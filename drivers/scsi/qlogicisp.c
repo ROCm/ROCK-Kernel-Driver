@@ -62,8 +62,6 @@
 
 #define DEFAULT_LOOP_COUNT	1000000
 
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
-
 /* End Configuration section *************************************************/
 
 #include <linux/module.h>

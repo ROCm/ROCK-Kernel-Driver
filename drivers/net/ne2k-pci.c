@@ -25,6 +25,11 @@
 	Limited full-duplex support.
 */
 
+#define DRV_NAME	"ne2k-pci"
+#define DRV_VERSION	"1.02"
+#define DRV_RELDATE	"10/19/2000"
+
+
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 
@@ -45,10 +50,12 @@ static int options[MAX_UNITS];
 #include <linux/errno.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/ethtool.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/uaccess.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -56,7 +63,7 @@ static int options[MAX_UNITS];
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO "ne2k-pci.c:v1.02 10/19/2000 D. Becker/P. Gortmaker\n"
+KERN_INFO DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " D. Becker/P. Gortmaker\n"
 KERN_INFO "  http://www.scyld.com/network/ne2k-pci.html\n";
 
 #if defined(__powerpc__)
@@ -66,11 +73,16 @@ KERN_INFO "  http://www.scyld.com/network/ne2k-pci.html\n";
 #define outsl outsl_ns
 #endif
 
+#define PFX DRV_NAME ": "
+
 MODULE_AUTHOR("Donald Becker / Paul Gortmaker");
 MODULE_DESCRIPTION("PCI NE2000 clone driver");
 MODULE_PARM(debug, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+MODULE_PARM_DESC(debug, "PCI NE2000 debug level (1-2)");
+MODULE_PARM_DESC(options, "PCI NE2000: Bit 5: full duplex");
+MODULE_PARM_DESC(full_duplex, "PCI NE2000 full duplex setting(s) (1)");
 
 /* Some defines that people can play with if so inclined. */
 
@@ -160,6 +172,7 @@ static void ne2k_pci_block_input(struct net_device *dev, int count,
 			  struct sk_buff *skb, int ring_offset);
 static void ne2k_pci_block_output(struct net_device *dev, const int count,
 		const unsigned char *buf, const int start_page);
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 
 
 
@@ -215,12 +228,12 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	irq = pdev->irq;
 
 	if (!ioaddr || ((pci_resource_flags (pdev, 0) & IORESOURCE_IO) == 0)) {
-		printk (KERN_ERR "ne2k-pci: no I/O resource at PCI BAR #0\n");
+		printk (KERN_ERR PFX "no I/O resource at PCI BAR #0\n");
 		return -ENODEV;
 	}
 
-	if (request_region (ioaddr, NE_IO_EXTENT, "ne2k-pci") == NULL) {
-		printk (KERN_ERR "ne2k-pci: I/O resource 0x%x @ 0x%lx busy\n",
+	if (request_region (ioaddr, NE_IO_EXTENT, DRV_NAME) == NULL) {
+		printk (KERN_ERR PFX "I/O resource 0x%x @ 0x%lx busy\n",
 			NE_IO_EXTENT, ioaddr);
 		return -EBUSY;
 	}
@@ -246,7 +259,7 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 
 	dev = alloc_etherdev(0);
 	if (!dev) {
-		printk (KERN_ERR "ne2k-pci: cannot allocate ethernet device\n");
+		printk (KERN_ERR PFX "cannot allocate ethernet device\n");
 		goto err_out_free_res;
 	}
 	SET_MODULE_OWNER(dev);
@@ -263,7 +276,7 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 		while ((inb(ioaddr + EN0_ISR) & ENISR_RESET) == 0)
 			/* Limit wait: '2' avoids jiffy roll-over. */
 			if (jiffies - reset_start_time > 2) {
-				printk("ne2k-pci: Card failure (no reset ack).\n");
+				printk(KERN_ERR PFX "Card failure (no reset ack).\n");
 				goto err_out_free_netdev;
 			}
 
@@ -342,8 +355,10 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	ei_status.block_input = &ne2k_pci_block_input;
 	ei_status.block_output = &ne2k_pci_block_output;
 	ei_status.get_8390_hdr = &ne2k_pci_get_8390_hdr;
+	ei_status.priv = (unsigned long) pdev;
 	dev->open = &ne2k_pci_open;
 	dev->stop = &ne2k_pci_close;
+	dev->do_ioctl = &netdev_ioctl;
 	NS8390_init(dev, 0);
 
 	i = register_netdev(dev);
@@ -573,6 +588,40 @@ static void ne2k_pci_block_output(struct net_device *dev, int count,
 	return;
 }
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	struct ei_device *ei = dev->priv;
+	struct pci_dev *pci_dev = (struct pci_dev *) ei->priv;
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+
+        switch (ethcmd) {
+        case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strcpy(info.driver, DRV_NAME);
+		strcpy(info.version, DRV_VERSION);
+		strcpy(info.bus_info, pci_dev->slot_name);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+
+        }
+	
+	return -EOPNOTSUPP;
+}
+
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	switch(cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
 
 static void __devexit ne2k_pci_remove_one (struct pci_dev *pdev)
 {
@@ -589,7 +638,7 @@ static void __devexit ne2k_pci_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_driver ne2k_driver = {
-	name:		"ne2k-pci",
+	name:		DRV_NAME,
 	probe:		ne2k_pci_init_one,
 	remove:		ne2k_pci_remove_one,
 	id_table:	ne2k_pci_tbl,

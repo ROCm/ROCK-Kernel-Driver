@@ -12,14 +12,15 @@
 #define DBG(x...)
 #endif
 
-#define PCI_PROBE_BIOS 1
-#define PCI_PROBE_CONF1 2
-#define PCI_PROBE_CONF2 4
-#define PCI_NO_SORT 0x100
-#define PCI_BIOS_SORT 0x200
-#define PCI_NO_CHECKS 0x400
-#define PCI_ASSIGN_ROMS 0x1000
-#define PCI_BIOS_IRQ_SCAN 0x2000
+#define PCI_PROBE_BIOS		0x0001
+#define PCI_PROBE_CONF1		0x0002
+#define PCI_PROBE_CONF2		0x0004
+#define PCI_NO_SORT		0x0100
+#define PCI_BIOS_SORT		0x0200
+#define PCI_NO_CHECKS		0x0400
+#define PCI_ASSIGN_ROMS		0x1000
+#define PCI_BIOS_IRQ_SCAN	0x2000
+#define PCI_ASSIGN_ALL_BUSSES	0x4000
 
 extern unsigned int pci_probe;
 

@@ -62,7 +62,4 @@ extern int setup_irq(unsigned int , struct irqaction * );
 extern hw_irq_controller no_irq_type;  /* needed in every arch ? */
 extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
 
-extern volatile unsigned long irq_err_count;
-
 #endif /* __asm_h */
-

@@ -80,6 +80,7 @@ struct asyncppp {
 
 static int flag_time = HZ;
 MODULE_PARM(flag_time, "i");
+MODULE_PARM_DESC(flag_time, "ppp_async: interval between flagged packets (in clock ticks)");
 
 /*
  * Prototypes.

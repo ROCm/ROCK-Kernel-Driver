@@ -1771,6 +1771,10 @@ MODULE_PARM(io, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(autodetect, "1-" __MODULE_STRING(1) "i");
+MODULE_PARM_DESC(io, "EtherExpress Pro/10 I/O base addres(es)");
+MODULE_PARM_DESC(irq, "EtherExpress Pro/10 IRQ number(s)");
+MODULE_PARM_DESC(mem, "EtherExpress Pro/10 Rx buffer size(es) in kB (3-29)");
+MODULE_PARM_DESC(autodetect, "EtherExpress Pro/10 force board(s) detection (0-1)");
 
 int 
 init_module(void)

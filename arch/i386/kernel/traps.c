@@ -105,6 +105,7 @@ void show_trace(unsigned long * stack)
 	i = 1;
 	module_start = VMALLOC_START;
 	module_end = VMALLOC_END;
+	module_end = 0;
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
 		addr = *stack++;
 		/*
@@ -129,7 +130,12 @@ void show_trace(unsigned long * stack)
 
 void show_trace_task(struct task_struct *tsk)
 {
-	show_trace(&tsk->thread.esp);
+	unsigned long esp = tsk->thread.esp;
+
+	/* User space on another CPU? */
+	if ((esp ^ (unsigned long)tsk) & (PAGE_MASK<<1))
+		return;
+	show_trace((unsigned long *)esp);
 }
 
 void show_stack(unsigned long * esp)

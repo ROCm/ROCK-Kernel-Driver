@@ -370,6 +370,9 @@ static int mem[MAX_NE3210_CARDS];
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_NE3210_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_NE3210_CARDS) "i");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_NE3210_CARDS) "i");
+MODULE_PARM_DESC(io, "NE3210 I/O base address(es)");
+MODULE_PARM_DESC(irq, "NE3210 IRQ number(s)");
+MODULE_PARM_DESC(mem, "NE3210 memory base address(es)");
 
 int init_module(void)
 {

@@ -379,6 +379,8 @@ static int irq[MAX_HP_CARDS];
 
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_HP_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_HP_CARDS) "i");
+MODULE_PARM_DESC(io, "HP PC-LAN I/O base address(es)");
+MODULE_PARM_DESC(irq, "HP PC-LAN IRQ number(s) (assigned)");
 
 /* This is set up so that only a single autoprobe takes place per call.
 ISA device autoprobes on a running machine are not recommended. */

@@ -626,6 +626,7 @@ static struct net_device dev_cs89x0;
 static int debug;
 
 MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "CS89[02]0 debug level (0-5)");
 
 EXPORT_NO_SYMBOLS;
 

@@ -30,7 +30,7 @@ ifeq ($(CONFIG_ISDN_PPP),y)
 endif
 
 subdir-$(CONFIG_NET_PCMCIA) += pcmcia
-subdir-$(CONFIG_NET_RADIO) += wireless
+subdir-$(CONFIG_NET_WIRELESS) += wireless
 subdir-$(CONFIG_TULIP) += tulip
 subdir-$(CONFIG_IRDA) += irda
 subdir-$(CONFIG_TR) += tokenring

@@ -80,13 +80,13 @@ static int alloc_branch(struct inode *inode,
 			break;
 		branch[n].key = cpu_to_block(nr);
 		bh = getblk(inode->i_dev, parent, BLOCK_SIZE);
-		if (!buffer_uptodate(bh))
-			wait_on_buffer(bh);
+		lock_buffer(bh);
 		memset(bh->b_data, 0, BLOCK_SIZE);
 		branch[n].bh = bh;
 		branch[n].p = (block_t*) bh->b_data + offsets[n];
 		*branch[n].p = branch[n].key;
 		mark_buffer_uptodate(bh, 1);
+		unlock_buffer(bh);
 		mark_buffer_dirty(bh);
 		parent = nr;
 	}

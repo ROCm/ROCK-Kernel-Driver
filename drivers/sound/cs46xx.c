@@ -3375,7 +3375,7 @@ static int cs_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-void printpm(struct cs_card *s)
+static void printpm(struct cs_card *s)
 {
 	CS_DBGOUT(CS_PM, 9, printk("pm struct:\n"));
 	CS_DBGOUT(CS_PM, 9, printk("flags:0x%x u32CLKCR1_SAVE: 0%x u32SSPMValue: 0x%x\n",
@@ -3588,7 +3588,7 @@ static int cs46xx_restart_part(struct cs_card *card)
 
 static void cs461x_reset(struct cs_card *card);
 static void cs461x_proc_stop(struct cs_card *card);
-int cs46xx_suspend(struct cs_card *card)
+static int cs46xx_suspend(struct cs_card *card)
 {
 	unsigned int tmp;
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 4, 
@@ -3680,7 +3680,7 @@ int cs46xx_suspend(struct cs_card *card)
 	return 0;
 }
 
-int cs46xx_resume(struct cs_card *card)
+static int cs46xx_resume(struct cs_card *card)
 {
 	int i;
 

@@ -10,8 +10,9 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
-#include <sys/time.h>
+#include <time.h>
 
 char* default_basename = "pca200e"; /* was initially written for the PCA-200E firmware */
 char* default_infname  = "<stdin>";

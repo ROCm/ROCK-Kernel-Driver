@@ -181,7 +181,7 @@ static int i596_debug = (DEB_SERIOUS|DEB_PROBE);
 MODULE_AUTHOR("Richard Hirst");
 MODULE_DESCRIPTION("i82596 driver");
 MODULE_PARM(i596_debug, "i");
-
+MODULE_PARM_DESC(i596_debug, "lasi_82596 debug mask");
 
 /* Copy frames shorter than rx_copybreak, otherwise pass on up in
  * a full sized sk_buff.  Value of 100 stolen from tulip.c (!alpha).

@@ -197,6 +197,12 @@ MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM(clone, "i");
 MODULE_PARM(de620_debug, "i");
+MODULE_PARM_DESC(bnc, "DE-620 set BNC medium (0-1)");
+MODULE_PARM_DESC(utp, "DE-620 set UTP medium (0-1)");
+MODULE_PARM_DESC(io, "DE-620 I/O base address,required");
+MODULE_PARM_DESC(irq, "DE-620 IRQ number,required");
+MODULE_PARM_DESC(clone, "Check also for non-D-Link DE-620 clones (0-1)");
+MODULE_PARM_DESC(de620_debug, "DE-620 debug level (0-2)");
 
 /***********************************************
  *                                             *

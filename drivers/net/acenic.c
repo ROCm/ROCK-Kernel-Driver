@@ -740,7 +740,6 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 }
 
 
-#ifdef MODULE
 MODULE_AUTHOR("Jes Sorensen <jes@linuxcare.com>");
 MODULE_DESCRIPTION("AceNIC/3C985/GA620 Gigabit Ethernet driver");
 MODULE_PARM(link, "1-" __MODULE_STRING(8) "i");
@@ -749,7 +748,12 @@ MODULE_PARM(tx_coal_tick, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(max_tx_desc, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(rx_coal_tick, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(max_rx_desc, "1-" __MODULE_STRING(8) "i");
-#endif
+MODULE_PARM_DESC(link, "Acenic/3C985/NetGear link state");
+MODULE_PARM_DESC(trace, "Acenic/3C985/NetGear firmware trace level");
+MODULE_PARM_DESC(tx_coal_tick, "Acenic/3C985/NetGear maximum clock ticks to wait for packets");
+MODULE_PARM_DESC(max_tx_desc, "Acenic/3C985/NetGear maximum number of transmit descriptors");
+MODULE_PARM_DESC(rx_coal_tick, "Acenic/3C985/NetGear maximum clock ticks to wait for packets");
+MODULE_PARM_DESC(max_rx_desc, "Acenic/3C985/NetGear maximum number of receive descriptors");
 
 
 static void __exit ace_module_cleanup(void)

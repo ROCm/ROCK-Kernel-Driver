@@ -222,7 +222,7 @@ static void flush_tachyon_cache(struct fc_info *fi, u_short ox_id);
 static int get_scsi_oxid(struct fc_info *fi);
 static void update_scsi_oxid(struct fc_info *fi);
 
-Scsi_Host_Template driver_template = IPH5526_SCSI_FC;
+static Scsi_Host_Template driver_template = IPH5526_SCSI_FC;
 
 static void iph5526_timeout(struct net_device *dev);
 

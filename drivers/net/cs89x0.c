@@ -1607,6 +1607,25 @@ MODULE_PARM(duplex, "i");
 MODULE_PARM(dma , "i");
 MODULE_PARM(dmasize , "i");
 MODULE_PARM(use_dma , "i");
+MODULE_PARM_DESC(io, "cs89x0 I/O base address");
+MODULE_PARM_DESC(irq, "cs89x0 IRQ number");
+#if DEBUGGING
+MODULE_PARM_DESC(debug, "cs89x0 debug level (0-6)");
+#else
+MODULE_PARM_DESC(debug, "(ignored)");
+#endif
+MODULE_PARM_DESC(media, "Set cs89x0 adapter(s) media type(s) (rj45,bnc,aui)");
+/* No other value than -1 for duplex seems to be currently interpreted */
+MODULE_PARM_DESC(duplex, "(ignored)");
+#if ALLOW_DMA
+MODULE_PARM_DESC(dma , "cs89x0 ISA DMA channel; ignored if use_dma=0");
+MODULE_PARM_DESC(dmasize , "cs89x0 DMA size in kB (16,64); ignored if use_dma=0");
+MODULE_PARM_DESC(use_dma , "cs89x0 using DMA (0-1)");
+#else
+MODULE_PARM_DESC(dma , "(ignored)");
+MODULE_PARM_DESC(dmasize , "(ignored)");
+MODULE_PARM_DESC(use_dma , "(ignored)");
+#endif
 
 MODULE_AUTHOR("Mike Cruse, Russwll Nelson <nelson@crynwr.com>, Andrew Morton <andrewm@uow.edu.au>");
 

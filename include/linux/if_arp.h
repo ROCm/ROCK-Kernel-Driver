@@ -79,6 +79,7 @@
 #define ARPHRD_FCFABRIC	787		/* Fibrechannel fabric		*/
 	/* 787->799 reserved for fibrechannel media types */
 #define ARPHRD_IEEE802_TR 800		/* Magic type ident for TR	*/
+#define ARPHRD_IEEE80211 801		/* IEEE 802.11			*/
 
 #define ARPHRD_VOID	  0xFFFF	/* Void type, nothing is known */
 

@@ -14,12 +14,3 @@ To-do items for network drivers
 
 * Add ETHTOOL_GDRVINFO ioctl support to all ethernet drivers.
 
-
-
-To-do items to consider for network drivers
--------------------------------------------
-* Make a single function which handles the ethtool ioctl for
-  most MII-compatible devices?  Ideally the driver would pass function
-  pointers to its existing mdio_{read,write} functions when calling the
-  generic ioctl handler.
-

@@ -1164,7 +1164,7 @@ L:	linux-scsi@vger.kernel.org
 S:	Unmaintained
 
 SCSI TAPE DRIVER
-P:	Kai Mdkisara
+P:	Kai Mäkisara
 M:	Kai.Makisara@metla.fi
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
@@ -1187,12 +1187,6 @@ P:	Urban Widmark
 M:	urban@teststation.com
 W:	http://samba.org/
 L:	samba@samba.org
-S:	Maintained
-
-SMP: (except SPARC)
-P:	Linus Torvalds
-M:	torvalds@transmeta.com
-L:	linux-smp@vger.kernel.org
 S:	Maintained
 
 SOFTWARE RAID (Multiple Disks) SUPPORT

@@ -682,6 +682,7 @@ static int shapers = 1;
 #ifdef MODULE
 
 MODULE_PARM(shapers, "i");
+MODULE_PARM_DESC(shapers, "Traffic shaper: maximum nuber of shapers");
 
 #else /* MODULE */
 

@@ -535,7 +535,22 @@ MODULE_PARM(tx_params, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(force32, "i");
-
+MODULE_PARM_DESC(max_interrupt_work, "GNIC-II maximum events handled per interrupt");
+MODULE_PARM_DESC(mtu, "GNIC-II MTU (all boards)");
+MODULE_PARM_DESC(debug, "GNIC-II debug level (0-7)");
+MODULE_PARM_DESC(min_rx_pkt, "GNIC-II minimum Rx packets processed between interrupts");
+MODULE_PARM_DESC(max_rx_gap, "GNIC-II maximum Rx inter-packet gap in 8.192 microsecond units");
+MODULE_PARM_DESC(max_rx_latency, "GNIC-II time between Rx interrupts in 8.192 microsecond units");
+MODULE_PARM_DESC(min_tx_pkt, "GNIC-II minimum Tx packets processed between interrupts");
+MODULE_PARM_DESC(max_tx_gap, "GNIC-II maximum Tx inter-packet gap in 8.192 microsecond units");
+MODULE_PARM_DESC(max_tx_latency, "GNIC-II time between Tx interrupts in 8.192 microsecond units");
+MODULE_PARM_DESC(rx_copybreak, "GNIC-II copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(rx_params, "GNIC-II min_rx_pkt+max_rx_gap+max_rx_latency");
+MODULE_PARM_DESC(tx_params, "GNIC-II min_tx_pkt+max_tx_gap+max_tx_latency");
+MODULE_PARM_DESC(options, "GNIC-II Bits 0-3: media type, bits 4-6: as force32, bit 7: half duplex, bit 9 full duplex");
+MODULE_PARM_DESC(full_duplex, "GNIC-II full duplex setting(s) (1)");
+MODULE_PARM_DESC(force32, "GNIC-II: Bit 0: 32 bit PCI, bit 1: disable parity, bit 2: 64 bit PCI (all boards)");
+                                                                        
 static int read_eeprom(long ioaddr, int location);
 static int mdio_read(long ioaddr, int phy_id, int location);
 static void mdio_write(long ioaddr, int phy_id, int location, int value);

@@ -6261,20 +6261,12 @@ static DWORD PCIEE_GetSerialNumber(WORD wAddress)
 	return (((DWORD) wHi << 16) | wLo);
 }
 
-#ifndef CONFIG_PCMCIA
 #ifndef CONFIG_ISAPNP
-static int dspio[IXJMAX + 1] =
-{
-	0,
-};
-static int xio[IXJMAX + 1] =
-{
-	0,
-};
+static int dspio[IXJMAX + 1];
+static int xio[IXJMAX + 1];
 
 MODULE_PARM(dspio, "1-" __MODULE_STRING(IXJMAX) "i");
 MODULE_PARM(xio, "1-" __MODULE_STRING(IXJMAX) "i");
-#endif
 #endif
 
 void ixj_exit(void)

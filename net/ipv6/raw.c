@@ -7,7 +7,7 @@
  *
  *	Adapted from linux/net/ipv4/raw.c
  *
- *	$Id: raw.c,v 1.45 2001/02/18 09:10:42 davem Exp $
+ *	$Id: raw.c,v 1.46 2001/06/05 11:36:55 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -117,8 +117,13 @@ static __inline__ int icmpv6_filter(struct sock *sk, struct sk_buff *skb)
 
 	opt = &sk->tp_pinfo.tp_raw;
 	if (pskb_may_pull(skb, sizeof(struct icmp6hdr))) {
+		__u32 *data = &opt->filter.data[0];
+		int bit_nr;
+
 		icmph = (struct icmp6hdr *) skb->data;
-		return test_bit(icmph->icmp6_type, &opt->filter);
+		bit_nr = icmph->icmp6_type;
+
+		return (data[bit_nr >> 5] & (1 << (bit_nr & 31))) != 0;
 	}
 	return 0;
 }

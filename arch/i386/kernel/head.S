@@ -41,8 +41,6 @@
  *
  * On entry, %esi points to the real-mode code as a 32-bit pointer.
  */
-ENTRY(stext)
-ENTRY(_stext)
 startup_32:
 /*
  * Set segments to known values
@@ -409,6 +407,12 @@ ENTRY(pg1)
 ENTRY(empty_zero_page)
 
 .org 0x5000
+
+/*
+ * Real beginning of normal "text" segment
+ */
+ENTRY(stext)
+ENTRY(_stext)
 
 /*
  * This starts the data section. Note that the above is all

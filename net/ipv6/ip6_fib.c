@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: ip6_fib.c,v 1.23 2001/03/19 20:31:17 davem Exp $
+ *	$Id: ip6_fib.c,v 1.24 2001/06/05 11:36:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -174,7 +174,7 @@ static __inline__ int addr_diff(void *token1, void *token2, int addrlen)
 
 			xb = ntohl(xb);
 
-			while (test_bit(j, &xb) == 0)
+			while ((xb & (1 << j)) == 0)
 				j--;
 
 			return (i * 32 + 31 - j);

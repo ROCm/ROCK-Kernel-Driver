@@ -2039,6 +2039,8 @@ static int irq=7;	/* EDIT THESE LINE FOR YOUR CONFIGURATION */
 static int io=0x200;    /* Or use the irq= io= options to insmod */
 MODULE_PARM(irq, "i");
 MODULE_PARM(io, "i");
+MODULE_PARM_DESC(irq, "DEPCA IRQ number");
+MODULE_PARM_DESC(io, "DEPCA I/O base address");
 
 /* See depca_probe() for autoprobe messages when a module */	
 int

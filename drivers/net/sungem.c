@@ -49,6 +49,7 @@ static char version[] __devinitdata =
 MODULE_AUTHOR("David S. Miller (davem@redhat.com)");
 MODULE_DESCRIPTION("Sun GEM Gbit ethernet driver");
 MODULE_PARM(gem_debug, "i");
+MODULE_PARM_DESC(gem_debug, "(ignored)");
 
 #define GEM_MODULE_NAME	"gem"
 #define PFX GEM_MODULE_NAME ": "
@@ -1732,14 +1733,6 @@ err_out_free_netdev:
 
 }
 
-static void gem_suspend(struct pci_dev *pdev)
-{
-}
-
-static void gem_resume(struct pci_dev *pdev)
-{
-}
-
 static void __devexit gem_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
@@ -1767,8 +1760,6 @@ static struct pci_driver gem_driver = {
 	id_table:	gem_pci_tbl,
 	probe:		gem_init_one,
 	remove:		gem_remove_one,
-	suspend:	gem_suspend,
-	resume:		gem_resume,
 };
 
 static int __init gem_init(void)

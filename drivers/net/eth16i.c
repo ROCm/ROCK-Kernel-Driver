@@ -1407,7 +1407,7 @@ MODULE_AUTHOR("Mika Kuoppala <miku@iki.fi>");
 MODULE_DESCRIPTION("ICL EtherTeam 16i/32 driver");
 
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_ETH16I_CARDS) "i");
-MODULE_PARM_DESC(io, "eth16i io base address");
+MODULE_PARM_DESC(io, "eth16i I/O base address(es)");
 
 #if 0
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_ETH16I_CARDS) "i");
@@ -1415,10 +1415,10 @@ MODULE_PARM_DESC(irq, "eth16i interrupt request number");
 #endif
 
 MODULE_PARM(mediatype, "1-" __MODULE_STRING(MAX_ETH16I_CARDS) "s");
-MODULE_PARM_DESC(mediatype, "eth16i interfaceport mediatype");
+MODULE_PARM_DESC(mediatype, "eth16i media type of interface(s) (bnc,tp,dix,auto,eprom)");
 
 MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "eth16i debug level (0-4)");
+MODULE_PARM_DESC(debug, "eth16i debug level (0-6)");
 #endif
 
 int init_module(void)

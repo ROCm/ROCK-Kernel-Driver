@@ -251,7 +251,7 @@ int __init el1_probe(struct net_device *dev)
 }
 
 /**
- *	el1_probe: 
+ *	el1_probe1: 
  *	@dev: The device structure to use
  *	@ioaddr: An I/O address to probe at.
  *
@@ -925,6 +925,8 @@ static int io=0x280;
 static int irq=5;
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(io, "EtherLink I/O base address");
+MODULE_PARM_DESC(irq, "EtherLink IRQ number");
 
 /**
  * init_module:

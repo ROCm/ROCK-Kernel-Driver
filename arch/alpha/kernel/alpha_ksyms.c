@@ -16,6 +16,7 @@
 #include <linux/pci.h>
 #include <linux/tty.h>
 #include <linux/mm.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/hwrpb.h>
@@ -100,6 +101,10 @@ EXPORT_SYMBOL(__memsetw);
 EXPORT_SYMBOL(__constant_c_memset);
 EXPORT_SYMBOL(copy_page);
 EXPORT_SYMBOL(clear_page);
+
+EXPORT_SYMBOL(__delay);
+EXPORT_SYMBOL(__udelay);
+EXPORT_SYMBOL(udelay);
 
 EXPORT_SYMBOL(__direct_map_base);
 EXPORT_SYMBOL(__direct_map_size);

@@ -1184,6 +1184,9 @@ static int dma;
 MODULE_PARM(irq, "i");
 MODULE_PARM(io, "i");
 MODULE_PARM(dma, "i");
+MODULE_PARM_DESC(irq, "ni6510 IRQ number (ignored for some cards)");
+MODULE_PARM_DESC(io, "ni6510 I/O base address");
+MODULE_PARM_DESC(dma, "ni6510 ISA DMA channel (ignored for some cards)");
 
 int init_module(void)
 {

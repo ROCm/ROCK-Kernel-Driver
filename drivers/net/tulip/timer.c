@@ -158,7 +158,7 @@ void tulip_timer(unsigned long data)
 				       medianame[tp->mtable->mleaf[tp->cur_index].media]);
 			tulip_select_media(dev, 0);
 			/* Restart the transmit process. */
-			tulip_restart_rxtx(tp, tp->csr6);
+			tulip_restart_rxtx(tp);
 			next_tick = (24*HZ)/10;
 			break;
 		}

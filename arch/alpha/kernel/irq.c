@@ -516,7 +516,10 @@ free_irq(unsigned int irq, void *dev_id)
 int
 get_irq_list(char *buf)
 {
-	int i, j;
+#ifdef CONFIG_SMP
+	int j;
+#endif
+	int i;
 	struct irqaction * action;
 	char *p = buf;
 

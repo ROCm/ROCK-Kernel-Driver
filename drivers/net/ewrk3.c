@@ -1849,6 +1849,8 @@ static int irq = 5;		/* or use the insmod io= irq= options           */
 
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(io, "EtherWORKS 3 I/O base address");
+MODULE_PARM_DESC(irq, "EtherWORKS 3 IRQ number");
 
 int init_module(void)
 {

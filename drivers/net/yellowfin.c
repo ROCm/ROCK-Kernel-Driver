@@ -36,6 +36,12 @@
 	
 */
 
+#define DRV_NAME	"yellowfin"
+#define DRV_VERSION	"1.05+LK1.1.3"
+#define DRV_RELDATE	"May 10, 2001"
+
+#define PFX DRV_NAME ": "
+
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 
@@ -108,6 +114,8 @@ static int gx_fix;
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/unaligned.h>
 #include <asm/bitops.h>
@@ -115,9 +123,9 @@ static int gx_fix;
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO "yellowfin.c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.com>\n"
+KERN_INFO DRV_NAME ".c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.com>\n"
 KERN_INFO "  http://www.scyld.com/network/yellowfin.html\n"
-KERN_INFO "  (unofficial 2.4.x port, LK1.1.3, May 10, 2001)\n";
+KERN_INFO "  (unofficial 2.4.x port, " DRV_VERSION ", " DRV_RELDATE ")\n";
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
@@ -146,6 +154,13 @@ MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(gx_fix, "i");
+MODULE_PARM_DESC(max_interrupt_work, "G-NIC maximum events handled per interrupt");
+MODULE_PARM_DESC(mtu, "G-NIC MTU (all boards)");
+MODULE_PARM_DESC(debug, "G-NIC debug level (0-7)");
+MODULE_PARM_DESC(rx_copybreak, "G-NIC copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(options, "G-NIC: Bits 0-3: media type, bit 17: full duplex");
+MODULE_PARM_DESC(full_duplex, "G-NIC full duplex setting(s) (1)");
+MODULE_PARM_DESC(gx_fix, "G-NIC: enable GX server chipset bug workaround (0-1)");
 
 /*
 				Theory of Operation
@@ -369,7 +384,7 @@ struct yellowfin_private {
 static int read_eeprom(long ioaddr, int location);
 static int mdio_read(long ioaddr, int phy_id, int location);
 static void mdio_write(long ioaddr, int phy_id, int location, int value);
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int yellowfin_open(struct net_device *dev);
 static void yellowfin_timer(unsigned long data);
 static void yellowfin_tx_timeout(struct net_device *dev);
@@ -407,7 +422,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 
 	dev = alloc_etherdev(sizeof(*np));
 	if (!dev) {
-		printk (KERN_ERR "yellowfin: cannot allocate ethernet device\n");
+		printk (KERN_ERR PFX "cannot allocate ethernet device\n");
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
@@ -474,7 +489,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	dev->stop = &yellowfin_close;
 	dev->get_stats = &yellowfin_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
-	dev->do_ioctl = &mii_ioctl;
+	dev->do_ioctl = &netdev_ioctl;
 	dev->tx_timeout = yellowfin_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
@@ -1330,13 +1345,39 @@ static void set_rx_mode(struct net_device *dev)
 	outw(cfg_value | 0x1000, ioaddr + Cnfg);
 }
 
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	struct yellowfin_private *np = dev->priv;
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+
+        switch (ethcmd) {
+        case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strcpy(info.driver, DRV_NAME);
+		strcpy(info.version, DRV_VERSION);
+		strcpy(info.bus_info, np->pci_dev->slot_name);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+
+        }
+	
+	return -EOPNOTSUPP;
+}
+
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct yellowfin_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	u16 *data = (u16 *)&rq->ifr_data;
 
 	switch(cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
 		data[0] = np->phys[0] & 0x1f;
 		/* Fall Through */
@@ -1390,7 +1431,7 @@ static void __devexit yellowfin_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_driver yellowfin_driver = {
-	name:		"yellowfin",
+	name:		DRV_NAME,
 	id_table:	yellowfin_pci_tbl,
 	probe:		yellowfin_init_one,
 	remove:		yellowfin_remove_one,

@@ -26,6 +26,7 @@ struct smb_inode_info {
 	__u16 attr;		/* Attribute fields, DOS value */
 
 	__u16 access;		/* Access mode */
+	__u16 flags;
 	unsigned long oldmtime;	/* last time refreshed */
 	unsigned long closed;	/* timestamp when closed */
 	unsigned openers;	/* number of fileid users */

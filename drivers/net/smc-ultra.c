@@ -500,6 +500,8 @@ static int irq[MAX_ULTRA_CARDS];
 
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_ULTRA_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_ULTRA_CARDS) "i");
+MODULE_PARM_DESC(io, "SMC Ultra I/O base address(es)");
+MODULE_PARM_DESC(irq, "SMC Ultra IRQ number(s) (assigned)");
 
 EXPORT_NO_SYMBOLS;
 

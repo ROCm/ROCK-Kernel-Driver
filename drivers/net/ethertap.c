@@ -336,6 +336,7 @@ static struct net_device_stats *ethertap_get_stats(struct net_device *dev)
 
 static int unit;
 MODULE_PARM(unit,"i");
+MODULE_PARM_DESC(unit,"Ethertap device number");
 
 static struct net_device dev_ethertap =
 {

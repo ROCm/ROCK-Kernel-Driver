@@ -237,7 +237,7 @@ typedef struct {
 	idefloppy_flexible_disk_page_t flexible_disk_page;	/* Copy of the flexible disk page */
 	int wp;							/* Write protect */
 
-	unsigned int flags;			/* Status/Action flags */
+	unsigned long flags;			/* Status/Action flags */
 } idefloppy_floppy_t;
 
 /*

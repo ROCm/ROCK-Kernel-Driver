@@ -4639,7 +4639,7 @@ GDTH_INITFUNC(void, gdth_setup(char *str,int *ints))
 
 #else
 
-Scsi_Host_Template driver_template = GDTH;
+static Scsi_Host_Template driver_template = GDTH;
 #include "scsi_module.c"
 #ifndef MODULE
 __setup("gdth=", option_setup);

@@ -124,18 +124,29 @@ MODULE_PARM(rxdmacount, "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(multicast_filter_limit, "i");
+MODULE_PARM_DESC(debug, "eepro100 debug level (0-6)");
+MODULE_PARM_DESC(options, "epro100: Bits 0-3: tranceiver type, bit 4: full duplex, bit 5: 100Mbps");
+MODULE_PARM_DESC(full_duplex, "epro100 full duplex setting(s) (1)");
+MODULE_PARM_DESC(congenb, "epro100  Enable congestion control (1)");
+MODULE_PARM_DESC(txfifo, "epro100 Tx FIFO threshold in 4 byte units, (0-15)");
+MODULE_PARM_DESC(rxfifo, "epro100 Rx FIFO threshold in 4 byte units, (0-15)");
+MODULE_PARM_DESC(txdmaccount, "epro100 Tx DMA burst length; 128 - disable (0-128)");
+MODULE_PARM_DESC(rxdmaccount, "epro100 Rx DMA burst length; 128 - disable (0-128)");
+MODULE_PARM_DESC(rx_copybreak, "epro100 copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(max_interrupt_work, "epro100 maximum events handled per interrupt");
+MODULE_PARM_DESC(multicast_filter_limit, "epro100 maximum number of filtered multicast addresses");
 
 #define RUN_AT(x) (jiffies + (x))
 
 /* ACPI power states don't universally work (yet) */
-#ifndef CONFIG_EEPRO100_PM
+#ifndef CONFIG_PM
 #undef pci_set_power_state
 #define pci_set_power_state null_set_power_state
 static inline int null_set_power_state(struct pci_dev *dev, int state)
 {
 	return 0;
 }
-#endif /* CONFIG_EEPRO100_PM */
+#endif /* CONFIG_PM */
 
 #define netdevice_start(dev)
 #define netdevice_stop(dev)
@@ -512,7 +523,7 @@ static const char is_mii[] = { 0, 1, 1, 0, 1, 1, 0, 1 };
 static int eepro100_init_one(struct pci_dev *pdev,
 		const struct pci_device_id *ent);
 static void eepro100_remove_one (struct pci_dev *pdev);
-#ifdef CONFIG_EEPRO100_PM
+#ifdef CONFIG_PM
 static int eepro100_suspend (struct pci_dev *pdev, u32 state);
 static int eepro100_resume (struct pci_dev *pdev);
 #endif
@@ -1910,7 +1921,7 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		   timer routine.  2000/05/09 SAW */
 		saved_acpi = pci_set_power_state(sp->pdev, 0);
 		t = del_timer_sync(&sp->timer);
-		data[3] = mdio_read(ioaddr, data[0], data[1]);
+		data[3] = mdio_read(ioaddr, data[0] & 0x1f, data[1] & 0x1f);
 		if (t)
 			add_timer(&sp->timer); /* may be set to the past  --SAW */
 		pci_set_power_state(sp->pdev, saved_acpi);
@@ -2129,7 +2140,7 @@ static void set_rx_mode(struct net_device *dev)
 	sp->rx_mode = new_rx_mode;
 }
 
-#ifdef CONFIG_EEPRO100_PM
+#ifdef CONFIG_PM
 static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pdev->driver_data;
@@ -2163,7 +2174,7 @@ static int eepro100_resume(struct pci_dev *pdev)
 	set_rx_mode(dev);
 	return 0;
 }
-#endif /* CONFIG_EEPRO100_PM */
+#endif /* CONFIG_PM */
 
 static void __devexit eepro100_remove_one (struct pci_dev *pdev)
 {
@@ -2194,7 +2205,7 @@ static struct pci_device_id eepro100_pci_tbl[] __devinitdata = {
 		PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ID1030,
 		PCI_ANY_ID, PCI_ANY_ID, },
-	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82820FW_4,
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_7,
 		PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0,}
 };
@@ -2205,10 +2216,10 @@ static struct pci_driver eepro100_driver = {
 	id_table:	eepro100_pci_tbl,
 	probe:		eepro100_init_one,
 	remove:		eepro100_remove_one,
-#ifdef CONFIG_EEPRO100_PM
+#ifdef CONFIG_PM
 	suspend:	eepro100_suspend,
 	resume:		eepro100_resume,
-#endif
+#endif /* CONFIG_PM */
 };
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,48)

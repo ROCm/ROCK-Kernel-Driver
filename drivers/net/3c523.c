@@ -1226,6 +1226,8 @@ static int irq[MAX_3C523_CARDS];
 static int io[MAX_3C523_CARDS];
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_3C523_CARDS) "i");
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_3C523_CARDS) "i");
+MODULE_PARM_DESC(io, "EtherLink/MC I/O base address(es)");
+MODULE_PARM_DESC(irq, "EtherLink/MC IRQ number(s)");
 
 int init_module(void)
 {

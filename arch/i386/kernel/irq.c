@@ -33,6 +33,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 
+#include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/system.h>
@@ -119,7 +120,12 @@ struct hw_interrupt_type no_irq_type = {
 	end_none
 };
 
-volatile unsigned long irq_err_count;
+atomic_t irq_err_count;
+#ifdef CONFIG_X86_IO_APIC
+#ifdef APIC_MISMATCH_DEBUG
+atomic_t irq_mis_count;
+#endif
+#endif
 
 /*
  * Generic, controller-independent functions:
@@ -167,7 +173,12 @@ int get_irq_list(char *buf)
 			apic_timer_irqs[cpu_logical_map(j)]);
 	p += sprintf(p, "\n");
 #endif
-	p += sprintf(p, "ERR: %10lu\n", irq_err_count);
+	p += sprintf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
+#ifdef CONFIG_X86_IO_APIC
+#ifdef APIC_MISMATCH_DEBUG
+	p += sprintf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
+#endif
+#endif
 	return p - buf;
 }
 

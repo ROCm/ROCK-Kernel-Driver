@@ -141,8 +141,8 @@ smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 	inode->u.smbfs_i.oldmtime = jiffies;
 
 	if (inode->i_mtime != last_time || inode->i_size != last_sz) {
-		VERBOSE("%s/%s changed, old=%ld, new=%ld, oz=%ld, nz=%ld\n",
-			DENTRY_PATH(dentry),
+		VERBOSE("%ld changed, old=%ld, new=%ld, oz=%ld, nz=%ld\n",
+			inode->i_ino,
 			(long) last_time, (long) inode->i_mtime,
 			(long) last_sz, (long) inode->i_size);
 

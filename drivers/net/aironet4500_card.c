@@ -707,14 +707,14 @@ int awc_i365_probe_once(struct i365_socket * s ){
 	awc_i365_card_release(s);
 
 
-	udelay(100000);
+	mdelay(100);
 	
 	i365_out(s, 0x2, 0x10 ); 	// power enable
-	udelay(200000);
+	mdelay(200);
 	
 	i365_out(s, 0x2, 0x10 | 0x01 | 0x04 | 0x80);	//power enable
 	
-	udelay(250000);
+	mdelay(250);
 	
 	if (!s->irq)
 		s->irq = 11;
@@ -740,7 +740,7 @@ int awc_i365_probe_once(struct i365_socket * s ){
 	i365_out(s,0x15,0x3f | 0x40);		// enab mem reg bit
 	i365_out(s,0x06,0x01);			// enab mem 
 	
-	udelay(10000);
+	mdelay(10);
 	
 	cis[0] = 0x45;
 	
@@ -751,7 +751,7 @@ int awc_i365_probe_once(struct i365_socket * s ){
 
 	mem[0x3e0] = 0x45;
 
-	udelay(10000);
+	mdelay(10);
 	
 	memcpy_fromio(cis,0xD000, 0x3e0);
 	
@@ -779,7 +779,7 @@ int awc_i365_probe_once(struct i365_socket * s ){
 		s->socket, s->manufacturer,s->product);
 
 	i365_out(s,0x07, 0x1 | 0x2); 		// enable io 16bit
-	udelay(1000);
+	mdelay(1);
 	port = s->io;
 	i365_out(s,0x08, port & 0xff);
 	i365_out(s,0x09, (port & 0xff00)/ 0x100);
@@ -788,7 +788,7 @@ int awc_i365_probe_once(struct i365_socket * s ){
 
 	i365_out(s,0x06, 0x40); 		// enable io window
 
-	udelay(1000);
+	mdelay(1);
 
 	i365_out(s,0x3e0,0x45);
 	
@@ -806,13 +806,10 @@ int awc_i365_probe_once(struct i365_socket * s ){
 
 	
 	outw(0x10, s->io + 0x34);
-	udelay(10000);
+	mdelay(10);
 	
 	return 0;
-	
-	
 
-		
 };
 
 

@@ -49,7 +49,7 @@ static inline unsigned long dir_pages(struct inode *inode)
 
 static int ext2_commit_chunk(struct page *page, unsigned from, unsigned to)
 {
-	struct inode *dir = (struct inode *)page->mapping->host;
+	struct inode *dir = page->mapping->host;
 	int err = 0;
 	dir->i_version = ++event;
 	page->mapping->a_ops->commit_write(NULL, page, from, to);
@@ -60,10 +60,10 @@ static int ext2_commit_chunk(struct page *page, unsigned from, unsigned to)
 
 static void ext2_check_page(struct page *page)
 {
-	struct inode *dir = (struct inode *)page->mapping->host;
+	struct inode *dir = page->mapping->host;
 	struct super_block *sb = dir->i_sb;
 	unsigned chunk_size = ext2_chunk_size(dir);
-	char *kaddr = (char*)page_address(page);
+	char *kaddr = page_address(page);
 	u32 max_inumber = le32_to_cpu(sb->u.ext2_sb.s_es->s_inodes_count);
 	unsigned offs, rec_len;
 	unsigned limit = PAGE_CACHE_SIZE;
@@ -255,7 +255,7 @@ ext2_readdir (struct file * filp, void * dirent, filldir_t filldir)
 
 		if (IS_ERR(page))
 			continue;
-		kaddr = (char *)page_address(page);
+		kaddr = page_address(page);
 		if (need_revalidate) {
 			offset = ext2_validate_entry(kaddr, offset, chunk_mask);
 			need_revalidate = 0;
@@ -317,7 +317,7 @@ struct ext2_dir_entry_2 * ext2_find_entry (struct inode * dir,
 		if (IS_ERR(page))
 			continue;
 
-		kaddr = (char*)page_address(page);
+		kaddr = page_address(page);
 		de = (ext2_dirent *) kaddr;
 		kaddr += PAGE_CACHE_SIZE - reclen;
 		for ( ; (char *) de <= kaddr ; de = ext2_next_entry(de))
@@ -404,7 +404,7 @@ int ext2_add_link (struct dentry *dentry, struct inode *inode)
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
 			goto out;
-		kaddr = (char*)page_address(page);
+		kaddr = page_address(page);
 		de = (ext2_dirent *)kaddr;
 		kaddr += PAGE_CACHE_SIZE - reclen;
 		while ((char *)de <= kaddr) {
@@ -460,8 +460,8 @@ out:
 int ext2_delete_entry (struct ext2_dir_entry_2 * dir, struct page * page )
 {
 	struct address_space *mapping = page->mapping;
-	struct inode *inode = (struct inode*)mapping->host;
-	char *kaddr = (char*)page_address(page);
+	struct inode *inode = mapping->host;
+	char *kaddr = page_address(page);
 	unsigned from = ((char*)dir - kaddr) & ~(ext2_chunk_size(inode)-1);
 	unsigned to = ((char*)dir - kaddr) + le16_to_cpu(dir->rec_len);
 	ext2_dirent * pde = NULL;
@@ -507,7 +507,7 @@ int ext2_make_empty(struct inode *inode, struct inode *parent)
 	if (err)
 		goto fail;
 
-	base = (char*)page_address(page);
+	base = page_address(page);
 
 	de = (struct ext2_dir_entry_2 *) base;
 	de->name_len = 1;
@@ -546,7 +546,7 @@ int ext2_empty_dir (struct inode * inode)
 		if (IS_ERR(page))
 			continue;
 
-		kaddr = (char *)page_address(page);
+		kaddr = page_address(page);
 		de = (ext2_dirent *)kaddr;
 		kaddr += PAGE_CACHE_SIZE-EXT2_DIR_REC_LEN(1);
 

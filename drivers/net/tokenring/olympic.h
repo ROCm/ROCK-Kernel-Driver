@@ -214,43 +214,43 @@
 /* xxxx These structures are all little endian in hardware. */
 
 struct olympic_tx_desc {
-	__u32 buffer;
-	__u32 status_length;
+	u32 buffer;
+	u32 status_length;
 };
 
 struct olympic_tx_status {
-	__u32 status;
+	u32 status;
 };
 
 struct olympic_rx_desc {
-	__u32 buffer;
-	__u32 res_length; 
+	u32 buffer;
+	u32 res_length; 
 };
 
 struct olympic_rx_status {
-	__u32 fragmentcnt_framelen;
-	__u32 status_buffercnt;
+	u32 fragmentcnt_framelen;
+	u32 status_buffercnt;
 };
 /* xxxx END These structures are all little endian in hardware. */
 /* xxxx There may be more, but I'm pretty sure about these */
 
 struct mac_receive_buffer {
-	__u16 next ; 
-	__u8 padding ; 
-	__u8 frame_status ;
-	__u16 buffer_length ; 
-	__u8 frame_data ; 
+	u16 next ; 
+	u8 padding ; 
+	u8 frame_status ;
+	u16 buffer_length ; 
+	u8 frame_data ; 
 };
 
 struct olympic_private {
 	
-	__u16 srb;      /* be16 */
-	__u16 trb;      /* be16 */
-	__u16 arb;      /* be16 */
-	__u16 asb;      /* be16 */
+	u16 srb;      /* be16 */
+	u16 trb;      /* be16 */
+	u16 arb;      /* be16 */
+	u16 asb;      /* be16 */
 
-	__u8 *olympic_mmio;
-	__u8 *olympic_lap;
+	u8 *olympic_mmio;
+	u8 *olympic_lap;
 	struct pci_dev *pdev ; 
 	char *olympic_card_name ; 
 
@@ -274,47 +274,47 @@ struct olympic_private {
 	int tx_ring_free, tx_ring_last_status, rx_ring_last_received,rx_status_last_received, free_tx_ring_entries;
 
 	struct net_device_stats olympic_stats ;
-	__u16 olympic_lan_status ;
-	__u8 olympic_ring_speed ;
-	__u16 pkt_buf_sz ; 
-	__u8 olympic_receive_options, olympic_copy_all_options,olympic_message_level, olympic_network_monitor;  
-	__u16 olympic_addr_table_addr, olympic_parms_addr ; 
-	__u8 olympic_laa[6] ; 
-	__u32 rx_ring_dma_addr;
-	__u32 rx_status_ring_dma_addr;
-	__u32 tx_ring_dma_addr;
-	__u32 tx_status_ring_dma_addr;
+	u16 olympic_lan_status ;
+	u8 olympic_ring_speed ;
+	u16 pkt_buf_sz ; 
+	u8 olympic_receive_options, olympic_copy_all_options,olympic_message_level, olympic_network_monitor;  
+	u16 olympic_addr_table_addr, olympic_parms_addr ; 
+	u8 olympic_laa[6] ; 
+	u32 rx_ring_dma_addr;
+	u32 rx_status_ring_dma_addr;
+	u32 tx_ring_dma_addr;
+	u32 tx_status_ring_dma_addr;
 };
 
 struct olympic_adapter_addr_table {
 
-	__u8 node_addr[6] ; 
-	__u8 reserved[4] ; 
-	__u8 func_addr[4] ; 
+	u8 node_addr[6] ; 
+	u8 reserved[4] ; 
+	u8 func_addr[4] ; 
 } ; 
 
 struct olympic_parameters_table { 
 	
-	__u8  phys_addr[4] ; 
-	__u8  up_node_addr[6] ; 
-	__u8  up_phys_addr[4] ; 
-	__u8  poll_addr[6] ; 
-	__u16 reserved ; 
-	__u16 acc_priority ; 
-	__u16 auth_source_class ; 
-	__u16 att_code ; 
-	__u8  source_addr[6] ; 
-	__u16 beacon_type ; 
-	__u16 major_vector ; 
-	__u16 lan_status ; 
-	__u16 soft_error_time ; 
- 	__u16 reserved1 ; 
-	__u16 local_ring ; 
-	__u16 mon_error ; 
-	__u16 beacon_transmit ; 
-	__u16 beacon_receive ; 
-	__u16 frame_correl ; 
-	__u8  beacon_naun[6] ; 
-	__u32 reserved2 ; 
-	__u8  beacon_phys[4] ; 	
+	u8  phys_addr[4] ; 
+	u8  up_node_addr[6] ; 
+	u8  up_phys_addr[4] ; 
+	u8  poll_addr[6] ; 
+	u16 reserved ; 
+	u16 acc_priority ; 
+	u16 auth_source_class ; 
+	u16 att_code ; 
+	u8  source_addr[6] ; 
+	u16 beacon_type ; 
+	u16 major_vector ; 
+	u16 lan_status ; 
+	u16 soft_error_time ; 
+ 	u16 reserved1 ; 
+	u16 local_ring ; 
+	u16 mon_error ; 
+	u16 beacon_transmit ; 
+	u16 beacon_receive ; 
+	u16 frame_correl ; 
+	u8  beacon_naun[6] ; 
+	u32 reserved2 ; 
+	u8  beacon_phys[4] ; 	
 }; 

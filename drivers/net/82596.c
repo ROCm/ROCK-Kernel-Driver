@@ -151,6 +151,7 @@ static int i596_debug = (DEB_SERIOUS|DEB_PROBE);
 MODULE_AUTHOR("Richard Hirst");
 MODULE_DESCRIPTION("i82596 driver");
 MODULE_PARM(i596_debug, "i");
+MODULE_PARM_DESC(i596_debug, "i82596 debug mask");
 
 
 /* Copy frames shorter than rx_copybreak, otherwise pass on up in
@@ -1493,9 +1494,11 @@ static struct net_device dev_82596 = { init: i82596_probe };
 static int io = 0x300;
 static int irq = 10;
 MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(irq, "Apricot IRQ number");
 #endif
 
 MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "i82596 debug mask");
 static int debug = -1;
 
 int init_module(void)

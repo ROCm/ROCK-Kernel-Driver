@@ -575,6 +575,7 @@ static char namespace[16] = "";
 static struct net_device dev_macsonic;
 
 MODULE_PARM(sonic_debug, "i");
+MODULE_PARM_DESC(sonic_debug, "macsonic debug level (1-4)");
 
 EXPORT_NO_SYMBOLS;
 

@@ -2014,7 +2014,10 @@ MODULE_PARM(HPNA_rx_cmd, "i");
 MODULE_PARM(HPNA_tx_cmd, "i");
 MODULE_PARM(HPNA_NoiseFloor, "i");
 MODULE_PARM(SF_mode, "i");
-
+MODULE_PARM_DESC(debug, "Davicom DM9xxx enable debugging (0-1)");
+MODULE_PARM_DESC(mode, "Davicom DM9xxx: Bit 0: 10/100Mbps, bit 2: duplex, bit 8: HomePNA");
+MODULE_PARM_DESC(SF_mode, "Davicom DM9xxx special function (bit 0: VLAN, bit 1 Flow Control, bit 2: TX pause packet)");
+                                                                                                                                
 /*	Description:
  *	when user used insmod to add module, system invoked init_module()
  *	to initilize and register.

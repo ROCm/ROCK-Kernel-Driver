@@ -299,6 +299,10 @@ MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(dma, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM(lance_debug, "i");
+MODULE_PARM_DESC(io, "LANCE/PCnet I/O base address(es),required");
+MODULE_PARM_DESC(dma, "LANCE/PCnet ISA DMA channel (ignored for some devices)");
+MODULE_PARM_DESC(irq, "LANCE/PCnet IRQ number (ignored for some devices)");
+MODULE_PARM_DESC(lance_debug, "LANCE/PCnet debug level (0-7)");
 
 int init_module(void)
 {

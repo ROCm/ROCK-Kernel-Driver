@@ -113,9 +113,11 @@ static const char version[] =
 
 static unsigned int de600_debug = DE600_DEBUG;
 MODULE_PARM(de600_debug, "i");
+MODULE_PARM_DESC(de600_debug, "DE-600 debug level (0-2)");
 
 static unsigned int delay_time = 10;
 MODULE_PARM(delay_time, "i");
+MODULE_PARM_DESC(delay_time, "DE-600 deley on I/O in microseconds");
 
 #ifdef FAKE_SMALL_MAX
 static unsigned long de600_rspace(struct sock *sk);

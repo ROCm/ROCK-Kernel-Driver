@@ -615,6 +615,9 @@ static int xcvr[MAX_EL2_CARDS];	/* choose int. or ext. xcvr */
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
 MODULE_PARM(xcvr, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
+MODULE_PARM_DESC(io, "EtherLink II I/O base address(es)");
+MODULE_PARM_DESC(irq, "EtherLink II IRQ number(s) (assigned)");
+MODULE_PARM_DESC(xcvr, "EtherLink II tranceiver(s) (0=internal, 1=external)");
 
 /* This is set up so that only a single autoprobe takes place per call.
 ISA device autoprobes on a running machine are not recommended. */

@@ -22,6 +22,7 @@
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
 #include <linux/timer.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 
@@ -29,6 +30,14 @@
 
 /* undefine, or define to various debugging levels (>4 == obscene levels) */
 #define TULIP_DEBUG 1
+
+/* undefine USE_IO_OPS for MMIO, define for PIO */
+#ifdef CONFIG_TULIP_MMIO
+# undef USE_IO_OPS
+#else
+# define USE_IO_OPS 1
+#endif
+
 
 
 struct tulip_chip_table {
@@ -139,10 +148,13 @@ enum status_bits {
 enum tulip_mode_bits {
 	TxThreshold		= (1 << 22),
 	FullDuplex		= (1 << 9),
+	TxOn			= 0x2000,
 	AcceptBroadcast		= 0x0100,
 	AcceptAllMulticast	= 0x0080,
 	AcceptAllPhys		= 0x0040,
 	AcceptRunt		= 0x0008,
+	RxOn			= 0x0002,
+	RxTx			= (TxOn | RxOn),
 };
 
 
@@ -219,7 +231,6 @@ enum t21143_csr6_bits {
 	 *   (1,1)   *    1024   *   160   *
 	 ***********************************/
 
-	csr6_st = (1<<13),   /* Transmit conrol: 1 = transmit, 0 = stop */
 	csr6_fc = (1<<12),   /* Forces a collision in next transmission (for testing in loopback mode) */
 	csr6_om_int_loop = (1<<10), /* internal (FIFO) loopback flag */
 	csr6_om_ext_loop = (1<<11), /* external (PMD) loopback flag */
@@ -231,7 +242,6 @@ enum t21143_csr6_bits {
 	csr6_if = (1<<4),    /* Inverse Filtering, rejects only addresses in address table: can't be set */
 	csr6_pb = (1<<3),    /* Pass Bad Frames, (1) causes even bad frames to be passed on */
 	csr6_ho = (1<<2),    /* Hash-only filtering mode: can't be set */
-	csr6_sr = (1<<1),    /* Start(1)/Stop(0) Receive */
 	csr6_hp = (1<<0),    /* Hash/Perfect Receive Filtering Mode: can't be set */
 
 	csr6_mask_capture = (csr6_sc | csr6_ca),
@@ -434,21 +444,48 @@ extern u16 t21041_csr13[];
 extern u16 t21041_csr14[];
 extern u16 t21041_csr15[];
 
+#ifndef USE_IO_OPS
+#undef inb
+#undef inw
+#undef inl
+#undef outb
+#undef outw
+#undef outl
+#define inb(addr) readb((void*)(addr))
+#define inw(addr) readw((void*)(addr))
+#define inl(addr) readl((void*)(addr))
+#define outb(val,addr) writeb((val), (void*)(addr))
+#define outw(val,addr) writew((val), (void*)(addr))
+#define outl(val,addr) writel((val), (void*)(addr))
+#endif /* !USE_IO_OPS */
 
-static inline void tulip_outl_csr (struct tulip_private *tp, u32 newValue, enum tulip_offsets offset)
+
+
+static inline void tulip_start_rxtx(struct tulip_private *tp)
 {
-	outl (newValue, tp->base_addr + offset);
+	long ioaddr = tp->base_addr;
+	outl(tp->csr6 | RxTx, ioaddr + CSR6);
+	barrier();
+	(void) inl(ioaddr + CSR6); /* mmio sync */
 }
 
-static inline void tulip_stop_rxtx(struct tulip_private *tp, u32 csr6mask)
+static inline void tulip_stop_rxtx(struct tulip_private *tp)
 {
-	tulip_outl_csr(tp, csr6mask & ~(csr6_st | csr6_sr), CSR6);
+	long ioaddr = tp->base_addr;
+	u32 csr6 = inl(ioaddr + CSR6);
+
+	if (csr6 & RxTx) {
+		outl(csr6 & ~RxTx, ioaddr + CSR6);
+		barrier();
+		(void) inl(ioaddr + CSR6); /* mmio sync */
+	}
 }
 
-static inline void tulip_restart_rxtx(struct tulip_private *tp, u32 csr6mask)
+static inline void tulip_restart_rxtx(struct tulip_private *tp)
 {
-	tulip_outl_csr(tp, csr6mask | csr6_sr, CSR6);
-	tulip_outl_csr(tp, csr6mask | csr6_st | csr6_sr, CSR6);
+	tulip_stop_rxtx(tp);
+	udelay(5);
+	tulip_start_rxtx(tp);
 }
 
 #endif /* __NET_TULIP_H__ */

@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 6
-EXTRAVERSION =-pre3
+EXTRAVERSION =-pre4
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -156,7 +156,8 @@ DRIVERS-$(CONFIG_SOUND) += drivers/sound/sounddrivers.o
 DRIVERS-$(CONFIG_PCI) += drivers/pci/driver.o
 DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
 DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
-DRIVERS-$(CONFIG_PCMCIA_NETCARD) += drivers/net/pcmcia/pcmcia_net.o
+DRIVERS-$(CONFIG_NET_PCMCIA) += drivers/net/pcmcia/pcmcia_net.o
+DRIVERS-$(CONFIG_NET_WIRELESS) += drivers/net/wireless/wireless_net.o
 DRIVERS-$(CONFIG_PCMCIA_CHRDEV) += drivers/char/pcmcia/pcmcia_char.o
 DRIVERS-$(CONFIG_DIO) += drivers/dio/dio.a
 DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o

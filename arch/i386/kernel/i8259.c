@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
 
+#include <asm/atomic.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -321,7 +322,7 @@ spurious_8259A_irq:
 			printk("spurious 8259A interrupt: IRQ%d.\n", irq);
 			spurious_irq_mask |= irqmask;
 		}
-		irq_err_count++;
+		atomic_inc(&irq_err_count);
 		/*
 		 * Theoretically we do not have to handle this IRQ,
 		 * but in Linux this does not cause problems and is

@@ -642,10 +642,11 @@ static void yenta_config_init(pci_socket_t *socket)
 	/* MAGIC NUMBERS! Fixme */
 	config_writeb(socket, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES / 4);
 	config_writeb(socket, PCI_LATENCY_TIMER, 168);
-	config_writeb(socket, PCI_SEC_LATENCY_TIMER, 176);
-	config_writeb(socket, PCI_PRIMARY_BUS, dev->bus->number);
-	config_writeb(socket, PCI_SECONDARY_BUS, dev->subordinate->number);
-	config_writeb(socket, PCI_SUBORDINATE_BUS, dev->subordinate->number);
+	config_writel(socket, PCI_PRIMARY_BUS,
+		(176 << 24) |			   /* sec. latency timer */
+		(dev->subordinate->subordinate << 16) | /* subordinate bus */
+		(dev->subordinate->secondary << 8) |  /* secondary bus */
+		dev->subordinate->primary);		   /* primary bus */
 
 	/*
 	 * Set up the bridging state:

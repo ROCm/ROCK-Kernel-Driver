@@ -25,6 +25,7 @@ static struct net_device *mace_devs;
 static int port_aaui = -1;
 
 MODULE_PARM(port_aaui, "i");
+MODULE_PARM_DESC(port_aaui, "MACE uses AAUI port (0-1)");
 
 #define N_RX_RING	8
 #define N_TX_RING	6

@@ -23,6 +23,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 
+#include <asm/atomic.h>
 #include <asm/smp.h>
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
@@ -270,7 +271,13 @@ void __init setup_local_APIC (void)
 	 *   PCI Ne2000 networking cards and PII/PIII processors, dual
 	 *   BX chipset. ]
 	 */
-#if 0
+	/*
+	 * Actually disabling the focus CPU check just makes the hang less
+	 * frequent as it makes the interrupt distributon model be more
+	 * like LRU than MRU (the short-term load is more even across CPUs).
+	 * See also the comment in end_level_ioapic_irq().  --macro
+	 */
+#if 1
 	/* Enable focus processor (bit==0) */
 	value &= ~(1<<9);
 #else
@@ -767,7 +774,7 @@ asmlinkage void smp_error_interrupt(void)
 	apic_write(APIC_ESR, 0);
 	v1 = apic_read(APIC_ESR);
 	ack_APIC_irq();
-	irq_err_count++;
+	atomic_inc(&irq_err_count);
 
 	/* Here is what the APIC error bits mean:
 	   0: Send CS error

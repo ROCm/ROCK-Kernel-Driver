@@ -21,6 +21,7 @@ ifeq ($(CONFIG_ALPHA_EV67),y)
 endif
 
 OBJS =	__divqu.o __remqu.o __divlu.o __remlu.o \
+	udelay.o \
 	$(ev6)memset.o \
 	$(ev6)memcpy.o \
 	memmove.o \

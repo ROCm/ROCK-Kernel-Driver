@@ -230,6 +230,23 @@ it will permanently select the 10baseT port.  Automatic selection of
 other media types does not occur.
 
 
+Transmit error, Tx status register 82
+-------------------------------------
+
+This is a common error which is almost always caused by another host on
+the same network being in full-duplex mode, while this host is in
+half-duplex mode.  You need to find that other host and make it run in
+half-duplex mode or fix this host to run in full-duplex mode.
+
+As a last resort, you can force the 3c59x driver into full-duplex mode
+with
+
+	options 3c59x full_duplex=1
+
+but this has to be viewed as a workaround for broken network gear and
+should only really be used for equipment which cannot autonegotiate.
+
+
 Additional resources
 --------------------
 

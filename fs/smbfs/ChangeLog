@@ -1,5 +1,10 @@
 ChangeLog for smbfs.
 
+2001-06-12 Urban Widmark <urban@teststation.com>
+
+	* proc.c: replace the win95-flush fix with smb_seek, when needed.
+	* proc.c: readdir 'lastname' bug (NetApp dir listing fix)
+
 2001-05-08 Urban Widmark <urban@teststation.com>
 
 	* inode.c: Fix for changes on the server side not being detected

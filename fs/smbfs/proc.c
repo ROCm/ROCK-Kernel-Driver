@@ -919,6 +919,31 @@ smb_setup_bcc(struct smb_sb_info *server, __u8 * p)
 }
 
 /*
+ * Called with the server locked
+ */
+static int
+smb_proc_seek(struct smb_sb_info *server, __u16 fileid,
+	      __u16 mode, off_t offset)
+{
+	int result;
+
+	smb_setup_header(server, SMBlseek, 4, 0);
+	WSET(server->packet, smb_vwv0, fileid);
+	WSET(server->packet, smb_vwv1, mode);
+	DSET(server->packet, smb_vwv2, offset);
+
+	result = smb_request_ok(server, SMBlseek, 2, 0);
+	if (result < 0) {
+		result = 0;
+		goto out;
+	}
+
+	result = DVAL(server->packet, smb_vwv0);
+out:
+	return result;
+}
+
+/*
  * We're called with the server locked, and we leave it that way.
  */
 static int
@@ -1209,11 +1234,6 @@ smb_proc_write(struct inode *inode, off_t offset, int count, const char *data)
 	result = smb_request_ok(server, SMBwrite, 1, 0);
 	if (result >= 0)
 		result = WVAL(server->packet, smb_vwv0);
-
-	/* flush to disk, to trigger win9x to update its filesize */
-	/* FIXME: this will be rather costly, won't it? */
-	if (server->mnt->flags & SMB_MOUNT_WIN95)
-		smb_proc_flush(server, fileid);
 
 	smb_unlock_server(server);
 	return result;
@@ -1858,6 +1878,7 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 		result = mask_len;
 		goto unlock_return;
 	}
+	mask_len--;	/* mask_len is strlen, not #bytes */
 	first = 1;
 	VERBOSE("starting mask_len=%d, mask=%s\n", mask_len, mask);
 
@@ -1946,18 +1967,28 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 		 * Note that some servers (win95?) point to the filename and
 		 * others (NT4, Samba using NT1) to the dir entry. We assume
 		 * here that those who do not point to a filename do not need
-		 * this info to continue the listing. OS/2 needs this, but it
-		 * talks "infolevel 1"
+		 * this info to continue the listing.
+		 *
+		 * OS/2 needs this and talks infolevel 1
+		 * NetApps want lastname with infolevel 260
+		 *
+		 * Both are happy if we return the data they point to. So we do.
 		 */
 		mask_len = 0;
-		if (info_level == 1 && ff_lastname > 0 &&
-		    ff_lastname < resp_data_len) {
+		if (ff_lastname > 0 && ff_lastname < resp_data_len) {
 			lastname = resp_data + ff_lastname;
 
-			/* lastname points to a length byte */
-			mask_len = *lastname++;
-			if (ff_lastname + 1 + mask_len > resp_data_len)
-				mask_len = resp_data_len-ff_lastname-1;
+			switch (info_level) {
+			case 260:
+				mask_len = resp_data_len - ff_lastname;
+				break;
+			case 1:
+				/* lastname points to a length byte */
+				mask_len = *lastname++;
+				if (ff_lastname + 1 + mask_len > resp_data_len)
+					mask_len = resp_data_len - ff_lastname - 1;
+				break;
+			}
 
 			/*
 			 * Update the mask string for the next message.
@@ -2062,7 +2093,7 @@ retry:
 	DSET(param, 8, 0);
 
 	result = smb_trans2_request(server, TRANSACT2_FINDFIRST,
-				    0, NULL, 12 + mask_len + 1, param,
+				    0, NULL, 12 + mask_len, param,
 				    &resp_data_len, &resp_data,
 				    &resp_param_len, &resp_param);
 	if (result < 0)
@@ -2246,6 +2277,7 @@ smb_proc_do_getattr(struct smb_sb_info *server, struct dentry *dir,
 		    struct smb_fattr *fattr)
 {
 	int result;
+	struct inode *inode = dir->d_inode;
 
 	smb_init_dirent(server, fattr);
 
@@ -2261,6 +2293,21 @@ smb_proc_do_getattr(struct smb_sb_info *server, struct dentry *dir,
 			result = smb_proc_getattr_ff(server, dir, fattr);
 		else
 			result = smb_proc_getattr_trans2(server, dir, fattr);
+	}
+
+	/*
+	 * None of the getattr versions here can make win9x return the right
+	 * filesize if there are changes made to an open file.
+	 * A seek-to-end does return the right size, but we only need to do
+	 * that on files we have written.
+	 */
+	if (server->mnt->flags & SMB_MOUNT_WIN95 &&
+	    inode &&
+	    inode->u.smbfs_i.flags & SMB_F_LOCALWRITE &&
+	    smb_is_open(inode))
+	{
+		__u16 fileid = inode->u.smbfs_i.fileid;
+		fattr->f_size = smb_proc_seek(server, fileid, 2, 0);
 	}
 
 	smb_finish_dirent(server, fattr);

@@ -1,6 +1,6 @@
 /*======================================================================
 
-    PCMCIA Card Services -- core services
+    Kernel Card Services -- core services
 
     cs.c 1.271 2000/10/02 20:27:49
     
@@ -90,11 +90,11 @@ static const char *version =
 #define OPTIONS PCI_OPT CB_OPT PM_OPT
 #endif
 
-static const char *release = "Linux PCMCIA Card Services " CS_RELEASE;
+static const char *release = "Linux Kernel Card Services " CS_RELEASE;
 static const char *options = "options: " OPTIONS;
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
-MODULE_DESCRIPTION("Linux PCMCIA Card Services " CS_RELEASE
+MODULE_DESCRIPTION("Linux Kernel Card Services " CS_RELEASE
 		   "\n  options:" OPTIONS);
 
 /*====================================================================*/
@@ -2416,7 +2416,7 @@ static int __init init_pcmcia_cs(void)
 
 static void __exit exit_pcmcia_cs(void)
 {
-    printk(KERN_INFO "unloading PCMCIA Card Services\n");
+    printk(KERN_INFO "unloading Kernel Card Services\n");
 #ifdef CONFIG_PROC_FS
     if (proc_pccard) {
 	remove_proc_entry("pccard", proc_bus);

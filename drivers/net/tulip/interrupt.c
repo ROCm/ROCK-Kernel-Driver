@@ -328,21 +328,11 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		if (csr5 & (RxIntr | RxNoBuf)) {
 #ifdef CONFIG_NET_HW_FLOWCONTROL
-                        if (tp->fc_bit) {
-                                if (test_bit(tp->fc_bit, &netdev_fc_xoff)) {
-                                        tulip_refill_rx(dev);
-                                } else {
-                                        tulip_refill_rx(dev);
-                                        rx += tulip_rx(dev);
-                                }
-                        } else {        /* not in fc mode */
-                                rx += tulip_rx(dev);
-                                tulip_refill_rx(dev);
-                        }
-#else
-			rx += tulip_rx(dev);
-			tulip_refill_rx(dev);
+                        if ((!tp->fc_bit) ||
+			    (!test_bit(tp->fc_bit, &netdev_fc_xoff)))
 #endif
+				rx += tulip_rx(dev);
+			tulip_refill_rx(dev);
 		}
 
 		if (csr5 & (TxNoBuf | TxDied | TxIntr | TimerInt)) {
@@ -418,7 +408,7 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					printk(KERN_WARNING "%s: The transmitter stopped."
 						   "  CSR5 is %x, CSR6 %x, new CSR6 %x.\n",
 						   dev->name, csr5, inl(ioaddr + CSR6), tp->csr6);
-				tulip_restart_rxtx(tp, tp->csr6);
+				tulip_restart_rxtx(tp);
 			}
 			spin_unlock(&tp->lock);
 		}
@@ -434,7 +424,7 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				else
 					tp->csr6 |= 0x00200000;  /* Store-n-forward. */
 				/* Restart the transmit process. */
-				tulip_restart_rxtx(tp, tp->csr6);
+				tulip_restart_rxtx(tp);
 				outl(0, ioaddr + CSR1);
 			}
 			if (csr5 & (RxDied | RxNoBuf)) {
@@ -444,16 +434,15 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				}
 			}
 			if (csr5 & RxDied) {		/* Missed a Rx frame. */
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-                                if (tp->fc_bit && !test_bit(tp->fc_bit, &netdev_fc_xoff)) {
-                                        tp->stats.rx_errors++;
-                                        tulip_outl_csr(tp, tp->csr6 | csr6_st | csr6_sr, CSR6);
-                                }
                                 tp->stats.rx_missed_errors += inl(ioaddr + CSR8) & 0xffff;
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+				if (tp->fc_bit && !test_bit(tp->fc_bit, &netdev_fc_xoff)) {
+					tp->stats.rx_errors++;
+					tulip_start_rxtx(tp);
+				}
 #else
 				tp->stats.rx_errors++;
-				tp->stats.rx_missed_errors += inl(ioaddr + CSR8) & 0xffff;
-				tulip_outl_csr(tp, tp->csr6 | csr6_st | csr6_sr, CSR6);
+				tulip_start_rxtx(tp);
 #endif
 			}
 			/*

@@ -28,6 +28,7 @@
 #include <linux/mman.h>
 #include <linux/elfcore.h>
 #include <linux/reboot.h>
+#include <linux/tty.h>
 #include <linux/console.h>
 
 #include <asm/reg.h>

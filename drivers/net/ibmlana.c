@@ -1197,6 +1197,8 @@ static int irq;
 static int io;
 MODULE_PARM(irq, "i");
 MODULE_PARM(io, "i");
+MODULE_PARM_DESC(irq, "IBM LAN/A IRQ number");
+MODULE_PARM_DESC(io, "IBM LAN/A I/O base address");
 
 int init_module(void)
 {

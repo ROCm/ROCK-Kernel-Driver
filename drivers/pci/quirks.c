@@ -17,6 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #undef DEBUG
 
@@ -267,6 +268,9 @@ extern int nr_ioapics;
 /*
  * VIA 686A/B: If an IO-APIC is active, we need to route all on-chip
  * devices to the external APIC.
+ *
+ * TODO: When we have device-specific interrupt routers,
+ * this code will go away from quirks.
  */
 static void __init quirk_via_ioapic(struct pci_dev *dev)
 {
@@ -277,11 +281,64 @@ static void __init quirk_via_ioapic(struct pci_dev *dev)
 	else
 		tmp = 0x1f; /* all known bits (4-0) routed to external APIC */
 		
+	printk(KERN_INFO "PCI: %sbling Via external APIC routing\n",
+	       tmp == 0 ? "Disa" : "Ena");
+
 	/* Offset 0x58: External APIC IRQ output control */
 	pci_write_config_byte (dev, 0x58, tmp);
 }
 
 #endif /* CONFIG_X86_IO_APIC */
+
+
+/*
+ * Via 686A/B:  The PCI_INTERRUPT_LINE register for the on-chip
+ * devices, USB0/1, AC97, MC97, and ACPI, has an unusual feature:
+ * when written, it makes an internal connection to the PIC.
+ * For these devices, this register is defined to be 4 bits wide.
+ * Normally this is fine.  However for IO-APIC motherboards, or
+ * non-x86 architectures (yes Via exists on PPC among other places),
+ * we must mask the PCI_INTERRUPT_LINE value versus 0xf to get
+ * interrupts delivered properly.
+ *
+ * TODO: When we have device-specific interrupt routers,
+ * quirk_via_irqpic will go away from quirks.
+ */
+
+/*
+ * FIXME: it is questionable that quirk_via_acpi
+ * is needed.  It shows up as an ISA bridge, and does not
+ * support the PCI_INTERRUPT_LINE register at all.  Therefore
+ * it seems like setting the pci_dev's 'irq' to the
+ * value of the ACPI SCI interrupt is only done for convenience.
+ *	-jgarzik
+ */
+static void __init quirk_via_acpi(struct pci_dev *d)
+{
+	/*
+	 * VIA ACPI device: SCI IRQ line in PCI config byte 0x42
+	 */
+	u8 irq;
+	pci_read_config_byte(d, 0x42, &irq);
+	irq &= 0xf;
+	if (irq && (irq != 2))
+		d->irq = irq;
+}
+
+static void __init quirk_via_irqpic(struct pci_dev *dev)
+{
+	u8 irq, new_irq = dev->irq & 0xf;
+
+	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
+
+	if (new_irq != irq) {
+		printk(KERN_INFO "PCI: Via IRQ fixup for %s, from %d to %d\n",
+		       dev->slot_name, irq, new_irq);
+
+		udelay(15);
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, new_irq);
+	}
+}
 
 
 /*
@@ -372,6 +429,11 @@ static struct pci_fixup pci_fixups[] __initdata = {
 #ifdef CONFIG_X86_IO_APIC 
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686,	quirk_via_ioapic },
 #endif
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_2,	quirk_via_irqpic },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_5,	quirk_via_irqpic },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic },
 
 	{ 0 }
 };

@@ -335,7 +335,7 @@ static int lan_saa9730_mii_init(struct lan_saa9730_private *lp)
 			printk("Error: lan_saa9730_mii_init: timeout\n");
 			return -1;
 		}
-		udelay(1000);	/* wait 1 ms. */
+		mdelay(1);	/* wait 1 ms. */
 	}
 
 	/* Now set the control and address register. */
@@ -350,11 +350,11 @@ static int lan_saa9730_mii_init(struct lan_saa9730_private *lp)
 			printk("Error: lan_saa9730_mii_init: timeout\n");
 			return -1;
 		}
-		udelay(1000);	/* wait 1 ms. */
+		mdelay(1);	/* wait 1 ms. */
 	}
 
 	/* Wait for 1 ms. */
-	udelay(1000);
+	mdelay(1);
 
 	/* Check the link status. */
 	if (INL(&lp->lan_saa9730_regs->StationMgmtData) &
@@ -369,7 +369,7 @@ static int lan_saa9730_mii_init(struct lan_saa9730_private *lp)
 		     &lp->lan_saa9730_regs->StationMgmtCtl);
 
 		/* Wait for 1 ms. */
-		udelay(1000);
+		mdelay(1);
 
 		/* set 'CONTROL' = force reset and renegotiate */
 		OUTL(PHY_CONTROL_RESET | PHY_CONTROL_AUTO_NEG |
@@ -377,7 +377,7 @@ static int lan_saa9730_mii_init(struct lan_saa9730_private *lp)
 		     &lp->lan_saa9730_regs->StationMgmtData);
 
 		/* Wait for 50 ms. */
-		udelay(50 * 1000);
+		mdelay(50);
 
 		/* set 'BUSY' to start operation */
 		OUTL(MD_CA_BUSY | PHY_ADDRESS << MD_CA_PHY_SHF | MD_CA_WR |
@@ -393,11 +393,11 @@ static int lan_saa9730_mii_init(struct lan_saa9730_private *lp)
 				    ("Error: lan_saa9730_mii_init: timeout\n");
 				return -1;
 			}
-			udelay(1000);	/* wait 1 ms. */
+			mdelay(1);	/* wait 1 ms. */
 		}
 
 		/* Wait for 1 ms. */
-		udelay(1000);
+		mdelay(1);
 
 		for (l = 0; l < 2; l++) {
 			/* set PHY address = 'STATUS' */
@@ -415,11 +415,11 @@ static int lan_saa9730_mii_init(struct lan_saa9730_private *lp)
 					    ("Error: lan_saa9730_mii_init: timeout\n");
 					return -1;
 				}
-				udelay(1000);	/* wait 1 ms. */
+				mdelay(1);	/* wait 1 ms. */
 			}
 
 			/* wait for 3 sec. */
-			udelay(3000 * 1000);
+			mdelay(3000);
 
 			/* check the link status */
 			if (INL(&lp->lan_saa9730_regs->StationMgmtData) &
@@ -495,7 +495,7 @@ static int lan_saa9730_stop(struct lan_saa9730_private *lp)
 			    ("Error: lan_sa9730_stop: MAC reset timeout\n");
 			return -1;
 		}
-		udelay(1000);	/* wait 1 ms. */
+		mdelay(1);	/* wait 1 ms. */
 	}
 
 	return 0;

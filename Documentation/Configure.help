@@ -7537,6 +7537,40 @@ CONFIG_PCMCIA_HERMES
   configure your card and that /etc/pcmcia/wireless.opts works :
     http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html
 
+Cisco/Aironet 34X/35X/4500/4800 ISA and PCI cards
+CONFIG_AIRO
+  This is the standard Linux driver to support Cisco/Aironet ISA
+  and PCI 802.11 wireless cards.
+  It supports the new 802.11b cards from Cisco (Cisco 34X, Cisco 35X
+  - with or without encryption) as well as card before the Cisco
+  aquisition (Aironet 4500, Aironet 4800, Aironet 4800B).
+
+  This driver support both the standard Linux Wireless Extensions
+  and Cisco proprietary API, so both the Linux Wireless Tools and the
+  Cisco Linux utilities can be used to configure the card.
+
+  The driver can be compiled as a module and will be named "airo.o".
+
+Cisco/Aironet 34X/35X/4500/4800 PCMCIA cards
+CONFIG_AIRO_CS
+  This is the standard Linux driver to support Cisco/Aironet PCMCIA
+  802.11 wireless cards. This driver is the same as the Aironet
+  driver part of the Linux Pcmcia package.
+  It supports the new 802.11b cards from Cisco (Cisco 34X, Cisco 35X
+  - with or without encryption) as well as card before the Cisco
+  aquisition (Aironet 4500, Aironet 4800, Aironet 4800B). It also
+  supports OEM of Cisco such as the DELL TrueMobile 4800 and Xircom
+  802.11b cards.
+
+  This driver support both the standard Linux Wireless Extensions
+  and Cisco proprietary API, so both the Linux Wireless Tools and the
+  Cisco Linux utilities can be used to configure the card.
+
+  To use your PC-cards, you will need supporting software from David
+  Hinds' pcmcia-cs package (see the file Documentation/Changes for
+  location). You also want to check out the PCMCIA-HOWTO, available
+  from http://www.linuxdoc.org/docs.html#howto .
+
 Aviator/Raytheon 2.4MHz wireless support
 CONFIG_PCMCIA_RAYCS
   Say Y here if you intend to attach an Aviator/Raytheon PCMCIA

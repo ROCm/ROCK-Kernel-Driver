@@ -138,7 +138,7 @@ struct rpc_xprt {
 	struct rpc_wait_queue	reconn;		/* waiting for reconnect */
 	struct rpc_rqst *	free;		/* free slots */
 	struct rpc_rqst		slot[RPC_MAXREQS];
-	unsigned int		sockstate;	/* Socket state */
+	unsigned long		sockstate;	/* Socket state */
 	unsigned char		shutdown   : 1,	/* being shut down */
 				nocong	   : 1,	/* no congestion control */
 				stream     : 1,	/* TCP */

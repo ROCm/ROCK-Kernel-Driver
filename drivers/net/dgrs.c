@@ -1441,6 +1441,9 @@ MODULE_PARM(ipaddr, "1-4i");
 MODULE_PARM(iptrap, "1-4i");
 MODULE_PARM(ipxnet, "i");
 MODULE_PARM(nicmode, "i");
+MODULE_PARM_DESC(debug, "Digi RightSwitch enable debugging (0-1)");
+MODULE_PARM_DESC(dma, "Digi RightSwitch enable BM DMA (0-1)");
+MODULE_PARM_DESC(nicmode, "Digi RightSwitch operating mode (1: switch, 2: multi-NIC)");
 
 static int __init dgrs_init_module (void)
 {

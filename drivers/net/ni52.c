@@ -1296,6 +1296,10 @@ MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM(memstart, "l");
 MODULE_PARM(memend, "l");
+MODULE_PARM_DESC(io, "NI5210 I/O base address,required");
+MODULE_PARM_DESC(irq, "NI5210 IRQ number,required");
+MODULE_PARM_DESC(memstart, "NI5210 memory base address,required");
+MODULE_PARM_DESC(memend, "NI5210 memory end address,required");
 
 int init_module(void)
 {

@@ -108,7 +108,8 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 	c1 = inb_p((unsigned short)bibma + 0x0a);
 
 	switch(bmide_dev->device) {
-		case PCI_DEVICE_ID_INTEL_82820FW_5:
+		case PCI_DEVICE_ID_INTEL_82801BA_8:
+		case PCI_DEVICE_ID_INTEL_82801BA_9:
 			p += sprintf(p, "\n                                Intel PIIX4 Ultra 100 Chipset.\n");
 			break;
 		case PCI_DEVICE_ID_INTEL_82372FB_1:
@@ -358,7 +359,8 @@ static int piix_config_drive_for_dma (ide_drive_t *drive)
 	byte			speed;
 
 	byte udma_66		= eighty_ninty_three(drive);
-	int ultra100		= ((dev->device == PCI_DEVICE_ID_INTEL_82820FW_5)) ? 1 : 0;
+	int ultra100		= ((dev->device == PCI_DEVICE_ID_INTEL_82801BA_8) ||
+				   (dev->device == PCI_DEVICE_ID_INTEL_82801BA_9)) ? 1 : 0;
 	int ultra66		= ((ultra100) ||
 				   (dev->device == PCI_DEVICE_ID_INTEL_82801AA_1) ||
 				   (dev->device == PCI_DEVICE_ID_INTEL_82372FB_1)) ? 1 : 0;

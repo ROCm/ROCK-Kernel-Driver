@@ -245,10 +245,6 @@ them.  The MII transceiver status is polled using an kernel timer.
 /* This table use during operation for capabilities and media timer. */
 
 static void tulip_timer(unsigned long data);
-static void t21142_timer(unsigned long data);
-static void mxic_timer(unsigned long data);
-static void pnic_timer(unsigned long data);
-static void comet_timer(unsigned long data);
 
 enum tbl_flag {
 	HAS_MII=1, HAS_MEDIA_TABLE=2, CSR12_IN_SROM=4, ALWAYS_CHECK_MII=8,
@@ -262,37 +258,15 @@ static struct tulip_chip_table {
 	int flags;
 	void (*media_timer)(unsigned long data);
 } tulip_tbl[] = {
-  { "Digital DC21040 Tulip", 128, 0x0001ebef, 0, tulip_timer },
-  { "Digital DC21041 Tulip", 128, 0x0001ebef, HAS_MEDIA_TABLE, tulip_timer },
-  { "Digital DS21140 Tulip", 128, 0x0001ebef,
-	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM, tulip_timer },
-  { "Digital DS21143 Tulip", 128, 0x0801fbff,
-	HAS_MII | HAS_MEDIA_TABLE | ALWAYS_CHECK_MII | HAS_ACPI | HAS_NWAY143, t21142_timer },
-  { "Lite-On 82c168 PNIC", 256, 0x0001ebef,
-	HAS_MII, pnic_timer },
-  { "Macronix 98713 PMAC", 128, 0x0001ebef,
-	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM, mxic_timer },
-  { "Macronix 98715 PMAC", 256, 0x0001ebef,
-	HAS_MEDIA_TABLE, mxic_timer },
-  { "Macronix 98725 PMAC", 256, 0x0001ebef,
-	HAS_MEDIA_TABLE, mxic_timer },
-  { "ASIX AX88140", 128, 0x0001fbff,
-	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM | MC_HASH_ONLY, tulip_timer },
-  { "Lite-On PNIC-II", 256, 0x0001ebef,
-	HAS_MII | HAS_NWAY143, pnic_timer },
-  { "ADMtek Comet", 256, 0x0001abef,
-	MC_HASH_ONLY, comet_timer },
-  { "Compex 9881 PMAC", 128, 0x0001ebef,
-	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM, mxic_timer },
   { "Xircom Cardbus Adapter (DEC 21143 compatible mode)", 128, 0x0801fbff,
        HAS_MII | HAS_ACPI, tulip_timer }, 
   {0},
 };
 /* This matches the table above.  Note 21142 == 21143. */
 enum chips {
-	DC21040=0, DC21041=1, DC21140=2, DC21142=3, DC21143=3,
-	LC82C168, MX98713, MX98715, MX98725, AX88140, PNIC2, COMET, COMPEX9881,
 	X3201_3,
+	DC21040, DC21041, DC21140, DC21142=4, DC21143=4,
+	LC82C168, MX98713, MX98715, MX98725, AX88140, PNIC2, COMET, COMPEX9881,
 };
 
 /* A full-duplex map for media types. */
@@ -307,9 +281,7 @@ static u16 t21041_csr13[] = { 0xEF05, 0xEF09, 0xEF09, 0xEF01, 0xEF09, };
 static u16 t21041_csr14[] = { 0x7F3F, 0xF7FD, 0xF7FD, 0x7F3F, 0x7F3D, };
 static u16 t21041_csr15[] = { 0x0008, 0x0006, 0x000E, 0x0008, 0x0008, };
 
-static u16 t21142_csr13[] = { 0x0001, 0x0009, 0x0009, 0x0000, 0x0001, };
 static u16 t21142_csr14[] = { 0xFFFF, 0x0705, 0x0705, 0x0000, 0x7F3D, };
-static u16 t21142_csr15[] = { 0x0008, 0x0006, 0x000E, 0x0008, 0x0008, };
 
 /* Offsets to the Command and Status Registers, "CSRs".  All accesses
    must be longword instructions and quadword aligned. */
@@ -1272,7 +1244,7 @@ tulip_up(struct net_device *dev)
 		*setup_frm++ = eaddrs[1]; *setup_frm++ = eaddrs[1];
 		*setup_frm++ = eaddrs[2]; *setup_frm++ = eaddrs[2];
 		/* Put the setup frame on the Tx list. */
-		tp->tx_ring[0].length = 0x08000000 | 192;
+		tp->tx_ring[0].length = 0x68000000 | 192;
 		tp->tx_ring[0].buffer1 = virt_to_bus(tp->setup_frame);
 		tp->tx_ring[0].status = DescOwned;
 
@@ -1291,7 +1263,7 @@ tulip_up(struct net_device *dev)
 		}
 
 		/* Put the setup frame on the Tx list. */
-		tp->tx_ring[tp->cur_tx].length = 0x08000000 | 192;
+		tp->tx_ring[tp->cur_tx].length = 0x68000000 | 192;
 		/* Lie about the address of our setup frame to make the */
 		/* chip happy */
 		tp->tx_ring[tp->cur_tx].buffer1 = virt_to_bus(tp->setup_frame);
@@ -1862,83 +1834,6 @@ static void tulip_timer(unsigned long data)
 	add_timer(&tp->timer);
 }
 
-/* Handle the 21143 uniquely: do autoselect with NWay, not the EEPROM list
-   of available transceivers.  */
-static void t21142_timer(unsigned long data)
-{
-	struct net_device *dev = (struct net_device *)data;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
-	long ioaddr = dev->base_addr;
-	int csr12 = inl(ioaddr + CSR12);
-	int next_tick = 60*HZ;
-	int new_csr6 = 0;
-
-	if ((tulip_debug > 2) && !(media_cap[dev->if_port] & MediaIsMII))
-		printk(KERN_INFO"%s: 21143 negotiation status %8.8x, %s.\n",
-			   dev->name, csr12, medianame[dev->if_port]);
-	if (media_cap[dev->if_port] & MediaIsMII) {
-		check_duplex(dev);
-		next_tick = 60*HZ;
-	} else if (tp->nwayset) {
-		/* Don't screw up a negotiated session! */
-		if (tulip_debug > 1)
-			printk(KERN_INFO"%s: Using NWay-set %s media, csr12 %8.8x.\n",
-				   dev->name, medianame[dev->if_port], csr12);
-	} else if (tp->medialock) {
-			;
-	} else if (dev->if_port == 3) {
-		if (csr12 & 2) {	/* No 100mbps link beat, revert to 10mbps. */
-			if (tulip_debug > 1)
-				printk(KERN_INFO"%s: No 21143 100baseTx link beat, %8.8x, "
-					   "trying NWay.\n", dev->name, csr12);
-			t21142_start_nway(dev);
-			next_tick = 3*HZ;
-		}
-	} else if (((csr12 & 0x7000) != 0x5000)
-			   && tp->chip_id != X3201_3) {
-		/* Negotiation failed.  Search media types. */
-		if (tulip_debug > 1)
-			printk(KERN_INFO"%s: 21143 negotiation failed, status %8.8x.\n",
-				   dev->name, csr12);
-		if (!(csr12 & 4)) {		/* 10mbps link beat good. */
-			new_csr6 = 0x82420000;
-			dev->if_port = 0;
-			outl(0, ioaddr + CSR13);
-			outl(0x0003FFFF, ioaddr + CSR14);
-			outw(t21142_csr15[dev->if_port], ioaddr + CSR15);
-			outl(t21142_csr13[dev->if_port], ioaddr + CSR13);
-		} else {
-			/* Select 100mbps port to check for link beat. */
-			new_csr6 = 0x83860000;
-			dev->if_port = 3;
-			outl(0, ioaddr + CSR13);
-			outl(0x0003FF7F, ioaddr + CSR14);
-			outw(8, ioaddr + CSR15);
-			outl(1, ioaddr + CSR13);
-		}
-		if (tulip_debug > 1)
-			printk(KERN_INFO"%s: Testing new 21143 media %s.\n",
-				   dev->name, medianame[dev->if_port]);
-		if (new_csr6 != (tp->csr6 & ~0x00D5)) {
-			tp->csr6 &= 0x00D5;
-			tp->csr6 |= new_csr6;
-			outl(0x0301, ioaddr + CSR12);
-			outl_CSR6(tp->csr6 | 0x0002, ioaddr, tp->chip_id);
-			outl_CSR6(tp->csr6 | 0x2002, ioaddr, tp->chip_id);
-		}
-		next_tick = 3*HZ;
-	}
-	if (tp->cur_tx - tp->dirty_tx > 0  &&
-		jiffies - dev->trans_start > TX_TIMEOUT) {
-		printk(KERN_WARNING "%s: Tx hung, %d vs. %d.\n",
-			   dev->name, tp->cur_tx, tp->dirty_tx);
-		tulip_tx_timeout(dev);
-	}
-
-	tp->timer.expires = RUN_AT(next_tick);
-	add_timer(&tp->timer);
-}
-
 static void t21142_start_nway(struct net_device *dev)
 {
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
@@ -2067,123 +1962,6 @@ static void t21142_lnk_change(struct net_device *dev, int csr5)
 		outl_CSR6(tp->csr6 | 0x0002, ioaddr, tp->chip_id);
 		outl_CSR6(tp->csr6 | 0x2002, ioaddr, tp->chip_id);
 	}
-}
-
-static void mxic_timer(unsigned long data)
-{
-	struct net_device *dev = (struct net_device *)data;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
-	long ioaddr = dev->base_addr;
-	int next_tick = 60*HZ;
-
-	if (tulip_debug > 3) {
-		printk(KERN_INFO"%s: MXIC negotiation status %8.8x.\n", dev->name,
-			   inl(ioaddr + CSR12));
-	}
-	if (next_tick) {
-		tp->timer.expires = RUN_AT(next_tick);
-		add_timer(&tp->timer);
-	}
-}
-
-static void pnic_timer(unsigned long data)
-{
-	struct net_device *dev = (struct net_device *)data;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
-	long ioaddr = dev->base_addr;
-	int csr12 = inl(ioaddr + CSR12);
-	int next_tick = 60*HZ;
-	int new_csr6 = tp->csr6 & ~0x40C40200;
-
-	if (media_cap[dev->if_port] & MediaIsMII) {
-		int negotiated = mdio_read(dev, tp->phys[0], 5) & tp->advertising[0];
-
-		if (tulip_debug > 1)
-			printk(KERN_DEBUG "%s: PNIC negotiated capability %8.8x, "
-				   "CSR5 %8.8x.\n",
-				   dev->name, negotiated, inl(ioaddr + CSR5));
-
-		if (negotiated & 0x0380) 				/* 10 vs 100mbps */
-			new_csr6 |= 0x810E0000;
-		else
-			new_csr6 |= 0x814E0000;
-		if (((negotiated & 0x0300) == 0x0100)			/* Duplex */
-			|| (negotiated & 0x00C0) == 0x0040
-			|| tp->full_duplex_lock) {
-			tp->full_duplex = 1;
-			new_csr6 |= 0x0200;
-		}
-		if (tulip_debug > 1)
-			printk(KERN_DEBUG "%s: PNIC MII PHY status %4.4x, Link "
-				   "partner report %4.4x, csr6 %8.8x/%8.8x.\n",
-			   dev->name, mdio_read(dev, tp->phys[0], 1), negotiated,
-				   tp->csr6, inl(ioaddr + CSR6));
-	} else {
-		int phy_reg = inl(ioaddr + 0xB8);
-		int csr5 = inl(ioaddr + CSR5);
-
-		if (tulip_debug > 1)
-			printk(KERN_DEBUG "%s: PNIC PHY status %8.8x, CSR5 %8.8x.\n",
-				   dev->name, phy_reg, csr5);
-
-		if (phy_reg & 0x04000000) {	/* Remote link fault */
-			/*outl(0x0201F078, ioaddr + 0xB8);*/
-			next_tick = 3*HZ;
-		}
-		if (inl(ioaddr + CSR5) & TPLnkFail) { /* 100baseTx link beat */
-			if (tulip_debug > 1)
-				printk(KERN_DEBUG "%s: %s link beat failed, CSR12 %4.4x, "
-					   "CSR5 %8.8x, PHY %3.3x.\n",
-					   dev->name, medianame[dev->if_port], csr12,
-					   inl(ioaddr + CSR5), inl(ioaddr + 0xB8));
-			if (tp->medialock) {
-			} else if (dev->if_port == 0) {
-				dev->if_port = 3;
-				outl(0x33, ioaddr + CSR12);
-				new_csr6 = 0x01860000;
-				outl(0x1F868, ioaddr + 0xB8);
-			} else {
-				dev->if_port = 0;
-				outl(0x32, ioaddr + CSR12);
-				new_csr6 = 0x00420000;
-				outl(0x1F078, ioaddr + 0xB8);
-			}
-			new_csr6 |= (tp->csr6 & 0xfdff);
-			next_tick = 3*HZ;
-		} else
-			new_csr6 = tp->csr6;
-		if (tp->full_duplex_lock  ||  (phy_reg & 0x30000000) != 0) {
-			tp->full_duplex = 1;
-			new_csr6 |= 0x00000200;
-		}
-	}
-	if (tp->csr6 != new_csr6) {
-		tp->csr6 = new_csr6;
-		outl_CSR6(tp->csr6 | 0x0002, ioaddr, tp->chip_id);	/* Restart Tx */
-		outl_CSR6(tp->csr6 | 0x2002, ioaddr, tp->chip_id);
-		dev->trans_start = jiffies;
-		if (tulip_debug > 1)
-			printk(KERN_INFO "%s: Changing PNIC configuration to %s-duplex, "
-				   "CSR6 %8.8x.\n",
-				   dev->name, tp->full_duplex ? "full" : "half", new_csr6);
-	}
-	tp->timer.expires = RUN_AT(next_tick);
-	add_timer(&tp->timer);
-}
-
-static void comet_timer(unsigned long data)
-{
-	struct net_device *dev = (struct net_device *)data;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
-	long ioaddr = dev->base_addr;
-	int next_tick = 60*HZ;
-
-	if (tulip_debug > 1)
-		printk(KERN_DEBUG "%s: Comet link status %4.4x partner capability "
-			   "%4.4x.\n",
-			   dev->name, inl(ioaddr + 0xB8), inl(ioaddr + 0xC8));
-	tp->timer.expires = RUN_AT(next_tick);
-	add_timer(&tp->timer);
 }
 
 static void tulip_tx_timeout(struct net_device *dev)
@@ -2741,12 +2519,6 @@ static int private_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
 		if (tp->mii_cnt)
 			data[0] = phy;
-		else if (tp->chip_id == DC21142)	/* 21142 pseudo-MII */
-			data[0] = 32;
-		else if (tp->chip_id == PNIC2)
-			data[0] = 32;
-		else if (tp->chip_id == COMET)
-			data[0] = 1;
 		else
 			return -ENODEV;
 		return 0;
@@ -2874,27 +2646,18 @@ static void set_rx_mode(struct net_device *dev)
 			for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 				 i++, mclist = mclist->next)
 				set_bit(ether_crc(ETH_ALEN, mclist->dmi_addr)>>26, mc_filter);
-			if (tp->chip_id == AX88140) {
-				outl(2, ioaddr + CSR13);
-				outl(mc_filter[0], ioaddr + CSR14);
-				outl(3, ioaddr + CSR13);
-				outl(mc_filter[1], ioaddr + CSR14);
-			} else if (tp->chip_id == COMET) { /* Has a simple hash filter. */
-				outl(mc_filter[0], ioaddr + 0xAC);
-				outl(mc_filter[1], ioaddr + 0xB0);
-			}
 		}
 	} else {
 		u16 *eaddrs, *setup_frm = tp->setup_frame;
 		struct dev_mc_list *mclist;
-		u32 tx_flags = 0x08000000 | 192;
+		u32 tx_flags = 0x68000000 | 192;
 		int i;
 
 		/* Note that only the low-address shortword of setup_frame is valid!
 		   The values are doubled for big-endian architectures. */
-		if ((dev->mc_count > 14) || ((dev->mc_count > 6) && (tp->chip_id == X3201_3))) { /* Must use a multicast hash table. */
+		if (dev->mc_count > 14) { /* Must use a multicast hash table. */
 			u16 hash_table[32];
-			tx_flags = 0x08400000 | 192;		/* Use hash filter. */
+			tx_flags = 0x68400000 | 192;		/* Use hash filter. */
 			memset(hash_table, 0, sizeof(hash_table));
 			set_bit(255, hash_table); 			/* Broadcast entry */
 			/* This should work on big-endian machines as well. */
@@ -2907,7 +2670,7 @@ static void set_rx_mode(struct net_device *dev)
 				*setup_frm++ = hash_table[i];
 			}
 			setup_frm = &tp->setup_frame[13*6];
-		} else if(tp->chip_id != X3201_3) {
+		} else {
 			/* We have <= 14 addresses so we can use the wonderful
 			   16 address perfect filtering of the Tulip. */
 			for (i = 0, mclist = dev->mc_list; i < dev->mc_count;
@@ -2917,30 +2680,6 @@ static void set_rx_mode(struct net_device *dev)
 				*setup_frm++ = eaddrs[1]; *setup_frm++ = eaddrs[1];
 				*setup_frm++ = eaddrs[2]; *setup_frm++ = eaddrs[2];
 			}
-			/* Fill the unused entries with the broadcast address. */
-			memset(setup_frm, 0xff, (15-i)*12);
-			setup_frm = &tp->setup_frame[15*6];
-		} else {
-			/* fill the first two table entries with our address */
-			eaddrs = (u16 *)dev->dev_addr;
-			for(i=0; i<2; i++) {
-				*setup_frm++ = eaddrs[0]; *setup_frm++ = eaddrs[0];
-				*setup_frm++ = eaddrs[1]; *setup_frm++ = eaddrs[1];
-				*setup_frm++ = eaddrs[2]; *setup_frm++ = eaddrs[2];
-			}
-			/* Double fill each entry to accomodate chips that */
-			/* don't like to parse these correctly */
-			for (i=0, mclist=dev->mc_list; i<dev->mc_count;
-				 i++, mclist=mclist->next) {
-				eaddrs = (u16 *)mclist->dmi_addr;
-				*setup_frm++ = eaddrs[0]; *setup_frm++ = eaddrs[0];
-				*setup_frm++ = eaddrs[1]; *setup_frm++ = eaddrs[1];
-				*setup_frm++ = eaddrs[2]; *setup_frm++ = eaddrs[2];
-				*setup_frm++ = eaddrs[0]; *setup_frm++ = eaddrs[0];
-				*setup_frm++ = eaddrs[1]; *setup_frm++ = eaddrs[1];
-				*setup_frm++ = eaddrs[2]; *setup_frm++ = eaddrs[2];
-			}
-			i=((i+1)*2);
 			/* Fill the unused entries with the broadcast address. */
 			memset(setup_frm, 0xff, (15-i)*12);
 			setup_frm = &tp->setup_frame[15*6];
@@ -2995,20 +2734,6 @@ static void set_rx_mode(struct net_device *dev)
 }
 
 static  struct pci_device_id tulip_pci_table[] __devinitdata = {
-#if 0 /* these entries conflict with regular tulip driver */
-  { 0x1011, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21040 },
-  { 0x1011, 0x0014, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21041 },
-  { 0x1011, 0x0009, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21140 },
-  { 0x1011, 0x0019, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21142 },
-  { 0x11AD, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, LC82C168 },
-  { 0x10d9, 0x0512, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MX98713 },
-  { 0x10d9, 0x0531, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MX98715 },
-  { 0x10d9, 0x0531, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MX98725 },
-  { 0x125B, 0x1400, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AX88140 },
-  { 0x11AD, 0xc115, PCI_ANY_ID, PCI_ANY_ID, 0, 0, PNIC2 },
-  { 0x1317, 0x0981, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
-  { 0x11F6, 0x9881, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMPEX9881 },
-#endif
   { 0x115D, 0x0003, PCI_ANY_ID, PCI_ANY_ID, 0, 0, X3201_3 },
   {0},
 };
@@ -3034,20 +2759,22 @@ static int __devinit tulip_pci_probe(struct pci_dev *pdev, const struct pci_devi
 	return -ENODEV;
 }
 
-static void tulip_suspend(struct pci_dev *pdev)
+static int tulip_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pdev->driver_data;
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	printk(KERN_INFO "tulip_suspend(%s)\n", dev->name);
 	if (tp->open) tulip_down(dev);
+	return 0;
 }
 
-static void tulip_resume(struct pci_dev *pdev)
+static int tulip_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pdev->driver_data;
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	printk(KERN_INFO "tulip_resume(%s)\n", dev->name);
 	if (tp->open) tulip_up(dev);
+	return 0;
 }
 
 static void __devexit tulip_remove(struct pci_dev *pdev)

@@ -83,6 +83,7 @@ static int lance_debug = LANCE_DEBUG;
 static int lance_debug = 1;
 #endif
 MODULE_PARM(lance_debug, "i");
+MODULE_PARM_DESC(lance_debug, "atarilance debug level (0-3)");
 
 /* Print debug messages on probing? */
 #undef LANCE_DEBUG_PROBE

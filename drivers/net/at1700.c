@@ -70,7 +70,7 @@ static char version[] __initdata =
 
 /* These unusual address orders are used to verify the CONFIG register. */
 
-static int fmv18x_probe_list[] = {
+static int fmv18x_probe_list[] __initdata = {
 	0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x300, 0x340, 0
 };
 
@@ -78,7 +78,7 @@ static int fmv18x_probe_list[] = {
  *	ISA
  */
 
-static int at1700_probe_list[] = {
+static int at1700_probe_list[] __initdata = {
 	0x260, 0x280, 0x2a0, 0x240, 0x340, 0x320, 0x380, 0x300, 0
 };
 
@@ -86,15 +86,15 @@ static int at1700_probe_list[] = {
  *	MCA
  */
 #ifdef CONFIG_MCA	
-static int at1700_ioaddr_pattern[] = {
+static int at1700_ioaddr_pattern[] __initdata = {
 	0x00, 0x04, 0x01, 0x05, 0x02, 0x06, 0x03, 0x07
 };
 
-static int at1700_mca_probe_list[] = {
+static int at1700_mca_probe_list[] __initdata = {
 	0x400, 0x1400, 0x2400, 0x3400, 0x4400, 0x5400, 0x6400, 0x7400, 0
 };
 
-static int at1700_irq_pattern[] = {
+static int at1700_irq_pattern[] __initdata = {
 	0x00, 0x00, 0x00, 0x30, 0x70, 0xb0, 0x00, 0x00,
 	0x00, 0xf0, 0x34, 0x74, 0xb4, 0x00, 0x00, 0xf4, 0x00
 };
@@ -175,10 +175,10 @@ struct at1720_mca_adapters_struct {
 };
 /* rEnE : maybe there are others I don't know off... */
 
-static struct at1720_mca_adapters_struct at1720_mca_adapters[] = {
+static struct at1720_mca_adapters_struct at1720_mca_adapters[] __initdata = {
 	{ "Allied Telesys AT1720AT",	0x6410 },
 	{ "Allied Telesys AT1720BT", 	0x6413 },
-	{ "Allied Telesys AT1720T",		0x6416 },
+	{ "Allied Telesys AT1720T",	0x6416 },
 	{ NULL, 0 },
 };
 #endif
@@ -470,7 +470,7 @@ err_out:
 #define EE_READ_CMD		(6 << 6)
 #define EE_ERASE_CMD	(7 << 6)
 
-static int read_eeprom(int ioaddr, int location)
+static int __init read_eeprom(int ioaddr, int location)
 {
 	int i;
 	unsigned short retval = 0;
@@ -880,6 +880,9 @@ static int irq;
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM(net_debug, "i");
+MODULE_PARM_DESC(io, "AT1700/FMV18X I/O base address");
+MODULE_PARM_DESC(irq, "AT1700/FMV18X IRQ number");
+MODULE_PARM_DESC(net_debug, "AT1700/FMV18X debug level (0-6)");
 
 int init_module(void)
 {

@@ -50,7 +50,8 @@ typedef struct dldwd_card {
 	struct dldwd_priv  priv;
 } dldwd_card_t;
 
-static char *version = "orinoco_cs.c 0.06 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata =
+"orinoco_cs.c 0.06 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 /*====================================================================*/
 
@@ -776,9 +777,8 @@ init_dldwd_cs(void)
 
 	TRACE_ENTER("dldwd");
 
-	printk(KERN_INFO "dldwd: David's Less Dodgy WaveLAN/IEEE Driver\n");
-
-	DEBUG(0, "%s\n", version);
+	printk(KERN_INFO "dldwd: David's Less Dodgy WaveLAN/IEEE Driver\n"
+	       KERN_INFO "%s\n", version);
 
 	CardServices(GetCardServicesInfo, &serv);
 	if (serv.Revision != CS_RELEASE_CODE) {

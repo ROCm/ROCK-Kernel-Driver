@@ -12,6 +12,8 @@
 
 #ifdef CONFIG_X86_IO_APIC
 
+#define APIC_MISMATCH_DEBUG
+
 #define IO_APIC_BASE(idx) \
 		((volatile int *)__fix_to_virt(FIX_IO_APIC_BASE_0 + idx))
 

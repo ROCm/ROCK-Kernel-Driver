@@ -4,7 +4,7 @@
 # Makefile for the Linux Wireless network device drivers.
 #
 
-O_TARGET := orinoco_drvs.o
+O_TARGET := wireless_net.o
 
 obj-y		:=
 obj-m		:=
@@ -12,16 +12,12 @@ obj-n		:=
 obj-		:=
 
 # Things that need to export symbols
-export-objs	:= orinoco.o hermes.o
+export-objs	:= airo.o orinoco.o hermes.o
 
-# ISA Bus cards
-
-# PCI bus cards
-
-# Other cards
+obj-$(CONFIG_PCMCIA_HERMES)	+= orinoco_cs.o orinoco.o hermes.o
 obj-$(CONFIG_APPLE_AIRPORT)	+= airport.o orinoco.o hermes.o
 
-# 16-bit Pcmcia wireless client drivers
-obj-$(CONFIG_PCMCIA_HERMES)	+= orinoco_cs.o orinoco.o hermes.o
+obj-$(CONFIG_AIRO)		+= airo.o
+obj-$(CONFIG_AIRO_CS)		+= airo_cs.o airo.o
 
 include $(TOPDIR)/Rules.make

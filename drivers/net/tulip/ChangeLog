@@ -1,3 +1,70 @@
+2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip.h, tulip_core.c:
+	Integrate MMIO support from devel branch, but default
+	it to off for stable kernel and driver series.
+
+2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_init_one):
+	Free descriptor rings on error.
+
+2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_mwi_config, tulip_init_one):
+	Large update to csr0 bus configuration code.  This is not stable
+	yet, so it is only conditionally enabled, via CONFIG_TULIP_MWI.
+
+2001-06-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c:
+	Initialize timer in tulip_init_one and tulip_down,
+	not in tulip_up.
+
+2001-06-14  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c:
+	- Update tulip_suspend, tulip_resume for new PCI PM API.
+	- Surround suspend/resume code with CONFIG_PM.
+
+2001-06-12  Jeff Golds  <jgolds@resilience.com>
+
+	* tulip_core.c:
+	- Reset sw ring ptrs in tulip_up.  Fixes PM resume case.
+	- Clean rx and tx rings on device down.
+
+2001-06-05  David Miller  <davem@redhat.com>
+
+	* tulip_core (set_rx_mode):  Do not use set_bit
+	on an integer variable.  Also fix endianness issue.
+
+2001-06-04  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* interrupt.c:
+	Simplify rx processing when CONFIG_NET_HW_FLOWCONTROL is
+	active, and in the process fix a bug where flow control
+	and low load caused rx not to be acknowledged properly.
+
+2001-06-01  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip.h:
+	- Remove tulip_outl_csr helper, redundant.
+	- Add tulip_start_rxtx inline helper.
+	- tulip_stop_rxtx helper: Add synchronization. Always use current
+	  csr6 value, instead of tp->csr6 value or value passed as arg.
+	- tulip_restart_rxtx helper: Add synchronization. Always
+	  use tp->csr6 for desired mode, not value passed as arg.
+	- New RxOn, TxOn, RxTx constants for csr6 modes.
+	- Remove now-redundant constants csr6_st, csr6_sr.
+
+	* 21142.c, interrupt.c, media.c, pnic.c, tulip_core.c:
+	Update for above rxtx helper changes.
+
+	* interrupt.c:
+	- whitespace cleanup around #ifdef CONFIG_NET_HW_FLOWCONTROL,
+	  convert tabs to spaces.
+	- Move tp->stats.rx_missed_errors update outside the ifdef.
+
 2001-05-18  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* tulip_core.c: Added ethtool support.

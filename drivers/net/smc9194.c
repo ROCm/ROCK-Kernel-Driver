@@ -1566,6 +1566,9 @@ static int ifport;
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM(ifport, "i");
+MODULE_PARM_DESC(io, "SMC 99194 I/O base address");
+MODULE_PARM_DESC(irq, "SMC 99194 IRQ number");
+MODULE_PARM_DESC(ifport, "SMC 99194 interface port (0-default, 1-TP, 2-AUI)");
 
 int init_module(void)
 {

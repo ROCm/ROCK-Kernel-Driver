@@ -177,7 +177,9 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
    fi
    bool '  Pocket and portable adapters' CONFIG_NET_POCKET
    if [ "$CONFIG_NET_POCKET" = "y" ]; then
-      dep_tristate '    AT-LAN-TEC/RealTek pocket adapter support' CONFIG_ATP $CONFIG_ISA
+      if [ "$CONFIG_ISA" = "y" -a "$CONFIG_X86" = "y" ]; then
+         tristate '    AT-LAN-TEC/RealTek pocket adapter support' CONFIG_ATP
+      fi
       tristate '    D-Link DE600 pocket adapter support' CONFIG_DE600
       tristate '    D-Link DE620 pocket adapter support' CONFIG_DE620
    fi

@@ -2812,8 +2812,7 @@ static void __devexit bttv_remove(struct pci_dev *pci_dev)
 
         /* disable PCI bus-mastering */
         pci_read_config_byte(btv->dev, PCI_COMMAND, &command);
-        /* Should this be &=~ ?? */
-        command&=~PCI_COMMAND_MASTER;
+        command &= ~PCI_COMMAND_MASTER;
         pci_write_config_byte(btv->dev, PCI_COMMAND, command);
 
         /* unmap and free memory */

@@ -194,6 +194,11 @@ MODULE_PARM(duplex, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
 MODULE_PARM(speed, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
 MODULE_PARM(debug, "i");
 MODULE_PARM(bbuf, "i");
+MODULE_PARM_DESC(aui, "ThunderLAN use AUI port(s) (0-1)");
+MODULE_PARM_DESC(duplex, "ThunderLAN duplex setting(s) (0-default, 1-half, 2-full)");
+MODULE_PARM_DESC(speed, "ThunderLAN port speen setting(s) (0,10,100)");
+MODULE_PARM_DESC(debug, "ThunderLAN debug mask");
+MODULE_PARM_DESC(bbuf, "ThunderLAN use big buffer (0-1)");
 EXPORT_NO_SYMBOLS;
 
 /* Define this to enable Link beat monitoring */
@@ -917,13 +922,13 @@ static int TLan_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			data[0] = phy;
 
 		case SIOCDEVPRIVATE+1: /* Read MII register */
-			TLan_MiiReadReg(dev, data[0], data[1], &data[3]);
+			TLan_MiiReadReg(dev, data[0] & 0x1f, data[1] & 0x1f, &data[3]);
 			return 0;
 		
 		case SIOCDEVPRIVATE+2: /* Write MII register */
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
-			TLan_MiiWriteReg(dev, data[0], data[1], data[2]);
+			TLan_MiiWriteReg(dev, data[0] & 0x1f, data[1] & 0x1f, data[2]);
 			return 0;
 		default:
 			return -EOPNOTSUPP;

@@ -1007,9 +1007,12 @@ MODULE_PARM(debug,"i");
 MODULE_PARM(irq,"1-8i");
 MODULE_PARM(xcvr,"1-8i");
 MODULE_PARM(max_interrupt_work, "i");
-#ifdef CONFIG_ISAPNP
+MODULE_PARM_DESC(debug, "EtherLink III debug level (0-6)");
+MODULE_PARM_DESC(irq, "EtherLink III IRQ number(s) (assigned)");
+MODULE_PARM_DESC(xcvr,"EtherLink III tranceiver(s) (0=internal, 1=external)");
+MODULE_PARM_DESC(max_interrupt_work, "EtherLink III maximum events handled per interrupt");
 MODULE_PARM(nopnp, "i");
-#endif
+MODULE_PARM_DESC(nopnp, "EtherLink III disable ISA PnP support (0-1)");
 
 int
 init_module(void)

@@ -62,7 +62,8 @@
 #endif
 
 #ifdef CONFIG_IRDA
-#include <net/irda/irda_device.h>
+extern int irda_proto_init(void);
+extern int irda_device_init(void);
 #endif
 
 #ifdef CONFIG_X86_IO_APIC

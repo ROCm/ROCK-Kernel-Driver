@@ -96,6 +96,7 @@ static slip_ctrl_t	**slip_ctrls;
 
 int slip_maxdev = SL_NRUNIT;		/* Can be overridden with insmod! */
 MODULE_PARM(slip_maxdev, "i");
+MODULE_PARM_DESC(slip_maxdev, "Maximum number of slip devices");
 
 static struct tty_ldisc	sl_ldisc;
 

@@ -1297,6 +1297,7 @@ static int timid;
 
 MODULE_PARM(parport, "1-" __MODULE_STRING(PLIP_MAX) "i");
 MODULE_PARM(timid, "1i");
+MODULE_PARM_DESC(parport, "List of parport device numbers to use by plip");
 
 static struct net_device *dev_plip[PLIP_MAX] = { NULL, };
 

@@ -1808,25 +1808,11 @@ static int sprintf_info(char *buffer, struct net_device *dev)
 #endif
 #endif
 
-static void streamer_suspend(struct pci_dev *pdev) {
-#if STREAMER_DEBUG
-  printk("lanstreamer::streamer_suspend entry pdev %p\n",pdev);
-#endif
-}
-
-static void streamer_resume(struct pci_dev *pdev) {
-#if STREAMER_DEBUG
-  printk("lanstreamer::streamer_resume entry pdev %p\n",pdev);
-#endif
-}
-
 static struct pci_driver streamer_pci_driver = {
   name:       "lanstreamer",
   id_table:   streamer_pci_tbl,
   probe:      streamer_init_one,
   remove:     streamer_remove_one,
-  suspend:    streamer_suspend,
-  resume:     streamer_resume,
 };
 
 static int __init streamer_init_module(void) {

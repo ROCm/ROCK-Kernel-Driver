@@ -1,3 +1,6 @@
+#ifndef __LINUX_IBMTR_H__
+#define __LINUX_IBMTR_H__
+
 /* Definitions for an IBM Token Ring card. */
 /* This file is distributed under the GNU GPL   */
 
@@ -452,3 +455,4 @@ struct srb_set_funct_addr {
 	unsigned char funct_address[4];
 };
 
+#endif /* __LINUX_IBMTR_H__ */

@@ -861,6 +861,8 @@ static int io = 0x300;
 static int irq;
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(io, "EtherLink16 I/O base address");
+MODULE_PARM_DESC(irq, "(ignored)");
 
 int init_module(void)
 {

@@ -85,6 +85,7 @@ IVc. Errata
 
 */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
@@ -480,11 +481,15 @@ struct netdrv_private {
 };
 
 MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
-MODULE_DESCRIPTION ("RealTek RTL-8139 Fast Ethernet driver");
+MODULE_DESCRIPTION ("Skeleton for a PCI Fast Ethernet driver");
 MODULE_PARM (multicast_filter_limit, "i");
 MODULE_PARM (max_interrupt_work, "i");
 MODULE_PARM (debug, "i");
 MODULE_PARM (media, "1-" __MODULE_STRING(8) "i");
+MODULE_PARM_DESC (multicast_filter_limit, "pci-skeleton maximum number of filtered multicast addresses");
+MODULE_PARM_DESC (max_interrupt_work, "pci-skeleton maximum events handled per interrupt");
+MODULE_PARM_DESC (media, "pci-skeleton: Bits 0-3: media type, bit 17: full duplex");
+MODULE_PARM_DESC (debug, "(unused)");
 
 static int read_eeprom (void *ioaddr, int location, int addr_len);
 static int netdrv_open (struct net_device *dev);
@@ -1790,7 +1795,7 @@ static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	case SIOCDEVPRIVATE + 1:	/* Read the specified MII register. */
 		spin_lock_irqsave (&tp->lock, flags);
-		data[3] = mdio_read (dev, data[0], data[1] & 0x1f);
+		data[3] = mdio_read (dev, data[0] & 0x1f, data[1] & 0x1f);
 		spin_unlock_irqrestore (&tp->lock, flags);
 		break;
 
@@ -1801,7 +1806,7 @@ static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		}
 
 		spin_lock_irqsave (&tp->lock, flags);
-		mdio_write (dev, data[0], data[1] & 0x1f, data[2]);
+		mdio_write (dev, data[0] & 0x1f, data[1] & 0x1f, data[2]);
 		spin_unlock_irqrestore (&tp->lock, flags);
 		break;
 
@@ -1918,7 +1923,9 @@ static void netdrv_set_rx_mode (struct net_device *dev)
 }
 
 
-static void netdrv_suspend (struct pci_dev *pdev)
+#ifdef CONFIG_PM
+
+static int netdrv_suspend (struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
 	struct netdrv_private *tp = dev->priv;
@@ -1942,10 +1949,12 @@ static void netdrv_suspend (struct pci_dev *pdev)
 	spin_unlock_irqrestore (&tp->lock, flags);
 
 	pci_power_off (pdev, -1);
+
+	return 0;
 }
 
 
-static void netdrv_resume (struct pci_dev *pdev)
+static int netdrv_resume (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
 
@@ -1954,7 +1963,11 @@ static void netdrv_resume (struct pci_dev *pdev)
 	pci_power_on (pdev);
 	netif_device_attach (dev);
 	netdrv_hw_start (dev);
+
+	return 0;
 }
+
+#endif /* CONFIG_PM */
 
 
 static struct pci_driver netdrv_pci_driver = {
@@ -1962,8 +1975,10 @@ static struct pci_driver netdrv_pci_driver = {
 	id_table:	netdrv_pci_tbl,
 	probe:		netdrv_init_one,
 	remove:		netdrv_remove_one,
+#ifdef CONFIG_PM
 	suspend:	netdrv_suspend,
 	resume:		netdrv_resume,
+#endif /* CONFIG_PM */
 };
 
 

@@ -1211,6 +1211,8 @@ MODULE_AUTHOR("Franco Venturi <fventuri@mediaone.net>");
 MODULE_DESCRIPTION("General Instruments SB1000 driver");
 MODULE_PARM(io, "1-2i");
 MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(io, "SB1000 I/O base addresses");
+MODULE_PARM_DESC(irq, "SB1000 IRQ number");
 
 static struct net_device dev_sb1000;
 static int io[2];

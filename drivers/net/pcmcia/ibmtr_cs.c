@@ -73,6 +73,9 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/ds.h>
 
+#define PCMCIA
+#include "../tokenring/ibmtr.c"
+
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
@@ -130,7 +133,7 @@ extern int ibmtr_probe(struct net_device *dev);
 unsigned char pcmcia_reality_check(unsigned char gss);
 
 extern int trdev_init(struct net_device *dev);
-extern void tok_interrupt(int irq, struct pt_regs *regs);
+extern void tok_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 extern int tok_init_card(struct net_device *dev);
 extern unsigned char get_sram_size(struct tok_info *ti);
 

@@ -857,7 +857,7 @@ int posix_lock_file(struct file *filp, struct file_lock *caller,
 	new_fl2 = locks_alloc_lock(0);
 	error = -ENOLCK; /* "no luck" */
 	if (!(new_fl && new_fl2))
-		goto out;
+		goto out_nolock;
 
 	lock_kernel();
 	if (caller->fl_type != F_UNLCK) {
@@ -1005,6 +1005,7 @@ int posix_lock_file(struct file *filp, struct file_lock *caller,
 	}
 out:
 	unlock_kernel();
+out_nolock:
 	/*
 	 * Free any unused locks.
 	 */

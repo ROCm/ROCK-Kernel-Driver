@@ -2,21 +2,26 @@
 # Wireless LAN device configuration
 #
 
-###tristate '  Hermes chipset support' CONFIG_NET_ORINOCO
-###dep_tristate '    PCMCIA Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)' CONFIG_PCMCIA_HERMES $CONFIG_NET_ORINOCO $CONFIG_PCMCIA
+if [ "$CONFIG_ISA" = "y" -o "$CONFIG_PCI" = "y" ]; then
+   tristate '  Cisco/Aironet 34X/35X/4500/4800 ISA and PCI cards' CONFIG_AIRO
+fi
 
 if [ "$CONFIG_ALL_PPC" = "y" ]; then
    tristate '  Apple Airport support (built-in)' CONFIG_APPLE_AIRPORT
 fi
 
 # If Pcmcia is compiled in, offer Pcmcia cards...
-if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
+if [ "$CONFIG_PCMCIA" != "n" ]; then
    comment 'Wireless Pcmcia cards support' 
 
-   dep_tristate '  Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)' CONFIG_PCMCIA_HERMES $CONFIG_PCMCIA
+   tristate '  Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)' CONFIG_PCMCIA_HERMES
+   tristate '  Cisco/Aironet 34X/35X/4500/4800 PCMCIA cards' CONFIG_AIRO_CS
+fi
 
-# If one of the Pcmcia cards above is enabled, activate Pcmcia network support
-   if [ "$CONFIG_PCMCIA_HERMES" = "y" ]; then
-      define_bool CONFIG_PCMCIA_NETCARD y
-   fi
+# yes, this works even when no drivers are selected
+if [ "$CONFIG_ISA" = "y" -o "$CONFIG_PCI" = "y" -o \
+     "$CONFIG_ALL_PPC" = "y" -o "$CONFIG_PCMCIA" != "n" ]; then
+   define_bool CONFIG_NET_WIRELESS y
+else
+   define_bool CONFIG_NET_WIRELESS n
 fi

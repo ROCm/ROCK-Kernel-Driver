@@ -4599,13 +4599,18 @@
 		11d4 0048  SoundMAX Integrated Digital Audio
 	2426  82801AB AC'97 Modem
 	2428  82801AB PCI Bridge
-	2440  82820 820 (Camino 2) Chipset ISA Bridge (ICH2)
-	2442  82820 820 (Camino 2) Chipset USB (Hub A)
-	2443  82820 820 (Camino 2) Chipset SMBus
-	2444  82820 820 (Camino 2) Chipset USB (Hub B)
-	2449  82820 820 (Camino 2) Chipset Ethernet
-	244b  82820 820 (Camino 2) Chipset IDE U100
-	244e  82820 820 (Camino 2) Chipset PCI
+	2440  82801BA ISA Bridge (ICH2)
+	2442  82801BA(M) USB (Hub A)
+	2443  82801BA(M) SMBus
+	2444  82801BA(M) USB (Hub B)
+	2445  82801BA(M) AC'97 Audio
+	2446  82801BA(M) AC'97 Modem
+	2448  82801BA PCI
+	2449  82801BA(M) Ethernet
+	244a  82801BAM IDE U100
+	244b  82801BA IDE U100
+	244c  82801BAM ISA Bridge (ICH2)
+	244e  82801BAM PCI
 	2500  82820 820 (Camino) Chipset Host Bridge (MCH)
 		1043 801c  P3C-2000 system chipset
 	2501  82820 820 (Camino) Chipset Host Bridge (MCH)

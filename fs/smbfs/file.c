@@ -151,6 +151,7 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 		 * Update the inode now rather than waiting for a refresh.
 		 */
 		inode->i_mtime = inode->i_atime = CURRENT_TIME;
+		inode->u.smbfs_i.flags |= SMB_F_LOCALWRITE;
 		if (offset > inode->i_size)
 			inode->i_size = offset;
 	} while (count);

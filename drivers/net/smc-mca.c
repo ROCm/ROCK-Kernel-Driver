@@ -440,6 +440,8 @@ static int irq[MAX_ULTRAMCA_CARDS];
 
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_ULTRAMCA_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_ULTRAMCA_CARDS) "i");
+MODULE_PARM_DESC(io, "SMC Ultra/EtherEZ MCA I/O base address(es)");
+MODULE_PARM_DESC(irq, "SMC Ultra/EtherEZ MCA IRQ number(s)");
 
 int init_module(void)
 {

@@ -2567,7 +2567,7 @@ MODULE_PARM(awc_debug,"i");
 MODULE_PARM(rx_queue_len,"i");
 MODULE_PARM(tx_rate,"i");
 MODULE_PARM(channel,"i");
-MODULE_PARM(tx_full_rate,"i");
+//MODULE_PARM(tx_full_rate,"i");
 MODULE_PARM(adhoc,"i");
 MODULE_PARM(master,"i");
 MODULE_PARM(slave,"i");
@@ -2576,6 +2576,12 @@ MODULE_PARM(max_mtu,"i");
 MODULE_PARM(large_buff_mem,"i");
 MODULE_PARM(small_buff_no,"i");
 MODULE_PARM(SSID,"c33");
+MODULE_PARM_DESC(awc_debug,"Aironet debug mask");
+MODULE_PARM_DESC(channel,"Aironet ");
+MODULE_PARM_DESC(adhoc,"Aironet Access Points not available (0-1)");
+MODULE_PARM_DESC(master,"Aironet is Adhoc master (creates network sync) (0-1)");
+MODULE_PARM_DESC(slave,"Aironet is Adhoc slave (0-1)");
+MODULE_PARM_DESC(max_mtu,"Aironet MTU limit (256-2312)");
 #endif
 
 /*EXPORT_SYMBOL(tx_queue_len);

@@ -939,17 +939,6 @@ struct pci_dev *dev = NULL;
 				pci_write_config_byte(dev, 0x44, reg);
 			}
 		}
-		if ((dev = pci_find_device(PCI_VENDOR_ID_VIA,
-						PCI_DEVICE_ID_VIA_82C586_2,
-						dev)))
-		{
-			/* Force correct USB function interrupt */
-			dev->irq = 11;
-			pcibios_write_config_byte(dev->bus->number,
-					dev->devfn,
-					PCI_INTERRUPT_LINE,
-					dev->irq);
-		}
 	}
 	if ((dev = pci_find_device(PCI_VENDOR_ID_WINBOND,
 				   PCI_DEVICE_ID_WINBOND_82C105, dev))){

@@ -101,8 +101,6 @@ static inline void wait_for_buffer(struct net_device *dev);
 /* Check for a network adaptor of this type, and return '0' iff one exists.
    If dev->base_addr == 0, probe all likely locations.
    If dev->base_addr == 1, always return failure.
-   If dev->base_addr == 2, allocate space for the device and return success
-   (detachable devices only).
    */
 
 int __init 
@@ -715,6 +713,8 @@ static int io = 0x320;
 static int irq = 10;
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(io, "SEEQ 8005 I/O base address");
+MODULE_PARM_DESC(irq, "SEEQ 8005 IRQ number");
 
 int init_module(void)
 {

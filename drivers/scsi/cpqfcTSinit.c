@@ -1808,7 +1808,7 @@ void* fcMemManager( ALIGNED_MEM *dynamic_mem, ULONG n_alloc, ULONG ab,
 
 #ifdef MODULE
 
-Scsi_Host_Template driver_template = CPQFCTS;
+static Scsi_Host_Template driver_template = CPQFCTS;
 
 #include "scsi_module.c"
 

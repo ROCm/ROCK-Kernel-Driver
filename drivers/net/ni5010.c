@@ -739,6 +739,8 @@ static int irq;
 
 MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(io, "ni5010 I/O base address");
+MODULE_PARM_DESC(irq, "ni5010 IRQ number");
 
 int init_module(void)
 {

@@ -13,6 +13,7 @@
  */
 
 #include <linux/config.h>
+#include <asm/atomic.h>
 #include <asm/irq.h>
 
 /*
@@ -83,7 +84,9 @@ extern int IO_APIC_get_PCI_irq_vector(int bus, int slot, int fn);
 extern void send_IPI(int dest, int vector);
 
 extern unsigned long io_apic_irqs;
-extern volatile unsigned long irq_err_count;
+
+extern atomic_t irq_err_count;
+extern atomic_t irq_mis_count;
 
 extern char _stext, _etext;
 

@@ -940,18 +940,6 @@ static void __init pci_fixup_latency(struct pci_dev *d)
 	pcibios_max_latency = 32;
 }
 
-static void __init pci_fixup_via_acpi(struct pci_dev *d)
-{
-	/*
-	 * VIA ACPI device: IRQ line in PCI config byte 0x42
-	 */
-	u8 irq;
-	pci_read_config_byte(d, 0x42, &irq);
-	irq &= 0x0f;
-	if (irq && (irq != 2))
-		d->irq = irq;
-}
-
 static void __init pci_fixup_piix4_acpi(struct pci_dev *d)
 {
 	/*
@@ -1006,8 +994,6 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pci_fixup_ide_bases },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		pci_fixup_latency },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5598,		pci_fixup_latency },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	pci_fixup_via_acpi },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	pci_fixup_via_acpi },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C691,	pci_fixup_via691 },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C598_1,	pci_fixup_via691_2 },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	pci_fixup_piix4_acpi },
@@ -1104,6 +1090,9 @@ char * __init pcibios_setup(char *str)
 	else if (!strcmp(str, "rom")) {
 		pci_probe |= PCI_ASSIGN_ROMS;
 		return NULL;
+	} else if (!strcmp(str, "assign-busses")) {
+		pci_probe |= PCI_ASSIGN_ALL_BUSSES;
+		return NULL;
 	} else if (!strncmp(str, "irqmask=", 8)) {
 		pcibios_irq_mask = simple_strtol(str+8, NULL, 0);
 		return NULL;
@@ -1112,6 +1101,11 @@ char * __init pcibios_setup(char *str)
 		return NULL;
 	}
 	return str;
+}
+
+unsigned int pcibios_assign_all_busses(void)
+{
+	return (pci_probe & PCI_ASSIGN_ALL_BUSSES) ? 1 : 0;
 }
 
 int pcibios_enable_device(struct pci_dev *dev)

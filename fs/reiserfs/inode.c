@@ -21,6 +21,7 @@
 #define GET_BLOCK_CREATE 1    /* add anything you need to find block */
 #define GET_BLOCK_NO_HOLE 2   /* return -ENOENT for file holes */
 #define GET_BLOCK_READ_DIRECT 4  /* read the tail if indirect item not found */
+#define GET_BLOCK_NO_ISEM     8 /* i_sem is not held, don't preallocate */
 
 //
 // initially this function was derived from minix or ext2's analog and
@@ -539,6 +540,19 @@ out:
     return retval ;
 }
 
+static inline int _allocate_block(struct reiserfs_transaction_handle *th,
+                           struct inode *inode, 
+			   b_blocknr_t *allocated_block_nr, 
+			   unsigned long tag,
+			   int flags) {
+  
+#ifdef REISERFS_PREALLOCATE
+    if (!(flags & GET_BLOCK_NO_ISEM)) {
+        return reiserfs_new_unf_blocknrs2(th, inode, allocated_block_nr, tag);
+    }
+#endif
+    return reiserfs_new_unf_blocknrs (th, allocated_block_nr, tag);
+}
 //
 // initially this function was derived from ext2's analog and evolved
 // as the prototype did.  You'll need to look at the ext2 version to
@@ -632,11 +646,7 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    goto research ;
 	}
 
-#ifdef REISERFS_PREALLOCATE
-	repeat = reiserfs_new_unf_blocknrs2 (&th, inode, &allocated_block_nr, tag);
-#else
-	repeat = reiserfs_new_unf_blocknrs (&th, &allocated_block_nr, tag);
-#endif
+	repeat = _allocate_block(&th, inode, &allocated_block_nr, tag, create);
 
 	if (repeat == NO_DISK_SPACE) {
 	    /* restart the transaction to give the journal a chance to free
@@ -644,11 +654,7 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    ** research if we succeed on the second try
 	    */
 	    restart_transaction(&th, inode, &path) ; 
-#ifdef REISERFS_PREALLOCATE
-	    repeat = reiserfs_new_unf_blocknrs2 (&th, inode, &allocated_block_nr, tag);
-#else
-	    repeat = reiserfs_new_unf_blocknrs (&th, &allocated_block_nr, tag);
-#endif
+	    repeat = _allocate_block(&th, inode,&allocated_block_nr,tag,create);
 
 	    if (repeat != NO_DISK_SPACE) {
 		goto research ;
@@ -736,10 +742,6 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    retval = reiserfs_insert_item (&th, &path, &tmp_key, &tmp_ih, (char *)&unp);
 	    if (retval) {
 		reiserfs_free_block (&th, allocated_block_nr);
-
-#ifdef REISERFS_PREALLOCATE
-		reiserfs_discard_prealloc (&th, inode); 
-#endif
 		goto failure; // retval == -ENOSPC or -EIO or -EEXIST
 	    }
 	    if (unp)
@@ -787,10 +789,6 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    mark_buffer_uptodate (unbh, 1);
 	    if (retval) {
 		reiserfs_free_block (&th, allocated_block_nr);
-
-#ifdef REISERFS_PREALLOCATE
-		reiserfs_discard_prealloc (&th, inode); 
-#endif
 		goto failure;
 	    }
 	    /* we've converted the tail, so we must 
@@ -832,10 +830,6 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    retval = reiserfs_paste_into_item (&th, &path, &tmp_key, (char *)&un, UNFM_P_SIZE);
 	    if (retval) {
 		reiserfs_free_block (&th, allocated_block_nr);
-
-#ifdef REISERFS_PREALLOCATE
-		reiserfs_discard_prealloc (&th, inode); 
-#endif
 		goto failure;
 	    }
 	    if (un.unfm_nodenum)
@@ -872,6 +866,8 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    reiserfs_warning ("vs-: reiserfs_get_block: "
 			      "%k should not be found", &key);
 	    retval = -EEXIST;
+	    if (allocated_block_nr)
+	        reiserfs_free_block (&th, allocated_block_nr);
 	    pathrelse(&path) ;
 	    goto failure;
 	}
@@ -920,6 +916,8 @@ static void init_inode (struct inode * inode, struct path * path)
     copy_key (INODE_PKEY (inode), &(ih->ih_key));
     inode->i_generation = INODE_PKEY (inode)->k_dir_id;
     inode->i_blksize = PAGE_SIZE;
+
+    INIT_LIST_HEAD(&inode->u.reiserfs_i.i_prealloc_list) ;
 
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
@@ -1484,6 +1482,8 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     inode->u.reiserfs_i.i_first_direct_byte = S_ISLNK(mode) ? 1 : 
       U32_MAX/*NO_BYTES_IN_DIRECT_ITEM*/;
 
+    INIT_LIST_HEAD(&inode->u.reiserfs_i.i_prealloc_list) ;
+
     if (old_format_only (sb))
 	inode2sd_v1 (&sd, inode);
     else
@@ -1786,7 +1786,8 @@ out:
     /* this is where we fill in holes in the file. */
     if (use_get_block) {
         kmap(bh_result->b_page) ;
-	retval = reiserfs_get_block(inode, block, bh_result, 1) ;
+	retval = reiserfs_get_block(inode, block, bh_result, 
+	                            GET_BLOCK_CREATE | GET_BLOCK_NO_ISEM) ;
         kunmap(bh_result->b_page) ;
 	if (!retval) {
 	    if (!buffer_mapped(bh_result) || bh_result->b_blocknr == 0) {

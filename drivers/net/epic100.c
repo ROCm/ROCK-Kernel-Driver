@@ -100,6 +100,7 @@ static int rx_copybreak;
 #error You must compile this driver with "-O".
 #endif
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -116,6 +117,7 @@ static int rx_copybreak;
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
+#include <linux/mii.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -135,6 +137,11 @@ MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+MODULE_PARM_DESC(debug, "EPIC/100 debug level (0-5)");
+MODULE_PARM_DESC(max_interrupt_work, "EPIC/100 maximum events handled per interrupt");
+MODULE_PARM_DESC(options, "EPIC/100: Bits 0-3: media type, bit 4: full duplex");
+MODULE_PARM_DESC(rx_copybreak, "EPIC/100 copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(full_duplex, "EPIC/100 full duplex setting(s) (1)");
 
 /*
 				Theory of Operation
@@ -1169,7 +1176,7 @@ static int epic_rx(struct net_device *dev)
 			if (pkt_len > PKT_BUF_SZ - 4) {
 				printk(KERN_ERR "%s: Oversized Ethernet frame, status %x "
 					   "%d bytes.\n",
-					   dev->name, pkt_len, status);
+					   dev->name, status, pkt_len);
 				pkt_len = 1514;
 			}
 			/* Check if the packet is long enough to accept without copying
@@ -1445,29 +1452,35 @@ static void __devexit epic_remove_one (struct pci_dev *pdev)
 }
 
 
-static void epic_suspend (struct pci_dev *pdev)
+#ifdef CONFIG_PM
+
+static int epic_suspend (struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	long ioaddr = dev->base_addr;
 
 	if (!netif_running(dev))
-		return;
+		return 0;
 	epic_pause(dev);
 	/* Put the chip into low-power mode. */
 	outl(0x0008, ioaddr + GENCTL);
 	/* pci_power_off(pdev, -1); */
+	return 0;
 }
 
 
-static void epic_resume (struct pci_dev *pdev)
+static int epic_resume (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (!netif_running(dev))
-		return;
+		return 0;
 	epic_restart(dev);
 	/* pci_power_on(pdev); */
+	return 0;
 }
+
+#endif /* CONFIG_PM */
 
 
 static struct pci_driver epic_driver = {
@@ -1475,8 +1488,10 @@ static struct pci_driver epic_driver = {
 	id_table:	epic_pci_tbl,
 	probe:		epic_init_one,
 	remove:		epic_remove_one,
+#ifdef CONFIG_PM
 	suspend:	epic_suspend,
 	resume:		epic_resume,
+#endif /* CONFIG_PM */
 };
 
 

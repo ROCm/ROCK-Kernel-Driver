@@ -76,7 +76,7 @@ check_icmp(const struct icmphdr *icmph,
 		    = { 12, 12, ICMP_NOT_ERROR, 0, 0 } };
 
 	/* Can't do anything if it's a fragment. */
-	if (!offset)
+	if (offset)
 		return 1;
 
 	/* Must cover type and code. */
@@ -87,7 +87,7 @@ check_icmp(const struct icmphdr *icmph,
 
 	/* If not embedded. */
 	if (!embedded) {
-		/* Bad checksum?  Don't print, just drop. */
+		/* Bad checksum?  Don't print, just ignore. */
 		if (!more_frags
 		    && ip_compute_csum((unsigned char *) icmph, datalen) != 0)
 			return 0;
@@ -108,6 +108,8 @@ check_icmp(const struct icmphdr *icmph,
 			   length of iph + 8 bytes. */
 			struct iphdr *inner = (void *)icmph + 8;
 
+			/* datalen > 8 since all ICMP_IS_ERROR types
+                           have min length > 8 */
 			if (datalen - 8 < sizeof(struct iphdr)) {
 				limpk("ICMP error internal way too short\n");
 				return 0;
@@ -155,6 +157,8 @@ check_icmp(const struct icmphdr *icmph,
 		u_int32_t arg = ntohl(icmph->un.gateway);
 
 		if (icmph->code == 0) {
+			/* Code 0 means that upper 8 bits is pointer
+                           to problem. */
 			if ((arg >> 24) >= iph->ihl*4) {
 				limpk("ICMP PARAMETERPROB ptr = %u\n",
 				      ntohl(icmph->un.gateway) >> 24);
@@ -196,7 +200,7 @@ check_udp(const struct iphdr *iph,
 	  int embedded)
 {
 	/* Can't do anything if it's a fragment. */
-	if (!offset)
+	if (offset)
 		return 1;
 
 	/* CHECK: Must cover UDP header. */
@@ -205,7 +209,7 @@ check_udp(const struct iphdr *iph,
 		return 0;
 	}
 
-	/* Bad checksum?  Don't print, just drop. */
+	/* Bad checksum?  Don't print, just say it's unclean. */
 	/* FIXME: SRC ROUTE packets won't match checksum --RR */
 	if (!more_frags && !embedded
 	    && csum_tcpudp_magic(iph->saddr, iph->daddr, datalen, IPPROTO_UDP,
@@ -263,7 +267,7 @@ check_tcp(const struct iphdr *iph,
 	  int more_frags,
 	  int embedded)
 {
-	u_int8_t *opt = (u_int8_t *)(tcph + 1);
+	u_int8_t *opt = (u_int8_t *)tcph;
 	u_int8_t tcpflags;
 	int end_of_options = 0;
 	size_t i;
@@ -272,7 +276,7 @@ check_tcp(const struct iphdr *iph,
 	/* In fact, this is caught below (offset < 516). */
 
 	/* Can't do anything if it's a fragment. */
-	if (!offset)
+	if (offset)
 		return 1;
 
 	/* CHECK: Smaller than minimal TCP hdr. */
@@ -281,7 +285,8 @@ check_tcp(const struct iphdr *iph,
 			limpk("Packet length %u < TCP header.\n", datalen);
 			return 0;
 		}
-		/* Must have ports available (datalen >= 8). */
+		/* Must have ports available (datalen >= 8), from
+                   check_icmp which set embedded = 1 */
 		/* CHECK: TCP ports inside ICMP error */
 		if (!tcph->source || !tcph->dest) {
 			limpk("Zero TCP ports %u/%u.\n",
@@ -301,7 +306,7 @@ check_tcp(const struct iphdr *iph,
 			return 1;
 	}
 
-	/* Bad checksum?  Don't print, just drop. */
+	/* Bad checksum?  Don't print, just say it's unclean. */
 	/* FIXME: SRC ROUTE packets won't match checksum --RR */
 	if (!more_frags && !embedded
 	    && csum_tcpudp_magic(iph->saddr, iph->daddr, datalen, IPPROTO_TCP,
@@ -373,6 +378,8 @@ check_tcp(const struct iphdr *iph,
 				      (unsigned int) opt[i], i);
 				return 0;
 			}
+			/* Move to next option */
+			i += opt[i+1];
 		}
 	}
 
@@ -384,7 +391,7 @@ check_tcp(const struct iphdr *iph,
 static int
 check_ip(struct iphdr *iph, size_t length, int embedded)
 {
-	u_int8_t *opt = (u_int8_t *)(iph + 1);
+	u_int8_t *opt = (u_int8_t *)iph;
 	int end_of_options = 0;
 	void *protoh;
 	size_t datalen;
@@ -430,18 +437,20 @@ check_ip(struct iphdr *iph, size_t length, int embedded)
 				      opt[i]);
 				return 0;
 			}
-			/* CHECK: zero-length options. */
-			else if (opt[i+1] == 0) {
-				limpk("IP option %u 0 len\n",
-				      opt[i]);
+			/* CHECK: zero-length or one-length options. */
+			else if (opt[i+1] < 2) {
+				limpk("IP option %u %u len\n",
+				      opt[i], opt[i+1]);
 				return 0;
 			}
 			/* CHECK: oversize options. */
-			else if (opt[i+1] + i >= iph->ihl * 4) {
+			else if (opt[i+1] + i > iph->ihl * 4) {
 				limpk("IP option %u at %u too long\n",
 				      opt[i], i);
 				return 0;
 			}
+			/* Move to next option */
+			i += opt[i+1];
 		}
 	}
 
@@ -495,10 +504,10 @@ check_ip(struct iphdr *iph, size_t length, int embedded)
 		return 0;
 	}
 
-	/* CHECK: Min offset of frag = 128 - 60 (max IP hdr len). */
-	if (offset && offset * 8 < MIN_LIKELY_MTU - 60) {
+	/* CHECK: Min offset of frag = 128 - IP hdr len. */
+	if (offset && offset * 8 < MIN_LIKELY_MTU - iph->ihl * 4) {
 		limpk("Fragment starts at %u < %u\n", offset * 8,
-		      MIN_LIKELY_MTU-60);
+		      MIN_LIKELY_MTU - iph->ihl * 4);
 		return 0;
 	}
 

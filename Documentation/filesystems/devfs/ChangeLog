@@ -1645,3 +1645,19 @@ Changes for patch v179
 Changes for patch v180
 
 - Fixed !CONFIG_DEVFS_FS stub declaration of <devfs_get_info>
+===============================================================================
+Changes for patch v181
+
+- Answered question posed by Al Viro and removed his comments from <devfs_open>
+
+- Moved setting of registered flag after other fields are changed
+
+- Fixed race between <devfsd_close> and <devfsd_notify_one>
+
+- Global VFS changes added bogus BKL to devfsd_close(): removed
+
+- Widened locking in <devfs_readlink> and <devfs_follow_link>
+
+- Replaced <devfsd_read> stack usage with <devfsd_ioctl> kmalloc
+
+- Simplified locking in <devfsd_ioctl> and fixed memory leak

@@ -18,6 +18,11 @@
 	http://www.scyld.com/network/sundance.html
 */
 
+#define DRV_NAME	"sundance"
+#define DRV_VERSION	"1.01"
+#define DRV_RELDATE	"4/09/00"
+
+
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 
@@ -85,6 +90,8 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -93,7 +100,7 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO "sundance.c:v1.01 4/09/00  Written by Donald Becker\n"
+KERN_INFO DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE "  Written by Donald Becker\n"
 KERN_INFO "  http://www.scyld.com/network/sundance.html\n";
 
 /* Condensed operations for readability. */
@@ -109,6 +116,12 @@ MODULE_PARM(debug, "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+MODULE_PARM_DESC(max_interrupt_work, "Sundance Alta maximum events handled per interrupt");
+MODULE_PARM_DESC(mtu, "Sundance Alta MTU (all boards)");
+MODULE_PARM_DESC(debug, "Sundance Alta debug level (0-5)");
+MODULE_PARM_DESC(rx_copybreak, "Sundance Alta copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(options, "Sundance Alta: Bits 0-3: media type, bit 17: full duplex");
+MODULE_PARM_DESC(full_duplex, "Sundance Alta full duplex setting(s) (1)");
 
 /*
 				Theory of Operation
@@ -346,6 +359,7 @@ struct netdev_private {
 	int mii_cnt;						/* MII device addresses. */
 	u16 advertising;					/* NWay media advertisement */
 	unsigned char phys[MII_CNT];		/* MII device addresses, only first one used. */
+	struct pci_dev *pci_dev;
 };
 
 /* The station address location in the EEPROM. */
@@ -366,7 +380,7 @@ static int  netdev_rx(struct net_device *dev);
 static void netdev_error(struct net_device *dev, int intr_status);
 static void set_rx_mode(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  netdev_close(struct net_device *dev);
 
 
@@ -400,7 +414,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
 
-	if (pci_request_regions(pdev, "sundance"))
+	if (pci_request_regions(pdev, DRV_NAME))
 		goto err_out_netdev;
 
 #ifdef USE_IO_OPS
@@ -422,6 +436,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	np = dev->priv;
 	np->chip_id = chip_idx;
 	np->drv_flags = pci_id_tbl[chip_idx].drv_flags;
+	np->pci_dev = pdev;
 	spin_lock_init(&np->lock);
 
 	if (dev->mem_start)
@@ -447,7 +462,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	dev->stop = &netdev_close;
 	dev->get_stats = &get_stats;
 	dev->set_multicast_list = &set_rx_mode;
-	dev->do_ioctl = &mii_ioctl;
+	dev->do_ioctl = &netdev_ioctl;
 	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	pci_set_drvdata(pdev, dev);
@@ -1156,11 +1171,37 @@ static void set_rx_mode(struct net_device *dev)
 	writeb(rx_mode, ioaddr + RxMode);
 }
 
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	struct netdev_private *np = dev->priv;
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+
+        switch (ethcmd) {
+        case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strcpy(info.driver, DRV_NAME);
+		strcpy(info.version, DRV_VERSION);
+		strcpy(info.bus_info, np->pci_dev->slot_name);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+
+        }
+	
+	return -EOPNOTSUPP;
+}
+
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	u16 *data = (u16 *)&rq->ifr_data;
 
 	switch(cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
 		data[0] = ((struct netdev_private *)dev->priv)->phys[0] & 0x1f;
 		/* Fall Through */
@@ -1258,7 +1299,7 @@ static void __devexit sundance_remove1 (struct pci_dev *pdev)
 }
 
 static struct pci_driver sundance_driver = {
-	name:		"sundance",
+	name:		DRV_NAME,
 	id_table:	sundance_pci_tbl,
 	probe:		sundance_probe1,
 	remove:		sundance_remove1,

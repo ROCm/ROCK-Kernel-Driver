@@ -1044,6 +1044,9 @@ static int loading_module = 1;
 MODULE_PARM(de4x5_debug, "i");
 MODULE_PARM(dec_only, "i");
 MODULE_PARM(args, "s");
+MODULE_PARM_DESC(de4x5_debug, "de4x5 debug mask");
+MODULE_PARM_DESC(dec_only, "de4x5 probe only for Digital boards (0-1)");
+MODULE_PARM_DESC(args, "de4x5 full duplex and media type settings; see de4x5.c for details");
 # else
 static int loading_module;
 #endif /* MODULE */
@@ -5784,6 +5787,7 @@ de4x5_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 static struct net_device *mdev = NULL;
 static int io=0x0;/* EDIT THIS LINE FOR YOUR CONFIGURATION IF NEEDED        */
 MODULE_PARM(io, "i");
+MODULE_PARM_DESC(io, "de4x5 I/O base address");
 
 int
 init_module(void)

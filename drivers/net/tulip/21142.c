@@ -84,7 +84,7 @@ void t21142_timer(unsigned long data)
 			tp->csr6 &= 0x00D5;
 			tp->csr6 |= new_csr6;
 			outl(0x0301, ioaddr + CSR12);
-			tulip_restart_rxtx(tp, tp->csr6);
+			tulip_restart_rxtx(tp);
 		}
 		next_tick = 3*HZ;
 	}
@@ -117,7 +117,7 @@ void t21142_start_nway(struct net_device *dev)
 	udelay(100);
 	outl(csr14, ioaddr + CSR14);
 	tp->csr6 = 0x82420000 | (tp->sym_advertise & 0x0040 ? FullDuplex : 0);
-	tulip_outl_csr(tp, tp->csr6, CSR6);
+	outl(tp->csr6, ioaddr + CSR6);
 	if (tp->mtable  &&  tp->mtable->csr15dir) {
 		outl(tp->mtable->csr15dir, ioaddr + CSR15);
 		outl(tp->mtable->csr15val, ioaddr + CSR15);
@@ -201,12 +201,12 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 			outl(1, ioaddr + CSR13);
 		}
 #if 0							/* Restart shouldn't be needed. */
-		tulip_outl_csr(tp, tp->csr6 | csr6_sr, CSR6);
+		outl(tp->csr6 | RxOn, ioaddr + CSR6);
 		if (tulip_debug > 2)
 			printk(KERN_DEBUG "%s:  Restarting Tx and Rx, CSR5 is %8.8x.\n",
 				   dev->name, inl(ioaddr + CSR5));
 #endif
-		tulip_outl_csr(tp, tp->csr6 | csr6_st | csr6_sr, CSR6);
+		tulip_start_rxtx(tp);
 		if (tulip_debug > 2)
 			printk(KERN_DEBUG "%s:  Setting CSR6 %8.8x/%x CSR12 %8.8x.\n",
 				   dev->name, tp->csr6, inl(ioaddr + CSR6),
@@ -252,7 +252,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 		tp->csr6 = 0x83860000;
 		outl(0x0003FF7F, ioaddr + CSR14);
 		outl(0x0301, ioaddr + CSR12);
-		tulip_restart_rxtx(tp, tp->csr6);
+		tulip_restart_rxtx(tp);
 	}
 }
 

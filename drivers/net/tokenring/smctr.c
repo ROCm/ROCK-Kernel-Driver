@@ -26,6 +26,10 @@
  *    1. Multicast support.
  */
 
+#if defined(__alpha__) || defined(__ia64__)
+#error FIXME: driver does not support 64-bit platforms
+#endif
+
 #ifdef MODULE
 #include <linux/module.h>
 #include <linux/version.h>

@@ -449,6 +449,10 @@ MODULE_PARM(io, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
 MODULE_PARM(mem_end, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
+MODULE_PARM_DESC(io, "WD80x3 I/O base address(es)");
+MODULE_PARM_DESC(irq, "WD80x3 IRQ number(s) (ignored for PureData boards)");
+MODULE_PARM_DESC(mem, "WD80x3 memory base address(es)(ignored for PureData boards)");
+MODULE_PARM_DESC(mem_end, "WD80x3 memory end address(es)");
 
 /* This is set up so that only a single autoprobe takes place per call.
 ISA device autoprobes on a running machine are not recommended. */

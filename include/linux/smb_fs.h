@@ -93,6 +93,11 @@ smb_kfree(void *obj)
 
 #endif /* DEBUG_SMB_MALLOC */
 
+/*
+ * Flags for the in-memory inode
+ */
+#define SMB_F_LOCALWRITE	0x02	/* file modified locally */
+
 
 /* NT1 protocol capability bits */
 #define SMB_CAP_RAW_MODE         0x0001

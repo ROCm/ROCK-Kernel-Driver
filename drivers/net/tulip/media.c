@@ -411,7 +411,6 @@ void tulip_select_media(struct net_device *dev, int startup)
   */
 int tulip_check_duplex(struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
 	struct tulip_private *tp = dev->priv;
 	unsigned int bmsr, lpa, negotiated, new_csr6;
 
@@ -442,11 +441,8 @@ int tulip_check_duplex(struct net_device *dev)
 	else		     new_csr6 &= ~FullDuplex;
 
 	if (new_csr6 != tp->csr6) {
-		if (inl(ioaddr + CSR6) & (csr6_st | csr6_sr))
-			tulip_restart_rxtx(tp, new_csr6);
-		else
-			outl(new_csr6, ioaddr + CSR6);
 		tp->csr6 = new_csr6;
+		tulip_restart_rxtx(tp);
 
 		if (tulip_debug > 0)
 			printk(KERN_INFO "%s: Setting %s-duplex based on MII"

@@ -68,6 +68,23 @@ MODULE_PARM(arlan_entry_debug, "i");
 MODULE_PARM(arlan_exit_debug, "i");
 MODULE_PARM(arlan_entry_and_exit_debug, "i");
 MODULE_PARM(arlan_EEPROM_bad, "i");
+MODULE_PARM_DESC(irq, "(unused)");
+MODULE_PARM_DESC(mem, "Arlan memory address for single device probing");
+MODULE_PARM_DESC(probe, "Arlan probe at initialization (0-1)");
+MODULE_PARM_DESC(arlan_debug, "Arlan debug enable (0-1)");
+MODULE_PARM_DESC(numDevices, "Number of Arlan devices; ignored if >1");
+MODULE_PARM_DESC(testMemory, "(unused)");
+MODULE_PARM_DESC(mdebug, "Arlan multicast debugging (0-1)");
+MODULE_PARM_DESC(retries, "Arlan maximum packet retransmisions");
+#ifdef ARLAN_ENTRY_EXIT_DEBUGGING
+MODULE_PARM_DESC(arlan_entry_debug, "Arlan driver function entry debugging");
+MODULE_PARM_DESC(arlan_exit_debug, "Arlan driver function exit debugging");
+MODULE_PARM_DESC(arlan_entry_and_exit_debug, "Arlan driver function entry and exit debugging");
+#else
+MODULE_PARM_DESC(arlan_entry_debug, "(ignored)");
+MODULE_PARM_DESC(arlan_exit_debug, "(ignored)");
+MODULE_PARM_DESC(arlan_entry_and_exit_debug, "(ignored)");
+#endif
 
 EXPORT_SYMBOL(arlan_device);
 EXPORT_SYMBOL(arlan_conf);

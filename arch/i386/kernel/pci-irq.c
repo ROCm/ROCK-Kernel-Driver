@@ -411,7 +411,7 @@ static struct irq_router pirq_routers[] = {
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_0, pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371MX,   pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443MX_0, pirq_piix_get, pirq_piix_set },
-	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82820FW_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_0, pirq_piix_get, pirq_piix_set },
 
 	{ "ALI", PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533, pirq_ali_get, pirq_ali_set },
 
@@ -587,13 +587,14 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		if (info->irq[pin].link == pirq) {
 			/* We refuse to override the dev->irq information. Give a warning! */
 		    	if (dev2->irq && dev2->irq != irq) {
-		    		printk(KERN_INFO "IRQ routing conflict in pirq table for device %s\n", dev2->slot_name);
+		    		printk(KERN_INFO "IRQ routing conflict for %s, have irq %d, want irq %d\n",
+				       dev2->slot_name, dev2->irq, irq);
 		    		continue;
 		    	}
 			dev2->irq = irq;
 			pirq_penalty[irq]++;
 			if (dev != dev2)
-				printk(KERN_INFO "PCI: The same IRQ used for device %s\n", dev2->slot_name);
+				printk(KERN_INFO "PCI: Sharing IRQ %d with %s\n", irq, dev2->slot_name);
 		}
 	}
 	return 1;

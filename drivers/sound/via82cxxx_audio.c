@@ -3012,7 +3012,6 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 {
 	int rc;
 	struct via_info *card;
-	u8 tmp;
 	static int printed_version = 0;
 
 	DPRINTK ("ENTER\n");
@@ -3107,19 +3106,6 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 	if (rc) {
 		printk (KERN_ERR PFX "interrupt init failed, aborting\n");
 		goto err_out_have_proc;
-	}
-
-	pci_read_config_byte (pdev, 0x3C, &tmp);
-	if ((tmp & 0x0F) != pdev->irq) {
-		printk (KERN_WARNING PFX "IRQ fixup, 0x3C==0x%02X\n", tmp);
-		udelay (15);
-		tmp &= 0xF0;
-		tmp |= pdev->irq;
-		pci_write_config_byte (pdev, 0x3C, tmp);
-		DPRINTK ("new 0x3c==0x%02x\n", tmp);
-	} else {
-		DPRINTK ("IRQ reg 0x3c==0x%02x, irq==%d\n",
-			tmp, tmp & 0x0F);
 	}
 
 	printk (KERN_INFO PFX "board #%d at 0x%04lX, IRQ %d\n",
