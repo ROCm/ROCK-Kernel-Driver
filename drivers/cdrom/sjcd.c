@@ -1700,7 +1700,7 @@ static int __init sjcd_init(void)
 	sprintf(sjcd_disk->disk_name, "sjcd");
 	sprintf(sjcd_disk->devfs_name, "sjcd");
 
-	if (check_region(sjcd_base, 4)) {
+	if (!request_region(sjcd_base, 4,"sjcd")) {
 		printk
 		    ("SJCD: Init failed, I/O port (%X) is already in use\n",
 		     sjcd_base);
