@@ -293,6 +293,7 @@ static int set_sgttyb(struct tty_struct * tty, struct sgttyb __user * sgttyb)
 	int retval;
 	struct sgttyb tmp;
 	struct termios termios;
+	unsigned long flags;
 
 	retval = tty_check_change(tty);
 	if (retval)
