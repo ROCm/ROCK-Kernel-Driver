@@ -2398,7 +2398,7 @@ static int set_mac_address(struct strip *strip_info,
 	return 0;
 }
 
-static int dev_set_mac_address(struct net_device *dev, void *addr)
+static int strip_set_mac_address(struct net_device *dev, void *addr)
 {
 	struct strip *strip_info = (struct strip *) (dev->priv);
 	struct sockaddr *sa = addr;
@@ -2552,7 +2552,7 @@ static void strip_dev_setup(struct net_device *dev)
 	dev->hard_start_xmit = strip_xmit;
 	dev->hard_header = strip_header;
 	dev->rebuild_header = strip_rebuild_header;
-	dev->set_mac_address = dev_set_mac_address;
+	dev->set_mac_address = strip_set_mac_address;
 	dev->get_stats = strip_get_stats;
 	dev->change_mtu = strip_change_mtu;
 }
