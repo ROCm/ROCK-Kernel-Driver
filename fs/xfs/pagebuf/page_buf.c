@@ -179,6 +179,11 @@ pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 0, 0 }};
 struct pbstats pbstats;
 
 /*
+ * Queue for delayed I/O completion.
+ */
+struct workqueue_struct *pagebuf_workqueue;
+
+/*
  * Pagebuf allocation / freeing.
  */
 
@@ -1167,7 +1172,7 @@ _pagebuf_wait_unpin(
  *	present, will be called as a side-effect.
  */
 void
-pagebuf_iodone_sched(
+pagebuf_iodone_work(
 	void			*v)
 {
 	page_buf_t		*pb = (page_buf_t *)v;
@@ -1196,11 +1201,8 @@ pagebuf_iodone(
 	PB_TRACE(pb, PB_TRACE_REC(done), pb->pb_iodone);
 
 	if ((pb->pb_iodone) || (pb->pb_flags & PBF_ASYNC)) {
-		INIT_TQUEUE(&pb->pb_iodone_sched,
-			pagebuf_iodone_sched, (void *)pb);
-
-		schedule_task(&pb->pb_iodone_sched);
-
+		INIT_WORK(&pb->pb_iodone_work, pagebuf_iodone_work, pb);
+		queue_work(pagebuf_workqueue, &pb->pb_iodone_work);
 	} else {
 		up(&pb->pb_iodonesema);
 	}
@@ -1854,6 +1856,10 @@ pagebuf_daemon_start(void)
 
 		kernel_thread(pagebuf_daemon, (void *)pb_daemon,
 				CLONE_FS|CLONE_FILES|CLONE_VM);
+
+		pagebuf_workqueue = create_workqueue("pagebuf");
+		if (!pagebuf_workqueue)
+			return -1;
 	}
 	return 0;
 }
@@ -1867,6 +1873,9 @@ STATIC void
 pagebuf_daemon_stop(void)
 {
 	if (pb_daemon) {
+		flush_workqueue(pagebuf_workqueue);
+		destroy_workqueue(pagebuf_workqueue);
+
 		pb_daemon->active = 0;
 		pb_daemon->io_active = 0;
 

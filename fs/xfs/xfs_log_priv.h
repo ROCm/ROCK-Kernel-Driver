@@ -438,7 +438,7 @@ typedef struct xlog_iclog_fields {
 	int			ic_bwritecnt;
 	ushort_t		ic_state;
 	char			*ic_datap;	/* pointer to iclog data */
-	struct tq_struct	ic_write_sched;
+	struct work_struct	ic_write_work;
 } xlog_iclog_fields_t;
 
 typedef struct xlog_in_core2 {
@@ -458,7 +458,7 @@ typedef struct xlog_in_core {
  * Defines to save our code from this glop.
  */
 #define ic_forcesema	hic_fields.ic_forcesema
-#define ic_write_sched	hic_fields.ic_write_sched
+#define ic_write_work	hic_fields.ic_write_work
 #define ic_next		hic_fields.ic_next
 #define ic_prev		hic_fields.ic_prev
 #define ic_bp		hic_fields.ic_bp
