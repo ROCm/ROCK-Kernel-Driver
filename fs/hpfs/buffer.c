@@ -88,7 +88,7 @@ void *hpfs_map_4sectors(struct super_block *s, unsigned secno, struct quad_buffe
 		return 0;
 	}
 
-	qbh->data = data = (char *)kmalloc(2048, GFP_KERNEL);
+	qbh->data = data = (char *)kmalloc(2048, GFP_NOFS);
 	if (!data) {
 		printk("HPFS: hpfs_map_4sectors: out of memory\n");
 		goto bail;
@@ -140,7 +140,7 @@ void *hpfs_get_4sectors(struct super_block *s, unsigned secno,
 	}
 
 	/*return hpfs_map_4sectors(s, secno, qbh, 0);*/
-	if (!(qbh->data = kmalloc(2048, GFP_KERNEL))) {
+	if (!(qbh->data = kmalloc(2048, GFP_NOFS))) {
 		printk("HPFS: hpfs_get_4sectors: out of memory\n");
 		return NULL;
 	}

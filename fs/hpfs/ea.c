@@ -52,7 +52,7 @@ void hpfs_ea_ext_remove(struct super_block *s, secno a, int ano, unsigned len)
 static char *get_indirect_ea(struct super_block *s, int ano, secno a, int size)
 {
 	char *ret;
-	if (!(ret = kmalloc(size + 1, GFP_KERNEL))) {
+	if (!(ret = kmalloc(size + 1, GFP_NOFS))) {
 		printk("HPFS: out of memory for EA\n");
 		return NULL;
 	}
@@ -140,7 +140,7 @@ char *hpfs_get_ea(struct super_block *s, struct fnode *fnode, char *key, int *si
 		if (!strcmp(ea->name, key)) {
 			if (ea->indirect)
 				return get_indirect_ea(s, ea->anode, ea_sec(ea), *size = ea_len(ea));
-			if (!(ret = kmalloc((*size = ea->valuelen) + 1, GFP_KERNEL))) {
+			if (!(ret = kmalloc((*size = ea->valuelen) + 1, GFP_NOFS))) {
 				printk("HPFS: out of memory for EA\n");
 				return NULL;
 			}
@@ -166,7 +166,7 @@ char *hpfs_get_ea(struct super_block *s, struct fnode *fnode, char *key, int *si
 		if (!strcmp(ea->name, key)) {
 			if (ea->indirect)
 				return get_indirect_ea(s, ea->anode, ea_sec(ea), *size = ea_len(ea));
-			if (!(ret = kmalloc((*size = ea->valuelen) + 1, GFP_KERNEL))) {
+			if (!(ret = kmalloc((*size = ea->valuelen) + 1, GFP_NOFS))) {
 				printk("HPFS: out of memory for EA\n");
 				return NULL;
 			}
