@@ -246,11 +246,11 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Timeouts for various operations:
  */
-#define WAIT_DRQ	(5*HZ/100)	/* 50msec - spec allows up to 20ms */
+#define WAIT_DRQ	(HZ/10)		/* 100msec - spec allows up to 20ms */
 #if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
 #define WAIT_READY	(5*HZ)		/* 5sec - some laptops are very slow */
 #else
-#define WAIT_READY	(3*HZ/100)	/* 30msec - should be instantaneous */
+#define WAIT_READY	(HZ/10)		/* 100msec - should be instantaneous */
 #endif /* CONFIG_APM || CONFIG_APM_MODULE */
 #define WAIT_PIDENTIFY	(10*HZ)	/* 10sec  - should be less than 3ms (?), if all ATAPI CD is closed at boot */
 #define WAIT_WORSTCASE	(30*HZ)	/* 30sec  - worst case when spinning up */
