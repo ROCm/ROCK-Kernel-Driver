@@ -662,7 +662,7 @@ static int ohci_suspend (struct usb_hcd *hcd, u32 state)
 		
  #ifdef CONFIG_PMAC_PBOOK
 	if (_machine == _MACH_Pmac)
-		disable_irq (ohci->irq);
+		disable_irq (hcd->pdev->irq);
  	/* else, 2.4 assumes shared irqs -- don't disable */
  #endif
 
@@ -836,7 +836,7 @@ static int ohci_resume (struct usb_hcd *hcd)
 
  #ifdef CONFIG_PMAC_PBOOK
 		if (_machine == _MACH_Pmac)
-			enable_irq (ohci->irq);
+			enable_irq (hcd->pdev->irq);
  #endif
 		if (ohci->hcca->done_head)
 			dl_done_list (ohci, dl_reverse_done_list (ohci));
