@@ -35,11 +35,65 @@ floatx80 floatx80_arccos(floatx80 rFm);
 floatx80 floatx80_pow(floatx80 rFn,floatx80 rFm);
 floatx80 floatx80_pol(floatx80 rFn,floatx80 rFm);
 
+static floatx80 floatx80_rsf(floatx80 rFn, floatx80 rFm)
+{
+   return floatx80_sub(rFm, rFn);
+}
+
+static floatx80 floatx80_rdv(floatx80 rFn, floatx80 rFm)
+{
+   return floatx80_div(rFm, rFn);
+}
+
+static floatx80 (* const dyadic_extended[16])(floatx80 rFn, floatx80 rFm) =
+{
+   [ADF_CODE >> 20] = floatx80_add,
+   [MUF_CODE >> 20] = floatx80_mul,
+   [SUF_CODE >> 20] = floatx80_sub,
+   [RSF_CODE >> 20] = floatx80_rsf,
+   [DVF_CODE >> 20] = floatx80_div,
+   [RDF_CODE >> 20] = floatx80_rdv,
+   [RMF_CODE >> 20] = floatx80_rem,
+
+   /* strictly, these opcodes should not be implemented */
+   [FML_CODE >> 20] = floatx80_mul,
+   [FDV_CODE >> 20] = floatx80_div,
+   [FRD_CODE >> 20] = floatx80_rdv,
+};
+
+static floatx80 floatx80_mvf(floatx80 rFm)
+{
+   return rFm;
+}
+
+static floatx80 floatx80_mnf(floatx80 rFm)
+{
+   rFm.high ^= 0x8000;
+   return rFm;
+}
+
+static floatx80 floatx80_abs(floatx80 rFm)
+{
+   rFm.high &= 0x7fff;
+   return rFm;
+}
+
+static floatx80 (* const monadic_extended[16])(floatx80 rFm) =
+{
+   [MVF_CODE >> 20] = floatx80_mvf,
+   [MNF_CODE >> 20] = floatx80_mnf,
+   [ABS_CODE >> 20] = floatx80_abs,
+   [RND_CODE >> 20] = floatx80_round_to_int,
+   [URD_CODE >> 20] = floatx80_round_to_int,
+   [SQT_CODE >> 20] = floatx80_sqrt,
+   [NRM_CODE >> 20] = floatx80_mvf,
+};
+
 unsigned int ExtendedCPDO(const unsigned int opcode)
 {
    FPA11 *fpa11 = GET_FPA11();
-   floatx80 rFm, rFn;
-   unsigned int Fd, Fm, Fn, nRc = 1;
+   floatx80 rFm, rFd;
+   unsigned int Fd, Fm, opc;
 
    //printk("ExtendedCPDO(0x%08x)\n",opcode);
    
@@ -68,9 +122,12 @@ unsigned int ExtendedCPDO(const unsigned int opcode)
      }
    }
    
+   opc = opcode & MASK_ARITHMETIC_OPCODE;
    if (!MONADIC_INSTRUCTION(opcode))
    {
-      Fn = getFn(opcode);
+      unsigned int Fn = getFn(opcode);
+      floatx80 rFn;
+
       switch (fpa11->fType[Fn])
       {
         case typeSingle:
@@ -87,187 +144,31 @@ unsigned int ExtendedCPDO(const unsigned int opcode)
         
         default: return 0;
       }
+
+      if (dyadic_extended[opc >> 20])
+      {
+         rFd = dyadic_extended[opc >> 20](rFn, rFm);
+      }
+      else
+      {
+         return 0;
+      }
+   }
+   else
+   {
+      if (monadic_extended[opc >> 20])
+      {
+         rFd = monadic_extended[opc >> 20](rFm);
+      }
+      else
+      {
+         return 0;
+      }
    }
 
    Fd = getFd(opcode);
-   switch (opcode & MASK_ARITHMETIC_OPCODE)
-   {
-      /* dyadic opcodes */
-      case ADF_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_add(rFn,rFm);
-      break;
+   fpa11->fpreg[Fd].fExtended = rFd;
+   fpa11->fType[Fd] = typeExtended;
 
-      case MUF_CODE:
-      case FML_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_mul(rFn,rFm);
-      break;
-
-      case SUF_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_sub(rFn,rFm);
-      break;
-
-      case RSF_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_sub(rFm,rFn);
-      break;
-
-      case DVF_CODE:
-      case FDV_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_div(rFn,rFm);
-      break;
-
-      case RDF_CODE:
-      case FRD_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_div(rFm,rFn);
-      break;
-
-#if 0
-      case POW_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_pow(rFn,rFm);
-      break;
-
-      case RPW_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_pow(rFm,rFn);
-      break;
-#endif
-
-      case RMF_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_rem(rFn,rFm);
-      break;
-
-#if 0
-      case POL_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_pol(rFn,rFm);
-      break;
-#endif
-
-      /* monadic opcodes */
-      case MVF_CODE:
-         fpa11->fpreg[Fd].fExtended = rFm;
-      break;
-
-      case MNF_CODE:
-         rFm.high ^= 0x8000;
-         fpa11->fpreg[Fd].fExtended = rFm;
-      break;
-
-      case ABS_CODE:
-         rFm.high &= 0x7fff;
-         fpa11->fpreg[Fd].fExtended = rFm;
-      break;
-
-      case RND_CODE:
-      case URD_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_round_to_int(rFm);
-      break;
-
-      case SQT_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_sqrt(rFm);
-      break;
-
-#if 0
-      case LOG_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_log(rFm);
-      break;
-
-      case LGN_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_ln(rFm);
-      break;
-
-      case EXP_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_exp(rFm);
-      break;
-
-      case SIN_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_sin(rFm);
-      break;
-
-      case COS_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_cos(rFm);
-      break;
-
-      case TAN_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_tan(rFm);
-      break;
-
-      case ASN_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_arcsin(rFm);
-      break;
-
-      case ACS_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_arccos(rFm);
-      break;
-
-      case ATN_CODE:
-         fpa11->fpreg[Fd].fExtended = floatx80_arctan(rFm);
-      break;
-#endif
-
-      case NRM_CODE:
-      break;
-      
-      default:
-      {
-        nRc = 0;
-      }
-   }
-   
-   if (0 != nRc) fpa11->fType[Fd] = typeExtended;
-   return nRc;
+   return 1;
 }
-
-#if 0
-floatx80 floatx80_exp(floatx80 Fm)
-{
-//series
-}
-
-floatx80 floatx80_ln(floatx80 Fm)
-{
-//series
-}
-
-floatx80 floatx80_sin(floatx80 rFm)
-{
-//series
-}
-
-floatx80 floatx80_cos(floatx80 rFm)
-{
-//series
-}
-
-floatx80 floatx80_arcsin(floatx80 rFm)
-{
-//series
-}
-
-floatx80 floatx80_arctan(floatx80 rFm)
-{
-  //series
-}
-
-floatx80 floatx80_log(floatx80 rFm)
-{
-  return floatx80_div(floatx80_ln(rFm),getExtendedConstant(7));
-}
-
-floatx80 floatx80_tan(floatx80 rFm)
-{
-  return floatx80_div(floatx80_sin(rFm),floatx80_cos(rFm));
-}
-
-floatx80 floatx80_arccos(floatx80 rFm)
-{
-   //return floatx80_sub(halfPi,floatx80_arcsin(rFm));
-}
-
-floatx80 floatx80_pow(floatx80 rFn,floatx80 rFm)
-{
-  return floatx80_exp(floatx80_mul(rFm,floatx80_ln(rFn))); 
-}
-
-floatx80 floatx80_pol(floatx80 rFn,floatx80 rFm)
-{
-  return floatx80_arctan(floatx80_div(rFn,rFm)); 
-}
-#endif
