@@ -576,8 +576,8 @@ segment_save(char *name)
 			segtype_string[seg->range[i].start & 0xff]);
 	}
 	sprintf(cmd2, "SAVESEG %s", name);
-	cpcmd(cmd1, NULL, 80);
-	cpcmd(cmd2, NULL, 80);
+	cpcmd(cmd1, NULL, 0);
+	cpcmd(cmd2, NULL, 0);
 	spin_unlock(&dcss_lock);
 }
 
