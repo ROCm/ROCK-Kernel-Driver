@@ -466,9 +466,10 @@ void set_sense(u8 *sense_buf, u8 sense_key, u8 sense_code,
 static void aac_io_done(Scsi_Cmnd * scsicmd)
 {
 	unsigned long cpu_flags;
-	spin_lock_irqsave(scsicmd->device->host->host_lock, cpu_flags);
+	struct Scsi_Host *host = scsicmd->device->host;
+	spin_lock_irqsave(host->host_lock, cpu_flags);
 	scsicmd->scsi_done(scsicmd);
-	spin_unlock_irqrestore(scsicmd->device->host->host_lock, cpu_flags);
+	spin_unlock_irqrestore(host->host_lock, cpu_flags);
 }
 
 static void __aac_io_done(Scsi_Cmnd * scsicmd)
@@ -877,18 +878,19 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 	struct fsa_scsi_hba *fsa_dev_ptr;
 	int cardtype;
 	int ret;
-	struct aac_dev *dev = (struct aac_dev *)scsicmd->device->host->hostdata;
+	struct Scsi_Host *host = scsicmd->device->host;
+	struct aac_dev *dev = (struct aac_dev *)host->hostdata;
 	
 	cardtype = dev->cardtype;
 
-	fsa_dev_ptr = fsa_dev[scsicmd->device->host->unique_id];
+	fsa_dev_ptr = fsa_dev[host->unique_id];
 
 	/*
 	 *	If the bus, target or lun is out of range, return fail
 	 *	Test does not apply to ID 16, the pseudo id for the controller
 	 *	itself.
 	 */
-	if (scsicmd->device->id != scsicmd->device->host->this_id) {
+	if (scsicmd->device->id != host->this_id) {
 		if ((scsicmd->device->channel == 0) ){
 			if( (scsicmd->device->id >= AAC_MAX_TARGET) || (scsicmd->device->lun != 0)){ 
 				scsicmd->result = DID_NO_CONNECT << 16;
@@ -906,9 +908,9 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 				case SS_INQUIR:
 				case SS_RDCAP:
 				case SS_TEST:
-					spin_unlock_irq(scsicmd->device->host->host_lock);
+					spin_unlock_irq(host->host_lock);
 					probe_container(dev, cid);
-					spin_lock_irq(scsicmd->device->host->host_lock);
+					spin_lock_irq(host->host_lock);
 					if (fsa_dev_ptr->valid[cid] == 0) {
 						scsicmd->result = DID_NO_CONNECT << 16;
 						__aac_io_done(scsicmd);
@@ -977,7 +979,7 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 		 *	see: <vendor>.c i.e. aac.c
 		 */
 		setinqstr(cardtype, (void *) (inq_data_ptr->inqd_vid), fsa_dev_ptr->type[cid]);
-		if (scsicmd->device->id == scsicmd->device->host->this_id)
+		if (scsicmd->device->id == host->this_id)
 			inq_data_ptr->inqd_pdt = INQD_PDT_PROC;	/* Processor device */
 		else
 			inq_data_ptr->inqd_pdt = INQD_PDT_DA;	/* Direct/random access device */
@@ -1071,21 +1073,21 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 			 *	containers to /dev/sd device names
 			 */
 			 
-			spin_unlock_irq(scsicmd->device->host->host_lock);
+			spin_unlock_irq(host->host_lock);
 			if  (scsicmd->request->rq_disk)
 				memcpy(fsa_dev_ptr->devname[cid],
 					scsicmd->request->rq_disk->disk_name,
 					8);
 
 			ret = aac_read(scsicmd, cid);
-			spin_lock_irq(scsicmd->device->host->host_lock);
+			spin_lock_irq(host->host_lock);
 			return ret;
 
 		case SS_WRITE:
 		case SM_WRITE:
-			spin_unlock_irq(scsicmd->device->host->host_lock);
+			spin_unlock_irq(host->host_lock);
 			ret = aac_write(scsicmd, cid);
-			spin_lock_irq(scsicmd->device->host->host_lock);
+			spin_lock_irq(host->host_lock);
 			return ret;
 		default:
 			/*

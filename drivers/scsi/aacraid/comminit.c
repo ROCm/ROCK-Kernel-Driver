@@ -72,7 +72,7 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	dev->comm_addr = (void *)base;
 	dev->comm_phys = phys;
 	dev->comm_size = size;
-
+	
 	dev->init = (struct aac_init *)(base + fibsize);
 	dev->init_pa = phys + fibsize;
 
@@ -88,7 +88,7 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	 */
 	dev->fib_base_va = (ulong)base;
 	
-	init->AdapterFibsVirtualAddress = cpu_to_le32((u32)(ulong)base);
+	init->AdapterFibsVirtualAddress = cpu_to_le32((u32)(ulong)phys);
 	init->AdapterFibsPhysicalAddress = cpu_to_le32((u32)phys);
 	init->AdapterFibsSize = cpu_to_le32(fibsize);
 	init->AdapterFibAlign = cpu_to_le32(sizeof(struct hw_fib));

@@ -75,9 +75,8 @@ unsigned int aac_response_normal(struct aac_queue * q)
 	{
 		u32 fast ;
 		fast = (entry->addr & cpu_to_le32(0x01));
-//		fib = &dev->fibs[(entry->addr >> 1)];
-//		hwfib = fib->hw_fib;
-		hwfib = bus_to_virt(le32_to_cpu(entry->addr & cpu_to_le32(~0x01)));
+		hwfib = (struct hw_fib *)((char *)dev->hw_fib_va + 
+				((entry->addr & ~0x01) - dev->hw_fib_pa));
 		fib = &dev->fibs[hwfib->header.SenderData];
 
 		aac_consumer_free(dev, q, HostNormRespQueue);
@@ -174,7 +173,8 @@ unsigned int aac_command_normal(struct aac_queue *q)
 	while(aac_consumer_get(dev, q, &entry))
 	{
 		struct hw_fib * hw_fib;
-		hw_fib = bus_to_virt(le32_to_cpu(entry->addr & cpu_to_le32(~0x01)));
+		hw_fib = (struct hw_fib *)((char *)dev->hw_fib_va + 
+				((entry->addr & ~0x01) - dev->hw_fib_pa));
 
 		if (dev->aif_thread) {
 		        aac_list_add_tail(&hw_fib->header.FibLinks, &q->cmdq);
