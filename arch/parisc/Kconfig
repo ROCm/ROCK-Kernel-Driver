@@ -3,15 +3,16 @@
 # see the Configure script.
 #
 
-mainmenu "Linux Kernel Configuration"
+mainmenu "Linux/PA-RISC Kernel Configuration"
 
 config PARISC
 	bool
 	default y
 	help
-	  The PA-RISC microprocessor is a RISC chip designed by
-	  Hewlett-Packard and used in their line of workstations.  The PA-RISC
-	  Linux project has a home page at <www.parisc-linux.org>.
+	  The PA-RISC microprocessor is designed by Hewlett-Packard and used
+	  in many of their workstations & servers (HP9000 700 and 800 series,
+	  and later HP3000 series).  The PA-RISC Linux project home page is
+	  at <http://www.parisc-linux.org/>.
 
 config MMU
 	bool
@@ -33,16 +34,72 @@ config RWSEM_XCHGADD_ALGORITHM
 
 config GENERIC_ISA_DMA
 	bool
-	default y
+
+# unless you want to implement ACPI on PA-RISC ... ;-)
+config PM
+	bool
 
 source "init/Kconfig"
 
 
-menu "General options"
+menu "Processor type and features"
 
-# bool 'Symmetric multi-processing support' CONFIG_SMP
-config SMP
+choice
+	prompt "Processor type"
+	default PA7000
+
+config PA7000
+	bool "PA7000/PA7100"
+	---help---
+	  This is the processor type of your CPU. This information is used for
+	  optimizing purposes.  In order to compile a kernel that can run on
+	  all PA CPUs (albeit not optimally fast), you can specify "PA7000"
+	  here.
+
+	  Specifying "PA8000" here will allow you to select a 64-bit kernel
+	  which is required on some machines.
+
+config PA7100LC
+	bool "PA7100LC/PA7300LC"
+	help
+	  Select this option for a 7100LC or 7300LC processor, as used
+	  in the 712, 715/Mirage, A180, B132, C160L and some other machines.
+
+config PA7200
+	bool "PA7200"
+	help
+	  Select this option for the PCX-T' processor, as used in C110, D100
+	  and similar machines.
+
+config PA8X00
+	bool "PA8000 and up"
+	help
+	  Select this option for PCX-U to PCX-W2 processors.
+
+endchoice
+
+# Define implied options from the CPU selection here
+
+config PA20
 	bool
+	depends on PA8X00
+	default y
+
+config PA11
+	bool
+	depends on PA7000 || PA7100LC || PA7200
+	default y
+
+config PARISC64
+	bool "64-bit kernel"
+	depends on PA8X00
+
+config PDC_NARROW
+	bool "32-bit firmware"
+	depends on PARISC64
+
+config SMP
+	bool "Symmetric multi-processing support"
 	---help---
 	  This enables support for systems with more than one CPU. If you have
 	  a system with only one CPU, like most personal computers, say N. If
@@ -54,96 +111,35 @@ config SMP
 	  singleprocessor machines. On a singleprocessor machine, the kernel
 	  will run faster if you say N here.
 
-	  Note that if you say Y here and choose architecture "586" or
-	  "Pentium" under "Processor family", the kernel will not work on 486
-	  architectures. Similarly, multiprocessor kernels for the "PPro"
-	  architecture may not work on all Pentium based boards.
-
-	  People using multiprocessor machines who say Y here should also say
-	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
-	  Management" code will be disabled if you say Y here.
-
 	  See also the <file:Documentation/smp.tex>,
-	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
-	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+	  <file:Documentation/smp.txt>, <file:Documentation/nmi_watchdog.txt>
+	  and the SMP-HOWTO available at
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
+
+config PREEMPT
+	bool
+#	bool "Preemptible Kernel"
+	default n
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
 	depends on SMP
 	default "32"
 
-config KWDB
-	bool "Kernel Debugger support"
-	help
-	  Include in-kernel hooks for kdb, the source level debugger for the
-	  PA-RISC port.
-
-# define_bool CONFIG_KWDB n
-# bool 'GSC/Gecko bus support' CONFIG_GSC y
-config GSC
-	bool
-	default y
-
-config IOMMU_CCIO
-	bool "U2/Uturn I/O MMU"
-	help
-	  Say Y here to enable DMA management routines for the first
-	  generation of PA-RISC cache-coherent machines.  Programs the
-	  U2/Uturn chip in "Virtual Mode" and use the I/O MMU.
-
-config GSC_LASI
-	bool "LASI I/O support"
-	help
-	  Say Y here to directly support the LASI controller chip found on
-	  PA-RISC workstations.  Linux-oriented documentation for this chip
-	  can be found at <http://www.parisc-linux.org/documentation/>.
-
-config PCI
-	bool "PCI support"
-	help
-	  Find out whether you have a PCI motherboard. PCI is the name of a
-	  bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-	  VESA. If you have PCI, say Y, otherwise N.
-
-	  The PCI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
-	  information about which PCI hardware does work under Linux and which
-	  doesn't.
-
-config GSC_DINO
-	bool "GSCtoPCI/DINO PCI support"
-	depends on PCI
-
-config PCI_LBA
-	bool "LBA/Elroy PCI support"
-	depends on PCI
-	help
-	  Say Y here to give the PA-RISC kernel access to PCI configuration
-	  and IO-port space on PA-RISC workstations equipped with a Lower Bus
-	  Adapter (LBA).  This includes A, B, C, J, L, and N-class machines
-	  with 4-digit model numbers, also the A300.
-
-config IOSAPIC
-	bool
-	depends on PCI_LBA
-	default y
-
-config IOMMU_SBA
-	bool
-	depends on PCI_LBA
-	default y
-
-#
-# if [ "$CONFIG_PCI_EPIC" = "y" ]; then...
-#
 endmenu
 
 
-menu "General setup"
+source "drivers/parisc/Kconfig"
+
+
+menu "Executable file formats"
+
+config KCORE_ELF
+	bool
+	depends on PROC_FS
+	default y
 
 config BINFMT_SOM
 	tristate "Kernel support for SOM binaries"
@@ -205,116 +201,25 @@ config BINFMT_MISC
 	  you have use for it; the module is called binfmt_misc.o. If you
 	  don't know what to answer at this point, say Y.
 
-config BINFMT_JAVA
-	tristate "Kernel support for JAVA binaries (obsolete)"
-	depends on EXPERIMENTAL
-	help
-	  If you say Y here, the kernel will load and execute Java J-code
-	  binaries directly.  Note: this option is obsolete and scheduled for
-	  removal, use CONFIG_BINFMT_MISC instead.
-
 endmenu
 
-##source drivers/parport/Config.in
+# source "drivers/mtd/Kconfig"
 
-menu "Parallel port support"
+source "drivers/parport/Kconfig"
 
-config PARPORT
-	tristate "Parallel port support"
-	---help---
-	  If you want to use devices connected to your machine's parallel port
-	  (the connector at the computer with 25 holes), e.g. printer, ZIP
-	  drive, PLIP link (Parallel Line Internet Protocol is mainly used to
-	  create a mini network by connecting the parallel ports of two local
-	  machines) etc., then you need to say Y here; please read
-	  <file:Documentation/parport.txt> and
-	  <file:drivers/parport/BUGS-parport>.
-
-	  For extensive information about drivers for many devices attaching
-	  to the parallel port see <http://www.torque.net/linux-pp.html> on
-	  the WWW.
-
-	  It is possible to share a single parallel port among several devices
-	  and it is safe to compile all the corresponding drivers into the
-	  kernel.  If you want to compile parallel port support as a module
-	  ( = code which can be inserted in and removed from the running
-	  kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  parport.o.  If you have more than one parallel port and want to
-	  specify which port and IRQ to be used by this driver at module load
-	  time, take a look at <file:Documentation/parport.txt>.
-
-	  If unsure, say Y.
-
-config PARPORT_PC
-	tristate "PC-style hardware"
-	depends on PCI && PARPORT
-	---help---
-	  You should say Y here if you have a PC-style parallel port. All IBM
-	  PC compatible computers and some Alphas have PC-style parallel
-	  ports.
-
-	  This code is also available as a module.  If you want to compile it
-	  as a module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  parport_pc.o.
-
-	  If unsure, say Y.
-
-config PARPORT_PC_FIFO
-	bool "Use FIFO/DMA if available"
-	depends on PARPORT_PC
-	help
-	  Many parallel port chipsets provide hardware that can speed up
-	  printing. Say Y here if you want to take advantage of that.
-
-	  As well as actually having a FIFO, or DMA capability, the kernel
-	  will need to know which IRQ the parallel port has.  By default,
-	  parallel port interrupts will not be used, and so neither will the
-	  FIFO.  See <file:Documentation/parport.txt> to find out how to
-	  specify which IRQ/DMA to use.
-
-config PARPORT_PC_SUPERIO
-	bool "SuperIO chipset support (EXPERIMENTAL)"
-	depends on PARPORT_PC && EXPERIMENTAL
-	help
-	  Saying Y here enables some probes for Super-IO chipsets in order to
-	  find out things like base addresses, IRQ lines and DMA channels.  It
-	  is safe to say N.
-
-config PARPORT_GSC
-	tristate "LASI/ASP builtin parallel-port"
-	depends on GSC_LASI && PARPORT
-	help
-	  Say Y here to build in low-level parallel-support for PC-style
-	  hardware integrated in the LASI-Controller (on the GSC Bus) for
-	  HP-PARISC workstations.
-
-# If exactly one hardware type is selected then parport will optimise away
-# support for loading any others.  Defeat this if the user is keen.
-config PARPORT_OTHER
-	bool "Support foreign hardware"
-	depends on PARPORT
-	help
-	  Say Y here if you want to be able to load driver modules to support
-	  other non-standard types of parallel ports. This causes a
-	  performance loss, so most people say N.
-
-config PARPORT_1284
-	bool "IEEE 1284 transfer modes"
-	depends on PARPORT
-	help
-	  If you have a printer that supports status readback or device ID, or
-	  want to use a device that uses enhanced parallel port transfer modes
-	  such as EPP and ECP, say Y here to enable advanced IEEE 1284
-	  transfer modes. Also say Y if you want device ID information to
-	  appear in /proc/sys/dev/parport/*/autoprobe*. It is safe to say N.
-
-endmenu
+# source "drivers/pnp/Kconfig"
 
 source "drivers/block/Kconfig"
 
+menu "ATA/IDE/MFM/RLL support"
+	depends on SUPERIO
+
+config IDE
+	tristate "ATA/IDE/MFM/RLL support"
+
+source "drivers/ide/Kconfig"
+
+endmenu
 
 menu "SCSI support"
 
@@ -338,303 +243,19 @@ config SCSI
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI device.
 
-comment "SCSI support type (disk, tape, CDrom)"
-	depends on SCSI
-
-config BLK_DEV_SD
-	tristate "SCSI disk support"
-	depends on SCSI
-	---help---
-	  If you want to use a SCSI hard disk or the SCSI or parallel port
-	  version of the IOMEGA ZIP drive under Linux, say Y and read the
-	  SCSI-HOWTO, the Disk-HOWTO and the Multi-Disk-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. This is NOT for SCSI
-	  CD-ROMs.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sd_mod.o.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.  Do not compile this driver as a
-	  module if your root file system (the one containing the directory /)
-	  is located on a SCSI disk. In this case, do not compile the driver
-	  for your SCSI host adapter (below) as a module either.
-
-config SD_EXTRA_DEVS
-	int "Maximum number of SCSI disks that can be loaded as modules"
-	depends on BLK_DEV_SD
-	default "40"
-	---help---
-	  This controls the amount of additional space allocated in tables for
-	  drivers that are loaded as modules after the kernel is booted.  In
-	  the event that the SCSI core itself was loaded as a module, this
-	  value is the number of additional disks that can be loaded after the
-	  first host driver is loaded.
-
-	  Admittedly this isn't pretty, but there are tons of race conditions
-	  involved with resizing the internal arrays on the fly.  Someday this
-	  flag will go away, and everything will work automatically.
-
-	  If you don't understand what's going on, go with the default.
-
-config CHR_DEV_ST
-	tristate "SCSI tape support"
-	depends on SCSI
-	---help---
-	  If you want to use a SCSI tape drive under Linux, say Y and read the
-	  SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, and
-	  <file:drivers/scsi/README.st> in the kernel source.  This is NOT for
-	  SCSI CD-ROMs.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called st.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
-
-config BLK_DEV_SR
-	tristate "SCSI CDROM support"
-	depends on SCSI
-	---help---
-	  If you want to use a SCSI CD-ROM under Linux, say Y and read the
-	  SCSI-HOWTO and the CD-ROM-HOWTO at
-	  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
-	  or M to "ISO 9660 CD-ROM file system support" later.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sr_mod.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
-
-config BLK_DEV_SR_VENDOR
-	bool "Enable vendor-specific extensions (for SCSI CDROM)"
-	depends on BLK_DEV_SR
-	help
-	  This enables the usage of vendor specific SCSI commands. This is
-	  required to support multisession CDs with old NEC/TOSHIBA cdrom
-	  drives (and HP Writers). If you have such a drive and get the first
-	  session only, try saying Y here; everybody else says N.
-
-config SR_EXTRA_DEVS
-	int "Maximum number of CDROM devices that can be loaded as modules"
-	depends on BLK_DEV_SR
-	default "2"
-	---help---
-	  This controls the amount of additional space allocated in tables for
-	  drivers that are loaded as modules after the kernel is booted. In
-	  the event that the SCSI core itself was loaded as a module, this
-	  value is the number of additional CD-ROMs that can be loaded after
-	  the first host driver is loaded.
-
-	  Admittedly this isn't pretty, but there are tons of race conditions
-	  involved with resizing the internal arrays on the fly.  Someday this
-	  flag will go away, and everything will work automatically.
-
-	  If you don't understand what's going on, go with the default.
-
-config CHR_DEV_SG
-	tristate "SCSI generic support"
-	depends on SCSI
-	---help---
-	  If you want to use SCSI scanners, synthesizers or CD-writers or just
-	  about anything having "SCSI" in its name other than hard disks,
-	  CD-ROMs or tapes, say Y here. These won't be supported by the kernel
-	  directly, so you need some additional software which knows how to
-	  talk to these devices using the SCSI protocol:
-
-	  For scanners, look at SANE (<http://www.mostang.com/sane/>). For CD
-	  writer software look at Cdrtools
-	  (<http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/cdrecord.html>)
-	  and for burning a "disk at once": CDRDAO
-	  (<http://cdrdao.sourceforge.net/>). Cdparanoia is a high
-	  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
-	  For other devices, it's possible that you'll have to write the
-	  driver software yourself. Please read the file
-	  <file:Documentation/scsi-generic.txt> for more information.
-
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
-	  say N.
-
-comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
-	depends on SCSI
-
-config SCSI_MULTI_LUN
-	bool "Probe all LUNs on each SCSI device"
-	depends on SCSI
-	help
-	  If you have a SCSI device that supports more than one LUN (Logical
-	  Unit Number), e.g. a CD jukebox, and only one LUN is detected, you
-	  can say Y here to force the SCSI driver to probe for multiple LUNs.
-	  A SCSI device with multiple LUNs acts logically like multiple SCSI
-	  devices. The vast majority of SCSI devices have only one LUN, and
-	  so most people can say N here and should in fact do so, because it
-	  is safer.
-
-config SCSI_CONSTANTS
-	bool "Verbose SCSI error reporting (kernel size +=12K)"
-	depends on SCSI
-	help
-	  The error messages regarding your SCSI hardware will be easier to
-	  understand if you say Y here; it will enlarge your kernel by about
-	  12 KB. If in doubt, say Y.
-
-
-menu "SCSI low-level drivers"
-	depends on SCSI!=n
-
-config SCSI_LASI
-	tristate "Lasi SCSI support"
-	depends on GSC_LASI && SCSI
-
-config SCSI_ZALON
-	tristate "Zalon SCSI support"
-	depends on GSC_LASI && SCSI
-	help
-	  The Zalon is an interface chip that sits between the PA-RISC
-	  processor and the NCR 53c720 SCSI controller on K-series PA-RISC
-	  boards (these are used, among other places, on some HP 780
-	  workstations).  Say Y here to make sure it gets initialized
-	  correctly before the Linux kernel tries to talk to the controller.
-
-config SCSI_SYM53C8XX
-	tristate "SYM53C8XX SCSI support"
-	depends on PCI && SCSI
-	---help---
-	  This driver supports all the features of recent 53C8XX chips (used
-	  in PCI SCSI controllers), notably the hardware phase mismatch
-	  feature of the SYM53C896.
-
-	  Older versions of the 53C8XX chips are not supported by this
-	  driver.  If your system uses either a 810 rev. < 16, a 815, or a 825
-	  rev. < 16 PCI SCSI processor, you must use the generic NCR53C8XX
-	  driver ("NCR53C8XX SCSI support" above) or configure both the
-	  NCR53C8XX and this SYM53C8XX drivers either as module or linked to
-	  the kernel image.
-
-	  When both drivers are linked into the kernel, the SYM53C8XX driver
-	  is called first at initialization and you can use the 'excl=ioaddr'
-	  driver boot option to exclude attachment of adapters by the
-	  SYM53C8XX driver.  For example, entering
-	  'sym53c8xx=excl:0xb400,excl=0xc000' at the lilo prompt prevents
-	  adapters at io address 0xb400 and 0xc000 from being attached by the
-	  SYM53C8XX driver, thus allowing the NCR53C8XX driver to attach them.
-	  The 'excl' option is also supported by the NCR53C8XX driver.
-
-	  Please read <file:drivers/scsi/README.ncr53c8xx> for more
-	  information.
-
-config SCSI_NCR53C8XX_DEFAULT_TAGS
-	int "default tagged command queue depth"
-	depends on SCSI_ZALON || SCSI_SYM53C8XX
-	default "8"
-	---help---
-	  "Tagged command queuing" is a feature of SCSI-2 which improves
-	  performance: the host adapter can send several SCSI commands to a
-	  device's queue even if previous commands haven't finished yet.
-	  Because the device is intelligent, it can optimize its operations
-	  (like head positioning) based on its own request queue. Some SCSI
-	  devices don't implement this properly; if you want to disable this
-	  feature, enter 0 or 1 here (it doesn't matter which).
-
-	  The default value is 8 and should be supported by most hard disks.
-	  This value can be overridden from the boot command line using the
-	  'tags' option as follows (example):
-	  'ncr53c8xx=tags:4/t2t3q16/t0u2q10' will set default queue depth to
-	  4, set queue depth to 16 for target 2 and target 3 on controller 0
-	  and set queue depth to 10 for target 0 / lun 2 on controller 1.
-
-	  The normal answer therefore is to go with the default 8 and to use
-	  a boot command line option for devices that need to use a different
-	  command queue depth.
-
-	  There is no safe option other than using good SCSI devices.
-
-config SCSI_NCR53C8XX_MAX_TAGS
-	int "maximum number of queued commands"
-	depends on SCSI_ZALON || SCSI_SYM53C8XX
-	default "32"
-	---help---
-	  This option allows you to specify the maximum number of commands
-	  that can be queued to any device, when tagged command queuing is
-	  possible. The default value is 32. Minimum is 2, maximum is 64.
-	  Modern hard disks are able to support 64 tags and even more, but
-	  do not seem to be faster when more than 32 tags are being used.
-
-	  So, the normal answer here is to go with the default value 32 unless
-	  you are using very large hard disks with large cache (>= 1 MB) that
-	  are able to take advantage of more than 32 tagged commands.
-
-	  There is no safe option and the default answer is recommended.
-
-config SCSI_NCR53C8XX_SYNC
-	int "synchronous transfers frequency in MHz"
-	depends on SCSI_ZALON || SCSI_SYM53C8XX
-	default "20"
-	---help---
-	  The SCSI Parallel Interface-2 Standard defines 5 classes of transfer
-	  rates: FAST-5, FAST-10, FAST-20, FAST-40 and FAST-80.  The numbers
-	  are respectively the maximum data transfer rates in mega-transfers
-	  per second for each class.  For example, a FAST-20 Wide 16 device is
-	  able to transfer data at 20 million 16 bit packets per second for a
-	  total rate of 40 MB/s.
-
-	  You may specify 0 if you want to only use asynchronous data
-	  transfers. This is the safest and slowest option. Otherwise, specify
-	  a value between 5 and 80, depending on the capability of your SCSI
-	  controller.  The higher the number, the faster the data transfer.
-	  Note that 80 should normally be ok since the driver decreases the
-	  value automatically according to the controller's capabilities.
-
-	  Your answer to this question is ignored for controllers with NVRAM,
-	  since the driver will get this information from the user set-up.  It
-	  also can be overridden using a boot setup option, as follows
-	  (example): 'ncr53c8xx=sync:12' will allow the driver to negotiate
-	  for FAST-20 synchronous data transfer (20 mega-transfers per
-	  second).
-
-	  The normal answer therefore is not to go with the default but to
-	  select the maximum value 80 allowing the driver to use the maximum
-	  value supported by each controller. If this causes problems with
-	  your SCSI devices, you should come back and decrease the value.
-
-	  There is no safe option other than using good cabling, right
-	  terminations and SCSI conformant devices.
-
-config SCSI_NCR53C8XX_PROFILE
-	bool "enable profiling"
-	depends on SCSI_ZALON || SCSI_SYM53C8XX
-	help
-	  This option allows you to enable profiling information gathering.
-	  These statistics are not very accurate due to the low frequency
-	  of the kernel clock (100 Hz on i386) and have performance impact
-	  on systems that use very fast devices.
-
-	  The normal answer therefore is N.
-
-config SCSI_NCR53C8XX_IOMAPPED
-	bool "use normal IO"
-	depends on SCSI_ZALON || SCSI_SYM53C8XX
-	help
-	  If you say Y here, the driver will use normal IO, as opposed to
-	  memory mapped IO. Memory mapped IO has less latency than normal IO
-	  and works for most Intel-based hardware. Under Linux/Alpha only
-	  normal IO is currently supported by the driver and so, this option
-	  has no effect on those systems.
-
-	  The normal answer therefore is N; try Y only if you encounter SCSI
-	  related problems.
+source drivers/scsi/Kconfig
 
 endmenu
 
-endmenu
+source "drivers/md/Kconfig"
+
+#source drivers/message/fusion/Kconfig
+
+#source drivers/ieee1394/Kconfig
+
+#source drivers/message/i2o/Kconfig
 
 source "net/Kconfig"
-
 
 menu "Network device support"
 	depends on NET
@@ -670,23 +291,52 @@ config NETDEVICES
 	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
 	  unsure, say Y.
 
-config LASI_82596
-	tristate "Lasi ethernet"
-	depends on NETDEVICES && GSC_LASI
-	help
-	  Say Y here to support the on-board Intel 82596 ethernet controller
-	  built into Hewlett-Packard PA-RISC machines.
-
 source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
 
 endmenu
 
+#source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+#source "drivers/isdn/Kconfig"
+
+#source "drivers/telephony/Kconfig"
+
+# input before char - char/joystick depends on it. As does USB.
+source "drivers/input/Kconfig"
+
 source "drivers/char/Kconfig"
+
+#source "drivers/misc/Kconfig"
+
+source "drivers/media/Kconfig"
 
 source "fs/Kconfig"
 
 
-menu "Sound Drivers"
+menu "Console drivers"
+	depends on VT
+
+config STI_CONSOLE
+	bool "STI console"
+	help
+	  The STI console is the builtin display/keyboard on HP-PARISC
+	  machines.  Say Y here to build support for it into your kernel.
+	  The alternative is to use your primary serial port as a console.
+
+config DUMMY_CONSOLE
+	bool
+	depends on STI_CONSOLE || SERIAL_8250_CONSOLE
+	default y
+
+source "drivers/video/Kconfig"
+
+endmenu
+
+menu "Sound"
 
 config SOUND
 	tristate "Sound card support"
@@ -722,34 +372,29 @@ source "sound/Kconfig"
 
 endmenu
 
+source "drivers/usb/Kconfig"
 
-menu "Console drivers"
-	depends on VT
-
-source "drivers/video/Kconfig"
-
-#  bool 'IODC console' CONFIG_IODC_CONSOLE
-config STI_CONSOLE
-	bool "STI console"
-	help
-	  The STI console is the builtin display/keyboard on HP-PARISC
-	  machines.  Say Y here to build support for it into your kernel.
-	  The alternative is to use your primary serial port as a console.
-
-config DUMMY_CONSOLE
-	bool
-	depends on STI_CONSOLE || !IODC_CONSOLE && GSC_PS2
-	default y
-
-endmenu
-
-# endmenu
+source "net/bluetooth/Kconfig"
 
 menu "Kernel hacking"
 
-#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+	help
+	  Say Y here if you are developing drivers or trying to debug and
+	  identify kernel problems.
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to have the kernel do limited verification on memory
+	  allocation as well as poisoning memory on free to catch use of freed
+	  memory.
+
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
 	help
 	  If you say Y here, you will have some control over the system even
 	  if the system crashes for example during kernel debugging (e.g., you
@@ -760,6 +405,14 @@ config MAGIC_SYSRQ
 	  send a BREAK and then within 5 seconds a command keypress. The
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
+
+config KALLSYMS
+	bool "Load all symbols for debugging/kksymoops"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to let the kernel print out symbolic crash information and
+	  symbolic stack backtraces. This increases the size of the kernel
+	  somewhat, as all symbols have to be loaded into the kernel image.
 
 endmenu
 

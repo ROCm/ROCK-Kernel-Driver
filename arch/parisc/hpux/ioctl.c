@@ -19,6 +19,7 @@
  *   TIOCSPGRP
  */
 
+#include <linux/sched.h>
 #include <linux/smp_lock.h>
 #include <asm/errno.h>
 #include <asm/ioctl.h>
@@ -54,10 +55,6 @@ int hpux_ioctl(int fd, unsigned long cmd, unsigned long arg)
 	case 't':
 		result = hpux_ioctl_t(fd, cmd, arg);
 		break;
-	default:
-		/* If my mother ever sees this, I hope she disowns me.
-		 * Take this out after NYLWE. */
-		result = sys_ioctl(fd, cmd, arg);
 	}
 	return result;
 }

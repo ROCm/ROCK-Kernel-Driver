@@ -1,5 +1,5 @@
 #
-# Makefile for the linux kernel.
+# Makefile for arch/parisc/kernel
 #
 
 ifdef CONFIG_PARISC64
@@ -27,5 +27,3 @@ obj-$(CONFIG_PARISC64) += binfmt_elf32.o sys_parisc32.o \
 		ioctl32.o signal32.o
 # only supported for PCX-W/U in 64-bit mode at the moment
 obj-$(CONFIG_PARISC64) += perf.o perf_asm.o
-
-include $(TOPDIR)/Rules.make

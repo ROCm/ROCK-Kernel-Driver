@@ -80,7 +80,6 @@ core-y					+= arch/parisc/kernel/pdc_cons.o  \
 					   arch/parisc/kernel/init_task.o
 libs-y					+= arch/parisc/lib/ \
 					   `$(CC) -print-libgcc-file-name`
-drivers-$(CONFIG_MATH_EMULATION)	+= arch/parisc/math-emu/
 
 palo: vmlinux
 	@if [ $$(palo -f /dev/null >/dev/null 2>&1 ; echo $$?) != 2 ]; then \

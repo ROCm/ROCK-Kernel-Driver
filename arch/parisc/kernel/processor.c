@@ -167,12 +167,24 @@ static int __init processor_probe(struct parisc_device *dev)
 	**	p->state = STATE_RENDEZVOUS;
 	*/
 
-	/*
-	** itimer and ipi IRQ handlers are statically initialized in
-	** arch/parisc/kernel/irq.c. ie Don't need to register them.
-	*/
-	p->region = irq_region[IRQ_FROM_REGION(CPU_IRQ_REGION)];
+#if 0
+	/* CPU 0 IRQ table is statically allocated/initialized */
+	if (cpuid) {
+		struct irqaction actions[];
 
+		/*
+		** itimer and ipi IRQ handlers are statically initialized in
+		** arch/parisc/kernel/irq.c. ie Don't need to register them.
+		*/
+		actions = kmalloc(sizeof(struct irqaction)*MAX_CPU_IRQ, GFP_ATOMIC);
+		if (!actions) {
+			/* not getting it's own table, share with monarch */
+			actions = cpu_irq_actions[0];
+		}
+
+		cpu_irq_actions[cpuid] = actions;
+	}
+#endif
 	return 0;
 }
 
