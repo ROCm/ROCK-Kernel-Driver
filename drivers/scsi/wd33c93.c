@@ -2086,3 +2086,4 @@ EXPORT_SYMBOL(wd33c93_release);
 EXPORT_SYMBOL(wd33c93_abort);
 EXPORT_SYMBOL(wd33c93_queuecommand);
 EXPORT_SYMBOL(wd33c93_intr);
+EXPORT_SYMBOL(wd33c93_proc_info);
