@@ -662,19 +662,17 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 		struct display *q = &fb_display[i];
 		struct vc_data *tmp = vc_cons[i].d;
 		
-		if (vc->vc_font.width > 32) {
-			/* If we are not the first console on this
-			   fb, copy the font from that console */
-			vc->vc_font.width = tmp->vc_font.width;
-			vc->vc_font.height = tmp->vc_font.height;
-			vc->vc_font.data = p->fontdata = q->fontdata;
-			p->userfont = q->userfont;
-			if (p->userfont) {
-				REFCOUNT(p->fontdata)++;
-				charcnt = FNTCHARCNT(p->fontdata);
-			}
-			con_copy_unimap(vc->vc_num, i);
+		/* If we are not the first console on this
+		   fb, copy the font from that console */
+		vc->vc_font.width = tmp->vc_font.width;
+		vc->vc_font.height = tmp->vc_font.height;
+		vc->vc_font.data = p->fontdata = q->fontdata;
+		p->userfont = q->userfont;
+		if (p->userfont) {
+			REFCOUNT(p->fontdata)++;
+			charcnt = FNTCHARCNT(p->fontdata);
 		}
+		con_copy_unimap(vc->vc_num, i);
 	}
 
 	if (!p->fontdata) {
