@@ -602,10 +602,6 @@ int pnp_activate_dev(struct pnp_dev *dev)
 		pnp_info("res: The PnP device '%s' is already active.", dev->dev.bus_id);
 		return -EBUSY;
 	}
-	spin_lock(&pnp_lock);	/* we lock just in case the device is being configured during this call */
-	dev->active = 1;
-	spin_unlock(&pnp_lock); /* once the device is claimed active we know it won't be configured so we can unlock */
-
 	/* If this condition is true, advanced configuration failed, we need to get this device up and running
 	 * so we use the simple config engine which ignores cold conflicts, this of course may lead to new failures */
 	if (!pnp_is_active(dev)) {
@@ -614,6 +610,11 @@ int pnp_activate_dev(struct pnp_dev *dev)
 			goto fail;
 		}
 	}
+
+	spin_lock(&pnp_lock);	/* we lock just in case the device is being configured during this call */
+	dev->active = 1;
+	spin_unlock(&pnp_lock); /* once the device is claimed active we know it won't be configured so we can unlock */
+
 	if (dev->config_mode & PNP_CONFIG_INVALID) {
 		pnp_info("res: Unable to activate the PnP device '%s' because its resource configuration is invalid.", dev->dev.bus_id);
 		goto fail;
