@@ -47,30 +47,29 @@
 void ax25_std_heartbeat_expiry(ax25_cb *ax25)
 {
 	switch (ax25->state) {
+	case AX25_STATE_0:
+		/* Magic here: If we listen() and a new link dies before it
+		   is accepted() it isn't 'dead' so doesn't get removed. */
+		if (ax25->sk == NULL || ax25->sk->destroy || (ax25->sk->state == TCP_LISTEN && ax25->sk->dead)) {
+			ax25_destroy_socket(ax25);
+			return;
+		}
+		break;
 
-		case AX25_STATE_0:
-			/* Magic here: If we listen() and a new link dies before it
-			   is accepted() it isn't 'dead' so doesn't get removed. */
-			if (ax25->sk == NULL || ax25->sk->destroy || (ax25->sk->state == TCP_LISTEN && ax25->sk->dead)) {
-				ax25_destroy_socket(ax25);
-				return;
+	case AX25_STATE_3:
+	case AX25_STATE_4:
+		/*
+		 * Check the state of the receive buffer.
+		 */
+		if (ax25->sk != NULL) {
+			if (atomic_read(&ax25->sk->rmem_alloc) < (ax25->sk->rcvbuf / 2) &&
+			    (ax25->condition & AX25_COND_OWN_RX_BUSY)) {
+				ax25->condition &= ~AX25_COND_OWN_RX_BUSY;
+				ax25->condition &= ~AX25_COND_ACK_PENDING;
+				ax25_send_control(ax25, AX25_RR, AX25_POLLOFF, AX25_RESPONSE);
+				break;
 			}
-			break;
-
-		case AX25_STATE_3:
-		case AX25_STATE_4:
-			/*
-			 * Check the state of the receive buffer.
-			 */
-			if (ax25->sk != NULL) {
-				if (atomic_read(&ax25->sk->rmem_alloc) < (ax25->sk->rcvbuf / 2) &&
-				    (ax25->condition & AX25_COND_OWN_RX_BUSY)) {
-					ax25->condition &= ~AX25_COND_OWN_RX_BUSY;
-					ax25->condition &= ~AX25_COND_ACK_PENDING;
-					ax25_send_control(ax25, AX25_RR, AX25_POLLOFF, AX25_RESPONSE);
-					break;
-				}
-			}
+		}
 	}
 
 	ax25_start_heartbeat(ax25);
@@ -117,53 +116,53 @@ void ax25_std_idletimer_expiry(ax25_cb *ax25)
 void ax25_std_t1timer_expiry(ax25_cb *ax25)
 {
 	switch (ax25->state) {
-		case AX25_STATE_1: 
-			if (ax25->n2count == ax25->n2) {
-				if (ax25->modulus == AX25_MODULUS) {
-					ax25_disconnect(ax25, ETIMEDOUT);
-					return;
-				} else {
-					ax25->modulus = AX25_MODULUS;
-					ax25->window  = ax25->ax25_dev->values[AX25_VALUES_WINDOW];
-					ax25->n2count = 0;
-					ax25_send_control(ax25, AX25_SABM, AX25_POLLON, AX25_COMMAND);
-				}
-			} else {
-				ax25->n2count++;
-				if (ax25->modulus == AX25_MODULUS)
-					ax25_send_control(ax25, AX25_SABM, AX25_POLLON, AX25_COMMAND);
-				else
-					ax25_send_control(ax25, AX25_SABME, AX25_POLLON, AX25_COMMAND);
-			}
-			break;
-
-		case AX25_STATE_2:
-			if (ax25->n2count == ax25->n2) {
-				ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
+	case AX25_STATE_1: 
+		if (ax25->n2count == ax25->n2) {
+			if (ax25->modulus == AX25_MODULUS) {
 				ax25_disconnect(ax25, ETIMEDOUT);
 				return;
 			} else {
-				ax25->n2count++;
-				ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
+				ax25->modulus = AX25_MODULUS;
+				ax25->window  = ax25->ax25_dev->values[AX25_VALUES_WINDOW];
+				ax25->n2count = 0;
+				ax25_send_control(ax25, AX25_SABM, AX25_POLLON, AX25_COMMAND);
 			}
-			break;
+		} else {
+			ax25->n2count++;
+			if (ax25->modulus == AX25_MODULUS)
+				ax25_send_control(ax25, AX25_SABM, AX25_POLLON, AX25_COMMAND);
+			else
+				ax25_send_control(ax25, AX25_SABME, AX25_POLLON, AX25_COMMAND);
+		}
+		break;
 
-		case AX25_STATE_3: 
-			ax25->n2count = 1;
+	case AX25_STATE_2:
+		if (ax25->n2count == ax25->n2) {
+			ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
+			ax25_disconnect(ax25, ETIMEDOUT);
+			return;
+		} else {
+			ax25->n2count++;
+			ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
+		}
+		break;
+
+	case AX25_STATE_3: 
+		ax25->n2count = 1;
+		ax25_std_transmit_enquiry(ax25);
+		ax25->state   = AX25_STATE_4;
+		break;
+
+	case AX25_STATE_4:
+		if (ax25->n2count == ax25->n2) {
+			ax25_send_control(ax25, AX25_DM, AX25_POLLON, AX25_RESPONSE);
+			ax25_disconnect(ax25, ETIMEDOUT);
+			return;
+		} else {
+			ax25->n2count++;
 			ax25_std_transmit_enquiry(ax25);
-			ax25->state   = AX25_STATE_4;
-			break;
-
-		case AX25_STATE_4:
-			if (ax25->n2count == ax25->n2) {
-				ax25_send_control(ax25, AX25_DM, AX25_POLLON, AX25_RESPONSE);
-				ax25_disconnect(ax25, ETIMEDOUT);
-				return;
-			} else {
-				ax25->n2count++;
-				ax25_std_transmit_enquiry(ax25);
-			}
-			break;
+		}
+		break;
 	}
 
 	ax25_calculate_t1(ax25);
