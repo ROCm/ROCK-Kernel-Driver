@@ -234,7 +234,7 @@ static struct board {
 	const char	*deviceLabel;
 	u32	   	flags;
 	u16	   	addrOfs;
-} board_info[] __devinitdata = {
+} board_info[] = {
 	{ "Compaq Netelligent 10 T PCI UTP", TLAN_ADAPTER_ACTIVITY_LED, 0x83 },
 	{ "Compaq Netelligent 10/100 TX PCI UTP", TLAN_ADAPTER_ACTIVITY_LED, 0x83 },
 	{ "Compaq Integrated NetFlex-3/P", TLAN_ADAPTER_NONE, 0x83 },
