@@ -46,6 +46,11 @@
 #define NVIDIA_X86_64_1_APBASE2		0xd8
 #define NVIDIA_X86_64_1_APLIMIT2	0xdc
 
+/* ULi K8 registers */
+#define ULI_X86_64_BASE_ADDR		0x10
+#define ULI_X86_64_HTT_FEA_REG		0x50
+#define ULI_X86_64_ENU_SCR_REG		0x54
+
 static int nr_garts;
 static struct pci_dev * hammers[MAX_HAMMER_GARTS];
 
@@ -406,6 +411,61 @@ static void __devinit amd8151_init(struct pci_dev *pdev, struct agp_bridge_data 
 	}
 }
 
+
+static struct aper_size_info_32 uli_sizes[7] =
+{
+	{256, 65536, 6, 10},
+	{128, 32768, 5, 9},
+	{64, 16384, 4, 8},
+	{32, 8192, 3, 7},
+	{16, 4096, 2, 6},
+	{8, 2048, 1, 4},
+	{4, 1024, 0, 3}
+};
+static int __devinit uli_agp_init(struct pci_dev *pdev)
+{
+	u32 httfea,baseaddr,enuscr;
+	struct pci_dev *dev1;
+	int i;
+	unsigned size = amd64_fetch_size();
+	printk(KERN_INFO "Setting up ULi AGP. \n");
+	dev1 = pci_find_slot ((unsigned int)pdev->bus->number,PCI_DEVFN(0,0));
+	if (dev1 == NULL) {
+		printk(KERN_INFO PFX "Detected a ULi chipset, "
+			"but could not fine the secondary device.\n");
+		return -ENODEV;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(uli_sizes); i++)
+		if (uli_sizes[i].size == size)
+			break;
+
+	if (i == ARRAY_SIZE(uli_sizes)) {
+		printk(KERN_INFO PFX "No ULi size found for %d\n", size);
+		return -ENODEV;
+	}
+
+	/* shadow x86-64 registers into ULi registers */
+	pci_read_config_dword (hammers[0], AMD64_GARTAPERTUREBASE, &httfea);
+
+	/* if x86-64 aperture base is beyond 4G, exit here */
+	if ((httfea & 0x7fff) >> (32 - 25))
+		return -ENODEV;
+
+	httfea = (httfea& 0x7fff) << 25;
+
+	pci_read_config_dword(pdev, ULI_X86_64_BASE_ADDR, &baseaddr);
+	baseaddr&= ~PCI_BASE_ADDRESS_MEM_MASK;
+	baseaddr|= httfea;
+	pci_write_config_dword(pdev, ULI_X86_64_BASE_ADDR, baseaddr);
+
+	enuscr= httfea+ (size * 1024 * 1024) - 1;
+	pci_write_config_dword(dev1, ULI_X86_64_HTT_FEA_REG, httfea);
+	pci_write_config_dword(dev1, ULI_X86_64_ENU_SCR_REG, enuscr);
+	return 0;
+}
+
+
 static struct aper_size_info_32 nforce3_sizes[5] =
 {
 	{512,  131072, 7, 0x00000000 },
@@ -514,6 +574,14 @@ static int __devinit agp_amd64_probe(struct pci_dev *pdev,
 		}
 	}
 
+	if (pdev->vendor == PCI_VENDOR_ID_AL) {
+		int ret = uli_agp_init(pdev);
+		if (ret) {
+			agp_put_bridge(bridge);
+			return ret;
+		}
+	}
+
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
 }
@@ -534,6 +602,15 @@ static struct pci_device_id agp_amd64_pci_table[] = {
 	.class_mask	= ~0,
 	.vendor		= PCI_VENDOR_ID_AMD,
 	.device		= PCI_DEVICE_ID_AMD_8151_0,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	/* ULi M1689 */
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AL,
+	.device		= PCI_DEVICE_ID_AL_M1689,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
@@ -582,7 +659,6 @@ static struct pci_device_id agp_amd64_pci_table[] = {
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
-
 	/* NForce3 */
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
