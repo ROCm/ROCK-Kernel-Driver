@@ -2012,7 +2012,7 @@ static s64 get_nr_free_clusters(ntfs_volume *vol)
  */
 static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 {
-	s64 nr_free = vol->nr_mft_records;
+	s64 nr_free;
 	u32 *kaddr;
 	struct address_space *mapping = vol->mftbmp_ino->i_mapping;
 	filler_t *readpage = (filler_t*)mapping->a_ops->readpage;
@@ -2021,13 +2021,16 @@ static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 	unsigned int max_size;
 
 	ntfs_debug("Entering.");
+	/* Number of mft records in file system (at this point in time). */
+	nr_free = vol->mft_ino->i_size >> vol->mft_record_size_bits;
 	/*
-	 * Convert the number of bits into bytes rounded up, then convert into
-	 * multiples of PAGE_CACHE_SIZE, rounding up so that if we have one
-	 * full and one partial page max_index = 2.
+	 * Convert the maximum number of set bits into bytes rounded up, then
+	 * convert into multiples of PAGE_CACHE_SIZE, rounding up so that if we
+	 * have one full and one partial page max_index = 2.
 	 */
-	max_index = (((vol->nr_mft_records + 7) >> 3) + PAGE_CACHE_SIZE - 1) >>
-			PAGE_CACHE_SHIFT;
+	max_index = ((((NTFS_I(vol->mft_ino)->initialized_size >>
+			vol->mft_record_size_bits) + 7) >> 3) +
+			PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	/* Use multiples of 4 bytes. */
 	max_size = PAGE_CACHE_SIZE >> 2;
 	ntfs_debug("Reading $MFT/$BITMAP, max_index = 0x%lx, max_size = "
@@ -2122,9 +2125,9 @@ static int ntfs_statfs(struct super_block *sb, struct kstatfs *sfs)
 	sfs->f_bavail = sfs->f_bfree = size;
 	/* Serialize accesses to the inode bitmap. */
 	down_read(&vol->mftbmp_lock);
-	/* Total file nodes in file system (at this moment in time). */
-	sfs->f_files  = vol->mft_ino->i_size >> vol->mft_record_size_bits;
-	/* Free file nodes in fs (based on current total count). */
+	/* Number of inodes in file system (at this point in time). */
+	sfs->f_files = vol->mft_ino->i_size >> vol->mft_record_size_bits;
+	/* Free inodes in fs (based on current total count). */
 	sfs->f_ffree = __get_nr_free_mft_records(vol);
 	up_read(&vol->mftbmp_lock);
 	/*
