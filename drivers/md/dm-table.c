@@ -79,7 +79,7 @@ static unsigned int int_log(unsigned long n, unsigned long base)
 }
 
 #define __HIGH(l, r) if (*(l) < (r)) *(l) = (r)
-#define __LOW(l, r) if (*(l) > (r)) *(l) = (r)
+#define __LOW(l, r) if (*(l) == 0 || *(l) > (r)) *(l) = (r)
 
 /*
  * Combine two io_restrictions, always taking the lower value.
