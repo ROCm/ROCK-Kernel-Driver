@@ -262,14 +262,14 @@ static ide_startstop_t do_reset1(struct ata_device *, int); /* needed below */
  * Poll the interface for completion every 50ms during an ATAPI drive reset
  * operation. If the drive has not yet responded, and we have not yet hit our
  * maximum waiting time, then the timer is restarted for another 50ms.
+ *
+ * Channel lock should be held.
  */
 static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
-	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 	int ret = ide_stopped;
 
-	spin_lock_irqsave(ch->lock, flags);
 	ata_select(drive, 10);
 	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
@@ -287,7 +287,6 @@ static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct req
 
 		ret = ide_stopped;
 	}
-	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ret;
 }
@@ -296,14 +295,14 @@ static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct req
  * Poll the interface for completion every 50ms during an ata reset operation.
  * If the drives have not yet responded, and we have not yet hit our maximum
  * waiting time, then the timer is restarted for another 50ms.
+ *
+ * Channel lock should be held.
  */
 static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
-	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 	int ret;
 
-	spin_lock_irqsave(ch->lock, flags);
 	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
 			ata_set_handler(drive, reset_pollfunc, HZ/20, NULL);
@@ -347,7 +346,6 @@ static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *
 		ret = ide_stopped;
 	}
 	ch->poll_timeout = 0;	/* done polling */
-	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_stopped;
 }
@@ -443,12 +441,17 @@ static struct ata_bit_messages ata_error_msgs[] = {
 static void dump_bits(struct ata_bit_messages *msgs, int nr, byte bits)
 {
 	int i;
+	int first = 1;
 
 	printk(" [ ");
 
 	for (i = 0; i < nr; i++, msgs++)
-		if ((bits & msgs->mask) == msgs->match)
-			printk("%s ", msgs->msg);
+		if ((bits & msgs->mask) == msgs->match) {
+			if (!first)
+				printk(",");
+			printk("%s", msgs->msg);
+			first = 0;
+		}
 
 	printk("] ");
 }
@@ -560,7 +563,7 @@ static int do_recalibrate(struct ata_device *drive)
 		memset(&args, 0, sizeof(args));
 		args.taskfile.sector_count = drive->sect;
 		args.cmd = WIN_RESTORE;
-		ide_raw_taskfile(drive, &args, NULL);
+		ide_raw_taskfile(drive, &args);
 		printk(KERN_INFO "%s: done!\n", drive->name);
 	}
 
@@ -1030,12 +1033,12 @@ void ide_timer_expiry(unsigned long data)
 		if (ch->poll_timeout) {
 			ret = handler(drive, drive->rq);
 		} else if (drive_is_ready(drive)) {
-			if (drive->waiting_for_dma)
+			if (test_bit(IDE_DMA, ch->active))
 				udma_irq_lost(drive);
 			(void) ide_ack_intr(ch);
 			printk("%s: lost interrupt\n", drive->name);
 			ret = handler(drive, drive->rq);
-		} else if (drive->waiting_for_dma) {
+		} else if (test_bit(IDE_DMA, ch->active)) {
 			struct request *rq = drive->rq;
 
 			/*

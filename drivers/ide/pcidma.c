@@ -167,7 +167,6 @@ int ata_start_dma(struct ata_device *drive, struct request *rq)
 	outl(ch->dmatable_dma, dma_base + 4); /* PRD table */
 	outb(reading, dma_base);		/* specify r/w */
 	outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
-	drive->waiting_for_dma = 1;
 
 	return 0;
 }
@@ -436,7 +435,6 @@ int udma_pci_stop(struct ata_device *drive)
 	unsigned long dma_base = ch->dma_base;
 	u8 dma_stat;
 
-	drive->waiting_for_dma = 0;
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */

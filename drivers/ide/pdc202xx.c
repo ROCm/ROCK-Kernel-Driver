@@ -571,7 +571,7 @@ static void pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 	outb(inb(ch->dma_base) | 1, ch->dma_base); /* start DMA */
 }
 
-int pdc202xx_udma_stop(struct ata_device *drive)
+static int pdc202xx_udma_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 	u32 high_16 = pci_resource_start(ch->pci_dev, 4);
@@ -585,7 +585,6 @@ int pdc202xx_udma_stop(struct ata_device *drive)
 		OUT_BYTE(clock & ~(ch->unit ? 0x08:0x02), high_16 + PDC_CLK);
 	}
 
-	drive->waiting_for_dma = 0;
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
@@ -604,7 +603,7 @@ static void pdc202xx_bug(struct ata_device *drive)
 
 #endif
 
-void pdc202xx_new_reset(struct ata_device *drive)
+static void pdc202xx_new_reset(struct ata_device *drive)
 {
 	ata_reset(drive->channel);
 	mdelay(1000);

@@ -91,7 +91,6 @@ static int ns87415_udma_stop(struct ata_device *drive)
 	unsigned long dma_base = ch->dma_base;
 	u8 dma_stat;
 
-	drive->waiting_for_dma = 0;
 	dma_stat = inb(ch->dma_base+2);
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	outb(inb(dma_base)|6, dma_base);	/* from ERRATA: clear the INTR & ERROR bits */
