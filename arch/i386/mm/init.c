@@ -438,6 +438,16 @@ void __init mem_init(void)
 	
 	bad_ppro = ppro_with_ram_bug();
 
+#ifdef CONFIG_HIGHMEM
+	/* check that fixmap and pkmap do not overlap */
+	if (PKMAP_BASE+LAST_PKMAP*PAGE_SIZE >= FIXADDR_START) {
+		printk(KERN_ERR "fixmap and kmap areas overlap - this will crash\n");
+		printk(KERN_ERR "pkstart: %lxh pkend: %lxh fixstart %lxh\n",
+				PKMAP_BASE, PKMAP_BASE+LAST_PKMAP*PAGE_SIZE, FIXADDR_START);
+		BUG();
+	}
+#endif
+ 
 	set_max_mapnr_init();
 
 #ifdef CONFIG_HIGHMEM
