@@ -62,6 +62,11 @@ static inline void ixgb_irq_enable(struct ixgb_adapter *adapter);
 int ixgb_up(struct ixgb_adapter *adapter);
 void ixgb_down(struct ixgb_adapter *adapter, boolean_t kill_watchdog);
 void ixgb_reset(struct ixgb_adapter *adapter);
+int ixgb_setup_tx_resources(struct ixgb_adapter *adapter);
+int ixgb_setup_rx_resources(struct ixgb_adapter *adapter);
+void ixgb_free_tx_resources(struct ixgb_adapter *adapter);
+void ixgb_free_rx_resources(struct ixgb_adapter *adapter);
+void ixgb_update_stats(struct ixgb_adapter *adapter);
 
 static int ixgb_init_module(void);
 static void ixgb_exit_module(void);
@@ -70,22 +75,17 @@ static void __devexit ixgb_remove(struct pci_dev *pdev);
 static int ixgb_sw_init(struct ixgb_adapter *adapter);
 static int ixgb_open(struct net_device *netdev);
 static int ixgb_close(struct net_device *netdev);
-static int ixgb_setup_tx_resources(struct ixgb_adapter *adapter);
-static int ixgb_setup_rx_resources(struct ixgb_adapter *adapter);
 static void ixgb_configure_tx(struct ixgb_adapter *adapter);
 static void ixgb_configure_rx(struct ixgb_adapter *adapter);
 static void ixgb_setup_rctl(struct ixgb_adapter *adapter);
 static void ixgb_clean_tx_ring(struct ixgb_adapter *adapter);
 static void ixgb_clean_rx_ring(struct ixgb_adapter *adapter);
-static void ixgb_free_tx_resources(struct ixgb_adapter *adapter);
-static void ixgb_free_rx_resources(struct ixgb_adapter *adapter);
 static void ixgb_set_multi(struct net_device *netdev);
 static void ixgb_watchdog(unsigned long data);
 static int ixgb_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
 static struct net_device_stats *ixgb_get_stats(struct net_device *netdev);
 static int ixgb_change_mtu(struct net_device *netdev, int new_mtu);
 static int ixgb_set_mac(struct net_device *netdev, void *p);
-static void ixgb_update_stats(struct ixgb_adapter *adapter);
 static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs);
 static boolean_t ixgb_clean_tx_irq(struct ixgb_adapter *adapter);
 static inline void ixgb_rx_checksum(struct ixgb_adapter *adapter,
@@ -99,6 +99,7 @@ static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter,
 static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter);
 #endif
 static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter);
+void set_ethtool_ops(struct net_device *netdev);
 static void ixgb_tx_timeout(struct net_device *dev);
 static void ixgb_tx_timeout_task(struct net_device *dev);
 static void ixgb_vlan_rx_register(struct net_device *netdev,
@@ -125,7 +126,6 @@ struct notifier_block ixgb_notifier_reboot = {
 /* Exported from other modules */
 
 extern void ixgb_check_options(struct ixgb_adapter *adapter);
-extern struct ethtool_ops ixgb_ethtool_ops;
 
 static struct pci_driver ixgb_driver = {
 	.name = ixgb_driver_name,
@@ -395,9 +395,9 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	netdev->set_multicast_list = &ixgb_set_multi;
 	netdev->set_mac_address = &ixgb_set_mac;
 	netdev->change_mtu = &ixgb_change_mtu;
+	set_ethtool_ops(netdev);
 	netdev->tx_timeout = &ixgb_tx_timeout;
 	netdev->watchdog_timeo = HZ;
-	SET_ETHTOOL_OPS(netdev, &ixgb_ethtool_ops);
 #ifdef CONFIG_IXGB_NAPI
 	netdev->poll = &ixgb_clean;
 	netdev->weight = 64;
@@ -626,7 +626,8 @@ static int ixgb_close(struct net_device *netdev)
  * Return 0 on success, negative on failure
  **/
 
-static int ixgb_setup_tx_resources(struct ixgb_adapter *adapter)
+int
+ixgb_setup_tx_resources(struct ixgb_adapter *adapter)
 {
 	struct ixgb_desc_ring *txdr = &adapter->tx_ring;
 	struct pci_dev *pdev = adapter->pdev;
@@ -715,7 +716,8 @@ static void ixgb_configure_tx(struct ixgb_adapter *adapter)
  * Returns 0 on success, negative on failure
  **/
 
-static int ixgb_setup_rx_resources(struct ixgb_adapter *adapter)
+int
+ixgb_setup_rx_resources(struct ixgb_adapter *adapter)
 {
 	struct ixgb_desc_ring *rxdr = &adapter->rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
@@ -847,7 +849,8 @@ static void ixgb_configure_rx(struct ixgb_adapter *adapter)
  * Free all transmit software resources
  **/
 
-static void ixgb_free_tx_resources(struct ixgb_adapter *adapter)
+void
+ixgb_free_tx_resources(struct ixgb_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
 
@@ -912,7 +915,8 @@ static void ixgb_clean_tx_ring(struct ixgb_adapter *adapter)
  * Free all receive software resources
  **/
 
-static void ixgb_free_rx_resources(struct ixgb_adapter *adapter)
+void
+ixgb_free_rx_resources(struct ixgb_adapter *adapter)
 {
 	struct ixgb_desc_ring *rx_ring = &adapter->rx_ring;
 	struct pci_dev *pdev = adapter->pdev;
@@ -1462,7 +1466,8 @@ static int ixgb_change_mtu(struct net_device *netdev, int new_mtu)
  * @adapter: board private structure
  **/
 
-static void ixgb_update_stats(struct ixgb_adapter *adapter)
+void
+ixgb_update_stats(struct ixgb_adapter *adapter)
 {
 	adapter->stats.tprl += IXGB_READ_REG(&adapter->hw, TPRL);
 	adapter->stats.tprh += IXGB_READ_REG(&adapter->hw, TPRH);

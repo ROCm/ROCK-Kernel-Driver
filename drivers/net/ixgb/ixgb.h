@@ -86,6 +86,10 @@ struct ixgb_adapter;
 
 #define IXGB_ERR(args...) printk(KERN_ERR "ixgb: " args)
 
+/* TX/RX descriptor defines */
+#define DEFAULT_TXD	 256
+#define MAX_TXD   	4096
+#define MIN_TXD	  64
 
 /* hardware cannot reliably support more than 512 descriptors owned by
  * hardware descrioptor cache otherwise an unreliable ring under heavy 
