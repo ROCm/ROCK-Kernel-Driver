@@ -1445,14 +1445,11 @@ static void __devexit agp_intel_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
-static int agp_intel_suspend(struct pci_dev *dev, u32 state)
-{
-	return 0;
-}
-
 static int agp_intel_resume(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+	
+	pci_restore_state(pdev, pdev->saved_config_space);
 
 	if (bridge->driver == &intel_generic_driver)
 		intel_configure();
@@ -1506,7 +1503,6 @@ static struct pci_driver agp_intel_pci_driver = {
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,
 	.remove		= agp_intel_remove,
-	.suspend	= agp_intel_suspend,
 	.resume		= agp_intel_resume,
 };
 

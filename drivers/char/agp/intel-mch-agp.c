@@ -569,14 +569,11 @@ static void __devexit agp_intelmch_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
-static int agp_intelmch_suspend(struct pci_dev *dev, u32 state)
-{
-	return 0;
-}
-
 static int agp_intelmch_resume(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+	
+	pci_restore_state(pdev, pdev->saved_config_space);
 
 	if (bridge->driver == &intel_845_driver)
 		intel_845_configure();
@@ -611,7 +608,6 @@ static struct pci_driver agp_intelmch_pci_driver = {
 	.id_table	= agp_intelmch_pci_table,
 	.probe		= agp_intelmch_probe,
 	.remove		= agp_intelmch_remove,
-	.suspend	= agp_intelmch_suspend,
 	.resume		= agp_intelmch_resume,
 };
 
