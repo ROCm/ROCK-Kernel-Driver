@@ -290,7 +290,7 @@ int __init agp_init(void)
 
 	already_initialised = 1;
 
-	memset(&agp_bridge, 0, sizeof(struct agp_bridge_data));
+	memset(agp_bridge, 0, sizeof(struct agp_bridge_data));
 	agp_bridge->type = NOT_SUPPORTED;
 
 	printk(KERN_INFO "Linux agpgart interface v%d.%d (c) Dave Jones\n",
