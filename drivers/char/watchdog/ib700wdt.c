@@ -262,9 +262,9 @@ static struct file_operations ibwdt_fops = {
 };
 
 static struct miscdevice ibwdt_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&ibwdt_fops
+	.minor = WATCHDOG_MINOR,
+	.name = "watchdog",
+	.fops = &ibwdt_fops
 };
 
 /*
@@ -273,9 +273,9 @@ static struct miscdevice ibwdt_miscdev = {
  */
 
 static struct notifier_block ibwdt_notifier = {
-	ibwdt_notify_sys,
-	NULL,
-	0
+	.notifier_call = ibwdt_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 static int __init
