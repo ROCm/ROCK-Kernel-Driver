@@ -270,8 +270,6 @@ NETWORKS	+= $(patsubst %/, %/built-in.o, $(networks-y))
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(libs-y) $(libs-m)))
 LIBS		+= $(patsubst %/, %/lib.a, $(libs-y))
 
-$(warning $(SUBDIRS))
-
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT
 
 # boot target
