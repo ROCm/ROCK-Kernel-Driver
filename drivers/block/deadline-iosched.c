@@ -137,6 +137,22 @@ deadline_find_hash(struct deadline_data *dd, sector_t offset)
 	return rq;
 }
 
+static sector_t deadline_get_last_sector(struct deadline_data *dd)
+{
+	sector_t last_sec = dd->last_sector;
+
+	/*
+	 * if dispatch is non-empty, disregard last_sector and check last one
+	 */
+	if (!list_empty(dd->dispatch)) {
+		struct request *__rq = list_entry_rq(dd->dispatch->prev);
+
+		last_sec = __rq->sector + __rq->nr_sectors;
+	}
+
+	return last_sec;
+}
+
 static int
 deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 {
@@ -205,7 +221,9 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 	 */
 	if (!*insert && !list_empty(sort_list)) {
 		__rq = list_entry_rq(sort_list->next);
-		if (bio->bi_sector + bio_sectors(bio) < __rq->sector)
+
+		if (bio->bi_sector + bio_sectors(bio) < __rq->sector &&
+		    bio->bi_sector > deadline_get_last_sector(dd))
 			*insert = sort_list;
 	}
 
@@ -268,17 +286,8 @@ deadline_move_to_dispatch(struct deadline_data *dd, struct request *rq)
 static void deadline_move_requests(struct deadline_data *dd, struct request *rq)
 {
 	struct list_head *sort_head = &dd->sort_list[rq_data_dir(rq)];
-	sector_t last_sec = dd->last_sector;
+	sector_t last_sec = deadline_get_last_sector(dd);
 	int batch_count = dd->fifo_batch;
-
-	/*
-	 * if dispatch is non-empty, disregard last_sector and check last one
-	 */
-	if (!list_empty(dd->dispatch)) {
-		struct request *__rq = list_entry_rq(dd->dispatch->prev);
-
-		last_sec = __rq->sector + __rq->nr_sectors;
-	}
 
 	do {
 		struct list_head *nxt = rq->queuelist.next;
