@@ -49,12 +49,12 @@ static int alloc_dha_stack(void)
         if (dump_header_asm.dha_stack[0])
                 return 0;
 
-        ptr = (void *)vmalloc(THREAD_SIZE * num_online_cpus());
+        ptr = (void *)vmalloc(THREAD_SIZE * num_possible_cpus());
         if (!ptr) {
                 return -ENOMEM;
         }
 
-        for (i = 0; i < num_online_cpus(); i++) {
+        for (i = 0; i < num_possible_cpus(); i++) {
                 dump_header_asm.dha_stack[i] = 
 			(uint64_t)((unsigned long)ptr + (i * THREAD_SIZE));
 	}
@@ -122,6 +122,7 @@ __dump_save_other_cpus(void)
 		for (i = 0; i < NR_CPUS; i++)
 			dump_expect_ipi[i] = (i != cpu && cpu_online(i));
 
+		printk(KERN_ALERT "sending IPI to other cpus...\n");
 		dump_send_ipi(dump_ipi_handler);
 		/*
 		 * may be we dont need to wait for IPI to be processed.
@@ -135,7 +136,8 @@ __dump_save_other_cpus(void)
 		 */
 		i = 10000; /* wait max of 10 seconds */
 		while ((atomic_read(&waiting_for_dump_ipi) > 0) && (--i > 0)) {
-			cpu_relax();
+			barrier();
+			mdelay(1);
 		} 
 		printk(KERN_ALERT "done waiting: %d cpus not responding\n",
 		       atomic_read(&waiting_for_dump_ipi));
