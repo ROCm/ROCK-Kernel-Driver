@@ -1595,7 +1595,7 @@ config CIFS_STATS
 	  mounted by the cifs client to be displayed in /proc/fs/cifs/Stats
 
 config CIFS_POSIX
-        bool "CIFS statistics (EXPERIMENTAL)"
+        bool "CIFS POSIX Extensions (EXPERIMENTAL)"
         depends on CIFS
         help
           Enabling this option will cause the cifs client to attempt to
