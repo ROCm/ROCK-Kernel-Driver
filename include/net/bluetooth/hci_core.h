@@ -231,7 +231,7 @@ static inline void hci_conn_hash_del(struct hci_dev *hdev, struct hci_conn *c)
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	list_del(&c->list);
 	if (c->type == ACL_LINK)
-		h->acl_num++;
+		h->acl_num--;
 	else
 		h->sco_num--;
 }
