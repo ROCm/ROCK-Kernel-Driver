@@ -15,7 +15,6 @@
 #include <asm/irq.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
-#include <asm/arch/irq.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/assabet.h>
 #include <asm/hardware/sa1111.h>
@@ -24,53 +23,78 @@
 
 
 /*
- * Install handler for Neponset IRQ.  Yes, yes... we are way down the IRQ
- * cascade which is not good for IRQ latency, but the hardware has been
- * designed that way...
+ * Install handler for Neponset IRQ.  Note that we have to loop here
+ * since the ETHERNET and USAR IRQs are level based, and we need to
+ * ensure that the IRQ signal is deasserted before returning.  This
+ * is rather unfortunate.
  */
-
-static void neponset_IRQ_demux( int irq, void *dev_id, struct pt_regs *regs )
+static void
+neponset_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
-	int irr;
+	unsigned int irr;
 
-	for(;;){
-		irr = IRR & (IRR_ETHERNET | IRR_USAR | IRR_SA1111);
-		/* Let's have all active IRQ bits high.
-		 * Note: there is a typo in the Neponset user's guide
-		 * for the SA1111 IRR level.
+	while (1) {
+		struct irqdesc *d;
+
+		/*
+		 * Acknowledge the parent IRQ.
 		 */
-		irr ^= (IRR_ETHERNET | IRR_USAR);
-		if (!irr) break;
+		desc->chip->ack(irq);
 
-		if( irr & IRR_ETHERNET )
-			do_IRQ(IRQ_NEPONSET_SMC9196, regs);
+		/*
+		 * Read the interrupt reason register.  Let's have all
+		 * active IRQ bits high.  Note: there is a typo in the
+		 * Neponset user's guide for the SA1111 IRR level.
+		 */
+		irr = IRR ^ (IRR_ETHERNET | IRR_USAR);
 
-		if( irr & IRR_USAR )
-			do_IRQ(IRQ_NEPONSET_USAR, regs);
+		if ((irr & (IRR_ETHERNET | IRR_USAR | IRR_SA1111)) == 0)
+			break;
 
-		if( irr & IRR_SA1111 )
-			sa1111_IRQ_demux(irq, dev_id, regs);
+		/*
+		 * Since there is no individual mask, we have to
+		 * mask the parent IRQ.  This is safe, since we'll
+		 * recheck the register for any pending IRQs.
+		 */
+		if (irr & (IRR_ETHERNET | IRR_USAR)) {
+			desc->chip->mask(irq);
+
+			if (irr & IRR_ETHERNET) {
+				d = irq_desc + IRQ_NEPONSET_SMC9196;
+				d->handle(IRQ_NEPONSET_SMC9196, d, regs);
+			}
+
+			if (irr & IRR_USAR) {
+				d = irq_desc + IRQ_NEPONSET_USAR;
+				d->handle(IRQ_NEPONSET_USAR, d, regs);
+			}
+
+			desc->chip->unmask(irq);
+		}
+
+		if (irr & IRR_SA1111) {
+			d = irq_desc + IRQ_NEPONSET_SA1111;
+			d->handle(IRQ_NEPONSET_SA1111, d, regs);
+		}
 	}
 }
 
-static struct irqaction neponset_irq = {
-	name:		"Neponset",
-	handler:	neponset_IRQ_demux,
-	flags:		SA_INTERRUPT
-};
-
 static void __init neponset_init_irq(void)
 {
-	sa1111_init_irq(-1);	/* SA1111 IRQ not routed to a GPIO */
+	/*
+	 * Install handler for GPIO25.
+	 */
+	set_irq_type(IRQ_GPIO25, IRQT_RISING);
+	set_irq_chained_handler(IRQ_GPIO25, neponset_irq_handler);
 
-	/* setup extra Neponset IRQs */
-	irq_desc[IRQ_NEPONSET_SMC9196].valid	= 1;
-	irq_desc[IRQ_NEPONSET_SMC9196].probe_ok	= 1;
-	irq_desc[IRQ_NEPONSET_USAR].valid	= 1;
-	irq_desc[IRQ_NEPONSET_USAR].probe_ok	= 1;
-
-	set_GPIO_IRQ_edge(GPIO_GPIO25, GPIO_RISING_EDGE);
-	setup_arm_irq(IRQ_GPIO25, &neponset_irq);
+	/*
+	 * Setup other Neponset IRQs.  SA1111 will be done by the
+	 * generic SA1111 code.
+	 */
+	set_irq_handler(IRQ_NEPONSET_SMC9196, do_simple_IRQ);
+	set_irq_flags(IRQ_NEPONSET_SMC9196, IRQF_VALID | IRQF_PROBE);
+	set_irq_handler(IRQ_NEPONSET_USAR, do_simple_IRQ);
+	set_irq_flags(IRQ_NEPONSET_USAR, IRQF_VALID | IRQF_PROBE);
 }
 
 static int __init neponset_init(void)
@@ -100,6 +124,8 @@ static int __init neponset_init(void)
 			"wrong ID: %02x\n", WHOAMI);
 		return -ENODEV;
 	}
+
+	neponset_init_irq();
 
 	/*
 	 * Disable GPIO 0/1 drivers so the buttons work on the module.
@@ -146,7 +172,10 @@ static int __init neponset_init(void)
 	 */
 	sa1110_mb_enable();
 
-	neponset_init_irq();
+	/*
+	 * Initialise SA1111 IRQs
+	 */
+	sa1111_init_irq(IRQ_NEPONSET_SA1111);
 
 	return 0;
 }

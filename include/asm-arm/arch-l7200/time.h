@@ -58,7 +58,7 @@ void __init time_init(void)
 
 	timer_irq.handler = timer_interrupt;
 
-	setup_arm_irq(IRQ_RTC_TICK, &timer_irq);
+	setup_irq(IRQ_RTC_TICK, &timer_irq);
 
 	RTC_RTCCR = RTC_RATE_128 | RTC_EN_TIC;	/* Set rate and enable timer */
 }

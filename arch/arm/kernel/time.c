@@ -31,9 +31,15 @@
 #include <asm/irq.h>
 #include <asm/leds.h>
 
-extern int setup_arm_irq(int, struct irqaction *);
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
+
+/* this needs a better home */
+spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+
+#ifdef CONFIG_SA1100_RTC_MODULE
+EXPORT_SYMBOL(rtc_lock);
+#endif
 
 /* change this if you have some constant time drift */
 #define USECS_PER_JIFFY	(1000000/HZ)

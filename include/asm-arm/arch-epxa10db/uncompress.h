@@ -29,14 +29,18 @@
 static void puts(const char *s)
 {
 	while (*s) {
-		while ((*UART_TSR(IO_ADDRESS(EXC_UART00_BASE)) & UART_TSR_TX_LEVEL_MSK)==15);
+		while ((*UART_TSR(EXC_UART00_BASE) &
+		       UART_TSR_TX_LEVEL_MSK)==15)
+			barrier();
 
-		*UART_TD(IO_ADDRESS(EXC_UART00_BASE)) = *s;
+		*UART_TD(EXC_UART00_BASE) = *s;
 
 		if (*s == '\n') {
-		while ((*UART_TSR(IO_ADDRESS(EXC_UART00_BASE)) & UART_TSR_TX_LEVEL_MSK)==15);
+			while ((*UART_TSR(EXC_UART00_BASE) &
+			       UART_TSR_TX_LEVEL_MSK)==15)
+				barrier();
 
-			*UART_TD(IO_ADDRESS(EXC_UART00_BASE)) = '\r';
+			*UART_TD(EXC_UART00_BASE) = '\r';
 		}
 		s++;
 	}

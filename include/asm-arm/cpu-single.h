@@ -37,9 +37,6 @@
 #define cpu_dcache_clean_entry		__cpu_fn(CPU_NAME,_dcache_clean_entry)
 #define cpu_icache_invalidate_range	__cpu_fn(CPU_NAME,_icache_invalidate_range)
 #define cpu_icache_invalidate_page	__cpu_fn(CPU_NAME,_icache_invalidate_page)
-#define cpu_tlb_invalidate_all		__cpu_fn(CPU_NAME,_tlb_invalidate_all)
-#define cpu_tlb_invalidate_range	__cpu_fn(CPU_NAME,_tlb_invalidate_range)
-#define cpu_tlb_invalidate_page		__cpu_fn(CPU_NAME,_tlb_invalidate_page)
 #define cpu_set_pgd			__cpu_fn(CPU_NAME,_set_pgd)
 #define cpu_set_pmd			__cpu_fn(CPU_NAME,_set_pmd)
 #define cpu_set_pte			__cpu_fn(CPU_NAME,_set_pte)
@@ -72,10 +69,6 @@ extern void cpu_dcache_clean_entry(unsigned long address);
 
 extern void cpu_icache_invalidate_range(unsigned long start, unsigned long end);
 extern void cpu_icache_invalidate_page(void *virt_page);
-
-extern void cpu_tlb_invalidate_all(void);
-extern void cpu_tlb_invalidate_range(unsigned long address, unsigned long end);
-extern void cpu_tlb_invalidate_page(unsigned long address, int flags);
 
 extern void cpu_set_pgd(unsigned long pgd_phys);
 extern void cpu_set_pmd(pmd_t *pmdp, pmd_t pmd);

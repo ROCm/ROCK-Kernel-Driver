@@ -95,7 +95,7 @@ static void dump_instr(struct pt_regs *regs)
 	int i;
 
 	printk("Code: ");
-	for (i = -2; i < 3; i++) {
+	for (i = -4; i < 1; i++) {
 		unsigned int val, bad;
 
 		if (thumb)

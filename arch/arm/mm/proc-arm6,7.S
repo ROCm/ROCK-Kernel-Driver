@@ -48,47 +48,6 @@ ENTRY(cpu_arm7_flush_ram_page)
 		mov	pc, lr
 
 /*
- * Function: arm6_7_tlb_invalidate_all (void)
- *
- * Purpose : flush all TLB entries in all caches
- */
-ENTRY(cpu_arm6_tlb_invalidate_all)
-ENTRY(cpu_arm7_tlb_invalidate_all)
-		mov	r0, #0
-		mcr	p15, 0, r0, c5, c0, 0		@ flush TLB
-		mov	pc, lr
-
-/*
- * Function: arm6_7_tlb_invalidate_page (unsigned long address, int end, int flags)
- *
- * Params  : address	Area start address
- *	   : end	Area end address
- *	   : flags	b0 = I cache as well
- *
- * Purpose : flush a TLB entry
- */
-ENTRY(cpu_arm6_tlb_invalidate_range)
-ENTRY(cpu_arm7_tlb_invalidate_range)
-1:		mcr	p15, 0, r0, c6, c0, 0		@ flush TLB
-		add	r0, r0, #4096
-		cmp	r0, r1
-		blt	1b
-		mov	pc, lr
-
-/*
- * Function: arm6_7_tlb_invalidate_page (unsigned long address, int flags)
- *
- * Params  : address	Address
- *	   : flags	b0 = I-TLB as well
- *
- * Purpose : flush a TLB entry
- */
-ENTRY(cpu_arm6_tlb_invalidate_page)
-ENTRY(cpu_arm7_tlb_invalidate_page)
-		mcr	p15, 0, r0, c6, c0, 0		@ flush TLB
-		mov	pc, lr
-
-/*
  * Function: arm6_7_data_abort ()
  *
  * Params  : r0 = address of aborted instruction
@@ -409,11 +368,6 @@ ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_icache_invalidate_range
 		.word	cpu_arm6_icache_invalidate_page
 
-		/* tlb */
-		.word	cpu_arm6_tlb_invalidate_all
-		.word	cpu_arm6_tlb_invalidate_range
-		.word	cpu_arm6_tlb_invalidate_page
-
 		/* pgtable */
 		.word	cpu_arm6_set_pgd
 		.word	cpu_arm6_set_pmd
@@ -452,11 +406,6 @@ ENTRY(arm7_processor_functions)
 		/* icache */
 		.word	cpu_arm7_icache_invalidate_range
 		.word	cpu_arm7_icache_invalidate_page
-
-		/* tlb */
-		.word	cpu_arm7_tlb_invalidate_all
-		.word	cpu_arm7_tlb_invalidate_range
-		.word	cpu_arm7_tlb_invalidate_page
 
 		/* pgtable */
 		.word	cpu_arm7_set_pgd
@@ -515,6 +464,7 @@ __arm6_proc_info:
 		.long	HWCAP_SWP | HWCAP_26BIT
 		.long	cpu_arm6_info
 		.long	arm6_processor_functions
+		.long	v3_tlb_fns
 		.size	__arm6_proc_info, . - __arm6_proc_info
 
 		.type	__arm610_proc_info, #object
@@ -528,6 +478,7 @@ __arm610_proc_info:
 		.long	HWCAP_SWP | HWCAP_26BIT
 		.long	cpu_arm610_info
 		.long	arm6_processor_functions
+		.long	v3_tlb_fns
 		.size	__arm610_proc_info, . - __arm610_proc_info
 
 		.type	__arm7_proc_info, #object
@@ -541,6 +492,7 @@ __arm7_proc_info:
 		.long	HWCAP_SWP | HWCAP_26BIT
 		.long	cpu_arm7_info
 		.long	arm7_processor_functions
+		.long	v3_tlb_fns
 		.size	__arm7_proc_info, . - __arm7_proc_info
 
 		.type	__arm710_proc_info, #object
@@ -554,4 +506,5 @@ __arm710_proc_info:
 		.long	HWCAP_SWP | HWCAP_26BIT
 		.long	cpu_arm710_info
 		.long	arm7_processor_functions
+		.long	v3_tlb_fns
 		.size	__arm710_proc_info, . - __arm710_proc_info

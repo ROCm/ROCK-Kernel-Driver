@@ -39,27 +39,31 @@ static void ebsa110_unmask_irq(unsigned int irq)
 {
 	__raw_writeb(1 << irq, IRQ_MSET);
 }
+
+static struct irqchip ebsa110_irq_chip = {
+	ack:	ebsa110_mask_irq,
+	mask:	ebsa110_mask_irq,
+	unmask:	ebsa110_unmask_irq,
+};
  
 static void __init ebsa110_init_irq(void)
 {
 	unsigned long flags;
-	int irq;
+	unsigned int irq;
 
-	save_flags_cli (flags);
+	local_irq_save(flags);
 	__raw_writeb(0xff, IRQ_MCLR);
 	__raw_writeb(0x55, IRQ_MSET);
 	__raw_writeb(0x00, IRQ_MSET);
 	if (__raw_readb(IRQ_MASK) != 0x55)
 		while (1);
 	__raw_writeb(0xff, IRQ_MCLR);	/* clear all interrupt enables */
-	restore_flags (flags);
+	local_irq_restore(flags);
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= ebsa110_mask_irq;
-		irq_desc[irq].mask	= ebsa110_mask_irq;
-		irq_desc[irq].unmask	= ebsa110_unmask_irq;
+		set_irq_chip(irq, &ebsa110_irq_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 }
 

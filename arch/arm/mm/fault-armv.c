@@ -116,7 +116,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (!inf->fn(addr, fsr, regs))
 		return;
 
-	printk(KERN_ALERT "Unhandled fault: %s (%X) at 0x%08lx\n",
+	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
 		inf->name, fsr, addr);
 	force_sig(inf->sig, current);
 	show_pte(current->mm, addr);
@@ -177,38 +177,13 @@ bad_pmd:
 	return;
 }
 
-/*
- * Take care of architecture specific things when placing a new PTE into
- * a page table, or changing an existing PTE.  Basically, there are two
- * things that we need to take care of:
- *
- *  1. If PG_dcache_dirty is set for the page, we need to ensure
- *     that any cache entries for the kernels virtual memory
- *     range are written back to the page.
- *  2. If we have multiple shared mappings of the same space in
- *     an object, we need to deal with the cache aliasing issues.
- *
- * Note that the page_table_lock will be held.
- */
-void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
+static void
+make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page)
 {
-	struct page *page = pte_page(pte);
 	struct vm_area_struct *mpnt;
-	struct mm_struct *mm;
-	unsigned long pgoff;
-	int aliases;
-
-	if (!VALID_PAGE(page) || !page->mapping)
-		return;
-
-	if (test_and_clear_bit(PG_dcache_dirty, &page->flags)) {
-		unsigned long kvirt = (unsigned long)page_address(page);
-		cpu_cache_clean_invalidate_range(kvirt, kvirt + PAGE_SIZE, 0);
-	}
-
-	mm = vma->vm_mm;
-	pgoff = (addr - vma->vm_start) >> PAGE_SHIFT;
-	aliases = 0;
+	struct mm_struct *mm = vma->vm_mm;
+	unsigned long pgoff = (addr - vma->vm_start) >> PAGE_SHIFT;
+	int aliases = 0;
 
 	/*
 	 * If we have any shared mappings that are in the same mm
@@ -245,4 +220,31 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 	}
 	if (aliases)
 		adjust_pte(vma, addr);
+}
+
+/*
+ * Take care of architecture specific things when placing a new PTE into
+ * a page table, or changing an existing PTE.  Basically, there are two
+ * things that we need to take care of:
+ *
+ *  1. If PG_dcache_dirty is set for the page, we need to ensure
+ *     that any cache entries for the kernels virtual memory
+ *     range are written back to the page.
+ *  2. If we have multiple shared mappings of the same space in
+ *     an object, we need to deal with the cache aliasing issues.
+ *
+ * Note that the page_table_lock will be held.
+ */
+void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
+{
+	struct page *page = pte_page(pte);
+
+	if (VALID_PAGE(page) && page->mapping) {
+		if (test_and_clear_bit(PG_dcache_dirty, &page->flags)) {
+			unsigned long kvirt = (unsigned long)page_address(page);
+			cpu_cache_clean_invalidate_range(kvirt, kvirt + PAGE_SIZE, 0);
+		}
+
+		make_coherent(vma, addr, page);
+	}
 }

@@ -270,5 +270,5 @@ void __init time_init(void)
 		timer_irq.handler = isa_timer_interrupt;
 		irq = IRQ_ISA_TIMER;
 	}
-	setup_arm_irq(irq, &timer_irq);
+	setup_irq(irq, &timer_irq);
 }

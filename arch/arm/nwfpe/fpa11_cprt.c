@@ -20,10 +20,10 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#include "fpa11.h"
 #include "milieu.h"
 #include "softfloat.h"
 #include "fpopcode.h"
-#include "fpa11.h"
 #include "fpa11.inl"
 #include "fpmodule.h"
 #include "fpmodule.inl"
@@ -82,8 +82,7 @@ unsigned int PerformFLT(const unsigned int opcode)
    
    unsigned int nRc = 1;
    SetRoundingMode(opcode);
-   SetRoundingPrecision(opcode);
-   
+
    switch (opcode & MASK_ROUNDING_PRECISION)
    {
       case ROUND_SINGLE:

@@ -734,19 +734,22 @@ preempt_return:
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
 
 #ifdef CONFIG_PREEMPT
-svc_preempt:	teq	r9, #0
-		movne	pc, lr
+svc_preempt:	teq	r9, #0				@ was preempt count = 0
+		movne	pc, lr				@ no
 		ldr	r0, [r6, #4]			@ local_irq_count
-		ldr	r1, [r6, #8]			@ local_b_count
+		ldr	r1, [r6, #8]			@ local_bh_count
 		adds	r0, r0, r1
 		movne	pc, lr
-1:		set_cpsr_c r0, #MODE_SVC		@ enable IRQs
-		bl	SYMBOL_NAME(preempt_schedule)
+		ldr	r1, [r8, #TI_TASK]
+		set_cpsr_c r2, #MODE_SVC		@ enable IRQs
+		str	r0, [r1, #0]			@ current->state = TASK_RUNNING
+1:		bl	SYMBOL_NAME(schedule)
 		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC	@ disable IRQs
 		ldr	r0, [r8, #TI_FLAGS]
 		tst	r0, #_TIF_NEED_RESCHED
-		bne	1b
-		b	preempt_return
+		beq	preempt_return
+		set_cpsr_c r0, #MODE_SVC		@ enable IRQs
+		b	1b
 #endif
 
 		.align	5

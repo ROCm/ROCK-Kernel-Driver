@@ -28,6 +28,10 @@
 static void arc_floppy_data_enable_dma(dmach_t channel, dma_t *dma)
 {
 	DPRINTK("arc_floppy_data_enable_dma\n");
+
+	if (dma->using_sg)
+		BUG();
+
 	switch (dma->dma_mode) {
 	case DMA_MODE_READ: { /* read */
 		extern unsigned char fdc1772_dma_read, fdc1772_dma_read_end;
@@ -39,7 +43,7 @@ static void arc_floppy_data_enable_dma(dmach_t channel, dma_t *dma)
 			
 		memcpy ((void *)0x1c, (void *)&fdc1772_dma_read,
 			&fdc1772_dma_read_end - &fdc1772_dma_read);
-		fdc1772_setupdma(dma->buf.length, dma->buf.address); /* Sets data pointer up */
+		fdc1772_setupdma(dma->buf.length, dma->buf.__address); /* Sets data pointer up */
 		enable_fiq(FIQ_FLOPPYDATA);
 		restore_flags(flags);
 	   }
@@ -54,7 +58,7 @@ static void arc_floppy_data_enable_dma(dmach_t channel, dma_t *dma)
 		clf();
 		memcpy ((void *)0x1c, (void *)&fdc1772_dma_write,
 			&fdc1772_dma_write_end - &fdc1772_dma_write);
-		fdc1772_setupdma(dma->buf.length, dma->buf.address); /* Sets data pointer up */
+		fdc1772_setupdma(dma->buf.length, dma->buf.__address); /* Sets data pointer up */
 		enable_fiq(FIQ_FLOPPYDATA;
 
 		restore_flags(flags);
@@ -140,6 +144,9 @@ static void a5k_floppy_enable_dma(dmach_t channel, dma_t *dma)
 	extern void floppy_fiqsetup(unsigned long len, unsigned long addr,
 				     unsigned long port);
 
+	if (dma->using_sg)
+		BUG();
+
 	if (dma->dma_mode == DMA_MODE_READ) {
 		extern unsigned char floppy_fiqin_start, floppy_fiqin_end;
 		fiqhandler_start = &floppy_fiqin_start;
@@ -155,7 +162,7 @@ static void a5k_floppy_enable_dma(dmach_t channel, dma_t *dma)
 	}
 	memcpy((void *)0x1c, fiqhandler_start, fiqhandler_length);
 	regs.ARM_r9 = dma->buf.length;
-	regs.ARM_r10 = (unsigned long)dma->buf.address;
+	regs.ARM_r10 = (unsigned long)dma->buf.__address;
 	regs.ARM_fp = FLOPPYDMA_BASE;
 	set_fiq_regs(&regs);
 	enable_fiq(dma->dma_irq);

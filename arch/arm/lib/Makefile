@@ -44,8 +44,6 @@ obj-$(v4)	+= io-readsw-armv4.o io-writesw-armv4.o io-readsl-armv4.o
 obj-y		+= io-writesl.o
 
 obj-$(CONFIG_CPU_26) += uaccess-armo.o
-obj-$(CONFIG_CPU_32) += copy_page-armv3.o copy_page-armv4.o copy_page-armv4mc.o
-obj-$(CONFIG_CPU_32v5) += copy_page-armv5te.o
 
 include $(TOPDIR)/Rules.make
 

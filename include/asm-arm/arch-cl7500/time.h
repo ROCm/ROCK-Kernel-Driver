@@ -37,5 +37,5 @@ void __init time_init(void)
 
 	timer_irq.handler = timer_interrupt;
 
-	setup_arm_irq(IRQ_TIMER, &timer_irq);
+	setup_irq(IRQ_TIMER, &timer_irq);
 }

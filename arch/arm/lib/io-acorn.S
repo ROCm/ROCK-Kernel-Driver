@@ -58,7 +58,7 @@ ENTRY(outsl)
 @ Proto  : void memc_write(int register, int value);
 @ Returns: nothing
 
-#if defined(CONFIG_CPU_26)
+#ifdef CONFIG_CPU_26
 ENTRY(memc_write)
 		cmp	r0, #7
 		RETINSTR(movgt,pc,lr)

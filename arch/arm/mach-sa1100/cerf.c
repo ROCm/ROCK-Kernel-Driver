@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/tty.h>
 
+#include <asm/irq.h>
 #include <asm/hardware.h>
 #include <asm/setup.h>
 
@@ -26,12 +27,12 @@ static void __init cerf_init_irq(void)
 	 */
 #ifdef CONFIG_SA1100_CERF_CPLD
 	/* PDA Full serial port */
-	set_GPIO_IRQ_edge(GPIO_GPIO3, GPIO_RISING_EDGE);
+	set_irq_type(IRQ_GPIO3, IRQT_RISING);
 	/* PDA Bluetooth */
-	set_GPIO_IRQ_edge(GPIO_GPIO2, GPIO_RISING_EDGE);
+	set_irq_type(IRQ_GPIO2, IRQT_RISING);
 #endif /* CONFIG_SA1100_CERF_CPLD */
 
-	set_GPIO_IRQ_edge(GPIO_UCB1200_IRQ, GPIO_RISING_EDGE);
+	set_irq_type(IRQ_GPIO_UCB1200_IRQ, IRQT_RISING);
 }
 
 static void __init

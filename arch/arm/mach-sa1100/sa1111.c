@@ -27,7 +27,6 @@
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
-#include <asm/arch/irq.h>
 
 #include <asm/hardware/sa1111.h>
 
@@ -40,65 +39,40 @@ struct resource sa1111_resource = {
 EXPORT_SYMBOL(sa1111_resource);
 
 /*
- * SA1111 interrupt support
+ * SA1111 interrupt support.  Since clearing an IRQ while there are
+ * active IRQs causes the interrupt output to pulse, the upper levels
+ * will call us again if there are more interrupts to process.
  */
-void sa1111_IRQ_demux(int irq, void *dev_id, struct pt_regs *regs)
+static void
+sa1111_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
-	unsigned long stat0, stat1;
+	unsigned int stat0, stat1, i;
 
-	while (1) {
-		int i;
+	desc->chip->ack(irq);
 
-		stat0 = INTSTATCLR0;
-		stat1 = INTSTATCLR1;
+	stat0 = INTSTATCLR0;
+	stat1 = INTSTATCLR1;
 
-		if (stat0 == 0 && stat1 == 0)
-			break;
-
-		for (i = IRQ_SA1111_START; stat0; i++, stat0 >>= 1)
-			if (stat0 & 1)
-				do_IRQ(i, regs);
-
-		for (i = IRQ_SA1111_START + 32; stat1; i++, stat1 >>= 1)
-			if (stat1 & 1)
-				do_IRQ(i, regs);
+	if (stat0 == 0 && stat1 == 0) {
+		do_bad_IRQ(irq, desc, regs);
+		return;
 	}
+
+	for (i = IRQ_SA1111_START; stat0; i++, stat0 >>= 1)
+		if (stat0 & 1)
+			do_edge_IRQ(i, irq_desc + i, regs);
+
+	for (i = IRQ_SA1111_START + 32; stat1; i++, stat1 >>= 1)
+		if (stat1 & 1)
+			do_edge_IRQ(i, irq_desc + i, regs);
 }
 
 #define SA1111_IRQMASK_LO(x)	(1 << (x - IRQ_SA1111_START))
 #define SA1111_IRQMASK_HI(x)	(1 << (x - IRQ_SA1111_START - 32))
 
-/*
- * A note about masking IRQs:
- *
- * The GPIO IRQ edge detection only functions while the IRQ itself is
- * enabled; edges are not detected while the IRQ is disabled.
- *
- * This is especially important for the PCMCIA signals, where we must
- * pick up every transition.  We therefore do not disable the IRQs
- * while processing them.
- *
- * However, since we are changed to a GPIO on the host processor,
- * all SA1111 IRQs will be disabled while we're processing any SA1111
- * IRQ.
- *
- * Note also that changing INTPOL while an IRQ is enabled will itself
- * trigger an IRQ.
- */
-static void sa1111_mask_and_ack_lowirq(unsigned int irq)
+static void sa1111_ack_lowirq(unsigned int irq)
 {
-	unsigned int mask = SA1111_IRQMASK_LO(irq);
-
-	//INTEN0 &= ~mask;
-	INTSTATCLR0 = mask;
-}
-
-static void sa1111_mask_and_ack_highirq(unsigned int irq)
-{
-	unsigned int mask = SA1111_IRQMASK_HI(irq);
-
-	//INTEN1 &= ~mask;
-	INTSTATCLR1 = mask;
+	INTSTATCLR0 = SA1111_IRQMASK_LO(irq);
 }
 
 static void sa1111_mask_lowirq(unsigned int irq)
@@ -106,14 +80,68 @@ static void sa1111_mask_lowirq(unsigned int irq)
 	INTEN0 &= ~SA1111_IRQMASK_LO(irq);
 }
 
-static void sa1111_mask_highirq(unsigned int irq)
-{
-	INTEN1 &= ~SA1111_IRQMASK_HI(irq);
-}
-
 static void sa1111_unmask_lowirq(unsigned int irq)
 {
 	INTEN0 |= SA1111_IRQMASK_LO(irq);
+}
+
+/*
+ * Attempt to re-trigger the interrupt.  The SA1111 contains a register
+ * (INTSET) which claims to do this.  However, in practice no amount of
+ * manipulation of INTEN and INTSET guarantees that the interrupt will
+ * be triggered.  In fact, its very difficult, if not impossible to get
+ * INTSET to re-trigger the interrupt.
+ */
+static void sa1111_rerun_lowirq(unsigned int irq)
+{
+	unsigned int mask = SA1111_IRQMASK_LO(irq);
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		INTPOL0 ^= mask;
+		INTPOL0 ^= mask;
+		if (INTSTATCLR1 & mask)
+			break;
+	}
+
+	if (i == 8)
+		printk(KERN_ERR "Danger Will Robinson: failed to "
+			"re-trigger IRQ%d\n", irq);
+}
+
+static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
+{
+	unsigned int mask = SA1111_IRQMASK_LO(irq);
+
+	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
+		return -EINVAL;
+
+	printk("IRQ%d: %s edge\n", irq, flags & __IRQT_RISEDGE ? "rising" : "falling");
+
+	if (flags & __IRQT_RISEDGE)
+		INTPOL0 &= ~mask;
+	else
+		INTPOL0 |= mask;
+
+	return 0;
+}
+
+static struct irqchip sa1111_low_chip = {
+	ack:		sa1111_ack_lowirq,
+	mask:		sa1111_mask_lowirq,
+	unmask:		sa1111_unmask_lowirq,
+	rerun:		sa1111_rerun_lowirq,
+	type:		sa1111_type_lowirq,
+};
+
+static void sa1111_ack_highirq(unsigned int irq)
+{
+	INTSTATCLR1 = SA1111_IRQMASK_HI(irq);
+}
+
+static void sa1111_mask_highirq(unsigned int irq)
+{
+	INTEN1 &= ~SA1111_IRQMASK_HI(irq);
 }
 
 static void sa1111_unmask_highirq(unsigned int irq)
@@ -121,9 +149,58 @@ static void sa1111_unmask_highirq(unsigned int irq)
 	INTEN1 |= SA1111_IRQMASK_HI(irq);
 }
 
+/*
+ * Attempt to re-trigger the interrupt.  The SA1111 contains a register
+ * (INTSET) which claims to do this.  However, in practice no amount of
+ * manipulation of INTEN and INTSET guarantees that the interrupt will
+ * be triggered.  In fact, its very difficult, if not impossible to get
+ * INTSET to re-trigger the interrupt.
+ */
+static void sa1111_rerun_highirq(unsigned int irq)
+{
+	unsigned int mask = SA1111_IRQMASK_HI(irq);
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		INTPOL1 ^= mask;
+		INTPOL1 ^= mask;
+		if (INTSTATCLR1 & mask)
+			break;
+	}
+
+	if (i == 8)
+		printk(KERN_ERR "Danger Will Robinson: failed to "
+			"re-trigger IRQ%d\n", irq);
+}
+
+static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
+{
+	unsigned int mask = SA1111_IRQMASK_HI(irq);
+
+	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
+		return -EINVAL;
+
+	printk("IRQ%d: %s edge\n", irq, flags & __IRQT_RISEDGE ? "rising" : "falling");
+
+	if (flags & __IRQT_RISEDGE)
+		INTPOL1 &= ~mask;
+	else
+		INTPOL1 |= mask;
+
+	return 0;
+}
+
+static struct irqchip sa1111_high_chip = {
+	ack:		sa1111_ack_highirq,
+	mask:		sa1111_mask_highirq,
+	unmask:		sa1111_unmask_highirq,
+	rerun:		sa1111_rerun_highirq,
+	type:		sa1111_type_highirq,
+};
+
 void __init sa1111_init_irq(int irq_nr)
 {
-	int irq, ret;
+	unsigned int irq;
 
 	request_mem_region(_INTTEST0, 512, "irqs");
 
@@ -140,33 +217,26 @@ void __init sa1111_init_irq(int irq_nr)
 		  SA1111_IRQMASK_HI(S1_READY_NINT);
 
 	/* clear all IRQs */
-	INTSTATCLR0 = -1;
-	INTSTATCLR1 = -1;
+	INTSTATCLR0 = ~0;
+	INTSTATCLR1 = ~0;
 
 	for (irq = IRQ_GPAIN0; irq <= SSPROR; irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 0;
-		irq_desc[irq].mask_ack	= sa1111_mask_and_ack_lowirq;
-		irq_desc[irq].mask	= sa1111_mask_lowirq;
-		irq_desc[irq].unmask	= sa1111_unmask_lowirq;
+		set_irq_chip(irq, &sa1111_low_chip);
+		set_irq_handler(irq, do_edge_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
+
 	for (irq = AUDXMTDMADONEA; irq <= S1_BVD1_STSCHG; irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 0;
-		irq_desc[irq].mask_ack	= sa1111_mask_and_ack_highirq;
-		irq_desc[irq].mask	= sa1111_mask_highirq;
-		irq_desc[irq].unmask	= sa1111_unmask_highirq;
+		set_irq_chip(irq, &sa1111_high_chip);
+		set_irq_handler(irq, do_edge_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
-	/* Register SA1111 interrupt */
-	if (irq_nr < 0)
-		return;
-
-	ret = request_irq(irq_nr, sa1111_IRQ_demux, SA_INTERRUPT,
-			  "SA1111", NULL);
-	if (ret < 0)
-		printk(KERN_ERR "SA1111: unable to claim IRQ%d: %d\n",
-		       irq_nr, ret);
+	/*
+	 * Register SA1111 interrupt
+	 */
+	set_irq_type(irq_nr, IRQT_RISING);
+	set_irq_chained_handler(irq_nr, sa1111_irq_handler);
 }
 
 /**
@@ -199,12 +269,12 @@ int __init sa1111_probe(unsigned long phys_addr)
 	 */
 	id = SBI_SKID;
 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
-		printk(KERN_DEBUG "SA-1111 not detected: ID = %08lx\n", id);
+		printk(KERN_DEBUG "SA1111 not detected: ID = %08lx\n", id);
 		ret = -ENODEV;
 		goto release;
 	}
 
-	printk(KERN_INFO "SA-1111 Microprocessor Companion Chip: "
+	printk(KERN_INFO "SA1111 Microprocessor Companion Chip: "
 		"silicon revision %lx, metal revision %lx\n",
 		(id & SKID_SIREV_MASK)>>4, (id & SKID_MTREV_MASK));
 

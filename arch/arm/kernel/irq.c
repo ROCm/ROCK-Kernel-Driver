@@ -34,8 +34,6 @@
 #include <asm/system.h>
 #include <asm/mach/irq.h>
 
-#include <asm/arch/irq.h>	/* pick up fixup_irq definition */
-
 /*
  * Maximum IRQ count.  Currently, this is arbitary.  However, it should
  * not be set too low to prevent false triggering.  Conversely, if it
@@ -54,25 +52,44 @@ void (*init_arch_irq)(void) __initdata = NULL;
 /*
  * Dummy mask/unmask handler
  */
-static void dummy_mask_unmask_irq(unsigned int irq)
+void dummy_mask_unmask_irq(unsigned int irq)
 {
 }
+
+void do_bad_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
+{
+	irq_err_count += 1;
+	printk(KERN_ERR "IRQ: spurious interrupt %d\n", irq);
+}
+
+static struct irqchip bad_chip = {
+	ack:	dummy_mask_unmask_irq,
+	mask:	dummy_mask_unmask_irq,
+	unmask:	dummy_mask_unmask_irq,
+};
+
+static struct irqdesc bad_irq_desc = {
+	chip:	&bad_chip,
+	handle:	do_bad_IRQ,
+	depth:	1,
+};
 
 /**
  *	disable_irq - disable an irq and wait for completion
  *	@irq: Interrupt to disable
  *
- *	Disable the selected interrupt line.
+ *	Disable the selected interrupt line.  We do this lazily.
  *
- *	This function may be called - with care - from IRQ context.
+ *	This function may be called from IRQ context.
  */
 void disable_irq(unsigned int irq)
 {
+	struct irqdesc *desc = irq_desc + irq;
 	unsigned long flags;
 
 	spin_lock_irqsave(&irq_controller_lock, flags);
-	irq_desc[irq].enabled = 0;
-	irq_desc[irq].mask(irq);
+	if (!desc->depth++)
+		desc->enabled = 0;
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
@@ -80,19 +97,35 @@ void disable_irq(unsigned int irq)
  *	enable_irq - enable interrupt handling on an irq
  *	@irq: Interrupt to enable
  *
- *	Re-enables the processing of interrupts on this IRQ line
+ *	Re-enables the processing of interrupts on this IRQ line.
+ *	Note that this may call the interrupt handler, so you may
+ *	get unexpected results if you hold IRQs disabled.
  *
  *	This function may be called from IRQ context.
  */
 void enable_irq(unsigned int irq)
 {
+	struct irqdesc *desc = irq_desc + irq;
 	unsigned long flags;
+	int pending = 0;
 
 	spin_lock_irqsave(&irq_controller_lock, flags);
-	irq_desc[irq].probing = 0;
-	irq_desc[irq].triggered = 0;
-	irq_desc[irq].enabled = 1;
-	irq_desc[irq].unmask(irq);
+	if (unlikely(!desc->depth)) {
+		printk("enable_irq(%u) unbalanced from %p\n", irq,
+			__builtin_return_address(0));
+	} else if (!--desc->depth) {
+		desc->probing = 0;
+		desc->enabled = 1;
+		desc->chip->unmask(irq);
+		pending = desc->pending;
+		desc->pending = 0;
+		/*
+		 * If the interrupt was waiting to be processed,
+		 * retrigger it.
+		 */
+		if (pending)
+			desc->chip->rerun(irq);
+	}
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
@@ -128,7 +161,7 @@ int show_interrupts(struct seq_file *p, void *v)
  * a large number if IRQs to appear in the same jiffie with the
  * same instruction pointer (or within 2 instructions).
  */
-static void check_irq_lock(struct irqdesc *desc, int irq, struct pt_regs *regs)
+static int check_irq_lock(struct irqdesc *desc, int irq, struct pt_regs *regs)
 {
 	unsigned long instr_ptr = instruction_pointer(regs);
 
@@ -138,123 +171,283 @@ static void check_irq_lock(struct irqdesc *desc, int irq, struct pt_regs *regs)
 
 		if (desc->lck_cnt > MAX_IRQ_CNT) {
 			printk(KERN_ERR "IRQ LOCK: IRQ%d is locking the system, disabled\n", irq);
-			disable_irq(irq);
+			return 1;
 		}
 	} else {
 		desc->lck_cnt = 0;
 		desc->lck_pc  = instruction_pointer(regs);
 		desc->lck_jif = jiffies;
 	}
+	return 0;
+}
+
+static void
+__do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
+{
+	unsigned int status;
+
+	spin_unlock(&irq_controller_lock);
+
+	if (!(action->flags & SA_INTERRUPT))
+		__sti();
+
+	status = 0;
+	do {
+		status |= action->flags;
+		action->handler(irq, action->dev_id, regs);
+		action = action->next;
+	} while (action);
+
+	if (status & SA_SAMPLE_RANDOM)
+		add_interrupt_randomness(irq);
+
+	__cli();
+	spin_lock(&irq_controller_lock);
 }
 
 /*
- * do_IRQ handles all normal device IRQ's
+ * This is for software-decoded IRQs.  The caller is expected to
+ * handle the ack, clear, mask and unmask issues.
  */
-asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
+void
+do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
-	struct irqdesc * desc;
-	struct irqaction * action;
-	int cpu;
+	struct irqaction *action;
+	const int cpu = smp_processor_id();
 
-	irq = fixup_irq(irq);
+	desc->triggered = 1;
+
+	irq_enter(cpu, irq);
+	kstat.irqs[cpu][irq]++;
+
+	action = desc->action;
+	if (action)
+		__do_irq(irq, desc->action, regs);
+
+	irq_exit(cpu, irq);
+}
+
+/*
+ * Most edge-triggered IRQ implementations seem to take a broken
+ * approach to this.  Hence the complexity.
+ */
+void
+do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
+{
+	const int cpu = smp_processor_id();
+
+	desc->triggered = 1;
+
+	/*
+	 * If we're currently running this IRQ, or its disabled,
+	 * we shouldn't process the IRQ.  Instead, turn on the
+	 * hardware masks.
+	 */
+	if (unlikely(desc->running || !desc->enabled))
+		goto running;
+
+	/*
+	 * Acknowledge and clear the IRQ, but don't mask it.
+	 */
+	desc->chip->ack(irq);
+
+	/*
+	 * Mark the IRQ currently in progress.
+	 */
+	desc->running = 1;
+
+	irq_enter(cpu, irq);
+	kstat.irqs[cpu][irq]++;
+
+	do {
+		struct irqaction *action;
+
+		action = desc->action;
+		if (!action)
+			break;
+
+		if (desc->pending && desc->enabled) {
+			desc->pending = 0;
+			desc->chip->unmask(irq);
+		}
+
+		__do_irq(irq, action, regs);
+	} while (desc->pending);
+
+	irq_exit(cpu, irq);
+
+	desc->running = 0;
+
+	/*
+	 * If we were disabled or freed, shut down the handler.
+	 */
+	if (likely(desc->action && !check_irq_lock(desc, irq, regs)))
+		return;
+
+ running:
+	/*
+	 * We got another IRQ while this one was masked or
+	 * currently running.  Delay it.
+	 */
+	desc->pending = 1;
+	desc->chip->mask(irq);
+	desc->chip->ack(irq);
+}
+
+/*
+ * Level-based IRQ handler.  Nice and simple.
+ */
+void
+do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
+{
+	struct irqaction *action;
+	const int cpu = smp_processor_id();
+
+	desc->triggered = 1;
+
+	/*
+	 * Acknowledge, clear _AND_ disable the interrupt.
+	 */
+	desc->chip->ack(irq);
+
+	if (likely(desc->enabled)) {
+		irq_enter(cpu, irq);
+		kstat.irqs[cpu][irq]++;
+
+		/*
+		 * Return with this interrupt masked if no action
+		 */
+		action = desc->action;
+		if (action) {
+			__do_irq(irq, desc->action, regs);
+
+			if (likely(desc->enabled &&
+				   !check_irq_lock(desc, irq, regs)))
+				desc->chip->unmask(irq);
+		}
+	}
+
+	irq_exit(cpu, irq);
+}
+
+/*
+ * do_IRQ handles all hardware IRQ's.  Decoded IRQs should not
+ * come via this function.  Instead, they should provide their
+ * own 'handler'
+ */
+asmlinkage void asm_do_IRQ(int irq, struct pt_regs *regs)
+{
+	struct irqdesc *desc = irq_desc + irq;
 
 	/*
 	 * Some hardware gives randomly wrong interrupts.  Rather
 	 * than crashing, do something sensible.
 	 */
 	if (irq >= NR_IRQS)
-		goto bad_irq;
-
-	desc = irq_desc + irq;
+		desc = &bad_irq_desc;
 
 	spin_lock(&irq_controller_lock);
-	desc->mask_ack(irq);
+	desc->handle(irq, desc, regs);
 	spin_unlock(&irq_controller_lock);
 
-	cpu = smp_processor_id();
-	irq_enter(cpu, irq);
-	kstat.irqs[cpu][irq]++;
-	desc->triggered = 1;
-
-	/* Return with this interrupt masked if no action */
-	action = desc->action;
-
-	if (action) {
-		int status = 0;
-
-		if (desc->nomask) {
-			spin_lock(&irq_controller_lock);
-			desc->unmask(irq);
-			spin_unlock(&irq_controller_lock);
-		}
-
-		if (!(action->flags & SA_INTERRUPT))
-			__sti();
-
-		do {
-			status |= action->flags;
-			action->handler(irq, action->dev_id, regs);
-			action = action->next;
-		} while (action);
-
-		if (status & SA_SAMPLE_RANDOM)
-			add_interrupt_randomness(irq);
-		__cli();
-
-		if (!desc->nomask && desc->enabled) {
-			spin_lock(&irq_controller_lock);
-			desc->unmask(irq);
-			spin_unlock(&irq_controller_lock);
-		}
-	}
-
-	/*
-	 * Debug measure - hopefully we can continue if an
-	 * IRQ lockup problem occurs...
-	 */
-	check_irq_lock(desc, irq, regs);
-
-	irq_exit(cpu, irq);
-
-	if (softirq_pending(cpu))
+	if (softirq_pending(smp_processor_id()))
 		do_softirq();
-	return;
-
-bad_irq:
-	irq_err_count += 1;
-	printk(KERN_ERR "IRQ: spurious interrupt %d\n", irq);
-	return;
 }
 
-#ifdef CONFIG_ARCH_ACORN
-void do_ecard_IRQ(int irq, struct pt_regs *regs)
+void __set_irq_handler(unsigned int irq, irq_handler_t handle, int is_chained)
 {
-	struct irqdesc * desc;
-	struct irqaction * action;
-	int cpu;
+	struct irqdesc *desc;
+	unsigned long flags;
+
+	if (irq >= NR_IRQS) {
+		printk(KERN_ERR "Trying to install handler for IRQ%d\n", irq);
+		return;
+	}
+
+	if (handle == NULL)
+		handle = do_bad_IRQ;
 
 	desc = irq_desc + irq;
 
-	cpu = smp_processor_id();
-	kstat.irqs[cpu][irq]++;
-	desc->triggered = 1;
+	if (is_chained && desc->chip == &bad_chip)
+		printk(KERN_WARNING "Trying to install chained handler for IRQ%d\n", irq);
 
-	action = desc->action;
-
-	if (action) {
-		do {
-			action->handler(irq, action->dev_id, regs);
-			action = action->next;
-		} while (action);
-	} else {
-		spin_lock(&irq_controller_lock);
-		desc->mask(irq);
-		spin_unlock(&irq_controller_lock);
+	spin_lock_irqsave(&irq_controller_lock, flags);
+	if (handle == do_bad_IRQ) {
+		desc->chip->mask(irq);
+		desc->chip->ack(irq);
+		desc->depth = 1;
+		desc->enabled = 0;
 	}
+	desc->handle = handle;
+	if (handle != do_bad_IRQ && is_chained) {
+		desc->valid = 0;
+		desc->probe_ok = 0;
+		desc->depth = 0;
+		desc->chip->unmask(irq);
+	}
+	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
-#endif
 
-int setup_arm_irq(int irq, struct irqaction * new)
+void set_irq_chip(unsigned int irq, struct irqchip *chip)
+{
+	struct irqdesc *desc;
+	unsigned long flags;
+
+	if (irq >= NR_IRQS) {
+		printk(KERN_ERR "Trying to install chip for IRQ%d\n", irq);
+		return;
+	}
+
+	if (chip == NULL)
+		chip = &bad_chip;
+
+	desc = irq_desc + irq;
+	spin_lock_irqsave(&irq_controller_lock, flags);
+	desc->chip = chip;
+	spin_unlock_irqrestore(&irq_controller_lock, flags);
+}
+
+int set_irq_type(unsigned int irq, unsigned int type)
+{
+	struct irqdesc *desc;
+	unsigned long flags;
+	int ret = -ENXIO;
+
+	if (irq >= NR_IRQS) {
+		printk(KERN_ERR "Trying to set irq type for IRQ%d\n", irq);
+		return -ENODEV;
+	}
+
+	desc = irq_desc + irq;
+	if (desc->chip->type) {
+		spin_lock_irqsave(&irq_controller_lock, flags);
+		ret = desc->chip->type(irq, type);
+		spin_unlock_irqrestore(&irq_controller_lock, flags);
+	}
+
+	return ret;
+}
+
+void set_irq_flags(unsigned int irq, unsigned int iflags)
+{
+	struct irqdesc *desc;
+	unsigned long flags;
+
+	if (irq >= NR_IRQS) {
+		printk(KERN_ERR "Trying to set irq flags for IRQ%d\n", irq);
+		return;
+	}
+
+	desc = irq_desc + irq;
+	spin_lock_irqsave(&irq_controller_lock, flags);
+	desc->valid = (iflags & IRQF_VALID) != 0;
+	desc->probe_ok = (iflags & IRQF_PROBE) != 0;
+	desc->noautoenable = (iflags & IRQF_NOAUTOEN) != 0;
+	spin_unlock_irqrestore(&irq_controller_lock, flags);
+}
+
+int setup_irq(unsigned int irq, struct irqaction *new)
 {
 	int shared = 0;
 	struct irqaction *old, **p;
@@ -302,11 +495,14 @@ int setup_arm_irq(int irq, struct irqaction * new)
 	*p = new;
 
 	if (!shared) {
-		desc->nomask = (new->flags & SA_IRQNOMASK) ? 1 : 0;
-		desc->probing = 0;
+ 		desc->probing = 0;
+		desc->running = 0;
+		desc->pending = 0;
+		desc->depth = 1;
 		if (!desc->noautoenable) {
+			desc->depth = 0;
 			desc->enabled = 1;
-			desc->unmask(irq);
+			desc->chip->unmask(irq);
 		}
 	}
 
@@ -366,7 +562,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	action->next = NULL;
 	action->dev_id = dev_id;
 
-	retval = setup_arm_irq(irq, action);
+	retval = setup_irq(irq, action);
 
 	if (retval)
 		kfree(action);
@@ -433,14 +629,12 @@ unsigned long probe_irq_on(void)
 	 */
 	spin_lock_irq(&irq_controller_lock);
 	for (i = 0; i < NR_IRQS; i++) {
-		if (!irq_desc[i].valid ||
-		    !irq_desc[i].probe_ok ||
-		    irq_desc[i].action)
+		if (!irq_desc[i].probe_ok || irq_desc[i].action)
 			continue;
 
 		irq_desc[i].probing = 1;
 		irq_desc[i].triggered = 0;
-		irq_desc[i].unmask(i);
+		irq_desc[i].chip->unmask(i);
 		irqs += 1;
 	}
 	spin_unlock_irq(&irq_controller_lock);
@@ -456,15 +650,13 @@ unsigned long probe_irq_on(void)
 	 */
 	spin_lock_irq(&irq_controller_lock);
 	for (i = 0; i < NR_IRQS; i++) {
-		if (irq_desc[i].probing &&
-		    irq_desc[i].triggered) {
+		if (irq_desc[i].probing && irq_desc[i].triggered) {
 			irq_desc[i].probing = 0;
 			irqs -= 1;
 		}
 	}
 	spin_unlock_irq(&irq_controller_lock);
 
-	/* now filter out any obviously spurious interrupts */
 	return irqs;
 }
 
@@ -508,17 +700,12 @@ void __init init_irq_proc(void)
 
 void __init init_IRQ(void)
 {
+	struct irqdesc *desc;
 	extern void init_dma(void);
 	int irq;
 
-	for (irq = 0; irq < NR_IRQS; irq++) {
-		irq_desc[irq].probe_ok = 0;
-		irq_desc[irq].valid    = 0;
-		irq_desc[irq].noautoenable = 0;
-		irq_desc[irq].mask_ack = dummy_mask_unmask_irq;
-		irq_desc[irq].mask     = dummy_mask_unmask_irq;
-		irq_desc[irq].unmask   = dummy_mask_unmask_irq;
-	}
+	for (irq = 0, desc = irq_desc; irq < NR_IRQS; irq++, desc++)
+		*desc = bad_irq_desc;
 
 	init_arch_irq();
 	init_dma();

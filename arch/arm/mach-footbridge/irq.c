@@ -27,6 +27,8 @@
 #include <asm/io.h>
 #include <asm/mach-types.h>
 
+extern void __init isa_init_irq(unsigned int irq);
+
 /*
  * Footbridge IRQ translation table
  *  Converts from our IRQ numbers into FootBridge masks
@@ -64,9 +66,15 @@ static void fb_unmask_irq(unsigned int irq)
 	*CSR_IRQ_ENABLE = fb_irq_mask[_DC21285_INR(irq)];
 }
 
+static struct irqchip fb_chip = {
+	ack:	fb_mask_irq,
+	mask:	fb_mask_irq,
+	unmask:	fb_unmask_irq,
+};
+
 static void __init __fb_init_irq(void)
 {
-	int irq;
+	unsigned int irq;
 
 	/*
 	 * setup DC21285 IRQs
@@ -75,128 +83,9 @@ static void __init __fb_init_irq(void)
 	*CSR_FIQ_DISABLE = -1;
 
 	for (irq = _DC21285_IRQ(0); irq < _DC21285_IRQ(20); irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= fb_mask_irq;
-		irq_desc[irq].mask	= fb_mask_irq;
-		irq_desc[irq].unmask	= fb_unmask_irq;
-	}
-}
-
-extern int isa_irq;
-
-static void isa_mask_pic_lo_irq(unsigned int irq)
-{
-	unsigned int mask = 1 << (irq & 7);
-
-	outb(inb(PIC_MASK_LO) | mask, PIC_MASK_LO);
-}
-
-static void isa_mask_ack_pic_lo_irq(unsigned int irq)
-{
-	unsigned int mask = 1 << (irq & 7);
-
-	outb(inb(PIC_MASK_LO) | mask, PIC_MASK_LO);
-	outb(0x20, PIC_LO);
-}
-
-static void isa_unmask_pic_lo_irq(unsigned int irq)
-{
-	unsigned int mask = 1 << (irq & 7);
-
-	outb(inb(PIC_MASK_LO) & ~mask, PIC_MASK_LO);
-}
-
-static void isa_mask_pic_hi_irq(unsigned int irq)
-{
-	unsigned int mask = 1 << (irq & 7);
-
-	outb(inb(PIC_MASK_HI) | mask, PIC_MASK_HI);
-}
-
-static void isa_mask_ack_pic_hi_irq(unsigned int irq)
-{
-	unsigned int mask = 1 << (irq & 7);
-
-	outb(inb(PIC_MASK_HI) | mask, PIC_MASK_HI);
-	outb(0x62, PIC_LO);
-	outb(0x20, PIC_HI);
-}
-
-static void isa_unmask_pic_hi_irq(unsigned int irq)
-{
-	unsigned int mask = 1 << (irq & 7);
-
-	outb(inb(PIC_MASK_HI) & ~mask, PIC_MASK_HI);
-}
-
-static void no_action(int irq, void *dev_id, struct pt_regs *regs)
-{
-}
-
-static struct irqaction irq_cascade = { handler: no_action, name: "cascade", };
-static struct resource pic1_resource = { "pic1", 0x20, 0x3f };
-static struct resource pic2_resource = { "pic2", 0xa0, 0xbf };
-
-static void __init isa_init_irq(int irq)
-{
-	/*
-	 * Setup, and then probe for an ISA PIC
-	 * If the PIC is not there, then we
-	 * ignore the PIC.
-	 */
-	outb(0x11, PIC_LO);
-	outb(_ISA_IRQ(0), PIC_MASK_LO);	/* IRQ number		*/
-	outb(0x04, PIC_MASK_LO);	/* Slave on Ch2		*/
-	outb(0x01, PIC_MASK_LO);	/* x86			*/
-	outb(0xf5, PIC_MASK_LO);	/* pattern: 11110101	*/
-
-	outb(0x11, PIC_HI);
-	outb(_ISA_IRQ(8), PIC_MASK_HI);	/* IRQ number		*/
-	outb(0x02, PIC_MASK_HI);	/* Slave on Ch1		*/
-	outb(0x01, PIC_MASK_HI);	/* x86			*/
-	outb(0xfa, PIC_MASK_HI);	/* pattern: 11111010	*/
-
-	outb(0x0b, PIC_LO);
-	outb(0x0b, PIC_HI);
-
-	if (inb(PIC_MASK_LO) == 0xf5 && inb(PIC_MASK_HI) == 0xfa) {
-		outb(0xff, PIC_MASK_LO);/* mask all IRQs	*/
-		outb(0xff, PIC_MASK_HI);/* mask all IRQs	*/
-		isa_irq = irq;
-	} else
-		isa_irq = -1;
-
-	if (isa_irq != -1) {
-		for (irq = _ISA_IRQ(0); irq < _ISA_IRQ(8); irq++) {
-			irq_desc[irq].valid	= 1;
-			irq_desc[irq].probe_ok	= 1;
-			irq_desc[irq].mask_ack	= isa_mask_ack_pic_lo_irq;
-			irq_desc[irq].mask	= isa_mask_pic_lo_irq;
-			irq_desc[irq].unmask	= isa_unmask_pic_lo_irq;
-		}
-
-		for (irq = _ISA_IRQ(8); irq < _ISA_IRQ(16); irq++) {
-			irq_desc[irq].valid	= 1;
-			irq_desc[irq].probe_ok	= 1;
-			irq_desc[irq].mask_ack	= isa_mask_ack_pic_hi_irq;
-			irq_desc[irq].mask	= isa_mask_pic_hi_irq;
-			irq_desc[irq].unmask	= isa_unmask_pic_hi_irq;
-		}
-
-		request_resource(&ioport_resource, &pic1_resource);
-		request_resource(&ioport_resource, &pic2_resource);
-		setup_arm_irq(IRQ_ISA_CASCADE, &irq_cascade);
-		setup_arm_irq(isa_irq, &irq_cascade);
-
-		/*
-		 * On the NetWinder, don't automatically
-		 * enable ISA IRQ11 when it is requested.
-		 * There appears to be a missing pull-up
-		 * resistor on this line.
-		 */
-		if (machine_is_netwinder())
-			irq_desc[_ISA_IRQ(11)].noautoenable = 1;
+		set_irq_chip(irq, &fb_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 }
 

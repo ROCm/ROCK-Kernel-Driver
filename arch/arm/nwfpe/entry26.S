@@ -65,18 +65,10 @@ several floating point instructions.  */
 
 	.globl	nwfpe_enter
 nwfpe_enter:
-	ldr	r4, =userRegisters
-	str	sp, [r4]		@ save pointer to user regs
+	mov	sl, sp
+	bl	FPA11_CheckInit		@ check to see if we are initialised
 
-	mov	r10, sp, lsr #13	@ find workspace
-	mov	r10, r10, lsl #13
-	add	r10, r10, #TSS_FPESAVE
-
-	ldr	r4, =fpa11
-	str	r10, [r4]		@ store pointer to our state
-	mov	r4, sp			@ use r4 for local pointer
-
-	ldr	r5, [r4, #60]		@ get contents of PC
+	ldr	r5, [sp, #60]		@ get contents of PC
 	bic	r5, r5, #0xfc000003
 	ldr	r0, [r5, #-4]		@ get actual instruction into r0
 	bl	EmulateAll		@ emulate the instruction
@@ -93,10 +85,10 @@ next:
 	teqne	r2, #0x0E000000
 	bne	ret_from_exception	@ return ok if not a fp insn
 
-	ldr	r9, [r4, #60]		@ get new condition codes
+	ldr	r9, [sp, #60]		@ get new condition codes
 	and	r9, r9, #0xfc000003
 	orr	r7, r5, r9
-	str	r7, [r4, #60]		@ update PC copy in regs
+	str	r7, [sp, #60]		@ update PC copy in regs
 
 	mov	r0, r6			@ save a copy
 	mov	r1, r9			@ fetch the condition codes

@@ -19,9 +19,9 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#include "fpa11.h"
 #include "softfloat.h"
 #include "fpopcode.h"
-#include "fpa11.h"
 
 float64 float64_exp(float64 Fm);
 float64 float64_ln(float64 Fm);
@@ -165,8 +165,7 @@ unsigned int DoubleCPDO(const unsigned int opcode)
 
       case RND_CODE:
       case URD_CODE:
-         fpa11->fpreg[Fd].fDouble = 
-             int32_to_float64(float64_to_int32(rFm));
+         fpa11->fpreg[Fd].fDouble = float64_round_to_int(rFm);
       break;
 
       case SQT_CODE:

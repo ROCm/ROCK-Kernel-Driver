@@ -25,8 +25,6 @@
 #include <asm/mach/serial_sa1100.h>
 #include <linux/serial_core.h>
 
-#include <asm/arch/irq.h>
-
 #include "generic.h"
 
 
@@ -68,6 +66,12 @@ static void ADS_unmask_irq0(unsigned int irq)
 	ADS_INT_EN1 |= (1 << (irq - ADS_EXT_IRQ(0)));
 }
 
+static struct irqchip ADS0_chip = {
+	ack:	ADS_mask_and_ack_irq0,
+	mask:	ADS_mask_irq0,
+	unmask:	ADS_unmask_irq0,
+};
+
 static void ADS_mask_and_ack_irq1(unsigned int irq)
 {
 	int mask = (1 << (irq - ADS_EXT_IRQ(8)));
@@ -85,9 +89,15 @@ static void ADS_unmask_irq1(unsigned int irq)
 	ADS_INT_EN2 |= (1 << (irq - ADS_EXT_IRQ(8)));
 }
 
+static struct irqchip ADS1_chip = {
+	ack:	ADS_mask_and_ack_irq1,
+	mask:	ADS_mask_irq1,
+	unmask:	ADS_unmask_irq1,
+};
+
 static void __init graphicsclient_init_irq(void)
 {
-	int irq;
+	unsigned int irq;
 
 	/* First the standard SA1100 IRQs */
 	sa1100_init_irq();
@@ -100,18 +110,14 @@ static void __init graphicsclient_init_irq(void)
 	ADS_INT_ST2 = 0xff;
 
 	for (irq = ADS_EXT_IRQ(0); irq <= ADS_EXT_IRQ(7); irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= ADS_mask_and_ack_irq0;
-		irq_desc[irq].mask	= ADS_mask_irq0;
-		irq_desc[irq].unmask	= ADS_unmask_irq0;
+		set_irq_chip(irq, &ADS0_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 	for (irq = ADS_EXT_IRQ(8); irq <= ADS_EXT_IRQ(15); irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= ADS_mask_and_ack_irq1;
-		irq_desc[irq].mask	= ADS_mask_irq1;
-		irq_desc[irq].unmask	= ADS_unmask_irq1;
+		set_irq_chip(irq, &ADS1_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 	set_GPIO_IRQ_edge(GPIO_GPIO0, GPIO_FALLING_EDGE);
 	setup_arm_irq( IRQ_GPIO0, &ADS_ext_irq );
@@ -148,6 +154,8 @@ static struct gc_uart_ctrl_data_t gc_uart_ctrl_data[] = {
   { GPIO_GC_UART2_CTS, 0, NULL,NULL }
 };
 
+#error Old code.  Someone needs to decide what to do with this
+#if 0 
 static void
 graphicsclient_cts_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -243,6 +251,7 @@ graphicsclient_uart_close(struct uart_port *port, struct uart_info *info)
 
 	return 0;
 }
+#endif
 
 static u_int graphicsclient_get_mctrl(struct uart_port *port)
 {
@@ -296,8 +305,6 @@ graphicsclient_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 }
 
 static struct sa1100_port_fns graphicsclient_port_fns __initdata = {
-	open:		graphicsclient_uart_open,
-	close:		graphicsclient_uart_close,
 	get_mctrl:	graphicsclient_get_mctrl,
 	set_mctrl:	graphicsclient_set_mctrl,
 	pm:		graphicsclient_uart_pm,

@@ -87,22 +87,6 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 
 #include "SA-1100.h"
 
-
-/*
- * SA1100 GPIO edge detection for IRQs:
- * IRQs are generated on Falling-Edge, Rising-Edge, or both.
- * This must be called *before* the corresponding IRQ is registered.
- * Use this instead of directly setting GRER/GFER.
- */
-#define GPIO_NO_EDGES		0
-#define GPIO_FALLING_EDGE       1
-#define GPIO_RISING_EDGE        2
-#define GPIO_BOTH_EDGES         3
-#ifndef __ASSEMBLY__
-extern void set_GPIO_IRQ_edge( int gpio_mask, int edge_mask );
-#endif
-
-
 /*
  * Implementation specifics.
  *
@@ -111,6 +95,8 @@ extern void set_GPIO_IRQ_edge( int gpio_mask, int edge_mask );
  * eg, ASSABET_UCB1300_IRQ  This will allow us to eleminate these
  * ifdefs, and lots of other preprocessor gunk elsewhere.
  */
+
+#include "badge4.h"
 
 #ifdef CONFIG_SA1100_PANGOLIN
 #include "pangolin.h"
@@ -178,6 +164,8 @@ extern void set_GPIO_IRQ_edge( int gpio_mask, int edge_mask );
 #if defined(CONFIG_SA1100_ADSBITSY)
 #include "adsbitsy.h"
 #endif
+
+#include "stork.h"
 
 #include "system3.h"
 

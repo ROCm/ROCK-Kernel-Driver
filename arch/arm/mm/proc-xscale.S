@@ -494,55 +494,6 @@ ENTRY(xscale_dcache_unlock)
 ENTRY(xscale_cache_dummy)
 	mov	pc, lr
 
-/* ================================== TLB ================================= */
-
-/*
- * cpu_xscale_tlb_invalidate_all()
- *
- * Invalidate all TLB entries
- */
-	.align	5
-ENTRY(cpu_xscale_tlb_invalidate_all)
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
-	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
-	cpwait_ret lr, ip
-
-/*
- * cpu_xscale_tlb_invalidate_range(start, end)
- *
- * invalidate TLB entries covering the specified range
- *
- * start: range start address
- * end:   range end address
- */
-	.align	5
-ENTRY(cpu_xscale_tlb_invalidate_range)
-	bic	r0, r0, #(PAGESIZE - 1) & 0x00ff
-	bic	r0, r0, #(PAGESIZE - 1) & 0xff00
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
-1:	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	mcr	p15, 0, r0, c8, c5, 1		@ invalidate I TLB entry
-	add	r0, r0, #PAGESIZE
-	cmp	r0, r1
-	blo	1b
-	cpwait_ret lr, ip
-
-/*
- * cpu_xscale_tlb_invalidate_page(page, flags)
- *
- * invalidate the TLB entries for the specified page.
- *
- * page:  page to invalidate
- * flags: non-zero if we include the I TLB
- */
-	.align	5
-ENTRY(cpu_xscale_tlb_invalidate_page)
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
-	teq	r1, #0
-	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	mcrne	p15, 0, r3, c8, c5, 1		@ invalidate I TLB entry
-	cpwait_ret lr, ip
-
 /* ================================ TLB LOCKING==============================
  *
  * The XScale MicroArchitecture implements support for locking entries into
@@ -637,6 +588,7 @@ ENTRY(cpu_xscale_set_pmd)
 	orreq	r1, r1, #PMD_SECT_TEX(1)
 #endif
 	str	r1, [r0]
+	mov	ip, #0
 	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
 	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
@@ -645,6 +597,8 @@ ENTRY(cpu_xscale_set_pmd)
  * cpu_xscale_set_pte(ptep, pte)
  *
  * Set a PTE and flush it out
+ *
+ * Errata 40: must set memory to write-through for user read-only pages.
  */
 	.align	5
 ENTRY(cpu_xscale_set_pte)
@@ -653,29 +607,49 @@ ENTRY(cpu_xscale_set_pte)
 	bic	r2, r1, #0xff0
 	orr	r2, r2, #PTE_TYPE_EXT		@ extended page
 
-	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
+	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-	tst	r1, #L_PTE_USER | L_PTE_EXEC	@ User or Exec?
+	tst	r3, #L_PTE_USER | L_PTE_EXEC	@ User or Exec?
 	orrne	r2, r2, #PTE_EXT_AP_URO_SRW	@ yes -> user r/o, system r/w
 
-	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+	tst	r3, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
 	orreq	r2, r2, #PTE_EXT_AP_UNO_SRW	@ yes -> user n/a, system r/w
 						@ combined with user -> user r/w
 
+	@
+	@ Handle the X bit.  We want to set this bit for the minicache
+	@ (U = E = B = W = 0, C = 1) or when write allocate is enabled,
+	@ and we have a writeable, cacheable region.  If we ignore the
+	@ U and E bits, we can allow user space to use the minicache as
+	@ well.
+	@
+	@  X = (C & ~W & ~B) | (C & W & B & write_allocate)
+	@
+	eor	ip, r1, #L_PTE_CACHEABLE
+	tst	ip, #L_PTE_CACHEABLE | L_PTE_WRITE | L_PTE_BUFFERABLE
 #if PTE_CACHE_WRITE_ALLOCATE
-	tst	r1, #L_PTE_CACHEABLE		@ cacheable?
-	orrne	r2, r2, #PTE_EXT_TEX(1)
-#else
-	eor	r1, r1, #L_PTE_CACHEABLE
-	tst	r1, #L_PTE_CACHEABLE | L_PTE_BUFFERABLE @ C = 1 B = 0?
-	orreq	r2, r2, #PTE_EXT_TEX(1)		@ yes -> set X (minicache)
+	eorne	ip, r1, #L_PTE_CACHEABLE | L_PTE_WRITE | L_PTE_BUFFERABLE
+	tstne	ip, #L_PTE_CACHEABLE | L_PTE_WRITE | L_PTE_BUFFERABLE
 #endif
+	orreq	r2, r2, #PTE_EXT_TEX(1)
 
-	tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
+	@
+	@ Erratum 40: The B bit must be cleared for a user read-only
+	@ cacheable page.
+	@
+	@  B = B & ~((U|E) & C & ~W)
+	@
+	and	ip, r1, #L_PTE_USER | L_PTE_EXEC | L_PTE_WRITE | L_PTE_CACHEABLE
+	teq	ip, #L_PTE_USER | L_PTE_CACHEABLE
+	teqne	ip, #L_PTE_EXEC | L_PTE_CACHEABLE
+	teqne	ip, #L_PTE_USER | L_PTE_EXEC | L_PTE_CACHEABLE
+	biceq	r2, r2, #PTE_BUFFERABLE
+
+	tst	r3, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
 	movne	r2, #0				@ no -> fault
 
 	str	r2, [r0]			@ hardware version
-	mov	r0, r0
+	mov	ip, #0
 	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
 	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
@@ -743,11 +717,6 @@ ENTRY(xscale_processor_functions)
 	.word	cpu_xscale_icache_invalidate_range
 	.word	cpu_xscale_icache_invalidate_page
 
-	/* tlb */
-	.word	cpu_xscale_tlb_invalidate_all
-	.word	cpu_xscale_tlb_invalidate_range
-	.word	cpu_xscale_tlb_invalidate_page
-
 	/* pgtable */
 	.word	cpu_xscale_set_pgd
 	.word	cpu_xscale_set_pmd
@@ -795,6 +764,7 @@ __80200_proc_info:
 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
 	.long	cpu_80200_info
 	.long	xscale_processor_functions
+	.long	v4wbi_tlb_fns
 	.size	__80200_proc_info, . - __80200_proc_info
 
 	.type	__cotulla_proc_info,#object
@@ -808,5 +778,6 @@ __cotulla_proc_info:
 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
 	.long	cpu_cotulla_info
 	.long	xscale_processor_functions
+	.long	v4wbi_tlb_fns
 	.size	__cotulla_proc_info, . - __cotulla_proc_info
 

@@ -14,6 +14,7 @@
 
 #include <asm/assembler.h>
 #include <asm/mach-types.h>
+#include <asm/procinfo.h>
 #include <asm/mach/arch.h>
 
 #define K(a,b,c)	((a) << 24 | (b) << 12 | (c))
@@ -126,7 +127,7 @@ __entry:
 		mov	r1, #MACH_TYPE_L7200
 #endif
 
-		mov	r0, #F_BIT | I_BIT | MODE_SVC	@ make sure svc mode
+		mov	r0, #PSR_F_BIT | PSR_I_BIT | MODE_SVC	@ make sure svc mode
 		msr	cpsr_c, r0			@ and all irqs disabled
 		bl	__lookup_processor_type
 		teq	r10, #0				@ invalid processor?
@@ -374,7 +375,7 @@ __lookup_processor_type:
 		and	r6, r6, r9			@ mask wanted bits
 		teq	r5, r6
 		moveq	pc, lr
-		add	r10, r10, #36			@ sizeof(proc_info_list)
+		add	r10, r10, #PROC_INFO_SZ		@ sizeof(proc_info_list)
 		cmp	r10, r7
 		blt	1b
 		mov	r10, #0				@ unknown processor
