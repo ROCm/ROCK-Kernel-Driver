@@ -1534,7 +1534,8 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);
-		goto out;
+		if (error != LOCK_USE_CLNT)
+			goto out;
 	}
 
 	for (;;) {
@@ -1668,7 +1669,8 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);
-		goto out;
+		if (error != LOCK_USE_CLNT)
+			goto out;
 	}
 
 	for (;;) {
@@ -1719,8 +1721,8 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	lock.fl_lmops = NULL;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
-		filp->f_op->lock(filp, F_SETLK, &lock);
-		goto out;
+		if (filp->f_op->lock(filp, F_SETLK, &lock) != LOCK_USE_CLNT)
+			goto out;
 	}
 
 	/* Can't use posix_lock_file here; we need to remove it no matter
