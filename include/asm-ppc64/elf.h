@@ -97,6 +97,8 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 
 #define ELF_ET_DYN_BASE         (0x08000000)
 
+#ifdef __KERNEL__
+
 /* Common routine for both 32-bit and 64-bit processes */
 static inline void ppc64_elf_core_copy_regs(elf_gregset_t elf_regs,
 					    struct pt_regs *regs)
@@ -129,6 +131,8 @@ extern int dump_task_fpu(struct task_struct *, elf_fpregset_t *);
 #ifdef CONFIG_SMP
 extern void dump_smp_unlazy_fpu(void);
 #define ELF_CORE_SYNC dump_smp_unlazy_fpu
+#endif
+
 #endif
 
 /* This yields a mask that user programs can use to figure out what
