@@ -23,6 +23,9 @@
  *
  * Based upon mouse.c (Brad Keryan) and printer.c (Michael Gee).
  *
+ * Changelog:
+ * 30/05/2003  replaced lock/unlock kernel with up/down
+ *             Daniele Bellucci  bellucda@tiscali.it
  * */
 
 #include <linux/module.h>
@@ -75,17 +78,17 @@ static int open_rio(struct inode *inode, struct file *file)
 {
 	struct rio_usb_data *rio = &rio_instance;
 
-	lock_kernel();
+	down(&(rio->lock));
 
 	if (rio->isopen || !rio->present) {
-		unlock_kernel();
+		up(&(rio->lock));
 		return -EBUSY;
 	}
 	rio->isopen = 1;
 
 	init_waitqueue_head(&rio->wait_q);
 
-	unlock_kernel();
+	up(&(rio->lock));
 
 	info("Rio opened.");
 
@@ -460,7 +463,6 @@ static int probe_rio(struct usb_interface *intf,
 		return -ENOMEM;
 	}
 
-	rio->present = 1;
 	rio->rio_dev = dev;
 
 	if (!(rio->obuf = (char *) kmalloc(OBUF_SIZE, GFP_KERNEL))) {
@@ -481,6 +483,8 @@ static int probe_rio(struct usb_interface *intf,
 	init_MUTEX(&(rio->lock));
 
 	usb_set_intfdata (intf, rio);
+	rio->present = 1;
+
 	return 0;
 }
 
@@ -525,7 +529,7 @@ static struct usb_driver rio_driver = {
 	.id_table =	rio_table,
 };
 
-int usb_rio_init(void)
+static int __init usb_rio_init(void)
 {
 	if (usb_register(&rio_driver) < 0)
 		return -1;
@@ -536,7 +540,7 @@ int usb_rio_init(void)
 }
 
 
-void usb_rio_cleanup(void)
+static void __exit usb_rio_cleanup(void)
 {
 	struct rio_usb_data *rio = &rio_instance;
 

@@ -756,7 +756,7 @@ static int usb_hub_port_reset(struct usb_device *hub, int port,
 	return -1;
 }
 
-void usb_hub_port_disable(struct usb_device *hub, int port)
+int usb_hub_port_disable(struct usb_device *hub, int port)
 {
 	int ret;
 
@@ -764,6 +764,8 @@ void usb_hub_port_disable(struct usb_device *hub, int port)
 	if (ret)
 		dev_err(hubdev(hub), "cannot disable port %d (err = %d)\n",
 			port + 1, ret);
+
+	return ret;
 }
 
 /* USB 2.0 spec, 7.1.7.3 / fig 7-29:

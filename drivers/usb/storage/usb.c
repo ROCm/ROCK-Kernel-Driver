@@ -374,7 +374,7 @@ static int usb_stor_control_thread(void * __us)
 				memcpy(us->srb->sense_buffer, 
 				       usb_stor_sense_invalidCDB, 
 				       sizeof(usb_stor_sense_invalidCDB));
-				us->srb->result = CHECK_CONDITION << 1;
+				us->srb->result = SAM_STAT_CHECK_CONDITION;
 		}
 
 		/* Handle those devices which need us to fake 
@@ -387,7 +387,7 @@ static int usb_stor_control_thread(void * __us)
 
 			US_DEBUGP("Faking INQUIRY command\n");
 			fill_inquiry_response(us, data_ptr, 36);
-			us->srb->result = GOOD << 1;
+			us->srb->result = SAM_STAT_GOOD;
 		}
 
 		/* we've got a command, let's do it! */
@@ -412,9 +412,11 @@ static int usb_stor_control_thread(void * __us)
 			US_DEBUGP("scsi command aborted\n");
 		}
 
-		/* in case an abort request was received after the command
-		 * completed, we must use a separate test to see whether
-		 * we need to signal that the abort has finished */
+		/* If an abort request was received we need to signal that
+		 * the abort has finished.  The proper test for this is
+		 * sm_state == US_STATE_ABORTING, not srb->result == DID_ABORT,
+		 * because an abort request might be received after all the
+		 * USB processing was complete. */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING)
 			complete(&(us->notify));
 
@@ -715,7 +717,6 @@ static int storage_probe(struct usb_interface *intf,
 		us->transport_name = "Bulk";
 		us->transport = usb_stor_Bulk_transport;
 		us->transport_reset = usb_stor_Bulk_reset;
-		us->max_lun = usb_stor_Bulk_max_lun(us);
 		break;
 
 #ifdef CONFIG_USB_STORAGE_HP8200e
@@ -841,6 +842,10 @@ static int storage_probe(struct usb_interface *intf,
 	/* allocate the URB, the usb_ctrlrequest, and the IRQ URB */
 	if (usb_stor_allocate_urbs(us))
 		goto BadDevice;
+
+	/* For bulk-only devices, determine the max LUN value */
+	if (us->protocol == US_PR_BULK)
+		us->max_lun = usb_stor_Bulk_max_lun(us);
 
 	/*
 	 * Since this is a new device, we need to generate a scsi 
