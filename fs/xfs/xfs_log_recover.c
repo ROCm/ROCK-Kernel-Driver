@@ -3463,7 +3463,7 @@ xlog_do_recover(xlog_t	*log,
 	 * or iunlinks they will have some entries in the AIL; so we look at
 	 * the AIL to determine how to set the tail_lsn.
 	 */
-	xlog_assign_tail_lsn(log->l_mp, NULL);
+	xlog_assign_tail_lsn(log->l_mp);
 
 	/*
 	 * Now that we've finished replaying all buffer and inode
