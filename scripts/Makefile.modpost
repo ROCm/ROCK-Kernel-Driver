@@ -51,16 +51,17 @@ $(modules:.ko=.mod.c): __modpost ;
 
 # Extract all checksums for all exported symbols
 
-ifeq ($(origin SUBDIRS),command line)
-modver_file := $(firstword $(wildcard \
-			     modversions.$(CONFIG_CFGNAME) modversions))
+# Are we building out-of-tree modules?
+
+ifeq ($(filter ../% /%,$(SUBDIRS)),)
+modver_file := $(wildcard modversions.$(shell echo $(CONFIG_CFGNAME)))
 quiet_cmd_modpost = MODPOST
       cmd_modpost = scripts/modpost $^ $(if $(modver_file),-i $(modver_file))
 
 __modpost: $(modules:.ko=.o)
 	$(call exec_cmd,modpost)
 else
-modver_file := modversions.$(CONFIG_CFGNAME)
+modver_file := modversions.$(shell echo $(CONFIG_CFGNAME))
 quiet_cmd_modpost = MODPOST
       cmd_modpost = scripts/modpost $(filter-out FORCE,$^) -o $(modver_file)
 __modpost: $(wildcard vmlinux) $(modules:.ko=.o) FORCE

@@ -292,7 +292,7 @@ export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 # When compiling out-of-tree modules, put MODVERDIR in the module source
 # tree rather than in the kernel source tree. The kernel source tree might
 # even be read-only.
-export MODVERDIR := $(shell D="$(firstword $(SUBDIRS))"; test "$${D:0:1}" = / -a "$${D\#$$PWD}" = "$$D" && echo "$$D/").tmp_versions
+export MODVERDIR := $(patsubst %,%/,$(firstword $(filter ../% /%,$(SUBDIRS)))).tmp_versions
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
@@ -751,6 +751,9 @@ endif
 _modinst_post: _modinst_
 	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
 
+modules_add:
+	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
+
 else # CONFIG_MODULES
 
 # Modules not configured
@@ -822,11 +825,30 @@ clean-dirs += $(addprefix _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
 $(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
+.PHONY: _clean _mrproper
+ifeq ($(filter ../% /%,$(SUBDIRS)),)
+
+clean_subdirs := .
+clean: _clean archclean $(clean-dirs)
+	$(call cmd,rmclean)
+mrproper distclean: _mrproper archmrproper
+	@echo "  Making $@ in the srctree"
+	$(call cmd,mrproper)
+
+else
+
+clean_subdirs := $(filter ../% /%,$(SUBDIRS))
+clean: _clean
+mrproper distclean: _mrproper
+	@echo "  Making $@ in $(clean_subdirs)"
+	$(Q)rm -rf $(MODVERDIR)
+
+endif
+
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
-clean: archclean $(clean-dirs)
-	$(call cmd,rmclean)
-	@find . $(RCS_FIND_IGNORE) \
+_clean:
+	@find $(clean_subdirs) $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
 		-type f -print | xargs rm -f
@@ -835,15 +857,13 @@ clean: archclean $(clean-dirs)
 #
 quiet_cmd_mrproper = RM  $$(MRPROPER_DIRS) + $$(MRPROPER_FILES)
 cmd_mrproper = rm -rf $(MRPROPER_DIRS) && rm -f $(MRPROPER_FILES)
-mrproper distclean: clean archmrproper
-	@echo '  Making $@ in the srctree'
-	@find . $(RCS_FIND_IGNORE) \
+_mrproper:
+	@find $(clean_subdirs) $(RCS_FIND_IGNORE) \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 	 	-o -name '.*.rej' -o \( -size 0 -a ! -path './.*' \) \
 		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
 		-type f -print | xargs rm -f
-	$(call cmd,mrproper)
 
 # Generate tags for editors
 # ---------------------------------------------------------------------------

@@ -29,11 +29,13 @@ quiet_cmd_modules_install = INSTALL $@
 $(filter-out ../% /%,$(modules)):
 	$(call cmd,modules_install)
 
-# Modules built outside just go into extra
+# Modules built outside go into extra by default
 
-quiet_cmd_modules_install_extra = INSTALL $(obj-m:.o=.ko)
-      cmd_modules_install_extra = mkdir -p $(MODLIB)/extra; \
-			    	  cp $@ $(MODLIB)/extra
+MOD_DIR ?= extra
+
+quiet_cmd_modules_install_extra = INSTALL $(@F)
+      cmd_modules_install_extra = mkdir -p $(MODLIB)/$(MOD_DIR); \
+			    	  cp $@ $(MODLIB)/$(MOD_DIR)
 
 $(filter     ../% /%,$(modules)):
 	$(call cmd,modules_install_extra)
