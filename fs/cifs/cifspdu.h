@@ -1090,40 +1090,40 @@ typedef union smb_com_transaction2 {
 
 typedef struct smb_com_transaction2_qpi_req {
 	struct smb_hdr hdr;	/* wct = 14+ */
-	__u16 TotalParameterCount;
-	__u16 TotalDataCount;
-	__u16 MaxParameterCount;
-	__u16 MaxDataCount;
+	__le16 TotalParameterCount;
+	__le16 TotalDataCount;
+	__le16 MaxParameterCount;
+	__le16 MaxDataCount;
 	__u8 MaxSetupCount;
 	__u8 Reserved;
-	__u16 Flags;
-	__u32 Timeout;
+	__le16 Flags;
+	__le32 Timeout;
 	__u16 Reserved2;
-	__u16 ParameterCount;
-	__u16 ParameterOffset;
-	__u16 DataCount;
-	__u16 DataOffset;
+	__le16 ParameterCount;
+	__le16 ParameterOffset;
+	__le16 DataCount;
+	__le16 DataOffset;
 	__u8 SetupCount;
 	__u8 Reserved3;
-	__u16 SubCommand;	/* one setup word */
-	__u16 ByteCount;
+	__le16 SubCommand;	/* one setup word */
+	__le16 ByteCount;
 	__u8 Pad;
-	__u16 InformationLevel;
+	__le16 InformationLevel;
 	__u32 Reserved4;
 	char FileName[1];
 } TRANSACTION2_QPI_REQ;
 
 typedef struct smb_com_transaction2_qpi_rsp {
 	struct smb_hdr hdr;	/* wct = 10 + SetupCount */
-	__u16 TotalParameterCount;
-	__u16 TotalDataCount;
-	__u16 Reserved;
-	__u16 ParameterCount;
-	__u16 ParameterOffset;
-	__u16 ParameterDisplacement;
-	__u16 DataCount;
-	__u16 DataOffset;
-	__u16 DataDisplacement;
+	__le16 TotalParameterCount;
+	__le16 TotalDataCount;
+	__le16 Reserved;
+	__le16 ParameterCount;
+	__le16 ParameterOffset;
+	__le16 ParameterDisplacement;
+	__le16 DataCount;
+	__le16 DataOffset;
+	__le16 DataDisplacement;
 	__u8 SetupCount;
 	__u8 Reserved1;		/* should be zero setup words following */
 	__u16 ByteCount;
