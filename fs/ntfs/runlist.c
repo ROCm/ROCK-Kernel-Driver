@@ -449,7 +449,7 @@ static inline runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
 }
 
 /**
- * ntfs_merge_runlists - merge two runlists into one
+ * ntfs_runlists_merge - merge two runlists into one
  * @drl:	original runlist to be worked on
  * @srl:	new runlist to be merged into @drl
  *
@@ -482,7 +482,7 @@ static inline runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
  *	-EINVAL	- Invalid parameters were passed in.
  *	-ERANGE	- The runlists overlap and cannot be merged.
  */
-runlist_element *ntfs_merge_runlists(runlist_element *drl,
+runlist_element *ntfs_runlists_merge(runlist_element *drl,
 		runlist_element *srl)
 {
 	int di, si;		/* Current index into @[ds]rl. */
@@ -915,7 +915,7 @@ mpa_err:
 		return rl;
 	}
 	/* Now combine the new and old runlists checking for overlaps. */
-	old_rl = ntfs_merge_runlists(old_rl, rl);
+	old_rl = ntfs_runlists_merge(old_rl, rl);
 	if (likely(!IS_ERR(old_rl)))
 		return old_rl;
 	ntfs_free(rl);
