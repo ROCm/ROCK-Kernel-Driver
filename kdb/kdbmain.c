@@ -152,7 +152,8 @@ static char *__env[] = {
  "MOREPROMPT=more> ",
 #endif
  "RADIX=16",
- "LINES=25",
+ "LINES=123456",
+ "BTAPROMPT=0",
  "COLUMNS=80",
  "MDCOUNT=8",			/* lines of md output */
  "BTARGS=5",			/* 5 possible args in bt */
