@@ -2427,12 +2427,12 @@ static int dev_boot_phase = 1;
  *	will not get the same name.
  */
 
-static int net_dev_init(void);
-
 int register_netdevice(struct net_device *dev)
 {
 	struct net_device *d, **dp;
 	int ret;
+
+	BUG_ON(dev_boot_phase);
 
 	spin_lock_init(&dev->queue_lock);
 	spin_lock_init(&dev->xmit_lock);
@@ -2440,9 +2440,6 @@ int register_netdevice(struct net_device *dev)
 #ifdef CONFIG_NET_FASTROUTE
 	dev->fastpath_lock = RW_LOCK_UNLOCKED;
 #endif
-
-	if (dev_boot_phase)
-		net_dev_init();
 
 #ifdef CONFIG_NET_DIVERT
 	ret = alloc_divert_blk(dev);
@@ -2552,6 +2549,8 @@ int unregister_netdevice(struct net_device *dev)
 	unsigned long now, warning_time;
 	struct net_device *d, **dp;
 
+	BUG_ON(dev_boot_phase);
+
 	/* If device is running, close it first. */
 	if (dev->flags & IFF_UP)
 		dev_close(dev);
@@ -2578,26 +2577,25 @@ int unregister_netdevice(struct net_device *dev)
 	br_write_lock_bh(BR_NETPROTO_LOCK);
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
 
-	if (!dev_boot_phase) {
+
 #ifdef CONFIG_NET_FASTROUTE
-		dev_clear_fastroute(dev);
+	dev_clear_fastroute(dev);
 #endif
 
-		/* Shutdown queueing discipline. */
-		dev_shutdown(dev);
-
-		net_run_sbin_hotplug(dev, "unregister");
-
-		/* Notify protocols, that we are about to destroy
-		   this device. They should clean all the things.
-		 */
-		notifier_call_chain(&netdev_chain, NETDEV_UNREGISTER, dev);
-
-		/*
-		 *	Flush the multicast chain
-		 */
-		dev_mc_discard(dev);
-	}
+	/* Shutdown queueing discipline. */
+	dev_shutdown(dev);
+	
+	net_run_sbin_hotplug(dev, "unregister");
+	
+	/* Notify protocols, that we are about to destroy
+	   this device. They should clean all the things.
+	*/
+	notifier_call_chain(&netdev_chain, NETDEV_UNREGISTER, dev);
+	
+	/*
+	 *	Flush the multicast chain
+	 */
+	dev_mc_discard(dev);
 
 	if (dev->uninit)
 		dev->uninit(dev);
@@ -2690,17 +2688,15 @@ extern void dv_init(void);
 
 
 /*
- *       Callers must hold the rtnl semaphore.  See the comment at the
- *       end of Space.c for details about the locking.
+ *       This is called single threaded during boot, so no need
+ *       to take the rtnl semaphore.
  */
 static int __init net_dev_init(void)
 {
 	struct net_device *dev, **dp;
 	int i;
 
-	if (!dev_boot_phase)
-		return 0;
-
+	BUG_ON(!dev_boot_phase);
 
 #ifdef CONFIG_NET_DIVERT
 	dv_init();
@@ -2834,7 +2830,7 @@ static int __init net_dev_init(void)
 	return 0;
 }
 
-__initcall(net_dev_init);
+subsys_initcall(net_dev_init);
 
 #ifdef CONFIG_HOTPLUG
 
