@@ -1399,11 +1399,11 @@ int compat_do_execve(char * filename,
 	if (retval < 0)
 		goto out_mm;
 
-	bprm.argc = compat_count(argv, bprm->p / sizeof(compat_uptr_t));
+	bprm->argc = compat_count(argv, bprm->p / sizeof(compat_uptr_t));
 	if ((retval = bprm->argc) < 0)
 		goto out_mm;
 
-	bprm.envc = compat_count(envp, bprm->p / sizeof(compat_uptr_t));
+	bprm->envc = compat_count(envp, bprm->p / sizeof(compat_uptr_t));
 	if ((retval = bprm->envc) < 0)
 		goto out_mm;
 
