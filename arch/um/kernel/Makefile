@@ -3,7 +3,7 @@
 # Licensed under the GPL
 #
 
-extra-y := vmlinux.lds uml.lds dyn.lds
+extra-y := vmlinux.lds
 
 # Descend into ../util for make clean.  This is here because it doesn't work
 # in arch/um/Makefile.
