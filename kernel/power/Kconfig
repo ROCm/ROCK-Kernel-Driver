@@ -44,7 +44,7 @@ config SOFTWARE_SUSPEND
 
 config PM_DISK
 	bool "Suspend-to-Disk Support"
-	depends on PM && SWAP
+	depends on PM && SWAP && X86 && !X86_64
 	---help---
 	  Suspend-to-disk is a power management state in which the contents
 	  of memory are stored on disk and the entire system is shut down or
