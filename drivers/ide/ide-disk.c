@@ -155,7 +155,7 @@ static ide_startstop_t read_intr (ide_drive_t *drive)
 }
 
 /*
- * write_intr() is the handler for disk write interrupts
+ * write_intr() is the handler for disk write/multwrite interrupts
  */
 static ide_startstop_t write_intr (ide_drive_t *drive)
 {
@@ -175,39 +175,12 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
 				ide_end_request(drive, 1, hwif->nsect);
 				return ide_stopped;
 			}
-			ide_pio_sector(drive, 1);
+			if (drive->mult_count)
+				ide_pio_multi(drive, 1);
+			else
+				ide_pio_sector(drive, 1);
 			ide_set_handler(drive, &write_intr, WAIT_CMD, NULL);
 			return ide_started;
-		}
-		/* the original code did this here (?) */
-		return ide_stopped;
-	}
-	return task_error(drive, rq, __FUNCTION__, stat);
-}
-
-/*
- * multwrite_intr() is the handler for disk multwrite interrupts
- */
-static ide_startstop_t multwrite_intr (ide_drive_t *drive)
-{
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct request *rq = hwif->hwgroup->rq;
-	u8 stat;
-
-	stat = hwif->INB(IDE_STATUS_REG);
-	if (OK_STAT(stat, DRIVE_READY, drive->bad_wstat)) {
-		if (stat & DRQ_STAT) {
-			/* The drive wants data. */
-			if (hwif->nleft) {
-				ide_pio_multi(drive, 1);
-				ide_set_handler(drive, &multwrite_intr, WAIT_CMD, NULL);
-				return ide_started;
-			}
-		} else {
-			if (!hwif->nleft) {	/* all done? */
-				ide_end_request(drive, 1, hwif->nsect);
-				return ide_stopped;
-			}
 		}
 		/* the original code did this here (?) */
 		return ide_stopped;
@@ -360,11 +333,10 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 		}
 		if (!drive->unmask)
 			local_irq_disable();
+		ide_set_handler(drive, &write_intr, WAIT_CMD, NULL);
 		if (drive->mult_count) {
-			ide_set_handler(drive, &multwrite_intr, WAIT_CMD, NULL);
 			ide_pio_multi(drive, 1);
 		} else {
-			ide_set_handler(drive, &write_intr, WAIT_CMD, NULL);
 			ide_pio_sector(drive, 1);
 		}
 		return ide_started;
