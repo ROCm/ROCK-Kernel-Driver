@@ -59,9 +59,6 @@ int __init msnd_register(multisound_dev_t *dev)
 
 	devs[i] = dev;
 	++num_devs;
-
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -80,8 +77,6 @@ void msnd_unregister(multisound_dev_t *dev)
 
 	devs[i] = NULL;
 	--num_devs;
-
-	MOD_DEC_USE_COUNT;
 }
 
 int msnd_get_num_devs(void)
