@@ -380,9 +380,6 @@ int linux_main(int argc, char **argv)
 
   	uml_postsetup();
 
-	init_task.thread.kernel_stack = (unsigned long) &init_thread_info + 
-		2 * PAGE_SIZE;
-
 	task_protections((unsigned long) &init_thread_info);
 	os_flush_stdout();
 
