@@ -459,6 +459,9 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 	struct mousedev *mousedev;
 	int minor = 0;
 
+	/* Ignore all wacom tablets */
+	if (dev->id.vendor == 0x56a) return NULL;
+
 	for (minor = 0; minor < MOUSEDEV_MINORS && mousedev_table[minor]; minor++);
 	if (minor == MOUSEDEV_MINORS) {
 		printk(KERN_ERR "mousedev: no more free mousedev devices\n");

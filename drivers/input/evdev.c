@@ -402,7 +402,21 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 	struct evdev *evdev;
 	int minor;
 
-	for (minor = 0; minor < EVDEV_MINORS && evdev_table[minor]; minor++);
+	for (minor = 0; minor < EVDEV_MINORS && evdev_table[minor]; minor++)
+	{
+		if (!evdev_table[minor]->exist && evdev_table[minor]->open) /* reuse */
+		{
+			evdev = evdev_table[minor];
+			evdev->handle.dev = dev;
+			evdev->handle.handler = handler;
+			evdev->handle.private = evdev; /* should already be */
+			evdev->exist = 1;
+			printk(KERN_INFO "evdev: reusing event%d for vendor/product 0x%x/0x%x\n", minor, dev->id.vendor, dev->id.product);
+			input_open_device(&evdev->handle);
+			wake_up_interruptible(&evdev->wait);
+			return &evdev->handle;
+		}
+	}
 	if (minor == EVDEV_MINORS) {
 		printk(KERN_ERR "evdev: no more free evdev devices\n");
 		return NULL;
