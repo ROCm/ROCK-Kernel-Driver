@@ -127,7 +127,7 @@ struct inquiry_data {
 	char reserved1[2];
 	char version_descriptor[16];
 	char reserved2[22];
-	char unique[159];
+	char unique[158];
 };
 
 extern int vio_num_address_cells;
