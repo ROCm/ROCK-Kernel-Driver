@@ -149,7 +149,8 @@ static void __pmac pmac_unmask_irq(unsigned int irq_nr)
 
 static void __pmac pmac_end_irq(unsigned int irq_nr)
 {
-	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))) {
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))
+	    && irq_desc[irq_nr].action) {
         	set_bit(irq_nr, ppc_cached_irq_mask);
 	        pmac_set_irq_mask(irq_nr, 1);
 	}

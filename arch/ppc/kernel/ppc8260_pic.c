@@ -90,7 +90,8 @@ static void m8260_end_irq(unsigned int irq_nr)
 	int	bit, word;
 	volatile uint	*simr;
 
-	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))) {
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))
+			&& irq_desc[irq_nr].action) {
 
 		bit = irq_to_siubit[irq_nr];
 		word = irq_to_siureg[irq_nr];

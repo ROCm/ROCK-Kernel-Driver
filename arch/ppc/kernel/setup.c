@@ -66,7 +66,7 @@ unsigned long sysmap_size;
 
 /* Used with the BI_MEMSIZE bootinfo parameter to store the memory
    size value reported by the boot loader. */ 
-unsigned int boot_mem_size;
+unsigned long boot_mem_size;
 
 unsigned long ISA_DMA_THRESHOLD;
 unsigned long DMA_MODE_READ, DMA_MODE_WRITE;

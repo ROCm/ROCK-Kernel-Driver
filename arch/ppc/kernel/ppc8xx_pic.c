@@ -46,7 +46,8 @@ static void m8xx_unmask_irq(unsigned int irq_nr)
 
 static void m8xx_end_irq(unsigned int irq_nr)
 {
-	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))) {
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))
+			&& irq_desc[irq_nr].action) {
 		int bit, word;
 
 		bit = irq_nr & 0x1f;

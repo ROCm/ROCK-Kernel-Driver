@@ -35,6 +35,7 @@ struct bi_record {
 
 extern struct bi_record *find_bootinfo(void);
 extern void parse_bootinfo(struct bi_record *rec);
+extern unsigned long boot_mem_size;
 
 #endif /* CONFIG_APUS */
 
