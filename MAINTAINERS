@@ -972,6 +972,11 @@ P:	Oliver Neukum
 M:	oliver@neukum.name
 S:	Maintained
 
+HUGETLB FILESYSTEM
+P:	William Irwin
+M:	wli@holomorphy.com
+S:	Maintained
+
 I2C AND SENSORS DRIVERS
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
