@@ -45,7 +45,7 @@ typedef struct {
 
 extern int cp_compat_stat(struct kstat *, struct compat_stat *);
 extern int get_compat_timespec(struct timespec *, const struct compat_timespec *);
-extern int put_compat_timespec(struct timespec *, const struct compat_timespec *);
+extern int put_compat_timespec(const struct timespec *, struct compat_timespec *);
 
 struct compat_iovec {
 	compat_uptr_t	iov_base;

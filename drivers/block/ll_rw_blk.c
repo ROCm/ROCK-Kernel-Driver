@@ -1188,13 +1188,23 @@ static void blk_unplug_timeout(unsigned long data)
  * Description:
  *   blk_start_queue() will clear the stop flag on the queue, and call
  *   the request_fn for the queue if it was in a stopped state when
- *   entered. Also see blk_stop_queue(). Must not be called from driver
- *   request function due to recursion issues. Queue lock must be held.
+ *   entered. Also see blk_stop_queue(). Queue lock must be held.
  **/
 void blk_start_queue(request_queue_t *q)
 {
 	clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
-	schedule_work(&q->unplug_work);
+
+	/*
+	 * one level of recursion is ok and is much faster than kicking
+	 * the unplug handling
+	 */
+	if (!test_and_set_bit(QUEUE_FLAG_REENTER, &q->queue_flags)) {
+		q->request_fn(q);
+		clear_bit(QUEUE_FLAG_REENTER, &q->queue_flags);
+	} else {
+		blk_plug_device(q);
+		schedule_work(&q->unplug_work);
+	}
 }
 
 EXPORT_SYMBOL(blk_start_queue);
@@ -1737,9 +1747,9 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	/*
 	 * If command is tagged, release the tag
 	 */
-	if(reinsert) {
+	if (reinsert)
 		blk_requeue_request(q, rq);
-	} else {
+	else {
 		int where = ELEVATOR_INSERT_BACK;
 
 		if (at_head)
@@ -1751,7 +1761,10 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 		drive_stat_acct(rq, rq->nr_sectors, 1);
 		__elv_add_request(q, rq, where, 0);
 	}
-	q->request_fn(q);
+	if (blk_queue_plugged(q))
+		__generic_unplug_device(q);
+	else
+		q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 

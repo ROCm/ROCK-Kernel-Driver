@@ -59,10 +59,11 @@ static void arc4_crypt(void *ctx_arg, u8 *out, const u8 *in)
 	u8 *const S = ctx->S;
 	u8 x = ctx->x;
 	u8 y = ctx->y;
+	u8 a, b;
 
-	u8 a = S[x];
+	a = S[x];
 	y = (y + a) & 0xff;
-	u8 b = S[y];
+	b = S[y];
 	S[x] = b;
 	S[y] = a;
 	x = (x + 1) & 0xff;

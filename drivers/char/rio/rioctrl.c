@@ -522,7 +522,7 @@ RIO_DEBUG_CTRL, 				if (su)
 					else {
 		 				rio_dprintk (RIO_DEBUG_CTRL, "p->RIOBindTab full! - Rta %x not added\n",
 		  					(int) arg);
-		 				return 1;
+		 				return -ENOMEM;
 					}
 					return 0;
 				}
@@ -1593,12 +1593,12 @@ RIO_DEBUG_CTRL, 				if (su)
 			case RIO_NO_MESG:
 				if ( su )
 					 p->RIONoMessage = 1;
-				return su ? 0 : EPERM;
+				return su ? 0 : -EPERM;
 
 			case RIO_MESG:
 				if ( su )
 					p->RIONoMessage = 0;
-				return su ? 0 : EPERM;
+				return su ? 0 : -EPERM;
 
 			case RIO_WHAT_MESG:
 				if ( copyout( (caddr_t)&p->RIONoMessage, (int)arg, 

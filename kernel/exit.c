@@ -386,7 +386,7 @@ static inline void close_files(struct files_struct * files)
 	}
 }
 
-void put_files_struct(struct files_struct *files)
+void fastcall put_files_struct(struct files_struct *files)
 {
 	if (atomic_dec_and_test(&files->count)) {
 		close_files(files);
@@ -810,7 +810,7 @@ asmlinkage long sys_exit(int error_code)
 	do_exit((error_code&0xff)<<8);
 }
 
-task_t *next_thread(task_t *p)
+task_t fastcall *next_thread(task_t *p)
 {
 	struct pid_link *link = p->pids + PIDTYPE_TGID;
 	struct list_head *tmp, *head = &link->pidptr->task_list;

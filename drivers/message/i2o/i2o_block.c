@@ -50,9 +50,11 @@
  *		Properly attach/detach I2O gendisk structure from the system
  *		gendisk list. The I2O block devices now appear in 
  * 		/proc/partitions.
+ *	Markus Lidel <Markus.Lidel@shadowconnect.com>:
+ *		Minor bugfixes for 2.6.
  *
- *	To do:
- *		Serial number scanning to find duplicates for FC multipathing
+ * To do:
+ *	Serial number scanning to find duplicates for FC multipathing
  */
 
 #include <linux/major.h>
@@ -108,25 +110,6 @@
 				 I2O_EVT_IND_BSA_CAPACITY_CHANGE | \
 				 I2O_EVT_IND_BSA_SCSI_SMART )
 
-
-/*
- * I2O Block Error Codes - should be in a header file really...
- */
-#define I2O_BSA_DSC_SUCCESS             0x0000
-#define I2O_BSA_DSC_MEDIA_ERROR         0x0001
-#define I2O_BSA_DSC_ACCESS_ERROR        0x0002
-#define I2O_BSA_DSC_DEVICE_FAILURE      0x0003
-#define I2O_BSA_DSC_DEVICE_NOT_READY    0x0004
-#define I2O_BSA_DSC_MEDIA_NOT_PRESENT   0x0005
-#define I2O_BSA_DSC_MEDIA_LOCKED        0x0006
-#define I2O_BSA_DSC_MEDIA_FAILURE       0x0007
-#define I2O_BSA_DSC_PROTOCOL_FAILURE    0x0008
-#define I2O_BSA_DSC_BUS_FAILURE         0x0009
-#define I2O_BSA_DSC_ACCESS_VIOLATION    0x000A
-#define I2O_BSA_DSC_WRITE_PROTECTED     0x000B
-#define I2O_BSA_DSC_DEVICE_RESET        0x000C
-#define I2O_BSA_DSC_VOLUME_CHANGED      0x000D
-#define I2O_BSA_DSC_TIMEOUT             0x000E
 
 #define I2O_LOCK(unit)	(i2ob_dev[(unit)].req_queue->queue_lock)
 
@@ -1091,6 +1074,28 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 			d->lct_data.tid, unit);	
 
 	/*
+	 * If this is the first I2O block device found on this IOP,
+	 * we need to initialize all the queue data structures
+	 * before any I/O can be performed. If it fails, this
+	 * device is useless.
+	 */
+	if(!i2ob_queues[unit]) {
+		if(i2ob_init_iop(unit))
+			return 1;
+	}
+
+	/*
+	 * This will save one level of lookup/indirection in critical
+	 * code so that we can directly get the queue ptr from the
+	 * device instead of having to go the IOP data structure.
+	 */
+	dev->req_queue = i2ob_queues[unit]->req_queue;
+
+	/* initialize gendik structure */
+	i2ob_disk[unit>>4]->private_data = dev;
+	i2ob_disk[unit>>4]->queue = dev->req_queue;
+
+	/*
 	 *	Ask for the current media data. If that isn't supported
 	 *	then we ask for the device capacity data
 	 */
@@ -1148,6 +1153,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	}
 
 	strcpy(d->dev_name, i2ob_disk[unit>>4]->disk_name);
+	strcpy(i2ob_disk[unit>>4]->devfs_name, i2ob_disk[unit>>4]->disk_name);
 
 	printk(KERN_INFO "%s: Max segments %d, queue depth %d, byte limit %d.\n",
 		 d->dev_name, i2ob_dev[unit].max_segments, i2ob_dev[unit].depth, i2ob_max_sectors[unit]<<9);
@@ -1193,28 +1199,6 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	printk(KERN_INFO "%s: Maximum sectors/read set to %d.\n", 
 		d->dev_name, i2ob_max_sectors[unit]);
 
-	/* 
-	 * If this is the first I2O block device found on this IOP,
-	 * we need to initialize all the queue data structures
-	 * before any I/O can be performed. If it fails, this
-	 * device is useless.
-	 */
-	if(!i2ob_queues[c->unit]) {
-		if(i2ob_init_iop(c->unit))
-			return 1;
-	}
-
-	/* 
-	 * This will save one level of lookup/indirection in critical 
-	 * code so that we can directly get the queue ptr from the
-	 * device instead of having to go the IOP data structure.
-	 */
-	dev->req_queue = i2ob_queues[c->unit]->req_queue;
-
-	/* Register a size before we register for events - otherwise we
-	   might miss and overwrite an event */
-	set_capacity(i2ob_disk[unit>>4], size>>9);
-
 	/*
 	 * Register for the events we're interested in and that the
 	 * device actually supports.
@@ -1251,6 +1235,7 @@ static int i2ob_init_iop(unsigned int unit)
 	i2ob_queues[unit]->i2ob_qhead = &i2ob_queues[unit]->request_queue[0];
 	atomic_set(&i2ob_queues[unit]->queue_depth, 0);
 
+	i2ob_queues[unit]->lock = SPIN_LOCK_UNLOCKED;
 	i2ob_queues[unit]->req_queue = blk_init_queue(i2ob_request, &i2ob_queues[unit]->lock);
 	if (!i2ob_queues[unit]->req_queue) {
 		kfree(i2ob_queues[unit]);
@@ -1336,6 +1321,8 @@ static void i2ob_scan(int bios)
 				continue;
 			}
 
+			i2o_release_device(d, &i2o_block_handler);
+
 			if(scan_unit<MAX_I2OB<<4)
 			{
  				/*
@@ -1365,7 +1352,6 @@ static void i2ob_scan(int bios)
 				if(!warned++)
 					printk(KERN_WARNING "i2o_block: too many device, registering only %d.\n", scan_unit>>4);
 			}
-			i2o_release_device(d, &i2o_block_handler);
 		}
 		i2o_unlock_controller(c);
 	}
@@ -1699,9 +1685,9 @@ static void i2o_block_exit(void)
 	
 	if(evt_running) {
 		printk(KERN_INFO "Killing I2O block threads...");
-		i = kill_proc(evt_pid, SIGTERM, 1);
+		i = kill_proc(evt_pid, SIGKILL, 1);
 		if(!i) {
-			printk("waiting...");
+			printk("waiting...\n");
 		}
 		/* Be sure it died */
 		wait_for_completion(&i2ob_thread_dead);

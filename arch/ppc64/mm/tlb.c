@@ -62,7 +62,7 @@ void hpte_update(pte_t *ptep, unsigned long pte, int wrprot)
 	addr = ptep_to_address(ptep);
 
 	if (REGION_ID(addr) == USER_REGION_ID)
-		context = mm->context;
+		context = mm->context.id;
 	i = batch->index;
 
 	/*

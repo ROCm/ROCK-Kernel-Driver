@@ -694,7 +694,7 @@ static inline void move_irq(int irq) { }
 #endif /* CONFIG_IRQBALANCE */
 
 #ifndef CONFIG_SMP
-void send_IPI_self(int vector)
+void fastcall send_IPI_self(int vector)
 {
 	unsigned int cfg;
 
