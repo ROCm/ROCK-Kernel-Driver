@@ -260,7 +260,8 @@ int simple_rmdir(struct inode *dir, struct dentry *dentry)
 	return 0;
 }
 
-int simple_rename(struct inode *old_dir, struct dentry *old_dentry, struct inode *new_dir, struct dentry *new_dentry)
+int simple_rename(struct inode *old_dir, struct dentry *old_dentry,
+		struct inode *new_dir, struct dentry *new_dentry)
 {
 	int they_are_dirs = S_ISDIR(old_dentry->d_inode->i_mode);
 
@@ -295,29 +296,30 @@ out:
 	return 0;
 }
 
-int simple_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+int simple_prepare_write(struct file *file, struct page *page,
+			unsigned from, unsigned to)
 {
-	void *kaddr;
-
-	if (PageUptodate(page))
-		goto out;
-	
-	kaddr = kmap_atomic(page, KM_USER0);
-	memset(kaddr, 0, PAGE_CACHE_SIZE);
-	kunmap_atomic(kaddr, KM_USER0);
-	SetPageUptodate(page);
-out:
-	set_page_dirty(page);
+	if (!PageUptodate(page)) {
+		if (to - from != PAGE_CACHE_SIZE) {
+			void *kaddr = kmap_atomic(page, KM_USER0);
+			memset(kaddr, 0, from);
+			memset(kaddr + to, 0, PAGE_CACHE_SIZE - to);
+			flush_dcache_page(page);
+			kunmap_atomic(kaddr, KM_USER0);
+		}
+		SetPageUptodate(page);
+	}
 	return 0;
 }
 
-int simple_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+int simple_commit_write(struct file *file, struct page *page,
+			unsigned offset, unsigned to)
 {
 	struct inode *inode = page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 
 	if (pos > inode->i_size)
 		inode->i_size = pos;
-
+	set_page_dirty(page);
 	return 0;
 }
