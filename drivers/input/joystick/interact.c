@@ -103,8 +103,7 @@ static int interact_read_packet(struct gameport *gameport, int length, u32 *data
 	t = gameport_time(gameport, INTERACT_MAX_START);
 	s = gameport_time(gameport, INTERACT_MAX_STROBE);
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	gameport_trigger(gameport);
 	v = gameport_read(gameport);
 

@@ -161,9 +161,7 @@ static inline void send_IPI_mask_bitmask(int mask, int vector)
 	unsigned long cfg;
 	unsigned long flags;
 
-	local_save_flags(flags);
-	local_irq_disable();
-
+	local_irq_save(flags);
 		
 	/*
 	 * Wait for idle.
@@ -200,8 +198,7 @@ static inline void send_IPI_mask_sequence(int mask, int vector)
 	 * should be modified to do 1 message per cluster ID - mbligh
 	 */ 
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 
 	for (query_cpu = 0; query_cpu < NR_CPUS; ++query_cpu) {
 		query_mask = 1 << query_cpu;

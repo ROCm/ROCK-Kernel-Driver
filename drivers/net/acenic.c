@@ -3389,8 +3389,7 @@ static int __init read_eeprom_byte(struct net_device *dev,
 	 * Don't take interrupts on this CPU will bit banging
 	 * the %#%#@$ I2C device
 	 */
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 
 	eeprom_start(regs);
 

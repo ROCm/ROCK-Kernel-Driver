@@ -106,8 +106,7 @@ static int gf2k_read_packet(struct gameport *gameport, int length, char *data)
 
 	i = 0;
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 
 	gameport_trigger(gameport);
 	v = gameport_read(gameport);;
@@ -137,8 +136,7 @@ static void gf2k_trigger_seq(struct gameport *gameport, short *seq)
 	unsigned long flags;
 	int i, t;
 
-        local_save_flags(flags);
-        local_irq_disable();
+        local_irq_save(flags);
 
 	i = 0;
         do {

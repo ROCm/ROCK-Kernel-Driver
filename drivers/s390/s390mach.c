@@ -254,8 +254,7 @@ s390_machine_check_handler(void *parm)
 
 		found = 0;	/* init ... */
 
-		local_save_flags(flags);
-		local_irq_disable();
+		local_irq_save(flags);
 
 		do {
 

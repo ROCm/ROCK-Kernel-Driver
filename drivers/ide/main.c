@@ -1082,27 +1082,18 @@ int ide_unregister_subdriver(struct ata_device *drive)
 {
 	unsigned long flags;
 
-	local_save_flags(flags); // FIXME: is this safe?
-	local_irq_disable();
-
 #if 0
-	if (__MOD_IN_USE(ata_ops(drive)->owner)) {
-		local_irq_restore(flags); // FIXME: is this safe?
+	if (__MOD_IN_USE(ata_ops(drive)->owner))
 		return 1;
-	}
 #endif
 
-	if (drive->usage || drive->busy || !ata_ops(drive)) {
-		local_irq_restore(flags);	// FIXME: is this safe?
+	if (drive->usage || drive->busy || !ata_ops(drive))
 		return 1;
-	}
 
 #if defined(CONFIG_BLK_DEV_ISAPNP) && defined(CONFIG_ISAPNP) && defined(MODULE)
 	pnpide_init(0);
 #endif
 	drive->driver = NULL;
-
-	local_irq_restore(flags); // FIXME: is this safe?
 
 	return 0;
 }

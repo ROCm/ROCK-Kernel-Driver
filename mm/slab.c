@@ -1355,7 +1355,11 @@ void* kmem_cache_alloc_batch(kmem_cache_t* cachep, int flags)
 		cc_entry(cc)[cc->avail++] =
 				kmem_cache_alloc_one_tail(cachep, slabp);
 	}
-	spin_unlock(&cachep->spinlock);
+	/*
+	 * CAREFUL: do not enable preemption yet, the per-CPU
+	 * entries rely on us being atomic.
+	 */
+	_raw_spin_unlock(&cachep->spinlock);
 
 	if (cc->avail)
 		return cc_entry(cc)[--cc->avail];
@@ -1382,8 +1386,12 @@ try_again:
 			} else {
 				STATS_INC_ALLOCMISS(cachep);
 				objp = kmem_cache_alloc_batch(cachep,flags);
+				local_irq_restore(save_flags);
+				/* end of non-preemptible region */
+				preempt_enable();
 				if (!objp)
 					goto alloc_new_slab_nolock;
+				return objp;
 			}
 		} else {
 			spin_lock(&cachep->spinlock);
@@ -1399,9 +1407,11 @@ try_again:
 alloc_new_slab:
 #ifdef CONFIG_SMP
 	spin_unlock(&cachep->spinlock);
-alloc_new_slab_nolock:
 #endif
 	local_irq_restore(save_flags);
+#ifdef CONFIG_SMP
+alloc_new_slab_nolock:
+#endif
 	if (kmem_cache_grow(cachep, flags))
 		/* Someone may have stolen our objs.  Doesn't matter, we'll
 		 * just come back here again.

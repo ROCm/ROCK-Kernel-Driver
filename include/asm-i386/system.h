@@ -318,18 +318,15 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 /* used in the idle loop; sti takes one instruction cycle to complete */
 #define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
 
+#define irqs_disabled()			\
+({					\
+	unsigned long flags;		\
+	local_save_flags(flags);	\
+	!(flags & (1<<9));		\
+})
+
 /* For spinlocks etc */
 #define local_irq_save(x)	__asm__ __volatile__("pushfl ; popl %0 ; cli":"=g" (x): /* no input */ :"memory")
-
-/*
- * Compatibility macros - they will be removed after some time.
- */
-#if !CONFIG_SMP
-# define sti() local_irq_enable()
-# define cli() local_irq_disable()
-# define save_flags(flags) local_save_flags(flags)
-# define restore_flags(flags) local_irq_restore(flags)
-#endif
 
 /*
  * disable hlt during certain critical i/o operations
