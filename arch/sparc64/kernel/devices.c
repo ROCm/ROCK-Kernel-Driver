@@ -131,9 +131,9 @@ void __init device_scan(void)
 			prom_printf("No cpu nodes, cannot continue\n");
 			prom_halt();
 		}
-		up_clock_tick = prom_getintdefault(cpu_node,
-						   "clock-frequency",
-						   0);
+		cpu_data(0).clock_tick = prom_getintdefault(cpu_node,
+							    "clock-frequency",
+							    0);
 	}
 #endif
 
