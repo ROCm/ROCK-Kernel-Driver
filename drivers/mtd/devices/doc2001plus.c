@@ -6,7 +6,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001plus.c,v 1.8 2004/04/04 12:36:45 gleixner Exp $
+ * $Id: doc2001plus.c,v 1.9 2004/08/09 13:19:44 dwmw2 Exp $
  *
  * Released under GPL
  */
@@ -1111,8 +1111,7 @@ int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
 	/* Disable flash internally */
 	WriteDOC(0, docptr, Mplus_FlashSelect);
 
-	if (instr->callback) 
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 
 	return 0;
 }

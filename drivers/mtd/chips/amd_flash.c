@@ -3,7 +3,7 @@
  *
  * Author: Jonas Holmberg <jonas.holmberg@axis.com>
  *
- * $Id: amd_flash.c,v 1.24 2004/07/12 13:34:30 dwmw2 Exp $
+ * $Id: amd_flash.c,v 1.25 2004/08/09 13:19:43 dwmw2 Exp $
  *
  * Copyright (c) 2001 Axis Communications AB
  *
@@ -1307,9 +1307,7 @@ static int amd_flash_erase(struct mtd_info *mtd, struct erase_info *instr)
 	}
 		
 	instr->state = MTD_ERASE_DONE;
-	if (instr->callback) {
-		instr->callback(instr);
-	}
+	mtd_erase_callback(instr);
 	
 	return 0;
 }

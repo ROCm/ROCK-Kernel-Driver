@@ -1,5 +1,5 @@
 /* 
- * $Id: mtd.h,v 1.54 2004/07/15 01:13:12 dwmw2 Exp $
+ * $Id: mtd.h,v 1.56 2004/08/09 18:46:04 dmarlin Exp $
  *
  * Copyright (C) 1999-2003 David Woodhouse <dwmw2@infradead.org> et al.
  *
@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/uio.h>
 
+#include <linux/mtd/compatmac.h>
 #include <mtd/mtd-abi.h>
 
 #define MTD_CHAR_MAJOR 90
@@ -191,6 +192,17 @@ int default_mtd_readv(struct mtd_info *mtd, struct kvec *vecs,
 #define MTD_READOOB(mtd, args...) (*(mtd->read_oob))(mtd, args)
 #define MTD_WRITEOOB(mtd, args...) (*(mtd->write_oob))(mtd, args)
 #define MTD_SYNC(mtd) do { if (mtd->sync) (*(mtd->sync))(mtd);  } while (0) 
+
+
+#ifdef CONFIG_MTD_PARTITIONS
+void mtd_erase_callback(struct erase_info *instr);
+#else
+static inline void mtd_erase_callback(struct erase_info *instr)
+{
+	if (instr->callback)
+		instr->callback(instr);
+}
+#endif
 
 /*
  * Debugging macro and defines

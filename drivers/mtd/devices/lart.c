@@ -2,7 +2,7 @@
 /*
  * MTD driver for the 28F160F3 Flash Memory (non-CFI) on LART.
  *
- * $Id: lart.c,v 1.6 2004/07/14 17:21:38 dwmw2 Exp $
+ * $Id: lart.c,v 1.7 2004/08/09 13:19:44 dwmw2 Exp $
  *
  * Author: Abraham vd Merwe <abraham@2d3d.co.za>
  *
@@ -433,7 +433,7 @@ static int flash_erase (struct mtd_info *mtd,struct erase_info *instr)
 	 }
 
    instr->state = MTD_ERASE_DONE;
-   if (instr->callback) instr->callback (instr);
+   mtd_erase_callback(instr);
 
    return (0);
 }
