@@ -9,8 +9,7 @@
 #define TCP_ECN_QUEUE_CWR	2
 #define TCP_ECN_DEMAND_CWR	4
 
-static __inline__ void
-TCP_ECN_queue_cwr(struct tcp_opt *tp)
+static inline void TCP_ECN_queue_cwr(struct tcp_sock *tp)
 {
 	if (tp->ecn_flags&TCP_ECN_OK)
 		tp->ecn_flags |= TCP_ECN_QUEUE_CWR;
@@ -19,16 +18,16 @@ TCP_ECN_queue_cwr(struct tcp_opt *tp)
 
 /* Output functions */
 
-static __inline__ void
-TCP_ECN_send_synack(struct tcp_opt *tp, struct sk_buff *skb)
+static inline void TCP_ECN_send_synack(struct tcp_sock *tp,
+				       struct sk_buff *skb)
 {
 	TCP_SKB_CB(skb)->flags &= ~TCPCB_FLAG_CWR;
 	if (!(tp->ecn_flags&TCP_ECN_OK))
 		TCP_SKB_CB(skb)->flags &= ~TCPCB_FLAG_ECE;
 }
 
-static __inline__ void
-TCP_ECN_send_syn(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb)
+static inline void TCP_ECN_send_syn(struct sock *sk, struct tcp_sock *tp,
+				    struct sk_buff *skb)
 {
 	tp->ecn_flags = 0;
 	if (sysctl_tcp_ecn && !(sk->sk_route_caps & NETIF_F_TSO)) {
@@ -45,8 +44,8 @@ TCP_ECN_make_synack(struct open_request *req, struct tcphdr *th)
 		th->ece = 1;
 }
 
-static __inline__ void
-TCP_ECN_send(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb, int tcp_header_len)
+static inline void TCP_ECN_send(struct sock *sk, struct tcp_sock *tp,
+				struct sk_buff *skb, int tcp_header_len)
 {
 	if (tp->ecn_flags & TCP_ECN_OK) {
 		/* Not-retransmitted data segment: set ECT and inject CWR. */
@@ -68,21 +67,18 @@ TCP_ECN_send(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb, int tcp_h
 
 /* Input functions */
 
-static __inline__ void
-TCP_ECN_accept_cwr(struct tcp_opt *tp, struct sk_buff *skb)
+static inline void TCP_ECN_accept_cwr(struct tcp_sock *tp, struct sk_buff *skb)
 {
 	if (skb->h.th->cwr)
 		tp->ecn_flags &= ~TCP_ECN_DEMAND_CWR;
 }
 
-static __inline__ void
-TCP_ECN_withdraw_cwr(struct tcp_opt *tp)
+static inline void TCP_ECN_withdraw_cwr(struct tcp_sock *tp)
 {
 	tp->ecn_flags &= ~TCP_ECN_DEMAND_CWR;
 }
 
-static __inline__ void
-TCP_ECN_check_ce(struct tcp_opt *tp, struct sk_buff *skb)
+static inline void TCP_ECN_check_ce(struct tcp_sock *tp, struct sk_buff *skb)
 {
 	if (tp->ecn_flags&TCP_ECN_OK) {
 		if (INET_ECN_is_ce(TCP_SKB_CB(skb)->flags))
@@ -95,30 +91,27 @@ TCP_ECN_check_ce(struct tcp_opt *tp, struct sk_buff *skb)
 	}
 }
 
-static __inline__ void
-TCP_ECN_rcv_synack(struct tcp_opt *tp, struct tcphdr *th)
+static inline void TCP_ECN_rcv_synack(struct tcp_sock *tp, struct tcphdr *th)
 {
 	if ((tp->ecn_flags&TCP_ECN_OK) && (!th->ece || th->cwr))
 		tp->ecn_flags &= ~TCP_ECN_OK;
 }
 
-static __inline__ void
-TCP_ECN_rcv_syn(struct tcp_opt *tp, struct tcphdr *th)
+static inline void TCP_ECN_rcv_syn(struct tcp_sock *tp, struct tcphdr *th)
 {
 	if ((tp->ecn_flags&TCP_ECN_OK) && (!th->ece || !th->cwr))
 		tp->ecn_flags &= ~TCP_ECN_OK;
 }
 
-static __inline__ int
-TCP_ECN_rcv_ecn_echo(struct tcp_opt *tp, struct tcphdr *th)
+static inline int TCP_ECN_rcv_ecn_echo(struct tcp_sock *tp, struct tcphdr *th)
 {
 	if (th->ece && !th->syn && (tp->ecn_flags&TCP_ECN_OK))
 		return 1;
 	return 0;
 }
 
-static __inline__ void
-TCP_ECN_openreq_child(struct tcp_opt *tp, struct open_request *req)
+static inline void TCP_ECN_openreq_child(struct tcp_sock *tp,
+					 struct open_request *req)
 {
 	tp->ecn_flags = req->ecn_ok ? TCP_ECN_OK : 0;
 }
