@@ -1,5 +1,6 @@
 #include <linux/pci.h>
 #include <linux/acpi.h>
+#include <linux/init.h>
 #include "pci.h"
 
 static int __init pci_acpi_init(void)

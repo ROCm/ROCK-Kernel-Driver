@@ -21,7 +21,6 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
-#include <linux/init.h>
 #include <linux/interrupt.h>
 #include <asm/kmap_types.h>
 #include <asm/tlbflush.h>
@@ -33,7 +32,7 @@ extern pte_t *kmap_pte;
 extern pgprot_t kmap_prot;
 extern pte_t *pkmap_page_table;
 
-extern void kmap_init(void) __init;
+extern void kmap_init(void);
 
 /*
  * Right now we initialize only a single pte table. It can be extended
