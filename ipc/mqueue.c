@@ -811,9 +811,9 @@ asmlinkage long sys_mq_timedsend(mqd_t mqdes, const char __user *u_msg_ptr,
 			wait.msg = (void *) msg_ptr;
 			wait.state = STATE_NONE;
 			ret = wq_sleep(info, SEND, timeout, &wait);
-			if (ret < 0)
-				free_msg(msg_ptr);
 		}
+		if (ret < 0)
+			free_msg(msg_ptr);
 	} else {
 		receiver = wq_get_first_waiter(info, RECV);
 		if (receiver) {

@@ -589,8 +589,7 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
 			ret = dmabounce_register_dev(&dev->dev, 1024, 4096);
 			if (ret) {
 				printk("SA1111: Failed to register %s with dmabounce", dev->dev.bus_id);
-				kfree(dev);
-				device_unregister(dev);
+				device_unregister(&dev->dev);
 			}
 		}
 	}
@@ -779,8 +778,7 @@ int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
 	/*
 	 * Check to see if either the start or end are illegal.
 	 */
-	return ((addr & ~(*dev->dma_mask))) ||
-		((addr + size - 1) & ~(*dev->dma_mask));
+	return ((addr & ~dma_mask)) || ((addr + size - 1) & ~dma_mask);
 }
 
 struct sa1111_save_data {
