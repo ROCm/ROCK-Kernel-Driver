@@ -14,6 +14,7 @@
 #include <linux/smp.h>
 #include <linux/mm.h>
 #include <linux/reboot.h>
+#include <linux/delay.h>
 #include <asm/ptrace.h>
 #include <asm/string.h>
 #include <asm/prom.h>

@@ -1125,7 +1125,9 @@ _GLOBAL(save_remaining_regs)
 	mtmsrd  r22,1
 	blr
 
-
+/*
+ * Kernel profiling with soft disable on iSeries
+ */
 do_profile:
 	ld	r22,8(r21)		/* Get SRR1 */
 	andi.	r22,r22,MSR_PR		/* Test if in kernel */
