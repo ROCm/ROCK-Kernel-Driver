@@ -79,31 +79,6 @@ unsigned long long __attribute__((weak)) sched_clock(void)
 	return (unsigned long long)jiffies * (1000000000 / HZ);
 }
 
-/*
- * Handle kernel profile stuff...
- */
-static inline void do_profile(struct pt_regs *regs)
-{
-
-	profile_hook(regs);
-
-	if (!user_mode(regs) &&
-	    prof_buffer &&
-	    current->pid) {
-		unsigned long pc = instruction_pointer(regs);
-		extern int _stext;
-
-		pc -= (unsigned long)&_stext;
-
-		pc >>= prof_shift;
-
-		if (pc >= prof_len)
-			pc = prof_len - 1;
-
-		prof_buffer[pc] += 1;
-	}
-}
-
 static unsigned long next_rtc_update;
 
 /*
@@ -317,7 +292,7 @@ EXPORT_SYMBOL(do_settimeofday);
 
 void timer_tick(struct pt_regs *regs)
 {
-	do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 	do_leds();
 	do_set_rtc();
 	do_timer(regs);

@@ -392,16 +392,13 @@ void smp4m_cross_call_irq(void)
 	ccall_info.processors_out[i] = 1;
 }
 
-extern void sparc_do_profile(unsigned long pc, unsigned long o7);
-
 void smp4m_percpu_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
 	clear_profile_irq(cpu);
 
-	if(!user_mode(regs))
-		sparc_do_profile(regs->pc, regs->u_regs[UREG_RETPC]);
+	profile_tick(CPU_PROFILING, regs);
 
 	if(!--prof_counter(cpu)) {
 		int user = user_mode(regs);

@@ -99,26 +99,6 @@ unsigned long profile_pc(struct pt_regs *regs)
 	return pc;
 }
 
-static spinlock_t ticker_lock = SPIN_LOCK_UNLOCKED;
-
-/* 32-bit Sparc specific profiling function. */
-void sparc_do_profile(unsigned long pc, unsigned long o7)
-{
-	if(prof_buffer && current->pid) {
-		extern int _stext;
-
-		pc -= (unsigned long) &_stext;
-		pc >>= prof_shift;
-
-		spin_lock(&ticker_lock);
-		if(pc < prof_len)
-			prof_buffer[pc]++;
-		else
-			prof_buffer[prof_len - 1]++;
-		spin_unlock(&ticker_lock);
-	}
-}
-
 __volatile__ unsigned int *master_l10_counter;
 __volatile__ unsigned int *master_l10_limit;
 
@@ -135,8 +115,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	static long last_rtc_update;
 
 #ifndef CONFIG_SMP
-	if(!user_mode(regs))
-		sparc_do_profile(profile_pc(regs));
+	profile_tick(CPU_PROFILING, regs);
 #endif
 
 	/* Protect counter clear so that do_gettimeoffset works */

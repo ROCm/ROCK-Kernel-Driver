@@ -9,7 +9,11 @@
 #include <linux/cpumask.h>
 #include <asm/errno.h>
 
+#define CPU_PROFILING	1
+#define SCHED_PROFILING	2
+
 struct proc_dir_entry;
+struct pt_regs;
 
 /* parse command line */
 int __init profile_setup(char * str);
@@ -17,6 +21,8 @@ int __init profile_setup(char * str);
 /* init basic kernel profiler */
 void __init profile_init(void);
 void create_prof_cpu_mask(struct proc_dir_entry *);
+void profile_tick(int, struct pt_regs *);
+void profile_hit(int, void *);
 
 extern unsigned int * prof_buffer;
 extern unsigned long prof_len;

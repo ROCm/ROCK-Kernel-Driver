@@ -9,6 +9,7 @@
 #include <linux/notifier.h>
 #include <linux/mm.h>
 #include <linux/cpumask.h>
+#include <linux/profile.h>
 #include <asm/sections.h>
 
 unsigned int * prof_buffer;
@@ -169,6 +170,25 @@ EXPORT_SYMBOL_GPL(profile_event_unregister);
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
+#include <asm/ptrace.h>
+
+void profile_hit(int type, void *__pc)
+{
+	unsigned long pc;
+
+	if (prof_on != type || !prof_buffer)
+		return;
+	pc = ((unsigned long)__pc - (unsigned long)_stext) >> prof_shift;
+	atomic_inc((atomic_t *)&prof_buffer[min(pc, prof_len - 1)]);
+}
+
+void profile_tick(int type, struct pt_regs *regs)
+{
+	if (type == CPU_PROFILING)
+		profile_hook(regs);
+	if (!user_mode(regs) && cpu_isset(smp_processor_id(), prof_cpu_mask))
+		profile_hit(type, (void *)profile_pc(regs));
+}
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)

@@ -47,41 +47,6 @@ static long halftick;
 extern void smp_do_timer(struct pt_regs *regs);
 #endif
 
-static inline void
-parisc_do_profile(struct pt_regs *regs)
-{
-	unsigned long pc = regs->iaoq[0];
-	extern char _stext;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-#if 0
-	/* FIXME: when we have irq affinity to cpu, we need to
-	 * only look at the cpus specified in this mask 
-	 */
-
-	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
-		return;
-#endif
-
-	pc -= (unsigned long) &_stext;
-	pc >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds PC values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (pc > prof_len - 1)
-		pc = prof_len - 1;
-	atomic_inc((atomic_t *)&prof_buffer[pc]);
-}
-
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	long now;
@@ -89,7 +54,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int nticks;
 	int cpu = smp_processor_id();
 
-	parisc_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 
 	now = mfctl(16);
 	/* initialize next_tick to time at last clocktick */

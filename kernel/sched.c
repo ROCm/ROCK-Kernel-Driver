@@ -31,6 +31,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
 #include <linux/notifier.h>
+#include <linux/profile.h>
 #include <linux/suspend.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
@@ -3220,10 +3221,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 				policy != SCHED_NORMAL)
 			goto out_unlock;
 	}
-#ifdef kern_profile
-	if (unlikely(prof_on == 2))
-		__do_profile((unsigned long)__builtin_return_address(0));
-#endif
+	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are

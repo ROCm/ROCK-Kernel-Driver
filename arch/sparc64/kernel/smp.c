@@ -975,8 +975,6 @@ void smp_promstop_others(void)
 	smp_cross_call(&xcall_promstop, 0, 0, 0);
 }
 
-extern void sparc64_do_profile(struct pt_regs *regs);
-
 #define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
 #define prof_counter(__cpu)		cpu_data(__cpu).counter
 
@@ -1002,7 +1000,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 	}
 
 	do {
-		sparc64_do_profile(regs);
+		profile_tick(CPU_PROFILING, regs);
 		if (!--prof_counter(cpu)) {
 			irq_enter();
 

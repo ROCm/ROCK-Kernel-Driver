@@ -396,7 +396,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  */
 
 #ifndef CONFIG_X86_LOCAL_APIC
-	x86_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 #else
 	if (!using_apic_timer)
 		smp_local_timer_interrupt(regs);

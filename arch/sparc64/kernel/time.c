@@ -442,22 +442,6 @@ static inline void timer_check_rtc(void)
 	}
 }
 
-void sparc64_do_profile(struct pt_regs *regs)
-{
-	unsigned long pc;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	pc = (profile_pc(regs) - (unsigned long)_stext) >> prof_shift;
-	atomic_inc((atomic_t *)&prof_buffer[min(pc, prof_len-1)]);
-}
-
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	unsigned long ticks, pstate;
@@ -466,7 +450,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	do {
 #ifndef CONFIG_SMP
-		sparc64_do_profile(regs);
+		profile_tick(CPU_PROFILING, regs);
 #endif
 		do_timer(regs);
 
