@@ -2101,9 +2101,9 @@ void serial8250_get_irq_map(unsigned int *map)
  *
  *	Suspend one serial port.
  */
-void serial8250_suspend_port(int line, u32 level)
+void serial8250_suspend_port(int line)
 {
-	uart_suspend_port(&serial8250_reg, &serial8250_ports[line].port, level);
+	uart_suspend_port(&serial8250_reg, &serial8250_ports[line].port);
 }
 
 /**
@@ -2112,9 +2112,9 @@ void serial8250_suspend_port(int line, u32 level)
  *
  *	Resume one serial port.
  */
-void serial8250_resume_port(int line, u32 level)
+void serial8250_resume_port(int line)
 {
-	uart_resume_port(&serial8250_reg, &serial8250_ports[line].port, level);
+	uart_resume_port(&serial8250_reg, &serial8250_ports[line].port);
 }
 
 static int __init serial8250_init(void)
