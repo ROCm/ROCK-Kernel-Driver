@@ -541,15 +541,14 @@ start_over:
 /* called from serio_driver->connect/disconnect methods under serio_sem */
 int serio_open(struct serio *serio, struct serio_driver *drv)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&serio->lock, flags);
+	serio_pause_rx(serio);
 	serio->drv = drv;
-	spin_unlock_irqrestore(&serio->lock, flags);
+	serio_continue_rx(serio);
+
 	if (serio->open && serio->open(serio)) {
-		spin_lock_irqsave(&serio->lock, flags);
+		serio_pause_rx(serio);
 		serio->drv = NULL;
-		spin_unlock_irqrestore(&serio->lock, flags);
+		serio_continue_rx(serio);
 		return -1;
 	}
 	return 0;
@@ -558,13 +557,12 @@ int serio_open(struct serio *serio, struct serio_driver *drv)
 /* called from serio_driver->connect/disconnect methods under serio_sem */
 void serio_close(struct serio *serio)
 {
-	unsigned long flags;
-
 	if (serio->close)
 		serio->close(serio);
-	spin_lock_irqsave(&serio->lock, flags);
+
+	serio_pause_rx(serio);
 	serio->drv = NULL;
-	spin_unlock_irqrestore(&serio->lock, flags);
+	serio_continue_rx(serio);
 }
 
 irqreturn_t serio_interrupt(struct serio *serio,
