@@ -96,8 +96,6 @@ void rw_swap_page(int rw, struct page *page)
 		PAGE_BUG(page);
 	if (!PageSwapCache(page))
 		PAGE_BUG(page);
-	if (page->mapping != &swapper_space)
-		PAGE_BUG(page);
 	if (!rw_swap_page_base(rw, entry, page))
 		unlock_page(page);
 }
@@ -112,8 +110,6 @@ void rw_swap_page_nolock(int rw, swp_entry_t entry, char *buf)
 	struct page *page = virt_to_page(buf);
 	
 	if (!PageLocked(page))
-		PAGE_BUG(page);
-	if (PageSwapCache(page))
 		PAGE_BUG(page);
 	if (page->mapping)
 		PAGE_BUG(page);
