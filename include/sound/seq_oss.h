@@ -58,7 +58,7 @@ struct snd_seq_oss_callback_t {
 	int (*open)(snd_seq_oss_arg_t *p, void *closure);
 	int (*close)(snd_seq_oss_arg_t *p);
 	int (*ioctl)(snd_seq_oss_arg_t *p, unsigned int cmd, unsigned long arg);
-	int (*load_patch)(snd_seq_oss_arg_t *p, int format, const char *buf, int offs, int count);
+	int (*load_patch)(snd_seq_oss_arg_t *p, int format, const char __user *buf, int offs, int count);
 	int (*reset)(snd_seq_oss_arg_t *p);
 	int (*raw_event)(snd_seq_oss_arg_t *p, unsigned char *data);
 };

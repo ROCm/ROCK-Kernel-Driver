@@ -13,7 +13,7 @@ void gus_voice_irq(void);
 void gus_write8(int reg, unsigned int data);
 void guswave_dma_irq(void);
 void gus_delay(void);
-int gus_default_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg);
+int gus_default_mixer_ioctl (int dev, unsigned int cmd, void __user *arg);
 void gus_timer_command (unsigned int addr, unsigned int val);
 
 /*	From gus_midi.c */
