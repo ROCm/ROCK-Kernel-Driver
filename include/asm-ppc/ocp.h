@@ -35,6 +35,8 @@
 #include <asm/rwsem.h>
 #include <asm/semaphore.h>
 
+#ifdef CONFIG_PPC_OCP
+
 #define OCP_MAX_IRQS	7
 #define MAX_EMACS	4
 #define OCP_IRQ_NA	-1	/* used when ocp device does not have an irq */
@@ -200,5 +202,6 @@ static DEVICE_ATTR(name##_##field, S_IRUGO, show_##name##_##field, NULL);
 #include <asm/ibm_ocp.h>
 #endif
 
+#endif				/* CONFIG_PPC_OCP */
 #endif				/* __OCP_H__ */
 #endif				/* __KERNEL__ */
