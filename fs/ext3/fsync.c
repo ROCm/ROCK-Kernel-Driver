@@ -27,8 +27,6 @@
 #include <linux/jbd.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
-#include <linux/jbd.h>
-#include <linux/smp_lock.h>
 
 /*
  * akpm: A new design for ext3_sync_file().
