@@ -46,6 +46,8 @@ enum {
 	NFSD_Getfd,
 	NFSD_Getfs,
 	NFSD_List,
+	NFSD_Fh,
+	NFSD_END
 };
 
 /*
@@ -58,6 +60,7 @@ static ssize_t write_export(struct file *file, char *buf, size_t size);
 static ssize_t write_unexport(struct file *file, char *buf, size_t size);
 static ssize_t write_getfd(struct file *file, char *buf, size_t size);
 static ssize_t write_getfs(struct file *file, char *buf, size_t size);
+static ssize_t write_filehandle(struct file *file, char *buf, size_t size);
 
 static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Svc] = write_svc,
@@ -67,6 +70,7 @@ static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Unexport] = write_unexport,
 	[NFSD_Getfd] = write_getfd,
 	[NFSD_Getfs] = write_getfs,
+	[NFSD_Fh] = write_filehandle,
 };
 
 /* an argresp is stored in an allocated page and holds the 
@@ -209,6 +213,7 @@ static struct { char *name; struct file_operations *ops; int mode; } files[] = {
 	[NFSD_Getfd] = {".getfd", &transaction_ops, S_IWUSR|S_IRUSR},
 	[NFSD_Getfs] = {".getfs", &transaction_ops, S_IWUSR|S_IRUSR},
 	[NFSD_List] = {"exports", &exports_operations, S_IRUGO},
+	[NFSD_Fh] = {"filehandle", &transaction_ops, S_IWUSR|S_IRUSR},
 };
 
 /*----------------------------------------------------------------------------*/
@@ -337,6 +342,62 @@ static ssize_t write_getfd(struct file *file, char *buf, size_t size)
 	return err;
 }
 
+static ssize_t write_filehandle(struct file *file, char *buf, size_t size)
+{
+	/* request is:
+	 *   domain path maxsize
+	 * response is
+	 *   filehandle
+	 *
+	 * qword quoting is used, so filehandle will be \x....
+	 */
+	char *dname, *path;
+	int maxsize;
+	char *mesg = buf;
+	int len;
+	struct auth_domain *dom;
+	struct knfsd_fh fh;
+
+	if (buf[size-1] != '\n')
+		return -EINVAL;
+	buf[size-1] = 0;
+
+	dname = mesg;
+	len = qword_get(&mesg, dname, size);
+	if (len <= 0) return -EINVAL;
+	
+	path = dname+len+1;
+	len = qword_get(&mesg, path, size);
+	if (len <= 0) return -EINVAL;
+
+	len = get_int(&mesg, &maxsize);
+	if (len)
+		return len;
+
+	if (maxsize < NFS_FHSIZE)
+		return -EINVAL;
+	if (maxsize > NFS3_FHSIZE)
+		maxsize = NFS3_FHSIZE;
+
+	if (qword_get(&mesg, mesg, size)>0)
+		return -EINVAL;
+
+	/* we have all the words, they are in buf.. */
+	dom = unix_domain_find(dname);
+	if (!dom)
+		return -ENOMEM;
+
+	len = exp_rootfh(dom, path, &fh,  maxsize);
+	auth_domain_put(dom);
+	if (len)
+		return len;
+	
+	mesg = buf; len = PAGE_SIZE-sizeof(struct argresp);
+	qword_addhex(&mesg, &len, (char*)&fh.fh_base, fh.fh_size);
+	mesg[-1] = '\n';
+	return mesg - buf;	
+}
+
 /*----------------------------------------------------------------------------*/
 /*
  *	populating the filesystem.
@@ -373,7 +434,7 @@ static int nfsd_fill_super(struct super_block * sb, void * data, int silent)
 		iput(inode);
 		return -ENOMEM;
 	}
-	for (i = NFSD_Svc; i <= NFSD_List; i++) {
+	for (i = NFSD_Svc; i < NFSD_END; i++) {
 		struct qstr name;
 		name.name = files[i].name;
 		name.len = strlen(name.name);
