@@ -76,7 +76,6 @@ static u32 northbridge_flush_word[NR_CPUS + 1];
 #define EMERGENCY_PAGES 32 /* = 128KB */ 
 
 #ifdef CONFIG_AGP
-extern int agp_init(void);
 #define AGPEXTERN extern
 #else
 #define AGPEXTERN
