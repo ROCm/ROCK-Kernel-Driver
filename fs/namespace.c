@@ -881,6 +881,54 @@ out1:
 	return retval;
 }
 
+/*
+ * Replace the fs->{rootmnt,root} with {mnt,dentry}. Put the old values.
+ * It can block. Requires the big lock held.
+ */
+void set_fs_root(struct fs_struct *fs, struct vfsmount *mnt,
+		 struct dentry *dentry)
+{
+	struct dentry *old_root;
+	struct vfsmount *old_rootmnt;
+	write_lock(&fs->lock);
+	spin_lock(&dcache_lock);
+	old_root = fs->root;
+	old_rootmnt = fs->rootmnt;
+	fs->rootmnt = mntget(mnt);
+	fs->root = dget(dentry);
+	spin_unlock(&dcache_lock);
+	write_unlock(&fs->lock);
+	if (old_root) {
+		dput(old_root);
+		mntput(old_rootmnt);
+	}
+}
+
+/*
+ * Replace the fs->{pwdmnt,pwd} with {mnt,dentry}. Put the old values.
+ * It can block. Requires the big lock held.
+ */
+void set_fs_pwd(struct fs_struct *fs, struct vfsmount *mnt,
+		struct dentry *dentry)
+{
+	struct dentry *old_pwd;
+	struct vfsmount *old_pwdmnt;
+
+	write_lock(&fs->lock);
+	spin_lock(&dcache_lock);
+	old_pwd = fs->pwd;
+	old_pwdmnt = fs->pwdmnt;
+	fs->pwdmnt = mntget(mnt);
+	fs->pwd = dget(dentry);
+	spin_unlock(&dcache_lock);
+	write_unlock(&fs->lock);
+
+	if (old_pwd) {
+		dput(old_pwd);
+		mntput(old_pwdmnt);
+	}
+}
+
 static void chroot_fs_refs(struct nameidata *old_nd, struct nameidata *new_nd)
 {
 	struct task_struct *g, *p;
