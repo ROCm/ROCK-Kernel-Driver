@@ -87,7 +87,12 @@ ioctl(file,I2C_SLAVE,long addr)
 
 ioctl(file,I2C_TENBIT,long select)
   Selects ten bit addresses if select not equals 0, selects normal 7 bit
-  addresses if select equals 0.
+  addresses if select equals 0. Default 0.
+
+ioctl(file,I2C_PEC,long select)
+  Selects SMBus PEC (packet error checking) generation and verification
+  if select not equals 0, disables if select equals 0. Default 0.
+  Used only for SMBus transactions.
 
 ioctl(file,I2C_FUNCS,unsigned long *funcs)
   Gets the adapter functionality and puts it in *funcs.

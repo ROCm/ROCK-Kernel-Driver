@@ -59,16 +59,16 @@ Algorithm drivers
 i2c-algo-8xx:    An algorithm for CPM's I2C device in Motorola 8xx processors (NOT BUILT BY DEFAULT)
 i2c-algo-bit:    A bit-banging algorithm
 i2c-algo-pcf:    A PCF 8584 style algorithm
-i2c-algo-ppc405: An algorithm for the I2C device in IBM 405xx processors (NOT BUILT BY DEFAULT)
+i2c-algo-ibmocp: An algorithm for the I2C device in IBM 4xx processors (NOT BUILT BY DEFAULT)
 
 Adapter drivers
 ---------------
 
 i2c-elektor:     Elektor ISA card (uses i2c-algo-pcf)
 i2c-elv:         ELV parallel port adapter (uses i2c-algo-bit)
-i2c-pcf-epp:     PCF8584 on a EPP parallel port (uses i2c-algo-pcf) (BROKEN - missing i2c-pcf-epp.h)
+i2c-pcf-epp:     PCF8584 on a EPP parallel port (uses i2c-algo-pcf) (NOT mkpatched)
 i2c-philips-par: Philips style parallel port adapter (uses i2c-algo-bit)
-i2c-ppc405:      IBM 405xx processor I2C device (uses i2c-algo-ppc405) (NOT BUILT BY DEFAULT)
+i2c-adap_ibmocp:      IBM 4xx processor I2C device (uses i2c-algo-ibmocp) (NOT BUILT BY DEFAULT)
 i2c-pport:       Primitive parallel port adapter (uses i2c-algo-bit)
 i2c-rpx:         RPX board Motorola 8xx I2C device (uses i2c-algo-8xx) (NOT BUILT BY DEFAULT)
 i2c-velleman:    Velleman K9000 parallel port adapter (uses i2c-algo-bit)
