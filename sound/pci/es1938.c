@@ -54,6 +54,7 @@
 #include <linux/slab.h>
 #include <linux/gameport.h>
 #include <linux/moduleparam.h>
+#include <linux/delay.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -567,7 +568,12 @@ static int snd_es1938_playback1_trigger(snd_pcm_substream_t * substream,
 	case SNDRV_PCM_TRIGGER_START:
 		/* According to the documentation this should be:
 		   0x13 but that value may randomly swap stereo channels */
+                snd_es1938_mixer_write(chip, ESSSB_IREG_AUDIO2CONTROL1, 0x92);
+                udelay(10);
 		snd_es1938_mixer_write(chip, ESSSB_IREG_AUDIO2CONTROL1, 0x93);
+                /* This two stage init gives the FIFO -> DAC connection time to
+                 * settle before first data from DMA flows in.  This should ensure
+                 * no swapping of stereo channels.  Report a bug if otherwise :-) */
 		outb(0x0a, SLIO_REG(chip, AUDIO2MODE));
 		chip->active |= DAC2;
 		break;
@@ -683,6 +689,8 @@ static int snd_es1938_playback1_prepare(snd_pcm_substream_t * substream)
 	u = snd_pcm_format_unsigned(runtime->format);
 
 	chip->dma2_shift = 2 - mono - is8;
+
+        snd_es1938_reset_fifo(chip);
 
 	/* set clock and counters */
         snd_es1938_rate_set(chip, substream, DAC2);
@@ -868,9 +876,9 @@ static snd_pcm_hardware_t snd_es1938_capture =
 	.rate_max =		48000,
 	.channels_min =		1,
 	.channels_max =		2,
-	.buffer_bytes_max =	65536,
+        .buffer_bytes_max =	0x8000,       /* DMA controller screws on higher values */
 	.period_bytes_min =	64,
-	.period_bytes_max =	65536,
+	.period_bytes_max =	0x8000,
 	.periods_min =		1,
 	.periods_max =		1024,
 	.fifo_size =		256,
@@ -890,9 +898,9 @@ static snd_pcm_hardware_t snd_es1938_playback =
 	.rate_max =		48000,
 	.channels_min =		1,
 	.channels_max =		2,
-	.buffer_bytes_max =	65536,
+        .buffer_bytes_max =	0x8000,       /* DMA controller screws on higher values */
 	.period_bytes_min =	64,
-	.period_bytes_max =	65536,
+	.period_bytes_max =	0x8000,
 	.periods_min =		1,
 	.periods_max =		1024,
 	.fifo_size =		256,
