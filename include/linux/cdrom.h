@@ -466,9 +466,10 @@ struct cdrom_generic_command
 #define GPCMD_REPORT_KEY		    0xa4
 #define GPCMD_REQUEST_SENSE		    0x03
 #define GPCMD_RESERVE_RZONE_TRACK	    0x53
+#define GPCMD_SEND_CUE_SHEET		    0x5d
 #define GPCMD_SCAN			    0xba
 #define GPCMD_SEEK			    0x2b
-#define GPCMD_SEND_DVD_STRUCTURE	    0xad
+#define GPCMD_SEND_DVD_STRUCTURE	    0xbf
 #define GPCMD_SEND_EVENT		    0xa2
 #define GPCMD_SEND_KEY			    0xa3
 #define GPCMD_SEND_OPC			    0x54
