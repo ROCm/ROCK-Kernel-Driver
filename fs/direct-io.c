@@ -446,12 +446,15 @@ static int dio_bio_reap(struct dio *dio)
 		while (dio->bio_list) {
 			unsigned long flags;
 			struct bio *bio;
+			int ret2;
 
 			spin_lock_irqsave(&dio->bio_lock, flags);
 			bio = dio->bio_list;
 			dio->bio_list = bio->bi_private;
 			spin_unlock_irqrestore(&dio->bio_lock, flags);
-			ret = dio_bio_complete(dio, bio);
+			ret2 = dio_bio_complete(dio, bio);
+			if (ret == 0)
+				ret = ret2;
 		}
 		dio->reap_counter = 0;
 	}
