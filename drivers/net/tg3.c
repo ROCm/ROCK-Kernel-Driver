@@ -2371,6 +2371,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	unsigned int i;
 	u32 len, entry, base_flags, mss;
 	int would_hit_hwbug;
+	unsigned long flags;
 
 	len = (skb->len - skb->data_len);
 
@@ -2393,12 +2394,12 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	 * So we really do need to disable interrupts when taking
 	 * tx_lock here.
 	 */
-	spin_lock_irq(&tp->tx_lock);
+	spin_lock_irqsave(&tp->tx_lock, flags);
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
 		netif_stop_queue(dev);
-		spin_unlock_irq(&tp->tx_lock);
+		spin_unlock_irqrestore(&tp->tx_lock, flags);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
 		return 1;
@@ -2550,7 +2551,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 
 out_unlock:
-	spin_unlock_irq(&tp->tx_lock);
+	spin_unlock_irqrestore(&tp->tx_lock, flags);
 
 	dev->trans_start = jiffies;
 
@@ -2562,6 +2563,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct tg3 *tp = dev->priv;
 	dma_addr_t mapping;
 	u32 len, entry, base_flags, mss;
+	unsigned long flags;
 
 	len = (skb->len - skb->data_len);
 
@@ -2584,12 +2586,12 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * So we really do need to disable interrupts when taking
 	 * tx_lock here.
 	 */
-	spin_lock_irq(&tp->tx_lock);
+	spin_lock_irqsave(&tp->tx_lock, flags);
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
 		netif_stop_queue(dev);
-		spin_unlock_irq(&tp->tx_lock);
+		spin_unlock_irqrestore(&tp->tx_lock, flags);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
 		return 1;
@@ -2695,7 +2697,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (TX_BUFFS_AVAIL(tp) <= (MAX_SKB_FRAGS + 1))
 		netif_stop_queue(dev);
 
-	spin_unlock_irq(&tp->tx_lock);
+	spin_unlock_irqrestore(&tp->tx_lock, flags);
 
 	dev->trans_start = jiffies;
 
