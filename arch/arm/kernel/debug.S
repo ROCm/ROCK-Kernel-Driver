@@ -44,6 +44,34 @@
 		beq	1001b
 		.endm
 
+#elif defined(CONFIG_DEBUG_ICEDCC)
+		@@ debug using ARM EmbeddedICE DCC channel
+		.macro	addruart, rx
+		.endm
+
+		.macro	senduart, rd, rx
+		mcr	p14, 0, \rd, c1, c0, 0
+		.endm
+
+		.macro	busyuart, rd, rx
+1001:
+		mrc	p14, 0, \rx, c0, c0, 0
+		tst	\rx, #2
+		beq	1001b
+
+		.endm
+
+		.macro	waituart, rd, rx
+		mov	\rd, #0x2000000
+1001:
+		subs	\rd, \rd, #1
+		bmi	1002f
+		mrc	p14, 0, \rx, c0, c0, 0
+		tst	\rx, #2
+		bne	1001b
+1002:
+		.endm
+
 #elif defined(CONFIG_ARCH_EBSA110)
 		.macro	addruart,rx
 		mov	\rx, #0xf0000000
@@ -462,6 +490,66 @@
 		tst	\rd, #0x10
 		beq	1001b
 		.endm
+
+#elif defined(CONFIG_ARCH_S3C2410)
+#include <asm/arch/map.h>
+#include <asm/arch/regs-serial.h>
+
+		.macro addruart, rx
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1
+		ldreq	\rx, = S3C2410_PA_UART
+		ldrne	\rx, = S3C2410_VA_UART
+#if CONFIG_DEBUG_S3C2410_UART != 0
+		add	\rx, \rx, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C2410_UART)
+#endif
+		.endm
+
+		.macro	senduart,rd,rx
+		str	\rd, [\rx, # S3C2410_UTXH ]
+		.endm
+
+		.macro	busyuart, rd, rx
+		ldr	\rd, [ \rx, # S3C2410_UFCON ]
+		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+		beq	1001f				@
+		@ FIFO enabled...
+1003:
+		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
+		tst	\rd, #S3C2410_UFSTAT_TXFULL
+		bne	1003b
+		b	1002f
+
+1001:
+		@ busy waiting for non fifo
+		ldr	\rd, [ \rx, # S3C2410_UTRSTAT ]
+		tst	\rd, #S3C2410_UTRSTAT_TXFE
+		beq	1001b
+
+1002:		@ exit busyuart
+		.endm
+
+		.macro	waituart,rd,rx
+
+		ldr	\rd, [ \rx, # S3C2410_UFCON ]
+		tst	\rd, #S3C2410_UFCON_FIFOMODE	@ fifo enabled?
+		beq	1001f				@
+		@ FIFO enabled...
+1003:
+		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
+		ands	\rd, \rd, #15<<S3C2410_UFSTAT_TXSHIFT
+		bne	1003b
+		b	1002f
+
+1001:
+		@ idle waiting for non fifo
+		ldr	\rd, [ \rx, # S3C2410_UTRSTAT ]
+		tst	\rd, #S3C2410_UTRSTAT_TXFE
+		beq	1001b
+
+1002:		@ exit busyuart
+		.endm
+
 #else
 #error Unknown architecture
 #endif
