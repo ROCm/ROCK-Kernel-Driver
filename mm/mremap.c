@@ -56,16 +56,18 @@ end:
 	return pte;
 }
 
-static inline int page_table_present(struct mm_struct *mm, unsigned long addr)
+static pte_t *get_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd))
-		return 0;
+		return NULL;
 	pmd = pmd_offset(pgd, addr);
-	return pmd_present(*pmd);
+	if (!pmd_present(*pmd))
+		return NULL;
+	return pte_offset_map(pmd, addr);
 }
 
 static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
@@ -98,11 +100,23 @@ static int
 move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		unsigned long new_addr)
 {
+	struct address_space *mapping = NULL;
 	struct mm_struct *mm = vma->vm_mm;
 	int error = 0;
 	pte_t *src, *dst;
 
+	if (vma->vm_file) {
+		/*
+		 * Subtle point from Rajesh Venkatasubramanian: before
+		 * moving file-based ptes, we must lock vmtruncate out,
+		 * since it might clean the dst vma before the src vma,
+		 * and we propagate stale pages into the dst afterward.
+		 */
+		mapping = vma->vm_file->f_mapping;
+		spin_lock(&mapping->i_mmap_lock);
+	}
 	spin_lock(&mm->page_table_lock);
+
 	src = get_one_pte_map_nested(mm, old_addr);
 	if (src) {
 		/*
@@ -110,13 +124,19 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 * memory allocation.  If it does then we need to drop the
 		 * atomic kmap
 		 */
-		if (!page_table_present(mm, new_addr)) {
+		dst = get_one_pte_map(mm, new_addr);
+		if (unlikely(!dst)) {
 			pte_unmap_nested(src);
-			src = NULL;
-		}
-		dst = alloc_one_pte_map(mm, new_addr);
-		if (src == NULL)
+			if (mapping)
+				spin_unlock(&mapping->i_mmap_lock);
+			dst = alloc_one_pte_map(mm, new_addr);
+			if (mapping && !spin_trylock(&mapping->i_mmap_lock)) {
+				spin_unlock(&mm->page_table_lock);
+				spin_lock(&mapping->i_mmap_lock);
+				spin_lock(&mm->page_table_lock);
+			}
 			src = get_one_pte_map_nested(mm, old_addr);
+		}
 		/*
 		 * Since alloc_one_pte_map can drop and re-acquire
 		 * page_table_lock, we should re-check the src entry...
@@ -137,6 +157,8 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 			pte_unmap(dst);
 	}
 	spin_unlock(&mm->page_table_lock);
+	if (mapping)
+		spin_unlock(&mapping->i_mmap_lock);
 	return error;
 }
 

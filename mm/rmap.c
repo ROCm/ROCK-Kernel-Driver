@@ -794,6 +794,7 @@ static inline int try_to_unmap_file(struct page *page)
 	 * but even so use it as a guide to how hard we should try?
 	 */
 	page_map_unlock(page);
+	cond_resched_lock(&mapping->i_mmap_lock);
 
 	max_nl_size = (max_nl_size + CLUSTER_SIZE - 1) & CLUSTER_MASK;
 	if (max_nl_cursor == 0)
@@ -816,13 +817,13 @@ static inline int try_to_unmap_file(struct page *page)
 				vma->vm_private_data = (void *) cursor;
 				if ((int)mapcount <= 0)
 					goto relock;
-				cond_resched();
 			}
 			if (ret != SWAP_FAIL)
 				vma->vm_private_data =
 					(void *) max_nl_cursor;
 			ret = SWAP_AGAIN;
 		}
+		cond_resched_lock(&mapping->i_mmap_lock);
 		max_nl_cursor += CLUSTER_SIZE;
 	} while (max_nl_cursor <= max_nl_size);
 
