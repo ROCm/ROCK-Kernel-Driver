@@ -166,6 +166,7 @@ static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect);
 static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area);  
 static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *image); 
 static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
+static int banshee_wait_idle(struct fb_info *info);
 
 static struct fb_ops tdfxfb_ops = {
 	.owner		= THIS_MODULE,
@@ -318,7 +319,7 @@ static inline void banshee_make_room(struct tdfx_par *par, int size)
 	while((tdfx_inl(par, STATUS) & 0x1f) < size);
 }
  
-static inline void banshee_wait_idle(struct fb_info *info)
+static int banshee_wait_idle(struct fb_info *info)
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par; 
 	int i = 0;
@@ -330,6 +331,7 @@ static inline void banshee_wait_idle(struct fb_info *info)
 		i = (tdfx_inl(par, STATUS) & STATUS_BUSY) ? 0 : i + 1;
 		if(i == 3) break;
 	}
+	return 0;
 }
 
 /*
@@ -758,7 +760,7 @@ static int tdfxfb_set_par(struct fb_info *info)
 			break;
 	}
 #endif 
-	do_write_regs(par, &reg);
+	do_write_regs(info, &reg);
 
 	/* Now change fb_fix_screeninfo according to changes in par */
 	info->fix.line_length = info->var.xres * ((info->var.bits_per_pixel + 7)>>3);
@@ -1210,9 +1212,6 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 
 	printk("fb: %s memory = %dK\n", tdfx_fix.id, tdfx_fix.smem_len >> 10);
 
-	/* clear framebuffer memory */
-	memset_io(info->screen_base, 0, tdfx_fix.smem_len);
-	
 	tdfx_fix.ypanstep	= nopan ? 0 : 1;
 	tdfx_fix.ywrapstep	= nowrap ? 0 : 1;
    
@@ -1223,11 +1222,13 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->pseudo_palette	= (void *)(default_par + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
 
+#ifndef MODULE
 	if (!mode_option)
 		mode_option = "640x480@60";
 	 
 	err = fb_find_mode(&info->var, info, mode_option, NULL, 0, NULL, 8); 
 	if (!err || err == 4)
+#endif
 		info->var = tdfx_var;
 
 	size = (info->var.bits_per_pixel == 8) ? 256 : 16;

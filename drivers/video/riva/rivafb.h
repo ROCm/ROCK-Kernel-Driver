@@ -41,9 +41,16 @@ struct riva_par {
 	u32 riva_palette[16];
 	u32 cursor_data[32 * 32/4];
 	int cursor_reset;
+	unsigned char *EDID;
+	unsigned int Chipset;
+	int forceCRTC;
+	Bool SecondCRTC;
+	int FlatPanel;
 #ifdef CONFIG_MTRR
 	struct { int vram; int vram_valid; } mtrr;
 #endif
 };
+
+void riva_common_setup(struct riva_par *);
 
 #endif /* __RIVAFB_H */

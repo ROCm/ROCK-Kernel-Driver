@@ -295,27 +295,21 @@ config FB_VGA16
 	  vga16fb.o.
 
 config FB_STI
-	bool "Generic STI frame buffer device support"
+	bool "HP STI frame buffer device support"
 	depends on FB && PARISC
+	default y
 	---help---
 	  STI refers to the HP "Standard Text Interface" which is a set of
 	  BIOS routines contained in a ROM chip in HP PA-RISC based machines.
-	  Enabling this option will implement the linux framebuffer device and
-	  an fbcon color text console using calls to the STI BIOS routines.
-	  The HP framebuffer device is usually planar, uses a strange memory
-	  layout, and changing the plane mask to create colored pixels
-	  requires a call to the STI routines, so do not expect /dev/fb to
-	  actually be useful.  However, it is the best we have as far as
-	  graphics on the HP chipsets due to lack of hardware level
-	  documentation for the various on-board HP chipsets used in these
-	  systems.  It is sufficient for basic text console functions,
-	  including fonts.
+	  Enabling this option will implement the linux framebuffer device
+	  using calls to the STI BIOS routines for initialisation.
+	
+	  If you enable this option, you will get a planar framebuffer device
+	  /dev/fb which will work on the most common HP graphic cards of the
+	  NGLE family, including the artist chips (in the 7xx and Bxxx series),
+	  HCRX, HCRX24, CRX, CRX24 and VisEG series.
 
-	  You should probably enable this option, unless you are having
-	  trouble getting video when booting the kernel (make sure it isn't
-	  just that you are running the console on the serial port, though).
-	  Really old HP boxes may not have STI, and must use the PDC BIOS
-	  console or the IODC BIOS.
+	  It is safe to enable this option, so you should probably say "Y".
 
 config FB_MAC
 	bool "Generic Macintosh display support"
@@ -470,6 +464,44 @@ config FB_RIVA
 	  inserted and removed from the running kernel whenever you want). The
 	  module will be called rivafb.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
+
+config FB_I810
+	tristate "Intel 810/815 support (EXPERIMENTAL)"
+	depends on FB && AGP && AGP_INTEL && EXPERIMENTAL && PCI	
+	help
+	  This driver supports the on-board graphics built in to the Intel 810 
+          and 815 chipsets.  Say Y if you have and plan to use such a board.
+
+          The driver is also available as a module ( = code which can be
+          inserted and removed from the running kernel whenever you want). 
+          The module will be called i810fb.o. If you want to compile it as a
+          module, say M here and read <file:Documentation/modules.txt>.
+
+          For more information, please read 
+	  <file:Documentation/fb/intel810.txt>
+
+config FB_I810_GTF
+	bool "use VESA Generalized Timing Formula"
+	depends on FB_I810
+	help
+	  If you say Y, then the VESA standard, Generalized Timing Formula 
+          or GTF, will be used to calculate the required video timing values
+	  per video mode.  Since the GTF allows nondiscrete timings 
+          (nondiscrete being a range of values as opposed to discrete being a
+          set of values), you'll be able to use any combination of horizontal 
+	  and vertical resolutions, and vertical refresh rates without having
+	  to specify your own timing parameters.  This is especially useful
+	  to maximize the performance of an aging display, or if you just 
+          have a display with nonstandard dimensions. A VESA compliant 
+	  monitor is recommended, but can still work with non-compliant ones.
+	  If you need or want this, then select this option. The timings may 
+	  not be compliant with Intel's recommended values. Use at your own 
+	  risk.
+
+          If you say N, the driver will revert to discrete video timings 
+	  using a set recommended by Intel in their documentation.
+  
+          If unsure, say N.
 
 config FB_MATROX
 	tristate "Matrox acceleration"
@@ -759,7 +791,7 @@ config FB_TRIDENT
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called rivafb.o. If you want to compile it as a
+	  module will be called tridentfb.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_PM3

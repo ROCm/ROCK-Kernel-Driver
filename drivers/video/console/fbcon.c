@@ -93,8 +93,6 @@
 #include <asm/machdep.h>
 #include <asm/setup.h>
 #endif
-#define INCLUDE_LINUX_LOGO_DATA
-#include <asm/linux_logo.h>
 
 #include "fbcon.h"
 #include "font.h"
@@ -203,8 +201,6 @@ static __inline__ void ypan_down(struct display *p, struct vc_data *vc,
 static void fbcon_bmove_rec(struct display *p, int sy, int sx, int dy,
 			    int dx, int height, int width, u_int y_break);
 
-static int fbcon_show_logo(void);
-
 #ifdef CONFIG_MAC
 /*
  * On the Macintoy, there may or may not be a working VBL int. We need to probe
@@ -291,7 +287,10 @@ void gen_set_disp(int con, struct fb_info *info)
 	struct display *display = fb_display + con;
 
 	display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;
-	display->scrollmode = SCROLL_YNOMOVE;
+	if (info->var.accel_flags)
+		display->scrollmode = SCROLL_YNOMOVE;
+	else
+		display->scrollmode = SCROLL_YREDRAW;
 	fbcon_changevar(con);
 	return;
 }
@@ -800,14 +799,6 @@ static int fbcon_changevar(int con)
 			p->fontdata = font->data;
 		}
 
-#ifdef FONTWIDTH8_ONLY		
-		if (!fontwidthvalid(p, vc->vc_font.width)) {
-			/* ++Geert: changed from panic() to `correct and continue' */
-			printk(KERN_ERR
-		       		"fbcon_set_display: No support for fontwidth %d\n",
-		       		vc->vc_font.width);
-		}
-#endif		
 		updatescrollmode(p, vc);
 
 		old_cols = vc->vc_cols;
@@ -926,11 +917,11 @@ static void fbcon_set_display(int con, int init, int logo)
 		struct display *q = &fb_display[i];
 		struct vc_data *tmp = vc_cons[i].d;
 		
-		if (fontwidthvalid(p, vc->vc_font.width)) {
+		if (!fontwidthvalid(p, vc->vc_font.width)) {
 			/* If we are not the first console on this
 			   fb, copy the font from that console */
-			tmp->vc_font.width = vc->vc_font.width;
-			tmp->vc_font.height = vc->vc_font.height;
+			vc->vc_font.width = tmp->vc_font.width;
+			vc->vc_font.height = tmp->vc_font.height;
 			p->fontdata = q->fontdata;
 			p->userfont = q->userfont;
 			if (p->userfont) {
@@ -950,14 +941,6 @@ static void fbcon_set_display(int con, int init, int logo)
 		p->fontdata = font->data;
 	}
 
-#ifdef FONTWIDTH8_ONLY		
-	if (!fontwidthvalid(p, vc->vc_font.width)) {
-		/* ++Geert: changed from panic() to `correct and continue' */
-		printk(KERN_ERR
-		       "fbcon_set_display: No support for fontwidth %d\n",
-		       vc->vc_font.width);
-	}
-#endif	
 	updatescrollmode(p, vc);
 
 	old_cols = vc->vc_cols;
@@ -1942,7 +1925,7 @@ static int fbcon_switch(struct vc_data *vc)
 		accel_clear_margins(vc, p, 0);
 	if (logo_shown == -2) {
 		logo_shown = fg_console;
-		fbcon_show_logo();	/* This is protected above by initmem_freed */
+		fb_show_logo(info);	/* This is protected above by initmem_freed */
 		update_region(fg_console,
 			      vc->vc_origin + vc->vc_size_row * vc->vc_top,
 			      vc->vc_size_row * (vc->vc_bottom -
@@ -2011,10 +1994,6 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 	u8 *fontdata = p->fontdata;
 	int i, j;
 
-#ifdef CONFIG_FONTWIDTH8_ONLY
-	if (fontwidth(p) != 8)
-		return -EINVAL;
-#endif
 	op->width = vc->vc_font.width;
 	op->height = vc->vc_font.height;
 	op->charcount = (p->charmask == 0x1ff) ? 512 : 256;
@@ -2029,9 +2008,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 			data += 32;
 			fontdata += j;
 		}
-	}
-#ifndef CONFIG_FONTWIDTH8_ONLY
-	else if (op->width <= 16) {
+	} else if (op->width <= 16) {
 		j = vc->vc_font.height * 2;
 		for (i = 0; i < op->charcount; i++) {
 			memcpy(data, fontdata, j);
@@ -2059,7 +2036,6 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 			fontdata += j;
 		}
 	}
-#endif
 	return 0;
 }
 
@@ -2212,10 +2188,6 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 	int i, k;
 	u8 *new_data, *data = op->data, *p;
 
-#ifdef CONFIG_FONTWIDTH8_ONLY
-	if (w != 8)
-		return -EINVAL;
-#endif
 	if ((w <= 0) || (w > 32)
 	    || (op->charcount != 256 && op->charcount != 512))
 		return -EINVAL;
@@ -2243,9 +2215,7 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 			data += 32;
 			p += h;
 		}
-	}
-#ifndef CONFIG_FONTWIDTH8_ONLY
-	else if (w <= 16) {
+	} else if (w <= 16) {
 		h *= 2;
 		for (i = 0; i < op->charcount; i++) {
 			memcpy(p, data, h);
@@ -2271,7 +2241,6 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 			p += h;
 		}
 	}
-#endif
 	/* we can do it in u32 chunks because of charcount is 256 or 512, so
 	   font length must be multiple of 256, at least. And 256 is multiple
 	   of 4 */
@@ -2344,8 +2313,7 @@ static struct fb_cmap palette_cmap = {
 
 static int fbcon_set_palette(struct vc_data *vc, unsigned char *table)
 {
-	int unit = vc->vc_num;
-	struct display *p = &fb_display[unit];
+	struct display *p = &fb_display[vc->vc_num];
 	struct fb_info *info = p->fb_info;
 	int i, j, k;
 	u8 val;
@@ -2543,253 +2511,6 @@ static int fbcon_set_origin(struct vc_data *vc)
 	if (softback_lines && !console_blanked)
 		fbcon_scrolldelta(vc, softback_lines);
 	return 0;
-}
-
-static inline unsigned safe_shift(unsigned d, int n)
-{
-	return n < 0 ? d >> -n : d << n;
-}
-
-static void __init fbcon_set_logocmap(struct fb_info *info)
-{
-	int i, j, n;
-
-	for (i = 0; i < LINUX_LOGO_COLORS; i += n) {
-		n = LINUX_LOGO_COLORS - i;
-		if (n > 16)
-			/* palette_cmap provides space for only 16 colors at once */
-			n = 16;
-		palette_cmap.start = 32 + i;
-		palette_cmap.len = n;
-		for (j = 0; j < n; ++j) {
-			palette_cmap.red[j] =
-				(linux_logo_red[i + j] << 8) |
-				linux_logo_red[i + j];
-			palette_cmap.green[j] =
-				(linux_logo_green[i + j] << 8) |
-				linux_logo_green[i + j];
-			palette_cmap.blue[j] =
-				(linux_logo_blue[i + j] << 8) |
-				linux_logo_blue[i + j];
-		}
-		fb_set_cmap(&palette_cmap, 1, info);
-	}
-}
-
-static void  __init fbcon_set_logo_truepalette(struct fb_info *info, u32 *palette)
-{
-	unsigned char mask[9] = { 0,0x80,0xc0,0xe0,0xf0,0xf8,0xfc,0xfe,0xff };
-	unsigned char redmask, greenmask, bluemask;
-	int redshift, greenshift, blueshift;
-	int i;
-	
-	/*
-	 * We have to create a temporary palette since console palette is only
-	 * 16 colors long.
-	 */
-	/* Bug: Doesn't obey msb_right ... (who needs that?) */
-	redmask   = mask[info->var.red.length   < 8 ? info->var.red.length   : 8];
-	greenmask = mask[info->var.green.length < 8 ? info->var.green.length : 8];
-	bluemask  = mask[info->var.blue.length  < 8 ? info->var.blue.length  : 8];
-	redshift   = info->var.red.offset   - (8 - info->var.red.length);
-	greenshift = info->var.green.offset - (8 - info->var.green.length);
-	blueshift  = info->var.blue.offset  - (8 - info->var.blue.length);
-	
-	
-	for ( i = 0; i < LINUX_LOGO_COLORS; i++) {
-		palette[i+32] = (safe_shift((linux_logo_red[i]   & redmask), redshift) |
-				 safe_shift((linux_logo_green[i] & greenmask), greenshift) |
-				 safe_shift((linux_logo_blue[i]  & bluemask), blueshift));
-	}
-}
-
-static void __init fbcon_set_logo_directpalette(struct fb_info *info, u32 *palette)
-{
-	int redshift, greenshift, blueshift;
-	int i;
-
-	redshift = info->var.red.offset;
-	greenshift = info->var.green.offset;
-	blueshift = info->var.blue.offset;
-	
-	for (i = 32; i < LINUX_LOGO_COLORS; i++) 
-		palette[i] = i << redshift | i << greenshift | i << blueshift;
-
-}
-	
-static void __init fbcon_set_logo(struct fb_info *info, u8 *logo, int needs_logo)
-{
-	int i, j;
-
-	switch (needs_logo) {
-	case 4:
-		for (i = 0; i < (LOGO_W * LOGO_H)/2; i++) {
-			logo[i*2] = linux_logo16[i] >> 4;
-			logo[(i*2)+1] = linux_logo16[i] & 0xf;
-		}
-		break;
-	case 1:
-	case ~1:
-	default:
-		for (i = 0; i < (LOGO_W * LOGO_H)/8; i++) 
-			for (j = 0; j < 8; j++) 
-				logo[i*2] = (linux_logo_bw[i] &  (7 - j)) ? 
-					((needs_logo == 1) ? 1 : 0) :
-					((needs_logo == 1) ? 0 : 1);
-				
-		break;
-	} 
-}	
-	
-/*
- * Three (3) kinds of logo maps exist.  linux_logo (>16 colors), linux_logo_16 
- * (16 colors) and linux_logo_bw (2 colors).  Depending on the visual format and
- * color depth of the framebuffer, the DAC, the pseudo_palette, and the logo data
- * will be adjusted accordingly.
- *
- * Case 1 - linux_logo:
- * Color exceeds the number of console colors (16), thus we set the hardware DAC 
- * using fb_set_cmap() appropriately.  The "needs_cmapreset"  flag will be set. 
- *
- * For visuals that require color info from the pseudo_palette, we also construct
- * one for temporary use. The "needs_directpalette" or "needs_truepalette" flags
- * will be set.
- *
- * Case 2 - linux_logo_16:
- * The number of colors just matches the console colors, thus there is no need
- * to set the DAC or the pseudo_palette.  However, the bitmap is packed, ie, 
- * each byte contains color information for two pixels (upper and lower nibble).  
- * To be consistent with fb_imageblit() usage, we therefore separate the two 
- * nibbles into separate bytes. The "needs_logo" flag will be set to 4.
- *
- * Case 3 - linux_logo_bw:
- * This is similar with Case 2.  Each byte contains information for 8 pixels.
- * We isolate each bit and expand each into a byte. The "needs_logo" flag will
- * be set to 1.
- */
-static int __init fbcon_show_logo(void)
-	{
-		struct display *p = &fb_display[fg_console];	/* draw to vt in foreground */
-	struct fb_info *info = p->fb_info;
-	struct vc_data *vc = info->display_fg;
-	struct fb_image image;
-	u32 *palette = NULL, *saved_palette = NULL;
-	unsigned char *fb = info->screen_base, *logo_new = NULL;
-	int done = 0, x;
-	int needs_cmapreset = 0;
-	int needs_truepalette = 0;
-	int needs_directpalette = 0;
-	int needs_logo = 0;
-
-	/* Return if the frame buffer is not mapped */
-	if (!fb || !info->fbops->fb_imageblit)
-		return 0;
-
-	image.depth = info->var.bits_per_pixel;
-
-	/* reasonable default */
-	if (image.depth >= 8)
-		image.data = linux_logo;
-	else if (image.depth >= 4) 
-		image.data = linux_logo16;
-	else 
-		image.data = linux_logo_bw;
-
-	switch (info->fix.visual) {
-	case FB_VISUAL_TRUECOLOR:
-		needs_truepalette = 1;
-		if (image.depth >= 4 && image.depth <= 8)
-			needs_logo = 4;
-		else if (image.depth < 4)
-			needs_logo = 1;
-		break;
-	case FB_VISUAL_DIRECTCOLOR:
-		if (image.depth >= 24) {
-			needs_directpalette = 1;
-			needs_cmapreset = 1;
-		}
-		/* 16 colors */
-		else if (image.depth >= 16)
-			needs_logo = 4;
-		/* 2 colors */
-		else
-			needs_logo = 1;
-		break;
-	case FB_VISUAL_MONO01:
-		/* reversed 0 = fg, 1 = bg */
-		needs_logo = ~1;
-		break;
-	case FB_VISUAL_MONO10:
-		needs_logo = 1;
-		break;
-	case FB_VISUAL_PSEUDOCOLOR:
-	default:
-		if (image.depth >= 8)
-			needs_cmapreset = 1;
-		/* fall through */
-	case FB_VISUAL_STATIC_PSEUDOCOLOR:
-		/* 16 colors */
-		if (image.depth >= 4 && image.depth < 8)
-			needs_logo = 4;
-		/* 2 colors */
-		else if (image.depth < 4)
-			needs_logo = 1;
-		break;
-	}		    
-	
-	if (needs_cmapreset) 
-		fbcon_set_logocmap(info);
-	
-	if (needs_truepalette || needs_directpalette) {
-		palette = kmalloc(256 * 4, GFP_KERNEL);
-		if (palette == NULL)
-			return 1;
-
-		if (needs_truepalette)
-			fbcon_set_logo_truepalette(info, palette);
-		else
-			fbcon_set_logo_directpalette(info, palette);
-
-		saved_palette = info->pseudo_palette;
-		info->pseudo_palette = palette;
-	}
-	
-	if (needs_logo) {
-		logo_new = kmalloc(LOGO_W * LOGO_H, GFP_KERNEL);
-		if (logo_new == NULL) {
-			if (palette)
-				kfree(palette);
-			if (saved_palette)
-				info->pseudo_palette = saved_palette;
-			return 1;
-		}
-
-		image.data = logo_new;
-		fbcon_set_logo(info, logo_new, needs_logo);
-	}
-
-	image.width = LOGO_W;
-	image.height = LOGO_H;
-	image.dy = 0;
-
-	for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
-	     x < info->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
-		image.dx = x;
-		info->fbops->fb_imageblit(info, &image);
-		done = 1;
-	}
-
-	if (palette != NULL)
-		kfree(palette);
-	if (saved_palette != NULL)
-		info->pseudo_palette = saved_palette;
-	if (logo_new != NULL)
-		kfree(logo_new);
-	/* 
-	 * Modes not yet supported: packed pixels with depth != 8 (does such a
-	 * thing exist in reality?) 
-	 */
-	return done ? (LOGO_H + vc->vc_font.height - 1) / vc->vc_font.height : 0;
 }
 
 /*

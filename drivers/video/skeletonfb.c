@@ -129,6 +129,40 @@ int xxxfb_init(void);
 int xxxfb_setup(char*);
 
 /**
+ *	xxxfb_open - Optional function. Called when the framebuffer is
+ *		     first accessed.
+ *	@info: frame buffer structure that represents a single frame buffer
+ *	@user: tell us if the userland (value=1) or the console is accessing
+ *	       the framebuffer. 
+ *
+ *	This function is the first function called in the framebuffer api.
+ *	Usually you don't need to provide this function. The case where it 
+ *	is used is to change from a text mode hardware state to a graphics
+ * 	mode state. 
+ */
+static int xxxfb_open(const struct fb_info *info, int user)
+{
+    return 0;
+}
+
+/**
+ *	xxxfb_release - Optional function. Called when the framebuffer 
+ *			device is closed. 
+ *	@info: frame buffer structure that represents a single frame buffer
+ *	@user: tell us if the userland (value=1) or the console is accessing
+ *	       the framebuffer. 
+ *	
+ *	Thus function is called when we close /dev/fb or the framebuffer 
+ *	console system is released. Usually you don't need this function.
+ *	The case where it is usually used is to go from a graphics state
+ *	to a text mode state.
+ */
+static int xxxfb_release(const struct fb_info *info, int user)
+{
+    return 0;
+}
+
+/**
  *      xxxfb_check_var - Optional function. Validates a var passed in. 
  *      @var: frame buffer variable screen structure
  *      @info: frame buffer structure that represents a single frame buffer 
@@ -143,7 +177,10 @@ int xxxfb_setup(char*);
  *	off by what the hardware can support then we alter the var PASSED in
  *	to what we can do. If the hardware doesn't support mode change 
  * 	a -EINVAL will be returned by the upper layers. You don't need to 
- *	implement this function then.
+ *	implement this function then. If you hardware doesn't support 
+ *	changing the resolution then this function is not needed. In this
+ *	case the driver woudl just provide a var that represents the static
+ *	state the screen is in.
  *
  *	Returns negative errno on error, or zero on success.
  */
@@ -164,6 +201,7 @@ static int xxxfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
  *	fb_info since we are using that data. This means we depend on the
  *	data in var inside fb_info to be supported by the hardware. 
  *	xxxfb_check_var is always called before xxxfb_set_par to ensure this.
+ *	Again if you can't can't the resolution you don't need this function.
  *
  */
 static int xxxfb_set_par(struct fb_info *info)
@@ -175,8 +213,8 @@ static int xxxfb_set_par(struct fb_info *info)
 
 /**
  *  	xxxfb_setcolreg - Optional function. Sets a color register.
- *      @regno: boolean, 0 copy local, 1 get_user() function
- *      @red: frame buffer colormap structure
+ *      @regno: Which register in the CLUT we are programming 
+ *      @red: The red value which can be up to 16 bits wide 
  *	@green: The green value which can be up to 16 bits wide 
  *	@blue:  The blue value which can be up to 16 bits wide.
  *	@transp: If supported the alpha value which can be up to 16 bits wide.	
@@ -284,12 +322,6 @@ static int xxxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 }
 
 /**
- *	xxxfb_cursor -
- *
- *	Returns negative errno on error, or zero on success.
- */
-
-/**
  *      xxxfb_pan_display - NOT a required function. Pans the display.
  *      @var: frame buffer variable screen structure
  *      @info: frame buffer structure that represents a single frame buffer
@@ -299,7 +331,6 @@ static int xxxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
  *  	If the values don't fit, return -EINVAL.
  *
  *      Returns negative errno on error, or zero on success.
- *
  */
 static int xxxfb_pan_display(struct fb_var_screeninfo *var,
 			     const struct fb_info *info)
@@ -335,12 +366,9 @@ static int xxxfb_blank(int blank_mode, const struct fb_info *info)
 /*
  * We provide our own functions if we have hardware acceleration
  * or non packed pixel format layouts. If we have no hardware 
- * acceleration, we use a generic unaccelerated function. If using
- * a pack pixel format just use the functions in cfb*.c. Each file 
- * has one of the three different accel functions we support. You   
- * can use these functions as fallbacks if hardware unsupported
- * action is requested. Also if you have non pack pixel modes and
- * non accelerated cards you have to provide your own functions.
+ * acceleration, we can use a generic unaccelerated function. If using
+ * a pack pixel format just use the functions in cfb_*.c. Each file 
+ * has one of the three different accel functions we support.
  */
 
 /**
@@ -349,40 +377,51 @@ static int xxxfb_blank(int blank_mode, const struct fb_info *info)
  *			 Draws a rectangle on the screen.		
  *
  *      @info: frame buffer structure that represents a single frame buffer
- *	@x1: The x and y corrdinates of the upper left hand corner of the 
- *	@y1: area we want to draw to. 
- *	@width: How wide the rectangle is we want to draw.
- *	@height: How tall the rectangle is we want to draw.
- *	@color:	The color to fill in the rectangle with. 
- *	@rop: The rater operation. We can draw the rectangle with a COPY
- *	      of XOR which provides erasing effect. 
+ *	@region: The structure representing the rectangular region we 
+ *		 wish to draw to.
  *
  *	This drawing operation places/removes a retangle on the screen 
  *	depending on the rastering operation with the value of color which
  *	is in the current color depth format.
  */
-void xxxfb_fillrect(struct fb_info *p, struct fb_fillrect *region)
+void xxfb_fillrect(struct fb_info *p, struct fb_fillrect *region)
 {
+/*	Meaning of struct fb_fillrect
+ *
+ *	@dx: The x and y corrdinates of the upper left hand corner of the 
+ *	@dy: area we want to draw to. 
+ *	@width: How wide the rectangle is we want to draw.
+ *	@height: How tall the rectangle is we want to draw.
+ *	@color:	The color to fill in the rectangle with. 
+ *	@rop: The raster operation. We can draw the rectangle with a COPY
+ *	      of XOR which provides erasing effect. 
+ */
 }
 
 /**
  *      xxxfb_copyarea - REQUIRED function. Can use generic routines if
  *                       non acclerated hardware and packed pixel based.
- *                       Copies on area of the screen to another area.
+ *                       Copies one area of the screen to another area.
  *
  *      @info: frame buffer structure that represents a single frame buffer
- *      @sx: The x and y corrdinates of the upper left hand corner of the
- *      @sy: source area on the screen.
- *      @width: How wide the rectangle is we want to copy.
- *      @height: How tall the rectangle is we want to copy.
- *      @dx: The x and y coordinates of the destination area on the screen.
+ *      @area: Structure providing the data to copy the framebuffer contents
+ *	       from one region to another.
  *
  *      This drawing operation copies a rectangular area from one area of the
  *	screen to another area.
  */
 void xxxfb_copyarea(struct fb_info *p, struct fb_copyarea *area) 
 {
+/*
+ *      @dx: The x and y coordinates of the upper left hand corner of the
+ *	@dy: destination area on the screen.
+ *      @width: How wide the rectangle is we want to copy.
+ *      @height: How tall the rectangle is we want to copy.
+ *      @sx: The x and y coordinates of the upper left hand corner of the
+ *      @sy: source area on the screen.
+ */
 }
+
 
 /**
  *      xxxfb_imageblit - REQUIRED function. Can use generic routines if
@@ -398,9 +437,89 @@ void xxxfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
  */
 void xxxfb_imageblit(struct fb_info *p, struct fb_image *image) 
 {
+/*
+ *      @dx: The x and y coordinates of the upper left hand corner of the
+ *	@dy: destination area to place the image on the screen.
+ *      @width: How wide the image is we want to copy.
+ *      @height: How tall the image is we want to copy.
+ *      @fg_color: For mono bitmap images this is color data for     
+ *      @bg_color: the foreground and background of the image to
+ *		   write directly to the frmaebuffer.
+ *	@depth:	How many bits represent a single pixel for this image.
+ *	@data: The actual data used to construct the image on the display.
+ *	@cmap: The colormap used for color images.   
+ */
 }
 
-/* ------------ Hardware Independent Functions ------------ */
+/**
+ *	xxxfb_cursor - 	REQUIRED function. If your hardware lacks support
+ *			for a cursor you can use the default cursor whose
+ *			function is called soft_cursor. It will always 
+ *			work since it uses xxxfb_imageblit function which 
+ *			is required. 	  	 
+ *
+ *      @info: frame buffer structure that represents a single frame buffer
+ *	@cursor: structure defining the cursor to draw.
+ *
+ *      This operation is used to set or alter the properities of the
+ *	cursor.
+ *
+ *	Returns negative errno on error, or zero on success.
+ */
+int xxxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
+{
+/*
+ *      @set: 	Which fields we are altering in struct fb_cursor 
+ *	@enable: Disable or enable the cursor 
+ *      @rop: 	The bit operation we want to do. 
+ *      @mask:  This is the cursor mask bitmap. 
+ *      @dest:  A image of the area we are going to display the cursor.
+ *		Used internally by the driver.	 
+ *      @hot:	The hot spot. 
+ *	@image:	The actual data for the cursor image.
+ */
+}
+
+/**
+ *	xxxfb_rotate -  NOT a required function. If your hardware
+ *			supports rotation the whole screen then 
+ *			you would provide a hook for this. 
+ *
+ *      @info: frame buffer structure that represents a single frame buffer
+ *	@angle: The angle we rotate the screen.   
+ *
+ *      This operation is used to set or alter the properities of the
+ *	cursor.
+ */
+void xxxfb_rotate(struct fb_info *info, int angle)
+{
+}
+
+/**
+ *	xxxfb_poll - NOT a required function. The purpose of this
+ *		     function is to provide a way for some process
+ *		     to wait until a specific hardware event occurs
+ *		     for the framebuffer device.
+ * 				 
+ *      @info: frame buffer structure that represents a single frame buffer
+ *	@wait: poll table where we store process that await a event.     
+ */
+void xxxfb_poll(struct fb_info *info, poll_table *wait)
+{
+}
+
+/**
+ *	xxxfb_sync - NOT a required function. Normally the accel engine 
+ *		     for a graphics card take a specific amount of time.
+ *		     Often we have to wait for the accelerator to finish
+ *		     its operation before we can write to the framebuffer
+ *		     so we can have consistant display output. 
+ *
+ *      @info: frame buffer structure that represents a single frame buffer
+ */
+void xxxfb_sync(struct fb_info *info)
+{
+}
 
     /*
      *  Initialization
@@ -480,39 +599,32 @@ int __init xxxfb_setup(char *options)
     /* Parse user speficied options (`video=xxxfb:') */
 }
 
-
 /* ------------------------------------------------------------------------- */
 
     /*
      *  Frame buffer operations
      */
 
-/* If all you need is that - just don't define ->fb_open */
-static int xxxfb_open(const struct fb_info *info, int user)
-{
-    return 0;
-}
-
-/* If all you need is that - just don't define ->fb_release */
-static int xxxfb_release(const struct fb_info *info, int user)
-{
-    return 0;
-}
-
 static struct fb_ops xxxfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_open	= xxxfb_open,    /* only if you need it to do something */
-	.fb_release	= xxxfb_release, /* only if you need it to do something */
+	.fb_open	= xxxfb_open,
+	.fb_read	= xxxfb_read,
+	.fb_write	= xxxfb_write,
+	.fb_release	= xxxfb_release,
 	.fb_check_var	= xxxfb_check_var,
-	.fb_set_par	= xxxfb_set_par,	/* optional */	
+	.fb_set_par	= xxxfb_set_par,	
 	.fb_setcolreg	= xxxfb_setcolreg,
-	.fb_blank	= xxxfb_blank,		/* optional */
-	.fb_pan_display	= xxxfb_pan_display,	/* optional */	
-	.fb_fillrect	= xxxfb_fillrect,  
-	.fb_copyarea	= xxxfb_copyarea,  
-	.fb_imageblit	= xxxfb_imageblit, 
-	.fb_ioctl	= xxxfb_ioctl,		/* optional */
-	.fb_mmap	= xxxfb_mmap,		/* optional */	
+	.fb_blank	= xxxfb_blank,
+	.fb_pan_display	= xxxfb_pan_display,	
+	.fb_fillrect	= xxxfb_fillrect, 	/* Needed !!! */ 
+	.fb_copyarea	= xxxfb_copyarea,	/* Needed !!! */ 
+	.fb_imageblit	= xxxfb_imageblit,	/* Needed !!! */
+	.fb_cursor	= xxxfb_cursor,		/* Needed !!! */
+	.fb_rotate	= xxxfb_rotate,
+	.fb_poll	= xxxfb_poll,
+	.fb_sync	= xxxfb_sync,
+	.fb_ioctl	= xxxfb_ioctl,
+	.fb_mmap	= xxxfb_mmap,	
 };
 
 /* ------------------------------------------------------------------------- */
