@@ -196,9 +196,11 @@ static int pfkey_release(struct socket *sock)
 	return 0;
 }
 
-static void pfkey_broadcast_one(struct sk_buff *skb, struct sk_buff **skb2,
-				int allocation, struct sock *sk)
+static int pfkey_broadcast_one(struct sk_buff *skb, struct sk_buff **skb2,
+			       int allocation, struct sock *sk)
 {
+	int err = -ENOBUFS;
+
 	sock_hold(sk);
 	if (*skb2 == NULL) {
 		if (atomic_read(&skb->users) != 1) {
@@ -215,9 +217,11 @@ static void pfkey_broadcast_one(struct sk_buff *skb, struct sk_buff **skb2,
 			skb_queue_tail(&sk->receive_queue, *skb2);
 			sk->data_ready(sk, (*skb2)->len);
 			*skb2 = NULL;
+			err = 0;
 		}
 	}
 	sock_put(sk);
+	return err;
 }
 
 /* Send SKB to all pfkey sockets matching selected criteria.  */
@@ -225,21 +229,23 @@ static void pfkey_broadcast_one(struct sk_buff *skb, struct sk_buff **skb2,
 #define BROADCAST_ONE		1
 #define BROADCAST_REGISTERED	2
 #define BROADCAST_PROMISC_ONLY	4
-static void pfkey_broadcast(struct sk_buff *skb, int allocation,
-			    int broadcast_flags, struct sock *one_sk)
+static int pfkey_broadcast(struct sk_buff *skb, int allocation,
+			   int broadcast_flags, struct sock *one_sk)
 {
 	struct sock *sk;
 	struct sk_buff *skb2 = NULL;
+	int err = -ESRCH;
 
 	/* XXX Do we need something like netlink_overrun?  I think
 	 * XXX PF_KEY socket apps will not mind current behavior.
 	 */
 	if (!skb)
-		return;
+		return -ENOMEM;
 
 	pfkey_lock_table();
 	for (sk = pfkey_table; sk; sk = sk->next) {
 		struct pfkey_opt *pfk = pfkey_sk(sk);
+		int err2;
 
 		/* Yes, it means that if you are meant to receive this
 		 * pfkey message you receive it twice as promiscuous
@@ -261,16 +267,22 @@ static void pfkey_broadcast(struct sk_buff *skb, int allocation,
 				continue;
 		}
 
-		pfkey_broadcast_one(skb, &skb2, allocation, sk);
+		err2 = pfkey_broadcast_one(skb, &skb2, allocation, sk);
+
+		/* Error is cleare after succecful sending to at least one
+		 * registered KM */
+		if ((broadcast_flags & BROADCAST_REGISTERED) && err)
+			err = err2;
 	}
 	pfkey_unlock_table();
 
 	if (one_sk != NULL)
-		pfkey_broadcast_one(skb, &skb2, allocation, one_sk);
+		err = pfkey_broadcast_one(skb, &skb2, allocation, one_sk);
 
 	if (skb2)
 		kfree_skb(skb2);
 	kfree_skb(skb);
+	return err;
 }
 
 static inline void pfkey_hdr_dup(struct sadb_msg *new, struct sadb_msg *orig)
@@ -1101,8 +1113,12 @@ static int pfkey_acquire(struct sock *sk, struct sk_buff *skb, struct sadb_msg *
 	if (x == NULL)
 		return 0;
 
-	if (x->km.state == XFRM_STATE_ACQ)
-		xfrm_state_delete(x);
+	spin_lock_bh(&x->lock);
+	if (x->km.state == XFRM_STATE_ACQ) {
+		x->km.state = XFRM_STATE_ERROR;
+		wake_up(&km_waitq);
+	}
+	spin_unlock_bh(&x->lock);
 	xfrm_state_put(x);
 	return 0;
 }
@@ -1783,14 +1799,10 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	struct sk_buff *out_skb;
 	struct sadb_msg *out_hdr;
 
-	if (!ext_hdrs[SADB_X_EXT_POLICY-1])
+	if ((pol = ext_hdrs[SADB_X_EXT_POLICY-1]) == NULL)
 		return -EINVAL;
 
-	pol = ext_hdrs[SADB_X_EXT_POLICY-1];
-	if (!pol->sadb_x_policy_dir || pol->sadb_x_policy_dir >= IPSEC_DIR_MAX)
-		return -EINVAL;
-
-	xp = xfrm_policy_byid(pol->sadb_x_policy_dir-1, pol->sadb_x_policy_id,
+	xp = xfrm_policy_byid(0, pol->sadb_x_policy_id,
 			      hdr->sadb_msg_type == SADB_X_SPDDELETE2);
 	if (xp == NULL)
 		return -ENOENT;
@@ -2142,9 +2154,7 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	else if (x->id.proto == IPPROTO_ESP)
 		dump_esp_combs(skb, t);
 
-	pfkey_broadcast(skb, GFP_ATOMIC, BROADCAST_REGISTERED, NULL);
-
-	return 0;
+	return pfkey_broadcast(skb, GFP_ATOMIC, BROADCAST_REGISTERED, NULL);
 }
 
 static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int *dir)

@@ -266,14 +266,14 @@ config VLAN_8021Q
 	tristate "802.1Q VLAN Support"
 
 config LLC
-	tristate "ANSI/IEEE 802.2 Data link layer protocol (IPX, Appletalk)"
+	tristate "ANSI/IEEE 802.2 - aka LLC (IPX, Appletalk, Token Ring)"
 	help
-	  This is a Logical Link Layer protocol used for Appletalk, IPX and in
-	  the future by NetBEUI and by the linux-sna project. It originally
-	  came from Procom Inc. that released the code for 2.0.36 and was
-	  ported to 2.{4,5}. Select this if you want to have support for
-	  those protocols or if you want to have the sockets interface for
-	  LLC.
+	  This is a Logical Link Layer protocol used for Appletalk, IPX,
+	  Token Ring devices, the linux-sna.org project and in the future by
+	  NetBEUI. It originally came from Procom Inc. that released the code
+	  for 2.0.36 and was heavily modified to work with 2.{4,5}.
+	  Select this if you want to have support for those protocols or if
+	  you want to have the sockets interface for LLC.
 	  
 
 config LLC_UI

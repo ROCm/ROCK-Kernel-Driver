@@ -204,6 +204,50 @@ void xfrm_put_type(struct xfrm_type *type)
 		__MOD_DEC_USE_COUNT(type->owner);
 }
 
+static inline unsigned long make_jiffies(long secs)
+{
+	if (secs >= (MAX_SCHEDULE_TIMEOUT-1)/HZ)
+		return MAX_SCHEDULE_TIMEOUT-1;
+	else
+	        return secs*HZ;
+}
+
+static void xfrm_policy_timer(unsigned long data)
+{
+	struct xfrm_policy *xp = (struct xfrm_policy*)data;
+	unsigned long now = (unsigned long)xtime.tv_sec;
+	long next = LONG_MAX;
+
+	if (xp->dead)
+		goto out;
+
+	if (xp->lft.hard_add_expires_seconds) {
+		long tmo = xp->lft.hard_add_expires_seconds +
+			xp->curlft.add_time - now;
+		if (tmo <= 0)
+			goto expired;
+		if (tmo < next)
+			next = tmo;
+	}
+	if (next != LONG_MAX &&
+	    !mod_timer(&xp->timer, jiffies + make_jiffies(next)))
+		atomic_inc(&xp->refcnt);
+
+out:
+	xfrm_pol_put(xp);
+	return;
+
+expired:
+	xfrm_pol_put(xp);
+
+	/* Not 100% correct. id can be recycled in theory */
+	xp = xfrm_policy_byid(0, xp->index, 1);
+	if (xp) {
+		xfrm_policy_kill(xp);
+		xfrm_pol_put(xp);
+	}
+}
+
 
 /* Allocate xfrm_policy. Not used here, it is supposed to be used by pfkeyv2
  * SPD calls.
@@ -219,6 +263,9 @@ struct xfrm_policy *xfrm_policy_alloc(int gfp)
 		memset(policy, 0, sizeof(struct xfrm_policy));
 		atomic_set(&policy->refcnt, 1);
 		policy->lock = RW_LOCK_UNLOCKED;
+		init_timer(&policy->timer);
+		policy->timer.data = (unsigned long)policy;
+		policy->timer.function = xfrm_policy_timer;
 	}
 	return policy;
 }
@@ -231,6 +278,9 @@ void __xfrm_policy_destroy(struct xfrm_policy *policy)
 		BUG();
 
 	if (policy->bundles)
+		BUG();
+
+	if (del_timer(&policy->timer))
 		BUG();
 
 	kfree(policy);
@@ -254,6 +304,9 @@ void xfrm_policy_kill(struct xfrm_policy *policy)
 		policy->bundles = dst->next;
 		dst_free(dst);
 	}
+
+	if (del_timer(&policy->timer))
+		atomic_dec(&policy->refcnt);
 
 out:
 	write_unlock_bh(&policy->lock);
@@ -302,6 +355,9 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	policy->index = pol ? pol->index : xfrm_gen_index(dir);
 	policy->curlft.add_time = (unsigned long)xtime.tv_sec;
 	policy->curlft.use_time = 0;
+	if (policy->lft.hard_add_expires_seconds &&
+	    !mod_timer(&policy->timer, jiffies + HZ))
+		atomic_inc(&policy->refcnt);
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (pol) {
@@ -380,7 +436,7 @@ int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*),
 	int count = 0;
 	int error = 0;
 
-	read_lock(&xfrm_policy_lock);
+	read_lock_bh(&xfrm_policy_lock);
 	for (dir = 0; dir < 2*XFRM_POLICY_MAX; dir++) {
 		for (xp = xfrm_policy_list[dir]; xp; xp = xp->next)
 			count++;
@@ -400,7 +456,7 @@ int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*),
 	}
 
 out:
-	read_unlock(&xfrm_policy_lock);
+	read_unlock_bh(&xfrm_policy_lock);
 	return error;
 }
 
@@ -411,7 +467,7 @@ struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl)
 {
 	struct xfrm_policy *pol;
 
-	read_lock(&xfrm_policy_lock);
+	read_lock_bh(&xfrm_policy_lock);
 	for (pol = xfrm_policy_list[dir]; pol; pol = pol->next) {
 		struct xfrm_selector *sel = &pol->selector;
 
@@ -420,7 +476,7 @@ struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl)
 			break;
 		}
 	}
-	read_unlock(&xfrm_policy_lock);
+	read_unlock_bh(&xfrm_policy_lock);
 	return pol;
 }
 
@@ -428,14 +484,14 @@ struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi
 {
 	struct xfrm_policy *pol;
 
-	read_lock(&xfrm_policy_lock);
+	read_lock_bh(&xfrm_policy_lock);
 	if ((pol = sk->policy[dir]) != NULL) {
 		if (xfrm4_selector_match(&pol->selector, fl))
 			atomic_inc(&pol->refcnt);
 		else
 			pol = NULL;
 	}
-	read_unlock(&xfrm_policy_lock);
+	read_unlock_bh(&xfrm_policy_lock);
 	return pol;
 }
 
@@ -727,8 +783,7 @@ restart:
 			return 0;
 	}
 
-	if (!policy->curlft.use_time)
-		policy->curlft.use_time = (unsigned long)xtime.tv_sec;
+	policy->curlft.use_time = (unsigned long)xtime.tv_sec;
 
 	switch (policy->action) {
 	case XFRM_POLICY_BLOCK:
@@ -936,8 +991,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
 	if (!pol)
 		return 1;
 
-	if (!pol->curlft.use_time)
-		pol->curlft.use_time = (unsigned long)xtime.tv_sec;
+	pol->curlft.use_time = (unsigned long)xtime.tv_sec;
 
 	if (pol->action == XFRM_POLICY_ALLOW) {
 		if (pol->xfrm_nr != 0) {
