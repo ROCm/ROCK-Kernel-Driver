@@ -32,7 +32,8 @@ CHECKFLAGS	+= -m64 -D__powerpc__
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
-CFLAGS		+= -msoft-float -pipe -mminimal-toc -mtraceback=none
+CFLAGS		+= -msoft-float -pipe -mminimal-toc -mtraceback=none \
+		   -mcall-aixdesc
 
 ifeq ($(CONFIG_POWER4_ONLY),y)
 	CFLAGS += $(call cc-option,-mcpu=power4)
