@@ -474,22 +474,28 @@ static int pcnet32_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct pcnet32_private *lp = dev->priv;
 	unsigned long flags;
+	int r = -EOPNOTSUPP;
 
-	spin_lock_irqsave(&lp->lock, flags);
-	mii_ethtool_gset(&lp->mii_if, cmd);
-	spin_unlock_irqrestore(&lp->lock, flags);
-	return 0;
+	if (lp->mii) {
+	    spin_lock_irqsave(&lp->lock, flags);
+	    mii_ethtool_gset(&lp->mii_if, cmd);
+	    spin_unlock_irqrestore(&lp->lock, flags);
+	    r = 0;
+	}
+	return r;
 }
 
 static int pcnet32_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct pcnet32_private *lp = dev->priv;
 	unsigned long flags;
-	int r;
+	int r = -EOPNOTSUPP;
 
-	spin_lock_irqsave(&lp->lock, flags);
-	r = mii_ethtool_sset(&lp->mii_if, cmd);
-	spin_unlock_irqrestore(&lp->lock, flags);
+	if (lp->mii) {
+	    spin_lock_irqsave(&lp->lock, flags);
+	    r = mii_ethtool_sset(&lp->mii_if, cmd);
+	    spin_unlock_irqrestore(&lp->lock, flags);
+	}
 	return r;
 }
 
@@ -509,11 +515,13 @@ static u32 pcnet32_get_link(struct net_device *dev)
 {
 	struct pcnet32_private *lp = dev->priv;
 	unsigned long flags;
-	int r;
+	int r = 1;
 
-	spin_lock_irqsave(&lp->lock, flags);
-	r = mii_link_ok(&lp->mii_if);
-	spin_unlock_irqrestore(&lp->lock, flags);
+	if (lp->mii) {
+	    spin_lock_irqsave(&lp->lock, flags);
+	    r = mii_link_ok(&lp->mii_if);
+	    spin_unlock_irqrestore(&lp->lock, flags);
+	}
 	return r;
 }
 
@@ -533,11 +541,13 @@ static int pcnet32_nway_reset(struct net_device *dev)
 {
 	struct pcnet32_private *lp = dev->priv;
 	unsigned long flags;
-	int r;
+	int r = -EOPNOTSUPP;
 
-	spin_lock_irqsave(&lp->lock, flags);
-	r = mii_nway_restart(&lp->mii_if);
-	spin_unlock_irqrestore(&lp->lock, flags);
+	if (lp->mii) {
+	    spin_lock_irqsave(&lp->lock, flags);
+	    r = mii_nway_restart(&lp->mii_if);
+	    spin_unlock_irqrestore(&lp->lock, flags);
+	}
 	return r;
 }
 
