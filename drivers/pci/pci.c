@@ -9,6 +9,8 @@
  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
  */
 
+#include <linux/delay.h>
+#include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>

@@ -6,6 +6,7 @@
  *	Copyright (c) 1997--1999 Martin Mares <mj@ucw.cz>
  */
 
+#include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>

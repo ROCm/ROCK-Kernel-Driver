@@ -1,4 +1,5 @@
 #include <linux/pci.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 
 /*
