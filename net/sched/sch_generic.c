@@ -465,7 +465,7 @@ static void __qdisc_destroy(struct rcu_head *head)
 	struct Qdisc_ops  *ops = qdisc->ops;
 
 #ifdef CONFIG_NET_ESTIMATOR
-	qdisc_kill_estimator(&qdisc->stats);
+	gen_kill_estimator(&qdisc->bstats, &qdisc->rate_est);
 #endif
 	write_lock(&qdisc_tree_lock);
 	if (ops->reset)

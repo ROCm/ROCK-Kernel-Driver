@@ -461,8 +461,8 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 
 #ifdef CONFIG_NET_ESTIMATOR
 		if (tca[TCA_RATE-1])
-			qdisc_new_estimator(&sch->stats, sch->stats_lock,
-					    tca[TCA_RATE-1]);
+			gen_new_estimator(&sch->bstats, &sch->rate_est,
+				sch->stats_lock, tca[TCA_RATE-1]);
 #endif
 		return sch;
 	}
@@ -489,11 +489,9 @@ static int qdisc_change(struct Qdisc *sch, struct rtattr **tca)
 			return err;
 	}
 #ifdef CONFIG_NET_ESTIMATOR
-	if (tca[TCA_RATE-1]) {
-		qdisc_kill_estimator(&sch->stats);
-		qdisc_new_estimator(&sch->stats, sch->stats_lock,
-				    tca[TCA_RATE-1]);
-	}
+	if (tca[TCA_RATE-1])
+		gen_replace_estimator(&sch->bstats, &sch->rate_est,
+			sch->stats_lock, tca[TCA_RATE-1]);
 #endif
 	return 0;
 }
