@@ -369,10 +369,6 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 
 EXPORT_SYMBOL(task_mulin_intr);
 
-/*
- * VERIFY ME before 2.4 ... unexpected race is possible based on details
- * RMK with 74LS245/373/374 TTL buffer logic because of passthrough.
- */
 ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
