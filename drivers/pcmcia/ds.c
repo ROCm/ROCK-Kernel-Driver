@@ -940,7 +940,11 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	ret = pcmcia_get_card_services_info(&buf.servinfo);
 	break;
     case DS_GET_CONFIGURATION_INFO:
-	ret = pcmcia_get_configuration_info(s->handle, &buf.config);
+	if (buf.config.Function && 
+	   (buf.config.Function >= s->parent->functions))
+	    ret = CS_BAD_ARGS;
+	else
+	    ret = pccard_get_configuration_info(s->parent, buf.config.Function, &buf.config);
 	break;
     case DS_GET_FIRST_TUPLE:
 	pcmcia_validate_mem(s->parent);

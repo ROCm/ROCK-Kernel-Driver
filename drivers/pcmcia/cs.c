@@ -935,29 +935,20 @@ int pcmcia_deregister_client(client_handle_t handle)
 
 /*====================================================================*/
 
-int pcmcia_get_configuration_info(client_handle_t handle,
+int pccard_get_configuration_info(struct pcmcia_socket *s,
+				  unsigned int function,
 				  config_info_t *config)
 {
-    struct pcmcia_socket *s;
     config_t *c;
     
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
 
-    if (handle->Function == BIND_FN_ALL) {
-	if (config->Function && (config->Function >= s->functions))
-	    return CS_BAD_ARGS;
-    } else
-	config->Function = handle->Function;
-    
+    config->Function = function;
+
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS) {
-	u_char fn = config->Function;
 	memset(config, 0, sizeof(config_info_t));
-	config->Function = fn;
 	config->Vcc = s->socket.Vcc;
 	config->Vpp1 = config->Vpp2 = s->socket.Vpp;
 	config->Option = s->cb_dev->subordinate->number;
@@ -974,7 +965,7 @@ int pcmcia_get_configuration_info(client_handle_t handle,
     }
 #endif
     
-    c = (s->config != NULL) ? &s->config[config->Function] : NULL;
+    c = (s->config != NULL) ? &s->config[function] : NULL;
     
     if ((c == NULL) || !(c->state & CONFIG_LOCKED)) {
 	config->Attributes = 0;
@@ -999,6 +990,7 @@ int pcmcia_get_configuration_info(client_handle_t handle,
     
     return CS_SUCCESS;
 } /* get_configuration_info */
+EXPORT_SYMBOL(pccard_get_configuration_info);
 
 /*======================================================================
 
@@ -2083,7 +2075,6 @@ EXPORT_SYMBOL(pcmcia_access_configuration_register);
 EXPORT_SYMBOL(pcmcia_deregister_client);
 EXPORT_SYMBOL(pcmcia_eject_card);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
-EXPORT_SYMBOL(pcmcia_get_configuration_info);
 EXPORT_SYMBOL(pcmcia_get_mem_page);
 EXPORT_SYMBOL(pcmcia_get_status);
 EXPORT_SYMBOL(pcmcia_insert_card);

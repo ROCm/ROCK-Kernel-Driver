@@ -74,6 +74,20 @@ int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
 }
 EXPORT_SYMBOL(pcmcia_validate_cis);
 
+int pcmcia_get_configuration_info(client_handle_t handle,
+				  config_info_t *config)
+{
+	struct pcmcia_socket *s;
+
+	if ((CHECK_HANDLE(handle)) || !config)
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	if (!s)
+		return CS_BAD_HANDLE;
+	return pccard_get_configuration_info(s, handle->Function, config);
+}
+EXPORT_SYMBOL(pcmcia_get_configuration_info);
+
 #ifdef CONFIG_PCMCIA_OBSOLETE
 
 int pcmcia_get_first_window(window_handle_t *win, win_req_t *req)
