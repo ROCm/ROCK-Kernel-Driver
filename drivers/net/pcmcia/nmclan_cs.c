@@ -449,21 +449,6 @@ static dev_link_t *nmclan_attach(void);
 static void nmclan_detach(dev_link_t *);
 
 /* ----------------------------------------------------------------------------
-flush_stale_links
-	Clean up stale device structures
----------------------------------------------------------------------------- */
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    nmclan_detach(link);
-    }
-}
-
-/* ----------------------------------------------------------------------------
 nmclan_attach
 	Creates an "instance" of the driver, allocating local data
 	structures for one device.  The device is registered with Card
@@ -480,7 +465,6 @@ static dev_link_t *nmclan_attach(void)
 
     DEBUG(0, "nmclan_attach()\n");
     DEBUG(1, "%s\n", rcsid);
-    flush_stale_links();
 
     /* Create new ethernet device */
     dev = alloc_etherdev(sizeof(mace_private));
@@ -569,10 +553,8 @@ static void nmclan_detach(dev_link_t *link)
 
     if (link->state & DEV_CONFIG) {
 	nmclan_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
+	if (link->state & DEV_STALE_CONFIG)
 	    return;
-	}
     }
 
     if (link->handle)
@@ -843,7 +825,9 @@ static void nmclan_release(dev_link_t *link)
 
   link->state &= ~DEV_CONFIG;
 
-} /* nmclan_release */
+  if (link->state & DEV_STALE_CONFIG)
+	  nmclan_detach(link);
+}
 
 /* ----------------------------------------------------------------------------
 nmclan_event

@@ -941,7 +941,7 @@ static void *aarp_seq_start(struct seq_file *seq, loff_t *pos)
 	iter->table     = resolved;
 	iter->bucket    = 0;
 
-	return *pos ? iter_next(iter, pos) : SEQ_START_TOKEN);
+	return *pos ? iter_next(iter, pos) : SEQ_START_TOKEN;
 }
 
 static void *aarp_seq_next(struct seq_file *seq, void *v, loff_t *pos)

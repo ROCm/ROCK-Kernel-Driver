@@ -442,18 +442,6 @@ static void elsa_cs_release(dev_link_t *link)
 
     DEBUG(0, "elsa_cs_release(0x%p)\n", link);
 
-    /*
-       If the device is currently in use, we won't release until it
-       is actually closed, because until then, we can't be sure that
-       no one will try to access the device or its data structures.
-    */
-    if (link->open) {
-        DEBUG(1, "elsa_cs: release postponed, '%s' "
-                   "still open\n", link->dev->dev_name);
-        link->state |= DEV_STALE_CONFIG;
-        return;
-    }
-
     /* Unlink the device chain */
     link->dev = NULL;
 

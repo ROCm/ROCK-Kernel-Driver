@@ -448,7 +448,7 @@ struct tc35815_local {
 
 /* Index to functions, as function prototypes. */
 
-static int __init tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, unsigned int irq);
+static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, unsigned int irq);
 
 static int	tc35815_open(struct net_device *dev);
 static int	tc35815_send_packet(struct sk_buff *skb, struct net_device *dev);
@@ -526,7 +526,7 @@ tc35815_probe(struct pci_dev *pdev,
 	return -ENODEV;
 }
 
-static int __init tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, unsigned int irq)
+static int __devinit tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, unsigned int irq)
 {
 	static unsigned version_printed = 0;
 	int i;

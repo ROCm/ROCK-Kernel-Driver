@@ -97,7 +97,6 @@ extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
 extern int mac89x0_probe(struct net_device *dev);
 extern int mc32_probe(struct net_device *dev);
-extern struct net_device *sdla_init(void);
 extern struct net_device *cops_probe(int unit);
 extern struct net_device *ltpc_probe(void);
   
@@ -470,10 +469,6 @@ void __init probe_old_netdevs(void)
 #ifdef CONFIG_LTPC
 	ltpc_probe();
 #endif
-#ifdef CONFIG_SDLA
-	sdla_init();
-#endif
-
 }
 
 /*

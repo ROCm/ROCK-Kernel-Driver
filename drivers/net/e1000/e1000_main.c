@@ -30,6 +30,22 @@
 
 /* Change Log
  *
+ * 5.2.16	8/8/03
+ *   o Added support for new controllers: 82545GM, 82546GB, 82541/7_B1
+ *   o Bug fix: reset h/w before first EEPROM read because we don't know
+ *     who may have been messing with the device before we got there.
+ *     [Dave Johnson (ddj -a-t- cascv.brown.edu)]
+ *   o Bug fix: read the correct work from EEPROM to detect programmed
+ *     WoL settings.
+ *   o Bug fix: TSO would hang if space left in FIFO was being miscalculated
+ *     when mss dropped without a correspoding drop in the DMA buffer size.
+ *   o ASF for Fiber nics isn't supported.
+ *   o Bug fix: Workaround added for potential hang with 82544 running in
+ *     PCI-X if send buffer terminates within an evenly-aligned dword.
+ *   o Feature: Add support for ethtool flow control setting.
+ *   o Feature: Add support for ethtool TSO setting.
+ *   o Feature: Increase default Tx Descriptor count to 1024 for >= 82544.
+ *   
  * 5.1.13	5/28/03
  *   o Bug fix: request_irq() failure resulted in freeing resources twice!
  *     [Don Fry (brazilnut@us.ibm.com)]
@@ -39,18 +55,11 @@
  *   o Cleanup: s/int/unsigned int/ for descriptor ring indexes.
  *   
  * 5.1.11	5/6/03
- *   o Feature: Added support for 82546EB (Quad-port) hardware.
- *   o Feature: Added support for Diagnostics through Ethtool.
- *   o Cleanup: Removed /proc support.
- *   o Cleanup: Removed proprietary IDIAG interface.
- *   o Bug fix: TSO bug fixes.
- *
- * 5.0.42	3/5/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.1.13-k2";
+char e1000_driver_version[] = "5.2.16-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -71,15 +80,28 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	{0x8086, 0x100D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x100E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x100F, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1010, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1014, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1015, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1016, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1017, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x101E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x101D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1018, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1019, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x101D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x101E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1026, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1027, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1028, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1075, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1076, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1077, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1078, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1079, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x107A, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x107B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	/* required last entry */
 	{0,}
 };
@@ -426,6 +448,11 @@ e1000_probe(struct pci_dev *pdev,
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
+	/* before reading the EEPROM, reset the controller to 
+	 * put the device in a known good starting state */
+	
+	e1000_reset_hw(&adapter->hw);
+
 	/* make sure the EEPROM is good */
 
 	if(e1000_validate_eeprom_checksum(&adapter->hw) < 0) {
@@ -457,7 +484,7 @@ e1000_probe(struct pci_dev *pdev,
 	adapter->phy_info_timer.function = &e1000_update_phy_info;
 	adapter->phy_info_timer.data = (unsigned long) adapter;
 
-	INIT_WORK(&adapter->tx_timeout_task, 
+	INIT_WORK(&adapter->tx_timeout_task,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
 	register_netdev(netdev);
@@ -476,11 +503,27 @@ e1000_probe(struct pci_dev *pdev,
 	 * enable the ACPI Magic Packet filter
 	 */
 
-	e1000_read_eeprom(&adapter->hw, EEPROM_INIT_CONTROL2_REG,1, &eeprom_data);
-	if((adapter->hw.mac_type >= e1000_82544) &&
-	   (eeprom_data & E1000_EEPROM_APME))
+	switch(adapter->hw.mac_type) {
+	case e1000_82542_rev2_0:
+	case e1000_82542_rev2_1:
+	case e1000_82543:
+		break;
+	case e1000_82546:
+	case e1000_82546_rev_3:
+		if((E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_FUNC_1)
+		   && (adapter->hw.media_type == e1000_media_type_copper)) {
+			e1000_read_eeprom(&adapter->hw,
+				EEPROM_INIT_CONTROL3_PORT_B, 1, &eeprom_data);
+			break;
+		}
+		/* Fall Through */
+	default:
+		e1000_read_eeprom(&adapter->hw,
+			EEPROM_INIT_CONTROL3_PORT_A, 1, &eeprom_data);
+		break;
+	}
+	if(eeprom_data & E1000_EEPROM_APME)
 		adapter->wol |= E1000_WUFC_MAG;
-
 
 	/* reset the hardware with the new settings */
 
@@ -516,7 +559,8 @@ e1000_remove(struct pci_dev *pdev)
 	struct e1000_adapter *adapter = netdev->priv;
 	uint32_t manc;
 
-	if(adapter->hw.mac_type >= e1000_82540) {
+	if(adapter->hw.mac_type >= e1000_82540 &&
+	   adapter->hw.media_type == e1000_media_type_copper) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		if(manc & E1000_MANC_SMBUS_EN) {
 			manc |= E1000_MANC_ARP_EN;
@@ -584,21 +628,13 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->fc_pause_time = E1000_FC_PAUSE_TIME;
 	hw->fc_send_xon = 1;
 
-	if((hw->mac_type == e1000_82541) || (hw->mac_type == e1000_82547))
+	if((hw->mac_type == e1000_82541) ||
+	   (hw->mac_type == e1000_82547) ||
+	   (hw->mac_type == e1000_82541_rev_2) ||
+	   (hw->mac_type == e1000_82547_rev_2))
 		hw->phy_init_script = 1;
 
-	/* Media type - copper or fiber */
-
-	if(hw->mac_type >= e1000_82543) {
-		uint32_t status = E1000_READ_REG(hw, STATUS);
-
-		if(status & E1000_STATUS_TBIMODE)
-			hw->media_type = e1000_media_type_fiber;
-		else
-			hw->media_type = e1000_media_type_copper;
-	} else {
-		hw->media_type = e1000_media_type_fiber;
-	}
+	e1000_set_media_type(hw);
 
 	if(hw->mac_type < e1000_82543)
 		hw->report_tx_early = 0;
@@ -614,6 +650,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	if(hw->media_type == e1000_media_type_copper) {
 		hw->mdix = AUTO_ALL_MODES;
 		hw->disable_polarity_correction = FALSE;
+		hw->master_slave = E1000_MASTER_SLAVE;
 	}
 
 	atomic_set(&adapter->irq_sem, 1);
@@ -763,7 +800,8 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 		tipg |= DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
 		break;
 	default:
-		if(adapter->hw.media_type == e1000_media_type_fiber)
+		if(adapter->hw.media_type == e1000_media_type_fiber ||
+		   adapter->hw.media_type == e1000_media_type_internal_serdes)
 			tipg = DEFAULT_82543_TIPG_IPGT_FIBER;
 		else
 			tipg = DEFAULT_82543_TIPG_IPGT_COPPER;
@@ -798,6 +836,12 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 		adapter->txd_cmd |= E1000_TXD_CMD_RS;
 	else
 		adapter->txd_cmd |= E1000_TXD_CMD_RPS;
+
+	/* Cache if we're 82544 running in PCI-X because we'll
+	 * need this to apply a workaround later in the send path. */
+	if(adapter->hw.mac_type == e1000_82544 &&
+	   adapter->hw.bus_type == e1000_bus_type_pcix)
+		adapter->pcix_82544 = 1;
 }
 
 /**
@@ -1490,11 +1534,18 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	struct e1000_buffer *buffer_info;
-	int len = skb->len;
+	unsigned int len = skb->len, max_per_txd = E1000_MAX_DATA_PER_TXD;
 	unsigned int offset = 0, size, count = 0, i;
 
 #ifdef NETIF_F_TSO
-	unsigned int tso = skb_shinfo(skb)->tso_size;
+	unsigned int mss = skb_shinfo(skb)->tso_size;
+	/* The controller does a simple calculation to 
+	 * make sure there is enough room in the FIFO before
+	 * initiating the DMA for each buffer.  The calc is:
+	 * 4 = ceil(buffer len/mss).  To make sure we don't
+	 * overrun the FIFO, adjust the max buffer len if mss
+	 * drops. */
+	if(mss) max_per_txd = min(mss << 2, max_per_txd);
 #endif
 	unsigned int nr_frags = skb_shinfo(skb)->nr_frags;
 	unsigned int f;
@@ -1504,13 +1555,20 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 
 	while(len) {
 		buffer_info = &tx_ring->buffer_info[i];
-		size = min(len, E1000_MAX_DATA_PER_TXD);
+		size = min(len, max_per_txd);
 #ifdef NETIF_F_TSO
 		/* Workaround for premature desc write-backs
 		 * in TSO mode.  Append 4-byte sentinel desc */
-		if(tso && !nr_frags && size == len && size > 4)
+		if(mss && !nr_frags && size == len && size > 8)
 			size -= 4;
 #endif
+		/* Workaround for potential 82544 hang in PCI-X.  Avoid
+		 * terminating buffers within evenly-aligned dwords. */
+		if(adapter->pcix_82544 &&
+		   !((unsigned long)(skb->data + offset + size - 1) & 4) &&
+		   size > 4)
+			size -= 4;
+
 		buffer_info->length = size;
 		buffer_info->dma =
 			pci_map_single(adapter->pdev,
@@ -1530,22 +1588,30 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 
 		frag = &skb_shinfo(skb)->frags[f];
 		len = frag->size;
-		offset = 0;
+		offset = frag->page_offset;
 
 		while(len) {
 			buffer_info = &tx_ring->buffer_info[i];
-			size = min(len, E1000_MAX_DATA_PER_TXD);
+			size = min(len, max_per_txd);
 #ifdef NETIF_F_TSO
 			/* Workaround for premature desc write-backs
 			 * in TSO mode.  Append 4-byte sentinel desc */
-			if(tso && f == (nr_frags-1) && size == len && size > 4)
+			if(mss && f == (nr_frags-1) && size == len && size > 8)
 				size -= 4;
 #endif
+			/* Workaround for potential 82544 hang in PCI-X.
+			 * Avoid terminating buffers within evenly-aligned
+			 * dwords. */
+			if(adapter->pcix_82544 &&
+			   !((unsigned long)(frag->page+offset+size-1) & 4) &&
+			   size > 4)
+				size -= 4;
+
 			buffer_info->length = size;
 			buffer_info->dma =
 				pci_map_page(adapter->pdev,
 					frag->page,
-					frag->page_offset + offset,
+					offset,
 					size,
 					PCI_DMA_TODEVICE);
 			buffer_info->time_stamp = jiffies;
@@ -1556,6 +1622,31 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 			if(++i == tx_ring->count) i = 0;
 		}
 	}
+
+	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
+
+		/* There aren't enough descriptors available to queue up
+		 * this send, so undo the mapping and abort the send. 
+		 * We could have done the check before we mapped the skb,
+		 * but because of all the workarounds (above), it's too
+		 * difficult to predict how many we're going to need.*/
+		i = first;
+
+		while(count--) {
+			buffer_info = &tx_ring->buffer_info[i];
+			if(buffer_info->dma) {
+				pci_unmap_page(adapter->pdev,
+					       buffer_info->dma,
+					       buffer_info->length,
+					       PCI_DMA_TODEVICE);
+				buffer_info->dma = 0;
+			}
+			if(++i == tx_ring->count) i = 0;
+		}
+
+		return 0;
+	}
+
 	i = (i == 0) ? tx_ring->count - 1 : i - 1;
 	tx_ring->buffer_info[i].skb = skb;
 	tx_ring->buffer_info[first].next_to_watch = i;
@@ -1650,27 +1741,17 @@ no_fifo_stall_required:
 	return 0;
 }
 
-/* Tx Descriptors needed, worst case */
-#define TXD_USE_COUNT(S) (((S) >> E1000_MAX_TXD_PWR) + \
-			 (((S) & (E1000_MAX_DATA_PER_TXD - 1)) ? 1 : 0))
-#define DESC_NEEDED TXD_USE_COUNT(MAX_JUMBO_FRAME_SIZE) + \
-	MAX_SKB_FRAGS * TXD_USE_COUNT(PAGE_SIZE) + 1
-
 static int
 e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 	unsigned int first;
 	unsigned int tx_flags = 0;
+	int count;
 
 	if(skb->len <= 0) {
 		dev_kfree_skb_any(skb);
 		return 0;
-	}
-
-	if(E1000_DESC_UNUSED(&adapter->tx_ring) < DESC_NEEDED) {
-		netif_stop_queue(netdev);
-		return 1;
 	}
 
 	if(adapter->hw.mac_type == e1000_82547) {
@@ -1693,7 +1774,12 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	else if(e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
 
-	e1000_tx_queue(adapter, e1000_tx_map(adapter, skb, first), tx_flags);
+	if((count = e1000_tx_map(adapter, skb, first)))
+		e1000_tx_queue(adapter, count, tx_flags);
+	else {
+		netif_stop_queue(netdev);
+		return 1;
+	}
 
 	netdev->trans_start = jiffies;
 
@@ -2001,6 +2087,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		   !e1000_clean_tx_irq(adapter))
 			break;
 #endif
+
 	return IRQ_HANDLED;
 }
 
@@ -2387,7 +2474,7 @@ e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	uint16_t mii_reg;
 	uint16_t spddplx;
 
-	if(adapter->hw.media_type == e1000_media_type_fiber)
+	if(adapter->hw.media_type != e1000_media_type_copper)
 		return -EOPNOTSUPP;
 
 	switch (cmd) {
@@ -2659,7 +2746,7 @@ e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 	case SYS_DOWN:
 	case SYS_HALT:
 	case SYS_POWER_OFF:
-		while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
+		while((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev))) {
 			if(pci_dev_driver(pdev) == &e1000_driver)
 				e1000_suspend(pdev, 3);
 		}
@@ -2706,7 +2793,8 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 			E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
 		}
 
-		if(adapter->hw.media_type == e1000_media_type_fiber) {
+		if(adapter->hw.media_type == e1000_media_type_fiber ||
+		   adapter->hw.media_type == e1000_media_type_internal_serdes) {
 			/* keep the laser running in D3 */
 			ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
 			ctrl_ext |= E1000_CTRL_EXT_SDP7_DATA;
@@ -2726,7 +2814,8 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 
 	pci_save_state(pdev, adapter->pci_state);
 
-	if(adapter->hw.mac_type >= e1000_82540) {
+	if(adapter->hw.mac_type >= e1000_82540 &&
+	   adapter->hw.media_type == e1000_media_type_copper) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		if(manc & E1000_MANC_SMBUS_EN) {
 			manc |= E1000_MANC_ARP_EN;
@@ -2764,7 +2853,8 @@ e1000_resume(struct pci_dev *pdev)
 
 	netif_device_attach(netdev);
 
-	if(adapter->hw.mac_type >= e1000_82540) {
+	if(adapter->hw.mac_type >= e1000_82540 &&
+	   adapter->hw.media_type == e1000_media_type_copper) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		manc &= ~(E1000_MANC_ARP_EN);
 		E1000_WRITE_REG(&adapter->hw, MANC, manc);

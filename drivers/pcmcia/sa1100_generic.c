@@ -100,13 +100,29 @@ static int sa11x0_drv_pcmcia_probe(struct device *dev)
 	return ret;
 }
 
+static int sa11x0_drv_pcmcia_suspend(struct device *dev, u32 state, u32 level)
+{
+	int ret = 0;
+	if (level == SUSPEND_SAVE_STATE)
+		ret = pcmcia_socket_dev_suspend(dev, state);
+	return ret;
+}
+
+static int sa11x0_drv_pcmcia_resume(struct device *dev, u32 level)
+{
+	int ret = 0;
+	if (level == RESUME_RESTORE_STATE)
+		ret = pcmcia_socket_dev_resume(dev);
+	return ret;
+}
+
 static struct device_driver sa11x0_pcmcia_driver = {
 	.probe		= sa11x0_drv_pcmcia_probe,
 	.remove		= sa11xx_drv_pcmcia_remove,
 	.name		= "sa11x0-pcmcia",
 	.bus		= &platform_bus_type,
-	.suspend 	= pcmcia_socket_dev_suspend,
-	.resume 	= pcmcia_socket_dev_resume,
+	.suspend 	= sa11x0_drv_pcmcia_suspend,
+	.resume 	= sa11x0_drv_pcmcia_resume,
 };
 
 /* sa11x0_pcmcia_init()

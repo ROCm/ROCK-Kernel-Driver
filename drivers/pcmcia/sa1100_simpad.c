@@ -13,6 +13,7 @@
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/irq.h>
+#include <asm/arch/simpad.h>
 #include "sa1100_generic.h"
  
 extern long get_cs3_shadow(void);
@@ -25,9 +26,6 @@ static struct pcmcia_irqs irqs[] = {
 
 static int simpad_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 {
-	set_cs3_bit(PCMCIA_RESET);
-	clear_cs3_bit(PCMCIA_BUFF_DIS);
-	clear_cs3_bit(PCMCIA_RESET);
 
 	clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
 
@@ -71,7 +69,7 @@ static int
 simpad_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 			       const socket_state_t *state)
 {
-	unsigned long value, flags;
+	unsigned long flags;
 
 	local_irq_save(flags);
 
@@ -82,8 +80,8 @@ simpad_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 		break;
 
 	case 33:  
-		clear_cs3_bit(VCC_3V_EN|EN0);
-		set_cs3_bit(VCC_5V_EN|EN1);
+		clear_cs3_bit(VCC_3V_EN|EN1);
+		set_cs3_bit(VCC_5V_EN|EN0);
 		break;
 
 	case 50:
@@ -99,7 +97,7 @@ simpad_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 		return -1;
 	}
 
-	/* Silently ignore Vpp, output enable, speaker enable. */
+
 	local_irq_restore(flags);
 
 	return 0;
@@ -113,6 +111,7 @@ static void simpad_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
 static void simpad_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
 {
 	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	set_cs3_bit(PCMCIA_RESET);
 }
 
 static struct pcmcia_low_level simpad_pcmcia_ops = { 

@@ -145,36 +145,39 @@ cpout:	retl						! get outta here
 	.globl C_LABEL(__csum_partial_copy_start), C_LABEL(__csum_partial_copy_end)
 C_LABEL(__csum_partial_copy_start):
 
-#define EX(x,y,a,b,z)                           \
+/* Work around cpp -rob */
+#define ALLOC #alloc
+#define EXECINSTR #execinstr
+#define EX(x,y,a,b)				\
 98:     x,y;                                    \
-        .section .fixup,z##alloc,z##execinstr;  \
+        .section .fixup,ALLOC,EXECINSTR;	\
         .align  4;                              \
 99:     ba 30f;                                 \
          a, b, %o3;                             \
-        .section __ex_table,z##alloc;           \
+        .section __ex_table,ALLOC;		\
         .align  4;                              \
         .word   98b, 99b;                       \
         .text;                                  \
         .align  4
 
-#define EX2(x,y,z)                          	\
+#define EX2(x,y)				\
 98:     x,y;                                    \
-        .section __ex_table,z##alloc;           \
+        .section __ex_table,ALLOC;		\
         .align  4;                              \
         .word   98b, 30f;                       \
         .text;                                  \
         .align  4
 
-#define EX3(x,y,z)                          	\
+#define EX3(x,y)				\
 98:     x,y;                                    \
-        .section __ex_table,z##alloc;           \
+        .section __ex_table,ALLOC;		\
         .align  4;                              \
         .word   98b, 96f;                       \
         .text;                                  \
         .align  4
 
-#define EXT(start,end,handler,z)                \
-        .section __ex_table,z##alloc;           \
+#define EXT(start,end,handler)			\
+        .section __ex_table,ALLOC;		\
         .align  4;                              \
         .word   start, 0, end, handler;         \
         .text;                                  \
@@ -247,21 +250,21 @@ C_LABEL(__csum_partial_copy_start):
 cc_end_cruft:
 	be	1f
 	 andcc	%o3, 4, %g0
-	EX(ldd	[%o0 + 0x00], %g2, and %o3, 0xf,#)
+	EX(ldd	[%o0 + 0x00], %g2, and %o3, 0xf)
 	add	%o1, 8, %o1
 	addcc	%g2, %g7, %g7
 	add	%o0, 8, %o0
 	addxcc	%g3, %g7, %g7
-	EX2(st	%g2, [%o1 - 0x08],#)
+	EX2(st	%g2, [%o1 - 0x08])
 	addx	%g0, %g7, %g7
 	andcc	%o3, 4, %g0
-	EX2(st	%g3, [%o1 - 0x04],#)
+	EX2(st	%g3, [%o1 - 0x04])
 1:	be	1f
 	 andcc	%o3, 3, %o3
-	EX(ld	[%o0 + 0x00], %g2, add %o3, 4,#)
+	EX(ld	[%o0 + 0x00], %g2, add %o3, 4)
 	add	%o1, 4, %o1
 	addcc	%g2, %g7, %g7
-	EX2(st	%g2, [%o1 - 0x04],#)
+	EX2(st	%g2, [%o1 - 0x04])
 	addx	%g0, %g7, %g7
 	andcc	%o3, 3, %g0
 	add	%o0, 4, %o0
@@ -271,14 +274,14 @@ cc_end_cruft:
 	 subcc	%o3, 2, %o3
 	b	4f
 	 or	%g0, %g0, %o4
-2:	EX(lduh	[%o0 + 0x00], %o4, add %o3, 2,#)
+2:	EX(lduh	[%o0 + 0x00], %o4, add %o3, 2)
 	add	%o0, 2, %o0
-	EX2(sth	%o4, [%o1 + 0x00],#)
+	EX2(sth	%o4, [%o1 + 0x00])
 	be	6f
 	 add	%o1, 2, %o1
 	sll	%o4, 16, %o4
-4:	EX(ldub	[%o0 + 0x00], %o5, add %g0, 1,#)
-	EX2(stb	%o5, [%o1 + 0x00],#)
+4:	EX(ldub	[%o0 + 0x00], %o5, add %g0, 1)
+	EX2(stb	%o5, [%o1 + 0x00])
 	sll	%o5, 8, %o5
 	or	%o5, %o4, %o4
 6:	addcc	%o4, %g7, %g7
@@ -295,9 +298,9 @@ cc_dword_align:
 	 andcc	%o0, 0x2, %g0
 	be	1f
 	 andcc	%o0, 0x4, %g0
-	EX(lduh	[%o0 + 0x00], %g4, add %g1, 0,#)
+	EX(lduh	[%o0 + 0x00], %g4, add %g1, 0)
 	sub	%g1, 2, %g1
-	EX2(sth	%g4, [%o1 + 0x00],#)
+	EX2(sth	%g4, [%o1 + 0x00])
 	add	%o0, 2, %o0
 	sll	%g4, 16, %g4
 	addcc	%g4, %g7, %g7
@@ -311,9 +314,9 @@ cc_dword_align:
 	or	%g3, %g7, %g7
 1:	be	3f
 	 andcc	%g1, 0xffffff80, %g0
-	EX(ld	[%o0 + 0x00], %g4, add %g1, 0,#)
+	EX(ld	[%o0 + 0x00], %g4, add %g1, 0)
 	sub	%g1, 4, %g1
-	EX2(st	%g4, [%o1 + 0x00],#)
+	EX2(st	%g4, [%o1 + 0x00])
 	add	%o0, 4, %o0
 	addcc	%g4, %g7, %g7
 	add	%o1, 4, %o1
@@ -342,7 +345,7 @@ C_LABEL(__csum_partial_copy_sparc_generic):
 	CSUMCOPY_BIGCHUNK(%o0,%o1,%g7,0x20,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)
 	CSUMCOPY_BIGCHUNK(%o0,%o1,%g7,0x40,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)
 	CSUMCOPY_BIGCHUNK(%o0,%o1,%g7,0x60,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)
-10:	EXT(5b, 10b, 20f,#)		! note for exception handling
+10:	EXT(5b, 10b, 20f)		! note for exception handling
 	sub	%g1, 128, %g1		! detract from length
 	addx	%g0, %g7, %g7		! add in last carry bit
 	andcc	%g1, 0xffffff80, %g0	! more to csum?
@@ -367,7 +370,7 @@ cctbl:	CSUMCOPY_LASTCHUNK(%o0,%o1,%g7,0x68,%g2,%g3,%g4,%g5)
 	CSUMCOPY_LASTCHUNK(%o0,%o1,%g7,0x28,%g2,%g3,%g4,%g5)
 	CSUMCOPY_LASTCHUNK(%o0,%o1,%g7,0x18,%g2,%g3,%g4,%g5)
 	CSUMCOPY_LASTCHUNK(%o0,%o1,%g7,0x08,%g2,%g3,%g4,%g5)
-12:	EXT(cctbl, 12b, 22f,#)		! note for exception table handling
+12:	EXT(cctbl, 12b, 22f)		! note for exception table handling
 	addx	%g0, %g7, %g7
 	andcc	%o3, 0xf, %g0		! check for low bits set
 ccte:	bne	cc_end_cruft		! something left, handle it out of band
@@ -378,7 +381,7 @@ ccdbl:	CSUMCOPY_BIGCHUNK_ALIGNED(%o0,%o1,%g7,0x00,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o
 	CSUMCOPY_BIGCHUNK_ALIGNED(%o0,%o1,%g7,0x20,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)
 	CSUMCOPY_BIGCHUNK_ALIGNED(%o0,%o1,%g7,0x40,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)
 	CSUMCOPY_BIGCHUNK_ALIGNED(%o0,%o1,%g7,0x60,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)
-11:	EXT(ccdbl, 11b, 21f,#)		! note for exception table handling
+11:	EXT(ccdbl, 11b, 21f)		! note for exception table handling
 	sub	%g1, 128, %g1		! detract from length
 	addx	%g0, %g7, %g7		! add in last carry bit
 	andcc	%g1, 0xffffff80, %g0	! more to csum?
@@ -395,9 +398,9 @@ ccslow:	cmp	%g1, 0
 	be,a	1f
 	 srl	%g1, 1, %g4		
 	sub	%g1, 1, %g1	
-	EX(ldub	[%o0], %g5, add %g1, 1,#)
+	EX(ldub	[%o0], %g5, add %g1, 1)
 	add	%o0, 1, %o0	
-	EX2(stb	%g5, [%o1],#)
+	EX2(stb	%g5, [%o1])
 	srl	%g1, 1, %g4
 	add	%o1, 1, %o1
 1:	cmp	%g4, 0		
@@ -406,34 +409,34 @@ ccslow:	cmp	%g1, 0
 	andcc	%o0, 2, %g0	
 	be,a	1f
 	 srl	%g4, 1, %g4
-	EX(lduh	[%o0], %o4, add %g1, 0,#)
+	EX(lduh	[%o0], %o4, add %g1, 0)
 	sub	%g1, 2, %g1	
 	srl	%o4, 8, %g2
 	sub	%g4, 1, %g4	
-	EX2(stb	%g2, [%o1],#)
+	EX2(stb	%g2, [%o1])
 	add	%o4, %g5, %g5
-	EX2(stb	%o4, [%o1 + 1],#)
+	EX2(stb	%o4, [%o1 + 1])
 	add	%o0, 2, %o0	
 	srl	%g4, 1, %g4
 	add	%o1, 2, %o1
 1:	cmp	%g4, 0		
 	be,a	2f
 	 andcc	%g1, 2, %g0
-	EX3(ld	[%o0], %o4,#)
+	EX3(ld	[%o0], %o4)
 5:	srl	%o4, 24, %g2
 	srl	%o4, 16, %g3
-	EX2(stb	%g2, [%o1],#)
+	EX2(stb	%g2, [%o1])
 	srl	%o4, 8, %g2
-	EX2(stb	%g3, [%o1 + 1],#)
+	EX2(stb	%g3, [%o1 + 1])
 	add	%o0, 4, %o0
-	EX2(stb	%g2, [%o1 + 2],#)
+	EX2(stb	%g2, [%o1 + 2])
 	addcc	%o4, %g5, %g5
-	EX2(stb	%o4, [%o1 + 3],#)
+	EX2(stb	%o4, [%o1 + 3])
 	addx	%g5, %g0, %g5	! I am now to lazy to optimize this (question it
 	add	%o1, 4, %o1	! is worthy). Maybe some day - with the sll/srl
 	subcc	%g4, 1, %g4	! tricks
 	bne,a	5b
-	 EX3(ld	[%o0], %o4,#)
+	 EX3(ld	[%o0], %o4)
 	sll	%g5, 16, %g2
 	srl	%g5, 16, %g5
 	srl	%g2, 16, %g2
@@ -441,19 +444,19 @@ ccslow:	cmp	%g1, 0
 	add	%g2, %g5, %g5 
 2:	be,a	3f		
 	 andcc	%g1, 1, %g0
-	EX(lduh	[%o0], %o4, and %g1, 3,#)
+	EX(lduh	[%o0], %o4, and %g1, 3)
 	andcc	%g1, 1, %g0
 	srl	%o4, 8, %g2
 	add	%o0, 2, %o0	
-	EX2(stb	%g2, [%o1],#)
+	EX2(stb	%g2, [%o1])
 	add	%g5, %o4, %g5
-	EX2(stb	%o4, [%o1 + 1],#)
+	EX2(stb	%o4, [%o1 + 1])
 	add	%o1, 2, %o1
 3:	be,a	1f		
 	 sll	%g5, 16, %o4
-	EX(ldub	[%o0], %g2, add %g0, 1,#)
+	EX(ldub	[%o0], %g2, add %g0, 1)
 	sll	%g2, 8, %o4	
-	EX2(stb	%g2, [%o1],#)
+	EX2(stb	%g2, [%o1])
 	add	%g5, %o4, %g5
 	sll	%g5, 16, %o4
 1:	addcc	%o4, %g5, %g5

@@ -29,18 +29,11 @@
     the provisions above, a recipient may use your version of this
     file under either the MPL or the GPL.
     
-    These routines handle allocating resources for Cardbus cards, as
-    well as setting up and shutting down Cardbus sockets.  They are
-    called from cs.c in response to Request/ReleaseConfiguration and
-    Request/ReleaseIO calls.
-
 ======================================================================*/
 
 /*
- * This file is going away.  Cardbus handling has been re-written to be
- * more of a PCI bridge thing, and the PCI code basically does all the
- * resource handling. This has wrappers to make the rest of the PCMCIA
- * subsystem not notice that it's not here any more.
+ * Cardbus handling has been re-written to be more of a PCI bridge thing,
+ * and the PCI code basically does all the resource handling.
  *
  *		Linus, Jan 2000
  */

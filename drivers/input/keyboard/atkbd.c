@@ -322,6 +322,16 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 }
 
 /*
+ * Enable keyboard.
+ */
+static void atkbd_enable(struct atkbd *atkbd)
+{
+	if (atkbd_command(atkbd, NULL, ATKBD_CMD_ENABLE))
+		printk(KERN_ERR "atkbd.c: Failed to enable keyboard on %s\n",
+		       atkbd->serio->phys);
+}
+
+/*
  * atkbd_set_3 checks if a keyboard has a working Set 3 support, and
  * sets it into that. Unfortunately there are keyboards that can be switched
  * to Set 3, but don't work well in that (BTC Multimedia ...)
@@ -399,7 +409,9 @@ static int atkbd_probe(struct atkbd *atkbd)
 
 	if (atkbd_reset)
 		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT)) 
-			printk(KERN_WARNING "atkbd.c: keyboard reset failed on %s\n", atkbd->serio->phys);
+			printk(KERN_WARNING
+			       "atkbd.c: keyboard reset failed on %s\n",
+			       atkbd->serio->phys);
 
 /*
  * Then we check the keyboard ID. We should get 0xab83 under normal conditions.
@@ -433,24 +445,20 @@ static int atkbd_probe(struct atkbd *atkbd)
 	if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
 		return -1;
 
+	return 0;
+}
+
 /*
  * Disable autorepeat. We don't need it, as we do it in software anyway,
  * because that way can get faster repeat, and have less system load (less
  * accesses to the slow ISA hardware). If this fails, we don't care, and will
  * just ignore the repeated keys.
+ *
+ * This command is for scancode set 3 only.
  */
-
+static void atkbd_disable_autorepeat(struct atkbd *atkbd)
+{
 	atkbd_command(atkbd, NULL, ATKBD_CMD_SETALL_MB);
-
-/*
- * Last, we enable the keyboard to make sure  that we get keypresses from it.
- */
-
-	if (atkbd_command(atkbd, NULL, ATKBD_CMD_ENABLE))
-		printk(KERN_ERR "atkbd.c: Failed to enable keyboard on %s\n",
-			atkbd->serio->phys);
-
-	return 0;
 }
 
 /*
@@ -477,7 +485,7 @@ static void atkbd_disconnect(struct serio *serio)
 }
 
 /*
- * atkbd_connect() is called when the serio module finds and interface
+ * atkbd_connect() is called when the serio module finds an interface
  * that isn't handled yet by an appropriate device driver. We check if
  * there is an AT keyboard out there and if yes, we register ourselves
  * to the input module.
@@ -531,7 +539,9 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		}
 		
 		atkbd->set = atkbd_set_3(atkbd);
-
+		if (atkbd->set == 3)
+			atkbd_disable_autorepeat(atkbd);
+		atkbd_enable(atkbd);
 	} else {
 		atkbd->set = 2;
 		atkbd->id = 0xab00;

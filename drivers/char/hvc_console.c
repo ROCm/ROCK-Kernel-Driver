@@ -284,9 +284,6 @@ int __init hvc_init(void)
 	if (tty_register_driver(hvc_driver))
 		panic("Couldn't register hvc console driver\n");
 
-	for (i = 0; i < num; i++)
-		tty_register_device(hvc_driver, i, NULL);
-
 	if (num > 0)
 		kernel_thread(khvcd, NULL, CLONE_KERNEL);
 

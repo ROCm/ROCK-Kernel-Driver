@@ -1088,6 +1088,7 @@ static int irix_core_dump(long signr, struct pt_regs * regs, struct file *file)
 	elf.e_ident[EI_CLASS] = ELFCLASS32;
 	elf.e_ident[EI_DATA] = ELFDATA2LSB;
 	elf.e_ident[EI_VERSION] = EV_CURRENT;
+	elf.e_ident[EI_OSABI] = ELF_OSABI;
 	memset(elf.e_ident+EI_PAD, 0, EI_NIDENT-EI_PAD);
 
 	elf.e_type = ET_CORE;

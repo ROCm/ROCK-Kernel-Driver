@@ -116,8 +116,6 @@ kernel-docs.txt
 	- listing of various WWW + books that document kernel internals.
 kernel-parameters.txt
 	- summary listing of command line / boot prompt args for the kernel.
-kmod.txt
-	- info on the kernel module loader/unloader (kerneld replacement).
 ldm.txt
 	- a brief description of LDM (Windows Dynamic Disks).
 locks.txt
@@ -144,8 +142,6 @@ mkdev.cciss
 	- script to make /dev entries for SMART controllers (see cciss.txt)
 mkdev.ida
 	- script to make /dev entries for Intelligent Disk Array Controllers.
-modules.txt
-	- short guide on how to make kernel parts into loadable modules
 moxa-smartio
 	- info on installing/using Moxa multiport serial driver.
 mtrr.txt

@@ -438,17 +438,6 @@ static void avma1cs_release(dev_link_t *link)
 
     DEBUG(0, "avma1cs_release(0x%p)\n", link);
 
-    /*
-       If the device is currently in use, we won't release until it
-       is actually closed.
-    */
-    if (link->open) {
-	DEBUG(1, "avma1_cs: release postponed, '%s' still open\n",
-	      link->dev->dev_name);
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-
     /* no unregister function with hisax */
     HiSax_closecard(local->node.minor);
 
@@ -463,7 +452,6 @@ static void avma1cs_release(dev_link_t *link)
     
     if (link->state & DEV_STALE_LINK)
 	avma1cs_detach(link);
-    
 } /* avma1cs_release */
 
 /*======================================================================

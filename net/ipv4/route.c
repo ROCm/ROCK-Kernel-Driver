@@ -259,7 +259,7 @@ static struct rtable *rt_cache_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *rt_cache_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? rt_cache_get_idx(seq, *pos) : SEQ_START_TOKEN;
+	return *pos ? rt_cache_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)

@@ -122,7 +122,12 @@ struct e1000_adapter;
 #define E1000_RX_BUFFER_WRITE	16	/* Must be power of 2 */
 
 #define AUTO_ALL_MODES       0
-#define E1000_EEPROM_APME    4
+#define E1000_EEPROM_APME    0x0400
+
+#ifndef E1000_MASTER_SLAVE
+/* Switch to override PHY master/slave setting */
+#define E1000_MASTER_SLAVE	e1000_ms_hw_default
+#endif
 
 /* only works for sizes that are powers of 2 */
 #define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
@@ -180,6 +185,7 @@ struct e1000_adapter {
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
 	struct work_struct tx_timeout_task;
+    	uint8_t fc_autoneg;
 
 	struct timer_list blink_timer;
 	unsigned long led_status;
@@ -194,6 +200,7 @@ struct e1000_adapter {
 	uint32_t tx_head_addr;
 	uint32_t tx_fifo_size;
 	atomic_t tx_fifo_stall;
+	boolean_t pcix_82544;
 
 	/* RX */
 	struct e1000_desc_ring rx_ring;

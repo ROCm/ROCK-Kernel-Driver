@@ -1,9 +1,9 @@
 /*
  * ACPI PCI HotPlug glue functions to ACPI CA subsystem
  *
- * Copyright (c) 2002,2003 Takayoshi Kochi (t-kochi@bq.jp.nec.com)
- * Copyright (c) 2002 Hiroshi Aono (h-aono@ap.jp.nec.com)
- * Copyright (c) 2002,2003 NEC Corporation
+ * Copyright (C) 2002,2003 Takayoshi Kochi (t-kochi@bq.jp.nec.com)
+ * Copyright (C) 2002 Hiroshi Aono (h-aono@ap.jp.nec.com)
+ * Copyright (C) 2002,2003 NEC Corporation
  *
  * All rights reserved.
  *
