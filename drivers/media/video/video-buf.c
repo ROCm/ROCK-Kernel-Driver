@@ -491,6 +491,11 @@ videobuf_status(struct v4l2_buffer *b, struct videobuf_buffer *vb,
 		break;
 	}
 
+	if (vb->input != UNSET) {
+		b->flags |= V4L2_BUF_FLAG_INPUT;
+		b->input  = vb->input;
+	}
+
 	b->field     = vb->field;
 	b->timestamp = vb->ts;
 	b->bytesused = vb->size;
@@ -573,6 +578,14 @@ videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 	if (buf->state == STATE_QUEUED ||
 	    buf->state == STATE_ACTIVE)
 		goto done;
+
+	if (b->flags & V4L2_BUF_FLAG_INPUT) {
+		if (b->input >= q->inputs)
+			goto done;
+		buf->input = b->input;
+	} else {
+		buf->input = UNSET;
+	}
 
 	switch (b->memory) {
 	case V4L2_MEMORY_MMAP:
@@ -1075,6 +1088,7 @@ int videobuf_mmap_setup(struct file *file, struct videobuf_queue *q,
 	for (i = 0; i < bcount; i++) {
 		q->bufs[i] = videobuf_alloc(q->msize);
 		q->bufs[i]->i      = i;
+		q->bufs[i]->input  = UNSET;
 		q->bufs[i]->memory = memory;
 		q->bufs[i]->bsize  = bsize;
 		switch (memory) {

@@ -18,6 +18,8 @@
 
 #include <linux/videodev.h>
 
+#define UNSET (-1U)
+
 /* --------------------------------------------------------------------- */
 
 /*
@@ -140,6 +142,7 @@ struct videobuf_buffer {
 	unsigned int            height;
 	unsigned int            bytesperline; /* use only if != 0 */
 	unsigned long           size;
+	unsigned int            input;
 	enum v4l2_field         field;
 	enum videobuf_state     state;
 	struct videobuf_dmabuf  dma;
@@ -174,9 +177,10 @@ struct videobuf_queue {
 	struct pci_dev             *pci;
 
 	enum v4l2_buf_type         type;
+	unsigned int               inputs; /* for V4L2_BUF_FLAG_INPUT */
 	unsigned int               msize;
 	enum v4l2_field            field;
-	enum v4l2_field            last; /* for field=V4L2_FIELD_ALTERNATE */
+	enum v4l2_field            last;   /* for field=V4L2_FIELD_ALTERNATE */
 	struct videobuf_buffer     *bufs[VIDEO_MAX_FRAME];
 	struct videobuf_queue_ops  *ops;
 
