@@ -46,7 +46,10 @@ struct net_bridge_fdb_entry
 {
 	struct hlist_node		hlist;
 	struct net_bridge_port		*dst;
-	struct list_head		age_list;
+	union {
+		struct list_head	age_list;
+		struct rcu_head		rcu;
+	};
 	atomic_t			use_count;
 	unsigned long			ageing_timer;
 	mac_addr			addr;
@@ -86,7 +89,7 @@ struct net_bridge
 	struct list_head		port_list;
 	struct net_device		*dev;
 	struct net_device_stats		statistics;
-	rwlock_t			hash_lock;
+	spinlock_t			hash_lock;
 	struct hlist_head		hash[BR_HASH_SIZE];
 	struct list_head		age_list;
 
@@ -136,8 +139,10 @@ extern void br_fdb_changeaddr(struct net_bridge_port *p,
 extern void br_fdb_cleanup(unsigned long arg);
 extern void br_fdb_delete_by_port(struct net_bridge *br,
 			   struct net_bridge_port *p);
+extern struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
+						 const unsigned char *addr);
 extern struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br,
-					unsigned char *addr);
+					       unsigned char *addr);
 extern void br_fdb_put(struct net_bridge_fdb_entry *ent);
 extern int br_fdb_fillbuf(struct net_bridge *br, void *buf, 
 			  unsigned long count, unsigned long off);
