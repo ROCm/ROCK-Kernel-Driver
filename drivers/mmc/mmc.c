@@ -343,15 +343,14 @@ static void mmc_decode_csd(struct mmc_csd *csd, u32 *resp)
 }
 
 /*
- * Locate a MMC card on this MMC host given a CID.
+ * Locate a MMC card on this MMC host given a raw CID.
  */
-static struct mmc_card *
-mmc_find_card(struct mmc_host *host, struct mmc_cid *cid)
+static struct mmc_card *mmc_find_card(struct mmc_host *host, u32 *raw_cid)
 {
 	struct mmc_card *card;
 
 	list_for_each_entry(card, &host->cards, node) {
-		if (memcmp(&card->cid, cid, sizeof(struct mmc_cid)) == 0)
+		if (memcmp(card->raw_cid, raw_cid, sizeof(card->raw_cid)) == 0)
 			return card;
 	}
 	return NULL;
@@ -361,7 +360,7 @@ mmc_find_card(struct mmc_host *host, struct mmc_cid *cid)
  * Allocate a new MMC card, and assign a unique RCA.
  */
 static struct mmc_card *
-mmc_alloc_card(struct mmc_host *host, struct mmc_cid *cid, unsigned int *frca)
+mmc_alloc_card(struct mmc_host *host, u32 *raw_cid, unsigned int *frca)
 {
 	struct mmc_card *card, *c;
 	unsigned int rca = *frca;
@@ -371,7 +370,7 @@ mmc_alloc_card(struct mmc_host *host, struct mmc_cid *cid, unsigned int *frca)
 		return ERR_PTR(-ENOMEM);
 
 	mmc_init_card(card, host);
-	memcpy(&card->cid, cid, sizeof(struct mmc_cid));
+	memcpy(card->raw_cid, raw_cid, sizeof(card->raw_cid));
 
  again:
 	list_for_each_entry(c, &host->cards, node)
@@ -456,7 +455,7 @@ static int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr)
  * to be discovered.  Add new cards to the list.
  *
  * Create a mmc_card entry for each discovered card, assigning
- * it an RCA, and save the CID.
+ * it an RCA, and save the raw CID for decoding later.
  */
 static void mmc_discover_cards(struct mmc_host *host)
 {
@@ -465,7 +464,6 @@ static void mmc_discover_cards(struct mmc_host *host)
 
 	while (1) {
 		struct mmc_command cmd;
-		struct mmc_cid cid;
 
 		cmd.opcode = MMC_ALL_SEND_CID;
 		cmd.arg = 0;
@@ -482,11 +480,9 @@ static void mmc_discover_cards(struct mmc_host *host)
 			break;
 		}
 
-		mmc_decode_cid(&cid, cmd.resp);
-
-		card = mmc_find_card(host, &cid);
+		card = mmc_find_card(host, cmd.resp);
 		if (!card) {
-			card = mmc_alloc_card(host, &cid, &first_rca);
+			card = mmc_alloc_card(host, cmd.resp, &first_rca);
 			if (IS_ERR(card)) {
 				err = PTR_ERR(card);
 				break;
@@ -528,6 +524,7 @@ static void mmc_read_csds(struct mmc_host *host)
 		}
 
 		mmc_decode_csd(&card->csd, cmd.resp);
+		mmc_decode_cid(&card->cid, card->raw_cid);
 	}
 }
 
