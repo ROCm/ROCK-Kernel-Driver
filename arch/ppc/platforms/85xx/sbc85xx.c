@@ -42,7 +42,6 @@
 #include <asm/mpc85xx.h>
 #include <asm/irq.h>
 #include <asm/immap_85xx.h>
-#include <asm/ocp.h>
 
 #include <mm/mmu_decl.h>
 
