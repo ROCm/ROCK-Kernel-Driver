@@ -70,11 +70,9 @@ void free_pgd_slow(pgd_t *pgd)
 
 pgd_t *get_pgd_slow(struct mm_struct *mm)
 {
-	void *pg2k;
 	pgd_t *new_pgd, *init_pgd;
 	pmd_t *new_pmd, *init_pmd;
 	pte_t *new_pte, *init_pte;
-	struct mm_struct bob;
 
 	new_pgd = alloc_pgd_table();
 	if (!new_pgd)

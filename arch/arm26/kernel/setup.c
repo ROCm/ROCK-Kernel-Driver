@@ -30,7 +30,6 @@
 #include <asm/mach-types.h>
 #include <asm/tlbflush.h>
 
-#include <asm/arch.h>
 #include <asm/irqchip.h>
 
 #ifndef MEM_SIZE
@@ -66,6 +65,8 @@ unsigned int system_rev;
 unsigned int system_serial_low;
 unsigned int system_serial_high;
 unsigned int elf_hwcap;
+unsigned int memc_ctrl_reg;
+unsigned int number_mfm_drives;
 
 struct processor processor;
 
@@ -147,33 +148,6 @@ static void __init setup_processor(void)
 	cpu_proc_init();
 }
 
-static struct machine_desc * __init setup_machine(unsigned int nr)
-{
-	extern struct machine_desc __arch_info_begin, __arch_info_end;
-	struct machine_desc *list;
-
-	/*
-	 * locate architecture in the list of supported architectures.
-	 */
-	for (list = &__arch_info_begin; list < &__arch_info_end; list++)
-		if (list->nr == nr)
-			break;
-
-	/*
-	 * If the architecture type is not recognised, then we
-	 * can co nothing...
-	 */
-	if (list >= &__arch_info_end) {
-		printk("Architecture configuration botched (nr %d), unable "
-		       "to continue.\n", nr);
-		while (1);
-	}
-
-	printk("Machine: %s\n", list->name);
-
-	return list;
-}
-
 /*
  * Initial parsing of the command line.  We need to pick out the
  * memory size.  We look for mem=size@start, where start and size
@@ -239,7 +213,7 @@ setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 }
 
 static void __init
-request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
+request_standard_resources(struct meminfo *mi)
 {
 	struct resource *res;
 	int i;
@@ -274,22 +248,18 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 			request_resource(res, &kernel_data);
 	}
 
-	if (mdesc->video_start) {
+/*	FIXME - needed? if (mdesc->video_start) {
 		video_ram.start = mdesc->video_start;
 		video_ram.end   = mdesc->video_end;
 		request_resource(&iomem_resource, &video_ram);
-	}
+	}*/
 
 	/*
 	 * Some machines don't have the possibility of ever
-	 * possessing lp0, lp1 or lp2
+	 * possessing lp1 or lp2
 	 */
-	if (mdesc->reserve_lp0)
+	if (0)  /* FIXME - need to do this for A5k at least */
 		request_resource(&ioport_resource, &lp0);
-	if (mdesc->reserve_lp1)
-		request_resource(&ioport_resource, &lp1);
-	if (mdesc->reserve_lp2)
-		request_resource(&ioport_resource, &lp2);
 }
 
 /*
@@ -358,6 +328,15 @@ static int __init parse_tag_videotext(const struct tag *tag)
 
 __tagtable(ATAG_VIDEOTEXT, parse_tag_videotext);
 #endif
+
+static int __init parse_tag_acorn(const struct tag *tag)
+{
+        memc_ctrl_reg = tag->u.acorn.memc_control_reg;
+        number_mfm_drives = tag->u.acorn.adfsdrives;
+        return 0;
+}
+
+__tagtable(ATAG_ACORN, parse_tag_acorn);
 
 static int __init parse_tag_ramdisk(const struct tag *tag)
 {
@@ -467,15 +446,18 @@ static struct init_tags {
 void __init setup_arch(char **cmdline_p)
 {
 	struct tag *tags = (struct tag *)&init_tags;
-	struct machine_desc *mdesc;
 	char *from = default_command_line;
 
 	setup_processor();
-	mdesc = setup_machine(machine_arch_type);
-	machine_name = mdesc->name;
+	if(machine_arch_type == MACH_TYPE_A5K)
+		machine_name = "A5000";
+	else if(machine_arch_type == MACH_TYPE_ARCHIMEDES)
+		machine_name = "Archimedes";
+	else
+		machine_name = "UNKNOWN";
 
-	if (mdesc->param_offset)
-		tags = (struct tag *)mdesc->param_offset; //FIXME - ugly?
+	//FIXME - this may need altering when we get ROM images working
+	tags = (struct tag *)0x0207c000;
 
 	/*
 	 * If we have the old style parameters, convert them to
@@ -501,12 +483,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_cmdline(&meminfo, cmdline_p, from);
 	bootmem_init(&meminfo);
 	paging_init(&meminfo);
-	request_standard_resources(&meminfo, mdesc);
-
-	/*
-	 * Set up various architecture-specific pointers
-	 */
-	init_arch_irq = mdesc->init_irq;
+	request_standard_resources(&meminfo);
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_DUMMY_CONSOLE)

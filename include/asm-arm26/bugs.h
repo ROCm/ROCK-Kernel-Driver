@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-arm/bugs.h
+ *  linux/include/asm-arm26/bugs.h
  *
  *  Copyright (C) 1995  Russell King
  *

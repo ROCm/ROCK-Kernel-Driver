@@ -227,7 +227,9 @@ extern void free_page_8k(unsigned long page);
 #define ll_alloc_task_struct()	((struct thread_info *)get_page_8k(GFP_KERNEL))
 #define ll_free_task_struct(p)  free_page_8k((unsigned long)(p))
 
-struct thread_info *alloc_thread_info(void)
+//FIXME - do we use *task param below looks like we dont, which is ok?
+//FIXME - if EXTRA_TASK_STRUCT is zero we can optimise the below away permanently. *IF* its supposed to be zero.
+struct thread_info *alloc_thread_info(struct task_struct *task)
 {
 	struct thread_info *thread = NULL;
 

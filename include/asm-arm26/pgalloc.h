@@ -55,9 +55,9 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
  * is thrown away. It just cant be zero. -IM
  */
 
-#define pmd_alloc_one(mm,addr)		((pmd_t *)2); BUG()
+#define pmd_alloc_one(mm,addr)		({ BUG(); ((pmd_t *)2); })
 #define pmd_free(pmd)			do { } while (0)
-#define pgd_populate(mm,pmd,pte)	(0)
+#define pgd_populate(mm,pmd,pte)	BUG()
 
 extern pgd_t *get_pgd_slow(struct mm_struct *mm);
 extern void free_pgd_slow(pgd_t *pgd);

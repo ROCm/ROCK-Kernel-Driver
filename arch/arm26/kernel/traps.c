@@ -175,6 +175,11 @@ void show_trace_task(struct task_struct *tsk)
 	}
 }
 
+/* FIXME - this is probably wrong.. */
+void show_stack(struct task_struct *task, unsigned long *sp) {
+	dump_mem("Stack: ", (unsigned long)sp, 8192+(unsigned long)task->thread_info);
+}
+
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -497,7 +502,7 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	die_if_kernel("unknown data abort code", regs, instr);
 }
 
-void __bug(const char *file, int line, void *data)
+volatile void __bug(const char *file, int line, void *data)
 {
 	printk(KERN_CRIT"kernel BUG at %s:%d!", file, line);
 	if (data)
