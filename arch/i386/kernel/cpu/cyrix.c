@@ -280,7 +280,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 			pci_dev_put(dev);
 			pit_latch_buggy = 1;
 		}
-		dev =  pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5520, NULL);
+		dev =  pci_get_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5520, NULL);
 		if (dev) {
 			pci_dev_put(dev);
 			pit_latch_buggy = 1;
