@@ -842,6 +842,13 @@ static inline char *pci_name(struct pci_dev *pdev)
 	return pdev->dev.bus_id;
 }
 
+/* Some archs want to see the pretty pci name, so use this macro */
+#ifdef CONFIG_PCI_NAMES
+#define pci_pretty_name(dev) ((dev)->pretty_name)
+#else
+#define pci_pretty_name(dev) ""
+#endif
+
 /*
  *  The world is not perfect and supplies us with broken PCI devices.
  *  For at least a part of these bugs we need a work-around, so both
