@@ -147,20 +147,22 @@ static int llc_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 		if (llc->state > 1) /* not closed */
 			rc = llc_conn_rcv(sk, skb);
 		else
-			kfree_skb(skb);
+			goto out_kfree_skb;
 	} else if (llc_backlog_type(skb) == LLC_EVENT) {
 		/* timer expiration event */
 		if (llc->state > 1)  /* not closed */
 			rc = llc_conn_state_process(sk, skb);
 		else
-			llc_conn_free_ev(skb);
-		kfree_skb(skb);
+			goto out_kfree_skb;
 	} else {
 		printk(KERN_ERR "%s: invalid skb in backlog\n", __FUNCTION__);
-		kfree_skb(skb);
+		goto out_kfree_skb;
 	}
-
+out:
 	return rc;
+out_kfree_skb:
+	kfree_skb(skb);
+	goto out;
 }
 
 /**

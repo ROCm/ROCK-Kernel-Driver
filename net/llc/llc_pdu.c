@@ -15,7 +15,6 @@
 #include <linux/if_tr.h>
 #include <net/llc_pdu.h>
 #include <net/llc_if.h>
-#include <net/llc_mac.h>
 #include <net/llc_main.h>
 
 static void llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type);
