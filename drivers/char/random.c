@@ -128,7 +128,6 @@
  * 	void add_keyboard_randomness(unsigned char scancode);
  * 	void add_mouse_randomness(__u32 mouse_data);
  * 	void add_interrupt_randomness(int irq);
- * 	void add_blkdev_randomness(int irq);
  * 
  * add_keyboard_randomness() uses the inter-keypress timing, as well as the
  * scancode as random inputs into the "entropy pool".
@@ -143,8 +142,6 @@
  * regular, and hence predictable to an attacker.  Disk interrupts are
  * a better measure, since the timing of the disk interrupts are more
  * unpredictable.
- * 
- * add_blkdev_randomness() times the finishing time of block requests.
  * 
  * All of these routines try to estimate how many bits of randomness a
  * particular randomness source.  They do this by keeping track of the
