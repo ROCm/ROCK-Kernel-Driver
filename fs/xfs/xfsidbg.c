@@ -5248,6 +5248,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		"dirty",	/* 0x1 */
 		"pinned",	/* 0x2 */
 		"sync unlock",	/* 0x4 */
+		"buf stale",	/* 0x8 */
 		0
 		};
 
