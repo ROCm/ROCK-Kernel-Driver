@@ -636,9 +636,11 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		{	
 			return -EINVAL;
 		} 
+#if 0 /* 'buf_size' member is 16-bits, and always smaller than kmalloc limit */
 		/* Check kmalloc limits */
 		if(iocommand.buf_size > 128000)
 			return -EINVAL;
+#endif
 		if(iocommand.buf_size > 0)
 		{
 			buff =  kmalloc(iocommand.buf_size, GFP_KERNEL);
