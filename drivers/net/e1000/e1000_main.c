@@ -59,7 +59,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.4.19-k1";
+char e1000_driver_version[] = "4.4.19-k2";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -171,7 +171,6 @@ static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_restore_vlan(struct e1000_adapter *adapter);
 
 static int e1000_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
-static int e1000_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
 static int e1000_suspend(struct pci_dev *pdev, uint32_t state);
 #ifdef CONFIG_PM
 static int e1000_resume(struct pci_dev *pdev);
@@ -183,17 +182,9 @@ struct notifier_block e1000_notifier_reboot = {
 	.priority	= 0
 };
 
-struct notifier_block e1000_notifier_netdev = {
-	.notifier_call	= e1000_notify_netdev,
-	.next		= NULL,
-	.priority	= 0
-};
-
 /* Exported from other modules */
 
 extern void e1000_check_options(struct e1000_adapter *adapter);
-extern void e1000_proc_dev_setup(struct e1000_adapter *adapter);
-extern void e1000_proc_dev_free(struct e1000_adapter *adapter);
 extern int e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr);
 
 static struct pci_driver e1000_driver = {
@@ -229,10 +220,8 @@ e1000_init_module(void)
 	printk(KERN_INFO "%s\n", e1000_copyright);
 
 	ret = pci_module_init(&e1000_driver);
-	if(ret >= 0) {
+	if(ret >= 0)
 		register_reboot_notifier(&e1000_notifier_reboot);
-		register_netdevice_notifier(&e1000_notifier_netdev);
-	}
 	return ret;
 }
 
@@ -249,7 +238,6 @@ static void __exit
 e1000_exit_module(void)
 {
 	unregister_reboot_notifier(&e1000_notifier_reboot);
-	unregister_netdevice_notifier(&e1000_notifier_netdev);
 	pci_unregister_driver(&e1000_driver);
 }
 
@@ -490,7 +478,6 @@ e1000_probe(struct pci_dev *pdev,
 
 	printk(KERN_INFO "%s: %s\n", netdev->name, adapter->id_string);
 	e1000_check_options(adapter);
-	e1000_proc_dev_setup(adapter);
 
 	/* Initial Wake on LAN setting
 	 * If APM wake is enabled in the EEPROM,
@@ -547,8 +534,6 @@ e1000_remove(struct pci_dev *pdev)
 	unregister_netdev(netdev);
 
 	e1000_phy_hw_reset(&adapter->hw);
-
-	e1000_proc_dev_free(adapter);
 
 	iounmap(adapter->hw.hw_addr);
 	pci_release_regions(pdev);
@@ -2425,29 +2410,6 @@ e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 			if(pci_dev_driver(pdev) == &e1000_driver)
 				e1000_suspend(pdev, 3);
 		}
-	}
-	return NOTIFY_DONE;
-}
-
-static int
-e1000_notify_netdev(struct notifier_block *nb, unsigned long event, void *p)
-{
-	struct e1000_adapter *adapter;
-	struct net_device *netdev = p;
-	if(netdev == NULL)
-		return NOTIFY_DONE;
-
-	switch(event) {
-	case NETDEV_CHANGENAME:
-		if(netdev->open == e1000_open) {
-			adapter = netdev->priv;
-			/* rename the proc nodes the easy way */
-			e1000_proc_dev_free(adapter);
-			memcpy(adapter->ifname, netdev->name, IFNAMSIZ);
-			adapter->ifname[IFNAMSIZ-1] = 0;
-			e1000_proc_dev_setup(adapter);
-		}
-		break;
 	}
 	return NOTIFY_DONE;
 }
