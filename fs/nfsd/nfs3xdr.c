@@ -760,7 +760,7 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 		p = resp->buffer;
 		*p++ = 0;		/* no more entries */
 		*p++ = htonl(resp->common.err == nfserr_eof);
-		rqstp->rq_res.page_len = ((unsigned long)p & ~PAGE_MASK);
+		rqstp->rq_res.page_len = (((unsigned long)p-1) & ~PAGE_MASK)+1;
 		return 1;
 	} else
 		return xdr_ressize_check(rqstp, p);
