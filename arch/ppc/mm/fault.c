@@ -54,7 +54,7 @@ unsigned int probingmem;
 
 extern void die_if_kernel(char *, struct pt_regs *, long);
 void bad_page_fault(struct pt_regs *, unsigned long, int sig);
-void do_page_fault(struct pt_regs *, unsigned long, unsigned long);
+int do_page_fault(struct pt_regs *, unsigned long, unsigned long);
 extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
 
 /*
