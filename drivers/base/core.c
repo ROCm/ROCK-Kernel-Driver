@@ -401,17 +401,17 @@ int __init devices_init(void)
 	return subsystem_register(&devices_subsys);
 }
 
-EXPORT_SYMBOL(device_for_each_child);
+EXPORT_SYMBOL_GPL(device_for_each_child);
 
-EXPORT_SYMBOL(device_initialize);
-EXPORT_SYMBOL(device_add);
-EXPORT_SYMBOL(device_register);
+EXPORT_SYMBOL_GPL(device_initialize);
+EXPORT_SYMBOL_GPL(device_add);
+EXPORT_SYMBOL_GPL(device_register);
 
-EXPORT_SYMBOL(device_del);
-EXPORT_SYMBOL(device_unregister);
-EXPORT_SYMBOL(get_device);
-EXPORT_SYMBOL(put_device);
-EXPORT_SYMBOL(device_find);
+EXPORT_SYMBOL_GPL(device_del);
+EXPORT_SYMBOL_GPL(device_unregister);
+EXPORT_SYMBOL_GPL(get_device);
+EXPORT_SYMBOL_GPL(put_device);
+EXPORT_SYMBOL_GPL(device_find);
 
-EXPORT_SYMBOL(device_create_file);
-EXPORT_SYMBOL(device_remove_file);
+EXPORT_SYMBOL_GPL(device_create_file);
+EXPORT_SYMBOL_GPL(device_remove_file);

@@ -78,5 +78,5 @@ void sysfs_remove_group(struct kobject * kobj,
 }
 
 
-EXPORT_SYMBOL(sysfs_create_group);
-EXPORT_SYMBOL(sysfs_remove_group);
+EXPORT_SYMBOL_GPL(sysfs_create_group);
+EXPORT_SYMBOL_GPL(sysfs_remove_group);
