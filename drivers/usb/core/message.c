@@ -566,18 +566,18 @@ void usb_sg_cancel (struct usb_sg_request *io)
  */
 int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char index, void *buf, int size)
 {
-	int i = 3;
+	int i;
 	int result;
 	
 	memset(buf,0,size);	// Make sure we parse really received data
 
-	while (i--) {
+	for (i = 0; i < 3; ++i) {
 		/* retry on length 0 or stall; some devices are flakey */
-		if ((result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-				    USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
-				    (type << 8) + index, 0, buf, size,
-				    HZ * USB_CTRL_GET_TIMEOUT)) > 0
-				|| result != -EPIPE)
+		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+				USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+				(type << 8) + index, 0, buf, size,
+				HZ * USB_CTRL_GET_TIMEOUT);
+		if (!(result == 0 || result == -EPIPE))
 			break;
 	}
 	return result;
