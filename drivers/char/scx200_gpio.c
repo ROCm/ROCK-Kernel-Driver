@@ -6,6 +6,7 @@
    Copyright (c) 2001,2002 Christer Weinigel <wingel@nano-system.com> */
 
 #include <linux/config.h>
+#include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
