@@ -103,7 +103,6 @@ MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the I801 at the given address. "
 		 "EXTREMELY DANGEROUS!");
 
-static void i801_do_pause(unsigned int amount);
 static int i801_transaction(void);
 static int i801_block_transaction(union i2c_smbus_data *data,
 				  char read_write, int command);
@@ -178,13 +177,6 @@ END:
 	return error_return;
 }
 
-
-static void i801_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 static int i801_transaction(void)
 {
 	int temp;
@@ -214,7 +206,7 @@ static int i801_transaction(void)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		i801_do_pause(1);
+		i2c_delay(1);
 		temp = inb_p(SMBHSTSTS);
 	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
 
@@ -342,7 +334,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i801_do_pause(1);
+			i2c_delay(1);
 		}
 		    while ((!(temp & 0x80))
 			   && (timeout++ < MAX_TIMEOUT));
@@ -402,7 +394,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i801_do_pause(1);
+			i2c_delay(1);
 		} while ((!(temp & 0x02))
 			   && (timeout++ < MAX_TIMEOUT));
 
