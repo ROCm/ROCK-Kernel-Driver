@@ -289,6 +289,7 @@ void __exit ns558_exit(void)
 #endif
 			case NS558_ISA:
 				release_region(port->gameport.io & ~(port->size - 1), port->size);
+				kfree(port);
 				break;
 		
 			default:
