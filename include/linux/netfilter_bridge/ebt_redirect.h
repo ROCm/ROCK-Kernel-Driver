@@ -3,7 +3,7 @@
 
 struct ebt_redirect_info
 {
-	// EBT_ACCEPT, EBT_DROP or EBT_CONTINUE or EBT_RETURN
+	/* EBT_ACCEPT, EBT_DROP, EBT_CONTINUE or EBT_RETURN */
 	int target;
 };
 #define EBT_REDIRECT_TARGET "redirect"

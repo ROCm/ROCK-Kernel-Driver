@@ -68,6 +68,9 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+  __con_initcall_start = .;
+  .con_initcall.init : { *(.con_initcall.init) }
+  __con_initcall_end = .;
   __machvec_start = .;
   .machvec.init : { *(.machvec.init) }
   __machvec_end = .;

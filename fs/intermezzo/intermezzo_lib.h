@@ -32,12 +32,6 @@
 # include <sys/types.h>
 #endif
 
-#undef MIN
-#define MIN(a,b) (((a)<(b)) ? (a): (b))
-#undef MAX
-#define MAX(a,b) (((a)>(b)) ? (a): (b))
-#define MKSTR(ptr) ((ptr))? (ptr) : ""
-
 static inline int size_round (int val)
 {
 	return (val + 3) & (~0x3);

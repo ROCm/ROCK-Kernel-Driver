@@ -910,9 +910,9 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 			sk->state	 = TCP_CLOSE;
 			sk->err		 = 0;
 			sk->shutdown	 |= SEND_SHUTDOWN;
-			if (!sk->dead)
+			if (!test_bit(SOCK_DEAD, &sk->flags))
 				sk->state_change(sk);
-			sk->dead         = 1;
+			__set_bit(SOCK_DEAD, &sk->flags);
 		}
 		else {
 			skb->h.raw = skb->data;

@@ -501,11 +501,12 @@ static struct console serial21285_console =
 	.index		= -1,
 };
 
-void __init rs285_console_init(void)
+static void __init rs285_console_init(void)
 {
 	serial21285_setup_ports();
 	register_console(&serial21285_console);
 }
+console_initcall(rs285_console_init);
 
 #define SERIAL_21285_CONSOLE	&serial21285_console
 #else

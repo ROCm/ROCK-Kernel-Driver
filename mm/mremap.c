@@ -1,5 +1,5 @@
 /*
- *	mm/remap.c
+ *	mm/mremap.c
  *
  *	(C) Copyright 1996 Linus Torvalds
  *

@@ -247,7 +247,10 @@ extern void		dst_init(void);
 struct flowi;
 extern int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 		       struct sock *sk, int flags);
+extern int xfrm6_lookup(struct dst_entry **dst_p, struct flowi *fl,
+		       struct sock *sk, int flags);
 extern void xfrm_init(void);
+extern void xfrm6_init(void);
 
 #endif
 

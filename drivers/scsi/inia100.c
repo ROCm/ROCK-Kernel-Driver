@@ -67,12 +67,6 @@
  *          - Fix allocation of scsi host structs and private data
  **************************************************************************/
 
-#define CVT_LINUX_VERSION(V,P,S)        (V * 65536 + P * 256 + S)
-
-#ifndef LINUX_VERSION_CODE
-#include <linux/version.h>
-#endif
-
 #include <linux/module.h>
 
 #include <linux/errno.h>

@@ -177,8 +177,7 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 
 	hwif->OUTB((taskfile->device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
 	if (task->handler != NULL) {
-		ide_set_handler(drive, task->handler, WAIT_WORSTCASE, NULL);
-		hwif->OUTB(taskfile->command, IDE_COMMAND_REG);
+		ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
 		if (task->prehandler != NULL)
 			return task->prehandler(drive, task->rq);
 		return ide_started;
@@ -1880,9 +1879,8 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
  			if (task->handler == NULL)
 				return ide_stopped;
 
-			ide_set_handler(drive, task->handler, WAIT_WORSTCASE, NULL);
 			/* Issue the command */
-			hwif->OUTB(taskfile->command, IDE_COMMAND_REG);
+			ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
 			if (task->prehandler != NULL)
 				return task->prehandler(drive, HWGROUP(drive)->rq);
 	}

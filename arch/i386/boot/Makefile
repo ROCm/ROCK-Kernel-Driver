@@ -62,8 +62,36 @@ $(obj)/compressed/vmlinux: FORCE
 	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed \
 					IMAGE_OFFSET=$(IMAGE_OFFSET) $@
 
-zdisk: $(BOOTIMAGE)
-	dd bs=8192 if=$(BOOTIMAGE) of=/dev/fd0
+# Set this if you want to pass append arguments to the zdisk/fdimage kernel
+FDARGS = 
+
+$(obj)/mtools.conf: $(obj)/mtools.conf.in
+	sed -e 's|@OBJ@|$(obj)|g' < $< > $@
+
+# This requires write access to /dev/fd0
+zdisk: $(BOOTIMAGE) $(obj)/mtools.conf
+	MTOOLSRC=$(src)/mtools.conf mformat a:			; sync
+	syslinux /dev/fd0					; sync
+	echo 'default linux $(FDARGS)' | \
+		MTOOLSRC=$(src)/mtools.conf mcopy - a:syslinux.cfg
+	MTOOLSRC=$(src)/mtools.conf mcopy $(BOOTIMAGE) a:linux	; sync
+
+# These require being root or having syslinux 2.02 or higher installed
+fdimage fdimage144: $(BOOTIMAGE) $(src)/mtools.conf
+	dd if=/dev/zero of=$(obj)/fdimage bs=1024 count=1440
+	MTOOLSRC=$(src)/mtools.conf mformat v:			; sync
+	syslinux $(obj)/fdimage					; sync
+	echo 'default linux $(FDARGS)' | \
+		MTOOLSRC=$(src)/mtools.conf mcopy - v:syslinux.cfg
+	MTOOLSRC=$(src)/mtools.conf mcopy $(BOOTIMAGE) v:linux	; sync
+
+fdimage288: $(BOOTIMAGE) $(src)/mtools.conf
+	dd if=/dev/zero of=$(obj)/fdimage bs=1024 count=2880
+	MTOOLSRC=$(src)/mtools.conf mformat w:			; sync
+	syslinux $(obj)/fdimage					; sync
+	echo 'default linux $(FDARGS)' | \
+		MTOOLSRC=$(src)/mtools.conf mcopy - w:syslinux.cfg
+	MTOOLSRC=$(src)/mtools.conf mcopy $(BOOTIMAGE) w:linux	; sync
 
 zlilo: $(BOOTIMAGE)
 	if [ -f $(INSTALL_PATH)/vmlinuz ]; then mv $(INSTALL_PATH)/vmlinuz $(INSTALL_PATH)/vmlinuz.old; fi

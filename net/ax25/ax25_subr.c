@@ -285,8 +285,8 @@ void ax25_disconnect(ax25_cb *ax25, int reason)
 		ax25->sk->state     = TCP_CLOSE;
 		ax25->sk->err       = reason;
 		ax25->sk->shutdown |= SEND_SHUTDOWN;
-		if (!ax25->sk->dead)
+		if (!test_bit(SOCK_DEAD, &ax25->sk->flags))
 			ax25->sk->state_change(ax25->sk);
-		ax25->sk->dead      = 1;
+		__set_bit(SOCK_DEAD, &ax25->sk->flags);
 	}
 }

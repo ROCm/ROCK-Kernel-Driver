@@ -47,7 +47,6 @@ static char *_rioctrl_c_sccs_ = "@(#)rioctrl.c	1.3";
 #include <linux/termios.h>
 #include <linux/serial.h>
 
-#include <linux/compatmac.h>
 #include <linux/generic_serial.h>
 
 

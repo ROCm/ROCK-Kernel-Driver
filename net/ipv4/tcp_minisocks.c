@@ -676,7 +676,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newsk->wmem_queued = 0;
 		newsk->forward_alloc = 0;
 
-		newsk->done = 0;
+		__clear_bit(SOCK_DONE, &newsk->flags);
 		newsk->userlocks = sk->userlocks & ~SOCK_BINDPORT_LOCK;
 		newsk->backlog.head = newsk->backlog.tail = NULL;
 		newsk->callback_lock = RW_LOCK_UNLOCKED;
@@ -761,7 +761,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 #endif
 		atomic_inc(&tcp_sockets_allocated);
 
-		if (newsk->keepopen)
+		if (test_bit(SOCK_KEEPOPEN, &newsk->flags))
 			tcp_reset_keepalive_timer(newsk, keepalive_time_when(newtp));
 		newsk->socket = NULL;
 		newsk->sleep = NULL;

@@ -84,11 +84,8 @@ static void *detect_HRT_floating_pointer(void *begin, void *end)
 int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)  
 {
 	unsigned char bus;
-	struct pci_dev dev0;
 	struct pci_bus *child;
 	int rc = 0;
-
-	memset(&dev0, 0, sizeof(struct pci_dev));
 
 	if (func->pci_dev == NULL)
 		func->pci_dev = pci_find_slot(func->bus, (func->device << 3) | (func->function & 0x7));
@@ -96,12 +93,10 @@ int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)
 	//Still NULL ? Well then scan for it !
 	if (func->pci_dev == NULL) {
 		dbg("INFO: pci_dev still null\n");
-		dev0.bus = ctrl->pci_dev->bus;
-		dev0.devfn = (func->device << 3) + (func->function & 0x7);
-		dev0.sysdata = ctrl->pci_dev->sysdata;
 
 		//this will generate pci_dev structures for all functions, but we will only call this case when lookup fails
-		func->pci_dev = pci_scan_slot(&dev0);
+		func->pci_dev = pci_scan_slot(ctrl->pci_dev->bus,
+				 (func->device << 3) + (func->function & 0x7));
 		if (func->pci_dev == NULL) {
 			dbg("ERROR: pci_dev still null\n");
 			return 0;

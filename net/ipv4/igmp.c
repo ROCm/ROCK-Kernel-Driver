@@ -606,7 +606,7 @@ void ip_mc_destroy_dev(struct in_device *in_dev)
 static struct in_device * ip_mc_find_dev(struct ip_mreqn *imr)
 {
 	struct flowi fl = { .nl_u = { .ip4_u =
-				      { .daddr = imr->imr_address.s_addr } } };
+				      { .daddr = imr->imr_multiaddr.s_addr } } };
 	struct rtable *rt;
 	struct net_device *dev = NULL;
 	struct in_device *idev = NULL;

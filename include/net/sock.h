@@ -29,6 +29,8 @@
  *              			protocol specific parts were moved to
  *              			respective headers and ipv4/v6, etc now
  *              			use private slabcaches for its socks
+ *              Pedro Hortas	:	New flags field for socket options
+ *
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -59,6 +61,18 @@
  * Most of it is for TCP, and not used by any of
  * the other protocols.
  */
+
+/* Sock flags */
+enum {
+	SOCK_DEAD,
+	SOCK_DONE,
+	SOCK_URGINLINE,
+	SOCK_KEEPOPEN,
+	SOCK_LINGER,
+	SOCK_DESTROY,
+	SOCK_BROADCAST,
+	SOCK_BSDISM,
+};
 
 /* Define this to get the sk->debug debugging facility. */
 #define SOCK_DEBUGGING
@@ -120,18 +134,8 @@ struct sock {
 	int			sndbuf;		/* Size of send buffer in bytes		*/
 	struct sock		*prev;
 
-	/* Not all are volatile, but some are, so we might as well say they all are.
-	 * XXX Make this a flag word -DaveM
-	 */
-	volatile char		dead,
-				done,
-				urginline,
-				keepopen,
-				linger,
-				destroy,
-				no_check,
-				broadcast,
-				bsdism;
+	unsigned long 		flags;
+	char		 	no_check;
 	unsigned char		debug;
 	unsigned char		rcvtstamp;
 	unsigned char		no_largesend;
@@ -605,7 +609,7 @@ static inline void sock_put(struct sock *sk)
 static inline void sock_orphan(struct sock *sk)
 {
 	write_lock_bh(&sk->callback_lock);
-	sk->dead = 1;
+	__set_bit(SOCK_DEAD, &sk->flags);
 	sk->socket = NULL;
 	sk->sleep = NULL;
 	write_unlock_bh(&sk->callback_lock);
@@ -769,7 +773,7 @@ static inline int sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	skb->dev = NULL;
 	skb_set_owner_r(skb, sk);
 	skb_queue_tail(&sk->receive_queue, skb);
-	if (!sk->dead)
+	if (!test_bit(SOCK_DEAD, &sk->flags))
 		sk->data_ready(sk,skb->len);
 out:
 	return err;
@@ -784,7 +788,7 @@ static inline int sock_queue_err_skb(struct sock *sk, struct sk_buff *skb)
 		return -ENOMEM;
 	skb_set_owner_r(skb, sk);
 	skb_queue_tail(&sk->error_queue,skb);
-	if (!sk->dead)
+	if (!test_bit(SOCK_DEAD, &sk->flags))
 		sk->data_ready(sk,skb->len);
 	return 0;
 }
@@ -895,6 +899,14 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 				remove_wait_queue((sk)->sleep, &wait); \
 				lock_sock(sk); \
 				}
+
+static inline void sock_valbool_flag(struct sock *sk, int bit, int valbool)
+{
+	if (valbool)
+		__set_bit(bit, &sk->flags);
+	else
+		__clear_bit(bit, &sk->flags);
+}
 
 extern __u32 sysctl_wmem_max;
 extern __u32 sysctl_rmem_max;

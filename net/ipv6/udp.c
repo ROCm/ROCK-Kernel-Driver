@@ -50,6 +50,7 @@
 #include <net/inet_common.h>
 
 #include <net/checksum.h>
+#include <net/xfrm.h>
 
 DEFINE_SNMP_STAT(struct udp_mib, udp_stats_in6);
 
@@ -541,6 +542,11 @@ out:
 
 static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 {
+	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb)) {
+		kfree_skb(skb);
+		return -1;
+	}
+
 #if defined(CONFIG_FILTER)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
@@ -645,6 +651,9 @@ static int udpv6_rcv(struct sk_buff *skb)
 
 	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
 		goto short_packet;
+
+	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
+                goto discard;
 
 	saddr = &skb->nh.ipv6h->saddr;
 	daddr = &skb->nh.ipv6h->daddr;

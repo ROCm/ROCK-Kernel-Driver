@@ -133,6 +133,10 @@ SECTIONS
 	  *(.initcall7.init)
 	  __initcall_end = .;
 	}
+   __con_initcall_start = .;
+  .con_initcall.init : AT(ADDR(.con_initcall.init) - PAGE_OFFSET)
+	{ *(.con_initcall.init) }
+  __con_initcall_end = .;
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 

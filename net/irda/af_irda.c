@@ -133,13 +133,13 @@ static void irda_disconnect_indication(void *instance, void *sap,
 	}
 
 	/* Prevent race conditions with irda_release() and irda_shutdown() */
-	if ((!sk->dead) && (sk->state != TCP_CLOSE)) {
+	if ((!test_bit(SOCK_DEAD, &sk->flags)) && (sk->state != TCP_CLOSE)) {
 		sk->state     = TCP_CLOSE;
 		sk->err       = ECONNRESET;
 		sk->shutdown |= SEND_SHUTDOWN;
 
 		sk->state_change(sk);
-                sk->dead = 1;	/* Uh-oh... Should use sock_orphan ? */
+                __set_bit(SOCK_DEAD, &sk->flags);	/* Uh-oh... Should use sock_orphan ? */
 
 		/* Close our TSAP.
 		 * If we leave it open, IrLMP put it back into the list of
@@ -163,7 +163,7 @@ static void irda_disconnect_indication(void *instance, void *sap,
 	/* Note : once we are there, there is not much you want to do
 	 * with the socket anymore, apart from closing it.
 	 * For example, bind() and connect() won't reset sk->err,
-	 * sk->shutdown and sk->dead to valid values...
+	 * sk->shutdown and sk->flags to valid values...
 	 * Jean II
 	 */
 }

@@ -63,14 +63,6 @@
  *		   merged them into a single header used by both .c files.
  ****************************************************************************/
 
-#ifndef	CVT_LINUX_VERSION
-#define	CVT_LINUX_VERSION(V,P,S)	(((V) * 65536) + ((P) * 256) + (S))
-#endif
-
-#ifndef	LINUX_VERSION_CODE
-#include <linux/version.h>
-#endif
-
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -116,12 +108,6 @@ static int inia100_bus_reset(Scsi_Cmnd *);
 
 #ifndef NULL
 #define NULL     0		/* zero          */
-#endif
-#ifndef TRUE
-#define TRUE     (1)		/* boolean true  */
-#endif
-#ifndef FALSE
-#define FALSE    (0)		/* boolean false */
 #endif
 #ifndef FAILURE
 #define FAILURE  (-1)

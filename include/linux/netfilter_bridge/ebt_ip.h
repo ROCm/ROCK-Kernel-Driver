@@ -25,7 +25,7 @@
  EBT_IP_SPORT | EBT_IP_DPORT )
 #define EBT_IP_MATCH "ip"
 
-// the same values are used for the invflags
+/* the same values are used for the invflags */
 struct ebt_ip_info
 {
 	uint32_t saddr;

@@ -321,9 +321,9 @@ static inline pgd_t *current_pgd_offset_k(unsigned long address)
 #define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PTE_MASK))
 #define pmd_page(pmd)		(pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
 
-#define __pmd_offset(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
+#define pmd_index(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 #define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
-			__pmd_offset(address))
+			pmd_index(address))
 #define pmd_none(x)	(!pmd_val(x))
 #define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
@@ -353,10 +353,10 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
        return pte; 
 }
 
-#define __pte_offset(address) \
+#define pte_index(address) \
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pte_offset_kernel(dir, address) ((pte_t *) pmd_page_kernel(*(dir)) + \
-			__pte_offset(address))
+			pte_index(address))
 
 /* x86-64 always has all page tables mapped. */
 #define pte_offset_map(dir,address) pte_offset_kernel(dir,address)

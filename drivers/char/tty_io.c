@@ -113,7 +113,15 @@
 #define TTY_PARANOIA_CHECK 1
 #define CHECK_TTY_COUNT 1
 
-struct termios tty_std_termios;		/* for the benefit of tty drivers  */
+struct termios tty_std_termios = {	/* for the benefit of tty drivers  */
+	.c_iflag = ICRNL | IXON,
+	.c_oflag = OPOST | ONLCR,
+	.c_cflag = B38400 | CS8 | CREAD | HUPCL,
+	.c_lflag = ISIG | ICANON | ECHO | ECHOE | ECHOK |
+		   ECHOCTL | ECHOKE | IEXTEN,
+	.c_cc = INIT_C_CC
+};
+
 LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 struct tty_ldisc ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
@@ -141,26 +149,13 @@ int tty_ioctl(struct inode * inode, struct file * file,
 	      unsigned int cmd, unsigned long arg);
 static int tty_fasync(int fd, struct file * filp, int on);
 extern int vme_scc_init (void);
-extern long vme_scc_console_init(void);
 extern int serial167_init(void);
-extern long serial167_console_init(void);
-extern void console_8xx_init(void);
 extern int rs_8xx_init(void);
-extern void mac_scc_console_init(void);
-extern void sclp_console_init(void);
-extern void sclp_tty_init(void);
-extern void con3215_init(void);
-extern void tub3270_con_init(void);
+extern void hwc_tty_init(void);
+extern void tty3215_init(void);
 extern void tub3270_init(void);
-extern void uart_console_init(void);
-extern void sgi_serial_console_init(void);
-extern void sci_console_init(void);
-extern void m68328_console_init(void);
-extern void mcfrs_console_init(void);
 extern void rs_360_init(void);
-extern void tx3912_console_init(void);
 extern void tx3912_rs_init(void);
-extern void hvc_console_init(void);
 
 static struct tty_struct *alloc_tty_struct(void)
 {
@@ -306,13 +301,9 @@ static int tty_set_ldisc(struct tty_struct *tty, int ldisc)
 	if (tty->ldisc.open)
 		retval = (tty->ldisc.open)(tty);
 	if (retval < 0) {
-		module_put(tty->ldisc.owner);
-		
 		tty->ldisc = o_ldisc;
 		tty->termios->c_line = tty->ldisc.num;
 		if (tty->ldisc.open && (tty->ldisc.open(tty) < 0)) {
-			module_put(tty->ldisc.owner);
-
 			tty->ldisc = ldiscs[N_TTY];
 			tty->termios->c_line = N_TTY;
 			if (tty->ldisc.open) {
@@ -2206,21 +2197,10 @@ int tty_unregister_driver(struct tty_driver *driver)
  */
 void __init console_init(void)
 {
-	/* Setup the default TTY line discipline. */
-	memset(ldiscs, 0, sizeof(ldiscs));
-	(void) tty_register_ldisc(N_TTY, &tty_ldisc_N_TTY);
+	initcall_t *call;
 
-	/*
-	 * Set up the standard termios.  Individual tty drivers may 
-	 * deviate from this; this is used as a template.
-	 */
-	memset(&tty_std_termios, 0, sizeof(struct termios));
-	memcpy(tty_std_termios.c_cc, INIT_C_CC, NCCS);
-	tty_std_termios.c_iflag = ICRNL | IXON;
-	tty_std_termios.c_oflag = OPOST | ONLCR;
-	tty_std_termios.c_cflag = B38400 | CS8 | CREAD | HUPCL;
-	tty_std_termios.c_lflag = ISIG | ICANON | ECHO | ECHOE | ECHOK |
-		ECHOCTL | ECHOKE | IEXTEN;
+	/* Setup the default TTY line discipline. */
+	(void) tty_register_ldisc(N_TTY, &tty_ldisc_N_TTY);
 
 	/*
 	 * set up the console device so that later boot sequences can 
@@ -2229,68 +2209,16 @@ void __init console_init(void)
 #ifdef CONFIG_EARLY_PRINTK
 	disable_early_printk();
 #endif
-#ifdef CONFIG_VT
-	con_init();
-#endif
-#ifdef CONFIG_AU1000_SERIAL_CONSOLE
-	au1000_serial_console_init();
-#endif
-#ifdef CONFIG_SERIAL_CONSOLE
-#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
-	console_8xx_init();
-#elif defined(CONFIG_MAC_SERIAL)
- 	mac_scc_console_init();
-#elif defined(CONFIG_PARISC)
-	pdc_console_init();
-#elif defined(CONFIG_SERIAL)
-	serial_console_init();
-#endif /* CONFIG_8xx */
-#ifdef CONFIG_SGI_SERIAL
-	sgi_serial_console_init();
-#endif
-#if defined(CONFIG_MVME162_SCC) || defined(CONFIG_BVME6000_SCC) || defined(CONFIG_MVME147_SCC)
-	vme_scc_console_init();
-#endif
-#if defined(CONFIG_SERIAL167)
-	serial167_console_init();
-#endif
-#if defined(CONFIG_SH_SCI)
-	sci_console_init();
-#endif
-#endif
-#ifdef CONFIG_TN3270_CONSOLE
-	tub3270_con_init();
-#endif
-#ifdef CONFIG_TN3215_CONSOLE
-	con3215_init();
-#endif
-#ifdef CONFIG_SCLP_CONSOLE
-        sclp_console_init();
-#endif
-#ifdef CONFIG_STDIO_CONSOLE
-	stdio_console_init();
-#endif
-#ifdef CONFIG_SERIAL_CORE_CONSOLE
-	uart_console_init();
-#endif
-#ifdef CONFIG_ARC_CONSOLE
-	arc_console_init();
-#endif
-#ifdef CONFIG_SERIAL_68328
-	m68328_console_init();
-#endif
-#ifdef CONFIG_SERIAL_COLDFIRE
-	mcfrs_console_init();
-#endif
 #ifdef CONFIG_SERIAL_68360
-	rs_360_init();
+ 	/* This is not a console initcall. I know not what it's doing here.
+	   So I haven't moved it. dwmw2 */
+        rs_360_init();
 #endif
-#ifdef CONFIG_SERIAL_TX3912_CONSOLE
-	tx3912_console_init();
-#endif
-#ifdef CONFIG_HVC_CONSOLE
-	hvc_console_init();
-#endif
+	call = &__con_initcall_start;
+	while (call < &__con_initcall_end) {
+		(*call)();
+		call++;
+	}
 }
 
 static struct tty_driver dev_tty_driver, dev_syscons_driver;

@@ -510,8 +510,8 @@ void rose_disconnect(struct sock *sk, int reason, int cause, int diagnostic)
 	sk->err       = reason;
 	sk->shutdown |= SEND_SHUTDOWN;
 
-	if (!sk->dead)
+	if (!test_bit(SOCK_DEAD, &sk->flags))
 		sk->state_change(sk);
 
-	sk->dead  = 1;
+	__set_bit(SOCK_DEAD, &sk->flags);
 }

@@ -641,7 +641,7 @@ EMU10K1 SOUND DRIVER
 P:	Rui Sousa	
 M:	rui.p.m.sousa@clix.pt	
 L:	emu10k1-devel@lists.sourceforge.net
-W:	http://opensource.creative.com/
+W:	http://sourceforge.net/projects/emu10k1/
 S:	Maintained
 
 ETHEREXPRESS-16 NETWORK DRIVER

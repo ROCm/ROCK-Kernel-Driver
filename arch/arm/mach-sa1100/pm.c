@@ -22,25 +22,12 @@
  * 2002-05-27:	Nicolas Pitre	Killed sleep.h and the kmalloced save array.
  * 				Storage is local on the stack now.
  */
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/pm.h>
-#include <linux/sysctl.h>
 #include <linux/errno.h>
-#include <linux/device.h>
-#include <linux/cpufreq.h>
+#include <linux/time.h>
 
 #include <asm/hardware.h>
 #include <asm/memory.h>
 #include <asm/system.h>
-#include <asm/leds.h>
-
-
-/*
- * Debug macros
- */
-#undef DEBUG
 
 extern void sa1100_cpu_suspend(void);
 extern void sa1100_cpu_resume(void);
@@ -58,10 +45,9 @@ enum {	SLEEP_SAVE_SP = 0,
 	SLEEP_SAVE_OSCR, SLEEP_SAVE_OIER,
 	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
 
-	SLEEP_SAVE_GPDR, SLEEP_SAVE_GRER, SLEEP_SAVE_GFER, SLEEP_SAVE_GAFR,
+	SLEEP_SAVE_GPDR, SLEEP_SAVE_GAFR,
 	SLEEP_SAVE_PPDR, SLEEP_SAVE_PPSR, SLEEP_SAVE_PPAR, SLEEP_SAVE_PSDR,
 
-	SLEEP_SAVE_ICMR,
 	SLEEP_SAVE_Ser1SDCR0,
 
 	SLEEP_SAVE_SIZE
@@ -71,10 +57,6 @@ enum {	SLEEP_SAVE_SP = 0,
 int pm_do_suspend(void)
 {
 	unsigned long sleep_save[SLEEP_SAVE_SIZE];
-
-	local_irq_disable();
-
-	leds_event(led_stop);
 
 	/* preserve current time */
 	RCNR = xtime.tv_sec;
@@ -88,8 +70,6 @@ int pm_do_suspend(void)
 	SAVE(OIER);
 
 	SAVE(GPDR);
-	SAVE(GRER);
-	SAVE(GFER);
 	SAVE(GAFR);
 
 	SAVE(PPDR);
@@ -98,13 +78,6 @@ int pm_do_suspend(void)
 	SAVE(PSDR);
 
 	SAVE(Ser1SDCR0);
-
-	SAVE(ICMR);
-
-	/* ... maybe a global variable initialized by arch code to set this? */
-	GRER = PWER;
-	GFER = 0;
-	GEDR = GEDR;
 
 	/* Clear previous reset status */
 	RCSR = RCSR_HWR | RCSR_SWR | RCSR_WDR | RCSR_SMR;
@@ -115,21 +88,22 @@ int pm_do_suspend(void)
 	/* go zzz */
 	sa1100_cpu_suspend();
 
-	/* ensure not to come back here if it wasn't intended */
+	/*
+	 * Ensure not to come back here if it wasn't intended
+	 */
 	PSPR = 0;
 
-#ifdef DEBUG
-	printk(KERN_DEBUG "*** made it back from resume\n");
-#endif
+	/*
+	 * Ensure interrupt sources are disabled; we will re-init
+	 * the interrupt subsystem via the device manager.
+	 */
+	ICLR = 0;
+	ICCR = 1;
+	ICMR = 0;
 
 	/* restore registers */
 	RESTORE(GPDR);
-	RESTORE(GRER);
-	RESTORE(GFER);
 	RESTORE(GAFR);
-
-	/* clear any edge detect bit */
-	GEDR = GEDR;
 
 	RESTORE(PPDR);
 	RESTORE(PPSR);
@@ -138,6 +112,9 @@ int pm_do_suspend(void)
 
 	RESTORE(Ser1SDCR0);
 
+	/*
+	 * Clear the peripheral sleep-hold bit.
+	 */
 	PSSR = PSSR_PH;
 
 	RESTORE(OSMR0);
@@ -147,23 +124,8 @@ int pm_do_suspend(void)
 	RESTORE(OSCR);
 	RESTORE(OIER);
 
-	ICLR = 0;
-	ICCR = 1;
-	RESTORE(ICMR);
-
 	/* restore current time */
 	xtime.tv_sec = RCNR;
-
-	leds_event(led_start);
-
-	local_irq_enable();
-
-	/*
-	 * Restore the CPU frequency settings.
-	 */
-#ifdef CONFIG_CPU_FREQ
-	cpufreq_restore();
-#endif
 
 	return 0;
 }
@@ -172,78 +134,3 @@ unsigned long sleep_phys_sp(void *sp)
 {
 	return virt_to_phys(sp);
 }
-
-#ifdef CONFIG_SYSCTL
-/*
- * ARGH!  ACPI people defined CTL_ACPI in linux/acpi.h rather than
- * linux/sysctl.h.
- *
- * This means our interface here won't survive long - it needs a new
- * interface.  Quick hack to get this working - use sysctl id 9999.
- */
-#warning ACPI broke the kernel, this interface needs to be fixed up.
-#define CTL_ACPI 9999
-#define ACPI_S1_SLP_TYP 19
-
-/*
- * Send us to sleep.
- */
-static int sysctl_pm_do_suspend(void)
-{
-	int retval;
-
-	/*
-	 * Suspend "legacy" devices.
-	 */
-	retval = pm_send_all(PM_SUSPEND, (void *)3);
-	if (retval == 0) {
-		/*
-		 * Suspend LDM devices.
-		 */
-		device_suspend(4, SUSPEND_NOTIFY);
-		device_suspend(4, SUSPEND_SAVE_STATE);
-		device_suspend(4, SUSPEND_DISABLE);
-
-		retval = pm_do_suspend();
-
-		/*
-		 * Resume LDM devices.
-		 */
-		device_resume(RESUME_RESTORE_STATE);
-		device_resume(RESUME_ENABLE);
-
-		/*
-		 * Resume "legacy" devices.
-		 */
-		pm_send_all(PM_RESUME, (void *)0);
-	}
-
-	return retval;
-}
-
-static struct ctl_table pm_table[] =
-{
-	{ACPI_S1_SLP_TYP, "suspend", NULL, 0, 0600, NULL, (proc_handler *)&sysctl_pm_do_suspend},
-	{0}
-};
-
-static struct ctl_table pm_dir_table[] =
-{
-	{CTL_ACPI, "pm", NULL, 0, 0555, pm_table},
-	{0}
-};
-
-/*
- * Initialize power interface
- */
-static int __init pm_init(void)
-{
-	register_sysctl_table(pm_dir_table, 1);
-	return 0;
-}
-
-fs_initcall(pm_init);
-
-#endif
-
-EXPORT_SYMBOL(pm_do_suspend);

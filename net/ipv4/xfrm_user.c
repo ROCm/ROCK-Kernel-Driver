@@ -234,8 +234,8 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 
 	switch (x->props.family) {
 	case AF_INET:
-		x1 = xfrm_state_lookup(x->props.saddr.xfrm4_addr,
-				       x->id.spi, x->id.proto);
+		x1 = xfrm4_state_lookup(x->props.saddr.xfrm4_addr,
+					x->id.spi, x->id.proto);
 		break;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case AF_INET6:
@@ -265,7 +265,7 @@ static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 
 	switch (p->family) {
 	case AF_INET:
-		x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+		x = xfrm4_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
 		break;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case AF_INET6:
@@ -395,7 +395,7 @@ static int xfrm_get_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 
 	switch (p->family) {
 	case AF_INET:
-		x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+		x = xfrm4_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
 		break;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case AF_INET6:
@@ -533,6 +533,21 @@ static int verify_newpolicy_info(struct xfrm_userpolicy_info *p)
 	case XFRM_POLICY_ALLOW:
 	case XFRM_POLICY_BLOCK:
 		break;
+
+	default:
+		return -EINVAL;
+	};
+
+	switch (p->family) {
+	case AF_INET:
+		break;
+
+	case AF_INET6:
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+		break;
+#else
+		return  -EAFNOSUPPORT;
+#endif
 
 	default:
 		return -EINVAL;
@@ -1057,7 +1072,8 @@ static int xfrm_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *xt,
 /* User gives us xfrm_user_policy_info followed by an array of 0
  * or more templates.
  */
-struct xfrm_policy *xfrm_compile_policy(int opt, u8 *data, int len, int *dir)
+struct xfrm_policy *xfrm_compile_policy(u16 family, int opt,
+                                        u8 *data, int len, int *dir)
 {
 	struct xfrm_userpolicy_info *p = (struct xfrm_userpolicy_info *)data;
 	struct xfrm_user_tmpl *ut = (struct xfrm_user_tmpl *) (p + 1);

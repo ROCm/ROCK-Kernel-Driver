@@ -10,9 +10,10 @@ GENHDRS=	aicdb.h $(YSRCS:.y=.h)
 GENSRCS=	$(YSRCS:.y=.c) $(LSRCS:.l=.c)
 
 SRCS=	${CSRCS} ${GENSRCS}
+LIBS=	-ldb
 CLEANFILES= ${GENSRCS} ${GENHDRS} $(YSRCS:.y=.output)
 # Override default kernel CFLAGS.  This is a userland app.
-AICASM_CFLAGS:= -I/usr/include -I. -ldb
+AICASM_CFLAGS:= -I/usr/include -I.
 YFLAGS= -d
 
 NOMAN=	noman
@@ -30,7 +31,7 @@ LFLAGS= -d
 endif
 
 $(PROG):  ${GENHDRS} $(SRCS)
-	$(AICASM_CC) $(AICASM_CFLAGS) $(SRCS) -o $(PROG)
+	$(AICASM_CC) $(AICASM_CFLAGS) $(SRCS) -o $(PROG) $(LIBS)
 
 aicdb.h:
 	@if [ -e "/usr/include/db3/db_185.h" ]; then		\
@@ -45,8 +46,9 @@ aicdb.h:
 		echo "*** Install db development libraries";	\
 	 fi
 
+clean-files := $(CLEANFILES) $(PROG)
 clean:
-	rm -f $(CLEANFILES) $(PROG)
+	rm -f $(clean-files)
 
 aicasm_gram.c aicasm_gram.h: aicasm_gram.y
 	$(YACC) $(YFLAGS) -b $(<:.y=) $<

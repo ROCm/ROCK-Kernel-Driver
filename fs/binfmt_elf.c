@@ -10,7 +10,7 @@
  */
 
 #include <linux/module.h>
-
+#include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/time.h>
@@ -256,8 +256,8 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 
 #ifndef elf_map
 
-static inline unsigned long
-elf_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int prot, int type)
+static unsigned long elf_map(struct file *filep, unsigned long addr,
+			struct elf_phdr *eppnt, int prot, int type)
 {
 	unsigned long map_addr;
 
@@ -934,7 +934,7 @@ static int dump_seek(struct file *file, off_t off)
  *
  * I think we should skip something. But I am not sure how. H.J.
  */
-static inline int maydump(struct vm_area_struct *vma)
+static int maydump(struct vm_area_struct *vma)
 {
 	/*
 	 * If we may not read the contents, don't allow us to dump
@@ -1046,7 +1046,7 @@ static inline void fill_elf_note_phdr(struct elf_phdr *phdr, int sz, off_t offse
 	return;
 }
 
-static inline void fill_note(struct memelfnote *note, const char *name, int type, 
+static void fill_note(struct memelfnote *note, const char *name, int type, 
 		unsigned int sz, void *data)
 {
 	note->name = name;
@@ -1060,7 +1060,8 @@ static inline void fill_note(struct memelfnote *note, const char *name, int type
  * fill up all the fields in prstatus from the given task struct, except registers
  * which need to be filled up separately.
  */
-static inline void fill_prstatus(struct elf_prstatus *prstatus, struct task_struct *p, long signr) 
+static void fill_prstatus(struct elf_prstatus *prstatus,
+			struct task_struct *p, long signr) 
 {
 	prstatus->pr_info.si_signo = prstatus->pr_cursig = signr;
 	prstatus->pr_sigpend = p->pending.signal.sig[0];
@@ -1075,7 +1076,7 @@ static inline void fill_prstatus(struct elf_prstatus *prstatus, struct task_stru
 	jiffies_to_timeval(p->cstime, &prstatus->pr_cstime);
 }
 
-static inline void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p)
+static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p)
 {
 	int i, len;
 	
@@ -1175,41 +1176,62 @@ static int elf_dump_thread_status(long signr, struct task_struct * p, struct lis
  */
 static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 {
+#define	NUM_NOTES	5
 	int has_dumped = 0;
 	mm_segment_t fs;
 	int segs;
 	size_t size = 0;
 	int i;
 	struct vm_area_struct *vma;
-	struct elfhdr elf;
+	struct elfhdr *elf = NULL;
 	off_t offset = 0, dataoff;
 	unsigned long limit = current->rlim[RLIMIT_CORE].rlim_cur;
-	int numnote = 5;
-	struct memelfnote notes[5];
-	struct elf_prstatus prstatus;	/* NT_PRSTATUS */
-	struct elf_prpsinfo psinfo;	/* NT_PRPSINFO */
+	int numnote = NUM_NOTES;
+	struct memelfnote *notes = NULL;
+	struct elf_prstatus *prstatus = NULL;	/* NT_PRSTATUS */
+	struct elf_prpsinfo *psinfo = NULL;	/* NT_PRPSINFO */
  	struct task_struct *g, *p;
  	LIST_HEAD(thread_list);
  	struct list_head *t;
-	elf_fpregset_t fpu;
-#ifdef ELF_CORE_COPY_XFPREGS
-	elf_fpxregset_t xfpu;
-#endif
+	elf_fpregset_t *fpu = NULL;
+	elf_fpxregset_t *xfpu = NULL;
 	int thread_status_size = 0;
-	
-	/* We no longer stop all vm operations
+
+	/*
+	 * We no longer stop all VM operations.
 	 * 
-	 * This because those proceses that could possibly 
-	 * change map_count or the mmap / vma pages are now blocked in do_exit on current finishing
+	 * This is because those proceses that could possibly change map_count or
+	 * the mmap / vma pages are now blocked in do_exit on current finishing
 	 * this core dump.
 	 *
 	 * Only ptrace can touch these memory addresses, but it doesn't change
-	 * the map_count or the pages allocated.  So no possibility of crashing exists while dumping
-	 * the mm->vm_next areas to the core file.
-	 *
+	 * the map_count or the pages allocated.  So no possibility of crashing
+	 * exists while dumping the mm->vm_next areas to the core file.
 	 */
-  	
-	 /* capture the status of all other threads */
+  
+	/* alloc memory for large data structures: too large to be on stack */
+	elf = kmalloc(sizeof(*elf), GFP_KERNEL);
+	if (!elf)
+		goto cleanup;
+	prstatus = kmalloc(sizeof(*prstatus), GFP_KERNEL);
+	if (!prstatus)
+		goto cleanup;
+	psinfo = kmalloc(sizeof(*psinfo), GFP_KERNEL);
+	if (!psinfo)
+		goto cleanup;
+	notes = kmalloc(NUM_NOTES * sizeof(struct memelfnote), GFP_KERNEL);
+	if (!notes)
+		goto cleanup;
+	fpu = kmalloc(sizeof(*fpu), GFP_KERNEL);
+	if (!fpu)
+		goto cleanup;
+#ifdef ELF_CORE_COPY_XFPREGS
+	xfpu = kmalloc(sizeof(*xfpu), GFP_KERNEL);
+	if (!xfpu)
+		goto cleanup;
+#endif
+
+	/* capture the status of all other threads */
 	if (signr) {
 		read_lock(&tasklist_lock);
 		do_each_thread(g,p)
@@ -1226,14 +1248,14 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	}
 
 	/* now collect the dump for the current */
-	memset(&prstatus, 0, sizeof(prstatus));
-	fill_prstatus(&prstatus, current, signr);
-	elf_core_copy_regs(&prstatus.pr_reg, regs);
+	memset(prstatus, 0, sizeof(*prstatus));
+	fill_prstatus(prstatus, current, signr);
+	elf_core_copy_regs(&prstatus->pr_reg, regs);
 	
 	segs = current->mm->map_count;
 
 	/* Set up header */
-	fill_elf_header(&elf, segs+1); /* including notes section*/
+	fill_elf_header(elf, segs+1);	/* including notes section */
 
 	has_dumped = 1;
 	current->flags |= PF_DUMPCORE;
@@ -1243,32 +1265,32 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	 * with info from their /proc.
 	 */
 
-	fill_note(&notes[0], "CORE", NT_PRSTATUS, sizeof(prstatus), &prstatus);
+	fill_note(notes +0, "CORE", NT_PRSTATUS, sizeof(*prstatus), prstatus);
 	
-	fill_psinfo(&psinfo, current->group_leader);
-	fill_note(&notes[1], "CORE", NT_PRPSINFO, sizeof(psinfo), &psinfo);
+	fill_psinfo(psinfo, current->group_leader);
+	fill_note(notes +1, "CORE", NT_PRPSINFO, sizeof(*psinfo), psinfo);
 	
-	fill_note(&notes[2], "CORE", NT_TASKSTRUCT, sizeof(*current), current);
+	fill_note(notes +2, "CORE", NT_TASKSTRUCT, sizeof(*current), current);
   
   	/* Try to dump the FPU. */
-	if ((prstatus.pr_fpvalid = elf_core_copy_task_fpregs(current, &fpu)))
-		fill_note(&notes[3], "CORE", NT_PRFPREG, sizeof(fpu), &fpu);
+	if ((prstatus->pr_fpvalid = elf_core_copy_task_fpregs(current, fpu)))
+		fill_note(notes +3, "CORE", NT_PRFPREG, sizeof(*fpu), fpu);
 	else
 		--numnote;
 #ifdef ELF_CORE_COPY_XFPREGS
-	if (elf_core_copy_task_xfpregs(current, &xfpu))
-		fill_note(&notes[4], "LINUX", NT_PRXFPREG, sizeof(xfpu), &xfpu);
+	if (elf_core_copy_task_xfpregs(current, xfpu))
+		fill_note(notes +4, "LINUX", NT_PRXFPREG, sizeof(*xfpu), xfpu);
 	else
 		--numnote;
 #else
-	numnote --;
+	numnote--;
 #endif	
   
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	DUMP_WRITE(&elf, sizeof(elf));
-	offset += sizeof(elf);				/* Elf header */
+	DUMP_WRITE(elf, sizeof(*elf));
+	offset += sizeof(*elf);				/* Elf header */
 	offset += (segs+1) * sizeof(struct elf_phdr);	/* Program headers */
 
 	/* Write notes phdr entry */
@@ -1276,8 +1298,8 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 		struct elf_phdr phdr;
 		int sz = 0;
 
-		for(i = 0; i < numnote; i++)
-			sz += notesize(&notes[i]);
+		for (i = 0; i < numnote; i++)
+			sz += notesize(notes + i);
 		
 		sz += thread_status_size;
 
@@ -1290,7 +1312,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	dataoff = offset = roundup(offset, ELF_EXEC_PAGESIZE);
 
 	/* Write program headers for segments dump */
-	for(vma = current->mm->mmap; vma != NULL; vma = vma->vm_next) {
+	for (vma = current->mm->mmap; vma != NULL; vma = vma->vm_next) {
 		struct elf_phdr phdr;
 		size_t sz;
 
@@ -1312,8 +1334,8 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	}
 
  	/* write out the notes section */
-	for(i = 0; i < numnote; i++)
-		if (!writenote(&notes[i], file))
+	for (i = 0; i < numnote; i++)
+		if (!writenote(notes + i, file))
 			goto end_coredump;
 
 	/* write out the thread status notes section */
@@ -1326,7 +1348,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
  
 	DUMP_SEEK(dataoff);
 
-	for(vma = current->mm->mmap; vma != NULL; vma = vma->vm_next) {
+	for (vma = current->mm->mmap; vma != NULL; vma = vma->vm_next) {
 		unsigned long addr;
 
 		if (!maydump(vma))
@@ -1373,7 +1395,14 @@ cleanup:
 		kfree(list_entry(tmp, struct elf_thread_status, list));
 	}
 
+	kfree(elf);
+	kfree(prstatus);
+	kfree(psinfo);
+	kfree(notes);
+	kfree(fpu);
+	kfree(xfpu);
 	return has_dumped;
+#undef NUM_NOTES
 }
 
 #endif		/* USE_ELF_CORE_DUMP */

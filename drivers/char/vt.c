@@ -2443,7 +2443,7 @@ static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols,
 struct tty_driver console_driver;
 static int console_refcount;
 
-void __init con_init(void)
+static void __init con_init(void)
 {
 	const char *display_desc = NULL;
 	unsigned int currcons = 0;
@@ -2492,6 +2492,7 @@ void __init con_init(void)
 	register_console(&vt_console_driver);
 #endif
 }
+console_initcall(con_init);
 
 int __init vty_init(void)
 {

@@ -2,7 +2,7 @@
  *  ebt_redirect
  *
  *	Authors:
- *	Bart De Schuymer <bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer <bdschuym@pandora.be>
  *
  *  April, 2002
  *
@@ -51,8 +51,10 @@ static int ebt_target_redirect_check(const char *tablename, unsigned int hookmas
 
 static struct ebt_target redirect_target =
 {
-	{NULL, NULL}, EBT_REDIRECT_TARGET, ebt_target_redirect,
-	ebt_target_redirect_check, NULL, THIS_MODULE
+	.name		= EBT_REDIRECT_TARGET,
+	.target		= ebt_target_redirect,
+	.check		= ebt_target_redirect_check,
+	.me		= THIS_MODULE,
 };
 
 static int __init init(void)

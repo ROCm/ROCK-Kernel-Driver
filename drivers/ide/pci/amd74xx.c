@@ -82,7 +82,7 @@ static char *amd_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 
-static long amd_base;
+static unsigned long amd_base;
 static struct pci_dev *bmide_dev;
 extern int (*amd74xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
 
@@ -102,7 +102,7 @@ static int amd74xx_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	amd_print("----------AMD BusMastering IDE Configuration----------------");
 
-	amd_print("Driver Version:                     2.8");
+	amd_print("Driver Version:                     2.9");
 	amd_print("South Bridge:                       %s", bmide_dev->dev.name);
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
@@ -284,7 +284,7 @@ static int amd74xx_ide_dma_check(ide_drive_t *drive)
  * and initialize its drive independent registers.
  */
 
-unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char *name)
+static unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char *name)
 {
 	unsigned char t;
 	unsigned int u;
@@ -378,12 +378,12 @@ unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init ata66_amd74xx(ide_hwif_t *hwif)
+static unsigned int __init ata66_amd74xx(ide_hwif_t *hwif)
 {
 	return ((amd_enabled & amd_80w) >> hwif->channel) & 1;
 }
 
-void __init init_hwif_amd74xx(ide_hwif_t *hwif)
+static void __init init_hwif_amd74xx(ide_hwif_t *hwif)
 {
 	int i;
 

@@ -74,6 +74,21 @@ struct rt0_hdr {
 #define rt0_type		rt_hdr.type;
 };
 
+struct ipv6_auth_hdr {
+	__u8  nexthdr;
+	__u8  hdrlen;           /* This one is measured in 32 bit units! */
+	__u16 reserved;
+	__u32 spi;
+	__u32 seq_no;           /* Sequence number */
+	__u8  auth_data[4];     /* Length variable but >=4. Mind the 64 bit alignment! */
+};
+
+struct ipv6_esp_hdr {
+	__u32 spi;
+	__u32 seq_no;           /* Sequence number */
+	__u8  enc_data[8];      /* Length variable but >=8. Mind the 64 bit alignment! */
+};
+
 /*
  *	IPv6 fixed header
  *

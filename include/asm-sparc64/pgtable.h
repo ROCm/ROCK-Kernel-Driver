@@ -273,11 +273,11 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 					((address >> PMD_SHIFT) & (REAL_PTRS_PER_PMD-1)))
 
 /* Find an entry in the third-level page table.. */
-#define __pte_offset(dir, address)	((pte_t *) __pmd_page(*(dir)) + \
+#define pte_index(dir, address)	((pte_t *) __pmd_page(*(dir)) + \
 					((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
-#define pte_offset_kernel		__pte_offset
-#define pte_offset_map			__pte_offset
-#define pte_offset_map_nested		__pte_offset
+#define pte_offset_kernel		pte_index
+#define pte_offset_map			pte_index
+#define pte_offset_map_nested		pte_index
 #define pte_unmap(pte)			do { } while (0)
 #define pte_unmap_nested(pte)		do { } while (0)
 

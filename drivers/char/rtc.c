@@ -152,6 +152,9 @@ static unsigned long rtc_irq_data = 0;	/* our output to the world	*/
 static unsigned long rtc_max_user_freq = 64; /* > this, need CAP_SYS_RESOURCE */
 
 #if RTC_IRQ
+/*
+ * rtc_task_lock nests inside rtc_lock.
+ */
 static spinlock_t rtc_task_lock = SPIN_LOCK_UNLOCKED;
 static rtc_task_t *rtc_callback = NULL;
 #endif
@@ -746,13 +749,15 @@ int rtc_unregister(rtc_task_t *task)
 #else
 	unsigned char tmp;
 
-	spin_lock_irq(&rtc_task_lock);
+	spin_lock_irq(&rtc_lock);
+	spin_lock(&rtc_task_lock);
 	if (rtc_callback != task) {
-		spin_unlock_irq(&rtc_task_lock);
+		spin_unlock(&rtc_task_lock);
+		spin_unlock_irq(&rtc_lock);
 		return -ENXIO;
 	}
 	rtc_callback = NULL;
-	spin_lock(&rtc_lock);
+	
 	/* disable controls */
 	tmp = CMOS_READ(RTC_CONTROL);
 	tmp &= ~RTC_PIE;
@@ -765,8 +770,8 @@ int rtc_unregister(rtc_task_t *task)
 		del_timer(&rtc_irq_timer);
 	}
 	rtc_status &= ~RTC_IS_OPEN;
-	spin_unlock(&rtc_lock);
-	spin_unlock_irq(&rtc_task_lock);
+	spin_unlock(&rtc_task_lock);
+	spin_unlock_irq(&rtc_lock);
 	return 0;
 #endif
 }

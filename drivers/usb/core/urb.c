@@ -195,7 +195,9 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 
 	if (!urb || urb->hcpriv || !urb->complete)
 		return -EINVAL;
-	if (!(dev = urb->dev) || !dev->present || !dev->bus || dev->devnum <= 0)
+	if (!(dev = urb->dev) ||
+	    (dev->state < USB_STATE_DEFAULT) ||
+	    (!dev->bus) || (dev->devnum <= 0))
 		return -ENODEV;
 	if (!(op = dev->bus->op) || !op->submit_urb)
 		return -ENODEV;
@@ -210,6 +212,9 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 	pipe = urb->pipe;
 	temp = usb_pipetype (pipe);
 	is_out = usb_pipeout (pipe);
+
+	if (!usb_pipecontrol (pipe) && dev->state < USB_STATE_CONFIGURED)
+		return -ENODEV;
 
 	/* (actually HCDs may need to duplicate this, endpoint might yet
 	 * stall due to queued bulk/intr transactions that complete after
@@ -376,7 +381,16 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  */
 int usb_unlink_urb(struct urb *urb)
 {
-	if (urb && urb->dev && urb->dev->present && urb->dev->bus && urb->dev->bus->op)
+	/* FIXME
+	 * We should not care about the state here, but the host controllers
+	 * die a horrible death if we submit a urb for a device that has been
+	 * physically removed.
+	 */
+	if (urb &&
+	    urb->dev &&
+	    (urb->dev->state >= USB_STATE_DEFAULT) &&
+	    urb->dev->bus &&
+	    urb->dev->bus->op)
 		return urb->dev->bus->op->unlink_urb(urb);
 	else
 		return -ENODEV;

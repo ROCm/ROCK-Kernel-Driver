@@ -107,6 +107,11 @@ export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE
 
 #	For now, leave verbose as default
 
+ifdef V
+  ifeq ("$(origin V)", "command line")
+    KBUILD_VERBOSE = $(V)
+  endif
+endif
 ifndef KBUILD_VERBOSE
   KBUILD_VERBOSE = 1
 endif
@@ -322,13 +327,14 @@ endef
 #	set -e makes the rule exit immediately on error
 
 define rule_vmlinux__
-	set -e;								\
+	set -e								\
 	$(if $(filter .tmp_kallsyms%,$^),,				\
 	  echo '  GEN     .version';					\
 	  . $(srctree)/scripts/mkversion > .tmp_version;		\
 	  mv -f .tmp_version .version;					\
 	  $(MAKE) $(build)=init;					\
 	)
+	set -e								\
 	$(call cmd,vmlinux__);						\
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef

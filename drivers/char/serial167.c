@@ -2836,7 +2836,7 @@ static struct console sercons = {
 };
 
 
-void __init serial167_console_init(void)
+static void __init serial167_console_init(void)
 {
 	if (vme_brdtype == VME_TYPE_MVME166 ||
 			vme_brdtype == VME_TYPE_MVME167 ||
@@ -2845,6 +2845,7 @@ void __init serial167_console_init(void)
 		register_console(&sercons);
 	}
 }
+console_initcall(serial167_console_init);
 
 #ifdef CONFIG_REMOTE_DEBUG
 void putDebugChar (int c)

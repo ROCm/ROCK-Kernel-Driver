@@ -181,12 +181,7 @@ static unsigned char saa_status(int byte, struct planb *pb)
 
 	/* Let's wait 30msec for this one */
 	current->state = TASK_INTERRUPTIBLE;
-#if LINUX_VERSION_CODE >= 0x02017F
 	schedule_timeout(30 * HZ / 1000);
-#else
-	current->timeout = jiffies + 30 * HZ / 1000;	/* 30 ms */;
-	schedule();
-#endif
 
 	return (unsigned char)in_8 (&planb_regs->saa_status);
 }

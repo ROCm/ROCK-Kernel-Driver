@@ -2522,12 +2522,11 @@ static kdev_t serial_console_device(struct console *c)
 /*
  *	Register console.
  */
-long __init console_8xx_init(long kmem_start, long kmem_end)
+static void __init console_8xx_init(long kmem_start, long kmem_end)
 {
 	register_console(&sercons);
-	return kmem_start;
 }
-
+console_initcall(console_8xx_init);
 #endif
 
 /* Index in baud rate table of the default console baud rate.

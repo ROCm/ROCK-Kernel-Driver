@@ -664,11 +664,6 @@ int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 	if (drive->media != ide_disk)
 		return 0;
 
-	/* paranoia check */
-	if (HWGROUP(drive)->handler != NULL)
-		BUG();
-	ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
-
 	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
 	
 	if (drive->vdma)
@@ -680,8 +675,7 @@ int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 	}
 
 	/* issue cmd to drive */
-	hwif->OUTB(command, IDE_COMMAND_REG);
-
+	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 	return HWIF(drive)->ide_dma_count(drive);
 }
 
@@ -702,11 +696,6 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	if (drive->media != ide_disk)
 		return 0;
 
-	/* paranoia check */
-	if (HWGROUP(drive)->handler != NULL)
-		BUG();
-	ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
-
 	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 	if (drive->vdma)
 		command = (lba48) ? WIN_WRITE_EXT: WIN_WRITE;
@@ -717,7 +706,7 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	}
 
 	/* issue cmd to drive */
-	hwif->OUTB(command, IDE_COMMAND_REG);
+	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 
 	return HWIF(drive)->ide_dma_count(drive);
 }
