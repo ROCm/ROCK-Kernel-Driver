@@ -131,6 +131,10 @@ static const struct fb_videomode modedb[] __initdata = {
 	NULL, 61, 1280, 1024, 9090, 200, 48, 26, 1, 184, 3,
 	0, FB_VMODE_NONINTERLACED
     }, {
+	/* 1400x1050 @ 60Hz, 63.9 kHz hsync */
+	NULL, 68, 1400, 1050, 9259, 136, 40, 13, 1, 112, 3,
+	0, FB_VMODE_NONINTERLACED   	
+    }, {
 	/* 1024x768 @ 85 Hz, 70.24 kHz hsync */
 	NULL, 85, 1024, 768, 10111, 192, 32, 34, 14, 160, 6,
 	0, FB_VMODE_NONINTERLACED

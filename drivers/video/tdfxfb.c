@@ -79,10 +79,6 @@
 #include <video/tdfx.h>
 #include <video/fbcon.h>
 
-#ifndef PCI_DEVICE_ID_3DFX_VOODOO5
-#define PCI_DEVICE_ID_3DFX_VOODOO5      0x0009
-#endif
-
 #undef TDFXFB_DEBUG 
 #ifdef TDFXFB_DEBUG
 #define DPRINTK(a,b...) printk(KERN_DEBUG "fb: %s: " a, __FUNCTION__ , ## b)
@@ -995,7 +991,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
 			sizeof(u32) * 16, GFP_KERNEL);
 
-	if (!info)	return -ENXIO;
+	if (!info)	return -ENOMEM;
 		
 	memset(info, 0, sizeof(info) + sizeof(struct display) + sizeof(u32) * 16);
      
@@ -1016,25 +1012,25 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	}
 
 	tdfx_fix.mmio_start = pci_resource_start(pdev, 0);
-	tdfx_fix.mmio_len = 1 << 24;
-	default_par.regbase_virt = ioremap_nocache(tdfx_fix.mmio_start, 1<<24);
+	tdfx_fix.mmio_len = pci_resource_len(pdev, 0);
+	default_par.regbase_virt = ioremap_nocache(tdfx_fix.mmio_start, tdfx_fix.mmio_len);
 	if (!default_par.regbase_virt) {
 		printk("fb: Can't remap %s register area.\n", tdfx_fix.id);
-		return -ENXIO;
+		goto out_err;
 	}
     
 	if (!request_mem_region(pci_resource_start(pdev, 0),
 	    pci_resource_len(pdev, 0), "tdfx regbase")) {
 		printk(KERN_WARNING "tdfxfb: Can't reserve regbase\n");
-		iounmap(default_par.regbase_virt);
-		return -ENXIO;
+		goto out_err;
 	} 
 
 	tdfx_fix.smem_start = pci_resource_start(pdev, 1);
 	if (!(tdfx_fix.smem_len = do_lfb_size(pdev->device))) {
-		iounmap(default_par.regbase_virt);
 		printk("fb: Can't count %s memory.\n", tdfx_fix.id);
-		return -ENXIO;
+		release_mem_region(pci_resource_start(pdev, 0),
+				   pci_resource_len(pdev, 0));
+		goto out_err;	
 	}
 
 	if (!request_mem_region(pci_resource_start(pdev, 1),
@@ -1042,16 +1038,18 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 		printk(KERN_WARNING "tdfxfb: Can't reserve smem\n");
 		release_mem_region(pci_resource_start(pdev, 0),
 				   pci_resource_len(pdev, 0));
-		iounmap(default_par.regbase_virt);
-		return -ENXIO;
+		goto out_err;
 	}
 
 	info->screen_base = ioremap_nocache(tdfx_fix.smem_start, 
-	tdfx_fix.smem_len);
+					    tdfx_fix.smem_len);
 	if (!info->screen_base) {
 		printk("fb: Can't remap %s framebuffer.\n", tdfx_fix.id);
-		iounmap(default_par.regbase_virt);
-		return -ENXIO;
+		release_mem_region(pci_resource_start(pdev, 1),
+				   pci_resource_len(pdev, 1));
+		release_mem_region(pci_resource_start(pdev, 0),
+				   pci_resource_len(pdev, 0));
+		goto out_err;
 	}
 
 	default_par.iobase = pci_resource_start(pdev, 2);
@@ -1063,9 +1061,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 				   pci_resource_len(pdev, 1));
 		release_mem_region(pci_resource_start(pdev, 0),
 				   pci_resource_len(pdev, 0));
-		iounmap(default_par.regbase_virt);
-		iounmap(info->screen_base);
-		return -ENXIO;
+		goto out_err;
 	}
 
 	printk("fb: %s memory = %dK\n", tdfx_fix.id, tdfx_fix.smem_len >> 10);
@@ -1104,13 +1100,24 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 
 	if (register_framebuffer(info) < 0) {
 		printk("tdfxfb: can't register framebuffer\n");
-		return -ENXIO;
+		goto out_err;
 	}
 	/*
 	 * Our driver data
 	 */
 	pci_set_drvdata(pdev, info);
 	return 0; 
+
+out_err:
+	/*
+	 * Cleanup after anything that was remapped/allocated.
+	 */
+	if (default_par.regbase_virt)
+		iounmap(default_par.regbase_virt);
+	if (info->screen_base)
+		iounmap(info->screen_base);
+	kfree(info);
+	return -ENXIO;
 }
 
 /**
@@ -1139,6 +1146,7 @@ static void __devexit tdfxfb_remove(struct pci_dev *pdev)
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_set_drvdata(pdev, NULL);
+	kfree(info);
 }
 
 int __init tdfxfb_init(void)

@@ -5,13 +5,13 @@
  *
  *     Created 28 Aug 2001 by Ghozlane Toumi
  *
- * $Id: sstfb.h,v 1.1.4.1 2001/08/29 01:30:38 ghoz Exp $
+ * $Id: sstfb.h,v 1.8 2002/05/10 19:35:11 ghoz Exp $
  */
 
 
 #ifndef _SSTFB_H_
 #define _SSTFB_H_
- 
+
 /*
  *
  *  Debug Stuff
@@ -72,9 +72,10 @@
 #define iprintk(X...)	printk(KERN_INFO "sstfb: " X)
 #define wprintk(X...)	printk(KERN_WARNING "sstfb: " X)
 
-#define BIT(x)		(1ul << (x))
+#define BIT(x)		(1ul<<(x))
 #define PS2KHZ(a)	(1000000000UL/(a))	/* picoseconds to KHz */
 #define KHZ2PS(a)	(1000000000UL/(a))
+#define POW2(x)		(1ul<<(x))
 
 #ifndef ABS
 # define ABS(x)		(((x)<0)?-(x):(x))
@@ -170,9 +171,15 @@
 #define DAC_DATA		0x022c
 #  define DAC_READ_CMD		  BIT(11)	/* set read dacreg mode */
 #define FBIINIT5		0x0244		/* v2 specific */
+#  define FBIINIT5_MASK		  0xfa40ffff    /* mask video bits*/
+#  define HDOUBLESCAN		  BIT(20)
+#  define VDOUBLESCAN		  BIT(21)
+#  define HSYNC_HIGH 		  BIT(23)
+#  define VSYNC_HIGH 		  BIT(24)
+#  define INTERLACE		  BIT(26)
 #define FBIINIT6		0x0248		/* v2 specific */
-#define FBIINIT7		0x024c		/* v2 specific */
 #  define TILES_IN_X_LSB_SHIFT	  30		/* v2 */
+#define FBIINIT7		0x024c		/* v2 specific */
 
 /* Dac Registers */
 #define DACREG_WMA		0x0	/* pixel write mode address */
@@ -275,30 +282,32 @@
  */
 
 /* used to know witch clock to set */
-#define VID_CLOCK	0
-#define GFX_CLOCK	1
+enum {
+	VID_CLOCK=0,
+	GFX_CLOCK=1,
+};
 
 /* freq max */
 #define DAC_FREF	14318	/* DAC reference freq (Khz) */
 #define VCO_MAX		260000
 
 /*
- *
- *  Declarations
- *
+ *  driver structs
  */
 
 struct pll_timing {
-	u8 m;
-	u8 n;
-	u8 p;
+	unsigned int m;
+	unsigned int n;
+	unsigned int p;
 };
+
+struct sstfb_info;
 
 struct dac_switch {
 	char * name;
-	int (*detect) (void);
-	int (*set_pll) (const struct pll_timing *t, const int clock);
-	void (*set_vidmod) (const int bpp);
+	int (*detect) (struct sstfb_info *sst_info);
+	int (*set_pll) (struct sstfb_info *sst_info, const struct pll_timing *t, const int clock);
+	void (*set_vidmod) (struct sstfb_info *sst_info, const int bpp);
 };
 
 struct sst_spec {
@@ -317,8 +326,12 @@ struct sstfb_par {
 	unsigned int vSyncOn;
 	unsigned int vSyncOff;
 	unsigned int vBackPorch;
-	unsigned int freq;	/* freq in picoseconds */
-	unsigned int tiles_in_X; /* num of tiles in X res */
+	unsigned int freq;	/* freq in kHz */
+	struct pll_timing pll;
+	unsigned int tiles_in_X;/* num of tiles in X res */
+	unsigned int vmode;     /* doublescan/interlaced */
+	unsigned int sync;      /* H/V sync polarity */
+	unsigned int valid;	/* par is correct (fool proof) */
 };
 
 struct sstfb_info {
@@ -336,18 +349,34 @@ struct sstfb_info {
 		unsigned long	vbase;
 	} mmio;				/* registers memory info */
 
-	struct dac_switch *	dac_sw;	/* dac specific functions */
-	struct sst_spec *	spec;
+	struct dac_switch 	dac_sw;	/* dac specific functions */
 
-	int	is_voodoo2;
+	int	type;
 	u8	revision;
 
 	/* status */
-	int	configured;
-/*	int	indexed_mode;
+/*XXX	int	configured;
+	int	indexed_mode;
 	int	vgapass;
 	int	clipping; */
 	int	gfx_clock;
+
+	int	currcon;
+	struct display  	disp; /* current display */
+	struct { u_int red, green, blue, transp; } palette[16];
+
+	union {
+#ifdef FBCON_HAS_CFB16
+		u16 cfb16[16];
+#endif
+#ifdef EN_24_32_BPP
+#if defined (FBCON_HAS_CFB24) || defined(FBCON_HAS_CFB32)
+		u32 cfb32[16];
+#endif
+#endif
+	} fbcon_cmap;
+
 };
+
 
 #endif /* _SSTFB_H_ */

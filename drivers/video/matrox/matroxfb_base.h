@@ -56,9 +56,6 @@
 #include <video/fbcon-cfb24.h>
 #include <video/fbcon-cfb32.h>
 
-#if defined(CONFIG_FB_COMPAT_XPMAC)
-#include <asm/vc_ioctl.h>
-#endif
 #if defined(CONFIG_PPC)
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
@@ -591,9 +588,6 @@ struct matrox_fb_info {
 				      } memory;
 			      } values;
 	struct { unsigned red, green, blue, transp; } palette[256];
-#if defined(CONFIG_FB_COMPAT_XPMAC)
-	char	matrox_name[32];
-#endif
 /* These ifdefs must be last! They differ for module & non-module compiles */
 #if defined(FBCON_HAS_CFB16) || defined(FBCON_HAS_CFB24) || defined(FBCON_HAS_CFB32)
 	union {

@@ -24,7 +24,7 @@
 #include <linux/fb.h>
 #include <linux/init.h>
 
-#include <linux/fbcon.h>
+#include <video/fbcon.h>
 
     /*
      *  RAM we reserve for the frame buffer. This defines the maximum screen
@@ -446,7 +446,7 @@ int __init vfb_init(void)
 	fb_info.pseudo_palette = &vfb_pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-	strcpy(fb_info.modename, vesafb_fix.id);
+	strcpy(fb_info.modename, vfb_fix.id);
 	fb_info.changevar = NULL;
 	fb_info.currcon = -1;
 	fb_info.disp = &disp;

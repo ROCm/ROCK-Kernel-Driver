@@ -68,7 +68,7 @@
  *               "Samuel Hocevar" <sam@via.ecp.fr>
  *                     Fixes
  *
- *               "Anton Altaparmakov"
+ *               "Anton Altaparmakov" <AntonA@bigfoot.com>
  *                     G400 MAX/non-MAX distinction
  *
  *               "Ken Aaker" <kdaaker@rchland.vnet.ibm.com>
@@ -883,25 +883,6 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 			}
 			matrox_cfbX_init(PMINFO display);
 			my_install_cmap(PMINFO2);
-#if defined(CONFIG_FB_COMPAT_XPMAC)
-			if (console_fb_info == &ACCESS_FBINFO(fbcon)) {
-				int vmode, cmode;
-
-				display_info.width = var->xres;
-				display_info.height = var->yres;
-				display_info.depth = var->bits_per_pixel;
-				display_info.pitch = (var->xres_virtual)*(var->bits_per_pixel)/8;
-				if (mac_var_to_vmode(var, &vmode, &cmode))
-					display_info.mode = 0;
-				else
-					display_info.mode = vmode;
-				strcpy(display_info.name, ACCESS_FBINFO(matrox_name));
-				display_info.fb_address = ACCESS_FBINFO(video.base);
-				display_info.cmap_adr_address = 0;
-				display_info.cmap_data_address = 0;
-				display_info.disp_reg_address = ACCESS_FBINFO(mmio.base);
-			}
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 		}
 	}
 	return 0;
@@ -1848,12 +1829,6 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	/* FIXME: Where to move this?! */
 #if defined(CONFIG_ALL_PPC)
-#if defined(CONFIG_FB_COMPAT_XPMAC)
-	strcpy(ACCESS_FBINFO(matrox_name), "MTRX,");	/* OpenFirmware naming convension */
-	strncat(ACCESS_FBINFO(matrox_name), b->name, 26);
-	if (!console_fb_info)
-		console_fb_info = &ACCESS_FBINFO(fbcon);
-#endif
 #ifndef MODULE
 	if (_machine == _MACH_Pmac) {
 		struct fb_var_screeninfo var;

@@ -325,7 +325,7 @@ int __init tx3912fb_init(void)
 	return 0;
 }
 
-int __init tx3912fb_setup(char *options)
+void __init tx3912fb_setup(char *options)
 {
 	char *this_opt;
 

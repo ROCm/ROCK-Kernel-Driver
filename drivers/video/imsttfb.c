@@ -1177,48 +1177,6 @@ static struct display_switch fbcon_imstt32 = {
 };
 #endif
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-
-extern struct vc_mode display_info;
-extern struct fb_info *console_fb_info;
-
-static void
-set_display_info (struct display *disp)
-{
-	display_info.width = disp->var.xres;
-	display_info.height = disp->var.yres;
-	display_info.depth = disp->var.bits_per_pixel;
-	display_info.pitch = disp->line_length;
-
-	switch (disp->var.xres) {
-		case 512:
-			display_info.mode = 2;
-			break;
-		case 640:
-			display_info.mode = 6;
-			break;
-		case 800:
-			display_info.mode = 12;
-			break;
-		case 832:
-			display_info.mode = 13;
-			break;
-		case 1024:
-			display_info.mode = 17;
-			break;
-		case 1152:
-			display_info.mode = 18;
-			break;
-		case 1280:
-			display_info.mode = disp->var.yres == 960 ? 19 : 20;
-			break;
-		default:
-			display_info.mode = 0;
-	}
-}
-#endif
-
 static int
 imsttfb_getcolreg (u_int regno, u_int *red, u_int *green,
 		   u_int *blue, u_int *transp, struct fb_info *info)
@@ -1385,10 +1343,6 @@ set_dispsw (struct display *disp, struct fb_info_imstt *p)
 		p->dispsw.cursor = 0;
 		p->dispsw.set_font = 0;
 	}
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	set_display_info(disp);
-#endif
 }
 
 static void
@@ -1864,16 +1818,6 @@ init_imstt(struct fb_info_imstt *p)
 	tmp = (in_le32(&p->dc_regs[SSTATUS]) & 0x0f00) >> 8;
 	printk("fb%u: %s frame buffer; %uMB vram; chip version %u\n",
 		i, p->fix.id, p->total_vram >> 20, tmp);
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	strncpy(display_info.name, "IMS,tt128mb", sizeof(display_info.name));
-	display_info.fb_address = p->frame_buffer_phys;
-	display_info.cmap_adr_address = p->cmap_regs_phys + PADDRW;
-	display_info.cmap_data_address = p->cmap_regs_phys + PDATA;
-	display_info.disp_reg_address = p->dc_regs_phys;
-	if (!console_fb_info)
-		console_fb_info = &p->info;
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 }
 
 static int __devinit

@@ -41,15 +41,6 @@
 #include <asm/machw.h>
 
 #include <video/fbcon.h>
-#include <video/fbcon-mfb.h>
-#include <video/fbcon-cfb2.h>
-#include <video/fbcon-cfb4.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb16.h>
-#include <video/fbcon-cfb24.h>
-#include <video/fbcon-cfb32.h>
-
-#if defined(FBCON_HAS_CFB8) || defined(FBCON_HAS_CFB4) || defined(FBCON_HAS_CFB2)
 
 /* Common DAC base address for the LC, RBV, Valkyrie, and IIvx */
 #define DAC_BASE 0x50f24000
@@ -151,191 +142,35 @@ struct jet_cmap_regs {
 	unsigned char lut;
 };
 
-#endif
-
 #define PIXEL_TO_MM(a)	(((a)*10)/28)	/* width in mm at 72 dpi */	
 
-static char* video_base;
-static int   video_size;
-static char* video_vbase;        /* mapped */
-
 /* mode */
-static int  video_bpp;
-static int  video_width;
-static int  video_height;
-static int  video_type = FB_TYPE_PACKED_PIXELS;
-static int  video_visual;
-static int  video_linelength;
-static int  video_cmap_len;
 static int  video_slot = 0;
 
-static struct fb_var_screeninfo macfb_defined={
-	0,0,0,0,	/* W,H, W, H (virtual) load xres,xres_virtual*/
-	0,0,		/* virtual -> visible no offset */
-	8,		/* depth -> load bits_per_pixel */
-	0,		/* greyscale ? */
-	{0,0,0},	/* R */
-	{0,0,0},	/* G */
-	{0,0,0},	/* B */
-	{0,0,0},	/* transparency */
-	0,		/* standard pixel format */
-	FB_ACTIVATE_NOW,
-	-1, -1,
-	FB_ACCEL_NONE,	/* The only way to accelerate a mac is .. */
-	0L,0L,0L,0L,0L,
-	0L,0L,0,	/* No sync info */
-	FB_VMODE_NONINTERLACED,
-	{0,0,0,0,0,0}
+static struct fb_var_screeninfo macfb_defined = {
+	bits_per_pixel:	8,	
+	activae:	FB_ACTIVATE_NOW,
+	width:		-1,
+	height:		-1,
+	right_margin:	32,
+	upper_margin:	16,
+	lower_margin:	4,
+	vsync_len:	4,
+	vmode:		FB_VMODE_NONINTERLACED,
+};
+
+static struct fb_fix_screeninfo vesafb_fix = {
+	id:	"Macintosh ",
+	type:	FB_TYPE_PACKED_PIXELS,
+	accel:	FB_ACCEL_NONE,
 };
 
 static struct display disp;
 static struct fb_info fb_info;
-static struct { u_short blue, green, red, pad; } palette[256];
-static union {
-#ifdef FBCON_HAS_CFB16
-    u16 cfb16[16];
-#endif
-#ifdef FBCON_HAS_CFB24
-    u32 cfb24[16];
-#endif
-#ifdef FBCON_HAS_CFB32
-    u32 cfb32[16];
-#endif
-} fbcon_cmap;
-
+static u32 pseudo_palette[17];
 static int             inverse   = 0;
 static int             vidtest   = 0;
 
-static int macfb_update_var(int con, struct fb_info *info)
-{
-	return 0;
-}
-
-static int macfb_get_fix(struct fb_fix_screeninfo *fix, int con,
-			 struct fb_info *info)
-{
-	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
-	strcpy(fix->id, "Mac Generic");
-
-	fix->smem_start = video_base;
-	fix->smem_len = video_size;
-	fix->type = video_type;
-	fix->visual = video_visual;
-	fix->xpanstep = 0;
-	fix->ypanstep = 0;
-	fix->line_length=video_linelength;
-	return 0;
-}
-
-static int macfb_get_var(struct fb_var_screeninfo *var, int con,
-			 struct fb_info *info)
-{
-	if(con==-1)
-		memcpy(var, &macfb_defined, sizeof(struct fb_var_screeninfo));
-	else
-		*var=fb_display[con].var;
-	return 0;
-}
-
-static void macfb_set_disp(int con)
-{
-	struct fb_fix_screeninfo fix;
-	struct display *display;
-	
-	if (con >= 0)
-		display = &fb_display[con];
-	else
-		display = &disp;	/* used during initialization */
-
-	macfb_get_fix(&fix, con, &fb_info);
-
-	memset(display, 0, sizeof(struct display));
-	display->visual = fix.visual;
-	display->type = fix.type;
-	display->type_aux = fix.type_aux;
-	display->ypanstep = fix.ypanstep;
-	display->ywrapstep = fix.ywrapstep;
-	display->line_length = fix.line_length;
-	display->next_line = fix.line_length;
-	display->can_soft_blank = 0;
-	display->inverse = inverse;
-	display->scrollmode = SCROLL_YREDRAW;
-	macfb_get_var(&display->var, -1, &fb_info);
-
-	switch (video_bpp) {
-#ifdef FBCON_HAS_MFB
-	case 1:
-		display->dispsw = &fbcon_mfb;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB2
-	case 2:
-		display->dispsw = &fbcon_cfb2;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB4
-	case 4:
-		display->dispsw = &fbcon_cfb4;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB8
-	case 8:
-		display->dispsw = &fbcon_cfb8;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB16
-	case 15:
-	case 16:
-		display->dispsw = &fbcon_cfb16;
-		display->dispsw_data = fbcon_cmap.cfb16;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB24
-	case 24:
-		display->dispsw = &fbcon_cfb24;
-		display->dispsw_data = fbcon_cmap.cfb24;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB32
-	case 32:
-		display->dispsw = &fbcon_cfb32;
-		display->dispsw_data = fbcon_cmap.cfb32;
-		break;
-#endif
-	default:
-		display->dispsw = &fbcon_dummy;
-		return;
-	}
-}
-
-static int macfb_set_var(struct fb_var_screeninfo *var, int con,
-			 struct fb_info *info)
-{
-	static int first = 1;
-
-	if (var->xres           != macfb_defined.xres           ||
-	    var->yres           != macfb_defined.yres           ||
-	    var->xres_virtual   != macfb_defined.xres_virtual   ||
-	    var->yres_virtual   != macfb_defined.yres           ||
-	    var->xoffset                                        ||
-	    var->bits_per_pixel != macfb_defined.bits_per_pixel ||
-	    var->nonstd) {
-		if (first) {
-			printk("macfb does not support changing the video mode\n");
-			first = 0;
-		}
-		return -EINVAL;
-	}
-
-	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_TEST)
-		return 0;
-
-	if (var->yoffset)
-		return -EINVAL;
-	return 0;
-}
-
-#if defined(FBCON_HAS_CFB8) || defined(FBCON_HAS_CFB4) || defined(FBCON_HAS_CFB2)
 static int valkyrie_setpalette (unsigned int regno, unsigned int red,
 				unsigned int green, unsigned int blue)
 {
@@ -425,7 +260,7 @@ static int v8_brazil_setpalette (unsigned int regno, unsigned int red,
 	unsigned char _regno;
 	unsigned long flags;
 
-	if (video_bpp>8) return 1; /* failsafe */
+	if (info->var.bits_per_pixel > 8) return 1; /* failsafe */
 
 	save_flags(flags);
 	cli();
@@ -438,7 +273,7 @@ static int v8_brazil_setpalette (unsigned int regno, unsigned int red,
 	   In 4bpp, the regnos are 0x0f, 0x1f, 0x2f, etc, etc
 	   
 	   In 2bpp, the regnos are 0x3f, 0x7f, 0xbf, 0xff */
-  	_regno = (regno<<(8-video_bpp)) | (0xFF>>video_bpp);
+  	_regno = (regno<<(8 - info->var.bits_per_pixel)) | (0xFF >> info->var.vits_per_pixel);
 	writeb(_regno, &v8_brazil_cmap_regs->addr); nop();
 
 	/* send one color channel at a time */
@@ -461,7 +296,7 @@ static int rbv_setpalette (unsigned int regno, unsigned int red,
 	unsigned char _regno;
 	unsigned long flags;
 
-	if (video_bpp>8) return 1; /* failsafe */
+	if (info->var.bits_per_pixel > 8) return 1; /* failsafe */
 
 	save_flags(flags);
 	cli();
@@ -470,7 +305,7 @@ static int rbv_setpalette (unsigned int regno, unsigned int red,
 	 * regno #254 and #255 are the important ones for 1-bit color,
 	 * regno #252-255 are the important ones for 2-bit color, etc.
 	 */
-	_regno = regno + (256-(1<<video_bpp));
+	_regno = regno + (256-(1 << info->var.bits_per_pixel));
 
 	/* reset clut? (VideoToolbox sez "not necessary") */
 	writeb(0xFF, &rbv_cmap_regs->cntl); nop();
@@ -524,7 +359,7 @@ static int toby_setpalette(unsigned int regno, unsigned int red,
 	unsigned char _red  =~(red>>8);
 	unsigned char _green=~(green>>8);
 	unsigned char _blue =~(blue>>8);
-	unsigned char _regno = (regno<<(8-video_bpp)) | (0xFF>>video_bpp);
+	unsigned char _regno = (regno << (8 - info->var.bits_per_pixel)) | (0xFF >> info->var.bits_per_pixel);
 	unsigned long flags;
 
 	save_flags(flags);
@@ -581,7 +416,7 @@ static int civic_setpalette (unsigned int regno, unsigned int red,
 	unsigned long flags;
 	int clut_status;
 	
-	if (video_bpp > 8) return 1; /* failsafe */
+	if (info->var.bits_per_pixel > 8) return 1; /* failsafe */
 
 	red   >>= 8;
 	green >>= 8;
@@ -679,27 +514,6 @@ static int csc_setpalette (unsigned int regno, unsigned int red,
 	return 0;
 }
 
-#endif /* FBCON_HAS_CFB8 || FBCON_HAS_CFB4 || FBCON_HAS_CFB2 */
-
-static int macfb_getcolreg(unsigned regno, unsigned *red, unsigned *green,
-			   unsigned *blue, unsigned *transp,
-			   struct fb_info *fb_info)
-{
-	/*
-	 *  Read a single color register and split it into colors/transparent.
-	 *  Return != 0 for invalid regno.
-	 */
-
-	if (regno >= video_cmap_len)
-		return 1;
-
-	*red   = palette[regno].red;
-	*green = palette[regno].green;
-	*blue  = palette[regno].blue;
-	*transp = 0;
-	return 0;
-}
-
 static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			   unsigned blue, unsigned transp,
 			   struct fb_info *fb_info)
@@ -711,103 +525,82 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	 *  != 0 for invalid regno.
 	 */
 	
-	if (regno >= video_cmap_len)
+	if (regno >= info->cmap.len)
 		return 1;
 
-	palette[regno].red   = red;
-	palette[regno].green = green;
-	palette[regno].blue  = blue;
-
-	switch (video_bpp) {
-#ifdef FBCON_HAS_MFB
+	switch (info->var.bits_per_pixel) {
 	case 1:
 		/* We shouldn't get here */
 		break;
-#endif
-#ifdef FBCON_HAS_CFB2
 	case 2:
 		if (macfb_setpalette)
 			macfb_setpalette(regno, red, green, blue);
 		else
 			return 1;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB4
 	case 4:
 		if (macfb_setpalette)
 			macfb_setpalette(regno, red, green, blue);
 		else
 			return 1;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB8
 	case 8:
 		if (macfb_setpalette)
 			macfb_setpalette(regno, red, green, blue);
 		else
 			return 1;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB16
-	case 15:
 	case 16:
-		/* 1:5:5:5 */
-		fbcon_cmap.cfb16[regno] =
-			((red   & 0xf800) >>  1) |
-			((green & 0xf800) >>  6) |
-			((blue  & 0xf800) >> 11) |
-			((transp != 0) << 15);
-		break;
-#endif
+		if (info->var.red.offset == 10) {
+			/* 1:5:5:5 */
+			((u32*) (info->pseudo_palette))[regno] =
+					((red   & 0xf800) >>  1) |
+					((green & 0xf800) >>  6) |
+					((blue  & 0xf800) >> 11) |
+					((transp != 0) << 15);
+		} else {
+			/* 0:5:6:5 */
+			((u32*) (info->pseudo_palette))[regno] =
+					((red   & 0xf800)      ) |
+					((green & 0xfc00) >>  5) |
+					((blue  & 0xf800) >> 11);
+		}
+		break;	
 		/* I'm pretty sure that one or the other of these
 		   doesn't exist on 68k Macs */
-#ifdef FBCON_HAS_CFB24
 	case 24:
 		red   >>= 8;
 		green >>= 8;
 		blue  >>= 8;
-		fbcon_cmap.cfb24[regno] =
-			(red   << macfb_defined.red.offset)   |
-			(green << macfb_defined.green.offset) |
-			(blue  << macfb_defined.blue.offset);
+		((u32 *)(info->pseudo_palette))[regno] =
+			(red   << info->var.red.offset)   |
+			(green << info->var.green.offset) |
+			(blue  << info->var.blue.offset);
 		break;
-#endif
-#ifdef FBCON_HAS_CFB32
 	case 32:
 		red   >>= 8;
 		green >>= 8;
 		blue  >>= 8;
-		fbcon_cmap.cfb32[regno] =
-			(red   << macfb_defined.red.offset)   |
-			(green << macfb_defined.green.offset) |
-			(blue  << macfb_defined.blue.offset);
+		((u32 *)(info->pseudo_palette))[regno] =
+			(red   << info->var.red.offset)   |
+			(green << info->var.green.offset) |
+			(blue  << info->var.blue.offset);
 		break;
-#endif
     }
     return 0;
 }
 
-static int macfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-	if (con == info->currcon) /* current console? */
-		return fb_get_cmap(cmap, kspc, macfb_getcolreg, info);
-	else if (fb_display[con].cmap.len) /* non default colormap? */
-		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
-	else
-		fb_copy_cmap(fb_default_cmap(video_cmap_len),
-		     cmap, kspc ? 0 : 2);
-	return 0;
-}
-
 static struct fb_ops macfb_ops = {
 	owner:		THIS_MODULE,
-	fb_get_fix:	macfb_get_fix,
-	fb_get_var:	macfb_get_var,
-	fb_set_var:	macfb_set_var,
-	fb_get_cmap:	macfb_get_cmap,
+	fb_get_fix:	gen_get_fix,
+	fb_get_var:	gen_get_var,
+	fb_set_var:	gen_set_var,
+	fb_get_cmap:	gen_get_cmap,
 	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	macfb_setcolreg,
+	fb_fillrect:	cfb_fillrect,
+	fb_copyarea:	cfb_copyarea,
+	fb_imageblit:	cfb_imageblit,
 };
 
 void __init macfb_setup(char *options, int *ints)
@@ -832,88 +625,67 @@ void __init macfb_setup(char *options, int *ints)
 	}
 }
 
-static int macfb_switch(int con, struct fb_info *info)
-{
-	/* Do we have to save the colormap? */
-	if (fb_display[info->currcon].cmap.len)
-		fb_get_cmap(&fb_display[info->currcon].cmap, 1, macfb_getcolreg,
-			    info);
-	
-	info->currcon = con;
-	/* Install new colormap */
-	do_install_cmap(con, info);
-	macfb_update_var(con, info);
-	return 1;
-}
-
 void __init macfb_init(void)
 {
+	int video_cmap_len, video_is_nubus = 0;
 	struct nubus_dev* ndev = NULL;
-	int video_is_nubus = 0;
 
 	if (!MACH_IS_MAC) 
 		return;
 
 	/* There can only be one internal video controller anyway so
 	   we're not too worried about this */
-	video_width      = mac_bi_data.dimensions & 0xFFFF;
-	video_height     = mac_bi_data.dimensions >> 16;
-	video_bpp        = mac_bi_data.videodepth;
-	video_linelength = mac_bi_data.videorow;
-	video_size       = video_linelength * video_height;
+	macfb_defined.xres = mac_bi_data.dimensions & 0xFFFF;
+	macfb_defined.yres = mac_bi_data.dimensions >> 16;
+	macfb_defined.bits_per_pixel = mac_bi_data.videodepth;
+	macfb_fix.line_length = mac_bi_data.videorow;
+	macfb_fix.smem_len = macfb_fix.line_length * macfb_defined.yres;
 	/* Note: physical address (since 2.1.127) */
-	video_base       = (void*) mac_bi_data.videoaddr;
+	macfb_fix.smem_start = (void*) mac_bi_data.videoaddr;
 	/* This is actually redundant with the initial mappings.
 	   However, there are some non-obvious aspects to the way
 	   those mappings are set up, so this is in fact the safest
 	   way to ensure that this driver will work on every possible
 	   Mac */
-	video_vbase	 = ioremap(mac_bi_data.videoaddr, video_size);
+	fb_info.screen_base = ioremap(mac_bi_data.videoaddr, macfb_fix.smem_len);
 	
 	printk("macfb: framebuffer at 0x%p, mapped to 0x%p, size %dk\n",
-	       video_base, video_vbase, video_size/1024);
+	       macfb_fix.smem_start, fb_info.screen_base, macfb_fix.smem_len/1024);
 	printk("macfb: mode is %dx%dx%d, linelength=%d\n",
-	       video_width, video_height, video_bpp, video_linelength);
+	       macfb_defined.xres, macfb_defined.yres/, macfb_defined.bits_per_pixel, macfb_fix.line_length);
 	
 	/*
 	 *	Fill in the available video resolution
 	 */
 	 
-	macfb_defined.xres           = video_width;
-	macfb_defined.yres           = video_height;
-	macfb_defined.xres_virtual   = video_width;
-	macfb_defined.yres_virtual   = video_height;
-	macfb_defined.bits_per_pixel = video_bpp;
+	macfb_defined.xres_virtual   = macfb_defined.xres;
+	macfb_defined.yres_virtual   = macfb_defined.yres;
 	macfb_defined.height = PIXEL_TO_MM(macfb_defined.yres);
 	macfb_defined.width  = PIXEL_TO_MM(macfb_defined.xres);	 
 
 	printk("macfb: scrolling: redraw\n");
-	macfb_defined.yres_virtual = video_height;
+	macfb_defined.yres_virtual = macfb_defined.yres;
 
 	/* some dummy values for timing to make fbset happy */
-	macfb_defined.pixclock     = 10000000 / video_width * 1000 / video_height;
-	macfb_defined.left_margin  = (video_width / 8) & 0xf8;
-	macfb_defined.right_margin = 32;
-	macfb_defined.upper_margin = 16;
-	macfb_defined.lower_margin = 4;
-	macfb_defined.hsync_len    = (video_width / 8) & 0xf8;
-	macfb_defined.vsync_len    = 4;
+	macfb_defined.pixclock     = 10000000 / macfb_defined.xres * 1000 / macfb_defined.yres;
+	macfb_defined.left_margin  = (macfb_defined.xres / 8) & 0xf8;
+	macfb_defined.hsync_len    = (macfb_defined.xres / 8) & 0xf8;
 
-	switch (video_bpp) {
+	switch (macfb_defined.bits_per_pixel) {
 	case 1:
 		/* XXX: I think this will catch any program that tries
 		   to do FBIO_PUTCMAP when the visual is monochrome */
 		video_cmap_len = 0;
-		video_visual = FB_VISUAL_MONO01;
+		macfb_fix.visual = FB_VISUAL_MONO01;
 		break;
 	case 2:
 	case 4:
 	case 8:
-		macfb_defined.red.length = video_bpp;
-		macfb_defined.green.length = video_bpp;
-		macfb_defined.blue.length = video_bpp;
-		video_cmap_len = 1 << video_bpp;
-		video_visual = FB_VISUAL_PSEUDOCOLOR;
+		macfb_defined.red.length = macfb_defined.bits_per_pixel;
+		macfb_defined.green.length = macfb_defined.bits_per_pixel;
+		macfb_defined.blue.length = macfb_defined.bits_per_pixel;
+		video_cmap_len = 1 << macfb_defined.bits_per_pixel;
+		macfb_fix.visual = FB_VISUAL_PSEUDOCOLOR;
 		break;
 	case 16:
 		macfb_defined.transp.offset = 15;
@@ -929,7 +701,7 @@ void __init macfb_init(void)
 		video_cmap_len = 16;
 		/* Should actually be FB_VISUAL_DIRECTCOLOR, but this
 		   works too */
-		video_visual = FB_VISUAL_TRUECOLOR;
+		macfb_fix.visual = FB_VISUAL_TRUECOLOR;
 		break;
 	case 24:
 	case 32:
@@ -944,11 +716,11 @@ void __init macfb_init(void)
 		printk("macfb: truecolor: "
 		       "size=0:8:8:8, shift=0:16:8:0\n");
 		video_cmap_len = 16;
-		video_visual = FB_VISUAL_TRUECOLOR;
+		macfb_fix.visual = FB_VISUAL_TRUECOLOR;
 	default:
 		video_cmap_len = 0;
-		video_visual = FB_VISUAL_MONO01;
-		printk("macfb: unknown or unsupported bit depth: %d\n", video_bpp);
+		macfb_fix.visual = FB_VISUAL_MONO01;
+		printk("macfb: unknown or unsupported bit depth: %d\n", macfb_defined.bits_per_pixel);
 		break;
 	}
 	
@@ -974,22 +746,22 @@ void __init macfb_init(void)
 
 		switch(ndev->dr_hw) {
 		case NUBUS_DRHW_APPLE_MDC:
-			strcpy( fb_info.modename, "Macintosh Display Card" );
+			strcat( macfb_fix.id, "Display Card" );
 			macfb_setpalette = mdc_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			break;
 		case NUBUS_DRHW_APPLE_TFB:
-			strcpy( fb_info.modename, "Toby" );
+			strcat( macfb_fix.id, "Toby" );
 			macfb_setpalette = toby_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			break;
 		case NUBUS_DRHW_APPLE_JET:
-			strcpy(fb_info.modename, "Jet");
+			strcat( macfb_fix.id, "Jet");
 			macfb_setpalette = jet_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			break;			
 		default:
-			strcpy( fb_info.modename, "Generic NuBus" );
+			strcat( macfb_fix.id, "Generic NuBus" );
 			break;
 		}
 	}
@@ -1007,14 +779,14 @@ void __init macfb_init(void)
 		case MAC_MODEL_IIX:
 		case MAC_MODEL_IICX:
 		case MAC_MODEL_IIFX:
-			strcpy( fb_info.modename, "Generic NuBus" );
+			strcat( macfb_fix.id, "Generic NuBus" );
 			break;
 
 			/* Valkyrie Quadras */
 		case MAC_MODEL_Q630:
 			/* I'm not sure about this one */
 		case MAC_MODEL_P588:
-			strcpy( fb_info.modename, "Valkyrie built-in" );
+			strcat( macfb_fix.id, "Valkyrie built-in" );
 			macfb_setpalette = valkyrie_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			valkyrie_cmap_regs = ioremap(DAC_BASE, 0x1000);
@@ -1037,7 +809,7 @@ void __init macfb_init(void)
 		case MAC_MODEL_Q700:
 		case MAC_MODEL_Q900:
 		case MAC_MODEL_Q950:
-			strcpy( fb_info.modename, "DAFB built-in" );
+			strcat( macfb_fix.id, "DAFB built-in" );
 			macfb_setpalette = dafb_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			dafb_cmap_regs = ioremap(DAFB_BASE, 0x1000);
@@ -1045,7 +817,7 @@ void __init macfb_init(void)
 
 			/* LC II uses the V8 framebuffer */
 		case MAC_MODEL_LCII:
-			strcpy( fb_info.modename, "V8 built-in" );
+			strcat( macfb_fix.id, "V8 built-in" );
 			macfb_setpalette = v8_brazil_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			v8_brazil_cmap_regs = ioremap(DAC_BASE, 0x1000);
@@ -1057,7 +829,7 @@ void __init macfb_init(void)
 		case MAC_MODEL_IIVI:
 		case MAC_MODEL_IIVX:
 		case MAC_MODEL_P600:
-			strcpy( fb_info.modename, "Brazil built-in" );
+			strcat( macfb_fix.id, "Brazil built-in" );
 			macfb_setpalette = v8_brazil_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			v8_brazil_cmap_regs = ioremap(DAC_BASE, 0x1000);
@@ -1074,7 +846,7 @@ void __init macfb_init(void)
 		case MAC_MODEL_P460:
 			macfb_setpalette = v8_brazil_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
-			strcpy( fb_info.modename, "Sonora built-in" );
+			strcat( macfb_fix.id, "Sonora built-in" );
 			v8_brazil_cmap_regs = ioremap(DAC_BASE, 0x1000);
 			break;
 
@@ -1085,7 +857,7 @@ void __init macfb_init(void)
 		case MAC_MODEL_IISI:
 			macfb_setpalette = rbv_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
-			strcpy( fb_info.modename, "RBV built-in" );
+			strcat( macfb_fix.id, "RBV built-in" );
 			rbv_cmap_regs = ioremap(DAC_BASE, 0x1000);
 			break;
 
@@ -1094,7 +866,7 @@ void __init macfb_init(void)
 		case MAC_MODEL_C660:
 			macfb_setpalette = civic_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
-			strcpy( fb_info.modename, "Civic built-in" );
+			strcat( macfb_fix.id, "Civic built-in" );
 			civic_cmap_regs = ioremap(CIVIC_BASE, 0x1000);
 			break;
 
@@ -1115,7 +887,7 @@ void __init macfb_init(void)
 				v8_brazil_cmap_regs =
 					ioremap(DAC_BASE, 0x1000);
 			}
-			strcpy( fb_info.modename, "LC built-in" );
+			strcat( macfb_fix.id, "LC built-in" );
 			break;
 			/* We think this may be like the LC II */
 		case MAC_MODEL_CCL:
@@ -1125,18 +897,18 @@ void __init macfb_init(void)
 				v8_brazil_cmap_regs =
 					ioremap(DAC_BASE, 0x1000);
 			}
-			strcpy( fb_info.modename, "Color Classic built-in" );
+			strcat( macfb_fix.id, "Color Classic built-in" );
 			break;
 
 			/* And we *do* mean "weirdos" */
 		case MAC_MODEL_TV:
-			strcpy( fb_info.modename, "Mac TV built-in" );
+			strcat( macfb_fix.id, "Mac TV built-in" );
 			break;
 
 			/* These don't have colour, so no need to worry */
 		case MAC_MODEL_SE30:
 		case MAC_MODEL_CLII:
-			strcpy( fb_info.modename, "Monochrome built-in" );
+			strcat( macfb_fix.id, "Monochrome built-in" );
 			break;
 
 			/* Powerbooks are particularly difficult.  Many of
@@ -1149,7 +921,7 @@ void __init macfb_init(void)
 		case MAC_MODEL_PB140:
 		case MAC_MODEL_PB145:
 		case MAC_MODEL_PB170:
-			strcpy( fb_info.modename, "DDC built-in" );
+			strcat( macfb_fix.id, "DDC built-in" );
 			break;
 
 			/* Internal is GSC, External (if present) is ViSC */
@@ -1159,13 +931,13 @@ void __init macfb_init(void)
 		case MAC_MODEL_PB180:
 		case MAC_MODEL_PB210:
 		case MAC_MODEL_PB230:
-			strcpy( fb_info.modename, "GSC built-in" );
+			strcat( macfb_fix.id, "GSC built-in" );
 			break;
 
 			/* Internal is TIM, External is ViSC */
 		case MAC_MODEL_PB165C:
 		case MAC_MODEL_PB180C:
-			strcpy( fb_info.modename, "TIM built-in" );
+			strcat( macfb_fix.id, "TIM built-in" );
 			break;
 
 			/* Internal is CSC, External is Keystone+Ariel. */
@@ -1177,31 +949,36 @@ void __init macfb_init(void)
 		case MAC_MODEL_PB280C:
 			macfb_setpalette = csc_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
-			strcpy( fb_info.modename, "CSC built-in" );
+			strcat( macfb_fix.id, "CSC built-in" );
 			csc_cmap_regs = ioremap(CSC_BASE, 0x1000);
 			break;
 		
 		default:
-			strcpy( fb_info.modename, "Unknown/Unsupported built-in" );
+			strcat( macfb_fix.id, "Unknown/Unsupported built-in" );
 			break;
 		}
-	
-	fb_info.changevar   = NULL;
-	fb_info.node        = NODEV;
-	fb_info.fbops       = &macfb_ops;
-	fb_info.screen_base = video_vbase;
-	fb_info.disp        = &disp;
-	fb_info.switch_con  = &macfb_switch;
-	fb_info.updatevar   = &macfb_update_var;
-	fb_info.flags       = FBINFO_FLAG_DEFAULT;
-	macfb_set_disp(-1);
-	do_install_cmap(0, &fb_info);
+
+	strcpy(fb_info.modename, macfb_fix.id);	
+	fb_info.changevar	= NULL;
+	fb_info.node		= NODEV;
+	fb_info.fbops		= &macfb_ops;
+	fb_info.var		= macfb_defined;
+	fb_info.fix		= macfb_fix;
+	fb_info.currcon		= -1;	
+	fb_info.disp		= &disp;
+	fb_info.switch_con	= gen_switch;
+	fb_info.updatevar	= gen_update_var;
+	fb_info.pseudo_palatte	= pseudo_palette;
+	fb_info.flags		= FBINFO_FLAG_DEFAULT;
+
+	fb_alloc_cmap(&fb_info.cmap, video_cmap_len, 0);
+	gen_set_disp(-1, info);
 	
 	if (register_framebuffer(&fb_info) < 0)
 		return;
 
 	printk("fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(fb_info.node), fb_info.modename);
+	       GET_FB_IDX(fb_info.node), fb_info.fix.id);
 }
 
 MODULE_LICENSE("GPL");

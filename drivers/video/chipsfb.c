@@ -31,10 +31,6 @@
 #include <linux/pci.h>
 #include <asm/io.h>
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#include <asm/pci-bridge.h>
-#endif
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
@@ -359,11 +355,6 @@ static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, in
 	disp->visual = fix->visual;
 	disp->var = *var;
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	display_info.depth = bpp;
-	display_info.pitch = fix->line_length;
-#endif
-	
 	if (p->info.changevar)
 		(*p->info.changevar)(con);
 
@@ -574,26 +565,6 @@ static void __init init_chips(struct fb_info_chips *p)
 		GET_FB_IDX(p->info.node), p->fix.smem_len / 1024);
 
 	chips_hw_init(p);
-
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	if (!console_fb_info) {
-		unsigned long iobase;
-
-		display_info.height = p->var.yres;
-		display_info.width = p->var.xres;
-		display_info.depth = 8;
-		display_info.pitch = p->fix.line_length;
-		display_info.mode = VMODE_800_600_60;
-		strncpy(display_info.name, "chips65550",
-			sizeof(display_info.name));
-		display_info.fb_address = p->frame_buffer_phys;
-		iobase = pci_bus_io_base_phys(p->pdev->bus->number);
-		display_info.cmap_adr_address = iobase + 0x3c8;
-		display_info.cmap_data_address = iobase + 0x3c9;
-		display_info.disp_reg_address = p->blitter_regs_phys;
-		console_fb_info = &p->info;
-	}
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 
 #ifdef CONFIG_PMAC_PBOOK
 	if (all_chips == NULL)

@@ -478,9 +478,6 @@ if [ "$CONFIG_4xx" != "y" -a "$CONFIG_8xx" != "y" ]; then
    bool 'VGA text console' CONFIG_VGA_CONSOLE
 fi
 source drivers/video/Config.in
-if [ "$CONFIG_FB" = "y" -a "$CONFIG_ALL_PPC" = "y" ]; then
-   bool 'Backward compatibility mode for Xpmac' CONFIG_FB_COMPAT_XPMAC
-fi
 endmenu
 
 

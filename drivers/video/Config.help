@@ -68,6 +68,12 @@ CONFIG_FB_PM2_CVPPC
   Say Y to enable support for the Amiga Phase 5 CVisionPPC BVisionPPC
   framebuffer cards.  Phase 5 is no longer with us, alas.
 
+CONFIG_FB_PM3
+  This is the frame buffer device driver for the 3DLabs Permedia3
+  chipset, used in Formac ProFormance III, 3DLabs Oxygen VX1 &
+  similar boards, 3DLabs Permedia3 Create!, Appian Jeronimo 2000
+  and maybe other boards.
+
 CONFIG_FB_AMIGA
   This is the frame buffer device driver for the builtin graphics
   chipset found in Amigas.
@@ -76,12 +82,6 @@ CONFIG_FB_AMIGA
   inserted and removed from the running kernel whenever you want). The
   module will be called amifb.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_FB_PM3
-  This is the frame buffer device driver for the 3DLabs Permedia3
-  chipset, used in Formac ProFormance III, 3DLabs Oxygen VX1 &
-  similar boards, 3DLabs Permedia3 Create!, Appian Jeronimo 2000
-  and maybe other boards.
 
 CONFIG_FB_AMIGA_OCS
   This enables support for the original Agnus and Denise video chips,
@@ -594,7 +594,7 @@ CONFIG_FB_IMSTT
   many Macintosh and compatible computers.
 
 CONFIG_FB_TX3912
-  The TX3912 is a Toshiba RISC processor based on the MIPS 3900 core
+  The TX3912 is a Toshiba RISC processor based on the MIPS 3900 core;
   see <http://www.toshiba.com/taec/components/Generic/risc/tx3912.htm>.
 
   Say Y here to enable kernel support for the on-board framebuffer.
@@ -716,17 +716,7 @@ CONFIG_FBCON_IPLAN2P8
   This is the low level frame buffer console driver for 8 interleaved
   bitplanes (256 colors) on Atari.
 
-CONFIG_FBCON_MAC
-  This is the low level frame buffer console driver for 1/2/4/8/16/32
-  bits per pixel packed pixels on Mac. It supports variable font
-  widths for low resolution screens.
-
 CONFIG_FBCON_HGA
   This is the low level frame buffer console driver for Hercules mono
   graphics cards.
-
-CONFIG_FBCON_VGA
-  This is the low level frame buffer console driver for VGA text mode;
-  it is used by frame buffer device drivers that support VGA text
-  mode.
 

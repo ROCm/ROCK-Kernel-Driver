@@ -33,10 +33,6 @@
 #include <linux/kbd_diacr.h>
 #include <linux/selection.h>
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif /* CONFIG_FB_COMPAT_XPMAC */
-
 char vt_dont_switch;
 extern struct tty_driver console_driver;
 
@@ -1047,68 +1043,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		   return -EPERM;
 		vt_dont_switch = 0;
 		return 0;
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	case VC_GETMODE:
-		{
-			struct vc_mode mode;
-
-			i = verify_area(VERIFY_WRITE, (void *) arg,
-					sizeof(struct vc_mode));
-			if (i == 0)
-				i = console_getmode(&mode);
-			if (i)
-				return i;
-			if (copy_to_user((void *) arg, &mode, sizeof(mode)))
-				return -EFAULT;
-			return 0;
-		}
-	case VC_SETMODE:
-	case VC_INQMODE:
-		{
-			struct vc_mode mode;
-
-			if (!perm)
-				return -EPERM;
-			if (copy_from_user(&mode, (void *) arg, sizeof(mode)))
-				return -EFAULT;
-			return console_setmode(&mode, cmd == VC_SETMODE);
-		}
-	case VC_SETCMAP:
-		{
-			unsigned char cmap[3][256], *p;
-			int n_entries, cmap_size, i, j;
-
-			if (!perm)
-				return -EPERM;
-			if (arg == (unsigned long) VC_POWERMODE_INQUIRY
-			    || arg <= VESA_POWERDOWN) {
-				/* compatibility hack: VC_POWERMODE
-				   was changed from 0x766a to 0x766c */
-				return console_powermode((int) arg);
-			}
-			if (get_user(cmap_size, (int *) arg))
-				return -EFAULT;
-			if (cmap_size % 3)
-				return -EINVAL;
-			n_entries = cmap_size / 3;
-			if ((unsigned) n_entries > 256)
-				return -EINVAL;
-			p = (unsigned char *) (arg + sizeof(int));
-			for (j = 0; j < n_entries; ++j)
-				for (i = 0; i < 3; ++i)
-					if (get_user(cmap[i][j], p++))
-						return -EFAULT;
-			return console_setcmap(n_entries, cmap[0],
-					       cmap[1], cmap[2]);
-		}
-	case VC_GETCMAP:
-		/* not implemented yet */
-		return -ENOIOCTLCMD;
-	case VC_POWERMODE:
-		if (!perm)
-			return -EPERM;
-		return console_powermode((int) arg);
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 	default:
 		return -ENOIOCTLCMD;
 	}

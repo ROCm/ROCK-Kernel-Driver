@@ -43,9 +43,6 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/nvram.h>
-#ifdef CONFIG_FB_COMPAT_XPMAC
-#include <asm/vc_ioctl.h>
-#endif
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <asm/io.h>
@@ -707,24 +704,6 @@ static void control_set_hardware(struct fb_info_control *p, struct fb_par_contro
 	/* Turn on display */
 	out_le32(CNTRL_REG(p,ctrl), par->ctrl);
 
-#ifdef CONFIG_FB_COMPAT_XPMAC
-	/* And let the world know the truth. */
-	if (!console_fb_info || console_fb_info == &p->info) {
-		display_info.height = p->par.yres;
-		display_info.width = p->par.xres;
-		display_info.depth = (cmode == CMODE_32) ? 32 :
-			((cmode == CMODE_16) ? 16 : 8);
-		display_info.pitch = p->par.pitch;
-		display_info.mode = p->par.vmode;
-		strncpy(display_info.name, "control",
-			sizeof(display_info.name));
-		display_info.fb_address = p->frame_buffer_phys + CTRLFB_OFF;
-		display_info.cmap_adr_address = p->cmap_regs_phys;
-		display_info.cmap_data_address = p->cmap_regs_phys + 0x30;
-		display_info.disp_reg_address = p->control_regs_phys;
-		console_fb_info = &p->info;
-	}
-#endif /* CONFIG_FB_COMPAT_XPMAC */
 #ifdef CONFIG_BOOTX_TEXT
 	btext_update_display(p->frame_buffer_phys + CTRLFB_OFF,
 			     p->par.xres, p->par.yres,
