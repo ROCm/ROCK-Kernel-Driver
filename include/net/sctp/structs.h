@@ -95,11 +95,11 @@ struct sockaddr_storage {
 /* A convenience structure for handling sockaddr structures.
  * We should wean ourselves off this.
  */
-typedef union {
+union sctp_addr {
 	struct sockaddr_in v4;
 	struct sockaddr_in6 v6;
 	struct sockaddr sa;
-} sockaddr_storage_t;
+};
 
 
 /* Forward declarations for data structures. */
@@ -246,17 +246,24 @@ typedef struct sctp_func {
 					 int optname,
 					 char *optval,
 					 int *optlen);
-	struct dst_entry *(*get_dst)	(sockaddr_storage_t *daddr,
-					 sockaddr_storage_t *saddr);
+	struct dst_entry *(*get_dst)	(union sctp_addr *daddr,
+					 union sctp_addr *saddr);
+	void            (*copy_addrlist) (struct list_head *,
+					  struct net_device *);
 	int		(*cmp_saddr)	(struct dst_entry *dst,
-					 sockaddr_storage_t *saddr);
+					 union sctp_addr *saddr);
+	void            (*addr_copy)    (union sctp_addr *dst,
+					 union sctp_addr *src);
+	void            (*from_skb)     (union sctp_addr *,
+					 struct sk_buff *skb,
+					 int saddr);
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;
 	struct list_head list;
 } sctp_func_t;
 
-sctp_func_t *sctp_get_af_specific(const sockaddr_storage_t *address);
+sctp_func_t *sctp_get_af_specific(sa_family_t);
 
 /* Protocol family functions. */
 typedef struct sctp_pf {
@@ -339,7 +346,7 @@ typedef struct sctp_cookie {
 	__u32 initial_tsn;
 
 	/* This holds the originating address of the INIT packet.  */
-	sockaddr_storage_t peer_addr;
+	union sctp_addr peer_addr;
 
 	/* This is a shim for my peer's INIT packet, followed by
 	 * a copy of the raw address list of the association.
@@ -393,7 +400,7 @@ union sctp_params {
  */
 typedef struct sctp_sender_hb_info {
 	sctp_paramhdr_t param_hdr;
-	sockaddr_storage_t daddr;
+	union sctp_addr daddr;
 	unsigned long sent_at;
 } sctp_sender_hb_info_t __attribute__((packed));
 
@@ -479,9 +486,9 @@ struct SCTP_chunk {
 	__u8 tsn_missing_report; /* Data chunk missing counter. */
 
 	/* What is the origin IP address for this chunk?  */
-	sockaddr_storage_t source;
+	union sctp_addr source;
 	/* Destination address for this chunk. */
-	sockaddr_storage_t dest;
+	union sctp_addr dest;
 
 	/* For an inbound chunk, this tells us where it came from.
 	 * For an outbound chunk, it tells us where we'd like it to
@@ -499,7 +506,7 @@ int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data);
 sctp_chunk_t *sctp_chunkify(struct sk_buff *, const sctp_association_t *,
 			    struct sock *);
 void sctp_init_addrs(sctp_chunk_t *chunk);
-const sockaddr_storage_t *sctp_source(const sctp_chunk_t *chunk);
+const union sctp_addr *sctp_source(const sctp_chunk_t *chunk);
 
 /* This is a structure for holding either an IPv6 or an IPv4 address.  */
 /* sin_family -- AF_INET or AF_INET6
@@ -508,7 +515,7 @@ const sockaddr_storage_t *sctp_source(const sctp_chunk_t *chunk);
  */
 struct sockaddr_storage_list {
 	struct list_head list;
-	sockaddr_storage_t a;
+	union sctp_addr a;
 };
 
 typedef sctp_chunk_t *(sctp_packet_phandler_t)(sctp_association_t *);
@@ -574,7 +581,7 @@ void sctp_packet_free(sctp_packet_t *);
 
 
 /* This represents a remote transport address.
- * For local transport addresses, we just use sockaddr_storage_t.
+ * For local transport addresses, we just use union sctp_addr.
  *
  * RFC2960 Section 1.4 Key Terms
  *
@@ -602,7 +609,7 @@ struct SCTP_transport {
 	int      dead;
 
 	/* This is the peer's IP address and port. */
-	sockaddr_storage_t ipaddr;
+	union sctp_addr ipaddr;
 
 	/* These are the functions we call to handle LLP stuff.  */
 	sctp_func_t *af_specific;
@@ -742,11 +749,11 @@ struct SCTP_transport {
 	int malloced; /* Is this structure kfree()able? */
 };
 
-extern sctp_transport_t *sctp_transport_new(const sockaddr_storage_t *, int);
+extern sctp_transport_t *sctp_transport_new(const union sctp_addr *, int);
 extern sctp_transport_t *sctp_transport_init(sctp_transport_t *,
-					     const sockaddr_storage_t *, int);
+					     const union sctp_addr *, int);
 extern void sctp_transport_set_owner(sctp_transport_t *, sctp_association_t *);
-extern void sctp_transport_route(sctp_transport_t *, sockaddr_storage_t *);
+extern void sctp_transport_route(sctp_transport_t *, union sctp_addr *);
 extern void sctp_transport_free(sctp_transport_t *);
 extern void sctp_transport_destroy(sctp_transport_t *);
 extern void sctp_transport_reset_timers(sctp_transport_t *);
@@ -893,10 +900,10 @@ void sctp_bind_addr_init(sctp_bind_addr_t *, __u16 port);
 void sctp_bind_addr_free(sctp_bind_addr_t *);
 int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
 			sctp_scope_t scope, int priority,int flags);
-int sctp_add_bind_addr(sctp_bind_addr_t *, sockaddr_storage_t *,
+int sctp_add_bind_addr(sctp_bind_addr_t *, union sctp_addr *,
 		       int priority);
-int sctp_del_bind_addr(sctp_bind_addr_t *, sockaddr_storage_t *);
-int sctp_bind_addr_has_addr(sctp_bind_addr_t *, const sockaddr_storage_t *);
+int sctp_del_bind_addr(sctp_bind_addr_t *, union sctp_addr *);
+int sctp_bind_addr_has_addr(sctp_bind_addr_t *, const union sctp_addr *);
 union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
 					 int *addrs_len,
 					 int priority);
@@ -906,10 +913,10 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp,
 			   unsigned short port,
 			   int priority);
 
-sctp_scope_t sctp_scope(const sockaddr_storage_t *);
-int sctp_in_scope(const sockaddr_storage_t *addr, const sctp_scope_t scope);
-int sctp_is_any(const sockaddr_storage_t *addr);
-int sctp_addr_is_valid(const sockaddr_storage_t *addr);
+sctp_scope_t sctp_scope(const union sctp_addr *);
+int sctp_in_scope(const union sctp_addr *addr, const sctp_scope_t scope);
+int sctp_is_any(const union sctp_addr *addr);
+int sctp_addr_is_valid(const union sctp_addr *addr);
 
 
 /* What type of sctp_endpoint_common?  */
@@ -1051,13 +1058,13 @@ void sctp_endpoint_put(sctp_endpoint_t *);
 void sctp_endpoint_hold(sctp_endpoint_t *);
 void sctp_endpoint_add_asoc(sctp_endpoint_t *, sctp_association_t *asoc);
 sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
-					       const sockaddr_storage_t *paddr,
+					       const union sctp_addr *paddr,
 					       sctp_transport_t **);
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
-					const sockaddr_storage_t *);
+					const union sctp_addr *);
 
-int sctp_has_association(const sockaddr_storage_t *laddr,
-			 const sockaddr_storage_t *paddr);
+int sctp_has_association(const union sctp_addr *laddr,
+			 const union sctp_addr *paddr);
 
 int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_cid_t cid,
@@ -1065,10 +1072,10 @@ int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_chunk_t *chunk,
 		     sctp_chunk_t **err_chunk);
 int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
-		      const sockaddr_storage_t *peer_addr,
+		      const union sctp_addr *peer_addr,
 		      sctp_init_chunk_t *peer_init, int priority);
 int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
-		       const sockaddr_storage_t *peer_addr, int priority);
+		       const union sctp_addr *peer_addr, int priority);
 __u32 sctp_generate_tag(const sctp_endpoint_t *ep);
 __u32 sctp_generate_tsn(const sctp_endpoint_t *ep);
 
@@ -1157,7 +1164,7 @@ struct SCTP_association {
 		/* Cache the primary path address here, when we
 		 * need a an address for msg_name.
 		 */
-		sockaddr_storage_t primary_addr;
+		union sctp_addr primary_addr;
 
 		/* active_path
 		 *   The path that we are currently using to
@@ -1535,16 +1542,16 @@ void sctp_association_hold(sctp_association_t *);
 
 sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *);
 sctp_transport_t *sctp_assoc_lookup_paddr(const sctp_association_t *,
-					  const sockaddr_storage_t *);
+					  const union sctp_addr *);
 sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *,
-				     const sockaddr_storage_t *address,
+				     const union sctp_addr *address,
 				     const int priority);
 void sctp_assoc_control_transport(sctp_association_t *, sctp_transport_t *,
 				  sctp_transport_cmd_t, sctp_sn_error_t);
 sctp_transport_t *sctp_assoc_lookup_tsn(sctp_association_t *, __u32);
 sctp_transport_t *sctp_assoc_is_match(sctp_association_t *,
-				      const sockaddr_storage_t *,
-				      const sockaddr_storage_t *);
+				      const union sctp_addr *,
+				      const union sctp_addr *);
 void sctp_assoc_migrate(sctp_association_t *, struct sock *);
 void sctp_assoc_update(sctp_association_t *dst, sctp_association_t *src);
 
@@ -1552,10 +1559,10 @@ __u32 __sctp_association_get_next_tsn(sctp_association_t *);
 __u32 __sctp_association_get_tsn_block(sctp_association_t *, int);
 __u16 __sctp_association_get_next_ssn(sctp_association_t *, __u16 sid);
 
-int sctp_cmp_addr(const sockaddr_storage_t *ss1,
-		  const sockaddr_storage_t *ss2);
-int sctp_cmp_addr_exact(const sockaddr_storage_t *ss1,
-		        const sockaddr_storage_t *ss2);
+int sctp_cmp_addr(const union sctp_addr *ss1,
+		  const union sctp_addr *ss2);
+int sctp_cmp_addr_exact(const union sctp_addr *ss1,
+		        const union sctp_addr *ss2);
 sctp_chunk_t *sctp_get_ecne_prepend(sctp_association_t *asoc);
 sctp_chunk_t *sctp_get_no_prepend(sctp_association_t *asoc);
 

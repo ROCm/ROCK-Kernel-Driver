@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2002 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -103,8 +103,8 @@ void sctp_proc_exit(void)
 /* Private helper to extract ipv4 address and stash them in
  * the protocol structure.
  */
-static inline void sctp_v4_get_local_addr_list(sctp_protocol_t *proto,
-					       struct net_device *dev)
+static void sctp_v4_copy_addrlist(struct list_head *addrlist, 
+				  struct net_device *dev)
 {
 	struct in_device *in_dev;
 	struct in_ifaddr *ifa;
@@ -117,7 +117,6 @@ static inline void sctp_v4_get_local_addr_list(sctp_protocol_t *proto,
 	}
 
 	read_lock(&in_dev->lock);
-
 	for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next) {
 		/* Add the address to the local list.  */
 		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
@@ -126,51 +125,12 @@ static inline void sctp_v4_get_local_addr_list(sctp_protocol_t *proto,
 			addr->a.v4.sin_family = AF_INET;
 			addr->a.v4.sin_port = 0;
 			addr->a.v4.sin_addr.s_addr = ifa->ifa_local;
-			list_add_tail(&addr->list, &proto->local_addr_list);
+			list_add_tail(&addr->list, addrlist);
 		}
 	}
 
 	read_unlock(&in_dev->lock);
 	read_unlock(&inetdev_lock);
-}
-
-/* Private helper to extract ipv6 address and stash them in
- * the protocol structure.
- * FIXME: Make this an address family function.
- */
-static inline void sctp_v6_get_local_addr_list(sctp_protocol_t *proto, 
-					       struct net_device *dev)
-{
-#ifdef SCTP_V6_SUPPORT
-	/* FIXME: The testframe doesn't support this function. */
-#ifndef TEST_FRAME
-	struct inet6_dev *in6_dev;
-	struct inet6_ifaddr *ifp;
-	struct sockaddr_storage_list *addr;
-
-	read_lock(&addrconf_lock);
-	if ((in6_dev = __in6_dev_get(dev)) == NULL) {
-		read_unlock(&addrconf_lock);
-		return;
-	}
-
-	read_lock_bh(&in6_dev->lock);
-	for (ifp = in6_dev->addr_list; ifp; ifp = ifp->if_next) {
-		/* Add the address to the local list.  */
-		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
-		if (addr) {
-			addr->a.v6.sin6_family = AF_INET6;
-			addr->a.v6.sin6_port = 0;
-			addr->a.v6.sin6_addr = ifp->addr;
-			INIT_LIST_HEAD(&addr->list);
-			list_add_tail(&addr->list, &proto->local_addr_list);
-		}
-	}
-
-	read_unlock_bh(&in6_dev->lock);
-	read_unlock(&addrconf_lock);
-#endif /* TEST_FRAME */
-#endif /* SCTP_V6_SUPPORT */
 }
 
 /* Extract our IP addresses from the system and stash them in the
@@ -179,11 +139,15 @@ static inline void sctp_v6_get_local_addr_list(sctp_protocol_t *proto,
 static void __sctp_get_local_addr_list(sctp_protocol_t *proto)
 {
 	struct net_device *dev;
+	struct list_head *pos;
+	struct sctp_func *af;
 
 	read_lock(&dev_base_lock);
 	for (dev = dev_base; dev; dev = dev->next) {
-		sctp_v4_get_local_addr_list(proto, dev);
-		sctp_v6_get_local_addr_list(proto, dev);
+		list_for_each(pos, &proto->address_families) {
+			af = list_entry(pos, sctp_func_t, list);
+			af->copy_addrlist(&proto->local_addr_list, dev);
+		}
 	}
 	read_unlock(&dev_base_lock);
 }
@@ -259,8 +223,8 @@ end_copy:
 /* Returns the dst cache entry for the given source and destination ip
  * addresses.
  */
-struct dst_entry *sctp_v4_get_dst(sockaddr_storage_t *daddr,
-				  sockaddr_storage_t *saddr)
+struct dst_entry *sctp_v4_get_dst(union sctp_addr *daddr,
+				  union sctp_addr *saddr)
 {
 	struct rtable *rt;
 	struct flowi fl = { .nl_u = { .ip4_u = { .daddr =
@@ -285,8 +249,31 @@ struct dst_entry *sctp_v4_get_dst(sockaddr_storage_t *daddr,
 	return &rt->u.dst;
 }
 
+
+/* Initialize a sctp_addr from in incoming skb.  */
+static void sctp_v4_from_skb(union sctp_addr *addr, struct sk_buff *skb,
+			     int is_saddr)
+{
+	void *from;
+	__u16 *port;
+	struct sctphdr *sh;
+
+	port = &addr->v4.sin_port;
+	addr->v4.sin_family = AF_INET;
+
+	sh = (struct sctphdr *) skb->h.raw;
+	if (is_saddr) {
+		*port  = ntohs(sh->source);
+		from = &skb->nh.iph->saddr;
+	} else {
+		*port = ntohs(sh->dest);
+		from = &skb->nh.iph->daddr;
+	}
+	memcpy(&addr->v4.sin_addr.s_addr, from, sizeof(struct in_addr));
+}
+
 /* Check if the dst entry's source addr matches the given source addr. */
-int sctp_v4_cmp_saddr(struct dst_entry *dst, sockaddr_storage_t *saddr)
+int sctp_v4_cmp_saddr(struct dst_entry *dst, union sctp_addr *saddr)
 {
 	struct rtable *rt = (struct rtable *)dst;
 
@@ -336,11 +323,11 @@ int sctp_ctl_sock_init(void)
 /* Get the table of functions for manipulating a particular address
  * family.
  */
-sctp_func_t *sctp_get_af_specific(const sockaddr_storage_t *address)
+sctp_func_t *sctp_get_af_specific(sa_family_t family)
 {
 	struct list_head *pos;
 	sctp_protocol_t *proto = sctp_get_protocol();
-	sctp_func_t *retval, *af;
+	struct sctp_func *retval, *af;
 
 	retval = NULL;
 
@@ -349,7 +336,7 @@ sctp_func_t *sctp_get_af_specific(const sockaddr_storage_t *address)
 	 */
 	list_for_each(pos, &proto->address_families) {
 		af = list_entry(pos, sctp_func_t, list);
-		if (address->sa.sa_family == af->sa_family) {
+		if (family == af->sa_family) {
 			retval = af;
 			break;
 		}
@@ -448,11 +435,13 @@ static struct inet_protocol sctp_protocol = {
 };
 
 /* IPv4 address related functions.  */
-sctp_func_t sctp_ipv4_specific = {
+struct sctp_func sctp_ipv4_specific = {
 	.queue_xmit     = ip_queue_xmit,
 	.setsockopt     = ip_setsockopt,
 	.getsockopt     = ip_getsockopt,
 	.get_dst	= sctp_v4_get_dst,
+	.copy_addrlist  = sctp_v4_copy_addrlist,
+	.from_skb       = sctp_v4_from_skb,
 	.cmp_saddr	= sctp_v4_cmp_saddr,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),

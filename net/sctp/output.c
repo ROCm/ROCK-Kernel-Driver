@@ -366,17 +366,12 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	 */
 	sh->checksum = htonl(crc32);
 
+	/* FIXME:  Delete the rest of this switch statement once phase 2
+	 * of address selection (ipv6 support) drops in.
+	 */
 	switch (transport->ipaddr.sa.sa_family) {
-	case AF_INET:
-		inet_sk(sk)->daddr = transport->ipaddr.v4.sin_addr.s_addr;
-		break;
-
 	case AF_INET6:
 		SCTP_V6(inet6_sk(sk)->daddr = transport->ipaddr.v6.sin6_addr;)
-		break;
-
-	default:
-		/* This is bogus address type, just bail. */
 		break;
 	};
 

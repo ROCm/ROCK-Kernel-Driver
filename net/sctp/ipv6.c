@@ -172,8 +172,8 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 /* Returns the dst cache entry for the given source and destination ip
  * addresses.
  */
-struct dst_entry *sctp_v6_get_dst(sockaddr_storage_t *daddr,
-				  sockaddr_storage_t *saddr)
+struct dst_entry *sctp_v6_get_dst(union sctp_addr *daddr,
+				  union sctp_addr *saddr)
 {
 	struct dst_entry *dst;
 	struct flowi fl = { .nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr,
@@ -206,8 +206,63 @@ struct dst_entry *sctp_v6_get_dst(sockaddr_storage_t *daddr,
 	return dst;
 }
 
+/* Make a copy of all potential local addresses. */
+static void sctp_v6_copy_addrlist(struct list_head *addrlist,
+				  struct net_device *dev)
+{
+	struct inet6_dev *in6_dev;
+	struct inet6_ifaddr *ifp;
+	struct sockaddr_storage_list *addr;
+
+	read_lock(&addrconf_lock);
+	if ((in6_dev = __in6_dev_get(dev)) == NULL) {
+		read_unlock(&addrconf_lock);
+		return;
+	}
+
+	read_lock(&in6_dev->lock);
+	for (ifp = in6_dev->addr_list; ifp; ifp = ifp->if_next) {
+		/* Add the address to the local list.  */
+		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
+		if (addr) {
+			addr->a.v6.sin6_family = AF_INET6;
+			addr->a.v6.sin6_port = 0;
+			addr->a.v6.sin6_addr = ifp->addr;
+			INIT_LIST_HEAD(&addr->list);
+			list_add_tail(&addr->list, addrlist);
+		}
+	}
+
+	read_unlock(&in6_dev->lock);
+	read_unlock(&addrconf_lock);
+}
+
+/* Initialize a sockaddr_storage from in incoming skb. */
+static void sctp_v6_from_skb(union sctp_addr *addr,struct sk_buff *skb,
+			     int is_saddr)
+{
+	void *from;
+	__u16 *port;
+	struct sctphdr *sh;
+
+	port = &addr->v6.sin6_port;
+	addr->v6.sin6_family = AF_INET6;
+	addr->v6.sin6_flowinfo = 0; /* FIXME */
+	addr->v6.sin6_scope_id = 0; /* FIXME */
+	
+	sh = (struct sctphdr *) skb->h.raw;
+	if (is_saddr) {
+		*port  = ntohs(sh->source);
+		from = &skb->nh.ipv6h->saddr;
+	} else {
+		*port = ntohs(sh->dest);
+		from = &skb->nh.ipv6h->daddr;
+	}
+	ipv6_addr_copy(&addr->v6.sin6_addr, from);
+}
+
 /* Check if the dst entry's source addr matches the given source addr. */
-int sctp_v6_cmp_saddr(struct dst_entry *dst, sockaddr_storage_t *saddr)
+int sctp_v6_cmp_saddr(struct dst_entry *dst, union sctp_addr *saddr)
 {
 	struct rt6_info *rt = (struct rt6_info *)dst;
 
@@ -227,12 +282,13 @@ static void sctp_inet6_msgname(char *msgname, int *addr_len)
 }
 
 /* Initialize a PF_INET msgname from a ulpevent. */
-static void sctp_inet6_event_msgname(sctp_ulpevent_t *event, char *msgname, int *addrlen)
+static void sctp_inet6_event_msgname(sctp_ulpevent_t *event, char *msgname, 
+				     int *addrlen)
 {
 	struct sockaddr_in6 *sin6, *sin6from;
 
 	if (msgname) {
-		sockaddr_storage_t *addr;
+		union sctp_addr *addr;
 
 		sctp_inet6_msgname(msgname, addrlen);
 		sin6 = (struct sockaddr_in6 *)msgname;
@@ -327,6 +383,8 @@ static sctp_func_t sctp_ipv6_specific = {
 	.setsockopt      = ipv6_setsockopt,
 	.getsockopt      = ipv6_getsockopt,
 	.get_dst	 = sctp_v6_get_dst,
+	.copy_addrlist   = sctp_v6_copy_addrlist,
+	.from_skb        = sctp_v6_from_skb,
 	.cmp_saddr	 = sctp_v6_cmp_saddr,
 	.net_header_len  = sizeof(struct ipv6hdr),
 	.sockaddr_len    = sizeof(struct sockaddr_in6),

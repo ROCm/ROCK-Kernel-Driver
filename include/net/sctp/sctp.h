@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2002 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -471,6 +471,26 @@ extern void sctp_put_port(struct sock *sk);
 static inline sctp_protocol_t *sctp_get_protocol(void)
 {
 	return &sctp_proto;
+}
+
+/* Convert from an IP version number to an Address Family symbol.  */
+static inline int ipver2af(__u8 ipver)
+{
+	int family;
+
+	switch (ipver) {
+	case 4:
+		family = AF_INET;
+		break;
+	case 6:
+		family = AF_INET6;
+		break;
+	default:
+		family = 0;
+		break;
+	};
+
+	return family;
 }
 
 /* Warning: The following hash functions assume a power of two 'size'. */
