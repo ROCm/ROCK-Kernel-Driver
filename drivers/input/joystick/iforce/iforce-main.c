@@ -352,7 +352,7 @@ int iforce_init_device(struct iforce *iforce)
  * Input device fields.
  */
 
-	iforce->dev.idbus = BUS_USB;
+	iforce->dev.id.bustype = BUS_USB;
 	iforce->dev.private = iforce;
 	iforce->dev.name = "Unknown I-Force device";
 	iforce->dev.open = iforce_open;
@@ -392,12 +392,12 @@ int iforce_init_device(struct iforce *iforce)
  */
 
 	if (!iforce_get_id_packet(iforce, "M"))
-		iforce->dev.idvendor = (iforce->edata[2] << 8) | iforce->edata[1];
+		iforce->dev.id.vendor = (iforce->edata[2] << 8) | iforce->edata[1];
 	else
 		printk(KERN_WARNING "iforce-main.c: Device does not respond to id packet M\n");
 
 	if (!iforce_get_id_packet(iforce, "P"))
-		iforce->dev.idproduct = (iforce->edata[2] << 8) | iforce->edata[1];
+		iforce->dev.id.product = (iforce->edata[2] << 8) | iforce->edata[1];
 	else
 		printk(KERN_WARNING "iforce-main.c: Device does not respond to id packet P\n");
 
@@ -438,8 +438,8 @@ int iforce_init_device(struct iforce *iforce)
  */
 
 	for (i = 0; iforce_device[i].idvendor; i++)
-		if (iforce_device[i].idvendor == iforce->dev.idvendor &&
-		    iforce_device[i].idproduct == iforce->dev.idproduct)
+		if (iforce_device[i].idvendor == iforce->dev.id.vendor &&
+		    iforce_device[i].idproduct == iforce->dev.id.product)
 			break;
 
 	iforce->type = iforce_device + i;

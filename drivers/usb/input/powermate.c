@@ -293,10 +293,10 @@ static void *powermate_probe(struct usb_device *udev, unsigned int ifnum, const 
 	pm->input.keybit[LONG(BTN_0)] = BIT(BTN_0);
 	pm->input.relbit[LONG(REL_DIAL)] = BIT(REL_DIAL);
 	pm->input.mscbit[LONG(MSC_PULSELED)] = BIT(MSC_PULSELED);
-	pm->input.idbus = BUS_USB;
-	pm->input.idvendor = udev->descriptor.idVendor;
-	pm->input.idproduct = udev->descriptor.idProduct;
-	pm->input.idversion = udev->descriptor.bcdDevice;
+	pm->input.id.bustype = BUS_USB;
+	pm->input.id.vendor = udev->descriptor.idVendor;
+	pm->input.id.product = udev->descriptor.idProduct;
+	pm->input.id.version = udev->descriptor.bcdDevice;
 	pm->input.event = powermate_input_event;
 
 	input_register_device(&pm->input);

@@ -22,6 +22,7 @@
 #include <linux/ptrace.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/input.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -40,10 +41,6 @@ static struct input_dev rpcmouse_dev = {
 	relbit:		{ BIT(REL_X) | BIT(REL_Y) },
 	name:		"Acorn RiscPC Mouse",
 	phys:		"rpcmouse/input0",
-	idbus:		BUS_HOST,
-	idvendor:	0x0005,
-	idproduct:	0x0001,
-	idversion:	0x0100,
 };
 
 static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
@@ -63,9 +60,9 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 	input_report_rel(&rpcmouse_dev, REL_X, dx);
 	input_report_rel(&rpcmouse_dev, REL_Y, dy);
 
-	input_report_key(&rpcmouse_dev, BTN_LEFT,   buttons & 0x10);
-	input_report_key(&rpcmouse_dev, BTN_MIDDLE, buttons & 0x20);
-	input_report_key(&rpcmouse_dev, BTN_RIGHT,  buttons & 0x40);
+	input_report_key(&rpcmouse_dev, BTN_LEFT,   b & 0x10);
+	input_report_key(&rpcmouse_dev, BTN_MIDDLE, b & 0x20);
+	input_report_key(&rpcmouse_dev, BTN_RIGHT,  b & 0x40);
 }
 
 static int __init rpcmouse_init(void)
@@ -79,6 +76,11 @@ static int __init rpcmouse_init(void)
 	}
 
 	input_register_device(&rpcmouse_dev);
+	rpcmouse.id.bustype	=BUS_HOST,
+	rpcmouse.id.vendor	=0x0005,
+	rpcmouse.id.product	=0x0001,
+	rpcmouse.id.version	=0x0100,
+
 	printk(KERN_INFO "input: Acorn RiscPC mouse irq %d", IRQ_VSYNCPULSE);
 
 	return 0;

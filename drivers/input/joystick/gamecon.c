@@ -593,10 +593,10 @@ static struct gc __init *gc_probe(int *config)
 		
                 gc->dev[i].name = gc_names[config[i + 1]];
 		gc->dev[i].phys = gc->phys[i];
-                gc->dev[i].idbus = BUS_PARPORT;
-                gc->dev[i].idvendor = 0x0001;
-                gc->dev[i].idproduct = config[i + 1];
-                gc->dev[i].idversion = 0x0100;
+                gc->dev[i].id.bustype = BUS_PARPORT;
+                gc->dev[i].id.vendor = 0x0001;
+                gc->dev[i].id.product = config[i + 1];
+                gc->dev[i].id.version = 0x0100;
 	}
 
 	parport_release(gc->pd);
@@ -617,21 +617,21 @@ static struct gc __init *gc_probe(int *config)
 }
 
 #ifndef MODULE
-int __init gc_setup(char *str)
+static int __init gc_setup(char *str)
 {
 	int i, ints[7];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 6; i++) gc[i] = ints[i + 1];
 	return 1;
 }
-int __init gc_setup_2(char *str)
+static int __init gc_setup_2(char *str)
 {
 	int i, ints[7];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 6; i++) gc_2[i] = ints[i + 1];
 	return 1;
 }
-int __init gc_setup_3(char *str)
+static int __init gc_setup_3(char *str)
 {
 	int i, ints[7];
 	get_options(str, ARRAY_SIZE(ints), ints);

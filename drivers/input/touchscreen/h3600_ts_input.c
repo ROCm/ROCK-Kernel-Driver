@@ -418,10 +418,10 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 	ts->dev.private = ts;
 	ts->dev.name = h3600_name;
 	ts->dev.phys = ts->phys;
-	ts->dev.idbus = BUS_RS232;
-	ts->dev.idvendor = SERIO_H3600;
-	ts->dev.idproduct = 0x0666;  /* FIXME !!! We can ask the hardware */
-	ts->dev.idversion = 0x0100;
+	ts->dev.id.bustype = BUS_RS232;
+	ts->dev.id.vendor = SERIO_H3600;
+	ts->dev.id.product = 0x0666;  /* FIXME !!! We can ask the hardware */
+	ts->dev.id.version = 0x0100;
 
 	if (serio_open(serio, dev)) {
         	free_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, ts);

@@ -490,10 +490,10 @@ int hidinput_connect(struct hid_device *hid)
 	hid->input.name = hid->name;
 	hid->input.phys = hid->phys;
 	hid->input.uniq = hid->uniq;
-	hid->input.idbus = BUS_USB;
-	hid->input.idvendor = dev->descriptor.idVendor;
-	hid->input.idproduct = dev->descriptor.idProduct;
-	hid->input.idversion = dev->descriptor.bcdDevice;
+	hid->input.id.bustype = BUS_USB;
+	hid->input.id.vendor = dev->descriptor.idVendor;
+	hid->input.id.product = dev->descriptor.idProduct;
+	hid->input.id.version = dev->descriptor.bcdDevice;
 
 	for (k = HID_INPUT_REPORT; k <= HID_OUTPUT_REPORT; k++) {
 		report_enum = hid->report_enum + k;

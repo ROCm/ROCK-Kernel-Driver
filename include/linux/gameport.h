@@ -39,10 +39,7 @@ struct gameport {
 	char *name;
 	char *phys;
 
-	unsigned short idbus;
-	unsigned short idvendor;
-	unsigned short idproduct;
-	unsigned short idversion;
+	struct input_devinfo id;
 
 	int io;
 	int speed;

@@ -3103,19 +3103,3 @@ static int __init serial_console_setup(struct console *co, char *options)
 
 	return 0;
 }
-
-#ifdef CONFIG_INPUT_KEYBDEV
-
-void handle_scancode(unsigned char scancode, int down)
-{
-  printk("handle_scancode(scancode=0x%x, down=%d)\n", scancode, down);
-}
-
-static void kbd_bh(unsigned long dummy)
-{
-}
-
-DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
-void (*kbd_ledfunc)(unsigned int led);
-
-#endif

@@ -259,7 +259,7 @@ int __init l4_init(void)
 
 			gameport->name = l4_name;
 			gameport->phys = l4->phys;
-			gameport->idbus = BUS_ISA;
+			gameport->id.bustype = BUS_ISA;
 
 			if (!i && !j)
 				gameport->io = L4_PORT;

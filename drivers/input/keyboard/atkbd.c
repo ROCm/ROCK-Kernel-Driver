@@ -98,6 +98,7 @@ static unsigned char atkbd_set3_keycode[512] = {
 #define ATKBD_CMD_ENABLE	0x00f4
 #define ATKBD_CMD_RESET_DIS	0x00f5
 #define ATKBD_CMD_SETALL_MB	0x00f8
+#define ATKBD_CMD_RESEND	0x00fe
 #define ATKBD_CMD_EX_ENABLE	0x10ea
 #define ATKBD_CMD_EX_SETLEDS	0x20eb
 
@@ -141,8 +142,15 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 	int code = data;
 
 #ifdef ATKBD_DEBUG
-	printk(KERN_DEBUG "atkbd.c: Received %02x\n", data);
+	printk(KERN_DEBUG "atkbd.c: Received %02x flags %02x\n", data, flags);
 #endif
+
+	/* Interface error.  Request that the keyboard resend. */
+	if (flags & (SERIO_FRAME | SERIO_PARITY)) {
+		printk("atkbd.c: frame/parity error: %02x\n", flags);
+		serio_write(serio, ATKBD_CMD_RESEND);
+		return;
+	}
 
 	switch (code) {
 		case ATKBD_RET_ACK:
@@ -496,10 +504,10 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	atkbd->dev.name = atkbd->name;
 	atkbd->dev.phys = atkbd->phys;
-	atkbd->dev.idbus = BUS_I8042;
-	atkbd->dev.idvendor = 0x0001;
-	atkbd->dev.idproduct = atkbd->set;
-	atkbd->dev.idversion = atkbd->id;
+	atkbd->dev.id.bustype = BUS_I8042;
+	atkbd->dev.id.vendor = 0x0001;
+	atkbd->dev.id.product = atkbd->set;
+	atkbd->dev.id.version = atkbd->id;
 
 	for (i = 0; i < 512; i++)
 		if (atkbd->keycode[i] && atkbd->keycode[i] <= 250)
@@ -520,14 +528,16 @@ static struct serio_dev atkbd_dev = {
 	disconnect:	atkbd_disconnect
 };
 
-/*
- * Module init and exit.
- */
-
-void __init atkbd_setup(char *str, int *ints)
+#ifndef MODULE
+static int __init atkbd_setup(char *str)
 {
-	if (!ints[0]) atkbd_set = ints[1];
+        int ints[4];
+        str = get_options(str, ARRAY_SIZE(ints), ints);
+        if (ints[0] > 0) atkbd_set = ints[1];
+        return 1;
 }
+__setup("atkbd_set=", atkbd_setup);
+#endif
 
 int __init atkbd_init(void)
 {

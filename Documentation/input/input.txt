@@ -207,7 +207,7 @@ program reading the data wishes. You can set GPM and X to any of
 these. You'll need ImPS/2 if you want to make use of a wheel on a USB
 mouse and ExplorerPS/2 if you want to use extra (up to 5) buttons. 
 
-3.2.3 joydev.c
+3.2.3 joydev.o
 ~~~~~~~~~~~~~~
   Joydev implements v0.x and v1.x Linux joystick api, much like
 drivers/char/joystick/joystick.c used to in earlier versions. See

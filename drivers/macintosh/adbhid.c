@@ -479,10 +479,10 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 	adbhid[id]->input.private = adbhid[id];
 	adbhid[id]->input.name = adbhid[id]->name;
 	adbhid[id]->input.phys = adbhid[id]->phys;
-	adbhid[id]->input.idbus = BUS_ADB;
-	adbhid[id]->input.idvendor = 0x0001;
-	adbhid[id]->input.idproduct = (id << 12) | (default_id << 8) | original_handler_id;
-	adbhid[id]->input.idversion = 0x0100;
+	adbhid[id]->input.id.bustype = BUS_ADB;
+	adbhid[id]->input.id.vendor = 0x0001;
+	adbhid[id]->input.id.product = (id << 12) | (default_id << 8) | original_handler_id;
+	adbhid[id]->input.id.version = 0x0100;
 
 	switch (default_id) {
 	case ADB_KEYBOARD:
@@ -607,7 +607,7 @@ adbhid_input_reregister(int id, int default_id, int org_handler_id,
 			int cur_handler_id, int mk)
 {
 	if (adbhid[id]) {
-		if (adbhid[id]->input.idproduct !=
+		if (adbhid[id]->input.id.product !=
 		    ((id << 12)|(default_id << 8)|org_handler_id)) {
 			adbhid_input_unregister(id);
 			adbhid_input_register(id, default_id, org_handler_id,

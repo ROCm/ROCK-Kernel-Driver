@@ -436,10 +436,10 @@ static void analog_init_device(struct analog_port *port, struct analog *analog, 
 
 	analog->dev.name = analog->name;
 	analog->dev.phys = analog->phys;
-	analog->dev.idbus = BUS_GAMEPORT;
-	analog->dev.idvendor = GAMEPORT_ID_VENDOR_ANALOG;
-	analog->dev.idproduct = analog->mask >> 4;
-	analog->dev.idversion = 0x0100;
+	analog->dev.id.bustype = BUS_GAMEPORT;
+	analog->dev.id.vendor = GAMEPORT_ID_VENDOR_ANALOG;
+	analog->dev.id.product = analog->mask >> 4;
+	analog->dev.id.version = 0x0100;
 
 	analog->dev.open = analog_open;
 	analog->dev.close = analog_close;

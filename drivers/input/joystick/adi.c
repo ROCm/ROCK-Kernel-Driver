@@ -416,10 +416,10 @@ static void adi_init_input(struct adi *adi, struct adi_port *port, int half)
 
 	adi->dev.name = adi->name;
 	adi->dev.phys = adi->phys;
-	adi->dev.idbus = BUS_GAMEPORT;
-	adi->dev.idvendor = GAMEPORT_ID_VENDOR_LOGITECH;
-	adi->dev.idproduct = adi->id;
-	adi->dev.idversion = 0x0100;
+	adi->dev.id.bustype = BUS_GAMEPORT;
+	adi->dev.id.vendor = GAMEPORT_ID_VENDOR_LOGITECH;
+	adi->dev.id.product = adi->id;
+	adi->dev.id.version = 0x0100;
 
 	adi->dev.private = port;
 	adi->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);

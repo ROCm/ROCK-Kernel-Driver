@@ -263,10 +263,10 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	sermouse->dev.name = sermouse_protocols[sermouse->type];
 	sermouse->dev.phys = sermouse->phys;
-	sermouse->dev.idbus = BUS_RS232;
-	sermouse->dev.idvendor = sermouse->type;
-	sermouse->dev.idproduct = c;
-	sermouse->dev.idversion = 0x0100;
+	sermouse->dev.id.bustype = BUS_RS232;
+	sermouse->dev.id.vendor = sermouse->type;
+	sermouse->dev.id.product = c;
+	sermouse->dev.id.version = 0x0100;
 
 	if (serio_open(serio, dev)) {
 		kfree(sermouse);

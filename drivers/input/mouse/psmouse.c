@@ -142,7 +142,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
  */
 
 	if (psmouse->type == PSMOUSE_IMEX) {
-		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 7) - (int) (packet[2] & 8));
+		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 7) - (int) (packet[3] & 8));
 		input_report_key(dev, BTN_SIDE, (packet[3] >> 4) & 1);
 		input_report_key(dev, BTN_EXTRA, (packet[3] >> 5) & 1);
 	}
@@ -600,10 +600,10 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	psmouse->dev.name = psmouse->devname;
 	psmouse->dev.phys = psmouse->phys;
-	psmouse->dev.idbus = BUS_I8042;
-	psmouse->dev.idvendor = psmouse->type;
-	psmouse->dev.idproduct = 0x0002;
-	psmouse->dev.idversion = 0x0100;
+	psmouse->dev.id.bustype = BUS_I8042;
+	psmouse->dev.id.vendor = psmouse->type;
+	psmouse->dev.id.product = 0x0002;
+	psmouse->dev.id.version = 0x0100;
 
 	input_register_device(&psmouse->dev);
 	

@@ -56,8 +56,15 @@ struct input_event {
  * IOCTLs (0x00 - 0x7f)
  */
 
+struct input_devinfo {
+	uint16_t bustype;
+	uint16_t vendor;
+	uint16_t product;
+	uint16_t version;
+};
+
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
-#define EVIOCGID		_IOR('E', 0x02, short[4])		/* get device ID */
+#define EVIOCGID		_IOR('E', 0x02, struct input_devinfo)	/* get device ID */
 #define EVIOCGREP		_IOR('E', 0x03, int[2])			/* get repeat settings */
 #define EVIOCSREP		_IOW('E', 0x03, int[2])			/* get repeat settings */
 #define EVIOCGKEYCODE		_IOR('E', 0x04, int[2])			/* get keycode */
@@ -454,17 +461,15 @@ struct input_event {
 #define KEY_FIRST		0x194
 #define KEY_LAST		0x195
 #define KEY_AB			0x196
-#define KEY_PLAY		0x197
+#define KEY_NEXT		0x197
 #define KEY_RESTART		0x198
 #define KEY_SLOW		0x199
 #define KEY_SHUFFLE		0x19a
-#define KEY_FASTFORWARD		0x19b
+#define KEY_BREAK		0x1ab
 #define KEY_PREVIOUS		0x19c
-#define KEY_NEXT		0x19d
-#define KEY_DIGITS		0x19e
-#define KEY_TEEN		0x19f
-#define KEY_TWEN		0x1a0
-#define KEY_BREAK		0x1a1
+#define KEY_DIGITS		0x19d
+#define KEY_TEEN		0x19e
+#define KEY_TWEN		0x1af
 
 #define KEY_MAX			0x1ff
 
@@ -742,10 +747,7 @@ struct input_dev {
 	char *name;
 	char *phys;
 	char *uniq;
-	unsigned short idbus;
-	unsigned short idvendor;
-	unsigned short idproduct;
-	unsigned short idversion;
+	struct input_devinfo id;
 
 	unsigned long evbit[NBITS(EV_MAX)];
 	unsigned long keybit[NBITS(KEY_MAX)];
@@ -818,10 +820,7 @@ struct input_device_id {
 
 	unsigned long flags;
 
-	unsigned short idbus;
-	unsigned short idvendor;
-	unsigned short idproduct;
-	unsigned short idversion;
+	struct input_devinfo id;
 
 	unsigned long evbit[NBITS(EV_MAX)];
 	unsigned long keybit[NBITS(KEY_MAX)];

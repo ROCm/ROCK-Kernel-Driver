@@ -290,19 +290,19 @@ static struct input_device_id *input_match_device(struct input_device_id *id, st
 	for (; id->flags || id->driver_info; id++) {
 
 		if (id->flags & INPUT_DEVICE_ID_MATCH_BUS)
-			if (id->idbus != dev->idbus)
+			if (id->id.bustype != dev->id.bustype)
 				continue;
 
 		if (id->flags & INPUT_DEVICE_ID_MATCH_VENDOR)
-			if (id->idvendor != dev->idvendor)
+			if (id->id.vendor != dev->id.vendor)
 				continue;
 	
 		if (id->flags & INPUT_DEVICE_ID_MATCH_PRODUCT)
-			if (id->idproduct != dev->idproduct)
+			if (id->id.product != dev->id.product)
 				continue;
 		
 		if (id->flags & INPUT_DEVICE_ID_MATCH_BUS)
-			if (id->idversion != dev->idversion)
+			if (id->id.version != dev->id.version)
 				continue;
 
 		MATCH_BIT(evbit,  EV_MAX);
@@ -395,7 +395,7 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 
 	envp[i++] = scratch;
 	scratch += sprintf(scratch, "PRODUCT=%x/%x/%x/%x",
-		dev->idbus, dev->idvendor, dev->idproduct, dev->idversion) + 1; 
+		dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version) + 1; 
 	
 	if (dev->name) {
 		envp[i++] = scratch;
@@ -710,7 +710,7 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 	while (dev) {
 
 		len = sprintf(buf, "I: Bus=%04x Vendor=%04x Product=%04x Version=%04x\n",
-			dev->idbus, dev->idvendor, dev->idproduct, dev->idversion);
+			dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
 
 		len += sprintf(buf + len, "N: Name=\"%s\"\n", dev->name ? dev->name : "");
 		len += sprintf(buf + len, "P: Phys=%s\n", dev->phys ? dev->phys : "");

@@ -170,10 +170,10 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 	magellan->dev.private = magellan;
 	magellan->dev.name = magellan_name;
 	magellan->dev.phys = magellan->phys;
-	magellan->dev.idbus = BUS_RS232;
-	magellan->dev.idvendor = SERIO_MAGELLAN;
-	magellan->dev.idproduct = 0x0001;
-	magellan->dev.idversion = 0x0100;
+	magellan->dev.id.bustype = BUS_RS232;
+	magellan->dev.id.vendor = SERIO_MAGELLAN;
+	magellan->dev.id.product = 0x0001;
+	magellan->dev.id.version = 0x0100;
 	
 	serio->private = magellan;
 
