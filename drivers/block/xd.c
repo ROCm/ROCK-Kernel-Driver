@@ -150,6 +150,7 @@ static devfs_handle_t devfs_handle = NULL;
 static int __init xd_init(void)
 {
 	u_char i,controller;
+	u_char count = 0;
 	unsigned int address;
 	int err;
 
