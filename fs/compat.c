@@ -300,7 +300,6 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 {
 	struct file * filp;
 	int error = -EBADF;
-	int (*handler)(unsigned int, unsigned int, unsigned long, struct file * filp);
 	struct ioctl_trans *t;
 
 	filp = fget(fd);
@@ -317,8 +316,10 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 	while (t && t->cmd != cmd)
 		t = (struct ioctl_trans *)t->next;
 	if (t) {
-		handler = t->handler;
-		error = handler(fd, cmd, arg, filp);
+		if (t->handler)
+			error = t->handler(fd, cmd, arg, filp);
+		else
+			error = sys_ioctl(fd, cmd, arg);
 	} else if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
 		error = siocdevprivate_ioctl(fd, cmd, arg);
 	} else {
