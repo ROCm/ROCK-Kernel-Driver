@@ -899,6 +899,9 @@ linvfs_get_block_core(
 		}
 	}
 
+	/* If this is a realtime file, data might be on a new device */
+	bh_result->b_bdev = iomap.iomap_target->pbr_bdev;
+
 	/* If we previously allocated a block out beyond eof and
 	 * we are now coming back to use it then we will need to
 	 * flag it as new even if it has a disk address.
