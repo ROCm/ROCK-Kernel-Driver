@@ -222,6 +222,10 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_SG_FREE)]       = { DRM(sg_free),     1, 1 },
 #endif
 
+#if __HAVE_VBL_IRQ
+	[DRM_IOCTL_NR(DRM_IOCTL_WAIT_VBLANK)]   = { DRM(wait_vblank), 0, 0 },
+#endif
+
 	DRIVER_IOCTLS
 };
 
