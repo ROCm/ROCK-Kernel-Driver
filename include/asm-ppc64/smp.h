@@ -38,7 +38,7 @@ struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
 
 
-#define smp_processor_id() (get_paca()->paca_index)
+#define __smp_processor_id() (get_paca()->paca_index)
 #define hard_smp_processor_id() (get_paca()->hw_cpu_id)
 
 extern cpumask_t cpu_sibling_map[NR_CPUS];
