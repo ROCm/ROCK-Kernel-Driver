@@ -1,10 +1,6 @@
 #
 # Makefile for some libs needed in the kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
 
 
 lib-y := errno.o ctype.o string.o vsprintf.o cmdline.o \
@@ -24,15 +20,18 @@ obj-$(CONFIG_CRC32)	+= crc32.o
 obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate/
 obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate/
 
-include $(TOPDIR)/drivers/net/Makefile.lib
-include $(TOPDIR)/drivers/usb/Makefile.lib
-include $(TOPDIR)/fs/Makefile.lib
-include $(TOPDIR)/net/bluetooth/bnep/Makefile.lib
+include drivers/net/Makefile.lib
+include drivers/usb/Makefile.lib
+include fs/Makefile.lib
+include net/bluetooth/bnep/Makefile.lib
 
-host-progs := gen_crc32table
-clean-files := crc32table.h
+host-progs	:= gen_crc32table
+clean-files	:= crc32table.h
 
 $(obj)/crc32.o: $(obj)/crc32table.h
 
+quiet_cmd_crc32 = GEN     $@
+      cmd_crc32 = $< > $@
+
 $(obj)/crc32table.h: $(obj)/gen_crc32table
-	./$< > $@
+	$(call cmd,crc32)
