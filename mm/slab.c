@@ -1153,12 +1153,12 @@ static int kmem_cache_grow (kmem_cache_t * cachep, int flags)
 	 * in kmem_cache_alloc(). If a caller is seriously mis-behaving they
 	 * will eventually be caught here (where it matters).
 	 */
-	if (in_interrupt() && (flags & SLAB_LEVEL_MASK) != SLAB_ATOMIC)
+	if (in_interrupt() && (flags & __GFP_WAIT))
 		BUG();
 
 	ctor_flags = SLAB_CTOR_CONSTRUCTOR;
 	local_flags = (flags & SLAB_LEVEL_MASK);
-	if (local_flags == SLAB_ATOMIC)
+	if (!(local_flags & __GFP_WAIT))
 		/*
 		 * Not allowed to sleep.  Need to tell a constructor about
 		 * this - it might need to know...

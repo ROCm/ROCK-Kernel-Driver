@@ -272,8 +272,6 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 	struct page * page = NULL;
 	int __freed = 0;
 
-	if (!(gfp_mask & __GFP_WAIT))
-		goto out;
 	if (in_interrupt())
 		BUG();
 
@@ -333,7 +331,6 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 		}
 		current->nr_local_pages = 0;
 	}
- out:
 	*freed = __freed;
 	return page;
 }
@@ -380,7 +377,7 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 			break;
 
 		local_min = z->pages_min;
-		if (!(gfp_mask & __GFP_WAIT))
+		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
 		min += local_min;
 		if (z->free_pages > min) {

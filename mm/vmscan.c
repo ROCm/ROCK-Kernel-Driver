@@ -52,6 +52,9 @@ static inline int is_page_cache_freeable(struct page * page)
  * So PF_MEMALLOC is dropped here.  This causes the slab allocations to fail
  * earlier, so radix-tree nodes will then be allocated from the mempool
  * reserves.
+ *
+ * We're still using __GFP_HIGH for radix-tree node allocations, so some of
+ * the emergency pools are available - just not all of them.
  */
 static inline int
 swap_out_add_to_swap_cache(struct page *page, swp_entry_t entry)
