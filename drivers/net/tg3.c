@@ -4899,14 +4899,16 @@ static int tg3_reset_hw(struct tg3 *tp)
 		      RDMAC_MODE_LNGREAD_ENAB);
 	if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
 		rdmac_mode |= RDMAC_MODE_SPLIT_ENABLE;
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
-		if (tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) {
-			if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
-				rdmac_mode |= RDMAC_MODE_FIFO_SIZE_128;
-			} else if (!(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) &&
-				   !(tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
-				rdmac_mode |= RDMAC_MODE_FIFO_LONG_BURST;
-			}
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
+	     tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) ||
+	    (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)) {
+		if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE &&
+		    (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 ||
+		     tp->pci_chip_rev_id == CHIPREV_ID_5705_A2)) {
+			rdmac_mode |= RDMAC_MODE_FIFO_SIZE_128;
+		} else if (!(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) &&
+			   !(tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
+			rdmac_mode |= RDMAC_MODE_FIFO_LONG_BURST;
 		}
 	}
 
@@ -5010,11 +5012,21 @@ static int tg3_reset_hw(struct tg3 *tp)
 	       WDMAC_MODE_ADDROFLOW_ENAB | WDMAC_MODE_FIFOOFLOW_ENAB |
 	       WDMAC_MODE_FIFOURUN_ENAB | WDMAC_MODE_FIFOOREAD_ENAB |
 	       WDMAC_MODE_LNGREAD_ENAB);
-	/* XXX Need to handle 5750 and PCI Express cases here... -DaveM */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
-	    (tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) != 0 &&
-	    !(tp->tg3_flags2 & TG3_FLG2_IS_5788))
-		val |= WDMAC_MODE_RX_ACCEL;
+
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
+	     tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
+		if ((tp->tg3_flags & TG3_FLG2_TSO_CAPABLE) &&
+		    (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 ||
+		     tp->pci_chip_rev_id == CHIPREV_ID_5705_A2)) {
+			/* nothing */
+		} else if (!(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) &&
+			   !(tp->tg3_flags2 & TG3_FLG2_IS_5788) &&
+			   !(tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS)) {
+			val |= WDMAC_MODE_RX_ACCEL;
+		}
+	}
+
 	tw32_f(WDMAC_MODE, val);
 	udelay(40);
 
