@@ -422,6 +422,14 @@ config SCSI_ATA_PIIX
 
 	  If unsure, say N.
 
+config SCSI_SATA_NV
+	tristate "NVIDIA SATA support"
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	help
+	  This option enables support for NVIDIA Serial ATA.
+
+	  If unsure, say N.
+
 config SCSI_SATA_PROMISE
 	tristate "Promise SATA TX2/TX4 support"
 	depends on SCSI_SATA && PCI
@@ -467,14 +475,6 @@ config SCSI_SATA_VITESSE
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
 	  This option enables support for Vitesse VSC7174 Serial ATA.
-
-	  If unsure, say N.
-
-config SCSI_SATA_NV
-	tristate "NVIDIA SATA support"
-	depends on SCSI_SATA && PCI && EXPERIMENTAL
-	help
-	  This option enables support for NVIDIA Serial ATA.
 
 	  If unsure, say N.
 
