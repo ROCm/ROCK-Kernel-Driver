@@ -687,14 +687,16 @@ static void __init handle_initrd(void)
 #endif
 }
 
+#ifdef CONFIG_BLK_DEV_INITRD
 static int __init initrd_load(void)
 {
-#ifdef CONFIG_BLK_DEV_INITRD
 	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
 	create_dev("/dev/initrd", MKDEV(RAMDISK_MAJOR, INITRD_MINOR), NULL);
-#endif
 	return rd_load_image("/dev/initrd");
 }
+#else
+static inline int initrd_load(void) { return 0; }
+#endif
 
 /*
  * Prepare the namespace - decide what/where to mount, load ramdisks, etc.
