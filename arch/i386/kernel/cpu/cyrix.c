@@ -1,7 +1,9 @@
 #include <linux/init.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/pci.h>
 #include <linux/pci_ids.h>
+
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/processor.h>
@@ -199,7 +201,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 			 *  The 5510/5520 companion chips have a funky PIT
 			 *  that breaks the TSC synchronizing, so turn it off
 			 */
-			if(pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5510, NULL) ||
+			if (pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5510, NULL) ||
 				pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5520, NULL))
 				clear_bit(X86_FEATURE_TSC, c->x86_capability);
 			return;

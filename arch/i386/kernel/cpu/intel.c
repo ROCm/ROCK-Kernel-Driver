@@ -315,7 +315,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 too_many_siblings:
 
 	if (disable_P4_HT)
-		clear_bit(X86_FEATURE_HT, &c->x86_capability);
+		clear_bit(X86_FEATURE_HT, c->x86_capability);
 #endif
 
 	/* Disable the PN if appropriate */

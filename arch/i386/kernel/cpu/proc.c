@@ -66,7 +66,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "stepping\t: unknown\n");
 
-	if ( test_bit(X86_FEATURE_TSC, &c->x86_capability) ) {
+	if ( test_bit(X86_FEATURE_TSC, c->x86_capability) ) {
 		seq_printf(m, "cpu MHz\t\t: %lu.%03lu\n",
 			cpu_khz / 1000, (cpu_khz % 1000));
 	}
@@ -96,7 +96,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		     c->wp_works_ok ? "yes" : "no");
 
 	for ( i = 0 ; i < 32*NCAPINTS ; i++ )
-		if ( test_bit(i, &c->x86_capability) &&
+		if ( test_bit(i, c->x86_capability) &&
 		     x86_cap_flags[i] != NULL )
 			seq_printf(m, " %s", x86_cap_flags[i]);
 
