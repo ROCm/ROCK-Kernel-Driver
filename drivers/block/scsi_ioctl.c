@@ -404,7 +404,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, void __user *arg)
 			if (hdr.sbp)
 				hdr.mx_sb_len = sizeof(struct request_sense);
 			hdr.timeout = cgc.timeout;
-			hdr.cmdp = &((struct cdrom_generic_command __user*) arg)->cmd;
+			hdr.cmdp = ((struct cdrom_generic_command __user*) arg)->cmd;
 			hdr.cmd_len = sizeof(cgc.cmd);
 
 			err = sg_io(q, bd_disk, &hdr);
