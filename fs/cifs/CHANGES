@@ -1,3 +1,7 @@
+Version 0.94
+------------
+Fix to list processing in reopen_files.
+
 Version 0.93
 ------------
 Add missing mount options including iocharset.  SMP fixes in write and open. 

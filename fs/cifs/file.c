@@ -319,7 +319,7 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 	}
 
 	/* reopen files */
-	list_for_each(tmp,&invalid_file_list) {
+	list_for_each_safe(tmp,tmp1, &invalid_file_list) {
 	/* BB need to fix above to check list end and skip entries we do not need to reopen */
 	        open_file = list_entry(tmp,struct cifsFileInfo, tlist);
         	if(open_file == NULL) {
@@ -336,6 +336,12 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 				write_unlock(&GlobalSMBSeslock);
 				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
 				write_lock(&GlobalSMBSeslock);
+				if(file->private_data == NULL) {
+                                        tmp = invalid_file_list.next;
+                                        tmp1 = tmp->next;
+                                        continue;
+                                }
+
 				list_move(&open_file->tlist,&pTcon->openFileList);
 				if(rc) {
 					cFYI(1,("reconnecting file %s failed with %d",
@@ -366,12 +372,11 @@ cifs_close(struct inode *inode, struct file *file)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
+		rc = CIFSSMBClose(xid,pTcon,pSMBFile->netfid);
 		write_lock(&file->f_owner.lock);
-		pSMBFile->invalidHandle = TRUE;
 		list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
 		write_unlock(&file->f_owner.lock);
-		rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);
 		if(pSMBFile->search_resume_name)
 			kfree(pSMBFile->search_resume_name);
 		kfree(file->private_data);
