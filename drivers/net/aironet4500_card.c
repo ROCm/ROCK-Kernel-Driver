@@ -16,28 +16,26 @@ static const char *awc_version =
 "aironet4500_cards.c v0.2  Feb 27, 2000  Elmer Joandi, elmer@ylenurme.ee.\n";
 #endif
 
-#include <linux/version.h>
+#include <linux/delay.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/config.h>
+#include <linux/if_arp.h>
+#include <linux/init.h>
+#include <linux/ioport.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/in.h>
+#include <linux/version.h>
+
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/if_arp.h>
-#include <linux/ioport.h>
-#include <linux/delay.h>
-#include <linux/init.h>
 
 #include "aironet4500.h"
 

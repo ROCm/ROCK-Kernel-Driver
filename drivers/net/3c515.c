@@ -62,14 +62,15 @@ static int max_interrupt_work = 20;
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/isapnp.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/netdevice.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
+#include <linux/skbuff.h>
+#include <linux/etherdevice.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/ethtool.h>
@@ -78,10 +79,6 @@ static int max_interrupt_work = 20;
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 #define NEW_MULTICAST
 #include <linux/delay.h>
