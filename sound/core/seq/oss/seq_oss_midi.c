@@ -578,6 +578,7 @@ send_synth_event(seq_oss_devinfo_t *dp, snd_seq_event_t *ev, int dev)
 		ossev.v.code = EV_CHN_VOICE;
 		ossev.v.note = ev->data.note.note;
 		ossev.v.parm = ev->data.note.velocity;
+		ossev.v.chn = ev->data.note.channel;
 		break;
 	case SNDRV_SEQ_EVENT_CONTROLLER:
 	case SNDRV_SEQ_EVENT_PGMCHANGE:
@@ -585,10 +586,12 @@ send_synth_event(seq_oss_devinfo_t *dp, snd_seq_event_t *ev, int dev)
 		ossev.l.code = EV_CHN_COMMON;
 		ossev.l.p1 = ev->data.control.param;
 		ossev.l.val = ev->data.control.value;
+		ossev.l.chn = ev->data.control.channel;
 		break;
 	case SNDRV_SEQ_EVENT_PITCHBEND:
 		ossev.l.code = EV_CHN_COMMON;
 		ossev.l.val = ev->data.control.value + 8192;
+		ossev.l.chn = ev->data.control.channel;
 		break;
 	}
 	
