@@ -127,6 +127,22 @@ static struct file_operations	DRM(fops) = {	\
 }
 #endif
 
+#ifndef MODULE
+/* DRM(options) is called by the kernel to parse command-line options
+ * passed via the boot-loader (e.g., LILO).  It calls the insmod option
+ * routine, drm_parse_drm.
+ */
+/* Use an additional macro to avoid preprocessor troubles */
+#define DRM_OPTIONS_FUNC DRM(options)
+static int __init DRM(options)( char *str )
+{
+	DRM(parse_options)( str );
+	return 1;
+}
+
+__setup( DRIVER_NAME "=", DRM_OPTIONS_FUNC );
+#undef DRM_OPTIONS_FUNC
+#endif
 
 /*
  * The default number of instances (minor numbers) to initialize.

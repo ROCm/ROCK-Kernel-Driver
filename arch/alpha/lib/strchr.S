@@ -6,7 +6,7 @@
  * string, or null if it is not found.
  */
 
-#include <alpha/regdef.h>
+#include <asm/regdef.h>
 
 	.set noreorder
 	.set noat

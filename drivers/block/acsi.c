@@ -369,7 +369,6 @@ static void acsi_prevent_removal( int target, int flag );
 static int acsi_change_blk_size( int target, int lun);
 static int acsi_mode_sense( int target, int lun, SENSE_DATA *sd );
 static void acsi_geninit(void);
-static int revalidate_acsidisk( kdev_t dev, int maxusage );
 static int acsi_revalidate (kdev_t);
 
 /************************* End of Prototypes **************************/
@@ -1108,19 +1107,12 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 		put_user(get_start_sect(inode->i_bdev), &geo->start);
 		return 0;
 	  }
-		
 	  case SCSI_IOCTL_GET_IDLUN:
 		/* SCSI compatible GET_IDLUN call to get target's ID and LUN number */
 		put_user( acsi_info[dev].target | (acsi_info[dev].lun << 8),
 				  &((Scsi_Idlun *) arg)->dev_id );
 		put_user( 0, &((Scsi_Idlun *) arg)->host_unique_id );
 		return 0;
-		
-	  case BLKRRPART: /* Re-read partition tables */
-	        if (!capable(CAP_SYS_ADMIN)) 
-			return -EACCES;
-		return revalidate_acsidisk(inode->i_rdev, 1);
-
 	  default:
 		return -EINVAL;
 	}
@@ -1156,7 +1148,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 #if 0
 		aip->changed = 1;	/* safety first */
 #endif
-		check_disk_change( inode->i_rdev );
+		check_disk_change( inode->i_bdev );
 		if (aip->changed)	/* revalidate was not successful (no medium) */
 			return -ENXIO;
 		acsi_prevent_removal(device, 1);
@@ -1164,7 +1156,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 	access_count[device]++;
 
 	if (filp && filp->f_mode) {
-		check_disk_change( inode->i_rdev );
+		check_disk_change( inode->i_bdev );
 		if (filp->f_mode & 2) {
 			if (aip->read_only) {
 				acsi_release( inode, filp );
@@ -1809,20 +1801,11 @@ void cleanup_module(void)
  *
  */
 
-static int revalidate_acsidisk(kdev_t dev, int maxusage )
+static int acsi_revalidate(kdev_t dev)
 {
 	int unit = DEVICE_NR(minor(dev));
 	struct acsi_info_struct *aip = &acsi_info[unit];
-	kdev_t device = mk_kdev(MAJOR_NR, unit<<4);
-	int res = dev_lock_part(device);
-
-	if (res < 0)
-		return res;
-
-	res = wipe_partitions(device);
-
 	stdma_lock( NULL, NULL );
-
 	if (acsi_devinit(aip) != DEV_SUPPORTED) {
 		printk( KERN_ERR "ACSI: revalidate failed for target %d lun %d\n",
 		       aip->target, aip->lun);
@@ -1834,16 +1817,6 @@ static int revalidate_acsidisk(kdev_t dev, int maxusage )
 
 	ENABLE_IRQ();
 	stdma_release();
-
-	if (!res)
-		grok_partitions(device, aip->size);
-
-	dev_unlock_part(device);
-	return res;
-}
-
-
-static int acsi_revalidate (kdev_t dev)
-{
-  return revalidate_acsidisk (dev, 0);
+	acsi_part[minor(dev)].nr_sects = aip->size;
+	return 0;
 }

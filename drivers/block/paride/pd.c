@@ -327,14 +327,6 @@ static char *pd_errs[17] = { "ERR","INDEX","ECC","DRQ","SEEK","WRERR",
 
 extern struct block_device_operations pd_fops;
 
-static struct gendisk pd_gendisk = {
-	major:		PD_MAJOR,
-	major_name:	PD_NAME,
-	minor_shift:	PD_BITS,
-	fops:		&pd_fops,
-	nr_real:	1,
-};
-
 static struct block_device_operations pd_fops = {
 	owner:			THIS_MODULE,
         open:			pd_open,
@@ -412,10 +404,6 @@ static int pd_ioctl(struct inode *inode,struct file *file,
 		}
 		put_user(get_start_sect(inode->i_bdev), (long *)&geo->start);
 		return 0;
-	    case BLKRRPART:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EACCES;
-		return pd_revalidate(inode->i_rdev);
 	    default:
 		return -EINVAL;
 	}
@@ -447,23 +435,13 @@ static int pd_check_media( kdev_t dev)
 static int pd_revalidate(kdev_t dev)
 {
 	int unit = DEVICE_NR(dev);
-	kdev_t device = mk_kdev(MAJOR_NR, unit << PD_BITS);
-	int res;
-
 	if ((unit >= PD_UNITS) || !PD.present)
 		return -ENODEV;
-
-	res = dev_lock_part(device);
-	if (res < 0)
-		return res;
-	res = wipe_partitions(device);
-
-	if (res == 0 && pd_identify(unit))
-		grok_partitions(device, PD.capacity);
-
-	dev_unlock_part(device);
- 
-        return res;
+	if (pd_identify(unit))
+		pd_hd[minor(dev)].nr_sects = PD.capacity;
+	else
+		pd_hd[minor(dev)].nr_sects = 0;
+        return 0;
 }
 
 #define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
@@ -706,7 +684,11 @@ static int pd_detect( void )
             }
 	for (unit=0;unit<PD_UNITS;unit++) {
 		if (PD.present) {
-			PD.gd = pd_gendisk;
+			PD.gd.major_name = PD.name;
+			PD.gd.minor_shift = PD_BITS;
+			PD.gd.fops = &pd_fops;
+			PD.gd.nr_real = 1;
+			PD.gd.major = major;
 			PD.gd.first_minor = unit << PD_BITS;
 			PD.gd.part = pd_hd + (unit << PD_BITS);
 			add_gendisk(&PD.gd);
@@ -947,8 +929,6 @@ static int __init pd_init(void)
 	blk_init_queue(q, do_pd_request, &pd_lock);
 	blk_queue_max_sectors(q, cluster);
 
-	pd_gendisk.major = major;
-	pd_gendisk.major_name = name;
 	printk("%s: %s version %s, major %d, cluster %d, nice %d\n",
 		name,name,PD_VERSION,major,cluster,nice);
 	pd_init_units();

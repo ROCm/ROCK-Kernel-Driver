@@ -897,7 +897,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 	if (err == 0 && (filp->f_flags & O_NDELAY) == 0
 	    && (filp->f_mode & 3)) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 		if (fs->ejected)
 			err = -ENXIO;
 	}

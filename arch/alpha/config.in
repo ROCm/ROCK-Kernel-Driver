@@ -12,7 +12,7 @@ define_bool CONFIG_GENERIC_ISA_DMA y
 source init/Config.in
 
 mainmenu_option next_comment
-comment 'General setup'
+comment 'System setup'
 
 choice 'Alpha system type' \
 	"Generic		CONFIG_ALPHA_GENERIC		\
@@ -265,6 +265,10 @@ if [ "$CONFIG_PROC_FS" != "n" ]; then
 fi
  
 tristate 'Kernel support for a.out (ECOFF) binaries' CONFIG_BINFMT_AOUT
+if [ "$CONFIG_BINFMT_AOUT" != "n" ]; then
+	bool '  OSF/1 v4 readv/writev compatibility' CONFIG_OSF4_COMPAT
+fi
+
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 tristate 'Kernel support for Linux/Intel ELF binaries' CONFIG_BINFMT_EM86

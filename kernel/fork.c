@@ -142,7 +142,7 @@ static int get_pid(unsigned long flags)
 		return 0;
 
 	spin_lock(&lastpid_lock);
-	if((++last_pid) & 0xffff8000) {
+	if((++last_pid) & ~PID_MASK) {
 		last_pid = 300;		/* Skip daemons etc. */
 		goto inside;
 	}
@@ -157,7 +157,7 @@ inside:
 			   p->tgid == last_pid	||
 			   p->session == last_pid) {
 				if(++last_pid >= next_safe) {
-					if(last_pid & 0xffff8000)
+					if(last_pid & ~PID_MASK)
 						last_pid = 300;
 					next_safe = PID_MAX;
 				}

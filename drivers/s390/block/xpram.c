@@ -334,35 +334,26 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 {
 	struct hd_geometry *geo;
 	unsigned long size;
-	int idx;
-
-	if ((!inode) || kdev_none(inode->i_rdev))
-		return -EINVAL;
-	idx = minor(inode->i_rdev);
+	int idx = minor(inode->i_rdev);
 	if (idx >= xpram_devs)
 		return -ENODEV;
-	switch (cmd) {
-	case BLKRRPART:
-		/* re-read partition table: can't do it */
+	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
-	case HDIO_GETGEO:
-		/*
-		 * get geometry: we have to fake one...  trim the size to a
-		 * multiple of 64 (32k): tell we have 16 sectors, 4 heads,
-		 * whatever cylinders. Tell also that data starts at sector. 4.
-		 */
-		geo = (struct hd_geometry *) arg;
-		if (geo == NULL)
-			return -EINVAL;
-		size = (xpram_pages * 8) & ~0x3f;
-		put_user(size >> 6, &geo->cylinders);
-		put_user(4, &geo->heads);
-		put_user(16, &geo->sectors);
-		put_user(4, &geo->start);
-		return 0;
-	default:
+	/*
+	 * get geometry: we have to fake one...  trim the size to a
+	 * multiple of 64 (32k): tell we have 16 sectors, 4 heads,
+	 * whatever cylinders. Tell also that data starts at sector. 4.
+	 */
+	geo = (struct hd_geometry *) arg;
+	if (geo == NULL)
 		return -EINVAL;
-	}
+	size = (xpram_pages * 8) & ~0x3f;
+	put_user(size >> 6, &geo->cylinders);
+	put_user(4, &geo->heads);
+	put_user(16, &geo->sectors);
+	put_user(4, &geo->start);
+	return 0;
+}
 }
 
 static struct block_device_operations xpram_devops =

@@ -1768,6 +1768,10 @@ ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 	u_long flags;
 
 	ahc = (struct ahc_softc *) dev_id;
+	if (!ahc->platform_data->host) {
+		printk("aic7xxx: interrupt while setup incomplete\n");
+		return;
+	}
 	ahc_lock(ahc, &flags); 
 	ahc_intr(ahc);
 	/*

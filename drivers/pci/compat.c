@@ -8,7 +8,10 @@
 
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/pci.h>
+
+/* Obsolete functions, these will be going away... */
 
 int
 pcibios_present(void)
@@ -63,3 +66,14 @@ PCI_OP(read, dword, int *)
 PCI_OP(write, byte, char)
 PCI_OP(write, word, short)
 PCI_OP(write, dword, int)
+
+
+EXPORT_SYMBOL(pcibios_present);
+EXPORT_SYMBOL(pcibios_read_config_byte);
+EXPORT_SYMBOL(pcibios_read_config_word);
+EXPORT_SYMBOL(pcibios_read_config_dword);
+EXPORT_SYMBOL(pcibios_write_config_byte);
+EXPORT_SYMBOL(pcibios_write_config_word);
+EXPORT_SYMBOL(pcibios_write_config_dword);
+EXPORT_SYMBOL(pcibios_find_class);
+EXPORT_SYMBOL(pcibios_find_device);

@@ -42,8 +42,14 @@ extern struct page * find_trylock_page(struct address_space *mapping,
 extern struct page * find_or_create_page(struct address_space *mapping,
 				unsigned long index, unsigned int gfp_mask);
 
-extern struct page * grab_cache_page(struct address_space *mapping,
-				unsigned long index);
+/*
+ * Returns locked page at given index in given cache, creating it if needed.
+ */
+static inline struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
+{
+	return find_or_create_page(mapping, index, mapping->gfp_mask);
+}
+
 extern struct page * grab_cache_page_nowait(struct address_space *mapping,
 				unsigned long index);
 extern struct page * read_cache_page(struct address_space *mapping,
@@ -52,6 +58,8 @@ extern struct page * read_cache_page(struct address_space *mapping,
 
 extern int add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index);
+extern void remove_from_page_cache(struct page *page);
+extern void __remove_from_page_cache(struct page *page);
 
 static inline void ___add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index)

@@ -16,8 +16,8 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/blk.h>
-#include <linux/buffer_head.h>	/* for invalidate_bdev() */
 #include <linux/kmod.h>
+#include <linux/ctype.h>
 
 #include "check.h"
 
@@ -104,10 +104,11 @@ EXPORT_SYMBOL(genhd_dasd_ioctl);
 
 char *disk_name (struct gendisk *hd, int minor, char *buf)
 {
-	const char *maj = hd->major_name;
 	unsigned int unit = (minor >> hd->minor_shift);
 	unsigned int part = (minor & ((1 << hd->minor_shift) -1 ));
 	struct hd_struct *p = hd->part + minor - hd->first_minor;
+	char s[40];
+	const char *maj;
 
 	if ((((minor - hd->first_minor) >> hd->minor_shift) < hd->nr_real) &&
 	     p->de) {
@@ -124,83 +125,45 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 		return buf;
 #endif
 	/*
-	 * IDE devices use multiple major numbers, but the drives
-	 * are named as:  {hda,hdb}, {hdc,hdd}, {hde,hdf}, {hdg,hdh}..
-	 * This requires special handling here.
+	 * Yes, I know, ... in cases is gccism and not a pretty one.  
+	 * However, the first variant will eventually consume _all_ cases
+	 * and switch will disappear.
 	 */
 	switch (hd->major) {
-		case IDE9_MAJOR:
-			unit += 2;
-		case IDE8_MAJOR:
-			unit += 2;
-		case IDE7_MAJOR:
-			unit += 2;
-		case IDE6_MAJOR:
-			unit += 2;
-		case IDE5_MAJOR:
-			unit += 2;
-		case IDE4_MAJOR:
-			unit += 2;
-		case IDE3_MAJOR:
-			unit += 2;
-		case IDE2_MAJOR:
-			unit += 2;
-		case IDE1_MAJOR:
-			unit += 2;
-		case IDE0_MAJOR:
-			maj = "hd";
+		default:
+			maj = hd->major_name;
 			break;
 		case MD_MAJOR:
-			sprintf(buf, "%s%d", maj, unit);
-			return buf;
+			sprintf(s, "%s%d", "md", unit);
+			maj = s;
+			break;
+		case COMPAQ_CISS_MAJOR ... COMPAQ_CISS_MAJOR+7:
+			sprintf(s, "cciss/c%dd%d",
+				hd->major - COMPAQ_CISS_MAJOR, unit);
+			maj = s;
+			break;
+		case DAC960_MAJOR ... DAC960_MAJOR+7:
+			sprintf(s, "rd/c%dd%d",
+				hd->major - DAC960_MAJOR, unit);
+			maj = s;
+			break;
+		case ATARAID_MAJOR:
+			sprintf(s, "ataraid/d%d", unit);
+			maj = s;
+			break;
+		case ACSI_MAJOR:
+		case XT_DISK_MAJOR:
+		case I2O_MAJOR:
+		case DASD_MAJOR:
+			sprintf(s, "%s%c", hd->major_name, unit + 'a');
+			maj = s;
 	}
-	if (hd->major >= SCSI_DISK1_MAJOR && hd->major <= SCSI_DISK7_MAJOR) {
-		unit = unit + (hd->major - SCSI_DISK1_MAJOR + 1) * 16;
-		if (unit+'a' > 'z') {
-			unit -= 26;
-			sprintf(buf, "sd%c%c", 'a' + unit / 26, 'a' + unit % 26);
-			if (part)
-				sprintf(buf + 4, "%d", part);
-			return buf;
-		}
-	}
-	if (hd->major >= COMPAQ_SMART2_MAJOR && hd->major <= COMPAQ_SMART2_MAJOR+7) {
-		int ctlr = hd->major - COMPAQ_SMART2_MAJOR;
- 		if (part == 0)
- 			sprintf(buf, "%s/c%dd%d", maj, ctlr, unit);
- 		else
- 			sprintf(buf, "%s/c%dd%dp%d", maj, ctlr, unit, part);
- 		return buf;
- 	}
-	if (hd->major >= COMPAQ_CISS_MAJOR && hd->major <= COMPAQ_CISS_MAJOR+7) {
-                int ctlr = hd->major - COMPAQ_CISS_MAJOR;
-                if (part == 0)
-                        sprintf(buf, "%s/c%dd%d", maj, ctlr, unit);
-                else
-                        sprintf(buf, "%s/c%dd%dp%d", maj, ctlr, unit, part);
-                return buf;
-	}
-	if (hd->major >= DAC960_MAJOR && hd->major <= DAC960_MAJOR+7) {
-		int ctlr = hd->major - DAC960_MAJOR;
- 		if (part == 0)
- 			sprintf(buf, "%s/c%dd%d", maj, ctlr, unit);
- 		else
- 			sprintf(buf, "%s/c%dd%dp%d", maj, ctlr, unit, part);
- 		return buf;
- 	}
-	if (hd->major == ATARAID_MAJOR) {
-		int disk = minor >> hd->minor_shift;
-		int part = minor & (( 1 << hd->minor_shift) - 1);
-		if (part == 0)
-			sprintf(buf, "%s/d%d", maj, disk);
-		else
-			sprintf(buf, "%s/d%dp%d", maj, disk, part);
-		return buf;
-	}
-	if (part)
-		sprintf(buf, "%s%c%d", maj, unit+'a', part);
+	if (!part)
+		sprintf(buf, "%s", maj);
+	else if (isdigit(maj[strlen(maj)-1]))
+		sprintf(buf, "%sp%d", maj, part);
 	else
-		sprintf(buf, "%s%c", maj, unit+'a');
+		sprintf(buf, "%s%d", maj, part);
 	return buf;
 }
 
@@ -326,10 +289,13 @@ void driverfs_remove_partitions(struct gendisk *hd, int minor)
 	return;
 }
 
-static void check_partition(struct gendisk *hd, kdev_t dev)
+/*
+ *	DON'T EXPORT
+ */
+void check_partition(struct gendisk *hd, struct block_device *bdev)
 {
 	devfs_handle_t de = NULL;
-	struct block_device *bdev;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	char buf[64];
 	struct parsed_partitions *state;
 	int i;
@@ -351,9 +317,6 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 		if (n - COMPAQ_SMART2_MAJOR <= 7 || n - COMPAQ_CISS_MAJOR <= 7)
 			sprintf(state->name, "p");
 	}
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW))
-		goto out;
 	state->limit = 1<<hd->minor_shift;
 	for (i = 0; check_part[i]; i++) {
 		int res, j;
@@ -365,7 +328,7 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 		if (res < 0) {
 			if (warn_no_part)
 				printk(" unable to read partition table\n");
-			goto setup_devfs;
+			goto out;
 		} 
 		p = hd->part + minor(dev) - hd->first_minor;
 		for (j = 1; j < state->limit; j++) {
@@ -377,12 +340,10 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 			md_autodetect_dev(mk_kdev(major(dev),minor(dev)+j));
 #endif
 		}
-		goto setup_devfs;
+		goto out;
 	}
 
 	printk(" unknown partition table\n");
-setup_devfs:
-	blkdev_put(bdev, BDEV_RAW);
 out:
 	driverfs_create_partitions(hd, minor(dev));
 	devfs_register_partitions (hd, minor(dev), 0);
@@ -500,34 +461,29 @@ void register_disk(struct gendisk *gdev, kdev_t dev, unsigned minors,
 
 void grok_partitions(kdev_t dev, long size)
 {
-	int minors, first_minor, end_minor;
+	struct block_device *bdev;
 	struct gendisk *g = get_gendisk(dev);
 	struct hd_struct *p;
 
 	if (!g)
 		return;
 
-	minors = 1 << g->minor_shift;
-	first_minor = minor(dev);
-	if (first_minor & (minors-1)) {
-		printk("grok_partitions: bad device 0x%02x:%02x\n",
-		       major(dev), first_minor);
-		first_minor &= ~(minors-1);
-	}
-	end_minor = first_minor + minors;
- 
-	p = g->part + first_minor - g->first_minor;
+	p = g->part + minor(dev) - g->first_minor;
 	p[0].nr_sects = size;
 
 	/* No minors to use for partitions */
-	if (minors == 1)
+	if (!g->minor_shift)
 		return;
 
 	/* No such device (e.g., media were just removed) */
 	if (!size)
 		return;
 
-	check_partition(g, mk_kdev(g->major, first_minor));
+	bdev = bdget(kdev_t_to_nr(dev));
+	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
+		return;
+	check_partition(g, bdev);
+	blkdev_put(bdev, BDEV_RAW);
 }
 
 unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Sector *p)

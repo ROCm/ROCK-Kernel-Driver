@@ -38,6 +38,31 @@
  */
 #define __HAVE_MTRR			1
 
+#define DRIVER_AUTHOR		"VA Linux Systems Inc."
+
+#define DRIVER_NAME		"gamma"
+#define DRIVER_DESC		"3DLabs gamma"
+#define DRIVER_DATE		"20010624"
+
+#define DRIVER_MAJOR		2
+#define DRIVER_MINOR		0
+#define DRIVER_PATCHLEVEL	0
+
+#define DRIVER_IOCTLS							  \
+	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	     = { gamma_dma,	  1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_INIT)] = { gamma_dma_init,  1, 1 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_COPY)] = { gamma_dma_copy,  1, 1 }
+
+#define IOCTL_TABLE_NAME	DRM(ioctls)
+#define IOCTL_FUNC_NAME 	DRM(ioctl)
+
+#define __HAVE_COUNTERS		5
+#define __HAVE_COUNTER6		_DRM_STAT_IRQ
+#define __HAVE_COUNTER7		_DRM_STAT_DMA
+#define __HAVE_COUNTER8		_DRM_STAT_PRIMARY
+#define __HAVE_COUNTER9		_DRM_STAT_SPECIAL
+#define __HAVE_COUNTER10	_DRM_STAT_MISSED
+
 /* DMA customization:
  */
 #define __HAVE_DMA			1

@@ -7,91 +7,91 @@
 /* entry.S is sensitive to the offsets of these fields */
 typedef struct {
 	unsigned long __softirq_pending;
-	unsigned int __local_irq_count;
-	unsigned int __local_bh_count;
 	unsigned int __syscall_count;
+	unsigned long idle_timestamp;
 	struct task_struct * __ksoftirqd_task;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
 
 /*
- * Are we in an interrupt context? Either doing bottom half
- * or hardware interrupt processing?
+ * We put the hardirq and softirq counter into the preemption
+ * counter. The bitmask has the following meaning:
+ *
+ * - bits 0-7 are the preemption count (max preemption depth: 256)
+ * - bits 8-15 are the softirq count (max # of softirqs: 256)
+ * - bits 16-27 are the hardirq count (max # of hardirqs: 4096)
+ *
+ * - ( bit 30 is the PREEMPT_ACTIVE flag. )
+ *
+ * PREEMPT_MASK: 0x000000ff
+ * SOFTIRQ_MASK: 0x0000ff00
+ * HARDIRQ_MASK: 0x0fff0000
  */
 
-#define in_interrupt()						\
-({								\
-	int __cpu = smp_processor_id();				\
-	(local_irq_count(__cpu) + local_bh_count(__cpu)) != 0;	\
-})
+#define PREEMPT_BITS	8
+#define SOFTIRQ_BITS	8
+#define HARDIRQ_BITS	12
 
-#define in_irq() (local_irq_count(smp_processor_id()) != 0)
+#define PREEMPT_SHIFT	0
+#define SOFTIRQ_SHIFT	(PREEMPT_SHIFT + PREEMPT_BITS)
+#define HARDIRQ_SHIFT	(SOFTIRQ_SHIFT + SOFTIRQ_BITS)
+
+#define __MASK(x)	((1UL << (x))-1)
+
+#define PREEMPT_MASK	(__MASK(PREEMPT_BITS) << PREEMPT_SHIFT)
+#define HARDIRQ_MASK	(__MASK(HARDIRQ_BITS) << HARDIRQ_SHIFT)
+#define SOFTIRQ_MASK	(__MASK(SOFTIRQ_BITS) << SOFTIRQ_SHIFT)
+
+#define hardirq_count()	(preempt_count() & HARDIRQ_MASK)
+#define softirq_count()	(preempt_count() & SOFTIRQ_MASK)
+#define irq_count()	(preempt_count() & (HARDIRQ_MASK | SOFTIRQ_MASK))
+
+#define PREEMPT_OFFSET	(1UL << PREEMPT_SHIFT)
+#define SOFTIRQ_OFFSET	(1UL << SOFTIRQ_SHIFT)
+#define HARDIRQ_OFFSET	(1UL << HARDIRQ_SHIFT)
+
+/*
+ * The hardirq mask has to be large enough to have
+ * space for potentially all IRQ sources in the system
+ * nesting on a single CPU:
+ */
+#if (1 << HARDIRQ_BITS) < NR_IRQS
+#error HARDIRQ_BITS is too low!
+#endif
+
+/*
+ * Are we doing bottom half or hardware interrupt processing?
+ * Are we in a softirq context? Interrupt context?
+ */
+#define in_irq()		(hardirq_count())
+#define in_softirq()		(softirq_count())
+#define in_interrupt()		(irq_count())
+
+
+#define hardirq_trylock()	(!in_interrupt())
+#define hardirq_endlock()	do { } while (0)
+
+#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
+
+#if CONFIG_PREEMPT
+# define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
+#else
+#define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
+# endif
+#define irq_exit()						\
+do {								\
+		preempt_count() -= IRQ_EXIT_OFFSET;		\
+		if (!in_interrupt() &&				\
+		    softirq_pending(smp_processor_id()))	\
+			do_softirq();				\
+		preempt_enable_no_resched();			\
+} while (0)
 
 #ifndef CONFIG_SMP
-
-extern unsigned long __irq_attempt[];
-#define irq_attempt(cpu, irq)  ((void)(cpu), __irq_attempt[irq])
-
-#define hardirq_trylock(cpu)	(local_irq_count(cpu) == 0)
-#define hardirq_endlock(cpu)	((void) 0)
-
-#define irq_enter(cpu, irq)	(local_irq_count(cpu)++)
-#define irq_exit(cpu, irq)	(local_irq_count(cpu)--)
-
-#define synchronize_irq()	barrier()
-
+# define synchronize_irq(irq)	barrier()
 #else
-
-#define irq_attempt(cpu, irq) (cpu_data[cpu].irq_attempt[irq])
-
-#include <asm/atomic.h>
-#include <linux/spinlock.h>
-#include <asm/smp.h>
-
-extern int global_irq_holder;
-extern spinlock_t global_irq_lock;
-
-static inline int irqs_running (void)
-{
-	int i;
-
-	for (i = 0; i < smp_num_cpus; i++)
-		if (local_irq_count(i))
-			return 1;
-	return 0;
-}
-
-static inline void release_irqlock(int cpu)
-{
-	/* if we didn't own the irq lock, just ignore.. */
-	if (global_irq_holder == cpu) {
-		global_irq_holder = NO_PROC_ID;
-		spin_unlock(&global_irq_lock);
-        }
-}
-
-static inline void irq_enter(int cpu, int irq)
-{
-	++local_irq_count(cpu);
-
-	while (spin_is_locked(&global_irq_lock))
-		barrier();
-}
-
-static inline void irq_exit(int cpu, int irq)
-{
-        --local_irq_count(cpu);
-}
-
-static inline int hardirq_trylock(int cpu)
-{
-	return !local_irq_count(cpu) && !spin_is_locked(&global_irq_lock);
-}
-
-#define hardirq_endlock(cpu)	do { } while (0)
-
-extern void synchronize_irq(void);
-
+  extern void synchronize_irq(unsigned int irq);
 #endif /* CONFIG_SMP */
+
 #endif /* _ALPHA_HARDIRQ_H */

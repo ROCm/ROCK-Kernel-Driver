@@ -187,12 +187,6 @@ spruce_halt(void)
 
 extern int boot_mem_size;
 
-static unsigned long __init
-spruce_find_end_of_memory(void)
-{
-	return boot_mem_size;
-}
-
 static void __init
 spruce_map_io(void)
 {
@@ -214,7 +208,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.init_IRQ = cpc700_init_IRQ;
 	ppc_md.get_irq = cpc700_get_irq;
 
-	ppc_md.find_end_of_memory = spruce_find_end_of_memory;
 	ppc_md.setup_io_mappings = spruce_map_io;
 
 	ppc_md.restart = spruce_restart;

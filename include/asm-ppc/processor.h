@@ -196,10 +196,11 @@
 #define	SPRN_DSISR	0x012	/* Data Storage Interrupt Status Register */
 #define	SPRN_EAR	0x11A	/* External Address Register */
 #define	SPRN_ESR	0x3D4	/* Exception Syndrome Register */
-#define	  ESR_IMCP	0x80000000	/* Instr. Machine Check - Protection */
-#define	  ESR_IMCN	0x40000000	/* Instr. Machine Check - Non-config */
-#define	  ESR_IMCB	0x20000000	/* Instr. Machine Check - Bus error */
-#define	  ESR_IMCT	0x10000000	/* Instr. Machine Check - Timeout */
+#define	  ESR_MCI	0x80000000	/* 405 Machine Check - Instruction */
+#define	  ESR_IMCP	0x80000000	/* 403 Inst. Mach. Check - Protection */
+#define	  ESR_IMCN	0x40000000	/* 403 Inst. Mach. Check - Non-config */
+#define	  ESR_IMCB	0x20000000	/* 403 Inst. Mach. Check - Bus error */
+#define	  ESR_IMCT	0x10000000	/* 403 Inst. Mach. Check - Timeout */
 #define	  ESR_PIL	0x08000000	/* Program Exception - Illegal */
 #define	  ESR_PPR	0x04000000	/* Program Exception - Priveleged */
 #define	  ESR_PTR	0x02000000	/* Program Exception - Trap */
@@ -747,9 +748,10 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_ESP(tsk)  ((tsk)->thread.regs? (tsk)->thread.regs->gpr[1]: 0)
 
 /* Get/set floating-point exception mode */
-#define GET_FP_EXC_MODE(tsk)		__unpack_fe01((tsk)->thread.fpexc_mode)
-#define SET_FP_EXC_MODE(tsk, val)	set_fpexc_mode((tsk), (val))
+#define GET_FPEXC_CTL(tsk, adr)	get_fpexc_mode((tsk), (adr))
+#define SET_FPEXC_CTL(tsk, val)	set_fpexc_mode((tsk), (val))
 
+extern int get_fpexc_mode(struct task_struct *tsk, unsigned long adr);
 extern int set_fpexc_mode(struct task_struct *tsk, unsigned int val);
 
 static inline unsigned int __unpack_fe01(unsigned int msr_bits)

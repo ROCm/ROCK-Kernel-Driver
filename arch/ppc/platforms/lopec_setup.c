@@ -301,12 +301,6 @@ lopec_progress(char *s, unsigned short hex)
 }
 #endif	/* CONFIG_SERIAL_TEXT_DEBUG */
 
-static unsigned long __init
-lopec_find_end_of_memory(void)
-{
-	return mpc10x_get_mem_size(MPC10X_MEM_MAP_B);
-}
-
 TODC_ALLOC();
 
 static void __init
@@ -376,7 +370,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.power_off = lopec_power_off;
 	ppc_md.halt = lopec_halt;
 
-	ppc_md.find_end_of_memory = lopec_find_end_of_memory;
 	ppc_md.setup_io_mappings = lopec_map_io;
 
 	ppc_md.time_init = todc_time_init;

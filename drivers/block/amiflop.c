@@ -1621,7 +1621,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 		return -ENODEV;
 
 	if (filp && filp->f_mode & 3) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 		if (filp->f_mode & 2 ) {
 			int wrprot;
 

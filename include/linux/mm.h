@@ -450,7 +450,6 @@ static inline int can_vma_merge(struct vm_area_struct * vma, unsigned long vm_fl
 
 struct zone_t;
 /* filemap.c */
-extern void remove_inode_page(struct page *);
 extern unsigned long page_unuse(struct page *);
 extern void truncate_inode_pages(struct address_space *, loff_t);
 

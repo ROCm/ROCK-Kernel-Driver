@@ -33,6 +33,7 @@
 #include <linux/file.h>
 #include <linux/types.h>
 #include <linux/ipc.h>
+#include <linux/namei.h>
 
 #include <asm/fpu.h>
 #include <asm/io.h>
@@ -956,6 +957,13 @@ static inline long put_it32(struct itimerval32 *o, struct itimerval *i)
 		 __put_user(i->it_value.tv_usec, &o->it_value.tv_usec)));
 }
 
+static inline void
+jiffies_to_timeval32(unsigned long jiffies, struct timeval32 *value)
+{
+	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
+	value->tv_sec = jiffies / HZ;
+}
+
 asmlinkage int osf_gettimeofday(struct timeval32 *tv, struct timezone *tz)
 {
 	if (tv) {
@@ -1163,32 +1171,24 @@ asmlinkage int osf_getrusage(int who, struct rusage32 *ru)
 	memset(&r, 0, sizeof(r));
 	switch (who) {
 	case RUSAGE_SELF:
-		r.ru_utime.tv_sec = CT_TO_SECS(current->times.tms_utime);
-		r.ru_utime.tv_usec = CT_TO_USECS(current->times.tms_utime);
-		r.ru_stime.tv_sec = CT_TO_SECS(current->times.tms_stime);
-		r.ru_stime.tv_usec = CT_TO_USECS(current->times.tms_stime);
+		jiffies_to_timeval32(current->utime, &r.ru_utime);
+		jiffies_to_timeval32(current->stime, &r.ru_stime);
 		r.ru_minflt = current->min_flt;
 		r.ru_majflt = current->maj_flt;
 		r.ru_nswap = current->nswap;
 		break;
 	case RUSAGE_CHILDREN:
-		r.ru_utime.tv_sec = CT_TO_SECS(current->times.tms_cutime);
-		r.ru_utime.tv_usec = CT_TO_USECS(current->times.tms_cutime);
-		r.ru_stime.tv_sec = CT_TO_SECS(current->times.tms_cstime);
-		r.ru_stime.tv_usec = CT_TO_USECS(current->times.tms_cstime);
+		jiffies_to_timeval32(current->cutime, &r.ru_utime);
+		jiffies_to_timeval32(current->cstime, &r.ru_stime);
 		r.ru_minflt = current->cmin_flt;
 		r.ru_majflt = current->cmaj_flt;
 		r.ru_nswap = current->cnswap;
 		break;
 	default:
-		r.ru_utime.tv_sec = CT_TO_SECS(current->times.tms_utime +
-					       current->times.tms_cutime);
-		r.ru_utime.tv_usec = CT_TO_USECS(current->times.tms_utime +
-						 current->times.tms_cutime);
-		r.ru_stime.tv_sec = CT_TO_SECS(current->times.tms_stime +
-					       current->times.tms_cstime);
-		r.ru_stime.tv_usec = CT_TO_USECS(current->times.tms_stime +
-						 current->times.tms_cstime);
+		jiffies_to_timeval32(current->utime + current->cutime,
+				   &r.ru_utime);
+		jiffies_to_timeval32(current->stime + current->cstime,
+				   &r.ru_stime);
 		r.ru_minflt = current->min_flt + current->cmin_flt;
 		r.ru_majflt = current->maj_flt + current->cmaj_flt;
 		r.ru_nswap = current->nswap + current->cnswap;
@@ -1390,3 +1390,44 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 	return addr;
 }
+
+#ifdef CONFIG_OSF4_COMPAT
+extern ssize_t sys_readv(unsigned long, const struct iovec *, unsigned long);
+extern ssize_t sys_writev(unsigned long, const struct iovec *, unsigned long);
+
+/* Clear top 32 bits of iov_len in the user's buffer for
+   compatibility with old versions of OSF/1 where iov_len
+   was defined as int. */
+static int
+osf_fix_iov_len(const struct iovec *iov, unsigned long count)
+{
+	unsigned long i;
+
+	for (i = 0 ; i < count ; i++) {
+		int *iov_len_high = (int *)&iov[i].iov_len + 1;
+
+		if (put_user(0, iov_len_high))
+			return -EFAULT;
+	}
+	return 0;
+}
+
+asmlinkage ssize_t
+osf_readv(unsigned long fd, const struct iovec * vector, unsigned long count)
+{
+	if (unlikely(personality(current->personality) == PER_OSF4))
+		if (osf_fix_iov_len(vector, count))
+			return -EFAULT;
+	return sys_readv(fd, vector, count);
+}
+
+asmlinkage ssize_t
+osf_writev(unsigned long fd, const struct iovec * vector, unsigned long count)
+{
+	if (unlikely(personality(current->personality) == PER_OSF4))
+		if (osf_fix_iov_len(vector, count))
+			return -EFAULT;
+	return sys_writev(fd, vector, count);
+}
+
+#endif

@@ -443,7 +443,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	 * use the action we have.
 	 */
 	action = NULL;
-	if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
+	if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
 		action = desc->action;
 		if (!action || !action->handler) {
 			ppc_spurious_interrupts++;
@@ -468,7 +468,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	   a different instance of this same irq, the other processor
 	   will take care of it.
 	 */
-	if (!action)
+	if (unlikely(!action))
 		goto out;
 
 
@@ -487,12 +487,12 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 		handle_irq_event(irq, regs, action);
 		spin_lock(&desc->lock);
 		
-		if (!(desc->status & IRQ_PENDING))
+		if (likely(!(desc->status & IRQ_PENDING)))
 			break;
 		desc->status &= ~IRQ_PENDING;
 	}
-	desc->status &= ~IRQ_INPROGRESS;
 out:
+	desc->status &= ~IRQ_INPROGRESS;
 	/*
 	 * The ->end() handler has to deal with interrupts which got
 	 * disabled while the handler was running.
@@ -561,10 +561,6 @@ void __init init_IRQ(void)
 #ifdef CONFIG_SMP
 void synchronize_irq(unsigned int irq)
 {
-        /* is there anything to synchronize with? */
-	if (!irq_desc[irq].action)
-		return;
-
 	while (irq_desc[irq].status & IRQ_INPROGRESS)
 		barrier();
 }

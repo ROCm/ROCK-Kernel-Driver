@@ -190,12 +190,12 @@ pcibios_align_resource(void *data, struct resource *res,
 #undef MB
 #undef GB
 
-static void __init
+static int __init
 pcibios_init(void)
 {
-	if (!alpha_mv.init_pci)
-		return;
-	alpha_mv.init_pci();
+	if (alpha_mv.init_pci)
+		alpha_mv.init_pci();
+	return 0;
 }
 
 subsys_initcall(pcibios_init);

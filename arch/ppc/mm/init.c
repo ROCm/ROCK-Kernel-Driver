@@ -45,6 +45,7 @@
 #include <asm/machdep.h>
 #include <asm/btext.h>
 #include <asm/tlb.h>
+#include <asm/bootinfo.h>
 
 #include "mem_pieces.h"
 #include "mmu_decl.h"
@@ -242,9 +243,14 @@ void __init MMU_init(void)
 
 	/*
 	 * Figure out how much memory we have, how much
-	 * is lowmem, and how much is highmem.
+	 * is lowmem, and how much is highmem.  If we were
+	 * passed the total memory size from the bootloader,
+	 * just use it.
 	 */
-	total_memory = ppc_md.find_end_of_memory();
+	if (boot_mem_size)
+		total_memory = boot_mem_size;
+	else
+		total_memory = ppc_md.find_end_of_memory();
 
 	if (__max_memory && total_memory > __max_memory)
 		total_memory = __max_memory;

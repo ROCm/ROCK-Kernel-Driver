@@ -689,7 +689,7 @@ void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th,
   struct reiserfs_inode_info *ei = REISERFS_I(inode);
 #ifdef CONFIG_REISERFS_CHECK
   if (ei->i_prealloc_count < 0)
-     reiserfs_warning("zam-4001:" __FUNCTION__ ": inode has negative prealloc blocks count.\n");
+     reiserfs_warning("zam-4001:%s inode has negative prealloc blocks count.\n", __FUNCTION__);
 #endif  
     if (ei->i_prealloc_count > 0) {
     __discard_prealloc(th, ei);
@@ -705,7 +705,7 @@ void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th)
 	ei = list_entry(plist->next, struct reiserfs_inode_info, i_prealloc_list);
 #ifdef CONFIG_REISERFS_CHECK
 	if (!ei->i_prealloc_count) {
-		reiserfs_warning("zam-4001:" __FUNCTION__ ": inode is in prealloc list but has no preallocated blocks.\n");
+		reiserfs_warning("zam-4001:%s: inode is in prealloc list but has no preallocated blocks.\n", __FUNCTION__);
 	}
 #endif
 	__discard_prealloc(th, ei);

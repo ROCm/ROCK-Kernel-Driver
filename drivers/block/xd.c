@@ -166,7 +166,7 @@ int __init xd_init (void)
 		printk("xd: Unable to get major number %d\n",MAJOR_NR);
 		return -1;
 	}
-	devfs_handle = devfs_mk_dir (NULL, xd_gendisk.major_name, NULL);
+	devfs_handle = devfs_mk_dir (NULL, "xd", NULL);
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_xd_request, &xd_lock);
 	add_gendisk(&xd_gendisk);
 	xd_geninit();
@@ -330,35 +330,9 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 			return put_user(!nodma, (long *) arg);
 		case HDIO_GET_MULTCOUNT:
 			return put_user(xd_maxsectors, (long *) arg);
-		case BLKRRPART:
-			if (!capable(CAP_SYS_ADMIN)) 
-				return -EACCES;
-			return xd_reread_partitions(inode->i_rdev);
-
 		default:
 			return -EINVAL;
 	}
-}
-
-/* xd_reread_partitions: rereads the partition table from a drive */
-static int xd_reread_partitions(kdev_t dev)
-{
-	int target = DEVICE_NR(dev);
-	kdev_t device = mk_kdev(MAJOR_NR, target << 6);
-	int res = dev_lock_part(device);
-	
-	if (res < 0)
-		return 0;
-
-	res = wipe_partitions(device);
-	if (!res)
-		grok_partitions(device, xd_info[target].heads
-				* xd_info[target].cylinders
-				* xd_info[target].sectors);
-
-	dev_unlock_part(device);
-
-	return res;
 }
 
 /* xd_readwrite: handle a read/write request */

@@ -870,7 +870,9 @@ no_irq:
 
 	if (misc_register(&rtc_dev))
 		{
+#if RTC_IRQ
 		free_irq(RTC_IRQ, NULL);
+#endif
 		release_region(RTC_PORT(0), RTC_IO_EXTENT);
 		return -ENODEV;
 		}

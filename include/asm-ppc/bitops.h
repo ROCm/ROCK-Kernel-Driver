@@ -26,10 +26,6 @@
 #define SMP_MB
 #endif /* CONFIG_SMP */
 
-/*
- * These used to be if'd out here because using : "cc" as a constraint
- * resulted in errors from egcs.  Things appear to be OK with gcc-2.95.
- */
 static __inline__ void set_bit(int nr, volatile unsigned long * addr)
 {
 	unsigned long old;
@@ -224,9 +220,7 @@ static __inline__ int __test_and_change_bit(int nr, volatile unsigned long *addr
 
 static __inline__ int test_bit(int nr, __const__ volatile unsigned long *addr)
 {
-	__const__ unsigned int *p = (__const__ unsigned int *) addr;
-
-	return ((p[nr >> 5] >> (nr & 0x1f)) & 1) != 0;
+	return ((addr[nr >> 5] >> (nr & 0x1f)) & 1) != 0;
 }
 
 /* Return the bit position of the most significant 1 bit in a word */
