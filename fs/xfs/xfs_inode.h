@@ -381,6 +381,7 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define XFS_IRECLAIM    0x0008  /* we have started reclaiming this inode    */
 #define XFS_ISTALE	0x0010	/* inode has been staled */
 #define XFS_IRECLAIMABLE 0x0020 /* inode can be reclaimed */
+#define XFS_INEW	0x0040
 
 /*
  * Flags for inode locking.
@@ -465,6 +466,9 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
 /*
  * xfs_iget.c prototypes.
  */
+
+#define IGET_CREATE	1
+
 void		xfs_ihash_init(struct xfs_mount *);
 void		xfs_ihash_free(struct xfs_mount *);
 void		xfs_chash_init(struct xfs_mount *);
@@ -473,7 +477,7 @@ xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 				  struct xfs_trans *);
 void            xfs_inode_lock_init(xfs_inode_t *, struct vnode *);
 int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			 uint, xfs_inode_t **, xfs_daddr_t);
+			 uint, uint, xfs_inode_t **, xfs_daddr_t);
 void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_iput_new(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);

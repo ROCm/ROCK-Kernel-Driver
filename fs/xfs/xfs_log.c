@@ -902,20 +902,15 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 	} else {
 		/*
 		 * The reservation head is behind the tail.
-		 * This can only happen when the AIL is empty so the tail
-		 * is equal to the head and the l_roundoff value in the
-		 * log structure is taking up the difference between the
-		 * reservation head and the tail.  The bytes accounted for
-		 * by the l_roundoff field are temporarily 'lost' to the
-		 * reservation mechanism, but they are cleaned up when the
-		 * log buffers that created them are reused.  These lost
-		 * bytes are what allow the reservation head to fall behind
-		 * the tail in the case that the log is 'empty'.
 		 * In this case we just want to return the size of the
 		 * log as the amount of space left.
 		 */
-		ASSERT((tail_cycle == (cycle + 1)) ||
-		       ((bytes + log->l_roundoff) >= tail_bytes));
+		xfs_fs_cmn_err(CE_ALERT, log->l_mp,
+			"xlog_space_left: head behind tail\n"
+			"  tail_cycle = %d, tail_bytes = %d\n"
+			"  GH   cycle = %d, GH   bytes = %d",
+			tail_cycle, tail_bytes, cycle, bytes);
+		ASSERT(0);
 		free_bytes = log->l_logsize;
 	}
 	return free_bytes;
@@ -1355,8 +1350,8 @@ xlog_grant_push_ail(xfs_mount_t	*mp,
 
 
 /*
- * Flush out the in-core log (iclog) to the on-disk log in a synchronous or
- * asynchronous fashion.  Previously, we should have moved the current iclog
+ * Flush out the in-core log (iclog) to the on-disk log in an asynchronous 
+ * fashion.  Previously, we should have moved the current iclog
  * ptr in the log to point to the next available iclog.  This allows further
  * write to continue while this code syncs out an iclog ready to go.
  * Before an in-core log can be written out, the data section must be scanned
@@ -1388,8 +1383,11 @@ xlog_sync(xlog_t		*log,
 	int		i, ops;
 	uint		count;		/* byte count of bwrite */
 	uint		count_init;	/* initial count before roundup */
+	int		roundoff;       /* roundoff to BB or stripe */
 	int		split = 0;	/* split write into two regions */
 	int		error;
+	SPLDECL(s);
+	int		v2 = XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb);
 
 	XFS_STATS_INC(xs_log_writes);
 	ASSERT(iclog->ic_refcnt == 0);
@@ -1398,23 +1396,34 @@ xlog_sync(xlog_t		*log,
 	count_init = log->l_iclog_hsize + iclog->ic_offset;
 
 	/* Round out the log write size */
-	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) &&
-	    log->l_mp->m_sb.sb_logsunit > 1) {
+	if (v2 && log->l_mp->m_sb.sb_logsunit > 1) {
 		/* we have a v2 stripe unit to use */
 		count = XLOG_LSUNITTOB(log, XLOG_BTOLSUNIT(log, count_init));
 	} else {
 		count = BBTOB(BTOBB(count_init));
 	}
-	iclog->ic_roundoff = count - count_init;
-	log->l_roundoff += iclog->ic_roundoff;
+	roundoff = count - count_init;
+	ASSERT(roundoff >= 0);
+	ASSERT((v2 && log->l_mp->m_sb.sb_logsunit > 1 && 
+                roundoff < log->l_mp->m_sb.sb_logsunit)
+		|| 
+		(log->l_mp->m_sb.sb_logsunit <= 1 && 
+		 roundoff < BBTOB(1)));
 
-	xlog_pack_data(log, iclog);       /* put cycle number in every block */
+	/* move grant heads by roundoff in sync */
+	s = GRANT_LOCK(log);
+	XLOG_GRANT_ADD_SPACE(log, roundoff, 'w');
+	XLOG_GRANT_ADD_SPACE(log, roundoff, 'r');
+	GRANT_UNLOCK(log, s);
+
+	/* put cycle number in every block */
+	xlog_pack_data(log, iclog, roundoff); 
 
 	/* real byte length */
-	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
+	if (v2) {
 		INT_SET(iclog->ic_header.h_len, 
 			ARCH_CONVERT,
-			iclog->ic_offset + iclog->ic_roundoff);
+			iclog->ic_offset + roundoff);
 	} else {
 		INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);
 	}
@@ -2278,11 +2287,6 @@ restart:
 		INT_SET(head->h_cycle, ARCH_CONVERT, log->l_curr_cycle);
 		ASSIGN_LSN(head->h_lsn, log, ARCH_CONVERT);
 		ASSERT(log->l_curr_block >= 0);
-
-		/* round off error from last write with this iclog */
-		ticket->t_curr_res -= iclog->ic_roundoff;
-		log->l_roundoff -= iclog->ic_roundoff;
-		iclog->ic_roundoff = 0;
 	}
 
 	/* If there is enough room to write everything, then do it.  Otherwise,
@@ -2853,7 +2857,6 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 				 * has already taken care of the roundoff from
 				 * the previous sync.
 				 */
-				ASSERT(iclog->ic_roundoff == 0);
 				iclog->ic_refcnt++;
 				lsn = INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT);
 				xlog_state_switch_iclogs(log, iclog, 0);

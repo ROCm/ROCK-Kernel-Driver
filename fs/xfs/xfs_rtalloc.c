@@ -149,7 +149,7 @@ xfs_growfs_rt_alloc(
 		/*
 		 * Lock the inode.
 		 */
-		if ((error = xfs_trans_iget(mp, tp, ino, XFS_ILOCK_EXCL, &ip)))
+		if ((error = xfs_trans_iget(mp, tp, ino, 0, XFS_ILOCK_EXCL, &ip)))
 			goto error_exit;
 		XFS_BMAP_INIT(&flist, &firstblock);
 		/*
@@ -189,7 +189,7 @@ xfs_growfs_rt_alloc(
 			/*
 			 * Lock the bitmap inode.
 			 */
-			if ((error = xfs_trans_iget(mp, tp, ino, XFS_ILOCK_EXCL,
+			if ((error = xfs_trans_iget(mp, tp, ino, 0, XFS_ILOCK_EXCL,
 					&ip)))
 				goto error_exit;
 			/*
@@ -2042,7 +2042,7 @@ xfs_growfs_rt(
 		/*
 		 * Lock out other callers by grabbing the bitmap inode lock.
 		 */
-		if ((error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino,
+		if ((error = xfs_trans_iget(mp, tp, 0, mp->m_sb.sb_rbmino,
 				XFS_ILOCK_EXCL, &ip)))
 			goto error_exit;
 		ASSERT(ip == mp->m_rbmip);
@@ -2057,7 +2057,7 @@ xfs_growfs_rt(
 		 * Get the summary inode into the transaction.
 		 */
 		if ((error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rsumino,
-				XFS_ILOCK_EXCL, &ip)))
+				0, XFS_ILOCK_EXCL, &ip)))
 			goto error_exit;
 		ASSERT(ip == mp->m_rsumip);
 		/*
@@ -2177,7 +2177,7 @@ xfs_rtallocate_extent(
 	/*
 	 * Lock out other callers by grabbing the bitmap inode lock.
 	 */
-	error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, XFS_ILOCK_EXCL, &ip);
+	error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, 0, XFS_ILOCK_EXCL, &ip);
 	if (error) {
 		return error;
 	}
@@ -2240,7 +2240,7 @@ xfs_rtfree_extent(
 	/*
 	 * Synchronize by locking the bitmap inode.
 	 */
-	error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, XFS_ILOCK_EXCL, &ip);
+	error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, 0, XFS_ILOCK_EXCL, &ip);
 	if (error) {
 		return error;
 	}
@@ -2348,12 +2348,12 @@ xfs_rtmount_inodes(
 	sbp = &mp->m_sb;
 	if (sbp->sb_rbmino == NULLFSINO)
 		return 0;
-	error = xfs_iget(mp, NULL, sbp->sb_rbmino, 0, &mp->m_rbmip, 0);
+	error = xfs_iget(mp, NULL, sbp->sb_rbmino, 0, 0, &mp->m_rbmip, 0);
 	if (error)
 		return error;
 	ASSERT(mp->m_rbmip != NULL);
 	ASSERT(sbp->sb_rsumino != NULLFSINO);
-	error = xfs_iget(mp, NULL, sbp->sb_rsumino, 0, &mp->m_rsumip, 0);
+	error = xfs_iget(mp, NULL, sbp->sb_rsumino, 0, 0, &mp->m_rsumip, 0);
 	if (error) {
 		VN_RELE(XFS_ITOV(mp->m_rbmip));
 		return error;
@@ -2384,7 +2384,7 @@ xfs_rtpick_extent(
 	__uint64_t	seq;		/* sequence number of file creation */
 	__uint64_t	*seqp;		/* pointer to seqno in inode */
 
-	error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, XFS_ILOCK_EXCL, &ip);
+	error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino, 0, XFS_ILOCK_EXCL, &ip);
 	if (error)
 		return error;
 	ASSERT(ip == mp->m_rbmip);

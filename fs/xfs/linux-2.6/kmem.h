@@ -83,7 +83,7 @@ typedef unsigned long xfs_pflags_t;
 
 static __inline unsigned int kmem_flags_convert(int flags)
 {
-	int lflags;
+	int	lflags = __GFP_NOWARN;	/* we'll report problems, if need be */
 
 #ifdef DEBUG
 	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS|KM_MAYFAIL))) {

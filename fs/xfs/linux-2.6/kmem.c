@@ -35,6 +35,7 @@
 #include <linux/vmalloc.h>
 #include <linux/highmem.h>
 #include <linux/swap.h>
+#include <linux/blkdev.h>
 
 #include "time.h"
 #include "kmem.h"
@@ -46,7 +47,8 @@
 void *
 kmem_alloc(size_t size, int flags)
 {
-	int	retries = 0, lflags = kmem_flags_convert(flags);
+	int	retries = 0;
+	int	lflags = kmem_flags_convert(flags);
 	void	*ptr;
 
 	do {
@@ -57,8 +59,10 @@ kmem_alloc(size_t size, int flags)
 		if (ptr || (flags & (KM_MAYFAIL|KM_NOSLEEP)))
 			return ptr;
 		if (!(++retries % 100))
-			printk(KERN_ERR "possible deadlock in %s (mode:0x%x)\n",
+			printk(KERN_ERR "XFS: possible memory allocation "
+					"deadlock in %s (mode:0x%x)\n",
 					__FUNCTION__, lflags);
+		blk_congestion_wait(WRITE, HZ/50);
 	} while (1);
 }
 
@@ -102,7 +106,8 @@ kmem_realloc(void *ptr, size_t newsize, size_t oldsize, int flags)
 void *
 kmem_zone_alloc(kmem_zone_t *zone, int flags)
 {
-	int	retries = 0, lflags = kmem_flags_convert(flags);
+	int	retries = 0;
+	int	lflags = kmem_flags_convert(flags);
 	void	*ptr;
 
 	do {
@@ -110,8 +115,10 @@ kmem_zone_alloc(kmem_zone_t *zone, int flags)
 		if (ptr || (flags & (KM_MAYFAIL|KM_NOSLEEP)))
 			return ptr;
 		if (!(++retries % 100))
-			printk(KERN_ERR "possible deadlock in %s (mode:0x%x)\n",
+			printk(KERN_ERR "XFS: possible memory allocation "
+					"deadlock in %s (mode:0x%x)\n",
 					__FUNCTION__, lflags);
+		blk_congestion_wait(WRITE, HZ/50);
 	} while (1);
 }
 

@@ -168,19 +168,35 @@ typedef struct xfs_buf {
 
 /* Finding and Reading Buffers */
 
-extern xfs_buf_t *pagebuf_find(	/* find buffer for block if	*/
+extern xfs_buf_t *_pagebuf_find(	/* find buffer for block if	*/
 					/* the block is in memory	*/
 		xfs_buftarg_t *,	/* inode for block		*/
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
-		page_buf_flags_t);	/* PBF_LOCK			*/
+		page_buf_flags_t,	/* PBF_LOCK			*/
+	        xfs_buf_t *);		/* newly allocated buffer	*/
 
-extern xfs_buf_t *pagebuf_get(		/* allocate a buffer		*/
+#define xfs_incore(buftarg,blkno,len,lockit) \
+	_pagebuf_find(buftarg, blkno ,len, lockit, NULL)
+
+extern xfs_buf_t *xfs_buf_get_flags(	/* allocate a buffer		*/
 		xfs_buftarg_t *,	/* inode for buffer		*/
 		loff_t,			/* starting offset of range     */
 		size_t,			/* length of range              */
 		page_buf_flags_t);	/* PBF_LOCK, PBF_READ,		*/
 					/* PBF_ASYNC			*/
+
+#define xfs_buf_get(target, blkno, len, flags) \
+	xfs_buf_get_flags((target), (blkno), (len), PBF_LOCK | PBF_MAPPED)
+
+extern xfs_buf_t *xfs_buf_read_flags(	/* allocate and read a buffer	*/
+		xfs_buftarg_t *,	/* inode for buffer		*/
+		loff_t,			/* starting offset of range	*/
+		size_t,			/* length of range		*/
+		page_buf_flags_t);	/* PBF_LOCK, PBF_ASYNC		*/
+
+#define xfs_buf_read(target, blkno, len, flags) \
+	xfs_buf_read_flags((target), (blkno), (len), PBF_LOCK | PBF_MAPPED)
 
 extern xfs_buf_t *pagebuf_lookup(
 		xfs_buftarg_t *,
@@ -472,18 +488,6 @@ extern inline xfs_caddr_t xfs_buf_offset(xfs_buf_t *bp, size_t offset)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
-#define xfs_buf_read(target, blkno, len, flags) \
-		pagebuf_get((target), (blkno), (len), \
-			PBF_LOCK | PBF_READ | PBF_MAPPED)
-#define xfs_buf_get(target, blkno, len, flags) \
-		pagebuf_get((target), (blkno), (len), \
-			PBF_LOCK | PBF_MAPPED)
-
-#define xfs_buf_read_flags(target, blkno, len, flags) \
-		pagebuf_get((target), (blkno), (len), PBF_READ | (flags))
-#define xfs_buf_get_flags(target, blkno, len, flags) \
-		pagebuf_get((target), (blkno), (len), (flags))
-
 static inline int	xfs_bawrite(void *mp, xfs_buf_t *bp)
 {
 	bp->pb_fspriv3 = mp;
@@ -507,10 +511,6 @@ static inline void	xfs_buf_relse(xfs_buf_t *bp)
 
 #define xfs_biodone(pb)		    \
 	    pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 0)
-
-#define xfs_incore(buftarg,blkno,len,lockit) \
-	    pagebuf_find(buftarg, blkno ,len, lockit)
-
 
 #define xfs_biomove(pb, off, len, data, rw) \
 	    pagebuf_iomove((pb), (off), (len), (data), \
@@ -566,6 +566,7 @@ static inline int xfs_bdwrite(void *mp, xfs_buf_t *bp)
 
 extern xfs_buftarg_t *xfs_alloc_buftarg(struct block_device *);
 extern void xfs_free_buftarg(xfs_buftarg_t *, int);
+extern void xfs_wait_buftarg(xfs_buftarg_t *);
 extern int xfs_setsize_buftarg(xfs_buftarg_t *, unsigned int, unsigned int);
 extern void xfs_incore_relse(xfs_buftarg_t *, int, int);
 extern int xfs_flush_buftarg(xfs_buftarg_t *, int);

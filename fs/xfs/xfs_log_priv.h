@@ -430,7 +430,6 @@ typedef struct xlog_iclog_fields {
 	int			ic_size;
 	int			ic_offset;
 	int			ic_refcnt;
-	int			ic_roundoff;
 	int			ic_bwritecnt;
 	ushort_t		ic_state;
 	char			*ic_datap;	/* pointer to iclog data */
@@ -462,7 +461,6 @@ typedef struct xlog_in_core {
 #define	ic_size		hic_fields.ic_size
 #define	ic_offset	hic_fields.ic_offset
 #define	ic_refcnt	hic_fields.ic_refcnt
-#define	ic_roundoff	hic_fields.ic_roundoff
 #define	ic_bwritecnt	hic_fields.ic_bwritecnt
 #define	ic_state	hic_fields.ic_state
 #define ic_datap	hic_fields.ic_datap
@@ -498,7 +496,6 @@ typedef struct log {
 	xfs_daddr_t		l_logBBstart;   /* start block of log */
 	int			l_logsize;      /* size of log in bytes */
 	int			l_logBBsize;    /* size of log in BB chunks */
-	int			l_roundoff;	/* round off error of iclogs */
 	int			l_curr_cycle;   /* Cycle number of log writes */
 	int			l_prev_cycle;   /* Cycle number before last
 						 * block increment */
@@ -545,7 +542,7 @@ extern int	 xlog_find_tail(xlog_t	*log,
 				int readonly);
 extern int	 xlog_recover(xlog_t *log, int readonly);
 extern int	 xlog_recover_finish(xlog_t *log, int mfsi_flags);
-extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
+extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog, int);
 extern void	 xlog_recover_process_iunlinks(xlog_t *log);
 
 extern struct xfs_buf *xlog_get_bp(xlog_t *, int);

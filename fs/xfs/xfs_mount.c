@@ -975,7 +975,7 @@ xfs_mountfs(
 	 * Get and sanity-check the root inode.
 	 * Save the pointer to it in the mount structure.
 	 */
-	error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL, &rip, 0);
+	error = xfs_iget(mp, NULL, sbp->sb_rootino, 0, XFS_ILOCK_EXCL, &rip, 0);
 	if (error) {
 		cmn_err(CE_WARN, "XFS: failed to read root inode");
 		goto error3;
@@ -1036,7 +1036,7 @@ xfs_mountfs(
 	/*
 	 * Complete the quota initialisation, post-log-replay component.
 	 */
-	if ((error = XFS_QM_MOUNT(mp, quotamount, quotaflags)))
+	if ((error = XFS_QM_MOUNT(mp, quotamount, quotaflags, mfsi_flags)))
 		goto error4;
 
 	return 0;
@@ -1098,6 +1098,8 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 
 	xfs_unmountfs_writesb(mp);
 
+	xfs_unmountfs_wait(mp); 		/* wait for async bufs */
+
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
 	xfs_freesb(mp);
@@ -1140,6 +1142,16 @@ xfs_unmountfs_close(xfs_mount_t *mp, struct cred *cr)
 	if (mp->m_rtdev_targp)
 		xfs_free_buftarg(mp->m_rtdev_targp, 1);
 	xfs_free_buftarg(mp->m_ddev_targp, 0);
+}
+
+void
+xfs_unmountfs_wait(xfs_mount_t *mp)
+{
+	if (mp->m_logdev_targp != mp->m_ddev_targp)
+		xfs_wait_buftarg(mp->m_logdev_targp);
+	if (mp->m_rtdev_targp)
+		xfs_wait_buftarg(mp->m_rtdev_targp);
+	xfs_wait_buftarg(mp->m_ddev_targp);
 }
 
 int

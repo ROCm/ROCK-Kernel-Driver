@@ -234,6 +234,10 @@ xfs_initialize_vnode(
 		vp->v_type = IFTOVT(ip->i_d.di_mode);
 		xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
 		xfs_set_inodeops(inode);
+	
+		ip->i_flags &= ~XFS_INEW;
+		barrier();
+
 		unlock_new_inode(inode);
 	}
 }
@@ -284,7 +288,7 @@ linvfs_destroy_inode(
 	kmem_cache_free(linvfs_inode_zone, LINVFS_GET_VP(inode));
 }
 
-int
+STATIC int
 xfs_inode_shake(
 	int		priority,
 	unsigned int	gfp_mask)
