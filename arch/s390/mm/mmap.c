@@ -26,6 +26,7 @@
 
 #include <linux/personality.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 
 /*
  * Top of mmap area (just below the process stack).
@@ -81,3 +82,5 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 		mm->unmap_area = arch_unmap_area_topdown;
 	}
 }
+EXPORT_SYMBOL_GPL(arch_pick_mmap_layout);
+

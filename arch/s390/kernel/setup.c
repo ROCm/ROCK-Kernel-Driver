@@ -76,8 +76,15 @@ extern int _text,_etext, _edata, _end;
 
 static char command_line[COMMAND_LINE_SIZE] = { 0, };
 
-static struct resource code_resource = { "Kernel code", 0x100000, 0 };
-static struct resource data_resource = { "Kernel data", 0, 0 };
+static struct resource code_resource = {
+	.name  = "Kernel code",
+	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
+};
+
+static struct resource data_resource = {
+	.name = "Kernel data",
+	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
+};
 
 /*
  * cpu_init() initializes state that is per-CPU.
@@ -314,7 +321,6 @@ void __init setup_arch(char **cmdline_p)
         unsigned long bootmap_size;
         unsigned long memory_start, memory_end;
         char c = ' ', cn, *to = command_line, *from = COMMAND_LINE;
-	struct resource *res;
 	unsigned long start_pfn, end_pfn;
         static unsigned int smptrap=0;
         unsigned long delay = 0;
@@ -472,6 +478,30 @@ void __init setup_arch(char **cmdline_p)
         }
 #endif
 
+	for (i = 0; i < 16 && memory_chunk[i].size > 0; i++) {
+		struct resource *res;
+
+		res = alloc_bootmem_low(sizeof(struct resource));
+		res->flags = IORESOURCE_BUSY | IORESOURCE_MEM;
+
+		switch (memory_chunk[i].type) {
+		case CHUNK_READ_WRITE:
+			res->name = "System RAM";
+			break;
+		case CHUNK_READ_ONLY:
+			res->name = "System ROM";
+			res->flags |= IORESOURCE_READONLY;
+			break;
+		default:
+			res->name = "reserved";
+		}
+		res->start = memory_chunk[i].addr;
+		res->end = memory_chunk[i].addr +  memory_chunk[i].size - 1;
+		request_resource(&iomem_resource, res);
+		request_resource(res, &code_resource);
+		request_resource(res, &data_resource);
+	}
+
         /*
          * Setup lowcore for boot cpu
          */
@@ -523,14 +553,6 @@ void __init setup_arch(char **cmdline_p)
 	 * Create kernel page tables and switch to virtual addressing.
 	 */
         paging_init();
-
-	res = alloc_bootmem_low(sizeof(struct resource));
-	res->start = 0;
-	res->end = memory_end;
-	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-	request_resource(&iomem_resource, res);
-	request_resource(res, &code_resource);
-	request_resource(res, &data_resource);
 
         /* Setup default console */
 	conmode_default();
