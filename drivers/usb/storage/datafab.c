@@ -67,25 +67,23 @@ static int datafab_determine_lun(struct us_data *us,
 
 static inline int
 datafab_bulk_read(struct us_data *us, unsigned char *data, unsigned int len) {
-	unsigned int act_len;	/* ignored */
-
 	if (len == 0)
 		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("datafab_bulk_read:  len = %d\n", len);
-	return usb_storage_raw_bulk(us, SCSI_DATA_READ, data, len, &act_len);
+	return usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+			data, len, NULL);
 }
 
 
 static inline int
 datafab_bulk_write(struct us_data *us, unsigned char *data, unsigned int len) {
-	unsigned int act_len;	/* ignored */
-
 	if (len == 0)
 		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("datafab_bulk_write:  len = %d\n", len);
-	return usb_storage_raw_bulk(us, SCSI_DATA_WRITE, data, len, &act_len);
+	return usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
+			data, len, NULL);
 }
 
 
@@ -522,6 +520,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 		0x00, 0x80, 0x00, 0x01, 0x1F, 0x00, 0x00, 0x00
 	};
 
+	srb->resid = 0;
 	if (!us->extra) {
 		us->extra = kmalloc(sizeof(struct datafab_info), GFP_NOIO);
 		if (!us->extra) {

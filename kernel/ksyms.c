@@ -33,7 +33,6 @@
 #include <linux/swap.h>
 #include <linux/ctype.h>
 #include <linux/file.h>
-#include <linux/iobuf.h>
 #include <linux/console.h>
 #include <linux/poll.h>
 #include <linux/mmzone.h>
@@ -103,6 +102,8 @@ EXPORT_SYMBOL(kmem_cache_shrink);
 EXPORT_SYMBOL(kmem_cache_alloc);
 EXPORT_SYMBOL(kmem_cache_free);
 EXPORT_SYMBOL(kmem_cache_size);
+EXPORT_SYMBOL(set_shrinker);
+EXPORT_SYMBOL(remove_shrinker);
 EXPORT_SYMBOL(kmalloc);
 EXPORT_SYMBOL(kfree);
 EXPORT_SYMBOL(vfree);
@@ -246,7 +247,6 @@ EXPORT_SYMBOL(dput);
 EXPORT_SYMBOL(have_submounts);
 EXPORT_SYMBOL(d_find_alias);
 EXPORT_SYMBOL(d_prune_aliases);
-EXPORT_SYMBOL(prune_dcache);
 EXPORT_SYMBOL(shrink_dcache_sb);
 EXPORT_SYMBOL(shrink_dcache_parent);
 EXPORT_SYMBOL(shrink_dcache_anon);
@@ -437,18 +437,6 @@ EXPORT_SYMBOL(__br_write_locks);
 EXPORT_SYMBOL(__br_write_lock);
 EXPORT_SYMBOL(__br_write_unlock);
 #endif
-
-/* Kiobufs */
-EXPORT_SYMBOL(alloc_kiovec);
-EXPORT_SYMBOL(free_kiovec);
-EXPORT_SYMBOL(expand_kiobuf);
-
-EXPORT_SYMBOL(map_user_kiobuf);
-EXPORT_SYMBOL(unmap_kiobuf);
-EXPORT_SYMBOL(lock_kiovec);
-EXPORT_SYMBOL(unlock_kiovec);
-EXPORT_SYMBOL(brw_kiovec);
-EXPORT_SYMBOL(kiobuf_wait_for_io);
 
 #ifdef HAVE_DISABLE_HLT
 EXPORT_SYMBOL(disable_hlt);

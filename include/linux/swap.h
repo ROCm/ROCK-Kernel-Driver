@@ -163,6 +163,8 @@ extern void swap_setup(void);
 
 /* linux/mm/vmscan.c */
 extern int try_to_free_pages(struct zone *, unsigned int, unsigned int);
+int shrink_all_memory(int nr_pages);
+extern int vm_swappiness;
 
 /* linux/mm/page_io.c */
 int swap_readpage(struct file *file, struct page *page);

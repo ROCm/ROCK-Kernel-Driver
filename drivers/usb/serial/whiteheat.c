@@ -334,6 +334,12 @@ static int whiteheat_attach (struct usb_serial *serial)
 	command_port = &serial->port[COMMAND_PORT];
 
 	pipe = usb_sndbulkpipe (serial->dev, command_port->bulk_out_endpointAddress);
+	/*
+	 * When the module is reloaded the firmware is still there and
+	 * the endpoints are still in the usb core unchanged. This is the
+         * unlinking bug in disguise. Same for the call below.
+         */
+	usb_clear_halt(serial->dev, pipe);
 	ret = usb_bulk_msg (serial->dev, pipe, command, sizeof(command), &alen, COMMAND_TIMEOUT);
 	if (ret) {
 		err("%s: Couldn't send command [%d]", serial->type->name, ret);
@@ -344,6 +350,8 @@ static int whiteheat_attach (struct usb_serial *serial)
 	}
 
 	pipe = usb_rcvbulkpipe (serial->dev, command_port->bulk_in_endpointAddress);
+	/* See the comment on the usb_clear_halt() above */
+	usb_clear_halt(serial->dev, pipe);
 	ret = usb_bulk_msg (serial->dev, pipe, result, sizeof(result), &alen, COMMAND_TIMEOUT);
 	if (ret) {
 		err("%s: Couldn't get results [%d]", serial->type->name, ret);
@@ -438,6 +446,10 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 	if (retval)
 		goto exit;
 
+	/* Work around HCD bugs */
+	usb_clear_halt(port->serial->dev, port->read_urb->pipe);
+	usb_clear_halt(port->serial->dev, port->write_urb->pipe);
+
 	/* Start reading from the device */
 	port->read_urb->dev = port->serial->dev;
 	retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
@@ -489,7 +501,8 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 {
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
-	if (tty_hung_up_p(filp)) {
+	/* filp is NULL when called from usb_serial_disconnect */
+	if (filp && (tty_hung_up_p(filp))) {
 		return;
 	}
 
@@ -1145,6 +1158,9 @@ static int start_command_port(struct usb_serial *serial)
 	command_info = (struct whiteheat_command_private *)command_port->private;
 	spin_lock_irqsave(&command_info->lock, flags);
 	if (!command_info->port_running) {
+		/* Work around HCD bugs */
+		usb_clear_halt(serial->dev, command_port->read_urb->pipe);
+
 		command_port->read_urb->dev = serial->dev;
 		retval = usb_submit_urb(command_port->read_urb, GFP_KERNEL);
 		if (retval) {

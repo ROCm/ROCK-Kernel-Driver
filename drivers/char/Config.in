@@ -80,6 +80,7 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
       bool '  Support for console on line printer' CONFIG_LP_CONSOLE
    fi
    dep_tristate 'Support for user-space parallel port device drivers' CONFIG_PPDEV $CONFIG_PARPORT
+   dep_tristate 'Texas Instruments parallel link cable support' CONFIG_TIPAR $CONFIG_PARPORT
 fi
 if [ "$CONFIG_PPC_PSERIES" = "y" ]; then
    bool 'pSeries Hypervisor Virtual Console support' CONFIG_HVC_CONSOLE

@@ -36,7 +36,6 @@
  * The following are not needed for the non-m68k ports
  */
 #define ide_ack_intr(hwif)		(1)
-#define ide_fix_driveid(id)		do {} while (0)
 #define ide_release_lock(lock)		do {} while (0)
 #define ide_get_lock(lock, hdlr, data)	do {} while (0)
 

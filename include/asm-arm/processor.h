@@ -28,22 +28,30 @@
 #include <asm/procinfo.h>
 #include <asm/arch/memory.h>
 #include <asm/proc/processor.h>
+#include <asm/types.h>
+
+union debug_insn {
+	u32	arm;
+	u16	thumb;
+};
+
+struct debug_entry {
+	u32			address;
+	union debug_insn	insn;
+};
 
 struct debug_info {
-	int				nsaved;
-	struct {
-		unsigned long		address;
-		unsigned long		insn;
-	} bp[2];
+	int			nsaved;
+	struct debug_entry	bp[2];
 };
 
 struct thread_struct {
 							/* fault info	  */
-	unsigned long			address;
-	unsigned long			trap_no;
-	unsigned long			error_code;
+	unsigned long		address;
+	unsigned long		trap_no;
+	unsigned long		error_code;
 							/* debugging	  */
-	struct debug_info		debug;
+	struct debug_info	debug;
 };
 
 #define INIT_THREAD  {	}

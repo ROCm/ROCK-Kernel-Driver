@@ -23,6 +23,8 @@
 #error "This file is SA-1111 bus glue.  CONFIG_SA1111 must be defined."
 #endif
 
+extern int usb_disabled(void);
+
 /*-------------------------------------------------------------------------*/
 
 static void sa1111_start_hc(struct sa1111_dev *dev)
@@ -354,6 +356,9 @@ static int ohci_hcd_sa1111_drv_probe(struct device *_dev)
 	struct sa1111_dev *dev = SA1111_DEV(_dev);
 	struct usb_hcd *hcd = NULL;
 	int ret;
+
+	if (usb_disabled())
+		return -ENODEV;
 
 	ret = usb_hcd_sa1111_probe(&ohci_sa1111_hc_driver, &hcd, dev);
 

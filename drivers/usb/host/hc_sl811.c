@@ -1321,6 +1321,9 @@ static int __init hci_hcd_init (void)
 	int ret;
 
 	DBGFUNC ("Enter hci_hcd_init\n");
+	if (usb_disabled())
+		return -ENODEV;
+
 	ret = hc_found_hci (base_addr, data_reg_addr, irq);
 
 	return ret;

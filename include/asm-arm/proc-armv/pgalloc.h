@@ -5,6 +5,7 @@
  *
  * Page table allocation/freeing primitives for 32-bit ARM processors.
  */
+#include <asm/cacheflush.h>
 #include "pgtable.h"
 
 /*

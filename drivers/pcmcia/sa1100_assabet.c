@@ -11,6 +11,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include <asm/arch/assabet.h>
 
@@ -192,14 +193,14 @@ static int assabet_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level assabet_pcmcia_ops = { 
-	init:			assabet_pcmcia_init,
-	shutdown:		assabet_pcmcia_shutdown,
-	socket_state:		assabet_pcmcia_socket_state,
-	get_irq_info:		assabet_pcmcia_get_irq_info,
-	configure_socket:	assabet_pcmcia_configure_socket,
+	.init			= assabet_pcmcia_init,
+	.shutdown		= assabet_pcmcia_shutdown,
+	.socket_state		= assabet_pcmcia_socket_state,
+	.get_irq_info		= assabet_pcmcia_get_irq_info,
+	.configure_socket	= assabet_pcmcia_configure_socket,
 
-	socket_init:		assabet_pcmcia_socket_init,
-	socket_suspend:		assabet_pcmcia_socket_suspend,
+	.socket_init		= assabet_pcmcia_socket_init,
+	.socket_suspend		= assabet_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_assabet_init(void)

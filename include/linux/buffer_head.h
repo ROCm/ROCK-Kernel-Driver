@@ -32,7 +32,6 @@ enum bh_state_bits {
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 
 struct page;
-struct kiobuf;
 struct buffer_head;
 struct address_space;
 typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);

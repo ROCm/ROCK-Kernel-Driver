@@ -40,7 +40,6 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
-#include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/vcache.h>
@@ -355,6 +354,9 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 				if (!PageReserved(page)) {
 					if (pte_dirty(pte))
 						set_page_dirty(page);
+					if (page->mapping && pte_young(pte) &&
+							!PageSwapCache(page))
+						mark_page_accessed(page);
 					tlb->freed++;
 					page_remove_rmap(page, ptep);
 					tlb_remove_page(tlb, page);
@@ -501,7 +503,7 @@ out:
 /* 
  * Given a physical address, is there a useful struct page pointing to
  * it?  This may become more complex in the future if we start dealing
- * with IO-aperture pages in kiobufs.
+ * with IO-aperture pages for direct-IO.
  */
 
 static inline struct page *get_page_map(struct page *page)
@@ -584,224 +586,6 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 	} while(len);
 out:
 	return i;
-}
-
-/*
- * Force in an entire range of pages from the current process's user VA,
- * and pin them in physical memory.  
- */
-#define dprintk(x...)
-
-int map_user_kiobuf(int rw, struct kiobuf *iobuf, unsigned long va, size_t len)
-{
-	int pgcount, err;
-	struct mm_struct *	mm;
-	
-	/* Make sure the iobuf is not already mapped somewhere. */
-	if (iobuf->nr_pages)
-		return -EINVAL;
-
-	mm = current->mm;
-	dprintk ("map_user_kiobuf: begin\n");
-	
-	pgcount = (va + len + PAGE_SIZE - 1)/PAGE_SIZE - va/PAGE_SIZE;
-	/* mapping 0 bytes is not permitted */
-	if (!pgcount) BUG();
-	err = expand_kiobuf(iobuf, pgcount);
-	if (err)
-		return err;
-
-	iobuf->locked = 0;
-	iobuf->offset = va & (PAGE_SIZE-1);
-	iobuf->length = len;
-	
-	/* Try to fault in all of the necessary pages */
-	down_read(&mm->mmap_sem);
-	/* rw==READ means read from disk, write into memory area */
-	err = get_user_pages(current, mm, va, pgcount,
-			(rw==READ), 0, iobuf->maplist, NULL);
-	up_read(&mm->mmap_sem);
-	if (err < 0) {
-		unmap_kiobuf(iobuf);
-		dprintk ("map_user_kiobuf: end %d\n", err);
-		return err;
-	}
-	iobuf->nr_pages = err;
-	while (pgcount--) {
-		/* FIXME: flush superflous for rw==READ,
-		 * probably wrong function for rw==WRITE
-		 */
-		flush_dcache_page(iobuf->maplist[pgcount]);
-	}
-	dprintk ("map_user_kiobuf: end OK\n");
-	return 0;
-}
-
-/*
- * Mark all of the pages in a kiobuf as dirty 
- *
- * We need to be able to deal with short reads from disk: if an IO error
- * occurs, the number of bytes read into memory may be less than the
- * size of the kiobuf, so we have to stop marking pages dirty once the
- * requested byte count has been reached.
- */
-
-void mark_dirty_kiobuf(struct kiobuf *iobuf, int bytes)
-{
-	int index, offset, remaining;
-	struct page *page;
-	
-	index = iobuf->offset >> PAGE_SHIFT;
-	offset = iobuf->offset & ~PAGE_MASK;
-	remaining = bytes;
-	if (remaining > iobuf->length)
-		remaining = iobuf->length;
-	
-	while (remaining > 0 && index < iobuf->nr_pages) {
-		page = iobuf->maplist[index];
-		
-		if (!PageReserved(page))
-			set_page_dirty(page);
-
-		remaining -= (PAGE_SIZE - offset);
-		offset = 0;
-		index++;
-	}
-}
-
-/*
- * Unmap all of the pages referenced by a kiobuf.  We release the pages,
- * and unlock them if they were locked. 
- */
-
-void unmap_kiobuf (struct kiobuf *iobuf) 
-{
-	int i;
-	struct page *map;
-	
-	for (i = 0; i < iobuf->nr_pages; i++) {
-		map = iobuf->maplist[i];
-		if (map) {
-			if (iobuf->locked)
-				unlock_page(map);
-			/* FIXME: cache flush missing for rw==READ
-			 * FIXME: call the correct reference counting function
-			 */
-			page_cache_release(map);
-		}
-	}
-	
-	iobuf->nr_pages = 0;
-	iobuf->locked = 0;
-}
-
-
-/*
- * Lock down all of the pages of a kiovec for IO.
- *
- * If any page is mapped twice in the kiovec, we return the error -EINVAL.
- *
- * The optional wait parameter causes the lock call to block until all
- * pages can be locked if set.  If wait==0, the lock operation is
- * aborted if any locked pages are found and -EAGAIN is returned.
- */
-
-int lock_kiovec(int nr, struct kiobuf *iovec[], int wait)
-{
-	struct kiobuf *iobuf;
-	int i, j;
-	struct page *page, **ppage;
-	int doublepage = 0;
-	int repeat = 0;
-	
- repeat:
-	
-	for (i = 0; i < nr; i++) {
-		iobuf = iovec[i];
-
-		if (iobuf->locked)
-			continue;
-
-		ppage = iobuf->maplist;
-		for (j = 0; j < iobuf->nr_pages; ppage++, j++) {
-			page = *ppage;
-			if (!page)
-				continue;
-			
-			if (TestSetPageLocked(page)) {
-				while (j--) {
-					struct page *tmp = *--ppage;
-					if (tmp)
-						unlock_page(tmp);
-				}
-				goto retry;
-			}
-		}
-		iobuf->locked = 1;
-	}
-
-	return 0;
-	
- retry:
-	
-	/* 
-	 * We couldn't lock one of the pages.  Undo the locking so far,
-	 * wait on the page we got to, and try again.  
-	 */
-	
-	unlock_kiovec(nr, iovec);
-	if (!wait)
-		return -EAGAIN;
-	
-	/* 
-	 * Did the release also unlock the page we got stuck on?
-	 */
-	if (!PageLocked(page)) {
-		/* 
-		 * If so, we may well have the page mapped twice
-		 * in the IO address range.  Bad news.  Of
-		 * course, it _might_ just be a coincidence,
-		 * but if it happens more than once, chances
-		 * are we have a double-mapped page. 
-		 */
-		if (++doublepage >= 3) 
-			return -EINVAL;
-		
-		/* Try again...  */
-		wait_on_page_locked(page);
-	}
-	
-	if (++repeat < 16)
-		goto repeat;
-	return -EAGAIN;
-}
-
-/*
- * Unlock all of the pages of a kiovec after IO.
- */
-
-int unlock_kiovec(int nr, struct kiobuf *iovec[])
-{
-	struct kiobuf *iobuf;
-	int i, j;
-	struct page *page, **ppage;
-	
-	for (i = 0; i < nr; i++) {
-		iobuf = iovec[i];
-
-		if (!iobuf->locked)
-			continue;
-		iobuf->locked = 0;
-		
-		ppage = iobuf->maplist;
-		for (j = 0; j < iobuf->nr_pages; ppage++, j++) {
-			page = *ppage;
-			if (!page)
-				continue;
-			unlock_page(page);
-		}
-	}
-	return 0;
 }
 
 static inline void zeromap_pte_range(pte_t * pte, unsigned long address,

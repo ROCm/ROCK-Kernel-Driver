@@ -58,7 +58,7 @@ static unsigned long sa1100_gettimeoffset (void)
 	elapsed = LATCH - ticks_to_match;
 
 	/* Now convert them to usec */
-	usec = (unsigned long)(elapsed*tick)/LATCH;
+	usec = (unsigned long)(elapsed * (tick_nsec / 1000))/LATCH;
 
 	return usec;
 }

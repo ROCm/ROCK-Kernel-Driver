@@ -97,14 +97,14 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
 }
 
 static struct pcmcia_low_level jornada720_pcmcia_ops = {
-  init:			jornada720_pcmcia_init,
-  shutdown:		sa1111_pcmcia_shutdown,
-  socket_state:		sa1111_pcmcia_socket_state,
-  get_irq_info:		sa1111_pcmcia_get_irq_info,
-  configure_socket:	jornada720_pcmcia_configure_socket,
+  .init			= jornada720_pcmcia_init,
+  .shutdown		= sa1111_pcmcia_shutdown,
+  .socket_state		= sa1111_pcmcia_socket_state,
+  .get_irq_info		= sa1111_pcmcia_get_irq_info,
+  .configure_socket	= jornada720_pcmcia_configure_socket,
 
-  socket_init:		sa1111_pcmcia_socket_init,
-  socket_suspend:	sa1111_pcmcia_socket_suspend,
+  .socket_init		= sa1111_pcmcia_socket_init,
+  .socket_suspend	= sa1111_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_jornada720_init(void)

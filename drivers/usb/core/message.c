@@ -756,6 +756,7 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
  *
  * This is used to enable data transfers on interfaces that may not
  * be enabled by default.  Not all devices support such configurability.
+ * Only the driver bound to an interface may change its setting.
  *
  * Within any given configuration, each interface may have several
  * alternative settings.  These are often used to control levels of
@@ -808,6 +809,22 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 				   interface, NULL, 0, HZ * 5)) < 0)
 		return ret;
 
+	/* FIXME drivers shouldn't need to replicate/bugfix the logic here
+	 * when they implement async or easily-killable versions of this or
+	 * other "should-be-internal" functions (like clear_halt).
+	 * should hcd+usbcore postprocess control requests?
+	 */
+
+	/* prevent submissions using previous endpoint settings */
+	iface_as = iface->altsetting + iface->act_altsetting;
+	for (i = 0; i < iface_as->bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint [i].bEndpointAddress;
+		int	out = !(ep & USB_DIR_IN);
+
+		ep &= USB_ENDPOINT_NUMBER_MASK;
+		(out ? dev->epmaxpacketout : dev->epmaxpacketin ) [ep] = 0;
+		// FIXME want hcd hook here, "no such endpoint"
+	}
 	iface->act_altsetting = alternate;
 
 	/* 9.1.1.5: reset toggles for all endpoints affected by this iface-as
@@ -819,21 +836,20 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 * any SetInterface request and hence assume toggles need to be reset.
 	 * However, EP0 toggles are re-synced for every individual transfer
 	 * during the SETUP stage - hence EP0 toggles are "don't care" here.
+	 * (Likewise, EP0 never "halts" on well designed devices.)
 	 */
 
 	iface_as = &iface->altsetting[alternate];
 	for (i = 0; i < iface_as->bNumEndpoints; i++) {
 		u8	ep = iface_as->endpoint[i].bEndpointAddress;
+		int	out = !(ep & USB_DIR_IN);
 
-		usb_settoggle(dev, ep&USB_ENDPOINT_NUMBER_MASK, usb_endpoint_out(ep), 0);
+		ep &= USB_ENDPOINT_NUMBER_MASK;
+		usb_settoggle (dev, ep, out, 0);
+		(out ? dev->epmaxpacketout : dev->epmaxpacketin) [ep]
+			= iface_as->endpoint [ep].wMaxPacketSize;
 	}
 
-	/* usb_set_maxpacket() sets the maxpacket size for all EP in all
-	 * interfaces but it shouldn't do any harm here: we have changed
-	 * the AS for the requested interface only, hence for unaffected
-	 * interfaces it's just re-application of still-valid values.
-	 */
-	usb_set_maxpacket(dev);
 	return 0;
 }
 
