@@ -5,7 +5,7 @@
  * Copyright (c) 2002-3 Open Source Development Labs
  * Copyright (c) 2003-2004 Greg Kroah-Hartman
  * Copyright (c) 2003-2004 IBM Corp.
- * 
+ *
  * This file is released under the GPLv2
  *
  */
@@ -17,8 +17,8 @@
 #include <linux/string.h>
 #include "base.h"
 
-#define to_class_attr(_attr) container_of(_attr,struct class_attribute,attr)
-#define to_class(obj) container_of(obj,struct class,subsys.kset.kobj)
+#define to_class_attr(_attr) container_of(_attr, struct class_attribute, attr)
+#define to_class(obj) container_of(obj, struct class, subsys.kset.kobj)
 
 static ssize_t
 class_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
@@ -28,12 +28,12 @@ class_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 	ssize_t ret = 0;
 
 	if (class_attr->show)
-		ret = class_attr->show(dc,buf);
+		ret = class_attr->show(dc, buf);
 	return ret;
 }
 
 static ssize_t
-class_attr_store(struct kobject * kobj, struct attribute * attr, 
+class_attr_store(struct kobject * kobj, struct attribute * attr,
 		 const char * buf, size_t count)
 {
 	struct class_attribute * class_attr = to_class_attr(attr);
@@ -41,7 +41,7 @@ class_attr_store(struct kobject * kobj, struct attribute * attr,
 	ssize_t ret = 0;
 
 	if (class_attr->store)
-		ret = class_attr->store(dc,buf,count);
+		ret = class_attr->store(dc, buf, count);
 	return ret;
 }
 
@@ -69,14 +69,14 @@ static struct kobj_type ktype_class = {
 };
 
 /* Hotplug events for classes go to the class_obj subsys */
-static decl_subsys(class,&ktype_class,NULL);
+static decl_subsys(class, &ktype_class, NULL);
 
 
 int class_create_file(struct class * cls, const struct class_attribute * attr)
 {
 	int error;
 	if (cls) {
-		error = sysfs_create_file(&cls->subsys.kset.kobj,&attr->attr);
+		error = sysfs_create_file(&cls->subsys.kset.kobj, &attr->attr);
 	} else
 		error = -EINVAL;
 	return error;
@@ -85,13 +85,13 @@ int class_create_file(struct class * cls, const struct class_attribute * attr)
 void class_remove_file(struct class * cls, const struct class_attribute * attr)
 {
 	if (cls)
-		sysfs_remove_file(&cls->subsys.kset.kobj,&attr->attr);
+		sysfs_remove_file(&cls->subsys.kset.kobj, &attr->attr);
 }
 
 struct class * class_get(struct class * cls)
 {
 	if (cls)
-		return container_of(subsys_get(&cls->subsys),struct class,subsys);
+		return container_of(subsys_get(&cls->subsys), struct class, subsys);
 	return NULL;
 }
 
@@ -135,15 +135,15 @@ int class_register(struct class * cls)
 {
 	int error;
 
-	pr_debug("device class '%s': registering\n",cls->name);
+	pr_debug("device class '%s': registering\n", cls->name);
 
 	INIT_LIST_HEAD(&cls->children);
 	INIT_LIST_HEAD(&cls->interfaces);
-	error = kobject_set_name(&cls->subsys.kset.kobj,cls->name);
+	error = kobject_set_name(&cls->subsys.kset.kobj, cls->name);
 	if (error)
 		return error;
 
-	subsys_set_kset(cls,class_subsys);
+	subsys_set_kset(cls, class_subsys);
 
 	error = subsystem_register(&cls->subsys);
 	if (!error) {
@@ -155,7 +155,7 @@ int class_register(struct class * cls)
 
 void class_unregister(struct class * cls)
 {
-	pr_debug("device class '%s': unregistering\n",cls->name);
+	pr_debug("device class '%s': unregistering\n", cls->name);
 	remove_class_attrs(cls);
 	subsystem_unregister(&cls->subsys);
 }
@@ -215,12 +215,12 @@ class_device_attr_show(struct kobject * kobj, struct attribute * attr,
 	ssize_t ret = 0;
 
 	if (class_dev_attr->show)
-		ret = class_dev_attr->show(cd,buf);
+		ret = class_dev_attr->show(cd, buf);
 	return ret;
 }
 
 static ssize_t
-class_device_attr_store(struct kobject * kobj, struct attribute * attr, 
+class_device_attr_store(struct kobject * kobj, struct attribute * attr,
 			const char * buf, size_t count)
 {
 	struct class_device_attribute * class_dev_attr = to_class_dev_attr(attr);
@@ -228,7 +228,7 @@ class_device_attr_store(struct kobject * kobj, struct attribute * attr,
 	ssize_t ret = 0;
 
 	if (class_dev_attr->store)
-		ret = class_dev_attr->store(cd,buf,count);
+		ret = class_dev_attr->store(cd, buf, count);
 	return ret;
 }
 
@@ -242,7 +242,7 @@ static void class_dev_release(struct kobject * kobj)
 	struct class_device *cd = to_class_dev(kobj);
 	struct class * cls = cd->class;
 
-	pr_debug("device class '%s': release.\n",cd->class_id);
+	pr_debug("device class '%s': release.\n", cd->class_id);
 
 	if (cls->release)
 		cls->release(cd);
