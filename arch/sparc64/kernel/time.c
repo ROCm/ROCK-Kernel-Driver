@@ -41,6 +41,7 @@
 #include <asm/isa.h>
 #include <asm/starfire.h>
 #include <asm/smp.h>
+#include <asm/sections.h>
 
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -449,7 +450,6 @@ void sparc64_do_profile(struct pt_regs *regs)
 		return;
 
 	{
-		extern int _stext;
 		extern int rwlock_impl_begin, rwlock_impl_end;
 		extern int atomic_impl_begin, atomic_impl_end;
 		extern int __memcpy_begin, __memcpy_end;
@@ -468,7 +468,7 @@ void sparc64_do_profile(struct pt_regs *regs)
 		     pc < (unsigned long) &__bitops_end))
 			pc = o7;
 
-		pc -= (unsigned long) &_stext;
+		pc -= (unsigned long) _stext;
 		pc >>= prof_shift;
 
 		if(pc >= prof_len)

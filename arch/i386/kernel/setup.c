@@ -42,6 +42,7 @@
 #include <asm/edd.h>
 #include <asm/setup.h>
 #include <asm/arch_hooks.h>
+#include <asm/sections.h>
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 
@@ -100,7 +101,7 @@ extern void early_cpu_init(void);
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(char *);
 extern int root_mountflags;
-extern char _text, _etext, _edata, _end;
+extern char _end[];
 
 unsigned long saved_videomode;
 
@@ -676,7 +677,7 @@ static unsigned long __init setup_memory(void)
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	start_pfn = PFN_UP(__pa(&_end));
+	start_pfn = PFN_UP(__pa(_end));
 
 	find_max_pfn();
 
@@ -947,15 +948,15 @@ void __init setup_arch(char **cmdline_p)
 
 	if (!MOUNT_ROOT_RDONLY)
 		root_mountflags &= ~MS_RDONLY;
-	init_mm.start_code = (unsigned long) &_text;
-	init_mm.end_code = (unsigned long) &_etext;
-	init_mm.end_data = (unsigned long) &_edata;
-	init_mm.brk = (unsigned long) &_end;
+	init_mm.start_code = (unsigned long) _text;
+	init_mm.end_code = (unsigned long) _etext;
+	init_mm.end_data = (unsigned long) _edata;
+	init_mm.brk = (unsigned long) _end;
 
-	code_resource.start = virt_to_phys(&_text);
-	code_resource.end = virt_to_phys(&_etext)-1;
-	data_resource.start = virt_to_phys(&_etext);
-	data_resource.end = virt_to_phys(&_edata)-1;
+	code_resource.start = virt_to_phys(_text);
+	code_resource.end = virt_to_phys(_etext)-1;
+	data_resource.start = virt_to_phys(_etext);
+	data_resource.end = virt_to_phys(_edata)-1;
 
 	parse_cmdline_early(cmdline_p);
 

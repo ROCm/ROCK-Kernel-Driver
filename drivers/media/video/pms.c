@@ -12,6 +12,10 @@
  *	Most of this code is directly derived from his userspace driver.
  *	His driver works so send any reports to alan@redhat.com unless the
  *	userspace driver also doesn't work for you...
+ *      
+ *      Changes:
+ *      08/07/2003        Daniele Bellucci <bellucda@tiscali.it>
+ *                        - pms_capture: report back -EFAULT 
  */
 
 #include <linux/module.h>
@@ -659,7 +663,8 @@ static int pms_capture(struct pms_device *dev, char *buf, int rgb555, int count)
 			if(dt+len>count)
 				dt=count-len;
 			cnt += dev->height;
-			copy_to_user(buf, tmp+32, dt);
+			if (copy_to_user(buf, tmp+32, dt))
+				return -EFAULT;
 			buf += dt;    
 			len += dt;
 		}

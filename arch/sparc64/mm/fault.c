@@ -26,6 +26,7 @@
 #include <asm/uaccess.h>
 #include <asm/asi.h>
 #include <asm/lsu.h>
+#include <asm/sections.h>
 
 #define ELEMENTS(arr) (sizeof (arr)/sizeof (arr[0]))
 
@@ -320,10 +321,9 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 
 	if (regs->tstate & TSTATE_PRIV) {
 		unsigned long tpc = regs->tpc;
-		extern unsigned int _etext;
 
 		/* Sanity check the PC. */
-		if ((tpc >= KERNBASE && tpc < (unsigned long) &_etext) ||
+		if ((tpc >= KERNBASE && tpc < (unsigned long) _etext) ||
 		    (tpc >= MODULES_VADDR && tpc < MODULES_END)) {
 			/* Valid, no problems... */
 		} else {

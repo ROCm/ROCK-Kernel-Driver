@@ -209,17 +209,9 @@ static void cleanup_board_resources(void)
 
 #ifdef MODULE
 
-/*
- * pcxe_init() is our init_module():
- */
-#define pcxe_init init_module
-
-void	cleanup_module(void);
-
-
 /*****************************************************************************/
 
-void cleanup_module()
+static void pcxe_cleanup()
 {
 
 	unsigned long	flags;
@@ -240,6 +232,12 @@ void cleanup_module()
 	kfree(digi_channels);
 	restore_flags(flags);
 }
+
+/*
+ * pcxe_init() is our init_module():
+ */
+module_init(pcxe_init);
+module_cleanup(pcxe_cleanup);
 #endif
 
 static inline struct channel *chan(register struct tty_struct *tty)

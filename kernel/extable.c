@@ -17,10 +17,10 @@
 */
 #include <linux/module.h>
 #include <asm/uaccess.h>
+#include <asm/sections.h>
 
 extern const struct exception_table_entry __start___ex_table[];
 extern const struct exception_table_entry __stop___ex_table[];
-extern char _stext[], _etext[], _sinittext[], _einittext[];
 
 /* Given an address, look for it in the exception tables. */
 const struct exception_table_entry *search_exception_tables(unsigned long addr)

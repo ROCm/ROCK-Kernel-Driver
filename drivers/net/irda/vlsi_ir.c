@@ -474,10 +474,8 @@ static ssize_t vlsi_proc_read(struct file *file, char *buf, size_t nbytes,
 	if (pos + nbytes > size)
 		nbytes = size - pos;
 
-	if (!access_ok(VERIFY_WRITE, buf, nbytes))
-		return -EINVAL;
-
-	copy_to_user(buf, procdata->data + pos, nbytes);
+	if (copy_to_user(buf, procdata->data + pos, nbytes))
+		return -EFAULT;
 
 	*ppos += nbytes;
 

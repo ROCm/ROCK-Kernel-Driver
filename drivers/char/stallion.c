@@ -472,8 +472,6 @@ static unsigned int	stl_baudrates[] = {
  */
 
 #ifdef MODULE
-int		init_module(void);
-void		cleanup_module(void);
 static void	stl_argbrds(void);
 static int	stl_parsebrd(stlconf_t *confp, char **argp);
 
