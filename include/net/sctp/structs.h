@@ -169,11 +169,11 @@ extern struct sctp_globals {
 
 	/* This is the hash of all endpoints. */
 	int ep_hashsize;
-	struct sctp_hashbucket *ep_hashbucket;
+	struct sctp_hashbucket *ep_hashtable;
 
 	/* This is the hash of all associations. */
 	int assoc_hashsize;
-	struct sctp_hashbucket *assoc_hashbucket;
+	struct sctp_hashbucket *assoc_hashtable;
 
 	/* This is the sctp port control hash.	*/
 	int port_hashsize;
@@ -207,9 +207,9 @@ extern struct sctp_globals {
 #define sctp_max_outstreams		(sctp_globals.max_outstreams)
 #define sctp_address_families		(sctp_globals.address_families)
 #define sctp_ep_hashsize		(sctp_globals.ep_hashsize)
-#define sctp_ep_hashbucket		(sctp_globals.ep_hashbucket)
+#define sctp_ep_hashtable		(sctp_globals.ep_hashtable)
 #define sctp_assoc_hashsize		(sctp_globals.assoc_hashsize)
-#define sctp_assoc_hashbucket		(sctp_globals.assoc_hashbucket)
+#define sctp_assoc_hashtable		(sctp_globals.assoc_hashtable)
 #define sctp_port_hashsize		(sctp_globals.port_hashsize)
 #define sctp_port_rover			(sctp_globals.port_rover)
 #define sctp_port_alloc_lock		(sctp_globals.port_alloc_lock)
