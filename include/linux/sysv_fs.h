@@ -176,39 +176,18 @@ struct coh_super_block {
 };
 
 /* SystemV/Coherent inode data on disk */
-
 struct sysv_inode {
 	u16 i_mode;
 	u16 i_nlink;
 	u16 i_uid;
 	u16 i_gid;
 	u32 i_size;
-	union { /* directories, regular files, ... */
-		unsigned char i_addb[3*(10+1+1+1)+1]; /* zone numbers: max. 10 data blocks,
-					      * then 1 indirection block,
-					      * then 1 double indirection block,
-					      * then 1 triple indirection block.
-					      * Then maybe a "file generation number" ??
-					      */
-		/* named pipes on Coherent */
-		struct {
-			char p_addp[30];
-			s16 p_pnc;
-			s16 p_prx;
-			s16 p_pwx;
-		} i_p;
-	} i_a;
+	u8  i_data[3*(10+1+1+1)];
+	u8  i_gen;
 	u32 i_atime;	/* time of last access */
 	u32 i_mtime;	/* time of last modification */
 	u32 i_ctime;	/* time of creation */
 };
-
-
-/* The number of inodes per block is
-   sb->sv_inodes_per_block = block_size / sizeof(struct sysv_inode) */
-/* The number of indirect pointers per block is
-   sb->sv_ind_per_block = block_size / sizeof(u32) */
-
 
 /* SystemV/Coherent directory entry on disk */
 #define SYSV_NAMELEN	14	/* max size of name in struct sysv_dir_entry */

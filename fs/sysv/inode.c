@@ -188,8 +188,8 @@ static void sysv_read_inode(struct inode *inode)
 
 	si = SYSV_I(inode);
 	for (block = 0; block < 10+1+1+1; block++)
-		read3byte(sbi, &raw_inode->i_a.i_addb[3*block],
-			(unsigned char*)&si->i_data[block]);
+		read3byte(sbi, &raw_inode->i_data[3*block],
+				(u8 *)&si->i_data[block]);
 	brelse(bh);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 		rdev = (u16)fs32_to_cpu(sbi, si->i_data[0]);
@@ -236,8 +236,8 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 		si->i_data[0] = cpu_to_fs32(sbi, kdev_t_to_nr(inode->i_rdev));
 	for (block = 0; block < 10+1+1+1; block++)
-		write3byte(sbi, (unsigned char*)&si->i_data[block],
-			&raw_inode->i_a.i_addb[3*block]);
+		write3byte(sbi, (u8 *)&si->i_data[block],
+			&raw_inode->i_data[3*block]);
 	mark_buffer_dirty(bh);
 	return bh;
 }
