@@ -1702,68 +1702,6 @@ int radeonfb_set_par(struct fb_info *info)
 }
 
 
-
-static ssize_t radeonfb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
-{
-	unsigned long p = *ppos;
-	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = iminor(inode);
-	struct fb_info *info = registered_fb[fbidx];
-	struct radeonfb_info *rinfo = info->par;
-	
-	if (p >= rinfo->mapped_vram)
-	    return 0;
-	if (count >= rinfo->mapped_vram)
-	    count = rinfo->mapped_vram;
-	if (count + p > rinfo->mapped_vram)
-		count = rinfo->mapped_vram - p;
-	radeonfb_sync(info);
-	if (count) {
-	    void __iomem *base_addr;
-
-	    base_addr = info->screen_base;
-	    count -= copy_to_user(buf, base_addr+p, count);	/* Ayee!! */
-	    if (!count)
-		return -EFAULT;
-	    *ppos += count;
-	}
-	return count;
-}
-
-static ssize_t radeonfb_write(struct file *file, const char __user *buf, size_t count,
-			      loff_t *ppos)
-{
-	unsigned long p = *ppos;
-	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = iminor(inode);
-	struct fb_info *info = registered_fb[fbidx];
-	struct radeonfb_info *rinfo = info->par;
-	int err;
-
-	if (p > rinfo->mapped_vram)
-	    return -ENOSPC;
-	if (count >= rinfo->mapped_vram)
-	    count = rinfo->mapped_vram;
-	err = 0;
-	if (count + p > rinfo->mapped_vram) {
-	    count = rinfo->mapped_vram - p;
-	    err = -ENOSPC;
-	}
-	radeonfb_sync(info);
-	if (count) {
-	    void __iomem *base_addr;
-
-	    base_addr = info->screen_base;
-	    count -= copy_from_user(base_addr+p, buf, count);	/* Ayee!! */
-	    *ppos += count;
-	    err = -EFAULT;
-	}
-	if (count)
-		return count;
-	return err;
-}
-
-
 static struct fb_ops radeonfb_ops = {
 	.owner			= THIS_MODULE,
 	.fb_check_var		= radeonfb_check_var,
@@ -1776,8 +1714,6 @@ static struct fb_ops radeonfb_ops = {
 	.fb_fillrect		= radeonfb_fillrect,
 	.fb_copyarea		= radeonfb_copyarea,
 	.fb_imageblit		= radeonfb_imageblit,
-	.fb_read		= radeonfb_read,
-	.fb_write		= radeonfb_write,
 	.fb_cursor		= soft_cursor,
 };
 
@@ -1796,7 +1732,7 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 		    | FBINFO_HWACCEL_YPAN;
 	info->fbops = &radeonfb_ops;
 	info->screen_base = rinfo->fb_base;
-
+	info->screen_size = rinfo->mapped_vram;
 	/* Fill fix common fields */
 	strlcpy(info->fix.id, rinfo->name, sizeof(info->fix.id));
         info->fix.smem_start = rinfo->fb_base_phys;
@@ -2242,12 +2178,6 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	}
 
 	RTRACE("radeonfb: mapped %ldk videoram\n", rinfo->mapped_vram/1024);
-
-
-	/* Argh. Scary arch !!! */
-#ifdef CONFIG_PPC64
-	rinfo->fb_base = IO_TOKEN_TO_ADDR(rinfo->fb_base);
-#endif
 
 	/*
 	 * Check for required workaround for PLL accesses

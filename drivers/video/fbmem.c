@@ -506,6 +506,7 @@ fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	struct fb_info *info = registered_fb[fbidx];
 	u32 *buffer, *dst, *src;
 	int c, i, cnt = 0, err = 0;
+	unsigned long total_size;
 
 	if (!info || ! info->screen_base)
 		return -ENODEV;
@@ -516,12 +517,16 @@ fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	if (info->fbops->fb_read)
 		return info->fbops->fb_read(file, buf, count, ppos);
 	
-	if (p >= info->fix.smem_len)
+	total_size = info->screen_size;
+	if (total_size == 0)
+		total_size = info->fix.smem_len;
+
+	if (p >= total_size)
 	    return 0;
-	if (count >= info->fix.smem_len)
-	    count = info->fix.smem_len;
-	if (count + p > info->fix.smem_len)
-		count = info->fix.smem_len - p;
+	if (count >= total_size)
+	    count = total_size;
+	if (count + p > total_size)
+		count = total_size - p;
 
 	cnt = 0;
 	buffer = kmalloc((count > PAGE_SIZE) ? PAGE_SIZE : count,
@@ -572,6 +577,7 @@ fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 	struct fb_info *info = registered_fb[fbidx];
 	u32 *buffer, *dst, *src;
 	int c, i, cnt = 0, err;
+	unsigned long total_size;
 
 	if (!info || !info->screen_base)
 		return -ENODEV;
@@ -582,13 +588,17 @@ fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 	if (info->fbops->fb_write)
 		return info->fbops->fb_write(file, buf, count, ppos);
 	
-	if (p > info->fix.smem_len)
+	total_size = info->screen_size;
+	if (total_size == 0)
+		total_size = info->fix.smem_len;
+
+	if (p > total_size)
 	    return -ENOSPC;
-	if (count >= info->fix.smem_len)
-	    count = info->fix.smem_len;
+	if (count >= total_size)
+	    count = total_size;
 	err = 0;
-	if (count + p > info->fix.smem_len) {
-	    count = info->fix.smem_len - p;
+	if (count + p > total_size) {
+	    count = total_size - p;
 	    err = -ENOSPC;
 	}
 	cnt = 0;

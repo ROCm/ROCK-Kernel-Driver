@@ -603,6 +603,7 @@ struct fb_info {
 	struct fb_cmap cmap;		/* Current cmap */
 	struct fb_ops *fbops;
 	char __iomem *screen_base;	/* Virtual address */
+	unsigned long screen_size;	/* Amount of ioremapped VRAM or 0 */ 
 	int currcon;			/* Current VC. */
 	void *pseudo_palette;		/* Fake palette of 16 colors */ 
 #define FBINFO_STATE_RUNNING	0
