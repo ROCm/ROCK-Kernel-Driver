@@ -44,18 +44,20 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-#include <linux/reboot.h>
-#include <linux/vmalloc.h>
 #include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/kref.h>
 #include <asm/uaccess.h>
 
-#include "scsi.h"
-#include <scsi/scsi_host.h>
-
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_eh.h>
+#include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
+#include <scsi/scsi_request.h>
 #include <scsi/scsicam.h>
 
 #include "scsi_logging.h"
@@ -769,7 +771,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 			 * Inform the user, but make sure that it's not treated
 			 * as a hard error.
 			 */
-			print_sense("sd", SCpnt);
+			scsi_print_sense("sd", SCpnt);
 			SCpnt->result = 0;
 			SCpnt->sense_buffer[0] = 0x0;
 			good_bytes = this_count;
@@ -918,7 +920,7 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 			 * probably pointless to loop */
 			if(!spintime) {
 				printk(KERN_NOTICE "%s: Unit Not Ready, sense:\n", diskname);
-				print_req_sense("", SRpnt);
+				scsi_print_req_sense("", SRpnt);
 			}
 			break;
 		}
@@ -987,7 +989,7 @@ repeat:
 		       driver_byte(the_result));
 
 		if (driver_byte(the_result) & DRIVER_SENSE)
-			print_req_sense("sd", SRpnt);
+			scsi_print_req_sense("sd", SRpnt);
 		else
 			printk("%s : sense not available. \n", diskname);
 
@@ -1542,7 +1544,7 @@ static void sd_shutdown(struct device *dev)
 				    status_byte(res), msg_byte(res),
 				    host_byte(res), driver_byte(res));
 			if (driver_byte(res) & DRIVER_SENSE)
-				print_req_sense("sd", sreq);
+				scsi_print_req_sense("sd", sreq);
 	}
 	
 	scsi_release_request(sreq);

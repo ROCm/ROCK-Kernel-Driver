@@ -122,6 +122,13 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	}
 }
 
+static inline int is_kernel_text(unsigned long addr)
+{
+	if (addr >= (unsigned long)_stext && addr <= (unsigned long)__init_end)
+		return 1;
+	return 0;
+}
+
 /*
  * This maps the physical memory to kernel virtual address space, a total 
  * of max_low_pfn pages, by creating page tables starting from address 
@@ -144,18 +151,29 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 		if (pfn >= max_low_pfn)
 			continue;
 		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {
+			unsigned int address = pfn * PAGE_SIZE + PAGE_OFFSET;
+
 			/* Map with big pages if possible, otherwise create normal page tables. */
 			if (cpu_has_pse) {
-				set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE));
+				unsigned int address2 = (pfn + PTRS_PER_PTE - 1) * PAGE_SIZE + PAGE_OFFSET + PAGE_SIZE-1;
+
+				if (is_kernel_text(address) || is_kernel_text(address2))
+					set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE_EXEC));
+				else
+					set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE));
 				pfn += PTRS_PER_PTE;
 			} else {
 				pte = one_page_table_init(pmd);
 
-				for (pte_ofs = 0; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++)
-					set_pte(pte, pfn_pte(pfn, PAGE_KERNEL));
+				for (pte_ofs = 0; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++) {
+						if (is_kernel_text(address))
+							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
+						else
+							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL));
+				}
 			}
 		}
-	}	
+	}
 }
 
 static inline int page_kills_ppro(unsigned long pagenr)
@@ -272,7 +290,8 @@ extern void set_highmem_pages_init(int);
 #define set_highmem_pages_init(bad_ppro) do { } while (0)
 #endif /* CONFIG_HIGHMEM */
 
-unsigned long __PAGE_KERNEL = _PAGE_KERNEL;
+unsigned long long __PAGE_KERNEL = _PAGE_KERNEL;
+unsigned long long __PAGE_KERNEL_EXEC = _PAGE_KERNEL_EXEC;
 
 #ifndef CONFIG_DISCONTIGMEM
 #define remap_numa_kva() do {} while (0)
@@ -301,6 +320,7 @@ static void __init pagetable_init (void)
 	if (cpu_has_pge) {
 		set_in_cr4(X86_CR4_PGE);
 		__PAGE_KERNEL |= _PAGE_GLOBAL;
+		__PAGE_KERNEL_EXEC |= _PAGE_GLOBAL;
 	}
 
 	kernel_physical_mapping_init(pgd_base);
@@ -391,6 +411,52 @@ void __init zone_sizes_init(void)
 extern void zone_sizes_init(void);
 #endif /* !CONFIG_DISCONTIGMEM */
 
+static int disable_nx __initdata = 0;
+u64 __supported_pte_mask = ~_PAGE_NX;
+
+/*
+ * noexec = on|off
+ *
+ * Control non executable mappings.
+ *
+ * on      Enable
+ * off     Disable
+ */
+static int __init noexec_setup(char *str)
+{
+	if (!strncmp(str, "on",2) && cpu_has_nx) {
+		__supported_pte_mask |= _PAGE_NX;
+		disable_nx = 0;
+	} else if (!strncmp(str,"off",3)) {
+		disable_nx = 1;
+		__supported_pte_mask &= ~_PAGE_NX;
+	}
+	return 1;
+}
+
+__setup("noexec=", noexec_setup);
+
+#ifdef CONFIG_X86_PAE
+static int use_nx = 0;
+
+static void __init set_nx(void)
+{
+	unsigned int v[4], l, h;
+
+	if (cpu_has_pae && (cpuid_eax(0x80000000) > 0x80000001)) {
+		cpuid(0x80000001, &v[0], &v[1], &v[2], &v[3]);
+		if ((v[3] & (1 << 20)) && !disable_nx) {
+			rdmsr(MSR_EFER, l, h);
+			l |= EFER_NX;
+			wrmsr(MSR_EFER, l, h);
+			use_nx = 1;
+			__supported_pte_mask |= _PAGE_NX;
+		}
+	}
+}
+
+#endif
+
 /*
  * paging_init() sets up the page tables - note that the first 8MB are
  * already mapped by head.S.
@@ -400,6 +466,12 @@ extern void zone_sizes_init(void);
  */
 void __init paging_init(void)
 {
+#ifdef CONFIG_X86_PAE
+	set_nx();
+	if (use_nx)
+		printk("NX (Execute Disable) protection: active\n");
+#endif
+
 	pagetable_init();
 
 	load_cr3(swapper_pg_dir);

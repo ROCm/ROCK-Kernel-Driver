@@ -16,11 +16,9 @@
  * General Public License for more details.
  *
  */
-
-#include "qla_os.h"
-
 #include "qla_def.h"
 
+#include <linux/delay.h>
 
 static void
 qla2x00_mbx_sem_timeout(unsigned long data)
@@ -89,7 +87,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 		}
 	}
 
-	ha->flags.mbox_busy = TRUE;
+	ha->flags.mbox_busy = 1;
 	/* Save mailbox command for debug */
 	ha->mcp = mcp;
 
@@ -135,7 +133,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 #endif
 
 	/* Issue set host interrupt command to send cmd out. */
-	ha->flags.mbox_int = FALSE;
+	ha->flags.mbox_int = 0;
 	clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 
 	/* Unlock mbx registers and wait for interrupt */
@@ -216,7 +214,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 		    command);)
 
 		/* Got interrupt. Clear the flag. */
-		ha->flags.mbox_int = FALSE;
+		ha->flags.mbox_int = 0;
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 
 		if (ha->mailbox_out[0] != MBS_COMMAND_COMPLETE) {
@@ -257,7 +255,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 	if (!abort_active)
 		spin_unlock_irqrestore(&ha->mbx_reg_lock, mbx_flags);
 
-	ha->flags.mbox_busy = FALSE;
+	ha->flags.mbox_busy = 0;
 
 	/* Clean up */
 	ha->mcp = NULL;
@@ -546,7 +544,7 @@ qla2x00_execute_fw(scsi_qla_host_t *ha)
  */
 void
 qla2x00_get_fw_version(scsi_qla_host_t *ha, uint16_t *major, uint16_t *minor,
-    uint16_t *subminor, uint16_t *attributes)
+    uint16_t *subminor, uint16_t *attributes, uint32_t *memory)
 {
 	int		rval;
 	mbx_cmd_t	mc;
@@ -556,7 +554,7 @@ qla2x00_get_fw_version(scsi_qla_host_t *ha, uint16_t *major, uint16_t *minor,
 
 	mcp->mb[0] = MBC_GET_FIRMWARE_VERSION;
 	mcp->out_mb = MBX_0;
-	mcp->in_mb = MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_6|MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->flags = 0;
 	mcp->tov = 30;
 	rval = qla2x00_mailbox_command(ha, mcp);
@@ -566,6 +564,10 @@ qla2x00_get_fw_version(scsi_qla_host_t *ha, uint16_t *major, uint16_t *minor,
 	*minor = mcp->mb[2];
 	*subminor = mcp->mb[3];
 	*attributes = mcp->mb[6];
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		*memory = 0x1FFFF;			/* Defaults to 128KB. */
+	else
+		*memory = (mcp->mb[5] << 16) | mcp->mb[4];
 
 	if (rval != QLA_SUCCESS) {
 		/*EMPTY*/
@@ -1431,35 +1433,37 @@ qla2x00_get_port_database(scsi_qla_host_t *ha, fc_port_t *fcport, uint8_t opt)
 	mcp->flags = MBX_DMA_IN;
 	mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
 	rval = qla2x00_mailbox_command(ha, mcp);
+	if (rval != QLA_SUCCESS)
+		goto gpd_error_out;
 
-	if (rval == QLA_SUCCESS) {
-		/* Names are little-endian. */
-		memcpy(fcport->node_name, pd->node_name, WWN_SIZE);
-		memcpy(fcport->port_name, pd->port_name, WWN_SIZE);
-
-		/* Get port_id of device. */
-		fcport->d_id.b.al_pa = pd->port_id[2];
-		fcport->d_id.b.area = pd->port_id[3];
-		fcport->d_id.b.domain = pd->port_id[0];
-		fcport->d_id.b.rsvd_1 = 0;
-
-		/* Check for device require authentication. */
-		pd->common_features & BIT_5 ? (fcport->flags |= FCF_AUTH_REQ) :
-		    (fcport->flags &= ~FCF_AUTH_REQ);
-
-		/* If not target must be initiator or unknown type. */
-		if ((pd->prli_svc_param_word_3[0] & BIT_4) == 0) {
-			fcport->port_type = FCT_INITIATOR;
-		} else {
-			fcport->port_type = FCT_TARGET;
-
-			/* Check for logged in. */
-			if (pd->master_state != PD_STATE_PORT_LOGGED_IN &&
-			    pd->slave_state != PD_STATE_PORT_LOGGED_IN)
-				rval = QLA_FUNCTION_FAILED;
-		}
+	/* Check for logged in state. */
+	if (pd->master_state != PD_STATE_PORT_LOGGED_IN &&
+	    pd->slave_state != PD_STATE_PORT_LOGGED_IN) {
+		rval = QLA_FUNCTION_FAILED;
+		goto gpd_error_out;
 	}
 
+	/* Names are little-endian. */
+	memcpy(fcport->node_name, pd->node_name, WWN_SIZE);
+	memcpy(fcport->port_name, pd->port_name, WWN_SIZE);
+
+	/* Get port_id of device. */
+	fcport->d_id.b.al_pa = pd->port_id[2];
+	fcport->d_id.b.area = pd->port_id[3];
+	fcport->d_id.b.domain = pd->port_id[0];
+	fcport->d_id.b.rsvd_1 = 0;
+
+	/* Check for device require authentication. */
+	pd->common_features & BIT_5 ? (fcport->flags |= FCF_AUTH_REQ) :
+	    (fcport->flags &= ~FCF_AUTH_REQ);
+
+	/* If not target must be initiator or unknown type. */
+	if ((pd->prli_svc_param_word_3[0] & BIT_4) == 0)
+		fcport->port_type = FCT_INITIATOR;
+	else
+		fcport->port_type = FCT_TARGET;
+
+gpd_error_out:
 	pci_free_consistent(ha->pdev, PORT_DATABASE_SIZE, pd, pd_dma);
 
 	if (rval != QLA_SUCCESS) {

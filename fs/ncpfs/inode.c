@@ -873,7 +873,9 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 				tmpattr.ia_valid = ATTR_MODE;
 				tmpattr.ia_mode = attr->ia_mode;
 
-				inode_setattr(inode, &tmpattr);
+				result = inode_setattr(inode, &tmpattr);
+				if (result)
+					goto out;
 			}
 		}
 #endif
@@ -899,13 +901,17 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 		   closing the file */
 		ncp_inode_close(inode);
 		result = ncp_make_closed(inode);
+		if (result)
+			goto out;
 		{
 			struct iattr tmpattr;
 			
 			tmpattr.ia_valid = ATTR_SIZE;
 			tmpattr.ia_size = attr->ia_size;
 			
-			inode_setattr(inode, &tmpattr);
+			result = inode_setattr(inode, &tmpattr);
+			if (result)
+				goto out;
 		}
 	}
 	if ((attr->ia_valid & ATTR_CTIME) != 0) {

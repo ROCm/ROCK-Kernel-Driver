@@ -3,7 +3,6 @@
 
 #include <linux/config.h>
 #include <linux/compiler.h>
-#include <asm/setup.h>
 
 /* These macros are used to mark some functions or 
  * initialized data (doesn't apply to uninitialized data)
@@ -69,7 +68,7 @@ extern initcall_t __con_initcall_start, __con_initcall_end;
 extern initcall_t __security_initcall_start, __security_initcall_end;
 
 /* Defined in init/main.c */
-extern char saved_command_line[COMMAND_LINE_SIZE];
+extern char saved_command_line[];
 #endif
   
 #ifndef MODULE

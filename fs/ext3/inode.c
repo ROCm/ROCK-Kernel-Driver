@@ -881,25 +881,41 @@ ext3_direct_io_get_blocks(struct inode *inode, sector_t iblock,
 	handle_t *handle = journal_current_handle();
 	int ret = 0;
 
-	if (handle && handle->h_buffer_credits <= EXT3_RESERVE_TRANS_BLOCKS) {
+	if (!handle)
+		goto get_block;		/* A read */
+
+	if (handle->h_transaction->t_state == T_LOCKED) {
+		/*
+		 * Huge direct-io writes can hold off commits for long
+		 * periods of time.  Let this commit run.
+		 */
+		ext3_journal_stop(handle);
+		handle = ext3_journal_start(inode, DIO_CREDITS);
+		if (IS_ERR(handle))
+			ret = PTR_ERR(handle);
+		goto get_block;
+	}
+
+	if (handle->h_buffer_credits <= EXT3_RESERVE_TRANS_BLOCKS) {
 		/*
 		 * Getting low on buffer credits...
 		 */
-		if (!ext3_journal_extend(handle, DIO_CREDITS)) {
+		ret = ext3_journal_extend(handle, DIO_CREDITS);
+		if (ret > 0) {
 			/*
-			 * Couldn't extend the transaction.  Start a new one
+			 * Couldn't extend the transaction.  Start a new one.
 			 */
 			ret = ext3_journal_restart(handle, DIO_CREDITS);
 		}
 	}
+
+get_block:
 	if (ret == 0)
 		ret = ext3_get_block_handle(handle, inode, iblock,
 					bh_result, create, 0);
-	if (ret == 0)
-		bh_result->b_size = (1 << inode->i_blkbits);
+	bh_result->b_size = (1 << inode->i_blkbits);
 	return ret;
 }
-
 
 /*
  * `handle' can be NULL if create is zero

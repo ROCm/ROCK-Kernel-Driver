@@ -14,9 +14,6 @@
 
 #ifndef __ASSEMBLY__
 
-/* Sparc64 is slow at multiplication, we prefer to use some extra space. */
-#define WANT_PAGE_VIRTUAL 1
-
 extern void _clear_page(void *page);
 #define clear_page(X)	_clear_page((void *)(X))
 struct page;
@@ -111,17 +108,19 @@ typedef unsigned long iopgprot_t;
  */
 #define PAGE_OFFSET		_AC(0xFFFFF80000000000,UL)
 
+#ifndef __ASSEMBLY__
+
 #define __pa(x)			((unsigned long)(x) - PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long) (x) + PAGE_OFFSET))
 
 /* PFNs are real physical page numbers.  However, mem_map only begins to record
  * per-page information starting at pfn_base.  This is to handle systems where
- * the first physical page in the machine is at some huge physical address, such
- * as 4GB.   This is common on a partitioned E10000, for example.
+ * the first physical page in the machine is at some huge physical address,
+ * such as 4GB.   This is common on a partitioned E10000, for example.
  */
+extern struct page *pfn_to_page(unsigned long pfn);
+extern unsigned long page_to_pfn(struct page *);
 
-#define pfn_to_page(pfn)	(mem_map + ((pfn)-(pfn_base)))
-#define page_to_pfn(page)	((unsigned long)(((page) - mem_map) + pfn_base))
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr)>>PAGE_SHIFT)
 
 #define pfn_valid(pfn)		(((pfn)-(pfn_base)) < max_mapnr)
@@ -129,8 +128,6 @@ typedef unsigned long iopgprot_t;
 
 #define virt_to_phys __pa
 #define phys_to_virt __va
-
-#ifndef __ASSEMBLY__
 
 /* The following structure is used to hold the physical
  * memory configuration of the machine.  This is filled in

@@ -1,29 +1,21 @@
-/*********************************************************************
- *                
- * Filename:      crc.c
- * Version:       0.1
- * Description:   CRC calculation routines
- * Status:        Experimental.
- * Author:        Dag Brattli <dagb@cs.uit.no>
- * Created at:    Mon Aug  4 20:40:53 1997
- * Modified at:   Sun May  2 20:28:08 1999
- * Modified by:   Dag Brattli <dagb@cs.uit.no>
- * Sources:       ppp.c by Michael Callahan <callahan@maths.ox.ac.uk>
- *                Al Longyear <longyear@netcom.com>
+/*
+ *	linux/lib/crc16.c
  *
- ********************************************************************/
+ *	This source code is licensed under the GNU General Public License,
+ *	Version 2. See the file COPYING for more details.
+ */
 
-#include <net/irda/crc.h>
+#include <linux/types.h>
 #include <linux/module.h>
+#include <linux/crc16.h>
 
 /*
- * This mysterious table is just the CRC of each possible byte.  It can be
- * computed using the standard bit-at-a-time methods.  The polynomial can
- * be seen in entry 128, 0x8408.  This corresponds to x^0 + x^5 + x^12.
+ * This mysterious table is just the CRC of each possible byte. It can be
+ * computed using the standard bit-at-a-time methods. The polynomial can
+ * be seen in entry 128, 0x8408. This corresponds to x^0 + x^5 + x^12.
  * Add the implicit x^16, and you have the standard CRC-CCITT.
  */
-__u16 const irda_crc16_table[256] =
-{
+u16 const crc16_table[256] = {
 	0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
 	0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
 	0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,
@@ -57,12 +49,21 @@ __u16 const irda_crc16_table[256] =
 	0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9, 0x8330,
 	0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 };
-EXPORT_SYMBOL(irda_crc16_table);
+EXPORT_SYMBOL(crc16_table);
 
-__u16 irda_calc_crc16( __u16 fcs, __u8 const *buf, size_t len) 
+/**
+ *	crc16 - recompute the CRC for the data buffer
+ *	@crc - previous CRC value
+ *	@buffer - data pointer
+ *	@len - number of bytes in the buffer
+ */
+u16 crc16(u16 crc, u8 const *buffer, size_t len)
 {
 	while (len--)
-                fcs = irda_fcs(fcs, *buf++);
-	return fcs;
+		crc = crc16_byte(crc, *buffer++);
+	return crc;
 }
-EXPORT_SYMBOL(irda_calc_crc16);
+EXPORT_SYMBOL(crc16);
+
+MODULE_DESCRIPTION("CRC16 calculations");
+MODULE_LICENSE("GPL");

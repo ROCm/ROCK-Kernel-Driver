@@ -16,6 +16,7 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 #include <asm/bootsetup.h>
+#include <asm/setup.h>
 
 /* Don't add a printk in there. printk relies on the PDA which is not initialized 
    yet. */

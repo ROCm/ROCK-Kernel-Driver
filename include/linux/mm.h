@@ -23,6 +23,7 @@ extern unsigned long max_mapnr;
 
 extern unsigned long num_physpages;
 extern void * high_memory;
+extern unsigned long vmalloc_earlyreserve;
 extern int page_cluster;
 
 #include <asm/page.h>

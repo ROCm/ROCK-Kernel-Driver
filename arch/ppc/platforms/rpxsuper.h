@@ -32,7 +32,7 @@ extern bd_t m8xx_board_info;
  * We just map a few things we need.  The CSR is actually 4 byte-wide
  * registers that can be accessed as 8-, 16-, or 32-bit values.
  */
-#define IMAP_ADDR		((uint)0xf0000000)
+#define CPM_MAP_ADDR		((uint)0xf0000000)
 #define RPX_CSR_ADDR		((uint)0xfa000000)
 #define RPX_CSR_SIZE		((uint)(512 * 1024))
 #define RPX_NVRTC_ADDR		((uint)0xfa080000)

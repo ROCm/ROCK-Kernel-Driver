@@ -60,6 +60,7 @@
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->tree_lock
+ *    ->page_map_lock()		(try_to_unmap_file)
  *
  *  ->i_sem
  *    ->i_mmap_lock		(truncate->unmap_mapping_range)
@@ -87,6 +88,13 @@
  *    ->private_lock		(try_to_unmap_one)
  *    ->tree_lock		(try_to_unmap_one)
  *    ->zone.lru_lock		(follow_page->mark_page_accessed)
+ *    ->page_map_lock()		(page_add_anon_rmap)
+ *      ->tree_lock		(page_remove_rmap->set_page_dirty)
+ *      ->private_lock		(page_remove_rmap->set_page_dirty)
+ *      ->inode_lock		(page_remove_rmap->set_page_dirty)
+ *    ->anon_vma.lock		(anon_vma_prepare)
+ *    ->inode_lock		(zap_pte_range->set_page_dirty)
+ *    ->private_lock		(zap_pte_range->__set_page_dirty_buffers)
  *
  *  ->task->proc_lock
  *    ->dcache_lock		(proc_pid_lookup)

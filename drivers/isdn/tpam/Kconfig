@@ -4,6 +4,7 @@
 config ISDN_DRV_TPAM
 	tristate "Auvertech TurboPAM support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && ISDN_I4L && PCI
+	select CRC16
 	help
 	  This enables support for the Auvertech TurboPAM ISDN-card.
 	  For running this card, additional firmware is necessary, which has

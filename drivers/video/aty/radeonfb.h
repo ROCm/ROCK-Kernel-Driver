@@ -516,12 +516,6 @@ static inline void _radeon_engine_idle (struct radeonfb_info *rinfo)
 	printk(KERN_ERR "radeonfb: Idle Timeout !\n");
 }
 
-static inline int radeon_accel_disabled(void)
-{
-	extern int radeonfb_noaccel;
-	return radeonfb_noaccel;
-}
-
 #define radeon_engine_idle()		_radeon_engine_idle(rinfo)
 #define radeon_fifo_wait(entries)	_radeon_fifo_wait(rinfo,entries)
 

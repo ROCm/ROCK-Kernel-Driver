@@ -250,7 +250,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	if (sk->sk_prot->init) {
 		int err = sk->sk_prot->init(sk);
 		if (err != 0) {
-			inet_sock_release(sk);
+			sk_common_release(sk);
 			return err;
 		}
 	}
@@ -510,10 +510,10 @@ struct proto_ops inet6_stream_ops = {
 	.ioctl =	inet6_ioctl,			/* must change  */
 	.listen =	inet_listen,			/* ok		*/
 	.shutdown =	inet_shutdown,			/* ok		*/
-	.setsockopt =	inet_setsockopt,		/* ok		*/
-	.getsockopt =	inet_getsockopt,		/* ok		*/
+	.setsockopt =	sock_common_setsockopt,		/* ok		*/
+	.getsockopt =	sock_common_getsockopt,		/* ok		*/
 	.sendmsg =	inet_sendmsg,			/* ok		*/
-	.recvmsg =	inet_recvmsg,			/* ok		*/
+	.recvmsg =	sock_common_recvmsg,		/* ok		*/
 	.mmap =		sock_no_mmap,
 	.sendpage =	tcp_sendpage
 };
@@ -531,10 +531,10 @@ struct proto_ops inet6_dgram_ops = {
 	.ioctl =	inet6_ioctl,			/* must change  */
 	.listen =	sock_no_listen,			/* ok		*/
 	.shutdown =	inet_shutdown,			/* ok		*/
-	.setsockopt =	inet_setsockopt,		/* ok		*/
-	.getsockopt =	inet_getsockopt,		/* ok		*/
+	.setsockopt =	sock_common_setsockopt,		/* ok		*/
+	.getsockopt =	sock_common_getsockopt,		/* ok		*/
 	.sendmsg =	inet_sendmsg,			/* ok		*/
-	.recvmsg =	inet_recvmsg,			/* ok		*/
+	.recvmsg =	sock_common_recvmsg,		/* ok		*/
 	.mmap =		sock_no_mmap,
 	.sendpage =	sock_no_sendpage,
 };

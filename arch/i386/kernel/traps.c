@@ -103,7 +103,7 @@ static int valid_stack_ptr(struct task_struct *task, void *p)
 }
 
 #ifdef CONFIG_FRAME_POINTER
-void print_context_stack(struct task_struct *task, unsigned long *stack,
+static void print_context_stack(struct task_struct *task, unsigned long *stack,
 			 unsigned long ebp)
 {
 	unsigned long addr;
@@ -117,16 +117,17 @@ void print_context_stack(struct task_struct *task, unsigned long *stack,
 	}
 }
 #else
-void print_context_stack(struct task_struct *task, unsigned long *stack,
+static void print_context_stack(struct task_struct *task, unsigned long *stack,
 			 unsigned long ebp)
 {
 	unsigned long addr;
 
 	while (!kstack_end(stack)) {
 		addr = *stack++;
-		if (kernel_text_address(addr)) {
-			printk(" [<%08lx>] ", addr);
-			print_symbol("%s\n", addr);
+		if (__kernel_text_address(addr)) {
+			printk(" [<%08lx>]", addr);
+			print_symbol(" %s", addr);
+			printk("\n");
 		}
 	}
 }

@@ -71,8 +71,6 @@
 **==========================================================
 */
 
-#define SCSI_NCR_DYNAMIC_DMA_MAPPING
-
 /*==========================================================
 **
 **	Miscallaneous defines.
@@ -81,22 +79,12 @@
 */
 
 #define u_char		unsigned char
-#define u_short		unsigned short
-#define u_int		unsigned int
 #define u_long		unsigned long
-
-#ifndef bcmp
-#define bcmp(s, d, n)	memcmp((d), (s), (n))
-#endif
 
 #ifndef bzero
 #define bzero(d, n)	memset((d), 0, (n))
 #endif
  
-#ifndef offsetof
-#define offsetof(t, m)	((size_t) (&((t *)0)->m))
-#endif
-
 /*==========================================================
 **
 **	assert ()
@@ -353,7 +341,6 @@ typedef struct m_link {		/* Link between free memory chunks */
 	struct m_link *next;
 } m_link_s;
 
-#ifdef	SCSI_NCR_DYNAMIC_DMA_MAPPING
 typedef struct m_vtob {		/* Virtual to Bus address translation */
 	struct m_vtob *next;
 	m_addr_t vaddr;
@@ -364,10 +351,8 @@ typedef struct m_vtob {		/* Virtual to Bus address translation */
 #define VTOB_HASH_MASK		(VTOB_HASH_SIZE-1)
 #define VTOB_HASH_CODE(m)	\
 	((((m_addr_t) (m)) >> MEMO_CLUSTER_SHIFT) & VTOB_HASH_MASK)
-#endif
 
 typedef struct m_pool {		/* Memory pool of a given kind */
-#ifdef	SCSI_NCR_DYNAMIC_DMA_MAPPING
 	m_bush_t bush;
 	m_addr_t (*getp)(struct m_pool *);
 	void (*freep)(struct m_pool *, m_addr_t);
@@ -378,10 +363,6 @@ typedef struct m_pool {		/* Memory pool of a given kind */
 	int nump;
 	m_vtob_s *(vtob[VTOB_HASH_SIZE]);
 	struct m_pool *next;
-#else
-#define M_GETP()		__GetFreePages(MEMO_GFP_FLAGS, MEMO_PAGE_ORDER)
-#define M_FREEP(p)		free_pages(p, MEMO_PAGE_ORDER)
-#endif	/* SCSI_NCR_DYNAMIC_DMA_MAPPING */
 	struct m_link h[PAGE_SHIFT-MEMO_SHIFT+MEMO_PAGE_ORDER+1];
 } m_pool_s;
 
@@ -508,12 +489,6 @@ static void __m_free(m_pool_s *mp, void *ptr, int size, char *name)
  * memory accessed by the PCI chip. `mp0' is the default not DMAable pool.
  */
 
-#ifndef	SCSI_NCR_DYNAMIC_DMA_MAPPING
-
-static m_pool_s mp0;
-
-#else
-
 static m_addr_t ___mp0_getp(m_pool_s *mp)
 {
 	m_addr_t m = GetPages();
@@ -530,21 +505,9 @@ static void ___mp0_freep(m_pool_s *mp, m_addr_t m)
 
 static m_pool_s mp0 = {0, ___mp0_getp, ___mp0_freep};
 
-#endif	/* SCSI_NCR_DYNAMIC_DMA_MAPPING */
-
 /*
  * DMAable pools.
  */
-
-#ifndef	SCSI_NCR_DYNAMIC_DMA_MAPPING
-
-/* Without pci bus iommu support, all the memory is assumed DMAable */
-
-#define __m_calloc_dma(b, s, n)		m_calloc(s, n)
-#define __m_free_dma(b, p, s, n)	m_free(p, s, n)
-#define __vtobus(b, p)			virt_to_bus(p)
-
-#else
 
 /*
  * With pci bus iommu support, we maintain one pool per pcidev and a 
@@ -680,8 +643,6 @@ static m_addr_t __vtobus(m_bush_t bush, void *m)
 	return vp ? vp->baddr + (((m_addr_t) m) - a) : 0;
 }
 
-#endif	/* SCSI_NCR_DYNAMIC_DMA_MAPPING */
-
 #define _m_calloc_dma(np, s, n)		__m_calloc_dma(np->dev, s, n)
 #define _m_free_dma(np, p, s, n)	__m_free_dma(np->dev, p, s, n)
 #define m_calloc_dma(s, n)		_m_calloc_dma(np, s, n)
@@ -692,23 +653,6 @@ static m_addr_t __vtobus(m_bush_t bush, void *m)
 /*
  *  Deal with DMA mapping/unmapping.
  */
-
-#ifndef SCSI_NCR_DYNAMIC_DMA_MAPPING
-
-/* Linux versions prior to pci bus iommu kernel interface */
-
-#define __unmap_scsi_data(dev, cmd)	do {; } while (0)
-#define __map_scsi_single_data(dev, cmd) (__vtobus(dev,(cmd)->request_buffer))
-#define __map_scsi_sg_data(dev, cmd)	((cmd)->use_sg)
-#define __sync_scsi_data_for_cpu(dev, cmd)	do {; } while (0)
-#define __sync_scsi_data_for_device(dev, cmd)	do {; } while (0)
-
-#define scsi_sg_dma_address(sc)		vtobus((sc)->address)
-#define scsi_sg_dma_len(sc)		((sc)->length)
-
-#else
-
-/* Linux version with pci bus iommu kernel interface */
 
 /* To keep track of the dma mapping (sg/single) that has been set */
 #define __data_mapped	SCp.phase
@@ -800,64 +744,13 @@ static void __sync_scsi_data_for_device(struct device *dev, Scsi_Cmnd *cmd)
 #define scsi_sg_dma_address(sc)		sg_dma_address(sc)
 #define scsi_sg_dma_len(sc)		sg_dma_len(sc)
 
-#endif	/* SCSI_NCR_DYNAMIC_DMA_MAPPING */
-
 #define unmap_scsi_data(np, cmd)	__unmap_scsi_data(np->dev, cmd)
 #define map_scsi_single_data(np, cmd)	__map_scsi_single_data(np->dev, cmd)
 #define map_scsi_sg_data(np, cmd)	__map_scsi_sg_data(np->dev, cmd)
 #define sync_scsi_data_for_cpu(np, cmd)	__sync_scsi_data_for_cpu(np->dev, cmd)
 #define sync_scsi_data_for_device(np, cmd) __sync_scsi_data_for_device(np->dev, cmd)
 
-/*==========================================================
-**
-**	SCSI data transfer direction
-**
-**	Until some linux kernel version near 2.3.40, 
-**	low-level scsi drivers were not told about data 
-**	transfer direction. We check the existence of this 
-**	feature that has been expected for a _long_ time by 
-**	all SCSI driver developers by just testing against 
-**	the definition of SCSI_DATA_UNKNOWN. Indeed this is 
-**	a hack, but testing against a kernel version would 
-**	have been a shame. ;-)
-**
-**==========================================================
-*/
-#ifdef	SCSI_DATA_UNKNOWN
-
 #define scsi_data_direction(cmd)	(cmd->sc_data_direction)
-
-#else
-
-#define	SCSI_DATA_UNKNOWN	0
-#define	SCSI_DATA_WRITE		1
-#define	SCSI_DATA_READ		2
-#define	SCSI_DATA_NONE		3
-
-static __inline__ int scsi_data_direction(Scsi_Cmnd *cmd)
-{
-	int direction;
-
-	switch((int) cmd->cmnd[0]) {
-	case 0x08:  /*	READ(6)				08 */
-	case 0x28:  /*	READ(10)			28 */
-	case 0xA8:  /*	READ(12)			A8 */
-		direction = SCSI_DATA_READ;
-		break;
-	case 0x0A:  /*	WRITE(6)			0A */
-	case 0x2A:  /*	WRITE(10)			2A */
-	case 0xAA:  /*	WRITE(12)			AA */
-		direction = SCSI_DATA_WRITE;
-		break;
-	default:
-		direction = SCSI_DATA_UNKNOWN;
-		break;
-	}
-
-	return direction;
-}
-
-#endif	/* SCSI_DATA_UNKNOWN */
 
 /*==========================================================
 **
@@ -879,602 +772,6 @@ static struct ncr_driver_setup
 
 #define initverbose (driver_setup.verbose)
 #define bootverbose (np->verbose)
-
-
-/*==========================================================
-**
-**	NVRAM detection and reading.
-**	 
-**	Currently supported:
-**	- 24C16 EEPROM with both Symbios and Tekram layout.
-**	- 93C46 EEPROM with Tekram layout.
-**
-**==========================================================
-*/
-
-#ifdef SCSI_NCR_NVRAM_SUPPORT
-/*
- *  24C16 EEPROM reading.
- *
- *  GPOI0 - data in/data out
- *  GPIO1 - clock
- *  Symbios NVRAM wiring now also used by Tekram.
- */
-
-#define SET_BIT 0
-#define CLR_BIT 1
-#define SET_CLK 2
-#define CLR_CLK 3
-
-/*
- *  Set/clear data/clock bit in GPIO0
- */
-static void __init
-S24C16_set_bit(ncr_slot *np, u_char write_bit, u_char *gpreg, int bit_mode)
-{
-	UDELAY (5);
-	switch (bit_mode){
-	case SET_BIT:
-		*gpreg |= write_bit;
-		break;
-	case CLR_BIT:
-		*gpreg &= 0xfe;
-		break;
-	case SET_CLK:
-		*gpreg |= 0x02;
-		break;
-	case CLR_CLK:
-		*gpreg &= 0xfd;
-		break;
-
-	}
-	OUTB (nc_gpreg, *gpreg);
-	UDELAY (5);
-}
-
-/*
- *  Send START condition to NVRAM to wake it up.
- */
-static void __init S24C16_start(ncr_slot *np, u_char *gpreg)
-{
-	S24C16_set_bit(np, 1, gpreg, SET_BIT);
-	S24C16_set_bit(np, 0, gpreg, SET_CLK);
-	S24C16_set_bit(np, 0, gpreg, CLR_BIT);
-	S24C16_set_bit(np, 0, gpreg, CLR_CLK);
-}
-
-/*
- *  Send STOP condition to NVRAM - puts NVRAM to sleep... ZZzzzz!!
- */
-static void __init S24C16_stop(ncr_slot *np, u_char *gpreg)
-{
-	S24C16_set_bit(np, 0, gpreg, SET_CLK);
-	S24C16_set_bit(np, 1, gpreg, SET_BIT);
-}
-
-/*
- *  Read or write a bit to the NVRAM,
- *  read if GPIO0 input else write if GPIO0 output
- */
-static void __init 
-S24C16_do_bit(ncr_slot *np, u_char *read_bit, u_char write_bit, u_char *gpreg)
-{
-	S24C16_set_bit(np, write_bit, gpreg, SET_BIT);
-	S24C16_set_bit(np, 0, gpreg, SET_CLK);
-	if (read_bit)
-		*read_bit = INB (nc_gpreg);
-	S24C16_set_bit(np, 0, gpreg, CLR_CLK);
-	S24C16_set_bit(np, 0, gpreg, CLR_BIT);
-}
-
-/*
- *  Output an ACK to the NVRAM after reading,
- *  change GPIO0 to output and when done back to an input
- */
-static void __init
-S24C16_write_ack(ncr_slot *np, u_char write_bit, u_char *gpreg, u_char *gpcntl)
-{
-	OUTB (nc_gpcntl, *gpcntl & 0xfe);
-	S24C16_do_bit(np, 0, write_bit, gpreg);
-	OUTB (nc_gpcntl, *gpcntl);
-}
-
-/*
- *  Input an ACK from NVRAM after writing,
- *  change GPIO0 to input and when done back to an output
- */
-static void __init 
-S24C16_read_ack(ncr_slot *np, u_char *read_bit, u_char *gpreg, u_char *gpcntl)
-{
-	OUTB (nc_gpcntl, *gpcntl | 0x01);
-	S24C16_do_bit(np, read_bit, 1, gpreg);
-	OUTB (nc_gpcntl, *gpcntl);
-}
-
-/*
- *  WRITE a byte to the NVRAM and then get an ACK to see it was accepted OK,
- *  GPIO0 must already be set as an output
- */
-static void __init 
-S24C16_write_byte(ncr_slot *np, u_char *ack_data, u_char write_data, 
-		  u_char *gpreg, u_char *gpcntl)
-{
-	int x;
-	
-	for (x = 0; x < 8; x++)
-		S24C16_do_bit(np, 0, (write_data >> (7 - x)) & 0x01, gpreg);
-		
-	S24C16_read_ack(np, ack_data, gpreg, gpcntl);
-}
-
-/*
- *  READ a byte from the NVRAM and then send an ACK to say we have got it,
- *  GPIO0 must already be set as an input
- */
-static void __init 
-S24C16_read_byte(ncr_slot *np, u_char *read_data, u_char ack_data, 
-	         u_char *gpreg, u_char *gpcntl)
-{
-	int x;
-	u_char read_bit;
-
-	*read_data = 0;
-	for (x = 0; x < 8; x++) {
-		S24C16_do_bit(np, &read_bit, 1, gpreg);
-		*read_data |= ((read_bit & 0x01) << (7 - x));
-	}
-
-	S24C16_write_ack(np, ack_data, gpreg, gpcntl);
-}
-
-/*
- *  Read 'len' bytes starting at 'offset'.
- */
-static int __init 
-sym_read_S24C16_nvram (ncr_slot *np, int offset, u_char *data, int len)
-{
-	u_char	gpcntl, gpreg;
-	u_char	old_gpcntl, old_gpreg;
-	u_char	ack_data;
-	int	retv = 1;
-	int	x;
-
-	/* save current state of GPCNTL and GPREG */
-	old_gpreg	= INB (nc_gpreg);
-	old_gpcntl	= INB (nc_gpcntl);
-	gpcntl		= old_gpcntl & 0x1c;
-
-	/* set up GPREG & GPCNTL to set GPIO0 and GPIO1 in to known state */
-	OUTB (nc_gpreg,  old_gpreg);
-	OUTB (nc_gpcntl, gpcntl);
-
-	/* this is to set NVRAM into a known state with GPIO0/1 both low */
-	gpreg = old_gpreg;
-	S24C16_set_bit(np, 0, &gpreg, CLR_CLK);
-	S24C16_set_bit(np, 0, &gpreg, CLR_BIT);
-		
-	/* now set NVRAM inactive with GPIO0/1 both high */
-	S24C16_stop(np, &gpreg);
-	
-	/* activate NVRAM */
-	S24C16_start(np, &gpreg);
-
-	/* write device code and random address MSB */
-	S24C16_write_byte(np, &ack_data,
-		0xa0 | ((offset >> 7) & 0x0e), &gpreg, &gpcntl);
-	if (ack_data & 0x01)
-		goto out;
-
-	/* write random address LSB */
-	S24C16_write_byte(np, &ack_data,
-		offset & 0xff, &gpreg, &gpcntl);
-	if (ack_data & 0x01)
-		goto out;
-
-	/* regenerate START state to set up for reading */
-	S24C16_start(np, &gpreg);
-	
-	/* rewrite device code and address MSB with read bit set (lsb = 0x01) */
-	S24C16_write_byte(np, &ack_data,
-		0xa1 | ((offset >> 7) & 0x0e), &gpreg, &gpcntl);
-	if (ack_data & 0x01)
-		goto out;
-
-	/* now set up GPIO0 for inputting data */
-	gpcntl |= 0x01;
-	OUTB (nc_gpcntl, gpcntl);
-		
-	/* input all requested data - only part of total NVRAM */
-	for (x = 0; x < len; x++) 
-		S24C16_read_byte(np, &data[x], (x == (len-1)), &gpreg, &gpcntl);
-
-	/* finally put NVRAM back in inactive mode */
-	gpcntl &= 0xfe;
-	OUTB (nc_gpcntl, gpcntl);
-	S24C16_stop(np, &gpreg);
-	retv = 0;
-out:
-	/* return GPIO0/1 to original states after having accessed NVRAM */
-	OUTB (nc_gpcntl, old_gpcntl);
-	OUTB (nc_gpreg,  old_gpreg);
-
-	return retv;
-}
-
-#undef SET_BIT
-#undef CLR_BIT
-#undef SET_CLK
-#undef CLR_CLK
-
-/*
- *  Try reading Symbios NVRAM.
- *  Return 0 if OK.
- */
-static int __init sym_read_Symbios_nvram (ncr_slot *np, Symbios_nvram *nvram)
-{
-	static u_char Symbios_trailer[6] = {0xfe, 0xfe, 0, 0, 0, 0};
-	u_char *data = (u_char *) nvram;
-	int len  = sizeof(*nvram);
-	u_short	csum;
-	int x;
-
-	/* probe the 24c16 and read the SYMBIOS 24c16 area */
-	if (sym_read_S24C16_nvram (np, SYMBIOS_NVRAM_ADDRESS, data, len))
-		return 1;
-
-	/* check valid NVRAM signature, verify byte count and checksum */
-	if (nvram->type != 0 ||
-	    memcmp(nvram->trailer, Symbios_trailer, 6) ||
-	    nvram->byte_count != len - 12)
-		return 1;
-
-	/* verify checksum */
-	for (x = 6, csum = 0; x < len - 6; x++)
-		csum += data[x];
-	if (csum != nvram->checksum)
-		return 1;
-
-	return 0;
-}
-
-/*
- *  93C46 EEPROM reading.
- *
- *  GPOI0 - data in
- *  GPIO1 - data out
- *  GPIO2 - clock
- *  GPIO4 - chip select
- *
- *  Used by Tekram.
- */
-
-/*
- *  Pulse clock bit in GPIO0
- */
-static void __init T93C46_Clk(ncr_slot *np, u_char *gpreg)
-{
-	OUTB (nc_gpreg, *gpreg | 0x04);
-	UDELAY (2);
-	OUTB (nc_gpreg, *gpreg);
-}
-
-/* 
- *  Read bit from NVRAM
- */
-static void __init T93C46_Read_Bit(ncr_slot *np, u_char *read_bit, u_char *gpreg)
-{
-	UDELAY (2);
-	T93C46_Clk(np, gpreg);
-	*read_bit = INB (nc_gpreg);
-}
-
-/*
- *  Write bit to GPIO0
- */
-static void __init T93C46_Write_Bit(ncr_slot *np, u_char write_bit, u_char *gpreg)
-{
-	if (write_bit & 0x01)
-		*gpreg |= 0x02;
-	else
-		*gpreg &= 0xfd;
-		
-	*gpreg |= 0x10;
-		
-	OUTB (nc_gpreg, *gpreg);
-	UDELAY (2);
-
-	T93C46_Clk(np, gpreg);
-}
-
-/*
- *  Send STOP condition to NVRAM - puts NVRAM to sleep... ZZZzzz!!
- */
-static void __init T93C46_Stop(ncr_slot *np, u_char *gpreg)
-{
-	*gpreg &= 0xef;
-	OUTB (nc_gpreg, *gpreg);
-	UDELAY (2);
-
-	T93C46_Clk(np, gpreg);
-}
-
-/*
- *  Send read command and address to NVRAM
- */
-static void __init 
-T93C46_Send_Command(ncr_slot *np, u_short write_data, 
-		    u_char *read_bit, u_char *gpreg)
-{
-	int x;
-
-	/* send 9 bits, start bit (1), command (2), address (6)  */
-	for (x = 0; x < 9; x++)
-		T93C46_Write_Bit(np, (u_char) (write_data >> (8 - x)), gpreg);
-
-	*read_bit = INB (nc_gpreg);
-}
-
-/*
- *  READ 2 bytes from the NVRAM
- */
-static void __init 
-T93C46_Read_Word(ncr_slot *np, u_short *nvram_data, u_char *gpreg)
-{
-	int x;
-	u_char read_bit;
-
-	*nvram_data = 0;
-	for (x = 0; x < 16; x++) {
-		T93C46_Read_Bit(np, &read_bit, gpreg);
-
-		if (read_bit & 0x01)
-			*nvram_data |=  (0x01 << (15 - x));
-		else
-			*nvram_data &= ~(0x01 << (15 - x));
-	}
-}
-
-/*
- *  Read Tekram NvRAM data.
- */
-static int __init 
-T93C46_Read_Data(ncr_slot *np, u_short *data,int len,u_char *gpreg)
-{
-	u_char	read_bit;
-	int	x;
-
-	for (x = 0; x < len; x++)  {
-
-		/* output read command and address */
-		T93C46_Send_Command(np, 0x180 | x, &read_bit, gpreg);
-		if (read_bit & 0x01)
-			return 1; /* Bad */
-		T93C46_Read_Word(np, &data[x], gpreg);
-		T93C46_Stop(np, gpreg);
-	}
-
-	return 0;
-}
-
-/*
- *  Try reading 93C46 Tekram NVRAM.
- */
-static int __init 
-sym_read_T93C46_nvram (ncr_slot *np, Tekram_nvram *nvram)
-{
-	u_char gpcntl, gpreg;
-	u_char old_gpcntl, old_gpreg;
-	int retv = 1;
-
-	/* save current state of GPCNTL and GPREG */
-	old_gpreg	= INB (nc_gpreg);
-	old_gpcntl	= INB (nc_gpcntl);
-
-	/* set up GPREG & GPCNTL to set GPIO0/1/2/4 in to known state, 0 in,
-	   1/2/4 out */
-	gpreg = old_gpreg & 0xe9;
-	OUTB (nc_gpreg, gpreg);
-	gpcntl = (old_gpcntl & 0xe9) | 0x09;
-	OUTB (nc_gpcntl, gpcntl);
-
-	/* input all of NVRAM, 64 words */
-	retv = T93C46_Read_Data(np, (u_short *) nvram,
-				sizeof(*nvram) / sizeof(short), &gpreg);
-	
-	/* return GPIO0/1/2/4 to original states after having accessed NVRAM */
-	OUTB (nc_gpcntl, old_gpcntl);
-	OUTB (nc_gpreg,  old_gpreg);
-
-	return retv;
-}
-
-/*
- *  Try reading Tekram NVRAM.
- *  Return 0 if OK.
- */
-static int __init 
-sym_read_Tekram_nvram (ncr_slot *np, u_short device_id, Tekram_nvram *nvram)
-{
-	u_char *data = (u_char *) nvram;
-	int len = sizeof(*nvram);
-	u_short	csum;
-	int x;
-
-	switch (device_id) {
-	case PCI_DEVICE_ID_NCR_53C885:
-	case PCI_DEVICE_ID_NCR_53C895:
-	case PCI_DEVICE_ID_NCR_53C896:
-		x = sym_read_S24C16_nvram(np, TEKRAM_24C16_NVRAM_ADDRESS,
-					  data, len);
-		break;
-	case PCI_DEVICE_ID_NCR_53C875:
-		x = sym_read_S24C16_nvram(np, TEKRAM_24C16_NVRAM_ADDRESS,
-					  data, len);
-		if (!x)
-			break;
-	default:
-		x = sym_read_T93C46_nvram(np, nvram);
-		break;
-	}
-	if (x)
-		return 1;
-
-	/* verify checksum */
-	for (x = 0, csum = 0; x < len - 1; x += 2)
-		csum += data[x] + (data[x+1] << 8);
-	if (csum != 0x1234)
-		return 1;
-
-	return 0;
-}
-
-#endif	/* SCSI_NCR_NVRAM_SUPPORT */
-
-/*===================================================================
-**
-**    Detect and try to read SYMBIOS and TEKRAM NVRAM.
-**
-**    Data can be used to order booting of boards.
-**
-**    Data is saved in ncr_device structure if NVRAM found. This
-**    is then used to find drive boot order for ncr_attach().
-**
-**    NVRAM data is passed to Scsi_Host_Template later during 
-**    ncr_attach() for any device set up.
-**
-**===================================================================
-*/
-#ifdef SCSI_NCR_NVRAM_SUPPORT
-static void __init ncr_get_nvram(struct ncr_device *devp, ncr_nvram *nvp)
-{
-	devp->nvram = nvp;
-	if (!nvp)
-		return;
-	/*
-	**    Get access to chip IO registers
-	*/
-#ifdef SCSI_NCR_IOMAPPED
-	request_region(devp->slot.io_port, 128, NAME53C8XX);
-	devp->slot.base_io = devp->slot.io_port;
-#else
-	devp->slot.reg = 
-		(struct ncr_reg *) remap_pci_mem(devp->slot.base_c, 128);
-	if (!devp->slot.reg)
-		return;
-#endif
-
-	/*
-	**    Try to read SYMBIOS nvram.
-	**    Try to read TEKRAM nvram if Symbios nvram not found.
-	*/
-	if	(!sym_read_Symbios_nvram(&devp->slot, &nvp->data.Symbios))
-		nvp->type = SCSI_NCR_SYMBIOS_NVRAM;
-	else if	(!sym_read_Tekram_nvram(&devp->slot, devp->chip.device_id,
-					&nvp->data.Tekram))
-		nvp->type = SCSI_NCR_TEKRAM_NVRAM;
-	else {
-		nvp->type = 0;
-		devp->nvram = 0;
-	}
-
-	/*
-	** Release access to chip IO registers
-	*/
-#ifdef SCSI_NCR_IOMAPPED
-	release_region(devp->slot.base_io, 128);
-#else
-	unmap_pci_mem((u_long) devp->slot.reg, 128ul);
-#endif
-
-}
-
-/*===================================================================
-**
-**	Display the content of NVRAM for debugging purpose.
-**
-**===================================================================
-*/
-#ifdef	SCSI_NCR_DEBUG_NVRAM
-static void __init ncr_display_Symbios_nvram(Symbios_nvram *nvram)
-{
-	int i;
-
-	/* display Symbios nvram host data */
-	printk(KERN_DEBUG NAME53C8XX ": HOST ID=%d%s%s%s%s%s\n",
-		nvram->host_id & 0x0f,
-		(nvram->flags  & SYMBIOS_SCAM_ENABLE)	? " SCAM"	:"",
-		(nvram->flags  & SYMBIOS_PARITY_ENABLE)	? " PARITY"	:"",
-		(nvram->flags  & SYMBIOS_VERBOSE_MSGS)	? " VERBOSE"	:"", 
-		(nvram->flags  & SYMBIOS_CHS_MAPPING)	? " CHS_ALT"	:"", 
-		(nvram->flags1 & SYMBIOS_SCAN_HI_LO)	? " HI_LO"	:"");
-
-	/* display Symbios nvram drive data */
-	for (i = 0 ; i < 15 ; i++) {
-		struct Symbios_target *tn = &nvram->target[i];
-		printk(KERN_DEBUG NAME53C8XX 
-		"-%d:%s%s%s%s WIDTH=%d SYNC=%d TMO=%d\n",
-		i,
-		(tn->flags & SYMBIOS_DISCONNECT_ENABLE)	? " DISC"	: "",
-		(tn->flags & SYMBIOS_SCAN_AT_BOOT_TIME)	? " SCAN_BOOT"	: "",
-		(tn->flags & SYMBIOS_SCAN_LUNS)		? " SCAN_LUNS"	: "",
-		(tn->flags & SYMBIOS_QUEUE_TAGS_ENABLED)? " TCQ"	: "",
-		tn->bus_width,
-		tn->sync_period / 4,
-		tn->timeout);
-	}
-}
-
-static u_char Tekram_boot_delay[7] __initdata = {3, 5, 10, 20, 30, 60, 120};
-
-static void __init ncr_display_Tekram_nvram(Tekram_nvram *nvram)
-{
-	int i, tags, boot_delay;
-	char *rem;
-
-	/* display Tekram nvram host data */
-	tags = 2 << nvram->max_tags_index;
-	boot_delay = 0;
-	if (nvram->boot_delay_index < 6)
-		boot_delay = Tekram_boot_delay[nvram->boot_delay_index];
-	switch((nvram->flags & TEKRAM_REMOVABLE_FLAGS) >> 6) {
-	default:
-	case 0:	rem = "";			break;
-	case 1: rem = " REMOVABLE=boot device";	break;
-	case 2: rem = " REMOVABLE=all";		break;
-	}
-
-	printk(KERN_DEBUG NAME53C8XX
-		": HOST ID=%d%s%s%s%s%s%s%s%s%s BOOT DELAY=%d tags=%d\n",
-		nvram->host_id & 0x0f,
-		(nvram->flags1 & SYMBIOS_SCAM_ENABLE)	? " SCAM"	:"",
-		(nvram->flags & TEKRAM_MORE_THAN_2_DRIVES) ? " >2DRIVES":"",
-		(nvram->flags & TEKRAM_DRIVES_SUP_1GB)	? " >1GB"	:"",
-		(nvram->flags & TEKRAM_RESET_ON_POWER_ON) ? " RESET"	:"",
-		(nvram->flags & TEKRAM_ACTIVE_NEGATION)	? " ACT_NEG"	:"",
-		(nvram->flags & TEKRAM_IMMEDIATE_SEEK)	? " IMM_SEEK"	:"",
-		(nvram->flags & TEKRAM_SCAN_LUNS)	? " SCAN_LUNS"	:"",
-		(nvram->flags1 & TEKRAM_F2_F6_ENABLED)	? " F2_F6"	:"",
-		rem, boot_delay, tags);
-
-	/* display Tekram nvram drive data */
-	for (i = 0; i <= 15; i++) {
-		int sync, j;
-		struct Tekram_target *tn = &nvram->target[i];
-		j = tn->sync_index & 0xf;
-		sync = Tekram_sync[j];
-		printk(KERN_DEBUG NAME53C8XX "-%d:%s%s%s%s%s%s PERIOD=%d\n",
-		i,
-		(tn->flags & TEKRAM_PARITY_CHECK)	? " PARITY"	: "",
-		(tn->flags & TEKRAM_SYNC_NEGO)		? " SYNC"	: "",
-		(tn->flags & TEKRAM_DISCONNECT_ENABLE)	? " DISC"	: "",
-		(tn->flags & TEKRAM_START_CMD)		? " START"	: "",
-		(tn->flags & TEKRAM_TAGGED_COMMANDS)	? " TCQ"	: "",
-		(tn->flags & TEKRAM_WIDE_NEGO)		? " WIDE"	: "",
-		sync);
-	}
-}
-#endif /* SCSI_NCR_DEBUG_NVRAM */
-#endif	/* SCSI_NCR_NVRAM_SUPPORT */
 
 
 /*===================================================================

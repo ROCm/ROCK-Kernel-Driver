@@ -316,7 +316,7 @@ static inline int exec_permission_lite(struct inode *inode,
 {
 	umode_t	mode = inode->i_mode;
 
-	if ((inode->i_op && inode->i_op->permission))
+	if (inode->i_op && inode->i_op->permission)
 		return -EAGAIN;
 
 	if (current->fsuid == inode->i_uid)
@@ -328,6 +328,9 @@ static inline int exec_permission_lite(struct inode *inode,
 		goto ok;
 
 	if ((inode->i_mode & S_IXUGO) && capable(CAP_DAC_OVERRIDE))
+		goto ok;
+
+	if (S_ISDIR(inode->i_mode) && capable(CAP_DAC_OVERRIDE))
 		goto ok;
 
 	if (S_ISDIR(inode->i_mode) && capable(CAP_DAC_READ_SEARCH))

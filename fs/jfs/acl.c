@@ -281,9 +281,9 @@ int jfs_setattr(struct dentry *dentry, struct iattr *iattr)
 	if (rc)
 		return rc;
 
-	inode_setattr(inode, iattr);
+	rc = inode_setattr(inode, iattr);
 
-	if (iattr->ia_valid & ATTR_MODE)
+	if (!rc && (iattr->ia_valid & ATTR_MODE))
 		rc = jfs_acl_chmod(inode);
 
 	return rc;

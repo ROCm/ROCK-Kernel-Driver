@@ -140,7 +140,7 @@ void show_trace(unsigned long *stack)
 	if (estack_end) { 
 		while (stack < estack_end) { 
 			addr = *stack++; 
-			if (kernel_text_address(addr)) {  
+			if (__kernel_text_address(addr)) {
 				i += printk_address(addr);
 				i += printk(" "); 
 				if (i > 50) {
@@ -169,7 +169,7 @@ void show_trace(unsigned long *stack)
 			 * down the cause of the crash will be able to figure
 			 * out the call path that was taken.
 			 */
-			 if (kernel_text_address(addr)) {  
+			 if (__kernel_text_address(addr)) {
 				 i += printk_address(addr);
 				 i += printk(" "); 
 				 if (i > 50) { 
@@ -185,7 +185,7 @@ void show_trace(unsigned long *stack)
 
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
 		addr = *stack++;
-		if (kernel_text_address(addr)) { 	 
+		if (__kernel_text_address(addr)) {
 			i += printk_address(addr);
 			i += printk(" "); 
 			if (i > 50) { 

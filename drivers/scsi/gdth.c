@@ -410,7 +410,7 @@
 #endif
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "gdth.h"
 
 static void gdth_delay(int milliseconds);

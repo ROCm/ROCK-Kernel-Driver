@@ -55,6 +55,7 @@
 #include <asm/bootsetup.h>
 #include <asm/smp.h>
 #include <asm/proto.h>
+#include <asm/setup.h>
 
 /*
  * Machine setup..

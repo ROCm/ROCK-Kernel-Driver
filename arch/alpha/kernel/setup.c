@@ -39,6 +39,7 @@
 #include <linux/reboot.h>
 #endif
 #include <linux/notifier.h>
+#include <asm/setup.h>
 #include <asm/io.h>
 
 extern struct notifier_block *panic_notifier_list;

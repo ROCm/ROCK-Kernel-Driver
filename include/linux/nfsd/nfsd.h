@@ -126,9 +126,13 @@ int		nfsd_permission(struct svc_export *, struct dentry *, int);
 #ifdef CONFIG_NFSD_V4
 void nfs4_state_init(void);
 void nfs4_state_shutdown(void);
+time_t nfs4_lease_time(void);
+void nfs4_reset_lease(time_t leasetime);
 #else
 void static inline nfs4_state_init(void){}
 void static inline nfs4_state_shutdown(void){}
+time_t static inline nfs4_lease_time(void){return 0;}
+void static inline nfs4_reset_lease(time_t leasetime){}
 #endif
 
 /*
@@ -249,7 +253,7 @@ static inline int is_fsid(struct svc_fh *fh, struct knfsd_fh *reffh)
 #define	COMPOUND_SLACK_SPACE		140    /* OP_GETFH */
 #define COMPOUND_ERR_SLACK_SPACE	12     /* OP_SETATTR */
 
-#define NFSD_LEASE_TIME			60  /* seconds */
+#define NFSD_LEASE_TIME                 (nfs4_lease_time())
 #define NFSD_LAUNDROMAT_MINTIMEOUT      10   /* seconds */
 
 /*

@@ -654,13 +654,13 @@ extern atomic_t dcpage_flushes_xcall;
 static __inline__ void __local_flush_dcache_page(struct page *page)
 {
 #if (L1DCACHE_SIZE > PAGE_SIZE)
-	__flush_dcache_page(page->virtual,
+	__flush_dcache_page(page_address(page),
 			    ((tlb_type == spitfire) &&
 			     page_mapping(page) != NULL));
 #else
 	if (page_mapping(page) != NULL &&
 	    tlb_type == spitfire)
-		__flush_icache_page(__pa(page->virtual));
+		__flush_icache_page(__pa(page_address(page)));
 #endif
 }
 
@@ -675,6 +675,7 @@ void smp_flush_dcache_page_impl(struct page *page, int cpu)
 	if (cpu == this_cpu) {
 		__local_flush_dcache_page(page);
 	} else if (cpu_online(cpu)) {
+		void *pg_addr = page_address(page);
 		u64 data0;
 
 		if (tlb_type == spitfire) {
@@ -683,14 +684,14 @@ void smp_flush_dcache_page_impl(struct page *page, int cpu)
 			if (page_mapping(page) != NULL)
 				data0 |= ((u64)1 << 32);
 			spitfire_xcall_deliver(data0,
-					       __pa(page->virtual),
-					       (u64) page->virtual,
+					       __pa(pg_addr),
+					       (u64) pg_addr,
 					       mask);
 		} else {
 			data0 =
 				((u64)&xcall_flush_dcache_page_cheetah);
 			cheetah_xcall_deliver(data0,
-					      __pa(page->virtual),
+					      __pa(pg_addr),
 					      0, mask);
 		}
 #ifdef CONFIG_DEBUG_DCFLUSH
@@ -703,6 +704,7 @@ void smp_flush_dcache_page_impl(struct page *page, int cpu)
 
 void flush_dcache_page_all(struct mm_struct *mm, struct page *page)
 {
+	void *pg_addr = page_address(page);
 	cpumask_t mask = cpu_online_map;
 	u64 data0;
 	int this_cpu = get_cpu();
@@ -719,13 +721,13 @@ void flush_dcache_page_all(struct mm_struct *mm, struct page *page)
 		if (page_mapping(page) != NULL)
 			data0 |= ((u64)1 << 32);
 		spitfire_xcall_deliver(data0,
-				       __pa(page->virtual),
-				       (u64) page->virtual,
+				       __pa(pg_addr),
+				       (u64) pg_addr,
 				       mask);
 	} else {
 		data0 = ((u64)&xcall_flush_dcache_page_cheetah);
 		cheetah_xcall_deliver(data0,
-				      __pa(page->virtual),
+				      __pa(pg_addr),
 				      0, mask);
 	}
 #ifdef CONFIG_DEBUG_DCFLUSH

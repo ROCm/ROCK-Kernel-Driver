@@ -85,8 +85,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.07"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.07"
+#define MPT_LINUX_VERSION_COMMON	"3.01.09"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.09"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -581,13 +581,6 @@ typedef	struct _ScsiCfgData {
 	u8		 rsvd[1];
 } ScsiCfgData;
 
-typedef struct _fw_image {
-	char		*fw;
-	dma_addr_t	 fw_dma;
-	u32		 size;
-	u32		 rsvd;
-} fw_image_t;
-
 /*
  *  Adapter Structure - pci_dev specific. Maximum: MPT_MAX_ADAPTERS
  */
@@ -659,9 +652,9 @@ typedef struct _MPT_ADAPTER
 	int			timeout_maxcnt;
 #endif
 	struct _mpt_ioctl_events *events;	/* pointer to event log */
-	fw_image_t		**cached_fw;	/* Pointer to FW SG List */
+	u8			*cached_fw;	/* Pointer to FW */
+	dma_addr_t	 	cached_fw_dma;
 	Q_TRACKER		 configQ;	/* linked list of config. requests */
-	int			 num_fw_frags;	/* Number of SGE in FW SG List */
 	int			 hs_reply_idx;
 #ifndef MFCNT
 	u32			 pad0;
@@ -682,6 +675,7 @@ typedef struct _MPT_ADAPTER
 	u8			 upload_fw;	/* If set, do a fw upload */
 	u8			 reload_fw;	/* Force a FW Reload on next reset */
 	u8			 pad1[5];
+	struct list_head	 list; 
 } MPT_ADAPTER;
 
 
@@ -740,6 +734,33 @@ typedef struct _mpt_sge {
 #define dprintk(x)  printk x
 #else
 #define dprintk(x)
+#endif
+
+#ifdef MPT_DEBUG_INIT
+#define dinitprintk(x)  printk x
+#define DBG_DUMP_FW_REQUEST_FRAME(mfp) \
+	{	int  i, n = 10;						\
+		u32 *m = (u32 *)(mfp);					\
+		printk(KERN_INFO " ");					\
+		for (i=0; i<n; i++)					\
+			printk(" %08x", le32_to_cpu(m[i]));		\
+		printk("\n");						\
+	}
+#else
+#define dinitprintk(x)
+#define DBG_DUMP_FW_REQUEST_FRAME(mfp)
+#endif
+
+#ifdef MPT_DEBUG_EXIT
+#define dexitprintk(x)  printk x
+#else
+#define dexitprintk(x)
+#endif
+
+#ifdef MPT_DEBUG_RESET
+#define drsprintk(x)  printk x
+#else
+#define drsprintk(x)
 #endif
 
 #ifdef MPT_DEBUG_HANDSHAKE
@@ -975,19 +996,6 @@ typedef struct _MPT_SCSI_HOST {
 	ushort			  sel_timeout[MPT_MAX_FC_DEVICES];
 } MPT_SCSI_HOST;
 
-/*
- *	Structure for overlaying onto scsi_cmnd->SCp area
- *	NOTE: SCp area is 36 bytes min, 44 bytes max?
- */
-typedef struct _scPrivate {
-	struct scsi_cmnd	*forw;
-	struct scsi_cmnd	*back;
-	void			*p1;
-	void			*p2;
-	u8			 io_path_id;	/* DMP */
-	u8			 pad[7];
-} scPrivate;
-
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  *	More Dynamic Multi-Pathing stuff...
@@ -1049,31 +1057,29 @@ extern int	 mpt_device_driver_register(struct mpt_pci_driver * dd_cbfunc, int cb
 extern void	 mpt_device_driver_deregister(int cb_idx);
 extern int	 mpt_register_ascqops_strings(void *ascqTable, int ascqtbl_sz, const char **opsTable);
 extern void	 mpt_deregister_ascqops_strings(void);
-extern MPT_FRAME_HDR	*mpt_get_msg_frame(int handle, int iocid);
-extern void	 mpt_free_msg_frame(int handle, int iocid, MPT_FRAME_HDR *mf);
-extern void	 mpt_put_msg_frame(int handle, int iocid, MPT_FRAME_HDR *mf);
+extern MPT_FRAME_HDR	*mpt_get_msg_frame(int handle, MPT_ADAPTER *ioc);
+extern void	 mpt_free_msg_frame(int handle, MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf);
+extern void	 mpt_put_msg_frame(int handle, MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf);
 extern void	 mpt_add_sge(char *pAddr, u32 flagslength, dma_addr_t dma_addr);
 extern void	 mpt_add_chain(char *pAddr, u8 next, u16 length, dma_addr_t dma_addr);
 
-extern int	 mpt_send_handshake_request(int handle, int iocid, int reqBytes, u32 *req, int sleepFlag);
+extern int	 mpt_send_handshake_request(int handle, MPT_ADAPTER *ioc, int reqBytes, u32 *req, int sleepFlag);
 extern int	 mpt_handshake_req_reply_wait(MPT_ADAPTER *ioc, int reqBytes, u32 *req, int replyBytes, u16 *u16reply, int maxwait, int sleepFlag);
 extern int	 mpt_verify_adapter(int iocid, MPT_ADAPTER **iocpp);
-extern MPT_ADAPTER	*mpt_adapter_find_first(void);
-extern MPT_ADAPTER	*mpt_adapter_find_next(MPT_ADAPTER *prev);
 extern u32	 mpt_GetIocState(MPT_ADAPTER *ioc, int cooked);
 extern void	 mpt_print_ioc_summary(MPT_ADAPTER *ioc, char *buf, int *size, int len, int showlan);
 extern int	 mpt_HardResetHandler(MPT_ADAPTER *ioc, int sleepFlag);
 extern int	 mpt_config(MPT_ADAPTER *ioc, CONFIGPARMS *cfg);
 extern int	 mpt_toolbox(MPT_ADAPTER *ioc, CONFIGPARMS *cfg);
-extern void	*mpt_alloc_fw_memory(MPT_ADAPTER *ioc, int size, int *frags, int *alloc_sz);
-extern void	 mpt_free_fw_memory(MPT_ADAPTER *ioc, fw_image_t **alt_img);
+extern void	 mpt_alloc_fw_memory(MPT_ADAPTER *ioc, int size);
+extern void	 mpt_free_fw_memory(MPT_ADAPTER *ioc);
 extern int	 mpt_findImVolumes(MPT_ADAPTER *ioc);
 extern int	 mpt_read_ioc_pg_3(MPT_ADAPTER *ioc);
 
 /*
  *  Public data decl's...
  */
-extern MPT_ADAPTER	 	*mpt_adapters[MPT_MAX_ADAPTERS];
+extern struct list_head	  ioc_list;
 extern struct proc_dir_entry	*mpt_proc_root_dir;
 extern DmpServices_t		*DmpService;
 
