@@ -932,7 +932,6 @@ int isapnp_cfg_begin(int csn, int logdev)
 {
 	if (csn < 1 || csn > isapnp_csn_count || logdev > 10)
 		return -EINVAL;
-	MOD_INC_USE_COUNT;
 	down(&isapnp_cfg_mutex);
 	isapnp_wait();
 	isapnp_key();
@@ -960,7 +959,6 @@ int isapnp_cfg_end(void)
 {
 	isapnp_wait();
 	up(&isapnp_cfg_mutex);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
