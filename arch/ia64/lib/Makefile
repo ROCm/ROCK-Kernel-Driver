@@ -4,7 +4,7 @@
 
 L_TARGET = lib.a
 
-export-objs := io.o swiotlb.o
+export-objs := swiotlb.o
 
 obj-y := __divsi3.o __udivsi3.o __modsi3.o __umodsi3.o					\
 	__divdi3.o __udivdi3.o __moddi3.o __umoddi3.o					\
