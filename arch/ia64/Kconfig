@@ -179,10 +179,10 @@ config DISCONTIGMEM
 	  See <file:Documentation/vm/numa> for more.
 
 config IA64_CYCLONE
-	bool "Support Cyclone(EXA) Time Source"
+	bool "Cyclone (EXA) Time Source support"
 	help
-		Say Y here to enable support for IBM EXA Cyclone time source.
-		If you're unsure, answer N.
+	  Say Y here to enable support for IBM EXA Cyclone time source.
+	  If you're unsure, answer N.
 
 config IOSAPIC
 	bool
