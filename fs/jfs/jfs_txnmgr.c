@@ -47,6 +47,7 @@
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
+#include <linux/suspend.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -2789,8 +2790,6 @@ int jfs_lazycommit(void *arg)
 	complete(&jfsIOwait);
 
 	do {
-		DECLARE_WAITQUEUE(wq, current);
-
 		LAZY_LOCK(flags);
 restart:
 		WorkDone = 0;
@@ -2825,12 +2824,19 @@ restart:
 		if (WorkDone)
 			goto restart;
 
-		add_wait_queue(&jfs_commit_thread_wait, &wq);
-		set_current_state(TASK_INTERRUPTIBLE);
-		LAZY_UNLOCK(flags);
-		schedule();
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&jfs_commit_thread_wait, &wq);
+		if (current->flags & PF_FREEZE) {
+			LAZY_UNLOCK(flags);
+			refrigerator(PF_IOTHREAD);
+		} else {
+			DECLARE_WAITQUEUE(wq, current);
+
+			add_wait_queue(&jfs_commit_thread_wait, &wq);
+			set_current_state(TASK_INTERRUPTIBLE);
+			LAZY_UNLOCK(flags);
+			schedule();
+			current->state = TASK_RUNNING;
+			remove_wait_queue(&jfs_commit_thread_wait, &wq);
+		}
 	} while (!jfs_stop_threads);
 
 	if (TxAnchor.unlock_queue)
@@ -2981,7 +2987,6 @@ int jfs_sync(void *arg)
 	complete(&jfsIOwait);
 
 	do {
-		DECLARE_WAITQUEUE(wq, current);
 		/*
 		 * write each inode on the anonymous inode list
 		 */
@@ -3030,12 +3035,20 @@ int jfs_sync(void *arg)
 		}
 		/* Add anon_list2 back to anon_list */
 		list_splice_init(&TxAnchor.anon_list2, &TxAnchor.anon_list);
-		add_wait_queue(&jfs_sync_thread_wait, &wq);
-		set_current_state(TASK_INTERRUPTIBLE);
-		TXN_UNLOCK();
-		schedule();
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&jfs_sync_thread_wait, &wq);
+
+		if (current->flags & PF_FREEZE) {
+			TXN_UNLOCK();
+			refrigerator(PF_IOTHREAD);
+		} else {
+			DECLARE_WAITQUEUE(wq, current);
+
+			add_wait_queue(&jfs_sync_thread_wait, &wq);
+			set_current_state(TASK_INTERRUPTIBLE);
+			TXN_UNLOCK();
+			schedule();
+			current->state = TASK_RUNNING;
+			remove_wait_queue(&jfs_sync_thread_wait, &wq);
+		}
 	} while (!jfs_stop_threads);
 
 	jFYI(1, ("jfs_sync being killed\n"));

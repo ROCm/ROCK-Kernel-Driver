@@ -49,7 +49,7 @@ struct jfs_inode_info {
 	long	cflag;		/* commit flags		*/
 	u16	bxflag;		/* xflag of pseudo buffer?	*/
 	unchar	agno;		/* ag number			*/
-	unchar	pad;		/* pad			*/
+	signed char active_ag;	/* ag currently allocating from	*/
 	lid_t	blid;		/* lid of pseudo buffer?	*/
 	lid_t	atlhead;	/* anonymous tlock list head	*/
 	lid_t	atltail;	/* anonymous tlock list tail	*/
