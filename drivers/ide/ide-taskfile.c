@@ -954,6 +954,9 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 		return startstop;
 	}
 
+	if (!drive->unmask)
+		local_irq_disable();
+
 	return task_out_intr(drive);
 }
 EXPORT_SYMBOL(pre_task_out_intr);
@@ -1029,6 +1032,9 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 				drive->name, drive->addressing ? "_EXT" : "");
 		return startstop;
 	}
+
+	if (!drive->unmask)
+		local_irq_disable();
 
 	return task_mulout_intr(drive);
 }
