@@ -22,7 +22,8 @@
 #include <asm/io.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/feature.h>
+#include <asm/machdep.h>
+#include <asm/pmac_feature.h>
 #ifdef CONFIG_PMAC_PBOOK
 #include <linux/adb.h>
 #include <linux/pmu.h>
@@ -155,7 +156,7 @@ static void bmac_reset_and_enable(struct net_device *dev);
 static void bmac_start_chip(struct net_device *dev);
 static void bmac_init_chip(struct net_device *dev);
 static void bmac_init_registers(struct net_device *dev);
-static void bmac_reset_chip(struct net_device *dev);
+static void bmac_enable_and_reset_chip(struct net_device *dev);
 static int bmac_set_address(struct net_device *dev, void *addr);
 static void bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs);
 static void bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs);
@@ -229,21 +230,18 @@ volatile unsigned short bmread(struct net_device *dev, unsigned long reg_offset 
 }
 
 static void
-bmac_reset_chip(struct net_device *dev)
+bmac_enable_and_reset_chip(struct net_device *dev)
 {
 	struct bmac_data *bp = (struct bmac_data *) dev->priv;
 	volatile struct dbdma_regs *rd = bp->rx_dma;
 	volatile struct dbdma_regs *td = bp->tx_dma;
 
-	dbdma_reset(rd);
-	dbdma_reset(td);
+	if (rd)
+		dbdma_reset(rd);
+	if (td)
+		dbdma_reset(td);
 
-	feature_set(bp->node, FEATURE_BMac_IO_enable);
-	udelay(10000);
-	feature_set(bp->node, FEATURE_BMac_reset);
-	udelay(10000);
-	feature_clear(bp->node, FEATURE_BMac_reset);
-	udelay(10000);
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 1);
 }
 
 #define MIFDELAY	udelay(10)
@@ -522,10 +520,7 @@ bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				}
 			}
 		}
-		feature_set(bp->node, FEATURE_BMac_reset);
-		mdelay(10);
-		feature_clear(bp->node, FEATURE_BMac_IO_enable);
-		mdelay(10);
+		pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
 		break;
 	case PBOOK_WAKE:
 		/* see if this is enough */
@@ -1254,7 +1249,7 @@ static void bmac_reset_and_enable(struct net_device *dev)
 	unsigned char *data;
 
 	save_flags(flags); cli();
-	bmac_reset_chip(dev);
+	bmac_enable_and_reset_chip(dev);
 	bmac_init_tx_ring(bp);
 	bmac_init_rx_ring(bp);
 	bmac_init_chip(dev);
@@ -1337,14 +1332,30 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 		       bmac->full_name);
 		return;
 	}
+	bp = (struct bmac_data *) dev->priv;
 	SET_MODULE_OWNER(dev);
+	bp->node = bmac;
 
+	if (!request_OF_resource(bmac, 0, " (bmac)")) {
+		printk(KERN_ERR "BMAC: can't request IO resource !\n");
+		goto err_out;
+	}
+	if (!request_OF_resource(bmac, 1, " (bmac tx dma)")) {
+		printk(KERN_ERR "BMAC: can't request TX DMA resource !\n");
+		goto err_out;
+	}
+
+	if (!request_OF_resource(bmac, 2, " (bmac rx dma)")) {
+		printk(KERN_ERR "BMAC: can't request RX DMA resource !\n");
+		goto err_out;
+	}
 	dev->base_addr = (unsigned long)
 		ioremap(bmac->addrs[0].address, bmac->addrs[0].size);
 	if (!dev->base_addr)
 		goto err_out;
 	dev->irq = bmac->intrs[0].line;
 
+	bmac_enable_and_reset_chip(dev);
 	bmwrite(dev, INTDISABLE, DisableAll);
 
 	printk(KERN_INFO "%s: BMAC%s at", dev->name, (is_bmac_plus? "+": ""));
@@ -1355,6 +1366,10 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	}
 	XXDEBUG((", base_addr=%#0lx", dev->base_addr));
 	printk("\n");
+
+	/* Enable chip without interrupts for now */
+	bmac_enable_and_reset_chip(dev);
+	bmwrite(dev, INTDISABLE, DisableAll);
 
 	dev->open = bmac_open;
 	dev->stop = bmac_close;
@@ -1367,7 +1382,6 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	if (bmac_verify_checksum(dev) != 0)
 		goto err_out_iounmap;
 
-	bp = (struct bmac_data *) dev->priv;
 	bp->is_bmac_plus = is_bmac_plus;
 	bp->tx_dma = (volatile struct dbdma_regs *)
 		ioremap(bmac->addrs[1].address, bmac->addrs[1].size);
@@ -1386,7 +1400,6 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	bp->queue = (struct sk_buff_head *)(bp->rx_cmds + N_RX_RING + 1);
 	skb_queue_head_init(bp->queue);
 
-	bp->node = bmac;
 	memset((char *) bp->tx_cmds, 0,
 	       (N_TX_RING + N_RX_RING + 2) * sizeof(struct dbdma_cmd));
 	/*     init_timer(&bp->tx_timeout); */
@@ -1408,6 +1421,12 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 		goto err_out_irq1;
 	}
 
+	/* Mask chip interrupts and disable chip, will be
+	 * re-enabled on open()
+	 */
+	disable_irq(dev->irq);
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
+	
 	bp->next_bmac = bmac_devs;
 	bmac_devs = dev;
 	return;
@@ -1423,6 +1442,12 @@ err_out_iounmap_tx:
 err_out_iounmap:
 	iounmap((void *)dev->base_addr);
 err_out:
+	if (bp->node) {
+		release_OF_resource(bp->node, 0);
+		release_OF_resource(bp->node, 1);
+		release_OF_resource(bp->node, 2);
+		pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
+	}
 	unregister_netdev(dev);
 	kfree(dev);
 }
@@ -1434,6 +1459,7 @@ static int bmac_open(struct net_device *dev)
 	/* reset the chip */
 	bp->opened = 1;
 	bmac_reset_and_enable(dev);
+	enable_irq(dev->irq);
 	dev->flags |= IFF_RUNNING;
 	return 0;
 }
@@ -1446,6 +1472,7 @@ static int bmac_close(struct net_device *dev)
 	unsigned short config;
 	int i;
 
+	bp->sleeping = 1;
 	dev->flags &= ~(IFF_UP | IFF_RUNNING);
 
 	/* disable rx and tx */
@@ -1479,6 +1506,8 @@ static int bmac_close(struct net_device *dev)
 	XXDEBUG(("bmac: all bufs freed\n"));
 
 	bp->opened = 0;
+	disable_irq(dev->irq);
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
 
 	return 0;
 }
@@ -1548,7 +1577,7 @@ static void bmac_tx_timeout(unsigned long data)
 	bmwrite(dev, TXCFG, (config & ~TxMACEnable));
 	out_le32(&td->control, DBDMA_CLEAR(RUN|PAUSE|FLUSH|WAKE|ACTIVE|DEAD));
 	printk(KERN_ERR "bmac: transmit timeout - resetting\n");
-	bmac_reset_chip(dev);
+	bmac_enable_and_reset_chip(dev);
 
 	/* restart rx dma */
 	cp = bus_to_virt(ld_le32(&rd->cmdptr));
@@ -1670,11 +1699,15 @@ static void __exit bmac_cleanup (void)
 		bp = (struct bmac_data *) dev->priv;
 		bmac_devs = bp->next_bmac;
 
+		unregister_netdev(dev);
+
+		release_OF_resource(bp->node, 0);
+		release_OF_resource(bp->node, 1);
+		release_OF_resource(bp->node, 2);
 		free_irq(dev->irq, dev);
 		free_irq(bp->tx_dma_intr, dev);
 		free_irq(bp->rx_dma_intr, dev);
 
-		unregister_netdev(dev);
 		kfree(dev);
 	} while (bmac_devs != NULL);
 }
