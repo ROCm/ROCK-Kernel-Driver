@@ -102,6 +102,9 @@ struct inode *ramfs_get_inode(struct super_block *sb, int mode, int dev)
 		case S_IFDIR:
 			inode->i_op = &ramfs_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
+
+			/* directory inodes start off with i_nlink == 2 (for "." entry) */
+			inode->i_nlink++;
 			break;
 		case S_IFLNK:
 			inode->i_op = &page_symlink_inode_operations;
@@ -131,10 +134,8 @@ static int ramfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int d
 static int ramfs_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 {
 	int retval = ramfs_mknod(dir, dentry, mode | S_IFDIR, 0);
-	if (!retval) {
+	if (!retval)
 		dir->i_nlink++;
-		dentry->d_inode->i_nlink++;
-	}
 	return retval;
 }
 
