@@ -770,7 +770,7 @@ static int patch_ad1980_specific(ac97_t *ac97)
 	snd_ac97_rename_ctl(ac97, "Master Playback Switch", "Master Surround Playback Switch");
 	snd_ac97_rename_ctl(ac97, "Master Playback Volume", "Master Surround Playback Volume");
 	snd_ac97_rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
-	snd_ac97_rename_ctl(ac97, "Headphone Playback Volume", "Headphone Playback Volume");
+	snd_ac97_rename_ctl(ac97, "Headphone Playback Volume", "Master Playback Volume");
 	return 0;
 }
 
