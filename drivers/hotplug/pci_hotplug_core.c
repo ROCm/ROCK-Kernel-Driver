@@ -38,6 +38,7 @@
 #include <linux/init.h>
 #include <linux/namei.h>
 #include <linux/pci.h>
+#include <linux/dnotify.h>
 #include <asm/uaccess.h>
 #include "pci_hotplug.h"
 
@@ -1012,10 +1013,13 @@ int pci_hp_deregister (struct hotplug_slot *slot)
 	return 0;
 }
 
-static inline void update_inode_time (struct inode *inode)
+static inline void update_dentry_inode_time (struct dentry *dentry)
 {
-	if (inode)
-		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	struct inode *inode = dentry->d_inode;
+	if (inode) {
+		inode->i_mtime = CURRENT_TIME;
+		dnotify_parent(dentry, DN_MODIFY);
+	}
 }
 
 /**
@@ -1050,16 +1054,16 @@ int pci_hp_change_slot_info (const char *name, struct hotplug_slot_info *info)
 	core = temp->core_priv;
 	if ((core->power_dentry) &&
 	    (temp->info->power_status != info->power_status))
-		update_inode_time (core->power_dentry->d_inode);
+		update_dentry_inode_time (core->power_dentry);
 	if ((core->attention_dentry) &&
 	    (temp->info->attention_status != info->attention_status))
-		update_inode_time (core->attention_dentry->d_inode);
+		update_dentry_inode_time (core->attention_dentry);
 	if ((core->latch_dentry) &&
 	    (temp->info->latch_status != info->latch_status))
-		update_inode_time (core->latch_dentry->d_inode);
+		update_dentry_inode_time (core->latch_dentry);
 	if ((core->adapter_dentry) &&
 	    (temp->info->adapter_status != info->adapter_status))
-		update_inode_time (core->adapter_dentry->d_inode);
+		update_dentry_inode_time (core->adapter_dentry);
 
 	memcpy (temp->info, info, sizeof (struct hotplug_slot_info));
 	spin_unlock (&list_lock);
