@@ -181,6 +181,7 @@ static inline unsigned char *
 xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
 {
 	struct IsdnCardState *cs = bcs->cs;
+	unsigned char *p;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, __FUNCTION__);
@@ -197,6 +198,7 @@ xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
 	} else {
 		*count = bcs->tx_skb->len;
 	}
+	p = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, *count);
 	bcs->tx_cnt -= *count;
 	bcs->count += *count;
@@ -206,8 +208,43 @@ xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
 
 		t += sprintf(t, "%s %c cnt %d", __FUNCTION__,
 			     bcs->hw.hscx.hscx ? 'B' : 'A', *count);
-		QuickHex(t, bcs->tx_skb->data, *count);
+		QuickHex(t, p, *count);
 		debugl1(cs, bcs->blog);
 	}
-	return bcs->tx_skb->data;
+	return p;
+}
+
+static inline unsigned char *
+xmit_fill_fifo_d(struct IsdnCardState *cs, int fifo_size, int *count, int *more)
+{
+	unsigned char *p;
+
+	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
+		debugl1(cs, __FUNCTION__);
+
+	if (!cs->tx_skb || cs->tx_skb->len <= 0) {
+		WARN_ON(1);
+		return NULL;
+	}
+
+	*more = 0;
+	if (cs->tx_skb->len > fifo_size) {
+		*more = 1;
+		*count = fifo_size;
+	} else {
+		*count = cs->tx_skb->len;
+	}
+
+	p = cs->tx_skb->data;
+	skb_pull(cs->tx_skb, *count);
+	cs->tx_cnt += *count;
+
+	if (cs->debug & L1_DEB_ISAC_FIFO) {
+		char *t = cs->dlog;
+
+		t += sprintf(t, "%s cnt %d", __FUNCTION__, *count);
+		QuickHex(t, p, *count);
+		debugl1(cs, cs->dlog);
+	}
+	return p;
 }

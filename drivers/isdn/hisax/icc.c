@@ -146,29 +146,15 @@ static void
 icc_fill_fifo(struct IsdnCardState *cs)
 {
 	int count, more;
-	u_char *ptr;
+	unsigned char *p;
 	unsigned long flags;
 
-	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
-		debugl1(cs, "icc_fill_fifo");
-
-	if (!cs->tx_skb)
+	p = xmit_fill_fifo_d(cs, 32, &count, &more);
+	if (!p)
 		return;
 
-	count = cs->tx_skb->len;
-	if (count <= 0)
-		return;
-
-	more = 0;
-	if (count > 32) {
-		more = !0;
-		count = 32;
-	}
 	spin_lock_irqsave(&icc_lock, flags);
-	ptr = cs->tx_skb->data;
-	skb_pull(cs->tx_skb, count);
-	cs->tx_cnt += count;
-	cs->writeisacfifo(cs, ptr, count);
+	cs->writeisacfifo(cs, p, count);
 	cs->writeisac(cs, ICC_CMDR, more ? 0x8 : 0xa);
 	if (test_and_set_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
 		debugl1(cs, "icc_fill_fifo dbusytimer running");
@@ -178,13 +164,6 @@ icc_fill_fifo(struct IsdnCardState *cs)
 	cs->dbusytimer.expires = jiffies + ((DBUSY_TIMER_VALUE * HZ)/1000);
 	add_timer(&cs->dbusytimer);
 	spin_unlock_irqrestore(&icc_lock, flags);
-	if (cs->debug & L1_DEB_ISAC_FIFO) {
-		char *t = cs->dlog;
-
-		t += sprintf(t, "icc_fill_fifo cnt %d", count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, cs->dlog);
-	}
 }
 
 void
