@@ -316,22 +316,25 @@ audit_msg_login(struct aud_process *pinfo, const char *evname,
 
 	/* fill in the executable name */
 	if (current->mm) {
-		struct vm_area_struct	*mmap;
-		struct file		*file;
-		char			*str;
-		int			len;
+		const struct vm_area_struct *mmap;
 
 		down_read(&current->mm->mmap_sem);
-		if ((mmap = current->mm->mmap)
-		 && (file = mmap->vm_file)
-		 && file->f_dentry) {
-			str = d_path(file->f_dentry, file->f_vfsmnt,
-					login_msg->executable,
-					sizeof(login_msg->executable));
+		for (mmap = current->mm->mmap; mmap; mmap = mmap->vm_next) {
+			const struct file *file;
 
-			if (str && str != login_msg->executable) {
-				len = strlen(str);
-				memmove(login_msg->executable, str, len+1);
+			if ((mmap->vm_flags & VM_EXECUTABLE)
+			    && (file = mmap->vm_file)
+			    && file->f_dentry) {
+				const char *str = d_path(file->f_dentry,
+						file->f_vfsmnt,
+						login_msg->executable,
+						sizeof(login_msg->executable));
+
+				if (!IS_ERR(str)) {
+					if (str != login_msg->executable)
+						memmove(login_msg->executable, str, strlen(str) + 1);
+					break;
+				}
 			}
 		}
 		up_read(&current->mm->mmap_sem);
