@@ -592,6 +592,11 @@ config PPC_PMAC
 	depends on PPC_MULTIPLATFORM
 	default y
 
+config PPC_PMAC64
+	bool
+	depends on PPC_PMAC && POWER4
+	default y
+
 config PPC_PREP
 	bool
 	depends on PPC_MULTIPLATFORM

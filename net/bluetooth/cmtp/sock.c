@@ -87,8 +87,10 @@ static int cmtp_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 		if (!nsock)
 			return err;
 
-		if (nsock->sk->sk_state != BT_CONNECTED)
+		if (nsock->sk->sk_state != BT_CONNECTED) {
+			fput(nsock->file);
 			return -EBADFD;
+		}
 
 		err = cmtp_add_connection(&ca, nsock);
 		if (!err) {

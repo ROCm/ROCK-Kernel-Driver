@@ -9,13 +9,13 @@
  * This needs to be optimized.
  */
 void
-__ia64_memcpy_fromio (void * to, unsigned long from, long count)
+__ia64_memcpy_fromio (void *to, unsigned long from, long count)
 {
+	char *dst = to;
+
 	while (count) {
 		count--;
-		*(char *) to = readb(from);
-		((char *) to)++;
-		from++;
+		*dst++ = readb(from++);
 	}
 }
 EXPORT_SYMBOL(__ia64_memcpy_fromio);
@@ -25,13 +25,13 @@ EXPORT_SYMBOL(__ia64_memcpy_fromio);
  * This needs to be optimized.
  */
 void
-__ia64_memcpy_toio (unsigned long to, void * from, long count)
+__ia64_memcpy_toio (unsigned long to, void *from, long count)
 {
+	char *src = from;
+
 	while (count) {
 		count--;
-		writeb(*(char *) from, to);
-		((char *) from)++;
-		to++;
+		writeb(*src++, to++);
 	}
 }
 EXPORT_SYMBOL(__ia64_memcpy_toio);

@@ -1002,7 +1002,7 @@ static void getTceTableParmsPSeriesLP(struct pci_controller *phb,
  * Returns the virtual address of the buffer and sets dma_handle
  * to the dma address (tce) of the first page.
  */
-void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
+static void *tce_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t *dma_handle)
 {
 	struct TceTable * tbl;
@@ -1055,7 +1055,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	return ret;
 }
 
-void pci_free_consistent(struct pci_dev *hwdev, size_t size,
+static void tce_free_consistent(struct pci_dev *hwdev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
 	struct TceTable * tbl;
@@ -1089,7 +1089,7 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
  * need not be page aligned, the dma_addr_t returned will point to the same
  * byte within the page as vaddr.
  */
-dma_addr_t pci_map_single(struct pci_dev *hwdev, void *vaddr, 
+static dma_addr_t tce_map_single(struct pci_dev *hwdev, void *vaddr, 
 			  size_t size, int direction )
 {
 	struct TceTable * tbl;
@@ -1124,7 +1124,7 @@ dma_addr_t pci_map_single(struct pci_dev *hwdev, void *vaddr,
 	return dma_handle;
 }
 
-void pci_unmap_single( struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction )
+static void tce_unmap_single( struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction )
 {
 	struct TceTable * tbl;
 	unsigned order, nPages;
@@ -1354,7 +1354,7 @@ static dma_addr_t create_tces_sg( struct TceTable *tbl, struct scatterlist *sg,
 	return dmaAddr;
 }
 
-int pci_map_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction )
+static int tce_map_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction )
 {
 	struct TceTable * tbl;
 	unsigned numTces;
@@ -1389,7 +1389,7 @@ int pci_map_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nents, int di
 	return num_dma;
 }
 
-void pci_unmap_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nelms, int direction )
+static void tce_unmap_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nelms, int direction )
 {
 	struct TceTable * tbl;
 	unsigned order, numTces, i;
@@ -1430,7 +1430,7 @@ void pci_unmap_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nelms, int
 
 }
 #else
-int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
+static int tce_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
 	       int direction)
 {
 	int i;
@@ -1448,7 +1448,7 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
 	return nelems;
 }
 
-void pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
+static void tce_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
 		  int direction)
 {
 	while (nelems--) {
@@ -1465,7 +1465,15 @@ void tce_init_pSeries(void)
 {
 	ppc_md.tce_build = tce_build_pSeries;
 	ppc_md.tce_free_one = tce_free_one_pSeries;
+
+	pci_dma_ops.pci_alloc_consistent = tce_alloc_consistent;
+	pci_dma_ops.pci_free_consistent = tce_free_consistent;
+	pci_dma_ops.pci_map_single = tce_map_single;
+	pci_dma_ops.pci_unmap_single = tce_unmap_single;
+	pci_dma_ops.pci_map_sg = tce_map_sg;
+	pci_dma_ops.pci_unmap_sg = tce_unmap_sg;
 }
+
 #endif
 
 #ifdef CONFIG_PPC_ISERIES
@@ -1473,5 +1481,12 @@ void tce_init_iSeries(void)
 {
 	ppc_md.tce_build = tce_build_iSeries;
 	ppc_md.tce_free_one = tce_free_one_iSeries;
+
+	pci_dma_ops.pci_alloc_consistent = tce_alloc_consistent;
+	pci_dma_ops.pci_free_consistent = tce_free_consistent;
+	pci_dma_ops.pci_map_single = tce_map_single;
+	pci_dma_ops.pci_unmap_single = tce_unmap_single;
+	pci_dma_ops.pci_map_sg = tce_map_sg;
+	pci_dma_ops.pci_unmap_sg = tce_unmap_sg;
 }
 #endif

@@ -798,10 +798,9 @@ static void get_capabilities(struct scsi_cd *cd)
 	if ((buffer[n + 2] & 0x8) == 0)
 		/* not a DVD drive */
 		cd->cdi.mask |= CDC_DVD;
-	if ((buffer[n + 3] & 0x20) == 0) {
+	if ((buffer[n + 3] & 0x20) == 0) 
 		/* can't write DVD-RAM media */
 		cd->cdi.mask |= CDC_DVD_RAM;
-	} else
 	if ((buffer[n + 3] & 0x10) == 0)
 		/* can't write DVD-R media */
 		cd->cdi.mask |= CDC_DVD_R;

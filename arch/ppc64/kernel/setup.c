@@ -40,6 +40,8 @@
 #include <asm/time.h>
 #include <asm/cputable.h>
 #include <asm/sections.h>
+#include <asm/btext.h>
+#include <asm/nvram.h>
 
 extern unsigned long klimit;
 /* extern void *stab; */
@@ -54,10 +56,17 @@ extern void  chrp_init(unsigned long r3,
 		       unsigned long r6,
 		       unsigned long r7);
 
+extern void  pmac_init(unsigned long r3,
+		       unsigned long r4,
+		       unsigned long r5,
+		       unsigned long r6,
+		       unsigned long r7);
+
 extern void iSeries_init( void );
 extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );
 extern void pSeriesLP_init_early(void);
+extern void pmac_init_early(void);
 extern void mm_init_ppc64( void ); 
 extern void pseries_secondary_smp_init(unsigned long); 
 extern int  idle_setup(void);
@@ -67,6 +76,8 @@ unsigned long decr_overclock = 1;
 unsigned long decr_overclock_proc0 = 1;
 unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
+
+int powersave_nap;
 
 #ifdef CONFIG_XMON
 extern void xmon_map_scc(void);
@@ -188,8 +199,24 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 		parse_bootinfo();
 		break;
+#endif /* CONFIG_PPC_PSERIES */
+#ifdef CONFIG_PPC_PMAC
+	case PLATFORM_POWERMAC:
+		pmac_init_early();
+#ifdef CONFIG_BLK_DEV_INITRD
+		initrd_start = initrd_end = 0;
 #endif
+		parse_bootinfo();
+#endif /* CONFIG_PPC_PMAC */
 	}
+
+#ifdef CONFIG_BOOTX_TEXT
+	map_boot_text();
+	if (systemcfg->platform == PLATFORM_POWERMAC) {
+		early_console_initialized = 1;
+		register_console(&udbg_console);
+	}
+#endif /* CONFIG_BOOTX_TEXT */
 
 #ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform & PLATFORM_PSERIES) {
@@ -206,14 +233,23 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 				rtas_call(rtas_token("start-cpu"), 3, 1, 
 					  (void *)&ret,
 					  get_hard_smp_processor_id(i), 
-					  *((unsigned long *)pseries_secondary_smp_init), i);
+					  *((unsigned long *)pseries_secondary_smp_init),
+					  i);
 				cpu_set(i, cpu_possible_map);
 				systemcfg->processorCount++;
 			}
 		}
-#endif
 	}
-#endif
+#endif /* CONFIG_SMP */
+#endif /* CONFIG_PPC_PSERIES */
+
+#ifdef CONFIG_PPC_PMAC
+	if (systemcfg->platform == PLATFORM_POWERMAC) {
+		finish_device_tree();
+		pmac_init(r3, r4, r5, r6, r7);
+	}
+#endif /* CONFIG_PPC_PMAC */
+
 	/* Finish initializing the hash table (do the dynamic
 	 * patching for the fast-path hashtable.S code)
 	 */
@@ -226,7 +262,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("naca->pftSize                 = 0x%lx\n", naca->pftSize);
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
 	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
-	printk("systemcfg                      = 0x%p\n", systemcfg);
+	printk("systemcfg                     = 0x%p\n", systemcfg);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
 	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);
@@ -261,6 +297,8 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 void machine_restart(char *cmd)
 {
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
 	ppc_md.restart(cmd);
 }
 
@@ -268,6 +306,8 @@ EXPORT_SYMBOL(machine_restart);
   
 void machine_power_off(void)
 {
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
 	ppc_md.power_off();
 }
 
@@ -275,6 +315,8 @@ EXPORT_SYMBOL(machine_power_off);
   
 void machine_halt(void)
 {
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
 	ppc_md.halt();
 }
 

@@ -847,7 +847,8 @@ bpt_cmds(void)
 			break;
 		}
 		
-		if (!(systemcfg->platform & PLATFORM_PSERIES)) {
+		if (systemcfg->platform != PLATFORM_POWERMAC &&
+		   !(systemcfg->platform & PLATFORM_PSERIES)) {
 			printf("Not supported for this platform\n");
 			break;
 		}

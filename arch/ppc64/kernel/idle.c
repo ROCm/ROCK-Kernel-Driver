@@ -42,6 +42,7 @@
 
 extern long cede_processor(void);
 extern long poll_pending(void);
+extern void power4_idle(void);
 
 int (*idle_loop)(void);
 
@@ -279,6 +280,17 @@ int cpu_idle(void)
 	return 0; 
 }
 
+int native_idle(void)
+{
+	while(1) {
+		if (!need_resched())
+			power4_idle();
+		if (need_resched())
+			schedule();
+	}
+	return 0;
+}
+
 int idle_setup(void)
 {
 #ifdef CONFIG_PPC_ISERIES
@@ -297,6 +309,9 @@ int idle_setup(void)
 			printk("idle = default_idle\n");
 			idle_loop = default_idle;
 		}
+	} else if (systemcfg->platform == PLATFORM_POWERMAC) {
+		printk("idle = native_idle\n");
+		idle_loop = native_idle;
 	} else {
 		printk("idle_setup: unknown platform, use default_idle\n");
 		idle_loop = default_idle;

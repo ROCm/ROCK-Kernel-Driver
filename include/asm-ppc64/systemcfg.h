@@ -72,6 +72,7 @@ extern struct systemcfg *systemcfg;
 #define PV_ICESTAR      0x0036
 #define PV_SSTAR        0x0037
 #define PV_POWER4p      0x0038
+#define PV_GPUL		0x0039
 #define PV_630          0x0040
 #define PV_630p         0x0041
 
@@ -79,6 +80,11 @@ extern struct systemcfg *systemcfg;
 #define PLATFORM_PSERIES      0x0100
 #define PLATFORM_PSERIES_LPAR 0x0101
 #define PLATFORM_ISERIES_LPAR 0x0201
+#define PLATFORM_POWERMAC     0x0400
+
+/* Compatibility with drivers coming from PPC32 world */
+#define _machine	(systemcfg->platform)
+#define _MACH_Pmac	PLATFORM_POWERMAC
 
 
 static inline volatile struct systemcfg *systemcfg_init(void)

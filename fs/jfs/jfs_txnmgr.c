@@ -2842,8 +2842,7 @@ restart:
 		jfs_err("jfs_lazycommit being killed w/pending transactions!");
 	else
 		jfs_info("jfs_lazycommit being killed\n");
-	complete(&jfsIOwait);
-	return 0;
+	complete_and_exit(&jfsIOwait, 0);
 }
 
 void txLazyUnlock(struct tblock * tblk)
@@ -3044,8 +3043,7 @@ int jfs_sync(void *arg)
 	} while (!jfs_stop_threads);
 
 	jfs_info("jfs_sync being killed");
-	complete(&jfsIOwait);
-	return 0;
+	complete_and_exit(&jfsIOwait, 0);
 }
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_JFS_DEBUG)

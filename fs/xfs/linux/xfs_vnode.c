@@ -213,7 +213,6 @@ vn_revalidate(
 		inode->i_mtime	    = va.va_mtime;
 		inode->i_ctime	    = va.va_ctime;
 		inode->i_atime	    = va.va_atime;
-		i_size_write(inode, va.va_size);
 		if (va.va_xflags & XFS_XFLAG_IMMUTABLE)
 			inode->i_flags |= S_IMMUTABLE;
 		else

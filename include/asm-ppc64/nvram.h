@@ -38,12 +38,15 @@
 #define NVRAM_SIG_OF	0x50	/* open firmware config */
 #define NVRAM_SIG_FW	0x51	/* general firmware */
 #define NVRAM_SIG_HW	0x52	/* hardware (VPD) */
+#define NVRAM_SIG_FLIP	0x5a	/* Apple flip/flop header */
+#define NVRAM_SIG_APPL	0x5f	/* Apple "system" (???) */
 #define NVRAM_SIG_SYS	0x70	/* system env vars */
 #define NVRAM_SIG_CFG	0x71	/* config data */
 #define NVRAM_SIG_ELOG	0x72	/* error log */
 #define NVRAM_SIG_VEND	0x7e	/* vendor defined */
 #define NVRAM_SIG_FREE	0x7f	/* Free space */
 #define NVRAM_SIG_OS	0xa0	/* OS defined */
+#define NVRAM_SIG_PANIC	0xa1	/* Apple OSX "panic" */
 
 /* If change this size, then change the size of NVNAME_LEN */
 struct nvram_header {
@@ -60,11 +63,53 @@ struct nvram_partition {
 };
 
 
-ssize_t pSeries_nvram_read(char *buf, size_t count, loff_t *index);
-ssize_t pSeries_nvram_write(char *buf, size_t count, loff_t *index);
-int nvram_write_error_log(char * buff, int length, unsigned int err_type);
-int nvram_read_error_log(char * buff, int length, unsigned int * err_type);
-int nvram_clear_error_log(void);
-void nvram_print_partitions(char * label);
+extern int nvram_write_error_log(char * buff, int length, unsigned int err_type);
+extern int nvram_read_error_log(char * buff, int length, unsigned int * err_type);
+extern int nvram_clear_error_log(void);
+extern struct nvram_partition *nvram_find_partition(int sig, const char *name);
+
+extern int pSeries_nvram_init(void);
+extern int pmac_nvram_init(void);
+
+/* PowerMac specific nvram stuffs */
+
+enum {
+	pmac_nvram_OF,		/* Open Firmware partition */
+	pmac_nvram_XPRAM,	/* MacOS XPRAM partition */
+	pmac_nvram_NR		/* MacOS Name Registry partition */
+};
+
+/* Return partition offset in nvram */
+extern int	pmac_get_partition(int partition);
+
+/* Direct access to XPRAM on PowerMacs */
+extern u8	pmac_xpram_read(int xpaddr);
+extern void	pmac_xpram_write(int xpaddr, u8 data);
+
+/* Synchronize NVRAM */
+extern int	nvram_sync(void);
+
+/* Some offsets in XPRAM */
+#define PMAC_XPRAM_MACHINE_LOC	0xe4
+#define PMAC_XPRAM_SOUND_VOLUME	0x08
+
+/* Machine location structure in PowerMac XPRAM */
+struct pmac_machine_location {
+	unsigned int	latitude;	/* 2+30 bit Fractional number */
+	unsigned int	longitude;	/* 2+30 bit Fractional number */
+	unsigned int	delta;		/* mix of GMT delta and DLS */
+};
+
+/*
+ * /dev/nvram ioctls
+ *
+ * Note that PMAC_NVRAM_GET_OFFSET is still supported, but is
+ * definitely obsolete. Do not use it if you can avoid it
+ */
+
+#define OBSOLETE_PMAC_NVRAM_GET_OFFSET \
+				_IOWR('p', 0x40, int)
+
+#define IOC_NVRAM_GET_OFFSET	_IOWR('p', 0x42, int)	/* Get NVRAM partition offset */
 
 #endif /* _PPC64_NVRAM_H */
