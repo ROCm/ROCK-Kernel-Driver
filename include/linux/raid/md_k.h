@@ -245,7 +245,7 @@ struct mdk_personality_s
 	int (*make_request)(request_queue_t *q, struct bio *bio);
 	int (*run)(mddev_t *mddev);
 	int (*stop)(mddev_t *mddev);
-	int (*status)(char *page, mddev_t *mddev);
+	void (*status)(struct seq_file *seq, mddev_t *mddev);
 	/* error_handler must set ->faulty and clear ->in_sync
 	 * if appropriate, and should abort recovery if needed 
 	 */

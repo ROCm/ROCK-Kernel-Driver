@@ -571,19 +571,18 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	return 0;
 }
 
-static int status(char *page, mddev_t *mddev)
+static void status(struct seq_file *seq, mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
-	int sz = 0, i;
+	int i;
 
-	sz += sprintf(page+sz, " [%d/%d] [", conf->raid_disks,
+	seq_printf(seq, " [%d/%d] [", conf->raid_disks,
 						conf->working_disks);
 	for (i = 0; i < conf->raid_disks; i++)
-		sz += sprintf(page+sz, "%s",
+		seq_printf(seq, "%s",
 			      conf->mirrors[i].rdev &&
 			      conf->mirrors[i].rdev->in_sync ? "U" : "_");
-	sz += sprintf (page+sz, "]");
-	return sz;
+	seq_printf(seq, "]");
 }
 
 #define LAST_DISK KERN_ALERT \
