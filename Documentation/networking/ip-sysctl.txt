@@ -31,6 +31,11 @@ ipfrag_low_thresh - INTEGER
 ipfrag_time - INTEGER
 	Time in seconds to keep an IP fragment in memory.	
 
+ipfrag_secret_interval - INTEGER
+	Regeneration interval (in seconds) of the hash secret (or lifetime 
+	for the hash secret) for IP fragments.
+	Default: 600
+
 INET peer storage:
 
 inet_peer_threshold - INTEGER
@@ -514,6 +519,25 @@ bindv6only - BOOLEAN
 		FALSE: enable IPv4-mapped address feature
 
 	Default: FALSE (as specified in RFC2553bis)
+
+IPv6 Fragmentation:
+
+ip6frag_high_thresh - INTEGER
+	Maximum memory used to reassemble IPv6 fragments. When 
+	ip6frag_high_thresh bytes of memory is allocated for this purpose,
+	the fragment handler will toss packets until ip6frag_low_thresh
+	is reached.
+	
+ip6frag_low_thresh - INTEGER
+	See ip6frag_high_thresh	
+
+ip6frag_time - INTEGER
+	Time in seconds to keep an IPv6 fragment in memory.
+
+ip6frag_secret_interval - INTEGER
+	Regeneration interval (in seconds) of the hash secret (or lifetime 
+	for the hash secret) for IPv6 fragments.
+	Default: 600
 
 conf/default/*:
 	Change the interface-specific default settings.
