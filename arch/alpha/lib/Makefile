@@ -2,7 +2,7 @@
 # Makefile for alpha-specific library files..
 #
 
-EXTRA_AFLAGS := $(CFLAGS)
+L_TARGET := lib.a
 
 # Many of these routines have implementations tuned for ev6.
 # Choose them iff we're targeting ev6 specifically.
@@ -17,7 +17,7 @@ ifeq ($(CONFIG_ALPHA_EV67),y)
   ev67 := ev67-
 endif
 
-OBJS =	__divqu.o __remqu.o __divlu.o __remlu.o \
+obj-y =	__divqu.o __remqu.o __divlu.o __remlu.o \
 	udelay.o \
 	$(ev6)memset.o \
 	$(ev6)memcpy.o \
@@ -46,12 +46,9 @@ OBJS =	__divqu.o __remqu.o __divlu.o __remlu.o \
 	fpreg.o \
 	callback_srm.o srm_puts.o srm_printk.o
 
-ifeq ($(CONFIG_SMP),y)
-  OBJS += dec_and_lock.o
-endif
+obj-$(CONFIG_SMP) += dec_and_lock.o
 
-lib.a: $(OBJS)
-	$(AR) rcs lib.a $(OBJS)
+include $(TOPDIR)/Rules.make
 
 __divqu.o: $(ev6)divide.S
 	$(CC) $(AFLAGS) -DDIV -c -o __divqu.o $(ev6)divide.S
@@ -64,5 +61,3 @@ __divlu.o: $(ev6)divide.S
 
 __remlu.o: $(ev6)divide.S
 	$(CC) $(AFLAGS) -DREM -DINTSIZE -c -o __remlu.o $(ev6)divide.S
-
-include $(TOPDIR)/Rules.make

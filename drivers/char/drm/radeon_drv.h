@@ -61,6 +61,15 @@ typedef struct drm_radeon_depth_clear_t {
 	u32 se_cntl;
 } drm_radeon_depth_clear_t;
 
+
+struct mem_block {
+	struct mem_block *next;
+	struct mem_block *prev;
+	int start;
+	int size;
+	int pid;		/* 0: free, -1: heap, other: real pids */
+};
+
 typedef struct drm_radeon_private {
 	drm_radeon_ring_buffer_t ring;
 	drm_radeon_sarea_t *sarea_priv;
@@ -126,6 +135,14 @@ typedef struct drm_radeon_private {
 	drm_map_t *ring_rptr;
 	drm_map_t *buffers;
 	drm_map_t *agp_textures;
+
+	struct mem_block *agp_heap;
+	struct mem_block *fb_heap;
+
+   	wait_queue_head_t irq_queue;
+   	atomic_t irq_received;
+   	atomic_t irq_emitted;
+
 } drm_radeon_private_t;
 
 typedef struct drm_radeon_buf_priv {
@@ -163,6 +180,20 @@ extern int radeon_cp_vertex2( DRM_IOCTL_ARGS );
 extern int radeon_cp_cmdbuf( DRM_IOCTL_ARGS );
 extern int radeon_cp_getparam( DRM_IOCTL_ARGS );
 extern int radeon_cp_flip( DRM_IOCTL_ARGS );
+
+extern int radeon_mem_alloc( DRM_IOCTL_ARGS );
+extern int radeon_mem_free( DRM_IOCTL_ARGS );
+extern int radeon_mem_init_heap( DRM_IOCTL_ARGS );
+extern void radeon_mem_takedown( struct mem_block **heap );
+extern void radeon_mem_release( struct mem_block *heap );
+
+extern int radeon_irq_emit( DRM_IOCTL_ARGS );
+extern int radeon_irq_wait( DRM_IOCTL_ARGS );
+
+extern int radeon_emit_and_wait_irq(drm_device_t *dev);
+extern int radeon_wait_irq(drm_device_t *dev, int irq_nr);
+extern int radeon_emit_irq(drm_device_t *dev);
+
 
 /* Flags for stats.boxes
  */
@@ -237,6 +268,16 @@ extern int radeon_cp_flip( DRM_IOCTL_ARGS );
 #define GET_SCRATCH( x )	(dev_priv->writeback_works			\
 				? DRM_READ32( &dev_priv->scratch[(x)] )		\
 				: RADEON_READ( RADEON_SCRATCH_REG0 + 4*(x) ) )
+
+
+#define RADEON_GEN_INT_CNTL		0x0040
+#	define RADEON_GUI_IDLE_INT_ENABLE	(1 << 19)
+#	define RADEON_SW_INT_ENABLE		(1 << 25)
+
+#define RADEON_GEN_INT_STATUS		0x0044
+#	define RADEON_GUI_IDLE_INT_TEST_ACK     (1 << 19)
+#	define RADEON_SW_INT_TEST_ACK   	(1 << 25)
+#	define RADEON_SW_INT_FIRE		(1 << 26)
 
 #define RADEON_HOST_PATH_CNTL		0x0130
 #	define RADEON_HDP_SOFT_RESET		(1 << 26)
@@ -526,6 +567,8 @@ extern int radeon_cp_flip( DRM_IOCTL_ARGS );
 #define RADEON_TXFORMAT_ARGB4444	5
 #define RADEON_TXFORMAT_ARGB8888	6
 #define RADEON_TXFORMAT_RGBA8888	7
+#define RADEON_TXFORMAT_VYUY422         10
+#define RADEON_TXFORMAT_YVYU422         11
 
 #define R200_PP_TXCBLEND_0                0x2f00
 #define R200_PP_TXCBLEND_1                0x2f10
