@@ -1374,7 +1374,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	struct m68k_serial	*info;
 	int 			retval, line;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	
 	if (line >= NR_PORTS || line < 0) /* we have exactly one */
 		return -ENODEV;

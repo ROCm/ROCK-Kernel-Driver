@@ -577,8 +577,7 @@ static void uart_flush_buffer(struct tty_struct *tty)
 	struct uart_port *port = state->port;
 	unsigned long flags;
 
-	DPRINTK("uart_flush_buffer(%d) called\n",
-	        minor(tty->device) - tty->driver->minor_start);
+	DPRINTK("uart_flush_buffer(%d) called\n", tty->index);
 
 	spin_lock_irqsave(&port->lock, flags);
 	uart_circ_clear(&state->info->xmit);
@@ -1556,7 +1555,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 {
 	struct uart_driver *drv = (struct uart_driver *)tty->driver->driver_state;
 	struct uart_state *state;
-	int retval, line = minor(tty->device) - tty->driver->minor_start;
+	int retval, line = tty->index;
 
 	BUG_ON(!kernel_locked());
 	DPRINTK("uart_open(%d) called\n", line);

@@ -1421,7 +1421,7 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 	printk("aurora_open: start\n");
 #endif
 	
-	board = AURORA_BOARD(minor(tty->device));
+	board = AURORA_BOARD(tty->index);
 	if (board > AURORA_NBOARD ||
 	    !(aurora_board[board].flags & AURORA_BOARD_PRESENT)) {
 #ifdef AURORA_DEBUG
@@ -1432,7 +1432,7 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 	}
 	
 	bp = &aurora_board[board];
-	port = aurora_port + board * AURORA_NPORT * AURORA_NCD180 + AURORA_PORT(minor(tty->device));
+	port = aurora_port + board * AURORA_NPORT * AURORA_NCD180 + AURORA_PORT(tty->index);
 	if ((aurora_paranoia_check(port, tty->name, "aurora_open")) {
 #ifdef AURORA_DEBUG
 		printk("aurora_open: error paranoia check\n");

@@ -1564,9 +1564,9 @@ ip2_open( PTTY tty, struct file *pFile )
 	wait_queue_t wait;
 	int rc = 0;
 	int do_clocal = 0;
-	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
+	i2ChanStrPtr  pCh = DevTable[tty->index];
 
-	ip2trace (minor(tty->device), ITRC_OPEN, ITRC_ENTER, 0 );
+	ip2trace (tty->index, ITRC_OPEN, ITRC_ENTER, 0 );
 
 	if ( pCh == NULL ) {
 		return -ENODEV;
@@ -2179,7 +2179,7 @@ ip2_unthrottle ( PTTY tty )
 static void
 ip2_start ( PTTY tty )
 {
- 	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
+ 	i2ChanStrPtr  pCh = DevTable[tty->index];
 
  	i2QueueCommands(PTYPE_BYPASS, pCh, 0, 1, CMD_RESUME);
  	i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_UNSUSPEND);
@@ -2192,7 +2192,7 @@ ip2_start ( PTTY tty )
 static void
 ip2_stop ( PTTY tty )
 {
- 	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
+ 	i2ChanStrPtr  pCh = DevTable[tty->index];
 
  	i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_SUSPEND);
 #ifdef IP2DEBUG_WRITE
@@ -2220,7 +2220,7 @@ static int
 ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 {
 	wait_queue_t wait;
-	i2ChanStrPtr pCh = DevTable[minor(tty->device)];
+	i2ChanStrPtr pCh = DevTable[tty->index];
 	struct async_icount cprev, cnow;	/* kernel counter temps */
 	struct serial_icounter_struct *p_cuser;	/* user space */
 	int rc = 0;

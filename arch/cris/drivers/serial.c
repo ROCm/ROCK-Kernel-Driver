@@ -3289,7 +3289,7 @@ rs_open(struct tty_struct *tty, struct file * filp)
 
 	/* find which port we want to open */
 
-	line = MINOR(tty->device) - tty->driver->minor_start;
+	line = tty->index;
   
 	if (line < 0 || line >= NR_PORTS)
 		return -ENODEV;

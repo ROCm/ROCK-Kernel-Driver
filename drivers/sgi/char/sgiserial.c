@@ -1725,7 +1725,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	struct sgi_serial	*info;
 	int 			retval, line;
 
-	line = MINOR(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	/* The zilog lines for the mouse/keyboard must be
 	 * opened using their respective drivers.
 	 */

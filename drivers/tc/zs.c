@@ -1639,7 +1639,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	struct dec_serial	*info;
 	int 			retval, line;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= zs_channels_found))
 		return -ENODEV;
 	info = zs_soft + line;

@@ -405,7 +405,7 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 	int boardnum;
 	int retval;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 
 	if(line < 0 || line >= nbdevs) {
 		printk("line out of range in pcxe_open\n");

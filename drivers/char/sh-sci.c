@@ -812,7 +812,7 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 	struct sci_port *port;
 	int retval, line;
 
-	line = minor(tty->device) - SCI_MINOR_START;
+	line = tty->index;
 
 	if ((line < 0) || (line >= SCI_NPORTS))
 		return -ENODEV;

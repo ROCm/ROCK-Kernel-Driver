@@ -398,7 +398,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	MOD_INC_USE_COUNT;
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= IRCOMM_TTY_PORTS)) {
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;

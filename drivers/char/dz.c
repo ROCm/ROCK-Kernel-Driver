@@ -1271,7 +1271,7 @@ static int dz_open (struct tty_struct *tty, struct file *filp)
 	struct dz_serial *info;
 	int retval, line;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 
 	/*
 	 * The dz lines for the mouse/keyboard must be opened using their

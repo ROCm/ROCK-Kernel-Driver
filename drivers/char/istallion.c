@@ -1035,7 +1035,7 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
 		(int) filp, tty->name);
 #endif
 
-	minordev = minor(tty->device);
+	minordev = tty->index;
 	brdnr = MINOR2BRD(minordev);
 	if (brdnr >= stli_nrbrds)
 		return(-ENODEV);

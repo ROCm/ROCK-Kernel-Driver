@@ -2354,7 +2354,7 @@ static int esp_open(struct tty_struct *tty, struct file * filp)
 	struct esp_struct	*info;
 	int 			retval, line;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= NR_PORTS))
 		return -ENODEV;
 

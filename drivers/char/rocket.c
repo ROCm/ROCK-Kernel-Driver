@@ -822,7 +822,7 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	CHANNEL_t	*cp;
 	unsigned long page;
 	
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= MAX_RP_PORTS))
 		return -ENODEV;
 	if (!tmp_buf) {

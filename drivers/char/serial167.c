@@ -2133,7 +2133,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
   int retval, line;
 
 /* CP('O'); */
-    line = minor(tty->device) - tty->driver->minor_start;
+    line = tty->index;
     if ((line < 0) || (NR_PORTS <= line)){
         return -ENODEV;
     }

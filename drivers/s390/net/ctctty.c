@@ -973,7 +973,7 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 	int retval,
 	 line;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if (line < 0 || line > CTC_TTY_MAX_DEVICES)
 		return -ENODEV;
 	info = &driver->info[line];

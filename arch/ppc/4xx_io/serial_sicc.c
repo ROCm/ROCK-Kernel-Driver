@@ -1052,8 +1052,7 @@ static void siccuart_flush_buffer(struct tty_struct *tty)
     unsigned long flags;
 
 #if DEBUG
-    printk("siccuart_flush_buffer(%d) called\n",
-           MINOR(tty->device) - tty->driver->minor_start);
+    printk("siccuart_flush_buffer(%d) called\n", tty->index);
 #endif
     save_flags(flags); cli();
     info->xmit.head = info->xmit.tail = 0;
@@ -1580,7 +1579,7 @@ static void siccuart_wait_until_sent(struct tty_struct *tty, int timeout)
     expire = jiffies + timeout;
 #if DEBUG
     printk("siccuart_wait_until_sent(%d), jiff=%lu, expire=%lu  char_time=%lu...\n",
-           MINOR(tty->device) - tty->driver->minor_start, jiffies,
+           tty->index, jiffies,
            expire, char_time);
 #endif
     while ((readb(info->port->uart_base + BL_SICC_LSR) & _LSR_TX_ALL) != _LSR_TX_ALL) {
@@ -1754,7 +1753,7 @@ static struct SICC_info *siccuart_get(int line)
 static int siccuart_open(struct tty_struct *tty, struct file *filp)
 {
     struct SICC_info *info;
-    int retval, line = MINOR(tty->device) - tty->driver->minor_start;
+    int retval, line = tty->index;
 
 
     // is this a line that we've got?

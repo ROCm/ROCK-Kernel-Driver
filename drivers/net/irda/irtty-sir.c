@@ -540,13 +540,11 @@ static int irtty_open(struct tty_struct *tty)
 
 	if (strchr(tty->driver->name, '%')) {
 		sprintf(hwname, tty->driver->name,
-			minor(tty->device) - tty->driver->minor_start +
-			tty->driver->name_base);
+			tty->index + tty->driver->name_base);
 	}
 	else {
 		sprintf(hwname, "%s%d", tty->driver->name,
-			minor(tty->device) - tty->driver->minor_start +
-			tty->driver->name_base);
+			tty->index + tty->driver->name_base);
 	}
 
 	/* apply mtt override */

@@ -2229,7 +2229,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	unsigned long		page;
 
 	MOD_INC_USE_COUNT;
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= zs_channels_found)) {
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;

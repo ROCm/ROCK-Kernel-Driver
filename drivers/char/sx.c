@@ -1434,7 +1434,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 		return -EIO;
 	}
 
-	line = minor(tty->device);
+	line = tty->index;
 	sx_dprintk (SX_DEBUG_OPEN, "%d: opening line %d. tty=%p ctty=%p, np=%d)\n", 
 	            current->pid, line, tty, current->tty, sx_nports);
 

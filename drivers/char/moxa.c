@@ -189,7 +189,7 @@ static struct mxser_mstatus GMStatus[MAX_PORTS];
 
 #define WAKEUP_CHARS		256
 
-#define PORTNO(x)		(minor((x)->device) - (x)->driver->minor_start)
+#define PORTNO(x)		((x)->index)
 
 static int verbose = 0;
 static int ttymajor = MOXAMAJOR;

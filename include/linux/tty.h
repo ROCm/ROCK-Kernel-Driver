@@ -260,6 +260,7 @@ struct tty_flip_buffer {
 struct tty_struct {
 	int	magic;
 	struct tty_driver *driver;
+	int index;
 	struct tty_ldisc ldisc;
 	struct termios *termios, *termios_locked;
 	char name[64];

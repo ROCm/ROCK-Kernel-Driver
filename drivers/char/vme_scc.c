@@ -842,7 +842,7 @@ static void scc_send_xchar(struct tty_struct *tty, char ch)
 
 static int scc_open (struct tty_struct * tty, struct file * filp)
 {
-	int line = minor(tty->device) - SCC_MINOR_BASE;
+	int line = tty->index;
 	int retval;
 	struct scc_port *port = &scc_ports[line];
 	int i, channel = port->channel;

@@ -1416,7 +1416,7 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
 	struct mcf_serial	*info;
 	int 			retval, line;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= NR_PORTS))
 		return -ENODEV;
 	info = mcfrs_table + line;

@@ -1373,7 +1373,7 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 		return (0) ;
 	}
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if (line < 0 || line >= nbdevs) 
 	{
 		printk(KERN_ERR "<Error> - pc_open : line out of range in pc_open\n");

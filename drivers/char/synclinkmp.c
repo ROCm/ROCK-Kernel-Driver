@@ -740,7 +740,7 @@ static int open(struct tty_struct *tty, struct file *filp)
 	int retval, line;
 	unsigned long flags;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= synclinkmp_device_count)) {
 		printk("%s(%d): open with illegal line #%d.\n",
 			__FILE__,__LINE__,line);

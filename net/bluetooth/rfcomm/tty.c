@@ -532,7 +532,7 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 	struct rfcomm_dlc *dlc;
 	int err, id;
 
-        id = minor(tty->device) - tty->driver->minor_start;
+        id = tty->index;
 
 	BT_DBG("tty %p id %d", tty, id);
 

@@ -1766,7 +1766,7 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 
 	MOD_INC_USE_COUNT;
 
-	line = minor(tty->device) - tty->driver->minor_start;
+	line = tty->index;
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
 		return -ENODEV;
 	info = &isdn_mdm.info[line];

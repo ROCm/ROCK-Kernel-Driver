@@ -172,8 +172,7 @@ static inline void free_tty_struct(struct tty_struct *tty)
 	kfree(tty);
 }
 
-#define TTY_NUMBER(tty) (minor((tty)->device) - (tty)->driver->minor_start + \
-			 (tty)->driver->name_base)
+#define TTY_NUMBER(tty) ((tty)->index + (tty)->driver->name_base)
 
 char *tty_name(struct tty_struct *tty, char *buf)
 {
@@ -843,6 +842,7 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	initialize_tty_struct(tty);
 	tty->device = device;
 	tty->driver = driver;
+	tty->index = idx;
 	sprintf(tty->name, "%s%d",
 		driver->name, idx + driver->name_base);
 
@@ -872,6 +872,7 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 		o_tty->device = mk_kdev(driver->other->major,
 					driver->other->minor_start + idx);
 		o_tty->driver = driver->other;
+		o_tty->index = idx;
 		sprintf(o_tty->name, "%s%d",
 			driver->other->name, idx + driver->other->name_base);
 
@@ -1069,7 +1070,7 @@ static void release_dev(struct file * filp)
 
 	tty_fasync(-1, filp, 0);
 
-	idx = minor(tty->device) - tty->driver->minor_start;
+	idx = tty->index;
 	pty_master = (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 		      tty->driver->subtype == PTY_TYPE_MASTER);
 	o_tty = tty->link;
@@ -1519,7 +1520,7 @@ static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
 		return 0;
 #ifdef CONFIG_VT
 	if (tty->driver->type == TTY_DRIVER_TYPE_CONSOLE) {
-		unsigned int currcons = minor(tty->device) - tty->driver->minor_start;
+		unsigned int currcons = tty->index;
 		if (vc_resize(currcons, tmp_ws.ws_col, tmp_ws.ws_row))
 			return -ENXIO;
 	}
