@@ -89,8 +89,8 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 				ses->serverOS, ses->serverNOS, ses->capabilities);
 		buf += length;
 		if(ses->server)
-			buf += sprintf(buf, "\tLocal Users To Same Server: %d ",
-				atomic_read(&ses->server->socketUseCount));
+			buf += sprintf(buf, "\tLocal Users To Same Server: %d SecMode: 0x%x",
+				atomic_read(&ses->server->socketUseCount),ses->server->secMode);
 	}
 	read_unlock(&GlobalSMBSeslock);
 	sprintf(buf, "\n");
@@ -590,6 +590,8 @@ packet_signing_enabled_write(struct file *file, const char *buffer,
 		sign_CIFS_PDUs = 0;
 	else if (c == '1' || c == 'y' || c == 'Y')
 		sign_CIFS_PDUs = 1;
+	else if (c == '2')
+		sign_CIFS_PDUs = 2;
 
 	return count;
 }
