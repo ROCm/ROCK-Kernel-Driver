@@ -45,6 +45,12 @@ int profile_event_register(enum profile_type, struct notifier_block * n);
 
 int profile_event_unregister(enum profile_type, struct notifier_block * n);
  
+int register_profile_notifier(struct notifier_block * nb);
+int unregister_profile_notifier(struct notifier_block * nb);
+ 
+/* profiling hook activated on each timer interrupt */
+void profile_hook(struct pt_regs * regs);
+
 #else
 
 static inline int profile_event_register(enum profile_type t, struct notifier_block * n)
@@ -60,7 +66,19 @@ static inline int profile_event_unregister(enum profile_type t, struct notifier_
 #define profile_exit_task(a) do { } while (0)
 #define profile_exec_unmap(a) do { } while (0)
 #define profile_exit_mmap(a) do { } while (0)
- 
+
+static inline int register_profile_notifier(struct notifier_block * nb)
+{
+	return -ENOSYS;
+}
+
+static inline int unregister_profile_notifier(struct notifier_block * nb)
+{
+	return -ENOSYS;
+}
+
+#define profile_hook(regs) do { } while (0)
+
 #endif /* CONFIG_PROFILING */
  
 #endif /* __KERNEL__ */

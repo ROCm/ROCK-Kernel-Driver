@@ -207,10 +207,5 @@ extern void $$dyncall(void);
 EXPORT_SYMBOL_NOVERS($$dyncall);
 #endif
 
-#ifdef CONFIG_PROFILING
-EXPORT_SYMBOL_GPL(register_profile_notifier);
-EXPORT_SYMBOL_GPL(unregister_profile_notifier);
-#endif
-
 #include <asm/pgtable.h>
 EXPORT_SYMBOL_NOVERS(vmalloc_start);

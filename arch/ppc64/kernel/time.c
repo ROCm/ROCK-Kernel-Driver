@@ -110,11 +110,8 @@ static inline void ppc64_do_profile(struct pt_regs *regs)
 	unsigned long nip;
 	extern unsigned long prof_cpu_mask;
 	extern char _stext;
-#ifdef CONFIG_PROFILING
-	extern void ppc64_profile_hook(struct pt_regs *);
 
-	ppc64_profile_hook(regs);
-#endif
+	profile_hook(regs);
 
 	if (user_mode(regs))
 		return;

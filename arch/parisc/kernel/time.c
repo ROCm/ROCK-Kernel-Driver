@@ -51,11 +51,7 @@ parisc_do_profile(struct pt_regs *regs)
 	extern unsigned long prof_cpu_mask;
 	extern char _stext;
 
-#ifdef CONFIG_PROFILING
-	extern void parisc_profile_hook(struct pt_regs *);
-
-	parisc_profile_hook(regs);
-#endif
+	profile_hook(regs);
 
 	if (user_mode(regs))
 		return;

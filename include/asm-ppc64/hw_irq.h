@@ -81,26 +81,5 @@ static inline void __do_save_and_cli(unsigned long *flags)
 struct hw_interrupt_type;
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}
  
-struct notifier_block;
- 
-#ifdef CONFIG_PROFILING
- 
-int register_profile_notifier(struct notifier_block * nb);
-int unregister_profile_notifier(struct notifier_block * nb);
-
-#else
-
-static inline int register_profile_notifier(struct notifier_block * nb)
-{
-	return -ENOSYS;
-}
-
-static inline int unregister_profile_notifier(struct notifier_block * nb)
-{
-	return -ENOSYS;
-}
-
-#endif /* CONFIG_PROFILING */
- 
 #endif /* _PPC64_HW_IRQ_H */
 #endif /* __KERNEL__ */
