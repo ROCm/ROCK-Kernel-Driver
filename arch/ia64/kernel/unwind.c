@@ -253,6 +253,11 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 	struct pt_regs *pt;
 
 	if ((unsigned) regnum - 1 >= 127) {
+		if (regnum == 0 && !write) {
+			*val = 0;	/* read r0 always returns 0 */
+			*nat = 0;
+			return 0;
+		}
 		UNW_DPRINT(0, "unwind.%s: trying to access non-existent r%u\n",
 			   __FUNCTION__, regnum);
 		return -1;
