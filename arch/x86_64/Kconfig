@@ -318,8 +318,9 @@ config SOFTWARE_SUSPEND
 
 source "drivers/acpi/Kconfig"
 
-endmenu
+source "arch/x86_64/kernel/cpufreq/Kconfig"
 
+endmenu
 
 menu "Bus options (PCI etc.)"
 
