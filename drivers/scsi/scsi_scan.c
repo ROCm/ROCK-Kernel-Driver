@@ -1939,6 +1939,7 @@ static void scsi_scan_target(Scsi_Device *sdevscan, struct Scsi_Host *shost,
 
 	sdevscan->host = shost;
 	sdevscan->id = id;
+	sdevscan->channel = channel;
 	/*
 	 * Scan LUN 0, if there is some response, scan further. Ideally, we
 	 * would not configure LUN 0 until all LUNs are scanned.
