@@ -300,7 +300,6 @@ static void __exit cpqarray_exit(void)
 		iounmap(hba[i]->vaddr);
 		unregister_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname);
 		del_timer(&hba[i]->timer);
-		blk_cleanup_queue(hba[i]->queue);
 		remove_proc_entry(hba[i]->devname, proc_array);
 		pci_free_consistent(hba[i]->pci_dev, 
 			NR_CMDS * sizeof(cmdlist_t), (hba[i]->cmd_pool), 
@@ -313,6 +312,7 @@ static void __exit cpqarray_exit(void)
 			devfs_remove("ida/c%dd%d",i,j);
 			put_disk(ida_gendisk[i][j]);
 		}
+		blk_cleanup_queue(hba[i]->queue);
 	}
 	devfs_remove("ida");
 	remove_proc_entry("cpqarray", proc_root_driver);
