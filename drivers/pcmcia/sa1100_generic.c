@@ -1154,6 +1154,9 @@ static int __init sa1100_pcmcia_init(void)
 #ifdef CONFIG_SA1100_PFS168
 	pcmcia_pfs_init();
 #endif
+#ifdef CONFIG_SA1100_PT_SYSTEM3
+	pcmcia_system3_init();
+#endif
 #ifdef CONFIG_SA1100_SHANNON
 	pcmcia_shannon_init();
 #endif
@@ -1169,6 +1172,7 @@ static int __init sa1100_pcmcia_init(void)
 #ifdef CONFIG_SA1100_YOPY
 	pcmcia_yopy_init();
 #endif
+
 	return 0;
 }
 
