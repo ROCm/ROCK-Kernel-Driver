@@ -48,6 +48,13 @@ ipt_tcpmss_target(struct sk_buff **pskb,
 	u_int16_t tcplen, newtotlen, oldval, newmss;
 	unsigned int i;
 	u_int8_t *opt;
+	struct sk_buff *nskb;
+
+	/* raw socket may have clone of skb: don't disturb it --RR */
+	nskb = skb_unshare(*pskb, GFP_ATOMIC);
+	if (!nskb)
+		return NF_DROP;
+	*pskb = nskb;
 
 	tcplen = (*pskb)->len - iph->ihl*4;
 

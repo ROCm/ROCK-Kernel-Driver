@@ -40,6 +40,11 @@ if [ "$CONFIG_PCI" = "y" ]; then
       bool '  Use suni PHY driver (155Mbps)' CONFIG_ATM_NICSTAR_USE_SUNI
       bool '  Use IDT77015 PHY driver (25Mbps)' CONFIG_ATM_NICSTAR_USE_IDT77105
    fi
+   tristate 'IDT 77252 (NICStAR II)' CONFIG_ATM_IDT77252
+   if [ "$CONFIG_ATM_IDT77252" != "n" ]; then
+      bool '  Receive ALL cells in raw queue' CONFIG_ATM_IDT77252_RCV_ALL
+      define_bool CONFIG_ATM_IDT77252_USE_SUNI y
+   fi
    tristate 'Madge Ambassador (Collage PCI 155 Server)' CONFIG_ATM_AMBASSADOR
    if [ "$CONFIG_ATM_AMBASSADOR" != "n" ]; then
       bool '  Enable debugging messages' CONFIG_ATM_AMBASSADOR_DEBUG

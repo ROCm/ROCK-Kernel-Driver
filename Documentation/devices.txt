@@ -971,7 +971,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c0d0	First disk, whole disk
 		  8 = /dev/rd/c0d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c0d15	32nd disk, whole disk
+		248 = /dev/rd/c0d31	32nd disk, whole disk
 
 		For partitions add:
 		  0 = /dev/rd/c?d?	Whole disk

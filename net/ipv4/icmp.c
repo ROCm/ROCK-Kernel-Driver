@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.81 2001/09/01 00:31:50 davem Exp $
+ *	Version: $Id: icmp.c,v 1.82 2001/11/01 23:44:31 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -139,7 +139,7 @@ struct icmp_err icmp_err_convert[] = {
   { EHOSTUNREACH,	1 }	/*	ICMP_PREC_CUTOFF	*/
 };
 
-/* Control parameters for ECHO relies. */
+/* Control parameters for ECHO replies. */
 int sysctl_icmp_echo_ignore_all;
 int sysctl_icmp_echo_ignore_broadcasts;
 

@@ -166,9 +166,9 @@ extern void FASTCALL(mark_page_accessed(struct page *));
  */
 #define DEBUG_LRU_PAGE(page)			\
 do {						\
-	if (PageActive(page))			\
+	if (!PageLRU(page))			\
 		BUG();				\
-	if (PageInactive(page))			\
+	if (PageActive(page))			\
 		BUG();				\
 	if (page_count(page) == 0)		\
 		BUG();				\
@@ -185,7 +185,6 @@ do {						\
 #define add_page_to_inactive_list(page)		\
 do {						\
 	DEBUG_LRU_PAGE(page);			\
-	SetPageInactive(page);		\
 	list_add(&(page)->lru, &inactive_list);	\
 	nr_inactive_pages++;			\
 } while (0)
@@ -200,7 +199,6 @@ do {						\
 #define del_page_from_inactive_list(page)	\
 do {						\
 	list_del(&(page)->lru);			\
-	ClearPageInactive(page);		\
 	nr_inactive_pages--;			\
 } while (0)
 

@@ -271,8 +271,8 @@ typedef struct page {
 #define PG_uptodate		 3
 #define PG_dirty		 4
 #define PG_unused		 5
-#define PG_active		 6
-#define PG_inactive		 7
+#define PG_lru			 6
+#define PG_active		 7
 #define PG_slab			 8
 #define PG_skip			10
 #define PG_highmem		11
@@ -320,14 +320,10 @@ extern void FASTCALL(set_page_dirty(struct page *));
 #define PageActive(page)	test_bit(PG_active, &(page)->flags)
 #define SetPageActive(page)	set_bit(PG_active, &(page)->flags)
 #define ClearPageActive(page)	clear_bit(PG_active, &(page)->flags)
-#define TestandSetPageActive(page)	test_and_set_bit(PG_active, &(page)->flags)
-#define TestandClearPageActive(page)	test_and_clear_bit(PG_active, &(page)->flags)
 
-#define PageInactive(page)	test_bit(PG_inactive, &(page)->flags)
-#define SetPageInactive(page)	set_bit(PG_inactive, &(page)->flags)
-#define ClearPageInactive(page)	clear_bit(PG_inactive, &(page)->flags)
-#define TestandSetPageInactive(page)	test_and_set_bit(PG_inactive, &(page)->flags)
-#define TestandClearPageInactive(page)	test_and_clear_bit(PG_inactive, &(page)->flags)
+#define PageLRU(page)		test_bit(PG_lru, &(page)->flags)
+#define TestSetPageLRU(page)	test_and_set_bit(PG_lru, &(page)->flags)
+#define TestClearPageLRU(page)	test_and_clear_bit(PG_lru, &(page)->flags)
 
 #ifdef CONFIG_HIGHMEM
 #define PageHighMem(page)		test_bit(PG_highmem, &(page)->flags)

@@ -2,7 +2,7 @@
 		     ----------------------------
 
 		    H. Peter Anvin <hpa@zytor.com>
-			Last update 2000-07-27
+			Last update 2000-10-29
 
 On the i386 platform, the Linux kernel uses a rather complicated boot
 convention.  This has evolved partially due to historical aspects, as
@@ -144,6 +144,9 @@ Most boot loaders will simply load the kernel at its target address
 directly.  Such boot loaders do not need to worry about filling in
 most of the fields in the header.  The following fields should be
 filled out, however:
+
+  vid_mode:
+	Please see the section on SPECIAL COMMAND LINE OPTIONS.
 
   type_of_loader:
 	If your boot loader has an assigned id (see table below), enter
@@ -319,8 +322,8 @@ conflict with actual kernel options now or in the future.
 
   mem=<size>
 	<size> is an integer in C notation optionally followed by K, M
-	or G (meaning << 10, << 20 or << 30).  This specifies to the
-	kernel the memory size.  This affects the possible placement
+	or G (meaning << 10, << 20 or << 30).  This specifies the end
+	of memory to the kernel. This affects the possible placement
 	of an initrd, since an initrd should be placed near end of
 	memory.  Note that this is an option to *both* the kernel and
 	the bootloader!
@@ -392,8 +395,8 @@ following hooks that, if set, are invoked by the kernel at the
 appropriate time.  The use of these hooks should probably be
 considered an absolutely last resort!
 
-IMPORTANT: All the hooks are required to preserve %ebp, %esi and %edi
-across invocation.
+IMPORTANT: All the hooks are required to preserve %esp, %ebp, %esi and
+%edi across invocation.
 
   realmode_swtch:
 	A 16-bit real mode far subroutine invoked immediately before

@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.127 2001/11/01 23:54:19 davem Exp $
+/* $Id: ioctl32.c,v 1.131 2001/11/07 01:13:23 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -71,6 +71,7 @@
 #include <asm/audioio.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
+#include <linux/if_bonding.h>
 #include <asm/display7seg.h>
 #include <asm/watchdog.h>
 #include <asm/module.h>
@@ -582,6 +583,58 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		u32 data;
 
 		__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
+		len = copy_to_user((char *)A(data), ifr.ifr_data, len);
+		if (len)
+			err = -EFAULT;
+	}
+
+out:
+	free_page((unsigned long)ifr.ifr_data);
+	return err;
+}
+
+static int bond_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
+{
+	struct ifreq ifr;
+	mm_segment_t old_fs;
+	int err, len;
+	u32 data;
+	
+	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
+		return -EFAULT;
+	ifr.ifr_data = (__kernel_caddr_t)get_free_page(GFP_KERNEL);
+	if (!ifr.ifr_data)
+		return -EAGAIN;
+
+	switch (cmd) {
+	case SIOCBONDENSLAVE:
+	case SIOCBONDRELEASE:
+	case SIOCBONDSETHWADDR:
+	case SIOCBONDCHANGEACTIVE:
+		len = IFNAMSIZ * sizeof(char);
+		break;
+	case SIOCBONDSLAVEINFOQUERY:
+		len = sizeof(struct ifslave);
+		break;
+	case SIOCBONDINFOQUERY:
+		len = sizeof(struct ifbond);
+		break;
+	default:
+		err = -EINVAL;
+		goto out;
+	};
+
+	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
+	if (copy_from_user(ifr.ifr_data, (char *)A(data), len)) {
+		err = -EFAULT;
+		goto out;
+	}
+
+	old_fs = get_fs();
+	set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, cmd, (unsigned long)&ifr);
+	set_fs (old_fs);
+	if (!err) {
 		len = copy_to_user((char *)A(data), ifr.ifr_data, len);
 		if (len)
 			err = -EFAULT;
@@ -4488,6 +4541,12 @@ HANDLE_IOCTL(SIOCGPPPVER, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCETHTOOL, ethtool_ioctl)
+HANDLE_IOCTL(SIOCBONDENSLAVE, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDRELEASE, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDSETHWADDR, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDSLAVEINFOQUERY, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDINFOQUERY, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDCHANGEACTIVE, bond_ioctl)
 HANDLE_IOCTL(SIOCADDRT, routing_ioctl)
 HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
 /* Note SIOCRTMSG is no longer, so this is safe and * the user would have seen just an -EINVAL anyways. */

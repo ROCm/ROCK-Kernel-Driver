@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) module.
  *
- * Version:	$Id: ip_input.c,v 1.53 2000/12/18 19:01:50 davem Exp $
+ * Version:	$Id: ip_input.c,v 1.54 2001/11/06 22:33:52 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -383,7 +383,7 @@ drop:
  */ 
 int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
-	struct iphdr *iph = skb->nh.iph;
+	struct iphdr *iph;
 
 	/* When the interface is in promisc. mode, drop all the crap
 	 * that it receives, do not try to analyse it.
@@ -417,6 +417,8 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 
 	if (!pskb_may_pull(skb, iph->ihl*4))
 		goto inhdr_error;
+
+	iph = skb->nh.iph;
 
 	if (ip_fast_csum((u8 *)iph, iph->ihl) != 0)
 		goto inhdr_error; 

@@ -47,6 +47,7 @@
 #include <linux/mca.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/io.h>

@@ -1284,7 +1284,7 @@ static int __init i2c_init(void)
 #ifdef CONFIG_I2C_ALGOBIT
 	extern int i2c_algo_bit_init(void);
 #endif
-#ifdef CONFIG_I2C_CONFIG_I2C_PHILIPSPAR
+#ifdef CONFIG_I2C_PHILIPSPAR
 	extern int i2c_bitlp_init(void);
 #endif
 #ifdef CONFIG_I2C_ELV

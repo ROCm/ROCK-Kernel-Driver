@@ -201,6 +201,12 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/SHARK MACHINE SUPPORT
+P:	Alexander Schulz
+M:	alex@shark-linux.de
+W:	http://www.shark-linux.de/shark.html
+S:	Maintained
+
 ARM/STRONGARM110 PORT
 P:	Russell King
 M:	rmk@arm.linux.org.uk

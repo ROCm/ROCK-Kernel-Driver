@@ -565,11 +565,11 @@ int dev_alloc_name(struct net_device *dev, const char *name)
 
 	/*
 	 * Verify the string as this thing may have come from
-	 * the user.  There must be one "%d" and no other "%"
-	 * characters.
+	 * the user.  There must be either one "%d" and no other "%"
+	 * characters, or no "%" characters at all.
 	 */
 	p = strchr(name, '%');
-	if (!p || p[1] != 'd' || strchr(p+2, '%'))
+	if (p && (p[1] != 'd' || strchr(p+2, '%')))
 		return -EINVAL;
 
 	/*
@@ -2221,6 +2221,12 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 		default:
 			if ((cmd >= SIOCDEVPRIVATE &&
 			    cmd <= SIOCDEVPRIVATE + 15) ||
+			    cmd == SIOCBONDENSLAVE ||
+			    cmd == SIOCBONDRELEASE ||
+			    cmd == SIOCBONDSETHWADDR ||
+			    cmd == SIOCBONDSLAVEINFOQUERY ||
+			    cmd == SIOCBONDINFOQUERY ||
+			    cmd == SIOCBONDCHANGEACTIVE ||
 			    cmd == SIOCETHTOOL ||
 			    cmd == SIOCGMIIPHY ||
 			    cmd == SIOCGMIIREG ||
@@ -2372,6 +2378,12 @@ int dev_ioctl(unsigned int cmd, void *arg)
 		case SIOCSIFTXQLEN:
 		case SIOCSIFNAME:
 		case SIOCSMIIREG:
+		case SIOCBONDENSLAVE:
+		case SIOCBONDRELEASE:
+		case SIOCBONDSETHWADDR:
+		case SIOCBONDSLAVEINFOQUERY:
+		case SIOCBONDINFOQUERY:
+		case SIOCBONDCHANGEACTIVE:
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			dev_load(ifr.ifr_name);

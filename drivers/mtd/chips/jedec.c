@@ -873,7 +873,7 @@ static void jedec_flash_chip_scan(struct jedec_private *priv,unsigned long start
    }
 }
 
-int __init jedec_probe_init(void)
+static int __init jedec_probe_init(void)
 {
 	register_mtd_chip_driver(&jedec_chipdrv);
 	return 0;

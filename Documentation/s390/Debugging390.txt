@@ -1287,10 +1287,14 @@ this can make debugging a particular process under VM painful under normal
 circumstances as the process may change when doing a 
 TR I R <address range>.
 Thankfully after reading VM's online help I figured out how to debug
-I particular process.
+particular processes in 31 bit mode, however, according to the current 
+VM online help documentation the method described below uses 
+TR STO or STD which don't currently work on  z/Series while in 
+64-bit mode.
 
 Your first problem is to find the STD ( segment table designation )
 of the program you wish to debug.
+
 There are several ways you can do this here are a few
 1) objdump --syms <program to be debugged> | grep main
 To get the address of main in the program.

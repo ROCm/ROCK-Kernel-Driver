@@ -38,7 +38,7 @@ pager_daemon_t pager_daemon = {
  */
 static inline void activate_page_nolock(struct page * page)
 {
-	if (PageInactive(page)) {
+	if (PageLRU(page) && !PageActive(page)) {
 		del_page_from_inactive_list(page);
 		add_page_to_active_list(page);
 	}
@@ -57,7 +57,7 @@ void activate_page(struct page * page)
  */
 void lru_cache_add(struct page * page)
 {
-	if (!PageActive(page) && !PageInactive(page)) {
+	if (!TestSetPageLRU(page)) {
 		spin_lock(&pagemap_lru_lock);
 		add_page_to_inactive_list(page);
 		spin_unlock(&pagemap_lru_lock);
@@ -73,12 +73,12 @@ void lru_cache_add(struct page * page)
  */
 void __lru_cache_del(struct page * page)
 {
-	if (PageActive(page)) {
-		del_page_from_active_list(page);
-	} else if (PageInactive(page)) {
-		del_page_from_inactive_list(page);
-	} else {
-//		printk("VM: __lru_cache_del, found unknown page ?!\n");
+	if (TestClearPageLRU(page)) {
+		if (PageActive(page)) {
+			del_page_from_active_list(page);
+		} else {
+			del_page_from_inactive_list(page);
+		}
 	}
 }
 

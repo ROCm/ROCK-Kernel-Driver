@@ -105,6 +105,15 @@
 #define SIOCGIFVLAN	0x8982		/* 802.1Q VLAN support		*/
 #define SIOCSIFVLAN	0x8983		/* Set 802.1Q VLAN options 	*/
 
+/* bonding calls */
+
+#define SIOCBONDENSLAVE	0x8990		/* enslave a device to the bond */
+#define SIOCBONDRELEASE 0x8991		/* release a slave from the bond*/
+#define SIOCBONDSETHWADDR      0x8992	/* set the hw addr of the bond  */
+#define SIOCBONDSLAVEINFOQUERY 0x8993   /* rtn info about slave state   */
+#define SIOCBONDINFOQUERY      0x8994	/* rtn info about bond state    */
+#define SIOCBONDCHANGEACTIVE   0x8995   /* update to a new active slave */
+			
 /* Device private ioctl calls */
 
 /*

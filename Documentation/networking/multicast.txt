@@ -31,6 +31,7 @@ de4x5		YES		YES		YES		Hardware
 de600		NO		NO		NO		N/A
 de620		PROMISC		PROMISC		YES		Software
 depca		YES		PROMISC		YES		Hardware
+dmfe		YES		YES		YES		Software(*)
 e2100		YES		YES		YES		Hardware
 eepro		YES		PROMISC		YES		Hardware
 eexpress	NO		NO		NO		N/A
@@ -52,9 +53,12 @@ sunlance	YES		YES		YES		Hardware
 tulip		YES		YES		YES		Hardware
 wavelan		YES		PROMISC		YES		Hardware
 wd		YES		YES		YES		Hardware
+xirc2ps_cs	YES		YES		YES		Hardware
 znet		YES		YES		YES		Software
 
 
 PROMISC = This multicast mode is in fact promiscuous mode. Avoid using
 cards who go PROMISC on any multicast in a multicast kernel.
+
 (#) = Hardware multicast support is not used yet.
+(*) = Hardware support for Davicom 9132 chipset only.

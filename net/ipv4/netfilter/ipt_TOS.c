@@ -19,7 +19,14 @@ target(struct sk_buff **pskb,
 	const struct ipt_tos_target_info *tosinfo = targinfo;
 
 	if ((iph->tos & IPTOS_TOS_MASK) != tosinfo->tos) {
+		struct sk_buff *nskb;
 		u_int16_t diffs[2];
+
+		/* raw socket may have clone of skb: don't disturb it --RR */
+		nskb = skb_unshare(*pskb, GFP_ATOMIC);
+		if (!nskb)
+			return NF_DROP;
+		*pskb = nskb;
 
 		diffs[0] = htons(iph->tos) ^ 0xFFFF;
 		iph->tos = (iph->tos & IPTOS_PREC_MASK) | tosinfo->tos;

@@ -349,6 +349,10 @@ extern void __global_restore_flags(unsigned long);
 void disable_hlt(void);
 void enable_hlt(void);
 
+extern unsigned long dmi_broken;
 extern int is_sony_vaio_laptop;
+
+#define BROKEN_ACPI_Sx		0x0001
+#define BROKEN_INIT_AFTER_S1	0x0002
 
 #endif

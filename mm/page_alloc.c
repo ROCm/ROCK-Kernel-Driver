@@ -80,9 +80,9 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		BUG();
 	if (PageLocked(page))
 		BUG();
-	if (PageActive(page))
+	if (PageLRU(page))
 		BUG();
-	if (PageInactive(page))
+	if (PageActive(page))
 		BUG();
 	page->flags &= ~((1<<PG_referenced) | (1<<PG_dirty));
 
@@ -203,7 +203,10 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 			set_page_count(page, 1);
 			if (BAD_RANGE(zone,page))
 				BUG();
-			DEBUG_LRU_PAGE(page);
+			if (PageLRU(page))
+				BUG();
+			if (PageActive(page))
+				BUG();
 			return page;	
 		}
 		curr_order++;
@@ -268,9 +271,9 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 						BUG();
 					if (PageLocked(page))
 						BUG();
-					if (PageActive(page))
+					if (PageLRU(page))
 						BUG();
-					if (PageInactive(page))
+					if (PageActive(page))
 						BUG();
 					if (PageDirty(page))
 						BUG();
@@ -425,7 +428,7 @@ unsigned long get_zeroed_page(unsigned int gfp_mask)
 void page_cache_release(struct page *page)
 {
 	if (!PageReserved(page) && put_page_testzero(page)) {
-		if (PageActive(page) || PageInactive(page))
+		if (PageLRU(page))
 			lru_cache_del(page);
 		__free_pages_ok(page, 0);
 	}

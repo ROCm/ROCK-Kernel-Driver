@@ -44,9 +44,6 @@
 
 #include "zisofs.h"
 
-#define min(a,b)	((a)<(b)?(a):(b))
-#define max(a,b)	((a)>(b)?(a):(b))
-
 /* This should probably be global. */
 static char zisofs_sink_page[PAGE_CACHE_SIZE];
 

@@ -347,7 +347,9 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 
 		page = list_entry(entry, struct page, lru);
 
-		if (unlikely(!PageInactive(page)))
+		if (unlikely(!PageLRU(page)))
+			BUG();
+		if (unlikely(PageActive(page)))
 			BUG();
 
 		list_del(entry);

@@ -56,7 +56,7 @@ will allow only devno's 0x480e & 0x480f to be autodetected.
 .El
 .Bl -item
 .It
-Multiple options can be passed separated by semicolons but no spaces are allowed between parameters. To be consistent with other hotpluggable architectures the script pointed to /proc/sys/kernel/hotplug (normally /sbin/hotplug) will be called automatically on startup or a machine check of a device as follows.
+Multiple options can be passed separated by semicolons, no spaces or newlines are allowed between parameters on the kernel parameter line as it complicates parsing, spaces are allowed in /proc/chandev & chandev.conf, newlines are allowed in chandev.conf only. To be consistent with other hotpluggable architectures the script pointed to /proc/sys/kernel/hotplug (normally /sbin/hotplug) will be called automatically on startup or a machine check of a device as follows.
 /sbin/hotplug chandev <start starting_devnames> <machine_check (devname last/pre_recovery_status) (current/post_recovery_status)>.
 The chandev layer doesn't open stdin stdout or stderr so it is advisable that you add the following lines to the start of your script, here is a sample script which starts devices as they become available.
 .It
@@ -132,7 +132,7 @@ e.g. ctc0,0x7c00,0x7c01
 .It
 Tells the channel layer to force ctc0 if detected to use cuu's 7c00 & 7c01 port,port_no is the relative adapter no on lcs, on ctc/escon this field is the ctc/escon protocol number ( default 0 ), don't do checksumming on received ip packets & as ctc doesn't have hardware stats so it ignores this parameter. This can be used for instance to force a device if it presents bad sense data to the IO layer & thus autodetection fails.
 .It
-lcs,0x7c00,0x7d00,-1,4096
+lcs,0x7c00,0x7d00,4096,-1
 All devices between 0x7c00 & 7d00 should be detected as lcs, let the driver use 4096k for each instance, don't care what port relative adapter number is chosen, don't checksum received ip packets & use hw stats .
 .It
 qeth1,0x7c00,0x7c01,0x7c02

@@ -471,6 +471,11 @@ your system and how much traffic was routed over those devices:
   ...] 1375103    17405    0    0    0     0       0          0 
   ...] 1703981     5535    0    0    0     3       0          0 
 
+In addition, each Channel Bond interface has it's own directory.  For
+example, the bond0 device will have a directory called /proc/net/bond0/.
+It will contain information that is specific to that bond, such as the
+current slaves of the bond, the link status of the slaves, and how
+many times the slaves link has failed.
 
 1.5 SCSI info
 -------------
