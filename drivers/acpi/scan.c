@@ -584,28 +584,31 @@ int acpi_device_set_context(struct acpi_device * device, int type)
 
 void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle, int type)
 {
-#ifdef CONFIG_ACPI_DEBUG
+#ifdef CONFIG_ACPI_DEBUG_OUTPUT
 	char		*type_string = NULL;
 	char		name[80] = {'?','\0'};
 	acpi_buffer	buffer = {sizeof(name), name};
 
-	acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
-
 	switch (type) {
 	case ACPI_BUS_TYPE_DEVICE:
 		type_string = "Device";
+		acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 		break;
 	case ACPI_BUS_TYPE_POWER:
 		type_string = "Power Resource";
+		acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 		break;
 	case ACPI_BUS_TYPE_PROCESSOR:
 		type_string = "Processor";
+		acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 		break;
 	case ACPI_BUS_TYPE_SYSTEM:
 		type_string = "System";
+		acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 		break;
 	case ACPI_BUS_TYPE_THERMAL:
 		type_string = "Thermal Zone";
+		acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 		break;
 	case ACPI_BUS_TYPE_POWER_BUTTON:
 		type_string = "Power Button";
@@ -618,7 +621,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 	}
 
 	pr_debug("Found %s %s [%p]\n", type_string, name, handle);
-#endif /*CONFIG_ACPI_DEBUG*/
+#endif /*CONFIG_ACPI_DEBUG_OUTPUT*/
 }
 
 static void acpi_device_attach(struct acpi_device * device, struct acpi_device * parent)
@@ -760,7 +763,7 @@ acpi_bus_add (
 	 * ----------------------
 	 * If there's a hardware id (_HID) or compatible ids (_CID) we check
 	 * to see if there's a driver installed for this kind of device.  Note
-	 * that drivers can install before or after a device in enumerated.
+	 * that drivers can install before or after a device is enumerated.
 	 *
 	 * TBD: Assumes LDM provides driver hot-plug capability.
 	 */
@@ -822,14 +825,10 @@ static int acpi_bus_scan (struct acpi_device	*start)
 		/*
 		 * If this is a scope object then parse it (depth-first).
 		 */
-		if (type == ACPI_TYPE_ANY) {
-			/* Hack to get around scope identity problem */
-			status = acpi_get_next_object(ACPI_TYPE_ANY, chandle, 0, NULL);
-			if (ACPI_SUCCESS(status)) {
-				level++;
-				phandle = chandle;
-				chandle = 0;
-			}
+		if (type == ACPI_TYPE_LOCAL_SCOPE) {
+			level++;
+			phandle = chandle;
+			chandle = 0;
 			continue;
 		}
 
@@ -900,11 +899,11 @@ acpi_bus_scan_fixed (
 	 */
 	if (acpi_fadt.pwr_button == 0)
 		result = acpi_bus_add(&device, acpi_root, 
-			ACPI_ROOT_OBJECT, ACPI_BUS_TYPE_POWER_BUTTON);
+			NULL, ACPI_BUS_TYPE_POWER_BUTTON);
 
 	if (acpi_fadt.sleep_button == 0)
 		result = acpi_bus_add(&device, acpi_root, 
-			ACPI_ROOT_OBJECT, ACPI_BUS_TYPE_SLEEP_BUTTON);
+			NULL, ACPI_BUS_TYPE_SLEEP_BUTTON);
 
 	return_VALUE(result);
 }
