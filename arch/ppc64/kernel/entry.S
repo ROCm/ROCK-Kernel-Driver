@@ -106,9 +106,8 @@ _GLOBAL(DoSyscall)
 	beq-	15f
 	ld	r10,.SYS_CALL_TABLE32@toc(2)
 /*
- * Now mung the first 4 parameters into shape, by making certain that
- * the high bits (most significant 32 bits in 64 bit reg) are 0
- * for the first 4 parameter regs(3-6).
+ * We now zero extend all six arguments (r3 - r8), the compatibility
+ * layer assumes this.
  */
 	clrldi	r3,r3,32
 	clrldi	r4,r4,32
@@ -178,9 +177,8 @@ _GLOBAL(ret_from_syscall_1)
 	beq-	55f
 	ld	r10,.SYS_CALL_TABLE32@toc(2)
 /*
- * Now mung the first 4 parameters into shape, by making certain that
- * the high bits (most significant 32 bits in 64 bit reg) are 0
- * for the first 4 parameter regs(3-6).
+ * We now zero extend all six arguments (r3 - r8), the compatibility
+ * layer assumes this.
  */
 	clrldi	r3,r3,32
 	clrldi	r4,r4,32
