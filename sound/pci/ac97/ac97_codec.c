@@ -2091,11 +2091,11 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 				return -EINVAL;
 		break;
 	case AC97_PCM_SURR_DAC_RATE:
-		if (! (ac97->ext_id & AC97_SCAP_SURROUND_DAC))
+		if (! (ac97->scaps & AC97_SCAP_SURROUND_DAC))
 			return -EINVAL;
 		break;
 	case AC97_PCM_LFE_DAC_RATE:
-		if (! (ac97->ext_id & AC97_SCAP_CENTER_LFE_DAC))
+		if (! (ac97->scaps & AC97_SCAP_CENTER_LFE_DAC))
 			return -EINVAL;
 		break;
 	case AC97_SPDIF:

@@ -1522,6 +1522,12 @@ static struct ac97_quirk ac97_quirks[] = {
 		.name = "ASRock K7VT2",
 		.type = AC97_TUNE_HP_ONLY
 	},
+	{
+		.vendor = 0x1043,
+		.device = 0x80a1,
+		.name = "ASUS A7V8-X",
+		.type = AC97_TUNE_SWAP_SURROUND
+	},
 	{ } /* terminator */
 };
 
@@ -1969,6 +1975,8 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 	static struct dxs_whitelist whitelist[] = {
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
+		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_ENABLE }, /* ASUS A7V8-X */
+		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ } /* terminator */
 	};
 	struct dxs_whitelist *w;
@@ -2073,7 +2081,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		if (chip_type == TYPE_VIA8233A) {
 			if ((err = snd_via8233a_pcm_new(chip)) < 0)
 				goto __error;
-			chip->dxs_fixed = 1; /* use 48k for DXS #3 */
+			// chip->dxs_fixed = 1; /* FIXME: use 48k for DXS #3? */
 		} else {
 			if ((err = snd_via8233_pcm_new(chip)) < 0)
 				goto __error;
