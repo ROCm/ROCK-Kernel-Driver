@@ -255,8 +255,8 @@ nfssvc_decode_readargs(struct svc_rqst *rqstp, u32 *p,
 		svc_take_page(rqstp);
 		args->vec[v].iov_base = page_address(rqstp->rq_respages[pn]);
 		args->vec[v].iov_len = len < PAGE_SIZE?len:PAGE_SIZE;
+		len -= args->vec[v].iov_len;
 		v++;
-		len -= PAGE_SIZE;
 	}
 	args->vlen = v;
 	return xdr_argsize_check(rqstp, p);

@@ -2,7 +2,7 @@
  * For boards with physically mapped flash and using 
  * drivers/mtd/maps/physmap.c mapping driver.
  *
- * $Id: physmap.h,v 1.2 2004/07/14 17:48:46 dwmw2 Exp $
+ * $Id: physmap.h,v 1.3 2004/07/21 00:16:15 jwboyer Exp $
  *
  * Copyright (C) 2003 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
@@ -33,11 +33,11 @@ extern struct map_info physmap_map;
 /*
  * Board needs to specify the exact mapping during their setup time.
  */
-static inline void physmap_configure(unsigned long addr, unsigned long size, int buswidth, void (*set_vpp)(struct map_info *, int) )
+static inline void physmap_configure(unsigned long addr, unsigned long size, int bankwidth, void (*set_vpp)(struct map_info *, int) )
 {
 	physmap_map.phys = addr;
 	physmap_map.size = size;
-	physmap_map.buswidth = buswidth;
+	physmap_map.bankwidth = bankwidth;
 	physmap_map.set_vpp = set_vpp;
 }
 
