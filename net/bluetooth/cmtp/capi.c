@@ -493,7 +493,6 @@ static u16 cmtp_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	application = cmtp_application_get(session, CMTP_APPLID, appl);
 	if ((!application) || (application->state != BT_CONNECTED)) {
 		BT_ERR("Can't find application with id %d", appl);
-		kfree_skb(skb);
 		return CAPI_ILLAPPNR;
 	}
 

@@ -40,6 +40,7 @@
 #include <linux/unistd.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
+#include <linux/moduleparam.h>
 
 #include <linux/slab.h>
 #include <linux/errno.h>
@@ -63,6 +64,10 @@
 #ifndef CONFIG_BT_HCIUSB_ZERO_PACKET
 #undef  URB_ZERO_PACKET
 #define URB_ZERO_PACKET 0
+#endif
+
+#ifdef CONFIG_BT_HCIUSB_SCO
+static int isoc = 1;
 #endif
 
 #define VERSION "2.7"
@@ -867,7 +872,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	isoc_ifnum = 1;
 
 #ifdef CONFIG_BT_HCIUSB_SCO
-	if (!(id->driver_info & HCI_BROKEN_ISOC))
+	if (isoc && !(id->driver_info & HCI_BROKEN_ISOC))
 		isoc_iface = usb_ifnum_to_if(udev, isoc_ifnum);
 
 	if (isoc_iface) {
@@ -1017,6 +1022,11 @@ static void __exit hci_usb_exit(void)
 
 module_init(hci_usb_init);
 module_exit(hci_usb_exit);
+
+#ifdef CONFIG_BT_HCIUSB_SCO
+module_param(isoc, bool, 0);
+MODULE_PARM_DESC(isoc, "Set isochronous transfers for SCO over HCI support");
+#endif
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);
