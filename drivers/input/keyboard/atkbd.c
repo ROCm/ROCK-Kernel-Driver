@@ -262,6 +262,11 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 				atkbd->release ? "released" : "pressed",
 				atkbd->translated ? "translated" : "raw", 
 				atkbd->set, code, serio->phys);
+			if (atkbd->translated && atkbd->set == 2 && code == 0x7a)
+				printk(KERN_WARNING "atkbd.c: This is an XFree86 bug. It shouldn't access"
+					"hardware directly.\n");
+			else
+				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' to make it known.\n",						code & 0x80 ? "e0" : "", code & 0x7f);
 			break;
 		default:
 			value = atkbd->release ? 0 :
@@ -469,6 +474,11 @@ static int atkbd_probe(struct atkbd *atkbd)
 		return -1;
 	atkbd->id = (param[0] << 8) | param[1];
 
+	if (atkbd->id == 0xaca1 && atkbd->translated) {
+		printk(KERN_ERR "atkbd.c: NCD terminal keyboards are only supported on non-translating\n");
+		printk(KERN_ERR "atkbd.c: controllers. Use i8042.direct=1 to disable translation.\n");
+		return -1;
+	}
 
 	return 0;
 }
