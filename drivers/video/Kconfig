@@ -376,19 +376,19 @@ config FB_SUN3
 	bool "Sun3 framebuffer support"
 	depends on FB && (SUN3 || SUN3X)
 
-config FB_BWTWO
+config FB_BW2
 	bool "BWtwo support"
 	depends on FB && ((SPARC32 || SPARC64) && FB_SBUS || (SUN3 || SUN3X) && FB_SUN3)
 	help
 	  This is the frame buffer device driver for the BWtwo frame buffer.
 
-config FB_CGTHREE
+config FB_CG3
 	bool "CGthree support"
 	depends on FB && ((SPARC32 || SPARC64) && FB_SBUS || (SUN3 || SUN3X) && FB_SUN3)
 	help
 	  This is the frame buffer device driver for the CGthree frame buffer.
 
-config FB_CGSIX
+config FB_CG6
 	bool "CGsix (GX,TurboGX) support"
 	depends on FB && ((SPARC32 || SPARC64) && FB_SBUS || (SUN3 || SUN3X) && FB_SUN3)
 	help

@@ -146,6 +146,12 @@ extern int i810fb_init(void);
 extern int i810fb_setup(char*);
 extern int ffb_init(void);
 extern int ffb_setup(char*);
+extern int cg6_init(void);
+extern int cg6_setup(char*);
+extern int cg3_init(void);
+extern int cg3_setup(char*);
+extern int bw2_init(void);
+extern int bw2_setup(char*);
 
 static struct {
 	const char *name;
@@ -239,6 +245,15 @@ static struct {
 #endif
 #ifdef CONFIG_FB_FFB
 	{ "ffb", ffb_init, ffb_setup },
+#endif
+#ifdef CONFIG_FB_CG6
+	{ "cg6", cg6_init, cg6_setup },
+#endif
+#ifdef CONFIG_FB_CG3
+	{ "cg3", cg3_init, cg3_setup },
+#endif
+#ifdef CONFIG_FB_BW2
+	{ "bw2", bw2_init, bw2_setup },
 #endif
 
 	/*
