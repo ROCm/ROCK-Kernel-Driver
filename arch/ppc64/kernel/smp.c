@@ -64,6 +64,7 @@ cpumask_t cpu_available_map   = CPU_MASK_NONE;
 cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 
 EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(cpu_possible_map);
 
 static struct smp_ops_t *smp_ops;
 
@@ -293,7 +294,8 @@ static void __init smp_space_timers(unsigned int max_cpus)
 }
 
 #ifdef CONFIG_PPC_PSERIES
-void vpa_init(int cpu) {
+void vpa_init(int cpu)
+{
 	unsigned long flags;
 
 	/* Register the Virtual Processor Area (VPA) */

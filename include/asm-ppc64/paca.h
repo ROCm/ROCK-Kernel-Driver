@@ -119,7 +119,7 @@ struct paca_struct {
 	struct ItLpRegSave xRegSav;	/* Register save for proc */
 
 /*=====================================================================================
- * CACHE_LINE_17-18 0x0800 - 0x0EFF Reserved
+ * CACHE_LINE_17-18 0x0800 - 0x08FF Reserved
  *=====================================================================================
  */
 	struct rtas_args xRtas;		/* Per processor RTAS struct */
@@ -128,7 +128,7 @@ struct paca_struct {
 	u8 rsvd5[256-16-sizeof(struct rtas_args)];
 
 /*=====================================================================================
- * CACHE_LINE_19-30 0x0800 - 0x0EFF Reserved
+ * CACHE_LINE_19-30 0x0900 - 0x0EFF Reserved
  *=====================================================================================
  */
 	u64 slb_shadow[0x20];

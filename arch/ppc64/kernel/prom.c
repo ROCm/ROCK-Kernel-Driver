@@ -1005,7 +1005,7 @@ prom_hold_cpus(unsigned long mem)
 				prom_print_hex(cpu_threads);
 				prom_print(RELOC(", max is "));
 				prom_print_hex(MAX_CPU_THREADS);
-		prom_print_nl();
+				prom_print_nl();
 				cpu_threads = 1; /* ToDo: panic? */
 			}
 		}
@@ -1016,27 +1016,31 @@ prom_hold_cpus(unsigned long mem)
 			prom_print_hex(cpuid);
 			prom_print(RELOC(" : starting cpu "));
 			prom_print(path);
-		prom_print(RELOC("..."));
+			prom_print(RELOC("..."));
 			call_prom(RELOC("start-cpu"), 3, 0, node, 
 				  secondary_hold, cpuid);
 
-		for ( i = 0 ; (i < 100000000) && 
+			for ( i = 0 ; (i < 100000000) && 
 			      (*acknowledge == ((unsigned long)-1)); i++ ) ;
 
-		if (*acknowledge == cpuid) {
-			prom_print(RELOC("ok\n"));
-			/* Set the number of active processors. */
-			_systemcfg->processorCount++;
+			if (*acknowledge == cpuid) {
+				prom_print(RELOC("ok\n"));
+#ifdef CONFIG_SMP
+				/* Set the number of active processors. */
+				_systemcfg->processorCount++;
 				cpu_set(cpuid, RELOC(cpu_available_map));
 				cpu_set(cpuid, RELOC(cpu_possible_map));
 				cpu_set(cpuid, RELOC(cpu_present_at_boot));
-		} else {
-			prom_print(RELOC("failed: "));
-			prom_print_hex(*acknowledge);
-			prom_print_nl();
+#endif
+			} else {
+				prom_print(RELOC("failed: "));
+				prom_print_hex(*acknowledge);
+				prom_print_nl();
 				/* prom_panic(RELOC("cpu failed to start")); */
+			}
 		}
-		} else {
+#ifdef CONFIG_SMP
+		else {
 			prom_print_hex(cpuid);
 			prom_print(RELOC(" : booting  cpu "));
 			prom_print(path);
@@ -1062,6 +1066,7 @@ prom_hold_cpus(unsigned long mem)
 			}
 			prom_print_nl();
 		}
+#endif
 		cpuid++;
 	}
 #ifdef CONFIG_HMT
@@ -1587,7 +1592,7 @@ inspect_node(phandle node, struct device_node *dad,
 	}
 
 	/* Add a "linux_phandle" value */
-        if (np->node != NULL) {
+        if (np->node) {
 		u32 ibm_phandle = 0;
 		int len;
 

@@ -381,6 +381,8 @@ int pci_domain_nr(struct pci_bus *bus)
 	return hose->global_number;
 }
 
+EXPORT_SYMBOL(pci_domain_nr);
+
 /* Set the name of the bus as it appears in /proc/bus/pci */
 int pci_name_bus(char *name, struct pci_bus *bus)
 {

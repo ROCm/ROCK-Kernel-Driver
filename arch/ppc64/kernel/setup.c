@@ -195,6 +195,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		finish_device_tree();
 		chrp_init(r3, r4, r5, r6, r7);
 
+#ifdef CONFIG_SMP
 		/* Start secondary threads on SMT systems */
 		for (i = 0; i < NR_CPUS; i++) {
 			if(cpu_available(i)  && !cpu_possible(i)) {
@@ -207,6 +208,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 				systemcfg->processorCount++;
 			}
 		}
+#endif
 	}
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
@@ -227,9 +229,11 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	mm_init_ppc64();
 
+#ifdef CONFIG_SMP
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		vpa_init(boot_cpuid);
 	}
+#endif
 
 	/* Select the correct idle loop for the platform. */
 	idle_setup();
@@ -448,8 +452,7 @@ int parse_bootinfo(void)
 			memcpy(cmd_line, (void *)rec->data, rec->size);
 			break;
 		case BI_SYSMAP:
-			sysmap = (char *)((rec->data[0] >= (KERNELBASE))
-					? rec->data[0] : (unsigned long)__va(rec->data[0]));
+			sysmap = __va(rec->data[0]);
 			sysmap_size = rec->data[1];
 			break;
 #ifdef CONFIG_BLK_DEV_INITRD

@@ -176,6 +176,7 @@ int pci_read_irq_line(struct pci_dev *pci_dev)
 	       pci_name(pci_dev), pci_dev->irq);
 	return 0;
 }
+EXPORT_SYMBOL(pci_read_irq_line);
 
 #define ISA_SPACE_MASK 0x1
 #define ISA_SPACE_IO 0x1
@@ -512,7 +513,7 @@ void pcibios_name_device(struct pci_dev *dev)
 #endif
 }   
 
-void __init pcibios_fixup_device_resources(struct pci_dev *dev,
+void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 					   struct pci_bus *bus)
 {
 	/* Update device resources.  */
@@ -531,6 +532,7 @@ void __init pcibios_fixup_device_resources(struct pci_dev *dev,
 		}
         }
 }
+EXPORT_SYMBOL(pcibios_fixup_device_resources);
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {

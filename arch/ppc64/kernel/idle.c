@@ -72,11 +72,11 @@ static void yield_shared_processor(void)
 		lpaca->yielded = 0;        /* Back to IPI's */
 		locale_irq_enable(); 
 	
-	/*
+		/*
 		 * The decrementer stops during the yield.  Force a fake 
 		 * decrementer here and let the timer_interrupt code sort 
 		 * out the actual time.
-	 */
+		 */
 		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 1;
 	}
 	  
@@ -136,23 +136,23 @@ int default_idle(void)
 	long oldval;
 
 	while (1) {
-			oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
+		oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
 
-			if (!oldval) {
-				set_thread_flag(TIF_POLLING_NRFLAG);
+		if (!oldval) {
+			set_thread_flag(TIF_POLLING_NRFLAG);
 
-				while (!need_resched()) {
+			while (!need_resched()) {
 				barrier();
-					HMT_low();
-				}
-
-				HMT_medium();
-				clear_thread_flag(TIF_POLLING_NRFLAG);
-			} else {
-				set_need_resched();
+				HMT_low();
 			}
 
-			schedule();
+			HMT_medium();
+			clear_thread_flag(TIF_POLLING_NRFLAG);
+		} else {
+			set_need_resched();
+		}
+
+		schedule();
 	}
 
 	return 0;
@@ -186,7 +186,7 @@ int dedicated_idle(void)
 				     naca->smt_snooze_delay*tb_ticks_per_usec)) {  
 					HMT_low(); /* Low thread priority */
 					continue;
-			}
+				}
 
 				HMT_very_low(); /* Low power mode */
 
@@ -201,7 +201,7 @@ int dedicated_idle(void)
 					 * need_resched was 1, set it back to 1
 					 * and schedule work
 					 */
-			clear_thread_flag(TIF_POLLING_NRFLAG);
+					clear_thread_flag(TIF_POLLING_NRFLAG);
 					oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
 					if(oldval == 1) {
 						set_need_resched();
@@ -294,14 +294,14 @@ int idle_setup(void)
 			} else {
 				printk("idle = dedicated_idle\n");
 				idle_loop = dedicated_idle;
-}
+			}
 		} else {
 			printk("idle = default_idle\n");
 			idle_loop = default_idle;
 		}
 	} else {
 		printk("idle_setup: unknown platform, use default_idle\n");
-	idle_loop = default_idle;
+		idle_loop = default_idle;
 	}
 #endif
 

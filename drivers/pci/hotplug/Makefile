@@ -9,6 +9,7 @@ obj-$(CONFIG_HOTPLUG_PCI_IBM)		+= ibmphp.o
 obj-$(CONFIG_HOTPLUG_PCI_ACPI)		+= acpiphp.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_ZT5550)	+= cpcihp_zt5550.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_GENERIC)	+= cpcihp_generic.o
+obj-$(CONFIG_HOTPLUG_PCI_RPA)		+= rpaphp.o
 
 pci_hotplug-objs	:=	pci_hotplug_core.o
 
@@ -32,6 +33,9 @@ acpiphp-objs		:=	acpiphp_core.o	\
 				acpiphp_glue.o	\
 				acpiphp_pci.o	\
 				acpiphp_res.o
+
+rpaphp-objs		:=	rpaphp_core.o	\
+				rpaphp_pci.o	
 
 ifdef CONFIG_HOTPLUG_PCI_ACPI
   EXTRA_CFLAGS  += -D_LINUX -I$(TOPDIR)/drivers/acpi
