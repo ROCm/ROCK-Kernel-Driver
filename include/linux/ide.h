@@ -1264,7 +1264,7 @@ extern void ide_init_drive_cmd (struct request *rq);
 /*
  * this function returns error location sector offset in case of a write error
  */
-extern sector_t ide_get_error_location(ide_drive_t *, char *);
+extern u64 ide_get_error_location(ide_drive_t *, char *);
 
 /*
  * "action" parameter type for ide_do_drive_cmd() below.
