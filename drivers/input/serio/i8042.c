@@ -21,10 +21,6 @@
 #include <linux/serio.h>
 #include <linux/sched.h>
 
-#undef DEBUG
-
-#include "i8042.h"
-
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");
 MODULE_LICENSE("GPL");
@@ -40,6 +36,9 @@ static int i8042_unlock;
 static int i8042_reset;
 static int i8042_direct;
 static int i8042_dumbkbd;
+
+#undef DEBUG
+#include "i8042.h"
 
 spinlock_t i8042_lock = SPIN_LOCK_UNLOCKED;
 
@@ -287,7 +286,6 @@ static void i8042_close(struct serio *port)
  */
 
 static struct i8042_values i8042_kbd_values = {
-	.irq =		I8042_KBD_IRQ,
 	.irqen =	I8042_CTR_KBDINT,
 	.disable =	I8042_CTR_KBDDIS,
 	.name =		"KBD",
@@ -306,7 +304,6 @@ static struct serio i8042_kbd_port =
 };
 
 static struct i8042_values i8042_aux_values = {
-	.irq =		I8042_AUX_IRQ,
 	.irqen =	I8042_CTR_AUXINT,
 	.disable =	I8042_CTR_AUXDIS,
 	.name =		"AUX",
@@ -811,6 +808,9 @@ int __init i8042_init(void)
 
 	if (i8042_platform_init())
 		return -EBUSY;
+
+	i8042_aux_values.irq =	I8042_AUX_IRQ;
+	i8042_kbd_values.irq =	I8042_KBD_IRQ;
 
 	if (i8042_controller_init())
 		return -ENODEV;
