@@ -411,22 +411,23 @@ int __init probe (int base)
 
 			return 1;
 		} else {
-			int i,j;
+			int i;
+
 			/* secondary enabled */
 			printk(KERN_INFO "%s&%s: qd6580: dual IDE board\n",
 					ide_hwifs[0].name,ide_hwifs[1].name);
 
-			for (i=0;i<2;i++) {
+			for (i = 0; i < 2; i++) {
+				int j;
 
 				ide_hwifs[i].chipset = ide_qd65xx;
-				ide_hwifs[i].mate = &ide_hwifs[i^1];
 				ide_hwifs[i].unit = i;
 
 				ide_hwifs[i].select_data = base;
 				ide_hwifs[i].config_data = config | (control <<8);
 				ide_hwifs[i].tuneproc = &qd6580_tune_drive;
 
-				for (j=0;j<2;j++) {
+				for (j = 0; j < 2; j++) {
 					ide_hwifs[i].drives[j].drive_data =
 					       i?QD6580_DEF_DATA2:QD6580_DEF_DATA;
 					ide_hwifs[i].drives[j].io_32bit = 1;

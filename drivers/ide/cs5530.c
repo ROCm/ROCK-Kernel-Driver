@@ -346,8 +346,7 @@ unsigned int __init pci_init_cs5530(struct pci_dev *dev)
  */
 void __init ide_init_cs5530(struct ata_channel *hwif)
 {
-	if (hwif->mate)
-		hwif->serialized = hwif->mate->serialized = 1;
+	hwif->serialized = 1;
 	if (!hwif->dma_base) {
 		hwif->autodma = 0;
 	} else {

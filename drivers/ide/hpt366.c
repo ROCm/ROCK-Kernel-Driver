@@ -1125,13 +1125,13 @@ unsigned int __init pci_init_hpt366(struct pci_dev *dev)
 
 	if (n_hpt_devs < HPT366_MAX_DEVS)
 		hpt_devs[n_hpt_devs++] = dev;
-	
+
 #if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!hpt366_proc) {
 		hpt366_proc = 1;
 		hpt366_display_info = &hpt366_get_info;
 	}
-#endif /* DISPLAY_HPT366_TIMINGS && CONFIG_PROC_FS */
+#endif
 
 	return dev->irq;
 }
@@ -1146,7 +1146,7 @@ unsigned int __init ata66_hpt366(struct ata_channel *hwif)
 	printk("HPT366: reg5ah=0x%02x ATA-%s Cable Port%d\n",
 		ata66, (ata66 & regmask) ? "33" : "66",
 		PCI_FUNC(hwif->pci_dev->devfn));
-#endif /* DEBUG */
+#endif
 	return ((ata66 & regmask) ? 0 : 1);
 }
 

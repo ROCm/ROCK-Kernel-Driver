@@ -1,0 +1,47 @@
+CONFIG_USB_DC2XX
+  Say Y here if you want to connect this type of still camera to your
+  computer's USB port.  See <file:Documentation/usb/dc2xx.txt> for
+  more information; some non-Kodak cameras may also work with this
+  driver, given application support (such as <http://www.gphoto.org/>).
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dc2xx.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_MDC800
+  Say Y here if you want to connect this type of still camera to
+  your computer's USB port. This driver can be used with gphoto 0.4.3
+  and higher (look at <http://www.gphoto.org/>).
+  To use it create a device node with "mknod /dev/mustek c 180 32" and
+  configure it in your software.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called mdc800.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_HPUSBSCSI
+  Say Y here if you want support for the HP 53xx series of scanners
+  and the Minolta Scan Dual. This driver is experimental.
+  The scanner will be accessible as a SCSI device.
+  This can be compiled as a module, called hpusbscsi.o.
+
+CONFIG_USB_MICROTEK
+  Say Y here if you want support for the Microtek X6USB and
+  possibly the Phantom 336CX, Phantom C6 and ScanMaker V6U(S)L.
+  Support for anything but the X6 is experimental.
+  Please report failures and successes.
+  The scanner will appear as a scsi generic device to the rest
+  of the system. Scsi support is required.
+  This driver can be compiled as a module, called microtek.o.
+
+CONFIG_USB_SCANNER
+  Say Y here if you want to connect a USB scanner to your computer's
+  USB port. Please read <file:Documentation/usb/scanner.txt> and
+  <file:Documentation/usb/scanner-hp-sane.txt> for more information.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called scanner.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.

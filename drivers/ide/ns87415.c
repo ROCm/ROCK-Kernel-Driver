@@ -141,11 +141,21 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 	using_inta = progif & (1 << (hwif->unit << 1));
 	if (!using_inta)
 		using_inta = ctrl & (1 << (4 + hwif->unit));
-	if (hwif->mate) {
-		hwif->select_data = hwif->mate->select_data;
+	if (hwif->unit == ATA_SECONDARY) {
+
+		/* FIXME: If we are initializing the secondary channel, let us
+		 * assume that the primary channel got initialized just a tad
+		 * bit before now.  It would be much cleaner if the data in
+		 * ns87415_control just got duplicated.
+		 */
+
+		if (!hwif->select_data)
+		    hwif->select_data = (unsigned long)
+			&ns87415_control[ns87415_count - 1];
 	} else {
-		hwif->select_data = (unsigned long)
-					&ns87415_control[ns87415_count++];
+		if (!hwif->select_data)
+		    hwif->select_data = (unsigned long)
+			&ns87415_control[ns87415_count++];
 		ctrl |= (1 << 8) | (1 << 9);	/* mask both IRQs */
 		if (using_inta)
 			ctrl &= ~(1 << 6);	/* unmask INTA */
@@ -170,9 +180,9 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 		do {
 			udelay(50);
 			stat = inb(hwif->io_ports[IDE_STATUS_OFFSET]);
-                	if (stat == 0xff)
-                        	break;
-        	} while ((stat & BUSY_STAT) && --timeout);
+			if (stat == 0xff)
+				break;
+		} while ((stat & BUSY_STAT) && --timeout);
 #endif
 	}
 
@@ -181,13 +191,23 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 
 	if (!using_inta)
 		hwif->irq = hwif->unit ? 15 : 14;	/* legacy mode */
-	else if (!hwif->irq && hwif->mate && hwif->mate->irq)
-		hwif->irq = hwif->mate->irq;	/* share IRQ with mate */
+	else {
+		static int primary_irq = 0;
+
+		/* Ugly way to let the primary and secondary channel on the
+		 * chip use the same IRQ line.
+		 */
+
+		if (hwif->unit == ATA_PRIMARY)
+			primary_irq = hwif->irq;
+		else if (!hwif->irq)
+			hwif->irq = primary_irq;
+	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base)
 		hwif->dmaproc = &ns87415_dmaproc;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 	hwif->selectproc = &ns87415_selectproc;
 }

@@ -387,7 +387,7 @@ static void set_mtrr_prepare_save (struct set_mtrr_context *ctxt)
 	 return;
 
     /*  Save value of CR4 and clear Page Global Enable (bit 7)  */
-    if ( test_bit(X86_FEATURE_PGE, &boot_cpu_data.x86_capability) ) {
+    if ( test_bit(X86_FEATURE_PGE, boot_cpu_data.x86_capability) ) {
 	ctxt->cr4val = read_cr4();
 	write_cr4(ctxt->cr4val & (unsigned char) ~(1<<7));
     }
@@ -448,7 +448,7 @@ static void set_mtrr_done (struct set_mtrr_context *ctxt)
     write_cr0( read_cr0() & 0xbfffffff );
 
     /*  Restore value of CR4  */
-    if ( test_bit(X86_FEATURE_PGE, &boot_cpu_data.x86_capability) )
+    if ( test_bit(X86_FEATURE_PGE, boot_cpu_data.x86_capability) )
 	write_cr4(ctxt->cr4val);
 
     /*  Re-enable interrupts locally (if enabled previously)  */
@@ -2122,7 +2122,7 @@ static void __init centaur_mcr_init(void)
 
 static int __init mtrr_setup(void)
 {
-    if ( test_bit(X86_FEATURE_MTRR, &boot_cpu_data.x86_capability) ) {
+    if ( test_bit(X86_FEATURE_MTRR, boot_cpu_data.x86_capability) ) {
 	/* Intel (P6) standard MTRRs */
 	mtrr_if = MTRR_IF_INTEL;
 	get_mtrr = intel_get_mtrr;
@@ -2166,14 +2166,14 @@ static int __init mtrr_setup(void)
 		break;
 	}
 
-    } else if ( test_bit(X86_FEATURE_K6_MTRR, &boot_cpu_data.x86_capability) ) {
+    } else if ( test_bit(X86_FEATURE_K6_MTRR, boot_cpu_data.x86_capability) ) {
 	/* Pre-Athlon (K6) AMD CPU MTRRs */
 	mtrr_if = MTRR_IF_AMD_K6;
 	get_mtrr = amd_get_mtrr;
 	set_mtrr_up = amd_set_mtrr_up;
 	size_or_mask  = 0xfff00000; /* 32 bits */
 	size_and_mask = 0;
-    } else if ( test_bit(X86_FEATURE_CYRIX_ARR, &boot_cpu_data.x86_capability) ) {
+    } else if ( test_bit(X86_FEATURE_CYRIX_ARR, boot_cpu_data.x86_capability) ) {
 	/* Cyrix ARRs */
 	mtrr_if = MTRR_IF_CYRIX_ARR;
 	get_mtrr = cyrix_get_arr;
@@ -2182,7 +2182,7 @@ static int __init mtrr_setup(void)
 	cyrix_arr_init();
 	size_or_mask  = 0xfff00000; /* 32 bits */
 	size_and_mask = 0;
-    } else if ( test_bit(X86_FEATURE_CENTAUR_MCR, &boot_cpu_data.x86_capability) ) {
+    } else if ( test_bit(X86_FEATURE_CENTAUR_MCR, boot_cpu_data.x86_capability) ) {
 	/* Centaur MCRs */
 	mtrr_if = MTRR_IF_CENTAUR_MCR;
 	get_mtrr = centaur_get_mcr;

@@ -433,10 +433,10 @@ typedef void (ide_intrproc_t) (ide_drive_t *);
 typedef void (ide_maskproc_t) (ide_drive_t *, int);
 typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
 
-/*
- * ide soft-power support
- */
-typedef int (ide_busproc_t) (ide_drive_t *, int);
+enum {
+	ATA_PRIMARY	= 0,
+	ATA_SECONDARY	= 1
+};
 
 struct ata_channel {
 	struct device	dev;		/* device handle */
@@ -467,7 +467,6 @@ struct ata_channel {
 	struct scatterlist *sg_table;	/* Scatter-gather list used to build the above */
 	int sg_nents;			/* Current number of entries in it */
 	int sg_dma_direction;		/* dma transfer direction */
-	struct ata_channel *mate;	/* other hwif from same PCI chip */
 	unsigned long	dma_base;	/* base addr for dma ports */
 	unsigned	dma_extra;	/* extra addr for dma ports */
 	unsigned long	config_data;	/* for use by chipset-specific code */
@@ -480,7 +479,7 @@ struct ata_channel {
 	hwif_chipset_t	chipset;	/* sub-module for tuning.. */
 	unsigned	noprobe    : 1;	/* don't probe for this interface */
 	unsigned	present    : 1;	/* there is a device on this interface */
-	unsigned	serialized : 1;	/* serialized operation with mate hwif */
+	unsigned	serialized : 1;	/* serialized operation between channels */
 	unsigned	sharing_irq: 1;	/* 1 = sharing irq with another hwif */
 	unsigned	reset      : 1;	/* reset after probe */
 	unsigned	autodma    : 1;	/* automatically try to enable DMA at boot */
@@ -490,7 +489,7 @@ struct ata_channel {
 	unsigned long	last_time;	/* time when previous rq was done */
 #endif
 	byte		straight8;	/* Alan's straight 8 check */
-	ide_busproc_t	*busproc;	/* driver soft-power interface */
+	int (*busproc)(ide_drive_t *, int);	/* driver soft-power interface */
 	byte		bus_state;	/* power state of the IDE bus */
 };
 
@@ -513,7 +512,6 @@ typedef enum {
  */
 typedef ide_startstop_t (ide_pre_handler_t)(ide_drive_t *, struct request *);
 typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
-typedef ide_startstop_t (ide_post_handler_t)(ide_drive_t *);
 
 /*
  * when ide_timer_expiry fires, invoke a handler of this type

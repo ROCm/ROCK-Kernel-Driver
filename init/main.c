@@ -27,6 +27,7 @@
 #include <linux/iobuf.h>
 #include <linux/bootmem.h>
 #include <linux/tty.h>
+#include <linux/percpu.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -270,12 +271,9 @@ static void __init smp_init(void)
 #define smp_init()	do { } while (0)
 #endif
 
-static inline void setup_per_cpu_areas(void)
-{
-}
 #else
 
-#ifndef __HAVE_ARCH_PER_CPU
+#ifdef __GENERIC_PER_CPU
 unsigned long __per_cpu_offset[NR_CPUS];
 
 static void __init setup_per_cpu_areas(void)
@@ -297,7 +295,11 @@ static void __init setup_per_cpu_areas(void)
 		memcpy(ptr, __per_cpu_start, size);
 	}
 }
-#endif /* !__HAVE_ARCH_PER_CPU */
+#else
+static inline void setup_per_cpu_areas(void)
+{
+}
+#endif /* !__GENERIC_PER_CPU */
 
 /* Called by boot processor to activate the rest. */
 static void __init smp_init(void)

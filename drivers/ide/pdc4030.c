@@ -162,7 +162,7 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	struct dc_ident ident;
 	int i;
 	ide_startstop_t startstop;
-	
+
 	if (!hwif) return 0;
 
 	drive = &hwif->drives[0];
@@ -224,9 +224,8 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	 */
 
 	hwif->chipset	= hwif2->chipset = ide_pdc4030;
-	hwif->mate	= hwif2;
-	hwif2->mate	= hwif;
-	hwif2->unit	= 1;
+	hwif->unit	= ATA_PRIMARY;
+	hwif2->unit	= ATA_SECONDARY;
 	hwif->selectproc = hwif2->selectproc = &promise_selectproc;
 	hwif->serialized = hwif2->serialized = 1;
 

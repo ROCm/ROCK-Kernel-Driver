@@ -637,7 +637,7 @@ static int __init detect_init_APIC (void)
 		printk("Could not enable APIC!\n");
 		return -1;
 	}
-	set_bit(X86_FEATURE_APIC, &boot_cpu_data.x86_capability);
+	set_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 	mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 	boot_cpu_physical_apicid = 0;
 	if (nmi_watchdog != NMI_NONE)

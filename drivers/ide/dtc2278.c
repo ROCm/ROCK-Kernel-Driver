@@ -124,7 +124,6 @@ void __init init_dtc2278 (void)
 	ide_hwifs[0].drives[1].no_unmask = 1;
 	ide_hwifs[1].drives[0].no_unmask = 1;
 	ide_hwifs[1].drives[1].no_unmask = 1;
-	ide_hwifs[0].mate = &ide_hwifs[1];
-	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].unit = 1;
+	ide_hwifs[0].unit = ATA_PRIMARY;
+	ide_hwifs[1].unit = ATA_SECONDARY;
 }
