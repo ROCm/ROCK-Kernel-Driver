@@ -408,6 +408,12 @@ static unsigned int centaur_size_cache(struct cpuinfo_x86 * c, unsigned int size
 	/* VIA C3 CPUs (670-68F) need further shifting. */
 	if ((c->x86 == 6) && ((c->x86_model == 7) || (c->x86_model == 8)))
 		size >>= 8;
+
+	/* VIA also screwed up Nehemiah stepping 1, and made
+	   it return '65KB' instead of '64KB' */
+	if ((c->x86==6) && (c->x86_model==9) && (c->x86_mask==1))
+		size -=1;
+
 	return size;
 }
 
