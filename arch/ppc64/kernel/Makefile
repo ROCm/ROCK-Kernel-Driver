@@ -5,7 +5,7 @@
 EXTRA_CFLAGS	+= -mno-minimal-toc
 extra-y		:= head.o vmlinux.lds.s
 
-obj-y               :=	setup.o entry.o traps.o irq.o idle.o \
+obj-y               :=	setup.o entry.o traps.o irq.o idle.o dma.o \
 			time.o process.o signal.o syscalls.o misc.o ptrace.o \
 			align.o semaphore.o bitops.o stab.o pacaData.o \
 			udbg.o binfmt_elf32.o sys_ppc32.o ioctl32.o \
