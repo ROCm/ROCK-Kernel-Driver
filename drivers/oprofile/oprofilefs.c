@@ -114,7 +114,7 @@ int oprofilefs_ulong_from_user(unsigned long * val, char const * buf, size_t cou
 		return -EFAULT;
 
 	spin_lock(&oprofilefs_lock);
-	*val = simple_strtoul(tmpbuf, NULL, 10);
+	*val = simple_strtoul(tmpbuf, NULL, 0);
 	spin_unlock(&oprofilefs_lock);
 	return 0;
 }
