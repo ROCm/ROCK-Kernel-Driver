@@ -1359,33 +1359,30 @@ neo2200_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 }
 
 static void
-neo2200_copyarea(struct fb_info *info, struct fb_copyarea *area)
+neo2200_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
+	u32 sx = area->sx, sy = area->sy, dx = area->dx, dy = area->dy;
 	u_long src, dst, bltCntl;
 
 	bltCntl = NEO_BC3_FIFO_EN | NEO_BC3_SKIP_MAPPING | 0x0C0000;
 
-	if (area->sy < area->dy) {
-		area->sy += (area->height - 1);
-		area->dy += (area->height - 1);
+	if (sy < dy) {
+		sy += (area->height - 1);
+		dy += (area->height - 1);
 
 		bltCntl |= NEO_BC0_DST_Y_DEC | NEO_BC0_SRC_Y_DEC;
 	}
 
 	if (area->sx < area->dx) {
-		area->sx += (area->width - 1);
-		area->dx += (area->width - 1);
+		sx += (area->width - 1);
+		dx += (area->width - 1);
 
 		bltCntl |= NEO_BC0_X_DEC;
 	}
 
-	src =
-	    area->sx * (info->var.bits_per_pixel >> 3) +
-	    area->sy * info->fix.line_length;
-	dst =
-	    area->dx * (info->var.bits_per_pixel >> 3) +
-	    area->dy * info->fix.line_length;
+	src = sx * (info->var.bits_per_pixel >> 3) + sy*info->fix.line_length;
+	dst = dx * (info->var.bits_per_pixel >> 3) + dy*info->fix.line_length;
 
 	neo2200_wait_fifo(info, 4);
 
@@ -1399,7 +1396,7 @@ neo2200_copyarea(struct fb_info *info, struct fb_copyarea *area)
 }
 
 static void
-neo2200_imageblit(struct fb_info *info, struct fb_image *image)
+neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 
@@ -1452,7 +1449,7 @@ neofb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 }
 
 static void
-neofb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+neofb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 	switch (info->fix.accel) {
 		case FB_ACCEL_NEOMAGIC_NM2200:
@@ -1468,7 +1465,7 @@ neofb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 }
 
 static void
-neofb_imageblit(struct fb_info *info, struct fb_image *image)
+neofb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	switch (info->fix.accel) {
 		case FB_ACCEL_NEOMAGIC_NM2200:
@@ -1483,7 +1480,7 @@ neofb_imageblit(struct fb_info *info, struct fb_image *image)
 	}
 }	
 
-static void
+static int 
 neofb_sync(struct fb_info *info)
 {
 	switch (info->fix.accel) {
@@ -1495,7 +1492,8 @@ neofb_sync(struct fb_info *info)
 			break;
 		default:
 			break;
-	}		
+	}
+	return 0;		
 }
 
 static struct fb_ops neofb_ops = {

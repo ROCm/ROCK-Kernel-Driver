@@ -833,7 +833,7 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
  * Screen-to-Screen BitBlt 2D command (for the bmove fb op.) - Voodoo2 only
  */
 #if 0
-static void sstfb_copyarea(struct fb_info *info, struct fb_copyarea *area)  
+static void sstfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 	struct sstfb_par *par = (struct sstfb_par *) info->par;
 	u32 stride = info->fix.line_length;

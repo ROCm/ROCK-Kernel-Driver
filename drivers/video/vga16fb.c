@@ -1165,7 +1165,7 @@ static unsigned int transl_l[] =
 #endif
 #endif
 
-void vga_8planes_imageblit(struct fb_info *info, struct fb_image *image)
+void vga_8planes_imageblit(struct fb_info *info, const struct fb_image *image)
 {
         char oldindex = getindex();
         char oldmode = setmode(0x40);
@@ -1196,7 +1196,7 @@ void vga_8planes_imageblit(struct fb_info *info, struct fb_image *image)
         setindex(oldindex);
 }
 
-void vga_imageblit_expand(struct fb_info *info, struct fb_image *image)
+void vga_imageblit_expand(struct fb_info *info, const struct fb_image *image)
 {
 	char *where = info->screen_base + (image->dx/8) + 
 		image->dy * info->fix.line_length;
@@ -1259,7 +1259,7 @@ void vga_imageblit_expand(struct fb_info *info, struct fb_image *image)
 	}
 }
 
-void vga_imageblit_color(struct fb_info *info, struct fb_image *image) 
+void vga_imageblit_color(struct fb_info *info, const struct fb_image *image) 
 {
 	/*
 	 * Draw logo 
@@ -1302,14 +1302,12 @@ void vga_imageblit_color(struct fb_info *info, struct fb_image *image)
 	}
 }
 				
-void vga16fb_imageblit(struct fb_info *info, const struct fb_image *img)
+void vga16fb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
-	struct fb_image image = *img;
-
-	if (image.depth == 0)
-		vga_imageblit_expand(info, &image);
-	else if (image.depth == info->var.bits_per_pixel)
-		vga_imageblit_color(info, &image);
+	if (image->depth == 0)
+		vga_imageblit_expand(info, image);
+	else if (image->depth == info->var.bits_per_pixel)
+		vga_imageblit_color(info, image);
 }
 
 static struct fb_ops vga16fb_ops = {

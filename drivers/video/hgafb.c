@@ -468,7 +468,7 @@ static void hgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	}
 }
 
-static void hgafb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+static void hgafb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 	u_int rows, y1, y2;
 	u8 *src, *dest;
@@ -498,9 +498,9 @@ static void hgafb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	}
 }
 
-static void hgafb_imageblit(struct fb_info *info, struct fb_image *image)
+static void hgafb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
-	u8 *dest, *cdat = image->data;
+	u8 *dest, *cdat = (u8 *) image->data;
 	u_int rows, y = image->dy;
 	u8 d;
 

@@ -34,9 +34,9 @@ static int ffb_setcolreg(unsigned, unsigned, unsigned, unsigned,
 static int ffb_blank(int, struct fb_info *);
 static void ffb_init_fix(struct fb_info *);
 
-static void ffb_imageblit(struct fb_info *, struct fb_image *);
-static void ffb_fillrect(struct fb_info *, struct fb_fillrect *);
-static void ffb_copyarea(struct fb_info *, struct fb_copyarea *);
+static void ffb_imageblit(struct fb_info *, const struct fb_image *);
+static void ffb_fillrect(struct fb_info *, const struct fb_fillrect *);
+static void ffb_copyarea(struct fb_info *, const struct fb_copyarea *);
 static int ffb_sync(struct fb_info *);
 static int ffb_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 
@@ -491,7 +491,7 @@ static void ffb_switch_from_graph(struct ffb_par *par)
  *      @info: frame buffer structure that represents a single frame buffer
  *      @rect: structure defining the rectagle and operation.
  */
-static void ffb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+static void ffb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	struct ffb_par *par = (struct ffb_par *) info->par;
 	struct ffb_fbc *fbc = par->fbc;
@@ -540,7 +540,7 @@ static void ffb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
  */
 
 static void
-ffb_copyarea(struct fb_info *info, struct fb_copyarea *area) 
+ffb_copyarea(struct fb_info *info, const struct fb_copyarea *area) 
 {
 	struct ffb_par *par = (struct ffb_par *) info->par;
 	struct ffb_fbc *fbc = par->fbc;
@@ -576,7 +576,7 @@ ffb_copyarea(struct fb_info *info, struct fb_copyarea *area)
  *      @info: frame buffer structure that represents a single frame buffer
  *      @image: structure defining the image.
  */
-static void ffb_imageblit(struct fb_info *info, struct fb_image *image)
+static void ffb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct ffb_par *par = (struct ffb_par *) info->par;
 	struct ffb_fbc *fbc = par->fbc;

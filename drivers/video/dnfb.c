@@ -113,7 +113,7 @@ static struct fb_info fb_info;
 /* frame buffer operations */
 
 static int dnfb_blank(int blank, struct fb_info *info);
-static void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area);
+static void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
 
 static struct fb_ops dn_fb_ops = {
 	.owner		= THIS_MODULE,
@@ -154,18 +154,17 @@ static int dnfb_blank(int blank, struct fb_info *info)
 }
 
 static 
-void dnfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 
 	int incr, y_delta, pre_read = 0, x_end, x_word_count;
-	ushort *src, dummy;
 	uint start_mask, end_mask, dest;
+	ushort *src, dummy;
 	short i, j;
 
 	incr = (area->dy <= area->sy) ? 1 : -1;
 
-	src =
-	    (ushort *) (info->screen_base + area->sy * info->fix.line_length +
+	src = (ushort *)(info->screen_base + area->sy * info->fix.line_length +
 			(area->sx >> 4));
 	dest = area->dy * (info->fix.line_length >> 1) + (area->dx >> 4);
 

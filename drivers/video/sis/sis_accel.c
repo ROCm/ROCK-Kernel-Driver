@@ -289,7 +289,7 @@ int sisfb_initaccel(void)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,34)  /* --- KERNEL 2.5.34 and later --- */
 
-void fbcon_sis_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+void fbcon_sis_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
    CRITFLAGS
 
@@ -312,7 +312,7 @@ void fbcon_sis_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 
 }
 
-void fbcon_sis_copyarea(struct fb_info *info, struct fb_copyarea *area)
+void fbcon_sis_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
    int xdir, ydir;
    CRITFLAGS

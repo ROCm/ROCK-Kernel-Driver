@@ -22,11 +22,9 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/fb.h>
-#include <linux/selection.h>
 #include <linux/pci.h>
 #include <asm/io.h>
 #include <video/tgafb.h>
-
 
 /*
  * Local functions.
@@ -40,9 +38,9 @@ static int tgafb_setcolreg(unsigned, unsigned, unsigned, unsigned,
 static int tgafb_blank(int, struct fb_info *);
 static void tgafb_init_fix(struct fb_info *);
 
-static void tgafb_imageblit(struct fb_info *, struct fb_image *);
-static void tgafb_fillrect(struct fb_info *, struct fb_fillrect *);
-static void tgafb_copyarea(struct fb_info *, struct fb_copyarea *);
+static void tgafb_imageblit(struct fb_info *, const struct fb_image *);
+static void tgafb_fillrect(struct fb_info *, const struct fb_fillrect *);
+static void tgafb_copyarea(struct fb_info *, const struct fb_copyarea *);
 
 static int tgafb_pci_register(struct pci_dev *, const struct pci_device_id *);
 #ifdef MODULE
@@ -520,7 +518,7 @@ tgafb_blank(int blank, struct fb_info *info)
  *      @image: structure defining the image.
  */
 static void
-tgafb_imageblit(struct fb_info *info, struct fb_image *image)
+tgafb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	static unsigned char const bitrev[256] = {
 		0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
@@ -779,7 +777,7 @@ tgafb_imageblit(struct fb_info *info, struct fb_image *image)
  *      @rect: structure defining the rectagle and operation.
  */
 static void
-tgafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+tgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	struct tga_par *par = (struct tga_par *) info->par;
 	int is8bpp = info->var.bits_per_pixel == 8;
@@ -1162,7 +1160,7 @@ copyarea_foreward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 static inline void
 copyarea_backward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 		       u32 height, u32 width, u32 line_length,
-		       struct fb_copyarea *area)
+		       const struct fb_copyarea *area)
 {
 	struct tga_par *par = (struct tga_par *) info->par;
 	unsigned long i, left, yincr;
@@ -1261,7 +1259,7 @@ copyarea_backward_8bpp(struct fb_info *info, u32 dx, u32 dy, u32 sx, u32 sy,
 }
 
 static void
-tgafb_copyarea(struct fb_info *info, struct fb_copyarea *area) 
+tgafb_copyarea(struct fb_info *info, const struct fb_copyarea *area) 
 {
 	unsigned long dx, dy, width, height, sx, sy, vxres, vyres;
 	unsigned long line_length, bpp;

@@ -1799,6 +1799,7 @@ static void * __init aty128_map_ROM(struct pci_dev *dev)
 	
 	// no need to search for the ROM, just ask the card where it is.
 	struct resource *r = &dev->resource[PCI_ROM_RESOURCE];
+	unsigned char *addr;
 	
 	// assign the ROM an address if it doesn't have one
 	if (r->start == 0)
@@ -1808,7 +1809,7 @@ static void * __init aty128_map_ROM(struct pci_dev *dev)
 	if (!(r->flags & PCI_ROM_ADDRESS_ENABLE))
 		pci_write_config_dword(dev, dev->rom_base_reg, r->start | PCI_ROM_ADDRESS_ENABLE);
 	
-	unsigned char *addr = ioremap(r->start, r->end - r->start + 1);
+	addr = ioremap(r->start, r->end - r->start + 1);
 	
 	// Very simple test to make sure it appeared
 	if (addr && (*addr != 0x55)) {
@@ -1821,15 +1822,15 @@ static void * __init aty128_map_ROM(struct pci_dev *dev)
 
 static void __init aty128_unmap_ROM(struct pci_dev *dev, void * rom)
 {
-	iounmap(rom);
-	
 	// leave it disabled and unassigned
 	struct resource *r = &dev->resource[PCI_ROM_RESOURCE];
+	
+	iounmap(rom);
+	
 	r->flags &= !PCI_ROM_ADDRESS_ENABLE;
 	r->end -= r->start;
 	r->start = 0;
 	pci_write_config_dword(dev, dev->rom_base_reg, 0);
-	
 }
 
 static void __init

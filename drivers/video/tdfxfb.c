@@ -163,8 +163,8 @@ static int tdfxfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 static int tdfxfb_blank(int blank, struct fb_info *info); 
 static int tdfxfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info);
 static void tdfxfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
-static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area);  
-static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *image); 
+static void tdfxfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);  
+static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image); 
 static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
 static int banshee_wait_idle(struct fb_info *info);
 
@@ -897,25 +897,26 @@ static void tdfxfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect
 /*
  * Screen-to-Screen BitBlt 2D command (for the bmove fb op.) 
  */
-static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area)  
+static void tdfxfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)  
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
+   	u32 sx = area->sx, sy = area->sy, dx = area->dx, dy = area->dy;
 	u32 bpp = info->var.bits_per_pixel;
 	u32 stride = info->fix.line_length;
 	u32 blitcmd = COMMAND_2D_S2S_BITBLT | (TDFX_ROP_COPY << 24);
 	u32 fmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13); 
-   
+	
 	if (area->sx <= area->dx) {
 		//-X 
 		blitcmd |= BIT(14);
-		area->sx += area->width - 1;
-		area->dx += area->width - 1;
+		sx += area->width - 1;
+		dx += area->width - 1;
 	}
 	if (area->sy <= area->dy) {
 		//-Y  
 		blitcmd |= BIT(15);
-		area->sy += area->height - 1;
-		area->dy += area->height - 1;
+		sy += area->height - 1;
+		dy += area->height - 1;
 	}
    
 	banshee_make_room(par, 6);
@@ -924,12 +925,12 @@ static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	tdfx_outl(par,	DSTFORMAT, fmt);
 	tdfx_outl(par,	COMMAND_2D, blitcmd); 
 	tdfx_outl(par,	DSTSIZE,   area->width | (area->height << 16));
-	tdfx_outl(par,	DSTXY,     area->dx | (area->dy << 16));
-	tdfx_outl(par,	LAUNCH_2D, area->sx | (area->sy << 16)); 
+	tdfx_outl(par,	DSTXY,     dx | (dy << 16));
+	tdfx_outl(par,	LAUNCH_2D, sx | (sy << 16)); 
 	banshee_wait_idle(info);
 }
 
-static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap) 
+static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *pixmap) 
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	int size = pixmap->height*((pixmap->width*pixmap->depth + 7)>>3);
@@ -1069,7 +1070,7 @@ static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		 * the two monochrome patterns.
 		 */
 		u8 *cursorbase = (u8 *) info->cursor.image.data;
-		char *bitmap = cursor->image.data;
+		char *bitmap = (char *)cursor->image.data;
 		char *mask = cursor->mask;
 		int i, j, k, h = 0;
 

@@ -86,7 +86,7 @@ static int hpfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
-void hpfb_copyarea(struct fb_info *info, struct fb_copyarea *area) 
+void hpfb_copyarea(struct fb_info *info, const struct fb_copyarea *area) 
 {
 	while (in_8(fb_regs + BUSY) & fb_bitmask);
 	out_8(fb_regs + WMRR, 0x3);
