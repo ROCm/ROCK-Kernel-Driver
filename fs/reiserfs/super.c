@@ -850,7 +850,9 @@ __u32 find_hash_out (struct super_block * s)
 
     inode = s->s_root->d_inode;
 
-    while (1) {
+    do { // Some serious "goto"-hater was there ;)
+	u32 teahash, r5hash, yurahash;
+
 	make_cpu_key (&key, inode, ~0, TYPE_DIRENTRY, 3);
 	retval = search_by_entry_key (s, &key, &path, &de);
 	if (retval == IO_ERROR) {
@@ -869,20 +871,30 @@ __u32 find_hash_out (struct super_block * s)
 	                     "is using the default hash\n");
 	    break;
 	}
-	if (GET_HASH_VALUE(yura_hash (de.de_name, de.de_namelen)) == 
-	    GET_HASH_VALUE(keyed_hash (de.de_name, de.de_namelen))) {
-	    reiserfs_warning ("reiserfs: Could not detect hash function "
-			      "please mount with -o hash={tea,rupasov,r5}\n") ;
-	    hash = UNSET_HASH ;
+	r5hash=GET_HASH_VALUE (r5_hash (de.de_name, de.de_namelen));
+	teahash=GET_HASH_VALUE (keyed_hash (de.de_name, de.de_namelen));
+	yurahash=GET_HASH_VALUE (yura_hash (de.de_name, de.de_namelen));
+	if ( ( (teahash == r5hash) && (GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num]))) == r5hash) ) ||
+	     ( (teahash == yurahash) && (yurahash == GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])))) ) ||
+	     ( (r5hash == yurahash) && (yurahash == GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])))) ) ) {
+	    reiserfs_warning("reiserfs: Unable to automatically detect hash"
+		"function for device %s\n"
+		"please mount with -o hash={tea,rupasov,r5}\n", kdevname (s->s_dev));
+	    hash = UNSET_HASH;
 	    break;
 	}
-	if (GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])) ) ==
-	    GET_HASH_VALUE (yura_hash (de.de_name, de.de_namelen)))
+	if (GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])) ) == yurahash)
 	    hash = YURA_HASH;
-	else
+	else if (GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])) ) == teahash)
 	    hash = TEA_HASH;
-	break;
-    }
+	else if (GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])) ) == r5hash)
+	    hash = R5_HASH;
+	else {
+	    reiserfs_warning("reiserfs: Unrecognised hash function for "
+			     "device %s\n", kdevname (s->s_dev));
+	    hash = UNSET_HASH;
+	}
+    } while (0);
 
     pathrelse (&path);
     return hash;
@@ -907,16 +919,16 @@ static int what_hash (struct super_block * s)
 	** mount options 
 	*/
 	if (reiserfs_rupasov_hash(s) && code != YURA_HASH) {
-	    printk("REISERFS: Error, tea hash detected, "
-		   "unable to force rupasov hash\n") ;
+	    printk("REISERFS: Error, %s hash detected, "
+		   "unable to force rupasov hash\n", reiserfs_hashname(code)) ;
 	    code = UNSET_HASH ;
 	} else if (reiserfs_tea_hash(s) && code != TEA_HASH) {
-	    printk("REISERFS: Error, rupasov hash detected, "
-		   "unable to force tea hash\n") ;
+	    printk("REISERFS: Error, %s hash detected, "
+		   "unable to force tea hash\n", reiserfs_hashname(code)) ;
 	    code = UNSET_HASH ;
 	} else if (reiserfs_r5_hash(s) && code != R5_HASH) {
-	    printk("REISERFS: Error, r5 hash detected, "
-		   "unable to force r5 hash\n") ;
+	    printk("REISERFS: Error, %s hash detected, "
+		   "unable to force r5 hash\n", reiserfs_hashname(code)) ;
 	    code = UNSET_HASH ;
 	} 
     } else { 

@@ -1960,6 +1960,7 @@ void print_block_head (struct buffer_head * bh, char * mes);
 void check_leaf (struct buffer_head * bh);
 void check_internal (struct buffer_head * bh);
 void print_statistics (struct super_block * s);
+char * reiserfs_hashname(int code);
 
 /* lbalance.c */
 int leaf_move_items (int shift_mode, struct tree_balance * tb, int mov_num, int mov_bytes, struct buffer_head * Snew);

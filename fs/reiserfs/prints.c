@@ -477,6 +477,17 @@ static int print_leaf (struct buffer_head * bh, int print_mode, int first, int l
     return 0;
 }
 
+char * reiserfs_hashname(int code)
+{
+    if ( code == YURA_HASH)
+	return "rupasov";
+    if ( code == TEA_HASH)
+	return "tea";
+    if ( code == R5_HASH)
+	return "r5";
+
+    return "unknown";
+}
 /* return 1 if this is not super block */
 static int print_super_block (struct buffer_head * bh)
 {
@@ -519,8 +530,7 @@ static int print_super_block (struct buffer_head * bh)
     printk ("Journal orig size %d\n", sb_jp_journal_size(rs));
     printk ("FS state %d\n", sb_fs_state(rs));
     printk ("Hash function \"%s\"\n",
-            sb_hash_function_code(rs) == TEA_HASH ? "tea" :
-	    ( sb_hash_function_code(rs) == YURA_HASH ? "rupasov" : (sb_hash_function_code(rs) == R5_HASH ? "r5" : "unknown")));
+	    reiserfs_hashname(sb_hash_function_code(rs)));
     
     printk ("Tree height %d\n", sb_tree_height(rs));
     return 0;
