@@ -390,7 +390,7 @@ static int __devinit serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 	return -ENODEV;
 }
 
-static int
+static int __devinit
 serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 {
 	struct serial_struct serial_req;
@@ -420,7 +420,7 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 
 }
 
-static void serial_pnp_remove(struct pnp_dev * dev)
+static void __devexit serial_pnp_remove(struct pnp_dev * dev)
 {
 	int line = (int)pnp_get_drvdata(dev);
 	if (line)

@@ -230,6 +230,7 @@ static struct pci_device_id ns87415_pci_tbl[] = {
 	{ PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87415, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, ns87415_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "NS87415IDE",

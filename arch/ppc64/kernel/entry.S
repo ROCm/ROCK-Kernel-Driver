@@ -292,7 +292,24 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	addi	r6,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r6,PACACURRENT(r13)	/* Set new 'current' */
 
-	ld	r1,KSP(r4)	/* Load new stack pointer */
+	ld	r8,KSP(r4)	/* new stack pointer */
+BEGIN_FTR_SECTION
+	clrrdi	r6,r8,28	/* get its ESID */
+	clrrdi	r9,r1,28	/* get current sp ESID */
+	clrldi.	r0,r6,2		/* is new ESID c00000000? */
+	cmpd	cr1,r6,r9	/* or is new ESID the same as current ESID? */
+	cror	eq,4*cr1+eq,eq
+	beq	2f		/* if yes, don't slbie it */
+	oris	r6,r6,0x0800	/* set C (class) bit */
+	slbie	r6
+2:
+END_FTR_SECTION_IFSET(CPU_FTR_SLB)
+	clrrdi	r7,r8,THREAD_SHIFT	/* base of new stack */
+	addi	r7,r7,THREAD_SIZE-INT_FRAME_SIZE
+
+	mr	r1,r8		/* start using new stack pointer */
+	std	r7,PACAKSAVE(r13)
+
 	ld	r6,_CCR(r1)
 	mtcrf	0xFF,r6
 
@@ -357,7 +374,6 @@ _GLOBAL(ret_from_except)
 	addi	r0,r1,INT_FRAME_SIZE	/* size of frame */
 	ld	r4,PACACURRENT(r13)
 	std	r0,THREAD+KSP(r4)	/* save kernel stack pointer */
-	std	r1,PACAKSAVE(r13)	/* save exception stack pointer */
 
 	/*
 	 * r13 is our per cpu area, only restore it if we are returning to
@@ -387,6 +403,10 @@ restore:
 
 4:	stb	r5,PACAPROCENABLED(r4)
 #endif
+
+	ld	r3,_MSR(r1)
+	andi.	r3,r3,MSR_RI
+	beq-	unrecov_restore
 
 	ld	r3,_CTR(r1)
 	ld	r0,_LINK(r1)
@@ -438,6 +458,11 @@ do_work:
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	.do_signal
 	b	.ret_from_except
+
+unrecov_restore:
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	.unrecoverable_exception
+	b	unrecov_restore
 
 #ifdef CONFIG_PPC_PSERIES
 /*

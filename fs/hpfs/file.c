@@ -6,27 +6,11 @@
  *  file VFS functions
  */
 
-#include <linux/buffer_head.h>
-#include <linux/string.h>
-#include <linux/time.h>
-#include <linux/smp_lock.h>
-#include <linux/pagemap.h>
 #include "hpfs_fn.h"
 
 #define BLOCKS(size) (((size) + 511) >> 9)
 
-/* HUH? */
-int hpfs_open(struct inode *i, struct file *f)
-{
-	lock_kernel();
-	hpfs_lock_inode(i);
-	hpfs_unlock_inode(i); /* make sure nobody is deleting the file */
-	unlock_kernel();
-	if (!i->i_nlink) return -ENOENT;
-	return 0;
-}
-
-int hpfs_file_release(struct inode *inode, struct file *file)
+static int hpfs_file_release(struct inode *inode, struct file *file)
 {
 	lock_kernel();
 	hpfs_write_if_changed(inode);
@@ -45,7 +29,7 @@ int hpfs_file_fsync(struct file *file, struct dentry *dentry, int datasync)
  * so we must ignore such errors.
  */
 
-secno hpfs_bmap(struct inode *inode, unsigned file_secno)
+static secno hpfs_bmap(struct inode *inode, unsigned file_secno)
 {
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
 	unsigned n, disk_secno;
@@ -61,7 +45,7 @@ secno hpfs_bmap(struct inode *inode, unsigned file_secno)
 	return disk_secno;
 }
 
-void hpfs_truncate(struct inode *i)
+static void hpfs_truncate(struct inode *i)
 {
 	if (IS_IMMUTABLE(i)) return /*-EPERM*/;
 	lock_kernel();
@@ -74,7 +58,7 @@ void hpfs_truncate(struct inode *i)
 	unlock_kernel();
 }
 
-int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
+static int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
 	secno s;
 	s = hpfs_bmap(inode, iblock);
@@ -124,7 +108,7 @@ struct address_space_operations hpfs_aops = {
 	.bmap = _hpfs_bmap
 };
 
-ssize_t hpfs_file_write(struct file *file, const char __user *buf,
+static ssize_t hpfs_file_write(struct file *file, const char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	ssize_t retval;
@@ -138,3 +122,19 @@ ssize_t hpfs_file_write(struct file *file, const char __user *buf,
 	return retval;
 }
 
+struct file_operations hpfs_file_ops =
+{
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= hpfs_file_write,
+	.mmap		= generic_file_mmap,
+	.release	= hpfs_file_release,
+	.fsync		= hpfs_file_fsync,
+	.sendfile	= generic_file_sendfile,
+};
+
+struct inode_operations hpfs_file_iops =
+{
+	.truncate	= hpfs_truncate,
+	.setattr	= hpfs_notify_change,
+};

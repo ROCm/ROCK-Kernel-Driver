@@ -467,6 +467,7 @@ static struct pci_device_id amd74xx_pci_tbl[] = {
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE3S_SATA2,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 12 },
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, amd74xx_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "AMD IDE",

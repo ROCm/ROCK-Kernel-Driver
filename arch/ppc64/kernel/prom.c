@@ -146,8 +146,8 @@ extern struct rtas_t rtas;
 extern unsigned long klimit;
 extern struct lmb lmb;
 
-#define MAX_PHB 16 * 3  // 16 Towers * 3 PHBs/tower
-struct _of_tce_table of_tce_table[MAX_PHB + 1] = {{0, 0, 0}};
+#define MAX_PHB (32 * 6)  /* 32 drawers * 6 PHBs/drawer */
+struct of_tce_table of_tce_table[MAX_PHB + 1];
 
 char *bootpath = 0;
 char *bootdevice = 0;
@@ -808,7 +808,7 @@ prom_initialize_tce_table(void)
 	unsigned long i, table = 0;
 	unsigned long base, vbase, align;
 	unsigned int minalign, minsize;
-	struct _of_tce_table *prom_tce_table = RELOC(of_tce_table);
+	struct of_tce_table *prom_tce_table = RELOC(of_tce_table);
 	unsigned long tce_entry, *tce_entryp;
 
 #ifdef DEBUG_PROM
@@ -817,6 +817,12 @@ prom_initialize_tce_table(void)
 
 	/* Search all nodes looking for PHBs. */
 	for (node = 0; prom_next_node(&node); ) {
+		if (table == MAX_PHB) {
+			prom_print(RELOC("WARNING: PCI host bridge ignored, "
+				         "need to increase MAX_PHB\n"));
+			continue;
+		}
+
 		compatible[0] = 0;
 		type[0] = 0;
 		model[0] = 0;
@@ -856,20 +862,21 @@ prom_initialize_tce_table(void)
 			minsize = 4UL << 20;
 		}
 
-		/* Even though we read what OF wants, we just set the table
+		/*
+		 * Even though we read what OF wants, we just set the table
 		 * size to 4 MB.  This is enough to map 2GB of PCI DMA space.
 		 * By doing this, we avoid the pitfalls of trying to DMA to
 		 * MMIO space and the DMA alias hole.
-		 */
-		/* 
+		 *
 		 * On POWER4, firmware sets the TCE region by assuming
 		 * each TCE table is 8MB. Using this memory for anything
 		 * else will impact performance, so we always allocate 8MB.
 		 * Anton
-		 *
-		 * XXX FIXME use a cpu feature here
 		 */
-		minsize = 8UL << 20;
+		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p))
+			minsize = 8UL << 20;
+		else
+			minsize = 4UL << 20;
 
 		/* Align to the greater of the align or size */
 		align = max(minalign, minsize);

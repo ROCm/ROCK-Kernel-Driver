@@ -98,4 +98,10 @@ pci_dma_sync_sg_for_device(struct pci_dev *hwdev, struct scatterlist *sg,
 	dma_sync_sg_for_device(hwdev == NULL ? NULL : &hwdev->dev, sg, nelems, (enum dma_data_direction)direction);
 }
 
+static inline int
+pci_dma_error(dma_addr_t dma_addr)
+{
+	return dma_error(dma_addr);
+}
+
 #endif

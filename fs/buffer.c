@@ -3024,6 +3024,26 @@ init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long flags)
 	}
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+static void buffer_exit_cpu(int cpu)
+{
+	int i;
+	struct bh_lru *b = &per_cpu(bh_lrus, cpu);
+
+	for (i = 0; i < BH_LRU_SIZE; i++) {
+		brelse(b->bhs[i]);
+		b->bhs[i] = NULL;
+	}
+}
+
+static int buffer_cpu_notify(struct notifier_block *self,
+			      unsigned long action, void *hcpu)
+{
+	if (action == CPU_DEAD)
+		buffer_exit_cpu((unsigned long)hcpu);
+	return NOTIFY_OK;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 void __init buffer_init(void)
 {
@@ -3041,6 +3061,7 @@ void __init buffer_init(void)
 	 */
 	nrpages = (nr_free_buffer_pages() * 10) / 100;
 	max_buffer_heads = nrpages * (PAGE_SIZE / sizeof(struct buffer_head));
+	hotcpu_notifier(buffer_cpu_notify, 0);
 }
 
 EXPORT_SYMBOL(__bforget);

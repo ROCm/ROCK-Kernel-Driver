@@ -136,10 +136,6 @@ static int get_mixer_levels(caddr_t arg)
 	return 0;
 }
 
-#ifndef MIN
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
 /* 4K page size but our output routines use some slack for overruns */
 #define PROC_BLOCK_SIZE (3*1024)
 

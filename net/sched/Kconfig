@@ -164,6 +164,17 @@ config NET_SCH_DSMARK
 	  To compile this code as a module, choose M here: the
 	  module will be called sch_dsmark.
 
+config NET_SCH_DELAY
+	tristate "Delay simulator"
+	depends on NET_SCHED
+	help
+	  Say Y if you want to delay packets by a fixed amount of
+	  time. This is often useful to simulate network delay when
+	  testing applications or protocols.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called sch_delay.
+
 config NET_SCH_INGRESS
 	tristate "Ingress Qdisc"
 	depends on NET_SCHED && NETFILTER

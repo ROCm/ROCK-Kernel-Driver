@@ -60,4 +60,6 @@ extern unsigned long __init lmb_phys_mem_size(void);
 extern unsigned long __init lmb_end_of_DRAM(void);
 extern unsigned long __init lmb_abs_to_phys(unsigned long);
 
+extern unsigned long io_hole_start;
+
 #endif /* _PPC64_LMB_H */

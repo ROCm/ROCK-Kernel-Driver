@@ -55,8 +55,8 @@ int sysfs_create_group(struct kobject * kobj,
 	if ((error = create_files(dir,grp))) {
 		if (grp->name)
 			sysfs_remove_subdir(dir);
-		dput(dir);
 	}
+	dput(dir);
 	return error;
 }
 
@@ -68,12 +68,13 @@ void sysfs_remove_group(struct kobject * kobj,
 	if (grp->name)
 		dir = sysfs_get_dentry(kobj->dentry,grp->name);
 	else
-		dir = kobj->dentry;
+		dir = dget(kobj->dentry);
 
 	remove_files(dir,grp);
-	dput(dir);
 	if (grp->name)
 		sysfs_remove_subdir(dir);
+	/* release the ref. taken in this routine */
+	dput(dir);
 }
 
 

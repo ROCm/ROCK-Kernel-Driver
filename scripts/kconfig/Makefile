@@ -8,7 +8,7 @@ xconfig: $(obj)/qconf
 	$< arch/$(ARCH)/Kconfig
 
 gconfig: $(obj)/gconf
-	./$<  arch/$(ARCH)/Kconfig
+	$< arch/$(ARCH)/Kconfig
 
 menuconfig: $(obj)/mconf
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
@@ -95,7 +95,7 @@ clean-files	:= libkconfig.so lkc_defs.h qconf.moc .tmp_qtcheck \
 HOSTCFLAGS_lex.zconf.o	:= -I$(src)
 HOSTCFLAGS_zconf.tab.o	:= -I$(src)
 
-HOSTLOADLIBES_qconf	= -L$(QTDIR)/lib -L$(QTDIR)/lib64 -Wl,-rpath,$(QTDIR)/lib -l$(QTLIB) -ldl
+HOSTLOADLIBES_qconf	= -L$(QTLIBPATH) -Wl,-rpath,$(QTLIBPATH) -l$(QTLIB) -ldl
 HOSTCXXFLAGS_qconf.o	= -I$(QTDIR)/include 
 
 HOSTLOADLIBES_gconf	= `pkg-config gtk+-2.0 gmodule-2.0 libglade-2.0 --libs`
@@ -107,6 +107,7 @@ $(obj)/qconf.o: $(obj)/.tmp_qtcheck
 
 ifeq ($(qconf-target),1)
 MOC = $(QTDIR)/bin/moc
+QTLIBPATH = $(QTDIR)/lib
 -include $(obj)/.tmp_qtcheck
 
 # QT needs some extra effort...
@@ -122,9 +123,12 @@ $(obj)/.tmp_qtcheck:
 	  echo "*"; \
 	  false; \
 	fi; \
-	LIB=qt; \
-	if [ -f $$DIR/lib/libqt-mt.so ]; then LIB=qt-mt; fi; \
-	echo "QTDIR=$$DIR" > $@; echo "QTLIB=$$LIB" >> $@; \
+	LIBPATH=$$DIR/lib; LIB=qt; \
+	$(HOSTCXX) -print-multi-os-directory > /dev/null 2>&1 && \
+	  LIBPATH=$$DIR/lib/$$($(HOSTCXX) -print-multi-os-directory); \
+	if [ -f $$LIBPATH/libqt-mt.so ]; then LIB=qt-mt; fi; \
+	echo "QTDIR=$$DIR" > $@; echo "QTLIBPATH=$$LIBPATH" >> $@; \
+	echo "QTLIB=$$LIB" >> $@; \
 	if [ ! -x $$DIR/bin/moc -a -x /usr/bin/moc ]; then \
 	  echo "*"; \
 	  echo "* Unable to find $$DIR/bin/moc, using /usr/bin/moc instead."; \

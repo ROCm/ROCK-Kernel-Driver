@@ -51,6 +51,13 @@ Licensing:	The code must be released to us under the
 		to be useful to other communities such as BSD you may well
 		wish to release under multiple licenses.
 
+Copyright:	The copyright owner must agree to use of GPL.
+		It's best if the submitter and copyright owner
+		are the same person/entity. If not, the name of
+		the person/entity authorizing use of GPL should be
+		listed in case it's necessary to verify the will of
+		the copright owner.
+
 Interfaces:	If your driver uses existing interfaces and behaves like
 		other drivers in the same class it will be much more likely
 		to be accepted than if it invents gratuitous new ones. 

@@ -558,6 +558,7 @@ static struct pci_device_id sc1200_pci_tbl[] = {
 	{ PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SCx200_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, sc1200_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "SC1200 IDE",
