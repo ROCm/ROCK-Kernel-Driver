@@ -22,24 +22,24 @@ struct thread_info {
 	struct exec_domain	*exec_domain;	/* execution domain */
 	unsigned long		flags;		/* low level flags */
 	int			cpu;		/* cpu we're on */
-	int			preempt_count;	/* not used at present */
-	int			softirq_count;
-	int			hardirq_count;
+	int			preempt_count;
 };
 
-/*
- * macros/functions for gaining access to the thread information structure
- */
 #define INIT_THREAD_INFO(tsk)			\
 {						\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
-	flags:		0,			\
-	cpu:		0,			\
+	.task =		&tsk,			\
+	.exec_domain =	&default_exec_domain,	\
+	.flags =	0,			\
+	.cpu =		0,			\
+	.preempt_count = 1			\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
+
+/*
+ * macros/functions for gaining access to the thread information structure
+ */
 
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)

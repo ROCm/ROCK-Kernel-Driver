@@ -507,9 +507,8 @@ out:
 }
 
 #ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_pic.c */
-int do_IRQ(struct pt_regs *regs)
+void do_IRQ(struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
 	int irq, first = 1;
         irq_enter();
 
@@ -529,10 +528,6 @@ int do_IRQ(struct pt_regs *regs)
 		/* That's not SMP safe ... but who cares ? */
 		ppc_spurious_interrupts++;
         irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
-	return 1; /* lets ret_from_int know we can do checks */
 }
 #endif /* CONFIG_PPC_ISERIES */
 
@@ -566,6 +561,10 @@ void __init init_IRQ(void)
 #ifdef CONFIG_SMP
 void synchronize_irq(unsigned int irq)
 {
+        /* is there anything to synchronize with? */
+	if (!irq_desc[irq].action)
+		return;
+
 	while (irq_desc[irq].status & IRQ_INPROGRESS)
 		barrier();
 }

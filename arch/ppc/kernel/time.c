@@ -151,7 +151,7 @@ static inline void ppc_do_profile (unsigned long nip)
  * with interrupts disabled.
  * We set it up to overflow again in 1/HZ seconds.
  */
-int timer_interrupt(struct pt_regs * regs)
+void timer_interrupt(struct pt_regs * regs)
 {
 	int next_dec;
 	unsigned long cpu = smp_processor_id();
@@ -215,11 +215,6 @@ int timer_interrupt(struct pt_regs * regs)
 		ppc_md.heartbeat();
 
 	irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
-
-	return 1; /* lets ret_from_int know we can do checks */
 }
 #endif /* CONFIG_PPC_ISERIES */
 

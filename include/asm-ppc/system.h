@@ -96,19 +96,6 @@ extern unsigned int rtas_data;
 struct pt_regs;
 extern void dump_regs(struct pt_regs *);
 
-#ifndef CONFIG_SMP
-
-/*
- * Compatibility macros, to be removed in future...
- */
-#define cli()	local_irq_disable()
-#define sti()	local_irq_enable()
-#define save_flags(flags)	local_save_flags(flags)
-#define restore_flags(flags)	local_irq_restore(flags)
-#define save_and_cli(flags)	local_irq_save(flags)
-
-#endif /* !CONFIG_SMP */
-
 static __inline__ unsigned long
 xchg_u32(volatile void *p, unsigned long val)
 {

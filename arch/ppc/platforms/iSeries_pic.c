@@ -42,7 +42,7 @@ extern void __no_lpq_restore_flags(unsigned long flags);
 extern void iSeries_smp_message_recv( struct pt_regs * );
 unsigned lpEvent_count = 0;
 
-int do_IRQ(struct pt_regs *regs)
+void do_IRQ(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 	unsigned long flags;
@@ -65,8 +65,7 @@ int do_IRQ(struct pt_regs *regs)
 
 	lpq = paca->lpQueuePtr;
 	if ( lpq ) {
-		local_save_flags( flags );
-		local_irq_disable();
+		local_irq_save(flags);
 		lpEvent_count += ItLpQueue_process( lpq, regs );
 		local_irq_restore( flags );
 	}
@@ -78,8 +77,4 @@ int do_IRQ(struct pt_regs *regs)
 		/* Signal a fake decrementer interrupt */
 		timer_interrupt( regs );
 	}
-
-	if (softirq_pending(cpu))
-		do_softirq();
-	return 1; /* lets ret_from_int know we can do checks */
 }

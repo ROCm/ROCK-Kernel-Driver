@@ -102,7 +102,7 @@ int timerRetEnabled = 0;
 int timerRetDisabled = 0;
 
 extern unsigned long iSeries_dec_value;
-int timer_interrupt(struct pt_regs * regs)
+void timer_interrupt(struct pt_regs * regs)
 {
 	long next_dec;
 	struct Paca * paca;
@@ -150,8 +150,4 @@ int timer_interrupt(struct pt_regs * regs)
 	set_dec( (unsigned)next_dec );
 
 	irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
-	return 1;
 }
