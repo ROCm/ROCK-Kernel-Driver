@@ -1118,8 +1118,8 @@ static unsigned int pdc20621_prog_dimm_global(struct ata_probe_ent *pe)
 	   		error = 0;
 	   		break;     
 		}
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout((i * 100) * HZ / 1000);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout((i * 100) * HZ / 1000 + 1);
    	}
    	return error;
 }

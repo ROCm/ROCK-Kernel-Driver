@@ -509,7 +509,7 @@ static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 
 	readl(mmio + PDC_TBG_MODE);	/* flush */
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(msecs_to_jiffies(10));
+	schedule_timeout(msecs_to_jiffies(10) + 1);
 
 	/* adjust slew rate control register. */
 	tmp = readl(mmio + PDC_SLEW_CTL);
