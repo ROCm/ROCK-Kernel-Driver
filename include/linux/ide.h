@@ -717,6 +717,7 @@ typedef struct ide_drive_s {
 					 *  3=64-bit
 					 */
 	unsigned scsi		: 1;	/* 0=default, 1=ide-scsi emulation */
+	unsigned sleeping	: 1;	/* 1=sleeping & sleep field valid */
 
         u8	quirk_list;	/* considered quirky, set for a specific host */
         u8	init_speed;	/* transfer rate set at boot */
