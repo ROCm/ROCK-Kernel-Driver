@@ -14,8 +14,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-extern int agp_memory_reserved;
-
 static u_int64_t pci_read64 (struct pci_dev *dev, int reg)
 {
 	union {
@@ -48,16 +46,11 @@ static void pci_write64 (struct pci_dev *dev, int reg, u64 value)
 static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
-	void *temp;
 	long tmp;
 	u32 pte;
 	u64 addr;
 
-	temp = agp_bridge.current_size;
-
-	num_entries = A_SIZE_32(temp)->num_entries;
-
-	num_entries -= agp_memory_reserved>>PAGE_SHIFT;
+	num_entries = agp_num_entries();
 
 	if (type != 0 || mem->type != 0)
 		return -EINVAL;

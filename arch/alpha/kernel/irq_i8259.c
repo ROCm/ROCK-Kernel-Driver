@@ -130,11 +130,11 @@ init_i8259a_irqs(void)
 # define IACK_SC	TITAN_IACK_SC
 #elif defined(CONFIG_ALPHA_TSUNAMI)
 # define IACK_SC	TSUNAMI_IACK_SC
-#elif defined(CONFIG_ALPHA_POLARIS)
-# define IACK_SC	POLARIS_IACK_SC
 #elif defined(CONFIG_ALPHA_IRONGATE)
 # define IACK_SC        IRONGATE_IACK_SC
 #endif
+/* Note that CONFIG_ALPHA_POLARIS is intentionally left out here, since
+   sys_rx164 wants to use isa_no_iack_sc_device_interrupt for some reason.  */
 
 #if defined(IACK_SC)
 void

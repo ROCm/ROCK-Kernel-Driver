@@ -35,6 +35,7 @@
 #include <linux/completion.h>
 #include <linux/uts.h>			/* for UTS_SYSNAME */
 #include <linux/pci.h>			/* for hcd->pdev and dma addressing */
+#include <linux/dma-mapping.h>
 #include <asm/byteorder.h>
 
 #include <linux/usb.h>

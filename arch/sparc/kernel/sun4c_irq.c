@@ -34,6 +34,7 @@
 #include <asm/sun4paddr.h>
 #include <asm/idprom.h>
 #include <asm/machines.h>
+#include <asm/sbus.h>
 
 #if 0
 static struct resource sun4c_timer_eb = { "sun4c_timer" };
@@ -50,6 +51,17 @@ static struct resource sun4c_intr_eb = { "sun4c_intr" };
  * so don't go making it static, like I tried. sigh.
  */
 unsigned char *interrupt_enable = 0;
+
+static int sun4c_pil_map[] = { 0, 1, 2, 3, 5, 7, 8, 9 };
+
+unsigned int sun4c_sbint_to_irq(struct sbus_dev *sdev, unsigned int sbint)
+{
+	if (sbint >= sizeof(sun4c_pil_map)) {
+		printk(KERN_ERR "%s: bogus SBINT %d\n", sdev->prom_name, sbint);
+		BUG();
+	}
+	return sun4c_pil_map[sbint];
+}
 
 static void sun4c_disable_irq(unsigned int irq_nr)
 {
@@ -213,6 +225,7 @@ void __init sun4c_init_IRQ(void)
 		    int_regs[0].reg_size, "sun4c_intr");
 	}
 
+	BTFIXUPSET_CALL(sbint_to_irq, sun4c_sbint_to_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(enable_irq, sun4c_enable_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(disable_irq, sun4c_disable_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(enable_pil_irq, sun4c_enable_irq, BTFIXUPCALL_NORM);

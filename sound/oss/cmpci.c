@@ -82,6 +82,7 @@
  *	- speaker mixer support 
  *	Mon Aug 13 2001
  *	- optimizations and cleanups
+ *    03/01/2003 - open_mode fixes from Georg Acher <acher@in.tum.de>
  *
  */
 /*****************************************************************************/
@@ -2272,7 +2273,7 @@ static int cm_release(struct inode *inode, struct file *file)
 		stop_adc(s);
 		dealloc_dmabuf(&s->dma_adc);
 	}
-	s->open_mode &= (~file->f_mode) & (FMODE_READ|FMODE_WRITE);
+	s->open_mode &= ~(file->f_mode & (FMODE_READ|FMODE_WRITE));
 	up(&s->open_sem);
 	wake_up(&s->open_wait);
 	unlock_kernel();
@@ -2540,7 +2541,7 @@ static int cm_midi_release(struct inode *inode, struct file *file)
 		set_current_state(TASK_RUNNING);
 	}
 	down(&s->open_sem);
-	s->open_mode &= (~(file->f_mode << FMODE_MIDI_SHIFT)) & (FMODE_MIDI_READ|FMODE_MIDI_WRITE);
+	s->open_mode &= ~((file->f_mode << FMODE_MIDI_SHIFT) & (FMODE_MIDI_READ|FMODE_MIDI_WRITE));
 	spin_lock_irqsave(&s->lock, flags);
 	if (!(s->open_mode & (FMODE_MIDI_READ | FMODE_MIDI_WRITE))) {
 		del_timer(&s->midi.timer);		

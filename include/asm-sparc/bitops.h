@@ -9,9 +9,8 @@
 #ifndef _SPARC_BITOPS_H
 #define _SPARC_BITOPS_H
 
-#include <linux/kernel.h>
+#include <linux/compiler.h>
 #include <asm/byteorder.h>
-#include <asm/system.h>
 
 #ifdef __KERNEL__
 

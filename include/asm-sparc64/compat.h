@@ -42,4 +42,13 @@ struct compat_timeval {
 	s32		tv_usec;
 };
 
+struct compat_flock {
+	short			l_type;
+	short			l_whence;
+	__kernel_off_t32	l_start;
+	__kernel_off_t32	l_len;
+	__kernel_pid_t32	l_pid;
+	short			__unused;
+};
+
 #endif /* _ASM_SPARC64_COMPAT_H */

@@ -3,7 +3,7 @@
 /*
  *      esssolo1.c  --  ESS Technology Solo1 (ES1946) audio driver.
  *
- *      Copyright (C) 1998-2001  Thomas Sailer (t.sailer@alumni.ethz.ch)
+ *      Copyright (C) 1998-2001, 2003  Thomas Sailer (t.sailer@alumni.ethz.ch)
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -82,6 +82,7 @@
  *    22.05.2001   0.19  more cleanups, changed PM to PCI 2.4 style, got rid
  *                       of global list of devices, using pci device data.
  *                       Marcus Meissner <mm@caldera.de>
+ *    03.01.2003   0.20  open_mode fixes from Georg Acher <acher@in.tum.de>
  */
 
 /*****************************************************************************/
@@ -1986,7 +1987,7 @@ static int solo1_midi_release(struct inode *inode, struct file *file)
 		set_current_state(TASK_RUNNING);
 	}
 	down(&s->open_sem);
-	s->open_mode &= (~(file->f_mode << FMODE_MIDI_SHIFT)) & (FMODE_MIDI_READ|FMODE_MIDI_WRITE);
+	s->open_mode &= ~((file->f_mode << FMODE_MIDI_SHIFT) & (FMODE_MIDI_READ|FMODE_MIDI_WRITE));
 	spin_lock_irqsave(&s->lock, flags);
 	if (!(s->open_mode & (FMODE_MIDI_READ | FMODE_MIDI_WRITE))) {
 		outb(0x30, s->iobase + 7); /* enable A1, A2 irq's */
@@ -2461,7 +2462,7 @@ static int __init init_solo1(void)
 {
 	if (!pci_present())   /* No PCI bus in this machine! */
 		return -ENODEV;
-	printk(KERN_INFO "solo1: version v0.19 time " __TIME__ " " __DATE__ "\n");
+	printk(KERN_INFO "solo1: version v0.20 time " __TIME__ " " __DATE__ "\n");
 	if (!pci_register_driver(&solo1_driver)) {
 		pci_unregister_driver(&solo1_driver);
                 return -ENODEV;

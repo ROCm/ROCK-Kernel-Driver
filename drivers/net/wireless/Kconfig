@@ -2,12 +2,12 @@
 # Wireless LAN device configuration
 #
 comment "Wireless ISA/PCI cards support"
-	depends on NET_RADIO
+	depends on NET_RADIO && (ISA || PCI || ALL_PPC || PCMCIA)
 
 # Good old obsolete Wavelan.
 config WAVELAN
 	tristate "AT&T/Lucent old WaveLAN & DEC RoamAbout DS ISA support"
-	depends on NET_RADIO
+	depends on NET_RADIO && ISA
 	---help---
 	  The Lucent WaveLAN (formerly NCR and AT&T; or DEC RoamAbout DS) is
 	  a Radio LAN (wireless Ethernet-like Local Area Network) using the
@@ -54,7 +54,7 @@ config AIRO
 
 config HERMES
 	tristate "Hermes chipset 802.11b support (Orinoco/Prism2/Symbol)"
-	depends on NET_RADIO
+	depends on NET_RADIO && (ALL_PPC || PCI || PCMCIA)
 	---help---
 	  A driver for 802.11b wireless cards based based on the "Hermes" or
 	  Intersil HFA384x (Prism 2) MAC controller.  This includes the vast

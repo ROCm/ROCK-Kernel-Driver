@@ -7,9 +7,8 @@ config ALPHA
 	default y
 	help
 	  The Alpha is a 64-bit general-purpose processor designed and
-	  marketed by the Digital Equipment Corporation of blessed memory, now
-	  Compaq.  Alpha Linux dates from 1995-1996 and was the first non-x86
-	  port. The Alpha Linux project has a home page at
+	  marketed by the Digital Equipment Corporation of blessed memory,
+	  now Hewlett-Packard.  The Alpha Linux project has a home page at
 	  <http://www.alphalinux.org/>.
 
 config MMU
@@ -42,9 +41,6 @@ menu "System setup"
 choice
 	prompt "Alpha system type"
 	default ALPHA_GENERIC
-
-config ALPHA_GENERIC
-	bool "Generic"
 	---help---
 	  This is the system type of your hardware.  A "generic" kernel will
 	  run on any supported Alpha system. However, if you configure a
@@ -83,6 +79,11 @@ config ALPHA_GENERIC
 	  Wildfire            AlphaServer GS 40/80/160/320
 
 	  If you don't know what to do, choose "generic".
+
+config ALPHA_GENERIC
+	bool "Generic"
+	help
+	  A generic kernel will run on all supported Alpha hardware.
 
 config ALPHA_ALCOR
 	bool "Alcor/Alpha-XLT"
@@ -809,47 +810,6 @@ endif
 source "drivers/ieee1394/Kconfig"
 
 source "net/Kconfig"
-
-
-menu "Network device support"
-	depends on NET
-
-config NETDEVICES
-	bool "Network device support"
-	---help---
-	  You can say N here if you don't intend to connect your Linux box to
-	  any other computer at all or if all your connections will be over a
-	  telephone line with a modem either via UUCP (UUCP is a protocol to
-	  forward mail and news between unix hosts over telephone lines; read
-	  the UUCP-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
-	  account or a BBS, even using term (term is a program which gives you
-	  almost full Internet connectivity if you have a regular dial up
-	  shell account on some Internet connected Unix computer. Read
-	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
-
-	  You'll have to say Y if your computer contains a network card that
-	  you want to use under Linux (make sure you know its name because you
-	  will be asked for it and read the Ethernet-HOWTO (especially if you
-	  plan to use more than one network card under Linux)) or if you want
-	  to use SLIP (Serial Line Internet Protocol is the protocol used to
-	  send Internet traffic over telephone lines or null modem cables) or
-	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
-	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
-	  Protocol is mainly used to create a mini network by connecting the
-	  parallel ports of two local machines) or AX.25/KISS (protocol for
-	  sending Internet traffic over amateur radio links).
-
-	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
-	  Olaf Kirch's excellent and free book "Network Administrator's
-	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
-	  unsure, say Y.
-
-source "drivers/net/Kconfig"
-
-source "drivers/atm/Kconfig"
-
-endmenu
 
 source "net/ax25/Kconfig"
 
