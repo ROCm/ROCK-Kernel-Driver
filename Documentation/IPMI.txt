@@ -340,6 +340,8 @@ You can change this at module load time (for a module) with:
   modprobe ipmi_si.o type=<type1>,<type2>....
        ports=<port1>,<port2>... addrs=<addr1>,<addr2>...
        irqs=<irq1>,<irq2>... trydefaults=[0|1]
+       regspacings=<sp1>,<sp2>,... regsizes=<size1>,<size2>,...
+       regshifts=<shift1>,<shift2>,...
 
 Each of these except si_trydefaults is a list, the first item for the
 first interface, second item for the second interface, etc.
@@ -361,12 +363,35 @@ si_trydefaults sets whether the standard IPMI interface at 0xca2 and
 any interfaces specified by ACPE are tried.  By default, the driver
 tries it, set this value to zero to turn this off.
 
+The next three parameters have to do with register layout.  The
+registers used by the interfaces may not appear at successive
+locations and they may not be in 8-bit registers.  These parameters
+allow the layout of the data in the registers to be more precisely
+specified.
+
+The regspacings parameter give the number of bytes between successive
+register start addresses.  For instance, if the regspacing is set to 4
+and the start address is 0xca2, then the address for the second
+register would be 0xca6.  This defaults to 1.
+
+The regsizes parameter gives the size of a register, in bytes.  The
+data used by IPMI is 8-bits wide, but it may be inside a larger
+register.  This parameter allows the read and write type to specified.
+It may be 1, 2, 4, or 8.  The default is 1.
+
+Since the register size may be larger than 32 bits, the IPMI data may not
+be in the lower 8 bits.  The regshifts parameter give the amount to shift
+the data to get to the actual IPMI data.
+
 When compiled into the kernel, the addresses can be specified on the
 kernel command line as:
 
   ipmi_si.type=<type1>,<type2>...
        ipmi_si.ports=<port1>,<port2>... ipmi_si.addrs=<addr1>,<addr2>...
        ipmi_si.irqs=<irq1>,<irq2>... ipmi_si.trydefaults=[0|1]
+       ipmi_si.regspacings=<sp1>,<sp2>,...
+       ipmi_si.regsizes=<size1>,<size2>,...
+       ipmi_si.regshifts=<shift1>,<shift2>,...
 
 It works the same as the module parameters of the same names.
 

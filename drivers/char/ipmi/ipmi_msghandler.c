@@ -46,7 +46,8 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 
-#define IPMI_MSGHANDLER_VERSION "v32"
+#define PFX "IPMI message handler: "
+#define IPMI_MSGHANDLER_VERSION "v33"
 
 struct ipmi_recv_msg *ipmi_alloc_recv_msg(void);
 static int ipmi_init_msghandler(void);
@@ -895,6 +896,12 @@ int ipmi_unregister_for_cmd(ipmi_user_t   user,
 	return rv;
 }
 
+void ipmi_user_set_run_to_completion(ipmi_user_t user, int val)
+{
+	user->intf->handlers->set_run_to_completion(user->intf->send_info,
+						    val);
+}
+
 static unsigned char
 ipmb_checksum(unsigned char *data, int size)
 {
@@ -1686,8 +1693,8 @@ channel_handler(ipmi_smi_t intf, struct ipmi_smi_msg *msg)
 			intf->curr_channel = IPMI_MAX_CHANNELS;
 			wake_up(&intf->waitq);
 
-			printk(KERN_WARNING "ipmi_msghandler: Error sending"
-			       "channel information: %d\n",
+			printk(KERN_WARNING PFX
+			       "Error sending channel information: %d\n",
 			       rv);
 		}
 	}
@@ -2351,7 +2358,7 @@ static int handle_read_event_rsp(ipmi_smi_t          intf,
 	} else {
 		/* There's too many things in the queue, discard this
 		   message. */
-		printk(KERN_WARNING "ipmi: Event queue full, discarding an"
+		printk(KERN_WARNING PFX "Event queue full, discarding an"
 		       " incoming event\n");
 	}
 
@@ -2433,10 +2440,34 @@ static int handle_new_recv_msg(ipmi_smi_t          intf,
 #endif
 	if (msg->rsp_size < 2) {
 		/* Message is too small to be correct. */
-		requeue = 0;
-	} else if ((msg->rsp[0] == ((IPMI_NETFN_APP_REQUEST|1) << 2))
-		   && (msg->rsp[1] == IPMI_SEND_MSG_CMD)
-		   && (msg->user_data != NULL))
+		printk(KERN_WARNING PFX "BMC returned to small a message"
+		       " for netfn %x cmd %x, got %d bytes\n",
+		       (msg->data[0] >> 2) | 1, msg->data[1], msg->rsp_size);
+
+		/* Generate an error response for the message. */
+		msg->rsp[0] = msg->data[0] | (1 << 2);
+		msg->rsp[1] = msg->data[1];
+		msg->rsp[2] = IPMI_ERR_UNSPECIFIED;
+		msg->rsp_size = 3;
+	} else if (((msg->rsp[0] >> 2) != ((msg->data[0] >> 2) | 1))/* Netfn */
+		   || (msg->rsp[1] != msg->data[1]))		  /* Command */
+	{
+		/* The response is not even marginally correct. */
+		printk(KERN_WARNING PFX "BMC returned incorrect response,"
+		       " expected netfn %x cmd %x, got netfn %x cmd %x\n",
+		       (msg->data[0] >> 2) | 1, msg->data[1],
+		       msg->rsp[0] >> 2, msg->rsp[1]);
+
+		/* Generate an error response for the message. */
+		msg->rsp[0] = msg->data[0] | (1 << 2);
+		msg->rsp[1] = msg->data[1];
+		msg->rsp[2] = IPMI_ERR_UNSPECIFIED;
+		msg->rsp_size = 3;
+	}
+
+	if ((msg->rsp[0] == ((IPMI_NETFN_APP_REQUEST|1) << 2))
+	    && (msg->rsp[1] == IPMI_SEND_MSG_CMD)
+	    && (msg->user_data != NULL))
 	{
 		/* It's a response to a response we sent.  For this we
 		   deliver a send message response to the user. */
@@ -2502,7 +2533,9 @@ static int handle_new_recv_msg(ipmi_smi_t          intf,
 			requeue = 0;
 		}
 
-	} else if (msg->rsp[1] == IPMI_READ_EVENT_MSG_BUFFER_CMD) {
+	} else if ((msg->rsp[0] == ((IPMI_NETFN_APP_REQUEST|1) << 2))
+		   && (msg->rsp[1] == IPMI_READ_EVENT_MSG_BUFFER_CMD))
+	{
 		/* It's an asyncronous event. */
 		requeue = handle_read_event_rsp(intf, msg);
 	} else {
@@ -3114,7 +3147,7 @@ static int ipmi_init_msghandler(void)
 
 	proc_ipmi_root = proc_mkdir("ipmi", NULL);
 	if (!proc_ipmi_root) {
-	    printk("Unable to create IPMI proc dir");
+	    printk(KERN_ERR PFX "Unable to create IPMI proc dir");
 	    return -ENOMEM;
 	}
 
@@ -3166,11 +3199,11 @@ static __exit void cleanup_ipmi(void)
 	/* Check for buffer leaks. */
 	count = atomic_read(&smi_msg_inuse_count);
 	if (count != 0)
-		printk("ipmi_msghandler: SMI message count %d at exit\n",
+		printk(KERN_WARNING PFX "SMI message count %d at exit\n",
 		       count);
 	count = atomic_read(&recv_msg_inuse_count);
 	if (count != 0)
-		printk("ipmi_msghandler: recv message count %d at exit\n",
+		printk(KERN_WARNING PFX "recv message count %d at exit\n",
 		       count);
 }
 module_exit(cleanup_ipmi);
@@ -3207,3 +3240,4 @@ EXPORT_SYMBOL(ipmi_get_my_address);
 EXPORT_SYMBOL(ipmi_set_my_LUN);
 EXPORT_SYMBOL(ipmi_get_my_LUN);
 EXPORT_SYMBOL(ipmi_smi_add_proc_entry);
+EXPORT_SYMBOL(ipmi_user_set_run_to_completion);

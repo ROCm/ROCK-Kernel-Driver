@@ -53,7 +53,7 @@
 
 #define	PFX "IPMI Watchdog: "
 
-#define IPMI_WATCHDOG_VERSION "v32"
+#define IPMI_WATCHDOG_VERSION "v33"
 
 /*
  * The IPMI command/response information for the watchdog timer.

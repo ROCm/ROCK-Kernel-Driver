@@ -45,7 +45,7 @@
 #include <asm/semaphore.h>
 #include <linux/init.h>
 
-#define IPMI_DEVINTF_VERSION "v32"
+#define IPMI_DEVINTF_VERSION "v33"
 
 struct ipmi_file_private
 {
