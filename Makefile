@@ -712,7 +712,7 @@ clean:	archclean
 		-name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	@rm -f $(CLEAN_FILES)
-	@$(MAKE) -f Documentation/DocBook/Makefile clean
+	@$(call descend,Documentation/DocBook,clean)
 
 mrproper: clean archmrproper
 	@echo 'Making mrproper'
@@ -722,7 +722,7 @@ mrproper: clean archmrproper
 	@rm -rf $(MRPROPER_DIRS)
 	@rm -f $(MRPROPER_FILES)
 	@$(call descend,scripts,mrproper)
-	@$(MAKE) -f Documentation/DocBook/Makefile mrproper
+	@$(call descend,Documentation/DocBook,mrproper)
 
 distclean: mrproper
 	@echo 'Making distclean'
@@ -809,7 +809,7 @@ help:
 # Documentation targets
 # ---------------------------------------------------------------------------
 sgmldocs psdocs pdfdocs htmldocs: scripts
-	@$(MAKE) -f Documentation/DocBook/Makefile $@
+	@$(call descend,Documentation/DocBook,$@)
 
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------

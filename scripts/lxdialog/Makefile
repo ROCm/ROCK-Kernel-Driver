@@ -44,4 +44,4 @@ ncurses:
 	fi
 
 mrproper:
-	@rm -f core $(host-progs) $(lxdialog-objs) ncurses
+	@rm -f $(addprefix $(obj)/,core $(host-progs) $(lxdialog-objs) ncurses)
