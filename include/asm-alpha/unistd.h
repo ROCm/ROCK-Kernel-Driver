@@ -360,7 +360,10 @@
 #define __NR_clock_nanosleep		422
 #define __NR_semtimedop			423
 #define __NR_tgkill			424
-#define NR_SYSCALLS			425
+#define __NR_stat64			425
+#define __NR_lstat64			426
+#define __NR_fstat64			427
+#define NR_SYSCALLS			428
 
 #if defined(__GNUC__)
 
