@@ -55,7 +55,7 @@ unsigned long		mip_addr, host_addr;
  * Parse the OEM Table
  */
 
-void __init
+int __init
 parse_unisys_oem (char *oemptr, int oem_entries)
 {
 	int                     i;
@@ -83,6 +83,7 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 			host = (struct mip_reg *)val;
 			host_reg = __va(host);
 			val = MIP_RD_LO(mi->mip_reg);
+			mip_port = MIP_PORT(mi->mip_info);
 			mip_addr = val;
 			mip = (struct mip_reg *)val;
 			mip_reg = __va(mip);
@@ -116,7 +117,7 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 		printk("\nEnabling ES7000 specific features...\n");
 		es7000_plat = 1;
 	}
-	return;
+	return es7000_plat;
 }
 
 int __init 
