@@ -120,7 +120,13 @@ static irqreturn_t usb_hcd_sa1111_hcim_irq (int irq, void *__hcd, struct pt_regs
 	}
 #endif
 
-	return usb_hcd_irq(irq, hcd, r);
+	usb_hcd_irq(irq, hcd, r);
+
+	/*
+	 * SA1111 seems to re-assert its interrupt immediately
+	 * after processing an interrupt.  Always return IRQ_HANDLED.
+	 */
+	return IRQ_HANDLED;
 }
 
 /*-------------------------------------------------------------------------*/
