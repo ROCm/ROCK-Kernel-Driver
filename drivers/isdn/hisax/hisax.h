@@ -6,6 +6,10 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  */
+
+#ifndef __HISAX_H__
+#define __HISAX_H__
+
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -46,11 +50,6 @@
 #define HW_INFO4_P10	0x0048
 #define HW_RSYNC	0x0060
 #define HW_TESTLOOP	0x0070
-#define CARD_RESET	0x00F0
-#define CARD_INIT	0x00F2
-#define CARD_RELEASE	0x00F3
-#define CARD_TEST	0x00F4
-#define CARD_AUX_IND	0x00F5
 
 #define PH_ACTIVATE	0x0100
 #define PH_DEACTIVATE	0x0110
@@ -349,17 +348,12 @@ struct l3_process {
 };
 
 struct hscx_hw {
-	int hscx;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 	u8 tsaxr0;
 	u8 tsaxr1;
 };
 
 struct w6692B_hw {
 	int bchan;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct isar_reg {
@@ -407,8 +401,6 @@ struct hdlc_hw {
 		struct hdlc_stat_reg sr;
 	} ctrl;
 	u_int stat;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct hfcB_hw {
@@ -479,10 +471,13 @@ struct amd7930_hw {
 struct BCState {
 	int channel;
 	int mode;
-	long Flag; /* long req'd for set_bit --RR */
+	long Flag;
 	struct IsdnCardState *cs;
-	int tx_cnt;		/* B-Channel transmit counter */
-	struct sk_buff *tx_skb; /* B-Channel transmit Buffer */
+	int unit;                       /* first or second unit (e.g. HSCX) */
+	int rcvidx;
+	u8 *rcvbuf;                     /* B-Channel receive Buffer */
+	int tx_cnt;  		        /* B-Channel transmit counter */
+	struct sk_buff *tx_skb;         /* B-Channel transmit Buffer */
 	struct sk_buff_head rqueue;	/* B-Channel receive queue */
 	struct sk_buff_head squeue;	/* B-Channel send queue */
 	struct sk_buff_head cmpl_queue;	/* B-Channel send complete queue */
@@ -492,8 +487,6 @@ struct BCState {
 	struct timer_list transbusy;
 	struct work_struct work;
 	unsigned long event;
-	int  (*BC_SetStack) (struct PStack *, struct BCState *);
-	void (*BC_Close) (struct BCState *);
 #ifdef ERROR_STATISTIC
 	int err_crc;
 	int err_tx;
@@ -861,6 +854,17 @@ struct icc_chip {
 
 struct IsdnCardState;
 
+/* Methods provided by driver for a specific card */
+
+struct card_ops {
+	void   (*init)      (struct IsdnCardState *);
+	void   (*test)      (struct IsdnCardState *);
+	int    (*reset)     (struct IsdnCardState *);
+	void   (*release)   (struct IsdnCardState *);
+	void   (*aux_ind)   (struct IsdnCardState *, void *);
+	void   (*irq_func)  (int, void *, struct pt_regs *);
+};
+
 /* Card specific drivers provide methods to access the
  * chips to the chip drivers */
 
@@ -878,10 +882,23 @@ struct dc_hw_ops {
 	void   (*write_fifo) (struct IsdnCardState *, u8 *, int);
 };
 
-/* Methods provided to shared FIFO handling */
+/* Methods provided to shared B-channel FIFO handling */
 
 struct bc_l1_ops {
 	void   (*fill_fifo)  (struct BCState *);
+	int    (*open)       (struct PStack *, struct BCState *);
+	void   (*close)      (struct BCState *);
+};
+
+/* Methods provided to shared D-channel FIFO handling */
+
+struct dc_l1_ops {
+	void   (*fill_fifo)  (struct IsdnCardState *);
+	int    (*open)       (struct PStack *, struct IsdnCardState *);
+	void   (*close)      (struct IsdnCardState *);
+
+	void   (*bh_func)    (void *);
+	void   (*dbusy_func) (struct IsdnCardState *);
 };
 
 #define HW_IOM1			0
@@ -900,6 +917,7 @@ struct IsdnCardState {
 	unsigned char typ;
 	unsigned char subtyp;
 	spinlock_t lock;
+	struct card_ops *card_ops;
 	int protocol;
 	unsigned int irq;
 	unsigned long irq_flags;
@@ -942,12 +960,9 @@ struct IsdnCardState {
 	u8 *status_end;
 	struct dc_hw_ops *dc_hw_ops;
 	struct bc_hw_ops *bc_hw_ops;
+	struct dc_l1_ops *dc_l1_ops;
 	struct bc_l1_ops *bc_l1_ops;
 	int    (*cardmsg) (struct IsdnCardState *, int, void *);
-	void   (*setstack_d) (struct PStack *, struct IsdnCardState *);
-	void   (*DC_Send_Data) (struct IsdnCardState *);
-	void   (*DC_Close) (struct IsdnCardState *);
-	void   (*irq_func) (int, void *, struct pt_regs *);
 	int    (*auxcmd) (struct IsdnCardState *, isdn_ctrl *);
 	struct Channel channel[2+MAX_WAITING_CALLS];
 	struct BCState bcs[2+MAX_WAITING_CALLS];
@@ -1363,9 +1378,6 @@ int QuickHex(char *txt, u8 * p, int cnt);
 void LogFrame(struct IsdnCardState *cs, u8 * p, int size);
 void dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir);
 void iecpy(u8 * dest, u8 * iestart, int ieoffset);
-#ifdef ISDN_CHIP_ISAC
-void setstack_isac(struct PStack *st, struct IsdnCardState *cs);
-#endif	/* ISDN_CHIP_ISAC */
 #endif	/* __KERNEL__ */
 
 #define HZDELAY(jiffs) {int tout = jiffs; while (tout--) udelay(1000000/HZ);}
@@ -1424,3 +1436,5 @@ L4L3(struct PStack *st, int pr, void *arg)
 {
 	st->l3.l4l3(st, pr, arg);
 }
+
+#endif

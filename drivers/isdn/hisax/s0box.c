@@ -166,49 +166,8 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
  
-static void
-s0box_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-#define MAXCOUNT 5
-	struct IsdnCardState *cs = dev_id;
-	u8 val;
-	int count = 0;
-
-	spin_lock(&cs->lock);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	count++;
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val && count < MAXCOUNT) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val && count < MAXCOUNT) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	if (count >= MAXCOUNT)
-		printk(KERN_WARNING "S0Box: more than %d loops in s0box_interrupt\n", count);
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
-}
-
 void
-release_io_s0box(struct IsdnCardState *cs)
+s0box_release(struct IsdnCardState *cs)
 {
 	release_region(cs->hw.teles3.cfg_reg, 8);
 }
@@ -216,20 +175,14 @@ release_io_s0box(struct IsdnCardState *cs)
 static int
 S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			break;
-		case CARD_RELEASE:
-			release_io_s0box(cs);
-			break;
-		case CARD_INIT:
-			inithscxisac(cs);
-			break;
-		case CARD_TEST:
-			break;
-	}
 	return(0);
 }
+
+static struct card_ops s0box_ops = {
+	.init     = inithscxisac,
+	.release  = s0box_release,
+	.irq_func = hscxisac_irq,
+};
 
 int __init
 setup_s0box(struct IsdnCard *card)
@@ -268,12 +221,12 @@ setup_s0box(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &S0Box_card_msg;
-	cs->irq_func = &s0box_interrupt;
+	cs->card_ops = &s0box_ops;
 	ISACVersion(cs, "S0Box:");
 	if (HscxVersion(cs, "S0Box:")) {
 		printk(KERN_WARNING
 		       "S0Box: wrong HSCX versions check IO address\n");
-		release_io_s0box(cs);
+		s0box_release(cs);
 		return (0);
 	}
 	return (1);

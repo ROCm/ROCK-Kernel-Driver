@@ -40,12 +40,6 @@ isac_write(struct IsdnCardState *cs, u8 addr, u8 val)
 }
 
 static inline void
-isac_read_fifo(struct IsdnCardState *cs, u8 *p, int len)
-{
-	return cs->dc_hw_ops->read_fifo(cs, p, len);
-}
-
-static inline void
 isac_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
 {
 	return cs->dc_hw_ops->write_fifo(cs, p, len);
@@ -140,30 +134,8 @@ isac_bh(void *data)
 void
 isac_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u8 *ptr;
-
-	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
-		debugl1(cs, "isac_empty_fifo");
-
-	if ((cs->rcvidx + count) >= MAX_DFRAME_LEN_L1) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "isac_empty_fifo overrun %d",
-				cs->rcvidx + count);
-		isac_write(cs, ISAC_CMDR, 0x80);
-		cs->rcvidx = 0;
-		return;
-	}
-	ptr = cs->rcvbuf + cs->rcvidx;
-	cs->rcvidx += count;
-	isac_read_fifo(cs, ptr, count);
+	recv_empty_fifo_d(cs, count);
 	isac_write(cs, ISAC_CMDR, 0x80);
-	if (cs->debug & L1_DEB_ISAC_FIFO) {
-		char *t = cs->dlog;
-
-		t += sprintf(t, "isac_empty_fifo cnt %d", count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, cs->dlog);
-	}
 }
 
 static void
@@ -191,7 +163,6 @@ void
 isac_interrupt(struct IsdnCardState *cs, u8 val)
 {
 	u8 exval, v1;
-	struct sk_buff *skb;
 	unsigned int count;
 
 	if (cs->debug & L1_DEB_ISAC)
@@ -214,20 +185,13 @@ isac_interrupt(struct IsdnCardState *cs, u8 val)
 #endif
 			}
 			isac_write(cs, ISAC_CMDR, 0x80);
+			cs->rcvidx = 0;
 		} else {
 			count = isac_read(cs, ISAC_RBCL) & 0x1f;
 			if (count == 0)
 				count = 32;
 			isac_empty_fifo(cs, count);
-			if ((count = cs->rcvidx) > 0) {
-				cs->rcvidx = 0;
-				if (!(skb = alloc_skb(count, GFP_ATOMIC)))
-					printk(KERN_WARNING "HiSax: D receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), cs->rcvbuf, count);
-					skb_queue_tail(&cs->rq, skb);
-				}
-			}
+ 			recv_rme_d(cs);
 		}
 		cs->rcvidx = 0;
 		sched_d_event(cs, D_RCVBUFREADY);
@@ -477,13 +441,14 @@ ISAC_l1hw(struct PStack *st, int pr, void *arg)
 	}
 }
 
-void
+static int
 setstack_isac(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = ISAC_l1hw;
+	return 0;
 }
 
-void 
+static void 
 DC_Close_isac(struct IsdnCardState *cs) {
 	if (cs->dc.isac.mon_rx) {
 		kfree(cs->dc.isac.mon_rx);
@@ -526,15 +491,25 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				debugl1(cs, "D-Channel Busy no skb");
 			}
 			isac_write(cs, ISAC_CMDR, 0x01); /* Transmitter reset */
-			cs->irq_func(cs->irq, cs, NULL);
+			cs->card_ops->irq_func(cs->irq, cs, NULL);
 		}
 	}
 }
+
+static struct dc_l1_ops isac_l1_ops = {
+	.fill_fifo  = isac_fill_fifo,
+	.open       = setstack_isac,
+	.close      = DC_Close_isac,
+	.bh_func    = isac_bh,
+	.dbusy_func = dbusy_timer_handler,
+};
 
 void __devinit
 initisac(struct IsdnCardState *cs)
 {
 	int val, eval;
+
+	dc_l1_init(cs, &isac_l1_ops);
 
 	val = isac_read(cs, ISAC_STAR);
 	debugl1(cs, "ISAC STAR %x", val);
@@ -551,16 +526,8 @@ initisac(struct IsdnCardState *cs)
 	/* Disable all IRQ */
 	isac_write(cs, ISAC_MASK, 0xFF);
 
-	INIT_WORK(&cs->work, isac_bh, cs);
-	cs->setstack_d = setstack_isac;
-	cs->DC_Send_Data = isac_fill_fifo;
-	cs->DC_Close = DC_Close_isac;
 	cs->dc.isac.mon_tx = NULL;
 	cs->dc.isac.mon_rx = NULL;
-	cs->dbusytimer.function = (void *) dbusy_timer_handler;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
-  	isac_write(cs, ISAC_MASK, 0xff);
   	cs->dc.isac.mocr = 0xaa;
 	if (test_bit(HW_IOM1, &cs->HW_Flags)) {
 		/* IOM 1 Mode */

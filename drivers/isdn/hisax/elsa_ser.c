@@ -375,11 +375,6 @@ static inline void transmit_chars(struct IsdnCardState *cs, int *intr_done)
 	}
 }
 
-static struct bc_l1_ops modem_l1_ops = {
-	.fill_fifo = modem_fill,
-};
-
-
 static void rs_interrupt_elsa(int irq, struct IsdnCardState *cs)
 {
 	int status, iir, msr;
@@ -424,10 +419,10 @@ close_elsastate(struct BCState *bcs)
 {
 	modehscx(bcs, 0, bcs->channel);
 	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.hscx.rcvbuf) {
+		if (bcs->rcvbuf) {
 			if (bcs->mode != L1_MODE_MODEM)
-				kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
+				kfree(bcs->rcvbuf);
+			bcs->rcvbuf = NULL;
 		}
 		skb_queue_purge(&bcs->rqueue);
 		skb_queue_purge(&bcs->squeue);
@@ -597,23 +592,23 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 			if (open_hscxstate(st->l1.hardware, bcs))
 				return (-1);
 			st->l1.l2l1 = hscx_l2l1;
-			// bcs->cs->BC_Send_Data = hscx_fill_fifo;
+			// bcs->cs->BC_Send_Data = hscx_fill_fifo; FIXME
 			break;
 		case L1_MODE_MODEM:
 			bcs->mode = L1_MODE_MODEM;
 			if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-				bcs->hw.hscx.rcvbuf = bcs->cs->hw.elsa.rcvbuf;
+				bcs->rcvbuf = bcs->cs->hw.elsa.rcvbuf;
 				skb_queue_head_init(&bcs->rqueue);
 				skb_queue_head_init(&bcs->squeue);
 			}
 			bcs->tx_skb = NULL;
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 			bcs->event = 0;
-			bcs->hw.hscx.rcvidx = 0;
+			bcs->rcvidx = 0;
 			bcs->tx_cnt = 0;
 			bcs->cs->hw.elsa.bcs = bcs;
 			st->l1.l2l1 = modem_l2l1;
-			bcs->cs->bc_l1_ops = &modem_l1_ops;
+//			bcs->cs->bc_l1_ops = &modem_l1_ops;
 			break;
 	}
 	st->l1.bcs = bcs;
@@ -623,13 +618,17 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
-void
-init_modem(struct IsdnCardState *cs) {
+static struct bc_l1_ops modem_l1_ops = {
+	.fill_fifo = modem_fill,
+	.open      = setstack_elsa,
+	.close     = close_elsastate,
+};
 
-	cs->bcs[0].BC_SetStack = setstack_elsa;
-	cs->bcs[1].BC_SetStack = setstack_elsa;
-	cs->bcs[0].BC_Close = close_elsastate;
-	cs->bcs[1].BC_Close = close_elsastate;
+void
+init_modem(struct IsdnCardState *cs)
+{
+	cs->bc_l1_ops = &modem_l1_ops;
+
 	if (!(cs->hw.elsa.rcvbuf = kmalloc(MAX_MODEM_BUF,
 		GFP_ATOMIC))) {
 		printk(KERN_WARNING

@@ -64,8 +64,8 @@ hfcs_Timer(struct IsdnCardState *cs)
 */
 }
 
-void
-release_io_hfcs(struct IsdnCardState *cs)
+static void
+hfcs_release(struct IsdnCardState *cs)
 {
 	release2bds0(cs);
 	del_timer(&cs->hw.hfcD.timer);
@@ -73,8 +73,8 @@ release_io_hfcs(struct IsdnCardState *cs)
 		release_region(cs->hw.hfcD.addr, 2);
 }
 
-static void
-reset_hfcs(struct IsdnCardState *cs)
+static int
+hfcs_reset(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HFCS: resetting card\n");
 	cs->hw.hfcD.cirm = HFCD_RESET;
@@ -111,35 +111,34 @@ reset_hfcs(struct IsdnCardState *cs)
 	hfcs_write_reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m); /* HFC Master */
 	cs->hw.hfcD.sctrl = 0;
 	hfcs_write_reg(cs, HFCD_DATA, HFCD_SCTRL, cs->hw.hfcD.sctrl);
+	return 0;
 }
 
 static int
 hfcs_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "HFCS: card_msg %x", mt);
-	switch (mt) {
-		case CARD_RESET:
-			reset_hfcs(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_hfcs(cs);
-			return(0);
-		case CARD_INIT:
-			cs->hw.hfcD.timer.expires = jiffies + 75;
-			add_timer(&cs->hw.hfcD.timer);
-			init2bds0(cs);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((80*HZ)/1000);
-			cs->hw.hfcD.ctmt |= HFCD_TIM800;
-			hfcs_write_reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt); 
-			hfcs_write_reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
+
+static void
+hfcs_init(struct IsdnCardState *cs)
+{
+	cs->hw.hfcD.timer.expires = jiffies + 75;
+	add_timer(&cs->hw.hfcD.timer);
+	init2bds0(cs);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((80*HZ)/1000);
+	cs->hw.hfcD.ctmt |= HFCD_TIM800;
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt); 
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
+}
+
+static struct card_ops hfcs_ops = {
+	.init     = hfcs_init,
+	.reset    = hfcs_reset,
+	.release  = hfcs_release,
+	.irq_func = hfcs_interrupt,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id hfc_ids[] __initdata = {
@@ -262,8 +261,8 @@ setup_hfcs(struct IsdnCard *card)
 	cs->hw.hfcD.timer.function = (void *) hfcs_Timer;
 	cs->hw.hfcD.timer.data = (long) cs;
 	init_timer(&cs->hw.hfcD.timer);
-	reset_hfcs(cs);
+	hfcs_reset(cs);
 	cs->cardmsg = &hfcs_card_msg;
-	cs->irq_func = &hfcs_interrupt;
+	cs->card_ops = &hfcs_ops;
 	return (1);
 }

@@ -233,29 +233,41 @@ reset_bkm(struct IsdnCardState *cs)
 static int
 BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			/* Disable ints */
-			enable_bkm_int(cs, 0);
-			reset_bkm(cs);
-			return (0);
-		case CARD_RELEASE:
-			/* Sanity */
-			enable_bkm_int(cs, 0);
-			reset_bkm(cs);
-			release_io_bkm(cs);
-			return (0);
-		case CARD_INIT:
-			initisac(cs);
-			initjade(cs);
-			/* Enable ints */
-			enable_bkm_int(cs, 1);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
+
+static void
+bkm_a4t_init(struct IsdnCardState *cs)
+{
+	initisac(cs);
+	initjade(cs);
+	/* Enable ints */
+	enable_bkm_int(cs, 1);
+}
+
+static int
+bkm_a4t_reset(struct IsdnCardState *cs)
+{
+	/* Disable ints */
+	enable_bkm_int(cs, 0);
+	reset_bkm(cs);
+	return 0;
+}
+
+static void
+bkm_a4t_release(struct IsdnCardState *cs)
+{
+	enable_bkm_int(cs, 0);
+	reset_bkm(cs);
+	release_io_bkm(cs);
+}
+
+static struct card_ops bkm_a4t_ops = {
+	.init     = bkm_a4t_init,
+	.reset    = bkm_a4t_reset,
+	.release  = bkm_a4t_release,
+	.irq_func = bkm_interrupt,
+};
 
 static struct pci_dev *dev_a4t __initdata = NULL;
 
@@ -335,8 +347,8 @@ setup_bkm_a4t(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &jade_ops;
 	cs->cardmsg = &BKM_card_msg;
-	cs->irq_func = &bkm_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
+	cs->card_ops = &bkm_a4t_ops;
 	ISACVersion(cs, "Telekom A4T:");
 	/* Jade version */
 	JadeVersion(cs, "Telekom A4T:");
