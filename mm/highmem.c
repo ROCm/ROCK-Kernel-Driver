@@ -343,7 +343,7 @@ repeat_alloc:
 	goto repeat_alloc;
 }
 
-void create_bounce(unsigned long pfn, struct bio **bio_orig, int gfp_mask)
+void create_bounce(unsigned long pfn, struct bio **bio_orig)
 {
 	struct page *page;
 	struct bio *bio = NULL;
@@ -369,7 +369,7 @@ void create_bounce(unsigned long pfn, struct bio **bio_orig, int gfp_mask)
 
 		to = &bio->bi_io_vec[i];
 
-		to->bv_page = alloc_bounce_page(gfp_mask);
+		to->bv_page = alloc_bounce_page(GFP_NOHIGHIO);
 		to->bv_len = from->bv_len;
 		to->bv_offset = from->bv_offset;
 

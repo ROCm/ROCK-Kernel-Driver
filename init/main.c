@@ -31,6 +31,8 @@
 #include <asm/io.h>
 #include <asm/bugs.h>
 
+#include <linux/device.h>
+
 #if defined(CONFIG_ARCH_S390)
 #include <asm/s390mach.h>
 #include <asm/ccwcache.h>
@@ -693,6 +695,9 @@ static void __init do_basic_setup(void)
 #if defined(CONFIG_ARCH_S390)
 	s390_init_machine_check();
 #endif
+
+	/* bring up the device tree */
+	device_driver_init();
 
 #ifdef CONFIG_PCI
 	pci_init();

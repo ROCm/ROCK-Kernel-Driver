@@ -1505,15 +1505,9 @@ static int __init HiSax_init(void)
 	       nrcards, (nrcards > 1) ? "s" : "");
 
 	/* Install only, if at least one card found */
-	if (!HiSax_inithardware(NULL)) {
-		retval = -EIO;
-		goto out_isdnl1;
-	}
-
+	HiSax_inithardware(NULL);
 	return 0;
 
- out_isdnl1:
-	Isdnl1Free();
  out_tei:
 	TeiFree();
  out_isdnl2:

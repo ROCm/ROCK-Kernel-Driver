@@ -74,7 +74,7 @@ static struct buffer_head **hash_table;
 static rwlock_t hash_table_lock = RW_LOCK_UNLOCKED;
 
 static struct buffer_head *lru_list[NR_LIST];
-static spinlock_t lru_list_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t lru_list_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 static int nr_buffers_type[NR_LIST];
 static unsigned long size_buffers_type[NR_LIST];
 
@@ -794,9 +794,10 @@ still_busy:
 	return;
 }
 
-inline void set_buffer_async_io(struct buffer_head *bh) {
-    bh->b_end_io = end_buffer_io_async ;
-    mark_buffer_async(bh, 1);
+inline void set_buffer_async_io(struct buffer_head *bh)
+{
+	bh->b_end_io = end_buffer_io_async;
+	mark_buffer_async(bh, 1);
 }
 
 /*
@@ -1036,7 +1037,7 @@ static int balance_dirty_state(void)
 {
 	unsigned long dirty, tot, hard_dirty_limit, soft_dirty_limit;
 
-	dirty = size_buffers_type[BUF_DIRTY] >> PAGE_SHIFT;
+	dirty = (size_buffers_type[BUF_DIRTY] + size_buffers_type[BUF_LOCKED]) >> PAGE_SHIFT;
 	tot = nr_free_buffer_pages();
 
 	dirty *= 100;

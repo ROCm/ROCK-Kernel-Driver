@@ -48,7 +48,7 @@ ssize_t fat_file_read(
 }
 
 
-int fat_get_block(struct inode *inode, long iblock, struct buffer_head *bh_result, int create)
+int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
 	struct super_block *sb = inode->i_sb;
 	unsigned long phys;

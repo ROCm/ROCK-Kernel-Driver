@@ -2542,7 +2542,7 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 			break;
 		}
 #endif
-		size = bio->bi_size;;
+		size = bio->bi_size;
 		buffer = bio_data(bio);
 	}
 #ifdef FLOPPY_SANITY_CHECK

@@ -1176,6 +1176,16 @@ void __init inode_init(unsigned long mempages)
 	unused_inodes_flush_task.routine = try_to_sync_unused_inodes;
 }
 
+static inline void do_atime_update(struct inode *inode)
+{
+	unsigned long time = CURRENT_TIME;
+	if (inode->i_atime != time) {
+		inode->i_atime = time;
+		mark_inode_dirty_sync(inode);
+	}
+}
+
+
 /**
  *	update_atime	-	update the access time
  *	@inode: inode accessed
@@ -1190,8 +1200,7 @@ void update_atime (struct inode *inode)
 	if ( IS_NOATIME (inode) ) return;
 	if ( IS_NODIRATIME (inode) && S_ISDIR (inode->i_mode) ) return;
 	if ( IS_RDONLY (inode) ) return;
-	inode->i_atime = CURRENT_TIME;
-	mark_inode_dirty_sync (inode);
+	do_atime_update(inode);
 }   /*  End Function update_atime  */
 
 

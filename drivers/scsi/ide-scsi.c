@@ -708,16 +708,25 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 		printk ("ide-scsi: %s: building DMA table, %d segments, %dkB total\n", drive->name, segments, pc->request_transfer >> 10);
 #endif /* IDESCSI_DEBUG_LOG */
 		while (segments--) {
-			bh->bi_io_vec[0].bv_page = sg->page;
+			struct page *page = sg->page;
+			int offset = sg->offset;
+
+			if (!page) {
+				BUG_ON(!sg->address);
+				page = virt_to_page(sg->address);
+				offset = (unsigned long) sg->address & ~PAGE_MASK;
+			}
+				
+			bh->bi_io_vec[0].bv_page = page;
 			bh->bi_io_vec[0].bv_len = sg->length;
-			bh->bi_io_vec[0].bv_offset = sg->offset;
+			bh->bi_io_vec[0].bv_offset = offset;
 			bh->bi_size = sg->length;
 			bh = bh->bi_next;
 			/*
 			 * just until scsi_merge is fixed up...
 			 */
-			BUG_ON(PageHighMem(sg->page));
-			sg->address = page_address(sg->page) + sg->offset;
+			BUG_ON(PageHighMem(page));
+			sg->address = page_address(page) + offset;
 			sg++;
 		}
 	} else {

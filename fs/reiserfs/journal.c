@@ -147,7 +147,7 @@ repeat:
   }
   bn = allocate_bitmap_node(p_s_sb) ;
   if (!bn) {
-    current->policy = SCHED_YIELD ;
+    current->policy |= SCHED_YIELD ;
     schedule() ;
     goto repeat ;
   }

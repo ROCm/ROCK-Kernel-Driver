@@ -374,6 +374,56 @@ static int grab_super(struct super_block *s)
 	put_super(s);
 	return 0;
 }
+ 
+/**
+ *	insert_super	-	put superblock on the lists
+ *	@s:	superblock in question
+ *	@type:	filesystem type it will belong to
+ *
+ *	Associates superblock with fs type and puts it on per-type and global
+ *	superblocks' lists.  Should be called with sb_lock held; drops it.
+ */
+static void insert_super(struct super_block *s, struct file_system_type *type)
+{
+	s->s_type = type;
+	list_add(&s->s_list, super_blocks.prev);
+	list_add(&s->s_instances, &type->fs_supers);
+	spin_unlock(&sb_lock);
+	get_filesystem(type);
+}
+
+void put_unnamed_dev(kdev_t dev);	/* should become static */
+
+/**
+ *	remove_super	-	makes superblock unreachable
+ *	@s:	superblock in question
+ *
+ *	Removes superblock from the lists, unlocks it, drop the reference
+ *	and releases the hosting device.  @s should have no active
+ *	references by that time and after remove_super() it's essentially
+ *	in rundown mode - all remaining references are temporary, no new
+ *	reference of any sort are going to appear and all holders of
+ *	temporary ones will eventually drop them.  At that point superblock
+ *	itself will be destroyed; all its contents is already gone.
+ */
+static void remove_super(struct super_block *s)
+{
+	kdev_t dev = s->s_dev;
+	struct block_device *bdev = s->s_bdev;
+	struct file_system_type *fs = s->s_type;
+
+	spin_lock(&sb_lock);
+	list_del(&s->s_list);
+	list_del(&s->s_instances);
+	spin_unlock(&sb_lock);
+	up_write(&s->s_umount);
+	put_super(s);
+	put_filesystem(fs);
+	if (bdev)
+		blkdev_put(bdev, BDEV_FS);
+	else
+		put_unnamed_dev(dev);
+}
 
 struct vfsmount *alloc_vfsmnt(void);
 void free_vfsmnt(struct vfsmount *mnt);
@@ -510,11 +560,8 @@ static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 	s->s_dev = dev;
 	s->s_bdev = bdev;
 	s->s_flags = flags;
-	s->s_type = type;
 	spin_lock(&sb_lock);
-	list_add (&s->s_list, super_blocks.prev);
-	list_add (&s->s_instances, &type->fs_supers);
-	spin_unlock(&sb_lock);
+	insert_super(s, type);
 	lock_super(s);
 	if (!type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 		goto out_fail;
@@ -527,17 +574,9 @@ out:
 	return s;
 
 out_fail:
-	s->s_dev = 0;
-	s->s_bdev = 0;
-	s->s_type = NULL;
 	unlock_super(s);
 	deactivate_super(s);
-	spin_lock(&sb_lock);
-	list_del(&s->s_list);
-	list_del(&s->s_instances);
-	spin_unlock(&sb_lock);
-	up_write(&s->s_umount);
-	put_super(s);
+	remove_super(s);
 	return NULL;
 }
 
@@ -609,13 +648,17 @@ static struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		goto out;
 	check_disk_change(dev);
 	error = -EACCES;
-	if (!(flags & MS_RDONLY) && is_read_only(dev))
-		goto out1;
+	if (!(flags & MS_RDONLY) && is_read_only(dev)) {
+		blkdev_put(bdev, BDEV_FS);
+		goto out;
+	}
 
 	error = -ENOMEM;
 	s = alloc_super();
-	if (!s)
-		goto out1;
+	if (!s) {
+		blkdev_put(bdev, BDEV_FS);
+		goto out;
+	}
 
 	error = -EBUSY;
 restart:
@@ -629,7 +672,8 @@ restart:
 		    ((flags ^ old->s_flags) & MS_RDONLY)) {
 			spin_unlock(&sb_lock);
 			destroy_super(s);
-			goto out1;
+			blkdev_put(bdev, BDEV_FS);
+			goto out;
 		}
 		if (!grab_super(old))
 			goto restart;
@@ -641,10 +685,7 @@ restart:
 	s->s_dev = dev;
 	s->s_bdev = bdev;
 	s->s_flags = flags;
-	s->s_type = fs_type;
-	list_add (&s->s_list, super_blocks.prev);
-	list_add (&s->s_instances, &fs_type->fs_supers);
-	spin_unlock(&sb_lock);
+	insert_super(s, fs_type);
 
 	error = -EINVAL;
 	lock_super(s);
@@ -652,24 +693,13 @@ restart:
 		goto out_fail;
 	s->s_flags |= MS_ACTIVE;
 	unlock_super(s);
-	get_filesystem(fs_type);
 	path_release(&nd);
 	return s;
 
 out_fail:
-	s->s_dev = 0;
-	s->s_bdev = 0;
-	s->s_type = NULL;
 	unlock_super(s);
 	deactivate_super(s);
-	spin_lock(&sb_lock);
-	list_del(&s->s_list);
-	list_del(&s->s_instances);
-	spin_unlock(&sb_lock);
-	up_write(&s->s_umount);
-	put_super(s);
-out1:
-	blkdev_put(bdev, BDEV_FS);
+	remove_super(s);
 out:
 	path_release(&nd);
 	return ERR_PTR(error);
@@ -685,11 +715,8 @@ static struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 		struct super_block * sb;
 		error = -EINVAL;
 		sb = read_super(dev, NULL, fs_type, flags, data);
-		if (sb) {
-			get_filesystem(fs_type);
+		if (sb)
 			return sb;
-		}
-		put_unnamed_dev(dev);
 	}
 	return ERR_PTR(error);
 }
@@ -724,39 +751,24 @@ retry:
 		}
 		s->s_dev = dev;
 		s->s_flags = flags;
-		s->s_type = fs_type;
-		list_add (&s->s_list, super_blocks.prev);
-		list_add (&s->s_instances, &fs_type->fs_supers);
-		spin_unlock(&sb_lock);
+		insert_super(s, fs_type);
 		lock_super(s);
 		if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 			goto out_fail;
 		s->s_flags |= MS_ACTIVE;
 		unlock_super(s);
-		get_filesystem(fs_type);
 		return s;
 
 	out_fail:
-		s->s_dev = 0;
-		s->s_bdev = 0;
-		s->s_type = NULL;
 		unlock_super(s);
 		deactivate_super(s);
-		spin_lock(&sb_lock);
-		list_del(&s->s_list);
-		list_del(&s->s_instances);
-		spin_unlock(&sb_lock);
-		up_write(&s->s_umount);
-		put_super(s);
-		put_unnamed_dev(dev);
+		remove_super(s);
 		return ERR_PTR(-EINVAL);
 	}
 }
 
 void kill_super(struct super_block *sb)
 {
-	struct block_device *bdev;
-	kdev_t dev;
 	struct dentry *root = sb->s_root;
 	struct file_system_type *fs = sb->s_type;
 	struct super_operations *sop = sb->s_op;
@@ -789,24 +801,9 @@ void kill_super(struct super_block *sb)
 			"Self-destruct in 5 seconds.  Have a nice day...\n");
 	}
 
-	dev = sb->s_dev;
-	sb->s_dev = 0;		/* Free the superblock */
-	bdev = sb->s_bdev;
-	sb->s_bdev = NULL;
-	put_filesystem(fs);
-	sb->s_type = NULL;
-	unlock_super(sb);
 	unlock_kernel();
-	if (bdev)
-		blkdev_put(bdev, BDEV_FS);
-	else
-		put_unnamed_dev(dev);
-	spin_lock(&sb_lock);
-	list_del(&sb->s_list);
-	list_del(&sb->s_instances);
-	spin_unlock(&sb_lock);
-	up_write(&sb->s_umount);
-	put_super(sb);
+	unlock_super(sb);
+	remove_super(sb);
 }
 
 /*
@@ -957,7 +954,6 @@ void __init mount_root(void)
 	int retval;
 	void *handle;
 	char path[64];
-	int path_start = -1;
 	char *name = "/dev/root";
 	char *fs_names, *p;
 #ifdef CONFIG_ROOT_NFS
@@ -1012,27 +1008,28 @@ skip_nfs:
 	handle = devfs_find_handle (NULL, ROOT_DEVICE_NAME,
 	                            MAJOR (ROOT_DEV), MINOR (ROOT_DEV),
 				    DEVFS_SPECIAL_BLK, 1);
-	if (handle)  /*  Sigh: bd*() functions only paper over the cracks  */
-	{
-	    unsigned major, minor;
+	if (handle) {
+		int n;
+		unsigned major, minor;
 
-	    devfs_get_maj_min (handle, &major, &minor);
-	    ROOT_DEV = MKDEV (major, minor);
+		devfs_get_maj_min (handle, &major, &minor);
+		ROOT_DEV = MKDEV (major, minor);
+		if (!ROOT_DEV)
+			panic("I have no root and I want to scream");
+		n = devfs_generate_path (handle, path + 5, sizeof (path) - 5);
+		if (n >= 0) {
+			name = path + n;
+			devfs_mk_symlink (NULL, "root", DEVFS_FL_DEFAULT,
+					  name + 5, NULL, NULL);
+			memcpy (name, "/dev/", 5);
+		}
 	}
-
-	/*
-	 * Probably pure paranoia, but I'm less than happy about delving into
-	 * devfs crap and checking it right now. Later.
-	 */
-	if (!ROOT_DEV)
-		panic("I have no root and I want to scream");
 
 retry:
 	bdev = bdget(kdev_t_to_nr(ROOT_DEV));
 	if (!bdev)
 		panic(__FUNCTION__ ": unable to allocate root device");
 	bdev->bd_op = devfs_get_ops (handle);
-	path_start = devfs_generate_path (handle, path + 5, sizeof (path) - 5);
 	mode = FMODE_READ;
 	if (!(root_mountflags & MS_RDONLY))
 		mode |= FMODE_WRITE;
@@ -1046,6 +1043,7 @@ retry:
 		 * Allow the user to distinguish between failed open
 		 * and bad superblock on root device.
 		 */
+Eio:
 		printk ("VFS: Cannot open root device \"%s\" or %s\n",
 			root_device_name, kdevname (ROOT_DEV));
 		printk ("Please append a correct \"root=\" boot option\n");
@@ -1068,11 +1066,17 @@ retry:
 		struct file_system_type * fs_type = get_fs_type(p);
 		if (!fs_type)
   			continue;
+		atomic_inc(&bdev->bd_count);
+		retval = blkdev_get(bdev, mode, 0, BDEV_FS);
+		if (retval)
+			goto Eio;
   		sb = read_super(ROOT_DEV, bdev, fs_type,
 				root_mountflags, root_mount_data);
-		if (sb) 
-			goto mount_it;
 		put_filesystem(fs_type);
+		if (sb) {
+			blkdev_put(bdev, BDEV_FS);
+			goto mount_it;
+		}
 	}
 	panic("VFS: Unable to mount root fs on %s", kdevname(ROOT_DEV));
 
@@ -1082,12 +1086,6 @@ mount_it:
 	printk ("VFS: Mounted root (%s filesystem)%s.\n", p,
 		(sb->s_flags & MS_RDONLY) ? " readonly" : "");
 	putname(fs_names);
-	if (path_start >= 0) {
-		name = path + path_start;
-		devfs_mk_symlink (NULL, "root", DEVFS_FL_DEFAULT,
-				  name + 5, NULL, NULL);
-		memcpy (name, "/dev/", 5);
-	}
 	vfsmnt = alloc_vfsmnt();
 	if (!vfsmnt)
 		panic("VFS: alloc_vfsmnt failed for root fs");

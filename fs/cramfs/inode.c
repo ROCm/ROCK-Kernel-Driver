@@ -19,6 +19,7 @@
 #include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/cramfs_fs.h>
+#include <asm/semaphore.h>
 
 #include <asm/uaccess.h>
 
@@ -32,6 +33,9 @@ static struct super_operations cramfs_ops;
 static struct inode_operations cramfs_dir_inode_operations;
 static struct file_operations cramfs_directory_operations;
 static struct address_space_operations cramfs_aops;
+
+static DECLARE_MUTEX(read_mutex);
+
 
 /* These two macros may change in future, to provide better st_ino
    semantics. */
@@ -199,8 +203,10 @@ static struct super_block * cramfs_read_super(struct super_block *sb, void *data
 	for (i = 0; i < READ_BUFFERS; i++)
 		buffer_blocknr[i] = -1;
 
+	down(&read_mutex);
 	/* Read the first block and get the superblock from it */
 	memcpy(&super, cramfs_read(sb, 0, sizeof(super)), sizeof(super));
+	up(&read_mutex);
 
 	/* Do sanity checks on the superblock */
 	if (super.magic != CRAMFS_MAGIC) {
@@ -291,7 +297,9 @@ static int cramfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		char *name;
 		int namelen, error;
 
+		down(&read_mutex);
 		de = cramfs_read(sb, OFFSET(inode) + offset, sizeof(*de)+256);
+		up(&read_mutex);
 		name = (char *)(de+1);
 
 		/*
@@ -332,7 +340,9 @@ static struct dentry * cramfs_lookup(struct inode *dir, struct dentry *dentry)
 		char *name;
 		int namelen, retval;
 
+		down(&read_mutex);
 		de = cramfs_read(dir->i_sb, OFFSET(dir) + offset, sizeof(*de)+256);
+		up(&read_mutex);
 		name = (char *)(de+1);
 
 		/* Try to take advantage of sorted directories */
@@ -384,18 +394,22 @@ static int cramfs_readpage(struct file *file, struct page * page)
 		u32 start_offset, compr_len;
 
 		start_offset = OFFSET(inode) + maxblock*4;
+		down(&read_mutex);
 		if (page->index)
 			start_offset = *(u32 *) cramfs_read(sb, blkptr_offset-4, 4);
-		compr_len = (*(u32 *) cramfs_read(sb, blkptr_offset, 4)
-			     - start_offset);
+		compr_len = (*(u32 *) cramfs_read(sb, blkptr_offset, 4) - start_offset);
+		up(&read_mutex);
 		pgdata = kmap(page);
 		if (compr_len == 0)
 			; /* hole */
-		else
+		else {
+			down(&read_mutex);
 			bytes_filled = cramfs_uncompress_block(pgdata,
 				 PAGE_CACHE_SIZE,
 				 cramfs_read(sb, start_offset, compr_len),
 				 compr_len);
+			up(&read_mutex);
+		}
 	} else
 		pgdata = kmap(page);
 	memset(pgdata + bytes_filled, 0, PAGE_CACHE_SIZE - bytes_filled);

@@ -800,9 +800,7 @@ static void iriap_connect_indication(void *instance, void *sap,
 	new->max_header_size = max_header_size;
 
 	/* Clean up the original one to keep it in listen state */
-	self->lsap->dlsap_sel = LSAP_ANY;
-	self->lsap->lsap_state = LSAP_DISCONNECTED;
-	/* FIXME: refcount in irlmp might get wrong */
+	irlmp_listen(self->lsap);
 	
 	iriap_do_server_event(new, IAP_LM_CONNECT_INDICATION, userdata);
 }

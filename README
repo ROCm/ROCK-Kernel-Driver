@@ -153,13 +153,12 @@ CONFIGURING the kernel:
 
 COMPILING the kernel:
 
- - Make sure you have gcc-2.91.66 (egcs-1.1.2) available.  gcc 2.95.2 may
+ - Make sure you have gcc 2.95.3 available.  gcc 2.91.66 (egcs-1.1.2) may
    also work but is not as safe, and *gcc 2.7.2.3 is no longer supported*.
    Also remember to upgrade your binutils package (for as/ld/nm and company)
    if necessary. For more information, refer to ./Documentation/Changes.
 
-   Please note that you can still run a.out user programs with this
-   kernel.
+   Please note that you can still run a.out user programs with this kernel.
 
  - Do a "make bzImage" to create a compressed kernel image.  If you want
    to make a boot disk (without root filesystem or LILO), insert a floppy

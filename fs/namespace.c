@@ -561,6 +561,67 @@ static int do_remount(struct nameidata *nd,int flags,int mnt_flags,void *data)
 	return err;
 }
 
+static int do_move_mount(struct nameidata *nd, char *old_name)
+{
+	struct nameidata old_nd, parent_nd;
+	struct vfsmount *p;
+	int err = 0;
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	if (!old_name || !*old_name)
+		return -EINVAL;
+	if (path_init(old_name, LOOKUP_POSITIVE|LOOKUP_FOLLOW, &old_nd))
+		err = path_walk(old_name, &old_nd);
+	if (err)
+		return err;
+
+	down(&mount_sem);
+	while(d_mountpoint(nd->dentry) && follow_down(&nd->mnt, &nd->dentry))
+		;
+	err = -EINVAL;
+	if (!check_mnt(nd->mnt) || !check_mnt(old_nd.mnt))
+		goto out;
+
+	err = -ENOENT;
+	down(&nd->dentry->d_inode->i_zombie);
+	if (IS_DEADDIR(nd->dentry->d_inode))
+		goto out1;
+
+	spin_lock(&dcache_lock);
+	if (!IS_ROOT(nd->dentry) && d_unhashed(nd->dentry))
+		goto out2;
+
+	err = -EINVAL;
+	if (old_nd.dentry != old_nd.mnt->mnt_root)
+		goto out2;
+
+	if (old_nd.mnt == old_nd.mnt->mnt_parent)
+		goto out2;
+
+	if (S_ISDIR(nd->dentry->d_inode->i_mode) !=
+	      S_ISDIR(old_nd.dentry->d_inode->i_mode))
+		goto out2;
+
+	err = -ELOOP;
+	for (p = nd->mnt; p->mnt_parent!=p; p = p->mnt_parent)
+		if (p == old_nd.mnt)
+			goto out2;
+	err = 0;
+
+	detach_mnt(old_nd.mnt, &parent_nd);
+	attach_mnt(old_nd.mnt, nd);
+out2:
+	spin_unlock(&dcache_lock);
+out1:
+	up(&nd->dentry->d_inode->i_zombie);
+out:
+	up(&mount_sem);
+	if (!err)
+		path_release(&parent_nd);
+	path_release(&old_nd);
+	return err;
+}
+
 static int do_add_mount(struct nameidata *nd, char *type, int flags,
 			int mnt_flags, char *name, void *data)
 {
@@ -677,6 +738,8 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 				    data_page);
 	else if (flags & MS_BIND)
 		retval = do_loopback(&nd, dev_name, flags & MS_REC);
+	else if (flags & MS_MOVE)
+		retval = do_move_mount(&nd, dev_name);
 	else
 		retval = do_add_mount(&nd, type_page, flags, mnt_flags,
 				      dev_name, data_page);
@@ -906,6 +969,8 @@ static void __init init_mount_tree(void)
 	root_vfsmnt = do_kern_mount("rootfs", 0, "rootfs", NULL);
 	if (IS_ERR(root_vfsmnt))
 		panic("can't allocate root vfsmount");
+	set_fs_pwd(current->fs, root_vfsmnt, root_vfsmnt->mnt_root);
+	set_fs_root(current->fs, root_vfsmnt, root_vfsmnt->mnt_root);
 }
 
 void __init mnt_init(unsigned long mempages)
@@ -992,6 +1057,8 @@ int __init change_root(kdev_t new_root_dev,const char *put_old)
 		}
 		path_release(&devfs_nd);
 	}
+	set_fs_pwd(current->fs, root_vfsmnt, root_vfsmnt->mnt_root);
+	set_fs_root(current->fs, root_vfsmnt, root_vfsmnt->mnt_root);
 	spin_lock(&dcache_lock);
 	detach_mnt(old_rootmnt, &parent_nd);
 	spin_unlock(&dcache_lock);

@@ -469,7 +469,12 @@ void irlmp_connect_indication(struct lsap_cb *self, struct sk_buff *skb)
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), slsap_sel=%02x, dlsap_sel=%02x\n", 
 		   self->slsap_sel, self->dlsap_sel);
-	
+
+	/* Note : self->lap is set in irlmp_link_data_indication(),
+	 * (case CONNECT_CMD:) because we have no way to set it here.
+	 * Similarly, self->dlsap_sel is usually set in irlmp_find_lsap().
+	 * Jean II */
+
 	self->qos = *self->lap->qos;
 
 	max_seg_size = self->lap->qos->data_size.value-LMP_HEADER;
@@ -577,7 +582,9 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 	/* Dup */
 	memcpy(new, orig, sizeof(struct lsap_cb));
 	new->notify.instance = instance;
-	
+	/* new->lap = orig->lap; => done in the memcpy() */
+	/* new->slsap_sel = orig->slsap_sel; => done in the memcpy() */
+
 	init_timer(&new->watchdog_timer);
 	
 	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) new, (int) new, 

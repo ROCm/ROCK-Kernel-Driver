@@ -14,13 +14,10 @@ if [ "$CONFIG_NET" != "n" ]; then
       source net/irda/irnet/Config.in
       source net/irda/ircomm/Config.in
       bool '  Ultra (connectionless) protocol' CONFIG_IRDA_ULTRA
-      bool '  IrDA protocol options' CONFIG_IRDA_OPTIONS
-      if [ "$CONFIG_IRDA_OPTIONS" != "n" ]; then
-	 comment '  IrDA options'
-	 bool '    Cache last LSAP' CONFIG_IRDA_CACHE_LAST_LSAP
-	 bool '    Fast RRs' CONFIG_IRDA_FAST_RR
-	 bool '    Debug information' CONFIG_IRDA_DEBUG
-      fi
+      comment 'IrDA options'
+      bool '  Cache last LSAP' CONFIG_IRDA_CACHE_LAST_LSAP
+      bool '  Fast RRs (low latency)' CONFIG_IRDA_FAST_RR
+      bool '  Debug information' CONFIG_IRDA_DEBUG
    fi
 
    if [ "$CONFIG_IRDA" != "n" ]; then

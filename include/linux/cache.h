@@ -34,4 +34,12 @@
 #endif
 #endif /* __cacheline_aligned */
 
+#ifndef __cacheline_aligned_in_smp
+#ifdef CONFIG_SMP
+#define __cacheline_aligned_in_smp __cacheline_aligned
+#else
+#define __cacheline_aligned_in_smp
+#endif /* CONFIG_SMP */
+#endif
+
 #endif /* __LINUX_CACHE_H */

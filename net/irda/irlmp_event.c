@@ -407,12 +407,7 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 		 *  removed later and moved to the list of unconnected LSAPs
 		 */
 		if (HASHBIN_GET_SIZE(self->lsaps) > 0) {
-			/* Make sure the timer has sensible value (the user
-			 * may have set it) - Jean II */
-			if(sysctl_lap_keepalive_time < 100)	/* 100ms */
-				sysctl_lap_keepalive_time = 100;
-			if(sysctl_lap_keepalive_time > 10000)	/* 10s */
-				sysctl_lap_keepalive_time = 10000;
+			/* Timer value is checked in irsysctl - Jean II */
 			irlmp_start_idle_timer(self, sysctl_lap_keepalive_time * HZ / 1000);
 		} else {
 			/* No more connections, so close IrLAP */

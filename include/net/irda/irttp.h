@@ -148,6 +148,17 @@ static __inline __u32 irttp_get_max_seg_size(struct tsap_cb *self)
 	return self->max_seg_size;
 }
 
+/* After doing a irttp_dup(), this get one of the two socket back into
+ * a state where it's waiting incomming connections.
+ * Note : this can be used *only* if the socket is not yet connected
+ * (i.e. NO irttp_connect_response() done on this socket).
+ * - Jean II */
+static inline void irttp_listen(struct tsap_cb *self)
+{
+	irlmp_listen(self->lsap);
+	self->dtsap_sel = LSAP_ANY;
+}
+
 extern struct irttp_cb *irttp;
 
 #endif /* IRTTP_H */

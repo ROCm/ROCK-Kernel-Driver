@@ -741,11 +741,13 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
  		  int timeout, int retries)
 {
 	DECLARE_COMPLETION(wait);
+	request_queue_t *q = &SRpnt->sr_device->request_queue;
 	
 	SRpnt->sr_request.waiting = &wait;
 	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
 	scsi_do_req (SRpnt, (void *) cmnd,
 		buffer, bufflen, scsi_wait_done, timeout, retries);
+	generic_unplug_device(q);
 	wait_for_completion(&wait);
 	SRpnt->sr_request.waiting = NULL;
 	if( SRpnt->sr_command != NULL )

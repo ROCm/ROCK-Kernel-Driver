@@ -228,18 +228,19 @@ static struct address_space_operations ramdisk_aops = {
 	commit_write: ramdisk_commit_write,
 };
 
-static int rd_blkdev_pagecache_IO(int rw, struct bio *sbh, int minor)
+static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
+				  sector_t sector, int minor)
 {
 	struct address_space * mapping;
 	unsigned long index;
 	int offset, size, err;
 
-	err = -EIO;
+	err = 0;
 	mapping = rd_bdev[minor]->bd_inode->i_mapping;
 
-	index = sbh->bi_sector >> (PAGE_CACHE_SHIFT - 9);
-	offset = (sbh->bi_sector << 9) & ~PAGE_CACHE_MASK;
-	size = bio_size(sbh);
+	index = sector >> (PAGE_CACHE_SHIFT - 9);
+	offset = (sector << 9) & ~PAGE_CACHE_MASK;
+	size = vec->bv_len;
 
 	do {
 		int count;
@@ -276,18 +277,18 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio *sbh, int minor)
 		if (rw == READ) {
 			src = kmap(page);
 			src += offset;
-			dst = bio_kmap(sbh);
+			dst = kmap(vec->bv_page) + vec->bv_offset;
 		} else {
 			dst = kmap(page);
 			dst += offset;
-			src = bio_kmap(sbh);
+			src = kmap(vec->bv_page) + vec->bv_offset;
 		}
 		offset = 0;
 
 		memcpy(dst, src, count);
 
 		kunmap(page);
-		bio_kunmap(sbh);
+		kunmap(vec->bv_page);
 
 		if (rw == READ) {
 			flush_dcache_page(page);
@@ -301,6 +302,22 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio *sbh, int minor)
 
  out:
 	return err;
+}
+
+static int rd_blkdev_bio_IO(struct bio *bio, unsigned int minor)
+{
+	struct bio_vec *bvec;
+	sector_t sector;
+	int ret = 0, i, rw;
+
+	sector = bio->bi_sector;
+	rw = bio_data_dir(bio);
+	bio_for_each_segment(bvec, bio, i) {
+		ret |= rd_blkdev_pagecache_IO(rw, bvec, sector, minor);
+		sector += bvec->bv_len >> 9;
+	}
+
+	return ret;
 }
 
 /*
@@ -323,7 +340,7 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 		goto fail;
 
 	offset = sbh->bi_sector << 9;
-	len = bio_size(sbh);
+	len = sbh->bi_size;
 
 	if ((offset + len) > rd_length[minor])
 		goto fail;
@@ -335,7 +352,7 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 		goto fail;
 	}
 
-	if (rd_blkdev_pagecache_IO(rw, sbh, minor))
+	if (rd_blkdev_bio_IO(sbh, minor))
 		goto fail;
 
 	set_bit(BIO_UPTODATE, &sbh->bi_flags);
@@ -437,10 +454,11 @@ static int rd_open(struct inode * inode, struct file * filp)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (unit == INITRD_MINOR) {
-		if (!initrd_start) return -ENODEV;
-		spin_lock( &initrd_users_lock );
+		spin_lock(&initrd_users_lock);
 		initrd_users++;
-		spin_unlock( &initrd_users_lock );
+		spin_unlock(&initrd_users_lock);
+		if (!initrd_start) 
+			return -ENODEV;
 		filp->f_op = &initrd_fops;
 		return 0;
 	}
@@ -539,10 +557,8 @@ int __init rd_init (void)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(rd_init);
 module_exit(rd_cleanup);
-#endif
 
 /* loadable module support */
 MODULE_PARM     (rd_size, "1i");

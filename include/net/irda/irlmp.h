@@ -264,4 +264,16 @@ static inline int irlmp_get_lap_tx_queue_len(struct lsap_cb *self)
 	return IRLAP_GET_TX_QUEUE_LEN(self->lap->irlap);
 }
 
+/* After doing a irlmp_dup(), this get one of the two socket back into
+ * a state where it's waiting incomming connections.
+ * Note : this can be used *only* if the socket is not yet connected
+ * (i.e. NO irlmp_connect_response() done on this socket).
+ * - Jean II */
+static inline void irlmp_listen(struct lsap_cb *self)
+{
+	self->dlsap_sel = LSAP_ANY;
+	self->lap = NULL;
+	self->lsap_state = LSAP_DISCONNECTED;
+}
+
 #endif

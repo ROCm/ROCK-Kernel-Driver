@@ -434,6 +434,8 @@ static inline void follow_dotdot(struct nameidata *nd)
 		mntput(nd->mnt);
 		nd->mnt = parent;
 	}
+	while (d_mountpoint(nd->dentry) && __follow_down(&nd->mnt, &nd->dentry))
+		;
 }
 
 /*

@@ -315,10 +315,13 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 
 	pos = ((loff_t) bio->bi_sector << 9) + lo->lo_offset;
 
-	if (bio_rw(bio) == WRITE)
-		ret = lo_send(lo, bio, loop_get_bs(lo), pos);
-	else
-		ret = lo_receive(lo, bio, loop_get_bs(lo), pos);
+	do {
+		if (bio_rw(bio) == WRITE)
+			ret = lo_send(lo, bio, loop_get_bs(lo), pos);
+		else
+			ret = lo_receive(lo, bio, loop_get_bs(lo), pos);
+
+	} while (++bio->bi_idx < bio->bi_vcnt);
 
 	return ret;
 }
@@ -489,6 +492,24 @@ inactive:
 	goto out;
 }
 
+static int do_bio_blockbacked(struct loop_device *lo, struct bio *bio,
+			      struct bio *rbh)
+{
+	unsigned long IV = loop_get_iv(lo, rbh->bi_sector);
+	struct bio_vec *to;
+	char *vto, *vfrom;
+	int ret = 0, i;
+
+	bio_for_each_segment(to, bio, i) {
+		vfrom = page_address(rbh->bi_io_vec[i].bv_page) + rbh->bi_io_vec[i].bv_offset;
+		vto = page_address(to->bv_page) + to->bv_offset;
+		ret |= lo_do_transfer(lo, bio_data_dir(bio), vto, vfrom,
+					to->bv_len, IV);
+	}
+
+	return ret;
+}
+
 static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 {
 	int ret;
@@ -501,10 +522,8 @@ static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 		bio_endio(bio, !ret, bio_sectors(bio));
 	} else {
 		struct bio *rbh = bio->bi_private;
-		unsigned long IV = loop_get_iv(lo, rbh->bi_sector);
 
-		ret = lo_do_transfer(lo, READ, bio_data(bio), bio_data(rbh),
-				     bio->bi_size, IV);
+		ret = do_bio_blockbacked(lo, bio, rbh);
 
 		bio_endio(rbh, !ret, bio_sectors(bio));
 		loop_put_buffer(bio);

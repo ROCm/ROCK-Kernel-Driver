@@ -1405,30 +1405,29 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 		}
 		self->add_wait = FALSE;
 
-		if ((self->retry_count < self->N2) && 
-		    (self->retry_count != self->N1)) {
-			
+		/* N2 is the disconnect timer. Until we reach it, we retry */
+		if (self->retry_count < self->N2) {
+			/* Retry sending the pf bit to the secondary */
 			irlap_wait_min_turn_around(self, &self->qos_tx);
 			irlap_send_rr_frame(self, CMD_FRAME);
 			
 			irlap_start_final_timer(self, self->final_timeout);
 		 	self->retry_count++;
-
 			IRDA_DEBUG(4, "irlap_state_nrm_p: FINAL_TIMER_EXPIRED:"
 				   " retry_count=%d\n", self->retry_count);
-			/* Keep state */
-		} else if (self->retry_count == self->N1) {
-			irlap_status_indication(self, STATUS_NO_ACTIVITY);
-			irlap_wait_min_turn_around(self, &self->qos_tx);
-			irlap_send_rr_frame(self, CMD_FRAME);
-			
-			irlap_start_final_timer(self, self->final_timeout);
-			self->retry_count++;
 
-			IRDA_DEBUG(4, "retry count = N1; retry_count=%d\n", 
-				   self->retry_count);
+			/* Early warning event. I'm using a pretty liberal
+			 * interpretation of the spec and generate an event
+			 * every time the timer is multiple of N1 (and not
+			 * only the first time). This allow application
+			 * to know precisely if connectivity restart...
+			 * Jean II */
+			if((self->retry_count % self->N1) == 0)
+				irlap_status_indication(self,
+							STATUS_NO_ACTIVITY);
+
 			/* Keep state */
-		} else if (self->retry_count >= self->N2) {
+		} else {
 			irlap_apply_default_connection_parameters(self);
 
 			/* Always switch state before calling upper layers */
@@ -1991,6 +1990,7 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 		 *  Wait until retry_count * n matches negotiated threshold/
 		 *  disconnect time (note 2 in IrLAP p. 82)
 		 *
+		 * Similar to irlap_state_nrm_p() -> FINAL_TIMER_EXPIRED
 		 * Note : self->wd_timeout = (self->final_timeout * 2),
 		 *   which explain why we use (self->N2 / 2) here !!!
 		 * Jean II
@@ -1998,16 +1998,15 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 		IRDA_DEBUG(1, __FUNCTION__ "(), retry_count = %d\n", 
 			   self->retry_count);
 
-		if ((self->retry_count <  (self->N2 / 2))  && 
-		    (self->retry_count != (self->N1 / 2))) {
-			
+		if (self->retry_count < (self->N2 / 2)) {
+			/* No retry, just wait for primary */
 			irlap_start_wd_timer(self, self->wd_timeout);
 			self->retry_count++;
-		} else if (self->retry_count == (self->N1 / 2)) {
-			irlap_status_indication(self, STATUS_NO_ACTIVITY);
-			irlap_start_wd_timer(self, self->wd_timeout);
-			self->retry_count++;
-		} else if (self->retry_count >= (self->N2 / 2)) {
+
+			if((self->retry_count % (self->N1 / 2)) == 0)
+				irlap_status_indication(self,
+							STATUS_NO_ACTIVITY);
+		} else {
 			irlap_apply_default_connection_parameters(self);
 			
 			/* Always switch state before calling upper layers */

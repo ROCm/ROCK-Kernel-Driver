@@ -191,6 +191,7 @@ struct dmi_blacklist
  *	corruption problems
  */ 
  
+#if 0
 static __init int disable_ide_dma(struct dmi_blacklist *d)
 {
 #ifdef CONFIG_BLK_DEV_IDE
@@ -203,6 +204,7 @@ static __init int disable_ide_dma(struct dmi_blacklist *d)
 #endif	
 	return 0;
 }
+#endif
 
 /* 
  * Reboot options and system auto-detection code provided by

@@ -496,6 +496,9 @@ CONFIG_PCMCIA_RAYCS=y
 # IrDA (infrared) support
 #
 # CONFIG_IRDA is not set
+CONFIG_IRDA_CACHE_LAST_LSAP=y
+CONFIG_IRDA_FAST_RR=y
+CONFIG_IRDA_DEBUG=y
 
 #
 # ISDN subsystem

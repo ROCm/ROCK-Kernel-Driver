@@ -273,7 +273,7 @@ extern struct file_operations fat_file_operations;
 extern struct inode_operations fat_file_inode_operations;
 extern ssize_t fat_file_read(struct file *filp, char *buf, size_t count,
 			     loff_t *ppos);
-extern int fat_get_block(struct inode *inode, long iblock,
+extern int fat_get_block(struct inode *inode, sector_t iblock,
 			 struct buffer_head *bh_result, int create);
 extern ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
 			      loff_t *ppos);

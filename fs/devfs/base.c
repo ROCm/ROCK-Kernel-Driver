@@ -3358,6 +3358,9 @@ static int __init init_devfs_fs (void)
     printk ("%s: devfs_debug: 0x%0x\n", DEVFS_NAME, devfs_debug);
 #endif
     printk ("%s: boot_options: 0x%0x\n", DEVFS_NAME, boot_options);
+    devfsd_buf_cache = kmem_cache_create ("devfsd_event",
+					  sizeof (struct devfsd_buf_entry),
+					  0, 0, NULL, NULL);
     err = register_filesystem (&devfs_fs_type);
     if (!err)
     {
@@ -3372,9 +3375,6 @@ void __init mount_devfs_fs (void)
 {
     int err;
 
-    devfsd_buf_cache = kmem_cache_create ("devfsd_event",
-					  sizeof (struct devfsd_buf_entry),
-					  0, 0, NULL, NULL);
     if ( !(boot_options & OPTION_MOUNT) ) return;
     err = do_mount ("none", "/dev", "devfs", 0, "");
     if (err == 0) printk ("Mounted devfs on /dev\n");

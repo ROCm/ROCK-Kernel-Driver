@@ -206,7 +206,7 @@ fail_nomem:
 	return retval;
 }
 
-spinlock_t mmlist_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+spinlock_t mmlist_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 int mmlist_nr;
 
 #define allocate_mm()	(kmem_cache_alloc(mm_cachep, SLAB_KERNEL))

@@ -140,7 +140,7 @@ changed:
 	return -EAGAIN;
 }
 
-static inline int get_block(struct inode * inode, long block,
+static inline int get_block(struct inode * inode, sector_t block,
 			struct buffer_head *bh_result, int create)
 {
 	int err = -EIO;

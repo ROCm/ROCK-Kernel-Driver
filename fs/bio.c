@@ -588,7 +588,6 @@ next_chunk:
 	bio->bi_sector = sector;
 	bio->bi_dev = dev;
 	bio->bi_idx = 0;
-	bio->bi_flags |= 1 << BIO_PREBUILT;
 	bio->bi_end_io = bio_end_io_kio;
 	bio->bi_private = kio;
 
@@ -619,9 +618,13 @@ next_chunk:
 		sector += nbytes >> 9;
 		size -= nbytes;
 		total_nr_pages--;
+		kio->offset += nbytes;
 	}
 
 queue_io:
+	if (bio->bi_vcnt > 1)
+		bio->bi_flags |= 1 << BIO_PREBUILT;
+
 	submit_bio(rw, bio);
 
 	if (total_nr_pages)

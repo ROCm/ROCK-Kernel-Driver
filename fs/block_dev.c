@@ -234,7 +234,7 @@ static struct vfsmount *bd_mnt;
 #define HASH_SIZE	(1UL << HASH_BITS)
 #define HASH_MASK	(HASH_SIZE-1)
 static struct list_head bdev_hashtable[HASH_SIZE];
-static spinlock_t bdev_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t bdev_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 static kmem_cache_t * bdev_cachep;
 
 #define alloc_bdev() \

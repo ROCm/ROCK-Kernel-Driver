@@ -114,7 +114,7 @@ static int zft_open(struct inode *ino, struct file *filep)
 	TRACE_FUN(ft_t_flow);
 
 	TRACE(ft_t_flow, "called for minor %d", MINOR(ino->i_rdev));
-	if ( test_and_set_bit(0,&busy_flag) )) {
+	if ( test_and_set_bit(0,&busy_flag) ) {
 		TRACE_ABORT(-EBUSY, ft_t_warn, "failed: already busy");
 	}
 	if ((MINOR(ino->i_rdev) & ~(ZFT_MINOR_OP_MASK | FTAPE_NO_REWIND))

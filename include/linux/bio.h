@@ -1,12 +1,11 @@
 /*
- * New 2.5 block I/O model
+ * 2.5 block I/O model
  *
  * Copyright (C) 2001 Jens Axboe <axboe@suse.de>
  *
- * This program is free software; you can redistribute it and/or mo
- * it under the terms of the GNU General Public License as publishe
- * the Free Software Foundation; either version 2 of the License, o
- * (at your option) any later version.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -121,7 +120,7 @@ struct bio {
  */
 #define __BVEC_END(bio) bio_iovec_idx((bio), (bio)->bi_idx - 1)
 #define BIO_CONTIG(bio, nxt) \
-	(bvec_to_phys(__BVEC_END((bio)) + (bio)->bi_size) ==bio_to_phys((nxt)))
+	(bvec_to_phys(__BVEC_END((bio)) + (bio)->bi_size) == bio_to_phys((nxt)))
 #define __BIO_SEG_BOUNDARY(addr1, addr2, mask) \
 	(((addr1) | (mask)) == (((addr2) - 1) | (mask)))
 #define BIO_SEG_BOUNDARY(q, b1, b2) \

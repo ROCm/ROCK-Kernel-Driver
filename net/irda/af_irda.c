@@ -914,8 +914,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	memcpy(&new->qos_tx, &self->qos_tx, sizeof(struct qos_info));
 
 	/* Clean up the original one to keep it in listen state */
-	self->tsap->dtsap_sel = self->tsap->lsap->dlsap_sel = LSAP_ANY;
-	self->tsap->lsap->lsap_state = LSAP_DISCONNECTED;
+	irttp_listen(self->tsap);
 
 	skb->sk = NULL;
 	skb->destructor = NULL;
@@ -1845,15 +1844,36 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		  	return -EFAULT;
 		}
 
-		/* Find the object we target */
-		ias_obj = irias_find_object(ias_opt->irda_class_name);
+		/* Find the object we target.
+		 * If the user gives us an empty string, we use the object
+		 * associated with this socket. This will workaround
+		 * duplicated class name - Jean II */
+		if(ias_opt->irda_class_name[0] == '\0') {
+			if(self->ias_obj == NULL) {
+				kfree(ias_opt);
+				return -EINVAL;
+			}
+			ias_obj = self->ias_obj;
+		} else
+			ias_obj = irias_find_object(ias_opt->irda_class_name);
+
+		/* Only ROOT can mess with the global IAS database.
+		 * Users can only add attributes to the object associated
+		 * with the socket they own - Jean II */
+		if((!capable(CAP_NET_ADMIN)) &&
+		   ((ias_obj == NULL) || (ias_obj != self->ias_obj))) {
+			kfree(ias_opt);
+			return -EPERM;
+		}
+
+		/* If the object doesn't exist, create it */
 		if(ias_obj == (struct ias_object *) NULL) {
 			/* Create a new object */
 			ias_obj = irias_new_object(ias_opt->irda_class_name,
 						   jiffies);
 		}
 
-		/* Do we have it already ? */
+		/* Do we have the attribute already ? */
 		if(irias_find_attrib(ias_obj, ias_opt->irda_attrib_name)) {
 			kfree(ias_opt);
 			return -EINVAL;
@@ -1927,11 +1947,26 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		  	return -EFAULT;
 		}
 
-		/* Find the object we target */
-		ias_obj = irias_find_object(ias_opt->irda_class_name);
+		/* Find the object we target.
+		 * If the user gives us an empty string, we use the object
+		 * associated with this socket. This will workaround
+		 * duplicated class name - Jean II */
+		if(ias_opt->irda_class_name[0] == '\0')
+			ias_obj = self->ias_obj;
+		else
+			ias_obj = irias_find_object(ias_opt->irda_class_name);
 		if(ias_obj == (struct ias_object *) NULL) {
 			kfree(ias_opt);
 			return -EINVAL;
+		}
+
+		/* Only ROOT can mess with the global IAS database.
+		 * Users can only del attributes from the object associated
+		 * with the socket they own - Jean II */
+		if((!capable(CAP_NET_ADMIN)) &&
+		   ((ias_obj == NULL) || (ias_obj != self->ias_obj))) {
+			kfree(ias_opt);
+			return -EPERM;
 		}
 
 		/* Find the attribute (in the object) we target */
@@ -2166,8 +2201,14 @@ bed:
 		  	return -EFAULT;
 		}
 
-		/* Find the object we target */
-		ias_obj = irias_find_object(ias_opt->irda_class_name);
+		/* Find the object we target.
+		 * If the user gives us an empty string, we use the object
+		 * associated with this socket. This will workaround
+		 * duplicated class name - Jean II */
+		if(ias_opt->irda_class_name[0] == '\0')
+			ias_obj = self->ias_obj;
+		else
+			ias_obj = irias_find_object(ias_opt->irda_class_name);
 		if(ias_obj == (struct ias_object *) NULL) {
 			kfree(ias_opt);
 			return -EINVAL;

@@ -1074,13 +1074,18 @@ static int release_aux(struct inode * inode, struct file * file)
 static int open_aux(struct inode * inode, struct file * file)
 {
 	unsigned long flags;
+	int ret;
+
 	spin_lock_irqsave(&aux_count_lock, flags);
 	if ( aux_count++ ) {
 		spin_unlock_irqrestore(&aux_count_lock, flags);
 		return 0;
 	}
 	queue->head = queue->tail = 0;		/* Flush input queue */
-	if (aux_request_irq(keyboard_interrupt, AUX_DEV)) {
+	spin_unlock_irqrestore(&aux_count_lock, flags);
+	ret = aux_request_irq(keyboard_interrupt, AUX_DEV);
+	spin_lock_irqsave(&aux_count_lock, flags);
+	if (ret) {
 		aux_count--;
 		spin_unlock_irqrestore(&aux_count_lock, flags);
 		return -EBUSY;

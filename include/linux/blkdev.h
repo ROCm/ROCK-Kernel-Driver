@@ -100,11 +100,6 @@ struct request_queue
 	unsigned long		bounce_pfn;
 
 	/*
-	 * for memory zoning (<= 4GB and > 4GB)
-	 */
-	int			bounce_gfp;
-
-	/*
 	 * This is used to remove the plug when tq_disk runs.
 	 */
 	struct tq_struct	plug_tq;
@@ -177,11 +172,11 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 
 #ifdef CONFIG_HIGHMEM
 
-extern void create_bounce(unsigned long pfn, struct bio **bio_orig, int gfp_mask);
+extern void create_bounce(unsigned long pfn, struct bio **bio_orig);
 
 extern inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
 {
-	create_bounce(q->bounce_pfn, bio, q->bounce_gfp);
+	create_bounce(q->bounce_pfn, bio);
 }
 
 #else /* CONFIG_HIGHMEM */

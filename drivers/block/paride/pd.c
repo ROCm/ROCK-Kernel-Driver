@@ -838,8 +838,7 @@ static int pd_ready( void )
 }
 
 static void do_pd_request (request_queue_t * q)
-
-{       struct buffer_head * bh;
+{
 	int	unit;
 
         if (pd_busy) return;
@@ -852,8 +851,6 @@ repeat:
         pd_block = CURRENT->sector;
         pd_run = CURRENT->nr_sectors;
         pd_count = CURRENT->current_nr_sectors;
-
-	bh = CURRENT->bh;
 
         if ((pd_dev >= PD_DEVS) || 
 	    ((pd_block+pd_count) > pd_hd[pd_dev].nr_sects)) {
@@ -878,9 +875,9 @@ static void pd_next_buf( int unit )
 
 {	long	saved_flags;
 
-	spin_lock_irqsave(&io_request_lock,saved_flags);
+	spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
 	end_request(1);
-	if (!pd_run) {  spin_unlock_irqrestore(&io_request_lock,saved_flags);
+	if (!pd_run) {  spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
 			return; 
 	}
 	
@@ -896,7 +893,7 @@ static void pd_next_buf( int unit )
 
 	pd_count = CURRENT->current_nr_sectors;
 	pd_buf = CURRENT->buffer;
-	spin_unlock_irqrestore(&io_request_lock,saved_flags);
+	spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
 }
 
 static void do_pd_read( void )
@@ -919,11 +916,11 @@ static void do_pd_read_start( void )
                         pi_do_claimed(PI,do_pd_read_start);
 			return;
                 }
-		spin_lock_irqsave(&io_request_lock,saved_flags);
+		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
                 end_request(0);
                 pd_busy = 0;
 		do_pd_request(NULL);
-		spin_unlock_irqrestore(&io_request_lock,saved_flags);
+		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
                 return;
         }
         pd_ide_command(unit,IDE_READ,pd_block,pd_run);
@@ -943,11 +940,11 @@ static void do_pd_read_drq( void )
                         pi_do_claimed(PI,do_pd_read_start);
                         return;
                 }
-		spin_lock_irqsave(&io_request_lock,saved_flags);
+		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
                 end_request(0);
                 pd_busy = 0;
 		do_pd_request(NULL);
-		spin_unlock_irqrestore(&io_request_lock,saved_flags);
+		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
                 return;
             }
             pi_read_block(PI,pd_buf,512);
@@ -958,11 +955,11 @@ static void do_pd_read_drq( void )
 	    if (!pd_count) pd_next_buf(unit);
         }
         pi_disconnect(PI);
-	spin_lock_irqsave(&io_request_lock,saved_flags);
+	spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
         end_request(1);
         pd_busy = 0;
 	do_pd_request(NULL);
-	spin_unlock_irqrestore(&io_request_lock,saved_flags);
+	spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
 }
 
 static void do_pd_write( void )
@@ -985,11 +982,11 @@ static void do_pd_write_start( void )
 			pi_do_claimed(PI,do_pd_write_start);
                         return;
                 }
-		spin_lock_irqsave(&io_request_lock,saved_flags);
+		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
                 end_request(0);
                 pd_busy = 0;
 		do_pd_request(NULL);
-		spin_unlock_irqrestore(&io_request_lock,saved_flags);
+		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
                 return;
         }
         pd_ide_command(unit,IDE_WRITE,pd_block,pd_run);
@@ -1001,11 +998,11 @@ static void do_pd_write_start( void )
                         pi_do_claimed(PI,do_pd_write_start);
                         return;
                 }
-		spin_lock_irqsave(&io_request_lock,saved_flags);
+		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
                 end_request(0);
                 pd_busy = 0;
 		do_pd_request(NULL);
-                spin_unlock_irqrestore(&io_request_lock,saved_flags);
+                spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
 		return;
             }
             pi_write_block(PI,pd_buf,512);
@@ -1030,19 +1027,19 @@ static void do_pd_write_done( void )
                         pi_do_claimed(PI,do_pd_write_start);
                         return;
                 }
-		spin_lock_irqsave(&io_request_lock,saved_flags);
+		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
                 end_request(0);
                 pd_busy = 0;
 		do_pd_request(NULL);
-		spin_unlock_irqrestore(&io_request_lock,saved_flags);
+		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
                 return;
         }
         pi_disconnect(PI);
-	spin_lock_irqsave(&io_request_lock,saved_flags);
+	spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
         end_request(1);
         pd_busy = 0;
 	do_pd_request(NULL);
-	spin_unlock_irqrestore(&io_request_lock,saved_flags);
+	spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
 }
 
 /* end of pd.c */

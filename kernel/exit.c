@@ -150,21 +150,34 @@ static inline int has_stopped_jobs(int pgrp)
 }
 
 /*
- * When we die, we re-parent all our children to
+ * When we die, we re-parent all our children.
+ * Try to give them to another thread in our process
+ * group, and if no such member exists, give it to
  * the global child reaper process (ie "init")
  */
 static inline void forget_original_parent(struct task_struct * father)
 {
-	struct task_struct * p;
+	struct task_struct * p, *reaper;
 
 	read_lock(&tasklist_lock);
+
+	/* Next in our thread group */
+	reaper = next_thread(father);
+	if (reaper == father)
+		reaper = child_reaper;
 
 	for_each_task(p) {
 		if (p->p_opptr == father) {
 			/* We dont want people slaying init */
 			p->exit_signal = SIGCHLD;
 			p->self_exec_id++;
-			p->p_opptr = child_reaper;
+
+			/* Make sure we're not reparenting to ourselves */
+			if (p == reaper)
+				p->p_opptr = child_reaper;
+			else
+				p->p_opptr = reaper;
+
 			if (p->pdeath_signal) send_sig(p->pdeath_signal, p, 0);
 		}
 	}

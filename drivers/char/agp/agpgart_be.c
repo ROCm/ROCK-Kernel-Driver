@@ -1399,10 +1399,6 @@ static int __init intel_i830_setup(struct pci_dev *i830_dev)
 }
 
 #endif /* CONFIG_AGP_I810 */
- 
- #ifdef CONFIG_AGP_INTEL
-
-#endif /* CONFIG_AGP_I810 */
 
 #ifdef CONFIG_AGP_INTEL
 
@@ -3563,12 +3559,6 @@ static struct {
 		AMD_IRONGATE,
 		"AMD",
 		"Irongate",
-		amd_irongate_setup },
-	{ PCI_DEVICE_ID_AMD_762_0,
-		PCI_VENDOR_ID_AMD,
-		AMD_IRONGATE,
-		"AMD",
-		"AMD 760MP",
 		amd_irongate_setup },
 	{ PCI_DEVICE_ID_AMD_761_0,
 		PCI_VENDOR_ID_AMD,

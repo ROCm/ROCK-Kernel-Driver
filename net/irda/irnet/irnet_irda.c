@@ -830,8 +830,7 @@ irnet_connect_socket(irnet_socket *	server,
 #endif /* STREAM_COMPAT */
 
   /* Clean up the original one to keep it in listen state */
-  server->tsap->dtsap_sel = server->tsap->lsap->dlsap_sel = LSAP_ANY;
-  server->tsap->lsap->lsap_state = LSAP_DISCONNECTED;
+  irttp_listen(server->tsap);
 
   /* Send a connection response on the new socket */
   irttp_connect_response(new->tsap, new->max_sdu_size_rx, NULL);
@@ -897,8 +896,7 @@ irnet_disconnect_server(irnet_socket *	self,
 		   self->saddr, self->daddr, self->rname);
 
   /* Clean up the server to keep it in listen state */
-  self->tsap->dtsap_sel = self->tsap->lsap->dlsap_sel = LSAP_ANY;
-  self->tsap->lsap->lsap_state = LSAP_DISCONNECTED;
+  irttp_listen(self->tsap);
 
   DEXIT(IRDA_SERV_TRACE, "\n");
   return;
@@ -1081,7 +1079,8 @@ irnet_disconnect_indication(void *	instance,
 			    struct sk_buff *skb)
 {
   irnet_socket *	self = (irnet_socket *) instance;
-  int			test = 0;
+  int			test_open;
+  int			test_connect;
 
   DENTER(IRDA_TCB_TRACE, "(self=0x%X)\n", (unsigned int) self);
   DASSERT(self != NULL, , IRDA_CB_ERROR, "Self is NULL !!!\n");
@@ -1091,23 +1090,23 @@ irnet_disconnect_indication(void *	instance,
     dev_kfree_skb(skb);
 
   /* Prevent higher layer from accessing IrTTP */
-  test = test_and_clear_bit(0, &self->ttp_open);
+  test_open = test_and_clear_bit(0, &self->ttp_open);
   /* Not connecting anymore...
    * (note : TSAP is open, so IAP callbacks are no longer pending...) */
-  test |= test_and_clear_bit(0, &self->ttp_connect);
+  test_connect = test_and_clear_bit(0, &self->ttp_connect);
 
   /* If both self->ttp_open and self->ttp_connect are NULL, it mean that we
    * have a race condition with irda_irnet_destroy() or
    * irnet_connect_indication(), so don't mess up tsap...
    */
-  if(!test)
+  if(!(test_open || test_connect))
     {
       DERROR(IRDA_CB_ERROR, "Race condition detected...\n");
       return;
     }
 
   /* If we were active, notify the control channel */
-  if(test_bit(0, &self->ttp_open))
+  if(test_open)
     irnet_post_event(self, IRNET_DISCONNECT_FROM,
 		     self->saddr, self->daddr, self->rname);
   else

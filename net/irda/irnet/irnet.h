@@ -199,6 +199,13 @@
  *	o Avoid leaking discovery log and skb
  *	o Replace "self" with "server" in irnet_connect_indication() to
  *	  better detect cut'n'paste error ;-)
+ *
+ * v9 - 29.11.01 - Jean II
+ *	o Fix event generation in disconnect indication that I broke in v8
+ *	  It was always generation "No-Answer" because I was testing ttp_open
+ *	  just after clearing it. *blush*.
+ *	o Use newly created irttp_listen() to fix potential crash when LAP
+ *	  destroyed before irnet module removed.
  */
 
 /***************************** INCLUDES *****************************/

@@ -148,8 +148,8 @@ S:	Supported
 ACPI
 P:	Andy Grover
 M:	andrew.grover@intel.com
-L:	acpi@phobos.fs.tum.de
-W:	http://phobos.fs.tum.de/acpi/index.html
+L:	acpi-devel@lists.sourceforge.net
+W:	http://sf.net/projects/acpi/
 S:	Maintained
 
 AD1816 SOUND DRIVER

@@ -24,6 +24,7 @@ endif
 
 subdir-$(CONFIG_PROC_FS)	+= proc
 subdir-y			+= partitions
+subdir-y			+= driverfs
 
 # Do not add any filesystems before this line
 subdir-$(CONFIG_EXT3_FS)	+= ext3    # Before ext2 so root fs can be ext3

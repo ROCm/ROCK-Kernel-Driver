@@ -102,10 +102,6 @@
 
 #include <linux/kmod.h>
 
-#ifdef CONFIG_VT
-extern void con_init_devfs (void);
-#endif
-
 #define CONSOLE_DEV MKDEV(TTY_MAJOR,0)
 #define TTY_DEV MKDEV(TTYAUX_MAJOR,0)
 #define SYSCONS_DEV MKDEV(TTYAUX_MAJOR,1)
@@ -2246,6 +2242,8 @@ static struct tty_driver dev_tty_driver, dev_syscons_driver;
 static struct tty_driver dev_ptmx_driver;
 #endif
 #ifdef CONFIG_VT
+extern void con_init_devfs (void);
+extern void console_map_init(void);
 static struct tty_driver dev_console_driver;
 #endif
 

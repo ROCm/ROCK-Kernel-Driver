@@ -223,8 +223,7 @@ static int raid0_stop (mddev_t *mddev)
  * Of course, those facts may not be valid anymore (and surely won't...)
  * Hey guys, there's some work out there ;-)
  */
-static int raid0_make_request (mddev_t *mddev,
-			       int rw, struct buffer_head * bh)
+static int raid0_make_request (mddev_t *mddev, int rw, struct bio *bio)
 {
 	unsigned int sect_in_chunk, chunksize_bits,  chunk_size;
 	raid0_conf_t *conf = mddev_to_conf(mddev);
@@ -235,11 +234,11 @@ static int raid0_make_request (mddev_t *mddev,
 
 	chunk_size = mddev->param.chunk_size >> 10;
 	chunksize_bits = ffz(~chunk_size);
-	block = bh->b_rsector >> 1;
+	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + block / conf->smallest->size;
 
 	/* Sanity check */
-	if (chunk_size < (block % chunk_size) + (bh->b_size >> 10))
+	if (chunk_size < (block % chunk_size) + (bio->bi_size >> 10))
 		goto bad_map;
  
 	if (!hash)
@@ -255,7 +254,7 @@ static int raid0_make_request (mddev_t *mddev,
 	} else
 		zone = hash->zone0;
     
-	sect_in_chunk = bh->b_rsector & ((chunk_size<<1) -1);
+	sect_in_chunk = bio->bi_sector & ((chunk_size<<1) -1);
 	chunk = (block - zone->zone_offset) / (zone->nb_dev << chunksize_bits);
 	tmp_dev = zone->dev[(block >> chunksize_bits) % zone->nb_dev];
 	rsect = (((chunk << chunksize_bits) + zone->dev_offset)<<1)
@@ -265,8 +264,8 @@ static int raid0_make_request (mddev_t *mddev,
 	 * The new BH_Lock semantics in ll_rw_blk.c guarantee that this
 	 * is the only IO operation happening on this bh.
 	 */
-	bh->b_rdev = tmp_dev->dev;
-	bh->b_rsector = rsect;
+	bio->bi_dev = tmp_dev->dev;
+	bio->bi_sector = rsect;
 
 	/*
 	 * Let the main block layer submit the IO and resolve recursion:
@@ -274,7 +273,7 @@ static int raid0_make_request (mddev_t *mddev,
 	return 1;
 
 bad_map:
-	printk ("raid0_make_request bug: can't convert block across chunks or bigger than %dk %ld %d\n", chunk_size, bh->b_rsector, bh->b_size >> 10);
+	printk ("raid0_make_request bug: can't convert block across chunks or bigger than %dk %ld %d\n", chunk_size, bio->bi_sector, bio->bi_size >> 10);
 	goto outerr;
 bad_hash:
 	printk("raid0_make_request bug: hash==NULL for block %ld\n", block);
@@ -285,7 +284,7 @@ bad_zone0:
 bad_zone1:
 	printk ("raid0_make_request bug: hash->zone1==NULL for block %ld\n", block);
  outerr:
-	buffer_IO_error(bh);
+	bio_io_error(bio);
 	return 0;
 }
 			   

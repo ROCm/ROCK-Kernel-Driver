@@ -42,7 +42,7 @@
 
 irq_cpustat_t irq_stat[NR_CPUS];
 
-static struct softirq_action softirq_vec[32] __cacheline_aligned;
+static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 
 /*
  * we cannot loop indefinitely here to avoid userspace starvation,
@@ -146,8 +146,8 @@ void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 
 /* Tasklets */
 
-struct tasklet_head tasklet_vec[NR_CPUS] __cacheline_aligned;
-struct tasklet_head tasklet_hi_vec[NR_CPUS] __cacheline_aligned;
+struct tasklet_head tasklet_vec[NR_CPUS] __cacheline_aligned_in_smp;
+struct tasklet_head tasklet_hi_vec[NR_CPUS] __cacheline_aligned_in_smp;
 
 void __tasklet_schedule(struct tasklet_struct *t)
 {

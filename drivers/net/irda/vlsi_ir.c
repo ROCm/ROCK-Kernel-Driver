@@ -2,7 +2,7 @@
  *
  *	vlsi_ir.c:	VLSI82C147 PCI IrDA controller driver for Linux
  *
- *	Version:	0.3, Sep 30, 2001
+ *	Version:	0.3a, Nov 10, 2001
  *
  *	Copyright (c) 2001 Martin Diehl
  *
@@ -490,7 +490,7 @@ static int vlsi_set_baud(struct net_device *ndev)
 	if (mode == IFF_FIR)
 		config ^= IRENABLE_FIR_ON;
 	else if (mode == IFF_MIR)
-		config ^= (IRENABLE_FIR_ON|IRENABLE_CRC16_ON);
+		config ^= (IRENABLE_MIR_ON|IRENABLE_CRC16_ON);
 	else
 		config ^= IRENABLE_SIR_ON;
 
@@ -877,6 +877,7 @@ static int vlsi_open(struct net_device *ndev)
 	idev->irlap = irlap_open(ndev,&idev->qos,hwname);
 
 	netif_start_queue(ndev);
+	outw(0, ndev->base_addr+VLSI_PIO_PROMPT);	/* kick hw state machine */
 
 	printk(KERN_INFO "%s: device %s operational using (%d,%d) tx,rx-ring\n",
 		__FUNCTION__, ndev->name, ringsize[0], ringsize[1]);
@@ -1200,7 +1201,6 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	int			alloc_size;
 
 
-	vlsi_reg_debug(0x3000, "vlsi initial state");
 	if (pci_enable_device(pdev))
 		goto out;
 

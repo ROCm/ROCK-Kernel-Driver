@@ -804,25 +804,17 @@ int get_swaparea_info(char *buf)
 {
 	char * page = (char *) __get_free_page(GFP_KERNEL);
 	struct swap_info_struct *ptr = swap_info;
-	int i, j, len = 0, usedswap;
+	int i, len;
 
 	if (!page)
 		return -ENOMEM;
 
-	len += sprintf(buf, "Filename\t\t\tType\t\tSize\tUsed\tPriority\n");
+	len = sprintf(buf, "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
 	for (i = 0 ; i < nr_swapfiles ; i++, ptr++) {
 		if ((ptr->flags & SWP_USED) && ptr->swap_map) {
 			char * path = d_path(ptr->swap_file, ptr->swap_vfsmnt,
 						page, PAGE_SIZE);
-
-			len += sprintf(buf + len, "%-31s ", path);
-
-			if (!ptr->swap_device)
-				len += sprintf(buf + len, "file\t\t");
-			else
-				len += sprintf(buf + len, "partition\t");
-
-			usedswap = 0;
+			int j, usedswap = 0;
 			for (j = 0; j < ptr->max; ++j)
 				switch (ptr->swap_map[j]) {
 					case SWAP_MAP_BAD:
@@ -831,8 +823,12 @@ int get_swaparea_info(char *buf)
 					default:
 						usedswap++;
 				}
-			len += sprintf(buf + len, "%d\t%d\t%d\n", ptr->pages << (PAGE_SHIFT - 10), 
-				usedswap << (PAGE_SHIFT - 10), ptr->prio);
+			len += sprintf(buf + len, "%-39s %s\t%d\t%d\t%d\n",
+				       path,
+				       ptr->swap_device ? "partition" : "file\t",
+				       ptr->pages << (PAGE_SHIFT - 10),
+				       usedswap << (PAGE_SHIFT - 10),
+				       ptr->prio);
 		}
 	}
 	free_page((unsigned long) page);

@@ -17004,8 +17004,8 @@ CONFIG_ACPI
   can be downloaded from:
   <http://developer.intel.com/technology/iapc/acpi/downloads.htm>.
 
-  The ACPI mailing list may also be of interest:
-  <http://phobos.fs.tum.de/acpi/index.html>.
+  The ACPI Sourceforge project may also be of interest:
+  <http://sf.net/projects/acpi/>
 
 Enable ACPI 2.0 with errata 1.3
 CONFIG_ACPI20
@@ -22281,11 +22281,6 @@ CONFIG_IRDA_ULTRA
   no management frames, simple fixed header).
   Ultra is available as a special socket : socket(AF_IRDA, SOCK_DGRAM, 1);
 
-IrDA protocol options
-CONFIG_IRDA_OPTIONS
-  Say Y here if you want to configure any of the following IrDA
-  options.
-
 IrDA cache last LSAP
 CONFIG_IRDA_CACHE_LAST_LSAP
   Say Y here if you want IrLMP to cache the last LSAP used.  This
@@ -22297,46 +22292,34 @@ CONFIG_IRDA_CACHE_LAST_LSAP
 IrDA Fast RRs
 CONFIG_IRDA_FAST_RR
   Say Y here is you want IrLAP to send fast RR (Receive Ready) frames
-  when acting as a primary station. This will make IrLAP send out a RR
-  frame immediately when receiving a frame if its own transmit queue
-  is currently empty. This will give a lot of speed improvement when
-  receiving much data since the secondary station will not have to
-  wait the max. turn around time before it is allowed to transmit the
-  next time. If the transmit queue of the secondary is also empty the
-  primary will back off waiting longer for sending out the RR frame
-  until the timeout reaches the normal value. Enabling this option
-  will make the IR-diode burn more power and thus reduce your battery
-  life.
+  when acting as a primary station.
+  Disabling this option will make latency over IrDA very bad. Enabling
+  this option will make the IrDA stack send more packet than strictly
+  necessary, thus reduce your battery life (but not that much).
 
-  If unsure, say N.
+  Fast RR will make IrLAP send out a RR frame immediately when
+  receiving a frame if its own transmit queue is currently empty. This
+  will give a lot of speed improvement when receiving much data since
+  the secondary station will not have to wait the max. turn around
+  time (usually 500ms) before it is allowed to transmit the next time.
+  If the transmit queue of the secondary is also empty, the primary will
+  start backing-off before sending another RR frame, waiting longer
+  each time until the back-off reaches the max. turn around time.
+  This back-off increase in controlled via
+  /proc/sys/net/irda/fast_poll_increase
+
+  If unsure, say Y.
 
 IrDA debugging information
 CONFIG_IRDA_DEBUG
   Say Y here if you want the IrDA subsystem to write debug information
   to your syslog. You can change the debug level in
   /proc/sys/net/irda/debug .
+  When this option is enabled, the IrDA also perform many extra internal
+  verifications which will usually prevent the kernel to crash in case of
+  bugs.
 
   If unsure, say Y (since it makes it easier to find the bugs).
-
-IrLAP compression support
-CONFIG_IRDA_COMPRESSION
-  Compression is _not_ part of the IrDA(tm) protocol specification,
-  but it's working great! Linux is the first to try out compression
-  support at the IrLAP layer. This means that you will only benefit
-  from compression if you are running a Linux <-> Linux configuration.
-
-  If you say Y here, you also need to say Y or M to a compression
-  protocol below.
-
-IrLAP Deflate compression
-CONFIG_IRDA_DEFLATE
-  Say Y here if you want to build support for the Deflate compression
-  protocol. The deflate compression (GZIP) is exactly
-  the same as the one used by the PPP protocol.
-
-  If you want to compile this compression support as a module, say M
-  here and read <file:Documentation/modules.txt>.  The module will be
-  called irda_deflate.o.
 
 IrLAN protocol
 CONFIG_IRLAN

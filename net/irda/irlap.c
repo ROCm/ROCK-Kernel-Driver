@@ -51,6 +51,11 @@
 hashbin_t *irlap = NULL;
 int sysctl_slot_timeout = SLOT_TIMEOUT * 1000 / HZ;
 
+/* This is the delay of missed pf period before generating an event
+ * to the application. The spec mandate 3 seconds, but in some cases
+ * it's way too long. - Jean II */
+int sysctl_warn_noreply_time = 3;
+
 extern void irlap_queue_xmit(struct irlap_cb *self, struct sk_buff *skb);
 static void __irlap_close(struct irlap_cb *self);
 
@@ -527,22 +532,7 @@ void irlap_discovery_request(struct irlap_cb *self, discovery_t *discovery)
 	self->discovery_cmd = discovery;
 	info.discovery = discovery;
 	
-	/* Check if the slot timeout is within limits */
-	if (sysctl_slot_timeout < 20) {
-		ERROR(__FUNCTION__ 
-		      "(), to low value for slot timeout!\n");
-		sysctl_slot_timeout = 20;
-	}
-	/* 
-	 * Highest value is actually 8, but we allow higher since
-	 * some devices seems to require it.
-	 */
-	if (sysctl_slot_timeout > 160) {
-		ERROR(__FUNCTION__ 
-		      "(), to high value for slot timeout!\n");
-		sysctl_slot_timeout = 160;
-	}
-	
+	/* sysctl_slot_timeout bounds are checked in irsysctl.c - Jean II */
 	self->slot_timeout = sysctl_slot_timeout * HZ / 1000;
 	
 	irlap_do_event(self, DISCOVERY_REQUEST, NULL, &info);
@@ -931,9 +921,6 @@ void irlap_init_qos_capabilities(struct irlap_cb *self,
 	/* Set data size */
 	/*self->qos_rx.data_size.bits &= 0x03;*/
 
-	/* Set disconnect time -> done properly in qos.c */
-	/*self->qos_rx.link_disc_time.bits &= 0x07;*/
-
 	irda_qos_bits_to_value(&self->qos_rx);
 }
 
@@ -1070,8 +1057,11 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 	/*
 	 *  Set N1 to 0 if Link Disconnect/Threshold Time = 3 and set it to 
 	 *  3 seconds otherwise. See page 71 in IrLAP for more details.
+	 *  Actually, it's not always 3 seconds, as we allow to set
+	 *  it via sysctl... Max maxtt is 500ms, and N1 need to be multiple
+	 *  of 2, so 1 second is minimum we can allow. - Jean II
 	 */
-	if (self->qos_tx.link_disc_time.value == 3)
+	if (self->qos_tx.link_disc_time.value == sysctl_warn_noreply_time)
 		/* 
 		 * If we set N1 to 0, it will trigger immediately, which is
 		 * not what we want. What we really want is to disable it,
@@ -1079,7 +1069,8 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 		 */
 		self->N1 = -2; /* Disable - Need to be multiple of 2*/
 	else
-		self->N1 = 3000 / self->qos_rx.max_turn_time.value;
+		self->N1 = sysctl_warn_noreply_time * 1000 /
+		  self->qos_rx.max_turn_time.value;
 	
 	IRDA_DEBUG(4, "Setting N1 = %d\n", self->N1);
 	

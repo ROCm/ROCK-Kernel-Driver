@@ -711,7 +711,7 @@ static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, uns
 	int count;
 
 	while (bcount) {
-		if (pc->b_count == bio_size(bio)) {
+		if (pc->b_count == bio->bi_size) {
 			rq->sector += rq->current_nr_sectors;
 			rq->nr_sectors -= rq->current_nr_sectors;
 			idefloppy_end_request (1, HWGROUP(drive));
@@ -723,7 +723,7 @@ static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, uns
 			idefloppy_discard_data (drive, bcount);
 			return;
 		}
-		count = IDEFLOPPY_MIN (bio_size(bio) - pc->b_count, bcount);
+		count = IDEFLOPPY_MIN (bio->bi_size - pc->b_count, bcount);
 		atapi_input_bytes (drive, bio_data(bio) + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 	}
@@ -742,7 +742,7 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 			idefloppy_end_request (1, HWGROUP(drive));
 			if ((bio = rq->bio) != NULL) {
 				pc->b_data = bio_data(bio);
-				pc->b_count = bio_size(bio);
+				pc->b_count = bio->bi_size;
 			}
 		}
 		if (bio == NULL) {
@@ -1210,7 +1210,7 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 	pc->callback = &idefloppy_rw_callback;
 	pc->rq = rq;
 	pc->b_data = rq->buffer;
-	pc->b_count = rq->cmd == READ ? 0 : bio_size(rq->bio);
+	pc->b_count = rq->cmd == READ ? 0 : rq->bio->bi_size;
 	if (rq->cmd == WRITE)
 		set_bit (PC_WRITING, &pc->flags);
 	pc->buffer = NULL;

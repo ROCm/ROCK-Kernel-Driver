@@ -119,22 +119,21 @@ static int linear_stop (mddev_t *mddev)
 	return 0;
 }
 
-static int linear_make_request (mddev_t *mddev,
-			int rw, struct buffer_head * bh)
+static int linear_make_request (mddev_t *mddev, int rw, struct bio *bio)
 {
         linear_conf_t *conf = mddev_to_conf(mddev);
         struct linear_hash *hash;
         dev_info_t *tmp_dev;
         long block;
 
-	block = bh->b_rsector >> 1;
+	block = bio->bi_sector >> 1;
 	hash = conf->hash_table + (block / conf->smallest->size);
   
 	if (block >= (hash->dev0->size + hash->dev0->offset)) {
 		if (!hash->dev1) {
 			printk ("linear_make_request : hash->dev1==NULL for block %ld\n",
 						block);
-			buffer_IO_error(bh);
+			bio_io_error(bio);
 			return 0;
 		}
 		tmp_dev = hash->dev1;
@@ -144,11 +143,11 @@ static int linear_make_request (mddev_t *mddev,
 	if (block >= (tmp_dev->size + tmp_dev->offset)
 				|| block < tmp_dev->offset) {
 		printk ("linear_make_request: Block %ld out of bounds on dev %s size %ld offset %ld\n", block, kdevname(tmp_dev->dev), tmp_dev->size, tmp_dev->offset);
-		buffer_IO_error(bh);
+		bio_io_error(bio);
 		return 0;
 	}
-	bh->b_rdev = tmp_dev->dev;
-	bh->b_rsector = bh->b_rsector - (tmp_dev->offset << 1);
+	bio->bi_dev = tmp_dev->dev;
+	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1);
 
 	return 1;
 }

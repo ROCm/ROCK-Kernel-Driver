@@ -58,7 +58,6 @@ put_info_buffer(char *cp)
 	else
 		divert_info_tail->next = ib;	/* follows existing messages */
 	divert_info_tail = ib;	/* new tail */
-	restore_flags(flags);
 
 	/* delete old entrys */
 	while (divert_info_head->next) {
@@ -70,7 +69,7 @@ put_info_buffer(char *cp)
 		} else
 			break;
 	}			/* divert_info_head->next */
-	spin_lock_irqrestore( &divert_info_lock, flags );
+	spin_unlock_irqrestore( &divert_info_lock, flags );
 	wake_up_interruptible(&(rd_queue));
 }				/* put_info_buffer */
 
@@ -163,7 +162,6 @@ isdn_divert_close(struct inode *ino, struct file *filep)
 		inf->usage_cnt--;
 		inf = inf->next;
 	}
-	restore_flags(flags);
 	if (if_used <= 0)
 		while (divert_info_head) {
 			inf = divert_info_head;

@@ -330,12 +330,11 @@ shmiq_qcntl_mmap (struct file *file, struct vm_area_struct *vma)
 
 	size  = vma->vm_end - vma->vm_start;
 	start = vma->vm_start; 
-	spin_lock( &shmiqs [minor].shmiq_lock );
-	mem = (unsigned long) shmiqs [minor].shmiq_vaddr =  vmalloc_uncached (size);
-	if (!mem) {
-		spin_unlock( &shmiqs [minor].shmiq_lock );
+	mem = vmalloc_uncached (size);
+	if (!mem)
 		return -EINVAL;
-	}
+	spin_lock( &shmiqs [minor].shmiq_lock );
+	hmiqs [minor].shmiq_vaddr = mem;
 
 	/* Prevent the swapper from considering these pages for swap and touching them */
 	vma->vm_flags    |= (VM_SHM  | VM_LOCKED | VM_IO);
@@ -344,12 +343,12 @@ shmiq_qcntl_mmap (struct file *file, struct vm_area_struct *vma)
 	/* Uncache the pages */
 	vma->vm_page_prot = PAGE_USERIO;
 
-	error = vmap_page_range (vma->vm_start, size, mem);
 
 	shmiqs [minor].tail = 0;
 	/* Init the shared memory input queue */
-	memset (shmiqs [minor].shmiq_vaddr, 0, size);
 	spin_unlock( &shmiqs [minor].shmiq_lock );
+	memset (shmiqs [minor].shmiq_vaddr, 0, size);
+	error = vmap_page_range (vma->vm_start, size, mem);
 	return error;
 }
 
@@ -435,8 +434,10 @@ shmiq_qcntl_close (struct inode *inode, struct file *filp)
 		return -EINVAL;
 
 	spin_lock( &shmiqs [minor].shmiq_lock );
-	if (shmiqs [minor].opened == 0)
+	if (shmiqs [minor].opened == 0) {
+		spin_unlock( &shmiqs [minor].shmiq_lock );
 		return -EINVAL;
+	}
 
 	shmiq_qcntl_fasync (-1, filp, 0);
 	shmiqs [minor].opened 	   = 0;

@@ -34,7 +34,7 @@ Go ahead and start both.  If ACPI or APM is not available on your
 system the associated daemon will exit gracefully.
 
   apmd:   http://worldvisions.ca/~apenwarr/apmd/
-  acpid:  http://phobos.fs.tum.de/acpi/
+  acpid:  http://acpid.sf.net/
 
 Driver Interface
 ----------------
@@ -260,7 +260,7 @@ proceed in the opposite direction.
 Q: Who do I contact for additional information about
    enabling power management for my specific driver/device?
 
-ACPI4Linux mailing list: acpi@phobos.fs.tum.de
+ACPI Development mailing list: acpi-devel@lists.sourceforge.net
 
 System Interface
 ----------------
