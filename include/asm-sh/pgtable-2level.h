@@ -42,7 +42,7 @@ static inline void pgd_clear (pgd_t * pgdp) 	{ }
  */
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 /*
- * (pmds are folded into pgds so this doesnt get actually called,
+ * (pmds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)
  */
 #define set_pmd(pmdptr, pmdval) (*(pmdptr) = pmdval)
