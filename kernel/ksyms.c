@@ -238,19 +238,6 @@ EXPORT_SYMBOL(compute_creds);
 EXPORT_SYMBOL(remove_arg_zero);
 EXPORT_SYMBOL(set_binfmt);
 
-/* sysctl table registration */
-EXPORT_SYMBOL(register_sysctl_table);
-EXPORT_SYMBOL(unregister_sysctl_table);
-EXPORT_SYMBOL(sysctl_string);
-EXPORT_SYMBOL(sysctl_intvec);
-EXPORT_SYMBOL(sysctl_jiffies);
-EXPORT_SYMBOL(proc_dostring);
-EXPORT_SYMBOL(proc_dointvec);
-EXPORT_SYMBOL(proc_dointvec_jiffies);
-EXPORT_SYMBOL(proc_dointvec_minmax);
-EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
-EXPORT_SYMBOL(proc_doulongvec_minmax);
-
 /* interrupt handling */
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
@@ -389,8 +376,6 @@ EXPORT_SYMBOL(fs_overflowgid);
 /* all busmice */
 EXPORT_SYMBOL(fasync_helper);
 EXPORT_SYMBOL(kill_fasync);
-
-/* binfmt_aout */
 
 /* library functions */
 EXPORT_SYMBOL(strnicmp);
