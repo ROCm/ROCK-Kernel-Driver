@@ -64,6 +64,9 @@
 #define FAT_FIRST_ENT(s, x)	((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
 	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
 
+/* start of data cluster's entry (number of reserved clusters) */
+#define FAT_START_ENT	2
+
 /* maximum number of clusters */
 #define MAX_FAT12	0xFF4
 #define MAX_FAT16	0xFFF4
@@ -221,7 +224,7 @@ struct msdos_sb_info {
 	unsigned long dir_start;
 	unsigned short dir_entries;  /* root dir start & entries */
 	unsigned long data_start;    /* first data sector */
-	unsigned long clusters;      /* number of clusters */
+	unsigned long max_cluster;   /* maximum cluster number */
 	unsigned long root_cluster;  /* first cluster of the root directory */
 	unsigned long fsinfo_sector; /* sector number of FAT32 fsinfo */
 	struct semaphore fat_lock;
@@ -268,6 +271,12 @@ static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
 static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
 {
 	return container_of(inode, struct msdos_inode_info, vfs_inode);
+}
+
+static inline sector_t fat_clus_to_blknr(struct msdos_sb_info *sbi, int clus)
+{
+	return ((sector_t)clus - FAT_START_ENT) * sbi->sec_per_clus
+		+ sbi->data_start;
 }
 
 static inline void fat16_towchar(wchar_t *dst, const __u8 *src, size_t len)

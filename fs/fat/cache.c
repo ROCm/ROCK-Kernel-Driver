@@ -305,7 +305,7 @@ int fat_access(struct super_block *sb, int nr, int new_value)
 	int next;
 
 	next = -EIO;
-	if (nr < 2 || MSDOS_SB(sb)->clusters + 2 <= nr) {
+	if (nr < FAT_START_ENT || MSDOS_SB(sb)->max_cluster <= nr) {
 		fat_fs_panic(sb, "invalid access to FAT (entry 0x%08x)", nr);
 		goto out;
 	}
@@ -431,9 +431,7 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
 	cluster = fat_bmap_cluster(inode, cluster);
 	if (cluster < 0)
 		return cluster;
-	else if (cluster) {
-		*phys = ((sector_t)cluster - 2) * sbi->sec_per_clus
-			+ sbi->data_start + offset;
-	}
+	else if (cluster)
+		*phys = fat_clus_to_blknr(sbi, cluster) + offset;
 	return 0;
 }

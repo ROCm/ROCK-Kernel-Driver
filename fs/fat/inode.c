@@ -419,17 +419,18 @@ static int fat_remount(struct super_block *sb, int *flags, char *data)
 
 static int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int free, nr, ret;
 
-	if (MSDOS_SB(sb)->free_clusters != -1)
-		free = MSDOS_SB(sb)->free_clusters;
+	if (sbi->free_clusters != -1)
+		free = sbi->free_clusters;
 	else {
 		lock_fat(sb);
-		if (MSDOS_SB(sb)->free_clusters != -1)
-			free = MSDOS_SB(sb)->free_clusters;
+		if (sbi->free_clusters != -1)
+			free = sbi->free_clusters;
 		else {
 			free = 0;
-			for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++) {
+			for (nr = FAT_START_ENT; nr < sbi->max_cluster; nr++) {
 				ret = fat_access(sb, nr, -1);
 				if (ret < 0) {
 					unlock_fat(sb);
@@ -437,17 +438,17 @@ static int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 				} else if (ret == FAT_ENT_FREE)
 					free++;
 			}
-			MSDOS_SB(sb)->free_clusters = free;
+			sbi->free_clusters = free;
 		}
 		unlock_fat(sb);
 	}
 
 	buf->f_type = sb->s_magic;
-	buf->f_bsize = MSDOS_SB(sb)->cluster_size;
-	buf->f_blocks = MSDOS_SB(sb)->clusters;
+	buf->f_bsize = sbi->cluster_size;
+	buf->f_blocks = sbi->max_cluster - FAT_START_ENT;
 	buf->f_bfree = free;
 	buf->f_bavail = free;
-	buf->f_namelen = MSDOS_SB(sb)->options.isvfat ? 260 : 12;
+	buf->f_namelen = sbi->options.isvfat ? 260 : 12;
 
 	return 0;
 }
@@ -1232,7 +1233,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 	/* check that FAT table does not overflow */
 	fat_clusters = sbi->fat_length * sb->s_blocksize * 8 / sbi->fat_bits;
-	total_clusters = min(total_clusters, fat_clusters - 2);
+	total_clusters = min(total_clusters, fat_clusters - FAT_START_ENT);
 	if (total_clusters > MAX_FAT(sb)) {
 		if (!silent)
 			printk(KERN_ERR "FAT: count of clusters too big (%u)\n",
@@ -1241,9 +1242,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		goto out_invalid;
 	}
 
-	sbi->clusters = total_clusters;
+	sbi->max_cluster = total_clusters + FAT_START_ENT;
 	/* check the free_clusters, it's not necessarily correct */
-	if (sbi->free_clusters != -1 && sbi->free_clusters > sbi->clusters)
+	if (sbi->free_clusters != -1 && sbi->free_clusters > total_clusters)
 		sbi->free_clusters = -1;
 
 	brelse(bh);

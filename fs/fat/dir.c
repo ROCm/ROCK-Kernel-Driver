@@ -767,7 +767,7 @@ static struct buffer_head *fat_extend_dir(struct inode *inode)
 	if (nr < 0)
 		return ERR_PTR(nr);
 
-	sector = ((sector_t)nr - 2) * sec_per_clus + MSDOS_SB(sb)->data_start;
+	sector = fat_clus_to_blknr(MSDOS_SB(sb), nr);
 	last_sector = sector + sec_per_clus;
 	for ( ; sector < last_sector; sector++) {
 		if ((bh = sb_getblk(sb, sector))) {
