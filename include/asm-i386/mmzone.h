@@ -19,10 +19,6 @@
 #endif /* CONFIG_NUMA */
 #endif /* CONFIG_X86_NUMAQ */
 
-#ifdef CONFIG_NUMA
-#define numa_node_id() _cpu_to_node(smp_processor_id())
-#endif /* CONFIG_NUMA */
-
 extern struct pglist_data *node_data[];
 
 /*

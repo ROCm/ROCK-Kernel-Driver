@@ -28,8 +28,6 @@ extern plat_pg_data_t *plat_node_data[];
 #define PLAT_NODE_DATA_LOCALNR(p, n) \
 		(((p) >> PAGE_SHIFT) - PLAT_NODE_DATA(n)->gendata.node_start_pfn)
 
-#define numa_node_id()	cputocnode(current->processor)
-
 #ifdef CONFIG_DISCONTIGMEM
 
 /*

@@ -72,7 +72,6 @@ static inline int __cpu_to_node(int cpu)
 	return node;
 }
 
-#define numa_node_id()	__cpu_to_node(smp_processor_id())
 #endif /* CONFIG_NUMA */
 
 /*

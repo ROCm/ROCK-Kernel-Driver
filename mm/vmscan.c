@@ -30,6 +30,8 @@
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
+#include <asm/topology.h>
+
 #include <linux/swapops.h>
 
 /*
@@ -739,6 +741,7 @@ int kswapd(void *p)
 	DECLARE_WAITQUEUE(wait, tsk);
 
 	daemonize();
+	set_cpus_allowed(tsk, __node_to_cpu_mask(pgdat->node_id));
 	sprintf(tsk->comm, "kswapd%d", pgdat->node_id);
 	sigfillset(&tsk->blocked);
 	

@@ -249,13 +249,23 @@ static inline struct zone *next_zone(struct zone *zone)
 #define for_each_zone(zone) \
 	for (zone = pgdat_list->node_zones; zone; zone = next_zone(zone))
 
+#ifdef CONFIG_NUMA
+#define MAX_NR_MEMBLKS	BITS_PER_LONG /* Max number of Memory Blocks */
+#else /* !CONFIG_NUMA */
+#define MAX_NR_MEMBLKS	1
+#endif /* CONFIG_NUMA */
+
+#include <asm/topology.h>
+/* Returns the number of the current Node. */
+#define numa_node_id()		(__cpu_to_node(smp_processor_id()))
+
 #ifndef CONFIG_DISCONTIGMEM
 
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
 #define MAX_NR_NODES		1
 
-#else /* !CONFIG_DISCONTIGMEM */
+#else /* CONFIG_DISCONTIGMEM */
 
 #include <asm/mmzone.h>
 
