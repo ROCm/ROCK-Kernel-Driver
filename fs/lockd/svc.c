@@ -163,22 +163,8 @@ lockd(struct svc_rqst *rqstp)
 		dprintk("lockd: request from %08x\n",
 			(unsigned)ntohl(rqstp->rq_addr.sin_addr.s_addr));
 
-		/*
-		 * Look up the NFS client handle. The handle is needed for
-		 * all but the GRANTED callback RPCs.
-		 */
-		rqstp->rq_client = NULL;
-		if (nlmsvc_ops) {
-			nlmsvc_ops->exp_readlock();
-			rqstp->rq_client =
-				nlmsvc_ops->exp_getclient(&rqstp->rq_addr);
-		}
-
 		svc_process(serv, rqstp);
 
-		/* Unlock export hash tables */
-		if (nlmsvc_ops)
-			nlmsvc_ops->exp_unlock();
 	}
 
 	/*

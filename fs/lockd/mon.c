@@ -42,6 +42,7 @@ nsm_mon_unmon(struct nlm_host *host, u32 proc, struct nsm_res *res)
 		goto out;
 
 	args.addr = host->h_addr.sin_addr.s_addr;
+	args.proto= (host->h_proto<<1) | host->h_server;
 	args.prog = NLM_PROGRAM;
 	args.vers = host->h_version;
 	args.proc = NLMPROC_NSM_NOTIFY;
@@ -167,8 +168,8 @@ xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 	/* This is the private part. Needed only for SM_MON call */
 	if (rqstp->rq_task->tk_msg.rpc_proc == SM_MON) {
 		*p++ = argp->addr;
-		*p++ = 0;
-		*p++ = 0;
+		*p++ = argp->vers;
+		*p++ = argp->proto;
 		*p++ = 0;
 	}
 

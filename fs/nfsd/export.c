@@ -840,7 +840,6 @@ exp_freeclient(svc_client *clp)
 
 	/* umap_free(&(clp->cl_umap)); */
 	exp_unexport_all(clp);
-	nfsd_lockd_unexport(clp);
 	kfree (clp);
 }
 

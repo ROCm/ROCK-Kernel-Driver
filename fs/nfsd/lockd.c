@@ -31,12 +31,19 @@ nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file *filp)
 	memcpy((char*)&fh.fh_handle.fh_base, f->data, f->size);
 	fh.fh_export = NULL;
 
-	nfserr = nfsd_open(rqstp, &fh, S_IFREG, MAY_LOCK, filp);
+	exp_readlock();
+	rqstp->rq_client = exp_getclient(&rqstp->rq_addr);
+	if (rqstp->rq_client == NULL)
+		nfserr = nfserr_stale;
+	else
+		nfserr = nfsd_open(rqstp, &fh, S_IFREG, MAY_LOCK, filp);
 	if (!nfserr) {
 		dget(filp->f_dentry);
 		mntget(filp->f_vfsmnt);
 	}
 	fh_put(&fh);
+	rqstp->rq_client = NULL;
+	exp_readunlock();
  	/* nlm and nfsd don't share error codes.
 	 * we invent: 0 = no error
 	 *            1 = stale file handle
@@ -61,22 +68,9 @@ nlm_fclose(struct file *filp)
 }
 
 struct nlmsvc_binding		nfsd_nlm_ops = {
-	.exp_readlock	= exp_readlock,		/* lock export table for reading */
-	.exp_unlock	= exp_readunlock,		/* unlock export table */
-	.exp_getclient	= exp_getclient,		/* look up NFS client */
 	.fopen		= nlm_fopen,		/* open file for locking */
 	.fclose		= nlm_fclose,		/* close file */
 };
-
-/*
- * When removing an NFS client entry, notify lockd that it is gone.
- * FIXME: We should do the same when unexporting an NFS volume.
- */
-void
-nfsd_lockd_unexport(struct svc_client *clnt)
-{
-	nlmsvc_invalidate_client(clnt);
-}
 
 void
 nfsd_lockd_init(void)

@@ -32,7 +32,6 @@ EXPORT_SYMBOL(lockd_down);
 EXPORT_SYMBOL(nlmclnt_proc);
 
 /* NFS server entry points/hooks */
-EXPORT_SYMBOL(nlmsvc_invalidate_client);
 EXPORT_SYMBOL(nlmsvc_ops);
 
 #endif /* CONFIG_MODULES */
