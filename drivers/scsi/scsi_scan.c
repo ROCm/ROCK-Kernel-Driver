@@ -1461,6 +1461,10 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	if (*bflags & BLIST_SINGLELUN)
 		sdev->single_lun = 1;
 
+	/* if the device needs this changing, it may do so in the detect
+	 * function */
+	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
+
 	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
 		if (sdt->detect)
 			sdev->attached += (*sdt->detect) (sdev);

@@ -209,8 +209,9 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
     retval->ehandler = NULL;    /* Initial value until the thing starts up. */
     retval->eh_notify   = NULL;    /* Who we notify when we exit. */
 
+    retval->max_host_blocked = tpnt->max_host_blocked ? tpnt->max_host_blocked : SCSI_DEFAULT_HOST_BLOCKED;
 
-    retval->host_blocked = FALSE;
+    retval->host_blocked = 0;
     retval->host_self_blocked = FALSE;
 
 #ifdef DEBUG
