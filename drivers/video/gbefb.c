@@ -1084,9 +1084,9 @@ int __init gbefb_init(void)
 	int i, ret = 0;
 
 #ifndef MODULE
-	char *option = NULL;
+	char *options = NULL;
 
-	if (fb_get_options("gbefb", &option))
+	if (fb_get_options("gbefb", &options))
 		return -ENODEV;
 	gbefb_setup(options);
 #endif
