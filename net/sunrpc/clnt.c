@@ -1011,12 +1011,12 @@ call_verify(struct rpc_task *task)
 				break;
 			case RPC_MISMATCH:
 				printk(KERN_WARNING "%s: RPC call version mismatch!\n", __FUNCTION__);
-				rpc_exit(task, -ENOSYS);
-				return NULL;
+				error = -ENOSYS;
+				goto out_err;
 			default:
 				printk(KERN_WARNING "%s: RPC call rejected, unknown error: %x\n", __FUNCTION__, n);
-				rpc_exit(task, -ENOSYS);
-				return NULL;
+				error = -ENOSYS;
+				goto out_err;
 		}
 		if (--len < 0)
 			goto out_overflow;
@@ -1071,23 +1071,23 @@ call_verify(struct rpc_task *task)
 				(unsigned int)task->tk_client->cl_prog,
 				task->tk_client->cl_server);
 		}
-		rpc_exit(task, -ENOSYS);
-		return NULL;
+		error = -ENOSYS;
+		goto out_err;
 	case RPC_PROG_MISMATCH:
 		printk(KERN_WARNING "RPC: call_verify: program %u, version %u unsupported by server %s\n",
 				(unsigned int)task->tk_client->cl_prog,
 				(unsigned int)task->tk_client->cl_vers,
 				task->tk_client->cl_server);
-		rpc_exit(task, -ENOSYS);
-		return NULL;
+		error = -ENOSYS;
+		goto out_err;
 	case RPC_PROC_UNAVAIL:
 		printk(KERN_WARNING "RPC: call_verify: proc %p unsupported by program %u, version %u on server %s\n",
 				task->tk_msg.rpc_proc,
 				task->tk_client->cl_prog,
 				task->tk_client->cl_vers,
 				task->tk_client->cl_server);
-		rpc_exit(task, -ENOSYS);
-		return NULL;
+		error = -ENOSYS;
+		goto out_err;
 	case RPC_GARBAGE_ARGS:
 		dprintk("RPC: %4d %s: server saw garbage\n", task->tk_pid, __FUNCTION__);
 		break;			/* retry */

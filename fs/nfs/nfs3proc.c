@@ -17,6 +17,7 @@
 #include <linux/nfs_page.h>
 #include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
+#include <linux/nfs_mount.h>
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
@@ -45,7 +46,7 @@ static inline int
 nfs3_rpc_call_wrapper(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
 {
 	struct rpc_message msg = {
-		.rpc_proc	= &nfs3_procedures[proc],
+		.rpc_proc	= &clnt->cl_procinfo[proc],
 		.rpc_argp	= argp,
 		.rpc_resp	= resp,
 	};
@@ -714,6 +715,219 @@ nfs3_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 	return status;
 }
 
+#ifdef CONFIG_NFS_ACL
+static struct posix_acl *
+nfs3_proc_getacl(struct inode *inode, int type)
+{
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_fattr fattr;
+	struct page *pages[NFSACL_MAXPAGES] = { };
+	struct nfs3_getaclargs args = {
+		/* The xdr layer may allocate pages here. */
+		.pages =	pages,
+	};
+	struct nfs3_getaclres res = {
+		.fattr =	&fattr,
+	};
+	struct posix_acl *acl;
+	int status, count;
+
+	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
+		return ERR_PTR(-EOPNOTSUPP);
+
+	acl = nfs_get_cached_acl(inode, type);
+	if (acl != ERR_PTR(-EAGAIN))
+		return acl;
+	acl = NULL;
+
+	/*
+	 * Only get the access acl when explicitly requested: We don't
+	 * need it for access decisions, and only some applications use
+	 * it. Applications which request the access acl first are not
+	 * penalized from this optimization.
+	 */
+	if (type == ACL_TYPE_ACCESS)
+		args.mask |= NFS3_ACLCNT|NFS3_ACL;
+	if (S_ISDIR(inode->i_mode))
+		args.mask |= NFS3_DFACLCNT|NFS3_DFACL;
+	if (!args.mask)
+		return NULL;
+	args.fh = NFS_FH(inode);
+
+	dprintk("NFS call getacl\n");
+	status = rpc_call(server->client_acl, NFS3PROC_GETACL,
+			  &args, &res, 0);
+	dprintk("NFS reply getacl: %d\n", status);
+
+	/* pages may have been allocated at the xdr layer. */
+	for (count = 0; count < NFSACL_MAXPAGES && args.pages[count]; count++)
+		__free_page(args.pages[count]);
+
+	if (status) {
+		if (status == -ENOSYS) {
+			dprintk("NFS_ACL extension not supported; disabling\n");
+			server->flags &= ~NFSACL;
+			status = -EOPNOTSUPP;
+		} else if (status == -ENOTSUPP)
+			status = -EOPNOTSUPP;
+		goto getout;
+	}
+	if ((args.mask & res.mask) != args.mask) {
+		status = -EIO;
+		goto getout;
+	}
+
+	status = nfs_refresh_inode(inode, &fattr);
+	if (res.acl_access) {
+		if (posix_acl_equiv_mode(res.acl_access, NULL) == 0) {
+			posix_acl_release(res.acl_access);
+			res.acl_access = NULL;
+		}
+	}
+	nfs_cache_acls(inode, res.acl_access, res.acl_default);
+
+	switch(type) {
+		case ACL_TYPE_ACCESS:
+			acl = res.acl_access;
+			res.acl_access = NULL;
+			break;
+
+		case ACL_TYPE_DEFAULT:
+			acl = res.acl_default;
+			res.acl_default = NULL;
+			break;
+	}
+
+getout:
+	posix_acl_release(res.acl_access);
+	posix_acl_release(res.acl_default);
+
+	if (status) {
+		posix_acl_release(acl);
+		acl = ERR_PTR(status);
+	}
+	return acl;
+}
+#endif  /* CONFIG_NFS_ACL */
+
+#ifdef CONFIG_NFS_ACL
+static int
+nfs3_proc_setacls(struct inode *inode, struct posix_acl *acl,
+		  struct posix_acl *dfacl)
+{
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_fattr fattr;
+	struct page *pages[NFSACL_MAXPAGES] = { };
+	struct nfs3_setaclargs args = {
+		.pages = pages,
+	};
+	int status, count;
+
+	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
+		return -EOPNOTSUPP;
+
+	/* We are doing this here, because XDR marshalling can only
+	   return -ENOMEM. */
+	if (acl && acl->a_count > NFS3_ACL_MAX_ENTRIES)
+		return -ENOSPC;
+	if (dfacl && dfacl->a_count > NFS3_ACL_MAX_ENTRIES)
+		return -ENOSPC;
+	args.inode = inode;
+	args.mask = NFS3_ACL;
+	args.acl_access = acl;
+	if (S_ISDIR(inode->i_mode)) {
+		args.mask |= NFS3_DFACL;
+		args.acl_default = dfacl;
+	}
+
+	dprintk("NFS call setacl\n");
+	status = rpc_call(server->client_acl, NFS3PROC_SETACL,
+			  &args, &fattr, 0);
+	dprintk("NFS reply setacl: %d\n", status);
+
+	/* pages may have been allocated at the xdr layer. */
+	for (count = 0; count < NFSACL_MAXPAGES && args.pages[count]; count++)
+		__free_page(args.pages[count]);
+
+	if (status) {
+		if (status == -ENOSYS) {
+			dprintk("NFS_ACL SETACL RPC not supported"
+				"(will not retry)\n");
+			server->flags &= ~NFSACL;
+			status = -EOPNOTSUPP;
+		} else if (status == -ENOTSUPP)
+			status = -EOPNOTSUPP;
+	} else {
+		NFS_FLAGS(inode) |= NFS_INO_INVALID_ACCESS;
+		if (acl) {
+			/*
+			 * Updating the access acl modifies the file mode
+			 * mode permission bits, so update the icache.
+			 */
+			mode_t mode = inode->i_mode;
+			int error = posix_acl_equiv_mode(acl, &mode);
+			if (error >= 0)
+				inode->i_mode = mode;
+			if (error == 0) {
+				/*
+				 * The acl is equivalent to the file mode
+				 * permission bits. No need to cache it.
+				 */
+				acl = NULL;
+			}
+		}
+		nfs_cache_acls(inode, acl, dfacl);
+		status = nfs_refresh_inode(inode, &fattr);
+	}
+
+	return status;
+}
+#endif  /* CONFIG_NFS_ACL */
+
+#ifdef CONFIG_NFS_ACL
+static int
+nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
+{
+	struct posix_acl *alloc = NULL, *dfacl = NULL;
+	int status;
+
+	if (S_ISDIR(inode->i_mode)) {
+		switch(type) {
+			case ACL_TYPE_ACCESS:
+				alloc = dfacl = NFS_PROTO(inode)->
+					getacl(inode, ACL_TYPE_DEFAULT);
+				if (IS_ERR(alloc))
+					goto fail;
+				break;
+
+			case ACL_TYPE_DEFAULT:
+				dfacl = acl;
+				alloc = acl = NFS_PROTO(inode)->
+					getacl(inode, ACL_TYPE_ACCESS);
+				if (IS_ERR(alloc))
+					goto fail;
+				break;
+
+			default:
+				return -EINVAL;
+		}
+	} else if (type != ACL_TYPE_ACCESS)
+			return -EINVAL;
+
+	if (acl == NULL) {
+		alloc = acl = posix_acl_from_mode(inode->i_mode, GFP_KERNEL);
+		if (IS_ERR(alloc))
+			goto fail;
+	}
+	status = nfs3_proc_setacls(inode, acl, dfacl);
+	posix_acl_release(alloc);
+	return status;
+
+fail:
+	return PTR_ERR(alloc);
+}
+#endif  /* CONFIG_NFS_ACL */
+
 extern u32 *nfs3_decode_dirent(u32 *, struct nfs_entry *, int);
 
 static void
@@ -868,4 +1082,9 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.file_open	= nfs_open,
 	.file_release	= nfs_release,
 	.lock		= nfs3_proc_lock,
+#ifdef CONFIG_NFS_ACL
+	.getacl		= nfs3_proc_getacl,
+	.setacl		= nfs3_proc_setacl,
+	.setacls	= nfs3_proc_setacls,
+#endif  /* CONFIG_NFS_ACL */
 };
