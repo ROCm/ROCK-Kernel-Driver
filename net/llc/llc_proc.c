@@ -125,18 +125,16 @@ static int llc_seq_socket_show(struct seq_file *seq, void *v)
 	sk = v;
 	llc = llc_sk(sk);
 
-	seq_printf(seq, "%2X  %2X ", sk->sk_type,
-		   !llc_mac_null(llc->addr.sllc_mmac));
+	/* FIXME: check if the address is multicast */
+	seq_printf(seq, "%2X  %2X ", sk->sk_type, 0);
 
-	if (llc->dev && llc_mac_null(llc->addr.sllc_mmac))
+	if (llc->dev)
 		llc_ui_format_mac(seq, llc->dev->dev_addr);
-	else if (!llc_mac_null(llc->addr.sllc_mmac))
-		llc_ui_format_mac(seq, llc->addr.sllc_mmac);
 	else
 		seq_printf(seq, "00:00:00:00:00:00");
 	seq_printf(seq, "@%02X ", llc->sap->laddr.lsap);
-	llc_ui_format_mac(seq, llc->addr.sllc_dmac);
-	seq_printf(seq, "@%02X %8d %8d %2d %3d %4d\n", llc->addr.sllc_dsap,
+	llc_ui_format_mac(seq, llc->daddr.mac);
+	seq_printf(seq, "@%02X %8d %8d %2d %3d %4d\n", llc->daddr.lsap,
 		   atomic_read(&sk->sk_wmem_alloc),
 		   atomic_read(&sk->sk_rmem_alloc),
 		   sk->sk_state,
