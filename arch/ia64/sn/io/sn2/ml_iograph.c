@@ -567,16 +567,12 @@ io_init_node(cnodeid_t cnodeid)
 	 * accordingly. In particular, SN00 has direct connected bridge,
 	 * and hence widget id is Not 0.
 	 */
+	widget_partnum = (((*(volatile int32_t *)(NODE_SWIN_BASE
+			(COMPACT_TO_NASID_NODEID(cnodeid), 0) + 
+			WIDGET_ID))) & WIDGET_PART_NUM) 
+			>> WIDGET_PART_NUM_SHFT;
 
-	widget_partnum = (((*(volatile int32_t *)(NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0) + WIDGET_ID))) & WIDGET_PART_NUM) >> WIDGET_PART_NUM_SHFT;
-
-	if (widget_partnum == BRIDGE_WIDGET_PART_NUM ||
-				widget_partnum == XBRIDGE_WIDGET_PART_NUM){
-		npdap->basew_id = (((*(volatile int32_t *)(NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0) + BRIDGE_WID_CONTROL))) & WIDGET_WIDGET_ID);
-
-		DBG("io_init_node: Found XBRIDGE widget_partnum= 0x%x\n", widget_partnum);
-
-	} else if ((widget_partnum == XBOW_WIDGET_PART_NUM) ||
+	if ((widget_partnum == XBOW_WIDGET_PART_NUM) ||
 			(widget_partnum == XXBOW_WIDGET_PART_NUM) ||
 			(widget_partnum == PXBOW_WIDGET_PART_NUM) ) {
 		/* 
