@@ -1895,6 +1895,60 @@ struct ct_sns_pkt {
 	} p;
 };
 
+/*
+ * SNS command structures -- for 2200 compatability.
+ */
+#define	RFT_ID_SNS_SCMD_LEN	22
+#define	RFT_ID_SNS_CMD_SIZE	60
+#define	RFT_ID_SNS_DATA_SIZE	16
+
+#define	RFF_ID_SNS_SCMD_LEN	8
+#define	RFF_ID_SNS_CMD_SIZE	32
+#define	RFF_ID_SNS_DATA_SIZE	16
+
+#define	RNN_ID_SNS_SCMD_LEN	10
+#define	RNN_ID_SNS_CMD_SIZE	36
+#define	RNN_ID_SNS_DATA_SIZE	16
+
+#define	GA_NXT_SNS_SCMD_LEN	6
+#define	GA_NXT_SNS_CMD_SIZE	28
+#define	GA_NXT_SNS_DATA_SIZE	(620 + 16)
+
+#define	GID_PT_SNS_SCMD_LEN	6
+#define	GID_PT_SNS_CMD_SIZE	28
+#define	GID_PT_SNS_DATA_SIZE	(MAX_FIBRE_DEVICES * 4 + 16)
+
+#define	GPN_ID_SNS_SCMD_LEN	6
+#define	GPN_ID_SNS_CMD_SIZE	28
+#define	GPN_ID_SNS_DATA_SIZE	(8 + 16)
+
+#define	GNN_ID_SNS_SCMD_LEN	6
+#define	GNN_ID_SNS_CMD_SIZE	28
+#define	GNN_ID_SNS_DATA_SIZE	(8 + 16)
+
+struct sns_cmd_pkt {
+	union {
+		struct {
+			uint16_t buffer_length;
+			uint16_t reserved_1;
+			uint32_t buffer_address[2];
+			uint16_t subcommand_length;
+			uint16_t reserved_2;
+			uint16_t subcommand;
+			uint16_t size;
+			uint32_t reserved_3;
+			uint8_t param[36];
+		} cmd;
+
+		uint8_t rft_data[RFT_ID_SNS_DATA_SIZE];
+		uint8_t rff_data[RFF_ID_SNS_DATA_SIZE];
+		uint8_t rnn_data[RNN_ID_SNS_DATA_SIZE];
+		uint8_t gan_data[GA_NXT_SNS_DATA_SIZE];
+		uint8_t gid_data[GID_PT_SNS_DATA_SIZE];
+		uint8_t gpn_data[GPN_ID_SNS_DATA_SIZE];
+		uint8_t gnn_data[GNN_ID_SNS_DATA_SIZE];
+	} p;
+};
 
 /* IO descriptors */
 #define MAX_IO_DESCRIPTORS	32
@@ -2162,10 +2216,14 @@ typedef struct scsi_qla_host {
 	uint8_t rscn_in_ptr;
 	uint8_t rscn_out_ptr;
 
+	/* SNS command interfaces. */
 	ms_iocb_entry_t		*ms_iocb;
 	dma_addr_t		ms_iocb_dma;
 	struct ct_sns_pkt	*ct_sns;
 	dma_addr_t		ct_sns_dma;
+	/* SNS command interfaces for 2200. */
+	struct sns_cmd_pkt	*sns_cmd;
+	dma_addr_t		sns_cmd_dma;
 
 	pid_t			dpc_pid;
 	int			dpc_should_die;

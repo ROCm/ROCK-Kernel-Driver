@@ -2921,37 +2921,59 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			continue;
 		}
 
-		/* Get consistent memory allocated for MS IOCB */
-		ha->ms_iocb = pci_alloc_consistent(ha->pdev,
-		    sizeof(ms_iocb_entry_t), &ha->ms_iocb_dma);
-		if (ha->ms_iocb == NULL) {
-			/* error */
-			qla_printk(KERN_WARNING, ha,
-			    "Memory Allocation failed - ms_iocb\n");
+		/* Allocate memory for SNS commands */
+		if (IS_QLA2200(ha)) {
+			/* Get consistent memory allocated for SNS commands */
+			ha->sns_cmd = pci_alloc_consistent(ha->pdev,
+			    sizeof(struct sns_cmd_pkt), &ha->sns_cmd_dma);
+			if (ha->sns_cmd == NULL) {
+				/* error */
+				qla_printk(KERN_WARNING, ha,
+				    "Memory Allocation failed - sns_cmd\n");
 
-			qla2x00_mem_free(ha);
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+				qla2x00_mem_free(ha);
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule_timeout(HZ/10);
 
-			continue;
+				continue;
+			}
+			memset(ha->sns_cmd, 0, sizeof(struct sns_cmd_pkt));
+		} else if (!IS_QLA2100(ha)) {
+			/* Get consistent memory allocated for MS IOCB */
+			ha->ms_iocb = pci_alloc_consistent(ha->pdev,
+			    sizeof(ms_iocb_entry_t), &ha->ms_iocb_dma);
+			if (ha->ms_iocb == NULL) {
+				/* error */
+				qla_printk(KERN_WARNING, ha,
+				    "Memory Allocation failed - ms_iocb\n");
+
+				qla2x00_mem_free(ha);
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule_timeout(HZ/10);
+
+				continue;
+			}
+			memset(ha->ms_iocb, 0, sizeof(ms_iocb_entry_t));
+
+			/*
+			 * Get consistent memory allocated for CT SNS
+			 * commands
+			 */
+			ha->ct_sns = pci_alloc_consistent(ha->pdev,
+			    sizeof(struct ct_sns_pkt), &ha->ct_sns_dma);
+			if (ha->ct_sns == NULL) {
+				/* error */
+				qla_printk(KERN_WARNING, ha,
+				    "Memory Allocation failed - ct_sns\n");
+
+				qla2x00_mem_free(ha);
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule_timeout(HZ/10);
+
+				continue;
+			}
+			memset(ha->ct_sns, 0, sizeof(struct ct_sns_pkt));
 		}
-		memset(ha->ms_iocb, 0, sizeof(ms_iocb_entry_t));
-
-		/* Get consistent memory allocated for CT SNS commands */
-		ha->ct_sns = pci_alloc_consistent(ha->pdev,
-		    sizeof(struct ct_sns_pkt), &ha->ct_sns_dma);
-		if (ha->ct_sns == NULL) {
-			/* error */
-			qla_printk(KERN_WARNING, ha,
-			    "Memory Allocation failed - ct_sns\n");
-
-			qla2x00_mem_free(ha);
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/10);
-
-			continue;
-		}
-		memset(ha->ct_sns, 0, sizeof(struct ct_sns_pkt));
 
 		/* Get consistent memory allocated for Get Port Database cmd */
 		ha->iodesc_pd = pci_alloc_consistent(ha->pdev,
@@ -3027,6 +3049,12 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 		pci_free_consistent(ha->pdev, PORT_DATABASE_SIZE,
 		    ha->iodesc_pd, ha->iodesc_pd_dma);
 	}
+
+	if (ha->sns_cmd) {
+		pci_free_consistent(ha->pdev,
+		    sizeof(struct sns_cmd_pkt), ha->sns_cmd, ha->sns_cmd_dma);
+	}
+
 	if (ha->ct_sns) {
 		pci_free_consistent(ha->pdev,
 		    sizeof(struct ct_sns_pkt), ha->ct_sns, ha->ct_sns_dma);
