@@ -61,7 +61,7 @@ static char *DRIVERNAME =
 static char *DRIVERLNAME = "divas";
 char *DRIVERRELEASE = "2.0";
 
-extern void diva_os_irq_wrapper(int irq, void *context,
+extern irqreturn_t diva_os_irq_wrapper(int irq, void *context,
 				struct pt_regs *regs);
 extern int create_divas_proc(void);
 extern void remove_divas_proc(void);

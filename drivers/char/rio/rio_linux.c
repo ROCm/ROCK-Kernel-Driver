@@ -445,7 +445,7 @@ void rio_reset_interrupt (struct Host *HostP)
 }
 
 
-static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
+static irqreturn_t rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
 {
   struct Host *HostP;
   func_enter ();
@@ -506,7 +506,7 @@ static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
   if (test_and_set_bit (RIO_BOARD_INTR_LOCK, &HostP->locks)) {
     printk (KERN_ERR "Recursive interrupt! (host %d/irq%d)\n", 
             (int) ptr, HostP->Ivec);
-    return;
+    return IRQ_HANDLED;
   }
 
   RIOServiceHost(p, HostP, irq);
@@ -518,6 +518,7 @@ static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
   rio_dprintk (RIO_DEBUG_IFLOW, "rio: exit rio_interrupt (%d/%d)\n", 
                irq, HostP->Ivec); 
   func_exit ();
+  return IRQ_HANDLED;
 }
 
 
