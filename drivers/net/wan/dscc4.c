@@ -1,8 +1,8 @@
 /*
  * drivers/net/wan/dscc4/dscc4.c: a DSCC4 HDLC driver for Linux
  *
- * This software may be used and distributed according to the terms of the 
- * GNU General Public License. 
+ * This software may be used and distributed according to the terms of the
+ * GNU General Public License.
  *
  * The author may be reached as romieu@cogenit.fr.
  * Specific bug reports/asian food will be welcome.
@@ -16,7 +16,7 @@
  * I. Board Compatibility
  *
  * This device driver is designed for the Siemens PEB20534 4 ports serial
- * controller as found on Etinc PCISYNC cards. The documentation for the 
+ * controller as found on Etinc PCISYNC cards. The documentation for the
  * chipset is available at http://www.infineon.com:
  * - Data Sheet "DSCC4, DMA Supported Serial Communication Controller with
  * 4 Channels, PEB 20534 Version 2.1, PEF 20534 Version 2.1";
@@ -39,8 +39,8 @@
  * III. Driver operation
  *
  * The rx/tx operations are based on a linked list of descriptors. The driver
- * doesn't use HOLD mode any more. HOLD mode is definitely buggy and the more 
- * I tried to fix it, the more it started to look like (convoluted) software 
+ * doesn't use HOLD mode any more. HOLD mode is definitely buggy and the more
+ * I tried to fix it, the more it started to look like (convoluted) software
  * mutation of LxDA method. Errata sheet DS5 suggests to use LxDA: consider
  * this a rfc2119 MUST.
  *
@@ -153,20 +153,20 @@ struct RxFD {
 
 #define DUMMY_SKB_SIZE		64
 #define TX_LOW			8
-#define TX_RING_SIZE    32
-#define RX_RING_SIZE    32
+#define TX_RING_SIZE		32
+#define RX_RING_SIZE		32
 #define TX_TOTAL_SIZE		TX_RING_SIZE*sizeof(struct TxFD)
 #define RX_TOTAL_SIZE		RX_RING_SIZE*sizeof(struct RxFD)
 #define IRQ_RING_SIZE		64		/* Keep it a multiple of 32 */
-#define TX_TIMEOUT      (HZ/10)
-#define DSCC4_HZ_MAX	33000000
+#define TX_TIMEOUT		(HZ/10)
+#define DSCC4_HZ_MAX		33000000
 #define BRR_DIVIDER_MAX		64*0x00004000	/* Cf errata DS5 p.10 */
-#define dev_per_card	4
+#define dev_per_card		4
 #define SCC_REGISTERS_MAX	23		/* Cf errata DS5 p.4 */
 
 #define SOURCE_ID(flags)	(((flags) >> 28) & 0x03)
-#define TO_SIZE(state) (((state) >> 16) & 0x1fff)
-#define TO_STATE(len) cpu_to_le32(((len) & TxSizeMax) << 16)
+#define TO_SIZE(state)		(((state) >> 16) & 0x1fff)
+#define TO_STATE(len)		cpu_to_le32(((len) & TxSizeMax) << 16)
 #define RX_MAX(len)		((((len) >> 5) + 1) << 5)
 #define SCC_REG_START(dpriv)	(SCC_START+(dpriv->dev_id)*SCC_OFFSET)
 
@@ -262,8 +262,8 @@ struct dscc4_dev_priv {
 #define EncodingMask	0x00700000
 #define CrcMask		0x00000003
 
-#define IntRxScc0       0x10000000
-#define IntTxScc0       0x01000000
+#define IntRxScc0	0x10000000
+#define IntTxScc0	0x01000000
 
 #define TxPollCmd	0x00000400
 #define RxActivate	0x08000000
@@ -365,11 +365,11 @@ static void scc_patchl(u32 mask, u32 value, struct dscc4_dev_priv *dpriv,
 	writel(state, dev->base_addr + SCC_REG_START(dpriv) + offset);
 }
 
-static void scc_writel(u32 bits, struct dscc4_dev_priv *dpriv, 
+static void scc_writel(u32 bits, struct dscc4_dev_priv *dpriv,
 		       struct net_device *dev, int offset)
 {
 	/*
-	 * Thread-UNsafe. 
+	 * Thread-UNsafe.
 	 * As of 2002/02/16, there are no thread racing for access.
 	 */
 	dpriv->scc_regs[offset] = bits;
@@ -388,7 +388,7 @@ static u32 scc_readl_star(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	return readl(dev->base_addr + SCC_REG_START(dpriv) + STAR);
 }
 
-static inline void dscc4_do_tx(struct dscc4_dev_priv *dpriv, 
+static inline void dscc4_do_tx(struct dscc4_dev_priv *dpriv,
 			       struct net_device *dev)
 {
 	dpriv->ltda = dpriv->tx_fd_dma +
@@ -458,7 +458,7 @@ static void dscc4_release_ring(struct dscc4_dev_priv *dpriv)
 	skbuff = dpriv->tx_skbuff;
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		if (*skbuff) {
-			pci_unmap_single(pdev, tx_fd->data, (*skbuff)->len, 
+			pci_unmap_single(pdev, tx_fd->data, (*skbuff)->len,
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb(*skbuff);
 		}
@@ -469,7 +469,7 @@ static void dscc4_release_ring(struct dscc4_dev_priv *dpriv)
 	skbuff = dpriv->rx_skbuff;
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		if (*skbuff) {
-			pci_unmap_single(pdev, rx_fd->data, (*skbuff)->len, 
+			pci_unmap_single(pdev, rx_fd->data, (*skbuff)->len,
 				PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(*skbuff);
 		}
@@ -675,7 +675,7 @@ static int __init dscc4_init_one(struct pci_dev *pdev,
 	ioaddr = (unsigned long)ioremap(pci_resource_start(pdev, 0),
 					pci_resource_len(pdev, 0));
 	if (!ioaddr) {
-		printk(KERN_ERR "%s: cannot remap MMIO region %lx @ %lx\n", 
+		printk(KERN_ERR "%s: cannot remap MMIO region %lx @ %lx\n",
 			DRV_NAME, pci_resource_len(pdev, 0),
 			pci_resource_start(pdev, 0));
 		goto err_out_free_mmio_region;
@@ -718,8 +718,8 @@ static int __init dscc4_init_one(struct pci_dev *pdev,
 		goto err_out_free_irq;
 	writel(priv->iqcfg_dma, ioaddr + IQCFG);
 
-	/* 
-	 * SCC 0-3 private rx/tx irq structures 
+	/*
+	 * SCC 0-3 private rx/tx irq structures
 	 * IQRX/TXi needs to be set soon. Learned it the hard way...
 	 */
 	for (i = 0; i < dev_per_card; i++) {
@@ -756,17 +756,17 @@ static int __init dscc4_init_one(struct pci_dev *pdev,
 err_out_free_iqrx:
 	while (--i >= 0) {
 		dpriv = priv->root + i;
-		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
+		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
 				    dpriv->iqrx, dpriv->iqrx_dma);
 	}
 	i = dev_per_card;
 err_out_free_iqtx:
 	while (--i >= 0) {
 		dpriv = priv->root + i;
-		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
+		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
 				    dpriv->iqtx, dpriv->iqtx_dma);
 	}
-	pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), priv->iqcfg, 
+	pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), priv->iqcfg,
 			    priv->iqcfg_dma);
 err_out_free_irq:
 	free_irq(pdev->irq, priv->root);
@@ -782,7 +782,7 @@ err_out:
 	return -ENODEV;
 };
 
-/* 
+/*
  * Let's hope the default values are decent enough to protect my
  * feet from the user's gun - Ueimor
  */
@@ -794,8 +794,8 @@ static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 	scc_writel(LengthCheck | (HDLC_MAX_MRU >> 5), dpriv, dev, RLCR);
 
 	/*
-	 * No address recognition/crc-CCITT/cts enabled 
-	 * Shared flags transmission disabled - cf errata DS5 p.11 
+	 * No address recognition/crc-CCITT/cts enabled
+	 * Shared flags transmission disabled - cf errata DS5 p.11
 	 * Carrier detect disabled - cf errata p.14
 	 */
 	scc_writel(0x021c8000, dpriv, dev, CCR1);
@@ -959,11 +959,11 @@ static int dscc4_open(struct net_device *dev)
 	if ((ret = dscc4_wait_ack_cec(dpriv, dev, "Cec")) < 0)
 		goto err_free_ring;
 
-	/* 
+	/*
 	 * I would expect XPR near CE completion (before ? after ?).
 	 * At worst, this code won't see a late XPR and people
-	 * will have to re-issue an ifconfig (this is harmless). 
-	 * WARNING, a really missing XPR usually means a hardware 
+	 * will have to re-issue an ifconfig (this is harmless).
+	 * WARNING, a really missing XPR usually means a hardware
 	 * reset is needed. Suggestions anyone ?
 	 */
 	if ((ret = dscc4_xpr_ack(dpriv)) < 0) {
@@ -1111,10 +1111,10 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 			divider <<= 4;
 		*bps = xtal / divider;
 	} else {
-		/* 
-		 * External clock - DTE 
-		 * "state" already reflects Clock mode 0a. 
-		 * Nothing more to be done 
+		/*
+		 * External clock - DTE
+		 * "state" already reflects Clock mode 0a.
+		 * Nothing more to be done
 		 */
 		brr = 0;
 	}
@@ -1314,7 +1314,7 @@ static void dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 		goto out;
 	writel(state, ioaddr + GSTAR);
 
-	if (state & Arf) { 
+	if (state & Arf) {
 		printk(KERN_ERR "%s: failure (Arf). Harass the maintener\n",
 		       dev->name);
 		goto out;
@@ -1363,7 +1363,7 @@ try:
 			if ((dpriv->tx_current - dpriv->tx_dirty)%TX_RING_SIZE)
 				netif_wake_queue(dev);
 
-		if (netif_running(dev) && dscc4_tx_quiescent(dpriv, dev) && 
+		if (netif_running(dev) && dscc4_tx_quiescent(dpriv, dev) &&
 		    !dscc4_tx_done(dpriv))
 				dscc4_do_tx(dpriv, dev);
 		return;
@@ -1383,7 +1383,7 @@ try:
 
 			if (debug > 2)
 				dscc4_tx_print(dev, dpriv, "Alls");
-			/* 
+			/*
 			 * DataComplete can't be trusted for Tx completion.
 			 * Cf errata DS5 p.8
 			 */
@@ -1391,7 +1391,7 @@ try:
 			tx_fd = dpriv->tx_fd + cur;
 			skb = dpriv->tx_skbuff[cur];
 			if (skb) {
-				pci_unmap_single(ppriv->pdev, tx_fd->data, 
+				pci_unmap_single(ppriv->pdev, tx_fd->data,
 						 skb->len, PCI_DMA_TODEVICE);
 				if (tx_fd->state & FrameEnd) {
 					stats->tx_packets++;
@@ -1402,12 +1402,12 @@ try:
 				++dpriv->tx_dirty;
 			} else {
 				if (debug > 1)
-					printk(KERN_ERR "%s Tx: NULL skb %d\n", 
+					printk(KERN_ERR "%s Tx: NULL skb %d\n",
 						dev->name, cur);
 			}
 			/*
 			 * If the driver ends sending crap on the wire, it
-			 * will be way easier to diagnose than the (not so) 
+			 * will be way easier to diagnose than the (not so)
 			 * random freeze induced by null sized tx frames.
 			 */
 			tx_fd->data = tx_fd->next;
@@ -1418,14 +1418,14 @@ try:
 			if (!(state &= ~Alls))
 				goto try;
 		}
-		/* 
+		/*
 		 * Transmit Data Underrun
 		 */
 		if (state & Xdu) {
 			printk(KERN_ERR "%s: XDU. Ask maintainer\n", DRV_NAME);
-			dpriv->flags = NeedIDT; 
+			dpriv->flags = NeedIDT;
 			/* Tx reset */
-			writel(MTFi | Rdt, 
+			writel(MTFi | Rdt,
 			       dev->base_addr + 0x0c*dpriv->dev_id + CH0CFG);
 			writel(Action, dev->base_addr + GCMDR);
 			return;
@@ -1451,7 +1451,7 @@ try:
 			if (dpriv->flags & NeedIDT) {
 				if (debug > 2)
 					dscc4_tx_print(dev, dpriv, "Xpr");
-				ring = dpriv->tx_fd_dma + 
+				ring = dpriv->tx_fd_dma +
 				       (dpriv->tx_dirty%TX_RING_SIZE)*
 				       sizeof(struct TxFD);
 				writel(ring, scc_addr + CH0BTDA);
@@ -1462,7 +1462,7 @@ try:
 				dpriv->flags &= ~NeedIDT;
 			}
 			if (dpriv->flags & NeedIDR) {
-				ring = dpriv->rx_fd_dma + 
+				ring = dpriv->rx_fd_dma +
 				       (dpriv->rx_current%RX_RING_SIZE)*
 				       sizeof(struct RxFD);
 				writel(ring, scc_addr + CH0BRDA);
@@ -1528,13 +1528,13 @@ try:
 			cur = dpriv->rx_current%RX_RING_SIZE;
 			rx_fd = dpriv->rx_fd + cur;
 			/*
-			 * Presume we're not facing a DMAC receiver reset. 
-			 * As We use the rx size-filtering feature of the 
-			 * DSCC4, the beginning of a new frame is waiting in 
-			 * the rx fifo. I bet a Receive Data Overflow will 
+			 * Presume we're not facing a DMAC receiver reset.
+			 * As We use the rx size-filtering feature of the
+			 * DSCC4, the beginning of a new frame is waiting in
+			 * the rx fifo. I bet a Receive Data Overflow will
 			 * happen most of time but let's try and avoid it.
 			 * Btw (as for RDO) if one experiences ERR whereas
-			 * the system looks rather idle, there may be a 
+			 * the system looks rather idle, there may be a
 			 * problem with latency. In this case, increasing
 			 * RX_RING_SIZE may help.
 			 */
@@ -1612,11 +1612,11 @@ try:
 			 * This has no effect. Why ?
 			 * ORed with TxSccRes, one sees the CFG ack (for
 			 * the TX part only).
-			 */	
+			 */
 			scc_writel(RxSccRes, dpriv, dev, CMDR);
 			dpriv->flags |= RdoSet;
 
-			/* 
+			/*
 			 * Let's try and save something in the received data.
 			 * rx_current must be incremented at least once to
 			 * avoid HOLD in the BRDA-to-be-pointed desc.
@@ -1631,13 +1631,13 @@ try:
 					rx_fd->state1 |= Hold;
 					rx_fd->state2 = 0x00000000;
 					rx_fd->end = 0xbabeface;
-				} else 
+				} else
 					dscc4_rx_skb(dpriv, dev);
 			} while (1);
 
 			if (debug > 0) {
 				if (dpriv->flags & RdoSet)
-					printk(KERN_DEBUG 
+					printk(KERN_DEBUG
 					       "%s: no RDO in Rx data\n", DRV_NAME);
 			}
 #ifdef DSCC4_RDO_EXPERIMENTAL_RECOVERY
@@ -1645,7 +1645,7 @@ try:
 			 * FIXME: must the reset be this violent ?
 			 */
 #warning "FIXME: CH0BRDA"
-			writel(dpriv->rx_fd_dma + 
+			writel(dpriv->rx_fd_dma +
 			       (dpriv->rx_current%RX_RING_SIZE)*
 			       sizeof(struct RxFD), scc_addr + CH0BRDA);
 			writel(MTFi|Rdr|Idr, scc_addr + CH0CFG);
@@ -1733,7 +1733,7 @@ static int dscc4_init_ring(struct net_device *dev)
 		tx_fd->complete = 0x00000000;
 	        /* FIXME: NULL should be ok - to be tried */
 	        tx_fd->data = dpriv->tx_fd_dma;
-		(tx_fd++)->next = (u32)(dpriv->tx_fd_dma + 
+		(tx_fd++)->next = (u32)(dpriv->tx_fd_dma +
 					(++i%TX_RING_SIZE)*sizeof(*tx_fd));
 	} while (i < TX_RING_SIZE);
 
@@ -1751,7 +1751,7 @@ static int dscc4_init_ring(struct net_device *dev)
 		// FIXME: return value verifiee mais traitement suspect
 		if (try_get_rx_skb(dpriv, dev) >= 0)
 			dpriv->rx_dirty++;
-		(rx_fd++)->next = (u32)(dpriv->rx_fd_dma + 
+		(rx_fd++)->next = (u32)(dpriv->rx_fd_dma +
 					(++i%RX_RING_SIZE)*sizeof(*rx_fd));
 	} while (i < RX_RING_SIZE);
 
@@ -1777,7 +1777,7 @@ static void __exit dscc4_remove_one(struct pci_dev *pdev)
 
 	ioaddr = hdlc_to_dev(&root->hdlc)->base_addr;
 	free_irq(pdev->irq, root);
-	pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), ppriv->iqcfg, 
+	pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), ppriv->iqcfg,
 			    ppriv->iqcfg_dma);
 	for (i = 0; i < dev_per_card; i++) {
 		struct dscc4_dev_priv *dpriv = root + i;
@@ -1785,9 +1785,9 @@ static void __exit dscc4_remove_one(struct pci_dev *pdev)
 
 		unregister_hdlc_device(hdlc);
 
-		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
+		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
 				    dpriv->iqrx, dpriv->iqrx_dma);
-		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
+		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
 				    dpriv->iqtx, dpriv->iqtx_dma);
 	}
 
@@ -1803,7 +1803,7 @@ static void __exit dscc4_remove_one(struct pci_dev *pdev)
 			   pci_resource_len(pdev, 0));
 }
 
-static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding, 
+static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding,
 	unsigned short parity)
 {
 	struct net_device *dev = hdlc_to_dev(hdlc);
