@@ -1114,12 +1114,10 @@ static int __init atm_init(void)
 		printk(KERN_ERR "atmsvc_init() failed with %d\n", error);
 		goto failure;
 	}
-#ifdef CONFIG_PROC_FS
         if ((error = atm_proc_init()) < 0) {
 		printk(KERN_ERR "atm_proc_init() failed with %d\n",error);
 		goto failure;
 	}
-#endif
 	return 0;
 
 failure:
@@ -1130,9 +1128,7 @@ failure:
 
 static void __exit atm_exit(void)
 {
-#ifdef CONFIG_PROC_FS
 	atm_proc_exit();
-#endif
 	atmsvc_exit();
 	atmpvc_exit();
 }
