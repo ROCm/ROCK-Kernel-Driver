@@ -155,6 +155,13 @@ struct nfs_inode {
 
 	wait_queue_head_t	nfs_i_wait;
 
+#ifdef CONFIG_NFS_V4
+        /* NFSv4 state */
+	struct nfs4_shareowner   *ro_owner;
+	struct nfs4_shareowner   *wo_owner;
+	struct nfs4_shareowner   *rw_owner;
+#endif /* CONFIG_NFS_V4*/
+
 	struct inode		vfs_inode;
 };
 
@@ -435,28 +442,74 @@ extern void * nfs_root_data(void);
 #define NFS_JUKEBOX_RETRY_TIME (5 * HZ)
 
 #ifdef CONFIG_NFS_V4
-struct nfs4_client {
-        atomic_t                cl_count;       /* refcount */
-        u64                     cl_clientid;    /* constant */
-	 nfs4_verifier           cl_confirm;     
 
-        /*
-         * Starts a list of lockowners, linked through lo_list.
-	 */
-        struct list_head        cl_lockowners;  /* protected by state_spinlock */
+/*
+ * In a seqid-mutating op, this macro controls which error return
+ * values trigger incrementation of the seqid.
+ *
+ * from rfc 3010:
+ * The client MUST monotonically increment the sequence number for the
+ * CLOSE, LOCK, LOCKU, OPEN, OPEN_CONFIRM, and OPEN_DOWNGRADE
+ * operations.  This is true even in the event that the previous
+ * operation that used the sequence number received an error.  The only
+ * exception to this rule is if the previous operation received one of
+ * the following errors: NFSERR_STALE_CLIENTID, NFSERR_STALE_STATEID,
+ * NFSERR_BAD_STATEID, NFSERR_BAD_SEQID, NFSERR_BADXDR,
+ * NFSERR_RESOURCE, NFSERR_NOFILEHANDLE.
+ *
+ */
+#define seqid_mutating_err(err)       \
+(((err) != NFSERR_STALE_CLIENTID) &&  \
+ ((err) != NFSERR_STALE_STATEID)  &&  \
+ ((err) != NFSERR_BAD_STATEID)    &&  \
+ ((err) != NFSERR_BAD_SEQID)      &&  \
+ ((err) != NFSERR_BAD_XDR)        &&  \
+ ((err) != NFSERR_RESOURCE)       &&  \
+ ((err) != NFSERR_NOFILEHANDLE))
+
+struct nfs4_client {
+        u64                     cl_clientid;    /* constant */
+	nfs4_verifier           cl_confirm;     
+
+	u32			cl_lockowner_id;
 };
+
+/*
+* The ->so_sema is held during all shareowner seqid-mutating operations:
+* OPEN, OPEN_DOWNGRADE, and CLOSE.
+* Its purpose is to properly serialize so_seqid, as mandated by
+* the protocol.
+*/
+struct nfs4_shareowner {
+	u32                  so_id;      /* 32-bit identifier, unique */
+	struct semaphore     so_sema;
+	u32                  so_seqid;   /* protected by so_sema */
+	nfs4_stateid         so_stateid; /* protected by so_sema */
+	unsigned int         so_flags;   /* protected by so_sema */
+};
+
 
 /* nfs4proc.c */
 extern int nfs4_proc_renew(struct nfs_server *server);
 
 /* nfs4renewd.c */
 extern int nfs4_init_renewd(struct nfs_server *server);
-#endif /* CONFIG_NFS_V4 */
 
-#ifdef CONFIG_NFS_V4
-
+/* nfs4state.c */
 extern struct nfs4_client *nfs4_get_client(void);
 extern void nfs4_put_client(struct nfs4_client *clp);
+extern struct nfs4_shareowner * nfs4_get_shareowner(struct inode *inode);
+void nfs4_put_shareowner(struct inode *inode, struct nfs4_shareowner *sp);
+extern int nfs4_set_inode_share(struct inode * inode,
+                     struct nfs4_shareowner *sp, unsigned int flags);
+extern void nfs4_increment_seqid(u32 status, struct nfs4_shareowner *sp);
+extern int nfs4_test_shareowner(struct inode *inode, unsigned int open_flags);
+struct nfs4_shareowner * nfs4_get_inode_share(struct inode * inode, unsigned int open_flags);
+
+
+
+
+
 
 struct nfs4_mount_data;
 static inline int
@@ -481,6 +534,7 @@ destroy_nfsv4_state(struct nfs_server *server)
 #else
 #define create_nfsv4_state(server, data)  0
 #define destroy_nfsv4_state(server)       do { } while (0)
+#define nfs4_put_shareowner(inode, owner) do { } while (0)
 #endif
 
 #endif /* __KERNEL__ */

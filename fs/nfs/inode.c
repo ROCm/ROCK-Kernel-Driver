@@ -140,6 +140,10 @@ nfs_clear_inode(struct inode *inode)
 	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
+	/* Clean up the V4 state */
+	nfs4_put_shareowner(inode, nfsi->wo_owner);
+	nfs4_put_shareowner(inode, nfsi->ro_owner);
+	nfs4_put_shareowner(inode, nfsi->rw_owner);
 }
 
 void
@@ -1492,9 +1496,18 @@ static struct file_system_type nfs4_fs_type = {
 	.kill_sb	= nfs_kill_super,
 	.fs_flags	= FS_ODD_RENAME,
 };
+
+#define nfs4_zero_state(nfsi) \
+	do { \
+		(nfsi)->wo_owner = NULL; \
+		(nfsi)->ro_owner = NULL; \
+		(nfsi)->rw_owner = NULL; \
+	} while(0)
 #define register_nfs4fs() register_filesystem(&nfs4_fs_type)
 #define unregister_nfs4fs() unregister_filesystem(&nfs4_fs_type)
 #else
+#define nfs4_zero_state(nfsi) \
+	do { } while (0)
 #define register_nfs4fs() (0)
 #define unregister_nfs4fs()
 #endif
@@ -1516,6 +1529,7 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 		return NULL;
 	nfsi->flags = 0;
 	nfsi->mm_cred = NULL;
+	nfs4_zero_state(nfsi);
 	return &nfsi->vfs_inode;
 }
 
