@@ -54,57 +54,6 @@
 *******************************************************************************
 */
 
-/*
-**	This file contains definitions and code that the 
-**	sym53c8xx and ncr53c8xx drivers should share.
-**	The sharing will be achieved in a further version  
-**	of the driver bundle. For now, only the ncr53c8xx 
-**	driver includes this file.
-*/
-
-/*==========================================================
-**
-**	Hmmm... What complex some PCI-HOST bridges actually 
-**	are, despite the fact that the PCI specifications 
-**	are looking so smart and simple! ;-)
-**
-**==========================================================
-*/
-
-/*==========================================================
-**
-**	Miscallaneous defines.
-**
-**==========================================================
-*/
-
-#define u_char		unsigned char
-#define u_long		unsigned long
-
-#ifndef bzero
-#define bzero(d, n)	memset((d), 0, (n))
-#endif
- 
-/*==========================================================
-**
-**	assert ()
-**
-**==========================================================
-**
-**	modified copy from 386bsd:/usr/include/sys/assert.h
-**
-**----------------------------------------------------------
-*/
-
-#define	assert(expression) { \
-	if (!(expression)) { \
-		(void)panic( \
-			"assertion \"%s\" failed: file \"%s\", line %d\n", \
-			#expression, \
-			__FILE__, __LINE__); \
-	} \
-}
-
 /*==========================================================
 **
 **	Debugging tags
@@ -137,169 +86,21 @@ static int ncr_debug = SCSI_NCR_DEBUG_FLAGS;
 	#define DEBUG_FLAGS	SCSI_NCR_DEBUG_FLAGS
 #endif
 
-/*==========================================================
-**
-**	A la VMS/CAM-3 queue management.
-**	Implemented from linux list management.
-**
-**==========================================================
-*/
-
-typedef struct xpt_quehead {
-	struct xpt_quehead *flink;	/* Forward  pointer */
-	struct xpt_quehead *blink;	/* Backward pointer */
-} XPT_QUEHEAD;
-
-#define xpt_que_init(ptr) do { \
-	(ptr)->flink = (ptr); (ptr)->blink = (ptr); \
-} while (0)
-
-static inline void __xpt_que_add(struct xpt_quehead * new,
-	struct xpt_quehead * blink,
-	struct xpt_quehead * flink)
+static inline struct list_head *ncr_list_pop(struct list_head *head)
 {
-	flink->blink	= new;
-	new->flink	= flink;
-	new->blink	= blink;
-	blink->flink	= new;
-}
+	if (!list_empty(head)) {
+		struct list_head *elem = head->next;
 
-static inline void __xpt_que_del(struct xpt_quehead * blink,
-	struct xpt_quehead * flink)
-{
-	flink->blink = blink;
-	blink->flink = flink;
-}
-
-static inline int xpt_que_empty(struct xpt_quehead *head)
-{
-	return head->flink == head;
-}
-
-static inline void xpt_que_splice(struct xpt_quehead *list,
-	struct xpt_quehead *head)
-{
-	struct xpt_quehead *first = list->flink;
-
-	if (first != list) {
-		struct xpt_quehead *last = list->blink;
-		struct xpt_quehead *at   = head->flink;
-
-		first->blink = head;
-		head->flink  = first;
-
-		last->flink = at;
-		at->blink   = last;
+		list_del(elem);
+		return elem;
 	}
+
+	return NULL;
 }
-
-#define xpt_que_entry(ptr, type, member) \
-	((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
-
-
-#define xpt_insque(new, pos)		__xpt_que_add(new, pos, (pos)->flink)
-
-#define xpt_remque(el)			__xpt_que_del((el)->blink, (el)->flink)
-
-#define xpt_insque_head(new, head)	__xpt_que_add(new, head, (head)->flink)
-
-static inline struct xpt_quehead *xpt_remque_head(struct xpt_quehead *head)
-{
-	struct xpt_quehead *elem = head->flink;
-
-	if (elem != head)
-		__xpt_que_del(head, elem->flink);
-	else
-		elem = NULL;
-	return elem;
-}
-
-#define xpt_insque_tail(new, head)	__xpt_que_add(new, (head)->blink, head)
-
-static inline struct xpt_quehead *xpt_remque_tail(struct xpt_quehead *head)
-{
-	struct xpt_quehead *elem = head->blink;
-
-	if (elem != head)
-		__xpt_que_del(elem->blink, head);
-	else
-		elem = 0;
-	return elem;
-}
-
-
-/*==========================================================
-**
-**	SMP threading.
-**
-**	Assuming that SMP systems are generally high end 
-**	systems and may use several SCSI adapters, we are 
-**	using one lock per controller instead of some global 
-**	one. For the moment (linux-2.1.95), driver's entry 
-**	points are called with the 'io_request_lock' lock 
-**	held, so:
-**	- We are uselessly loosing a couple of micro-seconds 
-**	  to lock the controller data structure.
-**	- But the driver is not broken by design for SMP and 
-**	  so can be more resistant to bugs or bad changes in 
-**	  the IO sub-system code.
-**	- A small advantage could be that the interrupt code 
-**	  is grained as wished (e.g.: by controller).
-**
-**==========================================================
-*/
-
-spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
-#define	NCR_LOCK_DRIVER(flags)     spin_lock_irqsave(&DRIVER_SMP_LOCK, flags)
-#define	NCR_UNLOCK_DRIVER(flags)   \
-		spin_unlock_irqrestore(&DRIVER_SMP_LOCK, flags)
-
-#define NCR_INIT_LOCK_NCB(np)      spin_lock_init(&np->smp_lock)
-#define	NCR_LOCK_NCB(np, flags)    spin_lock_irqsave(&np->smp_lock, flags)
-#define	NCR_UNLOCK_NCB(np, flags)  spin_unlock_irqrestore(&np->smp_lock, flags)
-
-#define	NCR_LOCK_SCSI_DONE(host, flags) \
-		spin_lock_irqsave((host)->host_lock, flags)
-#define	NCR_UNLOCK_SCSI_DONE(host, flags) \
-		spin_unlock_irqrestore(((host)->host_lock), flags)
-
-/*==========================================================
-**
-**	Memory mapped IO
-**
-**	Since linux-2.1, we must use ioremap() to map the io 
-**	memory space and iounmap() to unmap it. This allows 
-**	portability. Linux 1.3.X and 2.0.X allow to remap 
-**	physical pages addresses greater than the highest 
-**	physical memory address to kernel virtual pages with 
-**	vremap() / vfree(). That was not portable but worked 
-**	with i386 architecture.
-**
-**==========================================================
-*/
 
 #ifdef __sparc__
 #include <asm/irq.h>
 #endif
-
-#define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
-
-/*==========================================================
-**
-**	Insert a delay in micro-seconds and milli-seconds.
-**
-**	Under Linux, udelay() is restricted to delay < 
-**	1 milli-second. In fact, it generally works for up 
-**	to 1 second delay. Since 2.1.105, the mdelay() function 
-**	is provided for delays in milli-seconds.
-**	Under 2.0 kernels, udelay() is an inline function 
-**	that is very inaccurate on Pentium processors.
-**
-**==========================================================
-*/
-
-#define UDELAY udelay
-#define MDELAY mdelay
 
 /*==========================================================
 **
@@ -318,8 +119,6 @@ spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
 **
 **==========================================================
 */
-
-#define __GetFreePages(flags, order) __get_free_pages(flags, order)
 
 #define MEMO_SHIFT	4	/* 16 bytes minimum memory chunk */
 #if PAGE_SIZE >= 8192
@@ -356,10 +155,6 @@ typedef struct m_pool {		/* Memory pool of a given kind */
 	m_bush_t bush;
 	m_addr_t (*getp)(struct m_pool *);
 	void (*freep)(struct m_pool *, m_addr_t);
-#define M_GETP()		mp->getp(mp)
-#define M_FREEP(p)		mp->freep(mp, p)
-#define GetPages()		__GetFreePages(MEMO_GFP_FLAGS, MEMO_PAGE_ORDER)
-#define FreePages(p)		free_pages(p, MEMO_PAGE_ORDER)
 	int nump;
 	m_vtob_s *(vtob[VTOB_HASH_SIZE]);
 	struct m_pool *next;
@@ -385,7 +180,7 @@ static void *___m_alloc(m_pool_s *mp, int size)
 	j = i;
 	while (!h[j].next) {
 		if (s == (PAGE_SIZE << MEMO_PAGE_ORDER)) {
-			h[j].next = (m_link_s *) M_GETP();
+			h[j].next = (m_link_s *)mp->getp(mp);
 			if (h[j].next)
 				h[j].next->next = NULL;
 			break;
@@ -434,7 +229,7 @@ static void ___m_free(m_pool_s *mp, void *ptr, int size)
 	while (1) {
 #ifdef MEMO_FREE_UNUSED
 		if (s == (PAGE_SIZE << MEMO_PAGE_ORDER)) {
-			M_FREEP(a);
+			mp->freep(mp, a);
 			break;
 		}
 #endif
@@ -455,6 +250,8 @@ static void ___m_free(m_pool_s *mp, void *ptr, int size)
 	}
 }
 
+static spinlock_t ncr53c8xx_lock = SPIN_LOCK_UNLOCKED;
+
 static void *__m_calloc2(m_pool_s *mp, int size, char *name, int uflags)
 {
 	void *p;
@@ -465,7 +262,7 @@ static void *__m_calloc2(m_pool_s *mp, int size, char *name, int uflags)
 		printk ("new %-10s[%4d] @%p.\n", name, size, p);
 
 	if (p)
-		bzero(p, size);
+		memset(p, 0, size);
 	else if (uflags & MEMO_WARN)
 		printk (NAME53C8XX ": failed to allocate %s[%d]\n", name, size);
 
@@ -491,7 +288,7 @@ static void __m_free(m_pool_s *mp, void *ptr, int size, char *name)
 
 static m_addr_t ___mp0_getp(m_pool_s *mp)
 {
-	m_addr_t m = GetPages();
+	m_addr_t m = __get_free_pages(MEMO_GFP_FLAGS, MEMO_PAGE_ORDER);
 	if (m)
 		++mp->nump;
 	return m;
@@ -499,7 +296,7 @@ static m_addr_t ___mp0_getp(m_pool_s *mp)
 
 static void ___mp0_freep(m_pool_s *mp, m_addr_t m)
 {
-	FreePages(m);
+	free_pages(m, MEMO_PAGE_ORDER);
 	--mp->nump;
 }
 
@@ -569,7 +366,7 @@ static m_pool_s *___cre_dma_pool(m_bush_t bush)
 	m_pool_s *mp;
 	mp = __m_calloc(&mp0, sizeof(*mp), "MPOOL");
 	if (mp) {
-		bzero(mp, sizeof(*mp));
+		memset(mp, 0, sizeof(*mp));
 		mp->bush = bush;
 		mp->getp = ___dma_getp;
 		mp->freep = ___dma_freep;
@@ -597,7 +394,7 @@ static void *__m_calloc_dma(m_bush_t bush, int size, char *name)
 	struct m_pool *mp;
 	void *m = NULL;
 
-	NCR_LOCK_DRIVER(flags);
+	spin_lock_irqsave(&ncr53c8xx_lock, flags);
 	mp = ___get_dma_pool(bush);
 	if (!mp)
 		mp = ___cre_dma_pool(bush);
@@ -605,7 +402,7 @@ static void *__m_calloc_dma(m_bush_t bush, int size, char *name)
 		m = __m_calloc(mp, size, name);
 	if (mp && !mp->nump)
 		___del_dma_pool(mp);
-	NCR_UNLOCK_DRIVER(flags);
+	spin_unlock_irqrestore(&ncr53c8xx_lock, flags);
 
 	return m;
 }
@@ -615,13 +412,13 @@ static void __m_free_dma(m_bush_t bush, void *m, int size, char *name)
 	u_long flags;
 	struct m_pool *mp;
 
-	NCR_LOCK_DRIVER(flags);
+	spin_lock_irqsave(&ncr53c8xx_lock, flags);
 	mp = ___get_dma_pool(bush);
 	if (mp)
 		__m_free(mp, m, size, name);
 	if (mp && !mp->nump)
 		___del_dma_pool(mp);
-	NCR_UNLOCK_DRIVER(flags);
+	spin_unlock_irqrestore(&ncr53c8xx_lock, flags);
 }
 
 static m_addr_t __vtobus(m_bush_t bush, void *m)
@@ -632,14 +429,14 @@ static m_addr_t __vtobus(m_bush_t bush, void *m)
 	m_vtob_s *vp = NULL;
 	m_addr_t a = ((m_addr_t) m) & ~MEMO_CLUSTER_MASK;
 
-	NCR_LOCK_DRIVER(flags);
+	spin_lock_irqsave(&ncr53c8xx_lock, flags);
 	mp = ___get_dma_pool(bush);
 	if (mp) {
 		vp = mp->vtob[hc];
 		while (vp && (m_addr_t) vp->vaddr != a)
 			vp = vp->next;
 	}
-	NCR_UNLOCK_DRIVER(flags);
+	spin_unlock_irqrestore(&ncr53c8xx_lock, flags);
 	return vp ? vp->baddr + (((m_addr_t) m) - a) : 0;
 }
 
@@ -658,99 +455,88 @@ static m_addr_t __vtobus(m_bush_t bush, void *m)
 #define __data_mapped	SCp.phase
 #define __data_mapping	SCp.have_data_in
 
-static void __unmap_scsi_data(struct device *dev, Scsi_Cmnd *cmd)
+static void __unmap_scsi_data(struct device *dev, struct scsi_cmnd *cmd)
 {
-	enum dma_data_direction dma_dir = 
-		(enum dma_data_direction)scsi_to_pci_dma_dir(cmd->sc_data_direction);
-
 	switch(cmd->__data_mapped) {
 	case 2:
-		dma_unmap_sg(dev, cmd->buffer, cmd->use_sg, dma_dir);
+		dma_unmap_sg(dev, cmd->buffer, cmd->use_sg,
+				cmd->sc_data_direction);
 		break;
 	case 1:
 		dma_unmap_single(dev, cmd->__data_mapping,
-				 cmd->request_bufflen, dma_dir);
+				 cmd->request_bufflen,
+				 cmd->sc_data_direction);
 		break;
 	}
 	cmd->__data_mapped = 0;
 }
 
-static u_long __map_scsi_single_data(struct device *dev, Scsi_Cmnd *cmd)
+static u_long __map_scsi_single_data(struct device *dev, struct scsi_cmnd *cmd)
 {
 	dma_addr_t mapping;
-	enum dma_data_direction dma_dir = 
-		(enum dma_data_direction)scsi_to_pci_dma_dir(cmd->sc_data_direction);
-
 
 	if (cmd->request_bufflen == 0)
 		return 0;
 
 	mapping = dma_map_single(dev, cmd->request_buffer,
-				 cmd->request_bufflen, dma_dir);
+				 cmd->request_bufflen,
+				 cmd->sc_data_direction);
 	cmd->__data_mapped = 1;
 	cmd->__data_mapping = mapping;
 
 	return mapping;
 }
 
-static int __map_scsi_sg_data(struct device *dev, Scsi_Cmnd *cmd)
+static int __map_scsi_sg_data(struct device *dev, struct scsi_cmnd *cmd)
 {
 	int use_sg;
-	enum dma_data_direction dma_dir = 
-		(enum dma_data_direction)scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
 	if (cmd->use_sg == 0)
 		return 0;
 
-	use_sg = dma_map_sg(dev, cmd->buffer, cmd->use_sg, dma_dir);
+	use_sg = dma_map_sg(dev, cmd->buffer, cmd->use_sg,
+			cmd->sc_data_direction);
 	cmd->__data_mapped = 2;
 	cmd->__data_mapping = use_sg;
 
 	return use_sg;
 }
 
-static void __sync_scsi_data_for_cpu(struct device *dev, Scsi_Cmnd *cmd)
+static void __sync_scsi_data_for_cpu(struct device *dev, struct scsi_cmnd *cmd)
 {
-	enum dma_data_direction dma_dir = 
-		(enum dma_data_direction)scsi_to_pci_dma_dir(cmd->sc_data_direction);
-
 	switch(cmd->__data_mapped) {
 	case 2:
-		dma_sync_sg_for_cpu(dev, cmd->buffer, cmd->use_sg, dma_dir);
+		dma_sync_sg_for_cpu(dev, cmd->buffer, cmd->use_sg,
+				cmd->sc_data_direction);
 		break;
 	case 1:
 		dma_sync_single_for_cpu(dev, cmd->__data_mapping,
-					cmd->request_bufflen, dma_dir);
+					cmd->request_bufflen,
+					cmd->sc_data_direction);
 		break;
 	}
 }
 
-static void __sync_scsi_data_for_device(struct device *dev, Scsi_Cmnd *cmd)
+static void __sync_scsi_data_for_device(struct device *dev, struct scsi_cmnd *cmd)
 {
-	enum dma_data_direction dma_dir =
-		(enum dma_data_direction)scsi_to_pci_dma_dir(cmd->sc_data_direction);
-
 	switch(cmd->__data_mapped) {
 	case 2:
-		dma_sync_sg_for_device(dev, cmd->buffer, cmd->use_sg, dma_dir);
+		dma_sync_sg_for_device(dev, cmd->buffer, cmd->use_sg,
+				cmd->sc_data_direction);
 		break;
 	case 1:
 		dma_sync_single_for_device(dev, cmd->__data_mapping,
-					   cmd->request_bufflen, dma_dir);
+					   cmd->request_bufflen,
+					   cmd->sc_data_direction);
 		break;
 	}
 }
-
-#define scsi_sg_dma_address(sc)		sg_dma_address(sc)
-#define scsi_sg_dma_len(sc)		sg_dma_len(sc)
 
 #define unmap_scsi_data(np, cmd)	__unmap_scsi_data(np->dev, cmd)
 #define map_scsi_single_data(np, cmd)	__map_scsi_single_data(np->dev, cmd)
 #define map_scsi_sg_data(np, cmd)	__map_scsi_sg_data(np->dev, cmd)
 #define sync_scsi_data_for_cpu(np, cmd)	__sync_scsi_data_for_cpu(np->dev, cmd)
 #define sync_scsi_data_for_device(np, cmd) __sync_scsi_data_for_device(np->dev, cmd)
-
-#define scsi_data_direction(cmd)	(cmd->sc_data_direction)
 
 /*==========================================================
 **
@@ -773,58 +559,6 @@ static struct ncr_driver_setup
 #define initverbose (driver_setup.verbose)
 #define bootverbose (np->verbose)
 
-
-/*===================================================================
-**
-**	Utility routines that protperly return data through /proc FS.
-**
-**===================================================================
-*/
-#ifdef SCSI_NCR_USER_INFO_SUPPORT
-
-struct info_str
-{
-	char *buffer;
-	int length;
-	int offset;
-	int pos;
-};
-
-static void copy_mem_info(struct info_str *info, char *data, int len)
-{
-	if (info->pos + len > info->length)
-		len = info->length - info->pos;
-
-	if (info->pos + len < info->offset) {
-		info->pos += len;
-		return;
-	}
-	if (info->pos < info->offset) {
-		data += (info->offset - info->pos);
-		len  -= (info->offset - info->pos);
-	}
-
-	if (len > 0) {
-		memcpy(info->buffer + info->pos, data, len);
-		info->pos += len;
-	}
-}
-
-static int copy_info(struct info_str *info, char *fmt, ...)
-{
-	va_list args;
-	char buf[81];
-	int len;
-
-	va_start(args, fmt);
-	len = vsprintf(buf, fmt, args);
-	va_end(args);
-
-	copy_mem_info(info, buf, len);
-	return len;
-}
-
-#endif
 
 /*===================================================================
 **

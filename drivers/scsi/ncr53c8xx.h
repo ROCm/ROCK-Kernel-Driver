@@ -44,8 +44,6 @@
 
 #include <scsi/scsi_host.h>
 
-typedef	u_long		vm_offset_t;
-
 #include "sym53c8xx_defs.h"
 
 /*

@@ -66,19 +66,12 @@
 
 #include <linux/config.h>
 
-/* These options are not tunable from 'make config' */
-#define	SCSI_NCR_PROC_INFO_SUPPORT
-
 /*
 **	If you want a driver as small as possible, donnot define the 
 **	following options.
 */
 #define SCSI_NCR_BOOT_COMMAND_LINE_SUPPORT
 #define SCSI_NCR_DEBUG_INFO_SUPPORT
-#ifdef	SCSI_NCR_PROC_INFO_SUPPORT
-#	define	SCSI_NCR_USER_COMMAND_SUPPORT
-#	define	SCSI_NCR_USER_INFO_SUPPORT
-#endif
 
 /*
 **	To disable integrity checking, do not define the 
