@@ -56,6 +56,11 @@ ToDo/Notes:
 	  ntfs_prepare_write().
 	- Remove unused function fs/ntfs/runlist.c::ntfs_rl_merge().  (Adrian
 	  Bunk)
+	- Fix stupid bug in fs/ntfs/attrib.c::ntfs_attr_find() that resulted in
+	  a NULL pointer dereference in the error code path when a corrupt
+	  attribute was found.  (Thanks to Domen Puncer for the bug report.)
+	- Add MODULE_VERSION() to fs/ntfs/super.c.
+	- Make several functions and variables static.  (Adrian Bunk)
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 

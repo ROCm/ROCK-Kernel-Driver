@@ -44,6 +44,10 @@
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;
 
+/* A global default upcase table and a corresponding reference count. */
+static ntfschar *default_upcase = NULL;
+static unsigned long ntfs_nr_upcase_users = 0;
+
 /* Error constants/strings used in inode.c::ntfs_show_options(). */
 typedef enum {
 	/* One of these must be present, default is ON_ERRORS_CONTINUE. */
@@ -2175,7 +2179,7 @@ static int ntfs_statfs(struct super_block *sb, struct kstatfs *sfs)
 /**
  * The complete super operations.
  */
-struct super_operations ntfs_sops = {
+static struct super_operations ntfs_sops = {
 	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
 	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
 	.put_inode	= ntfs_put_inode,	  /* VFS: Called just before
@@ -2592,10 +2596,6 @@ static void ntfs_big_inode_init_once(void *foo, kmem_cache_t *cachep,
  */
 kmem_cache_t *ntfs_attr_ctx_cache;
 kmem_cache_t *ntfs_index_ctx_cache;
-
-/* A global default upcase table and a corresponding reference count. */
-ntfschar *default_upcase = NULL;
-unsigned long ntfs_nr_upcase_users = 0;
 
 /* Driver wide semaphore. */
 DECLARE_MUTEX(ntfs_lock);
