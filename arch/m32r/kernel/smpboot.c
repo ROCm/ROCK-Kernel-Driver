@@ -2,7 +2,7 @@
  *  linux/arch/m32r/kernel/smpboot.c
  *    orig : i386 2.4.10
  *
- *  MITSUBISHI M32R SMP booting functions
+ *  M32R SMP booting functions
  *
  *  Copyright (c) 2001, 2002, 2003  Hitoshi Yamamoto
  *
@@ -38,8 +38,6 @@
  *	Maciej W. Rozycki	:	Bits for genuine 82489DX APICs
  *		Martin J. Bligh	: 	Added support for multi-quad systems
  */
-
-/* $Id$ */
 
 #include <linux/config.h>
 #include <linux/init.h>
@@ -117,7 +115,6 @@ unsigned long cache_decay_ticks = HZ / 100;
 
 void smp_prepare_boot_cpu(void);
 void smp_prepare_cpus(unsigned int);
-static struct task_struct *fork_by_hand(void);
 static void smp_tune_scheduling(void);
 static void init_ipi_lock(void);
 static void do_boot_cpu(int);
@@ -238,20 +235,6 @@ smp_done:
 	Dprintk("Boot done.\n");
 }
 
-/*
- * fork_by_hand : This routin executes do_fork for APs idle process.
- */
-static struct task_struct * __init fork_by_hand(void)
-{
-	struct pt_regs regs = { 0 };
-
-	/*
-	 * don't care about the eip and regs settings since
-	 * we'll never reschedule the forked task.
-	 */
-	return copy_process(CLONE_VM | CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-}
-
 static void __init smp_tune_scheduling(void)
 {
 	/* Nothing to do. */
@@ -297,18 +280,11 @@ static void __init do_boot_cpu(int phys_id)
 	 * We can't use kernel_thread since we must avoid to
 	 * reschedule the child.
 	 */
-	idle = fork_by_hand();
+	idle = fork_idle(cpu_id);
 	if (IS_ERR(idle))
 		panic("failed fork for CPU#%d.", cpu_id);
-	wake_up_forked_process(idle);
 
-	/*
-	 * We remove it from the pidhash and the runqueue
-	 * once we got the process:
-	 */
-	init_idle(idle, cpu_id);
 	idle->thread.lr = (unsigned long)start_secondary;
-	unhash_process(idle);
 
 	map_cpu_to_physid(cpu_id, phys_id);
 

@@ -21,6 +21,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/profile.h>
+#include <linux/cpu.h>
 
 #include <asm/cacheflush.h>
 #include <asm/pgalloc.h>
@@ -130,6 +131,7 @@ unsigned long send_IPI_mask_phys(cpumask_t, int, int);
  *==========================================================================*/
 void smp_send_reschedule(int cpu_id)
 {
+	WARN_ON(cpu_is_offline(cpu_id));
 	send_IPI_mask(cpumask_of_cpu(cpu_id), RESCHEDULE_IPI, 1);
 }
 
@@ -394,7 +396,6 @@ void smp_flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
 static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	struct vm_area_struct *vma, unsigned long va)
 {
-	cpumask_t tmp;
 	unsigned long *mask;
 #ifdef DEBUG_SMP
 	unsigned long flags;
@@ -412,10 +413,13 @@ static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	 */
 	BUG_ON(cpus_empty(cpumask));
 
-	cpus_and(tmp, cpumask, cpu_online_map);
-	BUG_ON(!cpus_equal(cpumask, tmp));
 	BUG_ON(cpu_isset(smp_processor_id(), cpumask));
 	BUG_ON(!mm);
+
+	/* If a CPU which we ran on has gone down, OK. */
+	cpus_and(cpumask, cpumask, cpu_online_map);
+	if (cpus_empty(cpumask))
+		return;
 
 	/*
 	 * i'm not happy about this global shared spinlock in the
@@ -592,7 +596,7 @@ int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
 	int wait)
 {
 	struct call_data_struct data;
-	int cpus = num_online_cpus() - 1;
+	int cpus;
 
 #ifdef DEBUG_SMP
 	unsigned long flags;
@@ -601,8 +605,14 @@ int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
 		BUG();
 #endif /* DEBUG_SMP */
 
-	if (!cpus)
+	/* Holding any lock stops cpus from going down. */
+	spin_lock(&call_lock);
+	cpus = num_online_cpus() - 1;
+
+	if (!cpus) {
+		spin_unlock(&call_lock);
 		return 0;
+	}
 
 	/* Can deadlock when called with interrupts disabled */
 	WARN_ON(irqs_disabled());
@@ -614,7 +624,6 @@ int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
 	if (wait)
 		atomic_set(&data.finished, 0);
 
-	spin_lock(&call_lock);
 	call_data = &data;
 	mb();
 
