@@ -588,8 +588,6 @@ struct cyclades_port {
 	int                     breakon;
 	int                     breakoff;
 	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
 	unsigned char 		*xmit_buf;
 	int			xmit_head;
 	int			xmit_tail;
@@ -599,7 +597,6 @@ struct cyclades_port {
 	unsigned long		jiffies[3];
 	unsigned long		rflush_count;
 	struct termios		normal_termios;
-	struct termios		callout_termios;
 	struct cyclades_monitor	mon;
 	struct cyclades_idle_stats	idle_stats;
 	struct cyclades_icount	icount;

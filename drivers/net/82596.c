@@ -501,7 +501,7 @@ static void i596_display_data(struct net_device *dev)
 
 
 #if defined(ENABLE_MVME16x_NET) || defined(ENABLE_BVME6000_NET)
-static void i596_error(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t i596_error(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 #ifdef ENABLE_MVME16x_NET
@@ -522,6 +522,7 @@ static void i596_error(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 	printk(KERN_ERR "%s: Error interrupt\n", dev->name);
 	i596_display_data(dev);
+	return IRQ_HANDLED;
 }
 #endif
 
@@ -1004,13 +1005,13 @@ static int i596_open(struct net_device *dev)
 
 	DEB(DEB_OPEN,printk(KERN_DEBUG "%s: i596_open() irq %d.\n", dev->name, dev->irq));
 
-	if (request_irq(dev->irq, &i596_interrupt, 0, "i82596", dev)) {
+	if (request_irq(dev->irq, i596_interrupt, 0, "i82596", dev)) {
 		printk(KERN_ERR "%s: IRQ %d not free\n", dev->name, dev->irq);
 		return -EAGAIN;
 	}
 #ifdef ENABLE_MVME16x_NET
 	if (MACH_IS_MVME16x) {
-		if (request_irq(0x56, &i596_error, 0, "i82596_error", dev))
+		if (request_irq(0x56, i596_error, 0, "i82596_error", dev))
 			return -EAGAIN;
 	}
 #endif

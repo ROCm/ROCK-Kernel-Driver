@@ -155,8 +155,6 @@ struct m68k_serial {
 	int			line;
 	int			count;	    /* # of fd on device */
 	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
 	unsigned char 		*xmit_buf;
 	int			xmit_head;
 	int			xmit_tail;
@@ -164,7 +162,6 @@ struct m68k_serial {
 	struct work_struct	tqueue;
 	struct work_struct	tqueue_hangup;
 	struct termios		normal_termios;
-	struct termios		callout_termios;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 };

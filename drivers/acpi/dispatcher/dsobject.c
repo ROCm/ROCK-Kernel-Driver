@@ -204,7 +204,8 @@ acpi_ds_build_internal_buffer_obj (
 
 	if (obj_desc->buffer.length == 0) {
 		obj_desc->buffer.pointer = NULL;
-		ACPI_REPORT_WARNING (("Buffer created with zero length in AML\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+			"Buffer defined with zero length in AML, creating\n"));
 	}
 	else {
 		obj_desc->buffer.pointer = ACPI_MEM_CALLOCATE (

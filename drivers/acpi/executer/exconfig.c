@@ -360,11 +360,11 @@ acpi_ex_load_op (
 	/* The table must be either an SSDT or a PSDT */
 
 	if ((!ACPI_STRNCMP (table_ptr->signature,
-			  acpi_gbl_acpi_table_data[ACPI_TABLE_PSDT].signature,
-			  acpi_gbl_acpi_table_data[ACPI_TABLE_PSDT].sig_length)) &&
+			  acpi_gbl_table_data[ACPI_TABLE_PSDT].signature,
+			  acpi_gbl_table_data[ACPI_TABLE_PSDT].sig_length)) &&
 		(!ACPI_STRNCMP (table_ptr->signature,
-				 acpi_gbl_acpi_table_data[ACPI_TABLE_SSDT].signature,
-				 acpi_gbl_acpi_table_data[ACPI_TABLE_SSDT].sig_length))) {
+				 acpi_gbl_table_data[ACPI_TABLE_SSDT].signature,
+				 acpi_gbl_table_data[ACPI_TABLE_SSDT].sig_length))) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Table has invalid signature [%4.4s], must be SSDT or PSDT\n",
 			table_ptr->signature));

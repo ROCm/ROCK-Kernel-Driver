@@ -2315,7 +2315,7 @@ ixgb_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 	case SYS_DOWN:
 	case SYS_HALT:
 	case SYS_POWER_OFF:
-		pci_for_each_dev(pdev) {
+		while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 			if (pci_dev_driver(pdev) == &ixgb_driver)
 				ixgb_suspend(pdev, 3);
 		}

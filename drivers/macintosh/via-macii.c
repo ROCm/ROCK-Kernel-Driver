@@ -77,7 +77,7 @@ static volatile unsigned char *via;
 
 static int  macii_init_via(void);
 static void macii_start(void);
-static void macii_interrupt(int irq, void *arg, struct pt_regs *regs);
+static irqreturn_t macii_interrupt(int irq, void *arg, struct pt_regs *regs);
 static void macii_retransmit(int);
 static void macii_queue_poll(void);
 
@@ -151,7 +151,7 @@ int macii_init(void)
 	if (err) return err;
 
 	err = request_irq(IRQ_MAC_ADB, macii_interrupt, IRQ_FLG_LOCK, "ADB",
-		    macii_interrupt);
+			  macii_interrupt);
 	if (err) return err;
 
 	macii_state = idle;
@@ -410,7 +410,7 @@ static void macii_start(void)
  * Note: As of 21/10/97, the MacII ADB part works including timeout detection
  * and retransmit (Talk to the last active device).
  */
-void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
+static irqreturn_t macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
 	int x, adbdir;
 	unsigned long flags;
@@ -423,7 +423,7 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 
 	if (driver_running) {
 		local_irq_restore(flags);
-		return;
+		return IRQ_NONE;
 	}
 
 	driver_running = 1;
@@ -649,4 +649,5 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 	/* reset mutex and interrupts */
 	driver_running = 0;
 	local_irq_restore(flags);
+	return IRQ_HANDLED;
 }

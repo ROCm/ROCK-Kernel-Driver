@@ -1631,7 +1631,9 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 			error = dir->i_op->unlink(dir, dentry);
 	}
 	up(&dentry->d_inode->i_sem);
-	if (!error) {
+
+	/* We don't d_delete() NFS sillyrenamed files--they still exist. */
+	if (!error && !(dentry->d_flags & DCACHE_NFSFS_RENAMED)) {
 		d_delete(dentry);
 		inode_dir_notify(dir, DN_DELETE);
 	}
@@ -1671,7 +1673,7 @@ asmlinkage long sys_unlink(const char __user * pathname)
 			goto slashes;
 		inode = dentry->d_inode;
 		if (inode)
-			inode = igrab(inode);
+			atomic_inc(&inode->i_count);
 		error = vfs_unlink(nd.dentry->d_inode, dentry);
 	exit2:
 		dput(dentry);

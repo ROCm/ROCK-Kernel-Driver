@@ -721,8 +721,8 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 	}
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, "Solo1", sizeof(info.id));
-		strncpy(info.name, "ESS Solo1", sizeof(info.name));
+		strlcpy(info.id, "Solo1", sizeof(info.id));
+		strlcpy(info.name, "ESS Solo1", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -730,8 +730,8 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, "Solo1", sizeof(info.id));
-		strncpy(info.name, "ESS Solo1", sizeof(info.name));
+		strlcpy(info.id, "Solo1", sizeof(info.id));
+		strlcpy(info.name, "ESS Solo1", sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -915,9 +915,9 @@ static int solo1_open_mixdev(struct inode *inode, struct file *file)
 {
 	unsigned int minor = minor(inode->i_rdev);
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 		drvr = pci_dev_driver (pci_dev);
 		if (drvr != &solo1_driver)
@@ -1597,9 +1597,9 @@ static int solo1_open(struct inode *inode, struct file *file)
 	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 	
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 
 		drvr = pci_dev_driver(pci_dev);
@@ -1888,9 +1888,9 @@ static int solo1_midi_open(struct inode *inode, struct file *file)
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 
 		drvr = pci_dev_driver(pci_dev);
@@ -2113,9 +2113,9 @@ static int solo1_dmfm_open(struct inode *inode, struct file *file)
 	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 
 		drvr = pci_dev_driver(pci_dev);
@@ -2459,8 +2459,6 @@ static struct pci_driver solo1_driver = {
 
 static int __init init_solo1(void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
 	printk(KERN_INFO "solo1: version v0.20 time " __TIME__ " " __DATE__ "\n");
 	if (!pci_register_driver(&solo1_driver)) {
 		pci_unregister_driver(&solo1_driver);

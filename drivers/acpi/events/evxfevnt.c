@@ -654,7 +654,11 @@ acpi_install_gpe_block (
 		}
 
 		status = acpi_ns_attach_object (node, obj_desc, ACPI_TYPE_DEVICE);
+
+		/* Remove local reference to the object */
+
 		acpi_ut_remove_reference (obj_desc);
+
 		if (ACPI_FAILURE (status)) {
 			goto unlock_and_exit;
 		}

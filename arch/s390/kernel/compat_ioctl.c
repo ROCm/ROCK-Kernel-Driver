@@ -11,32 +11,57 @@
  *
  */
 
-#include <linux/types.h>
 #include <linux/compat.h>
-#include <linux/kernel.h>
-#include <linux/fs.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
 #include <linux/init.h>
-#include <linux/file.h>
-#include <linux/vt.h>
-#include <linux/kd.h>
-#include <linux/netdevice.h>
-#include <linux/route.h>
-#include <linux/ext2_fs.h>
-#include <linux/hdreg.h>
-#include <linux/if_bonding.h>
-#include <linux/blkpg.h>
-#include <linux/blk.h>
-#include <linux/dm-ioctl.h>
-#include <linux/loop.h>
-#include <linux/elevator.h>
+#include <linux/ioctl32.h>
+#include <linux/kernel.h>
+#include <linux/mm.h>
+#include <linux/sched.h>
+#include <linux/types.h>
+
+#include <asm/ioctls.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
+
+#include <linux/blk.h>
+#include <linux/blkpg.h>
+#include <linux/cdrom.h>
+#include <linux/dm-ioctl.h>
+#include <linux/elevator.h>
+#include <linux/file.h>
+#include <linux/fs.h>
+#include <linux/hdreg.h>
+#include <linux/kd.h>
+#include <linux/loop.h>
+#include <linux/lp.h>
+#include <linux/mtio.h>
+#include <linux/netdevice.h>
+#include <linux/nbd.h>
+#include <linux/ppp_defs.h>
+#include <linux/raid/md_u.h>
+#include <linux/random.h>
+#include <linux/raw.h>
+#include <linux/route.h>
+#include <linux/vt.h>
+#include <linux/watchdog.h>
+
+#include <linux/auto_fs.h>
+#include <linux/devfs_fs.h>
+#include <linux/ext2_fs.h>
+#include <linux/smb_fs.h>
+
+#include <linux/if_bonding.h>
+#include <linux/if_ppp.h>
+#include <linux/if_pppox.h>
+#include <linux/if_tun.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_ioctl.h>
+#include <scsi/sg.h>
+
 #include <asm/dasd.h>
-#include <asm/tape390.h>
 #include <asm/sockios.h>
-#include <asm/ioctls.h>
+#include <asm/tape390.h>
 
 #include "compat_linux.h"
 
@@ -49,7 +74,8 @@ struct hd_geometry32 {
 	__u32		start;
 };  
 
-static inline int hd_geometry_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static inline int hd_geometry_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg,
+				    struct file *f)
 {
 	struct hd_geometry32 *hg32 = (struct hd_geometry32 *) A(arg);
 	struct hd_geometry hg;
@@ -112,7 +138,8 @@ struct ifconf32 {
         __u32	ifcbuf;
 };
 
-static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int dev_ifname32(unsigned int fd, unsigned int cmd,
+			unsigned long arg, struct file *f)
 {
 	struct ireq32 *uir32 = (struct ireq32 *) A(arg);
 	struct net_device *dev;
@@ -137,8 +164,8 @@ static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return 0;
 }
 
-static inline int dev_ifconf(unsigned int fd, unsigned int cmd,
-			     unsigned long arg)
+static int dev_ifconf(unsigned int fd, unsigned int cmd,
+		      unsigned long arg, struct file *f)
 {
 	struct ioconf32 *uifc32 = (struct ioconf32 *) A(arg);
 	struct ifconf32 ifc32;
@@ -202,7 +229,8 @@ out:
 	return err;
 }
 
-static int bond_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
+static int bond_ioctl(unsigned int fd, unsigned int cmd,
+		      unsigned long arg, struct file *f)
 {
 	struct ifreq ifr;
 	mm_segment_t old_fs;
@@ -254,8 +282,8 @@ out:
 	return err;
 }
 
-static inline int dev_ifsioc(unsigned int fd, unsigned int cmd,
-			     unsigned long arg)
+static int dev_ifsioc(unsigned int fd, unsigned int cmd,
+			     unsigned long arg, struct file *f)
 {
 	struct ifreq32 *uifr = (struct ifreq32 *) A(arg);
 	struct ifreq ifr;
@@ -335,7 +363,8 @@ struct rtentry32
 	unsigned short	rt_irtt;	/* Initial RTT			*/
 };
 
-static inline int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int routing_ioctl(unsigned int fd, unsigned int cmd,
+			 unsigned long arg, struct file *f)
 {
 	struct rtentry32 *ur = (struct rtentry32 *) A(arg);
 	struct rtentry r;
@@ -364,7 +393,8 @@ static inline int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long
 	return ret;
 }
 
-static int do_ext2_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int do_ext2_ioctl(unsigned int fd, unsigned int cmd,
+			 unsigned long arg, struct file *f)
 {
 	/* These are just misnamed, they actually get/put from/to user an int */
 	switch (cmd) {
@@ -392,7 +422,8 @@ struct loop_info32 {
 	char			reserved[4];
 };
 
-static int loop_status(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int loop_status(unsigned int fd, unsigned int cmd,
+		       unsigned long arg, struct file *f)
 {
 	mm_segment_t old_fs = get_fs();
 	struct loop_info l;
@@ -448,10 +479,12 @@ struct blkpg_ioctl_arg32 {
 	u32 data;
 };
                                 
-static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd, struct blkpg_ioctl_arg32 *arg)
+static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd,
+			     unsigned long uarg, struct file *f)
 {
 	struct blkpg_ioctl_arg a;
 	struct blkpg_partition p;
+	struct blkpg_ioctl_arg32 *arg = (void*)A(uarg);
 	int err;
 	mm_segment_t old_fs = get_fs();
 	
@@ -541,7 +574,7 @@ typedef struct _ica_rsa_modexpo_crt_32 {
 #define ICAZ90HARDRESET _IOC(_IOC_NONE, ICA_IOCTL_MAGIC, 0x12, 0)
 #define ICAZ90HARDERROR _IOC(_IOC_NONE, ICA_IOCTL_MAGIC, 0x13, 0)
 
-static int do_rsa_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int do_rsa_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *f)
 {
 	mm_segment_t old_fs = get_fs();
 	int err = 0;
@@ -622,7 +655,8 @@ cleanup:
 	return err;
 }
 
-static int do_rsa_crt_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int do_rsa_crt_ioctl(unsigned int fd, unsigned int cmd,
+			    unsigned long arg, struct file *f)
 {
 	mm_segment_t old_fs = get_fs();
 	int err = 0;
@@ -745,7 +779,8 @@ cleanup:
 	return err;
 }
 
-static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg,
+		  struct file *f)
 {
 	mm_segment_t old_fs = get_fs();
 	int err;
@@ -759,216 +794,106 @@ static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return err;
 }
 
-struct ioctl32_handler {
-	unsigned int cmd;
-	int (*function)(unsigned int, unsigned int, unsigned long);
-};
+int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd,
+			 unsigned long arg, struct file *f)
+{
+	/* siocdevprivate cannot be emulated properly */
+	return -EINVAL;
+}
 
-struct ioctl32_list {
-	struct ioctl32_handler handler;
-	struct ioctl32_list *next;
-};
+#define COMPATIBLE_IOCTL(cmd)		HANDLE_IOCTL((cmd), NULL)
+#define HANDLE_IOCTL(cmd,handler)	{ (cmd), (handler), NULL },
+#define IOCTL_TABLE_START \
+	struct ioctl_trans ioctl_start[] = {
+#define IOCTL_TABLE_END \
+	}; struct ioctl_trans ioctl_end[0];
 
-#define IOCTL32_DEFAULT(cmd)		{ { cmd, (void *) sys_ioctl }, 0 }
-#define IOCTL32_HANDLER(cmd, handler)	{ { cmd, (void *) handler }, 0 }
+IOCTL_TABLE_START
+#include <linux/compat_ioctl.h>
 
-static struct ioctl32_list ioctl32_handler_table[] = {
-	IOCTL32_DEFAULT(FIBMAP),
-	IOCTL32_DEFAULT(FIGETBSZ),
+COMPATIBLE_IOCTL(DASDAPIVER)
+COMPATIBLE_IOCTL(BIODASDDISABLE)
+COMPATIBLE_IOCTL(BIODASDENABLE)
+COMPATIBLE_IOCTL(BIODASDRSRV)
+COMPATIBLE_IOCTL(BIODASDRLSE)
+COMPATIBLE_IOCTL(BIODASDSLCK)
+COMPATIBLE_IOCTL(BIODASDINFO)
+COMPATIBLE_IOCTL(BIODASDFMT)
 
-	IOCTL32_DEFAULT(DASDAPIVER),
-	IOCTL32_DEFAULT(BIODASDDISABLE),
-	IOCTL32_DEFAULT(BIODASDENABLE),
-	IOCTL32_DEFAULT(BIODASDRSRV),
-	IOCTL32_DEFAULT(BIODASDRLSE),
-	IOCTL32_DEFAULT(BIODASDSLCK),
-	IOCTL32_DEFAULT(BIODASDINFO),
-	IOCTL32_DEFAULT(BIODASDFMT),
+COMPATIBLE_IOCTL(TAPE390_DISPLAY)
+COMPATIBLE_IOCTL(BLKRASET)
+COMPATIBLE_IOCTL(BLKFRASET)
+COMPATIBLE_IOCTL(BLKBSZGET)
+COMPATIBLE_IOCTL(BLKGETSIZE64)
 
-	IOCTL32_DEFAULT(TAPE390_DISPLAY),
+HANDLE_IOCTL(HDIO_GETGEO, hd_geometry_ioctl)
 
-	IOCTL32_DEFAULT(BLKROSET),
-	IOCTL32_DEFAULT(BLKROGET),
-	IOCTL32_DEFAULT(BLKRRPART),
-	IOCTL32_DEFAULT(BLKFLSBUF),
-	IOCTL32_DEFAULT(BLKRASET),
-	IOCTL32_DEFAULT(BLKFRASET),
-	IOCTL32_DEFAULT(BLKSECTSET),
-	IOCTL32_DEFAULT(BLKSSZGET),
-	IOCTL32_DEFAULT(BLKBSZGET),
-	IOCTL32_DEFAULT(BLKGETSIZE64),
+COMPATIBLE_IOCTL(TCSBRKP)
 
-	IOCTL32_HANDLER(HDIO_GETGEO, hd_geometry_ioctl),
+COMPATIBLE_IOCTL(TIOCGSERIAL)
+COMPATIBLE_IOCTL(TIOCSSERIAL)
 
-	IOCTL32_DEFAULT(TCGETA),
-	IOCTL32_DEFAULT(TCSETA),
-	IOCTL32_DEFAULT(TCSETAW),
-	IOCTL32_DEFAULT(TCSETAF),
-	IOCTL32_DEFAULT(TCSBRK),
-	IOCTL32_DEFAULT(TCSBRKP),
-	IOCTL32_DEFAULT(TCXONC),
-	IOCTL32_DEFAULT(TCFLSH),
-	IOCTL32_DEFAULT(TCGETS),
-	IOCTL32_DEFAULT(TCSETS),
-	IOCTL32_DEFAULT(TCSETSW),
-	IOCTL32_DEFAULT(TCSETSF),
-	IOCTL32_DEFAULT(TIOCLINUX),
+COMPATIBLE_IOCTL(SIOCGSTAMP)
 
-	IOCTL32_DEFAULT(TIOCGETD),
-	IOCTL32_DEFAULT(TIOCSETD),
-	IOCTL32_DEFAULT(TIOCEXCL),
-	IOCTL32_DEFAULT(TIOCNXCL),
-	IOCTL32_DEFAULT(TIOCCONS),
-	IOCTL32_DEFAULT(TIOCGSOFTCAR),
-	IOCTL32_DEFAULT(TIOCSSOFTCAR),
-	IOCTL32_DEFAULT(TIOCSWINSZ),
-	IOCTL32_DEFAULT(TIOCGWINSZ),
-	IOCTL32_DEFAULT(TIOCMGET),
-	IOCTL32_DEFAULT(TIOCMBIC),
-	IOCTL32_DEFAULT(TIOCMBIS),
-	IOCTL32_DEFAULT(TIOCMSET),
-	IOCTL32_DEFAULT(TIOCPKT),
-	IOCTL32_DEFAULT(TIOCNOTTY),
-	IOCTL32_DEFAULT(TIOCSTI),
-	IOCTL32_DEFAULT(TIOCOUTQ),
-	IOCTL32_DEFAULT(TIOCSPGRP),
-	IOCTL32_DEFAULT(TIOCGPGRP),
-	IOCTL32_DEFAULT(TIOCSCTTY),
-	IOCTL32_DEFAULT(TIOCGPTN),
-	IOCTL32_DEFAULT(TIOCSPTLCK),
-	IOCTL32_DEFAULT(TIOCGSERIAL),
-	IOCTL32_DEFAULT(TIOCSSERIAL),
-	IOCTL32_DEFAULT(TIOCSERGETLSR),
+HANDLE_IOCTL(SIOCGIFNAME, dev_ifname32)
+HANDLE_IOCTL(SIOCGIFCONF, dev_ifconf)
+HANDLE_IOCTL(SIOCGIFFLAGS, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFFLAGS, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFMETRIC, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFMETRIC, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFMTU, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFMTU, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFMEM, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFMEM, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFHWADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFHWADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCADDMULTI, dev_ifsioc)
+HANDLE_IOCTL(SIOCDELMULTI, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFINDEX, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFMAP, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFMAP, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFBRDADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFBRDADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFDSTADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFDSTADDR, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFNETMASK, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFNETMASK, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFPFLAGS, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFPFLAGS, dev_ifsioc)
+HANDLE_IOCTL(SIOCGIFTXQLEN, dev_ifsioc)
+HANDLE_IOCTL(SIOCSIFTXQLEN, dev_ifsioc)
+HANDLE_IOCTL(SIOCADDRT, routing_ioctl)
+HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
+HANDLE_IOCTL(SIOCBONDENSLAVE, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDRELEASE, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDSETHWADDR, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDSLAVEINFOQUERY, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDINFOQUERY, bond_ioctl)
+HANDLE_IOCTL(SIOCBONDCHANGEACTIVE, bond_ioctl)
 
-	IOCTL32_DEFAULT(FIOCLEX),
-	IOCTL32_DEFAULT(FIONCLEX),
-	IOCTL32_DEFAULT(FIOASYNC),
-	IOCTL32_DEFAULT(FIONBIO),
-	IOCTL32_DEFAULT(FIONREAD),
+HANDLE_IOCTL(EXT2_IOC32_GETFLAGS, do_ext2_ioctl)
+HANDLE_IOCTL(EXT2_IOC32_SETFLAGS, do_ext2_ioctl)
+HANDLE_IOCTL(EXT2_IOC32_GETVERSION, do_ext2_ioctl)
+HANDLE_IOCTL(EXT2_IOC32_SETVERSION, do_ext2_ioctl)
 
-	IOCTL32_DEFAULT(PIO_FONT),
-	IOCTL32_DEFAULT(GIO_FONT),
-	IOCTL32_DEFAULT(KDSIGACCEPT),
-	IOCTL32_DEFAULT(KDGETKEYCODE),
-	IOCTL32_DEFAULT(KDSETKEYCODE),
-	IOCTL32_DEFAULT(KIOCSOUND),
-	IOCTL32_DEFAULT(KDMKTONE),
-	IOCTL32_DEFAULT(KDGKBTYPE),
-	IOCTL32_DEFAULT(KDSETMODE),
-	IOCTL32_DEFAULT(KDGETMODE),
-	IOCTL32_DEFAULT(KDSKBMODE),
-	IOCTL32_DEFAULT(KDGKBMODE),
-	IOCTL32_DEFAULT(KDSKBMETA),
-	IOCTL32_DEFAULT(KDGKBMETA),
-	IOCTL32_DEFAULT(KDGKBENT),
-	IOCTL32_DEFAULT(KDSKBENT),
-	IOCTL32_DEFAULT(KDGKBSENT),
-	IOCTL32_DEFAULT(KDSKBSENT),
-	IOCTL32_DEFAULT(KDGKBDIACR),
-	IOCTL32_DEFAULT(KDSKBDIACR),
-	IOCTL32_DEFAULT(KDGKBLED),
-	IOCTL32_DEFAULT(KDSKBLED),
-	IOCTL32_DEFAULT(KDGETLED),
-	IOCTL32_DEFAULT(KDSETLED),
-	IOCTL32_DEFAULT(GIO_SCRNMAP),
-	IOCTL32_DEFAULT(PIO_SCRNMAP),
-	IOCTL32_DEFAULT(GIO_UNISCRNMAP),
-	IOCTL32_DEFAULT(PIO_UNISCRNMAP),
-	IOCTL32_DEFAULT(PIO_FONTRESET),
-	IOCTL32_DEFAULT(PIO_UNIMAPCLR),
+HANDLE_IOCTL(LOOP_SET_STATUS, loop_status)
+HANDLE_IOCTL(LOOP_GET_STATUS, loop_status)
 
-	IOCTL32_DEFAULT(VT_SETMODE),
-	IOCTL32_DEFAULT(VT_GETMODE),
-	IOCTL32_DEFAULT(VT_GETSTATE),
-	IOCTL32_DEFAULT(VT_OPENQRY),
-	IOCTL32_DEFAULT(VT_ACTIVATE),
-	IOCTL32_DEFAULT(VT_WAITACTIVE),
-	IOCTL32_DEFAULT(VT_RELDISP),
-	IOCTL32_DEFAULT(VT_DISALLOCATE),
-	IOCTL32_DEFAULT(VT_RESIZE),
-	IOCTL32_DEFAULT(VT_RESIZEX),
-	IOCTL32_DEFAULT(VT_LOCKSWITCH),
-	IOCTL32_DEFAULT(VT_UNLOCKSWITCH),
+HANDLE_IOCTL(ICARSAMODEXPO, do_rsa_ioctl)
+HANDLE_IOCTL(ICARSACRT, do_rsa_crt_ioctl)
+HANDLE_IOCTL(ICARSAMODMULT, do_rsa_ioctl)
 
-	IOCTL32_DEFAULT(SIOCGSTAMP),
+COMPATIBLE_IOCTL(ICAZ90STATUS)
+COMPATIBLE_IOCTL(ICAZ90QUIESCE)
+COMPATIBLE_IOCTL(ICAZ90HARDRESET)
+COMPATIBLE_IOCTL(ICAZ90HARDERROR)
 
-	IOCTL32_DEFAULT(DM_VERSION),
-	IOCTL32_DEFAULT(DM_REMOVE_ALL),
-	IOCTL32_DEFAULT(DM_DEV_CREATE),
-	IOCTL32_DEFAULT(DM_DEV_REMOVE),
-	IOCTL32_DEFAULT(DM_DEV_RELOAD),
-	IOCTL32_DEFAULT(DM_DEV_SUSPEND),
-	IOCTL32_DEFAULT(DM_DEV_RENAME),
-	IOCTL32_DEFAULT(DM_DEV_DEPS),
-	IOCTL32_DEFAULT(DM_DEV_STATUS),
-	IOCTL32_DEFAULT(DM_TARGET_STATUS),
-	IOCTL32_DEFAULT(DM_TARGET_WAIT),
+HANDLE_IOCTL(BLKRAGET, w_long)
+HANDLE_IOCTL(BLKGETSIZE, w_long)
+HANDLE_IOCTL(BLKFRAGET, w_long)
+HANDLE_IOCTL(BLKSECTGET, w_long)
+HANDLE_IOCTL(BLKPG, blkpg_ioctl_trans)
 
-	IOCTL32_DEFAULT(LOOP_SET_FD),
-	IOCTL32_DEFAULT(LOOP_CLR_FD),
-
-	IOCTL32_HANDLER(SIOCGIFNAME, dev_ifname32),
-	IOCTL32_HANDLER(SIOCGIFCONF, dev_ifconf),
-	IOCTL32_HANDLER(SIOCGIFFLAGS, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFFLAGS, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFMETRIC, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFMETRIC, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFMTU, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFMTU, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFMEM, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFMEM, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFHWADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFHWADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCADDMULTI, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCDELMULTI, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFINDEX, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFMAP, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFMAP, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFBRDADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFBRDADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFDSTADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFDSTADDR, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFNETMASK, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFNETMASK, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFPFLAGS, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFPFLAGS, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCGIFTXQLEN, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCSIFTXQLEN, dev_ifsioc),
-	IOCTL32_HANDLER(SIOCADDRT, routing_ioctl),
-	IOCTL32_HANDLER(SIOCDELRT, routing_ioctl),
-
-	IOCTL32_HANDLER(SIOCBONDENSLAVE, bond_ioctl),
-	IOCTL32_HANDLER(SIOCBONDRELEASE, bond_ioctl),
-	IOCTL32_HANDLER(SIOCBONDSETHWADDR, bond_ioctl),
-	IOCTL32_HANDLER(SIOCBONDSLAVEINFOQUERY, bond_ioctl),
-	IOCTL32_HANDLER(SIOCBONDINFOQUERY, bond_ioctl),
-	IOCTL32_HANDLER(SIOCBONDCHANGEACTIVE, bond_ioctl),
-
-	IOCTL32_HANDLER(EXT2_IOC32_GETFLAGS, do_ext2_ioctl),
-	IOCTL32_HANDLER(EXT2_IOC32_SETFLAGS, do_ext2_ioctl),
-	IOCTL32_HANDLER(EXT2_IOC32_GETVERSION, do_ext2_ioctl),
-	IOCTL32_HANDLER(EXT2_IOC32_SETVERSION, do_ext2_ioctl),
-
-	IOCTL32_HANDLER(LOOP_SET_STATUS, loop_status),
-	IOCTL32_HANDLER(LOOP_GET_STATUS, loop_status),
-
-	IOCTL32_HANDLER(ICARSAMODEXPO, do_rsa_ioctl),
-	IOCTL32_HANDLER(ICARSACRT, do_rsa_crt_ioctl),
-	IOCTL32_HANDLER(ICARSAMODMULT, do_rsa_ioctl),
-	IOCTL32_DEFAULT(ICAZ90STATUS),
-	IOCTL32_DEFAULT(ICAZ90QUIESCE),
-	IOCTL32_DEFAULT(ICAZ90HARDRESET),
-	IOCTL32_DEFAULT(ICAZ90HARDERROR),
-
-	IOCTL32_HANDLER(BLKRAGET, w_long),
-	IOCTL32_HANDLER(BLKGETSIZE, w_long),
-	IOCTL32_HANDLER(BLKFRAGET, w_long),
-	IOCTL32_HANDLER(BLKSECTGET, w_long),
-	IOCTL32_HANDLER(BLKPG, blkpg_ioctl_trans)
-
-};
-
-#define NR_IOCTL32_HANDLERS	(sizeof(ioctl32_handler_table) /	\
-				 sizeof(ioctl32_handler_table[0]))
+IOCTL_TABLE_END

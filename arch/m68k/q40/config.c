@@ -39,8 +39,8 @@
 
 extern void floppy_setup(char *str, int *ints);
 
-extern void q40_process_int (int level, struct pt_regs *regs);
-extern void (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);  /* added just for debugging */
+extern irqreturn_t q40_process_int (int level, struct pt_regs *regs);
+extern irqreturn_t (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);  /* added just for debugging */
 extern void q40_init_IRQ (void);
 extern void q40_free_irq (unsigned int, void *);
 extern int  show_q40_interrupts (struct seq_file *, void *);
@@ -48,8 +48,8 @@ extern void q40_enable_irq (unsigned int);
 extern void q40_disable_irq (unsigned int);
 static void q40_get_model(char *model);
 static int  q40_get_hardware_list(char *buffer);
-extern int  q40_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
-extern void q40_sched_init(void (*handler)(int, void *, struct pt_regs *));
+extern int  q40_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
+extern void q40_sched_init(irqreturn_t (*handler)(int, void *, struct pt_regs *));
 
 extern unsigned long q40_gettimeoffset (void);
 extern int q40_hwclk (int, struct rtc_time *);

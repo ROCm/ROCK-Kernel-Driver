@@ -64,6 +64,7 @@ atomic_t vm_committed_space = ATOMIC_INIT(0);
  * Strict overcommit modes added 2002 Feb 26 by Alan Cox.
  * Additional code 2002 Jul 20 by Robert Love.
  */
+extern atomic_t slab_reclaim_pages;
 int vm_enough_memory(long pages)
 {
 	unsigned long free, allowed;
@@ -82,17 +83,19 @@ int vm_enough_memory(long pages)
 		free += nr_swap_pages;
 
 		/*
-		 * The code below doesn't account for free space in the
-		 * inode and dentry slab cache, slab cache fragmentation,
-		 * inodes and dentries which will become freeable under
-		 * VM load, etc. Lets just hope all these (complex)
-		 * factors balance out...
+		 * Any slabs which are created with the
+		 * SLAB_RECLAIM_ACCOUNT flag claim to have contents
+		 * which are reclaimable, under pressure.  The dentry
+		 * cache and most inode caches should fall into this
 		 */
-		free += (dentry_stat.nr_unused * sizeof(struct dentry)) >>
-			PAGE_SHIFT;
-		free += (inodes_stat.nr_unused * sizeof(struct inode)) >>
-			PAGE_SHIFT;
+		free += atomic_read(&slab_reclaim_pages);
 
+		/*
+		 * Leave the last 3% for root
+		 */
+		if (!capable(CAP_SYS_ADMIN))
+			free -= free / 32;
+		
 		if (free > pages)
 			return 1;
 		vm_unacct_memory(pages);
@@ -674,6 +677,7 @@ munmap_back:
 	vma->vm_pgoff = pgoff;
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
+	vma->vm_next = NULL;
 	INIT_LIST_HEAD(&vma->shared);
 
 	if (file) {
@@ -831,7 +835,7 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			 * reserved hugepage range.  For some archs like IA-64,
 			 * there is a separate region for hugepages.
 			 */
-			ret = check_valid_hugepage_range(addr, len);
+			ret = is_hugepage_only_range(addr, len);
 		}
 		if (ret)
 			return ret;

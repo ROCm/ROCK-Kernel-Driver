@@ -84,6 +84,8 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 {
 	static int dev;
 	snd_card_t *card;
+	struct resource *fm_res = NULL;
+	struct resource *mpu_res = NULL;
 	ymfpci_t *chip;
 	opl3_t *opl3;
 	char *str;
@@ -116,24 +118,18 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 
 	if (pci_id->device >= 0x0010) { /* YMF 744/754 */
 		if (fm_port[dev] < 0) {
-			// fm_port[dev] = pci_resource_start(pci, 1);
-			u16 addr;
-			pci_read_config_word(pci, PCIR_DSXG_FMBASE, &addr);
-			fm_port[dev] = addr;
+			fm_port[dev] = pci_resource_start(pci, 1);
 		}
 		if (fm_port[dev] >= 0 &&
-		    (chip->fm_res = request_region(fm_port[dev], 4, "YMFPCI OPL3")) != NULL) {
+		    (fm_res = request_region(fm_port[dev], 4, "YMFPCI OPL3")) != NULL) {
 			legacy_ctrl |= YMFPCI_LEGACY_FMEN;
 			pci_write_config_word(pci, PCIR_DSXG_FMBASE, fm_port[dev]);
 		}
 		if (mpu_port[dev] < 0) {
-			// mpu_port[dev] = pci_resource_start(pci, 1) + 0x20;
-			u16 addr;
-			pci_read_config_word(pci, PCIR_DSXG_MPU401BASE, &addr);
-			mpu_port[dev] = addr;
+			mpu_port[dev] = pci_resource_start(pci, 1) + 0x20;
 		}
 		if (mpu_port[dev] >= 0 &&
-		    (chip->mpu_res = request_region(mpu_port[dev], 2, "YMFPCI MPU401")) != NULL) {
+		    (mpu_res = request_region(mpu_port[dev], 2, "YMFPCI MPU401")) != NULL) {
 			legacy_ctrl |= YMFPCI_LEGACY_MEN;
 			pci_write_config_word(pci, PCIR_DSXG_MPU401BASE, mpu_port[dev]);
 		}
@@ -146,7 +142,7 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		default: fm_port[dev] = -1; break;
 		}
 		if (fm_port[dev] > 0 &&
-		    (chip->fm_res = request_region(fm_port[dev], 4, "YMFPCI OPL3")) != NULL) {
+		    (fm_res = request_region(fm_port[dev], 4, "YMFPCI OPL3")) != NULL) {
 			legacy_ctrl |= YMFPCI_LEGACY_FMEN;
 		} else {
 			legacy_ctrl2 &= ~YMFPCI_LEGACY2_FMIO;
@@ -160,15 +156,15 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		default: mpu_port[dev] = -1; break;
 		}
 		if (mpu_port[dev] > 0 &&
-		    (chip->mpu_res = request_region(mpu_port[dev], 2, "YMFPCI MPU401")) != NULL) {
+		    (mpu_res = request_region(mpu_port[dev], 2, "YMFPCI MPU401")) != NULL) {
 			legacy_ctrl |= YMFPCI_LEGACY_MEN;
 		} else {
 			legacy_ctrl2 &= ~YMFPCI_LEGACY2_MPUIO;
 			mpu_port[dev] = -1;
 		}
 	}
-	if (chip->mpu_res) {
-		legacy_ctrl |= YMFPCI_LEGACY_MIEN; /* FIXME: do we need this? */
+	if (mpu_res) {
+		legacy_ctrl |= YMFPCI_LEGACY_MIEN;
 		legacy_ctrl2 |= YMFPCI_LEGACY2_IMOD;
 	}
 	pci_read_config_word(pci, PCIR_DSXG_LEGACY, &old_legacy_ctrl);
@@ -178,8 +174,18 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 				     old_legacy_ctrl,
 			 	     &chip)) < 0) {
 		snd_card_free(card);
+		if (mpu_res) {
+			release_resource(mpu_res);
+			kfree_nocheck(mpu_res);
+		}
+		if (fm_res) {
+			release_resource(fm_res);
+			kfree_nocheck(fm_res);
+		}
 		return err;
 	}
+	chip->fm_res = fm_res;
+	chip->mpu_res = mpu_res;
 	if ((err = snd_ymfpci_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -230,7 +236,7 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 	sprintf(card->shortname, "Yamaha DS-XG PCI (%s)", str);
 	sprintf(card->longname, "%s at 0x%lx, irq %i",
 		card->shortname,
-		chip->reg_area_virt,
+		chip->reg_area_phys,
 		chip->irq);
 
 	if ((err = snd_card_register(card)) < 0) {

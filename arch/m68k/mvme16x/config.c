@@ -40,7 +40,7 @@ extern t_bdid mvme_bdid;
 
 static MK48T08ptr_t volatile rtc = (MK48T08ptr_t)MVME_RTC_BASE;
 
-extern void mvme16x_process_int (int level, struct pt_regs *regs);
+extern irqreturn_t mvme16x_process_int (int level, struct pt_regs *regs);
 extern void mvme16x_init_IRQ (void);
 extern void mvme16x_free_irq (unsigned int, void *);
 extern int show_mvme16x_interrupts (struct seq_file *, void *);
@@ -48,8 +48,8 @@ extern void mvme16x_enable_irq (unsigned int);
 extern void mvme16x_disable_irq (unsigned int);
 static void mvme16x_get_model(char *model);
 static int  mvme16x_get_hardware_list(char *buffer);
-extern int  mvme16x_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
-extern void mvme16x_sched_init(void (*handler)(int, void *, struct pt_regs *));
+extern int  mvme16x_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
+extern void mvme16x_sched_init(irqreturn_t (*handler)(int, void *, struct pt_regs *));
 extern unsigned long mvme16x_gettimeoffset (void);
 extern int mvme16x_hwclk (int, struct rtc_time *);
 extern int mvme16x_set_clock_mmss (unsigned long);
@@ -61,7 +61,7 @@ int bcd2int (unsigned char b);
 /* Save tick handler routine pointer, will point to do_timer() in
  * kernel/sched.c, called via mvme16x_process_int() */
 
-static void (*tick_handler)(int, void *, struct pt_regs *);
+static irqreturn_t (*tick_handler)(int, void *, struct pt_regs *);
 
 
 unsigned short mvme16x_config;
@@ -193,7 +193,7 @@ void __init config_mvme16x(void)
     }
 }
 
-static void mvme16x_abort_int (int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t mvme16x_abort_int (int irq, void *dev_id, struct pt_regs *fp)
 {
 	p_bdid p = &mvme_bdid;
 	unsigned long *new = (unsigned long *)vectors;
@@ -218,15 +218,16 @@ static void mvme16x_abort_int (int irq, void *dev_id, struct pt_regs *fp)
 		*(new+0x5e) = *(old+0x5e);	/* ABORT switch */
 	else
 		*(new+0x6e) = *(old+0x6e);	/* ABORT switch */
+	return IRQ_HANDLED;
 }
 
-static void mvme16x_timer_int (int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t mvme16x_timer_int (int irq, void *dev_id, struct pt_regs *fp)
 {
     *(volatile unsigned char *)0xfff4201b |= 8;
-    tick_handler(irq, dev_id, fp);
+    return tick_handler(irq, dev_id, fp);
 }
 
-void mvme16x_sched_init (void (*timer_routine)(int, void *, struct pt_regs *))
+void mvme16x_sched_init (irqreturn_t (*timer_routine)(int, void *, struct pt_regs *))
 {
     p_bdid p = &mvme_bdid;
     int irq;

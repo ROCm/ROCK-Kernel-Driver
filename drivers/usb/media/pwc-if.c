@@ -92,8 +92,8 @@ MODULE_DEVICE_TABLE(usb, pwc_device_table);
 static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id *id);
 static void usb_pwc_disconnect(struct usb_interface *intf);
 
-static struct usb_driver pwc_driver =
-{
+static struct usb_driver pwc_driver = {
+	.owner =		THIS_MODULE,
 	.name =			"Philips webcam",	/* name */
 	.id_table =		pwc_device_table,
 	.probe =		usb_pwc_probe,		/* probe() */
@@ -1804,7 +1804,7 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	}
 	memcpy(vdev, &pwc_template, sizeof(pwc_template));
 	strcpy(vdev->name, name);
-	SET_MODULE_OWNER(vdev);
+	vdev->owner = THIS_MODULE;
 	pdev->vdev = vdev;
 	vdev->priv = pdev;
 

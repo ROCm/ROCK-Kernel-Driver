@@ -79,7 +79,7 @@ driver writers.
 int
 dma_set_mask(struct device *dev, u64 mask)
 int
-pci_dma_set_mask(struct pci_device *dev, u64 mask)
+pci_set_dma_mask(struct pci_device *dev, u64 mask)
 
 Checks to see if the mask is possible and updates the device
 parameters if it is.

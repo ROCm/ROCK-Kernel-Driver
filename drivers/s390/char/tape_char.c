@@ -37,6 +37,7 @@ static int tapechar_ioctl(struct inode *, struct file *, unsigned int,
 
 static struct file_operations tape_fops =
 {
+	.owner = THIS_MODULE,
 	.read = tapechar_read,
 	.write = tapechar_write,
 	.ioctl = tapechar_ioctl,
@@ -237,13 +238,11 @@ tapechar_open (struct inode *inode, struct file *filp)
 	struct tape_device *device;
 	int minor, rc;
 
-	MOD_INC_USE_COUNT;
 	if (major(filp->f_dentry->d_inode->i_rdev) != tapechar_major)
 		return -ENODEV;
 	minor = minor(filp->f_dentry->d_inode->i_rdev);
 	device = tape_get_device(minor / TAPE_MINORS_PER_DEV);
 	if (IS_ERR(device)) {
-		MOD_DEC_USE_COUNT;
 		return PTR_ERR(device);
 	}
 	DBF_EVENT(6, "TCHAR:open: %x\n", minor(inode->i_rdev));
@@ -257,7 +256,6 @@ tapechar_open (struct inode *inode, struct file *filp)
 		tape_release(device);
 	}
 	tape_put_device(device);
-	MOD_DEC_USE_COUNT;
 	return rc;
 }
 
@@ -293,7 +291,6 @@ tapechar_release(struct inode *inode, struct file *filp)
 	tape_release(device);
 	tape_unassign(device);
 	tape_put_device(device);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

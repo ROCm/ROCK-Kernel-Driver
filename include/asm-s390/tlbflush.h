@@ -76,13 +76,16 @@ static inline void global_flush_tlb(void)
 	}
 #endif /* __s390x__ */
 	{
-		long dummy = 0;
+		register unsigned long addr asm("4");
+		long dummy;
+
+		dummy = 0;
+		addr = ((unsigned long) &dummy) + 1;
 		__asm__ __volatile__ (
-			"    la   4,1(%0)\n"
 			"    slr  2,2\n"
 			"    slr  3,3\n"
-			"    csp  2,4"
-			: : "a" (&dummy) : "cc", "2", "3", "4" );
+			"    csp  2,%0"
+			: : "a" (addr) : "cc", "2", "3" );
 	}
 }
 

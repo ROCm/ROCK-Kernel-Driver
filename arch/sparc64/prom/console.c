@@ -76,7 +76,7 @@ prom_puts(char *s, int len)
 
 /* Query for input device type */
 enum prom_input_device
-prom_query_input_device()
+prom_query_input_device(void)
 {
 	int st_p;
 	char propb[64];
@@ -111,7 +111,7 @@ prom_query_input_device()
 /* Query for output device type */
 
 enum prom_output_device
-prom_query_output_device()
+prom_query_output_device(void)
 {
 	int st_p;
 	char propb[64];

@@ -27,6 +27,36 @@
 
 #include "generic.h"
 
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start		= 0x18000000,
+		.end		= 0x18001fff,
+		.flags		= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start		= IRQ_GPIO0,
+		.end		= IRQ_GPIO0,
+		.flags		= IORESOURCE_IRQ,
+	},
+};
+
+static u64 sa1111_dmamask = 0xffffffffUL;
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+		.dma_mask = &sa1111_dmamask,
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&sa1111_device,
+};
+
 static int __init adsbitsy_init(void)
 {
 	int ret;
@@ -50,7 +80,7 @@ static int __init adsbitsy_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_init(0x18000000, IRQ_GPIO0);
+	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
 	if (ret < 0)
 		return ret;
 

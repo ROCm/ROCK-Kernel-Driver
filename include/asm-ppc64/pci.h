@@ -86,8 +86,7 @@ static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 	return 1;
 }
 
-/* Return the index of the PCI controller for device PDEV. */
-extern int pci_controller_num(struct pci_dev *pdev);
+extern int pci_domain_nr(struct pci_bus *bus);
 
 struct vm_area_struct;
 /* Map a range of PCI memory or I/O space for a device into user space */

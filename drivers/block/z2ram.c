@@ -322,7 +322,7 @@ static struct block_device_operations z2_fops =
 	.release	= z2_release,
 };
 
-static struct gendisk *z2_find(dev_t dev, int *part, void *data)
+static struct kobject *z2_find(dev_t dev, int *part, void *data)
 {
 	*part = 0;
 	return get_disk(z2ram_gendisk);

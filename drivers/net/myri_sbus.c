@@ -541,6 +541,7 @@ static irqreturn_t myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct myri_channel *chan	= &mp->shmem->channel;
 	unsigned long flags;
 	u32 status;
+	int handled = 0;
 
 	spin_lock_irqsave(&mp->irq_lock, flags);
 
@@ -549,6 +550,7 @@ static irqreturn_t myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (status & ISTAT_HOST) {
 		u32 softstate;
 
+		handled = 1;
 		DIRQ(("IRQ_DISAB "));
 		myri_disable_irq(lregs, mp->cregs);
 		softstate = sbus_readl(&chan->state);
@@ -568,7 +570,7 @@ static irqreturn_t myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_unlock_irqrestore(&mp->irq_lock, flags);
 
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(handled);
 }
 
 static int myri_open(struct net_device *dev)

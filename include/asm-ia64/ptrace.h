@@ -250,11 +250,10 @@ struct switch_stack {
   extern void ia64_increment_ip (struct pt_regs *pt);
   extern void ia64_decrement_ip (struct pt_regs *pt);
 
-static inline void
-force_successful_syscall_return (void)
-{
-	ia64_task_regs(current)->r8 = 0;
-}
+#define force_successful_syscall_return()		\
+	do {						\
+		ia64_task_regs(current)->r8 = 0;	\
+	} while (0)
 
 #endif /* !__KERNEL__ */
 

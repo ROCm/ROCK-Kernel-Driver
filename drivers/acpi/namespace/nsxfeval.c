@@ -437,15 +437,14 @@ acpi_ns_get_device_callback (
 	void                            *context,
 	void                            **return_value)
 {
+	struct acpi_get_devices_info    *info = context;
 	acpi_status                     status;
 	struct acpi_namespace_node      *node;
 	u32                             flags;
 	struct acpi_device_id           hid;
-	struct acpi_device_id           cid;
-	struct acpi_get_devices_info    *info;
+	struct acpi_compatible_id_list *cid;
+	acpi_native_uint                i;
 
-
-	info = context;
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
@@ -462,9 +461,8 @@ acpi_ns_get_device_callback (
 		return (AE_BAD_PARAMETER);
 	}
 
-	/*
-	 * Run _STA to determine if device is present
-	 */
+	/* Run _STA to determine if device is present */
+
 	status = acpi_ut_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
 		return (AE_CTRL_DEPTH);
@@ -472,12 +470,12 @@ acpi_ns_get_device_callback (
 
 	if (!(flags & 0x01)) {
 		/* Don't return at the device or children of the device if not there */
+
 		return (AE_CTRL_DEPTH);
 	}
 
-	/*
-	 * Filter based on device HID & CID
-	 */
+	/* Filter based on device HID & CID */
+
 	if (info->hid != NULL) {
 		status = acpi_ut_execute_HID (node, &hid);
 		if (status == AE_NOT_FOUND) {
@@ -487,7 +485,9 @@ acpi_ns_get_device_callback (
 			return (AE_CTRL_DEPTH);
 		}
 
-		if (ACPI_STRNCMP (hid.buffer, info->hid, sizeof (hid.buffer)) != 0) {
+		if (ACPI_STRNCMP (hid.value, info->hid, sizeof (hid.value)) != 0) {
+			/* Get the list of Compatible IDs */
+
 			status = acpi_ut_execute_CID (node, &cid);
 			if (status == AE_NOT_FOUND) {
 				return (AE_OK);
@@ -496,11 +496,16 @@ acpi_ns_get_device_callback (
 				return (AE_CTRL_DEPTH);
 			}
 
-			/* TBD: Handle CID packages */
+			/* Walk the CID list */
 
-			if (ACPI_STRNCMP (cid.buffer, info->hid, sizeof (cid.buffer)) != 0) {
-				return (AE_OK);
+			for (i = 0; i < cid->count; i++) {
+				if (ACPI_STRNCMP (cid->id[i].value, info->hid,
+						 sizeof (struct acpi_compatible_id)) != 0) {
+					ACPI_MEM_FREE (cid);
+					return (AE_OK);
+				}
 			}
+			ACPI_MEM_FREE (cid);
 		}
 	}
 

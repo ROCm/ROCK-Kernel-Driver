@@ -41,7 +41,7 @@
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 unsigned long highstart_pfn, highend_pfn;
 
 static int do_test_wp_bit(void);

@@ -465,7 +465,7 @@ void irlan_open_data_tsap(struct irlan_cb *self)
  	/*notify.flow_indication       = irlan_eth_flow_indication;*/
 	notify.disconnect_indication = irlan_disconnect_indication;
 	notify.instance              = self;
-	strncpy(notify.name, "IrLAN data", NOTIFY_MAX_NAME);
+	strlcpy(notify.name, "IrLAN data", sizeof(notify.name));
 
 	tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT, &notify);
 	if (!tsap) {
@@ -1178,20 +1178,6 @@ void print_ret_code(__u8 code)
 		WARNING("IrLAN: Asynchronous status\n");
 		break;
 	}
-}
-
-void irlan_mod_inc_use_count(void)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-void irlan_mod_dec_use_count(void)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 }
 
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");

@@ -27,18 +27,12 @@
 #include <sound/pcm.h>
 #include "awacs.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#include <asm/adb.h>
-#include <asm/cuda.h>
-#include <asm/pmu.h>
-#else /* 2.4.0 kernel */
 #include <linux/adb.h>
 #ifdef CONFIG_ADB_CUDA
 #include <linux/cuda.h>
 #endif
 #ifdef CONFIG_ADB_PMU
 #include <linux/pmu.h>
-#endif
 #endif
 #include <linux/nvram.h>
 #include <linux/tty.h>

@@ -60,12 +60,9 @@
 /*
  * Linux Interrupt Support.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-#define	AIC_LINUX_IRQRETURN_T irqreturn_t
-#define	AIC_LINUX_IRQRETURN(ours) return (IRQ_RETVAL(ours))
-#else
-#define	AIC_LINUX_IRQRETURN_T void
-#define	AIC_LINUX_IRQRETURN(ours)  return
+#ifndef IRQ_RETVAL
+typedef void irqreturn_t;
+#define	IRQ_RETVAL(x)
 #endif
 
 /*

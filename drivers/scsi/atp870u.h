@@ -35,6 +35,4 @@ static int atp870u_release(struct Scsi_Host *);
 
 extern const char *atp870u_info(struct Scsi_Host *);
 
-extern int atp870u_proc_info(char *, char **, off_t, int, int, int);
-
 #endif

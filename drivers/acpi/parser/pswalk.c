@@ -270,7 +270,7 @@ acpi_ps_delete_parse_tree (
 		return_VOID;
 	}
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, thread);
+	walk_state = acpi_ds_create_walk_state (0, NULL, NULL, thread);
 	if (!walk_state) {
 		return_VOID;
 	}

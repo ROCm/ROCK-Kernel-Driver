@@ -51,10 +51,10 @@
 /*
  * Data type ranges
  */
-#define ACPI_UINT8_MAX                  (UINT8)  0xFF
-#define ACPI_UINT16_MAX                 (UINT16) 0xFFFF
-#define ACPI_UINT32_MAX                 (UINT32) 0xFFFFFFFF
-#define ACPI_UINT64_MAX                 (UINT64) 0xFFFFFFFFFFFFFFFF
+#define ACPI_UINT8_MAX                  (~((UINT8)  0))
+#define ACPI_UINT16_MAX                 (~((UINT16) 0))
+#define ACPI_UINT32_MAX                 (~((UINT32) 0))
+#define ACPI_UINT64_MAX                 (~((UINT64) 0))
 #define ACPI_ASCII_MAX                  0x7F
 
 
@@ -313,7 +313,11 @@ typedef u32                                     acpi_integer;
 typedef u64                                     acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT64_MAX
 #define ACPI_INTEGER_BIT_SIZE           64
-#define ACPI_MAX_BCD_VALUE              9999999999999999
+#if ACPI_MACHINE_WIDTH == 64
+#define ACPI_MAX_BCD_VALUE              9999999999999999UL
+#else
+#define ACPI_MAX_BCD_VALUE              9999999999999999ULL
+#endif
 #define ACPI_MAX_BCD_DIGITS             16
 #define ACPI_MAX_DECIMAL_DIGITS         19
 
@@ -407,7 +411,7 @@ typedef u32                                     acpi_table_type;
 #define ACPI_TABLE_SSDT                 (acpi_table_type) 5
 #define ACPI_TABLE_XSDT                 (acpi_table_type) 6
 #define ACPI_TABLE_MAX                  6
-#define NUM_ACPI_TABLES                 (ACPI_TABLE_MAX+1)
+#define NUM_ACPI_TABLE_TYPES            (ACPI_TABLE_MAX+1)
 
 
 /*
@@ -747,7 +751,7 @@ struct acpi_system_info
 	u32                                 debug_level;
 	u32                                 debug_layer;
 	u32                                 num_table_types;
-	struct acpi_table_info              table_info [NUM_ACPI_TABLES];
+	struct acpi_table_info              table_info [NUM_ACPI_TABLE_TYPES];
 };
 
 
@@ -832,12 +836,35 @@ acpi_status (*acpi_walk_callback) (
 #define ACPI_INTERRUPT_HANDLED          0x01
 
 
-/* Structure and flags for acpi_get_device_info */
+/* Common string version of device HIDs and UIDs */
 
-#define ACPI_VALID_HID                  0x1
-#define ACPI_VALID_UID                  0x2
-#define ACPI_VALID_ADR                  0x4
-#define ACPI_VALID_STA                  0x8
+struct acpi_device_id
+{
+	char                            value[ACPI_DEVICE_ID_LENGTH];
+};
+
+/* Common string version of device CIDs */
+
+struct acpi_compatible_id
+{
+	char                            value[ACPI_MAX_CID_LENGTH];
+};
+
+struct acpi_compatible_id_list
+{
+	u32                             count;
+	u32                             size;
+	struct acpi_compatible_id       id[1];
+};
+
+
+/* Structure and flags for acpi_get_object_info */
+
+#define ACPI_VALID_STA                  0x0001
+#define ACPI_VALID_ADR                  0x0002
+#define ACPI_VALID_HID                  0x0004
+#define ACPI_VALID_UID                  0x0008
+#define ACPI_VALID_CID                  0x0010
 
 
 #define ACPI_COMMON_OBJ_INFO \
@@ -851,15 +878,18 @@ struct acpi_obj_info_header
 };
 
 
+/* Structure returned from Get Object Info */
+
 struct acpi_device_info
 {
 	ACPI_COMMON_OBJ_INFO;
 
-	u32                                 valid;              /*  Are the next bits legit? */
-	char                                hardware_id[9];     /*  _HID value if any */
-	char                                unique_id[9];       /*  _UID value if any */
-	acpi_integer                        address;            /*  _ADR value if any */
-	u32                                 current_status;     /*  _STA value */
+	u32                                 valid;              /* Indicates which fields are valid */
+	u32                                 current_status;     /* _STA value */
+	acpi_integer                        address;            /* _ADR value if any */
+	struct acpi_device_id               hardware_id;        /* _HID value if any */
+	struct acpi_device_id               unique_id;          /* _UID value if any */
+	struct acpi_compatible_id_list      compatibility_id;   /* List of _CIDs if any */
 };
 
 

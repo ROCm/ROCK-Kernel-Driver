@@ -36,6 +36,7 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
+#include <linux/proc_fs.h>
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/blk.h>		/* for initrd_* */
 #endif
@@ -93,7 +94,7 @@ unsigned long __max_memory;
 /* This is declared as we are using the more or less generic 
  * include/asm-ppc64/tlb.h file -- tgall
  */
-struct mmu_gather     mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 void show_mem(void)
 {
@@ -509,6 +510,34 @@ void __init paging_init(void)
 }
 #endif
 
+static struct kcore_list kcore_vmem;
+
+static void setup_kcore(void)
+{
+	int i;
+
+	for (i=0; i < lmb.memory.cnt; i++) {
+		unsigned long physbase, size;
+		unsigned long type = lmb.memory.region[i].type;
+		struct kcore_list *kcore_mem;
+
+		if (type != LMB_MEMORY_AREA)
+			continue;
+
+		physbase = lmb.memory.region[i].physbase;
+		size = lmb.memory.region[i].size;
+
+		/* GFP_ATOMIC to avoid might_sleep warnings during boot */
+		kcore_mem = kmalloc(sizeof(struct kcore_list), GFP_ATOMIC);
+		if (!kcore_mem)
+			panic("mem_init: kmalloc failed\n");
+
+		kclist_add(kcore_mem, __va(physbase), size);
+	}
+
+	kclist_add(&kcore_vmem, (void *)VMALLOC_START, VMALLOC_END-VMALLOC_START);
+}
+
 void initialize_paca_hardware_interrupt_stack(void);
 
 void __init mem_init(void)
@@ -576,6 +605,8 @@ void __init mem_init(void)
 	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
 #endif
 	mem_init_done = 1;
+
+	setup_kcore();
 
 	/* set the last page of each hardware interrupt stack to be protected */
 	initialize_paca_hardware_interrupt_stack();

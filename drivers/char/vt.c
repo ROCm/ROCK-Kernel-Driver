@@ -163,6 +163,12 @@ static void console_callback(void *ignored);
 
 static int printable;		/* Is console ready for printing? */
 
+/*
+ * ignore_poke: don't unblank the screen when things are typed.  This is
+ * mainly for the privacy of braille terminal users.
+ */
+static int ignore_poke;
+
 int do_poke_blanked_console;
 int console_blanked;
 
@@ -1314,7 +1320,7 @@ static void setterm_command(int currcons)
 		case 14: /* set vesa powerdown interval */
 			vesa_off_interval = ((par[1] < 60) ? par[1] : 60) * 60 * HZ;
 			break;
-		case 15:	/* Activate the previous console */
+		case 15: /* activate the previous console */
 			set_console(last_console);
 			break;
 	}
@@ -2282,6 +2288,13 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 				ret = 0;
 			}
 			break;
+		case 14:	/* blank screen until explicitly unblanked, not only poked */
+			ignore_poke = 1;
+			do_blank_screen(0);
+			break;
+		case 15:	/* which console is blanked ? */
+			ret = console_blanked;
+			break;
 		default:
 			ret = -EINVAL;
 			break;
@@ -2518,7 +2531,8 @@ int __init vty_init(void)
 	memset(&console_driver, 0, sizeof(struct tty_driver));
 	console_driver.magic = TTY_DRIVER_MAGIC;
 	console_driver.owner = THIS_MODULE;
-	console_driver.name = "vc/";
+	console_driver.devfs_name = "vc/";
+	console_driver.name = "tty";
 	console_driver.name_base = 1;
 	console_driver.major = TTY_MAJOR;
 	console_driver.minor_start = 1;
@@ -2712,14 +2726,7 @@ static void timer_do_blank_screen(int entering_gfx, int from_timer_handler)
 	hide_cursor(currcons);
 	if (!from_timer_handler)
 		del_timer_sync(&console_timer);
-	if (vesa_off_interval) {
-		console_timer.function = vesa_powerdown_screen;
-		mod_timer(&console_timer, jiffies + vesa_off_interval);
-	} else {
-		if (!from_timer_handler)
-			del_timer_sync(&console_timer);
-		console_timer.function = unblank_screen_t;
-	}
+	console_timer.function = unblank_screen_t;
 
 	save_screen(currcons);
 	/* In case we need to reset origin, blanking hook returns 1 */
@@ -2730,6 +2737,12 @@ static void timer_do_blank_screen(int entering_gfx, int from_timer_handler)
 
 	if (console_blank_hook && console_blank_hook(1))
 		return;
+
+	if (vesa_off_interval) {
+		console_timer.function = vesa_powerdown_screen;
+		mod_timer(&console_timer, jiffies + vesa_off_interval);
+	}
+
     	if (vesa_blank_mode)
 		sw->con_blank(vc_cons[currcons].d, vesa_blank_mode + 1);
 }
@@ -2754,6 +2767,7 @@ void unblank_screen(void)
 {
 	int currcons;
 
+	ignore_poke = 0;
 	if (!console_blanked)
 		return;
 	if (!vc_cons_allocated(fg_console)) {
@@ -2771,12 +2785,12 @@ void unblank_screen(void)
 	}
 
 	console_blanked = 0;
-	if (console_blank_hook)
-		console_blank_hook(0);
-	set_palette(currcons);
 	if (sw->con_blank(vc_cons[currcons].d, 0))
 		/* Low-level driver cannot restore -> do it ourselves */
 		update_screen(fg_console);
+	if (console_blank_hook)
+		console_blank_hook(0);
+	set_palette(currcons);
 	set_cursor(fg_console);
 }
 
@@ -2791,7 +2805,7 @@ static void blank_screen(unsigned long dummy)
 void poke_blanked_console(void)
 {
 	del_timer(&console_timer);
-	if (!vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
+	if (ignore_poke || !vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
 		return;
 	if (console_blanked) {
 		console_timer.function = unblank_screen_t;

@@ -15,10 +15,10 @@
 #include <linux/rtnetlink.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter.h>
+#include <linux/smp.h>
 #include <net/pkt_sched.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
-#include <asm/smp.h>
 #include <linux/kmod.h>
 #include <linux/stat.h>
 #include <linux/interrupt.h>

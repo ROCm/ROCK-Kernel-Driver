@@ -41,8 +41,11 @@
 /*
  * Controller mappings for all interrupt sources:
  */
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
-				{ [0 ... NR_IRQS-1] = { 0, &no_irq_type, }};
+irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
+	[0 ... NR_IRQS-1] = {
+		.handler = &no_irq_type,
+	}
+};
 
 /*
  * Special irq handlers.

@@ -490,10 +490,11 @@ static void rtnetlink_rcv(struct sock *sk, int len)
 		if (rtnl_shlock_nowait())
 			return;
 
-		while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
+		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 			if (rtnetlink_rcv_skb(skb)) {
 				if (skb->len)
-					skb_queue_head(&sk->receive_queue, skb);
+					skb_queue_head(&sk->sk_receive_queue,
+						       skb);
 				else
 					kfree_skb(skb);
 				break;
@@ -504,7 +505,7 @@ static void rtnetlink_rcv(struct sock *sk, int len)
 		up(&rtnl_sem);
 
 		netdev_run_todo();
-	} while (rtnl && rtnl->receive_queue.qlen);
+	} while (rtnl && rtnl->sk_receive_queue.qlen);
 }
 
 static struct rtnetlink_link link_rtnetlink_table[RTM_MAX-RTM_BASE+1] =

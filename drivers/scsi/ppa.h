@@ -167,7 +167,7 @@ int ppa_command(Scsi_Cmnd *);
 int ppa_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int ppa_abort(Scsi_Cmnd *);
 int ppa_reset(Scsi_Cmnd *);
-int ppa_proc_info(char *, char **, off_t, int, int, int);
+int ppa_proc_info(struct Scsi_Host *host, char *, char **, off_t, int, int);
 int ppa_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
 

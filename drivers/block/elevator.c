@@ -39,63 +39,6 @@
 #include <asm/uaccess.h>
 
 /*
- * This is a bit tricky. It's given that bio and rq are for the same
- * device, but the next request might of course not be. Run through
- * the tests below to check if we want to insert here if we can't merge
- * bio into an existing request
- */
-inline int bio_rq_in_between(struct bio *bio, struct request *rq,
-			     struct list_head *head)
-{
-	struct list_head *next;
-	struct request *next_rq;
-
-	/*
-	 * if .next is a valid request
-	 */
-	next = rq->queuelist.next;
-	if (unlikely(next == head))
-		return 0;
-
-	next_rq = list_entry(next, struct request, queuelist);
-
-	/*
-	 * not a sector based request
-	 */
-	if (!(next_rq->flags & REQ_CMD))
-		return 0;
-
-	/*
-	 * if the device is different (not a normal case) just check if
-	 * bio is after rq
-	 */
-	if (next_rq->rq_disk != rq->rq_disk)
-		return bio->bi_sector > rq->sector;
-
-	/*
-	 * ok, rq, next_rq and bio are on the same device. if bio is in between
-	 * the two, this is the sweet spot
-	 */
-	if (bio->bi_sector < next_rq->sector && bio->bi_sector > rq->sector)
-		return 1;
-
-	/*
-	 * next_rq is ordered wrt rq, but bio is not in between the two
-	 */
-	if (next_rq->sector > rq->sector)
-		return 0;
-
-	/*
-	 * next_rq and rq not ordered, if we happen to be either before
-	 * next_rq or after rq insert here anyway
-	 */
-	if (bio->bi_sector > rq->sector || bio->bi_sector < next_rq->sector)
-		return 1;
-
-	return 0;
-}
-
-/*
  * can we safely merge with this request?
  */
 inline int elv_rq_merge_ok(struct request *rq, struct bio *bio)
@@ -138,22 +81,10 @@ inline int elv_try_merge(struct request *__rq, struct bio *bio)
 
 inline int elv_try_last_merge(request_queue_t *q, struct bio *bio)
 {
-	int ret = ELEVATOR_NO_MERGE;
+	if (q->last_merge)
+		return elv_try_merge(list_entry_rq(q->last_merge), bio);
 
-	/*
-	 * give a one-shot try to merging with the last touched
-	 * request
-	 */
-	if (q->last_merge) {
-		struct request *__rq = list_entry_rq(q->last_merge);
-
-		if (!rq_mergeable(__rq))
-			q->last_merge = NULL;
-		else
-			ret = elv_try_merge(__rq, bio);
-	}
-
-	return ret;
+	return ELEVATOR_NO_MERGE;
 }
 
 /*
@@ -181,7 +112,7 @@ int elevator_noop_merge(request_queue_t *q, struct list_head **insert,
 		else if (__rq->flags & REQ_STARTED)
 			break;
 
-		if (!(__rq->flags & REQ_CMD))
+		if (!blk_fs_request(__rq))
 			continue;
 
 		if ((ret = elv_try_merge(__rq, bio))) {
@@ -275,6 +206,9 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 			     struct request *next)
 {
 	elevator_t *e = &q->elevator;
+
+	if (q->last_merge == &next->queuelist)
+		q->last_merge = NULL;
 
 	if (e->elevator_merge_req_fn)
 		e->elevator_merge_req_fn(q, rq, next);

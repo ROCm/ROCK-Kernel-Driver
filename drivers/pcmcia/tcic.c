@@ -115,19 +115,20 @@ static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs);
 static void tcic_timer(u_long data);
 static struct pccard_operations tcic_operations;
 
-typedef struct socket_info_t {
+struct tcic_socket {
     u_short	psock;
     void	(*handler)(void *info, u_int events);
     void	*info;
     u_char	last_sstat;
     u_char	id;
-} socket_info_t;
+    struct pcmcia_socket	socket;
+};
 
 static struct timer_list poll_timer;
 static int tcic_timer_pending;
 
 static int sockets;
-static socket_info_t socket_table[2];
+static struct tcic_socket socket_table[2];
 
 static socket_cap_t tcic_cap = {
 	/* only 16-bit cards, memory windows must be size-aligned */
@@ -372,15 +373,11 @@ static int __init get_tcic_id(void)
 
 /*====================================================================*/
 
-static struct pcmcia_socket_class_data tcic_data = {
-	.ops = &tcic_operations,
-};
-
 static struct device_driver tcic_driver = {
 	.name = "tcic-pcmcia",
 	.bus = &platform_bus_type,
-/*	.suspend = pcmcia_socket_dev_suspend,	FIXME?	*/
-/*	.resume = pcmcia_socket_dev_resume,	FIXME?	*/
+	.suspend = pcmcia_socket_dev_suspend,
+	.resume = pcmcia_socket_dev_resume,
 };
 
 static struct platform_device tcic_device = {
@@ -391,13 +388,10 @@ static struct platform_device tcic_device = {
 	},
 };
 
-static struct class_device tcic_class_data = {
-	.class = &pcmcia_socket_class,
-};
 
 static int __init init_tcic(void)
 {
-    int i, sock;
+    int i, sock, ret = 0;
     u_int mask, scan;
     servinfo_t serv;
 
@@ -524,13 +518,17 @@ static int __init init_tcic(void)
     /* jump start interrupt handler, if needed */
     tcic_interrupt(0, NULL, NULL);
 
-    tcic_data.nsock = sockets;
-    tcic_class_data.dev = &tcic_device.dev;
-    tcic_class_data.class_data = &tcic_data;
-    strncpy(tcic_class_data.class_id, "tcic-pcmcia", BUS_ID_SIZE);
-    
     platform_device_register(&tcic_device);
-    class_device_register(&tcic_class_data);
+
+    for (i = 0; i < sockets; i++) {
+	    socket_table[i].socket.ss_entry = &tcic_operations;
+	    socket_table[i].socket.dev.dev = &tcic_device.dev;
+	    ret = pcmcia_register_socket(&socket_table[i].socket);	    
+	    if (ret && i)
+		    pcmcia_unregister_socket(&socket_table[0].socket);
+    }
+    
+    return ret;
 
     return 0;
     
@@ -540,13 +538,19 @@ static int __init init_tcic(void)
 
 static void __exit exit_tcic(void)
 {
+    int i;
+
     del_timer_sync(&poll_timer);
     if (cs_irq != 0) {
 	tcic_aux_setw(TCIC_AUX_SYSCFG, TCIC_SYSCFG_AUTOBUSY|0x0a00);
 	free_irq(cs_irq, tcic_interrupt);
     }
     release_region(tcic_base, 16);
-    class_device_unregister(&tcic_class_data);
+
+    for (i = 0; i < sockets; i++) {
+	    pcmcia_unregister_socket(&socket_table[i].socket);	    
+    }
+
     platform_device_unregister(&tcic_device);
     driver_unregister(&tcic_driver);
 } /* exit_tcic */
@@ -640,18 +644,19 @@ static void tcic_timer(u_long data)
 
 /*====================================================================*/
 
-static int tcic_register_callback(unsigned int lsock, void (*handler)(void *, unsigned int), void * info)
+static int tcic_register_callback(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info)
 {
-    socket_table[lsock].handler = handler;
-    socket_table[lsock].info = info;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
+    socket_table[psock].handler = handler;
+    socket_table[psock].info = info;
     return 0;
 } /* tcic_register_callback */
 
 /*====================================================================*/
 
-static int tcic_get_status(unsigned int lsock, u_int *value)
+static int tcic_get_status(struct pcmcia_socket *sock, u_int *value)
 {
-    u_short psock = socket_table[lsock].psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_char reg;
 
     tcic_setl(TCIC_ADDR, (psock << TCIC_ADDR_SS_SHFT)
@@ -675,7 +680,7 @@ static int tcic_get_status(unsigned int lsock, u_int *value)
   
 /*====================================================================*/
 
-static int tcic_inquire_socket(unsigned int lsock, socket_cap_t *cap)
+static int tcic_inquire_socket(struct pcmcia_socket *sock, socket_cap_t *cap)
 {
     *cap = tcic_cap;
     return 0;
@@ -683,9 +688,9 @@ static int tcic_inquire_socket(unsigned int lsock, socket_cap_t *cap)
 
 /*====================================================================*/
 
-static int tcic_get_socket(unsigned int lsock, socket_state_t *state)
+static int tcic_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-    u_short psock = socket_table[lsock].psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_char reg;
     u_short scf1, scf2;
     
@@ -736,9 +741,9 @@ static int tcic_get_socket(unsigned int lsock, socket_state_t *state)
 
 /*====================================================================*/
 
-static int tcic_set_socket(unsigned int lsock, socket_state_t *state)
+static int tcic_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-    u_short psock = socket_table[lsock].psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_char reg;
     u_short scf1, scf2;
 
@@ -811,9 +816,9 @@ static int tcic_set_socket(unsigned int lsock, socket_state_t *state)
   
 /*====================================================================*/
 
-static int tcic_set_io_map(unsigned int lsock, struct pccard_io_map *io)
+static int tcic_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io)
 {
-    u_short psock = socket_table[lsock].psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_int addr;
     u_short base, len, ioctl;
     
@@ -848,9 +853,9 @@ static int tcic_set_io_map(unsigned int lsock, struct pccard_io_map *io)
 
 /*====================================================================*/
 
-static int tcic_set_mem_map(unsigned int lsock, struct pccard_mem_map *mem)
+static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *mem)
 {
-    u_short psock = socket_table[lsock].psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_short addr, ctl;
     u_long base, len, mmap;
 
@@ -892,11 +897,11 @@ static int tcic_set_mem_map(unsigned int lsock, struct pccard_mem_map *mem)
 
 /*====================================================================*/
 
-static void tcic_proc_setup(unsigned int sock, struct proc_dir_entry *base)
+static void tcic_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
 {
 }
 
-static int tcic_init(unsigned int s)
+static int tcic_init(struct pcmcia_socket *s)
 {
 	int i;
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
@@ -915,7 +920,7 @@ static int tcic_init(unsigned int s)
 	return 0;
 }
 
-static int tcic_suspend(unsigned int sock)
+static int tcic_suspend(struct pcmcia_socket *sock)
 {
 	return tcic_set_socket(sock, &dead_socket);
 }

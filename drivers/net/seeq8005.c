@@ -84,7 +84,7 @@ static int seeq8005_probe1(struct net_device *dev, int ioaddr);
 static int seeq8005_open(struct net_device *dev);
 static void seeq8005_timeout(struct net_device *dev);
 static int seeq8005_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void seeq8005_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t seeq8005_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void seeq8005_rx(struct net_device *dev);
 static int seeq8005_close(struct net_device *dev);
 static struct net_device_stats *seeq8005_get_stats(struct net_device *dev);
@@ -400,11 +400,12 @@ static int seeq8005_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 /* The typical workload of the driver:
    Handle the network interface interrupts. */
-static void seeq8005_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t seeq8005_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 	struct net_local *lp;
 	int ioaddr, status, boguscount = 0;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 	lp = (struct net_local *)dev->priv;
@@ -416,17 +417,20 @@ static void seeq8005_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		}
 		
 		if (status & SEEQSTAT_WINDOW_INT) {
+			handled = 1;
 			outw( SEEQCMD_WINDOW_INT_ACK | (status & SEEQCMD_INT_MASK), SEEQ_CMD);
 			if (net_debug) {
 				printk("%s: window int!\n",dev->name);
 			}
 		}
 		if (status & SEEQSTAT_TX_INT) {
+			handled = 1;
 			outw( SEEQCMD_TX_INT_ACK | (status & SEEQCMD_INT_MASK), SEEQ_CMD);
 			lp->stats.tx_packets++;
 			netif_wake_queue(dev);	/* Inform upper layers. */
 		}
 		if (status & SEEQSTAT_RX_INT) {
+			handled = 1;
 			/* Got a packet(s). */
 			seeq8005_rx(dev);
 		}
@@ -436,6 +440,7 @@ static void seeq8005_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	if(net_debug>2) {
 		printk("%s: eoi\n",dev->name);
 	}
+	return IRQ_RETVAL(handled);
 }
 
 /* We have a good packet(s), get it/them out of the buffers. */

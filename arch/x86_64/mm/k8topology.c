@@ -87,10 +87,8 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 
 		if (limit > end_pfn_map << PAGE_SHIFT) 
 			limit = end_pfn_map << PAGE_SHIFT; 
-		if (limit <= base) { 
-			printk(KERN_INFO "Node %d beyond memory map\n", nodeid);
+		if (limit <= base)
 			continue; 
-		} 
 			
 		base >>= 16;
 		base <<= 24; 

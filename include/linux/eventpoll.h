@@ -40,11 +40,20 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 asmlinkage long sys_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
 			       int timeout);
 
+#ifdef CONFIG_EPOLL
+
 /* Used to initialize the epoll bits inside the "struct file" */
 void eventpoll_init_file(struct file *file);
 
 /* Used in fs/file_table.c:__fput() to unlink files from the eventpoll interface */
 void eventpoll_release(struct file *file);
+
+#else
+
+static inline void eventpoll_init_file(struct file *file) {}
+static inline void eventpoll_release(struct file *file) {}
+
+#endif
 
 #endif /* #ifdef __KERNEL__ */
 

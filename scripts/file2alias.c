@@ -147,6 +147,28 @@ static int do_pci_entry(const char *filename,
 	return 1;
 }
 
+/* looks like: "ccw:tNmNdtNdmN" */ 
+static int do_ccw_entry(const char *filename,
+			struct ccw_device_id *id, char *alias)
+{
+	id->match_flags = TO_NATIVE(id->match_flags);
+	id->cu_type = TO_NATIVE(id->cu_type);
+	id->cu_model = TO_NATIVE(id->cu_model);
+	id->dev_type = TO_NATIVE(id->dev_type);
+	id->dev_model = TO_NATIVE(id->dev_model);
+
+	strcpy(alias, "ccw:");
+	ADD(alias, "t", id->match_flags&CCW_DEVICE_ID_MATCH_CU_TYPE,
+	    id->cu_type);
+	ADD(alias, "m", id->match_flags&CCW_DEVICE_ID_MATCH_CU_MODEL,
+	    id->cu_model);
+	ADD(alias, "dt", id->match_flags&CCW_DEVICE_ID_MATCH_DEVICE_TYPE,
+	    id->dev_type);
+	ADD(alias, "dm", id->match_flags&CCW_DEVICE_ID_MATCH_DEVICE_TYPE,
+	    id->dev_model);
+	return 1;
+}
+
 /* Ignore any prefix, eg. v850 prepends _ */
 static inline int sym_is(const char *symbol, const char *name)
 {
@@ -210,6 +232,9 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
 	else if (sym_is(symname, "__mod_ieee1394_device_table"))
 		do_table(symval, sym->st_size, sizeof(struct ieee1394_device_id),
 			 do_ieee1394_entry, mod);
+	else if (sym_is(symname, "__mod_ccw_device_table"))
+		do_table(symval, sym->st_size, sizeof(struct ccw_device_id),
+			 do_ccw_entry, mod);
 }
 
 /* Now add out buffered information to the generated C source */

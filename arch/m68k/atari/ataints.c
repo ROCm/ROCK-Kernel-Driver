@@ -110,7 +110,7 @@
 typedef void (*asm_irq_handler)(void);
 
 struct irqhandler {
-	void	(*handler)(int, void *, struct pt_regs *);
+	irqreturn_t (*handler)(int, void *, struct pt_regs *);
 	void	*dev_id;
 };
 
@@ -404,12 +404,13 @@ void __init atari_init_IRQ(void)
 }
 
 
-static void atari_call_irq_list( int irq, void *dev_id, struct pt_regs *fp )
+static irqreturn_t atari_call_irq_list( int irq, void *dev_id, struct pt_regs *fp )
 {
 	irq_node_t *node;
 
 	for (node = (irq_node_t *)dev_id; node; node = node->next)
 		node->handler(irq, node->dev_id, fp);
+	return IRQ_HANDLED;
 }
 
 
@@ -419,7 +420,7 @@ static void atari_call_irq_list( int irq, void *dev_id, struct pt_regs *fp )
  *                     If the addition was successful, it returns 0.
  */
 
-int atari_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+int atari_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *),
                       unsigned long flags, const char *devname, void *dev_id)
 {
 	int vector;

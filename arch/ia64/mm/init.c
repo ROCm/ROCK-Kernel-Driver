@@ -32,7 +32,7 @@
 struct mmu_gather mmu_gathers[NR_CPUS];
 
 /* References to section boundaries: */
-extern char _stext, _etext, _edata, __init_begin, __init_end;
+extern char _stext, _etext, _edata, __init_begin, __init_end, _end;
 
 extern void ia64_tlb_init (void);
 
@@ -583,6 +583,7 @@ mem_init (void)
 	long reserved_pages, codesize, datasize, initsize;
 	unsigned long num_pgt_pages;
 	pg_data_t *pgdat;
+	static struct kcore_list kcore_mem, kcore_vmem, kcore_kernel;
 
 #ifdef CONFIG_PCI
 	/*
@@ -600,6 +601,10 @@ mem_init (void)
 #endif
 
 	high_memory = __va(max_low_pfn * PAGE_SIZE);
+
+	kclist_add(&kcore_mem, __va(0), max_low_pfn * PAGE_SIZE);
+	kclist_add(&kcore_vmem, (void *)VMALLOC_START, VMALLOC_END-VMALLOC_START);
+	kclist_add(&kcore_kernel, &_stext, &_end - &_stext);
 
 	for_each_pgdat(pgdat)
 		totalram_pages += free_all_bootmem_node(pgdat);

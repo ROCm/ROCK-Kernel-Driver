@@ -1,5 +1,5 @@
 /*
- * $Id: ocelot.c,v 1.6 2001/10/02 15:05:14 dwmw2 Exp $
+ * $Id: ocelot.c,v 1.12 2003/05/21 12:45:19 dwmw2 Exp $
  *
  * Flash on Momenco Ocelot
  */
@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -20,47 +21,23 @@
 #define NVRAM_WINDOW_SIZE 0x00007FF0
 #define NVRAM_BUSWIDTH 1
 
-extern int parse_redboot_partitions(struct mtd_info *master, struct mtd_partition **pparts);
-
 static unsigned int cacheflush = 0;
 
 static struct mtd_info *flash_mtd;
 static struct mtd_info *nvram_mtd;
 
-__u8 ocelot_read8(struct map_info *map, unsigned long ofs)
+static void ocelot_ram_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf)
 {
-	return __raw_readb(map->map_priv_1 + ofs);
-}
+        struct map_info *map = (struct map_info *)mtd->priv;
+	size_t done = 0;
 
-void ocelot_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	cacheflush = 1;
-	__raw_writeb(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void ocelot_copy_from_cache(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	if (cacheflush) {
-		dma_cache_inv(map->map_priv_2, map->size);
-		cacheflush = 0;
-	}
-	memcpy_fromio(to, map->map_priv_1 + from, len);
-}
-
-void ocelot_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, map->map_priv_1 + from, len);
-}
-
-void ocelot_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
 	/* If we use memcpy, it does word-wide writes. Even though we told the 
 	   GT64120A that it's an 8-bit wide region, word-wide writes don't work.
 	   We end up just writing the first byte of the four to all four bytes.
 	   So we have this loop instead */
+	*retlen = len;
 	while(len) {
-		__raw_writeb(*(unsigned char *) from, map->map_priv_1 + to);
+		__raw_writeb(*(unsigned char *) from, map->virt + to);
 		from++;
 		to++;
 		len--;
@@ -70,23 +47,20 @@ void ocelot_copy_to(struct map_info *map, unsigned long to, const void *from, ss
 static struct mtd_partition *parsed_parts;
 
 struct map_info ocelot_flash_map = {
-	.name		= "Ocelot boot flash",
-	.size		= FLASH_WINDOW_SIZE,
-	.buswidth	= FLASH_BUSWIDTH,
-	.read8		= ocelot_read8,
-	.copy_from	= ocelot_copy_from_cache,
-	.write8		= ocelot_write8,
+	.name = "Ocelot boot flash",
+	.size = FLASH_WINDOW_SIZE,
+	.buswidth = FLASH_BUSWIDTH,
+	.phys = FLASH_WINDOW_ADDR,
 };
 
 struct map_info ocelot_nvram_map = {
-	.name		= "Ocelot NVRAM",
-	.size		= NVRAM_WINDOW_SIZE,
-	.buswidth	= NVRAM_BUSWIDTH,
-	.read8		= ocelot_read8,
-	.copy_from	= ocelot_copy_from,
-	.write8		= ocelot_write8,
-	.copy_to	= ocelot_copy_to
+	.name = "Ocelot NVRAM",
+	.size = NVRAM_WINDOW_SIZE,
+	.buswidth = NVRAM_BUSWIDTH,
+	.phys = NVRAM_WINDOW_ADDR,
 };
+
+static const char *probes[] = { "RedBoot", NULL };
 
 static int __init init_ocelot_maps(void)
 {
@@ -107,12 +81,13 @@ static int __init init_ocelot_maps(void)
 	iounmap(pld);
 
 	/* Now ioremap the NVRAM space */
-	ocelot_nvram_map.map_priv_1 = (unsigned long)ioremap_nocache(NVRAM_WINDOW_ADDR, NVRAM_WINDOW_SIZE);
-	if (!ocelot_nvram_map.map_priv_1) {
+	ocelot_nvram_map.virt = (unsigned long)ioremap_nocache(NVRAM_WINDOW_ADDR, NVRAM_WINDOW_SIZE);
+	if (!ocelot_nvram_map.virt) {
 		printk(KERN_NOTICE "Failed to ioremap Ocelot NVRAM space\n");
 		return -EIO;
 	}
-	//	ocelot_nvram_map.map_priv_2 = ocelot_nvram_map.map_priv_1;
+
+	simple_map_init(&ocelot_nvram_map);
 
 	/* And do the RAM probe on it to get an MTD device */
 	nvram_mtd = do_map_probe("map_ram", &ocelot_nvram_map);
@@ -120,22 +95,21 @@ static int __init init_ocelot_maps(void)
 		printk("NVRAM probe failed\n");
 		goto fail_1;
 	}
-	nvram_mtd->module = THIS_MODULE;
+	nvram_mtd->owner = THIS_MODULE;
 	nvram_mtd->erasesize = 16;
+	/* Override the write() method */
+	nvram_mtd->write = ocelot_ram_write;
 
 	/* Now map the flash space */
-	ocelot_flash_map.map_priv_1 = (unsigned long)ioremap_nocache(FLASH_WINDOW_ADDR, FLASH_WINDOW_SIZE);
-	if (!ocelot_flash_map.map_priv_1) {
+	ocelot_flash_map.virt = (unsigned long)ioremap_nocache(FLASH_WINDOW_ADDR, FLASH_WINDOW_SIZE);
+	if (!ocelot_flash_map.virt) {
 		printk(KERN_NOTICE "Failed to ioremap Ocelot flash space\n");
 		goto fail_2;
 	}
 	/* Now the cached version */
-	ocelot_flash_map.map_priv_2 = (unsigned long)__ioremap(FLASH_WINDOW_ADDR, FLASH_WINDOW_SIZE, 0);
+	ocelot_flash_map.cached = (unsigned long)__ioremap(FLASH_WINDOW_ADDR, FLASH_WINDOW_SIZE, 0);
 
-	if (!ocelot_flash_map.map_priv_2) {
-		/* Doesn't matter if it failed. Just use the uncached version */
-		ocelot_flash_map.map_priv_2 = ocelot_flash_map.map_priv_1;
-	}
+	simple_map_init(&ocelot_flash_map);
 
 	/* Only probe for flash if the write jumper is present */
 	if (brd_status & 0x40) {
@@ -155,10 +129,10 @@ static int __init init_ocelot_maps(void)
 
 	add_mtd_device(nvram_mtd);
 
-	flash_mtd->module = THIS_MODULE;
-	nr_parts = parse_redboot_partitions(flash_mtd, &parsed_parts);
+	flash_mtd->owner = THIS_MODULE;
+	nr_parts = parse_mtd_partitions(flash_mtd, probes, &parsed_parts, 0);
 
-	if (nr_parts)
+	if (nr_parts > 0)
 		add_mtd_partitions(flash_mtd, parsed_parts, nr_parts);
 	else
 		add_mtd_device(flash_mtd);
@@ -166,14 +140,13 @@ static int __init init_ocelot_maps(void)
 	return 0;
 	
  fail3:	
-	iounmap((void *)ocelot_flash_map.map_priv_1);
-	if (ocelot_flash_map.map_priv_2 &&
-	    ocelot_flash_map.map_priv_2 != ocelot_flash_map.map_priv_1)
-			iounmap((void *)ocelot_flash_map.map_priv_2);
+	iounmap((void *)ocelot_flash_map.virt);
+	if (ocelot_flash_map.cached)
+			iounmap((void *)ocelot_flash_map.cached);
  fail_2:
 	map_destroy(nvram_mtd);
  fail_1:
-	iounmap((void *)ocelot_nvram_map.map_priv_1);
+	iounmap((void *)ocelot_nvram_map.virt);
 
 	return -ENXIO;
 }
@@ -182,16 +155,16 @@ static void __exit cleanup_ocelot_maps(void)
 {
 	del_mtd_device(nvram_mtd);
 	map_destroy(nvram_mtd);
-	iounmap((void *)ocelot_nvram_map.map_priv_1);
+	iounmap((void *)ocelot_nvram_map.virt);
 
 	if (parsed_parts)
 		del_mtd_partitions(flash_mtd);
 	else
 		del_mtd_device(flash_mtd);
 	map_destroy(flash_mtd);
-	iounmap((void *)ocelot_flash_map.map_priv_1);
-	if (ocelot_flash_map.map_priv_2 != ocelot_flash_map.map_priv_1)
-		iounmap((void *)ocelot_flash_map.map_priv_2);
+	iounmap((void *)ocelot_flash_map.virt);
+	if (ocelot_flash_map.cached)
+		iounmap((void *)ocelot_flash_map.cached);
 }
 
 module_init(init_ocelot_maps);

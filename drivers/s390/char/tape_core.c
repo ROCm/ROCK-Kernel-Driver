@@ -11,7 +11,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>	     // for kernel parameters
 #include <linux/kmod.h>	     // for requesting modules
@@ -904,7 +903,7 @@ tape_init (void)
 {
 	tape_dbf_area = debug_register ( "tape", 1, 2, 3*sizeof(long));
 	debug_register_view(tape_dbf_area, &debug_sprintf_view);
-	DBF_EVENT(3, "tape init: ($Revision: 1.23 $)\n");
+	DBF_EVENT(3, "tape init: ($Revision: 1.25 $)\n");
 	tape_proc_init();
 	tapechar_init ();
 	tapeblock_init ();
@@ -929,12 +928,17 @@ tape_exit(void)
 MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte and "
 	      "Michael Holzheu (cotte@de.ibm.com,holzheu@de.ibm.com)");
 MODULE_DESCRIPTION("Linux on zSeries channel attached "
-		   "tape device driver ($Revision: 1.23 $)");
+		   "tape device driver ($Revision: 1.25 $)");
 
 module_init(tape_init);
 module_exit(tape_exit);
 
 EXPORT_SYMBOL(tape_dbf_area);
+EXPORT_SYMBOL(tape_generic_remove);
+EXPORT_SYMBOL(tape_disable_device);
+EXPORT_SYMBOL(tape_generic_probe);
+EXPORT_SYMBOL(tape_enable_device);
+EXPORT_SYMBOL(tape_put_device);
 EXPORT_SYMBOL(tape_state_verbose);
 EXPORT_SYMBOL(tape_op_verbose);
 EXPORT_SYMBOL(tape_state_set);

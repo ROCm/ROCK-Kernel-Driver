@@ -220,7 +220,7 @@ static struct {
 	},
 };
 
-int __init init_netlink(void)
+static int __init init_netlink(void)
 {
 	int i;
 
@@ -245,17 +245,7 @@ int __init init_netlink(void)
 	return 0;
 }
 
-#ifdef MODULE
-
-MODULE_LICENSE("GPL");
-
-int init_module(void)
-{
-	printk(KERN_INFO "Network Kernel/User communications module 0.04\n");
-	return init_netlink();
-}
-
-void cleanup_module(void)
+static void __exit cleanup_netlink(void)
 {
 	int i;
 
@@ -267,4 +257,6 @@ void cleanup_module(void)
 	unregister_chrdev(NETLINK_MAJOR, "netlink");
 }
 
-#endif
+MODULE_LICENSE("GPL");
+module_init(init_netlink);
+module_exit(cleanup_netlink);

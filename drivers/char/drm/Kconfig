@@ -24,10 +24,10 @@ config DRM_TDFX
 
 config DRM_GAMMA
 	tristate "3dlabs GMX 2000"
-	depends on DRM && n
+	depends on DRM
 	help
-	  This is the old gamma driver, disabled for now unless somebody
-	  tells me it actually might work.
+	  This is the old gamma driver, please tell me if it might actually
+	  work.
 
 config DRM_R128
 	tristate "ATI Rage 128"

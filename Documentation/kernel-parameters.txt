@@ -361,9 +361,10 @@ running once the system is up.
 
 	noirqbalance	[IA-32,SMP,KNL] Disable kernel irq balancing
 
-	i8042_direct	[HW] Non-translated mode
-	i8042_dumbkbd
-	i8042_noaux
+	i8042_direct	[HW] Keyboard has been put into non-translated mode 
+			by BIOS
+	i8042_dumbkbd	[HW] Don't attempt to blink the leds
+	i8042_noaux	[HW] Don't check for auxiliary (== mouse) port
 	i8042_nomux
 	i8042_reset	[HW] Reset the controller during init and cleanup
 	i8042_unlock	[HW] Unlock (ignore) the keylock
@@ -539,8 +540,6 @@ running once the system is up.
 			[KNL,ACPI] Mark specific memory as reserved.
 			Region of memory to be used, from ss to ss+nn.
 
-	memfrac=	[KNL]
-
 	meye=		[HW] Set MotionEye Camera parameters
 			See Documentation/video4linux/meye.txt.
 
@@ -616,6 +615,9 @@ running once the system is up.
 
 	noht		[SMP,IA-32] Disables P4 Xeon(tm) HyperThreading.
 
+	noirqdebug	[IA-32] Disables the code which attempts to detect and
+			disable unhandled interrupt sources.
+
 	noisapnp	[ISAPNP] Disables ISA PnP code.
 
 	noinitrd	[RAM] Tells the kernel not to load any configured
@@ -652,6 +654,9 @@ running once the system is up.
 	opl3sa2=	[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>,<mss_io>,<mpu_io>,<ymode>,<loopback>[,<isapnp>,<multiple]
  
+	oprofile.timer=	[HW]
+			Use timer interrupt instead of performance counters
+
 	optcd=		[HW,CD]
 			Format: <io>
 

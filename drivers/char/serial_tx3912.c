@@ -59,7 +59,7 @@ static struct real_driver rs_real_driver = {
 /*
  * Structures and such for TTY sessions and usage counts
  */
-static struct tty_driver rs_driver, rs_callout_driver;
+static struct tty_driver rs_driver;
 static struct tty_struct * rs_table[TX3912_UART_NPORTS] = { NULL, };
 static struct termios ** rs_termios;
 static struct termios ** rs_termios_locked;
@@ -594,15 +594,10 @@ static int rs_open  (struct tty_struct * tty, struct file * filp)
 	/* tty->low_latency = 1; */
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = port->gs.normal_termios;
-		else 
-			*tty->termios = port->gs.callout_termios;
+		*tty->termios = port->gs.normal_termios;
 		rs_set_real_termios (port);
 	}
 
-	port->gs.session = current->session;
-	port->gs.pgrp = current->pgrp;
 	func_exit();
 
 	/* Jim */
@@ -773,7 +768,6 @@ static int rs_init_portstructs(void)
 	port = rs_ports;
 	for (i=0; i < TX3912_UART_NPORTS;i++) {
 		rs_dprintk (TX3912_UART_DEBUG_INIT, "initing port %d\n", i);
-		port->gs.callout_termios = tty_std_termios;
 		port->gs.normal_termios	= tty_std_termios;
 		port->gs.magic = SERIAL_MAGIC;
 		port->gs.close_delay = HZ/2;
@@ -837,24 +831,11 @@ static int rs_init_drivers(void)
 	rs_driver.start = gs_start;
 	rs_driver.hangup = gs_hangup;
 
-	rs_callout_driver = rs_driver;
-	rs_callout_driver.name = "cua";
-	rs_callout_driver.major = TTYAUX_MAJOR;
-	rs_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
 	if ((error = tty_register_driver(&rs_driver))) {
 		printk(KERN_ERR "Couldn't register serial driver, error = %d\n",
 		       error);
 		return 1;
 	}
-	if ((error = tty_register_driver(&rs_callout_driver))) {
-		tty_unregister_driver(&rs_driver);
-		printk(KERN_ERR "Couldn't register callout driver, error = %d\n",
-		       error);
-		return 1;
-	}
-
-	func_exit();
 	return 0;
 }
 

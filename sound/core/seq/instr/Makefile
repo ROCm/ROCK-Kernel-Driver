@@ -19,6 +19,7 @@ sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_
 # Toplevel Module Dependency
 obj-$(call sequencer,$(CONFIG_SND_ALS100)) += snd-ainstr-fm.o
 obj-$(call sequencer,$(CONFIG_SND_AZT2320)) += snd-ainstr-fm.o
+obj-$(call sequencer,$(CONFIG_SND_AZT3328)) += snd-ainstr-fm.o
 obj-$(call sequencer,$(CONFIG_SND_DT019X)) += snd-ainstr-fm.o
 obj-$(call sequencer,$(CONFIG_SND_ES18XX)) += snd-ainstr-fm.o
 obj-$(call sequencer,$(CONFIG_SND_OPL3SA2)) += snd-ainstr-fm.o

@@ -633,7 +633,7 @@ int ip_route_me_harder(struct sk_buff **pskb)
 					.fwmark = (*pskb)->nfmark
 #endif
 				      } },
-			    .oif = (*pskb)->sk ? (*pskb)->sk->bound_dev_if : 0,
+			    .oif = (*pskb)->sk ? (*pskb)->sk->sk_bound_dev_if : 0,
 			    };
 	struct net_device *dev_src = NULL;
 	int err;
@@ -648,7 +648,7 @@ int ip_route_me_harder(struct sk_buff **pskb)
 	if ((err=ip_route_output_key(&rt, &fl)) != 0) {
 		printk("route_me_harder: ip_route_output_key(dst=%u.%u.%u.%u, src=%u.%u.%u.%u, oif=%d, tos=0x%x, fwmark=0x%lx) error %d\n",
 			NIPQUAD(iph->daddr), NIPQUAD(iph->saddr),
-			(*pskb)->sk ? (*pskb)->sk->bound_dev_if : 0,
+			(*pskb)->sk ? (*pskb)->sk->sk_bound_dev_if : 0,
 			RT_TOS(iph->tos)|RTO_CONN,
 #ifdef CONFIG_IP_ROUTE_FWMARK
 			(*pskb)->nfmark,

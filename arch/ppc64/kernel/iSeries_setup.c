@@ -864,7 +864,7 @@ static void iSeries_setup_dprofile(void)
 {
 	if ( dprof_buffer ) {
 		unsigned i;
-		for (i=0; i<MAX_PACAS; ++i) {
+		for (i=0; i<NR_CPUS; ++i) {
 			paca[i].prof_shift = dprof_shift;
 			paca[i].prof_len = dprof_len-1;
 			paca[i].prof_buffer = dprof_buffer;

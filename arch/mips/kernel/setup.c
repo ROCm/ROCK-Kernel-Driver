@@ -633,9 +633,8 @@ void __init setup_arch(char **cmdline_p)
 		panic("Unsupported architecture");
 	}
 
-	strncpy(command_line, arcs_cmdline, sizeof command_line);
-	command_line[sizeof command_line - 1] = 0;
-	strcpy(saved_command_line, command_line);
+	strlcpy(command_line, arcs_cmdline, sizeof command_line);
+	strlcpy(saved_command_line, command_line, sizeof saved_command_line);
 	*cmdline_p = command_line;
 
 	parse_mem_cmdline();

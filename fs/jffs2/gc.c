@@ -7,19 +7,22 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.88 2002/10/08 16:56:08 dwmw2 Exp $
+ * $Id: gc.c,v 1.103 2003/05/22 18:01:02 dwmw2 Exp $
  *
  */
 
 #include <linux/kernel.h>
 #include <linux/mtd/mtd.h>
 #include <linux/slab.h>
-#include <linux/interrupt.h>
 #include <linux/pagemap.h>
 #include <linux/crc32.h>
 #include <linux/compiler.h>
+#include <linux/stat.h>
 #include "nodelist.h"
 
+static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c, 
+					  struct jffs2_inode_cache *ic,
+					  struct jffs2_raw_node_ref *raw);
 static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
 					struct jffs2_inode_info *f, struct jffs2_full_dnode *fd);
 static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
@@ -32,6 +35,8 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,
 				       struct jffs2_inode_info *f, struct jffs2_full_dnode *fn,
 				       uint32_t start, uint32_t end);
+static int jffs2_garbage_collect_live(struct jffs2_sb_info *c,  struct jffs2_eraseblock *jeb,
+			       struct jffs2_raw_node_ref *raw, struct jffs2_inode_cache *ic);
 
 /* Called with erase_completion_lock held */
 static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
@@ -107,61 +112,87 @@ static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
  */
 int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 {
+	struct jffs2_inode_cache *ic;
 	struct jffs2_eraseblock *jeb;
-	struct jffs2_inode_info *f;
 	struct jffs2_raw_node_ref *raw;
-	struct jffs2_node_frag *frag;
-	struct jffs2_full_dnode *fn = NULL;
-	struct jffs2_full_dirent *fd;
-	uint32_t start = 0, end = 0, nrfrags = 0;
 	uint32_t inum;
-	struct inode *inode;
 	int ret = 0;
 
 	if (down_interruptible(&c->alloc_sem))
 		return -EINTR;
 
-	spin_lock_bh(&c->erase_completion_lock);
+	for (;;) {
+		spin_lock(&c->erase_completion_lock);
+		if (!c->unchecked_size)
+			break;
 
-	while (c->unchecked_size) {
 		/* We can't start doing GC yet. We haven't finished checking
-		   the node CRCs etc. Do it now and wait for it. */
-		struct jffs2_inode_cache *ic;
-
+		   the node CRCs etc. Do it now. */
+		
+		/* checked_ino is protected by the alloc_sem */
 		if (c->checked_ino > c->highest_ino) {
 			printk(KERN_CRIT "Checked all inodes but still 0x%x bytes of unchecked space?\n",
 			       c->unchecked_size);
 			D1(jffs2_dump_block_lists(c));
+			spin_unlock(&c->erase_completion_lock);
 			BUG();
 		}
+
+		spin_unlock(&c->erase_completion_lock);
+
+		spin_lock(&c->inocache_lock);
+
 		ic = jffs2_get_ino_cache(c, c->checked_ino++);
-		if (!ic)
+
+		if (!ic) {
+			spin_unlock(&c->inocache_lock);
 			continue;
+		}
+
 		if (!ic->nlink) {
 			D1(printk(KERN_DEBUG "Skipping check of ino #%d with nlink zero\n",
 				  ic->ino));
+			spin_unlock(&c->inocache_lock);
 			continue;
 		}
-		if (ic->state != INO_STATE_UNCHECKED) {
-			D1(printk(KERN_DEBUG "Skipping check of ino #%d already in state %d\n",
-				  ic->ino, ic->state));
+		switch(ic->state) {
+		case INO_STATE_CHECKEDABSENT:
+		case INO_STATE_PRESENT:
+			D1(printk(KERN_DEBUG "Skipping ino #%u already checked\n", ic->ino));
+			spin_unlock(&c->inocache_lock);
 			continue;
-		}
 
-		spin_unlock_bh(&c->erase_completion_lock);
+		case INO_STATE_GC:
+		case INO_STATE_CHECKING:
+			printk(KERN_WARNING "Inode #%u is in state %d during CRC check phase!\n", ic->ino, ic->state);
+			spin_unlock(&c->inocache_lock);
+			BUG();
+
+		case INO_STATE_READING:
+			/* We need to wait for it to finish, lest we move on
+			   and trigger the BUG() above while we haven't yet 
+			   finished checking all its nodes */
+			D1(printk(KERN_DEBUG "Waiting for ino #%u to finish reading\n", ic->ino));
+			up(&c->alloc_sem);
+			sleep_on_spinunlock(&c->inocache_wq, &c->inocache_lock);
+			return 0;
+
+		default:
+			BUG();
+
+		case INO_STATE_UNCHECKED:
+			;
+		}
+		ic->state = INO_STATE_CHECKING;
+		spin_unlock(&c->inocache_lock);
 
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_pass() triggering inode scan of ino#%d\n", ic->ino));
-		
-		{
-			/* XXX: This wants doing more sensibly -- split the core of jffs2_do_read_inode up */
-			struct inode *i = iget(OFNI_BS_2SFFJ(c), ic->ino);
-			if (is_bad_inode(i)) {
-				printk(KERN_NOTICE "Eep. read_inode() failed for ino #%u\n", ic->ino);
-				ret = -EIO;
-			}
-			iput(i);
-		}
 
+		ret = jffs2_do_crccheck_inode(c, ic);
+		if (ret)
+			printk(KERN_WARNING "Returned error for crccheck of ino #%u. Expect badness...\n", ic->ino);
+
+		jffs2_set_inocache_state(c, ic, INO_STATE_CHECKEDABSENT);
 		up(&c->alloc_sem);
 		return ret;
 	}
@@ -174,7 +205,7 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 
 	if (!jeb) {
 		printk(KERN_NOTICE "jffs2: Couldn't find erase block to garbage collect!\n");
-		spin_unlock_bh(&c->erase_completion_lock);
+		spin_unlock(&c->erase_completion_lock);
 		up(&c->alloc_sem);
 		return -EIO;
 	}
@@ -197,7 +228,7 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 			printk(KERN_WARNING "eep. End of raw list while still supposedly nodes to GC\n");
 			printk(KERN_WARNING "erase block at 0x%08x. free_size 0x%08x, dirty_size 0x%08x, used_size 0x%08x\n", 
 			       jeb->offset, jeb->free_size, jeb->dirty_size, jeb->used_size);
-			spin_unlock_bh(&c->erase_completion_lock);
+			spin_unlock(&c->erase_completion_lock);
 			up(&c->alloc_sem);
 			BUG();
 		}
@@ -207,7 +238,7 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 		/* Inode-less node. Clean marker, snapshot or something like that */
 		/* FIXME: If it's something that needs to be copied, including something
 		   we don't grok that has JFFS2_NODETYPE_RWCOMPAT_COPY, we should do so */
-		spin_unlock_bh(&c->erase_completion_lock);
+		spin_unlock(&c->erase_completion_lock);
 		jffs2_mark_node_obsolete(c, raw);
 		up(&c->alloc_sem);
 		goto eraseit_lock;
@@ -216,13 +247,136 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	inum = jffs2_raw_ref_to_inum(raw);
 	D1(printk(KERN_DEBUG "Inode number is #%u\n", inum));
 
-	spin_unlock_bh(&c->erase_completion_lock);
+	spin_unlock(&c->erase_completion_lock);
 
-	D1(printk(KERN_DEBUG "jffs2_garbage_collect_pass collecting from block @0x%08x. Node @0x%08x, ino #%u\n", jeb->offset, ref_offset(raw), inum));
+	D1(printk(KERN_DEBUG "jffs2_garbage_collect_pass collecting from block @0x%08x. Node @0x%08x(%d), ino #%u\n", jeb->offset, ref_offset(raw), ref_flags(raw), inum));
 
-	inode = iget(OFNI_BS_2SFFJ(c), inum);
+	/* Three possibilities:
+	   1. Inode is already in-core. We must iget it and do proper
+	      updating to its fragtree, etc.
+	   2. Inode is not in-core, node is REF_PRISTINE. We lock the
+	      inocache to prevent a read_inode(), copy the node intact.
+	   3. Inode is not in-core, node is not pristine. We must iget()
+	      and take the slow path.
+	*/
+	spin_lock(&c->inocache_lock);
+	ic = jffs2_get_ino_cache(c, inum);
+
+	/* This should never fail unless I'm particularly stupid.
+	   So we don't check before dereferencing it */
+
+	switch(ic->state) {
+	case INO_STATE_CHECKEDABSENT:
+		/* It's been checked, but it's not currently in-core. 
+		   We can just copy any pristine nodes, but have
+		   to prevent anyone else from doing read_inode() while
+		   we're at it, so we set the state accordingly */
+		if (ref_flags(raw) == REF_PRISTINE)
+			ic->state = INO_STATE_GC;
+		else {
+			D1(printk("Ino #%u is absent but node not REF_PRISTINE. Reading.\n", 
+				  inum));
+		}
+		break;
+
+	case INO_STATE_PRESENT:
+	case INO_STATE_UNCHECKED:
+		/* It's in-core or hasn't been checked. GC must iget() it. */
+		break;
+
+	case INO_STATE_CHECKING:
+		/* Should never happen. We should have finished checking
+		   by the time we actually start doing any GC. */
+		BUG();
+
+	
+	case INO_STATE_GC:
+		/* Should never happen. We are holding the alloc_sem, 
+		   no other garbage collection can happen. Note that we
+		   do depend on this later when deciding to do a simple
+		   node copy */
+		BUG();
+			 
+	case INO_STATE_READING:
+		/* Someone's currently trying to read it. We must wait for
+		   them to finish and then go through the full iget() route
+		   to do the GC. However, sometimes read_inode() needs to get
+		   the alloc_sem() (for marking nodes invalid) so we must
+		   drop the alloc_sem before sleeping. */
+
+		up(&c->alloc_sem);
+		D1(printk(KERN_DEBUG "jffs2_garbage_collect_pass() waiting for ino #%u in state %d\n",
+			  inum, ic->state));
+		sleep_on_spinunlock(&c->inocache_wq, &c->inocache_lock);
+		/* And because we dropped the alloc_sem we must start again from the 
+		   beginning. Ponder chance of livelock here -- we're returning success
+		   without actually making any progress.
+
+		   Q: What are the chances that the inode is back in INO_STATE_READING 
+		   again by the time we next enter this function? And that this happens
+		   enough times to cause a real delay?
+
+		   A: Small enough that I don't care :) 
+		*/
+		return 0;
+
+	}
+
+	spin_unlock(&c->inocache_lock);
+
+	/* OK. Now if the inode is in state INO_STATE_GC, we are going to copy the
+	   node intact, and we don't have to muck about with the fragtree etc. 
+	   because we know it's not in-core. If it _was_ in-core, we go through
+	   all the iget() crap anyway */
+
+	if (ic->state == INO_STATE_GC) {
+		ret = jffs2_garbage_collect_pristine(c, ic, raw);
+		jffs2_set_inocache_state(c, ic, INO_STATE_CHECKEDABSENT);
+
+		if (ret != -EBADFD)
+			goto release_sem;
+
+		/* Fall through if it wanted us to */
+	}
+
+	ret = jffs2_garbage_collect_live(c, jeb, raw, ic);
+
+ release_sem:
+	up(&c->alloc_sem);
+
+ eraseit_lock:
+	/* If we've finished this block, start it erasing */
+	spin_lock(&c->erase_completion_lock);
+
+ eraseit:
+	if (c->gcblock && !c->gcblock->used_size) {
+		D1(printk(KERN_DEBUG "Block at 0x%08x completely obsoleted by GC. Moving to erase_pending_list\n", c->gcblock->offset));
+		/* We're GC'ing an empty block? */
+		list_add_tail(&c->gcblock->list, &c->erase_pending_list);
+		c->gcblock = NULL;
+		c->nr_erasing_blocks++;
+		jffs2_erase_pending_trigger(c);
+	}
+	spin_unlock(&c->erase_completion_lock);
+
+	return ret;
+}
+
+
+static int jffs2_garbage_collect_live(struct jffs2_sb_info *c,  struct jffs2_eraseblock *jeb,
+			       struct jffs2_raw_node_ref *raw, struct jffs2_inode_cache *ic)
+{
+	struct jffs2_inode_info *f;
+	struct jffs2_node_frag *frag;
+	struct jffs2_full_dnode *fn = NULL;
+	struct jffs2_full_dirent *fd;
+	uint32_t start = 0, end = 0, nrfrags = 0;
+	struct inode *inode;
+	int ret = 0;
+
+	inode = iget(OFNI_BS_2SFFJ(c), ic->ino);
 	if (is_bad_inode(inode)) {
-		printk(KERN_NOTICE "Eep. read_inode() failed for ino #%u\n", inum);
+		printk(KERN_NOTICE "Eep. read_inode() failed for ino #%u\n", ic->ino);
 		/* NB. This will happen again. We need to do something appropriate here. */
 		up(&c->alloc_sem);
 		iput(inode);
@@ -254,16 +408,26 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 			end = frag->ofs + frag->size;
 #if 1 /* Temporary debugging sanity checks, till we're ready to _trust_ the REF_PRISTINE flag stuff */ 
 			if (!nrfrags && ref_flags(fn->raw) == REF_PRISTINE) {
-				if (fn->frags > 1)
+				if (fn->frags > 1) {
 					printk(KERN_WARNING "REF_PRISTINE node at 0x%08x had %d frags. Tell dwmw2\n", ref_offset(raw), fn->frags);
-
-				if (frag->ofs & (PAGE_CACHE_SIZE-1) && frag_prev(frag) && frag_prev(frag)->node)
+					mark_ref_normal(raw);
+				}
+				/* A hole node which isn't multi-page should be garbage-collected
+				   and merged anyway, so we just check for the frag size here,
+				   rather than mucking around with actually reading the node
+				   and checking the compression type, which is the real way
+				   to tell a hole node. */
+				if (frag->ofs & (PAGE_CACHE_SIZE-1) && frag_prev(frag) && frag_prev(frag)->size < PAGE_CACHE_SIZE) {
 					printk(KERN_WARNING "REF_PRISTINE node at 0x%08x had a previous non-hole frag in the same page. Tell dwmw2\n",
 					       ref_offset(raw));
+					mark_ref_normal(raw);
+				}
 
-				if ((frag->ofs+frag->size) & (PAGE_CACHE_SIZE-1) && frag_next(frag) && frag_next(frag)->node)
+				if ((frag->ofs+frag->size) & (PAGE_CACHE_SIZE-1) && frag_next(frag) && frag_next(frag)->size < PAGE_CACHE_SIZE) {
 					printk(KERN_WARNING "REF_PRISTINE node at 0x%08x (%08x-%08x) had a following non-hole frag in the same page. Tell dwmw2\n",
 					       ref_offset(raw), frag->ofs, frag->ofs+frag->size);
+					mark_ref_normal(raw);
+				}
 			}
 #endif
 			if (!nrfrags++)
@@ -273,6 +437,15 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 		}
 	}
 	if (fn) {
+		if (ref_flags(raw) == REF_PRISTINE) {
+			ret = jffs2_garbage_collect_pristine(c, ic, raw);
+			if (!ret) {
+				/* Urgh. Return it sensibly. */
+				frag->node->raw = ic->nodes;
+			}	
+			if (ret != -EBADFD)
+				goto upnout;
+		}
 		/* We found a datanode. Do the GC */
 		if((start >> PAGE_CACHE_SHIFT) < ((end-1) >> PAGE_CACHE_SHIFT)) {
 			/* It crosses a page boundary. Therefore, it must be a hole. */
@@ -305,25 +478,145 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	}
  upnout:
 	up(&f->sem);
-	up(&c->alloc_sem);
 	iput(inode);
 
- eraseit_lock:
-	/* If we've finished this block, start it erasing */
-	spin_lock_bh(&c->erase_completion_lock);
-
- eraseit:
-	if (c->gcblock && !c->gcblock->used_size) {
-		D1(printk(KERN_DEBUG "Block at 0x%08x completely obsoleted by GC. Moving to erase_pending_list\n", c->gcblock->offset));
-		/* We're GC'ing an empty block? */
-		list_add_tail(&c->gcblock->list, &c->erase_pending_list);
-		c->gcblock = NULL;
-		c->nr_erasing_blocks++;
-		jffs2_erase_pending_trigger(c);
-	}
-	spin_unlock_bh(&c->erase_completion_lock);
-
 	return ret;
+}
+
+static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c, 
+					  struct jffs2_inode_cache *ic,
+					  struct jffs2_raw_node_ref *raw)
+{
+	union jffs2_node_union *node;
+	struct jffs2_raw_node_ref *nraw;
+	size_t retlen;
+	int ret;
+	uint32_t phys_ofs, alloclen;
+	uint32_t crc;
+
+	D1(printk(KERN_DEBUG "Going to GC REF_PRISTINE node at 0x%08x\n", ref_offset(raw)));
+
+	/* Ask for a small amount of space (or the totlen if smaller) because we
+	   don't want to force wastage of the end of a block if splitting would
+	   work. */
+	ret = jffs2_reserve_space_gc(c, min_t(uint32_t, sizeof(struct jffs2_raw_inode) + JFFS2_MIN_DATA_LEN, raw->totlen),
+				     &phys_ofs, &alloclen);
+	if (ret)
+		return ret;
+
+	if (alloclen < raw->totlen) {
+		/* Doesn't fit untouched. We'll go the old route and split it */
+		return -EBADFD;
+	}
+
+	node = kmalloc(raw->totlen, GFP_KERNEL);
+	if (!node)
+               return -ENOMEM;
+
+	ret = jffs2_flash_read(c, ref_offset(raw), raw->totlen, &retlen, (char *)node);
+	if (!ret && retlen != raw->totlen)
+		ret = -EIO;
+	if (ret)
+		goto out_node;
+
+	crc = crc32(0, node, sizeof(struct jffs2_unknown_node)-4);
+	if (je32_to_cpu(node->u.hdr_crc) != crc) {
+		printk(KERN_WARNING "Header CRC failed on REF_PRISTINE node at 0x%08x: Read 0x%08x, calculated 0x%08x\n",
+		       ref_offset(raw), je32_to_cpu(node->u.hdr_crc), crc);
+		goto bail;
+	}
+
+	switch(je16_to_cpu(node->u.nodetype)) {
+	case JFFS2_NODETYPE_INODE:
+		crc = crc32(0, node, sizeof(node->i)-8);
+		if (je32_to_cpu(node->i.node_crc) != crc) {
+			printk(KERN_WARNING "Node CRC failed on REF_PRISTINE data node at 0x%08x: Read 0x%08x, calculated 0x%08x\n",
+			       ref_offset(raw), je32_to_cpu(node->i.node_crc), crc);
+			goto bail;
+		}
+
+		if (je32_to_cpu(node->i.dsize)) {
+			crc = crc32(0, node->i.data, je32_to_cpu(node->i.csize));
+			if (je32_to_cpu(node->i.data_crc) != crc) {
+				printk(KERN_WARNING "Data CRC failed on REF_PRISTINE data node at 0x%08x: Read 0x%08x, calculated 0x%08x\n",
+				       ref_offset(raw), je32_to_cpu(node->i.data_crc), crc);
+				goto bail;
+			}
+		}
+		break;
+
+	case JFFS2_NODETYPE_DIRENT:
+		crc = crc32(0, node, sizeof(node->d)-8);
+		if (je32_to_cpu(node->d.node_crc) != crc) {
+			printk(KERN_WARNING "Node CRC failed on REF_PRISTINE dirent node at 0x%08x: Read 0x%08x, calculated 0x%08x\n",
+			       ref_offset(raw), je32_to_cpu(node->d.node_crc), crc);
+			goto bail;
+		}
+
+		if (node->d.nsize) {
+			crc = crc32(0, node->d.name, node->d.nsize);
+			if (je32_to_cpu(node->d.name_crc) != crc) {
+				printk(KERN_WARNING "Name CRC failed on REF_PRISTINE dirent ode at 0x%08x: Read 0x%08x, calculated 0x%08x\n",
+				       ref_offset(raw), je32_to_cpu(node->d.name_crc), crc);
+				goto bail;
+			}
+		}
+		break;
+	default:
+		printk(KERN_WARNING "Unknown node type for REF_PRISTINE node at 0x%08x: 0x%04x\n", 
+		       ref_offset(raw), je16_to_cpu(node->u.nodetype));
+		goto bail;
+	}
+
+	nraw = jffs2_alloc_raw_node_ref();
+	if (!nraw) {
+		ret = -ENOMEM;
+		goto out_node;
+	}
+	nraw->flash_offset = phys_ofs;
+	nraw->totlen = raw->totlen;
+	nraw->next_phys = NULL;
+
+	/* OK, all the CRCs are good; this node can just be copied as-is. */
+
+	ret = jffs2_flash_write(c, phys_ofs, raw->totlen, &retlen, (char *)node);
+	if (ret || (retlen != raw->totlen)) {
+		printk(KERN_NOTICE "Write of %d bytes at 0x%08x failed. returned %d, retlen %zd\n",
+                       raw->totlen, phys_ofs, ret, retlen);
+		if (retlen) {
+                        /* Doesn't belong to any inode */
+			nraw->next_in_ino = NULL;
+
+			nraw->flash_offset |= REF_OBSOLETE;
+			jffs2_add_physical_node_ref(c, nraw);
+			jffs2_mark_node_obsolete(c, nraw);
+		} else {
+			printk(KERN_NOTICE "Not marking the space at 0x%08x as dirty because the flash driver returned retlen zero\n", nraw->flash_offset);
+                        jffs2_free_raw_node_ref(raw);
+		}
+		if (!ret)
+			ret = -EIO;
+		goto out_node;
+	}
+	nraw->flash_offset |= REF_PRISTINE;
+	jffs2_add_physical_node_ref(c, nraw);
+
+	/* Link into per-inode list. This is safe because of the ic
+	   state being INO_STATE_GC. Note that if we're doing this
+	   for an inode which is in-code, the 'nraw' pointer is then
+	   going to be fetched from ic->nodes by our caller. */
+        nraw->next_in_ino = ic->nodes;
+        ic->nodes = nraw;
+
+	jffs2_mark_node_obsolete(c, raw);
+	D1(printk(KERN_DEBUG "WHEEE! GC REF_PRISTINE node at 0x%08x succeeded\n", ref_offset(raw)));
+
+ out_node:
+	kfree(node);
+	return ret;
+ bail:
+	ret = -EBADFD;
+	goto out_node;
 }
 
 static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
@@ -331,7 +624,7 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 {
 	struct jffs2_full_dnode *new_fn;
 	struct jffs2_raw_inode ri;
-	unsigned short dev;
+	jint16_t dev;
 	char *mdata = NULL, mdatalen = 0;
 	uint32_t alloclen, phys_ofs;
 	int ret;
@@ -340,8 +633,8 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	    S_ISCHR(JFFS2_F_I_MODE(f)) ) {
 		/* For these, we don't actually need to read the old node */
 		/* FIXME: for minor or major > 255. */
-		dev =  ((JFFS2_F_I_RDEV_MAJ(f) << 8) | 
-			JFFS2_F_I_RDEV_MIN(f));
+		dev = cpu_to_je16(((JFFS2_F_I_RDEV_MAJ(f) << 8) | 
+			JFFS2_F_I_RDEV_MIN(f)));
 		mdata = (char *)&dev;
 		mdatalen = sizeof(dev);
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_metadata(): Writing %d bytes of kdev_t\n", mdatalen));
@@ -364,7 +657,7 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	
 	ret = jffs2_reserve_space_gc(c, sizeof(ri) + mdatalen, &phys_ofs, &alloclen);
 	if (ret) {
-		printk(KERN_WARNING "jffs2_reserve_space_gc of %d bytes for garbage_collect_metadata failed: %d\n",
+		printk(KERN_WARNING "jffs2_reserve_space_gc of %zd bytes for garbage_collect_metadata failed: %d\n",
 		       sizeof(ri)+ mdatalen, ret);
 		goto out;
 	}
@@ -377,7 +670,7 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 
 	ri.ino = cpu_to_je32(f->inocache->ino);
 	ri.version = cpu_to_je32(++f->highest_version);
-	ri.mode = cpu_to_je32(JFFS2_F_I_MODE(f));
+	ri.mode = cpu_to_jemode(JFFS2_F_I_MODE(f));
 	ri.uid = cpu_to_je16(JFFS2_F_I_UID(f));
 	ri.gid = cpu_to_je16(JFFS2_F_I_GID(f));
 	ri.isize = cpu_to_je32(JFFS2_F_I_SIZE(f));
@@ -431,7 +724,7 @@ static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_er
 	
 	ret = jffs2_reserve_space_gc(c, sizeof(rd)+rd.nsize, &phys_ofs, &alloclen);
 	if (ret) {
-		printk(KERN_WARNING "jffs2_reserve_space_gc of %d bytes for garbage_collect_dirent failed: %d\n",
+		printk(KERN_WARNING "jffs2_reserve_space_gc of %zd bytes for garbage_collect_dirent failed: %d\n",
 		       sizeof(rd)+rd.nsize, ret);
 		return ret;
 	}
@@ -489,7 +782,7 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 				continue;
 			}
 			if (retlen != sizeof(struct jffs2_unknown_node)) {
-				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%d not %d) reading header from obsolete node at %08x\n",
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%zd not %zd) reading header from obsolete node at %08x\n",
 				       retlen, sizeof(struct jffs2_unknown_node), ref_offset(raw));
 				continue;
 			}
@@ -506,7 +799,7 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 				continue;
 			}
 			if (retlen != sizeof(rd)) {
-				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%d not %d) reading from obsolete node at %08x\n",
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%zd not %zd) reading from obsolete node at %08x\n",
 				       retlen, sizeof(rd), ref_offset(raw));
 				continue;
 			}
@@ -534,7 +827,7 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 				continue;
 			}
 			if (retlen != name_len+1) {
-				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%d not %d) reading name from obsolete node at %08x\n",
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%zd not %d) reading name from obsolete node at %08x\n",
 				       retlen, name_len+1, ref_offset(raw));
 				continue;
 			}
@@ -597,7 +890,7 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 		   write it out again with the _same_ version as before */
 		ret = jffs2_flash_read(c, ref_offset(fn->raw), sizeof(ri), &readlen, (char *)&ri);
 		if (readlen != sizeof(ri) || ret) {
-			printk(KERN_WARNING "Node read failed in jffs2_garbage_collect_hole. Ret %d, retlen %d. Data will be lost by writing new hole node\n", ret, readlen);
+			printk(KERN_WARNING "Node read failed in jffs2_garbage_collect_hole. Ret %d, retlen %zd. Data will be lost by writing new hole node\n", ret, readlen);
 			goto fill;
 		}
 		if (je16_to_cpu(ri.nodetype) != JFFS2_NODETYPE_INODE) {
@@ -607,7 +900,7 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 			return -EIO;
 		}
 		if (je32_to_cpu(ri.totlen) != sizeof(ri)) {
-			printk(KERN_WARNING "jffs2_garbage_collect_hole: Node at 0x%08x had totlen 0x%x instead of expected 0x%x\n",
+			printk(KERN_WARNING "jffs2_garbage_collect_hole: Node at 0x%08x had totlen 0x%x instead of expected 0x%zx\n",
 			       ref_offset(fn->raw),
 			       je32_to_cpu(ri.totlen), sizeof(ri));
 			return -EIO;
@@ -642,7 +935,7 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 		ri.csize = cpu_to_je32(0);
 		ri.compr = JFFS2_COMPR_ZERO;
 	}
-	ri.mode = cpu_to_je32(JFFS2_F_I_MODE(f));
+	ri.mode = cpu_to_jemode(JFFS2_F_I_MODE(f));
 	ri.uid = cpu_to_je16(JFFS2_F_I_UID(f));
 	ri.gid = cpu_to_je16(JFFS2_F_I_GID(f));
 	ri.isize = cpu_to_je32(JFFS2_F_I_SIZE(f));
@@ -654,7 +947,7 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 
 	ret = jffs2_reserve_space_gc(c, sizeof(ri), &phys_ofs, &alloclen);
 	if (ret) {
-		printk(KERN_WARNING "jffs2_reserve_space_gc of %d bytes for garbage_collect_hole failed: %d\n",
+		printk(KERN_WARNING "jffs2_reserve_space_gc of %zd bytes for garbage_collect_hole failed: %d\n",
 		       sizeof(ri), ret);
 		return ret;
 	}
@@ -762,8 +1055,11 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 	 *    page OK. We'll actually write it out again in commit_write, which is a little
 	 *    suboptimal, but at least we're correct.
 	 */
+#ifdef __ECOS
+	pg = read_cache_page(start >> PAGE_CACHE_SHIFT, (void *)jffs2_do_readpage_unlock, inode);
+#else
 	pg = read_cache_page(inode->i_mapping, start >> PAGE_CACHE_SHIFT, (void *)jffs2_do_readpage_unlock, inode);
-
+#endif
 	if (IS_ERR(pg)) {
 		printk(KERN_WARNING "read_cache_page() returned error: %ld\n", PTR_ERR(pg));
 		return PTR_ERR(pg);
@@ -780,11 +1076,11 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 		ret = jffs2_reserve_space_gc(c, sizeof(ri) + JFFS2_MIN_DATA_LEN, &phys_ofs, &alloclen);
 
 		if (ret) {
-			printk(KERN_WARNING "jffs2_reserve_space_gc of %d bytes for garbage_collect_dnode failed: %d\n",
+			printk(KERN_WARNING "jffs2_reserve_space_gc of %zd bytes for garbage_collect_dnode failed: %d\n",
 			       sizeof(ri)+ JFFS2_MIN_DATA_LEN, ret);
 			break;
 		}
-		cdatalen = min(alloclen - sizeof(ri), end - offset);
+		cdatalen = min_t(uint32_t, alloclen - sizeof(ri), end - offset);
 		datalen = end - offset;
 
 		writebuf = pg_ptr + (offset & (PAGE_CACHE_SIZE -1));
@@ -804,7 +1100,7 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 
 		ri.ino = cpu_to_je32(f->inocache->ino);
 		ri.version = cpu_to_je32(++f->highest_version);
-		ri.mode = cpu_to_je32(JFFS2_F_I_MODE(f));
+		ri.mode = cpu_to_jemode(JFFS2_F_I_MODE(f));
 		ri.uid = cpu_to_je16(JFFS2_F_I_UID(f));
 		ri.gid = cpu_to_je16(JFFS2_F_I_GID(f));
 		ri.isize = cpu_to_je32(JFFS2_F_I_SIZE(f));

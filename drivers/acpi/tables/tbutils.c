@@ -66,26 +66,25 @@
 acpi_status
 acpi_tb_handle_to_object (
 	u16                             table_id,
-	struct acpi_table_desc          **table_desc)
+	struct acpi_table_desc          **return_table_desc)
 {
 	u32                             i;
-	struct acpi_table_desc          *list_head;
+	struct acpi_table_desc          *table_desc;
 
 
 	ACPI_FUNCTION_NAME ("tb_handle_to_object");
 
 
 	for (i = 0; i < ACPI_TABLE_MAX; i++) {
-		list_head = &acpi_gbl_acpi_tables[i];
-		do {
-			if (list_head->table_id == table_id) {
-				*table_desc = list_head;
+		table_desc = acpi_gbl_table_lists[i].next;
+		while (table_desc) {
+			if (table_desc->table_id == table_id) {
+				*return_table_desc = table_desc;
 				return (AE_OK);
 			}
 
-			list_head = list_head->next;
-
-		} while (list_head != &acpi_gbl_acpi_tables[i]);
+			table_desc = table_desc->next;
+		}
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "table_id=%X does not exist\n", table_id));

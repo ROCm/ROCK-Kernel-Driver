@@ -123,7 +123,7 @@ static int bt856_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 
 
 	memset(encoder, 0, sizeof(struct bt856));
-	strncpy(client->dev.name, "bt856", DEVICE_NAME_SIZE);
+	strlcpy(client->dev.name, "bt856", DEVICE_NAME_SIZE);
 	encoder->client = client;
 	i2c_set_clientdata(client, encoder);
 	encoder->addr = client->addr;

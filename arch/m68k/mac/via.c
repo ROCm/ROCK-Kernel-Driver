@@ -65,15 +65,15 @@ static int gIER,gIFR,gBufA,gBufB;
 static int  nubus_active = 0;
 
 void via_debug_dump(void);
-void via1_irq(int, void *, struct pt_regs *);
-void via2_irq(int, void *, struct pt_regs *);
-void via_nubus_irq(int, void *, struct pt_regs *);
+irqreturn_t via1_irq(int, void *, struct pt_regs *);
+irqreturn_t via2_irq(int, void *, struct pt_regs *);
+irqreturn_t via_nubus_irq(int, void *, struct pt_regs *);
 void via_irq_enable(int irq);
 void via_irq_disable(int irq);
 void via_irq_clear(int irq);
 
-extern void mac_bang(int, void *, struct pt_regs *);
-extern void mac_scc_dispatch(int, void *, struct pt_regs *);
+extern irqreturn_t mac_bang(int, void *, struct pt_regs *);
+extern irqreturn_t mac_scc_dispatch(int, void *, struct pt_regs *);
 extern int oss_present;
 
 /*
@@ -243,7 +243,7 @@ void __init via_init(void)
  * Start the 100 Hz clock
  */
 
-void __init via_init_clock(void (*func)(int, void *, struct pt_regs *))
+void __init via_init_clock(irqreturn_t (*func)(int, void *, struct pt_regs *))
 {	
 	via1[vACR] |= 0x40;
 	via1[vT1LL] = MAC_CLOCK_LOW;
@@ -423,13 +423,14 @@ void __init via_nubus_init(void)
  * the machspec interrupt number after clearing the interrupt.
  */
 
-void via1_irq(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t via1_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int irq_bit, i;
 	unsigned char events, mask;
 
 	mask = via1[vIER] & 0x7F;
-	if (!(events = via1[vIFR] & mask)) return;
+	if (!(events = via1[vIFR] & mask))
+		return IRQ_NONE;
 
 	for (i = 0, irq_bit = 1 ; i < 7 ; i++, irq_bit <<= 1)
 		if (events & irq_bit) {
@@ -453,15 +454,17 @@ void via1_irq(int irq, void *dev_id, struct pt_regs *regs)
 		via_irq_enable(IRQ_MAC_NUBUS);
 	}
 #endif
+	return IRQ_HANDLED;
 }
 
-void via2_irq(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t via2_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int irq_bit, i;
 	unsigned char events, mask;
 
 	mask = via2[gIER] & 0x7F;
-	if (!(events = via2[gIFR] & mask)) return;
+	if (!(events = via2[gIFR] & mask))
+		return IRQ_NONE;
 
 	for (i = 0, irq_bit = 1 ; i < 7 ; i++, irq_bit <<= 1)
 		if (events & irq_bit) {
@@ -470,6 +473,7 @@ void via2_irq(int irq, void *dev_id, struct pt_regs *regs)
 			via2[gIFR] = irq_bit | rbv_clear;
 			via2[gIER] = irq_bit | 0x80;
 		}
+	return IRQ_HANDLED;
 }
 
 /*
@@ -477,12 +481,13 @@ void via2_irq(int irq, void *dev_id, struct pt_regs *regs)
  * VIA2 dispatcher as a fast interrupt handler.
  */
 
-void via_nubus_irq(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t via_nubus_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int irq_bit, i;
 	unsigned char events;
 
-	if (!(events = ~via2[gBufA] & nubus_active)) return;
+	if (!(events = ~via2[gBufA] & nubus_active))
+		return IRQ_NONE;
 
 	for (i = 0, irq_bit = 1 ; i < 7 ; i++, irq_bit <<= 1) {
 		if (events & irq_bit) {
@@ -491,6 +496,7 @@ void via_nubus_irq(int irq, void *dev_id, struct pt_regs *regs)
 			via_irq_enable(NUBUS_SOURCE_BASE + i);
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 void via_irq_enable(int irq) {

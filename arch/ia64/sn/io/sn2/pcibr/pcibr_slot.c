@@ -149,7 +149,7 @@ pcibr_slot_startup(devfs_handle_t pcibr_vhdl, pcibr_slot_req_t reqp)
     error = pcibr_slot_attach(pcibr_vhdl, slot, D_PCI_HOT_PLUG_ATTACH,
                               l1_msg, &tmp_up_resp.resp_sub_errno);
 
-    strncpy(tmp_up_resp.resp_l1_msg, l1_msg, L1_QSIZE);
+    strlcpy(tmp_up_resp.resp_l1_msg, l1_msg, L1_QSIZE);
     tmp_up_resp.resp_l1_msg[L1_QSIZE] = '\0';
 
     if (COPYOUT(&tmp_up_resp, reqp->req_respp.up, reqp->req_size)) {
@@ -240,8 +240,8 @@ pcibr_slot_shutdown(devfs_handle_t pcibr_vhdl, pcibr_slot_req_t reqp)
     error = pcibr_slot_detach(pcibr_vhdl, slot, D_PCI_HOT_PLUG_DETACH,
                               l1_msg, &tmp_down_resp.resp_sub_errno);
 
-    strncpy(tmp_down_resp.resp_l1_msg, l1_msg, L1_QSIZE);
-    tmp_down_resp.resp_l1_msg[L1_QSIZE] = '\0';
+    strlcpy(tmp_down_resp.resp_l1_msg, l1_msg,
+	    sizeof(tmp_down_resp.resp_l1_msg));
 
     shutdown_copyout:
 

@@ -1148,7 +1148,7 @@ int snd_ad1848_add_ctl(ad1848_t *chip, const char *name, int index, int type, un
 	ctl = snd_ctl_new1(&newctls[type], chip);
 	if (! ctl)
 		return -ENOMEM;
-	strncpy(ctl->id.name, name, sizeof(ctl->id.name)-1);
+	strlcpy(ctl->id.name, name, sizeof(ctl->id.name));
 	ctl->id.index = index;
 	ctl->private_value = value;
 	if ((err = snd_ctl_add(chip->card, ctl)) < 0) {

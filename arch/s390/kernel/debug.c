@@ -208,8 +208,7 @@ static debug_info_t*  debug_info_alloc(char *name, int page_order,
 	rc->level       = DEBUG_DEFAULT_LEVEL;
 	rc->buf_size    = buf_size;
 	rc->entry_size  = sizeof(debug_entry_t) + buf_size;
-	strncpy(rc->name, name, MIN(strlen(name), (DEBUG_MAX_PROCF_LEN - 1)));
-	rc->name[MIN(strlen(name), (DEBUG_MAX_PROCF_LEN - 1))] = 0;
+	strlcpy(rc->name, name, sizeof(rc->name));
 	memset(rc->views, 0, DEBUG_MAX_VIEWS * sizeof(struct debug_view *));
 #ifdef CONFIG_PROC_FS
 	memset(rc->proc_entries, 0 ,DEBUG_MAX_VIEWS *
@@ -586,7 +585,6 @@ debug_info_t *debug_register
 {
 	debug_info_t *rc = NULL;
 
-	MOD_INC_USE_COUNT;
 	if (!initialized)
 		BUG();
 	down(&debug_lock);
@@ -606,7 +604,6 @@ debug_info_t *debug_register
       out:
         if (rc == NULL){
 		printk(KERN_ERR "debug: debug_register failed for %s\n",name);
-		MOD_DEC_USE_COUNT;
         }
 	up(&debug_lock);
 	return rc;
@@ -628,7 +625,6 @@ void debug_unregister(debug_info_t * id)
 	debug_info_put(id);
 	up(&debug_lock);
 
-	MOD_DEC_USE_COUNT;
       out:
 	return;
 }
@@ -852,9 +848,17 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 	int i;
 	unsigned long flags;
 	mode_t mode = S_IFREG;
+	struct proc_dir_entry *pde;
 
 	if (!id)
 		goto out;
+	pde = create_proc_entry(view->name, mode, id->proc_root_entry);
+	if (!pde){
+		printk(KERN_WARNING "debug: create_proc_entry() failed! Cannot register view %s/%s\n", id->name,view->name);
+		rc = -1;
+		goto out;
+	}
+
 	spin_lock_irqsave(&id->lock, flags);
 	for (i = 0; i < DEBUG_MAX_VIEWS; i++) {
 		if (id->views[i] == NULL)
@@ -865,6 +869,7 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 			id->name,view->name);
 		printk(KERN_WARNING 
 			"debug: maximum number of views reached (%i)!\n", i);
+		remove_proc_entry(pde->name, id->proc_root_entry);
 		rc = -1;
 	}
 	else {
@@ -873,11 +878,8 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 			mode |= S_IRUSR;
 		if (view->input_proc)
 			mode |= S_IWUSR;
-		id->proc_entries[i] = create_proc_entry(view->name, mode,
-							id->proc_root_entry);
-		if (id->proc_entries[i] != NULL)
-			id->proc_entries[i]->proc_fops = &debug_file_ops;
-		rc = 0;
+		pde->proc_fops = &debug_file_ops;
+		id->proc_entries[i] = pde;
 	}
 	spin_unlock_irqrestore(&id->lock, flags);
       out:

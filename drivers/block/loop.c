@@ -236,7 +236,6 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	up(&mapping->host->i_sem);
 out:
 	kunmap(bvec->bv_page);
-	balance_dirty_pages_ratelimited(mapping);
 	return ret;
 
 unlock:
@@ -867,7 +866,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	if (err)
 		return err;	
 
-	strncpy(lo->lo_name, info->lo_name, LO_NAME_SIZE);
+	strlcpy(lo->lo_name, info->lo_name, LO_NAME_SIZE);
 
 	lo->transfer = xfer_funcs[type]->transfer;
 	lo->ioctl = xfer_funcs[type]->ioctl;
@@ -902,7 +901,7 @@ loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 	info->lo_rdevice = lo->lo_device ? stat.rdev : stat.dev;
 	info->lo_offset = lo->lo_offset;
 	info->lo_flags = lo->lo_flags;
-	strncpy(info->lo_name, lo->lo_name, LO_NAME_SIZE);
+	strlcpy(info->lo_name, lo->lo_name, LO_NAME_SIZE);
 	info->lo_encrypt_type = lo->lo_encrypt_type;
 	if (lo->lo_encrypt_key_size && capable(CAP_SYS_ADMIN)) {
 		info->lo_encrypt_key_size = lo->lo_encrypt_key_size;

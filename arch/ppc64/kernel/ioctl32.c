@@ -685,7 +685,7 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 	if (__get_user(data32, &u_ifreq32->ifr_ifru.ifru_data))
 		return -EFAULT;
-	data64 = A(data32);
+	data64 = (void __user *)A(data32);
 
 	u_ifreq64 = compat_alloc_user_space(sizeof(*u_ifreq64));
 
@@ -801,7 +801,7 @@ static int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	
 	struct socket *mysock = sockfd_lookup(fd, &ret);
 
-	if (mysock && mysock->sk && mysock->sk->family == AF_INET6) { /* ipv6 */
+	if (mysock && mysock->sk && mysock->sk->sk_family == AF_INET6) { /* ipv6 */
 		ret = copy_from_user (&r6.rtmsg_dst, &(((struct in6_rtmsg32 *)arg)->rtmsg_dst),
 			3 * sizeof(struct in6_addr));
 		ret |= __get_user (r6.rtmsg_type, &(((struct in6_rtmsg32 *)arg)->rtmsg_type));

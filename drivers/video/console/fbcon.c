@@ -187,6 +187,7 @@ static int vbl_detected;
 static irqreturn_t fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 {
 	vbl_detected++;
+	return IRQ_HANDLED;
 }
 #endif
 

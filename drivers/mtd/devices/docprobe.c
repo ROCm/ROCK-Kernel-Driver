@@ -1,9 +1,10 @@
 
 /* Linux driver for Disk-On-Chip devices			*/
 /* Probe routines common to all DoC devices			*/
-/* (c) 1999 Machine Vision Holdings, Inc.			*/
-/* Author: David Woodhouse <dwmw2@infradead.org>		*/
-/* $Id: docprobe.c,v 1.30 2001/10/02 15:05:13 dwmw2 Exp $	*/
+/* (C) 1999 Machine Vision Holdings, Inc.			*/
+/* (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>		*/
+
+/* $Id: docprobe.c,v 1.36 2003/05/23 11:29:34 dwmw2 Exp $	*/
 
 
 
@@ -30,14 +31,12 @@
 /* DOC_SINGLE_DRIVER:
    Millennium driver has been merged into DOC2000 driver.
 
-   The newly-merged driver doesn't appear to work for writing. It's the
-   same with the DiskOnChip 2000 and the Millennium. If you have a 
-   Millennium and you want write support to work, remove the definition
-   of DOC_SINGLE_DRIVER below to use the old doc2001-specific driver.
-
-   Otherwise, it's left on in the hope that it'll annoy someone with
-   a Millennium enough that they go through and work out what the 
-   difference is :)
+   The old Millennium-only driver has been retained just in case there
+   are problems with the new code. If the combined driver doesn't work
+   for you, you can try the old one by undefining DOC_SINGLE_DRIVER 
+   below and also enabling it in your configuration. If this fixes the
+   problems, please send a report to the MTD mailing list at 
+   <linux-mtd@lists.infradead.org>.
 */
 #define DOC_SINGLE_DRIVER
 
@@ -46,18 +45,15 @@
 #include <linux/module.h>
 #include <asm/errno.h>
 #include <asm/io.h>
-#include <asm/uaccess.h>
-#include <linux/miscdevice.h>
-#include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/types.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/doc2000.h>
+#include <linux/mtd/compatmac.h>
 
 /* Where to look for the devices? */
 #ifndef CONFIG_MTD_DOCPROBE_ADDRESS
@@ -67,7 +63,7 @@
 
 static unsigned long doc_config_location = CONFIG_MTD_DOCPROBE_ADDRESS;
 MODULE_PARM(doc_config_location, "l");
-
+MODULE_PARM_DESC(doc_config_location, "Physical memory address at which to probe for DiskOnChip");
 
 static unsigned long __initdata doc_locations[] = {
 #if defined (__alpha__) || defined(__i386__) || defined(__x86_64__)
@@ -84,21 +80,24 @@ static unsigned long __initdata doc_locations[] = {
 	0xe0000, 0xe2000, 0xe4000, 0xe6000, 
 	0xe8000, 0xea000, 0xec000, 0xee000,
 #endif /*  CONFIG_MTD_DOCPROBE_HIGH */
-#elif defined(__ppc__)
+#elif defined(__PPC__)
 	0xe4000000,
 #elif defined(CONFIG_MOMENCO_OCELOT)
 	0x2f000000,
-#else
+        0xff000000,
+#elif defined(CONFIG_MOMENCO_OCELOT_G) || defined (CONFIG_MOMENCO_OCELOT_C)
+        0xff000000,
+##else
 #warning Unknown architecture for DiskOnChip. No default probe locations defined
 #endif
-	0 };
+	0xffffffff };
 
 /* doccheck: Probe a given memory window to see if there's a DiskOnChip present */
 
 static inline int __init doccheck(unsigned long potential, unsigned long physadr)
 {
 	unsigned long window=potential;
-	unsigned char tmp, ChipID;
+	unsigned char tmp, tmpb, tmpc, ChipID;
 #ifndef DOC_PASSIVE_PROBE
 	unsigned char tmp2;
 #endif
@@ -141,19 +140,65 @@ static inline int __init doccheck(unsigned long potential, unsigned long physadr
 	switch (ChipID) {
 	case DOC_ChipID_Doc2k:
 		/* Check the TOGGLE bit in the ECC register */
-		tmp = ReadDOC(window, 2k_ECCStatus) & DOC_TOGGLE_BIT;
-		if ((ReadDOC(window, 2k_ECCStatus) & DOC_TOGGLE_BIT) != tmp)
+		tmp  = ReadDOC(window, 2k_ECCStatus) & DOC_TOGGLE_BIT;
+		tmpb = ReadDOC(window, 2k_ECCStatus) & DOC_TOGGLE_BIT;
+		tmpc = ReadDOC(window, 2k_ECCStatus) & DOC_TOGGLE_BIT;
+		if (tmp != tmpb && tmp == tmpc)
 				return ChipID;
 		break;
 		
 	case DOC_ChipID_DocMil:
 		/* Check the TOGGLE bit in the ECC register */
-		tmp = ReadDOC(window, ECCConf) & DOC_TOGGLE_BIT;
-		if ((ReadDOC(window, ECCConf) & DOC_TOGGLE_BIT) != tmp)
+		tmp  = ReadDOC(window, ECCConf) & DOC_TOGGLE_BIT;
+		tmpb = ReadDOC(window, ECCConf) & DOC_TOGGLE_BIT;
+		tmpc = ReadDOC(window, ECCConf) & DOC_TOGGLE_BIT;
+		if (tmp != tmpb && tmp == tmpc)
 				return ChipID;
 		break;
 		
+	case DOC_ChipID_DocMilPlus16:
+	case DOC_ChipID_DocMilPlus32:
+	case 0:
+		/* Possible Millennium+, need to do more checks */
+#ifndef DOC_PASSIVE_PROBE
+		/* Possibly release from power down mode */
+		for (tmp = 0; (tmp < 4); tmp++)
+			ReadDOC(window, Mplus_Power);
+
+		/* Reset the DiskOnChip ASIC */
+		tmp = DOC_MODE_RESET | DOC_MODE_MDWREN | DOC_MODE_RST_LAT |
+			DOC_MODE_BDECT;
+		WriteDOC(tmp, window, Mplus_DOCControl);
+		WriteDOC(~tmp, window, Mplus_CtrlConfirm);
+	
+		mdelay(1);
+		/* Enable the DiskOnChip ASIC */
+		tmp = DOC_MODE_NORMAL | DOC_MODE_MDWREN | DOC_MODE_RST_LAT |
+			DOC_MODE_BDECT;
+		WriteDOC(tmp, window, Mplus_DOCControl);
+		WriteDOC(~tmp, window, Mplus_CtrlConfirm);
+		mdelay(1);
+#endif /* !DOC_PASSIVE_PROBE */	
+
+		ChipID = ReadDOC(window, ChipID);
+
+		switch (ChipID) {
+		case DOC_ChipID_DocMilPlus16:
+		case DOC_ChipID_DocMilPlus32:
+			/* Check the TOGGLE bit in the toggle register */
+			tmp  = ReadDOC(window, Mplus_Toggle) & DOC_TOGGLE_BIT;
+			tmpb = ReadDOC(window, Mplus_Toggle) & DOC_TOGGLE_BIT;
+			tmpc = ReadDOC(window, Mplus_Toggle) & DOC_TOGGLE_BIT;
+			if (tmp != tmpb && tmp == tmpc)
+					return ChipID;
+			break;
+		default:
+			break;
+		}
+		/* FALL TRHU */
+
 	default:
+
 #ifndef CONFIG_MTD_DOCPROBE_55AA
 		printk(KERN_WARNING "Possible DiskOnChip with unknown ChipID %2.2X found at 0x%lx\n",
 		       ChipID, physadr);
@@ -233,6 +278,13 @@ static void __init DoC_Probe(unsigned long physadr)
 			im_modname = "doc2001";
 #endif /* DOC_SINGLE_DRIVER */
 			break;
+
+		case DOC_ChipID_DocMilPlus16:
+		case DOC_ChipID_DocMilPlus32:
+			name="MillenniumPlus";
+			im_funcname = "DoCMilPlus_init";
+			im_modname = "doc2001plus";
+			break;
 		}
 
 		if (im_funcname)
@@ -244,6 +296,7 @@ static void __init DoC_Probe(unsigned long physadr)
 			return;
 		}
 		printk(KERN_NOTICE "Cannot find driver for DiskOnChip %s at 0x%lX\n", name, physadr);
+		kfree(mtd);
 	}
 	iounmap((void *)docptr);
 }
@@ -263,7 +316,7 @@ int __init init_doc(void)
 		printk(KERN_INFO "Using configured DiskOnChip probe address 0x%lx\n", doc_config_location);
 		DoC_Probe(doc_config_location);
 	} else {
-		for (i=0; doc_locations[i]; i++) {
+		for (i=0; (doc_locations[i] != 0xffffffff); i++) {
 			DoC_Probe(doc_locations[i]);
 		}
 	}
@@ -271,11 +324,7 @@ int __init init_doc(void)
 	   found, so the user knows we at least tried. */
 	if (!docfound)
 		printk(KERN_INFO "No recognised DiskOnChip devices found\n");
-	/* So it looks like we've been used and we get unloaded */
-	MOD_INC_USE_COUNT;
-	MOD_DEC_USE_COUNT;
-	return 0;
-	
+	return -EAGAIN;
 }
 
 module_init(init_doc);

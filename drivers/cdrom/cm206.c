@@ -1447,7 +1447,7 @@ int __init cm206_init(void)
 	request_region(cm206_base, 16, "cm206");
 	cd = (struct cm206_struct *) kmalloc(size, GFP_KERNEL);
 	if (!cd)
-		return -EIO;
+               goto out_base;
 	/* Now we have found the adaptor card, try to reset it. As we have
 	 * found out earlier, this process generates an interrupt as well,
 	 * so we might just exploit that fact for irq probing! */
@@ -1456,7 +1456,6 @@ int __init cm206_init(void)
 	if (cm206_irq <= 0) {
 		printk("can't find IRQ!\n");
 		goto out_probe;
-		return -EIO;
 	} else
 		printk(" IRQ %d found\n", cm206_irq);
 #else
@@ -1530,6 +1529,7 @@ out_blkdev:
 	free_irq(cm206_irq, NULL);
 out_probe:
 	kfree(cd);
+out_base:
 	release_region(cm206_base, 16);
 	return -EIO;
 }

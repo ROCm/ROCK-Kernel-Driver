@@ -51,6 +51,9 @@
 #ifndef _LINUX_TIMEX_H
 #define _LINUX_TIMEX_H
 
+#include <linux/config.h>
+#include <linux/compiler.h>
+
 #include <asm/param.h>
 
 /*
@@ -309,6 +312,105 @@ extern long pps_jitcnt;		/* jitter limit exceeded */
 extern long pps_calcnt;		/* calibration intervals */
 extern long pps_errcnt;		/* calibration errors */
 extern long pps_stbcnt;		/* stability limit exceeded */
+
+#ifdef CONFIG_TIME_INTERPOLATION
+
+struct time_interpolator {
+	/* cache-hot stuff first: */
+	unsigned long (*get_offset) (void);
+	void (*update) (long);
+	void (*reset) (void);
+
+	/* cache-cold stuff follows here: */
+	struct time_interpolator *next;
+	unsigned long frequency;	/* frequency in counts/second */
+	long drift;			/* drift in parts-per-million (or -1) */
+};
+
+extern volatile unsigned long last_nsec_offset;
+#ifndef __HAVE_ARCH_CMPXCHG
+extern spin_lock_t last_nsec_offset_lock;
+#endif
+extern struct time_interpolator *time_interpolator;
+
+extern void register_time_interpolator(struct time_interpolator *);
+extern void unregister_time_interpolator(struct time_interpolator *);
+
+/* Called with xtime WRITE-lock acquired.  */
+static inline void
+time_interpolator_update(long delta_nsec)
+{
+	struct time_interpolator *ti = time_interpolator;
+
+	if (last_nsec_offset > 0) {
+#ifdef __HAVE_ARCH_CMPXCHG
+		unsigned long new, old;
+
+		do {
+			old = last_nsec_offset;
+			if (old > delta_nsec)
+				new = old - delta_nsec;
+			else
+				new = 0;
+		} while (cmpxchg(&last_nsec_offset, old, new) != old);
+#else
+		/*
+		 * This really hurts, because it serializes gettimeofday(), but without an
+		 * atomic single-word compare-and-exchange, there isn't all that much else
+		 * we can do.
+		 */
+		spin_lock(&last_nsec_offset_lock);
+		{
+			last_nsec_offset -= min(last_nsec_offset, delta_nsec);
+		}
+		spin_unlock(&last_nsec_offset_lock);
+#endif
+	}
+
+	if (ti)
+		(*ti->update)(delta_nsec);
+}
+
+/* Called with xtime WRITE-lock acquired.  */
+static inline void
+time_interpolator_reset(void)
+{
+	struct time_interpolator *ti = time_interpolator;
+
+	last_nsec_offset = 0;
+	if (ti)
+		(*ti->reset)();
+}
+
+/* Called with xtime READ-lock acquired.  */
+static inline unsigned long
+time_interpolator_get_offset(void)
+{
+	struct time_interpolator *ti = time_interpolator;
+	if (ti)
+		return (*ti->get_offset)();
+	return last_nsec_offset;
+}
+
+#else /* !CONFIG_TIME_INTERPOLATION */
+
+static inline void
+time_interpolator_update(long delta_nsec)
+{
+}
+
+static inline void
+time_interpolator_reset(void)
+{
+}
+
+static inline unsigned long
+time_interpolator_get_offset(void)
+{
+	return 0;
+}
+
+#endif /* !CONFIG_TIME_INTERPOLATION */
 
 #endif /* KERNEL */
 

@@ -186,6 +186,7 @@ struct acpi_device_pnp {
 	acpi_bus_id		bus_id;		               /* Object name */
 	acpi_bus_address	bus_address;	                      /* _ADR */
 	acpi_hardware_id	hardware_id;	                      /* _HID */
+	struct acpi_compatible_id_list *cid_list;		     /* _CIDs */
 	acpi_unique_id		unique_id;	                      /* _UID */
 	acpi_device_name	device_name;	         /* Driver-determined */
 	acpi_device_class	device_class;	         /*        "          */

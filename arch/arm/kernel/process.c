@@ -239,7 +239,7 @@ static unsigned int nr_thread_info;
 #define ll_alloc_task_struct() ((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
 #define ll_free_task_struct(p) free_pages((unsigned long)(p),1)
 
-struct thread_info *alloc_thread_info(void)
+struct thread_info *alloc_thread_info(struct task_struct *task)
 {
 	struct thread_info *thread = NULL;
 

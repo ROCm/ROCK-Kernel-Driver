@@ -356,8 +356,7 @@ setup_arch (char **cmdline_p)
 	unw_init();
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
-	strncpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
-	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';		/* for safety */
+	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
 
 	efi_init();
 

@@ -121,6 +121,11 @@ int __init proteon_probe(struct net_device *dev)
 	int i,j;
 	struct proteon_card *card;
 
+#ifndef MODULE
+	netdev_boot_setup_check(dev);
+	tr_setup(dev);
+#endif
+
 	SET_MODULE_OWNER(dev);
 	if (!dev->base_addr)
 	{
@@ -158,20 +163,8 @@ int __init proteon_probe(struct net_device *dev)
 	if (versionprinted++ == 0)
 		printk(KERN_DEBUG "%s", version);
 
-#ifndef MODULE
-	dev = init_trdev(dev, 0);
-	if (!dev)
-	{
-		release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-		return -1;
-	}
-#endif
-
 	if (tmsdev_init(dev, ISA_MAX_ADDRESS, NULL))
-       	{
-		release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-		return -1;
-	}
+		goto out4;
 
 	dev->base_addr &= ~3; 
 		
@@ -211,9 +204,7 @@ int __init proteon_probe(struct net_device *dev)
                 if(irqlist[j] == 0)
                 {
                         printk(KERN_INFO "%s: AutoSelect no IRQ available\n", dev->name);
-			release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-			tmsdev_term(dev);
-			return -1;
+			goto out3;
 		}
 	}
 	else
@@ -225,18 +216,14 @@ int __init proteon_probe(struct net_device *dev)
 		{
 			printk(KERN_INFO "%s: Illegal IRQ %d specified\n",
 				dev->name, dev->irq);
-			release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-			tmsdev_term(dev);
-			return -1;
+			goto out3;
 		}
 		if (request_irq(dev->irq, tms380tr_interrupt, 0, 
 			cardname, dev))
 		{
                         printk(KERN_INFO "%s: Selected IRQ %d not available\n", 
 				dev->name, dev->irq);
-			release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-			tmsdev_term(dev);
-			return -1;
+			goto out3;
 		}
 	}
 
@@ -252,10 +239,7 @@ int __init proteon_probe(struct net_device *dev)
 		if(dmalist[j] == 0)
 		{
 			printk(KERN_INFO "%s: AutoSelect no DMA available\n", dev->name);
-			release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-			free_irq(dev->irq, dev);
-			tmsdev_term(dev);
-			return -1;
+			goto out2;
 		}
 	}
 	else
@@ -267,52 +251,36 @@ int __init proteon_probe(struct net_device *dev)
 		{
                         printk(KERN_INFO "%s: Illegal DMA %d specified\n", 
 				dev->name, dev->dma);
-			release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-			free_irq(dev->irq, dev);
-			tmsdev_term(dev);
-			return -1;
+			goto out2;
 		}
 		if (request_dma(dev->dma, cardname))
 		{
                         printk(KERN_INFO "%s: Selected DMA %d not available\n", 
 				dev->name, dev->dma);
-			release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-			free_irq(dev->irq, dev);
-			tmsdev_term(dev);
-			return -1;
+			goto out2;
 		}
 	}
 
 	printk(KERN_DEBUG "%s:    IO: %#4lx  IRQ: %d  DMA: %d\n",
 	       dev->name, dev->base_addr, dev->irq, dev->dma);
 		
-	if (register_trdev(dev) == 0) 
-	{
-		/* Enlist in the card list */
-		card = kmalloc(sizeof(struct proteon_card), GFP_KERNEL);
-		if (!card) {
-			unregister_trdev(dev);
-			release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-			free_irq(dev->irq, dev);
-			free_dma(dev->dma);
-			tmsdev_term(dev);
-			return -1;
-		}
-		card->next = proteon_card_list;
-		proteon_card_list = card;
-		card->dev = dev;
-	} 
-	else 
-	{
-		printk("KERN_INFO %s: register_trdev() returned non-zero.\n", dev->name);
-		release_region(dev->base_addr, PROTEON_IO_EXTENT); 
-		free_irq(dev->irq, dev);
-		free_dma(dev->dma);
-		tmsdev_term(dev);
-		return -1;
-	}
-	
+	/* Enlist in the card list */
+	card = kmalloc(sizeof(struct proteon_card), GFP_KERNEL);
+	if (!card)
+		goto out;
+	card->next = proteon_card_list;
+	proteon_card_list = card;
+	card->dev = dev;
 	return 0;
+out:
+	free_dma(dev->dma);
+out2:
+	free_irq(dev->irq, dev);
+out3:
+	tmsdev_term(dev);
+out4:
+	release_region(dev->base_addr, PROTEON_IO_EXTENT); 
+	return -1;
 }
 
 /*
@@ -402,64 +370,51 @@ MODULE_PARM(io, "1-" __MODULE_STRING(ISATR_MAX_ADAPTERS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(ISATR_MAX_ADAPTERS) "i");
 MODULE_PARM(dma, "1-" __MODULE_STRING(ISATR_MAX_ADAPTERS) "i");
 
+static int __init setup_card(unsigned long io, unsigned irq, unsigned char dma)
+{
+	int res = -ENOMEM;
+	struct proteon_card *this_card;
+	struct net_device *dev = alloc_trdev(0);
+
+	if (dev) {
+		dev->base_addr = io;
+		dev->irq       = irq;
+		dev->dma       = dma;
+		res = -ENODEV;
+		if (proteon_probe(dev) == 0) {
+			res = register_netdev(dev);
+			if (!res)
+				return 0;
+			release_region(dev->base_addr, PROTEON_IO_EXTENT);
+			free_irq(dev->irq, dev);
+			free_dma(dev->dma);
+			tmsdev_term(dev);
+			this_card = proteon_card_list;
+			proteon_card_list = this_card->next;
+			kfree(this_card);
+		}
+		kfree(dev);
+	}
+	return res;
+}
+
 int init_module(void)
 {
 	int i, num;
 	struct net_device *dev;
 
 	num = 0;
-	if (io[0]) 
-	{ /* Only probe addresses from command line */
-		dev = init_trdev(NULL, 0);
-		if (!dev)
-			return (-ENOMEM);
-		for (i = 0; i < ISATR_MAX_ADAPTERS; i++)
-	       	{
-			if (io[i] == 0)
-				continue;
-		
-			dev->base_addr = io[i];
-			dev->irq       = irq[i];
-			dev->dma       = dma[i];
-
-			if (!proteon_probe(dev))
-			{
+	if (io[0]) { /* Only probe addresses from command line */
+		for (i = 0; i < ISATR_MAX_ADAPTERS ; i++) {
+			if (io[i] && setup_card(io[i], irq[i], dma[i]) == 0)
 				num++;
-				dev = init_trdev(NULL, 0);
-				if (!dev)
-					goto partial;
-			}
 		}
-		unregister_netdev(dev);
-		kfree(dev);
-	}
-       	else
-       	{
-		dev = init_trdev(NULL, 0);
-		if (!dev)
-			return (-ENOMEM);
-
-		for(i = 0; portlist[i]; i++)
-		{
-			if (num >= ISATR_MAX_ADAPTERS)
-				continue;
-		
-			dev->base_addr = portlist[i];
-			dev->irq       = irq[num];
-			dev->dma       = dma[num];
-
-			if (!proteon_probe(dev))
-			{
+	} else {
+		for(i = 0; num < ISATR_MAX_ADAPTERS && portlist[i]; i++) {
+			if (setup_card(portlist[i], irq[i], dma[i]))
 				num++;
-				dev = init_trdev(NULL, 0);
-				if (!dev)
-					goto partial;
-			}
 		}
-		unregister_netdev(dev);
-		kfree(dev);
 	}
-partial:
 	printk(KERN_NOTICE "proteon.c: %d cards found.\n", num);
 	/* Probe for cards. */
 	if (num == 0) {

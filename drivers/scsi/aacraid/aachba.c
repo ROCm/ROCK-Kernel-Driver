@@ -1130,7 +1130,7 @@ static int query_disk(struct aac_dev *dev, void *arg)
 	else
 		qd.unmapped = 0;
 
-	strncpy(qd.name, fsa_dev_ptr->devname[qd.cnum], 8);
+	strlcpy(qd.name, fsa_dev_ptr->devname[qd.cnum], sizeof(qd.name));
 
 	if (copy_to_user(arg, &qd, sizeof (struct aac_query_disk)))
 		return -EFAULT;

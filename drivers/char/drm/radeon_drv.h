@@ -159,6 +159,7 @@ extern int radeon_cp_start( DRM_IOCTL_ARGS );
 extern int radeon_cp_stop( DRM_IOCTL_ARGS );
 extern int radeon_cp_reset( DRM_IOCTL_ARGS );
 extern int radeon_cp_idle( DRM_IOCTL_ARGS );
+extern int radeon_cp_resume( DRM_IOCTL_ARGS );
 extern int radeon_engine_reset( DRM_IOCTL_ARGS );
 extern int radeon_fullscreen( DRM_IOCTL_ARGS );
 extern int radeon_cp_buffers( DRM_IOCTL_ARGS );

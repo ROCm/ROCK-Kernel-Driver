@@ -148,6 +148,7 @@ static inline int __vlan_hwaccel_rx(struct sk_buff *skb,
 {
 	struct net_device_stats *stats;
 
+	skb->real_dev = skb->dev;
 	skb->dev = grp->vlan_devices[vlan_tag & VLAN_VID_MASK];
 	if (skb->dev == NULL) {
 		kfree_skb(skb);

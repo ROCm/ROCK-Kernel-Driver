@@ -286,7 +286,7 @@ static void videodev_proc_create(void)
 	video_dev_proc_entry->owner = THIS_MODULE;
 }
 
-static void videodev_proc_destroy(void)
+static void __exit videodev_proc_destroy(void)
 {
 	if (video_dev_proc_entry != NULL)
 		remove_proc_entry("dev", video_proc_entry);

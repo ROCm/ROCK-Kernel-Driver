@@ -45,11 +45,11 @@ static int prepare_tx(struct net_device *dev, struct archdr *pkt, int length,
 
 struct ArcProto rfc1051_proto =
 {
-	's',
-	XMTU - RFC1051_HDR_SIZE,
-	rx,
-	build_header,
-	prepare_tx
+	.suffix		= 's',
+	.mtu		= XMTU - RFC1051_HDR_SIZE,
+	.rx		= rx,
+	.build_header	= build_header,
+	.prepare_tx	= prepare_tx,
 };
 
 

@@ -97,7 +97,7 @@ css_register_subchannel(struct subchannel *sch)
 	sch->dev.bus = &css_bus_type;
 
 	/* Set a name for the subchannel */
-	strncpy (sch->dev.name, subchannel_types[sch->st], DEVICE_NAME_SIZE);
+	strlcpy (sch->dev.name, subchannel_types[sch->st], DEVICE_NAME_SIZE);
 	snprintf (sch->dev.bus_id, DEVICE_ID_SIZE, "0:%04x", sch->irq);
 
 	/* make it known to the system */

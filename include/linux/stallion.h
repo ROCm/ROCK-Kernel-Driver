@@ -84,8 +84,6 @@ typedef struct stlport {
 	int			refcount;
 	int			openwaitcnt;
 	int			brklen;
-	long			session;
-	long			pgrp;
 	unsigned int		sigs;
 	unsigned int		rxignoremsk;
 	unsigned int		rxmarkmsk;
@@ -103,7 +101,6 @@ typedef struct stlport {
 	wait_queue_head_t	close_wait;
 #endif
 	struct termios		normaltermios;
-	struct termios		callouttermios;
 	struct work_struct	tqueue;
 	comstats_t		stats;
 	stlrq_t			tx;

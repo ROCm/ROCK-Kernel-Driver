@@ -235,7 +235,7 @@ acpi_status
 acpi_unload_table (
 	acpi_table_type                 table_type)
 {
-	struct acpi_table_desc          *list_head;
+	struct acpi_table_desc          *table_desc;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_unload_table");
@@ -250,22 +250,22 @@ acpi_unload_table (
 
 	/* Find all tables of the requested type */
 
-	list_head = &acpi_gbl_acpi_tables[table_type];
-	do {
+	table_desc = acpi_gbl_table_lists[table_type].next;
+	while (table_desc); {
 		/*
 		 * Delete all namespace entries owned by this table.  Note that these
 		 * entries can appear anywhere in the namespace by virtue of the AML
 		 * "Scope" operator.  Thus, we need to track ownership by an ID, not
 		 * simply a position within the hierarchy
 		 */
-		acpi_ns_delete_namespace_by_owner (list_head->table_id);
+		acpi_ns_delete_namespace_by_owner (table_desc->table_id);
 
-		/* Delete (or unmap) the actual table */
+		table_desc = table_desc->next;
+	}
 
-		acpi_tb_delete_acpi_table (table_type);
+	/* Delete (or unmap) all tables of this type */
 
-	} while (list_head != &acpi_gbl_acpi_tables[table_type]);
-
+	acpi_tb_delete_tables_by_type (table_type);
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -313,7 +313,7 @@ acpi_get_table_header (
 	/* Check the table type and instance */
 
 	if ((table_type > ACPI_TABLE_MAX)   ||
-		(ACPI_IS_SINGLE_TABLE (acpi_gbl_acpi_table_data[table_type].flags) &&
+		(ACPI_IS_SINGLE_TABLE (acpi_gbl_table_data[table_type].flags) &&
 		 instance > 1)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
@@ -394,7 +394,7 @@ acpi_get_table (
 	/* Check the table type and instance */
 
 	if ((table_type > ACPI_TABLE_MAX)   ||
-		(ACPI_IS_SINGLE_TABLE (acpi_gbl_acpi_table_data[table_type].flags) &&
+		(ACPI_IS_SINGLE_TABLE (acpi_gbl_table_data[table_type].flags) &&
 		 instance > 1)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}

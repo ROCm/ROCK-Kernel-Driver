@@ -31,7 +31,6 @@ irnet_post_event(irnet_socket *	ap,
 		 char *		name,
 		 __u16		hints)
 {
-  unsigned long		flags;		/* For spinlock */
   int			index;		/* In the log */
 
   DENTER(CTRL_TRACE, "(ap=0x%X, event=%d, daddr=%08x, name=``%s'')\n",
@@ -41,7 +40,7 @@ irnet_post_event(irnet_socket *	ap,
    * Note : as we are the only event producer, we only need to exclude
    * ourself when touching the log, which is nice and easy.
    */
-  spin_lock_irqsave(&irnet_events.spinlock, flags);
+  spin_lock_bh(&irnet_events.spinlock);
 
   /* Copy the event in the log */
   index = irnet_events.index;
@@ -69,7 +68,7 @@ irnet_post_event(irnet_socket *	ap,
   DEBUG(CTRL_INFO, "New event index is %d\n", irnet_events.index);
 
   /* Spin lock end */
-  spin_unlock_irqrestore(&irnet_events.spinlock, flags);
+  spin_unlock_bh(&irnet_events.spinlock);
 
   /* Now : wake up everybody waiting for events... */
   wake_up_interruptible_all(&irnet_events.rwait);
@@ -115,7 +114,7 @@ irnet_open_tsap(irnet_socket *	self)
   notify.flow_indication	= irnet_flow_indication;
   notify.status_indication	= irnet_status_indication;
   notify.instance		= self;
-  strncpy(notify.name, IRNET_NOTIFY_NAME, NOTIFY_MAX_NAME);
+  strlcpy(notify.name, IRNET_NOTIFY_NAME, sizeof(notify.name));
 
   /* Open an IrTTP instance */
   self->tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT,
@@ -536,10 +535,9 @@ irda_irnet_connect(irnet_socket *	self)
    *	     Can't re-insert (MUST remove first) so check for that... */
   if((irnet_server.running) && (self->q.q_next == NULL))
     {
-      unsigned long		flags;
-      spin_lock_irqsave(&irnet_server.spinlock, flags);
+      spin_lock_bh(&irnet_server.spinlock);
       hashbin_insert(irnet_server.list, (irda_queue_t *) self, 0, self->rname);
-      spin_unlock_irqrestore(&irnet_server.spinlock, flags);
+      spin_unlock_bh(&irnet_server.spinlock);
       DEBUG(IRDA_SOCK_INFO, "Inserted ``%s'' in hashbin...\n", self->rname);
     }
 
@@ -596,12 +594,11 @@ irda_irnet_destroy(irnet_socket *	self)
   if((irnet_server.running) && (self->q.q_next != NULL))
     {
       struct irnet_socket *	entry;
-      unsigned long		flags;
       DEBUG(IRDA_SOCK_INFO, "Removing from hash..\n");
-      spin_lock_irqsave(&irnet_server.spinlock, flags);
+      spin_lock_bh(&irnet_server.spinlock);
       entry = hashbin_remove_this(irnet_server.list, (irda_queue_t *) self);
       self->q.q_next = NULL;
-      spin_unlock_irqrestore(&irnet_server.spinlock, flags);
+      spin_unlock_bh(&irnet_server.spinlock);
       DASSERT(entry == self, , IRDA_SOCK_ERROR, "Can't remove from hash.\n");
     }
 
@@ -695,7 +692,7 @@ irnet_daddr_to_dname(irnet_socket *	self)
       if(discoveries[i].daddr == self->daddr)
 	{
 	  /* Yes !!! Get it.. */
-	  strncpy(self->rname, discoveries[i].info, NICKNAME_MAX_LEN);
+	  strlcpy(self->rname, discoveries[i].info, sizeof(self->rname));
 	  self->rname[NICKNAME_MAX_LEN + 1] = '\0';
 	  DEBUG(IRDA_SERV_INFO, "Device 0x%08x is in fact ``%s''.\n",
 		self->daddr, self->rname);
@@ -723,7 +720,6 @@ static inline irnet_socket *
 irnet_find_socket(irnet_socket *	self)
 {
   irnet_socket *	new = (irnet_socket *) NULL;
-  unsigned long		flags;
   int			err;
 
   DENTER(IRDA_SERV_TRACE, "(self=0x%X)\n", (unsigned int) self);
@@ -736,7 +732,7 @@ irnet_find_socket(irnet_socket *	self)
   err = irnet_daddr_to_dname(self);
 
   /* Protect access to the instance list */
-  spin_lock_irqsave(&irnet_server.spinlock, flags);
+  spin_lock_bh(&irnet_server.spinlock);
 
   /* So now, try to get an socket having specifically
    * requested that nickname */
@@ -790,7 +786,7 @@ irnet_find_socket(irnet_socket *	self)
     }
 
   /* Spin lock end */
-  spin_unlock_irqrestore(&irnet_server.spinlock, flags);
+  spin_unlock_bh(&irnet_server.spinlock);
 
   DEXIT(IRDA_SERV_TRACE, " - new = 0x%X\n", (unsigned int) new);
   return new;
@@ -1135,10 +1131,15 @@ irnet_disconnect_indication(void *	instance,
     {
       if(test_open)
 	{
+#ifdef MISSING_PPP_API
+	  /* ppp_unregister_channel() wants a user context, which we
+	   * are guaranteed to NOT have here. What are we supposed
+	   * to do here ? Jean II */
 	  /* If we were connected, cleanup & close the PPP channel,
 	   * which will kill pppd (hangup) and the rest */
 	  ppp_unregister_channel(&self->chan);
 	  self->ppp_open = 0;
+#endif
 	}
       else
 	{
@@ -1711,7 +1712,6 @@ irnet_proc_read(char *	buf,
 {
   irnet_socket *	self;
   char *		state;
-  unsigned long		flags;
   int			i = 0;
 
   len = 0;
@@ -1728,7 +1728,7 @@ irnet_proc_read(char *	buf,
     return len;
 
   /* Protect access to the instance list */
-  spin_lock_irqsave(&irnet_server.spinlock, flags);
+  spin_lock_bh(&irnet_server.spinlock);
 
   /* Get the sockets one by one... */
   self = (irnet_socket *) hashbin_get_first(irnet_server.list);
@@ -1780,7 +1780,7 @@ irnet_proc_read(char *	buf,
     }
 
   /* Spin lock end */
-  spin_unlock_irqrestore(&irnet_server.spinlock, flags);
+  spin_unlock_bh(&irnet_server.spinlock);
 
   return len;
 }

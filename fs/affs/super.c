@@ -115,7 +115,7 @@ static int init_inodecache(void)
 {
 	affs_inode_cachep = kmem_cache_create("affs_inode_cache",
 					     sizeof(struct affs_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (affs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -210,9 +210,7 @@ parse_options(char *options, uid_t *uid, gid_t *gid, int *mode, int *reserved, s
 			optn = "volume";
 			if (!value || !*value)
 				goto out_no_arg;
-			if (strlen(value) > 30)
-				value[30] = 0;
-			strncpy(volume,value,30);
+			strlcpy(volume,value,31);
 		} else if (!strcmp(this_char,"mode")) {
 			optn = "mode";
 			if (!value || !*value)
@@ -543,7 +541,7 @@ affs_statfs(struct super_block *sb, struct statfs *buf)
 }
 
 static struct super_block *affs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, affs_fill_super);
 }

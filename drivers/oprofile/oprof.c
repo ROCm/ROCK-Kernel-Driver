@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/oprofile.h>
+#include <linux/moduleparam.h>
 #include <asm/semaphore.h>
 
 #include "oprof.h"
@@ -23,6 +24,12 @@ struct oprofile_operations * oprofile_ops;
 unsigned long oprofile_started;
 static unsigned long is_setup;
 static DECLARE_MUTEX(start_sem);
+
+/* timer
+   0 - use performance monitoring hardware if available
+   1 - use the timer int mechanism regardless
+ */
+static int timer = 0;
 
 int oprofile_setup(void)
 {
@@ -124,33 +131,33 @@ extern void timer_init(struct oprofile_operations ** ops);
 
 static int __init oprofile_init(void)
 {
-	int err;
-
 	/* Architecture must fill in the interrupt ops and the
 	 * logical CPU type, or we can fall back to the timer
 	 * interrupt profiler.
 	 */
-	err = oprofile_arch_init(&oprofile_ops);
-	if (err == -ENODEV) {
+	int err = oprofile_arch_init(&oprofile_ops);
+
+	if (err == -ENODEV || timer) {
 		timer_init(&oprofile_ops);
 		err = 0;
-	}
-
-	if (err)
+	} else if (err) {
 		goto out;
+	}
 
 	if (!oprofile_ops->cpu_type) {
 		printk(KERN_ERR "oprofile: cpu_type not set !\n");
 		err = -EFAULT;
-		goto out;
+	} else {
+		err = oprofilefs_register();
 	}
-
-	err = oprofilefs_register();
-	if (err)
-		goto out;
  
+	if (err)
+		goto out_exit;
 out:
 	return err;
+out_exit:
+	oprofile_arch_exit();
+	goto out;
 }
 
 
@@ -163,6 +170,9 @@ static void __exit oprofile_exit(void)
  
 module_init(oprofile_init);
 module_exit(oprofile_exit);
+
+module_param_named(timer, timer, int, 0644);
+MODULE_PARM_DESC(timer, "force use of timer interrupt");
  
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("John Levon <levon@movementarian.org>");

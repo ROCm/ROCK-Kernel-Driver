@@ -354,6 +354,21 @@ static int dummy_inode_removexattr (struct dentry *dentry, char *name)
 	return 0;
 }
 
+static int dummy_inode_getsecurity(struct dentry *dentry, const char *name, void *buffer, size_t size)
+{
+	return -EOPNOTSUPP;
+}
+
+static int dummy_inode_setsecurity(struct dentry *dentry, const char *name, const void *value, size_t size, int flags) 
+{
+	return -EOPNOTSUPP;
+}
+
+static int dummy_inode_listsecurity(struct dentry *dentry, char *buffer)
+{
+	return 0;
+}
+
 static int dummy_file_permission (struct file *file, int mask)
 {
 	return 0;
@@ -512,6 +527,9 @@ static void dummy_task_reparent_to_init (struct task_struct *p)
 	p->euid = p->fsuid = 0;
 	return;
 }
+
+static void dummy_task_to_inode(struct task_struct *p, struct inode *inode)
+{ }
 
 static int dummy_ipc_permission (struct kern_ipc_perm *ipcp, short flag)
 {
@@ -741,6 +759,16 @@ static void dummy_d_instantiate (struct dentry *dentry, struct inode *inode)
 	return;
 }
 
+static int dummy_getprocattr(struct task_struct *p, char *name, void *value, size_t size)
+{
+	return -EINVAL;
+}
+
+static int dummy_setprocattr(struct task_struct *p, char *name, void *value, size_t size)
+{
+	return -EINVAL;
+}
+
 
 struct security_operations dummy_security_ops;
 
@@ -812,6 +840,9 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, inode_getxattr);
 	set_to_dummy_if_null(ops, inode_listxattr);
 	set_to_dummy_if_null(ops, inode_removexattr);
+	set_to_dummy_if_null(ops, inode_getsecurity);
+	set_to_dummy_if_null(ops, inode_setsecurity);
+	set_to_dummy_if_null(ops, inode_listsecurity);
 	set_to_dummy_if_null(ops, file_permission);
 	set_to_dummy_if_null(ops, file_alloc_security);
 	set_to_dummy_if_null(ops, file_free_security);
@@ -842,6 +873,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, task_prctl);
 	set_to_dummy_if_null(ops, task_kmod_set_label);
 	set_to_dummy_if_null(ops, task_reparent_to_init);
+ 	set_to_dummy_if_null(ops, task_to_inode);
 	set_to_dummy_if_null(ops, ipc_permission);
 	set_to_dummy_if_null(ops, msg_msg_alloc_security);
 	set_to_dummy_if_null(ops, msg_msg_free_security);
@@ -866,6 +898,8 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
 	set_to_dummy_if_null(ops, d_instantiate);
+ 	set_to_dummy_if_null(ops, getprocattr);
+ 	set_to_dummy_if_null(ops, setprocattr);
 #ifdef CONFIG_SECURITY_NETWORK
 	set_to_dummy_if_null(ops, unix_stream_connect);
 	set_to_dummy_if_null(ops, unix_may_send);

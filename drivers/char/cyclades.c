@@ -712,7 +712,7 @@ cy_get_user(unsigned long *addr)
 
 #define	JIFFIES_DIFF(n, j)	((j) - (n))
 
-static struct tty_driver cy_serial_driver, cy_callout_driver;
+static struct tty_driver cy_serial_driver;
 static int serial_refcount;
 
 #ifdef CONFIG_ISA
@@ -968,8 +968,7 @@ do_softint(void *private_)
     if (test_and_clear_bit(Cy_EVENT_HANGUP, &info->event)) {
         tty_hangup(info->tty);
         wake_up_interruptible(&info->open_wait);
-        info->flags &= ~(ASYNC_NORMAL_ACTIVE|
-                             ASYNC_CALLOUT_ACTIVE);
+        info->flags &= ~ASYNC_NORMAL_ACTIVE;
     }
     if (test_and_clear_bit(Cy_EVENT_OPEN_WAKEUP, &info->event)) {
         wake_up_interruptible(&info->open_wait);
@@ -1448,10 +1447,7 @@ cyy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                             if(mdm_status & CyDCD){
                                 cy_sched_event(info,
 				    Cy_EVENT_OPEN_WAKEUP);
-                            }else if(!((info->flags
-			                & ASYNC_CALLOUT_ACTIVE)
-				 &&(info->flags
-				    & ASYNC_CALLOUT_NOHUP))){
+                            }else{
                                 cy_sched_event(info,
 				    Cy_EVENT_HANGUP);
                             }
@@ -1823,8 +1819,7 @@ cyz_handle_cmd(struct cyclades_card *cinfo)
 			  ((u_long)param) : 
 			  cy_readl(&ch_ctrl->rs_status)) & C_RS_DCD) {
 			cy_sched_event(info, Cy_EVENT_OPEN_WAKEUP);
-		    }else if(!((info->flags & ASYNC_CALLOUT_ACTIVE)
-			     &&(info->flags & ASYNC_CALLOUT_NOHUP))){
+		    }else{
 			cy_sched_event(info, Cy_EVENT_HANGUP);
 		    }
 		}
@@ -2376,36 +2371,11 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
     }
 
     /*
-     * If this is a callout device, then just make sure the normal
-     * device isn't being used.
-     */
-    if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-        if (info->flags & ASYNC_NORMAL_ACTIVE){
-            return -EBUSY;
-        }
-        if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-            (info->flags & ASYNC_SESSION_LOCKOUT) &&
-            (info->session != current->session)){
-            return -EBUSY;
-        }
-        if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-            (info->flags & ASYNC_PGRP_LOCKOUT) &&
-            (info->pgrp != current->pgrp)){
-            return -EBUSY;
-        }
-        info->flags |= ASYNC_CALLOUT_ACTIVE;
-        return 0;
-    }
-
-    /*
      * If non-blocking mode is set, then make the check up front
      * and then exit.
      */
     if ((filp->f_flags & O_NONBLOCK) ||
 	(tty->flags & (1 << TTY_IO_ERROR))) {
-        if (info->flags & ASYNC_CALLOUT_ACTIVE){
-            return -EBUSY;
-        }
         info->flags |= ASYNC_NORMAL_ACTIVE;
         return 0;
     }
@@ -2442,8 +2412,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 
 	while (1) {
 	    CY_LOCK(info, flags);
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (tty->termios->c_cflag & CBAUD)){
+		if ((tty->termios->c_cflag & CBAUD)){
 		    cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
 		    cy_writeb((u_long)base_addr+(CyMSVR1<<index), CyRTS);
 		    cy_writeb((u_long)base_addr+(CyMSVR2<<index), CyDTR);
@@ -2466,8 +2435,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 
 	    CY_LOCK(info, flags);
 		cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE)
-		&& !(info->flags & ASYNC_CLOSING)
+		if (!(info->flags & ASYNC_CLOSING)
 		&& (C_CLOCAL(tty)
 		    || (cy_readb(base_addr+(CyMSVR1<<index)) & CyDCD))) {
 			CY_UNLOCK(info, flags);
@@ -2507,8 +2475,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 	ch_ctrl = zfw_ctrl->ch_ctrl;
 
 	while (1) {
-	    if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		(tty->termios->c_cflag & CBAUD)){
+	    if ((tty->termios->c_cflag & CBAUD)){
 		cy_writel(&ch_ctrl[channel].rs_control,
 			cy_readl(&ch_ctrl[channel].rs_control) |
 			(C_RS_RTS | C_RS_DTR));
@@ -2530,8 +2497,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 		    -EAGAIN : -ERESTARTSYS);
 		break;
 	    }
-	    if (!(info->flags & ASYNC_CALLOUT_ACTIVE)
-	    && !(info->flags & ASYNC_CLOSING)
+	    if (!(info->flags & ASYNC_CLOSING)
 	    && (C_CLOCAL(tty)
 	      || (cy_readl(&ch_ctrl[channel].rs_status) & C_RS_DCD))) {
 		break;
@@ -2680,14 +2646,8 @@ cy_open(struct tty_struct *tty, struct file * filp)
     }
 
     if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-        if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-            *tty->termios = info->normal_termios;
-        else 
-            *tty->termios = info->callout_termios;
+	*tty->termios = info->normal_termios;
     }
-
-    info->session = current->session;
-    info->pgrp = current->pgrp;
 
 #ifdef CY_DEBUG_OPEN
     printk(" cyc:cy_open done\n");/**/
@@ -2839,8 +2799,6 @@ cy_close(struct tty_struct *tty, struct file *filp)
      */
     if (info->flags & ASYNC_NORMAL_ACTIVE)
         info->normal_termios = *tty->termios;
-    if (info->flags & ASYNC_CALLOUT_ACTIVE)
-        info->callout_termios = *tty->termios;
 
     /*
     * Now we wait for the transmit buffer to clear; and we notify
@@ -2917,8 +2875,7 @@ cy_close(struct tty_struct *tty, struct file *filp)
         wake_up_interruptible(&info->open_wait);
 	CY_LOCK(info, flags);
     }
-    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-                     ASYNC_CLOSING);
+    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
     wake_up_interruptible(&info->close_wait);
 
 #ifdef CY_DEBUG_OTHER
@@ -4701,7 +4658,7 @@ cy_hangup(struct tty_struct *tty)
     printk("cyc:cy_hangup (%d): setting count to 0\n", current->pid);
 #endif
     info->tty = 0;
-    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+    info->flags &= ~ASYNC_NORMAL_ACTIVE;
     wake_up_interruptible(&info->open_wait);
 } /* cy_hangup */
 
@@ -5523,22 +5480,8 @@ cy_init(void)
     cy_serial_driver.wait_until_sent = cy_wait_until_sent;
     cy_serial_driver.read_proc = cyclades_get_proc_info;
 
-    /*
-     * The callout device is just like normal device except for
-     * major number and the subtype code.
-     */
-    cy_callout_driver = cy_serial_driver;
-    cy_callout_driver.name = "cub";
-    cy_callout_driver.major = CYCLADESAUX_MAJOR;
-    cy_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-    cy_callout_driver.read_proc = 0;
-    cy_callout_driver.proc_entry = 0;
-
-
     if (tty_register_driver(&cy_serial_driver))
             panic("Couldn't register Cyclades serial driver\n");
-    if (tty_register_driver(&cy_callout_driver))
-            panic("Couldn't register Cyclades callout driver\n");
 
     for (i = 0; i < NR_CARDS; i++) {
             /* base_addr=0 indicates board not found */
@@ -5629,8 +5572,6 @@ cy_init(void)
                     info->default_threshold = 0;
                     info->default_timeout = 0;
 		    INIT_WORK(&info->tqueue, do_softint, info);
-                    info->callout_termios =
-		                cy_callout_driver.init_termios;
                     info->normal_termios =
 		                cy_serial_driver.init_termios;
 		    init_waitqueue_head(&info->open_wait);
@@ -5708,8 +5649,6 @@ cy_init(void)
                     info->default_threshold = 0;
                     info->default_timeout = 0;
 		    INIT_WORK(&info->tqueue, do_softint, info);
-                    info->callout_termios =
-		               cy_callout_driver.init_termios;
                     info->normal_termios =
 		               cy_serial_driver.init_termios;
 		    init_waitqueue_head(&info->open_wait);
@@ -5761,9 +5700,6 @@ cy_cleanup_module(void)
     if ((e1 = tty_unregister_driver(&cy_serial_driver)))
             printk("cyc: failed to unregister Cyclades serial driver(%d)\n",
 		e1);
-    if ((e2 = tty_unregister_driver(&cy_callout_driver)))
-            printk("cyc: failed to unregister Cyclades callout driver (%d)\n", 
-		e2);
 
     restore_flags(flags);
 

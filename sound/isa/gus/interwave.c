@@ -757,7 +757,7 @@ static int __devinit snd_interwave_probe(int dev, struct pnp_card_link *pcard,
 
 	if (request_irq(xirq, snd_interwave_interrupt, SA_INTERRUPT, "InterWave", (void *)iwcard)) {
 		snd_card_free(card);
-		snd_printk("unable to grab IRQ %d\n", irq);
+		snd_printk("unable to grab IRQ %d\n", xirq);
 		return -EBUSY;
 	}
 	iwcard->irq = xirq;
@@ -949,6 +949,9 @@ static int __init alsa_card_interwave_init(void)
 #endif
 
 	if (!cards) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&interwave_pnpc_driver);
+#endif
 #ifdef MODULE
 		printk(KERN_ERR "InterWave soundcard not found or device busy\n");
 #endif

@@ -444,7 +444,7 @@ static char *usb_dump_string(char *start, char *end, const struct usb_device *de
  * skip_bytes - the number of bytes to skip before writing anything
  * file_offset - the offset into the devices file on completion
  */
-static ssize_t usb_device_dump(char **buffer, size_t *nbytes, loff_t *skip_bytes, loff_t *file_offset,
+static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *skip_bytes, loff_t *file_offset,
 				struct usb_device *usbdev, struct usb_bus *bus, int level, int index, int count)
 {
 	int chix;
@@ -554,7 +554,7 @@ static ssize_t usb_device_dump(char **buffer, size_t *nbytes, loff_t *skip_bytes
 	return total_written;
 }
 
-static ssize_t usb_device_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
+static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	struct list_head *buslist;
 	struct usb_bus *bus;

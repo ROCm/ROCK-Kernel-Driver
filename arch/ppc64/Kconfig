@@ -37,6 +37,13 @@ config FRAME_POINTER
 	bool
 	default y
 
+# We optimistically allocate largepages from the VM, so make the limit
+# large enough (16MB). This badly named config option is actually
+# max order + 1
+config FORCE_MAX_ZONEORDER
+	int
+	default "13"
+
 source "init/Kconfig"
 
 
@@ -164,6 +171,10 @@ config PCI
 	  your box.  If you say Y here, the kernel will include drivers and
 	  infrastructure code to support PCI bus devices.
 
+config PCI_DOMAINS
+	bool
+	default PCI
+
 # only elf supported, a.out is not -- Cort
 config KCORE_ELF
 	bool
@@ -234,7 +245,7 @@ config HOTPLUG
 
 source "drivers/pcmcia/Kconfig"
 
-source "drivers/hotplug/Kconfig"
+source "drivers/pci/hotplug/Kconfig"
 
 config PROC_DEVICETREE
 	bool "Support for Open Firmware device tree in /proc"

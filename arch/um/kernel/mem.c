@@ -45,7 +45,7 @@ extern char __init_begin, __init_end;
 extern long physmem_size;
 
 /* Not changed by UML */
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 /* Changed during early boot */
 int kmalloc_ok = 0;

@@ -117,8 +117,9 @@ acpi_ns_search_node (
 			 * Found matching entry.
 			 */
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"Name %4.4s Type [%s] found at %p\n",
-				(char *) &target_name, acpi_ut_get_type_name (next_node->type), next_node));
+				"Name %4.4s Type [%s] found in scope [%4.4s] %p\n",
+				(char *) &target_name, acpi_ut_get_type_name (next_node->type),
+				next_node->name.ascii, next_node));
 
 			*return_node = next_node;
 			return_ACPI_STATUS (AE_OK);
@@ -141,8 +142,10 @@ acpi_ns_search_node (
 
 	/* Searched entire namespace level, not found */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Name %4.4s Type [%s] not found at %p\n",
-		(char *) &target_name, acpi_ut_get_type_name (type), next_node));
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+		"Name %4.4s Type [%s] not found in search in scope [%4.4s] %p first child %p\n",
+		(char *) &target_name, acpi_ut_get_type_name (type),
+		node->name.ascii, node, node->child));
 
 	return_ACPI_STATUS (AE_NOT_FOUND);
 }

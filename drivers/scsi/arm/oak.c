@@ -30,9 +30,6 @@
 #define NCR5380_queue_command		oakscsi_queue_command
 #define NCR5380_proc_info		oakscsi_proc_info
 
-int NCR5380_proc_info(char *buffer, char **start, off_t offset,
-		      int length, int hostno, int inout);
-
 #define NCR5380_implementation_fields	int port, ctrl
 #define NCR5380_local_declare()		struct Scsi_Host *_instance
 #define NCR5380_setup(instance)		_instance = instance

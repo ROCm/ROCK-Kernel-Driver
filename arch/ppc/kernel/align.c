@@ -189,7 +189,7 @@ fix_alignment(struct pt_regs *regs)
 #endif
 	int i, t;
 	int reg, areg;
-	unsigned char *addr;
+	unsigned char __user *addr;
 	union {
 		long l;
 		float f;
@@ -252,7 +252,7 @@ fix_alignment(struct pt_regs *regs)
 	 * pt_regs structure is overloaded and is really from the DEAR.
 	 */
 
-	addr = (unsigned char *)regs->dar;
+	addr = (unsigned char __user *)regs->dar;
 
 	/* Verify the address of the operand */
 	if (user_mode(regs)) {

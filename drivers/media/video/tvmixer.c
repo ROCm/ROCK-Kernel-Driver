@@ -83,8 +83,8 @@ static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	
         if (cmd == SOUND_MIXER_INFO) {
                 mixer_info info;
-                strncpy(info.id, "tv card", sizeof(info.id));
-                strncpy(info.name, i2c_clientname(client), sizeof(info.name));
+                strlcpy(info.id, "tv card", sizeof(info.id));
+                strlcpy(info.name, i2c_clientname(client), sizeof(info.name));
                 info.modify_counter = 42 /* FIXME */;
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
@@ -92,8 +92,8 @@ static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cm
         }
         if (cmd == SOUND_OLD_MIXER_INFO) {
                 _old_mixer_info info;
-                strncpy(info.id, "tv card", sizeof(info.id));
-                strncpy(info.name, i2c_clientname(client), sizeof(info.name));
+                strlcpy(info.id, "tv card", sizeof(info.id));
+                strlcpy(info.name, i2c_clientname(client), sizeof(info.name));
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
                 return 0;

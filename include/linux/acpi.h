@@ -401,6 +401,15 @@ struct pci_dev;
 int acpi_pci_irq_enable (struct pci_dev *dev);
 int acpi_pci_irq_init (void);
 
+struct acpi_pci_driver {
+	struct acpi_pci_driver *next;
+	int (*add)(acpi_handle *handle);
+	void (*remove)(acpi_handle *handle);
+};
+
+int acpi_pci_register_driver(struct acpi_pci_driver *driver);
+void acpi_pci_unregister_driver(struct acpi_pci_driver *driver);
+
 #endif /*CONFIG_ACPI_PCI*/
 
 #ifdef CONFIG_ACPI_EC

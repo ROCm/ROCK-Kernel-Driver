@@ -430,7 +430,7 @@ int saa7146_register_device(struct video_device *vid, struct saa7146_dev* dev, c
 	DEB_EE(("dev:%p, name:'%s'\n",dev,name));
  
  	*vid = device_template;
-	strncpy(vid->name, name, 32);
+	strlcpy(vid->name, name, sizeof(vid->name));
 	vid->priv = dev;
 
 	// fixme: -1 should be an insmod parameter *for the extension* (like "video_nr");

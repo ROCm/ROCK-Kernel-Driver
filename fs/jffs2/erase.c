@@ -7,16 +7,17 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: erase.c,v 1.45 2002/10/09 08:27:08 dwmw2 Exp $
+ * $Id: erase.c,v 1.51 2003/05/11 22:47:36 dwmw2 Exp $
  *
  */
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/mtd/mtd.h>
-#include <linux/interrupt.h>
 #include <linux/compiler.h>
 #include <linux/crc32.h>
+#include <linux/sched.h>
+#include <linux/pagemap.h>
 #include "nodelist.h"
 
 struct erase_priv_struct {
@@ -24,7 +25,10 @@ struct erase_priv_struct {
 	struct jffs2_sb_info *c;
 };
       
+#ifndef __ECOS
 static void jffs2_erase_callback(struct erase_info *);
+#endif
+static void jffs2_erase_failed(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 static void jffs2_erase_succeeded(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 static void jffs2_free_all_node_refs(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
@@ -32,16 +36,25 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
 {
 	int ret;
+#ifdef __ECOS
+       ret = jffs2_flash_erase(c, jeb);
+       if (!ret) {
+               jffs2_erase_succeeded(c, jeb);
+               return;
+       }
+#else /* Linux */
 	struct erase_info *instr;
 
 	instr = kmalloc(sizeof(struct erase_info) + sizeof(struct erase_priv_struct), GFP_KERNEL);
 	if (!instr) {
 		printk(KERN_WARNING "kmalloc for struct erase_info in jffs2_erase_block failed. Refiling block for later\n");
-		spin_lock_bh(&c->erase_completion_lock);
+		spin_lock(&c->erase_completion_lock);
 		list_del(&jeb->list);
 		list_add(&jeb->list, &c->erase_pending_list);
 		c->erasing_size -= c->sector_size;
-		spin_unlock_bh(&c->erase_completion_lock);
+		c->dirty_size += c->sector_size;
+		jeb->dirty_size = c->sector_size;
+		spin_unlock(&c->erase_completion_lock);
 		return;
 	}
 
@@ -65,15 +78,18 @@ void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
 		return;
 
 	kfree(instr);
+#endif /* __ECOS */
 
 	if (ret == -ENOMEM || ret == -EAGAIN) {
 		/* Erase failed immediately. Refile it on the list */
 		D1(printk(KERN_DEBUG "Erase at 0x%08x failed: %d. Refiling on erase_pending_list\n", jeb->offset, ret));
-		spin_lock_bh(&c->erase_completion_lock);
+		spin_lock(&c->erase_completion_lock);
 		list_del(&jeb->list);
 		list_add(&jeb->list, &c->erase_pending_list);
 		c->erasing_size -= c->sector_size;
-		spin_unlock_bh(&c->erase_completion_lock);
+		c->dirty_size += c->sector_size;
+		jeb->dirty_size = c->sector_size;
+		spin_unlock(&c->erase_completion_lock);
 		return;
 	}
 
@@ -82,20 +98,7 @@ void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
 	else
 		printk(KERN_WARNING "Erase at 0x%08x failed immediately: errno %d\n", jeb->offset, ret);
 
-	/* Note: This is almost identical to jffs2_erase_failed() except
-	   for the fact that we used spin_lock_bh() not spin_lock(). If
-	   we could use spin_lock_bh() from a BH, we could merge them.
-	   Or if we abandon the idea that MTD drivers may call the erase
-	   callback from a BH, I suppose :)
-	*/
-	spin_lock_bh(&c->erase_completion_lock);
-	c->erasing_size -= c->sector_size;
-	c->bad_size += c->sector_size;
-	list_del(&jeb->list);
-	list_add(&jeb->list, &c->bad_list);
-	c->nr_erasing_blocks--;
-	spin_unlock_bh(&c->erase_completion_lock);
-	wake_up(&c->erase_wait);
+	jffs2_erase_failed(c, jeb);
 }
 
 void jffs2_erase_pending_blocks(struct jffs2_sb_info *c)
@@ -104,7 +107,7 @@ void jffs2_erase_pending_blocks(struct jffs2_sb_info *c)
 
 	down(&c->erase_free_sem);
 
-	spin_lock_bh(&c->erase_completion_lock);
+	spin_lock(&c->erase_completion_lock);
 
 	while (!list_empty(&c->erase_complete_list) ||
 	       !list_empty(&c->erase_pending_list)) {
@@ -112,7 +115,7 @@ void jffs2_erase_pending_blocks(struct jffs2_sb_info *c)
 		if (!list_empty(&c->erase_complete_list)) {
 			jeb = list_entry(c->erase_complete_list.next, struct jffs2_eraseblock, list);
 			list_del(&jeb->list);
-			spin_unlock_bh(&c->erase_completion_lock);
+			spin_unlock(&c->erase_completion_lock);
 			jffs2_mark_erased_block(c, jeb);
 
 		} else if (!list_empty(&c->erase_pending_list)) {
@@ -126,7 +129,7 @@ void jffs2_erase_pending_blocks(struct jffs2_sb_info *c)
 			jeb->used_size = jeb->dirty_size = jeb->free_size = 0;
 			jffs2_free_all_node_refs(c, jeb);
 			list_add(&jeb->list, &c->erasing_list);
-			spin_unlock_bh(&c->erase_completion_lock);
+			spin_unlock(&c->erase_completion_lock);
 
 			jffs2_erase_block(c, jeb);
 
@@ -136,10 +139,10 @@ void jffs2_erase_pending_blocks(struct jffs2_sb_info *c)
 
 		/* Be nice */
 		cond_resched();
-		spin_lock_bh(&c->erase_completion_lock);
+		spin_lock(&c->erase_completion_lock);
 	}
 
-	spin_unlock_bh(&c->erase_completion_lock);
+	spin_unlock(&c->erase_completion_lock);
 	D1(printk(KERN_DEBUG "jffs2_erase_pending_blocks completed\n"));
 
 	up(&c->erase_free_sem);
@@ -156,8 +159,7 @@ static void jffs2_erase_succeeded(struct jffs2_sb_info *c, struct jffs2_eraseblo
 	jffs2_erase_pending_trigger(c);
 }
 
-
-static inline void jffs2_erase_failed(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
+static void jffs2_erase_failed(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
 {
 	 spin_lock(&c->erase_completion_lock);
 	 c->erasing_size -= c->sector_size;
@@ -169,6 +171,7 @@ static inline void jffs2_erase_failed(struct jffs2_sb_info *c, struct jffs2_eras
 	 wake_up(&c->erase_wait);
 }	 
 
+#ifndef __ECOS
 static void jffs2_erase_callback(struct erase_info *instr)
 {
 	struct erase_priv_struct *priv = (void *)instr->priv;
@@ -181,6 +184,7 @@ static void jffs2_erase_callback(struct erase_info *instr)
 	}	
 	kfree(instr);
 }
+#endif /* !__ECOS */
 
 /* Hmmm. Maybe we should accept the extra space it takes and make
    this a standard doubly-linked list? */
@@ -290,9 +294,9 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 			printk(KERN_WARNING "Failed to allocate raw node ref for clean marker\n");
 			/* Stick it back on the list from whence it came and come back later */
 			jffs2_erase_pending_trigger(c);
-			spin_lock_bh(&c->erase_completion_lock);
+			spin_lock(&c->erase_completion_lock);
 			list_add(&jeb->list, &c->erase_complete_list);
-			spin_unlock_bh(&c->erase_completion_lock);
+			spin_unlock(&c->erase_completion_lock);
 			return;
 		}
 	}
@@ -313,7 +317,7 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 				goto bad;
 			}
 			if (retlen != readlen) {
-				printk(KERN_WARNING "Short read from newly-erased block at 0x%08x. Wanted %d, got %d\n", ofs, readlen, retlen);
+				printk(KERN_WARNING "Short read from newly-erased block at 0x%08x. Wanted %d, got %zd\n", ofs, readlen, retlen);
 				goto bad;
 			}
 			for (i=0; i<readlen; i += sizeof(unsigned long)) {
@@ -328,13 +332,13 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 						jffs2_write_nand_badblock( c ,jeb );
 					kfree(ebuf);
 				bad2:
-					spin_lock_bh(&c->erase_completion_lock);
+					spin_lock(&c->erase_completion_lock);
 					c->erasing_size -= c->sector_size;
 					c->bad_size += c->sector_size;
 
 					list_add_tail(&jeb->list, &c->bad_list);
 					c->nr_erasing_blocks--;
-					spin_unlock_bh(&c->erase_completion_lock);
+					spin_unlock(&c->erase_completion_lock);
 					wake_up(&c->erase_wait);
 					return;
 				}
@@ -374,7 +378,7 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 			goto bad2;
 		}
 		if (retlen != je32_to_cpu(marker.totlen)) {
-			printk(KERN_WARNING "Short write to newly-erased block at 0x%08x: Wanted %d, got %d\n",
+			printk(KERN_WARNING "Short write to newly-erased block at 0x%08x: Wanted %d, got %zd\n",
 			       jeb->offset, je32_to_cpu(marker.totlen), retlen);
 			goto bad2;
 		}
@@ -392,7 +396,7 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 		jeb->wasted_size = 0;
 	}
 
-	spin_lock_bh(&c->erase_completion_lock);
+	spin_lock(&c->erase_completion_lock);
 	c->erasing_size -= c->sector_size;
 	c->free_size += jeb->free_size;
 	c->used_size += jeb->used_size;
@@ -403,7 +407,7 @@ static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseb
 	list_add_tail(&jeb->list, &c->free_list);
 	c->nr_erasing_blocks--;
 	c->nr_free_blocks++;
-	spin_unlock_bh(&c->erase_completion_lock);
+	spin_unlock(&c->erase_completion_lock);
 	wake_up(&c->erase_wait);
 }
 

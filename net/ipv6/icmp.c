@@ -96,13 +96,13 @@ struct icmpv6_msg {
 static __inline__ void icmpv6_xmit_lock(void)
 {
 	local_bh_disable();
-	if (unlikely(!spin_trylock(&icmpv6_socket->sk->lock.slock)))
+	if (unlikely(!spin_trylock(&icmpv6_socket->sk->sk_lock.slock)))
 		BUG();
 }
 
 static __inline__ void icmpv6_xmit_unlock(void)
 {
-	spin_unlock_bh(&icmpv6_socket->sk->lock.slock);
+	spin_unlock_bh(&icmpv6_socket->sk->sk_lock.slock);
 }
 
 /* 
@@ -213,14 +213,14 @@ int icmpv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct icmp6hd
 	struct icmp6hdr *icmp6h;
 	int err = 0;
 
-	if ((skb = skb_peek(&sk->write_queue)) == NULL)
+	if ((skb = skb_peek(&sk->sk_write_queue)) == NULL)
 		goto out;
 
 	icmp6h = (struct icmp6hdr*) skb->h.raw;
 	memcpy(icmp6h, thdr, sizeof(struct icmp6hdr));
 	icmp6h->icmp6_cksum = 0;
 
-	if (skb_queue_len(&sk->write_queue) == 1) {
+	if (skb_queue_len(&sk->sk_write_queue) == 1) {
 		skb->csum = csum_partial((char *)icmp6h,
 					sizeof(struct icmp6hdr), skb->csum);
 		icmp6h->icmp6_cksum = csum_ipv6_magic(&fl->fl6_src,
@@ -230,7 +230,7 @@ int icmpv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct icmp6hd
 	} else {
 		u32 tmp_csum = 0;
 
-		skb_queue_walk(&sk->write_queue, skb) {
+		skb_queue_walk(&sk->sk_write_queue, skb) {
 			tmp_csum = csum_add(tmp_csum, skb->csum);
 		}
 
@@ -263,7 +263,7 @@ static int icmpv6_getfrag(void *from, char *to, int offset, int len, int odd, st
 void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info, 
 		 struct net_device *dev)
 {
-	struct inet6_dev *idev;
+	struct inet6_dev *idev = NULL;
 	struct ipv6hdr *hdr = skb->nh.ipv6h;
 	struct sock *sk = icmpv6_socket->sk;
 	struct ipv6_pinfo *np = inet6_sk(sk);
@@ -384,7 +384,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 				hlimit, NULL, &fl, (struct rt6_info*)dst, MSG_DONTWAIT);
 	if (err) {
 		ip6_flush_pending_frames(sk);
-		goto out;
+		goto out_put;
 	}
 	err = icmpv6_push_pending_frames(sk, &fl, &tmp_hdr, len + sizeof(struct icmp6hdr));
 	__skb_push(skb, plen);
@@ -393,6 +393,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 		ICMP6_INC_STATS_OFFSET_BH(idev, Icmp6OutDestUnreachs, type - ICMPV6_DEST_UNREACH);
 	ICMP6_INC_STATS_BH(idev, Icmp6OutMsgs);
 
+out_put:
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
 out:
@@ -455,13 +456,14 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 
 	if (err) {
 		ip6_flush_pending_frames(sk);
-		goto out;
+		goto out_put;
 	}
 	err = icmpv6_push_pending_frames(sk, &fl, &tmp_hdr, skb->len + sizeof(struct icmp6hdr));
 
         ICMP6_INC_STATS_BH(idev, Icmp6OutEchoReplies);
         ICMP6_INC_STATS_BH(idev, Icmp6OutMsgs);
 
+out_put: 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
 out: 
@@ -517,7 +519,7 @@ static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
 	if ((sk = raw_v6_htable[hash]) != NULL) {
 		while((sk = __raw_v6_lookup(sk, nexthdr, daddr, saddr))) {
 			rawv6_err(sk, skb, NULL, type, code, inner_offset, info);
-			sk = sk->next;
+			sk = sk->sk_next;
 		}
 	}
 	read_unlock(&raw_v6_lock);
@@ -685,9 +687,9 @@ int __init icmpv6_init(struct net_proto_family *ops)
 		}
 
 		sk = __icmpv6_socket[i]->sk;
-		sk->allocation = GFP_ATOMIC;
-		sk->sndbuf = SK_WMEM_MAX*2;
-		sk->prot->unhash(sk);
+		sk->sk_allocation = GFP_ATOMIC;
+		sk->sk_sndbuf = SK_WMEM_MAX * 2;
+		sk->sk_prot->unhash(sk);
 	}
 
 

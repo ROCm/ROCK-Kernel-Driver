@@ -6,31 +6,24 @@
 #include <linux/completion.h>
 #endif
 
-int gdth_proc_info(char *buffer,char **start,off_t offset,int length,   
-                   int hostno,int inout)
+int gdth_proc_info(struct Scsi_Host *host, char *buffer,char **start,off_t offset,int length,   
+                   int inout)
 {
-    int hanum,busnum,i;
+    int hanum,busnum;
 
     TRACE2(("gdth_proc_info() length %d ha %d offs %d inout %d\n",
             length,hostno,(int)offset,inout));
 
-    for (i=0; i<gdth_ctr_vcount; ++i) {
-        if (gdth_ctr_vtab[i]->host_no == hostno)
-            break;
-    }
-    if (i==gdth_ctr_vcount)
-        return(-EINVAL);
-
-    hanum = NUMDATA(gdth_ctr_vtab[i])->hanum;
-    busnum= NUMDATA(gdth_ctr_vtab[i])->busnum;
+    hanum = NUMDATA(host)->hanum;
+    busnum= NUMDATA(host)->busnum;
 
     if (inout)
-        return(gdth_set_info(buffer,length,i,hanum,busnum));
+        return(gdth_set_info(buffer,length,hanum,busnum));
     else
-        return(gdth_get_info(buffer,start,offset,length,i,hanum,busnum));
+        return(gdth_get_info(buffer,start,offset,length,hanum,busnum));
 }
 
-static int gdth_set_info(char *buffer,int length,int vh,int hanum,int busnum)
+static int gdth_set_info(char *buffer,int length,int hanum,int busnum)
 {
     int             ret_val = -EINVAL;
 #if LINUX_VERSION_CODE >= 0x020503
@@ -763,7 +756,7 @@ static int gdth_set_bin_info(char *buffer,int length,int hanum,Scsi_Cmnd scp)
 #endif
 
 static int gdth_get_info(char *buffer,char **start,off_t offset,
-                         int length,int vh,int hanum,int busnum)
+                         int length,int hanum,int busnum)
 {
     int size = 0,len = 0;
     off_t begin = 0,pos = 0;

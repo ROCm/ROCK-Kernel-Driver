@@ -84,7 +84,7 @@ static inline struct thread_info *current_thread_info(void)
 
 #define THREAD_SIZE		(8192)
 
-extern struct thread_info *alloc_thread_info(void);
+extern struct thread_info *alloc_thread_info(struct task_struct *task);
 extern void free_thread_info(struct thread_info *);
 
 #define get_thread_info(ti)	get_task_struct((ti)->task)

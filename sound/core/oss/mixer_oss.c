@@ -85,8 +85,8 @@ static int snd_mixer_oss_info(snd_mixer_oss_file_t *fmixer,
 	struct mixer_info info;
 	
 	memset(&info, 0, sizeof(info));
-	strncpy(info.id, mixer && mixer->id[0] ? mixer->id : card->driver, sizeof(info.id) - 1);
-	strncpy(info.name, mixer && mixer->name[0] ? mixer->name : card->mixername, sizeof(info.name) - 1);
+	strlcpy(info.id, mixer && mixer->id[0] ? mixer->id : card->driver, sizeof(info.id));
+	strlcpy(info.name, mixer && mixer->name[0] ? mixer->name : card->mixername, sizeof(info.name));
 	info.modify_counter = card->mixer_oss_change_count;
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;
@@ -101,8 +101,8 @@ static int snd_mixer_oss_info_obsolete(snd_mixer_oss_file_t *fmixer,
 	_old_mixer_info info;
 	
 	memset(&info, 0, sizeof(info));
-	strncpy(info.id, mixer && mixer->id[0] ? mixer->id : card->driver, sizeof(info.id) - 1);
-	strncpy(info.name, mixer && mixer->name[0] ? mixer->name : card->mixername, sizeof(info.name) - 1);
+	strlcpy(info.id, mixer && mixer->id[0] ? mixer->id : card->driver, sizeof(info.id));
+	strlcpy(info.name, mixer && mixer->name[0] ? mixer->name : card->mixername, sizeof(info.name));
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
@@ -376,9 +376,7 @@ int snd_mixer_oss_ioctl_card(snd_card_t *card, unsigned int cmd, unsigned long a
 
 static struct file_operations snd_mixer_oss_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.open =		snd_mixer_oss_open,
 	.release =	snd_mixer_oss_release,
 	.ioctl =	snd_mixer_oss_ioctl,
@@ -1215,11 +1213,10 @@ static int snd_mixer_oss_notify_handler(snd_card_t * card, int cmd)
 		}
 		mixer->oss_dev_alloc = 1;
 		mixer->card = card;
-		if (*card->mixername) {
-			strncpy(mixer->name, card->mixername, sizeof(mixer->name) - 1);
-			mixer->name[sizeof(mixer->name)-1] = 0;
-		} else
-			strcpy(mixer->name, name);
+		if (*card->mixername)
+			strlcpy(mixer->name, card->mixername, sizeof(mixer->name));
+		else
+			strlcpy(mixer->name, name, sizeof(mixer->name));
 #ifdef SNDRV_OSS_INFO_DEV_MIXERS
 		snd_oss_info_register(SNDRV_OSS_INFO_DEV_MIXERS,
 				      card->number,

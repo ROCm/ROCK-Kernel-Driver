@@ -38,6 +38,7 @@
 #include <acpi/acpi.h>
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
+#include <asm/uaccess.h>
 
 #ifdef CONFIG_ACPI_EFI
 #include <linux/efi.h>
@@ -237,7 +238,7 @@ acpi_os_table_override (struct acpi_table_header *existing_table,
 static irqreturn_t
 acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
-	return (*acpi_irq_handler)(acpi_irq_context);
+	return (*acpi_irq_handler)(acpi_irq_context) ? IRQ_HANDLED : IRQ_NONE;
 }
 
 acpi_status
@@ -948,19 +949,22 @@ acpi_os_get_line(char *buffer)
 	return 0;
 }
 
-/*
- * We just have to assume we're dealing with valid memory
- */
-
+/* Assumes no unreadable holes inbetween */
 BOOLEAN
 acpi_os_readable(void *ptr, u32 len)
 {
+#if defined(__i386__) || defined(__x86_64__) 
+	char tmp;
+	return !__get_user(tmp, (char *)ptr) && !__get_user(tmp, (char *)ptr + len - 1);
+#endif
 	return 1;
 }
 
 BOOLEAN
 acpi_os_writable(void *ptr, u32 len)
 {
+	/* could do dummy write (racy) or a kernel page table lookup.
+	   The later may be difficult at early boot when kmap doesn't work yet. */
 	return 1;
 }
 
@@ -1006,7 +1010,7 @@ acpi_os_name_setup(char *str)
 		return 0;
 
 	for (; count-- && str && *str; str++) {
-		if (isalnum(*str) || *str == ' ')
+		if (isalnum(*str) || *str == ' ' || *str == ':')
 			*p++ = *str;
 		else if (*str == '\'' || *str == '"')
 			continue;

@@ -554,9 +554,9 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 		(drm_mga_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				    init->sarea_priv_offset);
 
-	DRM_IOREMAP( dev_priv->warp );
-	DRM_IOREMAP( dev_priv->primary );
-	DRM_IOREMAP( dev_priv->buffers );
+	DRM_IOREMAP( dev_priv->warp, dev );
+	DRM_IOREMAP( dev_priv->primary, dev );
+	DRM_IOREMAP( dev_priv->buffers, dev );
 
 	if(!dev_priv->warp->handle ||
 	   !dev_priv->primary->handle ||
@@ -651,11 +651,11 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 		drm_mga_private_t *dev_priv = dev->dev_private;
 
 		if ( dev_priv->warp != NULL )
-			DRM_IOREMAPFREE( dev_priv->warp );
+			DRM_IOREMAPFREE( dev_priv->warp, dev );
 		if ( dev_priv->primary != NULL )
-			DRM_IOREMAPFREE( dev_priv->primary );
+			DRM_IOREMAPFREE( dev_priv->primary, dev );
 		if ( dev_priv->buffers != NULL )
-			DRM_IOREMAPFREE( dev_priv->buffers );
+			DRM_IOREMAPFREE( dev_priv->buffers, dev );
 
 		if ( dev_priv->head != NULL ) {
 			mga_freelist_cleanup( dev );

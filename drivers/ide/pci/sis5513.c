@@ -161,9 +161,10 @@ static const struct {
 	{ "SiS748",	PCI_DEVICE_ID_SI_748,	ATA_133,	0 },
 	{ "SiS746",	PCI_DEVICE_ID_SI_746,	ATA_133,	0 },
 	{ "SiS745",	PCI_DEVICE_ID_SI_745,	ATA_133,	0 },
-	{ "SiS740",	PCI_DEVICE_ID_SI_740,	ATA_100,	0 },
+	{ "SiS740",	PCI_DEVICE_ID_SI_740,	ATA_133,	0 },
 	{ "SiS735",	PCI_DEVICE_ID_SI_735,	ATA_100,	SIS5513_LATENCY },
 	{ "SiS730",	PCI_DEVICE_ID_SI_730,	ATA_100a,	SIS5513_LATENCY },
+	{ "SiS655",	PCI_DEVICE_ID_SI_655,	ATA_133,	0 },
 	{ "SiS652",	PCI_DEVICE_ID_SI_652,	ATA_133,	0 },
 	{ "SiS651",	PCI_DEVICE_ID_SI_651,	ATA_133,	0 },
 	{ "SiS650",	PCI_DEVICE_ID_SI_650,	ATA_133,	0 },
@@ -257,8 +258,8 @@ static struct pci_dev *host_dev = NULL;
 static char* chipset_capability[] = {
 	"ATA", "ATA 16",
 	"ATA 33", "ATA 66",
-	"ATA 100", "ATA 100",
-	"ATA 133", "ATA 133"
+	"ATA 100 (1st gen)", "ATA 100 (2nd gen)",
+	"ATA 133 (1st gen)", "ATA 133 (2nd gen)"
 };
 
 #if defined(DISPLAY_SIS_TIMINGS) && defined(CONFIG_PROC_FS)
@@ -331,8 +332,8 @@ static char* get_drives_info (char *buffer, u8 pos)
 			// Configuration space remapped to 0x70
 			drive_pci = 0x70;
 		}
-		pci_read_config_dword(bmide_dev, (unsigned long)drive_pci+8*pos, &regdw0);
-		pci_read_config_dword(bmide_dev, (unsigned long)drive_pci+8*pos+4, &regdw1);
+		pci_read_config_dword(bmide_dev, (unsigned long)drive_pci+4*pos, &regdw0);
+		pci_read_config_dword(bmide_dev, (unsigned long)drive_pci+4*pos+8, &regdw1);
 		p += sprintf(p, "Drive %d:\n", pos);
 	}
 
@@ -357,8 +358,7 @@ static char* get_drives_info (char *buffer, u8 pos)
 			case ATA_100a:	p += sprintf(p, cycle_time[(reg01 & 0x70) >> 4]); break;
 			case ATA_100:
 			case ATA_133a:	p += sprintf(p, cycle_time[reg01 & 0x0F]); break;
-			case ATA_133:
-			default:	p += sprintf(p, "133+ ?"); break;
+			default:	p += sprintf(p, "?"); break;
 		}
 		p += sprintf(p, " \t UDMA Cycle Time    ");
 		switch(chipset_family) {
@@ -367,42 +367,39 @@ static char* get_drives_info (char *buffer, u8 pos)
 			case ATA_100a:	p += sprintf(p, cycle_time[(reg11 & 0x70) >> 4]); break;
 			case ATA_100:
 			case ATA_133a:  p += sprintf(p, cycle_time[reg11 & 0x0F]); break;
-			case ATA_133:
-			default:	p += sprintf(p, "133+ ?"); break;
+			default:	p += sprintf(p, "?"); break;
 		}
 		p += sprintf(p, "\n");
 	}
 
+	if (chipset_family < ATA_133) { /* else case TODO */
 /* Data Active */
-	p += sprintf(p, "                Data Active Time   ");
-	switch(chipset_family) {
-		case ATA_00:
-		case ATA_16: /* confirmed */
-		case ATA_33:
-		case ATA_66:
-		case ATA_100a: p += sprintf(p, active_time[reg01 & 0x07]); break;
-		case ATA_100:
-		case ATA_133a: p += sprintf(p, active_time[(reg00 & 0x70) >> 4]); break;
-		case ATA_133:
-		default: p += sprintf(p, "133+ ?"); break;
-	}
-	p += sprintf(p, " \t Data Active Time   ");
-	switch(chipset_family) {
-		case ATA_00:
-		case ATA_16:
-		case ATA_33:
-		case ATA_66:
-		case ATA_100a: p += sprintf(p, active_time[reg11 & 0x07]); break;
-		case ATA_100:
-		case ATA_133a: p += sprintf(p, active_time[(reg10 & 0x70) >> 4]); break;
-		case ATA_133:
-		default: p += sprintf(p, "133+ ?"); break;
-	}
-	p += sprintf(p, "\n");
+		p += sprintf(p, "                Data Active Time   ");
+		switch(chipset_family) {
+			case ATA_00:
+			case ATA_16: /* confirmed */
+			case ATA_33:
+			case ATA_66:
+			case ATA_100a: p += sprintf(p, active_time[reg01 & 0x07]); break;
+			case ATA_100:
+			case ATA_133a: p += sprintf(p, active_time[(reg00 & 0x70) >> 4]); break;
+			default: p += sprintf(p, "?"); break;
+		}
+		p += sprintf(p, " \t Data Active Time   ");
+		switch(chipset_family) {
+			case ATA_00:
+			case ATA_16:
+			case ATA_33:
+			case ATA_66:
+			case ATA_100a: p += sprintf(p, active_time[reg11 & 0x07]); break;
+			case ATA_100:
+			case ATA_133a: p += sprintf(p, active_time[(reg10 & 0x70) >> 4]); break;
+			default: p += sprintf(p, "?"); break;
+		}
+		p += sprintf(p, "\n");
 
 /* Data Recovery */
 	/* warning: may need (reg&0x07) for pre ATA66 chips */
-	if (chipset_family < ATA_133) {
 		p += sprintf(p, "                Data Recovery Time %s \t Data Recovery Time %s\n",
 			     recovery_time[reg00 & 0x0f], recovery_time[reg10 & 0x0f]);
 	}
@@ -430,7 +427,6 @@ static int sis_get_info (char *buffer, char **addr, off_t offset, int count)
 
 	p += sprintf(p, "\nSiS 5513 ");
 	switch(chipset_family) {
-		case ATA_00: p += sprintf(p, "Unknown???"); break;
 		case ATA_16: p += sprintf(p, "DMA 16"); break;
 		case ATA_33: p += sprintf(p, "Ultra 33"); break;
 		case ATA_66: p += sprintf(p, "Ultra 66"); break;
@@ -867,6 +863,19 @@ static int sis5513_config_xfer_rate (ide_drive_t *drive)
 	return sis5513_config_drive_xfer_rate(drive);
 }
 
+/* Helper function used at init time
+ * returns a PCI device revision ID
+ * (used to detect different IDE controller versions)
+ */
+static u8 __init devfn_rev(int device, int function)
+{
+	u8 revision;
+	/* Find device */
+	struct pci_dev* dev = pci_find_slot(0,PCI_DEVFN(device,function));
+	pci_read_config_byte(dev, PCI_REVISION_ID, &revision);
+	return revision;
+}
+
 /* Chip detection and general config */
 static unsigned int __init init_chipset_sis5513 (struct pci_dev *dev, const char *name)
 {
@@ -887,26 +896,24 @@ static unsigned int __init init_chipset_sis5513 (struct pci_dev *dev, const char
 		/* check 100/133 chipset family */
 		if (chipset_family == ATA_133) {
 			u32 reg54h;
-			u16 reg02h;
+			u16 devid;
 			pci_read_config_dword(dev, 0x54, &reg54h);
+			/* SiS962 and above report 0x5518 dev id if high bit is cleared */
 			pci_write_config_dword(dev, 0x54, (reg54h & 0x7fffffff));
-			pci_read_config_word(dev, 0x02, &reg02h);
+			pci_read_config_word(dev, 0x02, &devid);
+			/* restore register 0x54 */
 			pci_write_config_dword(dev, 0x54, reg54h);
+
 			/* devid 5518 here means SiS962 or later
-			   which supports ATA133 */
-			if (reg02h != 0x5518) {
+			   which supports ATA133.
+			   These are refered by chipset_family = ATA133
+			*/
+			if (devid != 0x5518) {
 				u8 reg49h;
-				unsigned long sbrev;
 				/* SiS961 family */
-
-		/*
-		 * FIXME !!! GAK!!!!!!!!!! PCI DIRECT POKING 
-		 */
-				outl(0x80001008, 0x0cf8);
-				sbrev = inl(0x0cfc);
-
 				pci_read_config_byte(dev, 0x49, &reg49h);
-				if (((sbrev & 0xff) == 0x10) && (reg49h & 0x80))
+				/* check isa bridge device rev id */
+				if (((devfn_rev(2,0) & 0xff) == 0x10) && (reg49h & 0x80))
 					chipset_family = ATA_133a;
 				else
 					chipset_family = ATA_100;
@@ -923,6 +930,14 @@ static unsigned int __init init_chipset_sis5513 (struct pci_dev *dev, const char
 		if (SiSHostChipInfo[i].flags & SIS5513_LATENCY) {
 			u8 latency = (chipset_family == ATA_100)? 0x80 : 0x10; /* Lacking specs */
 			pci_write_config_byte(dev, PCI_LATENCY_TIMER, latency);
+		}
+
+		/* Special case for SiS630 : 630S/ET is ATA_100a */
+		if (SiSHostChipInfo[i].host_id == PCI_DEVICE_ID_SI_630) {
+			/* check host device rev id */
+			if (devfn_rev(0,0) >= 0x30) {
+				chipset_family = ATA_100a;
+			}
 		}
 	}
 

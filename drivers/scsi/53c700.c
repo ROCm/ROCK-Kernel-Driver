@@ -124,6 +124,7 @@
 #include <linux/spinlock.h>
 #include <linux/completion.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -167,11 +168,13 @@ STATIC int NCR_700_abort(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_bus_reset(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_dev_reset(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_host_reset(Scsi_Cmnd * SCpnt);
-STATIC int NCR_700_proc_directory_info(char *, char **, off_t, int, int, int);
+STATIC int NCR_700_proc_directory_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 STATIC void NCR_700_chip_setup(struct Scsi_Host *host);
 STATIC void NCR_700_chip_reset(struct Scsi_Host *host);
 STATIC int NCR_700_slave_configure(Scsi_Device *SDpnt);
 STATIC void NCR_700_slave_destroy(Scsi_Device *SDpnt);
+
+static struct device_attribute **NCR_700_dev_attrs = NULL;
 
 static char *NCR_700_phase[] = {
 	"",
@@ -246,6 +249,9 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	struct Scsi_Host *host;
 	static int banner = 0;
 	int j;
+
+	if(tpnt->sdev_attrs == NULL)
+		tpnt->sdev_attrs = NCR_700_dev_attrs;
 
 	memory = dma_alloc_noncoherent(hostdata->dev, TOTAL_MEM_SIZE,
 				       &pScript, GFP_KERNEL);
@@ -1703,22 +1709,14 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_RETVAL(handled);
 }
 
-/* FIXME: Need to put some proc information in and plumb it
- * into the scsi proc system */
 STATIC int
-NCR_700_proc_directory_info(char *proc_buf, char **startp,
-			 off_t offset, int bytes_available,
-			 int host_no, int write)
+NCR_700_proc_directory_info(struct Scsi_Host *host, char *proc_buf, char **startp,
+			 off_t offset, int bytes_available, int write)
 {
 	static char buf[4096];	/* 1 page should be sufficient */
 	int len = 0;
-	struct Scsi_Host *host;
 	struct NCR_700_Host_Parameters *hostdata;
 	Scsi_Device *SDp;
-
-	host = scsi_host_hn_get(host_no);
-	if(host == NULL)
-		return 0;
 
 	if(write) {
 		/* FIXME: Clear internal statistics here */
@@ -2023,6 +2021,56 @@ NCR_700_slave_destroy(Scsi_Device *SDp)
 	/* to do here: deallocate memory */
 }
 
+static ssize_t
+NCR_700_store_queue_depth(struct device *dev, const char *buf, size_t count)
+{
+	int depth;
+
+	struct scsi_device *SDp = to_scsi_device(dev);
+	depth = simple_strtoul(buf, NULL, 0);
+	if(depth > NCR_700_MAX_TAGS)
+		return -EINVAL;
+	scsi_adjust_queue_depth(SDp, MSG_ORDERED_TAG, depth);
+
+	return count;
+}
+
+static ssize_t
+NCR_700_show_active_tags(struct device *dev, char *buf)
+{
+	struct scsi_device *SDp = to_scsi_device(dev);
+
+	return snprintf(buf, 20, "%d\n", NCR_700_get_depth(SDp));
+}
+
+static struct device_attribute NCR_700_queue_depth_attr = {
+	.attr = {
+		.name = 	"queue_depth",
+		.mode =		S_IWUSR,
+	},
+	.store = NCR_700_store_queue_depth,
+};
+
+static struct device_attribute NCR_700_active_tags_attr = {
+	.attr = {
+		.name =		"active_tags",
+		.mode =		S_IRUGO,
+	},
+	.show = NCR_700_show_active_tags,
+};
+
+STATIC int __init
+NCR_700_init(void)
+{
+	scsi_sysfs_modify_sdev_attribute(&NCR_700_dev_attrs,
+					 &NCR_700_queue_depth_attr);
+	scsi_sysfs_modify_sdev_attribute(&NCR_700_dev_attrs,
+					 &NCR_700_active_tags_attr);
+	return 0;
+}
+
 EXPORT_SYMBOL(NCR_700_detect);
 EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
+
+module_init(NCR_700_init);

@@ -16,11 +16,13 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/cpufreq.h>
+#include <linux/ioport.h>
 
 #include <asm/hardware.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/mach/map.h>
+#include <asm/irq.h>
 
 #include "generic.h"
 
@@ -128,13 +130,88 @@ static void sa1100_power_off(void)
 	PMCR = PMCR_SF;
 }
 
+static struct resource sa11x0udc_resources[] = {
+	[0] = {
+		.start	= 0x80000000,
+		.end	= 0x8000ffff,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device sa11x0udc_device = {
+	.name		= "sa11x0-udc",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA11x0 [UDC]",
+	},
+	.num_resources	= ARRAY_SIZE(sa11x0udc_resources),
+	.resource	= sa11x0udc_resources,
+};
+
+static struct resource sa11x0mcp_resources[] = {
+	[0] = {
+		.start	= 0x80060000,
+		.end	= 0x8006ffff,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device sa11x0mcp_device = {
+	.name		= "sa11x0-mcp",
+	.id		= 0,
+	.dev = {
+		.name	= "Intel Corporation SA11x0 [MCP]",
+	},
+	.num_resources	= ARRAY_SIZE(sa11x0mcp_resources),
+	.resource	= sa11x0mcp_resources,
+};
+
+static struct resource sa11x0fb_resources[] = {
+	[0] = {
+		.start	= 0xb0100000,
+		.end	= 0xb010ffff,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= IRQ_LCD,
+		.end	= IRQ_LCD,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device sa11x0fb_device = {
+	.name		= "sa11x0-fb",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA11x0 [LCD]",
+	},
+	.num_resources	= ARRAY_SIZE(sa11x0fb_resources),
+	.resource	= sa11x0fb_resources,
+};
+
+static struct platform_device sa11x0pcmcia_device = {
+	.name		= "sa11x0-pcmcia",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA11x0 [PCMCIA]",
+	},
+};
+
+static struct platform_device *sa11x0_devices[] __initdata = {
+	&sa11x0udc_device,
+	&sa11x0mcp_device,
+	&sa11x0pcmcia_device,
+	&sa11x0fb_device,
+};
+
 static int __init sa1100_init(void)
 {
 	pm_power_off = sa1100_power_off;
-	return 0;
+
+	return platform_add_devices(sa11x0_devices, ARRAY_SIZE(sa11x0_devices));
 }
 
-core_initcall(sa1100_init);
+arch_initcall(sa1100_init);
 
 void (*sa1100fb_backlight_power)(int on);
 void (*sa1100fb_lcd_power)(int on);

@@ -202,7 +202,6 @@ ppp_sync_open(struct tty_struct *tty)
 	struct syncppp *ap;
 	int err;
 
-	MOD_INC_USE_COUNT;
 	ap = kmalloc(sizeof(*ap), GFP_KERNEL);
 	err = -ENOMEM;
 	if (ap == 0)
@@ -236,7 +235,6 @@ ppp_sync_open(struct tty_struct *tty)
  out_free:
 	kfree(ap);
  out:
-	MOD_DEC_USE_COUNT;
 	return err;
 }
 
@@ -276,7 +274,6 @@ ppp_sync_close(struct tty_struct *tty)
 	if (ap->tpkt != 0)
 		kfree_skb(ap->tpkt);
 	kfree(ap);
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -404,6 +401,7 @@ ppp_sync_wakeup(struct tty_struct *tty)
 
 
 static struct tty_ldisc ppp_sync_ldisc = {
+	.owner	= THIS_MODULE,
 	.magic	= TTY_LDISC_MAGIC,
 	.name	= "pppsync",
 	.open	= ppp_sync_open,

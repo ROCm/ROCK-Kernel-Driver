@@ -87,7 +87,8 @@ static void *r_start(struct seq_file *m, loff_t *pos)
 	lock_kernel();
 	if (!l--)
 		return (void *)1;
-	for (wandev = router_devlist; l-- && wandev; wandev = wandev->next)
+	for (wandev = wanrouter_router_devlist; l-- && wandev;
+	     wandev = wandev->next)
 		;
 	return wandev;
 }
@@ -96,7 +97,7 @@ static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct wan_device *wandev = v;
 	(*pos)++;
-	return (v == (void *)1) ? router_devlist : wandev->next;
+	return (v == (void *)1) ? wanrouter_router_devlist : wandev->next;
 }
 
 static void r_stop(struct seq_file *m, void *v)

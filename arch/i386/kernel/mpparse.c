@@ -73,9 +73,6 @@ static unsigned int __initdata num_processors;
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map;
 
-#ifndef CONFIG_X86_GENERICARCH
-int x86_summit = 0;
-#endif
 u8 bios_cpu_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 /*
@@ -171,7 +168,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 
 	num_processors++;
 
-	if (m->mpc_apicid > MAX_APICS) {
+	if (MAX_APICS - m->mpc_apicid <= 0) {
 		printk(KERN_WARNING "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
 		--num_processors;
@@ -803,7 +800,7 @@ void __init mp_register_lapic (
 	struct mpc_config_processor processor;
 	int			boot_cpu = 0;
 	
-	if (id >= MAX_APICS) {
+	if (MAX_APICS - id <= 0) {
 		printk(KERN_WARNING "Processor #%d invalid (max %d)\n",
 			id, MAX_APICS);
 		return;
@@ -1086,7 +1083,7 @@ void __init mp_parse_prt (void)
 
 	/*
 	 * Parsing through the PCI Interrupt Routing Table (PRT) and program
-	 * routing for all static (IOAPIC-direct) entries.
+	 * routing for all entries.
 	 */
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
@@ -1100,6 +1097,10 @@ void __init mp_parse_prt (void)
 		else
 			irq = entry->link.index;
 
+		/* Don't set up the ACPI SCI because it's already set up */
+		if (acpi_fadt.sci_int == irq)
+			continue;
+	
 		ioapic = mp_find_ioapic(irq);
 		if (ioapic < 0)
 			continue;

@@ -1769,7 +1769,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	int using_dac = 0;
 
 	/* See if we can set the dma mask early on; failure is fatal. */
-	if (TRY_DAC && !pci_set_dma_mask(pci_dev, 0xffffffffffffffff)) {
+	if (TRY_DAC && !pci_set_dma_mask(pci_dev, 0xffffffffffffffffULL)) {
 		using_dac = 1;
 	} else if (!pci_set_dma_mask(pci_dev, 0xffffffff)) {
 		using_dac = 0;

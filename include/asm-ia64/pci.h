@@ -70,9 +70,6 @@ extern int pcibios_prep_mwi (struct pci_dev *);
 #define pci_dac_dma_to_offset(dev,dma_addr)		((dma_addr) & ~PAGE_MASK)
 #define pci_dac_dma_sync_single(dev,dma_addr,len,dir)	do { mb(); } while (0)
 
-/* Return the index of the PCI controller for device PDEV. */
-#define pci_controller_num(PDEV)	(0)
-
 #define sg_dma_len(sg)		((sg)->dma_length)
 #define sg_dma_address(sg)	((sg)->dma_address)
 
@@ -95,7 +92,7 @@ struct pci_controller {
 };
 
 #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
-#define PCI_SEGMENT(busdev)    (PCI_CONTROLLER(busdev)->segment)
+#define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
 
 /* generic pci stuff */
 #include <asm-generic/pci.h>

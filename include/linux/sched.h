@@ -245,7 +245,13 @@ struct signal_struct {
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
+	/* overloaded:
+	 * - notify group_exit_task when ->count is equal to notify_count
+	 * - everyone except group_exit_task is stopped during signal delivery
+	 *   of fatal signals, group_exit_task processes the signal.
+	 */
 	struct task_struct	*group_exit_task;
+	int			notify_count;
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
@@ -282,11 +288,6 @@ struct user_struct {
 	uid_t uid;
 };
 
-#define get_current_user() ({ 				\
-	struct user_struct *__user = current->user;	\
-	atomic_inc(&__user->__count);			\
-	__user; })
-
 extern struct user_struct *find_user(uid_t);
 
 extern struct user_struct root_user;
@@ -311,6 +312,7 @@ struct k_itimer {
 	unsigned long it_incr;		/* interval specified in jiffies */
 	struct task_struct *it_process;	/* process to send signal to */
 	struct timer_list it_timer;
+	struct sigqueue *sigq;		/* signal queue entry. */
 };
 
 
@@ -429,6 +431,8 @@ struct task_struct {
    	u32 self_exec_id;
 /* Protection of (de-)allocation: mm, files, fs, tty */
 	spinlock_t alloc_lock;
+/* Protection of proc_dentry: nesting proc_lock, dcache_lock, write_lock_irq(&tasklist_lock); */
+	spinlock_t proc_lock;
 /* context-switch lock */
 	spinlock_t switch_lock;
 
@@ -471,6 +475,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */
 #define PF_KSWAPD	0x00040000	/* I am kswapd */
 #define PF_SWAPOFF	0x00080000	/* I am in swapoff */
+#define PF_LESS_THROTTLE 0x01000000	/* Throttle me less: I clena memory */
 
 #ifdef CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
@@ -563,6 +568,10 @@ extern void zap_other_threads(struct task_struct *p);
 extern int kill_pg(pid_t, int, int);
 extern int kill_sl(pid_t, int, int);
 extern int kill_proc(pid_t, int, int);
+extern struct sigqueue *sigqueue_alloc(void);
+extern void sigqueue_free(struct sigqueue *);
+extern int send_sigqueue(int, struct sigqueue *,  struct task_struct *);
+extern int send_group_sigqueue(int, struct sigqueue *,  struct task_struct *);
 extern int do_sigaction(int, const struct k_sigaction *, struct k_sigaction *);
 extern int do_sigaltstack(const stack_t __user *, stack_t __user *, unsigned long);
 

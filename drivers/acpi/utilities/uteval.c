@@ -210,6 +210,46 @@ acpi_ut_evaluate_numeric_object (
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_ut_copy_id_string
+ *
+ * PARAMETERS:  Destination         - Where to copy the string
+ *              Source              - Source string
+ *              max_length          - Length of the destination buffer
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Copies an ID string for the _HID, _CID, and _UID methods.
+ *              Performs removal of a leading asterisk if present -- workaround
+ *              for a known issue on a bunch of machines.
+ *
+ ******************************************************************************/
+
+static void
+acpi_ut_copy_id_string (
+	char                            *destination,
+	char                            *source,
+	acpi_size                       max_length)
+{
+
+
+	/*
+	 * Workaround for ID strings that have a leading asterisk. This construct
+	 * is not allowed by the ACPI specification  (ID strings must be
+	 * alphanumeric), but enough existing machines have this embedded in their
+	 * ID strings that the following code is useful.
+	 */
+	if (*source == '*') {
+		source++;
+	}
+
+	/* Do the actual copy */
+
+	ACPI_STRNCPY (destination, source, max_length);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_ut_execute_HID
  *
  * PARAMETERS:  device_node         - Node for the device
@@ -245,18 +285,70 @@ acpi_ut_execute_HID (
 	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 		/* Convert the Numeric HID to string */
 
-		acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, hid->buffer);
+		acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, hid->value);
 	}
 	else {
 		/* Copy the String HID from the returned object */
 
-		ACPI_STRNCPY (hid->buffer, obj_desc->string.pointer, sizeof(hid->buffer));
+		acpi_ut_copy_id_string (hid->value, obj_desc->string.pointer,
+				sizeof (hid->value));
 	}
 
 	/* On exit, we must delete the return object */
 
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ut_translate_one_cid
+ *
+ * PARAMETERS:  obj_desc            - _CID object, must be integer or string
+ *              one_cid             - Where the CID string is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Return a numeric or string _CID value as a string.
+ *              (Compatible ID)
+ *
+ *              NOTE:  Assumes a maximum _CID string length of
+ *                     ACPI_MAX_CID_LENGTH.
+ *
+ ******************************************************************************/
+
+static acpi_status
+acpi_ut_translate_one_cid (
+	union acpi_operand_object       *obj_desc,
+	struct acpi_compatible_id       *one_cid)
+{
+
+
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+	case ACPI_TYPE_INTEGER:
+
+		/* Convert the Numeric CID to string */
+
+		acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, one_cid->value);
+		return (AE_OK);
+
+	case ACPI_TYPE_STRING:
+
+		if (obj_desc->string.length > ACPI_MAX_CID_LENGTH) {
+			return (AE_AML_STRING_LIMIT);
+		}
+
+		/* Copy the String CID from the returned object */
+
+		acpi_ut_copy_id_string (one_cid->value, obj_desc->string.pointer,
+				ACPI_MAX_CID_LENGTH);
+		return (AE_OK);
+
+	default:
+
+		return (AE_TYPE);
+	}
 }
 
 
@@ -279,55 +371,86 @@ acpi_ut_execute_HID (
 acpi_status
 acpi_ut_execute_CID (
 	struct acpi_namespace_node      *device_node,
-	struct acpi_device_id           *cid)
+	struct acpi_compatible_id_list **return_cid_list)
 {
 	union acpi_operand_object       *obj_desc;
 	acpi_status                     status;
+	u32                             count;
+	u32                             size;
+	struct acpi_compatible_id_list *cid_list;
+	acpi_native_uint                i;
 
 
 	ACPI_FUNCTION_TRACE ("ut_execute_CID");
 
 
+	/* Evaluate the _CID method for this device */
+
 	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__CID,
-			 ACPI_BTYPE_INTEGER | ACPI_BTYPE_STRING | ACPI_BTYPE_PACKAGE, &obj_desc);
+			 ACPI_BTYPE_INTEGER | ACPI_BTYPE_STRING | ACPI_BTYPE_PACKAGE,
+			 &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	/*
-	 *  A _CID can return either a single compatible ID or a package of compatible
-	 *  IDs.  Each compatible ID can be a Number (32 bit compressed EISA ID) or
-	 *  string (PCI ID format, e.g. "PCI\VEN_vvvv&DEV_dddd&SUBSYS_ssssssss").
-	 */
-	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
-	case ACPI_TYPE_INTEGER:
+	/* Get the number of _CIDs returned */
 
-		/* Convert the Numeric CID to string */
-
-		acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, cid->buffer);
-		break;
-
-	case ACPI_TYPE_STRING:
-
-		/* Copy the String CID from the returned object */
-
-		ACPI_STRNCPY (cid->buffer, obj_desc->string.pointer, sizeof (cid->buffer));
-		break;
-
-	case ACPI_TYPE_PACKAGE:
-
-		/* TBD: Parse package elements; need different return struct, etc. */
-
-		status = AE_SUPPORT;
-		break;
-
-	default:
-
-		status = AE_TYPE;
-		break;
+	count = 1;
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_PACKAGE) {
+		count = obj_desc->package.count;
 	}
 
-	/* On exit, we must delete the return object */
+	/* Allocate a worst-case buffer for the _CIDs */
+
+	size = (((count - 1) * sizeof (struct acpi_compatible_id)) +
+			   sizeof (struct acpi_compatible_id_list));
+
+	cid_list = ACPI_MEM_CALLOCATE ((acpi_size) size);
+	if (!cid_list) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	/* Init CID list */
+
+	cid_list->count = count;
+	cid_list->size = size;
+
+	/*
+	 *  A _CID can return either a single compatible ID or a package of compatible
+	 *  IDs.  Each compatible ID can be one of the following:
+	 *  -- Number (32 bit compressed EISA ID) or
+	 *  -- String (PCI ID format, e.g. "PCI\VEN_vvvv&DEV_dddd&SUBSYS_ssssssss").
+	 */
+
+	/* The _CID object can be either a single CID or a package (list) of CIDs */
+
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_PACKAGE) {
+		/* Translate each package element */
+
+		for (i = 0; i < count; i++) {
+			status = acpi_ut_translate_one_cid (obj_desc->package.elements[i],
+					  &cid_list->id[i]);
+			if (ACPI_FAILURE (status)) {
+				break;
+			}
+		}
+	}
+	else {
+		/* Only one CID, translate to a string */
+
+		status = acpi_ut_translate_one_cid (obj_desc, cid_list->id);
+	}
+
+	/* Cleanup on error */
+
+	if (ACPI_FAILURE (status)) {
+		ACPI_MEM_FREE (cid_list);
+	}
+	else {
+		*return_cid_list = cid_list;
+	}
+
+	/* On exit, we must delete the _CID return object */
 
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
@@ -371,12 +494,13 @@ acpi_ut_execute_UID (
 	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 		/* Convert the Numeric UID to string */
 
-		acpi_ex_unsigned_integer_to_string (obj_desc->integer.value, uid->buffer);
+		acpi_ex_unsigned_integer_to_string (obj_desc->integer.value, uid->value);
 	}
 	else {
 		/* Copy the String UID from the returned object */
 
-		ACPI_STRNCPY (uid->buffer, obj_desc->string.pointer, sizeof (uid->buffer));
+		acpi_ut_copy_id_string (uid->value, obj_desc->string.pointer,
+				sizeof (uid->value));
 	}
 
 	/* On exit, we must delete the return object */

@@ -312,7 +312,8 @@ void __init get_memcfg_from_srat(void)
 
 	if (rsdp_address->pointer_type == ACPI_PHYSICAL_POINTER) {
 		printk("%s: assigning address to rsdp\n", __FUNCTION__);
-		rsdp = (struct acpi_table_rsdp *)rsdp_address->pointer.physical;
+		rsdp = (struct acpi_table_rsdp *)
+				(u32)rsdp_address->pointer.physical;
 	} else {
 		printk("%s: rsdp_address is not a physical pointer\n", __FUNCTION__);
 		return;

@@ -12,7 +12,7 @@
  *     Copyright (c) 1998-2000 Dag Brattli <dag@brattli.net>,
  *     Copyright (c) 1998      Thomas Davis <ratbert@radiks.net>
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *
  *     This program is free software; you can redistribute it and/or
  *     modify it under the terms of the GNU General Public License as
@@ -287,6 +287,9 @@ void irlap_do_event(struct irlap_cb *self, IRLAP_EVENT event,
 				/* Send one frame */
 				ret = (*state[self->state])(self, SEND_I_CMD,
 							    skb, NULL);
+				/* Drop reference count.
+				 * It will be increase as needed in
+				 * irlap_send_data_xxx() */
 				kfree_skb(skb);
 
 				/* Poll the higher layers for one more frame */
@@ -517,6 +520,8 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 						    CMD_FRAME);
 			else
 				break;
+			/* irlap_send_ui_frame() won't increase skb reference
+			 * count, so no dev_kfree_skb() - Jean II */
 		}
 		if (i == 2) {
 			/* Force us to listen 500 ms again */

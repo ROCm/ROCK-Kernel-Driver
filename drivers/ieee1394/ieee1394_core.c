@@ -61,7 +61,6 @@ static kmem_cache_t *hpsb_packet_cache;
 
 /* Some globals used */
 const char *hpsb_speedto_str[] = { "S100", "S200", "S400", "S800", "S1600", "S3200" };
-const u8 hpsb_speedto_maxrec[] = {   0x7,    0x8,    0x9,   0x10,    0x11,    0x12 };
 
 static void dump_packet(const char *text, quadlet_t *data, int size)
 {
@@ -80,9 +79,12 @@ static void dump_packet(const char *text, quadlet_t *data, int size)
 static void run_packet_complete(struct hpsb_packet *packet)
 {
 	if (packet->complete_routine != NULL) {
-		packet->complete_routine(packet->complete_data);
+		void (*complete_routine)(void*) = packet->complete_routine;
+		void *complete_data = packet->complete_data;
+
 		packet->complete_routine = NULL;
 		packet->complete_data = NULL;
+		complete_routine(complete_data);
 	}
 	return;
 }
@@ -938,7 +940,7 @@ void abort_requests(struct hpsb_host *host)
 {
         unsigned long flags;
         struct hpsb_packet *packet;
-        struct list_head *lh;
+        struct list_head *lh, *tlh;
         LIST_HEAD(llist);
 
         host->driver->devctl(host, CANCEL_REQUESTS, 0);
@@ -948,8 +950,9 @@ void abort_requests(struct hpsb_host *host)
         INIT_LIST_HEAD(&host->pending_packets);
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each(lh, &llist) {
+        list_for_each_safe(lh, tlh, &llist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
+                list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
                 up(&packet->state_change);
@@ -962,7 +965,7 @@ void abort_timedouts(struct hpsb_host *host)
         unsigned long flags;
         struct hpsb_packet *packet;
         unsigned long expire;
-        struct list_head *lh, *next;
+        struct list_head *lh, *next, *tlh;
         LIST_HEAD(expiredlist);
 
         spin_lock_irqsave(&host->csr.lock, flags);
@@ -990,8 +993,9 @@ void abort_timedouts(struct hpsb_host *host)
 
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each(lh, &expiredlist) {
+        list_for_each_safe(lh, tlh, &expiredlist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
+                list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
                 up(&packet->state_change);
@@ -1241,7 +1245,6 @@ EXPORT_SYMBOL(hpsb_unref_host);
 
 /** ieee1394_core.c **/
 EXPORT_SYMBOL(hpsb_speedto_str);
-EXPORT_SYMBOL(hpsb_speedto_maxrec);
 EXPORT_SYMBOL(hpsb_set_packet_complete_task);
 EXPORT_SYMBOL(alloc_hpsb_packet);
 EXPORT_SYMBOL(free_hpsb_packet);

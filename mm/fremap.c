@@ -84,7 +84,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_unmap(pte);
 	if (flush)
 		flush_tlb_page(vma, addr);
-
+	update_mmu_cache(vma, addr, *pte);
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);
 	return 0;

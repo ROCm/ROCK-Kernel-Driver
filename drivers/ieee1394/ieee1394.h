@@ -57,7 +57,6 @@
 
 /* Maps speed values above to a string representation */
 extern const char *hpsb_speedto_str[];
-extern const u8 hpsb_speedto_maxrec[];
 
 
 #define SELFID_PWRCL_NO_POWER    0x0

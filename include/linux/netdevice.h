@@ -147,8 +147,6 @@ enum {
 
 #ifdef __KERNEL__
 
-extern const char *if_port_text[];
-
 #include <linux/cache.h>
 #include <linux/skbuff.h>
 
@@ -335,6 +333,7 @@ struct net_device
 	void                    *dn_ptr;        /* DECnet specific data */
 	void                    *ip6_ptr;       /* IPv6 specific data */
 	void			*ec_ptr;	/* Econet specific data	*/
+	void			*ax25_ptr;	/* AX.25 specific data */
 
 	struct list_head	poll_list;	/* Link to poll list	*/
 	int			quota;
@@ -441,9 +440,6 @@ struct net_device
 	struct divert_blk	*divert;
 #endif /* CONFIG_NET_DIVERT */
 
-	/* generic device structure used in constructing class */
-	struct device		*dev;
-
 	/* class/net/name entry */
 	struct class_device	class_dev;
 
@@ -455,7 +451,7 @@ struct net_device
 /* Set the sysfs physical device reference for the network logical device
  * if set prior to registration will cause a symlink during initialization.
  */
-#define SET_NETDEV_DEV(net, pdev)	((net)->dev = (pdev))
+#define SET_NETDEV_DEV(net, pdev)	((net)->class_dev.dev = (pdev))
 
 
 struct packet_type 

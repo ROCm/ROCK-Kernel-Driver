@@ -4,10 +4,10 @@ JFS Homepage:  http://oss.software.ibm.com/jfs/
 
 Team members
 ------------
-Steve Best         sbest@us.ibm.com
 Dave Kleikamp      shaggy@austin.ibm.com  
+Dave Blaschke      blaschke@us.ibm.com
+Steve Best         sbest@us.ibm.com
 Barry Arndt        barndt@us.ibm.com
-Christoph Hellwig  hch@infradead.org
 
 The following mount options are supported:
 

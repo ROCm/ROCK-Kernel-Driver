@@ -279,6 +279,7 @@ static int __init init(void)
 	return ret;
 }
 
+NEEDS_CONNTRACK(irc);
 
 module_init(init);
 module_exit(fini);

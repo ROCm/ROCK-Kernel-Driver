@@ -5,12 +5,13 @@
  *
  * This code is GPL
  * 
- * $Id: dc21285.c,v 1.9 2002/10/14 12:22:10 rmk Exp $
+ * $Id: dc21285.c,v 1.15 2003/05/21 12:45:18 dwmw2 Exp $
  */
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -92,28 +93,42 @@ void dc21285_copy_to(struct map_info *map, unsigned long to, const void *from, s
 }
 
 struct map_info dc21285_map = {
-	.name		= "DC21285 flash",
-	.size		= 16*1024*1024,
-	.read8		= dc21285_read8,
-	.read16		= dc21285_read16,
-	.read32		= dc21285_read32,
-	.copy_from	= dc21285_copy_from,
-	.write8		= dc21285_write8,
-	.write16	= dc21285_write16,
-	.write32	= dc21285_write32,
-	.copy_to	= dc21285_copy_to
+	.name = "DC21285 flash",
+	.phys = NO_XIP,
+	.size = 16*1024*1024,
+	.read8 = dc21285_read8,
+	.read16 = dc21285_read16,
+	.read32 = dc21285_read32,
+	.copy_from = dc21285_copy_from,
+	.write8 = dc21285_write8,
+	.write16 = dc21285_write16,
+	.write32 = dc21285_write32,
+	.copy_to = dc21285_copy_to
 };
+
 
 /* Partition stuff */
 static struct mtd_partition *dc21285_parts;
-		      
-extern int parse_redboot_partitions(struct mtd_info *, struct mtd_partition **);
-extern int parse_cmdline_partitions(struct mtd_info *master,
-				    struct mtd_partition **pparts,
-				    const char *mtd_id);
-
+#ifdef CONFIG_MTD_PARTITIONS
+static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
+#endif
+  
 int __init init_dc21285(void)
 {
+
+	/* 
+	 * Flash timing is determined with bits 19-16 of the
+	 * CSR_SA110_CNTL.  The value is the number of wait cycles, or
+	 * 0 for 16 cycles (the default).  Cycles are 20 ns.
+	 * Here we use 7 for 140 ns flash chips.
+	 */
+	/* access time */
+	*CSR_SA110_CNTL = ((*CSR_SA110_CNTL & ~0x000f0000) | (7 << 16));
+	/* burst time */
+	*CSR_SA110_CNTL = ((*CSR_SA110_CNTL & ~0x00f00000) | (7 << 20));
+	/* tristate time */
+	*CSR_SA110_CNTL = ((*CSR_SA110_CNTL & ~0x0f000000) | (7 << 24));
+
 	/* Determine buswidth */
 	switch (*CSR_SA110_CNTL & (3<<14)) {
 		case SA110_CNTL_ROMWIDTH_8: 
@@ -142,50 +157,19 @@ int __init init_dc21285(void)
 	mymtd = do_map_probe("cfi_probe", &dc21285_map);
 	if (mymtd) {
 		int nrparts = 0;
-		const char *part_type = NULL;
 
-		mymtd->module = THIS_MODULE;
+		mymtd->owner = THIS_MODULE;
 			
 		/* partition fixup */
-		do {
-#ifdef CONFIG_MTD_CMDLINE_PARTS
-			nrparts = parse_cmdline_partitions(mymtd, &dc21285_parts, "dc21285");
-			if (nrparts > 0) {
-				part_type = "command line";
-				break;
-			}
-#endif
-#ifdef CONFIG_MTD_REDBOOT_PARTS
-			nrparts = parse_redboot_partitions(mymtd, &dc21285_parts);
-			if (nrparts > 0) {
-				part_type = "RedBoot";
-				break;
-			}
-#endif
-		} while (0);
 
+#ifdef CONFIG_MTD_PARTITIONS
+		nrparts = parse_mtd_partitions(mymtd, probes, &dc21285_parts, (void *)0);
 		if (nrparts > 0) {
 			add_mtd_partitions(mymtd, dc21285_parts, nrparts);
-			printk(KERN_NOTICE "DC21285 using %s partition "
-			       "definition\n", part_type);
-		} else if (nrparts == 0) {
-			printk(KERN_NOTICE "DC21285 partition table failed\n");
-			add_mtd_device(mymtd);
+			return 0;
 		}
-
-		/* 
-		 * Flash timing is determined with bits 19-16 of the
-		 * CSR_SA110_CNTL.  The value is the number of wait cycles, or
-		 * 0 for 16 cycles (the default).  Cycles are 20 ns.
-		 * Here we use 7 for 140 ns flash chips.
-		 */
-		/* access time */
-		*CSR_SA110_CNTL = ((*CSR_SA110_CNTL & ~0x000f0000) | (7 << 16));
-		/* burst time */
-		*CSR_SA110_CNTL = ((*CSR_SA110_CNTL & ~0x00f00000) | (7 << 20));
-		/* tristate time */
-		*CSR_SA110_CNTL = ((*CSR_SA110_CNTL & ~0x0f000000) | (7 << 24));
-
+#endif
+		add_mtd_device(mymtd);
 		return 0;
 	}
 
@@ -195,17 +179,16 @@ int __init init_dc21285(void)
 
 static void __exit cleanup_dc21285(void)
 {
-	if (mymtd) {
-		del_mtd_device(mymtd);
-		map_destroy(mymtd);
-		mymtd = NULL;
-	}
-	if (dc21285_map.map_priv_1) {
-		iounmap((void *)dc21285_map.map_priv_1);
-		dc21285_map.map_priv_1 = 0;
-	}
-	if(dc21285_parts)
+#ifdef CONFIG_MTD_PARTITIONS
+	if (dc21285_parts) {
+		del_mtd_partitions(mymtd);
 		kfree(dc21285_parts);
+	} else
+#endif
+		del_mtd_device(mymtd);
+
+	map_destroy(mymtd);
+	iounmap((void *)dc21285_map.map_priv_1);
 }
 
 module_init(init_dc21285);

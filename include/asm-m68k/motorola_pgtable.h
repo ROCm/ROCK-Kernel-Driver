@@ -14,7 +14,7 @@
 #define _PAGE_SUPER	0x080	/* 68040 supervisor only */
 #define _PAGE_FAKE_SUPER 0x200	/* fake supervisor only on 680[23]0 */
 #define _PAGE_GLOBAL040	0x400	/* 68040 global bit, used for kva descs */
-#define _PAGE_COW	0x800	/* implemented in software */
+#define _PAGE_FILE	0x800	/* pagecache or swap? */
 #define _PAGE_NOCACHE030 0x040	/* 68030 no-cache mode */
 #define _PAGE_NOCACHE	0x060	/* 68040 cache mode, non-serialized */
 #define _PAGE_NOCACHE_S	0x040	/* 68040 no-cache mode, serialized */
@@ -159,6 +159,7 @@ extern inline int pte_write(pte_t pte)		{ return !(pte_val(pte) & _PAGE_RONLY); 
 extern inline int pte_exec(pte_t pte)		{ return 1; }
 extern inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }
 extern inline int pte_young(pte_t pte)		{ return pte_val(pte) & _PAGE_ACCESSED; }
+static inline int pte_file(pte_t pte)		{ return pte_val(pte) & _PAGE_FILE; }
 
 extern inline pte_t pte_wrprotect(pte_t pte)	{ pte_val(pte) |= _PAGE_RONLY; return pte; }
 extern inline pte_t pte_rdprotect(pte_t pte)	{ return pte; }
@@ -255,6 +256,25 @@ static inline void cache_page(void *vaddr)
 	}
 }
 
+#define PTE_FILE_MAX_BITS	29
+
+static inline unsigned long pte_to_pgoff(pte_t pte)
+{
+	return ((pte.pte >> 12) << 7) + ((pte.pte >> 2) & 0x1ff);
+}
+
+static inline pte_t pgoff_to_pte(inline unsigned off)
+{
+	pte_t pte = { ((off >> 7) << 12) + ((off & 0x1ff) << 2) + _PAGE_FILE };
+	return pte;
+}
+
+/* Encode and de-code a swap entry (must be !pte_none(e) && !pte_present(e)) */
+#define __swp_type(x)		(((x).val >> 2) & 0x1ff)
+#define __swp_offset(x)		((x).val >> 12)
+#define __swp_entry(type, offset) ((swp_entry_t) { ((type) << 2) | ((offset) << 12) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 #endif	/* !__ASSEMBLY__ */
 #endif /* _MOTOROLA_PGTABLE_H */

@@ -3,7 +3,9 @@ The Linux kernel supports three overcommit handling modes
 0	-	Heuristic overcommit handling. Obvious overcommits of
 		address space are refused. Used for a typical system. It
 		ensures a seriously wild allocation fails while allowing
-		overcommit to reduce swap usage.  This is the default.
+		overcommit to reduce swap usage.  root is allowed to 
+		allocate slighly more memory in this mode. This is the 
+		default.
 
 1	-	No overcommit handling. Appropriate for some scientific
 		applications.

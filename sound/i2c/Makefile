@@ -11,6 +11,8 @@ ifeq ($(subst m,y,$(CONFIG_L3)),y)
   obj-$(CONFIG_L3) += l3/
 endif
 
+obj-$(CONFIG_SND) += other/
+
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_INTERWAVE_STB) += snd-tea6330t.o snd-i2c.o
 obj-$(CONFIG_SND_ICE1712) += snd-cs8427.o snd-i2c.o

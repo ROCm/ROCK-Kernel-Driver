@@ -64,8 +64,8 @@ void __init
 pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
 	       int (*map_irq)(struct pci_dev *, u8, u8))
 {
-	struct pci_dev *dev;
-	pci_for_each_dev(dev) {
+	struct pci_dev *dev = NULL;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pdev_fixup_irq(dev, swizzle, map_irq);
 	}
 }

@@ -216,10 +216,11 @@ static int fd_device[4] = { 0, 0, 0, 0 };
 
 /* Milliseconds timer */
 
-static void ms_isr(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t ms_isr(int irq, void *dummy, struct pt_regs *fp)
 {
 	ms_busy = -1;
 	wake_up(&ms_wait);
+	return IRQ_HANDLED;
 }
 
 /* all waits are queued up 
@@ -576,7 +577,7 @@ static unsigned long fd_get_drive_id(int drive)
 	return (id);
 }
 
-static void fd_block_done(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t fd_block_done(int irq, void *dummy, struct pt_regs *fp)
 {
 	if (block_flag)
 		custom.dsklen = 0x4000;
@@ -591,6 +592,7 @@ static void fd_block_done(int irq, void *dummy, struct pt_regs *fp)
 		block_flag = 0;
 		wake_up (&wait_fd_block);
 	}
+	return IRQ_HANDLED;
 }
 
 static void raw_read(int drive)
@@ -1728,7 +1730,7 @@ static int __init fd_probe_drives(void)
 	return -ENOMEM;
 }
  
-static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
+static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 {
 	int drive = *part & 3;
 	if (unit[drive].type->code == FD_NODRIVE)

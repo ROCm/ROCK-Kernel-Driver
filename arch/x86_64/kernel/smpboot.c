@@ -42,6 +42,7 @@
 #include <linux/smp_lock.h>
 #include <linux/irq.h>
 #include <linux/bootmem.h>
+#include <linux/thread_info.h>
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
@@ -123,7 +124,7 @@ static void __init synchronize_tsc_bp (void)
 	unsigned long long t0;
 	unsigned long long sum, avg;
 	long long delta;
-	unsigned long one_usec;
+	long one_usec;
 	int buggy = 0;
 	extern unsigned cpu_khz;
 
@@ -339,7 +340,7 @@ extern int cpu_idle(void);
 /*
  * Activate a secondary processor.
  */
-int __init start_secondary(void *unused)
+void __init start_secondary(void)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -380,29 +381,7 @@ int __init start_secondary(void *unused)
 	set_bit(smp_processor_id(), &cpu_online_map);
 	wmb();
 	
-	return cpu_idle();
-}
-
-/*
- * Everything has been set up for the secondary
- * CPUs - they just need to reload everything
- * from the task structure
- * This function must not return.
- */
-void __init initialize_secondary(void)
-{
-	struct task_struct *me = stack_current();
-
-	/*
-	 * We don't actually need to load the full TSS,
-	 * basically just the stack pointer and the eip.
-	 */
-
-	asm volatile(
-		"movq %0,%%rsp\n\t"
-		"jmp *%1"
-		:
-		:"r" (me->thread.rsp),"r" (me->thread.rip));
+	cpu_idle();
 }
 
 extern volatile unsigned long init_rsp; 
@@ -412,16 +391,16 @@ static struct task_struct * __init fork_by_hand(void)
 {
 	struct pt_regs regs;
 	/*
-	 * don't care about the rip and regs settings since
+	 * don't care about the eip and regs settings since
 	 * we'll never reschedule the forked task.
 	 */
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 #if APIC_DEBUG
 static inline void inquire_remote_apic(int apicid)
 {
-	int i, regs[] = { APIC_ID >> 4, APIC_LVR >> 4, APIC_SPIV >> 4 };
+	unsigned i, regs[] = { APIC_ID >> 4, APIC_LVR >> 4, APIC_SPIV >> 4 };
 	char *names[] = { "ID", "VERSION", "SPIV" };
 	int timeout, status;
 
@@ -596,6 +575,7 @@ static void __init do_boot_cpu (int apicid)
 	idle = fork_by_hand();
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpu);
+	wake_up_forked_process(idle);	
 
 	/*
 	 * We remove it from the pidhash and the runqueue
@@ -603,22 +583,19 @@ static void __init do_boot_cpu (int apicid)
 	 */
 	init_idle(idle,cpu);
 
-	idle->thread.rip = (unsigned long)start_secondary;
-//	idle->thread.rsp = (unsigned long)idle->thread_info + THREAD_SIZE - 512;
-
 	unhash_process(idle);
 
 	cpu_pda[cpu].pcurrent = idle;
 
-	/* start_eip had better be page-aligned! */
 	start_rip = setup_trampoline();
 
-	init_rsp = (unsigned long)idle->thread_info + PAGE_SIZE + 1024;
+	init_rsp = idle->thread.rsp; 
 	init_tss[cpu].rsp0 = init_rsp;
-	initial_code = initialize_secondary;
+	initial_code = start_secondary;
+	clear_ti_thread_flag(idle->thread_info, TIF_FORK);
 
-	printk(KERN_INFO "Booting processor %d/%d rip %lx rsp %lx rsp2 %lx\n", cpu, apicid, 
-	       start_rip, idle->thread.rsp, init_rsp);
+	printk(KERN_INFO "Booting processor %d/%d rip %lx rsp %lx\n", cpu, apicid, 
+	       start_rip, init_rsp);
 
 	/*
 	 * This grunge runs the startup process for
@@ -676,7 +653,7 @@ static void __init do_boot_cpu (int apicid)
 		if (test_bit(cpu, &cpu_callin_map)) {
 			/* number CPUs logically, starting from 1 (BSP is 0) */
 			Dprintk("OK.\n");
-			printk("KERN_INFO CPU%d: ", cpu);
+			printk(KERN_INFO "CPU%d: ", cpu);
 			print_cpu_info(&cpu_data[cpu]);
 			Dprintk("CPU has booted.\n");
 		} else {
@@ -708,7 +685,7 @@ unsigned long cache_decay_ticks;
 
 static void smp_tune_scheduling (void)
 {
-	unsigned long cachesize;       /* kB   */
+	int cachesize;       /* kB   */
 	unsigned long bandwidth = 1000; /* MB/s */
 	/*
 	 * Rough estimation for SMP scheduling, this is the number of
@@ -753,7 +730,7 @@ static void smp_tune_scheduling (void)
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
-	int apicid, cpu;
+	unsigned apicid, cpu;
 
 	/*
 	 * Setup boot CPU information

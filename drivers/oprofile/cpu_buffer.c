@@ -168,10 +168,8 @@ void oprofile_add_sample(unsigned long eip, unsigned int is_kernel,
 }
 
 
-/* resets the cpu buffer to a sane state - should be called with 
- * cpu_buf->int_lock held
- */
-void cpu_buffer_reset(struct oprofile_cpu_buffer *cpu_buf)
+/* Resets the cpu buffer to a sane state. */
+void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
 {
 	/* reset these to invalid values; the next sample
 	 * collected will populate the buffer with proper

@@ -178,17 +178,6 @@ static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
 	return dev;
 }
 
-#if defined(CONFIG_HIPPI) || defined(CONFIG_TR) || defined(CONFIG_NET_FC)
-static int __register_netdev(struct net_device *dev)
-{
-	if (dev->init && dev->init(dev) != 0) {
-		unregister_netdev(dev);
-		return -EIO;
-	}
-	return 0;
-}
-#endif
-
 /**
  * init_etherdev - Register ethernet device
  * @dev: An ethernet device structure to be filled in, or %NULL if a new
@@ -252,28 +241,6 @@ static int eth_change_mtu(struct net_device *dev, int new_mtu)
 #ifdef CONFIG_FDDI
 
 /**
- * init_fddidev - Register FDDI device
- * @dev: A FDDI device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with FDDI-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_fddidev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "fddi%d", fddi_setup);
-}
-
-/**
  * alloc_fddidev - Register FDDI device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
  *	for this FDDI device
@@ -290,7 +257,6 @@ struct net_device *alloc_fddidev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "fddi%d", fddi_setup);
 }
 
-EXPORT_SYMBOL(init_fddidev);
 EXPORT_SYMBOL(alloc_fddidev);
 
 static int fddi_change_mtu(struct net_device *dev, int new_mtu)
@@ -330,27 +296,50 @@ static int hippi_mac_addr(struct net_device *dev, void *p)
 	return 0;
 }
 
-
-/**
- * init_hippi_dev - Register HIPPI device
- * @dev: A HIPPI device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with HIPPI-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_hippi_dev(struct net_device *dev, int sizeof_priv)
+static int hippi_neigh_setup_dev(struct net_device *dev, struct neigh_parms *p)
 {
-	return init_netdev(dev, sizeof_priv, "hip%d", hippi_setup);
+	/* Never send broadcast/multicast ARP messages */
+	p->mcast_probes = 0;
+ 
+	/* In IPv6 unicast probes are valid even on NBMA,
+	* because they are encapsulated in normal IPv6 protocol.
+	* Should be a generic flag. 
+	*/
+	if (p->tbl->family != AF_INET6)
+		p->ucast_probes = 0;
+	return 0;
+}
+
+static void hippi_setup(struct net_device *dev)
+{
+	dev->set_multicast_list	= NULL;
+	dev->change_mtu			= hippi_change_mtu;
+	dev->hard_header		= hippi_header;
+	dev->rebuild_header 		= hippi_rebuild_header;
+	dev->set_mac_address 		= hippi_mac_addr;
+	dev->hard_header_parse		= NULL;
+	dev->hard_header_cache		= NULL;
+	dev->header_cache_update	= NULL;
+	dev->neigh_setup 		= hippi_neigh_setup_dev; 
+
+	/*
+	 * We don't support HIPPI `ARP' for the time being, and probably
+	 * never will unless someone else implements it. However we
+	 * still need a fake ARPHRD to make ifconfig and friends play ball.
+	 */
+	dev->type		= ARPHRD_HIPPI;
+	dev->hard_header_len 	= HIPPI_HLEN;
+	dev->mtu		= 65280;
+	dev->addr_len		= HIPPI_ALEN;
+	dev->tx_queue_len	= 25 /* 5 */;
+	memset(dev->broadcast, 0xFF, HIPPI_ALEN);
+
+
+	/*
+	 * HIPPI doesn't support broadcast+multicast and we only use
+	 * static ARP tables. ARP is disabled by hippi_neigh_setup_dev. 
+	 */
+	dev->flags = 0; 
 }
 
 /**
@@ -370,34 +359,7 @@ struct net_device *alloc_hippi_dev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "hip%d", hippi_setup);
 }
 
-int register_hipdev(struct net_device *dev)
-{
-	return __register_netdev(dev);
-}
-
-void unregister_hipdev(struct net_device *dev)
-{
-	unregister_netdev(dev);
-}
-
-EXPORT_SYMBOL(init_hippi_dev);
 EXPORT_SYMBOL(alloc_hippi_dev);
-EXPORT_SYMBOL(register_hipdev);
-EXPORT_SYMBOL(unregister_hipdev);
-
-static int hippi_neigh_setup_dev(struct net_device *dev, struct neigh_parms *p)
-{
-	/* Never send broadcast/multicast ARP messages */
-	p->mcast_probes = 0;
- 
-	/* In IPv6 unicast probes are valid even on NBMA,
-	* because they are encapsulated in normal IPv6 protocol.
-	* Should be a generic flag. 
-	*/
-	if (p->tbl->family != AF_INET6)
-		p->ucast_probes = 0;
-	return 0;
-}
 
 #endif /* CONFIG_HIPPI */
 
@@ -454,41 +416,6 @@ void fddi_setup(struct net_device *dev)
 EXPORT_SYMBOL(fddi_setup);
 
 #endif /* CONFIG_FDDI */
-
-#ifdef CONFIG_HIPPI
-void hippi_setup(struct net_device *dev)
-{
-	dev->set_multicast_list	= NULL;
-	dev->change_mtu			= hippi_change_mtu;
-	dev->hard_header		= hippi_header;
-	dev->rebuild_header 		= hippi_rebuild_header;
-	dev->set_mac_address 		= hippi_mac_addr;
-	dev->hard_header_parse		= NULL;
-	dev->hard_header_cache		= NULL;
-	dev->header_cache_update	= NULL;
-	dev->neigh_setup 		= hippi_neigh_setup_dev; 
-
-	/*
-	 * We don't support HIPPI `ARP' for the time being, and probably
-	 * never will unless someone else implements it. However we
-	 * still need a fake ARPHRD to make ifconfig and friends play ball.
-	 */
-	dev->type		= ARPHRD_HIPPI;
-	dev->hard_header_len 	= HIPPI_HLEN;
-	dev->mtu		= 65280;
-	dev->addr_len		= HIPPI_ALEN;
-	dev->tx_queue_len	= 25 /* 5 */;
-	memset(dev->broadcast, 0xFF, HIPPI_ALEN);
-
-
-	/*
-	 * HIPPI doesn't support broadcast+multicast and we only use
-	 * static ARP tables. ARP is disabled by hippi_neigh_setup_dev. 
-	 */
-	dev->flags = 0; 
-}
-EXPORT_SYMBOL(hippi_setup);
-#endif /* CONFIG_HIPPI */
 
 #if defined(CONFIG_ATALK) || defined(CONFIG_ATALK_MODULE)
 
@@ -598,28 +525,6 @@ void tr_setup(struct net_device *dev)
 }
 
 /**
- * init_trdev - Register token ring device
- * @dev: A token ring device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with token ring-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_trdev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "tr%d", tr_setup);
-}
-
-/**
  * alloc_trdev - Register token ring device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
  *	for this token ring device
@@ -636,24 +541,10 @@ struct net_device *alloc_trdev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "tr%d", tr_setup);
 }
 
-int register_trdev(struct net_device *dev)
-{
-	return __register_netdev(dev);
-}
-
-void unregister_trdev(struct net_device *dev)
-{
-	unregister_netdev(dev);
-}
-
 EXPORT_SYMBOL(tr_setup);
-EXPORT_SYMBOL(init_trdev);
 EXPORT_SYMBOL(alloc_trdev);
-EXPORT_SYMBOL(register_trdev);
-EXPORT_SYMBOL(unregister_trdev);
 
 #endif /* CONFIG_TR */
-
 
 #ifdef CONFIG_NET_FC
 
@@ -675,28 +566,6 @@ void fc_setup(struct net_device *dev)
 }
 
 /**
- * init_fcdev - Register fibre channel device
- * @dev: A fibre channel device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with fibre channel-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_fcdev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "fc%d", fc_setup);
-}
-
-/**
  * alloc_fcdev - Register fibre channel device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
  *	for this fibre channel device
@@ -713,21 +582,8 @@ struct net_device *alloc_fcdev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "fc%d", fc_setup);
 }
 
-int register_fcdev(struct net_device *dev)
-{
-	return __register_netdev(dev);
-}                                               
-        
-void unregister_fcdev(struct net_device *dev)
-{
-	unregister_netdev(dev);
-}
-
 EXPORT_SYMBOL(fc_setup);
-EXPORT_SYMBOL(init_fcdev);
 EXPORT_SYMBOL(alloc_fcdev);
-EXPORT_SYMBOL(register_fcdev);
-EXPORT_SYMBOL(unregister_fcdev);
 
 #endif /* CONFIG_NET_FC */
 

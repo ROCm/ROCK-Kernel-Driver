@@ -2,7 +2,7 @@
  * Handle mapping of the flash memory access routines 
  * on TQM8xxL based devices.
  *
- * $Id: tqm8xxl.c,v 1.3 2001/10/02 15:05:14 dwmw2 Exp $
+ * $Id: tqm8xxl.c,v 1.8 2003/05/21 12:45:20 dwmw2 Exp $
  *
  * based on rpxlite.c
  *
@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 
 #include <linux/mtd/mtd.h>
@@ -51,59 +52,6 @@ static struct mtd_part_def part_banks[FLASH_BANK_MAX];
 static unsigned long num_banks;
 static unsigned long start_scan_addr;
 
-__u8 tqm8xxl_read8(struct map_info *map, unsigned long ofs)
-{
-	return *((__u8 *)(map->map_priv_1 + ofs));
-}
-
-__u16 tqm8xxl_read16(struct map_info *map, unsigned long ofs)
-{
-	return *((__u16 *)(map->map_priv_1 + ofs));
-}
-
-__u32 tqm8xxl_read32(struct map_info *map, unsigned long ofs)
-{
-	return *((__u32 *)(map->map_priv_1 + ofs));
-}
-
-void tqm8xxl_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, (void *)(map->map_priv_1 + from), len);
-}
-
-void tqm8xxl_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	*((__u8 *)(map->map_priv_1 + adr)) = d;
-}
-
-void tqm8xxl_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	*((__u16 *)( map->map_priv_1 + adr)) = d;
-}
-
-void tqm8xxl_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	*((__u32 *)(map->map_priv_1 + adr)) = d;
-}
-
-void tqm8xxl_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy_toio((void *)(map->map_priv_1 + to), from, len);
-}
-
-struct map_info tqm8xxl_map = {
-	.name		= "TQM8xxL",
-	.buswidth	= 4,
-	.read8		= tqm8xxl_read8,
-	.read16		= tqm8xxl_read16,
-	.read32		= tqm8xxl_read32,
-	.copy_from	= tqm8xxl_copy_from,
-	.write8		= tqm8xxl_write8,
-	.write16	= tqm8xxl_write16,
-	.write32	= tqm8xxl_write32,
-	.copy_to	= tqm8xxl_copy_to
-};
-
 /*
  * Here are partition information for all known TQM8xxL series devices.
  * See include/linux/mtd/partitions.h for definition of the mtd_partition
@@ -120,43 +68,44 @@ struct map_info tqm8xxl_map = {
 static unsigned long tqm8xxl_max_flash_size = 0x00800000;
 
 /* partition definition for first flash bank
- * also ref. to "drivers\char\flash_config.c" 
+ * (cf. "drivers/char/flash_config.c")
  */
 static struct mtd_partition tqm8xxl_partitions[] = {
 	{
-		.name		= "ppcboot",
-		.offset		= 0x00000000,
-		.size 		= 0x00020000,	/* 128KB */
-		.mask_flags	= MTD_WRITEABLE, /* force read-only */
+	  .name = "ppcboot",
+	  .offset = 0x00000000,
+	  .size = 0x00020000,           /* 128KB           */
+	  .mask_flags = MTD_WRITEABLE,  /* force read-only */
 	},
 	{
-		.name		= "kernel",	/* default kernel image */
-		.offset		= 0x00020000,
-		.size		= 0x000e0000,
-		.mask_flags	= MTD_WRITEABLE, /* force read-only */
+	  .name = "kernel",             /* default kernel image */
+	  .offset = 0x00020000,
+	  .size = 0x000e0000,
+	  .mask_flags = MTD_WRITEABLE,  /* force read-only */
 	},
 	{
-		.name		= "user",
-		.offset		= 0x00100000,
-		.size		= 0x00100000,
+	  .name = "user",
+	  .offset = 0x00100000,
+	  .size = 0x00100000,
 	},
 	{
-		.name		= "initrd",
-		.offset		= 0x00200000,
-		.size		= 0x00200000,
+	  .name = "initrd",
+	  .offset = 0x00200000,
+	  .size = 0x00200000,
 	}
 };
-/* partition definition for second flahs bank */
+/* partition definition for second flash bank */
 static struct mtd_partition tqm8xxl_fs_partitions[] = {
 	{
-		.name	= "cramfs",
-		.offset	= 0x00000000,
-		.size	= 0x00200000,
+	  .name = "cramfs",
+	  .offset = 0x00000000,
+	  .size = 0x00200000,
 	},
 	{
-		.name	= "jffs",
-		.offset	= 0x00200000,
-		.size	= 0x00200000,
+	  .name = "jffs",
+	  .offset = 0x00200000,
+	  .size = 0x00200000,
+	  .//size = MTDPART_SIZ_FULL,
 	}
 };
 #endif
@@ -172,66 +121,73 @@ int __init init_tqm_mtd(void)
 
 	flash_addr = bd->bi_flashstart;
 	flash_size = bd->bi_flashsize;
-	//request maximum flash size address spzce
+
+	//request maximum flash size address space
 	start_scan_addr = (unsigned long)ioremap(flash_addr, flash_size);
 	if (!start_scan_addr) {
-		//printk("%s:Failed to ioremap address:0x%x\n", __FUNCTION__, FLASH_ADDR);
-		printk("%s:Failed to ioremap address:0x%x\n", __FUNCTION__, flash_addr);
+		printk(KERN_WARNING "%s:Failed to ioremap address:0x%x\n", __FUNCTION__, flash_addr);
 		return -EIO;
 	}
-	for(idx = 0 ; idx < FLASH_BANK_MAX ; idx++)
-	{
+
+	for (idx = 0 ; idx < FLASH_BANK_MAX ; idx++) {
 		if(mtd_size >= flash_size)
 			break;
 		
-		printk("%s: chip probing count %d\n", __FUNCTION__, idx);
+		printk(KERN_INFO "%s: chip probing count %d\n", __FUNCTION__, idx);
 		
 		map_banks[idx] = (struct map_info *)kmalloc(sizeof(struct map_info), GFP_KERNEL);
-		if(map_banks[idx] == NULL)
-		{
-			//return -ENOMEM;
+		if(map_banks[idx] == NULL) {
 			ret = -ENOMEM;
+			/* FIXME: What if some MTD devices were probed already? */
 			goto error_mem;
 		}
+
 		memset((void *)map_banks[idx], 0, sizeof(struct map_info));
 		map_banks[idx]->name = (char *)kmalloc(16, GFP_KERNEL);
-		if(map_banks[idx]->name == NULL)
-		{
-			//return -ENOMEM;
+
+		if (!map_banks[idx]->name) {
 			ret = -ENOMEM;
+			/* FIXME: What if some MTD devices were probed already? */
 			goto error_mem;
 		}
-		memset((void *)map_banks[idx]->name, 0, 16);
-		
 		sprintf(map_banks[idx]->name, "TQM8xxL%d", idx);
+
+		map_banks[idx]->size = flash_size;
 		map_banks[idx]->buswidth = 4;
-		map_banks[idx]->read8 = tqm8xxl_read8;
-		map_banks[idx]->read16 = tqm8xxl_read16;
-		map_banks[idx]->read32 = tqm8xxl_read32;
-		map_banks[idx]->copy_from = tqm8xxl_copy_from;
-		map_banks[idx]->write8 = tqm8xxl_write8;
-		map_banks[idx]->write16 = tqm8xxl_write16;
-		map_banks[idx]->write32 = tqm8xxl_write32;
-		map_banks[idx]->copy_to = tqm8xxl_copy_to;
-		map_banks[idx]->map_priv_1 = 
-		start_scan_addr + ((idx > 0) ? 
+
+		simple_map_init(map_banks[idx]);
+
+		map_banks[idx]->virt = start_scan_addr;
+		map_banks[idx]->phys = flash_addr;
+		/* FIXME: This looks utterly bogus, but I'm trying to
+		   preserve the behaviour of the original (shown here)...
+
+		map_banks[idx]->map_priv_1 =
+		start_scan_addr + ((idx > 0) ?
 		(mtd_banks[idx-1] ? mtd_banks[idx-1]->size : 0) : 0);
+		*/
+
+		if (idx && mtd_banks[idx-1]) {
+			map_banks[idx]->virt += mtd_banks[idx-1]->size;
+			map_banks[idx]->phys += mtd_banks[idx-1]->size;
+		}
+
 		//start to probe flash chips
 		mtd_banks[idx] = do_map_probe("cfi_probe", map_banks[idx]);
-		if(mtd_banks[idx])
-		{
-			mtd_banks[idx]->module = THIS_MODULE;
+
+		if (mtd_banks[idx]) {
+			mtd_banks[idx]->owner = THIS_MODULE;
 			mtd_size += mtd_banks[idx]->size;
 			num_banks++;
-			printk("%s: bank%d, name:%s, size:%dbytes \n", __FUNCTION__, num_banks, 
+
+			printk(KERN_INFO "%s: bank%d, name:%s, size:%dbytes \n", __FUNCTION__, num_banks, 
 			mtd_banks[idx]->name, mtd_banks[idx]->size);
 		}
 	}
 
 	/* no supported flash chips found */
-	if(!num_banks)
-	{
-		printk("TQM8xxL: No support flash chips found!\n");
+	if (!num_banks) {
+		printk(KERN_NOTICE "TQM8xxL: No support flash chips found!\n");
 		ret = -ENXIO;
 		goto error_mem;
 	}
@@ -243,11 +199,12 @@ int __init init_tqm_mtd(void)
 	part_banks[0].mtd_part = tqm8xxl_partitions;
 	part_banks[0].type = "Static image";
 	part_banks[0].nums = NB_OF(tqm8xxl_partitions);
+
 	part_banks[1].mtd_part = tqm8xxl_fs_partitions;
 	part_banks[1].type = "Static file system";
 	part_banks[1].nums = NB_OF(tqm8xxl_fs_partitions);
-	for(idx = 0; idx < num_banks ; idx++)
-	{
+
+	for(idx = 0; idx < num_banks ; idx++) {
 		if (part_banks[idx].nums == 0) {
 			printk(KERN_NOTICE "TQM flash%d: no partition info available, registering whole flash at once\n", idx);
 			add_mtd_device(mtd_banks[idx]);
@@ -265,12 +222,9 @@ int __init init_tqm_mtd(void)
 #endif
 	return 0;
 error_mem:
-	for(idx = 0 ; idx < FLASH_BANK_MAX ; idx++)
-	{
-		if(map_banks[idx] != NULL)
-		{
-			if(map_banks[idx]->name != NULL)
-			{
+	for(idx = 0 ; idx < FLASH_BANK_MAX ; idx++) {
+		if(map_banks[idx] != NULL) {
+			if(map_banks[idx]->name != NULL) {
 				kfree(map_banks[idx]->name);
 				map_banks[idx]->name = NULL;
 			}
@@ -278,18 +232,15 @@ error_mem:
 			map_banks[idx] = NULL;
 		}
 	}
-	//return -ENOMEM;
 error:
 	iounmap((void *)start_scan_addr);
-	//return -ENXIO;
 	return ret;
 }
 
 static void __exit cleanup_tqm_mtd(void)
 {
 	unsigned int idx = 0;
-	for(idx = 0 ; idx < num_banks ; idx++)
-	{
+	for(idx = 0 ; idx < num_banks ; idx++) {
 		/* destroy mtd_info previously allocated */
 		if (mtd_banks[idx]) {
 			del_mtd_partitions(mtd_banks[idx]);
@@ -299,6 +250,7 @@ static void __exit cleanup_tqm_mtd(void)
 		kfree(map_banks[idx]->name);
 		kfree(map_banks[idx]);
 	}
+
 	if (start_scan_addr) {
 		iounmap((void *)start_scan_addr);
 		start_scan_addr = 0;

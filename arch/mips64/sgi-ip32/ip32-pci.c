@@ -125,7 +125,7 @@ struct pci_fixup pcibios_fixups[] = { { 0 } };
 
 void __init pcibios_init (void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	u32 start, size;
 	u16 cmd;
 	u32 base_io = 0x3000; /* The first i/o address to assign after SCSI */
@@ -157,7 +157,7 @@ void __init pcibios_init (void)
 	pci_scan_bus (0, &macepci_ops, NULL);
 
 #ifdef DEBUG_MACE_PCI
-	pci_for_each_dev (dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		printk ("Device: %d/%d/%d ARCS-assigned bus resource map\n",
 			dev->bus->number, PCI_SLOT (dev->devfn),
 			PCI_FUNC (dev->devfn));
@@ -176,7 +176,8 @@ void __init pcibios_init (void)
 	 * which we must assign, and a 1-page memory region which is
 	 * assigned by the system firmware.
 	 */
-	pci_for_each_dev (dev) {
+	dev = NULL;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		switch (PCI_SLOT (dev->devfn)) {
 		case 1: /* SCSI bus 0 */
 			dev->resource[0].start = 0x1000UL;
@@ -230,7 +231,8 @@ void __init pcibios_init (void)
 	printk ("Triggering PCI bridge interrupt...\n");
 	mace_write_32 (MACEPCI_ERROR_FLAGS, MACEPCI_ERROR_INTERRUPT_TEST);
 
-	pci_for_each_dev (dev) {
+	dev = NULL;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		printk ("Device: %d/%d/%d final bus resource map\n",
 			dev->bus->number, PCI_SLOT (dev->devfn),
 			PCI_FUNC (dev->devfn));

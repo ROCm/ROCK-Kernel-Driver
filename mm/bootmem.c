@@ -151,7 +151,11 @@ __alloc_bootmem_core(struct bootmem_data *bdata, unsigned long size,
 	unsigned long i, start = 0, incr, eidx;
 	void *ret;
 
-	BUG_ON(!size);
+	if(!size) {
+		printk("__alloc_bootmem_core(): zero-sized request\n");
+		dump_stack();
+		BUG();
+	}
 	BUG_ON(align & (align-1));
 
 	eidx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT);

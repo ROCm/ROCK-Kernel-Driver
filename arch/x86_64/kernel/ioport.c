@@ -1,5 +1,5 @@
 /*
- *	linux/arch/i386/kernel/ioport.c
+ *	linux/arch/x86_64/kernel/ioport.c
  *
  * This contains the io-permission bitmap code - written by obz, with changes
  * by Linus.
@@ -15,34 +15,35 @@
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/slab.h>
+#include <asm/io.h>
 
 /* Set EXTENT bits starting at BASE in BITMAP to value TURN_ON. */
 static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_value)
 {
-	int mask;
-	unsigned long *bitmap_base = bitmap + (base >> 6);
+	unsigned long mask;
+	unsigned long *bitmap_base = bitmap + (base / sizeof(unsigned long));
 	unsigned short low_index = base & 0x3f;
 	int length = low_index + extent;
 
 	if (low_index != 0) {
-		mask = (~0 << low_index);
+		mask = (~0UL << low_index);
 		if (length < 64)
-				mask &= ~(~0 << length);
+			mask &= ~(~0UL << length);
 		if (new_value)
 			*bitmap_base++ |= mask;
 		else
 			*bitmap_base++ &= ~mask;
-		length -= 32;
+		length -= 64;
 	}
 
-	mask = (new_value ? ~0 : 0);
+	mask = (new_value ? ~0UL : 0UL);
 	while (length >= 64) {
 		*bitmap_base++ = mask;
 		length -= 64;
 	}
 
 	if (length > 0) {
-		mask = ~(~0 << length);
+		mask = ~(~0UL << length);
 		if (new_value)
 			*bitmap_base++ |= mask;
 		else
@@ -113,3 +114,10 @@ asmlinkage long sys_iopl(unsigned int level, struct pt_regs regs)
 	regs.eflags = (regs.eflags & 0xffffffffffffcfff) | (level << 12);
 	return 0;
 }
+
+void eat_key(void)
+{
+	if (inb(0x60) & 1) 
+		inb(0x64);
+}
+

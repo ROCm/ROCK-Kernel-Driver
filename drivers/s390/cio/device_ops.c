@@ -6,6 +6,7 @@
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
  *    Author(s): Martin Schwidefsky (schwidefsky@de.ibm.com)
+ *               Cornelia Huck (cohuck@de.ibm.com)
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -375,6 +376,52 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 		*length = ciw->count;
 		*buffer = rcd_buf;
 	}
+
+	return ret;
+}
+
+/*
+ * Try to issue an unconditional reserve on a boxed device.
+ */
+int
+ccw_device_stlck(struct ccw_device *cdev)
+{
+	char buf[32];
+	unsigned long flags;
+	struct subchannel *sch;
+	int ret;
+
+	if (!cdev)
+		return -ENODEV;
+
+	sch = to_subchannel(cdev->dev.parent);
+	
+	CIO_TRACE_EVENT(2, "stl lock");
+	CIO_TRACE_EVENT(2, cdev->dev.bus_id);
+
+	/* Setup ccw. This cmd code seems not to be in use elsewhere. */
+	cdev->private->iccws[0].cmd_code = CCW_CMD_STLCK;
+	cdev->private->iccws[0].cda = (__u32) __pa(buf);
+	cdev->private->iccws[0].count = 32;
+	cdev->private->iccws[0].flags = CCW_FLAG_SLI;
+
+	spin_lock_irqsave(&sch->lock, flags);
+	ret = cio_start(sch, cdev->private->iccws, 0xE2D3C3D2, 0);
+	spin_unlock_irqrestore(&sch->lock, flags);
+	if (ret)
+		return ret;
+
+	wait_event(cdev->private->wait_q, sch->schib.scsw.actl == 0);
+	spin_lock_irqsave(&sch->lock, flags);
+
+	if ((cdev->private->irb.scsw.dstat !=
+	     (DEV_STAT_CHN_END|DEV_STAT_DEV_END)) ||
+	    (cdev->private->irb.scsw.cstat != 0))
+		ret = -EIO;
+
+	/* Clear irb. */
+	memset(&cdev->private->irb, 0, sizeof(struct irb));
+	spin_unlock_irqrestore(&sch->lock, flags);
 
 	return ret;
 }

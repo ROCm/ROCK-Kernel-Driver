@@ -113,82 +113,83 @@ struct exception_table_entry
 
 #define __put_user_asm_8(x, ptr, err) \
 ({								\
+	register __typeof__(x) const * __from asm("2");		\
+	register __typeof__(*(ptr)) * __to asm("4");		\
+	__from = &(x);						\
+	__to = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  2,%2\n"				\
-		"   la	  4,%1\n"				\
 		"   sacf  512\n"				\
-		"0: mvc	  0(8,4),0(2)\n"			\
+		"0: mvc	  0(8,%1),0(%2)\n"			\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err)					\
-		: "m" (*(__u64*)(ptr)), "m" (x), "K" (-EFAULT)	\
-		: "cc", "2", "4" );				\
+		: "a" (__to),"a" (__from),"K" (-EFAULT),"0" (0)	\
+		: "cc" );					\
 })
 
 #else /* __s390x__ */
 
 #define __put_user_asm_8(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) * __ptr asm("4");		\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%1\n"				\
 		"   sacf  512\n"				\
-		"0: stg	  %2,0(4)\n"				\
+		"0: stg	  %2,0(%1)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err)					\
-		: "m" (*(__u64*)(ptr)), "d" (x), "K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "d" (x), "K" (-EFAULT), "0" (0)	\
+		: "cc" );					\
 })
 
 #endif /* __s390x__ */
 
 #define __put_user_asm_4(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) * __ptr asm("4");		\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%1\n"				\
 		"   sacf  512\n"				\
-		"0: st	  %2,0(4)\n"				\
+		"0: st	  %2,0(%1)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err)					\
-		: "m" (*(__u32*)(ptr)), "d" (x), "K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "d" (x), "K" (-EFAULT), "0" (0)	\
+		: "cc" );					\
 })
 
 #define __put_user_asm_2(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) * __ptr asm("4");		\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%1\n"				\
 		"   sacf  512\n"				\
-		"0: sth	  %2,0(4)\n"				\
+		"0: sth	  %2,0(%1)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err)					\
-		: "m" (*(__u16*)(ptr)), "d" (x), "K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "d" (x), "K" (-EFAULT), "0" (0)	\
+		: "cc" );					\
 })
 
 #define __put_user_asm_1(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) * __ptr asm("4");		\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%1\n"				\
 		"   sacf  512\n"				\
-		"0: stc	  %2,0(4)\n"				\
+		"0: stc	  %2,0(%1)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err)					\
-		: "m" (*(__u8*)(ptr)), "d" (x),	"K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "d" (x),	"K" (-EFAULT), "0" (0)	\
+		: "cc" );					\
 })
 
 #define __put_user(x, ptr) \
@@ -223,35 +224,36 @@ extern int __put_user_bad(void);
 
 #define __get_user_asm_8(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) const * __from asm("2");	\
+	register __typeof__(x) * __to asm("4");			\
+	__from = (ptr);						\
+	__to = &(x);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  2,%1\n"				\
-		"   la	  4,%2\n"				\
 		"   sacf  512\n"				\
-		"0: mvc	  0(8,2),0(4)\n"			\
+		"0: mvc	  0(8,%1),0(%2)\n"			\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err), "=m" (x)				\
-		: "m" (*(const __u64*)(ptr)),"K" (-EFAULT)	\
-		: "cc", "2", "4" );				\
+		: "a" (__to),"a" (__from),"K" (-EFAULT),"0" (0)	\
+		: "cc" );					\
 })
 
 #else /* __s390x__ */
 
 #define __get_user_asm_8(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) const * __ptr asm("4");	\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%2\n"				\
 		"   sacf  512\n"				\
-		"0: lg	  %1,0(4)\n"				\
+		"0: lg	  %1,0(%2)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err), "=d" (x)				\
-		: "m" (*(const __u64*)(ptr)),"K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "K" (-EFAULT), "0" (0)		\
+		: "cc" );					\
 })
 
 #endif /* __s390x__ */
@@ -259,48 +261,48 @@ extern int __put_user_bad(void);
 
 #define __get_user_asm_4(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) const * __ptr asm("4");	\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%2\n"				\
 		"   sacf  512\n"				\
-		"0: l	  %1,0(4)\n"				\
+		"0: l	  %1,0(%2)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err), "=d" (x)				\
-		: "m" (*(const __u32*)(ptr)),"K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "K" (-EFAULT), "0" (0)		\
+		: "cc" );					\
 })
 
 #define __get_user_asm_2(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) const * __ptr asm("4");	\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%2\n"				\
 		"   sacf  512\n"				\
-		"0: lh	  %1,0(4)\n"				\
+		"0: lh	  %1,0(%2)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err), "=d" (x)				\
-		: "m" (*(const __u16*)(ptr)),"K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "K" (-EFAULT), "0" (0)		\
+		: "cc" );					\
 })
 
 #define __get_user_asm_1(x, ptr, err) \
 ({								\
+	register __typeof__(*(ptr)) const * __ptr asm("4");	\
+	__ptr = (ptr);						\
 	__asm__ __volatile__ (					\
-		"   sr	  %0,%0\n"				\
-		"   la	  4,%2\n"				\
 		"   sr	  %1,%1\n"				\
 		"   sacf  512\n"				\
-		"0: ic	  %1,0(4)\n"				\
+		"0: ic	  %1,0(%2)\n"				\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err), "=d" (x)				\
-		: "m" (*(const __u8*)(ptr)),"K" (-EFAULT)	\
-		: "cc", "4" );					\
+		: "a" (__ptr), "K" (-EFAULT), "0" (0)		\
+		: "cc" );					\
 })
 
 #define __get_user(x, ptr)					\

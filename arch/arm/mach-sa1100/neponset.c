@@ -79,33 +79,6 @@ neponset_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *reg
 	}
 }
 
-static inline void __init neponset_init_irq(void)
-{
-	/*
-	 * Install handler for GPIO25.
-	 */
-	set_irq_type(IRQ_GPIO25, IRQT_RISING);
-	set_irq_chained_handler(IRQ_GPIO25, neponset_irq_handler);
-
-	/*
-	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but
-	 * unfortunately something on the Neponset activates
-	 * this IRQ on sleep (ethernet?)
-	 */
-#if 0
-	enable_irq_wake(IRQ_GPIO25);
-#endif
-
-	/*
-	 * Setup other Neponset IRQs.  SA1111 will be done by the
-	 * generic SA1111 code.
-	 */
-	set_irq_handler(IRQ_NEPONSET_SMC9196, do_simple_IRQ);
-	set_irq_flags(IRQ_NEPONSET_SMC9196, IRQF_VALID | IRQF_PROBE);
-	set_irq_handler(IRQ_NEPONSET_USAR, do_simple_IRQ);
-	set_irq_flags(IRQ_NEPONSET_USAR, IRQF_VALID | IRQF_PROBE);
-}
-
 static void neponset_set_mctrl(struct uart_port *port, u_int mctrl)
 {
 	u_int mdm_ctl0 = MDM_CTL_0;
@@ -164,6 +137,42 @@ static struct sa1100_port_fns neponset_port_fns __initdata = {
 	.get_mctrl	= neponset_get_mctrl,
 };
 
+static int neponset_probe(struct device *dev)
+{
+	sa1100_register_uart_fns(&neponset_port_fns);
+
+	/*
+	 * Install handler for GPIO25.
+	 */
+	set_irq_type(IRQ_GPIO25, IRQT_RISING);
+	set_irq_chained_handler(IRQ_GPIO25, neponset_irq_handler);
+
+	/*
+	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but
+	 * unfortunately something on the Neponset activates
+	 * this IRQ on sleep (ethernet?)
+	 */
+#if 0
+	enable_irq_wake(IRQ_GPIO25);
+#endif
+
+	/*
+	 * Setup other Neponset IRQs.  SA1111 will be done by the
+	 * generic SA1111 code.
+	 */
+	set_irq_handler(IRQ_NEPONSET_SMC9196, do_simple_IRQ);
+	set_irq_flags(IRQ_NEPONSET_SMC9196, IRQF_VALID | IRQF_PROBE);
+	set_irq_handler(IRQ_NEPONSET_USAR, do_simple_IRQ);
+	set_irq_flags(IRQ_NEPONSET_USAR, IRQF_VALID | IRQF_PROBE);
+
+	/*
+	 * Disable GPIO 0/1 drivers so the buttons work on the module.
+	 */
+	NCR_0 = NCR_GP01_OFF;
+
+	return 0;
+}
+
 /*
  * LDM power management.
  */
@@ -201,27 +210,63 @@ static int neponset_resume(struct device *dev, u32 level)
 
 static struct device_driver neponset_device_driver = {
 	.name		= "neponset",
-	.bus		= &system_bus_type,
+	.bus		= &platform_bus_type,
+	.probe		= neponset_probe,
 	.suspend	= neponset_suspend,
 	.resume		= neponset_resume,
 };
 
-static struct sys_device neponset_device = {
-	.name		= "NEPONSET",
+static struct resource neponset_resources[] = {
+	[0] = {
+		.start	= 0x10000000,
+		.end	= 0x17ffffff,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device neponset_device = {
+	.name		= "neponset",
 	.id		= 0,
-	.root		= NULL,
 	.dev = {
 		.name	= "Neponset",
-		.bus_id	= "neponset",
-		.bus	= &system_bus_type,
-		.driver = &neponset_device_driver,
 	},
+	.num_resources	= ARRAY_SIZE(neponset_resources),
+	.resource	= neponset_resources,
+};
+
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start	= 0x40000000,
+		.end	= 0x40001fff,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= IRQ_NEPONSET_SA1111,
+		.end	= IRQ_NEPONSET_SA1111,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static u64 sa1111_dmamask = 0xffffffffUL;
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+		.dma_mask = &sa1111_dmamask,
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&neponset_device,
+	&sa1111_device,
 };
 
 static int __init neponset_init(void)
 {
-	int ret;
-
 	driver_register(&neponset_device_driver);
 
 	/*
@@ -248,29 +293,7 @@ static int __init neponset_init(void)
 		return -ENODEV;
 	}
 
-	ret = sys_device_register(&neponset_device);
-	if (ret)
-		return ret;
-
-	sa1100_register_uart_fns(&neponset_port_fns);
-
-	neponset_init_irq();
-
-	/*
-	 * Disable GPIO 0/1 drivers so the buttons work on the module.
-	 */
-	NCR_0 = NCR_GP01_OFF;
-
-	/*
-	 * Neponset has SA1111 connected to CS4.  We know that after
-	 * reset the chip will be configured for variable latency IO.
-	 */
-	/* FIXME: setup MSC2 */
-
-	/*
-	 * Probe and initialise the SA1111.
-	 */
-	return sa1111_init(0x40000000, IRQ_NEPONSET_SA1111);
+	return platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
 subsys_initcall(neponset_init);

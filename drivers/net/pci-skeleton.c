@@ -602,7 +602,7 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 	*ioaddr_out = NULL;
 	*dev_out = NULL;
 
-	/* dev zeroed in init_etherdev */
+	/* dev zeroed in alloc_etherdev */
 	dev = alloc_etherdev (sizeof (*tp));
 	if (dev == NULL) {
 		printk (KERN_ERR PFX "unable to alloc new ethernet\n");
@@ -790,7 +790,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	dev->irq = pdev->irq;
 	dev->base_addr = (unsigned long) ioaddr;
 
-	/* dev->priv/tp zeroed and aligned in init_etherdev */
+	/* dev->priv/tp zeroed and aligned in alloc_etherdev */
 	tp = dev->priv;
 
 	/* note: tp->chipset set in netdrv_init_board */

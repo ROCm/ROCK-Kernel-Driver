@@ -1513,7 +1513,7 @@ static struct block_device_operations floppy_fops =
 	.revalidate_disk= floppy_revalidate,
 };
 
-static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
+static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 {
 	int drive = *part & 3;
 	if ((*part >> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)

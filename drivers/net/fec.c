@@ -188,7 +188,7 @@ struct fec_enet_private {
 static int fec_enet_open(struct net_device *dev);
 static int fec_enet_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static void fec_enet_mii(struct net_device *dev);
-static void fec_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs);
+static irqreturn_t fec_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs);
 static void fec_enet_tx(struct net_device *dev);
 static void fec_enet_rx(struct net_device *dev);
 static int fec_enet_close(struct net_device *dev);
@@ -393,12 +393,13 @@ fec_timeout(struct net_device *dev)
 /* The interrupt handler.
  * This is called from the MPC core interrupt.
  */
-static	void
+static irqreturn_t
 fec_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	struct	net_device *dev = dev_id;
 	volatile fec_t	*fecp;
 	uint	int_events;
+	int handled = 0;
 
 	fecp = (volatile fec_t*)dev->base_addr;
 
@@ -413,20 +414,27 @@ fec_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 
 		/* Handle receive event in its own function.
 		 */
-		if (int_events & FEC_ENET_RXF)
+		if (int_events & FEC_ENET_RXF) {
+			handled = 1;
 			fec_enet_rx(dev);
+		}
 
 		/* Transmit OK, or non-fatal error. Update the buffer
 		   descriptors. FEC handles all errors, we just discover
 		   them as part of the transmit process.
 		*/
-		if (int_events & FEC_ENET_TXF)
+		if (int_events & FEC_ENET_TXF) {
+			handled = 1;
 			fec_enet_tx(dev);
+		}
 
-		if (int_events & FEC_ENET_MII)
+		if (int_events & FEC_ENET_MII) {
+			handled = 1;
 			fec_enet_mii(dev);
+		}
 	
 	}
+	return IRQ_RETVAL(handled);
 }
 
 

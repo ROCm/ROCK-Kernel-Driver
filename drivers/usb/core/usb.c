@@ -731,6 +731,70 @@ static void usb_release_dev(struct device *dev)
 }
 
 
+static struct usb_device *match_device(struct usb_device *dev,
+				       u16 vendor_id, u16 product_id)
+{
+	struct usb_device *ret_dev = NULL;
+	int child;
+
+	dbg("looking at vendor %d, product %d",
+	    dev->descriptor.idVendor,
+	    dev->descriptor.idProduct);
+
+	/* see if this device matches */
+	if ((dev->descriptor.idVendor == vendor_id) &&
+	    (dev->descriptor.idProduct == product_id)) {
+		dbg ("found the device!");
+		ret_dev = usb_get_dev(dev);
+		goto exit;
+	}
+
+	/* look through all of the children of this device */
+	for (child = 0; child < dev->maxchild; ++child) {
+		if (dev->children[child]) {
+			ret_dev = match_device(dev->children[child],
+					       vendor_id, product_id);
+			if (ret_dev)
+				goto exit;
+		}
+	}
+exit:
+	return ret_dev;
+}
+
+/**
+ * usb_find_device - find a specific usb device in the system
+ * @vendor_id: the vendor id of the device to find
+ * @product_id: the product id of the device to find
+ *
+ * Returns a pointer to a struct usb_device if such a specified usb
+ * device is present in the system currently.  The usage count of the
+ * device will be incremented if a device is found.  Make sure to call
+ * usb_put_dev() when the caller is finished with the device.
+ *
+ * If a device with the specified vendor and product id is not found,
+ * NULL is returned.
+ */
+struct usb_device *usb_find_device(u16 vendor_id, u16 product_id)
+{
+	struct list_head *buslist;
+	struct usb_bus *bus;
+	struct usb_device *dev = NULL;
+	
+	down(&usb_bus_list_lock);
+	for (buslist = usb_bus_list.next;
+	     buslist != &usb_bus_list; 
+	     buslist = buslist->next) {
+		bus = container_of(buslist, struct usb_bus, bus_list);
+		dev = match_device(bus->root_hub, vendor_id, product_id);
+		if (dev)
+			goto exit;
+	}
+exit:
+	up(&usb_bus_list_lock);
+	return dev;
+}
+
 /**
  * usb_get_current_frame_number - return current bus frame number
  * @dev: the device whose bus is being queried
@@ -1016,9 +1080,6 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* dma masks come from the controller; readonly, except to hcd */
 	dev->dev.dma_mask = parent->dma_mask;
-
-	/* it's not usable yet */
-	dev->state = USB_STATE_DEFAULT;
 
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
@@ -1513,6 +1574,7 @@ EXPORT_SYMBOL(usb_disconnect);
 
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
 
+EXPORT_SYMBOL(usb_find_device);
 EXPORT_SYMBOL(usb_get_current_frame_number);
 
 EXPORT_SYMBOL (usb_buffer_alloc);

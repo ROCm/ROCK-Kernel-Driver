@@ -194,9 +194,7 @@ odev_poll(struct file *file, poll_table * wait)
 
 static struct file_operations seq_oss_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		odev_read,
 	.write =	odev_write,
 	.open =		odev_open,

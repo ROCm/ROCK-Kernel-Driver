@@ -824,7 +824,7 @@ static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 	if (type < TUNERS) {
 		t->type = type;
 		printk("tuner(bttv): type forced to %d (%s) [insmod]\n",t->type,tuners[t->type].name);
-		strncpy(client->dev.name, tuners[t->type].name, DEVICE_NAME_SIZE);
+		strlcpy(client->dev.name, tuners[t->type].name, DEVICE_NAME_SIZE);
 	}
         i2c_attach_client(client);
         if (t->type == TUNER_MT2032)
@@ -875,7 +875,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		t->type = *iarg;
 		printk("tuner: type set to %d (%s)\n",
                         t->type,tuners[t->type].name);
-		strncpy(client->dev.name, tuners[t->type].name, DEVICE_NAME_SIZE);
+		strlcpy(client->dev.name, tuners[t->type].name, DEVICE_NAME_SIZE);
 		if (t->type == TUNER_MT2032)
                         mt2032_init(client);
 		break;

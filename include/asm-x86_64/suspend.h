@@ -41,7 +41,7 @@ extern unsigned long saved_context_eflags;
 #define loaddebug(thread,register) \
                __asm__("movq %0,%%db" #register  \
                        : /* no output */ \
-                       :"r" ((thread)->debugreg[register]))
+                       :"r" ((thread)->debugreg##register))
 
 extern void fix_processor_context(void);
 extern void do_magic(int resume);
@@ -53,13 +53,6 @@ extern unsigned long saved_ebp;
 extern unsigned long saved_ebx;
 extern unsigned long saved_esi;
 extern unsigned long saved_edi;
-
-static inline void acpi_save_register_state(unsigned long return_point)
-{
-	/* FIXME: This is probably no longer correct: we need to save all caller-saved registers */
-}
-
-#define acpi_restore_register_state()  do {} while (0)
 
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);

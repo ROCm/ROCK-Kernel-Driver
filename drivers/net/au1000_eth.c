@@ -675,37 +675,24 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 	char *pmac, *argptr;
 	char ethaddr[6];
 
-	if (!request_region(ioaddr, MAC_IOSIZE, "Au1000 ENET")) {
+	if (!request_region(ioaddr, MAC_IOSIZE, "Au1000 ENET"))
 		 return -ENODEV;
-	}
 
 	if (version_printed++ == 0) printk(version);
 
+	if (!dev)
+		dev = init_etherdev(NULL, sizeof(struct au1000_private));
+
 	if (!dev) {
-		dev = init_etherdev(0, sizeof(struct au1000_private));
-	}
-	if (!dev) {
-		 printk (KERN_ERR "au1000 eth: init_etherdev failed\n");  
-		 return -ENODEV;
+		printk (KERN_ERR "au1000 eth: init_etherdev failed\n");  
+		release_region(ioaddr, MAC_IOSIZE);
+		return -ENODEV;
 	}
 
 	printk("%s: Au1xxx ethernet found at 0x%lx, irq %d\n", 
 			dev->name, ioaddr, irq);
 
-	/* Initialize our private structure */
-	if (dev->priv == NULL) {
-		aup = (struct au1000_private *) 
-			kmalloc(sizeof(*aup), GFP_KERNEL);
-		if (aup == NULL) {
-			retval = -ENOMEM;
-			goto free_region;
-		}
-		dev->priv = aup;
-	}
-
 	aup = dev->priv;
-	memset(aup, 0, sizeof(*aup));
-
 
 	/* Allocate the data buffers */
 	aup->vaddr = (u32)dma_alloc(MAX_BUF_SIZE * 
@@ -834,8 +821,6 @@ free_region:
 	if (aup->vaddr) 
 		dma_free((void *)aup->vaddr, 
 				MAX_BUF_SIZE * (NUM_TX_BUFFS+NUM_RX_BUFFS));
-	if (dev->priv != NULL)
-		kfree(dev->priv);
 	printk(KERN_ERR "%s: au1000_probe1 failed.  Returns %d\n",
 	       dev->name, retval);
 	kfree(dev);
@@ -1003,15 +988,15 @@ static int au1000_close(struct net_device *dev)
 	spin_lock_irqsave(&aup->lock, flags);
 	
 	/* stop the device */
-	if (netif_device_present(dev)) {
+	if (netif_device_present(dev))
 		netif_stop_queue(dev);
-	}
 
 	/* disable the interrupt */
 	free_irq(dev->irq, dev);
 	spin_unlock_irqrestore(&aup->lock, flags);
 
 	reset_mac(dev);
+	kfree(dev);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

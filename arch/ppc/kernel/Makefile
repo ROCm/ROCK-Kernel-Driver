@@ -10,12 +10,10 @@ EXTRA_AFLAGS		:= -Wa,-m405
 endif
 
 # Start off with 'head.o', change as needed.
-HEAD-y				:= head.o
-HEAD-$(CONFIG_40x)		:= head_4xx.o
-HEAD-$(CONFIG_8xx)		:= head_8xx.o
-HEAD-$(CONFIG_6xx)		+= idle_6xx.o
-
-extra-y	:= $(HEAD-y)
+extra-y				:= head.o
+extra-$(CONFIG_40x)		:= head_4xx.o
+extra-$(CONFIG_8xx)		:= head_8xx.o
+extra-$(CONFIG_6xx)		+= idle_6xx.o
 
 obj-y				:= entry.o traps.o irq.o idle.o time.o misc.o \
 					process.o signal.o ptrace.o align.o \

@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/rcupdate.h>
+#include <linux/cpu.h>
 
 #ifdef CONFIG_NUMA
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
@@ -500,9 +501,12 @@ repeat_lock_task:
 					resched_task(rq->curr);
 			}
 			success = 1;
-		} else
-			if (unlikely(kick) && task_running(rq, p))
-				resched_task(rq->curr);
+		}
+#ifdef CONFIG_SMP
+	       	else
+			if (unlikely(kick) && task_running(rq, p) && (p->thread_info->cpu != smp_processor_id()))
+				smp_send_reschedule(p->thread_info->cpu);
+#endif
 		p->state = TASK_RUNNING;
 	}
 	task_rq_unlock(rq, &flags);
@@ -776,7 +780,7 @@ static int sched_best_cpu(struct task_struct *p)
 		return best_cpu;
 
 	minload = 10000000;
-	for (i = 0; i < numnodes; i++) {
+	for_each_node_with_cpus(i) {
 		load = atomic_read(&node_nr_running[i]);
 		if (load < minload) {
 			minload = load;
@@ -1104,7 +1108,7 @@ static void rebalance_tick(runqueue_t *this_rq, int idle)
 #endif
 		if (!(j % IDLE_REBALANCE_TICK)) {
 			spin_lock(&this_rq->lock);
-			load_balance(this_rq, 0, cpu_to_node_mask(this_cpu));
+			load_balance(this_rq, idle, cpu_to_node_mask(this_cpu));
 			spin_unlock(&this_rq->lock);
 		}
 		return;

@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/security.h>
+#include <linux/ptrace.h>
 
 #include <asm/poll.h>
 #include <asm/siginfo.h>
@@ -80,11 +81,11 @@ static int expand_files(struct files_struct *files, int nr)
  */
 
 static int locate_fd(struct files_struct *files, 
-			    struct file *file, int orig_start)
+			    struct file *file, unsigned int orig_start)
 {
 	unsigned int newfd;
+	unsigned int start;
 	int error;
-	int start;
 
 	error = -EINVAL;
 	if (orig_start >= current->rlim[RLIMIT_NOFILE].rlim_cur)
@@ -129,7 +130,7 @@ out:
 	return error;
 }
 
-static int dupfd(struct file *file, int start)
+static int dupfd(struct file *file, unsigned int start)
 {
 	struct files_struct * files = current->files;
 	int fd;
@@ -286,10 +287,8 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 
 	switch (cmd) {
 		case F_DUPFD:
-			if (arg < NR_OPEN) {
-				get_file(filp);
-				err = dupfd(filp, arg);
-			}
+			get_file(filp);
+			err = dupfd(filp, arg);
 			break;
 		case F_GETFD:
 			err = get_close_on_exec(fd);
@@ -320,6 +319,7 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			 * to fix this will be in libc.
 			 */
 			err = filp->f_owner.pid;
+			force_successful_syscall_return();
 			break;
 		case F_SETOWN:
 			err = f_setown(filp, arg, 1);

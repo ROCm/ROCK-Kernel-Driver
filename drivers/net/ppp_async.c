@@ -427,12 +427,12 @@ ppp_async_ioctl(struct ppp_channel *chan, unsigned int cmd, unsigned long arg)
 		break;
 
 	case PPPIOCGXASYNCMAP:
-		if (copy_to_user((void *) arg, ap->xaccm, sizeof(ap->xaccm)))
+		if (copy_to_user((void __user *) arg, ap->xaccm, sizeof(ap->xaccm)))
 			break;
 		err = 0;
 		break;
 	case PPPIOCSXASYNCMAP:
-		if (copy_from_user(accm, (void *) arg, sizeof(accm)))
+		if (copy_from_user(accm, (void __user *) arg, sizeof(accm)))
 			break;
 		accm[2] &= ~0x40000000U;	/* can't escape 0x5e */
 		accm[3] |= 0x60000000U;		/* must escape 0x7d, 0x7e */

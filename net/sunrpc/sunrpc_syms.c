@@ -169,7 +169,7 @@ cleanup_sunrpc(void)
 #ifdef RPC_DEBUG
 	rpc_unregister_sysctl();
 #endif
-#ifdef CONFIG_PROCFS
+#ifdef CONFIG_PROC_FS
 	rpc_proc_exit();
 #endif
 }

@@ -623,8 +623,8 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 		if (cmd == SOUND_MIXER_INFO) {
 			mixer_info info;
 
-			strncpy(info.id, card->ac97.name, sizeof(info.id));
-			strncpy(info.name, "Creative SBLive - Emu10k1", sizeof(info.name));
+			strlcpy(info.id, card->ac97.name, sizeof(info.id));
+			strlcpy(info.name, "Creative SBLive - Emu10k1", sizeof(info.name));
 			info.modify_counter = card->ac97.modcnt;
 
 			if (copy_to_user((void *)arg, &info, sizeof(info)))

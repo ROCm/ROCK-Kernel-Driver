@@ -551,10 +551,12 @@ static int tun_chr_close(struct inode *inode, struct file *file)
 	if (!(tun->flags & TUN_PERSIST)) {
 		dev_close(&tun->dev);
 		unregister_netdevice(&tun->dev);
-		kfree(tun);
 	}
 
 	rtnl_unlock();
+
+	if (!(tun->flags & TUN_PERSIST)) 
+		kfree(tun);
 	return 0;
 }
 

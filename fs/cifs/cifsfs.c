@@ -57,13 +57,14 @@ unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
 struct task_struct * oplockThread = NULL;
 
 extern int cifs_mount(struct super_block *, struct cifs_sb_info *, char *,
-			char *);
+			const char *);
 extern int cifs_umount(struct super_block *, struct cifs_sb_info *);
 void cifs_proc_init(void);
 void cifs_proc_clean(void);
 
 static int
-cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
+cifs_read_super(struct super_block *sb, void *data,
+		const char *devname, int silent)
 {
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb;
@@ -93,13 +94,17 @@ cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
 	inode = iget(sb, ROOT_I);
 
-	if (!inode)
+	if (!inode) {
+		rc = -ENOMEM;
 		goto out_no_root;
+	}
 
 	sb->s_root = d_alloc_root(inode);
 
-	if (!sb->s_root)
+	if (!sb->s_root) {
+		rc = -ENOMEM;
 		goto out_no_root;
+	}
 
 	return 0;
 
@@ -113,7 +118,7 @@ out_mount_failed:
 		unload_nls(cifs_sb->local_nls);	
 	if(cifs_sb)
 		kfree(cifs_sb);
-	return -EINVAL;
+	return rc;
 }
 
 void
@@ -251,7 +256,7 @@ struct super_operations cifs_super_ops = {
 
 static struct super_block *
 cifs_get_sb(struct file_system_type *fs_type,
-	    int flags, char *dev_name, void *data)
+	    int flags, const char *dev_name, void *data)
 {
 	int rc;
 	struct super_block *sb = sget(fs_type, NULL, set_anon_super, NULL);
@@ -331,7 +336,7 @@ struct file_operations cifs_file_ops = {
 	.release = cifs_close,
 	.lock = cifs_lock,
 	.fsync = cifs_fsync,
-    .flush = cifs_flush,
+	.flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
 	.sendfile = generic_file_sendfile,
 };
@@ -359,7 +364,7 @@ cifs_init_inodecache(void)
 {
 	cifs_inode_cachep = kmem_cache_create("cifs_inode_cache",
 					      sizeof (struct cifsInodeInfo),
-					      0, SLAB_HWCACHE_ALIGN,
+					      0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					      cifs_init_once, NULL);
 	if (cifs_inode_cachep == NULL)
 		return -ENOMEM;

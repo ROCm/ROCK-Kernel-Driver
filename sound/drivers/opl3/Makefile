@@ -4,11 +4,9 @@
 #
 
 snd-opl3-lib-objs := opl3_lib.o opl3_synth.o
-ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
 snd-opl3-synth-objs := opl3_seq.o opl3_midi.o opl3_drums.o
 ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
 snd-opl3-synth-objs += opl3_oss.o
-endif
 endif
 
 OPL3_OBJS = snd-opl3-lib.o
@@ -19,6 +17,7 @@ endif
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS100) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_AZT2320) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_AZT3328) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_DT019X) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_ES18XX) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_OPL3SA2) += $(OPL3_OBJS)

@@ -740,7 +740,7 @@ static void NCR5380_print_status (struct Scsi_Host *instance)
 	printk("NCR5380_print_status: no memory for print buffer\n");
 	return;
     }
-    len = NCR5380_proc_info(pr_bfr, &start, 0, PAGE_SIZE, HOSTNO, 0);
+    len = NCR5380_proc_info(instance, pr_bfr, &start, 0, PAGE_SIZE, 0);
     pr_bfr[len] = 0;
     printk("\n%s\n", pr_bfr);
     free_page((unsigned long) pr_bfr);
@@ -771,11 +771,10 @@ char *lprint_Scsi_Cmnd (Scsi_Cmnd *cmd, char *pos, char *buffer, int length);
 #ifndef NCR5380_proc_info
 static
 #endif
-int NCR5380_proc_info (char *buffer, char **start, off_t offset,
-		       int length, int hostno, int inout)
+int NCR5380_proc_info (struct Scsi_Host *instance, char *buffer, char **start, off_t offset,
+		       int length, int inout)
 {
     char *pos = buffer;
-    struct Scsi_Host *instance;
     struct NCR5380_hostdata *hostdata;
     Scsi_Cmnd *ptr;
     unsigned long flags;
@@ -787,13 +786,6 @@ int NCR5380_proc_info (char *buffer, char **start, off_t offset,
 	    pos = buffer;			\
 	}					\
     } while (0)
-
-    for (instance = first_instance; instance && HOSTNO != hostno;
-	 instance = instance->next)
-	;
-    if (!instance)
-	return(-ESRCH);
-    hostdata = (struct NCR5380_hostdata *)instance->hostdata;
 
     if (inout) { /* Has data been written to the file ? */
 	return(-ENOSYS);  /* Currently this is a no-op */
@@ -1274,7 +1266,7 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
 static void NCR5380_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
     struct Scsi_Host *instance = first_instance;
-    int done = 1;
+    int done = 1, handled = 0;
     unsigned char basr;
 
     INT_PRINTK("scsi%d: NCR5380 irq triggered\n", HOSTNO);
@@ -1333,6 +1325,7 @@ static void NCR5380_intr (int irq, void *dev_id, struct pt_regs *regs)
 		(void) NCR5380_read(RESET_PARITY_INTERRUPT_REG);
 	    }
 	} /* if !(SELECTION || PARITY) */
+	handled = 1;
     } /* BASR & IRQ */
     else {
 	printk(KERN_NOTICE "scsi%d: interrupt without IRQ bit set in BASR, "
@@ -1346,6 +1339,7 @@ static void NCR5380_intr (int irq, void *dev_id, struct pt_regs *regs)
 	/* Put a call to NCR5380_main() on the queue... */
 	queue_main();
     }
+    return IRQ_RETVAL(handled);
 }
 
 #ifdef NCR5380_STATS

@@ -555,8 +555,8 @@ static unsigned long force_recsrc(unsigned long recsrc)
 }
 
 #define set_mixer_info()							\
-		strncpy(info.id, "MSNDMIXER", sizeof(info.id));			\
-		strncpy(info.name, "MultiSound Mixer", sizeof(info.name));
+		strlcpy(info.id, "MSNDMIXER", sizeof(info.id));			\
+		strlcpy(info.name, "MultiSound Mixer", sizeof(info.name));
 
 static int mixer_ioctl(unsigned int cmd, unsigned long arg)
 {

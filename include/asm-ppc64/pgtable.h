@@ -303,6 +303,11 @@ static inline void ptep_mkdirty(pte_t *ptep)
 	pte_update(ptep, 0, _PAGE_DIRTY);
 }
 
+/*
+ * Macro to mark a page protection value as "uncacheable".
+ */
+#define pgprot_noncached(prot)	(__pgprot(pgprot_val(prot) | _PAGE_NO_CACHE | _PAGE_GUARDED))
+
 #define pte_same(A,B)	(((pte_val(A) ^ pte_val(B)) & ~_PAGE_HPTEFLAGS) == 0)
 
 /*
@@ -376,6 +381,15 @@ extern void hpte_init_pSeries(void);
 extern void hpte_init_iSeries(void);
 
 typedef pte_t *pte_addr_t;
+
+long pSeries_lpar_hpte_insert(unsigned long hpte_group,
+			      unsigned long va, unsigned long prpn,
+			      int secondary, unsigned long hpteflags,
+			      int bolted, int large);
+
+long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
+			 unsigned long prpn, int secondary,
+			 unsigned long hpteflags, int bolted, int large);
 
 #endif /* __ASSEMBLY__ */
 #endif /* _PPC64_PGTABLE_H */

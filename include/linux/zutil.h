@@ -18,15 +18,8 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 
-#ifndef local
-#  define local static
-#endif
-/* compile with -Dlocal if your debugger can't find static symbols */
-
 typedef unsigned char  uch;
-typedef uch FAR uchf;
 typedef unsigned short ush;
-typedef ush FAR ushf;
 typedef unsigned long  ulg;
 
         /* common constants */
@@ -64,8 +57,8 @@ typedef unsigned long  ulg;
 
          /* functions */
 
-typedef uLong (ZEXPORT *check_func) OF((uLong check, const Bytef *buf,
-				       uInt len));
+typedef uLong (*check_func) (uLong check, const Byte *buf,
+				       uInt len);
 
 
                         /* checksum functions */
@@ -88,7 +81,7 @@ typedef uLong (ZEXPORT *check_func) OF((uLong check, const Bytef *buf,
    An Adler-32 checksum is almost as reliable as a CRC32 but can be computed
    much faster. Usage example:
 
-     uLong adler = adler32(0L, Z_NULL, 0);
+     uLong adler = adler32(0L, NULL, 0);
 
      while (read_buffer(buffer, length) != EOF) {
        adler = adler32(adler, buffer, length);
@@ -96,14 +89,14 @@ typedef uLong (ZEXPORT *check_func) OF((uLong check, const Bytef *buf,
      if (adler != original_adler) error();
 */
 static inline uLong zlib_adler32(uLong adler,
-				 const Bytef *buf,
+				 const Byte *buf,
 				 uInt len)
 {
     unsigned long s1 = adler & 0xffff;
     unsigned long s2 = (adler >> 16) & 0xffff;
     int k;
 
-    if (buf == Z_NULL) return 1L;
+    if (buf == NULL) return 1L;
 
     while (len > 0) {
         k = len < NMAX ? len : NMAX;

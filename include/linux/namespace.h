@@ -12,9 +12,8 @@ struct namespace {
 	struct rw_semaphore	sem;
 };
 
-void umount_tree(struct vfsmount *mnt);
-
 extern void umount_tree(struct vfsmount *);
+extern int copy_namespace(int, struct task_struct *);
 
 static inline void put_namespace(struct namespace *namespace)
 {
@@ -38,7 +37,6 @@ static inline void exit_namespace(struct task_struct *p)
 		put_namespace(namespace);
 	}
 }
-extern int copy_namespace(int, struct task_struct *);
 
 static inline void get_namespace(struct namespace *namespace)
 {

@@ -83,7 +83,7 @@ static int kafstimod(void *arg)
 
 	for (;;) {
 		unsigned long jif;
-		signed long timeout;
+		unsigned long timeout;
 
 		/* deal with the server being asked to die */
 		if (kafstimod_die) {

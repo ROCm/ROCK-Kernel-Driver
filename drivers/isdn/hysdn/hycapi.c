@@ -227,7 +227,7 @@ hycapi_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		return;
 	}
 	if(chk == 1) {
-		printk(KERN_INFO "HYSDN: apl %d allready registered\n", appl);
+		printk(KERN_INFO "HYSDN: apl %d already registered\n", appl);
 		return;
 	}
 	MaxBDataBlocks = rp->datablkcnt > CAPI_MAXDATAWINDOW ? CAPI_MAXDATAWINDOW : rp->datablkcnt;

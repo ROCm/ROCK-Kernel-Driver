@@ -50,6 +50,7 @@
 #include <acpi/acinterp.h>
 #include <acpi/acnamesp.h>
 #include <acpi/acdebug.h>
+#include <acpi/acdisasm.h>
 
 
 #define _COMPONENT          ACPI_DISPATCHER
@@ -657,6 +658,16 @@ cleanup:
 	/* Always clear the object stack */
 
 	walk_state->num_operands = 0;
+
+#ifdef ACPI_DISASSEMBLER
+
+	/* On error, display method locals/args */
+
+	if (ACPI_FAILURE (status)) {
+		acpi_dm_dump_method_info (status, walk_state, op);
+	}
+#endif
+
 	return_ACPI_STATUS (status);
 }
 

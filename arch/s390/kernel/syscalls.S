@@ -62,7 +62,7 @@ SYSCALL(sys_getegid16,sys_ni_syscall,sys32_getegid16)		/* 50 old getegid16 sysca
 SYSCALL(sys_acct,sys_acct,sys32_acct_wrapper)
 SYSCALL(sys_umount,sys_umount,sys32_umount_wrapper)
 NI_SYSCALL							/* old lock syscall */
-SYSCALL(sys_ioctl,sys_ioctl,sys32_ioctl_wrapper)
+SYSCALL(sys_ioctl,sys_ioctl,compat_sys_ioctl_wrapper)
 SYSCALL(sys_fcntl,sys_fcntl,compat_sys_fcntl_wrapper)		/* 55 */
 NI_SYSCALL							/* intel mpx syscall */
 SYSCALL(sys_setpgid,sys_setpgid,sys32_setpgid_wrapper)
@@ -83,9 +83,9 @@ SYSCALL(sys_setregid16,sys_ni_syscall,sys32_setregid16_wrapper)	/* old setregid1
 SYSCALL(sys_sigsuspend_glue,sys_sigsuspend_glue,sys32_sigsuspend_glue)
 SYSCALL(sys_sigpending,sys_sigpending,compat_sys_sigpending_wrapper)
 SYSCALL(sys_sethostname,sys_sethostname,sys32_sethostname_wrapper)
-SYSCALL(sys_setrlimit,sys_setrlimit,sys32_setrlimit_wrapper)	/* 75 */
-SYSCALL(sys_old_getrlimit,sys_getrlimit,sys32_old_getrlimit_wrapper)
-SYSCALL(sys_getrusage,sys_getrusage,sys32_getrusage_wrapper)
+SYSCALL(sys_setrlimit,sys_setrlimit,compat_sys_setrlimit_wrapper)	/* 75 */
+SYSCALL(sys_old_getrlimit,sys_getrlimit,compat_sys_old_getrlimit_wrapper)
+SYSCALL(sys_getrusage,sys_getrusage,compat_sys_getrusage_wrapper)
 SYSCALL(sys_gettimeofday,sys_gettimeofday,sys32_gettimeofday_wrapper)
 SYSCALL(sys_settimeofday,sys_settimeofday,sys32_settimeofday_wrapper)
 SYSCALL(sys_getgroups16,sys_ni_syscall,sys32_getgroups16_wrapper)	/* 80 old getgroups16 syscall */
@@ -122,7 +122,7 @@ NI_SYSCALL							/* 110 iopl for i386 */
 SYSCALL(sys_vhangup,sys_vhangup,sys_vhangup)
 NI_SYSCALL							/* old "idle" system call */
 NI_SYSCALL							/* vm86old for i386 */
-SYSCALL(sys_wait4,sys_wait4,sys32_wait4_wrapper)
+SYSCALL(sys_wait4,sys_wait4,compat_sys_wait4_wrapper)
 SYSCALL(sys_swapoff,sys_swapoff,sys32_swapoff_wrapper)		/* 115 */
 SYSCALL(sys_sysinfo,sys_sysinfo,sys32_sysinfo_wrapper)
 SYSCALL(sys_ipc,sys_ipc,sys32_ipc_wrapper)
@@ -199,7 +199,7 @@ SYSCALL(sys_sendfile,sys_sendfile,sys32_sendfile_wrapper)
 NI_SYSCALL							/* streams1 */
 NI_SYSCALL							/* streams2 */
 SYSCALL(sys_vfork_glue,sys_vfork_glue,sys_vfork_glue)		/* 190 */
-SYSCALL(sys_getrlimit,sys_getrlimit,sys32_getrlimit_wrapper)
+SYSCALL(sys_getrlimit,sys_getrlimit,compat_sys_getrlimit_wrapper)
 SYSCALL(sys_mmap2,sys_mmap2,sys32_mmap2_wrapper)
 SYSCALL(sys_truncate64,sys_ni_syscall,sys32_truncate64_wrapper)
 SYSCALL(sys_ftruncate64,sys_ni_syscall,sys32_ftruncate64_wrapper)
@@ -257,9 +257,9 @@ SYSCALL(sys_io_getevents,sys_io_getevents,sys_ni_syscall)	/* 245 */
 SYSCALL(sys_io_submit,sys_io_submit,sys_ni_syscall)
 SYSCALL(sys_io_cancel,sys_io_cancel,sys_ni_syscall)
 SYSCALL(sys_exit_group,sys_exit_group,sys32_exit_group_wrapper)
-SYSCALL(sys_epoll_create,sys_epoll_create,sys_ni_syscall)
-SYSCALL(sys_epoll_ctl,sys_epoll_ctl,sys_ni_syscall)		/* 250 */
-SYSCALL(sys_epoll_wait,sys_epoll_wait,sys_ni_syscall)
+SYSCALL(sys_epoll_create,sys_epoll_create,sys_epoll_create_wrapper)
+SYSCALL(sys_epoll_ctl,sys_epoll_ctl,sys_epoll_ctl_wrapper)	/* 250 */
+SYSCALL(sys_epoll_wait,sys_epoll_wait,sys_epoll_wait_wrapper)
 SYSCALL(sys_set_tid_address,sys_set_tid_address,sys32_set_tid_address_wrapper)
 SYSCALL(sys_fadvise64,sys_fadvise64,sys_ni_syscall)
 SYSCALL(sys_timer_create,sys_timer_create,sys_ni_syscall)

@@ -234,6 +234,7 @@ static struct usb_device_id usb_bluetooth_ids [] = {
 MODULE_DEVICE_TABLE (usb, usb_bluetooth_ids);
 
 static struct usb_driver usb_bluetooth_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"bluetty",
 	.probe =	usb_bluetooth_probe,
 	.disconnect =	usb_bluetooth_disconnect,

@@ -10,6 +10,7 @@
  *
  * Errata 5: Processor may fail to execute a FID/VID change in presence of interrupt.
  * - We cli/sti on stepping A0 CPUs around the FID/VID transition.
+ * (ADDENDUM: This seems to be needed on more systems, so we do it unconditionally now).
  * Errata 15: Processors with half frequency multipliers may hang upon wakeup from disconnect.
  * - We disable half multipliers if ACPI is used on A0 stepping CPUs.
  */
@@ -208,13 +209,38 @@ static int get_ranges (unsigned char *pst)
 }
 
 
+static void change_FID(int fid)
+{
+	union msr_fidvidctl fidvidctl;
+
+	if (fidvidctl.bits.FID != fid) {
+		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+		fidvidctl.bits.SGTC = latency;
+		fidvidctl.bits.FID = fid;
+		fidvidctl.bits.FIDC = 1;
+		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+	}
+}
+
+
+static void change_VID(int vid)
+{
+	union msr_fidvidctl fidvidctl;
+
+	if (fidvidctl.bits.VID != vid) {
+		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+		fidvidctl.bits.VID = vid;
+		fidvidctl.bits.VIDC = 1;
+		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+	}
+}
+
+
 static void change_speed (unsigned int index)
 {
 	u8 fid, vid;
 	struct cpufreq_freqs freqs;
 	union msr_fidvidstatus fidvidstatus;
-	union msr_fidvidctl fidvidctl;
-
 
 	/* fid are the lower 8 bits of the index we stored into
 	 * the cpufreq frequency table in powernow_decode_bios,
@@ -228,35 +254,25 @@ static void change_speed (unsigned int index)
 
 	rdmsrl (MSR_K7_FID_VID_STATUS, fidvidstatus.val);
 	freqs.old = fsb * fid_codes[fidvidstatus.bits.CFID] * 100;
-
 	freqs.new = powernow_table[index].frequency;
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	/* Now do the magic poking into the MSRs.  */
 
-	if (have_a0 == 1)	/* A0 errata 5 */
-		__asm__("\tcli\n");
+	__asm__("\tcli\n");
 
-	/* First change the frequency. */
-	if (fidvidctl.bits.FID != fid) {
-		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
-		fidvidctl.bits.SGTC = latency;	/* Stop grant timeout counter */
-		fidvidctl.bits.FID = fid;
-		fidvidctl.bits.FIDC = 1;
-		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+	if (freqs.old > freqs.new) {
+		/* Going down, so change FID first */
+		change_FID(fid);
+		change_VID(vid);
+	} else {
+		/* Going up, so change VID first */
+		change_VID(fid);
+		change_FID(vid);
 	}
-
-	/* Now change voltage. */
-	if (fidvidctl.bits.VID != vid) {
-		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
-		fidvidctl.bits.VID = vid;
-		fidvidctl.bits.VIDC = 1;
-		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
-	}
-
-	if (have_a0 == 1)
-		__asm__("\tsti\n");
+	
+	__asm__("\tsti\n");
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 }

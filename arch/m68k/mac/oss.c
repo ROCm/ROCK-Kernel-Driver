@@ -30,11 +30,11 @@
 int oss_present;
 volatile struct mac_oss *oss;
 
-void oss_irq(int, void *, struct pt_regs *);
-void oss_nubus_irq(int, void *, struct pt_regs *);
+irqreturn_t oss_irq(int, void *, struct pt_regs *);
+irqreturn_t oss_nubus_irq(int, void *, struct pt_regs *);
 
-extern void via1_irq(int, void *, struct pt_regs *);
-extern void mac_scc_dispatch(int, void *, struct pt_regs *);
+extern irqreturn_t via1_irq(int, void *, struct pt_regs *);
+extern irqreturn_t mac_scc_dispatch(int, void *, struct pt_regs *);
 
 /*
  * Initialize the OSS
@@ -92,12 +92,13 @@ void __init oss_nubus_init(void)
  * and SCSI; everything else is routed to its own autovector IRQ.
  */
  
-void oss_irq(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t oss_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int events;
 
 	events = oss->irq_pending & (OSS_IP_SOUND|OSS_IP_SCSI);
-	if (!events) return;
+	if (!events)
+		return IRQ_NONE;
 
 #ifdef DEBUG_IRQS	
 	if ((console_loglevel == 10) && !(events & OSS_IP_SCSI)) {
@@ -118,6 +119,7 @@ void oss_irq(int irq, void *dev_id, struct pt_regs *regs)
 	} else {
 		/* FIXME: error check here? */
 	}
+	return IRQ_HANDLED;
 }
 
 /*
@@ -126,12 +128,13 @@ void oss_irq(int irq, void *dev_id, struct pt_regs *regs)
  * Unlike the VIA/RBV this is on its own autovector interrupt level.
  */
 
-void oss_nubus_irq(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t oss_nubus_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int events, irq_bit, i;
 
 	events = oss->irq_pending & OSS_IP_NUBUS;
-	if (!events) return;
+	if (!events)
+		return IRQ_NONE;
 
 #ifdef DEBUG_NUBUS_INT
 	if (console_loglevel > 7) {
@@ -148,6 +151,7 @@ void oss_nubus_irq(int irq, void *dev_id, struct pt_regs *regs)
 			oss->irq_level[i] = OSS_IRQLEV_NUBUS;
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 /*

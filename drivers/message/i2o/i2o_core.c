@@ -1690,7 +1690,9 @@ static int i2o_reset_controller(struct i2o_controller *c)
 		if((jiffies-time)>=20*HZ)
 		{
 			printk(KERN_ERR "IOP reset timeout.\n");
-			// Better to leak this for safety: - status;
+			/* The controller still may respond and overwrite
+			 * status_phys, LEAK it to prevent memory corruption.
+			 */
 			return -ETIMEDOUT;
 		}
 		schedule();
@@ -1719,6 +1721,10 @@ static int i2o_reset_controller(struct i2o_controller *c)
 			{
 				printk(KERN_ERR "%s: Timeout waiting for IOP reset.\n", 
 						c->name); 
+				/* The controller still may respond and
+				 * overwrite status_phys, LEAK it to prevent
+				 * memory corruption.
+				 */
 				return -ETIMEDOUT; 
 			} 
 			schedule(); 
@@ -3639,12 +3645,12 @@ static int dpt;
  
 int __init i2o_pci_scan(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int count=0;
 	
 	printk(KERN_INFO "i2o: Checking for PCI I2O controllers...\n");
 
-	pci_for_each_dev(dev)	
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
 	{
 		if((dev->class>>8)!=PCI_CLASS_INTELLIGENT_I2O)
 			continue;

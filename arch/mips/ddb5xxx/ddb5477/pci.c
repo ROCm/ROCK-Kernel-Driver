@@ -98,10 +98,10 @@ static unsigned char irq_map[MAX_SLOT_NUM] = {
 extern int vrc5477_irq_to_irq(int irq);
 void __init pcibios_fixup_irqs(void)
 {
-        struct pci_dev *dev;
+        struct pci_dev *dev = NULL;
         int slot_num;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		slot_num = PCI_SLOT(dev->devfn);
 		MIPS_ASSERT(slot_num < MAX_SLOT_NUM);
 		MIPS_ASSERT(irq_map[slot_num] != 0xff);

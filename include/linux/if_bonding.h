@@ -11,18 +11,38 @@
  *	This software may be used and distributed according to the terms
  *	of the GNU Public License, incorporated herein by reference.
  * 
+ * 2003/03/18 - Amir Noam <amir.noam at intel dot com>
+ *	- Added support for getting slave's speed and duplex via ethtool.
+ *	  Needed for 802.3ad and other future modes.
+ * 
+ * 2003/03/18 - Tsippy Mendelson <tsippy.mendelson at intel dot com> and
+ *		Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Enable support of modes that need to use the unique mac address of
+ *	  each slave.
+ *
+ * 2003/03/18 - Tsippy Mendelson <tsippy.mendelson at intel dot com> and
+ *		Amir Noam <amir.noam at intel dot com>
+ *	- Moved driver's private data types to bonding.h
+ *
+ * 2003/03/18 - Amir Noam <amir.noam at intel dot com>,
+ *		Tsippy Mendelson <tsippy.mendelson at intel dot com> and
+ *		Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Added support for IEEE 802.3ad Dynamic link aggregation mode.
+ *
+ * 2003/05/01 - Amir Noam <amir.noam at intel dot com>
+ *	- Added ABI version control to restore compatibility between
+ *	  new/old ifenslave and new/old bonding.
  */
 
 #ifndef _LINUX_IF_BONDING_H
 #define _LINUX_IF_BONDING_H
 
-#ifdef __KERNEL__
-#include <linux/timer.h>
 #include <linux/if.h>
-#include <linux/proc_fs.h>
-#endif /* __KERNEL__ */
-
 #include <linux/types.h>
+#include <linux/if_ether.h>
+
+/* userland - kernel ABI version (2003/05/08) */
+#define BOND_ABI_VERSION 1
 
 /*
  * We can remove these ioctl definitions in 2.5.  People should use the
@@ -41,6 +61,9 @@
 #define BOND_MODE_ACTIVEBACKUP	1
 #define BOND_MODE_XOR		2
 #define BOND_MODE_BROADCAST	3
+#define BOND_MODE_8023AD        4
+#define BOND_MODE_TLB           5
+#define BOND_MODE_ALB		6 /* TLB + RLB (receive load balancing) */
 
 /* each slave's link has 4 states */
 #define BOND_LINK_UP    0           /* link is up and running */
@@ -58,11 +81,6 @@
 #define BOND_MULTICAST_ACTIVE   1
 #define BOND_MULTICAST_ALL      2
 
-struct bond_parm_tbl {
-	char *modename;
-	int mode;
-};
-
 typedef struct ifbond {
 	__s32 bond_mode;
 	__s32 num_slaves;
@@ -78,52 +96,15 @@ typedef struct ifslave
 	__u32  link_failure_count;
 } ifslave;
 
-#ifdef __KERNEL__
-typedef struct slave {
-	struct slave *next;
-	struct slave *prev;
-	struct net_device *dev;
-	short  delay;
-	unsigned long jiffies;	
-	char   link;    /* one of BOND_LINK_XXXX */
-	char   state;   /* one of BOND_STATE_XXXX */
-	unsigned short original_flags;
-	u32 link_failure_count;
-} slave_t;
+struct ad_info {
+	__u16 aggregator_id;
+	__u16 ports;
+	__u16 actor_key;
+	__u16 partner_key;
+	__u8 partner_system[ETH_ALEN];
+};
 
-/*
- * Here are the locking policies for the two bonding locks:
- *
- * 1) Get bond->lock when reading/writing slave list.
- * 2) Get bond->ptrlock when reading/writing bond->current_slave.
- *    (It is unnecessary when the write-lock is put with bond->lock.)
- * 3) When we lock with bond->ptrlock, we must lock with bond->lock
- *    beforehand.
- */
-typedef struct bonding {
-	slave_t *next;
-	slave_t *prev;
-	slave_t *current_slave;
-	slave_t *primary_slave;
-	slave_t *current_arp_slave;
-	__s32 slave_cnt;
-	rwlock_t lock;
-	rwlock_t ptrlock;
-	struct timer_list mii_timer;
-	struct timer_list arp_timer;
-	struct net_device_stats *stats;
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *bond_proc_dir;
-	struct proc_dir_entry *bond_proc_info_file;
-#endif /* CONFIG_PROC_FS */
-	struct bonding *next_bond;
-	struct net_device *device;
-	struct dev_mc_list *mc_list;
-	unsigned short flags;
-} bonding_t;
-#endif /* __KERNEL__ */
-
-#endif /* _LINUX_BOND_H */
+#endif /* _LINUX_IF_BONDING_H */
 
 /*
  * Local variables:

@@ -437,6 +437,7 @@ static int __init init(void)
 	return 0;
 }
 
+PROVIDES_CONNTRACK(ftp);
 EXPORT_SYMBOL(ip_ftp_lock);
 
 MODULE_LICENSE("GPL");

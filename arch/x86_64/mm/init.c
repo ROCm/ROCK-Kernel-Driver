@@ -39,9 +39,9 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
-#define Dprintk(x...) printk(x)
+#define Dprintk(x...)
 
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 /*
  * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
@@ -105,7 +105,7 @@ static void set_pte_phys(unsigned long vaddr,
 	pml4_t *level4;
 	pgd_t *pgd;
 	pmd_t *pmd;
-	pte_t *pte;
+	pte_t *pte, new_pte;
 
 	Dprintk("set_pte_phys %lx to %lx\n", vaddr, phys);
 
@@ -132,11 +132,13 @@ static void set_pte_phys(unsigned long vaddr,
 			return;
 		}
 	}
+	new_pte = pfn_pte(phys >> PAGE_SHIFT, prot);
+
 	pte = pte_offset_kernel(pmd, vaddr);
-	/* CHECKME: */
-	if (pte_val(*pte))
+	if (!pte_none(*pte) &&
+	    pte_val(*pte) != (pte_val(new_pte) & __supported_pte_mask))
 		pte_ERROR(*pte);
-	set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, prot));
+	set_pte(pte, new_pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -339,6 +341,35 @@ void __init paging_init(void)
 	return;
 }
 #endif
+
+/* Unmap a kernel mapping if it exists. This is useful to avoid prefetches
+   from the CPU leading to inconsistent cache lines. address and size
+   must be aligned to 2MB boundaries. 
+   Does nothing when the mapping doesn't exist. */
+void __init clear_kernel_mapping(unsigned long address, unsigned long size) 
+{
+	unsigned long end = address + size;
+
+	BUG_ON(address & ~LARGE_PAGE_MASK);
+	BUG_ON(size & ~LARGE_PAGE_MASK); 
+	
+	for (; address < end; address += LARGE_PAGE_SIZE) { 
+		pgd_t *pgd = pgd_offset_k(address);
+		if (!pgd || pgd_none(*pgd))
+			continue; 
+		pmd_t *pmd = pmd_offset(pgd, address);
+		if (!pmd || pmd_none(*pmd))
+			continue; 
+		if (0 == (pmd_val(*pmd) & _PAGE_PSE)) { 
+			/* Could handle this, but it should not happen currently. */
+			printk(KERN_ERR 
+	       "clear_kernel_mapping: mapping has been split. will leak memory\n"); 
+			pmd_ERROR(*pmd); 
+		}
+		set_pmd(pmd, __pmd(0)); 		
+	}
+	__flush_tlb_all();
+} 
 
 static inline int page_is_ram (unsigned long pagenr)
 {

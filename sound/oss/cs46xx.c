@@ -944,10 +944,10 @@ static void cs_play_setup(struct cs_state *state)
 
 }
 
-struct InitStruct
+static struct InitStruct
 {
-    u32 long off;
-    u32 long val;
+    u32 off;
+    u32 val;
 } InitArray[] = { {0x00000040, 0x3fc0000f},
                   {0x0000004c, 0x04800000},
 
@@ -5725,11 +5725,6 @@ int __init cs46xx_init_module(void)
 	int rtn = 0;
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO 
 		"cs46xx: cs46xx_init_module()+ \n"));
-	if (!pci_present()) {	/* No PCI bus in this machine! */
-		CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO
-			"cs46xx: cs46xx_init_module()- no pci bus found\n"));
-		return -ENODEV;
-	}
 	rtn = pci_module_init(&cs46xx_pci_driver);
 
 	if(rtn == -ENODEV)

@@ -107,7 +107,6 @@ int snd_register_oss_device(int type, snd_card_t * card, int dev, snd_minor_t * 
 	*preg = *reg;
 	preg->number = minor;
 	preg->device = dev;
-	preg->dev = NULL;
 	down(&sound_oss_mutex);
 	list_add_tail(&preg->list, &snd_oss_minors_hash[cidx]);
 	minor_unit = SNDRV_MINOR_OSS_DEVICE(minor);

@@ -1182,7 +1182,7 @@ static int falcon_decode_var( struct fb_var_screeninfo *var,
 	par->HBB = gend2 - par->HHT - 2;
 #if 0
 	/* One more Videl constraint: data fetch of two lines must not overlap */
-	if (par->HDB & 0x200  &&  par->HDB & ~0x200 - par->HDE <= 5) {
+	if ((par->HDB & 0x200)  &&  (par->HDB & ~0x200) - par->HDE <= 5) {
 		/* if this happens increase margins, decrease hfreq. */
 	}
 #endif

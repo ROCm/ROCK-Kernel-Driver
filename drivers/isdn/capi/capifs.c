@@ -141,7 +141,7 @@ static int capifs_fill_super(struct super_block *s, void *data, int silent)
 }
 
 static struct super_block *capifs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_single(fs_type, flags, data, capifs_fill_super);
 }
@@ -234,8 +234,7 @@ static int __init capifs_init(void)
 	int err;
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(rev, p + 2, sizeof(rev));
-		rev[sizeof(rev)-1] = 0;
+		strlcpy(rev, p + 2, sizeof(rev));
 		if ((p = strchr(rev, '$')) != 0 && p > rev)
 		   *(p-1) = 0;
 	} else

@@ -113,7 +113,7 @@ static int smp_iSeries_numProcs(void)
 	struct ItLpPaca * lpPaca;
 
 	np = 0;
-        for (i=0; i < MAX_PACAS; ++i) {
+        for (i=0; i < NR_CPUS; ++i) {
                 lpPaca = paca[i].xLpPacaPtr;
                 if ( lpPaca->xDynProcStatus < 2 ) {
                         ++np;
@@ -128,7 +128,7 @@ static int smp_iSeries_probe(void)
 	unsigned np = 0;
 	struct ItLpPaca *lpPaca;
 
-	for (i=0; i < MAX_PACAS; ++i) {
+	for (i=0; i < NR_CPUS; ++i) {
 		lpPaca = paca[i].xLpPacaPtr;
 		if (lpPaca->xDynProcStatus < 2) {
 			paca[i].active = 1;
@@ -144,7 +144,7 @@ static void smp_iSeries_kick_cpu(int nr)
 	struct ItLpPaca * lpPaca;
 	/* Verify we have a Paca for processor nr */
 	if ( ( nr <= 0 ) ||
-	     ( nr >= MAX_PACAS ) )
+	     ( nr >= NR_CPUS ) )
 		return;
 	/* Verify that our partition has a processor nr */
 	lpPaca = paca[nr].xLpPacaPtr;
@@ -228,7 +228,7 @@ smp_kick_cpu(int nr)
 {
 	/* Verify we have a Paca for processor nr */
 	if ( ( nr <= 0 ) ||
-	     ( nr >= MAX_PACAS ) )
+	     ( nr >= NR_CPUS ) )
 		return;
 
 	/* The information for processor bringup must
@@ -390,17 +390,6 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 void smp_send_reschedule(int cpu)
 {
 	smp_message_pass(cpu, PPC_MSG_RESCHEDULE, 0, 0);
-}
-
-/*
- * this function sends a reschedule IPI to all (other) CPUs.
- * This should only be used if some 'global' task became runnable,
- * such as a RT task, that must be handled now. The first CPU
- * that manages to grab the task will run it.
- */
-void smp_send_reschedule_all(void)
-{
-	smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_RESCHEDULE, 0, 0);
 }
 
 #ifdef CONFIG_XMON

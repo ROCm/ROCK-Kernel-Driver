@@ -155,7 +155,7 @@ static void ide_outl (u32 val, unsigned long port)
 
 static void ide_outsl (unsigned long port, void *addr, u32 count)
 {
-	return outsl(port, addr, count);
+	outsl(port, addr, count);
 }
 
 void default_hwif_iops (ide_hwif_t *hwif)
@@ -391,7 +391,7 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
 		insw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
 		return;
 	}
-#endif /* CONFIG_ATARI */
+#endif /* CONFIG_ATARI || CONFIG_Q40 */
 	hwif->ata_input_data(drive, buffer, bytecount / 4);
 	if ((bytecount & 0x03) >= 2)
 		hwif->INSW(IDE_DATA_REG, ((u8 *)buffer)+(bytecount & ~0x03), 1);
@@ -410,7 +410,7 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
 		outsw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
 		return;
 	}
-#endif /* CONFIG_ATARI */
+#endif /* CONFIG_ATARI || CONFIG_Q40 */
 	hwif->ata_output_data(drive, buffer, bytecount / 4);
 	if ((bytecount & 0x03) >= 2)
 		hwif->OUTSW(IDE_DATA_REG, ((u8*)buffer)+(bytecount & ~0x03), 1);

@@ -299,7 +299,8 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define PAGE_COPY	__pgprot(_PAGE_BASE | _PAGE_USER)
 #define PAGE_COPY_X	__pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_EXEC)
 
-#define PAGE_KERNEL	__pgprot(_PAGE_RAM)
+#define PAGE_KERNEL		__pgprot(_PAGE_RAM)
+#define PAGE_KERNEL_NOCACHE	__pgprot(_PAGE_IO)
 
 /*
  * The PowerPC can only do execute protection on a segment (256MB) basis,
@@ -477,6 +478,11 @@ static inline void ptep_mkdirty(pte_t *ptep)
 	pte_update(ptep, 0, _PAGE_DIRTY);
 }
 
+/*
+ * Macro to mark a page protection value as "uncacheable".
+ */
+#define pgprot_noncached(prot)	(__pgprot(pgprot_val(prot) | _PAGE_NO_CACHE | _PAGE_GUARDED))
+
 #define pte_same(A,B)	(((pte_val(A) ^ pte_val(B)) & ~_PAGE_HASHPTE) == 0)
 
 #define pmd_page_kernel(pmd)	\
@@ -515,7 +521,7 @@ extern void paging_init(void);
 
 /*
  * When flushing the tlb entry for a page, we also need to flush the hash
- * table entry.  flush_hash_page is assembler (for speed) in hashtable.S.
+ * table entry.  flush_hash_pages is assembler (for speed) in hashtable.S.
  */
 extern int flush_hash_pages(unsigned context, unsigned long va,
 			    unsigned long pmdval, int count);

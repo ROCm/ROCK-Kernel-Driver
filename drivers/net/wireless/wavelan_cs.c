@@ -5026,77 +5026,28 @@ wavelan_event(event_t		event,		/* The event received */
   return 0;
 }
 
-/****************************** MODULE ******************************/
-/*
- * Module entry points : insertion & removal
- */
+static struct pcmcia_driver wavelan_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "wavelan_cs",
+	},
+	.attach		= wavelan_attach,
+	.detach		= wavelan_detach,
+};
 
-/*------------------------------------------------------------------*/
-/*
- * Module insertion : initialisation of the module.
- * Register the card with cardmgr...
- */
 static int __init
 init_wavelan_cs(void)
 {
-  servinfo_t	serv;
-
-#ifdef DEBUG_MODULE_TRACE
-  printk(KERN_DEBUG "-> init_wavelan_cs()\n");
-#ifdef DEBUG_VERSION_SHOW
-  printk(KERN_DEBUG "%s", version);
-#endif
-#endif
-
-  CardServices(GetCardServicesInfo, &serv);
-  if(serv.Revision != CS_RELEASE_CODE)
-    {
-#ifdef DEBUG_CONFIG_ERRORS
-      printk(KERN_WARNING "init_wavelan_cs: Card Services release does not match!\n");
-#endif
-      return -1;
-    }
-
-  register_pccard_driver(&dev_info, &wavelan_attach, &wavelan_detach);
-
-#ifdef DEBUG_MODULE_TRACE
-  printk(KERN_DEBUG "<- init_wavelan_cs()\n");
-#endif
-  return 0;
+	return pcmcia_register_driver(&wavelan_driver);
 }
 
-/*------------------------------------------------------------------*/
-/*
- * Module removal
- */
 static void __exit
 exit_wavelan_cs(void)
 {
-#ifdef DEBUG_MODULE_TRACE
-  printk(KERN_DEBUG "-> cleanup_module()\n");
-#endif
-#ifdef DEBUG_BASIC_SHOW
-  printk(KERN_NOTICE "wavelan_cs: unloading\n");
-#endif
+	/* Do some cleanup of the device list */
+	wv_flush_stale_links();
 
-  /* Do some cleanup of the device list */
-  wv_flush_stale_links();
-
-  /* If there remain some devices... */
-#ifdef DEBUG_CONFIG_ERRORS
-  if(dev_list != NULL)
-    {
-      /* Honestly, if this happen we are in a deep s**t */
-      printk(KERN_INFO "wavelan_cs: devices remaining when removing module\n");
-      printk(KERN_INFO "Please flush your disks and reboot NOW !\n");
-    }
-#endif
-
-  unregister_pccard_driver(&dev_info);
-
-#ifdef DEBUG_MODULE_TRACE
-  printk(KERN_DEBUG "<- cleanup_module()\n");
-#endif
+	pcmcia_unregister_driver(&wavelan_driver);
 }
 
 module_init(init_wavelan_cs);

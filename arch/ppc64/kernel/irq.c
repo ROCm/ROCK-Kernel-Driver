@@ -63,8 +63,11 @@ extern void iSeries_smp_message_recv( struct pt_regs * );
 volatile unsigned char *chrp_int_ack_special;
 static void register_irq_proc (unsigned int irq);
 
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
-	{ [0 ... NR_IRQS-1] = { 0, NULL, NULL, 0, SPIN_LOCK_UNLOCKED}};
+irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
+	[0 ... NR_IRQS-1] = {
+		.lock = SPIN_LOCK_UNLOCKED
+	}
+};
 	
 int ppc_spurious_interrupts = 0;
 unsigned long lpEvent_count = 0;
@@ -381,22 +384,48 @@ skip:
 	return 0;
 }
 
-static inline void
-handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
+extern char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
+
+static inline void handle_irq_event(int irq, struct pt_regs *regs,
+				    struct irqaction *action)
 {
 	int status = 0;
+	int retval = 0;
+	struct irqaction *first_action = action;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
 	do {
 		status |= action->flags;
-		action->handler(irq, action->dev_id, regs);
+		retval |= action->handler(irq, action->dev_id, regs);
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
+	if (retval != 1) {
+		static int count = 100;
+		char name_buf[256];
+		if (count) {
+			count--;
+			if (retval) {
+				printk("irq event %d: bogus retval mask %x\n",
+					irq, retval);
+			} else {
+				printk("irq %d: nobody cared!\n", irq);
+			}
+			dump_stack();
+			printk("handlers:\n");
+			action = first_action;
+			do {
+				printk("[<%p>]", action->handler);
+				printk(" (%s)\n",
+				       ppc_find_proc_name((unsigned *)action->handler, name_buf, 256));
+				action = action->next;
+			} while (action);
+		}
+	}
 }
 
 /*
@@ -676,7 +705,7 @@ static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
 #ifdef CONFIG_PPC_ISERIES
 	{
 		unsigned i;
-		for (i=0; i<MAX_PACAS; ++i) {
+		for (i=0; i<NR_CPUS; ++i) {
 			if ( paca[i].prof_buffer && (new_value & 1) )
 				paca[i].prof_enabled = 1;
 			else

@@ -54,13 +54,7 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_BLK_DEV_ALI14XX_MODULE
-# define _IDE_C
-# include "ide_modes.h"
-# undef _IDE_C
-#else
-# include "ide_modes.h"
-#endif /* CONFIG_BLK_DEV_ALI14XX_MODULE */
+#include "ide_modes.h"
 
 /* port addresses for auto-detection */
 #define ALI_NUM_PORTS 4

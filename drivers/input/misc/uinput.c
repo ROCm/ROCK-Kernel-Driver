@@ -192,15 +192,14 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 	if (NULL != dev->name) 
 		kfree(dev->name);
 
-	size = strnlen(user_dev->name, UINPUT_MAX_NAME_SIZE);
-	dev->name = kmalloc(size + 1, GFP_KERNEL);
+	size = strnlen(user_dev->name, UINPUT_MAX_NAME_SIZE) + 1;
+	dev->name = kmalloc(size, GFP_KERNEL);
 	if (!dev->name) {
 		retval = -ENOMEM;
 		goto exit;
 	}
 
-	strncpy(dev->name, user_dev->name, size);
-	dev->name[size] = '\0';
+	strlcpy(dev->name, user_dev->name, size);
 	dev->id.bustype	= user_dev->id.bustype;
 	dev->id.vendor	= user_dev->id.vendor;
 	dev->id.product	= user_dev->id.product;

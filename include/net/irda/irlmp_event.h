@@ -79,26 +79,6 @@ typedef enum {
 	LM_LAP_IDLE_TIMEOUT,
 } IRLMP_EVENT;
 
-/*
- *  Information which is used by the current thread, when executing in the
- *  state machine.
- */
-struct irlmp_event {
-	IRLMP_EVENT *event;
-	struct sk_buff *skb;
-
-	__u8 hint;
-	__u32 daddr;
-	__u32 saddr;
-
-	__u8 slsap;
-	__u8 dlsap;
-
-	int reason;
-
-	struct discovery_t *discovery;
-};
-
 extern const char *irlmp_state[];
 extern const char *irlsap_state[];
 

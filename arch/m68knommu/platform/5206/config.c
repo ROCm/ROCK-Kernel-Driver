@@ -79,10 +79,30 @@ void mcf_settimericr(unsigned int timer, unsigned int level)
 
 /***************************************************************************/
 
+int mcf_timerirqpending(int timer)
+{
+	unsigned int imr = 0;
+
+	switch (timer) {
+	case 1:  imr = MCFSIM_IMR_TIMER1; break;
+	case 2:  imr = MCFSIM_IMR_TIMER2; break;
+	default: break;
+	}
+	return (mcf_getipr() & imr);
+}
+
+/***************************************************************************/
+
 void config_BSP(char *commandp, int size)
 {
 	mcf_setimr(MCFSIM_IMR_MASKALL);
+
+#if defined(CONFIG_BOOTPARAM)
+	strncpy(commandp, CONFIG_BOOTPARAM_STRING, size);
+	commandp[size-1] = 0;
+#else
 	memset(commandp, 0, size);
+#endif
 
 	mach_sched_init = coldfire_timer_init;
 	mach_tick = coldfire_tick;

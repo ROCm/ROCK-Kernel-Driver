@@ -34,7 +34,7 @@ struct wan_sockaddr_ll
 typedef struct 
 {
 	unsigned char free;
-	unsigned char sk_state;
+	unsigned char state_sk;
 	int rcvbuf;
 	int sndbuf;
 	int rmem;
@@ -117,7 +117,7 @@ struct wanpipe_opt
 	unsigned short num; 
 };
 
-#define wp_sk(__sk) ((struct wanpipe_opt *)(__sk)->protinfo)
+#define wp_sk(__sk) ((struct wanpipe_opt *)(__sk)->sk_protinfo)
 
 #endif
 

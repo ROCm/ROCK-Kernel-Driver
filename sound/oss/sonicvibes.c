@@ -1046,8 +1046,8 @@ static int mixer_ioctl(struct sv_state *s, unsigned int cmd, unsigned long arg)
 	VALIDATE_STATE(s);
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, "SonicVibes", sizeof(info.id));
-		strncpy(info.name, "S3 SonicVibes", sizeof(info.name));
+		strlcpy(info.id, "SonicVibes", sizeof(info.id));
+		strlcpy(info.name, "S3 SonicVibes", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -1055,8 +1055,8 @@ static int mixer_ioctl(struct sv_state *s, unsigned int cmd, unsigned long arg)
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, "SonicVibes", sizeof(info.id));
-		strncpy(info.name, "S3 SonicVibes", sizeof(info.name));
+		strlcpy(info.id, "SonicVibes", sizeof(info.id));
+		strlcpy(info.name, "S3 SonicVibes", sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -2723,8 +2723,6 @@ static struct pci_driver sv_driver = {
  
 static int __init init_sonicvibes(void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
 	printk(KERN_INFO "sv: version v0.31 time " __TIME__ " " __DATE__ "\n");
 #if 0
 	if (!(wavetable_mem = __get_free_pages(GFP_KERNEL, 20-PAGE_SHIFT)))

@@ -107,7 +107,7 @@ struct notifier_block *sleep_notifier_list;
 static int pmu_probe(void);
 static int pmu_init(void);
 static void pmu_start(void);
-static void pmu_interrupt(int irq, void *arg, struct pt_regs *regs);
+static irqreturn_t pmu_interrupt(int irq, void *arg, struct pt_regs *regs);
 static int pmu_send_request(struct adb_request *req, int sync);
 static int pmu_autopoll(int devs);
 void pmu_poll(void);
@@ -572,7 +572,7 @@ pmu_poll()
 	local_irq_restore(flags);
 }
 
-static void 
+static irqreturn_t
 pmu_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct adb_request *req;
@@ -688,6 +688,7 @@ finish:
 	printk("pmu_interrupt: exit state %d acr %02X, b %02X data_index %d/%d adb_int_pending %d\n",
 		pmu_state, (uint) via1[ACR], (uint) via2[B], data_index, data_len, adb_int_pending);
 #endif
+	return IRQ_HANDLED;
 }
 
 static void 
@@ -838,11 +839,11 @@ static inline void __openfirmware
 pbook_pci_save(void)
 {
 	int npci;
-	struct pci_dev *pd;
+	struct pci_dev *pd = NULL;
 	struct pci_save *ps;
 
 	npci = 0;
-	for (pd = pci_devices; pd != NULL; pd = pd->next)
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL)
 		++npci;
 	n_pbook_pci_saves = npci;
 	if (npci == 0)
@@ -852,7 +853,8 @@ pbook_pci_save(void)
 	if (ps == NULL)
 		return;
 
-	for (pd = pci_devices; pd != NULL && npci != 0; pd = pd->next) {
+	pd = NULL;
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL) {
 		pci_read_config_word(pd, PCI_COMMAND, &ps->command);
 		pci_read_config_word(pd, PCI_CACHE_LINE_SIZE, &ps->cache_lat);
 		pci_read_config_word(pd, PCI_INTERRUPT_LINE, &ps->intr);
@@ -866,10 +868,10 @@ pbook_pci_restore(void)
 {
 	u16 cmd;
 	struct pci_save *ps = pbook_pci_saves;
-	struct pci_dev *pd;
+	struct pci_dev *pd = NULL;
 	int j;
 
-	for (pd = pci_devices; pd != NULL; pd = pd->next, ++ps) {
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL) {
 		if (ps->command == 0)
 			continue;
 		pci_read_config_word(pd, PCI_COMMAND, &cmd);

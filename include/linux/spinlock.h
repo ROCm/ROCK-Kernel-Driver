@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/stringify.h>
 
+#include <asm/processor.h>	/* for cpu relax */
 #include <asm/system.h>
 
 /*

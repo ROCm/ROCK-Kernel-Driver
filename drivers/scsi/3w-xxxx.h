@@ -474,7 +474,6 @@ int tw_scsi_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 int tw_scsi_detect(Scsi_Host_Template *tw_host);
 int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt);
 int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt);
-int tw_scsi_proc_info(char *buffer, char **start, off_t offset, int length, int inode, int inout);
 int tw_scsi_queue(Scsi_Cmnd *cmd, void (*done) (Scsi_Cmnd *));
 int tw_scsi_release(struct Scsi_Host *tw_host);
 int tw_scsiop_inquiry(TW_Device_Extension *tw_dev, int request_id);

@@ -6,11 +6,11 @@
  * of ugly preprocessor tricks. Talk about very very poor man's inheritance.
  */ 
 #include <linux/types.h>
-#include <linux/compat.h>
 #include <linux/config.h> 
 #include <linux/stddef.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
+#include <linux/compat.h>
 #include <linux/string.h>
 #include <linux/binfmts.h>
 #include <linux/mm.h>
@@ -23,12 +23,17 @@
 #include <asm/i387.h>
 #include <asm/uaccess.h>
 #include <asm/ia32.h>
+#include <asm/vsyscall32.h>
 
 #define ELF_NAME "elf/i386"
 
 #define AT_SYSINFO 32
+#define AT_SYSINFO_EHDR		33
 
-#define ARCH_DLINFO NEW_AUX_ENT(AT_SYSINFO, 0xffffe000)
+#define ARCH_DLINFO do {  \
+	NEW_AUX_ENT(AT_SYSINFO, (u32)(u64)VSYSCALL32_VSYSCALL); \
+	NEW_AUX_ENT(AT_SYSINFO_EHDR, VSYSCALL32_BASE);    \
+} while(0)
 
 struct file;
 struct elf_phdr; 
@@ -53,6 +58,47 @@ typedef unsigned int elf_greg_t;
 
 #define ELF_NGREG (sizeof (struct user_regs_struct32) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+
+/*
+ * These macros parameterize elf_core_dump in fs/binfmt_elf.c to write out
+ * extra segments containing the vsyscall DSO contents.  Dumping its
+ * contents makes post-mortem fully interpretable later without matching up
+ * the same kernel and hardware config to see what PC values meant.
+ * Dumping its extra ELF program headers includes all the other information
+ * a debugger needs to easily find how the vsyscall DSO was being used.
+ */
+#define ELF_CORE_EXTRA_PHDRS		(VSYSCALL32_EHDR->e_phnum)
+#define ELF_CORE_WRITE_EXTRA_PHDRS					      \
+do {									      \
+	const struct elf32_phdr *const vsyscall_phdrs =			      \
+		(const struct elf32_phdr *) (VSYSCALL32_BASE		      \
+					   + VSYSCALL32_EHDR->e_phoff);	      \
+	int i;								      \
+	Elf32_Off ofs = 0;						      \
+	for (i = 0; i < VSYSCALL32_EHDR->e_phnum; ++i) {		      \
+		struct elf_phdr phdr = vsyscall_phdrs[i];		      \
+		if (phdr.p_type == PT_LOAD) {				      \
+			ofs = phdr.p_offset = offset;			      \
+			offset += phdr.p_filesz;			      \
+		}							      \
+		else							      \
+			phdr.p_offset += ofs;				      \
+		phdr.p_paddr = 0; /* match other core phdrs */		      \
+		DUMP_WRITE(&phdr, sizeof(phdr));			      \
+	}								      \
+} while (0)
+#define ELF_CORE_WRITE_EXTRA_DATA					      \
+do {									      \
+	const struct elf32_phdr *const vsyscall_phdrs =			      \
+		(const struct elf32_phdr *) (VSYSCALL32_BASE		      \
+					   + VSYSCALL32_EHDR->e_phoff);	      \
+	int i;								      \
+	for (i = 0; i < VSYSCALL32_EHDR->e_phnum; ++i) {		      \
+		if (vsyscall_phdrs[i].p_type == PT_LOAD)		      \
+			DUMP_WRITE((void *) (u64) vsyscall_phdrs[i].p_vaddr,	      \
+				   vsyscall_phdrs[i].p_filesz);		      \
+	}								      \
+} while (0)
 
 struct elf_siginfo
 {
@@ -157,7 +203,6 @@ elf_core_copy_task_fpregs(struct task_struct *tsk, elf_fpregset_t *fpu)
 	struct _fpstate_ia32 *fpstate = (void*)fpu; 
 	struct pt_regs *regs = (struct pt_regs *)(tsk->thread.rsp0); 
 	mm_segment_t oldfs = get_fs();
-	int ret;
 
 	if (!tsk->used_math) 
 		return 0;
@@ -165,12 +210,12 @@ elf_core_copy_task_fpregs(struct task_struct *tsk, elf_fpregset_t *fpu)
 	if (tsk == current)
 		unlazy_fpu(tsk);
 	set_fs(KERNEL_DS); 
-	ret = save_i387_ia32(tsk, fpstate, regs, 1);
+	save_i387_ia32(tsk, fpstate, regs, 1);
 	/* Correct for i386 bug. It puts the fop into the upper 16bits of 
 	   the tag word (like FXSAVE), not into the fcs*/ 
 	fpstate->cssel |= fpstate->tag & 0xffff0000; 
 	set_fs(oldfs); 
-	return ret; 
+	return 1; 
 }
 
 #define ELF_CORE_COPY_XFPREGS 1
@@ -302,8 +347,9 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = IA32_STACK_TOP;
-		mpnt->vm_page_prot = PAGE_COPY_EXEC;
-		mpnt->vm_flags = VM_STACK_FLAGS;
+		mpnt->vm_flags = vm_stack_flags32; 
+ 		mpnt->vm_page_prot = (mpnt->vm_flags & VM_EXEC) ? 
+ 			PAGE_COPY_EXEC : PAGE_COPY;
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
@@ -333,7 +379,7 @@ elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	struct task_struct *me = current; 
 
 	if (prot & PROT_READ) 
-		prot |= PROT_EXEC; 
+		prot |= vm_force_exec32;
 
 	down_write(&me->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),

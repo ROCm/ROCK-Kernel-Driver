@@ -20,6 +20,8 @@
 #include <linux/soundcard.h>
 #include <linux/mm.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
+
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/atariints.h>

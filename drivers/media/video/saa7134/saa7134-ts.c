@@ -251,7 +251,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 
 		memset(cap,0,sizeof(*cap));
                 strcpy(cap->driver, "saa7134");
-		strncpy(cap->card, saa7134_boards[dev->board].name,
+		strlcpy(cap->card, saa7134_boards[dev->board].name,
 			sizeof(cap->card));
 		sprintf(cap->bus_info,"PCI:%s",dev->pci->slot_name);
 		cap->version = SAA7134_VERSION_CODE;
@@ -300,7 +300,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 		
 		memset(f,0,sizeof(*f));
 		f->index = index;
-		strncpy(f->description, "MPEG TS", 31);
+		strlcpy(f->description, "MPEG TS", sizeof(f->description));
 		f->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		f->pixelformat = V4L2_PIX_FMT_MPEG;
 		return 0;

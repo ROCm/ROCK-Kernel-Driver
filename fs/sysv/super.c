@@ -497,13 +497,13 @@ failed:
 /* Every kernel module contains stuff like this. */
 
 static struct super_block *sysv_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, sysv_fill_super);
 }
 
 static struct super_block *v7_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, v7_fill_super);
 }

@@ -90,7 +90,8 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * Only add valid (hashed) inodes to the superblock's
 		 * dirty list.  Add blockdev inodes as well.
 		 */
-		if (hlist_unhashed(&inode->i_hash) && !S_ISBLK(inode->i_mode))
+		if ((hlist_unhashed(&inode->i_hash) || (inode->i_state & (I_FREEING|I_CLEAR)))
+		    && !S_ISBLK(inode->i_mode))
 			goto out;
 
 		/*

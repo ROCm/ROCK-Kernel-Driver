@@ -57,8 +57,6 @@ static int sun3scsi_detect (Scsi_Host_Template *);
 static const char *sun3scsi_info (struct Scsi_Host *);
 static int sun3scsi_bus_reset(Scsi_Cmnd *);
 static int sun3scsi_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-static int sun3scsi_proc_info (char *buffer, char **start, off_t offset,
-			int length, int hostno, int inout);
 #ifdef MODULE
 static int sun3scsi_release (struct Scsi_Host *);
 #else

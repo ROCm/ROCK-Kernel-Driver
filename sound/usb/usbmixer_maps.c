@@ -59,32 +59,33 @@ static struct usbmix_name_map extigy_map[] = {
 	{ 2, "PCM Playback" }, /* FU */
 	/* 3: IT pcm */
 	/* 4: IT digital in */
-	{ 5, "Digital In Playback Source" }, /* SU */
+	{ 5, NULL }, /* DISABLED: this seems to be bogus on some firmware */
 	{ 6, "Digital In" }, /* FU */
 	/* 7: IT line */
 	{ 8, "Line Playback" }, /* FU */
 	/* 9: IT mic */
 	{ 10, "Mic Playback" }, /* FU */
-	{ 11, "Capture Source" }, /* SU */
+	{ 11, "Capture Input Source" }, /* SU */
 	{ 12, "Capture" }, /* FU */
 	/* 13: OT pcm capture */
 	/* 14: MU (w/o controls) */
 	/* 15: PU (3D enh) */
 	/* 16: MU (w/o controls) */
-	/* 17: PU (updown) */		/* FIXME: what control? */
+	{ 17, NULL, 1 }, /* DISABLED: PU-switch (any effect?) */
+	{ 17, "Channel Routing", 2 },	/* PU: mode select */
 	{ 18, "Tone Control - Bass", USB_FEATURE_BASS }, /* FU */
 	{ 18, "Tone Control - Treble", USB_FEATURE_TREBLE }, /* FU */
 	{ 18, "Master Playback" }, /* FU; others */
 	/* 19: OT speaker */
 	/* 20: OT headphone */
-	{ 21, "Digital Out Extension" }, /* EU */ /* FIXME: what? */
+	{ 21, NULL }, /* DISABLED: EU (for what?) */
 	{ 22, "Digital Out Playback" }, /* FU */
 	{ 23, "Digital Out1 Playback" }, /* FU */  /* FIXME: corresponds to 24 */
 	/* 24: OT digital out */
-	{ 25, "Digital Out2 Playback" }, /* FU */  /* FIXME: corresponds to 26 */
-	/* 26: OT digital out */
-	{ 27, "Output Extension" }, /* EU */ /* FIXME: what? */
-	/* 28: FU (mute) */
+	{ 25, "IEC958 Optical Playback" }, /* FU */
+	{ 26, "IEC958 Optical Playback" }, /* OT */
+	{ 27, NULL }, /* DISABLED: EU (for what?) */
+	/* 28: FU speaker (mute) */
 	{ 0 } /* terminator */
 };
 

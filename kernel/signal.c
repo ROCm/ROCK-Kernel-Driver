@@ -4,6 +4,10 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
  *  1997-11-02  Modified for POSIX.1b signals by Richard Henderson
+ *
+ *  2003-06-02  Jim Houston - Concurrent Computer Corp.
+ *		Changes to use preallocated sigqueue structures
+ *		to allow signals to be sent reliably.
  */
 
 #define __KERNEL_SYSCALLS__
@@ -258,20 +262,38 @@ next_signal(struct sigpending *pending, sigset_t *mask)
 	return sig;
 }
 
+struct sigqueue *__sigqueue_alloc(void)
+{
+	struct sigqueue *q = 0;
+
+	if (atomic_read(&nr_queued_signals) < max_queued_signals)
+		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
+	if (q) {
+		atomic_inc(&nr_queued_signals);
+		INIT_LIST_HEAD(&q->list);
+		q->flags = 0;
+		q->lock = 0;
+	}
+	return(q);
+}
+
+static inline void __sigqueue_free(struct sigqueue *q)
+{
+	if (q->flags & SIGQUEUE_PREALLOC)
+		return;
+	kmem_cache_free(sigqueue_cachep, q);
+	atomic_dec(&nr_queued_signals);
+}
+
 static void flush_sigqueue(struct sigpending *queue)
 {
-	struct sigqueue *q, *n;
+	struct sigqueue *q;
 
 	sigemptyset(&queue->signal);
-	q = queue->head;
-	queue->head = NULL;
-	queue->tail = &queue->head;
-
-	while (q) {
-		n = q->next;
-		kmem_cache_free(sigqueue_cachep, q);
-		atomic_dec(&nr_queued_signals);
-		q = n;
+	while (!list_empty(&queue->list)) {
+		q = list_entry(queue->list.next, struct sigqueue , list);
+		list_del_init(&q->list);
+		__sigqueue_free(q);
 	}
 }
 
@@ -336,7 +358,7 @@ void __exit_signal(struct task_struct *tsk)
 		 * If there is any task waiting for the group exit
 		 * then notify it:
 		 */
-		if (sig->group_exit_task && atomic_read(&sig->count) <= 2) {
+		if (sig->group_exit_task && atomic_read(&sig->count) == sig->notify_count) {
 			wake_up_process(sig->group_exit_task);
 			sig->group_exit_task = NULL;
 		}
@@ -411,15 +433,32 @@ unblock_all_signals(void)
 
 static inline int collect_signal(int sig, struct sigpending *list, siginfo_t *info)
 {
-	if (sigismember(&list->signal, sig)) {
-		/* Collect the siginfo appropriate to this signal.  */
-		struct sigqueue *q, **pp;
-		pp = &list->head;
-		while ((q = *pp) != NULL) {
-			if (q->info.si_signo == sig)
-				goto found_it;
-			pp = &q->next;
+	struct sigqueue *q, *first = 0;
+	int still_pending = 0;
+
+	if (unlikely(!sigismember(&list->signal, sig)))
+		return 0;
+
+	/*
+	 * Collect the siginfo appropriate to this signal.  Check if
+	 * there is another siginfo for the same signal.
+	*/
+	list_for_each_entry(q, &list->list, list) {
+		if (q->info.si_signo == sig) {
+			if (first) {
+				still_pending = 1;
+				break;
+			}
+			first = q;
 		}
+	}
+	if (first) {
+		list_del_init(&first->list);
+		copy_siginfo(info, &first->info);
+		__sigqueue_free(first);
+		if (!still_pending)
+			sigdelset(&list->signal, sig);
+	} else {
 
 		/* Ok, it wasn't in the queue.  This must be
 		   a fast-pathed signal or we must have been
@@ -431,31 +470,8 @@ static inline int collect_signal(int sig, struct sigpending *list, siginfo_t *in
 		info->si_code = 0;
 		info->si_pid = 0;
 		info->si_uid = 0;
-		return 1;
-
-found_it:
-		if ((*pp = q->next) == NULL)
-			list->tail = pp;
-
-		/* Copy the sigqueue information and free the queue entry */
-		copy_siginfo(info, &q->info);
-		kmem_cache_free(sigqueue_cachep,q);
-		atomic_dec(&nr_queued_signals);
-
-		/* Non-RT signals can exist multiple times.. */
-		if (sig >= SIGRTMIN) {
-			while ((q = *pp) != NULL) {
-				if (q->info.si_signo == sig)
-					goto found_another;
-				pp = &q->next;
-			}
-		}
-
-		sigdelset(&list->signal, sig);
-found_another:
-		return 1;
 	}
-	return 0;
+	return 1;
 }
 
 static int __dequeue_signal(struct sigpending *pending, sigset_t *mask,
@@ -544,25 +560,18 @@ inline void signal_wake_up(struct task_struct *t, int resume)
  */
 static int rm_from_queue(unsigned long mask, struct sigpending *s)
 {
-	struct sigqueue *q, **pp;
+	struct sigqueue *q, *n;
 
 	if (!sigtestsetmask(&s->signal, mask))
 		return 0;
 
 	sigdelsetmask(&s->signal, mask);
-
-	pp = &s->head;
-
-	while ((q = *pp) != NULL) {
+	list_for_each_entry_safe(q, n, &s->list, list) {
 		if (q->info.si_signo < SIGRTMIN &&
-		    (mask & sigmask (q->info.si_signo))) {
-			if ((*pp = q->next) == NULL)
-				s->tail = pp;
-			kmem_cache_free(sigqueue_cachep,q);
-			atomic_dec(&nr_queued_signals);
-			continue;
+		    (mask & sigmask(q->info.si_signo))) {
+			list_del_init(&q->list);
+			__sigqueue_free(q);
 		}
-		pp = &q->next;
 	}
 	return 1;
 }
@@ -695,9 +704,8 @@ static int send_signal(int sig, struct siginfo *info, struct sigpending *signals
 
 	if (q) {
 		atomic_inc(&nr_queued_signals);
-		q->next = NULL;
-		*signals->tail = q;
-		signals->tail = &q->next;
+		q->flags = 0;
+		list_add_tail(&q->list, &signals->list);
 		switch ((unsigned long) info) {
 		case 0:
 			q->info.si_signo = sig;
@@ -827,10 +835,113 @@ force_sig_specific(int sig, struct task_struct *t)
 	 && !((p)->flags & PF_EXITING)			\
 	 && (task_curr(p) || !signal_pending(p)))
 
+
+static inline void
+__group_complete_signal(int sig, struct task_struct *p, unsigned int mask)
+{
+	struct task_struct *t;
+
+	/*
+	 * Now find a thread we can wake up to take the signal off the queue.
+	 *
+	 * If the main thread wants the signal, it gets first crack.
+	 * Probably the least surprising to the average bear.
+	 */
+	if (wants_signal(sig, p, mask))
+		t = p;
+	else if (thread_group_empty(p))
+		/*
+		 * There is just one thread and it does not need to be woken.
+		 * It will dequeue unblocked signals before it runs again.
+		 */
+		return;
+	else {
+		/*
+		 * Otherwise try to find a suitable thread.
+		 */
+		t = p->signal->curr_target;
+		if (t == NULL)
+			/* restart balancing at this thread */
+			t = p->signal->curr_target = p;
+		BUG_ON(t->tgid != p->tgid);
+
+		while (!wants_signal(sig, t, mask)) {
+			t = next_thread(t);
+			if (t == p->signal->curr_target)
+				/*
+				 * No thread needs to be woken.
+				 * Any eligible threads will see
+				 * the signal in the queue soon.
+				 */
+				return;
+		}
+		p->signal->curr_target = t;
+	}
+
+	/*
+	 * Found a killable thread.  If the signal will be fatal,
+	 * then start taking the whole group down immediately.
+	 */
+	if (sig_fatal(p, sig) && !p->signal->group_exit &&
+	    !sigismember(&t->real_blocked, sig) &&
+	    (sig == SIGKILL || !(t->ptrace & PT_PTRACED))) {
+		/*
+		 * This signal will be fatal to the whole group.
+		 */
+		if (!sig_kernel_coredump(sig)) {
+			/*
+			 * Start a group exit and wake everybody up.
+			 * This way we don't have other threads
+			 * running and doing things after a slower
+			 * thread has the fatal signal pending.
+			 */
+			p->signal->group_exit = 1;
+			p->signal->group_exit_code = sig;
+			p->signal->group_stop_count = 0;
+			t = p;
+			do {
+				sigaddset(&t->pending.signal, SIGKILL);
+				signal_wake_up(t, 1);
+				t = next_thread(t);
+			} while (t != p);
+			return;
+		}
+
+		/*
+		 * There will be a core dump.  We make all threads other
+		 * than the chosen one go into a group stop so that nothing
+		 * happens until it gets scheduled, takes the signal off
+		 * the shared queue, and does the core dump.  This is a
+		 * little more complicated than strictly necessary, but it
+		 * keeps the signal state that winds up in the core dump
+		 * unchanged from the death state, e.g. which thread had
+		 * the core-dump signal unblocked.
+		 */
+		rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
+		rm_from_queue(SIG_KERNEL_STOP_MASK, &p->signal->shared_pending);
+		p->signal->group_stop_count = 0;
+		p->signal->group_exit_task = t;
+		t = p;
+		do {
+			p->signal->group_stop_count++;
+			signal_wake_up(t, 0);
+			t = next_thread(t);
+		} while (t != p);
+		wake_up_process(p->signal->group_exit_task);
+		return;
+	}
+
+	/*
+	 * The signal is already in the shared-pending queue.
+	 * Tell the chosen thread to wake up and dequeue it.
+	 */
+	signal_wake_up(t, sig == SIGKILL);
+	return;
+}
+
 static inline int
 __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
-	struct task_struct *t;
 	unsigned int mask;
 	int ret = 0;
 
@@ -871,101 +982,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	if (unlikely(ret))
 		return ret;
 
-	/*
-	 * Now find a thread we can wake up to take the signal off the queue.
-	 *
-	 * If the main thread wants the signal, it gets first crack.
-	 * Probably the least surprising to the average bear.
-	 */
-	if (wants_signal(sig, p, mask))
-		t = p;
-	else if (thread_group_empty(p))
-		/*
-		 * There is just one thread and it does not need to be woken.
-		 * It will dequeue unblocked signals before it runs again.
-		 */
-		return 0;
-	else {
-		/*
-		 * Otherwise try to find a suitable thread.
-		 */
-		t = p->signal->curr_target;
-		if (t == NULL)
-			/* restart balancing at this thread */
-			t = p->signal->curr_target = p;
-		BUG_ON(t->tgid != p->tgid);
-
-		while (!wants_signal(sig, t, mask)) {
-			t = next_thread(t);
-			if (t == p->signal->curr_target)
-				/*
-				 * No thread needs to be woken.
-				 * Any eligible threads will see
-				 * the signal in the queue soon.
-				 */
-				return 0;
-		}
-		p->signal->curr_target = t;
-	}
-
-	/*
-	 * Found a killable thread.  If the signal will be fatal,
-	 * then start taking the whole group down immediately.
-	 */
-	if (sig_fatal(p, sig) && !p->signal->group_exit &&
-	    !sigismember(&t->real_blocked, sig) &&
-	    (sig == SIGKILL || !(t->ptrace & PT_PTRACED))) {
-		/*
-		 * This signal will be fatal to the whole group.
-		 */
-		if (!sig_kernel_coredump(sig)) {
-			/*
-			 * Start a group exit and wake everybody up.
-			 * This way we don't have other threads
-			 * running and doing things after a slower
-			 * thread has the fatal signal pending.
-			 */
-			p->signal->group_exit = 1;
-			p->signal->group_exit_code = sig;
-			p->signal->group_stop_count = 0;
-			t = p;
-			do {
-				sigaddset(&t->pending.signal, SIGKILL);
-				signal_wake_up(t, 1);
-				t = next_thread(t);
-			} while (t != p);
-			return 0;
-		}
-
-		/*
-		 * There will be a core dump.  We make all threads other
-		 * than the chosen one go into a group stop so that nothing
-		 * happens until it gets scheduled, takes the signal off
-		 * the shared queue, and does the core dump.  This is a
-		 * little more complicated than strictly necessary, but it
-		 * keeps the signal state that winds up in the core dump
-		 * unchanged from the death state, e.g. which thread had
-		 * the core-dump signal unblocked.
-		 */
-		rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
-		rm_from_queue(SIG_KERNEL_STOP_MASK, &p->signal->shared_pending);
-		p->signal->group_stop_count = 0;
-		p->signal->group_exit_task = t;
-		t = p;
-		do {
-			p->signal->group_stop_count++;
-			signal_wake_up(t, 0);
-			t = next_thread(t);
-		} while (t != p);
-		wake_up_process(p->signal->group_exit_task);
-		return 0;
-	}
-
-	/*
-	 * The signal is already in the shared-pending queue.
-	 * Tell the chosen thread to wake up and dequeue it.
-	 */
-	signal_wake_up(t, sig == SIGKILL);
+	__group_complete_signal(sig, p, mask);
 	return 0;
 }
 
@@ -1195,6 +1212,142 @@ kill_proc(pid_t pid, int sig, int priv)
 }
 
 /*
+ * These functions support sending signals using preallocated sigqueue
+ * structures.  This is needed "because realtime applications cannot
+ * afford to lose notifications of asynchronous events, like timer
+ * expirations or I/O completions".  In the case of Posix Timers 
+ * we allocate the sigqueue structure from the timer_create.  If this
+ * allocation fails we are able to report the failure to the application
+ * with an EAGAIN error.
+ */
+ 
+struct sigqueue *sigqueue_alloc(void)
+{
+	struct sigqueue *q;
+
+	if ((q = __sigqueue_alloc()))
+		q->flags |= SIGQUEUE_PREALLOC;
+	return(q);
+}
+
+void sigqueue_free(struct sigqueue *q)
+{
+	unsigned long flags;
+	BUG_ON(!(q->flags & SIGQUEUE_PREALLOC));
+	/*
+	 * If the signal is still pending remove it from the
+	 * pending queue.
+	 */
+	if (unlikely(!list_empty(&q->list))) {
+		read_lock(&tasklist_lock);  
+		spin_lock_irqsave(q->lock, flags);
+		if (!list_empty(&q->list))
+			list_del_init(&q->list);
+		spin_unlock_irqrestore(q->lock, flags);
+		read_unlock(&tasklist_lock);
+	}
+	q->flags &= ~SIGQUEUE_PREALLOC;
+	__sigqueue_free(q);
+}
+
+int
+send_sigqueue(int sig, struct sigqueue *q, struct task_struct *p)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	/*
+	 * We need the tasklist lock even for the specific
+	 * thread case (when we don't need to follow the group
+	 * lists) in order to avoid races with "p->sighand"
+	 * going away or changing from under us.
+	 */
+	BUG_ON(!(q->flags & SIGQUEUE_PREALLOC));
+	read_lock(&tasklist_lock);  
+	spin_lock_irqsave(&p->sighand->siglock, flags);
+	
+	if (unlikely(!list_empty(&q->list))) {
+		/*
+		 * If an SI_TIMER entry is already queue just increment
+		 * the overrun count.
+		 */
+		if (q->info.si_code != SI_TIMER)
+			BUG();
+		q->info.si_overrun++;
+		goto out;
+	} 
+	/* Short-circuit ignored signals.  */
+	if (sig_ignored(p, sig)) {
+		ret = 1;
+		goto out;
+	}
+
+	q->lock = &p->sighand->siglock;
+	list_add_tail(&q->list, &p->pending.list);
+	sigaddset(&p->pending.signal, sig);
+	if (!sigismember(&p->blocked, sig))
+		signal_wake_up(p, sig == SIGKILL);
+
+out:
+	spin_unlock_irqrestore(&p->sighand->siglock, flags);
+	read_unlock(&tasklist_lock);
+	return(ret);
+}
+
+int
+send_group_sigqueue(int sig, struct sigqueue *q, struct task_struct *p)
+{
+	unsigned long flags;
+	unsigned int mask;
+	int ret = 0;
+
+	BUG_ON(!(q->flags & SIGQUEUE_PREALLOC));
+	read_lock(&tasklist_lock);
+	spin_lock_irqsave(&p->sighand->siglock, flags);
+	handle_stop_signal(sig, p);
+
+	/* Short-circuit ignored signals.  */
+	if (sig_ignored(p, sig)) {
+		ret = 1;
+		goto out;
+	}
+
+	if (unlikely(!list_empty(&q->list))) {
+		/*
+		 * If an SI_TIMER entry is already queue just increment
+		 * the overrun count.  Other uses should not try to
+		 * send the signal multiple times.
+		 */
+		if (q->info.si_code != SI_TIMER)
+			BUG();
+		q->info.si_overrun++;
+		goto out;
+	} 
+	/*
+	 * Don't bother zombies and stopped tasks (but
+	 * SIGKILL will punch through stopped state)
+	 */
+	mask = TASK_DEAD | TASK_ZOMBIE;
+	if (sig != SIGKILL)
+		mask |= TASK_STOPPED;
+
+	/*
+	 * Put this signal on the shared-pending queue.
+	 * We always use the shared queue for process-wide signals,
+	 * to avoid several races.
+	 */
+	q->lock = &p->sighand->siglock;
+	list_add_tail(&q->list, &p->signal->shared_pending.list);
+	sigaddset(&p->signal->shared_pending.signal, sig);
+
+	__group_complete_signal(sig, p, mask);
+out:
+	spin_unlock_irqrestore(&p->sighand->siglock, flags);
+	read_unlock(&tasklist_lock);
+	return(ret);
+}
+
+/*
  * Joy. Or not. Pthread wants us to wake up every thread
  * in our parent group.
  */
@@ -1346,6 +1499,9 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent)
 	spin_unlock_irqrestore(&sighand->siglock, flags);
 }
 
+
+#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 static void
 finish_stop(int stop_count)
 {
@@ -1459,9 +1615,6 @@ do_signal_stop(int signr)
 
 	finish_stop(stop_count);
 }
-
-
-#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 
 /*
  * Do appropriate magic when group_stop_count > 0.
@@ -1646,6 +1799,10 @@ EXPORT_SYMBOL(notify_parent);
 EXPORT_SYMBOL(send_sig);
 EXPORT_SYMBOL(send_sig_info);
 EXPORT_SYMBOL(send_group_sig_info);
+EXPORT_SYMBOL(sigqueue_alloc);
+EXPORT_SYMBOL(sigqueue_free);
+EXPORT_SYMBOL(send_sigqueue);
+EXPORT_SYMBOL(send_group_sigqueue);
 EXPORT_SYMBOL(sigprocmask);
 EXPORT_SYMBOL(block_all_signals);
 EXPORT_SYMBOL(unblock_all_signals);

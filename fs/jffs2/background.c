@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: background.c,v 1.33 2002/11/12 09:44:30 dwmw2 Exp $
+ * $Id: background.c,v 1.38 2003/05/26 09:50:38 dwmw2 Exp $
  *
  */
 
@@ -16,9 +16,8 @@
 #include <linux/kernel.h>
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
-#include <linux/interrupt.h>
 #include <linux/completion.h>
-#include <linux/mtd/compatmac.h> /* recalc_sigpending() */
+#include <linux/sched.h>
 #include <linux/unistd.h>
 #include "nodelist.h"
 
@@ -28,10 +27,10 @@ static int thread_should_wake(struct jffs2_sb_info *c);
 
 void jffs2_garbage_collect_trigger(struct jffs2_sb_info *c)
 {
-	spin_lock_bh(&c->erase_completion_lock);
+	spin_lock(&c->erase_completion_lock);
         if (c->gc_task && thread_should_wake(c))
                 send_sig(SIGHUP, c->gc_task, 1);
-	spin_unlock_bh(&c->erase_completion_lock);
+	spin_unlock(&c->erase_completion_lock);
 }
 
 /* This must only ever be called when no GC thread is currently running */
@@ -69,12 +68,12 @@ void jffs2_stop_garbage_collect_thread(struct jffs2_sb_info *c)
 		flush_scheduled_work();
 	}
 
-	spin_lock_bh(&c->erase_completion_lock);
+	spin_lock(&c->erase_completion_lock);
 	if (c->gc_task) {
 		D1(printk(KERN_DEBUG "jffs2: Killing GC task %d\n", c->gc_task->pid));
 		send_sig(SIGKILL, c->gc_task, 1);
 	}
-	spin_unlock_bh(&c->erase_completion_lock);
+	spin_unlock(&c->erase_completion_lock);
 	wait_for_completion(&c->gc_thread_exit);
 }
 
@@ -126,9 +125,9 @@ static int jffs2_garbage_collect_thread(void *_c)
 
 			case SIGKILL:
 				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGKILL received.\n"));
-				spin_lock_bh(&c->erase_completion_lock);
+				spin_lock(&c->erase_completion_lock);
 				c->gc_task = NULL;
-				spin_unlock_bh(&c->erase_completion_lock);
+				spin_unlock(&c->erase_completion_lock);
 				complete_and_exit(&c->gc_thread_exit, 0);
 
 			case SIGHUP:
@@ -152,6 +151,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 static int thread_should_wake(struct jffs2_sb_info *c)
 {
 	int ret = 0;
+	uint32_t dirty;
 
 	if (c->unchecked_size) {
 		D1(printk(KERN_DEBUG "thread_should_wake(): unchecked_size %d, checked_ino #%d\n",
@@ -159,8 +159,18 @@ static int thread_should_wake(struct jffs2_sb_info *c)
 		return 1;
 	}
 
+	/* dirty_size contains blocks on erase_pending_list
+	 * those blocks are counted in c->nr_erasing_blocks.
+	 * If one block is actually erased, it is not longer counted as dirty_space
+	 * but it is counted in c->nr_erasing_blocks, so we add it and subtract it
+	 * with c->nr_erasing_blocks * c->sector_size again.
+	 * Blocks on erasable_list are counted as dirty_size, but not in c->nr_erasing_blocks
+	 * This helps us to force gc and pick eventually a clean block to spread the load.
+	 */
+	dirty = c->dirty_size + c->erasing_size - c->nr_erasing_blocks * c->sector_size;
+
 	if (c->nr_free_blocks + c->nr_erasing_blocks < JFFS2_RESERVED_BLOCKS_GCTRIGGER && 
-			(c->dirty_size > c->sector_size)) 
+			(dirty > c->sector_size)) 
 		ret = 1;
 
 	D1(printk(KERN_DEBUG "thread_should_wake(): nr_free_blocks %d, nr_erasing_blocks %d, dirty_size 0x%x: %s\n", 

@@ -79,7 +79,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 931 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 942 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -229,6 +229,8 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 				      void (*done)(Scsi_Cmnd *));
 	
 static Scsi_Host_Template scsi_driver_template;
+
+const u8 sbp2_speedto_max_payload[] = { 0x7, 0x8, 0x9, 0xA, 0xB, 0xC };
 
 static struct hpsb_highlevel sbp2_highlevel = {
 	.name =		SBP2_DEVICE_NAME,
@@ -779,7 +781,7 @@ static int sbp2_start_ud(struct sbp2scsi_host_info *hi, struct unit_directory *u
 		scsi_id->ne = ud->ne;
 		scsi_id->hi = hi;
 		scsi_id->speed_code = SPEED_100;
-		scsi_id->max_payload_size = hpsb_speedto_maxrec[SPEED_100];
+		scsi_id->max_payload_size = sbp2_speedto_max_payload[SPEED_100];
 		atomic_set(&scsi_id->sbp2_login_complete, 0);
 		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
 		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);
@@ -1690,7 +1692,7 @@ static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id)
 
 	/* Payload size is the lesser of what our speed supports and what
 	 * our host supports.  */
-	scsi_id->max_payload_size = min(hpsb_speedto_maxrec[scsi_id->speed_code],
+	scsi_id->max_payload_size = min(sbp2_speedto_max_payload[scsi_id->speed_code],
 					(u8)(((be32_to_cpu(hi->host->csr.rom[2]) >> 12) & 0xf) - 1));
 
 	SBP2_ERR("Node[" NODE_BUS_FMT "]: Max speed [%s] - Max payload [%u]",
@@ -2845,11 +2847,10 @@ static const char *sbp2scsi_info (struct Scsi_Host *host)
 #define SPRINTF(args...) \
         do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
 
-static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
-			      int length, int hostno, int inout)
+static int sbp2scsi_proc_info(struct Scsi_Host *scsi_host, char *buffer, char **start, off_t offset,
+			      int length, int inout)
 {
 	Scsi_Device *scd;
-	struct Scsi_Host *scsi_host;
 	struct hpsb_host *host;
 	char *pos = buffer;
 
@@ -2857,16 +2858,12 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 	if (inout)
 		return length;
 
-	scsi_host = scsi_host_hn_get(hostno);
-	if (!scsi_host)  /* if we couldn't find it, we return an error */
-		return -ESRCH;
-
 	host = hpsb_get_host_bykey(&sbp2_highlevel, (unsigned long)scsi_host);
 	if (!host) /* shouldn't happen, but... */
 		return -ESRCH;
 
-	SPRINTF("Host scsi%d             : SBP-2 IEEE-1394 (%s)\n", hostno,
-		host->driver->name);
+	SPRINTF("Host scsi%d             : SBP-2 IEEE-1394 (%s)\n",
+		scsi_host->host_no, host->driver->name);
 	SPRINTF("Driver version         : %s\n", version);
 
 	SPRINTF("\nModule options         :\n");
@@ -2899,8 +2896,6 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 
 	SPRINTF("\n");
 
-	/* release the reference count on this host */
-	scsi_host_put(scsi_host);
 	/* Calculate start of next buffer, and return value. */
 	*start = buffer + offset;
 

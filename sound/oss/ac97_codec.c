@@ -487,8 +487,8 @@ static int ac97_mixer_ioctl(struct ac97_codec *codec, unsigned int cmd, unsigned
 
 	if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, codec->name, sizeof(info.id));
-		strncpy(info.name, codec->name, sizeof(info.name));
+		strlcpy(info.id, codec->name, sizeof(info.id));
+		strlcpy(info.name, codec->name, sizeof(info.name));
 		info.modify_counter = codec->modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -496,8 +496,8 @@ static int ac97_mixer_ioctl(struct ac97_codec *codec, unsigned int cmd, unsigned
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, codec->name, sizeof(info.id));
-		strncpy(info.name, codec->name, sizeof(info.name));
+		strlcpy(info.id, codec->name, sizeof(info.id));
+		strlcpy(info.name, codec->name, sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

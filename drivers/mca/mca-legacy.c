@@ -278,8 +278,7 @@ void mca_set_adapter_name(int slot, char* name)
 	if(!mca_dev)
 		return;
 
-	strncpy(mca_dev->dev.name, name, sizeof(mca_dev->dev.name));
-	mca_dev->dev.name[sizeof(mca_dev->dev.name) - 1] = '\0';
+	strlcpy(mca_dev->dev.name, name, sizeof(mca_dev->dev.name));
 }
 EXPORT_SYMBOL(mca_set_adapter_name);
 

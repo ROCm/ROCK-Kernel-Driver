@@ -78,12 +78,24 @@ static int putreg32(struct task_struct *child, unsigned regno, u32 val)
 	case offsetof(struct user32, u_debugreg[5]):
 		return -EIO;
 
-	case offsetof(struct user32, u_debugreg[0]) ...
-	     offsetof(struct user32, u_debugreg[3]):
+	case offsetof(struct user32, u_debugreg[0]):
+		child->thread.debugreg0 = val;
+		break;
+
+	case offsetof(struct user32, u_debugreg[1]):
+		child->thread.debugreg1 = val;
+		break;
+
+	case offsetof(struct user32, u_debugreg[2]):
+		child->thread.debugreg2 = val;
+		break;
+
+	case offsetof(struct user32, u_debugreg[3]):
+		child->thread.debugreg3 = val;
+		break;
+
 	case offsetof(struct user32, u_debugreg[6]):
-		child->thread.debugreg
-			[(regno-offsetof(struct user32, u_debugreg[0]))/4] 
-			= val; 
+		child->thread.debugreg6 = val;
 		break; 
 
 	case offsetof(struct user32, u_debugreg[7]):
@@ -92,7 +104,7 @@ static int putreg32(struct task_struct *child, unsigned regno, u32 val)
 		for(i=0; i<4; i++)
 			if ((0x5454 >> ((val >> (16 + 4*i)) & 0xf)) & 1)
 			       return -EIO;
-		child->thread.debugreg[7] = val; 
+		child->thread.debugreg7 = val; 
 		break; 
 		    
 	default:
@@ -142,8 +154,23 @@ static int getreg32(struct task_struct *child, unsigned regno, u32 *val)
 	R32(eflags, eflags);
 	R32(esp, rsp);
 
-	case offsetof(struct user32, u_debugreg[0]) ... offsetof(struct user32, u_debugreg[7]):
-		*val = child->thread.debugreg[(regno-offsetof(struct user32, u_debugreg[0]))/4]; 
+	case offsetof(struct user32, u_debugreg[0]): 
+		*val = child->thread.debugreg0; 
+		break; 
+	case offsetof(struct user32, u_debugreg[1]): 
+		*val = child->thread.debugreg1; 
+		break; 
+	case offsetof(struct user32, u_debugreg[2]): 
+		*val = child->thread.debugreg2; 
+		break; 
+	case offsetof(struct user32, u_debugreg[3]): 
+		*val = child->thread.debugreg3; 
+		break; 
+	case offsetof(struct user32, u_debugreg[6]): 
+		*val = child->thread.debugreg6; 
+		break; 
+	case offsetof(struct user32, u_debugreg[7]): 
+		*val = child->thread.debugreg7; 
 		break; 
 		    
 	default:

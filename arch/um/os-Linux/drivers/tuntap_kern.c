@@ -24,17 +24,16 @@ static void tuntap_init(struct net_device *dev, void *data)
 	struct tuntap_data *tpri;
 	struct tuntap_init *init = data;
 
-	init_etherdev(dev, 0);
 	pri = dev->priv;
 	tpri = (struct tuntap_data *) pri->user;
-	*tpri = ((struct tuntap_data)
-		{ .dev_name 		= init->dev_name,
-		  .fixed_config 	= (init->dev_name != NULL),
-		  .gate_addr 		= init->gate_addr,
-		  .fd 			= -1,
-		  .dev 			= dev });
+	tpri->dev_name = init->dev_name;
+	tpri->fixed_config = (init->dev_name != NULL);
+	tpri->gate_addr = init->gate_addr;
+	tpri->fd = -1;
+	tpri->dev = dev;
+
 	printk("TUN/TAP backend - ");
-	if(tpri->gate_addr != NULL) 
+	if (tpri->gate_addr != NULL)
 		printk("IP = %s", tpri->gate_addr);
 	printk("\n");
 }

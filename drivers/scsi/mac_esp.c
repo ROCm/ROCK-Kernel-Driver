@@ -142,9 +142,10 @@ void fake_intr(int irq, void *dev_id, struct pt_regs *pregs)
 	mac_esp_intr(irq, dev_id, pregs);
 }
 
-void fake_drq(int irq, void *dev_id, struct pt_regs *pregs)
+irqreturn_t fake_drq(int irq, void *dev_id, struct pt_regs *pregs)
 {
 	printk("mac_esp: got drq\n");
+	return IRQ_HANDLED;
 }
 
 #define DRIVER_SETUP

@@ -42,7 +42,7 @@ static irq_node_t *hp300_irq_list[HP300_NUM_IRQS] = { [0 ... HP300_NUM_IRQS-1] =
 static spinlock_t irqlist_lock;
 
 /* This handler receives all interrupts, dispatching them to the registered handlers */
-static void hp300_int_handler(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t hp300_int_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
         irq_node_t *t;
         /* We just give every handler on the chain an opportunity to handle
@@ -54,9 +54,10 @@ static void hp300_int_handler(int irq, void *dev_id, struct pt_regs *fp)
          * etc, in here. Note that currently we can't tell whether or not
          * a handler handles the interrupt, though. 
          */
+	return IRQ_HANDLED;
 }
 
-void (*hp300_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
+irqreturn_t (*hp300_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
 	hp300_int_handler, hp300_int_handler, hp300_int_handler, hp300_int_handler,
 	hp300_int_handler, hp300_int_handler, hp300_int_handler, NULL
 };
@@ -70,7 +71,7 @@ void (*hp300_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
  * matters (eg the dreaded FIFOless UART...)
  */
 int hp300_request_irq(unsigned int irq,
-                      void (*handler) (int, void *, struct pt_regs *),
+                      irqreturn_t (*handler) (int, void *, struct pt_regs *),
                       unsigned long flags, const char *devname, void *dev_id)
 {
         irq_node_t *t, *n = new_irq_node();

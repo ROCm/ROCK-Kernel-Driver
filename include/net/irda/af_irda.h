@@ -77,6 +77,6 @@ struct irda_sock {
 	LOCAL_FLOW rx_flow;
 };
 
-#define irda_sk(__sk) ((struct irda_sock *)(__sk)->protinfo)
+#define irda_sk(__sk) ((struct irda_sock *)(__sk)->sk_protinfo)
 
 #endif /* AF_IRDA_H */

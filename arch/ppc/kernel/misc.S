@@ -534,7 +534,7 @@ _GLOBAL(flush_instruction_cache)
 	isync
 	lis	r5, IDC_INVALL@h
 	mtspr	IC_CST, r5
-#elif defined(CONFIG_40x)
+#elif defined(CONFIG_4xx)
 #ifdef CONFIG_403GCX
 	li      r3, 512
 	mtctr   r3
@@ -1227,7 +1227,7 @@ _GLOBAL(sys_call_table)
 	.long sys_ni_syscall			/* old profil syscall holder */
 	.long sys_statfs
 	.long sys_fstatfs	/* 100 */
-	.long sys_ioperm
+	.long sys_ni_syscall
 	.long sys_socketcall
 	.long sys_syslog
 	.long sys_setitimer
@@ -1236,10 +1236,10 @@ _GLOBAL(sys_call_table)
 	.long sys_newlstat
 	.long sys_newfstat
 	.long sys_uname
-	.long sys_iopl		/* 110 */
+	.long sys_ni_syscall	/* 110 */
 	.long sys_vhangup
 	.long sys_ni_syscall	/* old 'idle' syscall */
-	.long sys_vm86
+	.long sys_ni_syscall
 	.long sys_wait4
 	.long sys_swapoff	/* 115 */
 	.long sys_sysinfo
@@ -1249,7 +1249,7 @@ _GLOBAL(sys_call_table)
 	.long ppc_clone		/* 120 */
 	.long sys_setdomainname
 	.long sys_newuname
-	.long sys_modify_ldt
+	.long sys_ni_syscall
 	.long sys_adjtimex
 	.long sys_mprotect	/* 125 */
 	.long sys_sigprocmask
@@ -1365,13 +1365,13 @@ _GLOBAL(sys_call_table)
 	.long sys_epoll_create
 	.long sys_epoll_ctl
 	.long sys_epoll_wait
- 	.long sys_remap_file_pages
- 	.long sys_timer_create	/* 240 */
- 	.long sys_timer_settime
- 	.long sys_timer_gettime
- 	.long sys_timer_getoverrun
- 	.long sys_timer_delete
- 	.long sys_clock_settime	/* 245 */
- 	.long sys_clock_gettime
- 	.long sys_clock_getres
- 	.long sys_clock_nanosleep
+	.long sys_remap_file_pages
+	.long sys_timer_create	/* 240 */
+	.long sys_timer_settime
+	.long sys_timer_gettime
+	.long sys_timer_getoverrun
+	.long sys_timer_delete
+	.long sys_clock_settime	/* 245 */
+	.long sys_clock_gettime
+	.long sys_clock_getres
+	.long sys_clock_nanosleep

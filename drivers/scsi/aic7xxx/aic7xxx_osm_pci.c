@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#44 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#45 $
  */
 
 #include "aic7xxx_osm.h"
@@ -110,6 +110,7 @@ static int
 ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	char		 buf[80];
+	bus_addr_t	 mask_39bit;
 	struct		 ahc_softc *ahc;
 	ahc_dev_softc_t	 pci;
 	struct		 ahc_pci_identity *entry;
@@ -160,12 +161,12 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 	pci_set_master(pdev);
 
+	mask_39bit = (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
 	if (sizeof(bus_addr_t) > 4
 	 && ahc_linux_get_memsize() > 0x80000000
-	 && ahc_pci_set_dma_mask(pdev, 0x7FFFFFFFFFULL) == 0) {
+	 && ahc_pci_set_dma_mask(pdev, mask_39bit) == 0) {
 		ahc->flags |= AHC_39BIT_ADDRESSING;
-		ahc->platform_data->hw_dma_mask =
-		    (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
+		ahc->platform_data->hw_dma_mask = mask_39bit;
 	} else {
 		ahc_pci_set_dma_mask(pdev, 0xFFFFFFFF);
 		ahc->platform_data->hw_dma_mask = 0xFFFFFFFF;

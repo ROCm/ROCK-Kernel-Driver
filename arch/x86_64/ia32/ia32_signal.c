@@ -33,6 +33,7 @@
 #include <asm/sigcontext32.h>
 #include <asm/fpu32.h>
 #include <asm/proto.h>
+#include <asm/vsyscall32.h>
 
 #define ptr_to_u32(x) ((u32)(u64)(x))	/* avoid gcc warning */ 
 
@@ -428,7 +429,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 
 	/* Return stub is in 32bit vsyscall page */
 	{ 
-		void *restorer = syscall32_page + 32; 
+		void *restorer = VSYSCALL32_SIGRETURN; 
 		if (ka->sa.sa_flags & SA_RESTORER)
 			restorer = ka->sa.sa_restorer;       
 		err |= __put_user(ptr_to_u32(restorer), &frame->pretcode);
@@ -521,7 +522,7 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	
 	{ 
-		void *restorer = syscall32_page + 32; 
+		void *restorer = VSYSCALL32_RTSIGRETURN; 
 		if (ka->sa.sa_flags & SA_RESTORER)
 			restorer = ka->sa.sa_restorer;       
 		err |= __put_user(ptr_to_u32(restorer), &frame->pretcode);

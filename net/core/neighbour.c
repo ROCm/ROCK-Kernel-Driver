@@ -540,7 +540,7 @@ static void neigh_sync(struct neighbour *n)
 	}
 }
 
-static void SMP_TIMER_NAME(neigh_periodic_timer)(unsigned long arg)
+static void neigh_periodic_timer(unsigned long arg)
 {
 	struct neigh_table *tbl = (struct neigh_table *)arg;
 	unsigned long now = jiffies;
@@ -604,15 +604,6 @@ next_elt:
 	mod_timer(&tbl->gc_timer, now + tbl->gc_interval);
 	write_unlock(&tbl->lock);
 }
-
-#ifdef CONFIG_SMP
-static void neigh_periodic_timer(unsigned long arg)
-{
-	struct neigh_table *tbl = (struct neigh_table *)arg;
-
-	tasklet_schedule(&tbl->gc_task);
-}
-#endif
 
 static __inline__ int neigh_max_probes(struct neighbour *n)
 {
@@ -1147,10 +1138,6 @@ void neigh_table_init(struct neigh_table *tbl)
 						      15) & ~15,
 						     0, SLAB_HWCACHE_ALIGN,
 						     NULL, NULL);
-#ifdef CONFIG_SMP
-	tasklet_init(&tbl->gc_task, SMP_TIMER_NAME(neigh_periodic_timer),
-		     (unsigned long)tbl);
-#endif
 	tbl->lock	       = RW_LOCK_UNLOCKED;
 	init_timer(&tbl->gc_timer);
 	tbl->gc_timer.data     = (unsigned long)tbl;
@@ -1178,7 +1165,6 @@ int neigh_table_clear(struct neigh_table *tbl)
 
 	/* It is not clean... Fix it to unload IPv6 module safely */
 	del_timer_sync(&tbl->gc_timer);
-	tasklet_kill(&tbl->gc_task);
 	del_timer_sync(&tbl->proxy_timer);
 	pneigh_queue_purge(&tbl->proxy_queue);
 	neigh_ifdown(tbl, NULL);

@@ -76,7 +76,12 @@ ENTRY(system_call)
 	jbsr    set_esp0
 	addql   #4,%sp
 
-	btst	#PF_TRACESYS_BIT,%a2@(TASK_FLAGS+PF_TRACESYS_OFF)
+	movel	%sp@(PT_ORIG_D0),%d0
+
+	movel	%sp,%d1			/* get thread_info pointer */
+	andl	#0xffffe000,%d1
+	movel	%d1,%a2
+	btst    #TIF_SYSCALL_TRACE,%a2@(TI_FLAGS)
 	jne	do_trace
 	cmpl	#NR_syscalls,%d0
 	jcc	badsys

@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.10 2003/03/21 18:47:31 aberg Exp $
+ * $Id: ctctty.c,v 1.11 2003/05/06 09:40:55 mschwide Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -28,9 +28,7 @@
 #include <linux/serial_reg.h>
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
-#ifdef CONFIG_DEVFS_FS
-#  include <linux/devfs_fs_kernel.h>
-#endif
+#include <linux/devfs_fs_kernel.h>
 #include "ctctty.h"
 
 #define CTC_TTY_MAJOR       43
@@ -48,7 +46,6 @@
 #define CTC_ASYNC_SPLIT_TERMIOS      0x0008 /* Sep. termios for dialin/out  */
 #define CTC_TTY_XMIT_SIZE              1024 /* Default bufsize for write    */
 #define CTC_SERIAL_XMIT_MAX            4000 /* Maximum bufsize for write    */
-#define CTC_SERIAL_TYPE_NORMAL            1
 
 /* Private data (similar to async_struct in <linux/serial.h>) */
 typedef struct {
@@ -89,12 +86,6 @@ static ctc_tty_driver *driver;
 #define MODEM_DO_RESTART
 
 #define CTC_TTY_NAME "ctctty"
-
-#ifdef CONFIG_DEVFS_FS
-static char *ctc_ttyname = "ctc/" CTC_TTY_NAME "%d";
-#else
-static char *ctc_ttyname = CTC_TTY_NAME;
-#endif
 
 static __u32 ctc_tty_magic = CTC_ASYNC_MAGIC;
 static int ctc_tty_shuttingdown = 0;
@@ -1171,12 +1162,13 @@ ctc_tty_init(void)
 	device = &driver->ctc_tty_device;
 
 	device->magic = TTY_DRIVER_MAGIC;
-	device->name = ctc_ttyname;
+	device->devfs_name = "ctc/" CTC_TTY_NAME;
+	device->name = CTC_TTY_NAME;
 	device->major = CTC_TTY_MAJOR;
 	device->minor_start = 0;
 	device->num = CTC_TTY_MAX_DEVICES;
 	device->type = TTY_DRIVER_TYPE_SERIAL;
-	device->subtype = CTC_SERIAL_TYPE_NORMAL;
+	device->subtype = SERIAL_TYPE_NORMAL;
 	device->init_termios = tty_std_termios;
 	device->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	device->flags = TTY_DRIVER_REAL_RAW;

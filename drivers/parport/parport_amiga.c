@@ -138,9 +138,10 @@ static unsigned char amiga_read_status(struct parport *p)
 }
 
 /* as this ports irq handling is already done, we use a generic funktion */
-static void amiga_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t amiga_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	parport_generic_irq(irq, (struct parport *) dev_id, regs);
+	return IRQ_HANDLED;
 }
 
 static void amiga_enable_irq(struct parport *p)

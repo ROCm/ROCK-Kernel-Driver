@@ -160,19 +160,15 @@ static int osst_zero_buffer_tail(OSST_buffer *);
 static int osst_copy_to_buffer(OSST_buffer *, unsigned char *);
 static int osst_copy_from_buffer(OSST_buffer *, unsigned char *);
 
-static int osst_attach(Scsi_Device *);
-static void osst_detach(Scsi_Device *);
+static int osst_probe(struct device *);
+static int osst_remove(struct device *);
 
-struct Scsi_Device_Template osst_template =
-{
-	.module =       THIS_MODULE,
-	.list =         LIST_HEAD_INIT(osst_template.list),
-	.name =         "OnStream Tape",
-	.scsi_type =    TYPE_TAPE,
-	.attach =       osst_attach,
-	.detach =       osst_detach,
-	.scsi_driverfs_driver = {
-		.name =  "osst",
+struct scsi_driver osst_template = {
+	.owner			= THIS_MODULE,
+	.gendrv = {
+		.name		=  "osst",
+		.probe		= osst_probe,
+		.remove		= osst_remove,
 	}
 };
 
@@ -2227,8 +2223,7 @@ static int __osst_analyze_headers(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, in
 	}
 	if (strncmp(header->ident_str, "ADR_SEQ", 7) != 0 &&
 	    strncmp(header->ident_str, "ADR-SEQ", 7) != 0) {
-		strncpy(id_string, header->ident_str, 7);
-		id_string[7] = 0;
+		strlcpy(id_string, header->ident_str, 8);
 #if DEBUG
 		printk(OSST_DEB_MSG "%s:D: Invalid header identification string %s\n", name, id_string);
 #endif
@@ -5327,22 +5322,6 @@ __setup("osst=", osst_setup);
 
 #endif
 
-/* Driverfs file support */
-static ssize_t osst_device_kdev_read(struct device *driverfs_dev, char *page)
-{
-	kdev_t kdev; 
-	kdev.value=(int)(long)driverfs_dev->driver_data;
-	return sprintf(page, "%x\n",kdev.value);
-}
-static DEVICE_ATTR(kdev,S_IRUGO,osst_device_kdev_read,NULL);
-
-static ssize_t osst_device_type_read(struct device *driverfs_dev, char *page) 
-{
-	return sprintf (page, "CHR\n");
-}
-static DEVICE_ATTR(type,S_IRUGO,osst_device_type_read,NULL);
-
-
 static struct file_operations osst_fops = {
 	.owner =        THIS_MODULE,
 	.read =         osst_read,
@@ -5385,8 +5364,9 @@ static	struct	osst_support_data support_list[] = {
  * osst startup / cleanup code
  */
 
-static int osst_attach(Scsi_Device * SDp)
+static int osst_probe(struct device *dev)
 {
+	Scsi_Device    * SDp = to_scsi_device(dev);
 	OS_Scsi_Tape   * tpnt;
 	ST_mode        * STm;
 	ST_partstat    * STps;
@@ -5395,12 +5375,12 @@ static int osst_attach(Scsi_Device * SDp)
 	int              i, mode, dev_num;
 
 	if (SDp->type != TYPE_TAPE || !osst_supports(SDp))
-		return 1;
+		return -ENODEV;
 
 	drive = alloc_disk(1);
 	if (!drive) {
 		printk(KERN_ERR "osst :E: Out of memory. Device not attached.\n");
-		return 1;
+		return -ENODEV;
 	}
 
 	/* if this is the first attach, build the infrastructure */
@@ -5522,45 +5502,12 @@ static int osst_attach(Scsi_Device * SDp)
 	write_unlock(&os_scsi_tapes_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-		char name[8];
-
 		/*  Rewind entry  */
-		sprintf(name, "ot%s", osst_formats[mode]);
-
-		sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
-				SDp->sdev_driverfs_dev.bus_id, name);
-		sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
-				SDp->sdev_driverfs_dev.name, name);
-		tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
-		tpnt->driverfs_dev_r[mode].bus = SDp->sdev_driverfs_dev.bus;
-		tpnt->driverfs_dev_r[mode].driver_data =
-			(void *)(long)__mkdev(OSST_MAJOR, dev_num + (mode << 5));
-		device_register(&tpnt->driverfs_dev_r[mode]);
-		device_create_file(&tpnt->driverfs_dev_r[mode], 
-				&dev_attr_type);
-		device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
-
 		devfs_mk_cdev(MKDEV(OSST_MAJOR, dev_num + (mode << 5)),
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				"%s/ot%s", SDp->devfs_name, osst_formats[mode]);
 
 		/*  No-rewind entry  */
-		sprintf (name, "ot%sn", osst_formats[mode]);
-
-		sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
-				SDp->sdev_driverfs_dev.bus_id, name);
-		sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
-				SDp->sdev_driverfs_dev.name, name);
-		tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
-		tpnt->driverfs_dev_n[mode].bus = SDp->sdev_driverfs_dev.bus;
-		tpnt->driverfs_dev_n[mode].driver_data =
-			(void *)(long)__mkdev(OSST_MAJOR, dev_num + (mode << 5) + 128);
-		device_register(&tpnt->driverfs_dev_n[mode]);
-		device_create_file(&tpnt->driverfs_dev_n[mode], 
-				&dev_attr_type);
-		device_create_file(&tpnt->driverfs_dev_n[mode], 
-				&dev_attr_kdev);
-
 		devfs_mk_cdev(MKDEV(OSST_MAJOR, dev_num + (mode << 5) + 128),
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				"%s/ot%sn", SDp->devfs_name, osst_formats[mode]);
@@ -5575,16 +5522,17 @@ static int osst_attach(Scsi_Device * SDp)
 
 out_put_disk:
         put_disk(drive);
-        return 1;
+        return -ENODEV;
 };
 
-static void osst_detach(Scsi_Device * SDp)
+static int osst_remove(struct device *dev)
 {
+  Scsi_Device * SDp = to_scsi_device(dev);
   OS_Scsi_Tape * tpnt;
   int i, mode;
 
   if ((SDp->type != TYPE_TAPE) || (osst_nr_dev <= 0))
-	  return;
+	  return 0;
 
   write_lock(&os_scsi_tapes_lock);
   for(i=0; i < osst_max_dev; i++) {
@@ -5599,29 +5547,17 @@ static void osst_detach(Scsi_Device * SDp)
 		os_scsi_tapes[i] = NULL;
 		osst_nr_dev--;
 		write_unlock(&os_scsi_tapes_lock);
-		for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-			device_remove_file(&tpnt->driverfs_dev_r[mode],
-					&dev_attr_type);
-			device_remove_file(&tpnt->driverfs_dev_r[mode],
-					&dev_attr_kdev);
-			device_unregister(&tpnt->driverfs_dev_r[mode]);
-			device_remove_file(&tpnt->driverfs_dev_n[mode],
-					&dev_attr_type);
-			device_remove_file(&tpnt->driverfs_dev_n[mode],
-					&dev_attr_kdev);
-			device_unregister(&tpnt->driverfs_dev_n[mode]);
-			}
 		if (tpnt->header_cache != NULL) vfree(tpnt->header_cache);
 		if (tpnt->buffer) {
 			normalize_buffer(tpnt->buffer);
 			kfree(tpnt->buffer);
 		}
 		kfree(tpnt);
-		return;
+		return 0;
 	}
   }
   write_unlock(&os_scsi_tapes_lock);
-  return;
+  return 0;
 }
 
 static int __init init_osst(void) 
@@ -5630,7 +5566,7 @@ static int __init init_osst(void)
 
 	validate_options();
 	
-	if ((register_chrdev(OSST_MAJOR,"osst", &osst_fops) < 0) || scsi_register_device(&osst_template)) {
+	if ((register_chrdev(OSST_MAJOR,"osst", &osst_fops) < 0) || scsi_register_driver(&osst_template.gendrv)) {
 		printk(KERN_ERR "osst :E: Unable to register major %d for OnStream tapes\n", OSST_MAJOR);
 		return 1;
 	}
@@ -5643,7 +5579,7 @@ static void __exit exit_osst (void)
 	int i;
 	OS_Scsi_Tape * STp;
 
-	scsi_unregister_device(&osst_template);
+	scsi_unregister_driver(&osst_template.gendrv);
 	unregister_chrdev(OSST_MAJOR, "osst");
 
 	if (os_scsi_tapes) {

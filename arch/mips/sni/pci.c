@@ -31,9 +31,9 @@ do {                                                                         \
 /* To do:  Bring this uptodate ...  */
 static void pcimt_pcibios_fixup (void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/*
 		 * TODO: Take care of RM300 revision D boards for where the
 		 * network slot became an ordinary PCI slot.

@@ -725,6 +725,7 @@ static struct usb_device_id acm_ids[] = {
 MODULE_DEVICE_TABLE (usb, acm_ids);
 
 static struct usb_driver acm_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"acm",
 	.probe =	acm_probe,
 	.disconnect =	acm_disconnect,

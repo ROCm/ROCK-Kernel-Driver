@@ -456,18 +456,18 @@ acpi_tb_get_table_ptr (
 	 * instance is always in the list head.
 	 */
 	if (instance == 1) {
-		/*
-		 * Just pluck the pointer out of the global table!
-		 * Will be null if no table is present
-		 */
-		*table_ptr_loc = acpi_gbl_acpi_tables[table_type].pointer;
+		/* Get the first */
+
+		if (acpi_gbl_table_lists[table_type].next) {
+			*table_ptr_loc = acpi_gbl_table_lists[table_type].next->pointer;
+		}
 		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*
 	 * Check for instance out of range
 	 */
-	if (instance > acpi_gbl_acpi_tables[table_type].count) {
+	if (instance > acpi_gbl_table_lists[table_type].count) {
 		return_ACPI_STATUS (AE_NOT_EXIST);
 	}
 
@@ -478,7 +478,7 @@ acpi_tb_get_table_ptr (
 	 * need to walk from the 2nd table until we reach the Instance
 	 * that the user is looking for and return its table pointer.
 	 */
-	table_desc = acpi_gbl_acpi_tables[table_type].next;
+	table_desc = acpi_gbl_table_lists[table_type].next;
 	for (i = 2; i < instance; i++) {
 		table_desc = table_desc->next;
 	}

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.74 2002/11/12 09:37:39 dwmw2 Exp $
+ * $Id: super.c,v 1.79 2003/05/27 22:35:42 dwmw2 Exp $
  *
  */
 
@@ -23,7 +23,6 @@
 #include <linux/jffs2.h>
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
-#include <linux/interrupt.h>
 #include <linux/ctype.h>
 #include <linux/namei.h>
 #include "nodelist.h"
@@ -53,7 +52,7 @@ static void jffs2_i_init_once(void * foo, kmem_cache_t * cachep, unsigned long f
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
-		init_MUTEX(&ei->sem);
+		init_MUTEX_LOCKED(&ei->sem);
 		inode_init_once(&ei->vfs_inode);
 	}
 }
@@ -102,7 +101,7 @@ static int jffs2_sb_set(struct super_block *sb, void *data)
 }
 
 static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
-					      int flags, char *dev_name, 
+					      int flags, const char *dev_name, 
 					      void *data, struct mtd_info *mtd)
 {
 	struct super_block *sb;
@@ -154,7 +153,7 @@ static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
 }
 
 static struct super_block *jffs2_get_sb_mtdnr(struct file_system_type *fs_type,
-					      int flags, char *dev_name, 
+					      int flags, const char *dev_name, 
 					      void *data, int mtdnr)
 {
 	struct mtd_info *mtd;
@@ -169,7 +168,8 @@ static struct super_block *jffs2_get_sb_mtdnr(struct file_system_type *fs_type,
 }
 
 static struct super_block *jffs2_get_sb(struct file_system_type *fs_type,
-					int flags, char *dev_name, void *data)
+					int flags, const char *dev_name,
+					void *data)
 {
 	int err;
 	struct nameidata nd;
@@ -299,7 +299,7 @@ static int __init init_jffs2_fs(void)
 
 	jffs2_inode_cachep = kmem_cache_create("jffs2_i",
 					     sizeof(struct jffs2_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     jffs2_i_init_once, NULL);
 	if (!jffs2_inode_cachep) {
 		printk(KERN_ERR "JFFS2 error: Failed to initialise inode cache\n");

@@ -529,6 +529,9 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 
 	irport->priv = self;
 
+	/* Keep track of module usage */
+	SET_MODULE_OWNER(self->netdev);
+
 	/* Initialize IO */
 	self->io           = &irport->io;
 	self->io->fir_base  = fir_base;
@@ -747,6 +750,7 @@ static int ircc_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* Check for empty frame */
 		if (!skb->len) {
 			ircc_change_speed(self, speed); 
+			dev->trans_start = jiffies;
 			spin_unlock_irqrestore(&self->irport->lock, flags);
 			dev_kfree_skb(skb);
 			return 0;
@@ -776,6 +780,7 @@ static int ircc_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* Transmit frame */
 		ircc_dma_xmit(self, iobase, 0);
 	}
+	dev->trans_start = jiffies;
 	spin_unlock_irqrestore(&self->irport->lock, flags);
 	dev_kfree_skb(skb);
 
@@ -1090,8 +1095,6 @@ static int ircc_net_open(struct net_device *dev)
 		WARNING("%s(), unable to allocate DMA=%d\n", __FUNCTION__, self->io->dma);
 		return -EAGAIN;
 	}
-	
-	MOD_INC_USE_COUNT;
 
 	return 0;
 }
@@ -1123,8 +1126,6 @@ static int ircc_net_close(struct net_device *dev)
 	disable_dma(self->io->dma);
 
 	free_dma(self->io->dma);
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -1186,6 +1187,9 @@ static int __exit ircc_close(struct ircc_cb *self)
 	ASSERT(self != NULL, return -1;);
 
         iobase = self->irport->io.fir_base;
+
+        if (self->pmdev)
+		pm_unregister(self->pmdev);
 
 	/* This will destroy irport */
 	irport_close(self->irport);

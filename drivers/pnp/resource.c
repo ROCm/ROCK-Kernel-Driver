@@ -455,8 +455,8 @@ int pnp_check_irq(struct pnp_dev * dev, int idx)
 #ifdef CONFIG_PCI
 	/* check if the resource is being used by a pci device */
 	if (!pnp_skip_pci_scan) {
-		struct pci_dev * pci;
-		pci_for_each_dev(pci) {
+		struct pci_dev * pci = NULL;
+		while ((pci = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci)) != NULL) {
 			if (pci->irq == *irq)
 				return CONFLICT_TYPE_PCI;
 		}

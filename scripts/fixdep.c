@@ -21,7 +21,7 @@
  *
  * If the user re-runs make *config, linux/autoconf.h will be
  * regenerated.  make notices that and will rebuild every file which
- * includes autconf.h, i.e. basically all files. This is extremely
+ * includes autoconf.h, i.e. basically all files. This is extremely
  * annoying if the user just changed CONFIG_HIS_DRIVER from n to m.
  * 
  * So we play the same trick that "mkdep" played before. We replace
@@ -72,7 +72,7 @@
  *   cmd_<target> = <cmdline>
  *
  * and then basically copies the .<target>.d file to stdout, in the
- * process filtering out the dependency on linux/autconf.h and adding
+ * process filtering out the dependency on linux/autoconf.h and adding
  * dependencies on include/config/my/option.h for every
  * CONFIG_MY_OPTION encountered in any of the prequisites.
  *

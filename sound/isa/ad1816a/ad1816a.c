@@ -307,8 +307,10 @@ static int __init alsa_card_ad1816a_init(void)
 
 	cards += pnp_register_card_driver(&ad1816a_pnpc_driver);
 #ifdef MODULE
-	if (!cards)
+	if (!cards) {
+		pnp_unregister_card_driver(&ad1816a_pnpc_driver);
 		printk(KERN_ERR "no AD1816A based soundcards found.\n");
+	}
 #endif	/* MODULE */
 	return cards ? 0 : -ENODEV;
 }

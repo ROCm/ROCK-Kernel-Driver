@@ -1462,7 +1462,7 @@ static int __devinit sstfb_probe(struct pci_dev *pdev,
 		goto fail;
 	}
 	sst_get_memsize(info, &fix->smem_len);
-	strncpy(fix->id, spec->name, sizeof(fix->id));
+	strlcpy(fix->id, spec->name, sizeof(fix->id));
 
 	iprintk("%s (revision %d) with %s dac\n",
 		fix->id, par->revision, par->dac_sw.name);

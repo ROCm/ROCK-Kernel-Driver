@@ -335,7 +335,7 @@ static void avma1cs_config(dev_link_t *link)
 
 	devname[0] = 0;
 	if( !first_tuple(handle, &tuple, &parse) && parse.version_1.ns > 1 ) {
-	    strncpy(devname,parse.version_1.str + parse.version_1.ofs[1], 
+	    strlcpy(devname,parse.version_1.str + parse.version_1.ofs[1], 
 			sizeof(devname));
 	}
 	/*
@@ -515,30 +515,30 @@ static int avma1cs_event(event_t event, int priority,
     return 0;
 } /* avma1cs_event */
 
-/*====================================================================*/
+static struct pcmcia_driver avma1cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "avma1_cs",
+	},
+	.attach		= avma1cs_attach,
+	.detach		= avma1cs_detach,
+};
 
 static int __init init_avma1_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-        printk(KERN_NOTICE "avma1_cs: Card Services release "
-               "does not match!\n");
-        return -1;
-    }
-    register_pccard_driver(&dev_info, &avma1cs_attach, &avma1cs_detach);
-    return 0;
+	return pcmcia_register_driver(&avma1cs_driver);
 }
 
 static void __exit exit_avma1_cs(void)
 {
-    DEBUG(0, "avma1_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	if (dev_list->state & DEV_CONFIG)
-	    avma1cs_release((u_long)dev_list);
-        avma1cs_detach(dev_list);
+	pcmcia_unregister_driver(&avma1cs_driver);
+
+	/* XXX: this really needs to move into generic code.. */
+	while (dev_list != NULL) {
+		if (dev_list->state & DEV_CONFIG)
+			avma1cs_release((u_long)dev_list);
+		avma1cs_detach(dev_list);
+	}
 }
 
 module_init(init_avma1_cs);

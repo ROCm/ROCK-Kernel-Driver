@@ -543,6 +543,10 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
+config PCI_DOMAINS
+	bool
+	default PCI
+
 source "drivers/pci/Kconfig"
 
 config HOTPLUG
@@ -563,7 +567,7 @@ config HOTPLUG
 	  agent" (/sbin/hotplug) to load modules and set up software needed
 	  to use devices as you hotplug them.
 
-source "drivers/hotplug/Kconfig"
+source "drivers/pci/hotplug/Kconfig"
 
 source "drivers/pcmcia/Kconfig"
 

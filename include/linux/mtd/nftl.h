@@ -1,15 +1,14 @@
-
-/* Defines for NAND Flash Translation Layer  */
-/* (c) 1999 Machine Vision Holdings, Inc.    */
-/* Author: David Woodhouse <dwmw2@mvhi.com>  */
-/* $Id: nftl.h,v 1.10 2000/12/29 00:25:38 dwmw2 Exp $ */
+/*
+ * $Id: nftl.h,v 1.13 2003/05/23 11:25:02 dwmw2 Exp $
+ *
+ * (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>
+ */
 
 #ifndef __MTD_NFTL_H__
 #define __MTD_NFTL_H__
 
-#ifndef __BOOT__
 #include <linux/mtd/mtd.h>
-#endif
+#include <linux/mtd/blktrans.h>
 
 /* Block Control Information */
 
@@ -84,8 +83,7 @@ struct NFTLMediaHeader {
 #define BLOCK_RESERVED     0xfffc /* bios block or bad block */
 
 struct NFTLrecord {
-	struct mtd_info *mtd;
-	struct semaphore mutex;
+	struct mtd_blktrans_dev mbd;
 	__u16 MediaUnit, SpareMediaUnit;
 	__u32 EraseSize;
 	struct NFTLMediaHeader MediaHdr;
@@ -97,14 +95,12 @@ struct NFTLrecord {
 	__u16 lastEUN;                  /* should be suppressed */
 	__u16 numfreeEUNs;
 	__u16 LastFreeEUN; 		/* To speed up finding a free EUN */
-	__u32 long nr_sects;
 	int head,sect,cyl;
 	__u16 *EUNtable; 		/* [numvunits]: First EUN for each virtual unit  */
 	__u16 *ReplUnitTable; 		/* [numEUNs]: ReplUnitNumber for each */
         unsigned int nb_blocks;		/* number of physical blocks */
         unsigned int nb_boot_blocks;	/* number of blocks used by the bios */
         struct erase_info instr;
-	struct gendisk *disk;
 };
 
 int NFTL_mount(struct NFTLrecord *s);
@@ -115,7 +111,7 @@ int NFTL_formatblock(struct NFTLrecord *s, int block);
 #endif
 
 #define MAX_NFTLS 16
-#define MAX_SECTORS_PER_UNIT 32
+#define MAX_SECTORS_PER_UNIT 64
 #define NFTL_PARTN_BITS 4
 
 #endif /* __KERNEL__ */

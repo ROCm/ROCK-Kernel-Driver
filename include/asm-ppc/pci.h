@@ -102,6 +102,9 @@ static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 {
 	if (direction == PCI_DMA_NONE)
 		BUG();
+
+	consistent_sync(ptr, size, direction);
+
 	return virt_to_bus(ptr);
 }
 
@@ -203,7 +206,8 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 {
 	if (direction == PCI_DMA_NONE)
 		BUG();
-	/* nothing to do */
+
+	consistent_sync(bus_to_virt(dma_handle), size, direction);
 }
 
 /* Make physical memory consistent for a set of streaming
@@ -262,7 +266,7 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
 }
 
 /* Return the index of the PCI controller for device PDEV. */
-extern int pci_controller_num(struct pci_dev *pdev);
+#define pci_domain_nr(bus) ((struct pci_controller *)(bus)->sysdata)->index
 
 /* Map a range of PCI memory or I/O space for a device into user space */
 int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,

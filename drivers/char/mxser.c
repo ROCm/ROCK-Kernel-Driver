@@ -87,7 +87,6 @@
 #define		MXSER_ERR_VECTOR	-4
 
 #define 	SERIAL_TYPE_NORMAL	1
-#define 	SERIAL_TYPE_CALLOUT	2
 
 #define 	WAKEUP_CHARS		256
 
@@ -208,7 +207,6 @@ MODULE_DEVICE_TABLE(pci, mxser_pcibrds);
 
 static int ioaddr[MXSER_BOARDS];
 static int ttymajor = MXSERMAJOR;
-static int calloutmajor = MXSERCUMAJOR;
 static int verbose;
 
 /* Variables for insmod */
@@ -218,7 +216,6 @@ MODULE_DESCRIPTION("MOXA Smartio Family Multiport Board Device Driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(ioaddr, "1-4i");
 MODULE_PARM(ttymajor, "i");
-MODULE_PARM(calloutmajor, "i");
 MODULE_PARM(verbose, "i");
 
 struct mxser_hwconf {
@@ -256,15 +253,12 @@ struct mxser_struct {
 	unsigned long event;
 	int count;		/* # of fd on device */
 	int blocked_open;	/* # of blocked opens */
-	long session;		/* Session of opening process */
-	long pgrp;		/* pgrp of opening process */
 	unsigned char *xmit_buf;
 	int xmit_head;
 	int xmit_tail;
 	int xmit_cnt;
 	struct work_struct tqueue;
 	struct termios normal_termios;
-	struct termios callout_termios;
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	wait_queue_head_t delta_msr_wait;
@@ -294,7 +288,7 @@ static int mxserBoardCAP[MXSER_BOARDS] =
 };
 
 
-static struct tty_driver mxvar_sdriver, mxvar_cdriver;
+static struct tty_driver mxvar_sdriver;
 static int mxvar_refcount;
 static struct mxser_struct mxvar_table[MXSER_PORTS];
 static struct tty_struct *mxvar_tty[MXSER_PORTS + 1];
@@ -374,8 +368,6 @@ static void __exit mxser_module_exit(void)
 
 	if (verbose)
 		printk("Unloading module mxser ...\n");
-	if ((err |= tty_unregister_driver(&mxvar_cdriver)))
-		printk("Couldn't unregister MOXA Smartio family callout driver\n");
 	if ((err |= tty_unregister_driver(&mxvar_sdriver)))
 		printk("Couldn't unregister MOXA Smartio family serial driver\n");
 
@@ -428,7 +420,6 @@ int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 		info->close_delay = 5 * HZ / 10;
 		info->closing_wait = 30 * HZ;
 		INIT_WORK(&info->tqueue, mxser_do_softint, info);
-		info->callout_termios = mxvar_cdriver.init_termios;
 		info->normal_termios = mxvar_sdriver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
@@ -532,16 +523,7 @@ static int __init mxser_module_init(void)
 	mxvar_sdriver.start = mxser_start;
 	mxvar_sdriver.hangup = mxser_hangup;
 
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	mxvar_cdriver = mxvar_sdriver;
-	mxvar_cdriver.name = "cum";
-	mxvar_cdriver.major = calloutmajor;
-	mxvar_cdriver.subtype = SERIAL_TYPE_CALLOUT;
-
-	printk("Tty devices major number = %d, callout devices major number = %d\n", ttymajor, calloutmajor);
+	printk("Tty devices major number = %d\n", ttymajor);
 
 	mxvar_diagflag = 0;
 	memset(mxvar_table, 0, MXSER_PORTS * sizeof(struct mxser_struct));
@@ -666,30 +648,17 @@ static int __init mxser_module_init(void)
 	}
 
 
-	ret1 = 0;
-	ret2 = 0;
-	if (!(ret1 = tty_register_driver(&mxvar_sdriver))) {
-		if (!(ret2 = tty_register_driver(&mxvar_cdriver))) {
-			return 0;
-		} else {
-			tty_unregister_driver(&mxvar_sdriver);
-			printk("Couldn't install MOXA Smartio family callout driver !\n");
-		}
-	} else
-		printk("Couldn't install MOXA Smartio family driver !\n");
+	if (!tty_register_driver(&mxvar_sdriver))
+		return 0;
 
+	printk("Couldn't install MOXA Smartio family driver !\n");
 
-	if (ret1 || ret2) {
-		for (i = 0; i < MXSER_BOARDS; i++) {
-			if (mxsercfg[i].board_type == -1)
-				continue;
-			else {
-				free_irq(mxsercfg[i].irq, &mxvar_table[i * MXSER_PORTS_PER_BOARD]);
-			}
-		}
-		return -1;
+	for (i = 0; i < MXSER_BOARDS; i++) {
+		if (mxsercfg[i].board_type == -1)
+			continue;
+		free_irq(mxsercfg[i].irq, &mxvar_table[i * MXSER_PORTS_PER_BOARD]);
 	}
-	return (0);
+	return -1;
 }
 
 static void mxser_do_softint(void *private_)
@@ -758,15 +727,9 @@ static int mxser_open(struct tty_struct *tty, struct file *filp)
 		return (retval);
 
 	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else
-			*tty->termios = info->callout_termios;
+		*tty->termios = info->normal_termios;
 		mxser_change_speed(info, 0);
 	}
-	info->session = current->session;
-	info->pgrp = current->pgrp;
-
 	return (0);
 }
 
@@ -823,8 +786,6 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 	 */
 	if (info->flags & ASYNC_NORMAL_ACTIVE)
 		info->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify
 	 * the line discipline to only process XON/XOFF characters.
@@ -872,8 +833,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE |
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	restore_flags(flags);
 
@@ -1154,7 +1114,8 @@ static int mxser_ioctl_special(unsigned int cmd, unsigned long arg)
 		return 0;
 
 	case MOXA_GET_CUMAJOR:
-		if(copy_to_user((int *) arg, &calloutmajor, sizeof(int)))
+		result = 0;
+		if(copy_to_user((int *) arg, &result, sizeof(int)))
 			return -EFAULT;
 		return 0;
 
@@ -1349,7 +1310,7 @@ void mxser_hangup(struct tty_struct *tty)
 	mxser_shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1513,8 +1474,7 @@ static inline void mxser_check_modem_status(struct mxser_struct *info,
 	if ((info->flags & ASYNC_CHECK_CD) && (status & UART_MSR_DDCD)) {
 		if (status & UART_MSR_DCD)
 			wake_up_interruptible(&info->open_wait);
-		else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (info->flags & ASYNC_CALLOUT_NOHUP)))
+		else
 			set_bit(MXSER_EVENT_HANGUP, &info->event);
 		schedule_work(&info->tqueue);
 	}
@@ -1563,41 +1523,16 @@ static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,
 #endif
 	}
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return (-EBUSY);
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-			return (-EBUSY);
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-			return (-EBUSY);
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return (0);
-	}
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return (-EBUSY);
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return (0);
 	}
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 
 	/*
 	 * Block waiting for the carrier detect and the line to become
@@ -1617,9 +1552,8 @@ static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,
 	while (1) {
 		save_flags(flags);
 		cli();
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE))
-			outb(inb(info->base + UART_MCR) | UART_MCR_DTR | UART_MCR_RTS,
-			     info->base + UART_MCR);
+		outb(inb(info->base + UART_MCR) | UART_MCR_DTR | UART_MCR_RTS,
+		     info->base + UART_MCR);
 		restore_flags(flags);
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) || !(info->flags & ASYNC_INITIALIZED)) {
@@ -1633,8 +1567,7 @@ static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,
 #endif
 			break;
 		}
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(info->flags & ASYNC_CLOSING) &&
+		if (!(info->flags & ASYNC_CLOSING) &&
 		    (do_clocal || (inb(info->base + UART_MSR) & UART_MSR_DCD)))
 			break;
 		if (signal_pending(current)) {

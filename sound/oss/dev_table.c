@@ -22,7 +22,7 @@ int sound_install_audiodrv(int vers, char *name, struct audio_driver *driver,
 {
 	struct audio_driver *d;
 	struct audio_operations *op;
-	int l, num;
+	int num;
 
 	if (vers != AUDIO_DRIVER_VERSION || driver_size > sizeof(struct audio_driver)) {
 		printk(KERN_ERR "Sound: Incompatible audio driver for %s\n", name);
@@ -58,11 +58,7 @@ int sound_install_audiodrv(int vers, char *name, struct audio_driver *driver,
 	memcpy((char *) d, (char *) driver, driver_size);
 
 	op->d = d;
-	l = strlen(name) + 1;
-	if (l > sizeof(op->name))
-		l = sizeof(op->name);
-	strncpy(op->name, name, l);
-	op->name[l - 1] = 0;
+	strlcpy(op->name, name, sizeof(op->name));
 	op->flags = flags;
 	op->format_mask = format_mask;
 	op->devc = devc;
@@ -82,7 +78,6 @@ int sound_install_mixer(int vers, char *name, struct mixer_operations *driver,
 	int driver_size, void *devc)
 {
 	struct mixer_operations *op;
-	int l;
 
 	int n = sound_alloc_mixerdev();
 
@@ -110,11 +105,7 @@ int sound_install_mixer(int vers, char *name, struct mixer_operations *driver,
 	memset((char *) op, 0, sizeof(struct mixer_operations));
 	memcpy((char *) op, (char *) driver, driver_size);
 
-	l = strlen(name) + 1;
-	if (l > sizeof(op->name))
-		l = sizeof(op->name);
-	strncpy(op->name, name, l);
-	op->name[l - 1] = 0;
+	strlcpy(op->name, name, sizeof(op->name));
 	op->devc = devc;
 
 	mixer_devs[n] = op;

@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/sysrq.h>
+#include <asm/xmon.h>
 #include <asm/prom.h>
 #include <asm/bootx.h>
 #include <asm/machdep.h>
@@ -52,7 +53,7 @@ void buf_access(void)
 
 extern int adb_init(void);
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_CHRP
 /*
  * This looks in the "ranges" property for the primary PCI host bridge
  * to find the physical address of the start of PCI/ISA I/O space.
@@ -90,7 +91,7 @@ static unsigned long chrp_find_phys_io_base(void)
 	}
 	return base;
 }
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_CHRP */
 
 #ifdef CONFIG_MAGIC_SYSRQ
 static void sysrq_handle_xmon(int key, struct pt_regs *regs,
@@ -110,7 +111,7 @@ static struct sysrq_key_op sysrq_xmon_op =
 void
 xmon_map_scc(void)
 {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_MULTIPLATFORM
 	volatile unsigned char *base;
 	
 	if (_machine == _MACH_Pmac) {
@@ -397,7 +398,7 @@ static unsigned char scc_inittab[] = {
 };
 
 void
-xmon_init_scc()
+xmon_init_scc(void)
 {
 	if ( _machine == _MACH_chrp )
 	{

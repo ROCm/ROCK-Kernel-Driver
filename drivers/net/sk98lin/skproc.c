@@ -46,378 +46,168 @@
 
 #include "h/skdrv1st.h"
 #include "h/skdrv2nd.h"
-#define ZEROPAD	1		/* pad with zero */
-#define SIGN	2		/* unsigned/signed long */
-#define PLUS	4		/* show plus */
-#define SPACE	8		/* space if plus */
-#define LEFT	16		/* left justified */
-//#define SPECIAL	32		/* 0x */
-#define LARGE	64
 
-extern char * SkNumber(char * str, long long num, int base, int size, 
-				int precision ,int type);
-int proc_read(char *buffer,
-				char **buffer_location,
-				off_t offset,
-				int buffer_length,
-				int *eof,
-				void *data);
+extern spinlock_t sk_devs_lock;
 
-
-extern struct net_device *sk98lin_root_dev;
-
-/*****************************************************************************
- *
- * 	proc_read - print "summaries" entry 
- *
- * Description:
- *  This function fills the proc entry with statistic data about 
- *  the ethernet device.
- *  
- *
- * Returns: buffer with statistic data
- *	
- */
-int sk_proc_read(char *buffer,
-char **buffer_location,
-off_t offset,
-int buffer_length,
-int *eof,
-void *data)
+static int sk_show_dev(struct net_device *dev, char *buf)
 {
+	DEV_NET	*pNet = (DEV_NET*) dev->priv;
+	SK_AC *pAC = pNet->pAC;
+	int t = pNet->PortNr;
+	SK_RLMT_NET *rlmt = &pAC->Rlmt.Net[t];
+	unsigned long Flags;		
+	unsigned Size;
 	int len = 0;
-	int t;
 	int i;
-	DEV_NET				*pNet;
-	SK_AC				*pAC;
-	char 				test_buf[100];
-	unsigned long			Flags;		
-	unsigned int			Size;
-	struct net_device 		*next;
-	struct net_device 		*SkgeProcDev = sk98lin_root_dev;
 
-	SK_PNMI_STRUCT_DATA 	*pPnmiStruct;
+	SK_PNMI_STRUCT_DATA 	*pPnmiStruct = &pAC->PnmiStruct;
 	SK_PNMI_STAT		*pPnmiStat;
-	struct proc_dir_entry *file = (struct proc_dir_entry*) data;
 
-	while (SkgeProcDev) {
-		pNet = (DEV_NET*) SkgeProcDev->priv;
-		pAC = pNet->pAC;
-		next = pAC->Next;
-		pPnmiStruct = &pAC->PnmiStruct;
-		/* NetIndex in GetStruct is now required, zero is only dummy */
+	spin_lock_irqsave(&pAC->SlowPathLock, Flags);
+	Size = SK_PNMI_STRUCT_SIZE;
+	SkPnmiGetStruct(pAC, pAC->IoBase, pPnmiStruct, &Size, t);
+	spin_unlock_irqrestore(&pAC->SlowPathLock, Flags);
 
-		for (t=pAC->GIni.GIMacsFound; t > 0; t--) {
-			if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 1)
-				t--;
-			
-			spin_lock_irqsave(&pAC->SlowPathLock, Flags);
-			Size = SK_PNMI_STRUCT_SIZE;
-			SkPnmiGetStruct(pAC, pAC->IoBase, 
-				pPnmiStruct, &Size, t-1);
-			spin_unlock_irqrestore(&pAC->SlowPathLock, Flags);
-	
-			if (strcmp(pAC->dev[t-1]->name, file->name) == 0) {
-				pPnmiStat = &pPnmiStruct->Stat[0];
-				len = sprintf(buffer, 
-					"\nDetailed statistic for device %s\n",
-					pAC->dev[t-1]->name);
-				len += sprintf(buffer + len,
-					"==================================\n");
-	
-				/* Board statistics */
-				len += sprintf(buffer + len, 
-					"\nBoard statistics\n\n");
-				len += sprintf(buffer + len,
-					"Active Port               %c\n",
-					'A' + pAC->Rlmt.Net[t-1].Port[pAC->Rlmt.
-					Net[t-1].PrefPort]->PortNumber);
-				len += sprintf(buffer + len,
-					"Preferred Port            %c\n",
-					'A' + pAC->Rlmt.Net[t-1].Port[pAC->Rlmt.
-					Net[t-1].PrefPort]->PortNumber);
+	pPnmiStat = &pPnmiStruct->Stat[0];
 
-				len += sprintf(buffer + len,
-					"Bus speed (Mhz)           %d\n",
-					pPnmiStruct->BusSpeed);
+	len = sprintf(buf, "\nDetailed statistic for device %s\n", dev->name);
+	len += sprintf(buf + len, "==================================\n");
 
-				len += sprintf(buffer + len,
-					"Bus width (Bit)           %d\n",
-					pPnmiStruct->BusWidth);
+	/* Board statistics */
+	len += sprintf(buf + len, "\nBoard statistics\n\n");
+	len += sprintf(buf + len, "Active Port               %c\n",
+		'A' + rlmt->Port[rlmt->ActivePort]->PortNumber);
+	len += sprintf(buf + len, "Preferred Port            %c\n",
+		'A' + rlmt->Port[rlmt->PrefPort]->PortNumber);
 
-				for (i=0; i < SK_MAX_SENSORS; i ++) {
-					if (strcmp(pAC->I2c.SenTable[i].SenDesc,
-							"Temperature") == 0 ) {
-						len += sprintf(buffer + len,
-							"Temperature (C)           %d.%d\n",
-							pAC->I2c.SenTable[i].SenValue / 10,
-							pAC->I2c.SenTable[i].SenValue % 10);
-						len += sprintf(buffer + len,
-							"Temperature (F)           %d.%d\n",
-							((((pAC->I2c.SenTable[i].SenValue)
-							*10)*9)/5 + 3200)/100,
-							((((pAC->I2c.SenTable[i].SenValue)
-							*10)*9)/5 + 3200) % 10);
-					} else if (strcmp(pAC->I2c.SenTable[i].SenDesc,
-							"Speed Fan") == 0 ) {
-						len += sprintf(buffer + len,
-							"Speed Fan                 %d\n",
-							pAC->I2c.SenTable[i].SenValue);
-					} else {
-						len += sprintf(buffer + len,
-							"%-20s      %d.%d\n",
-							pAC->I2c.SenTable[i].SenDesc,
-							pAC->I2c.SenTable[i].SenValue / 1000,
-							pAC->I2c.SenTable[i].SenValue % 1000);
-					}
-				}
-				
-				/*Receive statistics */
-				
-				len += sprintf(buffer + len, 
-				"\nReceive statistics\n\n");
+	len += sprintf(buf + len, "Bus speed (Mhz)           %d\n",
+		pPnmiStruct->BusSpeed);
 
-				len += sprintf(buffer + len,
-					"Received bytes            %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxOctetsOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Received packets          %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Received errors           %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFcsCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Received dropped          %s\n",
-					SkNumber(test_buf, pPnmiStruct->RxNoBufCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Received multicast        %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxMulticastOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Received errors types\n");
-				len += sprintf(buffer + len,
-					"   length errors          %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxRuntCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   over errors            %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFifoOverflowCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   crc errors             %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFcsCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   frame errors           %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFramingCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   fifo errors            %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFifoOverflowCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   missed errors          %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxMissedCts,
-					10, 0, -1, 0));
-				
-				/*Transmit statistics */
-				len += sprintf(buffer + len, 
-				"\nTransmit statistics\n\n");
-				
-				len += sprintf(buffer + len,
-					"Transmit bytes            %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxOctetsOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit packets          %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit errors           %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxSingleCollisionCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit dropped          %s\n",
-					SkNumber(test_buf, pPnmiStruct->TxNoBufCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit collisions       %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxSingleCollisionCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmited errors types\n");
-				len += sprintf(buffer + len,
-					"   aborted errors         %ld\n",
-					pAC->stats.tx_aborted_errors);
-				len += sprintf(buffer + len,
-					"   carrier errors         %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxCarrierCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   fifo errors            %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxFifoUnderrunCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   heartbeat errors       %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxCarrierCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   window errors          %ld\n",
-					pAC->stats.tx_window_errors);
-			}
+	len += sprintf(buf + len, "Bus width (Bit)           %d\n",
+		pPnmiStruct->BusWidth);
+
+	for (i=0; i < SK_MAX_SENSORS; i ++) {
+		SK_SENSOR *sens = &pAC->I2c.SenTable[i];
+		SK_I32 val = sens->SenValue;
+		if (strcmp(sens->SenDesc, "Temperature") == 0 ) {
+			len += sprintf(buf + len,
+				"Temperature (C)           %d.%d\n",
+				val / 10, val % 10);
+			val = val * 18 + 3200;
+			len += sprintf(buf + len,
+				"Temperature (F)           %d.%d\n",
+				val/100, val % 10);
+		} else if (strcmp(sens->SenDesc, "Speed Fan") == 0 ) {
+			len += sprintf(buf + len,
+				"Speed Fan                 %d\n",
+				val);
+		} else {
+			len += sprintf(buf + len,
+				"%-20s      %d.%d\n",
+				sens->SenDesc, val / 1000, val % 1000);
 		}
-		SkgeProcDev = next;
 	}
-	if (offset >= len) {
-		*eof = 1;
-		return 0;
-	}
+	
+	/*Receive statistics */
+	
+	len += sprintf(buf + len, "\nReceive statistics\n\n");
 
-	*buffer_location = buffer + offset;
-	if (buffer_length >= len - offset) {
-		*eof = 1;
-	}
-	return (min_t(int, buffer_length, len - offset));
+	len += sprintf(buf + len, "Received bytes            %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxOctetsOkCts);
+	len += sprintf(buf + len, "Received packets          %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxOkCts);
+	len += sprintf(buf + len, "Received errors           %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxFcsCts);
+	len += sprintf(buf + len, "Received dropped          %Ld\n",
+		(unsigned long long) pPnmiStruct->RxNoBufCts);
+	len += sprintf(buf + len, "Received multicast        %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxMulticastOkCts);
+	len += sprintf(buf + len, "Received errors types\n");
+	len += sprintf(buf + len, "   length errors          %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxRuntCts);
+	len += sprintf(buf + len, "   over errors            %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxFifoOverflowCts);
+	len += sprintf(buf + len, "   crc errors             %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxFcsCts);
+	len += sprintf(buf + len, "   frame errors           %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxFramingCts);
+	len += sprintf(buf + len, "   fifo errors            %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxFifoOverflowCts);
+	len += sprintf(buf + len, "   missed errors          %Ld\n",
+		(unsigned long long) pPnmiStat->StatRxMissedCts);
+	
+	/*Transmit statistics */
+	len += sprintf(buf + len, "\nTransmit statistics\n\n");
+	
+	len += sprintf(buf + len, "Transmit bytes            %Ld\n",
+		(unsigned long long) pPnmiStat->StatTxOctetsOkCts);
+	len += sprintf(buf + len, "Transmit packets          %Ld\n",
+		(unsigned long long) pPnmiStat->StatTxOkCts);
+	len += sprintf(buf + len, "Transmit errors           %Ld\n",
+		(unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
+	len += sprintf(buf + len, "Transmit dropped          %Ld\n",
+		(unsigned long long) pPnmiStruct->TxNoBufCts);
+	len += sprintf(buf + len, "Transmit collisions       %Ld\n",
+		(unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
+	len += sprintf(buf + len, "Transmited errors types\n");
+	len += sprintf(buf + len, "   aborted errors         %ld\n",
+		pAC->stats.tx_aborted_errors);
+	len += sprintf(buf + len, "   carrier errors         %Ld\n",
+		(unsigned long long) pPnmiStat->StatTxCarrierCts);
+	len += sprintf(buf + len, "   fifo errors            %Ld\n",
+		(unsigned long long) pPnmiStat->StatTxFifoUnderrunCts);
+	len += sprintf(buf + len, "   heartbeat errors       %Ld\n",
+		(unsigned long long) pPnmiStat->StatTxCarrierCts);
+	len += sprintf(buf + len, "   window errors          %ld\n",
+		pAC->stats.tx_window_errors);
+	return len;
 }
 
-
-
-
-
-/*****************************************************************************
- *
- * SkDoDiv - convert 64bit number
- *
- * Description:
- *	This function "converts" a long long number.
- *
- * Returns:
- *	remainder of division
- */
-static long SkDoDiv (long long Dividend, int Divisor, long long *pErg)
+static ssize_t sk_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 {
- long   	Rest;
- long long 	Ergebnis;
- long   	Akku;
+	struct inode * inode = file->f_dentry->d_inode;
+	struct proc_dir_entry *entry = PDE(inode);
+	char *page = (char *)__get_free_page(GFP_KERNEL);
+	struct net_device *dev;
+	loff_t pos = *ppos;
+	ssize_t res = 0;
+	int len = 0;
 
+	if (!page)
+		return -ENOMEM;
 
- Akku  = Dividend >> 32;
+	spin_lock(&sk_devs_lock);
+	dev = entry->data;
+	if (dev)
+		len = sk_show_dev(dev, page);
+	spin_unlock(&sk_devs_lock);
 
- Ergebnis = ((long long) (Akku / Divisor)) << 32;
- Rest = Akku % Divisor ;
-
- Akku = Rest << 16;
- Akku |= ((Dividend & 0xFFFF0000) >> 16);
-
-
- Ergebnis += ((long long) (Akku / Divisor)) << 16;
- Rest = Akku % Divisor ;
-
- Akku = Rest << 16;
- Akku |= (Dividend & 0xFFFF);
-
- Ergebnis += (Akku / Divisor);
- Rest = Akku % Divisor ;
-
- *pErg = Ergebnis;
- return (Rest);
+	if (pos >= 0 && pos < len) {
+		res = nbytes;
+		if (res > len - pos)
+			res = len - pos;
+		if (copy_to_user(page + pos, buf, nbytes))
+			res = -EFAULT;
+		else
+			*ppos = pos + res;
+	}
+	free_page((unsigned long) page);
+	return nbytes;
 }
 
-
-#if 0
-#define do_div(n,base) ({ \
-long long __res; \
-__res = ((unsigned long long) n) % (unsigned) base; \
-n = ((unsigned long long) n) / (unsigned) base; \
-__res; })
-
-#endif
-
-
-/*****************************************************************************
- *
- * SkNumber - Print results
- *
- * Description:
- *	This function converts a long long number into a string.
- *
- * Returns:
- *	number as string
- */
-char * SkNumber(char * str, long long num, int base, int size, int precision
-	,int type)
+static loff_t sk_lseek(struct file *file, loff_t offset, int orig)
 {
-	char c,sign,tmp[66], *strorg = str;
-	const char *digits="0123456789abcdefghijklmnopqrstuvwxyz";
-	int i;
-
-	if (type & LARGE)
-		digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	if (type & LEFT)
-		type &= ~ZEROPAD;
-	if (base < 2 || base > 36)
-		return 0;
-	c = (type & ZEROPAD) ? '0' : ' ';
-	sign = 0;
-	if (type & SIGN) {
-		if (num < 0) {
-			sign = '-';
-			num = -num;
-			size--;
-		} else if (type & PLUS) {
-			sign = '+';
-			size--;
-		} else if (type & SPACE) {
-			sign = ' ';
-			size--;
-		}
+	switch (orig) {
+	    case 1:
+		offset += file->f_pos;
+	    case 0:
+		if (offset >= 0)
+			return file->f_pos = offset;
 	}
-	if (type & SPECIAL) {
-		if (base == 16)
-			size -= 2;
-		else if (base == 8)
-			size--;
-	}
-	i = 0;
-	if (num == 0)
-		tmp[i++]='0';
-	else while (num != 0)
-		tmp[i++] = digits[SkDoDiv(num,base, &num)];
-
-	if (i > precision)
-		precision = i;
-	size -= precision;
-	if (!(type&(ZEROPAD+LEFT)))
-		while(size-->0)
-			*str++ = ' ';
-	if (sign)
-		*str++ = sign;
-	if (type & SPECIAL) {
-		if (base==8)
-			*str++ = '0';
-		else if (base==16) {
-			*str++ = '0';
-			*str++ = digits[33];
-		}
-	}
-	if (!(type & LEFT))
-		while (size-- > 0)
-			*str++ = c;
-	while (i < precision--)
-		*str++ = '0';
-	while (i-- > 0)
-		*str++ = tmp[i];
-	while (size-- > 0)
-		*str++ = ' ';
-	
-	str[0] = '\0';
-	
-	return strorg;
+	return -EINVAL;
 }
 
-
-
+struct file_operations sk_proc_fops = {
+	.read = sk_read,
+	.llseek	= sk_lseek,
+};

@@ -399,8 +399,8 @@ static Scsi_Host_Template	*the_template	= NULL;
 
 static irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ncr53c8xx_timeout(unsigned long np);
-static int ncr53c8xx_proc_info(char *buffer, char **start, off_t offset,
-			int length, int hostno, int func);
+static int ncr53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			int length, int func);
 
 #define initverbose (driver_setup.verbose)
 #define bootverbose (np->verbose)
@@ -3701,7 +3701,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	/*
 	**	Store input informations in the host data structure.
 	*/
-	strncpy(np->chip_name, device->chip.name, sizeof(np->chip_name) - 1);
+	strlcpy(np->chip_name, device->chip.name, sizeof(np->chip_name));
 	np->unit	= unit;
 	np->verbose	= driver_setup.verbose;
 	sprintf(np->inst_name, "ncr53c%s-%d", np->chip_name, np->unit);
@@ -5033,7 +5033,7 @@ static int ncr_detach(ncb_p np)
 	char inst_name[16];
 
 	/* Local copy so we don't access np after freeing it! */
-	strncpy(inst_name, ncr_name(np), 16);
+	strlcpy(inst_name, ncr_name(np), sizeof(inst_name));
 
 	printk("%s: releasing host resources\n", ncr_name(np));
 
@@ -9249,21 +9249,17 @@ static int ncr_host_info(ncb_p np, char *ptr, off_t offset, int len)
 **	- func = 1 means write (parse user control command)
 */
 
-static int ncr53c8xx_proc_info(char *buffer, char **start, off_t offset,
-			int length, int hostno, int func)
+static int ncr53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			int length, int func)
 {
-	struct Scsi_Host *host;
 	struct host_data *host_data;
 	ncb_p ncb = 0;
 	int retv;
 
 #ifdef DEBUG_PROC_INFO
-printk("ncr53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
+printk("ncr53c8xx_proc_info: hostno=%d, func=%d\n", host->host_no, func);
 #endif
 
-	if((host = scsi_host_hn_get(hostno))==NULL)
-		return -EINVAL;
-		
 	host_data = (struct host_data *) host->hostdata;
 	ncb = host_data->ncb;
 

@@ -449,10 +449,6 @@
 
 #include <linux/version.h>
 
-#ifndef LinuxVersionCode
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
-#endif
-
 #define MAX_INT_PARAM 10
 
 #if defined(MODULE)
@@ -963,8 +959,6 @@ static struct pci_dev *get_pci_dev(unsigned long port_base) {
    unsigned int addr;
    struct pci_dev *dev = NULL;
 
-   if (!pci_present()) return NULL;
-
    while((dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) {
       addr = pci_resource_start (dev, 0);
 
@@ -986,8 +980,6 @@ static void enable_pci_ports(void) {
 #if defined(CONFIG_PCI)
 
    struct pci_dev *dev = NULL;
-
-   if (!pci_present()) return;
 
    while((dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) {
 
@@ -1413,8 +1405,6 @@ static void add_pci_ports(void) {
    unsigned int addr, k;
 
    struct pci_dev *dev = NULL;
-
-   if (!pci_present()) return;
 
    for (k = 0; k < MAX_PCI; k++) {
 

@@ -85,7 +85,7 @@ static int acpi_processor_info_open_fs(struct inode *inode, struct file *file);
 static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file);
 static int acpi_processor_power_open_fs(struct inode *inode, struct file *file);
 static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file);
-
+static int acpi_processor_get_limit_info(struct acpi_processor *pr);
 
 static struct acpi_driver acpi_processor_driver = {
 	.name =		ACPI_PROCESSOR_DRIVER_NAME,
@@ -769,7 +769,9 @@ acpi_processor_get_platform_limit (
 	}
 
 	pr->performance_platform_limit = (int) ppc;
-
+	
+	acpi_processor_get_limit_info(pr);
+	
 	return_VALUE(0);
 }
 EXPORT_SYMBOL(acpi_processor_get_platform_limit);
@@ -790,6 +792,7 @@ acpi_processor_register_performance (
 		return_VALUE(-EBUSY);
 
 	(*pr)->performance = performance;
+	performance->pr = *pr;
 	return 0;
 }
 EXPORT_SYMBOL(acpi_processor_register_performance);

@@ -794,8 +794,6 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 
 	DEBUG(1, "Selecting requested active setting=%d. maxPS=%d.", actInterface, maxPS);
 
-	/* Code below may sleep, need to lock module while we are here */
-	MOD_INC_USE_COUNT;
 	uvd = usbvideo_AllocateDevice(cams);
 	if (uvd != NULL) {
 		struct konicawc *cam = (struct konicawc *)(uvd->user_data);
@@ -857,7 +855,6 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		info("konicawc: %s on %s\n", cam->input.name, cam->input.phys);
 #endif
 	}
-	MOD_DEC_USE_COUNT;
 
 	if (uvd) {
 		usb_set_intfdata (intf, uvd);

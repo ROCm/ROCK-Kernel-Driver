@@ -187,8 +187,7 @@ int snd_seq_device_new(snd_card_t *card, int device, char *id, int argsize,
 	/* set up device info */
 	dev->card = card;
 	dev->device = device;
-	strncpy(dev->id, id, sizeof(dev->id) - 1);
-	dev->id[sizeof(dev->id) - 1] = 0;
+	strlcpy(dev->id, id, sizeof(dev->id));
 	dev->argsize = argsize;
 	dev->status = SNDRV_SEQ_DEVICE_FREE;
 
@@ -350,8 +349,7 @@ static ops_list_t * create_driver(char *id)
 	memset(ops, 0, sizeof(*ops));
 
 	/* set up driver entry */
-	strncpy(ops->id, id, sizeof(ops->id) - 1);
-	ops->id[sizeof(ops->id) - 1] = 0;
+	strlcpy(ops->id, id, sizeof(ops->id));
 	init_MUTEX(&ops->reg_mutex);
 	ops->driver = DRIVER_EMPTY;
 	INIT_LIST_HEAD(&ops->dev_list);

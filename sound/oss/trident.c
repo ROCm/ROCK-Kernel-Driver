@@ -4385,9 +4385,6 @@ static struct pci_driver trident_pci_driver = {
 
 static int __init trident_init_module (void)
 {
-	if (!pci_present())   /* No PCI bus in this machine! */
-		return -ENODEV;
-
 	printk(KERN_INFO "Trident 4DWave/SiS 7018/ALi 5451,Tvia CyberPro "
 	       "5050 PCI Audio, version " DRIVER_VERSION ", " 
 	       __TIME__ " " __DATE__ "\n");

@@ -213,24 +213,6 @@ extern void tasklet_kill(struct tasklet_struct *t);
 extern void tasklet_init(struct tasklet_struct *t,
 			 void (*func)(unsigned long), unsigned long data);
 
-#ifdef CONFIG_SMP
-
-#define SMP_TIMER_NAME(name) name##__thr
-
-#define SMP_TIMER_DEFINE(name, task) \
-DECLARE_TASKLET(task, name##__thr, 0); \
-static void name (unsigned long dummy) \
-{ \
-	tasklet_schedule(&(task)); \
-}
-
-#else /* CONFIG_SMP */
-
-#define SMP_TIMER_NAME(name) name
-#define SMP_TIMER_DEFINE(name, task)
-
-#endif /* CONFIG_SMP */
-
 /*
  * Autoprobing for irqs:
  *

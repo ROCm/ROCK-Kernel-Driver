@@ -25,6 +25,9 @@
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
+#include <linux/sysdev.h>
+#include <linux/module.h>
+
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -37,6 +40,8 @@
 #include <mach_apic.h>
 
 #include "io_ports.h"
+
+static void apic_pm_activate(void);
 
 void __init apic_intr_init(void)
 {
@@ -291,6 +296,8 @@ void __init init_bsp_APIC(void)
 	value = apic_read(APIC_SPIV);
 	value &= ~APIC_VECTOR_MASK;
 	value |= APIC_SPIV_APIC_ENABLED;
+	
+	/* This bit is reserved on P4/Xeon and should be cleared */
 	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) && (boot_cpu_data.x86 == 15))
 		value &= ~APIC_SPIV_FOCUS_DISABLED;
 	else
@@ -451,12 +458,10 @@ void __init setup_local_APIC (void)
 
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		setup_apic_nmi_watchdog();
+	apic_pm_activate();
 }
 
 #ifdef CONFIG_PM
-
-#include <linux/device.h>
-#include <linux/module.h>
 
 static struct {
 	/* 'active' is true if the local APIC was enabled by us and
@@ -479,13 +484,11 @@ static struct {
 	unsigned int apic_thmr;
 } apic_pm_state;
 
-static int lapic_suspend(struct device *dev, u32 state, u32 level)
+static int lapic_suspend(struct sys_device *dev, u32 state)
 {
 	unsigned int l, h;
 	unsigned long flags;
 
-	if (level != SUSPEND_POWER_DOWN)
-		return 0;
 	if (!apic_pm_state.active)
 		return 0;
 
@@ -512,13 +515,11 @@ static int lapic_suspend(struct device *dev, u32 state, u32 level)
 	return 0;
 }
 
-static int lapic_resume(struct device *dev, u32 level)
+static int lapic_resume(struct sys_device *dev)
 {
 	unsigned int l, h;
 	unsigned long flags;
 
-	if (level != RESUME_POWER_ON)
-		return 0;
 	if (!apic_pm_state.active)
 		return 0;
 
@@ -552,42 +553,41 @@ static int lapic_resume(struct device *dev, u32 level)
 	return 0;
 }
 
-static struct device_driver lapic_driver = {
-	.name		= "lapic",
-	.bus		= &system_bus_type,
+
+static struct sysdev_class lapic_sysclass = {
+	set_kset_name("lapic"),
 	.resume		= lapic_resume,
 	.suspend	= lapic_suspend,
 };
 
-/* not static, needed by child devices */
-struct sys_device device_lapic = {
-	.name		= "lapic",
-	.id		= 0,
-	.dev		= {
-		.name	= "lapic",
-		.driver	= &lapic_driver,
-	},
+static struct sys_device device_lapic = {
+	.id	= 0,
+	.cls	= &lapic_sysclass,
 };
-EXPORT_SYMBOL(device_lapic);
 
 static void __init apic_pm_activate(void)
 {
 	apic_pm_state.active = 1;
 }
 
-static int __init init_lapic_devicefs(void)
+static int __init init_lapic_sysfs(void)
 {
+	int error;
+
 	if (!cpu_has_apic)
 		return 0;
 	/* XXX: remove suspend/resume procs if !apic_pm_state.active? */
-	driver_register(&lapic_driver);
-	return sys_device_register(&device_lapic);
+
+	error = sysdev_class_register(&lapic_sysclass);
+	if (!error)
+		error = sys_device_register(&device_lapic);
+	return error;
 }
-device_initcall(init_lapic_devicefs);
+device_initcall(init_lapic_sysfs);
 
 #else	/* CONFIG_PM */
 
-static inline void apic_pm_activate(void) { }
+static void apic_pm_activate(void) { }
 
 #endif	/* CONFIG_PM */
 

@@ -983,8 +983,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		struct dentry *dentry; 
 		unsigned long move_count;
 		struct qstr * qstr;
-		
-		prefetch(node->next);
 
 		smp_read_barrier_depends();
 		dentry = hlist_entry(node, struct dentry, d_hash);
@@ -1072,7 +1070,6 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 	spin_lock(&dcache_lock);
 	base = d_hash(dparent, dentry->d_name.hash);
 	hlist_for_each(lhp,base) { 
-		prefetch(lhp->next);
 		/* read_barrier_depends() not required for d_hash list
 		 * as it is parsed under dcache_lock
 		 */
@@ -1272,8 +1269,9 @@ void d_move(struct dentry * dentry, struct dentry * target)
  * @buflen: buffer length
  *
  * Convert a dentry into an ASCII path name. If the entry has been deleted
- * the string " (deleted)" is appended. Note that this is ambiguous. Returns
- * the buffer.
+ * the string " (deleted)" is appended. Note that this is ambiguous.
+ *
+ * Returns the buffer or an error code if the path was too long.
  *
  * "buflen" should be positive. Caller holds the dcache_lock.
  */
@@ -1552,7 +1550,7 @@ static void __init dcache_init(unsigned long mempages)
 	dentry_cache = kmem_cache_create("dentry_cache",
 					 sizeof(struct dentry),
 					 0,
-					 SLAB_HWCACHE_ALIGN,
+					 SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					 NULL, NULL);
 	if (!dentry_cache)
 		panic("Cannot create dentry cache");
@@ -1606,6 +1604,7 @@ kmem_cache_t *filp_cachep;
 EXPORT_SYMBOL(d_genocide);
 
 extern void bdev_cache_init(void);
+extern void chrdev_init(void);
 
 void __init vfs_caches_init(unsigned long mempages)
 {
@@ -1626,4 +1625,5 @@ void __init vfs_caches_init(unsigned long mempages)
 	files_init(mempages); 
 	mnt_init(mempages);
 	bdev_cache_init();
+	chrdev_init();
 }

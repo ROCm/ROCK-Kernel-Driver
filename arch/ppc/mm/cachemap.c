@@ -2,7 +2,7 @@
  *  PowerPC version derived from arch/arm/mm/consistent.c
  *    Copyright (C) 2001 Dan Malek (dmalek@jlc.net)
  *
- *  arch/arm/mm/consistent.c
+ *  arch/ppc/mm/cachemap.c
  *
  *  Copyright (C) 2000 Russell King
  *
@@ -59,57 +59,69 @@ int map_page(unsigned long va, unsigned long pa, int flags);
  */
 void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 {
-	int order, err, i;
-	unsigned long page, va, pa, flags;
-	struct vm_struct *area;
-	void	 *ret;
+	int order, err;
+	struct page *page, *free, *end;
+	unsigned long pa, flags, offset;
+	struct vm_struct *area = NULL;
+	unsigned long va = 0;
 
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 
-	/* Only allocate page size areas.
-	*/
+	/* Only allocate page size areas */
 	size = PAGE_ALIGN(size);
 	order = get_order(size);
 
-	page = __get_free_pages(gfp, order);
-	if (!page) {
-		BUG();
+	free = page = alloc_pages(gfp, order);
+	if (! page)
 		return NULL;
-	}
+
+	pa = page_to_phys(page);
+	*dma_handle = page_to_bus(page);
+	end = page + (1 << order);
 
 	/*
 	 * we need to ensure that there are no cachelines in use,
 	 * or worse dirty in this area.
 	 */
-	invalidate_dcache_range(page, page + size);
+	invalidate_dcache_range((unsigned long)page_address(page),
+				(unsigned long)page_address(page) + size);
 
-	/* Allocate some common virtual space to map the new pages.
-	*/
+	/*
+	 * alloc_pages() expects the block to be handled as a unit, so
+	 * it only sets the page count on the first page.  We set the
+	 * counts on each page so they can be freed individually
+	 */
+	for (; page < end; page++)
+		set_page_count(page, 1);
+
+
+	/* Allocate some common virtual space to map the new pages*/
 	area = get_vm_area(size, VM_ALLOC);
-	if (area == 0) {
-		free_pages(page, order);
-		return NULL;
-	}
-	va = VMALLOC_VMADDR(area->addr);
-	ret = (void *)va;
+	if (! area)
+		goto out;
 
-	/* This gives us the real physical address of the first page.
-	*/
-	*dma_handle = pa = virt_to_bus((void *)page);
+	va = VMALLOC_VMADDR(area->addr);
 
 	flags = _PAGE_KERNEL | _PAGE_NO_CACHE;
-
-	err = 0;
-	for (i = 0; i < size && err == 0; i += PAGE_SIZE)
-		err = map_page(va+i, pa+i, flags);
 	
-	if (err) {
-		vfree((void *)va);
-		return NULL;
+	for (offset = 0; offset < size; offset += PAGE_SIZE) {
+		err = map_page(va+offset, pa+offset, flags);
+		if (err) {
+			vfree((void *)va);
+			va = 0;
+			goto out;
+		}
+
+		free++;
 	}
 
-	return ret;
+ out:
+	/* Free pages which weren't mapped */
+	for (; free < end; free++) {
+		__free_page(free);
+	}
+
+	return (void *)va;
 }
 
 /*
@@ -117,8 +129,7 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
  */
 void consistent_free(void *vaddr)
 {
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 	vfree(vaddr);
 }
 
@@ -155,6 +166,6 @@ void consistent_sync_page(struct page *page, unsigned long offset,
 {
 	unsigned long start;
 
-	start = page_address(page) + offset;
+	start = (unsigned long)page_address(page) + offset;
 	consistent_sync((void *)start, size, direction);
 }

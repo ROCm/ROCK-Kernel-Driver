@@ -5,6 +5,7 @@
  *  Copyright (C) 2000-2002	Andre Hedrick <andre@linux-ide.org>
  *  Copyright (C) 2001-2002	Klaus Smolin
  *					IBM Storage Technology Division
+ *  Copyright (C) 2003		Bartlomiej Zolnierkiewicz
  *
  *  The big the bad and the ugly.
  *
@@ -57,9 +58,6 @@
 #else
 #define DTF(x...)
 #endif
-
-#define task_map_rq(rq, flags)		ide_map_buffer((rq), (flags))
-#define task_unmap_rq(rq, buf, flags)	ide_unmap_buffer((rq), (buf), (flags))
 
 static void ata_bswap_data (void *buffer, int wcount)
 {
@@ -167,9 +165,12 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 
 	hwif->OUTB((taskfile->device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
 	if (task->handler != NULL) {
-		ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
-		if (task->prehandler != NULL)
+		if (task->prehandler != NULL) {
+			hwif->OUTBSYNC(drive, taskfile->command, IDE_COMMAND_REG);
+			ndelay(400);	/* FIXME */
 			return task->prehandler(drive, task->rq);
+		}
+		ide_execute_command(drive, taskfile->command, task->handler, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
 
@@ -351,403 +352,270 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 
 EXPORT_SYMBOL(task_no_data_intr);
 
+static u8 wait_drive_not_busy(ide_drive_t *drive)
+{
+	ide_hwif_t *hwif = HWIF(drive);
+	int retries = 5;
+	u8 stat;
+	/*
+	 * (ks) Last sector was transfered, wait until drive is ready.
+	 * This can take up to 10 usec. We willl wait max 50 us.
+	 */
+	while (((stat = hwif->INB(IDE_STATUS_REG)) & BUSY_STAT) && retries--)
+		udelay(10);
+	return stat;
+}
+
 /*
- * Handler for command with PIO data-in phase, READ
- */
-/*
- * FIXME before 2.4 enable ...
- *	DATA integrity issue upon error. <andre@linux-ide.org>
+ * Handler for command with PIO data-in phase (Read).
  */
 ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
-	struct request *rq	= HWGROUP(drive)->rq;
-	ide_hwif_t *hwif	= HWIF(drive);
-	char *pBuf		= NULL;
-	u8 stat;
-	unsigned long flags;
+	struct request *rq = HWGROUP(drive)->rq;
+	u8 stat, good_stat;
 
-	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),DATA_READY,BAD_R_STAT)) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-#if 0
-			DTF("%s: attempting to recover last " \
-				"sector counter status=0x%02x\n",
-				drive->name, stat);
-			/*
-			 * Expect a BUG BOMB if we attempt to rewind the
-			 * offset in the BH aka PAGE in the current BLOCK
-			 * segment.  This is different than the HOST segment.
-			 */
-#endif
-			if (!rq->bio)
-				rq->current_nr_sectors++;
-			return DRIVER(drive)->error(drive, "task_in_intr", stat);
-		}
-		if (!(stat & BUSY_STAT)) {
-			DTF("task_in_intr to Soon wait for next interrupt\n");
-			if (HWGROUP(drive)->handler == NULL)
-				ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
-			return ide_started;  
-		}
-	}
-#if 0
-
-	/*
-	 * Holding point for a brain dump of a thought :-/
-	 */
-
-	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat)) {
-		DTF("%s: READ attempting to recover last " \
-			"sector counter status=0x%02x\n",
-			drive->name, stat);
-		rq->current_nr_sectors++;
-		return DRIVER(drive)->error(drive, "task_in_intr", stat);
-        }
-	if (!rq->current_nr_sectors)
-		if (!DRIVER(drive)->end_request(drive, 1, 0))
-			return ide_stopped;
-
-	if (--rq->current_nr_sectors <= 0)
-		if (!DRIVER(drive)->end_request(drive, 1, 0))
-			return ide_stopped;
-#endif
-
-	pBuf = task_map_rq(rq, &flags);
-	DTF("Read: %p, rq->current_nr_sectors: %d, stat: %02x\n",
-		pBuf, (int) rq->current_nr_sectors, stat);
-	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
-	task_unmap_rq(rq, pBuf, &flags);
-	/*
-	 * FIXME :: We really can not legally get a new page/bh
-	 * regardless, if this is the end of our segment.
-	 * BH walking or segment can only be updated after we have a good
-	 * hwif->INB(IDE_STATUS_REG); return.
-	 */
-	if (--rq->current_nr_sectors <= 0)
-		if (!DRIVER(drive)->end_request(drive, 1, 0))
-			return ide_stopped;
-	/*
-	 * ERM, it is techincally legal to leave/exit here but it makes
-	 * a mess of the code ...
-	 */
-	if (HWGROUP(drive)->handler == NULL)
+	good_stat = DATA_READY;
+	stat = HWIF(drive)->INB(IDE_STATUS_REG);
+check_status:
+	if (!OK_STAT(stat, good_stat, BAD_R_STAT)) {
+		if (stat & (ERR_STAT | DRQ_STAT))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		/* BUSY_STAT: No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
-	return ide_started;
-}
-
-EXPORT_SYMBOL(task_in_intr);
-
-/*
- * Handler for command with Read Multiple
- */
-ide_startstop_t task_mulin_intr (ide_drive_t *drive)
-{
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
-	unsigned int msect	= drive->mult_count;
-	unsigned int nsect;
-	unsigned long flags;
-	u8 stat;
-
-	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),DATA_READY,BAD_R_STAT)) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			if (!rq->bio) {
-				rq->current_nr_sectors += drive->mult_count;
-				/*
-				 * NOTE: could rewind beyond beginning :-/
-				 */
-			} else {
-				printk(KERN_ERR "%s: MULTI-READ assume all data " \
-					"transfered is bad status=0x%02x\n",
-					drive->name, stat);
-			}
-			return DRIVER(drive)->error(drive, "task_mulin_intr", stat);
-		}
-		/* no data yet, so wait for another interrupt */
-		if (HWGROUP(drive)->handler == NULL)
-			ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
 
+	/*
+	 * Complete previously submitted bios (if any).
+	 * Status was already verifyied.
+	 */
+	while (rq->bio != rq->cbio)
+		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
+			return ide_stopped;
+	/* Complete rq->buffer based request (ioctls). */
+	if (!rq->bio && !rq->nr_sectors) {
+		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		return ide_stopped;
+	}
+
+	rq->errors = 0;
+	task_sectors(drive, rq, 1, IDE_PIO_IN);
+
+	/* If it was the last datablock check status and finish transfer. */
+	if (!rq->nr_sectors) {
+		good_stat = 0;
+		stat = wait_drive_not_busy(drive);
+		goto check_status;
+	}
+
+	/* Still data left to transfer. */
+	ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
+
+	return ide_started;
+}
+EXPORT_SYMBOL(task_in_intr);
+
+/*
+ * Handler for command with PIO data-in phase (Read Multiple).
+ */
+ide_startstop_t task_mulin_intr (ide_drive_t *drive)
+{
+	struct request *rq = HWGROUP(drive)->rq;
+	unsigned int msect = drive->mult_count;
+	unsigned int nsect;
+	u8 stat, good_stat;
+
+	good_stat = DATA_READY;
+	stat = HWIF(drive)->INB(IDE_STATUS_REG);
+check_status:
+	if (!OK_STAT(stat, good_stat, BAD_R_STAT)) {
+		if (stat & (ERR_STAT | DRQ_STAT))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		/* BUSY_STAT: No data yet, so wait for another IRQ. */
+		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
+		return ide_started;
+	}
+
+	/*
+	 * Complete previously submitted bios (if any).
+	 * Status was already verifyied.
+	 */
+	while (rq->bio != rq->cbio)
+		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
+			return ide_stopped;
+	/* Complete rq->buffer based request (ioctls). */
+	if (!rq->bio && !rq->nr_sectors) {
+		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		return ide_stopped;
+	}
+
+	rq->errors = 0;
 	do {
 		nsect = rq->current_nr_sectors;
 		if (nsect > msect)
 			nsect = msect;
-		pBuf = task_map_rq(rq, &flags);
-		DTF("Multiread: %p, nsect: %d, msect: %d, " \
-			" rq->current_nr_sectors: %d\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
-		taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
-		task_unmap_rq(rq, pBuf, &flags);
-		rq->errors = 0;
-		rq->current_nr_sectors -= nsect;
-		msect -= nsect;
-		/*
-		 * FIXME :: We really can not legally get a new page/bh
-		 * regardless, if this is the end of our segment.
-		 * BH walking or segment can only be updated after we have a
-		 * good hwif->INB(IDE_STATUS_REG); return.
-		 */
-		if (!rq->current_nr_sectors) {
-			if (!DRIVER(drive)->end_request(drive, 1, 0))
-				return ide_stopped;
-		}
+
+		task_sectors(drive, rq, nsect, IDE_PIO_IN);
+
+		if (!rq->nr_sectors)
+			msect = 0;
+		else
+			msect -= nsect;
 	} while (msect);
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
+
+	/* If it was the last datablock check status and finish transfer. */
+	if (!rq->nr_sectors) {
+		good_stat = 0;
+		stat = wait_drive_not_busy(drive);
+		goto check_status;
+	}
+
+	/* Still data left to transfer. */
+	ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
+
 	return ide_started;
 }
-
 EXPORT_SYMBOL(task_mulin_intr);
 
 /*
- * VERIFY ME before 2.4 ... unexpected race is possible based on details
- * RMK with 74LS245/373/374 TTL buffer logic because of passthrough.
- */
-ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
-{
-	char *pBuf		= NULL;
-	unsigned long flags;
-	ide_startstop_t startstop;
-
-	if (ide_wait_stat(&startstop, drive, DATA_READY,
-			drive->bad_wstat, WAIT_DRQ)) {
-		printk(KERN_ERR "%s: no DRQ after issuing WRITE%s\n",
-			drive->name,
-			drive->addressing ? "_EXT" : "");
-		return startstop;
-	}
-	/* For Write_sectors we need to stuff the first sector */
-	pBuf = task_map_rq(rq, &flags);
-	taskfile_output_data(drive, pBuf, SECTOR_WORDS);
-	rq->current_nr_sectors--;
-	task_unmap_rq(rq, pBuf, &flags);
-	return ide_started;
-}
-
-EXPORT_SYMBOL(pre_task_out_intr);
-
-/*
- * Handler for command with PIO data-out phase WRITE
- *
- * WOOHOO this is a CORRECT STATE DIAGRAM NOW, <andre@linux-ide.org>
+ * Handler for command with PIO data-out phase (Write).
  */
 ide_startstop_t task_out_intr (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
-	unsigned long flags;
+	struct request *rq = HWGROUP(drive)->rq;
 	u8 stat;
 
-	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG), DRIVE_READY, drive->bad_wstat)) {
-		DTF("%s: WRITE attempting to recover last " \
-			"sector counter status=0x%02x\n",
-			drive->name, stat);
-		rq->current_nr_sectors++;
-		return DRIVER(drive)->error(drive, "task_out_intr", stat);
+	stat = HWIF(drive)->INB(IDE_STATUS_REG);
+	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat)) {
+		if ((stat & (ERR_STAT | DRQ_STAT)) ||
+		    ((stat & WRERR_STAT) && !drive->nowerr))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		if (stat & BUSY_STAT) {
+			/* Not ready yet, so wait for another IRQ. */
+			ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
+			return ide_started;
+		}
 	}
-	/*
-	 * Safe to update request for partial completions.
-	 * We have a good STATUS CHECK!!!
+
+	/* Deal with unexpected ATA data phase. */
+	if ((!(stat & DATA_READY) && rq->nr_sectors) ||
+	    ((stat & DATA_READY) && !rq->nr_sectors))
+		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+
+	/* 
+	 * Complete previously submitted bios (if any).
+	 * Status was already verifyied.
 	 */
-	if (!rq->current_nr_sectors)
-		if (!DRIVER(drive)->end_request(drive, 1, 0))
+	while (rq->bio != rq->cbio)
+		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
 			return ide_stopped;
-	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
-		rq = HWGROUP(drive)->rq;
-		pBuf = task_map_rq(rq, &flags);
-		DTF("write: %p, rq->current_nr_sectors: %d\n",
-			pBuf, (int) rq->current_nr_sectors);
-		taskfile_output_data(drive, pBuf, SECTOR_WORDS);
-		task_unmap_rq(rq, pBuf, &flags);
-		rq->errors = 0;
-		rq->current_nr_sectors--;
+	/* Complete rq->buffer based request (ioctls). */
+	if (!rq->bio && !rq->nr_sectors) {
+		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		return ide_stopped;
 	}
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
+
+	/* Still data left to transfer. */
+	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
+
+	rq->errors = 0;
+	task_sectors(drive, rq, 1, IDE_PIO_OUT);
+
 	return ide_started;
 }
 
 EXPORT_SYMBOL(task_out_intr);
 
-#undef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
-
-ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
+ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 {
-#ifdef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
-	ide_hwif_t *hwif		= HWIF(drive);
-	char *pBuf			= NULL;
-	unsigned int nsect = 0, msect	= drive->mult_count;
-        u8 stat;
-	unsigned long flags;
-#endif /* ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
-
-	ide_task_t *args = rq->special;
 	ide_startstop_t startstop;
 
-#if 0
-	/*
-	 * assign private copy for multi-write
-	 */
-	memcpy(&HWGROUP(drive)->wrq, rq, sizeof(struct request));
-#endif
-
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
-			drive->bad_wstat, WAIT_DRQ)) {
-		printk(KERN_ERR "%s: no DRQ after issuing %s\n",
-			drive->name,
-			drive->addressing ? "MULTWRITE_EXT" : "MULTWRITE");
+			  drive->bad_wstat, WAIT_DRQ)) {
+		printk(KERN_ERR "%s: no DRQ after issuing WRITE%s\n",
+				drive->name, drive->addressing ? "_EXT" : "");
 		return startstop;
 	}
-#ifdef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
 
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-		pBuf = task_map_rq(rq, &flags);
-		DTF("Pre-Multiwrite: %p, nsect: %d, msect: %d, " \
-			"rq->current_nr_sectors: %ld\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
-		msect -= nsect;
-		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
-		task_unmap_rq(rq, pBuf, &flags);
-		rq->current_nr_sectors -= nsect;
-		if (!rq->current_nr_sectors) {
-			if (!DRIVER(drive)->end_request(drive, 1, 0))
-				if (!rq->bio) {
-					stat = hwif->INB(IDE_STATUS_REG);
-					return ide_stopped;
-				}
-		}
-	} while (msect);
-	rq->errors = 0;
-	return ide_started;
-#else /* ! ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
-	if (!(drive_is_ready(drive))) {
-		int i;
-		for (i=0; i<100; i++) {
-			if (drive_is_ready(drive))
-				break;
-		}
-	}
-
-	/*
-	 * WARNING :: if the drive as not acked good status we may not
-	 * move the DATA-TRANSFER T-Bar as BSY != 0. <andre@linux-ide.org>
-	 */
-	return args->handler(drive);
-#endif /* ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
+	return task_out_intr(drive);
 }
-
-EXPORT_SYMBOL(pre_task_mulout_intr);
+EXPORT_SYMBOL(pre_task_out_intr);
 
 /*
- * FIXME before enabling in 2.4 ... DATA integrity issue upon error.
- */
-/*
- * Handler for command write multiple
- * Called directly from execute_drive_cmd for the first bunch of sectors,
- * afterwards only by the ISR
+ * Handler for command with PIO data-out phase (Write Multiple).
  */
 ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif		= HWIF(drive);
-	u8 stat				= hwif->INB(IDE_STATUS_REG);
-	struct request *rq		= HWGROUP(drive)->rq;
-	char *pBuf			= NULL;
-	ide_startstop_t startstop	= ide_stopped;
-	unsigned int msect		= drive->mult_count;
+	struct request *rq = HWGROUP(drive)->rq;
+	unsigned int msect = drive->mult_count;
 	unsigned int nsect;
-	unsigned long flags;
+	u8 stat;
 
-	/*
-	 * (ks/hs): Handle last IRQ on multi-sector transfer,
-	 * occurs after all data was sent in this chunk
-	 */
-	if (rq->current_nr_sectors == 0) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			if (!rq->bio) {
-                                rq->current_nr_sectors += drive->mult_count;
-				/*
-				 * NOTE: could rewind beyond beginning :-/
-				 */
-			} else {
-				printk(KERN_ERR "%s: MULTI-WRITE assume all data " \
-					"transfered is bad status=0x%02x\n",
-					drive->name, stat);
-			}
-			return DRIVER(drive)->error(drive, "task_mulout_intr", stat);
-		}
-		if (!rq->bio)
-			DRIVER(drive)->end_request(drive, 1, 0);
-		return startstop;
-	}
-	/*
-	 * DON'T be lazy code the above and below togather !!!
-	 */
-	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			if (!rq->bio) {
-				rq->current_nr_sectors += drive->mult_count;
-				/*
-				 * NOTE: could rewind beyond beginning :-/
-				 */
-			} else {
-				printk("%s: MULTI-WRITE assume all data " \
-					"transfered is bad status=0x%02x\n",
-					drive->name, stat);
-			}
-			return DRIVER(drive)->error(drive, "task_mulout_intr", stat);
-		}
-		/* no data yet, so wait for another interrupt */
-		if (HWGROUP(drive)->handler == NULL)
+	stat = HWIF(drive)->INB(IDE_STATUS_REG);
+	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat)) {
+		if ((stat & (ERR_STAT | DRQ_STAT)) ||
+		    ((stat & WRERR_STAT) && !drive->nowerr))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		if (stat & BUSY_STAT) {
+			/* Not ready yet, so wait for another IRQ. */
 			ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
-		return ide_started;
+			return ide_started;
+		}
 	}
 
-#ifndef ALTERNATE_STATE_DIAGRAM_MULTI_OUT
-	if (HWGROUP(drive)->handler != NULL) {
-		unsigned long lflags;
-		spin_lock_irqsave(&ide_lock, lflags);
-		HWGROUP(drive)->handler = NULL;
-		del_timer(&HWGROUP(drive)->timer);
-		spin_unlock_irqrestore(&ide_lock, lflags);
-	}
-#endif /* ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
+	/* Deal with unexpected ATA data phase. */
+	if ((!(stat & DATA_READY) && rq->nr_sectors) ||
+	    ((stat & DATA_READY) && !rq->nr_sectors))
+		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 
+	/* 
+	 * Complete previously submitted bios (if any).
+	 * Status was already verifyied.
+	 */
+	while (rq->bio != rq->cbio)
+		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
+			return ide_stopped;
+	/* Complete rq->buffer based request (ioctls). */
+	if (!rq->bio && !rq->nr_sectors) {
+		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		return ide_stopped;
+	}
+
+	/* Still data left to transfer. */
+	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+
+	rq->errors = 0;
 	do {
 		nsect = rq->current_nr_sectors;
 		if (nsect > msect)
 			nsect = msect;
-		pBuf = task_map_rq(rq, &flags);
-		DTF("Multiwrite: %p, nsect: %d, msect: %d, " \
-			"rq->current_nr_sectors: %ld\n",
-			pBuf, nsect, msect, rq->current_nr_sectors);
-		msect -= nsect;
-		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
-		task_unmap_rq(rq, pBuf, &flags);
-		rq->current_nr_sectors -= nsect;
-		/*
-		 * FIXME :: We really can not legally get a new page/bh
-		 * regardless, if this is the end of our segment.
-		 * BH walking or segment can only be updated after we
-		 * have a good  hwif->INB(IDE_STATUS_REG); return.
-		 */
-		if (!rq->current_nr_sectors) {
-			if (!DRIVER(drive)->end_request(drive, 1, 0))
-				if (!rq->bio)
-					return ide_stopped;
-		}
+
+		task_sectors(drive, rq, nsect, IDE_PIO_OUT);
+
+		if (!rq->nr_sectors)
+			msect = 0;
+		else
+			msect -= nsect;
 	} while (msect);
-	rq->errors = 0;
-	if (HWGROUP(drive)->handler == NULL)
-		ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
+
 	return ide_started;
 }
-
 EXPORT_SYMBOL(task_mulout_intr);
+
+ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
+{
+	ide_startstop_t startstop;
+
+	if (ide_wait_stat(&startstop, drive, DATA_READY,
+			  drive->bad_wstat, WAIT_DRQ)) {
+		printk(KERN_ERR "%s: no DRQ after issuing MULTWRITE%s\n",
+				drive->name, drive->addressing ? "_EXT" : "");
+		return startstop;
+	}
+
+	return task_mulout_intr(drive);
+}
+EXPORT_SYMBOL(pre_task_mulout_intr);
 
 /* Called by internal to feature out type of command being called */
 //ide_pre_handler_t * ide_pre_handler_parser (task_struct_t *taskfile, hob_struct_t *hobfile)
@@ -1092,11 +960,12 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 	 */
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA) {
 		if (data_size == 0)
-			rq.current_nr_sectors = rq.nr_sectors = (args->hobRegister[IDE_NSECTOR_OFFSET_HOB] << 8) | args->tfRegister[IDE_NSECTOR_OFFSET];
-		/*	rq.hard_cur_sectors	*/
+			rq.nr_sectors = (args->hobRegister[IDE_NSECTOR_OFFSET_HOB] << 8) | args->tfRegister[IDE_NSECTOR_OFFSET];
 		else
-			rq.current_nr_sectors = rq.nr_sectors = data_size / SECTOR_SIZE;
-		/*	rq.hard_cur_sectors	*/
+			rq.nr_sectors = data_size / SECTOR_SIZE;
+
+		rq.hard_nr_sectors = rq.nr_sectors;
+		rq.hard_cur_sectors = rq.current_nr_sectors = rq.nr_sectors;
 	}
 
 	if (args->tf_out_flags.all == 0) {

@@ -12,7 +12,7 @@ ENTRY(_start)
 jiffies = jiffies_64 + 4;
 #else
 OUTPUT_FORMAT("elf64-s390", "elf64-s390", "elf64-s390")
-OUTPUT_ARCH(s390)
+OUTPUT_ARCH(s390:64-bit)
 ENTRY(_start)
 jiffies = jiffies_64;
 #endif

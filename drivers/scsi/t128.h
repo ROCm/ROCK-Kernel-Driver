@@ -99,8 +99,6 @@ static int t128_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int t128_host_reset(Scsi_Cmnd *);
 static int t128_bus_reset(Scsi_Cmnd *);
 static int t128_device_reset(Scsi_Cmnd *);
-static int t128_proc_info (char *buffer, char **start, off_t offset,
-		   int length, int hostno, int inout);
 
 #ifndef NULL
 #define NULL 0

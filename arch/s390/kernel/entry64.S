@@ -249,14 +249,14 @@ sysc_restart:
 # special linkage: %r12 contains the return address for trace_svc
 #
 sysc_tracesys:
-	srl	%r7,3
+	srl	%r7,2
 	stg     %r7,SP_R2(%r15)
         brasl   %r14,syscall_trace
 	larl	%r1,.Lnr_syscalls
 	clc	SP_R2(8,%r15),0(%r1)
 	jl	sysc_tracego
 	lg	%r7,SP_R2(%r15)   # strace might have changed the
-	sll     %r7,3             #  system call
+	sll     %r7,2             #  system call
 	lgf	%r8,0(%r7,%r10)
 sysc_tracego:
 	lmg     %r3,%r6,SP_R3(%r15)

@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/soundcard.h>
+#include <linux/interrupt.h>
 
 #include <asm/uaccess.h>
 #include <asm/q40ints.h>
@@ -461,7 +462,7 @@ static void Q40Play(void)
 	}
 	spin_lock_irqsave(&dmasound.lock, flags);
 	Q40PlayNextFrame(1);
-	spin_unlock_irqrestore_flags(&dmasound.lock, flags);
+	spin_unlock_irqrestore(&dmasound.lock, flags);
 }
 
 static irqreturn_t Q40StereoInterrupt(int irq, void *dummy, struct pt_regs *fp)

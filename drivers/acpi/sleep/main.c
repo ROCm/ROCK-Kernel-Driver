@@ -214,6 +214,10 @@ acpi_suspend (
 {
 	acpi_status status;
 
+	/* Suspend is hard to get right on SMP. */
+	if (num_online_cpus() != 1)
+		return AE_ERROR;
+
 	/* get out if state is invalid */
 	if (state < ACPI_STATE_S1 || state > ACPI_STATE_S5)
 		return AE_ERROR;
@@ -226,7 +230,10 @@ acpi_suspend (
 	 * TBD: S1 can be done without device_suspend.  Make a CONFIG_XX
 	 * to handle however when S1 failed without device_suspend.
 	 */
-	freeze_processes();		/* device_suspend needs processes to be stopped */
+	if (freeze_processes()) {
+		thaw_processes();
+		return AE_ERROR;		/* device_suspend needs processes to be stopped */
+	}
 
 	/* do we have a wakeup address for S2 and S3? */
 	/* Here, we support only S4BIOS, those we set the wakeup address */

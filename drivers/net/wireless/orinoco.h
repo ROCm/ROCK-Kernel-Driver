@@ -11,8 +11,28 @@
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
-#include <linux/workqueue.h>
+#include <linux/version.h>
 #include "hermes.h"
+
+/* Workqueue / task queue backwards compatibility stuff */
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
+#include <linux/workqueue.h>
+#else
+#include <linux/tqueue.h>
+#define work_struct tq_struct
+#define INIT_WORK INIT_TQUEUE
+#define schedule_work schedule_task
+#endif
+
+/* Interrupt handler backwards compatibility stuff */
+#ifndef IRQ_NONE
+
+#define IRQ_NONE
+#define IRQ_HANDLED
+typedef void irqreturn_t;
+
+#endif
 
 /* To enable debug messages */
 //#define ORINOCO_DEBUG		3
@@ -42,9 +62,12 @@ struct orinoco_private {
 	/* Synchronisation stuff */
 	spinlock_t lock;
 	int hw_unavailable;
-	struct work_struct timeout_task;
+	struct work_struct reset_work;
 
+	/* driver state */
 	int open;
+	u16 last_linkstatus;
+	int connected;
 
 	/* Net device stuff */
 	struct net_device *ndev;
@@ -54,6 +77,7 @@ struct orinoco_private {
 	/* Hardware control variables */
 	hermes_t hw;
 	u16 txfid;
+
 
 	/* Capabilities of the hardware/firmware */
 	int firmware_type;
@@ -68,6 +92,7 @@ struct orinoco_private {
 	int has_sensitivity;
 	int nicbuf_size;
 	u16 channel_mask;
+	int broken_disableport;
 
 	/* Configuration paramaters */
 	u32 iw_mode;
@@ -91,9 +116,6 @@ struct orinoco_private {
 	/* Configuration dependent variables */
 	int port_type, createibss;
 	int promiscuous, mc_count;
-
-	/* /proc based debugging stuff */
-	struct proc_dir_entry *dir_dev;
 };
 
 #ifdef ORINOCO_DEBUG
@@ -110,10 +132,8 @@ extern struct net_device *alloc_orinocodev(int sizeof_card,
 					   int (*hard_reset)(struct orinoco_private *));
 extern int __orinoco_up(struct net_device *dev);
 extern int __orinoco_down(struct net_device *dev);
-int orinoco_reinit_firmware(struct net_device *dev);
-
-extern int orinoco_proc_dev_init(struct net_device *dev);
-extern void orinoco_proc_dev_cleanup(struct net_device *dev);
+extern int orinoco_stop(struct net_device *dev);
+extern int orinoco_reinit_firmware(struct net_device *dev);
 extern irqreturn_t orinoco_interrupt(int irq, void * dev_id, struct pt_regs *regs);
 
 /********************************************************************/

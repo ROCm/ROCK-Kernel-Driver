@@ -697,12 +697,12 @@ raw3215_shutdown(struct raw3215_info *raw)
 	    raw->queued_read != NULL) {
 		raw->flags |= RAW3215_CLOSING;
 		add_wait_queue(&raw->empty_wait, &wait);
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		spin_unlock_irqrestore(raw->lock, flags);
 		schedule();
 		spin_lock_irqsave(raw->lock, flags);
 		remove_wait_queue(&raw->empty_wait, &wait);
-		current->state = TASK_RUNNING;
+		set_current_state(TASK_RUNNING);
 		raw->flags &= ~(RAW3215_ACTIVE | RAW3215_CLOSING);
 	}
 	spin_unlock_irqrestore(raw->lock, flags);

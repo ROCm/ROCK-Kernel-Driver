@@ -3,7 +3,7 @@
 /*
  *	mcfuart.h -- ColdFire internal UART support defines.
  *
- *	(C) Copyright 1999-2002, Greg Ungerer (gerg@snapgear.com)
+ *	(C) Copyright 1999-2003, Greg Ungerer (gerg@snapgear.com)
  * 	(C) Copyright 2000, Lineo Inc. (www.lineo.com) 
  */
 
@@ -29,13 +29,17 @@
 #define	MCFUART_BASE1		0x140		/* Base address of UART1 */
 #define	MCFUART_BASE2		0x180		/* Base address of UART2 */
 #endif
+#elif defined(CONFIG_M5282)
+#define MCFUART_BASE1		0x200           /* Base address of UART1 */
+#define MCFUART_BASE2		0x240           /* Base address of UART2 */
+#define MCFUART_BASE3		0x280           /* Base address of UART3 */
 #elif defined(CONFIG_M5249) || defined(CONFIG_M5307) || defined(CONFIG_M5407)
 #if defined(CONFIG_NETtel) || defined(CONFIG_DISKtel) || defined(CONFIG_SECUREEDGEMP3)
 #define MCFUART_BASE1		0x200           /* Base address of UART1 */
-#define MCFUART_BASE2		0x1c0           /* Base address of UART2 */    
+#define MCFUART_BASE2		0x1c0           /* Base address of UART2 */
 #else
 #define MCFUART_BASE1		0x1c0           /* Base address of UART1 */
-#define MCFUART_BASE2		0x200           /* Base address of UART2 */    
+#define MCFUART_BASE2		0x200           /* Base address of UART2 */
 #endif
 #endif
 
@@ -55,7 +59,13 @@
 #define	MCFUART_UIMR		0x14		/* Interrupt Mask (w) */
 #define	MCFUART_UBG1		0x18		/* Baud Rate MSB (r/w) */
 #define	MCFUART_UBG2		0x1c		/* Baud Rate LSB (r/w) */
+#ifdef	CONFIG_M5272
+#define	MCFUART_UTF		0x28		/* Transmitter FIFO (r/w) */
+#define	MCFUART_URF		0x2c		/* Receiver FIFO (r/w) */
+#define	MCFUART_UFPD		0x30		/* Frac Prec. Divider (r/w) */
+#else
 #define	MCFUART_UIVR		0x30		/* Interrupt Vector (r/w) */
+#endif
 #define	MCFUART_UIPR		0x34		/* Input Port (r) */
 #define	MCFUART_UOP1		0x38		/* Output Port Bit Set (w) */
 #define	MCFUART_UOP0		0x3c		/* Output Port Bit Reset (w) */
@@ -169,6 +179,22 @@
 #define	MCFUART_UIR_DELTABREAK	0x04		/* Break start or stop */
 #define	MCFUART_UIR_RXREADY	0x02		/* Receiver ready */
 #define	MCFUART_UIR_TXREADY	0x01		/* Transmitter ready */
+
+#ifdef	CONFIG_M5272
+/*
+ *	Define bit flags in the Transmitter FIFO Register (UTF).
+ */
+#define	MCFUART_UTF_TXB		0x1f		/* Transmitter data level */
+#define	MCFUART_UTF_FULL	0x20		/* Transmitter fifo full */
+#define	MCFUART_UTF_TXS		0xc0		/* Transmitter status */
+
+/*
+ *	Define bit flags in the Receiver FIFO Register (URF).
+ */
+#define	MCFUART_URF_RXB		0x1f		/* Receiver data level */
+#define	MCFUART_URF_FULL	0x20		/* Receiver fifo full */
+#define	MCFUART_URF_RXS		0xc0		/* Receiver status */
+#endif
 
 /****************************************************************************/
 #endif	/* mcfuart_h */

@@ -15,7 +15,7 @@
 #include "autofs_i.h"
 
 static struct super_block *autofs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, autofs_fill_super);
 }

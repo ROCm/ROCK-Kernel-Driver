@@ -404,44 +404,6 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 {
 	int ret = 0;
 
-	if (me->me && !(me->flags & IP_NAT_HELPER_F_STANDALONE)) {
-		struct ip_conntrack_helper *ct_helper;
-		
-		if ((ct_helper = ip_ct_find_helper(&me->tuple))) {
-			if (!try_module_get(ct_helper->me))
-				return -EBUSY;
-		} else {
-			/* We are a NAT helper for protocol X.  If we need
-			 * respective conntrack helper for protoccol X, compute
-			 * conntrack helper name and try to load module */
-			char name[MODULE_NAME_LEN];
-			const char *tmp = module_name(me->me);
-			
-			if (strlen(tmp) + 6 > MODULE_NAME_LEN) {
-				printk("%s: unable to "
-				       "compute conntrack helper name "
-				       "from %s\n", __FUNCTION__, tmp);
-				return -EBUSY;
-			}
-			tmp += 6;
-			sprintf(name, "ip_conntrack%s", tmp);
-#ifdef CONFIG_KMOD
-			if (!request_module("ip_conntrack%s", tmp)
-			    && (ct_helper = ip_ct_find_helper(&me->tuple))) {
-				if (!try_module_get(ct_helper->me))
-					return -EBUSY;
-			} else {
-				printk("unable to load module %s\n", name);
-				return -EBUSY;
-			}
-#else
-			printk("unable to load module %s automatically "
-			       "because kernel was compiled without kernel "
-			       "module loader support\n", name);
-			return -EBUSY;
-#endif
-		}
-	}
 	WRITE_LOCK(&ip_nat_lock);
 	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple))
 		ret = -EBUSY;
@@ -484,19 +446,4 @@ void ip_nat_helper_unregister(struct ip_nat_helper *me)
 	   which is just a long-winded way of making things
 	   worse. --RR */
 	ip_ct_selective_cleanup(kill_helper, me);
-
-	/* If we are no standalone NAT helper, we need to decrement usage count
-	 * on our conntrack helper */
-	if (me->me && !(me->flags & IP_NAT_HELPER_F_STANDALONE)) {
-		struct ip_conntrack_helper *ct_helper;
-		
-		if ((ct_helper = ip_ct_find_helper(&me->tuple)))
-			module_put(ct_helper->me);
-#ifdef CONFIG_MODULES
-		else 
-			printk("%s: unable to decrement usage count"
-			       " of conntrack helper %s\n",
-			       __FUNCTION__, me->me->name);
-#endif
-	}
 }

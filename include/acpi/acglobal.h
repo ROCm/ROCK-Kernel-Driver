@@ -105,6 +105,8 @@ ACPI_EXTERN struct acpi_common_facs             acpi_gbl_common_fACS;
  */
 ACPI_EXTERN u8                                  acpi_gbl_integer_bit_width;
 ACPI_EXTERN u8                                  acpi_gbl_integer_byte_width;
+ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1a_enable;
+ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1b_enable;
 
 /*
  * Since there may be multiple SSDTs and PSDTS, a single pointer is not
@@ -115,15 +117,15 @@ ACPI_EXTERN u8                                  acpi_gbl_integer_byte_width;
 /*
  * ACPI Table info arrays
  */
-extern      struct acpi_table_desc              acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
-extern      struct acpi_table_support           acpi_gbl_acpi_table_data[NUM_ACPI_TABLES];
+extern      struct acpi_table_list              acpi_gbl_table_lists[NUM_ACPI_TABLE_TYPES];
+extern      struct acpi_table_support           acpi_gbl_table_data[NUM_ACPI_TABLE_TYPES];
 
 /*
  * Predefined mutex objects.  This array contains the
  * actual OS mutex handles, indexed by the local ACPI_MUTEX_HANDLEs.
  * (The table maps local handles to the real OS handles)
  */
-ACPI_EXTERN struct acpi_mutex_info              acpi_gbl_acpi_mutex_info [NUM_MTX];
+ACPI_EXTERN struct acpi_mutex_info              acpi_gbl_mutex_info[NUM_MUTEX];
 
 
 /*****************************************************************************
@@ -134,8 +136,8 @@ ACPI_EXTERN struct acpi_mutex_info              acpi_gbl_acpi_mutex_info [NUM_MT
 
 
 ACPI_EXTERN struct acpi_memory_list             acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
-ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_drv_notify;
-ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_sys_notify;
+ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_device_notify;
+ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_system_notify;
 ACPI_EXTERN acpi_init_handler                   acpi_gbl_init_handler;
 ACPI_EXTERN struct acpi_walk_state             *acpi_gbl_breakpoint_walk;
 ACPI_EXTERN acpi_handle                         acpi_gbl_global_lock_semaphore;
@@ -200,7 +202,7 @@ ACPI_EXTERN u32                                 acpi_gbl_deepest_nesting;
  ****************************************************************************/
 
 
-ACPI_EXTERN struct acpi_thread_state            *acpi_gbl_current_walk_list;
+ACPI_EXTERN struct acpi_thread_state           *acpi_gbl_current_walk_list;
 
 /* Control method single step flag */
 
@@ -213,7 +215,7 @@ ACPI_EXTERN u8                                  acpi_gbl_cm_single_step;
  *
  ****************************************************************************/
 
-ACPI_EXTERN union acpi_parse_object             *acpi_gbl_parsed_namespace_root;
+ACPI_EXTERN union acpi_parse_object            *acpi_gbl_parsed_namespace_root;
 
 /*****************************************************************************
  *
@@ -234,8 +236,8 @@ ACPI_EXTERN u8                                  acpi_gbl_sleep_type_b;
 
 extern      struct acpi_fixed_event_info        acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS];
 ACPI_EXTERN struct acpi_fixed_event_handler     acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
-ACPI_EXTERN struct acpi_gpe_xrupt_info          *acpi_gbl_gpe_xrupt_list_head;
-ACPI_EXTERN struct acpi_gpe_block_info          *acpi_gbl_gpe_fadt_blocks[ACPI_MAX_GPE_BLOCKS];
+ACPI_EXTERN struct acpi_gpe_xrupt_info         *acpi_gbl_gpe_xrupt_list_head;
+ACPI_EXTERN struct acpi_gpe_block_info         *acpi_gbl_gpe_fadt_blocks[ACPI_MAX_GPE_BLOCKS];
 ACPI_EXTERN acpi_handle                         acpi_gbl_gpe_lock;
 
 

@@ -251,8 +251,8 @@ struct filter_fs *filter_get_filter_fs(const char *cache_type)
         if (ops == NULL) {
                 CERROR("prepare to die: unrecognized cache type for Filter\n");
         }
-        return ops;
         FEXIT;
+        return ops;
 }
 
 

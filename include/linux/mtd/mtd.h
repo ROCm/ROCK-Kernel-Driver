@@ -1,5 +1,5 @@
 
-/* $Id: mtd.h,v 1.33 2001/06/09 00:08:59 dwmw2 Exp $ */
+/* $Id: mtd.h,v 1.45 2003/05/20 21:56:40 dwmw2 Exp $ */
 
 #ifndef __MTD_MTD_H__
 #define __MTD_MTD_H__
@@ -9,7 +9,6 @@
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/types.h>
-#include <linux/mtd/compatmac.h>
 #include <linux/module.h>
 #include <linux/uio.h>
 
@@ -25,7 +24,6 @@ struct mtd_oob_buf {
 	u_int32_t length;
 	unsigned char *ptr;
 };
-
 
 #define MTD_CHAR_MAJOR 90
 #define MTD_BLOCK_MAJOR 31
@@ -93,15 +91,22 @@ struct region_info_user {
 #define MEMUNLOCK               _IOW('M', 6, struct erase_info_user)
 #define MEMGETREGIONCOUNT	_IOR('M', 7, int)
 #define MEMGETREGIONINFO	_IOWR('M', 8, struct region_info_user)
+#define MEMSETOOBSEL		_IOW('M', 9, struct nand_oobinfo)
+
+struct nand_oobinfo {
+	int	useecc;
+	int	eccpos[6];	
+};
+
 
 #ifndef __KERNEL__
 
 typedef struct mtd_info_user mtd_info_t;
 typedef struct erase_info_user erase_info_t;
 typedef struct region_info_user region_info_t;
+typedef struct nand_oobinfo nand_oobinfo_t;
 
 	/* User-space ioctl definitions */
-
 
 #else /* __KERNEL__ */
 
@@ -147,10 +152,14 @@ struct mtd_info {
 	u_int32_t oobsize;   // Amount of OOB data per block (e.g. 16)
 	u_int32_t ecctype;
 	u_int32_t eccsize;
+	
 
 	// Kernel-only stuff starts here.
 	char *name;
 	int index;
+
+	// oobinfo is a nand_oobinfo structure, which can be set by iotcl (MEMSETOOBINFO)
+	struct nand_oobinfo oobinfo;
 
 	/* Data for variable erase regions. If numeraseregions is zero,
 	 * it means that the whole device has erasesize as given above. 
@@ -161,24 +170,35 @@ struct mtd_info {
 	/* This really shouldn't be here. It can go away in 2.5 */
 	u_int32_t bank_size;
 
-	struct module *module;
 	int (*erase) (struct mtd_info *mtd, struct erase_info *instr);
 
 	/* This stuff for eXecute-In-Place */
 	int (*point) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char **mtdbuf);
 
 	/* We probably shouldn't allow XIP if the unpoint isn't a NULL */
-	void (*unpoint) (struct mtd_info *mtd, u_char * addr);
+	void (*unpoint) (struct mtd_info *mtd, u_char * addr, loff_t from, size_t len);
 
 
 	int (*read) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf);
 	int (*write) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf);
 
-	int (*read_ecc) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf, u_char *eccbuf);
-	int (*write_ecc) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf, u_char *eccbuf);
+	int (*read_ecc) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf, u_char *eccbuf, struct nand_oobinfo *oobsel);
+	int (*write_ecc) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf, u_char *eccbuf, struct nand_oobinfo *oobsel);
 
 	int (*read_oob) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf);
 	int (*write_oob) (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf);
+
+	/* 
+	 * Methods to access the protection register area, present in some 
+	 * flash devices. The user data is one time programmable but the
+	 * factory data is read only. 
+	 */
+	int (*read_user_prot_reg) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf);
+
+	int (*read_fact_prot_reg) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf);
+
+	/* This function is not yet implemented */
+	int (*write_user_prot_reg) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf);
 
 	/* iovec-based read/write methods. We need these especially for NAND flash,
 	   with its limited number of write cycles per erase.
@@ -186,7 +206,11 @@ struct mtd_info {
 	   which contains an (ofs, len) tuple.
 	*/
 	int (*readv) (struct mtd_info *mtd, struct iovec *vecs, unsigned long count, loff_t from, size_t *retlen);
+	int (*readv_ecc) (struct mtd_info *mtd, struct iovec *vecs, unsigned long count, loff_t from, 
+		size_t *retlen, u_char *eccbuf, struct nand_oobinfo *oobsel);
 	int (*writev) (struct mtd_info *mtd, const struct iovec *vecs, unsigned long count, loff_t to, size_t *retlen);
+	int (*writev_ecc) (struct mtd_info *mtd, const struct iovec *vecs, unsigned long count, loff_t to, 
+		size_t *retlen, u_char *eccbuf, struct nand_oobinfo *oobsel);
 
 	/* Sync */
 	void (*sync) (struct mtd_info *mtd);
@@ -200,6 +224,9 @@ struct mtd_info {
 	void (*resume) (struct mtd_info *mtd);
 
 	void *priv;
+
+	struct module *owner;
+	int usecount;
 };
 
 
@@ -208,35 +235,27 @@ struct mtd_info {
 extern int add_mtd_device(struct mtd_info *mtd);
 extern int del_mtd_device (struct mtd_info *mtd);
 
-extern struct mtd_info *__get_mtd_device(struct mtd_info *mtd, int num);
+extern struct mtd_info *get_mtd_device(struct mtd_info *mtd, int num);
 
-static inline struct mtd_info *get_mtd_device(struct mtd_info *mtd, int num)
-{
-	struct mtd_info *ret;
-	
-	ret = __get_mtd_device(mtd, num);
-	if (ret && !try_module_get(ret->module))
-		return NULL;
-	return ret;
-}
+extern void put_mtd_device(struct mtd_info *mtd);
 
-static inline void put_mtd_device(struct mtd_info *mtd)
-{
-	module_put(mtd->module);
-}
 
 struct mtd_notifier {
 	void (*add)(struct mtd_info *mtd);
 	void (*remove)(struct mtd_info *mtd);
-	struct mtd_notifier *next;
+	struct list_head list;
 };
 
 
 extern void register_mtd_user (struct mtd_notifier *new);
 extern int unregister_mtd_user (struct mtd_notifier *old);
 
+int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
+		       unsigned long count, loff_t to, size_t *retlen);
 
-#ifndef MTDC
+int default_mtd_readv(struct mtd_info *mtd, struct iovec *vecs,
+		      unsigned long count, loff_t from, size_t *retlen);
+
 #define MTD_ERASE(mtd, args...) (*(mtd->erase))(mtd, args)
 #define MTD_POINT(mtd, a,b,c,d) (*(mtd->point))(mtd, a,b,c, (u_char **)(d))
 #define MTD_UNPOINT(mtd, arg) (*(mtd->unpoint))(mtd, (u_char *)arg)
@@ -249,7 +268,6 @@ extern int unregister_mtd_user (struct mtd_notifier *old);
 #define MTD_READOOB(mtd, args...) (*(mtd->read_oob))(mtd, args)
 #define MTD_WRITEOOB(mtd, args...) (*(mtd->write_oob))(mtd, args)
 #define MTD_SYNC(mtd) do { if (mtd->sync) (*(mtd->sync))(mtd);  } while (0) 
-#endif /* MTDC */
 
 /*
  * Debugging macro and defines
@@ -260,12 +278,14 @@ extern int unregister_mtd_user (struct mtd_notifier *old);
 #define MTD_DEBUG_LEVEL3	(3)	/* Noisy   */
 
 #ifdef CONFIG_MTD_DEBUG
-#define DEBUG(n, args...)			\
-	if (n <=  CONFIG_MTD_DEBUG_VERBOSE) {	\
-		printk(KERN_INFO args);	\
-	}
+#define DEBUG(n, args...)				\
+ 	do {						\
+		if (n <= CONFIG_MTD_DEBUG_VERBOSE)	\
+			printk(KERN_INFO args);		\
+	} while(0)
 #else /* CONFIG_MTD_DEBUG */
-#define DEBUG(n, args...)
+#define DEBUG(n, args...) do { } while(0)
+
 #endif /* CONFIG_MTD_DEBUG */
 
 #endif /* __KERNEL__ */

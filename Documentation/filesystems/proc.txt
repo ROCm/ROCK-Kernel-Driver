@@ -1068,6 +1068,8 @@ The pdflush writeback daemons will periodically wake up and write `old' data
 out to disk.  This tunable expresses the interval between those wakeups, in
 100'ths of a second.
 
+Setting this to zero disables periodic writeback altogether.
+
 dirty_expire_centisecs
 ----------------------
 

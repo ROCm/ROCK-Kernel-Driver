@@ -1316,9 +1316,7 @@ static void snd_rawmidi_proc_info_read(snd_info_entry_t *entry,
 
 static struct file_operations snd_rawmidi_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_rawmidi_read,
 	.write =	snd_rawmidi_write,
 	.open =		snd_rawmidi_open,
@@ -1394,7 +1392,7 @@ int snd_rawmidi_new(snd_card_t * card, char *id, int device,
 	init_MUTEX(&rmidi->open_mutex);
 	init_waitqueue_head(&rmidi->open_wait);
 	if (id != NULL)
-		strncpy(rmidi->id, id, sizeof(rmidi->id) - 1);
+		strlcpy(rmidi->id, id, sizeof(rmidi->id));
 	if ((err = snd_rawmidi_alloc_substreams(rmidi, &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT], SNDRV_RAWMIDI_STREAM_INPUT, input_count)) < 0) {
 		snd_rawmidi_free(rmidi);
 		return err;

@@ -67,18 +67,34 @@ enable_kernel_fp(void)
 #endif /* CONFIG_SMP */
 }
 
-int
-dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
+#ifdef CONFIG_SMP
+static void smp_unlazy_onefpu(void *arg)
 {
-	/*
-	 * XXX temporary workaround until threaded coredumps for ppc64
-	 * are implemented - Anton
-	 */
+	struct pt_regs *regs = current->thread.regs;
+
 	if (!regs)
-		return 0;
+		return;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
-	memcpy(fpregs, &current->thread.fpr[0], sizeof(*fpregs));
+}
+
+void dump_smp_unlazy_fpu(void)
+{
+	smp_call_function(smp_unlazy_onefpu, NULL, 1, 1);
+}
+#endif
+
+int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
+{
+	struct pt_regs *regs = tsk->thread.regs;
+
+	if (!regs)
+		return 0;
+	if (tsk == current && (regs->msr & MSR_FP))
+		giveup_fpu(current);
+
+	memcpy(fpregs, &tsk->thread.fpr[0], sizeof(*fpregs));
+
 	return 1;
 }
 
@@ -113,7 +129,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 }
 
 static void show_tsk_stack(struct task_struct *p, unsigned long sp);
-static char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
+char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
 
 void show_regs(struct pt_regs * regs)
 {
@@ -410,7 +426,7 @@ void initialize_paca_hardware_interrupt_stack(void)
 
 extern char _stext[], _etext[], __init_begin[], __init_end[];
 
-static char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
+char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
 {
 	unsigned long tb_flags;
 	unsigned short name_len;

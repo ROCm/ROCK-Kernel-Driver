@@ -67,7 +67,7 @@ extern int sun3_map_test(unsigned long, char *);
 #define ENABLE_IRQ()
 
 
-static void scsi_sun3_intr(int irq, void *dummy, struct pt_regs *fp);
+static irqreturn_t scsi_sun3_intr(int irq, void *dummy, struct pt_regs *fp);
 static inline unsigned char sun3scsi_read(int reg);
 static inline void sun3scsi_write(int reg, int value);
 
@@ -342,9 +342,10 @@ static const char * sun3scsi_info (struct Scsi_Host *spnt) {
 // safe bits for the CSR
 #define CSR_GOOD 0x060f
 
-static void scsi_sun3_intr(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t scsi_sun3_intr(int irq, void *dummy, struct pt_regs *fp)
 {
 	unsigned short csr = dregs->csr;
+	int handled = 0;
 
 	dregs->csr &= ~CSR_DMA_ENABLE;
 
@@ -368,10 +369,15 @@ static void scsi_sun3_intr(int irq, void *dummy, struct pt_regs *fp)
 		if(csr & CSR_DMA_CONFLICT) {
 			printk("scsi%d: dma conflict\n", default_instance->host_no);
 		}
+		handled = 1;
 	}
 
-	if(csr & (CSR_SDB_INT | CSR_DMA_INT))
+	if(csr & (CSR_SDB_INT | CSR_DMA_INT)) {
 		NCR5380_intr(irq, dummy, fp);
+		handled = 1;
+	}
+
+	return IRQ_RETVAL(handled);
 }
 
 /*

@@ -269,7 +269,8 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 int hid_pid_init(struct hid_device *hid)
 {
     struct hid_ff_pid *private;
-    
+    struct hid_input *hidinput = list_entry(&hid->inputs, struct hid_input, list);
+
     private = hid->ff_private = kmalloc(sizeof(struct hid_ff_pid), GFP_KERNEL);
     if (!private) return -1;
     
@@ -289,11 +290,11 @@ int hid_pid_init(struct hid_device *hid)
     }
 
     usb_fill_control_urb(private->urbffout, hid->dev,0,(void *) &private->ffcr,private->ctrl_buffer,8,hid_pid_ctrl_out,hid);
-    hid->input.upload_effect = hid_pid_upload_effect;
-    hid->input.flush = hid_pid_flush;
-    hid->input.ff_effects_max = 8;  // A random default
-    set_bit(EV_FF, hid->input.evbit);
-    set_bit(EV_FF_STATUS, hid->input.evbit);
+    hidinput->input.upload_effect = hid_pid_upload_effect;
+    hidinput->input.flush = hid_pid_flush;
+    hidinput->input.ff_effects_max = 8;  // A random default
+    set_bit(EV_FF, hidinput->input.evbit);
+    set_bit(EV_FF_STATUS, hidinput->input.evbit);
 
     spin_lock_init(&private->lock);
 

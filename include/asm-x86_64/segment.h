@@ -18,6 +18,7 @@
 #define __USER_CS     0x33   /* 6*8+3 */ 
 #define __USER32_DS	__USER_DS 
 #define __KERNEL16_CS	(GDT_ENTRY_KERNELCS16 * 8)
+#define __KERNEL_COMPAT32_CS   0x8
 
 #define GDT_ENTRY_TLS 1
 #define GDT_ENTRY_TSS 8	/* needs two entries */

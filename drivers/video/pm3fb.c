@@ -2631,8 +2631,7 @@ static void pm3fb_font_setup(char *lf, unsigned long board_num)
 		DPRINTK(1, "Fontname %s too long\n", lf);
 		return;
 	}
-	strncpy(fontn[board_num], lf, lfs);
-	fontn[board_num][lfs] = '\0';
+	strlcpy(fontn[board_num], lf, lfs + 1);
 }
 
 static void pm3fb_bootdepth_setup(char *bds, unsigned long board_num)

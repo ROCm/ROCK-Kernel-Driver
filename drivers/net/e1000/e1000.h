@@ -134,6 +134,7 @@ struct e1000_buffer {
 	uint64_t dma;
 	unsigned long length;
 	unsigned long time_stamp;
+	unsigned int next_to_watch;
 };
 
 struct e1000_desc_ring {
@@ -169,7 +170,6 @@ struct e1000_adapter {
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
 	struct vlan_group *vlgrp;
-	char *id_string;
 	uint32_t bd_number;
 	uint32_t rx_buffer_len;
 	uint32_t part_num;
@@ -218,6 +218,9 @@ struct e1000_adapter {
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
 
+	uint32_t test_icr;
+	struct e1000_desc_ring test_tx_ring;
+	struct e1000_desc_ring test_rx_ring;
 
 
 	uint32_t pci_state[16];

@@ -112,9 +112,9 @@
  * Common fields for objects that support ASL notifications
  */
 #define ACPI_COMMON_NOTIFY_INFO \
-	union acpi_operand_object               *sys_handler;        /* Handler for system notifies */\
-	union acpi_operand_object               *drv_handler;        /* Handler for driver notifies */\
-	union acpi_operand_object               *addr_handler;       /* Handler for Address space */
+	union acpi_operand_object               *system_notify;     /* Handler for system notifies */\
+	union acpi_operand_object               *device_notify;     /* Handler for driver notifies */\
+	union acpi_operand_object               *address_space;     /* Handler for Address space */
 
 
 /******************************************************************************
@@ -214,7 +214,7 @@ struct acpi_object_region
 	ACPI_OBJECT_COMMON_HEADER
 
 	u8                                      space_id;
-	union acpi_operand_object               *addr_handler;      /* Handler for system notifies */
+	union acpi_operand_object               *address_space;     /* Handler for region access */
 	struct acpi_namespace_node              *node;              /* containing object */
 	union acpi_operand_object               *next;
 	u32                                     length;
@@ -446,8 +446,8 @@ union acpi_operand_object
 	struct acpi_object_buffer_field         buffer_field;
 	struct acpi_object_bank_field           bank_field;
 	struct acpi_object_index_field          index_field;
-	struct acpi_object_notify_handler       notify_handler;
-	struct acpi_object_addr_handler         addr_handler;
+	struct acpi_object_notify_handler       notify;
+	struct acpi_object_addr_handler         address_space;
 	struct acpi_object_reference            reference;
 	struct acpi_object_extra                extra;
 	struct acpi_object_data                 data;

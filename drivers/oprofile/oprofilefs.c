@@ -299,8 +299,8 @@ static int oprofilefs_fill_super(struct super_block * sb, void * data, int silen
 }
 
 
-static struct super_block * oprofilefs_get_sb(struct file_system_type * fs_type,
-	int flags, char * dev_name, void * data)
+static struct super_block *oprofilefs_get_sb(struct file_system_type *fs_type,
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_single(fs_type, flags, data, oprofilefs_fill_super);
 }

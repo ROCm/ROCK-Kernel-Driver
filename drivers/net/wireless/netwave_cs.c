@@ -1743,31 +1743,28 @@ static int netwave_close(struct net_device *dev) {
     return 0;
 }
 
-static int __init init_netwave_cs(void) {
-    servinfo_t serv;
+static struct pcmcia_driver netwave_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "netwave_cs",
+	},
+	.attach		= netwave_attach,
+	.detach		= netwave_detach,
+};
 
-    DEBUG(0, "%s\n", version);
-
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk("netwave_cs: Card Services release does not match!\n");
-	return -1;
-    }
- 
-    register_pccard_driver(&dev_info, &netwave_attach, &netwave_detach);
-	
-    return 0;
+static int __init init_netwave_cs(void)
+{
+	return pcmcia_register_driver(&netwave_driver);
 }
 
-static void __exit exit_netwave_cs(void) {
-    DEBUG(1, "netwave_cs: unloading\n");
+static void __exit exit_netwave_cs(void)
+{
+	pcmcia_unregister_driver(&netwave_driver);
 
-    unregister_pccard_driver(&dev_info);
-
-    /* Do some cleanup of the device list */
-    netwave_flush_stale_links();
-    if(dev_list != NULL)	/* Critical situation */
-        printk("netwave_cs: devices remaining when removing module\n");
+	/* Do some cleanup of the device list */
+	netwave_flush_stale_links();
+	if (dev_list != NULL)	/* Critical situation */
+		printk("netwave_cs: devices remaining when removing module\n");
 }
 
 module_init(init_netwave_cs);

@@ -421,7 +421,7 @@ static int DIVA_INIT_FUNCTION divas_maint_register_chrdev(void)
 		return (0);
 	}
 
-	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, DivasMAINT);
+	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, "DivasMAINT");
 	return (1);
 }
 

@@ -350,6 +350,11 @@ acpi_ps_get_next_namepath (
 
 				(status != AE_NOT_FOUND)) {
 				ACPI_REPORT_NSERROR (path, status);
+
+				acpi_os_printf ("search_node %p start_node %p return_node %p\n",
+					scope_info.scope.node, parser_state->start_node, node);
+
+
 			}
 			else {
 				/*

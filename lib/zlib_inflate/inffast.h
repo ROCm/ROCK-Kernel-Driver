@@ -8,10 +8,10 @@
    subject to change. Applications should only use zlib.h.
  */
 
-extern int zlib_inflate_fast OF((
+extern int zlib_inflate_fast (
     uInt,
     uInt,
     inflate_huft *,
     inflate_huft *,
     inflate_blocks_statef *,
-    z_streamp ));
+    z_streamp );

@@ -1961,7 +1961,7 @@ queue:
 
 	goto queue;
 startio:
-	__blk_stop_queue(q);
+	blk_stop_queue(q);
 	start_io(h);
 }
 
@@ -2021,8 +2021,8 @@ static irqreturn_t do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 * See if we can queue up some more IO
 	 */
-	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
 	blk_start_queue(&h->queue);
+	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
 	return IRQ_HANDLED;
 }
 /* 

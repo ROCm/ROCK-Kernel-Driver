@@ -40,10 +40,11 @@ enum sb_hw_type {
 	SB_HW_DT019X,		/* Diamond Tech. DT-019X / Avance Logic ALS-007 */
 };
 
-#define SB_OPEN_PCM		0x01
-#define SB_OPEN_MIDI_INPUT	0x02
-#define SB_OPEN_MIDI_OUTPUT	0x04
-#define SB_OPEN_MIDI_TRIGGER	0x08
+#define SB_OPEN_PCM			0x01
+#define SB_OPEN_MIDI_INPUT		0x02
+#define SB_OPEN_MIDI_OUTPUT		0x04
+#define SB_OPEN_MIDI_INPUT_TRIGGER	0x08
+#define SB_OPEN_MIDI_OUTPUT_TRIGGER	0x10
 
 #define SB_MODE_HALT		0x00
 #define SB_MODE_PLAYBACK_8	0x01
@@ -157,6 +158,7 @@ typedef struct _snd_sb sb_t;
 #define SB_DSP_STEREO_16BIT	0xac
 
 #define SB_DSP_MIDI_INPUT_IRQ	0x31
+#define SB_DSP_MIDI_UART_IRQ	0x35
 #define SB_DSP_MIDI_OUTPUT	0x38
 
 #define SB_DSP4_OUT8_AI		0xc6
@@ -295,13 +297,13 @@ int snd_sbmixer_new(sb_t *chip);
 /* sb8_init.c */
 int snd_sb8dsp_pcm(sb_t *chip, int device, snd_pcm_t ** rpcm);
 /* sb8.c */
-void snd_sb8dsp_interrupt(sb_t *chip);
+irqreturn_t snd_sb8dsp_interrupt(sb_t *chip);
 int snd_sb8_playback_open(snd_pcm_substream_t *substream);
 int snd_sb8_capture_open(snd_pcm_substream_t *substream);
 int snd_sb8_playback_close(snd_pcm_substream_t *substream);
 int snd_sb8_capture_close(snd_pcm_substream_t *substream);
 /* midi8.c */
-void snd_sb8dsp_midi_interrupt(sb_t *chip);
+irqreturn_t snd_sb8dsp_midi_interrupt(sb_t *chip);
 int snd_sb8dsp_midi(sb_t *chip, int device, snd_rawmidi_t ** rrawmidi);
 
 /* sb16_init.c */

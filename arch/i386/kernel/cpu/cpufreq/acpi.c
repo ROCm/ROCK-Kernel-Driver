@@ -553,8 +553,9 @@ acpi_cpufreq_cpu_init (
 {
 	unsigned int		i;
 	unsigned int		cpu = policy->cpu;
-	struct acpi_processor  *pr = NULL;
+	struct acpi_processor	*pr = NULL;
 	struct acpi_processor_performance *perf = &performance[policy->cpu];
+	struct acpi_device	*device;
 	unsigned int		result = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_cpu_init");
@@ -596,6 +597,17 @@ acpi_cpufreq_cpu_init (
 
 	acpi_cpufreq_add_file(pr);
 
+	if (acpi_bus_get_device(pr->handle, &device))
+		device = NULL;
+		
+	printk(KERN_INFO "cpufreq: %s - ACPI performance management activated.\n",
+		device ? acpi_device_bid(device) : "CPU??");
+	for (i = 0; i < pr->performance->state_count; i++)
+		printk(KERN_INFO "cpufreq: %cP%d: %d MHz, %d mW, %d uS\n",
+			(i == pr->performance->state?'*':' '), i,
+			(u32) pr->performance->states[i].core_frequency,
+			(u32) pr->performance->states[i].power,
+			(u32) pr->performance->states[i].transition_latency);
 	return_VALUE(result);
 }
 
@@ -658,16 +670,21 @@ acpi_cpufreq_init (void)
 
 	/* test it on one CPU */
 	for (i=0; i<NR_CPUS; i++) {
-		if (cpu_online(i))
+		if (!cpu_online(i))
 			continue;
 		pr = performance[i].pr;
 		if (pr && pr->flags.performance)
 			goto found_capable_cpu;
 	}
 	result = -ENODEV;
-	goto err;
+	goto err0;
 
  found_capable_cpu:
+	
+ 	result = cpufreq_register_driver(&acpi_cpufreq_driver);
+	if (result) 
+		goto err0;
+	
 	perf = pr->performance;
 	current_state = perf->state;
 
@@ -676,7 +693,7 @@ acpi_cpufreq_init (void)
 		if (result) {
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Disabled P-States due to failure while switching.\n"));
 			result = -ENODEV;
-			goto err;
+			goto err1;
 		}
 	}
 
@@ -684,7 +701,7 @@ acpi_cpufreq_init (void)
 	if (result) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Disabled P-States due to failure while switching.\n"));
 		result = -ENODEV;
-		goto err;
+		goto err1;
 	}
 	
 	if (current_state != 0) {
@@ -692,18 +709,17 @@ acpi_cpufreq_init (void)
 		if (result) {
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Disabled P-States due to failure while switching.\n"));
 			result = -ENODEV;
-			goto err;
+			goto err1;
 		}
 	}
-
-	result = cpufreq_register_driver(&acpi_cpufreq_driver);
-	if (result)
-		goto err;
 
 	return_VALUE(0);
 
 	/* error handling */
- err:
+ err1:
+	cpufreq_unregister_driver(&acpi_cpufreq_driver);
+	
+ err0:
 	/* unregister struct acpi_processor_performance performance */
 	for (i=0; i<NR_CPUS; i++) {
 		if (performance[i].pr) {
@@ -713,6 +729,8 @@ acpi_cpufreq_init (void)
 		}
 	}
 	kfree(performance);
+	
+	printk(KERN_INFO "cpufreq: No CPUs supporting ACPI performance management found.\n");
 	return_VALUE(result);
 }
 

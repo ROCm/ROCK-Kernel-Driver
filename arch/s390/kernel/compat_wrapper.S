@@ -220,12 +220,12 @@ sys32_umount_wrapper:
 	lgfr	%r3,%r3			# int
 	jg	sys_umount		# branch to system call
 
-	.globl  sys32_ioctl_wrapper 
-sys32_ioctl_wrapper:
+	.globl  compat_sys_ioctl_wrapper
+compat_sys_ioctl_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgfr	%r3,%r3			# unsigned int
 	llgfr	%r4,%r4			# unsigned int
-	jg	sys32_ioctl		# branch to system call
+	jg	compat_sys_ioctl	# branch to system call
 
 	.globl  compat_sys_fcntl_wrapper 
 compat_sys_fcntl_wrapper:
@@ -1209,3 +1209,24 @@ sys32_exit_group_wrapper:
 sys32_set_tid_address_wrapper:
 	llgtr	%r2,%r2			# int *
 	jg	sys_set_tid_address	# branch to system call
+
+	.globl  sys_epoll_create_wrapper
+sys_epoll_create_wrapper:
+	lgfr	%r2,%r2			# int
+	jg	sys_epoll_create	# branch to system call
+
+	.globl  sys_epoll_ctl_wrapper
+sys_epoll_ctl_wrapper:
+	lgfr	%r2,%r2			# int
+	lgfr	%r3,%r3			# int
+	lgfr	%r4,%r4			# int
+	llgtr	%r5,%r5			# struct epoll_event *
+	jg	sys_epoll_ctl		# branch to system call
+
+	.globl  sys_epoll_wait_wrapper
+sys_epoll_wait_wrapper:
+	lgfr	%r2,%r2			# int
+	llgtr	%r3,%r3			# struct epoll_event *
+	lgfr	%r4,%r4			# int
+	lgfr	%r5,%r5			# int
+	jg	sys_epoll_wait		# branch to system call

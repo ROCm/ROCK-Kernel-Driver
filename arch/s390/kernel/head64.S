@@ -586,7 +586,7 @@ startup:basr  %r13,0                     # get base
         .quad  .Lduct                   # cr2: dispatchable unit control table
         .quad  0                        # cr3: instruction authorization
         .quad  0                        # cr4: instruction authorization
-        .quad  0                        # cr5:  various things
+        .quad  0xffffffffffffffff       # cr5: primary-aste origin
         .quad  0                        # cr6:  I/O interrupts
         .quad  0                        # cr7:  secondary space segment table
         .quad  0                        # cr8:  access registers translation

@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#130 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#133 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -293,7 +293,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHD_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.8"
+#define AIC79XX_DRIVER_VERSION "1.3.9"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -1006,7 +1006,7 @@ ahd_flush_device_writes(struct ahd_softc *ahd)
 	(((dev_softc)->dma_mask = mask) && 0)
 #endif
 /**************************** Proc FS Support *********************************/
-int	ahd_linux_proc_info(char *, char **, off_t, int, int, int);
+int	ahd_linux_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 
 /*************************** Domain Validation ********************************/
 #define AHD_DV_CMD(cmd) ((cmd)->scsi_done == ahd_linux_dv_complete)
@@ -1211,7 +1211,7 @@ void	ahd_platform_set_tags(struct ahd_softc *ahd,
 int	ahd_platform_abort_scbs(struct ahd_softc *ahd, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
-AIC_LINUX_IRQRETURN_T
+irqreturn_t
 	ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
 void	ahd_platform_flushwork(struct ahd_softc *ahd);
 int	ahd_softc_comp(struct ahd_softc *, struct ahd_softc *);

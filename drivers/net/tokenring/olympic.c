@@ -1773,7 +1773,7 @@ static void __devexit olympic_remove_one(struct pci_dev *pdev)
 		strcat(proc_name,dev->name) ;
 		remove_proc_entry(proc_name,NULL); 
 	}
-	unregister_trdev(dev) ; 
+	unregister_netdev(dev) ; 
 	iounmap(olympic_priv->olympic_mmio) ; 
 	iounmap(olympic_priv->olympic_lap) ; 
 	pci_release_regions(pdev) ;

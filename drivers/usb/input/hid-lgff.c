@@ -254,6 +254,7 @@ static void hid_lgff_input_init(struct hid_device* hid)
 	signed short* ff;
 	u16 idVendor = hid->dev->descriptor.idVendor;
 	u16 idProduct = hid->dev->descriptor.idProduct;
+	struct hid_input *hidinput = list_entry(&hid->inputs, struct hid_input, list);
 
 	while (dev->idVendor && (idVendor != dev->idVendor || idProduct != dev->idProduct))
 		dev++;
@@ -261,15 +262,15 @@ static void hid_lgff_input_init(struct hid_device* hid)
 	ff = dev->ff;
 
 	while (*ff >= 0) {
-		set_bit(*ff, hid->input.ffbit);
+		set_bit(*ff, hidinput->input.ffbit);
 		++ff;
 	}
 
-	hid->input.upload_effect = hid_lgff_upload_effect;
-	hid->input.flush = hid_lgff_flush;
+	hidinput->input.upload_effect = hid_lgff_upload_effect;
+	hidinput->input.flush = hid_lgff_flush;
 
-	set_bit(EV_FF, hid->input.evbit);
-	hid->input.ff_effects_max = LGFF_EFFECTS;
+	set_bit(EV_FF, hidinput->input.evbit);
+	hidinput->input.ff_effects_max = LGFF_EFFECTS;
 }
 
 static void hid_lgff_exit(struct hid_device* hid)

@@ -102,7 +102,7 @@ pcibios_fixup_final(struct pci_dev *dev)
 {
 	unsigned int class = dev->class >> 8;
 
-	if (class == PCI_CLASS_BRIDGE_ISA || class == PCI_CLASS_BRIDGE_ISA) {
+	if (class == PCI_CLASS_BRIDGE_ISA || class == PCI_CLASS_BRIDGE_EISA) {
 		dev->dma_mask = MAX_ISA_DMA_ADDRESS - 1;
 		isa_bridge = dev;
 	}
@@ -483,12 +483,4 @@ sys_pciconfig_iobase(long which, unsigned long bus, unsigned long dfn)
 	}
 
 	return -EOPNOTSUPP;
-}
-
-/* Return the index of the PCI controller for device PDEV. */
-int
-pci_controller_num(struct pci_dev *pdev)
-{
-        struct pci_controller *hose = pdev->sysdata;
-	return (hose ? (int) hose->index : -ENXIO);
 }

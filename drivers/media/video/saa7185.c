@@ -202,7 +202,7 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 
 
 	memset(encoder, 0, sizeof(*encoder));
-	strncpy(client->dev.name, "saa7185", DEVICE_NAME_SIZE);
+	strlcpy(client->dev.name, "saa7185", DEVICE_NAME_SIZE);
 	encoder->client = client;
 	i2c_set_clientdata(client, encoder);
 	encoder->addr = addr;

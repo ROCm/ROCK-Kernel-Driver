@@ -6,7 +6,7 @@
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.64 2002/06/10
+ * Version: 1.65 2002/08/14
  *
  * See matroxfb_base.c for contributors.
  *
@@ -25,11 +25,117 @@
 #define MGATVO_B	1
 #define MGATVO_C	2
 
+static const struct maven_gamma {
+  unsigned char reg83;
+  unsigned char reg84;
+  unsigned char reg85;
+  unsigned char reg86;
+  unsigned char reg87;
+  unsigned char reg88;
+  unsigned char reg89;
+  unsigned char reg8a;
+  unsigned char reg8b;
+} maven_gamma[] = {
+  { 131, 57, 223, 15, 117, 212, 251, 91, 156},
+  { 133, 61, 128, 63, 180, 147, 195, 100, 180},
+  { 131, 19, 63, 31, 50, 66, 171, 64, 176},
+  { 0, 0, 0, 31, 16, 16, 16, 100, 200},
+  { 8, 23, 47, 73, 147, 244, 220, 80, 195},
+  { 22, 43, 64, 80, 147, 115, 58, 85, 168},
+  { 34, 60, 80, 214, 147, 212, 188, 85, 167},
+  { 45, 77, 96, 216, 147, 99, 91, 85, 159},
+  { 56, 76, 112, 107, 147, 212, 148, 64, 144},
+  { 65, 91, 128, 137, 147, 196, 17, 69, 148},
+  { 72, 104, 136, 138, 147, 180, 245, 73, 147},
+  { 87, 116, 143, 126, 16, 83, 229, 77, 144},
+  { 95, 119, 152, 254, 244, 83, 221, 77, 151},
+  { 100, 129, 159, 156, 244, 148, 197, 77, 160},
+  { 105, 141, 167, 247, 244, 132, 181, 84, 166},
+  { 105, 147, 168, 247, 244, 245, 181, 90, 170},
+  { 120, 153, 175, 248, 212, 229, 165, 90, 180},
+  { 119, 156, 176, 248, 244, 229, 84, 74, 160},
+  { 119, 158, 183, 248, 244, 229, 149, 78, 165}
+};
+
+/* Definition of the various controls */
+struct mctl {
+	struct v4l2_queryctrl desc;
+	size_t control;
+};
+
+#define BLMIN	0x0FF
+#define WLMAX	0x3FF
+
+static const struct mctl maven_controls[] =
+{	{ { V4L2_CID_BRIGHTNESS, V4L2_CTRL_TYPE_INTEGER,
+	  "brightness",
+	  0, WLMAX - BLMIN, 1, 379 - BLMIN, 
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.brightness) },
+	{ { V4L2_CID_CONTRAST, V4L2_CTRL_TYPE_INTEGER,
+	  "contrast",
+	  0, 1023, 1, 127,
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.contrast) },
+	{ { V4L2_CID_SATURATION, V4L2_CTRL_TYPE_INTEGER,
+	  "saturation",
+	  0, 255, 1, 155,
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.saturation) },
+	{ { V4L2_CID_HUE, V4L2_CTRL_TYPE_INTEGER,
+	  "hue",
+	  0, 255, 1, 0,
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.hue) },
+	{ { V4L2_CID_GAMMA, V4L2_CTRL_TYPE_INTEGER,
+	  "gamma",
+	  0, sizeof(maven_gamma)/sizeof(maven_gamma[0])-1, 1, 3,
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.gamma) },
+	{ { MATROXFB_CID_TESTOUT, V4L2_CTRL_TYPE_BOOLEAN,
+	  "test output",
+	  0, 1, 1, 0, 
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.testout) },
+	{ { MATROXFB_CID_DEFLICKER, V4L2_CTRL_TYPE_INTEGER,
+	  "deflicker mode",
+	  0, 2, 1, 0,
+	  0,
+	}, offsetof(struct matrox_fb_info, altout.tvo_params.deflicker) },
+
+};
+
+#define MAVCTRLS (sizeof(maven_controls)/sizeof(maven_controls[0]))
+
+/* Return: positive number: id found
+           -EINVAL:         id not found, return failure
+	   -ENOENT:         id not found, create fake disabled control */
+static int get_ctrl_id(__u32 v4l2_id) {
+	int i;
+
+	for (i = 0; i < MAVCTRLS; i++) {
+		if (v4l2_id < maven_controls[i].desc.id) {
+			if (maven_controls[i].desc.id == 0x08000000) {
+				return -EINVAL;
+			}
+			return -ENOENT;
+		}
+		if (v4l2_id == maven_controls[i].desc.id) {
+			return i;
+		}
+	}
+	return -EINVAL;
+}
+
 struct maven_data {
 	struct matrox_fb_info*		primary_head;
 	struct i2c_client*		client;
 	int				version;
 };
+
+static int* get_ctrl_ptr(struct maven_data* md, int idx) {
+	return (int*)((char*)(md->primary_head) + maven_controls[idx].control);
+}
 
 static int maven_get_reg(struct i2c_client* c, char reg) {
 	char dst;
@@ -115,7 +221,7 @@ static int matroxfb_PLL_mavenclock(const struct matrox_pll_features2* pll,
 	unsigned int scrlen;
 	unsigned int fmax;
 
-	DBG("PLL_calcclock")
+	DBG(__FUNCTION__)
 
 	scrlen = htotal * (vtotal - 1);
 	fwant = htotal * vtotal;
@@ -219,8 +325,33 @@ static unsigned char maven_compute_deflicker (const struct maven_data* md) {
 	unsigned char df;
 	
 	df = (md->version == MGATVO_B?0x40:0x00);
+	switch (md->primary_head->altout.tvo_params.deflicker) {
+		case 0:
+/*			df |= 0x00; */
+			break;
+		case 1:
+			df |= 0xB1;
+			break;
+		case 2:
+			df |= 0xA2;
+			break;
+	}
 	return df;
 }
+
+static void maven_compute_bwlevel (const struct maven_data* md,
+				   int *bl, int *wl) {
+	const int b = md->primary_head->altout.tvo_params.brightness + BLMIN;
+	const int c = md->primary_head->altout.tvo_params.contrast;
+
+	*bl = max(b - c, BLMIN);
+	*wl = min(b + c, WLMAX);
+}
+
+static const struct maven_gamma* maven_compute_gamma (const struct maven_data* md) {
+ 	return maven_gamma + md->primary_head->altout.tvo_params.gamma;
+}
+
 
 static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* data) {
 	static struct mavenregs palregs = { {
@@ -336,18 +467,40 @@ static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* dat
 
 	/* Set deflicker */
 	data->regs[0x93] = maven_compute_deflicker(md);
+ 
+	/* set gamma */
+	{
+		const struct maven_gamma* g;
+		g = maven_compute_gamma(md);
+		data->regs[0x83] = g->reg83;
+		data->regs[0x84] = g->reg84;
+		data->regs[0x85] = g->reg85;
+		data->regs[0x86] = g->reg86;
+		data->regs[0x87] = g->reg87;
+		data->regs[0x88] = g->reg88;
+		data->regs[0x89] = g->reg89;
+		data->regs[0x8A] = g->reg8a;
+		data->regs[0x8B] = g->reg8b;
+	}
+ 
+	/* Set contrast / brightness */
+	{
+		int bl, wl;
+		maven_compute_bwlevel (md, &bl, &wl);
+		data->regs[0x0e] = bl >> 2;
+		data->regs[0x0f] = bl & 3;
+		data->regs[0x1e] = wl >> 2;
+		data->regs[0x1f] = wl & 3;
+	}
 
-	/* gamma correction registers */
-	data->regs[0x83] = 0x00;
-	data->regs[0x84] = 0x00;
-	data->regs[0x85] = 0x00;
-	data->regs[0x86] = 0x1F;
-	data->regs[0x87] = 0x10;
-	data->regs[0x88] = 0x10;
-	data->regs[0x89] = 0x10;
-	data->regs[0x8A] = 0x64;	/* 100 */
-	data->regs[0x8B] = 0xC8;	/* 200 */
-
+	/* Set saturation */
+	{
+		data->regs[0x20] =
+		data->regs[0x22] = ACCESS_FBINFO(altout.tvo_params.saturation);
+	}
+ 
+	/* Set HUE */
+	data->regs[0x25] = ACCESS_FBINFO(altout.tvo_params.hue);
 	return;
 }
 
@@ -859,14 +1012,117 @@ static inline int maven_resync(struct maven_data* md) {
 	return 0;
 }
 
-static int maven_verify_output_mode(struct maven_data* md, u_int32_t arg) {
-	switch (arg) {
-		case MATROXFB_OUTPUT_MODE_PAL:
-		case MATROXFB_OUTPUT_MODE_NTSC:
-		case MATROXFB_OUTPUT_MODE_MONITOR:
-			return 0;
+static int maven_get_queryctrl (struct maven_data* md, 
+				struct v4l2_queryctrl *p) {
+	int i;
+	
+	i = get_ctrl_id(p->id);
+	if (i >= 0) {
+		*p = maven_controls[i].desc;
+		return 0;
+	}
+	if (i == -ENOENT) {
+		static const struct v4l2_queryctrl disctrl = 
+			{ .flags = V4L2_CTRL_FLAG_DISABLED };
+			
+		i = p->id;
+		*p = disctrl;
+		p->id = i;
+		sprintf(p->name, "Ctrl #%08X", i);
+		return 0;
 	}
 	return -EINVAL;
+}
+
+static int maven_set_control (struct maven_data* md, 
+			      struct v4l2_control *p) {
+	int i;
+	
+	i = get_ctrl_id(p->id);
+	if (i < 0) return -EINVAL;
+
+	/*
+	 * Check if changed.
+	 */
+	if (p->value == *get_ctrl_ptr(md, i)) return 0;
+
+	/*
+	 * Check limits.
+	 */
+	if (p->value > maven_controls[i].desc.maximum) return -EINVAL;
+	if (p->value < maven_controls[i].desc.minimum) return -EINVAL;
+
+	/*
+	 * Store new value.
+	 */
+	*get_ctrl_ptr(md, i) = p->value;
+
+	switch (p->id) {
+		case V4L2_CID_BRIGHTNESS:
+		case V4L2_CID_CONTRAST:
+		{
+		  int blacklevel, whitelevel;
+		  maven_compute_bwlevel(md, &blacklevel, &whitelevel);
+		  blacklevel = (blacklevel >> 2) | ((blacklevel & 3) << 8);
+		  whitelevel = (whitelevel >> 2) | ((whitelevel & 3) << 8);
+		  maven_set_reg_pair(md->client, 0x0e, blacklevel);
+		  maven_set_reg_pair(md->client, 0x1e, whitelevel);
+		}
+		break;
+		case V4L2_CID_SATURATION:
+		{
+		  maven_set_reg(md->client, 0x20, p->value);
+		  maven_set_reg(md->client, 0x22, p->value);
+		}
+		break;
+		case V4L2_CID_HUE:
+		{
+		  maven_set_reg(md->client, 0x25, p->value);
+		}
+		break;
+		case V4L2_CID_GAMMA:
+		{
+		  const struct maven_gamma* g;
+		  g = maven_compute_gamma(md);
+		  maven_set_reg(md->client, 0x83, g->reg83);
+		  maven_set_reg(md->client, 0x84, g->reg84);
+		  maven_set_reg(md->client, 0x85, g->reg85);
+		  maven_set_reg(md->client, 0x86, g->reg86);
+		  maven_set_reg(md->client, 0x87, g->reg87);
+		  maven_set_reg(md->client, 0x88, g->reg88);
+		  maven_set_reg(md->client, 0x89, g->reg89);
+		  maven_set_reg(md->client, 0x8a, g->reg8a);
+		  maven_set_reg(md->client, 0x8b, g->reg8b);
+		}
+		break;
+		case MATROXFB_CID_TESTOUT:
+		{
+			unsigned char val 
+			  = maven_get_reg (md->client,0x8d);
+			if (p->value) val |= 0x10;
+			else          val &= ~0x10;
+			maven_set_reg (md->client, 0x8d, val);
+		}
+		break;
+		case MATROXFB_CID_DEFLICKER:
+		{
+		  maven_set_reg(md->client, 0x93, maven_compute_deflicker(md));
+		}
+		break;
+	}
+	
+
+	return 0;
+}
+
+static int maven_get_control (struct maven_data* md, 
+			      struct v4l2_control *p) {
+	int i;
+	
+	i = get_ctrl_id(p->id);
+	if (i < 0) return -EINVAL;
+	p->value = *get_ctrl_ptr(md, i);
+	return 0;
 }
 
 /******************************************************/
@@ -892,7 +1148,25 @@ static int maven_out_start(void* md) {
 }
 
 static int maven_out_verify_mode(void* md, u_int32_t arg) {
-	return maven_verify_output_mode(md, arg);
+	switch (arg) {
+		case MATROXFB_OUTPUT_MODE_PAL:
+		case MATROXFB_OUTPUT_MODE_NTSC:
+		case MATROXFB_OUTPUT_MODE_MONITOR:
+			return 0;
+	}
+	return -EINVAL;
+}
+
+static int maven_out_get_queryctrl(void* md, struct v4l2_queryctrl* p) {
+        return maven_get_queryctrl(md, p);
+}
+
+static int maven_out_get_ctrl(void* md, struct v4l2_control* p) {
+	return maven_get_control(md, p);
+}
+
+static int maven_out_set_ctrl(void* md, struct v4l2_control* p) {
+	return maven_set_control(md, p);
 }
 
 static struct matrox_altout maven_altout = {
@@ -901,12 +1175,14 @@ static struct matrox_altout maven_altout = {
 	.program	= maven_out_program,
 	.start		= maven_out_start,
 	.verifymode	= maven_out_verify_mode,
+	.getqueryctrl	= maven_out_get_queryctrl,
+	.getctrl	= maven_out_get_ctrl,
+	.setctrl	= maven_out_set_ctrl,
 };
 
 static int maven_init_client(struct i2c_client* clnt) {
-	struct i2c_adapter* a = clnt->adapter;
-	struct maven_data* md = clnt->data;
-	MINFO_FROM(container_of(a, struct i2c_bit_adapter, adapter)->minfo);
+	struct maven_data* md = i2c_get_clientdata(clnt);
+	MINFO_FROM(container_of(clnt->adapter, struct i2c_bit_adapter, adapter)->minfo);
 
 	md->primary_head = MINFO;
 	md->client = clnt;
@@ -918,14 +1194,26 @@ static int maven_init_client(struct i2c_client* clnt) {
 	up_write(&ACCESS_FBINFO(altout.lock));
 	if (maven_get_reg(clnt, 0xB2) < 0x14) {
 		md->version = MGATVO_B;
+		/* Tweak some things for this old chip */
 	} else {
 		md->version = MGATVO_C;
 	}
+	/*
+	 * Set all parameters to its initial values.
+	 */
+	{
+		unsigned int i;
+
+		for (i = 0; i < MAVCTRLS; ++i) {
+			*get_ctrl_ptr(md, i) = maven_controls[i].desc.default_value;
+		}
+	}
+
 	return 0;
 }
 
 static int maven_shutdown_client(struct i2c_client* clnt) {
-	struct maven_data* md = clnt->data;
+	struct maven_data* md = i2c_get_clientdata(clnt);
 
 	if (md->primary_head) {
 		MINFO_FROM(md->primary_head);
@@ -947,8 +1235,7 @@ I2C_CLIENT_INSMOD;
 
 static struct i2c_driver maven_driver;
 
-static int maven_detect_client(struct i2c_adapter* adapter, int address, unsigned short flags,
-		int kind) {
+static int maven_detect_client(struct i2c_adapter* adapter, int address, int kind) {
 	int err = 0;
 	struct i2c_client* new_client;
 	struct maven_data* data;
@@ -963,15 +1250,12 @@ static int maven_detect_client(struct i2c_adapter* adapter, int address, unsigne
 		goto ERROR0;
 	}
 	data = (struct maven_data*)(new_client + 1);
-	new_client->data = data;
+	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
 	new_client->driver = &maven_driver;
 	new_client->flags = 0;
-	if (kind < 0) {
-		;
-	}
-	strcpy(new_client->name, "maven client");
+	strcpy(new_client->dev.name, "maven client");
 	if ((err = i2c_attach_client(new_client)))
 		goto ERROR3;
 	err = maven_init_client(new_client);
@@ -1015,6 +1299,7 @@ static struct i2c_driver maven_driver={
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= maven_attach_adapter,
 	.detach_client	= maven_detach_client,
+	.command	= maven_command,
 };
 
 /* ************************** */

@@ -34,8 +34,9 @@
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/bio.h>
+#include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 
 #define XPRAM_NAME	"xpram"
@@ -47,12 +48,14 @@
 #define PRINT_WARN(x...)	printk(KERN_WARNING XPRAM_NAME " warning:" x)
 #define PRINT_ERR(x...)		printk(KERN_ERR XPRAM_NAME " error:" x)
 
+
+static struct sysdev_class xpram_sysclass = {
+	set_kset_name("xpram"),
+};
+
 static struct sys_device xpram_sys_device = {
-	.name = "S/390 expanded memory RAM disk",
-	.dev  = {
-		.name   = "S/390 expanded memory RAM disk",
-		.bus_id = "xpram",
-	},
+	.id	= 0,
+	.cls	= &xpram_sysclass,
 }; 
 
 typedef struct {
@@ -459,7 +462,7 @@ static int __init xpram_setup_blkdev(void)
 		disk->private_data = &xpram_devices[i];
 		disk->queue = &xpram_queue;
 		sprintf(disk->disk_name, "slram%d", i);
-		sprintf(disk->disk_name, "slram/%d", i);
+		sprintf(disk->devfs_name, "slram/%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
 		add_disk(disk);
 	}
@@ -484,6 +487,7 @@ static void __exit xpram_exit(void)
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_remove("slram");
 	sys_device_unregister(&xpram_sys_device);
+	sysdev_class_unregister(&xpram_sys_class);
 }
 
 static int __init xpram_init(void)
@@ -501,9 +505,15 @@ static int __init xpram_init(void)
 	rc = xpram_setup_sizes(xpram_pages);
 	if (rc)
 		return rc;
-	rc = sys_device_register(&xpram_sys_device);
+	rc = sysdev_class_register(&xpram_sysclass);
 	if (rc)
 		return rc;
+
+	rc = sys_device_register(&xpram_sys_device);
+	if (rc) {
+		sysdev_class_unregister(&xpram_syclass);
+		return rc;
+	}
 	rc = xpram_setup_blkdev();
 	if (rc)
 		sys_device_unregister(&xpram_sys_device);

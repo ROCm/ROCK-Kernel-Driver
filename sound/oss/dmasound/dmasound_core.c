@@ -351,9 +351,8 @@ static int mixer_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	    case SOUND_MIXER_INFO:
 		{
 		    mixer_info info;
-		    strncpy(info.id, dmasound.mach.name2, sizeof(info.id));
-		    strncpy(info.name, dmasound.mach.name2, sizeof(info.name));
-		    info.name[sizeof(info.name)-1] = 0;
+		    strlcpy(info.id, dmasound.mach.name2, sizeof(info.id));
+		    strlcpy(info.name, dmasound.mach.name2, sizeof(info.name));
 		    info.modify_counter = mixer.modify_counter;
 		    if (copy_to_user((int *)arg, &info, sizeof(info)))
 			    return -EFAULT;
@@ -904,7 +903,7 @@ static int sq_open(struct inode *inode, struct file *file)
 	  O_RDONLY and dsp1 could be opened O_WRONLY
 	*/
 
-	dmasound.minDev = MINOR(inode->i_rdev) & 0x0f;
+	dmasound.minDev = minor(inode->i_rdev) & 0x0f;
 
 	/* OK. - we should make some attempt at consistency. At least the H'ware
 	   options should be set with a valid mode.  We will make it that the LL

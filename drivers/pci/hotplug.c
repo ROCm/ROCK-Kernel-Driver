@@ -190,9 +190,7 @@ int pci_remove_device_safe(struct pci_dev *dev)
 	list_del(&dev->bus_list);
 	list_del(&dev->global_list);
 	pci_free_resources(dev);
-#ifdef CONFIG_PROC_FS
 	pci_proc_detach_device(dev);
-#endif
 	return 0;
 }
 EXPORT_SYMBOL(pci_remove_device_safe);
@@ -237,10 +235,7 @@ void pci_remove_bus_device(struct pci_dev *dev)
 		struct pci_bus *b = dev->subordinate;
 
 		pci_remove_behind_bridge(dev);
-
-#ifdef CONFIG_PROC_FS
 		pci_proc_detach_bus(b);
-#endif
 
 		list_del(&b->node);
 		kfree(b);
@@ -251,10 +246,7 @@ void pci_remove_bus_device(struct pci_dev *dev)
 	list_del(&dev->bus_list);
 	list_del(&dev->global_list);
 	pci_free_resources(dev);
-#ifdef CONFIG_PROC_FS
 	pci_proc_detach_device(dev);
-#endif
-
 	pci_put_dev(dev);
 }
 

@@ -23,53 +23,50 @@ struct tcpudphdr {
 	uint16_t dst;
 };
 
-union h_u {
-	unsigned char *raw;
-	struct tcpudphdr *tuh;
-};
-
 static int ebt_filter_ip(const struct sk_buff *skb, const struct net_device *in,
    const struct net_device *out, const void *data,
    unsigned int datalen)
 {
 	struct ebt_ip_info *info = (struct ebt_ip_info *)data;
+	union {struct iphdr iph; struct tcpudphdr ports;} u;
 
-	if (info->bitmask & EBT_IP_TOS &&
-	   FWINV(info->tos != ((*skb).nh.iph)->tos, EBT_IP_TOS))
+	if (skb_copy_bits(skb, 0, &u.iph, sizeof(u.iph)))
 		return EBT_NOMATCH;
-	if (info->bitmask & EBT_IP_PROTO) {
-		if (FWINV(info->protocol != ((*skb).nh.iph)->protocol,
-		          EBT_IP_PROTO))
-			return EBT_NOMATCH;
-		if ( info->protocol == IPPROTO_TCP ||
-		     info->protocol == IPPROTO_UDP )
-		{
-			union h_u h;
-			h.raw = skb->data + skb->nh.iph->ihl*4;
-			if (info->bitmask & EBT_IP_DPORT) {
-				uint16_t port = ntohs(h.tuh->dst);
-				if (FWINV(port < info->dport[0] ||
-				          port > info->dport[1],
-				          EBT_IP_DPORT))
-				return EBT_NOMATCH;
-			}
-			if (info->bitmask & EBT_IP_SPORT) {
-				uint16_t port = ntohs(h.tuh->src);
-				if (FWINV(port < info->sport[0] ||
-				          port > info->sport[1],
-				          EBT_IP_SPORT))
-				return EBT_NOMATCH;
-			}
-		}
-	}
+	if (info->bitmask & EBT_IP_TOS &&
+	   FWINV(info->tos != u.iph.tos, EBT_IP_TOS))
+		return EBT_NOMATCH;
 	if (info->bitmask & EBT_IP_SOURCE &&
-	   FWINV((((*skb).nh.iph)->saddr & info->smsk) !=
+	   FWINV((u.iph.saddr & info->smsk) !=
 	   info->saddr, EBT_IP_SOURCE))
 		return EBT_NOMATCH;
 	if ((info->bitmask & EBT_IP_DEST) &&
-	   FWINV((((*skb).nh.iph)->daddr & info->dmsk) !=
+	   FWINV((u.iph.daddr & info->dmsk) !=
 	   info->daddr, EBT_IP_DEST))
 		return EBT_NOMATCH;
+	if (info->bitmask & EBT_IP_PROTO) {
+		if (FWINV(info->protocol != u.iph.protocol, EBT_IP_PROTO))
+			return EBT_NOMATCH;
+		if (!(info->bitmask & EBT_IP_DPORT) &&
+		    !(info->bitmask & EBT_IP_SPORT))
+			return EBT_MATCH;
+		if (skb_copy_bits(skb, u.iph.ihl*4, &u.ports,
+		    sizeof(u.ports)))
+			return EBT_NOMATCH;
+		if (info->bitmask & EBT_IP_DPORT) {
+			u.ports.dst = ntohs(u.ports.dst);
+			if (FWINV(u.ports.dst < info->dport[0] ||
+			          u.ports.dst > info->dport[1],
+			          EBT_IP_DPORT))
+			return EBT_NOMATCH;
+		}
+		if (info->bitmask & EBT_IP_SPORT) {
+			u.ports.src = ntohs(u.ports.src);
+			if (FWINV(u.ports.src < info->sport[0] ||
+			          u.ports.src > info->sport[1],
+			          EBT_IP_SPORT))
+			return EBT_NOMATCH;
+		}
+	}
 	return EBT_MATCH;
 }
 
@@ -86,7 +83,7 @@ static int ebt_ip_check(const char *tablename, unsigned int hookmask,
 	if (info->bitmask & ~EBT_IP_MASK || info->invflags & ~EBT_IP_MASK)
 		return -EINVAL;
 	if (info->bitmask & (EBT_IP_DPORT | EBT_IP_SPORT)) {
-		if (info->bitmask & EBT_IPROTO)
+		if (info->invflags & EBT_IP_PROTO)
 			return -EINVAL;
 		if (info->protocol != IPPROTO_TCP &&
 		    info->protocol != IPPROTO_UDP)

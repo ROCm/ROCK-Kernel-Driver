@@ -1,8 +1,11 @@
 /*
  * drivers/base/core.c - core driver model code (device registration, etc)
+ *
+ * Copyright (c) 2002-3 Patrick Mochel
+ * Copyright (c) 2002-3 Open Source Development Labs
  * 
- * Copyright (c) 2002 Patrick Mochel
- *		 2002 Open Source Development Lab
+ * This file is released under the GPLv2
+ *
  */
 
 #undef DEBUG
@@ -211,7 +214,7 @@ int device_add(struct device *dev)
 		 dev->bus_id, dev->name);
 
 	/* first, register with generic layer. */
-	strncpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
+	strlcpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
 	if (parent)
 		dev->kobj.parent = &parent->kobj;
 
@@ -340,10 +343,39 @@ void device_unregister(struct device * dev)
 	put_device(dev);
 }
 
+/**
+ *	device_for_each_child - device child iterator.
+ *	@dev:	parent struct device.
+ *	@data:	data for the callback.
+ *	@fn:	function to be called for each device.
+ *
+ *	Iterate over @dev's child devices, and call @fn for each,
+ *	passing it @data. 
+ *
+ *	We check the return of @fn each time. If it returns anything
+ *	other than 0, we break out and return that value.
+ */
+int device_for_each_child(struct device * dev, void * data,
+		     int (*fn)(struct device *, void *))
+{
+	struct device * child;
+	int error = 0;
+
+	down_read(&devices_subsys.rwsem);
+	list_for_each_entry(child,&dev->children,node) {
+		if((error = fn(child,data)))
+			break;
+	}
+	up_read(&devices_subsys.rwsem);
+	return error;
+}
+
 int __init devices_init(void)
 {
 	return subsystem_register(&devices_subsys);
 }
+
+EXPORT_SYMBOL(device_for_each_child);
 
 EXPORT_SYMBOL(device_initialize);
 EXPORT_SYMBOL(device_add);

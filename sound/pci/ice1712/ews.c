@@ -155,13 +155,13 @@ static int snd_ice1712_ews88mt_chip_select(ice1712_t *ice, int chip_mask)
 }
 
 /* start callback for EWS88MT, needs to select a certain chip mask */
-static int ews88mt_ak4524_start(akm4xxx_t *ak, int chip)
+static void ews88mt_ak4524_lock(akm4xxx_t *ak, int chip)
 {
-	ice1712_t *ice = ak->chip;
+	ice1712_t *ice = ak->private_data[0];
 	unsigned char tmp;
 	/* assert AK4524 CS */
 	if (snd_ice1712_ews88mt_chip_select(ice, ~(1 << chip) & 0x0f) < 0)
-		return -EINVAL;
+		snd_printk(KERN_ERR "fatal error (ews88mt chip select)\n");
 	snd_ice1712_save_gpio_status(ice);
 	tmp = ICE1712_EWS88_SERIAL_DATA |
 		ICE1712_EWS88_SERIAL_CLOCK |
@@ -169,22 +169,21 @@ static int ews88mt_ak4524_start(akm4xxx_t *ak, int chip)
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION,
 			  ice->gpio.direction | tmp);
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ~tmp);
-	return 0;
 }
 
 /* stop callback for EWS88MT, needs to deselect chip mask */
-static void ews88mt_ak4524_stop(akm4xxx_t *ak)
+static void ews88mt_ak4524_unlock(akm4xxx_t *ak, int chip)
 {
-	ice1712_t *ice = ak->chip;
+	ice1712_t *ice = ak->private_data[0];
 	snd_ice1712_restore_gpio_status(ice);
 	udelay(1);
 	snd_ice1712_ews88mt_chip_select(ice, 0x0f);
 }
 
 /* start callback for EWX24/96 */
-static int ewx2496_ak4524_start(akm4xxx_t *ak, int chip)
+static void ewx2496_ak4524_lock(akm4xxx_t *ak, int chip)
 {
-	ice1712_t *ice = ak->chip;
+	ice1712_t *ice = ak->private_data[0];
 	unsigned char tmp;
 	snd_ice1712_save_gpio_status(ice);
 	tmp =  ICE1712_EWX2496_SERIAL_DATA |
@@ -194,25 +193,23 @@ static int ewx2496_ak4524_start(akm4xxx_t *ak, int chip)
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION,
 			  ice->gpio.direction | tmp);
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ~tmp);
-	return 0;
 }
 
 /* start callback for DMX 6fire */
-static int dmx6fire_ak4524_start(akm4xxx_t *ak, int chip)
+static void dmx6fire_ak4524_lock(akm4xxx_t *ak, int chip)
 {
-	ice1712_t *ice = ak->chip;
+	struct snd_ak4xxx_private *priv = (void *)ak->private_value[0];
+	ice1712_t *ice = ak->private_data[0];
 	unsigned char tmp;
 	snd_ice1712_save_gpio_status(ice);
-	tmp = ak->cs_mask = ak->cs_addr = (1 << chip) & ICE1712_6FIRE_AK4524_CS_MASK;
+	tmp = priv->cs_mask = priv->cs_addr = (1 << chip) & ICE1712_6FIRE_AK4524_CS_MASK;
 	tmp |= ICE1712_6FIRE_SERIAL_DATA |
 		ICE1712_6FIRE_SERIAL_CLOCK |
 		ICE1712_6FIRE_RW;
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION,
 			  ice->gpio.direction | tmp);
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ~tmp);
-	return 0;
 }
-
 
 /*
  * CS8404 interface on EWS88MT/D
@@ -328,6 +325,13 @@ static akm4xxx_t akm_ews88mt __devinitdata = {
 	.num_adcs = 8,
 	.num_dacs = 8,
 	.type = SND_AK4524,
+	.ops = {
+		.lock = ews88mt_ak4524_lock,
+		.unlock = ews88mt_ak4524_unlock
+	}
+};
+
+static struct snd_ak4xxx_private akm_ews88mt_priv __devinitdata = {
 	.caddr = 2,
 	.cif = 1, /* CIF high */
 	.data_mask = ICE1712_EWS88_SERIAL_DATA,
@@ -337,16 +341,18 @@ static akm4xxx_t akm_ews88mt __devinitdata = {
 	.cs_none = 0, /* no chip select on gpio */
 	.add_flags = ICE1712_EWS88_RW, /* set rw bit high */
 	.mask_flags = 0,
-	.ops = {
-		.start = ews88mt_ak4524_start,
-		.stop = ews88mt_ak4524_stop
-	}
 };
 
 static akm4xxx_t akm_ewx2496 __devinitdata = {
 	.num_adcs = 2,
 	.num_dacs = 2,
 	.type = SND_AK4524,
+	.ops = {
+		.lock = ewx2496_ak4524_lock
+	}
+};
+
+static struct snd_ak4xxx_private akm_ewx2496_priv __devinitdata = {
 	.caddr = 2,
 	.cif = 1, /* CIF high */
 	.data_mask = ICE1712_EWS88_SERIAL_DATA,
@@ -356,15 +362,18 @@ static akm4xxx_t akm_ewx2496 __devinitdata = {
 	.cs_none = 0,
 	.add_flags = ICE1712_EWS88_RW, /* set rw bit high */
 	.mask_flags = 0,
-	.ops = {
-		.start = ewx2496_ak4524_start
-	}
 };
 
 static akm4xxx_t akm_6fire __devinitdata = {
 	.num_adcs = 6,
 	.num_dacs = 6,
 	.type = SND_AK4524,
+	.ops = {
+		.lock = dmx6fire_ak4524_lock
+	}
+};
+
+static struct snd_ak4xxx_private akm_6fire_priv __devinitdata = {
 	.caddr = 2,
 	.cif = 1, /* CIF high */
 	.data_mask = ICE1712_6FIRE_SERIAL_DATA,
@@ -374,11 +383,7 @@ static akm4xxx_t akm_6fire __devinitdata = {
 	.cs_none = 0,
 	.add_flags = ICE1712_6FIRE_RW, /* set rw bit high */
 	.mask_flags = 0,
-	.ops = {
-		.start = dmx6fire_ak4524_start
-	}
 };
-
 
 /*
  * initialize the chip
@@ -479,17 +484,19 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
-		snd_ice1712_akm4xxx_init(ak, &akm_ews88mt, ice);
+		err = snd_ice1712_akm4xxx_init(ak, &akm_ews88mt, &akm_ews88mt_priv, ice);
 		break;
 	case ICE1712_SUBDEVICE_EWX2496:
-		snd_ice1712_akm4xxx_init(ak, &akm_ewx2496, ice);
+		err = snd_ice1712_akm4xxx_init(ak, &akm_ewx2496, &akm_ewx2496_priv, ice);
 		break;
 	case ICE1712_SUBDEVICE_DMX6FIRE:
-		snd_ice1712_akm4xxx_init(ak, &akm_6fire, ice);
+		err = snd_ice1712_akm4xxx_init(ak, &akm_6fire, &akm_6fire_priv, ice);
 		break;
+	default:
+		err = 0;
 	}
 
-	return 0;
+	return err;
 }
 
 /*
@@ -602,7 +609,7 @@ static int snd_ice1712_ews88mt_output_sense_put(snd_kcontrol_t *kcontrol, snd_ct
 static int snd_ice1712_ews88mt_input_sense_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int channel = kcontrol->id.index;
+	int channel = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	unsigned char data;
 
 	snd_assert(channel >= 0 && channel <= 7, return 0);
@@ -621,7 +628,7 @@ static int snd_ice1712_ews88mt_input_sense_get(snd_kcontrol_t *kcontrol, snd_ctl
 static int snd_ice1712_ews88mt_input_sense_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
-	int channel = kcontrol->id.index;
+	int channel = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
 	unsigned char data, ndata;
 
 	snd_assert(channel >= 0 && channel <= 7, return 0);
@@ -645,6 +652,7 @@ static snd_kcontrol_new_t snd_ice1712_ews88mt_input_sense __devinitdata = {
 	.info = snd_ice1712_ewx_io_sense_info,
 	.get = snd_ice1712_ews88mt_input_sense_get,
 	.put = snd_ice1712_ews88mt_input_sense_put,
+	.count = 8,
 };
 
 static snd_kcontrol_new_t snd_ice1712_ews88mt_output_sense __devinitdata = {
@@ -894,12 +902,13 @@ static int __devinit snd_ice1712_ews_add_controls(ice1712_t *ice)
 {
 	unsigned int idx;
 	int err;
-	snd_kcontrol_t *kctl;
 	
-	/* all terratec cards have spdif */
-	err = snd_ice1712_spdif_build_controls(ice);
-	if (err < 0)
-		return err;
+	/* all terratec cards have spdif, but cs8427 module builds it's own controls */
+	if (ice->cs8427 == NULL) {
+		err = snd_ice1712_spdif_build_controls(ice);
+		if (err < 0)
+			return err;
+	}
 
 	/* ak4524 controls */
 	switch (ice->eeprom.subvendor) {
@@ -924,13 +933,9 @@ static int __devinit snd_ice1712_ews_add_controls(ice1712_t *ice)
 		break;
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
-		for (idx = 0; idx < 8; idx++) {
-			kctl = snd_ctl_new1(&snd_ice1712_ews88mt_input_sense, ice);
-			kctl->id.index = idx;
-			err = snd_ctl_add(ice->card, kctl);
-			if (err < 0)
-				return err;
-		}
+		err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_ews88mt_input_sense, ice));
+		if (err < 0)
+			return err;
 		err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_ews88mt_output_sense, ice));
 		if (err < 0)
 			return err;

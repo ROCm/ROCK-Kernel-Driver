@@ -179,8 +179,7 @@ static void *_sparc_alloc_io(unsigned int busno, unsigned long phys,
 		tack += sizeof (struct resource);
 	}
 
-	strncpy(tack, name, XNMLN);
-	tack[XNMLN] = 0;
+	strlcpy(tack, name, XNMLN+1);
 	res->name = tack;
 
 	va = _sparc_ioremap(res, busno, phys, size);

@@ -21,7 +21,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: integrator-flash.c,v 1.7 2001/11/01 20:55:47 rmk Exp $
+   $Id: integrator-flash.c,v 1.12 2003/05/20 20:59:30 dwmw2 Exp $
 
 ======================================================================*/
 
@@ -40,8 +40,6 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/system.h>
-
-extern int parse_afs_partitions(struct mtd_info *, struct mtd_partition **);
 
 // board specific stuff - sorry, it should be in arch/arm/mach-*.
 #ifdef CONFIG_ARCH_INTEGRATOR
@@ -153,62 +151,17 @@ static void armflash_set_vpp(struct map_info *map, int on)
 }
 #endif
 
-static __u8 armflash_read8(struct map_info *map, unsigned long ofs)
-{
-	return readb(ofs + map->map_priv_2);
-}
-
-static __u16 armflash_read16(struct map_info *map, unsigned long ofs)
-{
-	return readw(ofs + map->map_priv_2);
-}
-
-static __u32 armflash_read32(struct map_info *map, unsigned long ofs)
-{
-	return readl(ofs + map->map_priv_2);
-}
-
-static void armflash_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy(to, (void *) (from + map->map_priv_2), len);
-}
-
-static void armflash_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	writeb(d, adr + map->map_priv_2);
-}
-
-static void armflash_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	writew(d, adr + map->map_priv_2);
-}
-
-static void armflash_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	writel(d, adr + map->map_priv_2);
-}
-
-static void armflash_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy((void *) (to + map->map_priv_2), from, len);
-}
 
 static struct map_info armflash_map =
 {
-	.name		= "AFS",
-	.read8		= armflash_read8,
-	.read16		= armflash_read16,
-	.read32		= armflash_read32,
-	.copy_from	= armflash_copy_from,
-	.write8		= armflash_write8,
-	.write16	= armflash_write16,
-	.write32	= armflash_write32,
-	.copy_to	= armflash_copy_to,
-	.set_vpp	= armflash_set_vpp,
+	.name =		"AFS",
+	.set_vpp =	armflash_set_vpp,
+	.phys =		FLASH_BASE,
 };
 
 static struct mtd_info *mtd;
 static struct mtd_partition *parts;
+static const char *probes[] = { "RedBoot", "afs", NULL };
 
 static int __init armflash_cfi_init(void *base, u_int size)
 {
@@ -222,7 +175,9 @@ static int __init armflash_cfi_init(void *base, u_int size)
 	 */
 	armflash_map.size       = size;
 	armflash_map.buswidth   = 4;
-	armflash_map.map_priv_2 = (unsigned long) base;
+	armflash_map.virt = (unsigned long) base;
+
+	simple_map_init(&armflash_map);
 
 	/*
 	 * Also, the CFI layer automatically works out what size
@@ -233,9 +188,9 @@ static int __init armflash_cfi_init(void *base, u_int size)
 	if (!mtd)
 		return -ENXIO;
 
-	mtd->module = THIS_MODULE;
+	mtd->owner = THIS_MODULE;
 
-	ret = parse_afs_partitions(mtd, &parts);
+	ret = parse_mtd_partitions(mtd, probes, &parts, (void *)0);
 	if (ret > 0) {
 		ret = add_mtd_partitions(mtd, parts, ret);
 		if (ret)
@@ -290,7 +245,7 @@ out:
 static void __exit armflash_exit(void)
 {
 	armflash_cfi_exit();
-	iounmap((void *)armflash_map.map_priv_2);
+	iounmap((void *)armflash_map.virt);
 	release_mem_region(FLASH_BASE, FLASH_SIZE);
 	armflash_flash_exit();
 }

@@ -80,8 +80,7 @@ group_write(struct device_driver *drv, const char *buf, size_t count)
 		if (!(end = strchr(start, delim[i])))
 			return count;
 		len = min_t(ptrdiff_t, BUS_ID_SIZE, end - start);
-		strncpy (bus_ids[i], start, len);
-		bus_ids[i][len] = '\0';
+		strlcpy (bus_ids[i], start, len);
 		argv[i] = bus_ids[i];
 		start = end + 1;
 	}

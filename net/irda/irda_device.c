@@ -532,6 +532,7 @@ int irda_device_set_mode(struct net_device* dev, int mode)
 	return ret;
 }
 
+#ifdef CONFIG_ISA
 /*
  * Function setup_dma (idev, buffer, count, mode)
  *
@@ -553,3 +554,4 @@ void setup_dma(int channel, char *buffer, int count, int mode)
 
 	release_dma_lock(flags);
 }
+#endif

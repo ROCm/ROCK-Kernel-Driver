@@ -2384,7 +2384,7 @@ static int ldn_access_total_modeselect(int host_index)
 }
 
 /* routine to display info in the proc-fs-structure (a deluxe feature) */
-static int ibmmca_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
+static int ibmmca_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t offset, int length, int inout)
 {
 	int len = 0;
 	int i, id, lun, host_index;
@@ -2392,13 +2392,13 @@ static int ibmmca_proc_info(char *buffer, char **start, off_t offset, int length
 	unsigned long flags;
 	int max_pun;
 
-	for (i = 0; hosts[i] && hosts[i]->host_no != hostno; i++);
+	for (i = 0; hosts[i] && hosts[i] != shpnt; i++);
 	
 	spin_lock_irqsave(hosts[i]->host_lock, flags);	/* Check it */
-	shpnt = hosts[i];
 	host_index = i;
 	if (!shpnt) {
-		len += sprintf(buffer + len, "\nIBM MCA SCSI: Can't find adapter for host number %d\n", hostno);
+		len += sprintf(buffer + len, "\nIBM MCA SCSI: Can't find adapter for host number %d\n",
+				shpnt->host_no);
 		return len;
 	}
 	max_pun = subsystem_maxid(host_index);
@@ -2411,7 +2411,7 @@ static int ibmmca_proc_info(char *buffer, char **start, off_t offset, int length
 #else
 	len += sprintf(buffer + len, "               Multiple LUN probing.....: No\n");
 #endif
-	len += sprintf(buffer + len, "               This Hostnumber..........: %d\n", hostno);
+	len += sprintf(buffer + len, "               This Hostnumber..........: %d\n", shpnt->host_no);
 	len += sprintf(buffer + len, "               Base I/O-Port............: 0x%x\n", (unsigned int) (IM_CMD_REG(host_index)));
 	len += sprintf(buffer + len, "               (Shared) IRQ.............: %d\n", IM_IRQ);
 	len += sprintf(buffer + len, "               Total Interrupts.........: %d\n", IBM_DS(host_index).total_interrupts);

@@ -19,9 +19,9 @@ struct linear_hash
 struct linear_private_data
 {
 	struct linear_hash	*hash_table;
-	dev_info_t		disks[MD_SB_DISKS];
 	dev_info_t		*smallest;
 	int			nr_zones;
+	dev_info_t		disks[0];
 };
 
 

@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple ROM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_rom.c,v 1.17 2001/10/02 15:05:12 dwmw2 Exp $
+ * $Id: map_rom.c,v 1.20 2003/05/28 12:51:49 dwmw2 Exp $
  */
 
 #include <linux/version.h>
@@ -12,8 +12,10 @@
 #include <asm/byteorder.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-
+#include <linux/init.h>
+#include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
+#include <linux/mtd/compatmac.h>
 
 static int maprom_read (struct mtd_info *, loff_t, size_t, size_t *, u_char *);
 static int maprom_write (struct mtd_info *, loff_t, size_t, size_t *, const u_char *);
@@ -49,7 +51,7 @@ struct mtd_info *map_rom_probe(struct map_info *map)
  	while(mtd->size & (mtd->erasesize - 1))
 		mtd->erasesize >>= 1;
 
-	MOD_INC_USE_COUNT;
+	__module_get(THIS_MODULE);
 	return mtd;
 }
 
@@ -58,7 +60,7 @@ static int maprom_read (struct mtd_info *mtd, loff_t from, size_t len, size_t *r
 {
 	struct map_info *map = (struct map_info *)mtd->priv;
 
-	map->copy_from(map, buf, from, len);
+	map_copy_from(map, buf, from, len);
 	*retlen = len;
 	return 0;
 }

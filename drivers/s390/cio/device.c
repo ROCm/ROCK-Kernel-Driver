@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.53 $
+ *   $Revision: 1.54 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -316,11 +316,63 @@ online_store (struct device *dev, const char *buf, size_t count)
 	return count;
 }
 
+static void ccw_device_unbox_recog(void *data);
+
+static ssize_t
+stlck_store(struct device *dev, const char *buf, size_t count)
+{
+	struct ccw_device *cdev = to_ccwdev(dev);
+	int ret;
+
+	/* We don't care what was piped to the attribute 8) */
+	ret = ccw_device_stlck(cdev);
+	if (ret != 0) {
+		printk(KERN_WARNING
+		       "Unconditional reserve failed on device %s, rc=%d\n",
+		       dev->bus_id, ret);
+		return ret;
+	}
+
+	/*
+	 * Device was successfully unboxed.
+	 * Trigger removal of stlck attribute and device recognition.
+	 */
+	INIT_WORK(&cdev->private->kick_work,
+		  ccw_device_unbox_recog, (void *) cdev);
+	queue_work(ccw_device_work, &cdev->private->kick_work);
+	
+	return 0;
+}
+
 static DEVICE_ATTR(chpids, 0444, chpids_show, NULL);
 static DEVICE_ATTR(pimpampom, 0444, pimpampom_show, NULL);
 static DEVICE_ATTR(devtype, 0444, devtype_show, NULL);
 static DEVICE_ATTR(cutype, 0444, cutype_show, NULL);
 static DEVICE_ATTR(online, 0644, online_show, online_store);
+static DEVICE_ATTR(steal_lock, 0200, NULL, stlck_store);
+
+/* A device has been unboxed. Start device recognition. */
+static void
+ccw_device_unbox_recog(void *data)
+{
+	struct ccw_device *cdev;
+
+	cdev = (struct ccw_device *)data;
+	if (!cdev)
+		return;
+
+	/* Remove stlck attribute. */
+	device_remove_file(&cdev->dev, &dev_attr_steal_lock);
+
+	spin_lock_irq(cdev->ccwlock);
+
+	/* Device is no longer boxed. */
+	cdev->private->state = DEV_STATE_NOT_OPER;
+
+	/* Finally start device recognition. */
+	ccw_device_recognition(cdev);
+	spin_unlock_irq(cdev->ccwlock);
+}
 
 static inline int
 subchannel_add_files (struct device *dev)
@@ -346,6 +398,19 @@ device_add_files (struct device *dev)
 		device_remove_file(dev, &dev_attr_devtype);
 	}
 	return ret;
+}
+
+/*
+ * Add a "steal lock" attribute to boxed devices.
+ * This allows to trigger an unconditional reserve ccw to eckd dasds
+ * (if the device is something else, there should be no problems more than
+ * a command reject; we don't have any means of finding out the device's
+ * type if it was boxed at ipl/attach).
+ */
+void
+ccw_device_add_stlck(struct ccw_device *cdev)
+{
+	device_create_file(&cdev->dev, &dev_attr_steal_lock);
 }
 
 /* this is a simple abstraction for device_register that sets the

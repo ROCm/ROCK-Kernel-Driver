@@ -84,8 +84,9 @@
 	movq \offset+72(%rsp),%rax
 	.endm
 			
+#define REST_SKIP 6*8			
 	.macro SAVE_REST
-	subq $6*8,%rsp
+	subq $REST_SKIP,%rsp
 	movq %rbx,5*8(%rsp) 
 	movq %rbp,4*8(%rsp) 
 	movq %r12,3*8(%rsp) 
@@ -94,7 +95,6 @@
 	movq %r15,(%rsp) 
 	.endm		
 
-#define REST_SKIP 6*8
 	.macro RESTORE_REST
 	movq (%rsp),%r15
 	movq 1*8(%rsp),%r14

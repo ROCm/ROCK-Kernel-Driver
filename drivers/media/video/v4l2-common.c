@@ -113,7 +113,7 @@ int v4l2_video_std_construct(struct v4l2_standard *vs,
 		vs->frameperiod.denominator = 25;
 		vs->framelines = 625;
 	}
-	strncpy(vs->name,name,sizeof(vs->name));
+	strlcpy(vs->name,name,sizeof(vs->name));
 	return 0;
 }
 

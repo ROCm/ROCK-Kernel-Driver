@@ -272,10 +272,6 @@ BEGIN_FTR_SECTION
 	blr
 END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 
-	/* Stop DST streams */
-	DSSALL
-	sync
-	
 	/* Turn off interrupts and data relocation. */
 	mfmsr	r7		/* Save MSR in r7 */
 	rlwinm	r4,r7,0,17,15
@@ -284,6 +280,10 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	mtmsr	r4
 	isync
 
+	/* Stop DST streams */
+	DSSALL
+	sync
+	
 	/* Get the current enable bit of the L3CR into r4 */
 	mfspr	r4,SPRN_L3CR
 	

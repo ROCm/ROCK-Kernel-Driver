@@ -8,6 +8,9 @@
 #include <linux/workqueue.h>
 #endif
 
+typedef enum {
+  reiserfs_attrs_cleared	= 0x00000001,
+} reiserfs_super_block_flags;
 
 /* struct reiserfs_super_block accessors/mutators
  * since this is a disk structure, it will always be in 
@@ -250,6 +253,8 @@ struct reiserfs_journal {
   struct reiserfs_journal_cnode *j_list_hash_table[JOURNAL_HASH_SIZE] ; /* hash table for all the real buffer heads in all 
   										the transactions */
   struct list_head j_prealloc_list;     /* list of inodes which have preallocated blocks */
+  unsigned long j_max_trans_size ;
+  unsigned long j_max_batch_size ;
 };
 
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */
@@ -436,7 +441,6 @@ struct reiserfs_sb_info
 #define REISERFS_NO_BORDER 11
 #define REISERFS_NO_UNHASHED_RELOCATION 12
 #define REISERFS_HASHED_RELOCATION 13
-#define REISERFS_TEST4 14 
 
 #define REISERFS_ATTRS 15
 
@@ -458,6 +462,7 @@ struct reiserfs_sb_info
 #define have_small_tails(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_SMALLTAIL))
 #define replay_only(s) (REISERFS_SB(s)->s_mount_opt & (1 << REPLAYONLY))
 #define reiserfs_dont_log(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_NOLOG))
+#define reiserfs_attrs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ATTRS))
 #define old_format_only(s) (REISERFS_SB(s)->s_properties & (1 << REISERFS_3_5))
 #define convert_reiserfs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_CONVERT))
 

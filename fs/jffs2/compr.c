@@ -7,14 +7,15 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: compr.c,v 1.24 2002/05/20 14:56:37 dwmw2 Exp $
+ * $Id: compr.c,v 1.26 2003/01/12 13:21:28 dwmw2 Exp $
  *
  */
 
-#ifdef __KERNEL__
+#if defined(__KERNEL__) || defined (__ECOS)
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+#include <linux/types.h>
 #else 
 #define KERN_DEBUG
 #define KERN_NOTICE

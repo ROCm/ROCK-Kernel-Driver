@@ -629,20 +629,6 @@ static void request_events(void *send_info)
 	atomic_set(&kcs_info->req_events, 1);
 }
 
-#if 0
-static int new_user(void *send_info)
-{
-	if (!try_module_get(THIS_MODULE))
-		return -EBUSY;
-	return 0;
-}
-
-static void user_left(void *send_info)
-{
-	module_put(THIS_MODULE);
-}
-#endif
-
 static int initialized = 0;
 
 /* Must be called with interrupts off and with the kcs_lock held. */

@@ -74,15 +74,12 @@ struct riscom_port {
 	long			event; /* long req'd for set_bit --RR */
 	int			timeout;
 	int			close_delay;
-	long			session;
-	long			pgrp;
 	unsigned char 		* xmit_buf;
 	int			custom_divisor;
 	int			xmit_head;
 	int			xmit_tail;
 	int			xmit_cnt;
 	struct termios          normal_termios;
-	struct termios		callout_termios;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 	struct tq_struct	tqueue;

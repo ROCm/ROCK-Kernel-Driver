@@ -288,46 +288,32 @@ exit:
 
 static void timer_notify_task(struct k_itimer *timr)
 {
-	struct siginfo info;
 	int ret;
 
-	memset(&info, 0, sizeof (info));
+	memset(&timr->sigq->info, 0, sizeof(siginfo_t));
 
 	/* Send signal to the process that owns this timer. */
-	info.si_signo = timr->it_sigev_signo;
-	info.si_errno = 0;
-	info.si_code = SI_TIMER;
-	info.si_tid = timr->it_id;
-	info.si_value = timr->it_sigev_value;
+	timr->sigq->info.si_signo = timr->it_sigev_signo;
+	timr->sigq->info.si_errno = 0;
+	timr->sigq->info.si_code = SI_TIMER;
+	timr->sigq->info.si_tid = timr->it_id;
+	timr->sigq->info.si_value = timr->it_sigev_value;
 	if (timr->it_incr)
-		info.si_sys_private = ++timr->it_requeue_pending;
+		timr->sigq->info.si_sys_private = ++timr->it_requeue_pending;
 
 	if (timr->it_sigev_notify & SIGEV_THREAD_ID & MIPS_SIGEV)
-		ret = send_sig_info(info.si_signo, &info, timr->it_process);
+		ret = send_sigqueue(timr->it_sigev_signo, timr->sigq,
+			timr->it_process);
 	else
-		ret = send_group_sig_info(info.si_signo, &info, 
-					  timr->it_process);
-	switch (ret) {
-
-	default:
+		ret = send_group_sigqueue(timr->it_sigev_signo, timr->sigq,
+			timr->it_process);
+	if (ret) {
 		/*
-		 * Signal was not sent.  May or may not need to
-		 * restart the timer.
-		 */
-		printk(KERN_WARNING "sending signal failed: %d\n", ret);
-	case 1:
-		/*
-		 * signal was not sent because of sig_ignor or,
-		 * possibly no queue memory OR will be sent but,
+		 * signal was not sent because of sig_ignor
 		 * we will not get a call back to restart it AND
 		 * it should be restarted.
 		 */
 		schedule_next_timer(timr);
-	case 0:
-		/*
-		 * all's well new signal queued
-		 */
-		break;
 	}
 }
 
@@ -379,7 +365,11 @@ static struct k_itimer * alloc_posix_timer(void)
 	struct k_itimer *tmr;
 	tmr = kmem_cache_alloc(posix_timers_cache, GFP_KERNEL);
 	memset(tmr, 0, sizeof (struct k_itimer));
-
+	tmr->it_id = (timer_t)-1;
+	if (unlikely(!(tmr->sigq = sigqueue_alloc()))) {
+		kmem_cache_free(posix_timers_cache, tmr);
+		tmr = 0;
+	}
 	return tmr;
 }
 
@@ -390,6 +380,7 @@ static void release_posix_timer(struct k_itimer *tmr)
 		idr_remove(&posix_timers_id, tmr->it_id);
 		spin_unlock_irq(&idr_lock);
 	}
+	sigqueue_free(tmr->sigq);
 	kmem_cache_free(posix_timers_cache, tmr);
 }
 

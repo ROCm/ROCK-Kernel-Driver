@@ -26,9 +26,9 @@ u_long cpuctrl_physaddr;
 u_long timer_physaddr;
 u_long apollo_model;
 
-extern void dn_sched_init(void (*handler)(int,void *,struct pt_regs *));
+extern void dn_sched_init(irqreturn_t (*handler)(int,void *,struct pt_regs *));
 extern void dn_init_IRQ(void);
-extern int dn_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
+extern int dn_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
 extern void dn_free_irq(unsigned int irq, void *dev_id);
 extern void dn_enable_irq(unsigned int);
 extern void dn_disable_irq(unsigned int);
@@ -41,12 +41,12 @@ extern void dn_dummy_waitbut(void);
 extern struct fb_info *dn_fb_init(long *);
 extern void dn_dummy_debug_init(void);
 extern void dn_dummy_video_setup(char *,int *);
-extern void dn_process_int(int irq, struct pt_regs *fp);
+extern irqreturn_t dn_process_int(int irq, struct pt_regs *fp);
 #ifdef CONFIG_HEARTBEAT
 static void dn_heartbeat(int on);
 #endif
-static void dn_timer_int(int irq,void *, struct pt_regs *);
-static void (*sched_timer_handler)(int, void *, struct pt_regs *)=NULL;
+static irqreturn_t dn_timer_int(int irq,void *, struct pt_regs *);
+static irqreturn_t (*sched_timer_handler)(int, void *, struct pt_regs *)=NULL;
 static void dn_get_model(char *model);
 static const char *apollo_models[] = {
 	"DN3000 (Otter)",
@@ -195,7 +195,7 @@ void config_apollo(void) {
 
 }		
 
-void dn_timer_int(int irq, void *dev_id, struct pt_regs *fp) {
+irqreturn_t dn_timer_int(int irq, void *dev_id, struct pt_regs *fp) {
 
 	volatile unsigned char x;
 
@@ -204,9 +204,10 @@ void dn_timer_int(int irq, void *dev_id, struct pt_regs *fp) {
 	x=*(volatile unsigned char *)(timer+3);
 	x=*(volatile unsigned char *)(timer+5);
 
+	return IRQ_HANDLED;
 }
 
-void dn_sched_init(void (*timer_routine)(int, void *, struct pt_regs *)) {
+void dn_sched_init(irqreturn_t (*timer_routine)(int, void *, struct pt_regs *)) {
 
 	/* program timer 1 */       	
 	*(volatile unsigned char *)(timer+3)=0x01;

@@ -620,6 +620,7 @@ static void wacom_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_driver wacom_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"wacom",
 	.probe =	wacom_probe,
 	.disconnect =	wacom_disconnect,

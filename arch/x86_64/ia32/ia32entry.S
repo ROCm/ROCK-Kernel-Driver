@@ -182,9 +182,9 @@ quiet_ni_syscall:
 	PTREGSCALL stub32_sigaltstack, sys32_sigaltstack
 	PTREGSCALL stub32_sigsuspend, sys32_sigsuspend
 	PTREGSCALL stub32_execve, sys32_execve
-	PTREGSCALL stub32_fork, sys32_fork
+	PTREGSCALL stub32_fork, sys_fork
 	PTREGSCALL stub32_clone, sys32_clone
-	PTREGSCALL stub32_vfork, sys32_vfork
+	PTREGSCALL stub32_vfork, sys_vfork
 	PTREGSCALL stub32_iopl, sys_iopl
 	PTREGSCALL stub32_rt_sigsuspend, sys_rt_sigsuspend
 

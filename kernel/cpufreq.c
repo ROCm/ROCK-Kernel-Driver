@@ -29,11 +29,8 @@
  * level driver of CPUFreq support, and its locking mutex. 
  * cpu_max_freq is in kHz.
  */
-struct cpufreq_driver   	*cpufreq_driver;
+static struct cpufreq_driver   	*cpufreq_driver;
 static DECLARE_MUTEX            (cpufreq_driver_sem);
-
-/* required for the proc interface, remove when that goes away */
-EXPORT_SYMBOL_GPL(cpufreq_driver);
 
 /**
  * Two notifier lists: the "policy" list is involved in the 
@@ -52,10 +49,12 @@ static DECLARE_RWSEM		(cpufreq_notifier_rwsem);
 static LIST_HEAD(cpufreq_governor_list);
 static DECLARE_MUTEX		(cpufreq_governor_sem);
 
-static struct class_interface cpufreq_interface;
-
-static int cpufreq_cpu_get(unsigned int cpu) {
+static int cpufreq_cpu_get(unsigned int cpu)
+{
 	if (cpu >= NR_CPUS)
+		return 0;
+
+	if (!cpufreq_driver)
 		return 0;
 
 	if (!try_module_get(cpufreq_driver->owner))
@@ -69,7 +68,8 @@ static int cpufreq_cpu_get(unsigned int cpu) {
 	return 1;
 }
 
-static void cpufreq_cpu_put(unsigned int cpu) {
+static void cpufreq_cpu_put(unsigned int cpu)
+{
 	kobject_put(&cpufreq_driver->policy[cpu].kobj);
 	module_put(cpufreq_driver->owner);
 }
@@ -81,7 +81,8 @@ static void cpufreq_cpu_put(unsigned int cpu) {
 /**
  * cpufreq_parse_governor - parse a governor string
  */
-int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor)
+int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
+				struct cpufreq_governor **governor)
 {
 	if (!strnicmp(str_governor, "performance", CPUFREQ_NAME_LEN)) {
 		*policy = CPUFREQ_POLICY_PERFORMANCE;
@@ -110,24 +111,8 @@ int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpu
 EXPORT_SYMBOL_GPL(cpufreq_parse_governor);
 
 
-/* forward declarations */
-static int cpufreq_add_dev (struct class_device * dev);
-static void cpufreq_remove_dev (struct class_device * dev);
-
 /* drivers/base/cpu.c */
-extern struct device_class cpu_devclass;
-
-static struct class_interface cpufreq_interface = {
-        .class =	&cpu_class,
-        .add =		&cpufreq_add_dev,
-        .remove =	&cpufreq_remove_dev,
-};
-
-static inline int to_cpu_nr (struct class_device *dev)
-{
-	struct sys_device * cpu_sys_dev = container_of(dev->dev, struct sys_device, dev);
-	return (cpu_sys_dev->id);
-}
+extern struct sysdev_class cpu_sysdev_class;
 
 
 /**
@@ -230,7 +215,8 @@ static ssize_t show_scaling_driver (struct cpufreq_policy * policy, char *buf)
 /**
  * show_scaling_available_governors - show the available CPUfreq governors
  */
-static ssize_t show_scaling_available_governors(struct cpufreq_policy * policy, char *buf)
+static ssize_t show_scaling_available_governors (struct cpufreq_policy * policy,
+				char *buf)
 {
 	ssize_t i = 0;
 	struct cpufreq_governor *t;
@@ -327,9 +313,9 @@ static struct kobj_type ktype_cpufreq = {
  *
  * Adds the cpufreq interface for a CPU device. 
  */
-static int cpufreq_add_dev (struct class_device * class_dev)
+static int cpufreq_add_dev (struct sys_device * sys_dev)
 {
-	unsigned int cpu = to_cpu_nr(class_dev);
+	unsigned int cpu = sys_dev->id;
 	int ret = 0;
 	struct cpufreq_policy new_policy;
 	struct cpufreq_policy *policy;
@@ -354,15 +340,13 @@ static int cpufreq_add_dev (struct class_device * class_dev)
 	memcpy(&new_policy, 
 	       policy, 
 	       sizeof(struct cpufreq_policy));
-	class_set_devdata(class_dev, policy);
 	up(&cpufreq_driver_sem);
 
 	init_MUTEX(&policy->lock);
 	/* prepare interface data */
-	policy->kobj.parent = &class_dev->kobj;
+	policy->kobj.parent = &sys_dev->kobj;
 	policy->kobj.ktype = &ktype_cpufreq;
-//	policy->dev = dev->dev;
-	strncpy(policy->kobj.name, "cpufreq", KOBJ_NAME_LEN);
+	strlcpy(policy->kobj.name, "cpufreq", KOBJ_NAME_LEN);
 
 	ret = kobject_register(&policy->kobj);
 	if (ret)
@@ -392,12 +376,12 @@ static int cpufreq_add_dev (struct class_device * class_dev)
  *
  * Removes the cpufreq interface for a CPU device.
  */
-static void cpufreq_remove_dev (struct class_device * class_dev)
+static int cpufreq_remove_dev (struct sys_device * sys_dev)
 {
-	unsigned int cpu = to_cpu_nr(class_dev);
+	unsigned int cpu = sys_dev->id;
 
 	if (!kobject_get(&cpufreq_driver->policy[cpu].kobj))
-		return;
+		return -EFAULT;
 
 	down(&cpufreq_driver_sem);
 	if ((cpufreq_driver->target) && 
@@ -417,8 +401,16 @@ static void cpufreq_remove_dev (struct class_device * class_dev)
 
 	up(&cpufreq_driver_sem);
 	kobject_put(&cpufreq_driver->policy[cpu].kobj);
-	return;
+	return 0;
 }
+
+static int cpufreq_restore(struct sys_device *);
+
+static struct sysdev_driver cpufreq_sysdev_driver = {
+	.add		= cpufreq_add_dev,
+	.remove		= cpufreq_remove_dev,
+	.restore	= cpufreq_restore,
+};
 
 
 /*********************************************************************
@@ -839,7 +831,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 
 	memset(cpufreq_driver->policy, 0, NR_CPUS * sizeof(struct cpufreq_policy));
 
-	return class_interface_register(&cpufreq_interface);
+	return sysdev_driver_register(&cpu_sysdev_class,&cpufreq_sysdev_driver);
 }
 EXPORT_SYMBOL_GPL(cpufreq_register_driver);
 
@@ -857,7 +849,7 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 	if (!cpufreq_driver || (driver != cpufreq_driver))
 		return -EINVAL;
 
-	class_interface_unregister(&cpufreq_interface);
+	sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);
 
 	down(&cpufreq_driver_sem);
 	kfree(cpufreq_driver->policy);
@@ -870,41 +862,34 @@ EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
 
 
 #ifdef CONFIG_PM
+
 /**
  *	cpufreq_restore - restore the CPU clock frequency after resume
  *
  *	Restore the CPU clock frequency so that our idea of the current
  *	frequency reflects the actual hardware.
  */
-int cpufreq_restore(void)
+static int cpufreq_restore(struct sys_device * sysdev)
 {
-	struct cpufreq_policy policy;
-	unsigned int i;
+	int cpu = sysdev->id;
 	unsigned int ret = 0;
+	struct cpufreq_policy policy;
 
-	if (in_interrupt())
-		panic("cpufreq_restore() called from interrupt context!");
-
-	if (!try_module_get(cpufreq_driver->owner))
-		goto error_out;
-
-	for (i=0;i<NR_CPUS;i++) {
-		if (!cpu_online(i) || !cpufreq_cpu_get(i))
-			continue;
-
+	if (cpu_online(cpu) && cpufreq_cpu_get(cpu)) {
 		down(&cpufreq_driver_sem);
-		memcpy(&policy, &cpufreq_driver->policy[i], sizeof(struct cpufreq_policy));
+		memcpy(&policy, &cpufreq_driver->policy[cpu], 
+		       sizeof(struct cpufreq_policy));
 		up(&cpufreq_driver_sem);
-		ret += cpufreq_set_policy(&policy);
-
-		cpufreq_cpu_put(i);
+		ret = cpufreq_set_policy(&policy);
+		cpufreq_cpu_put(cpu);
 	}
 
-	module_put(cpufreq_driver->owner);
- error_out:
 	return ret;
 }
-EXPORT_SYMBOL_GPL(cpufreq_restore);
+
 #else
-#define cpufreq_restore() do {} while (0)
+static int cpufreq_restore(struct sys_device * sysdev)
+{
+	return 0;
+}
 #endif /* CONFIG_PM */

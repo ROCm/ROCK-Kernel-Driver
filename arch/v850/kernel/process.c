@@ -1,7 +1,7 @@
 /*
  * arch/v850/kernel/process.c -- Arch-dependent process handling
  *
- *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
  *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
@@ -198,14 +198,6 @@ int sys_execve (char *name, char **argv, char **envp, struct pt_regs *regs)
 	}
 
 	return error;
-}
-
-/* This is the common part of the various fork-like system calls (which
-   are in entry.S).  */
-int fork_common (int flags, unsigned long new_sp, struct pt_regs *regs)
-{
-	struct task_struct *p = do_fork (flags, new_sp, regs, 0, 0, 0);
-	return IS_ERR (p) ? PTR_ERR (p) : p->pid;
 }
 
 

@@ -1363,16 +1363,15 @@ static int __init ip_auto_config_setup(char *addrs)
 			case 4:
 				if ((dp = strchr(ip, '.'))) {
 					*dp++ = '\0';
-					strncpy(system_utsname.domainname, dp, __NEW_UTS_LEN);
-					system_utsname.domainname[__NEW_UTS_LEN] = '\0';
+					strlcpy(system_utsname.domainname, dp,
+						sizeof(system_utsname.domainname));
 				}
-				strncpy(system_utsname.nodename, ip, __NEW_UTS_LEN);
-				system_utsname.nodename[__NEW_UTS_LEN] = '\0';
+				strlcpy(system_utsname.nodename, ip,
+					sizeof(system_utsname.nodename));
 				ic_host_name_set = 1;
 				break;
 			case 5:
-				strncpy(user_dev_name, ip, IFNAMSIZ);
-				user_dev_name[IFNAMSIZ-1] = '\0';
+				strlcpy(user_dev_name, ip, sizeof(user_dev_name));
 				break;
 			case 6:
 				ic_proto_name(ip);

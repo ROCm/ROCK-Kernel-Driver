@@ -232,24 +232,28 @@ static int delta_spdif_stream_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontro
 /*
  * AK4524 on Delta 44 and 66 to choose the chip mask
  */
-static int delta_ak4524_start(akm4xxx_t *ak, int chip)
+static void delta_ak4524_lock(akm4xxx_t *ak, int chip)
 {
-	snd_ice1712_save_gpio_status(ak->chip);
-	ak->cs_mask =
-	ak->cs_addr = chip == 0 ? ICE1712_DELTA_CODEC_CHIP_A :
-				  ICE1712_DELTA_CODEC_CHIP_B;
-	return 0;
+        struct snd_ak4xxx_private *priv = (void *)ak->private_value[0];
+        ice1712_t *ice = ak->private_data[0];
+
+	snd_ice1712_save_gpio_status(ice);
+	priv->cs_mask =
+	priv->cs_addr = chip == 0 ? ICE1712_DELTA_CODEC_CHIP_A :
+				    ICE1712_DELTA_CODEC_CHIP_B;
 }
 
 /*
  * AK4524 on Delta1010LT to choose the chip address
  */
-static int delta1010lt_ak4524_start(akm4xxx_t *ak, int chip)
+static void delta1010lt_ak4524_lock(akm4xxx_t *ak, int chip)
 {
-	snd_ice1712_save_gpio_status(ak->chip);
-	ak->cs_mask = ICE1712_DELTA_1010LT_CS;
-	ak->cs_addr = chip << 4;
-	return 0;
+        struct snd_ak4xxx_private *priv = (void *)ak->private_value[0];
+        ice1712_t *ice = ak->private_data[0];
+
+	snd_ice1712_save_gpio_status(ice);
+	priv->cs_mask = ICE1712_DELTA_1010LT_CS;
+	priv->cs_addr = chip << 4;
 }
 
 /*
@@ -258,7 +262,7 @@ static int delta1010lt_ak4524_start(akm4xxx_t *ak, int chip)
 static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 {
 	unsigned char tmp, tmp2;
-	ice1712_t *ice = ak->chip;
+	ice1712_t *ice = ak->private_data[0];
 
 	if (rate == 0)	/* no hint - S/PDIF input is master, simply return */
 		return;
@@ -275,14 +279,14 @@ static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 		return;
 
 	/* do it again */
-	snd_ice1712_akm4xxx_reset(ak, 1);
+	snd_akm4xxx_reset(ak, 1);
 	down(&ice->gpio_mutex);
 	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA) & ~ICE1712_DELTA_DFS;
 	if (rate > 48000)
 		tmp |= ICE1712_DELTA_DFS;
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	up(&ice->gpio_mutex);
-	snd_ice1712_akm4xxx_reset(ak, 0);
+	snd_akm4xxx_reset(ak, 0);
 }
 
 
@@ -330,6 +334,12 @@ static akm4xxx_t akm_audiophile __devinitdata = {
 	.type = SND_AK4528,
 	.num_adcs = 2,
 	.num_dacs = 2,
+	.ops = {
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
+static struct snd_ak4xxx_private akm_audiophile_priv __devinitdata = {
 	.caddr = 2,
 	.cif = 0,
 	.data_mask = ICE1712_DELTA_AP_DOUT,
@@ -339,15 +349,18 @@ static akm4xxx_t akm_audiophile __devinitdata = {
 	.cs_none = 0,
 	.add_flags = ICE1712_DELTA_AP_CS_DIGITAL,
 	.mask_flags = 0,
-	.ops = {
-		.set_rate_val = delta_ak4524_set_rate_val
-	}
 };
 
 static akm4xxx_t akm_delta410 __devinitdata = {
 	.type = SND_AK4529,
 	.num_adcs = 2,
 	.num_dacs = 8,
+	.ops = {
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
+static struct snd_ak4xxx_private akm_delta410_priv __devinitdata = {
 	.caddr = 0,
 	.cif = 0,
 	.data_mask = ICE1712_DELTA_AP_DOUT,
@@ -357,15 +370,19 @@ static akm4xxx_t akm_delta410 __devinitdata = {
 	.cs_none = 0,
 	.add_flags = ICE1712_DELTA_AP_CS_DIGITAL,
 	.mask_flags = 0,
-	.ops = {
-		.set_rate_val = delta_ak4524_set_rate_val
-	}
 };
 
 static akm4xxx_t akm_delta1010lt __devinitdata = {
 	.type = SND_AK4524,
 	.num_adcs = 8,
 	.num_dacs = 8,
+	.ops = {
+		.lock = delta1010lt_ak4524_lock,
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
+static struct snd_ak4xxx_private akm_delta1010lt_priv __devinitdata = {
 	.caddr = 2,
 	.cif = 0, /* the default level of the CIF pin from AK4524 */
 	.data_mask = ICE1712_DELTA_1010LT_DOUT,
@@ -375,16 +392,19 @@ static akm4xxx_t akm_delta1010lt __devinitdata = {
 	.cs_none = ICE1712_DELTA_1010LT_CS_NONE,
 	.add_flags = 0,
 	.mask_flags = 0,
-	.ops = {
-		.start = delta1010lt_ak4524_start,
-		.set_rate_val = delta_ak4524_set_rate_val
-	}
 };
 
 static akm4xxx_t akm_delta44 __devinitdata = {
 	.type = SND_AK4524,
 	.num_adcs = 4,
 	.num_dacs = 4,
+	.ops = {
+		.lock = delta_ak4524_lock,
+		.set_rate_val = delta_ak4524_set_rate_val
+	}
+};
+
+static struct snd_ak4xxx_private akm_delta44_priv __devinitdata = {
 	.caddr = 2,
 	.cif = 0, /* the default level of the CIF pin from AK4524 */
 	.data_mask = ICE1712_DELTA_CODEC_SERIAL_DATA,
@@ -394,10 +414,6 @@ static akm4xxx_t akm_delta44 __devinitdata = {
 	.cs_none = 0,
 	.add_flags = 0,
 	.mask_flags = 0,
-	.ops = {
-		.start = delta_ak4524_start,
-		.set_rate_val = delta_ak4524_set_rate_val
-	}
 };
 
 static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
@@ -466,24 +482,24 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
-		snd_ice1712_akm4xxx_init(ak, &akm_audiophile, ice);
+		err = snd_ice1712_akm4xxx_init(ak, &akm_audiophile, &akm_audiophile_priv, ice);
 		break;
 	case ICE1712_SUBDEVICE_DELTA410:
-		snd_ice1712_akm4xxx_init(ak, &akm_delta410, ice);
+		err = snd_ice1712_akm4xxx_init(ak, &akm_delta410, &akm_delta410_priv, ice);
 		break;
 	case ICE1712_SUBDEVICE_DELTA1010LT:
-		snd_ice1712_akm4xxx_init(ak, &akm_delta1010lt, ice);
+		err = snd_ice1712_akm4xxx_init(ak, &akm_delta1010lt, &akm_delta1010lt_priv, ice);
 		break;
 	case ICE1712_SUBDEVICE_DELTA66:
 	case ICE1712_SUBDEVICE_DELTA44:
-		snd_ice1712_akm4xxx_init(ak, &akm_delta44, ice);
+		err = snd_ice1712_akm4xxx_init(ak, &akm_delta44, &akm_delta44_priv, ice);
 		break;
 	default:
 		snd_BUG();
 		return -EINVAL;
 	}
 
-	return 0;
+	return err;
 }
 
 
@@ -534,9 +550,6 @@ static int __devinit snd_ice1712_delta_add_controls(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA1010:
 	case ICE1712_SUBDEVICE_DELTADIO2496:
 	case ICE1712_SUBDEVICE_DELTA66:
-	case ICE1712_SUBDEVICE_AUDIOPHILE:
-	case ICE1712_SUBDEVICE_DELTA410:
-	case ICE1712_SUBDEVICE_DELTA1010LT:
 		err = snd_ice1712_spdif_build_controls(ice);
 		if (err < 0)
 			return err;

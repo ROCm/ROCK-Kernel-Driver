@@ -40,7 +40,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.init_dma	= init_dma_amd74xx,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
 		.extra		= 0
 	},{	/* 1 */
@@ -53,7 +53,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.init_dma	= init_dma_amd74xx,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
 		.extra		= 0
 	},{	/* 2 */
@@ -66,7 +66,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.init_dma	= init_dma_amd74xx,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
 		.extra		= 0
 	},{	/* 3 */
@@ -79,7 +79,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.init_dma	= init_dma_amd74xx,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
 		.extra		= 0
 	},{	/* 4 */
@@ -92,7 +92,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.init_dma	= init_dma_amd74xx,
 		.autodma	= AUTODMA,
 		.channels	= 2,
-		.enablebits	= {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
 		.extra		= 0
 	},
@@ -106,7 +106,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.init_dma	= init_dma_amd74xx,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
+		.enablebits	= {{0x50,0x02,0x02}, {0x50,0x01,0x01}},
 		.bootable	= ON_BOARD,
 		.extra		= 0,
 	},
@@ -120,7 +120,7 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.init_dma	= init_dma_amd74xx,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
+		.enablebits	= {{0x50,0x02,0x02}, {0x50,0x01,0x01}},
 		.bootable	= ON_BOARD,
 		.extra		= 0,
 	},

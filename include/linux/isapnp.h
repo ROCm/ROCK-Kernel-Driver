@@ -115,8 +115,8 @@ void *isapnp_alloc(long size);
 int isapnp_proc_init(void);
 int isapnp_proc_done(void);
 #else
-static inline isapnp_proc_init(void) { return 0; }
-static inline isapnp_proc_done(void) { return 0; }
+static inline int isapnp_proc_init(void) { return 0; }
+static inline int isapnp_proc_done(void) { return 0; }
 #endif
 
 /* init/main.c */

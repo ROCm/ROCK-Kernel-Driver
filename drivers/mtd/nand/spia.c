@@ -1,9 +1,14 @@
 /*
  *  drivers/mtd/nand/spia.c
  *
- *  Copyright (C) 2000 Steven J. Hill (sjhill@cotw.com)
+ *  Copyright (C) 2000 Steven J. Hill (sjhill@realitydiluted.com)
  *
- * $Id: spia.c,v 1.12 2001/10/02 15:05:14 dwmw2 Exp $
+ *
+ *	10-29-2001 TG	change to support hardwarespecific access
+ *			to controllines	(due to change in nand.c)
+ *			page_cache added
+ *
+ * $Id: spia.c,v 1.19 2003/04/20 07:24:40 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -68,6 +73,7 @@ __setup("spia_peddr=",spia_peddr);
 const static struct mtd_partition partition_info[] = {
 	{
 		.name	= "SPIA flash partition 1",
+		.offset	= 0,
 		.size	= 2*1024*1024
 	},
 	{
@@ -77,6 +83,25 @@ const static struct mtd_partition partition_info[] = {
 	}
 };
 #define NUM_PARTITIONS 2
+
+
+/* 
+ *	hardware specific access to control-lines
+*/
+void spia_hwcontrol(int cmd){
+
+    switch(cmd){
+
+	case NAND_CTL_SETCLE: (*(volatile unsigned char *) (spia_io_base + spia_pedr)) |=  0x01; break;
+	case NAND_CTL_CLRCLE: (*(volatile unsigned char *) (spia_io_base + spia_pedr)) &= ~0x01; break;
+
+	case NAND_CTL_SETALE: (*(volatile unsigned char *) (spia_io_base + spia_pedr)) |=  0x02; break;
+	case NAND_CTL_CLRALE: (*(volatile unsigned char *) (spia_io_base + spia_pedr)) &= ~0x02; break;
+
+	case NAND_CTL_SETNCE: (*(volatile unsigned char *) (spia_io_base + spia_pedr)) &= ~0x04; break;
+	case NAND_CTL_CLRNCE: (*(volatile unsigned char *) (spia_io_base + spia_pedr)) |=  0x04; break;
+    }
+}
 
 /*
  * Main initialization routine
@@ -110,11 +135,12 @@ int __init spia_init (void)
 	(*(volatile unsigned char *) (spia_io_base + spia_peddr)) = 0x07;
 
 	/* Set address of NAND IO lines */
-	this->IO_ADDR = spia_fio_base;
-	this->CTRL_ADDR = spia_io_base + spia_pedr;
-	this->CLE = 0x01;
-	this->ALE = 0x02;
-	this->NCE = 0x04;
+	this->IO_ADDR_R = spia_fio_base;
+	this->IO_ADDR_W = spia_fio_base;
+	/* Set address of hardware control function */
+	this->hwcontrol = spia_hwcontrol;
+	/* 15 us command delay time */
+	this->chip_delay = 15;		
 
 	/* Scan to find existence of the device */
 	if (nand_scan (spia_mtd)) {
@@ -159,5 +185,5 @@ module_exit(spia_cleanup);
 #endif
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Steven J. Hill <sjhill@cotw.com");
+MODULE_AUTHOR("Steven J. Hill <sjhill@realitydiluted.com");
 MODULE_DESCRIPTION("Board-specific glue layer for NAND flash on SPIA board");

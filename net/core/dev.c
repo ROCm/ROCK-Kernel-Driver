@@ -1385,8 +1385,10 @@ static __inline__ void skb_bond(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 
-	if (dev->master)
+	if (dev->master) {
+		skb->real_dev = skb->dev;
 		skb->dev = dev->master;
+	}
 }
 
 static void net_tx_action(struct softirq_action *h)
@@ -2754,6 +2756,8 @@ void netdev_run_todo(void)
 
 		dev->next = NULL;
 
+		netdev_unregister_sysfs(dev);
+
 		netdev_wait_allrefs(dev);
 
 		BUG_ON(atomic_read(&dev->refcnt));
@@ -2842,8 +2846,6 @@ int unregister_netdevice(struct net_device *dev)
 
 	free_divert_blk(dev);
 
-	netdev_unregister_sysfs(dev);
-
 	spin_lock(&unregister_todo_lock);
 	dev->next = unregister_todo;
 	unregister_todo = dev;
@@ -2860,10 +2862,6 @@ int unregister_netdevice(struct net_device *dev)
  *	present) and leaves us with a valid list of present and active devices.
  *
  */
-
-extern void net_device_init(void);
-extern void ip_auto_config(void);
-
 
 /*
  *       This is called single threaded during boot, so no need
@@ -2997,11 +2995,6 @@ static int __init net_dev_init(void)
 #ifdef CONFIG_NET_SCHED
 	pktsched_init();
 #endif
-	/*
-	 *	Initialise network devices
-	 */
-
-	net_device_init();
 	rc = 0;
 out:
 	return rc;

@@ -45,11 +45,11 @@ static int prepare_tx(struct net_device *dev, struct archdr *pkt, int length,
 
 struct ArcProto rawmode_proto =
 {
-	'r',
-	XMTU,
-	rx,
-	build_header,
-	prepare_tx
+	.suffix		= 'r',
+	.mtu		= XMTU,
+	.rx		= rx,
+	.build_header	= build_header,
+	.prepare_tx	= prepare_tx,
 };
 
 

@@ -32,9 +32,7 @@ $(warning kbuild: $(obj)/Makefile - Usage of O_TARGET := $(O_TARGET) is obsolete
 endif
 
 ifdef L_TARGET
-ifneq ($(L_TARGET),lib.a)
-$(warning kbuild: $(obj)/Makefile - L_TARGET := $(L_TARGET) target shall be renamed to lib.a. Please fix!)
-endif
+$(error kbuild: $(obj)/Makefile - Use of L_TARGET is replaced by lib-y in 2.5. Please fix!)
 endif
 
 ifdef list-multi
@@ -47,21 +45,19 @@ endif
 
 # ===========================================================================
 
-# If a Makefile does not define a L_TARGET, link an object called "built-in.o"
-
-ifdef L_TARGET
-L_TARGET := $(obj)/$(L_TARGET)
-else
-ifneq ($(strip $(obj-y) $(obj-m) $(obj-n) $(obj-)),)
-O_TARGET := $(obj)/built-in.o
+ifneq ($(strip $(lib-y) $(lib-m) $(lib-n) $(lib-)),)
+lib-target := $(obj)/lib.a
 endif
+
+ifneq ($(strip $(obj-y) $(obj-m) $(obj-n) $(obj-) $(lib-target)),)
+builtin-target := $(obj)/built-in.o
 endif
 
 # We keep a list of all modules in $(MODVERDIR)
 
 touch-module = @echo $(@:.o=.ko) > $(MODVERDIR)/$(@F:.o=.mod)
 
-__build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(extra-y)) \
+__build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
 	 $(if $(KBUILD_MODULES),$(obj-m)) \
 	 $(subdir-ym) $(always)
 	@:
@@ -203,7 +199,8 @@ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S FORCE
 	$(call if_changed_dep,as_o_S)
 
-targets += $(real-objs-y) $(real-objs-m) $(extra-y) $(MAKECMDGOALS) $(always)
+targets += $(real-objs-y) $(real-objs-m) $(lib-y)
+targets += $(extra-y) $(MAKECMDGOALS) $(always)
 
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
@@ -214,30 +211,30 @@ $(sort $(subdir-obj-y)): $(subdir-ym) ;
 #
 # Rule to compile a set of .o files into one .o file
 #
-ifdef O_TARGET
+ifdef builtin-target
 quiet_cmd_link_o_target = LD      $@
-# If the list of objects to link is empty, just create an empty O_TARGET
+# If the list of objects to link is empty, just create an empty built-in.o
 cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      $(LD) $(ld_flags) -r -o $@ $(filter $(obj-y), $^),\
 		      rm -f $@; $(AR) rcs $@)
 
-$(O_TARGET): $(obj-y) FORCE
+$(builtin-target): $(obj-y) FORCE
 	$(call if_changed,link_o_target)
 
-targets += $(O_TARGET)
-endif # O_TARGET
+targets += $(builtin-target)
+endif # builtin-target
 
 #
 # Rule to compile a set of .o files into one .a file
 #
-ifdef L_TARGET
+ifdef lib-target
 quiet_cmd_link_l_target = AR      $@
-cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
+cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(lib-y)
 
-$(L_TARGET): $(obj-y) FORCE
+$(lib-target): $(lib-y) FORCE
 	$(call if_changed,link_l_target)
 
-targets += $(L_TARGET)
+targets += $(lib-target)
 endif
 
 #

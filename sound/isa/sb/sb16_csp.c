@@ -393,8 +393,7 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 				return err;
 
 			/* fill in codec header */
-			strncpy(p->codec_name, info.codec_name, sizeof(p->codec_name) - 1);
-			p->codec_name[sizeof(p->codec_name) - 1] = 0;
+			strlcpy(p->codec_name, info.codec_name, sizeof(p->codec_name));
 			p->func_nr = func_nr;
 			p->mode = LE_SHORT(funcdesc_h.flags_play_rec);
 			switch (LE_SHORT(funcdesc_h.VOC_type)) {

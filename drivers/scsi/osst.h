@@ -530,7 +530,7 @@ typedef struct {
 
 /* The OnStream tape drive descriptor */
 typedef struct {
-  struct Scsi_Device_Template *driver;
+  struct scsi_driver *driver;
   unsigned capacity;
   Scsi_Device* device;
   struct semaphore lock;       /* for serialization */
@@ -555,8 +555,6 @@ typedef struct {
   /* Mode characteristics */
   ST_mode modes[ST_NBR_MODES];
   int current_mode;
-  struct device driverfs_dev_r[ST_NBR_MODES];
-  struct device driverfs_dev_n[ST_NBR_MODES];
 
   /* Status variables */
   int partition;

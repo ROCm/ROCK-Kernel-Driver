@@ -1,4 +1,4 @@
-# $Id: Config.in,v 1.74 2002/04/23 13:52:14 mag Exp $
+# $Id: Kconfig,v 1.3 2003/05/28 11:02:23 dwmw2 Exp $
 
 menu "Memory Technology Devices (MTD)"
 
@@ -199,13 +199,28 @@ config NFTL
 	  not use it.
 
 config NFTL_RW
-	bool "Write support for NFTL (BETA)"
+	bool "Write support for NFTL"
 	depends on NFTL
 	help
-	  If you're lucky, this will actually work. Don't whinge if it
-	  doesn't.  Send mail to the MTD mailing list
-	  <linux-mtd@lists.infradead.org> if you want to help to make it more
-	  reliable.
+	  Support for writing to the NAND Flash Translation Layer, as used
+	  on the DiskOnChip.
+
+config INFTL
+	tristate "INFTL (Inverse NAND Flash Translation Layer) support"
+	depends on MTD
+	---help---
+	  This provides support for the Inverse NAND Flash Translation 
+	  Layer which is used on M-Systems' newer DiskOnChip devices. It
+	  uses a kind of pseudo-file system on a flash device to emulate
+	  a block device with 512-byte sectors, on top of which you put
+	  a 'normal' file system.
+
+	  You may find that the algorithms used in this code are patented
+	  unless you live in the Free World where software patents aren't
+	  legal - in the USA you are only permitted to use this on DiskOnChip
+	  hardware, although under the terms of the GPL you're obviously
+	  permitted to copy, modify and distribute the code as you wish. Just
+	  not use it.
 
 source "drivers/mtd/chips/Kconfig"
 

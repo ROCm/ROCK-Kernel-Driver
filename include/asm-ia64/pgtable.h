@@ -209,6 +209,10 @@ ia64_phys_addr_valid (unsigned long addr)
 #define VMALLOC_VMADDR(x)	((unsigned long)(x))
 #define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
 
+/* fs/proc/kcore.c */
+#define	kc_vaddr_to_offset(v) ((v) - 0xA000000000000000)
+#define	kc_offset_to_vaddr(o) ((o) + 0xA000000000000000)
+
 /*
  * Conversion functions: convert page frame number (pfn) and a protection value to a page
  * table entry (pte).

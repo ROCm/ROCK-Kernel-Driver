@@ -59,7 +59,7 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #include "../macmodes.h"
@@ -93,7 +93,7 @@
 #define DBG(fmt, args...)
 #endif
 
-#ifndef CONFIG_ALL_PPC
+#ifndef CONFIG_PPC_PMAC
 /* default mode */
 static struct fb_var_screeninfo default_var __initdata = {
 	/* 640x480, 60 Hz, Non-Interlaced (25.175 MHz dotclock) */
@@ -103,7 +103,7 @@ static struct fb_var_screeninfo default_var __initdata = {
 	0, FB_VMODE_NONINTERLACED
 };
 
-#else /* CONFIG_ALL_PPC */
+#else /* CONFIG_PPC_PMAC */
 /* default to 1024x768 at 75Hz on PPC - this will work
  * on the iMac, the usual 640x480 @ 60Hz doesn't. */
 static struct fb_var_screeninfo default_var = {
@@ -114,7 +114,7 @@ static struct fb_var_screeninfo default_var = {
 	FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	FB_VMODE_NONINTERLACED
 };
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 /* default modedb mode */
 /* 640x480, 60 Hz, Non-Interlaced (25.172 MHz dotclock) */
@@ -259,7 +259,7 @@ static int  nomtrr __initdata = 0;
 
 static char *mode_option __initdata = NULL;
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 static int default_vmode __initdata = VMODE_1024_768_60;
 static int default_cmode __initdata = CMODE_8;
 #endif
@@ -1434,7 +1434,7 @@ aty128fb_setup(char *options)
 			continue;
 		}
 #endif
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 		/* vmode and cmode deprecated */
 		if (!strncmp(this_opt, "vmode:", 6)) {
 			unsigned int vmode = simple_strtoul(this_opt+6, NULL, 0);
@@ -1459,7 +1459,7 @@ aty128fb_setup(char *options)
 			}
 			continue;
 		}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 		mode_option = this_opt;
 	}
 	return 0;
@@ -1543,7 +1543,7 @@ aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 
 	var = default_var;
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	if (_machine == _MACH_Pmac) {
 		if (mode_option) {
 			if (!mac_find_mode(&var, info, mode_option, 8))
@@ -1582,7 +1582,7 @@ aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 				var = default_var;
 		}
 	} else
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 	{
 		if (fb_find_mode(&var, info, mode_option, NULL, 0,
 				 &defaultmode, 8) == 0)
@@ -1872,7 +1872,7 @@ aty128_get_pllinfo(struct aty128fb_par *par, void *bios)
 static void __init
 aty128_timings(struct aty128fb_par *par)
 {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 	/* instead of a table lookup, assume OF has properly
 	 * setup the PLL registers and use their values
 	 * to set the XCLK values and reference divider values */
@@ -1886,7 +1886,7 @@ aty128_timings(struct aty128fb_par *par)
 	if (!par->constants.dotclock)
 		par->constants.dotclock = 2950;
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 	x_mpll_ref_fb_div = aty_ld_pll(X_MPLL_REF_FB_DIV);
 	xclk_cntl = aty_ld_pll(XCLK_CNTL) & 0x7;
 	Nx = (x_mpll_ref_fb_div & 0x00ff00) >> 8;

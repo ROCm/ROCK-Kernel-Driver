@@ -2671,7 +2671,7 @@ int bus_in(struct bttv *btv, int bit)
 static int tea5757_read(struct bttv *btv)
 {
 	int value = 0;
-	long timeout;
+	unsigned long timeout;
 	int i;
 	
 	/* better safe than sorry */

@@ -22,6 +22,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 
 	if (hwdev == NULL || hwdev->dma_mask != 0xffffffff)
 		gfp |= GFP_DMA;
+
 #ifdef CONFIG_NOT_COHERENT_CACHE
 	ret = consistent_alloc(gfp, size, dma_handle);
 #else
@@ -30,7 +31,9 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 
 	if (ret != NULL) {
 		memset(ret, 0, size);
+#ifndef CONFIG_NOT_COHERENT_CACHE
 		*dma_handle = virt_to_bus(ret);
+#endif
 	}
 	return ret;
 }

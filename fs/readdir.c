@@ -59,7 +59,7 @@ struct old_linux_dirent {
 
 struct readdir_callback {
 	struct old_linux_dirent __user * dirent;
-	int count;
+	int result;
 };
 
 static int fillonedir(void * __buf, const char * name, int namlen, loff_t offset,
@@ -68,21 +68,24 @@ static int fillonedir(void * __buf, const char * name, int namlen, loff_t offset
 	struct readdir_callback * buf = (struct readdir_callback *) __buf;
 	struct old_linux_dirent __user * dirent;
 
-	if (buf->count)
+	if (buf->result)
 		return -EINVAL;
-	buf->count++;
+	buf->result++;
 	dirent = buf->dirent;
 	if (!access_ok(VERIFY_WRITE, (unsigned long)dirent,
 			(unsigned long)(dirent->d_name + namlen + 1) -
 				(unsigned long)dirent))
-		return -EFAULT;
+		goto efault;
 	if (	__put_user(ino, &dirent->d_ino) ||
 		__put_user(offset, &dirent->d_offset) ||
 		__put_user(namlen, &dirent->d_namlen) ||
 		__copy_to_user(dirent->d_name, name, namlen) ||
 		__put_user(0, dirent->d_name + namlen))
-		return -EFAULT;
+		goto efault;
 	return 0;
+efault:
+	buf->result = -EFAULT;
+	return -EFAULT;
 }
 
 asmlinkage long old_readdir(unsigned int fd, struct old_linux_dirent __user * dirent, unsigned int count)
@@ -96,12 +99,12 @@ asmlinkage long old_readdir(unsigned int fd, struct old_linux_dirent __user * di
 	if (!file)
 		goto out;
 
-	buf.count = 0;
+	buf.result = 0;
 	buf.dirent = dirent;
 
 	error = vfs_readdir(file, fillonedir, &buf);
 	if (error >= 0)
-		error = buf.count;
+		error = buf.result;
 
 	fput(file);
 out:
@@ -144,7 +147,6 @@ static int filldir(void * __buf, const char * name, int namlen, loff_t offset,
 			goto efault;
 	}
 	dirent = buf->current_dir;
-	buf->previous = dirent;
 	if (__put_user(ino, &dirent->d_ino))
 		goto efault;
 	if (__put_user(reclen, &dirent->d_reclen))
@@ -153,11 +155,13 @@ static int filldir(void * __buf, const char * name, int namlen, loff_t offset,
 		goto efault;
 	if (__put_user(0, dirent->d_name + namlen))
 		goto efault;
+	buf->previous = dirent;
 	((char *) dirent) += reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
 efault:
+	buf->error = -EFAULT;
 	return -EFAULT;
 }
 
@@ -225,7 +229,6 @@ static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 			goto efault;
 	}
 	dirent = buf->current_dir;
-	buf->previous = dirent;
 	if (__put_user(ino, &dirent->d_ino))
 		goto efault;
 	if (__put_user(0, &dirent->d_off))
@@ -238,11 +241,13 @@ static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 		goto efault;
 	if (__put_user(0, dirent->d_name + namlen))
 		goto efault;
+	buf->previous = dirent;
 	((char *) dirent) += reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
 efault:
+	buf->error = -EFAULT;
 	return -EFAULT;
 }
 

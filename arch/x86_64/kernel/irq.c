@@ -65,8 +65,12 @@
 /*
  * Controller mappings for all interrupt sources:
  */
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
-	{ [0 ... NR_IRQS-1] = { 0, &no_irq_type, NULL, 0, SPIN_LOCK_UNLOCKED}};
+irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
+	[0 ... NR_IRQS-1] = {
+		.handler = &no_irq_type,
+		.lock = SPIN_LOCK_UNLOCKED
+	}
+};
 
 static void register_irq_proc (unsigned int irq);
 
@@ -795,7 +799,7 @@ static unsigned int parse_hex_value (const char *buffer,
 {
 	unsigned char hexnum [HEX_DIGITS];
 	unsigned long value;
-	int i;
+	unsigned i;
 
 	if (!count)
 		return -EINVAL;

@@ -229,7 +229,7 @@ void sctp_generate_t3_rtx_event(unsigned long peer)
 			   transport, GFP_ATOMIC);
 
 	if (error)
-		asoc->base.sk->err = -error;
+		asoc->base.sk->sk_err = -error;
 
 out_unlock:
 	sctp_bh_unlock_sock(asoc->base.sk);
@@ -269,7 +269,7 @@ static void sctp_generate_timeout_event(struct sctp_association *asoc,
 			   (void *)timeout_type, GFP_ATOMIC);
 
 	if (error)
-		asoc->base.sk->err = -error;
+		asoc->base.sk->sk_err = -error;
 
 out_unlock:
 	sctp_bh_unlock_sock(asoc->base.sk);
@@ -339,7 +339,7 @@ void sctp_generate_heartbeat_event(unsigned long data)
 			   transport, GFP_ATOMIC);
 
          if (error)
-		 asoc->base.sk->err = -error;
+		 asoc->base.sk->sk_err = -error;
 
 out_unlock:
 	sctp_bh_unlock_sock(asoc->base.sk);
@@ -616,16 +616,16 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *as
 	asoc->state_timestamp = jiffies;
 
 	if (sctp_style(sk, TCP)) {
-		/* Change the sk->state of a TCP-style socket that has 
+		/* Change the sk->sk_state of a TCP-style socket that has 
 		 * sucessfully completed a connect() call.
 		 */
 		if (sctp_state(asoc, ESTABLISHED) && sctp_sstate(sk, CLOSED))
-			sk->state = SCTP_SS_ESTABLISHED;
+			sk->sk_state = SCTP_SS_ESTABLISHED;
 
 		/* Set the RCV_SHUTDOWN flag when a SHUTDOWN is received. */
 		if (sctp_state(asoc, SHUTDOWN_RECEIVED) &&
 		    sctp_sstate(sk, ESTABLISHED))
-			sk->shutdown |= RCV_SHUTDOWN;
+			sk->sk_shutdown |= RCV_SHUTDOWN;
 	}
 
 	if (sctp_state(asoc, ESTABLISHED) ||
@@ -644,7 +644,7 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *as
 		 * notifications.
 		 */
 		if (!sctp_style(sk, UDP))
-			sk->state_change(sk);
+			sk->sk_state_change(sk);
 	}
 }
 

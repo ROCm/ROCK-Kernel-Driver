@@ -1291,11 +1291,10 @@ static const char *nsp_info(struct Scsi_Host *shpnt)
 #undef SPRINTF
 #define SPRINTF(args...) \
         do { if(pos < buffer + length) pos += sprintf(pos, ## args); } while(0)
-static int nsp_proc_info(char  *buffer,
+static int nsp_proc_info(struct Scsi_Host *host, char  *buffer,
 			 char **start,
 			 off_t  offset,
 			 int    length,
-			 int    hostno,
 			 int    inout)
 {
 	int id;
@@ -1304,29 +1303,14 @@ static int nsp_proc_info(char  *buffer,
 	int speed;
 	unsigned long flags;
 	nsp_hw_data *data = &nsp_data;
-	struct Scsi_Host *host = NULL;
 
 	if (inout) {
 		return -EINVAL;
 	}
 
-	/* search this HBA host */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,45))
-	host = scsi_host_hn_get(hostno);
-#else
-	for (host=scsi_hostlist; host; host=host->next) {
-                if (host->host_no == hostno) {
-                        break;
-                }
-        }
-#endif
-	if (host == NULL) {
-		return -ESRCH;
-	}
-
 	SPRINTF("NinjaSCSI status\n\n");
 	SPRINTF("Driver version:        $Revision: 1.5 $\n");
-	SPRINTF("SCSI host No.:         %d\n",          hostno);
+	SPRINTF("SCSI host No.:         %d\n",          host->host_no);
 	SPRINTF("IRQ:                   %d\n",          host->irq);
 	SPRINTF("IO:                    0x%lx-0x%lx\n", host->io_port, host->io_port + host->n_io_port - 1);
 	SPRINTF("MMIO(virtual address): 0x%lx\n",       host->base);

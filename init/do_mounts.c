@@ -176,7 +176,7 @@ fail:
 
 static int __init root_dev_setup(char *line)
 {
-	strncpy(saved_root_name, line, 63);
+	strlcpy(saved_root_name, line, sizeof(saved_root_name));
 	return 1;
 }
 

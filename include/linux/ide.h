@@ -720,7 +720,7 @@ typedef struct ide_drive_s {
 	unsigned doorlocking	: 1;	/* for removable only: door lock/unlock works */
 	unsigned autotune	: 3;	/* 1=autotune, 2=noautotune, 
 					   3=biostimings, 0=default */
-	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
+	unsigned remap_0_to_1	: 1;	/* 0=noremap, 1=remap 0->1 (for EZDrive) */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */
@@ -817,33 +817,25 @@ typedef struct ide_dma_ops_s {
  * 
  * temporarily mapping a (possible) highmem bio for PIO transfer
  */
-#define ide_rq_offset(rq) \
-	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
 
-/*
- * taskfiles really should use hard_cur_sectors as well!
- */
-#define task_rq_offset(rq) \
-	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
-
-static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
+static inline void *task_map_rq(struct request *rq, unsigned long *flags)
 {
 	/*
 	 * fs request
 	 */
-	if (rq->bio)
-		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+	if (rq->cbio)
+		return rq_map_buffer(rq, flags);
 
 	/*
 	 * task request
 	 */
-	return rq->buffer + task_rq_offset(rq);
+	return rq->buffer + blk_rq_offset(rq);
 }
 
-static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
+static inline void task_unmap_rq(struct request *rq, char *buffer, unsigned long *flags)
 {
-	if (rq->bio)
-		bio_kunmap_irq(buffer, flags);
+	if (rq->cbio)
+		rq_unmap_buffer(buffer, flags);
 }
 
 #define IDE_CHIPSET_PCI_MASK	\
@@ -885,6 +877,8 @@ typedef struct hwif_s {
 	struct ide_pci_device_s	*cds;	/* chipset device struct */
 	
 	struct pnp_dev  *pnp_dev;	/* for PnP devices */
+
+	ide_startstop_t (*rw_disk)(ide_drive_t *, struct request *, sector_t);
 
 #if 0
 	ide_hwif_ops_t	*hwifops;
@@ -1001,6 +995,7 @@ typedef struct hwif_s {
 
 	unsigned	noprobe    : 1;	/* don't probe for this interface */
 	unsigned	present    : 1;	/* this interface exists */
+	unsigned	hold       : 1; /* this interface is always present */
 	unsigned	serialized : 1;	/* serialized all channel operation */
 	unsigned	sharing_irq: 1;	/* 1 = sharing irq with another hwif */
 	unsigned	reset      : 1;	/* reset after probe */
@@ -1112,7 +1107,6 @@ typedef struct {
 #ifdef CONFIG_PROC_FS
 extern void proc_ide_create(void);
 extern void proc_ide_destroy(void);
-extern void recreate_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 extern void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 extern void destroy_proc_ide_drives(ide_hwif_t *);
 extern void create_proc_ide_interfaces(void);
@@ -1296,12 +1290,6 @@ extern void ide_fixstring(u8 *, const int, const int);
 extern int ide_wait_stat(ide_startstop_t *, ide_drive_t *, u8, u8, unsigned long);
 
 /*
- * This routine is called from the partition-table code in genhd.c
- * to "convert" a drive to a logical geometry with fewer than 1024 cyls.
- */
-extern int ide_xlate_1024(struct block_device *, int, int, const char *);
-
-/*
  * Return the current idea about the total capacity of this drive.
  */
 extern unsigned long current_capacity (ide_drive_t *drive);
@@ -1422,6 +1410,31 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
+#define IDE_PIO_IN	0
+#define IDE_PIO_OUT	1
+
+static inline void task_sectors(ide_drive_t *drive, struct request *rq,
+				unsigned nsect, int rw)
+{
+	unsigned long flags;
+	char *buf;
+
+	buf = task_map_rq(rq, &flags);
+
+	/*
+	 * IRQ can happen instantly after reading/writing
+	 * last sector of the datablock.
+	 */
+	process_that_request_first(rq, nsect);
+
+	if (rw == IDE_PIO_OUT)
+		taskfile_output_data(drive, buf, nsect * SECTOR_WORDS);
+	else
+		taskfile_input_data(drive, buf, nsect * SECTOR_WORDS);
+
+	task_unmap_rq(rq, buf, &flags);
+}
+
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);
 
@@ -1533,6 +1546,8 @@ extern int ide_config_drive_speed(ide_drive_t *, u8);
 extern u8 eighty_ninty_three (ide_drive_t *);
 extern int set_transfer(ide_drive_t *, ide_task_t *);
 extern int taskfile_lib_get_identify(ide_drive_t *drive, u8 *);
+
+ide_startstop_t __ide_do_rw_disk(ide_drive_t *drive, struct request *rq, sector_t block);
 
 /*
  * ide_system_bus_speed() returns what we think is the system VESA/PCI

@@ -92,13 +92,13 @@ void nr_start_idletimer(struct sock *sk)
 
 void nr_start_heartbeat(struct sock *sk)
 {
-	del_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
 
-	sk->timer.data     = (unsigned long)sk;
-	sk->timer.function = &nr_heartbeat_expiry;
-	sk->timer.expires  = jiffies + 5 * HZ;
+	sk->sk_timer.data     = (unsigned long)sk;
+	sk->sk_timer.function = &nr_heartbeat_expiry;
+	sk->sk_timer.expires  = jiffies + 5 * HZ;
 
-	add_timer(&sk->timer);
+	add_timer(&sk->sk_timer);
 }
 
 void nr_stop_t1timer(struct sock *sk)
@@ -123,7 +123,7 @@ void nr_stop_idletimer(struct sock *sk)
 
 void nr_stop_heartbeat(struct sock *sk)
 {
-	del_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
 }
 
 int nr_t1timer_running(struct sock *sk)
@@ -141,9 +141,8 @@ static void nr_heartbeat_expiry(unsigned long param)
 	case NR_STATE_0:
 		/* Magic here: If we listen() and a new link dies before it
 		   is accepted() it isn't 'dead' so doesn't get removed. */
-		if (test_bit(SOCK_DESTROY, &sk->flags) ||
-				(sk->state == TCP_LISTEN &&
-					test_bit(SOCK_DEAD, &sk->flags))) {
+		if (sock_flag(sk, SOCK_DESTROY) ||
+		    (sk->sk_state == TCP_LISTEN && sock_flag(sk, SOCK_DEAD))) {
 			nr_destroy_socket(sk);
 			return;
 		}
@@ -153,7 +152,7 @@ static void nr_heartbeat_expiry(unsigned long param)
 		/*
 		 * Check for the state of the receive buffer.
 		 */
-		if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
+		if (atomic_read(&sk->sk_rmem_alloc) < (sk->sk_rcvbuf / 2) &&
 		    (nr->condition & NR_COND_OWN_RX_BUSY)) {
 			nr->condition &= ~NR_COND_OWN_RX_BUSY;
 			nr->condition &= ~NR_COND_ACK_PENDING;
@@ -207,14 +206,14 @@ static void nr_idletimer_expiry(unsigned long param)
 	nr_stop_t2timer(sk);
 	nr_stop_t4timer(sk);
 
-	sk->state     = TCP_CLOSE;
-	sk->err       = 0;
-	sk->shutdown |= SEND_SHUTDOWN;
+	sk->sk_state     = TCP_CLOSE;
+	sk->sk_err       = 0;
+	sk->sk_shutdown |= SEND_SHUTDOWN;
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
-		sk->state_change(sk);
-
-	__set_bit(SOCK_DEAD, &sk->flags);
+	if (!sock_flag(sk, SOCK_DEAD)) {
+		sk->sk_state_change(sk);
+		sock_set_flag(sk, SOCK_DEAD);
+	}
 	bh_unlock_sock(sk);
 }
 

@@ -129,7 +129,7 @@ int __init rd_load_image(char *from)
 	int in_fd, out_fd;
 	unsigned long rd_blocks, devblocks;
 	int nblocks, i, disk;
-	char *buf;
+	char *buf = NULL;
 	unsigned short rotate = 0;
 #if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC_ISERIES)
 	char rotator[4] = { '|' , '/' , '-' , '\\' };
@@ -226,7 +226,6 @@ int __init rd_load_image(char *from)
 #endif
 	}
 	printk("done.\n");
-	kfree(buf);
 
 successful_load:
 	res = 1;
@@ -235,6 +234,7 @@ done:
 noclose_input:
 	close(out_fd);
 out:
+	kfree(buf);
 	sys_unlink("/dev/ram");
 	return res;
 }

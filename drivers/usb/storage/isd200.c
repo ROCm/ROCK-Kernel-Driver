@@ -558,7 +558,7 @@ void isd200_invoke_transport( struct us_data *us,
 
 	case USB_STOR_TRANSPORT_GOOD:
 		/* Indicate a good result */
-		srb->result = GOOD << 1;
+		srb->result = SAM_STAT_GOOD;
 		break;
 
 	case USB_STOR_TRANSPORT_FAILED:
@@ -598,11 +598,11 @@ void isd200_invoke_transport( struct us_data *us,
 		}
 		if (result == ISD200_GOOD) {
 			isd200_build_sense(us, srb);
-			srb->result = CHECK_CONDITION << 1;
+			srb->result = SAM_STAT_CHECK_CONDITION;
 
 			/* If things are really okay, then let's show that */
 			if ((srb->sense_buffer[2] & 0xf) == 0x0)
-				srb->result = GOOD << 1;
+				srb->result = SAM_STAT_GOOD;
 		} else
 			srb->result = DID_ERROR << 16;
 	}
@@ -611,7 +611,7 @@ void isd200_invoke_transport( struct us_data *us,
 	 * condition, show that in the result code
 	 */
 	if (transferStatus == USB_STOR_TRANSPORT_FAILED)
-		srb->result = CHECK_CONDITION << 1;
+		srb->result = SAM_STAT_CHECK_CONDITION;
 }
 
 #ifdef CONFIG_USB_STORAGE_DEBUG
@@ -1185,7 +1185,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 
 		/* copy InquiryData */
 		isd200_data_copy(srb, (char *) &info->InquiryData, srb->request_bufflen);
-		srb->result = GOOD << 1;
+		srb->result = SAM_STAT_GOOD;
 		sendToTransport = FALSE;
 		break;
 
@@ -1205,7 +1205,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Media Status not supported, just report okay\n");
-			srb->result = GOOD << 1;
+			srb->result = SAM_STAT_GOOD;
 			sendToTransport = FALSE;
 		}
 		break;
@@ -1226,7 +1226,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Media Status not supported, just report okay\n");
-			srb->result = GOOD << 1;
+			srb->result = SAM_STAT_GOOD;
 			sendToTransport = FALSE;
 		}
 		break;
@@ -1252,7 +1252,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = sizeof(struct read_capacity_data);
 
 		isd200_data_copy(srb, (char *) &readCapacityData, srb->request_bufflen);
-		srb->result = GOOD << 1;
+		srb->result = SAM_STAT_GOOD;
 		sendToTransport = FALSE;
 	}
 	break;
@@ -1336,7 +1336,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Not removeable media, just report okay\n");
-			srb->result = GOOD << 1;
+			srb->result = SAM_STAT_GOOD;
 			sendToTransport = FALSE;
 		}
 		break;
@@ -1365,7 +1365,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Nothing to do, just report okay\n");
-			srb->result = GOOD << 1;
+			srb->result = SAM_STAT_GOOD;
 			sendToTransport = FALSE;
 		}
 		break;

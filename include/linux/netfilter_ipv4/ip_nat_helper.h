@@ -3,14 +3,13 @@
 /* NAT protocol helper routines. */
 
 #include <linux/netfilter_ipv4/ip_conntrack.h>
+#include <linux/module.h>
 
 struct sk_buff;
 
 /* Flags */
 /* NAT helper must be called on every packet (for TCP) */
 #define IP_NAT_HELPER_F_ALWAYS		0x01
-/* Standalone NAT helper, without a conntrack part */
-#define IP_NAT_HELPER_F_STANDALONE	0x02
 
 struct ip_nat_helper
 {

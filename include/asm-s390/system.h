@@ -25,12 +25,9 @@ extern struct task_struct *resume(void *, void *);
 
 #ifdef __s390x__
 #define __FLAG_SHIFT 56
-extern void __misaligned_u16(void);
-extern void __misaligned_u32(void);
-extern void __misaligned_u64(void);
-#else /* __s390x__ */
+#else /* ! __s390x__ */
 #define __FLAG_SHIFT 24
-#endif /* __s390x__ */
+#endif /* ! __s390x__ */
 
 static inline void save_fp_regs(s390_fp_regs *fpregs)
 {
@@ -301,56 +298,52 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 
 #define __ctl_load(array, low, high) ({ \
 	__asm__ __volatile__ ( \
-		"   la    1,%0\n" \
-		"   bras  2,0f\n" \
-                "   lctlg 0,0,0(1)\n" \
-		"0: ex    %1,0(2)" \
-		: : "m" (array), "a" (((low)<<4)+(high)) : "1", "2" ); \
+		"   bras  1,0f\n" \
+                "   lctlg 0,0,0(%0)\n" \
+		"0: ex    %1,0(1)" \
+		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
 	__asm__ __volatile__ ( \
-		"   la    1,%0\n" \
-		"   bras  2,0f\n" \
-		"   stctg 0,0,0(1)\n" \
-		"0: ex    %1,0(2)" \
-		: "=m" (array) : "a" (((low)<<4)+(high)): "1", "2" ); \
+		"   bras  1,0f\n" \
+		"   stctg 0,0,0(%1)\n" \
+		"0: ex    %2,0(1)" \
+		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \
         __u8 __dummy[24]; \
         __asm__ __volatile__ ( \
-                "    la    1,%0\n"       /* align to 8 byte */ \
-                "    aghi  1,7\n" \
-                "    nill  1,0xfff8\n" \
-                "    bras  2,0f\n"       /* skip indirect insns */ \
-                "    stctg 0,0,0(1)\n" \
-                "    lctlg 0,0,0(1)\n" \
-                "0:  ex    %1,0(2)\n"    /* execute stctl */ \
-                "    lg    0,0(1)\n" \
-                "    ogr   0,%2\n"       /* set the bit */ \
-                "    stg   0,0(1)\n" \
-                "1:  ex    %1,6(2)"      /* execute lctl */ \
-                : "=m" (__dummy) : "a" (cr*17), "a" (1L<<(bit)) \
-                : "cc", "0", "1", "2"); \
+                "    bras  1,0f\n"       /* skip indirect insns */ \
+                "    stctg 0,0,0(%1)\n" \
+                "    lctlg 0,0,0(%1)\n" \
+                "0:  ex    %2,0(1)\n"    /* execute stctl */ \
+                "    lg    0,0(%1)\n" \
+                "    ogr   0,%3\n"       /* set the bit */ \
+                "    stg   0,0(%1)\n" \
+                "1:  ex    %2,6(1)"      /* execute lctl */ \
+                : "=m" (__dummy) \
+		: "a" ((((unsigned long) &__dummy) + 7) & ~7UL), \
+		  "a" (cr*17), "a" (1L<<(bit)) \
+                : "cc", "0", "1" ); \
         })
 
 #define __ctl_clear_bit(cr, bit) ({ \
-        __u8 __dummy[24]; \
+        __u8 __dummy[16]; \
         __asm__ __volatile__ ( \
-                "    la    1,%0\n"       /* align to 8 byte */ \
-                "    aghi  1,7\n" \
-                "    nill  1,0xfff8\n" \
-                "    bras  2,0f\n"       /* skip indirect insns */ \
-                "    stctg 0,0,0(1)\n" \
-                "    lctlg 0,0,0(1)\n" \
-                "0:  ex    %1,0(2)\n"    /* execute stctl */ \
-                "    lg    0,0(1)\n" \
-                "    ngr   0,%2\n"       /* set the bit */ \
-                "    stg   0,0(1)\n" \
-                "1:  ex    %1,6(2)"      /* execute lctl */ \
-                : "=m" (__dummy) : "a" (cr*17), "a" (~(1L<<(bit))) \
-                : "cc", "0", "1", "2"); \
+                "    bras  1,0f\n"       /* skip indirect insns */ \
+                "    stctg 0,0,0(%1)\n" \
+                "    lctlg 0,0,0(%1)\n" \
+                "0:  ex    %2,0(1)\n"    /* execute stctl */ \
+                "    lg    0,0(%1)\n" \
+                "    ngr   0,%3\n"       /* set the bit */ \
+                "    stg   0,0(%1)\n" \
+                "1:  ex    %2,6(1)"      /* execute lctl */ \
+                : "=m" (__dummy) \
+		: "a" ((((unsigned long) &__dummy) + 7) & ~7UL), \
+		  "a" (cr*17), "a" (~(1L<<(bit))) \
+                : "cc", "0", "1" ); \
         })
 
 #else /* __s390x__ */
@@ -360,58 +353,52 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 
 #define __ctl_load(array, low, high) ({ \
 	__asm__ __volatile__ ( \
-		"   la    1,%0\n" \
-		"   bras  2,0f\n" \
-                "   lctl 0,0,0(1)\n" \
-		"0: ex    %1,0(2)" \
-		: : "m" (array), "a" (((low)<<4)+(high)) : "1", "2" ); \
+		"   bras  1,0f\n" \
+                "   lctl 0,0,0(%0)\n" \
+		"0: ex    %1,0(1)" \
+		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
 	__asm__ __volatile__ ( \
-		"   la    1,%0\n" \
-		"   bras  2,0f\n" \
-		"   stctl 0,0,0(1)\n" \
-		"0: ex    %1,0(2)" \
-		: "=m" (array) : "a" (((low)<<4)+(high)): "1", "2" ); \
+		"   bras  1,0f\n" \
+		"   stctl 0,0,0(%1)\n" \
+		"0: ex    %2,0(1)" \
+		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)): "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \
         __u8 __dummy[16]; \
         __asm__ __volatile__ ( \
-                "    la    1,%0\n"       /* align to 8 byte */ \
-                "    ahi   1,7\n" \
-                "    srl   1,3\n" \
-                "    sll   1,3\n" \
-                "    bras  2,0f\n"       /* skip indirect insns */ \
-                "    stctl 0,0,0(1)\n" \
-                "    lctl  0,0,0(1)\n" \
-                "0:  ex    %1,0(2)\n"    /* execute stctl */ \
-                "    l     0,0(1)\n" \
-                "    or    0,%2\n"       /* set the bit */ \
-                "    st    0,0(1)\n" \
-                "1:  ex    %1,4(2)"      /* execute lctl */ \
-                : "=m" (__dummy) : "a" (cr*17), "a" (1<<(bit)) \
-                : "cc", "0", "1", "2"); \
+                "    bras  1,0f\n"       /* skip indirect insns */ \
+                "    stctl 0,0,0(%1)\n" \
+                "    lctl  0,0,0(%1)\n" \
+                "0:  ex    %2,0(1)\n"    /* execute stctl */ \
+                "    l     0,0(%1)\n" \
+                "    or    0,%3\n"       /* set the bit */ \
+                "    st    0,0(%1)\n" \
+                "1:  ex    %2,4(1)"      /* execute lctl */ \
+                : "=m" (__dummy) \
+		: "a" ((((unsigned long) &__dummy) + 7) & ~7UL), \
+		  "a" (cr*17), "a" (1<<(bit)) \
+                : "cc", "0", "1" ); \
         })
 
 #define __ctl_clear_bit(cr, bit) ({ \
         __u8 __dummy[16]; \
         __asm__ __volatile__ ( \
-                "    la    1,%0\n"       /* align to 8 byte */ \
-                "    ahi   1,7\n" \
-                "    srl   1,3\n" \
-                "    sll   1,3\n" \
-                "    bras  2,0f\n"       /* skip indirect insns */ \
-                "    stctl 0,0,0(1)\n" \
-                "    lctl  0,0,0(1)\n" \
-                "0:  ex    %1,0(2)\n"    /* execute stctl */ \
-                "    l     0,0(1)\n" \
-                "    nr    0,%2\n"       /* set the bit */ \
-                "    st    0,0(1)\n" \
-                "1:  ex    %1,4(2)"      /* execute lctl */ \
-                : "=m" (__dummy) : "a" (cr*17), "a" (~(1<<(bit))) \
-                : "cc", "0", "1", "2"); \
+                "    bras  1,0f\n"       /* skip indirect insns */ \
+                "    stctl 0,0,0(%1)\n" \
+                "    lctl  0,0,0(%1)\n" \
+                "0:  ex    %2,0(1)\n"    /* execute stctl */ \
+                "    l     0,0(%1)\n" \
+                "    nr    0,%3\n"       /* set the bit */ \
+                "    st    0,0(%1)\n" \
+                "1:  ex    %2,4(1)"      /* execute lctl */ \
+                : "=m" (__dummy) \
+		: "a" ((((unsigned long) &__dummy) + 7) & ~7UL), \
+		  "a" (cr*17), "a" (~(1<<(bit))) \
+                : "cc", "0", "1" ); \
         })
 #endif /* __s390x__ */
 

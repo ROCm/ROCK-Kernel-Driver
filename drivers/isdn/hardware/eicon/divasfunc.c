@@ -77,16 +77,10 @@ void diva_xdi_didd_register_adapter(int card)
 		d.features = IoAdapters[card - 1]->Properties.Features;
 		DBG_TRC(("DIDD register A(%d) channels=%d", card,
 			 d.channels))
-		    /* workaround for different Name in structure */
-		    strncpy(IoAdapters[card - 1]->Name,
-			    IoAdapters[card - 1]->Properties.Name, MIN(30,
-								       strlen
-								       (IoAdapters
-									[card
-									 -
-									 1]->
-									Properties.
-									Name)));
+		/* workaround for different Name in structure */
+		strlcpy(IoAdapters[card - 1]->Name,
+			IoAdapters[card - 1]->Properties.Name,
+			sizeof(IoAdapters[card - 1]->Name));
 		req.didd_remove_adapter.e.Req = 0;
 		req.didd_add_adapter.e.Rc = IDI_SYNC_REQ_DIDD_ADD_ADAPTER;
 		req.didd_add_adapter.info.descriptor = (void *) &d;

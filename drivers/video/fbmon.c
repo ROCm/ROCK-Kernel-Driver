@@ -29,7 +29,7 @@
 #include <linux/tty.h>
 #include <linux/fb.h>
 #include <linux/module.h>
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 #include <linux/pci.h>
 #include <asm/prom.h>
 #endif
@@ -828,7 +828,7 @@ void show_edid(unsigned char *edid)
 	printk("========================================\n");
 }
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 char *get_EDID_from_OF(struct pci_dev *pdev)
 {
 	static char *propnames[] =
@@ -1256,7 +1256,7 @@ EXPORT_SYMBOL(show_edid);
 #ifdef CONFIG_X86
 EXPORT_SYMBOL(get_EDID_from_BIOS);
 #endif
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 EXPORT_SYMBOL(get_EDID_from_OF);
 #endif
 EXPORT_SYMBOL(fb_get_monitor_limits);

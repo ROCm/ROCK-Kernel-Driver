@@ -281,6 +281,14 @@ EXPORT_SYMBOL(devinet_ioctl);
 EXPORT_SYMBOL(register_inetaddr_notifier);
 EXPORT_SYMBOL(unregister_inetaddr_notifier);
 
+/* proc */
+#ifdef CONFIG_PROC_FS
+EXPORT_SYMBOL(udp_proc_register);
+EXPORT_SYMBOL(udp_proc_unregister);
+EXPORT_SYMBOL(tcp_proc_register);
+EXPORT_SYMBOL(tcp_proc_unregister);
+#endif
+
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
 
@@ -329,7 +337,7 @@ EXPORT_SYMBOL(xfrm_find_acq);
 EXPORT_SYMBOL(xfrm_alloc_spi);
 EXPORT_SYMBOL(xfrm_state_flush);
 EXPORT_SYMBOL(xfrm_policy_kill);
-EXPORT_SYMBOL(xfrm_policy_delete);
+EXPORT_SYMBOL(xfrm_policy_bysel);
 EXPORT_SYMBOL(xfrm_policy_insert);
 EXPORT_SYMBOL(xfrm_policy_walk);
 EXPORT_SYMBOL(xfrm_policy_flush);
@@ -469,8 +477,10 @@ EXPORT_SYMBOL(sysctl_tcp_tw_recycle);
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
 
-EXPORT_SYMBOL(ip_generic_getfrag);
+#endif
 
+#if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE) || defined (CONFIG_IPV6_TUNNEL_MODULE)
+EXPORT_SYMBOL(ip_generic_getfrag);
 #endif
 
 EXPORT_SYMBOL(tcp_read_sock);
@@ -600,8 +610,6 @@ EXPORT_SYMBOL(dev_mc_add);
 EXPORT_SYMBOL(dev_mc_delete);
 EXPORT_SYMBOL(dev_mc_upload);
 EXPORT_SYMBOL(__kill_fasync);
-
-EXPORT_SYMBOL(if_port_text);
 
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);

@@ -361,7 +361,7 @@ encode_attrs(struct xdr_stream *xdr, struct iattr *iap,
 	*q++ = htonl(len);
 
 	status = 0;
-out:
+/* out: */
 	return status;
 }
 

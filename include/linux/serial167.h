@@ -43,8 +43,6 @@ struct cyclades_port {
 	int                     x_char; /* to be pushed out ASAP */
 	int                     x_break;
 	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
 	unsigned char 		*xmit_buf;
 	int			xmit_head;
 	int			xmit_tail;
@@ -53,7 +51,6 @@ struct cyclades_port {
         int                     default_timeout;
 	struct work_struct	tqueue;
 	struct termios		normal_termios;
-	struct termios		callout_termios;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
         struct cyclades_monitor mon;

@@ -97,8 +97,8 @@
 /*
  * A newly forked process directly context switches into this.
  */ 	
+/* rdi:	prev */	
 ENTRY(ret_from_fork)
-	movq %rax,%rdi		/* prev task, returned by __switch_to -> arg1 */
 	call schedule_tail
 	GET_THREAD_INFO(%rcx)
 	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%rcx)
@@ -414,6 +414,7 @@ iret_label:
 	.previous
 	.section .fixup,"ax"
 	/* force a signal here? this matches i386 behaviour */
+	/* running with kernel gs */
 bad_iret:
 	movq $-9999,%rdi	/* better code? */
 	jmp do_exit			
@@ -519,21 +520,27 @@ ENTRY(spurious_interrupt)
  */ 		  				
 ENTRY(error_entry)
 	/* rdi slot contains rax, oldrax contains error code */
-	pushq %rsi
-	movq  8(%rsp),%rsi	/* load rax */
-	pushq %rdx
-	pushq %rcx
-	pushq %rsi	/* store rax */ 
-	pushq %r8
-	pushq %r9
-	pushq %r10
-	pushq %r11
 	cld	
-	SAVE_REST
+	subq  $14*8,%rsp
+	movq %rsi,13*8(%rsp)
+	movq 14*8(%rsp),%rsi	/* load rax from rdi slot */
+	movq %rdx,12*8(%rsp)
+	movq %rcx,11*8(%rsp)
+	movq %rsi,10*8(%rsp)	/* store rax */ 
+	movq %r8, 9*8(%rsp)
+	movq %r9, 8*8(%rsp)
+	movq %r10,7*8(%rsp)
+	movq %r11,6*8(%rsp)
+	movq %rbx,5*8(%rsp) 
+	movq %rbp,4*8(%rsp) 
+	movq %r12,3*8(%rsp) 
+	movq %r13,2*8(%rsp) 
+	movq %r14,1*8(%rsp) 
+	movq %r15,(%rsp) 
+	xorl %ebx,%ebx	
 	testl $3,CS(%rsp)
 	je  error_kernelspace
 error_swapgs:	
-	xorl %ebx,%ebx	
 	swapgs
 error_sti:	
 	movq %rdi,RDI(%rsp) 	
@@ -557,13 +564,14 @@ error_exit:
 	iretq
 
 error_kernelspace:
+	incl %ebx
        /* There are two places in the kernel that can potentially fault with
-          usergs. Handle them here. */    
+          usergs. Handle them here. The exception handlers after
+	  iret run with kernel gs again, so don't set the user space flag. */
 	cmpq $iret_label,RIP(%rsp) 
 	je   error_swapgs
 	cmpq $gs_change,RIP(%rsp)
         je   error_swapgs
-	movl $1,%ebx	
 	jmp  error_sti
 	
        /* Reload gs selector with exception handling */
@@ -584,7 +592,9 @@ gs_change:
         .quad gs_change,bad_gs
         .previous
         .section .fixup,"ax"
+	/* running with kernelgs */
 bad_gs: 
+	swapgs			/* switch back to user gs */
 	xorl %eax,%eax
         movl %eax,%gs
         jmp  2b
@@ -614,12 +624,8 @@ ENTRY(kernel_thread)
 	
 	# clone now
 	call do_fork
-
+	movq %rax,RAX(%rsp)
 	xorl %edi,%edi
-	cmpq $-1000,%rax
-	jnb  1f
-	movl tsk_pid(%rax),%eax	
-1:	movq %rax,RAX(%rsp)
 
 	/*
 	 * It isn't worth to check for reschedule here,

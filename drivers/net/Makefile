@@ -11,6 +11,7 @@ endif
 obj-$(CONFIG_E100) += e100/
 obj-$(CONFIG_E1000) += e1000/
 obj-$(CONFIG_IXGB) += ixgb/
+obj-$(CONFIG_BONDING) += bonding/
 
 #
 # link order important here
@@ -64,7 +65,7 @@ obj-$(CONFIG_MII) += mii.o
 obj-$(CONFIG_WINBOND_840) += mii.o
 obj-$(CONFIG_SUNDANCE) += sundance.o mii.o
 obj-$(CONFIG_HAMACHI) += hamachi.o mii.o
-obj-$(CONFIG_NET) += Space.o setup.o net_init.o loopback.o
+obj-$(CONFIG_NET) += Space.o net_init.o loopback.o
 obj-$(CONFIG_SEEQ8005) += seeq8005.o
 obj-$(CONFIG_ETHERTAP) += ethertap.o
 obj-$(CONFIG_NET_SB1000) += sb1000.o
@@ -108,7 +109,6 @@ ifeq ($(CONFIG_SLIP_COMPRESSED),y)
 endif
 
 obj-$(CONFIG_DUMMY) += dummy.o
-obj-$(CONFIG_BONDING) += bonding.o
 obj-$(CONFIG_DE600) += de600.o
 obj-$(CONFIG_DE620) += de620.o
 obj-$(CONFIG_AT1500) += lance.o
@@ -173,7 +173,7 @@ obj-$(CONFIG_MAC89x0) += mac89x0.o
 obj-$(CONFIG_TUN) += tun.o
 obj-$(CONFIG_DL2K) += dl2k.o
 obj-$(CONFIG_R8169) += r8169.o
-obj-$(CONFIG_AMD8111_ETH) += amd8111e.o
+obj-$(CONFIG_AMD8111_ETH) += amd8111e.o mii.o
 
 # non-drivers/net drivers who want mii lib
 obj-$(CONFIG_PCMCIA_SMC91C92) += mii.o

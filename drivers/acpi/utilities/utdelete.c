@@ -71,6 +71,7 @@ acpi_ut_delete_internal_obj (
 	void                            *obj_pointer = NULL;
 	union acpi_operand_object       *handler_desc;
 	union acpi_operand_object       *second_desc;
+	union acpi_operand_object       *next_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_delete_internal_obj", object);
@@ -136,6 +137,15 @@ acpi_ut_delete_internal_obj (
 		if (object->device.gpe_block) {
 			(void) acpi_ev_delete_gpe_block (object->device.gpe_block);
 		}
+
+		/* Walk the handler list for this device */
+
+		handler_desc = object->device.address_space;
+		while (handler_desc) {
+			next_desc = handler_desc->address_space.next;
+			acpi_ut_remove_reference (handler_desc);
+			handler_desc = next_desc;
+		}
 		break;
 
 
@@ -183,10 +193,13 @@ acpi_ut_delete_internal_obj (
 			 * default handlers -- and therefore, we created the context object
 			 * locally, it was not created by an external caller.
 			 */
-			handler_desc = object->region.addr_handler;
-			if ((handler_desc) &&
-				(handler_desc->addr_handler.hflags == ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)) {
-				obj_pointer = second_desc->extra.region_context;
+			handler_desc = object->region.address_space;
+			if (handler_desc) {
+				if (handler_desc->address_space.hflags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED) {
+					obj_pointer = second_desc->extra.region_context;
+				}
+
+				acpi_ut_remove_reference (handler_desc);
 			}
 
 			/* Now we can free the Extra object */
@@ -210,7 +223,6 @@ acpi_ut_delete_internal_obj (
 	default:
 		break;
 	}
-
 
 	/* Free any allocated memory (pointer within the object) found above */
 
@@ -299,7 +311,7 @@ acpi_ut_update_ref_count (
 	new_count = count;
 
 	/*
-	 * Reference count action (increment, decrement, or force delete)
+	 * Perform the reference count action (increment, decrement, or force delete)
 	 */
 	switch (action) {
 
@@ -402,8 +414,6 @@ acpi_ut_update_object_reference (
 {
 	acpi_status                     status;
 	u32                             i;
-	union acpi_operand_object       *next;
-	union acpi_operand_object       *new;
 	union acpi_generic_state         *state_list = NULL;
 	union acpi_generic_state         *state;
 
@@ -417,9 +427,8 @@ acpi_ut_update_object_reference (
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	/*
-	 * Make sure that this isn't a namespace handle
-	 */
+	/* Make sure that this isn't a namespace handle */
+
 	if (ACPI_GET_DESCRIPTOR_TYPE (object) == ACPI_DESC_TYPE_NAMED) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Object %p is NS handle\n", object));
 		return_ACPI_STATUS (AE_OK);
@@ -439,28 +448,8 @@ acpi_ut_update_object_reference (
 		switch (ACPI_GET_OBJECT_TYPE (object)) {
 		case ACPI_TYPE_DEVICE:
 
-			status = acpi_ut_create_update_state_and_push (object->device.addr_handler,
-					   action, &state_list);
-			if (ACPI_FAILURE (status)) {
-				goto error_exit;
-			}
-
-			acpi_ut_update_ref_count (object->device.sys_handler, action);
-			acpi_ut_update_ref_count (object->device.drv_handler, action);
-			break;
-
-
-		case ACPI_TYPE_LOCAL_ADDRESS_HANDLER:
-
-			/* Must walk list of address handlers */
-
-			next = object->addr_handler.next;
-			while (next) {
-				new = next->addr_handler.next;
-				acpi_ut_update_ref_count (next, action);
-
-				next = new;
-			}
+			acpi_ut_update_ref_count (object->device.system_notify, action);
+			acpi_ut_update_ref_count (object->device.device_notify, action);
 			break;
 
 
@@ -590,16 +579,14 @@ acpi_ut_add_reference (
 	ACPI_FUNCTION_TRACE_PTR ("ut_add_reference", object);
 
 
-	/*
-	 * Ensure that we have a valid object
-	 */
+	/* Ensure that we have a valid object */
+
 	if (!acpi_ut_valid_internal_object (object)) {
 		return_VOID;
 	}
 
-	/*
-	 * We have a valid ACPI internal object, now increment the reference count
-	 */
+	/* Increment the reference count */
+
 	(void) acpi_ut_update_object_reference (object, REF_INCREMENT);
 	return_VOID;
 }
@@ -624,6 +611,7 @@ acpi_ut_remove_reference (
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_remove_reference", object);
 
+
 	/*
 	 * Allow a NULL pointer to be passed in, just ignore it.  This saves
 	 * each caller from having to check.  Also, ignore NS nodes.
@@ -634,9 +622,8 @@ acpi_ut_remove_reference (
 		return_VOID;
 	}
 
-	/*
-	 * Ensure that we have a valid object
-	 */
+	/* Ensure that we have a valid object */
+
 	if (!acpi_ut_valid_internal_object (object)) {
 		return_VOID;
 	}

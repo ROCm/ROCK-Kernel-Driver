@@ -55,7 +55,7 @@ static int sysfs_fill_super(struct super_block *sb, void *data, int silent)
 }
 
 static struct super_block *sysfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_single(fs_type, flags, data, sysfs_fill_super);
 }

@@ -83,8 +83,6 @@ struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
 	int minors;
-	int minor_shift;		/* number of times minor is shifted to
-					   get real minor */
 	char disk_name[16];		/* name of major driver */
 	struct hd_struct **part;	/* [indexed by minor] */
 	struct block_device_operations *fops;
@@ -160,16 +158,15 @@ static inline void disk_stat_set_all(struct gendisk *gendiskp, int value)	{
 #ifdef  CONFIG_SMP
 static inline int init_disk_stats(struct gendisk *disk)
 {
-	disk->dkstats = kmalloc_percpu(sizeof (struct disk_stats), GFP_KERNEL);
+	disk->dkstats = alloc_percpu(struct disk_stats);
 	if (!disk->dkstats)
 		return 0;
-	disk_stat_set_all(disk, 0);
 	return 1;
 }
 
 static inline void free_disk_stats(struct gendisk *disk)
 {
-	kfree_percpu(disk->dkstats);
+	free_percpu(disk->dkstats);
 }
 #else	/* CONFIG_SMP */
 static inline int init_disk_stats(struct gendisk *disk)
@@ -365,12 +362,12 @@ extern void add_partition(struct gendisk *, int, sector_t, sector_t);
 extern void delete_partition(struct gendisk *, int);
 
 extern struct gendisk *alloc_disk(int minors);
-extern struct gendisk *get_disk(struct gendisk *disk);
+extern struct kobject *get_disk(struct gendisk *disk);
 extern void put_disk(struct gendisk *disk);
 
 extern void blk_register_region(dev_t dev, unsigned long range,
 			struct module *module,
-			struct gendisk *(*probe)(dev_t, int *, void *),
+			struct kobject *(*probe)(dev_t, int *, void *),
 			int (*lock)(dev_t, void *),
 			void *data);
 extern void blk_unregister_region(dev_t dev, unsigned long range);

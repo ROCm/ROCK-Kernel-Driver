@@ -46,7 +46,7 @@ struct smb_to_posix_error {
 const struct smb_to_posix_error mapping_table_ERRDOS[] = {
 	{ERRbadfunc, -EINVAL},
 	{ERRbadfile, -ENOENT},
-	{ERRbadpath, -ENOENT},
+	{ERRbadpath, -ENOTDIR},
 	{ERRnofids, -EMFILE},
 	{ERRnoaccess, -EACCES},
 	{ERRbadfid, -EBADF},
@@ -63,26 +63,29 @@ const struct smb_to_posix_error mapping_table_ERRDOS[] = {
 	{ERRnofiles, -ENOENT},
 	{ERRbadshare, -ETXTBSY},
 	{ERRlock, -EACCES},
-	{ERRfilexists, -EINVAL},
+	{ERRunsup, -EINVAL},
+	{ERRnosuchshare,-ENXIO},
+	{ERRfilexists, -EEXIST},
 	{ERRinvparm, -EINVAL},
 	{ERRdiskfull, -ENOSPC},
-	{ERRinvnum, -EINVAL},
+	{ERRinvname, -ENOENT},
 	{ERRdirnotempty, -ENOTEMPTY},
 	{ERRnotlocked, -ENOLCK},
 	{ERRalreadyexists, -EEXIST},
 	{ERRmoredata, -EOVERFLOW},
 	{ErrQuota, -EDQUOT},
 	{ErrNotALink, -ENOLINK},
+	{ERRnetlogonNotStarted,-ENOPROTOOPT},
 	{0, 0}
 };
 
 const struct smb_to_posix_error mapping_table_ERRSRV[] = {
 	{ERRerror, -EIO},
-	{ERRbadpw, -EACCES},
+	{ERRbadpw, -EPERM},
 	{ERRbadtype, -EREMOTE},
 	{ERRaccess, -EACCES},
 	{ERRinvtid, -ENXIO},
-	{ERRinvnetname, -ENOENT},
+	{ERRinvnetname, -ENODEV},
 	{ERRinvdevice, -ENXIO},
 	{ERRqfull, -ENOSPC},
 	{ERRqtoobig, -ENOSPC},
@@ -617,7 +620,7 @@ static const struct {
 	ERRHRD, ERRgeneral, NT_STATUS_EVENTLOG_CANT_START}, {
 	ERRDOS, ERRnoaccess, NT_STATUS_TRUST_FAILURE}, {
 	ERRHRD, ERRgeneral, NT_STATUS_MUTANT_LIMIT_EXCEEDED}, {
-	ERRDOS, 2455, NT_STATUS_NETLOGON_NOT_STARTED}, {
+	ERRDOS, ERRnetlogonNotStarted, NT_STATUS_NETLOGON_NOT_STARTED}, {
 	ERRSRV, 2239, NT_STATUS_ACCOUNT_EXPIRED}, {
 	ERRHRD, ERRgeneral, NT_STATUS_POSSIBLE_DEADLOCK}, {
 	ERRHRD, ERRgeneral, NT_STATUS_NETWORK_CREDENTIAL_CONFLICT}, {

@@ -1178,7 +1178,7 @@ struct {
 
 static int __init pm2pci_detect(struct pm2fb_info* p) {
 	struct pm2pci_par* pci=&p->board_par.pci;
-	struct pci_dev* dev;
+	struct pci_dev* dev = NULL;
 	int i;
 	unsigned char* m;
 #ifdef __sparc__
@@ -1186,13 +1186,9 @@ static int __init pm2pci_detect(struct pm2fb_info* p) {
 #endif
 
 	memset(pci, 0, sizeof(struct pm2pci_par));
-	if (!pci_present()) {
-		DPRINTK("no PCI bus found.\n");
-		return 0;
-	}
 	DPRINTK("scanning PCI bus for known chipsets...\n");
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		for (i = 0; pm2pci_cards[i].vendor; i++)
 			if (pm2pci_cards[i].vendor == dev->vendor &&
 			    pm2pci_cards[i].device == dev->device) {
@@ -2307,9 +2303,7 @@ static void __init pm2fb_mode_setup(char* options) {
 }
 
 static void __init pm2fb_font_setup(char* options) {
-
-	strncpy(pm2fb_options.font, options, sizeof(pm2fb_options.font));
-	pm2fb_options.font[sizeof(pm2fb_options.font)-1]='\0';
+	strlcpy(pm2fb_options.font, options, sizeof(pm2fb_options.font));
 }
 
 static void __init pm2fb_var_setup(char* options) {

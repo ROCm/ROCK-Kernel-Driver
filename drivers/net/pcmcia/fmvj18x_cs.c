@@ -923,8 +923,7 @@ static void fjn_tx_timeout(struct net_device *dev)
 	   htons(inw(ioaddr +14)));
     lp->stats.tx_errors++;
     /* ToDo: We should try to restart the adaptor... */
-    cli();
-
+    local_irq_disable();
     fjn_reset(dev);
 
     lp->tx_started = 0;
@@ -932,7 +931,7 @@ static void fjn_tx_timeout(struct net_device *dev)
     lp->tx_queue_len = 0;
     lp->sent = 0;
     lp->open_time = jiffies;
-    sti();
+    local_irq_enable();
     netif_wake_queue(dev);
 }
 
@@ -1361,9 +1360,8 @@ static void set_rx_mode(struct net_device *dev)
 	    mc_filter[bit >> 3] |= (1 << bit);
 	}
     }
-    
-    save_flags(flags);
-    cli();
+
+    local_irq_save(flags); 
     if (memcmp(mc_filter, lp->mc_filter, sizeof(mc_filter))) {
 	int saved_bank = inb(ioaddr + CONFIG_1);
 	/* Switch to bank 1 and set the multicast table. */
@@ -1373,5 +1371,5 @@ static void set_rx_mode(struct net_device *dev)
 	memcpy(lp->mc_filter, mc_filter, sizeof(mc_filter));
 	outb(saved_bank, ioaddr + CONFIG_1);
     }
-    restore_flags(flags);
+    local_irq_restore(flags);
 }

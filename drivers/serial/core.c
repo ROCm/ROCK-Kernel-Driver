@@ -2023,7 +2023,7 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 }
 
 /*
- * This reverses the affects of uart_configure_port, hanging up the
+ * This reverses the effects of uart_configure_port, hanging up the
  * port before removal.
  */
 static void
@@ -2115,6 +2115,7 @@ int uart_register_driver(struct uart_driver *drv)
 	normal->magic		= TTY_DRIVER_MAGIC;
 	normal->owner		= drv->owner;
 	normal->driver_name	= drv->driver_name;
+	normal->devfs_name	= drv->devfs_name;
 	normal->name		= drv->dev_name;
 	normal->major		= drv->major;
 	normal->minor_start	= drv->minor;
@@ -2188,11 +2189,11 @@ int uart_register_driver(struct uart_driver *drv)
 void uart_unregister_driver(struct uart_driver *drv)
 {
 	struct tty_driver *p = drv->tty_driver;
-	drv->tty_driver = NULL;
 	tty_unregister_driver(p);
 	kfree(drv->state);
-	kfree(drv->tty_driver->termios);
-	kfree(drv->tty_driver);
+	kfree(p->termios);
+	kfree(p);
+	drv->tty_driver = NULL;
 }
 
 struct tty_driver *uart_console_device(struct console *co, int *index)

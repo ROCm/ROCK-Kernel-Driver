@@ -27,6 +27,7 @@
 #define	RAM_START	0x10000400
 #define	RAM_LENGTH	0xffc00
 #define	RAM_END		0x10100000
+#define _ramend	_ram_end_notused
 #define	DATA_ADDR	RAM_START
 #endif
 
@@ -73,42 +74,8 @@
 #endif
 
 #ifdef CONFIG_DRAGEN2
-#ifdef CONFIG_RAMKERNEL
-#define	ROMVEC_START	0x04030000
-#define	ROMVEC_LENGTH	0x400
-#define	ROM_START	0x04030400
-#define	ROM_LENGTH	0x1cec00
-#define	ROM_END		0x04200000
-#define	RAMVEC_START	0x00000000
-#define	RAMVEC_LENGTH	0x400
-#define	RAM_START	0x00010400
-#define	RAM_LENGTH	0x1ff0000
-#define	RAM_END		0x02000000
-#endif
-#ifdef CONFIG_ROMKERNEL
-#define	ROMVEC_START	0x04030000
-#define	ROMVEC_LENGTH	0x400
-#define	ROM_START	0x04030400
-#define	ROM_LENGTH	0x1cec00
-#define	ROM_END		0x04200000
-#define	RAMVEC_START	0x00000000
-#define	RAMVEC_LENGTH	0x400
-#define	RAM_START	0x00010000
-#define	RAM_LENGTH	0x1ff0000
-#define	RAM_END		0x02000000
-#endif
-#ifdef CONFIG_HIMEMKERNEL
-#define	ROMVEC_START	0x01e00000
-#define	ROMVEC_LENGTH	0x400
-#define	ROM_START	0x01e00400
-#define	ROM_LENGTH	0x1ffc00
-#define	ROM_END		0x02000000
-#define	RAMVEC_START	0x00000000
-#define	RAMVEC_LENGTH	0x400
-#define	RAM_START	0x00010000
-#define	RAM_LENGTH	0x1df0000
-#define	RAM_END		0x01e00000
-#endif
+#define	RAM_START	0x10000
+#define	RAM_LENGTH	0x7f0000
 #endif
 
 #ifdef CONFIG_UCQUICC
@@ -149,10 +116,15 @@
  *	but this isn't important here, we assume at least 4MiB.
  */
 #if defined(CONFIG_M5206eC3) || defined(CONFIG_M5249C3) || \
-    defined(CONFIG_M5272C3) || defined(CONFIG_M5306C3) || \
+    defined(CONFIG_M5272C3) || defined(CONFIG_M5307C3) || \
     defined(CONFIG_ARN5307) || defined(CONFIG_M5407C3)
 #define	RAM_START	0x20000
 #define	RAM_LENGTH	0x3e0000
+#endif
+
+#if defined(CONFIG_M5282C3)
+#define	RAM_START	0x10000
+#define	RAM_LENGTH	0x3f0000
 #endif
 
 /*
@@ -167,13 +139,13 @@
 #define	RAM_LENGTH	0x3ffc00
 #endif
 
-#ifdef CONFIG_RAMKERNEL
+#if defined(CONFIG_RAMKERNEL)
 #define	TEXT		ram
 #define	DATA		ram
 #define	INIT		ram
 #define	BSS		ram
 #endif
-#ifdef CONFIG_ROMKERNEL
+#if defined(CONFIG_ROMKERNEL) || defined(CONFIG_HIMEMKERNEL)
 #define	TEXT		rom
 #define	DATA		ram
 #define	INIT		ram
@@ -305,6 +277,9 @@ SECTIONS {
 		__con_initcall_start = .;
 		*(.con_initcall.init)
 		__con_initcall_end = .;
+		__security_initcall_start = .;
+		*(.security_initcall.init)
+		__security_initcall_end = .;
 		. = ALIGN(4);
 		__initramfs_start = .;
 		*(.init.ramfs)

@@ -90,7 +90,7 @@ unsigned char cia_able_irq(struct ciabase *base, unsigned char mask)
 }
 
 int cia_request_irq(struct ciabase *base, unsigned int irq,
-                    void (*handler)(int, void *, struct pt_regs *),
+                    irqreturn_t (*handler)(int, void *, struct pt_regs *),
                     unsigned long flags, const char *devname, void *dev_id)
 {
 	unsigned char mask;
@@ -120,7 +120,7 @@ void cia_free_irq(struct ciabase *base, unsigned int irq, void *dev_id)
 	cia_able_irq(base, 1 << irq);
 }
 
-static void cia_handler(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t cia_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
 	struct ciabase *base = (struct ciabase *)dev_id;
 	int mach_irq, i;
@@ -138,6 +138,7 @@ static void cia_handler(int irq, void *dev_id, struct pt_regs *fp)
 		ints >>= 1;
 	}
 	amiga_do_irq_list(base->server_irq, fp);
+	return IRQ_HANDLED;
 }
 
 void __init cia_init_IRQ(struct ciabase *base)

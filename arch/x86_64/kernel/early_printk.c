@@ -170,8 +170,7 @@ int __init setup_early_printk(char *opt)
 	if (early_console_initialized)
 		return -1;
 
-	strncpy(buf,opt,256); 
-	buf[255] = 0; 
+	strlcpy(buf,opt,sizeof(buf)); 
 	space = strchr(buf, ' '); 
 	if (space)
 		*space = 0; 

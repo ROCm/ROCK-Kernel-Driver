@@ -651,13 +651,21 @@ acpi_ut_copy_simple_object (
 		 */
 		if ((source_desc->buffer.pointer) &&
 			(!(source_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
-			dest_desc->buffer.pointer = ACPI_MEM_ALLOCATE (source_desc->buffer.length);
-			if (!dest_desc->buffer.pointer) {
-				return (AE_NO_MEMORY);
-			}
+			dest_desc->buffer.pointer = NULL;
 
-			ACPI_MEMCPY (dest_desc->buffer.pointer, source_desc->buffer.pointer,
-					  source_desc->buffer.length);
+			/* Create an actual buffer only if length > 0 */
+
+			if (source_desc->buffer.length) {
+				dest_desc->buffer.pointer = ACPI_MEM_ALLOCATE (source_desc->buffer.length);
+				if (!dest_desc->buffer.pointer) {
+					return (AE_NO_MEMORY);
+				}
+
+				/* Copy the actual buffer data */
+
+				ACPI_MEMCPY (dest_desc->buffer.pointer, source_desc->buffer.pointer,
+						  source_desc->buffer.length);
+			}
 		}
 		break;
 

@@ -61,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v2.0"
+#define DRIVER_VERSION "v2.1"
 #define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
 #define DRIVER_DESC "USB Universal Host Controller Interface driver"
 
@@ -91,9 +91,7 @@ static int uhci_get_current_frame_number(struct uhci_hcd *uhci);
 static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb);
 static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb);
 
-static int  ports_active(struct uhci_hcd *uhci);
-static void suspend_hc(struct uhci_hcd *uhci);
-static void wakeup_hc(struct uhci_hcd *uhci);
+static void hc_state_transitions(struct uhci_hcd *uhci);
 
 /* If a transfer is still active after this much time, turn off FSBR */
 #define IDLE_TIMEOUT	(HZ / 20)	/* 50 ms */
@@ -1757,9 +1755,8 @@ static void stall_callback(unsigned long ptr)
 		uhci->skel_term_qh->link = UHCI_PTR_TERM;
 	}
 
-	/* enter global suspend if nothing connected */
-	if (!uhci->is_suspended && !ports_active(uhci))
-		suspend_hc(uhci);
+	/* Poll for and perform state transitions */
+	hc_state_transitions(uhci);
 
 	init_stall_timer(hcd);
 }
@@ -1884,14 +1881,14 @@ static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 			err("%x: host system error, PCI problems?", io_addr);
 		if (status & USBSTS_HCPE)
 			err("%x: host controller process error. something bad happened", io_addr);
-		if ((status & USBSTS_HCH) && !uhci->is_suspended) {
+		if ((status & USBSTS_HCH) && uhci->state > 0) {
 			err("%x: host controller halted. very bad", io_addr);
 			/* FIXME: Reset the controller, fix the offending TD */
 		}
 	}
 
 	if (status & USBSTS_RD)
-		wakeup_hc(uhci);
+		uhci->resume_detect = 1;
 
 	uhci_free_pending_qhs(uhci);
 
@@ -1922,10 +1919,18 @@ static void reset_hc(struct uhci_hcd *uhci)
 	unsigned int io_addr = uhci->io_addr;
 
 	/* Global reset for 50ms */
+	uhci->state = UHCI_RESET;
 	outw(USBCMD_GRESET, io_addr + USBCMD);
-	wait_ms(50);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((HZ*50+999) / 1000);
+	set_current_state(TASK_RUNNING);
 	outw(0, io_addr + USBCMD);
-	wait_ms(10);
+
+	/* Another 10ms delay */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((HZ*10+999) / 1000);
+	set_current_state(TASK_RUNNING);
+	uhci->resume_detect = 0;
 }
 
 static void suspend_hc(struct uhci_hcd *uhci)
@@ -1933,34 +1938,49 @@ static void suspend_hc(struct uhci_hcd *uhci)
 	unsigned int io_addr = uhci->io_addr;
 
 	dbg("%x: suspend_hc", io_addr);
-
-	uhci->is_suspended = 1;
-	smp_wmb();
-
+	uhci->state = UHCI_SUSPENDED;
+	uhci->resume_detect = 0;
 	outw(USBCMD_EGSM, io_addr + USBCMD);
 }
 
 static void wakeup_hc(struct uhci_hcd *uhci)
 {
 	unsigned int io_addr = uhci->io_addr;
-	unsigned int status;
 
-	dbg("%x: wakeup_hc", io_addr);
+	switch (uhci->state) {
+		case UHCI_SUSPENDED:		/* Start the resume */
+			dbg("%x: wakeup_hc", io_addr);
 
-	/* Global resume for 20ms */
-	outw(USBCMD_FGR | USBCMD_EGSM, io_addr + USBCMD);
-	wait_ms(20);
-	outw(0, io_addr + USBCMD);
-	
-	/* wait for EOP to be sent */
-	status = inw(io_addr + USBCMD);
-	while (status & USBCMD_FGR)
-		status = inw(io_addr + USBCMD);
+			/* Global resume for >= 20ms */
+			outw(USBCMD_FGR | USBCMD_EGSM, io_addr + USBCMD);
+			uhci->state = UHCI_RESUMING_1;
+			uhci->state_end = jiffies + (20*HZ+999) / 1000;
+			break;
 
-	uhci->is_suspended = 0;
+		case UHCI_RESUMING_1:		/* End global resume */
+			uhci->state = UHCI_RESUMING_2;
+			outw(0, io_addr + USBCMD);
+			/* Falls through */
 
-	/* Run and mark it configured with a 64-byte max packet */
-	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
+		case UHCI_RESUMING_2:		/* Wait for EOP to be sent */
+			if (inw(io_addr + USBCMD) & USBCMD_FGR)
+				break;
+
+			/* Run for at least 1 second, and
+			 * mark it configured with a 64-byte max packet */
+			uhci->state = UHCI_RUNNING_GRACE;
+			uhci->state_end = jiffies + HZ;
+			outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP,
+					io_addr + USBCMD);
+			break;
+
+		case UHCI_RUNNING_GRACE:	/* Now allowed to suspend */
+			uhci->state = UHCI_RUNNING;
+			break;
+
+		default:
+			break;
+	}
 }
 
 static int ports_active(struct uhci_hcd *uhci)
@@ -1973,6 +1993,73 @@ static int ports_active(struct uhci_hcd *uhci)
 		connection |= (inw(io_addr + USBPORTSC1 + i * 2) & USBPORTSC_CCS);
 
 	return connection;
+}
+
+static int suspend_allowed(struct uhci_hcd *uhci)
+{
+	unsigned int io_addr = uhci->io_addr;
+	int i;
+
+	if (!uhci->hcd.pdev ||
+	     uhci->hcd.pdev->vendor != PCI_VENDOR_ID_INTEL ||
+	     uhci->hcd.pdev->device != PCI_DEVICE_ID_INTEL_82371AB_2)
+		return 1;
+
+	/* This is a 82371AB/EB/MB USB controller which has a bug that
+	 * causes false resume indications if any port has an
+	 * over current condition.  To prevent problems, we will not
+	 * allow a global suspend if any ports are OC.
+	 *
+	 * Some motherboards using the 82371AB/EB/MB (but not the USB portion)
+	 * appear to hardwire the over current inputs active to disable
+	 * the USB ports.
+	 */
+
+	/* check for over current condition on any port */
+	for (i = 0; i < uhci->rh_numports; i++) {
+		if (inw(io_addr + USBPORTSC1 + i * 2) & USBPORTSC_OC)
+			return 0;
+	}
+
+	return 1;
+}
+
+static void hc_state_transitions(struct uhci_hcd *uhci)
+{
+	switch (uhci->state) {
+		case UHCI_RUNNING:
+
+			/* global suspend if nothing connected for 1 second */
+			if (!ports_active(uhci) && suspend_allowed(uhci)) {
+				uhci->state = UHCI_SUSPENDING_GRACE;
+				uhci->state_end = jiffies + HZ;
+			}
+			break;
+
+		case UHCI_SUSPENDING_GRACE:
+			if (ports_active(uhci))
+				uhci->state = UHCI_RUNNING;
+			else if (time_after_eq(jiffies, uhci->state_end))
+				suspend_hc(uhci);
+			break;
+
+		case UHCI_SUSPENDED:
+
+			/* wakeup if requested by a device */
+			if (uhci->resume_detect)
+				wakeup_hc(uhci);
+			break;
+
+		case UHCI_RESUMING_1:
+		case UHCI_RESUMING_2:
+		case UHCI_RUNNING_GRACE:
+			if (time_after_eq(jiffies, uhci->state_end))
+				wakeup_hc(uhci);
+			break;
+
+		default:
+			break;
+	}
 }
 
 static void start_hc(struct uhci_hcd *uhci)
@@ -2003,6 +2090,8 @@ static void start_hc(struct uhci_hcd *uhci)
 	outl(uhci->fl->dma_handle, io_addr + USBFLBASEADD);
 
 	/* Run and mark it configured with a 64-byte max packet */
+	uhci->state = UHCI_RUNNING_GRACE;
+	uhci->state_end = jiffies + HZ;
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 
         uhci->hcd.state = USB_STATE_READY;
@@ -2100,8 +2189,6 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 
 	uhci->fsbr = 0;
 	uhci->fsbrtimeout = 0;
-
-	uhci->is_suspended = 0;
 
 	spin_lock_init(&uhci->qh_remove_list_lock);
 	INIT_LIST_HEAD(&uhci->qh_remove_list);
@@ -2335,7 +2422,11 @@ static int uhci_suspend(struct usb_hcd *hcd, u32 state)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
-	suspend_hc(uhci);
+	/* Don't try to suspend broken motherboards, reset instead */
+	if (suspend_allowed(uhci))
+		suspend_hc(uhci);
+	else
+		reset_hc(uhci);
 	return 0;
 }
 
@@ -2345,8 +2436,13 @@ static int uhci_resume(struct usb_hcd *hcd)
 
 	pci_set_master(uhci->hcd.pdev);
 
-	reset_hc(uhci);
-	start_hc(uhci);
+	if (uhci->state == UHCI_SUSPENDED)
+		uhci->resume_detect = 1;
+	else {
+		reset_hc(uhci);
+		start_hc(uhci);
+	}
+	uhci->hcd.state = USB_STATE_READY;
 	return 0;
 }
 #endif

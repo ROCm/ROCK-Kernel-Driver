@@ -151,12 +151,9 @@ struct moxa_str {
 	int blocked_open;
 	long event; /* long req'd for set_bit --RR */
 	int asyncflags;
-	long session;
-	long pgrp;
 	unsigned long statusflags;
 	struct tty_struct *tty;
 	struct termios normal_termios;
-	struct termios callout_termios;
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	struct work_struct tqueue;
@@ -185,7 +182,6 @@ static struct mxser_mstatus GMStatus[MAX_PORTS];
 
 
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 
 #define WAKEUP_CHARS		256
 
@@ -193,7 +189,6 @@ static struct mxser_mstatus GMStatus[MAX_PORTS];
 
 static int verbose = 0;
 static int ttymajor = MOXAMAJOR;
-static int calloutmajor = MOXACUMAJOR;
 #ifdef MODULE
 /* Variables for insmod */
 static int baseaddr[] 	= 	{0, 0, 0, 0};
@@ -207,13 +202,11 @@ MODULE_PARM(type, "1-4i");
 MODULE_PARM(baseaddr, "1-4i");
 MODULE_PARM(numports, "1-4i");
 MODULE_PARM(ttymajor, "i");
-MODULE_PARM(calloutmajor, "i");
 MODULE_PARM(verbose, "i");
 
 #endif				//MODULE
 
 static struct tty_driver moxaDriver;
-static struct tty_driver moxaCallout;
 static struct tty_struct *moxaTable[MAX_PORTS + 1];
 static struct termios *moxaTermios[MAX_PORTS + 1];
 static struct termios *moxaTermiosLocked[MAX_PORTS + 1];
@@ -319,8 +312,6 @@ void cleanup_module(void)
 		if (moxaEmptyTimer_on[i])
 			del_timer(&moxaEmptyTimer[i]);
 
-	if (tty_unregister_driver(&moxaCallout))
-		printk("Couldn't unregister MOXA Intellio family callout driver\n");
 	if (tty_unregister_driver(&moxaDriver))
 		printk("Couldn't unregister MOXA Intellio family serial driver\n");
 	if (verbose)
@@ -339,7 +330,6 @@ int moxa_init(void)
 
 	init_MUTEX(&moxaBuffSem);
 	memset(&moxaDriver, 0, sizeof(struct tty_driver));
-	memset(&moxaCallout, 0, sizeof(struct tty_driver));
 	moxaDriver.magic = TTY_DRIVER_MAGIC;
 	moxaDriver.owner = THIS_MODULE;
 	moxaDriver.name = "ttya";
@@ -375,11 +365,6 @@ int moxa_init(void)
 	moxaDriver.start = moxa_start;
 	moxaDriver.hangup = moxa_hangup;
 
-	moxaCallout = moxaDriver;
-	moxaCallout.name = "ttyA";
-	moxaCallout.major = calloutmajor;
-	moxaCallout.subtype = SERIAL_TYPE_CALLOUT;
-
 	moxaXmitBuff = 0;
 
 	for (i = 0, ch = moxaChannels; i < MAX_PORTS; i++, ch++) {
@@ -391,7 +376,6 @@ int moxa_init(void)
 		ch->closing_wait = 30 * HZ;
 		ch->count = 0;
 		ch->blocked_open = 0;
-		ch->callout_termios = moxaCallout.init_termios;
 		ch->normal_termios = moxaDriver.init_termios;
 		init_waitqueue_head(&ch->open_wait);
 		init_waitqueue_head(&ch->close_wait);
@@ -406,17 +390,10 @@ int moxa_init(void)
 		moxa_boards[i].pciInfo.devNum = 0;
 	}
 	MoxaDriverInit();
-	printk("Tty devices major number = %d, callout devices major number = %d\n", ttymajor, calloutmajor);
+	printk("Tty devices major number = %d\n", ttymajor);
 
-	ret1 = 0;
-	ret2 = 0;
-	if ((ret1 = tty_register_driver(&moxaDriver))) {
+	if (tty_register_driver(&moxaDriver)) {
 		printk(KERN_ERR "Couldn't install MOXA Smartio family driver !\n");
-	} else if ((ret2 = tty_register_driver(&moxaCallout))) {
-		tty_unregister_driver(&moxaDriver);
-		printk(KERN_ERR "Couldn't install MOXA Smartio family callout driver !\n");
-	}
-	if (ret1 || ret2) {
 		return -1;
 	}
 	for (i = 0; i < MAX_PORTS; i++) {
@@ -542,7 +519,7 @@ static void do_moxa_softint(void *private_)
 		if (test_and_clear_bit(MOXA_EVENT_HANGUP, &ch->event)) {
 			tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
 			wake_up_interruptible(&ch->open_wait);
-			ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+			ch->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 		}
 	}
 }
@@ -583,13 +560,8 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	tty->driver_data = ch;
 	ch->tty = tty;
 	if (ch->count == 1 && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = ch->normal_termios;
-		else
-			*tty->termios = ch->callout_termios;
+		*tty->termios = ch->normal_termios;
 	}
-	ch->session = current->session;
-	ch->pgrp = current->pgrp;
 	if (!(ch->asyncflags & ASYNC_INITIALIZED)) {
 		ch->statusflags = 0;
 		set_tty_param(tty);
@@ -655,8 +627,6 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	 */
 	if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
 		ch->normal_termios = *tty->termios;
-	if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-		ch->callout_termios = *tty->termios;
 	if (ch->asyncflags & ASYNC_INITIALIZED) {
 		setup_empty_event(tty);
 		tty_wait_until_sent(tty, 30 * HZ);	/* 30 seconds timeout */
@@ -680,8 +650,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 		}
 		wake_up_interruptible(&ch->open_wait);
 	}
-	ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE |
-			    ASYNC_CLOSING);
+	ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CLOSING);
 	wake_up_interruptible(&ch->close_wait);
 }
 
@@ -963,7 +932,7 @@ static void moxa_hangup(struct tty_struct *tty)
 	shut_down(ch);
 	ch->event = 0;
 	ch->count = 0;
-	ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+	ch->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 	ch->tty = 0;
 	wake_up_interruptible(&ch->open_wait);
 }
@@ -1083,30 +1052,10 @@ static int block_till_ready(struct tty_struct *tty, struct file *filp,
 #endif
 	}
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-			return (-EBUSY);
-		if ((ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
-		    (ch->asyncflags & ASYNC_SESSION_LOCKOUT) &&
-		    (ch->session != current->session))
-			return (-EBUSY);
-		if ((ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
-		    (ch->asyncflags & ASYNC_PGRP_LOCKOUT) &&
-		    (ch->pgrp != current->pgrp))
-			return (-EBUSY);
-		ch->asyncflags |= ASYNC_CALLOUT_ACTIVE;
-		return (0);
-	}
-	/*
 	 * If non-blocking mode is set, then make the check up front
 	 * and then exit.
 	 */
 	if (filp->f_flags & O_NONBLOCK) {
-		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-			return (-EBUSY);
 		ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
 		return (0);
 	}
@@ -1139,8 +1088,7 @@ static int block_till_ready(struct tty_struct *tty, struct file *filp,
 #endif
 			break;
 		}
-		if (!(ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(ch->asyncflags & ASYNC_CLOSING) && (do_clocal ||
+		if (!(ch->asyncflags & ASYNC_CLOSING) && (do_clocal ||
 						MoxaPortDCDON(ch->port)))
 			break;
 
@@ -1717,7 +1665,8 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 			return -EFAULT;
 		return 0;
 	case MOXA_GET_CUMAJOR:
-		if(copy_to_user((void *)arg, &calloutmajor, sizeof(int)))
+		i = 0;
+		if(copy_to_user((void *)arg, &i, sizeof(int)))
 			return -EFAULT;
 		return 0;
 	case MOXA_GETMSTATUS:

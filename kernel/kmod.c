@@ -58,9 +58,9 @@ char modprobe_path[256] = "/sbin/modprobe";
  * If module auto-loading support is disabled then this function
  * becomes a no-operation.
  */
-#define MODULENAME_SIZE 32
 int request_module(const char *fmt, ...)
 {
+#define MODULENAME_SIZE 32
 	va_list args;
 	char module_name[MODULENAME_SIZE];
 	unsigned int max_modprobes;

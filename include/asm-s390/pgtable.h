@@ -212,15 +212,14 @@ extern char empty_zero_page[PAGE_SIZE];
 #define _PAGE_INVALID   0x400          /* HW invalid                       */
 
 /* Software bits in the page table entry */
-#define _PAGE_MKCLEAN   0x002
-#define _PAGE_ISCLEAN   0x004
+#define _PAGE_ISCLEAN   0x002
 
 /* Mask and four different kinds of invalid pages. */
 #define _PAGE_INVALID_MASK	0x601
 #define _PAGE_INVALID_EMPTY	0x400
-#define _PAGE_INVALID_NONE	0x001
-#define _PAGE_INVALID_SWAP	0x200
-#define _PAGE_INVALID_FILE	0x201
+#define _PAGE_INVALID_NONE	0x401
+#define _PAGE_INVALID_SWAP	0x600
+#define _PAGE_INVALID_FILE	0x601
 
 #ifndef __s390x__
 
@@ -320,15 +319,6 @@ extern char empty_zero_page[PAGE_SIZE];
  */
 extern inline void set_pte(pte_t *pteptr, pte_t pteval)
 {
-	if ((pte_val(pteval) & (_PAGE_MKCLEAN|_PAGE_INVALID))
-	    == _PAGE_MKCLEAN) 
-	{
-		pte_val(pteval) &= ~_PAGE_MKCLEAN;
-               
-		asm volatile ("sske %0,%1" 
-				: : "d" (0), "a" (pte_val(pteval)));
-	}
-
 	*pteptr = pteval;
 }
 
@@ -501,7 +491,7 @@ extern inline pte_t pte_mkdirty(pte_t pte)
 	 * sske instruction is slow. It is faster to let the
 	 * next instruction set the dirty bit.
 	 */
-	pte_val(pte) &= ~(_PAGE_MKCLEAN | _PAGE_ISCLEAN);
+	pte_val(pte) &= ~ _PAGE_ISCLEAN;
 	return pte;
 }
 
@@ -582,29 +572,22 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 	pgprot_t __pgprot = (pgprot);					  \
 	unsigned long __physpage = __pa((__page-mem_map) << PAGE_SHIFT);  \
 	pte_t __pte = mk_pte_phys(__physpage, __pgprot);                  \
-	                                                                  \
-	if (!(pgprot_val(__pgprot) & _PAGE_ISCLEAN)) {			  \
-		int __users = !!PagePrivate(__page) + !!__page->mapping;  \
-		if (__users + page_count(__page) == 1)                    \
-			pte_val(__pte) |= _PAGE_MKCLEAN;                  \
-	}								  \
 	__pte;                                                            \
 })
 
 #define pfn_pte(pfn, pgprot)                                              \
 ({                                                                        \
-	struct page *__page = mem_map+(pfn);                              \
 	pgprot_t __pgprot = (pgprot);					  \
 	unsigned long __physpage = __pa((pfn) << PAGE_SHIFT);             \
 	pte_t __pte = mk_pte_phys(__physpage, __pgprot);                  \
-	                                                                  \
-	if (!(pgprot_val(__pgprot) & _PAGE_ISCLEAN)) {			  \
-		int __users = !!PagePrivate(__page) + !!__page->mapping;  \
-		if (__users + page_count(__page) == 1)                    \
-			pte_val(__pte) |= _PAGE_MKCLEAN;                  \
-	}								  \
 	__pte;                                                            \
 })
+
+#define arch_set_page_uptodate(__page)					  \
+	do {								  \
+		asm volatile ("sske %0,%1" : : "d" (0),			  \
+			      "a" (__pa((__page-mem_map) << PAGE_SHIFT)));\
+	} while (0)
 
 #ifdef __s390x__
 

@@ -31,6 +31,7 @@
 #include <linux/smp_lock.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
+#include <net/sock.h>		/* siocdevprivate_ioctl */
 
 #include <asm/uaccess.h>
 
@@ -377,6 +378,7 @@ static int put_compat_flock(struct flock *kfl, struct compat_flock *ufl)
 	return 0;
 }
 
+#ifndef HAVE_ARCH_GET_COMPAT_FLOCK64
 static int get_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
 {
 	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)) ||
@@ -388,7 +390,9 @@ static int get_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
 		return -EFAULT;
 	return 0;
 }
+#endif
 
+#ifndef HAVE_ARCH_PUT_COMPAT_FLOCK64
 static int put_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
 {
 	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)) ||
@@ -400,6 +404,7 @@ static int put_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
 		return -EFAULT;
 	return 0;
 }
+#endif
 
 extern asmlinkage long sys_fcntl(unsigned int, unsigned int, unsigned long);
 

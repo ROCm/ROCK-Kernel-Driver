@@ -2388,7 +2388,7 @@ int presto_do_set_ext_attr(struct presto_file_set *fset,
 
         /* We first "truncate" name to the maximum allowable in presto */
         /* This simulates the strncpy_from_use code in fs/ext_attr.c */
-        strncpy(temp,name,sizeof(temp));
+        strlcpy(temp,name,sizeof(temp));
 
         /* Pass down to cache*/
         error = iops->set_ext_attr(inode,temp,buffer,buffer_len,flags);

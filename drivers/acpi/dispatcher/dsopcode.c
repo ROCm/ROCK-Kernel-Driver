@@ -82,7 +82,7 @@ acpi_ds_execute_arguments (
 	union acpi_parse_object         *arg;
 
 
-	ACPI_FUNCTION_TRACE ("acpi_ds_execute_arguments");
+	ACPI_FUNCTION_TRACE ("ds_execute_arguments");
 
 
 	/*
@@ -99,7 +99,7 @@ acpi_ds_execute_arguments (
 
 	/* Create and initialize a new parser state */
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, NULL);
+	walk_state = acpi_ds_create_walk_state (0, NULL, NULL, NULL);
 	if (!walk_state) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -139,7 +139,7 @@ acpi_ds_execute_arguments (
 
 	/* Create and initialize a new parser state */
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, NULL);
+	walk_state = acpi_ds_create_walk_state (0, NULL, NULL, NULL);
 	if (!walk_state) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}

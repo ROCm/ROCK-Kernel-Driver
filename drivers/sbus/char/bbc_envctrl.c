@@ -571,12 +571,13 @@ static void attach_one_fan(struct linux_ebus_child *echild, int fan_idx)
 	set_fan_speeds(fp);
 }
 
-void bbc_envctrl_init(void)
+int bbc_envctrl_init(void)
 {
 	struct linux_ebus_child *echild;
 	int temp_index = 0;
 	int fan_index = 0;
 	int devidx = 0;
+	int err = 0;
 
 	while ((echild = bbc_i2c_getdev(devidx++)) != NULL) {
 		if (!strcmp(echild->prom_name, "temperature"))
@@ -585,7 +586,8 @@ void bbc_envctrl_init(void)
 			attach_one_fan(echild, fan_index++);
 	}
 	if (temp_index != 0 && fan_index != 0)
-		kernel_thread(kenvctrld, NULL, CLONE_FS | CLONE_FILES);
+		err = kernel_thread(kenvctrld, NULL, CLONE_FS | CLONE_FILES);
+	return err;
 }
 
 static void destroy_one_temp(struct bbc_cpu_temperature *tp)

@@ -195,8 +195,6 @@ struct irlan_cb {
 struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr);
 void irlan_close(struct irlan_cb *self);
 void irlan_close_tsaps(struct irlan_cb *self);
-void irlan_mod_inc_use_count(void);
-void irlan_mod_dec_use_count(void);
 
 int  irlan_register_netdev(struct irlan_cb *self);
 void irlan_ias_register(struct irlan_cb *self, __u8 tsap_sel);

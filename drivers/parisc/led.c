@@ -667,7 +667,7 @@ int lcd_print( char *str )
 	tasklet_disable(&led_tasklet);
 
 	/* copy display string to buffer for procfs */
-	strncpy(lcd_text, str, sizeof(lcd_text)-1);
+	strlcpy(lcd_text, str, sizeof(lcd_text));
 	
 	/* Set LCD Cursor to 1st character */
 	gsc_writeb(lcd_info.reset_cmd1, LCD_CMD_REG);

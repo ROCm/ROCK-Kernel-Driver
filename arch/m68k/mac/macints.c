@@ -217,10 +217,9 @@ static void scc_irq_disable(int);
  * console_loglevel determines NMI handler function
  */
 
-extern void mac_bang(int, void *, struct pt_regs *);
-
-void mac_nmi_handler(int, void *, struct pt_regs *);
-void mac_debug_handler(int, void *, struct pt_regs *);
+extern irqreturn_t mac_bang(int, void *, struct pt_regs *);
+irqreturn_t mac_nmi_handler(int, void *, struct pt_regs *);
+irqreturn_t mac_debug_handler(int, void *, struct pt_regs *);
 
 /* #define DEBUG_MACINTS */
 
@@ -499,7 +498,7 @@ int mac_irq_pending( unsigned int irq )
  */
  
 int mac_request_irq(unsigned int irq,
-		    void (*handler)(int, void *, struct pt_regs *),
+		    irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		    unsigned long flags, const char *devname, void *dev_id)
 {
 	irq_node_t *node;
@@ -647,18 +646,19 @@ void mac_default_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 static int num_debug[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-void mac_debug_handler(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t mac_debug_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	if (num_debug[irq] < 10) {
 		printk("DEBUG: Unexpected IRQ %d\n", irq);
 		num_debug[irq]++;
 	}
+	return IRQ_HANDLED;
 }
 
 static int in_nmi = 0;
 static volatile int nmi_hold = 0;
 
-void mac_nmi_handler(int irq, void *dev_id, struct pt_regs *fp)
+irqreturn_t mac_nmi_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
 	int i;
 	/* 
@@ -703,6 +703,7 @@ void mac_nmi_handler(int irq, void *dev_id, struct pt_regs *fp)
 #endif
 	}
 	in_nmi--;
+	return IRQ_HANDLED;
 }
 
 /*

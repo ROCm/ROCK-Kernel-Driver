@@ -635,9 +635,9 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_DEVICE:
 
-		acpi_ex_out_pointer ("addr_handler", obj_desc->device.addr_handler);
-		acpi_ex_out_pointer ("sys_handler",  obj_desc->device.sys_handler);
-		acpi_ex_out_pointer ("drv_handler",  obj_desc->device.drv_handler);
+		acpi_ex_out_pointer ("address_space", obj_desc->device.address_space);
+		acpi_ex_out_pointer ("system_notify", obj_desc->device.system_notify);
+		acpi_ex_out_pointer ("device_notify", obj_desc->device.device_notify);
 		break;
 
 
@@ -673,7 +673,7 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("Flags",        obj_desc->region.flags);
 		acpi_ex_out_address ("Address",      obj_desc->region.address);
 		acpi_ex_out_integer ("Length",       obj_desc->region.length);
-		acpi_ex_out_pointer ("addr_handler", obj_desc->region.addr_handler);
+		acpi_ex_out_pointer ("address_space", obj_desc->region.address_space);
 		acpi_ex_out_pointer ("Next",         obj_desc->region.next);
 		break;
 
@@ -682,8 +682,8 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_integer ("system_level", obj_desc->power_resource.system_level);
 		acpi_ex_out_integer ("resource_order", obj_desc->power_resource.resource_order);
-		acpi_ex_out_pointer ("sys_handler",  obj_desc->power_resource.sys_handler);
-		acpi_ex_out_pointer ("drv_handler",  obj_desc->power_resource.drv_handler);
+		acpi_ex_out_pointer ("system_notify", obj_desc->power_resource.system_notify);
+		acpi_ex_out_pointer ("device_notify", obj_desc->power_resource.device_notify);
 		break;
 
 
@@ -692,17 +692,17 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("Processor ID", obj_desc->processor.proc_id);
 		acpi_ex_out_integer ("Length",       obj_desc->processor.length);
 		acpi_ex_out_address ("Address",      (acpi_physical_address) obj_desc->processor.address);
-		acpi_ex_out_pointer ("sys_handler",  obj_desc->processor.sys_handler);
-		acpi_ex_out_pointer ("drv_handler",  obj_desc->processor.drv_handler);
-		acpi_ex_out_pointer ("addr_handler", obj_desc->processor.addr_handler);
+		acpi_ex_out_pointer ("system_notify", obj_desc->processor.system_notify);
+		acpi_ex_out_pointer ("device_notify", obj_desc->processor.device_notify);
+		acpi_ex_out_pointer ("address_space", obj_desc->processor.address_space);
 		break;
 
 
 	case ACPI_TYPE_THERMAL:
 
-		acpi_ex_out_pointer ("sys_handler",  obj_desc->thermal_zone.sys_handler);
-		acpi_ex_out_pointer ("drv_handler",  obj_desc->thermal_zone.drv_handler);
-		acpi_ex_out_pointer ("addr_handler", obj_desc->thermal_zone.addr_handler);
+		acpi_ex_out_pointer ("system_notify", obj_desc->thermal_zone.system_notify);
+		acpi_ex_out_pointer ("device_notify", obj_desc->thermal_zone.device_notify);
+		acpi_ex_out_pointer ("address_space", obj_desc->thermal_zone.address_space);
 		break;
 
 
@@ -762,18 +762,18 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_LOCAL_ADDRESS_HANDLER:
 
-		acpi_ex_out_integer ("space_id",     obj_desc->addr_handler.space_id);
-		acpi_ex_out_pointer ("Next",         obj_desc->addr_handler.next);
-		acpi_ex_out_pointer ("region_list",  obj_desc->addr_handler.region_list);
-		acpi_ex_out_pointer ("Node",         obj_desc->addr_handler.node);
-		acpi_ex_out_pointer ("Context",      obj_desc->addr_handler.context);
+		acpi_ex_out_integer ("space_id",     obj_desc->address_space.space_id);
+		acpi_ex_out_pointer ("Next",         obj_desc->address_space.next);
+		acpi_ex_out_pointer ("region_list",  obj_desc->address_space.region_list);
+		acpi_ex_out_pointer ("Node",         obj_desc->address_space.node);
+		acpi_ex_out_pointer ("Context",      obj_desc->address_space.context);
 		break;
 
 
 	case ACPI_TYPE_LOCAL_NOTIFY:
 
-		acpi_ex_out_pointer ("Node",         obj_desc->notify_handler.node);
-		acpi_ex_out_pointer ("Context",      obj_desc->notify_handler.context);
+		acpi_ex_out_pointer ("Node",         obj_desc->notify.node);
+		acpi_ex_out_pointer ("Context",      obj_desc->notify.context);
 		break;
 
 

@@ -60,7 +60,14 @@
 #include <linux/if_vlan.h>
 #include <linux/mii.h>
 
-#define E100_REGS_LEN 1
+#define E100_CABLE_UNKNOWN	0
+#define E100_CABLE_OK		1		
+#define E100_CABLE_OPEN_NEAR	2	/* Open Circuit Near End  */
+#define E100_CABLE_OPEN_FAR	3	/* Open Circuit Far End   */
+#define E100_CABLE_SHORT_NEAR	4	/* Short Circuit Near End */
+#define E100_CABLE_SHORT_FAR	5	/* Short Circuit Far End  */
+
+#define E100_REGS_LEN 2
 /*
  *  Configure parameters for buffers per controller.
  *  If the machine this is being used on is a faster machine (i.e. > 150MHz)
@@ -105,8 +112,6 @@
 #define E100_MAX_CU_IDLE_WAIT	50	/* Max udelays in wait_cus_idle */
 
 /* HWI feature related constant */
-#define HWI_MAX_LOOP                    100
-#define MAX_SAME_RESULTS		3
 #define HWI_REGISTER_GRANULARITY        80	/* register granularity = 80 Cm */
 #define HWI_NEAR_END_BOUNDARY           1000	/* Near end is defined as < 10 meters */
 
@@ -942,7 +947,6 @@ struct e100_private {
 #ifdef CONFIG_PM
 	u32 pci_state[16];
 #endif
-	char ifname[IFNAMSIZ];
 #ifdef E100_CU_DEBUG	
 	u8 last_cmd;
 	u8 last_sub_cmd;
@@ -956,7 +960,10 @@ struct e100_private {
 #define E100_SPEED_100_FULL 4
 
 /********* function prototypes *************/
+extern int e100_open(struct net_device *);
+extern int e100_close(struct net_device *);
 extern void e100_isolate_driver(struct e100_private *bdp);
+extern unsigned char e100_hw_init(struct e100_private *);
 extern void e100_sw_reset(struct e100_private *bdp, u32 reset_cmd);
 extern u8 e100_start_cu(struct e100_private *bdp, tcb_t *tcb);
 extern void e100_free_non_tx_cmd(struct e100_private *bdp,
@@ -981,14 +988,13 @@ extern unsigned char e100_cu_unknown_state(struct e100_private *bdp);
 #define TEST_TIMEOUT		0x08
 
 enum test_offsets {
-	E100_EEPROM_TEST_FAIL = 0,
-	E100_CHIP_TIMEOUT,
-	E100_ROM_TEST_FAIL,
-	E100_REG_TEST_FAIL,
-	E100_MAC_TEST_FAIL,
-	E100_LPBK_MAC_FAIL,
-	E100_LPBK_PHY_FAIL,
-	E100_MAX_TEST_RES
+	test_link,
+	test_eeprom,
+	test_self_test,
+	test_loopback_mac,
+	test_loopback_phy,
+	cable_diag,
+	max_test_res,  /* must be last */
 };
 
 #endif

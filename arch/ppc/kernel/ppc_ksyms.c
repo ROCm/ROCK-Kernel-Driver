@@ -26,6 +26,7 @@
 #include <asm/bitops.h>
 #include <asm/checksum.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/pmu.h>
@@ -93,12 +94,12 @@ EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(ISA_DMA_THRESHOLD);
 EXPORT_SYMBOL_NOVERS(DMA_MODE_READ);
 EXPORT_SYMBOL(DMA_MODE_WRITE);
-#if defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_PPC_PREP)
 EXPORT_SYMBOL(_prep_type);
 EXPORT_SYMBOL(ucSystemType);
 #endif
 
-#if !__INLINE_BITOPS
+#if !defined(__INLINE_BITOPS)
 EXPORT_SYMBOL(set_bit);
 EXPORT_SYMBOL(clear_bit);
 EXPORT_SYMBOL(change_bit);
@@ -156,6 +157,7 @@ EXPORT_SYMBOL(mm_ptov);
 EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
+EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 EXPORT_SYMBOL(ppc_ide_md);
@@ -197,6 +199,7 @@ EXPORT_SYMBOL(flush_icache_range);
 EXPORT_SYMBOL(flush_dcache_range);
 EXPORT_SYMBOL(flush_icache_user_range);
 EXPORT_SYMBOL(flush_dcache_page);
+EXPORT_SYMBOL(flush_tlb_kernel_range);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(last_task_used_altivec);
 EXPORT_SYMBOL(giveup_altivec);
@@ -235,9 +238,14 @@ EXPORT_SYMBOL(set_backlight_level);
 EXPORT_SYMBOL(set_backlight_enable);
 EXPORT_SYMBOL(register_backlight_controller);
 #endif /* CONFIG_PMAC_BACKLIGHT */
-#if defined(CONFIG_ALL_PPC)
+#ifdef CONFIG_PPC_MULTIPLATFORM
 EXPORT_SYMBOL(_machine);
+#endif
+#ifdef CONFIG_PPC_PMAC
 EXPORT_SYMBOL_NOVERS(sys_ctrler);
+EXPORT_SYMBOL(pmac_newworld);
+#endif
+#ifdef CONFIG_PPC_OF
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
 EXPORT_SYMBOL(find_compatible_devices);
@@ -251,12 +259,11 @@ EXPORT_SYMBOL(release_OF_resource);
 EXPORT_SYMBOL(pci_busdev_to_OF_node);
 EXPORT_SYMBOL(pci_device_to_OF_node);
 EXPORT_SYMBOL(pci_device_from_OF_node);
-EXPORT_SYMBOL(pmac_newworld);
-#endif /* defined(CONFIG_ALL_PPC) */
+#endif /* CONFIG_PPC_OF */
 #if defined(CONFIG_BOOTX_TEXT)
 EXPORT_SYMBOL(btext_update_display);
 #endif
-#if defined(CONFIG_SCSI) && defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_SCSI) && defined(CONFIG_PPC_PMAC)
 EXPORT_SYMBOL(note_scsi_host);
 #endif
 #ifdef CONFIG_VT
@@ -334,7 +341,7 @@ EXPORT_SYMBOL(debugger_fault_handler);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
-#if defined(CONFIG_8xx) || defined(CONFIG_4xx)
+#if defined(CONFIG_8xx) || defined(CONFIG_40x)
 EXPORT_SYMBOL(__res);
 #endif
 #if defined(CONFIG_8xx)
@@ -351,7 +358,7 @@ extern long *intercept_table;
 EXPORT_SYMBOL(intercept_table);
 #endif
 EXPORT_SYMBOL(cur_cpu_spec);
-#if defined(CONFIG_ALL_PPC)
+#ifdef CONFIG_PPC_PMAC
 extern unsigned long agp_special_page;
 EXPORT_SYMBOL_NOVERS(agp_special_page);
-#endif /* defined(CONFIG_ALL_PPC) */
+#endif

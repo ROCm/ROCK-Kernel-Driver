@@ -23,7 +23,7 @@
 #include "time.h"
 
 extern void hp300_reset(void);
-extern void (*hp300_default_handler[])(int, void *, struct pt_regs *);
+extern irqreturn_t (*hp300_default_handler[])(int, void *, struct pt_regs *);
 extern int show_hp300_interrupts(struct seq_file *, void *);
 
 #ifdef CONFIG_HEARTBEAT

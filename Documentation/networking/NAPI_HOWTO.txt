@@ -218,7 +218,7 @@ it's important at this point to introduce the classical D Becker
 interrupt processor:
 
 ------------------
-static void
+static irqreturn_t
 netdevice_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 
@@ -228,9 +228,9 @@ netdevice_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int work_count = my_work_count;
         status = read_interrupt_status_reg();
         if (status == 0)
-                return;         /* Shared IRQ: not us */
+                return IRQ_NONE; /* Shared IRQ: not us */
         if (status == 0xffff)
-                return;         /* Hot unplug */
+                return IRQ_HANDLED;      /* Hot unplug */
         if (status & error)
 		do_some_error_handling()
         
@@ -262,7 +262,7 @@ netdevice_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		status = read_interrupt_status_reg();
 
 	} while (!(status & error) || more_work_to_be_done);
-
+	return IRQ_HANDLED;
 }
 
 ----------------------------------------------------------------------
@@ -270,7 +270,7 @@ netdevice_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 We now change this to what is shown below to NAPI-enable it:
 
 ----------------------------------------------------------------------
-static void
+static irqreturn_t
 netdevice_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
@@ -278,9 +278,9 @@ netdevice_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
         status = read_interrupt_status_reg();
         if (status == 0)
-                return;         /* Shared IRQ: not us */
+                return IRQ_NONE;         /* Shared IRQ: not us */
         if (status == 0xffff)
-                return;         /* Hot unplug */
+                return IRQ_HANDLED;         /* Hot unplug */
         if (status & error)
 		do_some_error_handling();
         
@@ -325,7 +325,7 @@ netdevice_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 /************************ start note *********************************/		
 	} while (!(status & error) || more_work_to_be_done(status));
 /************************ end note note *********************************/		
-
+	return IRQ_HANDLED;
 }
 
 ---------------------------------------------------------------------
@@ -430,7 +430,7 @@ the call.
 -------------------------------------------------------------------
 
 /* this is called by the network core */
-static void my_poll (struct net_device *dev, int *budget)
+static int my_poll (struct net_device *dev, int *budget)
 {
 
 	struct my_private *tp = (struct my_private *)dev->priv;
@@ -461,7 +461,7 @@ static void my_poll (struct net_device *dev, int *budget)
                 if ((rx_size > (MAX_ETH_FRAME_SIZE+4)) ||
                     (!(rx_status & RxStatusOK))) {
                         netdrv_rx_err (rx_status, dev, tp, ioaddr);
-                        return;
+                        return 1;
                 }
 
 /************************ note note *********************************/		

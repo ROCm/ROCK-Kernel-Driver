@@ -17,6 +17,7 @@
 #include <asm/sigcontext.h>
 #include <asm/user.h>
 #include <asm/thread_info.h>
+#include <asm/uaccess.h>
 
 extern void fpu_init(void);
 extern void init_fpu(struct task_struct *child);
@@ -91,6 +92,8 @@ static inline int restore_fpu_checking(struct i387_fxsave_struct *fx)
 		     ".previous"
 		     : [err] "=r" (err)
 		     : [fx] "r" (fx), "0" (0)); 
+	if (unlikely(err))
+		init_fpu(current);
 	return err;
 } 
 
@@ -109,6 +112,8 @@ static inline int save_i387_checking(struct i387_fxsave_struct *fx)
 		     ".previous"
 		     : [err] "=r" (err)
 		     : [fx] "r" (fx), "0" (0)); 
+	if (unlikely(err))
+		__clear_user(fx, sizeof(struct i387_fxsave_struct));
 	return err;
 } 
 

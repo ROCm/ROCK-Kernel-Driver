@@ -86,12 +86,6 @@ struct scsi_cmnd *last_cmnd;
 static unsigned long serial_number;
 
 /*
- * List of all highlevel drivers.
- */
-LIST_HEAD(scsi_devicelist);
-static DECLARE_RWSEM(scsi_devicelist_mutex);
-
-/*
  * Note - the initial logging level can be set here to log events at boot time.
  * After the system is up, you may enable logging via the /proc interface.
  */
@@ -931,50 +925,6 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 	return depth;
 }
 
-int scsi_attach_device(struct scsi_device *sdev)
-{
-	struct Scsi_Device_Template *sdt;
-
-	down_read(&scsi_devicelist_mutex);
-	list_for_each_entry(sdt, &scsi_devicelist, list) {
-		if (!try_module_get(sdt->module))
-			continue;
-		(*sdt->attach)(sdev);
-		module_put(sdt->module);
-	}
-	up_read(&scsi_devicelist_mutex);
-	return 0;
-}
-
-void scsi_detach_device(struct scsi_device *sdev)
-{
-	struct Scsi_Device_Template *sdt;
-
-	down_read(&scsi_devicelist_mutex);
-	list_for_each_entry(sdt, &scsi_devicelist, list) {
-		if (!try_module_get(sdt->module))
-			continue;
-		(*sdt->detach)(sdev);
-		module_put(sdt->module);
-	}
-	up_read(&scsi_devicelist_mutex);
-}
-
-void scsi_rescan_device(struct scsi_device *sdev)
-{
-	struct Scsi_Device_Template *sdt;
-
-	down_read(&scsi_devicelist_mutex);
-	list_for_each_entry(sdt, &scsi_devicelist, list) {
-		if (!try_module_get(sdt->module))
-			continue;
-		if (*sdt->rescan)
-			(*sdt->rescan)(sdev);
-		module_put(sdt->module);
-	}
-	up_read(&scsi_devicelist_mutex);
-}
-
 int scsi_device_get(struct scsi_device *sdev)
 {
 	if (!try_module_get(sdev->host->hostt->module))
@@ -1028,71 +978,6 @@ void scsi_set_device_offline(struct scsi_device *sdev)
 	} else {
 		/* FIXME: Send online state change hotplug event */
 	}
-}
-
-/*
- * This entry point is called from the upper level module's module_init()
- * routine.  That implies that when this function is called, the
- * scsi_mod module is locked down because of upper module layering and
- * that the high level driver module is locked down by being in it's
- * init routine.  So, the *only* thing we have to do to protect adds 
- * we perform in this function is to make sure that all call's
- * to the high level driver's attach() and detach() call in points, other
- * than via scsi_register_device and scsi_unregister_device which are in
- * the module_init and module_exit code respectively and therefore already
- * locked down by the kernel module loader, are wrapped by try_module_get()
- * and module_put() to avoid races on device adds and removes.
- */
-int scsi_register_device(struct Scsi_Device_Template *tpnt)
-{
-	struct scsi_device *sdev;
-	struct Scsi_Host *shpnt;
-
-#ifdef CONFIG_KMOD
-	if (scsi_host_get_next(NULL) == NULL)
-		request_module("scsi_hostadapter");
-#endif
-
-	if (!list_empty(&tpnt->list))
-		return 1;
-
-	down_write(&scsi_devicelist_mutex);
-	list_add_tail(&tpnt->list, &scsi_devicelist);
-	up_write(&scsi_devicelist_mutex);
-
-	scsi_upper_driver_register(tpnt);
-
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) 
-		list_for_each_entry(sdev, &shpnt->my_devices, siblings)
-			(*tpnt->attach)(sdev);
-
-	return 0;
-}
-
-int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
-{
-	struct scsi_device *sdev;
-	struct Scsi_Host *shpnt;
-
-	/*
-	 * Next, detach the devices from the driver.
-	 */
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		list_for_each_entry(sdev, &shpnt->my_devices, siblings)
-			(*tpnt->detach)(sdev);
-	}
-
-	/*
-	 * Extract the template from the linked list.
-	 */
-	down_write(&scsi_devicelist_mutex);
-	list_del(&tpnt->list);
-	up_write(&scsi_devicelist_mutex);
-
-	scsi_upper_driver_unregister(tpnt);
-	return 0;
 }
 
 MODULE_DESCRIPTION("SCSI core");

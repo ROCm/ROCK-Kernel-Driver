@@ -249,12 +249,6 @@
    one machine. You'll have to increase the number of boards in sx.h
    if you want more than 4 boards.  */
 
-
-/* Why the hell am I defining these here? */
-#define SX_TYPE_NORMAL 1
-#define SX_TYPE_CALLOUT 2
-
-
 #ifndef PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8
 #define PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8 0x2000
 #endif
@@ -305,7 +299,6 @@ static void sx_enable_rx_interrupts (void * ptr);
 static int  sx_get_CD (void * ptr); 
 static void sx_shutdown_port (void * ptr);
 static int  sx_set_real_termios (void  *ptr);
-static void sx_hungup (void  *ptr);
 static void sx_close (void  *ptr);
 static int sx_chars_in_buffer (void * ptr);
 static int sx_init_board (struct sx_board *board);
@@ -315,7 +308,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 static int sx_init_drivers(void);
 
 
-static struct tty_driver sx_driver, sx_callout_driver;
+static struct tty_driver sx_driver;
 
 static struct tty_struct * sx_table[SX_NPORTS];
 static struct termios ** sx_termios;
@@ -386,7 +379,6 @@ static struct real_driver sx_real_driver = {
 	sx_set_real_termios, 
 	sx_chars_in_buffer,
 	sx_close,
-	sx_hungup,
 };
 
 
@@ -1170,9 +1162,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 			port->c_dcd = c_dcd;
 			if (sx_get_CD (port)) {
 				/* DCD went UP */
-				if( (~(port->gs.flags & ASYNC_NORMAL_ACTIVE) || 
-						 ~(port->gs.flags & ASYNC_CALLOUT_ACTIVE)) &&
-						(sx_read_channel_byte(port, hi_hstat) != HS_IDLE_CLOSED) &&
+				if ((sx_read_channel_byte(port, hi_hstat) != HS_IDLE_CLOSED) &&
 						!(port->gs.tty->termios->c_cflag & CLOCAL) ) {
 					/* Are we blocking in open?*/
 					sx_dprintk (SX_DEBUG_MODEMSIGNALS, "DCD active, unblocking open\n");
@@ -1182,9 +1172,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 				}
 			} else {
 				/* DCD went down! */
-				if (!((port->gs.flags & ASYNC_CALLOUT_ACTIVE) &&
-				      (port->gs.flags & ASYNC_CALLOUT_NOHUP)) &&
-				    !(port->gs.tty->termios->c_cflag & CLOCAL) ) {
+				if (!(port->gs.tty->termios->c_cflag & CLOCAL) ) {
 					sx_dprintk (SX_DEBUG_MODEMSIGNALS, "DCD dropped. hanging up....\n");
 					tty_hangup (port->gs.tty);
 				} else {
@@ -1453,8 +1441,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 
 	tty->driver_data = port;
 	port->gs.tty = tty;
-	if (!port->gs.count)
-		MOD_INC_USE_COUNT;
 	port->gs.count++;
 
 	sx_dprintk (SX_DEBUG_OPEN, "starting port\n");
@@ -1466,7 +1452,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	sx_dprintk (SX_DEBUG_OPEN, "done gs_init\n");
 	if (retval) {
 		port->gs.count--;
-		if (port->gs.count) MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
@@ -1485,7 +1470,6 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	if (sx_send_command (port, HS_LOPEN, -1, HS_IDLE_OPEN) != 1) {
 		printk (KERN_ERR "sx: Card didn't respond to LOPEN command.\n");
 		port->gs.count--;
-		if (!port->gs.count) MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
@@ -1503,54 +1487,15 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	/* tty->low_latency = 1; */
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = port->gs.normal_termios;
-		else 
-			*tty->termios = port->gs.callout_termios;
+		*tty->termios = port->gs.normal_termios;
 		sx_set_real_termios (port);
 	}
 
-	port->gs.session = current->session;
-	port->gs.pgrp = current->pgrp;
 	port->c_dcd = sx_get_CD (port);
 	sx_dprintk (SX_DEBUG_OPEN, "at open: cd=%d\n", port->c_dcd);
 	func_exit();
 	return 0;
 
-}
-
-
-/* I haven't the foggiest why the decrement use count has to happen
-   here. The whole linux serial drivers stuff needs to be redesigned.
-   My guess is that this is a hack to minimize the impact of a bug
-   elsewhere. Thinking about it some more. (try it sometime) Try
-   running minicom on a serial port that is driven by a modularized
-   driver. Have the modem hangup. Then remove the driver module. Then
-   exit minicom.  I expect an "oops".  -- REW */
-static void sx_hungup (void *ptr)
-{
-  /*
-	struct sx_port *port = ptr; 
-  */
-	func_enter ();
-
-	/* Don't force the SX card to close. mgetty doesn't like it !!!!!! -- pvdl */
-	/* For some reson we added this code. Don't know why anymore ;-( -- pvdl */
-	/*
-	sx_setsignals (port, 0, 0);
-	sx_reconfigure_port(port);	
-	sx_send_command (port, HS_CLOSE, 0, 0);
-
-	if (sx_read_channel_byte (port, hi_hstat) != HS_IDLE_CLOSED) {
-		if (sx_send_command (port, HS_FORCE_CLOSED, -1, HS_IDLE_CLOSED) != 1) {
-			printk (KERN_ERR 
-			        "sx: sent the force_close command, but card didn't react\n");
-		} else
-			sx_dprintk (SX_DEBUG_CLOSE, "sent the force_close command.\n");
-	}
-	*/
-	MOD_DEC_USE_COUNT;
-	func_exit ();
 }
 
 
@@ -1589,7 +1534,6 @@ static void sx_close (void *ptr)
 		port->gs.count = 0;
 	}
 
-	MOD_DEC_USE_COUNT;
 	func_exit ();
 }
 
@@ -2285,12 +2229,13 @@ static int sx_init_drivers(void)
 
 	memset(&sx_driver, 0, sizeof(sx_driver));
 	sx_driver.magic = TTY_DRIVER_MAGIC;
+	sx_driver.owner = THIS_MODULE;
 	sx_driver.driver_name = "specialix_sx";
 	sx_driver.name = "ttyX";
 	sx_driver.major = SX_NORMAL_MAJOR;
 	sx_driver.num = sx_nports;
 	sx_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	sx_driver.subtype = SX_TYPE_NORMAL;
+	sx_driver.subtype = SERIAL_TYPE_NORMAL;
 	sx_driver.init_termios = tty_std_termios;
 	sx_driver.init_termios.c_cflag =
 	  B9600 | CS8 | CREAD | HUPCL | CLOCAL;
@@ -2317,23 +2262,11 @@ static int sx_init_drivers(void)
 	sx_driver.start = gs_start;
 	sx_driver.hangup = gs_hangup;
 
-	sx_callout_driver = sx_driver;
-	sx_callout_driver.name = "cux";
-	sx_callout_driver.major = SX_CALLOUT_MAJOR;
-	sx_callout_driver.subtype = SX_TYPE_CALLOUT;
-
 	if ((error = tty_register_driver(&sx_driver))) {
 		printk(KERN_ERR "sx: Couldn't register sx driver, error = %d\n",
 		       error);
 		return 1;
 	}
-	if ((error = tty_register_driver(&sx_callout_driver))) {
-		tty_unregister_driver(&sx_driver);
-		printk(KERN_ERR "sx: Couldn't register sx callout driver, error = %d\n",
-		       error);
-		return 1;
-	}
-
 	func_exit();
 	return 0;
 }
@@ -2389,7 +2322,6 @@ static int sx_init_portstructs (int nboards, int nports)
 		board->ports = port;
 		for (j=0; j < boards[i].nports;j++) {
 			sx_dprintk (SX_DEBUG_INIT, "initing port %d\n", j);
-			port->gs.callout_termios = tty_std_termios;
 			port->gs.normal_termios	= tty_std_termios;
 			port->gs.magic = SX_MAGIC;
 			port->gs.close_delay = HZ/2;
@@ -2450,7 +2382,6 @@ static void __exit sx_release_drivers(void)
 {
 	func_enter();
 	tty_unregister_driver(&sx_driver);
-	tty_unregister_driver(&sx_callout_driver);
 	func_exit();
 }
 
@@ -2529,69 +2460,68 @@ static int __init sx_init(void)
 	}
 
 #ifdef CONFIG_PCI
-	if (pci_present ()) {
 #ifndef TWO_ZERO
-		while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
-		                                PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, 
-			                              pdev))) {
-			if (pci_enable_device(pdev))
-				continue;
+	while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
+					PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, 
+					      pdev))) {
+		if (pci_enable_device(pdev))
+			continue;
 #else
-			for (i=0;i< SX_NBOARDS;i++) {
-				if (pcibios_find_device (PCI_VENDOR_ID_SPECIALIX, 
-				                         PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, i,
-					                       &pci_bus, &pci_fun)) break;
+	for (i=0;i< SX_NBOARDS;i++) {
+		if (pcibios_find_device (PCI_VENDOR_ID_SPECIALIX, 
+					 PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, i,
+					       &pci_bus, &pci_fun))
+			break;
 #endif
-			/* Specialix has a whole bunch of cards with
-			   0x2000 as the device ID. They say its because
-			   the standard requires it. Stupid standard. */
-			/* It seems that reading a word doesn't work reliably on 2.0.
-			   Also, reading a non-aligned dword doesn't work. So we read the
-			   whole dword at 0x2c and extract the word at 0x2e (SUBSYSTEM_ID)
-			   ourselves */
-			/* I don't know why the define doesn't work, constant 0x2c does --REW */ 
-			pci_read_config_dword (pdev, 0x2c, &tint);
-			tshort = (tint >> 16) & 0xffff;
-			sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x.\n", tint);
-			/* sx_dprintk (SX_DEBUG_PROBE, "pdev = %d/%d	(%x)\n", pdev, tint); */ 
-			if ((tshort != 0x0200) && (tshort != 0x0300)) {
-				sx_dprintk (SX_DEBUG_PROBE, "But it's not an SX card (%d)...\n", 
-				            tshort);
-				continue;
-			}
-			board = &boards[found];
-
-			board->flags &= ~SX_BOARD_TYPE;
-			board->flags |= (tshort == 0x200)?SX_PCI_BOARD:
-			                                  SX_CFPCI_BOARD;
-
-			/* CF boards use base address 3.... */
-			if (IS_CF_BOARD (board))
-				board->hw_base = pci_resource_start (pdev, 3);
-			else
-				board->hw_base = pci_resource_start (pdev, 2);
-			board->base2 = 
-			board->base = (ulong) ioremap(board->hw_base, WINDOW_LEN (board));
-			if (!board->base) {
-				printk(KERN_ERR "ioremap failed\n");
-				/* XXX handle error */
-			}
-
-			/* Most of the stuff on the CF board is offset by
-			   0x18000 ....  */
-			if (IS_CF_BOARD (board)) board->base += 0x18000;
-
-			board->irq = pdev->irq;
-
-			sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x/%lx(%d) %x.\n", 
-			            tint, boards[found].base, board->irq, board->flags);
-
-			if (probe_sx (board)) {
-				found++;
-				fix_sx_pci (pdev, board);
-			} else 
-				iounmap ((char *) (board->base));
+		/* Specialix has a whole bunch of cards with
+		   0x2000 as the device ID. They say its because
+		   the standard requires it. Stupid standard. */
+		/* It seems that reading a word doesn't work reliably on 2.0.
+		   Also, reading a non-aligned dword doesn't work. So we read the
+		   whole dword at 0x2c and extract the word at 0x2e (SUBSYSTEM_ID)
+		   ourselves */
+		/* I don't know why the define doesn't work, constant 0x2c does --REW */ 
+		pci_read_config_dword (pdev, 0x2c, &tint);
+		tshort = (tint >> 16) & 0xffff;
+		sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x.\n", tint);
+		/* sx_dprintk (SX_DEBUG_PROBE, "pdev = %d/%d	(%x)\n", pdev, tint); */ 
+		if ((tshort != 0x0200) && (tshort != 0x0300)) {
+			sx_dprintk (SX_DEBUG_PROBE, "But it's not an SX card (%d)...\n", 
+				    tshort);
+			continue;
 		}
+		board = &boards[found];
+
+		board->flags &= ~SX_BOARD_TYPE;
+		board->flags |= (tshort == 0x200)?SX_PCI_BOARD:
+						  SX_CFPCI_BOARD;
+
+		/* CF boards use base address 3.... */
+		if (IS_CF_BOARD (board))
+			board->hw_base = pci_resource_start (pdev, 3);
+		else
+			board->hw_base = pci_resource_start (pdev, 2);
+		board->base2 = 
+		board->base = (ulong) ioremap(board->hw_base, WINDOW_LEN (board));
+		if (!board->base) {
+			printk(KERN_ERR "ioremap failed\n");
+			/* XXX handle error */
+		}
+
+		/* Most of the stuff on the CF board is offset by
+		   0x18000 ....  */
+		if (IS_CF_BOARD (board)) board->base += 0x18000;
+
+		board->irq = pdev->irq;
+
+		sx_dprintk (SX_DEBUG_PROBE, "Got a specialix card: %x/%lx(%d) %x.\n", 
+			    tint, boards[found].base, board->irq, board->flags);
+
+		if (probe_sx (board)) {
+			found++;
+			fix_sx_pci (pdev, board);
+		} else 
+			iounmap ((char *) (board->base));
 	}
 #endif
 
@@ -2717,4 +2647,5 @@ static void __exit sx_exit (void)
 
 module_init(sx_init);
 module_exit(sx_exit);
+
 

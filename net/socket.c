@@ -311,7 +311,7 @@ static int init_inodecache(void)
 {
 	sock_inode_cachep = kmem_cache_create("sock_inode_cache",
 					     sizeof(struct socket_alloc),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (sock_inode_cachep == NULL)
 		return -ENOMEM;
@@ -325,7 +325,7 @@ static struct super_operations sockfs_ops = {
 };
 
 static struct super_block *sockfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_pseudo(fs_type, "socket:", &sockfs_ops, SOCKFS_MAGIC);
 }
@@ -889,11 +889,11 @@ int sock_close(struct inode *inode, struct file *filp)
  *
  *	1. fasync_list is modified only under process context socket lock
  *	   i.e. under semaphore.
- *	2. fasync_list is used under read_lock(&sk->callback_lock)
+ *	2. fasync_list is used under read_lock(&sk->sk_callback_lock)
  *	   or under socket lock.
  *	3. fasync_list can be used from softirq context, so that
  *	   modification under socket lock have to be enhanced with
- *	   write_lock_bh(&sk->callback_lock).
+ *	   write_lock_bh(&sk->sk_callback_lock).
  *							--ANK (990710)
  */
 
@@ -930,9 +930,9 @@ static int sock_fasync(int fd, struct file *filp, int on)
 	{
 		if(fa!=NULL)
 		{
-			write_lock_bh(&sk->callback_lock);
+			write_lock_bh(&sk->sk_callback_lock);
 			fa->fa_fd=fd;
-			write_unlock_bh(&sk->callback_lock);
+			write_unlock_bh(&sk->sk_callback_lock);
 
 			kfree(fna);
 			goto out;
@@ -941,17 +941,17 @@ static int sock_fasync(int fd, struct file *filp, int on)
 		fna->fa_fd=fd;
 		fna->magic=FASYNC_MAGIC;
 		fna->fa_next=sock->fasync_list;
-		write_lock_bh(&sk->callback_lock);
+		write_lock_bh(&sk->sk_callback_lock);
 		sock->fasync_list=fna;
-		write_unlock_bh(&sk->callback_lock);
+		write_unlock_bh(&sk->sk_callback_lock);
 	}
 	else
 	{
 		if (fa!=NULL)
 		{
-			write_lock_bh(&sk->callback_lock);
+			write_lock_bh(&sk->sk_callback_lock);
 			*prev=fa->fa_next;
-			write_unlock_bh(&sk->callback_lock);
+			write_unlock_bh(&sk->sk_callback_lock);
 			kfree(fa);
 		}
 	}

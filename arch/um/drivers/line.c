@@ -563,9 +563,7 @@ char *add_xterm_umid(char *base)
 		return(base);
 	}
 
-	strncpy(title, base, len);
-	len -= strlen(title);
-	snprintf(&title[strlen(title)], len, " (%s)", umid);
+	snprintf(title, len, "%s (%s)", base, umid);
 	return(title);
 }
 

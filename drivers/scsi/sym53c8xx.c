@@ -493,8 +493,6 @@ typedef unsigned int pcidev_t;
 #define PciDeviceFn(d)		((d)&0xff)
 #define __PciDev(busn, devfn)	(((busn)<<8)+(devfn))
 
-#define pci_present pcibios_present
-
 #define pci_read_config_byte(d, w, v) \
 	pcibios_read_config_byte(PciBusNumber(d), PciDeviceFn(d), w, v)
 #define pci_read_config_word(d, w, v) \
@@ -1288,8 +1286,8 @@ static struct proc_dir_entry proc_scsi_sym53c8xx = {
 };
 #endif
 #ifdef SCSI_NCR_PROC_INFO_SUPPORT
-static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
-			int length, int hostno, int func);
+static int sym53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			int length, int func);
 #endif
 
 /*
@@ -5454,7 +5452,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	/*
 	**	Store input informations in the host data structure.
 	*/
-	strncpy(np->chip_name, device->chip.name, sizeof(np->chip_name) - 1);
+	strlcpy(np->chip_name, device->chip.name, sizeof(np->chip_name));
 	np->unit	= unit;
 	np->verbose	= driver_setup.verbose;
 	sprintf(np->inst_name, NAME53C "%s-%d", np->chip_name, np->unit);
@@ -12905,12 +12903,6 @@ int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 #endif
 
 	/*
-	**    PCI is required.
-	*/
-	if (!pci_present())
-		return 0;
-
-	/*
 	**    Initialize driver general stuff.
 	*/
 #ifdef SCSI_NCR_PROC_INFO_SUPPORT
@@ -14226,21 +14218,16 @@ static int ncr_host_info(ncb_p np, char *ptr, off_t offset, int len)
 **	- func = 1 means write (parse user control command)
 */
 
-static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
-			int length, int hostno, int func)
+static int sym53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			int length, int func)
 {
-	struct Scsi_Host *host;
 	struct host_data *host_data;
 	ncb_p ncb = 0;
 	int retv;
 
 #ifdef DEBUG_PROC_INFO
-printk("sym53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
+printk("sym53c8xx_proc_info: hostno=%d, func=%d\n", host->host_no, func);
 #endif
-
-	host = scsi_host_hn_get(hostno);
-	if (!host)
-		return -EINVAL;
 
 	host_data = (struct host_data *) host->hostdata;
 	ncb = host_data->ncb;
@@ -14261,7 +14248,6 @@ printk("sym53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
 	}
 
 out:
-	scsi_host_put(host);
 	return retv;
 }
 

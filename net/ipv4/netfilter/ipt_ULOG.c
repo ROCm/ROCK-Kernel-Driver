@@ -336,7 +336,7 @@ static int __init init(void)
 		return -ENOMEM;
 
 	if (ipt_register_target(&ipt_ulog_reg) != 0) {
-		sock_release(nflognl->socket);
+		sock_release(nflognl->sk_socket);
 		return -EINVAL;
 	}
 
@@ -351,7 +351,7 @@ static void __exit fini(void)
 	DEBUGP("ipt_ULOG: cleanup_module\n");
 
 	ipt_unregister_target(&ipt_ulog_reg);
-	sock_release(nflognl->socket);
+	sock_release(nflognl->sk_socket);
 
 	/* remove pending timers and free allocated skb's */
 	for (i = 0; i < ULOG_MAXNLGROUPS; i++) {

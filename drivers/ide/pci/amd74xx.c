@@ -313,7 +313,8 @@ static unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char 
 
 		case AMD_UDMA_100:
 			pci_read_config_byte(dev, AMD_CABLE_DETECT, &t);
-			amd_80w = ((u & 0x3) ? 1 : 0) | ((u & 0xc) ? 2 : 0);
+			pci_read_config_dword(dev, AMD_UDMA_TIMING, &u);
+			amd_80w = ((t & 0x3) ? 1 : 0) | ((t & 0xc) ? 2 : 0);
 			for (i = 24; i >= 0; i -= 8)
 				if (((u >> i) & 4) && !(amd_80w & (1 << (1 - (i >> 4))))) {
 					printk(KERN_WARNING "AMD_IDE: Bios didn't set cable bits correctly. Enabling workaround.\n");
@@ -381,11 +382,6 @@ static unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char 
 
 
 	return 0;
-}
-
-static unsigned int __init ata66_amd74xx(ide_hwif_t *hwif)
-{
-	return ((amd_enabled & amd_80w) >> hwif->channel) & 1;
 }
 
 static void __init init_hwif_amd74xx(ide_hwif_t *hwif)

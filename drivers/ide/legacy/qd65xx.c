@@ -42,14 +42,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 
-#ifdef CONFIG_BLK_DEV_QD65XX_MODULE
-# define _IDE_C
-# include "ide_modes.h"
-# undef _IDE_C
-#else
-# include "ide_modes.h"
-#endif /* CONFIG_BLK_DEV_QD65XX_MODULE */
-
+#include "ide_modes.h"
 #include "qd65xx.h"
 
 /*

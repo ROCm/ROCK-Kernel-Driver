@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/blacklist.c
  *   S/390 common I/O routines -- blacklisting of specific devices
- *   $Revision: 1.23 $
+ *   $Revision: 1.24 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -197,7 +197,7 @@ static int cio_ignore_read (char *page, char **start, off_t off,
 			while (++devno < __MAX_SUBCHANNELS)
 				if (!test_bit(devno, bl_dev))
 					break;
-			len += sprintf(page + len, "-0x%04lx", devno);
+			len += sprintf(page + len, "-0x%04lx", --devno);
 		}
 		len += sprintf(page + len, "\n");
 	}

@@ -52,7 +52,7 @@ static char *amijoy_phys[2] = { "amijoy/input0", "amijoy/input1" };
 
 static char *amijoy_name = "Amiga joystick";
 
-static void amijoy_interrupt(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t amijoy_interrupt(int irq, void *dummy, struct pt_regs *fp)
 {
 	int i, data = 0, button = 0;
 
@@ -74,6 +74,7 @@ static void amijoy_interrupt(int irq, void *dummy, struct pt_regs *fp)
 
 			input_sync(amijoy_dev + i);
 		}
+	return IRQ_HANDLED;
 }
 
 static int amijoy_open(struct input_dev *dev)

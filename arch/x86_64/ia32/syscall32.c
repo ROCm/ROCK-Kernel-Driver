@@ -13,33 +13,14 @@
 #include <asm/tlbflush.h>
 #include <asm/ia32_unistd.h>
 
-/* 32bit SYSCALL stub mapped into user space. */ 
-asm("	.code32\n"
-    "\nsyscall32:\n"
-    "	pushl %ebp\n"
-    "	movl  %ecx,%ebp\n"
-    "	syscall\n"
-    "	popl  %ebp\n"
-    "	ret\n"
+/* 32bit VDSO mapped into user space. */ 
+asm(".section \".init.data\",\"aw\"\n"
+    "syscall32:\n"
+    ".incbin \"arch/x86_64/ia32/vsyscall.so\"\n"
     "syscall32_end:\n"
-
-    /* signal trampolines */
-
-    "sig32_rt_tramp:\n"
-    "	movl $"  __stringify(__NR_ia32_rt_sigreturn) ",%eax\n"
-    "   syscall\n"
-    "sig32_rt_tramp_end:\n"
-
-    "sig32_tramp:\n"
-    "	popl %eax\n"
-    "	movl $"  __stringify(__NR_ia32_sigreturn) ",%eax\n"
-    "	syscall\n"
-    "sig32_tramp_end:\n"
-    "	.code64\n"); 
+    ".previous");
 
 extern unsigned char syscall32[], syscall32_end[];
-extern unsigned char sig32_rt_tramp[], sig32_rt_tramp_end[];
-extern unsigned char sig32_tramp[], sig32_tramp_end[];
 
 char *syscall32_page; 
 
@@ -76,10 +57,6 @@ static int __init init_syscall32(void)
 		panic("Cannot allocate syscall32 page"); 
 	SetPageReserved(virt_to_page(syscall32_page));
 	memcpy(syscall32_page, syscall32, syscall32_end - syscall32);
-	memcpy(syscall32_page + 32, sig32_rt_tramp, 
-	       sig32_rt_tramp_end - sig32_rt_tramp);
-	memcpy(syscall32_page + 64, sig32_tramp, 
-	       sig32_tramp_end - sig32_tramp);	
 	return 0;
 } 
 	

@@ -25,6 +25,7 @@
 #include <linux/sched.h>		/* wake_up() */
 #include <asm/semaphore.h>		/* struct semaphore */
 #include <linux/rwsem.h>		/* struct rw_semaphore */
+#include <linux/workqueue.h>		/* struct workqueue_struct */
 
 /* Typedef's */
 typedef struct timespec snd_timestamp_t;
@@ -158,6 +159,7 @@ struct _snd_card {
 	spinlock_t files_lock;		/* lock the files for this card */
 	int shutdown;			/* this card is going down */
 	wait_queue_head_t shutdown_sleep;
+	struct work_struct free_workq;	/* for free in workqueue */
 
 #ifdef CONFIG_PM
 	int (*set_power_state) (snd_card_t *card, unsigned int state);
@@ -184,7 +186,7 @@ static inline void snd_power_unlock(snd_card_t *card)
 	up(&card->power_lock);
 }
 
-void snd_power_wait(snd_card_t *card);
+int snd_power_wait(snd_card_t *card, unsigned int power_state, struct file *file);
 
 static inline unsigned int snd_power_get_state(snd_card_t *card)
 {
@@ -199,7 +201,7 @@ static inline void snd_power_change_state(snd_card_t *card, unsigned int state)
 #else
 #define snd_power_lock(card)		do { (void)(card); } while (0)
 #define snd_power_unlock(card)		do { (void)(card); } while (0)
-#define snd_power_wait(card)		do { (void)(card); } while (0)
+static inline int snd_power_wait(snd_card_t *card, unsigned int state, struct file *file) { return 0; }
 #define snd_power_get_state(card)	SNDRV_CTL_POWER_D0
 #define snd_power_change_state(card, state)	do { (void)(card); } while (0)
 #endif
@@ -211,8 +213,8 @@ struct _snd_minor {
 	int number;			/* minor number */
 	int device;			/* device number */
 	const char *comment;		/* for /proc/asound/devices */
-	snd_info_entry_t *dev;		/* for /proc/asound/dev */
 	struct file_operations *f_ops;	/* file operations */
+	char name[0];			/* device name (keep at the end of structure) */
 };
 
 typedef struct _snd_minor snd_minor_t;
@@ -240,12 +242,13 @@ int snd_minor_info_done(void);
 /* sound_oss.c */
 
 #ifdef CONFIG_SND_OSSEMUL
-
 int snd_minor_info_oss_init(void);
 int snd_minor_info_oss_done(void);
-
 int snd_oss_init_module(void);
-
+#else
+#define snd_minor_info_oss_init() /*NOP*/
+#define snd_minor_info_oss_done() /*NOP*/
+#define snd_oss_init_module() /*NOP*/
 #endif
 
 /* memory.c */
@@ -268,6 +271,10 @@ void snd_hidden_vfree(void *obj);
 #define kfree_nocheck(obj) snd_wrapper_kfree(obj)
 #define vfree_nocheck(obj) snd_wrapper_vfree(obj)
 #else
+#define snd_memory_init() /*NOP*/
+#define snd_memory_done() /*NOP*/
+#define snd_memory_info_init() /*NOP*/
+#define snd_memory_info_done() /*NOP*/
 #define kmalloc_nocheck(size, flags) kmalloc(size, flags)
 #define vmalloc_nocheck(size) vmalloc(size)
 #define kfree_nocheck(obj) kfree(obj)

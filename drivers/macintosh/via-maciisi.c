@@ -84,7 +84,7 @@ static int maciisi_init(void);
 static int maciisi_send_request(struct adb_request* req, int sync);
 static void maciisi_sync(struct adb_request *req);
 static int maciisi_write(struct adb_request* req);
-static void maciisi_interrupt(int irq, void* arg, struct pt_regs* regs);
+static irqreturn_t maciisi_interrupt(int irq, void* arg, struct pt_regs* regs);
 static void maciisi_input(unsigned char *buf, int nb, struct pt_regs *regs);
 static int maciisi_init_via(void);
 static void maciisi_poll(void);
@@ -414,7 +414,7 @@ maciisi_poll(void)
 /* Shift register interrupt - this is *supposed* to mean that the
    register is either full or empty. In practice, I have no idea what
    it means :( */
-static void
+static irqreturn_t
 maciisi_interrupt(int irq, void* arg, struct pt_regs* regs)
 {
 	int status;
@@ -436,7 +436,7 @@ maciisi_interrupt(int irq, void* arg, struct pt_regs* regs)
 		/* Shouldn't happen, we hope */
 		printk(KERN_ERR "maciisi_interrupt: called without interrupt flag set\n");
 		local_irq_restore(flags);
-		return;
+		return IRQ_NONE;
 	}
 
 	/* Clear the interrupt */
@@ -635,6 +635,7 @@ maciisi_interrupt(int irq, void* arg, struct pt_regs* regs)
 		printk("maciisi_interrupt: unknown maciisi_state %d?\n", maciisi_state);
 	}
 	local_irq_restore(flags);
+	return IRQ_HANDLED;
 }
 
 static void

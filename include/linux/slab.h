@@ -41,6 +41,8 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define SLAB_CACHE_DMA		0x00004000UL	/* use GFP_DMA memory */
 #define SLAB_MUST_HWCACHE_ALIGN	0x00008000UL	/* force alignment */
 #define SLAB_STORE_USER		0x00010000UL	/* store the last owner for bug hunting */
+#define SLAB_RECLAIM_ACCOUNT	0x00020000UL	/* track pages allocated to indicate
+						   what is reclaimable later*/
 
 /* flags passed to a constructor func */
 #define	SLAB_CTOR_CONSTRUCTOR	0x001UL		/* if not set, then deconstructor */
@@ -60,7 +62,38 @@ extern void *kmem_cache_alloc(kmem_cache_t *, int);
 extern void kmem_cache_free(kmem_cache_t *, void *);
 extern unsigned int kmem_cache_size(kmem_cache_t *);
 
-extern void *kmalloc(size_t, int);
+/* Size description struct for general caches. */
+struct cache_sizes {
+	size_t		 cs_size;
+	kmem_cache_t	*cs_cachep;
+	kmem_cache_t	*cs_dmacachep;
+};
+extern struct cache_sizes malloc_sizes[];
+extern void *__kmalloc(size_t, int);
+
+static inline void *kmalloc(size_t size, int flags)
+{
+	if (__builtin_constant_p(size)) {
+		int i = 0;
+#define CACHE(x) \
+		if (size <= x) \
+			goto found; \
+		else \
+			i++;
+#include "kmalloc_sizes.h"
+#undef CACHE
+		{
+			extern void __you_cannot_kmalloc_that_much(void);
+			__you_cannot_kmalloc_that_much();
+		}
+found:
+		return kmem_cache_alloc((flags & GFP_DMA) ?
+			malloc_sizes[i].cs_dmacachep :
+			malloc_sizes[i].cs_cachep, flags);
+	}
+	return __kmalloc(size, flags);
+}
+
 extern void kfree(const void *);
 extern unsigned int ksize(const void *);
 

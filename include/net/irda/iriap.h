@@ -66,7 +66,7 @@ struct iriap_cb {
 	__u32        daddr;
 	__u8         operation;
 
-	struct sk_buff *skb;
+	struct sk_buff *request_skb;
 	struct lsap_cb *lsap;
 	__u8 slsap_sel;
 

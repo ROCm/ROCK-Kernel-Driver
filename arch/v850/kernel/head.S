@@ -39,7 +39,7 @@ C_ENTRY(start):
 	cmp	r19, r20
 	bne	1f			// Guard was not active
 
-	// If we get here, the reset guard was active.	Load up some
+	// If we get here, the reset guard was active.  Load up some
 	// interesting values as arguments, and jump to the handler.
 	st.w	r0, RESET_GUARD		// Allow further resets to succeed
 	mov	lp, r6			// Arg 0: return address
@@ -53,7 +53,7 @@ C_ENTRY(start):
 
 1:	st.w	r20, RESET_GUARD	// Turn on reset guard
 #endif /* CONFIG_RESET_GUARD */
-  
+
 	// Setup a temporary stack for doing pre-initialization function calls.
 	// 
 	// We can't use the initial kernel stack, because (1) it may be

@@ -326,8 +326,6 @@ i2InitChannels ( i2eBordStrPtr pB, int nChannels, i2ChanStrPtr pCh)
 		pCh->speed       = CBR_9600;
 
 		pCh->flags    = 0;
-		pCh->session  = 0;
-		pCh->pgrp     = 0;
 
 		pCh->ClosingDelay     = 5*HZ/10;
 		pCh->ClosingWaitTime  = 30*HZ;

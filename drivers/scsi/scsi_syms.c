@@ -29,8 +29,8 @@
  * This source file contains the symbol table used by scsi loadable
  * modules.
  */
-EXPORT_SYMBOL(scsi_register_device);
-EXPORT_SYMBOL(scsi_unregister_device);
+EXPORT_SYMBOL(scsi_register_driver);
+EXPORT_SYMBOL(scsi_register_interface);
 EXPORT_SYMBOL(scsi_register_host);
 EXPORT_SYMBOL(scsi_unregister_host);
 EXPORT_SYMBOL(scsi_add_host);
@@ -89,11 +89,6 @@ EXPORT_SYMBOL(scsi_set_device_offline);
  */
 EXPORT_SYMBOL(scsi_reset_provider);
 
-/*
- * These are here only while I debug the rest of the scsi stuff.
- */
-EXPORT_SYMBOL(scsi_host_hn_get);
-EXPORT_SYMBOL(scsi_host_put);
 EXPORT_SYMBOL(scsi_device_types);
 
 /*

@@ -54,13 +54,7 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_BLK_DEV_UMC8672_MODULE
-# define _IDE_C
-# include "ide_modes.h"
-# undef _IDE_C
-#else
-# include "ide_modes.h"
-#endif /* CONFIG_BLK_DEV_UMC8672_MODULE */
+#include "ide_modes.h"
 
 /*
  * Default speeds.  These can be changed with "auto-tune" and/or hdparm.

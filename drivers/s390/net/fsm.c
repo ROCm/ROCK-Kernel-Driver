@@ -26,7 +26,7 @@ init_fsm(char *name, const char **state_names, const char **event_names, int nr_
 		return NULL;
 	}
 	memset(this, 0, sizeof(fsm_instance));
-	strncpy(this->name, name, sizeof(this->name));
+	strlcpy(this->name, name, sizeof(this->name));
 
 	f = (fsm *)kmalloc(sizeof(fsm), order);
 	if (f == NULL) {

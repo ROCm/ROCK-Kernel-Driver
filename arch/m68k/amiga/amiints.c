@@ -51,7 +51,7 @@
 #include <asm/amipcmcia.h>
 
 extern int cia_request_irq(struct ciabase *base,int irq,
-                           void (*handler)(int, void *, struct pt_regs *),
+                           irqreturn_t (*handler)(int, void *, struct pt_regs *),
                            unsigned long flags, const char *devname, void *dev_id);
 extern void cia_free_irq(struct ciabase *base, unsigned int irq, void *dev_id);
 extern void cia_init_IRQ(struct ciabase *base);
@@ -70,9 +70,10 @@ static const unsigned char ami_servers[AMI_STD_IRQS] = {
 
 static short ami_ablecount[AMI_IRQS];
 
-static void ami_badint(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t ami_badint(int irq, void *dev_id, struct pt_regs *fp)
 {
 	num_spurious += 1;
+	return IRQ_NONE;
 }
 
 /*
@@ -183,7 +184,7 @@ static inline void amiga_delete_irq(irq_node_t **list, void *dev_id)
  */
 
 int amiga_request_irq(unsigned int irq,
-		      void (*handler)(int, void *, struct pt_regs *),
+		      irqreturn_t (*handler)(int, void *, struct pt_regs *),
                       unsigned long flags, const char *devname, void *dev_id)
 {
 	irq_node_t *node;
@@ -368,7 +369,7 @@ void amiga_do_irq_list(int irq, struct pt_regs *fp)
  * The builtin Amiga hardware interrupt handlers.
  */
 
-static void ami_int1(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t ami_int1(int irq, void *dev_id, struct pt_regs *fp)
 {
 	unsigned short ints = custom.intreqr & custom.intenar;
 
@@ -389,9 +390,10 @@ static void ami_int1(int irq, void *dev_id, struct pt_regs *fp)
 		custom.intreq = IF_SOFT;
 		amiga_do_irq(IRQ_AMIGA_SOFT, fp);
 	}
+	return IRQ_HANDLED;
 }
 
-static void ami_int3(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t ami_int3(int irq, void *dev_id, struct pt_regs *fp)
 {
 	unsigned short ints = custom.intreqr & custom.intenar;
 
@@ -410,9 +412,10 @@ static void ami_int3(int irq, void *dev_id, struct pt_regs *fp)
 	/* if a vertical blank interrupt */
 	if (ints & IF_VERTB)
 		amiga_do_irq_list(IRQ_AMIGA_VERTB, fp);
+	return IRQ_HANDLED;
 }
 
-static void ami_int4(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t ami_int4(int irq, void *dev_id, struct pt_regs *fp)
 {
 	unsigned short ints = custom.intreqr & custom.intenar;
 
@@ -439,9 +442,10 @@ static void ami_int4(int irq, void *dev_id, struct pt_regs *fp)
 		custom.intreq = IF_AUD3;
 		amiga_do_irq(IRQ_AMIGA_AUD3, fp);
 	}
+	return IRQ_HANDLED;
 }
 
-static void ami_int5(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t ami_int5(int irq, void *dev_id, struct pt_regs *fp)
 {
 	unsigned short ints = custom.intreqr & custom.intenar;
 
@@ -456,14 +460,15 @@ static void ami_int5(int irq, void *dev_id, struct pt_regs *fp)
 		custom.intreq = IF_DSKSYN;
 		amiga_do_irq(IRQ_AMIGA_DSKSYN, fp);
 	}
+	return IRQ_HANDLED;
 }
 
-static void ami_int7(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t ami_int7(int irq, void *dev_id, struct pt_regs *fp)
 {
 	panic ("level 7 interrupt received\n");
 }
 
-void (*amiga_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
+irqreturn_t (*amiga_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
 	ami_badint, ami_int1, ami_badint, ami_int3,
 	ami_int4, ami_int5, ami_badint, ami_int7
 };

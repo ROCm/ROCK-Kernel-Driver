@@ -430,14 +430,15 @@ static int __init bbc_present(void)
 	return 0;
 }
 
-extern void bbc_envctrl_init(void);
+extern int bbc_envctrl_init(void);
 extern void bbc_envctrl_cleanup(void);
+static void bbc_i2c_cleanup(void);
 
 static int __init bbc_i2c_init(void)
 {
 	struct linux_ebus *ebus = NULL;
 	struct linux_ebus_device *edev = NULL;
-	int index = 0;
+	int err, index = 0;
 
 	if (tlb_type != cheetah || !bbc_present())
 		return -ENODEV;
@@ -454,11 +455,13 @@ static int __init bbc_i2c_init(void)
 	if (!index)
 		return -ENODEV;
 
-	bbc_envctrl_init();
-	return 0;
+	err = bbc_envctrl_init();
+	if (err)
+		bbc_i2c_cleanup();
+	return err;
 }
 
-static void __exit bbc_i2c_cleanup(void)
+static void bbc_i2c_cleanup(void)
 {
 	struct bbc_i2c_bus *bp = all_bbc_i2c;
 

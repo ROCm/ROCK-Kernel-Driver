@@ -70,11 +70,14 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 	struct vm_area_struct *vma;
 	unsigned long end = TASK_SIZE;
 
+#ifdef CONFIG_IA32_EMULATION
 	if (test_thread_flag(TIF_IA32)) { 
 		if (!addr) 
 			addr = TASK_UNMAPPED_32;
 		end = IA32_PAGE_OFFSET; 
-	} else if (flags & MAP_32BIT) { 
+	} else 
+#endif
+	if (flags & MAP_32BIT) { 
 		/* This is usually used needed to map code in small model, so it needs to 
 		   be in the first 31bit. Limit it to that.
 		   This means we need to move the unmapped base down for this case. This can 
@@ -117,5 +120,5 @@ asmlinkage long sys_uname(struct new_utsname * name)
 asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg)
 {
 	unsigned long raddr;
-	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: raddr;
+	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: (long)raddr;
 } 

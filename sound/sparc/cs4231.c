@@ -716,10 +716,12 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_STOP:
 	{
 		unsigned int what = 0;
-		snd_pcm_substream_t *s = substream;
+		snd_pcm_substream_t *s;
+		struct list_head *pos;
 		unsigned long flags;
 
-		do {
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == chip->playback_substream) {
 				what |= CS4231_PLAYBACK_ENABLE;
 				snd_pcm_trigger_done(s, substream);
@@ -727,8 +729,7 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream, int cmd)
 				what |= CS4231_RECORD_ENABLE;
 				snd_pcm_trigger_done(s, substream);
 			}
-			s = s->link_next;
-		} while (s != substream);
+		}
 
 #if 0
 		printk("TRIGGER: what[%x] on(%d)\n",

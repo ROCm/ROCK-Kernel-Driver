@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: dir.c,v 1.73 2002/08/26 15:00:51 dwmw2 Exp $
+ * $Id: dir.c,v 1.76 2003/05/26 09:50:38 dwmw2 Exp $
  *
  */
 
@@ -16,12 +16,19 @@
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/crc32.h>
-#include <linux/mtd/compatmac.h> /* For completion */
 #include <linux/jffs2.h>
 #include <linux/jffs2_fs_i.h>
 #include <linux/jffs2_fs_sb.h>
 #include <linux/time.h>
 #include "nodelist.h"
+
+/* Urgh. Please tell me there's a nicer way of doing this. */
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,48)
+typedef int mknod_arg_t;
+#else
+typedef dev_t mknod_arg_t;
+#endif
 
 static int jffs2_readdir (struct file *, void *, filldir_t);
 
@@ -32,7 +39,7 @@ static int jffs2_unlink (struct inode *,struct dentry *);
 static int jffs2_symlink (struct inode *,struct dentry *,const char *);
 static int jffs2_mkdir (struct inode *,struct dentry *,int);
 static int jffs2_rmdir (struct inode *,struct dentry *);
-static int jffs2_mknod (struct inode *,struct dentry *,int,dev_t);
+static int jffs2_mknod (struct inode *,struct dentry *,int,mknod_arg_t);
 static int jffs2_rename (struct inode *, struct dentry *,
                         struct inode *, struct dentry *);
 
@@ -211,8 +218,7 @@ static int jffs2_create(struct inode *dir_i, struct dentry *dentry, int mode)
 		return ret;
 	}
 
-	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(ri->ctime);
-	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
+	dir_i->i_mtime = dir_i->i_ctime = ITIME(je32_to_cpu(ri->ctime));
 
 	jffs2_free_raw_inode(ri);
 	d_instantiate(dentry, inode);
@@ -402,8 +408,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(rd->mctime);
-	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
+	dir_i->i_mtime = dir_i->i_ctime = ITIME(je32_to_cpu(rd->mctime));
 
 	jffs2_free_raw_dirent(rd);
 
@@ -540,8 +545,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(rd->mctime);
-	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
+	dir_i->i_mtime = dir_i->i_ctime = ITIME(je32_to_cpu(rd->mctime));
 	dir_i->i_nlink++;
 
 	jffs2_free_raw_dirent(rd);
@@ -573,7 +577,7 @@ static int jffs2_rmdir (struct inode *dir_i, struct dentry *dentry)
 	return ret;
 }
 
-static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, dev_t rdev)
+static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mknod_arg_t rdev)
 {
 	struct jffs2_inode_info *f, *dir_f;
 	struct jffs2_sb_info *c;
@@ -583,7 +587,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, de
 	struct jffs2_full_dnode *fn;
 	struct jffs2_full_dirent *fd;
 	int namelen;
-	unsigned short dev;
+	jint16_t dev;
 	int devlen = 0;
 	uint32_t alloclen, phys_ofs;
 	uint32_t writtenlen;
@@ -596,7 +600,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, de
 	c = JFFS2_SB_INFO(dir_i->i_sb);
 	
 	if (S_ISBLK(mode) || S_ISCHR(mode)) {
-		dev = (MAJOR(rdev) << 8) | MINOR(rdev);
+		dev = cpu_to_je16((MAJOR(rdev) << 8) | MINOR(rdev));
 		devlen = sizeof(dev);
 	}
 	
@@ -704,8 +708,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, de
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(rd->mctime);
-	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
+	dir_i->i_mtime = dir_i->i_ctime = ITIME(je32_to_cpu(rd->mctime));
 
 	jffs2_free_raw_dirent(rd);
 

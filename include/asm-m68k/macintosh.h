@@ -2,6 +2,7 @@
 #define __ASM_MACINTOSH_H
 
 #include <linux/seq_file.h>
+#include <linux/interrupt.h>
 
 /*
  *	Apple Macintoshisms
@@ -10,7 +11,7 @@
 extern void mac_reset(void);
 extern void mac_poweroff(void);
 extern void mac_init_IRQ(void);
-extern int mac_request_irq (unsigned int, void (*)(int, void *, 
+extern int mac_request_irq (unsigned int, irqreturn_t (*)(int, void *, 
 				struct pt_regs *),
 				unsigned long, const char *, void *);
 extern void mac_free_irq(unsigned int, void *);

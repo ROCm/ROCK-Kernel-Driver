@@ -352,9 +352,7 @@ static inline void balance_irq(int cpu, int irq)
 	unsigned long allowed_mask;
 	unsigned int new_cpu;
 		
-	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH && NO_BALANCE_IRQ)
-		return;
-	else if (irqbalance_disabled) 
+	if (irqbalance_disabled)
 		return; 
 
 	allowed_mask = cpu_online_map & irq_affinity[irq];
@@ -614,6 +612,9 @@ static int __init balanced_irq_init(void)
 	struct cpuinfo_x86 *c;
 
         c = &boot_cpu_data;
+	/* When not overwritten by the command line ask subarchitecture. */
+	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH)
+		irqbalance_disabled = NO_BALANCE_IRQ;
 	if (irqbalance_disabled)
 		return 0;
 	
@@ -1159,7 +1160,8 @@ void __init setup_IO_APIC_irqs(void)
 		entry.delivery_mode = INT_DELIVERY_MODE;
 		entry.dest_mode = INT_DEST_MODE;
 		entry.mask = 0;				/* enable IRQ */
-		entry.dest.logical.logical_dest = TARGET_CPUS;
+		entry.dest.logical.logical_dest = 
+					cpu_mask_to_apicid(TARGET_CPUS);
 
 		idx = find_irq_entry(apic,pin,mp_INT);
 		if (idx == -1) {
@@ -1238,7 +1240,7 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	 */
 	entry.dest_mode = INT_DEST_MODE;
 	entry.mask = 0;					/* unmask IRQ now */
-	entry.dest.logical.logical_dest = TARGET_CPUS;
+	entry.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
 	entry.delivery_mode = INT_DELIVERY_MODE;
 	entry.polarity = 0;
 	entry.trigger = 0;
@@ -2308,7 +2310,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq)
 
 	entry.delivery_mode = INT_DELIVERY_MODE;
 	entry.dest_mode = INT_DEST_MODE;
-	entry.dest.logical.logical_dest = TARGET_CPUS;
+	entry.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
 	entry.mask = 1;					 /* Disabled (masked) */
 	entry.trigger = 1;				   /* Level sensitive */
 	entry.polarity = 1;					/* Low active */

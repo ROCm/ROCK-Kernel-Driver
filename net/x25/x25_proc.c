@@ -94,7 +94,7 @@ static __inline__ struct sock *x25_get_socket_idx(loff_t pos)
 {
 	struct sock *s;
 
-	for (s = x25_list; pos && s; s = s->next)
+	for (s = x25_list; pos && s; s = s->sk_next)
 		--pos;
 
 	return s;
@@ -120,7 +120,7 @@ static void *x25_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 	s = v;
-	s = s->next;
+	s = s->sk_next;
 out:
 	return s;
 }
@@ -158,8 +158,9 @@ static int x25_seq_socket_show(struct seq_file *seq, void *v)
 		   devname, x25->lci & 0x0FFF, x25->state, x25->vs, x25->vr,
 		   x25->va, x25_display_timer(s) / HZ, x25->t2  / HZ,
 		   x25->t21 / HZ, x25->t22 / HZ, x25->t23 / HZ,
-		   atomic_read(&s->wmem_alloc), atomic_read(&s->rmem_alloc),
-		   s->socket ? SOCK_INODE(s->socket)->i_ino : 0L);
+		   atomic_read(&s->sk_wmem_alloc),
+		   atomic_read(&s->sk_rmem_alloc),
+		   s->sk_socket ? SOCK_INODE(s->sk_socket)->i_ino : 0L);
 out:
 	return 0;
 } 

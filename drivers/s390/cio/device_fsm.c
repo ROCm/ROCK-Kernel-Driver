@@ -132,6 +132,7 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		CIO_DEBUG(KERN_WARNING, 2,
 			  "SenseID : boxed device %04X on subchannel %04X\n",
 			  sch->schib.pmcw.dev, sch->irq);
+		ccw_device_add_stlck(cdev);
 		break;
 	}
 	io_subchannel_recog_done(cdev);
@@ -588,6 +589,29 @@ ccw_device_killing_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 			      ERR_PTR(-ETIMEDOUT));
 }
 
+static void
+ccw_device_stlck_done(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	struct irb *irb;
+
+	switch (dev_event) {
+	case DEV_EVENT_INTERRUPT:
+		irb = (struct irb *) __LC_IRB;
+		/* Check for unsolicited interrupt. */
+		if (irb->scsw.stctl ==
+		    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS))
+			goto out_wakeup;
+
+		ccw_device_accumulate_irb(cdev, irb);
+		/* We don't care about basic sense etc. */
+		break;
+	default: /* timeout */
+		break;
+	}
+out_wakeup:
+	wake_up(&cdev->private->wait_q);
+}
+
 /*
  * No operation action. This is used e.g. to ignore a timeout event in
  * state offline.
@@ -662,8 +686,8 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 	},
 	[DEV_STATE_BOXED] {
 		[DEV_EVENT_NOTOPER]	ccw_device_offline_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_bug,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
+		[DEV_EVENT_INTERRUPT]	ccw_device_stlck_done,
+		[DEV_EVENT_TIMEOUT]	ccw_device_stlck_done,
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
 	},
 	/* states to wait for i/o completion before doing something */

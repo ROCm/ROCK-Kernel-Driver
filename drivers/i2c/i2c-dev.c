@@ -122,7 +122,7 @@ static ssize_t show_dev(struct class_device *class_dev, char *buf)
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 
-static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
+static ssize_t i2cdev_read (struct file *file, char __user *buf, size_t count,
                             loff_t *offset)
 {
 	char *tmp;
@@ -147,7 +147,7 @@ static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
 	return ret;
 }
 
-static ssize_t i2cdev_write (struct file *file, const char *buf, size_t count,
+static ssize_t i2cdev_write (struct file *file, const char __user *buf, size_t count,
                              loff_t *offset)
 {
 	int ret;
@@ -211,12 +211,12 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		return 0;
 	case I2C_FUNCS:
 		funcs = i2c_get_functionality(client->adapter);
-		return (copy_to_user((unsigned long *)arg,&funcs,
+		return (copy_to_user((unsigned long __user *)arg, &funcs,
 		                     sizeof(unsigned long)))?-EFAULT:0;
 
         case I2C_RDWR:
 		if (copy_from_user(&rdwr_arg, 
-				   (struct i2c_rdwr_ioctl_data *)arg, 
+				   (struct i2c_rdwr_ioctl_data __user *)arg, 
 				   sizeof(rdwr_arg)))
 			return -EFAULT;
 
@@ -284,7 +284,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 	case I2C_SMBUS:
 		if (copy_from_user(&data_arg,
-		                   (struct i2c_smbus_ioctl_data *) arg,
+		                   (struct i2c_smbus_ioctl_data __user *) arg,
 		                   sizeof(struct i2c_smbus_ioctl_data)))
 			return -EFAULT;
 		if ((data_arg.size != I2C_SMBUS_BYTE) && 

@@ -364,7 +364,7 @@ static void fd_motor_off_timer( unsigned long dummy );
 static void check_change( unsigned long dummy );
 static __inline__ void set_head_settle_flag( void );
 static __inline__ int get_head_settle_flag( void );
-static void floppy_irq (int irq, void *dummy, struct pt_regs *fp);
+static irqreturn_t floppy_irq (int irq, void *dummy, struct pt_regs *fp);
 static void fd_error( void );
 static int do_format(int drive, int type, struct atari_format_descr *desc);
 static void do_fd_action( int drive );
@@ -597,7 +597,7 @@ static __inline__ int get_head_settle_flag( void )
 
 static void (*FloppyIRQHandler)( int status ) = NULL;
 
-static void floppy_irq (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t floppy_irq (int irq, void *dummy, struct pt_regs *fp)
 {
 	unsigned char status;
 	void (*handler)( int );
@@ -613,6 +613,7 @@ static void floppy_irq (int irq, void *dummy, struct pt_regs *fp)
 	else {
 		DPRINT(("FDC irq, no handler\n"));
 	}
+	return IRQ_HANDLED;
 }
 
 
@@ -1570,7 +1571,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		 */
 
 		/* get the parameters from user space */
-		if (p->ref != 1 && p->ref != -1)
+		if (floppy->ref != 1 && floppy->ref != -1)
 			return -EBUSY;
 		if (copy_from_user(&setprm, (void *) param, sizeof(setprm)))
 			return -EFAULT;
@@ -1617,7 +1618,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 				    printk (KERN_INFO "floppy%d: setting %s %p!\n",
 				        drive, dtp->name, dtp);
 				UDT = dtp;
-				set_capacity(p->disk, UDT->blocks);
+				set_capacity(floppy->disk, UDT->blocks);
 
 				if (cmd == FDDEFPRM) {
 				  /* save settings as permanent default type */
@@ -1663,7 +1664,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		UDT = dtp;
-		set_capacity(p->disk, UDT->blocks);
+		set_capacity(floppy->disk, UDT->blocks);
 
 		return 0;
 	case FDMSGON:
@@ -1677,7 +1678,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 	case FDFMTBEG:
 		return 0;
 	case FDFMTTRK:
-		if (p->ref != 1 && p->ref != -1)
+		if (floppy->ref != 1 && floppy->ref != -1)
 			return -EBUSY;
 		if (copy_from_user(&fmt_desc, (void *) param, sizeof(fmt_desc)))
 			return -EFAULT;
@@ -1686,7 +1687,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		UDT = NULL;
 		/* MSch: invalidate default_params */
 		default_params[drive].blocks  = 0;
-		set_capacity(p->disk, MAX_DISK_SIZE * 2);
+		set_capacity(floppy->disk, MAX_DISK_SIZE * 2);
 	case FDFMTEND:
 	case FDFLUSH:
 		/* invalidate the buffer track to force a reread */
@@ -1895,7 +1896,7 @@ static struct block_device_operations floppy_fops = {
 	.revalidate_disk= floppy_revalidate,
 };
 
-static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
+static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 {
 	int drive = *part & 3;
 	int type  = *part >> 2;

@@ -749,7 +749,7 @@ out:
 
 static struct super_block *
 rpc_get_sb(struct file_system_type *fs_type,
-		int flags, char *dev_name, void *data)
+		int flags, const char *dev_name, void *data)
 {
 	return get_sb_single(fs_type, flags, data, rpc_fill_super);
 }
@@ -782,7 +782,7 @@ int register_rpc_pipefs(void)
 {
 	rpc_inode_cachep = kmem_cache_create("rpc_inode_cache",
                                              sizeof(struct rpc_inode),
-                                             0, SLAB_HWCACHE_ALIGN,
+                                             0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
                                              init_once, NULL);
 	if (!rpc_inode_cachep)
 		return -ENOMEM;

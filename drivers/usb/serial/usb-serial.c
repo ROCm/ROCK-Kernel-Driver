@@ -366,6 +366,7 @@ static struct usb_device_id generic_serial_ids[] = {
 
 /* Driver structure we register with the USB core */
 static struct usb_driver usb_serial_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usbserial",
 	.probe =	usb_serial_probe,
 	.disconnect =	usb_serial_disconnect,
@@ -1303,11 +1304,8 @@ struct tty_driver usb_serial_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
 	.owner =		THIS_MODULE,
 	.driver_name =		"usbserial",
-#ifndef CONFIG_DEVFS_FS
+	.devfs_name =		"usb/tts/",
 	.name =			"ttyUSB",
-#else
-	.name =			"usb/tts/",
-#endif
 	.major =		SERIAL_TTY_MAJOR,
 	.minor_start =		0,
 	.num =			SERIAL_TTY_MINORS,

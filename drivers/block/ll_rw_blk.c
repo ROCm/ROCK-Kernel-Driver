@@ -391,12 +391,6 @@ void blk_queue_dma_alignment(request_queue_t *q, int mask)
 	q->dma_alignment = mask;
 }
 
-void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
-{
-	spin_lock_init(lock);
-	q->queue_lock = lock;
-}
-
 /**
  * blk_queue_find_tag - find a request by its tag and queue
  *
@@ -413,11 +407,12 @@ struct request *blk_queue_find_tag(request_queue_t *q, int tag)
 {
 	struct blk_queue_tag *bqt = q->queue_tags;
 
-	if (unlikely(bqt == NULL || bqt->max_depth < tag))
+	if (unlikely(bqt == NULL || tag >= bqt->real_max_depth))
 		return NULL;
 
 	return bqt->tag_index[tag];
 }
+
 /**
  * blk_queue_free_tags - release tag maintenance info
  * @q:  the request queue for the device
@@ -448,6 +443,42 @@ void blk_queue_free_tags(request_queue_t *q)
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
 
+static int init_tag_map(struct blk_queue_tag *tags, int depth)
+{
+	int bits, i;
+
+	if (depth > (queue_nr_requests*2)) {
+		depth = (queue_nr_requests*2);
+		printk(KERN_ERR "%s: adjusted depth to %d\n", __FUNCTION__, depth);
+	}
+
+	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
+	if (!tags->tag_index)
+		goto fail;
+
+	bits = (depth / BLK_TAGS_PER_LONG) + 1;
+	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
+	if (!tags->tag_map)
+		goto fail;
+
+	memset(tags->tag_index, 0, depth * sizeof(struct request *));
+	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
+	tags->max_depth = depth;
+	tags->real_max_depth = bits * BITS_PER_LONG;
+
+	/*
+	 * set the upper bits if the depth isn't a multiple of the word size
+	 */
+	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
+		__set_bit(i, tags->tag_map);
+
+	return 0;
+fail:
+	kfree(tags->tag_index);
+	return -ENOMEM;
+}
+
+
 /**
  * blk_queue_init_tags - initialize the queue tag info
  * @q:  the request queue for the device
@@ -456,37 +487,16 @@ void blk_queue_free_tags(request_queue_t *q)
 int blk_queue_init_tags(request_queue_t *q, int depth)
 {
 	struct blk_queue_tag *tags;
-	int bits, i;
-
-	if (depth > (queue_nr_requests*2)) {
-		depth = (queue_nr_requests*2);
-		printk("blk_queue_init_tags: adjusted depth to %d\n", depth);
-	}
 
 	tags = kmalloc(sizeof(struct blk_queue_tag),GFP_ATOMIC);
 	if (!tags)
 		goto fail;
 
-	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
-	if (!tags->tag_index)
-		goto fail_index;
+	if (init_tag_map(tags, depth))
+		goto fail;
 
-	bits = (depth / BLK_TAGS_PER_LONG) + 1;
-	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
-	if (!tags->tag_map)
-		goto fail_map;
-
-	memset(tags->tag_index, 0, depth * sizeof(struct request *));
-	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
 	INIT_LIST_HEAD(&tags->busy_list);
 	tags->busy = 0;
-	tags->max_depth = depth;
-
-	/*
-	 * set the upper bits if the depth isn't a multiple of the word size
-	 */
-	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
-		__set_bit(i, tags->tag_map);
 
 	/*
 	 * assign it, all done
@@ -494,13 +504,54 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	q->queue_tags = tags;
 	q->queue_flags |= (1 << QUEUE_FLAG_QUEUED);
 	return 0;
-
-fail_map:
-	kfree(tags->tag_index);
-fail_index:
-	kfree(tags);
 fail:
+	kfree(tags);
 	return -ENOMEM;
+}
+
+/**
+ * blk_queue_resize_tags - change the queueing depth
+ * @q:  the request queue for the device
+ * @new_depth: the new max command queueing depth
+ *
+ *  Notes:
+ *    Must be called with the queue lock held.
+ **/
+int blk_queue_resize_tags(request_queue_t *q, int new_depth)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+	struct request **tag_index;
+	unsigned long *tag_map;
+	int bits, max_depth;
+
+	if (!bqt)
+		return -ENXIO;
+
+	/*
+	 * don't bother sizing down
+	 */
+	if (new_depth <= bqt->real_max_depth) {
+		bqt->max_depth = new_depth;
+		return 0;
+	}
+
+	/*
+	 * save the old state info, so we can copy it back
+	 */
+	tag_index = bqt->tag_index;
+	tag_map = bqt->tag_map;
+	max_depth = bqt->real_max_depth;
+
+	if (init_tag_map(bqt, new_depth))
+		return -ENOMEM;
+
+	memcpy(bqt->tag_index, tag_index, max_depth * sizeof(struct request *));
+	bits = max_depth / BLK_TAGS_PER_LONG;
+	memcpy(bqt->tag_map, tag_map, bits * sizeof(unsigned long));
+
+	kfree(tag_index);
+	kfree(tag_map);
+	return 0;
 }
 
 /**
@@ -524,7 +575,7 @@ void blk_queue_end_tag(request_queue_t *q, struct request *rq)
 
 	BUG_ON(tag == -1);
 
-	if (unlikely(tag >= bqt->max_depth))
+	if (unlikely(tag >= bqt->real_max_depth))
 		return;
 
 	if (unlikely(!__test_and_clear_bit(tag, bqt->tag_map))) {
@@ -1019,30 +1070,12 @@ static void blk_unplug_timeout(unsigned long data)
  *   blk_start_queue() will clear the stop flag on the queue, and call
  *   the request_fn for the queue if it was in a stopped state when
  *   entered. Also see blk_stop_queue(). Must not be called from driver
- *   request function due to recursion issues.
+ *   request function due to recursion issues. Queue lock must be held.
  **/
 void blk_start_queue(request_queue_t *q)
 {
-	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
-		unsigned long flags;
-
-		spin_lock_irqsave(q->queue_lock, flags);
-		if (!elv_queue_empty(q))
-			q->request_fn(q);
-		spin_unlock_irqrestore(q->queue_lock, flags);
-	}
-}
-
-/**
- * __blk_stop_queue: see blk_stop_queue()
- *
- * Description:
- *  Like blk_stop_queue(), but queue_lock must be held
- **/
-void __blk_stop_queue(request_queue_t *q)
-{
-	blk_remove_plug(q);
-	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
+	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
+		schedule_work(&q->unplug_work);
 }
 
 /**
@@ -1057,15 +1090,12 @@ void __blk_stop_queue(request_queue_t *q)
  *   or if it simply chooses not to queue more I/O at one point, it can
  *   call this function to prevent the request_fn from being called until
  *   the driver has signalled it's ready to go again. This happens by calling
- *   blk_start_queue() to restart queue operations.
+ *   blk_start_queue() to restart queue operations. Queue lock must be held.
  **/
 void blk_stop_queue(request_queue_t *q)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(q->queue_lock, flags);
-	__blk_stop_queue(q);
-	spin_unlock_irqrestore(q->queue_lock, flags);
+	blk_remove_plug(q);
+	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
 
 /**
@@ -2307,7 +2337,6 @@ EXPORT_SYMBOL(blk_rq_map_sg);
 EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);
 EXPORT_SYMBOL(submit_bio);
-EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
 EXPORT_SYMBOL(blk_get_request);
@@ -2326,7 +2355,6 @@ EXPORT_SYMBOL(blk_queue_invalidate_tags);
 
 EXPORT_SYMBOL(blk_start_queue);
 EXPORT_SYMBOL(blk_stop_queue);
-EXPORT_SYMBOL(__blk_stop_queue);
 EXPORT_SYMBOL(blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);
 

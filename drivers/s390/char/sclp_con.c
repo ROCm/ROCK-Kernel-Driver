@@ -15,9 +15,11 @@
 #include <linux/timer.h>
 #include <linux/jiffies.h>
 #include <linux/bootmem.h>
+#include <linux/err.h>
 
 #include "sclp.h"
 #include "sclp_rw.h"
+#include "sclp_tty.h"
 
 #define SCLP_CON_PRINT_HEADER "sclp console driver: "
 
@@ -69,10 +71,23 @@ sclp_conbuf_callback(struct sclp_buffer *buffer, int rc)
 }
 
 static inline void
-__sclp_conbuf_emit(struct sclp_buffer *buffer)
+sclp_conbuf_emit(void)
 {
+	struct sclp_buffer* buffer;
+	unsigned long flags;
+	int count;
+
+	spin_lock_irqsave(&sclp_con_lock, flags);
+	buffer = sclp_conbuf;
+	sclp_conbuf = NULL;
+	if (buffer == NULL) {
+		spin_unlock_irqrestore(&sclp_con_lock, flags);
+		return;
+	}
 	list_add_tail(&buffer->list, &sclp_con_outqueue);
-	if (sclp_con_buffer_count++ == 0)
+	count = sclp_con_buffer_count++;
+	spin_unlock_irqrestore(&sclp_con_lock, flags);
+	if (count == 0)
 		sclp_emit_buffer(buffer, sclp_conbuf_callback);
 }
 
@@ -83,14 +98,7 @@ __sclp_conbuf_emit(struct sclp_buffer *buffer)
 static void
 sclp_console_timeout(unsigned long data)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&sclp_con_lock, flags);
-	if (sclp_conbuf != NULL) {
-		__sclp_conbuf_emit(sclp_conbuf);
-		sclp_conbuf = NULL;
-	}
-	spin_unlock_irqrestore(&sclp_con_lock, flags);
+	sclp_conbuf_emit();
 }
 
 /*
@@ -134,8 +142,9 @@ sclp_console_write(struct console *console, const char *message,
 		 * output buffer. Emit the buffer, create a new buffer
 		 * and then output the rest of the string.
 		 */
-		__sclp_conbuf_emit(sclp_conbuf);
-		sclp_conbuf = NULL;
+		spin_unlock_irqrestore(&sclp_con_lock, flags);
+		sclp_conbuf_emit();
+		spin_lock_irqsave(&sclp_con_lock, flags);
 		message += written;
 		count -= written;
 	} while (count > 0);
@@ -150,11 +159,11 @@ sclp_console_write(struct console *console, const char *message,
 	spin_unlock_irqrestore(&sclp_con_lock, flags);
 }
 
-/* returns the device number of the SCLP console */
-static kdev_t
-sclp_console_device(struct console *c)
+static struct tty_driver *
+sclp_console_device(struct console *c, int *index)
 {
-	return	mk_kdev(sclp_console_major, sclp_console_minor);
+	*index = c->index;
+	return &sclp_tty_driver;
 }
 
 /*
@@ -167,13 +176,10 @@ sclp_console_unblank(void)
 {
 	unsigned long flags;
 
+	sclp_conbuf_emit();
 	spin_lock_irqsave(&sclp_con_lock, flags);
 	if (timer_pending(&sclp_con_timer))
 		del_timer(&sclp_con_timer);
-	if (sclp_conbuf != NULL) {
-		__sclp_conbuf_emit(sclp_conbuf);
-		sclp_conbuf = NULL;
-	}
 	while (sclp_con_buffer_count > 0) {
 		spin_unlock_irqrestore(&sclp_con_lock, flags);
 		sclp_sync_wait();
@@ -204,17 +210,19 @@ sclp_console_init(void)
 {
 	void *page;
 	int i;
+	int rc;
 
 	if (!CONSOLE_IS_SCLP)
 		return 0;
-	if (sclp_rw_init() != 0)
-		return 0;
+	rc = sclp_rw_init();
+	if (rc)
+		return rc;
 	/* Allocate pages for output buffering */
 	INIT_LIST_HEAD(&sclp_con_pages);
 	for (i = 0; i < MAX_CONSOLE_PAGES; i++) {
 		page = alloc_bootmem_low_pages(PAGE_SIZE);
 		if (page == NULL)
-			return 0;
+			return -ENOMEM;
 		list_add_tail((struct list_head *) page, &sclp_con_pages);
 	}
 	INIT_LIST_HEAD(&sclp_con_outqueue);

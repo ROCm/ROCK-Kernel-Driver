@@ -42,7 +42,7 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/module.h>
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/bcd.h>
 
 #include <asm/io.h>
@@ -278,18 +278,22 @@ unsigned long get_cmos_time(void)
 	return retval;
 }
 
+static struct sysdev_class rtc_sysclass = {
+	set_kset_name("rtc"),
+};
+
 /* XXX this driverfs stuff should probably go elsewhere later -john */
 static struct sys_device device_i8253 = {
-	.name		= "rtc",
 	.id		= 0,
-	.dev	= {
-		.name	= "i8253 Real Time Clock",
-	},
+	.cls	= &rtc_sysclass,
 };
 
 static int time_init_device(void)
 {
-	return sys_device_register(&device_i8253);
+	int error = sysdev_class_register(&rtc_sysclass);
+	if (!error)
+		error = sys_device_register(&device_i8253);
+	return error;
 }
 
 device_initcall(time_init_device);

@@ -190,6 +190,7 @@ struct sk_buff {
 	struct sock		*sk;
 	struct timeval		stamp;
 	struct net_device	*dev;
+	struct net_device	*real_dev;
 
 	union {
 		struct tcphdr	*th;

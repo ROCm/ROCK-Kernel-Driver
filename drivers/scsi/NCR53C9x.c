@@ -890,24 +890,15 @@ static int esp_host_info(struct NCR_ESP *esp, char *ptr, off_t offset, int len)
 }
 
 /* ESP proc filesystem code. */
-int esp_proc_info(char *buffer, char **start, off_t offset, int length,
-		  int hostno, int inout)
+int esp_proc_info(struct Scsi_Host *shost, char *buffer, char **start, off_t offset, int length,
+		  int inout)
 {
-	struct NCR_ESP *esp;
+	struct NCR_ESP *esp = (struct NCR_ESP *) SCpnt->device->host->hostdata;
 
 	if(inout)
 		return -EINVAL; /* not yet */
-
-	for_each_esp(esp) {
-		if(esp->ehost->host_no == hostno)
-			break;
-	}
-	if(!esp)
-		return -EINVAL;
-
 	if(start)
 		*start = buffer;
-
 	return esp_host_info(esp, buffer, offset, length);
 }
 

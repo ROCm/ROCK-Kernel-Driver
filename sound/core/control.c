@@ -222,7 +222,7 @@ snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * ncontrol, void *private_data)
 	kctl.id.device = ncontrol->device;
 	kctl.id.subdevice = ncontrol->subdevice;
 	if (ncontrol->name)
-		strncpy(kctl.id.name, ncontrol->name, sizeof(kctl.id.name)-1);
+		strlcpy(kctl.id.name, ncontrol->name, sizeof(kctl.id.name));
 	kctl.id.index = ncontrol->index;
 	kctl.count = ncontrol->count ? ncontrol->count : 1;
 	access = ncontrol->access == 0 ? SNDRV_CTL_ELEM_ACCESS_READWRITE :
@@ -396,10 +396,6 @@ static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 			continue;
 		if (kctl->id.index + kctl->count <= id->index)
 			continue;
-		if (kctl->id.index != id->index) {
-			printk("BOOOR: %i, %i, %i\n", kctl->id.index, kctl->count, id->index);
-			continue;
-		}
 		return kctl;
 	}
 	return NULL;
@@ -449,12 +445,12 @@ static int snd_ctl_card_info(snd_card_t * card, snd_ctl_file_t * ctl,
 	memset(&info, 0, sizeof(info));
 	down_read(&snd_ioctl_rwsem);
 	info.card = card->number;
-	strncpy(info.id, card->id, sizeof(info.id) - 1);
-	strncpy(info.driver, card->driver, sizeof(info.driver) - 1);
-	strncpy(info.name, card->shortname, sizeof(info.name) - 1);
-	strncpy(info.longname, card->longname, sizeof(info.longname) - 1);
-	strncpy(info.mixername, card->mixername, sizeof(info.mixername) - 1);
-	strncpy(info.components, card->components, sizeof(info.components) - 1);
+	strlcpy(info.id, card->id, sizeof(info.id));
+	strlcpy(info.driver, card->driver, sizeof(info.driver));
+	strlcpy(info.name, card->shortname, sizeof(info.name));
+	strlcpy(info.longname, card->longname, sizeof(info.longname));
+	strlcpy(info.mixername, card->mixername, sizeof(info.mixername));
+	strlcpy(info.components, card->components, sizeof(info.components));
 	up_read(&snd_ioctl_rwsem);
 	if (copy_to_user((void *) arg, &info, sizeof(snd_ctl_card_info_t)))
 		return -EFAULT;
@@ -772,9 +768,9 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 			return -EPERM;
 #ifdef CONFIG_PM
 		if (card->set_power_state) {
-		    snd_power_lock(card);
-		    err = card->set_power_state(card, err);
-		    snd_power_unlock(card);
+			snd_power_lock(card);
+			err = card->set_power_state(card, err);
+			snd_power_unlock(card);
 		} else
 #endif
 			err = -ENOPROTOOPT;
@@ -931,9 +927,7 @@ static int snd_ctl_fasync(int fd, struct file * file, int on)
 
 static struct file_operations snd_ctl_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_ctl_read,
 	.open =		snd_ctl_open,
 	.release =	snd_ctl_release,

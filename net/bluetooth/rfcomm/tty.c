@@ -294,7 +294,7 @@ static int rfcomm_create_dev(struct sock *sk, unsigned long arg)
 	
 	if (req.flags & (1 << RFCOMM_REUSE_DLC)) {
 		/* Socket must be connected */
-		if (sk->state != BT_CONNECTED)
+		if (sk->sk_state != BT_CONNECTED)
 			return -EBADFD;
 
 		dlc = rfcomm_pi(sk)->dlc;
@@ -314,7 +314,7 @@ static int rfcomm_create_dev(struct sock *sk, unsigned long arg)
 	if (req.flags & (1 << RFCOMM_REUSE_DLC)) {
 		/* DLC is now used by device.
 		 * Socket must be disconnected */
-		sk->state = BT_CLOSED;
+		sk->sk_state = BT_CLOSED;
 	}
 
 	return id;
@@ -863,11 +863,8 @@ static struct tty_driver rfcomm_tty_driver = {
 
 	.magic			= TTY_DRIVER_MAGIC,
 	.driver_name		= "rfcomm",
-#ifdef CONFIG_DEVFS_FS
-	.name			= "bluetooth/rfcomm/",
-#else
+	.devfs_name		= "bluetooth/rfcomm/",
 	.name			= "rfcomm",
-#endif
 	.major			= RFCOMM_TTY_MAJOR,
 	.minor_start		= RFCOMM_TTY_MINOR,
 	.num			= RFCOMM_TTY_PORTS,

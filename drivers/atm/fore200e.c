@@ -633,11 +633,6 @@ fore200e_pca_detect(const struct fore200e_bus* bus, int index)
     struct pci_dev*  pci_dev = NULL;
     int              count = index;
     
-    if (pci_present() == 0) {
-	printk(FORE200E "no PCI subsystem\n");
-	return NULL;
-    }
-
     do {
 	pci_dev = pci_find_device(PCI_VENDOR_ID_FORE, PCI_DEVICE_ID_FORE_PCA200E, pci_dev);
 	if (pci_dev == NULL)

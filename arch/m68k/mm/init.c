@@ -33,7 +33,7 @@
 #endif
 #include <asm/tlb.h>
 
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 /*
  * ZERO_PAGE is a special page that is used for zero-initialized

@@ -50,7 +50,7 @@ int usb_stor_euscsi_init(struct us_data *us)
 	int result;
 
 	US_DEBUGP("Attempting to init eUSCSI bridge...\n");
-	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
+	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 			0x0C, USB_RECIP_INTERFACE | USB_TYPE_VENDOR,
 			0x01, 0x0, &data, 0x1, 5*HZ);
 	US_DEBUGP("-- result is %d\n", result);

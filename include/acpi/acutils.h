@@ -488,7 +488,7 @@ acpi_ut_execute_HID (
 acpi_status
 acpi_ut_execute_CID (
 	struct acpi_namespace_node      *device_node,
-	struct acpi_device_id           *cid);
+	struct acpi_compatible_id_list **return_cid_list);
 
 acpi_status
 acpi_ut_execute_STA (

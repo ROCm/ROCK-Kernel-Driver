@@ -679,7 +679,7 @@ titan_agp_configure(alpha_agp_info *agp)
 }
 
 static int 
-titan_agp_bind_memory(alpha_agp_info *agp, off_t pg_start, agp_memory *mem)
+titan_agp_bind_memory(alpha_agp_info *agp, off_t pg_start, struct agp_memory *mem)
 {
 	struct titan_agp_aperture *aper = agp->aperture.sysdata;
 	return iommu_bind(aper->arena, aper->pg_start + pg_start, 
@@ -687,7 +687,7 @@ titan_agp_bind_memory(alpha_agp_info *agp, off_t pg_start, agp_memory *mem)
 }
 
 static int 
-titan_agp_unbind_memory(alpha_agp_info *agp, off_t pg_start, agp_memory *mem)
+titan_agp_unbind_memory(alpha_agp_info *agp, off_t pg_start, struct agp_memory *mem)
 {
 	struct titan_agp_aperture *aper = agp->aperture.sysdata;
 	return iommu_unbind(aper->arena, aper->pg_start + pg_start,

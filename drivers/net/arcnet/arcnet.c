@@ -73,11 +73,11 @@ struct ArcProto *arc_proto_map[256], *arc_proto_default, *arc_bcast_proto;
 
 struct ArcProto arc_proto_null =
 {
-	'?',
-	XMTU,
-	null_rx,
-	null_build_header,
-	null_prepare_tx
+	.suffix		= '?',
+	.mtu		= XMTU,
+	.rx		= null_rx,
+	.build_header	= null_build_header,
+	.prepare_tx	= null_prepare_tx,
 };
 
 static spinlock_t arcnet_lock = SPIN_LOCK_UNLOCKED;
@@ -671,7 +671,7 @@ static void arcnet_timeout(struct net_device *dev)
  * interrupts. Establish which device needs attention, and call the correct
  * chipset interrupt handler.
  */
-void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct arcnet_local *lp;
@@ -696,7 +696,7 @@ void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			ACOMMAND(CFLAGScmd | RESETclear);
 		AINTMASK(0);
 		spin_unlock(&arcnet_lock);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	BUGMSG(D_DURING, "in arcnet_inthandler (status=%Xh, intmask=%Xh)\n",
@@ -864,6 +864,7 @@ void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	AINTMASK(lp->intmask);
 	
 	spin_unlock(&arcnet_lock);
+	return IRQ_RETVAL(didsomething);
 }
 
 

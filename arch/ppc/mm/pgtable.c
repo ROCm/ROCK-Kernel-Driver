@@ -74,7 +74,6 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	pte_t *pte;
 	extern int mem_init_done;
 	extern void *early_get_page(void);
-	int timeout = 0;
 
 	if (mem_init_done)
 		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);

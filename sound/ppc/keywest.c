@@ -49,6 +49,10 @@ struct i2c_driver keywest_driver = {
 };
 
 
+#ifndef i2c_device_name
+#define i2c_device_name(x)	((x)->dev.name)
+#endif
+
 static int keywest_attach_adapter(struct i2c_adapter *adapter)
 {
 	int err;
@@ -57,20 +61,21 @@ static int keywest_attach_adapter(struct i2c_adapter *adapter)
 	if (! keywest_ctx)
 		return -EINVAL;
 
-	if (strncmp(adapter->name, "mac-io", 6))
+	if (strncmp(i2c_device_name(adapter), "mac-io", 6))
 		return 0; /* ignored */
 
 	new_client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
 	if (! new_client)
 		return -ENOMEM;
 
+	memset(new_client, 0, sizeof(*new_client));
 	new_client->addr = keywest_ctx->addr;
-	new_client->data = keywest_ctx;
+	i2c_set_clientdata(new_client, keywest_ctx);
 	new_client->adapter = adapter;
 	new_client->driver = &keywest_driver;
 	new_client->flags = 0;
 
-	strcpy(new_client->name, keywest_ctx->name);
+	strcpy(i2c_device_name(new_client), keywest_ctx->name);
 
 	new_client->id = keywest_ctx->id++; /* Automatically unique */
 	keywest_ctx->client = new_client;

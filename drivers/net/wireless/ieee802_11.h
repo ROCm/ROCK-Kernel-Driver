@@ -2,9 +2,15 @@
 #define _IEEE802_11_H
 
 #define IEEE802_11_DATA_LEN		2304
-/* Actually, the standard seems to be inconsistent about what the
-   maximum frame size really is.  Section 6.2.1.1.2 says 2304 octets,
-   but the figure in Section 7.1.2 says 2312 octects. */
+/* Maximum size for the MA-UNITDATA primitive, 802.11 standard section
+   6.2.1.1.2.
+
+   The figure in section 7.1.2 suggests a body size of up to 2312
+   bytes is allowed, which is a bit confusing, I suspect this
+   represents the 2304 bytes of real data, plus a possible 8 bytes of
+   WEP IV and ICV. (this interpretation suggested by Ramiro Barreiro) */
+
+
 #define IEEE802_11_HLEN			30
 #define IEEE802_11_FRAME_LEN		(IEEE802_11_DATA_LEN + IEEE802_11_HLEN)
 

@@ -24,6 +24,12 @@ ifeq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS		+=-g
 endif
 
+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+CFLAGS		+= -mbig-endian
+AS		+= -EB
+LD		+= -EB
+endif
+
 # Select CPU dependent flags.  Note that order of declaration is important;
 # the options further down the list override previous items.
 #
@@ -34,10 +40,7 @@ apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3
 # Note that GCC does not numerically define an architecture version
 # macro, but instead defines a whole series of macros which makes
 # testing for a specific architecture or later rather impossible.
-#
-# Note - GCC does accept -march=armv5te, but someone messed up the assembler or the
-# gcc specs file - this needs fixing properly - ie in gcc and/or binutils.
-arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5t
+arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5te
 arch-$(CONFIG_CPU_32v4)		:=-D__LINUX_ARM_ARCH__=4 -march=armv4
 arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
 
@@ -50,13 +53,13 @@ tune-$(CONFIG_CPU_ARM922T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_ARM926T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
-tune-$(CONFIG_CPU_XSCALE)	:=-mtune=strongarm -Wa,-mxscale #-mtune=xscale
+tune-$(CONFIG_CPU_XSCALE)	:=-mtune=xscale
 
 # Force -mno-fpu to be passed to the assembler.  Some versions of gcc don't
 # do this with -msoft-float
 CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
-AFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mno-fpu -msoft-float -Wa,-mno-fpu
+AFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
 
 #Default value
 DATAADDR	:= .
@@ -76,7 +79,11 @@ endif
 ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	:= armv
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
-LDFLAGS_BLOB	+= --oformat elf32-littlearm
+  ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+    LDFLAGS_BLOB	+= --oformat elf32-bigarm
+  else
+    LDFLAGS_BLOB	+= --oformat elf32-littlearm
+  endif
 textaddr-y	:= 0xC0008000
 endif
 

@@ -104,7 +104,6 @@ static struct serial_uart_config uart_config[] = {
 };
 
 struct tty_driver hp_simserial_driver;
-static struct tty_driver callout_driver;
 static int serial_refcount;
 
 static struct async_struct *IRQ_ports[NR_IRQS];
@@ -689,7 +688,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	MOD_DEC_USE_COUNT;
 }
@@ -723,7 +722,7 @@ static void rs_hangup(struct tty_struct *tty)
 
 	info->event = 0;
 	state->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -937,10 +936,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 
 	if ((info->state->count == 1) &&
 	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->state->normal_termios;
-		else
-			*tty->termios = info->state->callout_termios;
+		*tty->termios = info->state->normal_termios;
 	}
 
 	/*
@@ -951,9 +947,6 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 		if ((console->flags & CON_ENABLED) && console->write) break;
 		console = console->next;
 	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 #ifdef SIMSERIAL_DEBUG
 	printk("rs_open ttys%d successful\n", info->line);
@@ -1084,22 +1077,9 @@ simrs_init (void)
 		       state->port, state->irq,
 		       uart_config[state->type].name);
 	}
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = hp_simserial_driver;
-	callout_driver.name = "cua";
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	callout_driver.read_proc = 0;
-	callout_driver.proc_entry = 0;
 
 	if (tty_register_driver(&hp_simserial_driver))
 		panic("Couldn't register simserial driver\n");
-
-	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
 
 	return 0;
 }

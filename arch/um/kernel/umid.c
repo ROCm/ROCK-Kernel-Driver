@@ -45,8 +45,7 @@ static int __init set_umid(char *name, int is_random)
 	if(strlen(name) > UMID_LEN - 1)
 		printk("Unique machine name is being truncated to %s "
 		       "characters\n", UMID_LEN);
-	strncpy(umid, name, UMID_LEN - 1);
-	umid[UMID_LEN - 1] = '\0';
+	strlcpy(umid, name, sizeof(umid));
 
 	umid_is_random = is_random;
 	umid_inited = 1;
@@ -222,7 +221,7 @@ static int __init make_uml_dir(void)
 			       "$HOME\n");
 			exit(1);
 		}
-		strncpy(dir, home, sizeof(dir));
+		strlcpy(dir, home, sizeof(dir));
 		uml_dir++;
 	}
 	len = strlen(dir);
@@ -251,8 +250,7 @@ static int __init make_umid(void)
 	int fd, err;
 	char tmp[strlen(uml_dir) + UMID_LEN + 1];
 
-	strncpy(tmp, uml_dir, sizeof(tmp) - 1);
-	tmp[sizeof(tmp) - 1] = '\0';
+	strlcpy(tmp, uml_dir, sizeof(tmp));
 
 	if(*umid == 0){
 		strcat(tmp, "XXXXXX");

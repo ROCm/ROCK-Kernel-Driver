@@ -117,11 +117,14 @@
 
 #include <linux/fs.h>
 #include <linux/list.h>
+#include <linux/cdev.h>
 
 struct tty_driver {
 	int	magic;		/* magic number for this structure */
+	struct cdev cdev;
 	struct module	*owner;
 	const char	*driver_name;
+	const char	*devfs_name;
 	const char	*name;
 	int	name_base;	/* offset of printed name */
 	short	major;		/* major device number */

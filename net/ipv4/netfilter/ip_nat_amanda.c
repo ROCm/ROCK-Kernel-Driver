@@ -221,6 +221,6 @@ static int __init init(void)
 	return ret;
 }
 
-
+NEEDS_CONNTRACK(amanda);
 module_init(init);
 module_exit(fini);

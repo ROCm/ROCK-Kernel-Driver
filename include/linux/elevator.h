@@ -83,7 +83,6 @@ extern elevator_t iosched_deadline;
 
 extern int elevator_init(request_queue_t *, elevator_t *);
 extern void elevator_exit(request_queue_t *);
-extern inline int bio_rq_in_between(struct bio *, struct request *, struct list_head *);
 extern inline int elv_rq_merge_ok(struct request *, struct bio *);
 extern inline int elv_try_merge(struct request *, struct bio *);
 extern inline int elv_try_last_merge(request_queue_t *, struct bio *);

@@ -183,11 +183,6 @@
 #define SERIAL_SICC_MINOR   1
 #define SERIAL_SICC_NR      1
 
-#define CALLOUT_SICC_NAME   "cuasicc"
-#define CALLOUT_SICC_MAJOR  151
-#define CALLOUT_SICC_MINOR  1
-#define CALLOUT_SICC_NR     SERIAL_SICC_NR
-
 #ifndef TRUE
 #define TRUE 1
 #endif
@@ -202,7 +197,7 @@
 /*
  * Things needed by tty driver
  */
-static struct tty_driver siccnormal_driver, sicccallout_driver;
+static struct tty_driver siccnormal_driver;
 static int siccuart_refcount;
 static struct tty_struct *siccuart_table[SERIAL_SICC_NR];
 static struct termios *siccuart_termios[SERIAL_SICC_NR];
@@ -275,8 +270,6 @@ struct SICC_state {
     unsigned int        custom_divisor;
     unsigned int        flags;
     struct termios      normal_termios;
-    struct termios      callout_termios;
-
     int         count;
     struct SICC_info    *info;
 };
@@ -304,8 +297,6 @@ struct SICC_info {
     unsigned int        lcr_h;
     unsigned int        mctrl;
     int         blocked_open;
-    pid_t           session;
-    pid_t           pgrp;
 
     struct tasklet_struct   tlet;
 
@@ -1487,8 +1478,6 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
      */
     if (info->flags & ASYNC_NORMAL_ACTIVE)
         info->state->normal_termios = *tty->termios;
-    if (info->flags & ASYNC_CALLOUT_ACTIVE)
-        info->state->callout_termios = *tty->termios;
     /*
      * Now we wait for the transmit buffer to clear; and we notify
      * the line discipline to only process XON/XOFF characters.
@@ -1524,8 +1513,7 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
         }
         wake_up_interruptible(&info->open_wait);
     }
-    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-             ASYNC_CLOSING);
+    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
     wake_up_interruptible(&info->close_wait);
     MOD_DEC_USE_COUNT;
 }
@@ -1594,7 +1582,7 @@ static void siccuart_hangup(struct tty_struct *tty)
     siccuart_shutdown(info);
     info->event = 0;
     state->count = 0;
-    info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+    info->flags &= ~ASYNC_NORMAL_ACTIVE;
     info->tty = NULL;
     wake_up_interruptible(&info->open_wait);
 }
@@ -1620,43 +1608,17 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
     }
 
     /*
-     * If this is a callout device, then just make sure the normal
-     * device isn't being used.
-     */
-    if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-        if (info->flags & ASYNC_NORMAL_ACTIVE)
-            return -EBUSY;
-        if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-            (info->flags & ASYNC_SESSION_LOCKOUT) &&
-            (info->session != current->session))
-            return -EBUSY;
-        if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-            (info->flags & ASYNC_PGRP_LOCKOUT) &&
-            (info->pgrp != current->pgrp))
-            return -EBUSY;
-        info->flags |= ASYNC_CALLOUT_ACTIVE;
-        return 0;
-    }
-
-    /*
      * If non-blocking mode is set, or the port is not enabled,
      * then make the check up front and then exit.
      */
     if ((filp->f_flags & O_NONBLOCK) ||
         (tty->flags & (1 << TTY_IO_ERROR))) {
-        if (info->flags & ASYNC_CALLOUT_ACTIVE)
-            return -EBUSY;
         info->flags |= ASYNC_NORMAL_ACTIVE;
         return 0;
     }
 
-    if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-        if (state->normal_termios.c_cflag & CLOCAL)
-            do_clocal = 1;
-    } else {
-        if (tty->termios->c_cflag & CLOCAL)
-            do_clocal = 1;
-    }
+    if (tty->termios->c_cflag & CLOCAL)
+	do_clocal = 1;
 
     /*
      * Block waiting for the carrier detect and the line to become
@@ -1676,8 +1638,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
     info->blocked_open++;
     while (1) {
         save_flags(flags); cli();
-        if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-            (tty->termios->c_cflag & CBAUD)) {
+        if (tty->termios->c_cflag & CBAUD) {
             info->mctrl = TIOCM_DTR | TIOCM_RTS;
             info->port->set_mctrl(info->port, info->mctrl);
         }
@@ -1691,8 +1652,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
                 retval = -ERESTARTSYS;
             break;
         }
-        if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-            !(info->flags & ASYNC_CLOSING) &&
+        if (!(info->flags & ASYNC_CLOSING) &&
             (do_clocal /*|| (UART_GET_FR(info->port) & SICC_UARTFR_DCD)*/))
             break;
         if (signal_pending(current)) {
@@ -1803,12 +1763,7 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
 
     if ((info->state->count == 1) &&
         (info->flags & ASYNC_SPLIT_TERMIOS)) {
-        if (tty->driver->subtype == SERIAL_TYPE_NORMAL) {
-            *tty->termios = info->state->normal_termios;
-        }
-        else  {
-            *tty->termios = info->state->callout_termios;
-        }
+	*tty->termios = info->state->normal_termios;
     }
 #ifdef CONFIG_SERIAL_SICC_CONSOLE
     if (siccuart_cons.cflag && siccuart_cons.index == line) {
@@ -1817,8 +1772,6 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
         siccuart_change_speed(info, NULL);
     }
 #endif
-    info->session = current->session;
-    info->pgrp = current->pgrp;
     return 0;
 }
 
@@ -1862,28 +1815,14 @@ int __init siccuart_init(void)
     siccnormal_driver.wait_until_sent = siccuart_wait_until_sent;
     siccnormal_driver.read_proc = NULL;
 
-    /*
-     * The callout device is just like the normal device except for
-     * the major number and the subtype code.
-     */
-    sicccallout_driver = siccnormal_driver;
-    sicccallout_driver.name = CALLOUT_SICC_NAME;
-    sicccallout_driver.major = CALLOUT_SICC_MAJOR;
-    sicccallout_driver.subtype = SERIAL_TYPE_CALLOUT;
-    sicccallout_driver.read_proc = NULL;
-    sicccallout_driver.proc_entry = NULL;
-
     if (tty_register_driver(&siccnormal_driver))
         panic("Couldn't register SICC serial driver\n");
-    if (tty_register_driver(&sicccallout_driver))
-        panic("Couldn't register SICC callout driver\n");
 
     for (i = 0; i < SERIAL_SICC_NR; i++) {
         struct SICC_state *state = sicc_state + i;
         state->line     = i;
         state->close_delay  = 5 * HZ / 10;
         state->closing_wait = 30 * HZ;
-        state->callout_termios  = sicccallout_driver.init_termios;
         state->normal_termios   = siccnormal_driver.init_termios;
     }
 

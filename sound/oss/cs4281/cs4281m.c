@@ -2266,8 +2266,8 @@ static int mixer_ioctl(struct cs4281_state *s, unsigned int cmd,
 	}
 	if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, "CS4281", sizeof(info.id));
-		strncpy(info.name, "Crystal CS4281", sizeof(info.name));
+		strlcpy(info.id, "CS4281", sizeof(info.id));
+		strlcpy(info.name, "Crystal CS4281", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
 		if (copy_to_user((void *) arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -2275,8 +2275,8 @@ static int mixer_ioctl(struct cs4281_state *s, unsigned int cmd,
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, "CS4281", sizeof(info.id));
-		strncpy(info.name, "Crystal CS4281", sizeof(info.name));
+		strlcpy(info.id, "CS4281", sizeof(info.id));
+		strlcpy(info.name, "Crystal CS4281", sizeof(info.name));
 		if (copy_to_user((void *) arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -4484,11 +4484,6 @@ int __init cs4281_init_module(void)
 	int rtn = 0;
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO 
 		"cs4281: cs4281_init_module()+ \n"));
-	if (!pci_present()) {	/* No PCI bus in this machine! */
-		CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO
-			"cs4281: cs4281_init_module()- no pci bus found\n"));
-		return -ENODEV;
-	}
 	printk(KERN_INFO "cs4281: version v%d.%02d.%d time " __TIME__ " "
 	       __DATE__ "\n", CS4281_MAJOR_VERSION, CS4281_MINOR_VERSION,
 	       CS4281_ARCH);

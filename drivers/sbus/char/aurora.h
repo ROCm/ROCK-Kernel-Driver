@@ -247,8 +247,6 @@ struct Aurora_port {
 	long			event;
 	int			timeout;
 	int			close_delay;
-	long			session;
-	long			pgrp;
 	unsigned char 		* xmit_buf;
 	int			custom_divisor;
 	int			xmit_head;

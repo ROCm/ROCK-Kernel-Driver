@@ -341,6 +341,8 @@ static int __init init(void)
 	return ret;
 }
 
+NEEDS_CONNTRACK(ftp);
+
 module_init(init);
 module_exit(fini);
 MODULE_LICENSE("GPL");

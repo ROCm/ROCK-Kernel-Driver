@@ -636,8 +636,8 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 	{
 		mixer_info info;
 		memset(&info,0,sizeof(info));
-                strncpy(info.id,   "TV audio", sizeof(info.id)-1);
-                strncpy(info.name, dev->name,  sizeof(info.name)-1);
+                strlcpy(info.id,   "TV audio", sizeof(info.id));
+                strlcpy(info.name, dev->name,  sizeof(info.name));
                 info.modify_counter = dev->oss.count;
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
@@ -647,8 +647,8 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 	{
 		_old_mixer_info info;
 		memset(&info,0,sizeof(info));
-                strncpy(info.id,   "TV audio", sizeof(info.id)-1);
-                strncpy(info.name, dev->name,  sizeof(info.name)-1);
+                strlcpy(info.id,   "TV audio", sizeof(info.id));
+                strlcpy(info.name, dev->name,  sizeof(info.name));
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
 		return 0;

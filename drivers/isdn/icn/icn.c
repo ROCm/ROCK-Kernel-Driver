@@ -509,7 +509,7 @@ icn_parse_status(u_char * status, int channel, icn_card * card)
 				char *s = strpbrk(t, ",");
 
 				*s++ = '\0';
-				strncpy(cmd.parm.setup.phone, t,
+				strlcpy(cmd.parm.setup.phone, t,
 					sizeof(cmd.parm.setup.phone));
 				s = strpbrk(t = s, ",");
 				*s++ = '\0';
@@ -525,7 +525,7 @@ icn_parse_status(u_char * status, int channel, icn_card * card)
 				else
 					cmd.parm.setup.si2 =
 					    simple_strtoul(t, NULL, 10);
-				strncpy(cmd.parm.setup.eazmsn, s,
+				strlcpy(cmd.parm.setup.eazmsn, s,
 					sizeof(cmd.parm.setup.eazmsn));
 			}
 			cmd.parm.setup.plan = 0;
@@ -540,19 +540,19 @@ icn_parse_status(u_char * status, int channel, icn_card * card)
 			cmd.parm.setup.screen = 0;
 			break;
 		case 5:
-			strncpy(cmd.parm.num, status + 3, sizeof(cmd.parm.num) - 1);
+			strlcpy(cmd.parm.num, status + 3, sizeof(cmd.parm.num));
 			break;
 		case 6:
-			sprintf(cmd.parm.num, "%d",
+			snprintf(cmd.parm.num, sizeof(cmd.parm.num), "%d",
 			     (int) simple_strtoul(status + 7, NULL, 16));
 			break;
 		case 7:
 			status += 3;
 			if (strlen(status) == 4)
-				sprintf(cmd.parm.num, "%s%c%c",
+				snprintf(cmd.parm.num, sizeof(cmd.parm.num), "%s%c%c",
 				     status + 2, *status, *(status + 1));
 			else
-				strncpy(cmd.parm.num, status + 1, sizeof(cmd.parm.num) - 1);
+				strlcpy(cmd.parm.num, status + 1, sizeof(cmd.parm.num));
 			break;
 		case 8:
 			card->flags &= ~ICN_FLAGS_B1ACTIVE;
@@ -1558,7 +1558,7 @@ icn_initcard(int port, char *id)
 	    ISDN_FEATURE_L3_TRANS |
 	    ISDN_FEATURE_P_UNKNOWN;
 	card->ptype = ISDN_PTYPE_UNKNOWN;
-	strncpy(card->interface.id, id, sizeof(card->interface.id) - 1);
+	strlcpy(card->interface.id, id, sizeof(card->interface.id));
 	card->msg_buf_write = card->msg_buf;
 	card->msg_buf_read = card->msg_buf;
 	card->msg_buf_end = &card->msg_buf[sizeof(card->msg_buf) - 1];

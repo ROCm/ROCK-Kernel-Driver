@@ -23,16 +23,12 @@ void pcap_init(struct net_device *dev, void *data)
 	struct pcap_data *ppri;
 	struct pcap_init *init = data;
 
-	init_etherdev(dev, 0);
 	pri = dev->priv;
 	ppri = (struct pcap_data *) pri->user;
-	*ppri = ((struct pcap_data)
-		{ .host_if 	= init->host_if,
-		  .promisc 	= init->promisc,
-		  .optimize 	= init->optimize,
-		  .filter 	= init->filter,
-		  .compiled 	= NULL,
-		  .pcap 	= NULL });
+	ppri->host_if = init->host_if;
+	ppri->promisc = init->promisc;
+	ppri->optimize = init->optimize;
+	ppri->filter = init->filter;
 }
 
 static int pcap_read(int fd, struct sk_buff **skb, 

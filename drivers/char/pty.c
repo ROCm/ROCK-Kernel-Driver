@@ -347,11 +347,8 @@ int __init pty_init(void)
 	pty_driver.magic = TTY_DRIVER_MAGIC;
 	pty_driver.owner = THIS_MODULE;
 	pty_driver.driver_name = "pty_master";
-#ifdef CONFIG_DEVFS_FS
-	pty_driver.name = "pty/m";
-#else
 	pty_driver.name = "pty";
-#endif
+	pty_driver.devfs_name = "pty/m";
 	pty_driver.major = PTY_MASTER_MAJOR;
 	pty_driver.minor_start = 0;
 	pty_driver.num = NR_PTYS;
@@ -382,11 +379,8 @@ int __init pty_init(void)
 	pty_slave_driver = pty_driver;
 	pty_slave_driver.driver_name = "pty_slave";
 	pty_slave_driver.proc_entry = 0;
-#ifdef CONFIG_DEVFS_FS
-	pty_slave_driver.name = "pty/s";
-#else
 	pty_slave_driver.name = "ttyp";
-#endif
+	pty_slave_driver.devfs_name = "pty/s";
 	pty_slave_driver.subtype = PTY_TYPE_SLAVE;
 	pty_slave_driver.major = PTY_SLAVE_MAJOR;
 	pty_slave_driver.minor_start = 0;

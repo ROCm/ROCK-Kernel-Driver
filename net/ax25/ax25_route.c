@@ -435,7 +435,7 @@ int ax25_rt_autobind(ax25_cb *ax25, ax25_address *addr)
 	}
 
 	if (ax25->sk != NULL)
-		ax25->sk->zapped = 0;
+		ax25->sk->sk_zapped = 0;
 
 put:
 	ax25_put_route(ax25_rt);

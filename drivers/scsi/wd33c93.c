@@ -1913,7 +1913,7 @@ wd33c93_init(struct Scsi_Host *instance, const wd33c93_regs regs,
 }
 
 int
-wd33c93_proc_info(char *buf, char **start, off_t off, int len, int hn, int in)
+wd33c93_proc_info(struct Scsi_Host *instance, char *buf, char **start, off_t off, int len, int in)
 {
 
 #ifdef PROC_INTERFACE
@@ -1921,16 +1921,10 @@ wd33c93_proc_info(char *buf, char **start, off_t off, int len, int hn, int in)
 	char *bp;
 	char tbuf[128];
 	struct Scsi_Host *instance;
-	struct WD33C93_hostdata *hd;
 	Scsi_Cmnd *cmd;
 	int x, i;
 	static int stop = 0;
 
-	instance = scsi_host_hn_get(hn);
-	if (!instance) {
-		printk("*** Hmm... Can't find host #%d!\n", hn);
-		return (-ESRCH);
-	}
 	hd = (struct WD33C93_hostdata *) instance->hostdata;
 
 /* If 'in' is TRUE we need to _read_ the proc file. We accept the following

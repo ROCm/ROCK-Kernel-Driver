@@ -437,6 +437,8 @@ struct net2280_ep_regs {	/* [11.9] */
 
 /*-------------------------------------------------------------------------*/
 
+#ifdef	__KERNEL__
+
 /* indexed registers [11.10] are accessed indirectly
  * caller must own the device lock.
  */
@@ -457,6 +459,9 @@ set_idx_reg (struct net2280_regs *regs, u32 index, u32 value)
 	/* posted, may not be visible yet */
 }
 
+#endif	/* __KERNEL__ */
+
+
 #define REG_DIAG		0x0
 #define     RETRY_COUNTER                                       16
 #define     FORCE_PCI_SERR                                      11
@@ -470,6 +475,8 @@ set_idx_reg (struct net2280_regs *regs, u32 index, u32 value)
 #define REG_FRAME		0x02	/* from last sof */
 #define REG_CHIPREV		0x03	/* in bcd */
 #define	REG_HS_NAK_RATE		0x0a	/* NAK per N uframes */
+
+#ifdef	__KERNEL__
 
 /* ep a-f highspeed and fullspeed maxpacket, addresses
  * computed from ep->num
@@ -519,6 +526,7 @@ static inline void allow_status (struct net2280_ep *ep)
 	writel (  (1 << CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE)
 		| (1 << CLEAR_NAK_OUT_PACKETS_MODE)
 		, &ep->regs->ep_rsp);
+	ep->stopped = 1;
 }
 
 static inline void set_halt (struct net2280_ep *ep)
@@ -707,3 +715,4 @@ static inline void stop_out_naking (struct net2280_ep *ep)
 		writel ((1 << CLEAR_NAK_OUT_PACKETS), &ep->regs->ep_rsp);
 }
 
+#endif	/* __KERNEL__ */

@@ -40,7 +40,7 @@ struct inflate_blocks_state {
     struct {
       uInt table;               /* table lengths (14 bits) */
       uInt index;               /* index into blens (or border) */
-      uIntf *blens;             /* bit lengths of codes */
+      uInt *blens;              /* bit lengths of codes */
       uInt bb;                  /* bit length tree depth */
       inflate_huft *tb;         /* bit length decoding tree */
     } trees;            /* if DTREE, decoding info for trees */
@@ -55,10 +55,10 @@ struct inflate_blocks_state {
   uInt bitk;            /* bits in bit buffer */
   uLong bitb;           /* bit buffer */
   inflate_huft *hufts;  /* single malloc for tree space */
-  Bytef *window;        /* sliding window */
-  Bytef *end;           /* one byte after sliding window */
-  Bytef *read;          /* window read pointer */
-  Bytef *write;         /* window write pointer */
+  Byte *window;         /* sliding window */
+  Byte *end;            /* one byte after sliding window */
+  Byte *read;           /* window read pointer */
+  Byte *write;          /* window write pointer */
   check_func checkfn;   /* check function */
   uLong check;          /* check on output */
 
@@ -92,10 +92,10 @@ struct inflate_blocks_state {
 extern uInt zlib_inflate_mask[17];
 
 /* copy as much as possible from the sliding window to the output area */
-extern int zlib_inflate_flush OF((
+extern int zlib_inflate_flush (
     inflate_blocks_statef *,
     z_streamp ,
-    int));
+    int);
 
 /* inflate private state */
 typedef enum {

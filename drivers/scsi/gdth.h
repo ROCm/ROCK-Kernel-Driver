@@ -978,7 +978,7 @@ const char *gdth_info(struct Scsi_Host *);
 
 #if LINUX_VERSION_CODE >= 0x020501
 int gdth_bios_param(struct scsi_device *,struct block_device *,sector_t,int *);
-int gdth_proc_info(char *,char **,off_t,int,int,int);
+int gdth_proc_info(struct Scsi_Host *, char *,char **,off_t,int,int);
 int gdth_eh_abort(Scsi_Cmnd *scp);
 int gdth_eh_device_reset(Scsi_Cmnd *scp);
 int gdth_eh_bus_reset(Scsi_Cmnd *scp);

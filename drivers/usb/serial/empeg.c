@@ -111,6 +111,7 @@ static struct usb_device_id id_table [] = {
 MODULE_DEVICE_TABLE (usb, id_table);
 
 static struct usb_driver empeg_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"empeg",
 	.probe =	usb_serial_probe,
 	.disconnect =	usb_serial_disconnect,
@@ -459,14 +460,15 @@ static void empeg_unthrottle (struct usb_serial_port *port)
 
 static int  empeg_startup (struct usb_serial *serial)
 {
+	int r;
 
 	dbg("%s", __FUNCTION__);
 
 	dbg("%s - Set config to 1", __FUNCTION__);
-	usb_set_configuration (serial->dev, 1);
+	r = usb_set_configuration (serial->dev, 1);
 
 	/* continue on with initialization */
-	return 0;
+	return r;
 
 }
 

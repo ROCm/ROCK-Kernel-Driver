@@ -483,8 +483,20 @@ _GLOBAL(__copy_tofrom_user)
  * on an exception, reset to the beginning and jump back into the
  * standard __copy_tofrom_user
  */
-100:	ld	r3,-24(r1)
-	ld	r4,-24(r1)
+100:	ld	r20,-120(1)
+	ld	r21,-112(1)
+	ld	r22,-104(1)
+	ld	r23,-96(1)
+	ld	r24,-88(1)
+	ld	r25,-80(1)
+	ld	r26,-72(1)
+	ld	r27,-64(1)
+	ld	r28,-56(1)
+	ld	r29,-48(1)
+	ld	r30,-40(1)
+	ld	r31,-32(1)
+	ld	r3,-24(r1)
+	ld	r4,-16(r1)
 	li	r5,4096
 	b	.Ldst_aligned
 

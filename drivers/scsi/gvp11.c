@@ -28,11 +28,12 @@
 static struct Scsi_Host *first_instance = NULL;
 static Scsi_Host_Template *gvp11_template;
 
-static void gvp11_intr (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t gvp11_intr (int irq, void *dummy, struct pt_regs *fp)
 {
     unsigned long flags;
     unsigned int status;
     struct Scsi_Host *instance;
+    int handled = 0;
 
     for (instance = first_instance; instance &&
 	 instance->hostt == gvp11_template; instance = instance->next)
@@ -44,7 +45,9 @@ static void gvp11_intr (int irq, void *dummy, struct pt_regs *fp)
 	spin_lock_irqsave(&instance->host_lock, flags);
 	wd33c93_intr (instance);
 	spin_unlock_irqrestore(&instance->host_lock, flags);
+	handled = 1;
     }
+    return IRQ_RETVAL(handled);
 }
 
 static int gvp11_xfer_mask = 0;
@@ -352,6 +355,13 @@ release:
     return num_gvp11;
 }
 
+static int gvp11_bus_reset(Scsi_Cmnd *cmd)
+{
+	/* FIXME perform bus-specific reset */
+	wd33c93_host_reset(cmd);
+	return SUCCESS;
+}
+
 
 #define HOSTS_C
 
@@ -363,8 +373,9 @@ static Scsi_Host_Template driver_template = {
 	.detect			= gvp11_detect,
 	.release		= gvp11_release,
 	.queuecommand		= wd33c93_queuecommand,
-	.abort			= wd33c93_abort,
-	.reset			= wd33c93_reset,
+	.eh_abort_handler	= wd33c93_abort,
+	.eh_bus_reset_handler	= gvp11_bus_reset,
+	.eh_host_reset_handler	= wd33c93_host_reset,
 	.can_queue		= CAN_QUEUE,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,

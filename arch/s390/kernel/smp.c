@@ -469,7 +469,7 @@ static struct task_struct *__devinit fork_by_hand(void)
        /* don't care about the psw and regs settings since we'll never
           reschedule the forked task. */
        memset(&regs,0,sizeof(struct pt_regs));
-       return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+       return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 int __cpu_up(unsigned int cpu)
@@ -498,6 +498,7 @@ int __cpu_up(unsigned int cpu)
                 printk("failed fork for CPU %d", cpu);
 		return -EIO;
 	}
+	wake_up_forked_process(idle);
 
         /*
          * We remove it from the pidhash and the runqueue
@@ -512,10 +513,9 @@ int __cpu_up(unsigned int cpu)
 	cpu_lowcore->kernel_stack = (unsigned long)
 		idle->thread_info + (THREAD_SIZE);
 	__ctl_store(cpu_lowcore->cregs_save_area[0], 0, 15);
-	__asm__ __volatile__("la    1,%0\n\t"
-			     "stam  0,15,0(1)"
-			     : "=m" (cpu_lowcore->access_regs_save_area[0])
-			     : : "1", "memory");
+	__asm__ __volatile__("stam  0,15,0(%0)"
+			     : : "a" (&cpu_lowcore->access_regs_save_area)
+			     : "memory");
         eieio();
         signal_processor(cpu,sigp_restart);
 

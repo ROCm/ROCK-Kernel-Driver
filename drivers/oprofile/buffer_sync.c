@@ -127,6 +127,14 @@ static struct notifier_block module_load_nb = {
 };
 
  
+static void end_sync_timer(void)
+{
+	del_timer_sync(&sync_timer);
+	/* timer might have queued work, make sure it's completed. */
+	flush_scheduled_work();
+}
+
+
 int sync_start(void)
 {
 	int err;
@@ -158,7 +166,7 @@ out3:
 out2:
 	profile_event_unregister(EXIT_TASK, &exit_task_nb);
 out1:
-	del_timer_sync(&sync_timer);
+	end_sync_timer();
 	goto out;
 }
 
@@ -169,9 +177,7 @@ void sync_stop(void)
 	profile_event_unregister(EXIT_TASK, &exit_task_nb);
 	profile_event_unregister(EXIT_MMAP, &exit_mmap_nb);
 	profile_event_unregister(EXEC_UNMAP, &exec_unmap_nb);
-	del_timer_sync(&sync_timer);
-	/* timer might have queued work, make sure it's completed. */
-	flush_scheduled_work();
+	end_sync_timer();
 }
 
  
@@ -230,8 +236,6 @@ static unsigned long lookup_dcookie(struct mm_struct * mm, unsigned long addr, o
 	struct vm_area_struct * vma;
 
 	for (vma = find_vma(mm, addr); vma; vma = vma->vm_next) {
-		if (!vma)
-			goto out;
  
 		if (!vma->vm_file)
 			continue;
@@ -244,7 +248,7 @@ static unsigned long lookup_dcookie(struct mm_struct * mm, unsigned long addr, o
 		*offset = (vma->vm_pgoff << PAGE_SHIFT) + addr - vma->vm_start; 
 		break;
 	}
-out:
+
 	return cookie;
 }
 
@@ -268,12 +272,17 @@ static void add_kernel_ctx_switch(unsigned int in_kernel)
 		add_event_entry(KERNEL_EXIT_SWITCH_CODE); 
 }
  
-static void add_user_ctx_switch(pid_t pid, unsigned long cookie)
+static void
+add_user_ctx_switch(struct task_struct const * task, unsigned long cookie)
 {
 	add_event_entry(ESCAPE_CODE);
 	add_event_entry(CTX_SWITCH_CODE); 
-	add_event_entry(pid);
+	add_event_entry(task->pid);
 	add_event_entry(cookie);
+	/* Another code for daemon back-compat */
+	add_event_entry(ESCAPE_CODE);
+	add_event_entry(CTX_TGID_CODE);
+	add_event_entry(task->tgid);
 }
 
  
@@ -366,11 +375,25 @@ static inline int is_ctx_switch(unsigned long val)
 }
  
 
-/* compute number of filled slots in cpu_buffer queue */
-static unsigned long nr_filled_slots(struct oprofile_cpu_buffer * b)
+/* "acquire" as many cpu buffer slots as we can */
+static unsigned long get_slots(struct oprofile_cpu_buffer * b)
 {
 	unsigned long head = b->head_pos;
 	unsigned long tail = b->tail_pos;
+
+	/*
+	 * Subtle. This resets the persistent last_task
+	 * and in_kernel values used for switching notes.
+	 * BUT, there is a small window between reading
+	 * head_pos, and this call, that means samples
+	 * can appear at the new head position, but not
+	 * be prefixed with the notes for switching
+	 * kernel mode or a task switch. This small hole
+	 * can lead to mis-attribution or samples where
+	 * we don't know if it's in the kernel or not,
+	 * at the start of an event buffer.
+	 */
+	cpu_buffer_reset(b);
 
 	if (head >= tail)
 		return head - tail;
@@ -408,9 +431,9 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
  
 	/* Remember, only we can modify tail_pos */
 
-	unsigned long const available_elements = nr_filled_slots(cpu_buf);
+	unsigned long const available = get_slots(cpu_buf);
   
-	for (i=0; i < available_elements; ++i) {
+	for (i=0; i < available; ++i) {
 		struct op_sample * s = &cpu_buf->buffer[cpu_buf->tail_pos];
  
 		if (is_ctx_switch(s->eip)) {
@@ -426,7 +449,7 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 				mm = take_tasks_mm(new);
 
 				cookie = get_exec_dcookie(mm);
-				add_user_ctx_switch(new->pid, cookie);
+				add_user_ctx_switch(new, cookie);
 			}
 		} else {
 			add_sample(mm, s, in_kernel);
@@ -435,8 +458,6 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 		increment_tail(cpu_buf);
 	}
 	release_mm(mm);
-
-	cpu_buffer_reset(cpu_buf);
 }
  
  

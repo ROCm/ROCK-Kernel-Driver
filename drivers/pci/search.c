@@ -29,15 +29,35 @@ pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
 struct pci_bus *
 pci_find_bus(unsigned char busnr)
 {
-	struct pci_bus* bus;
+	struct pci_bus* bus = NULL;
 	struct pci_bus* tmp_bus;
 
-	pci_for_each_bus(bus) {
+	while ((bus = pci_find_next_bus(bus)) != NULL)  {
 		tmp_bus = pci_do_find_bus(bus, busnr);
 		if(tmp_bus)
 			return tmp_bus;
 	}
 	return NULL;
+}
+
+/**
+ * pci_find_next_bus - begin or continue searching for a PCI bus
+ * @from: Previous PCI bus found, or %NULL for new search.
+ *
+ * Iterates through the list of known PCI busses.  A new search is
+ * initiated by passing %NULL to the @from argument.  Otherwise if
+ * @from is not %NULL, searches continue from next device on the
+ * global list.
+ */
+struct pci_bus * 
+pci_find_next_bus(const struct pci_bus *from)
+{
+	struct list_head *n = from ? from->node.next : pci_root_buses.next;
+	struct pci_bus *b = NULL;
+
+	if (n != &pci_root_buses)
+		b = pci_bus_b(n);
+	return b;
 }
 
 /**
@@ -55,9 +75,9 @@ pci_find_bus(unsigned char busnr)
 struct pci_dev *
 pci_find_slot(unsigned int bus, unsigned int devfn)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (dev->bus->number == bus && dev->devfn == devfn)
 			return dev;
 	}
@@ -97,7 +117,6 @@ pci_find_subsys(unsigned int vendor, unsigned int device,
 	return NULL;
 }
 
-
 /**
  * pci_find_device - begin or continue searching for a PCI device by vendor/device id
  * @vendor: PCI vendor id to match, or %PCI_ANY_ID to match all vendor ids
@@ -114,6 +133,34 @@ struct pci_dev *
 pci_find_device(unsigned int vendor, unsigned int device, const struct pci_dev *from)
 {
 	return pci_find_subsys(vendor, device, PCI_ANY_ID, PCI_ANY_ID, from);
+}
+
+
+/**
+ * pci_find_device_reverse - begin or continue searching for a PCI device by vendor/device id
+ * @vendor: PCI vendor id to match, or %PCI_ANY_ID to match all vendor ids
+ * @device: PCI device id to match, or %PCI_ANY_ID to match all device ids
+ * @from: Previous PCI device found in search, or %NULL for new search.
+ *
+ * Iterates through the list of known PCI devices in the reverse order of pci_find_device().
+ * If a PCI device is found with a matching @vendor and @device, a pointer to
+ * its device structure is returned.  Otherwise, %NULL is returned.
+ * A new search is initiated by passing %NULL to the @from argument.
+ * Otherwise if @from is not %NULL, searches continue from previous device on the global list.
+ */
+struct pci_dev *
+pci_find_device_reverse(unsigned int vendor, unsigned int device, const struct pci_dev *from)
+{
+	struct list_head *n = from ? from->global_list.prev : pci_devices.prev;
+
+	while (n != &pci_devices) {
+		struct pci_dev *dev = pci_dev_g(n);
+		if ((vendor == PCI_ANY_ID || dev->vendor == vendor) &&
+		    (device == PCI_ANY_ID || dev->device == device))
+			return dev;
+		n = n->prev;
+	}
+	return NULL;
 }
 
 
@@ -146,5 +193,6 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
 EXPORT_SYMBOL(pci_find_bus);
 EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
+EXPORT_SYMBOL(pci_find_device_reverse);
 EXPORT_SYMBOL(pci_find_slot);
 EXPORT_SYMBOL(pci_find_subsys);

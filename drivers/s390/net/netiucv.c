@@ -1630,8 +1630,8 @@ netiucv_init_netdevice(int ifno, char *username)
 	dev->addr_len            = 0;
 	dev->type                = ARPHRD_SLIP;
 	dev->tx_queue_len        = NETIUCV_QUEUELEN_DEFAULT;
-	dev->owner               = THIS_MODULE;
 	dev->flags	         = IFF_POINTOPOINT | IFF_NOARP;
+	SET_MODULE_OWNER(&tun->dev);
 	return dev;
 }
 

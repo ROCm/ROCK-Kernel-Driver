@@ -158,6 +158,9 @@ typedef struct srb {
 	uint8_t dir;		/* direction of transfer */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,18)
 	dma_addr_t saved_dma_handle;	/* for unmap of single transfers */
+	/* NOTE: the sp->cmd will be NULL when this completion is
+	 * called, so you should know the scsi_cmnd when using this */
+	struct completion *wait;
 #endif
 
 } srb_t;
@@ -317,6 +320,7 @@ struct device_reg {
 #define MBC_NOP                     0	/* No Operation. */
 #define MBC_LOAD_RAM                1	/* Load RAM. */
 #define MBC_EXECUTE_FIRMWARE        2	/* Execute firmware. */
+#define MBC_DUMP_RAM		     3   /* Dump RAM contents */
 #define MBC_WRITE_RAM_WORD          4	/* Write ram word. */
 #define MBC_READ_RAM_WORD           5	/* Read ram word. */
 #define MBC_MAILBOX_REGISTER_TEST   6	/* Wrap incoming mailboxes */
@@ -371,9 +375,170 @@ struct device_reg {
 
 /*
  *  QLogic ISP1280 NVRAM structure definition.
+ *
+ * NOTE: the firmware structure is byte reversed on big-endian systems
+ * because it is read a word at a time from the chip, so the in-memory
+ * representation becomes correct
  */
 typedef struct {
-	uint8_t id[4];		/* 0, 1, 2, 3 */
+#if defined(__BIG_ENDIAN)
+	uint8_t id1;		/* 1 */
+	uint8_t id0;		/* 0 */
+
+	uint8_t id3;		/* 3 */
+	uint8_t id2;		/* 2 */
+
+	struct {
+		uint8_t bios_configuration_mode:2;
+		uint8_t bios_disable:1;
+		uint8_t selectable_scsi_boot_enable:1;
+		uint8_t cd_rom_boot_enable:1;
+		uint8_t disable_loading_risc_code:1;
+		uint8_t enable_64bit_addressing:1;
+		uint8_t unused_7:1;
+	} cntr_flags_1;		/* 5 */
+	uint8_t version;	/* 4 */
+
+	struct {
+		uint8_t boot_lun_number:5;
+		uint8_t scsi_bus_number:1;
+		uint8_t unused_6:1;
+		uint8_t unused_7:1;
+		uint8_t boot_target_number:4;
+		uint8_t unused_12:1;
+		uint8_t unused_13:1;
+		uint8_t unused_14:1;
+		uint8_t unused_15:1;
+	} cntr_flags_2;		/* 6, 7 */
+
+	uint16_t unused_8;	/* 8, 9 */
+	uint16_t unused_10;	/* 10, 11 */
+	uint16_t unused_12;	/* 12, 13 */
+	uint16_t unused_14;	/* 14, 15 */
+
+	/* Termination
+	 * 0 = Disable, 1 = high only, 3 = Auto term
+	 */
+	union {
+		uint8_t c;
+		struct {
+			uint8_t scsi_bus_1_control:2;
+			uint8_t scsi_bus_0_control:2;
+			uint8_t unused_0:1;
+			uint8_t unused_1:1;
+			uint8_t unused_2:1;
+			uint8_t auto_term_support:1;
+		} f;
+	} termination;		/* 17 */
+	union {
+		uint8_t c;
+		struct {
+			uint8_t reserved:2;
+			uint8_t burst_enable:1;
+			uint8_t reserved_1:1;
+			uint8_t fifo_threshold:4;
+		} f;
+	} isp_config;		/* 16 */
+
+
+	uint16_t isp_parameter;	/* 18, 19 */
+
+	union {
+		uint16_t w;
+		struct {
+			uint16_t enable_fast_posting:1;
+			uint16_t report_lvd_bus_transition:1;
+			uint16_t unused_2:1;
+			uint16_t unused_3:1;
+			uint16_t unused_4:1;
+			uint16_t unused_5:1;
+			uint16_t unused_6:1;
+			uint16_t unused_7:1;
+			uint16_t unused_8:1;
+			uint16_t unused_9:1;
+			uint16_t unused_10:1;
+			uint16_t unused_11:1;
+			uint16_t unused_12:1;
+			uint16_t unused_13:1;
+			uint16_t unused_14:1;
+			uint16_t unused_15:1;
+		} f;
+	} firmware_feature;	/* 20, 21 */
+
+	uint16_t unused_22;	/* 22, 23 */
+
+	struct {
+		uint8_t bus_reset_delay;	/* 25 */
+		struct {
+			uint8_t initiator_id:4;
+			uint8_t scsi_reset_disable:1;
+			uint8_t scsi_bus_size:1;
+			uint8_t scsi_bus_type:1;
+			uint8_t unused_7:1;
+		} config_1;	/* 24 */
+
+		uint8_t retry_delay;	/* 27 */
+		uint8_t retry_count;	/* 26 */
+
+		uint8_t unused_29;	/* 29 */
+		struct {
+			uint8_t async_data_setup_time:4;
+			uint8_t req_ack_active_negation:1;
+			uint8_t data_line_active_negation:1;
+			uint8_t unused_6:1;
+			uint8_t unused_7:1;
+		} config_2;	/* 28 */
+
+
+		uint16_t selection_timeout;	/* 30, 31 */
+		uint16_t max_queue_depth;	/* 32, 33 */
+
+		uint16_t unused_34;	/* 34, 35 */
+		uint16_t unused_36;	/* 36, 37 */
+		uint16_t unused_38;	/* 38, 39 */
+
+		struct {
+			uint8_t execution_throttle;	/* 41 */
+			union {
+				uint8_t c;
+				struct {
+					uint8_t renegotiate_on_error:1;
+					uint8_t stop_queue_on_check:1;
+					uint8_t auto_request_sense:1;
+					uint8_t tag_queuing:1;
+					uint8_t sync_data_transfers:1;
+					uint8_t wide_data_transfers:1;
+					uint8_t parity_checking:1;
+					uint8_t disconnect_allowed:1;
+				} f;
+			} parameter;	/* 40 */
+
+			struct {
+				uint8_t sync_offset:4;
+				uint8_t device_enable:1;
+				uint8_t lun_disable:1;
+				uint8_t unused_6:1;
+				uint8_t unused_7:1;
+			} flags;	/* 43 */
+			uint8_t sync_period;	/* 42 */
+
+
+			uint16_t unused_44;	/* 44, 45 */
+		} target[MAX_TARGETS];
+	} bus[MAX_BUSES];
+
+	uint16_t unused_248;	/* 248, 249 */
+
+	uint16_t subsystem_id[2];	/* 250, 251, 252, 253 */
+
+	uint8_t chksum;		/* 255 */
+	uint8_t unused_254;	/* 254 */
+
+#elif defined(__LITTLE_ENDIAN)
+	uint8_t id0;		/* 0 */
+	uint8_t id1;		/* 1 */
+	uint8_t id2;		/* 2 */
+	uint8_t id3;		/* 3 */
 	uint8_t version;	/* 4 */
 
 	struct {
@@ -521,13 +686,187 @@ typedef struct {
 	uint8_t unused_254;	/* 254 */
 
 	uint8_t chksum;		/* 255 */
+#else
+#error neither __BIG_ENDIAN nor __LITTLE_ENDIAN is defined
+#endif
 } nvram_t;
 
 /*
  *  QLogic ISP12160 NVRAM structure definition.
+ *
+ * NOTE: the firmware structure is byte reversed on big-endian systems
+ * because it is read a word at a time from the chip, so the in-memory
+ * representation becomes correct
  */
 typedef struct {
-	uint8_t id[4];		/* 0, 1, 2, 3 */
+#if defined(__BIG_ENDIAN)
+	uint8_t id1;		/* 1 */
+	uint8_t id0;		/* 0 */
+
+	uint8_t id3;		/* 3 */
+	uint8_t id2;		/* 2 */
+
+	/* Host/Bios Flags */
+	struct {
+		uint8_t bios_configuration_mode:2;
+		uint8_t bios_disable:1;
+		uint8_t selectable_scsi_boot_enable:1;
+		uint8_t cd_rom_boot_enable:1;
+		uint8_t disable_loading_risc_code:1;
+		uint8_t unused_6:1;
+		uint8_t unused_7:1;
+	} cntr_flags_1;		/* 5 */
+	uint8_t version;	/* 4 */
+
+	/* Selectable Boot Support */
+	struct {
+		uint16_t boot_lun_number:5;
+		uint16_t scsi_bus_number:1;
+		uint16_t unused_6:1;
+		uint16_t unused_7:1;
+		uint16_t boot_target_number:4;
+		uint16_t unused_12:1;
+		uint16_t unused_13:1;
+		uint16_t unused_14:1;
+		uint16_t unused_15:1;
+	} cntr_flags_2;		/* 6, 7 */
+
+	uint16_t unused_8;	/* 8, 9 */
+	uint16_t unused_10;	/* 10, 11 */
+	uint16_t unused_12;	/* 12, 13 */
+	uint16_t unused_14;	/* 14, 15 */
+
+	/* Termination
+	 * 0 = Disable, 1 = high only, 3 = Auto term
+	 */
+	union {
+		uint8_t c;
+		struct {
+			uint8_t scsi_bus_1_control:2;
+			uint8_t scsi_bus_0_control:2;
+			uint8_t unused_0:1;
+			uint8_t unused_1:1;
+			uint8_t unused_2:1;
+			uint8_t auto_term_support:1;
+		} f;
+	} termination;		/* 17 */
+	/* Auto Term - 3                          */
+	/* High Only - 1 (GPIO2 = 1 & GPIO3 = 0)  */
+	/* Disable - 0 (GPIO2 = 0 & GPIO3 = X)    */
+	/* ISP Config Parameters */
+	union {
+		uint8_t c;
+		struct {
+			uint8_t reserved:2;
+			uint8_t burst_enable:1;
+			uint8_t reserved_1:1;
+			uint8_t fifo_threshold:4;
+		} f;
+	} isp_config;		/* 16 */
+
+	uint16_t isp_parameter;	/* 18, 19 */
+
+	union {
+		uint16_t w;
+		struct {
+			uint16_t enable_fast_posting:1;
+			uint16_t report_lvd_bus_transition:1;
+			uint16_t unused_2:1;
+			uint16_t unused_3:1;
+			uint16_t unused_4:1;
+			uint16_t unused_5:1;
+			uint16_t unused_6:1;
+			uint16_t unused_7:1;
+			uint16_t unused_8:1;
+			uint16_t unused_9:1;
+			uint16_t unused_10:1;
+			uint16_t unused_11:1;
+			uint16_t unused_12:1;
+			uint16_t unused_13:1;
+			uint16_t unused_14:1;
+			uint16_t unused_15:1;
+		} f;
+	} firmware_feature;	/* 20, 21 */
+
+	uint16_t unused_22;	/* 22, 23 */
+
+	struct {
+		uint8_t bus_reset_delay;	/* 25 */
+		struct {
+			uint8_t initiator_id:4;
+			uint8_t scsi_reset_disable:1;
+			uint8_t scsi_bus_size:1;
+			uint8_t scsi_bus_type:1;
+			uint8_t unused_7:1;
+		} config_1;	/* 24 */
+
+		uint8_t retry_delay;	/* 27 */
+		uint8_t retry_count;	/* 26 */
+
+		uint8_t unused_29;	/* 29 */
+		/* Adapter Capabilities bits */
+		struct {
+			uint8_t async_data_setup_time:4;
+			uint8_t req_ack_active_negation:1;
+			uint8_t data_line_active_negation:1;
+			uint8_t unused_6:1;
+			uint8_t unused_7:1;
+		} config_2;	/* 28 */
+
+		uint16_t selection_timeout;	/* 30, 31 */
+		uint16_t max_queue_depth;	/* 32, 33 */
+
+		uint16_t unused_34;	/* 34, 35 */
+		uint16_t unused_36;	/* 36, 37 */
+		uint16_t unused_38;	/* 38, 39 */
+
+		struct {
+			uint8_t execution_throttle;	/* 41 */
+			union {
+				uint8_t c;
+				struct {
+					uint8_t renegotiate_on_error:1;
+					uint8_t stop_queue_on_check:1;
+					uint8_t auto_request_sense:1;
+					uint8_t tag_queuing:1;
+					uint8_t sync_data_transfers:1;
+					uint8_t wide_data_transfers:1;
+					uint8_t parity_checking:1;
+					uint8_t disconnect_allowed:1;
+				} f;
+			} parameter;	/* 40 */
+
+			struct {
+				uint8_t sync_offset:5;
+				uint8_t device_enable:1;
+				uint8_t unused_6:1;
+				uint8_t unused_7:1;
+			} flags1; /* 43 */
+			uint8_t sync_period;	/* 42 */
+
+			uint8_t unused_45;	/* 45 */
+			struct {
+				uint8_t ppr_options:4;
+				uint8_t ppr_bus_width:2;
+				uint8_t unused_8:1;
+				uint8_t enable_ppr:1;
+			} flags2;	/* 44 */
+
+		} target[MAX_TARGETS];
+	} bus[MAX_BUSES];
+
+	uint16_t unused_248;	/* 248, 249 */
+
+	uint16_t subsystem_id[2];	/* 250, 251, 252, 253 */
+
+	uint8_t chksum;		/* 255 */
+	uint8_t System_Id_Pointer;	/* 254 */
+
+#elif defined(__LITTLE_ENDIAN)
+	uint8_t id0;		/* 0 */
+	uint8_t id1;		/* 1 */
+	uint8_t id2;		/* 2 */
+	uint8_t id3;		/* 3 */
 	uint8_t version;	/* 4 */
 	/* Host/Bios Flags */
 	struct {
@@ -541,15 +880,15 @@ typedef struct {
 	} cntr_flags_1;		/* 5 */
 	/* Selectable Boot Support */
 	struct {
-		uint8_t boot_lun_number:5;
-		uint8_t scsi_bus_number:1;
-		uint8_t unused_6:1;
-		uint8_t unused_7:1;
-		uint8_t boot_target_number:4;
-		uint8_t unused_12:1;
-		uint8_t unused_13:1;
-		uint8_t unused_14:1;
-		uint8_t unused_15:1;
+		uint16_t boot_lun_number:5;
+		uint16_t scsi_bus_number:1;
+		uint16_t unused_6:1;
+		uint16_t unused_7:1;
+		uint16_t boot_target_number:4;
+		uint16_t unused_12:1;
+		uint16_t unused_13:1;
+		uint16_t unused_14:1;
+		uint16_t unused_15:1;
 	} cntr_flags_2;		/* 6, 7 */
 
 	uint16_t unused_8;	/* 8, 9 */
@@ -591,22 +930,22 @@ typedef struct {
 	union {
 		uint16_t w;
 		struct {
-			uint8_t enable_fast_posting:1;
-			uint8_t report_lvd_bus_transition:1;
-			uint8_t unused_2:1;
-			uint8_t unused_3:1;
-			uint8_t unused_4:1;
-			uint8_t unused_5:1;
-			uint8_t unused_6:1;
-			uint8_t unused_7:1;
-			uint8_t unused_8:1;
-			uint8_t unused_9:1;
-			uint8_t unused_10:1;
-			uint8_t unused_11:1;
-			uint8_t unused_12:1;
-			uint8_t unused_13:1;
-			uint8_t unused_14:1;
-			uint8_t unused_15:1;
+			uint16_t enable_fast_posting:1;
+			uint16_t report_lvd_bus_transition:1;
+			uint16_t unused_2:1;
+			uint16_t unused_3:1;
+			uint16_t unused_4:1;
+			uint16_t unused_5:1;
+			uint16_t unused_6:1;
+			uint16_t unused_7:1;
+			uint16_t unused_8:1;
+			uint16_t unused_9:1;
+			uint16_t unused_10:1;
+			uint16_t unused_11:1;
+			uint16_t unused_12:1;
+			uint16_t unused_13:1;
+			uint16_t unused_14:1;
+			uint16_t unused_15:1;
 		} f;
 	} firmware_feature;	/* 20, 21 */
 
@@ -665,11 +1004,14 @@ typedef struct {
 				uint8_t device_enable:1;
 				uint8_t unused_6:1;
 				uint8_t unused_7:1;
+			} flags1; /* 43 */
+
+			struct {
 				uint8_t ppr_options:4;
 				uint8_t ppr_bus_width:2;
 				uint8_t unused_8:1;
 				uint8_t enable_ppr:1;
-			} flags;	/* 43, 44 */
+			} flags2;	/* 43 */
 
 			uint8_t unused_45;	/* 45 */
 		} target[MAX_TARGETS];
@@ -682,6 +1024,9 @@ typedef struct {
 	uint8_t System_Id_Pointer;	/* 254 */
 
 	uint8_t chksum;		/* 255 */
+#else
+#error neither __BIG_ENDIAN nor __LITTLE_ENDIAN is defined
+#endif
 } nvram160_t;
 
 /*
@@ -1306,7 +1651,6 @@ struct scsi_qla_host {
 /*
  *  Linux - SCSI Driver Interface Function Prototypes.
  */
-int qla1280_proc_info(char *, char **, off_t, int, int, int);
 const char *qla1280_info(struct Scsi_Host *host);
 int qla1280_detect(Scsi_Host_Template *);
 int qla1280_release(struct Scsi_Host *);

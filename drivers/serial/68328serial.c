@@ -83,13 +83,12 @@ struct m68k_serial *m68k_consinfo = 0;
 extern wait_queue_head_t keypress_wait; 
 #endif
 
-struct tty_driver serial_driver, callout_driver;
+struct tty_driver serial_driver;
 static int serial_refcount;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
-  
+ 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
@@ -1178,8 +1177,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	 */
 	if (info->flags & S_NORMAL_ACTIVE)
 		info->normal_termios = *tty->termios;
-	if (info->flags & S_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1220,8 +1217,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(S_NORMAL_ACTIVE|S_CALLOUT_ACTIVE|
-			 S_CLOSING);
+	info->flags &= ~(S_NORMAL_ACTIVE|S_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	restore_flags(flags);
 }
@@ -1240,7 +1236,7 @@ void rs_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(S_NORMAL_ACTIVE|S_CALLOUT_ACTIVE);
+	info->flags &= ~S_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1272,25 +1268,6 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		return -EAGAIN;
 #endif
 	}
-
-	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & S_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & S_CALLOUT_ACTIVE) &&
-		    (info->flags & S_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & S_CALLOUT_ACTIVE) &&
-		    (info->flags & S_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= S_CALLOUT_ACTIVE;
-		return 0;
-	}
 	
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
@@ -1298,20 +1275,13 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & S_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= S_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & S_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1326,8 +1296,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	info->blocked_open++;
 	while (1) {
 		cli();
-		if (!(info->flags & S_CALLOUT_ACTIVE))
-			m68k_rtsdtr(info, 1);
+		m68k_rtsdtr(info, 1);
 		sti();
 		current->state = TASK_INTERRUPTIBLE;
 		if (tty_hung_up_p(filp) ||
@@ -1342,8 +1311,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & S_CALLOUT_ACTIVE) &&
-		    !(info->flags & S_CLOSING) && do_clocal)
+		if (!(info->flags & S_CLOSING) && do_clocal)
 			break;
                 if (signal_pending(current)) {
 			retval = -ERESTARTSYS;
@@ -1401,15 +1369,9 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & S_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
+		*tty->termios = info->normal_termios;
 		change_speed(info);
 	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 	return 0;
 }
@@ -1519,20 +1481,9 @@ rs68328_init(void)
 	serial_driver.hangup = rs_hangup;
 	serial_driver.set_ldisc = rs_set_ldisc;
 
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-	callout_driver.name = "cua";
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
 	if (tty_register_driver(&serial_driver))
 		panic("Couldn't register serial driver\n");
-	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
-	
+
 	save_flags(flags); cli();
 
 	for(i=0;i<NR_PORTS;i++) {
@@ -1551,7 +1502,6 @@ rs68328_init(void)
 	    info->blocked_open = 0;
 	    INIT_WORK(&info->tqueue, do_softint, info);
 	    INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
-	    info->callout_termios =callout_driver.init_termios;
 	    info->normal_termios = serial_driver.init_termios;
 	    init_waitqueue_head(&info->open_wait);
 	    init_waitqueue_head(&info->close_wait);

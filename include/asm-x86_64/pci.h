@@ -76,8 +76,8 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
  * Once the device is given the dma address, the device owns this memory
  * until either pci_unmap_single or pci_dma_sync_single is performed.
  */
-extern dma_addr_t __pci_map_single(struct pci_dev *hwdev, void *ptr,
-			  size_t size, int direction, int flush);
+extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, 
+				 int direction);
 
 
 void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t addr,
@@ -126,8 +126,8 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 
 
 #else
-static inline dma_addr_t __pci_map_single(struct pci_dev *hwdev, void *ptr,
-					size_t size, int direction, int flush)
+static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
+					size_t size, int direction)
 {
 	dma_addr_t addr; 
 
@@ -214,12 +214,6 @@ extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 			 int nents, int direction);
 
-static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-			  size_t size, int direction)
-{
-	return __pci_map_single(hwdev,ptr,size,direction,1); 
-}
-
 #define pci_unmap_page pci_unmap_single
 
 /* Return whether the given PCI device DMA address mask can
@@ -275,12 +269,6 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
  */
 #define sg_dma_address(sg)	((sg)->dma_address)
 #define sg_dma_len(sg)		((sg)->length)
-
-/* Return the index of the PCI controller for device. */
-static inline int pci_controller_num(struct pci_dev *dev)
-{
-	return 0;
-}
 
 #define HAVE_PCI_MMAP
 extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,

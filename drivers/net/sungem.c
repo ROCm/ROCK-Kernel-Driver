@@ -48,7 +48,7 @@
 #include <asm/pbm.h>
 #endif
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 #include <asm/pci-bridge.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
@@ -1491,7 +1491,7 @@ static void gem_init_phy(struct gem *gp)
 	mifcfg &= ~MIF_CFG_BBMODE;
 	writel(mifcfg, gp->regs + MIF_CFG);
 	
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
 		int i, j;
 
@@ -1525,7 +1525,7 @@ static void gem_init_phy(struct gem *gp)
 				break;
 		}
 	}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 	if (gp->pdev->vendor == PCI_VENDOR_ID_SUN &&
 	    gp->pdev->device == PCI_DEVICE_ID_SUN_GEM) {
@@ -1924,7 +1924,7 @@ static void gem_init_hw(struct gem *gp, int restart_link)
 	}
 }
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 /* Enable the chip's clock and make sure it's config space is
  * setup properly. There appear to be no need to restore the
  * base addresses.
@@ -1963,7 +1963,7 @@ static void gem_apple_powerdown(struct gem *gp)
 	pmac_call_feature(PMAC_FTR_GMAC_ENABLE, gp->of_node, 0, 0);
 }
 
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 /* Must be invoked under gp->lock. */
 static void gem_stop_phy(struct gem *gp)
@@ -2028,10 +2028,10 @@ static void gem_shutdown(struct gem *gp)
 
 		spin_unlock_irq(&gp->lock);
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 		/* Power down the chip */
 		gem_apple_powerdown(gp);
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 	} else {
 		gem_stop(gp);
 
@@ -2085,13 +2085,13 @@ static int gem_open(struct net_device *dev)
 	 * etc. state so it is safe to do this bit without gp->lock
 	 */
 	if (!gp->hw_running) {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 		/* First, we need to bring up the chip */
 		if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
 			gem_apple_powerup(gp);
 			gem_check_invariants(gp);
 		}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 
 		/* Reset the chip */
 		spin_lock_irq(&gp->lock);
@@ -2112,10 +2112,10 @@ static int gem_open(struct net_device *dev)
 
 		printk(KERN_ERR "%s: failed to request irq !\n", gp->dev->name);
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 		if (!hw_was_up && gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
 			gem_apple_powerdown(gp);
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 		/* Fire the PM timer that will shut us down in about 10 seconds */
 		gp->pm_timer.expires = jiffies + 10*HZ;
 		add_timer(&gp->pm_timer);
@@ -2227,13 +2227,13 @@ static int gem_resume(struct pci_dev *pdev)
 	printk(KERN_INFO "%s: resuming\n", dev->name);
 
 	if (gp->opened) {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 		/* First, we need to bring up the chip */
 		if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
 			gem_apple_powerup(gp);
 			gem_check_invariants(gp);
 		}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 		spin_lock_irq(&gp->lock);
 
 		gem_stop(gp);
@@ -2541,7 +2541,7 @@ static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return rc;
 }
 
-#if (!defined(__sparc__) && !defined(CONFIG_ALL_PPC))
+#if (!defined(__sparc__) && !defined(CONFIG_PPC))
 /* Fetch MAC address from vital product data of PCI ROM. */
 static void find_eth_addr_in_vpd(void *rom_base, int len, unsigned char *dev_addr)
 {
@@ -2604,7 +2604,7 @@ use_random:
 
 static int __devinit gem_get_device_address(struct gem *gp)
 {
-#if defined(__sparc__) || defined(CONFIG_ALL_PPC)
+#if defined(__sparc__) || defined(CONFIG_PPC_PMAC)
 	struct net_device *dev = gp->dev;
 #endif
 
@@ -2623,7 +2623,7 @@ static int __devinit gem_get_device_address(struct gem *gp)
 	}
 	if (node == -1)
 		memcpy(dev->dev_addr, idprom->id_ethaddr, 6);
-#elif defined(CONFIG_ALL_PPC)
+#elif defined(CONFIG_PPC_PMAC)
 	unsigned char *addr;
 
 	addr = get_property(gp->of_node, "local-mac-address", NULL);
@@ -2748,7 +2748,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	 * invariants to work, but also because the firmware might
 	 * not have properly shut down the PHY.
 	 */
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	if (pdev->vendor == PCI_VENDOR_ID_APPLE)
 		gem_apple_powerup(gp);
 #endif
@@ -2779,7 +2779,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		goto err_out_iounmap;
 	}
 
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	gp->of_node = pci_device_to_OF_node(pdev);
 #endif	
 	if (gem_get_device_address(gp))

@@ -42,6 +42,40 @@ ctl_table ipv6_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
+	{
+		.ctl_name	= NET_IPV6_IP6FRAG_HIGH_THRESH,
+		.procname	= "ip6frag_high_thresh",
+		.data		= &sysctl_ip6frag_high_thresh,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_IPV6_IP6FRAG_LOW_THRESH,
+		.procname	= "ip6frag_low_thresh",
+		.data		= &sysctl_ip6frag_low_thresh,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_IPV6_IP6FRAG_TIME,
+		.procname	= "ip6frag_time",
+		.data		= &sysctl_ip6frag_time,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies,
+	},
+	{
+		.ctl_name	= NET_IPV6_IP6FRAG_SECRET_INTERVAL,
+		.procname	= "ip6frag_secret_interval",
+		.data		= &sysctl_ip6frag_secret_interval,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies
+	},
 	{ .ctl_name = 0 }
 };
 

@@ -130,8 +130,7 @@ void __init apus_setup_arch(void)
 	for( p = cmd_line; p && *p; ) {
 	    i = 0;
 	    if (!strncmp( p, "debug=", 6 )) {
-		    strncpy( debug_device, p+6, sizeof(debug_device)-1 );
-		    debug_device[sizeof(debug_device)-1] = 0;
+		    strlcpy( debug_device, p+6, sizeof(debug_device) );
 		    if ((q = strchr( debug_device, ' ' ))) *q = 0;
 		    i = 1;
 	    } else if (!strncmp( p, "60nsram", 7 )) {

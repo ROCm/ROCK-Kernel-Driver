@@ -2024,8 +2024,8 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	VALIDATE_CARD(card);
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strncpy(info.name,card_names[card->card_type],sizeof(info.name));
+		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
 		info.modify_counter = card->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -2033,8 +2033,8 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strncpy(info.name,card_names[card->card_type],sizeof(info.name));
+		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -2132,10 +2132,10 @@ static int ess_open_mixdev(struct inode *inode, struct file *file)
 {
 	unsigned int minor = minor(inode->i_rdev);
 	struct ess_card *card = NULL;
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	struct pci_driver *drvr;
 
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		drvr = pci_dev_driver (pdev);
 		if (drvr == &maestro_pci_driver) {
 			card = (struct ess_card*)pci_get_drvdata (pdev);
@@ -2978,13 +2978,13 @@ ess_open(struct inode *inode, struct file *file)
 	unsigned int minor = minor(inode->i_rdev);
 	struct ess_state *s = NULL;
 	unsigned char fmtm = ~0, fmts = 0;
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	/*
 	 *	Scan the cards and find the channel. We only
 	 *	do this at open time so it is ok
 	 */
 
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		struct ess_card *c;
 		struct pci_driver *drvr;
 

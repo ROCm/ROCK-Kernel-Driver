@@ -742,20 +742,4 @@
 	}
 },
 
-/*
- * Boot-up quirks
- */
-/* Extigy needs to send a vendor-specific control to boot up the
- * correct interface
- */
-{
-	USB_DEVICE(0x041e, 0x3000),
-	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
-		.vendor_name = "CreativeLabs",
-		.product_name = "Sound Blaster Extigy",
-		.ifnum = QUIRK_ANY_INTERFACE,
-		.type = QUIRK_BOOT_EXTIGY
-	}
-},
-
 #undef USB_DEVICE_VENDOR_SPEC

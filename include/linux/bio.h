@@ -22,6 +22,7 @@
 
 #include <linux/kdev_t.h>
 #include <linux/highmem.h>
+#include <linux/mempool.h>
 
 /* Platforms may set this to teach the BIO layer about IOMMU hardware. */
 #include <asm/io.h>
@@ -201,6 +202,28 @@ struct bio {
  * runs
  */
 #define bio_get(bio)	atomic_inc(&(bio)->bi_cnt)
+
+
+/*
+ * A bio_pair is used when we need to split a bio.
+ * This can only happen for a bio that refers to just one
+ * page of data, and in the unusual situation when the
+ * page crosses a chunk/device boundary
+ *
+ * The address of the master bio is stored in bio1.bi_private
+ * The address of the pool the pair was allocated from is stored
+ *   in bio2.bi_private
+ */
+struct bio_pair {
+	struct bio	bio1, bio2;
+	struct bio_vec	bv1, bv2;
+	atomic_t	cnt;
+	int		error;
+};
+extern struct bio_pair *bio_split(struct bio *bi, mempool_t *pool,
+				  int first_sectors);
+extern mempool_t *bio_split_pool;
+extern void bio_pair_release(struct bio_pair *dbio);
 
 extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);

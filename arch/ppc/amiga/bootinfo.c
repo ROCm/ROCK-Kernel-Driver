@@ -59,8 +59,7 @@ void __init parse_bootinfo(const struct bi_record *record)
 		break;
 
 	    case BI_COMMAND_LINE:
-		strncpy(cmd_line, (const char *)data, CL_SIZE);
-		cmd_line[CL_SIZE-1] = '\0';
+		strlcpy(cmd_line, (const char *)data, sizeof(cmd_line));
 		break;
 
 	    default:

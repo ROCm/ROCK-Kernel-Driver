@@ -38,9 +38,9 @@ static void __init eisa_name_device (struct eisa_device *edev)
 
 	for (i = 0; i < EISA_INFOS; i++) {
 		if (!strcmp (edev->id.sig, eisa_table[i].id.sig)) {
-			strncpy (edev->dev.name,
+			strlcpy (edev->dev.name,
 				 eisa_table[i].name,
-				 DEVICE_NAME_SIZE - 1);
+				 DEVICE_NAME_SIZE);
 			return;
 		}
 	}

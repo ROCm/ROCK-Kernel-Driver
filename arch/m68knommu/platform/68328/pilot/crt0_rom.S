@@ -136,10 +136,10 @@ L2:
 	cmpal	%a1, %a2
 	bhi	L2
 
-	/* Copy data segment from ROM to RAM */
+	/* Copy data+init segment from ROM to RAM */
 	moveal	#_etext, %a0
 	moveal	#_sdata, %a1
-	moveal	#_edata, %a2
+	moveal	#__init_end, %a2
 
 	DBG_PUTC('D')
 

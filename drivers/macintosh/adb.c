@@ -749,7 +749,7 @@ static int adb_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t adb_read(struct file *file, char *buf,
+static ssize_t adb_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	int ret;
@@ -810,7 +810,7 @@ static ssize_t adb_read(struct file *file, char *buf,
 	return ret;
 }
 
-static ssize_t adb_write(struct file *file, const char *buf,
+static ssize_t adb_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	int ret/*, i*/;

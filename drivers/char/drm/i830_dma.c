@@ -246,7 +246,7 @@ int i830_dma_cleanup(drm_device_t *dev)
 	   
 	   	if (dev_priv->ring.virtual_start) {
 		   	DRM(ioremapfree)((void *) dev_priv->ring.virtual_start,
-					 dev_priv->ring.Size);
+					 dev_priv->ring.Size, dev);
 		}
 	   	if (dev_priv->hw_status_page) {
 			pci_free_consistent(dev->pdev, PAGE_SIZE,
@@ -264,7 +264,7 @@ int i830_dma_cleanup(drm_device_t *dev)
 			drm_buf_t *buf = dma->buflist[ i ];
 			drm_i830_buf_priv_t *buf_priv = buf->dev_private;
 			if ( buf_priv->kernel_virtual && buf->total )
-				DRM(ioremapfree)(buf_priv->kernel_virtual, buf->total);
+				DRM(ioremapfree)(buf_priv->kernel_virtual, buf->total, dev);
 		}
 	}
    	return 0;
@@ -340,7 +340,7 @@ static int i830_freelist_init(drm_device_t *dev, drm_i830_private_t *dev_priv)
 	   	*buf_priv->in_use = I830_BUF_FREE;
 
 		buf_priv->kernel_virtual = DRM(ioremap)(buf->bus_address, 
-							buf->total);
+							buf->total, dev);
 	}
 	return 0;
 }
@@ -394,7 +394,7 @@ static int i830_dma_initialize(drm_device_t *dev,
 
    	dev_priv->ring.virtual_start = DRM(ioremap)(dev->agp->base + 
 						    init->ring_start, 
-						    init->ring_size);
+						    init->ring_size, dev);
 
    	if (dev_priv->ring.virtual_start == NULL) {
 		dev->dev_private = (void *) dev_priv;

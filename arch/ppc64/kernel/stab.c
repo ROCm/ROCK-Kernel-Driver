@@ -23,7 +23,8 @@
 #include <asm/pmc.h>
 
 int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
-void make_slbe(unsigned long esid, unsigned long vsid, int large);
+void make_slbe(unsigned long esid, unsigned long vsid, int large,
+	       int kernel_segment);
 
 /*
  * Build an entry for the base kernel segment and put it into
@@ -45,7 +46,8 @@ void stab_initialize(unsigned long stab)
 		asm volatile("isync":::"memory");
 		asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
 		asm volatile("isync; slbia; isync":::"memory");
-		make_slbe(esid, vsid, 0);
+		make_slbe(esid, vsid, 0, 1);
+		asm volatile("isync":::"memory");
 #endif
 	} else {
 		asm volatile("isync; slbia; isync":::"memory");
@@ -139,10 +141,13 @@ int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 
 /*
  * Create a segment buffer entry for the given esid/vsid pair.
+ *
+ * NOTE: A context syncronising instruction is required before and after
+ * this, in the common case we use exception entry and rfid.
  */
-void make_slbe(unsigned long esid, unsigned long vsid, int large)
+void make_slbe(unsigned long esid, unsigned long vsid, int large,
+	       int kernel_segment)
 {
-	int kernel_segment = 0;
 	unsigned long entry, castout_entry;
 	union {
 		unsigned long word0;
@@ -153,42 +158,15 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large)
 		slb_dword1    data;
 	} vsid_data;
 
-	if (REGION_ID(esid << SID_SHIFT) >= KERNEL_REGION_ID)
-		kernel_segment = 1;
-
 	/*
-	 * Find an empty entry, if one exists.
+	 * Find an empty entry, if one exists. Must start at 0 because
+	 * we use this code to load SLB entry 0 at boot.
 	 */
 	for (entry = 0; entry < naca->slb_size; entry++) {
 		asm volatile("slbmfee  %0,%1" 
 			     : "=r" (esid_data) : "r" (entry)); 
-		if (!esid_data.data.v) {
-			/* 
-			 * Write the new SLB entry.
-			 */
-			vsid_data.word0 = 0;
-			vsid_data.data.vsid = vsid;
-			vsid_data.data.kp = 1;
-			if (large)
-				vsid_data.data.l = 1;
-			if (kernel_segment)
-				vsid_data.data.c = 1;
-
-			esid_data.word0 = 0;
-			esid_data.data.esid = esid;
-			esid_data.data.v = 1;
-			esid_data.data.index = entry;
-
-			/* slbie not needed as no previous mapping existed. */
-			/* Order update  */
-			asm volatile("isync" : : : "memory");
-			asm volatile("slbmte  %0,%1" 
-				     : : "r" (vsid_data), 
-				     "r" (esid_data)); 
-			/* Order update  */
-			asm volatile("isync" : : : "memory");
-			return;
-		}
+		if (!esid_data.data.v)
+			goto write_entry;
 	}
 
 	/*
@@ -211,13 +189,13 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large)
 		if (castout_entry >= naca->slb_size)
 			castout_entry = 1; 
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
-	} while (esid_data.data.esid == GET_ESID((unsigned long)_get_SP()) &&
-			esid_data.data.v);
+	} while (esid_data.data.esid == GET_ESID((unsigned long)_get_SP()));
 
 	get_paca()->xStab_data.next_round_robin = castout_entry;
 
 	/* slbie not needed as the previous mapping is still valid. */
-	
+
+write_entry:	
 	/* 
 	 * Write the new SLB entry.
 	 */
@@ -234,10 +212,11 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large)
 	esid_data.data.v = 1;
 	esid_data.data.index = entry;
 
-	asm volatile("isync" : : : "memory");   /* Order update */
-	asm volatile("slbmte  %0,%1" 
-		     : : "r" (vsid_data), "r" (esid_data)); 
-	asm volatile("isync" : : : "memory" );   /* Order update */
+	/*
+	 * No need for an isync before or after this slbmte. The exception
+         * we enter with and the rfid we exit with are context synchronizing.
+	 */
+	asm volatile("slbmte  %0,%1" : : "r" (vsid_data), "r" (esid_data)); 
 }
 
 static inline void __ste_allocate(unsigned long esid, unsigned long vsid,
@@ -246,10 +225,10 @@ static inline void __ste_allocate(unsigned long esid, unsigned long vsid,
 	if (cpu_has_slb()) {
 #ifndef CONFIG_PPC_ISERIES
 		if (REGION_ID(esid << SID_SHIFT) == KERNEL_REGION_ID)
-			make_slbe(esid, vsid, 1); 
+			make_slbe(esid, vsid, 1, kernel_segment); 
 		else
 #endif
-			make_slbe(esid, vsid, 0); 
+			make_slbe(esid, vsid, 0, kernel_segment);
 	} else {
 		unsigned char top_entry, stab_entry, *segments; 
 

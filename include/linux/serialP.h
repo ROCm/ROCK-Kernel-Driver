@@ -50,7 +50,6 @@ struct serial_state {
 	unsigned short	closing_wait; /* time to wait before closing */
 	struct async_icount	icount;	
 	struct termios		normal_termios;
-	struct termios		callout_termios;
 	int	io_type;
 	struct async_struct *info;
 	struct pci_dev	*dev;
@@ -80,8 +79,6 @@ struct async_struct {
 	unsigned long		last_active;
 	int			line;
 	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
  	struct circ_buf		xmit;
  	spinlock_t		xmit_lock;
 	u8			*iomem_base;

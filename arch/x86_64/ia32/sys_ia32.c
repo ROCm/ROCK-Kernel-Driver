@@ -234,7 +234,7 @@ sys32_mmap(struct mmap_arg_struct *arg)
 	}
 	
 	if (a.prot & PROT_READ) 
-		a.prot |= PROT_EXEC; 
+		a.prot |= vm_force_exec32;
 
 	mm = current->mm; 
 	down_write(&mm->mmap_sem); 
@@ -253,7 +253,7 @@ asmlinkage long
 sys32_mprotect(unsigned long start, size_t len, unsigned long prot)
 {
 	if (prot & PROT_READ) 
-		prot |= PROT_EXEC; 
+		prot |= vm_force_exec32;
 	return sys_mprotect(start,len,prot); 
 }
 
@@ -929,7 +929,11 @@ struct sysinfo32 {
         u32 totalswap;
         u32 freeswap;
         unsigned short procs;
-        char _f[22];
+	unsigned short pad; 
+        u32 totalhigh;
+        u32 freehigh;
+        u32 mem_unit;
+        char _f[20-2*sizeof(u32)-sizeof(int)];
 };
 
 extern asmlinkage long sys_sysinfo(struct sysinfo *info);
@@ -955,7 +959,10 @@ sys32_sysinfo(struct sysinfo32 *info)
 	    __put_user (s.bufferram, &info->bufferram) ||
 	    __put_user (s.totalswap, &info->totalswap) ||
 	    __put_user (s.freeswap, &info->freeswap) ||
-	    __put_user (s.procs, &info->procs))
+	    __put_user (s.procs, &info->procs) ||
+	    __put_user (s.totalhigh, &info->totalhigh) || 
+	    __put_user (s.freehigh, &info->freehigh) ||
+	    __put_user (s.mem_unit, &info->mem_unit))
 		return -EFAULT;
 	return 0;
 }
@@ -1419,7 +1426,7 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 	}
 
 	if (prot & PROT_READ)
-		prot |= PROT_EXEC;
+		prot |= vm_force_exec32;
 
 	down_write(&mm->mmap_sem);
 	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
@@ -1587,40 +1594,14 @@ free:
 	return ret; 
 } 
 
-asmlinkage long sys32_fork(struct pt_regs regs)
-{
-	struct task_struct *p;
-	p = do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
-}
-
 asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp, struct pt_regs regs)
 {
-	struct task_struct *p;
 	void *parent_tid = (void *)regs.rdx;
 	void *child_tid = (void *)regs.rdi; 
 	if (!newsp)
 		newsp = regs.rsp;
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
+        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
 		    parent_tid, child_tid);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
-}
-
-/*
- * This is trivial, and on the face of it looks like it
- * could equally well be done in user mode.
- *
- * Not so, for quite unobvious reasons - register pressure.
- * In user mode vfork() cannot have a stack frame, and if
- * done by calling the "clone()" system call directly, you
- * do not have enough call-clobbered registers to hold all
- * the information you need.
- */
-asmlinkage long sys32_vfork(struct pt_regs regs)
-{
-	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*

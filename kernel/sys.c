@@ -226,6 +226,11 @@ cond_syscall(sys_shutdown)
 cond_syscall(sys_sendmsg)
 cond_syscall(sys_recvmsg)
 cond_syscall(sys_socketcall)
+cond_syscall(sys_futex)
+cond_syscall(compat_sys_futex)
+cond_syscall(sys_epoll_create)
+cond_syscall(sys_epoll_ctl)
+cond_syscall(sys_epoll_wait)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
@@ -387,8 +392,10 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 
 	/* For safety, we require "magic" arguments. */
 	if (magic1 != LINUX_REBOOT_MAGIC1 ||
-	    (magic2 != LINUX_REBOOT_MAGIC2 && magic2 != LINUX_REBOOT_MAGIC2A &&
-			magic2 != LINUX_REBOOT_MAGIC2B))
+	    (magic2 != LINUX_REBOOT_MAGIC2 &&
+	                magic2 != LINUX_REBOOT_MAGIC2A &&
+			magic2 != LINUX_REBOOT_MAGIC2B &&
+	                magic2 != LINUX_REBOOT_MAGIC2C))
 		return -EINVAL;
 
 	lock_kernel();

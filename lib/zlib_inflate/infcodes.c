@@ -14,11 +14,13 @@
 #define exop word.what.Exop
 #define bits word.what.Bits
 
-inflate_codes_statef *zlib_inflate_codes_new(bl, bd, tl, td, z)
-uInt bl, bd;
-inflate_huft *tl;
-inflate_huft *td; /* need separate declaration for Borland C++ */
-z_streamp z;
+inflate_codes_statef *zlib_inflate_codes_new(
+	uInt bl,
+	uInt bd,
+	inflate_huft *tl,
+	inflate_huft *td, /* need separate declaration for Borland C++ */
+	z_streamp z
+)
 {
   inflate_codes_statef *c;
 
@@ -34,21 +36,22 @@ z_streamp z;
 }
 
 
-int zlib_inflate_codes(s, z, r)
-inflate_blocks_statef *s;
-z_streamp z;
-int r;
+int zlib_inflate_codes(
+	inflate_blocks_statef *s,
+	z_streamp z,
+	int r
+)
 {
   uInt j;               /* temporary storage */
   inflate_huft *t;      /* temporary pointer */
   uInt e;               /* extra bits or operation */
   uLong b;              /* bit buffer */
   uInt k;               /* bits in bit buffer */
-  Bytef *p;             /* input data pointer */
+  Byte *p;              /* input data pointer */
   uInt n;               /* bytes available there */
-  Bytef *q;             /* output window write pointer */
+  Byte *q;              /* output window write pointer */
   uInt m;               /* bytes to end of window or read pointer */
-  Bytef *f;             /* pointer to copy strings from */
+  Byte *f;              /* pointer to copy strings from */
   inflate_codes_statef *c = s->sub.decode.codes;  /* codes state */
 
   /* copy input/output information to locals (UPDATE macro restores) */
@@ -146,15 +149,9 @@ int r;
       DUMPBITS(j)
       c->mode = COPY;
     case COPY:          /* o: copying bytes in window, waiting for space */
-#ifndef __TURBOC__ /* Turbo C bug for following expression */
-      f = (uInt)(q - s->window) < c->sub.copy.dist ?
-          s->end - (c->sub.copy.dist - (q - s->window)) :
-          q - c->sub.copy.dist;
-#else
       f = q - c->sub.copy.dist;
-      if ((uInt)(q - s->window) < c->sub.copy.dist)
-        f = s->end - (c->sub.copy.dist - (uInt)(q - s->window));
-#endif
+      while (f < s->window)             /* modulo window size-"while" instead */
+        f += s->end - s->window;        /* of "if" handles invalid distances */
       while (c->len)
       {
         NEEDOUT
@@ -197,8 +194,9 @@ int r;
 }
 
 
-void zlib_inflate_codes_free(c, z)
-inflate_codes_statef *c;
-z_streamp z;
+void zlib_inflate_codes_free(
+	inflate_codes_statef *c,
+	z_streamp z
+)
 {
 }

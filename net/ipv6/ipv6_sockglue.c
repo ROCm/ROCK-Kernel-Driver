@@ -81,7 +81,7 @@ int ip6_ra_control(struct sock *sk, int sel, void (*destructor)(struct sock *))
 	struct ip6_ra_chain *ra, *new_ra, **rap;
 
 	/* RA packet may be delivered ONLY to IPPROTO_RAW socket */
-	if (sk->type != SOCK_RAW || inet_sk(sk)->num != IPPROTO_RAW)
+	if (sk->sk_type != SOCK_RAW || inet_sk(sk)->num != IPPROTO_RAW)
 		return -EINVAL;
 
 	new_ra = (sel>=0) ? kmalloc(sizeof(*new_ra), GFP_KERNEL) : NULL;
@@ -134,7 +134,7 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 	int val, valbool;
 	int retv = -ENOPROTOOPT;
 
-	if(level==SOL_IP && sk->type != SOCK_RAW)
+	if (level == SOL_IP && sk->sk_type != SOCK_RAW)
 		return udp_prot.setsockopt(sk, level, optname, optval, optlen);
 
 	if(level!=SOL_IPV6)
@@ -156,11 +156,11 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 			struct ipv6_txoptions *opt;
 			struct sk_buff *pktopt;
 
-			if (sk->protocol != IPPROTO_UDP &&
-			    sk->protocol != IPPROTO_TCP)
+			if (sk->sk_protocol != IPPROTO_UDP &&
+			    sk->sk_protocol != IPPROTO_TCP)
 				break;
 
-			if (sk->state != TCP_ESTABLISHED) {
+			if (sk->sk_state != TCP_ESTABLISHED) {
 				retv = -ENOTCONN;
 				break;
 			}
@@ -174,26 +174,26 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 			fl6_free_socklist(sk);
 			ipv6_sock_mc_close(sk);
 
-			if (sk->protocol == IPPROTO_TCP) {
+			if (sk->sk_protocol == IPPROTO_TCP) {
 				struct tcp_opt *tp = tcp_sk(sk);
 
 				local_bh_disable();
-				sock_prot_dec_use(sk->prot);
+				sock_prot_dec_use(sk->sk_prot);
 				sock_prot_inc_use(&tcp_prot);
 				local_bh_enable();
-				sk->prot = &tcp_prot;
+				sk->sk_prot = &tcp_prot;
 				tp->af_specific = &ipv4_specific;
-				sk->socket->ops = &inet_stream_ops;
-				sk->family = PF_INET;
+				sk->sk_socket->ops = &inet_stream_ops;
+				sk->sk_family = PF_INET;
 				tcp_sync_mss(sk, tp->pmtu_cookie);
 			} else {
 				local_bh_disable();
-				sock_prot_dec_use(sk->prot);
+				sock_prot_dec_use(sk->sk_prot);
 				sock_prot_inc_use(&udp_prot);
 				local_bh_enable();
-				sk->prot = &udp_prot;
-				sk->socket->ops = &inet_dgram_ops;
-				sk->family = PF_INET;
+				sk->sk_prot = &udp_prot;
+				sk->sk_socket->ops = &inet_dgram_ops;
+				sk->sk_family = PF_INET;
 			}
 			opt = xchg(&np->opt, NULL);
 			if (opt)
@@ -202,7 +202,7 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 			if (pktopt)
 				kfree_skb(pktopt);
 
-			sk->destruct = inet_sock_destruct;
+			sk->sk_destruct = inet_sock_destruct;
 #ifdef INET_REFCNT_DEBUG
 			atomic_dec(&inet6_sock_nr);
 #endif
@@ -264,7 +264,7 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 		int junk;
 
 		fl.fl6_flowlabel = 0;
-		fl.oif = sk->bound_dev_if;
+		fl.oif = sk->sk_bound_dev_if;
 
 		if (optlen == 0)
 			goto update;
@@ -295,10 +295,11 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 			goto done;
 update:
 		retv = 0;
-		if (sk->type == SOCK_STREAM) {
+		if (sk->sk_type == SOCK_STREAM) {
 			if (opt) {
 				struct tcp_opt *tp = tcp_sk(sk);
-				if (!((1<<sk->state)&(TCPF_LISTEN|TCPF_CLOSE))
+				if (!((1 << sk->sk_state) &
+				      (TCPF_LISTEN | TCPF_CLOSE))
 				    && inet_sk(sk)->daddr != LOOPBACK4_IPV6) {
 					tp->ext_header_len = opt->opt_flen + opt->opt_nflen;
 					tcp_sync_mss(sk, tp->pmtu_cookie);
@@ -307,9 +308,9 @@ update:
 			opt = xchg(&np->opt, opt);
 			sk_dst_reset(sk);
 		} else {
-			write_lock(&sk->dst_lock);
+			write_lock(&sk->sk_dst_lock);
 			opt = xchg(&np->opt, opt);
-			write_unlock(&sk->dst_lock);
+			write_unlock(&sk->sk_dst_lock);
 			sk_dst_reset(sk);
 		}
 
@@ -326,7 +327,7 @@ done:
 		break;
 
 	case IPV6_MULTICAST_HOPS:
-		if (sk->type == SOCK_STREAM)
+		if (sk->sk_type == SOCK_STREAM)
 			goto e_inval;
 		if (val > 255 || val < -1)
 			goto e_inval;
@@ -340,9 +341,9 @@ done:
 		break;
 
 	case IPV6_MULTICAST_IF:
-		if (sk->type == SOCK_STREAM)
+		if (sk->sk_type == SOCK_STREAM)
 			goto e_inval;
-		if (sk->bound_dev_if && sk->bound_dev_if != val)
+		if (sk->sk_bound_dev_if && sk->sk_bound_dev_if != val)
 			goto e_inval;
 
 		if (__dev_get_by_index(val) == NULL) {
@@ -488,7 +489,7 @@ done:
 	case IPV6_RECVERR:
 		np->recverr = valbool;
 		if (!val)
-			skb_queue_purge(&sk->error_queue);
+			skb_queue_purge(&sk->sk_error_queue);
 		retv = 0;
 		break;
 	case IPV6_FLOWINFO_SEND:
@@ -528,7 +529,7 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 	int len;
 	int val;
 
-	if(level==SOL_IP && sk->type != SOCK_RAW)
+	if (level == SOL_IP && sk->sk_type != SOCK_RAW)
 		return udp_prot.getsockopt(sk, level, optname, optval, optlen);
 	if(level!=SOL_IPV6)
 		return -ENOPROTOOPT;
@@ -536,12 +537,12 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 		return -EFAULT;
 	switch (optname) {
 	case IPV6_ADDRFORM:
-		if (sk->protocol != IPPROTO_UDP &&
-		    sk->protocol != IPPROTO_TCP)
+		if (sk->sk_protocol != IPPROTO_UDP &&
+		    sk->sk_protocol != IPPROTO_TCP)
 			return -EINVAL;
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
-		val = sk->family;
+		val = sk->sk_family;
 		break;
 	case MCAST_MSFILTER:
 	{
@@ -564,7 +565,7 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 		struct msghdr msg;
 		struct sk_buff *skb;
 
-		if (sk->type != SOCK_STREAM)
+		if (sk->sk_type != SOCK_STREAM)
 			return -ENOPROTOOPT;
 
 		msg.msg_control = optval;

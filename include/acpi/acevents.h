@@ -165,7 +165,7 @@ acpi_ev_address_space_dispatch (
 	void                            *value);
 
 acpi_status
-acpi_ev_addr_handler_helper (
+acpi_ev_install_handler (
 	acpi_handle                     obj_handle,
 	u32                             level,
 	void                            *context,

@@ -72,7 +72,8 @@ acpi_ns_dump_one_device (
 	void                            *context,
 	void                            **return_value)
 {
-	struct acpi_device_info         info;
+	struct acpi_buffer              buffer;
+	struct acpi_device_info         *info;
 	acpi_status                     status;
 	u32                             i;
 
@@ -82,16 +83,19 @@ acpi_ns_dump_one_device (
 
 	status = acpi_ns_dump_one_object (obj_handle, level, context, return_value);
 
-	status = acpi_get_object_info (obj_handle, &info);
+	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+	status = acpi_get_object_info (obj_handle, &buffer);
 	if (ACPI_SUCCESS (status)) {
+		info = buffer.pointer;
 		for (i = 0; i < level; i++) {
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " "));
 		}
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "    HID: %s, ADR: %8.8X%8.8X, Status: %X\n",
-				  info.hardware_id,
-				  ACPI_HIDWORD (info.address), ACPI_LODWORD (info.address),
-				  info.current_status));
+				  info->hardware_id.value,
+				  ACPI_HIDWORD (info->address), ACPI_LODWORD (info->address),
+				  info->current_status));
+		ACPI_MEM_FREE (info);
 	}
 
 	return (status);

@@ -14,20 +14,20 @@
 #include "infblock.h"
 
 struct inflate_codes_state;
-typedef struct inflate_codes_state FAR inflate_codes_statef;
+typedef struct inflate_codes_state inflate_codes_statef;
 
-extern inflate_codes_statef *zlib_inflate_codes_new OF((
+extern inflate_codes_statef *zlib_inflate_codes_new (
     uInt, uInt,
     inflate_huft *, inflate_huft *,
-    z_streamp ));
+    z_streamp );
 
-extern int zlib_inflate_codes OF((
+extern int zlib_inflate_codes (
     inflate_blocks_statef *,
     z_streamp ,
-    int));
+    int);
 
-extern void zlib_inflate_codes_free OF((
+extern void zlib_inflate_codes_free (
     inflate_codes_statef *,
-    z_streamp ));
+    z_streamp );
 
 #endif /* _INFCODES_H */

@@ -44,12 +44,12 @@ static int continue_tx(struct net_device *dev, int bufnum);
 
 struct ArcProto rfc1201_proto =
 {
-	'a',
-	1500,			/* could be more, but some receivers can't handle it... */
-	rx,
-	build_header,
-	prepare_tx,
-	continue_tx
+	.suffix		= 'a',
+	.mtu		= 1500,	/* could be more, but some receivers can't handle it... */
+	.rx		= rx,
+	.build_header	= build_header,
+	.prepare_tx	= prepare_tx,
+	.continue_tx	= continue_tx,
 };
 
 

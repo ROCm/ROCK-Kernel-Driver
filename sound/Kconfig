@@ -24,7 +24,13 @@ source "sound/arm/Kconfig"
 # here assuming USB is defined before ALSA
 source "sound/usb/Kconfig"
 
+# the following will depenend on the order of config.
+# here assuming PCMCIA is defined before ALSA
+source "sound/pcmcia/Kconfig"
+
 source "sound/sparc/Kconfig"
+
+source "sound/parisc/Kconfig"
 
 endmenu
 

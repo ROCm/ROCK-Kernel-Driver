@@ -58,8 +58,12 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define __pte(x) ((pte_t) { (x) } )
 #define __pmd(x) ((pmd_t) { (x) } )
 #define __pgd(x) ((pgd_t) { (x) } )
-#define __level4(x) ((level4_t) { (x) } )
+#define __pml4(x) ((pml4_t) { (x) } )
 #define __pgprot(x)	((pgprot_t) { (x) } )
+
+extern unsigned long vm_stack_flags, vm_stack_flags32;
+extern unsigned long vm_data_default_flags, vm_data_default_flags32;
+extern unsigned long vm_force_exec32;
 
 #endif /* !__ASSEMBLY__ */
 
@@ -119,8 +123,18 @@ extern __inline__ int get_order(unsigned long size)
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
 
-#define VM_DATA_DEFAULT_FLAGS  (VM_READ | VM_WRITE | VM_EXEC | \
+#define __VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
+				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+#define __VM_STACK_FLAGS 	(VM_GROWSDOWN | VM_READ | VM_WRITE | VM_EXEC | \
                                 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+
+#define VM_DATA_DEFAULT_FLAGS \
+	(test_thread_flag(TIF_IA32) ? vm_data_default_flags32 : \
+	  vm_data_default_flags) 
+
+#define VM_STACK_DEFAULT_FLAGS \
+	(test_thread_flag(TIF_IA32) ? vm_stack_flags32 : vm_stack_flags) 
+	
 
 #endif /* __KERNEL__ */
 

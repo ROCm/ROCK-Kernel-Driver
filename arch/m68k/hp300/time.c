@@ -36,13 +36,13 @@
 
 #define INTVAL ((10000 / 4) - 1)
 
-static void hp300_tick(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t hp300_tick(int irq, void *dev_id, struct pt_regs *regs)
 {
   unsigned long tmp;
-  void (*vector)(int, void *, struct pt_regs *) = dev_id;
+  irqreturn_t (*vector)(int, void *, struct pt_regs *) = dev_id;
   in_8(CLOCKBASE + CLKSR);
   asm volatile ("movpw %1@(5),%0" : "=d" (tmp) : "a" (CLOCKBASE));
-  vector(irq, NULL, regs);
+  return vector(irq, NULL, regs);
 }
 
 unsigned long hp300_gettimeoffset(void)
@@ -61,7 +61,7 @@ unsigned long hp300_gettimeoffset(void)
   return (USECS_PER_JIFFY * ticks) / INTVAL;
 }
 
-void __init hp300_sched_init(void (*vector)(int, void *, struct pt_regs *))
+void __init hp300_sched_init(irqreturn_t (*vector)(int, void *, struct pt_regs *))
 {
   out_8(CLOCKBASE + CLKCR2, 0x1);		/* select CR1 */
   out_8(CLOCKBASE + CLKCR1, 0x1);		/* reset */

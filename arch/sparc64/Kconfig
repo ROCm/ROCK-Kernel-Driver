@@ -318,6 +318,10 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
+config PCI_DOMAINS
+	bool
+	default PCI
+
 config RTC
 	tristate
 	depends on PCI
@@ -1444,6 +1448,12 @@ source "drivers/ieee1394/Kconfig"
 source "net/Kconfig"
 
 source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+source "drivers/telephony/Kconfig"
 
 # This one must be before the filesystem configs. -DaveM
 

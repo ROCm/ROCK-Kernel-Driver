@@ -25,26 +25,28 @@ struct inflate_codes_state;
    at least ten.  The ten bytes are six bytes for the longest length/
    distance pair plus four bytes for overloading the bit buffer. */
 
-int zlib_inflate_fast(bl, bd, tl, td, s, z)
-uInt bl, bd;
-inflate_huft *tl;
-inflate_huft *td; /* need separate declaration for Borland C++ */
-inflate_blocks_statef *s;
-z_streamp z;
+int zlib_inflate_fast(
+	uInt bl,
+	uInt bd,
+	inflate_huft *tl,
+	inflate_huft *td, /* need separate declaration for Borland C++ */
+	inflate_blocks_statef *s,
+	z_streamp z
+)
 {
   inflate_huft *t;      /* temporary pointer */
   uInt e;               /* extra bits or operation */
   uLong b;              /* bit buffer */
   uInt k;               /* bits in bit buffer */
-  Bytef *p;             /* input data pointer */
+  Byte *p;              /* input data pointer */
   uInt n;               /* bytes available there */
-  Bytef *q;             /* output window write pointer */
+  Byte *q;              /* output window write pointer */
   uInt m;               /* bytes to end of window or read pointer */
   uInt ml;              /* mask for literal/length tree */
   uInt md;              /* mask for distance tree */
   uInt c;               /* bytes to copy */
   uInt d;               /* distance back to copy from */
-  Bytef *r;             /* copy source pointer */
+  Byte *r;              /* copy source pointer */
 
   /* load input, output, bit values */
   LOAD
@@ -88,28 +90,41 @@ z_streamp z;
 
             /* do the copy */
             m -= c;
-            if ((uInt)(q - s->window) >= d)     /* offset before dest */
-            {                                   /*  just copy */
-              r = q - d;
-              *q++ = *r++;  c--;        /* minimum count is three, */
-              *q++ = *r++;  c--;        /*  so unroll loop a little */
-            }
-            else                        /* else offset after destination */
+            r = q - d;
+            if (r < s->window)                  /* wrap if needed */
             {
-              e = d - (uInt)(q - s->window); /* bytes from offset to end */
-              r = s->end - e;           /* pointer to offset */
-              if (c > e)                /* if source crosses, */
+              do {
+                r += s->end - s->window;        /* force pointer in window */
+              } while (r < s->window);          /* covers invalid distances */
+              e = s->end - r;
+              if (c > e)
               {
-                c -= e;                 /* copy to end of window */
+                c -= e;                         /* wrapped copy */
                 do {
-                  *q++ = *r++;
+                    *q++ = *r++;
                 } while (--e);
-                r = s->window;          /* copy rest from start of window */
+                r = s->window;
+                do {
+                    *q++ = *r++;
+                } while (--c);
+              }
+              else                              /* normal copy */
+              {
+                *q++ = *r++;  c--;
+                *q++ = *r++;  c--;
+                do {
+                    *q++ = *r++;
+                } while (--c);
               }
             }
-            do {                        /* copy all or what's left */
-              *q++ = *r++;
-            } while (--c);
+            else                                /* normal copy */
+            {
+              *q++ = *r++;  c--;
+              *q++ = *r++;  c--;
+              do {
+                *q++ = *r++;
+              } while (--c);
+            }
             break;
           }
           else if ((e & 64) == 0)

@@ -2309,7 +2309,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 		if (0 == v4l2)
 			return -EINVAL;
                 strcpy(cap->driver,"bttv");
-                strncpy(cap->card,btv->video_dev.name,sizeof(cap->card));
+                strlcpy(cap->card,btv->video_dev.name,sizeof(cap->card));
 		sprintf(cap->bus_info,"PCI:%s",btv->dev->slot_name);
 		cap->version = BTTV_VERSION_CODE;
 		cap->capabilities =
@@ -2367,7 +2367,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 		f->index       = index;
 		f->type        = type;
 		f->pixelformat = bttv_formats[i].fourcc;
-		strncpy(f->description,bttv_formats[i].name,31);
+		strlcpy(f->description,bttv_formats[i].name,sizeof(f->description));
 		return 0;
 	}
 

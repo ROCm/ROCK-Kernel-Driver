@@ -46,11 +46,11 @@ extern void __bad_pda_field(void);
 #define pda_to_op(op,field,val) do { \
        switch (sizeof_field(struct x8664_pda, field)) { 		\
 case 2: \
-asm volatile(op "w %0,%%gs:%c1"::"r" (val),"i"(pda_offset(field)):"memory"); break; \
+asm volatile(op "w %0,%%gs:%P1"::"r" (val),"i"(pda_offset(field)):"memory"); break; \
 case 4: \
-asm volatile(op "l %0,%%gs:%c1"::"r" (val),"i"(pda_offset(field)):"memory"); break; \
+asm volatile(op "l %0,%%gs:%P1"::"r" (val),"i"(pda_offset(field)):"memory"); break; \
 case 8: \
-asm volatile(op "q %0,%%gs:%c1"::"r" (val),"i"(pda_offset(field)):"memory"); break; \
+asm volatile(op "q %0,%%gs:%P1"::"r" (val),"i"(pda_offset(field)):"memory"); break; \
        default: __bad_pda_field(); 					\
        } \
        } while (0)
@@ -63,11 +63,11 @@ asm volatile(op "q %0,%%gs:%c1"::"r" (val),"i"(pda_offset(field)):"memory"); bre
        typedef typeof_field(struct x8664_pda, field) T__; T__ ret__; \
        switch (sizeof_field(struct x8664_pda, field)) { 		\
 case 2: \
-asm volatile(op "w %%gs:%c1,%0":"=r" (ret__):"i"(pda_offset(field)):"memory"); break;\
+asm volatile(op "w %%gs:%P1,%0":"=r" (ret__):"i"(pda_offset(field)):"memory"); break;\
 case 4: \
-asm volatile(op "l %%gs:%c1,%0":"=r" (ret__):"i"(pda_offset(field)):"memory"); break;\
+asm volatile(op "l %%gs:%P1,%0":"=r" (ret__):"i"(pda_offset(field)):"memory"); break;\
 case 8: \
-asm volatile(op "q %%gs:%c1,%0":"=r" (ret__):"i"(pda_offset(field)):"memory"); break;\
+asm volatile(op "q %%gs:%P1,%0":"=r" (ret__):"i"(pda_offset(field)):"memory"); break;\
        default: __bad_pda_field(); 					\
        } \
        ret__; })

@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
+#include <linux/cpu.h>
 
 /*
    - No shared variables, all the data are CPU local.

@@ -1305,14 +1305,14 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     u_char saved_page;
     unsigned bytes_rcvd;
     unsigned int_status, eth_status, rx_status, tx_status;
-    unsigned rsr, pktlen, handled = 1;
+    unsigned rsr, pktlen;
     ulong start_ticks = jiffies; /* fixme: jiffies rollover every 497 days
 				  * is this something to worry about?
 				  * -- on a laptop?
 				  */
 
     if (!netif_device_present(dev))
-	return IRQ_NONE;
+	return IRQ_HANDLED;
 
     ioaddr = dev->base_addr;
     if (lp->mohawk) { /* must disable the interrupt */
@@ -1330,7 +1330,6 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
   loop_entry:
     if (int_status == 0xff) { /* card may be ejected */
 	DEBUG(3, "%s: interrupt %d for dead card\n", dev->name, irq);
-	handled = 0;
 	goto leave;
     }
     eth_status = GetByte(XIRCREG_ESR);
@@ -1515,7 +1514,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
      * force an interrupt with this command:
      *	  PutByte(XIRCREG_CR, EnableIntr|ForceIntr);
      */
-    return IRQ_RETVAL(handled);
+    return IRQ_HANDLED;
 } /* xirc2ps_interrupt */
 
 /*====================================================================*/

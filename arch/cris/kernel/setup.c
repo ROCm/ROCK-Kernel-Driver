@@ -170,14 +170,12 @@ setup_arch(char **cmdline_p)
 	*cmdline_p = command_line;
 
 	if (romfs_in_flash) {
-		strncpy(command_line, "root=", COMMAND_LINE_SIZE);
-		strncpy(command_line+5, CONFIG_ETRAX_ROOT_DEVICE,
-			COMMAND_LINE_SIZE-5);
+		strlcpy(command_line, "root=", sizeof(command_line));
+		strlcat(command_line, CONFIG_ETRAX_ROOT_DEVICE,
+			sizeof(command_line));
 
 		/* Save command line copy for /proc/cmdline */
-
-		memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
-		saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
+		strlcpy(saved_command_line, command_line, sizeof(saved_command_line));
 	}
 
 	/* give credit for the CRIS port */

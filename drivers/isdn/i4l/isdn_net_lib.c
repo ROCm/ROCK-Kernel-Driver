@@ -270,8 +270,7 @@ isdn_net_bind(isdn_net_dev *idev, isdn_net_ioctl_cfg *cfg)
 	int chidx = -1;
 	char drvid[25];
 
-	strncpy(drvid, cfg->drvid, 24);
-	drvid[24] = 0;
+	strlcpy(drvid, cfg->drvid, sizeof(drvid));
 
 	if (cfg->exclusive && !strlen(drvid)) {
 		/* If we want to bind exclusively, need to specify drv/chan */
@@ -562,8 +561,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 	if (retval)
 		goto out;
 
-	strncpy(mlp->msn, cfg->eaz, ISDN_MSNLEN-1);
-	mlp->msn[ISDN_MSNLEN-1] = 0;
+	strlcpy(mlp->msn, cfg->eaz, sizeof(mlp->msn));
 	mlp->onhtime = cfg->onhtime;
 	idev->charge = cfg->charge;
 	mlp->l2_proto = cfg->l2_proto;
@@ -864,7 +862,7 @@ isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone *peer)
 
 	slot = idev->isdn_slot;
 
-	strncpy(phone->phone, slot->num, ISDN_MSNLEN);
+	strlcpy(phone->phone, slot->num, sizeof(phone->phone));
 	phone->outgoing = USG_OUTGOING(slot->usage);
 
 	if (copy_to_user(peer, phone, sizeof(*peer)))

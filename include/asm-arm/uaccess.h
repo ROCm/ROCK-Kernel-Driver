@@ -144,13 +144,13 @@ extern int __put_user_bad(void);
 		register int __e asm("r0");				\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
-			__put_user_x(__r1, __p, __e, 1, "r2", "lr");	\
+			__put_user_x(__r1, __p, __e, 1, "ip", "lr");	\
 			break;						\
 		case 2:							\
-			__put_user_x(__r1, __p, __e, 2, "r2", "lr");	\
+			__put_user_x(__r1, __p, __e, 2, "ip", "lr");	\
 			break;						\
 		case 4:							\
-			__put_user_x(__r1, __p, __e, 4, "r2", "lr");	\
+			__put_user_x(__r1, __p, __e, 4, "ip", "lr");	\
 			break;						\
 		case 8:							\
 			__put_user_x(__r1, __p, __e, 8, "ip", "lr");	\

@@ -253,7 +253,7 @@ sim710_mca_probe(struct device *dev)
 	} else {
 		return -ENODEV;
 	}
-	strncpy(dev->name, name, sizeof(dev->name));
+	strlcpy(dev->name, name, sizeof(dev->name));
 	mca_device_set_claim(mca_dev, 1);
 	base = mca_device_transform_ioport(mca_dev, base);
 	irq_vector = mca_device_transform_irq(mca_dev, irq_vector);

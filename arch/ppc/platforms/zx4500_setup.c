@@ -104,9 +104,9 @@ zx4500_setup_arch(void)
 #endif
 
 	/* Get boot string from flash */
-	strncpy(boot_string,
+	strlcpy(boot_string,
 		(char *)ZX4500_BOOT_STRING_ADDR,
-		ZX4500_BOOT_STRING_LEN);
+		sizeof(boot_string));
 	boot_string[ZX4500_BOOT_STRING_LEN] = '\0';
 
 	/* Can be delimited by 0xff */

@@ -2509,9 +2509,6 @@ static int __init amb_probe (void) {
   
   PRINTD (DBG_FLOW, "amb_probe");
   
-  if (!pci_present())
-    return 0;
-  
   devs = 0;
   pci_dev = NULL;
   while ((pci_dev = pci_find_device

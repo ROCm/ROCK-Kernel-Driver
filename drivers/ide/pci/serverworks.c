@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/pci/serverworks.c		Version 0.7	10 Sept 2002
+ * linux/drivers/ide/pci/serverworks.c		Version 0.8	 25 Ebr 2003
  *
  * Copyright (C) 1998-2000 Michel Aubry
  * Copyright (C) 1998-2000 Andrzej Krzysztofowicz
@@ -203,10 +203,21 @@ static int svwks_get_info (char *buffer, char **addr, off_t offset, int count)
 }
 #endif  /* defined(DISPLAY_SVWKS_TIMINGS) && defined(CONFIG_PROC_FS) */
 
+static int check_in_drive_lists (ide_drive_t *drive, const char **list)
+{
+	while (*list)
+		if (!strcmp(*list++, drive->id->model))
+			return 1;
+	return 0;
+}
+
 static u8 svwks_ratemask (ide_drive_t *drive)
 {
 	struct pci_dev *dev     = HWIF(drive)->pci_dev;
 	u8 mode;
+
+	if (!svwks_revision)
+		pci_read_config_byte(dev, PCI_REVISION_ID, &svwks_revision);
 
 	if (dev->device == PCI_DEVICE_ID_SERVERWORKS_OSB4IDE) {
 		u32 reg = 0;
@@ -225,9 +236,13 @@ static u8 svwks_ratemask (ide_drive_t *drive)
 	} else if (svwks_revision >= SVWKS_CSB5_REVISION_NEW) {
 		u8 btr = 0;
 		pci_read_config_byte(dev, 0x5A, &btr);
-		mode = btr;
+		mode = btr & 0x3;
 		if (!eighty_ninty_three(drive))
 			mode = min(mode, (u8)1);
+		/* If someone decides to do UDMA133 on CSB5 the same
+		   issue will bite so be inclusive */
+		if (mode > 2 && check_in_drive_lists(drive, svwks_bad_ata100))
+			mode = 2;
 	}
 	if (((dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE) ||
 	     (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2)) &&
@@ -419,13 +434,10 @@ static void config_chipset_for_pio (ide_drive_t *drive)
 
 static void svwks_tune_drive (ide_drive_t *drive, u8 pio)
 {
-	/* Tune to desired value or to "best". We must not adjust
-	   "best" when we adjust from pio numbers to rate values! */
-	   
-	if(pio != 255)
-		(void) svwks_tune_chipset(drive, (XFER_PIO_0 + pio));
-	else
+	if(pio == 255)
 		(void) svwks_tune_chipset(drive, 255);
+	else
+		(void) svwks_tune_chipset(drive, (XFER_PIO_0 + pio));
 }
 
 static int config_chipset_for_dma (ide_drive_t *drive)
@@ -446,7 +458,7 @@ static int svwks_config_drive_xfer_rate (ide_drive_t *drive)
 
 	drive->init_speed = 0;
 
-	if (id && (id->capability & 1) && drive->autodma) {
+	if ((id->capability & 1) && drive->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (hwif->ide_dma_bad_drive(drive))
 			goto fast_ata_pio;
@@ -483,28 +495,10 @@ no_dma_set:
 	return hwif->ide_dma_on(drive);
 }
 
+/* This can go soon */
+
 static int svwks_ide_dma_end (ide_drive_t *drive)
 {
-	/*
-	 *	We never place the OSB4 into a UDMA mode with a disk
-	 *	medium, that means the UDMA "all my data is 4 byte shifted"
-	 *	problem cannot occur.
-	 */
-#if 0
-	ide_hwif_t *hwif	= HWIF(drive);
-	u8 dma_stat		= hwif->INB(hwif->dma_status);
-
-	if ((dma_stat & 1) && drive->media == ide_disk)
-	{
-		printk(KERN_CRIT "Serverworks OSB4 in impossible state.\n");
-		printk(KERN_CRIT "Disable UDMA or if you are using Seagate then try switching disk types\n");
-		printk(KERN_CRIT "on this controller. Please report this event to osb4-bug@ide.cabal.tm\n");
-		/* Panic might sys_sync -> death by corrupt disk */
-		printk(KERN_CRIT "OSB4: continuing might cause disk corruption.\n");
-		while(1)
-			cpu_relax();
-	}
-#endif	
 	return __ide_dma_end(drive);
 }
 
@@ -630,8 +624,6 @@ static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *
 
 static unsigned int __init ata66_svwks_svwks (ide_hwif_t *hwif)
 {
-//	struct pci_dev *dev = hwif->pci_dev;
-//	return 0;
 	return 1;
 }
 

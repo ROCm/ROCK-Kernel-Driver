@@ -19,89 +19,72 @@ static int ebt_filter_arp(const struct sk_buff *skb, const struct net_device *in
    const struct net_device *out, const void *data, unsigned int datalen)
 {
 	struct ebt_arp_info *info = (struct ebt_arp_info *)data;
+	struct arphdr arph;
 
+	if (skb_copy_bits(skb, 0, &arph, sizeof(arph)))
+		return EBT_NOMATCH;
 	if (info->bitmask & EBT_ARP_OPCODE && FWINV(info->opcode !=
-	   ((*skb).nh.arph)->ar_op, EBT_ARP_OPCODE))
+	   arph.ar_op, EBT_ARP_OPCODE))
 		return EBT_NOMATCH;
 	if (info->bitmask & EBT_ARP_HTYPE && FWINV(info->htype !=
-	   ((*skb).nh.arph)->ar_hrd, EBT_ARP_HTYPE))
+	   arph.ar_hrd, EBT_ARP_HTYPE))
 		return EBT_NOMATCH;
 	if (info->bitmask & EBT_ARP_PTYPE && FWINV(info->ptype !=
-	   ((*skb).nh.arph)->ar_pro, EBT_ARP_PTYPE))
+	   arph.ar_pro, EBT_ARP_PTYPE))
 		return EBT_NOMATCH;
 
-	if (info->bitmask & (EBT_ARP_SRC_IP | EBT_ARP_DST_IP))
-	{
-		uint32_t arp_len = sizeof(struct arphdr) +
-		   (2 * (((*skb).nh.arph)->ar_hln)) +
-		   (2 * (((*skb).nh.arph)->ar_pln));
-		uint32_t dst;
-		uint32_t src;
+	if (info->bitmask & (EBT_ARP_SRC_IP | EBT_ARP_DST_IP)) {
+		uint32_t addr;
 
-		/* Make sure the packet is long enough */
-		if ((((*skb).nh.raw) + arp_len) > (*skb).tail)
-			return EBT_NOMATCH;
 		/* IPv4 addresses are always 4 bytes */
-		if (((*skb).nh.arph)->ar_pln != sizeof(uint32_t))
+		if (arph.ar_pln != sizeof(uint32_t))
 			return EBT_NOMATCH;
-
 		if (info->bitmask & EBT_ARP_SRC_IP) {
-			memcpy(&src, ((*skb).nh.raw) + sizeof(struct arphdr) +
-			   ((*skb).nh.arph)->ar_hln, sizeof(uint32_t));
-			if (FWINV(info->saddr != (src & info->smsk),
+			if (skb_copy_bits(skb, sizeof(struct arphdr) +
+			    arph.ar_hln, &addr, sizeof(addr)))
+				return EBT_NOMATCH;
+			if (FWINV(info->saddr != (addr & info->smsk),
 			   EBT_ARP_SRC_IP))
 				return EBT_NOMATCH;
 		}
 
 		if (info->bitmask & EBT_ARP_DST_IP) {
-			memcpy(&dst, ((*skb).nh.raw)+sizeof(struct arphdr) +
-			   (2*(((*skb).nh.arph)->ar_hln)) +
-			   (((*skb).nh.arph)->ar_pln), sizeof(uint32_t));
-			if (FWINV(info->daddr != (dst & info->dmsk),
+			if (skb_copy_bits(skb, sizeof(struct arphdr) +
+			    2*arph.ar_hln + sizeof(uint32_t), &addr,
+			    sizeof(addr)))
+				return EBT_NOMATCH;
+			if (FWINV(info->daddr != (addr & info->dmsk),
 			   EBT_ARP_DST_IP))
 				return EBT_NOMATCH;
 		}
 	}
 
-	if (info->bitmask & (EBT_ARP_SRC_MAC | EBT_ARP_DST_MAC))
-	{
-		uint32_t arp_len = sizeof(struct arphdr) +
-		   (2 * (((*skb).nh.arph)->ar_hln)) +
-		   (2 * (((*skb).nh.arph)->ar_pln));
-		unsigned char dst[ETH_ALEN];
-		unsigned char src[ETH_ALEN];
+	if (info->bitmask & (EBT_ARP_SRC_MAC | EBT_ARP_DST_MAC)) {
+		unsigned char mac[ETH_ALEN];
+		uint8_t verdict, i;
 
-		/* Make sure the packet is long enough */
-		if ((((*skb).nh.raw) + arp_len) > (*skb).tail)
-			return EBT_NOMATCH;
 		/* MAC addresses are 6 bytes */
-		if (((*skb).nh.arph)->ar_hln != ETH_ALEN)
+		if (arph.ar_hln != ETH_ALEN)
 			return EBT_NOMATCH;
 		if (info->bitmask & EBT_ARP_SRC_MAC) {
-			uint8_t verdict, i;
-
-			memcpy(&src, ((*skb).nh.raw) +
-					sizeof(struct arphdr),
-					ETH_ALEN);
+			if (skb_copy_bits(skb, sizeof(struct arphdr), &mac,
+			    ETH_ALEN))
+				return EBT_NOMATCH;
 			verdict = 0;
 			for (i = 0; i < 6; i++)
-				verdict |= (src[i] ^ info->smaddr[i]) &
+				verdict |= (mac[i] ^ info->smaddr[i]) &
 				       info->smmsk[i];
 			if (FWINV(verdict != 0, EBT_ARP_SRC_MAC))
 				return EBT_NOMATCH;
 		}
 
 		if (info->bitmask & EBT_ARP_DST_MAC) {
-			uint8_t verdict, i;
-
-			memcpy(&dst, ((*skb).nh.raw) +
-					sizeof(struct arphdr) +
-			   		(((*skb).nh.arph)->ar_hln) +
-			   		(((*skb).nh.arph)->ar_pln),
-					ETH_ALEN);
+			if (skb_copy_bits(skb, sizeof(struct arphdr) +
+			    arph.ar_hln + arph.ar_pln, &mac, ETH_ALEN))
+				return EBT_NOMATCH;
 			verdict = 0;
 			for (i = 0; i < 6; i++)
-				verdict |= (dst[i] ^ info->dmaddr[i]) &
+				verdict |= (mac[i] ^ info->dmaddr[i]) &
 					info->dmmsk[i];
 			if (FWINV(verdict != 0, EBT_ARP_DST_MAC))
 				return EBT_NOMATCH;

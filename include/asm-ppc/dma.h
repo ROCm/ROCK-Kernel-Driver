@@ -99,7 +99,7 @@ extern unsigned long ISA_DMA_THRESHOLD;
  */
 
 /* see prep_setup_arch() for detailed informations */
-#if defined(CONFIG_SOUND_CS4232) && defined(CONFIG_ALL_PPC)
+#if defined(CONFIG_SOUND_CS4232) && defined(CONFIG_PPC_PREP)
 extern long ppc_cs4232_dma, ppc_cs4232_dma2;
 #define SND_DMA1 ppc_cs4232_dma
 #define SND_DMA2 ppc_cs4232_dma2

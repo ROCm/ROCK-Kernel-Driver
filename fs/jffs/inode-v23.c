@@ -1783,7 +1783,7 @@ static struct super_operations jffs_ops =
 };
 
 static struct super_block *jffs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, jffs_fill_super);
 }
@@ -1806,9 +1806,11 @@ init_jffs_fs(void)
 	jffs_proc_root = proc_mkdir("jffs", proc_root_fs);
 #endif
 	fm_cache = kmem_cache_create("jffs_fm", sizeof(struct jffs_fm),
-				     0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+				     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, 
+				     NULL, NULL);
 	node_cache = kmem_cache_create("jffs_node",sizeof(struct jffs_node),
-				       0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+				       0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, 
+				       NULL, NULL);
 	return register_filesystem(&jffs_fs_type);
 }
 

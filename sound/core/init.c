@@ -26,7 +26,6 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/ctype.h>
-#include <linux/workqueue.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -49,6 +48,8 @@ static void snd_card_id_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer
 {
 	snd_iprintf(buffer, "%s\n", entry->card->id);
 }
+
+static void snd_card_free_thread(void * __card);
 
 /**
  *  snd_card_new - create and initialize a soundcard structure
@@ -76,7 +77,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	if (xid) {
 		if (!snd_info_check_reserved_words(xid))
 			goto __error;
-		strncpy(card->id, xid, sizeof(card->id) - 1);
+		strlcpy(card->id, xid, sizeof(card->id));
 	}
 	write_lock(&snd_card_rwlock);
 	if (idx < 0) {
@@ -115,6 +116,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	INIT_LIST_HEAD(&card->ctl_files);
 	spin_lock_init(&card->files_lock);
 	init_waitqueue_head(&card->shutdown_sleep);
+	INIT_WORK(&card->free_workq, snd_card_free_thread, card);
 #ifdef CONFIG_PM
 	init_MUTEX(&card->power_lock);
 	init_waitqueue_head(&card->power_sleep);
@@ -193,9 +195,7 @@ int snd_card_disconnect(snd_card_t * card)
 		f_ops = &s_f_ops->f_ops;
 
 		memset(f_ops, 0, sizeof(*f_ops));
-#ifndef LINUX_2_2
 		f_ops->owner = file->f_op->owner;
-#endif
 		f_ops->release = file->f_op->release;
 		f_ops->poll = snd_disconnect_poll;
 
@@ -251,6 +251,10 @@ int snd_card_free(snd_card_t * card)
 	snd_cards[card->number] = NULL;
 	snd_cards_count--;
 	write_unlock(&snd_card_rwlock);
+
+#ifdef CONFIG_PM
+	wake_up(&card->power_sleep);
+#endif
 
 	/* wait, until all devices are ready for the free operation */
 	wait_event(card->shutdown_sleep, card->files == NULL);
@@ -325,16 +329,15 @@ static void snd_card_free_thread(void * __card)
  */
 int snd_card_free_in_thread(snd_card_t * card)
 {
-	DECLARE_WORK(works, snd_card_free_thread, card);
-
 	if (card->files == NULL) {
 		snd_card_free(card);
 		return 0;
 	}
-	if (schedule_work(&works))
+
+	if (schedule_work(&card->free_workq))
 		return 0;
 
-	snd_printk(KERN_ERR "kernel_thread failed in snd_card_free_in_thread for card %i\n", card->number);
+	snd_printk(KERN_ERR "schedule_work() failed in snd_card_free_in_thread for card %i\n", card->number);
 	/* try to free the structure immediately */
 	snd_card_free(card);
 	return -EFAULT;
@@ -352,6 +355,10 @@ static void choose_default_id(snd_card_t * card)
 		id++;
 	}
 	id = card->id;
+	while (*spos != '\0' && !isalnum(*spos))
+		spos++;
+	if (isdigit(*spos))
+		*id++ = isalpha(card->shortname[0]) ? card->shortname[0] : 'D';
 	while (*spos != '\0' && (size_t)(id - card->id) < sizeof(card->id) - 1) {
 		if (isalnum(*spos))
 			*id++ = *spos;
@@ -360,6 +367,9 @@ static void choose_default_id(snd_card_t * card)
 	*id = '\0';
 
 	id = card->id;
+	
+	if (*id == '\0')
+		strcpy(id, "default");
 
 	while (1) {
 	      	if (loops-- == 0) {
@@ -419,7 +429,7 @@ int snd_card_register(snd_card_t * card)
 		write_unlock(&snd_card_rwlock);
 		return 0;
 	}
-	if (!card->id[0])
+	if (card->id[0] == '\0')
 		choose_default_id(card);
 	snd_cards[card->number] = card;
 	snd_cards_count++;
@@ -662,21 +672,35 @@ int snd_card_file_remove(snd_card_t *card, struct file *file)
 /**
  *  snd_power_wait - wait until the power-state is changed.
  *  @card: soundcard structure
+ *  @power_state: expected power state
+ *  @file: file structure for the O_NONBLOCK check (optional)
  *
  *  Waits until the power-state is changed.
  *
  *  Note: the power lock must be active before call.
  */
-void snd_power_wait(snd_card_t *card)
+int snd_power_wait(snd_card_t *card, unsigned int power_state, struct file *file)
 {
 	wait_queue_t wait;
 
+	/* fastpath */
+	if (snd_power_get_state(card) == power_state)
+		return 0;
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&card->power_sleep, &wait);
-	snd_power_unlock(card);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(30 * HZ);
-	remove_wait_queue(&card->power_sleep, &wait);
-	snd_power_lock(card);
+	while (1) {
+		if (card->shutdown)
+			return -ENODEV;
+		if (snd_power_get_state(card) == power_state) {
+			remove_wait_queue(&card->power_sleep, &wait);
+			return 0;
+		}
+		if (file && (file->f_flags & O_NONBLOCK))
+			return -EAGAIN;
+		snd_power_unlock(card);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(30 * HZ);
+		snd_power_lock(card);
+	}
 }
 #endif /* CONFIG_PM */

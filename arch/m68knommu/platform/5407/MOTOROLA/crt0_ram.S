@@ -99,7 +99,7 @@ _start:
 	movec	%d0, %ACR3
 
 	/* Enable cache */
-	move.l	#0x86088400, %d0
+	move.l	#0xa4098400, %d0		/* Write buffer, dflt precise */
 	movec	%d0,%CACR
 	nop
 

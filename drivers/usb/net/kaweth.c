@@ -114,6 +114,8 @@ MODULE_AUTHOR("Michael Zappe <zapman@interlan.net>, Stephane Alnet <stephane@u-p
 MODULE_DESCRIPTION("KL5USB101 USB Ethernet driver");
 MODULE_LICENSE("GPL");
 
+static const char driver_name[] = "kaweth";
+
 static int kaweth_probe(
 		struct usb_interface *intf,
 		const struct usb_device_id *id	/* from id_table */
@@ -169,7 +171,7 @@ MODULE_DEVICE_TABLE (usb, usb_klsi_table);
  ****************************************************************/
 static struct usb_driver kaweth_driver = {
 	.owner =	THIS_MODULE,
-	.name =		"kaweth",
+	.name =		driver_name,
 	.probe =	kaweth_probe,
 	.disconnect =	kaweth_disconnect,
 	.id_table =     usb_klsi_table,
@@ -670,7 +672,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	switch (ethcmd) {
 	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "kaweth", sizeof(info.driver)-1);
+		strlcpy(info.driver, driver_name, sizeof(info.driver));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -1016,7 +1018,7 @@ static int kaweth_probe(
 
 	kaweth_dbg("Initializing net device.");
 
-	if(!(netdev = kmalloc(sizeof(struct net_device), GFP_KERNEL))) {
+	if (!(netdev = alloc_etherdev(0))) {
 		kfree(kaweth);
 		return -ENOMEM;
 	}
@@ -1054,18 +1056,21 @@ static int kaweth_probe(
 	
 	SET_MODULE_OWNER(netdev);
 
-	if (!init_etherdev(netdev, 0)) {
+	usb_set_intfdata(intf, kaweth);
+
+	if (register_netdev(netdev) != 0) {
 		kaweth_err("Error calling init_etherdev.");
-		goto err_tx_and_rx;
+		goto err_intfdata;
 	}
 
 	kaweth_info("kaweth interface created at %s", kaweth->net->name);
 
 	kaweth_dbg("Kaweth probe returning.");
 
-	usb_set_intfdata(intf, kaweth);
 	return 0;
 
+err_intfdata:
+	usb_set_intfdata(intf, NULL);
 err_tx_and_rx:
 	usb_free_urb(kaweth->rx_urb);
 err_only_tx:
@@ -1113,6 +1118,7 @@ static void kaweth_disconnect(struct usb_interface *intf)
 
 		kaweth_dbg("Unregistering net device");
 		unregister_netdev(kaweth->net);
+		kfree(kaweth->net);
 	}
 
 	usb_free_urb(kaweth->rx_urb);

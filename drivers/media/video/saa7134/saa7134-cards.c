@@ -596,16 +596,18 @@ static struct {
 static void board_flyvideo(struct saa7134_dev *dev)
 {
 	u32 value;
-	int index;
 
 	saa_writel(SAA7134_GPIO_GPMODE0 >> 2,   0);
 	value = saa_readl(SAA7134_GPIO_GPSTATUS0 >> 2);
 #if 0
-	index = (value & 0x1f00) >> 8;
-	printk(KERN_INFO "%s: flyvideo: gpio is 0x%x [model=%s,tuner=%d]\n",
-	       dev->name, value, fly_list[index].model,
-	       fly_list[index].tuner_type);
-	dev->tuner_type = fly_list[index].tuner_type;
+	{
+		int index = (value & 0x1f00) >> 8;
+		printk(KERN_INFO "%s: flyvideo: gpio is 0x%x "
+				"[model=%s,tuner=%d]\n",
+		       dev->name, value, fly_list[index].model,
+		       fly_list[index].tuner_type);
+		dev->tuner_type = fly_list[index].tuner_type;
+	}
 #else
 	printk(KERN_INFO "%s: flyvideo: gpio is 0x%x\n",
 	       dev->name, value);

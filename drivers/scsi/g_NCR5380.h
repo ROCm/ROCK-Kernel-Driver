@@ -51,11 +51,8 @@ static int generic_NCR5380_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *))
 static int generic_NCR5380_bus_reset(Scsi_Cmnd *);
 static int generic_NCR5380_host_reset(Scsi_Cmnd *);
 static int generic_NCR5380_device_reset(Scsi_Cmnd *);
-static int notyet_generic_proc_info (char *buffer ,char **start, off_t offset,
-                     int length, int hostno, int inout);
 static const char* generic_NCR5380_info(struct Scsi_Host *);
 static int generic_NCR5380_biosparam(struct scsi_device *, struct block_device *, sector_t, int *);
-static int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int length, int hostno, int inout);
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2
@@ -102,7 +99,7 @@ static int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, i
 #define NCR5380_region_size 0x3a00
 
 #define NCR5380_read(reg) isa_readb(NCR5380_map_name + NCR53C400_mem_base + (reg))
-#define NCR5380_write(reg, value) isa_writeb(NCR5380_map_name + NCR53C400_mem_base + (reg), value)
+#define NCR5380_write(reg, value) isa_writeb(value, NCR5380_map_name + NCR53C400_mem_base + (reg))
 #endif
 
 #define NCR5380_implementation_fields \

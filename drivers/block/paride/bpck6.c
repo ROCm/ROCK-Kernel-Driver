@@ -193,11 +193,11 @@ static int bpck6_probe_unit ( PIA *pi )
   	if(out)
  	{
 		ppc6_close(PPCSTRUCT(pi));
-		return(1);	
 		if(verbose)
 		{
 			printk(KERN_DEBUG "leaving probe\n");
 		}
+               return(1);
 	}
   	else
   	{

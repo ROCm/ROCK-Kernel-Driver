@@ -245,7 +245,7 @@ void sctp_transport_route(struct sctp_transport *transport,
 	if (dst) {
 		transport->pmtu = dst_pmtu(dst);
 
-		/* Initialize sk->rcv_saddr, if the transport is the
+		/* Initialize sk->sk_rcv_saddr, if the transport is the
 		 * association's active path for getsockname().
 		 */ 
 		if (asoc && (transport == asoc->peer.active_path))

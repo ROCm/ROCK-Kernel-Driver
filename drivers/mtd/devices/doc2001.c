@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001.c,v 1.35 2001/10/02 15:05:13 dwmw2 Exp $
+ * $Id: doc2001.c,v 1.40 2003/05/20 21:03:07 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -22,7 +22,6 @@
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
-#include <linux/mtd/nand_ids.h>
 #include <linux/mtd/doc2000.h>
 
 /* #define ECC_DEBUG */
@@ -38,9 +37,9 @@ static int doc_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int doc_write(struct mtd_info *mtd, loff_t to, size_t len,
 		     size_t *retlen, const u_char *buf);
 static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
-			size_t *retlen, u_char *buf, u_char *eccbuf);
+			size_t *retlen, u_char *buf, u_char *eccbuf, int oobsel);
 static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
-			 size_t *retlen, const u_char *buf, u_char *eccbuf);
+			 size_t *retlen, const u_char *buf, u_char *eccbuf, int oobsel);
 static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 			size_t *retlen, u_char *buf);
 static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
@@ -182,7 +181,7 @@ static int DoC_SelectFloor(unsigned long docptr, int floor)
 /* DoC_IdentChip: Identify a given NAND chip given {floor,chip} */
 static int DoC_IdentChip(struct DiskOnChip *doc, int floor, int chip)
 {
-	int mfr, id, i;
+	int mfr, id, i, j;
 	volatile char dummy;
 
 	/* Page in the required floor/chip
@@ -216,11 +215,15 @@ static int DoC_IdentChip(struct DiskOnChip *doc, int floor, int chip)
 
 	/* FIXME: to deal with multi-flash on multi-Millennium case more carefully */
 	for (i = 0; nand_flash_ids[i].name != NULL; i++) {
-		if (mfr == nand_flash_ids[i].manufacture_id &&
-		    id == nand_flash_ids[i].model_id) {
+		if ( id == nand_flash_ids[i].id) {
+			/* Try to identify manufacturer */
+			for (j = 0; nand_manuf_ids[j].id != 0x0; j++) {
+				if (nand_manuf_ids[j].id == mfr)
+					break;
+			}	
 			printk(KERN_INFO "Flash chip found: Manufacturer ID: %2.2X, "
-			       "Chip ID: %2.2X (%s)\n",
-			       mfr, id, nand_flash_ids[i].name);
+			       "Chip ID: %2.2X (%s:%s)\n",
+			       mfr, id, nand_manuf_ids[j].name, nand_flash_ids[i].name);
 			doc->mfr = mfr;
 			doc->id = id;
 			doc->chipshift = nand_flash_ids[i].chipshift;
@@ -363,7 +366,7 @@ static void DoCMil_init(struct mtd_info *mtd)
 
 	mtd->oobblock = 512;
 	mtd->oobsize = 16;
-	mtd->module = THIS_MODULE;
+	mtd->owner = THIS_MODULE;
 	mtd->erase = doc_erase;
 	mtd->point = NULL;
 	mtd->unpoint = NULL;
@@ -399,11 +402,11 @@ static int doc_read (struct mtd_info *mtd, loff_t from, size_t len,
 		     size_t *retlen, u_char *buf)
 {
 	/* Just a special case of doc_read_ecc */
-	return doc_read_ecc(mtd, from, len, retlen, buf, NULL);
+	return doc_read_ecc(mtd, from, len, retlen, buf, NULL, 0);
 }
 
 static int doc_read_ecc (struct mtd_info *mtd, loff_t from, size_t len,
-			 size_t *retlen, u_char *buf, u_char *eccbuf)
+			 size_t *retlen, u_char *buf, u_char *eccbuf, int oobsel)
 {
 	int i, ret;
 	volatile char dummy;
@@ -525,11 +528,11 @@ static int doc_write (struct mtd_info *mtd, loff_t to, size_t len,
 		      size_t *retlen, const u_char *buf)
 {
 	char eccbuf[6];
-	return doc_write_ecc(mtd, to, len, retlen, buf, eccbuf);
+	return doc_write_ecc(mtd, to, len, retlen, buf, eccbuf, 0);
 }
 
 static int doc_write_ecc (struct mtd_info *mtd, loff_t to, size_t len,
-			  size_t *retlen, const u_char *buf, u_char *eccbuf)
+			  size_t *retlen, const u_char *buf, u_char *eccbuf, int oobsel)
 {
 	int i,ret = 0;
 	volatile char dummy;

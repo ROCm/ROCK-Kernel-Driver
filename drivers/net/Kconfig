@@ -225,7 +225,7 @@ source "drivers/net/arm/Kconfig"
 
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
-	depends on NET_ETHERNET && PPC && ALL_PPC
+	depends on NET_ETHERNET && PPC_PMAC
 	help
 	  Power Macintoshes and clones with Ethernet built-in on the
 	  motherboard will usually use a MACE (Medium Access Control for
@@ -249,7 +249,7 @@ config MACE_AAUI_PORT
 
 config BMAC
 	tristate "BMAC (G3 ethernet) support"
-	depends on NET_ETHERNET && PPC && ALL_PPC
+	depends on NET_ETHERNET && PPC_PMAC
 	help
 	  Say Y for support of BMAC Ethernet interfaces. These are used on G3
 	  computers.
@@ -1870,7 +1870,7 @@ config 68360_ENET
 
 config FEC
 	bool "FEC ethernet controller (of ColdFire 5272)"
-	depends on M5272
+	depends on M5272 || M5282
 	help
 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
 	  controller on the Motorola ColdFire 5272 processor.

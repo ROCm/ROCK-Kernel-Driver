@@ -116,7 +116,7 @@ static __inline__ volatile struct a2232memory *a2232mem (unsigned int board);
 static __inline__ void a2232_receive_char(	struct a2232_port *port,
 						int ch, int err );
 /* The interrupt service routine */
-static void a2232_vbl_inter(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp);
 /* Initialize the port structures */
 static void a2232_init_portstructs(void);
 /* Initialize and register TTY drivers. */
@@ -172,7 +172,6 @@ static struct a2232_port a2232_ports[MAX_A2232_BOARDS*NUMLINES];
 
 /* TTY driver structs */
 static struct tty_driver a2232_driver;
-static struct tty_driver a2232_callout_driver;
 
 /* Variables used by the TTY driver */
 static int a2232_refcount;
@@ -474,15 +473,9 @@ static int  a2232_open(struct tty_struct * tty, struct file * filp)
 	}
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)){
-		if (tty->driver->subtype == A2232_TTY_SUBTYPE_NORMAL)
-			*tty->termios = port->gs.normal_termios;
-		else 
-			*tty->termios = port->gs.callout_termios;
+		*tty->termios = port->gs.normal_termios;
 		a2232_set_real_termios (port);
 	}
-
-	port->gs.session = current->session;
-	port->gs.pgrp = current->pgrp;
 
 	a2232_enable_rx_interrupts(port);
 	
@@ -533,7 +526,7 @@ static __inline__ void a2232_receive_char(	struct a2232_port *port,
 	tty_flip_buffer_push(tty);
 }
 
-static void a2232_vbl_inter(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp)
 {
 #if A2232_IOBUFLEN != 256
 #error "Re-Implement a2232_vbl_inter()!"
@@ -649,18 +642,13 @@ int ch, err, n, p;
 						if (!(port->gs.flags & ASYNC_CHECK_CD))
 							;	/* Don't report DCD changes */
 						else if (port->cd_status) { // if DCD on: DCD went UP!
-							if (~(port->gs.flags & ASYNC_NORMAL_ACTIVE) ||
-							    ~(port->gs.flags & ASYNC_CALLOUT_ACTIVE)) {
-								/* Are we blocking in open?*/
-								wake_up_interruptible(&port->gs.open_wait);
-							}
+							
+							/* Are we blocking in open?*/
+							wake_up_interruptible(&port->gs.open_wait);
 						}
 						else { // if DCD off: DCD went DOWN!
-							if (!((port->gs.flags & ASYNC_CALLOUT_ACTIVE) &&
-							      (port->gs.flags & ASYNC_CALLOUT_NOHUP))) {
-								if (port->gs.tty)
-									tty_hangup (port->gs.tty);
-							}
+							if (port->gs.tty)
+								tty_hangup (port->gs.tty);
 						}
 						
 					} // if CD changed for this port
@@ -673,6 +661,7 @@ int ch, err, n, p;
 		} // if events in CD queue
 		
 	} // for every completely initialized A2232 board
+	return IRQ_HANDLED;
 }
 
 static void a2232_init_portstructs(void)
@@ -685,7 +674,6 @@ static void a2232_init_portstructs(void)
 		port->which_a2232 = i/NUMLINES;
 		port->which_port_on_a2232 = i%NUMLINES;
 		port->disable_rx = port->throttle_input = port->cd_status = 0;
-		port->gs.callout_termios = tty_std_termios;
 		port->gs.normal_termios = tty_std_termios;
 		port->gs.magic = A2232_MAGIC;
 		port->gs.close_delay = HZ/2;
@@ -711,7 +699,7 @@ static int a2232_init_drivers(void)
 	a2232_driver.major = A2232_NORMAL_MAJOR;
 	a2232_driver.num = NUMLINES * nr_a2232;
 	a2232_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	a2232_driver.subtype = A2232_TTY_SUBTYPE_NORMAL;
+	a2232_driver.subtype = SERIAL_TTY_NORMAL;
 	a2232_driver.init_termios = tty_std_termios;
 	a2232_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
@@ -737,19 +725,8 @@ static int a2232_init_drivers(void)
 	a2232_driver.start = gs_start;
 	a2232_driver.hangup = gs_hangup;
 
-	a2232_callout_driver = a2232_driver;
-	a2232_callout_driver.name = "cuy";
-	a2232_callout_driver.major = A2232_CALLOUT_MAJOR;
-	a2232_callout_driver.subtype = A2232_TTY_SUBTYPE_CALLOUT;
-
 	if ((error = tty_register_driver(&a2232_driver))) {
 		printk(KERN_ERR "A2232: Couldn't register A2232 driver, error = %d\n",
-		       error);
-		return 1;
-	}
-	if ((error = tty_register_driver(&a2232_callout_driver))) {
-		tty_unregister_driver(&a2232_driver);
-		printk(KERN_ERR "A2232: Couldn't register A2232 callout driver, error = %d\n",
 		       error);
 		return 1;
 	}
@@ -864,7 +841,6 @@ void cleanup_module(void)
 	}
 
 	tty_unregister_driver(&a2232_driver);
-	tty_unregister_driver(&a2232_callout_driver);
 	free_irq(IRQ_AMIGA_VERTB, a2232_driver_ID);
 }
 #endif
