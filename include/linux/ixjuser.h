@@ -350,7 +350,7 @@ typedef enum {
 typedef struct {
 	int elements_used;
 	IXJ_CADENCE_TERM termination;
-	IXJ_CADENCE_ELEMENT *ce;
+	IXJ_CADENCE_ELEMENT __user *ce;
 } IXJ_CADENCE;
 
 #define IXJCTL_TONE_CADENCE		_IOW ('q', 0xCA, IXJ_CADENCE *)

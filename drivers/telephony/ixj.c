@@ -461,8 +461,8 @@ static void DAA_Coeff_Japan(IXJ *j);
 static int ixj_init_filter(IXJ *j, IXJ_FILTER * jf);
 static int ixj_init_filter_raw(IXJ *j, IXJ_FILTER_RAW * jfr);
 static int ixj_init_tone(IXJ *j, IXJ_TONE * ti);
-static int ixj_build_cadence(IXJ *j, IXJ_CADENCE * cp);
-static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp);
+static int ixj_build_cadence(IXJ *j, IXJ_CADENCE __user * cp);
+static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE __user * cp);
 /* Serial Control Interface funtions */
 static int SCI_Control(IXJ *j, int control);
 static int SCI_Prepare(IXJ *j);
@@ -2855,7 +2855,7 @@ static void alaw2ulaw(unsigned char *buff, unsigned long len)
 	}
 }
 
-static ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t * ppos)
+static ssize_t ixj_read(struct file * file_p, char __user *buf, size_t length, loff_t * ppos)
 {
 	unsigned long i = *ppos;
 	IXJ * j = get_ixj(NUM(file_p->f_dentry->d_inode));
@@ -2910,7 +2910,7 @@ static ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t *
 	}
 }
 
-static ssize_t ixj_enhanced_read(struct file * file_p, char *buf, size_t length,
+static ssize_t ixj_enhanced_read(struct file * file_p, char __user *buf, size_t length,
 			  loff_t * ppos)
 {
 	int pre_retval;
@@ -2935,7 +2935,7 @@ static ssize_t ixj_enhanced_read(struct file * file_p, char *buf, size_t length,
 	return read_retval;
 }
 
-static ssize_t ixj_write(struct file *file_p, const char *buf, size_t count, loff_t * ppos)
+static ssize_t ixj_write(struct file *file_p, const char __user *buf, size_t count, loff_t * ppos)
 {
 	unsigned long i = *ppos;
 	IXJ *j = file_p->private_data;
@@ -2989,7 +2989,7 @@ static ssize_t ixj_write(struct file *file_p, const char *buf, size_t count, lof
 	return min(count, j->write_buffer_size);
 }
 
-static ssize_t ixj_enhanced_write(struct file * file_p, const char *buf, size_t count, loff_t * ppos)
+static ssize_t ixj_enhanced_write(struct file * file_p, const char __user *buf, size_t count, loff_t * ppos)
 {
 	int pre_retval;
 	ssize_t write_retval = 0;
@@ -5938,31 +5938,41 @@ static void ixj_testram(IXJ *j)
 	ixj_WriteDSPCommand(0x3001, j);	/* Test External SRAM */
 }
 
-static int ixj_build_cadence(IXJ *j, IXJ_CADENCE * cp)
+static int ixj_build_cadence(IXJ *j, IXJ_CADENCE __user * cp)
 {
-	IXJ_CADENCE *lcp;
+	ixj_cadence *lcp;
+	IXJ_CADENCE_ELEMENT __user *cep;
 	IXJ_CADENCE_ELEMENT *lcep;
 	IXJ_TONE ti;
+	int err;
 
-	lcp = kmalloc(sizeof(IXJ_CADENCE), GFP_KERNEL);
+	lcp = kmalloc(sizeof(ixj_cadence), GFP_KERNEL);
 	if (lcp == NULL)
 		return -ENOMEM;
-	if (copy_from_user(lcp, (char *) cp, sizeof(IXJ_CADENCE)) || (unsigned)lcp->elements_used >= ~0U/sizeof(IXJ_CADENCE_ELEMENT) )
-        {
-                kfree(lcp);
-                return -EFAULT;
-        }
+
+	err = -EFAULT;
+	if (copy_from_user(&lcp->elements_used,
+			   &cp->elements_used, sizeof(int)))
+		goto out;
+	if (copy_from_user(&lcp->termination,
+			   &cp->termination, sizeof(IXJ_CADENCE_TERM)))
+		goto out;
+	if (get_user(cep, &cp->ce))
+		goto out;
+
+	err = -EINVAL;
+	if ((unsigned)lcp->elements_used >= ~0U/sizeof(IXJ_CADENCE_ELEMENT))
+		goto out;
+
+	err = -ENOMEM;
 	lcep = kmalloc(sizeof(IXJ_CADENCE_ELEMENT) * lcp->elements_used, GFP_KERNEL);
-	if (lcep == NULL) {
-		kfree(lcp);
-		return -ENOMEM;
-	}
-	if (copy_from_user(lcep, lcp->ce, sizeof(IXJ_CADENCE_ELEMENT) * lcp->elements_used))
-	{
-		kfree(lcep);
-		kfree(lcp);
-		return -EFAULT;
-	}
+	if (!lcep)
+		goto out;
+
+	err = -EFAULT;
+	if (copy_from_user(lcep, cep, sizeof(IXJ_CADENCE_ELEMENT) * lcp->elements_used))
+		goto out1;
+
 	if (j->cadence_t) {
 		kfree(j->cadence_t->ce);
 		kfree(j->cadence_t);
@@ -5982,9 +5992,14 @@ static int ixj_build_cadence(IXJ *j, IXJ_CADENCE * cp)
 	}
 	ixj_play_tone(j, lcp->ce[0].index);
 	return 1;
+out1:
+	kfree(lcep);
+out:
+	kfree(lcp);
+	return err;
 }
 
-static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp)
+static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE __user * cp)
 {
 	IXJ_FILTER_CADENCE *lcp;
 	lcp = kmalloc(sizeof(IXJ_FILTER_CADENCE), GFP_KERNEL);
@@ -5994,7 +6009,7 @@ static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp)
 		}
 		return -ENOMEM;
         }
-	if (copy_from_user(lcp, (char *) cp, sizeof(IXJ_FILTER_CADENCE))) {
+	if (copy_from_user(lcp, cp, sizeof(IXJ_FILTER_CADENCE))) {
 		if(ixjdebug & 0x0001) {
 			printk(KERN_INFO "Could not copy cadence to kernel\n");
 		}
@@ -6206,6 +6221,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 	IXJ_TONE ti;
 	IXJ_FILTER jf;
 	IXJ_FILTER_RAW jfr;
+	void __user *argp = (void __user *)arg;
 
 	unsigned int raise, mant;
 	unsigned int minor = iminor(inode);
@@ -6251,7 +6267,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 		retval = j->serial;
 		break;
 	case IXJCTL_VERSION:
-		if (copy_to_user((char *) arg, ixj_c_revision, strlen(ixj_c_revision))) 
+		if (copy_to_user(argp, ixj_c_revision, strlen(ixj_c_revision))) 
 			retval = -EFAULT;
 		break;
 	case PHONE_RING_CADENCE:
@@ -6259,7 +6275,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 		break;
 	case IXJCTL_CIDCW:
 		if(arg) {
-			if (copy_from_user(&j->cid_send, (char *)arg, sizeof(PHONE_CID))) {
+			if (copy_from_user(&j->cid_send, argp, sizeof(PHONE_CID))) {
 				retval = -EFAULT;
 				break;
 			}
@@ -6274,7 +6290,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
                 /* Fall through */
  	case PHONE_RING_START:
 		if(arg) {
-			if (copy_from_user(&j->cid_send, (char *)arg, sizeof(PHONE_CID))) {
+			if (copy_from_user(&j->cid_send, argp, sizeof(PHONE_CID))) {
 				retval = -EFAULT;
 				break;
 			}
@@ -6432,22 +6448,22 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 			samplerate = arg;
 		break;
 	case IXJCTL_DRYBUFFER_READ:
-		put_user(j->drybuffer, (unsigned long *) arg);
+		put_user(j->drybuffer, (unsigned long __user *) argp);
 		break;
 	case IXJCTL_DRYBUFFER_CLEAR:
 		j->drybuffer = 0;
 		break;
 	case IXJCTL_FRAMES_READ:
-		put_user(j->framesread, (unsigned long *) arg);
+		put_user(j->framesread, (unsigned long __user *) argp);
 		break;
 	case IXJCTL_FRAMES_WRITTEN:
-		put_user(j->frameswritten, (unsigned long *) arg);
+		put_user(j->frameswritten, (unsigned long __user *) argp);
 		break;
 	case IXJCTL_READ_WAIT:
-		put_user(j->read_wait, (unsigned long *) arg);
+		put_user(j->read_wait, (unsigned long __user *) argp);
 		break;
 	case IXJCTL_WRITE_WAIT:
-		put_user(j->write_wait, (unsigned long *) arg);
+		put_user(j->write_wait, (unsigned long __user *) argp);
 		break;
 	case PHONE_MAXRINGS:
 		j->maxrings = arg;
@@ -6573,7 +6589,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
                         12, 10, 16, 9, 8, 48, 5,
                         40, 40, 80, 40, 40, 6
                 };
-                if(copy_from_user(&pd, (void *)arg, sizeof(pd))) {
+                if(copy_from_user(&pd, argp, sizeof(pd))) {
                         retval = -EFAULT;
 			break;
 		}
@@ -6590,7 +6606,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
                         default:val=proto_size[pd.type]*3;break;
                 }
                 pd.buf_min=pd.buf_max=pd.buf_opt=val;
-                if(copy_to_user((void *)arg, &pd, sizeof(pd)))
+                if(copy_to_user(argp, &pd, sizeof(pd)))
                         retval = -EFAULT;
         	break;
         }
@@ -6644,7 +6660,7 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 		ixj_write_vmwi(j, arg);
 		break;
 	case IXJCTL_CID:
-		if (copy_to_user((char *) arg, &j->cid, sizeof(PHONE_CID))) 
+		if (copy_to_user(argp, &j->cid, sizeof(PHONE_CID))) 
 			retval = -EFAULT;
 		j->ex.bits.caller_id = 0;
 		break;
@@ -6666,13 +6682,13 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 		break;
 	case PHONE_CAPABILITIES_LIST:
 		add_caps(j);
-		if (copy_to_user((char *) arg, j->caplist, sizeof(struct phone_capability) * j->caps)) 
+		if (copy_to_user(argp, j->caplist, sizeof(struct phone_capability) * j->caps)) 
 			retval = -EFAULT;
 		break;
 	case PHONE_CAPABILITIES_CHECK:
 		{
 			struct phone_capability cap;
-			if (copy_from_user(&cap, (char *) arg, sizeof(cap))) 
+			if (copy_from_user(&cap, argp, sizeof(cap))) 
 				retval = -EFAULT;
 			else {
 				add_caps(j);
@@ -6688,12 +6704,12 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 		j->ex.bits.pstn_ring = 0;
 		break;
 	case IXJCTL_SET_FILTER:
-		if (copy_from_user(&jf, (char *) arg, sizeof(jf))) 
+		if (copy_from_user(&jf, argp, sizeof(jf))) 
 			retval = -EFAULT;
 		retval = ixj_init_filter(j, &jf);
 		break;
 	case IXJCTL_SET_FILTER_RAW:
-		if (copy_from_user(&jfr, (char *) arg, sizeof(jfr))) 
+		if (copy_from_user(&jfr, argp, sizeof(jfr))) 
 			retval = -EFAULT;
 		else
 			retval = ixj_init_filter_raw(j, &jfr);
@@ -6705,19 +6721,19 @@ static int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd,
 			retval = j->filter_hist[arg];
 		break;
 	case IXJCTL_INIT_TONE:
-		if (copy_from_user(&ti, (char *) arg, sizeof(ti)))
+		if (copy_from_user(&ti, argp, sizeof(ti)))
 			retval = -EFAULT;
 		else
 			retval = ixj_init_tone(j, &ti);
 		break;
 	case IXJCTL_TONE_CADENCE:
-		retval = ixj_build_cadence(j, (IXJ_CADENCE *) arg);
+		retval = ixj_build_cadence(j, argp);
 		break;
 	case IXJCTL_FILTER_CADENCE:
-		retval = ixj_build_filter_cadence(j, (IXJ_FILTER_CADENCE *) arg);
+		retval = ixj_build_filter_cadence(j, argp);
 		break;
 	case IXJCTL_SIGCTL:
-		if (copy_from_user(&j->sigdef, (char *)arg, sizeof(IXJ_SIGDEF))) {
+		if (copy_from_user(&j->sigdef, argp, sizeof(IXJ_SIGDEF))) {
 			retval = -EFAULT;
 			break;
 		}

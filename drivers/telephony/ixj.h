@@ -1167,6 +1167,12 @@ typedef struct {
 ******************************************************************************/
 
 typedef struct {
+	int elements_used;
+	IXJ_CADENCE_TERM termination;
+	IXJ_CADENCE_ELEMENT *ce;
+} ixj_cadence;
+
+typedef struct {
 	struct phone_device p;
 	struct timer_list timer;
 	unsigned int board;
@@ -1220,8 +1226,8 @@ typedef struct {
 	char tone_index;
 	char tone_state;
 	char maxrings;
-	IXJ_CADENCE *cadence_t;
-	IXJ_CADENCE *cadence_r;
+	ixj_cadence *cadence_t;
+	ixj_cadence *cadence_r;
 	int tone_cadence_state;
 	IXJ_CADENCE_F cadence_f[6];
 	DTMF dtmf;
