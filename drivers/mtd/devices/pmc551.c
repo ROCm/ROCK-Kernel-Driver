@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.26 2004/07/14 17:25:07 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.27 2004/07/20 02:44:26 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -108,12 +108,6 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/pmc551.h>
 #include <linux/mtd/compatmac.h>
-
-#if LINUX_VERSION_CODE > 0x20300
-#define PCI_BASE_ADDRESS(dev) (dev->resource[0].start)
-#else
-#define PCI_BASE_ADDRESS(dev) (dev->base_address[0])
-#endif
 
 static struct mtd_info *pmc551list;
 
@@ -564,7 +558,7 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
 	       (size<1024)?size:(size<1048576)?size>>10:size>>20,
                (size<1024)?'B':(size<1048576)?'K':'M',
 	       size, ((dcmd&(0x1<<3)) == 0)?"non-":"",
-               PCI_BASE_ADDRESS(dev)&PCI_BASE_ADDRESS_MEM_MASK );
+               (dev->resource[0].start)&PCI_BASE_ADDRESS_MEM_MASK );
 
         /*
          * Check to see the state of the memory
@@ -694,7 +688,7 @@ int __init init_pmc551(void)
                 }
 
                 printk(KERN_NOTICE "pmc551: Found PCI V370PDC at 0x%lX\n",
-				    PCI_BASE_ADDRESS(PCI_Device));
+				    PCI_Device->resource[0].start);
 
                 /*
                  * The PMC551 device acts VERY weird if you don't init it
@@ -748,7 +742,7 @@ int __init init_pmc551(void)
 			printk(KERN_NOTICE "pmc551: Using specified aperture size %dM\n", asize>>20);
 			priv->asize = asize;
 		}
-                priv->start = ioremap((PCI_BASE_ADDRESS(PCI_Device)
+                priv->start = ioremap(((PCI_Device->resource[0].start)
                                        & PCI_BASE_ADDRESS_MEM_MASK),
                                       priv->asize);
 		
