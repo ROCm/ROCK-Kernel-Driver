@@ -36,6 +36,8 @@ struct in_device
 	rwlock_t		lock;
 	int			dead;
 	struct in_ifaddr	*ifa_list;	/* IP ifaddr chain		*/
+	int			mc_initted;
+
 	struct ip_mc_list	*mc_list;	/* IP multicast filter chain    */
 	rwlock_t		mc_lock;	/* for mc_tomb */
 	struct ip_mc_list	*mc_tomb;
