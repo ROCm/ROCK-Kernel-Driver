@@ -313,10 +313,10 @@ aiptek_disconnect(struct usb_device *dev, void *ptr)
 }
 
 static struct usb_driver aiptek_driver = {
-	name:"aiptek",
-	probe:aiptek_probe,
-	disconnect:aiptek_disconnect,
-	id_table:aiptek_ids,
+	.name ="aiptek",
+	.probe =aiptek_probe,
+	.disconnect =aiptek_disconnect,
+	.id_table =aiptek_ids,
 };
 
 static int __init

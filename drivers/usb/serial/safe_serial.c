@@ -399,17 +399,17 @@ static int safe_startup (struct usb_serial *serial)
 }
 
 static struct usb_serial_device_type safe_device = {
-	owner:			THIS_MODULE,
-	name:			"Safe",
-	id_table:		id_table,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		1,
-	write:			safe_write,
-	write_room:		safe_write_room,
-	read_bulk_callback:	safe_read_bulk_callback,
-	attach:			safe_startup,
+	.owner =		THIS_MODULE,
+	.name =			"Safe",
+	.id_table =		id_table,
+	.num_interrupt_in =	NUM_DONT_CARE,
+	.num_bulk_in =		NUM_DONT_CARE,
+	.num_bulk_out =		NUM_DONT_CARE,
+	.num_ports =		1,
+	.write =		safe_write,
+	.write_room =		safe_write_room,
+	.read_bulk_callback =	safe_read_bulk_callback,
+	.attach =		safe_startup,
 };
 
 static int __init safe_init (void)

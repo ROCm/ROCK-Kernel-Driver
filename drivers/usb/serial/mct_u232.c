@@ -141,25 +141,25 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 
 static struct usb_serial_device_type mct_u232_device = {
-	owner:		     THIS_MODULE,
-	name:		     "Magic Control Technology USB-RS232",
-	id_table:	     id_table_combined,
-	num_interrupt_in:    2,
-	num_bulk_in:	     0,
-	num_bulk_out:	     1,
-	num_ports:	     1,
-	open:		     mct_u232_open,
-	close:		     mct_u232_close,
+	.owner =	     THIS_MODULE,
+	.name =		     "Magic Control Technology USB-RS232",
+	.id_table =	     id_table_combined,
+	.num_interrupt_in =  2,
+	.num_bulk_in =	     0,
+	.num_bulk_out =	     1,
+	.num_ports =	     1,
+	.open =		     mct_u232_open,
+	.close =	     mct_u232_close,
 #ifdef FIX_WRITE_RETURN_CODE_PROBLEM
-	write:		     mct_u232_write,
-	write_bulk_callback: mct_u232_write_bulk_callback,
+	.write =	     mct_u232_write,
+	.write_bulk_callback = mct_u232_write_bulk_callback,
 #endif
-	read_int_callback:   mct_u232_read_int_callback,
-	ioctl:		     mct_u232_ioctl,
-	set_termios:	     mct_u232_set_termios,
-	break_ctl:	     mct_u232_break_ctl,
-	attach:		     mct_u232_startup,
-	shutdown:	     mct_u232_shutdown,
+	.read_int_callback = mct_u232_read_int_callback,
+	.ioctl =	     mct_u232_ioctl,
+	.set_termios =	     mct_u232_set_termios,
+	.break_ctl =	     mct_u232_break_ctl,
+	.attach =	     mct_u232_startup,
+	.shutdown =	     mct_u232_shutdown,
 };
 
 

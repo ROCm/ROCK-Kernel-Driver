@@ -577,7 +577,7 @@ call_transmit(struct rpc_task *task)
 	if (task->tk_status < 0)
 		return;
 	xprt_transmit(task);
-	if (!rpcproc_decode(clnt, task->tk_msg.rpc_proc)) {
+	if (!rpcproc_decode(clnt, task->tk_msg.rpc_proc) && task->tk_status >= 0) {
 		task->tk_action = NULL;
 		rpc_wake_up_task(task);
 	}

@@ -360,13 +360,13 @@ static void __init sl82c105_init_channel(struct ata_channel *ch)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_WINBOND,
-	device: PCI_DEVICE_ID_WINBOND_82C105,
-	init_chipset: sl82c105_init_chipset,
-	init_channel: sl82c105_init_channel,
-	init_dma: sl82c105_init_dma,
-	enablebits: { {0x40,0x01,0x01}, {0x40,0x10,0x10} },
-	bootable: ON_BOARD
+	.vendor = PCI_VENDOR_ID_WINBOND,
+	.device = PCI_DEVICE_ID_WINBOND_82C105,
+	.init_chipset = sl82c105_init_chipset,
+	.init_channel = sl82c105_init_channel,
+	.init_dma = sl82c105_init_dma,
+	.enablebits = { {0x40,0x01,0x01}, {0x40,0x10,0x10} },
+	.bootable = ON_BOARD
 };
 
 int __init init_sl82c105(void)

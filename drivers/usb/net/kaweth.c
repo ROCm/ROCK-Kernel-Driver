@@ -165,11 +165,11 @@ MODULE_DEVICE_TABLE (usb, usb_klsi_table);
  *     kaweth_driver
  ****************************************************************/
 static struct usb_driver kaweth_driver = {
-	owner:		THIS_MODULE,
-	name:		"kaweth",
-	probe:		kaweth_probe,
-	disconnect:	kaweth_disconnect,
-	id_table:       usb_klsi_table,
+	.owner =	THIS_MODULE,
+	.name =		"kaweth",
+	.probe =	kaweth_probe,
+	.disconnect =	kaweth_disconnect,
+	.id_table =     usb_klsi_table,
 };
 
 typedef __u8 eth_addr_t[6];

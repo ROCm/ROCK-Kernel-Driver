@@ -268,7 +268,7 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
 
 		prefetchw(&page->flags);
 		list_del(&page->list);
-		if (!add_to_page_cache_unique(page, mapping, page->index))
+		if (!add_to_page_cache(page, mapping, page->index))
 			bio = do_mpage_readpage(bio, page,
 					nr_pages - page_idx,
 					&last_block_in_bio, get_block);

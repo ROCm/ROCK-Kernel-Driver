@@ -189,7 +189,6 @@ static inline int dup_mmap(struct mm_struct * mm)
 	mm->map_count = 0;
 	mm->rss = 0;
 	mm->cpu_vm_mask = 0;
-	mm->swap_address = 0;
 	pprev = &mm->mmap;
 
 	/*
@@ -308,9 +307,6 @@ inline void __mmdrop(struct mm_struct *mm)
 void mmput(struct mm_struct *mm)
 {
 	if (atomic_dec_and_lock(&mm->mm_users, &mmlist_lock)) {
-		extern struct mm_struct *swap_mm;
-		if (swap_mm == mm)
-			swap_mm = list_entry(mm->mmlist.next, struct mm_struct, mmlist);
 		list_del(&mm->mmlist);
 		mmlist_nr--;
 		spin_unlock(&mmlist_lock);

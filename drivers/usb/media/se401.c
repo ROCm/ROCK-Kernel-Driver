@@ -1283,20 +1283,20 @@ static int se401_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 static struct file_operations se401_fops = {
-	owner:		THIS_MODULE,
-        open:           se401_open,
-        release:        se401_close,
-        read:           se401_read,
-        mmap:           se401_mmap,
-	ioctl:          se401_ioctl,
-	llseek:         no_llseek,
+	.owner =	THIS_MODULE,
+        .open =         se401_open,
+        .release =      se401_close,
+        .read =         se401_read,
+        .mmap =         se401_mmap,
+	.ioctl =        se401_ioctl,
+	.llseek =       no_llseek,
 };
 static struct video_device se401_template = {
-	owner:		THIS_MODULE,
-        name:           "se401 USB camera",
-        type:           VID_TYPE_CAPTURE,
-        hardware:       VID_HARDWARE_SE401,
-	fops:           &se401_fops,
+	.owner =	THIS_MODULE,
+        .name =         "se401 USB camera",
+        .type =         VID_TYPE_CAPTURE,
+        .hardware =     VID_HARDWARE_SE401,
+	.fops =         &se401_fops,
 };
 
 
@@ -1523,7 +1523,7 @@ static inline void usb_se401_remove_disconnected (struct usb_se401 *se401)
 static struct usb_driver se401_driver = {
         name:		"se401",
         id_table:	device_table,
-	probe:		se401_probe,
+	.probe =	se401_probe,
         disconnect:	se401_disconnect
 };
 

@@ -303,59 +303,59 @@ static void __init amd74xx_init_dma(struct ata_channel *ch, unsigned long dmabas
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_AMD,
-		device: PCI_DEVICE_ID_AMD_COBRA_7401,
-		init_chipset: amd74xx_init_chipset,
-		init_channel: amd74xx_init_channel,
-		init_dma: amd74xx_init_dma,
-		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_AMD,
+		.device = PCI_DEVICE_ID_AMD_COBRA_7401,
+		.init_chipset = amd74xx_init_chipset,
+		.init_channel = amd74xx_init_channel,
+		.init_dma = amd74xx_init_dma,
+		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor:	PCI_VENDOR_ID_AMD,
-		device:	PCI_DEVICE_ID_AMD_VIPER_7409,
-		init_chipset: amd74xx_init_chipset,
-		init_channel: amd74xx_init_channel,
-		init_dma: amd74xx_init_dma,
-		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		bootable: ON_BOARD,
-		flags: ATA_F_SIMPLEX
+		.vendor = PCI_VENDOR_ID_AMD,
+		.device = PCI_DEVICE_ID_AMD_VIPER_7409,
+		.init_chipset = amd74xx_init_chipset,
+		.init_channel = amd74xx_init_channel,
+		.init_dma = amd74xx_init_dma,
+		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.bootable = ON_BOARD,
+		.flags = ATA_F_SIMPLEX
 	},
 	{
-		vendor:	PCI_VENDOR_ID_AMD,
-		device:	PCI_DEVICE_ID_AMD_VIPER_7411,
-		init_chipset: amd74xx_init_chipset,
-		init_channel: amd74xx_init_channel,
-		init_dma: amd74xx_init_dma,
-		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_AMD,
+		.device = PCI_DEVICE_ID_AMD_VIPER_7411,
+		.init_chipset = amd74xx_init_chipset,
+		.init_channel = amd74xx_init_channel,
+		.init_dma = amd74xx_init_dma,
+		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor:	PCI_VENDOR_ID_AMD,
-		device:	PCI_DEVICE_ID_AMD_OPUS_7441,
-		init_chipset: amd74xx_init_chipset,
-		init_channel: amd74xx_init_channel,
-		init_dma: amd74xx_init_dma,
-		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_AMD,
+		.device = PCI_DEVICE_ID_AMD_OPUS_7441,
+		.init_chipset = amd74xx_init_chipset,
+		.init_channel = amd74xx_init_channel,
+		.init_dma = amd74xx_init_dma,
+		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor:	PCI_VENDOR_ID_AMD,
-		device:	PCI_DEVICE_ID_AMD_8111_IDE,
-		init_chipset: amd74xx_init_chipset,
-		init_channel: amd74xx_init_channel,
-		init_dma: amd74xx_init_dma,
-		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_AMD,
+		.device = PCI_DEVICE_ID_AMD_8111_IDE,
+		.init_chipset = amd74xx_init_chipset,
+		.init_channel = amd74xx_init_channel,
+		.init_dma = amd74xx_init_dma,
+		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor:	PCI_VENDOR_ID_NVIDIA,
-		device:	PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
-		init_chipset: amd74xx_init_chipset,
-		init_channel: amd74xx_init_channel,
-		init_dma: amd74xx_init_dma,
-		enablebits: {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_NVIDIA,
+		.device = PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
+		.init_chipset = amd74xx_init_chipset,
+		.init_channel = amd74xx_init_channel,
+		.init_dma = amd74xx_init_dma,
+		.enablebits = {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
+		.bootable = ON_BOARD
 	},
 };
 
@@ -363,9 +363,8 @@ int __init init_amd74xx(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
-	}
 
         return 0;
 }

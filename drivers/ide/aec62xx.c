@@ -61,22 +61,25 @@
 #define AEC_CABLEPINS_INPUT	0x10
 
 static unsigned char aec_cyc2udma[9] = { 5, 5, 5, 4, 3, 2, 2, 1, 1 };
-static unsigned char aec_cyc2act[16] = { 1, 1, 2, 3, 4, 5, 6, 0, 0, 7,  7,  7, 7,  7,  7,  7 };
-static unsigned char aec_cyc2rec[16] = { 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 12, 13, 14 };
+static unsigned char aec_cyc2act[16] =
+    { 1, 1, 2, 3, 4, 5, 6, 0, 0, 7, 7, 7, 7, 7, 7, 7 };
+static unsigned char aec_cyc2rec[16] =
+    { 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 12, 13, 14 };
 
 /*
  * aec_set_speed_old() writes timing values to
  * the chipset registers for ATP850UF
  */
 
-static void aec_set_speed_old(struct pci_dev *dev, unsigned char dn, struct ata_timing *timing)
+static void aec_set_speed_old(struct pci_dev *dev, unsigned char dn,
+			      struct ata_timing *timing)
 {
 	unsigned char t;
 
 	pci_write_config_byte(dev, AEC_DRIVE_TIMING + (dn << 1),
-		aec_cyc2act[FIT(timing->active, 0, 15)]);
+			      aec_cyc2act[FIT(timing->active, 0, 15)]);
 	pci_write_config_byte(dev, AEC_DRIVE_TIMING + (dn << 1) + 1,
-		aec_cyc2rec[FIT(timing->recover, 0, 15)]);
+			      aec_cyc2rec[FIT(timing->recover, 0, 15)]);
 
 	pci_read_config_byte(dev, AEC_UDMA_OLD, &t);
 	t &= ~(3 << (dn << 1));
@@ -90,19 +93,22 @@ static void aec_set_speed_old(struct pci_dev *dev, unsigned char dn, struct ata_
  * other Artop chips
  */
 
-static void aec_set_speed_new(struct pci_dev *dev, unsigned char dn, struct ata_timing *timing)
+static void aec_set_speed_new(struct pci_dev *dev, unsigned char dn,
+			      struct ata_timing *timing)
 {
 	unsigned char t;
 
 	pci_write_config_byte(dev, AEC_DRIVE_TIMING + dn,
-		(aec_cyc2act[FIT(timing->active, 0, 15)] << 4)
-		| aec_cyc2rec[FIT(timing->recover, 0, 15)]);
+			      (aec_cyc2act[FIT(timing->active, 0, 15)] <<
+			       4)
+			      | aec_cyc2rec[FIT(timing->recover, 0, 15)]);
 
 	pci_read_config_byte(dev, AEC_UDMA_NEW + (dn >> 1), &t);
 	t &= ~(0xf << ((dn & 1) << 2));
 	if (timing->udma) {
 		if (timing->udma >= 2)
-			t |= aec_cyc2udma[FIT(timing->udma, 2, 8)] << ((dn & 1) << 2);
+			t |= aec_cyc2udma[FIT(timing->udma, 2, 8)] <<
+			    ((dn & 1) << 2);
 		if (timing->mode == XFER_UDMA_5)
 			t |= 6;
 		if (timing->mode == XFER_UDMA_6)
@@ -123,12 +129,15 @@ static int aec_set_drive(struct ata_device *drive, unsigned char speed)
 	int T, UT;
 	int aec_old;
 
-	aec_old = (drive->channel->pci_dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF);
+	aec_old =
+	    (drive->channel->pci_dev->device ==
+	     PCI_DEVICE_ID_ARTOP_ATP850UF);
 
 	if (speed != XFER_PIO_SLOW && speed != drive->current_speed)
 		if (ide_config_drive_speed(drive, speed))
-			printk(KERN_WARNING "ide%d: Drive %d didn't accept speed setting. Oh, well.\n",
-				drive->dn >> 1, drive->dn & 1);
+			printk(KERN_WARNING
+			       "ide%d: Drive %d didn't accept speed setting. Oh, well.\n",
+			       drive->dn >> 1, drive->dn & 1);
 
 	T = 1000000000 / system_bus_speed;
 	UT = T / (aec_old ? 1 : 2);
@@ -152,7 +161,9 @@ static int aec_set_drive(struct ata_device *drive, unsigned char speed)
 static void aec62xx_tune_drive(struct ata_device *drive, unsigned char pio)
 {
 	if (pio == 255) {
-		aec_set_drive(drive, ata_timing_mode(drive, XFER_PIO | XFER_EPIO));
+		aec_set_drive(drive,
+			      ata_timing_mode(drive,
+					      XFER_PIO | XFER_EPIO));
 		return;
 	}
 
@@ -169,14 +180,17 @@ static int __init aec62xx_modes_map(struct ata_channel *ch)
 
 	if (ch->udma_four)
 		switch (ch->pci_dev->device) {
-			case PCI_DEVICE_ID_ARTOP_ATP865R:
-			case PCI_DEVICE_ID_ARTOP_ATP865:
-				/* Can't use these modes simultaneously,
-				   based on which PLL clock was chosen. */
-				map |= inb (bmide + AEC_BM_STAT_PCH) & AEC_PLLCLK_ATA133 ? XFER_UDMA_133 : XFER_UDMA_100;
-			case PCI_DEVICE_ID_ARTOP_ATP860R:
-			case PCI_DEVICE_ID_ARTOP_ATP860:
-				map |= XFER_UDMA_66;
+		case PCI_DEVICE_ID_ARTOP_ATP865R:
+		case PCI_DEVICE_ID_ARTOP_ATP865:
+			/* Can't use these modes simultaneously,
+			   based on which PLL clock was chosen. */
+			map |=
+			    inb(bmide +
+				AEC_BM_STAT_PCH) & AEC_PLLCLK_ATA133 ?
+			    XFER_UDMA_133 : XFER_UDMA_100;
+		case PCI_DEVICE_ID_ARTOP_ATP860R:
+		case PCI_DEVICE_ID_ARTOP_ATP860:
+			map |= XFER_UDMA_66;
 		}
 
 	return map;
@@ -200,27 +214,28 @@ static unsigned int __init aec62xx_init_chipset(struct pci_dev *dev)
 
 	switch (dev->device) {
 
-		case PCI_DEVICE_ID_ARTOP_ATP865R:
-		case PCI_DEVICE_ID_ARTOP_ATP865:
+	case PCI_DEVICE_ID_ARTOP_ATP865R:
+	case PCI_DEVICE_ID_ARTOP_ATP865:
 
-			/* Clear reset and test bits. */
-			pci_read_config_byte(dev, AEC_MISC, &t);
-			pci_write_config_byte(dev, AEC_MISC, t & ~0x30);
+		/* Clear reset and test bits. */
+		pci_read_config_byte(dev, AEC_MISC, &t);
+		pci_write_config_byte(dev, AEC_MISC, t & ~0x30);
 
-			/* Enable chip interrupt output. */
-			pci_read_config_byte(dev, AEC_IDE_ENABLE, &t);
-			pci_write_config_byte(dev, AEC_IDE_ENABLE, t & ~0x01);
+		/* Enable chip interrupt output. */
+		pci_read_config_byte(dev, AEC_IDE_ENABLE, &t);
+		pci_write_config_byte(dev, AEC_IDE_ENABLE, t & ~0x01);
 
 #ifdef CONFIG_AEC6280_BURST
-			/* Must be greater than 0x80 for burst mode. */
-			pci_write_config_byte(dev, PCI_LATENCY_TIMER, 0x90);
+		/* Must be greater than 0x80 for burst mode. */
+		pci_write_config_byte(dev, PCI_LATENCY_TIMER, 0x90);
 
-			/* Enable burst mode. */
-			pci_read_config_byte(dev, AEC_IDE_ENABLE, &t);
-			pci_write_config_byte(dev, AEC_IDE_ENABLE, t | 0x80);
+		/* Enable burst mode. */
+		pci_read_config_byte(dev, AEC_IDE_ENABLE, &t);
+		pci_write_config_byte(dev, AEC_IDE_ENABLE, t | 0x80);
 #endif
-			/* switch cable detection pins to input-only. */
-			outb (inb (bmide + AEC_BM_STAT_SCH) | AEC_CABLEPINS_INPUT, bmide + AEC_BM_STAT_SCH);
+		/* switch cable detection pins to input-only. */
+		outb(inb(bmide + AEC_BM_STAT_SCH) | AEC_CABLEPINS_INPUT,
+		     bmide + AEC_BM_STAT_SCH);
 	}
 
 /*
@@ -229,7 +244,7 @@ static unsigned int __init aec62xx_init_chipset(struct pci_dev *dev)
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
 	printk(KERN_INFO "AEC_IDE: %s (rev %02x) controller on pci%s\n",
-		dev->name, t, dev->slot_name);
+	       dev->name, t, dev->slot_name);
 
 	return dev->irq;
 }
@@ -274,7 +289,8 @@ static void __init aec62xx_init_channel(struct ata_channel *ch)
 /*
  * We allow the BM-DMA driver only work on enabled interfaces.
  */
-static void __init aec62xx_init_dma(struct ata_channel *ch, unsigned long dmabase)
+static void __init aec62xx_init_dma(struct ata_channel *ch,
+				    unsigned long dmabase)
 {
 	unsigned char t;
 
@@ -286,50 +302,49 @@ static void __init aec62xx_init_dma(struct ata_channel *ch, unsigned long dmabas
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_ARTOP,
-		device: PCI_DEVICE_ID_ARTOP_ATP850UF,
-		init_chipset: aec62xx_init_chipset,
-		init_channel: aec62xx_init_channel,
-		init_dma: aec62xx_init_dma,
-		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
-		bootable: OFF_BOARD,
-		flags: ATA_F_SER | ATA_F_IRQ | ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_ARTOP,
+		.device = PCI_DEVICE_ID_ARTOP_ATP850UF,
+		.init_chipset = aec62xx_init_chipset,
+		.init_channel = aec62xx_init_channel,
+		.init_dma = aec62xx_init_dma,
+		.enablebits = {{0x4a, 0x02, 0x02}, {0x4a, 0x04, 0x04}},
+		.bootable = OFF_BOARD,
+		.flags = ATA_F_SER | ATA_F_IRQ | ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_ARTOP,
-		device: PCI_DEVICE_ID_ARTOP_ATP860,
-		init_chipset: aec62xx_init_chipset,
-		init_channel: aec62xx_init_channel,
-		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
-		bootable: NEVER_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_ARTOP,
+		.device = PCI_DEVICE_ID_ARTOP_ATP860,
+		.init_chipset = aec62xx_init_chipset,
+		.init_channel = aec62xx_init_channel,
+		.enablebits = {{0x4a, 0x02, 0x02}, {0x4a, 0x04, 0x04}},
+		.bootable = NEVER_BOARD,
+		.flags = ATA_F_IRQ | ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_ARTOP,
-		device: PCI_DEVICE_ID_ARTOP_ATP860R,
-		init_chipset: aec62xx_init_chipset,
-		init_channel: aec62xx_init_channel,
-		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_ARTOP,
+		.device = PCI_DEVICE_ID_ARTOP_ATP860R,
+		.init_chipset = aec62xx_init_chipset,
+		.init_channel = aec62xx_init_channel,
+		.enablebits = {{0x4a, 0x02, 0x02}, {0x4a, 0x04, 0x04}},
+		.bootable = OFF_BOARD,
+		.flags = ATA_F_IRQ | ATA_F_DMA},
+	{
+		.vendor = PCI_VENDOR_ID_ARTOP,
+		.device = PCI_DEVICE_ID_ARTOP_ATP865,
+		.init_chipset = aec62xx_init_chipset,
+		.init_channel = aec62xx_init_channel,
+		.enablebits = {{0x4a, 0x02, 0x02}, {0x4a, 0x04, 0x04}},
+		.bootable = NEVER_BOARD,
+		.flags = ATA_F_IRQ | ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_ARTOP,
-		device: PCI_DEVICE_ID_ARTOP_ATP865,
-		init_chipset: aec62xx_init_chipset,
-		init_channel: aec62xx_init_channel,
-		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
-		bootable: NEVER_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
-	{
-		vendor: PCI_VENDOR_ID_ARTOP,
-		device: PCI_DEVICE_ID_ARTOP_ATP865R,
-		init_chipset: aec62xx_init_chipset,
-		init_channel: aec62xx_init_channel,
-		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_ARTOP,
+		.device = PCI_DEVICE_ID_ARTOP_ATP865R,
+		.init_chipset = aec62xx_init_chipset,
+		.init_channel = aec62xx_init_channel,
+		.enablebits = {{0x4a, 0x02, 0x02}, {0x4a, 0x04, 0x04}},
+		.bootable = OFF_BOARD,
+		.flags = ATA_F_IRQ | ATA_F_DMA
 	}
 };
 

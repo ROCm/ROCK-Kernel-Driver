@@ -1325,10 +1325,10 @@ static void CDCEther_disconnect( struct usb_device *usb, void *ptr )
 //////////////////////////////////////////////////////////////////////////////
 
 static struct usb_driver CDCEther_driver = {
-	name:		"CDCEther",
-	probe:		CDCEther_probe,
-	disconnect:	CDCEther_disconnect,
-	id_table:	CDCEther_ids,
+	.name =		"CDCEther",
+	.probe =	CDCEther_probe,
+	.disconnect =	CDCEther_disconnect,
+	.id_table =	CDCEther_ids,
 };
 
 //////////////////////////////////////////////////////////////////////////////

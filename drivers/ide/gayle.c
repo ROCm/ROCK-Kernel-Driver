@@ -106,9 +106,9 @@ static int gayle_ack_intr_a1200(struct ata_channel *hwif)
     return 1;
 }
 
-    /*
-     *  Probe for a Gayle IDE interface (and optionally for an IDE doubler)
-     */
+/*
+ *  Probe for a Gayle IDE interface (and optionally for an IDE doubler)
+ */
 
 void __init gayle_init(void)
 {
@@ -122,7 +122,7 @@ void __init gayle_init(void)
 
     for (i = 0; i < GAYLE_NUM_PROBE_HWIFS; i++) {
 	ide_ioreg_t base, ctrlport, irqport;
-	ide_ack_intr_t *ack_intr;
+	int (*ack_intr)(struct ata_channel *);
 	hw_regs_t hw;
 	int index;
 	unsigned long phys_base, res_start, res_n;

@@ -556,7 +556,7 @@ static void cdrom_end_request(struct ata_device *drive, struct request *rq, int 
 	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
 		uptodate = 1;
 
-	__ata_end_request(drive, rq, uptodate, 0);
+	ata_end_request(drive, rq, uptodate, 0);
 }
 
 
@@ -912,7 +912,7 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 
 	if (dma) {
 		if (!dma_error) {
-			__ata_end_request(drive, rq, 1, rq->nr_sectors);
+			ata_end_request(drive, rq, 1, rq->nr_sectors);
 
 			return ATA_OP_FINISHED;
 		} else
@@ -1497,7 +1497,7 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 		if (dma_error)
 			return ata_error(drive, rq, "dma error");
 
-		__ata_end_request(drive, rq, 1, rq->nr_sectors);
+		ata_end_request(drive, rq, 1, rq->nr_sectors);
 
 		return ATA_OP_FINISHED;
 	}
@@ -1936,7 +1936,7 @@ static int cdrom_read_toc(struct ata_device *drive, struct request_sense *sense)
 		   If we get an error for the regular case, we assume
 		   a CDI without additional audio tracks. In this case
 		   the readable TOC is empty (CDI tracks are not included)
-		   and only holds the Leadout entry. Heiko Eißfeldt */
+		   and only holds the Leadout entry. Heiko EiÃ^ßfeldt */
 		ntracks = 0;
 		stat = cdrom_read_tocentry(drive, CDROM_LEADOUT, 1, 0,
 					   (char *)&toc->hdr,
@@ -2453,26 +2453,26 @@ void ide_cdrom_release_real (struct cdrom_device_info *cdi)
  * Device initialization.
  */
 static struct cdrom_device_ops ide_cdrom_dops = {
-	open:			ide_cdrom_open_real,
-	release:		ide_cdrom_release_real,
-	drive_status:		ide_cdrom_drive_status,
-	media_changed:		ide_cdrom_check_media_change_real,
-	tray_move:		ide_cdrom_tray_move,
-	lock_door:		ide_cdrom_lock_door,
-	select_speed:		ide_cdrom_select_speed,
-	get_last_session:	ide_cdrom_get_last_session,
-	get_mcn:		ide_cdrom_get_mcn,
-	reset:			ide_cdrom_reset,
-	audio_ioctl:		ide_cdrom_audio_ioctl,
-	dev_ioctl:		ide_cdrom_dev_ioctl,
-	capability:		CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
+	.open =			ide_cdrom_open_real,
+	.release =		ide_cdrom_release_real,
+	.drive_status =		ide_cdrom_drive_status,
+	.media_changed =	ide_cdrom_check_media_change_real,
+	.tray_move =		ide_cdrom_tray_move,
+	.lock_door =		ide_cdrom_lock_door,
+	.select_speed =		ide_cdrom_select_speed,
+	.get_last_session =	ide_cdrom_get_last_session,
+	.get_mcn =		ide_cdrom_get_mcn,
+	.reset =		ide_cdrom_reset,
+	.audio_ioctl =		ide_cdrom_audio_ioctl,
+	.dev_ioctl =		ide_cdrom_dev_ioctl,
+	.capability =		CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
 				CDC_SELECT_SPEED | CDC_SELECT_DISC |
 				CDC_MULTI_SESSION | CDC_MCN |
 				CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET |
 				CDC_IOCTLS | CDC_DRIVE_STATUS | CDC_CD_R |
 				CDC_CD_RW | CDC_DVD | CDC_DVD_R| CDC_DVD_RAM |
 				CDC_GENERIC_PACKET,
-	generic_packet:		ide_cdrom_packet,
+	.generic_packet =	ide_cdrom_packet,
 };
 
 static int ide_cdrom_register(struct ata_device *drive, int nslots)
@@ -2840,11 +2840,11 @@ static int ide_cdrom_setup(struct ata_device *drive)
 }
 
 /* Forwarding functions to generic routines. */
-static int ide_cdrom_ioctl (struct ata_device *drive,
+static int ide_cdrom_ioctl(struct ata_device *drive,
 		     struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	return cdrom_ioctl (inode, file, cmd, arg);
+	return cdrom_ioctl(inode, file, cmd, arg);
 }
 
 static int ide_cdrom_open (struct inode *ip, struct file *fp, struct ata_device *drive)
@@ -2932,18 +2932,18 @@ int ide_cdrom_cleanup(struct ata_device *drive)
 static void ide_cdrom_attach(struct ata_device *drive);
 
 static struct ata_operations ide_cdrom_driver = {
-	owner:			THIS_MODULE,
-	attach:			ide_cdrom_attach,
-	cleanup:		ide_cdrom_cleanup,
-	standby:		NULL,
-	do_request:		ide_cdrom_do_request,
-	end_request:		NULL,
-	ioctl:			ide_cdrom_ioctl,
-	open:			ide_cdrom_open,
-	release:		ide_cdrom_release,
-	check_media_change:	ide_cdrom_check_media_change,
-	revalidate:		ide_cdrom_revalidate,
-	capacity:		ide_cdrom_capacity,
+	.owner =		THIS_MODULE,
+	.attach =		ide_cdrom_attach,
+	.cleanup =		ide_cdrom_cleanup,
+	.standby =		NULL,
+	.do_request =		ide_cdrom_do_request,
+	.end_request =		NULL,
+	.ioctl =		ide_cdrom_ioctl,
+	.open =			ide_cdrom_open,
+	.release =		ide_cdrom_release,
+	.check_media_change =	ide_cdrom_check_media_change,
+	.revalidate =		ide_cdrom_revalidate,
+	.capacity =		ide_cdrom_capacity,
 };
 
 /* options */

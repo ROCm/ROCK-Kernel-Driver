@@ -505,12 +505,12 @@ static void __init ide_init_sis5513(struct ata_channel *hwif)
 
 /* module data table */
 static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_SI,
-	device: PCI_DEVICE_ID_SI_5513,
-	init_chipset: pci_init_sis5513,
-	init_channel: ide_init_sis5513,
-	enablebits: {{0x4a,0x02,0x02}, {0x4a,0x04,0x04} },
-	bootable: ON_BOARD,
+	.vendor = PCI_VENDOR_ID_SI,
+	.device = PCI_DEVICE_ID_SI_5513,
+	.init_chipset = pci_init_sis5513,
+	.init_channel = ide_init_sis5513,
+	.enablebits = {{0x4a,0x02,0x02}, {0x4a,0x04,0x04} },
+	.bootable = ON_BOARD,
 };
 
 int __init init_sis5513(void)

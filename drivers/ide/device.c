@@ -79,6 +79,8 @@ void ata_mask(struct ata_device *drive)
 		ch->maskproc(drive);
 }
 
+EXPORT_SYMBOL(ata_mask);
+
 /*
  * Check the state of the status register.
  */
@@ -92,6 +94,39 @@ int ata_status(struct ata_device *drive, u8 good, u8 bad)
 }
 
 EXPORT_SYMBOL(ata_status);
+
+/*
+ * This is used to check for the drive status on the IRQ handling code path.
+ */
+int ata_status_irq(struct ata_device *drive)
+{
+	if (test_bit(IDE_DMA, drive->channel->active))
+		return udma_irq_status(drive);
+
+	/* Need to guarantee 400ns since last command was issued?
+	 */
+#ifdef CONFIG_IDEPCI_SHARE_IRQ
+
+	/*
+	 * We do a passive status test under shared PCI interrupts on cards
+	 * that truly share the ATA side interrupt, but may also share an
+	 * interrupt with another pci card/device.
+	 */
+
+	if (drive->channel->io_ports[IDE_CONTROL_OFFSET])
+		drive->status = IN_BYTE(drive->channel->io_ports[IDE_CONTROL_OFFSET]);
+
+	else
+#endif
+		ata_status(drive, 0, 0);	/* Note: this may clear a pending IRQ! */
+
+	if (drive->status & BUSY_STAT)
+		return 0;	/* drive busy:  definitely not interrupting */
+	else
+		return 1;	/* drive ready: *might* be interrupting */
+}
+
+EXPORT_SYMBOL(ata_status_irq);
 
 /*
  * Busy-wait for the drive status to be not "busy".  Check then the status for
@@ -116,7 +151,7 @@ int ata_status_poll(struct ata_device *drive, u8 good, u8 bad,
 		unsigned long flags;
 
 		__save_flags(flags);
-		ide__sti();
+		local_irq_enable();
 		timeout += jiffies;
 		while (!ata_status(drive, 0, BUSY_STAT)) {
 			if (time_after(jiffies, timeout)) {
@@ -210,6 +245,8 @@ void ata_out_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
 	OUT_BYTE(rf->high_cylinder, ch->io_ports[IDE_HCYL_OFFSET]);
 }
 
+EXPORT_SYMBOL(ata_out_regfile);
+
 /*
  * Input a complete register file.
  */
@@ -222,6 +259,5 @@ void ata_in_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
 	rf->low_cylinder = IN_BYTE(ch->io_ports[IDE_LCYL_OFFSET]);
 	rf->high_cylinder = IN_BYTE(ch->io_ports[IDE_HCYL_OFFSET]);
 }
-
 
 MODULE_LICENSE("GPL");

@@ -1046,8 +1046,6 @@ static void usb_hub_events(void)
 
 static int usb_hub_thread(void *__hub)
 {
-	lock_kernel();
-
 	/*
 	 * This thread doesn't need any user-level access,
 	 * so get rid of all our resources
@@ -1067,8 +1065,6 @@ static int usb_hub_thread(void *__hub)
 	} while (!signal_pending(current));
 
 	dbg("usb_hub_thread exiting");
-
-	unlock_kernel();
 	complete_and_exit(&khubd_exited, 0);
 }
 
@@ -1083,11 +1079,11 @@ static struct usb_device_id hub_id_table [] = {
 MODULE_DEVICE_TABLE (usb, hub_id_table);
 
 static struct usb_driver hub_driver = {
-	name:		"hub",
-	probe:		hub_probe,
-	ioctl:		hub_ioctl,
-	disconnect:	hub_disconnect,
-	id_table:	hub_id_table,
+	.name =		"hub",
+	.probe =	hub_probe,
+	.ioctl =	hub_ioctl,
+	.disconnect =	hub_disconnect,
+	.id_table =	hub_id_table,
 };
 
 /*

@@ -75,8 +75,7 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
 		INC_CACHE_INFO(noent_race);
 		return -ENOENT;
 	}
-
-	error = add_to_page_cache_unique(page, &swapper_space, entry.val);
+	error = add_to_page_cache(page, &swapper_space, entry.val);
 	if (error != 0) {
 		swap_free(entry);
 		if (error == -EEXIST)
@@ -103,6 +102,69 @@ void __delete_from_swap_cache(struct page *page)
 	ClearPageDirty(page);
 	__remove_inode_page(page);
 	INC_CACHE_INFO(del_total);
+}
+
+/**
+ * add_to_swap - allocate swap space for a page
+ * @page: page we want to move to swap
+ *
+ * Allocate swap space for the page and add the page to the
+ * swap cache.  Caller needs to hold the page lock. 
+ */
+int add_to_swap(struct page * page)
+{
+	swp_entry_t entry;
+	int flags;
+
+	if (!PageLocked(page))
+		BUG();
+
+	for (;;) {
+		entry = get_swap_page();
+		if (!entry.val)
+			return 0;
+
+		/* Radix-tree node allocations are performing
+		 * GFP_ATOMIC allocations under PF_MEMALLOC.  
+		 * They can completely exhaust the page allocator.  
+		 *
+		 * So PF_MEMALLOC is dropped here.  This causes the slab 
+		 * allocations to fail earlier, so radix-tree nodes will 
+		 * then be allocated from the mempool reserves.
+		 *
+		 * We're still using __GFP_HIGH for radix-tree node
+		 * allocations, so some of the emergency pools are available,
+		 * just not all of them.
+		 */
+
+		flags = current->flags;
+		current->flags &= ~PF_MEMALLOC;
+		current->flags |= PF_NOWARN;
+		ClearPageUptodate(page);		/* why? */
+
+		/*
+		 * Add it to the swap cache and mark it dirty
+		 * (adding to the page cache will clear the dirty
+		 * and uptodate bits, so we need to do it again)
+		 */
+		switch (add_to_swap_cache(page, entry)) {
+		case 0:				/* Success */
+			current->flags = flags;
+			SetPageUptodate(page);
+			set_page_dirty(page);
+			swap_free(entry);
+			return 1;
+		case -ENOMEM:			/* radix-tree allocation */
+			current->flags = flags;
+			swap_free(entry);
+			return 0;
+		default:			/* ENOENT: raced */
+			break;
+		}
+		/* Raced with "speculative" read_swap_cache_async */
+		current->flags = flags;
+		swap_free(entry);
+	}
 }
 
 /*

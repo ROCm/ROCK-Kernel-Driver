@@ -115,9 +115,6 @@ void __fput(struct file * file)
 
 	locks_remove_flock(file);
 
-	if (file->f_iobuf)
-		free_kiovec(1, &file->f_iobuf);
-
 	if (file->f_op && file->f_op->release)
 		file->f_op->release(inode, file);
 	fops_put(file->f_op);

@@ -19,8 +19,11 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/writeback.h>
+#include <linux/blkdev.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
+
+extern struct super_block *blockdev_superblock;
 
 /**
  *	__mark_inode_dirty -	internal function
@@ -91,10 +94,8 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * If the inode was already on s_dirty, don't reposition
 		 * it (that would break s_dirty time-ordering).
 		 */
-		if (!was_dirty) {
-			list_del(&inode->i_list);
-			list_add(&inode->i_list, &sb->s_dirty);
-		}
+		if (!was_dirty)
+			list_move(&inode->i_list, &sb->s_dirty);
 	}
 out:
 	spin_unlock(&inode_lock);
@@ -133,8 +134,7 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 	struct address_space *mapping = inode->i_mapping;
 	struct super_block *sb = inode->i_sb;
 
-	list_del(&inode->i_list);
-	list_add(&inode->i_list, &sb->s_locked_inodes);
+	list_move(&inode->i_list, &sb->s_locked_inodes);
 
 	BUG_ON(inode->i_state & I_LOCK);
 
@@ -212,9 +212,19 @@ __writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
  * that it can be located for waiting on in __writeback_single_inode().
  *
  * Called under inode_lock.
+ *
+ * If `bdi' is non-zero then we're being asked to writeback a specific queue.
+ * This function assumes that the blockdev superblock's inodes are backed by
+ * a variety of queues, so all inodes are searched.  For other superblocks,
+ * assume that all inodes are backed by the same queue.
+ *
+ * FIXME: this linear search could get expensive with many fileystems.  But
+ * how to fix?  We need to go from an address_space to all inodes which share
+ * a queue with that address_space.
  */
-static void sync_sb_inodes(struct super_block *sb, int sync_mode,
-		int *nr_to_write, unsigned long *older_than_this)
+static void
+sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
+	int sync_mode, int *nr_to_write, unsigned long *older_than_this)
 {
 	struct list_head *tmp;
 	struct list_head *head;
@@ -228,7 +238,14 @@ static void sync_sb_inodes(struct super_block *sb, int sync_mode,
 		struct backing_dev_info *bdi;
 		int really_sync;
 
-		/* Was this inode dirtied after __sync_list was called? */
+		if (single_bdi && mapping->backing_dev_info != single_bdi) {
+			if (sb != blockdev_superblock)
+				break;		/* inappropriate superblock */
+			list_move(&inode->i_list, &inode->i_sb->s_dirty);
+			continue;		/* not this blockdev */
+		}
+
+		/* Was this inode dirtied after sync_sb_inodes was called? */
 		if (time_after(mapping->dirtied_when, start))
 			break;
 
@@ -249,8 +266,7 @@ static void sync_sb_inodes(struct super_block *sb, int sync_mode,
 		__writeback_single_inode(inode, really_sync, nr_to_write);
 		if (sync_mode == WB_SYNC_HOLD) {
 			mapping->dirtied_when = jiffies;
-			list_del(&inode->i_list);
-			list_add(&inode->i_list, &inode->i_sb->s_dirty);
+			list_move(&inode->i_list, &inode->i_sb->s_dirty);
 		}
 		if (current_is_pdflush())
 			writeback_release(bdi);
@@ -269,6 +285,37 @@ out:
 }
 
 /*
+ * If `bdi' is non-zero then we will scan the first inode against each
+ * superblock until we find the matching ones.  One group will be the dirty
+ * inodes against a filesystem.  Then when we hit the dummy blockdev superblock,
+ * sync_sb_inodes will seekout the blockdev which matches `bdi'.  Maybe not
+ * super-efficient but we're about to do a ton of I/O...
+ */
+static void
+__writeback_unlocked_inodes(struct backing_dev_info *bdi, int *nr_to_write,
+				enum writeback_sync_modes sync_mode,
+				unsigned long *older_than_this)
+{
+	struct super_block *sb;
+
+	spin_lock(&inode_lock);
+	spin_lock(&sb_lock);
+	sb = sb_entry(super_blocks.prev);
+	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.prev)) {
+		if (!list_empty(&sb->s_dirty)) {
+			spin_unlock(&sb_lock);
+			sync_sb_inodes(bdi, sb, sync_mode, nr_to_write,
+					older_than_this);
+			spin_lock(&sb_lock);
+		}
+		if (nr_to_write && *nr_to_write <= 0)
+			break;
+	}
+	spin_unlock(&sb_lock);
+	spin_unlock(&inode_lock);
+}
+
+/*
  * Start writeback of dirty pagecache data against all unlocked inodes.
  *
  * Note:
@@ -284,26 +331,25 @@ out:
  * This is a "memory cleansing" operation, not a "data integrity" operation.
  */
 void writeback_unlocked_inodes(int *nr_to_write,
-			       enum writeback_sync_modes sync_mode,
-			       unsigned long *older_than_this)
+				enum writeback_sync_modes sync_mode,
+				unsigned long *older_than_this)
 {
-	struct super_block *sb;
-
-	spin_lock(&inode_lock);
-	spin_lock(&sb_lock);
-	sb = sb_entry(super_blocks.prev);
-	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.prev)) {
-		if (!list_empty(&sb->s_dirty)) {
-			spin_unlock(&sb_lock);
-			sync_sb_inodes(sb, sync_mode, nr_to_write,
-					older_than_this);
-			spin_lock(&sb_lock);
-		}
-		if (nr_to_write && *nr_to_write <= 0)
-			break;
-	}
-	spin_unlock(&sb_lock);
-	spin_unlock(&inode_lock);
+	__writeback_unlocked_inodes(NULL, nr_to_write,
+				sync_mode, older_than_this);
+}
+/*
+ * Perform writeback of dirty data against a particular queue.
+ *
+ * This is for writer throttling.  We don't want processes to write back
+ * other process's data, espsecially when the other data belongs to a
+ * different spindle.
+ */
+void writeback_backing_dev(struct backing_dev_info *bdi, int *nr_to_write,
+			enum writeback_sync_modes sync_mode,
+			unsigned long *older_than_this)
+{
+	__writeback_unlocked_inodes(bdi, nr_to_write,
+				sync_mode, older_than_this);
 }
 
 static void __wait_on_locked(struct list_head *head)
@@ -336,7 +382,7 @@ void sync_inodes_sb(struct super_block *sb, int wait)
 	nr_to_write = ps.nr_dirty + ps.nr_dirty / 4;
 
 	spin_lock(&inode_lock);
-	sync_sb_inodes(sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
+	sync_sb_inodes(NULL, sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
 				&nr_to_write, NULL);
 	if (wait)
 		__wait_on_locked(&sb->s_locked_inodes);

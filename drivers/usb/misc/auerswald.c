@@ -1879,13 +1879,13 @@ static int auerchar_release (struct inode *inode, struct file *file)
 /* File operation structure                                             */
 static struct file_operations auerswald_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		auerchar_read,
-	write:          auerchar_write,
-	ioctl:		auerchar_ioctl,
-	open:		auerchar_open,
-	release:	auerchar_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		auerchar_read,
+	.write =        auerchar_write,
+	.ioctl =	auerchar_ioctl,
+	.open =		auerchar_open,
+	.release =	auerchar_release,
 };
 
 
@@ -2138,10 +2138,10 @@ MODULE_DEVICE_TABLE (usb, auerswald_ids);
 
 /* Standard usb driver struct */
 static struct usb_driver auerswald_driver = {
-	name:		"auerswald",
-	probe:		auerswald_probe,
-	disconnect:	auerswald_disconnect,
-	id_table:	auerswald_ids,
+	.name =		"auerswald",
+	.probe =	auerswald_probe,
+	.disconnect =	auerswald_disconnect,
+	.id_table =	auerswald_ids,
 };
 
 

@@ -245,27 +245,9 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 	}
 
 	if (arg & O_DIRECT) {
-		if (inode->i_mapping && inode->i_mapping->a_ops) {
-			if (!inode->i_mapping->a_ops->direct_IO)
+		if (!inode->i_mapping || !inode->i_mapping->a_ops ||
+			!inode->i_mapping->a_ops->direct_IO)
 				return -EINVAL;
-		}
-
-		/*
-		 * alloc_kiovec() can sleep and we are only serialized by
-		 * the big kernel lock here, so abuse the i_sem to serialize
-		 * this case too. We of course wouldn't need to go deep down
-		 * to the inode layer, we could stay at the file layer, but
-		 * we don't want to pay for the memory of a semaphore in each
-		 * file structure too and we use the inode semaphore that we just
-		 * pay for anyways.
-		 */
-		error = 0;
-		down(&inode->i_sem);
-		if (!filp->f_iobuf)
-			error = alloc_kiovec(1, &filp->f_iobuf);
-		up(&inode->i_sem);
-		if (error < 0)
-			return error;
 	}
 
 	/* required for strict SunOS emulation */

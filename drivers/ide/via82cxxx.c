@@ -380,22 +380,22 @@ static void __init via82cxxx_init_dma(struct ata_channel *hwif, unsigned long dm
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_VIA,
-		device:	PCI_DEVICE_ID_VIA_82C576_1,
-		init_chipset: via82cxxx_init_chipset,
-		init_channel: via82cxxx_init_channel,
-		init_dma: via82cxxx_init_dma,
-		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
-		bootable: ON_BOARD,
+		.vendor = PCI_VENDOR_ID_VIA,
+		.device = PCI_DEVICE_ID_VIA_82C576_1,
+		.init_chipset = via82cxxx_init_chipset,
+		.init_channel = via82cxxx_init_channel,
+		.init_dma = via82cxxx_init_dma,
+		.enablebits = {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
+		.bootable = ON_BOARD,
 	},
 	{
-		vendor:	PCI_VENDOR_ID_VIA,
-		device:	PCI_DEVICE_ID_VIA_82C586_1,
-		init_chipset: via82cxxx_init_chipset,
-		init_channel: via82cxxx_init_channel,
-		init_dma: via82cxxx_init_dma,
-		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
-		bootable: ON_BOARD,
+		.vendor = PCI_VENDOR_ID_VIA,
+		.device = PCI_DEVICE_ID_VIA_82C586_1,
+		.init_chipset = via82cxxx_init_chipset,
+		.init_channel = via82cxxx_init_channel,
+		.init_dma = via82cxxx_init_dma,
+		.enablebits = {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
+		.bootable = ON_BOARD,
 	},
 };
 
@@ -403,9 +403,8 @@ int __init init_via82cxxx(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
-	}
 
 	return 0;
 }

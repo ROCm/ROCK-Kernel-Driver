@@ -1222,34 +1222,34 @@ static void __init hpt366_init_dma(struct ata_channel *ch, unsigned long dmabase
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_TTI,
-		device: PCI_DEVICE_ID_TTI_HPT366,
-		init_chipset: hpt366_init_chipset,
-		init_channel: hpt366_init_channel,
-		init_dma: hpt366_init_dma,
-		bootable: OFF_BOARD,
-		extra: 240,
-		flags: ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_TTI,
+		.device = PCI_DEVICE_ID_TTI_HPT366,
+		.init_chipset = hpt366_init_chipset,
+		.init_channel = hpt366_init_channel,
+		.init_dma = hpt366_init_dma,
+		.bootable = OFF_BOARD,
+		.extra = 240,
+		.flags = ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_TTI,
-		device: PCI_DEVICE_ID_TTI_HPT372,
-		init_chipset: hpt366_init_chipset,
-		init_channel: hpt366_init_channel,
-		init_dma: hpt366_init_dma,
-		bootable: OFF_BOARD,
-		extra: 0,
-		flags: ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_TTI,
+		.device = PCI_DEVICE_ID_TTI_HPT372,
+		.init_chipset = hpt366_init_chipset,
+		.init_channel = hpt366_init_channel,
+		.init_dma = hpt366_init_dma,
+		.bootable = OFF_BOARD,
+		.extra = 0,
+		.flags = ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_TTI,
-		device: PCI_DEVICE_ID_TTI_HPT374,
-		init_chipset: hpt366_init_chipset,
-		init_channel: hpt366_init_channel,
-		init_dma: hpt366_init_dma,
-		bootable: OFF_BOARD,
-		extra: 0,
-		flags: ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA
+		.vendor = PCI_VENDOR_ID_TTI,
+		.device = PCI_DEVICE_ID_TTI_HPT374,
+		.init_chipset = hpt366_init_chipset,
+		.init_channel = hpt366_init_channel,
+		.init_dma = hpt366_init_dma,
+		.bootable = OFF_BOARD,
+		.extra = 0,
+		.flags = ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA
 	},
 };
 

@@ -44,10 +44,13 @@ static int usb_open(struct inode * inode, struct file * file)
 
 	spin_lock (&minor_lock);
 	c = usb_minors[minor];
-	spin_unlock (&minor_lock);
 
-	if (!c || !(new_fops = fops_get(c)))
+	if (!c || !(new_fops = fops_get(c))) {
+		spin_unlock(&minor_lock);
 		return err;
+	}
+	spin_unlock(&minor_lock);
+
 	old_fops = file->f_op;
 	file->f_op = new_fops;
 	/* Curiouser and curiouser... NULL ->open() as "no device" ? */
@@ -62,8 +65,8 @@ static int usb_open(struct inode * inode, struct file * file)
 }
 
 static struct file_operations usb_fops = {
-	owner:		THIS_MODULE,
-	open:		usb_open,
+	.owner =	THIS_MODULE,
+	.open =		usb_open,
 };
 
 int usb_major_init(void)

@@ -161,10 +161,10 @@ static void mts_usb_disconnect(struct usb_device *dev, void *ptr);
 static struct usb_device_id mts_usb_ids [];
 
 static struct usb_driver mts_usb_driver = {
-	name:		"microtekX6",
-	probe:		mts_usb_probe,
-	disconnect:	mts_usb_disconnect,
-	id_table:	mts_usb_ids,
+	.name =		"microtekX6",
+	.probe =	mts_usb_probe,
+	.disconnect =	mts_usb_disconnect,
+	.id_table =	mts_usb_ids,
 };
 
 
@@ -743,22 +743,22 @@ out:
 
 
 static Scsi_Host_Template mts_scsi_host_template = {
-	name:           "microtekX6",
-	detect:		mts_scsi_detect,
-	release:	mts_scsi_release,
-	queuecommand:	mts_scsi_queuecommand,
+	.name =         "microtekX6",
+	.detect =	mts_scsi_detect,
+	.release =	mts_scsi_release,
+	.queuecommand =	mts_scsi_queuecommand,
 
-	eh_abort_handler:	mts_scsi_abort,
-	eh_host_reset_handler:	mts_scsi_host_reset,
+	.eh_abort_handler =	mts_scsi_abort,
+	.eh_host_reset_handler =mts_scsi_host_reset,
 
-	sg_tablesize:		SG_ALL,
-	can_queue:		1,
-	this_id:		-1,
-	cmd_per_lun:		1,
-	present:		0,
-	unchecked_isa_dma:	FALSE,
-	use_clustering:		TRUE,
-	emulated:		TRUE
+	.sg_tablesize =		SG_ALL,
+	.can_queue =		1,
+	.this_id =		-1,
+	.cmd_per_lun =		1,
+	.present =		0,
+	.unchecked_isa_dma =	FALSE,
+	.use_clustering =	TRUE,
+	.emulated =		TRUE
 };
 
 

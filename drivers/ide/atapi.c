@@ -27,6 +27,7 @@
 #include <linux/blkdev.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/completion.h>
 #include <linux/cdrom.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
@@ -115,6 +116,66 @@ void atapi_write(struct ata_device *drive, u8 *buf, unsigned int n)
 		outsw(IDE_DATA_REG, buf + (n & ~0x03), 1);
 }
 
+
+/*
+ * This function issues a special IDE device request onto the request queue.
+ *
+ * If action is ide_wait, then the rq is queued at the end of the request
+ * queue, and the function sleeps until it has been processed.  This is for use
+ * when invoked from an ioctl handler.
+ *
+ * If action is ide_preempt, then the rq is queued at the head of the request
+ * queue, displacing the currently-being-processed request and this function
+ * returns immediately without waiting for the new rq to be completed.  This is
+ * VERY DANGEROUS, and is intended for careful use by the ATAPI tape/cdrom
+ * driver code.
+ *
+ * If action is ide_end, then the rq is queued at the end of the request queue,
+ * and the function returns immediately without waiting for the new rq to be
+ * completed. This is again intended for careful use by the ATAPI tape/cdrom
+ * driver code.
+ */
+int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t action)
+{
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	unsigned int major = ch->major;
+	request_queue_t *q = &drive->queue;
+	struct list_head *queue_head = &q->queue_head;
+	DECLARE_COMPLETION(wait);
+
+#ifdef CONFIG_BLK_DEV_PDC4030
+	if (ch->chipset == ide_pdc4030 && rq->buffer)
+		return -ENOSYS;  /* special drive cmds not supported */
+#endif
+	rq->errors = 0;
+	rq->rq_status = RQ_ACTIVE;
+	rq->rq_dev = mk_kdev(major, (drive->select.b.unit) << PARTN_BITS);
+	if (action == ide_wait)
+		rq->waiting = &wait;
+
+	spin_lock_irqsave(ch->lock, flags);
+
+	if (action == ide_preempt)
+		drive->rq = NULL;
+	else if (!blk_queue_empty(&drive->queue))
+		queue_head = queue_head->prev;	/* ide_end and ide_wait */
+
+	__elv_add_request(q, rq, queue_head);
+
+	do_ide_request(q);
+
+	spin_unlock_irqrestore(ch->lock, flags);
+
+	if (action == ide_wait) {
+		wait_for_completion(&wait);	/* wait for it to be serviced */
+		return rq->errors ? -EIO : 0;	/* return -EIO if errors */
+	}
+
+	return 0;
+}
+
+EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(atapi_discard_data);
 EXPORT_SYMBOL(atapi_write_zeros);
 EXPORT_SYMBOL(atapi_init_pc);

@@ -657,14 +657,14 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 }
 
 static struct file_operations hiddev_fops = {
-	owner:		THIS_MODULE,
-	read:		hiddev_read,
-	write:		hiddev_write,
-	poll:		hiddev_poll,
-	open:		hiddev_open,
-	release:	hiddev_release,
-	ioctl:		hiddev_ioctl,
-	fasync:		hiddev_fasync,
+	.owner =	THIS_MODULE,
+	.read =		hiddev_read,
+	.write =	hiddev_write,
+	.poll =		hiddev_poll,
+	.open =		hiddev_open,
+	.release =	hiddev_release,
+	.ioctl =	hiddev_ioctl,
+	.fasync =	hiddev_fasync,
 };
 
 /*
@@ -759,8 +759,8 @@ static void *hiddev_usbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 
 static /* const */ struct usb_driver hiddev_driver = {
-	name:		"hiddev",
-	probe:		hiddev_usbd_probe,
+	.name =		"hiddev",
+	.probe =	hiddev_usbd_probe,
 };
 
 int __init hiddev_init(void)
