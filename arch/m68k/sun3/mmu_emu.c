@@ -177,7 +177,6 @@ void mmu_emu_init(unsigned long bootmem_end)
 			pmeg_alloc[sun3_get_segmap(seg)] = 2;
 		}
 	}
-
 	
 	dvma_init();
 	
@@ -276,7 +275,7 @@ unsigned long get_free_context(struct mm_struct *mm)
 //todo: better allocation scheme? but is extra complexity worthwhile?
 //todo: only clear old entries if necessary? how to tell?
 
-static inline void mmu_emu_map_pmeg (int context, int vaddr)
+inline void mmu_emu_map_pmeg (int context, int vaddr)
 {
 	static unsigned char curr_pmeg = 128;
 	int i;

@@ -161,6 +161,9 @@ extern __inline__ void sun3_put_context(unsigned char c)
 	return;
 }
 
+extern void *sun3_ioremap(unsigned long phys, unsigned long size,
+			  unsigned long type);
+
 
 #endif	/* !__ASSEMBLY__ */
 
