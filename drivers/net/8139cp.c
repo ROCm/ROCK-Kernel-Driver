@@ -633,8 +633,12 @@ static irqreturn_t
 cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
-	struct cp_private *cp = netdev_priv(dev);
+	struct cp_private *cp;
 	u16 status;
+
+	if (unlikely(dev == NULL))
+		return IRQ_NONE;
+	cp = netdev_priv(dev);
 
 	status = cpr16(IntrStatus);
 	if (!status || (status == 0xFFFF))
@@ -974,22 +978,14 @@ static struct net_device_stats *cp_get_stats(struct net_device *dev)
 
 static void cp_stop_hw (struct cp_private *cp)
 {
-	struct net_device *dev = cp->dev;
-
 	cpw16(IntrStatus, ~(cpr16(IntrStatus)));
 	cpw16_f(IntrMask, 0);
 	cpw8(Cmd, 0);
 	cpw16_f(CpCmd, 0);
-	cpw16(IntrStatus, ~(cpr16(IntrStatus)));
-	synchronize_irq(dev->irq);
-	udelay(10);
+	cpw16_f(IntrStatus, ~(cpr16(IntrStatus)));
 
 	cp->rx_tail = 0;
 	cp->tx_head = cp->tx_tail = 0;
-
-	(void) dev; /* avoid compiler warning when synchronize_irq()
-		     * disappears during !CONFIG_SMP
-		     */
 }
 
 static void cp_reset_hw (struct cp_private *cp)
@@ -1200,14 +1196,18 @@ static int cp_close (struct net_device *dev)
 	if (netif_msg_ifdown(cp))
 		printk(KERN_DEBUG "%s: disabling interface\n", dev->name);
 
+	spin_lock_irqsave(&cp->lock, flags);
+
 	netif_stop_queue(dev);
 	netif_carrier_off(dev);
 
-	spin_lock_irqsave(&cp->lock, flags);
 	cp_stop_hw(cp);
+
 	spin_unlock_irqrestore(&cp->lock, flags);
 
+	synchronize_irq(dev->irq);
 	free_irq(dev->irq, dev);
+
 	cp_free_rings(cp);
 	return 0;
 }
