@@ -65,7 +65,7 @@ dasd_register_major(int major)
 {
 	struct major_info *mi;
 	struct hd_struct *gd_part;
-	devfs_handle_t *gd_de_arr, *gd_label_arr;
+	devfs_handle_t *gd_de_arr;
 	int *gd_sizes;
 	char *gd_flags;
 	int new_major, rc;
@@ -78,14 +78,12 @@ dasd_register_major(int major)
 	gd_de_arr = kmalloc(DASD_PER_MAJOR * sizeof(devfs_handle_t),
 			    GFP_KERNEL);
 	gd_flags = kmalloc(DASD_PER_MAJOR * sizeof(char), GFP_KERNEL);
-	gd_label_arr = kmalloc(DASD_PER_MAJOR * sizeof(devfs_handle_t),
-			       GFP_KERNEL);
 	gd_part = kmalloc(sizeof (struct hd_struct) << MINORBITS, GFP_ATOMIC);
 	gd_sizes = kmalloc(sizeof(int) << MINORBITS, GFP_ATOMIC);
 
 	/* Check if one of the allocations failed. */
 	if (mi == NULL || gd_de_arr == NULL || gd_flags == NULL ||
-	    gd_label_arr == NULL || gd_part == NULL || gd_sizes == NULL) {
+	    gd_part == NULL || gd_sizes == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"Cannot get memory to allocate another "
 			"major number");
@@ -114,14 +112,12 @@ dasd_register_major(int major)
 	mi->gendisk.fops = &dasd_device_operations;
 	mi->gendisk.de_arr = gd_de_arr;
 	mi->gendisk.flags = gd_flags;
-	mi->gendisk.label_arr = gd_label_arr;
 	mi->gendisk.part = gd_part;
 	mi->gendisk.sizes = gd_sizes;
 
 	/* Initialize the gendisk arrays. */
 	memset(gd_de_arr, 0, DASD_PER_MAJOR * sizeof(devfs_handle_t));
 	memset(gd_flags, 0, DASD_PER_MAJOR * sizeof (char));
-	memset(gd_label_arr, 0, DASD_PER_MAJOR * sizeof(devfs_handle_t));
 	memset(gd_part, 0, sizeof (struct hd_struct) << MINORBITS);
 	memset(gd_sizes, 0, sizeof(int) << MINORBITS);
 
@@ -143,7 +139,6 @@ out_error:
 	/* We rely on kfree to do the != NULL check. */
 	kfree(gd_sizes);
 	kfree(gd_part);
-	kfree(gd_label_arr);
 	kfree(gd_flags);
 	kfree(gd_de_arr);
 	kfree(mi);
@@ -182,7 +177,6 @@ dasd_unregister_major(struct major_info * mi)
 	/* Free memory. */
 	kfree(bs);
 	kfree(mi->gendisk.part);
-	kfree(mi->gendisk.label_arr);
 	kfree(mi->gendisk.flags);
 	kfree(mi->gendisk.de_arr);
 	kfree(mi);
