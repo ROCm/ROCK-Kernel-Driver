@@ -93,4 +93,10 @@ fi
 #bool 'Network code profiler' CONFIG_NET_PROFILE
 endmenu
 
+mainmenu_option next_comment
+comment 'Network testing'
+tristate 'Packet Generator (USE WITH CAUTION)' CONFIG_NET_PKTGEN
+endmenu
+
+
 endmenu

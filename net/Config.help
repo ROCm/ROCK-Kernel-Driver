@@ -512,3 +512,18 @@ CONFIG_NET_PROFILE
   performance will be written to /proc/net/profile. If you don't know
   what it is about, you don't need it: say N.
 
+CONFIG_NET_PKTGEN
+  This module will inject preconfigured packets, at a configurable
+  rate, out of a given interface.  It is used for network interface
+  stress testing and performance analysis.  If you don't understand
+  what was just said, you don't need it: say N.
+
+  Documentation on how to use the packet generator can be found
+  at <file:Documentation/networking/pktgen.txt>.
+
+  This code is also available as a module called pktgen.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want).  If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
+
+
