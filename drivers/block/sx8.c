@@ -1,5 +1,5 @@
 /*
- *  carmel.c: Driver for Promise SATA SX8 looks-like-I2O hardware
+ *  sx8.c: Driver for Promise SATA SX8 looks-like-I2O hardware
  *
  *  Copyright 2004 Red Hat, Inc.
  *
@@ -32,7 +32,7 @@
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Promise SATA SX8 (carmel) block driver");
+MODULE_DESCRIPTION("Promise SATA SX8 block driver");
 
 #if 0
 #define CARM_DEBUG
@@ -43,7 +43,7 @@ MODULE_DESCRIPTION("Promise SATA SX8 (carmel) block driver");
 #endif
 #undef CARM_NDEBUG
 
-#define DRV_NAME "carmel"
+#define DRV_NAME "sx8"
 #define DRV_VERSION "0.8"
 #define PFX DRV_NAME ": "
 
