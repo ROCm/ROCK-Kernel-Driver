@@ -464,7 +464,5 @@ void __init swap_setup(void)
 	hotcpu_notifier(cpu_swap_callback, 0);
 }
 
-#ifdef CONFIG_DPROBES_MODULE
 EXPORT_SYMBOL(swapper_space);
 EXPORT_SYMBOL(delete_from_swap_cache);
-#endif
