@@ -73,7 +73,7 @@ void *hpfs_map_4sectors(struct super_block *s, unsigned secno, struct quad_buffe
 
 	if (secno & 3) {
 		printk("HPFS: hpfs_map_4sectors: unaligned read\n");
-		return 0;
+		return NULL;
 	}
 
 	qbh->data = data = (char *)kmalloc(2048, GFP_NOFS);
@@ -126,7 +126,7 @@ void *hpfs_get_4sectors(struct super_block *s, unsigned secno,
 
 	if (secno & 3) {
 		printk("HPFS: hpfs_get_4sectors: unaligned read\n");
-		return 0;
+		return NULL;
 	}
 
 	/*return hpfs_map_4sectors(s, secno, qbh, 0);*/
