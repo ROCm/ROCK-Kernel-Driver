@@ -519,9 +519,11 @@ static int sbpro_audio_prepare_for_output(int dev, int bsize, int bcount)
 			sb_dsp_command(devc, 0xa0 | bits);	/* Mono output */
 		else
 			sb_dsp_command(devc, 0xa8 | bits);	/* Stereo output */
+		spin_unlock_irqrestore(&devc->lock, flags);
 	}
 	else
 	{
+		spin_unlock_irqrestore(&devc->lock, flags);
 		tmp = sb_getmixer(devc, 0x0e);
 		if (devc->channels == 1)
 			tmp &= ~0x02;
@@ -529,7 +531,6 @@ static int sbpro_audio_prepare_for_output(int dev, int bsize, int bcount)
 			tmp |= 0x02;
 		sb_setmixer(devc, 0x0e, tmp);
 	}
-	spin_unlock_irqrestore(&devc->lock, flags);
 	devc->trigger_bits = 0;
 	return 0;
 }
