@@ -534,7 +534,7 @@ void show_stack(struct task_struct *tsk, unsigned long *stack)
 				next_exc = 0;
 			} else
 				ret = *(unsigned long *)(sp + 4);
-			printk(" [%08lx] ", ret);
+			printk(" [<%08lx>] ", ret);
 #ifdef CONFIG_KALLSYMS
 			print_symbol("%s", ret);
 			printk("\n");
