@@ -921,7 +921,7 @@ static void __init quirk_usb_handoff_uhci(struct pci_dev *pdev)
 
 static void __init quirk_usb_handoff_ohci(struct pci_dev *pdev)
 {
-	char *base;
+	void __iomem *base;
 	int wait_time;
 
 	base = ioremap_nocache(pci_resource_start(pdev, 0),
@@ -952,7 +952,7 @@ static void __init quirk_usb_handoff_ohci(struct pci_dev *pdev)
 static void __init quirk_usb_disable_ehci(struct pci_dev *pdev)
 {
 	int wait_time, delta;
-	char *base, *op_reg_base;
+	void __iomem *base, *op_reg_base;
 	u32 hcc_params, val, temp;
 	u8 cap_length;
 
