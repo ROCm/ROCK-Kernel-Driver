@@ -20,7 +20,7 @@
 #include <asm/sn/bte.h>
 
 void hubiio_crb_error_handler(struct hubdev_info *hubdev_info);
-extern void bte_crb_error_handler(struct hubdev_info *, int, int, ioerror_t *,
+extern void bte_crb_error_handler(cnodeid_t, int, int, ioerror_t *,
 				  int);
 static irqreturn_t hub_eint_handler(int irq, void *arg, struct pt_regs *ep)
 {
@@ -156,7 +156,7 @@ void hubiio_crb_error_handler(struct hubdev_info *hubdev_info)
 
 			hubiio_crb_free(hubdev_info, i);
 
-			bte_crb_error_handler(hubdev_info, bte_num,
+			bte_crb_error_handler(nasid_to_cnodeid(nasid), bte_num,
 					      i, &ioerror, icrbd.d_bteop);
 			num_errors++;
 			continue;
