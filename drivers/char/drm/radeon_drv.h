@@ -669,6 +669,10 @@ extern void radeon_do_release(drm_device_t *dev);
 #define R200_RE_POINTSIZE                 0x2648
 #define R200_SE_TCL_INPUT_VTX_VECTOR_ADDR_0 0x2254
 
+#define RADEON_PP_TEX_SIZE_0                0x1d04  /* NPOT */
+#define RADEON_PP_TEX_SIZE_1                0x1d0c
+#define RADEON_PP_TEX_SIZE_2                0x1d14
+
 
 #define SE_VAP_CNTL__TCL_ENA_MASK                          0x00000001
 #define SE_VAP_CNTL__FORCE_W_TO_ONE_MASK                   0x00010000
