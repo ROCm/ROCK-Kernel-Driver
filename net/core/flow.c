@@ -18,6 +18,7 @@
 #include <linux/percpu.h>
 #include <linux/bitops.h>
 #include <linux/notifier.h>
+#include <linux/cpu.h>
 #include <net/flow.h>
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
