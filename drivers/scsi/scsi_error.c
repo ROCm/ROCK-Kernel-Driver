@@ -52,8 +52,12 @@
  * go to single-user mode.  For that matter, init also sends SIGKILL,
  * so we mustn't enable that one either.  We use SIGHUP instead.  Other
  * options would be SIGPWR, I suppose.
+ *
+ * Changed behavior 1/1/2003 - it turns out, that SIGHUP can get sent
+ * to error handlers from a process responsible for their creation.
+ * To sidestep that issue, we now use SIGPWR as suggested above.
  */
-#define SHUTDOWN_SIGS	(sigmask(SIGHUP))
+#define SHUTDOWN_SIGS	(sigmask(SIGPWR))
 
 #ifdef DEBUG
 #define SENSE_TIMEOUT SCSI_TIMEOUT
@@ -1618,7 +1622,7 @@ void scsi_error_handler(void *data)
 	/*
 	 * Wake up the thread that created us.
 	 */
-	SCSI_LOG_ERROR_RECOVERY(3, printk("Wake up parent \n"));
+	SCSI_LOG_ERROR_RECOVERY(3, printk("Wake up parent of scsi_eh_%d\n",shost->host_no));
 
 	up(shost->eh_notify);
 
@@ -1628,7 +1632,7 @@ void scsi_error_handler(void *data)
 		 * away and die.  This typically happens if the user is
 		 * trying to unload a module.
 		 */
-		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler sleeping\n"));
+		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler scsi_eh_%d sleeping\n",shost->host_no));
 
 		/*
 		 * Note - we always use down_interruptible with the semaphore
@@ -1643,7 +1647,7 @@ void scsi_error_handler(void *data)
 		if (signal_pending(current))
 			break;
 
-		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler waking up\n"));
+		SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler scsi_eh_%d waking up\n",shost->host_no));
 
 		shost->eh_active = 1;
 
@@ -1671,7 +1675,7 @@ void scsi_error_handler(void *data)
 
 	}
 
-	SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler exiting\n"));
+	SCSI_LOG_ERROR_RECOVERY(1, printk("Error handler scsi_eh_%d exiting\n",shost->host_no));
 
 	/*
 	 * Make sure that nobody tries to wake us up again.

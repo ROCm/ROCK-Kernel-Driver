@@ -337,7 +337,7 @@ void scsi_unregister(struct Scsi_Host *shost)
 	if (shost->ehandler) {
 		DECLARE_MUTEX_LOCKED(sem);
 		shost->eh_notify = &sem;
-		send_sig(SIGHUP, shost->ehandler, 1);
+		send_sig(SIGPWR, shost->ehandler, 1);
 		down(&sem);
 		shost->eh_notify = NULL;
 	}
