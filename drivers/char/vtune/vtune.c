@@ -1988,15 +1988,8 @@ samp_get_parm(samp_parm3 * out_buf)
  * @todo Is there anyway to make the func declaration the same? Is it worth it?
  *
  */
-#if defined(linux32) || defined(linux32_64)
-asmlinkage void
-ebs_intr(struct pt_regs *regs)
-#elif defined(linux64)
-void
+int
 ebs_intr(int irq, void *arg, struct pt_regs *regs)
-#else
-#error Unknown architecture
-#endif
 {
     INT_FRAME int_frame;
     u32 wake_up_thread;
@@ -2071,7 +2064,7 @@ ebs_intr(int irq, void *arg, struct pt_regs *regs)
     ack_APIC_irq();     // C code responsible for ACK'ing the APIC
 #endif
 
-    return;
+    return IRQ_HANDLED;
 }
 
 /*

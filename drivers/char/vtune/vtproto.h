@@ -63,11 +63,10 @@ void samp_apic_set_perf_lvt_int_mask(void);
 void samp_apic_clear_perf_lvt_int_mask(void);
 __u32 SAMP_Set_apic_perf_lvt(long apic_perf_lvt);
 void SAMP_Set_Apic_Virtual_Wire_Mode(void);
-#elif defined(linux64)
-void ebs_intr(int irq, void *arg, struct pt_regs *regs);
-#else
+#elif !defined(linux64)
 #error Compiling for unsupported architecture
 #endif
+int ebs_intr(int irq, void *arg, struct pt_regs *regs);
 
 ssize_t samp_write_module_file(struct file *, char *, size_t, loff_t *);
 void samp_write_sample_file(void);

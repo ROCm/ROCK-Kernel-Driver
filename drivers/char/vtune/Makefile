@@ -1,7 +1,13 @@
-flags-$(CONFIG_X86)	+= -Dlinux32
+ifeq ($(CONFIG_X86),y)
+ifeq ($(CONFIG_X86_64),)
+CONFIG_IA32=y
+endif
+endif
+
+flags-$(CONFIG_IA32)	+= -Dlinux32
 flags-$(CONFIG_X86_64)	+= -Dlinux32_64
 flags-$(CONFIG_IA64)	+= -Dlinux64
-#flags-$(CONFIG_PERFMON)	+= -DPERFMON_SUPPORTED
+#flags-$(CONFIG_PERFMON) += -DPERFMON_SUPPORTED
 
 EXTRA_CFLAGS += -I$(src)/include \
 		-DKERNEL_26X \
@@ -18,7 +24,7 @@ EXTRA_CFLAGS += -I$(src)/include \
 
 obj-$(CONFIG_VTUNE)	:= vtune_drv.o
 vtune_drv-y		:= vtune.o sys_call_table.o
-vtune_drv-$(CONFIG_X86)	+= vtlib32.o vtoshooks32.o vtxsys32.o \
+vtune_drv-$(CONFIG_IA32) += vtlib32.o vtoshooks32.o vtxsys32.o \
 			   vtlibcommon32.o apic32.o
 vtune_drv-$(CONFIG_X86_64) += vtlib32_64.o vtoshooks32_64.o vtxsys32_64.o \
 			      apic32_64.o vtlibcommon32.o

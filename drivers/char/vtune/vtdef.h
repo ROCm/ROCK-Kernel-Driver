@@ -274,9 +274,9 @@ typedef struct _KDESCRIPTOR_UNSCRAM {
 
 #define MAX_REG_SET_ENTRIES      120
 
-#define IA32_FAMILY5_MAX_COUNTER 0x0ffffffffff  // max counter on P5... cpu counters are 40 bits
-#define IA32_FAMILY6_MAX_COUNTER 0x0ffffffffff  // max counter on P6... cpu counters are 40 bits
-#define IA32_FAMILYF_MAX_COUNTER 0x0ffffffffff  // max counter on Pentium(R) 4 processor ... cpu counters are 40 bits
+#define IA32_FAMILY5_MAX_COUNTER 0x0ffffffffffULL  // max counter on P5... cpu counters are 40 bits
+#define IA32_FAMILY6_MAX_COUNTER 0x0ffffffffffULL  // max counter on P6... cpu counters are 40 bits
+#define IA32_FAMILYF_MAX_COUNTER 0x0ffffffffffULL  // max counter on Pentium(R) 4 processor ... cpu counters are 40 bits
 
 typedef struct _REG_SET {
     __u8 options;
