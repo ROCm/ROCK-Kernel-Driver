@@ -2110,8 +2110,12 @@ int block_symlink(struct inode *inode, const char *symname, int len)
 	 * ->i_size will be enough for everything) and zero it out.
 	 * OTOH it's obviously correct and should make the page up-to-date.
 	 */
-	err = mapping->a_ops->readpage(NULL, page);
-	wait_on_page_locked(page);
+	if (!PageUptodate(page)) {
+		err = mapping->a_ops->readpage(NULL, page);
+		wait_on_page_locked(page);
+	} else {
+		unlock_page(page);
+	}
 	page_cache_release(page);
 	if (err < 0)
 		goto fail;
