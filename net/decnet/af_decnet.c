@@ -1229,7 +1229,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
 	int err = -EOPNOTSUPP;
-	unsigned long amount = 0;
+	long amount = 0;
 	struct sk_buff *skb;
 	int val;
 
