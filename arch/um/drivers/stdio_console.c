@@ -30,7 +30,7 @@
 #include "init.h"
 #include "2_5compat.h"
 
-#define MAX_TTYS (8)
+#define MAX_TTYS (16)
 
 /* Referenced only by tty_driver below - presumably it's locked correctly
  * by the tty driver.
