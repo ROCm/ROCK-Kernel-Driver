@@ -324,6 +324,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 	const u8	*bufp = 0;
 	u8		*ubuf = urb->transfer_buffer;
 	int		len = 0;
+	unsigned long	flags;
 
 	typeReq  = (cmd->bRequestType << 8) | cmd->bRequest;
 	wValue   = le16_to_cpu (cmd->wValue);
@@ -436,7 +437,9 @@ error:
 	}
 
 	/* any errors get returned through the urb completion */
+	local_irq_save (flags);
 	usb_hcd_giveback_urb (hcd, urb, NULL);
+	local_irq_restore (flags);
 	return 0;
 }
 
@@ -500,13 +503,13 @@ static void rh_report_status (unsigned long ptr)
 
 	/* complete the status urb, or retrigger the timer */
 	spin_lock (&hcd_data_lock);
-	hcd->rh_timer.data = 0;
 	if (length > 0) {
+		hcd->rh_timer.data = 0;
 		urb->actual_length = length;
 		urb->status = 0;
 		urb->hcpriv = 0;
 	} else
-		rh_status_urb (hcd, urb);
+		mod_timer (&hcd->rh_timer, jiffies + HZ/4);
 	spin_unlock (&hcd_data_lock);
 	spin_unlock (&urb->lock);
 
@@ -541,15 +544,14 @@ void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 {
 	unsigned long	flags;
 
-	spin_lock_irqsave (&hcd_data_lock, flags);
-	hcd->rh_timer.data = 0;
-	spin_unlock_irqrestore (&hcd_data_lock, flags);
-
 	/* note:  always a synchronous unlink */
 	del_timer_sync (&hcd->rh_timer);
+	hcd->rh_timer.data = 0;
 
+	local_irq_save (flags);
 	urb->hcpriv = 0;
 	usb_hcd_giveback_urb (hcd, urb, NULL);
+	local_irq_restore (flags);
 }
 
 /*-------------------------------------------------------------------------*/
