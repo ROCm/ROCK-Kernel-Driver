@@ -40,3 +40,12 @@
  * den TigerJet i/o-Raum gemappt
  * -> 0x01 des AMD bei hw.njet.base + 0C4 */
 #define TJ_AMD_PORT						0xC0
+
+
+
+/* ***************************************************************************************** *
+ * *************************************** Prototypen ************************************** *
+ * ***************************************************************************************** */
+
+BYTE ReadByteAmd7930(struct IsdnCardState *cs, BYTE offset);
+void WriteByteAmd7930(struct IsdnCardState *cs, BYTE offset, BYTE value);

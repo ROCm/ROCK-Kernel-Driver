@@ -62,42 +62,53 @@
 
 static void Amd7930_new_ph(struct IsdnCardState *cs);
 
-static inline u8
-HIBYTE(u16 w)
-{
-	return (w >> 8) & 0xff;
-}
+static WORD initAMD[] = {
+	0x0100,
 
-static inline u8
-LOBYTE(u16 w)
-{
-	return w & 0xff;
-}
+	0x00A5, 3, 0x01, 0x40, 0x58,				// LPR, LMR1, LMR2
+	0x0086, 1, 0x0B,					// DMR1 (D-Buffer TH-Interrupts on)
+	0x0087, 1, 0xFF,					// DMR2
+	0x0092, 1, 0x03,					// EFCR (extended mode d-channel-fifo on)
+	0x0090, 4, 0xFE, 0xFF, 0x02, 0x0F,			// FRAR4, SRAR4, DMR3, DMR4 (address recognition )
+	0x0084, 2, 0x80, 0x00,					// DRLR
+	0x00C0, 1, 0x47,					// PPCR1
+	0x00C8, 1, 0x01,					// PPCR2
 
-static inline u8
-rByteAMD(struct IsdnCardState *cs, u8 reg)
-{
-	return cs->dc_hw_ops->read_reg(cs, reg);
-}
+	0x0102,
+	0x0107,
+	0x01A1, 1,
+	0x0121, 1,
+	0x0189, 2,
 
-static inline void
-wByteAMD(struct IsdnCardState *cs, u8 reg, u8 val)
-{
-	cs->dc_hw_ops->write_reg(cs, reg, val);
-}
+	0x0045, 4, 0x61, 0x72, 0x00, 0x00,			// MCR1, MCR2, MCR3, MCR4
+	0x0063, 2, 0x08, 0x08,					// GX
+	0x0064, 2, 0x08, 0x08,					// GR
+	0x0065, 2, 0x99, 0x00,					// GER
+	0x0066, 2, 0x7C, 0x8B,					// STG
+	0x0067, 2, 0x00, 0x00,					// FTGR1, FTGR2
+	0x0068, 2, 0x20, 0x20,					// ATGR1, ATGR2
+	0x0069, 1, 0x4F,					// MMR1
+	0x006A, 1, 0x00,					// MMR2
+	0x006C, 1, 0x40,					// MMR3
+	0x0021, 1, 0x02,					// INIT
+	0x00A3, 1, 0x40,					// LMR1
 
-static void
-wWordAMD(struct IsdnCardState *cs, u8 reg, u16 val)
+	0xFFFF
+};
+
+
+void /* macro wWordAMD */
+WriteWordAmd7930(struct IsdnCardState *cs, BYTE reg, WORD val)
 {
         wByteAMD(cs, 0x00, reg);
         wByteAMD(cs, 0x01, LOBYTE(val));
         wByteAMD(cs, 0x01, HIBYTE(val));
 }
 
-static u16
-rWordAMD(struct IsdnCardState *cs, u8 reg)
+WORD /* macro rWordAMD */
+ReadWordAmd7930(struct IsdnCardState *cs, BYTE reg)
 {
-        u16 res;
+        WORD res;
         /* direct access register */
         if(reg < 8) {
         	res = rByteAMD(cs, reg);
@@ -112,20 +123,9 @@ rWordAMD(struct IsdnCardState *cs, u8 reg)
 	return (res);
 }
 
-static inline void
-AmdIrqOff(struct IsdnCardState *cs)
-{
-	cs->dc.amd7930.setIrqMask(cs, 0);
-}
-
-static inline void
-AmdIrqOn(struct IsdnCardState *cs)
-{
-	cs->dc.amd7930.setIrqMask(cs, 1);
-}
 
 static void
-Amd7930_ph_command(struct IsdnCardState *cs, u8 command, char *s)
+Amd7930_ph_command(struct IsdnCardState *cs, u_char command, char *s)
 {
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "AMD7930: %s: ph_command 0x%02X", s, command);
@@ -136,7 +136,7 @@ Amd7930_ph_command(struct IsdnCardState *cs, u8 command, char *s)
 
 
 
-static u8 i430States[] = {
+static BYTE i430States[] = {
 // to   reset  F3    F4    F5    F6    F7    F8    AR     from
         0x01, 0x02, 0x00, 0x00, 0x00, 0x07, 0x05, 0x00,   // init
         0x01, 0x02, 0x00, 0x00, 0x00, 0x07, 0x05, 0x00,   // reset
@@ -150,14 +150,14 @@ static u8 i430States[] = {
 
 
 /*                    Row     init    -   reset  F3    F4    F5    F6    F7    F8    AR */
-static u8 stateHelper[] = { 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+static BYTE stateHelper[] = { 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
 
 
 
 
 static void
 Amd7930_get_state(struct IsdnCardState *cs) {
-        u8 lsr = rByteAMD(cs, 0xA1);
+        BYTE lsr = rByteAMD(cs, 0xA1);
         cs->dc.amd7930.ph_state = (lsr & 0x7) + 2;
         Amd7930_new_ph(cs);
 }
@@ -167,8 +167,8 @@ Amd7930_get_state(struct IsdnCardState *cs) {
 static void
 Amd7930_new_ph(struct IsdnCardState *cs)
 {
-        u8 index = stateHelper[cs->dc.amd7930.old_state]*8 + stateHelper[cs->dc.amd7930.ph_state]-1;
-        u8 message = i430States[index];
+        u_char index = stateHelper[cs->dc.amd7930.old_state]*8 + stateHelper[cs->dc.amd7930.ph_state]-1;
+        u_char message = i430States[index];
 
         if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "AMD7930: new_ph %d, old_ph %d, message %d, index %d",
@@ -176,7 +176,7 @@ Amd7930_new_ph(struct IsdnCardState *cs)
 
         cs->dc.amd7930.old_state = cs->dc.amd7930.ph_state;
 
-        /* abort transmit if necessary */
+        /* abort transmit if nessesary */
         if ((message & 0xf0) && (cs->tx_skb)) {
                 wByteAMD(cs, 0x21, 0xC2);
                 wByteAMD(cs, 0x21, 0x02);
@@ -232,9 +232,9 @@ Amd7930_new_ph(struct IsdnCardState *cs)
 
 
 static void
-Amd7930_bh(void *data)
+Amd7930_bh(struct IsdnCardState *cs)
 {
-	struct IsdnCardState *cs = data;
+
         struct PStack *stptr;
 
 	if (!cs)
@@ -244,7 +244,7 @@ Amd7930_bh(void *data)
 			debugl1(cs, "Amd7930: bh, D-Channel Busy cleared");
 		stptr = cs->stlist;
 		while (stptr != NULL) {
-			stptr->l2.l1l2(stptr, PH_PAUSE | CONFIRM, NULL);
+			stptr->l1.l1l2(stptr, PH_PAUSE | CONFIRM, NULL);
 			stptr = stptr->next;
 		}
 	}
@@ -267,13 +267,12 @@ Amd7930_bh(void *data)
         }
 }
 
-
 static void
 Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
 {
 
-        u8 stat, der;
-	u8 *ptr;
+        BYTE stat, der;
+	BYTE *ptr;
 	struct sk_buff *skb;
 
 
@@ -317,7 +316,7 @@ Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
 								QuickHex(t, cs->rcvbuf, cs->rcvidx);
 								debugl1(cs, cs->dlog);
 							}
-                                                        /* moves received data in sk-buffer */
+                                                        /* moves recieved data in sk-buffer */
 							memcpy(skb_put(skb, cs->rcvidx), cs->rcvbuf, cs->rcvidx);
 							skb_queue_tail(&cs->rq, skb);
 						}
@@ -327,10 +326,10 @@ Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
                                 /* throw damaged packets away, reset recieve-buffer, indicate RX */
 				ptr = cs->rcvbuf;
 				cs->rcvidx = 0;
-				sched_d_event(cs, D_RCVBUFREADY);
+				schedule_event(cs, D_RCVBUFREADY);
 			}
                 }
-		/* Packet too long, overflow */
+		/* Packet to long, overflow */
 		if(cs->rcvidx >= MAX_DFRAME_LEN_L1) {
 			if (cs->debug & L1_DEB_WARN)
 			        debugl1(cs, "AMD7930: empty_Dfifo L2-Framelength overrun");
@@ -346,9 +345,9 @@ static void
 Amd7930_fill_Dfifo(struct IsdnCardState *cs)
 {
 
-        u16 dtcrr, dtcrw, len, count;
-        u8 txstat, dmr3;
-        u8 *ptr, *deb_ptr;
+        WORD dtcrr, dtcrw, len, count;
+        BYTE txstat, dmr3;
+        BYTE *ptr, *deb_ptr;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "Amd7930: fill_Dfifo");
@@ -414,10 +413,10 @@ Amd7930_fill_Dfifo(struct IsdnCardState *cs)
 }
 
 
-void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
+void Amd7930_interrupt(struct IsdnCardState *cs, BYTE irflags)
 {
-	u8 dsr1, dsr2, lsr;
-        u16 der;
+	BYTE dsr1, dsr2, lsr;
+        WORD der;
 
  while (irflags)
  {
@@ -443,7 +442,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_d_event(cs, D_CLEARBUSY);
+				schedule_event(cs, D_CLEARBUSY);
                         /* restart frame */
                         if (cs->tx_skb) {
 				skb_push(cs->tx_skb, cs->tx_cnt);
@@ -461,7 +460,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			sched_d_event(cs, D_CLEARBUSY);
+			schedule_event(cs, D_CLEARBUSY);
                 /* restart TX-Frame */
                 if (cs->tx_skb) {
 			skb_push(cs->tx_skb, cs->tx_cnt);
@@ -482,7 +481,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
                 if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			sched_d_event(cs, D_CLEARBUSY);
+			schedule_event(cs, D_CLEARBUSY);
 		if (cs->tx_skb) {
 			if (cs->tx_skb->len)
 				Amd7930_fill_Dfifo(cs);
@@ -511,7 +510,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
                 if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			sched_d_event(cs, D_CLEARBUSY);
+			schedule_event(cs, D_CLEARBUSY);
 
                 if (cs->tx_skb) {
         		if (cs->debug & L1_DEB_ISAC)
@@ -529,7 +528,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 			Amd7930_fill_Dfifo(cs);
 		}
                 else
-			sched_d_event(cs, D_XMTBUFREADY);
+			schedule_event(cs, D_XMTBUFREADY);
 		/* AMD interrupts on */
                 AmdIrqOn(cs);
         }
@@ -544,7 +543,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 
 		cs->dc.amd7930.ph_state = (lsr & 0x7) + 2;
 
-		sched_d_event(cs, D_L1STATECHANGE);
+		schedule_event(cs, D_L1STATECHANGE);
 		/* AMD interrupts on */
                 AmdIrqOn(cs);
 	}
@@ -560,6 +559,7 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 {
         struct IsdnCardState *cs = (struct IsdnCardState *) st->l1.hardware;
 	struct sk_buff *skb = arg;
+	u_long flags;
 
         if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "Amd7930: l1hw called, pr: 0x%04X", pr);
@@ -570,6 +570,7 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 				LogFrame(cs, skb->data, skb->len);
 			if (cs->debug & DEB_DLOG_VERBOSE)
 				dlogframe(cs, skb, 0);
+			spin_lock_irqsave(&cs->lock, flags);
 			if (cs->tx_skb) {
 				skb_queue_tail(&cs->sq, skb);
 #ifdef L2FRAME_DEBUG		/* psa */
@@ -586,8 +587,10 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 #endif
 				Amd7930_fill_Dfifo(cs);
 			}
+			spin_unlock_irqrestore(&cs->lock, flags);
 			break;
 		case (PH_PULL | INDICATION):
+			spin_lock_irqsave(&cs->lock, flags);
 			if (cs->tx_skb) {
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "Amd7930: l1hw: l2l1 tx_skb exist this shouldn't happen");
@@ -606,6 +609,7 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 				Logl2Frame(cs, skb, "Amd7930: l1hw: PH_DATA_PULLED", 0);
 #endif
 			Amd7930_fill_Dfifo(cs);
+			spin_unlock_irqrestore(&cs->lock, flags);
 			break;
 		case (PH_PULL | REQUEST):
 #ifdef L2FRAME_DEBUG		/* psa */
@@ -614,21 +618,23 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 #endif
 			if (!cs->tx_skb) {
 				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l2.l1l2(st, PH_PULL | CONFIRM, NULL);
+				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
 			} else
 				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
 		case (HW_RESET | REQUEST):
-
-                        if ((cs->dc.amd7930.ph_state == 8))
-                                /* b-channels off, PH-AR cleared
-                                 * change to F3 */
-                                Amd7930_ph_command(cs, 0x20, "HW_RESET REQEST"); //LMR1 bit 5
-			else {
-                                Amd7930_ph_command(cs, 0x40, "HW_RESET REQUEST");
-                                cs->dc.amd7930.ph_state = 2;
-                                Amd7930_new_ph(cs);
-                        }
+			spin_lock_irqsave(&cs->lock, flags);
+			if ((cs->dc.amd7930.ph_state == 8)) {
+				/* b-channels off, PH-AR cleared
+				 * change to F3 */
+				Amd7930_ph_command(cs, 0x20, "HW_RESET REQEST"); //LMR1 bit 5
+				spin_unlock_irqrestore(&cs->lock, flags);
+			} else {
+				Amd7930_ph_command(cs, 0x40, "HW_RESET REQUEST");
+				cs->dc.amd7930.ph_state = 2;
+				spin_unlock_irqrestore(&cs->lock, flags);
+				Amd7930_new_ph(cs);
+			}
 			break;
 		case (HW_ENABLE | REQUEST):
                         cs->dc.amd7930.ph_state = 9;
@@ -650,7 +656,7 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_d_event(cs, D_CLEARBUSY);
+				schedule_event(cs, D_CLEARBUSY);
 			break;
 		default:
 			if (cs->debug & L1_DEB_WARN)
@@ -659,7 +665,7 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 	}
 }
 
-static int
+void
 setstack_Amd7930(struct PStack *st, struct IsdnCardState *cs)
 {
 
@@ -667,21 +673,30 @@ setstack_Amd7930(struct PStack *st, struct IsdnCardState *cs)
 		debugl1(cs, "Amd7930: setstack called");
 
         st->l1.l1hw = Amd7930_l1hw;
-	return 0;
 }
+
+
+void
+DC_Close_Amd7930(struct IsdnCardState *cs) {
+        if (cs->debug & L1_DEB_ISAC)
+		debugl1(cs, "Amd7930: DC_Close called");
+}
+
 
 static void
 dbusy_timer_handler(struct IsdnCardState *cs)
 {
+	u_long flags;
 	struct PStack *stptr;
-        u16 dtcr, der;
-        u8 dsr1, dsr2;
+        WORD dtcr, der;
+        BYTE dsr1, dsr2;
 
 
         if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "Amd7930: dbusy_timer expired!");
 
 	if (test_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
+		spin_lock_irqsave(&cs->lock, flags);
                 /* D Transmit Byte Count Register:
                  * Counts down packet's number of Bytes, 0 if packet ready */
                 dtcr = rWordAMD(cs, 0x85);
@@ -689,14 +704,15 @@ dbusy_timer_handler(struct IsdnCardState *cs)
                 dsr2 = rByteAMD(cs, 0x07);
                 der  = rWordAMD(cs, 0x03);
 
-        if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "Amd7930: dbusy_timer_handler: DSR1=0x%02X, DSR2=0x%02X, DER=0x%04X, cs->tx_skb->len=%u, tx_stat=%u, dtcr=%u, cs->tx_cnt=%u", dsr1, dsr2, der, cs->tx_skb->len, cs->dc.amd7930.tx_xmtlen, dtcr, cs->tx_cnt);
+	        if (cs->debug & L1_DEB_ISAC)
+			debugl1(cs, "Amd7930: dbusy_timer_handler: DSR1=0x%02X, DSR2=0x%02X, DER=0x%04X, cs->tx_skb->len=%u, tx_stat=%u, dtcr=%u, cs->tx_cnt=%u", dsr1, dsr2, der, cs->tx_skb->len, cs->dc.amd7930.tx_xmtlen, dtcr, cs->tx_cnt);
 
-		if ((int)(cs->dc.amd7930.tx_xmtlen - dtcr) < cs->tx_cnt) {	/* D-Channel Busy */
+		if ((cs->dc.amd7930.tx_xmtlen - dtcr) < cs->tx_cnt) {	/* D-Channel Busy */
 			test_and_set_bit(FLG_L1_DBUSY, &cs->HW_Flags);
 			stptr = cs->stlist;
+			spin_unlock_irqrestore(&cs->lock, flags);
 			while (stptr != NULL) {
-				stptr->l2.l1l2(stptr, PH_PAUSE | INDICATION, NULL);
+				stptr->l1.l1l2(stptr, PH_PAUSE | INDICATION, NULL);
 				stptr = stptr->next;
 			}
 
@@ -716,7 +732,8 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 			/* Transmitter reset, abort transmit */
 			wByteAMD(cs, 0x21, 0x82);
 			wByteAMD(cs, 0x21, 0x02);
-			cs->card_ops->irq_func(cs->irq, cs, NULL); /* FIXME? */
+			spin_unlock_irqrestore(&cs->lock, flags);
+			cs->irq_func(cs->irq, cs, NULL);
 
                         if (cs->debug & L1_DEB_ISAC)
 				debugl1(cs, "Amd7930: dbusy_timer_handler: Transmitter reset");
@@ -724,59 +741,23 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 	}
 }
 
-static u16 initAMD[] = {
-	0x0100,
 
-	0x00A5, 3, 0x01, 0x40, 0x58,				// LPR, LMR1, LMR2
-	0x0086, 1, 0x0B,					// DMR1 (D-Buffer TH-Interrupts on)
-	0x0087, 1, 0xFF,					// DMR2
-	0x0092, 1, 0x03,					// EFCR (extended mode d-channel-fifo on)
-	0x0090, 4, 0xFE, 0xFF, 0x02, 0x0F,			// FRAR4, SRAR4, DMR3, DMR4 (address recognition )
-	0x0084, 2, 0x80, 0x00,					// DRLR
-	0x00C0, 1, 0x47,					// PPCR1
-	0x00C8, 1, 0x01,					// PPCR2
-
-	0x0102,
-	0x0107,
-	0x01A1, 1,
-	0x0121, 1,
-	0x0189, 2,
-
-	0x0045, 4, 0x61, 0x72, 0x00, 0x00,			// MCR1, MCR2, MCR3, MCR4
-	0x0063, 2, 0x08, 0x08,					// GX
-	0x0064, 2, 0x08, 0x08,					// GR
-	0x0065, 2, 0x99, 0x00,					// GER
-	0x0066, 2, 0x7C, 0x8B,					// STG
-	0x0067, 2, 0x00, 0x00,					// FTGR1, FTGR2
-	0x0068, 2, 0x20, 0x20,					// ATGR1, ATGR2
-	0x0069, 1, 0x4F,					// MMR1
-	0x006A, 1, 0x00,					// MMR2
-	0x006C, 1, 0x40,					// MMR3
-	0x0021, 1, 0x02,					// INIT
-	0x00A3, 1, 0x40,					// LMR1
-
-	0xFFFF};
-
-static struct dc_l1_ops amd7930_l1_ops = {
-	.open       = setstack_Amd7930,
-	.bh_func    = Amd7930_bh,
-	.dbusy_func = dbusy_timer_handler,
-};
 
 void __devinit
 Amd7930_init(struct IsdnCardState *cs)
 {
-	u16 *ptr;
-	u8 cmd, cnt;
+    WORD *ptr;
+    BYTE cmd, cnt;
 
         if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "Amd7930: initamd called");
 
-	dc_l1_init(cs, &amd7930_l1_ops);
         cs->dc.amd7930.tx_xmtlen = 0;
         cs->dc.amd7930.old_state = 0;
         cs->dc.amd7930.lmr1 = 0x40;
         cs->dc.amd7930.ph_command = Amd7930_ph_command;
+	cs->setstack_d = setstack_Amd7930;
+	cs->DC_Close = DC_Close_Amd7930;
 
 	/* AMD Initialisation */
 	for (ptr = initAMD; *ptr != 0xFFFF; ) {
@@ -805,11 +786,11 @@ Amd7930_init(struct IsdnCardState *cs)
 	}
 }
 
-int
-amd7930_setup(struct IsdnCardState *cs, struct dc_hw_ops *amd7930_ops,
-	      void (*set_irq_mask)(struct IsdnCardState *, u8 val))
+void __devinit
+setup_Amd7930(struct IsdnCardState *cs)
 {
-	cs->dc_hw_ops = amd7930_ops;
-        cs->dc.amd7930.setIrqMask = set_irq_mask;
-	return 0;
+        INIT_WORK(&cs->tqueue, (void *)(void *) Amd7930_bh, cs);
+	cs->dbusytimer.function = (void *) dbusy_timer_handler;
+	cs->dbusytimer.data = (long) cs;
+	init_timer(&cs->dbusytimer);
 }

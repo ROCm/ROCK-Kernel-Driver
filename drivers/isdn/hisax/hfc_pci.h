@@ -1,4 +1,4 @@
-/* $Id: hfc_pci.h,v 1.8.6.2 2001/09/23 22:24:48 kai Exp $
+/* $Id: hfc_pci.h,v 1.10.2.2 2004/01/12 22:52:26 keil Exp $
  *
  * specific defines for CCD's HFC 2BDS0 PCI chips
  *
@@ -185,53 +185,51 @@
 typedef struct {
     unsigned short z1;  /* Z1 pointer 16 Bit */
     unsigned short z2;  /* Z2 pointer 16 Bit */
-  } __attribute__((packed)) z_type;
+  } z_type;
 
 typedef struct {
-    u8 data[D_FIFO_SIZE]; /* FIFO data space */
-    u8 fill1[0x20A0-D_FIFO_SIZE]; /* reserved, do not use */
-    u8 f1,f2; /* f pointers */
-    u8 fill2[0x20C0-0x20A2]; /* reserved, do not use */
+    u_char data[D_FIFO_SIZE]; /* FIFO data space */
+    u_char fill1[0x20A0-D_FIFO_SIZE]; /* reserved, do not use */
+    u_char f1,f2; /* f pointers */
+    u_char fill2[0x20C0-0x20A2]; /* reserved, do not use */
     z_type za[MAX_D_FRAMES+1]; /* mask index with D_FREG_MASK for access */
-    u8 fill3[0x4000-0x2100]; /* align 16K */  
-  } __attribute__((packed)) dfifo_type;
+    u_char fill3[0x4000-0x2100]; /* align 16K */  
+  } dfifo_type;
 
 typedef struct {
     z_type za[MAX_B_FRAMES+1]; /* only range 0x0..0x1F allowed */ 
-    u8 f1,f2; /* f pointers */
-    u8 fill[0x2100-0x2082]; /* alignment */
-  } __attribute__((packed)) bzfifo_type;
+    u_char f1,f2; /* f pointers */
+    u_char fill[0x2100-0x2082]; /* alignment */
+  } bzfifo_type;
 
 
 typedef union {
     struct { 
       dfifo_type d_tx; /* D-send channel */
       dfifo_type d_rx; /* D-receive channel */
-    } __attribute__((packed)) d_chan; 
+    } d_chan; 
     struct {
-      u8 fill1[0x200];
-      u8 txdat_b1[B_FIFO_SIZE];
+      u_char fill1[0x200];
+      u_char txdat_b1[B_FIFO_SIZE];
       bzfifo_type txbz_b1;
 
       bzfifo_type txbz_b2;
-      u8 txdat_b2[B_FIFO_SIZE];
+      u_char txdat_b2[B_FIFO_SIZE];
 
-      u8 fill2[D_FIFO_SIZE];
+      u_char fill2[D_FIFO_SIZE];
 
-      u8 rxdat_b1[B_FIFO_SIZE];
+      u_char rxdat_b1[B_FIFO_SIZE];
       bzfifo_type rxbz_b1;
 
       bzfifo_type rxbz_b2;
-      u8 rxdat_b2[B_FIFO_SIZE];
-    } __attribute__((packed)) b_chans;  
-    u8 fill[32768]; 
-  } __attribute__((packed)) fifo_area;
+      u_char rxdat_b2[B_FIFO_SIZE];
+    } b_chans;  
+    u_char fill[32768]; 
+  } fifo_area;
 
 
-//#define Write_hfc(a,b,c) (*(((u8 *)a->hw.hfcpci.pci_io)+b) = c) 
-//#define Read_hfc(a,b) (*(((u8 *)a->hw.hfcpci.pci_io)+b))
-#define Write_hfc(a,b,c)	writeb(c, ((u8 *)a->hw.hfcpci.pci_io)+b)
-#define Read_hfc(a,b)		readb(((u8 *)a->hw.hfcpci.pci_io)+b)
+#define Write_hfc(a,b,c) (*(((u_char *)a->hw.hfcpci.pci_io)+b) = c) 
+#define Read_hfc(a,b) (*(((u_char *)a->hw.hfcpci.pci_io)+b))
 
 extern void main_irq_hcpci(struct BCState *bcs);
 extern void inithfcpci(struct IsdnCardState *cs);

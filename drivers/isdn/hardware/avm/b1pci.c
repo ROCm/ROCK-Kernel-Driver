@@ -1,4 +1,4 @@
-/* $Id: b1pci.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
+/* $Id: b1pci.c,v 1.1.2.2 2004/01/16 21:09:27 keil Exp $
  * 
  * Module for AVM B1 PCI-card.
  * 
@@ -25,6 +25,10 @@
 #include <linux/isdn/capiutil.h>
 #include <linux/isdn/capilli.h>
 #include "avmcard.h"
+
+/* ------------------------------------------------------------- */
+
+static char *revision = "$Revision: 1.1.2.2 $";
 
 /* ------------------------------------------------------------- */
 
@@ -362,13 +366,50 @@ static struct pci_driver b1pci_pci_driver = {
 	.remove		= __devexit_p(b1pci_pci_remove),
 };
 
+static struct capi_driver capi_driver_b1pci = {
+	.name		= "b1pci",
+	.revision	= "1.0",
+};
+#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
+static struct capi_driver capi_driver_b1pciv4 = {
+	.name		= "b1pciv4",
+	.revision	= "1.0",
+};
+#endif
+
 static int __init b1pci_init(void)
 {
-	return pci_module_init(&b1pci_pci_driver);
+	char *p;
+	char rev[32];
+	int err;
+
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strlcpy(rev, p + 2, 32);
+		if ((p = strchr(rev, '$')) != 0 && p > rev)
+		   *(p-1) = 0;
+	} else
+		strcpy(rev, "1.0");
+
+
+	err = pci_module_init(&b1pci_pci_driver);
+	if (!err) {
+		strlcpy(capi_driver_b1pci.revision, rev, 32);
+		register_capi_driver(&capi_driver_b1pci);
+#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
+		strlcpy(capi_driver_b1pciv4.revision, rev, 32);
+		register_capi_driver(&capi_driver_b1pciv4);
+#endif
+		printk(KERN_INFO "b1pci: revision %s\n", rev);
+	}
+	return err;
 }
 
 static void __exit b1pci_exit(void)
 {
+	unregister_capi_driver(&capi_driver_b1pci);
+#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
+	unregister_capi_driver(&capi_driver_b1pciv4);
+#endif
 	pci_unregister_driver(&b1pci_pci_driver);
 }
 

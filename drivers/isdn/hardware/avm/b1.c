@@ -1,4 +1,4 @@
-/* $Id: b1.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
+/* $Id: b1.c,v 1.1.2.2 2004/01/16 21:09:27 keil Exp $
  * 
  * Common module for AVM B1 cards.
  * 
@@ -28,7 +28,7 @@
 #include <linux/isdn/capicmd.h>
 #include <linux/isdn/capiutil.h>
 
-static char *revision = "$Revision: 1.1.4.1.2.1 $";
+static char *revision = "$Revision: 1.1.2.2 $";
 
 /* ------------------------------------------------------------- */
 
@@ -76,7 +76,7 @@ avmcard *b1_alloc_card(int nr_controllers)
 		kfree(card);
 		return 0;
 	}
-	memset(cinfo, 0, sizeof(*cinfo));
+	memset(cinfo, 0, sizeof(*cinfo) * nr_controllers);
 
 	card->ctrlinfo = cinfo;
 	for (i = 0; i < nr_controllers; i++) {
@@ -308,14 +308,13 @@ int b1_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 		return -EIO;
 	}
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&card->lock, flags);
 	b1_setinterrupt(port, card->irq, card->cardtype);
 	b1_put_byte(port, SEND_INIT);
 	b1_put_word(port, CAPI_MAXAPPL);
 	b1_put_word(port, AVM_NCCI_PER_CHANNEL*2);
 	b1_put_word(port, ctrl->cnr - 1);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock, flags);
 
 	return 0;
 }
@@ -348,15 +347,14 @@ void b1_register_appl(struct capi_ctr *ctrl,
 	else nconn = ctrl->profile.nbchannel * -want;
 	if (nconn == 0) nconn = ctrl->profile.nbchannel;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&card->lock, flags);
 	b1_put_byte(port, SEND_REGISTER);
 	b1_put_word(port, appl);
 	b1_put_word(port, 1024 * (nconn+1));
 	b1_put_word(port, nconn);
 	b1_put_word(port, rp->datablkcnt);
 	b1_put_word(port, rp->datablklen);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 void b1_release_appl(struct capi_ctr *ctrl, u16 appl)
@@ -368,11 +366,10 @@ void b1_release_appl(struct capi_ctr *ctrl, u16 appl)
 
 	capilib_release_appl(&cinfo->ncci_head, appl);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&card->lock, flags);
 	b1_put_byte(port, SEND_RELEASE);
 	b1_put_word(port, appl);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 u16 b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
@@ -396,20 +393,18 @@ u16 b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 
 		dlen = CAPIMSG_DATALEN(skb->data);
 
-		save_flags(flags);
-		cli();
+	 	spin_lock_irqsave(&card->lock, flags);
 		b1_put_byte(port, SEND_DATA_B3_REQ);
 		b1_put_slice(port, skb->data, len);
 		b1_put_slice(port, skb->data + len, dlen);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&card->lock, flags);
 	} else {
 		retval = CAPI_NOERROR;
 
-		save_flags(flags);
-		cli();
+	 	spin_lock_irqsave(&card->lock, flags);
 		b1_put_byte(port, SEND_MESSAGE);
 		b1_put_slice(port, skb->data, len);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&card->lock, flags);
 	}
  out:
 	dev_kfree_skb_any(skb);
@@ -505,9 +500,14 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 	unsigned DataB3Len;
 	unsigned NCCI;
 	unsigned WindowSize;
+	unsigned long flags;
 
-	if (!b1_rx_full(card->port))
-	   return IRQ_NONE;
+	spin_lock_irqsave(&card->lock, flags);
+
+	if (!b1_rx_full(card->port)) {
+		spin_unlock_irqrestore(&card->lock, flags);
+		return IRQ_NONE;
+	}
 
 	b1cmd = b1_get_byte(card->port);
 
@@ -518,6 +518,7 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		ApplId = (unsigned) b1_get_word(card->port);
 		MsgLen = b1_get_slice(card->port, card->msgbuf);
 		DataB3Len = b1_get_slice(card->port, card->databuf);
+		spin_unlock_irqrestore(&card->lock, flags);
 
 		if (MsgLen < 30) { /* not CAPI 64Bit */
 			memset(card->msgbuf+MsgLen, 0, 30-MsgLen);
@@ -538,6 +539,7 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 		ApplId = (unsigned) b1_get_word(card->port);
 		MsgLen = b1_get_slice(card->port, card->msgbuf);
+		spin_unlock_irqrestore(&card->lock, flags);
 		if (!(skb = alloc_skb(MsgLen, GFP_ATOMIC))) {
 			printk(KERN_ERR "%s: incoming packet dropped\n",
 					card->name);
@@ -557,6 +559,7 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		ApplId = b1_get_word(card->port);
 		NCCI = b1_get_word(card->port);
 		WindowSize = b1_get_word(card->port);
+		spin_unlock_irqrestore(&card->lock, flags);
 
 		capilib_new_ncci(&cinfo->ncci_head, ApplId, NCCI, WindowSize);
 
@@ -566,6 +569,7 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 		ApplId = b1_get_word(card->port);
 		NCCI = b1_get_word(card->port);
+		spin_unlock_irqrestore(&card->lock, flags);
 
 		if (NCCI != 0xffffffff)
 			capilib_free_ncci(&cinfo->ncci_head, ApplId, NCCI);
@@ -574,16 +578,19 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 	case RECEIVE_START:
 	   	/* b1_put_byte(card->port, SEND_POLLACK); */
+		spin_unlock_irqrestore(&card->lock, flags);
 		capi_ctr_resume_output(ctrl);
 		break;
 
 	case RECEIVE_STOP:
+		spin_unlock_irqrestore(&card->lock, flags);
 		capi_ctr_suspend_output(ctrl);
 		break;
 
 	case RECEIVE_INIT:
 
 		cinfo->versionlen = b1_get_slice(card->port, cinfo->versionbuf);
+		spin_unlock_irqrestore(&card->lock, flags);
 		b1_parse_version(cinfo);
 		printk(KERN_INFO "%s: %s-card (%s) now active\n",
 		       card->name,
@@ -595,6 +602,7 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 	case RECEIVE_TASK_READY:
 		ApplId = (unsigned) b1_get_word(card->port);
 		MsgLen = b1_get_slice(card->port, card->msgbuf);
+		spin_unlock_irqrestore(&card->lock, flags);
 		card->msgbuf[MsgLen] = 0;
 		while (    MsgLen > 0
 		       && (   card->msgbuf[MsgLen-1] == '\n'
@@ -608,6 +616,7 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 	case RECEIVE_DEBUGMSG:
 		MsgLen = b1_get_slice(card->port, card->msgbuf);
+		spin_unlock_irqrestore(&card->lock, flags);
 		card->msgbuf[MsgLen] = 0;
 		while (    MsgLen > 0
 		       && (   card->msgbuf[MsgLen-1] == '\n'
@@ -619,9 +628,11 @@ irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		break;
 
 	case 0xff:
+		spin_unlock_irqrestore(&card->lock, flags);
 		printk(KERN_ERR "%s: card removed ?\n", card->name);
 		return IRQ_NONE;
 	default:
+		spin_unlock_irqrestore(&card->lock, flags);
 		printk(KERN_ERR "%s: b1_interrupt: 0x%x ???\n",
 				card->name, b1cmd);
 		return IRQ_HANDLED;

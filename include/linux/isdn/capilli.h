@@ -1,4 +1,4 @@
-/* $Id: capilli.h,v 1.4.8.1 2001/09/23 22:24:33 kai Exp $
+/* $Id: capilli.h,v 1.1.2.2 2004/01/16 21:09:27 keil Exp $
  * 
  * Kernel CAPI 2.0 Driver Interface for Linux
  * 
@@ -83,6 +83,22 @@ void capi_ctr_reseted(struct capi_ctr * card);
 void capi_ctr_suspend_output(struct capi_ctr * card);
 void capi_ctr_resume_output(struct capi_ctr * card);
 void capi_ctr_handle_message(struct capi_ctr * card, u16 appl, struct sk_buff *skb);
+
+// ---------------------------------------------------------------------------
+// needed for AVM capi drivers
+
+struct capi_driver {
+	char name[32];				/* driver name */
+	char revision[32];
+
+	int (*add_card)(struct capi_driver *driver, capicardparams *data);
+
+	/* management information for kcapi */
+	struct list_head list; 
+};
+
+void register_capi_driver(struct capi_driver *driver);
+void unregister_capi_driver(struct capi_driver *driver);
 
 // ---------------------------------------------------------------------------
 // library functions for use by hardware controller drivers

@@ -4,8 +4,8 @@
 
 menu "ISDN subsystem"
 
-config ISDN_BOOL
-	bool "ISDN support"
+config ISDN
+	tristate "ISDN support"
 	depends on NET
 	---help---
 	  ISDN ("Integrated Services Digital Networks", called RNIS in France)
@@ -22,9 +22,9 @@ config ISDN_BOOL
 
 
 menu "Old ISDN4Linux"
-	depends on NET && ISDN_BOOL && BROKEN_ON_SMP
+	depends on NET && ISDN
 
-config ISDN
+config ISDN_I4L
 	tristate "Old ISDN4Linux (obsolete)"
 	---help---
 	  This driver allows you to use an ISDN-card for networking
@@ -41,18 +41,18 @@ config ISDN
 	  Therefore the old ISDN4Linux layer is becoming obsolete. It is 
 	  still usable, though, if you select this option.
 
-if ISDN
+if ISDN_I4L
 source "drivers/isdn/i4l/Kconfig"
 endif
 
 endmenu
 
 comment "CAPI subsystem"
-	depends on NET && ISDN_BOOL
+	depends on NET && ISDN
 
 config ISDN_CAPI
 	tristate "CAPI2.0 support"
-	depends on ISDN_BOOL
+	depends on ISDN
 	help
 	  This provides the CAPI (Common ISDN Application Programming
 	  Interface, a standard making it easy for programs to access ISDN

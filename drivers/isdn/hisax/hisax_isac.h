@@ -17,26 +17,26 @@ struct isac {
 	struct hisax_d_if hisax_d_if;
 	struct FsmInst l1m;
 	struct FsmTimer timer;
-	u8 mocr;
-	u8 adf2;
+	u_char mocr;
+	u_char adf2;
 	int    type;
 
-	u8 rcvbuf[MAX_DFRAME_LEN_L1];
+	u_char rcvbuf[MAX_DFRAME_LEN_L1];
 	int rcvidx;
 
 	struct sk_buff *tx_skb;
 	int tx_cnt;
 
-	u8 (*read_isac)      (struct isac *, u8);
-	void   (*write_isac)     (struct isac *, u8, u8);
-	void   (*read_isac_fifo) (struct isac *, u8 *, int);
-	void   (*write_isac_fifo)(struct isac *, u8 *, int);
+	u_char (*read_isac)      (struct isac *, u_char);
+	void   (*write_isac)     (struct isac *, u_char, u_char);
+	void   (*read_isac_fifo) (struct isac *, u_char *, int);
+	void   (*write_isac_fifo)(struct isac *, u_char *, int);
 };
 
 void isac_init(struct isac *isac);
 void isac_d_l2l1(struct hisax_if *hisax_d_if, int pr, void *arg);
 
-void hisax_isac_setup(struct isac *isac);
+void isac_setup(struct isac *isac);
 void isac_irq(struct isac *isac);
 
 void isacsx_setup(struct isac *isac);
