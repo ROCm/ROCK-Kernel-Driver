@@ -32,9 +32,6 @@
 
 #include <asm/io.h>
 
-#ifdef CONFIG_MTRR
-#include <asm/mtrr.h>
-#endif // CONFIG_MTRR
 
 static int dpt;
 
