@@ -546,6 +546,7 @@ EXPORT_SYMBOL(eeh_check_failure);
 struct eeh_early_enable_info {
 	unsigned int buid_hi;
 	unsigned int buid_lo;
+	int force_off;
 };
 
 /* Enable eeh for the given device node. */
@@ -559,6 +560,8 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 	u32 *device_id = (u32 *)get_property(dn, "device-id", 0);
 	u32 *regs;
 	int enable;
+
+	dn->eeh_mode = 0;
 
 	if (status && strcmp(status, "ok") != 0)
 		return NULL;	/* ignore devices with bad status */
@@ -589,14 +592,13 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 				   enable)) {
 		if (enable) {
 			printk(KERN_WARNING "EEH: %s user requested to run "
-			       "without EEH.\n", dn->full_name);
+			       "without EEH checking.\n", dn->full_name);
 			enable = 0;
 		}
 	}
 
-	if (!enable) {
-		dn->eeh_mode = EEH_MODE_NOCHECK;
-		return NULL;
+	if (!enable || info->force_off) {
+		dn->eeh_mode |= EEH_MODE_NOCHECK;
 	}
 
 	/* This device may already have an EEH parent. */
@@ -640,14 +642,13 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
  * As a side effect we can determine here if eeh is supported at all.
  * Note that we leave EEH on so failed config cycles won't cause a machine
  * check.  If a user turns off EEH for a particular adapter they are really
- * telling Linux to ignore errors.
+ * telling Linux to ignore errors.  Some hardware (e.g. POWER5) won't 
+ * grant access to a slot if EEH isn't enabled, and so we always enable EEH
+ * for all slots/all devices.
  *
- * We should probably distinguish between "ignore errors" and "turn EEH off"
- * but for now disabling EEH for adapters is mostly to work around drivers that
- * directly access mmio space (without using the macros).
- *
- * The eeh-force-off option does literally what it says, so if Linux must
- * avoid enabling EEH this must be done.
+ * The eeh-force-off option disables EEH checking globally, for all slots.
+ * Even if force-off is set, the EEH hardware is still enabled, so that 
+ * newer systems can boot.
  */
 void __init eeh_init(void)
 {
@@ -661,6 +662,14 @@ void __init eeh_init(void)
 		printk(KERN_WARNING "EEH: RTAS not found !\n");
 		return;
 	}
+	
+	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
+	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
+	ibm_read_slot_reset_state = rtas_token("ibm,read-slot-reset-state");
+
+	if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE)
+		return;
+	
 	prop = (u32 *)get_property(np, "rtas-error-log-max", NULL);
 	if (prop == NULL) {
 		printk(KERN_WARNING "EEH: Can't fint rtas-error-log-max !\n");
@@ -673,17 +682,11 @@ void __init eeh_init(void)
 		eeh_error_buf_size = RTAS_ERROR_LOG_MAX;
 	}
 
-	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
-	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
-	ibm_read_slot_reset_state = rtas_token("ibm,read-slot-reset-state");
-
-	if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE)
-		return;
-
+	info.force_off = 0;
 	if (eeh_force_off) {
 		printk(KERN_WARNING "EEH: WARNING: PCI Enhanced I/O Error "
 		       "Handling is user disabled\n");
-		return;
+		info.force_off = 1;
 	}
 
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
