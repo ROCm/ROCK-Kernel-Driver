@@ -107,7 +107,7 @@ static int __init parse_numa_properties(void)
 	}
 
 	for (; memory; memory = of_find_node_by_type(memory, "memory")) {
-		int *tmp1, *tmp2;
+		unsigned int *tmp1, *tmp2;
 		unsigned long i;
 		unsigned long start = 0;
 		unsigned long size = 0;
