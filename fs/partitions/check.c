@@ -355,7 +355,6 @@ static struct attribute * default_attrs[] = {
 extern struct subsystem block_subsys;
 
 static struct subsystem part_subsys = {
-	.kobj	= { .name = "part" },
 	.parent		= &block_subsys,
 	.default_attrs	= default_attrs,
 	.sysfs_ops	= &part_sysfs_ops,

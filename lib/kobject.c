@@ -5,6 +5,7 @@
 #define DEBUG 0
 
 #include <linux/kobject.h>
+#include <linux/string.h>
 #include <linux/module.h>
 #include <linux/stat.h>
 
@@ -76,11 +77,13 @@ int kobject_register(struct kobject * kobj)
 		}
 		up_write(&s->rwsem);
 	}
-	error = sysfs_create_dir(kobj);
-	if (!error) {
-		error = kobject_populate_dir(kobj);
-		if (error)
-			sysfs_remove_dir(kobj);
+	if (strlen(kobj->name)) {
+		error = sysfs_create_dir(kobj);
+		if (!error) {
+			error = kobject_populate_dir(kobj);
+			if (error)
+				sysfs_remove_dir(kobj);
+		}
 	}
 	return error;
 }
