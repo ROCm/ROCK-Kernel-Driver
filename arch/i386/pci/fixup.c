@@ -214,7 +214,11 @@ static void __devinit pci_fixup_nforce2(struct pci_dev *dev)
 	fixed_val = rev < 0xC1 ? 0x1F01FF01 : 0x9F01FF01;
 
 	pci_read_config_dword(dev, 0x6c, &val);
-	if (val != fixed_val) {
+ 	/*
+ 	 * Apply fixup only if C1 Halt Disconnect is enabled
+ 	 * (bit28) because it is not supported on some boards.
+ 	 */
+	if ((val & (1 << 28)) && val != fixed_val) {
 		printk(KERN_WARNING "PCI: nForce2 C1 Halt Disconnet fixup\n");
 		pci_write_config_dword(dev, 0x6c, fixed_val);
 	}
