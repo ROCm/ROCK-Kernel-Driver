@@ -1352,12 +1352,10 @@ asmlinkage int sys32_lseek(unsigned int fd, int offset, unsigned int origin)
 	return sys_lseek(fd, offset, origin);
 }
 
-asmlinkage long sys32_semctl_broken(int semid, int semnum, int cmd, union semun arg)
+asmlinkage long sys32_semctl(int semid, int semnum, int cmd, union semun arg)
 {
         union semun u;
 	
-	cmd &= ~IPC_64; /* should be removed together with the _broken suffix */
-
         if (cmd == SETVAL) {
                 /* Ugh.  arg is a union of int,ptr,ptr,ptr, so is 8 bytes.
                  * The int should be in the first 4, but our argument

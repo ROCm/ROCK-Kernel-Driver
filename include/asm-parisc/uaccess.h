@@ -40,10 +40,10 @@ extern int __put_user_bad(void);
 #define get_user __get_user
 
 #if BITS_PER_LONG == 32
-#define LDD_KERNEL(ptr) __get_kernel_bad();
-#define LDD_USER(ptr) __get_user_bad();
-#define STD_KERNEL(x, ptr) __put_kernel_asm64((u32)x,ptr)
-#define STD_USER(x, ptr) __put_user_asm64((u32)x,ptr)
+#define LDD_KERNEL(ptr)		__get_kernel_bad();
+#define LDD_USER(ptr)		__get_user_bad();
+#define STD_KERNEL(x, ptr)	__put_kernel_asm64(x,ptr)
+#define STD_USER(x, ptr)	__put_user_asm64(x,ptr)
 #else
 #define LDD_KERNEL(ptr) __get_kernel_asm("ldd",ptr)
 #define LDD_USER(ptr) __get_user_asm("ldd",ptr)
@@ -256,11 +256,12 @@ static inline void __put_user_asm64(u64 x, void *ptr)
  * Complex access routines -- external declarations
  */
 
-extern unsigned long lcopy_to_user(void *, const void *, unsigned long);
-extern unsigned long lcopy_from_user(void *, const void *, unsigned long);
-extern long lstrncpy_from_user(char *, const char *, long);
-extern unsigned lclear_user(void *,unsigned long);
-extern long lstrnlen_user(const char *,long);
+extern unsigned long lcopy_to_user(void __user *, const void *, unsigned long);
+extern unsigned long lcopy_from_user(void *, const void __user *, unsigned long);
+extern unsigned long lcopy_in_user(void __user *, const void __user *, unsigned long);
+extern long lstrncpy_from_user(char *, const char __user *, long);
+extern unsigned lclear_user(void __user *,unsigned long);
+extern long lstrnlen_user(const char __user *,long);
 
 /*
  * Complex access routines -- macros
@@ -276,5 +277,7 @@ extern long lstrnlen_user(const char *,long);
 #define __copy_from_user lcopy_from_user
 #define copy_to_user lcopy_to_user
 #define __copy_to_user lcopy_to_user
+#define copy_in_user lcopy_in_user
+#define __copy_in_user lcopy_in_user
 
 #endif /* __PARISC_UACCESS_H */

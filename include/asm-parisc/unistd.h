@@ -490,7 +490,7 @@
  */
 
 #define __NR_Linux                0
-#define __NR_syscall              (__NR_Linux + 0)
+#define __NR_restart_syscall      (__NR_Linux + 0)
 #define __NR_exit                 (__NR_Linux + 1)
 #define __NR_fork                 (__NR_Linux + 2)
 #define __NR_read                 (__NR_Linux + 3)

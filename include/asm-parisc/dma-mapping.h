@@ -5,9 +5,7 @@
 #include <linux/config.h>
 #include <asm/cacheflush.h>
 
-/*
-** See Documentation/DMA-mapping.txt
-*/
+/* See Documentation/DMA-mapping.txt */
 struct hppa_dma_ops {
 	int  (*dma_supported)(struct device *dev, u64 mask);
 	void *(*alloc_consistent)(struct device *dev, size_t size, dma_addr_t *iova, int flag);
@@ -208,15 +206,13 @@ int ccio_request_resource(const struct parisc_device *dev,
 		struct resource *res);
 int ccio_allocate_resource(const struct parisc_device *dev,
 		struct resource *res, unsigned long size,
-		unsigned long min, unsigned long max, unsigned long align,
-		void (*alignf)(void *, struct resource *, unsigned long, unsigned long),
-		void *alignf_data);
+		unsigned long min, unsigned long max, unsigned long align);
 #else /* !CONFIG_IOMMU_CCIO */
 #define ccio_get_iommu(dev) NULL
 #define ccio_request_resource(dev, res) request_resource(&iomem_resource, res)
-#define ccio_allocate_resource(dev, res, size, min, max, align, alignf, data) \
+#define ccio_allocate_resource(dev, res, size, min, max, align) \
 		allocate_resource(&iomem_resource, res, size, min, max, \
-				align, alignf, data)
+				align, NULL, NULL)
 #endif /* !CONFIG_IOMMU_CCIO */
 
 #ifdef CONFIG_IOMMU_SBA
