@@ -2182,10 +2182,7 @@ static void show_task(task_t * p)
 	else
 		printk(" (NOTLB)\n");
 
-	{
-		extern void show_trace_task(task_t *tsk);
-		show_trace_task(p);
-	}
+	show_stack(p, NULL);
 }
 
 void show_state(void)

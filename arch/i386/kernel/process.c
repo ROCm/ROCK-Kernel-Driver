@@ -190,7 +190,7 @@ void show_regs(struct pt_regs * regs)
 		".previous			\n"
 		: "=r" (cr4): "0" (0));
 	printk("CR0: %08lx CR2: %08lx CR3: %08lx CR4: %08lx\n", cr0, cr2, cr3, cr4);
-	show_trace(&regs->esp);
+	show_trace(NULL, &regs->esp);
 }
 
 /*

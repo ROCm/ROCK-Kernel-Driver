@@ -32,9 +32,9 @@
 
 #ifdef CONFIG_MCA
 #include <linux/mca.h>
-#include <asm/processor.h>
 #endif
 
+#include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -92,7 +92,7 @@ asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
 
-void show_trace(unsigned long * stack)
+void show_trace(struct task_struct *task, unsigned long * stack)
 {
 	int i;
 	unsigned long addr;
@@ -122,10 +122,10 @@ void show_trace_task(struct task_struct *tsk)
 	/* User space on another CPU? */
 	if ((esp ^ (unsigned long)tsk->thread_info) & (PAGE_MASK<<1))
 		return;
-	show_trace((unsigned long *)esp);
+	show_trace(tsk, (unsigned long *)esp);
 }
 
-void show_stack(unsigned long * esp)
+void show_stack(struct task_struct *task, unsigned long * esp)
 {
 	unsigned long *stack;
 	int i;
@@ -145,7 +145,7 @@ void show_stack(unsigned long * esp)
 		printk("%08lx ", *stack++);
 	}
 	printk("\n");
-	show_trace(esp);
+	show_trace(task, esp);
 }
 
 /*
@@ -155,7 +155,7 @@ void dump_stack(void)
 {
 	unsigned long stack;
 
-	show_trace(&stack);
+	show_trace(current, &stack);
 }
 
 void show_registers(struct pt_regs *regs)
@@ -192,7 +192,7 @@ void show_registers(struct pt_regs *regs)
 	if (in_kernel) {
 
 		printk("\nStack: ");
-		show_stack((unsigned long*)esp);
+		show_stack(NULL, (unsigned long*)esp);
 
 		printk("Code: ");
 		if(regs->eip < PAGE_OFFSET)

@@ -148,9 +148,14 @@ extern void sched_init(void);
 extern void init_idle(task_t *idle, int cpu);
 
 extern void show_state(void);
-extern void show_trace(unsigned long *stack);
-extern void show_stack(unsigned long *stack);
 extern void show_regs(struct pt_regs *);
+
+/*
+ * TASK is a pointer to the task whose backtrace we want to see (or NULL for current
+ * task), SP is the stack pointer of the first frame that should be shown in the back
+ * trace (or NULL if the entire call-chain of the task should be shown).
+ */
+extern void show_stack(struct task_struct *task, unsigned long *sp);
 
 void io_schedule(void);
 long io_schedule_timeout(long timeout);
