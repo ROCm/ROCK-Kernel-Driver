@@ -540,12 +540,23 @@ static int blockDecrypt_CBC(fish2_key *key,BYTE *src,BYTE *dst,int len)
 }
 
 
-int transfer_fish2(struct loop_device *lo, int cmd, char *raw_buf,
-                  char *loop_buf, int size, sector_t real_block)
-{ if (cmd == READ)
+int transfer_fish2(struct loop_device *lo, int cmd,
+		    struct page *raw_page, unsigned raw_off,
+		    struct page *loop_page, unsigned loop_off,
+		    int size, sector_t IV)
+{
+  char *raw_buf = kmap_atomic(raw_page, KM_USER0) + raw_off;
+  char *loop_buf = kmap_atomic(loop_page, KM_USER1) + loop_off;
+
+  if (cmd == READ)
     blockDecrypt_CBC((fish2_key *)lo->key_data,raw_buf,loop_buf,size);
   else
     blockEncrypt_CBC((fish2_key *)lo->key_data,loop_buf,raw_buf,size);
+
+  kunmap_atomic(raw_buf, KM_USER0);
+  kunmap_atomic(loop_buf, KM_USER1);
+  cond_resched();
+
   return 0;
 }
 
