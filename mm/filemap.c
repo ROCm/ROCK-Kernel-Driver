@@ -122,11 +122,11 @@ static inline int sync_page(struct page *page)
  * if a dirty page/buffer is encountered, it must be waited upon, and not just
  * skipped over.
  */
-int filemap_fdatawrite(struct address_space *mapping)
+static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
 {
 	int ret;
 	struct writeback_control wbc = {
-		.sync_mode = WB_SYNC_ALL,
+		.sync_mode = sync_mode,
 		.nr_to_write = mapping->nrpages * 2,
 	};
 
@@ -138,6 +138,20 @@ int filemap_fdatawrite(struct address_space *mapping)
 	write_unlock(&mapping->page_lock);
 	ret = do_writepages(mapping, &wbc);
 	return ret;
+}
+
+int filemap_fdatawrite(struct address_space *mapping)
+{
+	return __filemap_fdatawrite(mapping, WB_SYNC_ALL);
+}
+
+/*
+ * This is a mostly non-blocking flush.  Not suitable for data-integrity
+ * purposes.
+ */
+int filemap_flush(struct address_space *mapping)
+{
+	return __filemap_fdatawrite(mapping, WB_SYNC_NONE);
 }
 
 /**
