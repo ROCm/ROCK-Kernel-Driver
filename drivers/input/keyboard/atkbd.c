@@ -380,30 +380,39 @@ static int atkbd_probe(struct atkbd *atkbd)
 			printk(KERN_WARNING "atkbd.c: keyboard reset failed\n");
 
 /*
- * Next we check we can set LEDs on the keyboard. This should work on every
- * keyboard out there. It also turns the LEDs off, which we want anyway.
- */
-
-	param[0] = 0;
-	if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
-		return -1;
-
-/*
  * Then we check the keyboard ID. We should get 0xab83 under normal conditions.
  * Some keyboards report different values, but the first byte is always 0xab or
  * 0xac. Some old AT keyboards don't report anything.
  */
 
 	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID)) {
+
+/*
+ * If the get ID command failed, we check if we can at least set the LEDs on
+ * the keyboard. This should work on every keyboard out there. It also turns
+ * the LEDs off, which we want anyway.
+ */
+		param[0] = 0;
+		if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
+			return -1;
 		atkbd->id = 0xabba;
 		return 0;
 	}
+
 	if (param[0] != 0xab && param[0] != 0xac)
 		return -1;
 	atkbd->id = param[0] << 8;
 	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID2))
 		return -1;
 	atkbd->id |= param[0];
+
+/*
+ * Set the LEDs to a defined state.
+ */
+
+	param[0] = 0;
+	if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
+		return -1;
 
 /*
  * Disable autorepeat. We don't need it, as we do it in software anyway,

@@ -2,11 +2,7 @@
  * $Id: rpckbd.c,v 1.7 2001/09/25 10:12:07 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
- *
- *  Based on the work of:
- *	Russell King
- *
- * Fixes by Russell King.
+ *  Copyright (c) 2002 Russell King
  */
 
 /*
@@ -44,7 +40,7 @@
 #include <asm/hardware/iomd.h>
 #include <asm/system.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_AUTHOR("Vojtech Pavlik, Russell King");
 MODULE_DESCRIPTION("Acorn RiscPC PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 

@@ -3,6 +3,7 @@
 #
 config INPUT_MOUSE
 	bool "Mice"
+	default y
 	depends on INPUT
 	help
 	  Say Y here, and a list of supported mice will be displayed.
@@ -12,6 +13,7 @@ config INPUT_MOUSE
 
 config MOUSE_PS2
 	tristate "PS/2 mouse"
+	default y
 	depends on INPUT && INPUT_MOUSE && SERIO
 	---help---
 	  Say Y here if you have a PS/2 mouse connected to your system. This
