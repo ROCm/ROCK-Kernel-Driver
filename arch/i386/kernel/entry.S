@@ -274,9 +274,9 @@ ENTRY(sysenter_entry)
 	movl TI_FLAGS(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx
 	jne syscall_exit_work
-	RESTORE_INT_REGS
-	movl 12(%esp),%edx
-	movl 24(%esp),%ecx
+/* if something modifies registers it must also disable sysexit */
+	movl EIP(%esp), %edx
+	movl OLDESP(%esp), %ecx
 	sti
 	sysexit
 
