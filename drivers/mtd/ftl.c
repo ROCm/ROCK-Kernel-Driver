@@ -155,8 +155,8 @@ static void ftl_notify_remove(struct mtd_info *mtd);
 void ftl_freepart(partition_t *part);
 
 static struct mtd_notifier ftl_notifier = {
-	add:	ftl_notify_add,
-	remove:	ftl_notify_remove,
+	.add	= ftl_notify_add,
+	.remove	= ftl_notify_remove,
 };
 
 /* Partition state flags */
