@@ -15,16 +15,11 @@
 #include <linux/if_arp.h>
 #include <linux/if_tr.h>
 #include <linux/rtnetlink.h>
-#include <net/llc_if.h>
 #include <net/llc_mac.h>
 #include <net/llc_pdu.h>
 #include <net/llc_sap.h>
-#include <net/llc_conn.h>
-#include <net/sock.h>
 #include <net/llc_main.h>
 #include <net/llc_evnt.h>
-#include <net/llc_c_ev.h>
-#include <net/llc_s_ev.h>
 #include <linux/trdevice.h>
 
 #if 0
@@ -33,11 +28,54 @@
 #define dprintk(args...)
 #endif
 
-u8 llc_mac_null_var[IFHWADDRLEN];
-
 static int fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
-static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
+
+extern void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb);
+extern void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb);
+
+/*
+ * Packet handlers for LLC_DEST_SAP and LLC_DEST_CONN.
+ * FIXME: There will be a registration service in next changesets.
+ */
+static void (*llc_type_handlers[2])(struct llc_sap *sap,
+				 struct sk_buff *skb) = {
+	[LLC_DEST_SAP - 1]  = llc_sap_handler,
+	[LLC_DEST_CONN - 1] = llc_conn_handler,
+};
+
+/**
+ *	llc_pdu_type - returns which LLC component must handle for PDU
+ *	@skb: input skb
+ *
+ *	This function returns which LLC component must handle this PDU.
+ */
+static __inline__ int llc_pdu_type(struct sk_buff *skb)
+{
+	int type = LLC_DEST_CONN; /* I-PDU or S-PDU type */
+	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
+
+	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) != LLC_PDU_TYPE_U)
+		goto out;
+	switch (LLC_U_PDU_CMD(pdu)) {
+	case LLC_1_PDU_CMD_XID:
+	case LLC_1_PDU_CMD_UI:
+	case LLC_1_PDU_CMD_TEST:
+		type = LLC_DEST_SAP;
+		break;
+	case LLC_2_PDU_CMD_SABME:
+	case LLC_2_PDU_CMD_DISC:
+	case LLC_2_PDU_RSP_UA:
+	case LLC_2_PDU_RSP_DM:
+	case LLC_2_PDU_RSP_FRMR:
+		break;
+	default:
+		type = LLC_DEST_INVALID;
+		break;
+	}
+out:
+	return type;
+}
 
 /**
  *	llc_rcv - 802.2 entry point from net lower layers
@@ -56,7 +94,7 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 {
 	struct llc_sap *sap;
 	struct llc_pdu_sn *pdu;
-	u8 dest;
+	int dest;
 
 	/*
 	 * When the interface is in promisc. mode, drop all the crap that it
@@ -83,80 +121,18 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		        pdu->dsap);
 		goto drop;
 	}
-	llc_decode_pdu_type(skb, &dest);
-	if (dest == LLC_DEST_SAP) { /* type 1 services */
-		if (sap->rcv_func)
-			sap->rcv_func(skb, dev, pt);
-		else {
-			struct llc_addr laddr;
-			struct sock *sk;
-
-			llc_pdu_decode_da(skb, laddr.mac);
-			llc_pdu_decode_dsap(skb, &laddr.lsap);
-
-			sk = llc_lookup_dgram(sap, &laddr);
-			if (!sk)
-				goto drop;
-			skb->sk = sk;
-			llc_sap_rcv(sap, skb);
-			sock_put(sk);
-		}
-	} else if (dest == LLC_DEST_CONN) {
-		struct llc_addr saddr, daddr;
-		struct sock *sk;
-		int rc;
-
-		llc_pdu_decode_sa(skb, saddr.mac);
-		llc_pdu_decode_ssap(skb, &saddr.lsap);
-		llc_pdu_decode_da(skb, daddr.mac);
-		llc_pdu_decode_dsap(skb, &daddr.lsap);
-
-		sk = llc_lookup_established(sap, &saddr, &daddr);
-		if (!sk) {
-			/*
-			 * Didn't find an active connection; verify if there
-			 * is a listening socket for this llc addr
-			 */
-			struct llc_opt *llc;
-			struct sock *parent;
-			
-			parent = llc_lookup_listener(sap, &daddr);
-
-			if (!parent) {
-				dprintk("llc_lookup_listener failed!\n");
-				goto drop;
-			}
-
-			sk = llc_sk_alloc(parent->sk_family, GFP_ATOMIC);
-			if (!sk) {
-				sock_put(parent);
-				goto drop;
-			}
-			llc = llc_sk(sk);
-			memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
-			memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
-			llc_sap_assign_sock(sap, sk);
-			sock_hold(sk);
-			sock_put(parent);
-			skb->sk = parent;
-		} else
-			skb->sk = sk;
-		bh_lock_sock(sk);
-		if (!sock_owned_by_user(sk)) {
-			/* rc = */ llc_conn_rcv(sk, skb);
-			rc = 0;
-		} else {
-			dprintk("%s: adding to backlog...\n", __FUNCTION__);
-			llc_set_backlog_type(skb, LLC_PACKET);
-			sk_add_backlog(sk, skb);
-			rc = 0;
-		}
-		bh_unlock_sock(sk);
-		sock_put(sk);
-		if (rc)
-			goto drop;
-	} else /* unknown or not supported pdu */
- 		goto drop;
+	/*
+	 * First the upper layer protocols that don't need the full
+	 * LLC functionality
+	 */
+	if (sap->rcv_func) {
+		sap->rcv_func(skb, dev, pt);
+		goto out;
+	}
+	dest = llc_pdu_type(skb);
+	if (unlikely(!dest || !llc_type_handlers[dest - 1]))
+		goto drop;
+	llc_type_handlers[dest - 1](sap, skb);
 out:
 	return 0;
 drop:
@@ -209,42 +185,6 @@ static void llc_station_rcv(struct sk_buff *skb)
 	ev->type   = LLC_STATION_EV_TYPE_PDU;
 	ev->reason = 0;
 	llc_station_state_process(&llc_main_station, skb);
-}
-
-
-/**
- *	llc_conn_rcv - sends received pdus to the connection state machine
- *	@sk: current connection structure.
- *	@skb: received frame.
- *
- *	Sends received pdus to the connection state machine.
- */
-int llc_conn_rcv(struct sock* sk, struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-
-	if (!llc->dev)
-		llc->dev = skb->dev;
-	ev->type   = LLC_CONN_EV_TYPE_PDU;
-	ev->reason = 0;
-	return llc_conn_state_process(sk, skb);
-}
-
-/**
- *	llc_sap_rcv - sends received pdus to the sap state machine
- *	@sap: current sap component structure.
- *	@skb: received frame.
- *
- *	Sends received pdus to the sap state machine.
- */
-static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
-{
-	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-
-	ev->type   = LLC_SAP_EV_TYPE_PDU;
-	ev->reason = 0;
-	llc_sap_state_process(sap, skb);
 }
 
 /**

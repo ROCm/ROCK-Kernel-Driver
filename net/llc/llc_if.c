@@ -27,6 +27,8 @@
 #include <net/llc_c_st.h>
 #include <net/llc_main.h>
 
+u8 llc_mac_null_var[IFHWADDRLEN];
+
 /**
  *	llc_sap_open - open interface to the upper layers.
  *	@lsap: SAP number.

@@ -193,3 +193,36 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 	} 
 	kfree_skb(skb);
 }
+
+/**
+ *	llc_sap_rcv - sends received pdus to the sap state machine
+ *	@sap: current sap component structure.
+ *	@skb: received frame.
+ *
+ *	Sends received pdus to the sap state machine.
+ */
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->type   = LLC_SAP_EV_TYPE_PDU;
+	ev->reason = 0;
+	llc_sap_state_process(sap, skb);
+}
+
+void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_addr laddr;
+	struct sock *sk;
+
+	llc_pdu_decode_da(skb, laddr.mac);
+	llc_pdu_decode_dsap(skb, &laddr.lsap);
+
+	sk = llc_lookup_dgram(sap, &laddr);
+	if (sk) {
+		skb->sk = sk;
+		llc_sap_rcv(sap, skb);
+		sock_put(sk);
+	} else
+		kfree_skb(skb);
+}

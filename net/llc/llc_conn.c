@@ -27,6 +27,12 @@
 #include <net/llc_pdu.h>
 #include <net/llc_s_ev.h>
 
+#if 0
+#define dprintk(args...) printk(KERN_DEBUG args)
+#else
+#define dprintk(args...)
+#endif
+
 static int llc_find_offset(int state, int ev_type);
 static void llc_conn_send_pdus(struct sock *sk);
 static int llc_conn_service(struct sock *sk, struct sk_buff *skb);
@@ -650,4 +656,76 @@ static int llc_find_offset(int state, int ev_type)
 		rc = llc_offset_table[state][3]; break;
 	}
 	return rc;
+}
+
+/**
+ *	llc_conn_rcv - sends received pdus to the connection state machine
+ *	@sk: current connection structure.
+ *	@skb: received frame.
+ *
+ *	Sends received pdus to the connection state machine.
+ */
+int llc_conn_rcv(struct sock* sk, struct sk_buff *skb)
+{
+	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+	struct llc_opt *llc = llc_sk(sk);
+
+	if (!llc->dev)
+		llc->dev = skb->dev;
+	ev->type   = LLC_CONN_EV_TYPE_PDU;
+	ev->reason = 0;
+	return llc_conn_state_process(sk, skb);
+}
+
+void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_addr saddr, daddr;
+	struct sock *sk;
+
+	llc_pdu_decode_sa(skb, saddr.mac);
+	llc_pdu_decode_ssap(skb, &saddr.lsap);
+	llc_pdu_decode_da(skb, daddr.mac);
+	llc_pdu_decode_dsap(skb, &daddr.lsap);
+
+	sk = llc_lookup_established(sap, &saddr, &daddr);
+	if (!sk) {
+		/*
+		 * Didn't find an active connection; verify if there
+		 * is a listening socket for this llc addr
+		 */
+		struct llc_opt *llc;
+		struct sock *parent = llc_lookup_listener(sap, &daddr);
+
+		if (!parent) {
+			dprintk("llc_lookup_listener failed!\n");
+			goto drop;
+		}
+
+		sk = llc_sk_alloc(parent->sk_family, GFP_ATOMIC);
+		if (!sk) {
+			sock_put(parent);
+			goto drop;
+		}
+		llc = llc_sk(sk);
+		memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
+		memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
+		llc_sap_assign_sock(sap, sk);
+		sock_hold(sk);
+		sock_put(parent);
+		skb->sk = parent;
+	} else
+		skb->sk = sk;
+	bh_lock_sock(sk);
+	if (!sock_owned_by_user(sk))
+		llc_conn_rcv(sk, skb);
+	else {
+		dprintk("%s: adding to backlog...\n", __FUNCTION__);
+		llc_set_backlog_type(skb, LLC_PACKET);
+		sk_add_backlog(sk, skb);
+	}
+	bh_unlock_sock(sk);
+	sock_put(sk);
+	return;
+drop:
+	kfree_skb(skb);
 }
