@@ -1295,8 +1295,6 @@ extern void QUIRK_LIST(ide_drive_t *);
 
 extern void ata_input_data(ide_drive_t *, void *, u32);
 extern void ata_output_data(ide_drive_t *, void *, u32);
-extern void atapi_input_bytes(ide_drive_t *, void *, u32);
-extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);

@@ -184,16 +184,6 @@ void default_hwif_mmiops (ide_hwif_t *hwif)
 
 EXPORT_SYMBOL(default_hwif_mmiops);
 
-void default_hwif_transport (ide_hwif_t *hwif)
-{
-	hwif->ata_input_data		= ata_input_data;
-	hwif->ata_output_data		= ata_output_data;
-	hwif->atapi_input_bytes		= atapi_input_bytes;
-	hwif->atapi_output_bytes	= atapi_output_bytes;
-}
-
-EXPORT_SYMBOL(default_hwif_transport);
-
 u32 ide_read_24 (ide_drive_t *drive)
 {
 	u8 hcyl = HWIF(drive)->INB(IDE_HCYL_REG);
@@ -201,8 +191,6 @@ u32 ide_read_24 (ide_drive_t *drive)
 	u8 sect = HWIF(drive)->INB(IDE_SECTOR_REG);
 	return (hcyl<<16)|(lcyl<<8)|sect;
 }
-
-EXPORT_SYMBOL(ide_read_24);
 
 void SELECT_DRIVE (ide_drive_t *drive)
 {
@@ -299,7 +287,7 @@ void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
  * extra byte allocated for the buffer.
  */
 
-void atapi_input_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
+static void atapi_input_bytes(ide_drive_t *drive, void *buffer, u32 bytecount)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 
@@ -316,9 +304,7 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
 		hwif->INSW(IDE_DATA_REG, ((u8 *)buffer)+(bytecount & ~0x03), 1);
 }
 
-EXPORT_SYMBOL(atapi_input_bytes);
-
-void atapi_output_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
+static void atapi_output_bytes(ide_drive_t *drive, void *buffer, u32 bytecount)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 
@@ -335,7 +321,15 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
 		hwif->OUTSW(IDE_DATA_REG, ((u8*)buffer)+(bytecount & ~0x03), 1);
 }
 
-EXPORT_SYMBOL(atapi_output_bytes);
+void default_hwif_transport(ide_hwif_t *hwif)
+{
+	hwif->ata_input_data		= ata_input_data;
+	hwif->ata_output_data		= ata_output_data;
+	hwif->atapi_input_bytes		= atapi_input_bytes;
+	hwif->atapi_output_bytes	= atapi_output_bytes;
+}
+
+EXPORT_SYMBOL(default_hwif_transport);
 
 /*
  * Beginning of Taskfile OPCODE Library and feature sets.
@@ -437,6 +431,7 @@ void ide_fix_driveid (struct hd_driveid *id)
 #endif
 }
 
+/* FIXME: exported for use by the USB storage (isd200.c) code only */
 EXPORT_SYMBOL(ide_fix_driveid);
 
 void ide_fixstring (u8 *s, const int bytecount, const int byteswap)
