@@ -3428,8 +3428,13 @@ static int ide_drive_remove(struct device * dev)
 	ide_drive_t * drive = container_of(dev,ide_drive_t,gendev);
 	ide_driver_t * driver = drive->driver;
 
-	if (driver && driver->standby)
-		driver->standby(drive);
+	if (driver) {
+		if (driver->standby)
+			driver->standby(drive);
+		if (driver->cleanup)
+			driver->cleanup(drive);
+	}
+	
 	return 0;
 }
 
