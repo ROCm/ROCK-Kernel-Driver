@@ -947,8 +947,9 @@ static void usb_find_drivers(struct usb_device *dev)
 		/* register this interface with driverfs */
 		interface->dev.parent = &dev->dev;
 		interface->dev.bus = &usb_bus_type;
-		sprintf (&interface->dev.bus_id[0], "if%d",
-			interface->altsetting->bInterfaceNumber);
+		sprintf (&interface->dev.bus_id[0], "%s:%d",
+			 dev->devpath,
+			 interface->altsetting->bInterfaceNumber);
 		if (!desc->iInterface
 				|| usb_string (dev, desc->iInterface,
 					interface->dev.name,
@@ -1288,22 +1289,38 @@ int usb_set_address(struct usb_device *dev)
  */
 static void set_device_description (struct usb_device *dev)
 {
-	char	*buf, *here, *end;
+	void    *buf;
 	int	mfgr = dev->descriptor.iManufacturer;
 	int	prod = dev->descriptor.iProduct;
+	int	vendor_id = dev->descriptor.idVendor;
+	int	product_id = dev->descriptor.idProduct;
+	char	*mfgr_str, *prod_str;
 
-	/* set default; keep it if there are no strings */
+	/* set default; keep it if there are no strings, or kmalloc fails */
 	sprintf (dev->dev.name, "USB device %04x:%04x",
-		 dev->descriptor.idVendor,
-		 dev->descriptor.idProduct);
-	if (!mfgr && !prod)
-		return;
+		 vendor_id, product_id);
 
-	if (!(buf = kmalloc(256, GFP_KERNEL)))
+	if (!(buf = kmalloc(256 * 2, GFP_KERNEL)))
 		return;
-	here = dev->dev.name;
-	end = here + sizeof dev->dev.name - 2;
-	*end = 0;
+	
+	prod_str = (char *) buf;
+	mfgr_str = (char *) buf + 256;
+
+	if (prod && usb_string (dev, prod, prod_str, 256) > 0) {
+#ifdef DEBUG
+		printk (KERN_INFO "Product: %s\n", prod_str);
+#endif
+	} else {
+		prod_str = 0;
+	}
+
+	if (mfgr && usb_string (dev, mfgr, mfgr_str, 256) > 0) {
+#ifdef DEBUG
+		printk (KERN_INFO "Manufacturer: %s\n", mfgr_str);
+#endif
+	} else {
+		mfgr_str = 0;
+	}
 
 	/* much like pci ... describe as either:
 	 * - both strings:   'product descr (vendor descr)'
@@ -1311,33 +1328,20 @@ static void set_device_description (struct usb_device *dev)
 	 * - vendor only:    'USB device vvvv:pppp (vendor descr)'
 	 * - neither string: 'USB device vvvv:pppp'
 	 */
-	if (prod && usb_string (dev, prod, buf, 256) > 0) {
-		strncpy (here, buf, end - here);
-#ifdef DEBUG
-		printk (KERN_INFO "Product: %s\n", buf);
-#endif
-	} else {
-		buf [0] = 0;
-		prod = -1;
+
+	if (prod_str && mfgr_str) {
+		snprintf(dev->dev.name, sizeof dev->dev.name,
+			 "%s (%s)", prod_str, mfgr_str);
+	} else if (prod_str) {
+		snprintf(dev->dev.name, sizeof dev->dev.name,
+			 "%s (USB device %04x:%04x)",
+			 prod_str, vendor_id, product_id);
+	} else if (mfgr_str) {
+		snprintf(dev->dev.name, sizeof dev->dev.name,
+			 "USB device %04x:%04x (%s)",
+			 vendor_id, product_id, mfgr_str);
 	}
-	here = strchr (here, 0);
-	if (mfgr && usb_string (dev, mfgr, buf, 256) > 0) {
-		*here++ = ' ';
-		*here++ = '(';
-		strncpy (here, buf, end - here - 1);
-		here = strchr (here, 0);
-		*here++ = ')';
-#ifdef DEBUG
-		printk (KERN_INFO "Manufacturer: %s\n", buf);
-#endif
-	} else {
-		if (prod != -1)
-			snprintf (here, end - here - 1,
-				" (USB device %04x:%04x)",
-				dev->descriptor.idVendor,
-				dev->descriptor.idProduct);
-		/* both strings unavailable, keep the default */
-	}
+
 	kfree(buf);
 }
 

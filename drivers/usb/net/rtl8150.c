@@ -21,7 +21,7 @@
 #include <asm/uaccess.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v0.5.4 (2002/04/11)"
+#define DRIVER_VERSION "v0.5.5 (2002/07/22)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "rtl8150 based usb-ethernet driver"
 
@@ -68,11 +68,15 @@
 
 /* Define these values to match your device */
 #define VENDOR_ID_REALTEK		0x0bda
+#define	VENDOR_ID_MELCO			0x0411
+
 #define PRODUCT_ID_RTL8150		0x8150
+#define	PRODUCT_ID_LUAKTX		0x0012
 
 /* table of devices that work with this driver */
 static struct usb_device_id rtl8150_table[] = {
 	{USB_DEVICE(VENDOR_ID_REALTEK, PRODUCT_ID_RTL8150)},
+	{USB_DEVICE(VENDOR_ID_MELCO, PRODUCT_ID_LUAKTX)},
 	{}
 };
 
@@ -727,11 +731,6 @@ static void *rtl8150_probe(struct usb_device *udev, unsigned int ifnum,
 
 	if (usb_set_configuration(udev, udev->config[0].bConfigurationValue)) {
 		err("usb_set_configuration() failed");
-		return NULL;
-	}
-	if ((udev->descriptor.idVendor != VENDOR_ID_REALTEK) ||
-	    (udev->descriptor.idProduct != PRODUCT_ID_RTL8150)) {
-		err("Not the one we are interested about");
 		return NULL;
 	}
 	dev = kmalloc(sizeof(rtl8150_t), GFP_KERNEL);

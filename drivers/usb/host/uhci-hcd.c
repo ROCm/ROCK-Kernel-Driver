@@ -2053,6 +2053,8 @@ static void start_hc(struct uhci_hcd *uhci)
 
 	/* Run and mark it configured with a 64-byte max packet */
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
+
+        uhci->hcd.state = USB_STATE_READY;
 }
 
 #ifdef CONFIG_PROC_FS
@@ -2343,8 +2345,6 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 
 	/* disable legacy emulation */
 	pci_write_config_word(dev, USBLEGSUP, USBLEGSUP_DEFAULT);
-
-        hcd->state = USB_STATE_READY;
 
 	usb_connect(uhci->rh_dev);
         uhci->rh_dev->speed = USB_SPEED_FULL;

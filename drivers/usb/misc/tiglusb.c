@@ -2,18 +2,29 @@
  *
  * tiglusb -- Texas Instruments' USB GraphLink (aka SilverLink) driver.
  * Target: Texas Instruments graphing calculators (http://lpg.ticalc.org).
- *      
- * Copyright (C) 2001-2002: 
+ *
+ * Copyright (C) 2001-2002:
  *   Romain Lievin <roms@lpg.ticalc.org>
  *   Julien BLACHE <jb@technologeek.org>
  * under the terms of the GNU General Public License.
  *
  * Based on dabusb.c, printer.c & scanner.c
  *
- * Please see the file: linux/Documentation/usb/SilverLink.txt 
+ * Please see the file: linux/Documentation/usb/SilverLink.txt
  * and the website at:  http://lpg.ticalc.org/prj_usb/
  * for more info.
  *
+ * History :
+ *  16/07/2002 : v1.04 -- Julien BLACHE <jb@jblache.org>
+ *    + removed useless usblp_cleanup()
+ *    + removed {un,}lock_kernel() as suggested on lkml
+ *    + inlined clear_pipes() (used once)
+ *    + inlined clear_device() (small, used twice)
+ *    + removed tiglusb_find_struct() (used once, simple code)
+ *    + replaced down() with down_interruptible() wherever possible
+ *    + fixed double unregistering wrt devfs, causing devfs
+ *      to force an oops when the device is deconnected
+ *    + removed unused fields from struct tiglusb_t
  */
 
 #include <linux/module.h>
@@ -30,14 +41,17 @@
 #include <linux/ticable.h>
 #include "tiglusb.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+# define minor(x) MINOR(x)
+#endif
+
 /*
  * Version Information
  */
-#define DRIVER_VERSION "1.03"
+#define DRIVER_VERSION "1.04"
 #define DRIVER_AUTHOR  "Romain Lievin <roms@lpg.ticalc.org> & Julien Blache <jb@jblache.org>"
 #define DRIVER_DESC    "TI-GRAPH LINK USB (aka SilverLink) driver"
 #define DRIVER_LICENSE "GPL"
-
 
 /* ----- global variables --------------------------------------------- */
 
@@ -48,48 +62,47 @@ static devfs_handle_t devfs_handle;
 
 /*---------- misc functions ------------------------------------------- */
 
-/* Unregister device */
-static void usblp_cleanup (tiglusb_t * s)
-{
-	devfs_unregister (s->devfs);
-	//memset(tiglusb[s->minor], 0, sizeof(tiglusb_t));
-	info ("tiglusb%d removed", s->minor);
-}
-
-/* Re-initialize device */
-static int clear_device (struct usb_device *dev)
+/*
+ * Re-initialize device
+ */
+static inline int
+clear_device (struct usb_device *dev)
 {
 	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
-		err ("tiglusb: clear_device failed");
+		err ("clear_device failed");
 		return -1;
 	}
 
 	return 0;
 }
 
-/* Clear input & output pipes (endpoints) */
-static int clear_pipes (struct usb_device *dev)
+/* 
+ * Clear input & output pipes (endpoints)
+ */
+static inline int
+clear_pipes (struct usb_device *dev)
 {
 	unsigned int pipe;
 
 	pipe = usb_sndbulkpipe (dev, 1);
 	if (usb_clear_halt (dev, usb_pipeendpoint (pipe))) {
-		err("tiglusb: clear_pipe (r), request failed");
+		err ("clear_pipe (r), request failed");
 		return -1;
 	}
 
 	pipe = usb_sndbulkpipe (dev, 2);
 	if (usb_clear_halt (dev, usb_pipeendpoint (pipe))) {
-		err ("tiglusb: clear_pipe (w), request failed");
+		err ("clear_pipe (w), request failed");
 		return -1;
 	}
 
 	return 0;
 }
 
-/* ----- kernel module functions--------------------------------------- */
+/* ----- file operations functions--------------------------------------- */
 
-static int tiglusb_open (struct inode *inode, struct file *file)
+static int
+tiglusb_open (struct inode *inode, struct file *filp)
 {
 	int devnum = minor (inode->i_rdev);
 	ptiglusb_t s;
@@ -99,37 +112,46 @@ static int tiglusb_open (struct inode *inode, struct file *file)
 
 	s = &tiglusb[devnum - TIUSB_MINOR];
 
-	down (&s->mutex);
+	if (down_interruptible (&s->mutex)) {
+		return -ERESTARTSYS;
+	}
 
 	while (!s->dev || s->opened) {
 		up (&s->mutex);
 
-		if (file->f_flags & O_NONBLOCK) {
+		if (filp->f_flags & O_NONBLOCK) {
 			return -EBUSY;
 		}
+
 		schedule_timeout (HZ / 2);
 
 		if (signal_pending (current)) {
 			return -EAGAIN;
 		}
-		down (&s->mutex);
+
+		if (down_interruptible (&s->mutex)) {
+			return -ERESTARTSYS;
+		}
 	}
 
 	s->opened = 1;
 	up (&s->mutex);
 
-	file->f_pos = 0;
-	file->private_data = s;
+	filp->f_pos = 0;
+	filp->private_data = s;
 
 	return 0;
 }
 
-static int tiglusb_release (struct inode *inode, struct file *file)
+static int
+tiglusb_release (struct inode *inode, struct file *filp)
 {
-	ptiglusb_t s = (ptiglusb_t) file->private_data;
+	ptiglusb_t s = (ptiglusb_t) filp->private_data;
 
-	lock_kernel ();
-	down (&s->mutex);
+	if (down_interruptible (&s->mutex)) {
+		return -ERESTARTSYS;
+	}
+
 	s->state = _stopped;
 	up (&s->mutex);
 
@@ -139,14 +161,14 @@ static int tiglusb_release (struct inode *inode, struct file *file)
 		wake_up (&s->remove_ok);
 
 	s->opened = 0;
-	unlock_kernel ();
 
 	return 0;
 }
 
-static ssize_t tiglusb_read (struct file *file, char *buf, size_t count, loff_t * ppos)
+static ssize_t
+tiglusb_read (struct file *filp, char *buf, size_t count, loff_t * f_pos)
 {
-	ptiglusb_t s = (ptiglusb_t) file->private_data;
+	ptiglusb_t s = (ptiglusb_t) filp->private_data;
 	ssize_t ret = 0;
 	int bytes_to_read = 0;
 	int bytes_read = 0;
@@ -154,7 +176,7 @@ static ssize_t tiglusb_read (struct file *file, char *buf, size_t count, loff_t 
 	char buffer[BULK_RCV_MAX];
 	unsigned int pipe;
 
-	if (*ppos)
+	if (*f_pos)
 		return -ESPIPE;
 
 	if (s->remove_pending)
@@ -171,35 +193,35 @@ static ssize_t tiglusb_read (struct file *file, char *buf, size_t count, loff_t 
 	if (result == -ETIMEDOUT) {	/* NAK */
 		ret = result;
 		if (!bytes_read) {
-			warn ("quirk !");
+			dbg ("quirk !");
 		}
 		warn ("tiglusb_read, NAK received.");
 		goto out;
 	} else if (result == -EPIPE) {	/* STALL -- shouldn't happen */
-		warn ("CLEAR_FEATURE request to remove STALL condition.\n");
+		warn ("clear_halt request to remove STALL condition.");
 		if (usb_clear_halt (s->dev, usb_pipeendpoint (pipe)))
-			warn ("send_packet, request failed\n");
-		//clear_device(s->dev);
+			err ("clear_halt, request failed");
+		clear_device (s->dev);
 		ret = result;
 		goto out;
 	} else if (result < 0) {	/* We should not get any I/O errors */
-		warn ("funky result: %d. Please notify maintainer.", result);
+		err ("funky result: %d. Please notify maintainer.", result);
 		ret = -EIO;
 		goto out;
 	}
 
 	if (copy_to_user (buf, buffer, bytes_read)) {
 		ret = -EFAULT;
-		goto out;
 	}
 
       out:
 	return ret ? ret : bytes_read;
 }
 
-static ssize_t tiglusb_write (struct file *file, const char *buf, size_t count, loff_t * ppos)
+static ssize_t
+tiglusb_write (struct file *filp, const char *buf, size_t count, loff_t * f_pos)
 {
-	ptiglusb_t s = (ptiglusb_t) file->private_data;
+	ptiglusb_t s = (ptiglusb_t) filp->private_data;
 	ssize_t ret = 0;
 	int bytes_to_write = 0;
 	int bytes_written = 0;
@@ -207,7 +229,7 @@ static ssize_t tiglusb_write (struct file *file, const char *buf, size_t count, 
 	char buffer[BULK_SND_MAX];
 	unsigned int pipe;
 
-	if (*ppos)
+	if (*f_pos)
 		return -ESPIPE;
 
 	if (s->remove_pending)
@@ -231,10 +253,10 @@ static ssize_t tiglusb_write (struct file *file, const char *buf, size_t count, 
 		ret = result;
 		goto out;
 	} else if (result == -EPIPE) {	/* STALL -- shouldn't happen */
-		warn ("CLEAR_FEATURE request to remove STALL condition.");
+		warn ("clear_halt request to remove STALL condition.");
 		if (usb_clear_halt (s->dev, usb_pipeendpoint (pipe)))
-			warn ("send_packet, request failed");
-		//clear_device(s->dev);
+			err ("clear_halt, request failed");
+		clear_device (s->dev);
 		ret = result;
 		goto out;
 	} else if (result < 0) {	/* We should not get any I/O errors */
@@ -245,23 +267,25 @@ static ssize_t tiglusb_write (struct file *file, const char *buf, size_t count, 
 
 	if (bytes_written != bytes_to_write) {
 		ret = -EIO;
-		goto out;
 	}
 
       out:
 	return ret ? ret : bytes_written;
 }
 
-static int tiglusb_ioctl (struct inode *inode, struct file *file,
-			  unsigned int cmd, unsigned long arg)
+static int
+tiglusb_ioctl (struct inode *inode, struct file *filp,
+	       unsigned int cmd, unsigned long arg)
 {
-	ptiglusb_t s = (ptiglusb_t) file->private_data;
+	ptiglusb_t s = (ptiglusb_t) filp->private_data;
 	int ret = 0;
 
 	if (s->remove_pending)
 		return -EIO;
 
-	down (&s->mutex);
+	if (down_interruptible (&s->mutex)) {
+		return -ERESTARTSYS;
+	}
 
 	if (!s->dev) {
 		up (&s->mutex);
@@ -304,40 +328,30 @@ static struct file_operations tiglusb_fops = {
 	.release =	tiglusb_release,
 };
 
-static int tiglusb_find_struct (void)
-{
-	int u;
-
-	for (u = 0; u < MAXTIGL; u++) {
-		ptiglusb_t s = &tiglusb[u];
-		if (!s->dev)
-			return u;
-	}
-
-	return -1;
-}
-
 /* --- initialisation code ------------------------------------- */
 
-static void *tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
-			    const struct usb_device_id *id)
+static void *
+tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
+	       const struct usb_device_id *id)
 {
-	int minor;
+	int minor = -1;
+	int i;
 	ptiglusb_t s;
 	char name[8];
 
-	dbg ("tiglusb: probing vendor id 0x%x, device id 0x%x ifnum:%d",
+	dbg ("probing vendor id 0x%x, device id 0x%x ifnum:%d",
 	     dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
 
-	/* 
-	 * We don't handle multiple configurations. As of version 0x0103 of 
-	 * the TIGL hardware, there's only 1 configuration. 
+	/*
+	 * We don't handle multiple configurations. As of version 0x0103 of
+	 * the TIGL hardware, there's only 1 configuration.
 	 */
 
 	if (dev->descriptor.bNumConfigurations != 1)
 		return NULL;
 
-	if ((dev->descriptor.idProduct != 0xe001) && (dev->descriptor.idVendor != 0x451))
+	if ((dev->descriptor.idProduct != 0xe001)
+	    && (dev->descriptor.idVendor != 0x451))
 		return NULL;
 
 	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
@@ -345,7 +359,17 @@ static void *tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 		return NULL;
 	}
 
-	minor = tiglusb_find_struct ();
+	/*
+	 * Find a tiglusb struct
+	 */
+	for (i = 0; i < MAXTIGL; i++) {
+		ptiglusb_t s = &tiglusb[i];
+		if (!s->dev) {
+			minor = i;
+			break;
+		}
+	}
+
 	if (minor == -1)
 		return NULL;
 
@@ -358,26 +382,28 @@ static void *tiglusb_probe (struct usb_device *dev, unsigned int ifnum,
 	dbg ("bound to interface: %d", ifnum);
 
 	sprintf (name, "%d", s->minor);
-	info ("tiglusb: registering to devfs : major = %d, minor = %d, node = %s", TIUSB_MAJOR,
-		(TIUSB_MINOR + s->minor), name);
+	dbg ("registering to devfs : major = %d, minor = %d, node = %s",
+	     TIUSB_MAJOR, (TIUSB_MINOR + s->minor), name);
 	s->devfs =
 	    devfs_register (devfs_handle, name, DEVFS_FL_DEFAULT, TIUSB_MAJOR,
-			    TIUSB_MINOR + s->minor, S_IFCHR | S_IRUGO | S_IWUGO, &tiglusb_fops,
-			    NULL);
+			    TIUSB_MINOR + s->minor, S_IFCHR | S_IRUGO | S_IWUGO,
+			    &tiglusb_fops, NULL);
 
 	/* Display firmware version */
-	info ("tiglusb: link cable version %i.%02x",
-		dev->descriptor.bcdDevice >> 8, dev->descriptor.bcdDevice & 0xff);
+	info ("link cable version %i.%02x",
+		dev->descriptor.bcdDevice >> 8,
+		dev->descriptor.bcdDevice & 0xff);
 
 	return s;
 }
 
-static void tiglusb_disconnect (struct usb_device *dev, void *drv_context)
+static void
+tiglusb_disconnect (struct usb_device *dev, void *drv_context)
 {
 	ptiglusb_t s = (ptiglusb_t) drv_context;
 
 	if (!s || !s->dev)
-		warn ("bogus disconnect");
+		info ("bogus disconnect");
 
 	s->remove_pending = 1;
 	wake_up (&s->wait);
@@ -387,16 +413,12 @@ static void tiglusb_disconnect (struct usb_device *dev, void *drv_context)
 	s->dev = NULL;
 	s->opened = 0;
 
-	/* cleanup now or later, on close */
-	if (!s->opened)
-		usblp_cleanup (s);
-	else
-		up (&s->mutex);
-
-	/* unregister device */
 	devfs_unregister (s->devfs);
 	s->devfs = NULL;
-	info ("tiglusb: device disconnected");
+
+	info ("device %d removed", s->minor);
+
+	up (&s->mutex);
 }
 
 static struct usb_device_id tiglusb_ids[] = {
@@ -417,9 +439,11 @@ static struct usb_driver tiglusb_driver = {
 /* --- initialisation code ------------------------------------- */
 
 #ifndef MODULE
-/*      You must set these - there is no sane way to probe for this cable.
- *      You can use 'tipar=timeout,delay' to set these now. */
-static int __init tiglusb_setup (char *str)
+/*
+ * You can use 'tiusb=timeout'
+ */
+static int __init
+tiglusb_setup (char *str)
 {
 	int ints[2];
 
@@ -433,7 +457,8 @@ static int __init tiglusb_setup (char *str)
 }
 #endif
 
-static int __init tiglusb_init (void)
+static int __init
+tiglusb_init (void)
 {
 	unsigned u;
 	int result;
@@ -452,7 +477,7 @@ static int __init tiglusb_init (void)
 
 	/* register device */
 	if (devfs_register_chrdev (TIUSB_MAJOR, "tiglusb", &tiglusb_fops)) {
-		err ("tiglusb: unable to get major %d", TIUSB_MAJOR);
+		err ("unable to get major %d", TIUSB_MAJOR);
 		return -EIO;
 	}
 
@@ -471,7 +496,8 @@ static int __init tiglusb_init (void)
 	return 0;
 }
 
-static void __exit tiglusb_cleanup (void)
+static void __exit
+tiglusb_cleanup (void)
 {
 	usb_deregister (&tiglusb_driver);
 	devfs_unregister (devfs_handle);
