@@ -435,6 +435,8 @@ static int PCI_GetBusDevHelper(struct controller *ctrl, u8 *bus_num, u8 *dev_num
 	u8 tbus, tdevice, tslot;
 
 	PCIIRQRoutingInfoLength = pcibios_get_irq_routing_table();
+	if (!PCIIRQRoutingInfoLength)
+		return -1;
 
 	len = (PCIIRQRoutingInfoLength->size -
 	       sizeof(struct irq_routing_table)) / sizeof(struct irq_info);

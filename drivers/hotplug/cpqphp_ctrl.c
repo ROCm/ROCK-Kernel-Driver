@@ -188,6 +188,8 @@ static u8 handle_presence_change(u16 change, struct controller * ctrl)
 			rc++;
 
 			p_slot = find_slot(ctrl, hp_slot + (readb(ctrl->hpc_reg + SLOT_MASK) >> 4));
+			if (!p_slot)
+				return 0;
 
 			// If the switch closed, must be a button
 			// If not in button mode, nevermind
@@ -1799,8 +1801,12 @@ static void interrupt_event_handler(struct controller *ctrl)
 				hp_slot = ctrl->event_queue[loop].hp_slot;
 
 				func = cpqhp_slot_find(ctrl->bus, (hp_slot + ctrl->slot_device_offset), 0);
+				if (!func)
+					return;
 
 				p_slot = find_slot(ctrl, hp_slot + ctrl->slot_device_offset);
+				if (!p_slot)
+					return;
 
 				dbg("hp_slot %d, func %p, p_slot %p\n",
 				    hp_slot, func, p_slot);
@@ -2511,8 +2517,14 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		// Setup the IO, memory, and prefetchable windows
 
 		io_node = get_max_resource(&(resources->io_head), 0x1000);
+		if (!io_node)
+			return -ENOMEM;
 		mem_node = get_max_resource(&(resources->mem_head), 0x100000);
+		if (!mem_node)
+			return -ENOMEM;
 		p_mem_node = get_max_resource(&(resources->p_mem_head), 0x100000);
+		if (!p_mem_node)
+			return -ENOMEM;
 		dbg("Setup the IO, memory, and prefetchable windows\n");
 		dbg("io_node\n");
 		dbg("(base, len, next) (%x, %x, %p)\n", io_node->base, io_node->length, io_node->next);

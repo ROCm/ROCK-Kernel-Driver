@@ -1057,6 +1057,8 @@ static int ibm_configure_device (struct pci_func *func)
 
 	if (func->dev == NULL) {
 		dev0.bus = ibmphp_find_bus (func->busno);
+		if (!dev0.bus)
+			return 0;
 		dev0.devfn = ((func->device << 3) + (func->function & 0x7));
 		dev0.sysdata = dev0.bus->sysdata;
 
@@ -1097,6 +1099,8 @@ static int is_bus_empty (struct slot * slot_cur)
 			continue;
 		}
 		tmp_slot = ibmphp_get_slot_from_physical_num (i);
+		if (!tmp_slot)
+			return 0;
 		rc = slot_update (&tmp_slot);
 		if (rc)
 			return 0;
@@ -1219,6 +1223,8 @@ static int check_limitations (struct slot *slot_cur)
 
 	for (i = slot_cur->bus_on->slot_min; i <= slot_cur->bus_on->slot_max; i++) {
 		tmp_slot = ibmphp_get_slot_from_physical_num (i);
+		if (!tmp_slot)
+			return -ENODEV;
 		if ((SLOT_PWRGD (tmp_slot->status)) && !(SLOT_CONNECT (tmp_slot->status))) 
 			count++;
 	}
