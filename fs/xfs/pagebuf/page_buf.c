@@ -1689,10 +1689,10 @@ pagebuf_delwri_flush(
 	int			pincount = 0;
 	int			flush_cnt = 0;
 
+	pagebuf_runall_queues(pagebuf_dataio_workqueue);
+
 	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
-
-	pagebuf_runall_queues(pagebuf_dataio_workqueue);
 
 	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
 		pb = list_entry(curr, page_buf_t, pb_list);
