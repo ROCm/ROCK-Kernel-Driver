@@ -4,6 +4,6 @@
 
 EXTRA_AFLAGS := -traditional
 
-lib-y += delay.o 
-lib-$(CONFIG_ARCH_S390_31) += memset.o strcmp.o strcpy.o strncpy.o uaccess.o
-lib-$(CONFIG_ARCH_S390X) += memset64.o strcmp64.o strcpy64.o strncpy64.o uaccess64.o
+lib-y += delay.o string.o
+lib-$(CONFIG_ARCH_S390_31) += uaccess.o
+lib-$(CONFIG_ARCH_S390X) += uaccess64.o
