@@ -393,7 +393,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 {
 	struct address_space *mapping = page->mapping;
 	loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
-	char * write_data = kmap(page);
+	char * write_data;
 	int rc = -EFAULT;
 	int bytes_written = 0;
 	struct cifs_sb_info *cifs_sb;
@@ -411,8 +411,9 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 
 	/* figure out which file struct to use 
 	if (file->private_data == NULL) {
-	   FreeXid(xid);
-	   return -EBADF;
+		kunmap(page);
+		FreeXid(xid);
+		return -EBADF;
 	}     
 	 */
 	if (!mapping) {
@@ -424,15 +425,17 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	}
 
 	offset += (loff_t)from;
+	write_data = kmap(page);
 	write_data += from;
 
 	if((to > PAGE_CACHE_SIZE) || (from > to) || (offset > mapping->host->i_size)) {
+		kunmap(page);
 		FreeXid(xid);
 		return -EIO;
 	}
 
 	/* check to make sure that we are not extending the file */
-    if(mapping->host->i_size - offset < (loff_t)to)
+	if(mapping->host->i_size - offset < (loff_t)to)
 		to = (unsigned)(mapping->host->i_size - offset); 
 		
 
@@ -459,6 +462,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		rc = -EIO;
 	}
 
+	kunmap(page);
 	FreeXid(xid);
 	return rc;
 }
