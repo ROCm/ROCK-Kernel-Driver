@@ -801,7 +801,6 @@ ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
 
 /************************  Host template entry points *************************/
 static int	   ahd_linux_detect(Scsi_Host_Template *);
-static int	   ahd_linux_release(struct Scsi_Host *);
 static const char *ahd_linux_info(struct Scsi_Host *);
 static int	   ahd_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
@@ -811,6 +810,7 @@ static void	   ahd_linux_slave_destroy(Scsi_Device *);
 static int	   ahd_linux_biosparam(struct scsi_device*,
 				       struct block_device*, sector_t, int[]);
 #else
+static int	   ahd_linux_release(struct Scsi_Host *);
 static void	   ahd_linux_select_queue_depth(struct Scsi_Host *host,
 						Scsi_Device *scsi_devs);
 static int	   ahd_linux_biosparam(Disk *, kdev_t, int[]);
@@ -874,7 +874,7 @@ ahd_linux_detect(Scsi_Host_Template *template)
 	ahd_list_lockinit();
 
 #ifdef CONFIG_PCI
-	ahd_linux_pci_probe(template);
+	ahd_linux_pci_init();
 #endif
 
 	/*
@@ -894,6 +894,7 @@ ahd_linux_detect(Scsi_Host_Template *template)
 	return (found);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 /*
  * Free the passed in Scsi_Host memory structures prior to unloading the
  * module.
@@ -925,6 +926,7 @@ ahd_linux_release(struct Scsi_Host * host)
 	ahd_list_unlock(&l);
 	return (0);
 }
+#endif
 
 /*
  * Return a string describing the driver.
@@ -1664,9 +1666,9 @@ ahd_linux_bus_reset(Scsi_Cmnd *cmd)
 }
 
 Scsi_Host_Template aic79xx_driver_template = {
+	.module			= THIS_MODULE,
+	.name			= "aic79xx",
 	.proc_info		= ahd_linux_proc_info,
-	.detect			= ahd_linux_detect,
-	.release		= ahd_linux_release,
 	.info			= ahd_linux_info,
 	.queuecommand		= ahd_linux_queue,
 	.eh_abort_handler	= ahd_linux_abort,
@@ -1698,18 +1700,17 @@ Scsi_Host_Template aic79xx_driver_template = {
 #endif
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	.name			= "aic79xx",
 	.slave_alloc		= ahd_linux_slave_alloc,
 	.slave_configure	= ahd_linux_slave_configure,
 	.slave_destroy		= ahd_linux_slave_destroy,
 #else
+	.detect			= ahd_linux_detect,
+	.release		= ahd_linux_release,
 	.select_queue_depths	= ahd_linux_select_queue_depth,
 	.use_new_eh_code	= 1,
 #endif
 };
 
-#define driver_template aic79xx_driver_template
-#include "scsi_module.c"
 /**************************** Tasklet Handler *********************************/
 
 static void
@@ -2381,9 +2382,8 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 		ahd_set_name(ahd, new_name);
 	}
 	host->unique_id = ahd->unit;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	scsi_set_device(host, &ahd->dev_softc->dev);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4) && \
+    LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
 	scsi_set_pci_device(host, ahd->dev_softc);
 #endif
 	ahd_linux_initialize_scsi_bus(ahd);
@@ -2410,6 +2410,10 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	ahd_intr_enable(ahd, TRUE);
 	ahd_linux_start_dv(ahd);
 	ahd_unlock(ahd, &s);
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	scsi_add_host(host, &ahd->dev_softc->dev);
+#endif
 	return (0);
 }
 
@@ -2556,8 +2560,12 @@ ahd_platform_free(struct ahd_softc *ahd)
 					 __WCLONE) == -ERESTARTSYS);
 		}
 		ahd_teardown_runq_tasklet(ahd);
-		if (ahd->platform_data->host != NULL)
+		if (ahd->platform_data->host != NULL) {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+			scsi_remove_host(ahd->platform_data->host);
+#endif
 			scsi_unregister(ahd->platform_data->host);
+		}
 
 		/* destroy all of the device and target objects */
 		for (i = 0; i < AHD_NUM_TARGETS; i++) {
@@ -2595,20 +2603,16 @@ ahd_platform_free(struct ahd_softc *ahd)
 					   0x1000);
 #endif
 		}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-		/* XXX Need an instance detach in the PCI code */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) && \
+    LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
+    		/*
+		 * In 2.4 we detach from the scsi midlayer before the PCI
+		 * layer invokes our remove callback.
+		 */
 		if (ahd->dev_softc != NULL)
 			ahd->dev_softc->driver = NULL;
 #endif
 		free(ahd->platform_data, M_DEVBUF);
-	}
-	if (TAILQ_EMPTY(&ahd_tailq)) {
-		unregister_reboot_notifier(&ahd_linux_notifier);
-#ifdef CONFIG_PCI
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-		pci_unregister_driver(&aic79xx_pci_driver);
-#endif
-#endif
 	}
 }
 
@@ -5315,3 +5319,30 @@ ahd_platform_dump_card_state(struct ahd_softc *ahd)
 		}
 	}
 }
+
+static int __init ahd_linux_init(void)
+{
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+       return (ahd_linux_detect(&aic79xx_driver_template) ? 0 : -ENODEV);
+#else
+	scsi_register_module(MODULE_SCSI_HA, &aic79xx_driver_template);
+	if (!driver_template.present) {
+		scsi_unregister_module(MODULE_SCSI_HA,
+				       &aic79xx_driver_template);
+		return (-ENODEV);
+	}
+
+	return (0);
+#endif
+}
+
+static void __exit ahd_linux_exit(void)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	scsi_unregister_module(MODULE_SCSI_HA, &aic79xx_driver_template);
+#endif
+	ahd_linux_pci_exit();
+}
+
+module_init(ahd_linux_init);
+module_exit(ahd_linux_exit);

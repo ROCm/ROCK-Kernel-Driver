@@ -952,7 +952,8 @@ void ahd_power_state_change(struct ahd_softc *ahd,
 #include <linux/bios32.h>
 #endif
 
-int			 ahd_linux_pci_probe(Scsi_Host_Template *);
+int			 ahd_linux_pci_init(void);
+void			 ahd_linux_pci_exit(void);
 int			 ahd_pci_map_registers(struct ahd_softc *ahd);
 int			 ahd_pci_map_int(struct ahd_softc *ahd);
 

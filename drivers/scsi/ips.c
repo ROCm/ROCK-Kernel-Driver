@@ -2737,7 +2737,7 @@ ips_next(ips_ha_t *ha, int intr) {
 
       scb->dcdb.cmd_attribute = ips_command_direction[scb->scsi_cmd->cmnd[0]];
 
-      if (!scb->dcdb.cmd_attribute & 0x3)
+      if (!(scb->dcdb.cmd_attribute & 0x3))
          scb->dcdb.transfer_length = 0;
 
       if (scb->data_len >= IPS_MAX_XFER) {
@@ -3315,7 +3315,7 @@ ips_done(ips_ha_t *ha, ips_scb_t *scb) {
          scb->dcdb.transfer_length = scb->data_len;
          scb->dcdb.cmd_attribute |= ips_command_direction[scb->scsi_cmd->cmnd[0]];
 
-         if (!scb->dcdb.cmd_attribute & 0x3)
+         if (!(scb->dcdb.cmd_attribute & 0x3))
             scb->dcdb.transfer_length = 0;
 
          if (scb->data_len >= IPS_MAX_XFER) {

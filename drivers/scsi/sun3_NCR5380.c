@@ -2564,7 +2564,7 @@ static void NCR5380_reselect (struct Scsi_Host *instance)
     msg[0] = NCR5380_read(CURRENT_SCSI_DATA_REG);
 #endif
 
-    if (!msg[0] & 0x80) {
+    if (!(msg[0] & 0x80)) {
 	printk(KERN_DEBUG "scsi%d: expecting IDENTIFY message, got ", HOSTNO);
 	print_msg(msg);
 	do_abort(instance);

@@ -125,7 +125,7 @@ void sym_mdelay(int ms) { mdelay(ms); }
  *
  *  The whole SCSI sub-system under Linux is basically single-threaded.
  *  Everything, including low-level driver interrupt routine, happens 
- *  whith the `io_request_lock' held.
+ *  with the `io_request_lock' held.
  *  The sym53c8xx-1.x drivers series ran their interrupt code using a 
  *  spin mutex per controller. This added complexity without improving 
  *  scalability significantly. the sym-2 driver still use a spinlock 
