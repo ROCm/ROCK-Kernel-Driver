@@ -352,20 +352,6 @@ void iSeries_pcibios_fixup_bus(struct pci_bus* PciBus)
 	PPCDBG(PPCDBG_BUSWALK,__FUNCTION__"(0x%04X) Entry.\n",PciBus->number); 
 
 }
-/***********************************************************************
- * find_floppy(void) 
- *	
- * Finds the default floppy device, if the system has one, and returns 
- * the pci_dev for the isa bridge for the floppy device.  
- *
- * Note: On iSeries there will only be a virtual diskette. 
- ***********************************************************************/
-struct pci_dev*
-find_floppy(void)
-{
-	PPCDBG(PPCDBG_BUSWALK,"- Find Floppy pci_dev.. None on iSeries.\n");
-	return NULL;
-}
 
 
 /***********************************************************************

@@ -58,7 +58,6 @@ static void fixup_broken_pcnet32(struct pci_dev* dev);
 static void fixup_windbond_82c105(struct pci_dev* dev);
 void        fixup_resources(struct pci_dev* dev);
 
-struct pci_dev *find_floppy(void);
 void   iSeries_pcibios_init(void);
 void   pSeries_pcibios_init(void);
 
@@ -94,8 +93,8 @@ struct pci_controller *phbtab[PCI_MAX_PHB];
 
 static int pci_bus_count;
 
-/* Floppy dev for ppc64_fd_dma_setup().  May be null if no floppy in the system. */
-struct pci_dev *ppc64_floppy_dev = NULL;
+/* Cached ISA bridge dev. */
+struct pci_dev *ppc64_isabridge_dev = NULL;
 
 struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,	PCI_ANY_ID, fixup_broken_pcnet32 },
@@ -492,7 +491,10 @@ pcibios_init(void)
 	create_tce_tables();
 	PPCDBG(PPCDBG_BUSWALK,"pSeries create_tce_tables()\n");
 #endif
-	ppc64_floppy_dev = find_floppy();
+
+	/* Cache the location of the ISA bridge (if we have one) */
+	if (ppc64_isabridge_dev = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL))
+		printk("ISA bridge at %s\n", ppc64_isabridge_dev->slot_name);
 
 	printk("PCI: Probing PCI hardware done\n");
 	PPCDBG(PPCDBG_BUSWALK,"PCI: Probing PCI hardware done.\n");

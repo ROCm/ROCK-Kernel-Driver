@@ -36,8 +36,6 @@
 
 #define fd_dma_setup(addr,size,mode,io) ppc64_fd_dma_setup(addr,size,mode,io)
 
-extern struct pci_dev *ppc64_floppy_dev;
-
 static __inline__ int 
 ppc64_fd_dma_setup(char *addr, unsigned long size, int mode, int io)
 {
@@ -52,12 +50,12 @@ ppc64_fd_dma_setup(char *addr, unsigned long size, int mode, int io)
 	if (bus_addr 
 	    && (addr != prev_addr || size != prev_size || dir != prev_dir)) {
 		/* different from last time -- unmap prev */
-		pci_unmap_single(ppc64_floppy_dev, bus_addr, prev_size, prev_dir);
+		pci_unmap_single(NULL, bus_addr, prev_size, prev_dir);
 		bus_addr = 0;
 	}
 
 	if (!bus_addr)	/* need to map it */ {
-		bus_addr = pci_map_single(ppc64_floppy_dev, addr, size, dir);
+		bus_addr = pci_map_single(NULL, addr, size, dir);
 	}
 
 	/* remember this one as prev */

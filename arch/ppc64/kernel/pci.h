@@ -46,7 +46,7 @@ extern int    pci_set_reset(struct pci_dev*,int);
 extern int    device_Location(struct pci_dev*,char*);
 extern int    format_device_location(struct pci_dev*,char*, int );
 
-extern struct pci_dev *ppc64_floppy_dev;
+extern struct pci_dev *ppc64_isabridge_dev;	/* may be NULL if no ISA bus */
 
 /*******************************************************************
  * PCI device_node operations

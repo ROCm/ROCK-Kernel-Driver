@@ -757,34 +757,6 @@ pci_find_hose_for_OF_device(struct device_node *node)
 	return NULL;
 }
 
-/***********************************************************************
- * find_floppy(void) 
- *	
- * Finds the default floppy device, if the system has one, and returns 
- * the pci_dev for the isa bridge for the floppy device.  
- *
- * Note: This functions finds the first "fdc" device and then looks to 
- * the parent device which should be the isa bridge device.  If there 
- * is more than one floppy on the system, it will find the first one 
- * and maybe that is okay. 
- ***********************************************************************/
-struct pci_dev*
-find_floppy(void)
-{
-	struct device_node *floppy_dn;
-	struct pci_dev *floppy_dev = NULL;
-	int *reg; 
-
-	floppy_dn = find_type_devices("fdc");
-	if (floppy_dn && floppy_dn->parent) {
-		if ((reg = (unsigned int *)get_property(floppy_dn->parent,"reg", 0)) != NULL)
-			floppy_dev  = pci_find_slot((reg[0] & 0x00ff0000) >> 16, (reg[0] & 0x0000ff00) >> 8);
-	}
-	PPCDBG(PPCDBG_BUSWALK,"\tFloppy pci_dev\n");
-	PPCDBGCALL(PPCDBG_BUSWALK, dumpPci_Dev(floppy_dev) );
-	return floppy_dev;
-}
-
 /*********************************************************************** 
  * ppc64_pcibios_init
  *  
