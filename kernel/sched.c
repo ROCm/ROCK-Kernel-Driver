@@ -156,6 +156,12 @@ static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
  * task_rq_lock - lock the runqueue a given task resides on and disable
  * interrupts.  Note the ordering: we can safely lookup the task_rq without
  * explicitly disabling preemption.
+ *
+ * WARNING: to squeeze out a few more cycles we do not disable preemption
+ * explicitly (or implicitly), we just keep interrupts disabled. This means
+ * that within task_rq_lock/unlock sections you must be careful
+ * about locking/unlocking spinlocks, since they could cause an unexpected
+ * preemption.
  */
 static inline runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
 {
@@ -164,9 +170,9 @@ static inline runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
 repeat_lock_task:
 	local_irq_save(*flags);
 	rq = task_rq(p);
-	spin_lock(&rq->lock);
+	_raw_spin_lock(&rq->lock);
 	if (unlikely(rq != task_rq(p))) {
-		spin_unlock_irqrestore(&rq->lock, *flags);
+		_raw_spin_unlock_irqrestore(&rq->lock, *flags);
 		goto repeat_lock_task;
 	}
 	return rq;
@@ -174,7 +180,7 @@ repeat_lock_task:
 
 static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 {
-	spin_unlock_irqrestore(&rq->lock, *flags);
+	_raw_spin_unlock_irqrestore(&rq->lock, *flags);
 }
 
 /*
@@ -282,8 +288,15 @@ static inline void resched_task(task_t *p)
 	nrpolling |= test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
 
 	if (!need_resched && !nrpolling && (p->thread_info->cpu != smp_processor_id()))
+		/*
+		 * NOTE: smp_send_reschedule() can be called from
+		 * spinlocked sections which do not have an elevated
+		 * preemption count. So the code either has to avoid
+	 	 * spinlocks, or has to put preempt_disable() and
+		 * preempt_enable_no_resched() around the code.
+		 */
 		smp_send_reschedule(p->thread_info->cpu);
-	preempt_enable();
+	preempt_enable_no_resched();
 #else
 	set_tsk_need_resched(p);
 #endif
@@ -334,8 +347,10 @@ repeat:
  */
 void kick_if_running(task_t * p)
 {
-	if (p == task_rq(p)->curr)
+	if (p == task_rq(p)->curr) {
 		resched_task(p);
+		preempt_check_resched();
+	}
 }
 #endif
 

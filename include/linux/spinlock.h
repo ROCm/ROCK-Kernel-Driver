@@ -26,6 +26,7 @@
 #define write_lock_bh(lock)			do { local_bh_disable();         write_lock(lock); } while (0)
 
 #define spin_unlock_irqrestore(lock, flags)	do { spin_unlock(lock);  local_irq_restore(flags); } while (0)
+#define _raw_spin_unlock_irqrestore(lock, flags) do { _raw_spin_unlock(lock);  local_irq_restore(flags); } while (0)
 #define spin_unlock_irq(lock)			do { spin_unlock(lock);  local_irq_enable();       } while (0)
 #define spin_unlock_bh(lock)			do { spin_unlock(lock);  local_bh_enable();        } while (0)
 
@@ -143,6 +144,12 @@ do { \
 		preempt_schedule(); \
 } while (0)
 
+#define preempt_check_resched() \
+do { \
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
+		preempt_schedule(); \
+} while (0)
+
 #define spin_lock(lock)	\
 do { \
 	preempt_disable(); \
@@ -176,6 +183,7 @@ do { \
 #define preempt_disable()		do { } while (0)
 #define preempt_enable_no_resched()	do {} while(0)
 #define preempt_enable()		do { } while (0)
+#define preempt_check_resched()		do { } while (0)
 
 #define spin_lock(lock)			_raw_spin_lock(lock)
 #define spin_trylock(lock)		_raw_spin_trylock(lock)
