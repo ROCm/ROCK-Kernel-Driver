@@ -144,7 +144,7 @@ static inline unsigned unix_hash_fold(unsigned hash)
 	return hash&(UNIX_HASH_SIZE-1);
 }
 
-#define unix_peer(sk) ((sk)->sk_pair)
+#define unix_peer(sk) (unix_sk(sk)->peer)
 
 static inline int unix_our_peer(struct sock *sk, struct sock *osk)
 {
