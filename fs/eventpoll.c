@@ -288,8 +288,10 @@ static int ep_getfd(int *efd, struct inode **einode, struct file **efile);
 static int ep_alloc_pages(char **pages, int numpages);
 static int ep_free_pages(char **pages, int numpages);
 static int ep_file_init(struct file *file, unsigned int hashbits);
-static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file, int fd);
-static struct list_head *ep_hash_entry(struct eventpoll *ep, unsigned int index);
+static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file,
+				  int fd);
+static struct list_head *ep_hash_entry(struct eventpoll *ep,
+				       unsigned int index);
 static int ep_init(struct eventpoll *ep, unsigned int hashbits);
 static void ep_free(struct eventpoll *ep);
 static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd);
@@ -299,7 +301,8 @@ static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
 				 poll_table *pt);
 static int ep_insert(struct eventpoll *ep, struct epoll_event *event,
 		     struct file *tfile, int fd);
-static int ep_modify(struct eventpoll *ep, struct epitem *epi, struct epoll_event *event);
+static int ep_modify(struct eventpoll *ep, struct epitem *epi,
+		     struct epoll_event *event);
 static void ep_unregister_pollwait(struct eventpoll *ep, struct epitem *epi);
 static int ep_unlink(struct eventpoll *ep, struct epitem *epi);
 static int ep_remove(struct eventpoll *ep, struct epitem *epi);
@@ -309,11 +312,12 @@ static unsigned int ep_eventpoll_poll(struct file *file, poll_table *wait);
 static int ep_collect_ready_items(struct eventpoll *ep,
 				  struct list_head *txlist, int maxevents);
 static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
-			  struct epoll_event *events);
+			  struct epoll_event __user *events);
 static void ep_reinject_items(struct eventpoll *ep, struct list_head *txlist);
 static int ep_events_transfer(struct eventpoll *ep,
-			      struct epoll_event *events, int maxevents);
-static int ep_poll(struct eventpoll *ep, struct epoll_event *events,
+			      struct epoll_event __user *events,
+			      int maxevents);
+static int ep_poll(struct eventpoll *ep, struct epoll_event __user *events,
 		   int maxevents, long timeout);
 static int eventpollfs_delete_dentry(struct dentry *dentry);
 static struct inode *ep_eventpoll_inode(void);
@@ -532,11 +536,13 @@ eexit_1:
 
 
 /*
- * The following function implement the controller interface for the eventpoll
- * file that enable the insertion/removal/change of file descriptors inside
- * the interest set. It rapresents the kernel part of the user space epoll_ctl(2).
+ * The following function implements the controller interface for
+ * the eventpoll file that enables the insertion/removal/change of
+ * file descriptors inside the interest set.  It represents
+ * the kernel part of the user space epoll_ctl(2).
  */
-asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
+asmlinkage long
+sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event __user *event)
 {
 	int error;
 	struct file *file, *tfile;
@@ -637,8 +643,8 @@ eexit_1:
  * Implement the event wait interface for the eventpoll file. It is the kernel
  * part of the user space epoll_wait(2).
  */
-asmlinkage long sys_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
-			       int timeout)
+asmlinkage long sys_epoll_wait(int epfd, struct epoll_event __user *events,
+			       int maxevents, int timeout)
 {
 	int error;
 	struct file *file;
@@ -662,7 +668,7 @@ asmlinkage long sys_epoll_wait(int epfd, struct epoll_event *events, int maxeven
 		goto eexit_1;
 
 	/*
-	 * We have to check that the file structure underneath the file descriptor
+	 * We have to check that the file structure underneath the fd
 	 * the user passed to us _is_ an eventpoll file.
 	 */
 	error = -EINVAL;
@@ -1409,7 +1415,7 @@ static int ep_collect_ready_items(struct eventpoll *ep, struct list_head *txlist
  * because of the way poll() is traditionally implemented in Linux.
  */
 static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
-			  struct epoll_event *events)
+			  struct epoll_event __user *events)
 {
 	int eventcnt = 0, eventbuf = 0;
 	unsigned int revents;
@@ -1521,7 +1527,8 @@ static void ep_reinject_items(struct eventpoll *ep, struct list_head *txlist)
 /*
  * Perform the transfer of events to user space.
  */
-static int ep_events_transfer(struct eventpoll *ep, struct epoll_event *events, int maxevents)
+static int ep_events_transfer(struct eventpoll *ep,
+			      struct epoll_event __user *events, int maxevents)
 {
 	int eventcnt = 0;
 	struct list_head txlist;
@@ -1549,8 +1556,8 @@ static int ep_events_transfer(struct eventpoll *ep, struct epoll_event *events, 
 }
 
 
-static int ep_poll(struct eventpoll *ep, struct epoll_event *events, int maxevents,
-		   long timeout)
+static int ep_poll(struct eventpoll *ep, struct epoll_event __user *events,
+		   int maxevents, long timeout)
 {
 	int res, eavail;
 	unsigned long flags;
