@@ -342,7 +342,7 @@ int __init detect_pdc4030(struct ata_channel *hwif)
 	outb(0x14, IDE_SELECT_REG);
 	outb(PROMISE_EXTENDED_COMMAND, IDE_COMMAND_REG);
 
-	ide_delay_50ms();
+	mdelay(50);
 
 	if (inb(IDE_ERROR_REG) == 'P' &&
 	    inb(IDE_NSECTOR_REG) == 'T' &&

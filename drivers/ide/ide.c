@@ -151,6 +151,12 @@ int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate
 	return ret;
 }
 
+/* This is the default end request function as well */
+int ide_end_request(struct ata_device *drive, struct request *rq, int uptodate)
+{
+	return __ide_end_request(drive, rq, uptodate, 0);
+}
+
 /*
  * This should get invoked any time we exit the driver to
  * wait for an interrupt response from a drive.  handler() points
@@ -508,7 +514,7 @@ static void ata_dump_bits(struct ata_bit_messages *msgs, int nr, byte bits)
 	printk("} ");
 }
 #else
-#define ata_dump_bits(msgs,nr,bits) do { } while (0)
+# define ata_dump_bits(msgs,nr,bits) do { } while (0)
 #endif
 
 /*
@@ -1517,36 +1523,6 @@ static int ide_release(struct inode * inode, struct file * file)
 	return 0;
 }
 
-/*
- * Setup hw_regs_t structure described by parameters.  You
- * may set up the hw structure yourself OR use this routine to
- * do it for you.
- */
-void ide_setup_ports(hw_regs_t *hw,
-		ide_ioreg_t base, int *offsets,
-		ide_ioreg_t ctrl, ide_ioreg_t intr,
-		ide_ack_intr_t *ack_intr, int irq)
-{
-	int i;
-
-	for (i = 0; i < IDE_NR_PORTS; i++) {
-		if (offsets[i] != -1)
-			hw->io_ports[i] = base + offsets[i];
-		else
-			hw->io_ports[i] = 0;
-	}
-	if (offsets[IDE_CONTROL_OFFSET] == -1)
-		hw->io_ports[IDE_CONTROL_OFFSET] = ctrl;
-/* FIMXE: check if we can remove this ifdef */
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	if (offsets[IDE_IRQ_OFFSET] == -1)
-		hw->io_ports[IDE_IRQ_OFFSET] = intr;
-#endif
-	hw->irq = irq;
-	hw->dma = NO_DMA;
-	hw->ack_intr = ack_intr;
-}
-
 int ide_spin_wait_hwgroup(struct ata_device *drive)
 {
 	/* FIXME: Wait on a proper timer. Instead of playing games on the
@@ -1570,24 +1546,6 @@ int ide_spin_wait_hwgroup(struct ata_device *drive)
 	}
 
 	return 0;
-}
-
-/*
- * Delay for *at least* 50ms.  As we don't know how much time is left
- * until the next tick occurs, we wait an extra tick to be safe.
- * This is used only during the probing/polling for drives at boot time.
- *
- * However, its usefullness may be needed in other places, thus we export it now.
- * The future may change this to a millisecond setable delay.
- */
-void ide_delay_50ms (void)
-{
-#ifndef CONFIG_BLK_DEV_IDECS
-	mdelay(50);
-#else
-	__set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/20);
-#endif
 }
 
 static int ide_check_media_change(kdev_t i_rdev)
@@ -1638,12 +1596,6 @@ void ide_fixstring (byte *s, const int bytecount, const int byteswap)
 		*p++ = '\0';
 }
 
-/* This is the default end request function as well */
-int ide_end_request(struct ata_device *drive, struct request *rq, int uptodate)
-{
-	return __ide_end_request(drive, rq, uptodate, 0);
-}
-
 struct block_device_operations ide_fops[] = {{
 	owner:			THIS_MODULE,
 	open:			ide_open,
@@ -1669,7 +1621,6 @@ EXPORT_SYMBOL(restart_request);
 EXPORT_SYMBOL(ide_end_drive_cmd);
 EXPORT_SYMBOL(__ide_end_request);
 EXPORT_SYMBOL(ide_end_request);
-EXPORT_SYMBOL(ide_delay_50ms);
 EXPORT_SYMBOL(ide_stall_queue);
 
 EXPORT_SYMBOL(ide_setup_ports);

@@ -133,6 +133,43 @@ static spinlock_t ata_drivers_lock = SPIN_LOCK_UNLOCKED;
  */
 struct ata_channel ide_hwifs[MAX_HWIFS];	/* master data repository */
 
+/*
+ * FIXME: This function should be unrolled in the palces where it get's used,
+ * since in reality it's simple architecture specific initialization.
+ *
+ * Setup hw_regs_t structure described by parameters.  You may set up the hw
+ * structure yourself OR use this routine to do it for you.
+ */
+void ide_setup_ports(hw_regs_t *hw,
+		ide_ioreg_t base,
+		int *offsets,
+		ide_ioreg_t ctrl,
+		ide_ioreg_t intr,
+		ide_ack_intr_t *ack_intr,
+		int irq)
+{
+	int i;
+
+	for (i = 0; i < IDE_NR_PORTS; i++) {
+		if (offsets[i] != -1)
+			hw->io_ports[i] = base + offsets[i];
+		else
+			hw->io_ports[i] = 0;
+	}
+	if (offsets[IDE_CONTROL_OFFSET] == -1)
+		hw->io_ports[IDE_CONTROL_OFFSET] = ctrl;
+
+	/* FIMXE: check if we can remove this ifdef */
+#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
+	if (offsets[IDE_IRQ_OFFSET] == -1)
+		hw->io_ports[IDE_IRQ_OFFSET] = intr;
+#endif
+
+	hw->irq = irq;
+	hw->dma = NO_DMA;
+	hw->ack_intr = ack_intr;
+}
+
 static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 {
 	static const unsigned int majors[] = {
@@ -148,15 +185,18 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 	memset(&hw, 0, sizeof(hw_regs_t));
 
 	/* fill in any non-zero initial values */
-	ch->index     = index;
+	ch->index = index;
 	ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, &ch->irq);
+
 	memcpy(&ch->hw, &hw, sizeof(hw));
 	memcpy(ch->io_ports, hw.io_ports, sizeof(hw.io_ports));
+
 	ch->noprobe	= !ch->io_ports[IDE_DATA_OFFSET];
 #ifdef CONFIG_BLK_DEV_HD
 	if (ch->io_ports[IDE_DATA_OFFSET] == HD_DATA)
 		ch->noprobe = 1; /* may be overridden by ide_setup() */
 #endif
+
 	ch->major = majors[index];
 	sprintf(ch->name, "ide%d", index);
 	ch->bus_state = BUSSTATE_ON;
@@ -576,7 +616,7 @@ static struct ata_operations * subdriver_iterator(struct ata_operations *prev)
  * Register an IDE interface, specifing exactly the registers etc
  * Set init=1 iff calling before probes have taken place.
  */
-int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp)
+int ide_register_hw(hw_regs_t *hw)
 {
 	int h;
 	int retry = 1;
@@ -626,9 +666,6 @@ found:
 		if (subdriver_match(ch, subdriver) > 0)
 			break;
 	}
-
-	if (hwifp)
-		*hwifp = ch;
 
 	return (initializing || ch->present) ? h : -1;
 }

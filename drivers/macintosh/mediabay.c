@@ -569,7 +569,7 @@ media_bay_step(int i)
 				pmu_suspend();
 				ide_init_hwif_ports(&hw, (ide_ioreg_t) bay->cd_base, (ide_ioreg_t) 0, NULL);
 				hw.irq = bay->cd_irq;
-				bay->cd_index = ide_register_hw(&hw, NULL);
+				bay->cd_index = ide_register_hw(&hw);
 				pmu_resume();
 			}
 			if (bay->cd_index == -1) {

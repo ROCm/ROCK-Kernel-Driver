@@ -68,17 +68,7 @@ static inline void do_identify(struct ata_device *drive, u8 cmd)
 	 * However let's try to get away with this...
 	 */
 
-#if 1
 	ata_read(drive, id, SECTOR_WORDS);
-#else
-        {
-                unsigned long   *ptr = (unsigned long *)id ;
-                unsigned long   lcount = 256/2 ;
-                // printk("IDE_DATA_REG = %#lx",IDE_DATA_REG);
-                while( lcount-- )
-                        *ptr++ = inl(IDE_DATA_REG);
-        }
-#endif
 	ide__sti();	/* local CPU only */
 	ide_fix_driveid(id);
 
@@ -248,7 +238,7 @@ static int identify(struct ata_device *drive, u8 cmd)
 	rc = 1;
 	if (IDE_CONTROL_REG) {
 		/* take a deep breath */
-		ide_delay_50ms();
+		mdelay(50);
 		a = IN_BYTE(IDE_ALTSTATUS_REG);
 		s = IN_BYTE(IDE_STATUS_REG);
 		if ((a ^ s) & ~INDEX_STAT) {
@@ -258,7 +248,7 @@ static int identify(struct ata_device *drive, u8 cmd)
 			hd_status = IDE_ALTSTATUS_REG;	/* use non-intrusive polling */
 		}
 	} else {
-		ide_delay_50ms();
+		mdelay(50);
 		hd_status = IDE_STATUS_REG;
 	}
 
@@ -281,10 +271,11 @@ static int identify(struct ata_device *drive, u8 cmd)
 	do {
 		if (time_after(jiffies, timeout))
 			goto out;	/* drive timed-out */
-		ide_delay_50ms();		/* give drive a breather */
+		mdelay(50);		/* give drive a breather */
 	} while (IN_BYTE(hd_status) & BUSY_STAT);
 
-	ide_delay_50ms();		/* wait for IRQ and DRQ_STAT */
+	mdelay(50);		/* wait for IRQ and DRQ_STAT */
+
 	if (OK_STAT(GET_STAT(),DRQ_STAT,BAD_R_STAT)) {
 		unsigned long flags;
 		__save_flags(flags);	/* local CPU only */
@@ -345,13 +336,13 @@ static int do_probe(struct ata_device *drive, byte cmd)
 		drive->name, drive->present, drive->type,
 		(cmd == WIN_IDENTIFY) ? "ATA" : "ATAPI");
 #endif
-	ide_delay_50ms();	/* needed for some systems (e.g. crw9624 as drive0 with disk as slave) */
+	mdelay(50);	/* needed for some systems (e.g. crw9624 as drive0 with disk as slave) */
 	SELECT_DRIVE(hwif,drive);
-	ide_delay_50ms();
+	mdelay(50);
 	if (IN_BYTE(IDE_SELECT_REG) != drive->select.all && !drive->present) {
 		if (drive->select.b.unit != 0) {
 			SELECT_DRIVE(hwif,&hwif->drives[0]);	/* exit with drive0 selected */
-			ide_delay_50ms();		/* allow BUSY_STAT to assert & clear */
+			mdelay(50);		/* allow BUSY_STAT to assert & clear */
 		}
 		return 3;    /* no i/f present: mmm.. this should be a 4 -ml */
 	}
@@ -363,13 +354,13 @@ static int do_probe(struct ata_device *drive, byte cmd)
 		if (rc == 1 && cmd == WIN_PIDENTIFY && drive->autotune != 2) {
 			unsigned long timeout;
 			printk("%s: no response (status = 0x%02x), resetting drive\n", drive->name, GET_STAT());
-			ide_delay_50ms();
+			mdelay(50);
 			OUT_BYTE (drive->select.all, IDE_SELECT_REG);
-			ide_delay_50ms();
+			mdelay(50);
 			OUT_BYTE(WIN_SRST, IDE_COMMAND_REG);
 			timeout = jiffies;
 			while ((GET_STAT() & BUSY_STAT) && time_before(jiffies, timeout + WAIT_WORSTCASE))
-				ide_delay_50ms();
+				mdelay(50);
 			rc = identify(drive, cmd);
 		}
 		if (rc == 1)
@@ -380,7 +371,7 @@ static int do_probe(struct ata_device *drive, byte cmd)
 
 	if (drive->select.b.unit != 0) {
 		SELECT_DRIVE(hwif,&hwif->drives[0]);	/* exit with drive0 selected */
-		ide_delay_50ms();
+		mdelay(50);
 		(void) GET_STAT();		/* ensure drive irq is clear */
 	}
 	return rc;
@@ -392,7 +383,7 @@ static void enable_nest(struct ata_device *drive)
 
 	printk("%s: enabling %s -- ", drive->channel->name, drive->id->model);
 	SELECT_DRIVE(drive->channel, drive);
-	ide_delay_50ms();
+	mdelay(50);
 	OUT_BYTE(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
 	timeout = jiffies + WAIT_WORSTCASE;
 	do {
@@ -400,9 +391,9 @@ static void enable_nest(struct ata_device *drive)
 			printk("failed (timeout)\n");
 			return;
 		}
-		ide_delay_50ms();
+		mdelay(50);
 	} while (GET_STAT() & BUSY_STAT);
-	ide_delay_50ms();
+	mdelay(50);
 	if (!OK_STAT(GET_STAT(), 0, BAD_STAT))
 		printk("failed (status = 0x%02x)\n", GET_STAT());
 	else
@@ -536,7 +527,7 @@ static void channel_probe(struct ata_channel *ch)
 		udelay(10);
 		OUT_BYTE(8, ch->io_ports[IDE_CONTROL_OFFSET]);
 		do {
-			ide_delay_50ms();
+			mdelay(50);
 			stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
 		} while ((stat & BUSY_STAT) && time_before(jiffies, timeout));
 	}

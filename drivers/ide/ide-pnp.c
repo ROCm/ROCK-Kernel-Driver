@@ -32,29 +32,6 @@
 
 #define DEV_NAME(dev) (dev->bus->name ? dev->bus->name : "ISA PnP")
 
-enum {
-	GENERIC_HD_DATA,
-	GENERIC_HD_ERROR,
-	GENERIC_HD_NSECTOR,
-	GENERIC_HD_SECTOR,
-	GENERIC_HD_LCYL,
-	GENERIC_HD_HCYL,
-	GENERIC_HD_SELECT,
-	GENERIC_HD_STATUS
-};
-
-static int generic_ide_offsets[IDE_NR_PORTS] __initdata = {
-	GENERIC_HD_DATA,
-	GENERIC_HD_ERROR,
-	GENERIC_HD_NSECTOR,
-	GENERIC_HD_SECTOR,
-	GENERIC_HD_LCYL,
-	GENERIC_HD_HCYL,
-	GENERIC_HD_SELECT,
-	GENERIC_HD_STATUS,
-	-1, -1
-};
-
 /* ISA PnP device table entry */
 struct pnp_dev_t {
 	unsigned short card_vendor, card_device, vendor, device;
@@ -65,8 +42,8 @@ struct pnp_dev_t {
 static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 {
 	hw_regs_t hw;
-	struct ata_channel *hwif;
 	int index;
+	int i;
 
 	if (!enable)
 		return 0;
@@ -74,15 +51,24 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 	if (!(DEV_IO(dev, 0) && DEV_IO(dev, 1) && DEV_IRQ(dev, 0)))
 		return 1;
 
-	ide_setup_ports(&hw, (ide_ioreg_t) DEV_IO(dev, 0),
-			generic_ide_offsets, (ide_ioreg_t) DEV_IO(dev, 1),
-			0, NULL, DEV_IRQ(dev, 0));
+	/* Initialize register access base values. */
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; ++i)
+		hw.io_ports[i] = DEV_IO(dev, 0) + i;
+	hw.io_ports[IDE_CONTROL_OFFSET] = DEV_IO(dev, 1);
 
-	index = ide_register_hw(&hw, &hwif);
+	hw.irq = DEV_IRQ(dev, 0);
+	hw.dma = NO_DMA;
+	hw.ack_intr = NULL;
+
+	index = ide_register_hw(&hw);
 
 	if (index != -1) {
-		hwif->pci_dev = dev;
+		struct ata_channel *ch;
+
+		ch = &ide_hwifs[index];
+		ch->pci_dev = dev;
 		printk(KERN_INFO "ide%d: %s IDE interface\n", index, DEV_NAME(dev));
+
 		return 0;
 	}
 

@@ -351,7 +351,7 @@ controller_ok:
 		base = port ? 0x170 : 0x1f0;
 
 	if ((ch = lookup_channel(base, d->bootable, dev->name)) == NULL)
-		return -ENOMEM;	/* no room in ide_hwifs[] */
+		return -ENOMEM;	/* no room */
 
 	if (ch->io_ports[IDE_DATA_OFFSET] != base) {
 		ide_init_hwif_ports(&ch->hw, base, (ctl | 2), NULL);

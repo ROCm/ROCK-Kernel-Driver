@@ -353,13 +353,20 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 
 	OUT_BYTE((args->taskfile.device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
 	if (args->handler != NULL) {
+
+		/* This is apparently supposed to reset the wait timeout for
+		 * the interrupt to accur.
+		 */
+
 		ide_set_handler(drive, args->handler, WAIT_CMD, NULL);
 		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+
 		/*
 		 * Warning check for race between handler and prehandler for
 		 * writing first block of data.  however since we are well
 		 * inside the boundaries of the seek, we should be okay.
 		 */
+
 		if (args->prehandler != NULL)
 			return args->prehandler(drive, rq);
 	} else {
@@ -579,7 +586,8 @@ static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request 
 	return ide_started;
 }
 
-/* Called by ioctl to feature out type of command being called */
+/* Called to figure out the type of command being called.
+ */
 void ide_cmd_type_parser(struct ata_taskfile *args)
 {
 	struct hd_drive_task_hdr *taskfile = &args->taskfile;

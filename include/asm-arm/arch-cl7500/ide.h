@@ -43,8 +43,8 @@ static __inline__ void
 ide_init_default_hwifs(void)
 {
 	hw_regs_t hw;
-   
+
 	ide_init_hwif_ports(&hw, ISASLOT_IO + 0x1f0, ISASLOT_IO + 0x3f6, NULL);
-   	hw.irq = IRQ_ISA_14;
-	ide_register_hw(&hw, NULL);
+	hw.irq = IRQ_ISA_14;
+	ide_register_hw(&hw);
 }

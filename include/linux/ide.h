@@ -71,18 +71,20 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Definitions for accessing IDE controller registers
  */
-#define IDE_NR_PORTS		(10)
 
-#define IDE_DATA_OFFSET		(0)
-#define IDE_ERROR_OFFSET	(1)
-#define IDE_NSECTOR_OFFSET	(2)
-#define IDE_SECTOR_OFFSET	(3)
-#define IDE_LCYL_OFFSET		(4)
-#define IDE_HCYL_OFFSET		(5)
-#define IDE_SELECT_OFFSET	(6)
-#define IDE_STATUS_OFFSET	(7)
-#define IDE_CONTROL_OFFSET	(8)
-#define IDE_IRQ_OFFSET		(9)
+enum {
+	IDE_DATA_OFFSET	    = 0,
+	IDE_ERROR_OFFSET    = 1,
+	IDE_NSECTOR_OFFSET  = 2,
+	IDE_SECTOR_OFFSET   = 3,
+	IDE_LCYL_OFFSET	    = 4,
+	IDE_HCYL_OFFSET	    = 5,
+	IDE_SELECT_OFFSET   = 6,
+	IDE_STATUS_OFFSET   = 7,
+	IDE_CONTROL_OFFSET  = 8,
+	IDE_IRQ_OFFSET	    = 9,
+	IDE_NR_PORTS	    = 10
+};
 
 #define IDE_FEATURE_OFFSET	IDE_ERROR_OFFSET
 #define IDE_COMMAND_OFFSET	IDE_STATUS_OFFSET
@@ -549,7 +551,7 @@ struct ata_channel {
 /*
  * Register new hardware with ide
  */
-extern int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp);
+extern int ide_register_hw(hw_regs_t *hw);
 extern void ide_unregister(struct ata_channel *hwif);
 
 struct ata_taskfile;
@@ -758,8 +760,6 @@ extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
-
-void ide_delay_50ms(void);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_driveid_update(struct ata_device *);
