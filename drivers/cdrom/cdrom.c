@@ -318,8 +318,9 @@ static void sanitize_format(union cdrom_addr *addr,
 static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		     unsigned long arg);
 
-int cdrom_get_last_written(kdev_t dev, long *last_written);
-int cdrom_get_next_writable(kdev_t dev, long *next_writable);
+int cdrom_get_last_written(struct cdrom_device_info *, long *);
+static int cdrom_get_next_writable(struct cdrom_device_info *, long *);
+static void cdrom_count_tracks(struct cdrom_device_info *, tracktype*);
 
 #ifdef CONFIG_SYSCTL
 static void cdrom_sysctl_register(void);
@@ -436,7 +437,7 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 	return 0;
 }
 
-struct cdrom_device_info *cdrom_find_device(kdev_t dev)
+static struct cdrom_device_info *cdrom_find_device(kdev_t dev)
 {
 	struct cdrom_device_info *cdi;
 
@@ -775,7 +776,7 @@ static int cdrom_load_unload(struct cdrom_device_info *cdi, int slot)
 	return cdi->ops->generic_packet(cdi, &cgc);
 }
 
-int cdrom_select_disc(struct cdrom_device_info *cdi, int slot)
+static int cdrom_select_disc(struct cdrom_device_info *cdi, int slot)
 {
 	struct cdrom_changer_info info;
 	int curslot;
@@ -859,7 +860,7 @@ int cdrom_media_changed(kdev_t dev)
 }
 
 /* badly broken, I know. Is due for a fixup anytime. */
-void cdrom_count_tracks(struct cdrom_device_info *cdi, tracktype* tracks)
+static void cdrom_count_tracks(struct cdrom_device_info *cdi, tracktype* tracks)
 {
 	struct cdrom_tochdr header;
 	struct cdrom_tocentry entry;
@@ -1921,7 +1922,6 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 {		
 	struct cdrom_device_ops *cdo = cdi->ops;
 	struct cdrom_generic_command cgc;
-	kdev_t dev = cdi->dev;
 	char buffer[32];
 	int ret = 0;
 
@@ -2193,7 +2193,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 	case CDROM_NEXT_WRITABLE: {
 		long next = 0;
 		cdinfo(CD_DO_IOCTL, "entering CDROM_NEXT_WRITABLE\n"); 
-		if ((ret = cdrom_get_next_writable(dev, &next)))
+		if ((ret = cdrom_get_next_writable(cdi, &next)))
 			return ret;
 		IOCTL_OUT(arg, long, next);
 		return 0;
@@ -2201,7 +2201,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 	case CDROM_LAST_WRITTEN: {
 		long last = 0;
 		cdinfo(CD_DO_IOCTL, "entering CDROM_LAST_WRITTEN\n"); 
-		if ((ret = cdrom_get_last_written(dev, &last)))
+		if ((ret = cdrom_get_last_written(cdi, &last)))
 			return ret;
 		IOCTL_OUT(arg, long, last);
 		return 0;
@@ -2211,10 +2211,9 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 	return -ENOTTY;
 }
 
-int cdrom_get_track_info(kdev_t dev, __u16 track, __u8 type,
+static int cdrom_get_track_info(struct cdrom_device_info *cdi, __u16 track, __u8 type,
 			 track_information *ti)
 {
-        struct cdrom_device_info *cdi = cdrom_find_device(dev);
 	struct cdrom_device_ops *cdo = cdi->ops;
 	struct cdrom_generic_command cgc;
 	int ret;
@@ -2241,9 +2240,8 @@ int cdrom_get_track_info(kdev_t dev, __u16 track, __u8 type,
 }
 
 /* requires CD R/RW */
-int cdrom_get_disc_info(kdev_t dev, disc_information *di)
+static int cdrom_get_disc_info(struct cdrom_device_info *cdi, disc_information *di)
 {
-	struct cdrom_device_info *cdi = cdrom_find_device(dev);
 	struct cdrom_device_ops *cdo = cdi->ops;
 	struct cdrom_generic_command cgc;
 	int ret;
@@ -2273,9 +2271,8 @@ int cdrom_get_disc_info(kdev_t dev, disc_information *di)
 
 /* return the last written block on the CD-R media. this is for the udf
    file system. */
-int cdrom_get_last_written(kdev_t dev, long *last_written)
-{	
-	struct cdrom_device_info *cdi = cdrom_find_device(dev);
+int cdrom_get_last_written(struct cdrom_device_info *cdi, long *last_written)
+{
 	struct cdrom_tocentry toc;
 	disc_information di;
 	track_information ti;
@@ -2285,17 +2282,17 @@ int cdrom_get_last_written(kdev_t dev, long *last_written)
 	if (!CDROM_CAN(CDC_GENERIC_PACKET))
 		goto use_toc;
 
-	if ((ret = cdrom_get_disc_info(dev, &di)))
+	if ((ret = cdrom_get_disc_info(cdi, &di)))
 		goto use_toc;
 
 	last_track = (di.last_track_msb << 8) | di.last_track_lsb;
-	if ((ret = cdrom_get_track_info(dev, last_track, 1, &ti)))
+	if ((ret = cdrom_get_track_info(cdi, last_track, 1, &ti)))
 		goto use_toc;
 
 	/* if this track is blank, try the previous. */
 	if (ti.blank) {
 		last_track--;
-		if ((ret = cdrom_get_track_info(dev, last_track, 1, &ti)))
+		if ((ret = cdrom_get_track_info(cdi, last_track, 1, &ti)))
 			goto use_toc;
 	}
 
@@ -2325,9 +2322,8 @@ use_toc:
 }
 
 /* return the next writable block. also for udf file system. */
-int cdrom_get_next_writable(kdev_t dev, long *next_writable)
+static int cdrom_get_next_writable(struct cdrom_device_info *cdi, long *next_writable)
 {
-	struct cdrom_device_info *cdi = cdrom_find_device(dev);
 	disc_information di;
 	track_information ti;
 	__u16 last_track;
@@ -2336,17 +2332,17 @@ int cdrom_get_next_writable(kdev_t dev, long *next_writable)
 	if (!CDROM_CAN(CDC_GENERIC_PACKET))
 		goto use_last_written;
 
-	if ((ret = cdrom_get_disc_info(dev, &di)))
+	if ((ret = cdrom_get_disc_info(cdi, &di)))
 		goto use_last_written;
 
 	last_track = (di.last_track_msb << 8) | di.last_track_lsb;
-	if ((ret = cdrom_get_track_info(dev, last_track, 1, &ti)))
+	if ((ret = cdrom_get_track_info(cdi, last_track, 1, &ti)))
 		goto use_last_written;
 
         /* if this track is blank, try the previous. */
 	if (ti.blank) {
 		last_track--;
-		if ((ret = cdrom_get_track_info(dev, last_track, 1, &ti)))
+		if ((ret = cdrom_get_track_info(cdi, last_track, 1, &ti)))
 			goto use_last_written;
 	}
 
@@ -2359,7 +2355,7 @@ int cdrom_get_next_writable(kdev_t dev, long *next_writable)
 	return 0;
 
 use_last_written:
-	if ((ret = cdrom_get_last_written(dev, next_writable))) {
+	if ((ret = cdrom_get_last_written(cdi, next_writable))) {
 		*next_writable = 0;
 		return ret;
 	} else {
@@ -2368,11 +2364,7 @@ use_last_written:
 	}
 }
 
-EXPORT_SYMBOL(cdrom_get_disc_info);
-EXPORT_SYMBOL(cdrom_get_track_info);
-EXPORT_SYMBOL(cdrom_get_next_writable);
 EXPORT_SYMBOL(cdrom_get_last_written);
-EXPORT_SYMBOL(cdrom_count_tracks);
 EXPORT_SYMBOL(register_cdrom);
 EXPORT_SYMBOL(unregister_cdrom);
 EXPORT_SYMBOL(cdrom_open);
@@ -2380,11 +2372,9 @@ EXPORT_SYMBOL(cdrom_release);
 EXPORT_SYMBOL(cdrom_ioctl);
 EXPORT_SYMBOL(cdrom_media_changed);
 EXPORT_SYMBOL(cdrom_number_of_slots);
-EXPORT_SYMBOL(cdrom_select_disc);
 EXPORT_SYMBOL(cdrom_mode_select);
 EXPORT_SYMBOL(cdrom_mode_sense);
 EXPORT_SYMBOL(init_cdrom_command);
-EXPORT_SYMBOL(cdrom_find_device);
 
 #ifdef CONFIG_SYSCTL
 
