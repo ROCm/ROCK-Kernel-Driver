@@ -444,17 +444,16 @@ static int lookup_node(struct mm_struct *mm, unsigned long addr)
 
 /* Copy a kernel node mask to user space */
 static int copy_nodes_to_user(unsigned long *user_mask, unsigned long maxnode,
-			      unsigned long *nodes)
+			      void *nodes, unsigned nbytes)
 {
 	unsigned long copy = ALIGN(maxnode-1, 64) / 8;
 
-	if (copy > sizeof(nodes)) {
+	if (copy > nbytes) {
 		if (copy > PAGE_SIZE)
 			return -EINVAL;
-		if (clear_user((char*)user_mask + sizeof(nodes),
-				copy - sizeof(nodes)))
+		if (clear_user((char*)user_mask + nbytes, copy - nbytes))
 			return -EFAULT;
-		copy = sizeof(nodes);
+		copy = nbytes;
 	}
 	return copy_to_user(user_mask, nodes, copy) ? -EFAULT : 0;
 }
@@ -514,7 +513,7 @@ asmlinkage long sys_get_mempolicy(int *policy,
 	if (nmask) {
 		DECLARE_BITMAP(nodes, MAX_NUMNODES);
 		get_zonemask(pol, nodes);
-		err = copy_nodes_to_user(nmask, maxnode, nodes);
+		err = copy_nodes_to_user(nmask, maxnode, nodes, sizeof(nodes));
 	}
 
  out:

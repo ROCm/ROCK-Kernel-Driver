@@ -628,15 +628,6 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	m2info->mmio.vbase = ACCESS_FBINFO(mmio.vbase);
 	m2info->mmio.len = ACCESS_FBINFO(mmio.len);
 
-	/*
-	 *  If we have unused output, connect CRTC2 to it...
-	 */
-	if (ACCESS_FBINFO(outputs[1]).output &&
-	    ACCESS_FBINFO(outputs[1]).src == MATROXFB_SRC_NONE &&
-	    ACCESS_FBINFO(outputs[2]).src == MATROXFB_SRC_NONE) {
-		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_CRTC2;
-	}
-
 	matroxfb_dh_init_fix(m2info);
 	if (register_framebuffer(&m2info->fbcon)) {
 		return -ENXIO;

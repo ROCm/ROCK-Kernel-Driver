@@ -1272,6 +1272,7 @@ static unsigned int maxclk;		/* "matrox:maxclk:xxxxM" */
 static int dfp;				/* "matrox:dfp */
 static int dfp_type = -1;		/* "matrox:dfp:xxx */
 static int memtype = -1;		/* "matrox:memtype:xxx" */
+static char outputs[8];			/* "matrox:outputs:xxx" */
 
 #ifndef MODULE
 static char videomode[64];		/* "matrox:mode:xxxxx" or "matrox:xxxxx" */
@@ -1537,6 +1538,39 @@ static struct fb_videomode defaultmode = {
 
 static int hotplug = 0;
 
+static void setDefaultOutputs(WPMINFO2) {
+	unsigned int i;
+	const char* ptr;
+
+	ACCESS_FBINFO(outputs[0]).default_src = MATROXFB_SRC_CRTC1;
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+		ACCESS_FBINFO(outputs[1]).default_src = MATROXFB_SRC_CRTC1;
+		ACCESS_FBINFO(outputs[2]).default_src = MATROXFB_SRC_CRTC1;
+	} else if (dfp) {
+		ACCESS_FBINFO(outputs[2]).default_src = MATROXFB_SRC_CRTC1;
+	}
+	ptr = outputs;
+	for (i = 0; i < MATROXFB_MAX_OUTPUTS; i++) {
+		char c = *ptr++;
+
+		if (c == 0) {
+			break;
+		}
+		if (c == '0') {
+			ACCESS_FBINFO(outputs[i]).default_src = MATROXFB_SRC_NONE;
+		} else if (c == '1') {
+			ACCESS_FBINFO(outputs[i]).default_src = MATROXFB_SRC_CRTC1;
+		} else if (c == '2' && ACCESS_FBINFO(devflags.crtc2)) {
+			ACCESS_FBINFO(outputs[i]).default_src = MATROXFB_SRC_CRTC2;
+		} else {
+			printk(KERN_ERR "matroxfb: Unknown outputs setting\n");
+			break;
+		}
+	}
+	/* Nullify this option for subsequent adapters */
+	outputs[0] = 0;
+}
+
 static int initMatrox2(WPMINFO struct board* b){
 	unsigned long ctrlptr_phys = 0;
 	unsigned long video_base_phys = 0;
@@ -1577,20 +1611,18 @@ static int initMatrox2(WPMINFO struct board* b){
 	ACCESS_FBINFO(devflags.crtc2) = (b->flags & DEVF_CRTC2) != 0;
 	ACCESS_FBINFO(devflags.maven_capable) = (b->flags & DEVF_MAVEN_CAPABLE) != 0;
 	ACCESS_FBINFO(devflags.dualhead) = (b->flags & DEVF_DUALHEAD) != 0;
-	if (b->flags & DEVF_PANELLINK_CAPABLE) {
-		ACCESS_FBINFO(outputs[2]).data = MINFO;
-		ACCESS_FBINFO(outputs[2]).output = &panellink_output;
-		if (dfp)
-			ACCESS_FBINFO(outputs[2]).src = MATROXFB_SRC_CRTC1;
-		else
-			ACCESS_FBINFO(outputs[2]).src = MATROXFB_SRC_NONE;
-		ACCESS_FBINFO(outputs[2]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
-		ACCESS_FBINFO(devflags.panellink) = 1;
-	}
 	ACCESS_FBINFO(devflags.dfp_type) = dfp_type;
 	ACCESS_FBINFO(devflags.g450dac) = (b->flags & DEVF_G450DAC) != 0;
 	ACCESS_FBINFO(devflags.textstep) = ACCESS_FBINFO(devflags.vgastep) * ACCESS_FBINFO(devflags.textmode);
 	ACCESS_FBINFO(devflags.textvram) = 65536 / ACCESS_FBINFO(devflags.textmode);
+	setDefaultOutputs(PMINFO2);
+	if (b->flags & DEVF_PANELLINK_CAPABLE) {
+		ACCESS_FBINFO(outputs[2]).data = MINFO;
+		ACCESS_FBINFO(outputs[2]).output = &panellink_output;
+		ACCESS_FBINFO(outputs[2]).src = ACCESS_FBINFO(outputs[2]).default_src;
+		ACCESS_FBINFO(outputs[2]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
+		ACCESS_FBINFO(devflags.panellink) = 1;
+	}
 
 	if (ACCESS_FBINFO(capable.cross4MB) < 0)
 		ACCESS_FBINFO(capable.cross4MB) = b->flags & DEVF_CROSS4MB;
@@ -1813,6 +1845,13 @@ static int initMatrox2(WPMINFO struct board* b){
 							to yres_virtual * xres_virtual < 2^32 */
 	}
 	matroxfb_init_fix(PMINFO2);
+	/* Normalize values (namely yres_virtual) */
+	matroxfb_check_var(&vesafb_defined, &ACCESS_FBINFO(fbcon));
+	/* And put it into "current" var. Do NOT program hardware yet, or we'll not take over
+	 * vgacon correctly. fbcon_startup will call fb_set_par for us, WITHOUT check_var,
+	 * and unfortunately it will do it BEFORE vgacon contents is saved, so it won't work
+	 * anyway. But we at least tried... */
+	ACCESS_FBINFO(fbcon.var) = vesafb_defined;
 	err = -EINVAL;
 
 	printk(KERN_INFO "matroxfb: %dx%dx%dbpp (virtual: %dx%d)\n",
@@ -1834,6 +1873,9 @@ static int initMatrox2(WPMINFO struct board* b){
 		 * until someone tells me what is proper thing to do */
 		printk(KERN_INFO "fb%d: initializing hardware\n",
 			ACCESS_FBINFO(fbcon.node));
+		/* We have to use FB_ACTIVATE_FORCE, as we had to put vesafb_defined to the fbcon.var
+		 * already before, so register_framebuffer works correctly. */
+		vesafb_defined.activate |= FB_ACTIVATE_FORCE;
 		fb_set_var(&ACCESS_FBINFO(fbcon), &vesafb_defined);
 	}
 	return 0;
@@ -2288,6 +2330,8 @@ int __init matroxfb_setup(char *options) {
 			mem = simple_strtoul(this_opt+4, NULL, 0);
 		else if (!strncmp(this_opt, "mode:", 5))
 			strlcpy(videomode, this_opt+5, sizeof(videomode));
+		else if (!strncmp(this_opt, "outputs:", 8))
+			strlcpy(outputs, this_opt+8, sizeof(outputs));
 		else if (!strncmp(this_opt, "dfp:", 4)) {
 			dfp_type = simple_strtoul(this_opt+4, NULL, 0);
 			dfp = 1;
@@ -2463,6 +2507,8 @@ MODULE_PARM(dfp, "i");
 MODULE_PARM_DESC(dfp, "Specifies whether to use digital flat panel interface of G200/G400 (0 or 1) (default=0)");
 MODULE_PARM(dfp_type, "i");
 MODULE_PARM_DESC(dfp_type, "Specifies DFP interface type (0 to 255) (default=read from hardware)");
+MODULE_PARM(outputs, "c8");
+MODULE_PARM_DESC(outputs, "Specifies which CRTC is mapped to which output (string of up to three letters, consisting of 0 (disabled), 1 (CRTC1), 2 (CRTC2)) (default=111 for Gx50, 101 for G200/G400 with DFP, and 100 for all other devices)");
 #ifdef CONFIG_PPC_PMAC
 MODULE_PARM(vmode, "i");
 MODULE_PARM_DESC(vmode, "Specify the vmode mode number that should be used (640x480 default)");

@@ -2824,19 +2824,13 @@ int __init blk_dev_init(void)
 		panic("Failed to create kblockd\n");
 
 	request_cachep = kmem_cache_create("blkdev_requests",
-			sizeof(struct request), 0, 0, NULL, NULL);
-	if (!request_cachep)
-		panic("Can't create request pool slab cache\n");
+			sizeof(struct request), 0, SLAB_PANIC, NULL, NULL);
 
 	requestq_cachep = kmem_cache_create("blkdev_queue",
-			sizeof(request_queue_t), 0, 0, NULL, NULL);
-	if (!requestq_cachep)
-		panic("Can't create request queue slab cache\n");
+			sizeof(request_queue_t), 0, SLAB_PANIC, NULL, NULL);
 
 	iocontext_cachep = kmem_cache_create("blkdev_ioc",
-			sizeof(struct io_context), 0, 0, NULL, NULL);
-	if (!iocontext_cachep)
-		panic("Can't create io context slab cache\n");
+			sizeof(struct io_context), 0, SLAB_PANIC, NULL, NULL);
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;

@@ -1188,7 +1188,7 @@ static int maven_init_client(struct i2c_client* clnt) {
 	md->client = clnt;
 	down_write(&ACCESS_FBINFO(altout.lock));
 	ACCESS_FBINFO(outputs[1]).output = &maven_altout;
-	ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_NONE;
+	ACCESS_FBINFO(outputs[1]).src = ACCESS_FBINFO(outputs[1]).default_src;
 	ACCESS_FBINFO(outputs[1]).data = md;
 	ACCESS_FBINFO(outputs[1]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
 	up_write(&ACCESS_FBINFO(altout.lock));
@@ -1249,6 +1249,7 @@ static int maven_detect_client(struct i2c_adapter* adapter, int address, int kin
 		err = -ENOMEM;
 		goto ERROR0;
 	}
+	memset(new_client, 0, sizeof(*new_client) + sizeof(*data));
 	data = (struct maven_data*)(new_client + 1);
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;

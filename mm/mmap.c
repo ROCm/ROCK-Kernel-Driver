@@ -951,7 +951,7 @@ out:
 	}
 	if (flags & MAP_POPULATE) {
 		up_write(&mm->mmap_sem);
-		sys_remap_file_pages(addr, len, prot,
+		sys_remap_file_pages(addr, len, 0,
 					pgoff, flags & MAP_NONBLOCK);
 		down_write(&mm->mmap_sem);
 	}
