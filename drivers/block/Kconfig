@@ -63,7 +63,7 @@ config AMIGA_Z2RAM
 
 config ATARI_ACSI
 	tristate "Atari ACSI support"
-	depends on ATARI
+	depends on ATARI && BROKEN
 	---help---
 	  This enables support for the Atari ACSI interface. The driver
 	  supports hard disks and CD-ROMs, which have 512-byte sectors, or can
