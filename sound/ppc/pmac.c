@@ -1169,9 +1169,8 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 
 #if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
 	/* add sleep notifier */
-	snd_pmac_register_sleep_notifier(chip);
-	card->set_power_state = snd_pmac_set_power_state;
-	card->power_state_private_data = chip;
+	if (! snd_pmac_register_sleep_notifier(chip))
+		snd_card_set_pm_callback(chip->card, snd_pmac_suspend, snd_pmac_resume, chip);
 #endif
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
@@ -1275,21 +1274,16 @@ static struct pmu_sleep_notifier snd_pmac_sleep_notifier = {
 static int __init snd_pmac_register_sleep_notifier(pmac_t *chip)
 {
 	/* should be protected here.. */
-	if (sleeping_pmac) {
-		snd_printd("sleep notifier already reigistered\n");
-		return -EBUSY;
-	}
+	snd_assert(! sleeping_pmac, return -EBUSY);
 	sleeping_pmac = chip;
 	pmu_register_sleep_notifier(&snd_pmac_sleep_notifier);
-	snd_card_set_pm_callback(chip->card, snd_pmac_suspend, snd_pmac_resume, chip);
 	return 0;
 }
 						    
 static int snd_pmac_unregister_sleep_notifier(pmac_t *chip)
 {
 	/* should be protected here.. */
-	if (sleeping_pmac != chip)
-		return -ENODEV;
+	snd_assert(sleeping_pmac == chip, return -ENODEV);
 	pmu_unregister_sleep_notifier(&snd_pmac_sleep_notifier);
 	sleeping_pmac = NULL;
 	return 0;
