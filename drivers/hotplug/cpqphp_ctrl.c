@@ -1471,7 +1471,8 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 		func->status = 0;
 	} else {
 		// Get vendor/device ID u32
-		rc = pci_read_config_dword_nodev (ctrl->pci_ops, func->bus, func->device, func->function, PCI_VENDOR_ID, &temp_register);
+		ctrl->pci_bus->number = func->bus;
+		rc = pci_bus_read_config_dword (ctrl->pci_bus, PCI_DEVFN(func->device, func->function), PCI_VENDOR_ID, &temp_register);
 		dbg("%s: pci_read_config_dword returns %d\n", __FUNCTION__, rc);
 		dbg("%s: temp_register is %x\n", __FUNCTION__, temp_register);
 
@@ -2082,7 +2083,9 @@ int cpqhp_process_SS (struct controller *ctrl, struct pci_func *func)
 	u8 index = 0;
 	u8 replace_flag;
 	u32 rc = 0;
+	unsigned int devfn;
 	struct slot* p_slot;
+	struct pci_bus *pci_bus = ctrl->pci_bus;
 	int physical_slot=0;
 
 	device = func->device; 
@@ -2094,8 +2097,11 @@ int cpqhp_process_SS (struct controller *ctrl, struct pci_func *func)
 
 	// Make sure there are no video controllers here
 	while (func && !rc) {
+		pci_bus->number = func->bus;
+		devfn = PCI_DEVFN(func->device, func->function);
+
 		// Check the Class Code
-		rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, 0x0B, &class_code);
+		rc = pci_bus_read_config_byte (pci_bus, devfn, 0x0B, &class_code);
 		if (rc)
 			return rc;
 
@@ -2104,13 +2110,13 @@ int cpqhp_process_SS (struct controller *ctrl, struct pci_func *func)
 			rc = REMOVE_NOT_SUPPORTED;
 		} else {
 			// See if it's a bridge
-			rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, PCI_HEADER_TYPE, &header_type);
+			rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_HEADER_TYPE, &header_type);
 			if (rc)
 				return rc;
 
 			// If it's a bridge, check the VGA Enable bit
 			if ((header_type & 0x7F) == PCI_HEADER_TYPE_BRIDGE) {
-				rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, PCI_BRIDGE_CONTROL, &BCR);
+				rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_BRIDGE_CONTROL, &BCR);
 				if (rc)
 					return rc;
 
@@ -2334,7 +2340,8 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
 
 	dbg("%s\n", __FUNCTION__);
 	// Check for Multi-function device
-	rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, 0x0E, &temp_byte);
+	ctrl->pci_bus->number = func->bus;
+	rc = pci_bus_read_config_byte (ctrl->pci_bus, PCI_DEVFN(func->device, func->function), 0x0E, &temp_byte);
 	if (rc) {
 		dbg("%s: rc = %d\n", __FUNCTION__, rc);
 		return rc;
@@ -2372,7 +2379,7 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
 		//  and creates a board structure
 
 		while ((function < max_functions) && (!stop_it)) {
-			pci_read_config_dword_nodev (ctrl->pci_ops, func->bus, func->device, function, 0x00, &ID);
+			pci_bus_read_config_dword (ctrl->pci_bus, PCI_DEVFN(func->device, function), 0x00, &ID);
 
 			if (ID == 0xFFFFFFFF) {	  // There's nothing there. 
 				function++;
@@ -2435,6 +2442,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 	u32 temp_register;
 	u32 base;
 	u32 ID;
+	unsigned int devfn;
 	struct pci_resource *mem_node;
 	struct pci_resource *p_mem_node;
 	struct pci_resource *io_node;
@@ -2445,17 +2453,22 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 	struct pci_resource *hold_bus_node;
 	struct irq_mapping irqs;
 	struct pci_func *new_slot;
+	struct pci_bus *pci_bus;
 	struct resource_lists temp_resources;
 
+	pci_bus = ctrl->pci_bus;
+	pci_bus->number = func->bus;
+	devfn = PCI_DEVFN(func->device, func->function);
+
 	// Check for Bridge
-	rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, PCI_HEADER_TYPE, &temp_byte);
+	rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_HEADER_TYPE, &temp_byte);
 	if (rc)
 		return rc;
 
 	if ((temp_byte & 0x7F) == PCI_HEADER_TYPE_BRIDGE) { // PCI-PCI Bridge
 		// set Primary bus
 		dbg("set Primary bus = %d\n", func->bus);
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PRIMARY_BUS, func->bus);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_PRIMARY_BUS, func->bus);
 		if (rc)
 			return rc;
 
@@ -2470,29 +2483,29 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		// set Secondary bus
 		temp_byte = bus_node->base;
 		dbg("set Secondary bus = %d\n", bus_node->base);
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_SECONDARY_BUS, temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SECONDARY_BUS, temp_byte);
 		if (rc)
 			return rc;
 
 		// set subordinate bus
 		temp_byte = bus_node->base + bus_node->length - 1;
 		dbg("set subordinate bus = %d\n", bus_node->base + bus_node->length - 1);
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_SUBORDINATE_BUS, temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
 		if (rc)
 			return rc;
 
 		// set subordinate Latency Timer and base Latency Timer
 		temp_byte = 0x40;
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_SEC_LATENCY_TIMER, temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SEC_LATENCY_TIMER, temp_byte);
 		if (rc)
 			return rc;
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_LATENCY_TIMER, temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_LATENCY_TIMER, temp_byte);
 		if (rc)
 			return rc;
 
 		// set Cache Line size
 		temp_byte = 0x08;
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_CACHE_LINE_SIZE, temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_CACHE_LINE_SIZE, temp_byte);
 		if (rc)
 			return rc;
 
@@ -2568,10 +2581,10 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 			// set IO base and Limit registers
 			temp_byte = io_node->base >> 8;
-			rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_IO_BASE, temp_byte);
+			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
 
 			temp_byte = (io_node->base + io_node->length - 1) >> 8;
-			rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_IO_LIMIT, temp_byte);
+			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
 		} else {
 			kfree(hold_IO_node);
 			hold_IO_node = NULL;
@@ -2586,16 +2599,16 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 			// set Mem base and Limit registers
 			temp_word = mem_node->base >> 16;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			temp_word = (mem_node->base + mem_node->length - 1) >> 16;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 		} else {
 			temp_word = 0xFFFF;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			temp_word = 0x0000;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 
 			kfree(hold_mem_node);
 			hold_mem_node = NULL;
@@ -2610,16 +2623,16 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 			// set Pre Mem base and Limit registers
 			temp_word = p_mem_node->base >> 16;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PREF_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
 
 			temp_word = (p_mem_node->base + p_mem_node->length - 1) >> 16;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PREF_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 		} else {
 			temp_word = 0xFFFF;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PREF_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
 
 			temp_word = 0x0000;
-			rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PREF_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 
 			kfree(hold_p_mem_node);
 			hold_p_mem_node = NULL;
@@ -2635,7 +2648,9 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			irqs.barber_pole = (irqs.barber_pole + 1) & 0x03;
 
 			ID = 0xFFFFFFFF;
-			pci_read_config_dword_nodev (ctrl->pci_ops, hold_bus_node->base, device, 0, 0x00, &ID);
+			pci_bus->number = hold_bus_node->base;
+			pci_bus_read_config_dword (pci_bus, PCI_DEVFN(device, 0), 0x00, &ID);
+			pci_bus->number = func->bus;
 
 			if (ID != 0xFFFFFFFF) {	  //  device Present
 				// Setup slot structure.
@@ -2703,7 +2718,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			temp_byte = temp_resources.bus_head->base - 1;
 
 			// set subordinate bus
-			rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_SUBORDINATE_BUS, temp_byte);
+			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
 
 			if (temp_resources.bus_head->length == 0) {
 				kfree(temp_resources.bus_head);
@@ -2724,7 +2739,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 				hold_IO_node->base = io_node->base + io_node->length;
 
 				temp_byte = (hold_IO_node->base) >> 8;
-				rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_IO_BASE, temp_byte);
+				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_IO_BASE, temp_byte);
 
 				return_resource(&(resources->io_head), io_node);
 			}
@@ -2742,13 +2757,13 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 					func->io_head = hold_IO_node;
 
 					temp_byte = (io_node->base - 1) >> 8;
-					rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_IO_LIMIT, temp_byte);
+					rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
 
 					return_resource(&(resources->io_head), io_node);
 				} else {
 					// it doesn't need any IO
 					temp_word = 0x0000;
-					pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_IO_LIMIT, temp_word);
+					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_IO_LIMIT, temp_word);
 
 					return_resource(&(resources->io_head), io_node);
 					kfree(hold_IO_node);
@@ -2774,7 +2789,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 				hold_mem_node->base = mem_node->base + mem_node->length;
 
 				temp_word = (hold_mem_node->base) >> 16;
-				rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_MEMORY_BASE, temp_word);
+				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 				return_resource(&(resources->mem_head), mem_node);
 			}
@@ -2792,14 +2807,14 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 					// configure end address
 					temp_word = (mem_node->base - 1) >> 16;
-					rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_MEMORY_LIMIT, temp_word);
+					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 
 					// Return unused resources to the pool
 					return_resource(&(resources->mem_head), mem_node);
 				} else {
 					// it doesn't need any Mem
 					temp_word = 0x0000;
-					rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_MEMORY_LIMIT, temp_word);
+					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 
 					return_resource(&(resources->mem_head), mem_node);
 					kfree(hold_mem_node);
@@ -2825,7 +2840,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 				hold_p_mem_node->base = p_mem_node->base + p_mem_node->length;
 
 				temp_word = (hold_p_mem_node->base) >> 16;
-				rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PREF_MEMORY_BASE, temp_word);
+				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
 
 				return_resource(&(resources->p_mem_head), p_mem_node);
 			}
@@ -2843,13 +2858,13 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 					func->p_mem_head = hold_p_mem_node;
 
 					temp_word = (p_mem_node->base - 1) >> 16;
-					rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PREF_MEMORY_LIMIT, temp_word);
+					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 
 					return_resource(&(resources->p_mem_head), p_mem_node);
 				} else {
 					// it doesn't need any PMem
 					temp_word = 0x0000;
-					rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_PREF_MEMORY_LIMIT, temp_word);
+					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
 
 					return_resource(&(resources->p_mem_head), p_mem_node);
 					kfree(hold_p_mem_node);
@@ -2870,14 +2885,14 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 		// enable card
 		command = 0x0157;	// = PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |  PCI_COMMAND_INVALIDATE | PCI_COMMAND_PARITY | PCI_COMMAND_SERR
-		rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_COMMAND, command);
+		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_COMMAND, command);
 
 		// set Bridge Control Register
 		command = 0x07;		// = PCI_BRIDGE_CTL_PARITY | PCI_BRIDGE_CTL_SERR | PCI_BRIDGE_CTL_NO_ISA
-		rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_BRIDGE_CONTROL, command);
+		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_BRIDGE_CONTROL, command);
 	} else if ((temp_byte & 0x7F) == PCI_HEADER_TYPE_NORMAL) {
 		// Standard device
-		rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, 0x0B, &class_code);
+		rc = pci_bus_read_config_byte (pci_bus, devfn, 0x0B, &class_code);
 
 		if (class_code == PCI_BASE_CLASS_DISPLAY) {
 			// Display (video) adapter (not supported)
@@ -2887,10 +2902,10 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		for (cloop = 0x10; cloop <= 0x24; cloop += 4) {
 			temp_register = 0xFFFFFFFF;
 
-			dbg("CND: bus=%d, device=%d, func=%d, offset=%d\n", func->bus, func->device, func->function, cloop);
-			rc = pci_write_config_dword_nodev(ctrl->pci_ops, func->bus, func->device, func->function, cloop, temp_register);
+			dbg("CND: bus=%d, devfn=%d, offset=%d\n", pci_bus->number, devfn, cloop);
+			rc = pci_bus_write_config_dword (pci_bus, devfn, cloop, temp_register);
 
-			rc = pci_read_config_dword_nodev (ctrl->pci_ops, func->bus, func->device, func->function, cloop, &temp_register);
+			rc = pci_bus_read_config_dword (pci_bus, devfn, cloop, &temp_register);
 			dbg("CND: base = 0x%x\n", temp_register);
 
 			if (temp_register) {	  // If this register is implemented
@@ -2971,7 +2986,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 					return(NOT_ENOUGH_RESOURCES);
 				}
 
-				rc = pci_write_config_dword_nodev(ctrl->pci_ops, func->bus, func->device, func->function, cloop, base);
+				rc = pci_bus_write_config_dword (pci_bus, devfn, cloop, base);
 
 				// Check for 64-bit base
 				if ((temp_register & 0x07L) == 0x04) {
@@ -2980,13 +2995,13 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 					// Upper 32 bits of address always zero on today's systems
 					// FIXME this is probably not true on Alpha and ia64???
 					base = 0;
-					rc = pci_write_config_dword_nodev(ctrl->pci_ops, func->bus, func->device, func->function, cloop, base);
+					rc = pci_bus_write_config_dword (pci_bus, devfn, cloop, base);
 				}
 			}
 		}		// End of base register loop
 
 		// Figure out which interrupt pin this function uses
-		rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, PCI_INTERRUPT_PIN, &temp_byte);
+		rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_INTERRUPT_PIN, &temp_byte);
 
 		// If this function needs an interrupt and we are behind a bridge
 		// and the pin is tied to something that's alread mapped,
@@ -2998,7 +3013,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			IRQ = resources->irqs->interrupt[(temp_byte + resources->irqs->barber_pole - 1) & 0x03];
 		} else {
 			// Program IRQ based on card type
-			rc = pci_read_config_byte_nodev (ctrl->pci_ops, func->bus, func->device, func->function, 0x0B, &class_code);
+			rc = pci_bus_read_config_byte (pci_bus, devfn, 0x0B, &class_code);
 
 			if (class_code == PCI_BASE_CLASS_STORAGE) {
 				IRQ = cpqhp_disk_irq;
@@ -3008,7 +3023,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		}
 
 		// IRQ Line
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_INTERRUPT_LINE, IRQ);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_INTERRUPT_LINE, IRQ);
 
 		if (!behind_bridge) {
 			rc = cpqhp_set_irq(func->bus, func->device, temp_byte + 0x09, IRQ);
@@ -3022,19 +3037,19 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 		// Latency Timer
 		temp_byte = 0x40;
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_LATENCY_TIMER, temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_LATENCY_TIMER, temp_byte);
 
 		// Cache Line size
 		temp_byte = 0x08;
-		rc = pci_write_config_byte_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_CACHE_LINE_SIZE, temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_CACHE_LINE_SIZE, temp_byte);
 
 		// disable ROM base Address
 		temp_dword = 0x00L;
-		rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_ROM_ADDRESS, temp_dword);
+		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_ROM_ADDRESS, temp_dword);
 
 		// enable card
 		temp_word = 0x0157;	// = PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |  PCI_COMMAND_INVALIDATE | PCI_COMMAND_PARITY | PCI_COMMAND_SERR
-		rc = pci_write_config_word_nodev(ctrl->pci_ops, func->bus, func->device, func->function, PCI_COMMAND, temp_word);
+		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_COMMAND, temp_word);
 	}			// End of Not-A-Bridge else
 	else {
 		// It's some strange type of PCI adapter (Cardbus?)

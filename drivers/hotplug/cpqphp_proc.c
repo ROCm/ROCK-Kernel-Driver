@@ -53,8 +53,9 @@ static int read_ctrl (char *buf, char **start, off_t offset, int len, int *eof, 
 	*eof = 1;
 
 	out += sprintf(out, "hot plug ctrl Info Page\n");
-	out += sprintf(out, "bus = %d, device = %d, function = %d\n",ctrl->bus,
-		       ctrl->device, ctrl->function);
+	out += sprintf(out, "bus = %d, device = %d, function = %d\n",
+		       ctrl->bus, PCI_SLOT(ctrl->pci_dev->devfn),
+		       PCI_FUNC(ctrl->pci_dev->devfn));
 	out += sprintf(out, "Free resources: memory\n");
 	index = 11;
 	res = ctrl->mem_head;
@@ -104,8 +105,9 @@ static int read_dev (char *buf, char **start, off_t offset, int len, int *eof, v
 	*eof = 1;
 
 	out += sprintf(out, "hot plug ctrl Info Page\n");
-	out += sprintf(out, "bus = %d, device = %d, function = %d\n",ctrl->bus,
-		       ctrl->device, ctrl->function);
+	out += sprintf(out, "bus = %d, device = %d, function = %d\n",
+		       ctrl->bus, PCI_SLOT(ctrl->pci_dev->devfn),
+		       PCI_FUNC(ctrl->pci_dev->devfn));
 
 	slot=ctrl->slot;
 

@@ -292,16 +292,14 @@ struct controller {
 	struct pci_resource *io_head;
 	struct pci_resource *bus_head;
 	struct pci_dev *pci_dev;
-	struct pci_ops *pci_ops;
+	struct pci_bus *pci_bus;
 	struct proc_dir_entry* proc_entry;
 	struct proc_dir_entry* proc_entry2;
 	struct event_info event_queue[10];
 	struct slot *slot;
 	u8 next_event;
 	u8 interrupt;
-	u8 bus;
-	u8 device;
-	u8 function;
+	u8 bus;				/* bus number for the pci hotplug controller */
 	u8 rev;
 	u8 slot_device_offset;
 	u8 first_slot;

@@ -286,12 +286,12 @@ static u32 store_HRT (void *rom_start)
 			return(rc);
 
 		// The device Number
-		rc = add_byte( &pFill, ctrl->device, &usedbytes, &available);
+		rc = add_byte( &pFill, PCI_SLOT(ctrl->pci_dev->devfn), &usedbytes, &available);
 		if (rc)
 			return(rc);
 
 		// The function Number
-		rc = add_byte( &pFill, ctrl->function, &usedbytes, &available);
+		rc = add_byte( &pFill, PCI_FUNC(ctrl->pci_dev->devfn), &usedbytes, &available);
 		if (rc)
 			return(rc);
 
@@ -479,8 +479,9 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 		device = p_ev_ctrl->device;
 		function = p_ev_ctrl->function;
 
-		while ((bus != ctrl->bus) || (device != ctrl->device)
-		       || (function != ctrl->function)) {
+		while ((bus != ctrl->bus) ||
+		       (device != PCI_SLOT(ctrl->pci_dev->devfn)) || 
+		       (function != PCI_FUNC(ctrl->pci_dev->devfn))) {
 			nummem = p_ev_ctrl->mem_avail;
 			numpmem = p_ev_ctrl->p_mem_avail;
 			numio = p_ev_ctrl->io_avail;
