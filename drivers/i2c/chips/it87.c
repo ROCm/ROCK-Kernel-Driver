@@ -170,8 +170,11 @@ static inline u8 FAN_TO_REG(long rpm, int div)
 static int DIV_TO_REG(int val)
 {
 	int answer = 0;
-	while ((val >>= 1))
+	val >>= 1;
+	while (val) {
 		answer++;
+		val >>= 1;
+	}
 	return answer;
 }
 #define DIV_FROM_REG(val) (1 << (val))
