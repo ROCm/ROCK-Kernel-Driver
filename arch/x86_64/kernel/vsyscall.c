@@ -80,7 +80,7 @@ static inline void do_vgettimeofday(struct timeval * tv)
 		sync_core();
 		rdtscll(t);
 		sec = __xtime.tv_sec;
-		usec = (__xtime.tv_nsec * 1000) +
+		usec = (__xtime.tv_nsec / 1000) +
 			(__jiffies - __wall_jiffies) * (1000000 / HZ) +
 			(t  - __hpet.last_tsc) * (1000000 / HZ) / __hpet.ticks + __hpet.offset;
 

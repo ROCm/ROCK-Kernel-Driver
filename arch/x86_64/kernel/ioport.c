@@ -53,7 +53,7 @@ static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_
 /*
  * this changes the io permissions bitmap in the current task.
  */
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	struct thread_struct * t = &current->thread;
 	struct tss_struct * tss;

@@ -26,7 +26,6 @@ struct save_context_frame {
 	unsigned long rdx;	
 	unsigned long rsi;
 	unsigned long rdi; 
-	unsigned long rax;
 	unsigned long r15;
 	unsigned long r14;
 	unsigned long r13;
@@ -45,7 +44,7 @@ struct save_context_frame {
    frame pointer and the scheduler is compiled with frame pointers. -AK */
 #define SAVE_CONTEXT \
 	__PUSH(r8) __PUSH(r9) __PUSH(r10) __PUSH(r11) __PUSH(r12) __PUSH(r13) \
-	__PUSH(r14) __PUSH(r15) __PUSH(rax) \
+	__PUSH(r14) __PUSH(r15) \
 	__PUSH(rdi) __PUSH(rsi) \
 	__PUSH(rdx) __PUSH(rcx) \
 	__PUSH(rbx) __PUSH(rbp) 
@@ -53,7 +52,7 @@ struct save_context_frame {
 	__POP(rbp) __POP(rbx) \
 	__POP(rcx) __POP(rdx) \
 	__POP(rsi) __POP(rdi) \
-	__POP(rax) __POP(r15) __POP(r14) __POP(r13) __POP(r12) __POP(r11) __POP(r10) \
+	__POP(r15) __POP(r14) __POP(r13) __POP(r12) __POP(r11) __POP(r10) \
 	__POP(r9) __POP(r8)
 
 /* RED-PEN: pipeline stall on ret because it is not predicted */
@@ -68,9 +67,10 @@ struct save_context_frame {
 		     "thread_return:\n\t"					    \
 		     RESTORE_CONTEXT						    \
 		     :[prevrsp] "=m" (prev->thread.rsp), 			    \
-		      [prevrip] "=m" (prev->thread.rip)			    	    \
+		      [prevrip] "=m" (prev->thread.rip),		    	    \
+		      "=a" (last)						    \
 		     :[nextrsp] "m" (next->thread.rsp), 			    \
-		      [nextrip]"m" (next->thread.rip),				    \
+		      [nextrip] "m" (next->thread.rip),				    \
 		      [next] "S" (next), [prev] "D" (prev)  			    \
 	             :"memory")
     

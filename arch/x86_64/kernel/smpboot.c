@@ -127,7 +127,7 @@ static void __init synchronize_tsc_bp (void)
 	int buggy = 0;
 	extern unsigned cpu_khz;
 
-	printk("checking TSC synchronization across %u CPUs: ",num_booting_cpus());
+	printk(KERN_INFO "checking TSC synchronization across %u CPUs: ",num_booting_cpus());
 
 	one_usec = cpu_khz; 
 
@@ -262,9 +262,8 @@ void __init smp_callin(void)
 	phys_id = GET_APIC_ID(apic_read(APIC_ID));
 	cpuid = smp_processor_id();
 	if (test_and_set_bit(cpuid, &cpu_callin_map)) {
-		printk("huh, phys CPU#%d, CPU#%d already present??\n",
+		panic("smp_callin: phys CPU#%d, CPU#%d already present??\n",
 					phys_id, cpuid);
-		BUG();
 	}
 	Dprintk("CPU#%d (phys ID: %d) waiting for CALLOUT\n", cpuid, phys_id);
 
@@ -290,9 +289,8 @@ void __init smp_callin(void)
 	}
 
 	if (!time_before(jiffies, timeout)) {
-		printk("BUG: CPU%d started up but did not get a callout!\n",
+		panic("smp_callin: CPU%d started up but did not get a callout!\n",
 			cpuid);
-		BUG();
 	}
 
 	/*
@@ -429,7 +427,7 @@ static inline void inquire_remote_apic(int apicid)
 	char *names[] = { "ID", "VERSION", "SPIV" };
 	int timeout, status;
 
-	printk("Inquiring remote APIC #%d...\n", apicid);
+	printk(KERN_INFO "Inquiring remote APIC #%d...\n", apicid);
 
 	for (i = 0; i < sizeof(regs) / sizeof(*regs); i++) {
 		printk("... APIC #%d %s: ", apicid, names[i]);
@@ -576,9 +574,9 @@ static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned int start_
 	Dprintk("After Startup.\n");
 
 	if (send_status)
-		printk("APIC never delivered???\n");
+		printk(KERN_ERR "APIC never delivered???\n");
 	if (accept_status)
-		printk("APIC delivery error (%lx).\n", accept_status);
+		printk(KERN_ERR "APIC delivery error (%lx).\n", accept_status);
 
 	return (send_status | accept_status);
 }
@@ -621,7 +619,7 @@ static void __init do_boot_cpu (int apicid)
 	init_tss[cpu].rsp0 = init_rsp;
 	initial_code = initialize_secondary;
 
-	printk("Booting processor %d/%d rip %lx rsp %lx rsp2 %lx\n", cpu, apicid, 
+	printk(KERN_INFO "Booting processor %d/%d rip %lx rsp %lx rsp2 %lx\n", cpu, apicid, 
 	       start_rip, idle->thread.rsp, init_rsp);
 
 	/*
@@ -680,7 +678,7 @@ static void __init do_boot_cpu (int apicid)
 		if (test_bit(cpu, &cpu_callin_map)) {
 			/* number CPUs logically, starting from 1 (BSP is 0) */
 			Dprintk("OK.\n");
-			printk("CPU%d: ", cpu);
+			printk("KERN_INFO CPU%d: ", cpu);
 			print_cpu_info(&cpu_data[cpu]);
 			Dprintk("CPU has booted.\n");
 		} else {
@@ -744,10 +742,10 @@ static void smp_tune_scheduling (void)
 
 	cache_decay_ticks = (long)cacheflush_time/cpu_khz * HZ / 1000;
 
-	printk("per-CPU timeslice cutoff: %ld.%02ld usecs.\n",
+	printk(KERN_INFO "per-CPU timeslice cutoff: %ld.%02ld usecs.\n",
 		(long)cacheflush_time/(cpu_khz/1000),
 		((long)cacheflush_time*100/(cpu_khz/1000)) % 100);
-	printk("task migration cache decay timeout: %ld msecs.\n",
+	printk(KERN_INFO "task migration cache decay timeout: %ld msecs.\n",
 		(cache_decay_ticks + 1) * 1000 / HZ);
 }
 
@@ -763,7 +761,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * Setup boot CPU information
 	 */
 	smp_store_cpu_info(0); /* Final full version of the data */
-	printk("CPU%d: ", 0);
+	printk(KERN_INFO "CPU%d: ", 0);
 	print_cpu_info(&cpu_data[0]);
 
 	current_thread_info()->cpu = 0;
@@ -795,7 +793,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * CPU too, but we do it for the sake of robustness anyway.
 	 */
 	if (!test_bit(boot_cpu_id, &phys_cpu_present_map)) {
-		printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
+		printk(KERN_NOTICE "weird, boot CPU (#%d) not listed by the BIOS.\n",
 								 boot_cpu_id);
 		phys_cpu_present_map |= (1 << hard_smp_processor_id());
 	}

@@ -300,11 +300,11 @@ static nmi_callback_t nmi_callback = dummy_nmi_callback;
  
 asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 {
-	int cpu;
+	int cpu = safe_smp_processor_id();
+
+	init_tss[cpu].ist[NMI_STACK] -= 2048;	/* this shouldn't be needed. */	
 
 	nmi_enter();
-
-	cpu = smp_processor_id(); 
 
 	add_pda(__nmi_count,1);
 
@@ -312,6 +312,8 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 		default_do_nmi(regs);
 	
 	nmi_exit();
+
+	init_tss[cpu].ist[NMI_STACK] += 2048;
 }
 
 void set_nmi_callback(nmi_callback_t callback)

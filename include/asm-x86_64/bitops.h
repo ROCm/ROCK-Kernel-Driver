@@ -303,7 +303,7 @@ static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
 {
 	unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
 	unsigned long set = 0;
-	long res, bit = offset&63;
+	unsigned long res, bit = offset&63;
 	
 	if (bit) {
 		/*
