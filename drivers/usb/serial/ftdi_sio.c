@@ -17,6 +17,9 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (26/Mar/2004) Jan Capek
+ *      Added PID's for ICD-U20/ICD-U40 - incircuit PIC debuggers from CCS Inc.
+ *
  * (09/Feb/2004) Ian Abbott
  *      Changed full name of USB-UIRT device to avoid "/" character.
  *      Added FTDI's alternate PID (0x6006) for FT232/245 devices.
@@ -354,6 +357,7 @@ static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_3, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_4, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_ELV_UO100_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, INSIDE_ACCESSO, 0, 0x3ff) },
 	{ }						/* Terminating entry */
 };
 
@@ -435,7 +439,32 @@ static struct usb_device_id id_table_FT232BM [] = {
 	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_R2X0, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_3, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_4, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E808_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E809_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E80A_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E80B_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E80C_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E80D_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E80E_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E80F_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E888_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E889_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E88A_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E88B_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E88C_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E88D_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E88E_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_GUDEADS_E88F_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_ELV_UO100_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_SDMUSBQSS_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_MASTERDEVEL2_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_0_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_1_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_2_PID, 0x400, 0xffff) },
+	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU20_0_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU40_1_PID) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU20_0_PID) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU40_1_PID) },
 	{ }						/* Terminating entry */
 };
 
@@ -532,6 +561,12 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, PROTEGO_SPECIAL_3) },
 	{ USB_DEVICE(FTDI_VID, PROTEGO_SPECIAL_4) },
 	{ USB_DEVICE(FTDI_VID, FTDI_ELV_UO100_PID) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_SDMUSBQSS_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_MASTERDEVEL2_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_0_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_1_PID, 0x400, 0xffff) },
+ 	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_2_PID, 0x400, 0xffff) },
+	{ USB_DEVICE(FTDI_VID, INSIDE_ACCESSO) },
 	{ }						/* Terminating entry */
 };
 
@@ -789,8 +824,14 @@ static __u32 ftdi_232bm_baud_to_divisor(int baud)
 static int set_rts(struct usb_serial_port *port, int high_or_low)
 {
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
-	char buf[1];
+	char *buf;
 	unsigned ftdi_high_or_low;
+	int rv;
+	
+	buf = kmalloc(1, GFP_NOIO);
+	if (!buf)
+		return -ENOMEM;
+	
 	if (high_or_low) {
 		ftdi_high_or_low = FTDI_SIO_SET_RTS_HIGH;
 		priv->last_dtr_rts |= TIOCM_RTS;
@@ -798,20 +839,29 @@ static int set_rts(struct usb_serial_port *port, int high_or_low)
 		ftdi_high_or_low = FTDI_SIO_SET_RTS_LOW;
 		priv->last_dtr_rts &= ~TIOCM_RTS;
 	}
-	return(usb_control_msg(port->serial->dev,
+	rv = usb_control_msg(port->serial->dev,
 			       usb_sndctrlpipe(port->serial->dev, 0),
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST, 
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST_TYPE,
 			       ftdi_high_or_low, 0, 
-			       buf, 0, WDR_TIMEOUT));
+			       buf, 0, WDR_TIMEOUT);
+
+	kfree(buf);
+	return rv;
 }
 
 
 static int set_dtr(struct usb_serial_port *port, int high_or_low)
 {
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
-	char buf[1];
+	char *buf;
 	unsigned ftdi_high_or_low;
+	int rv;
+	
+	buf = kmalloc(1, GFP_NOIO);
+	if (!buf)
+		return -ENOMEM;
+
 	if (high_or_low) {
 		ftdi_high_or_low = FTDI_SIO_SET_DTR_HIGH;
 		priv->last_dtr_rts |= TIOCM_DTR;
@@ -819,12 +869,15 @@ static int set_dtr(struct usb_serial_port *port, int high_or_low)
 		ftdi_high_or_low = FTDI_SIO_SET_DTR_LOW;
 		priv->last_dtr_rts &= ~TIOCM_DTR;
 	}
-	return(usb_control_msg(port->serial->dev,
+	rv = usb_control_msg(port->serial->dev,
 			       usb_sndctrlpipe(port->serial->dev, 0),
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST, 
 			       FTDI_SIO_SET_MODEM_CTRL_REQUEST_TYPE,
 			       ftdi_high_or_low, 0, 
-			       buf, 0, WDR_TIMEOUT));
+			       buf, 0, WDR_TIMEOUT);
+
+	kfree(buf);
+	return rv;
 }
 
 
@@ -833,21 +886,29 @@ static __u32 get_ftdi_divisor(struct usb_serial_port * port);
 
 static int change_speed(struct usb_serial_port *port)
 {
-	char buf[1];
+	char *buf;
         __u16 urb_value;
 	__u16 urb_index;
 	__u32 urb_index_value;
+	int rv;
+
+	buf = kmalloc(1, GFP_NOIO);
+	if (!buf)
+		return -ENOMEM;
 
 	urb_index_value = get_ftdi_divisor(port);
 	urb_value = (__u16)urb_index_value;
 	urb_index = (__u16)(urb_index_value >> 16);
 	
-	return (usb_control_msg(port->serial->dev,
+	rv = usb_control_msg(port->serial->dev,
 			    usb_sndctrlpipe(port->serial->dev, 0),
 			    FTDI_SIO_SET_BAUDRATE_REQUEST,
 			    FTDI_SIO_SET_BAUDRATE_REQUEST_TYPE,
 			    urb_value, urb_index,
-			    buf, 0, 100) < 0);
+			    buf, 0, 100);
+
+	kfree(buf);
+	return rv;
 }
 
 
@@ -1309,15 +1370,16 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 			/* drop RTS */
 			if (set_rts(port, LOW) < 0) {
 				err("Error from RTS LOW urb");
-			}	
-			/* shutdown our bulk read */
-			if (port->read_urb) {
-				usb_unlink_urb (port->read_urb);	
 			}
-			/* unlink the running write urbs */
-			
+		} /* Note change no line if hupcl is off */
+		
+		/* shutdown our bulk read */
+		if (port->read_urb) {
+			if (usb_unlink_urb (port->read_urb) < 0) {
+				err("Error unlinking read urb");
+			}
+		}
 
-		} /* Note change no line is hupcl is off */
 	} /* if (serial->dev) */
 
 

@@ -55,7 +55,9 @@ set_bConfigurationValue (struct device *dev, const char *buf, size_t count)
 
 	if (sscanf (buf, "%u", &config) != 1 || config > 255)
 		return -EINVAL;
+	down(&udev->serialize);
 	value = usb_set_configuration (udev, config);
+	up(&udev->serialize);
 	return (value < 0) ? value : count;
 }
 
@@ -109,6 +111,37 @@ show_speed (struct device *dev, char *buf)
 }
 static DEVICE_ATTR(speed, S_IRUGO, show_speed, NULL);
 
+static ssize_t
+show_devnum (struct device *dev, char *buf)
+{
+	struct usb_device *udev;
+
+	udev = to_usb_device (dev);
+	return sprintf (buf, "%d\n", udev->devnum);
+}
+static DEVICE_ATTR(devnum, S_IRUGO, show_devnum, NULL);
+
+static ssize_t
+show_version (struct device *dev, char *buf)
+{
+	struct usb_device *udev;
+
+	udev = to_usb_device (dev);
+	return sprintf (buf, "%2x.%02x\n", udev->descriptor.bcdUSB >> 8, 
+			udev->descriptor.bcdUSB & 0xff);
+}
+static DEVICE_ATTR(version, S_IRUGO, show_version, NULL);
+
+static ssize_t
+show_maxchild (struct device *dev, char *buf)
+{
+	struct usb_device *udev;
+
+	udev = to_usb_device (dev);
+	return sprintf (buf, "%d\n", udev->maxchild);
+}
+static DEVICE_ATTR(maxchild, S_IRUGO, show_maxchild, NULL);
+
 /* Descriptor fields */
 #define usb_descriptor_attr(field, format_string)			\
 static ssize_t								\
@@ -159,6 +192,10 @@ void usb_create_driverfs_dev_files (struct usb_device *udev)
 		device_create_file (dev, &dev_attr_product);
 	if (udev->descriptor.iSerialNumber)
 		device_create_file (dev, &dev_attr_serial);
+
+	device_create_file (dev, &dev_attr_devnum);
+	device_create_file (dev, &dev_attr_version);
+	device_create_file (dev, &dev_attr_maxchild);
 }
 
 /* Interface fields */

@@ -94,7 +94,7 @@ static const char ep0name [] = "ep0";
 #define	UDC_PROC_FILE
 #endif
 
-#ifdef CONFIG_ARCH_IXP425
+#ifdef CONFIG_ARCH_IXP4XX
 #undef USE_DMA
 
 /* cpu-specific register addresses are compiled in to this code */
@@ -2374,8 +2374,8 @@ static struct pxa2xx_udc memory = {
 #if	defined(CONFIG_ARCH_PXA)
 #define CP15R0_XSCALE_VALUE	0x69052000	/* intel/arm/xscale */
 
-#elif	defined(CONFIG_ARCH_IXP425)
-#define CP15R0_XSCALE_VALUE	0x69054000	/* intel/arm/ixp425 */
+#elif	defined(CONFIG_ARCH_IXP4XX)
+#define CP15R0_XSCALE_VALUE	0x69054000	/* intel/arm/ixp4xx */
 
 #endif
 
@@ -2434,7 +2434,7 @@ static int __init pxa2xx_udc_probe(struct device *_dev)
 		/* fall through */
 	case PXA250_C0: case PXA210_C0:
 		break;
-#elif	defined(CONFIG_ARCH_IXP425)
+#elif	defined(CONFIG_ARCH_IXP4XX)
 	case IXP425_A0:
 		out_dma = 0;
 		break;

@@ -124,14 +124,25 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 		unsigned int length = le16_to_cpu(config->wTotalLength);
 
 		if (*ppos < pos + length) {
+
+			/* The descriptor may claim to be longer than it
+			 * really is.  Here is the actual allocated length. */
+			unsigned alloclen =
+				ps->dev->config[i].desc.wTotalLength;
+
 			len = length - (*ppos - pos);
 			if (len > nbytes)
 				len = nbytes;
 
-			if (copy_to_user(buf,
-			    ps->dev->rawdescriptors[i] + (*ppos - pos), len)) {
-				ret = -EFAULT;
-				goto err;
+			/* Simply don't write (skip over) unallocated parts */
+			if (alloclen > (*ppos - pos)) {
+				alloclen -= (*ppos - pos);
+				if (copy_to_user(buf,
+				    ps->dev->rawdescriptors[i] + (*ppos - pos),
+				    min(len, alloclen))) {
+					ret = -EFAULT;
+					goto err;
+				}
 			}
 
 			*ppos += len;
@@ -328,18 +339,17 @@ static void driver_disconnect(struct usb_interface *intf)
 	if (!ps)
 		return;
 
-	/* this waits till synchronous requests complete */
-	down_write (&ps->devsem);
+	/* NOTE:  this relies on usbcore having canceled and completed
+	 * all pending I/O requests; 2.6 does that.
+	 */
 
 	/* prevent new I/O requests */
 	ps->dev = 0;
-	ps->ifclaimed = 0;
+	clear_bit(intf->cur_altsetting->desc.bInterfaceNumber, &ps->ifclaimed);
 	usb_set_intfdata (intf, NULL);
 
 	/* force async requests to complete */
 	destroy_all_async (ps);
-
-	up_write (&ps->devsem);
 }
 
 struct usb_driver usbdevfs_driver = {
@@ -363,13 +373,15 @@ static int claimintf(struct dev_state *ps, unsigned int intf)
 		return 0;
 	iface = dev->actconfig->interface[intf];
 	err = -EBUSY;
-	lock_kernel();
+
+	/* lock against other changes to driver bindings */
+	down_write(&usb_bus_type.subsys.rwsem);
 	if (!usb_interface_claimed(iface)) {
 		usb_driver_claim_interface(&usbdevfs_driver, iface, ps);
 		set_bit(intf, &ps->ifclaimed);
 		err = 0;
 	}
-	unlock_kernel();
+	up_write(&usb_bus_type.subsys.rwsem);
 	return err;
 }
 
@@ -384,11 +396,14 @@ static int releaseintf(struct dev_state *ps, unsigned int intf)
 	err = -EINVAL;
 	dev = ps->dev;
 	down(&dev->serialize);
+	/* lock against other changes to driver bindings */
+	down_write(&usb_bus_type.subsys.rwsem);
 	if (test_and_clear_bit(intf, &ps->ifclaimed)) {
 		iface = dev->actconfig->interface[intf];
 		usb_driver_release_interface(&usbdevfs_driver, iface);
 		err = 0;
 	}
+	up_write(&usb_bus_type.subsys.rwsem);
 	up(&dev->serialize);
 	return err;
 }
@@ -414,6 +429,8 @@ static int findintfep(struct usb_device *dev, unsigned int ep)
 
 	if (ep & ~(USB_DIR_IN|0xf))
 		return -EINVAL;
+	if (!dev->actconfig)
+		return -ESRCH;
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		iface = dev->actconfig->interface[i];
 		for (j = 0; j < iface->num_altsetting; j++) {
@@ -434,6 +451,8 @@ static int findintfif(struct usb_device *dev, unsigned int ifn)
 
 	if (ifn & ~0xff)
 		return -EINVAL;
+	if (!dev->actconfig)
+		return -ESRCH;
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		if (dev->actconfig->interface[i]->
 				altsetting[0].desc.bInterfaceNumber == ifn)
@@ -684,9 +703,9 @@ static int proc_getdriver(struct dev_state *ps, void __user *arg)
 	if ((ret = findintfif(ps->dev, gd.interface)) < 0)
 		return ret;
 	interface = ps->dev->actconfig->interface[ret];
-	if (!interface->driver)
+	if (!interface->dev.driver)
 		return -ENODATA;
-	strcpy(gd.driver, interface->driver->name);
+	strncpy(gd.driver, interface->dev.driver->name, sizeof(gd.driver));
 	if (copy_to_user(arg, &gd, sizeof(gd)))
 		return -EFAULT;
 	return 0;
@@ -705,26 +724,11 @@ static int proc_connectinfo(struct dev_state *ps, void __user *arg)
 
 static int proc_resetdevice(struct dev_state *ps)
 {
-	int i, ret;
+	/* FIXME when usb_reset_device() is fixed we'll need to grab
+	 * ps->dev->serialize before calling it.
+	 */
+	return usb_reset_device(ps->dev);
 
-	ret = usb_reset_device(ps->dev);
-	if (ret < 0)
-		return ret;
-
-	for (i = 0; i < ps->dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *intf = ps->dev->actconfig->interface[i];
-
-		/* Don't simulate interfaces we've claimed */
-		if (test_bit(i, &ps->ifclaimed))
-			continue;
-
-		err ("%s - this function is broken", __FUNCTION__);
-		if (intf->driver && ps->dev) {
-			usb_probe_interface (&intf->dev);
-		}
-	}
-
-	return 0;
 }
 
 static int proc_setintf(struct dev_state *ps, void __user *arg)
@@ -738,7 +742,7 @@ static int proc_setintf(struct dev_state *ps, void __user *arg)
 	if ((ret = findintfif(ps->dev, setintf.interface)) < 0)
 		return ret;
 	interface = ps->dev->actconfig->interface[ret];
-	if (interface->driver) {
+	if (interface->dev.driver) {
 		if ((ret = checkintf(ps, ret)))
 			return ret;
 	}
@@ -750,10 +754,51 @@ static int proc_setintf(struct dev_state *ps, void __user *arg)
 static int proc_setconfig(struct dev_state *ps, void __user *arg)
 {
 	unsigned int u;
+	int status = 0;
+ 	struct usb_host_config *actconfig;
 
 	if (get_user(u, (unsigned int __user *)arg))
 		return -EFAULT;
-	return usb_set_configuration(ps->dev, u);
+
+	down(&ps->dev->serialize);
+ 	actconfig = ps->dev->actconfig;
+ 
+ 	/* Don't touch the device if any interfaces are claimed.
+ 	 * It could interfere with other drivers' operations, and if
+	 * an interface is claimed by usbfs it could easily deadlock.
+	 */
+ 	if (actconfig) {
+ 		int i;
+ 
+ 		for (i = 0; i < actconfig->desc.bNumInterfaces; ++i) {
+ 			if (usb_interface_claimed(actconfig->interface[i])) {
+				dev_warn (&ps->dev->dev,
+					"usbfs: interface %d claimed "
+					"while '%s' sets config #%d\n",
+					actconfig->interface[i]
+						->cur_altsetting
+						->desc.bInterfaceNumber,
+					current->comm, u);
+#if 0	/* FIXME:  enable in 2.6.10 or so */
+ 				status = -EBUSY;
+				break;
+#endif
+			}
+ 		}
+ 	}
+
+	/* SET_CONFIGURATION is often abused as a "cheap" driver reset,
+	 * so avoid usb_set_configuration()'s kick to sysfs
+	 */
+	if (status == 0) {
+		if (actconfig && actconfig->desc.bConfigurationValue == u)
+			status = usb_reset_configuration(ps->dev);
+		else
+			status = usb_set_configuration(ps->dev, u);
+	}
+	up(&ps->dev->serialize);
+
+	return status;
 }
 
 static int proc_submiturb(struct dev_state *ps, void __user *arg)
@@ -1080,58 +1125,51 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		}
 	}
 
-       if (!ps->dev)
-               retval = -ENODEV;
-       else if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
-               retval = -EINVAL;
-       else switch (ctrl.ioctl_code) {
+	if (!ps->dev) {
+		if (buf)
+			kfree(buf);
+		return -ENODEV;
+	}
 
-       /* disconnect kernel driver from interface, leaving it unbound.  */
-       /* maybe unbound - you get no guarantee it stays unbound */
-       case USBDEVFS_DISCONNECT:
-		/* this function is misdesigned - retained for compatibility */
-		lock_kernel();
-		driver = ifp->driver;
-		if (driver) {
-			dbg ("disconnect '%s' from dev %d interface %d",
-			     driver->name, ps->dev->devnum, ctrl.ifno);
-			usb_unbind_interface(&ifp->dev);
+	down(&ps->dev->serialize);
+	if (ps->dev->state != USB_STATE_CONFIGURED)
+		retval = -ENODEV;
+	else if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
+               retval = -EINVAL;
+	else switch (ctrl.ioctl_code) {
+
+	/* disconnect kernel driver from interface */
+	case USBDEVFS_DISCONNECT:
+		down_write(&usb_bus_type.subsys.rwsem);
+		if (ifp->dev.driver) {
+			driver = to_usb_driver(ifp->dev.driver);
+			dev_dbg (&ifp->dev, "disconnect by usbfs\n");
+			usb_driver_release_interface(driver, ifp);
 		} else
 			retval = -ENODATA;
-		unlock_kernel();
+		up_write(&usb_bus_type.subsys.rwsem);
 		break;
 
 	/* let kernel drivers try to (re)bind to the interface */
 	case USBDEVFS_CONNECT:
-		lock_kernel();
-		retval = usb_probe_interface (&ifp->dev);
-		unlock_kernel();
+		bus_rescan_devices(ifp->dev.bus);
 		break;
 
 	/* talk directly to the interface's driver */
 	default:
-		/* BKL used here to protect against changing the binding
-		 * of this driver to this device, as well as unloading its
-		 * driver module.
-		 */
-		lock_kernel ();
-		driver = ifp->driver;
+		down_read(&usb_bus_type.subsys.rwsem);
+		if (ifp->dev.driver)
+			driver = to_usb_driver(ifp->dev.driver);
 		if (driver == 0 || driver->ioctl == 0) {
-			unlock_kernel();
-			retval = -ENOSYS;
+			retval = -ENOTTY;
 		} else {
-			if (!try_module_get (driver->owner)) {
-				unlock_kernel();
-				retval = -ENOSYS;
-				break;
-			}
-			unlock_kernel ();
 			retval = driver->ioctl (ifp, ctrl.ioctl_code, buf);
 			if (retval == -ENOIOCTLCMD)
 				retval = -ENOTTY;
-			module_put (driver->owner);
 		}
+		up_read(&usb_bus_type.subsys.rwsem);
 	}
+	up(&ps->dev->serialize);
 
 	/* cleanup and return */
 	if (retval >= 0

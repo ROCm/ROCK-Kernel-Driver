@@ -160,7 +160,7 @@ UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
 UNUSUAL_DEV(  0x04da, 0x0901, 0x0100, 0x0200,
 		"Panasonic",
 		"LS-120 Camera",
-		US_SC_UFI, US_PR_CBI, NULL, 0),
+		US_SC_UFI, US_PR_DEVICE, NULL, 0),
 
 /* From Yukihiro Nakai, via zaitcev@yahoo.com.
  * This is needed for CB instead of CBI */
@@ -273,7 +273,7 @@ UNUSUAL_DEV(  0x054c, 0x0010, 0x0500, 0x0500,
 UNUSUAL_DEV(  0x054c, 0x0025, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick NW-MS7",
-		US_SC_UFI, US_PR_CB, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN ),
 
 #ifdef CONFIG_USB_STORAGE_ISD200
@@ -384,7 +384,7 @@ UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 UNUSUAL_DEV(  0x05dc, 0xb002, 0x0000, 0x0113,
 		"Lexar",
 		"USB CF Reader",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Reported by Carlos Villegas <cav@uniscope.co.jp>
@@ -392,15 +392,15 @@ UNUSUAL_DEV(  0x05dc, 0xb002, 0x0000, 0x0113,
  * That is the only reason this entry is needed.
  */
 UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
-		"SIIG",
-		"CompactFlash Card Reader",
+		"Genesys Logic",
+		"USB to IDE Card Reader",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Submitted Alexander Oltu <alexander@all-2.com> */
 UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff, 
-		"", 
-		"USB TO IDE",
+		"Genesys Logic", 
+		"USB to IDE Optical",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ), 
 
@@ -411,16 +411,9 @@ UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff,
  *
  * ST818 slim drives (rev 0.02) don't need special care.
 */
-UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0x0001,
-		"EagleTec",
-		"External Hard Disk",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
-/* Reported by Henning Schild <henning@wh9.tu-dresden.de> */
-UNUSUAL_DEV(  0x05e3, 0x0702, 0x0113, 0x0113,
-		"EagleTec",
-		"External Hard Disk",
+UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0xffff,
+		"Genesys Logic",
+		"USB to IDE Disk",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
@@ -725,6 +718,21 @@ UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		"USB Cable 205",
 		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
 		0 ),
+#endif
+
+#ifdef CONFIG_USB_STORAGE_DATAFAB
+UNUSUAL_DEV( 0x0c0b, 0xa109, 0x0000, 0xffff,
+	       "Acomdata",
+	       "CF",
+	       US_SC_SCSI, US_PR_DATAFAB, NULL,
+	       US_FL_SINGLE_LUN ),
+#endif
+#ifdef CONFIG_USB_STORAGE_SDDR55
+UNUSUAL_DEV( 0x0c0b, 0xa109, 0x0000, 0xffff,
+	       "Acomdata",
+	       "SM",
+	       US_SC_SCSI, US_PR_SDDR55, NULL,
+	       US_FL_SINGLE_LUN ),
 #endif
 
 /* Submitted by Joris Struyve <joris@struyve.be> */

@@ -3104,7 +3104,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	}
 	if (status < 0)
-		goto out2;
+		goto out1;
 
 	dev->maxpacket = usb_maxpacket (dev->udev, dev->out, 1);
 	
@@ -3127,7 +3127,6 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 out3:
 	if (info->unbind)
 		info->unbind (dev, udev);
-out2:
 	free_netdev(net);
 out1:
 	kfree(dev);

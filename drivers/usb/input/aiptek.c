@@ -265,7 +265,7 @@ aiptek_probe(struct usb_interface *intf,
 	     const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
-	struct usb_host_interface *interface = intf->altsetting + 0;
+	struct usb_host_interface *interface = intf->cur_altsetting;
 	struct usb_endpoint_descriptor *endpoint;
 	struct aiptek *aiptek;
 	int err = -ENOMEM;
