@@ -30,6 +30,7 @@
 
 #include <linux/delay.h>
 #include <linux/cache.h>
+#include <linux/interrupt.h>
 
 #include <asm/sigp.h>
 #include <asm/pgalloc.h>
@@ -65,7 +66,7 @@ extern char vmpoff_cmd[];
 
 extern void do_reipl(unsigned long devno);
 
-static sigp_ccode smp_ext_bitcall(int, ec_bit_sig);
+static void smp_ext_bitcall(int, ec_bit_sig);
 static void smp_ext_bitcall_others(ec_bit_sig);
 
 /*
@@ -147,6 +148,59 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 			cpu_relax();
 	spin_unlock(&call_lock);
 
+	return 0;
+}
+
+/*
+ * Call a function on one CPU
+ * cpu : the CPU the function should be executed on
+ *
+ * You must not call this function with disabled interrupts or from a
+ * hardware interrupt handler. You may call it from a bottom half.
+ *
+ * It is guaranteed that the called function runs on the specified CPU,
+ * preemption is disabled.
+ */
+int smp_call_function_on(void (*func) (void *info), void *info,
+			 int nonatomic, int wait, int cpu)
+{
+	struct call_data_struct data;
+	int curr_cpu;
+
+	if (!cpu_online(cpu))
+		return -EINVAL;
+
+	/* disable preemption for local function call */
+	curr_cpu = get_cpu();
+
+	if (curr_cpu == cpu) {
+		/* direct call to function */
+		func(info);
+		put_cpu();
+		return 0;
+	}
+
+	data.func = func;
+	data.info = info;
+	atomic_set(&data.started, 0);
+	data.wait = wait;
+	if (wait)
+		atomic_set(&data.finished, 0);
+
+	spin_lock_bh(&call_lock);
+	call_data = &data;
+	smp_ext_bitcall(cpu, ec_call_function);
+
+	/* Wait for response */
+	while (atomic_read(&data.started) != 1)
+		cpu_relax();
+
+	if (wait)
+		while (atomic_read(&data.finished) != 1)
+			cpu_relax();
+
+	spin_unlock_bh(&call_lock);
+	put_cpu();
 	return 0;
 }
 
@@ -305,16 +359,14 @@ void do_ext_call_interrupt(struct pt_regs *regs, __u16 code)
  * Send an external call sigp to another cpu and return without waiting
  * for its completion.
  */
-static sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig)
+static void smp_ext_bitcall(int cpu, ec_bit_sig sig)
 {
-        sigp_ccode ccode;
-
         /*
          * Set signaling bit in lowcore of target cpu and kick it
          */
 	set_bit(sig, (unsigned long *) &lowcore_ptr[cpu]->ext_call_fast);
-        ccode = signal_processor(cpu, sigp_external_call);
-        return ccode;
+	while(signal_processor(cpu, sigp_external_call) == sigp_busy)
+		udelay(10);
 }
 
 /*

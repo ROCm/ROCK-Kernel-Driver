@@ -607,6 +607,7 @@ do_IRQ (struct pt_regs *regs)
 	struct irb *irb;
 
 	irq_enter ();
+	asm volatile ("mc 0,0");
 	if (S390_lowcore.int_clock >= S390_lowcore.jiffy_timer)
 		account_ticks(regs);
 	/*

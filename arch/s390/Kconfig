@@ -250,6 +250,12 @@ config SHARED_KERNEL
 	  You should only select this option if you know what you are
 	  doing and want to exploit this feature.
 
+config VIRT_TIMER
+	bool "Virtual CPU timer support"
+	help
+	  This provides a kernel interface for virtual CPU timers.
+	  Default is disabled.
+
 endmenu
 
 config PCMCIA
