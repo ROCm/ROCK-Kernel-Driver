@@ -50,6 +50,10 @@ __SA1100_start:
 10:
 #endif
 
+		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
+		ands	r0, r0, #0x0d
+		beq	99f
+
 		@ Data cache might be active.
 		@ Be sure to flush kernel binary out of the cache,
 		@ whatever state it is, before it is turned off.
@@ -68,11 +72,4 @@ __SA1100_start:
 		bic	r0, r0, #0x0d		@ clear WB, DC, MMU
 		bic	r0, r0, #0x1000		@ clear Icache
 		mcr	p15, 0, r0, c1, c0, 0
-
-/*
- * Pause for a short time so that we give enough time
- * for the host to start a terminal up.
- */
-		mov	r0, #0x00200000
-1:		subs	r0, r0, #1
-		bne	1b
+99:

@@ -62,7 +62,7 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 			if (disk->part[part - 1]->nr_sects == 0)
 				return -ENXIO;
 			/* partition in use? Incomplete check for now. */
-			bdevp = bdget(MKDEV(disk->major, disk->first_minor) + part);
+			bdevp = bdget_disk(disk, part);
 			if (!bdevp)
 				return -ENOMEM;
 			if (bd_claim(bdevp, &holder) < 0) {

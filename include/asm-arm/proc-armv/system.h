@@ -15,12 +15,16 @@
 #define set_cr(x)					\
 	__asm__ __volatile__(				\
 	"mcr	p15, 0, %0, c1, c0, 0	@ set CR"	\
-	: : "r" (x))
+	: : "r" (x) : "cc")
 
-#define get_cr(x)					\
+#define get_cr()					\
+	({						\
+	unsigned int __val;				\
 	__asm__ __volatile__(				\
 	"mrc	p15, 0, %0, c1, c0, 0	@ get CR"	\
-	: "=r" (x))
+	: "=r" (__val) : : "cc");			\
+	__val;						\
+	})
 
 #define CR_M	(1 << 0)	/* MMU enable				*/
 #define CR_A	(1 << 1)	/* Alignment abort enable		*/
@@ -48,16 +52,6 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 #endif
 
 /*
- * Save the current interrupt enable state.
- */
-#define local_save_flags(x)					\
-	({							\
-	__asm__ __volatile__(					\
-	"mrs	%0, cpsr		@ local_save_flags"	\
-	: "=r" (x) : : "memory");				\
-	})
-
-/*
  * Save the current interrupt enable state & disable IRQs
  */
 #define local_irq_save(x)					\
@@ -70,7 +64,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 "	msr	cpsr_c, %1"					\
 	: "=r" (x), "=r" (temp)					\
 	:							\
-	: "memory");						\
+	: "memory", "cc");					\
 	})
 	
 /*
@@ -85,7 +79,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 "	msr	cpsr_c, %0"					\
 	: "=r" (temp)						\
 	:							\
-	: "memory");						\
+	: "memory", "cc");					\
 	})
 
 /*
@@ -100,7 +94,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 "	msr	cpsr_c, %0"					\
 	: "=r" (temp)						\
 	:							\
-	: "memory");						\
+	: "memory", "cc");					\
 	})
 
 /*
@@ -115,7 +109,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 "	msr	cpsr_c, %0"					\
 	: "=r" (temp)						\
 	:							\
-	: "memory");						\
+	: "memory", "cc");					\
 	})
 
 /*
@@ -130,7 +124,17 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 "	msr	cpsr_c, %0"					\
 	: "=r" (temp)						\
 	:							\
-	: "memory");						\
+	: "memory", "cc");					\
+	})
+
+/*
+ * Save the current interrupt enable state.
+ */
+#define local_save_flags(x)					\
+	({							\
+	__asm__ __volatile__(					\
+	"mrs	%0, cpsr		@ local_save_flags"	\
+	: "=r" (x) : : "memory", "cc");				\
 	})
 
 /*
@@ -141,7 +145,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 	"msr	cpsr_c, %0		@ local_irq_restore\n"	\
 	:							\
 	: "r" (x)						\
-	: "memory")
+	: "memory", "cc")
 
 #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
 /*
@@ -186,12 +190,12 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 		case 1:	__asm__ __volatile__ ("swpb %0, %1, [%2]"
 					: "=&r" (ret)
 					: "r" (x), "r" (ptr)
-					: "memory");
+					: "memory", "cc");
 			break;
 		case 4:	__asm__ __volatile__ ("swp %0, %1, [%2]"
 					: "=&r" (ret)
 					: "r" (x), "r" (ptr)
-					: "memory");
+					: "memory", "cc");
 			break;
 #endif
 		default: __bad_xchg(ptr, size), ret = 0;

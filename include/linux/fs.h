@@ -1041,6 +1041,7 @@ extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern int blkdev_open(struct inode *, struct file *);
 extern int blkdev_close(struct inode *, struct file *);
+extern struct block_device *open_by_devnum(dev_t, unsigned, int);
 extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;
 extern struct file_operations def_chr_fops;
@@ -1104,7 +1105,7 @@ extern int fs_may_remount_ro(struct super_block *);
 extern int check_disk_change(struct block_device *);
 extern int invalidate_inodes(struct super_block *);
 extern int __invalidate_device(struct block_device *, int);
-extern int invalidate_device(kdev_t, int);
+extern int invalidate_partition(struct gendisk *, int);
 unsigned long invalidate_mapping_pages(struct address_space *mapping,
 					pgoff_t start, pgoff_t end);
 unsigned long invalidate_inode_pages(struct address_space *mapping);
@@ -1292,6 +1293,10 @@ extern struct dentry *simple_lookup(struct inode *, struct dentry *);
 extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;
 extern struct inode_operations simple_dir_inode_operations;
+struct tree_descr { char *name; struct file_operations *ops; int mode; };
+extern int simple_fill_super(struct super_block *, int, struct tree_descr *);
+extern int simple_pin_fs(char *name, struct vfsmount **mount, int *count);
+extern void simple_release_fs(struct vfsmount **mount, int *count);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned int real_root_dev;

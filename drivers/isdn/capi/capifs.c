@@ -153,39 +153,17 @@ static struct file_system_type capifs_fs_type = {
 	.kill_sb	= kill_anon_super,
 };
 
-static spinlock_t entries_lock = SPIN_LOCK_UNLOCKED;
 static struct vfsmount *capifs_mnt;
-static int entry_count = 0;
+static int entry_count;
 
-static struct vfsmount *grab_instance(void)
+static int grab_instance(void)
 {
-	struct vfsmount *mnt = NULL;
-	spin_lock(&entries_lock);
-	if (!capifs_mnt) {
-		spin_unlock(&entries_lock);
-		mnt = kern_mount(&capifs_fs_type);
-		if (IS_ERR(mnt))
-			return NULL;
-		spin_lock(&entries_lock);
-		if (!capifs_mnt)
-			capifs_mnt = mnt;
-	}
-	mntget(capifs_mnt);
-	entry_count++;
-	spin_unlock(&entries_lock);
-	mntput(mnt);
-	return capifs_mnt;
+	return simple_pin_fs("capifs", &capifs_mnt, &entry_count);
 }
 
 static void drop_instance(void)
 {
-	struct vfsmount *mnt;
-	spin_lock(&entries_lock);
-	mnt = capifs_mnt;
-	if (!--entry_count)
-		capifs_mnt = NULL;
-	spin_unlock(&entries_lock);
-	mntput(mnt);
+	return simple_release_fs(&capifs_mnt, &entry_count);
 }
 
 static struct dentry *get_node(int type, int num)
@@ -207,7 +185,7 @@ void capifs_new_ncci(char type, unsigned int num, dev_t device)
 	struct dentry *dentry;
 	struct inode *inode;
 
-	if (!grab_instance())
+	if (grab_instance() < 0)
 		return;
 	sb = capifs_mnt->mnt_sb;
 	inode = new_inode(sb);
@@ -232,7 +210,7 @@ void capifs_new_ncci(char type, unsigned int num, dev_t device)
 
 void capifs_free_ncci(char type, unsigned int num)
 {
-	if (grab_instance()) {
+	if (grab_instance() == 0) {
 		struct dentry *dentry = get_node(type, num);
 		if (!IS_ERR(dentry)) {
 			struct inode *inode = dentry->d_inode;

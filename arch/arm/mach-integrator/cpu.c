@@ -12,6 +12,7 @@
  * CPU support functions
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/cpufreq.h>
@@ -173,9 +174,9 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 	return 0;
 }
 
-static int integrator_cpufreq_init(struct cpufreq *policy)
+static int integrator_cpufreq_init(struct cpufreq_policy *policy)
 {
-	unsigned long cus_allowed;
+	unsigned long cpus_allowed;
 	unsigned int cpu = policy->cpu;
 	u_int cm_osc, cm_stat, mem_freq_khz;
 	struct vco vco;

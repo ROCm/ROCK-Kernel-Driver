@@ -237,6 +237,8 @@ static struct atari_floppy_struct {
 				   disk change detection) */
 	int flags;		/* flags */
 	struct gendisk *disk;
+	int ref;
+	int type;
 } unit[FD_MAX_UNITS];
 
 #define	UD	unit[drive]
@@ -1328,12 +1330,6 @@ static void finish_fdc_done( int dummy )
 	DPRINT(("finish_fdc() finished\n"));
 }
 
-
-/* Prevent "aliased" accesses. */
-static int fd_ref[4] = { 0,0,0,0 };
-static int fd_device[4] = { 0,0,0,0 };
-
-
 /* The detection of disk changes is a dark chapter in Atari history :-(
  * Because the "Drive ready" signal isn't present in the Atari
  * hardware, one has to rely on the "Write Protect". This works fine,
@@ -1378,7 +1374,7 @@ static int floppy_revalidate(struct gendisk *disk)
 
 	if (test_bit(drive, &changed_floppies) ||
 	    test_bit(drive, &fake_change) ||
-	    unit[drive].disktype == 0) {
+	    p->disktype == 0) {
 		if (UD.flags & FTD_MSG)
 			printk(KERN_ERR "floppy: clear format %p!\n", UDT);
 		BufferDrive = -1;
@@ -1445,7 +1441,7 @@ repeat:
 
 	floppy = CURRENT->rq_disk->private_data;
 	drive = floppy - unit;
-	type = fd_device[drive];
+	type = floppy->type;
 	
 	if (!UD.connected) {
 		/* drive not connected */
@@ -1458,7 +1454,7 @@ repeat:
 		if (!UDT) {
 			Probing = 1;
 			UDT = disk_type + StartDiskType[DriveType];
-			set_capacity(unit[drive].disk, UDT->blocks);
+			set_capacity(floppy->disk, UDT->blocks);
 			UD.autoprobe = 1;
 		}
 	} 
@@ -1476,7 +1472,7 @@ repeat:
 		}
 		type = minor2disktype[type].index;
 		UDT = &disk_type[type];
-		set_capacity(unit[drive].disk, UDT->blocks);
+		set_capacity(floppy->disk, UDT->blocks);
 		UD.autoprobe = 0;
 	}
 	
@@ -1522,19 +1518,16 @@ void do_fd_request(request_queue_t * q)
 static int fd_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long param)
 {
-	int drive, type;
-	kdev_t device;
 	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct atari_floppy_struct *floppy = disk->private_data;
+	int drive = floppy - unit;
+	int type = floppy->type;
 	struct atari_format_descr fmt_desc;
 	struct atari_disk_type *dtp;
 	struct floppy_struct getprm;
 	int settype;
 	struct floppy_struct setprm;
 
-	device = inode->i_rdev;
-	drive = minor (device);
-	type  = drive >> 2;
-	drive &= 3;
 	switch (cmd) {
 	case FDGETPRM:
 		if (type) {
@@ -1577,7 +1570,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		 */
 
 		/* get the parameters from user space */
-		if (fd_ref[drive] != 1 && fd_ref[drive] != -1)
+		if (p->ref != 1 && p->ref != -1)
 			return -EBUSY;
 		if (copy_from_user(&setprm, (void *) param, sizeof(setprm)))
 			return -EFAULT;
@@ -1624,7 +1617,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 				    printk (KERN_INFO "floppy%d: setting %s %p!\n",
 				        drive, dtp->name, dtp);
 				UDT = dtp;
-				set_capacity(unit[drive].disk, UDT->blocks);
+				set_capacity(p->disk, UDT->blocks);
 
 				if (cmd == FDDEFPRM) {
 				  /* save settings as permanent default type */
@@ -1670,7 +1663,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		UDT = dtp;
-		set_capacity(unit[drive].disk, UDT->blocks);
+		set_capacity(p->disk, UDT->blocks);
 
 		return 0;
 	case FDMSGON:
@@ -1684,7 +1677,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 	case FDFMTBEG:
 		return 0;
 	case FDFMTTRK:
-		if (fd_ref[drive] != 1 && fd_ref[drive] != -1)
+		if (p->ref != 1 && p->ref != -1)
 			return -EBUSY;
 		if (copy_from_user(&fmt_desc, (void *) param, sizeof(fmt_desc)))
 			return -EFAULT;
@@ -1693,7 +1686,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		UDT = NULL;
 		/* MSch: invalidate default_params */
 		default_params[drive].blocks  = 0;
-		set_capacity(unit[drive].disk, MAX_DISK_SIZE * 2);
+		set_capacity(p->disk, MAX_DISK_SIZE * 2);
 	case FDFMTEND:
 	case FDFLUSH:
 		/* invalidate the buffer track to force a reread */
@@ -1844,23 +1837,22 @@ static void __init config_types( void )
 
 static int floppy_open( struct inode *inode, struct file *filp )
 {
-	int drive = minor(inode->i_rdev) & 3;
+	struct atari_floppy_struct *p = inode->i_bdev->bd_disk->private_data;
 	int type  = minor(inode->i_rdev) >> 2;
-	int old_dev = fd_device[drive];
 
 	DPRINT(("fd_open: type=%d\n",type));
-	if (fd_ref[drive] && old_dev != type)
+	if (p->ref && p->type != type)
 		return -EBUSY;
 
-	if (fd_ref[drive] == -1 || (fd_ref[drive] && filp->f_flags & O_EXCL))
+	if (p->ref == -1 || (p->ref && filp->f_flags & O_EXCL))
 		return -EBUSY;
 
 	if (filp->f_flags & O_EXCL)
-		fd_ref[drive] = -1;
+		p->ref = -1;
 	else
-		fd_ref[drive]++;
+		p->ref++;
 
-	fd_device[drive] = type;
+	p->type = type;
 
 	if (filp->f_flags & O_NDELAY)
 		return 0;
@@ -1868,28 +1860,29 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	if (filp->f_mode & 3) {
 		check_disk_change(inode->i_bdev);
 		if (filp->f_mode & 2) {
-			if (UD.wpstat) {
+			if (p->wpstat) {
+				if (p->ref < 0)
+					p->ref = 0;
+				else
+					p->ref--;
 				floppy_release(inode, filp);
 				return -EROFS;
 			}
 		}
 	}
-
 	return 0;
 }
 
 
 static int floppy_release( struct inode * inode, struct file * filp )
 {
-	int drive = minor(inode->i_rdev) & 3;
-
-	if (fd_ref[drive] < 0)
-		fd_ref[drive] = 0;
-	else if (!fd_ref[drive]--) {
+	struct atari_floppy_struct *p = inode->i_bdev->bd_disk->private_data;
+	if (p->ref < 0)
+		p->ref = 0;
+	else if (!p->ref--) {
 		printk(KERN_ERR "floppy_release with fd_ref == 0");
-		fd_ref[drive] = 0;
+		p->ref = 0;
 	}
-
 	return 0;
 }
 
@@ -1912,7 +1905,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	return get_disk(unit[drive].disk);
 }
 
-int __init atari_floppy_init (void)
+static int __init atari_floppy_init (void)
 {
 	int i;
 
@@ -2014,18 +2007,7 @@ void __init atari_floppy_setup( char *str, int *ints )
 	}
 }
 
-#ifdef MODULE
-
-MODULE_LICENSE("GPL");
-
-int init_module (void)
-{
-	if (!MACH_IS_ATARI)
-		return -ENXIO;
-	return atari_floppy_init ();
-}
-
-void cleanup_module (void)
+static void atari_floppy_exit(void)
 {
 	int i;
 	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
@@ -2039,5 +2021,8 @@ void cleanup_module (void)
 	del_timer_sync(&fd_timer);
 	atari_stram_free( DMABuffer );
 }
-#endif
 
+module_init(atari_floppy_init)
+module_exit(atari_floppy_exit)
+
+MODULE_LICENSE("GPL");

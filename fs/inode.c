@@ -365,16 +365,6 @@ int __invalidate_device(struct block_device *bdev, int do_sync)
 	return res;
 }
 
-int invalidate_device(kdev_t dev, int do_sync)
-{
-	int res = 0;
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (bdev)
-		res = __invalidate_device(bdev, do_sync);
-	bdput(bdev);
-	return res;
-}
-
 static int can_unuse(struct inode *inode)
 {
 	if (inode->i_state)

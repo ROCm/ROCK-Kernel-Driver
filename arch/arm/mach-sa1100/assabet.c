@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/module.h>
+#include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/serial_core.h>
 #include <linux/delay.h>
@@ -25,6 +26,7 @@
 #include <asm/setup.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>

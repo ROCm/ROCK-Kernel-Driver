@@ -35,6 +35,9 @@ SECTIONS
 		__setup_start = .;
 			*(.init.setup)
 		__setup_end = .;
+		__early_begin = .;
+			*(__early_param)
+		__early_end = .;
 		__start___param = .;
 			*(__param)
 		__stop___param = .;

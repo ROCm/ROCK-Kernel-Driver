@@ -450,11 +450,11 @@ static int __info(struct mapped_device *md, struct dm_ioctl *param)
 	if (dm_suspended(md))
 		param->flags |= DM_SUSPEND_FLAG;
 
-	param->dev = MKDEV(disk->major, disk->first_minor);
-	bdev = bdget(param->dev);
+	bdev = bdget_disk(disk, 0);
 	if (!bdev)
 		return -ENXIO;
 
+	param->dev = bdev->bd_dev;
 	param->open_count = bdev->bd_openers;
 	bdput(bdev);
 

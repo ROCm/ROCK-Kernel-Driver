@@ -3885,7 +3885,7 @@ static int floppy_read_block_0(struct gendisk *disk)
 	struct block_device *bdev;
 	int ret;
 
-	bdev = bdget(MKDEV(disk->major, disk->first_minor));
+	bdev = bdget_disk(disk, 0);
 	if (!bdev) {
 		printk("No block device for %s\n", disk->disk_name);
 		BUG();

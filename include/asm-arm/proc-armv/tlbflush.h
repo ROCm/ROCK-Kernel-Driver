@@ -20,6 +20,7 @@
 #define TLB_V4_D_FULL	(1 << 10)
 #define TLB_V4_I_FULL	(1 << 11)
 
+#define TLB_DCLEAN	(1 << 30)
 #define TLB_WB		(1 << 31)
 
 /*
@@ -65,7 +66,7 @@
 # define v4_always_flags	(-1UL)
 #endif
 
-#define v4wbi_tlb_flags	(TLB_WB | \
+#define v4wbi_tlb_flags	(TLB_WB | TLB_DCLEAN | \
 			 TLB_V4_I_FULL | TLB_V4_D_FULL | \
 			 TLB_V4_I_PAGE | TLB_V4_D_PAGE)
 
@@ -84,7 +85,7 @@
 # define v4wbi_always_flags	(-1UL)
 #endif
 
-#define v4wb_tlb_flags	(TLB_WB | \
+#define v4wb_tlb_flags	(TLB_WB | TLB_DCLEAN | \
 			 TLB_V4_I_FULL | TLB_V4_D_FULL | \
 			 TLB_V4_D_PAGE)
 
@@ -285,6 +286,41 @@ static inline void flush_tlb_kernel_page(unsigned long kaddr)
 		asm("mcr%? p15, 0, %0, c8, c5, 1" : : "r" (kaddr));
 	if (!tlb_flag(TLB_V4_I_PAGE) && tlb_flag(TLB_V4_I_FULL))
 		asm("mcr%? p15, 0, %0, c8, c5, 0" : : "r" (zero));
+}
+
+/*
+ *	flush_pmd_entry
+ *
+ *	Flush a PMD entry (word aligned, or double-word aligned) to
+ *	RAM if the TLB for the CPU we are running on requires this.
+ *	This is typically used when we are creating PMD entries.
+ *
+ *	clean_pmd_entry
+ *
+ *	Clean (but don't drain the write buffer) if the CPU requires
+ *	these operations.  This is typically used when we are removing
+ *	PMD entries.
+ */
+static inline void flush_pmd_entry(pmd_t *pmd)
+{
+	const unsigned int zero = 0;
+	const unsigned int __tlb_flag = __cpu_tlb_flags;
+
+	if (tlb_flag(TLB_DCLEAN))
+		asm("mcr%?	p15, 0, %0, c7, c10, 1	@ flush_pmd"
+			: : "r" (pmd));
+	if (tlb_flag(TLB_WB))
+		asm("mcr%?	p15, 0, %0, c7, c10, 4	@ flush_pmd"
+			: : "r" (zero));
+}
+
+static inline void clean_pmd_entry(pmd_t *pmd)
+{
+	const unsigned int __tlb_flag = __cpu_tlb_flags;
+
+	if (tlb_flag(TLB_DCLEAN))
+		asm("mcr%?	p15, 0, %0, c7, c10, 1	@ flush_pmd"
+			: : "r" (pmd));
 }
 
 #undef tlb_flag

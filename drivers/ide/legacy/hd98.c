@@ -46,8 +46,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#define MAJOR_NR HD_MAJOR
-#define DEVICE_NR(device) (minor(device)>>6)
 #include <linux/blk.h>
 
 #include "io_ports.h"
@@ -100,6 +98,9 @@
 #define ICRC_ERR		0x80	/* new meaning:  CRC error during transfer */
 
 static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
+static struct request_queue hd_queue;
+
+#define CURRENT elv_next_request(&hd_queue)
 
 #define TIMEOUT_VALUE	(6*HZ)
 #define	HD_DELAY	0
@@ -115,26 +116,24 @@ static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
 static void recal_intr(void);
 static void bad_rw_intr(void);
 
-static char recalibrate[MAX_HD];
-static char special_op[MAX_HD];
-
 static int reset;
 static int hd_error;
-
-#define SUBSECTOR(block) (CURRENT->current_nr_sectors > 0)
 
 /*
  *  This struct defines the HD's and their types.
  */
 struct hd_i_struct {
 	unsigned int head,sect,cyl,wpcom,lzone,ctl;
+	int unit;
+	int recalibrate;
+	int special_op;
 };
 	
 #ifdef HD_TYPE
-struct hd_i_struct hd_info[] = { HD_TYPE };
+static struct hd_i_struct hd_info[] = { HD_TYPE };
 static int NR_HD = ((sizeof (hd_info))/(sizeof (struct hd_i_struct)));
 #else
-struct hd_i_struct hd_info[MAX_HD];
+static struct hd_i_struct hd_info[MAX_HD];
 static int NR_HD;
 #endif
 
@@ -195,11 +194,11 @@ void __init hd_setup(char *str, int *ints)
 
 static void dump_status (const char *msg, unsigned int stat)
 {
-	char devc;
-
-	devc = CURRENT ? 'a' + DEVICE_NR(CURRENT->rq_dev) : '?';
+	char *name = CURRENT ?
+			CURRENT->rq_dev->bd_disk->disk_name :
+			"hd?";
 #ifdef VERBOSE_ERRORS
-	printk("hd%c: %s: status=0x%02x { ", devc, msg, stat & 0xff);
+	printk("%s: %s: status=0x%02x { ", name, msg, stat & 0xff);
 	if (stat & BUSY_STAT)	printk("Busy ");
 	if (stat & READY_STAT)	printk("DriveReady ");
 	if (stat & WRERR_STAT)	printk("WriteFault ");
@@ -213,7 +212,7 @@ static void dump_status (const char *msg, unsigned int stat)
 		hd_error = 0;
 	} else {
 		hd_error = inb(HD_ERROR);
-		printk("hd%c: %s: error=0x%02x { ", devc, msg, hd_error & 0xff);
+		printk("%s: %s: error=0x%02x { ", name, msg, hd_error & 0xff);
 		if (hd_error & BBD_ERR)		printk("BadSector ");
 		if (hd_error & ECC_ERR)		printk("UncorrectableError ");
 		if (hd_error & ID_ERR)		printk("SectorIdNotFound ");
@@ -230,12 +229,12 @@ static void dump_status (const char *msg, unsigned int stat)
 		printk("\n");
 	}
 #else
-	printk("hd%c: %s: status=0x%02x.\n", devc, msg, stat & 0xff);
+	printk("%s: %s: status=0x%02x.\n", name, msg, stat & 0xff);
 	if ((stat & ERR_STAT) == 0) {
 		hd_error = 0;
 	} else {
 		hd_error = inb(HD_ERROR);
-		printk("hd%c: %s: error=0x%02x.\n", devc, msg, hd_error & 0xff);
+		printk("%s: %s: error=0x%02x.\n", name, msg, hd_error & 0xff);
 	}
 #endif
 }
@@ -290,9 +289,13 @@ static int controller_ready(unsigned int drive, unsigned int head)
 	return 0;
 }
 
-static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
-		unsigned int head,unsigned int cyl,unsigned int cmd,
-		void (*intr_addr)(void))
+static void hd_out(struct hd_i_struct *disk,
+		   unsigned int nsect,
+		   unsigned int sect,
+		   unsigned int head,
+		   unsigned int cyl,
+		   unsigned int cmd,
+		   void (*intr_addr)(void))
 {
 	unsigned short port;
 
@@ -302,19 +305,19 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 #endif
 	if (reset)
 		return;
-	if (!controller_ready(drive, head)) {
+	if (!controller_ready(disk->unit, head)) {
 		reset = 1;
 		return;
 	}
 	SET_HANDLER(intr_addr);
-	outb(hd_info[drive].ctl,HD_CMD);
+	outb(disk->ctl,HD_CMD);
 	port=HD_DATA + 2;
-	outb(hd_info[drive].wpcom>>2, port); port += 2;
+	outb(disk->wpcom>>2, port); port += 2;
 	outb(nsect, port); port += 2;
 	outb(sect, port); port += 2;
 	outb(cyl, port); port += 2;
 	outb(cyl>>8, port); port += 2;
-	outb(0xA0|(drive<<4)|head, port); port += 2;
+	outb(0xA0|(disk->unit<<4)|head, port); port += 2;
 	outb(cmd, port);
 }
 
@@ -363,9 +366,10 @@ repeat:
 			goto repeat;
 	}
 	if (++i < NR_HD) {
-		special_op[i] = recalibrate[i] = 1;
-		hd_out(i,hd_info[i].sect,hd_info[i].sect,hd_info[i].head-1,
-			hd_info[i].cyl,WIN_SPECIFY,&reset_hd);
+		struct hd_i_struct *disk = &hd_info[i];
+		disk->special_op = disk->recalibrate = 1;
+		hd_out(disk, disk->sect, disk->sect, disk->head-1,
+			disk->cyl, WIN_SPECIFY, &reset_hd);
 		if (reset)
 			goto repeat;
 	} else
@@ -398,18 +402,19 @@ void unexpected_hd_interrupt(void)
  */
 static void bad_rw_intr(void)
 {
-	int dev;
+	struct request *req = CURRENT;
+	struct hd_i_struct *disk;
 
-	if (!CURRENT)
+	if (!req)
 		return;
-	dev = DEVICE_NR(CURRENT->rq_dev);
-	if (++CURRENT->errors >= MAX_ERRORS || (hd_error & BBD_ERR)) {
-		end_request(CURRENT, 0);
-		special_op[dev] = recalibrate[dev] = 1;
-	} else if (CURRENT->errors % RESET_FREQ == 0)
+	disk = req->rq_disk->private_data;
+	if (++req->errors >= MAX_ERRORS || (hd_error & BBD_ERR)) {
+		end_request(req, 0);
+		disk->special_op = disk->recalibrate = 1;
+	} else if (req->errors % RESET_FREQ == 0)
 		reset = 1;
-	else if ((hd_error & TRK0_ERR) || CURRENT->errors % RECAL_FREQ == 0)
-		special_op[dev] = recalibrate[dev] = 1;
+	else if ((hd_error & TRK0_ERR) || req->errors % RECAL_FREQ == 0)
+		disk->special_op = disk->recalibrate = 1;
 	/* Otherwise just retry */
 }
 
@@ -427,6 +432,7 @@ static inline int wait_DRQ(void)
 static void read_intr(void)
 {
 	int i, retries = 100000;
+	struct request *req;
 
 	do {
 		i = (unsigned) inb(HD_STATUS);
@@ -442,19 +448,20 @@ static void read_intr(void)
 	hd_request();
 	return;
 ok_to_read:
-	insw(HD_DATA,CURRENT->buffer,256);
-	CURRENT->sector++;
-	CURRENT->buffer += 512;
-	CURRENT->errors = 0;
-	i = --CURRENT->nr_sectors;
-	--CURRENT->current_nr_sectors;
+	req = CURRENT;
+	insw(HD_DATA,req->buffer,256);
+	req->sector++;
+	req->buffer += 512;
+	req->errors = 0;
+	i = --req->nr_sectors;
+	--req->current_nr_sectors;
 #ifdef DEBUG
-	printk("hd%c: read: sector %ld, remaining = %ld, buffer=0x%08lx\n",
-		dev+'a', CURRENT->sector, CURRENT->nr_sectors,
-		(unsigned long) CURRENT->buffer+512);
+	printk("%s: read: sector %ld, remaining = %ld, buffer=%p\n",
+		req->rq_disk->disk_name, req->sector, req->nr_sectors,
+		req->buffer+512);
 #endif
-	if (CURRENT->current_nr_sectors <= 0)
-		end_request(CURRENT, 1);
+	if (req->current_nr_sectors <= 0)
+		end_request(req, 1);
 	if (i > 0) {
 		SET_HANDLER(&read_intr);
 		return;
@@ -472,6 +479,7 @@ static void write_intr(void)
 {
 	int i;
 	int retries = 100000;
+	struct request *req = CURRENT;
 
 	do {
 		i = (unsigned) inb(HD_STATUS);
@@ -479,7 +487,7 @@ static void write_intr(void)
 			continue;
 		if (!OK_STATUS(i))
 			break;
-		if ((CURRENT->nr_sectors <= 1) || (i & DRQ_STAT))
+		if ((req->nr_sectors <= 1) || (i & DRQ_STAT))
 			goto ok_to_write;
 	} while (--retries > 0);
 	dump_status("write_intr", i);
@@ -487,15 +495,15 @@ static void write_intr(void)
 	hd_request();
 	return;
 ok_to_write:
-	CURRENT->sector++;
-	i = --CURRENT->nr_sectors;
-	--CURRENT->current_nr_sectors;
-	CURRENT->buffer += 512;
-	if (!i || (CURRENT->bio && !SUBSECTOR(i)))
-		end_request(CURRENT, 1);
+	req->sector++;
+	i = --req->nr_sectors;
+	--req->current_nr_sectors;
+	req->buffer += 512;
+	if (!i || (req->bio && req->current_nr_sectors < 1))
+		end_request(req, 1);
 	if (i > 0) {
 		SET_HANDLER(&write_intr);
-		outsw(HD_DATA,CURRENT->buffer,256);
+		outsw(HD_DATA,req->buffer,256);
 		local_irq_enable();
 	} else {
 #if (HD_DELAY > 0)
@@ -521,8 +529,6 @@ static void recal_intr(void)
  */
 static void hd_times_out(unsigned long dummy)
 {
-	unsigned int dev;
-
 	do_hd = NULL;
 
 	if (!CURRENT)
@@ -531,11 +537,10 @@ static void hd_times_out(unsigned long dummy)
 	disable_irq(HD_IRQ);
 	local_irq_enable();
 	reset = 1;
-	dev = DEVICE_NR(CURRENT->rq_dev);
-	printk("hd%c: timeout\n", dev+'a');
+	printk("%s: timeout\n", CURRENT->rq_disk->disk_name);
 	if (++CURRENT->errors >= MAX_ERRORS) {
 #ifdef DEBUG
-		printk("hd%c: too many errors\n", dev+'a');
+		printk("%s: too many errors\n", CURRENT->rq_disk->disk_name);
 #endif
 		end_request(CURRENT, 0);
 	}
@@ -544,18 +549,18 @@ static void hd_times_out(unsigned long dummy)
 	enable_irq(HD_IRQ);
 }
 
-int do_special_op (unsigned int dev)
+int do_special_op(struct hd_i_struct *disk, struct request *req)
 {
-	if (recalibrate[dev]) {
-		recalibrate[dev] = 0;
-		hd_out(dev,hd_info[dev].sect,0,0,0,WIN_RESTORE,&recal_intr);
+	if (disk->recalibrate) {
+		disk->recalibrate = 0;
+		hd_out(disk, disk->sect,0,0,0,WIN_RESTORE,&recal_intr);
 		return reset;
 	}
-	if (hd_info[dev].head > 16) {
-		printk ("hd%c: cannot handle device with more than 16 heads - giving up\n", dev+'a');
-		end_request(CURRENT, 0);
+	if (disk->head > 16) {
+		printk ("%s: cannot handle device with more than 16 heads - giving up\n", req->rq_disk->disk_name);
+		end_request(req, 0);
 	}
-	special_op[dev] = 0;
+	disk->special_op = 0;
 	return 1;
 }
 
@@ -571,7 +576,9 @@ int do_special_op (unsigned int dev)
  */
 static void hd_request(void)
 {
-	unsigned int dev, block, nsect, sec, track, head, cyl;
+	unsigned int block, nsect, sec, track, head, cyl;
+	struct hd_i_struct *disk;
+	struct request *req;
 
 	if (do_hd)
 		return;
@@ -583,62 +590,58 @@ repeat:
 		do_hd = NULL;
 		return;
 	}
+	req = CURRENT;
 
 	if (reset) {
 		local_irq_disable();
 		reset_hd();
 		return;
 	}
-	dev = DEVICE_NR(CURRENT->rq_dev);
-	block = CURRENT->sector;
-	nsect = CURRENT->nr_sectors;
-	if (dev >= NR_HD) {
-		printk("hd: bad disk number: %d\n", dev);
-		end_request(CURRENT, 0);
-		goto repeat;
-	}
-	if (block >= get_capacity(hd_gendisk[dev]) ||
-	    ((block+nsect) > get_capacity(hd_gendisk[dev]))) {
+	disk = req->rq_disk->private_data;
+	block = req->sector;
+	nsect = req->nr_sectors;
+	if (block >= get_capacity(req->rq_disk) ||
+	    ((block+nsect) > get_capacity(req->rq_disk))) {
 		printk("%s: bad access: block=%d, count=%d\n",
-			hd_gendisk[dev]->disk_name, block, nsect);
-		end_request(CURRENT, 0);
+			req->rq_disk->disk_name, block, nsect);
+		end_request(req, 0);
 		goto repeat;
 	}
 
-	if (special_op[dev]) {
-		if (do_special_op(dev))
+	if (disk->special_op) {
+		if (do_special_op(disk, req))
 			goto repeat;
 		return;
 	}
-	sec   = block % hd_info[dev].sect + 1;
-	track = block / hd_info[dev].sect;
-	head  = track % hd_info[dev].head;
-	cyl   = track / hd_info[dev].head;
+	sec   = block % disk->sect + 1;
+	track = block / disk->sect;
+	head  = track % disk->head;
+	cyl   = track / disk->head;
 #ifdef DEBUG
-	printk("hd%c: %sing: CHS=%d/%d/%d, sectors=%d, buffer=0x%08lx\n",
-		dev+'a', (CURRENT->cmd == READ)?"read":"writ",
-		cyl, head, sec, nsect, (unsigned long) CURRENT->buffer);
+	printk("%s: %sing: CHS=%d/%d/%d, sectors=%d, buffer=%p\n",
+		req->rq_disk->disk_name, (req->cmd == READ)?"read":"writ",
+		cyl, head, sec, nsect, req->buffer);
 #endif
-	if(CURRENT->flags & REQ_CMD) {
-		switch (rq_data_dir(CURRENT)) {
+	if (req->flags & REQ_CMD) {
+		switch (rq_data_dir(req)) {
 		case READ:
-			hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr);
+			hd_out(disk,nsect,sec,head,cyl,WIN_READ,&read_intr);
 			if (reset)
 				goto repeat;
 			break;
 		case WRITE:
-			hd_out(dev,nsect,sec,head,cyl,WIN_WRITE,&write_intr);
+			hd_out(disk,nsect,sec,head,cyl,WIN_WRITE,&write_intr);
 			if (reset)
 				goto repeat;
 			if (wait_DRQ()) {
 				bad_rw_intr();
 				goto repeat;
 			}
-			outsw(HD_DATA,CURRENT->buffer,256);
+			outsw(HD_DATA,req->buffer,256);
 			break;
 		default:
 			printk("unknown hd-command\n");
-			end_request(CURRENT, 0);
+			end_request(req, 0);
 			break;
 		}
 	}
@@ -654,42 +657,25 @@ static void do_hd_request (request_queue_t * q)
 static int hd_ioctl(struct inode * inode, struct file * file,
 	unsigned int cmd, unsigned long arg)
 {
+	struct hd_i_struct *disk = inode->i_bdev->bd_disk->private_data;
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
-	int dev = DEVICE_NR(inode->i_rdev);
+	struct hd_geometry g; 
 
-	if (dev >= NR_HD)
+	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
-	switch (cmd) {
-		case HDIO_GETGEO:
-		{
-			struct hd_geometry g; 
-			if (!loc)  return -EINVAL;
-			g.heads = hd_info[dev].head;
-			g.sectors = hd_info[dev].sect;
-			g.cylinders = hd_info[dev].cyl;
-			g.start = get_start_sect(inode->i_bdev);
-			return copy_to_user(loc, &g, sizeof g) ? -EFAULT : 0; 
-		}
-
-		default:
-			return -EINVAL;
-	}
-}
-
-static int hd_open(struct inode * inode, struct file * filp)
-{
-	int target =  DEVICE_NR(inode->i_rdev);
-	if (target >= NR_HD)
-		return -ENODEV;
-	return 0;
+	if (!loc)
+		return -EINVAL;
+	g.heads = disk->head;
+	g.sectors = disk->sect;
+	g.cylinders = disk->cyl;
+	g.start = get_start_sect(inode->i_bdev);
+	return copy_to_user(loc, &g, sizeof g) ? -EFAULT : 0; 
 }
 
 /*
  * Releasing a block device means we sync() it, so that it can safely
  * be forgotten about...
  */
-
-extern struct block_device_operations hd_fops;
 
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -704,7 +690,6 @@ static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct block_device_operations hd_fops = {
-	.open =		hd_open,
 	.ioctl =	hd_ioctl,
 };
 
@@ -721,15 +706,15 @@ static struct block_device_operations hd_fops = {
 static int __init hd_init(void)
 {
 	int drive;
-	if (register_blkdev(MAJOR_NR,"hd",&hd_fops)) {
-		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);
+	if (register_blkdev(HD_MAJOR,"hd")) {
+		printk("hd: unable to get major %d for hard disk\n",HD_MAJOR);
 		return -1;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_hd_request, &hd_lock);
-	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
+	blk_init_queue(&hd_queue, do_hd_request, &hd_lock);
+	blk_queue_max_sectors(&hd_queue, 255);
 	init_timer(&device_timer);
 	device_timer.function = hd_times_out;
-	blk_queue_hardsect_size(QUEUE, 512);
+	blk_queue_hardsect_size(&hd_queue, 512);
 
 #ifdef __i386__
 	if (!NR_HD) {
@@ -768,24 +753,22 @@ static int __init hd_init(void)
 		goto out;
 
 	for (drive=0 ; drive < NR_HD ; drive++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(64);
+		struct hd_i_struct *p = &hd_info[drive];
 		if (!disk)
 			goto Enomem;
-		disk->major = MAJOR_NR;
+		disk->major = HD_MAJOR;
 		disk->first_minor = drive << 6;
-		disk->minor_shift = 6;
 		disk->fops = &hd_fops;
 		sprintf(disk->disk_name, "hd%c", 'a'+drive);
+		disk->private_data = p;
+		set_capacity(disk, p->head * p->sect * p->cyl);
+		disk->queue = &hd_queue;
+		p->unit = drive;
 		hd_gendisk[drive] = disk;
-	}
-	for (drive=0 ; drive < NR_HD ; drive++) {
-		sector_t size = hd_info[drive].head *
-			hd_info[drive].sect * hd_info[drive].cyl;
-		set_capacity(hd_gendisk[drive], size);
-		printk ("%s: %ldMB, CHS=%d/%d/%d\n",
-			hd_gendisk[drive]->disk_name,
-			size / 2048, hd_info[drive].cyl,
-			hd_info[drive].head, hd_info[drive].sect);
+		printk ("%s: %luMB, CHS=%d/%d/%d\n",
+			disk->disk_name, (unsigned long)get_capacity(disk)/2048,
+			p->cyl, p->head, p->sect);
 	}
 
 	if (request_irq(HD_IRQ, hd_interrupt, SA_INTERRUPT, "hd", NULL)) {
@@ -849,11 +832,8 @@ static int __init hd_init(void)
 		goto out9;
 	}
 
-	for(drive=0; drive < NR_HD; drive++) {
-		struct hd_i_struct *p = hd_info + drive;
-		set_capacity(hd_gendisk[drive], p->head * p->sect * p->cyl);
+	for(drive=0; drive < NR_HD; drive++)
 		add_disk(hd_gendisk[drive]);
-	}
 	return 0;
 
 out9:
@@ -879,8 +859,8 @@ out1:
 	NR_HD = 0;
 out:
 	del_timer(&device_timer);
-	unregister_blkdev(MAJOR_NR,"hd");
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	unregister_blkdev(HD_MAJOR,"hd");
+	blk_cleanup_queue(&hd_queue);
 	return -1;
 Enomem:
 	while (drive--)
