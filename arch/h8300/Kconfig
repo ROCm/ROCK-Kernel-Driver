@@ -145,6 +145,8 @@ source "fs/Kconfig.binfmt"
 
 endmenu
 
+source "drivers/base/Kconfig"
+
 source "drivers/block/Kconfig"
 
 source "drivers/ide/Kconfig"

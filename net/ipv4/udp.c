@@ -189,7 +189,6 @@ gotit:
 
 		sk_add_node(sk, h);
 		sock_prot_inc_use(sk->sk_prot);
-		sock_hold(sk);
 	}
 	write_unlock_bh(&udp_hash_lock);
 	return 0;
@@ -210,7 +209,6 @@ static void udp_v4_unhash(struct sock *sk)
 	if (sk_del_node_init(sk)) {
 		inet_sk(sk)->num = 0;
 		sock_prot_dec_use(sk->sk_prot);
-		__sock_put(sk);
 	}
 	write_unlock_bh(&udp_hash_lock);
 }

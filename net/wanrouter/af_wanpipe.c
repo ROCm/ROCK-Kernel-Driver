@@ -982,8 +982,7 @@ static int wanpipe_release(struct socket *sock)
 
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
-	if (sk_del_node_init(sk))
-		__sock_put(sk);
+	sk_del_node_init(sk);
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 
@@ -1143,8 +1142,7 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 	}
 	
 	write_lock(&wanpipe_sklist_lock);
-	if (sk_del_node_init(sk))
-		__sock_put(sk);
+	sk_del_node_init(sk);
 	write_unlock(&wanpipe_sklist_lock);
 
 
@@ -1206,8 +1204,7 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 	 * appropriate locks */
 	
 	write_lock(&wanpipe_sklist_lock);
-	if (sk_del_node_init(init))
-		__sock_put(sk);
+	sk_del_node_init(sk);
 	write_unlock(&wanpipe_sklist_lock);
 
 	sk->sk_socket = NULL;
@@ -1536,7 +1533,6 @@ static int wanpipe_create(struct socket *sock, int protocol)
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
 	sk_add_node(sk, &wanpipe_sklist);
-	sock_hold(sk);
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 
@@ -2434,7 +2430,6 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
 	sk_add_node(newsk, &wanpipe_sklist);
-	sock_hold(sk);
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 

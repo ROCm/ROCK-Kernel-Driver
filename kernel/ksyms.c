@@ -592,7 +592,6 @@ EXPORT_SYMBOL(__tasklet_hi_schedule);
 /* init task, for moving kthread roots - ought to export a function ?? */
 
 EXPORT_SYMBOL(init_task);
-EXPORT_SYMBOL(init_thread_union);
 
 EXPORT_SYMBOL(tasklist_lock);
 EXPORT_SYMBOL(find_task_by_pid);
@@ -604,5 +603,6 @@ EXPORT_SYMBOL(__per_cpu_offset);
 /* debug */
 EXPORT_SYMBOL(dump_stack);
 EXPORT_SYMBOL(ptrace_notify);
+EXPORT_SYMBOL(console_printk);
 
-EXPORT_SYMBOL(current_kernel_time); 
+EXPORT_SYMBOL(current_kernel_time);

@@ -37,7 +37,7 @@ config TULIP
 	---help---
 	  This driver is developed for the SMC EtherPower series Ethernet
 	  cards and also works with cards based on the DECchip 
-	  21040/21041/21140 (Tulip series) chips.  Some LinkSys PCI cards are
+	  21140 (Tulip series) chips.  Some LinkSys PCI cards are
 	  of this type.  (If your card is NOT SMC EtherPower 10/100 PCI
 	  (smc9332dst), you can also try the driver for "Generic DECchip"
 	  cards, above.  However, most people with a network card of this type

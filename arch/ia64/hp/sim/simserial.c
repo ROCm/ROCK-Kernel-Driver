@@ -1031,6 +1031,9 @@ simrs_init (void)
 	int			i;
 	struct serial_state	*state;
 
+	if (!ia64_platform_is("hpsim"))
+		return -ENODEV;
+
 	hp_simserial_driver = alloc_tty_driver(1);
 	if (!hp_simserial_driver)
 		return -ENOMEM;

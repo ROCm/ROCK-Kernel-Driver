@@ -88,12 +88,12 @@ ioctl_lcd(struct inode *inode, struct file *file, unsigned int cmd,
 		i = (lcd->lcd_dev)->descriptor.bcdDevice;
 		sprintf(buf,"%1d%1d.%1d%1d",(i & 0xF000)>>12,(i & 0xF00)>>8,
 			(i & 0xF0)>>4,(i & 0xF));
-		if (copy_to_user((void *)arg,buf,strlen(buf))!=0)
+		if (copy_to_user((void __user *)arg,buf,strlen(buf))!=0)
 			return -EFAULT;
 		break;
 	case IOCTL_GET_DRV_VERSION:
 		sprintf(buf,DRIVER_VERSION);
-		if (copy_to_user((void *)arg,buf,strlen(buf))!=0)
+		if (copy_to_user((void __user *)arg,buf,strlen(buf))!=0)
 			return -EFAULT;
 		break;
 	default:
@@ -105,7 +105,7 @@ ioctl_lcd(struct inode *inode, struct file *file, unsigned int cmd,
 }
 
 static ssize_t
-write_lcd(struct file *file, const char *buffer,
+write_lcd(struct file *file, const char __user *buffer,
 	  size_t count, loff_t * ppos)
 {
 	struct lcd_usb_data *lcd = &lcd_instance;
@@ -171,7 +171,7 @@ write_lcd(struct file *file, const char *buffer,
 }
 
 static ssize_t
-read_lcd(struct file *file, char *buffer, size_t count, loff_t * ppos)
+read_lcd(struct file *file, char __user *buffer, size_t count, loff_t * ppos)
 {
 	struct lcd_usb_data *lcd = &lcd_instance;
 	ssize_t read_count;

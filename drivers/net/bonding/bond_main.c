@@ -390,6 +390,7 @@
 #include <linux/timer.h>
 #include <linux/socket.h>
 #include <linux/ctype.h>
+#include <linux/inet.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -497,9 +498,7 @@ static struct bond_parm_tbl bond_lacp_tbl[] = {
 {	NULL,		-1},
 };
 
-static int first_pass	= 1;
-static struct bonding *these_bonds =  NULL;
-static struct net_device *dev_bonds = NULL;
+static LIST_HEAD(bond_dev_list);
 
 MODULE_PARM(max_bonds, "i");
 MODULE_PARM_DESC(max_bonds, "Max number of bonded devices");
@@ -2794,84 +2793,6 @@ static void activebackup_arp_monitor(struct net_device *master)
 	mod_timer(&bond->arp_timer, next_timer);
 }
 
-typedef uint32_t in_addr_t;
-
-int
-my_inet_aton(char *cp, unsigned long *the_addr) {
-	static const in_addr_t max[4] = { 0xffffffff, 0xffffff, 0xffff, 0xff };
-	in_addr_t val;
-	char c;
-	union iaddr {
-	  uint8_t bytes[4];
-	  uint32_t word;
-	} res;
-	uint8_t *pp = res.bytes;
-	int digit,base;
-
-	res.word = 0;
-
-	c = *cp;
-	for (;;) {
-		/*
-		 * Collect number up to ``.''.
-		 * Values are specified as for C:
-		 * 0x=hex, 0=octal, isdigit=decimal.
-		 */
-		if (!isdigit(c)) goto ret_0;
-		val = 0; base = 10; digit = 0;
-		for (;;) {
-			if (isdigit(c)) {
-				val = (val * base) + (c - '0');
-				c = *++cp;
-				digit = 1;
-			} else {
-				break;
-			}
-		}
-		if (c == '.') {
-			/*
-			 * Internet format:
-			 *	a.b.c.d
-			 *	a.b.c	(with c treated as 16 bits)
-			 *	a.b	(with b treated as 24 bits)
-			 */
-			if (pp > res.bytes + 2 || val > 0xff) {
-				goto ret_0;
-			}
-			*pp++ = val;
-			c = *++cp;
-		} else
-			break;
-	}
-	/*
-	 * Check for trailing characters.
-	 */
-	if (c != '\0' && (!isascii(c) || !isspace(c))) {
-		goto ret_0;
-	}
-	/*
-	 * Did we get a valid digit?
-	 */
-	if (!digit) {
-		goto ret_0;
-	}
-
-	/* Check whether the last part is in its limits depending on
-	   the number of parts in total.  */
-	if (val > max[pp - res.bytes]) {
-		goto ret_0;
-	}
-
-	if (the_addr != NULL) {
-		*the_addr = res.word | htonl (val);
-	}
-
-	return (1);
-
-ret_0:
-	return (0);
-}
-
 static int bond_sethwaddr(struct net_device *master, struct net_device *slave)
 {
 #ifdef BONDING_DEBUG
@@ -3408,7 +3329,7 @@ static struct net_device_stats *bond_get_stats(struct net_device *dev)
 
 static int bond_get_info(char *buf, char **start, off_t offset, int length)
 {
-	bonding_t *bond = these_bonds;
+	bonding_t *bond;
 	int len = 0;
 	off_t begin = 0;
 	u16 link;
@@ -3416,7 +3337,8 @@ static int bond_get_info(char *buf, char **start, off_t offset, int length)
 
 	len += sprintf(buf + len, "%s\n", version);
 
-	while (bond != NULL) {
+	read_lock(&dev_base_lock);
+	list_for_each_entry(bond, &bond_dev_list, bond_list) {
 		/*
 		 * This function locks the mutex, so we can't lock it until 
 		 * afterwards
@@ -3526,93 +3448,48 @@ static int bond_get_info(char *buf, char **start, off_t offset, int length)
 			len = 0;
 		}
 
-
-		bond = bond->next_bond;
 	}
+	read_unlock(&dev_base_lock);
+
 	return len;
 }
 
 static int bond_event(struct notifier_block *this, unsigned long event, 
 			void *ptr)
 {
-	struct bonding *this_bond = (struct bonding *)these_bonds;
-	struct bonding *last_bond;
 	struct net_device *event_dev = (struct net_device *)ptr;
+	struct net_device *master = event_dev->master;
 
-	/* while there are bonds configured */
-	while (this_bond != NULL) {
-		if (this_bond == event_dev->priv ) {
-			switch (event) {
-			case NETDEV_UNREGISTER:
-				/* 
-				 * remove this bond from a linked list of 
-				 * bonds 
-				 */
-				if (this_bond == these_bonds) {
-					these_bonds = this_bond->next_bond;
-				} else {
-					for (last_bond = these_bonds; 
-					     last_bond != NULL; 
-					     last_bond = last_bond->next_bond) {
-						if (last_bond->next_bond == 
-						    this_bond) {
-							last_bond->next_bond = 
-							this_bond->next_bond;
-						}
-					}
-				}
-				return NOTIFY_DONE;
+	if (event == NETDEV_UNREGISTER && master != NULL) 
+		bond_release(master, event_dev);
 
-			default:
-				return NOTIFY_DONE;
-			}
-		} else if (this_bond->device == event_dev->master) {
-			switch (event) {
-			case NETDEV_UNREGISTER:
-				bond_release(this_bond->device, event_dev);
-				break;
-			}
-			return NOTIFY_DONE;
-		}
-		this_bond = this_bond->next_bond;
-	}
 	return NOTIFY_DONE;
 }
 
 static struct notifier_block bond_netdev_notifier = {
-	notifier_call: bond_event,
+	.notifier_call = bond_event,
 };
 
 static int __init bond_init(struct net_device *dev)
 {
-	bonding_t *bond, *this_bond, *last_bond;
+	bonding_t *bond;
 	int count;
 
 #ifdef BONDING_DEBUG
 	printk (KERN_INFO "Begin bond_init for %s\n", dev->name);
 #endif
-	bond = kmalloc(sizeof(struct bonding), GFP_KERNEL);
-	if (bond == NULL) {
-		return -ENOMEM;
-	}
-	memset(bond, 0, sizeof(struct bonding));
+	bond = dev->priv;
 
 	/* initialize rwlocks */
 	rwlock_init(&bond->lock);
 	rwlock_init(&bond->ptrlock);
 	
-	bond->stats = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
-	if (bond->stats == NULL) {
-		kfree(bond);
-		return -ENOMEM;
-	}
-	memset(bond->stats, 0, sizeof(struct net_device_stats));
-
+	/* space is reserved for stats in alloc_netdev call. */
+	bond->stats = (struct net_device_stats *)(bond + 1);
 	bond->next = bond->prev = (slave_t *)bond;
 	bond->current_slave = NULL;
 	bond->current_arp_slave = NULL;
 	bond->device = dev;
-	dev->priv = bond;
 
 	/* Initialize the device structure. */
 	switch (bond_mode) {
@@ -3637,8 +3514,6 @@ static int __init bond_init(struct net_device *dev)
 		break;
 	default:
 		printk(KERN_ERR "Unknown bonding mode %d\n", bond_mode);
-		kfree(bond->stats);
-		kfree(bond);
 		return -EINVAL;
 	}
 
@@ -3647,13 +3522,6 @@ static int __init bond_init(struct net_device *dev)
 	dev->stop = bond_close;
 	dev->set_multicast_list = set_multicast_list;
 	dev->do_ioctl = bond_ioctl;
-
-	/* 
-	 * Fill in the fields of the device structure with ethernet-generic 
-	 * values. 
-	 */
-
-	ether_setup(dev);
 
 	dev->tx_queue_len = 0;
 	dev->flags |= IFF_MASTER|IFF_MULTICAST;
@@ -3687,8 +3555,6 @@ static int __init bond_init(struct net_device *dev)
 	if (bond->bond_proc_dir == NULL) {
 		printk(KERN_ERR "%s: Cannot init /proc/net/%s/\n", 
 			dev->name, dev->name);
-		kfree(bond->stats);
-		kfree(bond);
 		return -ENOMEM;
 	}
 	bond->bond_proc_dir->owner = THIS_MODULE;
@@ -3700,27 +3566,13 @@ static int __init bond_init(struct net_device *dev)
 		printk(KERN_ERR "%s: Cannot init /proc/net/%s/info\n", 
 			dev->name, dev->name);
 		remove_proc_entry(dev->name, proc_net);
-		kfree(bond->stats);
-		kfree(bond);
 		return -ENOMEM;
 	}
 	bond->bond_proc_info_file->owner = THIS_MODULE;
 #endif /* CONFIG_PROC_FS */
 
-	if (first_pass == 1) {
-		these_bonds = bond;
-		register_netdevice_notifier(&bond_netdev_notifier);
-		first_pass = 0;
-	} else {
-		last_bond = these_bonds;
-		this_bond = these_bonds->next_bond;
-		while (this_bond != NULL) {
-			last_bond = this_bond;
-			this_bond = this_bond->next_bond;
-		}
-		last_bond->next_bond = bond;
-	} 
 
+	list_add_tail(&bond->bond_list, &bond_dev_list);
 	return 0;
 }
 
@@ -3753,14 +3605,10 @@ bond_parse_parm(char *mode_arg, struct bond_parm_tbl *tbl)
 	return -1;
 }
 
-
 static int __init bonding_init(void)
 {
 	int no;
 	int err;
-
-	/* Find a name for this unit */
-	static struct net_device *dev_bond = NULL;
 
 	printk(KERN_INFO "%s", version);
 
@@ -3812,12 +3660,6 @@ static int __init bonding_init(void)
 		       max_bonds, 1, INT_MAX, BOND_DEFAULT_MAX_BONDS);
 		max_bonds = BOND_DEFAULT_MAX_BONDS;
 	}
-	dev_bond = dev_bonds = kmalloc(max_bonds*sizeof(struct net_device), 
-					GFP_KERNEL);
-	if (dev_bond == NULL) {
-		return -ENOMEM;
-	}
-	memset(dev_bonds, 0, max_bonds*sizeof(struct net_device));
 
 	if (miimon < 0) {
 		printk(KERN_WARNING 
@@ -3958,15 +3800,18 @@ static int __init bonding_init(void)
         for (arp_ip_count=0 ;
              (arp_ip_count < MAX_ARP_IP_TARGETS) && arp_ip_target[arp_ip_count];
               arp_ip_count++ ) {
-                /* TODO: check and log bad ip address */
-                if (my_inet_aton(arp_ip_target[arp_ip_count],
-                                 &arp_target[arp_ip_count]) == 0) {
+		/* not complete check, but should be good enough to
+		   catch mistakes */
+		if (!isdigit(arp_ip_target[arp_ip_count][0])) { 
                         printk(KERN_WARNING
                                "bonding_init(): bad arp_ip_target module "
                                "parameter (%s), ARP monitoring will not be "
                                "performed\n",
                                arp_ip_target[arp_ip_count]);
                         arp_interval = 0;
+		} else { 
+			u32 ip = in_aton(arp_ip_target[arp_ip_count]); 
+			*(u32 *)(arp_ip_target[arp_ip_count]) = ip;
 		}
         }
 
@@ -4005,48 +3850,50 @@ static int __init bonding_init(void)
 		primary = NULL;
 	}
 
+	register_netdevice_notifier(&bond_netdev_notifier);
 
 	for (no = 0; no < max_bonds; no++) {
-		dev_bond->init = bond_init;
-	
-		err = dev_alloc_name(dev_bond,"bond%d");
-		if (err < 0) {
-			kfree(dev_bonds);
+		struct net_device *dev;
+		char name[IFNAMSIZ];
+
+		snprintf(name, IFNAMSIZ, "bond%d", no);
+
+		dev = alloc_netdev(sizeof(bonding_t) 
+				   + sizeof(struct net_device_stats),
+				   name, ether_setup);
+		if (!dev)
+			return -ENOMEM;
+
+		dev->init = bond_init;
+		SET_MODULE_OWNER(dev);
+
+		if ( (err = register_netdev(dev)) ) {
+#ifdef BONDING_DEBUG
+			printk(KERN_INFO "%s: register_netdev failed %d\n",
+			       dev->name, err);
+#endif
+			kfree(dev);
 			return err;
-		}
-		SET_MODULE_OWNER(dev_bond);
-		if (register_netdev(dev_bond) != 0) {
-			kfree(dev_bonds);
-			return -EIO;
 		}	
-		dev_bond++;
 	}
 	return 0;
 }
 
 static void __exit bonding_exit(void)
 {
-	struct net_device *dev_bond = dev_bonds;
-	struct bonding *bond;
-	int no;
+	struct bonding *bond, *nxt;
 
 	unregister_netdevice_notifier(&bond_netdev_notifier);
 		 
-	for (no = 0; no < max_bonds; no++) {
-
+	list_for_each_entry_safe(bond, nxt, &bond_dev_list, bond_list) {
+		struct net_device *dev = bond->device;
 #ifdef CONFIG_PROC_FS
-		bond = (struct bonding *) dev_bond->priv;
 		remove_proc_entry("info", bond->bond_proc_dir);
-		remove_proc_entry(dev_bond->name, proc_net);
+		remove_proc_entry(dev->name, proc_net);
 #endif
-		unregister_netdev(dev_bond);
-		kfree(bond->stats);
-		kfree(dev_bond->priv);
-		
-		dev_bond->priv = NULL;
-		dev_bond++;
+		unregister_netdev(dev);
+		kfree(dev);
 	}
-	kfree(dev_bonds);
 }
 
 module_init(bonding_init);

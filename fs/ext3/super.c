@@ -947,6 +947,9 @@ static int ext3_check_descriptors (struct super_block * sb)
 		block += EXT3_BLOCKS_PER_GROUP(sb);
 		gdp++;
 	}
+
+	sbi->s_es->s_free_blocks_count=cpu_to_le32(ext3_count_free_blocks(sb));
+	sbi->s_es->s_free_inodes_count=cpu_to_le32(ext3_count_free_inodes(sb));
 	return 1;
 }
 
@@ -1307,13 +1310,19 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		printk (KERN_ERR "EXT3-fs: not enough memory\n");
 		goto failed_mount;
 	}
-	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->s_debts),
+	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(u8),
 			GFP_KERNEL);
 	if (!sbi->s_debts) {
-		printk ("EXT3-fs: not enough memory\n");
+		printk("EXT3-fs: not enough memory to allocate s_bgi\n");
 		goto failed_mount2;
 	}
-	memset(sbi->s_debts, 0, sbi->s_groups_count * sizeof(*sbi->s_debts));
+	memset(sbi->s_debts, 0,  sbi->s_groups_count * sizeof(u8));
+
+	percpu_counter_init(&sbi->s_freeblocks_counter);
+	percpu_counter_init(&sbi->s_freeinodes_counter);
+	percpu_counter_init(&sbi->s_dirs_counter);
+	bgl_lock_init(&sbi->s_blockgroup_lock);
+
 	for (i = 0; i < db_count; i++) {
 		block = descriptor_loc(sb, logic_sb_block, i);
 		sbi->s_group_desc[i] = sb_bread(sb, block);
@@ -1329,7 +1338,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		goto failed_mount2;
 	}
 	sbi->s_gdb_count = db_count;
-	sbi->s_dir_count = ext3_count_dirs(sb);
 	/*
 	 * set up enough so that it can read an inode
 	 */
@@ -1427,13 +1435,19 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		test_opt(sb,DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA ? "ordered":
 		"writeback");
 
+	percpu_counter_mod(&sbi->s_freeblocks_counter,
+		ext3_count_free_blocks(sb));
+	percpu_counter_mod(&sbi->s_freeinodes_counter,
+		ext3_count_free_inodes(sb));
+	percpu_counter_mod(&sbi->s_dirs_counter,
+		ext3_count_dirs(sb));
+
 	return 0;
 
 failed_mount3:
 	journal_destroy(sbi->s_journal);
 failed_mount2:
-	if (sbi->s_debts)
-		kfree(sbi->s_debts);
+	kfree(sbi->s_debts);
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
@@ -1702,6 +1716,8 @@ static void ext3_commit_super (struct super_block * sb,
 	if (!sbh)
 		return;
 	es->s_wtime = cpu_to_le32(get_seconds());
+	es->s_free_blocks_count = cpu_to_le32(ext3_count_free_blocks(sb));
+	es->s_free_inodes_count = cpu_to_le32(ext3_count_free_inodes(sb));
 	BUFFER_TRACE(sbh, "marking dirty");
 	mark_buffer_dirty(sbh);
 	if (sync)
@@ -1777,9 +1793,7 @@ int ext3_force_commit(struct super_block *sb)
 
 	journal = EXT3_SB(sb)->s_journal;
 	sb->s_dirt = 0;
-	lock_kernel();	/* important: lock down j_running_transaction */
 	ret = ext3_journal_force_commit(journal);
-	unlock_kernel();
 	return ret;
 }
 
@@ -1794,24 +1808,21 @@ int ext3_force_commit(struct super_block *sb)
 
 void ext3_write_super (struct super_block * sb)
 {
-	lock_kernel();	
 	if (down_trylock(&sb->s_lock) == 0)
 		BUG();
 	sb->s_dirt = 0;
-	log_start_commit(EXT3_SB(sb)->s_journal, NULL);
-	unlock_kernel();
+	journal_start_commit(EXT3_SB(sb)->s_journal, NULL);
 }
 
 static int ext3_sync_fs(struct super_block *sb, int wait)
 {
 	tid_t target;
 
-	lock_kernel();	
 	sb->s_dirt = 0;
-	target = log_start_commit(EXT3_SB(sb)->s_journal, NULL);
-	if (wait)
-		log_wait_commit(EXT3_SB(sb)->s_journal, target);
-	unlock_kernel();
+	if (journal_start_commit(EXT3_SB(sb)->s_journal, &target)) {
+		if (wait)
+			log_wait_commit(EXT3_SB(sb)->s_journal, target);
+	}
 	return 0;
 }
 
@@ -1823,7 +1834,6 @@ void ext3_write_super_lockfs(struct super_block *sb)
 {
 	sb->s_dirt = 0;
 
-	lock_kernel();		/* 2.4.5 forgot to do this for us */
 	if (!(sb->s_flags & MS_RDONLY)) {
 		journal_t *journal = EXT3_SB(sb)->s_journal;
 
@@ -1835,7 +1845,6 @@ void ext3_write_super_lockfs(struct super_block *sb)
 		EXT3_CLEAR_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
 		ext3_commit_super(sb, EXT3_SB(sb)->s_es, 1);
 	}
-	unlock_kernel();
 }
 
 /*
@@ -1845,14 +1854,12 @@ void ext3_write_super_lockfs(struct super_block *sb)
 void ext3_unlockfs(struct super_block *sb)
 {
 	if (!(sb->s_flags & MS_RDONLY)) {
-		lock_kernel();
 		lock_super(sb);
 		/* Reser the needs_recovery flag before the fs is unlocked. */
 		EXT3_SET_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
 		ext3_commit_super(sb, EXT3_SB(sb)->s_es, 1);
 		unlock_super(sb);
 		journal_unlock_updates(EXT3_SB(sb)->s_journal);
-		unlock_kernel();
 	}
 }
 
@@ -1997,7 +2004,9 @@ static int (*old_sync_dquot)(struct dquot *dquot);
 
 static int ext3_sync_dquot(struct dquot *dquot)
 {
-	int nblocks, ret;
+	int nblocks;
+	int ret;
+	int err;
 	handle_t *handle;
 	struct quota_info *dqops = sb_dqopt(dquot->dq_sb);
 	struct inode *qinode;
@@ -2012,18 +2021,17 @@ static int ext3_sync_dquot(struct dquot *dquot)
 		default:
 			nblocks = EXT3_MAX_TRANS_DATA;
 	}
-	lock_kernel();
 	qinode = dqops->files[dquot->dq_type]->f_dentry->d_inode;
 	handle = ext3_journal_start(qinode, nblocks);
 	if (IS_ERR(handle)) {
-		unlock_kernel();
-		return PTR_ERR(handle);
+		ret = PTR_ERR(handle);
+		goto out;
 	}
-	unlock_kernel();
 	ret = old_sync_dquot(dquot);
-	lock_kernel();
-	ret = ext3_journal_stop(handle);
-	unlock_kernel();
+	err = ext3_journal_stop(handle);
+	if (ret == 0)
+		ret = err;
+out:
 	return ret;
 }
 #endif

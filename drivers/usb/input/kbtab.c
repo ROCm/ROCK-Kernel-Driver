@@ -181,7 +181,7 @@ static int kbtab_probe(struct usb_interface *intf, const struct usb_device_id *i
 			 kbtab->data, 8,
 			 kbtab_irq, kbtab, endpoint->bInterval);
 	kbtab->irq->transfer_dma = kbtab->data_dma;
-	kbtab->irq->transfer_flags |= URB_NO_DMA_MAP;
+	kbtab->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	input_register_device(&kbtab->dev);
 

@@ -123,7 +123,7 @@ eicon_isa_find_card(int Mem, int Irq, char * Id)
 int
 eicon_isa_bootload(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 	int	tmp;
-	int               timeout;
+	unsigned long     timeout;
 	eicon_isa_codebuf cbuf;
 	unsigned char     *code;
 	eicon_isa_boot    *boot;
@@ -300,7 +300,7 @@ int
 eicon_isa_load(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 	eicon_isa_boot    *boot;
 	int               tmp;
-	int               timeout;
+	unsigned long     timeout;
 	int 		  j;
 	eicon_isa_codebuf cbuf;
 	unsigned char     *code;

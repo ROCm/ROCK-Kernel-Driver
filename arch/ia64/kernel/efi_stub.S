@@ -62,7 +62,7 @@ GLOBAL_ENTRY(efi_call_phys)
 	mov b6=r2
 	;;
 	andcm r16=loc3,r16		// get psr with IT, DT, and RT bits cleared
-	br.call.sptk.many rp=ia64_switch_mode
+	br.call.sptk.many rp=ia64_switch_mode_phys
 .ret0:	mov out4=in5
 	mov out0=in1
 	mov out1=in2
@@ -73,7 +73,7 @@ GLOBAL_ENTRY(efi_call_phys)
 	br.call.sptk.many rp=b6		// call the EFI function
 .ret1:	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	mov r16=loc3
-	br.call.sptk.many rp=ia64_switch_mode // return to virtual mode
+	br.call.sptk.many rp=ia64_switch_mode_virt // return to virtual mode
 .ret2:	mov ar.rsc=loc4			// restore RSE configuration
 	mov ar.pfs=loc1
 	mov rp=loc0

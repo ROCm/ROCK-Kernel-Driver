@@ -573,6 +573,8 @@ endif
 
 endmenu
 
+source "drivers/base/Kconfig"
+
 source "drivers/mtd/Kconfig"
 
 source "drivers/block/Kconfig"

@@ -34,14 +34,16 @@
 #include <linux/initrd.h>
 
 #include <asm/ia32.h>
-#include <asm/page.h>
-#include <asm/pgtable.h>
 #include <asm/machvec.h>
+#include <asm/mca.h>
+#include <asm/page.h>
+#include <asm/patch.h>
+#include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
-#include <asm/system.h>
-#include <asm/mca.h>
 #include <asm/smp.h>
+#include <asm/system.h>
+#include <asm/unistd.h>
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"
@@ -65,6 +67,17 @@ struct io_space io_space[MAX_IO_SPACES];
 unsigned int num_io_spaces;
 
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
+
+/*
+ * The merge_mask variable needs to be set to (max(iommu_page_size(iommu)) - 1).  This
+ * mask specifies a mask of address bits that must be 0 in order for two buffers to be
+ * mergeable by the I/O MMU (i.e., the end address of the first buffer and the start
+ * address of the second buffer must be aligned to (merge_mask+1) in order to be
+ * mergeable).  By default, we assume there is no I/O MMU which can merge physically
+ * discontiguous buffers, so we set the merge_mask to ~0UL, which corresponds to a iommu
+ * page-size of 2^64.
+ */
+unsigned long ia64_max_iommu_merge_mask = ~0UL;
 
 #define COMMAND_LINE_SIZE	512
 
@@ -102,11 +115,11 @@ static unsigned long bootmap_start; /* physical address where the bootmem map is
 static int
 find_max_pfn (unsigned long start, unsigned long end, void *arg)
 {
-	unsigned long *max_pfn = arg, pfn;
+	unsigned long *max_pfnp = arg, pfn;
 
 	pfn = (PAGE_ALIGN(end - 1) - PAGE_OFFSET) >> PAGE_SHIFT;
-	if (pfn > *max_pfn)
-		*max_pfn = pfn;
+	if (pfn > *max_pfnp)
+		*max_pfnp = pfn;
 	return 0;
 }
 
@@ -265,9 +278,8 @@ sort_regions (struct rsvd_region *rsvd_region, int max)
 static void
 find_memory (void)
 {
-#	define KERNEL_END	((unsigned long) &_end)
+#	define KERNEL_END	(&_end)
 	unsigned long bootmap_size;
-	unsigned long max_pfn;
 	int n = 0;
 
 	/*
@@ -286,8 +298,8 @@ find_memory (void)
 				+ strlen(__va(ia64_boot_param->command_line)) + 1);
 	n++;
 
-	rsvd_region[n].start = KERNEL_START;
-	rsvd_region[n].end   = KERNEL_END;
+	rsvd_region[n].start = (unsigned long) ia64_imva((void *)KERNEL_START);
+	rsvd_region[n].end   = (unsigned long) ia64_imva(KERNEL_END);
 	n++;
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -350,10 +362,13 @@ find_memory (void)
 void __init
 setup_arch (char **cmdline_p)
 {
+	extern unsigned long *__start___vtop_patchlist[], *__end____vtop_patchlist[];
 	extern unsigned long ia64_iobase;
 	unsigned long phys_iobase;
 
 	unw_init();
+
+	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end____vtop_patchlist);
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
 	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
@@ -459,8 +474,6 @@ setup_arch (char **cmdline_p)
 
 	platform_setup(cmdline_p);
 	paging_init();
-
-	unw_create_gate_table();
 }
 
 /*
@@ -735,6 +748,8 @@ cpu_init (void)
 	/* Clear the stack memory reserved for pt_regs: */
 	memset(ia64_task_regs(current), 0, sizeof(struct pt_regs));
 
+	ia64_set_kr(IA64_KR_FPU_OWNER, 0);
+
 	/*
 	 * Initialize default control register to defer all speculative faults.  The
 	 * kernel MUST NOT depend on a particular setting of these bits (in other words,
@@ -745,20 +760,15 @@ cpu_init (void)
 	 */
 	ia64_set_dcr(  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
 		     | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC);
-#ifndef CONFIG_SMP
-	ia64_set_fpu_owner(0);
-#endif
-
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 	if (current->mm)
 		BUG();
 
-	ia64_mmu_init(cpu_data);
+	ia64_mmu_init(ia64_imva(cpu_data));
 
 #ifdef CONFIG_IA32_SUPPORT
-	/* initialize global ia32 state - CR0 and CR4 */
-	asm volatile ("mov ar.cflg = %0" :: "r" (((ulong) IA32_CR4 << 32) | IA32_CR0));
+	ia32_cpu_init();
 #endif
 
 	/* disable all local interrupt sources: */
@@ -800,27 +810,9 @@ cpu_init (void)
 void
 check_bugs (void)
 {
-	extern int __start___mckinley_e9_bundles[];
-	extern int __end___mckinley_e9_bundles[];
-	u64 *bundle;
-	int *wp;
+	extern char __start___mckinley_e9_bundles[];
+	extern char __end___mckinley_e9_bundles[];
 
-	if (local_cpu_data->family == 0x1f && local_cpu_data->model == 0)
-		printk(KERN_INFO "check_bugs: leaving McKinley Errata 9 workaround enabled\n");
-	else {
-		printk(KERN_INFO "check_bugs: McKinley Errata 9 workaround not needed; "
-		       "disabling it\n");
-		for (wp = __start___mckinley_e9_bundles; wp < __end___mckinley_e9_bundles; ++wp) {
-			bundle = (u64 *) ((char *) wp + *wp);
-			/* install a bundle of NOPs: */
-			bundle[0] = 0x0000000100000000;
-			bundle[1] = 0x0004000000000200;
-			ia64_fc(bundle);
-		}
-		ia64_insn_group_barrier();
-		ia64_sync_i();
-		ia64_insn_group_barrier();
-		ia64_srlz_i();
-		ia64_insn_group_barrier();
-	}
+	ia64_patch_mckinley_e9((unsigned long) __start___mckinley_e9_bundles,
+			       (unsigned long) __end___mckinley_e9_bundles);
 }

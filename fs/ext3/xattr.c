@@ -849,7 +849,6 @@ ext3_xattr_set(struct inode *inode, int name_index, const char *name,
 	handle_t *handle;
 	int error, error2;
 
-	lock_kernel();
 	handle = ext3_journal_start(inode, EXT3_XATTR_TRANS_BLOCKS);
 	if (IS_ERR(handle))
 		error = PTR_ERR(handle);
@@ -857,7 +856,6 @@ ext3_xattr_set(struct inode *inode, int name_index, const char *name,
 		error = ext3_xattr_set_handle(handle, inode, name_index, name,
 					      value, value_len, flags);
 	error2 = ext3_journal_stop(handle);
-	unlock_kernel();
 
 	return error ? error : error2;
 }

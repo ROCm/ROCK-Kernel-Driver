@@ -39,8 +39,8 @@
 #define LLC_PDU_CMD_RSP_MASK	0x01
 #define LLC_PDU_CMD		0
 #define LLC_PDU_RSP		1
-#define LLC_PDU_IS_CMD(pdu)    ((pdu->ssap & LLC_PDU_RSP) ? 1 : 0)
-#define LLC_PDU_IS_RSP(pdu)    ((pdu->ssap & LLC_PDU_RSP) ? 0 : 1)
+#define LLC_PDU_IS_CMD(pdu)    ((pdu->ssap & LLC_PDU_RSP) ? 0 : 1)
+#define LLC_PDU_IS_RSP(pdu)    ((pdu->ssap & LLC_PDU_RSP) ? 1 : 0)
 
 /* Get PDU type from 2 lowest-order bits of control field first byte */
 #define LLC_PDU_TYPE_I_MASK    0x01	/* 16-bit control field */
@@ -53,18 +53,18 @@
 #define LLC_PDU_TYPE_U	3	/* first two bits */
 
 #define LLC_PDU_TYPE_IS_I(pdu) \
-	((!(pdu->ctrl_1 & LLC_PDU_TYPE_I_MASK)) ? 0 : 1)
+	((!(pdu->ctrl_1 & LLC_PDU_TYPE_I_MASK)) ? 1 : 0)
 
 #define LLC_PDU_TYPE_IS_U(pdu) \
-	(((pdu->ctrl_1 & LLC_PDU_TYPE_U_MASK) == LLC_PDU_TYPE_U) ? 0 : 1)
+	(((pdu->ctrl_1 & LLC_PDU_TYPE_U_MASK) == LLC_PDU_TYPE_U) ? 1 : 0)
 
 #define LLC_PDU_TYPE_IS_S(pdu) \
-	(((pdu->ctrl_1 & LLC_PDU_TYPE_S_MASK) == LLC_PDU_TYPE_S) ? 0 : 1)
+	(((pdu->ctrl_1 & LLC_PDU_TYPE_S_MASK) == LLC_PDU_TYPE_S) ? 1 : 0)
 
 /* U-format PDU control field masks */
 #define LLC_U_PF_BIT_MASK      0x10	/* P/F bit mask */
-#define LLC_U_PF_IS_1(pdu)     ((pdu->ctrl_1 & LLC_U_PF_BIT_MASK) ? 0 : 1)
-#define LLC_U_PF_IS_0(pdu)     ((!(pdu->ctrl_1 & LLC_U_PF_BIT_MASK)) ? 0 : 1)
+#define LLC_U_PF_IS_1(pdu)     ((pdu->ctrl_1 & LLC_U_PF_BIT_MASK) ? 1 : 0)
+#define LLC_U_PF_IS_0(pdu)     ((!(pdu->ctrl_1 & LLC_U_PF_BIT_MASK)) ? 1 : 0)
 
 #define LLC_U_PDU_CMD_MASK     0xEC	/* cmd/rsp mask */
 #define LLC_U_PDU_CMD(pdu)     (pdu->ctrl_1 & LLC_U_PDU_CMD_MASK)
@@ -119,8 +119,8 @@
 
 #define LLC_I_PF_BIT_MASK      0x01
 
-#define LLC_I_PF_IS_0(pdu)     ((!(pdu->ctrl_2 & LLC_I_PF_BIT_MASK)) ? 0 : 1)
-#define LLC_I_PF_IS_1(pdu)     ((pdu->ctrl_2 & LLC_I_PF_BIT_MASK) ? 0 : 1)
+#define LLC_I_PF_IS_0(pdu)     ((!(pdu->ctrl_2 & LLC_I_PF_BIT_MASK)) ? 1 : 0)
+#define LLC_I_PF_IS_1(pdu)     ((pdu->ctrl_2 & LLC_I_PF_BIT_MASK) ? 1 : 0)
 
 /* S-PDU supervisory commands and responses */
 
@@ -136,8 +136,8 @@
 #define LLC_2_PDU_RSP_RNR      0x04	/* rx not ready rsp */
 
 #define LLC_S_PF_BIT_MASK      0x01
-#define LLC_S_PF_IS_0(pdu)     ((!(pdu->ctrl_2 & LLC_S_PF_BIT_MASK)) ? 0 : 1)
-#define LLC_S_PF_IS_1(pdu)     ((pdu->ctrl_2 & LLC_S_PF_BIT_MASK) ? 0 : 1)
+#define LLC_S_PF_IS_0(pdu)     ((!(pdu->ctrl_2 & LLC_S_PF_BIT_MASK)) ? 1 : 0)
+#define LLC_S_PF_IS_1(pdu)     ((pdu->ctrl_2 & LLC_S_PF_BIT_MASK) ? 1 : 0)
 
 #define PDU_SUPV_GET_Nr(pdu)   ((pdu->ctrl_2 & 0xFE) >> 1)
 #define PDU_GET_NEXT_Vr(sn)    (++sn & ~LLC_2_SEQ_NBR_MODULO)

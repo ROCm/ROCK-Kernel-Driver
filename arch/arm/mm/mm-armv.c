@@ -309,9 +309,9 @@ static void __init build_mem_type_table(void)
 	const char *policy;
 
 	/*
-	 * ARMv5 can use ECC memory.
+	 * ARMv5 and higher can use ECC memory.
 	 */
-	if (cpu_arch == CPU_ARCH_ARMv5) {
+	if (cpu_arch >= CPU_ARCH_ARMv5) {
 		mem_types[MT_VECTORS].prot_l1 |= ecc_mask;
 		mem_types[MT_MEMORY].prot_sect |= ecc_mask;
 	} else {

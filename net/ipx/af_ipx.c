@@ -142,7 +142,6 @@ static void ipx_remove_socket(struct sock *sk)
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	sk_del_node_init(sk);
 	spin_unlock_bh(&intrfc->if_sklist_lock);
-	sock_put(sk);
 	ipxitf_put(intrfc);
 out:
 	return;
@@ -229,7 +228,6 @@ unlock:
 static void ipxitf_insert_socket(struct ipx_interface *intrfc, struct sock *sk)
 {
 	ipxitf_hold(intrfc);
-	sock_hold(sk);
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	ipx_sk(sk)->intrfc = intrfc;
 	sk_add_node(sk, &intrfc->if_sklist);

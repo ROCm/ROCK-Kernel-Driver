@@ -356,7 +356,7 @@ static void llc_conn_send_pdus(struct sock *sk)
 	while ((skb = skb_dequeue(&sk->sk_write_queue)) != NULL) {
 		struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-		if (!LLC_PDU_TYPE_IS_I(pdu) &&
+		if (LLC_PDU_TYPE_IS_I(pdu) &&
 		    !(skb->dev->flags & IFF_LOOPBACK)) {
 			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 

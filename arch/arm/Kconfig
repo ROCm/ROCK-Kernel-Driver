@@ -483,6 +483,16 @@ config PCI_HOST_VIA82C505
 	depends on PCI && ARCH_SHARK
 	default y
 
+config ICST525
+	bool
+	depends on ARCH_INTEGRATOR
+	default y
+
+config ARM_AMBA
+	bool
+	depends on ARCH_INTEGRATOR
+	default y
+
 config ISA
 	bool
 	depends on FOOTBRIDGE_HOST || ARCH_SHARK || ARCH_CLPS7500 || ARCH_EBSA110 || ARCH_CDB89712 || ARCH_EDB7211 || ARCH_SA1100
@@ -582,7 +592,7 @@ endif
 
 config CPU_FREQ_INTEGRATOR
 	tristate "CPUfreq driver for ARM Integrator CPUs"
-	depends on ARCH_INTEGRATOR && CPU_FREQ
+	depends on ARCH_INTEGRATOR && ICST525 && CPU_FREQ
 	default y
 	help
 	  This enables the CPUfreq driver for ARM Integrator CPUs.
@@ -692,6 +702,8 @@ config KCORE_AOUT
 endchoice
 
 source "fs/Kconfig.binfmt"
+
+source "drivers/base/Kconfig"
 
 config PM
 	bool "Power Management support"

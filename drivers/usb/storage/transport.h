@@ -63,16 +63,18 @@
 #define US_PR_DPCM_USB  0xf0		/* Combination CB/SDDR09 */
 
 #ifdef CONFIG_USB_STORAGE_FREECOM
-#define US_PR_FREECOM   0xf1	    /* Freecom */
+#define US_PR_FREECOM   0xf1		/* Freecom */
 #endif
 
 #ifdef CONFIG_USB_STORAGE_DATAFAB
-#define US_PR_DATAFAB   0xf2	    /* Datafab chipsets */
+#define US_PR_DATAFAB   0xf2		/* Datafab chipsets */
 #endif
 
 #ifdef CONFIG_USB_STORAGE_JUMPSHOT
-#define US_PR_JUMPSHOT  0xf3	    /* Lexar Jumpshot */
+#define US_PR_JUMPSHOT  0xf3		/* Lexar Jumpshot */
 #endif
+
+#define US_PR_DEVICE	0xff		/* Use device's value */
 
 /*
  * Bulk only data structures

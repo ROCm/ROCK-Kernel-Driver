@@ -521,6 +521,8 @@ config WATCHDOG_RIO
 
 endmenu
 
+source "drivers/base/Kconfig"
+
 source "drivers/video/Kconfig"
 
 source "drivers/serial/Kconfig"

@@ -289,19 +289,51 @@ static __inline__ void sk_node_init(struct hlist_node *node)
 	node->pprev = NULL;
 }
 
-static __inline__ int sk_del_node_init(struct sock *sk)
+static __inline__ void __sk_del_node(struct sock *sk)
+{
+	__hlist_del(&sk->sk_node);
+}
+
+static __inline__ int __sk_del_node_init(struct sock *sk)
 {
 	if (sk_hashed(sk)) {
-		__hlist_del(&sk->sk_node);
+		__sk_del_node(sk);
 		sk_node_init(&sk->sk_node);
 		return 1;
 	}
 	return 0;
 }
 
-static __inline__ void sk_add_node(struct sock *sk, struct hlist_head *list)
+static inline void __sock_put(struct sock *sk);
+
+static __inline__ int sk_del_node_init(struct sock *sk)
+{
+	int rc = __sk_del_node_init(sk);
+
+	if (rc) {
+		/* paranoid for a while -acme */
+		WARN_ON(atomic_read(&sk->sk_refcnt) == 1);
+		__sock_put(sk);
+	}
+	return rc;
+}
+
+static __inline__ void __sk_add_node(struct sock *sk, struct hlist_head *list)
 {
 	hlist_add_head(&sk->sk_node, list);
+}
+
+static inline void sock_hold(struct sock *sk);
+
+static __inline__ void sk_add_node(struct sock *sk, struct hlist_head *list)
+{
+	sock_hold(sk);
+	__sk_add_node(sk, list);
+}
+
+static __inline__ void __sk_del_bind_node(struct sock *sk)
+{
+	__hlist_del(&sk->sk_bind_node);
 }
 
 static __inline__ void sk_add_bind_node(struct sock *sk,

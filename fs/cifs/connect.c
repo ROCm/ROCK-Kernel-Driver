@@ -53,7 +53,7 @@ struct smb_vol {
 	char *UNC;
 	char *UNCip;
 	uid_t linux_uid;
-	uid_t linux_gid;
+	gid_t linux_gid;
 	mode_t file_mode;
 	mode_t dir_mode;
 	int rw;
@@ -136,8 +136,8 @@ cifs_reconnect(struct TCP_Server_Info *server)
 int
 cifs_demultiplex_thread(struct TCP_Server_Info *server)
 {
-	int length, total_read;
-	unsigned int pdu_length;
+	int length;
+	unsigned int pdu_length, total_read;
 	struct smb_hdr *smb_buffer = NULL;
 	struct msghdr smb_msg;
 	mm_segment_t temp_fs;
@@ -351,6 +351,10 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 	memset(vol,0,sizeof(struct smb_vol));
 	vol->linux_uid = current->uid;	/* current->euid instead? */
 	vol->linux_gid = current->gid;
+	vol->dir_mode = S_IRWXUGO;
+	/* 2767 perms indicate mandatory locking support */
+	vol->file_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);
+
 	vol->rw = TRUE;
 
 	if (!options)
@@ -466,6 +470,8 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 			/* ignore */
 		} else if (strnicmp(data, "rw", 2) == 0) {
 			vol->rw = TRUE;
+		} else if (strnicmp(data, "ro", 2) == 0) {
+			vol->rw = FALSE;
 		} else
 			printk(KERN_WARNING "CIFS: Unknown mount option %s\n",data);
 	}
@@ -929,8 +935,11 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			cifs_sb->rsize = PAGE_CACHE_SIZE;
 			cERROR(1,("Attempt to set readsize for mount to less than one page (4096)"));
 		}
-
-
+		cifs_sb->mnt_uid = volume_info.linux_uid;
+		cifs_sb->mnt_gid = volume_info.linux_gid;
+		cifs_sb->mnt_file_mode = volume_info.file_mode;
+		cifs_sb->mnt_dir_mode = volume_info.dir_mode;
+		cFYI(1,("file mode: 0x%x  dir mode: 0x%x",cifs_sb->mnt_file_mode,cifs_sb->mnt_dir_mode));
 		tcon =
 		    find_unc(sin_server.sin_addr.s_addr, volume_info.UNC,
 			     volume_info.username);

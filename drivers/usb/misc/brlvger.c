@@ -109,9 +109,9 @@ static int brlvger_probe (struct usb_interface *intf,
 static void brlvger_disconnect(struct usb_interface *intf);
 static int brlvger_open(struct inode *inode, struct file *file);
 static int brlvger_release(struct inode *inode, struct file *file);
-static ssize_t brlvger_write(struct file *file, const char *buffer,
+static ssize_t brlvger_write(struct file *file, const char __user *buffer,
 			     size_t count, loff_t *pos);
-static ssize_t brlvger_read(struct file *file, char *buffer,
+static ssize_t brlvger_read(struct file *file, char __user *buffer,
 			    size_t count, loff_t *unused_pos);
 static int brlvger_ioctl(struct inode *inode, struct file *file,
 			 unsigned cmd, unsigned long arg);
@@ -546,7 +546,7 @@ brlvger_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-brlvger_write(struct file *file, const char *buffer,
+brlvger_write(struct file *file, const char __user *buffer,
 	      size_t count, loff_t *pos)
 {
 	struct brlvger_priv *priv = file->private_data;
@@ -655,7 +655,7 @@ read_index(struct brlvger_priv *priv)
 }
 
 static ssize_t
-brlvger_read(struct file *file, char *buffer,
+brlvger_read(struct file *file, char __user *buffer,
 	     size_t count, loff_t *unused_pos)
 {
 	struct brlvger_priv *priv = file->private_data;
@@ -719,7 +719,7 @@ brlvger_ioctl(struct inode *inode, struct file *file,
 		memcpy(&vi.fwver, priv->fwver, BRLVGER_FWVER_SIZE);
 		memcpy(&vi.serialnum, priv->serialnum, BRLVGER_SERIAL_SIZE);
 
-		if(copy_to_user((void *)arg, &vi, sizeof(vi)))
+		if(copy_to_user((void __user *)arg, &vi, sizeof(vi)))
 			return -EFAULT;
 		return 0;
 	}

@@ -193,7 +193,6 @@ static int netlink_insert(struct sock *sk, u32 pid)
 		if (nlk_sk(sk)->pid == 0) {
 			nlk_sk(sk)->pid = pid;
 			sk_add_node(sk, &nl_table[sk->sk_protocol]);
-			sock_hold(sk);
 			err = 0;
 		}
 	}
@@ -204,8 +203,7 @@ static int netlink_insert(struct sock *sk, u32 pid)
 static void netlink_remove(struct sock *sk)
 {
 	netlink_table_grab();
-	if (sk_del_node_init(sk))
-		__sock_put(sk);
+	sk_del_node_init(sk);
 	netlink_table_ungrab();
 }
 

@@ -50,11 +50,14 @@
 
 /*
  * Data type ranges
+ * Note: These macros are designed to be compiler independent as well as
+ * working around problems that some 32-bit compilers have with 64-bit
+ * constants.
  */
-#define ACPI_UINT8_MAX                  (~((UINT8)  0))
-#define ACPI_UINT16_MAX                 (~((UINT16) 0))
-#define ACPI_UINT32_MAX                 (~((UINT32) 0))
-#define ACPI_UINT64_MAX                 (~((UINT64) 0))
+#define ACPI_UINT8_MAX                  (UINT8) (~((UINT8)  0)) /* 0xFF               */
+#define ACPI_UINT16_MAX                 (UINT16)(~((UINT16) 0)) /* 0xFFFF             */
+#define ACPI_UINT32_MAX                 (UINT32)(~((UINT32) 0)) /* 0xFFFFFFFF         */
+#define ACPI_UINT64_MAX                 (UINT64)(~((UINT64) 0)) /* 0xFFFFFFFFFFFFFFFF */
 #define ACPI_ASCII_MAX                  0x7F
 
 
@@ -299,8 +302,6 @@ struct uint32_struct
 typedef u32                                     acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT32_MAX
 #define ACPI_INTEGER_BIT_SIZE           32
-#define ACPI_MAX_BCD_VALUE              99999999
-#define ACPI_MAX_BCD_DIGITS             8
 #define ACPI_MAX_DECIMAL_DIGITS         10
 
 #define ACPI_USE_NATIVE_DIVIDE          /* Use compiler native 32-bit divide */
@@ -313,12 +314,6 @@ typedef u32                                     acpi_integer;
 typedef u64                                     acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT64_MAX
 #define ACPI_INTEGER_BIT_SIZE           64
-#if ACPI_MACHINE_WIDTH == 64
-#define ACPI_MAX_BCD_VALUE              9999999999999999UL
-#else
-#define ACPI_MAX_BCD_VALUE              9999999999999999ULL
-#endif
-#define ACPI_MAX_BCD_DIGITS             16
 #define ACPI_MAX_DECIMAL_DIGITS         19
 
 #if ACPI_MACHINE_WIDTH == 64

@@ -319,6 +319,8 @@ config PRINTER
 
 endmenu
 
+source "drivers/base/Kconfig"
+
 source "drivers/video/Kconfig"
 
 source "drivers/mtd/Kconfig"

@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (c) 1992-1997,2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_BRIDGE_H
 #define _ASM_SN_PCI_BRIDGE_H
@@ -36,7 +36,6 @@
 
 #include <linux/config.h>
 #include <asm/sn/xtalk/xwidget.h>
-#ifndef CONFIG_IA64_SGI_SN1
 #include <asm/sn/pci/pic.h>
 
 extern int io_get_sh_swapper(nasid_t);
@@ -45,7 +44,6 @@ extern int io_get_sh_swapper(nasid_t);
 
 #define BRIDGE_REG_SET32(reg) \
                 *(volatile uint32_t *) (((uint64_t)reg)^4)
-#endif	/* CONFIG_IA64_SGI_SN1 */
 
 /* I/O page size */
 
@@ -111,7 +109,6 @@ typedef volatile bridge_ate_t  *bridge_ate_p;
  * Generated from Bridge spec dated 04oct95
  */
 
-#ifndef CONFIG_IA64_SGI_SN1
 
 /*
  * pic_widget_cfg_s is a local definition of widget_cfg_t but with
@@ -604,292 +601,6 @@ typedef volatile struct bridge_s {
 	uint64_t	    d[0x400000 / 8];	/* read-only */
     } b_external_flash;
 } bridge_t;
-
-#else	/* CONFIG_IA64_SGI_SN1 */
-
-
-typedef volatile struct bridge_s {
-
-    /* Local Registers				       0x000000-0x00FFFF */
-
-    /* standard widget configuration		       0x000000-0x000057 */
-    widget_cfg_t	    b_widget;		    /* 0x000000 */
-
-    /* helper fieldnames for accessing bridge widget */
-
-#define b_wid_id			b_widget.w_id
-#define b_wid_stat			b_widget.w_status
-#define b_wid_err_upper			b_widget.w_err_upper_addr
-#define b_wid_err_lower			b_widget.w_err_lower_addr
-#define b_wid_control			b_widget.w_control
-#define b_wid_req_timeout		b_widget.w_req_timeout
-#define b_wid_int_upper			b_widget.w_intdest_upper_addr
-#define b_wid_int_lower			b_widget.w_intdest_lower_addr
-#define b_wid_err_cmdword		b_widget.w_err_cmd_word
-#define b_wid_llp			b_widget.w_llp_cfg
-#define b_wid_tflush			b_widget.w_tflush
-
-    /*
-     * we access these through synergy unswizzled space, so the address
-     * gets twiddled (i.e. references to 0x4 actually go to 0x0 and vv.)
-     * That's why we put the register first and filler second.
-     */
-    /* bridge-specific widget configuration	       0x000058-0x00007F */
-    bridgereg_t             b_wid_aux_err;          /* 0x00005C */
-    bridgereg_t		    _pad_000058;
-
-    bridgereg_t             b_wid_resp_upper;       /* 0x000064 */
-    bridgereg_t             _pad_000060;
-
-    bridgereg_t             b_wid_resp_lower;       /* 0x00006C */
-    bridgereg_t             _pad_000068;
-
-    bridgereg_t             b_wid_tst_pin_ctrl;     /* 0x000074 */
-    bridgereg_t             _pad_000070;
-
-    bridgereg_t		    _pad_000078[2];
-
-    /* PMU & Map				       0x000080-0x00008F */
-    bridgereg_t             b_dir_map;              /* 0x000084 */
-    bridgereg_t             _pad_000080;
-    bridgereg_t		    _pad_000088[2];
-
-    /* SSRAM					       0x000090-0x00009F */
-    bridgereg_t             b_ram_perr_or_map_fault;/* 0x000094 */
-    bridgereg_t             _pad_000090;
-#define b_ram_perr  b_ram_perr_or_map_fault	/* Bridge */
-#define b_map_fault b_ram_perr_or_map_fault	/* Xbridge */
-    bridgereg_t		    _pad_000098[2];
-
-    /* Arbitration				       0x0000A0-0x0000AF */
-    bridgereg_t             b_arb;                  /* 0x0000A4 */
-    bridgereg_t             _pad_0000A0;
-    bridgereg_t		    _pad_0000A8[2];
-
-    /* Number In A Can				       0x0000B0-0x0000BF */
-    bridgereg_t             b_nic;                  /* 0x0000B4 */
-    bridgereg_t             _pad_0000B0;
-    bridgereg_t		    _pad_0000B8[2];
-
-    /* PCI/GIO					       0x0000C0-0x0000FF */
-    bridgereg_t             b_bus_timeout;          /* 0x0000C4 */
-    bridgereg_t             _pad_0000C0;
-#define b_pci_bus_timeout b_bus_timeout
-
-    bridgereg_t             b_pci_cfg;              /* 0x0000CC */
-    bridgereg_t             _pad_0000C8;
-
-    bridgereg_t             b_pci_err_upper;        /* 0x0000D4 */
-    bridgereg_t             _pad_0000D0;
-
-    bridgereg_t             b_pci_err_lower;        /* 0x0000DC */
-    bridgereg_t             _pad_0000D8;
-    bridgereg_t		    _pad_0000E0[8];
-#define b_gio_err_lower b_pci_err_lower
-#define b_gio_err_upper b_pci_err_upper
-
-    /* Interrupt				       0x000100-0x0001FF */
-    bridgereg_t             b_int_status;           /* 0x000104 */
-    bridgereg_t             _pad_000100;
-
-    bridgereg_t             b_int_enable;           /* 0x00010C */
-    bridgereg_t             _pad_000108;
-
-    bridgereg_t             b_int_rst_stat;         /* 0x000114 */
-    bridgereg_t             _pad_000110;
-
-    bridgereg_t             b_int_mode;             /* 0x00011C */
-    bridgereg_t             _pad_000118;
-
-    bridgereg_t             b_int_device;           /* 0x000124 */
-    bridgereg_t             _pad_000120;
-
-    bridgereg_t             b_int_host_err;         /* 0x00012C */
-    bridgereg_t             _pad_000128;
-
-    struct {
-        bridgereg_t             addr;               /* 0x0001{34,,,6C} */
-        bridgereg_t             __pad;              /* 0x0001{30,,,68} */
-    } b_int_addr[8];				    /* 0x000130 */
-
-    bridgereg_t             b_err_int_view;         /* 0x000174 */
-    bridgereg_t             _pad_000170;
-
-    bridgereg_t             b_mult_int;             /* 0x00017c */
-    bridgereg_t             _pad_000178;
-
-    struct {
-        bridgereg_t             intr;               /* 0x0001{84,,,BC} */
-        bridgereg_t             __pad;              /* 0x0001{80,,,B8} */
-    } b_force_always[8];			    /* 0x000180 */
-
-    struct {
-        bridgereg_t             intr;               /* 0x0001{C4,,,FC} */
-        bridgereg_t             __pad;              /* 0x0001{C0,,,F8} */
-    } b_force_pin[8];			    	    /* 0x0001C0 */
-
-    /* Device					       0x000200-0x0003FF */
-    struct {
-        bridgereg_t             reg;                /* 0x0002{04,,,3C} */
-        bridgereg_t             __pad;              /* 0x0002{00,,,38} */
-    } b_device[8];				    /* 0x000200 */
-
-    struct {
-        bridgereg_t             reg;                /* 0x0002{44,,,7C} */
-        bridgereg_t             __pad;              /* 0x0002{40,,,78} */
-    } b_wr_req_buf[8];				    /* 0x000240 */
-
-    struct {
-        bridgereg_t             reg;                /* 0x0002{84,,,8C} */
-        bridgereg_t             __pad;              /* 0x0002{80,,,88} */
-    } b_rrb_map[2];				    /* 0x000280 */
-#define	b_even_resp	b_rrb_map[0].reg	    /* 0x000284 */
-#define	b_odd_resp	b_rrb_map[1].reg	    /* 0x00028C */
-
-    bridgereg_t             b_resp_status;          /* 0x000294 */
-    bridgereg_t             _pad_000290;
-
-    bridgereg_t             b_resp_clear;           /* 0x00029C */
-    bridgereg_t             _pad_000298;
-
-    bridgereg_t		    _pad_0002A0[24];
-
-    /* Xbridge only */
-    struct {
-	bridgereg_t	        upper;              /* 0x0003{04,,,F4} */
-	bridgereg_t             __pad1;		    /* 0x0003{00,,,F0} */
-	bridgereg_t             lower;              /* 0x0003{0C,,,FC} */
-	bridgereg_t             __pad2;             /* 0x0003{08,,,F8} */
-    } b_buf_addr_match[16];
-
-    /* Performance Monitor Registers (even only) */
-    struct {
-        bridgereg_t             flush_w_touch;      /* 0x000404,,,5C4 */
-        bridgereg_t             __pad1;             /* 0x000400,,,5C0 */
-
-        bridgereg_t             flush_wo_touch;     /* 0x00040C,,,5CC */
-        bridgereg_t             __pad2;             /* 0x000408,,,5C8 */
-
-        bridgereg_t             inflight;           /* 0x000414,,,5D4 */
-        bridgereg_t             __pad3;             /* 0x000410,,,5D0 */
-
-        bridgereg_t             prefetch;           /* 0x00041C,,,5DC */
-        bridgereg_t             __pad4;             /* 0x000418,,,5D8 */
-
-        bridgereg_t             total_pci_retry;    /* 0x000424,,,5E4 */
-        bridgereg_t             __pad5;             /* 0x000420,,,5E0 */
-
-        bridgereg_t             max_pci_retry;      /* 0x00042C,,,5EC */
-        bridgereg_t             __pad6;             /* 0x000428,,,5E8 */
-
-        bridgereg_t             max_latency;        /* 0x000434,,,5F4 */
-        bridgereg_t             __pad7;             /* 0x000430,,,5F0 */
-
-        bridgereg_t             clear_all;          /* 0x00043C,,,5FC */
-        bridgereg_t             __pad8;             /* 0x000438,,,5F8 */
-    } b_buf_count[8];
-
-    char                    _pad_000600[0x010000 - 0x000600];
-
-    /*
-     * The Xbridge has 1024 internal ATE's and the Bridge has 128.
-     * Make enough room for the Xbridge ATE's and depend on runtime
-     * checks to limit access to bridge ATE's.
-     */
-
-    /* Internal Address Translation Entry RAM	       0x010000-0x011fff */
-    union {
-	bridge_ate_t		wr;		/* write-only */
-	struct {
-	    bridgereg_t             rd;         /* read-only */
-            bridgereg_t             _p_pad;
-	}			hi;
-    }			    b_int_ate_ram[XBRIDGE_INTERNAL_ATES];
-
-#define b_int_ate_ram_lo(idx) b_int_ate_ram[idx+512].hi.rd
-
-    /* the xbridge read path for internal ates starts at 0x12000.
-     * I don't believe we ever try to read the ates.
-     */
-    /* Internal Address Translation Entry RAM LOW       0x012000-0x013fff */
-    struct {
-	bridgereg_t             rd; 
-        bridgereg_t             _p_pad;
-    }			    xb_int_ate_ram_lo[XBRIDGE_INTERNAL_ATES];
-
-    char		    _pad_014000[0x20000 - 0x014000];
-
-    /* PCI Device Configuration Spaces		       0x020000-0x027FFF */
-    union {				/* make all access sizes available. */
-	uchar_t			c[0x1000 / 1];
-	uint16_t		s[0x1000 / 2];
-	uint32_t		l[0x1000 / 4];
-	uint64_t		d[0x1000 / 8];
-	union {
-	    uchar_t		c[0x100 / 1];
-	    uint16_t		s[0x100 / 2];
-	    uint32_t		l[0x100 / 4];
-	    uint64_t		d[0x100 / 8];
-	}			f[8];
-    } b_type0_cfg_dev[8];			    /* 0x020000 */
-
-    /* PCI Type 1 Configuration Space		       0x028000-0x028FFF */
-    union {				/* make all access sizes available. */
-	uchar_t			c[0x1000 / 1];
-	uint16_t		s[0x1000 / 2];
-	uint32_t		l[0x1000 / 4];
-	uint64_t		d[0x1000 / 8];
-        union {
-            uchar_t         c[0x100 / 1];
-            uint16_t        s[0x100 / 2];
-            uint32_t        l[0x100 / 4];
-            uint64_t        d[0x100 / 8];
-	} f[8];
-    } b_type1_cfg;				    /* 0x028000-0x029000 */
-
-    char		    _pad_029000[0x007000];  /* 0x029000-0x030000 */
-
-    /* PCI Interrupt Acknowledge Cycle		       0x030000 */
-    union {
-	uchar_t			c[8 / 1];
-	uint16_t		s[8 / 2];
-	uint32_t		l[8 / 4];
-	uint64_t		d[8 / 8];
-    } b_pci_iack;				    /* 0x030000 */
-
-    uchar_t		    _pad_030007[0x04fff8];  /* 0x030008-0x07FFFF */
-
-    /* External Address Translation Entry RAM	       0x080000-0x0FFFFF */
-    bridge_ate_t	    b_ext_ate_ram[0x10000];
-
-    /* Reserved					       0x100000-0x1FFFFF */
-    char		    _pad_100000[0x200000-0x100000];
-
-    /* PCI/GIO Device Spaces			       0x200000-0xBFFFFF */
-    union {				/* make all access sizes available. */
-	uchar_t			c[0x100000 / 1];
-	uint16_t		s[0x100000 / 2];
-	uint32_t		l[0x100000 / 4];
-	uint64_t		d[0x100000 / 8];
-    } b_devio_raw[10];			/* 0x200000 */
-
-    /* b_devio macro is a bit strange; it reflects the
-     * fact that the Bridge ASIC provides 2M for the
-     * first two DevIO windows and 1M for the other six.
-     */
-#define b_devio(n)	b_devio_raw[((n)<2)?(n*2):(n+2)]
-
-    /* External Flash Proms 1,0			       0xC00000-0xFFFFFF */
-    union {				/* make all access sizes available. */
-	uchar_t			c[0x400000 / 1];	/* read-only */
-	uint16_t		s[0x400000 / 2];	/* read-write */
-	uint32_t		l[0x400000 / 4];	/* read-only */
-	uint64_t		d[0x400000 / 8];	/* read-only */
-    } b_external_flash;			/* 0xC00000 */
-} bridge_t;
-
-#endif	/* CONFIG_IA64_SGI_SN1 */
-
 
 #define berr_field	berr_un.berr_st
 #endif				/* __ASSEMBLY__ */
@@ -1428,8 +1139,7 @@ typedef volatile struct bridge_s {
 #define BRIDGE_ISR_ERRORS		\
 		(BRIDGE_ISR_LINK_ERROR|BRIDGE_ISR_PCIBUS_ERROR|		\
 		 BRIDGE_ISR_XTALK_ERROR|BRIDGE_ISR_SSRAM_PERR|		\
-		 BRIDGE_ISR_PMU_ESIZE_FAULT|PIC_ISR_PCIX_ARB_ERR|	\
-		 PIC_ISR_INT_RAM_PERR)
+		 BRIDGE_ISR_PMU_ESIZE_FAULT|PIC_ISR_INT_RAM_PERR)
 
 /*
  * List of Errors which are fatal and kill the sytem
@@ -1598,22 +1308,6 @@ typedef volatile struct bridge_s {
 
 #define BRIDGE_TMO_PCI_RETRY_CNT_MAX	0x3ff
 
-#ifdef SN0
-/*
- * The NASID should be shifted by this amount and stored into the
- * interrupt(x) register.
- */
-#define BRIDGE_INT_ADDR_NASID_SHFT	8
-
-/*
- * The BRIDGE_INT_ADDR_DEST_IO bit should be set to send an interrupt to
- * memory.
- */
-#define BRIDGE_INT_ADDR_DEST_IO		(1 << 17)
-#define BRIDGE_INT_ADDR_DEST_MEM	0
-#define BRIDGE_INT_ADDR_MASK		(1 << 17)
-#endif
-
 /* Bridge device(x) register bits definition */
 #define BRIDGE_DEV_ERR_LOCK_EN		(1ull << 28)
 #define BRIDGE_DEV_PAGE_CHK_DIS		(1ull << 27)
@@ -1726,6 +1420,38 @@ typedef volatile struct bridge_s {
 #define BRIDGE_PCI_MEM64_LIMIT		BRIDGE_PIO64_XTALK_ALIAS_LIMIT
 #define BRIDGE_PCI_IO_BASE		BRIDGE_PCIIO_XTALK_ALIAS_BASE
 #define BRIDGE_PCI_IO_LIMIT		BRIDGE_PCIIO_XTALK_ALIAS_LIMIT
+
+/*
+ * Macros for Xtalk to Bridge bus (PCI) PIO
+ * refer to section 5.2.1 Figure 4 of the "PCI Interface Chip (PIC) Volume II
+ * Programmer's Reference" (Revision 0.8 as of this writing).
+ *
+ * These are PIC bridge specific.  A separate set of macros was defined
+ * because PIC deviates from Bridge/Xbridge by not supporting a big-window
+ * alias for PCI I/O space, and also redefines XTALK addresses
+ * 0x0000C0000000L and 0x000100000000L to be PCI MEM aliases for the second
+ * bus.
+ */
+
+/* XTALK addresses that map into PIC Bridge Bus addr space */
+#define PICBRIDGE0_PIO32_XTALK_ALIAS_BASE	0x000040000000L
+#define PICBRIDGE0_PIO32_XTALK_ALIAS_LIMIT	0x00007FFFFFFFL
+#define PICBRIDGE0_PIO64_XTALK_ALIAS_BASE	0x000080000000L
+#define PICBRIDGE0_PIO64_XTALK_ALIAS_LIMIT	0x0000BFFFFFFFL
+#define PICBRIDGE1_PIO32_XTALK_ALIAS_BASE	0x0000C0000000L
+#define PICBRIDGE1_PIO32_XTALK_ALIAS_LIMIT	0x0000FFFFFFFFL
+#define PICBRIDGE1_PIO64_XTALK_ALIAS_BASE	0x000100000000L
+#define PICBRIDGE1_PIO64_XTALK_ALIAS_LIMIT	0x00013FFFFFFFL
+
+/* XTALK addresses that map into PCI addresses */
+#define PICBRIDGE0_PCI_MEM32_BASE	PICBRIDGE0_PIO32_XTALK_ALIAS_BASE
+#define PICBRIDGE0_PCI_MEM32_LIMIT	PICBRIDGE0_PIO32_XTALK_ALIAS_LIMIT
+#define PICBRIDGE0_PCI_MEM64_BASE	PICBRIDGE0_PIO64_XTALK_ALIAS_BASE
+#define PICBRIDGE0_PCI_MEM64_LIMIT	PICBRIDGE0_PIO64_XTALK_ALIAS_LIMIT
+#define PICBRIDGE1_PCI_MEM32_BASE	PICBRIDGE1_PIO32_XTALK_ALIAS_BASE
+#define PICBRIDGE1_PCI_MEM32_LIMIT	PICBRIDGE1_PIO32_XTALK_ALIAS_LIMIT
+#define PICBRIDGE1_PCI_MEM64_BASE	PICBRIDGE1_PIO64_XTALK_ALIAS_BASE
+#define PICBRIDGE1_PCI_MEM64_LIMIT	PICBRIDGE1_PIO64_XTALK_ALIAS_LIMIT
 
 /*
  * Macros for Bridge bus (PCI/GIO) to Xtalk DMA
@@ -1844,9 +1570,6 @@ typedef union ate_u {
 #define ATE_SWAPSHIFT		29
 #define ATE_SWAP_ON(x)		((x) |= (1 << ATE_SWAPSHIFT))
 #define ATE_SWAP_OFF(x)		((x) &= ~(1 << ATE_SWAPSHIFT))
-
-#define is_xbridge(bridge) IS_XBRIDGE(bridge->b_wid_id)
-#define is_pic(bridge) IS_PIC_BRIDGE(bridge->b_wid_id)
 
 /* extern declarations */
 

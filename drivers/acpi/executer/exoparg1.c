@@ -222,7 +222,7 @@ acpi_ex_opcode_1A_1T_1R (
 	union acpi_operand_object       *return_desc2 = NULL;
 	u32                             temp32;
 	u32                             i;
-	u32                             j;
+	u32                             power_of_ten;
 	acpi_integer                    digit;
 
 
@@ -291,61 +291,70 @@ acpi_ex_opcode_1A_1T_1R (
 		case AML_FROM_BCD_OP:           /* from_bcd (BCDValue, Result) */
 
 			/*
-			 * The 64-bit ACPI integer can hold 16 4-bit BCD integers
+			 * The 64-bit ACPI integer can hold 16 4-bit BCD characters
+			 * (if table is 32-bit, integer can hold 8 BCD characters)
+			 * Convert each 4-bit BCD value
 			 */
+			power_of_ten = 1;
 			return_desc->integer.value = 0;
-			for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
-				/* Get one BCD digit */
+			digit = operand[0]->integer.value;
 
-				digit = (acpi_integer) ((operand[0]->integer.value >> (i * 4)) & 0xF);
+			/* Convert each BCD digit (each is one nybble wide) */
+
+			for (i = 0; (i < acpi_gbl_integer_nybble_width) && (digit > 0); i++) {
+				/* Get the least significant 4-bit BCD digit */
+
+				temp32 = ((u32) digit) & 0xF;
 
 				/* Check the range of the digit */
 
-				if (digit > 9) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD digit too large: %d\n",
-						(u32) digit));
+				if (temp32 > 9) {
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+						"BCD digit too large (not decimal): 0x%X\n",
+						temp32));
+
 					status = AE_AML_NUMERIC_OVERFLOW;
 					goto cleanup;
 				}
 
-				if (digit > 0) {
-					/* Sum into the result with the appropriate power of 10 */
+				/* Sum the digit into the result with the current power of 10 */
 
-					for (j = 0; j < i; j++) {
-						digit *= 10;
-					}
+				return_desc->integer.value += (((acpi_integer) temp32) * power_of_ten);
 
-					return_desc->integer.value += digit;
-				}
+				/* Shift to next BCD digit */
+
+				digit >>= 4;
+
+				/* Next power of 10 */
+
+				power_of_ten *= 10;
 			}
 			break;
 
 
 		case AML_TO_BCD_OP:             /* to_bcd (Operand, Result) */
 
-			if (operand[0]->integer.value > ACPI_MAX_BCD_VALUE) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD overflow: %8.8X%8.8X\n",
+			return_desc->integer.value = 0;
+			digit = operand[0]->integer.value;
+
+			/* Each BCD digit is one nybble wide */
+
+			for (i = 0; (i < acpi_gbl_integer_nybble_width) && (digit > 0); i++) {
+				(void) acpi_ut_short_divide (&digit, 10, &digit, &temp32);
+
+				/* Insert the BCD digit that resides in the remainder from above */
+
+				return_desc->integer.value |= (((acpi_integer) temp32) << (i * 4));
+			}
+
+			/* Overflow if there is any data left in Digit */
+
+			if (digit > 0) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Integer too large to convert to BCD: %8.8X%8.8X\n",
 					ACPI_HIDWORD(operand[0]->integer.value),
 					ACPI_LODWORD(operand[0]->integer.value)));
 				status = AE_AML_NUMERIC_OVERFLOW;
 				goto cleanup;
-			}
-
-			return_desc->integer.value = 0;
-			for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
-				/* Divide by nth factor of 10 */
-
-				temp32 = 0;
-				digit = operand[0]->integer.value;
-				for (j = 0; j < i; j++) {
-					(void) acpi_ut_short_divide (&digit, 10, &digit, &temp32);
-				}
-
-				/* Create the BCD digit from the remainder above */
-
-				if (digit > 0) {
-					return_desc->integer.value += ((acpi_integer) temp32 << (i * 4));
-				}
 			}
 			break;
 
