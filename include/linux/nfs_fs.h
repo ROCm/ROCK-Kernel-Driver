@@ -238,7 +238,7 @@ loff_t req_offset(struct nfs_page *req)
  * linux/fs/nfs/inode.c
  */
 extern void nfs_zap_caches(struct inode *);
-extern struct inode *nfs_fhget(struct dentry *, struct nfs_fh *,
+extern struct inode *nfs_fhget(struct super_block *, struct nfs_fh *,
 				struct nfs_fattr *);
 extern int __nfs_refresh_inode(struct inode *, struct nfs_fattr *);
 extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);

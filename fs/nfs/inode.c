@@ -53,7 +53,6 @@
  */
 #define NFS_MAX_READAHEAD	RPC_MAXREQS
 
-static struct inode * __nfs_fhget(struct super_block *, struct nfs_fh *, struct nfs_fattr *);
 void nfs_zap_caches(struct inode *);
 static void nfs_invalidate_inode(struct inode *);
 
@@ -273,7 +272,7 @@ nfs_get_root(struct inode **rooti, rpc_authflavor_t authflavor, struct super_blo
 		return error;
 	}
 
-	*rooti = __nfs_fhget(sb, rootfh, &fattr);
+	*rooti = nfs_fhget(sb, rootfh, &fattr);
 	if (error == -EACCES && authflavor > RPC_AUTH_MAXFLAVOR) {
 		if (*rooti) {
 			NFS_FLAGS(*rooti) |= NFS_INO_FAKE_ROOT;
@@ -692,33 +691,15 @@ nfs_init_locked(struct inode *inode, void *opaque)
 	return 0;
 }
 
-/*
- * This is our own version of iget that looks up inodes by file handle
- * instead of inode number.  We use this technique instead of using
- * the vfs read_inode function because there is no way to pass the
- * file handle or current attributes into the read_inode function.
- *
- */
-struct inode *
-nfs_fhget(struct dentry *dentry, struct nfs_fh *fhandle,
-				 struct nfs_fattr *fattr)
-{
-	struct super_block *sb = dentry->d_sb;
-
-	dprintk("NFS: nfs_fhget(%s/%s fileid=%Ld)\n",
-		dentry->d_parent->d_name.name, dentry->d_name.name,
-		(long long)fattr->fileid);
-	return __nfs_fhget(sb, fhandle, fattr);
-}
-
 /* Don't use READDIRPLUS on directories that we believe are too large */
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
 
 /*
- * Look up the inode by super block and fattr->fileid.
+ * This is our front-end to iget that looks up inodes by file handle
+ * instead of inode number.
  */
-static struct inode *
-__nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
+struct inode *
+nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 {
 	struct nfs_find_desc desc = {
 		.fh	= fh,
@@ -801,7 +782,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		unlock_new_inode(inode);
 	} else
 		nfs_refresh_inode(inode, fattr);
-	dprintk("NFS: __nfs_fhget(%s/%Ld ct=%d)\n",
+	dprintk("NFS: nfs_fhget(%s/%Ld ct=%d)\n",
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
 		atomic_read(&inode->i_count));
@@ -810,7 +791,7 @@ out:
 	return inode;
 
 out_no_inode:
-	printk("__nfs_fhget: iget failed\n");
+	printk("nfs_fhget: iget failed\n");
 	goto out;
 }
 

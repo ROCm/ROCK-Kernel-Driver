@@ -688,7 +688,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, stru
 			goto out_unlock;
 	}
 	error = -EACCES;
-	inode = nfs_fhget(dentry, &fhandle, &fattr);
+	inode = nfs_fhget(dentry->d_sb, &fhandle, &fattr);
 	if (!inode)
 		goto out_unlock;
 no_entry:
@@ -791,7 +791,7 @@ static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 		if (error)
 			goto out_err;
 	}
-	inode = nfs_fhget(dentry, fhandle, fattr);
+	inode = nfs_fhget(dentry->d_sb, fhandle, fattr);
 	if (inode) {
 		d_instantiate(dentry, inode);
 		nfs_renew_times(dentry);
