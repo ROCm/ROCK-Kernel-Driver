@@ -927,7 +927,7 @@ static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg 
 	WRITE32(OP_READDIR);
 	WRITE64(readdir->cookie);
 	WRITEMEM(readdir->verifier.data, sizeof(readdir->verifier.data));
-	WRITE32(readdir->count >> 5);  /* meaningless "dircount" field */
+	WRITE32(readdir->count >> 1);  /* We're not doing readdirplus */
 	WRITE32(readdir->count);
 	WRITE32(2);
 	WRITE32(FATTR4_WORD0_FILEID);
@@ -2817,8 +2817,8 @@ static int decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct n
 	struct kvec	*iov = rcvbuf->head;
 	unsigned int	nr, pglen = rcvbuf->page_len;
 	uint32_t	*end, *entry, *p, *kaddr;
-	uint32_t	len, attrlen, word;
-	int 		i, hdrlen, recvd, status;
+	uint32_t	len, attrlen;
+	int 		hdrlen, recvd, status;
 
 	status = decode_op_hdr(xdr, OP_READDIR);
 	if (status)
@@ -2839,42 +2839,24 @@ static int decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct n
 	for (nr = 0; *p++; nr++) {
 		if (p + 3 > end)
 			goto short_pkt;
-		p += 2;     /* cookie */
-		len = ntohl(*p++);  /* filename length */
+		p += 2;			/* cookie */
+		len = ntohl(*p++);	/* filename length */
 		if (len > NFS4_MAXNAMLEN) {
 			printk(KERN_WARNING "NFS: giant filename in readdir (len 0x%x)\n", len);
 			goto err_unmap;
 		}
-			
 		p += XDR_QUADLEN(len);
 		if (p + 1 > end)
 			goto short_pkt;
-		len = ntohl(*p++);  /* bitmap length */
-		if (len > 10) {
-			printk(KERN_WARNING "NFS: giant bitmap in readdir (len 0x%x)\n", len);
-			goto err_unmap;
-		}
-		if (p + len + 1 > end)
-			goto short_pkt;
-		attrlen = 0;
-		for (i = 0; i < len; i++) {
-			word = ntohl(*p++);
-			if (!word)
-				continue;
-			else if (i == 0 && word == FATTR4_WORD0_FILEID) {
-				attrlen = 8;
-				continue;
-			}
-			printk(KERN_WARNING "NFS: unexpected bitmap word in readdir (0x%x)\n", word);
-			goto err_unmap;
-		}
-		if (ntohl(*p++) != attrlen) {
-			printk(KERN_WARNING "NFS: unexpected attrlen in readdir\n");
-			goto err_unmap;
-		}
-		p += XDR_QUADLEN(attrlen);
+		len = ntohl(*p++);	/* bitmap length */
+		p += len;
 		if (p + 1 > end)
 			goto short_pkt;
+		attrlen = XDR_QUADLEN(ntohl(*p++));
+		p += attrlen;		/* attributes */
+		if (p + 2 > end)
+			goto short_pkt;
+		entry = p;
 	}
 	if (!nr && (entry[0] != 0 || entry[1] == 0))
 		goto short_pkt;
@@ -3667,6 +3649,7 @@ static int nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 
 uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
+	uint32_t bitmap[1] = {0};
 	uint32_t len;
 
 	if (!*p++) {
@@ -3689,11 +3672,17 @@ uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 	 */
 	entry->ino = 1;
 
-	len = ntohl(*p++);             /* bitmap length */
-	p += len;
-	len = ntohl(*p++);             /* attribute buffer length */
-	if (len)
-		p = xdr_decode_hyper(p, &entry->ino);
+	len = ntohl(*p++);		/* bitmap length */
+	if (len > 0) {
+		bitmap[0] = ntohl(*p);
+		p += len;
+	}
+	len = XDR_QUADLEN(ntohl(*p++));	/* attribute buffer length */
+	if (len > 0) {
+		if (bitmap[0] == FATTR4_WORD0_FILEID)
+			xdr_decode_hyper(p, &entry->ino);
+		p += len;
+	}
 
 	entry->eof = !p[0] && p[1];
 	return p;
