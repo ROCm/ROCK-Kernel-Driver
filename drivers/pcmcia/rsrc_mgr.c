@@ -580,6 +580,32 @@ pcmcia_align(void *align_data, struct resource *res,
 		res->start = res->end;
 }
 
+/*
+ * Adjust an existing IO region allocation, but making sure that we don't
+ * encroach outside the resources which the user supplied.
+ */
+int adjust_io_region(struct resource *res, unsigned long r_start,
+		     unsigned long r_end, struct pcmcia_socket *s)
+{
+	resource_map_t *m;
+	int ret = -ENOMEM;
+
+	down(&rsrc_sem);
+	for (m = io_db.next; m != &io_db; m = m->next) {
+		unsigned long start = m->base;
+		unsigned long end = m->base + m->num - 1;
+
+		if (start > r_start || r_end > end)
+			continue;
+
+		ret = adjust_resource(res, r_start, r_end - r_start + 1);
+		break;
+	}
+	up(&rsrc_sem);
+
+	return ret;
+}
+
 /*======================================================================
 
     These find ranges of I/O ports or memory addresses that are not
@@ -593,19 +619,19 @@ pcmcia_align(void *align_data, struct resource *res,
     
 ======================================================================*/
 
-int find_io_region(ioaddr_t *base, ioaddr_t num, unsigned long align,
-		   char *name, struct pcmcia_socket *s)
+struct resource *find_io_region(unsigned long base, int num,
+		   unsigned long align, char *name, struct pcmcia_socket *s)
 {
 	struct resource *res = make_resource(0, num, IORESOURCE_IO, name);
 	struct pcmcia_align_data data;
-	unsigned long min = *base;
+	unsigned long min = base;
 	int ret;
 
 	if (align == 0)
 		align = 0x10000;
 
 	data.mask = align - 1;
-	data.offset = *base & data.mask;
+	data.offset = base & data.mask;
 	data.map = &io_db;
 
 	down(&rsrc_sem);
@@ -621,10 +647,9 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, unsigned long align,
 
 	if (ret != 0) {
 		kfree(res);
-	} else {
-		*base = res->start;
+		res = NULL;
 	}
-	return ret;
+	return res;
 }
 
 int find_mem_region(u_long *base, u_long num, u_long align,
