@@ -52,7 +52,8 @@ unsigned char pmeg_ctx[PMEGS_NUM];
 
 /* pointers to the mm structs for each task in each
    context. 0xffffffff is a marker for kernel context */
-struct mm_struct *ctx_alloc[CONTEXTS_NUM] = {0xffffffff, 0, 0, 0, 0, 0, 0, 0};
+struct mm_struct *ctx_alloc[CONTEXTS_NUM] = {(struct mm_struct *)0xffffffff, 
+					     0, 0, 0, 0, 0, 0, 0};
 /* has this context been mmdrop'd? */
 static unsigned char ctx_avail = CONTEXTS_NUM-1;
 
