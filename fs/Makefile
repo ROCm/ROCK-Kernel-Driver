@@ -5,8 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 # 
 
-O_TARGET := fs.o
-
 export-objs :=	open.o dcache.o buffer.o bio.o inode.o dquot.o mpage.o aio.o \
                 fcntl.o
 

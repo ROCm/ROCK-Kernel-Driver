@@ -1,8 +1,6 @@
 # Makefile for the Linux sound card driver
 #
 
-O_TARGET := sound.o
-
 export-objs     := sound_core.o
 
 obj-$(CONFIG_SOUND) += soundcore.o
