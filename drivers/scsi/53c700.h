@@ -205,6 +205,12 @@ struct NCR_700_Host_Parameters {
 
 	/* Free list, singly linked by ITL_forw elements */
 	struct NCR_700_command_slot *free_list;
+	/* Completion for waited for ops, like reset, abort or
+	 * device reset.
+	 *
+	 * NOTE: relies on single threading in the error handler to
+	 * have only one outstanding at once */
+	struct completion *eh_complete;
 };
 
 /*
