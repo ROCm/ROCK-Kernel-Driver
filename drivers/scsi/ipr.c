@@ -3482,6 +3482,12 @@ static void ipr_reinit_ipr_cmnd_for_erp(struct ipr_cmnd *ipr_cmd)
 static void ipr_erp_request_sense(struct ipr_cmnd *ipr_cmd)
 {
 	struct ipr_cmd_pkt *cmd_pkt = &ipr_cmd->ioarcb.cmd_pkt;
+	u32 ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
+
+	if (IPR_IOASC_SENSE_KEY(ioasc) > 0) {
+		ipr_erp_done(ipr_cmd);
+		return;
+	}
 
 	ipr_reinit_ipr_cmnd_for_erp(ipr_cmd);
 
