@@ -1202,37 +1202,6 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 }
 
 
-#ifdef NL_EMULATE_DEV
-
-static rwlock_t nl_emu_lock = RW_LOCK_UNLOCKED;
-
-/*
- *	Backward compatibility.
- */	
- 
-int netlink_post(int unit, struct sk_buff *skb)
-{
-	struct socket *sock;
-
-	read_lock(&nl_emu_lock);
-	sock = netlink_kernel[unit];
-	if (sock) {
-		struct sock *sk = sock->sk;
-		memset(skb->cb, 0, sizeof(skb->cb));
-		sock_hold(sk);
-		read_unlock(&nl_emu_lock);
-
-		netlink_broadcast(sk, skb, 0, ~0, GFP_ATOMIC);
-
-		sock_put(sk);
-		return 0;
-	}
-	read_unlock(&nl_emu_lock);
-	return -EUNATCH;
-}
-
-#endif
-
 #ifdef CONFIG_PROC_FS
 struct nl_seq_iter {
 	int link;
@@ -1497,6 +1466,3 @@ EXPORT_SYMBOL(netlink_set_nonroot);
 EXPORT_SYMBOL(netlink_unicast);
 EXPORT_SYMBOL(netlink_unregister_notifier);
 
-#if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
-EXPORT_SYMBOL(netlink_post);
-#endif
