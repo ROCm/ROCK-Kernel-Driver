@@ -196,32 +196,17 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			csocket = server->ssocket;
 			continue;
 		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)) {
-			cFYI(0,("ERESTARTSYS returned from sock_recvmsg"));
 			schedule_timeout(1); /* minimum sleep to prevent looping
 				allowing socket to clear and app threads to set
 				tcpStatus CifsNeedReconnect if server hung */
 			continue;
-		} else if (length < 0) {
-			if (length == -ECONNRESET) {
-				cERROR(1, ("Connection reset by peer "));
-				cifs_reconnect(server);
-				csocket = server->ssocket;
-			} else { 
-				cERROR(1,("Unexpected error on sock_recvmsg(peek) = %d",
-					length)); /* there may be other non-fatal 
-					errors that the tcp stack can return 
-					to kernel that are not documented yet
-					and that are not checked above. */
-				cifs_reconnect(server);
-				csocket = server->ssocket; 
-			}
-			continue;	
-		} else if (length == 0) {
-			cFYI(1,("Zero length peek received - dead session?"));
+		} else if (length <= 0) {
+			cFYI(1,("Reconnecting after unexpected rcvmsg error "));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
 			continue;
 		}
+
 		pdu_length = 4 + ntohl(smb_buffer->smb_buf_length);
 		cFYI(1, ("Peek length rcvd: %d with smb length: %d", length, pdu_length));
 
@@ -245,7 +230,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				cERROR(1,
 				       ("Unknown RFC 1001 frame received not 0x00 nor 0x85"));
 				cifs_dump_mem(" Received Data is: ", temp, length);
-				break;
+				cifs_reconnect(server);
+				csocket = server->ssocket;
+				continue;
 			} else {
 				if ((length != sizeof (struct smb_hdr) - 1)
 				    || (pdu_length >
@@ -259,11 +246,12 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					    ("Invalid size or format for SMB found with length %d and pdu_lenght %d",
 						length, pdu_length));
 					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
-					/* BB fix by finding next smb signature - and reading off data until next smb ? BB */
-
-					/* BB add reconnect here */
-
-					break;
+					/* could we fix this network corruption by finding next 
+						smb header (instead of killing the session) and
+						restart reading from next valid SMB found? */
+					cifs_reconnect(server);
+					csocket = server->ssocket;
+					continue;
 				} else {	/* length ok */
 
 					length = 0;
@@ -277,9 +265,10 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 							cERROR(1,
 							       ("Zero length receive when expecting %d ",
 								pdu_length - total_read));
-							/* BB add reconnect here */
-							break;
-						}						
+							cifs_reconnect(server);
+							csocket = server->ssocket;
+							continue;
+						}
 					}
 				}
 
