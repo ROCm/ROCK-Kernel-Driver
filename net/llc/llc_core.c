@@ -78,17 +78,14 @@ void llc_del_sap(struct llc_sap *sap)
  */
 struct llc_sap *llc_sap_find(unsigned char sap_value)
 {
-	struct llc_sap* sap = NULL;
-	struct list_head *entry;
+	struct llc_sap* sap;
 
 	read_lock_bh(&llc_sap_list_lock);
-	list_for_each(entry, &llc_sap_list) {
-		sap = list_entry(entry, struct llc_sap, node);
+	list_for_each_entry(sap, &llc_sap_list, node)
 		if (sap->laddr.lsap == sap_value)
-			break;
-	}
-	if (entry == &llc_sap_list) /* not found */
-		sap = NULL;
+			goto out;
+	sap = NULL;
+out:
 	read_unlock_bh(&llc_sap_list_lock);
 	return sap;
 }
