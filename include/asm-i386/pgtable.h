@@ -107,6 +107,9 @@ void paging_init(void);
 #define _PAGE_BIT_DIRTY		6
 #define _PAGE_BIT_PSE		7	/* 4 MB (or 2MB) page, Pentium+, if present.. */
 #define _PAGE_BIT_GLOBAL	8	/* Global TLB entry PPro+ */
+#define _PAGE_BIT_UNUSED1	9	/* available for programmer */
+#define _PAGE_BIT_UNUSED2	10
+#define _PAGE_BIT_UNUSED3	11
 
 #define _PAGE_PRESENT	0x001
 #define _PAGE_RW	0x002
@@ -117,6 +120,9 @@ void paging_init(void);
 #define _PAGE_DIRTY	0x040
 #define _PAGE_PSE	0x080	/* 4 MB (or 2MB) page, Pentium+, if present.. */
 #define _PAGE_GLOBAL	0x100	/* Global TLB entry PPro+ */
+#define _PAGE_UNUSED1	0x200	/* available for programmer */
+#define _PAGE_UNUSED2	0x400
+#define _PAGE_UNUSED3	0x800
 
 #define _PAGE_FILE	0x040	/* set:pagecache unset:swap */
 #define _PAGE_PROTNONE	0x080	/* If not present */
