@@ -414,12 +414,7 @@ void fbgen_set_disp(int con, struct fb_info_gen *info)
 
 void gen_set_disp(int con, struct fb_info *info)
 {
-	struct display *display;
-
-	if (con >= 0)
-		display = fb_display + con;
-	else
-		display = info->disp;
+	struct display *display = (con < 0) ? info->disp : (fb_display + con);
 
 	display->visual = info->fix.visual;
 	display->type	= info->fix.type;
@@ -510,9 +505,13 @@ int fbgen_update_var(int con, struct fb_info *info)
 
 int gen_update_var(int con, struct fb_info *info)
 {
+	struct display *disp = (con < 0) ? info->disp : (fb_display + con);
 	int err;
     
 	if (con == info->currcon) {
+		info->var.xoffset = disp->var.xoffset;
+		info->var.yoffset = disp->var.yoffset;
+		info->var.vmode	= disp->var.vmode;	
 		if (info->fbops->fb_pan_display) {
 			if ((err = info->fbops->fb_pan_display(&info->var, con, info)))
 				return err;
