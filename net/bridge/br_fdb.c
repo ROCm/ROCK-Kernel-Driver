@@ -16,11 +16,10 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
-#include <linux/if_bridge.h>
 #include <linux/times.h>
+#include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <asm/atomic.h>
-#include <asm/uaccess.h>
 #include "br_private.h"
 
 static kmem_cache_t *br_fdb_cache;
@@ -52,17 +51,6 @@ static __inline__ int has_expired(const struct net_bridge *br,
 {
 	return !fdb->is_static 
 		&& time_before_eq(fdb->ageing_timer + hold_time(br), jiffies);
-}
-
-static inline void copy_fdb(struct __fdb_entry *ent, 
-				const struct net_bridge_fdb_entry *f)
-{
-	memset(ent, 0, sizeof(struct __fdb_entry));
-	memcpy(ent->mac_addr, f->addr.addr, ETH_ALEN);
-	ent->port_no = f->dst?f->dst->port_no:0;
-	ent->is_local = f->is_local;
-	ent->ageing_timer_value = f->is_static ? 0 
-		: jiffies_to_clock_t(jiffies - f->ageing_timer);
 }
 
 static __inline__ int br_mac_hash(const unsigned char *mac)
@@ -214,68 +202,48 @@ void br_fdb_put(struct net_bridge_fdb_entry *ent)
 		kmem_cache_free(br_fdb_cache, ent);
 }
 
-int br_fdb_get_entries(struct net_bridge *br,
-		       unsigned char *_buf,
-		       int maxnum,
-		       int offset)
+/*
+ * Fill buffer with forwarding table records in 
+ * the API format.
+ */
+int br_fdb_fillbuf(struct net_bridge *br, void *buf,
+		   unsigned long maxnum, unsigned long skip)
 {
-	int i;
-	int num;
-	struct __fdb_entry *walk;
+	struct __fdb_entry *fe = buf;
+	int i, num = 0;
+	struct hlist_node *h;
+	struct net_bridge_fdb_entry *f;
 
-	num = 0;
-	walk = (struct __fdb_entry *)_buf;
+	memset(buf, 0, maxnum*sizeof(struct __fdb_entry));
 
 	read_lock_bh(&br->hash_lock);
-	for (i=0;i<BR_HASH_SIZE;i++) {
-		struct hlist_node *h;
-		
-		hlist_for_each(h, &br->hash[i]) {
-			struct net_bridge_fdb_entry *f
-				= hlist_entry(h, struct net_bridge_fdb_entry, hlist);
-			struct __fdb_entry ent;
-
+	for (i = 0; i < BR_HASH_SIZE; i++) {
+		hlist_for_each_entry(f, h, &br->hash[i], hlist) {
 			if (num >= maxnum)
 				goto out;
 
 			if (has_expired(br, f)) 
 				continue;
 
-			if (offset) {
-				offset--;
+			if (skip) {
+				--skip;
 				continue;
 			}
 
-			copy_fdb(&ent, f);
-
-			atomic_inc(&f->use_count);
-			read_unlock_bh(&br->hash_lock);
-			
-			if (copy_to_user(walk, &ent, sizeof(struct __fdb_entry)))
-				return -EFAULT;
-
-			read_lock_bh(&br->hash_lock);
-			
-			/* entry was deleted during copy_to_user */
-			if (atomic_dec_and_test(&f->use_count)) {
-				kmem_cache_free(br_fdb_cache, f);
-				num = -EAGAIN;
-				goto out;
-			}
-
-			/* entry changed address hash while copying */
-			if (br_mac_hash(f->addr.addr) != i) {
-				num = -EAGAIN;
-				goto out;
-			}
-
-			num++;
-			walk++;
+			/* convert from internal format to API */
+			memcpy(fe->mac_addr, f->addr.addr, ETH_ALEN);
+			fe->port_no = f->dst->port_no;
+			fe->is_local = f->is_local;
+			if (!f->is_static)
+				fe->ageing_timer_value = jiffies_to_clock_t(jiffies - f->ageing_timer);
+			++fe;
+			++num;
 		}
 	}
 
  out:
 	read_unlock_bh(&br->hash_lock);
+
 	return num;
 }
 

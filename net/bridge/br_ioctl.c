@@ -52,6 +52,39 @@ static void get_port_ifindices(struct net_bridge *br, int *ifindices, int num)
 	}
 }
 
+/*
+ * Format up to a page worth of forwarding table entries
+ * userbuf -- where to copy result
+ * maxnum  -- maximum number of entries desired
+ *            (limited to a page for sanity)
+ * offset  -- number of records to skip
+ */
+static int get_fdb_entries(struct net_bridge *br, void __user *userbuf, 
+			   unsigned long maxnum, unsigned long offset)
+{
+	int num;
+	void *buf;
+	size_t size = maxnum * sizeof(struct __fdb_entry);
+
+	if (size > PAGE_SIZE) {
+		size = PAGE_SIZE;
+		maxnum = PAGE_SIZE/sizeof(struct __fdb_entry);
+	}
+
+	buf = kmalloc(size, GFP_USER);
+	if (!buf)
+		return -ENOMEM;
+	
+	num = br_fdb_fillbuf(br, buf, maxnum, offset);
+	if (num > 0) {
+		if (copy_to_user(userbuf, buf, num*sizeof(struct __fdb_entry)))
+			num = -EFAULT;
+	}
+	kfree(buf);
+
+	return num;
+}
+
 int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct net_bridge *br = netdev_priv(dev);
@@ -270,7 +303,8 @@ int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	}
 
 	case BRCTL_GET_FDB_ENTRIES:
-		return br_fdb_get_entries(br, (void *)args[1], args[2], args[3]);
+		return get_fdb_entries(br, (void __user *)args[1], 
+				       args[2], args[3]);
 	}
 
 	return -EOPNOTSUPP;

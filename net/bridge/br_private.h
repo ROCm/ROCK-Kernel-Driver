@@ -137,10 +137,8 @@ extern void br_fdb_delete_by_port(struct net_bridge *br,
 extern struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br,
 					unsigned char *addr);
 extern void br_fdb_put(struct net_bridge_fdb_entry *ent);
-extern int  br_fdb_get_entries(struct net_bridge *br,
-			unsigned char *_buf,
-			int maxnum,
-			int offset);
+extern int br_fdb_fillbuf(struct net_bridge *br, void *buf, 
+			  unsigned long count, unsigned long off);
 extern int br_fdb_insert(struct net_bridge *br,
 			 struct net_bridge_port *source,
 			 const unsigned char *addr,
