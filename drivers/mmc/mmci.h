@@ -138,6 +138,6 @@ struct mmci_host {
 	unsigned int		oldstat;
 
 	/* pio stuff */
-	void			*buffer;
+	unsigned int		offset;
 	unsigned int		size;
 };

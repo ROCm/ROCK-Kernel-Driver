@@ -64,7 +64,6 @@ static void mmci_stop_data(struct mmci_host *host)
 	writel(0, host->base + MMCIDATACTRL);
 	writel(0, host->base + MMCIMASK1);
 	host->data = NULL;
-	host->buffer = NULL;
 }
 
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
@@ -76,7 +75,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	    1 << data->blksz_bits, data->blocks, data->flags);
 
 	host->data = data;
-	host->buffer = data->req->buffer;
+	host->offset = 0;
 	host->size = data->blocks << data->blksz_bits;
 	host->data_xfered = 0;
 
@@ -198,6 +197,7 @@ static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status
 
 	do {
 		unsigned int count;
+		char *buffer;
 
 		/*
 		 * Check for data available.
@@ -205,13 +205,13 @@ static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status
 		if (!(status & MCI_RXDATAAVLBL))
 			break;
 
+		buffer = req->buffer;
 		count = host->size - (readl(base + MMCIFIFOCNT) << 2);
-		if (count < 0)
-			count = 0;
-		if (count && host->buffer) {
+
+		if (count > 0) {
 			ret = 1;
-			readsl(base + MMCIFIFO, host->buffer, count >> 2);
-			host->buffer += count;
+			readsl(base + MMCIFIFO, buffer + host->offset, count >> 2);
+			host->offset += count;
 			host->size -= count;
 		}
 
@@ -228,6 +228,7 @@ static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 statu
 
 	do {
 		unsigned int count, maxcnt;
+		char *buffer;
 
 		/*
 		 * We only need to test the half-empty flag here - if
@@ -237,13 +238,14 @@ static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 statu
 		if (!(status & MCI_TXFIFOHALFEMPTY))
 			break;
 
+		buffer = req->buffer;
 		maxcnt = status & MCI_TXFIFOEMPTY ?
 			 MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
 		count = min(host->size, maxcnt);
 
-		writesl(base + MMCIFIFO, host->buffer, count >> 2);
+		writesl(base + MMCIFIFO, buffer + host->offset, count >> 2);
 
-		host->buffer += count;
+		host->offset += count;
 		host->size -= count;
 
 		ret = 1;
