@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,8 +29,11 @@
  *	- Add support for setting bond's MAC address with special
  *	  handling required for ALB/TLB.
  *
- * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ * 2003/12/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Code cleanup and style changes
+ *
+ * 2003/12/30 - Amir Noam <amir.noam at intel dot com>
+ *	- Fixed: Cannot remove and re-enslave the original active slave.
  */
 
 //#define BONDING_DEBUG 1
@@ -992,6 +995,7 @@ static void alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *sla
 static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 {
 	struct slave *tmp_slave1, *tmp_slave2, *free_mac_slave;
+	struct slave *has_bond_addr = bond->curr_active_slave;
 	int i, j, found = 0;
 
 	if (bond->slave_cnt == 0) {
@@ -1049,6 +1053,15 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 			free_mac_slave = tmp_slave1;
 			break;
 		}
+
+		if (!has_bond_addr) {
+			if (!memcmp(tmp_slave1->dev->dev_addr,
+				    bond->dev->dev_addr,
+				    ETH_ALEN)) {
+
+				has_bond_addr = tmp_slave1;
+			}
+		}
 	}
 
 	if (free_mac_slave) {
@@ -1059,7 +1072,8 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 		       ": Warning: the hw address of slave %s is in use by "
 		       "the bond; giving it the hw address of %s\n",
 		       slave->dev->name, free_mac_slave->dev->name);
-	} else {
+
+	} else if (has_bond_addr) {
 		printk(KERN_ERR DRV_NAME
 		       ": Error: the hw address of slave %s is in use by the "
 		       "bond; couldn't find a slave with a free hw address to "
@@ -1217,8 +1231,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 			break;
 		}
 
-		if (ipx_hdr(skb)->ipx_type !=
-		    __constant_htons(IPX_TYPE_NCP)) {
+		if (ipx_hdr(skb)->ipx_type != IPX_TYPE_NCP) {
 			/* The only protocol worth balancing in
 			 * this family since it has an "ARP" like
 			 * mechanism
