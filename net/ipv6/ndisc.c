@@ -297,10 +297,8 @@ static int ndisc_constructor(struct neighbour *neigh)
 	}
 
 	parms = in6_dev->nd_parms;
-	if (parms) {
-		__neigh_parms_put(neigh->parms);
-		neigh->parms = neigh_parms_clone(parms);
-	}
+	__neigh_parms_put(neigh->parms);
+	neigh->parms = neigh_parms_clone(parms);
 	rcu_read_unlock();
 
 	neigh->type = is_multicast ? RTN_MULTICAST : RTN_UNICAST;

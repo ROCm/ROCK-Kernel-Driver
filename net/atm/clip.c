@@ -320,17 +320,15 @@ static int clip_constructor(struct neighbour *neigh)
 	if (neigh->type != RTN_UNICAST) return -EINVAL;
 
 	rcu_read_lock();
-	in_dev = __in_dev_get(dev);
+	in_dev = rcu_dereference(__in_dev_get(dev));
 	if (!in_dev) {
 		rcu_read_unlock();
 		return -EINVAL;
 	}
 
 	parms = in_dev->arp_parms;
-	if (parms) {
-		__neigh_parms_put(neigh->parms);
-		neigh->parms = neigh_parms_clone(parms);
-	}
+	__neigh_parms_put(neigh->parms);
+	neigh->parms = neigh_parms_clone(parms);
 	rcu_read_unlock();
 
 	neigh->ops = &clip_neigh_ops;

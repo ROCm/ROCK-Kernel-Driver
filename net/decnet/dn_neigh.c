@@ -139,17 +139,20 @@ static int dn_neigh_construct(struct neighbour *neigh)
 	struct neigh_parms *parms;
 
 	rcu_read_lock();
-	dn_db = dev->dn_ptr;
+	dn_db = rcu_dereference(dev->dn_ptr);
 	if (dn_db == NULL) {
 		rcu_read_unlock();
 		return -EINVAL;
 	}
 
 	parms = dn_db->neigh_parms;
-	if (parms) {
-		__neigh_parms_put(neigh->parms);
-		neigh->parms = neigh_parms_clone(parms);
+	if (!parms) {
+		rcu_read_unlock();
+		return -EINVAL;
 	}
+
+	__neigh_parms_put(neigh->parms);
+	neigh->parms = neigh_parms_clone(parms);
 	rcu_read_unlock();
 
 	if (dn_db->use_long)
