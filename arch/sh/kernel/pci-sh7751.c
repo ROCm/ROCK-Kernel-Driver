@@ -250,8 +250,8 @@ struct pci_fixup pcibios_fixups[] = {
 	{ 0 }
 };
 
-void __init pcibios_fixup_pbus_ranges(struct pci_bus *b,
-		struct pbus_set_ranges_data *range)
+void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *b,
+					 struct pbus_set_ranges_data *range)
 {
 	/* No fixups needed */
 }

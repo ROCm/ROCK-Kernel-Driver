@@ -121,8 +121,8 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
 }
 
 
-void pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
-				struct pbus_set_ranges_data *pranges)
+void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
+					 struct pbus_set_ranges_data *pranges)
 {
 }
 
