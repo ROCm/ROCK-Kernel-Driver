@@ -63,7 +63,7 @@ static LIST_HEAD (rio_vg_head);
 static LIST_HEAD (rio_lo_head);
 static LIST_HEAD (opt_vg_head);
 static LIST_HEAD (opt_lo_head);
-static void *io_mem;
+static void __iomem *io_mem;
 
 /* Local functions */
 static int ebda_rsrc_controller (void);
