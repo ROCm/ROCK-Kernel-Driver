@@ -540,6 +540,13 @@ UNUSUAL_DEV(  0x07ab, 0xfc01, 0x0000, 0x9999,
 		US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
 #endif
 
+/* Reported by Eero Volotinen <eero@ping-viini.org> */
+UNUSUAL_DEV(  0x07ab, 0xfccd, 0x0406, 0x0406,
+		"Freecom Technologies",
+		"FHD-Classic",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
 UNUSUAL_DEV(  0x07af, 0x0004, 0x0100, 0x0133, 
 		"Microtech",
 		"USB-SCSI-DB25",
