@@ -229,8 +229,7 @@ CONFIG_SYN_COOKIES=y
 CONFIG_IPV6=m
 # CONFIG_ATM is not set
 # CONFIG_VLAN_8021Q is not set
-CONFIG_LLC=y
-# CONFIG_LLC_UI is not set
+# CONFIG_LLC is not set
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
 # CONFIG_DEV_APPLETALK is not set
@@ -345,11 +344,7 @@ CONFIG_E1000=y
 #
 # Token Ring devices
 #
-CONFIG_TR=y
-CONFIG_IBMOL=y
-# CONFIG_IBMLS is not set
-# CONFIG_3C359 is not set
-# CONFIG_TMS380TR is not set
+# CONFIG_TR is not set
 # CONFIG_NET_FC is not set
 # CONFIG_RCPCI is not set
 # CONFIG_SHAPER is not set
