@@ -142,7 +142,12 @@ int default_idle(void)
 
 			while (!need_resched() && !cpu_is_offline(cpu)) {
 				barrier();
+				/*
+				 * Go into low thread priority and possibly
+				 * low power mode.
+				 */
 				HMT_low();
+				HMT_very_low();
 			}
 
 			HMT_medium();
@@ -184,18 +189,18 @@ int dedicated_idle(void)
 			start_snooze = __get_tb() +
 				*smt_snooze_delay * tb_ticks_per_usec;
 			while (!need_resched() && !cpu_is_offline(cpu)) {
-				/* need_resched could be 1 or 0 at this 
-				 * point.  If it is 0, set it to 0, so
-				 * an IPI/Prod is sent.  If it is 1, keep
-				 * it that way & schedule work.
+				/*
+				 * Go into low thread priority and possibly
+				 * low power mode.
 				 */
-				if (*smt_snooze_delay == 0 ||
-				    __get_tb() < start_snooze) {
-					HMT_low(); /* Low thread priority */
-					continue;
-				}
+				HMT_low();
+				HMT_very_low();
 
-				HMT_very_low(); /* Low power mode */
+				if (*smt_snooze_delay == 0 ||
+				    __get_tb() < start_snooze)
+					continue;
+
+				HMT_medium();
 
 				if (!(ppaca->lppaca.xIdle)) {
 					/* Indicate we are no longer polling for
@@ -210,7 +215,6 @@ int dedicated_idle(void)
 						break;
 					}
 
-					/* DRENG: Go HMT_medium here ? */
 					local_irq_disable(); 
 
 					/* SMT dynamic mode.  Cede will result 
