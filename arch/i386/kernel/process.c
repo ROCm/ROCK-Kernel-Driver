@@ -507,7 +507,7 @@ struct task_struct * __switch_to(struct task_struct *prev_p, struct task_struct 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
 	 */
-	load_esp0(tss, next->esp0);
+	load_esp0(tss, next);
 
 	/*
 	 * Load the per-thread Thread-Local Storage descriptor.
