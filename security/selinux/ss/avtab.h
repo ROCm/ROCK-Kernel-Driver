@@ -78,6 +78,8 @@ struct avtab_node *avtab_search_node(struct avtab *h, struct avtab_key *key, int
 
 struct avtab_node *avtab_search_node_next(struct avtab_node *node, int specified);
 
+void avtab_cache_init(void);
+
 #define AVTAB_HASH_BITS 15
 #define AVTAB_HASH_BUCKETS (1 << AVTAB_HASH_BITS)
 #define AVTAB_HASH_MASK (AVTAB_HASH_BUCKETS-1)
