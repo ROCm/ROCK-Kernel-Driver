@@ -205,6 +205,67 @@ xfs_read(
 	return ret;
 }
 
+ssize_t
+xfs_sendfile(
+	bhv_desc_t		*bdp,
+	struct file		*filp,
+	loff_t			*offp,
+	size_t			count,
+	read_actor_t		actor,
+	void			*target,
+	cred_t			*credp)
+{
+	size_t			size = 0;
+	ssize_t			ret;
+	xfs_fsize_t		n;
+	xfs_inode_t		*ip;
+	xfs_mount_t		*mp;
+	vnode_t			*vp;
+
+	ip = XFS_BHVTOI(bdp);
+	vp = BHV_TO_VNODE(bdp);
+	mp = ip->i_mount;
+	vn_trace_entry(vp, "xfs_sendfile", (inst_t *)__return_address);
+
+	XFS_STATS_INC(xfsstats.xs_read_calls);
+
+	n = XFS_MAX_FILE_OFFSET - *offp;
+	if ((n <= 0) || (size == 0))
+		return 0;
+
+	if (n < size)
+		size = n;
+
+	if (XFS_FORCED_SHUTDOWN(mp)) {
+		return -EIO;
+	}
+
+	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+	    !(filp->f_mode & FINVIS)) {
+		int error;
+		vrwlock_t locktype = VRWLOCK_READ;
+
+		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, *offp,
+				size, FILP_DELAY_FLAG(filp), &locktype);
+		if (error) {
+			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			return -error;
+		}
+	}
+
+	ret = generic_file_sendfile(filp, offp, count, actor, target);
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+
+	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
+
+	if (!(filp->f_mode & FINVIS))
+		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+
+	return ret;
+}
+
 /*
  * This routine is called to handle zeroing any space in the last
  * block of the file that is beyond the EOF.  We do this since the
