@@ -327,9 +327,6 @@ skip_copy_pte_range:
 					 */
 					if (likely(page_mapped(page) && page->mapping))
 						page_add_rmap(page, vma, address, PageAnon(page));
-					else
-						printk("Badness in %s at %s:%d\n",
-						       __FUNCTION__, __FILE__, __LINE__);
 				} else {
 					BUG_ON(page_mapped(page));
 					BUG_ON(page->mapping);
@@ -1447,7 +1444,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct page * new_page;
 	struct address_space *mapping = NULL;
 	pte_t entry;
-	int sequence = 0, reserved, anon, pageable, as;
+	int sequence = 0, anon, pageable, as;
 	int ret = VM_FAULT_MINOR;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
@@ -1487,16 +1484,6 @@ retry:
 	BUG_ON(PageAnon(new_page));
 
 	/*
-	 * This is the entry point for memory under VM_RESERVED vmas.
-	 * That memory will not be tracked by the vm. These aren't
-	 * real anonymous pages, they're "device" reserved pages instead.
-	 */
-	reserved = !!(vma->vm_flags & VM_RESERVED);
-	if (unlikely(reserved == pageable))
-		printk("Badness in %s at %s:%d\n",
-		       __FUNCTION__, __FILE__, __LINE__);
-
-	/*
 	 * Should we do an early C-O-W break?
 	 */
 	anon = 0;
@@ -1513,6 +1500,9 @@ retry:
 		new_page = page;
 		anon = 1;
 		pageable = 1;
+
+		/* a reserved vma cannot have pageable pages in it */
+		BUG_ON(vma->vm_flags & VM_RESERVED);
 	}
 
 	spin_lock(&mm->page_table_lock);
