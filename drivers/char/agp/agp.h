@@ -170,7 +170,7 @@ struct agp_bridge_data {
 /* Chipset independant registers (from AGP Spec) */
 #define AGP_APBASE	0x10
 
-/* intel register */
+/* Intel registers */
 #define INTEL_APSIZE	0xb4
 #define INTEL_ATTBASE	0xb8
 #define INTEL_AGPCTRL	0xb0
@@ -185,7 +185,7 @@ struct agp_bridge_data {
 #define INTEL_I460_GATT_VALID		(1UL << 24)
 #define INTEL_I460_GATT_COHERENT	(1UL << 25)
 
-/* intel i830 registers */
+/* Intel i830 registers */
 #define I830_GMCH_CTRL			0x52
 #define I830_GMCH_ENABLED		0x4
 #define I830_GMCH_MEM_MASK		0x1
@@ -219,31 +219,31 @@ struct agp_bridge_data {
 #define I852_GME			0x2
 #define I852_GM				0x5
 
-/* intel 815 register */
+/* Intel 815 register */
 #define INTEL_815_APCONT	0x51
 #define INTEL_815_ATTBASE_MASK	~0x1FFFFFFF
 
-/* intel i820 registers */
+/* Intel i820 registers */
 #define INTEL_I820_RDCR		0x51
 #define INTEL_I820_ERRSTS	0xc8
 
-/* intel i840 registers */
+/* Intel i840 registers */
 #define INTEL_I840_MCHCFG	0x50
 #define INTEL_I840_ERRSTS	0xc8
  
-/* intel i845 registers */
+/* Intel i845 registers */
 #define INTEL_I845_AGPM		0x51
 #define INTEL_I845_ERRSTS	0xc8
 
-/* intel i850 registers */
+/* Intel i850 registers */
 #define INTEL_I850_MCHCFG	0x50
 #define INTEL_I850_ERRSTS	0xc8
 
-/* intel i860 registers */
+/* Intel i860 registers */
 #define INTEL_I860_MCHCFG	0x50
 #define INTEL_I860_ERRSTS	0xc8
 
-/* intel i810 registers */
+/* Intel i810 registers */
 #define I810_GMADDR		0x10
 #define I810_MMADDR		0x14
 #define I810_PTE_BASE		0x10000
@@ -334,7 +334,6 @@ struct agp_bridge_data {
 #define ATI_GART_CACHE_CNTRL        0x0c
 #define ATI_GART_CACHE_ENTRY_CNTRL  0x10
 
-
 /* Serverworks Registers */
 #define SVWRKS_APSIZE		0x10
 #define SVWRKS_SIZE_MASK	0xfe000000
@@ -362,6 +361,17 @@ struct agp_bridge_data {
 #define HP_ZX1_TCNFG		0x318
 #define HP_ZX1_PDIR_BASE	0x320
 #define HP_ZX1_CACHE_FLUSH	0x428
+
+/* NVIDIA registers */
+#define NVIDIA_0_APSIZE     0x80
+#define NVIDIA_1_WBC        0xf0
+#define NVIDIA_2_GARTCTRL   0xd0
+#define NVIDIA_2_APBASE     0xd8
+#define NVIDIA_2_APLIMIT    0xdc
+#define NVIDIA_2_ATTBASE(i) (0xe0 + (i) * 4)
+#define NVIDIA_3_APBASE     0x50
+#define NVIDIA_3_APLIMIT    0x54
+
 
 struct agp_device_ids {
 	unsigned short device_id; /* first, to make table easier to read */
