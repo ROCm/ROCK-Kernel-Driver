@@ -288,9 +288,32 @@ static unsigned int speedstep_detect_chipset (void)
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
 			      NULL);
-	if (speedstep_chipset_dev)
-		return SPEEDSTEP_CHIPSET_ICH2M;
+	if (speedstep_chipset_dev) {
+		/* speedstep.c causes lockups on Dell Inspirons 8000 and
+		 * 8100 which use a pretty old revision of the 82815 
+		 * host brige. Abort on these systems.
+		 */
+		static struct pci_dev   *hostbridge;
+		u8			rev = 0;
 
+		hostbridge  = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+			      PCI_DEVICE_ID_INTEL_82815_MC,
+			      PCI_ANY_ID,
+			      PCI_ANY_ID,
+			      NULL);
+
+		if (!hostbridge)
+			return SPEEDSTEP_CHIPSET_ICH2M;
+			
+		pci_read_config_byte(hostbridge, PCI_REVISION_ID, &rev);
+		if (rev < 5) {
+			dprintk(KERN_INFO "cpufreq: hostbrige does not support speedstep\n");
+			speedstep_chipset_dev = NULL;
+			return 0;
+		}
+
+		return SPEEDSTEP_CHIPSET_ICH2M;
+	}
 
 	return 0;
 }
@@ -504,6 +527,7 @@ static unsigned int speedstep_detect_processor (void)
 static int speedstep_detect_speeds (void)
 {
 	unsigned int    state;
+	unsigned int    low = 0, high = 0;
 	int             i, result;
     
 	for (i=0; i<2; i++) {
@@ -517,28 +541,31 @@ static int speedstep_detect_speeds (void)
 			switch (speedstep_processor) {
 			case SPEEDSTEP_PROCESSOR_PIII_C:
 			case SPEEDSTEP_PROCESSOR_PIII_T:
-				speedstep_low_freq = pentium3_get_frequency();
+				low = pentium3_get_frequency();
 				break;
 			case SPEEDSTEP_PROCESSOR_P4M:
-				speedstep_low_freq = pentium4_get_frequency();
+				low = pentium4_get_frequency();
 			}
 			speedstep_set_state(SPEEDSTEP_HIGH);
 		} else {
 			switch (speedstep_processor) {
 			case SPEEDSTEP_PROCESSOR_PIII_C:
 			case SPEEDSTEP_PROCESSOR_PIII_T:
-				speedstep_high_freq = pentium3_get_frequency();
+				high = pentium3_get_frequency();
 				break;
 			case SPEEDSTEP_PROCESSOR_P4M:
-				speedstep_high_freq = pentium4_get_frequency();
+				high = pentium4_get_frequency();
 			}
 			speedstep_set_state(SPEEDSTEP_LOW);
 		}
 
-		if (!speedstep_low_freq || !speedstep_high_freq || 
+		if (!low || !high || 
 		    (speedstep_low_freq == speedstep_high_freq))
 			return -EIO;
 	}
+
+	speedstep_low_freq = low;
+	speedstep_high_freq = high;
 
 	return 0;
 }
@@ -632,6 +659,8 @@ static int __init speedstep_init(void)
 		return result;
 
 	/* detect low and high frequency */
+	speedstep_low_freq = 100000;
+	speedstep_high_freq = 200000;
 	result = speedstep_detect_speeds();
 	if (result)
 		return result;
