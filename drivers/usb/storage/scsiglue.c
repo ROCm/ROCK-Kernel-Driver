@@ -252,7 +252,6 @@ static int bus_reset( Scsi_Cmnd *srb )
 	for (i = 0; i < pusb_dev_save->actconfig->bNumInterfaces; i++) {
  		struct usb_interface *intf =
 			&pusb_dev_save->actconfig->interface[i];
-		const struct usb_device_id *id;
 
 		/* if this is an unclaimed interface, skip it */
 		if (!intf->driver) {
@@ -263,11 +262,8 @@ static int bus_reset( Scsi_Cmnd *srb )
 
 		/* simulate a disconnect and reconnect for all interfaces */
 		US_DEBUGPX("simulating disconnect/reconnect.\n");
-		down(&intf->driver->serialize);
-		intf->driver->disconnect(pusb_dev_save, intf->private_data);
-		id = usb_match_id(intf, intf->driver->id_table);
-		intf->driver->probe(pusb_dev_save, i, id);
-		up(&intf->driver->serialize);
+		usb_device_remove (&intf->dev);
+		usb_device_probe (&intf->dev);
 	}
 	US_DEBUGP("bus_reset() complete\n");
 	scsi_lock(srb->host);

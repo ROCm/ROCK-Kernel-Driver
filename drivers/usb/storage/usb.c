@@ -103,10 +103,10 @@ static int my_host_number;
 struct us_data *us_list;
 struct semaphore us_list_semaphore;
 
-static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
-			    const struct usb_device_id *id);
+static int storage_probe(struct usb_interface *iface,
+			 const struct usb_device_id *id);
 
-static void storage_disconnect(struct usb_device *dev, void *ptr);
+static void storage_disconnect(struct usb_interface *iface);
 
 /* The entries in this table, except for final ones here
  * (USB_MASS_STORAGE_CLASS and the empty entry), correspond,
@@ -623,9 +623,11 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 }
 
 /* Probe to see if a new device is actually a SCSI device */
-static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
-			    const struct usb_device_id *id)
+static int storage_probe(struct usb_interface *intf,
+			 const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
+	int ifnum = intf->altsetting->bInterfaceNumber;
 	int i;
 	const int id_index = id - storage_usb_ids; 
 	char mf[USB_STOR_STRING_LEN];		     /* manufacturer */
@@ -650,7 +652,6 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	/* the altsetting on the interface we're probing that matched our
 	 * usb_match_id table
 	 */
-	struct usb_interface *intf = dev->actconfig->interface;
 	struct usb_interface_descriptor *altsetting =
 		intf[ifnum].altsetting + intf[ifnum].act_altsetting;
 	US_DEBUGP("act_altsetting is %d\n", intf[ifnum].act_altsetting);
@@ -680,7 +681,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			US_DEBUGP("Product: %s\n", unusual_dev->productName);
 	} else
 		/* no, we can't support it */
-		return NULL;
+		return -EIO;
 
 	/* At this point, we know we've got a live one */
 	US_DEBUGP("USB Mass Storage device detected\n");
@@ -728,7 +729,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		} else if (result != 0) {
 			/* it's not a stall, but another error -- time to bail */
 			US_DEBUGP("-- Unknown error.  Rejecting device\n");
-			return NULL;
+			return -EIO;
 		}
 	}
 #endif
@@ -736,7 +737,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	/* Do some basic sanity checks, and bail if we find a problem */
 	if (!ep_in || !ep_out || (protocol == US_PR_CBI && !ep_int)) {
 		US_DEBUGP("Endpoint sanity check failed! Rejecting dev.\n");
-		return NULL;
+		return -EIO;
 	}
 
 	/* At this point, we've decided to try to use the device */
@@ -815,7 +816,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 						    GFP_KERNEL)) == NULL) {
 			printk(KERN_WARNING USB_STORAGE "Out of memory\n");
 			usb_put_dev(dev);
-			return NULL;
+			return -ENOMEM;
 		}
 		memset(ss, 0, sizeof(struct us_data));
 		new_device = 1;
@@ -1091,8 +1092,9 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	printk(KERN_DEBUG 
 	       "USB Mass Storage device found at %d\n", dev->devnum);
 
-	/* return a pointer for the disconnect function */
-	return ss;
+	/* save a pointer to our structure */
+	dev_set_drvdata (&intf->dev, ss);
+	return 0;
 
 	/* we come here if there are any problems */
 	/* ss->dev_semaphore must be locked */
@@ -1102,15 +1104,17 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	up(&ss->dev_semaphore);
 	if (new_device)
 		kfree(ss);
-	return NULL;
+	return -EIO;
 }
 
 /* Handle a disconnect event from the USB core */
-static void storage_disconnect(struct usb_device *dev, void *ptr)
+static void storage_disconnect(struct usb_interface *intf)
 {
-	struct us_data *ss = ptr;
+	struct us_data *ss = dev_get_drvdata (&intf->dev);
 
 	US_DEBUGP("storage_disconnect() called\n");
+
+	dev_set_drvdata (&intf->dev, NULL);
 
 	/* this is the odd case -- we disconnected but weren't using it */
 	if (!ss) {
