@@ -51,6 +51,14 @@
 
 /* CHANGELOG
  *
+ * Version 2.8
+ *
+ * Fixed bad bug affecting tag starvation processing (previously the
+ * driver would hang the system if too many tags starved.  Also fixed
+ * bad bug having to do with 10 byte command processing and REQUEST
+ * SENSE (the command would loop forever getting a transfer length
+ * mismatch in the CMD phase).
+ *
  * Version 2.7
  *
  * Fixed scripts problem which caused certain devices (notably CDRWs)
@@ -104,7 +112,7 @@
  * Initial modularisation from the D700.  See NCR_D700.c for the rest of
  * the changelog.
  * */
-#define NCR_700_VERSION "2.7"
+#define NCR_700_VERSION "2.8"
 
 #include <linux/config.h>
 #include <linux/version.h>
