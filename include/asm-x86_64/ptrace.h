@@ -32,10 +32,7 @@
 /* top of stack page */ 
 #define FRAME_SIZE 168
 
-#define PTRACE_SETOPTIONS         21
-
-/* options set using PTRACE_SETOPTIONS */
-#define PTRACE_O_TRACESYSGOOD     0x00000001
+#define PTRACE_OLDSETOPTIONS         21
 
 /* Dummy values for ptrace */ 
 #define FS 1000 

@@ -261,7 +261,7 @@ do_ptrace_normal(struct task_struct *child, long request, long addr, long data)
 		}
 		return 0;
 	}
-	return -EIO;
+	return ptrace_request(child, request, addr, data);
 }
 
 #ifdef CONFIG_S390_SUPPORT
@@ -469,7 +469,7 @@ do_ptrace_emu31(struct task_struct *child, long request, long addr, long data)
 		}
 		return 0;
 	}
-	return -EIO;
+	return ptrace_request(child, request, addr, data);
 }
 #endif
 
@@ -538,12 +538,6 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 		/* detach a process that was attached. */
 		return ptrace_detach(child, data);
 
-	case PTRACE_SETOPTIONS:
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		return 0;
 	/* Do requests that differ for 31/64 bit */
 	default:
 #ifdef CONFIG_S390_SUPPORT
@@ -551,8 +545,8 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 			return do_ptrace_emu31(child, request, addr, data);
 #endif
 		return do_ptrace_normal(child, request, addr, data);
-		
 	}
+	/* Not reached.  */
 	return -EIO;
 }
 

@@ -584,9 +584,14 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 
 	/* PTRACE_DUMPCORE unsupported... */
 
-	default:
-		pt_error_return(regs, EIO);
+	default: {
+		int err = ptrace_request(child, request, addr, data);
+		if (err)
+			pt_error_return(regs, -err);
+		else
+			pt_succ_return(regs, 0);
 		goto out_tsk;
+	}
 	}
 out_tsk:
 	if (child)
@@ -604,7 +609,8 @@ asmlinkage void syscall_trace(void)
 		return;
 	if (!(current->ptrace & PT_PTRACED))
 		return;
-	current->exit_code = SIGTRAP;
+	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+					? 0x80 : 0);
 	current->state = TASK_STOPPED;
 	current->thread.flags ^= MAGIC_CONSTANT;
 	notify_parent(current, SIGCHLD);

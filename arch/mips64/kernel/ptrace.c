@@ -275,17 +275,8 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 		ret = ptrace_detach(child, data);
 		break;
 
-	case PTRACE_SETOPTIONS: {
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		ret = 0;
-		break;
-	}
-
 	default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
 
@@ -535,17 +526,8 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = ptrace_detach(child, data);
 		break;
 
-	case PTRACE_SETOPTIONS: {
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		ret = 0;
-		break;
-	}
-
 	default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
 
