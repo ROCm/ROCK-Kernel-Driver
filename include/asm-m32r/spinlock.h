@@ -1,14 +1,12 @@
 #ifndef _ASM_M32R_SPINLOCK_H
 #define _ASM_M32R_SPINLOCK_H
 
-/* $Id$ */
-
 /*
  *  linux/include/asm-m32r/spinlock.h
- *    orig : i386 2.4.10
  *
  *  M32R version:
  *    Copyright (C) 2001, 2002  Hitoshi Yamamoto
+ *    Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
 #include <linux/config.h>	/* CONFIG_DEBUG_SPINLOCK, CONFIG_SMP */
@@ -41,6 +39,9 @@ typedef struct {
 #if SPINLOCK_DEBUG
 	unsigned magic;
 #endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 #define SPINLOCK_MAGIC	0xdead4ead
@@ -66,22 +67,17 @@ typedef struct {
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 #define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
-/*
- * This works. Despite all the confusion.
+/**
+ * _raw_spin_trylock - Try spin lock and return a result
+ * @lock: Pointer to the lock variable
+ *
+ * _raw_spin_trylock() tries to get the lock and returns a result.
+ * On the m32r, the result value is 1 (= Success) or 0 (= Failure).
  */
-
-/*======================================================================*
- * Try spin lock
- *======================================================================*
- * Argument:
- *   arg0: lock
- * Return value:
- *   =1: Success
- *   =0: Failure
- *======================================================================*/
-static __inline__ int _raw_spin_trylock(spinlock_t *lock)
+static inline int _raw_spin_trylock(spinlock_t *lock)
 {
 	int oldval;
+	unsigned long tmp1, tmp2;
 
 	/*
 	 * lock->lock :  =1 : unlock
@@ -93,16 +89,16 @@ static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 	 */
 	__asm__ __volatile__ (
 		"# spin_trylock			\n\t"
-		"ldi	r4, #0;			\n\t"
-		"mvfc	r5, psw;		\n\t"
+		"ldi	%1, #0;			\n\t"
+		"mvfc	%2, psw;		\n\t"
 		"clrpsw	#0x40 -> nop;		\n\t"
-		DCACHE_CLEAR("%0", "r6", "%1")
-		"lock	%0, @%1;		\n\t"
-		"unlock	r4, @%1;		\n\t"
-		"mvtc	r5, psw;		\n\t"
-		: "=&r" (oldval)
+		DCACHE_CLEAR("%0", "r6", "%3")
+		"lock	%0, @%3;		\n\t"
+		"unlock	%1, @%3;		\n\t"
+		"mvtc	%2, psw;		\n\t"
+		: "=&r" (oldval), "=&r" (tmp1), "=&r" (tmp2)
 		: "r" (&lock->lock)
-		: "memory", "r4", "r5"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
@@ -111,8 +107,10 @@ static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 	return (oldval > 0);
 }
 
-static __inline__ void _raw_spin_lock(spinlock_t *lock)
+static inline void _raw_spin_lock(spinlock_t *lock)
 {
+	unsigned long tmp0, tmp1;
+
 #if SPINLOCK_DEBUG
 	__label__ here;
 here:
@@ -135,31 +133,31 @@ here:
 		"# spin_lock			\n\t"
 		".fillinsn			\n"
 		"1:				\n\t"
-		"mvfc	r5, psw;		\n\t"
+		"mvfc	%1, psw;		\n\t"
 		"clrpsw	#0x40 -> nop;		\n\t"
-		DCACHE_CLEAR("r4", "r6", "%0")
-		"lock	r4, @%0;		\n\t"
-		"addi	r4, #-1;		\n\t"
-		"unlock	r4, @%0;		\n\t"
-		"mvtc	r5, psw;		\n\t"
-		"bltz	r4, 2f;			\n\t"
+		DCACHE_CLEAR("%0", "r6", "%2")
+		"lock	%0, @%2;		\n\t"
+		"addi	%0, #-1;		\n\t"
+		"unlock	%0, @%2;		\n\t"
+		"mvtc	%1, psw;		\n\t"
+		"bltz	%0, 2f;			\n\t"
 		LOCK_SECTION_START(".balign 4 \n\t")
 		".fillinsn			\n"
 		"2:				\n\t"
-		"ld	r4, @%0;		\n\t"
-		"bgtz	r4, 1b;			\n\t"
+		"ld	%0, @%2;		\n\t"
+		"bgtz	%0, 1b;			\n\t"
 		"bra	2b;			\n\t"
 		LOCK_SECTION_END
-		: /* no outputs */
+		: "=&r" (tmp0), "=&r" (tmp1)
 		: "r" (&lock->lock)
-		: "memory", "r4", "r5"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
 	);
 }
 
-static __inline__ void _raw_spin_unlock(spinlock_t *lock)
+static inline void _raw_spin_unlock(spinlock_t *lock)
 {
 #if SPINLOCK_DEBUG
 	BUG_ON(lock->magic != SPINLOCK_MAGIC);
@@ -183,6 +181,9 @@ typedef struct {
 	volatile int lock;
 #if SPINLOCK_DEBUG
 	unsigned magic;
+#endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
 #endif
 } rwlock_t;
 
@@ -211,8 +212,10 @@ typedef struct {
  */
 /* the spinlock helpers are in arch/i386/kernel/semaphore.c */
 
-static __inline__ void _raw_read_lock(rwlock_t *rw)
+static inline void _raw_read_lock(rwlock_t *rw)
 {
+	unsigned long tmp0, tmp1;
+
 #if SPINLOCK_DEBUG
 	BUG_ON(rw->magic != RWLOCK_MAGIC);
 #endif
@@ -231,40 +234,42 @@ static __inline__ void _raw_read_lock(rwlock_t *rw)
 		"# read_lock			\n\t"
 		".fillinsn			\n"
 		"1:				\n\t"
-		"mvfc	r5, psw;		\n\t"
+		"mvfc	%1, psw;		\n\t"
 		"clrpsw	#0x40 -> nop;		\n\t"
-		DCACHE_CLEAR("r4", "r6", "%0")
-		"lock	r4, @%0;		\n\t"
-		"addi	r4, #-1;		\n\t"
-		"unlock	r4, @%0;		\n\t"
-		"mvtc	r5, psw;		\n\t"
-		"bltz	r4, 2f;			\n\t"
+		DCACHE_CLEAR("%0", "r6", "%2")
+		"lock	%0, @%2;		\n\t"
+		"addi	%0, #-1;		\n\t"
+		"unlock	%0, @%2;		\n\t"
+		"mvtc	%1, psw;		\n\t"
+		"bltz	%0, 2f;			\n\t"
 		LOCK_SECTION_START(".balign 4 \n\t")
 		".fillinsn			\n"
 		"2:				\n\t"
 		"clrpsw	#0x40 -> nop;		\n\t"
-		DCACHE_CLEAR("r4", "r6", "%0")
-		"lock	r4, @%0;		\n\t"
-		"addi	r4, #1;			\n\t"
-		"unlock	r4, @%0;		\n\t"
-		"mvtc	r5, psw;		\n\t"
+		DCACHE_CLEAR("%0", "r6", "%2")
+		"lock	%0, @%2;		\n\t"
+		"addi	%0, #1;			\n\t"
+		"unlock	%0, @%2;		\n\t"
+		"mvtc	%1, psw;		\n\t"
 		".fillinsn			\n"
 		"3:				\n\t"
-		"ld	r4, @%0;		\n\t"
-		"bgtz	r4, 1b;			\n\t"
+		"ld	%0, @%2;		\n\t"
+		"bgtz	%0, 1b;			\n\t"
 		"bra	3b;			\n\t"
 		LOCK_SECTION_END
-		: /* no outputs */
+		: "=&r" (tmp0), "=&r" (tmp1)
 		: "r" (&rw->lock)
-		: "memory", "r4", "r5"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
 	);
 }
 
-static __inline__ void _raw_write_lock(rwlock_t *rw)
+static inline void _raw_write_lock(rwlock_t *rw)
 {
+	unsigned long tmp0, tmp1, tmp2;
+
 #if SPINLOCK_DEBUG
 	BUG_ON(rw->magic != RWLOCK_MAGIC);
 #endif
@@ -281,85 +286,91 @@ static __inline__ void _raw_write_lock(rwlock_t *rw)
 	 */
 	__asm__ __volatile__ (
 		"# write_lock					\n\t"
-		"seth	r5, #high(" RW_LOCK_BIAS_STR ");	\n\t"
-		"or3	r5, r5, #low(" RW_LOCK_BIAS_STR ");	\n\t"
+		"seth	%1, #high(" RW_LOCK_BIAS_STR ");	\n\t"
+		"or3	%1, %1, #low(" RW_LOCK_BIAS_STR ");	\n\t"
 		".fillinsn					\n"
 		"1:						\n\t"
-		"mvfc	r6, psw;				\n\t"
+		"mvfc	%2, psw;				\n\t"
 		"clrpsw	#0x40 -> nop;				\n\t"
-		DCACHE_CLEAR("r4", "r7", "%0")
-		"lock	r4, @%0;				\n\t"
-		"sub	r4, r5;					\n\t"
-		"unlock	r4, @%0;				\n\t"
-		"mvtc	r6, psw;				\n\t"
-		"bnez	r4, 2f;					\n\t"
+		DCACHE_CLEAR("%0", "r7", "%3")
+		"lock	%0, @%3;				\n\t"
+		"sub	%0, %1;					\n\t"
+		"unlock	%0, @%3;				\n\t"
+		"mvtc	%2, psw;				\n\t"
+		"bnez	%0, 2f;					\n\t"
 		LOCK_SECTION_START(".balign 4 \n\t")
 		".fillinsn					\n"
 		"2:						\n\t"
 		"clrpsw	#0x40 -> nop;				\n\t"
-		DCACHE_CLEAR("r4", "r7", "%0")
-		"lock	r4, @%0;				\n\t"
-		"add	r4, r5;					\n\t"
-		"unlock	r4, @%0;				\n\t"
-		"mvtc	r6, psw;				\n\t"
+		DCACHE_CLEAR("%0", "r7", "%3")
+		"lock	%0, @%3;				\n\t"
+		"add	%0, %1;					\n\t"
+		"unlock	%0, @%3;				\n\t"
+		"mvtc	%2, psw;				\n\t"
 		".fillinsn					\n"
 		"3:						\n\t"
-		"ld	r4, @%0;				\n\t"
-		"beq	r4, r5, 1b;				\n\t"
+		"ld	%0, @%3;				\n\t"
+		"beq	%0, %1, 1b;				\n\t"
 		"bra	3b;					\n\t"
 		LOCK_SECTION_END
-		: /* no outputs */
+		: "=&r" (tmp0), "=&r" (tmp1), "=&r" (tmp2)
 		: "r" (&rw->lock)
-		: "memory", "r4", "r5", "r6"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r7"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
 	);
 }
 
-static __inline__ void _raw_read_unlock(rwlock_t *rw)
+static inline void _raw_read_unlock(rwlock_t *rw)
 {
+	unsigned long tmp0, tmp1;
+
 	__asm__ __volatile__ (
 		"# read_unlock			\n\t"
-		"mvfc	r5, psw;		\n\t"
+		"mvfc	%1, psw;		\n\t"
 		"clrpsw	#0x40 -> nop;		\n\t"
-		DCACHE_CLEAR("r4", "r6", "%0")
-		"lock	r4, @%0;		\n\t"
-		"addi	r4, #1;			\n\t"
-		"unlock	r4, @%0;		\n\t"
-		"mvtc	r5, psw;		\n\t"
-		: /* no outputs */
+		DCACHE_CLEAR("%0", "r6", "%2")
+		"lock	%0, @%2;		\n\t"
+		"addi	%0, #1;			\n\t"
+		"unlock	%0, @%2;		\n\t"
+		"mvtc	%1, psw;		\n\t"
+		: "=&r" (tmp0), "=&r" (tmp1)
 		: "r" (&rw->lock)
-		: "memory", "r4", "r5"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
 	);
 }
 
-static __inline__ void _raw_write_unlock(rwlock_t *rw)
+static inline void _raw_write_unlock(rwlock_t *rw)
 {
+	unsigned long tmp0, tmp1, tmp2;
+
 	__asm__ __volatile__ (
 		"# write_unlock					\n\t"
-		"seth	r5, #high(" RW_LOCK_BIAS_STR ");	\n\t"
-		"or3	r5, r5, #low(" RW_LOCK_BIAS_STR ");	\n\t"
-		"mvfc	r6, psw;				\n\t"
+		"seth	%1, #high(" RW_LOCK_BIAS_STR ");	\n\t"
+		"or3	%1, %1, #low(" RW_LOCK_BIAS_STR ");	\n\t"
+		"mvfc	%2, psw;				\n\t"
 		"clrpsw	#0x40 -> nop;				\n\t"
-		DCACHE_CLEAR("r4", "r7", "%0")
-		"lock	r4, @%0;				\n\t"
-		"add	r4, r5;					\n\t"
-		"unlock	r4, @%0;				\n\t"
-		"mvtc	r6, psw;				\n\t"
-		: /* no outputs */
+		DCACHE_CLEAR("%0", "r7", "%3")
+		"lock	%0, @%3;				\n\t"
+		"add	%0, %1;					\n\t"
+		"unlock	%0, @%3;				\n\t"
+		"mvtc	%2, psw;				\n\t"
+		: "=&r" (tmp0), "=&r" (tmp1), "=&r" (tmp2)
 		: "r" (&rw->lock)
-		: "memory", "r4", "r5", "r6"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r7"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
 	);
 }
 
-static __inline__ int _raw_write_trylock(rwlock_t *lock)
+#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
+
+static inline int _raw_write_trylock(rwlock_t *lock)
 {
 	atomic_t *count = (atomic_t *)lock;
 	if (atomic_sub_and_test(RW_LOCK_BIAS, count))

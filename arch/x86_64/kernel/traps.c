@@ -437,7 +437,8 @@ static void do_trap(int trapnr, int signr, char *str,
 #define DO_ERROR(trapnr, signr, str, name) \
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
-	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
+							== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, regs, error_code, NULL); \
 }
@@ -450,7 +451,8 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_errno = 0; \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
-	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
+							== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, regs, error_code, &info); \
 }
@@ -471,7 +473,8 @@ DO_ERROR(18, SIGSEGV, "reserved", reserved)
 asmlinkage void *do_##name(struct pt_regs * regs, long error_code) \
 { \
 	struct pt_regs *pr = ((struct pt_regs *)(current->thread.rsp0))-1; \
-	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
+							== NOTIFY_STOP) \
 		return regs; \
 	if (regs->cs & 3) { \
 		memcpy(pr, regs, sizeof(struct pt_regs)); \
@@ -565,7 +568,8 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 	unsigned char reason = inb(0x61);
 
 	if (!(reason & 0xc0)) {
-		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
+								== NOTIFY_STOP)
 			return;
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -580,7 +584,7 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 		unknown_nmi_error(reason, regs);
 		return;
 	}
-	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_STOP)
 		return; 
 	if (reason & 0x80)
 		mem_parity_error(reason, regs);
@@ -676,7 +680,7 @@ clear_TF_reenable:
 clear_TF:
 	/* RED-PEN could cause spurious errors */
 	if (notify_die(DIE_DEBUG, "debug2", regs, condition, 1, SIGTRAP) 
-	    != NOTIFY_BAD)
+								!= NOTIFY_STOP)
 	regs->eflags &= ~TF_MASK;
 	return regs;	
 }

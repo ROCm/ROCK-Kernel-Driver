@@ -1,7 +1,7 @@
 /*
  *  linux/arch/m32r/kernel/setup_m32700ut.c
  *
- *  Setup routines for MITSUBISHI M32700UT Board
+ *  Setup routines for Renesas M32700UT Board
  *
  *  Copyright (c) 2002 	Hiroyuki Kondo, Hirokazu Takata,
  *                      Hitoshi Yamamoto, Takeo Takahashi
@@ -9,8 +9,6 @@
  *  This file is subject to the terms and conditions of the GNU General
  *  Public License.  See the file "COPYING" in the main directory of this
  *  archive for more details.
- *
- *  $Id: setup_m32700ut.c,v 1.6 2003/11/27 10:18:49 takeo Exp $
  */
 
 #include <linux/config.h>

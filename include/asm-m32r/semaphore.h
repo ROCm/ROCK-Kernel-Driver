@@ -1,8 +1,6 @@
 #ifndef _ASM_M32R_SEMAPHORE_H
 #define _ASM_M32R_SEMAPHORE_H
 
-/* $Id$ */
-
 #include <linux/linkage.h>
 
 #ifdef __KERNEL__
@@ -10,39 +8,15 @@
 /*
  * SMP- and interrupt-safe semaphores..
  *
- * (C) Copyright 1996 Linus Torvalds
- *
- * Modified 1996-12-23 by Dave Grothe <dave@gcom.com> to fix bugs in
- *                     the original code and to make semaphore waits
- *                     interruptible so that processes waiting on
- *                     semaphores can be killed.
- * Modified 1999-02-14 by Andrea Arcangeli, split the sched.c helper
- *		       functions in asm/sempahore-helper.h while fixing a
- *		       potential and subtle race discovered by Ulrich Schmid
- *		       in down_interruptible(). Since I started to play here I
- *		       also implemented the `trylock' semaphore operation.
- *          1999-07-02 Artur Skawina <skawina@geocities.com>
- *                     Optimized "0(ecx)" -> "(ecx)" (the assembler does not
- *                     do this). Changed calling sequences from push/jmp to
- *                     traditional call/ret.
- * Modified 2001-01-01 Andreas Franck <afranck@gmx.de>
- *		       Some hacks to ensure compatibility with recent
- *		       GCC snapshots, to avoid stack corruption when compiling
- *		       with -fomit-frame-pointer. It's not sure if this will
- *		       be fixed in GCC, as our previous implementation was a
- *		       bit dubious.
- *
- * If you would like to see an analysis of this implementation, please
- * ftp to gcom.com and download the file
- * /pub/linux/src/semaphore/semaphore-2.0.24.tar.gz.
- *
+ * Copyright (C) 1996  Linus Torvalds
+ * Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
 #include <linux/config.h>
-#include <asm/system.h>
-#include <asm/atomic.h>
 #include <linux/wait.h>
 #include <linux/rwsem.h>
+#include <asm/system.h>
+#include <asm/atomic.h>
 
 #undef LOAD
 #undef STORE
@@ -58,21 +32,14 @@ struct semaphore {
 	atomic_t count;
 	int sleepers;
 	wait_queue_head_t wait;
-#ifdef WAITQUEUE_DEBUG
-	long __magic;
-#endif
 };
 
-#ifdef WAITQUEUE_DEBUG
-# define __SEM_DEBUG_INIT(name) \
-		, (int)&(name).__magic
-#else
-# define __SEM_DEBUG_INIT(name)
-#endif
-
-#define __SEMAPHORE_INITIALIZER(name,count) \
-{ ATOMIC_INIT(count), 0, __WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
-	__SEM_DEBUG_INIT(name) }
+#define __SEMAPHORE_INITIALIZER(name, n)				\
+{									\
+	.count		= ATOMIC_INIT(n),				\
+	.sleepers	= 0,						\
+	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
+}
 
 #define __MUTEX_INITIALIZER(name) \
 	__SEMAPHORE_INITIALIZER(name,1)
@@ -83,7 +50,7 @@ struct semaphore {
 #define DECLARE_MUTEX(name) __DECLARE_SEMAPHORE_GENERIC(name,1)
 #define DECLARE_MUTEX_LOCKED(name) __DECLARE_SEMAPHORE_GENERIC(name,0)
 
-static __inline__ void sema_init (struct semaphore *sem, int val)
+static inline void sema_init (struct semaphore *sem, int val)
 {
 /*
  *	*sem = (struct semaphore)__SEMAPHORE_INITIALIZER((*sem),val);
@@ -94,17 +61,14 @@ static __inline__ void sema_init (struct semaphore *sem, int val)
 	atomic_set(&sem->count, val);
 	sem->sleepers = 0;
 	init_waitqueue_head(&sem->wait);
-#ifdef WAITQUEUE_DEBUG
-	sem->__magic = (int)&sem->__magic;
-#endif
 }
 
-static __inline__ void init_MUTEX (struct semaphore *sem)
+static inline void init_MUTEX (struct semaphore *sem)
 {
 	sema_init(sem, 1);
 }
 
-static __inline__ void init_MUTEX_LOCKED (struct semaphore *sem)
+static inline void init_MUTEX_LOCKED (struct semaphore *sem)
 {
 	sema_init(sem, 0);
 }
@@ -120,19 +84,15 @@ asmlinkage int  __down_trylock(struct semaphore * sem);
 asmlinkage void __up(struct semaphore * sem);
 
 /*
- * This is ugly, but we want the default case to fall through.
- * "__down_failed" is a special asm handler that calls the C
- * routine that actually waits. See arch/i386/kernel/semaphore.c
+ * Atomically decrement the semaphore's count.  If it goes negative,
+ * block the calling thread in the TASK_UNINTERRUPTIBLE state.
  */
-static __inline__ void down(struct semaphore * sem)
+static inline void down(struct semaphore * sem)
 {
 	unsigned long flags;
-	int temp;
+	long count;
 
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
+	might_sleep();
 	local_irq_save(flags);
 	__asm__ __volatile__ (
 		"# down				\n\t"
@@ -140,7 +100,7 @@ static __inline__ void down(struct semaphore * sem)
 		LOAD"	%0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
 		STORE"	%0, @%1;		\n\t"
-		: "=&r" (temp)
+		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
@@ -149,7 +109,7 @@ static __inline__ void down(struct semaphore * sem)
 	);
 	local_irq_restore(flags);
 
-	if (temp < 0)
+	if (unlikely(count < 0))
 		__down(sem);
 }
 
@@ -157,16 +117,13 @@ static __inline__ void down(struct semaphore * sem)
  * Interruptible try to acquire a semaphore.  If we obtained
  * it, return zero.  If we were interrupted, returns -EINTR
  */
-static __inline__ int down_interruptible(struct semaphore * sem)
+static inline int down_interruptible(struct semaphore * sem)
 {
 	unsigned long flags;
-	int temp;
+	long count;
 	int result = 0;
 
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
+	might_sleep();
 	local_irq_save(flags);
 	__asm__ __volatile__ (
 		"# down_interruptible		\n\t"
@@ -174,7 +131,7 @@ static __inline__ int down_interruptible(struct semaphore * sem)
 		LOAD"	%0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
 		STORE"	%0, @%1;		\n\t"
-		: "=&r" (temp)
+		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
@@ -183,7 +140,7 @@ static __inline__ int down_interruptible(struct semaphore * sem)
 	);
 	local_irq_restore(flags);
 
-	if (temp < 0)
+	if (unlikely(count < 0))
 		result = __down_interruptible(sem);
 
 	return result;
@@ -193,15 +150,11 @@ static __inline__ int down_interruptible(struct semaphore * sem)
  * Non-blockingly attempt to down() a semaphore.
  * Returns zero if we acquired it
  */
-static __inline__ int down_trylock(struct semaphore * sem)
+static inline int down_trylock(struct semaphore * sem)
 {
 	unsigned long flags;
-	int temp;
+	long count;
 	int result = 0;
-
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
@@ -210,7 +163,7 @@ static __inline__ int down_trylock(struct semaphore * sem)
 		LOAD"	%0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
 		STORE"	%0, @%1;		\n\t"
-		: "=&r" (temp)
+		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
@@ -219,7 +172,7 @@ static __inline__ int down_trylock(struct semaphore * sem)
 	);
 	local_irq_restore(flags);
 
-	if (temp < 0)
+	if (unlikely(count < 0))
 		result = __down_trylock(sem);
 
 	return result;
@@ -231,14 +184,10 @@ static __inline__ int down_trylock(struct semaphore * sem)
  * The default case (no contention) will result in NO
  * jumps for both down() and up().
  */
-static __inline__ void up(struct semaphore * sem)
+static inline void up(struct semaphore * sem)
 {
 	unsigned long flags;
-	int temp;
-
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
+	long count;
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
@@ -247,7 +196,7 @@ static __inline__ void up(struct semaphore * sem)
 		LOAD"	%0, @%1;		\n\t"
 		"addi	%0, #1;			\n\t"
 		STORE"	%0, @%1;		\n\t"
-		: "=&r" (temp)
+		: "=&r" (count)
 		: "r" (&sem->count)
 		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
@@ -256,11 +205,10 @@ static __inline__ void up(struct semaphore * sem)
 	);
 	local_irq_restore(flags);
 
-	if (temp <= 0)
+	if (unlikely(count <= 0))
 		__up(sem);
 }
 
 #endif  /* __KERNEL__ */
 
 #endif  /* _ASM_M32R_SEMAPHORE_H */
-

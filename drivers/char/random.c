@@ -807,10 +807,11 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	long		delta, delta2, delta3;
 	int		entropy = 0;
 
+	preempt_disable();
 	/* if over the trickle threshold, use only 1 in 4096 samples */
 	if ( random_state->entropy_count > trickle_thresh &&
 	     (__get_cpu_var(trickle_count)++ & 0xfff))
-		return;
+		goto out;
 
 	/*
 	 * Use get_cycles() if implemented, otherwise fall back to
@@ -861,6 +862,8 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 		entropy = int_ln_12bits(delta);
 	}
 	batch_entropy_store(num, time, entropy);
+out:
+	preempt_enable();
 }
 
 void add_keyboard_randomness(unsigned char scancode)

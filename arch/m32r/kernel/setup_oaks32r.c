@@ -7,10 +7,6 @@
  *                            Hitoshi Yamamoto, Mamoru Sakugawa
  */
 
-static char *rcsid =
-"$Id: setup_oaks32r.c,v 1.1 2004/03/31 05:06:18 sakugawa Exp $";
-static void use_rcsid(void) {rcsid = rcsid; use_rcsid();}
-
 #include <linux/config.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>
