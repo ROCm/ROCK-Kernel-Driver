@@ -138,6 +138,11 @@ include $(TOPDIR)/Rules.make
 sim710.o:   sim710_d.h
 53c700.o:   53c700_d.h
 
+# If you want to play with the firmware, uncomment
+# GENERATE_FIRMWARE := 1
+
+ifdef GENERATE_FIRMWARE
+
 53c8xx_d.h: 53c7,8xx.scr script_asm.pl
 	$(CPP) -traditional -DCHIP=810 - < $< | grep -v '^#' | $(PERL) script_asm.pl $@ $(@:_d.h=_u.h)
 
@@ -155,3 +160,5 @@ sim710_u.h: sim710_d.h
 
 53c700_d.h: 53c700.scr script_asm.pl
 	$(PERL) -s script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h) < $<
+
+endif
