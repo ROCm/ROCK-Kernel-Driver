@@ -396,44 +396,44 @@ typedef struct sc1200_saved_state_s {
 	__u32		regs[4];
 } sc1200_saved_state_t;
 
-static int sc1200_save_state (struct pci_dev *dev, u32 state)
-{
-	ide_hwif_t		*hwif = NULL;
-
-printk("SC1200: save_state(%u)\n", state);
-	if (state != 0)
-		return 0;	// we only save state when going from full power to less
-	//
-	// Loop over all interfaces that are part of this PCI device:
-	//
-	while ((hwif = lookup_pci_dev(hwif, dev)) != NULL) {
-		sc1200_saved_state_t	*ss;
-		unsigned int		basereg, r;
-		//
-		// allocate a permanent save area, if not already allocated
-		//
-		ss = (sc1200_saved_state_t *)hwif->config_data;
-		if (ss == NULL) {
-			ss = kmalloc(sizeof(sc1200_saved_state_t), GFP_KERNEL);
-			if (ss == NULL)
-				return -ENOMEM;
-			(sc1200_saved_state_t *)hwif->config_data = ss;
-		}
-		ss = (sc1200_saved_state_t *)hwif->config_data;
-		//
-		// Save timing registers:  this may be unnecessary if BIOS also does it
-		//
-		basereg = hwif->channel ? 0x50 : 0x40;
-		for (r = 0; r < 4; ++r) {
-			pci_read_config_dword (hwif->pci_dev, basereg + (r<<2), &ss->regs[r]);
-		}
-	}
-	return 0;
-}
 
 static int sc1200_suspend (struct pci_dev *dev, u32 state)
 {
+	ide_hwif_t		*hwif = NULL;
+
 	printk("SC1200: suspend(%u)\n", state);
+
+	if (state == 0) {
+		// we only save state when going from full power to less
+
+		//
+		// Loop over all interfaces that are part of this PCI device:
+		//
+		while ((hwif = lookup_pci_dev(hwif, dev)) != NULL) {
+			sc1200_saved_state_t	*ss;
+			unsigned int		basereg, r;
+			//
+			// allocate a permanent save area, if not already allocated
+			//
+			ss = (sc1200_saved_state_t *)hwif->config_data;
+			if (ss == NULL) {
+				ss = kmalloc(sizeof(sc1200_saved_state_t), GFP_KERNEL);
+				if (ss == NULL)
+					return -ENOMEM;
+				(sc1200_saved_state_t *)hwif->config_data = ss;
+			}
+			ss = (sc1200_saved_state_t *)hwif->config_data;
+			//
+			// Save timing registers:  this may be unnecessary if 
+			// BIOS also does it
+			//
+			basereg = hwif->channel ? 0x50 : 0x40;
+			for (r = 0; r < 4; ++r) {
+				pci_read_config_dword (hwif->pci_dev, basereg + (r<<2), &ss->regs[r]);
+			}
+		}
+	}
+
 	/* You don't need to iterate over disks -- sysfs should have done that for you already */ 
 
 	pci_disable_device(dev);
@@ -572,7 +572,6 @@ static struct pci_driver driver = {
 	.name		= "SC1200 IDE",
 	.id_table	= sc1200_pci_tbl,
 	.probe		= sc1200_init_one,
-	.save_state	= sc1200_save_state,
 	.suspend	= sc1200_suspend,
 	.resume		= sc1200_resume,
 };
