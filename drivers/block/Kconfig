@@ -417,4 +417,6 @@ config CDROM_PKTCDVD_WCACHE
 
 source "drivers/s390/block/Kconfig"
 
+source "drivers/block/Kconfig.iosched"
+
 endmenu
