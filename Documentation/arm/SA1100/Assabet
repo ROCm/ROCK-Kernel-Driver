@@ -16,7 +16,6 @@ To build the kernel with current defaults:
 
 	make assabet_config
 	make oldconfig
-	make dep
 	make zImage
 
 The resulting kernel image should be available in linux/arch/arm/boot/zImage.

@@ -437,8 +437,8 @@ Also add:
 into the /usr/src/linux/drivers/net directory.
 
 
-3.) Go to /usr/src/linux directory and run 'make config' followed by 'make dep' 
-and finally 'make' (or make bzImage) to rebuild the kernel. 
+3.) Go to /usr/src/linux directory and run 'make config' followed by 'make' 
+(or make bzImage) to rebuild the kernel. 
 
 4.) Use the DOS 'setup' utility to disable plug and play on the NIC.
 

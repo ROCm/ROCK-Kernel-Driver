@@ -8,7 +8,6 @@ To compile for Pangolin, you must issue the following commands:
 
 	make pangolin_config
 	make oldconfig
-	make dep
 	make zImage
 
 Supported peripherals:

@@ -37,7 +37,7 @@ configuration for your kernel. If you want to use the GoldStar driver
 like a module, don't select 'GoldStar CDROM support'. By the way, you
 have to include the iso9660 filesystem.
 
-Now start compiling the kernel with 'make dep ; make zImage'.
+Now start compiling the kernel with 'make zImage'.
 If you want to use the driver as a module, you have to do 'make modules' 
 and 'make modules_install', additionally.
 Install your new kernel as usual - maybe you do it with 'make zlilo'.

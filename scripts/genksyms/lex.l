@@ -37,7 +37,7 @@
 
 %}
 
-IDENT			[A-Za-z_][A-Za-z0-9_]*
+IDENT			[A-Za-z_\$][A-Za-z0-9_\$]*
 
 O_INT			0[0-7]*
 D_INT			[1-9][0-9]*

@@ -20,10 +20,11 @@ DOCBOOKS := wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 # file.tmpl --> file.sgml +--> file.ps  (psdocs)
 #                         +--> file.pdf  (pdfdocs)
 #                         +--> DIR=file  (htmldocs)
+#                         +--> man/      (mandocs)
 
 ###
 # The targets that may be used.
-.PHONY:	sgmldocs psdocs pdfdocs htmldocs clean mrproper
+.PHONY:	sgmldocs psdocs pdfdocs htmldocs mandocs installmandocs
 
 BOOKS := $(addprefix $(obj)/,$(DOCBOOKS))
 sgmldocs: $(BOOKS)
@@ -37,10 +38,18 @@ pdfdocs: $(PDF)
 HTML := $(patsubst %.sgml, %.html, $(BOOKS))
 htmldocs: $(HTML)
 
+MAN := $(patsubst %.sgml, %.9, $(BOOKS))
+mandocs: $(MAN)
+
+installmandocs: mandocs
+	$(MAKEMAN) install Documentation/DocBook/man
+
 ###
 #External programs used
 KERNELDOC = scripts/kernel-doc
 DOCPROC   = scripts/docproc
+SPLITMAN  = $(PERL) $(srctree)/scripts/split-man
+MAKEMAN   = $(PERL) $(srctree)/scripts/makeman
 
 ###
 # DOCPROC is used for two purposes:
@@ -128,6 +137,13 @@ quiet_cmd_db2html = DB2HTML $@
             cp $(PNG-$(basename $(notdir $@))) $(patsubst %.html,%,$@); fi
 
 ###
+# Rule to generate man files - output is placed in the man subdirectory
+
+%.9:	%.sgml
+	$(SPLITMAN) $< $(objtree)/Documentation/DocBook/man "$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)"
+	$(MAKEMAN) convert $(objtree)/Documentation/DocBook/man $<
+
+###
 # Rules to generate postscripts and PNG imgages from .fig format files
 quiet_cmd_fig2eps = FIG2EPS $@
       cmd_fig2eps = fig2dev -Leps $< $@
@@ -157,10 +173,10 @@ quiet_cmd_fig2png = FIG2PNG $@
 # Help targets as used by the top-level makefile
 dochelp:
 	@echo  '  Linux kernel internal documentation in different formats:'
-	@echo  '  sgmldocs (SGML), psdocs (Postscript), pdfdocs (PDF), htmldocs (HTML)'
+	@echo  '  sgmldocs (SGML), psdocs (Postscript), pdfdocs (PDF)'
+	@echo  '  htmldocs (HTML), mandocs (man pages, use installmandocs to install)'
 
 ###
-# clean and mrproper as used by the top-level makefile 
 # Temporary files left by various tools
 clean-files := $(DOCBOOKS) \
 	$(patsubst %.sgml, %.dvi,  $(DOCBOOKS)) \
@@ -171,10 +187,14 @@ clean-files := $(DOCBOOKS) \
 	$(patsubst %.sgml, %.ps,   $(DOCBOOKS)) \
 	$(patsubst %.sgml, %.pdf,  $(DOCBOOKS)) \
 	$(patsubst %.sgml, %.html, $(DOCBOOKS)) \
-	$(patsubst %.fig,%.eps, $(IMG-parportbook)) \
-	$(patsubst %.fig,%.png, $(IMG-parportbook)) \
+	$(patsubst %.sgml, %.9,    $(DOCBOOKS)) \
+	$(patsubst %.fig,%.eps,    $(IMG-parportbook)) \
+	$(patsubst %.fig,%.png,    $(IMG-parportbook)) \
 	$(C-procfs-example)
 
 ifneq ($(wildcard $(patsubst %.html,%,$(HTML))),)
 clean-rule := rm -rf $(wildcard $(patsubst %.html,%,$(HTML)))
 endif
+
+#man put files in man subdir - traverse down
+subdir- := man/
