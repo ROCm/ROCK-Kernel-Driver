@@ -154,7 +154,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 			struct dentry *mounts = dget(dentry);
 			while (follow_down(&mnt,&mounts)&&d_mountpoint(mounts))
 				;
-			exp2 = exp_get_by_name(rqstp->rq_client, mnt, mounts);
+			exp2 = exp_get_by_name(exp->ex_client, mnt, mounts);
 			if (exp2 && EX_CROSSMNT(exp2)) {
 				/* successfully crossed mount point */
 				exp = exp2;

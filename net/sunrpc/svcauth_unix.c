@@ -201,6 +201,8 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 {
 	struct svc_buf	*argp = &rqstp->rq_argbuf;
 	struct svc_buf	*resp = &rqstp->rq_resbuf;
+	int		rv=0;
+	struct ip_map key, *ipm;
 
 	if ((argp->len -= 3) < 0) {
 		return SVC_GARBAGE;
@@ -224,12 +226,45 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 	/* Put NULL verifier */
 	svc_putu32(resp, RPC_AUTH_NULL);
 	svc_putu32(resp, 0);
-	return SVC_OK;
+
+	key.m_class = rqstp->rq_server->sv_program->pg_class;
+	key.m_addr = rqstp->rq_addr.sin_addr;
+
+	ipm = ip_map_lookup(&key, 0);
+
+	rqstp->rq_client = NULL;
+
+	if (ipm)
+		switch (cache_check(&ip_map_cache, &ipm->h)) {
+		case -EAGAIN:
+			rv = SVC_DROP;
+			break;
+		case -ENOENT:
+			rv = SVC_OK; /* rq_client is NULL */
+			break;
+		case 0:
+			rqstp->rq_client = &ipm->m_client->h;
+			cache_get(&rqstp->rq_client->h);
+			ip_map_put(&ipm->h, &ip_map_cache);
+			rv = SVC_OK;
+			break;
+		default: BUG();
+		}
+	else rv = SVC_DROP;
+
+	if (rqstp->rq_client == NULL && proc != 0)
+		*authp = rpc_autherr_badcred;
+
+	return rv;
 }
 
 static int
 svcauth_null_release(struct svc_rqst *rqstp)
 {
+	if (rqstp->rq_client)
+		auth_domain_put(rqstp->rq_client);
+	rqstp->rq_client = NULL;
+
 	return 0; /* don't drop */
 }
 
@@ -250,6 +285,8 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 	struct svc_cred	*cred = &rqstp->rq_cred;
 	u32		*bufp = argp->buf, slen, i;
 	int		len   = argp->len;
+	int		rv=0;
+	struct ip_map key, *ipm;
 
 	if ((len -= 3) < 0)
 		return SVC_GARBAGE;
@@ -285,7 +322,34 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 	svc_putu32(resp, RPC_AUTH_NULL);
 	svc_putu32(resp, 0);
 
-	return SVC_OK;
+	key.m_class = rqstp->rq_server->sv_program->pg_class;
+	key.m_addr = rqstp->rq_addr.sin_addr;
+
+	ipm = ip_map_lookup(&key, 0);
+
+	rqstp->rq_client = NULL;
+
+	if (ipm)
+		switch (cache_check(&ip_map_cache, &ipm->h)) {
+		case -EAGAIN:
+			rv = SVC_DROP;
+			break;
+		case -ENOENT:
+			rv = SVC_OK; /* rq_client is NULL */
+			break;
+		case 0:
+			rqstp->rq_client = &ipm->m_client->h;
+			cache_get(&rqstp->rq_client->h);
+			ip_map_put(&ipm->h, &ip_map_cache);
+			rv = SVC_OK;
+			break;
+		default: BUG();
+		}
+	else rv = SVC_DROP;
+
+	if (rqstp->rq_client == NULL && proc != 0)
+		goto badcred;
+	return rv;
 
 badcred:
 	*authp = rpc_autherr_badcred;
@@ -297,6 +361,10 @@ svcauth_unix_release(struct svc_rqst *rqstp)
 {
 	/* Verifier (such as it is) is already in place.
 	 */
+	if (rqstp->rq_client)
+		auth_domain_put(rqstp->rq_client);
+	rqstp->rq_client = NULL;
+
 	return 0;
 }
 

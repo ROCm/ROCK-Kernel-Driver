@@ -32,18 +32,12 @@ nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file *filp)
 	fh.fh_export = NULL;
 
 	exp_readlock();
-	rqstp->rq_client = exp_getclient(&rqstp->rq_addr);
-	if (rqstp->rq_client == NULL)
-		nfserr = nfserr_stale;
-	else
-		nfserr = nfsd_open(rqstp, &fh, S_IFREG, MAY_LOCK, filp);
+	nfserr = nfsd_open(rqstp, &fh, S_IFREG, MAY_LOCK, filp);
 	if (!nfserr) {
 		dget(filp->f_dentry);
 		mntget(filp->f_vfsmnt);
 	}
 	fh_put(&fh);
-	if (rqstp->rq_client)
-		auth_domain_put(rqstp->rq_client);
 	rqstp->rq_client = NULL;
 	exp_readunlock();
  	/* nlm and nfsd don't share error codes.

@@ -206,10 +206,6 @@ nfsd(struct svc_rqst *rqstp)
 		/* Lock the export hash tables for reading. */
 		exp_readlock();
 
-		/* Validate the client's address. This will also defeat
-		 * port probes on port 2049 by unauthorized clients.
-		 */
-		rqstp->rq_client = exp_getclient(&rqstp->rq_addr);
 		/* Process request with signals blocked.  */
 		spin_lock_irq(&current->sig->siglock);
 		siginitsetinv(&current->blocked, ALLOWED_SIGS);
@@ -219,10 +215,6 @@ nfsd(struct svc_rqst *rqstp)
 		svc_process(serv, rqstp);
 
 		/* Unlock export hash tables */
-		if (rqstp->rq_client) {
-			auth_domain_put(rqstp->rq_client);
-			rqstp->rq_client = NULL;
-		}
 		exp_readunlock();
 		update_thread_usage(atomic_read(&nfsd_busy));
 		atomic_dec(&nfsd_busy);
@@ -369,5 +361,6 @@ struct svc_program		nfsd_program = {
 	.pg_nvers		= NFSD_NRVERS,		/* nr of entries in nfsd_version */
 	.pg_vers		= nfsd_version,		/* version table */
 	.pg_name		= "nfsd",		/* program name */
+	.pg_class		= "nfsd",		/* authentication class */
 	.pg_stats		= &nfsd_svcstats,	/* version table */
 };

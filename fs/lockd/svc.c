@@ -389,5 +389,6 @@ struct svc_program	nlmsvc_program = {
 	.pg_nvers	= NLM_NRVERS,		/* number of entries in nlmsvc_version */
 	.pg_vers	= nlmsvc_version,	/* version table */
 	.pg_name	= "lockd",		/* service name */
+	.pg_class	= "nfsd",		/* share authentication with nfsd */
 	.pg_stats	= &nlmsvc_stats,	/* stats table */
 };
