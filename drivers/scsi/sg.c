@@ -194,6 +194,7 @@ typedef struct sg_device /* holds the state of each scsi generic device */
     volatile char detached;  /* 0->attached, 1->detached pending removal */
     volatile char exclude;   /* opened for exclusive access */
     char sgdebug;       /* 0->off, 1->sense, 9->dump dev, 10-> all devs */
+    struct device sg_driverfs_dev;
 } Sg_device; /* 36 bytes long on i386 */
 
 
@@ -695,7 +696,7 @@ static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
 
     srp->my_cmdp = SRpnt;
     q = &SRpnt->sr_device->request_queue;
-    SRpnt->sr_request.rq_dev = sdp->i_rdev;
+    SRpnt->sr_request->rq_dev = sdp->i_rdev;
     SRpnt->sr_sense_buffer[0] = 0;
     SRpnt->sr_cmd_len = hp->cmd_len;
     if (! (hp->flags & SG_FLAG_LUN_INHIBIT)) {
@@ -1222,7 +1223,7 @@ static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
     SRpnt->sr_bufflen = 0;
     SRpnt->sr_buffer = NULL;
     SRpnt->sr_underflow = 0;
-    SRpnt->sr_request.rq_dev = mk_kdev(0, 0);  /* "sg" _disowns_ request blk */
+    SRpnt->sr_request->rq_dev = mk_kdev(0, 0);  /* "sg" _disowns_ request blk */
 
     srp->my_cmdp = NULL;
     srp->done = 1;
@@ -1370,6 +1371,29 @@ static int __init sg_def_reserved_size_setup(char *str)
 __setup("sg_def_reserved_size=", sg_def_reserved_size_setup);
 #endif
 
+/* Driverfs file support */
+static ssize_t sg_device_kdev_read(struct device *driverfs_dev, char *page, 
+		size_t count, loff_t off)
+{
+	Sg_device * sdp=list_entry(driverfs_dev, Sg_device, sg_driverfs_dev);
+	return off ? 0 : sprintf(page, "%x\n",sdp->i_rdev.value);
+}
+static struct driver_file_entry sg_device_kdev_file = {
+	name: "kdev",
+	mode: S_IRUGO,
+	show: sg_device_kdev_read,
+};
+
+static ssize_t sg_device_type_read(struct device *driverfs_dev, char *page, 
+		size_t count, loff_t off) 
+{
+	return off ? 0 : sprintf (page, "CHR\n");
+}
+static struct driver_file_entry sg_device_type_file = {
+	name: "type",
+	mode: S_IRUGO,
+	show: sg_device_type_read,
+};
 
 static int sg_attach(Scsi_Device * scsidp)
 {
@@ -1428,6 +1452,18 @@ static int sg_attach(Scsi_Device * scsidp)
     sdp->detached = 0;
     sdp->sg_tablesize = scsidp->host ? scsidp->host->sg_tablesize : 0;
     sdp->i_rdev = mk_kdev(SCSI_GENERIC_MAJOR, k);
+
+    memset(&sdp->sg_driverfs_dev, 0, sizeof(struct device));
+    sprintf(sdp->sg_driverfs_dev.bus_id, "%s:gen",
+	    scsidp->sdev_driverfs_dev.bus_id);
+    sprintf(sdp->sg_driverfs_dev.name, "%sgeneric", 
+	    scsidp->sdev_driverfs_dev.name);
+    sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
+    sdp->sg_driverfs_dev.bus = &scsi_driverfs_bus_type;
+    device_register(&sdp->sg_driverfs_dev);
+    device_create_file(&sdp->sg_driverfs_dev, &sg_device_type_file);
+    device_create_file(&sdp->sg_driverfs_dev, &sg_device_kdev_file);
+
     sdp->de = devfs_register (scsidp->de, "generic", DEVFS_FL_DEFAULT,
                              SCSI_GENERIC_MAJOR, k,
                              S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
@@ -1496,6 +1532,9 @@ static void sg_detach(Scsi_Device * scsidp)
             }
 	    SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d, dirty\n", k));
 	    devfs_unregister (sdp->de);
+	    device_remove_file(&sdp->sg_driverfs_dev,sg_device_type_file.name);
+	    device_remove_file(&sdp->sg_driverfs_dev,sg_device_kdev_file.name);
+	    put_device(&sdp->sg_driverfs_dev);
 	    sdp->de = NULL;
 	    if (NULL == sdp->headfp) {
 		kfree((char *)sdp);
@@ -1505,6 +1544,7 @@ static void sg_detach(Scsi_Device * scsidp)
         else { /* nothing active, simple case */
             SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d\n", k));
 	    devfs_unregister (sdp->de);
+	    put_device(&sdp->sg_driverfs_dev);
 	    kfree((char *)sdp);
 	    sg_dev_arr[k] = NULL;
         }
@@ -1529,9 +1569,16 @@ MODULE_PARM(def_reserved_size, "i");
 MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 
 static int __init init_sg(void) {
+    int rc;
     if (def_reserved_size >= 0)
 	sg_big_buff = def_reserved_size;
-    return scsi_register_device(&sg_template);
+    rc = scsi_register_device(&sg_template);
+    if (!rc) {
+	sg_template.scsi_driverfs_driver.name = (char *)sg_template.tag;
+	sg_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
+	driver_register(&sg_template.scsi_driverfs_driver);
+    }
+    return rc; 
 }
 
 static void __exit exit_sg( void)
@@ -1546,6 +1593,7 @@ static void __exit exit_sg( void)
         sg_dev_arr = NULL;
     }
     sg_template.dev_max = 0;
+    remove_driver(&sg_template.scsi_driverfs_driver);
 }
 
 

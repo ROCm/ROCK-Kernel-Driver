@@ -417,6 +417,8 @@ extern unsigned int scsi_need_isa_buffer;	/* True if some devices need indirecti
 extern volatile int in_scan_scsis;
 extern const unsigned char scsi_command_size[8];
 
+extern struct bus_type scsi_driverfs_bus_type;
+
 
 /*
  * These are the error handling functions defined in scsi_error.c
@@ -566,6 +568,7 @@ struct scsi_device {
         atomic_t                device_active; /* commands checked out for device */
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
 	Scsi_Cmnd *device_queue;	/* queue of SCSI Command structures */
+        Scsi_Cmnd *current_cmnd;	/* currently active command */
 
 	unsigned int id, lun, channel;
 
@@ -622,6 +625,7 @@ struct scsi_device {
 
 	// Flag to allow revalidate to succeed in sd_open
 	int allow_revalidate;
+	struct device sdev_driverfs_dev;
 };
 
 
@@ -662,7 +666,7 @@ struct scsi_request {
 	struct Scsi_Host *sr_host;
 	Scsi_Device *sr_device;
 	Scsi_Cmnd *sr_command;
-	struct request sr_request;	/* A copy of the command we are
+	struct request *sr_request;	/* A copy of the command we are
 				   working on */
 	unsigned sr_bufflen;	/* Size of data buffer */
 	void *sr_buffer;		/* Data buffer */
@@ -773,8 +777,8 @@ struct scsi_cmnd {
 				   transferred less actual number
 				   transferred (0 if not supported) */
 
-	struct request request;	/* A copy of the command we are
-				   working on */
+	struct request *request;	/* The command we are
+				   	   working on */
 
 	unsigned char sense_buffer[SCSI_SENSE_BUFFERSIZE];		/* obtained by REQUEST SENSE
 						 * when CHECK CONDITION is
@@ -855,5 +859,88 @@ struct scsi_cmnd {
 #define SCSI_TRY_RESET_HOST	3
 
 extern int scsi_reset_provider(Scsi_Device *, int);
+
+/**
+ * scsi_activate_tcq - turn on tag command queueing
+ * @SDpnt:	device to turn on TCQ for
+ * @depth:	queue depth
+ *
+ * Notes:
+ *	Eventually, I hope depth would be the maximum depth
+ *	the device could cope with and the real queue depth
+ *	would be adjustable from 0 to depth.
+ **/
+static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
+        request_queue_t *q = &SDpnt->request_queue;
+
+        if(SDpnt->tagged_supported && !blk_queue_tagged(q)) {
+                blk_queue_init_tags(q, depth);
+                SDpnt->tagged_queue = 1;
+        }
+}
+
+/**
+ * scsi_deactivate_tcq - turn off tag command queueing
+ * @SDpnt:	device to turn off TCQ for
+ **/
+static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt) {
+        blk_queue_free_tags(&SDpnt->request_queue);
+        SDpnt->tagged_queue = 0;
+}
+#define MSG_SIMPLE_TAG	0x20
+#define MSG_HEAD_TAG	0x21
+#define MSG_ORDERED_TAG	0x22
+
+#define SCSI_NO_TAG	(-1)    /* identify no tag in use */
+
+/**
+ * scsi_populate_tag_msg - place a tag message in a buffer
+ * @SCpnt:	pointer to the Scsi_Cmnd for the tag
+ * @msg:	pointer to the area to place the tag
+ *
+ * Notes:
+ *	designed to create the correct type of tag message for the 
+ *	particular request.  Returns the size of the tag message.
+ *	May return 0 if TCQ is disabled for this device.
+ **/
+static inline int scsi_populate_tag_msg(Scsi_Cmnd *SCpnt, char *msg) {
+        struct request *req = SCpnt->request;
+
+        if(!blk_rq_tagged(req))
+                return 0;
+    
+        if(req->flags & REQ_BARRIER)
+                *msg++ = MSG_ORDERED_TAG;
+        else
+                *msg++ = MSG_SIMPLE_TAG;
+
+        *msg++ = SCpnt->request->tag;
+
+        return 2;
+}
+
+/**
+ * scsi_find_tag - find a tagged command by device
+ * @SDpnt:	pointer to the ScSI device
+ * @tag:	the tag number
+ *
+ * Notes:
+ *	Only works with tags allocated by the generic blk layer.
+ **/
+static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
+
+        struct request *req;
+
+        if(tag == SCSI_NO_TAG)
+                /* single command, look in space */
+                return SDpnt->current_cmnd;
+
+        req = blk_queue_find_tag(&SDpnt->request_queue, tag);
+
+        if(req == NULL)
+                return NULL;
+
+        return (Scsi_Cmnd *)req->special;
+}
 
 #endif

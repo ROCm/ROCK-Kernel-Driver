@@ -12,6 +12,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/major.h>
+#include <linux/device.h>
 
 enum {
 /* These three have identical behaviour; use the second one if DOS fdisk gets
@@ -62,6 +63,7 @@ struct hd_struct {
 	unsigned long nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
 	int number;                     /* stupid old code wastes space  */
+	struct device hd_driverfs_dev;  /* support driverfs hiearchy     */
 };
 
 #define GENHD_FL_REMOVABLE  1
@@ -80,6 +82,7 @@ struct gendisk {
 	struct block_device_operations *fops;
 
 	devfs_handle_t *de_arr;         /* one per physical disc */
+	struct device **driverfs_dev_arr;/* support driverfs hierarchy */
 	char *flags;                    /* one per physical disc */
 };
 
@@ -241,6 +244,7 @@ char *disk_name (struct gendisk *hd, int minor, char *buf);
 
 extern void devfs_register_partitions (struct gendisk *dev, int minor,
 				       int unregister);
+extern void driverfs_remove_partitions (struct gendisk *hd, int minor);
 
 static inline unsigned int disk_index (kdev_t dev)
 {

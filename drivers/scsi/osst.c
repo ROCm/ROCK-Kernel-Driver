@@ -270,7 +270,7 @@ static int osst_chk_result(OS_Scsi_Tape * STp, Scsi_Request * SRpnt)
 /* Wakeup from interrupt */
 static void osst_sleep_done (Scsi_Cmnd * SCpnt)
 {
-	unsigned int dev = TAPE_NR(SCpnt->request.rq_dev);
+	unsigned int dev = TAPE_NR(SCpnt->request->rq_dev);
 	OS_Scsi_Tape * STp;
 
 	if (os_scsi_tapes && (STp = os_scsi_tapes[dev])) {
@@ -285,13 +285,13 @@ static void osst_sleep_done (Scsi_Cmnd * SCpnt)
 		}
 		else
 			(STp->buffer)->midlevel_result = SCpnt->result;
-		SCpnt->request.rq_status = RQ_SCSI_DONE;
+		SCpnt->request->rq_status = RQ_SCSI_DONE;
 		(STp->buffer)->last_SRpnt = SCpnt->sc_request;
 
 #if DEBUG
 		STp->write_pending = 0;
 #endif
-		complete(SCpnt->request.waiting);
+		complete(SCpnt->request->waiting);
 	}
 #if DEBUG
 	else if (debugging)
@@ -313,7 +313,7 @@ static	Scsi_Request * osst_do_scsi(Scsi_Request *SRpnt, OS_Scsi_Tape *STp,
 #endif
 	if (SRpnt == NULL) {
 		if ((SRpnt = scsi_allocate_request(STp->device)) == NULL) {
-			printk(KERN_ERR "osst%d:E: Can't get SCSI request.\n", TAPE_NR(STp->devt));
+			printk(KERN_ERR "osst%d:E: Can't get SCSI request->\n", TAPE_NR(STp->devt));
 			if (signal_pending(current))
 				(STp->buffer)->syscall_result = (-EINTR);
 			else
@@ -336,15 +336,15 @@ static	Scsi_Request * osst_do_scsi(Scsi_Request *SRpnt, OS_Scsi_Tape *STp,
 		bp = (STp->buffer)->b_data;
 	SRpnt->sr_data_direction = direction;
 	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_request.waiting = &(STp->wait);
-	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
-	SRpnt->sr_request.rq_dev = STp->devt;
+	SRpnt->sr_request->waiting = &(STp->wait);
+	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
+	SRpnt->sr_request->rq_dev = STp->devt;
 
 	scsi_do_req(SRpnt, (void *)cmd, bp, bytes, osst_sleep_done, timeout, retries);
 
 	if (do_wait) {
-		wait_for_completion(SRpnt->sr_request.waiting);
-		SRpnt->sr_request.waiting = NULL;
+		wait_for_completion(SRpnt->sr_request->waiting);
+		SRpnt->sr_request->waiting = NULL;
 		STp->buffer->syscall_result = osst_chk_result(STp, SRpnt);
 #ifdef OSST_INJECT_ERRORS
 		if (STp->buffer->syscall_result == 0 &&
@@ -377,7 +377,7 @@ static void osst_write_behind_check(OS_Scsi_Tape *STp)
 		STp->nbr_finished++;
 #endif
 	wait_for_completion(&(STp->wait));
-	(STp->buffer)->last_SRpnt->sr_request.waiting = NULL;
+	(STp->buffer)->last_SRpnt->sr_request->waiting = NULL;
 
 	STp->buffer->syscall_result = osst_chk_result(STp, STp->buffer->last_SRpnt);
 
