@@ -1668,7 +1668,7 @@ static int idedisk_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	struct block_device *bdev = inode->i_bdev;
-	return generic_ide_ioctl(bdev, cmd, arg);
+	return generic_ide_ioctl(file, bdev, cmd, arg);
 }
 
 static int idedisk_media_changed(struct gendisk *disk)

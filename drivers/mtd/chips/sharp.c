@@ -4,7 +4,7 @@
  * Copyright 2000,2001 David A. Schleef <ds@schleef.org>
  *           2000,2001 Lineo, Inc.
  *
- * $Id: sharp.c,v 1.13 2004/07/12 14:06:34 dwmw2 Exp $
+ * $Id: sharp.c,v 1.14 2004/08/09 13:19:43 dwmw2 Exp $
  *
  * Devices supported:
  *   LH28F016SCT Symmetrical block flash memory, 2Mx8
@@ -425,8 +425,7 @@ static int sharp_erase(struct mtd_info *mtd, struct erase_info *instr)
 	}
 
 	instr->state = MTD_ERASE_DONE;
-	if(instr->callback)
-		instr->callback(instr);
+	mtd_erase_callback(instr);
 
 	return 0;
 }

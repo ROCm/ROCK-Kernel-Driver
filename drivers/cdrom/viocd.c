@@ -199,7 +199,7 @@ static int viocd_blk_ioctl(struct inode *inode, struct file *file,
 		unsigned cmd, unsigned long arg)
 {
 	struct disk_info *di = inode->i_bdev->bd_disk->private_data;
-	return cdrom_ioctl(&di->viocd_info, inode, cmd, arg);
+	return cdrom_ioctl(file, &di->viocd_info, inode, cmd, arg);
 }
 
 static int viocd_blk_media_changed(struct gendisk *disk)

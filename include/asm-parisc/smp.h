@@ -52,11 +52,18 @@ extern void smp_send_reschedule(int cpu);
 extern unsigned long cpu_present_mask;
 
 #define smp_processor_id()	(current_thread_info()->cpu)
-#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
 
 #endif /* CONFIG_SMP */
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 #define ANY_PROC_ID		0xFF		/* Any processor magic marker */
+static inline int __cpu_disable (void) {
+  return 0;
+}
+static inline void __cpu_die (unsigned int cpu) {
+  while(1)
+    ;
+}
+extern int __cpu_up (unsigned int cpu);
 
 #endif /*  __ASM_SMP_H */

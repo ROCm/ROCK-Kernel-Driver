@@ -173,3 +173,9 @@ EXPORT_SYMBOL(__moddi3);
 extern void $$dyncall(void);
 EXPORT_SYMBOL($$dyncall);
 #endif
+
+#ifdef CONFIG_DISCONTIGMEM
+#include <asm/mmzone.h>
+EXPORT_SYMBOL(node_data);
+EXPORT_SYMBOL(pfnnid_map);
+#endif

@@ -33,8 +33,6 @@
 
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
-static long nfs_file_fcntl(int fd, unsigned int cmd,
-			unsigned long arg, struct file *filp);
 static int nfs_file_open(struct inode *, struct file *);
 static int nfs_file_release(struct inode *, struct file *);
 static int  nfs_file_mmap(struct file *, struct vm_area_struct *);
@@ -43,6 +41,7 @@ static ssize_t nfs_file_read(struct kiocb *, char __user *, size_t, loff_t);
 static ssize_t nfs_file_write(struct kiocb *, const char __user *, size_t, loff_t);
 static int  nfs_file_flush(struct file *);
 static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
+static int nfs_check_flags(int flags);
 
 struct file_operations nfs_file_operations = {
 	.llseek		= remote_llseek,
@@ -57,7 +56,7 @@ struct file_operations nfs_file_operations = {
 	.fsync		= nfs_fsync,
 	.lock		= nfs_lock,
 	.sendfile	= nfs_file_sendfile,
-	.fcntl		= nfs_file_fcntl,
+	.check_flags	= nfs_check_flags,
 };
 
 struct inode_operations nfs_file_inode_operations = {
@@ -71,26 +70,12 @@ struct inode_operations nfs_file_inode_operations = {
 # define IS_SWAPFILE(inode)	(0)
 #endif
 
-#define nfs_invalid_flags	(O_APPEND | O_DIRECT)
-
-/*
- * Check for special cases that NFS doesn't support, and
- * pass the rest to the generic fcntl function.
- */
-static long
-nfs_file_fcntl(int fd, unsigned int cmd,
-		unsigned long arg, struct file *filp)
+static int nfs_check_flags(int flags)
 {
-	switch (cmd) {
-	case F_SETFL:
-		if ((filp->f_flags & nfs_invalid_flags) == nfs_invalid_flags)
-			return -EINVAL;
-		break;
-	default:
-		break;
-	}
+	if (flags & (O_APPEND | O_DIRECT))
+		return -EINVAL;
 
-	return generic_file_fcntl(fd, cmd, arg, filp);
+	return 0;
 }
 
 /*
@@ -101,10 +86,11 @@ nfs_file_open(struct inode *inode, struct file *filp)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
 	int (*open)(struct inode *, struct file *);
-	int res = 0;
+	int res;
 
-	if ((filp->f_flags & nfs_invalid_flags) == nfs_invalid_flags)
-		return -EINVAL;
+	res = nfs_check_flags(filp->f_flags);
+	if (!res)
+		return res;
 
 	lock_kernel();
 	/* Do NFSv4 open() call */

@@ -28,11 +28,15 @@
 #include "cirrus.h"
 
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Driver for the Cirrus PD6729 PCI-PCMCIA bridge");
+MODULE_AUTHOR("Jun Komuro <komurojun@mbn.nifty.com>");
 
 #define MAX_SOCKETS 2
 
-/* simple helper functions */
-/* External clock time, in nanoseconds.  120 ns = 8.33 MHz */
+/*
+ * simple helper functions
+ * External clock time, in nanoseconds.  120 ns = 8.33 MHz
+ */
 #define to_cycles(ns)	((ns)/120)
 
 static spinlock_t port_lock = SPIN_LOCK_UNLOCKED;
@@ -225,8 +229,10 @@ static int pd6729_get_status(struct pcmcia_socket *sock, u_int *value)
 		*value |= SS_DETECT;
 	}
 
-	/* IO cards have a different meaning of bits 0,1 */
-	/* Also notice the inverse-logic on the bits */
+	/*
+	 * IO cards have a different meaning of bits 0,1
+	 * Also notice the inverse-logic on the bits
+	 */
 	if (indirect_read(socket, I365_INTCTL) & I365_PC_IOCARD) {
 		/* IO card */
 		if (!(status & I365_CS_STSCHG))
@@ -268,8 +274,10 @@ static int pd6729_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 	state->io_irq   = 0;
 	state->csc_mask = 0;
 
-	/* First the power status of the socket */
-	/* PCTRL - Power Control Register */
+	/*
+	 * First the power status of the socket
+	 * PCTRL - Power Control Register
+	 */
 	reg = indirect_read(socket, I365_POWER);
 
 	if (reg & I365_PWR_AUTO)
@@ -294,8 +302,10 @@ static int pd6729_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 			state->Vpp = 120;
 	}
 
-	/* Now the IO card, RESET flags and IO interrupt */
-	/* IGENC, Interrupt and General Control */
+	/*
+	 * Now the IO card, RESET flags and IO interrupt
+	 * IGENC, Interrupt and General Control
+	 */
 	reg = indirect_read(socket, I365_INTCTL);
 
 	if ((reg & I365_PC_RESET) == 0)
@@ -306,8 +316,10 @@ static int pd6729_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 	/* Set the IRQ number */
 	state->io_irq = socket->socket.pci_irq;
 
-	/* Card status change */
-	/* CSCICR, Card Status Change Interrupt Configuration */
+	/*
+	 * Card status change
+	 * CSCICR, Card Status Change Interrupt Configuration
+	 */
 	reg = indirect_read(socket, I365_CSCINT);
 
 	if (reg & I365_CSC_DETECT)
@@ -610,9 +622,11 @@ static int __devinit pd6729_pci_probe(struct pci_dev *dev, const struct pci_devi
 	printk(KERN_INFO "pd6729: Cirrus PD6729 PCI to PCMCIA Bridge at 0x%lx on irq %d\n",
 		pci_resource_start(dev, 0), dev->irq);
 	printk(KERN_INFO "pd6729: configured as a %d socket device.\n", MAX_SOCKETS);
- 	/* Since we have no memory BARs some firmware we may not
- 	   have had PCI_COMMAND_MEM enabled, yet the device needs
- 	   it. */
+ 	/*
+	 * Since we have no memory BARs some firmware we may not
+	 * have had PCI_COMMAND_MEM enabled, yet the device needs
+	 * it.
+	 */
 	pci_read_config_byte(dev, PCI_COMMAND, &configbyte);
 	if (!(configbyte & PCI_COMMAND_MEMORY)) {
 		printk(KERN_DEBUG "pd6729: Enabling PCI_COMMAND_MEMORY.\n");

@@ -30,7 +30,7 @@
 #define smp_mb__before_clear_bit()      smp_mb()
 #define smp_mb__after_clear_bit()       smp_mb()
 
-static __inline__ void set_bit(int nr, void * address)
+static __inline__ void set_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -43,7 +43,7 @@ static __inline__ void set_bit(int nr, void * address)
 	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 }
 
-static __inline__ void __set_bit(int nr, void * address)
+static __inline__ void __set_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -53,7 +53,7 @@ static __inline__ void __set_bit(int nr, void * address)
 	*addr |= mask;
 }
 
-static __inline__ void clear_bit(int nr, void * address)
+static __inline__ void clear_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -66,7 +66,7 @@ static __inline__ void clear_bit(int nr, void * address)
 	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 }
 
-static __inline__ void __clear_bit(unsigned long nr, volatile void * address)
+static __inline__ void __clear_bit(unsigned long nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -76,7 +76,7 @@ static __inline__ void __clear_bit(unsigned long nr, volatile void * address)
 	*addr &= ~mask;
 }
 
-static __inline__ void change_bit(int nr, void * address)
+static __inline__ void change_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -89,7 +89,7 @@ static __inline__ void change_bit(int nr, void * address)
 	atomic_spin_unlock_irqrestore(ATOMIC_HASH(addr), flags);
 }
 
-static __inline__ void __change_bit(int nr, void * address)
+static __inline__ void __change_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -99,7 +99,7 @@ static __inline__ void __change_bit(int nr, void * address)
 	*addr ^= mask;
 }
 
-static __inline__ int test_and_set_bit(int nr, void * address)
+static __inline__ int test_and_set_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -116,7 +116,7 @@ static __inline__ int test_and_set_bit(int nr, void * address)
 	return oldbit;
 }
 
-static __inline__ int __test_and_set_bit(int nr, void * address)
+static __inline__ int __test_and_set_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -130,7 +130,7 @@ static __inline__ int __test_and_set_bit(int nr, void * address)
 	return oldbit;
 }
 
-static __inline__ int test_and_clear_bit(int nr, void * address)
+static __inline__ int test_and_clear_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -147,7 +147,7 @@ static __inline__ int test_and_clear_bit(int nr, void * address)
 	return oldbit;
 }
 
-static __inline__ int __test_and_clear_bit(int nr, void * address)
+static __inline__ int __test_and_clear_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -161,7 +161,7 @@ static __inline__ int __test_and_clear_bit(int nr, void * address)
 	return oldbit;
 }
 
-static __inline__ int test_and_change_bit(int nr, void * address)
+static __inline__ int test_and_change_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -178,7 +178,7 @@ static __inline__ int test_and_change_bit(int nr, void * address)
 	return oldbit;
 }
 
-static __inline__ int __test_and_change_bit(int nr, void * address)
+static __inline__ int __test_and_change_bit(int nr, volatile unsigned long * address)
 {
 	unsigned long mask;
 	unsigned long *addr = (unsigned long *) address;
@@ -192,10 +192,10 @@ static __inline__ int __test_and_change_bit(int nr, void * address)
 	return oldbit;
 }
 
-static __inline__ int test_bit(int nr, const void *address)
+static __inline__ int test_bit(int nr, const volatile unsigned long *address)
 {
 	unsigned long mask;
-	unsigned long *addr = (unsigned long *) address;
+	const unsigned long *addr = (const unsigned long *)address;
 	
 	addr += (nr >> SHIFT_PER_LONG);
 	mask = 1L << CHOP_SHIFTCOUNT(nr);
@@ -322,7 +322,7 @@ static __inline__ int fls(int x)
  * unlikely to be set. It's guaranteed that at least one of the 140
  * bits is cleared.
  */
-static inline int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(const unsigned long *b)
 {
 #ifndef __LP64__
 	if (unlikely(b[0]))
@@ -354,9 +354,9 @@ static inline int sched_find_first_bit(unsigned long *b)
 #define find_first_zero_bit(addr, size) \
 	find_next_zero_bit((addr), (size), 0)
 
-static __inline__ unsigned long find_next_zero_bit(void * addr, unsigned long size, unsigned long offset)
+static __inline__ unsigned long find_next_zero_bit(const void * addr, unsigned long size, unsigned long offset)
 {
-	unsigned long * p = ((unsigned long *) addr) + (offset >> SHIFT_PER_LONG);
+	const unsigned long * p = ((unsigned long *) addr) + (offset >> SHIFT_PER_LONG);
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
 	unsigned long tmp;
 
@@ -389,9 +389,9 @@ found_middle:
 	return result + ffz(tmp);
 }
 
-static __inline__ unsigned long find_next_bit(unsigned long *addr, unsigned long size, unsigned long offset)
+static __inline__ unsigned long find_next_bit(const unsigned long *addr, unsigned long size, unsigned long offset)
 {
-	unsigned long *p = addr + (offset >> 6);
+	const unsigned long *p = addr + (offset >> 6);
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
 	unsigned long tmp;
 
@@ -446,15 +446,15 @@ found_middle:
  * disabling interrupts.
  */
 #ifdef __LP64__
-#define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x38, addr)
-#define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x38, addr)
-#define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x38, addr)
-#define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x38, addr)
+#define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x38, (unsigned long *)addr)
+#define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x38, (unsigned long *)addr)
+#define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x38, (unsigned long *)addr)
+#define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x38, (unsigned long *)addr)
 #else
-#define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x18, addr)
-#define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x18, addr)
-#define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x18, addr)
-#define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x18, addr)
+#define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x18, (unsigned long *)addr)
+#define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x18, (unsigned long *)addr)
+#define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x18, (unsigned long *)addr)
+#define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x18, (unsigned long *)addr)
 #endif
 
 #endif	/* __KERNEL__ */

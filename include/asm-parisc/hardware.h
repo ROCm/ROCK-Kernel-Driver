@@ -97,6 +97,7 @@ struct bc_module {
 #define HPHW_IOA       12
 #define HPHW_BRIDGE    13
 #define HPHW_FABRIC    14
+#define HPHW_MC	       15
 #define HPHW_FAULTY    31
 
 

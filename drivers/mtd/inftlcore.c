@@ -7,7 +7,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * Author: David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: inftlcore.c,v 1.16 2004/07/12 12:34:58 dwmw2 Exp $
+ * $Id: inftlcore.c,v 1.17 2004/08/09 13:56:48 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -893,7 +893,7 @@ extern char inftlmountrev[];
 
 int __init init_inftl(void)
 {
-	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.16 $, "
+	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.17 $, "
 		"inftlmount.c %s\n", inftlmountrev);
 
 	return register_mtd_blktrans(&inftl_tr);

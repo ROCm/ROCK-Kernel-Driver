@@ -735,7 +735,7 @@ static int idescsi_ide_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	struct block_device *bdev = inode->i_bdev;
-	return generic_ide_ioctl(bdev, cmd, arg);
+	return generic_ide_ioctl(file, bdev, cmd, arg);
 }
 
 static struct block_device_operations idescsi_ops = {
