@@ -751,9 +751,10 @@ page_ok:
 			flush_dcache_page(page);
 
 		/*
-		 * Mark the page accessed if we read the beginning.
+		 * When (part of) the same page is read multiple times
+		 * in succession, only mark it as accessed the first time.
 		 */
-		if (!offset)
+		if (ra.prev_page != index)
 			mark_page_accessed(page);
 
 		/*

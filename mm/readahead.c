@@ -35,6 +35,7 @@ void
 file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
 {
 	ra->ra_pages = mapping->backing_dev_info->ra_pages;
+	ra->prev_page = -1;
 }
 
 /*
@@ -431,6 +432,7 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 
 	if (newsize == 0 || (ra->flags & RA_FLAG_INCACHE)) {
 		newsize = 1;
+		ra->prev_page = offset;
 		goto out;	/* No readahead or file already in cache */
 	}
 	/*
