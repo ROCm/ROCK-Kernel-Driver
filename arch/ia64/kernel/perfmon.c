@@ -1678,7 +1678,6 @@ static int
 pfm_fasync(int fd, struct file *filp, int on)
 {
 	pfm_context_t *ctx;
-	unsigned long flags;
 	int ret;
 
 	if (PFM_IS_FILE(filp) == 0) {
@@ -1691,18 +1690,20 @@ pfm_fasync(int fd, struct file *filp, int on)
 		printk(KERN_ERR "perfmon: pfm_fasync NULL ctx [%d]\n", current->pid);
 		return -EBADF;
 	}
-
-
-	PROTECT_CTX(ctx, flags);
-
+	/*
+	 * we cannot mask interrupts during this call because this may
+	 * may go to sleep if memory is not readily avalaible.
+	 *
+	 * We are protected from the conetxt disappearing by the get_fd()/put_fd()
+	 * done in caller. Serialization of this function is ensured by caller.
+	 */
 	ret = pfm_do_fasync(fd, filp, ctx, on);
+
 
 	DPRINT(("pfm_fasync called on ctx_fd=%d on=%d async_queue=%p ret=%d\n",
 		fd,
 		on,
 		ctx->ctx_async_queue, ret));
-
-	UNPROTECT_CTX(ctx, flags);
 
 	return ret;
 }
