@@ -2732,6 +2732,7 @@ MODULE_LICENSE("Dual BSD/GPL");
  * Driver host template.
  */
 static struct scsi_host_template sym2_template = {
+	.module			= THIS_MODULE,
 	.name			= "sym53c8xx",
 #if 0
 	.detect			= sym53c8xx_detect,
@@ -2831,6 +2832,9 @@ static int __devinit sym2_probe(struct pci_dev *pdev,
 {
 	sym_device sym_dev;
 	sym_nvram nvram;
+
+	memset(&sym_dev, 0, sizeof(sym_dev));
+	memset(&nvram, 0, sizeof(nvram));
 
 	sym_dev.host_id = SYM_SETUP_HOST_ID;
 	if (sym53c8xx_pci_init(pdev, &sym_dev))
