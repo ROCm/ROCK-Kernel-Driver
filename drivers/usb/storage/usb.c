@@ -364,17 +364,6 @@ static int usb_stor_control_thread(void * __us)
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
 
-		/* handle requests for EVPD, which most USB devices do
-		 * not support */
-		else if((us->srb->cmnd[0] == INQUIRY) &&
-				(us->srb->cmnd[1] & 0x1)) {
-				US_DEBUGP("Faking INQUIRY command for EVPD\n");
-				memcpy(us->srb->sense_buffer, 
-				       usb_stor_sense_invalidCDB, 
-				       sizeof(usb_stor_sense_invalidCDB));
-				us->srb->result = SAM_STAT_CHECK_CONDITION;
-		}
-
 		/* Handle those devices which need us to fake 
 		 * their inquiry data */
 		else if ((us->srb->cmnd[0] == INQUIRY) &&
