@@ -71,8 +71,11 @@ match(const struct sk_buff *skb,
 	DEBUGP("master's name = %s , info->name = %s\n", 
 		exp->expectant->helper->name, info->name);
 
-	ret ^= !strncmp(exp->expectant->helper->name, info->name, 
-	                strlen(exp->expectant->helper->name));
+	if (info->name[0] == '\0')
+		ret ^= 1;
+	else
+		ret ^= !strncmp(exp->expectant->helper->name, info->name, 
+		                strlen(exp->expectant->helper->name));
 out_unlock:
 	READ_UNLOCK(&ip_conntrack_lock);
 	return ret;
@@ -92,10 +95,6 @@ static int check(const char *tablename,
 	if (matchsize != IPT_ALIGN(sizeof(struct ipt_helper_info)))
 		return 0;
 
-	/* verify that we actually should match anything */
-	if ( strlen(info->name) == 0 )
-		return 0;
-	
 	return 1;
 }
 
