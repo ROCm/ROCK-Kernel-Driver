@@ -839,6 +839,7 @@ waveartist_intr(int irq, void *dev_id, struct pt_regs *regs)
 	wavnc_info *devc = (wavnc_info *)dev_id;
 	int	   irqstatus, status;
 
+	spin_lock(&waveartist_lock);
 	irqstatus = inb(devc->hw.io_base + IRQSTAT);
 	status    = inb(devc->hw.io_base + STATR);
 
@@ -870,6 +871,7 @@ waveartist_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (irqstatus & 0x2)
 		// We do not use SB mode natively...
 		printk(KERN_WARNING "waveartist: Unexpected SB interrupt...\n");
+	spin_unlock(&waveartist_lock);
 }
 
 /* -------------------------------------------------------------------------
@@ -1523,8 +1525,7 @@ vnc_volume_slider(wavnc_info *devc)
 
 	*CSR_TIMER1_LOAD = 0x00ffffff;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&waveartist_lock, flags);
 
 	outb(0xFF, 0x201);
 	*CSR_TIMER1_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_DIV1;
@@ -1534,7 +1535,7 @@ vnc_volume_slider(wavnc_info *devc)
 
 	*CSR_TIMER1_CNTL = 0;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&waveartist_lock,flags);
 	
 	volume = 0x00ffffff - *CSR_TIMER1_VALUE;
 
