@@ -526,13 +526,17 @@ static u32 pcnet32_get_link(struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
     unsigned long flags;
-    int r = 1;
+    int r;
 
+    spin_lock_irqsave(&lp->lock, flags);
     if (lp->mii) {
-	spin_lock_irqsave(&lp->lock, flags);
 	r = mii_link_ok(&lp->mii_if);
-	spin_unlock_irqrestore(&lp->lock, flags);
+    } else {
+	ulong ioaddr = dev->base_addr;	/* card base I/O address */
+	r = (lp->a.read_bcr(ioaddr, 4) != 0xc0);
     }
+    spin_unlock_irqrestore(&lp->lock, flags);
+
     return r;
 }
 
