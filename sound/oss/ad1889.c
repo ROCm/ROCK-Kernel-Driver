@@ -37,7 +37,7 @@
 #include <linux/soundcard.h>
 #include <linux/ac97_codec.h>
 #include <linux/sound.h>
-#include <linux/wrapper.h>
+#include <linux/interrupt.h>
 
 #include <asm/delay.h>
 #include <asm/io.h>
@@ -749,7 +749,7 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 static int ad1889_open(struct inode *inode, struct file *file)
 {
 	/* check minor; only support /dev/dsp atm */
-	if (MINOR(inode->i_rdev) != 3)
+	if (minor(inode->i_rdev) != 3)
 		return -ENXIO;
 	
 	file->private_data = ad1889_dev;
@@ -782,7 +782,7 @@ static struct file_operations ad1889_fops = {
 /************************* /dev/mixer interfaces ************************ */
 static int ad1889_mixer_open(struct inode *inode, struct file *file)
 {
-	if (ad1889_dev->ac97_codec->dev_mixer != MINOR(inode->i_rdev))
+	if (ad1889_dev->ac97_codec->dev_mixer != minor(inode->i_rdev))
 		return -ENODEV;
 
 	file->private_data = ad1889_dev->ac97_codec;
