@@ -135,7 +135,6 @@ void udbg_init_debug_lpar(void)
 int find_udbg_vterm(void)
 {
 	struct device_node *stdout_node;
-	phandle *stdout_ph;
 	u32 *termno;
 	char *name;
 	int found = 0;
@@ -143,10 +142,10 @@ int find_udbg_vterm(void)
 	/* find the boot console from /chosen/stdout */
 	if (!of_chosen)
 		return 0;
-	stdout_ph = (phandle *)get_property(of_chosen, "linux,stdout-package", NULL);
-	if (stdout_ph == NULL)
+	name = (char *)get_property(of_chosen, "linux,stdout-path", NULL);
+	if (name == NULL)
 		return 0;
-	stdout_node = of_find_node_by_phandle(*stdout_ph);
+	stdout_node = of_find_node_by_path(name);
 	if (!stdout_node)
 		return 0;
 
