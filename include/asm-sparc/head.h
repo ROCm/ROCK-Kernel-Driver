@@ -22,8 +22,8 @@
 /* Data/text faults. Defaults to sun4c version at boot time. */
 #define SPARC_TFAULT rd %psr, %l0; rd %wim, %l3; b sun4c_fault; mov 1, %l7;
 #define SPARC_DFAULT rd %psr, %l0; rd %wim, %l3; b sun4c_fault; mov 0, %l7;
-#define SRMMU_TFAULT rd %psr, %l0; rd %wim, %l3; b C_LABEL(srmmu_fault); mov 1, %l7;
-#define SRMMU_DFAULT rd %psr, %l0; rd %wim, %l3; b C_LABEL(srmmu_fault); mov 0, %l7;
+#define SRMMU_TFAULT rd %psr, %l0; rd %wim, %l3; b srmmu_fault; mov 1, %l7;
+#define SRMMU_DFAULT rd %psr, %l0; rd %wim, %l3; b srmmu_fault; mov 0, %l7;
 
 /* This is for traps we should NEVER get. */
 #define BAD_TRAP(num) \
@@ -41,17 +41,17 @@
 
 /* Software trap for Linux system calls. */
 #define LINUX_SYSCALL_TRAP \
-        sethi %hi(C_LABEL(sys_call_table)), %l7; \
-        or %l7, %lo(C_LABEL(sys_call_table)), %l7; \
+        sethi %hi(sys_call_table), %l7; \
+        or %l7, %lo(sys_call_table), %l7; \
         b linux_sparc_syscall; \
         rd %psr, %l0;
 
 /* Software trap for SunOS4.1.x system calls. */
 #define SUNOS_SYSCALL_TRAP \
         rd %psr, %l0; \
-        sethi %hi(C_LABEL(sunos_sys_table)), %l7; \
+        sethi %hi(sunos_sys_table), %l7; \
         b linux_sparc_syscall; \
-        or %l7, %lo(C_LABEL(sunos_sys_table)), %l7;
+        or %l7, %lo(sunos_sys_table), %l7;
 
 #define SUNOS_NO_SYSCALL_TRAP \
         b sunos_syscall; \
@@ -80,8 +80,8 @@
 
 /* Software trap for Sparc-netbsd system calls. */
 #define NETBSD_SYSCALL_TRAP \
-        sethi %hi(C_LABEL(sys_call_table)), %l7; \
-        or %l7, %lo(C_LABEL(sys_call_table)), %l7; \
+        sethi %hi(sys_call_table), %l7; \
+        or %l7, %lo(sys_call_table), %l7; \
         b bsd_syscall; \
         rd %psr, %l0;
 

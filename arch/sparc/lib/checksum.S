@@ -13,7 +13,6 @@
  *	BSD4.4 portable checksum routine
  */
 
-#include <asm/cprefix.h>
 #include <asm/errno.h>
 
 #define CSUM_BIGCHUNK(buf, offset, sum, t0, t1, t2, t3, t4, t5)	\
@@ -104,8 +103,8 @@ csum_partial_fix_alignment:
 	/* The common case is to get called with a nicely aligned
 	 * buffer of size 0x20.  Follow the code path for that case.
 	 */
-	.globl	C_LABEL(csum_partial)
-C_LABEL(csum_partial):			/* %o0=buf, %o1=len, %o2=sum */
+	.globl	csum_partial
+csum_partial:			/* %o0=buf, %o1=len, %o2=sum */
 	andcc	%o0, 0x7, %g0				! alignment problems?
 	bne	csum_partial_fix_alignment		! yep, handle it
 	 sethi	%hi(cpte - 8), %g7			! prepare table jmp ptr
@@ -142,8 +141,8 @@ cpte:	bne	csum_partial_end_cruft			! yep, handle it
 cpout:	retl						! get outta here
 	 mov	%o2, %o0				! return computed csum
 
-	.globl C_LABEL(__csum_partial_copy_start), C_LABEL(__csum_partial_copy_end)
-C_LABEL(__csum_partial_copy_start):
+	.globl __csum_partial_copy_start, __csum_partial_copy_end
+__csum_partial_copy_start:
 
 /* Work around cpp -rob */
 #define ALLOC #alloc
@@ -329,8 +328,8 @@ cc_dword_align:
 	 * out of you, game over, lights out.
 	 */
 	.align	8
-	.globl	C_LABEL(__csum_partial_copy_sparc_generic)
-C_LABEL(__csum_partial_copy_sparc_generic):
+	.globl	__csum_partial_copy_sparc_generic
+__csum_partial_copy_sparc_generic:
 					/* %o0=src, %o1=dest, %g1=len, %g7=sum */
 	xor	%o0, %o1, %o4		! get changing bits
 	andcc	%o4, 3, %g0		! check for mismatched alignment
@@ -472,7 +471,7 @@ ccslow:	cmp	%g1, 0
 4:	addcc	%g7, %g5, %g7
 	retl	
 	 addx	%g0, %g7, %o0
-C_LABEL(__csum_partial_copy_end):
+__csum_partial_copy_end:
 
 /* We do these strange calculations for the csum_*_from_user case only, ie.
  * we only bother with faults on loads... */
@@ -551,7 +550,7 @@ C_LABEL(__csum_partial_copy_end):
         mov     %i5, %o0
         mov     %i7, %o1
         mov	%i4, %o2
-        call    C_LABEL(lookup_fault)
+        call    lookup_fault
 	 mov	%g7, %i4
 	cmp	%o0, 2
 	bne	1f	
@@ -561,7 +560,7 @@ C_LABEL(__csum_partial_copy_end):
 	 mov	%i0, %o1
 	mov	%i1, %o0
 5:
-	call	C_LABEL(__memcpy)
+	call	__memcpy
 	 mov	%i2, %o2
 	tst	%o0
 	bne,a	2f
@@ -570,7 +569,7 @@ C_LABEL(__csum_partial_copy_end):
 2:
 	mov	%i1, %o0
 6:
-	call	C_LABEL(__bzero)
+	call	__bzero
 	 mov	%i3, %o1
 1:
 	ld	[%sp + 168], %o2		! struct_ptr of parent
