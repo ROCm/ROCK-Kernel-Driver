@@ -323,7 +323,7 @@ error:
 	return err;
 }
 
-int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, void __user *arg)
+int scsi_cmd_ioctl(struct file *file, struct gendisk *bd_disk, unsigned int cmd, void __user *arg)
 {
 	request_queue_t *q;
 	struct request *rq;
