@@ -466,6 +466,18 @@ static int validate_sp(unsigned long sp, struct task_struct *p,
 	    && sp <= stack_page + THREAD_SIZE - nbytes)
 		return 1;
 
+#ifdef CONFIG_IRQSTACKS
+	stack_page = (unsigned long) hardirq_ctx[task_cpu(p)];
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
+		return 1;
+
+	stack_page = (unsigned long) softirq_ctx[task_cpu(p)];
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
+		return 1;
+#endif
+
 	return 0;
 }
 
