@@ -130,7 +130,7 @@ static int  nsc_ircc_hard_xmit_sir(struct sk_buff *skb, struct net_device *dev);
 static int  nsc_ircc_hard_xmit_fir(struct sk_buff *skb, struct net_device *dev);
 static int  nsc_ircc_pio_write(int iobase, __u8 *buf, int len, int fifo_size);
 static void nsc_ircc_dma_xmit(struct nsc_ircc_cb *self, int iobase);
-static void nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 baud);
+static __u8 nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 baud);
 static void nsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int  nsc_ircc_is_receiving(struct nsc_ircc_cb *self);
 static int  nsc_ircc_read_dongle_id (int iobase);
@@ -948,17 +948,19 @@ static void nsc_ircc_change_dongle_speed(int iobase, int speed, int dongle_id)
  *
  *    Change the speed of the device
  *
+ * This function *must* be called with irq off and spin-lock.
  */
-static void nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 speed)
+static __u8 nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 speed)
 {
 	struct net_device *dev = self->netdev;
 	__u8 mcr = MCR_SIR;
 	int iobase; 
 	__u8 bank;
+	__u8 ier;                  /* Interrupt enable register */
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), speed=%d\n", speed);
 
-	ASSERT(self != NULL, return;);
+	ASSERT(self != NULL, return 0;);
 
 	iobase = self->io.fir_base;
 
@@ -1033,18 +1035,21 @@ static void nsc_ircc_change_speed(struct nsc_ircc_cb *self, __u32 speed)
 	if (speed > 115200) {
 		/* Install FIR xmit handler */
 		dev->hard_start_xmit = nsc_ircc_hard_xmit_fir;
-		outb(IER_SFIF_IE, iobase+IER);
+		ier = IER_SFIF_IE;
 		nsc_ircc_dma_receive(self);
 	} else {
 		/* Install SIR xmit handler */
 		dev->hard_start_xmit = nsc_ircc_hard_xmit_sir;
-		outb(IER_RXHDL_IE, iobase+IER);
+		ier = IER_RXHDL_IE;
 	}
+	/* Set our current interrupt mask */
+	outb(ier, iobase+IER);
     	
 	/* Restore BSR */
 	outb(bank, iobase+BSR);
-	netif_wake_queue(dev);
-	
+
+	/* Make sure interrupt handlers keep the proper interrupt mask */
+	return(ier);
 }
 
 /*
@@ -1069,20 +1074,36 @@ static int nsc_ircc_hard_xmit_sir(struct sk_buff *skb, struct net_device *dev)
 
 	netif_stop_queue(dev);
 		
+	/* Make sure tests *& speed change are atomic */
+	spin_lock_irqsave(&self->lock, flags);
+	
 	/* Check if we need to change the speed */
 	speed = irda_get_next_speed(skb);
 	if ((speed != self->io.speed) && (speed != -1)) {
-		/* Check for empty frame */
+		/* Check for empty frame. */
 		if (!skb->len) {
-			nsc_ircc_change_speed(self, speed); 
+			/* If we just sent a frame, we get called before
+			 * the last bytes get out (because of the SIR FIFO).
+			 * If this is the case, let interrupt handler change
+			 * the speed itself... Jean II */
+			if (self->io.direction == IO_RECV) {
+				nsc_ircc_change_speed(self, speed); 
+				/* TODO : For SIR->SIR, the next packet
+				 * may get corrupted - Jean II */
+				netif_wake_queue(dev);
+			} else {
+				self->new_speed = speed;
+				/* Queue will be restarted after speed change
+				 * to make sure packets gets through the
+				 * proper xmit handler - Jean II */
+			}
+			spin_unlock_irqrestore(&self->lock, flags);
 			dev_kfree_skb(skb);
 			return 0;
 		} else
 			self->new_speed = speed;
 	}
 
-	spin_lock_irqsave(&self->lock, flags);
-	
 	/* Save current bank */
 	bank = inb(iobase+BSR);
 	
@@ -1121,19 +1142,37 @@ static int nsc_ircc_hard_xmit_fir(struct sk_buff *skb, struct net_device *dev)
 
 	netif_stop_queue(dev);
 	
+	/* Make sure tests *& speed change are atomic */
+	spin_lock_irqsave(&self->lock, flags);
+
 	/* Check if we need to change the speed */
 	speed = irda_get_next_speed(skb);
 	if ((speed != self->io.speed) && (speed != -1)) {
-		/* Check for empty frame */
+		/* Check for empty frame. */
 		if (!skb->len) {
-			nsc_ircc_change_speed(self, speed); 
+			/* If we are currently transmitting, defer to
+			 * interrupt handler. - Jean II */
+			if(self->tx_fifo.len == 0) {
+				nsc_ircc_change_speed(self, speed); 
+				netif_wake_queue(dev);
+			} else {
+				self->new_speed = speed;
+				/* Keep queue stopped :
+				 * the speed change operation may change the
+				 * xmit handler, and we want to make sure
+				 * the next packet get through the proper
+				 * Tx path, so block the Tx queue until
+				 * the speed change has been done.
+				 * Jean II */
+			}
+			spin_unlock_irqrestore(&self->lock, flags);
 			dev_kfree_skb(skb);
 			return 0;
-		} else
+		} else {
+			/* Change speed after current frame */
 			self->new_speed = speed;
+		}
 	}
-
-	spin_lock_irqsave(&self->lock, flags);
 
 	/* Save current bank */
 	bank = inb(iobase+BSR);
@@ -1204,8 +1243,9 @@ static int nsc_ircc_hard_xmit_fir(struct sk_buff *skb, struct net_device *dev)
 		nsc_ircc_dma_xmit(self, iobase);
 	}
  out:
-	/* Not busy transmitting anymore if window is not full */
-	if (self->tx_fifo.free < MAX_TX_WINDOW)
+	/* Not busy transmitting anymore if window is not full,
+	 * and if we don't need to change speed */
+	if ((self->tx_fifo.free < MAX_TX_WINDOW) && (self->new_speed == 0))
 		netif_wake_queue(self->netdev);
 
 	/* Restore bank register */
@@ -1329,12 +1369,6 @@ static int nsc_ircc_dma_xmit_complete(struct nsc_ircc_cb *self)
 		self->stats.tx_packets++;
 	}
 
-	/* Check if we need to change the speed */
-	if (self->new_speed) {
-		nsc_ircc_change_speed(self, self->new_speed);
-		self->new_speed = 0;
-	}
-
 	/* Finished with this frame, so prepare for next */
 	self->tx_fifo.ptr++;
 	self->tx_fifo.len--;
@@ -1351,8 +1385,9 @@ static int nsc_ircc_dma_xmit_complete(struct nsc_ircc_cb *self)
 		self->tx_fifo.tail = self->tx_buff.head;
 	}
 
-	/* Make sure we have room for more frames */
-	if (self->tx_fifo.free < MAX_TX_WINDOW) {
+	/* Make sure we have room for more frames and
+	 * that we don't need to change speed */
+	if ((self->tx_fifo.free < MAX_TX_WINDOW) && (self->new_speed == 0)) {
 		/* Not busy transmitting anymore */
 		/* Tell the network layer, that we can accept more frames */
 		netif_wake_queue(self->netdev);
@@ -1629,24 +1664,25 @@ static void nsc_ircc_sir_interrupt(struct nsc_ircc_cb *self, int eir)
 	}
 	/* Check if transmission has completed */
 	if (eir & EIR_TXEMP_EV) {
-		/* Check if we need to change the speed? */
+		/* Turn around and get ready to receive some data */
+		self->io.direction = IO_RECV;
+		self->ier = IER_RXHDL_IE;
+		/* Check if we need to change the speed?
+		 * Need to be after self->io.direction to avoid race with
+		 * nsc_ircc_hard_xmit_sir() - Jean II */
 		if (self->new_speed) {
 			IRDA_DEBUG(2, __FUNCTION__ "(), Changing speed!\n");
-			nsc_ircc_change_speed(self, self->new_speed);
+			self->ier = nsc_ircc_change_speed(self,
+							  self->new_speed);
 			self->new_speed = 0;
+			netif_wake_queue(self->netdev);
 
 			/* Check if we are going to FIR */
 			if (self->io.speed > 115200) {
-				/* Should wait for status FIFO interrupt */
-				self->ier = IER_SFIF_IE;
-
 				/* No need to do anymore SIR stuff */
 				return;
 			}
 		}
-		/* Turn around and get ready to receive some data */
-		self->io.direction = IO_RECV;
-		self->ier = IER_RXHDL_IE;
 	}
 
 	/* Rx FIFO threshold or timeout */
@@ -1705,19 +1741,36 @@ static void nsc_ircc_fir_interrupt(struct nsc_ircc_cb *self, int iobase,
 		}
 	} else if (eir & EIR_DMA_EV) {
 		/* Finished with all transmissions? */
-		if (nsc_ircc_dma_xmit_complete(self)) {		
-			/* Check if there are more frames to be transmitted */
-			if (irda_device_txqueue_empty(self->netdev)) {
-				/* Prepare for receive */
-				nsc_ircc_dma_receive(self);
-			
-				self->ier = IER_SFIF_IE;
+		if (nsc_ircc_dma_xmit_complete(self)) {
+			if(self->new_speed != 0) {
+				/* As we stop the Tx queue, the speed change
+				 * need to be done when the Tx fifo is
+				 * empty. Ask for a Tx done interrupt */
+				self->ier = IER_TXEMP_IE;
+			} else {
+				/* Check if there are more frames to be
+				 * transmitted */
+				if (irda_device_txqueue_empty(self->netdev)) {
+					/* Prepare for receive */
+					nsc_ircc_dma_receive(self);
+					self->ier = IER_SFIF_IE;
+				} else
+					WARNING(__FUNCTION__ "(), potential "
+						"Tx queue lockup !\n");
 			}
 		} else {
 			/*  Not finished yet, so interrupt on DMA again */
 			self->ier = IER_DMA_IE;
 		}
+	} else if (eir & EIR_TXEMP_EV) {
+		/* The Tx FIFO has totally drained out, so now we can change
+		 * the speed... - Jean II */
+		self->ier = nsc_ircc_change_speed(self, self->new_speed);
+		self->new_speed = 0;
+		netif_wake_queue(self->netdev);
+		/* Note : nsc_ircc_change_speed() restarted Rx fifo */
 	}
+
 	outb(bank, iobase+BSR);
 }
 
