@@ -856,7 +856,9 @@ int swsusp_suspend(void)
 	local_irq_disable();
 	save_processor_state();
 	error = swsusp_arch_suspend();
+	/* Restore control flow magically appears here */
 	restore_processor_state();
+	restore_highmem();
 	local_irq_enable();
 	return error;
 }
@@ -876,8 +878,13 @@ int swsusp_resume(void)
 {
 	int error;
 	local_irq_disable();
+	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
 	error = swsusp_arch_resume();
+	/* Code below is only ever reached in case of failure. Otherwise
+	 * execution continues at place where swsusp_arch_suspend was called
+         */
+	BUG_ON(!error);
 	restore_processor_state();
 	restore_highmem();
 	local_irq_enable();
