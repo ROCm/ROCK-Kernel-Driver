@@ -1,3 +1,5 @@
+#ifndef _PPC64_HVCALL_H
+#define _PPC64_HVCALL_H
 
 #define H_Success	0
 #define H_Busy		1	/* Hardware busy -- retry later */
@@ -138,3 +140,4 @@ long plpar_hcall_4out(unsigned long opcode,
 		      unsigned long *out3,
 		      unsigned long *out4);
 
+#endif /* _PPC64_HVCALL_H */

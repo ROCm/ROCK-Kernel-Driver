@@ -1,6 +1,6 @@
-#ifndef __ARCH_I386_PERCPU__
-#define __ARCH_I386_PERCPU__
+#ifndef __ARCH_PPC64_PERCPU__
+#define __ARCH_PPC64_PERCPU__
 
 #include <asm-generic/percpu.h>
 
-#endif /* __ARCH_I386_PERCPU__ */
+#endif /* __ARCH_PPC64_PERCPU__ */

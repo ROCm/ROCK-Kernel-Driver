@@ -1,6 +1,8 @@
 /*
- * include/asm-ppc/serial.h
+ * include/asm-ppc64/serial.h
  */
+#ifndef _PPC64_SERIAL_H
+#define _PPC64_SERIAL_H
 
 #include <linux/config.h>
 
@@ -124,3 +126,5 @@
 	EXTRA_SERIAL_PORT_DEFNS		\
 	HUB6_SERIAL_PORT_DFNS		\
 	MCA_SERIAL_PORT_DFNS
+
+#endif /* _PPC64_SERIAL_H */
