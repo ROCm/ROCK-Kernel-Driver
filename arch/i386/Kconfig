@@ -345,11 +345,11 @@ config X86_OOSTORE
 
 config X86_PREFETCH
 	bool
-	depends on MPENTIUMIII || MP4
+	depends on MPENTIUMIII || MPENTIUM4
 	default y
 
 config X86_SSE2
-        bool
+	bool
 	depends on MK8 || MPENTIUM4
 	default y
 
