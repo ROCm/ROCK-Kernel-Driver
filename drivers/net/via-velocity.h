@@ -1792,7 +1792,6 @@ struct velocity_info {
 	u8 mCAMmask[(MCAM_SIZE / 8)];
 
 	spinlock_t lock;
-	spinlock_t xmit_lock;
 
 	int wol_opts;
 	u8 wol_passwd[6];
