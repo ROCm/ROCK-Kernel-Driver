@@ -1441,14 +1441,7 @@ struct super_operations ntfs_sops = {
 	clear_inode:	ntfs_clear_big_inode,	/* VFS: Called when an inode is
 						   removed from memory. */
 	umount_begin:	NULL,		/* Forced umount. */
-	/*
-	 * These are NFSd support functions but NTFS is a standard fs so
-	 * shouldn't need to implement these manually. At least we can try
-	 * without and if it doesn't work in some way we can always implement
-	 * something here.
-	 */
-	fh_to_dentry:	NULL,		/* Get dentry for given file handle. */
-	dentry_to_fh:	NULL,		/* Get file handle for given dentry. */
+
 	show_options:	ntfs_show_options, /* Show mount options in proc. */
 };
 
