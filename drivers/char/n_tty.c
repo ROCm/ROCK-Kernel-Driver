@@ -50,9 +50,6 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 
-#define IS_CONSOLE_DEV(dev)	(kdev_val(dev) == __mkdev(TTY_MAJOR,0))
-#define IS_SYSCONS_DEV(dev)	(kdev_val(dev) == __mkdev(TTYAUX_MAJOR,1))
-
 /* number of characters left in xmit buffer before select has we have room */
 #define WAKEUP_CHARS 256
 
@@ -951,6 +948,8 @@ static inline int copy_from_read_buf(struct tty_struct *tty,
 	return retval;
 }
 
+extern ssize_t redirected_tty_write(struct file *,const char *,size_t,loff_t *);
+
 static ssize_t read_chan(struct tty_struct *tty, struct file *file,
 			 unsigned char *buf, size_t nr)
 {
@@ -975,9 +974,7 @@ do_it_again:
 	/* NOTE: not yet done after every sleep pending a thorough
 	   check of the logic of this change. -- jlc */
 	/* don't stop on /dev/console */
-	if (!IS_CONSOLE_DEV(file->f_dentry->d_inode->i_rdev) &&
-	    !IS_SYSCONS_DEV(file->f_dentry->d_inode->i_rdev) &&
-	    current->tty == tty) {
+	if (file->f_op->write != redirected_tty_write && current->tty == tty) {
 		if (tty->pgrp <= 0)
 			printk("read_chan: tty->pgrp <= 0!\n");
 		else if (current->pgrp != tty->pgrp) {
@@ -1168,9 +1165,7 @@ static ssize_t write_chan(struct tty_struct * tty, struct file * file,
 	ssize_t retval = 0;
 
 	/* Job control check -- must be done at start (POSIX.1 7.1.1.4). */
-	if (L_TOSTOP(tty) && 
-	    !IS_CONSOLE_DEV(file->f_dentry->d_inode->i_rdev) &&
-	    !IS_SYSCONS_DEV(file->f_dentry->d_inode->i_rdev)) {
+	if (L_TOSTOP(tty) && file->f_op->write != redirected_tty_write) {
 		retval = tty_check_change(tty);
 		if (retval)
 			return retval;

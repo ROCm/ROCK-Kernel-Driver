@@ -80,16 +80,6 @@ typedef struct {
 
 #define mk_kdev(major, minor)	((kdev_t) { __mkdev(major,minor) } )
 
-/*
- * The "values" are just _cookies_, usable for 
- * internal equality comparisons and for things
- * like NFS filehandle conversion.
- */
-static inline unsigned int kdev_val(kdev_t dev)
-{
-	return dev.value;
-}
-
 #define NODEV		(mk_kdev(0,0))
 
 /* Mask off the high bits for now.. */
