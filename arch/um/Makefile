@@ -5,7 +5,8 @@
 
 ARCH_DIR = arch/um
 OS := $(shell uname -s)
-#We require it or things break.
+# We require bash because the vmlinux link and loader script cpp use bash
+# features.
 SHELL := /bin/bash
 
 filechk_gen_header = $<
