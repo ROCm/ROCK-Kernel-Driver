@@ -367,6 +367,16 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	unsigned long timeout;
 	int rtn = 0;
 
+	/* check if the device is still usable */
+	if (unlikely(cmd->device->sdev_state == SDEV_DEL)) {
+		/* in SDEV_DEL we error all commands. DID_NO_CONNECT
+		 * returns an immediate error upwards, and signals
+		 * that the device is no longer present */
+		cmd->result = DID_NO_CONNECT << 16;
+		scsi_done(cmd);
+		/* return 0 (because the command has been processed) */
+		goto out;
+	}
 	/* Assign a unique nonzero serial_number. */
 	/* XXX(hch): this is racy */
 	if (++serial_number == 0)
@@ -893,7 +903,7 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
  */
 int scsi_device_get(struct scsi_device *sdev)
 {
-	if (test_bit(SDEV_DEL, &sdev->sdev_state))
+	if (sdev->sdev_state == SDEV_DEL)
 		return -ENXIO;
 	if (!get_device(&sdev->sdev_gendev))
 		return -ENXIO;
@@ -1015,7 +1025,7 @@ int scsi_device_cancel(struct scsi_device *sdev, int recovery)
 	struct list_head *lh, *lh_sf;
 	unsigned long flags;
 
-	set_bit(SDEV_CANCEL, &sdev->sdev_state);
+	sdev->sdev_state = SDEV_CANCEL;
 
 	spin_lock_irqsave(&sdev->list_lock, flags);
 	list_for_each_entry(scmd, &sdev->cmd_list, list) {

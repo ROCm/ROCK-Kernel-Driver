@@ -524,7 +524,7 @@ static int smsc_ircc_present(unsigned int fir_base, unsigned int sir_base)
 
 	return 0;
  out3:
-	release_region(fir_base, SMSC_IRCC2_FIR_CHIP_IO_EXTENT);
+	release_region(sir_base, SMSC_IRCC2_SIR_CHIP_IO_EXTENT);
  out2:
 	release_region(fir_base, SMSC_IRCC2_FIR_CHIP_IO_EXTENT);
  out1:

@@ -911,7 +911,9 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(BUS_RESET_SETTLE_TIME);
+		spin_lock_irqsave(scmd->device->host->host_lock, flags);
 		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
+		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 	}
 
 	return rtn;
@@ -940,7 +942,9 @@ static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(HOST_RESET_SETTLE_TIME);
+		spin_lock_irqsave(scmd->device->host->host_lock, flags);
 		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
+		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 	}
 
 	return rtn;
@@ -1608,7 +1612,7 @@ int scsi_error_handler(void *data)
  *
  * Returns:     Nothing
  *
- * Lock status: No locks are assumed held.
+ * Lock status: Host lock must be held.
  *
  * Notes:       This only needs to be called if the reset is one which
  *		originates from an unknown location.  Resets originated
@@ -1622,7 +1626,7 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
 {
 	struct scsi_device *sdev;
 
-	shost_for_each_device(sdev, shost) {
+	__shost_for_each_device(sdev, shost) {
 		if (channel == sdev->channel) {
 			sdev->was_reset = 1;
 			sdev->expecting_cc_ua = 1;
@@ -1642,7 +1646,7 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
  *
  * Returns:     Nothing
  *
- * Lock status: No locks are assumed held.
+ * Lock status: Host lock must be held
  *
  * Notes:       This only needs to be called if the reset is one which
  *		originates from an unknown location.  Resets originated
@@ -1656,7 +1660,7 @@ void scsi_report_device_reset(struct Scsi_Host *shost, int channel, int target)
 {
 	struct scsi_device *sdev;
 
-	shost_for_each_device(sdev, shost) {
+	__shost_for_each_device(sdev, shost) {
 		if (channel == sdev->channel &&
 		    target == sdev->id) {
 			sdev->was_reset = 1;

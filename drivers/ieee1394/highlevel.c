@@ -98,7 +98,7 @@ void *hpsb_create_hostinfo(struct hpsb_highlevel *hl, struct hpsb_host *host,
 		return NULL;
 	}
 
-	hi = kmalloc(sizeof(*hi) + data_size, GFP_KERNEL);
+	hi = kmalloc(sizeof(*hi) + data_size, GFP_ATOMIC);
 	if (!hi)
 		return NULL;
 
