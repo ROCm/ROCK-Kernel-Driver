@@ -303,7 +303,7 @@ static int ea_write(struct inode *ip, struct jfs_ea_list *ealist, int size,
 	}
 
 	ea->flag = DXD_EXTENT;
-	DXDsize(ea, ealist->size);
+	DXDsize(ea, le32_to_cpu(ealist->size));
 	DXDlength(ea, nblocks);
 	DXDaddress(ea, blkno);
 
@@ -342,7 +342,8 @@ static int ea_read_inline(struct inode *ip, struct jfs_ea_list *ealist)
 	/* Sanity Check */
 	if ((sizeDXD(&ji->ea) > sizeof (ji->i_inline_ea)))
 		return -EIO;
-	if (((struct jfs_ea_list *) &ji->i_inline_ea)->size != ea_size)
+	if (le32_to_cpu(((struct jfs_ea_list *) &ji->i_inline_ea)->size)
+	    != ea_size)
 		return -EIO;
 
 	memcpy(ealist, ji->i_inline_ea, ea_size);
