@@ -221,13 +221,14 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 	local_irq_disable();
 	if (retval != 1) {
 		static int count = 100;
-		while (count) {
+		if (count) {
 			count--;
 			printk(retval
 				? "irq event %d: bogus retval mask %x\n"
 				: "irq %d: nobody cared!\n",
 				irq, 
 				retval);
+			dump_stack();
 		}
 	}
 
