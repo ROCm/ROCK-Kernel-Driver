@@ -91,7 +91,7 @@ static void ixdp2x00_irq_unmask(unsigned int irq)
 	unsigned long dummy;
 	static struct slowport_cfg old_cfg;
 
-#ifdef CONFGI_ARCH_IXDP2400
+#ifdef CONFIG_ARCH_IXDP2400
 	if (machine_is_ixdp2400())
 		ixp2000_acquire_slowport(&slowport_cpld_cfg, &old_cfg);
 #endif
