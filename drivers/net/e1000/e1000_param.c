@@ -319,8 +319,6 @@ e1000_validate_option(int *value, struct e1000_option *opt)
 	return -1;
 }
 
-#define LIST_LEN(l) (sizeof(l) / sizeof(l[0]))
-
 static void e1000_check_fiber_options(struct e1000_adapter *adapter);
 static void e1000_check_copper_options(struct e1000_adapter *adapter);
 
@@ -403,7 +401,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 			name: "Flow Control",
 			err:  "reading default settings from EEPROM",
 			def:  e1000_fc_default,
-			arg: { l: { nr: LIST_LEN(fc_list), p: fc_list }}
+			arg: { l: { nr: ARRAY_SIZE(fc_list), p: fc_list }}
 		};
 
 		int fc = FlowControl[bd];
@@ -489,7 +487,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 			name: "Speed",
 			err:  "parameter ignored",
 			def:  0,
-			arg: { l: { nr: LIST_LEN(speed_list), p: speed_list }}
+			arg: { l: { nr: ARRAY_SIZE(speed_list), p: speed_list }}
 		};
 
 		speed = Speed[bd];
@@ -504,7 +502,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 			name: "Duplex",
 			err:  "parameter ignored",
 			def:  0,
-			arg: { l: { nr: LIST_LEN(dplx_list), p: dplx_list }}
+			arg: { l: { nr: ARRAY_SIZE(dplx_list), p: dplx_list }}
 		};
 
 		dplx = Duplex[bd];
@@ -556,7 +554,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 			name: "Autoneg",
 			err:  "parameter ignored",
 			def:  AUTONEG_ADV_DEFAULT,
-			arg: { l: { nr: LIST_LEN(an_list), p: an_list }}
+			arg: { l: { nr: ARRAY_SIZE(an_list), p: an_list }}
 		};
 
 		int an = AutoNeg[bd];
