@@ -29,7 +29,7 @@ extern int kernel_thread_proc(void *data);
 extern void syscall_segv(int sig);
 extern int current_pid(void);
 extern unsigned long alloc_stack(int order, int atomic);
-extern int do_signal(int error);
+extern int do_signal(void);
 extern int is_stack_fault(unsigned long sp);
 extern unsigned long segv(unsigned long address, unsigned long ip, 
 			  int is_write, int is_user, void *sc);

@@ -159,9 +159,10 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 	return(0);
 }
 
-int do_signal(int error)
+int do_signal(void)
 {
-	return(kern_do_signal(&current->thread.regs, NULL, error));
+	return(kern_do_signal(&current->thread.regs, NULL,
+			      PT_REGS_SYSCALL_RET(&current->thread.regs)));
 }
 
 /*
