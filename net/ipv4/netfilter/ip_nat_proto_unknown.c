@@ -29,12 +29,13 @@ static int unknown_unique_tuple(struct ip_conntrack_tuple *tuple,
 	return 0;
 }
 
-static void
-unknown_manip_pkt(struct iphdr *iph, size_t len,
+static int
+unknown_manip_pkt(struct sk_buff **pskb,
+		  unsigned int hdroff,
 		  const struct ip_conntrack_manip *manip,
 		  enum ip_nat_manip_type maniptype)
 {
-	return;
+	return 1;
 }
 
 static unsigned int

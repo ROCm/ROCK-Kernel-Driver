@@ -368,23 +368,9 @@ static int tda9887_attach(struct i2c_adapter *adap, int addr, int kind)
 
 static int tda9887_probe(struct i2c_adapter *adap)
 {
-	int rc;
-
-	switch (adap->id) {
-	case I2C_ALGO_BIT | I2C_HW_B_BT848:
-	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
-	case I2C_ALGO_SAA7134:
-		printk("tda9887: probing %s i2c adapter [id=0x%x]\n",
-		       adap->dev.name,adap->id);
-		rc = i2c_probe(adap, &addr_data, tda9887_attach);
-		break;
-	default:
-		printk("tda9887: ignoring %s i2c adapter [id=0x%x]\n",
-		       adap->dev.name,adap->id);
-		rc = 0;
-		/* nothing */
-	}
-	return rc;
+	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
+		return i2c_probe(adap, &addr_data, tda9887_attach);
+	return 0;
 }
 
 static int tda9887_detach(struct i2c_client *client)

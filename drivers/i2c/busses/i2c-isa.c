@@ -40,6 +40,7 @@ static struct i2c_algorithm isa_algorithm = {
 static struct i2c_adapter isa_adapter = {
 	.owner		= THIS_MODULE,
 	.id		= I2C_ALGO_ISA | I2C_HW_ISA,
+	.class          = I2C_ADAP_CLASS_SMBUS,
 	.algo		= &isa_algorithm,
 	.dev		= {
 		.name	= "ISA main adapter",

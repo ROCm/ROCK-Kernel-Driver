@@ -62,6 +62,8 @@
 #define RAW_LINES            640
 #define RAW_BPL             1024
 
+#define UNSET (-1U)
+
 /* ---------------------------------------------------------- */
 
 struct bttv_tvnorm 
@@ -276,7 +278,6 @@ struct bttv {
 	struct i2c_algo_bit_data   i2c_algo;
 	struct i2c_client          i2c_client;
 	int                        i2c_state, i2c_rc;
-	struct i2c_client         *i2c_clients[I2C_CLIENTS_MAX];
 
 	/* video4linux (1) */
 	struct video_device video_dev;

@@ -707,7 +707,9 @@ static void free_fw_chain(struct ip_fw *volatile* chainptr)
 		ftmp = *chainptr;
 		*chainptr = ftmp->fw_next;
 		kfree(ftmp);
-		MOD_DEC_USE_COUNT;
+		/* We will block in cleanup's unregister sockopt if unloaded,
+		   so this is safe. */
+		module_put(THIS_MODULE);
 	}
 	WRITE_UNLOCK(&ip_fw_lock);
 }
@@ -717,6 +719,10 @@ static void free_fw_chain(struct ip_fw *volatile* chainptr)
 static int insert_in_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,int len)
 {
 	struct ip_fw *ftmp;
+
+	/* Are we unloading now?  We will block on nf_unregister_sockopt */
+	if (!try_module_get(THIS_MODULE))
+		return ENOPROTOOPT;
 
 	ftmp = kmalloc( sizeof(struct ip_fw), GFP_KERNEL );
 	if ( ftmp == NULL )
@@ -748,7 +754,6 @@ static int insert_in_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	ftmp->fw_next = *chainptr;
        	*chainptr=ftmp;
 	WRITE_UNLOCK(&ip_fw_lock);
-	MOD_INC_USE_COUNT;
 	return(0);
 }
 
@@ -757,6 +762,10 @@ static int append_to_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	struct ip_fw *ftmp;
 	struct ip_fw *chtmp=NULL;
 	struct ip_fw *volatile chtmp_prev=NULL;
+
+	/* Are we unloading now?  We will block on nf_unregister_sockopt */
+	if (!try_module_get(THIS_MODULE))
+		return ENOPROTOOPT;
 
 	ftmp = kmalloc( sizeof(struct ip_fw), GFP_KERNEL );
 	if ( ftmp == NULL )
@@ -796,7 +805,6 @@ static int append_to_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	else
         	*chainptr=ftmp;
 	WRITE_UNLOCK(&ip_fw_lock);
-	MOD_INC_USE_COUNT;
 	return(0);
 }
 
@@ -869,7 +877,9 @@ static int del_from_chain(struct ip_fw *volatile*chainptr, struct ip_fw *frwl)
 	}
 	WRITE_UNLOCK(&ip_fw_lock);
 	if (was_found) {
-		MOD_DEC_USE_COUNT;
+		/* We will block in cleanup's unregister sockopt if unloaded,
+		   so this is safe. */
+		module_put(THIS_MODULE);
 		return 0;
 	} else
 		return(EINVAL);

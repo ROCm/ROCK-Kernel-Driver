@@ -440,8 +440,8 @@ void neigh_destroy(struct neighbour *neigh)
 
 	if (!neigh->dead) {
 		printk(KERN_WARNING
-		       "Destroying alive neighbour %p from %08lx\n", neigh,
-		       *(((unsigned long *)&neigh) - 1));
+		       "Destroying alive neighbour %p\n", neigh);
+		dump_stack();
 		return;
 	}
 

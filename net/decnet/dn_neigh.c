@@ -202,7 +202,7 @@ static int dn_neigh_output_packet(struct sk_buff *skb)
 	struct net_device *dev = neigh->dev;
 	char mac_addr[ETH_ALEN];
 
-	dn_dn2eth(mac_addr, rt->rt_saddr);
+	dn_dn2eth(mac_addr, rt->rt_local_src);
 	if (!dev->hard_header || dev->hard_header(skb, dev, ntohs(skb->protocol), neigh->ha, mac_addr, skb->len) >= 0)
 		return neigh->ops->queue_xmit(skb);
 
@@ -692,48 +692,23 @@ out_kfree:
 	goto out;
 }
 
-static int dn_seq_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *seq  = (struct seq_file *)file->private_data;
-
-	kfree(seq->private);
-	seq->private = NULL;
-	return seq_release(inode, file);
-}
-
 static struct file_operations dn_neigh_seq_fops = {
 	.open		= dn_neigh_seq_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= dn_seq_release,
+	.release	= seq_release_private,
 };
 
-static int __init dn_neigh_proc_init(void)
-{
-	int rc = 0;
-	struct proc_dir_entry *p = create_proc_entry("decnet_neigh", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &dn_neigh_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
-}
-
-#else
-static int __init dn_neigh_proc_init(void)
-{
-	return 0;
-}
 #endif
 
 void __init dn_neigh_init(void)
 {
 	neigh_table_init(&dn_neigh_table);
-
-	dn_neigh_proc_init();
+	proc_net_fops_create("decnet_neigh", S_IRUGO, &dn_neigh_seq_fops);
 }
 
 void __exit dn_neigh_cleanup(void)
 {
+	proc_net_remove("decnet_neigh");
 	neigh_table_clear(&dn_neigh_table);
 }

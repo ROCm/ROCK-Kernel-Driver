@@ -130,7 +130,7 @@ match(const struct sk_buff *skb,
        		return 0;
        }
 
-       route=skb->data+ptr;
+       route = (struct ipv6_rt_hdr *) (skb->data + ptr);
 
        DEBUGP("IPv6 RT LEN %u %u ", hdrlen, route->hdrlen);
        DEBUGP("TYPE %04X ", route->type);

@@ -340,7 +340,7 @@ static int tda7432_attach(struct i2c_adapter *adap, int addr, int kind)
 
 static int tda7432_probe(struct i2c_adapter *adap)
 {
-	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848))
+	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, tda7432_attach);
 	return 0;
 }
