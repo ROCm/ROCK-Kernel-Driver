@@ -37,8 +37,6 @@
  * SCSI interface function Prototypes
  */
 
-static int adpt_proc_info(char *buffer, char **start, off_t offset,
-		  int length, int inode, int inout);
 static int adpt_detect(Scsi_Host_Template * sht);
 static int adpt_queue(Scsi_Cmnd * cmd, void (*cmdcomplete) (Scsi_Cmnd *));
 static int adpt_abort(Scsi_Cmnd * cmd);

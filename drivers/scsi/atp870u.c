@@ -2657,33 +2657,14 @@ int atp870u_set_info(char *buffer, int length, struct Scsi_Host *HBAptr)
 }
 
 #define BLS buffer + len + size
-int atp870u_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
+int atp870u_proc_info(struct Scsi_Host *HBAptr, char *buffer, char **start, off_t offset, int length, int inout)
 {
-	struct Scsi_Host *HBAptr;
 	static u8 buff[512];
-	int i;
 	int size = 0;
 	int len = 0;
 	off_t begin = 0;
 	off_t pos = 0;
 
-	HBAptr = NULL;
-	for (i = 0; i < MAX_ATP; i++) {
-		if ((HBAptr = atp_host[i]) != NULL) {
-			if (HBAptr->host_no == hostno) {
-				break;
-			}
-			HBAptr = NULL;
-		}
-	}
-
-	if (HBAptr == NULL) {
-		size += sprintf(BLS, "Can't find adapter for host number %d\n", hostno);
-		len += size;
-		pos = begin + len;
-		size = 0;
-		goto stop_output;
-	}
 	if (inout == TRUE) {	/* Has data been written to the file? */
 		return (atp870u_set_info(buffer, length, HBAptr));
 	}
@@ -2701,9 +2682,7 @@ int atp870u_proc_info(char *buffer, char **start, off_t offset, int length, int 
 	size += sprintf(BLS, "                   IRQ: %d\n", HBAptr->irq);
 	len += size;
 	pos = begin + len;
-	size = 0;
 
-stop_output:
 	*start = buffer + (offset - begin);	/* Start of wanted data */
 	len -= (offset - begin);	/* Start slop */
 	if (len > length) {

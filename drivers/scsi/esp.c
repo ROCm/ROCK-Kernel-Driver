@@ -1386,8 +1386,8 @@ static int esp_host_info(struct esp *esp, char *ptr, off_t offset, int len)
 }
 
 /* ESP proc filesystem code. */
-static int esp_proc_info(char *buffer, char **start, off_t offset,
-			 int length, int hostno, int inout)
+static int esp_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			 int length, int inout)
 {
 	struct esp *esp;
 
@@ -1395,7 +1395,7 @@ static int esp_proc_info(char *buffer, char **start, off_t offset,
 		return -EINVAL; /* not yet */
 
 	for_each_esp(esp) {
-		if (esp->ehost->host_no == hostno)
+		if (esp->ehost == host)
 			break;
 	}
 	if (!esp)

@@ -79,8 +79,8 @@ static int proc_scsi_read(char *buffer, char **start, off_t offset,
 		n = generic_proc_info(buffer, start, offset, length,
 				      shost->hostt->info, shost);
 	else
-		n = (shost->hostt->proc_info(buffer, start, offset,
-					   length, shost->host_no, 0));
+		n = shost->hostt->proc_info(shost, buffer, start, offset,
+					   length, 0);
 
 	*eof = (n < length);
 	return n;
@@ -104,8 +104,7 @@ static int proc_scsi_write(struct file *file, const char *buf,
 		ret = -EFAULT;
 		if (copy_from_user(page, buf, count))
 			goto out;
-		ret = shost->hostt->proc_info(page, &start, 0, count,
-					      shost->host_no, 1);
+		ret = shost->hostt->proc_info(shost, page, &start, 0, count, 1);
 	}
 out:
 	free_page((unsigned long)page);

@@ -2392,21 +2392,6 @@ mega_8_to_40ld(mraid_inquiry *inquiry, mega_inquiry3 *enquiry3,
 		enquiry3->pdrv_state[i] = inquiry->pdrv_info.pdrv_state[i];
 }
 
-
-/*
- * megaraid_proc_info()
- *
- * Returns data to be displayed in /proc/scsi/megaraid/X
- */
-static int
-megaraid_proc_info(char *buffer, char **start, off_t offset, int length,
-		int host_no, int inout)
-{
-	*start = buffer;
-	return 0;
-}
-
-
 /*
  * Release the controller's resources
  */
@@ -5379,7 +5364,6 @@ free_local_pdev(struct pci_dev *pdev)
 
 static Scsi_Host_Template driver_template = {
 	.name =				"MegaRAID",
-	.proc_info =			megaraid_proc_info,
 	.detect =			megaraid_detect,
 	.release =			megaraid_release,
 	.info =				megaraid_info,

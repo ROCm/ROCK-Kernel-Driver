@@ -353,17 +353,12 @@ cumanascsi_2_set_proc_info(struct Scsi_Host *host, char *buffer, int length)
  *	      inout  - 0 for reading, 1 for writing.
  * Returns  : length of data written to buffer.
  */
-int cumanascsi_2_proc_info (char *buffer, char **start, off_t offset,
-			    int length, int host_no, int inout)
+int cumanascsi_2_proc_info (struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			    int length, int inout)
 {
 	int pos, begin;
-	struct Scsi_Host *host;
 	struct cumanascsi2_info *info;
 	Scsi_Device *scd;
-
-	host = scsi_host_hn_get(host_no);
-	if (!host)
-		return 0;
 
 	if (inout == 1)
 		return cumanascsi_2_set_proc_info(host, buffer, length);

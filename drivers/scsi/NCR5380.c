@@ -824,7 +824,7 @@ static void NCR5380_print_status(struct Scsi_Host *instance)
 	NCR5380_dprint(NDEBUG_ANY, instance);
 	NCR5380_dprint_phase(NDEBUG_ANY, instance);
 
-	len = NCR5380_proc_info(pr_bfr, &start, 0, sizeof(pr_bfr), instance->host_no, 0);
+	len = NCR5380_proc_info(instance, pr_bfr, &start, 0, sizeof(pr_bfr), 0);
 	pr_bfr[len] = 0;
 	printk("\n%s\n", pr_bfr);
 }
@@ -855,16 +855,12 @@ char *lprint_opcode(int opcode, char *pos, char *buffer, int length);
 #ifndef NCR5380_proc_info
 static
 #endif
-int NCR5380_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
+int NCR5380_proc_info(struct Scsi_Host *instance, char *buffer, char **start, off_t offset, int length, int inout)
 {
 	char *pos = buffer;
-	struct Scsi_Host *instance;
 	struct NCR5380_hostdata *hostdata;
 	Scsi_Cmnd *ptr;
 
-	instance = scsi_host_hn_get(hostno);
-	if (!instance)
-		return (-ESRCH);
 	hostdata = (struct NCR5380_hostdata *) instance->hostdata;
 
 	if (inout) {		/* Has data been written to the file ? */

@@ -5,9 +5,9 @@
  * $Id: gdth_proc.h,v 1.13 2003/02/27 14:59:25 achim Exp $
  */
 
-static int gdth_set_info(char *buffer,int length,int vh,int hanum,int busnum);
+static int gdth_set_info(char *buffer,int length,int hanum,int busnum);
 static int gdth_get_info(char *buffer,char **start,off_t offset,
-                         int length,int vh,int hanum,int busnum);
+                         int length,int hanum,int busnum);
 
 #if LINUX_VERSION_CODE >= 0x020503
 static void gdth_do_req(Scsi_Request *srp, gdth_cmd_str *cmd, 

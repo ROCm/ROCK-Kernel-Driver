@@ -233,9 +233,6 @@ printk("reading %p len %d\n",addr, len);
 #endif
 #undef STAT
 
-int NCR5380_proc_info(char *buffer, char **start, off_t offset,
-		      int length, int hostno, int inout);
-
 #define BOARD_NORMAL	0
 #define BOARD_NCR53C400	1
 

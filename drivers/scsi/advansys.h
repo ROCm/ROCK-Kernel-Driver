@@ -55,14 +55,6 @@ int advansys_reset(Scsi_Cmnd *);
 int advansys_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int[]);
 static int advansys_slave_configure(Scsi_Device *);
-#ifdef CONFIG_PROC_FS
-#if LINUX_VERSION_CODE < ASC_LINUX_VERSION(2,3,28)
-extern struct proc_dir_entry proc_scsi_advansys;
-#endif /* version < v2.3.28 */
-int advansys_proc_info(char *, char **, off_t, int, int, int);
-#else /* !defined(CONFIG_PROC_FS) */
-#define advansys_proc_info      NULL
-#endif /* !defined(CONFIG_PROC_FS) */
 
 /* init/main.c setup function */
 void advansys_setup(char *, int *);

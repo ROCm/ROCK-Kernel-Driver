@@ -167,7 +167,7 @@ STATIC int NCR_700_abort(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_bus_reset(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_dev_reset(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_host_reset(Scsi_Cmnd * SCpnt);
-STATIC int NCR_700_proc_directory_info(char *, char **, off_t, int, int, int);
+STATIC int NCR_700_proc_directory_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 STATIC void NCR_700_chip_setup(struct Scsi_Host *host);
 STATIC void NCR_700_chip_reset(struct Scsi_Host *host);
 STATIC int NCR_700_slave_configure(Scsi_Device *SDpnt);
@@ -1703,22 +1703,15 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_RETVAL(handled);
 }
 
-/* FIXME: Need to put some proc information in and plumb it
- * into the scsi proc system */
 STATIC int
-NCR_700_proc_directory_info(char *proc_buf, char **startp,
-			 off_t offset, int bytes_available,
-			 int host_no, int write)
+NCR_700_proc_directory_info(struct Scsi_Host *host, char *proc_buf, char **startp,
+			 off_t offset, int bytes_available, int write)
 {
 	static char buf[4096];	/* 1 page should be sufficient */
 	int len = 0;
 	struct Scsi_Host *host;
 	struct NCR_700_Host_Parameters *hostdata;
 	Scsi_Device *SDp;
-
-	host = scsi_host_hn_get(host_no);
-	if(host == NULL)
-		return 0;
 
 	if(write) {
 		/* FIXME: Clear internal statistics here */
