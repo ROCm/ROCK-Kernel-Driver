@@ -1,5 +1,5 @@
 /*
- * rsrc_mgr.c -- Resource management routines
+ * rsrc_mgr.c -- Resource management routines and/or wrappers
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,24 +14,11 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/init.h>
-#include <linux/interrupt.h>
 #include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/ioport.h>
-#include <linux/timer.h>
-#include <linux/pci.h>
-#include <asm/irq.h>
-#include <asm/io.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/ss.h>
 #include <pcmcia/cs.h>
-#include <pcmcia/bulkmem.h>
-#include <pcmcia/cistpl.h>
 #include "cs_internal.h"
 
 
