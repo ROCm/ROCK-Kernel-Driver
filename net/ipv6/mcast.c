@@ -1321,8 +1321,17 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ifmcaddr6 *pmc,
 		if (type == MLD2_ALLOW_NEW_SOURCES ||
 		    type == MLD2_BLOCK_OLD_SOURCES)
 			return skb;
-		if (pmc->mca_crcount || isquery)
+		if (pmc->mca_crcount || isquery) {
+			/* make sure we have room for group header and at
+			 * least one source.
+			 */
+			if (skb && AVAILABLE(skb) < sizeof(struct mld2_grec)+
+			    sizeof(struct in6_addr)) {
+				mld_sendpack(skb);
+				skb = 0; /* add_grhead will get a new one */
+			}
 			skb = add_grhead(skb, pmc, type, &pgr);
+		}
 		return skb;
 	}
 	pmr = skb ? (struct mld2_report *)skb->h.raw : 0;
