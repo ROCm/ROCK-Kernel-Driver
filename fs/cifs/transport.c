@@ -159,7 +159,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	midQ = AllocMidQEntry(in_buf, ses);
 	if (midQ == NULL)
 		return -EIO;
-	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
+	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4) {
 		cERROR(1,
 		       ("Illegal length, greater than maximum frame, %d ",
 			in_buf->smb_buf_length));

@@ -52,6 +52,7 @@ unsigned int multiuser_mount = 0;
 unsigned int extended_security = 0;
 unsigned int ntlmv2_support = 0;
 unsigned int sign_CIFS_PDUs = 0;
+unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
 
 extern int cifs_mount(struct super_block *, struct cifs_sb_info *, char *,
 			char *);
@@ -83,8 +84,11 @@ cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
 
 	sb->s_magic = CIFS_MAGIC_NUMBER;
 	sb->s_op = &cifs_super_ops;
-	sb->s_blocksize = CIFS_MAX_MSGSIZE;	/* BB check SMBSessSetup negotiated size */
-	sb->s_blocksize_bits = 10;	/* 2**10 = CIFS_MAX_MSGSIZE */
+	if(cifs_sb->tcon->ses->server->maxBuf > MAX_CIFS_HDR_SIZE + 512)
+	    sb->s_blocksize = cifs_sb->tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE;
+	else
+		sb->s_blocksize = CIFSMaximumBufferSize;
+	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
 	inode = iget(sb, ROOT_I);
 
 	if (!inode)
@@ -160,6 +164,12 @@ cifs_statfs(struct super_block *sb, struct statfs *buf)
 	/* BB get from info put in tcon struct at mount time with call to QFSAttrInfo */
 	FreeXid(xid);
 	return 0;		/* always return success? what if volume is no longer available? */
+}
+
+static int cifs_permission(struct inode * inode, int mask)
+{
+	/* the server does permission checks, we do not need to do it here */
+	return 0;
 }
 
 static kmem_cache_t *cifs_inode_cachep;
@@ -270,6 +280,7 @@ struct inode_operations cifs_dir_inode_ops = {
 	.mkdir = cifs_mkdir,
 	.rmdir = cifs_rmdir,
 	.rename = cifs_rename,
+	.permission = cifs_permission,
 /*	revalidate:cifs_revalidate,   */
 	.setattr = cifs_setattr,
 	.symlink = cifs_symlink,
@@ -280,18 +291,19 @@ struct inode_operations cifs_file_inode_ops = {
 	.setattr = cifs_setattr,
 	.getattr = cifs_getattr, /* do we need this anymore? */
 	.rename = cifs_rename,
+	.permission = cifs_permission,
 #ifdef CIFS_XATTR
 	.setxattr = cifs_setxattr,
 	.getxattr = cifs_getxattr,
 	.listxattr = cifs_listxattr,
 	.removexattr = cifs_removexattr,
-	.permission = cifs_permission,
 #endif 
 };
 
 struct inode_operations cifs_symlink_inode_ops = {
 	.readlink = cifs_readlink,
 	.follow_link = cifs_follow_link,
+	.permission = cifs_permission,
 	/* BB add the following two eventually */
 	/* revalidate: cifs_revalidate,
 	   setattr:    cifs_notify_change, *//* BB do we need notify change */

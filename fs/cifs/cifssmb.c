@@ -519,8 +519,7 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	pSMB->OffsetLow = cpu_to_le32(lseek & 0xFFFFFFFF);
 	pSMB->OffsetHigh = cpu_to_le32(lseek >> 32);
 	pSMB->Remaining = 0;
-	pSMB->MaxCount = cpu_to_le16(min_t(const unsigned int, count,
-		(tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFF00));
+	pSMB->MaxCount = cpu_to_le16(count);
 	pSMB->MaxCountHigh = 0;
 	pSMB->ByteCount = 0;  /* no need to do le conversion since it is 0 */
 

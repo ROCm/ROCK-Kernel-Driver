@@ -608,6 +608,7 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 	int rc = -EACCES;
 	int bytes_read = 0;
 	int total_read;
+	int current_read_size;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int xid;
@@ -624,10 +625,11 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 
 	for (total_read = 0,current_offset=read_data; read_size > total_read;
 				total_read += bytes_read,current_offset+=bytes_read) {
+		current_read_size = min_t(const int,read_size - total_read,cifs_sb->rsize);
 		rc = CIFSSMBRead(xid, pTcon,
 				 ((struct cifsFileInfo *) file->
 				  private_data)->netfid,
-				 read_size - total_read, *poffset,
+				 current_read_size, *poffset,
 				 &bytes_read, &current_offset);
 		if (rc || (bytes_read == 0)) {
 			if (total_read) {
@@ -744,6 +746,8 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			num_pages-i, (unsigned long) offset)); 
 		
 		read_size = (num_pages - i) * PAGE_CACHE_SIZE;
+		/* Read size needs to be in multiples of one page */
+		read_size = min_t(const unsigned int,read_size,cifs_sb->rsize & PAGE_CACHE_MASK);
 		rc = CIFSSMBRead(xid, pTcon,
 			((struct cifsFileInfo *) file->
 			 private_data)->netfid,
