@@ -40,7 +40,6 @@
 #include <linux/slab.h>
 #include <linux/sunrpc/auth.h>
 #include <linux/in.h>
-#include <linux/sunrpc/svcauth_gss.h>
 #include <linux/sunrpc/gss_krb5.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/crypto.h>
@@ -217,35 +216,36 @@ gss_get_mic_kerberos(struct gss_ctx	*ctx,
 }
 
 static struct gss_api_ops gss_kerberos_ops = {
-	.name			= "krb5",
 	.gss_import_sec_context	= gss_import_sec_context_kerberos,
 	.gss_get_mic		= gss_get_mic_kerberos,
 	.gss_verify_mic		= gss_verify_mic_kerberos,
 	.gss_delete_sec_context	= gss_delete_sec_context_kerberos,
 };
 
-/* XXX error checking? reference counting? */
+static struct gss_api_mech gss_kerberos_mech = {
+	.gm_name	= "krb5",
+	.gm_owner	= THIS_MODULE,
+	.gm_ops		= &gss_kerberos_ops,
+	.gm_pf_num	= 2,
+	.gm_pfs		= {
+		{RPC_AUTH_GSS_KRB5, 0, RPC_GSS_SVC_NONE, "krb5"},
+		{RPC_AUTH_GSS_KRB5I, 0, RPC_GSS_SVC_INTEGRITY, "krb5i"},
+	},
+};
+
 static int __init init_kerberos_module(void)
 {
-	struct gss_api_mech *gm;
+	int status;
 
-	if (gss_mech_register(&gss_mech_krb5_oid, &gss_kerberos_ops))
+	status = gss_mech_register(&gss_kerberos_mech);
+	if (status)
 		printk("Failed to register kerberos gss mechanism!\n");
-	gm = gss_mech_get_by_OID(&gss_mech_krb5_oid);
-	gss_register_triple(RPC_AUTH_GSS_KRB5 , gm, 0, RPC_GSS_SVC_NONE);
-	gss_register_triple(RPC_AUTH_GSS_KRB5I, gm, 0, RPC_GSS_SVC_INTEGRITY);
-	if (svcauth_gss_register_pseudoflavor(RPC_AUTH_GSS_KRB5, "krb5"))
-		printk("Failed to register %s with server!\n", "krb5");
-	if (svcauth_gss_register_pseudoflavor(RPC_AUTH_GSS_KRB5I, "krb5i"))
-		printk("Failed to register %s with server!\n", "krb5i");
-	gss_mech_put(gm);
-	return 0;
+	return status;
 }
 
 static void __exit cleanup_kerberos_module(void)
 {
-	gss_unregister_triple(RPC_AUTH_GSS_KRB5I);
-	gss_unregister_triple(RPC_AUTH_GSS_KRB5);
+	gss_mech_unregister(&gss_kerberos_mech);
 }
 
 MODULE_LICENSE("GPL");

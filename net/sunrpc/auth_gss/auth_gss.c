@@ -559,7 +559,7 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 
 	if (!(gss_auth = kmalloc(sizeof(*gss_auth), GFP_KERNEL)))
 		goto out_dec;
-	gss_auth->mech = gss_pseudoflavor_to_mech(flavor);
+	gss_auth->mech = gss_mech_get_by_pseudoflavor(flavor);
 	if (!gss_auth->mech) {
 		printk(KERN_WARNING "%s: Pseudoflavor %d not found!",
 				__FUNCTION__, flavor);
@@ -578,7 +578,7 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 
 	snprintf(gss_auth->path, sizeof(gss_auth->path), "%s/%s",
 			clnt->cl_pathname,
-			gss_auth->mech->gm_ops->name);
+			gss_auth->mech->gm_name);
 	gss_auth->dentry = rpc_mkpipe(gss_auth->path, clnt, &gss_upcall_ops, RPC_PIPE_WAIT_FOR_OPEN);
 	if (IS_ERR(gss_auth->dentry))
 		goto err_free;
@@ -696,7 +696,8 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 	*p++ = htonl(RPC_AUTH_GSS);
 	cred_len = p++;
 
-	service = gss_pseudoflavor_to_service(gss_cred->gc_flavor);
+	service = gss_pseudoflavor_to_service(ctx->gc_gss_ctx->mech_type,
+						gss_cred->gc_flavor);
 	if (service == 0) {
 		dprintk("RPC: %4u Bad pseudoflavor %d in gss_marshal\n",
 			task->tk_pid, gss_cred->gc_flavor);
@@ -785,7 +786,8 @@ gss_validate(struct rpc_task *task, u32 *p)
 
 	if (gss_verify_mic(ctx->gc_gss_ctx, &verf_buf, &mic, &qop_state))
                goto out_bad;
-       service = gss_pseudoflavor_to_service(gss_cred->gc_flavor);
+       service = gss_pseudoflavor_to_service(ctx->gc_gss_ctx->mech_type,
+					gss_cred->gc_flavor);
        switch (service) {
        case RPC_GSS_SVC_NONE:
 	       /* verifier data, flavor, length: */
@@ -836,7 +838,8 @@ gss_wrap_req(struct rpc_task *task,
 		status = encode(rqstp, p, obj);
 		goto out;
 	}
-	service = gss_pseudoflavor_to_service(gss_cred->gc_flavor);
+	service = gss_pseudoflavor_to_service(ctx->gc_gss_ctx->mech_type,
+						gss_cred->gc_flavor);
 	switch (service) {
 		case RPC_GSS_SVC_NONE:
 			status = encode(rqstp, p, obj);
@@ -908,7 +911,8 @@ gss_unwrap_resp(struct rpc_task *task,
 
 	if (ctx->gc_proc != RPC_GSS_PROC_DATA)
 		goto out_decode;
-	service = gss_pseudoflavor_to_service(gss_cred->gc_flavor);
+	service = gss_pseudoflavor_to_service(ctx->gc_gss_ctx->mech_type,
+						gss_cred->gc_flavor);
 	switch (service) {
 		case RPC_GSS_SVC_NONE:
 			goto out_decode;
@@ -999,7 +1003,6 @@ out:
 static void __exit exit_rpcsec_gss(void)
 {
 	gss_svc_shutdown();
-	gss_mech_unregister_all();
 	rpcauth_unregister(&authgss_ops);
 }
 

@@ -617,19 +617,15 @@ struct gss_domain {
 	u32			pseudoflavor;
 };
 
-/* XXX this should be done in gss_pseudoflavors, and shouldn't be hardcoded: */
 static struct auth_domain *
 find_gss_auth_domain(struct gss_ctx *ctx, u32 svc)
 {
-	switch(gss_get_pseudoflavor(ctx, 0, svc)) {
-		case RPC_AUTH_GSS_KRB5:
-			return auth_domain_find("gss/krb5");
-		case RPC_AUTH_GSS_KRB5I:
-			return auth_domain_find("gss/krb5i");
-		case RPC_AUTH_GSS_KRB5P:
-			return auth_domain_find("gss/krb5p");
-	}
-	return NULL;
+	char *name;
+
+	name = gss_service_to_auth_domain_name(ctx->mech_type, svc);
+	if (!name)
+		return NULL;
+	return auth_domain_find(name);
 }
 
 int
@@ -637,19 +633,17 @@ svcauth_gss_register_pseudoflavor(u32 pseudoflavor, char * name)
 {
 	struct gss_domain	*new;
 	struct auth_domain	*test;
-	static char		*prefix = "gss/";
-	int			stat = -1;
+	int			stat = -ENOMEM;
 
 	new = kmalloc(sizeof(*new), GFP_KERNEL);
 	if (!new)
 		goto out;
 	cache_init(&new->h.h);
 	atomic_inc(&new->h.h.refcnt);
-	new->h.name = kmalloc(strlen(name) + strlen(prefix) + 1, GFP_KERNEL);
+	new->h.name = kmalloc(strlen(name) + 1, GFP_KERNEL);
 	if (!new->h.name)
 		goto out_free_dom;
-	strcpy(new->h.name, prefix);
-	strcat(new->h.name, name);
+	strcpy(new->h.name, name);
 	new->h.flavour = RPC_AUTH_GSS;
 	new->pseudoflavor = pseudoflavor;
 	new->h.h.expiry_time = NEVER;
