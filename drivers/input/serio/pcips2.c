@@ -134,13 +134,11 @@ static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_i
 
 	ret = pci_enable_device(dev);
 	if (ret)
-		return ret;
+		goto out;
 
-	if (!request_region(pci_resource_start(dev, 0),
-			    pci_resource_len(dev, 0), "pcips2")) {
-		ret = -EBUSY;
+	ret = pci_request_regions(dev, "pcips2");
+	if (ret)
 		goto disable;
-	}
 
 	ps2if = kmalloc(sizeof(struct pcips2_data), GFP_KERNEL);
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
@@ -172,10 +170,10 @@ static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_i
  release:
 	kfree(ps2if);
 	kfree(serio);
-	release_region(pci_resource_start(dev, 0),
-		       pci_resource_len(dev, 0));
+	pci_release_regions(dev);
  disable:
 	pci_disable_device(dev);
+ out:
 	return ret;
 }
 
@@ -184,10 +182,9 @@ static void __devexit pcips2_remove(struct pci_dev *dev)
 	struct pcips2_data *ps2if = pci_get_drvdata(dev);
 
 	serio_unregister_port(ps2if->io);
-	release_region(pci_resource_start(dev, 0),
-		       pci_resource_len(dev, 0));
 	pci_set_drvdata(dev, NULL);
 	kfree(ps2if);
+	pci_release_regions(dev);
 	pci_disable_device(dev);
 }
 
