@@ -2314,6 +2314,7 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 static int
 isdn_tty_stat_callback(int i, isdn_ctrl *c)
 {
+	isdn_ctrl cmd;
 	modem_info *info;
 	char *e;
 
@@ -2366,6 +2367,7 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 #endif
 				if (TTY_IS_ACTIVE(info)) {
 					if (info->dialing == 1) {
+						isdn_slot_command(info->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
 						info->dialing = 2;
 						return 1;
 					}
