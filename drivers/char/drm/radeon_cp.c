@@ -1412,6 +1412,9 @@ int radeon_cp_idle( DRM_IOCTL_ARGS )
 
 	LOCK_TEST_WITH_RETURN( dev );
 
+/* 	if (dev->irq)  */
+/* 		radeon_emit_and_wait_irq( dev ); */
+
 	return radeon_do_cp_idle( dev_priv );
 }
 

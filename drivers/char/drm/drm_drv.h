@@ -306,7 +306,7 @@ static int DRM(setup)( drm_device_t *dev )
 	dev->map_count = 0;
 
 	dev->vmalist = NULL;
-	dev->lock.hw_lock = NULL;
+	dev->sigdata.lock = dev->lock.hw_lock = NULL;
 	init_waitqueue_head( &dev->lock.lock_queue );
 	dev->queue_count = 0;
 	dev->queue_reserved = 0;
@@ -491,7 +491,7 @@ static int DRM(takedown)( drm_device_t *dev )
 	DRM(dma_takedown)( dev );
 #endif
 	if ( dev->lock.hw_lock ) {
-		dev->lock.hw_lock = NULL; /* SHM removed */
+		dev->sigdata.lock = dev->lock.hw_lock = NULL; /* SHM removed */
 		dev->lock.pid = 0;
 		wake_up_interruptible( &dev->lock.lock_queue );
 	}
