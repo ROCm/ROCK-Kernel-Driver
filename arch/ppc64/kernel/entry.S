@@ -139,7 +139,7 @@ _GLOBAL(ret_from_syscall_1)
 91:
 #endif
 	li	r10,-_LAST_ERRNO
-	cmpl	0,r3,r10
+	cmpld	0,r3,r10
 	blt	30f
 	neg	r3,r3
 22:	ld	r10,_CCR(r1)	/* Set SO bit in CR */

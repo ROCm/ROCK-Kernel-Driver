@@ -151,11 +151,18 @@ static int save_sigregs(struct pt_regs *regs, _sigregs *sregs)
 	unsigned long old_mask = regs->psw.mask;
 	int err;
   
+	save_access_regs(current->thread.acrs);
+
 	/* Copy a 'clean' PSW mask to the user to avoid leaking
 	   information about whether PER is currently on.  */
 	regs->psw.mask = PSW_MASK_MERGE(PSW_USER_BITS, regs->psw.mask);
-	err = __copy_to_user(&sregs->regs, regs, sizeof(_s390_regs_common));
+	err = __copy_to_user(&sregs->regs.psw, &regs->psw,
+			     sizeof(sregs->regs.psw)+sizeof(sregs->regs.gprs));
 	regs->psw.mask = old_mask;
+	if (err != 0)
+		return err;
+	err = __copy_to_user(&sregs->regs.acrs, current->thread.acrs,
+			     sizeof(sregs->regs.acrs));
 	if (err != 0)
 		return err;
 	/* 
@@ -176,11 +183,17 @@ static int restore_sigregs(struct pt_regs *regs, _sigregs *sregs)
 	/* Alwys make any pending restarted system call return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
-	err = __copy_from_user(regs, &sregs->regs, sizeof(_s390_regs_common));
+	err = __copy_from_user(&regs->psw, &sregs->regs.psw,
+			       sizeof(sregs->regs.psw)+sizeof(sregs->regs.gprs));
 	regs->psw.mask = PSW_MASK_MERGE(old_mask, regs->psw.mask);
 	regs->psw.addr |= PSW_ADDR_AMODE;
 	if (err)
 		return err;
+	err = __copy_from_user(&current->thread.acrs, &sregs->regs.acrs,
+			       sizeof(sregs->regs.acrs));
+	if (err)
+		return err;
+	restore_access_regs(current->thread.acrs);
 
 	err = __copy_from_user(&current->thread.fp_regs, &sregs->fpregs,
 			       sizeof(s390_fp_regs));

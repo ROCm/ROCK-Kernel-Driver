@@ -273,7 +273,6 @@ CONFIG_IDE_GENERIC=y
 # CONFIG_BLK_DEV_IDEPCI is not set
 # CONFIG_BLK_DEV_IDEDMA is not set
 # CONFIG_IDEDMA_AUTO is not set
-# CONFIG_DMA_NONPCI is not set
 # CONFIG_BLK_DEV_HD is not set
 
 #

@@ -3039,6 +3039,8 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		goto out;
 	
 	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE, node_perm, NULL, &ad);
+	if (err)
+		goto out;
 
 	if (recv_perm) {
 		u32 port_sid;

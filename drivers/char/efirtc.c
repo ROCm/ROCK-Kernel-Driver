@@ -6,13 +6,13 @@
  *
  * Based on skeleton from the drivers/char/rtc.c driver by P. Gortmaker
  *
- * This code provides a architected & portable interface to the real time 
+ * This code provides an architected & portable interface to the real time
  * clock by using EFI instead of direct bit fiddling. The functionalities are 
  * quite different from the rtc.c driver. The only way to talk to the device 
  * is by using ioctl(). There is a /proc interface which provides the raw 
  * information.
  *
- * Please note that we have kept the API as close as possible from the 
+ * Please note that we have kept the API as close as possible to the
  * legacy RTC. The standard /sbin/hwclock program should work normally 
  * when used to get/set the time.
  *
@@ -297,7 +297,7 @@ static struct miscdevice efi_rtc_dev=
 };
 
 /*
- *	We export RAW EFI information to /proc/efirtc
+ *	We export RAW EFI information to /proc/driver/efirtc
  */
 static int
 efi_rtc_get_status(char *buf)
@@ -307,6 +307,10 @@ efi_rtc_get_status(char *buf)
 	char		*p = buf;
 	efi_bool_t	enabled, pending;	
 	unsigned long	flags;
+
+	memset(&eft, 0, sizeof(eft));
+	memset(&alm, 0, sizeof(alm));
+	memset(&cap, 0, sizeof(cap));
 
 	spin_lock_irqsave(&efi_rtc_lock, flags);
 

@@ -247,6 +247,14 @@ acpi_ns_root_initialize (void)
 
 unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+
+	/* Save a handle to "_GPE", it is always present */
+
+	if (ACPI_SUCCESS (status)) {
+		status = acpi_ns_get_node_by_path ("\\_GPE", NULL, ACPI_NS_NO_UPSEARCH,
+				  &acpi_gbl_fadt_gpe_device);
+	}
+
 	return_ACPI_STATUS (status);
 }
 
@@ -577,6 +585,7 @@ acpi_ns_lookup (
 		if ((num_segments       == 0)                               &&
 			(type_to_check_for  != ACPI_TYPE_ANY)                   &&
 			(type_to_check_for  != ACPI_TYPE_LOCAL_ALIAS)           &&
+			(type_to_check_for  != ACPI_TYPE_LOCAL_METHOD_ALIAS)    &&
 			(type_to_check_for  != ACPI_TYPE_LOCAL_SCOPE)           &&
 			(this_node->type    != ACPI_TYPE_ANY)                   &&
 			(this_node->type    != type_to_check_for)) {

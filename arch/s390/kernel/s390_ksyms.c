@@ -33,6 +33,8 @@ EXPORT_SYMBOL_NOVERS(_sb_findmap);
 EXPORT_SYMBOL_NOVERS(__copy_from_user_asm);
 EXPORT_SYMBOL_NOVERS(__copy_to_user_asm);
 EXPORT_SYMBOL_NOVERS(__clear_user_asm);
+EXPORT_SYMBOL_NOVERS(__strncpy_from_user_asm);
+EXPORT_SYMBOL_NOVERS(__strnlen_user_asm);
 EXPORT_SYMBOL(diag10);
 
 /*

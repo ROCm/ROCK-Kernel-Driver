@@ -48,8 +48,8 @@ typedef struct { unsigned long iopgprot; } iopgprot_t;
 
 #define pte_val(x)	((x).pte)
 #define iopte_val(x)	((x).iopte)
-#define pmd_val(x)      ((unsigned long)(x).pmd)
-#define pgd_val(x)	((unsigned long)(x).pgd)
+#define pmd_val(x)      ((x).pmd)
+#define pgd_val(x)	((x).pgd)
 #define ctxd_val(x)	((x).ctxd)
 #define pgprot_val(x)	((x).pgprot)
 #define iopgprot_val(x)	((x).iopgprot)
@@ -74,8 +74,8 @@ typedef unsigned long iopgprot_t;
 
 #define pte_val(x)	(x)
 #define iopte_val(x)	(x)
-#define pmd_val(x)      ((unsigned long)(x))
-#define pgd_val(x)	((unsigned long)(x))
+#define pmd_val(x)      (x)
+#define pgd_val(x)	(x)
 #define ctxd_val(x)	(x)
 #define pgprot_val(x)	(x)
 #define iopgprot_val(x)	(x)

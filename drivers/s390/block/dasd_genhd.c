@@ -9,7 +9,7 @@
  *
  * gendisk related functions for the dasd driver.
  *
- * $Revision: 1.44 $
+ * $Revision: 1.46 $
  */
 
 #include <linux/config.h>
@@ -71,7 +71,7 @@ dasd_gendisk_alloc(struct dasd_device *device)
 
  	sprintf(gdp->devfs_name, "dasd/%s", device->cdev->dev.bus_id);
 
-	if (device->ro_flag)
+	if (test_bit(DASD_FLAG_RO, &device->flags))
 		set_disk_ro(gdp, 1);
 	gdp->private_data = device;
 	gdp->queue = device->request_queue;
@@ -96,22 +96,33 @@ dasd_gendisk_free(struct dasd_device *device)
 /*
  * Trigger a partition detection.
  */
-void
+int
 dasd_scan_partitions(struct dasd_device * device)
 {
 	struct block_device *bdev;
 
 	/* Make the disk known. */
 	set_capacity(device->gdp, device->blocks << device->s2b_shift);
-	/* See fs/partition/check.c:register_disk,rescan_partitions */
 	bdev = bdget_disk(device->gdp, 0);
-	if (bdev) {
-		if (blkdev_get(bdev, FMODE_READ, 1) >= 0) {
-			/* Can't call rescan_partitions directly. Use ioctl. */
-			ioctl_by_bdev(bdev, BLKRRPART, 0);
-			blkdev_put(bdev);
-		}
-	}
+	if (!bdev || blkdev_get(bdev, FMODE_READ, 1) < 0)
+		return -ENODEV;
+	/*
+	 * See fs/partition/check.c:register_disk,rescan_partitions
+	 * Can't call rescan_partitions directly. Use ioctl.
+	 */
+	ioctl_by_bdev(bdev, BLKRRPART, 0);
+	/*
+	 * Since the matching blkdev_put call to the blkdev_get in
+	 * this function is not called before dasd_destroy_partitions
+	 * the offline open_count limit needs to be increased from
+	 * 0 to 1. This is done by setting device->bdev (see
+	 * dasd_generic_set_offline). As long as the partition
+	 * detection is running no offline should be allowed. That
+	 * is why the assignment to device->bdev is done AFTER
+	 * the BLKRRPART ioctl.
+	 */
+	device->bdev = bdev;
+	return 0;
 }
 
 /*
@@ -121,13 +132,32 @@ dasd_scan_partitions(struct dasd_device * device)
 void
 dasd_destroy_partitions(struct dasd_device * device)
 {
-	int p;
+	/* The two structs have 168/176 byte on 31/64 bit. */
+	struct blkpg_partition bpart;
+	struct blkpg_ioctl_arg barg;
+	struct block_device *bdev;
 
-	for (p = device->gdp->minors - 1; p > 0; p--) {
-		invalidate_partition(device->gdp, p);
-		delete_partition(device->gdp, p);
-	}
+	/*
+	 * Get the bdev pointer from the device structure and clear
+	 * device->bdev to lower the offline open_count limit again.
+	 */
+	bdev = device->bdev;
+	device->bdev = 0;
+
+	/*
+	 * See fs/partition/check.c:delete_partition
+	 * Can't call delete_partitions directly. Use ioctl.
+	 * The ioctl also does locking and invalidation.
+	 */
+	memset(&bpart, sizeof(struct blkpg_partition), 0);
+	memset(&barg, sizeof(struct blkpg_ioctl_arg), 0);
+	barg.data = &bpart;
+	for (bpart.pno = device->gdp->minors - 1; bpart.pno > 0; bpart.pno--)
+		ioctl_by_bdev(bdev, BLKPG_DEL_PARTITION, (unsigned long) &barg);
+
 	invalidate_partition(device->gdp, 0);
+	/* Matching blkdev_put to the blkdev_get in dasd_scan_partitions. */
+	blkdev_put(bdev);
 	set_capacity(device->gdp, 0);
 }
 

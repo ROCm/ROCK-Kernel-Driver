@@ -64,7 +64,6 @@ static int idepnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id
 	if (index != -1) {
 	    	printk(KERN_INFO "ide%d: generic PnP IDE interface\n", index);
 		pnp_set_drvdata(dev,hwif);
-		hwif->pnp_dev = dev;
 		return 0;
 	}
 

@@ -17,10 +17,10 @@
 int main(void)
 {
 	DEFINE(__THREAD_info, offsetof(struct task_struct, thread_info),);
-	DEFINE(__THREAD_ar2, offsetof(struct task_struct, thread.ar2),);
-	DEFINE(__THREAD_ar4, offsetof(struct task_struct, thread.ar4),);
 	DEFINE(__THREAD_ksp, offsetof(struct task_struct, thread.ksp),);
 	DEFINE(__THREAD_per, offsetof(struct task_struct, thread.per_info),);
+	DEFINE(__THREAD_mm_segment,
+	       offsetof(struct task_struct, thread.mm_segment),);
 	BLANK();
 	DEFINE(__PER_atmid, offsetof(per_struct, lowcore.words.perc_atmid),);
 	DEFINE(__PER_address, offsetof(per_struct, lowcore.words.address),);
@@ -31,5 +31,12 @@ int main(void)
 	DEFINE(__TI_flags, offsetof(struct thread_info, flags),);
 	DEFINE(__TI_cpu, offsetof(struct thread_info, cpu),);
 	DEFINE(__TI_precount, offsetof(struct thread_info, preempt_count),);
+	BLANK();
+	DEFINE(__PT_PSW, offsetof(struct pt_regs, psw),);
+	DEFINE(__PT_GPRS, offsetof(struct pt_regs, gprs),);
+	DEFINE(__PT_ORIG_GPR2, offsetof(struct pt_regs, orig_gpr2),);
+	DEFINE(__PT_ILC, offsetof(struct pt_regs, ilc),);
+	DEFINE(__PT_TRAP, offsetof(struct pt_regs, trap),);
+	DEFINE(__PT_SIZE, sizeof(struct pt_regs),);
 	return 0;
 }

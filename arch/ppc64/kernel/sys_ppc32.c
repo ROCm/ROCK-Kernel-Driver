@@ -35,9 +35,6 @@
 #include <linux/uio.h>
 #include <linux/aio.h>
 #include <linux/nfs_fs.h>
-#include <linux/smb_fs.h>
-#include <linux/smb_mount.h>
-#include <linux/ncp_fs.h>
 #include <linux/module.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -253,208 +250,6 @@ out:
 	return ret;
 }
 
-struct ncp_mount_data32_v3 {
-        int version;
-        unsigned int ncp_fd;
-        compat_uid_t mounted_uid;
-        compat_pid_t wdog_pid;
-        unsigned char mounted_vol[NCP_VOLNAME_LEN + 1];
-        unsigned int time_out;
-        unsigned int retry_count;
-        unsigned int flags;
-        compat_uid_t uid;
-        compat_gid_t gid;
-        compat_mode_t file_mode;
-        compat_mode_t dir_mode;
-};
-
-struct ncp_mount_data32_v4 {
-	int version;
-	/* all members below are "long" in ABI ... i.e. 32bit on sparc32, while 64bits on sparc64 */
-	unsigned int flags;
-	unsigned int mounted_uid;
-	int wdog_pid;
-
-	unsigned int ncp_fd;
-	unsigned int time_out;
-	unsigned int retry_count;
-
-	unsigned int uid;
-	unsigned int gid;
-	unsigned int file_mode;
-	unsigned int dir_mode;
-};
-
-static void *do_ncp_super_data_conv(void *raw_data)
-{
-	switch (*(int*)raw_data) {
-		case NCP_MOUNT_VERSION:
-			{
-				struct ncp_mount_data news, *n = &news; 
-				struct ncp_mount_data32_v3 *n32 = (struct ncp_mount_data32_v3 *)raw_data;
-
-				n->version = n32->version;
-				n->ncp_fd = n32->ncp_fd;
-				n->mounted_uid = n32->mounted_uid;
-				n->wdog_pid = n32->wdog_pid;
-				memmove (n->mounted_vol, n32->mounted_vol, sizeof (n32->mounted_vol));
-				n->time_out = n32->time_out;
-				n->retry_count = n32->retry_count;
-				n->flags = n32->flags;
-				n->uid = n32->uid;
-				n->gid = n32->gid;
-				n->file_mode = n32->file_mode;
-				n->dir_mode = n32->dir_mode;
-				memcpy(raw_data, n, sizeof(*n)); 
-			}
-			break;
-		case NCP_MOUNT_VERSION_V4:
-			{
-				struct ncp_mount_data_v4 news, *n = &news; 
-				struct ncp_mount_data32_v4 *n32 = (struct ncp_mount_data32_v4 *)raw_data;
-
-				n->version = n32->version;
-				n->flags = n32->flags;
-				n->mounted_uid = n32->mounted_uid;
-				n->wdog_pid = n32->wdog_pid;
-				n->ncp_fd = n32->ncp_fd;
-				n->time_out = n32->time_out;
-				n->retry_count = n32->retry_count;
-				n->uid = n32->uid;
-				n->gid = n32->gid;
-				n->file_mode = n32->file_mode;
-				n->dir_mode = n32->dir_mode;
-				memcpy(raw_data, n, sizeof(*n)); 
-			}
-			break;
-		default:
-			/* do not touch unknown structures */
-			break;
-	}
-	return raw_data;
-}
-
-struct smb_mount_data32 {
-        int version;
-        compat_uid_t mounted_uid;
-        compat_uid_t uid;
-        compat_gid_t gid;
-        compat_mode_t file_mode;
-        compat_mode_t dir_mode;
-};
-
-static void *do_smb_super_data_conv(void *raw_data)
-{
-	struct smb_mount_data news, *s = &news;
-	struct smb_mount_data32 *s32 = (struct smb_mount_data32 *)raw_data;
-
-	if (s32->version != SMB_MOUNT_OLDVERSION)
-		goto out;
-	s->version = s32->version;
-	s->mounted_uid = s32->mounted_uid;
-	s->uid = s32->uid;
-	s->gid = s32->gid;
-	s->file_mode = s32->file_mode;
-	s->dir_mode = s32->dir_mode;
-	memcpy(raw_data, s, sizeof(struct smb_mount_data)); 
-out:
-	return raw_data;
-}
-
-static int copy_mount_stuff_to_kernel(const void *user, unsigned long *kernel)
-{
-	int i;
-	unsigned long page;
-	struct vm_area_struct *vma;
-
-	*kernel = 0;
-	if(!user)
-		return 0;
-	vma = find_vma(current->mm, (unsigned long)user);
-	if(!vma || (unsigned long)user < vma->vm_start)
-		return -EFAULT;
-	if(!(vma->vm_flags & VM_READ))
-		return -EFAULT;
-	i = vma->vm_end - (unsigned long) user;
-	if(PAGE_SIZE <= (unsigned long) i)
-		i = PAGE_SIZE - 1;
-	if(!(page = __get_free_page(GFP_KERNEL)))
-		return -ENOMEM;
-	if(copy_from_user((void *) page, user, i)) {
-		free_page(page);
-		return -EFAULT;
-	}
-	*kernel = page;
-	return 0;
-}
-
-#define SMBFS_NAME	"smbfs"
-#define NCPFS_NAME	"ncpfs"
-
-asmlinkage long sys32_mount(char *dev_name, char *dir_name, char *type, unsigned long new_flags, u32 data)
-{
-	unsigned long type_page = 0;
-	unsigned long data_page = 0;
-	unsigned long dev_page = 0;
-	unsigned long dir_page = 0;
-	int err, is_smb, is_ncp;
-	
-	is_smb = is_ncp = 0;
-
-	err = copy_mount_stuff_to_kernel((const void *)type, &type_page);
-	if (err)
-		goto out;
-
-	if (type_page) {
-		is_smb = !strcmp((char *)type_page, SMBFS_NAME);
-		is_ncp = !strcmp((char *)type_page, NCPFS_NAME);
-	} else {
-		is_smb = is_ncp = 0;
-	}
-
-	err = copy_mount_stuff_to_kernel((const void *)AA(data), &data_page);
-	if (err)
-		goto type_out;
-
-	err = copy_mount_stuff_to_kernel(dev_name, &dev_page);
-	if (err)
-		goto data_out;
-
-	err = copy_mount_stuff_to_kernel(dir_name, &dir_page);
-	if (err)
-		goto dev_out;
-
-	if (!is_smb && !is_ncp) {
-		lock_kernel();
-		err = do_mount((char*)dev_page, (char*)dir_page,
-				(char*)type_page, new_flags, (char*)data_page);
-		unlock_kernel();
-	} else {
-		if (is_ncp)
-			do_ncp_super_data_conv((void *)data_page);
-		else
-			do_smb_super_data_conv((void *)data_page);
-
-		lock_kernel();
-		err = do_mount((char*)dev_page, (char*)dir_page,
-				(char*)type_page, new_flags, (char*)data_page);
-		unlock_kernel();
-	}
-	free_page(dir_page);
-
-dev_out:
-	free_page(dev_page);
-
-data_out:
-	free_page(data_page);
-
-type_out:
-	free_page(type_page);
-
-out:
-	return err;
-}
-
 /* readdir & getdents */
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 #define ROUND_UP(x) (((x)+sizeof(u32)-1) & ~(sizeof(u32)-1))
@@ -527,9 +322,8 @@ struct getdents_callback32 {
 	int error;
 };
 
-static int
-filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
-		               unsigned int d_type)
+static int filldir(void * __buf, const char * name, int namlen, off_t offset,
+		   ino_t ino, unsigned int d_type)
 {
 	struct linux_dirent32 * dirent;
 	struct getdents_callback32 * buf = (struct getdents_callback32 *) __buf;
@@ -539,28 +333,44 @@ filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
 	if (reclen > buf->count)
 		return -EINVAL;
 	dirent = buf->previous;
-	if (dirent)
-		put_user(offset, &dirent->d_off);
+	if (dirent) {
+		if (__put_user(offset, &dirent->d_off))
+			goto efault;
+	}
 	dirent = buf->current_dir;
+	if (__put_user(ino, &dirent->d_ino))
+		goto efault;
+	if (__put_user(reclen, &dirent->d_reclen))
+		goto efault;
+	if (copy_to_user(dirent->d_name, name, namlen))
+		goto efault;
+	if (__put_user(0, dirent->d_name + namlen))
+		goto efault;
+	if (__put_user(d_type, (char *) dirent + reclen - 1))
+		goto efault;
 	buf->previous = dirent;
-	put_user(ino, &dirent->d_ino);
-	put_user(reclen, &dirent->d_reclen);
-	copy_to_user(dirent->d_name, name, namlen);
-	put_user(0, dirent->d_name + namlen);
-	put_user(d_type, (char *) dirent + reclen - 1);
-	((char *) dirent) += reclen;
+	dirent = (void *)dirent + reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
+efault:
+	buf->error = -EFAULT;
+	return -EFAULT;
 }
 
-asmlinkage long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent, unsigned int count)
+long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent,
+		    unsigned int count)
 {
 	struct file * file;
 	struct linux_dirent32 * lastdirent;
 	struct getdents_callback32 buf;
-	int error = -EBADF;
+	int error;
 
+	error = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, dirent, count))
+		goto out;
+
+	error = -EBADF;
 	file = fget(fd);
 	if (!file)
 		goto out;
@@ -573,19 +383,20 @@ asmlinkage long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent, u
 	error = vfs_readdir(file, (filldir_t)filldir, &buf);
 	if (error < 0)
 		goto out_putf;
-	lastdirent = buf.previous;
 	error = buf.error;
-	if(lastdirent) {
-		put_user(file->f_pos, &lastdirent->d_off);
-		error = count - buf.count;
+	lastdirent = buf.previous;
+	if (lastdirent) {
+		if (put_user(file->f_pos, &lastdirent->d_off))
+			error = -EFAULT;
+		else
+			error = count - buf.count;
 	}
- out_putf:
-	fput(file);
 
- out:
+out_putf:
+	fput(file);
+out:
 	return error;
 }
-/* end of readdir & getdents */
 
 /*
  * Ooo, nasty.  We need here to frob 32-bit unsigned longs to

@@ -731,6 +731,9 @@ ccw_device_w4sense(struct ccw_device *cdev, enum dev_event dev_event)
 	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
 		if (cdev->handler)
 			cdev->handler (cdev, 0, irb);
+		if (irb->scsw.cc == 1)
+			/* Basic sense hasn't started. Try again. */
+			ccw_device_do_sense(cdev, irb);
 		return;
 	}
 	/* Add basic sense info to irb. */
@@ -828,6 +831,8 @@ ccw_device_wait4io_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
 		if (cdev->handler)
 			cdev->handler (cdev, 0, irb);
+		if (irb->scsw.cc == 1)
+			goto call_handler;
 		return;
 	}
 	/*
@@ -841,6 +846,7 @@ ccw_device_wait4io_irq(struct ccw_device *cdev, enum dev_event dev_event)
 		}
 		return;
 	}
+call_handler:
 	/* Iff device is idle, reset timeout. */
 	sch = to_subchannel(cdev->dev.parent);
 	if (!stsch(sch->irq, &sch->schib))
@@ -908,6 +914,8 @@ ccw_device_stlck_done(struct ccw_device *cdev, enum dev_event dev_event)
 		/* Check for unsolicited interrupt. */
 		if (irb->scsw.stctl ==
 		    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS))
+			/* FIXME: we should restart stlck here, but this
+			 * is extremely unlikely ... */
 			goto out_wakeup;
 
 		ccw_device_accumulate_irb(cdev, irb);

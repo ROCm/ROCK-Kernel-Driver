@@ -351,6 +351,7 @@ acpi_ns_dump_one_object (
 
 
 		case ACPI_TYPE_LOCAL_ALIAS:
+		case ACPI_TYPE_LOCAL_METHOD_ALIAS:
 
 			acpi_os_printf ("Target %4.4s (%p)\n", acpi_ut_get_node_name (obj_desc), obj_desc);
 			break;

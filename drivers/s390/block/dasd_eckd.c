@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.51 $
+ * $Revision: 1.53 $
  */
 
 #include <linux/config.h>
@@ -1131,7 +1131,7 @@ dasd_eckd_release(struct block_device *bdev, int no, long args)
 	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
 	cqr->retries = 0;
-	cqr->expires = 10 * HZ;
+	cqr->expires = 2 * HZ;
 	cqr->buildclk = get_clock();
 	cqr->status = DASD_CQR_FILLED;
 
@@ -1174,7 +1174,7 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
 	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
 	cqr->retries = 0;
-	cqr->expires = 10 * HZ;
+	cqr->expires = 2 * HZ;
 	cqr->buildclk = get_clock();
 	cqr->status = DASD_CQR_FILLED;
 
@@ -1216,7 +1216,7 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
 	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
 	cqr->retries = 0;
-	cqr->expires = 10 * HZ;
+	cqr->expires = 2 * HZ;
 	cqr->buildclk = get_clock();
 	cqr->status = DASD_CQR_FILLED;
 
@@ -1274,6 +1274,7 @@ dasd_eckd_performance(struct block_device *bdev, int no, long args)
 	stats = (struct dasd_rssd_perf_stats_t *) (prssdp + 1);
 	memset(stats, 0, sizeof (struct dasd_rssd_perf_stats_t));
 
+	ccw++;
 	ccw->cmd_code = DASD_ECKD_CCW_RSSD;
 	ccw->count = sizeof (struct dasd_rssd_perf_stats_t);
 	ccw->cda = (__u32)(addr_t) stats;

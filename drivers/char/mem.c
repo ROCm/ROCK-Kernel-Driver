@@ -311,7 +311,7 @@ static ssize_t write_kmem(struct file * file, const char * buf,
 				len = PAGE_SIZE;
 			if (len) {
 				written = copy_from_user(kbuf, buf, len);
-				if (written != len) {
+				if (written) {
 					ssize_t ret;
 
 					free_page((unsigned long)kbuf);

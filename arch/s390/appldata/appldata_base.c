@@ -372,31 +372,57 @@ static int
 appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 			   void *buffer, size_t *lenp)
 {
-	struct appldata_ops *ops;
-	int rc, len;
+	struct appldata_ops *ops = NULL, *tmp_ops;
+	int rc, len, found;
 	char buf[2];
+	struct list_head *lh;
 
+	found = 0;
+	spin_lock_bh(&appldata_ops_lock);
+	list_for_each(lh, &appldata_ops_list) {
+		tmp_ops = list_entry(lh, struct appldata_ops, list);
+		if (&tmp_ops->ctl_table[2] == ctl) {
+			found = 1;
+		}
+	}
+	if (!found) {
+		spin_unlock_bh(&appldata_ops_lock);
+		return -ENODEV;
+	}
 	ops = ctl->data;
+	if (!try_module_get(ops->owner)) {	// protect this function
+		spin_unlock_bh(&appldata_ops_lock);
+		return -ENODEV;
+	}
+	spin_unlock_bh(&appldata_ops_lock);
+
 	if (!*lenp || filp->f_pos) {
 		*lenp = 0;
+		module_put(ops->owner);
 		return 0;
 	}
 	if (!write) {
 		len = sprintf(buf, ops->active ? "1\n" : "0\n");
 		if (len > *lenp)
 			len = *lenp;
-		if (copy_to_user(buffer, buf, len))
+		if (copy_to_user(buffer, buf, len)) {
+			module_put(ops->owner);
 			return -EFAULT;
+		}
 		goto out;
 	}
 	len = *lenp;
-	if (copy_from_user(buf, buffer, len > sizeof(buf) ? sizeof(buf) : len))
+	if (copy_from_user(buf, buffer,
+			   len > sizeof(buf) ? sizeof(buf) : len)) {
+		module_put(ops->owner);
 		return -EFAULT;
+	}
 
 	spin_lock_bh(&appldata_ops_lock);
 	if ((buf[0] == '1') && (ops->active == 0)) {
-		if (!try_module_get(ops->owner)) {
+		if (!try_module_get(ops->owner)) {	// protect tasklet
 			spin_unlock_bh(&appldata_ops_lock);
+			module_put(ops->owner);
 			return -ENODEV;
 		}
 		ops->active = 1;
@@ -430,6 +456,7 @@ appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 out:
 	*lenp = len;
 	filp->f_pos += len;
+	module_put(ops->owner);
 	return 0;
 }
 
@@ -511,7 +538,6 @@ int appldata_register_ops(struct appldata_ops *ops)
 	ops->ctl_table[3].ctl_name = 0;
 
 	ops->sysctl_header = register_sysctl_table(ops->ctl_table,1);
-	ops->ctl_table[2].de->owner = ops->owner;
 
 	P_INFO("%s-ops registered!\n", ops->name);
 	return 0;
@@ -525,10 +551,11 @@ int appldata_register_ops(struct appldata_ops *ops)
 void appldata_unregister_ops(struct appldata_ops *ops)
 {
 	spin_lock_bh(&appldata_ops_lock);
-	list_del(&ops->list);
-	spin_unlock_bh(&appldata_ops_lock);
 	unregister_sysctl_table(ops->sysctl_header);
+	list_del(&ops->list);
 	kfree(ops->ctl_table);
+	ops->ctl_table = NULL;
+	spin_unlock_bh(&appldata_ops_lock);
 	P_INFO("%s-ops unregistered!\n", ops->name);
 }
 /********************** module-ops management <END> **************************/

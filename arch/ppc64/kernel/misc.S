@@ -593,7 +593,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* old stat syscall */
 	.llong .ppc32_lseek
 	.llong .sys_getpid              /* 20 */
-	.llong .sys32_mount
+	.llong .compat_sys_mount
 	.llong .sys_oldumount
 	.llong .sys_setuid
 	.llong .sys_getuid

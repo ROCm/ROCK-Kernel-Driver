@@ -9,135 +9,191 @@
  *  These functions have standard call interface
  */
 
+#include <linux/errno.h>
 #include <asm/lowcore.h>
+#include <asm/offsets.h>
 
         .text
         .align 4
         .globl __copy_from_user_asm
+	# %r2 = to, %r3 = n, %r4 = from
 __copy_from_user_asm:
-	lr	%r5,%r3
-	sacf	512
-0:	mvcle	%r2,%r4,0
-	jo	0b
-1:	sacf	0
-	lr	%r2,%r5
+	slr	%r0,%r0
+0:	mvcp	0(%r3,%r2),0(%r4),%r0
+	jnz	1f
+	slr	%r2,%r2
 	br	%r14
-2:	lhi	%r1,-4096
-	lr	%r3,%r4
-	slr	%r3,%r1      # %r3 = %r4 + 4096
-	nr	%r3,%r1      # %r3 = (%r4 + 4096) & -4096
-	slr	%r3,%r4      # %r3 = #bytes to next user page boundary
-	clr	%r5,%r3      # copy crosses next page boundary ?
-	jnh	1b           # no, this page fauled
-	# The page after the current user page might have faulted.
-	# We cant't find out which page because the program check handler
-	# might have callled schedule, destroying all lowcore information.
-	# We retry with the shortened length.
-3:	mvcle	%r2,%r4,0
-	jo	3b
-	j	1b
+1:	la	%r2,256(%r2)
+	la	%r4,256(%r4)
+	ahi	%r3,-256
+2:	mvcp	0(%r3,%r2),0(%r4),%r0
+	jnz	1b
+3:	slr	%r2,%r2
+	br	%r14
+4:	lhi	%r0,-4096
+	lr	%r5,%r4
+	slr	%r5,%r0
+	nr	%r5,%r0		# %r5 = (%r4 + 4096) & -4096
+	slr	%r5,%r4		# %r5 = #bytes to next user page boundary
+	clr	%r3,%r5		# copy crosses next page boundary ?
+	jnh	6f		# no, the current page faulted
+	# move with the reduced length which is < 256
+5:	mvcp	0(%r5,%r2),0(%r4),%r0
+	slr	%r3,%r5
+6:	lr	%r2,%r3
+	br	%r14
         .section __ex_table,"a"
-	.long	0b,2b
-	.long	3b,1b
+	.long	0b,4b
+	.long	2b,4b
+	.long	5b,6b
         .previous
 
         .align 4
         .text
         .globl __copy_to_user_asm
+	# %r2 = from, %r3 = n, %r4 = to
 __copy_to_user_asm:
-	lr	%r5,%r3
-	sacf	512
-0:	mvcle	%r4,%r2,0
-	jo	0b
-1:	sacf	0
-	lr	%r2,%r3
+	slr	%r0,%r0
+0:	mvcs	0(%r3,%r4),0(%r2),%r0
+	jnz	1f
+	slr	%r2,%r2
 	br	%r14
-2:	lhi	%r1,-4096
+1:	la	%r2,256(%r2)
+	la	%r4,256(%r4)
+	ahi	%r3,-256
+2:	mvcs	0(%r3,%r4),0(%r2),%r0
+	jnz	1b
+3:	slr	%r2,%r2
+	br	%r14
+4:	lhi	%r0,-4096
 	lr	%r5,%r4
-	slr	%r5,%r1      # %r5 = %r4 + 4096
-	nr	%r5,%r1      # %r5 = (%r4 + 4096) & -4096
-	slr	%r5,%r4      # %r5 = #bytes to next user page boundary
-	clr	%r3,%r5      # copy crosses next page boundary ?
-	jnh	1b           # no, the current page fauled
-	# The page after the current user page might have faulted.
-	# We cant't find out which page because the program check handler
-	# might have callled schedule, destroying all lowcore information.
-	# We retry with the shortened length.
-3:	mvcle	%r4,%r2,0
-	jo	3b
-	j	1b
+	slr	%r5,%r0
+	nr	%r5,%r0		# %r5 = (%r4 + 4096) & -4096
+	slr	%r5,%r4		# %r5 = #bytes to next user page boundary
+	clr	%r3,%r5		# copy crosses next page boundary ?
+	jnh	6f		# no, the current page faulted
+	# move with the reduced length which is < 256
+5:	mvcs	0(%r5,%r4),0(%r2),%r0
+	slr	%r3,%r5
+6:	lr	%r2,%r3
+	br	%r14
         .section __ex_table,"a"
-	.long	0b,2b
-	.long	3b,1b
+	.long	0b,4b
+	.long	2b,4b
+	.long	5b,6b
         .previous
 
         .align 4
         .text
         .globl __copy_in_user_asm
+	# %r2 = from, %r3 = n, %r4 = to
 __copy_in_user_asm:
-	stm	%r6,%r15,24(%r15)
-	lr	%r5,%r3
-	lr	%r7,%r3
-	lr	%r6,%r2
-	cpya	6,4          # ar6 = ar4
-	sacf	512
-0:	mvcle	%r4,%r6,0
-	jo	0b
-1:	sacf	0
-	lr	%r2,%r7
-	lm	%r6,%r15,24(%r15)
+	sacf	256
+	bras	1,1f
+	mvc	0(1,%r4),0(%r2)
+0:	mvc	0(256,%r4),0(%r2)
+	la	%r2,256(%r2)
+	la	%r4,256(%r4)
+1:	ahi	%r3,-256
+	jnm	0b
+2:	ex	%r3,0(%r1)
+	sacf	0
+	slr	%r2,%r2
+	br	14
+3:	mvc	0(1,%r4),0(%r2)
+	la	%r2,1(%r2)
+	la	%r4,1(%r4)
+	ahi	%r3,-1
+	jnm	3b
+4:	lr	%r2,%r3
+	sacf	0
 	br	%r14
-2:	lhi	%r1,-4096
-	lr	%r5,%r4
-	slr	%r5,%r1      # %r5 = %r4 + 4096
-	nr	%r5,%r1      # %r5 = (%r4 + 4096) & -4096
-	slr	%r5,%r4      # %r5 = #bytes to next user page boundary
-	clr	%r7,%r5      # copy crosses next page boundary ?
-	jnh	1b           # no, the current page fauled
-	# The page after the current user page might have faulted.
-	# We cant't find out which page because the program check handler
-	# might have callled schedule, destroying all lowcore information.
-	# We retry with the shortened length.
-3:	mvcle	%r4,%r6,0
-	jo	3b
-	j	1b
         .section __ex_table,"a"
-	.long	0b,2b
-	.long	3b,1b
+	.long	0b,3b
+	.long	2b,3b
+	.long	3b,4b
         .previous
 
         .align 4
         .text
         .globl __clear_user_asm
+	# %r2 = to, %r3 = n
 __clear_user_asm:
-	lr	%r4,%r2
-	lr	%r5,%r3
-	sr	%r2,%r2
-	sr	%r3,%r3
-	sacf	512
-0:	mvcle	%r4,%r2,0
-	jo	0b
-1:	sacf	0
+	bras	%r5,0f
+	.long	empty_zero_page
+0:	l	%r5,0(%r5)
+	slr	%r0,%r0
+1:	mvcs	0(%r3,%r2),0(%r5),%r0
+	jnz	2f
+	slr	%r2,%r2
 	br	%r14
-2:	lr	%r2,%r5
-	lhi	%r1,-4096
-	slr	%r5,%r1      # %r5 = %r4 + 4096
-	nr	%r5,%r1      # %r5 = (%r4 + 4096) & -4096
-	slr	%r5,%r4      # %r5 = #bytes to next user page boundary
-	clr	%r2,%r5      # copy crosses next page boundary ?
-	jnh	1b           # no, the current page fauled
-	# The page after the current user page might have faulted.
-	# We cant't find out which page because the program check handler
-	# might have callled schedule, destroying all lowcore information.
-	# We retry with the shortened length.
-	slr	%r2,%r5
-3:	mvcle	%r4,%r2,0
-	jo	3b
-	j	1b
-4:	alr	%r2,%r5
-	j	1b
+2:	la	%r2,256(%r2)
+	ahi	%r3,-256
+3:	mvcs	0(%r3,%r2),0(%r5),%r0
+	jnz	2b
+4:	slr	%r2,%r2
+	br	%r14
+5:	lhi	%r0,-4096
+	lr	%r4,%r2
+	slr	%r4,%r0
+	nr	%r4,%r0		# %r4 = (%r2 + 4096) & -4096
+	slr	%r4,%r2		# %r4 = #bytes to next user page boundary
+	clr	%r3,%r4		# clear crosses next page boundary ?
+	jnh	7f		# no, the current page faulted
+	# clear with the reduced length which is < 256
+6:	mvcs	0(%r4,%r2),0(%r5),%r0
+	slr	%r3,%r4
+7:	lr	%r2,%r3
+	br	%r14
         .section __ex_table,"a"
-	.long	0b,2b
-        .long	3b,4b
+	.long	1b,5b
+	.long	3b,5b
+	.long	6b,7b
         .previous
 
+        .align 4
+        .text
+        .globl __strncpy_from_user_asm
+	# %r2 = dst, %r3 = src, %r4 = count
+__strncpy_from_user_asm:
+	lhi	%r0,0
+	lhi	%r1,1
+	lhi	%r5,0
+0:	mvcp	0(%r1,%r2),0(%r3),%r0
+	tm	0(%r2),0xff
+	jz	1f
+	la	%r2,1(%r2)
+	la	%r3,1(%r3)
+	ahi	%r5,1
+	clr	%r5,%r4
+	jl	0b
+1:	lr	%r2,%r5
+	br	%r14
+2:	lhi	%r2,-EFAULT
+	br	%r14
+        .section __ex_table,"a"
+	.long	0b,2b
+	.previous
+
+        .align 4
+        .text
+        .globl __strnlen_user_asm
+	# %r2 = src, %r3 = count
+__strnlen_user_asm:
+	lhi	%r0,0
+	lhi	%r1,1
+	lhi	%r5,0
+0:	mvcp	24(%r1,%r15),0(%r2),%r0
+	ahi	%r5,1
+	tm	24(%r15),0xff
+	jz	1f
+	la	%r2,1(%r2)
+	clr	%r5,%r3
+	jl	0b
+1:	lr	%r2,%r5
+	br	%r14
+2:	lhi	%r2,-EFAULT
+	br	%r14
+        .section __ex_table,"a"
+	.long	0b,2b
+	.previous

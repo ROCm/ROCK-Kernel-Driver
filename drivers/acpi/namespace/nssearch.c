@@ -113,6 +113,12 @@ acpi_ns_search_node (
 		/* Check for match against the name */
 
 		if (next_node->name.integer == target_name) {
+			/* Resolve a control method alias if any */
+
+			if (acpi_ns_get_type (next_node) == ACPI_TYPE_LOCAL_METHOD_ALIAS) {
+				next_node = ACPI_CAST_PTR (struct acpi_namespace_node, next_node->object);
+			}
+
 			/*
 			 * Found matching entry.
 			 */
