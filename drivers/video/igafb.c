@@ -541,7 +541,7 @@ static int __init iga_init(struct fb_info_iga *info)
 		return 0;
 
 	printk("fb%d: %s frame buffer device at 0x%08lx [%dMB VRAM]\n",
-	       GET_FB_IDX(info->fb_info.node), igafb_name, 
+	       minor(info->fb_info.node), igafb_name, 
 	       info->frame_buffer_phys, info->total_vram >> 20);
 
 	iga_blank_border(info); 

@@ -176,6 +176,7 @@ struct neofb_par {
   int lcd_stretch;
   int internal_display;
   int external_display;
+  int libretto;
 };
 
 typedef struct {
