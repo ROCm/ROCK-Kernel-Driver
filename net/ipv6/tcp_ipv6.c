@@ -967,12 +967,14 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 	struct tcphdr *th = skb->h.th, *t1; 
 	struct sk_buff *buff;
 	struct flowi fl;
+	int daddr_type;
 
 	if (th->rst)
 		return;
 
-	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr))
-		return; 
+	daddr_type = ipv6_addr_type(&skb->nh.ipv6h->daddr);
+	if (daddr_type & (IPV6_ADDR_ANYCAST | IPV6_ADDR_MULTICAST))
+		return;
 
 	/*
 	 * We need to grab some memory, and put together an RST,
@@ -1171,13 +1173,14 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	struct tcp_opt tmptp, *tp = tcp_sk(sk);
 	struct open_request *req = NULL;
 	__u32 isn = TCP_SKB_CB(skb)->when;
+	int daddr_type;
 
 	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_conn_request(sk, skb);
 
-	/* FIXME: do the same check for anycast */
-	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr))
-		goto drop; 
+	daddr_type = ipv6_addr_type(&skb->nh.ipv6h->daddr);
+	if (daddr_type & (IPV6_ADDR_ANYCAST | IPV6_ADDR_MULTICAST))
+		goto drop;
 
 	/*
 	 *	There are no SYN attacks on IPv6, yet...	
