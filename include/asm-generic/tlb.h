@@ -99,7 +99,7 @@ tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 }
 
 
-/* void tlb_remove_page(struct mmu_gather *tlb, pte_t *ptep, unsigned long addr)
+/* tlb_remove_page
  *	Must perform the equivalent to __free_pte(pte_get_and_clear(ptep)), while
  *	handling the additional races in SMP caused by other CPUs caching valid
  *	mappings in their TLBs.
