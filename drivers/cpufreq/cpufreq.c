@@ -1,10 +1,8 @@
 /*
- *  linux/kernel/cpufreq.c
+ *  linux/drivers/cpufreq/cpufreq.c
  *
  *  Copyright (C) 2001 Russell King
  *            (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
- *
- *  $Id: cpufreq.c,v 1.59 2003/01/20 17:31:48 db Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
