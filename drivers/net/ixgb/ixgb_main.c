@@ -1876,7 +1876,6 @@ static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter)
 	struct ixgb_rx_desc *rx_desc;
 	struct ixgb_buffer *buffer_info;
 	struct sk_buff *skb;
-	int reserve_len = 2;
 	unsigned int i;
 	int num_group_tail_writes;
 	long cleancount;
@@ -1895,7 +1894,7 @@ static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter)
 	while (--cleancount > 0) {
 		rx_desc = IXGB_RX_DESC(*rx_ring, i);
 
-		skb = dev_alloc_skb(adapter->rx_buffer_len + reserve_len);
+		skb = dev_alloc_skb(adapter->rx_buffer_len + NET_IP_ALIGN);
 
 		if (unlikely(!skb)) {
 			/* Better luck next round */
@@ -1906,7 +1905,7 @@ static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter)
 		 * this will result in a 16 byte aligned IP header after
 		 * the 14 byte MAC header is removed
 		 */
-		skb_reserve(skb, reserve_len);
+		skb_reserve(skb, NET_IP_ALIGN);
 
 		skb->dev = netdev;
 
