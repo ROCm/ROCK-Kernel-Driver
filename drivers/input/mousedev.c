@@ -76,7 +76,7 @@ enum mousedev_emul {
 	MOUSEDEV_EMUL_PS2,
 	MOUSEDEV_EMUL_IMPS,
 	MOUSEDEV_EMUL_EXPS
-} __attribute__ ((packed));
+};
 
 #define PACKET_QUEUE_LEN	16
 struct mousedev_list {
