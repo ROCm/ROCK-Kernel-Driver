@@ -1031,7 +1031,7 @@ static void lane2_associate_ind (struct net_device *dev, u8 *mac_addr,
 #define LEC_ARP_REFRESH_INTERVAL (3*HZ)
 
 static void lec_arp_check_expire(unsigned long data);
-static __inline__ void lec_arp_expire_arp(unsigned long data);
+static void lec_arp_expire_arp(unsigned long data);
 void dump_arp_table(struct lec_priv *priv);
 
 /* 
@@ -1371,7 +1371,7 @@ lec_arp_destroy(struct lec_priv *priv)
         struct lec_arp_table *entry, *next;
         int i;
 
-        del_timer(&priv->lec_arp_timer);
+        del_timer_sync(&priv->lec_arp_timer);
         
         /*
          * Remove all entries
@@ -1386,7 +1386,7 @@ lec_arp_destroy(struct lec_priv *priv)
         entry = priv->lec_arp_empty_ones;
         while(entry) {
                 next = entry->next;
-                del_timer(&entry->timer);
+                del_timer_sync(&entry->timer);
                 lec_arp_clear_vccs(entry);
                 kfree(entry);
                 entry = next;
@@ -1395,7 +1395,7 @@ lec_arp_destroy(struct lec_priv *priv)
         entry = priv->lec_no_forward;
         while(entry) {
                 next = entry->next;
-                del_timer(&entry->timer);
+                del_timer_sync(&entry->timer);
                 lec_arp_clear_vccs(entry);
                 kfree(entry);
                 entry = next;
@@ -1404,7 +1404,7 @@ lec_arp_destroy(struct lec_priv *priv)
         entry = priv->mcast_fwds;
         while(entry) {
                 next = entry->next;
-                del_timer(&entry->timer);
+                /* No timer, LANEv2 7.1.20 and 2.3.5.3 */
                 lec_arp_clear_vccs(entry);
                 kfree(entry);
                 entry = next;
@@ -1478,8 +1478,6 @@ lec_arp_expire_arp(unsigned long data)
 
         entry = (struct lec_arp_table *)data;
 
-        del_timer(&entry->timer);
-
         DPRINTK("lec_arp_expire_arp\n");
         if (entry->status == ESI_ARP_PENDING) {
                 if (entry->no_tries <= entry->priv->max_retry_count) {
@@ -1489,8 +1487,7 @@ lec_arp_expire_arp(unsigned long data)
                                 send_to_lecd(entry->priv, l_arp_xmt, entry->mac_addr, NULL, NULL);
                         entry->no_tries++;
                 }
-                entry->timer.expires = jiffies + (1*HZ);
-                add_timer(&entry->timer);
+                mod_timer(&entry->timer, jiffies + (1*HZ));
         }
 }
 
@@ -1562,8 +1559,6 @@ lec_arp_check_expire(unsigned long data)
         unsigned long time_to_check;
         int i;
 
-        del_timer(&priv->lec_arp_timer);
-
         DPRINTK("lec_arp_check_expire %p,%d\n",priv,
                 atomic_read(&priv->lec_arp_users));
         DPRINTK("expire: eo:%p nf:%p\n",priv->lec_arp_empty_ones,
@@ -1621,8 +1616,8 @@ lec_arp_check_expire(unsigned long data)
                 }
                 lec_arp_put(priv);
         }
-        priv->lec_arp_timer.expires = jiffies + LEC_ARP_REFRESH_INTERVAL;
-        add_timer(&priv->lec_arp_timer);
+
+        mod_timer(&priv->lec_arp_timer, jiffies + LEC_ARP_REFRESH_INTERVAL);
 }
 /*
  * Try to find vcc where mac_address is attached.
