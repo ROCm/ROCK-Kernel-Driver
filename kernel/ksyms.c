@@ -243,6 +243,8 @@ EXPORT_SYMBOL(shrink_dcache_anon);
 EXPORT_SYMBOL(find_inode_number);
 EXPORT_SYMBOL(is_subdir);
 EXPORT_SYMBOL(get_unused_fd);
+EXPORT_SYMBOL(vfs_read);
+EXPORT_SYMBOL(vfs_write);
 EXPORT_SYMBOL(vfs_create);
 EXPORT_SYMBOL(vfs_mkdir);
 EXPORT_SYMBOL(vfs_mknod);
