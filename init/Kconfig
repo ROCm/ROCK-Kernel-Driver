@@ -32,16 +32,19 @@ config EXPERIMENTAL
 	  you say Y here, you will be offered the choice of using features or
 	  drivers that are currently considered to be in the alpha-test phase.
 
-config BROKEN
-	bool "Prompt for old and known-broken drivers"
-	depends on EXPERIMENTAL
-	default n
+config CLEAN_COMPILE
+	bool "Don't select drivers known to be broken" if EXPERIMENTAL
+	default y
 	help
-	  This option allows you to choose whether you want to try to
-	  compile (and fix) old drivers that haven't been updated to
-	  new infrastructure.
+	  Select this option if you don't even want to see the option
+	  to configure known-broken drivers.
 
-	  If unsure, say N.
+	  If unsure, say Y
+
+config BROKEN
+	bool
+	depends on !CLEAN_COMPILE
+	default y
 
 config BROKEN_ON_SMP
 	bool
