@@ -224,7 +224,7 @@ int chmc_getunumber(int syndrome_code,
 		int dimm;
 
 		/* Multi-bit error, we just dump out all the
-		 * dimm labels assosciated with this bank.
+		 * dimm labels associated with this bank.
 		 */
 		for (dimm = 0; dimm < CHMCTRL_NDIMMS; dimm++) {
 			sprintf(buf, "%s ",

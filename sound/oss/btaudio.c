@@ -25,7 +25,6 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/types.h>
-#include <linux/wrapper.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/poll.h>
@@ -817,18 +816,20 @@ static char *irq_name[] = { "", "", "", "OFLOW", "", "", "", "", "", "", "",
 			    "RISCI", "FBUS", "FTRGT", "FDSR", "PPERR",
 			    "RIPERR", "PABORT", "OCERR", "SCERR" };
 
-static void btaudio_irq(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t btaudio_irq(int irq, void *dev_id, struct pt_regs * regs)
 {
 	int count = 0;
 	u32 stat,astat;
 	struct btaudio *bta = dev_id;
+	int handled = 0;
 
 	for (;;) {
 		count++;
 		stat  = btread(REG_INT_STAT);
 		astat = stat & btread(REG_INT_MASK);
 		if (!astat)
-			return;
+			return IRQ_RETVAL(handled);
+		handled = 1;
 		btwrite(astat,REG_INT_STAT);
 
 		if (irq_debug) {
@@ -864,7 +865,7 @@ static void btaudio_irq(int irq, void *dev_id, struct pt_regs * regs)
 			btwrite(0, REG_INT_MASK);
 		}
 	}
-	return;
+	return IRQ_NONE;
 }
 
 /* -------------------------------------------------------------- */

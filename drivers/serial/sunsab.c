@@ -290,7 +290,7 @@ static void check_status(struct uart_sunsab_port *up,
 	wake_up_interruptible(&up->port.info->delta_msr_wait);
 }
 
-static void sunsab_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunsab_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunsab_port *up = dev_id;
 	union sab82532_irq_status status;
@@ -339,6 +339,8 @@ static void sunsab_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 /* port->lock is not held.  */
@@ -826,9 +828,9 @@ static struct uart_driver sunsab_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/%d",
+	.dev_name		= "tts/",
 #else
-	.dev_name		= "ttyS%d",
+	.dev_name		= "ttyS",
 #endif
 	.major			= TTY_MAJOR,
 };
@@ -859,11 +861,6 @@ static void sunsab_console_write(struct console *con, const char *s, unsigned n)
 		sunsab_console_putchar(up, *s++);
 	}
 	sunsab_tec_wait(up);
-}
-
-static kdev_t sunsab_console_device(struct console *con)
-{
-	return mk_kdev(sunsab_reg.major, sunsab_reg.minor + con->index);
 }
 
 static int sunsab_console_setup(struct console *con, char *options)
@@ -926,10 +923,11 @@ static int sunsab_console_setup(struct console *con, char *options)
 static struct console sunsab_console = {
 	.name	=	"ttyS",
 	.write	=	sunsab_console_write,
-	.device	=	sunsab_console_device,
+	.device	=	uart_console_device,
 	.setup	=	sunsab_console_setup,
 	.flags	=	CON_PRINTBUFFER,
 	.index	=	-1,
+	.data	=	&sunsab_reg,
 };
 
 static void __init sunsab_console_init(void)

@@ -12,6 +12,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/list.h>
+#include <linux/interrupt.h>
 
 #define	AVMB1_PORTLEN		0x1f
 #define AVM_MAXVERSION		8
@@ -555,7 +556,7 @@ void b1_register_appl(struct capi_ctr *ctrl, u16 appl,
 void b1_release_appl(struct capi_ctr *ctrl, u16 appl);
 u16  b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
 void b1_parse_version(avmctrl_info *card);
-void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs);
+irqreturn_t b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs);
 
 int b1ctl_read_proc(char *page, char **start, off_t off,
         		int count, int *eof, struct capi_ctr *ctrl);
@@ -568,7 +569,7 @@ void avmcard_dma_free(avmcard_dmainfo *);
 int b1pciv4_detect(avmcard *card);
 int t1pci_detect(avmcard *card);
 void b1dma_reset(avmcard *card);
-void b1dma_interrupt(int interrupt, void *devptr, struct pt_regs *regs);
+irqreturn_t b1dma_interrupt(int interrupt, void *devptr, struct pt_regs *regs);
 
 int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data);
 void b1dma_reset_ctr(struct capi_ctr *ctrl);

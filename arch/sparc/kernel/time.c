@@ -120,7 +120,7 @@ __volatile__ unsigned int *master_l10_limit;
 
 #define TICK_SIZE (tick_nsec / 1000)
 
-void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	/* last time the cmos clock got updated */
 	static long last_rtc_update;
@@ -156,6 +156,8 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	    last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
 	}
 	write_sequnlock(&xtime_lock);
+
+	return IRQ_HANDLED;
 }
 
 /* Kick start a stopped clock (procedure from the Sun NVRAM/hostid FAQ). */
@@ -406,7 +408,9 @@ void __init sbus_time_init(void)
 	mon = MSTK_REG_MONTH(mregs);
 	year = MSTK_CVT_YEAR( MSTK_REG_YEAR(mregs) );
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_nsec = 0;
+	wall_to_monotonic.tv_sec = -xtime.tv_sec + INITIAL_JIFFIES / HZ;
+	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+	wall_to_monotonic.tv_nsec = 0;
 	mregs->creg &= ~MSTK_CREG_READ;
 	spin_unlock_irq(&mostek_lock);
 #ifdef CONFIG_SUN4
@@ -437,7 +441,9 @@ void __init sbus_time_init(void)
 		intersil_start(iregs);
 
 		xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-		xtime.tv_nsec = 0;
+		wall_to_monotonic.tv_sec = -xtime.tv_sec + INITIAL_JIFFIES / HZ;
+		xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+		wall_to_monotonic.tv_nsec = 0;
 		printk("%u/%u/%u %u:%u:%u\n",day,mon,year,hour,min,sec);
 	}
 #endif
@@ -510,13 +516,28 @@ static void sbus_do_settimeofday(struct timeval *tv)
 	 * made, and then undo it!
 	 */
 	tv->tv_usec -= do_gettimeoffset();
-	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+	tv->tv_usec -= (jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
+
 	while (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
+		tv->tv_usec += USEC_PER_SEC;
 		tv->tv_sec--;
 	}
+	tv->tv_usec *= NSEC_PER_USEC;
+
+	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
+	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_usec;
+
+	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
+		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec++;
+	}
+	if (wall_to_monotonic.tv_nsec < 0) {
+		wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec--;
+	}
+
 	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = (tv->tv_usec * 1000);
+	xtime.tv_nsec = tv->tv_usec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;

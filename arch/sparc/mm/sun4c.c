@@ -248,7 +248,7 @@ void sun4c_complete_all_stores(void)
 	_unused = sun4c_get_context();
 	sun4c_set_context(_unused);
 #ifdef CONFIG_SUN_AUXIO
-	_unused = *AUXREG;
+	_unused = get_auxio();
 #endif
 }
 
@@ -1901,7 +1901,7 @@ static pte_t *sun4c_pte_alloc_one_kernel(struct mm_struct *mm, unsigned long add
 	if ((pte = sun4c_pte_alloc_one_fast(mm, address)) != NULL)
 		return pte;
 
-	pte = (pte_t *)__get_free_page(GFP_KERNEL);
+	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte)
 		memset(pte, 0, PAGE_SIZE);
 	return pte;

@@ -21,9 +21,7 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/swap.h>
-#ifdef CONFIG_BLK_DEV_INITRD
-#include <linux/blk.h>
-#endif
+#include <linux/initrd.h>
 
 #include <asm/bootinfo.h>
 #include <asm/cachectl.h>

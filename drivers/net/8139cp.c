@@ -658,7 +658,8 @@ rx_next:
 	cp->rx_tail = rx_tail;
 }
 
-static void cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t
+cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
 	struct cp_private *cp = dev->priv;
@@ -666,7 +667,7 @@ static void cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 
 	status = cpr16(IntrStatus);
 	if (!status || (status == 0xFFFF))
-		return;
+		return IRQ_NONE;
 
 	if (netif_msg_intr(cp))
 		printk(KERN_DEBUG "%s: intr, status %04x cmd %02x cpcmd %04x\n",
@@ -693,6 +694,7 @@ static void cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 	}
 
 	spin_unlock(&cp->lock);
+	return IRQ_HANDLED;
 }
 
 static void cp_tx (struct cp_private *cp)

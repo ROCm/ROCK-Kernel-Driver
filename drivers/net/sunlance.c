@@ -812,7 +812,7 @@ out:
 	spin_unlock(&lp->lock);
 }
 
-static void lance_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t lance_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct lance_private *lp = (struct lance_private *)dev->priv;
@@ -871,6 +871,8 @@ static void lance_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	sbus_writew(LE_C0_INEA, lp->lregs + RDP);
+
+	return IRQ_HANDLED;
 }
 
 /* Build a fake network packet and send it to ourselves. */
@@ -1415,7 +1417,7 @@ static int __init sparc_lance_init(struct net_device *dev,
 				       "'tpe-link-test?'\n", dev->name);
 				printk(KERN_NOTICE "%s: warning: mail any problems "
 				       "to ecd@skynet.be\n", dev->name);
-				set_auxio(AUXIO_LINK_TEST, 0);
+				auxio_set_lte(AUXIO_LTE_ON);
 			}
 no_link_test:
 			lp->auto_select = 1;

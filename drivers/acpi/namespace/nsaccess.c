@@ -527,7 +527,7 @@ acpi_ns_lookup (
 
 		/* Extract one ACPI name from the front of the pathname */
 
-		ACPI_MOVE_UNALIGNED32_TO_32 (&simple_name, path);
+		ACPI_MOVE_32_TO_32 (&simple_name, path);
 
 		/* Try to find the single (4 character) ACPI name */
 

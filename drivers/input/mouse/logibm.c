@@ -75,7 +75,7 @@ MODULE_PARM(logibm_irq, "i");
 static int logibm_irq = LOGIBM_IRQ;
 static int logibm_used = 0;
 
-static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static int logibm_open(struct input_dev *dev)
 {
@@ -114,7 +114,7 @@ static struct input_dev logibm_dev = {
 	},
 };
 
-static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	char dx, dy;
 	unsigned char buttons;
@@ -139,6 +139,7 @@ static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	input_sync(&logibm_dev);
 
 	outb(LOGIBM_ENABLE_IRQ, LOGIBM_CONTROL_PORT);
+	return IRQ_HANDLED;
 }
 
 #ifndef MODULE

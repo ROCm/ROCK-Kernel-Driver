@@ -942,11 +942,6 @@ void gdb_puts(const char *str)
 	}
 }
 
-static kdev_t gdb_console_dev(struct console *con)
-{
-	return MKDEV(1, 3); /* /dev/null */
-}
-
 static void gdb_console_write(struct console *con, const char *s, unsigned n)
 {
 	gdb_puts(s);
@@ -955,7 +950,6 @@ static void gdb_console_write(struct console *con, const char *s, unsigned n)
 static struct console gdb_console = {
 	.name	= "gdb",
 	.write	= gdb_console_write,
-	.device	= gdb_console_dev,
 	.flags	= CON_PRINTBUFFER,
 	.index	= -1
 };

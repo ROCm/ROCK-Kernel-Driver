@@ -458,7 +458,7 @@ static _INLINE_ void check_modem_status(struct uart_sunsu_port *up)
 	wake_up_interruptible(&up->port.info->delta_msr_wait);
 }
 
-static void sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunsu_port *up = dev_id;
 	unsigned long flags;
@@ -476,6 +476,8 @@ static void sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	} while (!(serial_in(up, UART_IIR) & UART_IIR_NO_INT));
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 /* Separate interrupt handling path for keyboard/mouse ports.  */
@@ -548,7 +550,7 @@ static void receive_kbd_ms_chars(struct uart_sunsu_port *up, struct pt_regs *reg
 	} while (serial_in(up, UART_LSR) & UART_LSR_DR);
 }
 
-static void sunsu_kbd_ms_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunsu_kbd_ms_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunsu_port *up = dev_id;
 
@@ -559,6 +561,8 @@ static void sunsu_kbd_ms_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			receive_kbd_ms_chars(up, regs,
 					     (status & UART_LSR_BI) != 0);
 	}
+
+	return IRQ_HANDLED;
 }
 
 static unsigned int sunsu_tx_empty(struct uart_port *port)
@@ -1282,9 +1286,9 @@ static struct uart_driver sunsu_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/%d",
+	.dev_name		= "tts/",
 #else
-	.dev_name		= "ttyS%d",
+	.dev_name		= "ttyS",
 #endif
 	.major			= TTY_MAJOR,
 };
@@ -1418,11 +1422,6 @@ static void sunsu_console_write(struct console *co, const char *s,
 	serial_out(up, UART_IER, ier);
 }
 
-static kdev_t sunsu_console_device(struct console *co)
-{
-	return mk_kdev(sunsu_reg.major, sunsu_reg.minor + co->index);
-}
-
 /*
  *	Setup initial baud/bits/parity. We do two things here:
  *	- construct a cflag setting for the first su_open()
@@ -1463,10 +1462,11 @@ static int __init sunsu_console_setup(struct console *co, char *options)
 static struct console sunsu_cons = {
 	.name	=	"ttyS",
 	.write	=	sunsu_console_write,
-	.device	=	sunsu_console_device,
+	.device	=	uart_console_device,
 	.setup	=	sunsu_console_setup,
 	.flags	=	CON_PRINTBUFFER,
 	.index	=	-1,
+	.data	=	&sunsu_reg,
 };
 
 /*

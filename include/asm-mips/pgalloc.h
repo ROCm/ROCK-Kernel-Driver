@@ -132,7 +132,7 @@ static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte;
 
-	pte = (pte_t *) __get_free_page(GFP_KERNEL);
+	pte = (pte_t *) __get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte)
 		clear_page(pte);
 	return pte;

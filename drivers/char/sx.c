@@ -441,7 +441,7 @@ static struct miscdevice sx_fw_device = {
 /* This doesn't work. Who's paranoid around here? Not me! */
 
 static inline int sx_paranoia_check(struct sx_port const * port,
-				    kdev_t device, const char *routine)
+				    char *name, const char *routine)
 {
 
 	static const char *badmagic =
@@ -450,11 +450,11 @@ static inline int sx_paranoia_check(struct sx_port const * port,
 	  KERN_ERR "sx: Warning: null sx port for device %s in %s\n";
  
 	if (!port) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (port->magic != SX_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 
@@ -1202,7 +1202,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
  * Small, elegant, clear.
  */
 
-static void sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
+static irqreturn_t sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 {
 	struct sx_board *board = ptr;
 	struct sx_port *port;
@@ -1269,12 +1269,14 @@ static void sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 		}
 	}
 
-	if (!sx_initialized) return;
-	if (!(board->flags & SX_BOARD_INITIALIZED)) return;
+	if (!sx_initialized)
+		return IRQ_HANDLED;
+	if (!(board->flags & SX_BOARD_INITIALIZED))
+		return IRQ_HANDLED;
 
 	if (test_and_set_bit (SX_BOARD_INTR_LOCK, &board->locks)) {
 		printk (KERN_ERR "Recursive interrupt! (%d)\n", board->irq);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	 for (i=0;i<board->nports;i++) {
@@ -1298,6 +1300,7 @@ static void sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 
 	sx_dprintk (SX_DEBUG_FLOW, "sx: exit sx_interrupt (%d/%d)\n", irq, board->irq); 
 	/*  func_exit ();  */
+	return IRQ_HANDLED;
 }
 
 
@@ -1434,7 +1437,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 		return -EIO;
 	}
 
-	line = minor(tty->device);
+	line = tty->index;
 	sx_dprintk (SX_DEBUG_OPEN, "%d: opening line %d. tty=%p ctty=%p, np=%d)\n", 
 	            current->pid, line, tty, current->tty, sx_nports);
 
@@ -1500,7 +1503,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	/* tty->low_latency = 1; */
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = port->gs.normal_termios;
 		else 
 			*tty->termios = port->gs.callout_termios;

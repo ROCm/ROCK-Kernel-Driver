@@ -276,7 +276,7 @@ snd_wavefront_pnp (int dev, snd_wavefront_card_t *acard, struct pnp_card_link *c
 
 #endif /* CONFIG_PNP */
 
-static void snd_wavefront_ics2115_interrupt(int irq, 
+static irqreturn_t snd_wavefront_ics2115_interrupt(int irq, 
 					    void *dev_id, 
 					    struct pt_regs *regs)
 {
@@ -285,13 +285,14 @@ static void snd_wavefront_ics2115_interrupt(int irq,
 	acard = (snd_wavefront_card_t *) dev_id;
 
 	if (acard == NULL) 
-		return;
+		return IRQ_NONE;
 
 	if (acard->wavefront.interrupts_are_midi) {
 		snd_wavefront_midi_interrupt (acard);
 	} else {
 		snd_wavefront_internal_interrupt (acard);
 	}
+	return IRQ_HANDLED;
 }
 
 snd_hwdep_t * __devinit

@@ -801,7 +801,7 @@ static void set_baud(struct tty_struct *tty, unsigned int baudcode)
 	struct termios old_termios = *(tty->termios);
 	tty->termios->c_cflag &= ~CBAUD;	/* Clear the old baud setting */
 	tty->termios->c_cflag |= baudcode;	/* Set the new baud setting */
-	tty->driver.set_termios(tty, &old_termios);
+	tty->driver->set_termios(tty, &old_termios);
 }
 
 /*
@@ -1048,8 +1048,10 @@ static int sprintf_neighbours(char *buffer, MetricomNodeTable * table,
 		if (table->num_nodes)
 			ptr += sprintf(ptr, "\n %s\n", title);
 		for (i = 0; i < table->num_nodes; i++) {
+			MetricomNode node;
+
 			spin_lock_irqsave(&strip_lock, flags);
-			MetricomNode node = table->node[i];
+			node = table->node[i];
 			spin_unlock_irqrestore(&strip_lock, flags);
 			ptr += sprintf(ptr, "  %s\n", node.c);
 		}
@@ -1266,7 +1268,7 @@ static void ResetRadio(struct strip *strip_info)
 			set_baud(tty, strip_info->user_baud);
 	}
 
-	tty->driver.write(tty, 0, s.string, s.length);
+	tty->driver->write(tty, 0, s.string, s.length);
 #ifdef EXT_COUNTERS
 	strip_info->tx_ebytes += s.length;
 #endif
@@ -1288,7 +1290,7 @@ static void strip_write_some_more(struct tty_struct *tty)
 
 	if (strip_info->tx_left > 0) {
 		int num_written =
-		    tty->driver.write(tty, 0, strip_info->tx_head,
+		    tty->driver->write(tty, 0, strip_info->tx_head,
 				      strip_info->tx_left);
 		strip_info->tx_left -= num_written;
 		strip_info->tx_head += num_written;
@@ -2688,8 +2690,8 @@ static int strip_open(struct tty_struct *tty)
 
 	strip_info->tty = tty;
 	tty->disc_data = strip_info;
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 

@@ -403,9 +403,6 @@ struct video_card {
 	/* entry in dv1394_cards */
 	struct list_head list;
 
-	/* handle to /dev/ieee1394/dv/N, NULL if devfs not in use */
-	devfs_handle_t devfs_handle;
-
 	/* OHCI card IT DMA context number, -1 if not in use */
 	int ohci_it_ctx;
 	struct ohci1394_iso_tasklet it_tasklet;
@@ -458,6 +455,10 @@ struct video_card {
 	 */
 	spinlock_t spinlock;
 
+	/* flag to prevent spurious interrupts (which OHCI seems to
+	   generate a lot :) from accessing the struct */
+	int dma_running;
+	
 	/*
 	  3) the sleeping semaphore 'sem' - this is used from process context only,
 	  to serialize various operations on the video_card. Even though only one
@@ -571,7 +572,7 @@ static inline int video_card_initialized(struct video_card *v)
 
 static int do_dv1394_init(struct video_card *video, struct dv1394_init *init);
 static int do_dv1394_init_default(struct video_card *video);
-static int do_dv1394_shutdown(struct video_card *video, int free_user_buf);
+static void do_dv1394_shutdown(struct video_card *video, int free_user_buf);
 
 
 /* NTSC empty packet rate accurate to within 0.01%, 

@@ -217,10 +217,11 @@ uctrl_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-void uctrl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t uctrl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uctrl_driver *driver = (struct uctrl_driver *)dev_id;
 	printk("in uctrl_interrupt\n");
+	return IRQ_HANDLED;
 }
 
 static struct file_operations uctrl_fops = {

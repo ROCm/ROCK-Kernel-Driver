@@ -16,6 +16,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -447,6 +448,10 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
         else
                 sch->handle = handle;
 
+	err = -EBUSY;
+	if (!try_module_get(ops->owner))
+		goto err_out;
+
 	if (!ops->init || (err = ops->init(sch, tca[TCA_OPTIONS-1])) == 0) {
 		write_lock(&qdisc_tree_lock);
 		sch->next = dev->qdisc_list;
@@ -458,6 +463,7 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 #endif
 		return sch;
 	}
+	module_put(ops->owner);
 
 err_out:
 	*errp = err;

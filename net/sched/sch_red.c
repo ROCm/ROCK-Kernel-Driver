@@ -407,14 +407,7 @@ static int red_change(struct Qdisc *sch, struct rtattr *opt)
 
 static int red_init(struct Qdisc* sch, struct rtattr *opt)
 {
-	int err;
-
-	MOD_INC_USE_COUNT;
-
-	if ((err = red_change(sch, opt)) != 0) {
-		MOD_DEC_USE_COUNT;
-	}
-	return err;
+	return red_change(sch, opt);
 }
 
 
@@ -458,27 +451,23 @@ rtattr_failure:
 
 static void red_destroy(struct Qdisc *sch)
 {
-	MOD_DEC_USE_COUNT;
 }
 
-struct Qdisc_ops red_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "red",
-	.priv_size	= sizeof(struct red_sched_data),
-
-	.enqueue	= red_enqueue,
-	.dequeue	= red_dequeue,
-	.requeue	= red_requeue,
-	.drop		= red_drop,
-
-	.init		= red_init,
-	.reset		= red_reset,
-	.destroy	= red_destroy,
-	.change		= red_change,
-
-	.dump		= red_dump,
+struct Qdisc_ops red_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"red",
+	.priv_size	=	sizeof(struct red_sched_data),
+	.enqueue	=	red_enqueue,
+	.dequeue	=	red_dequeue,
+	.requeue	=	red_requeue,
+	.drop		=	red_drop,
+	.init		=	red_init,
+	.reset		=	red_reset,
+	.destroy	=	red_destroy,
+	.change		=	red_change,
+	.dump		=	red_dump,
+	.owner		=	THIS_MODULE,
 };
 
 

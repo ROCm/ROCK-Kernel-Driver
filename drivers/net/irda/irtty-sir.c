@@ -62,7 +62,7 @@ static int irtty_chars_in_buffer(struct sir_dev *dev)
 	ASSERT(priv != NULL, return -1;);
 	ASSERT(priv->magic == IRTTY_MAGIC, return -1;);
 
-	return priv->tty->driver.chars_in_buffer(priv->tty);
+	return priv->tty->driver->chars_in_buffer(priv->tty);
 }
 
 /* Wait (sleep) until underlaying hardware finished transmission
@@ -91,9 +91,9 @@ static void irtty_wait_until_sent(struct sir_dev *dev)
 	ASSERT(priv->magic == IRTTY_MAGIC, return;);
 
 	tty = priv->tty;
-	if (tty->driver.wait_until_sent) {
+	if (tty->driver->wait_until_sent) {
 		lock_kernel();
-		tty->driver.wait_until_sent(tty, MSECS_TO_JIFFIES(100));
+		tty->driver->wait_until_sent(tty, MSECS_TO_JIFFIES(100));
 		unlock_kernel();
 	}
 	else {
@@ -161,8 +161,8 @@ static int irtty_change_speed(struct sir_dev *dev, unsigned speed)
 	}	
 
 	tty->termios->c_cflag = cflag;
-	if (tty->driver.set_termios)
-		tty->driver.set_termios(tty, &old_termios);
+	if (tty->driver->set_termios)
+		tty->driver->set_termios(tty, &old_termios);
 	unlock_kernel();
 
 	priv->io.speed = speed;
@@ -180,32 +180,29 @@ static int irtty_change_speed(struct sir_dev *dev, unsigned speed)
 static int irtty_set_dtr_rts(struct sir_dev *dev, int dtr, int rts)
 {
 	struct sirtty_cb *priv = dev->priv;
-	int arg = 0;
+	int set = 0;
+	int clear = 0;
 
 	ASSERT(priv != NULL, return -1;);
 	ASSERT(priv->magic == IRTTY_MAGIC, return -1;);
 
-#ifdef TIOCM_OUT2 /* Not defined for ARM */
-	arg = TIOCM_OUT2;
-#endif
 	if (rts)
-		arg |= TIOCM_RTS;
+		set |= TIOCM_RTS;
+	else
+		clear |= TIOCM_RTS;
 	if (dtr)
-		arg |= TIOCM_DTR;
+		set |= TIOCM_DTR;
+	else
+		clear |= TIOCM_DTR;
 
 	/*
-	 * The ioctl() function, or actually set_modem_info() in serial.c
-	 * expects a pointer to the argument in user space. This is working
-	 * here because we are always called from the kIrDAd thread which
-	 * has set_fs(KERNEL_DS) permanently set. Therefore copy_from_user()
-	 * is happy with our arg-parameter being local here in kernel space.
+	 * We can't use ioctl() because it expects a non-null file structure,
+	 * and we don't have that here.
+	 * This function is not yet defined for all tty driver, so
+	 * let's be careful... Jean II
 	 */
-
-	lock_kernel();
-	if (priv->tty->driver.ioctl(priv->tty, NULL, TIOCMSET, (unsigned long) &arg)) { 
-		IRDA_DEBUG(2, "%s(), error doing ioctl!\n", __FUNCTION__);
-	}
-	unlock_kernel();
+	ASSERT(priv->tty->driver->tiocmset != NULL, return -1;);
+	priv->tty->driver->tiocmset(priv->tty, NULL, set, clear);
 
 	return 0;
 }
@@ -234,17 +231,17 @@ static int irtty_do_write(struct sir_dev *dev, const unsigned char *ptr, size_t 
 	ASSERT(priv->magic == IRTTY_MAGIC, return -1;);
 
 	tty = priv->tty;
-	if (!tty->driver.write)
+	if (!tty->driver->write)
 		return 0;
 	tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	if (tty->driver.write_room) {
-		writelen = tty->driver.write_room(tty);
+	if (tty->driver->write_room) {
+		writelen = tty->driver->write_room(tty);
 		if (writelen > len)
 			writelen = len;
 	}
 	else
 		writelen = len;
-	return tty->driver.write(tty, 0, ptr, writelen);
+	return tty->driver->write(tty, 0, ptr, writelen);
 }
 
 /* ------------------------------------------------------- */
@@ -357,8 +354,8 @@ static inline void irtty_stop_receiver(struct tty_struct *tty, int stop)
 		cflag |= CREAD;
 
 	tty->termios->c_cflag = cflag;
-	if (tty->driver.set_termios)
-		tty->driver.set_termios(tty, &old_termios);
+	if (tty->driver->set_termios)
+		tty->driver->set_termios(tty, &old_termios);
 	unlock_kernel();
 }
 
@@ -384,8 +381,8 @@ static int irtty_start_dev(struct sir_dev *dev)
 
 	tty = priv->tty;
 
-	if (tty->driver.start)
-		tty->driver.start(tty);
+	if (tty->driver->start)
+		tty->driver->start(tty);
 	/* Make sure we can receive more data */
 	irtty_stop_receiver(tty, FALSE);
 
@@ -413,8 +410,8 @@ static int irtty_stop_dev(struct sir_dev *dev)
 
 	/* Make sure we don't receive more data */
 	irtty_stop_receiver(tty, TRUE);
-	if (tty->driver.stop)
-		tty->driver.stop(tty);
+	if (tty->driver->stop)
+		tty->driver->stop(tty);
 
 	up(&irtty_sem);
 
@@ -505,7 +502,6 @@ static int irtty_open(struct tty_struct *tty)
 {
 	struct sir_dev *dev;
 	struct sirtty_cb *priv;
-	char hwname[16];
 	int ret = 0;
 
 	/* unfortunately, there's no tty_ldisc->owner field
@@ -525,11 +521,11 @@ static int irtty_open(struct tty_struct *tty)
 
 	/* stop the underlying  driver */
 	irtty_stop_receiver(tty, TRUE);
-	if (tty->driver.stop)
-		tty->driver.stop(tty);
+	if (tty->driver->stop)
+		tty->driver->stop(tty);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	
 /* from old irtty - but what is it good for?
  * we _are_ the ldisc and we _don't_ implement flush_buffer!
@@ -538,25 +534,11 @@ static int irtty_open(struct tty_struct *tty)
  *		tty->ldisc.flush_buffer(tty);
  */
 
-
-	/* create device name - could we use tty_name() here? */
-
-	if (strchr(tty->driver.name, '%')) {
-		sprintf(hwname, tty->driver.name,
-			minor(tty->device) - tty->driver.minor_start +
-			tty->driver.name_base);
-	}
-	else {
-		sprintf(hwname, "%s%d", tty->driver.name,
-			minor(tty->device) - tty->driver.minor_start +
-			tty->driver.name_base);
-	}
-
 	/* apply mtt override */
 	sir_tty_drv.qos_mtt_bits = qos_mtt_bits;
 
 	/* get a sir device instance for this driver */
-	dev = sirdev_get_instance(&sir_tty_drv, hwname);
+	dev = sirdev_get_instance(&sir_tty_drv, tty->name);
 	if (!dev) {
 		ret = -ENODEV;
 		goto out;
@@ -628,8 +610,8 @@ static void irtty_close(struct tty_struct *tty)
 	/* Stop tty */
 	irtty_stop_receiver(tty, TRUE);
 	tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
-	if (tty->driver.stop)
-		tty->driver.stop(tty);
+	if (tty->driver->stop)
+		tty->driver->stop(tty);
 
 	kfree(priv);
 

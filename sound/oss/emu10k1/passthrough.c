@@ -36,7 +36,6 @@
 #include <asm/io.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
-#include <linux/wrapper.h>
 
 #include "hwaccess.h"
 #include "cardwo.h"

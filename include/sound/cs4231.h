@@ -316,7 +316,7 @@ unsigned char snd_cs4236_ext_in(cs4231_t *chip, unsigned char reg);
 void snd_cs4231_mce_up(cs4231_t *chip);
 void snd_cs4231_mce_down(cs4231_t *chip);
 
-void snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 const char *snd_cs4231_chip_id(cs4231_t *chip);
 

@@ -27,17 +27,9 @@
 static inline pte_t *
 pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
-	int count = 0;
 	pte_t *pte;
 
-	do {
-		pte = (pte_t *)__get_free_page(GFP_KERNEL);
-		if (!pte) {
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ);
-		}
-	} while (!pte && (count++ < 10));
-
+	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte) {
 		clear_page(pte);
 		clean_dcache_area(pte, sizeof(pte_t) * PTRS_PER_PTE);
@@ -51,16 +43,8 @@ static inline struct page *
 pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
 	struct page *pte;
-	int count = 0;
 
-	do {
-		pte = alloc_pages(GFP_KERNEL, 0);
-		if (!pte) {
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ);
-		}
-	} while (!pte && (count++ < 10));
-
+	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
 	if (pte) {
 		void *page = page_address(pte);
 		clear_page(page);

@@ -1337,7 +1337,7 @@ static void show_rx_frame(struct orinoco_rxframe_hdr *frame)
 /*
  * Interrupt handler
  */
-void orinoco_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t orinoco_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct orinoco_private *priv = (struct orinoco_private *) dev_id;
 	hermes_t *hw = &priv->hw;
@@ -1353,7 +1353,7 @@ void orinoco_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (orinoco_lock(priv, &flags) != 0) {
 		/* If hw is unavailable */
-		return;
+		return IRQ_NONE;
 	}
 
 	evstat = hermes_read_regn(hw, EVSTAT);
@@ -1403,6 +1403,8 @@ much! Shutting down.\n",
 	};
 
 	orinoco_unlock(priv, &flags);
+
+	return IRQ_HANDLED;
 }
 
 static void __orinoco_ev_tick(struct orinoco_private *priv, hermes_t *hw)

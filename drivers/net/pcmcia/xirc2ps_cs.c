@@ -646,6 +646,7 @@ xirc2ps_attach(void)
     link->irq.Instance = dev;
 
     /* Fill in card specific entries */
+    SET_MODULE_OWNER(dev);
     dev->hard_start_xmit = &do_start_xmit;
     dev->set_config = &do_config;
     dev->get_stats = &do_get_stats;
@@ -1714,7 +1715,6 @@ do_open(struct net_device *dev)
 
     /* okay */
     link->open++;
-    MOD_INC_USE_COUNT;
 
     netif_start_queue(dev);
     do_reset(dev,1);
@@ -2065,8 +2065,6 @@ do_stop(struct net_device *dev)
     link->open--;
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
-
-    MOD_DEC_USE_COUNT;
 
     return 0;
 }

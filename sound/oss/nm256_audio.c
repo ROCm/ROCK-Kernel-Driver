@@ -44,8 +44,8 @@ static struct audio_driver nm256_audio_driver;
 
 static int nm256_grabInterrupt (struct nm256_info *card);
 static int nm256_releaseInterrupt (struct nm256_info *card);
-static void nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy);
-static void nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy);
+static irqreturn_t nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy);
+static irqreturn_t nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy);
 static int handle_pm_event (struct pm_dev *dev, pm_request_t rqst, void *data);
 
 /* These belong in linux/pci.h. */
@@ -528,16 +528,17 @@ nm256_initHw (struct nm256_info *card)
  * I suppose...yucky bleah.)
  */
 
-static void
+static irqreturn_t
 nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 {
     struct nm256_info *card = (struct nm256_info *)dev_id;
     u16 status;
     static int badintrcount = 0;
+    int handled = 0;
 
     if ((card == NULL) || (card->magsig != NM_MAGIC_SIG)) {
 	printk (KERN_ERR "NM256: Bad card pointer\n");
-	return;
+	return IRQ_NONE;
     }
 
     status = nm256_readPort16 (card, 2, NM_INT_REG);
@@ -558,13 +559,14 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 	     * inserted a PCMCIA card and someone's spamming us with IRQ 9s.
 	     */
 
+	    handled = 1;
 	    if (card->playing)
 		stopPlay (card);
 	    if (card->recording)
 		stopRecord (card);
 	    badintrcount = 0;
 	}
-	return;
+	return IRQ_RETVAL(handled);
     }
 
     badintrcount = 0;
@@ -572,6 +574,7 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
     /* Rather boring; check for individual interrupts and process them. */
 
     if (status & NM_PLAYBACK_INT) {
+	handled = 1;
 	status &= ~NM_PLAYBACK_INT;
 	NM_ACK_INT (card, NM_PLAYBACK_INT);
 
@@ -580,6 +583,7 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
     }
 
     if (status & NM_RECORD_INT) {
+	handled = 1;
 	status &= ~NM_RECORD_INT;
 	NM_ACK_INT (card, NM_RECORD_INT);
 
@@ -590,6 +594,7 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
     if (status & NM_MISC_INT_1) {
 	u8 cbyte;
 
+	handled = 1;
 	status &= ~NM_MISC_INT_1;
 	printk (KERN_ERR "NM256: Got misc interrupt #1\n");
 	NM_ACK_INT (card, NM_MISC_INT_1);
@@ -601,6 +606,7 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
     if (status & NM_MISC_INT_2) {
 	u8 cbyte;
 
+	handled = 1;
 	status &= ~NM_MISC_INT_2;
 	printk (KERN_ERR "NM256: Got misc interrupt #2\n");
 	NM_ACK_INT (card, NM_MISC_INT_2);
@@ -610,11 +616,13 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 
     /* Unknown interrupt. */
     if (status) {
+	handled = 1;
 	printk (KERN_ERR "NM256: Fire in the hole! Unknown status 0x%x\n",
 		status);
 	/* Pray. */
 	NM_ACK_INT (card, status);
     }
+    return IRQ_RETVAL(handled);
 }
 
 /*
@@ -623,16 +631,17 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
  * routine.
  */
 
-static void
+static irqreturn_t
 nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
 {
     struct nm256_info *card = (struct nm256_info *)dev_id;
     u32 status;
     static int badintrcount = 0;
+    int handled = 0;
 
     if ((card == NULL) || (card->magsig != NM_MAGIC_SIG)) {
 	printk (KERN_ERR "NM256: Bad card pointer\n");
-	return;
+	return IRQ_NONE;
     }
 
     status = nm256_readPort32 (card, 2, NM_INT_REG);
@@ -655,13 +664,14 @@ nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
 	     * IRQ 9s.
 	     */
 
+	    handled = 1;
 	    if (card->playing)
 		stopPlay (card);
 	    if (card->recording)
 		stopRecord (card);
 	    badintrcount = 0;
 	}
-	return;
+	return IRQ_RETVAL(handled);
     }
 
     badintrcount = 0;
@@ -669,6 +679,7 @@ nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
     /* Rather boring; check for individual interrupts and process them. */
 
     if (status & NM2_PLAYBACK_INT) {
+	handled = 1;
 	status &= ~NM2_PLAYBACK_INT;
 	NM2_ACK_INT (card, NM2_PLAYBACK_INT);
 
@@ -677,6 +688,7 @@ nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
     }
 
     if (status & NM2_RECORD_INT) {
+	handled = 1;
 	status &= ~NM2_RECORD_INT;
 	NM2_ACK_INT (card, NM2_RECORD_INT);
 
@@ -687,6 +699,7 @@ nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
     if (status & NM2_MISC_INT_1) {
 	u8 cbyte;
 
+	handled = 1;
 	status &= ~NM2_MISC_INT_1;
 	printk (KERN_ERR "NM256: Got misc interrupt #1\n");
 	NM2_ACK_INT (card, NM2_MISC_INT_1);
@@ -697,6 +710,7 @@ nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
     if (status & NM2_MISC_INT_2) {
 	u8 cbyte;
 
+	handled = 1;
 	status &= ~NM2_MISC_INT_2;
 	printk (KERN_ERR "NM256: Got misc interrupt #2\n");
 	NM2_ACK_INT (card, NM2_MISC_INT_2);
@@ -706,11 +720,13 @@ nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
 
     /* Unknown interrupt. */
     if (status) {
+	handled = 1;
 	printk (KERN_ERR "NM256: Fire in the hole! Unknown status 0x%x\n",
 		status);
 	/* Pray. */
 	NM2_ACK_INT (card, status);
     }
+    return IRQ_RETVAL(handled);
 }
 
 /* 

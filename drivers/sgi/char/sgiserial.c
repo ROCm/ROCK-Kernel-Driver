@@ -143,20 +143,20 @@ static unsigned char tmp_buf[4096]; /* This is cheating */
 static DECLARE_MUTEX(tmp_buf_sem);
 
 static inline int serial_paranoia_check(struct sgi_serial *info,
-					dev_t device, const char *routine)
+					char *name, const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
 	static const char *badmagic = KERN_WARNING
-		"Warning: bad magic number for serial struct (%d, %d) in %s\n";
+		"Warning: bad magic number for serial struct %s in %s\n";
 	static const char *badinfo = KERN_WARNING
-		"Warning: null sgi_serial for (%d, %d) in %s\n";
+		"Warning: null sgi_serial for %s in %s\n";
 
 	if (!info) {
-		printk(badinfo, MAJOR(device), MINOR(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (info->magic != SERIAL_MAGIC) {
-		printk(badmagic, MAJOR(device), MINOR(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -293,7 +293,7 @@ static void rs_stop(struct tty_struct *tty)
 	struct sgi_serial *info = (struct sgi_serial *)tty->driver_data;
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_stop"))
+	if (serial_paranoia_check(info, tty->name, "rs_stop"))
 		return;
 	
 	save_flags(flags); cli();
@@ -310,7 +310,7 @@ static void rs_start(struct tty_struct *tty)
 	struct sgi_serial *info = (struct sgi_serial *)tty->driver_data;
 	unsigned long flags;
 	
-	if (serial_paranoia_check(info, tty->device, "rs_start"))
+	if (serial_paranoia_check(info, tty->name, "rs_start"))
 		return;
 	
 	save_flags(flags); cli();
@@ -1003,7 +1003,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	struct sgi_serial *info = (struct sgi_serial *)tty->driver_data;
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_write"))
+	if (serial_paranoia_check(info, tty->name, "rs_write"))
 		return 0;
 
 	if (!tty || !info->xmit_buf)
@@ -1076,7 +1076,7 @@ static int rs_write_room(struct tty_struct *tty)
 	struct sgi_serial *info = (struct sgi_serial *)tty->driver_data;
 	int	ret;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_write_room"))
+	if (serial_paranoia_check(info, tty->name, "rs_write_room"))
 		return 0;
 	ret = SERIAL_XMIT_SIZE - info->xmit_cnt - 1;
 	if (ret < 0)
@@ -1088,7 +1088,7 @@ static int rs_chars_in_buffer(struct tty_struct *tty)
 {
 	struct sgi_serial *info = (struct sgi_serial *)tty->driver_data;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_chars_in_buffer"))
+	if (serial_paranoia_check(info, tty->name, "rs_chars_in_buffer"))
 		return 0;
 	return info->xmit_cnt;
 }
@@ -1097,7 +1097,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 {
 	struct sgi_serial *info = (struct sgi_serial *)tty->driver_data;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_flush_buffer"))
+	if (serial_paranoia_check(info, tty->name, "rs_flush_buffer"))
 		return;
 	cli();
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
@@ -1113,7 +1113,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	struct sgi_serial *info = (struct sgi_serial *)tty->driver_data;
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_flush_chars"))
+	if (serial_paranoia_check(info, tty->name, "rs_flush_chars"))
 		return;
 
 	if (info->xmit_cnt <= 0 || tty->stopped || tty->hw_stopped ||
@@ -1167,7 +1167,7 @@ static void rs_throttle(struct tty_struct * tty)
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (serial_paranoia_check(info, tty->device, "rs_throttle"))
+	if (serial_paranoia_check(info, tty->name, "rs_throttle"))
 		return;
 	
 	if (I_IXOFF(tty))
@@ -1191,7 +1191,7 @@ static void rs_unthrottle(struct tty_struct * tty)
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (serial_paranoia_check(info, tty->device, "rs_unthrottle"))
+	if (serial_paranoia_check(info, tty->name, "rs_unthrottle"))
 		return;
 	
 	if (I_IXOFF(tty)) {
@@ -1377,7 +1377,7 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 	struct sgi_serial * info = (struct sgi_serial *) tty->driver_data;
 	int retval;
 
-	if (serial_paranoia_check(info, tty->device, "zs_ioctl"))
+	if (serial_paranoia_check(info, tty->name, "zs_ioctl"))
 		return -ENODEV;
 
 	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
@@ -1473,7 +1473,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	struct sgi_serial * info = (struct sgi_serial *)tty->driver_data;
 	unsigned long flags;
 
-	if (!info || serial_paranoia_check(info, tty->device, "rs_close"))
+	if (!info || serial_paranoia_check(info, tty->name, "rs_close"))
 		return;
 	
 	save_flags(flags); cli();
@@ -1539,8 +1539,8 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	ZS_CLEARFIFO(info->zs_channel);
 
 	shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1574,7 +1574,7 @@ void rs_hangup(struct tty_struct *tty)
 {
 	struct sgi_serial * info = (struct sgi_serial *)tty->driver_data;
 	
-	if (serial_paranoia_check(info, tty->device, "rs_hangup"))
+	if (serial_paranoia_check(info, tty->name, "rs_hangup"))
 		return;
 	
 	rs_flush_buffer(tty);
@@ -1618,7 +1618,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ZILOG_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ZILOG_CALLOUT_ACTIVE) &&
@@ -1725,7 +1725,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	struct sgi_serial	*info;
 	int 			retval, line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 	/* The zilog lines for the mouse/keyboard must be
 	 * opened using their respective drivers.
 	 */
@@ -1735,11 +1735,10 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	/* Is the kgdb running over this line? */
 	if (info->kgdb_channel)
 		return -ENODEV;
-	if (serial_paranoia_check(info, tty->device, "rs_open"))
+	if (serial_paranoia_check(info, tty->name, "rs_open"))
 		return -ENODEV;
 #ifdef SERIAL_DEBUG_OPEN
-	printk("rs_open %s%d, count = %d\n", tty->driver.name, info->line,
-	       info->count);
+	printk("rs_open %s, count = %d\n", tty->name, info->count);
 #endif
 	info->count++;
 	tty->driver_data = info;
@@ -1762,7 +1761,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ZILOG_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;
@@ -1781,7 +1780,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("rs_open ttys%d successful...\n", info->line);
+	printk("rs_open %s successful...\n", tty->name);
 #endif
 	return 0;
 }
@@ -2110,9 +2109,10 @@ static void zs_console_write(struct console *co, const char *str,
 	rs_fair_output();
 }
 
-static kdev_t zs_console_device(struct console *con)
+static struct tty_driver *zs_console_device(struct console *con, int *index)
 {
-	return MKDEV(TTY_MAJOR, 64 + con->index);
+	*index = con->index;
+	return &serial_driver;
 }
 
 

@@ -58,7 +58,6 @@ struct sparc_stackf {
 
 #define TRACEREG_SZ   sizeof(struct pt_regs)
 #define STACKFRAME_SZ sizeof(struct sparc_stackf)
-#define REGWIN_SZ     sizeof(struct reg_window)
 
 #ifdef __KERNEL__
 #define user_mode(regs) (!((regs)->psr & PSR_PS))
@@ -70,7 +69,6 @@ extern void show_regs(struct pt_regs *);
 /* For assembly code. */
 #define TRACEREG_SZ       0x50
 #define STACKFRAME_SZ     0x60
-#define REGWIN_SZ         0x40
 #endif
 
 /*

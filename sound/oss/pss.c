@@ -152,7 +152,7 @@ static int	pss_enable_joystick = 0;/* Parameter for enabling the joystick */
 
 static void pss_write(pss_confdata *devc, int data)
 {
-	int i, limit;
+	unsigned long i, limit;
 
 	limit = jiffies + HZ/10;	/* The timeout is 0.1 seconds */
 	/*
@@ -305,7 +305,8 @@ static int pss_get_dspword(pss_confdata * devc, unsigned short *word)
 
 static int pss_download_boot(pss_confdata * devc, unsigned char *block, int size, int flags)
 {
-	int i, limit, val, count;
+	int i, val, count;
+	unsigned long limit;
 
 	if (flags & CPF_FIRST)
 	{

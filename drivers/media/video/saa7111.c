@@ -66,7 +66,7 @@ static struct i2c_client client_template;
 
 /* ----------------------------------------------------------------------- */
 
-static int saa7111_attach(struct i2c_adapter *adap, int addr, unsigned short flags, int kind)
+static int saa7111_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	int i;
 	struct saa7111 *decoder;

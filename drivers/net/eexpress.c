@@ -252,7 +252,7 @@ static void eexp_timeout(struct net_device *dev);
 static struct net_device_stats *eexp_stats(struct net_device *dev);
 static int eexp_xmit(struct sk_buff *buf, struct net_device *dev);
 
-static void eexp_irq(int irq, void *dev_addr, struct pt_regs *regs);
+static irqreturn_t eexp_irq(int irq, void *dev_addr, struct pt_regs *regs);
 static void eexp_set_multicast(struct net_device *dev);
 
 /*
@@ -761,7 +761,7 @@ static void eexp_cmd_clear(struct net_device *dev)
 	}
 }
 	
-static void eexp_irq(int irq, void *dev_info, struct pt_regs *regs)
+static irqreturn_t eexp_irq(int irq, void *dev_info, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_info;
 	struct net_local *lp;
@@ -772,7 +772,7 @@ static void eexp_irq(int irq, void *dev_info, struct pt_regs *regs)
 	{
 		printk(KERN_WARNING "eexpress: irq %d for unknown device\n",
 		       irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	lp = (struct net_local *)dev->priv;
@@ -860,7 +860,7 @@ static void eexp_irq(int irq, void *dev_info, struct pt_regs *regs)
 	outw(old_write_ptr, ioaddr+WRITE_PTR);
 	
 	spin_unlock(&lp->lock);
-	return;
+	return IRQ_HANDLED;
 }
 
 /*

@@ -96,7 +96,6 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
-#include <linux/wrapper.h>
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 
@@ -941,7 +940,7 @@ static int alloc_dmabuf(struct i810_state *state)
 	/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 	pend = virt_to_page(rawbuf + (PAGE_SIZE << order) - 1);
 	for (page = virt_to_page(rawbuf); page <= pend; page++)
-		mem_map_reserve(page);
+		SetPageReserved(page);
 
 	return 0;
 }
@@ -956,7 +955,7 @@ static void dealloc_dmabuf(struct i810_state *state)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(dmabuf->rawbuf + (PAGE_SIZE << dmabuf->buforder) - 1);
 		for (page = virt_to_page(dmabuf->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		pci_free_consistent(state->card->pci_dev, PAGE_SIZE << dmabuf->buforder,
 				    dmabuf->rawbuf, dmabuf->dma_handle);
 	}
@@ -1389,7 +1388,7 @@ static void i810_channel_interrupt(struct i810_card *card)
 #endif
 }
 
-static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct i810_card *card = (struct i810_card *)dev_id;
 	u32 status;
@@ -1401,7 +1400,7 @@ static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if(!(status & INT_MASK)) 
 	{
 		spin_unlock(&card->lock);
-		return;  /* not for us */
+		return IRQ_NONE;  /* not for us */
 	}
 
 	if(status & (INT_PO|INT_PI|INT_MC))
@@ -1410,6 +1409,7 @@ static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  	/* clear 'em */
 	outl(status & INT_MASK, card->iobase + GLOB_STA);
 	spin_unlock(&card->lock);
+	return IRQ_HANDLED;
 }
 
 /* in this loop, dmabuf.count signifies the amount of data that is

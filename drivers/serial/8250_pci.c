@@ -23,6 +23,7 @@
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
+#include <linux/8250_pci.h>
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
@@ -1807,13 +1808,6 @@ static struct pci_device_id serial_pci_tbl[] __devinitdata = {
 	{	PCI_VENDOR_ID_ATT, PCI_DEVICE_ID_ATT_VENUS_MODEM,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
 		pbn_b1_1_115200 },
-
-	/*
-	 * 3Com US Robotics 56k Voice Internal PCI model 5610
-	 */
-	{	PCI_VENDOR_ID_USR, 0x1008,
-		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
-		pbn_b0_1_115200 },
 
 	/*
 	 * Titan Electronic cards

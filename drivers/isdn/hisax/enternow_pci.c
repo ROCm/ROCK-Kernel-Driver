@@ -208,7 +208,7 @@ enpci_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static void
+static irqreturn_t
 enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -253,6 +253,7 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			write_tiger(cs);
 	}
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 static struct card_ops enpci_ops = {

@@ -171,7 +171,7 @@ sa1110_sdram_controller_fix:
  *       This is to allow sleep_save_sp to be accessed with a relative load
  *       while we can't rely on any MMU translation.  We could have put
  *       sleep_save_sp in the .text section as well, but some setups might
- *       insist on it to be truely read-only.
+ *       insist on it to be truly read-only.
  */
 
 	.data

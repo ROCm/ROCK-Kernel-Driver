@@ -201,7 +201,7 @@ MODULE_SUPPORTED_DEVICE
 #ifdef WD_DEBUG
 static void wd_dumpregs(void);
 #endif
-static void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t wd_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void wd_toggleintr(struct wd_timer* pTimer, int enable);
 static void wd_pingtimer(struct wd_timer* pTimer);
 static void wd_starttimer(struct wd_timer* pTimer);
@@ -325,13 +325,11 @@ static int wd_open(struct inode *inode, struct file *f)
 		wd_dev.initialized = 1;
 	}
 
-	MOD_INC_USE_COUNT;
 	return(0);
 }
 
 static int wd_release(struct inode *inode, struct file *file)
 {
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -444,7 +442,7 @@ static ssize_t wd_read(struct file * file, char * buffer,
 #endif /* ifdef WD_DEBUG */
 }
 
-static void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t wd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/* Only WD0 will interrupt-- others are NMI and we won't
 	 * see them here....
@@ -456,7 +454,7 @@ static void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		wd_dev.watchdog[WD0_ID].runstatus |=  WD_STAT_SVCD;
 	}
 	spin_unlock_irq(&wd_dev.lock);
-	return;
+	return IRQ_HANDLED;
 }
 
 static struct file_operations wd_fops = {

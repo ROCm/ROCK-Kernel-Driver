@@ -332,8 +332,8 @@ ppp_asynctty_receive(struct tty_struct *tty, const unsigned char *buf,
 	spin_unlock_bh(&ap->recv_lock);
 	ap_put(ap);
 	if (test_and_clear_bit(TTY_THROTTLED, &tty->flags)
-	    && tty->driver.unthrottle)
-		tty->driver.unthrottle(tty);
+	    && tty->driver->unthrottle)
+		tty->driver->unthrottle(tty);
 }
 
 static void
@@ -662,7 +662,7 @@ ppp_async_push(struct asyncppp *ap)
 		if (!tty_stuffed && ap->optr < ap->olim) {
 			avail = ap->olim - ap->optr;
 			set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-			sent = tty->driver.write(tty, 0, ap->optr, avail);
+			sent = tty->driver->write(tty, 0, ap->optr, avail);
 			if (sent < 0)
 				goto flush;	/* error, e.g. loss of CD */
 			ap->optr += sent;

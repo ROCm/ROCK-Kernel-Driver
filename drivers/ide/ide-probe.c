@@ -1214,7 +1214,7 @@ out_unlink:
 	spin_unlock_irq(&ide_lock);
 out_up:
 	up(&ide_cfg_sem);
-	return 0;
+	return 1;
 }
 
 static int ata_lock(dev_t dev, void *data)

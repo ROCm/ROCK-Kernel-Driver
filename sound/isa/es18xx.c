@@ -727,11 +727,10 @@ static int snd_es18xx_playback_trigger(snd_pcm_substream_t *substream,
 		return snd_es18xx_playback2_trigger(chip, substream, cmd);
 }
 
-static void snd_es18xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_es18xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es18xx_t *chip = snd_magic_cast(es18xx_t, dev_id, return);
+	es18xx_t *chip = snd_magic_cast(es18xx_t, dev_id, return IRQ_NONE);
 	unsigned char status;
-
 
 	if (chip->caps & ES18XX_CONTROL) {
 		/* Read Interrupt status */
@@ -787,7 +786,7 @@ static void snd_es18xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		/* ack interrupt */
 		snd_es18xx_mixer_write(chip, 0x66, 0x00);
 	}
-
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_uframes_t snd_es18xx_playback_pointer(snd_pcm_substream_t * substream)

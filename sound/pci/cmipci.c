@@ -1640,15 +1640,15 @@ static int snd_cmipci_capture_spdif_hw_free(snd_pcm_substream_t *subs)
 /*
  * interrupt handler
  */
-static void snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, dev_id, return);
+	cmipci_t *cm = snd_magic_cast(cmipci_t, dev_id, return IRQ_NONE);
 	unsigned int status, mask = 0;
 	
 	/* fastpath out, to ease interrupt sharing */
 	status = snd_cmipci_read(cm, CM_REG_INT_STATUS);
 	if (!(status & CM_INTR))
-		return;
+		return IRQ_NONE;
 
 	/* acknowledge interrupt */
 	spin_lock(&cm->reg_lock);
@@ -1669,6 +1669,8 @@ static void snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if ((status & CM_CHINT1) && cm->channel[1].running)
 			snd_pcm_period_elapsed(cm->channel[1].substream);
 	}
+
+	return IRQ_HANDLED;
 }
 
 /*

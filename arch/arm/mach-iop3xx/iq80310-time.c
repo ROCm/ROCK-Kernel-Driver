@@ -101,7 +101,7 @@ static void iq80310_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 *
 	 * Since the timer interrupt is cascaded through the CPLD and
 	 * the 80312 and the demux code calls do_IRQ, the irq count is
-	 * going to be atleast 2 when we get here and this will cause the
+	 * going to be at least 2 when we get here and this will cause the
 	 * kernel to increment the system tick counter even if we're
 	 * idle. This causes it to look like there's always 100% system
 	 * time, which is not the case.  To get around it, we just decrement

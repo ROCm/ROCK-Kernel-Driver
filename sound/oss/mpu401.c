@@ -444,15 +444,17 @@ int intchk_mpu401(void *dev_id)
 	return input_avail(devc);
 }
 
-void mpuintr(int irq, void *dev_id, struct pt_regs *dummy)
+irqreturn_t mpuintr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	struct mpu_config *devc;
 	int dev = (int) dev_id;
+	int handled = 0;
 
 	devc = &dev_conf[dev];
 
 	if (input_avail(devc))
 	{
+		handled = 1;
 		if (devc->base != 0 && (devc->opened & OPEN_READ || devc->mode == MODE_SYNTH))
 			mpu401_input_loop(devc);
 		else
@@ -461,6 +463,7 @@ void mpuintr(int irq, void *dev_id, struct pt_regs *dummy)
 			read_data(devc);
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 static int mpu401_open(int dev, int mode,
@@ -500,7 +503,7 @@ static int mpu401_open(int dev, int mode,
 	{
 		if (!try_module_get(coprocessor->owner)) {
 			mpu401_close(dev);
-			return err;
+			return -ENODEV;
 		}
 
 		if ((err = coprocessor->open(coprocessor->devc, COPR_MIDI)) < 0)
@@ -839,7 +842,7 @@ static int mpu_synth_open(int dev, int mode)
 	coprocessor = midi_devs[midi_dev]->coproc;
 	if (coprocessor) {
 		if (!try_module_get(coprocessor->owner))
-			return err;
+			return -ENODEV;
 
 		if ((err = coprocessor->open(coprocessor->devc, COPR_MIDI)) < 0)
 		{

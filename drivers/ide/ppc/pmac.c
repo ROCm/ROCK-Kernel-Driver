@@ -702,7 +702,7 @@ pmac_ide_get_irq(unsigned long base)
 
 static int ide_majors[]  __pmacdata = { 3, 22, 33, 34, 56, 57 };
 
-kdev_t __init
+dev_t __init
 pmac_find_ide_boot(char *bootdevice, int n)
 {
 	int i;
@@ -717,7 +717,7 @@ pmac_find_ide_boot(char *bootdevice, int n)
 		name = pmac_ide[i].node->full_name;
 		if (memcmp(name, bootdevice, n) == 0 && name[n] == 0) {
 			/* XXX should cope with the 2nd drive as well... */
-			return mk_kdev(ide_majors[i], 0);
+			return MKDEV(ide_majors[i], 0);
 		}
 	}
 

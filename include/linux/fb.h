@@ -348,7 +348,6 @@ struct fb_pixmap {
 
 #include <linux/fs.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 
 struct fb_info;
 struct vm_area_struct;
@@ -397,7 +396,7 @@ struct fb_ops {
 };
 
 struct fb_info {
-   kdev_t node;
+   int node;
    int flags;
    int open;                            /* Has this been open already ? */
 #define FBINFO_FLAG_MODULE	1	/* Low-level driver is a module */

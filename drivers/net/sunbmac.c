@@ -874,7 +874,7 @@ static void bigmac_rx(struct bigmac *bp)
 		printk(KERN_NOTICE "%s: Memory squeeze, deferring packet.\n", bp->dev->name);
 }
 
-static void bigmac_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t bigmac_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct bigmac *bp = (struct bigmac *) dev_id;
 	u32 qec_status, bmac_status;
@@ -895,6 +895,8 @@ static void bigmac_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (bmac_status & CREG_STAT_RXIRQ)
 		bigmac_rx(bp);
+
+	return IRQ_HANDLED;
 }
 
 static int bigmac_open(struct net_device *dev)

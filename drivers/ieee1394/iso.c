@@ -47,8 +47,11 @@ static struct hpsb_iso* hpsb_iso_common_init(struct hpsb_host *host, enum hpsb_i
 	int dma_direction;
 
 	/* make sure driver supports the ISO API */
-	if(!host->driver->isoctl)
+	if(!host->driver->isoctl) {
+		printk(KERN_INFO "ieee1394: host driver '%s' does not support the rawiso API\n",
+		       host->driver->name);
 		return NULL;
+	}
 
 	/* sanitize parameters */
 

@@ -210,7 +210,7 @@ __handle_user_windows_continue:
 __handle_perfctrs_continue:
 		 andcc			%l1, %o0, %g0
 
-		/* This fpdepth clear is neccessary for non-syscall rtraps only */
+		/* This fpdepth clear is necessary for non-syscall rtraps only */
 user_nowork:
 		bne,pn			%xcc, __handle_userfpu
 		 stb			%g0, [%g6 + TI_FPDEPTH]

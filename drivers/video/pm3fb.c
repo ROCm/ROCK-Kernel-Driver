@@ -1602,7 +1602,6 @@ static void pm3fb_common_init(struct pm3fb_info *l_fb_info)
 	disp[l_fb_info->board_num].scrollmode = 0;	/* SCROLL_YNOMOVE; *//* 0 means "let fbcon choose" */
 	l_fb_info->gen.parsize = sizeof(struct pm3fb_par);
 	l_fb_info->gen.info.changevar = NULL;
-	l_fb_info->gen.info.node = B_FREE;
 	l_fb_info->gen.info.fbops = &pm3fb_ops;
 	l_fb_info->gen.info.disp = &(disp[l_fb_info->board_num]);
 	if (fontn[l_fb_info->board_num][0])
@@ -1646,7 +1645,7 @@ static void pm3fb_common_init(struct pm3fb_info *l_fb_info)
 	pm3fb_write_mode(l_fb_info);
 	
 	printk("fb%d: %s, using %uK of video memory (%s)\n",
-	       minor(l_fb_info->gen.info.node),
+	       l_fb_info->gen.info.node,
 	       permedia3_name, (u32) (l_fb_info->fb_size >> 10),
 	       cardbase[l_fb_info->board_type].cardname);
 }

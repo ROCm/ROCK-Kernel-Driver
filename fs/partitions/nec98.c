@@ -66,13 +66,6 @@ is_valid_nec98_partition_table(const struct nec98_partition *ptable,
 	return valid;
 }
 
-#ifdef CONFIG_BSD_DISKLABEL
-extern void parse_bsd(struct parsed_partitions *state,
-			struct block_device *bdev,
-			u32 offset, u32 size, int origin, char *flavour,
-			int max_partitions);
-#endif
-
 int nec98_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	unsigned int nr;

@@ -140,7 +140,7 @@ fwin_from_user:
 C_LABEL(fwin_mmu_patchme):	b	C_LABEL(sun4c_fwin_stackchk)
 				 andcc	%sp, 0x7, %g0
 
-#define STACK_OFFSET (THREAD_SIZE - TRACEREG_SZ - REGWIN_SZ)
+#define STACK_OFFSET (THREAD_SIZE - TRACEREG_SZ - STACKFRAME_SZ)
 
 fwin_user_stack_is_bolixed:
 	/* LOCATION: Window 'W' */

@@ -696,7 +696,7 @@ static void free_ring(struct net_device *dev);
 static void reinit_ring(struct net_device *dev);
 static void init_registers(struct net_device *dev);
 static int start_tx(struct sk_buff *skb, struct net_device *dev);
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void netdev_error(struct net_device *dev, int intr_status);
 static void netdev_rx(struct net_device *dev);
 static void netdev_tx_done(struct net_device *dev);
@@ -1680,15 +1680,16 @@ static void netdev_tx_done(struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	int boguscnt = max_interrupt_work;
+	unsigned int handled = 0;
 
 	if (np->hands_off)
-		return;
+		return IRQ_NONE;
 	do {
 		/* Reading automatically acknowledges all int sources. */
 		u32 intr_status = readl(ioaddr + IntrStatus);
@@ -1701,6 +1702,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 		if (intr_status == 0)
 			break;
+		handled = 1;
 
 		if (intr_status &
 		   (IntrRxDone | IntrRxIntr | RxStatusFIFOOver |
@@ -1731,6 +1733,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 	if (netif_msg_intr(np))
 		printk(KERN_DEBUG "%s: exiting interrupt.\n", dev->name);
+
+	return IRQ_RETVAL(handled);
 }
 
 /* This routine is logically part of the interrupt handler, but separated

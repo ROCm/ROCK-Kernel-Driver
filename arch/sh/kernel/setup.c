@@ -25,9 +25,7 @@
 #include <linux/delay.h>
 #include <linux/config.h>
 #include <linux/init.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
+#include <linux/initrd.h>
 #include <linux/bootmem.h>
 #include <linux/console.h>
 #include <linux/ctype.h>
@@ -141,12 +139,6 @@ static void sh_console_write(struct console *co, const char *s,
     	sh_bios_console_write(s, count);
 }
 
-static kdev_t sh_console_device(struct console *c)
-{
-	/* /dev/null */
-	return mk_kdev(MEM_MAJOR, 3);
-}
-
 /*
  *	Setup initial baud/bits/parity. We do two things here:
  *	- construct a cflag setting for the first rs_open()
@@ -173,7 +165,6 @@ static int __init sh_console_setup(struct console *co, char *options)
 static struct console sh_console = {
 	.name		= "bios",
 	.write		= sh_console_write,
-	.device		= sh_console_device,
 	.setup		= sh_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,

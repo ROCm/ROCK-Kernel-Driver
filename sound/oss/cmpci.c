@@ -98,7 +98,6 @@
 #include <linux/slab.h>
 #include <linux/soundcard.h>
 #include <linux/pci.h>
-#include <linux/wrapper.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/spinlock.h>
@@ -938,7 +937,7 @@ static void dealloc_dmabuf(struct dmabuf *db)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (pstart = virt_to_page(db->rawbuf); pstart <= pend; pstart++)
-			mem_map_unreserve(pstart);
+			ClearPageReserved(pstart);
 		free_pages((unsigned long)db->rawbuf, db->buforder);
 	}
 	db->rawbuf = NULL;
@@ -987,7 +986,7 @@ static int prog_dmabuf(struct cm_state *s, unsigned rec)
 		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (pstart = virt_to_page(db->rawbuf); pstart <= pend; pstart++)
-			mem_map_reserve(pstart);
+			SetPageReserved(pstart);
 	}
 	bytepersec = rate << sample_shift[fmt];
 	bufs = PAGE_SIZE << db->buforder;
@@ -1156,7 +1155,7 @@ static void cm_handle_midi(struct cm_state *s)
 }
 #endif
 
-static void cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct cm_state *s = (struct cm_state *)dev_id;
 	unsigned int intsrc, intstat;
@@ -1165,7 +1164,7 @@ static void cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inl(s->iobase + CODEC_CMI_INT_STATUS);
 	if (!(intsrc & 0x80000000))
-		return;
+		return IRQ_NONE;
 	spin_lock(&s->lock);
 	intstat = inb(s->iobase + CODEC_CMI_INT_HLDCLR + 2);
 	/* acknowledge interrupt */
@@ -1180,6 +1179,7 @@ static void cm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	cm_handle_midi(s);
 #endif
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_SOUND_CMPCI_MIDI

@@ -444,12 +444,6 @@ anakin_console_write(struct console *co, const char *s, unsigned int count)
 	}
 }
 
-static kdev_t
-anakin_console_device(struct console *co)
-{
-	return mk_kdev(SERIAL_ANAKIN_MAJOR, SERIAL_ANAKIN_MINOR + co->index);
-}
-
 /*
  * Read the current UART setup.
  */
@@ -493,19 +487,20 @@ anakin_console_setup(struct console *co, char *options)
 	return uart_set_options(port, co, baud, parity, bits);
 }
 
+extern struct uart_driver anakin_reg;
 static struct console anakin_console = {
 	.name		= SERIAL_ANAKIN_NAME,
 	.write		= anakin_console_write,
-	.device		= anakin_console_device,
+	.device		= uart_console_device,
 	.setup		= anakin_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
 };
 
-static void __init
-anakin_console_init(void)
+static int __init anakin_console_init(void)
 {
 	register_console(&anakin_console);
+	return 0;
 }
 console_initcall(anakin_console_init);
 
@@ -514,7 +509,7 @@ console_initcall(anakin_console_init);
 #define ANAKIN_CONSOLE		NULL
 #endif
 
-static struct uart_register anakin_reg = {
+static struct uart_driver anakin_reg = {
 	.driver_name		= SERIAL_ANAKIN_NAME,
 	.dev_name		= SERIAL_ANAKIN_NAME,
 	.major			= SERIAL_ANAKIN_MAJOR,

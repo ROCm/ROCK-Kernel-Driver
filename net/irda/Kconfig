@@ -16,7 +16,7 @@ config IRDA
 	  some user-space utilities like irattach.  For more information, see
 	  the file <file:Documentation/networking/irda.txt>.  You also want to
 	  read the IR-HOWTO, available at
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you want to exchange bits of data (vCal, vCard) with a PDA, you
 	  will need to install some OBEX application, such as OpenObex :

@@ -78,7 +78,7 @@
 	printk(KERN_ERR fmt, ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 806 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 895 $ Ben Collins <bcollins@debian.org>";
 
 /* Our ieee1394 highlevel driver */
 #define ETHER1394_DRIVER_NAME "ether1394"
@@ -86,9 +86,6 @@ static char version[] __devinitdata =
 static kmem_cache_t *packet_task_cache;
 static struct hpsb_highlevel *hl_handle = NULL;
 
-/* Card handling */
-static LIST_HEAD (host_info_list);
-static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
 
 /* Use common.lf to determine header len */
 static int hdr_type_len[] = {
@@ -104,40 +101,6 @@ MODULE_LICENSE("GPL");
 
 static void ether1394_iso(struct hpsb_iso *iso);
 
-
-/* Find our host_info struct for a given host pointer. Must be called
- * under spinlock.  */
-static inline struct host_info *find_host_info (struct hpsb_host *host)
-{
-	struct list_head *lh;
-	struct host_info *hi;
-
-	lh = host_info_list.next;
-	while (lh != &host_info_list) {
-		hi = list_entry (lh, struct host_info, list);
-
-		if (hi->host == host)
-			return hi;
-
-		lh = lh->next;
-	}
-	return NULL;
-}
-
-/* Find the network device for our host */
-static inline struct net_device *ether1394_find_dev (struct hpsb_host *host)
-{
-	struct host_info *hi;
-
-	spin_lock_irq (&host_info_lock);
-	hi = find_host_info (host);
-	spin_unlock_irq (&host_info_lock);
-
-	if (hi == NULL)
-		return NULL;
-
-	return hi->dev;
-}
 
 /* This is called after an "ifup" */
 static int ether1394_open (struct net_device *dev)
@@ -355,7 +318,7 @@ static int ether1394_init_dev (struct net_device *dev)
  * when the module is installed. This is where we add all of our ethernet
  * devices. One for each host.
  */
-static void ether1394_add_host (struct hpsb_host *host)
+static void ether1394_add_host (struct hpsb_host *host, struct hpsb_highlevel *hl)
 {
 	struct host_info *hi = NULL;
 	struct net_device *dev = NULL;
@@ -377,30 +340,23 @@ static void ether1394_add_host (struct hpsb_host *host)
 	priv = (struct eth1394_priv *)dev->priv;
 
 	priv->host = host;
+	spin_lock_init(&priv->lock);
 
-	hi = (struct host_info *)kmalloc (sizeof (struct host_info),
-					  in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
+	hi = hpsb_create_hostinfo(hl, host, sizeof(*hi));
 
 	if (hi == NULL)
 		goto out;
 
 	if (register_netdev (dev)) {
 		ETH1394_PRINT (KERN_ERR, dev->name, "Error registering network driver\n");
-		kfree (dev);
-		kfree (hi);
-		return;
+		goto out;
 	}
 
 	ETH1394_PRINT (KERN_ERR, dev->name, "IEEE-1394 IPv4 over 1394 Ethernet (%s)\n",
 		       host->driver->name);
 
-	INIT_LIST_HEAD (&hi->list);
 	hi->host = host;
 	hi->dev = dev;
-
-	spin_lock_irq (&host_info_lock);
-	list_add_tail (&hi->list, &host_info_list);
-	spin_unlock_irq (&host_info_lock);
 
 	/* Ignore validity in hopes that it will be set in the future.  It'll
 	 * check it on transmit. */
@@ -416,6 +372,9 @@ static void ether1394_add_host (struct hpsb_host *host)
 out:
 	if (dev != NULL)
 		kfree (dev);
+	if (hi)
+		hpsb_destroy_hostinfo(hl, host);
+
 	ETH1394_PRINT_G (KERN_ERR, "Out of memory\n");
 
 	return;
@@ -424,20 +383,17 @@ out:
 /* Remove a card from our list */
 static void ether1394_remove_host (struct hpsb_host *host)
 {
-	struct eth1394_priv *priv;
-	struct host_info *hi;
+	struct host_info *hi = hpsb_get_hostinfo(hl_handle, host);
 
-	spin_lock_irq (&host_info_lock);
-	hi = find_host_info (host);
 	if (hi != NULL) {
-		priv = (struct eth1394_priv *)hi->dev->priv;
+		struct eth1394_priv *priv = (struct eth1394_priv *)hi->dev->priv;
+
 		priv->bc_state = ETHER1394_BC_CLOSED;
 		unregister_netdev (hi->dev);
+		hpsb_iso_shutdown(priv->iso);
+
 		kfree (hi->dev);
-		list_del (&hi->list);
-		kfree (hi);
 	}
-	spin_unlock_irq (&host_info_lock);
 
 	return;
 }
@@ -445,11 +401,14 @@ static void ether1394_remove_host (struct hpsb_host *host)
 /* A reset has just arisen */
 static void ether1394_host_reset (struct hpsb_host *host)
 {
-	struct net_device *dev = ether1394_find_dev(host);
+	struct host_info *hi = hpsb_get_hostinfo(hl_handle, host);
+	struct net_device *dev;
 
 	/* This can happen for hosts that we don't use */
-	if (dev == NULL)
+	if (hi == NULL)
 		return;
+
+	dev = hi->dev;
 
 	/* Reset our private host data, but not our mtu */
 	netif_stop_queue (dev);
@@ -559,14 +518,17 @@ static int ether1394_write (struct hpsb_host *host, int srcid, int destid,
 	struct sk_buff *skb;
 	char *buf = (char *)data;
 	unsigned long flags;
-	struct net_device *dev = ether1394_find_dev (host);
+	struct host_info *hi = hpsb_get_hostinfo(hl_handle, host);
+	struct net_device *dev;
 	struct eth1394_priv *priv;
 
-	if (dev == NULL) {
+	if (hi == NULL) {
 		ETH1394_PRINT_G (KERN_ERR, "Could not find net device for host %p\n",
 				 host);
 		return RCODE_ADDRESS_ERROR;
 	}
+
+	dev = hi->dev;
 
 	priv = (struct eth1394_priv *)dev->priv;
 
@@ -627,8 +589,9 @@ static void ether1394_iso(struct hpsb_iso *iso)
 	struct sk_buff *skb;
 	quadlet_t *data;
 	char *buf;
-	int flags;
-	struct net_device *dev = ether1394_find_dev(iso->host);
+	unsigned long flags;
+	struct host_info *hi = hpsb_get_hostinfo(hl_handle, iso->host);
+	struct net_device *dev;
 	struct eth1394_priv *priv;
 	unsigned int len;
 	u32 specifier_id;
@@ -636,11 +599,13 @@ static void ether1394_iso(struct hpsb_iso *iso)
 	int i;
 	int nready;
 
-	if (dev == NULL) {
+	if (hi == NULL) {
 		ETH1394_PRINT_G (KERN_ERR, "Could not find net device for host %s\n",
 				 iso->host->driver->name);
 		return;
 	}
+
+	dev = hi->dev;
 
 	nready = hpsb_iso_n_ready(iso);
 	for(i = 0; i < nready; i++) {
@@ -941,19 +906,6 @@ static int __init ether1394_init_module (void)
 
 static void __exit ether1394_exit_module (void)
 {
-	struct list_head *lh;
-	struct host_info *hi;
-	struct eth1394_priv *priv;
-
-	lh = host_info_list.next;
-	while (lh != &host_info_list) {
-		hi = list_entry (lh, struct host_info, list);
-		priv = (struct eth1394_priv*)hi->dev->priv;
-		if (priv->bc_state != ETHER1394_BC_CLOSED) {
-			hpsb_iso_shutdown(priv->iso);
-		}
-		lh = lh->next;
-	}
 	hpsb_unregister_highlevel (hl_handle);
 	kmem_cache_destroy(packet_task_cache);
 }

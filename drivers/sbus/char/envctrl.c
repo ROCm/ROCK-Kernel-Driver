@@ -707,7 +707,6 @@ static int
 envctrl_open(struct inode *inode, struct file *file)
 {
 	file->private_data = 0;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -717,7 +716,6 @@ envctrl_open(struct inode *inode, struct file *file)
 static int
 envctrl_release(struct inode *inode, struct file *file)
 {
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

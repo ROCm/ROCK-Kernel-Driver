@@ -117,7 +117,7 @@ static int pcnet_open(struct net_device *dev);
 static int pcnet_close(struct net_device *dev);
 static int ei_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int do_ioctl_light(struct net_device *dev, struct ifreq *rq, int cmd);
-static void ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs);
 static void ei_watchdog(u_long arg);
 static void pcnet_reset_8390(struct net_device *dev);
 static int set_config(struct net_device *dev, struct ifmap *map);
@@ -315,6 +315,7 @@ static dev_link_t *pcnet_attach(void)
     link->conf.IntType = INT_MEMORY_AND_IO;
 
     ethdev_init(dev);
+    SET_MODULE_OWNER(dev);
     dev->init = &pcnet_init;
     dev->open = &pcnet_open;
     dev->stop = &pcnet_close;
@@ -1030,7 +1031,6 @@ static int pcnet_open(struct net_device *dev)
 	return -ENODEV;
 
     link->open++;
-    MOD_INC_USE_COUNT;
 
     set_misc_reg(dev);
     request_irq(dev->irq, ei_irq_wrapper, SA_SHIRQ, dev_info, dev);
@@ -1063,8 +1063,6 @@ static int pcnet_close(struct net_device *dev)
     del_timer(&info->watchdog);
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
-
-    MOD_DEC_USE_COUNT;
 
     return 0;
 } /* pcnet_close */
@@ -1121,11 +1119,13 @@ static int set_config(struct net_device *dev, struct ifmap *map)
 
 /*====================================================================*/
 
-static void ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs)
 {
     pcnet_dev_t *info = dev_id;
     info->stale = 0;
     ei_interrupt(irq, dev_id, regs);
+    /* FIXME! Was it really ours? */
+    return IRQ_HANDLED;
 }
 
 static void ei_watchdog(u_long arg)

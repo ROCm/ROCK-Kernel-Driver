@@ -55,6 +55,7 @@ static int sg_version_num = 30528;	/* 2 digits for each component */
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
 #include <linux/moduleparam.h>
+#include <linux/devfs_fs_kernel.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -2771,6 +2772,10 @@ static struct sg_proc_leaf sg_proc_leaf_arr[] = {
 	return (size < (begin + len - offset)) ?                \
 				size : begin + len - offset;    \
     } while(0)
+
+/* this should _really_ be private to the scsi midlayer.  But
+   /proc/scsi/sg is an established name, so.. */
+extern struct proc_dir_entry *proc_scsi;
 
 static int
 sg_proc_init()

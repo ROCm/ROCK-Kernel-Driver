@@ -31,7 +31,6 @@
 #include <linux/ac97_codec.h>
 #include <linux/smp_lock.h>
 #include <linux/ioport.h>
-#include <linux/wrapper.h>
 #include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -1694,10 +1693,11 @@ static void via_intr_channel (struct via_channel *chan)
 }
 
 
-static void via_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t via_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct via_info *card = dev_id;
 	u32 status32;
+	int handled = 0;
 
 	/* to minimize interrupt sharing costs, we use the SGD status
 	 * shadow register to check the status of all inputs and
@@ -1708,10 +1708,12 @@ static void via_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (!(status32 & VIA_INTR_MASK))
         {
 #ifdef CONFIG_MIDI_VIA82CXXX
-	    	 if (card->midi_devc)
+	    	 if (card->midi_devc) {
                     	uart401intr(irq, card->midi_devc, regs);
+			handled = 1;
+		}
 #endif
-		return;
+		goto out;
     	}
 	DPRINTK ("intr, status32 == 0x%08X\n", status32);
 
@@ -1720,14 +1722,21 @@ static void via_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	spin_lock (&card->lock);
 
-	if (status32 & VIA_INTR_OUT)
+	if (status32 & VIA_INTR_OUT) {
+		handled = 1;
 		via_intr_channel (&card->ch_out);
-	if (status32 & VIA_INTR_IN)
+	}
+	if (status32 & VIA_INTR_IN) {
+		handled = 1;
 		via_intr_channel (&card->ch_in);
-	if (status32 & VIA_INTR_FM)
+	}
+	if (status32 & VIA_INTR_FM) {
+		handled = 1;
 		via_intr_channel (&card->ch_fm);
-
+	}
 	spin_unlock (&card->lock);
+out:
+	return IRQ_RETVAL(handled);
 }
 
 

@@ -46,7 +46,7 @@ static inline unsigned long virt_irq_to_real(unsigned long virt_irq) {
  * powermacs as well as prep/chrp boxes.
  * Prep and chrp both have cascaded 8259 PICs.
  */
-static __inline__ int irq_cannonicalize(int irq)
+static __inline__ int irq_canonicalize(int irq)
 {
 	return irq;
 }

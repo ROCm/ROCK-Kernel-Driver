@@ -25,7 +25,7 @@
 #include "gus.h"
 #include "gus_hw.h"
 
-void            gusintr(int irq, void *dev_id, struct pt_regs *dummy);
+irqreturn_t gusintr(int irq, void *dev_id, struct pt_regs *dummy);
 
 int             gus_base = 0, gus_irq = 0, gus_dma = 0;
 int             gus_no_wave_dma = 0; 
@@ -119,10 +119,11 @@ static void __exit unload_gus(struct address_info *hw_config)
 		sound_free_dma(hw_config->dma2);
 }
 
-void gusintr(int irq, void *dev_id, struct pt_regs *dummy)
+irqreturn_t gusintr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	unsigned char src;
 	extern int gus_timer_enabled;
+	int handled = 0;
 
 #ifdef CONFIG_SOUND_GUSMAX
 	if (have_gus_max) {
@@ -140,8 +141,8 @@ void gusintr(int irq, void *dev_id, struct pt_regs *dummy)
 	while (1)
 	{
 		if (!(src = inb(u_IrqStatus)))
-			return;
-
+			break;
+		handled = 1;
 		if (src & DMA_TC_IRQ)
 		{
 			guswave_dma_irq();
@@ -160,6 +161,7 @@ void gusintr(int irq, void *dev_id, struct pt_regs *dummy)
 		if (src & (WAVETABLE_IRQ | ENVELOPE_IRQ))
 			gus_voice_irq();
 	}
+	return IRQ_RETVAL(handled);
 }
 
 /*

@@ -20,6 +20,7 @@
 #include <asm/processor.h>
 #include <asm/visasm.h>
 #include <asm/estate.h>
+#include <asm/auxio.h>
 
 /* #define SYSCALL_TRACING	1 */
 
@@ -662,9 +663,11 @@ floppy_tdone:
 	sethi		%hi(auxio_register), %g1
 	ldx		[%g1 + %lo(auxio_register)], %g7
 	lduba		[%g7] ASI_PHYS_BYPASS_EC_E, %g5
-	or		%g5, 0xc2, %g5
+	or		%g5, AUXIO_AUX1_FTCNT, %g5
+/*	andn		%g5, AUXIO_AUX1_MASK, %g5 */
 	stba		%g5, [%g7] ASI_PHYS_BYPASS_EC_E
-	andn		%g5, 0x02, %g5
+	andn		%g5, AUXIO_AUX1_FTCNT, %g5
+/*	andn		%g5, AUXIO_AUX1_MASK, %g5 */
 
 	nop; nop;  nop; nop;  nop; nop;
 	nop; nop;  nop; nop;  nop; nop;
@@ -1264,7 +1267,7 @@ dcpe_icpe_tl1_common:
 	 * because corrupt data may have been placed there and we don't
 	 * want to reference it.
 	 *
-	 * %g1 is one if this trap occured at %tl >= 1.
+	 * %g1 is one if this trap occurred at %tl >= 1.
 	 *
 	 * Next, we turn off error reporting so that we don't recurse.
 	 */

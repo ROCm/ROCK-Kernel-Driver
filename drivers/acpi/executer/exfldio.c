@@ -568,9 +568,10 @@ acpi_ex_write_with_update_rule (
  *
  * PARAMETERS:  Datum               - Where the Datum is returned
  *              Buffer              - Raw field buffer
+ *              buffer_length       - Entire length (used for big-endian only)
  *              byte_granularity    - 1/2/4/8 Granularity of the field
  *                                    (aka Datum Size)
- *              Offset              - Datum offset into the buffer
+ *              buffer_offset       - Datum offset into the buffer
  *
  * RETURN:      none
  *
@@ -580,35 +581,44 @@ acpi_ex_write_with_update_rule (
  ******************************************************************************/
 
 void
-acpi_ex_get_buffer_datum(
+acpi_ex_get_buffer_datum (
 	acpi_integer                    *datum,
 	void                            *buffer,
+	u32                             buffer_length,
 	u32                             byte_granularity,
-	u32                             offset)
+	u32                             buffer_offset)
 {
+	u32                             index;
+
 
 	ACPI_FUNCTION_ENTRY ();
 
 
+	/* Get proper index into buffer (handles big/little endian) */
+
+	index = ACPI_BUFFER_INDEX (buffer_length, buffer_offset, byte_granularity);
+
+	/* Move the requested number of bytes */
+
 	switch (byte_granularity) {
 	case ACPI_FIELD_BYTE_GRANULARITY:
 
-		*datum = ((u8 *) buffer) [offset];
+		*datum = ((u8 *) buffer) [index];
 		break;
 
 	case ACPI_FIELD_WORD_GRANULARITY:
 
-		ACPI_MOVE_UNALIGNED16_TO_32 (datum, &(((u16 *) buffer) [offset]));
+		ACPI_MOVE_16_TO_64 (datum, &(((u16 *) buffer) [index]));
 		break;
 
 	case ACPI_FIELD_DWORD_GRANULARITY:
 
-		ACPI_MOVE_UNALIGNED32_TO_32 (datum, &(((u32 *) buffer) [offset]));
+		ACPI_MOVE_32_TO_64 (datum, &(((u32 *) buffer) [index]));
 		break;
 
 	case ACPI_FIELD_QWORD_GRANULARITY:
 
-		ACPI_MOVE_UNALIGNED64_TO_64 (datum, &(((u64 *) buffer) [offset]));
+		ACPI_MOVE_64_TO_64 (datum, &(((u64 *) buffer) [index]));
 		break;
 
 	default:
@@ -624,9 +634,10 @@ acpi_ex_get_buffer_datum(
  *
  * PARAMETERS:  merged_datum        - Value to store
  *              Buffer              - Receiving buffer
+ *              buffer_length       - Entire length (used for big-endian only)
  *              byte_granularity    - 1/2/4/8 Granularity of the field
  *                                    (aka Datum Size)
- *              Offset              - Datum offset into the buffer
+ *              buffer_offset       - Datum offset into the buffer
  *
  * RETURN:      none
  *
@@ -639,32 +650,40 @@ void
 acpi_ex_set_buffer_datum (
 	acpi_integer                    merged_datum,
 	void                            *buffer,
+	u32                             buffer_length,
 	u32                             byte_granularity,
-	u32                             offset)
+	u32                             buffer_offset)
 {
+	u32                             index;
 
 	ACPI_FUNCTION_ENTRY ();
 
 
+	/* Get proper index into buffer (handles big/little endian) */
+
+	index = ACPI_BUFFER_INDEX (buffer_length, buffer_offset, byte_granularity);
+
+	/* Move the requested number of bytes */
+
 	switch (byte_granularity) {
 	case ACPI_FIELD_BYTE_GRANULARITY:
 
-		((u8 *) buffer) [offset] = (u8) merged_datum;
+		((u8 *) buffer) [index] = (u8) merged_datum;
 		break;
 
 	case ACPI_FIELD_WORD_GRANULARITY:
 
-		ACPI_MOVE_UNALIGNED16_TO_16 (&(((u16 *) buffer)[offset]), &merged_datum);
+		ACPI_MOVE_64_TO_16 (&(((u16 *) buffer)[index]), &merged_datum);
 		break;
 
 	case ACPI_FIELD_DWORD_GRANULARITY:
 
-		ACPI_MOVE_UNALIGNED32_TO_32 (&(((u32 *) buffer)[offset]), &merged_datum);
+		ACPI_MOVE_64_TO_32 (&(((u32 *) buffer)[index]), &merged_datum);
 		break;
 
 	case ACPI_FIELD_QWORD_GRANULARITY:
 
-		ACPI_MOVE_UNALIGNED64_TO_64 (&(((u64 *) buffer)[offset]), &merged_datum);
+		ACPI_MOVE_64_TO_64 (&(((u64 *) buffer)[index]), &merged_datum);
 		break;
 
 	default:
@@ -762,8 +781,8 @@ acpi_ex_extract_from_field (
 
 		/* Store the datum to the caller buffer */
 
-		acpi_ex_set_buffer_datum (merged_datum, buffer, obj_desc->common_field.access_byte_width,
-				datum_offset);
+		acpi_ex_set_buffer_datum (merged_datum, buffer, buffer_length,
+				obj_desc->common_field.access_byte_width, datum_offset);
 
 		return_ACPI_STATUS (AE_OK);
 	}
@@ -835,7 +854,7 @@ acpi_ex_extract_from_field (
 		 * Store the merged field datum in the caller's buffer, according to
 		 * the granularity of the field (size of each datum).
 		 */
-		acpi_ex_set_buffer_datum (merged_datum, buffer,
+		acpi_ex_set_buffer_datum (merged_datum, buffer, buffer_length,
 				obj_desc->common_field.access_byte_width, datum_offset);
 
 		/*
@@ -916,7 +935,7 @@ acpi_ex_insert_into_field (
 
 	/* Get a single datum from the caller's buffer */
 
-	acpi_ex_get_buffer_datum (&previous_raw_datum, buffer,
+	acpi_ex_get_buffer_datum (&previous_raw_datum, buffer, buffer_length,
 			obj_desc->common_field.access_byte_width, datum_offset);
 
 	/*
@@ -979,7 +998,7 @@ acpi_ex_insert_into_field (
 		 * Get the next raw buffer datum.  It may contain bits of the previous
 		 * field datum
 		 */
-		acpi_ex_get_buffer_datum (&this_raw_datum, buffer,
+		acpi_ex_get_buffer_datum (&this_raw_datum, buffer, buffer_length,
 				obj_desc->common_field.access_byte_width, datum_offset);
 
 		/* Create the field datum based on the field alignment */

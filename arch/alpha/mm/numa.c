@@ -12,9 +12,7 @@
 #include <linux/mm.h>
 #include <linux/bootmem.h>
 #include <linux/swap.h>
-#ifdef CONFIG_BLK_DEV_INITRD
-#include <linux/blk.h>
-#endif
+#include <linux/initrd.h>
 
 #include <asm/hwrpb.h>
 #include <asm/pgalloc.h>

@@ -109,7 +109,7 @@ int line_write(struct line *lines, struct tty_struct *tty, int from_user,
 		buf = new;
 	}
 
-	i = minor(tty->device) - tty->driver.minor_start;
+	i = tty->index;
 	line = &lines[i];
 
 	down(&line->sem);
@@ -219,7 +219,7 @@ int line_open(struct line *lines, struct tty_struct *tty,
 	int n, err = 0;
 
 	if(tty == NULL) n = 0;
-	else n = minor(tty->device) - tty->driver.minor_start;
+	else n = tty->index;
 	line = &lines[n];
 
 	down(&line->sem);
@@ -267,7 +267,7 @@ void line_close(struct line *lines, struct tty_struct *tty)
 	int n;
 
 	if(tty == NULL) n = 0;
-	else n = minor(tty->device) - tty->driver.minor_start;
+	else n = tty->index;
 	line = &lines[n];
 
 	down(&line->sem);
@@ -444,7 +444,7 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 
 	for(i = 0; i < nlines; i++){
 		if(!lines[i].valid) 
-			tty_unregister_devfs(driver, driver->minor_start + i);
+			tty_unregister_devfs(driver, i);
 	}
 
 	mconsole_register_dev(&line_driver->mc);

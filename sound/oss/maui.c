@@ -102,9 +102,10 @@ static int maui_write(unsigned char data)
 	return 0;
 }
 
-static void mauiintr(int irq, void *dev_id, struct pt_regs *dummy)
+static irqreturn_t mauiintr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	irq_ok = 1;
+	return IRQ_HANDLED;
 }
 
 static int __init download_code(void)

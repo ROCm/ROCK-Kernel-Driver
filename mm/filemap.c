@@ -31,12 +31,11 @@
  * This is needed for the following functions:
  *  - try_to_release_page
  *  - block_invalidatepage
- *  - page_has_buffers
  *  - generic_osync_inode
  *
- * FIXME: remove all knowledge of the buffer layer from this file
+ * FIXME: remove all knowledge of the buffer layer from the core VM
  */
-#include <linux/buffer_head.h>
+#include <linux/buffer_head.h> /* for generic_osync_inode */
 
 #include <asm/uaccess.h>
 #include <asm/mman.h>

@@ -1747,7 +1747,6 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	fb_memset((void *) info->screen_base, 0,
 		  info->fix.smem_len);
 
-	info->node = NODEV;
 	info->fbops = &atyfb_ops;
 	info->pseudo_palette = pseudo_palette;
 	info->flags = FBINFO_FLAG_DEFAULT;
@@ -1861,7 +1860,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	fb_list = info;
 
 	printk("fb%d: %s frame buffer device on %s\n",
-	       minor(info->node), info->fix.id, name);
+	       info->node, info->fix.id, name);
 	return 1;
 }
 

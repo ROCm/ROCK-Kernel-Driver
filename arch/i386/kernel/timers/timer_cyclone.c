@@ -18,6 +18,7 @@
 #include <asm/fixmap.h>
 
 extern spinlock_t i8253_lock;
+extern unsigned long jiffies;
 extern unsigned long calibrate_tsc(void);
 
 /* Number of usecs that the last interrupt was delayed */
@@ -46,6 +47,8 @@ static rwlock_t monotonic_lock = RW_LOCK_UNLOCKED;
 
 static void mark_offset_cyclone(void)
 {
+	unsigned long lost, delay;
+	unsigned long delta = last_cyclone_low;
 	int count;
 	unsigned long long this_offset, last_offset;
 
@@ -62,6 +65,15 @@ static void mark_offset_cyclone(void)
 	count |= inb(0x40) << 8;
 	spin_unlock(&i8253_lock);
 
+	/* lost tick compensation */
+	delta = last_cyclone_low - delta;	
+	delta /=(CYCLONE_TIMER_FREQ/1000000);
+	delta += delay_at_last_interrupt;
+	lost = delta/(1000000/HZ);
+	delay = delta%(1000000/HZ);
+	if(lost >= 2)
+		jiffies += lost-1;
+	
 	/* update the monotonic base value */
 	this_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
 	monotonic_base += (this_offset - last_offset) & CYCLONE_TIMER_MASK;
@@ -70,6 +82,12 @@ static void mark_offset_cyclone(void)
 	/* calculate delay_at_last_interrupt */
 	count = ((LATCH-1) - count) * TICK_SIZE;
 	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
+
+	/* catch corner case where tick rollover 
+	 * occured between cyclone and pit reads
+	 */
+	if(abs(delay - delay_at_last_interrupt) > 900)
+		jiffies++;
 }
 
 static unsigned long get_offset_cyclone(void)

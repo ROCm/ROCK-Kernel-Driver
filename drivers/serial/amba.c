@@ -640,11 +640,6 @@ ambauart_console_write(struct console *co, const char *s, unsigned int count)
 	UART_PUT_CR(port, old_cr);
 }
 
-static kdev_t ambauart_console_device(struct console *co)
-{
-	return mk_kdev(SERIAL_AMBA_MAJOR, SERIAL_AMBA_MINOR + co->index);
-}
-
 static void __init
 ambauart_console_get_options(struct uart_port *port, int *baud,
 			     int *parity, int *bits)
@@ -696,18 +691,21 @@ static int __init ambauart_console_setup(struct console *co, char *options)
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
 
+extern struct uart_driver amba_reg;
 static struct console amba_console = {
 	.name		= "ttyAM",
 	.write		= ambauart_console_write,
-	.device		= ambauart_console_device,
+	.device		= uart_console_device,
 	.setup		= ambauart_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= &amba_reg,
 };
 
-static void __init ambauart_console_init(void)
+static int __init ambauart_console_init(void)
 {
 	register_console(&amba_console);
+	return 0;
 }
 console_initcall(ambauart_console_init);
 
@@ -719,7 +717,7 @@ console_initcall(ambauart_console_init);
 static struct uart_driver amba_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyAM",
-	.dev_name		= "ttyAM%d",
+	.dev_name		= "ttyAM",
 	.major			= SERIAL_AMBA_MAJOR,
 	.minor			= SERIAL_AMBA_MINOR,
 	.nr			= UART_NR,

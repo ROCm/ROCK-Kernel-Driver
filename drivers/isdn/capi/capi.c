@@ -278,7 +278,6 @@ static struct capincci *capincci_alloc(struct capidev *cdev, u32 ncci)
 	struct capincci *np, **pp;
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	struct capiminor *mp = 0;
-	kdev_t kdev;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 	np = kmalloc(sizeof(*np), GFP_ATOMIC);
@@ -297,8 +296,7 @@ static struct capincci *capincci_alloc(struct capidev *cdev, u32 ncci)
 		printk(KERN_DEBUG "set mp->nccip\n");
 #endif
 #if defined(CONFIG_ISDN_CAPI_CAPIFS) || defined(CONFIG_ISDN_CAPI_CAPIFS_MODULE)
-		kdev = mk_kdev(capi_ttymajor, mp->minor);
-		capifs_new_ncci(0, mp->minor, kdev);
+		capifs_new_ncci(0, mp->minor, MKDEV(capi_ttymajor, mp->minor));
 #endif
 	}
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
@@ -1283,7 +1281,7 @@ static int capinc_tty_init(void)
 	memset(drv, 0, sizeof(struct tty_driver));
 	drv->magic = TTY_DRIVER_MAGIC;
 	drv->driver_name = "capi_nc";
-	drv->name = "capi/%d";
+	drv->name = "capi/";
 	drv->major = capi_ttymajor;
 	drv->minor_start = 0;
 	drv->num = CAPINC_NR_PORTS;

@@ -183,7 +183,7 @@ config MPENTIUMII
 	  optimizations.
 
 config MPENTIUMIII
-	bool "Pentium-III/Celeron(Coppermine)"
+	bool "Pentium-III/Celeron(Coppermine)/Pentium-III Xeon"
 	help
 	  Select this for Intel chips based on the Pentium-III and
 	  Celeron-Coppermine core.  This option enables use of some
@@ -191,7 +191,7 @@ config MPENTIUMIII
 	  extensions.
 
 config MPENTIUM4
-	bool "Pentium-4/Celeron(P4-based)"
+	bool "Pentium-4/Celeron(P4-based)/Xeon"
 	help
 	  Select this for Intel Pentium 4 chips.  This includes both
 	  the Pentium 4 and P4-based Celeron chips.  This option
@@ -345,7 +345,7 @@ config X86_GOOD_APIC
 
 config X86_INTEL_USERCOPY
 	bool
-	depends on MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M586MMX
+	depends on MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M586MMX || X86_GENERIC || MK8 || MK7
 	default y
 
 config X86_USE_PPRO_CHECKSUM
@@ -409,7 +409,7 @@ config SMP
 	  See also the <file:Documentation/smp.tex>,
 	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
 	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
 
@@ -790,7 +790,7 @@ config PM
 	  page on the WWW at
 	  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
 	  Battery Powered Linux mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  Note that, even if you say N here, Linux on the x86 architecture
 	  will issue the hlt instruction if nothing is to be done, thereby
@@ -798,7 +798,7 @@ config PM
 
 config SOFTWARE_SUSPEND
 	bool "Software Suspend (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && PM
+	depends on EXPERIMENTAL && PM && SWAP
 	---help---
 	  Enable the possibilty of suspendig machine. It doesn't need APM.
 	  You may suspend your machine by 'swsusp' or 'shutdown -z <time>' 
@@ -847,7 +847,7 @@ config APM
 	  In order to use APM, you will need supporting software. For location
 	  and more information, read <file:Documentation/pm.txt> and the
 	  Battery Powered Linux mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver does not spin down disk drives (see the hdparm(8)
 	  manpage ("man 8 hdparm") for that), and it doesn't turn off
@@ -1000,7 +1000,7 @@ config PCI
 	  VESA. If you have PCI, say Y, otherwise N.
 
 	  The PCI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
@@ -1203,7 +1203,7 @@ config BINFMT_ELF
 	  want to say Y here.
 
 	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you find that after upgrading from Linux kernel 1.2 and saying Y
 	  here, you still can't run any ELF binaries (they just crash), then
@@ -1225,7 +1225,7 @@ config BINFMT_MISC
 	  programs that need an interpreter to run like Java, Python or
 	  Emacs-Lisp. It's also useful if you often run DOS executables under
 	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  <http://www.tldp.org/docs.html#howto>). Once you have
 	  registered such a binary class with the kernel, you can start one of
 	  those programs simply by typing in its name at a shell prompt; Linux
 	  will automatically feed it to the correct interpreter.
@@ -1341,7 +1341,7 @@ config CD_NO_IDESCSI
 	---help---
 	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
 	  here, otherwise N. Read the CD-ROM-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  Note that the answer to this question doesn't directly affect the
 	  kernel: saying N will just cause the configurator to skip all
@@ -1412,7 +1412,7 @@ config SOUND
 	  interrupt and DMA channel), because you will be asked for it.
 
 	  You want to read the Sound-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  <http://www.tldp.org/docs.html#howto>. General information about
 	  the modular sound system is contained in the files
 	  <file:Documentation/sound/Introduction>.  The file
 	  <file:Documentation/sound/README.OSS> contains some slightly

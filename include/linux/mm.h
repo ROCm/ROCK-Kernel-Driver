@@ -594,28 +594,10 @@ extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned lon
 
 extern unsigned int nr_used_zone_pages(void);
 
-#ifdef CONFIG_MMU
 extern struct page * vmalloc_to_page(void *addr);
 extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot);
-#else
-static inline struct page * vmalloc_to_page(void *addr)
-{
-	return NULL;
-}
-static inline struct page * follow_page(struct mm_struct *mm,
-		unsigned long address, int write)
-{
-	return NULL;
-}
-static inline int remap_page_range(struct vm_area_struct *vma,
-		unsigned long from, unsigned long to,
-		unsigned long size, pgprot_t prot)
-{
-	return -EPERM;
-}
-#endif /* CONFIG_MMU */
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

@@ -76,7 +76,7 @@ acpi_ev_get_gpe_event_info (
 	acpi_native_uint                i;
 
 
-	ACPI_FUNCTION_NAME ("ev_get_gpe_event_info");
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* A NULL gpe_block means use the FADT-defined GPE block(s) */

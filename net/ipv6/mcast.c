@@ -768,7 +768,7 @@ static void mld_clear_delrec(struct inet6_dev *idev)
 		psf = pmc->mca_tomb;
 		pmc->mca_tomb = 0;
 		spin_unlock_bh(&pmc->mca_lock);
-		for (psf=pmc->mca_tomb; psf; psf=psf_next) {
+		for (; psf; psf=psf_next) {
 			psf_next = psf->sf_next;
 			kfree(psf);
 		}
@@ -1042,6 +1042,8 @@ int igmp6_event_query(struct sk_buff *skb)
 		mld_clear_delrec(idev);
 	} else if (len >= 28) {
 		max_delay = MLDV2_MRC(ntohs(mlh2->mrc))*(HZ/10);
+		if (!max_delay)
+			max_delay = 1;
 		idev->mc_maxdelay = max_delay;
 		if (mlh2->qrv)
 			idev->mc_qrv = mlh2->qrv;
@@ -1251,6 +1253,7 @@ static void mld_sendpack(struct sk_buff *skb)
 	struct ipv6hdr *pip6 = skb->nh.ipv6h;
 	struct mld2_report *pmr = (struct mld2_report *)skb->h.raw;
 	int payload_len, mldlen;
+	struct inet6_dev *idev = in6_dev_get(skb->dev);
 
 	payload_len = skb->tail - (unsigned char *)skb->nh.ipv6h -
 		sizeof(struct ipv6hdr);
@@ -1260,7 +1263,9 @@ static void mld_sendpack(struct sk_buff *skb)
 	pmr->csum = csum_ipv6_magic(&pip6->saddr, &pip6->daddr, mldlen,
 		IPPROTO_ICMPV6, csum_partial(skb->h.raw, mldlen, 0));
 	dev_queue_xmit(skb);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+	ICMP6_INC_STATS(idev,Icmp6OutMsgs);
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 }
 
 static int grec_size(struct ifmcaddr6 *pmc, int type, int gdel, int sdel)
@@ -1518,6 +1523,7 @@ static void mld_send_cr(struct inet6_dev *idev)
 static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 {
 	struct sock *sk = igmp6_socket->sk;
+	struct inet6_dev *idev;
         struct sk_buff *skb;
         struct icmp6hdr *hdr;
 	struct in6_addr *snd_addr;
@@ -1575,12 +1581,17 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 					   IPPROTO_ICMPV6,
 					   csum_partial((__u8 *) hdr, len, 0));
 
+	idev = in6_dev_get(skb->dev);
+
 	dev_queue_xmit(skb);
 	if (type == ICMPV6_MGM_REDUCTION)
-		ICMP6_INC_STATS(Icmp6OutGroupMembReductions);
+		ICMP6_INC_STATS(idev, Icmp6OutGroupMembReductions);
 	else
-		ICMP6_INC_STATS(Icmp6OutGroupMembResponses);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+		ICMP6_INC_STATS(idev, Icmp6OutGroupMembResponses);
+	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 	return;
 
 out:
@@ -2096,8 +2107,6 @@ static int ip6_mcf_read_proc(char *buffer, char **start, off_t offset,
 			unsigned long icount, xcount, i;
 
 			spin_lock_bh(&imc->mca_lock);
-			icount = imc->mca_sfcount[MCAST_INCLUDE];
-			xcount = imc->mca_sfcount[MCAST_EXCLUDE];
 			for (psf=imc->mca_sources; psf; psf=psf->sf_next) {
 				if (first) {
 					len += sprintf(buffer+len, "%3s %6s "
@@ -2119,36 +2128,6 @@ static int ip6_mcf_read_proc(char *buffer, char **start, off_t offset,
 				len += sprintf(buffer+len, " %6lu %6lu\n",
 					psf->sf_count[MCAST_INCLUDE],
 					psf->sf_count[MCAST_EXCLUDE]);
-				pos = begin+len;
-				if (pos < offset) {
-					len=0;
-					begin=pos;
-				}
-				if (pos > offset+length) {
-					spin_unlock_bh(&imc->mca_lock);
-					read_unlock_bh(&idev->lock);
-					in6_dev_put(idev);
-					goto done;
-				}
-				icount -= psf->sf_count[MCAST_INCLUDE];
-				xcount -= psf->sf_count[MCAST_EXCLUDE];
-			}
-			if (icount > 0 || xcount > 0) {
-				if (first) {
-					len += sprintf(buffer+len, "%3s %6s "
-						"%32s %32s %6s %6s\n", "Idx",
-						"Device", "Multicast Address",
-						"Source Address", "INC", "EXC");
-					first = 0;
-				}
-				len += sprintf(buffer+len,"%3d %6.6s ",
-					dev->ifindex, dev->name);
-
-				for (i=0; i<16; i++)
-					len += sprintf(buffer+len, "%02x",
-						imc->mca_addr.s6_addr[i]);
-				len += sprintf(buffer+len, " %32s %6lu %6lu\n",
-					"NONE", icount, xcount);
 				pos = begin+len;
 				if (pos < offset) {
 					len=0;

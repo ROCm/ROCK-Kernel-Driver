@@ -8,7 +8,7 @@ config BLK_DEV_SD
 	  If you want to use a SCSI hard disk or the SCSI or parallel port
 	  version of the IOMEGA ZIP drive under Linux, say Y and read the
 	  SCSI-HOWTO, the Disk-HOWTO and the Multi-Disk-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. This is NOT for SCSI
+	  <http://www.tldp.org/docs.html#howto>. This is NOT for SCSI
 	  CD-ROMs.
 
 	  This driver is also available as a module ( = code which can be
@@ -26,7 +26,7 @@ config CHR_DEV_ST
 	---help---
 	  If you want to use a SCSI tape drive under Linux, say Y and read the
 	  SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, and
+	  <http://www.tldp.org/docs.html#howto>, and
 	  <file:Documentation/scsi/st.txt> in the kernel source.  This is NOT for
 	  SCSI CD-ROMs.
 
@@ -48,7 +48,7 @@ config CHR_DEV_OSST
 	  tape drives (ADR-x0) that supports the standard SCSI-2 commands for
 	  tapes (QIC-157) and can be driven by the standard driver st.
 	  For more information, you may have a look at the SCSI-HOWTO
-	  <http://www.linuxdoc.org/docs.html#howto>  and
+	  <http://www.tldp.org/docs.html#howto>  and
 	  <file:Documentation/scsi/osst.txt>  in the kernel source.
 	  More info on the OnStream driver may be found on
 	  <http://linux1.onstream.nl/test/>
@@ -67,7 +67,7 @@ config BLK_DEV_SR
 	---help---
 	  If you want to use a SCSI CD-ROM under Linux, say Y and read the
 	  SCSI-HOWTO and the CD-ROM-HOWTO at
-	  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
+	  <http://www.tldp.org/docs.html#howto>. Also make sure to say Y
 	  or M to "ISO 9660 CD-ROM file system support" later.
 
 	  This driver is also available as a module ( = code which can be
@@ -238,7 +238,7 @@ config SCSI_AHA152X
 	  must be manually specified in this case.
 
 	  It is explained in section 3.3 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. You might also want to
+	  <http://www.tldp.org/docs.html#howto>. You might also want to
 	  read the file <file:Documentation/scsi/aha152x.txt>.
 
 	  This driver is also available as a module ( = code which can be
@@ -252,7 +252,7 @@ config SCSI_AHA1542
 	---help---
 	  This is support for a SCSI host adapter.  It is explained in section
 	  3.4 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  Note that Trantor was
+	  <http://www.tldp.org/docs.html#howto>.  Note that Trantor was
 	  purchased by Adaptec, and some former Trantor products are being
 	  sold under the Adaptec name.  If it doesn't work out of the box, you
 	  may have to change some settings in <file:drivers/scsi/aha1542.h>.
@@ -268,7 +268,7 @@ config SCSI_AHA1740
 	---help---
 	  This is support for a SCSI host adapter.  It is explained in section
 	  3.5 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+	  <http://www.tldp.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/aha1740.h>.
 
@@ -316,7 +316,7 @@ config SCSI_AIC7XXX_OLD
 	  configuration options. You should read
 	  <file:Documentation/scsi/aic7xxx_old.txt> at a minimum before
 	  contacting the maintainer with any questions.  The SCSI-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>, can also
+	  available from <http://www.tldp.org/docs.html#howto>, can also
 	  be of great help.
 
 	  If you want to compile this driver as a module ( = code which can be
@@ -377,7 +377,7 @@ config SCSI_AM53C974
 	  This is support for the AM53/79C974 SCSI host adapters.  Please read
 	  <file:Documentation/scsi/AM53C974.txt> for details.  Also, the
 	  SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, is for you.
+	  <http://www.tldp.org/docs.html#howto>, is for you.
 
 	  Note that there is another driver for AM53C974 based adapters:
 	  "Tekram DC390(T) and Am53/79C974 (PCscsi) SCSI support", above.  You
@@ -406,7 +406,7 @@ config SCSI_BUSLOGIC
 	---help---
 	  This is support for BusLogic MultiMaster and FlashPoint SCSI Host
 	  Adapters. Consult the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, and the files
+	  <http://www.tldp.org/docs.html#howto>, and the files
 	  <file:Documentation/scsi/BusLogic.txt> and
 	  <file:Documentation/scsi/FlashPoint.txt> for more information. If this
 	  driver does not work correctly without modification, please contact
@@ -451,7 +451,7 @@ config SCSI_DTC3280
 	help
 	  This is support for DTC 3180/3280 SCSI Host Adapters.  Please read
 	  the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, and the file
+	  <http://www.tldp.org/docs.html#howto>, and the file
 	  <file:Documentation/scsi/dtc3x80.txt>.
 
 	  This driver is also available as a module ( = code which can be
@@ -470,7 +470,7 @@ config SCSI_EATA
 
 	  You want to read the start of <file:drivers/scsi/eata.c> and the
 	  SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -518,7 +518,7 @@ config SCSI_EATA_PIO
 	  host adapters could also use this driver but are discouraged from
 	  doing so, since this driver only supports hard disks and lacks
 	  numerous features.  You might want to have a look at the SCSI-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>.
+	  available from <http://www.tldp.org/docs.html#howto>.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -534,7 +534,7 @@ config SCSI_FUTURE_DOMAIN
 	  other adapters based on the Future Domain chipsets (Quantum
 	  ISA-200S, ISA-250MG; Adaptec AHA-2920A; and at least one IBM board).
 	  It is explained in section 3.7 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  NOTE: Newer Adaptec AHA-2920C boards use the Adaptec AIC-7850 chip
 	  and should use the aic7xxx driver ("Adaptec AIC7xxx chipset SCSI
@@ -589,7 +589,7 @@ config SCSI_GENERIC_NCR5380
 	  generic 5380 support.
 
 	  It is explained in section 3.8 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+	  <http://www.tldp.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/g_NCR5380.h>.
 
@@ -605,7 +605,7 @@ config SCSI_GENERIC_NCR5380_MMIO
 	  This is a driver for the old NCR 53c80 series of SCSI controllers
 	  on boards using memory mapped I/O. 
 	  It is explained in section 3.8 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+	  <http://www.tldp.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/g_NCR5380.h>.
 
@@ -719,7 +719,7 @@ config SCSI_INITIO
 	help
 	  This is support for the Initio 91XXU(W) SCSI host adapter.  Please
 	  read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -732,7 +732,7 @@ config SCSI_INIA100
 	help
 	  This is support for the Initio INI-A100U2W SCSI host adapter.
 	  Please read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -758,7 +758,7 @@ config SCSI_PPA
 	  For more information about this driver and how to use it you should
 	  read the file <file:Documentation/scsi/ppa.txt>.  You should also read
 	  the SCSI-HOWTO, which is available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If you use this driver,
+	  <http://www.tldp.org/docs.html#howto>.  If you use this driver,
 	  you will still be able to use the parallel port for other tasks,
 	  such as a printer; it is safe to compile both drivers into the
 	  kernel.
@@ -787,7 +787,7 @@ config SCSI_IMM
 	  For more information about this driver and how to use it you should
 	  read the file <file:Documentation/scsi/ppa.txt>.  You should also read
 	  the SCSI-HOWTO, which is available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If you use this driver,
+	  <http://www.tldp.org/docs.html#howto>.  If you use this driver,
 	  you will still be able to use the parallel port for other tasks,
 	  such as a printer; it is safe to compile both drivers into the
 	  kernel.
@@ -833,7 +833,7 @@ config SCSI_NCR53C406A
 	  This is support for the NCR53c406a SCSI host adapter.  For user
 	  configurable parameters, check out <file:drivers/scsi/NCR53c406a.c>
 	  in the kernel source.  Also read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -883,7 +883,7 @@ config SCSI_NCR53C7xx
 	  This is a driver for the 53c7 and 8xx NCR family of SCSI
 	  controllers, not to be confused with the NCR 5380 controllers.  It
 	  is explained in section 3.8 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+	  <http://www.tldp.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/53c7,8xx.h>.  Please read
 	  <file:Documentation/scsi/ncr53c7xx.txt> for the available boot time
@@ -1220,7 +1220,7 @@ config SCSI_PAS16
 	---help---
 	  This is support for a SCSI host adapter.  It is explained in section
 	  3.10 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+	  <http://www.tldp.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/pas16.h>.
 
@@ -1235,7 +1235,7 @@ config SCSI_PCI2000
 	help
 	  This is support for the PCI2000I EIDE interface card which acts as a
 	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module called pci2000 ( = code
 	  which can be inserted in and removed from the running kernel
@@ -1248,7 +1248,7 @@ config SCSI_PCI2220I
 	help
 	  This is support for the PCI2220i EIDE interface card which acts as a
 	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module called pci2220i ( = code
 	  which can be inserted in and removed from the running kernel
@@ -1261,7 +1261,7 @@ config SCSI_PSI240I
 	help
 	  This is support for the PSI240i EIDE interface card which acts as a
 	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module called psi240i ( = code
 	  which can be inserted in and removed from the running kernel
@@ -1283,7 +1283,7 @@ config SCSI_QLOGIC_FAS
 	  Information about this driver is contained in
 	  <file:Documentation/scsi/qlogicfas.txt>.  You should also read the
 	  SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -1303,7 +1303,7 @@ config SCSI_QLOGIC_ISP
 
 	  Please read the file <file:Documentation/scsi/qlogicisp.txt>.  You
 	  should also read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -1346,7 +1346,7 @@ config SCSI_SEAGATE
 	---help---
 	  These are 8-bit SCSI controllers; the ST-01 is also supported by
 	  this driver.  It is explained in section 3.9 of the SCSI-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>.  If it
+	  available from <http://www.tldp.org/docs.html#howto>.  If it
 	  doesn't work out of the box, you may have to change some settings in
 	  <file:drivers/scsi/seagate.h>.
 
@@ -1389,6 +1389,23 @@ config SCSI_SYM53C416
 	  removed from the running kernel whenever you want), say M here and
 	  read <file:Documentation/modules.txt>. The module will be called
 	  sym53c416.
+
+config SCSI_DC395x
+	tristate "Tekram DC395(U/UW/F) and DC315(U) SCSI support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && PCI && SCSI
+	---help---
+	  This driver supports PCI SCSI host adapters based on the ASIC
+	  TRM-S1040 chip, e.g Tekram DC395(U/UW/F) and DC315(U) variants.
+
+	  This driver works, but is still in experimental status. So better
+	  have a bootable disk and a backup in case of emergency.
+
+	  Documentation can be found in <file:Documentation/scsi/dc395x.txt>.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called dc395x.
 
 config SCSI_DC390T
 	tristate "Tekram DC390(T) and Am53/79C974 SCSI support"
@@ -1433,7 +1450,7 @@ config SCSI_T128
 	---help---
 	  This is support for a SCSI host adapter. It is explained in section
 	  3.11 of the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+	  <http://www.tldp.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/t128.h>.  Note that Trantor was purchased by
 	  Adaptec, and some former Trantor products are being sold under the
@@ -1453,7 +1470,7 @@ config SCSI_U14_34F
 	  information about this hardware.  If the driver doesn't work out of
 	  the box, you may have to change some settings in
 	  <file: drivers/scsi/u14-34f.c>.  Read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  Note that there is also
+	  <http://www.tldp.org/docs.html#howto>.  Note that there is also
 	  another driver for the same hardware: "UltraStor SCSI support",
 	  below.  You should say Y to both only if you want 24F support as
 	  well.
@@ -1502,7 +1519,7 @@ config SCSI_ULTRASTOR
 	  This is support for the UltraStor 14F, 24F and 34F SCSI-2 host
 	  adapter family.  This driver is explained in section 3.12 of the
 	  SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
+	  <http://www.tldp.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/ultrastor.h>.
 
@@ -1520,7 +1537,7 @@ config SCSI_NSP32
 	help
 	  This is support for the Workbit NinjaSCSI-32Bi/UDE PCI/Cardbus
 	  SCSI host adapter. Please read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),

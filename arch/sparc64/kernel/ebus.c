@@ -73,7 +73,7 @@ static void __ebus_dma_reset(struct ebus_dma_info *p)
 	}
 }
 
-static void ebus_dma_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ebus_dma_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct ebus_dma_info *p = dev_id;
 	unsigned long flags;
@@ -87,12 +87,16 @@ static void ebus_dma_irq(int irq, void *dev_id, struct pt_regs *regs)
 	if (csr & EBDMA_CSR_ERR_PEND) {
 		printk(KERN_CRIT "ebus_dma(%s): DMA error!\n", p->name);
 		p->callback(p, EBUS_DMA_EVENT_ERROR, p->client_cookie);
+		return IRQ_HANDLED;
 	} else if (csr & EBDMA_CSR_INT_PEND) {
 		p->callback(p,
 			    (csr & EBDMA_CSR_TC) ?
 			    EBUS_DMA_EVENT_DMA : EBUS_DMA_EVENT_DEVICE,
 			    p->client_cookie);
+		return IRQ_HANDLED;
 	}
+
+	return IRQ_NONE;
 }
 
 int ebus_dma_register(struct ebus_dma_info *p)

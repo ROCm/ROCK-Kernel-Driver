@@ -51,7 +51,6 @@
 #include "drm_init.h"
 #include "drm_ioctl.h"
 #include "drm_lock.h"
-#include "drm_lists.h"
 #include "drm_memory.h"
 #include "drm_proc.h"
 #include "drm_vm.h"

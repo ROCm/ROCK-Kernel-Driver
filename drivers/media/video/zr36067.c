@@ -59,12 +59,10 @@
 #include <asm/page.h>
 #include <linux/sched.h>
 #include <linux/types.h>
-#include <linux/wrapper.h>
 
 #include <linux/spinlock.h>
 #include <linux/vmalloc.h>
 #include <linux/i2c-old.h>
-#define     MAP_NR(x)       virt_to_page(x)
 #define     ZORAN_HARDWARE  VID_HARDWARE_ZR36067
 
 #include <linux/videodev.h>
@@ -303,7 +301,7 @@ static int v4l_fbuffer_alloc(struct zoran *zr)
 			zr->v4l_gbuf[i].fbuffer_phys = virt_to_phys(mem);
 			zr->v4l_gbuf[i].fbuffer_bus = virt_to_bus(mem);
 			for (off = 0; off < v4l_bufsize; off += PAGE_SIZE)
-				mem_map_reserve(MAP_NR(mem + off));
+				SetPageReserved(virt_to_page(mem + off));
 			DEBUG1(printk
 			       (KERN_INFO
 				"%s: V4L frame %d mem 0x%lx (bus: 0x%lx)\n",
@@ -366,7 +364,7 @@ static void v4l_fbuffer_free(struct zoran *zr)
 		if (v4l_bufsize <= MAX_KMALLOC_MEM) {
 			mem = zr->v4l_gbuf[i].fbuffer;
 			for (off = 0; off < v4l_bufsize; off += PAGE_SIZE)
-				mem_map_unreserve(MAP_NR(mem + off));
+				ClearPageReserved(virt_to_page(mem + off));
 			kfree((void *) zr->v4l_gbuf[i].fbuffer);
 		}
 #if defined(CONFIG_BIGPHYS_AREA)
@@ -445,7 +443,7 @@ static int jpg_fbuffer_alloc(struct zoran *zr)
 			zr->jpg_gbuf[i].frag_tab[1] =
 			    ((zr->jpg_bufsize / 4) << 1) | 1;
 			for (off = 0; off < zr->jpg_bufsize; off += PAGE_SIZE)
-				mem_map_reserve(MAP_NR(mem + off));
+				SetPageReserved(virt_to_page(mem + off));
 		} else {
 			/* jpg_bufsize is allreay page aligned */
 			for (j = 0; j < zr->jpg_bufsize / PAGE_SIZE; j++) 
@@ -463,7 +461,7 @@ static int jpg_fbuffer_alloc(struct zoran *zr)
 				    virt_to_bus((void *) mem);
 				zr->jpg_gbuf[i].frag_tab[2 * j + 1] =
 				    (PAGE_SIZE / 4) << 1;
-				mem_map_reserve(MAP_NR(mem));
+				SetPageReserved(virt_to_page(mem));
 			}
 
 			zr->jpg_gbuf[i].frag_tab[2 * j - 1] |= 1;
@@ -503,7 +501,7 @@ static void jpg_fbuffer_free(struct zoran *zr)
 								  [0]);
 				for (off = 0; off < zr->jpg_bufsize;
 				     off += PAGE_SIZE)
-					mem_map_unreserve(MAP_NR
+					ClearPageReserved(virt_to_page
 							  (mem + off));
 				kfree((void *) mem);
 				zr->jpg_gbuf[i].frag_tab[0] = 0;
@@ -513,7 +511,7 @@ static void jpg_fbuffer_free(struct zoran *zr)
 			for (j = 0; j < zr->jpg_bufsize / PAGE_SIZE; j++) {
 				if (!zr->jpg_gbuf[i].frag_tab[2 * j])
 					break;
-				mem_map_unreserve(MAP_NR
+				ClearPageReserved(virt_to_page
 						  (bus_to_virt
 						   (zr->jpg_gbuf[i].
 						    frag_tab[2 * j])));
@@ -2782,12 +2780,13 @@ static void error_handler(struct zoran *zr, u32 astat, u32 stat)
 	}
 }
 
-static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32 stat, astat;
 	int count;
 	struct zoran *zr;
 	unsigned long flags;
+	int handled = 0;
 
 	zr = (struct zoran *) dev_id;
 	count = 0;
@@ -2806,7 +2805,7 @@ static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		zr->last_isr = stat;
 		spin_unlock_irqrestore(&zr->lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	spin_lock_irqsave(&zr->lock, flags);
@@ -2817,6 +2816,7 @@ static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 		if (!astat) {
 			break;
 		}
+		handled = 1;
 		if (astat & cardvsync[zr->card]) {	// SW
 
 			if (zr->codec_mode == BUZ_MODE_MOTION_DECOMPRESS
@@ -3010,6 +3010,7 @@ static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 		zr->last_isr = stat;
 	}
 	spin_unlock_irqrestore(&zr->lock, flags);
+	return IRQ_RETVAL(handled);
 }
 
 /* Check a zoran_params struct for correctness, insert default params */

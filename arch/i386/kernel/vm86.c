@@ -695,7 +695,8 @@ static int irqbits;
 	| (1 << SIGUSR1) | (1 << SIGUSR2) | (1 << SIGIO)  | (1 << SIGURG) \
 	| (1 << SIGUNUSED) )
 	
-static void irq_handler(int intno, void *dev_id, struct pt_regs * regs) {
+static irqreturn_t irq_handler(int intno, void *dev_id, struct pt_regs * regs)
+{
 	int irq_bit;
 	unsigned long flags;
 
@@ -709,6 +710,7 @@ static void irq_handler(int intno, void *dev_id, struct pt_regs * regs) {
 	/* else user will poll for IRQs */
 out:
 	spin_unlock_irqrestore(&irqbits_lock, flags);	
+	return IRQ_NONE;
 }
 
 static inline void free_vm86_irq(int irqnumber)
@@ -742,7 +744,10 @@ static inline int get_and_reset_irq(int irqnumber)
 	bit = irqbits & (1 << irqnumber);
 	irqbits &= ~bit;
 	spin_unlock_irqrestore(&irqbits_lock, flags);	
-	return bit;
+	if (!bit)
+		return 0;
+	enable_irq(irqnumber);
+	return 1;
 }
 
 

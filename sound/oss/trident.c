@@ -195,7 +195,6 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
-#include <linux/wrapper.h>
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/interrupt.h>
@@ -207,7 +206,7 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 
-#if defined CONFIG_ALPHA_NAUTILUS || CONFIG_ALPHA_GENERIC
+#if defined(CONFIG_ALPHA_NAUTILUS) || defined(CONFIG_ALPHA_GENERIC)
 #include <asm/hwrpb.h>
 #endif
 
@@ -1222,7 +1221,7 @@ static int alloc_dmabuf(struct dmabuf* dmabuf, struct pci_dev* pci_dev, int orde
 	/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 	pend = virt_to_page(rawbuf + (PAGE_SIZE << order) - 1);
 	for (page = virt_to_page(rawbuf); page <= pend; page++)
-		mem_map_reserve(page);
+		SetPageReserved(page);
 
 	return 0;
 }
@@ -1253,7 +1252,7 @@ static void dealloc_dmabuf(struct dmabuf* dmabuf, struct pci_dev* pci_dev)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(dmabuf->rawbuf + (PAGE_SIZE << dmabuf->buforder) - 1);
 		for (page = virt_to_page(dmabuf->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		pci_free_consistent(pci_dev, PAGE_SIZE << dmabuf->buforder,
 				    dmabuf->rawbuf, dmabuf->dma_handle);
 		dmabuf->rawbuf = NULL;
@@ -1728,7 +1727,7 @@ static void cyber_address_interrupt(struct trident_card *card)
 	}
 }
 
-static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct trident_card *card = (struct trident_card *)dev_id;
 	u32 event;
@@ -1755,13 +1754,14 @@ static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		event = inl(TRID_REG(card, T4D_MISCINT));
 		outl(event | (ST_TARGET_REACHED | MIXER_OVERFLOW | MIXER_UNDERFLOW), TRID_REG(card, T4D_MISCINT));
 		spin_unlock(&card->lock);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* manually clear interrupt status, bad hardware design, blame T^2 */
 	outl((ST_TARGET_REACHED | MIXER_OVERFLOW | MIXER_UNDERFLOW),
 	     TRID_REG(card, T4D_MISCINT));
 	spin_unlock(&card->lock);
+	return IRQ_HANDLED;
 }
 
 /* in this loop, dmabuf.count signifies the amount of data that is waiting to be copied to
@@ -4284,7 +4284,7 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 		if(card->revision == ALI_5451_V02)
 			ali_close_multi_channels();
 		/* edited by HMSEO for GT sound */
-#if defined CONFIG_ALPHA_NAUTILUS || CONFIG_ALPHA_GENERIC
+#if defined(CONFIG_ALPHA_NAUTILUS) || defined(CONFIG_ALPHA_GENERIC)
 		{
 			u16 ac97_data;
 			extern struct hwrpb_struct *hwrpb;

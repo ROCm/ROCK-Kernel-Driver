@@ -78,7 +78,7 @@ static const char *version =
 #define DEBUG(n, args...) do { } while (0)
 #endif
 
-static void i365_count_irq(int, void *, struct pt_regs *);
+static irqreturn_t i365_count_irq(int, void *, struct pt_regs *);
 static inline int _check_irq(int irq, int flags)
 {
     if (request_irq(irq, i365_count_irq, flags, "x", i365_count_irq) != 0)
@@ -535,11 +535,12 @@ static u_int __init set_bridge_opts(u_short s, u_short ns)
 static volatile u_int irq_hits;
 static u_short irq_sock;
 
-static void i365_count_irq(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t i365_count_irq(int irq, void *dev, struct pt_regs *regs)
 {
     i365_get(irq_sock, I365_CSC);
     irq_hits++;
     DEBUG(2, "-> hit on irq %d\n", irq);
+    return IRQ_HANDLED;
 }
 
 static u_int __init test_irq(u_short sock, int irq)
@@ -625,11 +626,6 @@ static u_int __init isa_scan(u_short sock, u_int mask0)
 static int to_cycles(int ns)
 {
     return ns/cycle_time;
-}
-
-static int to_ns(int cycles)
-{
-    return cycle_time*cycles;
 }
 
 /*====================================================================*/
@@ -939,7 +935,7 @@ static DECLARE_WORK(pcic_task, pcic_bh, NULL);
 
 static unsigned long last_detect_jiffies;
 
-static void pcic_interrupt(int irq, void *dev,
+static irqreturn_t pcic_interrupt(int irq, void *dev,
 				    struct pt_regs *regs)
 {
     int i, j, csc;
@@ -947,7 +943,8 @@ static void pcic_interrupt(int irq, void *dev,
 #ifdef CONFIG_ISA
     u_long flags = 0;
 #endif
-    
+    int handled = 0;
+
     DEBUG(4, "i82365: pcic_interrupt(%d)\n", irq);
 
     for (j = 0; j < 20; j++) {
@@ -956,6 +953,7 @@ static void pcic_interrupt(int irq, void *dev,
 	    if ((socket[i].cs_irq != irq) &&
 		(socket[i].cap.pci_irq != irq))
 		continue;
+	    handled = 1;
 	    ISA_LOCK(i, flags);
 	    csc = i365_get(i, I365_CSC);
 	    if ((csc == 0) || (!socket[i].handler) ||
@@ -1002,6 +1000,7 @@ static void pcic_interrupt(int irq, void *dev,
 	printk(KERN_NOTICE "i82365: infinite loop in interrupt handler\n");
 
     DEBUG(4, "i82365: interrupt done\n");
+    return IRQ_RETVAL(handled);
 } /* pcic_interrupt */
 
 static void pcic_interrupt_wrapper(u_long data)

@@ -248,7 +248,7 @@ struct priv
 };
 
 static int  ni65_probe1(struct net_device *dev,int);
-static void ni65_interrupt(int irq, void * dev_id, struct pt_regs *regs);
+static irqreturn_t ni65_interrupt(int irq, void * dev_id, struct pt_regs *regs);
 static void ni65_recv_intr(struct net_device *dev,int);
 static void ni65_xmit_intr(struct net_device *dev,int);
 static int  ni65_open(struct net_device *dev);
@@ -307,7 +307,6 @@ static int ni65_open(struct net_device *dev)
 	if(ni65_lance_reinit(dev))
 	{
 		netif_start_queue(dev);
-		MOD_INC_USE_COUNT;
 		return 0;
 	}
 	else
@@ -341,7 +340,6 @@ static int ni65_close(struct net_device *dev)
 	}
 #endif
 	free_irq(dev->irq,dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -512,7 +510,7 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 	}
 
 	dev->base_addr = ioaddr;
-
+	SET_MODULE_OWNER(dev);
 	dev->open		= ni65_open;
 	dev->stop		= ni65_close;
 	dev->hard_start_xmit	= ni65_send_packet;
@@ -839,7 +837,7 @@ static int ni65_lance_reinit(struct net_device *dev)
 /*
  * interrupt handler
  */
-static void ni65_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t ni65_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	int csr0 = 0;
 	struct net_device *dev = dev_id;
@@ -940,7 +938,7 @@ static void ni65_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 	else
 		writedatareg(CSR0_INEA);
 
-	return;
+	return IRQ_HANDLED;
 }
 
 /*

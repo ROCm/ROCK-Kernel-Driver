@@ -138,7 +138,6 @@ static int fbcon_set_origin(struct vc_data *);
 #define DEFAULT_CURSOR_BLINK_RATE	(20)
 
 static int vbl_cursor_cnt;
-static int cursor_blink_rate;
 
 #define divides(a, b)	((!(a) || (b)%(a)) ? 0 : 1)
 
@@ -185,7 +184,7 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
  */
 static int vbl_detected;
 
-static void fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 {
 	vbl_detected++;
 }
@@ -202,7 +201,9 @@ static void fb_flashcursor(void *private)
 	info->fbops->fb_cursor(info, &info->cursor);
 }
 
-static void fb_vbl_handler(int irq, void *dev_id, struct pt_regs *fp)
+#if (defined(__arm__) && defined(IRQ_VSYNCPULSE)) || defined(CONFIG_ATARI) || defined(CONFIG_MAC)
+static int cursor_blink_rate;
+static irqreturn_t fb_vbl_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
 	struct fb_info *info = dev_id;
 
@@ -210,7 +211,9 @@ static void fb_vbl_handler(int irq, void *dev_id, struct pt_regs *fp)
 		schedule_work(&info->queue);	
 		vbl_cursor_cnt = cursor_blink_rate; 
 	}
+	return IRQ_HANDLED;
 }
+#endif
 	
 static void cursor_timer_handler(unsigned long dev_addr);
 
@@ -527,8 +530,9 @@ static const char *fbcon_startup(void)
 	struct fb_info *info;
 	struct vc_data *vc;
 	static int done = 0;
-	int irqres = 1;
+	int irqres;
 
+	irqres = 1;
 	/*
 	 *  If num_registered_fb is zero, this is a call for the dummy part.
 	 *  The frame buffer devices weren't initialized yet.

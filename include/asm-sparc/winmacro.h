@@ -11,14 +11,6 @@
 #include <asm/ptrace.h>
 #include <asm/psr.h>
 
-/* These are just handy. */
-#define _SV	save	%sp, -REGWIN_SZ, %sp
-#define _RS     restore 
-
-#define FLUSH_ALL_KERNEL_WINDOWS \
-	_SV; _SV; _SV; _SV; _SV; _SV; _SV; \
-	_RS; _RS; _RS; _RS; _RS; _RS; _RS;
-
 /* Store the register window onto the 8-byte aligned area starting
  * at %reg.  It might be %sp, it might not, we don't care.
  */
@@ -45,25 +37,25 @@
 
 /* Loading and storing struct pt_reg trap frames. */
 #define LOAD_PT_INS(base_reg) \
-        ldd     [%base_reg + REGWIN_SZ + PT_I0], %i0; \
-        ldd     [%base_reg + REGWIN_SZ + PT_I2], %i2; \
-        ldd     [%base_reg + REGWIN_SZ + PT_I4], %i4; \
-        ldd     [%base_reg + REGWIN_SZ + PT_I6], %i6;
+        ldd     [%base_reg + STACKFRAME_SZ + PT_I0], %i0; \
+        ldd     [%base_reg + STACKFRAME_SZ + PT_I2], %i2; \
+        ldd     [%base_reg + STACKFRAME_SZ + PT_I4], %i4; \
+        ldd     [%base_reg + STACKFRAME_SZ + PT_I6], %i6;
 
 #define LOAD_PT_GLOBALS(base_reg) \
-        ld      [%base_reg + REGWIN_SZ + PT_G1], %g1; \
-        ldd     [%base_reg + REGWIN_SZ + PT_G2], %g2; \
-        ldd     [%base_reg + REGWIN_SZ + PT_G4], %g4; \
-        ldd     [%base_reg + REGWIN_SZ + PT_G6], %g6;
+        ld      [%base_reg + STACKFRAME_SZ + PT_G1], %g1; \
+        ldd     [%base_reg + STACKFRAME_SZ + PT_G2], %g2; \
+        ldd     [%base_reg + STACKFRAME_SZ + PT_G4], %g4; \
+        ldd     [%base_reg + STACKFRAME_SZ + PT_G6], %g6;
 
 #define LOAD_PT_YREG(base_reg, scratch) \
-        ld      [%base_reg + REGWIN_SZ + PT_Y], %scratch; \
+        ld      [%base_reg + STACKFRAME_SZ + PT_Y], %scratch; \
         wr      %scratch, 0x0, %y;
 
 #define LOAD_PT_PRIV(base_reg, pt_psr, pt_pc, pt_npc) \
-        ld      [%base_reg + REGWIN_SZ + PT_PSR], %pt_psr; \
-        ld      [%base_reg + REGWIN_SZ + PT_PC], %pt_pc; \
-        ld      [%base_reg + REGWIN_SZ + PT_NPC], %pt_npc;
+        ld      [%base_reg + STACKFRAME_SZ + PT_PSR], %pt_psr; \
+        ld      [%base_reg + STACKFRAME_SZ + PT_PC], %pt_pc; \
+        ld      [%base_reg + STACKFRAME_SZ + PT_NPC], %pt_npc;
 
 #define LOAD_PT_ALL(base_reg, pt_psr, pt_pc, pt_npc, scratch) \
         LOAD_PT_YREG(base_reg, scratch) \
@@ -72,25 +64,25 @@
         LOAD_PT_PRIV(base_reg, pt_psr, pt_pc, pt_npc)
 
 #define STORE_PT_INS(base_reg) \
-        std     %i0, [%base_reg + REGWIN_SZ + PT_I0]; \
-        std     %i2, [%base_reg + REGWIN_SZ + PT_I2]; \
-        std     %i4, [%base_reg + REGWIN_SZ + PT_I4]; \
-        std     %i6, [%base_reg + REGWIN_SZ + PT_I6];
+        std     %i0, [%base_reg + STACKFRAME_SZ + PT_I0]; \
+        std     %i2, [%base_reg + STACKFRAME_SZ + PT_I2]; \
+        std     %i4, [%base_reg + STACKFRAME_SZ + PT_I4]; \
+        std     %i6, [%base_reg + STACKFRAME_SZ + PT_I6];
 
 #define STORE_PT_GLOBALS(base_reg) \
-        st      %g1, [%base_reg + REGWIN_SZ + PT_G1]; \
-        std     %g2, [%base_reg + REGWIN_SZ + PT_G2]; \
-        std     %g4, [%base_reg + REGWIN_SZ + PT_G4]; \
-        std     %g6, [%base_reg + REGWIN_SZ + PT_G6];
+        st      %g1, [%base_reg + STACKFRAME_SZ + PT_G1]; \
+        std     %g2, [%base_reg + STACKFRAME_SZ + PT_G2]; \
+        std     %g4, [%base_reg + STACKFRAME_SZ + PT_G4]; \
+        std     %g6, [%base_reg + STACKFRAME_SZ + PT_G6];
 
 #define STORE_PT_YREG(base_reg, scratch) \
         rd      %y, %scratch; \
-        st      %scratch, [%base_reg + REGWIN_SZ + PT_Y];
+        st      %scratch, [%base_reg + STACKFRAME_SZ + PT_Y];
 
 #define STORE_PT_PRIV(base_reg, pt_psr, pt_pc, pt_npc) \
-        st      %pt_psr, [%base_reg + REGWIN_SZ + PT_PSR]; \
-        st      %pt_pc,  [%base_reg + REGWIN_SZ + PT_PC]; \
-        st      %pt_npc, [%base_reg + REGWIN_SZ + PT_NPC];
+        st      %pt_psr, [%base_reg + STACKFRAME_SZ + PT_PSR]; \
+        st      %pt_pc,  [%base_reg + STACKFRAME_SZ + PT_PC]; \
+        st      %pt_npc, [%base_reg + STACKFRAME_SZ + PT_NPC];
 
 #define STORE_PT_ALL(base_reg, reg_psr, reg_pc, reg_npc, g_scratch) \
         STORE_PT_PRIV(base_reg, reg_psr, reg_pc, reg_npc) \

@@ -312,22 +312,26 @@ static int __devinit snd_interwave_detect(struct snd_interwave *iwcard,
 	return -ENODEV;
 }
 
-static void snd_interwave_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_interwave_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct snd_interwave *iwcard = (struct snd_interwave *) dev_id;
 	int loop, max = 5;
+	int handled = 0;
 
 	do {
 		loop = 0;
 		if (inb(iwcard->gus_status_reg)) {
+			handled = 1;
 			snd_gus_interrupt(irq, iwcard->gus, regs);
 			loop++;
 		}
 		if (inb(iwcard->pcm_status_reg) & 0x01) {	/* IRQ bit is set? */
+			handled = 1;
 			snd_cs4231_interrupt(irq, iwcard->cs4231, regs);
 			loop++;
 		}
 	} while (loop && --max > 0);
+	return IRQ_RETVAL(handled);
 }
 
 static void __devinit snd_interwave_reset(snd_gus_card_t * gus)

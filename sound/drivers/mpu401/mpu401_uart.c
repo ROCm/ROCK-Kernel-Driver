@@ -90,7 +90,7 @@ static void snd_mpu401_uart_clear_rx(mpu401_t *mpu)
 #endif
 }
 
-static void _snd_mpu401_uart_interrupt(mpu401_t *mpu)
+static irqreturn_t _snd_mpu401_uart_interrupt(mpu401_t *mpu)
 {
 	if (test_bit(MPU401_MODE_BIT_INPUT, &mpu->mode)) {
 		if (! test_and_set_bit(MPU401_MODE_BIT_RX_LOOP, &mpu->mode)) {
@@ -108,6 +108,9 @@ static void _snd_mpu401_uart_interrupt(mpu401_t *mpu)
 		snd_mpu401_uart_output_write(mpu);
 		spin_unlock(&mpu->output_lock);
 	}
+
+	/* FIXME! This should really check whether the irq was for us */
+	return IRQ_HANDLED;
 }
 
 /**
@@ -118,13 +121,13 @@ static void _snd_mpu401_uart_interrupt(mpu401_t *mpu)
  *
  * Processes the interrupt for MPU401-UART i/o.
  */
-void snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mpu401_t *mpu = snd_magic_cast(mpu401_t, dev_id, return);
+	mpu401_t *mpu = snd_magic_cast(mpu401_t, dev_id, return IRQ_NONE);
 	
 	if (mpu == NULL)
-		return;
-	_snd_mpu401_uart_interrupt(mpu);
+		return IRQ_NONE;
+	return _snd_mpu401_uart_interrupt(mpu);
 }
 
 /*

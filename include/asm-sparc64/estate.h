@@ -15,7 +15,7 @@
  * errors 2) uncorrectable E-cache errors.  Such events only occur on reads
  * of the E-cache by the local processor for: 1) data loads 2) instruction
  * fetches 3) atomic operations.  Such events _cannot_ occur for: 1) merge
- * 2) writeback 2) copyout.  The AFSR bits assosciated with these traps are
+ * 2) writeback 2) copyout.  The AFSR bits associated with these traps are
  * UCC and UCU.
  */
 
@@ -31,7 +31,7 @@
  * 4) As the result of such errors on instruction vector fetch can generate any
  *    of the 3 trap types.
  *
- * The AFSR bits assosciated with these traps are EMU, EDU, WDU, CPU, IVU, UE,
+ * The AFSR bits associated with these traps are EMU, EDU, WDU, CPU, IVU, UE,
  * BERR, and TO.
  */
 

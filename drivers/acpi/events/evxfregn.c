@@ -159,16 +159,14 @@ acpi_install_address_space_handler (
 		}
 	}
 
-	/*
-	 * If the caller hasn't specified a setup routine, use the default
-	 */
+	/* If the caller hasn't specified a setup routine, use the default */
+
 	if (!setup) {
 		setup = acpi_ev_default_region_setup;
 	}
 
-	/*
-	 * Check for an existing internal object
-	 */
+	/* Check for an existing internal object */
+
 	obj_desc = acpi_ns_get_attached_object (node);
 	if (obj_desc) {
 		/*
@@ -181,7 +179,7 @@ acpi_install_address_space_handler (
 		handler_obj = obj_desc->device.addr_handler;
 		while (handler_obj) {
 			/*
-			 * We have an Address handler, see if user requested this
+			 * Found an Address handler, see if user requested this
 			 * address space.
 			 */
 			if(handler_obj->addr_handler.space_id == space_id) {
@@ -189,9 +187,8 @@ acpi_install_address_space_handler (
 				goto unlock_and_exit;
 			}
 
-			/*
-			 * Move through the linked list of handlers
-			 */
+			/* Walk the linked list of handlers */
+
 			handler_obj = handler_obj->addr_handler.next;
 		}
 	}
@@ -232,10 +229,10 @@ acpi_install_address_space_handler (
 		acpi_ut_get_region_name (space_id), space_id, node->name.ascii, node, obj_desc));
 
 	/*
-	 * Now we can install the handler
+	 * Install the handler
 	 *
-	 * At this point we know that there is no existing handler.
-	 * So, we just allocate the object for the handler and link it
+	 * At this point there is no existing handler.
+	 * Just allocate the object for the handler and link it
 	 * into the list.
 	 */
 	handler_obj = acpi_ut_create_internal_object (ACPI_TYPE_LOCAL_ADDRESS_HANDLER);
@@ -254,15 +251,15 @@ acpi_install_address_space_handler (
 	handler_obj->addr_handler.setup     = setup;
 
 	/*
-	 * Now walk the namespace finding all of the regions this
+	 * Walk the namespace finding all of the regions this
 	 * handler will manage.
 	 *
-	 * We start at the device and search the branch toward
+	 * Start at the device and search the branch toward
 	 * the leaf nodes until either the leaf is encountered or
 	 * a device is detected that has an address handler of the
 	 * same type.
 	 *
-	 * In either case we back up and search down the remainder
+	 * In either case, back up and search down the remainder
 	 * of the branch
 	 */
 	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, device,
@@ -270,9 +267,8 @@ acpi_install_address_space_handler (
 			 acpi_ev_addr_handler_helper,
 			 handler_obj, NULL);
 
-	/*
-	 * Place this handler 1st on the list
-	 */
+	/* Place this handler 1st on the list */
+
 	handler_obj->common.reference_count =
 			 (u16) (handler_obj->common.reference_count +
 			 obj_desc->common.reference_count - 1);
@@ -289,12 +285,13 @@ unlock_and_exit:
  *
  * FUNCTION:    acpi_remove_address_space_handler
  *
- * PARAMETERS:  space_id        - The address space ID
+ * PARAMETERS:  Device          - Handle for the device
+ *              space_id        - The address space ID
  *              Handler         - Address of the handler
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Install a handler for accesses on an Operation Region
+ * DESCRIPTION: Remove a previously installed handler.
  *
  ******************************************************************************/
 
@@ -342,19 +339,16 @@ acpi_remove_address_space_handler (
 		goto unlock_and_exit;
 	}
 
-	/*
-	 * find the address handler the user requested
-	 */
+	/* Find the address handler the user requested */
+
 	handler_obj = obj_desc->device.addr_handler;
 	last_obj_ptr = &obj_desc->device.addr_handler;
 	while (handler_obj) {
-		/*
-		 * We have a handler, see if user requested this one
-		 */
+		/* We have a handler, see if user requested this one */
+
 		if (handler_obj->addr_handler.space_id == space_id) {
-			/*
-			 * Got it, first dereference this in the Regions
-			 */
+			/* Matched space_id, first dereference this in the Regions */
+
 			ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 				"Removing address handler %p(%p) for region %s on Device %p(%p)\n",
 				handler_obj, handler, acpi_ut_get_region_name (space_id),
@@ -375,45 +369,36 @@ acpi_remove_address_space_handler (
 				acpi_ev_detach_region (region_obj, TRUE);
 
 				/*
-				 * Walk the list, since we took the first region and it
-				 * was removed from the list by the dissassociate call
-				 * we just get the first item on the list again
+				 * Walk the list: Just grab the head because the
+				 * detach_region removed the previous head.
 				 */
 				region_obj = handler_obj->addr_handler.region_list;
 
 			}
 
-			/*
-			 * Remove this Handler object from the list
-			 */
+			/* Remove this Handler object from the list */
+
 			*last_obj_ptr = handler_obj->addr_handler.next;
 
-			/*
-			 * Now we can delete the handler object
-			 */
-			acpi_ut_remove_reference (handler_obj);
-			acpi_ut_remove_reference (handler_obj);
+			/* Now we can delete the handler object */
 
+			acpi_ut_remove_reference (handler_obj);
 			goto unlock_and_exit;
 		}
 
-		/*
-		 * Move through the linked list of handlers
-		 */
+		/* Walk the linked list of handlers */
+
 		last_obj_ptr = &handler_obj->addr_handler.next;
 		handler_obj = handler_obj->addr_handler.next;
 	}
 
+	/* The handler does not exist */
 
-	/*
-	 * The handler does not exist
-	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 		"Unable to remove address handler %p for %s(%X), dev_node %p, obj %p\n",
 		handler, acpi_ut_get_region_name (space_id), space_id, node, obj_desc));
 
 	status = AE_NOT_EXIST;
-
 
 unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);

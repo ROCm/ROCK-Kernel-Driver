@@ -690,9 +690,9 @@ typedef void            (*ExcpHndlr) (void) ;
 #define ICSR0		__REG(0x40800014)  /* ICP Status Register 0 */
 #define ICSR1		__REG(0x40800018)  /* ICP Status Register 1 */
 
-#define ICCR0_AME       (1 << 7)           /* Adress match enable */
+#define ICCR0_AME       (1 << 7)           /* Address match enable */
 #define ICCR0_TIE       (1 << 6)           /* Transmit FIFO interrupt enable */
-#define ICCR0_RIE       (1 << 5)           /* Recieve FIFO interrupt enable */
+#define ICCR0_RIE       (1 << 5)           /* Receive FIFO interrupt enable */
 #define ICCR0_RXE       (1 << 4)           /* Receive enable */
 #define ICCR0_TXE       (1 << 3)           /* Transmit enable */
 #define ICCR0_TUS       (1 << 2)           /* Transmit FIFO underrun select */

@@ -10,6 +10,8 @@
  *
  */
 
+#include <linux/interrupt.h>
+
 /* All Registers original Siemens Spec  */
 
 #define IPAC_CONF	0xC0
@@ -29,7 +31,7 @@
 #define IPAC_TIMR2	0xCC
 
 void ipac_init(struct IsdnCardState *cs);
-void ipac_irq(int intno, void *dev_id, struct pt_regs *regs);
+irqreturn_t ipac_irq(int intno, void *dev_id, struct pt_regs *regs);
 int  ipac_setup(struct IsdnCardState *cs, struct dc_hw_ops *ipac_dc_ops,
 		struct bc_hw_ops *ipac_bc_ops);
 

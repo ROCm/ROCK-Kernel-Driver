@@ -58,9 +58,11 @@ static void memcons_write (struct console *co, const char *buf, unsigned len)
 		len -= write (buf, len);
 }
 
-static kdev_t memcons_device (struct console *co)
+extern struct tty_driver tty_driver;
+static struct tty_driver *memcons_device (struct console *co, int *index)
 {
-        return MKDEV (TTY_MAJOR, 64 + co->index);
+	*index = co->index;
+	return &tty_driver;
 }
 
 static struct console memcons =

@@ -341,7 +341,7 @@ extern int scsi_cmd_ioctl(struct block_device *, unsigned int, unsigned long);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
-extern void __blk_run_queue(request_queue_t *q);
+extern void blk_run_queue(request_queue_t *q);
 
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
@@ -390,6 +390,8 @@ extern int blk_queue_init_tags(request_queue_t *, int);
 extern void blk_queue_free_tags(request_queue_t *);
 extern void blk_queue_invalidate_tags(request_queue_t *);
 extern void blk_congestion_wait(int rw, long timeout);
+
+extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128

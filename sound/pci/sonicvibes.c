@@ -596,18 +596,19 @@ static int snd_sonicvibes_trigger(sonicvibes_t * sonic, int what, int cmd)
 	return result;
 }
 
-static void snd_sonicvibes_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_sonicvibes_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sonicvibes_t *sonic = snd_magic_cast(sonicvibes_t, dev_id, return);
+	sonicvibes_t *sonic = snd_magic_cast(sonicvibes_t, dev_id,
+						return IRQ_NONE);
 	unsigned char status;
 
 	status = inb(SV_REG(sonic, STATUS));
 	if (!(status & (SV_DMAA_IRQ | SV_DMAC_IRQ | SV_MIDI_IRQ)))
-		return;
+		return IRQ_NONE;
 	if (status == 0xff) {	/* failure */
 		outb(sonic->irqmask = ~0, SV_REG(sonic, IRQMASK));
 		snd_printk("IRQ failure - interrupts disabled!!\n");
-		return;
+		return IRQ_HANDLED;
 	}
 	if (sonic->pcm) {
 		if (status & SV_DMAA_IRQ)
@@ -654,6 +655,8 @@ static void snd_sonicvibes_interrupt(int irq, void *dev_id, struct pt_regs *regs
 		snd_ctl_notify(sonic->card, SNDRV_CTL_EVENT_MASK_VALUE, &sonic->master_mute->id);
 		snd_ctl_notify(sonic->card, SNDRV_CTL_EVENT_MASK_VALUE, &sonic->master_volume->id);
 	}
+
+	return IRQ_HANDLED;
 }
 
 /*

@@ -944,7 +944,7 @@ void iriap_call_indication(struct iriap_cb *self, struct sk_buff *skb)
 /*
  * Function iriap_watchdog_timer_expired (data)
  *
- *    Query has taken to long time, so abort
+ *    Query has taken too long time, so abort
  *
  */
 void iriap_watchdog_timer_expired(void *data)

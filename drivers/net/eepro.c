@@ -307,7 +307,7 @@ extern int eepro_probe(struct net_device *dev);
 static int	eepro_probe1(struct net_device *dev, short ioaddr);
 static int	eepro_open(struct net_device *dev);
 static int	eepro_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void	eepro_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t eepro_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void 	eepro_rx(struct net_device *dev);
 static void 	eepro_transmit_interrupt(struct net_device *dev);
 static int	eepro_close(struct net_device *dev);
@@ -1104,8 +1104,6 @@ static int eepro_open(struct net_device *dev)
 	/* enabling rx */
 	eepro_en_rx(ioaddr);
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -1178,17 +1176,18 @@ static int eepro_send_packet(struct sk_buff *skb, struct net_device *dev)
 /*	The typical workload of the driver:
 	Handle the network interface interrupts. */
 
-static void
+static irqreturn_t
 eepro_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev =  (struct net_device *)dev_id;
 	                      /* (struct net_device *)(irq2dev_map[irq]);*/
 	struct eepro_local *lp;
 	int ioaddr, status, boguscount = 20;
+	int handled = 0;
 
 	if (dev == NULL) {
                 printk (KERN_ERR "eepro_interrupt(): irq %d for unknown device.\\n", irq);
-                return;
+                return IRQ_NONE;
         }
 
 	lp = (struct eepro_local *)dev->priv;
@@ -1202,6 +1201,7 @@ eepro_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	while (((status = inb(ioaddr + STATUS_REG)) & (RX_INT|TX_INT)) && (boguscount--))
 	{
+		handled = 1;
 		if (status & RX_INT) {
 			if (net_debug > 4)
 				printk(KERN_DEBUG "%s: packet received interrupt.\n", dev->name);
@@ -1233,7 +1233,7 @@ eepro_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		printk(KERN_DEBUG "%s: exiting eepro_interrupt routine.\n", dev->name);
 
 	spin_unlock(&lp->lock);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 static int eepro_close(struct net_device *dev)
@@ -1274,8 +1274,6 @@ static int eepro_close(struct net_device *dev)
 #endif
 
 	/* Update the statistics here. What statistics? */
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

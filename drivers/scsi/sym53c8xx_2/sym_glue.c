@@ -1009,7 +1009,7 @@ out:
 /*
  *  Linux entry point of the interrupt handler.
  */
-static void sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	unsigned long flags;
 	hcb_p np = (hcb_p) dev_id;
@@ -1029,6 +1029,8 @@ static void sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
 	SYM_UNLOCK_HCB(np, flags);
 
 	if (DEBUG_FLAGS & DEBUG_TINY) printf_debug ("]\n");
+
+	return IRQ_HANDLED;
 }
 
 /*

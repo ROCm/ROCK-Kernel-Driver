@@ -430,7 +430,7 @@ struct depca_private {
 */
 static int depca_open(struct net_device *dev);
 static int depca_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void depca_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t depca_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int depca_close(struct net_device *dev);
 static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static void depca_tx_timeout(struct net_device *dev);
@@ -894,7 +894,7 @@ static int depca_start_xmit(struct sk_buff *skb, struct net_device *dev)
 /*
 ** The DEPCA interrupt handler. 
 */
-static void depca_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t depca_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct depca_private *lp;
@@ -903,7 +903,7 @@ static void depca_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (dev == NULL) {
 		printk("depca_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	lp = (struct depca_private *) dev->priv;
@@ -938,6 +938,7 @@ static void depca_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outb(nicsr, DEPCA_NICSR);
 
 	spin_unlock(&lp->lock);
+	return IRQ_HANDLED;
 }
 
 /* Called with lp->lock held */

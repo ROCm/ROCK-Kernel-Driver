@@ -150,7 +150,6 @@ int __init hpfb_init_one(unsigned long base)
 	/*
 	 *	Let there be consoles..
 	 */
-	fb_info.node  = NODEV;
 	fb_info.fbops = &hpfb_ops;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.var   = hpfb_defined;

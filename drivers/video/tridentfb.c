@@ -1140,7 +1140,6 @@ static int __devinit trident_pci_probe(struct pci_dev * dev, const struct pci_de
 		nativex = get_nativex();
 
 	fb_info.fix = tridentfb_fix;
-	fb_info.node = NODEV;
 	fb_info.fbops = &tridentfb_ops;
 
 
@@ -1161,7 +1160,7 @@ static int __devinit trident_pci_probe(struct pci_dev * dev, const struct pci_de
 		return -EINVAL;
 	}
 	output("fb%d: %s frame buffer device %dx%d-%dbpp\n",
-	   minor(fb_info.node), fb_info.fix.id,default_var.xres,
+	   fb_info.node, fb_info.fix.id,default_var.xres,
 	   default_var.yres,default_var.bits_per_pixel);
 	return 0;
 }

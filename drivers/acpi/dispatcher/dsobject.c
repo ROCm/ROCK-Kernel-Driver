@@ -187,7 +187,7 @@ acpi_ds_build_internal_buffer_obj (
 			return (AE_TYPE);
 		}
 
-		byte_list_length = byte_list->common.value.integer32;
+		byte_list_length = (u32) byte_list->common.value.integer;
 	}
 
 	/*

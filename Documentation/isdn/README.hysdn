@@ -131,7 +131,7 @@ Table of contents
    1006 Second boot stage failure
    1007 Timeout waiting for card ready during boot
    1008 Operation only allowed in booted state
-   1009 Config line to long 
+   1009 Config line too long 
    1010 Invalid channel number 
    1011 Timeout sending config data
 

@@ -1987,7 +1987,7 @@ static int vt_check(struct file *file)
 	if (tty_paranoia_check(tty, inode->i_rdev, "tty_ioctl"))
 		return -EINVAL;
 	                                                
-	if (tty->driver.ioctl != vt_ioctl)
+	if (tty->driver->ioctl != vt_ioctl)
 		return -EINVAL;
 	
 	/*
@@ -2847,7 +2847,7 @@ static int tiocgdev(unsigned fd, unsigned cmd,  unsigned int *ptr)
 	real_tty = (struct tty_struct *)file->private_data;
 	if (!real_tty) 	
 		return -EINVAL; 
-	return put_user(kdev_t_to_nr(real_tty->device), ptr); 
+	return put_user(real_tty->device, ptr); 
 } 
 
 

@@ -159,7 +159,7 @@ struct netidblk {
 
 static int	znet_open(struct net_device *dev);
 static int	znet_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void	znet_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t znet_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void	znet_rx(struct net_device *dev);
 static int	znet_close(struct net_device *dev);
 static struct net_device_stats *net_get_stats(struct net_device *dev);
@@ -604,16 +604,17 @@ static int znet_send_packet(struct sk_buff *skb, struct net_device *dev)
 }
 
 /* The ZNET interrupt handler. */
-static void	znet_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t znet_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 	struct znet_private *znet = dev->priv;
 	int ioaddr;
 	int boguscnt = 20;
+	int handled = 0;
 
 	if (dev == NULL) {
 		printk(KERN_WARNING "znet_interrupt(): IRQ %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	spin_lock (&znet->lock);
@@ -636,6 +637,8 @@ static void	znet_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		}
 		if ((status & SR0_INTERRUPT) == 0)
 			break;
+
+		handled = 1;
 
 		if ((status & SR0_EVENT_MASK) == SR0_TRANSMIT_DONE ||
 		    (status & SR0_EVENT_MASK) == SR0_RETRANSMIT_DONE ||
@@ -682,7 +685,7 @@ static void	znet_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	spin_unlock (&znet->lock);
 	
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 static void znet_rx(struct net_device *dev)

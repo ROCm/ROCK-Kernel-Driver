@@ -407,7 +407,6 @@ mcpcia_init_arch(void)
 {
 	/* With multiple PCI busses, we play with I/O as physical addrs.  */
 	ioport_resource.end = ~0UL;
-	iomem_resource.end = ~0UL;
 
 	/* Allocate hose 0.  That's the one that all the ISA junk hangs
 	   off of, from which we'll be registering stuff here in a bit.

@@ -6,13 +6,19 @@
 #include <linux/stddef.h>
 #include <linux/init.h>
 #include <linux/config.h>
+#include <linux/spinlock.h>
 #include <asm/oplib.h>
 #include <asm/io.h>
 #include <asm/auxio.h>
 #include <asm/string.h>		/* memset(), Linux has no bzero() */
 
 /* Probe and map in the Auxiliary I/O register */
-unsigned char *auxio_register;
+
+/* auxio_register is not static because it is referenced 
+ * in entry.S::floppy_tdone
+ */
+unsigned long auxio_register = 0UL;
+static spinlock_t auxio_lock = SPIN_LOCK_UNLOCKED;
 
 void __init auxio_probe(void)
 {
@@ -23,7 +29,6 @@ void __init auxio_probe(void)
 	switch (sparc_cpu_model) {
 	case sun4d:
 	case sun4:
-		auxio_register = 0;
 		return;
 	default:
 		break;
@@ -37,12 +42,10 @@ void __init auxio_probe(void)
 		if(!auxio_nd) {
 #ifdef CONFIG_PCI
 			/* There may be auxio on Ebus */
-			auxio_register = 0;
 			return;
 #else
 			if(prom_searchsiblings(node, "leds")) {
 				/* VME chassis sun4m machine, no auxio exists. */
-				auxio_register = 0;
 				return;
 			}
 			prom_printf("Cannot find auxio node, cannot continue...\n");
@@ -56,14 +59,46 @@ void __init auxio_probe(void)
 	r.flags = auxregs[0].which_io & 0xF;
 	r.start = auxregs[0].phys_addr;
 	r.end = auxregs[0].phys_addr + auxregs[0].reg_size - 1;
-	auxio_register = (unsigned char *) sbus_ioremap(&r, 0,
-	    auxregs[0].reg_size, "auxio");
+	auxio_register = sbus_ioremap(&r, 0, auxregs[0].reg_size, "auxio");
 	/* Fix the address on sun4m and sun4c. */
 	if((((unsigned long) auxregs[0].phys_addr) & 3) == 3 ||
 	   sparc_cpu_model == sun4c)
-		auxio_register = (unsigned char *) ((int)auxio_register | 3);
+		auxio_register |= 3;
 
-	TURN_ON_LED;
+	set_auxio(AUXIO_LED, 0);
+}
+
+unsigned char get_auxio(void)
+{
+	if(auxio_register) 
+		return sbus_readb(auxio_register);
+	return 0;
+}
+
+void set_auxio(unsigned char bits_on, unsigned char bits_off)
+{
+	unsigned char regval;
+	unsigned long flags;
+	spin_lock_irqsave(&auxio_lock, flags);
+	switch(sparc_cpu_model) {
+	case sun4c:
+		regval = sbus_readb(auxio_register);
+		sbus_writeb(((regval | bits_on) & ~bits_off) | AUXIO_ORMEIN,
+			auxio_register);
+		break;
+	case sun4m:
+		if(!auxio_register)
+			break;     /* VME chassic sun4m, no auxio. */
+		regval = sbus_readb(auxio_register);
+		sbus_writeb(((regval | bits_on) & ~bits_off) | AUXIO_ORMEIN4M,
+			auxio_register);
+		break;
+	case sun4d:
+		break;
+	default:
+		panic("Can't set AUXIO register on this machine.");
+	};
+	spin_unlock_irqrestore(&auxio_lock, flags);
 }
 
 

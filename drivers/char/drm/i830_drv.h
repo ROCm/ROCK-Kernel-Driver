@@ -61,7 +61,7 @@ typedef struct drm_i830_private {
 	drm_i830_sarea_t *sarea_priv;
    	drm_i830_ring_buffer_t ring;
 
-      	unsigned long hw_status_page;
+      	void * hw_status_page;
    	unsigned long counter;
 
 	dma_addr_t dma_status_page;

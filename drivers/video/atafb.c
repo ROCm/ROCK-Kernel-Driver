@@ -1522,7 +1522,7 @@ static void falcon_set_par( struct atafb_par *par )
 }
 
 
-static void falcon_vbl_switcher( int irq, void *dummy, struct pt_regs *fp )
+static irqreturn_t falcon_vbl_switcher( int irq, void *dummy, struct pt_regs *fp )
 {
 	struct falcon_hw *hw = &f_new_mode;
 
@@ -1579,6 +1579,7 @@ static void falcon_vbl_switcher( int irq, void *dummy, struct pt_regs *fp )
 		videl.xoffset = current_par.hw.falcon.xoffset;
 		shifter_f030.off_next = current_par.hw.falcon.line_offset;
 	}
+	return IRQ_HANDLED;
 }
 
 
@@ -2792,7 +2793,6 @@ int __init atafb_init(void)
 
 	strcpy(fb_info.modename, "Atari Builtin ");
 	fb_info.changevar = NULL;
-	fb_info.node = NODEV;
 	fb_info.fbops = &atafb_ops;
 	fb_info.disp = &disp;
 	fb_info.currcon = -1;
@@ -2816,7 +2816,7 @@ int __init atafb_init(void)
 	   printk("   virtual %dx%d\n",
 			  disp.var.xres_virtual, disp.var.yres_virtual);
 	printk("fb%d: %s frame buffer device, using %dK of video memory\n",
-	       minor(fb_info.node), fb_info.modename, screen_len>>10);
+	       fb_info.node, fb_info.modename, screen_len>>10);
 
 	/* TODO: This driver cannot be unloaded yet */
 	MOD_INC_USE_COUNT;

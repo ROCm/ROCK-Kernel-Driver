@@ -30,7 +30,7 @@ config NET_ETHERNET
 	  If your Linux machine will be connected to an Ethernet and you have
 	  an Ethernet network interface card (NIC) installed in your computer,
 	  say Y here and read the Ethernet-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. You will then also have
+	  <http://www.tldp.org/docs.html#howto>. You will then also have
 	  to say Y to the driver for your particular NIC.
 
 	  Note that the answer to this question won't directly affect the
@@ -392,7 +392,7 @@ config PRINTER
 	  box (as opposed to using a serial printer; if the connector at the
 	  printer has 9 or 25 holes ["female"], then it's serial), say Y.
 	  Also read the Printing-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  It is possible to share one parallel port among several devices
 	  (e.g. printer and ZIP drive) and it is safe to compile the
@@ -485,7 +485,7 @@ config BLK_DEV_IDE
 	  topics, is contained in <file:Documentation/ide.txt>. For detailed
 	  information about hard drives, consult the Disk-HOWTO and the
 	  Multi-Disk-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  To fine-tune ATA/IDE drive/interface parameters for improved
 	  performance, look for the hdparm package at

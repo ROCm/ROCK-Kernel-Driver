@@ -136,16 +136,17 @@ struct serial98_port {
 #ifdef CONFIG_SERIAL98_CONSOLE
 static void
 serial98_console_write(struct console *co, const char *s, unsigned int count);
-static kdev_t serial98_console_device(struct console *co);
 static int __init serial98_console_setup(struct console *co, char *options);
 
+extern struct uart_driver serial98_reg;
 static struct console serial98_console = {
 	.name		= "ttyS",
 	.write		= serial98_console_write,
-	.device		= serial98_console_device,
+	.device		= uart_console_device,
 	.setup		= serial98_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= &serial98_reg,
 };
 
 #define SERIAL98_CONSOLE	&serial98_console
@@ -156,7 +157,7 @@ static struct console serial98_console = {
 static struct uart_driver serial98_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial98",
-	.dev_name		= "ttyS%d",
+	.dev_name		= "ttyS",
 	.major			= TTY_MAJOR,
 	.minor			= 64,
 	.nr			= SERIAL98_NR,
@@ -992,11 +993,6 @@ serial98_console_write(struct console *co, const char *s, unsigned int count)
 
 	/* restore modem status interrupt */
 	outb(ier2, IER2_8251F);
-}
-
-static kdev_t serial98_console_device(struct console *co)
-{
-	return mk_kdev(TTY_MAJOR, 64 + co->index);
 }
 
 static int __init serial98_console_setup(struct console *co, char *options)

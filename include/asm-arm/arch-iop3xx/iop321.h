@@ -17,12 +17,10 @@
 /*
  * IOP321 I/O and Mem space regions for PCI autoconfiguration
  */
-#define	IOP321_PCI_LOWER_IO		0x90000000
-#define	IOP321_PCI_UPPER_IO		0x9000ffff
-#define IOP321_PCI_LOWER_MEM		0x80000000
-#define IOP321_PCI_UPPER_MEM		0x83ffffff
-
-#define IOP321_PCI_WINDOW_SIZE		64 * 0x100000
+#define	IOP321_PCI_IO_BASE		0x90000000
+#define	IOP321_PCI_IO_SIZE		0x00010000
+#define IOP321_PCI_MEM_BASE		0x40000000
+#define IOP321_PCI_MEM_SIZE		0x40000000
 
 /*
  * IOP321 chipset registers

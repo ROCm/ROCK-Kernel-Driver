@@ -66,7 +66,7 @@ struct irq_region {
 
 extern struct irq_region *irq_region[NR_IRQ_REGS];
 
-static __inline__ int irq_cannonicalize(int irq)
+static __inline__ int irq_canonicalize(int irq)
 {
 #ifdef CONFIG_EISA
 	return (irq == (IRQ_FROM_REGION(EISA_IRQ_REGION)+2) 

@@ -11,8 +11,28 @@
 #include <asm/ptrace.h>
 #include <asm/system.h>
 
+/*
+ * For 2.4.x compatibility, 2.4.x can use
+ *
+ *	typedef void irqreturn_t;
+ *	#define IRQ_NONE
+ *	#define IRQ_HANDLED
+ *	#define IRQ_RETVAL(x)
+ *
+ * To mix old-style and new-style irq handler returns.
+ *
+ * IRQ_NONE means we didn't handle it.
+ * IRQ_HANDLED means that we did have a valid interrupt and handled it.
+ * IRQ_RETVAL(x) selects on the two depending on x being non-zero (for handled)
+ */
+typedef int irqreturn_t;
+
+#define IRQ_NONE	(0)
+#define IRQ_HANDLED	(1)
+#define IRQ_RETVAL(x)	((x) != 0)
+
 struct irqaction {
-	void (*handler)(int, void *, struct pt_regs *);
+	irqreturn_t (*handler)(int, void *, struct pt_regs *);
 	unsigned long flags;
 	unsigned long mask;
 	const char *name;
@@ -20,15 +40,16 @@ struct irqaction {
 	struct irqaction *next;
 };
 
+extern irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs);
 extern int request_irq(unsigned int,
-		       void (*handler)(int, void *, struct pt_regs *),
+		       irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		       unsigned long, const char *, void *);
 extern void free_irq(unsigned int, void *);
 
 /*
  * Temporary defines for UP kernels, until all code gets fixed.
  */
-#if !CONFIG_SMP
+#ifndef CONFIG_SMP
 # define cli()			local_irq_disable()
 # define sti()			local_irq_enable()
 # define save_flags(x)		local_save_flags(x)

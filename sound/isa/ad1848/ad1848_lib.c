@@ -585,9 +585,9 @@ static int snd_ad1848_capture_prepare(snd_pcm_substream_t * substream)
 	return 0;
 }
 
-void snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ad1848_t *chip = snd_magic_cast(ad1848_t, dev_id, return);
+	ad1848_t *chip = snd_magic_cast(ad1848_t, dev_id, return IRQ_NONE);
 
 	if ((chip->mode & AD1848_MODE_PLAY) && chip->playback_substream &&
 	    (chip->mode & AD1848_MODE_RUNNING))
@@ -596,6 +596,7 @@ void snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    (chip->mode & AD1848_MODE_RUNNING))
 		snd_pcm_period_elapsed(chip->capture_substream);
 	outb(0, AD1848P(chip, STATUS));	/* clear global interrupt bit */
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_uframes_t snd_ad1848_playback_pointer(snd_pcm_substream_t * substream)

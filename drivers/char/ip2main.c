@@ -274,7 +274,7 @@ static void ip2_hangup(PTTY);
 
 static void set_irq(int, int);
 static void ip2_interrupt_bh(i2eBordStrPtr pB);
-static void ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static void ip2_poll(unsigned long arg);
 static inline void service_all_boards(void);
 static void do_input(void *p);
@@ -366,7 +366,7 @@ static int tracewrap;
 
 #if defined(MODULE) && defined(IP2DEBUG_OPEN)
 #define DBG_CNT(s) printk(KERN_DEBUG "(%s): [%x] refc=%d, ttyc=%d, modc=%x -> %s\n", \
-		    cdevname(tty->device),(pCh->flags),ref_count, \
+		    tty->name,(pCh->flags),ref_count, \
 		    tty->count,/*GET_USE_COUNT(module)*/0,s)
 #else
 #define DBG_CNT(s)
@@ -1339,11 +1339,12 @@ ip2_interrupt_bh(i2eBordStrPtr pB)
 /*                                                                            */
 /*                                                                            */
 /******************************************************************************/
-static void
+static irqreturn_t
 ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	int i;
 	i2eBordStrPtr  pB;
+	int handled = 0;
 
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, 99, 1, irq );
 
@@ -1355,6 +1356,7 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 //			IRQ = 0 for polled boards, we won't poll "IRQ" boards
 
 		if ( pB && (pB->i2eUsingIrq == irq) ) {
+			handled = 1;
 #ifdef USE_IQI
 
 		    if (NO_MAIL_HERE != ( pB->i2eStartMail = iiGetMail(pB))) {
@@ -1379,6 +1381,7 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	++irq_counter;
 
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, ITRC_RETURN, 0 );
+	return IRQ_RETVAL(handled);
 }
 
 /******************************************************************************/
@@ -1564,9 +1567,9 @@ ip2_open( PTTY tty, struct file *pFile )
 	wait_queue_t wait;
 	int rc = 0;
 	int do_clocal = 0;
-	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
+	i2ChanStrPtr  pCh = DevTable[tty->index];
 
-	ip2trace (minor(tty->device), ITRC_OPEN, ITRC_ENTER, 0 );
+	ip2trace (tty->index, ITRC_OPEN, ITRC_ENTER, 0 );
 
 	if ( pCh == NULL ) {
 		return -ENODEV;
@@ -1578,9 +1581,8 @@ ip2_open( PTTY tty, struct file *pFile )
 
 #ifdef IP2DEBUG_OPEN
 	printk(KERN_DEBUG \
-			"IP2:open(tty=%p,pFile=%p):dev=%x,maj=%d,min=%d,ch=%d,idx=%d\n",
-	       tty, pFile, tty->device, major(tty->device), minor(tty->device),
-			 pCh->infl.hd.i2sChannel, pCh->port_index);
+			"IP2:open(tty=%p,pFile=%p):dev=%s,ch=%d,idx=%d\n",
+	       tty, pFile, tty->name, pCh->infl.hd.i2sChannel, pCh->port_index);
 	open_sanity_check ( pCh, pCh->pMyBord );
 #endif
 
@@ -1616,7 +1618,7 @@ ip2_open( PTTY tty, struct file *pFile )
 	 *    (These are the only tests the standard serial driver makes for
 	 *    callout devices.)
 	 */
-	if ( tty->driver.subtype == SERIAL_TYPE_CALLOUT ) {
+	if ( tty->driver->subtype == SERIAL_TYPE_CALLOUT ) {
 		if ( pCh->flags & ASYNC_NORMAL_ACTIVE ) {
 			return -EBUSY;
 		}
@@ -1719,7 +1721,7 @@ noblock:
 	if ( tty->count == 1 ) {
 		i2QueueCommands(PTYPE_INLINE, pCh, 0, 2, CMD_CTSFL_DSAB, CMD_RTSFL_DSAB);
 		if ( pCh->flags & ASYNC_SPLIT_TERMIOS ) {
-			if ( tty->driver.subtype == SERIAL_TYPE_NORMAL ) {
+			if ( tty->driver->subtype == SERIAL_TYPE_NORMAL ) {
 				*tty->termios = pCh->NormalTermios;
 			} else {
 				*tty->termios = pCh->CalloutTermios;
@@ -1771,7 +1773,7 @@ ip2_close( PTTY tty, struct file *pFile )
 	ip2trace (CHANN, ITRC_CLOSE, ITRC_ENTER, 0 );
 
 #ifdef IP2DEBUG_OPEN
-	printk(KERN_DEBUG "IP2:close ttyF%02X:\n",minor(tty->device));
+	printk(KERN_DEBUG "IP2:close %s:\n",tty->name);
 #endif
 
 	if ( tty_hung_up_p ( pFile ) ) {
@@ -1827,8 +1829,8 @@ ip2_close( PTTY tty, struct file *pFile )
 
 	serviceOutgoingFifo ( pCh->pMyBord );
 
-	if ( tty->driver.flush_buffer ) 
-		tty->driver.flush_buffer(tty);
+	if ( tty->driver->flush_buffer ) 
+		tty->driver->flush_buffer(tty);
 	if ( tty->ldisc.flush_buffer )  
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -2180,7 +2182,7 @@ ip2_unthrottle ( PTTY tty )
 static void
 ip2_start ( PTTY tty )
 {
- 	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
+ 	i2ChanStrPtr  pCh = DevTable[tty->index];
 
  	i2QueueCommands(PTYPE_BYPASS, pCh, 0, 1, CMD_RESUME);
  	i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_UNSUSPEND);
@@ -2193,7 +2195,7 @@ ip2_start ( PTTY tty )
 static void
 ip2_stop ( PTTY tty )
 {
- 	i2ChanStrPtr  pCh = DevTable[minor(tty->device)];
+ 	i2ChanStrPtr  pCh = DevTable[tty->index];
 
  	i2QueueCommands(PTYPE_BYPASS, pCh, 100, 1, CMD_SUSPEND);
 #ifdef IP2DEBUG_WRITE
@@ -2221,7 +2223,7 @@ static int
 ip2_ioctl ( PTTY tty, struct file *pFile, UINT cmd, ULONG arg )
 {
 	wait_queue_t wait;
-	i2ChanStrPtr pCh = DevTable[minor(tty->device)];
+	i2ChanStrPtr pCh = DevTable[tty->index];
 	struct async_icount cprev, cnow;	/* kernel counter temps */
 	struct serial_icounter_struct *p_cuser;	/* user space */
 	int rc = 0;

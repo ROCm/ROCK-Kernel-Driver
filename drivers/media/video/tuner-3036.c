@@ -114,8 +114,7 @@ set_tv_freq(struct i2c_client *c, int freq)
 /* ---------------------------------------------------------------------- */
 
 static int 
-tuner_attach(struct i2c_adapter *adap, int addr,
-	     unsigned short flags, int kind)
+tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	static unsigned char buffer[] = { 0x29, 0x32, 0x2a, 0, 0x2b, 0 };
 

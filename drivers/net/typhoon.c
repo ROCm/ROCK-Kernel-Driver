@@ -1790,7 +1790,7 @@ typhoon_poll(struct net_device *dev, int *total_budget)
 	return (done ? 0 : 1);
 }
 
-static void
+static irqreturn_t
 typhoon_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
@@ -1799,7 +1799,7 @@ typhoon_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 
 	intr_status = readl(ioaddr + TYPHOON_REG_INTR_STATUS);
 	if(!intr_status)
-		return;
+		return IRQ_NONE;
 
 	writel(intr_status, ioaddr + TYPHOON_REG_INTR_STATUS);
 
@@ -1811,6 +1811,7 @@ typhoon_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 		printk(KERN_ERR "%s: Error, poll already scheduled\n",
                        dev->name);
 	}
+	return IRQ_HANDLED;
 }
 
 static void
@@ -2134,7 +2135,7 @@ typhoon_close(struct net_device *dev)
 	return 0;
 }
 
-#if CONFIG_PM
+#ifdef CONFIG_PM
 static int
 typhoon_resume(struct pci_dev *pdev)
 {
@@ -2482,7 +2483,7 @@ static struct pci_driver typhoon_driver = {
 	.id_table	= typhoon_pci_tbl,
 	.probe		= typhoon_init_one,
 	.remove		= __devexit_p(typhoon_remove_one),
-#if CONFIG_PM
+#ifdef CONFIG_PM
 	.suspend	= typhoon_suspend,
 	.resume		= typhoon_resume,
 	.enable_wake	= typhoon_enable_wake,

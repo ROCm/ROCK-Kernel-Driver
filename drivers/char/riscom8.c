@@ -131,7 +131,7 @@ static unsigned short rc_ioport[] =  {
 
 
 static inline int rc_paranoia_check(struct riscom_port const * port,
-				    kdev_t device, const char *routine)
+				    char *name, const char *routine)
 {
 #ifdef RISCOM_PARANOIA_CHECK
 	static const char badmagic[] = KERN_INFO
@@ -140,11 +140,11 @@ static inline int rc_paranoia_check(struct riscom_port const * port,
 		"rc: Warning: null riscom port for device %s in %s\n";
 
 	if (!port) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (port->magic != RISCOM8_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -590,23 +590,24 @@ static inline void rc_check_modem(struct riscom_board const * bp)
 }
 
 /* The main interrupt processing routine */
-static void rc_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t rc_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	unsigned char status;
 	unsigned char ack;
 	struct riscom_board *bp;
 	unsigned long loop = 0;
-	
+	int handled = 0;
+
 	bp = IRQ_to_board[irq];
 	
 	if (!bp || !(bp->flags & RC_BOARD_ACTIVE))  {
-		return;
+		return IRQ_NONE;
 	}
 	
 	while ((++loop < 16) && ((status = ~(rc_in(bp, RC_BSR))) &
 				 (RC_BSR_TOUT | RC_BSR_TINT |
 				  RC_BSR_MINT | RC_BSR_RINT))) {
-	
+		handled = 1;
 		if (status & RC_BSR_TOUT) 
 			printk(KERN_WARNING "rc%d: Got timeout. Hardware "
 					    "error?\n", board_No(bp));
@@ -648,6 +649,7 @@ static void rc_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		rc_out(bp, CD180_EOIR, 0);   /* Mark end of interrupt */
 		rc_out(bp, RC_CTOUT, 0);     /* Clear timeout flag    */
 	}
+	return IRQ_RETVAL(handled);
 }
 
 /*
@@ -991,7 +993,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == RISCOM_TYPE_CALLOUT) {
+	if (tty->driver->subtype == RISCOM_TYPE_CALLOUT) {
 		if (port->flags & ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
@@ -1089,13 +1091,13 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 	struct riscom_board * bp;
 	unsigned long flags;
 	
-	board = RC_BOARD(minor(tty->device));
+	board = RC_BOARD(tty->index);
 	if (board >= RC_NBOARD || !(rc_board[board].flags & RC_BOARD_PRESENT))
 		return -ENODEV;
 	
 	bp = &rc_board[board];
-	port = rc_port + board * RC_NPORT + RC_PORT(minor(tty->device));
-	if (rc_paranoia_check(port, tty->device, "rc_open"))
+	port = rc_port + board * RC_NPORT + RC_PORT(tty->index);
+	if (rc_paranoia_check(port, tty->name, "rc_open"))
 		return -ENODEV;
 	
 	if ((error = rc_setup_board(bp))) 
@@ -1112,7 +1114,7 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 		return error;
 	
 	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == RISCOM_TYPE_NORMAL)
+		if (tty->driver->subtype == RISCOM_TYPE_NORMAL)
 			*tty->termios = port->normal_termios;
 		else
 			*tty->termios = port->callout_termios;
@@ -1134,7 +1136,7 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 	unsigned long flags;
 	unsigned long timeout;
 	
-	if (!port || rc_paranoia_check(port, tty->device, "close"))
+	if (!port || rc_paranoia_check(port, tty->name, "close"))
 		return;
 	
 	save_flags(flags); cli();
@@ -1198,8 +1200,8 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 		}
 	}
 	rc_shutdown_port(bp, port);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1226,7 +1228,7 @@ static int rc_write(struct tty_struct * tty, int from_user,
 	int c, total = 0;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_write"))
+	if (rc_paranoia_check(port, tty->name, "rc_write"))
 		return 0;
 	
 	bp = port_Board(port);
@@ -1302,7 +1304,7 @@ static void rc_put_char(struct tty_struct * tty, unsigned char ch)
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	unsigned long flags;
 
-	if (rc_paranoia_check(port, tty->device, "rc_put_char"))
+	if (rc_paranoia_check(port, tty->name, "rc_put_char"))
 		return;
 
 	if (!tty || !port->xmit_buf)
@@ -1324,7 +1326,7 @@ static void rc_flush_chars(struct tty_struct * tty)
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_flush_chars"))
+	if (rc_paranoia_check(port, tty->name, "rc_flush_chars"))
 		return;
 	
 	if (port->xmit_cnt <= 0 || tty->stopped || tty->hw_stopped ||
@@ -1343,7 +1345,7 @@ static int rc_write_room(struct tty_struct * tty)
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	int	ret;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_write_room"))
+	if (rc_paranoia_check(port, tty->name, "rc_write_room"))
 		return 0;
 
 	ret = SERIAL_XMIT_SIZE - port->xmit_cnt - 1;
@@ -1356,7 +1358,7 @@ static int rc_chars_in_buffer(struct tty_struct *tty)
 {
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_chars_in_buffer"))
+	if (rc_paranoia_check(port, tty->name, "rc_chars_in_buffer"))
 		return 0;
 	
 	return port->xmit_cnt;
@@ -1367,7 +1369,7 @@ static void rc_flush_buffer(struct tty_struct *tty)
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_flush_buffer"))
+	if (rc_paranoia_check(port, tty->name, "rc_flush_buffer"))
 		return;
 
 	save_flags(flags); cli();
@@ -1531,7 +1533,7 @@ static int rc_ioctl(struct tty_struct * tty, struct file * filp,
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	int retval;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_ioctl"))
+	if (rc_paranoia_check(port, tty->name, "rc_ioctl"))
 		return -ENODEV;
 	
 	switch (cmd) {
@@ -1581,7 +1583,7 @@ static void rc_throttle(struct tty_struct * tty)
 	struct riscom_board *bp;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_throttle"))
+	if (rc_paranoia_check(port, tty->name, "rc_throttle"))
 		return;
 	
 	bp = port_Board(port);
@@ -1604,7 +1606,7 @@ static void rc_unthrottle(struct tty_struct * tty)
 	struct riscom_board *bp;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_unthrottle"))
+	if (rc_paranoia_check(port, tty->name, "rc_unthrottle"))
 		return;
 	
 	bp = port_Board(port);
@@ -1627,7 +1629,7 @@ static void rc_stop(struct tty_struct * tty)
 	struct riscom_board *bp;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_stop"))
+	if (rc_paranoia_check(port, tty->name, "rc_stop"))
 		return;
 	
 	bp = port_Board(port);
@@ -1645,7 +1647,7 @@ static void rc_start(struct tty_struct * tty)
 	struct riscom_board *bp;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_start"))
+	if (rc_paranoia_check(port, tty->name, "rc_start"))
 		return;
 	
 	bp = port_Board(port);
@@ -1684,7 +1686,7 @@ static void rc_hangup(struct tty_struct * tty)
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	struct riscom_board *bp;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_hangup"))
+	if (rc_paranoia_check(port, tty->name, "rc_hangup"))
 		return;
 	
 	bp = port_Board(port);
@@ -1702,7 +1704,7 @@ static void rc_set_termios(struct tty_struct * tty, struct termios * old_termios
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
 	unsigned long flags;
 				
-	if (rc_paranoia_check(port, tty->device, "rc_set_termios"))
+	if (rc_paranoia_check(port, tty->name, "rc_set_termios"))
 		return;
 	
 	if (tty->termios->c_cflag == old_termios->c_cflag &&

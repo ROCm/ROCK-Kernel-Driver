@@ -1,4 +1,3 @@
-
 /*
 	Written 1997-1998 by Donald Becker.
 
@@ -387,7 +386,7 @@ static int corkscrew_start_xmit(struct sk_buff *skb,
 static int corkscrew_rx(struct net_device *dev);
 static void corkscrew_timeout(struct net_device *dev);
 static int boomerang_rx(struct net_device *dev);
-static void corkscrew_interrupt(int irq, void *dev_id,
+static irqreturn_t corkscrew_interrupt(int irq, void *dev_id,
 				    struct pt_regs *regs);
 static int corkscrew_close(struct net_device *dev);
 static void update_stats(int addr, struct net_device *dev);
@@ -1150,7 +1149,7 @@ static int corkscrew_start_xmit(struct sk_buff *skb,
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
 
-static void corkscrew_interrupt(int irq, void *dev_id,
+static irqreturn_t corkscrew_interrupt(int irq, void *dev_id,
 				    struct pt_regs *regs)
 {
 	/* Use the now-standard shared IRQ implementation. */
@@ -1289,6 +1288,7 @@ static void corkscrew_interrupt(int irq, void *dev_id,
 
 	if (corkscrew_debug > 4)
 		printk("%s: exiting interrupt, status %4.4x.\n", dev->name, status);
+	return IRQ_HANDLED;
 }
 
 static int corkscrew_rx(struct net_device *dev)

@@ -1227,7 +1227,7 @@ fore200e_irq_rx(struct fore200e* fore200e)
 }
 
 
-static void
+static irqreturn_t
 fore200e_interrupt(int irq, void* dev, struct pt_regs* regs)
 {
     struct fore200e* fore200e = FORE200E_DEV((struct atm_dev*)dev);
@@ -1235,13 +1235,14 @@ fore200e_interrupt(int irq, void* dev, struct pt_regs* regs)
     if (fore200e->bus->irq_check(fore200e) == 0) {
 	
 	DPRINTK(3, "unexpected interrupt on device %c\n", fore200e->name[9]);
-	return;
+	return IRQ_NONE;
     }
     DPRINTK(3, "valid interrupt on device %c\n", fore200e->name[9]);
 
     tasklet_schedule(&fore200e->tasklet);
     
     fore200e->bus->irq_ack(fore200e);
+    return IRQ_HANDLED;
 }
 
 

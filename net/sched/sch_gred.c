@@ -348,7 +348,6 @@ static int gred_change(struct Qdisc *sch, struct rtattr *opt)
 		table->grio=sopt->grio; 
 		table->initd=0;
 		/* probably need to clear all the table DP entries as well */
-		MOD_INC_USE_COUNT;
 		return 0;
 	    }
 
@@ -490,7 +489,6 @@ static int gred_init(struct Qdisc *sch, struct rtattr *opt)
 		table->def=sopt->def_DP; 
 		table->grio=sopt->grio; 
 		table->initd=0;
-		MOD_INC_USE_COUNT;
 		return 0;
 	}
 
@@ -602,27 +600,23 @@ static void gred_destroy(struct Qdisc *sch)
 		if (table->tab[i])
 			kfree(table->tab[i]);
 	}
-	MOD_DEC_USE_COUNT;
 }
 
-struct Qdisc_ops gred_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "gred",
-	.priv_size	= sizeof(struct gred_sched),
-
-	.enqueue	= gred_enqueue,
-	.dequeue	= gred_dequeue,
-	.requeue	= gred_requeue,
-	.drop		= gred_drop,
-
-	.init		= gred_init,
-	.reset		= gred_reset,
-	.destroy	= gred_destroy,
-	.change		= gred_change,
-
-	.dump		= gred_dump,
+struct Qdisc_ops gred_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"gred",
+	.priv_size	=	sizeof(struct gred_sched),
+	.enqueue	=	gred_enqueue,
+	.dequeue	=	gred_dequeue,
+	.requeue	=	gred_requeue,
+	.drop		=	gred_drop,
+	.init		=	gred_init,
+	.reset		=	gred_reset,
+	.destroy	=	gred_destroy,
+	.change		=	gred_change,
+	.dump		=	gred_dump,
+	.owner		=	THIS_MODULE,
 };
 
 

@@ -345,50 +345,6 @@ restart:
 	return 0;
 }
 
-static struct super_block *get_super_to_sync(int type)
-{
-	struct list_head *head;
-	int cnt, dirty;
-
-restart:
-	spin_lock(&sb_lock);
-	list_for_each(head, &super_blocks) {
-		struct super_block *sb = list_entry(head, struct super_block, s_list);
-
-		for (cnt = 0, dirty = 0; cnt < MAXQUOTAS; cnt++)
-			if ((type == cnt || type == -1) && sb_has_quota_enabled(sb, cnt)
-			    && info_any_dquot_dirty(&sb_dqopt(sb)->info[cnt]))
-				dirty = 1;
-		if (!dirty)
-			continue;
-		sb->s_count++;
-		spin_unlock(&sb_lock);
-		down_read(&sb->s_umount);
-		if (!sb->s_root) {
-			drop_super(sb);
-			goto restart;
-		}
-		return sb;
-	}
-	spin_unlock(&sb_lock);
-	return NULL;
-}
-
-void sync_dquots(struct super_block *sb, int type)
-{
-	if (sb) {
-		if (sb->s_qcop->quota_sync)
-			sb->s_qcop->quota_sync(sb, type);
-	}
-	else {
-		while ((sb = get_super_to_sync(type))) {
-			if (sb->s_qcop->quota_sync)
-				sb->s_qcop->quota_sync(sb, type);
-			drop_super(sb);
-		}
-	}
-}
-
 /* Free unused dquots from cache */
 static void prune_dqcache(int count)
 {

@@ -532,7 +532,7 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 	struct rfcomm_dlc *dlc;
 	int err, id;
 
-        id = minor(tty->device) - tty->driver.minor_start;
+        id = tty->index;
 
 	BT_DBG("tty %p id %d", tty, id);
 
@@ -852,7 +852,7 @@ static struct tty_driver rfcomm_tty_driver = {
 	.magic			= TTY_DRIVER_MAGIC,
 	.driver_name		= "rfcomm",
 #ifdef CONFIG_DEVFS_FS
-	.name			= "bluetooth/rfcomm/%d",
+	.name			= "bluetooth/rfcomm/",
 #else
 	.name			= "rfcomm",
 #endif

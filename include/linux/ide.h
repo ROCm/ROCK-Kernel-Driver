@@ -1245,7 +1245,6 @@ extern int noautodma;
  * We need blk.h, but we replace its end_request by our own version.
  */
 #define IDE_DRIVER		/* Toggle some magic bits in blk.h */
-#define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #include <linux/blk.h>
 
 extern int ide_end_request (ide_drive_t *drive, int uptodate, int nrsecs);
@@ -1568,7 +1567,7 @@ extern void ide_stall_queue(ide_drive_t *drive, unsigned long timeout);
 
 extern int ide_spin_wait_hwgroup(ide_drive_t *);
 extern void ide_timer_expiry(unsigned long);
-extern void ide_intr(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t ide_intr(int irq, void *dev_id, struct pt_regs *regs);
 extern void do_ide_request(request_queue_t *);
 extern void ide_init_subdrivers(void);
 

@@ -186,7 +186,7 @@ static spinlock_t espchain_lock = SPIN_LOCK_UNLOCKED;
 static int esps_running = 0;
 
 /* Forward declarations. */
-static void esp_intr(int irq, void *dev_id, struct pt_regs *pregs);
+static irqreturn_t esp_intr(int irq, void *dev_id, struct pt_regs *pregs);
 
 /* Debugging routines */
 struct esp_cmdstrings {
@@ -4321,7 +4321,7 @@ state_machine:
 }
 
 /* Service only the ESP described by dev_id. */
-static void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
+static irqreturn_t esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 {
 	struct esp *esp = dev_id;
 	unsigned long flags;
@@ -4337,6 +4337,8 @@ static void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 		ESP_INTSON(esp->dregs);
 	}
 	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 static int esp_slave_alloc(Scsi_Device *SDptr)

@@ -1395,7 +1395,7 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 /*
  *  sa1100fb_handle_irq: Handle 'LCD DONE' interrupts.
  */
-static void sa1100fb_handle_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sa1100fb_handle_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sa1100fb_info *fbi = dev_id;
 	unsigned int lcsr = LCSR;
@@ -1406,6 +1406,7 @@ static void sa1100fb_handle_irq(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	LCSR = lcsr;
+	return IRQ_HANDLED;
 }
 
 /*
@@ -1700,7 +1701,6 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 
 	fbi->fb.fbops		= &sa1100fb_ops;
 	fbi->fb.flags		= FBINFO_FLAG_DEFAULT;
-	fbi->fb.node		= NODEV;
 	fbi->fb.monspecs	= monspecs;
 	fbi->fb.currcon		= -1;
 	fbi->fb.pseudo_palette	= (fbi + 1);

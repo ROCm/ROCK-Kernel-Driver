@@ -278,7 +278,7 @@ static int lance_open_fail(struct net_device *dev);
 static void lance_init_ring(struct net_device *dev, int mode);
 static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int lance_rx(struct net_device *dev);
-static void lance_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t lance_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int lance_close(struct net_device *dev);
 static struct net_device_stats *lance_get_stats(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
@@ -945,7 +945,7 @@ out:
 }
 
 /* The LANCE interrupt handler. */
-static void
+static irqreturn_t
 lance_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
@@ -955,7 +955,7 @@ lance_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	if (dev == NULL) {
 		printk ("lance_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	ioaddr = dev->base_addr;
@@ -1066,6 +1066,7 @@ lance_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			   inw(dev->base_addr + LANCE_DATA));
 
 	spin_unlock (&lp->devlock);
+	return IRQ_HANDLED;
 }
 
 static int

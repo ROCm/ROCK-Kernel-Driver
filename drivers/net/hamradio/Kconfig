@@ -60,7 +60,7 @@ config DMASCC
 	  Currently, this driver supports Ottawa PI/PI2, Paccomm/Gracilis
 	  PackeTwin, and S5SCC/DMA boards. They are detected automatically.
 	  If you have one of these cards, say Y here and read the AX25-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>.
+	  available from <http://www.tldp.org/docs.html#howto>.
 
 	  This driver can operate multiple boards simultaneously. If you
 	  compile it as a module (by saying M instead of Y), it will be called
@@ -88,7 +88,7 @@ config SCC
 	  in order to communicate with other computers. If you want to use
 	  this, read <file:Documentation/networking/z8530drv.txt> and the
 	  AX25-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
+	  <http://www.tldp.org/docs.html#howto>. Also make sure to say Y
 	  to "Amateur Radio AX.25 Level 2" support.
 
 	  If you want to compile this as a module ( = code which can be

@@ -330,7 +330,7 @@ Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
 				sched_d_event(cs, D_RCVBUFREADY);
 			}
                 }
-		/* Packet to long, overflow */
+		/* Packet too long, overflow */
 		if(cs->rcvidx >= MAX_DFRAME_LEN_L1) {
 			if (cs->debug & L1_DEB_WARN)
 			        debugl1(cs, "AMD7930: empty_Dfifo L2-Framelength overrun");

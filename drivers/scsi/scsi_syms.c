@@ -92,7 +92,6 @@ EXPORT_SYMBOL(scsi_reset_provider);
 /*
  * These are here only while I debug the rest of the scsi stuff.
  */
-EXPORT_SYMBOL(scsi_host_get_next);
 EXPORT_SYMBOL(scsi_host_hn_get);
 EXPORT_SYMBOL(scsi_host_put);
 EXPORT_SYMBOL(scsi_device_types);

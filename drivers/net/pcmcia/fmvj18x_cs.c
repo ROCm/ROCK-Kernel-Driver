@@ -314,6 +314,7 @@ static dev_link_t *fmvj18x_attach(void)
     link->conf.IntType = INT_MEMORY_AND_IO;
 
     /* The FMVJ18x specific entries in the device structure. */
+    SET_MODULE_OWNER(dev);
     dev->hard_start_xmit = &fjn_start_xmit;
     dev->set_config = &fjn_config;
     dev->get_stats = &fjn_get_stats;
@@ -1287,8 +1288,6 @@ static int fjn_open(struct net_device *dev)
     lp->open_time = jiffies;
     netif_start_queue(dev);
     
-    MOD_INC_USE_COUNT;
-
     return 0;
 } /* fjn_open */
 
@@ -1323,7 +1322,6 @@ static int fjn_close(struct net_device *dev)
     link->open--;
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
-    MOD_DEC_USE_COUNT;
 
     return 0;
 } /* fjn_close */
@@ -1369,9 +1367,11 @@ static void set_rx_mode(struct net_device *dev)
 	
 	memset(mc_filter, 0, sizeof(mc_filter));
 	for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
-	     i++, mclist = mclist->next)
-	    set_bit(ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f,
-		    mc_filter);
+	     i++, mclist = mclist->next) {
+	    unsigned int bit =
+	    	ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f;
+	    mc_filter[bit >> 3] |= (1 << bit);
+	}
     }
     
     save_flags(flags);

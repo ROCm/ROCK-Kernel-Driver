@@ -39,13 +39,14 @@
 #include <linux/blk.h>
 #include <linux/delay.h>
 #include <linux/completion.h>
+#include <linux/interrupt.h>
 #include <asm/semaphore.h>
 #include "scsi.h"
 #include "hosts.h"
 
 #include "aacraid.h"
 
-static void aac_sa_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t aac_sa_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct aac_dev *dev = dev_id;
 	unsigned short intstat, mask;
@@ -75,7 +76,9 @@ static void aac_sa_intr(int irq, void *dev_id, struct pt_regs *regs)
 		} else if (intstat & DOORBELL_4) {	// dev -> Host Normal Response Not Full
 			sa_writew(dev, DoorbellClrReg_p, DOORBELL_4);
 		}
+		return IRQ_HANDLED;
 	}
+	return IRQ_NONE;
 }
 
 /**

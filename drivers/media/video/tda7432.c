@@ -312,8 +312,7 @@ static void do_tda7432_init(struct i2c_client *client)
  * i2c interface functions *
  * *********************** */
 
-static int tda7432_attach(struct i2c_adapter *adap, int addr,
-			  unsigned short flags, int kind)
+static int tda7432_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	struct tda7432 *t;
 	struct i2c_client *client;

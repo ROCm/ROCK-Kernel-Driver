@@ -67,7 +67,6 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
-#include <linux/wrapper.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
@@ -640,7 +639,7 @@ static inline void dealloc_dmabuf(struct it8172_state *s, struct dmabuf *db)
 	/* undo marking the pages as reserved */
 	pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 	for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-	    mem_map_unreserve(page);
+	    ClearPageReserved(page);
 	pci_free_consistent(s->dev, PAGE_SIZE << db->buforder,
 			    db->rawbuf, db->dmaaddr);
     }
@@ -670,7 +669,7 @@ static int prog_dmabuf(struct it8172_state *s, struct dmabuf *db,
 	   otherwise remap_page_range doesn't do what we want */
 	pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 	for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-	    mem_map_reserve(page);
+	    SetPageReserved(page);
     }
 
     db->count = 0;
@@ -727,7 +726,7 @@ static inline int prog_dmabuf_dac(struct it8172_state *s)
 
 /* hold spinlock for the following! */
 
-static void it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct it8172_state *s = (struct it8172_state *)dev_id;
     struct dmabuf* dac = &s->dma_dac;
@@ -741,8 +740,10 @@ static void it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     isc = inb(s->io+IT_AC_ISC);
 
     /* fastpath out, to ease interrupt sharing */
-    if (!(isc & (ISC_VCI | ISC_CCI | ISC_PCI)))
-	return;
+    if (!(isc & (ISC_VCI | ISC_CCI | ISC_PCI))) {
+	spin_unlock(&s->lock);
+	return IRQ_NONE;
+    }
 
     /* clear audio interrupts first */
     outb(isc | ISC_VCI | ISC_CCI | ISC_PCI, s->io+IT_AC_ISC);
@@ -819,6 +820,7 @@ static void it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     }
     
     spin_unlock(&s->lock);
+    return IRQ_HANDLED;
 }
 
 /* --------------------------------------------------------------------- */

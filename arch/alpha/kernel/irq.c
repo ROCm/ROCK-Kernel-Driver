@@ -45,7 +45,10 @@ volatile unsigned long irq_err_count;
  * Special irq handlers.
  */
 
-void no_action(int cpl, void *dev_id, struct pt_regs *regs) { }
+irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs)
+{
+	return IRQ_NONE;
+}
 
 /*
  * Generic no controller code
@@ -414,7 +417,7 @@ init_irq_proc (void)
 }
 
 int
-request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	    unsigned long irqflags, const char * devname, void *dev_id)
 {
 	int retval;

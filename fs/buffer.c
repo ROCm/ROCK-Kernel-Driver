@@ -447,15 +447,6 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 	invalidate_inode_pages(bdev->bd_inode->i_mapping);
 }
 
-void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (bdev) {
-		invalidate_bdev(bdev, destroy_dirty_buffers);
-		bdput(bdev);
-	}
-}
-
 /*
  * Kick pdflush then try to free up some ZONE_NORMAL memory.
  */
@@ -776,6 +767,85 @@ void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 EXPORT_SYMBOL(mark_buffer_dirty_inode);
 
 /*
+ * Add a page to the dirty page list.
+ *
+ * It is a sad fact of life that this function is called from several places
+ * deeply under spinlocking.  It may not sleep.
+ *
+ * If the page has buffers, the uptodate buffers are set dirty, to preserve
+ * dirty-state coherency between the page and the buffers.  It the page does
+ * not have buffers then when they are later attached they will all be set
+ * dirty.
+ *
+ * The buffers are dirtied before the page is dirtied.  There's a small race
+ * window in which a writepage caller may see the page cleanness but not the
+ * buffer dirtiness.  That's fine.  If this code were to set the page dirty
+ * before the buffers, a concurrent writepage caller could clear the page dirty
+ * bit, see a bunch of clean buffers and we'd end up with dirty buffers/clean
+ * page on the dirty page list.
+ *
+ * There is also a small window where the page is dirty, and not on dirty_pages.
+ * Also a possibility that by the time the page is added to dirty_pages, it has
+ * been set clean.  The page lists are somewhat approximate in this regard.
+ * It's better to have clean pages accidentally attached to dirty_pages than to
+ * leave dirty pages attached to clean_pages.
+ *
+ * We use private_lock to lock against try_to_free_buffers while using the
+ * page's buffer list.  Also use this to protect against clean buffers being
+ * added to the page after it was set dirty.
+ *
+ * FIXME: may need to call ->reservepage here as well.  That's rather up to the
+ * address_space though.
+ *
+ * For now, we treat swapper_space specially.  It doesn't use the normal
+ * block a_ops.
+ */
+int __set_page_dirty_buffers(struct page *page)
+{
+	struct address_space * const mapping = page->mapping;
+	int ret = 0;
+
+	if (mapping == NULL) {
+		SetPageDirty(page);
+		goto out;
+	}
+
+	if (!PageUptodate(page))
+		buffer_error();
+
+	spin_lock(&mapping->private_lock);
+	if (page_has_buffers(page)) {
+		struct buffer_head *head = page_buffers(page);
+		struct buffer_head *bh = head;
+
+		do {
+			if (buffer_uptodate(bh))
+				set_buffer_dirty(bh);
+			else
+				buffer_error();
+			bh = bh->b_this_page;
+		} while (bh != head);
+	}
+	spin_unlock(&mapping->private_lock);
+
+	if (!TestSetPageDirty(page)) {
+		spin_lock(&mapping->page_lock);
+		if (page->mapping) {	/* Race with truncate? */
+			if (!mapping->backing_dev_info->memory_backed)
+				inc_page_state(nr_dirty);
+			list_del(&page->list);
+			list_add(&page->list, &mapping->dirty_pages);
+		}
+		spin_unlock(&mapping->page_lock);
+		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
+	}
+	
+out:
+	return ret;
+}
+EXPORT_SYMBOL(__set_page_dirty_buffers);
+
+/*
  * Write out and wait upon a list of buffers.
  *
  * We have conflicting pressures: we want to make sure that all
@@ -916,7 +986,7 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
-		bh = alloc_buffer_head();
+		bh = alloc_buffer_head(GFP_NOFS);
 		if (!bh)
 			goto no_grow;
 
@@ -2267,7 +2337,7 @@ int nobh_prepare_write(struct page *page, unsigned from, unsigned to,
 		if (buffer_uptodate(&map_bh))
 			continue;	/* reiserfs does this */
 		if (block_start < from || block_end > to) {
-			struct buffer_head *bh = alloc_buffer_head();
+			struct buffer_head *bh = alloc_buffer_head(GFP_NOFS);
 
 			if (!bh) {
 				ret = -ENOMEM;
@@ -2826,9 +2896,9 @@ static void recalc_bh_state(void)
 	buffer_heads_over_limit = (tot > max_buffer_heads);
 }
 	
-struct buffer_head *alloc_buffer_head(void)
+struct buffer_head *alloc_buffer_head(int gfp_flags)
 {
-	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, GFP_NOFS);
+	struct buffer_head *ret = kmem_cache_alloc(bh_cachep, gfp_flags);
 	if (ret) {
 		preempt_disable();
 		__get_cpu_var(bh_accounting).nr++;

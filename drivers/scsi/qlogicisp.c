@@ -606,7 +606,7 @@ static int	isp1020_load_parameters(struct Scsi_Host *);
 static int	isp1020_mbox_command(struct Scsi_Host *, u_short []); 
 static int	isp1020_return_status(struct Status_Entry *);
 static void	isp1020_intr_handler(int, void *, struct pt_regs *);
-static void	do_isp1020_intr_handler(int, void *, struct pt_regs *);
+static irqreturn_t do_isp1020_intr_handler(int, void *, struct pt_regs *);
 
 #if USE_NVRAM_DEFAULTS
 static int	isp1020_get_defaults(struct Scsi_Host *);
@@ -965,7 +965,7 @@ int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 
 #define ASYNC_EVENT_INTERRUPT	0x01
 
-void do_isp1020_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t do_isp1020_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct Scsi_Host *host = dev_id;
 	unsigned long flags;
@@ -973,6 +973,8 @@ void do_isp1020_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(host->host_lock, flags);
 	isp1020_intr_handler(irq, dev_id, regs);
 	spin_unlock_irqrestore(host->host_lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 void isp1020_intr_handler(int irq, void *dev_id, struct pt_regs *regs)

@@ -137,18 +137,20 @@ static struct bc_hw_ops jade_ops = {
 	.write_fifo = jade_write_fifo,
 };
 
-static void
+static irqreturn_t
 bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val = 0;
 	I20_REGISTER_FILE *pI20_Regs;
+	int handled = 0;
 
 	spin_lock(&cs->lock);
 	pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
 
 	/* ISDN interrupt pending? */
 	if (pI20_Regs->i20IntStatus & intISDN) {
+		handled = 1;
 		/* Reset the ISDN interrupt     */
 		pI20_Regs->i20IntStatus = intISDN;
 		/* Disable ISDN interrupt */
@@ -172,6 +174,7 @@ bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		pI20_Regs->i20IntCtrl |= intISDN;
 	}
 	spin_unlock(&cs->lock);
+	return IRQ_RETVAL(handled);
 }
 
 static void

@@ -84,6 +84,7 @@ typedef struct drm_gamma_init {
 	unsigned int mmio2;
 	unsigned int mmio3;
 	unsigned int buffers_offset;
+	int num_rast;
 } drm_gamma_init_t;
 
 #endif /* _GAMMA_DRM_H_ */

@@ -984,7 +984,7 @@ serial8250_handle_port(struct uart_8250_port *up, struct pt_regs *regs)
  * This means we need to loop through all ports. checking that they
  * don't have an interrupt pending.
  */
-static void serial8250_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t serial8250_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct irq_info *i = dev_id;
 	struct list_head *l, *end = NULL;
@@ -1024,6 +1024,8 @@ static void serial8250_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&i->lock);
 
 	DEBUG_INTR("end.\n");
+	/* FIXME! Was it really ours? */
+	return IRQ_HANDLED;
 }
 
 /*
@@ -1828,7 +1830,7 @@ static void __init serial8250_isa_init_ports(void)
 	for (i = 0, up = serial8250_ports; i < ARRAY_SIZE(old_serial_port);
 	     i++, up++) {
 		up->port.iobase   = old_serial_port[i].port;
-		up->port.irq      = irq_cannonicalize(old_serial_port[i].irq);
+		up->port.irq      = irq_canonicalize(old_serial_port[i].irq);
 		up->port.uartclk  = old_serial_port[i].baud_base * 16;
 		up->port.flags    = old_serial_port[i].flags |
 				    UPF_RESOURCES;
@@ -1942,11 +1944,6 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	serial_out(up, UART_IER, ier);
 }
 
-static kdev_t serial8250_console_device(struct console *co)
-{
-	return mk_kdev(TTY_MAJOR, 64 + co->index);
-}
-
 static int __init serial8250_console_setup(struct console *co, char *options)
 {
 	struct uart_port *port;
@@ -1975,13 +1972,15 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
 
+extern struct uart_driver serial8250_reg;
 static struct console serial8250_console = {
 	.name		= "ttyS",
 	.write		= serial8250_console_write,
-	.device		= serial8250_console_device,
+	.device		= uart_console_device,
 	.setup		= serial8250_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= &serial8250_reg,
 };
 
 static int __init serial8250_console_init(void)
@@ -2001,9 +2000,9 @@ static struct uart_driver serial8250_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/%d",
+	.dev_name		= "tts/",
 #else
-	.dev_name		= "ttyS%d",
+	.dev_name		= "ttyS",
 #endif
 	.major			= TTY_MAJOR,
 	.minor			= 64,

@@ -1763,7 +1763,7 @@ static inline void BusLogic_IncrementSizeBucket(BusLogic_CommandSizeBuckets_T
 */
 
 static void BusLogic_QueueCompletedCCB(BusLogic_CCB_T *);
-static void BusLogic_InterruptHandler(int, void *, Registers_T *);
+static irqreturn_t BusLogic_InterruptHandler(int, void *, Registers_T *);
 static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *,
 				     SCSI_Command_T *, unsigned int);
 static void BusLogic_Message(BusLogic_MessageLevel_T, char *,

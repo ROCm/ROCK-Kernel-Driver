@@ -833,14 +833,14 @@ static void snd_rme32_capture_stop(rme32_t * rme32)
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 }
 
-static void
+static irqreturn_t
 snd_rme32_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	rme32_t *rme32 = (rme32_t *) dev_id;
 
 	rme32->rcreg = readl(rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	if (!(rme32->rcreg & RME32_RCR_IRQ)) {
-		return;
+		return IRQ_NONE;
 	} else {
 		if (rme32->capture_substream) {
 			snd_pcm_period_elapsed(rme32->capture_substream);
@@ -850,6 +850,7 @@ snd_rme32_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		writel(0, rme32->iobase + RME32_IO_CONFIRM_ACTION_IRQ);
 	}
+	return IRQ_HANDLED;
 }
 
 static unsigned int period_bytes[] = { RME32_BLOCK_SIZE };

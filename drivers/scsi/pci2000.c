@@ -262,7 +262,7 @@ static int PsiRaidCmd (PADAPTER2000 padapter, char cmd)
  *	Returns:		TRUE if drive is not ready in time.
  *
  ****************************************************************/
-static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	{
 	struct Scsi_Host   *shost = NULL;	// Pointer to host data block
 	PADAPTER2000		padapter;		// Pointer to adapter control structure
@@ -275,7 +275,7 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	int					bus;
 	int					z;
     unsigned long		flags;
-
+    int handled = 0;
 
 	DEB(printk ("\npci2000 received interrupt "));
 	for ( z = 0; z < NumAdapters;  z++ )										// scan for interrupt to process
@@ -297,6 +297,7 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 		goto out;
 		}
 
+    handled = 1;
 	spin_lock_irqsave(shost->host_lock, flags);
 	padapter = HOSTDATA(shost);
 
@@ -391,7 +392,8 @@ irqProceed:;
 
 irq_return:
     spin_unlock_irqrestore(shost->host_lock, flags);
-out:;
+out:
+    return IRQ_RETVAL(handled);
 }
 /****************************************************************
  *	Name:	Pci2000_QueueCommand

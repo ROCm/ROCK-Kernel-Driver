@@ -791,14 +791,22 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, 
 void usb_disconnect(struct usb_device **pdev)
 {
 	struct usb_device	*dev = *pdev;
-	struct usb_bus		*bus = dev->bus;
-	struct usb_operations	*ops = bus->op;
+	struct usb_bus		*bus;
+	struct usb_operations	*ops;
 	int			i;
 
 	might_sleep ();
 
-	if (!dev)
+	if (!dev) {
+		pr_debug ("%s nodev\n", __FUNCTION__);
 		return;
+	}
+	bus = dev->bus;
+	if (!bus) {
+		pr_debug ("%s nobus\n", __FUNCTION__);
+		return;
+	}
+	ops = bus->op;
 
 	*pdev = NULL;
 

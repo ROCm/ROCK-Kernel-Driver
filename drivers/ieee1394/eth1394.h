@@ -56,7 +56,6 @@ struct eth1394_priv {
 };
 
 struct host_info {
-	struct list_head list;
 	struct hpsb_host *host;
 	struct net_device *dev;
 };

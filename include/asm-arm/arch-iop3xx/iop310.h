@@ -1,7 +1,7 @@
 /*
  * linux/include/asm/arch-iop3xx/iop310.h
  *
- * Intel IOP310 Compainion Chip definitions
+ * Intel IOP310 Companion Chip definitions
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

@@ -404,29 +404,6 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
 	atomic_inc(&host->generation);
 	host->in_bus_reset = 0;
         highlevel_host_reset(host);
-
-        /* check for common cycle master error */
-        hpsb_check_cycle_master(host);
-}
-
-
-void hpsb_check_cycle_master(struct hpsb_host *host)
-{
-	/* check if host is IRM and not ROOT */
-	if (host->is_irm && !host->is_root) {
-		HPSB_NOTICE("Host is IRM but not root, resetting");
-		if (host->reset_retries++ < 4) {
-			/* selfid stage did not yield valid cycle master */
-			hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
-		} else {
-			host->reset_retries = 0;
-			HPSB_NOTICE("Stopping out-of-control reset loop");
-			HPSB_NOTICE("Warning - Cycle Master not set correctly");
-		}
-		return;
-	}
-
-	host->reset_retries = 0;
 }
 
 
@@ -460,6 +437,63 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
 
         up(&packet->state_change);
         hpsb_schedule_work(&host->timeout_tq);
+}
+
+/**
+ * hpsb_send_phy_config - transmit a PHY configuration packet on the bus
+ * @host: host that PHY config packet gets sent through
+ * @rootid: root whose force_root bit should get set (-1 = don't set force_root)
+ * @gapcnt: gap count value to set (-1 = don't set gap count)
+ *
+ * This function sends a PHY config packet on the bus through the specified host.
+ *
+ * Return value: 0 for success or error number otherwise.
+ */
+int hpsb_send_phy_config(struct hpsb_host *host, int rootid, int gapcnt)
+{
+	struct hpsb_packet *packet;
+	int retval = 0;
+
+	if(rootid >= ALL_NODES || rootid < -1 || gapcnt > 0x3f || gapcnt < -1 ||
+	   (rootid == -1 && gapcnt == -1)) {
+		HPSB_DEBUG("Invalid Parameter: rootid = %d   gapcnt = %d",
+			   rootid, gapcnt);
+		return -EINVAL;
+	}
+
+	packet = alloc_hpsb_packet(0);
+	if (!packet)
+		return -ENOMEM;
+
+	packet->host = host;
+	packet->header_size = 16;
+	packet->data_size = 0;
+	packet->expect_response = 0;
+	packet->no_waiter = 0;
+	packet->type = hpsb_raw;
+	packet->header[0] = 0;
+	if(rootid != -1)
+		packet->header[0] |= rootid << 24 | 1 << 23;
+	if(gapcnt != -1)
+		packet->header[0] |= gapcnt << 16 | 1 << 22;
+
+	packet->header[1] = ~packet->header[0];
+
+	packet->generation = get_hpsb_generation(host);
+
+	HPSB_DEBUG("Sending PHY configuration packet (I hope)...");
+	if (!hpsb_send_packet(packet)) {
+		retval = -EINVAL;
+		goto fail;
+	}
+
+	down(&packet->state_change);
+	down(&packet->state_change);
+
+fail:
+	free_hpsb_packet(packet);
+
+	return retval;
 }
 
 /**
@@ -983,9 +1017,6 @@ static struct file_operations ieee1394_chardev_ops = {
 	.open =	ieee1394_dispatch_open,
 };
 
-devfs_handle_t ieee1394_devfs_handle;
-
-
 /* claim a block of minor numbers */
 int ieee1394_register_chardev(int blocknum,
 			      struct module *module,
@@ -1150,11 +1181,11 @@ static int __init ieee1394_init(void)
 	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
 					      0, 0, NULL, NULL);
 
-	ieee1394_devfs_handle = devfs_mk_dir("ieee1394");
+	devfs_mk_dir("ieee1394");
 
 	if (register_chrdev(IEEE1394_MAJOR, "ieee1394", &ieee1394_chardev_ops)) {
 		HPSB_ERR("unable to register character device major %d!\n", IEEE1394_MAJOR);
-		devfs_unregister(ieee1394_devfs_handle);
+		devfs_remove("ieee1394");
 		return -ENODEV;
 	}
 
@@ -1165,7 +1196,7 @@ static int __init ieee1394_init(void)
 	if (ieee1394_procfs_entry == NULL) {
 		HPSB_ERR("unable to create /proc/bus/ieee1394\n");
 		unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
-		devfs_unregister(ieee1394_devfs_handle);
+		devfs_remove("ieee1394");
 		return -ENOMEM;
 	}
 	ieee1394_procfs_entry->owner = THIS_MODULE;
@@ -1190,10 +1221,7 @@ static void __exit ieee1394_cleanup(void)
 	kmem_cache_destroy(hpsb_packet_cache);
 
 	unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
-
-	/* it's ok to pass a NULL devfs_handle to devfs_unregister */
-	devfs_unregister(ieee1394_devfs_handle);
-
+	devfs_remove("ieee1394");
 	remove_proc_entry("ieee1394", proc_bus);
 }
 
@@ -1214,17 +1242,16 @@ EXPORT_SYMBOL(hpsb_speedto_str);
 EXPORT_SYMBOL(hpsb_set_packet_complete_task);
 EXPORT_SYMBOL(alloc_hpsb_packet);
 EXPORT_SYMBOL(free_hpsb_packet);
+EXPORT_SYMBOL(hpsb_send_phy_config);
 EXPORT_SYMBOL(hpsb_send_packet);
 EXPORT_SYMBOL(hpsb_reset_bus);
 EXPORT_SYMBOL(hpsb_bus_reset);
 EXPORT_SYMBOL(hpsb_selfid_received);
 EXPORT_SYMBOL(hpsb_selfid_complete);
-EXPORT_SYMBOL(hpsb_check_cycle_master);
 EXPORT_SYMBOL(hpsb_packet_sent);
 EXPORT_SYMBOL(hpsb_packet_received);
 EXPORT_SYMBOL(ieee1394_register_chardev);
 EXPORT_SYMBOL(ieee1394_unregister_chardev);
-EXPORT_SYMBOL(ieee1394_devfs_handle);
 EXPORT_SYMBOL(ieee1394_procfs_entry);
 
 /** ieee1394_transactions.c **/
@@ -1250,6 +1277,13 @@ EXPORT_SYMBOL(hpsb_register_addrspace);
 EXPORT_SYMBOL(hpsb_unregister_addrspace);
 EXPORT_SYMBOL(hpsb_listen_channel);
 EXPORT_SYMBOL(hpsb_unlisten_channel);
+EXPORT_SYMBOL(hpsb_get_hostinfo);
+EXPORT_SYMBOL(hpsb_create_hostinfo);
+EXPORT_SYMBOL(hpsb_destroy_hostinfo);
+EXPORT_SYMBOL(hpsb_set_hostinfo_key);
+EXPORT_SYMBOL(hpsb_get_hostinfo_key);
+EXPORT_SYMBOL(hpsb_get_hostinfo_bykey);
+EXPORT_SYMBOL(hpsb_set_hostinfo);
 EXPORT_SYMBOL(highlevel_read);
 EXPORT_SYMBOL(highlevel_write);
 EXPORT_SYMBOL(highlevel_lock);
@@ -1261,7 +1295,6 @@ EXPORT_SYMBOL(highlevel_host_reset);
 /** nodemgr.c **/
 EXPORT_SYMBOL(hpsb_guid_get_entry);
 EXPORT_SYMBOL(hpsb_nodeid_get_entry);
-EXPORT_SYMBOL(hpsb_check_nodeid);
 EXPORT_SYMBOL(hpsb_node_fill_packet);
 EXPORT_SYMBOL(hpsb_node_read);
 EXPORT_SYMBOL(hpsb_node_write);
@@ -1302,4 +1335,3 @@ EXPORT_SYMBOL(hpsb_iso_n_ready);
 EXPORT_SYMBOL(hpsb_iso_packet_sent);
 EXPORT_SYMBOL(hpsb_iso_packet_received);
 EXPORT_SYMBOL(hpsb_iso_wake);
-

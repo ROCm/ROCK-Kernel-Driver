@@ -179,7 +179,7 @@ static DECLARE_WAIT_QUEUE_HEAD(mpt_waitq);
 /*
  *  Forward protos...
  */
-static void	mpt_interrupt(int irq, void *bus_id, struct pt_regs *r);
+static irqreturn_t mpt_interrupt(int irq, void *bus_id, struct pt_regs *r);
 static int	mpt_base_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply);
 
 static int	mpt_do_ioc_recovery(MPT_ADAPTER *ioc, u32 reason, int sleepFlag);
@@ -312,7 +312,7 @@ static inline u32 CHIPREG_PIO_READ32(volatile u32 *a)
  *	dispatches (calls) a protocol-specific callback routine to handle
  *	the protocol-specific details of the MPT request completion.
  */
-static void
+static irqreturn_t
 mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 {
 	MPT_ADAPTER	*ioc;
@@ -338,7 +338,7 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 
 		if (!iocCmp) {
 			printk(KERN_WARNING "mpt_interrupt: Invalid ioc!\n");
-			return;
+			return IRQ_NONE;
 		}
 	}
 
@@ -353,7 +353,7 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 	while (1) {
 
 		if ((pa = CHIPREG_READ32(&ioc->chip->ReplyFifo)) == 0xFFFFFFFF)
-			return;
+			return IRQ_HANDLED;
 
 		cb_idx = 0;
 		freeme = 0;
@@ -501,10 +501,12 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 			dirqprintk((MYIOC_s_INFO_FMT "ISR processed %d replies.",
 					ioc->name, count));
 			dirqprintk((" Giving this ISR a break!\n"));
-			return;
+			return IRQ_HANDLED;
 		}
 
 	}	/* drain reply FIFO */
+
+	return IRQ_HANDLED;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

@@ -66,7 +66,7 @@ extern void enable_irq(unsigned int);
 #define NR_IRQS		((NR_UIC_IRQS * NR_UICS) + NR_BOARD_IRQS)
 #endif
 static __inline__ int
-irq_cannonicalize(int irq)
+irq_canonicalize(int irq)
 {
 	return (irq);
 }
@@ -78,7 +78,7 @@ irq_cannonicalize(int irq)
 #define	NR_IRQS		(NR_UIC_IRQS + NR_BOARD_IRQS)
 
 static __inline__ int
-irq_cannonicalize(int irq)
+irq_canonicalize(int irq)
 {
 	return (irq);
 }
@@ -148,7 +148,7 @@ irq_cannonicalize(int irq)
 #define	mk_int_int_mask(IL) (1 << (7 - (IL/2)))
 
 /* always the same on 8xx -- Cort */
-static __inline__ int irq_cannonicalize(int irq)
+static __inline__ int irq_canonicalize(int irq)
 {
 	return irq;
 }
@@ -196,10 +196,10 @@ static __inline__ int irq_cannonicalize(int irq)
  * powermacs as well as prep/chrp boxes.
  * Prep and chrp both have cascaded 8259 PICs.
  */
-static __inline__ int irq_cannonicalize(int irq)
+static __inline__ int irq_canonicalize(int irq)
 {
-	if (ppc_md.irq_cannonicalize)
-		return ppc_md.irq_cannonicalize(irq);
+	if (ppc_md.irq_canonicalize)
+		return ppc_md.irq_canonicalize(irq);
 	return irq;
 }
 

@@ -201,7 +201,7 @@ static void pci_intr(sb_devc *devc)
 		sb_intr(devc);
 }
 
-static void sbintr(int irq, void *dev_id, struct pt_regs *dummy)
+static irqreturn_t sbintr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	sb_devc *devc = dev_id;
 
@@ -219,6 +219,7 @@ static void sbintr(int irq, void *dev_id, struct pt_regs *dummy)
 		sb_intr (devc);
 		break;
 	}
+	return IRQ_HANDLED;
 }
 
 int sb_dsp_reset(sb_devc * devc)

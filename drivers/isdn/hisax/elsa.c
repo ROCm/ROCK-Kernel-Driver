@@ -307,7 +307,7 @@ TimerRun(struct IsdnCardState *cs)
 	return (v & ELSA_TIMER_RUN);
 }
 
-static void
+static irqreturn_t
 elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -317,7 +317,7 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	/* The card tends to generate interrupts while being removed
 	   causing us to just crash the kernel. bad. */
 		printk(KERN_WARNING "Elsa: card not available!\n");
-		return;
+		return IRQ_NONE;
 	}
 #if ARCOFI_USE
 	if (cs->hw.elsa.MFlag) {
@@ -351,9 +351,10 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 #endif
 	if (cs->hw.elsa.trig)
 		byteout(cs->hw.elsa.trig, 0x00);
+	return IRQ_HANDLED;
 }
 
-static void
+static irqreturn_t
 elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -361,13 +362,13 @@ elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 
 	if (!cs) {
 		printk(KERN_WARNING "Elsa: Spurious interrupt!\n");
-		return;
+		return IRQ_NONE;
 	}
 	if (cs->subtyp == ELSA_QS1000PCI || cs->subtyp == ELSA_QS3000PCI) {
 		val = bytein(cs->hw.elsa.cfg + 0x4c); /* PCI IRQ */
 		if (!test_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags) && 
 		    !(val & ELSA_PCI_IRQ_MASK))
-			return;
+			return IRQ_NONE;
 	}
 #if ARCOFI_USE
 	if (cs->hw.elsa.MFlag) {
@@ -380,7 +381,7 @@ elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		}
 	}
 #endif
-	ipac_irq(intno, dev_id, regs);
+	return ipac_irq(intno, dev_id, regs);
 }
 
 static void

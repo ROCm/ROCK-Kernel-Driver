@@ -107,7 +107,7 @@ static struct termios * aurora_termios_locked[AURORA_TNPORTS] = { NULL, };
 DECLARE_TASK_QUEUE(tq_aurora);
 
 static inline int aurora_paranoia_check(struct Aurora_port const * port,
-				    kdev_t device, const char *routine)
+				    char *name, const char *routine)
 {
 #ifdef AURORA_PARANOIA_CHECK
 	static const char *badmagic =
@@ -116,11 +116,11 @@ static inline int aurora_paranoia_check(struct Aurora_port const * port,
 		KERN_DEBUG "aurora: Warning: null aurora port for device %s in %s\n";
 
 	if (!port) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (port->magic != AURORA_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -265,7 +265,7 @@ for(i=0;i<TYPE_1_IRQS;i++)
 return 0;
 }
 
-static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs);
+static irqreturn_t aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs);
 
 /* Main probing routine, also sets irq. */
 static int aurora_probe(void)
@@ -701,7 +701,7 @@ static void aurora_check_modem(struct Aurora_board const * bp, int chip)
 }
 
 /* The main interrupt processing routine */
-static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	unsigned char status;
 	unsigned char ack,chip/*,chip_id*/;
@@ -719,7 +719,7 @@ static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 /* old	bp = IRQ_to_board[irq&0x0f];*/
 	
 	if (!bp || !(bp->flags & AURORA_BOARD_ACTIVE))
-		return;
+		return IRQ_NONE;
 
 /*	The while() below takes care of this.
 	status = sbus_readb(&bp->r[0]->r[CD180_SRSR]);
@@ -727,7 +727,7 @@ static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 	printk("mumu: %02x\n", status);
 #endif
 	if (!(status&SRSR_ANYINT))
-		return; * Nobody has anything to say, so exit *
+		return IRQ_NONE; * Nobody has anything to say, so exit *
 */
 	while ((loop++ < 48) &&
 	       (status = sbus_readb(&bp->r[0]->r[CD180_SRSR]) & SRSR_ANYINT)){
@@ -875,6 +875,8 @@ static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		}
 	}
 #endif
+
+	return IRQ_HANDLED;
 }
 
 #ifdef AURORA_INT_DEBUG
@@ -1419,7 +1421,7 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 	printk("aurora_open: start\n");
 #endif
 	
-	board = AURORA_BOARD(minor(tty->device));
+	board = AURORA_BOARD(tty->index);
 	if (board > AURORA_NBOARD ||
 	    !(aurora_board[board].flags & AURORA_BOARD_PRESENT)) {
 #ifdef AURORA_DEBUG
@@ -1430,8 +1432,8 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 	}
 	
 	bp = &aurora_board[board];
-	port = aurora_port + board * AURORA_NPORT * AURORA_NCD180 + AURORA_PORT(minor(tty->device));
-	if (aurora_paranoia_check(port, tty->device, "aurora_open")) {
+	port = aurora_port + board * AURORA_NPORT * AURORA_NCD180 + AURORA_PORT(tty->index);
+	if ((aurora_paranoia_check(port, tty->name, "aurora_open")) {
 #ifdef AURORA_DEBUG
 		printk("aurora_open: error paranoia check\n");
 #endif
@@ -1483,7 +1485,7 @@ static void aurora_close(struct tty_struct * tty, struct file * filp)
 	printk("aurora_close: start\n");
 #endif
 	
-	if (!port || aurora_paranoia_check(port, tty->device, "close"))
+	if (!port || (aurora_paranoia_check(port, tty->name, "close"))
 		return;
 	
 	chip = AURORA_CD180(port_No(port));
@@ -1562,8 +1564,8 @@ static void aurora_close(struct tty_struct * tty, struct file * filp)
 	printk("aurora_close: shutdown_port\n");
 #endif
 	aurora_shutdown_port(bp, port);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1597,7 +1599,7 @@ static int aurora_write(struct tty_struct * tty, int from_user,
 #ifdef AURORA_DEBUG
 	printk("aurora_write: start %d\n",count);
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_write"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_write"))
 		return 0;
 		
 	chip = AURORA_CD180(port_No(port));
@@ -1679,7 +1681,7 @@ static void aurora_put_char(struct tty_struct * tty, unsigned char ch)
 #ifdef AURORA_DEBUG
 	printk("aurora_put_char: start %c\n",ch);
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_put_char"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_put_char"))
 		return;
 
 	if (!tty || !port->xmit_buf)
@@ -1710,7 +1712,7 @@ static void aurora_flush_chars(struct tty_struct * tty)
 /*#ifdef AURORA_DEBUG
 	printk("aurora_flush_chars: start\n");
 #endif*/
-	if (aurora_paranoia_check(port, tty->device, "aurora_flush_chars"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_flush_chars"))
 		return;
 		
 	chip = AURORA_CD180(port_No(port));
@@ -1740,7 +1742,7 @@ static int aurora_write_room(struct tty_struct * tty)
 #ifdef AURORA_DEBUG
 	printk("aurora_write_room: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_write_room"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_write_room"))
 		return 0;
 
 	ret = SERIAL_XMIT_SIZE - port->xmit_cnt - 1;
@@ -1756,7 +1758,7 @@ static int aurora_chars_in_buffer(struct tty_struct *tty)
 {
 	struct Aurora_port *port = (struct Aurora_port *) tty->driver_data;
 				
-	if (aurora_paranoia_check(port, tty->device, "aurora_chars_in_buffer"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_chars_in_buffer"))
 		return 0;
 	
 	return port->xmit_cnt;
@@ -1770,7 +1772,7 @@ static void aurora_flush_buffer(struct tty_struct *tty)
 #ifdef AURORA_DEBUG
 	printk("aurora_flush_buffer: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_flush_buffer"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_flush_buffer"))
 		return;
 
 	save_flags(flags); cli();
@@ -1999,7 +2001,7 @@ static int aurora_ioctl(struct tty_struct * tty, struct file * filp,
 #ifdef AURORA_DEBUG
 	printk("aurora_ioctl: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_ioctl"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_ioctl"))
 		return -ENODEV;
 	
 	switch (cmd) {
@@ -2060,7 +2062,7 @@ static void aurora_throttle(struct tty_struct * tty)
 #ifdef AURORA_DEBUG
 	printk("aurora_throttle: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_throttle"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_throttle"))
 		return;
 	
 	bp = port_Board(port);
@@ -2092,7 +2094,7 @@ static void aurora_unthrottle(struct tty_struct * tty)
 #ifdef AURORA_DEBUG
 	printk("aurora_unthrottle: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_unthrottle"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_unthrottle"))
 		return;
 	
 	bp = port_Board(port);
@@ -2127,7 +2129,7 @@ static void aurora_stop(struct tty_struct * tty)
 #ifdef AURORA_DEBUG
 	printk("aurora_stop: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_stop"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_stop"))
 		return;
 	
 	bp = port_Board(port);
@@ -2157,7 +2159,7 @@ static void aurora_start(struct tty_struct * tty)
 #ifdef AURORA_DEBUG
 	printk("aurora_start: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_start"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_start"))
 		return;
 	
 	bp = port_Board(port);
@@ -2213,7 +2215,7 @@ static void aurora_hangup(struct tty_struct * tty)
 #ifdef AURORA_DEBUG
 	printk("aurora_hangup: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_hangup"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_hangup"))
 		return;
 	
 	bp = port_Board(port);
@@ -2237,7 +2239,7 @@ static void aurora_set_termios(struct tty_struct * tty, struct termios * old_ter
 #ifdef AURORA_DEBUG
 	printk("aurora_set_termios: start\n");
 #endif
-	if (aurora_paranoia_check(port, tty->device, "aurora_set_termios"))
+	if ((aurora_paranoia_check(port, tty->name, "aurora_set_termios"))
 		return;
 	
 	if (tty->termios->c_cflag == old_termios->c_cflag &&

@@ -480,7 +480,7 @@
 #define _H3800_ASIC1_GPIO_State         0x40    /* R   See masks below  (default 0)         */
 #define _H3800_ASIC1_GPIO_Reset         0x42    /* R/W See masks below  (default 0x04)      */
 #define _H3800_ASIC1_GPIO_SleepMask     0x44    /* R/W 0:don't mask, 1:mask trigger in sleep mode  */
-#define _H3800_ASIC1_GPIO_SleepDir      0x46    /* R/W direction 0:input, 1:ouput in sleep mode    */
+#define _H3800_ASIC1_GPIO_SleepDir      0x46    /* R/W direction 0:input, 1:output in sleep mode    */
 #define _H3800_ASIC1_GPIO_SleepOut      0x48    /* R/W level 0:low, 1:high in sleep mode           */
 #define _H3800_ASIC1_GPIO_Status        0x4A    /* R   Pin status                                  */
 #define _H3800_ASIC1_GPIO_BattFaultDir  0x4C    /* R/W direction 0:input, 1:output in batt_fault   */

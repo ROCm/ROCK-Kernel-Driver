@@ -505,6 +505,17 @@ W:	http://www.qsl.net/dl1bke/
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
+DC395x SCSI driver
+P:	Oliver Neukum
+M:	oliver@neukum.name
+P:	Ali Akcaagac
+M:	aliakc@web.de
+P:	Jamie Lenehan
+M:	lenehan@twibble.org
+W:	http://twibble.org/dist/dc395x/
+L:	http://lists.twibble.org/mailman/listinfo/dc395x/
+S:	Maintained
+
 DC390/AM53C974 SCSI driver
 P:	Kurt Garloff
 M:	garloff@suse.de
@@ -651,9 +662,11 @@ L:	linux-net@vger.kernel.org
 S:	Maintained
 
 ETHERNET BRIDGE
+P:	Stephen Hemminger
+M:	shemminger@osdl.org
 L:	bridge@math.leidenuniv.nl
 W:	http://bridge.sourceforge.net/
-S:	Unmaintained
+S:	Maintained
 
 ETHERTEAM 16I DRIVER
 P:	Mika Kuoppala

@@ -558,7 +558,7 @@ static void hamachi_timer(unsigned long data);
 static void hamachi_tx_timeout(struct net_device *dev);
 static void hamachi_init_ring(struct net_device *dev);
 static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static inline int hamachi_rx(struct net_device *dev);
 static inline int hamachi_tx(struct net_device *dev);
 static void hamachi_error(struct net_device *dev, int intr_status);
@@ -1367,16 +1367,17 @@ static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
+static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
 	struct hamachi_private *hmp;
 	long ioaddr, boguscnt = max_interrupt_work;
+	int handled = 0;
 
 #ifndef final_version			/* Can never occur. */
 	if (dev == NULL) {
 		printk (KERN_ERR "hamachi_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 #endif
 
@@ -1393,6 +1394,8 @@ static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 
 		if (intr_status == 0)
 			break;
+
+		handled = 1;
 
 		if (intr_status & IntrRxDone)
 			hamachi_rx(dev);
@@ -1466,6 +1469,7 @@ static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 #endif
 
 	spin_unlock(&hmp->lock);
+	return IRQ_RETVAL(handled);
 }
 
 /* This routine is logically part of the interrupt handler, but separated

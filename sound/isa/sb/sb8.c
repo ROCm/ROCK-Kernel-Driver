@@ -70,15 +70,16 @@ struct snd_sb8 {
 
 static snd_card_t *snd_sb8_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
-static void snd_sb8_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_sb8_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sb_t *chip = snd_magic_cast(sb_t, dev_id, return);
+	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
 
 	if (chip->open & SB_OPEN_PCM) {
 		snd_sb8dsp_interrupt(chip);
 	} else {
 		snd_sb8dsp_midi_interrupt(chip);
 	}
+	return IRQ_HANDLED;
 }
 
 static void snd_sb8_free(snd_card_t *card)

@@ -481,16 +481,16 @@ static snd_pcm_uframes_t snd_fm801_capture_pointer(snd_pcm_substream_t * substre
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
-static void snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, dev_id, return);
+	fm801_t *chip = snd_magic_cast(fm801_t, dev_id, return IRQ_NONE);
 	unsigned short status;
 	unsigned int tmp;
 
 	status = inw(FM801_REG(chip, IRQ_STATUS));
 	status &= FM801_IRQ_PLAYBACK|FM801_IRQ_CAPTURE|FM801_IRQ_MPU|FM801_IRQ_VOLUME;
 	if (! status)
-		return;
+		return IRQ_NONE;
 	/* ack first */
 	outw(status, FM801_REG(chip, IRQ_STATUS));
 	if (chip->pcm && (status & FM801_IRQ_PLAYBACK) && chip->playback_substream) {
@@ -525,6 +525,8 @@ static void snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
 	if (status & FM801_IRQ_VOLUME)
 		;/* TODO */
+
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_hardware_t snd_fm801_playback =

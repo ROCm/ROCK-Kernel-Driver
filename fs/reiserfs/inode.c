@@ -1260,7 +1260,6 @@ struct dentry *reiserfs_get_dentry(struct super_block *sb, void *vobjp)
 	    iput(inode);
 	    return ERR_PTR(-ENOMEM);
     }
-    result->d_vfs_flags |= DCACHE_REFERENCED;
     return result;
 }
 

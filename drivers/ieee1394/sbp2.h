@@ -417,11 +417,6 @@ struct scsi_id_instance_data {
  * Sbp2 host data structure (one per sbp2 host)
  */
 struct sbp2scsi_host_info {
-
-	/*
-	 * For use in keeping track of hosts
-	 */
-	struct list_head list;
 	struct hpsb_host *host;
 
 	/*
@@ -463,7 +458,6 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
  * IEEE-1394 core driver related prototypes
  */
 static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host);
-static struct sbp2scsi_host_info *sbp2_find_host_info(struct hpsb_host *host);
 static void sbp2_remove_host(struct hpsb_host *host);
 
 static int sbp2_probe(struct device *dev);

@@ -530,7 +530,6 @@ static int	stl_getportstruct(unsigned long arg);
 static int	stl_getbrdstruct(unsigned long arg);
 static int	stl_waitcarrier(stlport_t *portp, struct file *filp);
 static void	stl_delay(int len);
-static void	stl_intr(int irq, void *dev_id, struct pt_regs *regs);
 static void	stl_eiointr(stlbrd_t *brdp);
 static void	stl_echatintr(stlbrd_t *brdp);
 static void	stl_echmcaintr(stlbrd_t *brdp);
@@ -1017,11 +1016,11 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
 	int		brdnr, panelnr, portnr, rc;
 
 #if DEBUG
-	printk("stl_open(tty=%x,filp=%x): device=%x\n", (int) tty,
-		(int) filp, tty->device);
+	printk("stl_open(tty=%x,filp=%x): device=%s\n", (int) tty,
+		(int) filp, tty->name);
 #endif
 
-	minordev = minor(tty->device);
+	minordev = tty->index;
 	brdnr = MINOR2BRD(minordev);
 	if (brdnr >= stl_nrbrds)
 		return(-ENODEV);
@@ -1090,7 +1089,7 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
  *	previous opens still in effect. If we are a normal serial device
  *	then also we might have to wait for carrier.
  */
-	if (tty->driver.subtype == STL_DRVTYPCALLOUT) {
+	if (tty->driver->subtype == STL_DRVTYPCALLOUT) {
 		if (portp->flags & ASYNC_NORMAL_ACTIVE)
 			return(-EBUSY);
 		if (portp->flags & ASYNC_CALLOUT_ACTIVE) {
@@ -1114,7 +1113,7 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
 	}
 
 	if ((portp->refcount == 1) && (portp->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == STL_DRVTYPSERIAL)
+		if (tty->driver->subtype == STL_DRVTYPSERIAL)
 			*tty->termios = portp->normaltermios;
 		else
 			*tty->termios = portp->callouttermios;
@@ -2085,10 +2084,11 @@ stl_readdone:
  *	calls off to the approrpriate board interrupt handlers.
  */
 
-static void stl_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t stl_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	stlbrd_t	*brdp;
 	int		i;
+	int handled = 0;
 
 #if DEBUG
 	printk("stl_intr(irq=%d,regs=%x)\n", irq, (int) regs);
@@ -2099,8 +2099,10 @@ static void stl_intr(int irq, void *dev_id, struct pt_regs *regs)
 			continue;
 		if (brdp->state == 0)
 			continue;
+		handled = 1;
 		(* brdp->isr)(brdp);
 	}
+	return IRQ_RETVAL(handled);
 }
 
 /*****************************************************************************/

@@ -477,7 +477,6 @@ static char ibm_ansi_order = 1;
 static char ibm_ansi_order = 0;
 #endif
 
-static void interrupt_handler(int, void *, struct pt_regs *);
 static void issue_cmd(int, unsigned long, unsigned char);
 static void internal_done(Scsi_Cmnd * cmd);
 static void check_devices(int, int);
@@ -501,7 +500,8 @@ static int option_setup(char *);
 static int ldn_access_load(int, int);
 static int ldn_access_total_read_write(int);
 
-static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t interrupt_handler(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	int host_index, ihost_index;
 	unsigned int intr_reg;
@@ -517,7 +517,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 	/* return if some other device on this IRQ caused the interrupt */
 	if (!hosts[host_index]) {
 		spin_unlock(dev->host_lock);
-		return;
+		return IRQ_NONE;
 	}
 
 	/* the reset-function already did all the job, even ints got
@@ -525,7 +525,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 	if ((reset_status(host_index) == IM_RESET_NOT_IN_PROGRESS_NO_INT) || (reset_status(host_index) == IM_RESET_FINISHED_OK_NO_INT)) {
 		reset_status(host_index) = IM_RESET_NOT_IN_PROGRESS;
 		spin_unlock(dev->host_lock);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/*must wait for attention reg not busy, then send EOI to subsystem */
@@ -612,7 +612,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 		reset_status(ihost_index) = IM_RESET_FINISHED_OK;
 		last_scsi_command(ihost_index)[ldn] = NO_SCSI;
 		spin_unlock(dev->host_lock);
-		return;
+		return IRQ_HANDLED;
 	}
 	/* handling of commands coming from upper level of scsi driver */
 	if (last_scsi_type(ihost_index)[ldn] == IM_IMM_CMD) {
@@ -632,7 +632,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 			last_scsi_command(ihost_index)[ldn] = NO_SCSI;
 			last_scsi_type(ihost_index)[ldn] = 0;
 			spin_unlock(dev->host_lock);
-			return;
+			return IRQ_HANDLED;
 		} else if (last_scsi_command(ihost_index)[ldn] == IM_ABORT_IMM_CMD) {
 			/* react on SCSI abort command */
 #ifdef IM_DEBUG_PROBE
@@ -652,7 +652,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 			if (cmd->scsi_done)
 				(cmd->scsi_done) (cmd);	/* should be the internal_done */
 			spin_unlock(dev->host_lock);
-			return;
+			return IRQ_HANDLED;
 		} else {
 			disk_rw_in_progress = 0;
 			PS2_DISK_LED_OFF();
@@ -660,7 +660,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 			stat_result(ihost_index) = cmd_result;
 			last_scsi_command(ihost_index)[ldn] = NO_SCSI;
 			spin_unlock(dev->host_lock);
-			return;
+			return IRQ_HANDLED;
 		}
 	}
 	last_scsi_command(ihost_index)[ldn] = NO_SCSI;
@@ -671,7 +671,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 	if (cmd) {
 		if ((cmd->target == TIMEOUT_PUN) && (cmd->device->lun == TIMEOUT_LUN)) {
 			printk("IBM MCA SCSI: Ignoring interrupt from pun=%x, lun=%x.\n", cmd->target, cmd->device->lun);
-			return;
+			return IRQ_HANDLED;
 		}
 	}
 #endif
@@ -679,7 +679,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 	if (!cmd)
 	{
 		spin_unlock(dev->host_lock);
-		return;
+		return IRQ_HANDLED;
 	}
 
 #ifdef IM_DEBUG_INT
@@ -710,7 +710,7 @@ static void interrupt_handler(int irq, void *dev_id, struct pt_regs *regs)
 	if (cmd->scsi_done)
 		(cmd->scsi_done) (cmd);
 	spin_unlock(dev->host_lock);
-	return;
+	return IRQ_HANDLED;
 }
 
 static void issue_cmd(int host_index, unsigned long cmd_reg, unsigned char attn_reg)

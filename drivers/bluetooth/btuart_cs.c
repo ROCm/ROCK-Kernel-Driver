@@ -294,7 +294,7 @@ static void btuart_receive(btuart_info_t *info)
 
 		}
 
-		/* Make sure we don't stay here to long */
+		/* Make sure we don't stay here too long */
 		if (boguscount++ > 16)
 			break;
 
@@ -343,7 +343,7 @@ void btuart_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 			break;
 		}
 
-		/* Make sure we don't stay here to long */
+		/* Make sure we don't stay here too long */
 		if (boguscount++ > 100)
 			break;
 

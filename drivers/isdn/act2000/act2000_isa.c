@@ -69,7 +69,7 @@ act2000_isa_detect(unsigned short portbase)
         return ret;
 }
 
-static void
+static irqreturn_t
 act2000_isa_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         act2000_card *card = irq2card_map[irq];
@@ -78,7 +78,7 @@ act2000_isa_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         if (!card) {
                 printk(KERN_WARNING
                        "act2000: Spurious interrupt!\n");
-                return;
+                return IRQ_NONE;
         }
         istatus = (inb(ISA_PORT_ISR) & 0x07);
         if (istatus & ISA_ISR_OUT) {
@@ -95,6 +95,7 @@ act2000_isa_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         }
 	if (istatus)
 		printk(KERN_DEBUG "act2000: ?IRQ %d %02x\n", irq, istatus);
+	return IRQ_HANDLED;
 }
 
 static void

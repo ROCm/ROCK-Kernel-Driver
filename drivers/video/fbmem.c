@@ -25,6 +25,7 @@
 #include <linux/mman.h>
 #include <linux/tty.h>
 #include <linux/init.h>
+#include <linux/linux_logo.h>
 #include <linux/proc_fs.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
@@ -655,7 +656,7 @@ int fb_prepare_logo(struct fb_info *info)
 	}
 
 	/* Return if no suitable logo was found */
-	fb_logo.logo = find_logo(info->var.bits_per_pixel);
+	fb_logo.logo = fb_find_logo(info->var.bits_per_pixel);
 	
 	if (!fb_logo.logo || fb_logo.logo->height > info->var.yres) {
 		fb_logo.logo = NULL;
@@ -752,7 +753,7 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 	for (fi = registered_fb; fi < &registered_fb[FB_MAX] && len < 4000; fi++)
 		if (*fi)
 			clen += sprintf(buf + clen, "%d %s\n",
-				        minor((*fi)->node),
+				        (*fi)->node,
 				        (*fi)->fix.id);
 	*start = buf + offset;
 	if (clen > offset)
@@ -1222,7 +1223,7 @@ register_framebuffer(struct fb_info *fb_info)
 	for (i = 0 ; i < FB_MAX; i++)
 		if (!registered_fb[i])
 			break;
-	fb_info->node = mk_kdev(FB_MAJOR, i);
+	fb_info->node = i;
 	
 	if (fb_info->pixmap.addr == NULL) {
 		fb_info->pixmap.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
@@ -1264,7 +1265,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 {
 	int i;
 
-	i = minor(fb_info->node);
+	i = fb_info->node;
 	if (!registered_fb[i])
 		return -EINVAL;
 	devfs_remove("fb/%d", i);

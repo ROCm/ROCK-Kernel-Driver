@@ -815,7 +815,7 @@ static unsigned long io_port[] = {
 /* But transfer orientation from the 16 bit data register is Little Endian */
 #define REG2H(x)   le16_to_cpu(x)
 
-static void do_interrupt_handler(int, void *, struct pt_regs *);
+static irqreturn_t do_interrupt_handler(int, void *, struct pt_regs *);
 static void flush_dev(Scsi_Device *, unsigned long, unsigned int, unsigned int);
 static int do_trace = FALSE;
 static int setup_done = FALSE;
@@ -2332,16 +2332,19 @@ static void ihdlr(int irq, unsigned int j) {
    return;
 }
 
-static void do_interrupt_handler(int irq, void *shap, struct pt_regs *regs) {
+static irqreturn_t do_interrupt_handler(int irq, void *shap,
+					struct pt_regs *regs) {
    unsigned int j;
    unsigned long spin_flags;
 
    /* Check if the interrupt must be processed by this handler */
-   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return;
+   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards)
+	return IRQ_NONE;
 
    spin_lock_irqsave(sh[j]->host_lock, spin_flags);
    ihdlr(irq, j);
    spin_unlock_irqrestore(sh[j]->host_lock, spin_flags);
+   return IRQ_HANDLED;
 }
 
 static int eata2x_release(struct Scsi_Host *shpnt) {

@@ -37,7 +37,7 @@ struct pt_regs;
 struct hw_interrupt_type;
 struct irqaction;
 
-#define irq_cannonicalize(irq)	(irq)
+#define irq_canonicalize(irq)	(irq)
 
 /* Initialize irq handling for IRQs.
    BASE_IRQ, BASE_IRQ+INTERVAL, ..., BASE_IRQ+NUM*INTERVAL

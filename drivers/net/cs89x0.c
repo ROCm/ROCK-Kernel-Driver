@@ -218,7 +218,7 @@ extern int cs89x0_probe(struct net_device *dev);
 static int cs89x0_probe1(struct net_device *dev, int ioaddr);
 static int net_open(struct net_device *dev);
 static int net_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void set_multicast_list(struct net_device *dev);
 static void net_timeout(struct net_device *dev);
 static void net_rx(struct net_device *dev);
@@ -1401,12 +1401,13 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 /* The typical workload of the driver:
    Handle the network interface interrupts. */
    
-static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 	struct net_local *lp;
 	int ioaddr, status;
- 
+ 	int handled = 0;
+
 	ioaddr = dev->base_addr;
 	lp = (struct net_local *)dev->priv;
 
@@ -1419,6 +1420,7 @@ static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
            vista, baby!  */
 	while ((status = readword(dev, ISQ_PORT))) {
 		if (net_debug > 4)printk("%s: event=%04x\n", dev->name, status);
+		handled = 1;
 		switch(status & ISQ_EVENT_MASK) {
 		case ISQ_RECEIVER_EVENT:
 			/* Got a packet(s). */
@@ -1485,6 +1487,7 @@ static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			break;
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 static void

@@ -32,7 +32,7 @@
 /***************************************************/
 /* The cards interrupt handler. Called from system */
 /***************************************************/
-static void
+static irqreturn_t
 ergo_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	hysdn_card *card = dev_id;	/* parameter from irq */
@@ -41,16 +41,16 @@ ergo_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	uchar volatile b;
 
 	if (!card)
-		return;		/* error -> spurious interrupt */
+		return IRQ_NONE;		/* error -> spurious interrupt */
 	if (!card->irq_enabled)
-		return;		/* other device interrupting or irq switched off */
+		return IRQ_NONE;		/* other device interrupting or irq switched off */
 
 	save_flags(flags);
 	cli();			/* no further irqs allowed */
 
 	if (!(bytein(card->iobase + PCI9050_INTR_REG) & PCI9050_INTR_REG_STAT1)) {
 		restore_flags(flags);	/* restore old state */
-		return;		/* no interrupt requested by E1 */
+		return IRQ_NONE;		/* no interrupt requested by E1 */
 	}
 	/* clear any pending ints on the board */
 	dpr = card->dpram;
@@ -62,6 +62,7 @@ ergo_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	if (!card->hw_lock)
 		schedule_work(&card->irq_queue);
 	restore_flags(flags);
+	return IRQ_HANDLED;
 }				/* ergo_interrupt */
 
 /******************************************************************************/

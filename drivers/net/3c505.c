@@ -259,7 +259,7 @@ static inline unsigned int backlog_next(unsigned int n)
 
 static inline int get_status(unsigned int base_addr)
 {
-	int timeout = jiffies + 10*HZ/100;
+	unsigned long timeout = jiffies + 10*HZ/100;
 	register int stat1;
 	do {
 		stat1 = inb_status(base_addr);
@@ -283,7 +283,7 @@ static int start_receive(struct net_device *, pcb_struct *);
 
 inline static void adapter_reset(struct net_device *dev)
 {
-	int timeout;
+	unsigned long timeout;
 	elp_device *adapter = dev->priv;
 	unsigned char orig_hcr = adapter->hcr_val;
 
@@ -343,7 +343,7 @@ static inline void check_3c505_dma(struct net_device *dev)
 /* Primitive functions used by send_pcb() */
 static inline unsigned int send_pcb_slow(unsigned int base_addr, unsigned char byte)
 {
-	unsigned int timeout;
+	unsigned long timeout;
 	outb_command(byte, base_addr);
 	for (timeout = jiffies + 5*HZ/100; time_before(jiffies, timeout);) {
 		if (inb_status(base_addr) & HCRE)
@@ -402,7 +402,7 @@ static inline void prime_rx(struct net_device *dev)
 static int send_pcb(struct net_device *dev, pcb_struct * pcb)
 {
 	int i;
-	int timeout;
+	unsigned long timeout;
 	elp_device *adapter = dev->priv;
 	unsigned long flags;
 
@@ -488,7 +488,7 @@ static int receive_pcb(struct net_device *dev, pcb_struct * pcb)
 	int i, j;
 	int total_length;
 	int stat;
-	int timeout;
+	unsigned long timeout;
 	unsigned long flags;
 
 	elp_device *adapter = dev->priv;
@@ -662,14 +662,14 @@ static void receive_packet(struct net_device *dev, int len)
  *
  ******************************************************/
 
-static void elp_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
+static irqreturn_t elp_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 {
 	int len;
 	int dlen;
 	int icount = 0;
 	struct net_device *dev;
 	elp_device *adapter;
-	int timeout;
+	unsigned long timeout;
 
 	dev = dev_id;
 	adapter = (elp_device *) dev->priv;
@@ -855,6 +855,7 @@ static void elp_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 	 * indicate no longer in interrupt routine
 	 */
 	spin_unlock(&adapter->lock);
+	return IRQ_HANDLED;
 }
 
 
@@ -947,7 +948,7 @@ static int elp_open(struct net_device *dev)
 	if (!send_pcb(dev, &adapter->tx_pcb))
 		printk("%s: couldn't send memory configuration command\n", dev->name);
 	else {
-		int timeout = jiffies + TIMEOUT;
+		unsigned long timeout = jiffies + TIMEOUT;
 		while (adapter->got[CMD_CONFIGURE_ADAPTER_MEMORY] == 0 && time_before(jiffies, timeout));
 		if (time_after_eq(jiffies, timeout))
 			TIMEOUT_MSG(__LINE__);
@@ -966,7 +967,7 @@ static int elp_open(struct net_device *dev)
 	if (!send_pcb(dev, &adapter->tx_pcb))
 		printk("%s: couldn't send 82586 configure command\n", dev->name);
 	else {
-		int timeout = jiffies + TIMEOUT;
+		unsigned long timeout = jiffies + TIMEOUT;
 		while (adapter->got[CMD_CONFIGURE_82586] == 0 && time_before(jiffies, timeout));
 		if (time_after_eq(jiffies, timeout))
 			TIMEOUT_MSG(__LINE__);
@@ -1150,7 +1151,7 @@ static struct net_device_stats *elp_get_stats(struct net_device *dev)
 	if (!send_pcb(dev, &adapter->tx_pcb))
 		printk("%s: couldn't send get statistics command\n", dev->name);
 	else {
-		int timeout = jiffies + TIMEOUT;
+		unsigned long timeout = jiffies + TIMEOUT;
 		while (adapter->got[CMD_NETWORK_STATISTICS] == 0 && time_before(jiffies, timeout));
 		if (time_after_eq(jiffies, timeout)) {
 			TIMEOUT_MSG(__LINE__);
@@ -1317,7 +1318,7 @@ static void elp_set_mc_list(struct net_device *dev)
 		if (!send_pcb(dev, &adapter->tx_pcb))
 			printk("%s: couldn't send set_multicast command\n", dev->name);
 		else {
-			int timeout = jiffies + TIMEOUT;
+			unsigned long timeout = jiffies + TIMEOUT;
 			while (adapter->got[CMD_LOAD_MULTICAST_LIST] == 0 && time_before(jiffies, timeout));
 			if (time_after_eq(jiffies, timeout)) {
 				TIMEOUT_MSG(__LINE__);
@@ -1344,7 +1345,7 @@ static void elp_set_mc_list(struct net_device *dev)
 		printk("%s: couldn't send 82586 configure command\n", dev->name);
 	}
 	else {
-		int timeout = jiffies + TIMEOUT;
+		unsigned long timeout = jiffies + TIMEOUT;
 		spin_unlock_irqrestore(&adapter->lock, flags);
 		while (adapter->got[CMD_CONFIGURE_82586] == 0 && time_before(jiffies, timeout));
 		if (time_after_eq(jiffies, timeout))
@@ -1396,10 +1397,8 @@ static inline void elp_init(struct net_device *dev)
 
 static int __init elp_sense(struct net_device *dev)
 {
-	int timeout;
 	int addr = dev->base_addr;
 	const char *name = dev->name;
-	unsigned long flags;
 	byte orig_HSR;
 
 	if (!request_region(addr, ELP_IO_EXTENT, "3c505"))
@@ -1506,7 +1505,8 @@ static int __init elp_autodetect(struct net_device *dev)
 int __init elplus_probe(struct net_device *dev)
 {
 	elp_device *adapter;
-	int i, tries, tries1, timeout, okay;
+	int i, tries, tries1, okay;
+	unsigned long timeout;
 	unsigned long cookie = 0;
 
 	SET_MODULE_OWNER(dev);

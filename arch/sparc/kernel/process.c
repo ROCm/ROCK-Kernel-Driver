@@ -377,58 +377,10 @@ void flush_thread(void)
 		current->thread.flags &= ~SPARC_FLAG_KTHREAD;
 
 		/* We must fixup kregs as well. */
+		/* XXX This was not fixed for ti for a while, worked. Unused? */
 		current->thread.kregs = (struct pt_regs *)
-			(((unsigned long)current) +
-			 (THREAD_SIZE - TRACEREG_SZ));
+		    ((char *)current->thread_info + (THREAD_SIZE - TRACEREG_SZ));
 	}
-}
-
-static __inline__ void copy_regs(struct pt_regs *dst, struct pt_regs *src)
-{
-	__asm__ __volatile__("ldd\t[%1 + 0x00], %%g2\n\t"
-			     "ldd\t[%1 + 0x08], %%g4\n\t"
-			     "ldd\t[%1 + 0x10], %%o4\n\t"
-			     "std\t%%g2, [%0 + 0x00]\n\t"
-			     "std\t%%g4, [%0 + 0x08]\n\t"
-			     "std\t%%o4, [%0 + 0x10]\n\t"
-			     "ldd\t[%1 + 0x18], %%g2\n\t"
-			     "ldd\t[%1 + 0x20], %%g4\n\t"
-			     "ldd\t[%1 + 0x28], %%o4\n\t"
-			     "std\t%%g2, [%0 + 0x18]\n\t"
-			     "std\t%%g4, [%0 + 0x20]\n\t"
-			     "std\t%%o4, [%0 + 0x28]\n\t"
-			     "ldd\t[%1 + 0x30], %%g2\n\t"
-			     "ldd\t[%1 + 0x38], %%g4\n\t"
-			     "ldd\t[%1 + 0x40], %%o4\n\t"
-			     "std\t%%g2, [%0 + 0x30]\n\t"
-			     "std\t%%g4, [%0 + 0x38]\n\t"
-			     "ldd\t[%1 + 0x48], %%g2\n\t"
-			     "std\t%%o4, [%0 + 0x40]\n\t"
-			     "std\t%%g2, [%0 + 0x48]\n\t" : :
-			     "r" (dst), "r" (src) :
-			     "g2", "g3", "g4", "g5", "o4", "o5");
-}
-
-static __inline__ void copy_regwin(struct reg_window *dst, struct reg_window *src)
-{
-	__asm__ __volatile__("ldd\t[%1 + 0x00], %%g2\n\t"
-			     "ldd\t[%1 + 0x08], %%g4\n\t"
-			     "ldd\t[%1 + 0x10], %%o4\n\t"
-			     "std\t%%g2, [%0 + 0x00]\n\t"
-			     "std\t%%g4, [%0 + 0x08]\n\t"
-			     "std\t%%o4, [%0 + 0x10]\n\t"
-			     "ldd\t[%1 + 0x18], %%g2\n\t"
-			     "ldd\t[%1 + 0x20], %%g4\n\t"
-			     "ldd\t[%1 + 0x28], %%o4\n\t"
-			     "std\t%%g2, [%0 + 0x18]\n\t"
-			     "std\t%%g4, [%0 + 0x20]\n\t"
-			     "std\t%%o4, [%0 + 0x28]\n\t"
-			     "ldd\t[%1 + 0x30], %%g2\n\t"
-			     "ldd\t[%1 + 0x38], %%g4\n\t"
-			     "std\t%%g2, [%0 + 0x30]\n\t"
-			     "std\t%%g4, [%0 + 0x38]\n\t" : :
-			     "r" (dst), "r" (src) :
-			     "g2", "g3", "g4", "g5", "o4", "o5");
 }
 
 static __inline__ struct sparc_stackf *
@@ -495,8 +447,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 {
 	struct thread_info *ti = p->thread_info;
 	struct pt_regs *childregs;
-	struct reg_window *new_stack;
-	unsigned long stack_offset;
+	char *new_stack;
 
 #ifndef CONFIG_SMP
 	if(last_task_used_math == current) {
@@ -513,15 +464,18 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 	p->set_child_tid = p->clear_child_tid = NULL;
 
-	/* Calculate offset to stack_frame & pt_regs */
-	stack_offset = THREAD_SIZE - TRACEREG_SZ;
-
-	if(regs->psr & PSR_PS)
-		stack_offset -= REGWIN_SZ;
-	childregs = ((struct pt_regs *) (((unsigned long)ti) + stack_offset));
-	copy_regs(childregs, regs);
-	new_stack = (((struct reg_window *) childregs) - 1);
-	copy_regwin(new_stack, (((struct reg_window *) regs) - 1));
+	/*
+	 *  p->thread_info         new_stack   childregs
+	 *  !                      !           !             {if(PSR_PS) }
+	 *  V                      V (stk.fr.) V  (pt_regs)  { (stk.fr.) }
+	 *  +----- - - - - - ------+===========+============={+==========}+
+	 */
+	new_stack = (char*)ti + THREAD_SIZE;
+	if (regs->psr & PSR_PS)
+		new_stack -= STACKFRAME_SZ;
+	new_stack -= STACKFRAME_SZ + TRACEREG_SZ;
+	memcpy(new_stack, (char *)regs - STACKFRAME_SZ, STACKFRAME_SZ + TRACEREG_SZ);
+	childregs = (struct pt_regs *) (new_stack + STACKFRAME_SZ);
 
 	/*
 	 * A new process must start with interrupts closed in 2.5,
@@ -542,14 +496,11 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		extern struct pt_regs fake_swapper_regs;
 
 		p->thread.kregs = &fake_swapper_regs;
-		new_stack = (struct reg_window *)
-			((((unsigned long)ti) + (THREAD_SIZE)) - REGWIN_SZ);
+		new_stack += STACKFRAME_SZ + TRACEREG_SZ;
 		childregs->u_regs[UREG_FP] = (unsigned long) new_stack;
 		p->thread.flags |= SPARC_FLAG_KTHREAD;
 		p->thread.current_ds = KERNEL_DS;
-		memcpy((void *)new_stack,
-		       (void *)regs->u_regs[UREG_FP],
-		       sizeof(struct reg_window));
+		memcpy(new_stack, (void *)regs->u_regs[UREG_FP], STACKFRAME_SZ);
 		childregs->u_regs[UREG_G6] = (unsigned long) ti;
 	} else {
 		p->thread.kregs = childregs;

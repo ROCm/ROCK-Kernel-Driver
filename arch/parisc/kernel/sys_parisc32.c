@@ -1131,7 +1131,7 @@ asmlinkage long sys32_msgrcv(int msqid,
 struct nfsctl_export32 {
 	char		ex_client[NFSCLNT_IDMAX+1];
 	char		ex_path[NFS_MAXPATHLEN+1];
-	__kernel_dev_t	ex_dev;
+	__kernel_old_dev_t ex_dev;
 	compat_ino_t	ex_ino;
 	int		ex_flags;
 	__kernel_uid_t	ex_anon_uid;

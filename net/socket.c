@@ -69,8 +69,6 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/wanrouter.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
 #include <linux/if_bridge.h>
 #include <linux/init.h>
 #include <linux/poll.h>
@@ -142,6 +140,36 @@ static struct file_operations socket_file_ops = {
  */
 
 static struct net_proto_family *net_families[NPROTO];
+
+static __inline__ void net_family_bug(int family)
+{
+	printk(KERN_ERR "%d is not yet sock_registered!\n", family);
+	BUG();
+}
+
+int net_family_get(int family)
+{
+	struct net_proto_family *prot = net_families[family];
+	int rc = 1;
+
+	barrier();
+	if (likely(prot != NULL))
+		rc = try_module_get(prot->owner);
+	else
+		net_family_bug(family);
+	return rc;
+}
+
+void net_family_put(int family)
+{
+	struct net_proto_family *prot = net_families[family];
+
+	barrier();
+	if (likely(prot != NULL))
+		module_put(prot->owner);
+	else
+		net_family_bug(family);
+}
 
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 static atomic_t net_family_lockct = ATOMIC_INIT(0);
@@ -506,8 +534,13 @@ struct file_operations bad_sock_fops = {
  
 void sock_release(struct socket *sock)
 {
-	if (sock->ops) 
+	if (sock->ops) {
+		const int family = sock->ops->family;
+
 		sock->ops->release(sock);
+		sock->ops = NULL;
+		net_family_put(family);
+	}
 
 	if (sock->fasync_list)
 		printk(KERN_ERR "sock_release: fasync list not empty!\n");
@@ -1058,11 +1091,12 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 
 	sock->type  = type;
 
+	i = -EBUSY;
+	if (!net_family_get(family))
+		goto out_release;
+
 	if ((i = net_families[family]->create(sock, protocol)) < 0) 
-	{
-		sock_release(sock);
-		goto out;
-	}
+		goto out_release;
 
 	*res = sock;
 	security_socket_post_create(sock, family, type, protocol);
@@ -1070,6 +1104,9 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 out:
 	net_family_read_unlock();
 	return i;
+out_release:
+	sock_release(sock);
+	goto out;
 }
 
 asmlinkage long sys_socket(int family, int type, int protocol)
@@ -1944,17 +1981,6 @@ void __init sock_init(void)
 	 *  do_initcalls is run.  
 	 */
 
-
-	/*
-	 * The netlink device handler may be needed early.
-	 */
-
-#ifdef CONFIG_NET
-	rtnetlink_init();
-#endif
-#ifdef CONFIG_NETLINK_DEV
-	init_netlink();
-#endif
 #ifdef CONFIG_NETFILTER
 	netfilter_init();
 #endif

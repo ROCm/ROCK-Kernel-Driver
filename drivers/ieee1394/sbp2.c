@@ -298,7 +298,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 846 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 896 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
@@ -455,10 +455,6 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 static Scsi_Host_Template scsi_driver_template;
 
 static u8 sbp2_speedto_maxrec[] = { 0x7, 0x8, 0x9 };
-
-static LIST_HEAD(sbp2_host_info_list);
-
-static spinlock_t sbp2_host_info_lock = SPIN_LOCK_UNLOCKED;
 
 static struct hpsb_highlevel *sbp2_hl_handle = NULL;
 
@@ -779,10 +775,9 @@ static struct sbp2_command_info *sbp2util_allocate_command_orb(
 static void sbp2util_free_command_dma(struct sbp2_command_info *command)
 {
 	struct sbp2scsi_host_info *hi;
-	
-	hi = (struct sbp2scsi_host_info *)&command->Current_SCpnt->device->host->hostdata;
 
-	if (hi == NULL) {
+	hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle, (unsigned long)command->Current_SCpnt->device->host);
+	if (!hi) {
 		printk(KERN_ERR "%s: hi == NULL\n", __FUNCTION__);
 		return;
 	}
@@ -911,34 +906,33 @@ static void sbp2_update(struct unit_directory *ud)
 static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 {
 	struct sbp2scsi_host_info *hi;
-	unsigned long flags;
 	struct Scsi_Host *scsi_host;
 
 	SBP2_DEBUG("sbp2_add_host");
 
-	hi = sbp2_find_host_info(host);
+	hi = hpsb_get_hostinfo(sbp2_hl_handle, host);
 	if (hi)
 		return hi;
 
 	/* Register our host with the SCSI stack. */
-	scsi_host = scsi_register (&scsi_driver_template, sizeof(struct sbp2scsi_host_info));
+	scsi_host = scsi_register (&scsi_driver_template, 0);
 	if (!scsi_host) {
 		SBP2_ERR("failed to register scsi host");
 		return NULL;
 	}
 
-	hi = (struct sbp2scsi_host_info *)&scsi_host->hostdata;
-	memset(hi, 0, sizeof(struct sbp2scsi_host_info));
+	hi = hpsb_create_hostinfo(sbp2_hl_handle, host, sizeof(*hi));
+	if (!hi) {
+		SBP2_ERR("failed to allocate hostinfo");
+		scsi_unregister(hi->scsi_host);
+	}
+
+	hpsb_set_hostinfo_key(sbp2_hl_handle, host, (unsigned long)scsi_host);
 
 	hi->scsi_host = scsi_host;
-	INIT_LIST_HEAD(&hi->list);
 	hi->host = host;
 	hi->sbp2_command_lock = SPIN_LOCK_UNLOCKED;
 	hi->scsi_host->max_id = SBP2SCSI_MAX_SCSI_IDS;
-
-	spin_lock_irqsave(&sbp2_host_info_lock, flags);
-	list_add_tail(&hi->list, &sbp2_host_info_list);
-	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
 
 	/* XXX We need a device to pass here as the scsi-host class. Can't
 	 * use the PCI device, since it is already bound to the ieee1394
@@ -946,52 +940,13 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 	 * enabled (scsi-host uses classdata member of the device). */
 	if (scsi_add_host(hi->scsi_host, NULL)) {
 		SBP2_ERR("failed to add scsi host");
-
-		spin_lock_irqsave(&sbp2_host_info_lock, flags);
-		list_del(&hi->list);
-		spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
-
 		scsi_unregister(hi->scsi_host);
+		hpsb_destroy_hostinfo(sbp2_hl_handle, host);
 	}
 
 	return hi;
 }
 
-/*
- * This fuction returns a host info structure from the host structure, in
- * case we have multiple hosts.
- */
-static struct sbp2scsi_host_info *sbp2_find_host_info(struct hpsb_host *host)
-{
-	struct list_head *lh;
-	struct sbp2scsi_host_info *hi;
-
-	list_for_each (lh, &sbp2_host_info_list) {
-		hi = list_entry(lh, struct sbp2scsi_host_info, list);
-		if (hi->host == host)
-			return hi;
-	}
-
-	return NULL;
-}
-
-/*
- * This function returns a host info structure for a given Scsi_Host
- * struct.
- */
-static struct sbp2scsi_host_info *sbp2_find_host_info_scsi(struct Scsi_Host *host)
-{
-	struct list_head *lh;
-	struct sbp2scsi_host_info *hi;
-
-	list_for_each (lh, &sbp2_host_info_list) {
-		hi = list_entry(lh, struct sbp2scsi_host_info, list);
-		if (hi->scsi_host == host)
-			return hi;
-	}
-
-	return NULL;
-}
 
 /*
  * This function is called when a host is removed.
@@ -999,20 +954,16 @@ static struct sbp2scsi_host_info *sbp2_find_host_info_scsi(struct Scsi_Host *hos
 static void sbp2_remove_host(struct hpsb_host *host)
 {
 	struct sbp2scsi_host_info *hi;
-	unsigned long flags;
 
 	SBP2_DEBUG("sbp2_remove_host");
 
-	spin_lock_irqsave(&sbp2_host_info_lock, flags);
-	hi = sbp2_find_host_info(host);
-	if (hi)
-		list_del(&hi->list);
-	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
+	hi = hpsb_get_hostinfo(sbp2_hl_handle, host);
 
 	if (hi) {
 		scsi_remove_host(hi->scsi_host);
 		scsi_unregister(hi->scsi_host);
-	}
+	} else
+		SBP2_ERR("attempt to remove unknown host %p", host);
 }
 
 /*
@@ -2614,9 +2565,7 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 		return(RCODE_ADDRESS_ERROR);
 	}
 
-	spin_lock_irqsave(&sbp2_host_info_lock, flags);
-	hi = sbp2_find_host_info(host);
-	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
+	hi = hpsb_get_hostinfo(sbp2_hl_handle, host);
 
 	if (!hi) {
 		SBP2_ERR("host info is NULL - this is bad!");
@@ -2763,7 +2712,7 @@ static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/*
 	 * Pull our host info and scsi id instance data from the scsi command
 	 */
-	hi = (struct sbp2scsi_host_info *) &SCpnt->device->host->hostdata;
+	hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle, (unsigned long)SCpnt->device->host);
 
 	if (!hi) {
 		SBP2_ERR("sbp2scsi_host_info is NULL - this is bad!");
@@ -2992,7 +2941,8 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
  */
 static int sbp2scsi_abort (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *)&SCpnt->device->host->hostdata;
+	struct sbp2scsi_host_info *hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle,
+								(unsigned long)SCpnt->device->host);
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 	struct sbp2_command_info *command;
 	unsigned long flags;
@@ -3042,7 +2992,8 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
  */
 static int sbp2scsi_reset (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *)&SCpnt->device->host->hostdata;
+	struct sbp2scsi_host_info *hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle,
+								(unsigned long)SCpnt->device->host);
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 
 	SBP2_ERR("reset requested");
@@ -3080,7 +3031,7 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 	if (!host)  /* if we couldn't find it, we return an error */
 		return -ESRCH;
 
-	hi = sbp2_find_host_info_scsi(host);
+	hi = hpsb_get_hostinfo_bykey(sbp2_hl_handle, (unsigned long)host);
 	if (!hi) /* shouldn't happen, but... */
 		return -ESRCH;
 
@@ -3089,10 +3040,10 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 	SPRINTF("Driver version         : %s\n", version);
 
 	SPRINTF("\nModule options         :\n");
-	SPRINTF("  max_speed       : %s\n", hpsb_speedto_str[max_speed]);
-	SPRINTF("  max_sectors     : %d\n", max_sectors);
-	SPRINTF("  serialize_io    : %s\n", serialize_io ? "yes" : "no");
-	SPRINTF("  exclusive_login : %s\n", exclusive_login ? "yes" : "no");
+	SPRINTF("  max_speed            : %s\n", hpsb_speedto_str[max_speed]);
+	SPRINTF("  max_sectors          : %d\n", max_sectors);
+	SPRINTF("  serialize_io         : %s\n", serialize_io ? "yes" : "no");
+	SPRINTF("  exclusive_login      : %s\n", exclusive_login ? "yes" : "no");
 
 	SPRINTF("\nAttached devices       : %s\n", !list_empty(&host->my_devices) ?
 		"" : "none");

@@ -1143,7 +1143,7 @@ static void amifb_deinit(void);
 	 */
 
 static int flash_cursor(void);
-static void amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
+static irqreturn_t amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
 static u_long chipalloc(u_long size);
 static void chipfree(void);
 
@@ -2385,7 +2385,6 @@ default_chipset:
 	    fb_info.monspecs.vfmax = 90;
 	}
 
-	fb_info.node = NODEV;
 	fb_info.fbops = &amifb_ops;
 	fb_info.par = &currentpar;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
@@ -2453,7 +2452,7 @@ default_chipset:
 	}
 
 	printk("fb%d: %s frame buffer device, using %dK of video memory\n",
-	       minor(fb_info.node), fb_info.fix.id, fb_info.fix.smem_len>>10);
+	       fb_info.node, fb_info.fix.id, fb_info.fix.smem_len>>10);
 
 	return 0;
 
@@ -2504,7 +2503,7 @@ static int flash_cursor(void)
 	 * VBlank Display Interrupt
 	 */
 
-static void amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 {
 	if (do_vmode_pan || do_vmode_full)
 		ami_update_display();
@@ -2534,6 +2533,7 @@ static void amifb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 		ami_reinit_copper();
 		do_vmode_full = 0;
 	}
+	return IRQ_HANDLED;
 }
 
 /* --------------------------- Hardware routines --------------------------- */

@@ -249,7 +249,7 @@ struct _snd_es1938 {
 #endif
 };
 
-static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static struct pci_device_id snd_es1938_ids[] __devinitdata = {
         { 0x125d, 0x1969, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* Solo-1 */
@@ -1490,10 +1490,11 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 /* --------------------------------------------------------------------
  * Interrupt handler
  * -------------------------------------------------------------------- */
-static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, dev_id, return);
+	es1938_t *chip = snd_magic_cast(es1938_t, dev_id, return IRQ_NONE);
 	unsigned char status, audiostatus;
+	int handled = 0;
 
 	status = inb(SLIO_REG(chip, IRQCONTROL));
 #if 0
@@ -1509,6 +1510,7 @@ static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		printk("Es1938debug - AUDIO channel 1 DMAC DMA status: 0x%x\n", inl(SLDM_REG(chip, DMASTATUS)));
 #endif
 		/* clear irq */
+		handled = 1;
 		audiostatus = inb(SLSB_REG(chip, STATUS));
 		if (chip->active & ADC1)
 			snd_pcm_period_elapsed(chip->capture_substream);
@@ -1525,6 +1527,7 @@ static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 #endif
 		/* clear irq */
+		handled = 1;
 		snd_es1938_mixer_bits(chip, ESSSB_IREG_AUDIO2CONTROL2, 0x80, 0);
 		if (chip->active & DAC2)
 			snd_pcm_period_elapsed(chip->playback1_substream);
@@ -1533,6 +1536,7 @@ static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* Hardware volume */
 	if (status & 0x40) {
 		int split = snd_es1938_mixer_read(chip, 0x64) & 0x80;
+		handled = 1;
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE, &chip->hw_switch->id);
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE, &chip->hw_volume->id);
 		if (!split) {
@@ -1546,9 +1550,12 @@ static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* MPU401 */
 	if (status & 0x80) {
 		// snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0); /* ack? */
-		if (chip->rmidi)
+		if (chip->rmidi) {
+			handled = 1;
 			snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
+		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 #define ES1938_DMA_SIZE 64

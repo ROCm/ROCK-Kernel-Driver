@@ -62,7 +62,8 @@ struct nkbd {
 	char phys[32];
 };
 
-void nkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+irqreturn_t nkbd_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct nkbd *nkbd = serio->private;
 
@@ -75,6 +76,7 @@ void nkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags,
 
 	else if (data == 0xe7) /* end of init sequence */
 		printk(KERN_INFO "input: %s on %s\n", nkbd_name, serio->phys);
+	return IRQ_HANDLED;
 
 }
 

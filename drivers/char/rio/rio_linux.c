@@ -293,7 +293,7 @@ struct miscdevice rio_fw_device = {
 /* This doesn't work. Who's paranoid around here? Not me! */
 
 static inline int rio_paranoia_check(struct rio_port const * port,
-				    kdev_t device, const char *routine)
+				    char *name, const char *routine)
 {
 
   static const char *badmagic =
@@ -302,11 +302,11 @@ static inline int rio_paranoia_check(struct rio_port const * port,
     KERN_ERR "rio: Warning: null rio port for device %s in %s\n";
  
   if (!port) {
-    printk (badinfo, cdevname(device), routine);
+    printk (badinfo, name, routine);
     return 1;
   }
   if (port->magic != RIO_MAGIC) {
-    printk (badmagic, cdevname(device), routine);
+    printk (badmagic, name, routine);
     return 1;
   }
 
@@ -372,18 +372,15 @@ int RIODelay_ni (struct Port *PortP, int njiffies)
 }
 
 
-int rio_minor (kdev_t device)
+int rio_minor(struct tty_struct *tty)
 {
-  return minor (device) + 
-    256 * ((major (device) == RIO_NORMAL_MAJOR1) ||
-	   (major (device) == RIO_CALLOUT_MAJOR1));
+	return tty->index + (tty->driver->termios - rio_termios);
 }
 
 
-int rio_ismodem (kdev_t device)
+int rio_ismodem(struct tty_struct *tty)
 {
-  return (major (device) == RIO_NORMAL_MAJOR0) ||
-         (major (device) == RIO_NORMAL_MAJOR1);
+	return tty->driver == &rio_driver || tty->driver == &rio_driver2;
 }
 
 
@@ -423,7 +420,7 @@ static int rio_set_real_termios (void *ptr)
 
   tty = ((struct Port *)ptr)->gs.tty;
 
-  modem = (major(tty->device) == RIO_NORMAL_MAJOR0) || (major(tty->device) == RIO_NORMAL_MAJOR1);
+  modem = rio_ismodem(tty);
 
   rv = RIOParam( (struct Port *) ptr, CONFIG, modem, 1);
 
@@ -448,7 +445,7 @@ void rio_reset_interrupt (struct Host *HostP)
 }
 
 
-static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
+static irqreturn_t rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
 {
   struct Host *HostP;
   func_enter ();
@@ -509,7 +506,7 @@ static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
   if (test_and_set_bit (RIO_BOARD_INTR_LOCK, &HostP->locks)) {
     printk (KERN_ERR "Recursive interrupt! (host %d/irq%d)\n", 
             (int) ptr, HostP->Ivec);
-    return;
+    return IRQ_HANDLED;
   }
 
   RIOServiceHost(p, HostP, irq);
@@ -521,6 +518,7 @@ static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
   rio_dprintk (RIO_DEBUG_IFLOW, "rio: exit rio_interrupt (%d/%d)\n", 
                irq, HostP->Ivec); 
   func_exit ();
+  return IRQ_HANDLED;
 }
 
 
@@ -942,7 +940,9 @@ static int rio_init_drivers(void)
   rio_driver.hangup = gs_hangup;
 
   rio_driver2 = rio_driver;
-  rio_driver.major = RIO_NORMAL_MAJOR1;
+  rio_driver2.major = RIO_NORMAL_MAJOR1;
+  rio_driver2.termios += 256;
+  rio_driver2.termios_locked += 256;
 
   rio_callout_driver = rio_driver;
   rio_callout_driver.name = "cusr";
@@ -951,6 +951,8 @@ static int rio_init_drivers(void)
 
   rio_callout_driver2 = rio_callout_driver;
   rio_callout_driver2.major = RIO_CALLOUT_MAJOR1;
+  rio_callout_driver2.termios += 256;
+  rio_callout_driver2.termios_locked += 256;
 
   rio_dprintk (RIO_DEBUG_INIT, "set_termios = %p\n", gs_set_termios);
 

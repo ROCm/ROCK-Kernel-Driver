@@ -71,19 +71,29 @@
 
 	Versin LK1.06b (D-Link):
 	- New tx scheme, adaptive tx_coalesce
+	
+	Version LK1.07 (D-Link):
+	- Fix tx bugs in big-endian machines
+	- Remove unused max_interrupt_work module parameter, the new 
+	  NAPI-like rx scheme doesn't need it.
+	- Remove redundancy get_stats() in intr_handler(), those 
+	  I/O access could affect performance in ARM-based system
+	- Add Linux software VLAN support
+	
+	Version LK1.08 (D-Link):
+	- Fix bug of custom mac address 
+	(StationAddr register only accept word write) 
 
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.06b"
-#define DRV_RELDATE	"6-Nov-2002"
+#define DRV_VERSION	"1.01+LK1.08a"
+#define DRV_RELDATE	"23-Apr-2003"
 
 
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 static int debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
-/* Maximum events (Rx packets, etc.) to handle at each interrupt. */
-static int max_interrupt_work = 0;
 /* Maximum number of multicast addresses to filter (vs. rx-all-multicast).
    Typical is a 64 element hash table based on the Ethernet CRC.  */
 static int multicast_filter_limit = 32;
@@ -129,8 +139,7 @@ static char *media[MAX_UNITS];
 /* Operational parameters that usually are not changed. */
 /* Time in jiffies before concluding the transmitter is hung. */
 #define TX_TIMEOUT  (4*HZ)
-
-#define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
+#define PKT_BUF_SZ		1536	/* Size of each temporary Rx buffer.*/
 
 #ifndef __KERNEL__
 #define __KERNEL__
@@ -181,12 +190,10 @@ MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Sundance Alta Ethernet driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(debug, "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "s");
 MODULE_PARM(flowctrl, "i");
-MODULE_PARM_DESC(max_interrupt_work, "Sundance Alta maximum events handled per interrupt");
 MODULE_PARM_DESC(debug, "Sundance Alta debug level (0-5)");
 MODULE_PARM_DESC(rx_copybreak, "Sundance Alta copy breakpoint for copy-only-tiny-frames");
 MODULE_PARM_DESC(flowctrl, "Sundance Alta flow control [0|1]");
@@ -495,13 +502,14 @@ static void tx_timeout(struct net_device *dev);
 static void init_ring(struct net_device *dev);
 static int  start_tx(struct sk_buff *skb, struct net_device *dev);
 static int reset_tx (struct net_device *dev);
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void rx_poll(unsigned long data);
 static void tx_poll(unsigned long data);
 static void refill_rx (struct net_device *dev);
 static void netdev_error(struct net_device *dev, int intr_status);
 static void netdev_error(struct net_device *dev, int intr_status);
 static void set_rx_mode(struct net_device *dev);
+static int __set_mac_addr(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  netdev_close(struct net_device *dev);
@@ -847,17 +855,18 @@ static int netdev_open(struct net_device *dev)
 	if (netif_msg_ifup(np))
 		printk(KERN_DEBUG "%s: netdev_open() irq %d.\n",
 			   dev->name, dev->irq);
-
 	init_ring(dev);
 
 	writel(np->rx_ring_dma, ioaddr + RxListPtr);
 	/* The Tx list pointer is written as packets are queued. */
 
-	for (i = 0; i < 6; i++)
-		writeb(dev->dev_addr[i], ioaddr + StationAddr + i);
-
 	/* Initialize other registers. */
+	__set_mac_addr(dev);
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+	writew(dev->mtu + 18, ioaddr + MaxFrameSize);
+#else
 	writew(dev->mtu + 14, ioaddr + MaxFrameSize);
+#endif
 	if (dev->mtu > 2047)
 		writel(readl(ioaddr + ASICCtrl) | 0x0C, ioaddr + ASICCtrl);
 
@@ -879,7 +888,7 @@ static int netdev_open(struct net_device *dev)
 		writeb(0x01, ioaddr + DebugCtrl1);
 	netif_start_queue(dev);
 
-	writew(StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl1);
+	writew (StatsEnable | RxEnable | TxEnable, ioaddr + MACCtrl1);
 
 	if (netif_msg_ifup(np))
 		printk(KERN_DEBUG "%s: Done netdev_open(), status: Rx %x Tx %x "
@@ -951,7 +960,7 @@ static void tx_timeout(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	long flag;
+	unsigned long flag;
 	
 	netif_stop_queue(dev);
 	tasklet_disable(&np->tx_tasklet);
@@ -966,11 +975,11 @@ static void tx_timeout(struct net_device *dev)
 		for (i=0; i<TX_RING_SIZE; i++) {
 			printk(KERN_DEBUG "%02x %08x %08x %08x(%02x) %08x %08x\n", i,
 				np->tx_ring_dma + i*sizeof(*np->tx_ring),	
-				np->tx_ring[i].next_desc,
-				np->tx_ring[i].status,
-				(np->tx_ring[i].status >> 2) & 0xff,
-				np->tx_ring[i].frag[0].addr, 
-				np->tx_ring[i].frag[0].length);
+				le32_to_cpu(np->tx_ring[i].next_desc),
+				le32_to_cpu(np->tx_ring[i].status),
+				(le32_to_cpu(np->tx_ring[i].status) >> 2) & 0xff,
+				le32_to_cpu(np->tx_ring[i].frag[0].addr), 
+				le32_to_cpu(np->tx_ring[i].frag[0].length));
 		}
 		printk(KERN_DEBUG "TxListPtr=%08x netif_queue_stopped=%d\n", 
 			readl(dev->base_addr + TxListPtr), 
@@ -1152,15 +1161,15 @@ reset_tx (struct net_device *dev)
 
 /* The interrupt handler cleans up after the Tx thread, 
    and schedule a Rx thread work */
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
 	struct netdev_private *np;
 	long ioaddr;
-	int boguscnt = max_interrupt_work;
 	int hw_frame_id;
 	int tx_cnt;
 	int tx_status;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 	np = dev->priv;
@@ -1175,6 +1184,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 		if (!(intr_status & DEFAULT_INTR))
 			break;
+
+		handled = 1;
 
 		if (intr_status & (IntrRxDMADone)) {
 			writew(DEFAULT_INTR & ~(IntrRxDone|IntrRxDMADone),
@@ -1226,11 +1237,14 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 				int entry = np->dirty_tx % TX_RING_SIZE;
 				struct sk_buff *skb;
 				int sw_frame_id;
-				sw_frame_id = (np->tx_ring[entry].status >> 2) & 0xff;
-					if (sw_frame_id == hw_frame_id &&
-						!(np->tx_ring[entry].status & 0x00010000))
+				sw_frame_id = (le32_to_cpu(
+					np->tx_ring[entry].status) >> 2) & 0xff;
+				if (sw_frame_id == hw_frame_id &&
+					!(le32_to_cpu(np->tx_ring[entry].status)
+					& 0x00010000))
 						break;
-					if (sw_frame_id == (hw_frame_id + 1) % TX_RING_SIZE)
+				if (sw_frame_id == (hw_frame_id + 1) % 
+					TX_RING_SIZE)
 						break;
 				skb = np->tx_skbuff[entry];
 				/* Free the original skb. */
@@ -1248,7 +1262,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
 				int entry = np->dirty_tx % TX_RING_SIZE;
 				struct sk_buff *skb;
-				if (!(np->tx_ring[entry].status & 0x00010000))
+				if (!(le32_to_cpu(np->tx_ring[entry].status) 
+							& 0x00010000))
 					break;
 				skb = np->tx_skbuff[entry];
 				/* Free the original skb. */
@@ -1271,20 +1286,12 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 		/* Abnormal error summary/uncommon events handlers. */
 		if (intr_status & (IntrPCIErr | LinkChange | StatsMax))
 			netdev_error(dev, intr_status);
-		if (--boguscnt < 0) {
-			get_stats(dev);
-			if (netif_msg_hw(np))
-				printk(KERN_WARNING "%s: Too much work at interrupt, "
-				   "status=0x%4.4x / 0x%4.4x.\n",
-				   dev->name, intr_status, readw(ioaddr + IntrClear));
-			break;
-		}
-	} while (1);
+	} while (0);
 	if (netif_msg_intr(np))
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
 			   dev->name, readw(ioaddr + IntrStatus));
 	writel(5000, ioaddr + DownCounter);
-
+	return IRQ_RETVAL(handled);
 }
 
 static void rx_poll(unsigned long data)
@@ -1463,8 +1470,8 @@ static void netdev_error(struct net_device *dev, int intr_status)
 
 static struct net_device_stats *get_stats(struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
+	long ioaddr = dev->base_addr;
 	int i;
 
 	/* We should lock this segment of code for SMP eventually, although
@@ -1477,7 +1484,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 	np->stats.collisions += readb(ioaddr + StatsLateColl);
 	np->stats.collisions += readb(ioaddr + StatsMultiColl);
 	np->stats.collisions += readb(ioaddr + StatsOneColl);
-	readb(ioaddr + StatsCarrierError);
+	np->stats.tx_carrier_errors += readb(ioaddr + StatsCarrierError);
 	readb(ioaddr + StatsTxDefer);
 	for (i = StatsTxDefer; i <= StatsMcastRx; i++)
 		readb(ioaddr + i);
@@ -1528,6 +1535,20 @@ static void set_rx_mode(struct net_device *dev)
 		writew(mc_filter[i], ioaddr + MulticastFilter0 + i*2);
 	writeb(rx_mode, ioaddr + RxMode);
 }
+
+static int __set_mac_addr(struct net_device *dev)
+{
+	u16 addr16;
+
+	addr16 = (dev->dev_addr[0] | (dev->dev_addr[1] << 8));
+	writew(addr16, dev->base_addr + StationAddr);
+	addr16 = (dev->dev_addr[2] | (dev->dev_addr[3] << 8));
+	writew(addr16, dev->base_addr + StationAddr+2);
+	addr16 = (dev->dev_addr[4] | (dev->dev_addr[5] << 8));
+	writew(addr16, dev->base_addr + StationAddr+4);
+	return 0;
+}
+	
 
 static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
@@ -1615,6 +1636,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	int rc;
 	int i;
+	long ioaddr = dev->base_addr;
 
 	if (!netif_running(dev))
 		return -EINVAL;
@@ -1632,11 +1654,12 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		for (i=0; i<TX_RING_SIZE; i++) {
 			printk(KERN_DEBUG "%02x %08x %08x %08x(%02x) %08x %08x\n", i,
 				np->tx_ring_dma + i*sizeof(*np->tx_ring),	
-				np->tx_ring[i].next_desc,
-				np->tx_ring[i].status,
-				(np->tx_ring[i].status >> 2) & 0xff,
-				np->tx_ring[i].frag[0].addr, 
-				np->tx_ring[i].frag[0].length);
+				le32_to_cpu(np->tx_ring[i].next_desc),
+				le32_to_cpu(np->tx_ring[i].status),
+				(le32_to_cpu(np->tx_ring[i].status) >> 2) 
+					& 0xff,
+				le32_to_cpu(np->tx_ring[i].frag[0].addr), 
+				le32_to_cpu(np->tx_ring[i].frag[0].length));
 		}
 		printk(KERN_DEBUG "TxListPtr=%08x netif_queue_stopped=%d\n", 
 			readl(dev->base_addr + TxListPtr), 
@@ -1646,6 +1669,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			np->dirty_tx, np->dirty_tx % TX_RING_SIZE);
 		printk(KERN_DEBUG "cur_rx=%d dirty_rx=%d\n", np->cur_rx, np->dirty_rx);
 		printk(KERN_DEBUG "cur_task=%d\n", np->cur_task);
+		printk(KERN_DEBUG "TxStatus=%04x\n", readw(ioaddr + TxStatus));
 			return 0;
 	}
 				

@@ -2781,7 +2781,6 @@ int __init clgenfb_init(void)
 		 sizeof (fb_info->gen.info.modename));
 	fb_info->gen.info.modename [sizeof (fb_info->gen.info.modename) - 1] = 0;
 
-	fb_info->gen.info.node = NODEV;
 	fb_info->gen.info.fbops = &clgenfb_ops;
 	fb_info->gen.info.disp = &disp;
 	fb_info->gen.info.currcon = -1;

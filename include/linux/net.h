@@ -127,15 +127,21 @@ struct proto_ops {
 				      int offset, size_t size, int flags);
 };
 
+struct module;
+
 struct net_proto_family {
-	int	family;
-	int	(*create)(struct socket *sock, int protocol);
+	int		family;
+	int		(*create)(struct socket *sock, int protocol);
 	/* These are counters for the number of different methods of
 	   each we support */
-	short	authentication;
-	short	encryption;
-	short	encrypt_net;
+	short		authentication;
+	short		encryption;
+	short		encrypt_net;
+	struct module	*owner;
 };
+
+extern int	     net_family_get(int family);
+extern void	     net_family_put(int family);
 
 struct iovec;
 

@@ -211,7 +211,7 @@ acpi_rs_vendor_resource (
 
 		/* Dereference */
 
-		ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+		ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 		/* Calculate bytes consumed */
 
@@ -307,7 +307,7 @@ acpi_rs_vendor_stream (
 
 		temp16 = (u16) linked_list->data.vendor_specific.length;
 
-		ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+		ACPI_MOVE_16_TO_16 (buffer, &temp16);
 		buffer += 2;
 	}
 	else {

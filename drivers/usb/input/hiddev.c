@@ -35,6 +35,7 @@
 #include <linux/usb.h>
 #include "hid.h"
 #include <linux/hiddev.h>
+#include <linux/devfs_fs_kernel.h>
 
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 #define HIDDEV_MINOR_BASE	0
@@ -50,7 +51,6 @@ struct hiddev {
 	int open;
 	int minor;
 	wait_queue_head_t wait;
-	devfs_handle_t devfs;
 	struct hid_device *hid;
 	struct hiddev_list *list;
 };
@@ -66,7 +66,6 @@ struct hiddev_list {
 };
 
 static struct hiddev *hiddev_table[HIDDEV_MINORS];
-static devfs_handle_t hiddev_devfs_handle;
 
 /* forward reference to make our lives easier */
 extern struct usb_driver hiddev_driver;
@@ -229,7 +228,7 @@ static int hiddev_fasync(int fd, struct file *file, int on)
  */
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
-	devfs_unregister(hiddev->devfs);
+	devfs_remove("usb/hid/hiddev%d", hiddev->minor);
 	usb_deregister_dev(1, hiddev->minor);
 	hiddev_table[hiddev->minor] = NULL;
 	kfree(hiddev);
@@ -716,8 +715,8 @@ int hiddev_connect(struct hid_device *hid)
 	hiddev->exist = 1;
 
 	sprintf(devfs_name, "usb/hid/hiddev%d", minor);
-	hiddev->devfs = devfs_register(NULL, devfs_name,
-		DEVFS_FL_DEFAULT, USB_MAJOR, minor + HIDDEV_MINOR_BASE,
+	devfs_register(NULL, devfs_name, 0,
+		USB_MAJOR, minor + HIDDEV_MINOR_BASE,
 		S_IFCHR | S_IRUGO | S_IWUSR, &hiddev_fops, NULL);
 	hid->minor = minor;
 	hid->hiddev = hiddev;
@@ -774,7 +773,7 @@ static /* const */ struct usb_driver hiddev_driver = {
 
 int __init hiddev_init(void)
 {
-	hiddev_devfs_handle = devfs_mk_dir("usb/hid");
+	devfs_mk_dir("usb/hid");
 	usb_register(&hiddev_driver);
 	return 0;
 }

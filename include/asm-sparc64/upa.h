@@ -21,7 +21,7 @@
 #define UPA_PORTID_PREQDQ       0x000000007e000000 /* slave-wr's to mod supported  */
 #define UPA_PORTID_PREQRD       0x0000000001e00000 /* # incoming P_REQ's supported */
 #define UPA_PORTID_UPACAP       0x00000000001f0000 /* UPA capabilities of mod      */
-#define UPA_PORTID_ID           0x000000000000ffff /* Module Indentification bits  */
+#define UPA_PORTID_ID           0x000000000000ffff /* Module Identification bits  */
 
 /* UPA I/O space accessors */
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__)

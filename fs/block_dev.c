@@ -449,14 +449,13 @@ int check_disk_change(struct block_device *bdev)
 {
 	struct gendisk *disk = bdev->bd_disk;
 	struct block_device_operations * bdops = disk->fops;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	if (!bdops->media_changed)
 		return 0;
 	if (!bdops->media_changed(bdev->bd_disk))
 		return 0;
 
-	if (invalidate_device(dev, 0))
+	if (__invalidate_device(bdev, 0))
 		printk("VFS: busy inodes on changed media.\n");
 
 	if (bdops->revalidate_disk)
@@ -464,36 +463,6 @@ int check_disk_change(struct block_device *bdev)
 	if (bdev->bd_disk->minors > 1)
 		bdev->bd_invalidated = 1;
 	return 1;
-}
-
-int full_check_disk_change(struct block_device *bdev)
-{
-	int res = 0;
-	if (bdev->bd_contains != bdev)
-		BUG();
-	down(&bdev->bd_sem);
-	if (check_disk_change(bdev) && bdev->bd_invalidated) {
-		rescan_partitions(bdev->bd_disk, bdev);
-		res = 1;
-	}
-	up(&bdev->bd_sem);
-	return res;
-}
-
-/*
- * Will die as soon as two remaining callers get converted.
- */
-int __check_disk_change(dev_t dev)
-{
-	struct block_device *bdev = bdget(dev);
-	int res;
-	if (!bdev)
-		return 0;
-	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
-		return 0;
-	res = full_check_disk_change(bdev);
-	blkdev_put(bdev, BDEV_RAW);
-	return res;
 }
 
 static void bd_set_size(struct block_device *bdev, loff_t size)
@@ -559,10 +528,10 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdev->bd_contains = whole;
 			down(&whole->bd_sem);
 			whole->bd_part_count++;
-			p = disk->part + part - 1;
+			p = disk->part[part - 1];
 			bdev->bd_inode->i_data.backing_dev_info =
 			   whole->bd_inode->i_data.backing_dev_info;
-			if (!(disk->flags & GENHD_FL_UP) || !p->nr_sects) {
+			if (!(disk->flags & GENHD_FL_UP) || !p || !p->nr_sects) {
 				whole->bd_part_count--;
 				up(&whole->bd_sem);
 				ret = -ENXIO;

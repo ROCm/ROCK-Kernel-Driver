@@ -46,6 +46,7 @@
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/fs.h>
 #include <linux/ioport.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
@@ -187,7 +188,7 @@ static void eurwdt_activate_timer(void)
  * Kernel methods.
  */
  
-void eurwdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t eurwdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	printk(KERN_CRIT "timeout WDT timeout\n");
  
@@ -197,6 +198,7 @@ void eurwdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	printk(KERN_CRIT "Initiating system reboot.\n");
 	machine_restart(NULL);
 #endif
+	return IRQ_HANDLED;
 }
 
 

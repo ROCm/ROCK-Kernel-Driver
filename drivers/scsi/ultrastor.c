@@ -288,7 +288,7 @@ static const unsigned short ultrastor_ports_14f[] = {
 #endif
 
 static void ultrastor_interrupt(int, void *, struct pt_regs *);
-static void do_ultrastor_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t do_ultrastor_interrupt(int, void *, struct pt_regs *);
 static inline void build_sg_list(struct mscp *, Scsi_Cmnd *SCpnt);
 
 
@@ -1160,7 +1160,8 @@ static void ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 }
 
-static void do_ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_ultrastor_interrupt(int irq, void *dev_id,
+						struct pt_regs *regs)
 {
     unsigned long flags;
     struct Scsi_Host *dev = dev_id;
@@ -1168,6 +1169,7 @@ static void do_ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     spin_lock_irqsave(dev->host_lock, flags);
     ultrastor_interrupt(irq, dev_id, regs);
     spin_unlock_irqrestore(dev->host_lock, flags);
+    return IRQ_HANDLED;
 }
 
 MODULE_LICENSE("GPL");

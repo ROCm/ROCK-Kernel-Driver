@@ -246,7 +246,7 @@ static int pvr2_update_par(void);
 static void pvr2_update_display(void);
 static void pvr2_init_display(void);
 static void pvr2_do_blank(void);
-static void pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
+static irqreturn_t pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp);
 static int pvr2_init_cable(void);
 static int pvr2_get_param(const struct pvr2_params *p, const char *s,
                             int val, int size);
@@ -939,7 +939,7 @@ static void pvr2_do_blank(void)
 	is_blanked = do_blank > 0 ? do_blank : 0;
 }
 
-static void pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 {
 	if (do_vmode_pan || do_vmode_full)
 		pvr2_update_display();
@@ -958,6 +958,7 @@ static void pvr2fb_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	if (do_vmode_full) {
 		do_vmode_full = 0;
 	}
+	return IRQ_HANDLED;
 }
 
 /*
@@ -1020,7 +1021,6 @@ int __init pvr2fb_init(void)
 	
 	strcpy(fb_info.modename, pvr2fb_name);
 	fb_info.changevar = NULL;
-	fb_info.node = NODEV;
 	fb_info.fbops = &pvr2fb_ops;
 	fb_info.screen_base = (char *) videomemory;
 	fb_info.disp = &disp;
@@ -1059,10 +1059,10 @@ int __init pvr2fb_init(void)
 	modememused = get_line_length(var.xres_virtual, var.bits_per_pixel);
 	modememused *= var.yres_virtual;
 	printk("fb%d: %s frame buffer device, using %ldk/%ldk of video memory\n",
-	       minor(fb_info.node), fb_info.modename, modememused>>10,
+	       fb_info.node, fb_info.modename, modememused>>10,
 	       videomemorysize>>10);
 	printk("fb%d: Mode %dx%d-%d pitch = %ld cable: %s video output: %s\n", 
-	       minor(fb_info.node), var.xres, var.yres, var.bits_per_pixel, 
+	       fb_info.node, var.xres, var.yres, var.bits_per_pixel, 
 	       get_line_length(var.xres, var.bits_per_pixel),
 	       (char *)pvr2_get_param(cables, NULL, cable_type, 3),
 	       (char *)pvr2_get_param(outputs, NULL, video_output, 3));

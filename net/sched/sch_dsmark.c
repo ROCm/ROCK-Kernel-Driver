@@ -353,7 +353,6 @@ int dsmark_init(struct Qdisc *sch,struct rtattr *opt)
 	if (!(p->q = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops)))
 		p->q = &noop_qdisc;
 	DPRINTK("dsmark_init: qdisc %p\n",&p->q);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -382,7 +381,6 @@ static void dsmark_destroy(struct Qdisc *sch)
 	qdisc_destroy(p->q);
 	p->q = &noop_qdisc;
 	kfree(p->mask);
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -433,41 +431,35 @@ rtattr_failure:
 	return -1;
 }
 
-static struct Qdisc_class_ops dsmark_class_ops =
-{
-	.graft		= dsmark_graft,
-	.leaf		= dsmark_leaf,
-	.get		= dsmark_get,
-	.put		= dsmark_put,
-	.change		= dsmark_change,
-	.delete		= dsmark_delete,
-	.walk		= dsmark_walk,
-
-	.tcf_chain	= dsmark_find_tcf,
-	.bind_tcf	= dsmark_bind_filter,
-	.unbind_tcf	= dsmark_put,
-
-	.dump		= dsmark_dump_class,
+static struct Qdisc_class_ops dsmark_class_ops = {
+	.graft		=	dsmark_graft,
+	.leaf		=	dsmark_leaf,
+	.get		=	dsmark_get,
+	.put		=	dsmark_put,
+	.change		=	dsmark_change,
+	.delete		=	dsmark_delete,
+	.walk		=	dsmark_walk,
+	.tcf_chain	=	dsmark_find_tcf,
+	.bind_tcf	=	dsmark_bind_filter,
+	.unbind_tcf	=	dsmark_put,
+	.dump		=	dsmark_dump_class,
 };
 
-struct Qdisc_ops dsmark_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= &dsmark_class_ops,
-	.id		= "dsmark",
-	.priv_size	= sizeof(struct dsmark_qdisc_data),
-
-	.enqueue	= dsmark_enqueue,
-	.dequeue	= dsmark_dequeue,
-	.requeue	= dsmark_requeue,
-	.drop		= dsmark_drop,
-
-	.init		= dsmark_init,
-	.reset		= dsmark_reset,
-	.destroy	= dsmark_destroy,
-	.change		= NULL,
-
-	.dump		= dsmark_dump
+struct Qdisc_ops dsmark_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	&dsmark_class_ops,
+	.id		=	"dsmark",
+	.priv_size	=	sizeof(struct dsmark_qdisc_data),
+	.enqueue	=	dsmark_enqueue,
+	.dequeue	=	dsmark_dequeue,
+	.requeue	=	dsmark_requeue,
+	.drop		=	dsmark_drop,
+	.init		=	dsmark_init,
+	.reset		=	dsmark_reset,
+	.destroy	=	dsmark_destroy,
+	.change		=	NULL,
+	.dump		=	dsmark_dump,
+	.owner		=	THIS_MODULE,
 };
 
 #ifdef MODULE

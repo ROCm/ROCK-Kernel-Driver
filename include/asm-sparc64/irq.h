@@ -12,6 +12,7 @@
 #include <linux/linkage.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <asm/pil.h>
 #include <asm/ptrace.h>
 
@@ -113,7 +114,7 @@ static __inline__ char *__irq_itoa(unsigned int irq)
 
 #define NR_IRQS    16
 
-#define irq_cannonicalize(irq)	(irq)
+#define irq_canonicalize(irq)	(irq)
 extern void disable_irq(unsigned int);
 #define disable_irq_nosync disable_irq
 extern void enable_irq(unsigned int);
@@ -128,7 +129,7 @@ extern void set_irq_udt(int);
 #endif
 
 extern int request_fast_irq(unsigned int irq,
-			    void (*handler)(int, void *, struct pt_regs *),
+			    irqreturn_t (*handler)(int, void *, struct pt_regs *),
 			    unsigned long flags, __const__ char *devname,
 			    void *dev_id);
 

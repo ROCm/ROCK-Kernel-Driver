@@ -1581,7 +1581,6 @@ static int __init riva_set_fbinfo(struct fb_info *info)
 	struct riva_par *par = (struct riva_par *) info->par;
 	unsigned int cmap_len;
 
-	info->node = NODEV;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->var = rivafb_default_var;
 	info->fix = rivafb_fix;

@@ -1298,18 +1298,20 @@ static int fdc_config(void)
 	TRACE_EXIT 0;
 }
 
-static void ftape_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ftape_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	void (*handler) (void) = *fdc.hook;
+	int handled = 0;
 	TRACE_FUN(ft_t_any);
 
 	*fdc.hook = NULL;
 	if (handler) {
+		handled = 1;
 		handler();
 	} else {
 		TRACE(ft_t_bug, "Unexpected ftape interrupt");
 	}
-	TRACE_EXIT;
+	return IRQ_RETVAL(handled);
 }
 
 int fdc_grab_irq_and_dma(void)

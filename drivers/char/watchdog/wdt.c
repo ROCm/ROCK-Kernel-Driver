@@ -37,6 +37,7 @@
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/fs.h>
 #include <linux/ioport.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
@@ -178,7 +179,7 @@ static int wdt_status(void)
  *	a failure condition occurring.
  */
  
-void wdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t wdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/*
 	 *	Read the status register see what is up and
@@ -210,7 +211,8 @@ void wdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif		
 #else
 		printk(KERN_CRIT "Reset in 5ms.\n");
-#endif		
+#endif
+	return IRQ_HANDLED;
 }
 
 
