@@ -193,18 +193,6 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 		 * be a write to vm.
 		 */
 		bio = bio_map_user(bdev, uaddr, hdr.dxfer_len, reading);
-		if (bio) {
-			if (writing)
-				bio->bi_rw |= (1 << BIO_RW);
-
-			nr_sectors = (bio->bi_size + 511) >> 9;
-
-			if (bio->bi_size < hdr.dxfer_len) {
-				bio_endio(bio, bio->bi_size, 0);
-				bio_unmap_user(bio, 0);
-				bio = NULL;
-			}
-		}
 
 		/*
 		 * if bio setup failed, fall back to slow approach
@@ -243,21 +231,10 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	rq->hard_nr_sectors = rq->nr_sectors = nr_sectors;
 	rq->hard_cur_sectors = rq->current_nr_sectors = nr_sectors;
 
-	if (bio) {
-		/*
-		 * subtle -- if bio_map_user() ended up bouncing a bio, it
-		 * would normally disappear when its bi_end_io is run.
-		 * however, we need it for the unmap, so grab an extra
-		 * reference to it
-		 */
-		bio_get(bio);
+	rq->bio = rq->biotail = bio;
 
-		rq->nr_phys_segments = bio_phys_segments(q, bio);
-		rq->nr_hw_segments = bio_hw_segments(q, bio);
-		rq->current_nr_sectors = bio_cur_sectors(bio);
-		rq->hard_cur_sectors = rq->current_nr_sectors;
-		rq->buffer = bio_data(bio);
-	}
+	if (bio)
+		blk_rq_bio_prep(q, rq, bio);
 
 	rq->data_len = hdr.dxfer_len;
 	rq->data = buffer;
@@ -268,8 +245,6 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	if (!rq->timeout)
 		rq->timeout = BLK_DEFAULT_TIMEOUT;
 
-	rq->bio = rq->biotail = bio;
-
 	start_time = jiffies;
 
 	/* ignore return value. All information is passed back to caller
@@ -277,11 +252,9 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	 * N.B. a non-zero SCSI status is _not_ necessarily an error.
 	 */
 	blk_do_rq(q, bdev, rq);
-	
-	if (bio) {
+
+	if (bio)
 		bio_unmap_user(bio, reading);
-		bio_put(bio);
-	}
 
 	/* write to all output members */
 	hdr.status = rq->errors;	
