@@ -65,8 +65,8 @@ static int sockstat_seq_show(struct seq_file *seq, void *v)
 	socket_seq_show(seq);
 	seq_printf(seq, "TCP: inuse %d orphan %d tw %d alloc %d mem %d\n",
 		   fold_prot_inuse(&tcp_prot), atomic_read(&tcp_orphan_count),
-		   tcp_tw_count, atomic_read(&tcp_prot.sockets_allocated),
-		   atomic_read(&tcp_prot.memory_allocated));
+		   tcp_tw_count, atomic_read(&tcp_sockets_allocated),
+		   atomic_read(&tcp_memory_allocated));
 	seq_printf(seq, "UDP: inuse %d\n", fold_prot_inuse(&udp_prot));
 	seq_printf(seq, "RAW: inuse %d\n", fold_prot_inuse(&raw_prot));
 	seq_printf(seq,  "FRAG: inuse %d memory %d\n", ip_frag_nqueues,

@@ -594,6 +594,9 @@ extern int sysctl_tcp_fack;
 extern int sysctl_tcp_reordering;
 extern int sysctl_tcp_ecn;
 extern int sysctl_tcp_dsack;
+extern int sysctl_tcp_mem[3];
+extern int sysctl_tcp_wmem[3];
+extern int sysctl_tcp_rmem[3];
 extern int sysctl_tcp_app_win;
 extern int sysctl_tcp_adv_win_scale;
 extern int sysctl_tcp_tw_reuse;
@@ -610,6 +613,10 @@ extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
 extern int sysctl_tcp_default_win_scale;
 extern int sysctl_tcp_moderate_rcvbuf;
+
+extern atomic_t tcp_memory_allocated;
+extern atomic_t tcp_sockets_allocated;
+extern int tcp_memory_pressure;
 
 struct open_request;
 

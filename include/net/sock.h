@@ -541,18 +541,18 @@ struct proto {
 
 	/* Memory pressure */
 	void			(*enter_memory_pressure)(void);
-	atomic_t		memory_allocated;	/* Current allocated memory. */
-	atomic_t		sockets_allocated;	/* Current number of sockets. */
+	atomic_t		*memory_allocated;	/* Current allocated memory. */
+	atomic_t		*sockets_allocated;	/* Current number of sockets. */
 	/*
 	 * Pressure flag: try to collapse.
 	 * Technical note: it is used by multiple contexts non atomically.
 	 * All the sk_stream_mem_schedule() is of this nature: accounting
 	 * is strict, actions are advisory and have some latency.
 	 */
-	int			memory_pressure;
-	int			sysctl_mem[3];
-	int			sysctl_wmem[3];
-	int			sysctl_rmem[3];
+	int			*memory_pressure;
+	int			*sysctl_mem;
+	int			*sysctl_wmem;
+	int			*sysctl_rmem;
 	int			max_header;
 
 	char			name[32];

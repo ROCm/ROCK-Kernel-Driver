@@ -193,12 +193,12 @@ void __sk_stream_mem_reclaim(struct sock *sk)
 {
 	if (sk->sk_forward_alloc >= SK_STREAM_MEM_QUANTUM) {
 		atomic_sub(sk->sk_forward_alloc / SK_STREAM_MEM_QUANTUM,
-			   &sk->sk_prot->memory_allocated);
+			   sk->sk_prot->memory_allocated);
 		sk->sk_forward_alloc &= SK_STREAM_MEM_QUANTUM - 1;
-		if (sk->sk_prot->memory_pressure &&
-		    (atomic_read(&sk->sk_prot->memory_allocated) <
+		if (*sk->sk_prot->memory_pressure &&
+		    (atomic_read(sk->sk_prot->memory_allocated) <
 		     sk->sk_prot->sysctl_mem[0]))
-			sk->sk_prot->memory_pressure = 0;
+			*sk->sk_prot->memory_pressure = 0;
 	}
 }
 
@@ -209,23 +209,23 @@ int sk_stream_mem_schedule(struct sock *sk, int size, int kind)
 	int amt = sk_stream_pages(size);
 
 	sk->sk_forward_alloc += amt * SK_STREAM_MEM_QUANTUM;
-	atomic_add(amt, &sk->sk_prot->memory_allocated);
+	atomic_add(amt, sk->sk_prot->memory_allocated);
 
 	/* Under limit. */
-	if (atomic_read(&sk->sk_prot->memory_allocated) < sk->sk_prot->sysctl_mem[0]) {
-		if (sk->sk_prot->memory_pressure)
-			sk->sk_prot->memory_pressure = 0;
+	if (atomic_read(sk->sk_prot->memory_allocated) < sk->sk_prot->sysctl_mem[0]) {
+		if (*sk->sk_prot->memory_pressure)
+			*sk->sk_prot->memory_pressure = 0;
 		return 1;
 	}
 
 	/* Over hard limit. */
-	if (atomic_read(&sk->sk_prot->memory_allocated) > sk->sk_prot->sysctl_mem[2]) {
+	if (atomic_read(sk->sk_prot->memory_allocated) > sk->sk_prot->sysctl_mem[2]) {
 		sk->sk_prot->enter_memory_pressure();
 		goto suppress_allocation;
 	}
 
 	/* Under pressure. */
-	if (atomic_read(&sk->sk_prot->memory_allocated) > sk->sk_prot->sysctl_mem[1])
+	if (atomic_read(sk->sk_prot->memory_allocated) > sk->sk_prot->sysctl_mem[1])
 		sk->sk_prot->enter_memory_pressure();
 
 	if (kind) {
@@ -234,8 +234,8 @@ int sk_stream_mem_schedule(struct sock *sk, int size, int kind)
 	} else if (sk->sk_wmem_queued < sk->sk_prot->sysctl_wmem[0])
 		return 1;
 
-	if (!sk->sk_prot->memory_pressure ||
-	    sk->sk_prot->sysctl_mem[2] > atomic_read(&sk->sk_prot->sockets_allocated) *
+	if (!*sk->sk_prot->memory_pressure ||
+	    sk->sk_prot->sysctl_mem[2] > atomic_read(sk->sk_prot->sockets_allocated) *
 				sk_stream_pages(sk->sk_wmem_queued +
 						atomic_read(&sk->sk_rmem_alloc) +
 						sk->sk_forward_alloc))
@@ -255,7 +255,7 @@ suppress_allocation:
 
 	/* Alas. Undo changes. */
 	sk->sk_forward_alloc -= amt * SK_STREAM_MEM_QUANTUM;
-	atomic_sub(amt, &sk->sk_prot->memory_allocated);
+	atomic_sub(amt, sk->sk_prot->memory_allocated);
 	return 0;
 }
 

@@ -508,24 +508,24 @@ ctl_table ipv4_table[] = {
 	{
 		.ctl_name	= NET_TCP_MEM,
 		.procname	= "tcp_mem",
-		.data		= &tcp_prot.sysctl_mem,
-		.maxlen		= sizeof(tcp_prot.sysctl_mem),
+		.data		= &sysctl_tcp_mem,
+		.maxlen		= sizeof(sysctl_tcp_mem),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
 	{
 		.ctl_name	= NET_TCP_WMEM,
 		.procname	= "tcp_wmem",
-		.data		= &tcp_prot.sysctl_wmem,
-		.maxlen		= sizeof(tcp_prot.sysctl_wmem),
+		.data		= &sysctl_tcp_wmem,
+		.maxlen		= sizeof(sysctl_tcp_wmem),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
 	{
 		.ctl_name	= NET_TCP_RMEM,
 		.procname	= "tcp_rmem",
-		.data		= &tcp_prot.sysctl_rmem,
-		.maxlen		= sizeof(tcp_prot.sysctl_rmem),
+		.data		= &sysctl_tcp_rmem,
+		.maxlen		= sizeof(sysctl_tcp_rmem),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},

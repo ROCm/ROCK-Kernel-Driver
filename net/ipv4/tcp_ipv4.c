@@ -2086,10 +2086,10 @@ static int tcp_v4_init_sock(struct sock *sk)
 
 	tp->af_specific = &ipv4_specific;
 
-	sk->sk_sndbuf = tcp_prot.sysctl_wmem[1];
-	sk->sk_rcvbuf = tcp_prot.sysctl_rmem[1];
+	sk->sk_sndbuf = sysctl_tcp_wmem[1];
+	sk->sk_rcvbuf = sysctl_tcp_rmem[1];
 
-	atomic_inc(&tcp_prot.sockets_allocated);
+	atomic_inc(&tcp_sockets_allocated);
 
 	return 0;
 }
@@ -2113,7 +2113,7 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 	if (tp->bind_hash)
 		tcp_put_port(sk);
 
-	atomic_dec(&tcp_prot.sockets_allocated);
+	atomic_dec(&tcp_sockets_allocated);
 
 	return 0;
 }
@@ -2600,8 +2600,12 @@ struct proto tcp_prot = {
 	.unhash			= tcp_unhash,
 	.get_port		= tcp_v4_get_port,
 	.enter_memory_pressure	= tcp_enter_memory_pressure,
-	.sysctl_wmem		= { 4 * 1024, 16 * 1024, 128 * 1024 },
-	.sysctl_rmem		= { 4 * 1024, 87380, 87380 * 2 },
+	.sockets_allocated	= &tcp_sockets_allocated,
+	.memory_allocated	= &tcp_memory_allocated,
+	.memory_pressure	= &tcp_memory_pressure,
+	.sysctl_mem		= sysctl_tcp_mem,
+	.sysctl_wmem		= sysctl_tcp_wmem,
+	.sysctl_rmem		= sysctl_tcp_rmem,
 	.max_header		= MAX_TCP_HEADER,
 };
 

@@ -207,7 +207,7 @@ static void tcp_fixup_sndbuf(struct sock *sk)
 		     sizeof(struct sk_buff);
 
 	if (sk->sk_sndbuf < 3 * sndmem)
-		sk->sk_sndbuf = min(3 * sndmem, tcp_prot.sysctl_wmem[2]);
+		sk->sk_sndbuf = min(3 * sndmem, sysctl_tcp_wmem[2]);
 }
 
 /* 2. Tuning advertised window (window_clamp, rcv_ssthresh)
@@ -291,7 +291,7 @@ static void tcp_fixup_rcvbuf(struct sock *sk)
 	while (tcp_win_from_space(rcvmem) < tp->advmss)
 		rcvmem += 128;
 	if (sk->sk_rcvbuf < 4 * rcvmem)
-		sk->sk_rcvbuf = min(4 * rcvmem, tcp_prot.sysctl_rmem[2]);
+		sk->sk_rcvbuf = min(4 * rcvmem, sysctl_tcp_rmem[2]);
 }
 
 /* 4. Try to fixup all. It is made iimediately after connection enters
@@ -347,12 +347,12 @@ static void tcp_clamp_window(struct sock *sk, struct tcp_opt *tp)
 	 * do not clamp window. Try to expand rcvbuf instead.
 	 */
 	if (ofo_win) {
-		if (sk->sk_rcvbuf < tcp_prot.sysctl_rmem[2] &&
+		if (sk->sk_rcvbuf < sysctl_tcp_rmem[2] &&
 		    !(sk->sk_userlocks & SOCK_RCVBUF_LOCK) &&
 		    !tcp_prot.memory_pressure &&
-		    atomic_read(&tcp_prot.memory_allocated) < tcp_prot.sysctl_mem[0])
+		    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0])
 			sk->sk_rcvbuf = min(atomic_read(&sk->sk_rmem_alloc),
-					    tcp_prot.sysctl_rmem[2]);
+					    sysctl_tcp_rmem[2]);
 	}
 	if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf) {
 		app_win += ofo_win;
@@ -473,7 +473,7 @@ void tcp_rcv_space_adjust(struct sock *sk)
 			rcvmem = (tp->advmss + MAX_TCP_HEADER +
 				  16 + sizeof(struct sk_buff));
 			space *= rcvmem;
-			space = min(space, tcp_prot.sysctl_rmem[2]);
+			space = min(space, sysctl_tcp_rmem[2]);
 			if (space > sk->sk_rcvbuf)
 				sk->sk_rcvbuf = space;
 		}
@@ -3837,14 +3837,14 @@ static void tcp_new_space(struct sock *sk)
 	if (tp->packets_out < tp->snd_cwnd &&
 	    !(sk->sk_userlocks & SOCK_SNDBUF_LOCK) &&
 	    !tcp_prot.memory_pressure &&
-	    atomic_read(&tcp_prot.memory_allocated) < tcp_prot.sysctl_mem[0]) {
+	    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0]) {
  		int sndmem = max_t(u32, tp->mss_clamp, tp->mss_cache) +
 			MAX_TCP_HEADER + 16 + sizeof(struct sk_buff),
 		    demanded = max_t(unsigned int, tp->snd_cwnd,
 						   tp->reordering + 1);
 		sndmem *= 2*demanded;
 		if (sndmem > sk->sk_sndbuf)
-			sk->sk_sndbuf = min(sndmem, tcp_prot.sysctl_wmem[2]);
+			sk->sk_sndbuf = min(sndmem, sysctl_tcp_wmem[2]);
 		tp->snd_cwnd_stamp = tcp_time_stamp;
 	}
 
