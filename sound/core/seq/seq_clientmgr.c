@@ -423,7 +423,10 @@ static ssize_t snd_seq_read(struct file *file, char __user *buf, size_t count, l
 			count -= err;
 			buf += err;
 		} else {
-			copy_to_user(buf, &cell->event, sizeof(snd_seq_event_t));
+			if (copy_to_user(buf, &cell->event, sizeof(snd_seq_event_t))) {
+				err = -EFAULT;
+				break;
+			}
 			count -= sizeof(snd_seq_event_t);
 			buf += sizeof(snd_seq_event_t);
 		}

@@ -246,7 +246,7 @@ struct sndrv_ctl_elem_value32 {
 		struct sndrv_aes_iec958 iec958;
         } value;
         unsigned char reserved[128];
-} __attribute__((packed));
+};
 
 
 /* hmm, it's so hard to retrieve the value type from the control id.. */

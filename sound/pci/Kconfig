@@ -8,27 +8,41 @@ config SND_AC97_CODEC
 	select SND_PCM
 
 config SND_ALI5451
-	tristate "ALi PCI Audio M5451"
+	tristate "ALi M5451 PCI Audio Controller"
 	depends on SND
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
+	  Say Y here to include support for the integrated AC97 sound
+	  device on motherboards using the ALi M5451 Audio Controller
+	  (M1535/M1535D/M1535+/M1535D+ south bridges).  Newer chipsets
+	  use the "Intel/SiS/nVidia/AMD/ALi AC97 Controller" driver.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ali5451.
 
 config SND_ATIIXP
-	tristate "ATI IXP 150/200/250/300"
+	tristate "ATI IXP AC97 Controller"
 	depends on SND
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250/300 AC97 controller.
+	  Say Y here to include support for the integrated AC97 sound
+	  device on motherboards with ATI chipsets (ATI IXP 150/200/250/
+	  300/400).
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-atiixp.
 
 config SND_ATIIXP_MODEM
-	tristate "ATI IXP 150/200/250 Modem"
+	tristate "ATI IXP Modem"
 	depends on SND
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250 AC97 modem
-	  controller.
+	  Say Y here to include support for the integrated MC97 modem on
+	  motherboards with ATI chipsets (ATI IXP 150/200/250).
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-atiixp-modem.
 
 config SND_AU8810
         tristate "Aureal Advantage"
@@ -36,10 +50,14 @@ config SND_AU8810
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
         help
-          Say 'Y' or 'M' to include support for Aureal Advantage soundcards.
-          Supported features: Hardware Mixer, SRC, EQ and SPDIF output.
+	  Say Y here to include support for Aureal Advantage soundcards.
+
+	  Supported features: Hardware Mixer, SRC, EQ and SPDIF output.
           3D support code is in place, but not yet useable. For more info, 
           email the ALSA developer list, or mjander@users.sourceforge.net.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-au8810.
  
 config SND_AU8820
         tristate "Aureal Vortex"
@@ -47,9 +65,13 @@ config SND_AU8820
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
         help
-          Say 'Y' or 'M' to include support for Aureal Vortex soundcards.
+	  Say Y here to include support for Aureal Vortex soundcards.
+
           Supported features: Hardware Mixer and SRC. For more info, email 
           the ALSA developer list, or mjander@users.sourceforge.net.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-au8820.
  
 config SND_AU8830
         tristate "Aureal Vortex 2"
@@ -57,10 +79,14 @@ config SND_AU8830
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
         help
-          Say 'Y' or 'M' to include support for Aureal Vortex 2 soundcards.
+	  Say Y here to include support for Aureal Vortex 2 soundcards.
+
           Supported features: Hardware Mixer, SRC, EQ and SPDIF output.
           3D support code is in place, but not yet useable. For more info, 
           email the ALSA developer list, or mjander@users.sourceforge.net.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-au8830.
  
 config SND_AZT3328
 	tristate "Aztech AZF3328 / PCI168 (EXPERIMENTAL)"
@@ -69,15 +95,22 @@ config SND_AZT3328
 	select SND_MPU401_UART
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for Aztech AZF3328 (PCI168) soundcards.
+	  Say Y here to include support for Aztech AZF3328 (PCI168)
+	  soundcards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-azt3328.
 
 config SND_BT87X
         tristate "Bt87x Audio Capture"
         depends on SND
 	select SND_PCM
         help
-          Say 'Y' or 'M' to include support for recording audio from TV cards
-          based on Brooktree Bt878/Bt879 chips.
+	  Say Y here to include support for recording audio from TV
+	  cards based on Brooktree Bt878/Bt879 chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-bt87x.
 
 config SND_CS46XX
 	tristate "Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x"
@@ -85,14 +118,19 @@ config SND_CS46XX
 	select SND_RAWMIDI
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Cirrus Logic CS4610 / CS4612 /
-	  CS4614 / CS4615 / CS4622 / CS4624 / CS4630 / CS4280 chips.
+	  Say Y here to include support for Cirrus Logic CS4610/CS4612/
+	  CS4614/CS4615/CS4622/CS4624/CS4630/CS4280 chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-cs46xx.
 
 config SND_CS46XX_NEW_DSP
 	bool "Cirrus Logic (Sound Fusion) New DSP support (EXPERIMENTAL)"
 	depends on SND_CS46XX && EXPERIMENTAL
 	help
-	  Say 'Y' to use a new DSP image for SPDIF and dual codecs.
+	  Say Y here to use a new DSP image for SPDIF and dual codecs.
+
+	  This works better than the old code, so say Y.
 
 config SND_CS4281
 	tristate "Cirrus Logic (Sound Fusion) CS4281"
@@ -101,24 +139,37 @@ config SND_CS4281
 	select SND_RAWMIDI
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Cirrus Logic CS4281.
+	  Say Y here to include support for Cirrus Logic CS4281 chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-cs4281.
 
 config SND_EMU10K1
-	tristate "EMU10K1 (SB Live! & Audigy, E-mu APS)"
+	tristate "Emu10k1 (SB Live!, Audigy, E-mu APS)"
 	depends on SND
 	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Sound Blaster PCI 512, Live!,
-	  Audigy and E-mu APS (partially supported).
+	  Say Y to include support for Sound Blaster PCI 512, Live!,
+	  Audigy and E-mu APS (partially supported) soundcards.
+
+	  The confusing multitude of mixer controls is documented in
+	  <file:Documentation/sound/alsa/SB-Live-mixer.txt> and
+	  <file:Documentation/sound/alsa/Audigy-mixer.txt>.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-emu10k1.
 
 config SND_KORG1212
 	tristate "Korg 1212 IO"
 	depends on SND
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for Korg 1212IO.
+	  Say Y here to include support for Korg 1212IO soundcards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-korg1212.
 
 config SND_MIXART
 	tristate "Digigram miXart"
@@ -126,38 +177,55 @@ config SND_MIXART
 	select SND_HWDEP
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for Digigram miXart soundcard.
+	  If you want to use Digigram miXart soundcards, say Y here and
+	  read <file:Documentation/sound/alsa/MIXART.txt>.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-mixart.
 
 config SND_NM256
 	tristate "NeoMagic NM256AV/ZX"
 	depends on SND
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for NeoMagic NM256AV/ZX chips.
+	  Say Y here to include support for NeoMagic NM256AV/ZX chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-nm256.
 
 config SND_RME32
 	tristate "RME Digi32, 32/8, 32 PRO"
 	depends on SND
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for RME Digi32, Digi32 PRO and
-	  Digi32/8 (Sek'd Prodif32, Prodif96 and Prodif Gold) audio devices.
+	  Say Y to include support for RME Digi32, Digi32 PRO and
+	  Digi32/8 (Sek'd Prodif32, Prodif96 and Prodif Gold) audio
+	  devices.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-rme32.
 
 config SND_RME96
 	tristate "RME Digi96, 96/8, 96/8 PRO"
 	depends on SND
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for RME Digi96, Digi96/8 and
-	  Digi96/8 PRO/PAD/PST.
+	  Say Y here to include support for RME Digi96, Digi96/8 and
+	  Digi96/8 PRO/PAD/PST soundcards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-rme96.
 
 config SND_RME9652
 	tristate "RME Digi9652 (Hammerfall)"
 	depends on SND
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for RME Hammerfall (RME Digi9652 /
-	  Digi9636) soundcards.
+	  Say Y here to include support for RME Hammerfall (RME
+	  Digi9652/Digi9636) soundcards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-rme9652.
 
 config SND_HDSP
 	tristate "RME Hammerfall DSP Audio"
@@ -166,8 +234,11 @@ config SND_HDSP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for RME Hammerfall DSP Audio
+	  Say Y here to include support for RME Hammerfall DSP Audio
 	  soundcards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-hdsp.
 
 config SND_TRIDENT
 	tristate "Trident 4D-Wave DX/NX; SiS 7018"
@@ -175,8 +246,11 @@ config SND_TRIDENT
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Trident 4D-Wave DX/NX and
-	  SiS 7018 soundcards.
+	  Say Y here to include support for soundcards based on Trident
+	  4D-Wave DX/NX or SiS 7018 chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-trident.
 
 config SND_YMFPCI
 	tristate "Yamaha YMF724/740/744/754"
@@ -185,8 +259,11 @@ config SND_YMFPCI
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Yamaha PCI audio chips - 
+	  Say Y here to include support for Yamaha PCI audio chips -
 	  YMF724, YMF724F, YMF740, YMF740C, YMF744, YMF754.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ymfpci.
 
 config SND_ALS4000
 	tristate "Avance Logic ALS4000"
@@ -195,7 +272,11 @@ config SND_ALS4000
 	select SND_MPU401_UART
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for Avance Logic ALS4000.
+	  Say Y here to include support for soundcards based on Avance Logic
+	  ALS4000 chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-als4000.
 
 config SND_CMIPCI
 	tristate "C-Media 8738, 8338"
@@ -204,8 +285,12 @@ config SND_CMIPCI
 	select SND_MPU401_UART
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for C-Media CMI8338 and 8738 PCI
-	  soundcards.
+	  If you want to use soundcards based on C-Media CMI8338 or CMI8738
+	  chips, say Y here and read
+	  <file:Documentation/sound/alsa/CMIPCI.txt>.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-cmipci.
 
 config SND_ENS1370
 	tristate "(Creative) Ensoniq AudioPCI 1370"
@@ -213,7 +298,10 @@ config SND_ENS1370
 	select SND_RAWMIDI
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1370.
+	  Say Y here to include support for Ensoniq AudioPCI ES1370 chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ens1370.
 
 config SND_ENS1371
 	tristate "(Creative) Ensoniq AudioPCI 1371/1373"
@@ -221,8 +309,11 @@ config SND_ENS1371
 	select SND_RAWMIDI
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1371 and
+	  Say Y here to include support for Ensoniq AudioPCI ES1371 chips and
 	  Sound Blaster PCI 64 or 128 soundcards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ens1371.
 
 config SND_ES1938
 	tristate "ESS ES1938/1946/1969 (Solo-1)"
@@ -231,8 +322,11 @@ config SND_ES1938
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ESS Solo-1 (ES1938, ES1946, ES1969)
-	  soundcard.
+	  Say Y here to include support for soundcards based on ESS Solo-1
+	  (ES1938, ES1946, ES1969) chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-es1938.
 
 config SND_ES1968
 	tristate "ESS ES1968/1978 (Maestro-1/2/2E)"
@@ -240,14 +334,22 @@ config SND_ES1968
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ESS Maestro 1/2/2E.
+	  Say Y here to include support for soundcards based on ESS Maestro
+	  1/2/2E chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-es1968.
 
 config SND_MAESTRO3
 	tristate "ESS Allegro/Maestro3"
 	depends on SND
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ESS Maestro 3 (Allegro) soundcard.
+	  Say Y here to include support for soundcards based on ESS Maestro 3
+	  (Allegro) chips.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-maestro3.
 
 config SND_FM801
 	tristate "ForteMedia FM801"
@@ -256,15 +358,23 @@ config SND_FM801
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards.
+	  Say Y here to include support for soundcards based on the ForteMedia
+	  FM801 chip.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-fm801.
 
 config SND_FM801_TEA575X
 	tristate "ForteMedia FM801 + TEA5757 tuner"
 	depends on SND_FM801
         select VIDEO_DEV
 	help
-	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards
-          with TEA5757 tuner connected to GPIO1-3 pins (Media Forte SF256-PCS-02).
+	  Say Y here to include support for soundcards based on the ForteMedia
+	  FM801 chip with a TEA5757 tuner connected to GPIO1-3 pins (Media
+	  Forte SF256-PCS-02).
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-fm801-tea575x.
 
 config SND_ICE1712
 	tristate "ICEnsemble ICE1712 (Envy24)"
@@ -272,10 +382,16 @@ config SND_ICE1712
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ICE1712 (Envy24) based soundcards.
-	  Currently supported hardware is: MidiMan M Audio - Delta 1010(LT), Dio 2496,
-	  Delta 66/44, Audiophile 24/96; Hoontech SoundTrack DSP 24 (Value);
-	  TerraTec - EWX 24/96, EWS 88MT, EWS 88D, DMX 6Fire.
+	  Say Y here to include support for soundcards based on the
+	  ICE1712 (Envy24) chip.
+
+	  Currently supported hardware is: M-Audio Delta 1010(LT),
+	  DiO 2496, 66, 44, 410, Audiophile 24/96; Digigram VX442;
+	  TerraTec EWX 24/96, EWS 88MT, 88D, DMX 6Fire, Phase 88;
+	  Hoontech SoundTrack DSP 24/Value/Media7.1; Event EZ8.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ice1712.
 
 config SND_ICE1724
 	tristate "ICE/VT1724/1720 (Envy24HT/PT)"
@@ -283,26 +399,40 @@ config SND_ICE1724
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ICE/VT1724/1720 (Envy24HT/PT) based
-	  soundcards.
-	  Currently supported hardware is: MidiMan M Audio - Revolution 7.1,
-	  AMP Ltd AUDIO2000, Terratec Aureon 5.1 Sky/7.1, AudioTrak Prodigy 7.1.
+	  Say Y here to include support for soundcards based on
+	  ICE/VT1724/1720 (Envy24HT/PT) chips.
+
+	  Currently supported hardware is: AMP AUDIO2000; M-Audio
+	  Revolution 7.1; TerraTec Aureon 5.1 Sky, 7.1 Space/Universe;
+	  AudioTrak Prodigy 7.1; Pontis MS300; Albatron K8X800 Pro II;
+	  Chaintech ZNF3-150/250.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ice1724.
 
 config SND_INTEL8X0
-	tristate "Intel i8x0/MX440, SiS 7012; Ali 5455; NForce Audio; AMD768/8111"
+	tristate "Intel/SiS/nVidia/AMD/ALi AC97 Controller"
 	depends on SND
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Intel8x0 based soundcards,
-	  SiS 7012, AMD768/8111, NVidia NForce and ALi 5455 chips.
+	  Say Y here to include support for the integrated AC97 sound
+	  device on motherboards with Intel/SiS/nVidia/AMD chipsets, or
+	  ALi chipsets using the M5455 Audio Controller.  (There is a
+	  separate driver for ALi M5451 Audio Controllers.)
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-intel8x0.
 
 config SND_INTEL8X0M
-	tristate "Intel i8x0/MX440; SiS 7013; NForce; AMD768/8111 modems (EXPERIMENTAL)"
+	tristate "Intel/SiS/nVidia/AMD MC97 Modem (EXPERIMENTAL)"
 	depends on SND && EXPERIMENTAL
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for Intel8x0, SiS 7013, NVidia NForce
-          and AMD768/8111 based modems.
+	  Say Y here to include support for the integrated MC97 modem on
+	  motherboards with Intel/SiS/nVidia/AMD chipsets.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-intel8x0m.
 
 config SND_SONICVIBES
 	tristate "S3 SonicVibes"
@@ -311,22 +441,33 @@ config SND_SONICVIBES
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for S3 SonicVibes based soundcards.
+	  Say Y here to include support for soundcards based on the S3
+	  SonicVibes chip.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-sonicvibes.
 
 config SND_VIA82XX
-	tristate "VIA 82C686A/B, 8233 South Bridge"
+	tristate "VIA 82C686A/B, 8233/8235 AC97 Controller"
 	depends on SND
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for VIA VT82C686A/B, VT8233 South Bridge.
+	  Say Y here to include support for the integrated AC97 sound
+	  device on motherboards with VIA chipsets.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-via82xx.
 
 config SND_VX222
 	tristate "Digigram VX222"
 	depends on SND
 	select SND_VX_LIB
 	help
-	  Say 'Y' or 'M' to include support for Digigram VX222 soundcards.
+	  Say Y here to include support for Digigram VX222 soundcards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-vx222.
 
 endmenu
 

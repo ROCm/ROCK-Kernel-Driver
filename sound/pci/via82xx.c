@@ -2243,8 +2243,9 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 	for (i = 0; i < chip->num_devs; i++)
 		snd_via82xx_channel_reset(chip, &chip->devs[i]);
 
-	sprintf(card->longname, "%s at 0x%lx, irq %d",
-		card->shortname, chip->port, chip->irq);
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s with %s at %#lx, irq %d", card->shortname,
+		 snd_ac97_get_short_name(chip->ac97), chip->port, chip->irq);
 
 	snd_via82xx_proc_init(chip);
 

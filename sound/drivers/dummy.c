@@ -557,7 +557,7 @@ DUMMY_VOLUME("CD Volume", 0, MIXER_ADDR_CD),
 DUMMY_CAPSRC("CD Capture Switch", 0, MIXER_ADDR_MASTER)
 };
 
-int __init snd_card_dummy_new_mixer(snd_card_dummy_t * dummy)
+static int __init snd_card_dummy_new_mixer(snd_card_dummy_t * dummy)
 {
 	snd_card_t *card = dummy->card;
 	unsigned int idx;

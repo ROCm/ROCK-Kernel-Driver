@@ -68,6 +68,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int buggy_irq[SNDRV_CARDS];
+static int xbox[SNDRV_CARDS];
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -82,6 +83,8 @@ module_param_array(ac97_quirk, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(buggy_irq, bool, boot_devs, 0444);
 MODULE_PARM_DESC(buggy_irq, "Enable workaround for buggy interrupts on some motherboards.");
+module_param_array(xbox, bool, boot_devs, 0444);
+MODULE_PARM_DESC(xbox, "Set to 1 for Xbox, if you have problems with the AC'97 codec detection.");
 
 /*
  *  Direct registers
@@ -385,10 +388,10 @@ struct _snd_intel8x0 {
 
 	unsigned int mmio;
 	unsigned long addr;
-	void __iomem * remap_addr;
+	unsigned long remap_addr;
 	unsigned int bm_mmio;
 	unsigned long bmaddr;
-	void __iomem * remap_bmaddr;
+	unsigned long remap_bmaddr;
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -405,6 +408,7 @@ struct _snd_intel8x0 {
 	    in_sdin_init: 1;
 	int fix_nocache: 1; /* workaround for 440MX */
 	int buggy_irq: 1; /* workaround for buggy mobos */
+	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
@@ -1907,6 +1911,8 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	ac97.private_data = chip;
 	ac97.private_free = snd_intel8x0_mixer_free_ac97;
 	ac97.scaps = AC97_SCAP_SKIP_MODEM;
+	if (chip->xbox)
+		ac97.scaps |= AC97_SCAP_DETECT_BY_VENDOR;
 	if (chip->device_type != DEVICE_ALI) {
 		glob_sta = igetdword(chip, ICHREG(GLOB_STA));
 		ops = &standard_bus_ops;
@@ -2237,9 +2243,9 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 		snd_dma_free_pages(&chip->bdbars);
 	}
 	if (chip->remap_addr)
-		iounmap(chip->remap_addr);
+		iounmap((void *) chip->remap_addr);
 	if (chip->remap_bmaddr)
-		iounmap(chip->remap_bmaddr);
+		iounmap((void *) chip->remap_bmaddr);
 	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
@@ -2512,8 +2518,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and Nforce */
 		chip->mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
-		chip->remap_addr = ioremap_nocache(chip->addr, pci_resource_len(pci, 2));
-		if (!chip->remap_addr) {
+		chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr,
+								   pci_resource_len(pci, 2));
+		if (chip->remap_addr == 0) {
 			snd_printk("AC'97 space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;
@@ -2524,8 +2531,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 3) & IORESOURCE_MEM) {	/* ICH4 */
 		chip->bm_mmio = 1;
 		chip->bmaddr = pci_resource_start(pci, 3);
-		chip->remap_bmaddr = ioremap_nocache(chip->bmaddr, pci_resource_len(pci, 3));
-		if (!chip->remap_bmaddr) {
+		chip->remap_bmaddr = (unsigned long) ioremap_nocache(chip->bmaddr,
+								     pci_resource_len(pci, 3));
+		if (chip->remap_bmaddr == 0) {
 			snd_printk("Controller space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;
@@ -2689,6 +2697,8 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	}
 	if (buggy_irq[dev])
 		chip->buggy_irq = 1;
+	if (xbox[dev])
+		chip->xbox = 1;
 
 	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev], ac97_quirk[dev])) < 0) {
 		snd_card_free(card);
@@ -2701,8 +2711,9 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	
 	snd_intel8x0_proc_init(chip);
 
-	sprintf(card->longname, "%s at 0x%lx, irq %i",
-		card->shortname, chip->addr, chip->irq);
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s with %s at %#lx, irq %i", card->shortname,
+		 snd_ac97_get_short_name(chip->ac97[0]), chip->addr, chip->irq);
 
 	if (! ac97_clock[dev])
 		intel8x0_measure_ac97_clock(chip);

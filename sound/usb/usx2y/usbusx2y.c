@@ -346,11 +346,11 @@ static void* usX2Y_usb_probe(struct usb_device* device, struct usb_interface *in
 	     device->descriptor.idProduct != USB_ID_US224 &&
 	     device->descriptor.idProduct != USB_ID_US428) ||
 	    !(card = usX2Y_create_card(device)))
-		return 0;
+		return NULL;
 	if ((err = usX2Y_hwdep_new(card, device)) < 0  ||
 	    (err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
-		return 0;
+		return NULL;
 	}
 	return card;
 }

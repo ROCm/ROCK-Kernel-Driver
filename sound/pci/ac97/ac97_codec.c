@@ -1759,6 +1759,22 @@ void snd_ac97_get_name(ac97_t *ac97, unsigned int id, char *name, int modem)
 	sprintf(name + strlen(name), " id %x", id & 0xff);
 }
 
+/**
+ * snd_ac97_get_short_name - retrieve codec name
+ * @ac97: the codec instance
+ *
+ * Returns the short identifying name of the codec.
+ */
+const char *snd_ac97_get_short_name(ac97_t *ac97)
+{
+	const ac97_codec_id_t *pid;
+
+	for (pid = snd_ac97_codec_ids; pid->id; pid++)
+		if (pid->id == (ac97->id & pid->mask))
+			return pid->name;
+	return "unknown codec";
+}
+
 
 /* wait for a while until registers are accessible after RESET
  * return 0 if ok, negative not ready
@@ -1766,9 +1782,10 @@ void snd_ac97_get_name(ac97_t *ac97, unsigned int id, char *name, int modem)
 static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 {
 	unsigned long end_time;
+	unsigned short val;
+
 	end_time = jiffies + timeout;
 	do {
-		unsigned short ext_mid;
 		
 		/* use preliminary reads to settle the communication */
 		snd_ac97_read(ac97, AC97_RESET);
@@ -1776,17 +1793,24 @@ static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 		snd_ac97_read(ac97, AC97_VENDOR_ID2);
 		/* modem? */
 		if (with_modem) {
-			ext_mid = snd_ac97_read(ac97, AC97_EXTENDED_MID);
-			if (ext_mid != 0xffff && (ext_mid & 1) != 0)
+			val = snd_ac97_read(ac97, AC97_EXTENDED_MID);
+			if (val != 0xffff && (val & 1) != 0)
 				return 0;
 		}
-		/* because the PCM or MASTER volume registers can be modified,
-		 * the REC_GAIN register is used for tests
-		 */
-		/* test if we can write to the record gain volume register */
-		snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a05);
-		if ((snd_ac97_read(ac97, AC97_REC_GAIN) & 0x7fff) == 0x0a05)
-			return 0;
+		if (ac97->scaps & AC97_SCAP_DETECT_BY_VENDOR) {
+			/* probably only Xbox issue - all registers are read as zero */
+			val = snd_ac97_read(ac97, AC97_VENDOR_ID1);
+			if (val != 0 && val != 0xffff)
+				return 0;
+		} else {
+			/* because the PCM or MASTER volume registers can be modified,
+			 * the REC_GAIN register is used for tests
+			 */
+			/* test if we can write to the record gain volume register */
+			snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a05);
+			if ((snd_ac97_read(ac97, AC97_REC_GAIN) & 0x7fff) == 0x0a05)
+				return 0;
+		}
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
 	} while (time_after_eq(end_time, jiffies));
@@ -2488,6 +2512,7 @@ EXPORT_SYMBOL(snd_ac97_read);
 EXPORT_SYMBOL(snd_ac97_write_cache);
 EXPORT_SYMBOL(snd_ac97_update);
 EXPORT_SYMBOL(snd_ac97_update_bits);
+EXPORT_SYMBOL(snd_ac97_get_short_name);
 EXPORT_SYMBOL(snd_ac97_bus);
 EXPORT_SYMBOL(snd_ac97_mixer);
 EXPORT_SYMBOL(snd_ac97_pcm_assign);

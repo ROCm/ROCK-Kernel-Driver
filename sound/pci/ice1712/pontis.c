@@ -490,7 +490,7 @@ static int pontis_gpio_mask_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
 	down(&ice->gpio_mutex);
 	/* 4-7 reserved */
-	ucontrol->value.integer.value[0] = (~ice->gpio.write_mask & 0xffff) | 0x00f0;
+	ucontrol->value.integer.value[0] = (ice->gpio.write_mask & 0xffff) | 0x00f0;
 	up(&ice->gpio_mutex);
 	return 0;
 }
@@ -502,7 +502,7 @@ static int pontis_gpio_mask_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	int changed;
 	down(&ice->gpio_mutex);
 	/* 4-7 reserved */
-	val = (~ucontrol->value.integer.value[0] & 0xffff) | 0x00f0;
+	val = (ucontrol->value.integer.value[0] & 0xffff) | 0x00f0;
 	changed = val != ice->gpio.write_mask;
 	ice->gpio.write_mask = val;
 	up(&ice->gpio_mutex);
@@ -823,7 +823,7 @@ static unsigned char pontis_eeprom[] __devinitdata = {
 	0x80,	/* ACLINK: I2S */
 	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
-	0x07,	/* GPIO_DIR */
+	0x00,	/* GPIO_DIR */
 	0x00,	/* GPIO_DIR1 */
 	0x00,	/* GPIO_DIR2 (ignored) */
 	0x0f,	/* GPIO_MASK (4-7 reserved for CS8416) */

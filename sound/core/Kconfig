@@ -17,17 +17,26 @@ config SND_SEQUENCER
 	depends on SND
 	select SND_TIMER
 	help
-	  Say 'Y' or 'M' to enable MIDI sequencer and router support. This feature
-	  allows routing and enqueing MIDI events. Events can be processed at given
-	  time.
+	  Say Y or M to enable MIDI sequencer and router support.  This
+	  feature allows routing and enqueueing of MIDI events.  Events
+	  can be processed at a given time.
+
+	  Many programs require this feature, so you should enable it
+	  unless you know what you're doing.
 
 config SND_SEQ_DUMMY
 	tristate "Sequencer dummy client"
 	depends on SND_SEQUENCER
 	help
-	  Say 'Y' or 'M' to enable dummy sequencer client. This client is a simple
-	  midi-through client. All normal input events are redirected to output port
-	  immediately.
+	  Say Y here to enable the dummy sequencer client.  This client
+	  is a simple MIDI-through client: all normal input events are
+	  redirected to the output port immediately.
+
+	  You don't need this unless you want to connect many MIDI
+	  devices or applications together.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-seq-dummy.
 
 config SND_OSSEMUL
 	bool
@@ -37,7 +46,13 @@ config SND_MIXER_OSS
 	depends on SND
 	select SND_OSSEMUL
 	help
-	  Say 'Y' or 'M' to enable mixer OSS API emulation (/dev/mixer*).
+	  To enable OSS mixer API emulation (/dev/mixer*), say Y here
+	  and read <file:Documentation/sound/alsa/OSS-Emulation.txt>.
+
+	  Many programs still use the OSS API, so say Y.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-mixer-oss.
 
 config SND_PCM_OSS
 	tristate "OSS PCM (digital audio) API"
@@ -45,15 +60,26 @@ config SND_PCM_OSS
 	select SND_OSSEMUL
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to enable digital audio (PCM) OSS API emulation (/dev/dsp*).
+	  To enable OSS digital audio (PCM) emulation (/dev/dsp*), say Y
+	  here and read <file:Documentation/sound/alsa/OSS-Emulation.txt>.
+
+	  Many programs still use the OSS API, so say Y.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-pcm-oss.
 
 config SND_SEQUENCER_OSS
 	bool "OSS Sequencer API"
 	depends on SND_SEQUENCER
 	select SND_OSSEMUL
 	help
-	  Say 'Y' to enable OSS sequencer emulation (both /dev/sequencer and
-	  /dev/music interfaces).
+	  Say Y here to enable OSS sequencer emulation (both
+	  /dev/sequencer and /dev/music interfaces).
+
+	  Many programs still use the OSS API, so say Y.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-seq-oss.
 
 config SND_BIT32_EMUL
 	tristate "Emulation for 32-bit applications"
@@ -63,38 +89,51 @@ config SND_BIT32_EMUL
 	select SND_TIMER
 	select SND_HWDEP
 	help
-	  Say 'Y' or 'M' to enable the emulation for 32-bit ALSA-native
+	  Say Y here to enable the emulation for 32-bit ALSA-native
 	  applications.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ioctl32.
 
 config SND_RTCTIMER
 	tristate "RTC Timer support"
 	depends on SND && RTC
 	select SND_TIMER
 	help
-	  Say 'Y' or 'M' to enable RTC timer support for ALSA. ALSA code uses RTC
-	  timer as precise timing source and maps the RTC timer to the ALSA's timer
-	  interface. ALSA sequencer code can also use this timing source.
+	  Say Y here to enable RTC timer support for ALSA.  ALSA uses
+	  the RTC timer as a precise timing source and maps the RTC
+	  timer to ALSA's timer interface.  The ALSA sequencer code also
+	  can use this timing source.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-rtctimer.
 
 config SND_VERBOSE_PRINTK
 	bool "Verbose printk"
 	depends on SND
 	help
-	  Say 'Y' to enable verbose log messages. These messages will help to
-	  identify source file and position containing printed messages.
+	  Say Y here to enable verbose log messages.  These messages
+	  will help to identify source file and position containing
+	  printed messages.
+
+	  You don't need this unless you're debugging ALSA.
 
 config SND_DEBUG
 	bool "Debug"
 	depends on SND
 	help
-	  Say 'Y' to enable ALSA debug code.
+	  Say Y here to enable ALSA debug code.
 
 config SND_DEBUG_MEMORY
 	bool "Debug memory"
 	depends on SND_DEBUG
 	help
-	  Say 'Y' to enable debugging of memory allocation.
+	  Say Y here to enable debugging of memory allocations.
 
 config SND_DEBUG_DETECT
 	bool "Debug detection"
 	depends on SND_DEBUG
+	help
+	  Say Y here to enable extra-verbose log messages printed when
+	  detecting devices.
 

@@ -638,37 +638,11 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
-				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
-				.data = & (const struct audioformat) {
-					.format = SNDRV_PCM_FORMAT_S24,
-					.channels = 12,
-					.iface = 1,
-					.altsetting = 1,
-					.altset_idx = 1,
-					.attributes = 0,
-					.endpoint = 0x81,
-					.ep_attr = 0x01,
-					.rates = SNDRV_PCM_RATE_CONTINUOUS,
-					.rate_min = 48000,
-					.rate_max = 48000,
-				}
+				.type = QUIRK_AUDIO_EDIROL_UA1000
 			},
 			{
 				.ifnum = 2,
-				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
-				.data = & (const struct audioformat) {
-					.format = SNDRV_PCM_FORMAT_S24,
-					.channels = 10,
-					.iface = 2,
-					.altsetting = 1,
-					.altset_idx = 1,
-					.attributes = 0,
-					.endpoint = 0x02,
-					.ep_attr = 0x01,
-					.rates = SNDRV_PCM_RATE_CONTINUOUS,
-					.rate_min = 48000,
-					.rate_max = 48000,
-				}
+				.type = QUIRK_AUDIO_EDIROL_UA1000
 			},
 			{
 				.ifnum = 3,
