@@ -9,6 +9,9 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/mm.h>
+#include <linux/highmem.h>	/* pte_offset_map => kmap_atomic */
+
 #include <asm/scatterlist.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -17,6 +20,8 @@
 #include <asm/io-unit.h>
 #include <asm/mxcc.h>
 #include <asm/bitops.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 /* #define IOUNIT_DEBUG */
 #ifdef IOUNIT_DEBUG
@@ -188,7 +193,7 @@ static void iounit_map_dma_area(unsigned long va, __u32 addr, int len)
 
 			pgdp = pgd_offset(init_task.mm, addr);
 			pmdp = pmd_offset(pgdp, addr);
-			ptep = pte_offset(pmdp, addr);
+			ptep = pte_offset_map(pmdp, addr);
 
 			set_pte(ptep, pte_val(mk_pte(virt_to_page(page), dvma_prot)));
 			

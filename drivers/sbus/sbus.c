@@ -16,6 +16,9 @@
 #include <asm/oplib.h>
 #include <asm/bpp.h>
 #include <asm/irq.h>
+#ifdef CONFIG_SPARC32
+#include <asm/pcic.h>		/* pcic_present */
+#endif
 
 struct sbus_bus *sbus_root = NULL;
 
@@ -282,7 +285,6 @@ static void __init sbus_fixup_all_regs(struct sbus_dev *first_sdev)
 
 extern void register_proc_sparc_ioport(void);
 extern void firetruck_init(void);
-extern void rs_init(void);
 
 static int __init sbus_init(void)
 {
@@ -334,10 +336,17 @@ static int __init sbus_init(void)
 		   (nd = prom_getchild(iommund)) == 0 ||
 		   (nd = prom_searchsiblings(nd, "sbus")) == 0) {
 #ifdef CONFIG_PCI
-                        if (!pcibios_present()) {       
+#ifdef CONFIG_SPARC32
+                        if (!pcic_present()) {
                                 prom_printf("Neither SBUS nor PCI found.\n");
                                 prom_halt();
                         }
+#else
+                        if (!pcibios_present()) {
+                                prom_printf("Neither SBUS nor PCI found.\n");
+                                prom_halt();
+                        }
+#endif
                         return 0;
 #else
 			/* No reason to run further - the data access trap will occur. */
@@ -495,8 +504,6 @@ static int __init sbus_init(void)
 		sun4d_init_sbi_irq();
 	}
 	
-	rs_init();
-
 #ifdef __sparc_v9__
 	if (sparc_cpu_model == sun4u) {
 		firetruck_init();

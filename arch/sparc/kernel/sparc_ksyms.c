@@ -142,7 +142,6 @@ EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
 
 /* Misc SMP information */
-EXPORT_SYMBOL(smp_num_cpus);
 EXPORT_SYMBOL(__cpu_number_map);
 EXPORT_SYMBOL(__cpu_logical_map);
 #endif

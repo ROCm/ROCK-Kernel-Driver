@@ -530,7 +530,7 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t len, dma_addr_t *pba)
 		}
 	}
 
-	*pba = virt_to_bus(va);
+	*pba = virt_to_phys(va); /* equals virt_to_bus (R.I.P.) for us. */
 	return (void *) res->start;
 }
 
@@ -565,7 +565,7 @@ void pci_free_consistent(struct pci_dev *pdev, size_t n, void *p, dma_addr_t ba)
 		return;
 	}
 
-	pgp = (unsigned long) bus_to_virt(ba);
+	pgp = (unsigned long) phys_to_virt(ba);	/* bus_to_virt actually */
 	mmu_inval_dma_area(pgp, n);
 	{
 		int x;
@@ -592,7 +592,7 @@ dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 	/* IIep is write-through, not flushing. */
-	return virt_to_bus(ptr);
+	return virt_to_phys(ptr);
 }
 
 /* Unmap a single streaming mode DMA translation.  The dma_addr and size
@@ -608,7 +608,7 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t ba, size_t size,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 	if (direction != PCI_DMA_TODEVICE) {
-		mmu_inval_dma_area((unsigned long)bus_to_virt(ba),
+		mmu_inval_dma_area((unsigned long)phys_to_virt(ba),
 		    (size + PAGE_SIZE-1) & PAGE_MASK);
 	}
 }
@@ -637,7 +637,8 @@ int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents,
 		BUG();
 	/* IIep is write-through, not flushing. */
 	for (n = 0; n < nents; n++) {
-		sg->dvma_address = virt_to_bus(sg->address);
+		if (page_address(sg->page) == NULL) BUG();
+		sg->dvma_address = virt_to_phys(page_address(sg->page));
 		sg->dvma_length = sg->length;
 		sg++;
 	}
@@ -657,7 +658,9 @@ void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents,
 		BUG();
 	if (direction != PCI_DMA_TODEVICE) {
 		for (n = 0; n < nents; n++) {
-			mmu_inval_dma_area((unsigned long)sg->address,
+			if (page_address(sg->page) == NULL) BUG();
+			mmu_inval_dma_area(
+			    (unsigned long) page_address(sg->page),
 			    (sg->length + PAGE_SIZE-1) & PAGE_MASK);
 			sg++;
 		}
@@ -678,7 +681,7 @@ void pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t ba, size_t size, int 
 	if (direction == PCI_DMA_NONE)
 		BUG();
 	if (direction != PCI_DMA_TODEVICE) {
-		mmu_inval_dma_area((unsigned long)bus_to_virt(ba),
+		mmu_inval_dma_area((unsigned long)phys_to_virt(ba),
 		    (size + PAGE_SIZE-1) & PAGE_MASK);
 	}
 }
@@ -697,7 +700,9 @@ void pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, i
 		BUG();
 	if (direction != PCI_DMA_TODEVICE) {
 		for (n = 0; n < nents; n++) {
-			mmu_inval_dma_area((unsigned long)sg->address,
+			if (page_address(sg->page) == NULL) BUG();
+			mmu_inval_dma_area(
+			    (unsigned long) page_address(sg->page),
 			    (sg->length + PAGE_SIZE-1) & PAGE_MASK);
 			sg++;
 		}

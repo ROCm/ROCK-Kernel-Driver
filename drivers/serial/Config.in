@@ -51,16 +51,28 @@ if [ "$CONFIG_ARM" = "y" ]; then
    dep_bool '  Console on SA1100 serial port' CONFIG_SERIAL_SA1100_CONSOLE $CONFIG_SERIAL_SA1100
 fi
 
+if [ "$CONFIG_SPARC" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
+   define_bool CONFIG_SERIAL_SUNCORE y
+   define_bool CONFIG_SERIAL_CORE_CONSOLE y
+   tristate 'Sun Zilog8530 serial support' CONFIG_SERIAL_SUNZILOG
+   dep_tristate 'Sun SU serial support' CONFIG_SERIAL_SUNSU $CONFIG_PCI
+   dep_tristate 'Sun Siemens SAB82532 serial support' CONFIG_SERIAL_SUNSAB $CONFIG_PCI
+fi
+
 if [ "$CONFIG_SERIAL_AMBA" = "y"   -o "$CONFIG_SERIAL_CLPS711X" = "y" -o \
      "$CONFIG_SERIAL_21285" = "y"  -o "$CONFIG_SERIAL_SA1100" = "y" -o \
      "$CONFIG_SERIAL_ANAKIN" = "y" -o "$CONFIG_SERIAL_UART00" = "y" -o \
-     "$CONFIG_SERIAL_8250" = "y"   -o "$CONFIG_SERIAL_ROCKETPORT" = "y" ]; then
+     "$CONFIG_SERIAL_8250" = "y"   -o "$CONFIG_SERIAL_ROCKETPORT" = "y" -o \
+     "$CONFIG_SERIAL_SUNZILOG" = "y" -o "$CONFIG_SERIAL_SUNSU" = "y" -o \
+     "$CONFIG_SERIAL_SUNSAB" = "y" ]; then
    define_bool CONFIG_SERIAL_CORE y
 else
    if [ "$CONFIG_SERIAL_AMBA" = "m"   -o "$CONFIG_SERIAL_CLPS711X" = "m" -o \
         "$CONFIG_SERIAL_21285" = "m"  -o "$CONFIG_SERIAL_SA1100" = "m" -o \
         "$CONFIG_SERIAL_ANAKIN" = "m" -o "$CONFIG_SERIAL_UART00" = "m" -o \
-        "$CONFIG_SERIAL_8250" = "m"   -o "$CONFIG_SERIAL_ROCKETPORT" = "m" ]; then
+        "$CONFIG_SERIAL_8250" = "m"   -o "$CONFIG_SERIAL_ROCKETPORT" = "m" -o \
+        "$CONFIG_SERIAL_SUNZILOG" = "m" -o "$CONFIG_SERIAL_SUNSU" = "m" -o \
+        "$CONFIG_SERIAL_SUNSAB" = "m" ]; then
       define_bool CONFIG_SERIAL_CORE m
    fi
 fi
@@ -70,7 +82,8 @@ if [ "$CONFIG_SERIAL_AMBA_CONSOLE" = "y" -o \
      "$CONFIG_SERIAL_SA1100_CONSOLE" = "y" -o \
      "$CONFIG_SERIAL_ANAKIN_CONSOLE" = "y" -o \
      "$CONFIG_SERIAL_UART00_CONSOLE" = "y" -o \
-     "$CONFIG_SERIAL_8250_CONSOLE" = "y" ]; then
+     "$CONFIG_SERIAL_8250_CONSOLE" = "y"  -o \
+     "$CONFIG_SERIAL_SUNCORE" = "y" ]; then
    define_bool CONFIG_SERIAL_CORE_CONSOLE y
 fi
 

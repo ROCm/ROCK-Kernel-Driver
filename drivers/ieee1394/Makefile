@@ -24,4 +24,4 @@ obj-$(CONFIG_IEEE1394_CMP) += cmp.o
 include $(TOPDIR)/Rules.make
 
 ieee1394.o: $(ieee1394-objs)
-	$(LD) -r -o $@ $(ieee1394-objs)
+	$(LD) $(LDFLAGS) -r -o $@ $(ieee1394-objs)

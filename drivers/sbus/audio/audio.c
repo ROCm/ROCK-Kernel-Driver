@@ -1694,9 +1694,9 @@ static int sparcaudio_ioctl(struct inode * inode, struct file * file,
 }
 
 static struct file_operations sparcaudioctl_fops = {
-	owner:		THIS_MODULE,
-	poll:		sparcaudio_poll,
-	ioctl:		sparcaudio_ioctl,
+	.owner =	THIS_MODULE,
+	.poll =		sparcaudio_poll,
+	.ioctl =	sparcaudio_ioctl,
 };
 
 static int sparcaudio_open(struct inode * inode, struct file * file)
@@ -1886,14 +1886,14 @@ static int sparcaudio_release(struct inode * inode, struct file * file)
 }
 
 static struct file_operations sparcaudio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		sparcaudio_read,
-	write:		sparcaudio_write,
-	poll:		sparcaudio_poll,
-	ioctl:		sparcaudio_ioctl,
-	open:		sparcaudio_open,
-	release:	sparcaudio_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		sparcaudio_read,
+	.write =	sparcaudio_write,
+	.poll =		sparcaudio_poll,
+	.ioctl =	sparcaudio_ioctl,
+	.open =		sparcaudio_open,
+	.release =	sparcaudio_release,
 };
 
 static struct {

@@ -107,35 +107,16 @@ int cpu_idle(void)
 
 #endif
 
-#ifdef CONFIG_PREEMPT
-void kpreempt_maybe(void)
-{
-	int cpu = smp_processor_id();
-
-	if (local_irq_count(cpu) == 0 &&
-	    local_bh_count(cpu) == 0 &&
-	    test_thread_flag(TIF_NEED_RESCHED))
-		schedule();
-}
-#endif
-
 extern char reboot_command [];
 
-#ifdef CONFIG_SUN_CONSOLE
 extern void (*prom_palette)(int);
 extern int serial_console;
-#endif
 extern void (*prom_keyboard)(void);
 
 void machine_halt(void)
 {
-	sti();
-	mdelay(8);
-	cli();
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette (1);
-#endif
 	if (prom_keyboard)
 		prom_keyboard();
 	prom_halt();
@@ -144,13 +125,8 @@ void machine_halt(void)
 
 void machine_alt_power_off(void)
 {
-	sti();
-	mdelay(8);
-	cli();
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette(1);
-#endif
 	if (prom_keyboard)
 		prom_keyboard();
 	prom_halt_power_off();
@@ -161,16 +137,10 @@ void machine_restart(char * cmd)
 {
 	char *p;
 	
-	sti();
-	mdelay(8);
-	cli();
-
 	p = strchr (reboot_command, '\n');
 	if (p) *p = 0;
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette (1);
-#endif
 	if (prom_keyboard)
 		prom_keyboard();
 	if (cmd)
@@ -311,10 +281,6 @@ void __show_regs(struct pt_regs * regs)
 			     : "=r" (flags)
 			     : "i" (PSTATE_IE));
 	spin_lock(&regdump_lock);
-	printk("CPU[%d]: local_irq_count[%u] irqs_running[%d]\n",
-	       smp_processor_id(),
-	       local_irq_count(smp_processor_id()),
-	       irqs_running());
 #endif
 	printk("TSTATE: %016lx TPC: %016lx TNPC: %016lx Y: %08x    %s\n", regs->tstate,
 	       regs->tpc, regs->tnpc, regs->y, print_tainted());

@@ -31,6 +31,7 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/vaddrs.h>
+#include <asm/pgalloc.h>	/* bug in asm-generic/tlb.h: check_pgt_cache */
 #include <asm/tlb.h>
 
 mmu_gather_t mmu_gathers[NR_CPUS];
@@ -59,7 +60,7 @@ pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
 #define kmap_get_fixed_pte(vaddr) \
-	pte_offset(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {
@@ -76,11 +77,13 @@ void show_mem(void)
 	       nr_swap_pages << (PAGE_SHIFT-10));
 	printk("%ld pages of RAM\n", totalram_pages);
 	printk("%d free pages\n", nr_free_pages());
+#if 0 /* undefined pgtable_cache_size, pgd_cache_size */
 	printk("%ld pages in page table cache\n",pgtable_cache_size);
 #ifndef CONFIG_SMP
 	if (sparc_cpu_model == sun4m || sparc_cpu_model == sun4d)
 		printk("%ld entries in page dir cache\n",pgd_cache_size);
 #endif	
+#endif
 }
 
 extern pgprot_t protection_map[16];
@@ -306,6 +309,23 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
 
 	return max_pfn;
+}
+
+/*
+ * check_pgt_cache
+ *
+ * This is called at the end of unmapping of VMA (zap_page_range),
+ * to rescan the page cache for architecture specific things,
+ * presumably something like sun4/sun4c PMEGs. Most architectures
+ * define check_pgt_cache empty.
+ *
+ * We simply copy the 2.4 implementation for now.
+ */
+int pgt_cache_water[2] = { 25, 50 };
+
+void check_pgt_cache(void)
+{
+	do_check_pgt_cache(pgt_cache_water[0], pgt_cache_water[1]);
 }
 
 /*

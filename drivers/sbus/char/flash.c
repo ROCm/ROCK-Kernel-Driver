@@ -148,12 +148,12 @@ static struct file_operations flash_fops = {
 	/* no write to the Flash, use mmap
 	 * and play flash dependent tricks.
 	 */
-	owner:		THIS_MODULE,
-	llseek:		flash_llseek,
-	read:		flash_read,
-	mmap:		flash_mmap,
-	open:		flash_open,
-	release:	flash_release,
+	.owner =	THIS_MODULE,
+	.llseek =	flash_llseek,
+	.read =		flash_read,
+	.mmap =		flash_mmap,
+	.open =		flash_open,
+	.release =	flash_release,
 };
 
 static struct miscdevice flash_dev = { FLASH_MINOR, "flash", &flash_fops };

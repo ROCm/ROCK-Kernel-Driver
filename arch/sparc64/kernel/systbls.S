@@ -91,7 +91,7 @@ sys_call_table:
 /*50*/	.word sys_getegid, sys_acct, sys_memory_ordering, sys_nis_syscall, sys_ioctl
 	.word sys_reboot, sys_nis_syscall, sys_symlink, sys_readlink, sys_execve
 /*60*/	.word sys_umask, sys_chroot, sys_newfstat, sys_nis_syscall, sys_getpagesize
-	.word sys_msync, sys_vfork, sys_pread, sys_pwrite, sys_nis_syscall
+	.word sys_msync, sys_vfork, sys_pread64, sys_pwrite64, sys_nis_syscall
 /*70*/	.word sys_nis_syscall, sys_mmap, sys_nis_syscall, sys64_munmap, sys_mprotect
 	.word sys_madvise, sys_vhangup, sys_nis_syscall, sys_mincore, sys_getgroups
 /*80*/	.word sys_setgroups, sys_getpgrp, sys_nis_syscall, sys_setitimer, sys_nis_syscall

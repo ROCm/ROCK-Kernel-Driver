@@ -41,15 +41,16 @@ SUBDIRS += arch/sparc/kernel arch/sparc/lib arch/sparc/prom \
 CORE_FILES := arch/sparc/kernel/kernel.o arch/sparc/mm/mm.o $(CORE_FILES) \
 	arch/sparc/math-emu/math-emu.o
 
-LIBS := $(TOPDIR)/lib/lib.a $(LIBS) $(TOPDIR)/arch/sparc/prom/promlib.a \
-	$(TOPDIR)/arch/sparc/lib/lib.a
+LIBS := $(LIBS) arch/sparc/prom/promlib.a arch/sparc/lib/lib.a
 
 # This one has to come last
 SUBDIRS += arch/sparc/boot
 CORE_FILES_NO_BTFIX := $(CORE_FILES)
 CORE_FILES += arch/sparc/boot/btfix.o
 
+# Export what is needed by arch/sparc/boot/Makefile
 export	CORE_FILES_NO_BTFIX
+export INIT
 
 archclean:
 	rm -f $(TOPDIR)/vmlinux.aout
@@ -60,7 +61,7 @@ archmrproper:
 
 prepare: check_asm
 
-check_asm: include/linux/version.h include/linux/asm include/config/MARKER
+check_asm: include/linux/version.h include/asm include/config/MARKER
 	$(MAKE) -C arch/sparc/kernel check_asm
 
 tftpboot.img:

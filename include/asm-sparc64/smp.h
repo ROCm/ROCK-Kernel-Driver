@@ -65,10 +65,18 @@ extern cpuinfo_sparc cpu_data[NR_CPUS];
 #include <asm/atomic.h>
 
 extern unsigned char boot_cpu_id;
+
+extern unsigned long phys_cpu_present_map;
+#define cpu_possible(cpu)	(phys_cpu_present_map & (1UL << (cpu)))
+
 extern unsigned long cpu_online_map;
 #define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
+
 extern atomic_t sparc64_num_cpus_online;
 #define num_online_cpus()	(atomic_read(&sparc64_num_cpus_online))
+
+extern atomic_t sparc64_num_cpus_possible;
+#define num_possible_cpus()	(atomic_read(&sparc64_num_cpus_possible))
 
 static inline int any_online_cpu(unsigned long mask)
 {
@@ -80,10 +88,6 @@ static inline int any_online_cpu(unsigned long mask)
 /*
  *	General functions that each host system must provide.
  */
-
-extern void smp_callin(void);
-extern void smp_boot_cpus(void);
-extern void smp_store_cpu_info(int id);
 
 extern __inline__ int hard_smp_processor_id(void)
 {

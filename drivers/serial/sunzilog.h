@@ -1,175 +1,19 @@
-/* $Id: zs.h,v 1.3 1999/09/21 14:38:18 davem Exp $
- * zs.h: Definitions for the Sparc Zilog serial driver.
- *
- * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
- * Copyright (C) 1996 Eddie C. Dost   (ecd@skynet.be)
- */
-#ifndef _ZS_H
-#define _ZS_H
+#ifndef _SUNZILOG_H
+#define _SUNZILOG_H
 
-/* Just one channel */
-struct sun_zschannel {
+struct zilog_channel {
 	volatile unsigned char control;
-	volatile unsigned char pad1;
+	volatile unsigned char __pad1;
 	volatile unsigned char data;
-	volatile unsigned char pad2;
+	volatile unsigned char __pad2;
 };
 
-/* The address space layout for each zs chip.  Yes they are
- * backwards.
- */
-struct sun_zslayout {
-	struct sun_zschannel channelB;
-	struct sun_zschannel channelA;
+struct zilog_layout {
+	struct zilog_channel channelB;
+	struct zilog_channel channelA;
 };
 
 #define NUM_ZSREGS    16
-
-struct serial_struct {
-	int	type;
-	int	line;
-	int	port;
-	int	irq;
-	int	flags;
-	int	xmit_fifo_size;
-	int	custom_divisor;
-	int	baud_base;
-	unsigned short	close_delay;
-	char	reserved_char[2];
-	int	hub6;
-	unsigned short	closing_wait; /* time to wait before closing */
-	unsigned short	closing_wait2; /* no longer used... */
-	int	reserved[4];
-};
-
-/*
- * For the close wait times, 0 means wait forever for serial port to
- * flush its output.  65535 means don't wait at all.
- */
-#define ZILOG_CLOSING_WAIT_INF	0
-#define ZILOG_CLOSING_WAIT_NONE	65535
-
-/*
- * Definitions for ZILOG_struct (and serial_struct) flags field
- */
-#define ZILOG_HUP_NOTIFY 0x0001 /* Notify getty on hangups and closes 
-				   on the callout port */
-#define ZILOG_FOURPORT  0x0002	/* Set OU1, OUT2 per AST Fourport settings */
-#define ZILOG_SAK	0x0004	/* Secure Attention Key (Orange book) */
-#define ZILOG_SPLIT_TERMIOS 0x0008 /* Separate termios for dialin/callout */
-
-#define ZILOG_SPD_MASK	0x0030
-#define ZILOG_SPD_HI	0x0010	/* Use 76800 instead of 38400 bps */
-#define ZILOG_SPD_CUST	0x0030  /* Use user-specified divisor */
-
-#define ZILOG_SKIP_TEST	0x0040 /* Skip UART test during autoconfiguration */
-#define ZILOG_AUTO_IRQ  0x0080 /* Do automatic IRQ during autoconfiguration */
-#define ZILOG_SESSION_LOCKOUT 0x0100 /* Lock out cua opens based on session */
-#define ZILOG_PGRP_LOCKOUT    0x0200 /* Lock out cua opens based on pgrp */
-#define ZILOG_CALLOUT_NOHUP   0x0400 /* Don't do hangups for cua device */
-
-#define ZILOG_FLAGS	0x0FFF	/* Possible legal ZILOG flags */
-#define ZILOG_USR_MASK 0x0430	/* Legal flags that non-privileged
-				 * users can set or reset */
-
-/* Internal flags used only by kernel/chr_drv/serial.c */
-#define ZILOG_INITIALIZED	0x80000000 /* Serial port was initialized */
-#define ZILOG_CALLOUT_ACTIVE	0x40000000 /* Call out device is active */
-#define ZILOG_NORMAL_ACTIVE	0x20000000 /* Normal device is active */
-#define ZILOG_BOOT_AUTOCONF	0x10000000 /* Autoconfigure port on bootup */
-#define ZILOG_CLOSING		0x08000000 /* Serial port is closing */
-#define ZILOG_CTS_FLOW		0x04000000 /* Do CTS flow control */
-#define ZILOG_CHECK_CD		0x02000000 /* i.e., CLOCAL */
-
-/* Software state per channel */
-
-#ifdef __KERNEL__
-/*
- * This is our internal structure for each serial port's state.
- * 
- * Many fields are paralleled by the structure used by the serial_struct
- * structure.
- *
- * For definitions of the flags field, see tty.h
- */
-
-struct sun_serial {
-	struct sun_serial *zs_next;       /* For IRQ servicing chain */
-	struct sun_zschannel *zs_channel; /* Channel registers */
-	unsigned char read_reg_zero;
-
-	char soft_carrier;  /* Use soft carrier on this channel */
-	char cons_keyb;     /* Channel runs the keyboard */
-	char cons_mouse;    /* Channel runs the mouse */
-	char break_abort;   /* Is serial console in, so process brk/abrt */
-	char kgdb_channel;  /* Kgdb is running on this channel */
-	char is_cons;       /* Is this our console. */
-
-	char channelA;      /* This is channel A. */
-	char parity_mask;   /* Mask out parity bits in data register. */
-
-	/* We need to know the current clock divisor
-	 * to read the bps rate the chip has currently
-	 * loaded.
-	 */
-	unsigned char clk_divisor;  /* May be 1, 16, 32, or 64 */
-	int zs_baud;
-
-	/* Current write register values */
-	unsigned char curregs[NUM_ZSREGS];
-
-	char change_needed;
-
-	int			magic;
-	int			baud_base;
-	int			port;
-	int			irq;
-	int			flags; 		/* defined in tty.h */
-	int			type; 		/* UART type */
-	struct tty_struct 	*tty;
-	int			read_status_mask;
-	int			ignore_status_mask;
-	int			timeout;
-	int			xmit_fifo_size;
-	int			custom_divisor;
-	int			x_char;	/* xon/xoff character */
-	int			close_delay;
-	unsigned short		closing_wait;
-	unsigned short		closing_wait2;
-	unsigned long		event;
-	unsigned long		last_active;
-	int			line;
-	int			count;	    /* # of fd on device */
-	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
-	unsigned char 		*xmit_buf;
-	int			xmit_head;
-	int			xmit_tail;
-	int			xmit_cnt;
-	struct tq_struct	tqueue;
-	struct tq_struct	tqueue_hangup;
-	struct termios		normal_termios;
-	struct termios		callout_termios;
-	wait_queue_head_t	open_wait;
-	wait_queue_head_t	close_wait;
-};
-
-
-#define SERIAL_MAGIC 0x5301
-
-/*
- * The size of the serial xmit buffer is 1 page, or 4096 bytes
- */
-#define SERIAL_XMIT_SIZE 4096
-
-/*
- * Events are used to schedule things to happen at timer-interrupt
- * time, instead of at rs interrupt time.
- */
-#define RS_EVENT_WRITE_WAKEUP	0
-
-#endif /* __KERNEL__ */
 
 /* Conversion routines to/from brg time constants from/to bits
  * per second.
@@ -263,6 +107,7 @@ struct sun_serial {
 #define	X16CLK		0x40	/* x16 clock mode */
 #define	X32CLK		0x80	/* x32 clock mode */
 #define	X64CLK		0xC0	/* x64 clock mode */
+#define XCLK_MASK	0xC0
 
 /* Write Register 5 */
 
@@ -424,4 +269,4 @@ struct sun_serial {
 				     sbus_readb(&channel->data); \
 				     udelay(2); } while(0)
 
-#endif /* !(_ZS_H) */
+#endif /* _SUNZILOG_H */

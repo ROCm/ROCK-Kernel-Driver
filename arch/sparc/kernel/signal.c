@@ -19,6 +19,7 @@
 #include <linux/tty.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/binfmts.h>	/* do_coredum */
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -26,6 +27,7 @@
 #include <asm/svr4.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
+#include <asm/cacheflush.h>	/* flush_sig_insns */
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
@@ -34,7 +36,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 extern void fpload(unsigned long *fpregs, unsigned long *fsr);
 
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
-			 unsigned long orig_o0, int ret_from_syscall);
+			 unsigned long orig_o0, int restart_syscall);
 
 /* This turned off for production... */
 /* #define DEBUG_SIGNALS 1 */
@@ -229,7 +231,7 @@ restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 {
 	int err;
 #ifdef CONFIG_SMP
-	if (current->flags & PF_USEDFPU)
+	if (test_tsk_thread_flag(current, TIF_USEDFPU))
 		regs->psr &= ~PSR_EF;
 #else
 	if (current == last_task_used_math) {
@@ -238,8 +240,8 @@ restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 	}
 #endif
 	current->used_math = 1;
-	current->flags &= ~PF_USEDFPU;
-	
+	clear_tsk_thread_flag(current, TIF_USEDFPU);
+
 	if (verify_area (VERIFY_READ, fpu, sizeof(*fpu)))
 		return -EFAULT;
 
@@ -586,12 +588,12 @@ save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 {
 	int err = 0;
 #ifdef CONFIG_SMP
-	if (current->flags & PF_USEDFPU) {
+	if (test_tsk_thread_flag(current, TIF_USEDFPU)) {
 		put_psr(get_psr() | PSR_EF);
 		fpsave(&current->thread.float_regs[0], &current->thread.fsr,
 		       &current->thread.fpqueue[0], &current->thread.fpqdepth);
 		regs->psr &= ~(PSR_EF);
-		current->flags &= ~(PF_USEDFPU);
+		clear_tsk_thread_flag(current, TIF_USEDFPU);
 	}
 #else
 	if (current == last_task_used_math) {
@@ -1295,7 +1297,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 				/* fall through */
 			default:
 				sigaddset(&current->pending.signal, signr);
-				recalc_sigpending(current);
+				recalc_sigpending();
 				current->flags |= PF_SIGNALED;
 				do_exit(exit_code);
 				/* NOT REACHED */
