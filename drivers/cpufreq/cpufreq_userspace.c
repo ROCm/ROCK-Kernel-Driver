@@ -75,6 +75,7 @@ static struct cpufreq_policy current_policy[NR_CPUS];
 
 static DECLARE_MUTEX	(userspace_sem); 
 
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_GOVERNOR, "userspace", msg)
 
 /* keep track of frequency transitions */
 static int 
@@ -83,6 +84,7 @@ userspace_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 {
         struct cpufreq_freqs *freq = data;
 
+	dprintk("saving cpu_cur_freq of cpu %u to be %u kHz\n", freq->cpu, freq->new);
 	cpu_cur_freq[freq->cpu] = freq->new;
 
         return 0;
@@ -103,6 +105,8 @@ static struct notifier_block userspace_cpufreq_notifier_block = {
 static int _cpufreq_set(unsigned int freq, unsigned int cpu)
 {
 	int ret = -EINVAL;
+
+	dprintk("_cpufreq_set for cpu %u, freq %u kHz\n", cpu, freq);
 
 	down(&userspace_sem);
 	if (!cpu_is_managed[cpu])
@@ -527,6 +531,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_set_freq[cpu] = policy->cur;
 		sysfs_create_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
+		dprintk("managing cpu %u started (%u - %u kHz, currently %u kHz)\n", cpu, cpu_min_freq[cpu], cpu_max_freq[cpu], cpu_cur_freq[cpu]);
 		up(&userspace_sem);
 		break;
 	case CPUFREQ_GOV_STOP:
@@ -536,12 +541,14 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_max_freq[cpu] = 0;
 		cpu_set_freq[cpu] = 0;
 		sysfs_remove_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
+		dprintk("managing cpu %u stopped\n", cpu);
 		up(&userspace_sem);
 		break;
 	case CPUFREQ_GOV_LIMITS:
 		down(&userspace_sem);
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
+		dprintk("limit event for cpu %u: %u - %u kHz, currently %u kHz, last set to %u kHz\n", cpu, cpu_min_freq[cpu], cpu_max_freq[cpu], cpu_cur_freq[cpu], cpu_set_freq[cpu]);
 		if (policy->max < cpu_set_freq[cpu]) {
 			__cpufreq_driver_target(&current_policy[cpu], policy->max, 
 			      CPUFREQ_RELATION_H);
