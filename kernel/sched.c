@@ -1180,7 +1180,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
 		set_tsk_need_resched(p);
-		return;
+		goto out;
 	}
 	spin_lock(&rq->lock);
 	/*
@@ -1207,7 +1207,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			dequeue_task(p, rq->active);
 			enqueue_task(p, rq->active);
 		}
-		goto out;
+		goto out_unlock;
 	}
 	if (!--p->time_slice) {
 		dequeue_task(p, rq->active);
@@ -1223,8 +1223,9 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 		} else
 			enqueue_task(p, rq->active);
 	}
-out:
+out_unlock:
 	spin_unlock(&rq->lock);
+out:
 	rebalance_tick(rq, 0);
 }
 
