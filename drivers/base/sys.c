@@ -12,7 +12,7 @@
  * add themselves as children of the system bus.
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/sysdev.h>
 #include <linux/err.h>
@@ -61,6 +61,19 @@ static struct sysfs_ops sysfs_ops = {
 static struct kobj_type ktype_sysdev = {
 	.sysfs_ops	= &sysfs_ops,
 };
+
+
+int sysdev_create_file(struct sys_device * s, struct sysdev_attribute * a)
+{
+	return sysfs_create_file(&s->kobj,&a->attr);
+}
+
+
+void sysdev_remove_file(struct sys_device * s, struct sysdev_attribute * a)
+{
+	sysfs_remove_file(&s->kobj,&a->attr);
+}
+
 
 /* 
  * declare system_subsys 
