@@ -532,10 +532,11 @@ extern int scsi_dev_info_list_add_str(char *);
 
 /*
  * scsi_target: representation of a scsi target, for now, this is only
- * used for single_lun devices.
+ * used for single_lun devices. If no one has active IO to the target,
+ * starget_sdev_user is NULL, else it points to the active sdev.
  */
 struct scsi_target {
-	unsigned int starget_busy;
+	struct scsi_device *starget_sdev_user;
 	unsigned int starget_refcnt;
 };
 

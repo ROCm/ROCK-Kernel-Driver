@@ -1283,7 +1283,7 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 				return SCSI_SCAN_NO_RESPONSE;
 			}
 			starget->starget_refcnt = 0;
-			starget->starget_busy = 0;
+			starget->starget_sdev_user = NULL;
 		}
 		starget->starget_refcnt++;
 		sdev->sdev_target = starget;

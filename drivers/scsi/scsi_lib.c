@@ -327,9 +327,9 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 }
 
 /*
- * Called for single_lun devices on IO completion. Clear starget_busy, and
- * Call __blk_run_queue for all the scsi_devices on the target - including
- * current_sdev first.
+ * Called for single_lun devices on IO completion. Clear starget_sdev_user,
+ * and call __blk_run_queue for all the scsi_devices on the target -
+ * including current_sdev first.
  *
  * Called with *no* scsi locks held.
  */
@@ -338,19 +338,33 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	struct scsi_device *sdev;
 	unsigned int flags, flags2;
 
-	spin_lock_irqsave(current_sdev->request_queue->queue_lock, flags2);
 	spin_lock_irqsave(current_sdev->host->host_lock, flags);
-	WARN_ON(!current_sdev->sdev_target->starget_busy);
-	if (current_sdev->device_busy == 0)
-		current_sdev->sdev_target->starget_busy = 0;
+	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
+	current_sdev->sdev_target->starget_sdev_user = NULL;
 	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
 
 	/*
 	 * Call __blk_run_queue for all LUNs on the target, starting with
-	 * current_sdev.
+	 * current_sdev. We race with others (to set starget_sdev_user),
+	 * but in most cases, we will be first. Ideally, each LU on the
+	 * target would get some limited time or requests on the target.
 	 */
+	spin_lock_irqsave(current_sdev->request_queue->queue_lock, flags2);
 	__blk_run_queue(current_sdev->request_queue);
 	spin_unlock_irqrestore(current_sdev->request_queue->queue_lock, flags2);
+
+	spin_lock_irqsave(current_sdev->host->host_lock, flags);
+	if (current_sdev->sdev_target->starget_sdev_user) {
+		/*
+		 * After unlock, this races with anyone clearing
+		 * starget_sdev_user, but we (should) always enter this
+		 * function again, avoiding any problems.
+		 */
+		spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+		return;
+	}
+	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+
 	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
 			    same_target_siblings) {
 		spin_lock_irqsave(sdev->request_queue->queue_lock, flags2);
@@ -1158,8 +1172,8 @@ static void scsi_request_fn(request_queue_t *q)
 		if (!scsi_host_queue_ready(q, shost, sdev))
 			goto after_host_lock;
 
-		if (sdev->single_lun && !sdev->device_busy &&
-		    sdev->sdev_target->starget_busy)
+		if (sdev->single_lun && sdev->sdev_target->starget_sdev_user &&
+		    (sdev->sdev_target->starget_sdev_user != sdev))
 			goto after_host_lock;
 
 		/*
@@ -1198,7 +1212,7 @@ static void scsi_request_fn(request_queue_t *q)
 			blkdev_dequeue_request(req);
 	
 		if (sdev->single_lun)
-			sdev->sdev_target->starget_busy = 1;
+			sdev->sdev_target->starget_sdev_user = sdev;
 
 		shost->host_busy++;
 		spin_unlock_irqrestore(shost->host_lock, flags);
