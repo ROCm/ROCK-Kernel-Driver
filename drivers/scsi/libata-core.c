@@ -2022,26 +2022,6 @@ static unsigned long ata_pio_poll(struct ata_port *ap)
 }
 
 /**
- *	ata_pio_start -
- *	@qc:
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-
-static void ata_pio_start (struct ata_queued_cmd *qc)
-{
-	struct ata_port *ap = qc->ap;
-
-	assert(qc->tf.protocol == ATA_PROT_PIO);
-
-	qc->flags |= ATA_QCFLAG_POLL;
-	qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
-	ata_tf_to_host_nolock(ap, &qc->tf);
-	queue_work(ata_wq, &ap->pio_task);
-}
-
-/**
  *	ata_pio_complete -
  *	@ap:
  *
@@ -2443,6 +2423,7 @@ err_out:
  *	is slightly different.
  *
  *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
  *
  *	RETURNS:
  *	Zero on success, negative on error.
@@ -2465,7 +2446,10 @@ static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 		break;
 
 	case ATA_PROT_PIO: /* load tf registers, initiate polling pio */
-		ata_pio_start(qc);
+		qc->flags |= ATA_QCFLAG_POLL;
+		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
+		ata_tf_to_host_nolock(ap, &qc->tf);
+		queue_work(ata_wq, &ap->pio_task);
 		break;
 
 	default:
