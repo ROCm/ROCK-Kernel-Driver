@@ -273,7 +273,7 @@ void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return;
-	ac97->write(ac97, reg, value);
+	ac97->bus->write(ac97, reg, value);
 }
 
 /**
@@ -291,7 +291,7 @@ unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg)
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return 0;
-	return ac97->read(ac97, reg);
+	return ac97->bus->read(ac97, reg);
 }
 
 /**
@@ -311,7 +311,7 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 	spin_lock(&ac97->reg_lock);
 	ac97->regs[reg] = value;
 	spin_unlock(&ac97->reg_lock);
-	ac97->write(ac97, reg, value);
+	ac97->bus->write(ac97, reg, value);
 	set_bit(reg, ac97->reg_accessed);
 }
 
@@ -338,7 +338,7 @@ int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 	if (change) {
 		ac97->regs[reg] = value;
 		spin_unlock(&ac97->reg_lock);
-		ac97->write(ac97, reg, value);
+		ac97->bus->write(ac97, reg, value);
 	} else
 		spin_unlock(&ac97->reg_lock);
 	return change;
@@ -371,7 +371,7 @@ int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, 
 	if (change) {
 		ac97->regs[reg] = new;
 		spin_unlock(&ac97->reg_lock);
-		ac97->write(ac97, reg, new);
+		ac97->bus->write(ac97, reg, new);
 	} else
 		spin_unlock(&ac97->reg_lock);
 	return change;
@@ -391,11 +391,11 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 		ac97->spec.ad18xx.pcmreg[codec] = new;
 		spin_unlock(&ac97->reg_lock);
 		/* select single codec */
-		ac97->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 		/* update PCM bits */
-		ac97->write(ac97, AC97_PCM, new);
+		ac97->bus->write(ac97, AC97_PCM, new);
 		/* select all codecs */
-		ac97->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
 	} else
 		spin_unlock(&ac97->reg_lock);
 	up(&ac97->spec.ad18xx.mutex);
@@ -979,9 +979,29 @@ AD18XX_PCM_BITS("LFE Playback Volume", 2, 0, 0, 31)
  *
  */
 
+static int snd_ac97_bus_free(ac97_bus_t *bus)
+{
+	if (bus) {
+		snd_ac97_bus_proc_done(bus);
+		if (bus->private_free)
+			bus->private_free(bus);
+		snd_magic_kfree(bus);
+	}
+	return 0;
+}
+
+static int snd_ac97_bus_dev_free(snd_device_t *device)
+{
+	ac97_bus_t *bus = snd_magic_cast(ac97_bus_t, device->device_data, return -ENXIO);
+	return snd_ac97_bus_free(bus);
+}
+
 static int snd_ac97_free(ac97_t *ac97)
 {
 	if (ac97) {
+		snd_ac97_proc_done(ac97);
+		if (ac97->bus)
+			ac97->bus->codec[ac97->num] = NULL;
 		if (ac97->private_free)
 			ac97->private_free(ac97);
 		snd_magic_kfree(ac97);
@@ -1196,7 +1216,7 @@ static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, int che
 
 static int snd_ac97_mixer_build(ac97_t * ac97)
 {
-	snd_card_t *card = ac97->card;
+	snd_card_t *card = ac97->bus->card;
 	snd_kcontrol_t *kctl;
 	int err;
 	unsigned int idx;
@@ -1503,7 +1523,7 @@ static int snd_ac97_test_rate(ac97_t *ac97, int reg, int rate)
 	unsigned short val;
 	unsigned int tmp;
 
-	tmp = ((unsigned int)rate * ac97->clock) / 48000;
+	tmp = ((unsigned int)rate * ac97->bus->clock) / 48000;
 	snd_ac97_write_cache(ac97, reg, tmp & 0xffff);
 	val = snd_ac97_read(ac97, reg);
 	return val == (tmp & 0xffff);
@@ -1608,13 +1628,61 @@ static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 }
 
 /**
- * snd_ac97_mixer - create an AC97 codec component
+ * snd_ac97_bus - create an AC97 bus component
  * @card: the card instance
+ * @_bus: the template of AC97 bus, callbacks and
+ *         the private data.
+ * @rbus: the pointer to store the new AC97 bus instance.
+ *
+ * Creates an AC97 bus component.  An ac97_bus_t instance is newly
+ * allocated and initialized from the template (_bus).
+ *
+ * The template must include the valid callbacks (at least read and
+ * write), the bus number (num), and the private data (private_data).
+ * The other callbacks, wait and reset, are not mandatory.
+ * 
+ * The clock is set to 48000.  If another clock is needed, set
+ * bus->clock manually.
+ *
+ * The AC97 bus instance is registered as a low-level device, so you don't
+ * have to release it manually.
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
+int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus)
+{
+	int err;
+	ac97_bus_t *bus;
+	static snd_device_ops_t ops = {
+		.dev_free =	snd_ac97_bus_dev_free,
+	};
+
+	snd_assert(card != NULL, return -EINVAL);
+	snd_assert(_bus != NULL && rbus != NULL, return -EINVAL);
+	bus = snd_magic_kmalloc(ac97_bus_t, 0, GFP_KERNEL);
+	if (bus == NULL)
+		return -ENOMEM;
+	*bus = *_bus;
+	bus->card = card;
+	if (bus->clock == 0)
+		bus->clock = 48000;
+	snd_ac97_bus_proc_init(bus);
+	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, bus, &ops)) < 0) {
+		snd_ac97_bus_free(bus);
+		return err;
+	}
+	*rbus = bus;
+	return 0;
+}
+
+/**
+ * snd_ac97_mixer - create an Codec97 component
+ * @bus: the AC97 bus which codec is attached to
  * @_ac97: the template of ac97, including index, callbacks and
  *         the private data.
  * @rac97: the pointer to store the new ac97 instance.
  *
- * Creates an AC97 codec component.  An ac97_t instance is newly
+ * Creates an Codec97 component.  An ac97_t instance is newly
  * allocated and initialized from the template (_ac97).  The codec
  * is then initialized by the standard procedure.
  *
@@ -1623,21 +1691,16 @@ static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
  * data (private_data).  The other callbacks, wait and reset, are not
  * mandatory.
  * 
- * The clock is set to 48000.  If another clock is needed, reset
- * ac97->clock manually afterwards.
- *
  * The ac97 instance is registered as a low-level device, so you don't
  * have to release it manually.
  *
- * The MCs (Modem Codecs only) are only detected but valid. The PCM driver
- * have to check for MCs using the !ac97_is_audio() function.
- *
  * Returns zero if successful, or a negative error code on failure.
  */
-int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
+int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 {
 	int err;
 	ac97_t *ac97;
+	snd_card_t *card;
 	char name[64];
 	unsigned long end_time;
 	unsigned int reg;
@@ -1647,31 +1710,34 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 
 	snd_assert(rac97 != NULL, return -EINVAL);
 	*rac97 = NULL;
-	snd_assert(card != NULL && _ac97 != NULL, return -EINVAL);
+	snd_assert(bus != NULL && _ac97 != NULL, return -EINVAL);
+	snd_assert(_ac97->num < 4 && bus->codec[_ac97->num] == NULL, return -EINVAL);
+	card = bus->card;
 	ac97 = snd_magic_kmalloc(ac97_t, 0, GFP_KERNEL);
 	if (ac97 == NULL)
 		return -ENOMEM;
 	*ac97 = *_ac97;
-	ac97->card = card;
+	ac97->bus = bus;
+	bus->codec[ac97->num] = ac97;
 	spin_lock_init(&ac97->reg_lock);
 
 	if (ac97->pci) {
 		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_VENDOR_ID, &ac97->subsystem_vendor);
 		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_ID, &ac97->subsystem_device);
 	}
-	if (ac97->reset) {
-		ac97->reset(ac97);
+	if (bus->reset) {
+		bus->reset(ac97);
 		goto __access_ok;
 	}
 
 	snd_ac97_write(ac97, AC97_RESET, 0);	/* reset to defaults */
-	if (ac97->wait)
-		ac97->wait(ac97);
+	if (bus->wait)
+		bus->wait(ac97);
 	else {
 		udelay(50);
 		if (ac97_reset_wait(ac97, HZ/2, 0) < 0 &&
 		    ac97_reset_wait(ac97, HZ/2, 1) < 0) {
-			snd_printk("AC'97 %d:%d does not respond - RESET\n", ac97->num, ac97->addr);
+			snd_printk(KERN_ERR "AC'97 %d does not respond - RESET\n", ac97->num);
 			snd_ac97_free(ac97);
 			return -ENXIO;
 		}
@@ -1680,7 +1746,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	ac97->id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;
 	ac97->id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
 	if (ac97->id == 0x00000000 || ac97->id == 0xffffffff) {
-		snd_printk("AC'97 %d:%d access is not valid [0x%x], removing mixer.\n", ac97->num, ac97->addr, ac97->id);
+		snd_printk(KERN_ERR "AC'97 %d access is not valid [0x%x], removing mixer.\n", ac97->num, ac97->id);
 		snd_ac97_free(ac97);
 		return -EIO;
 	}
@@ -1700,7 +1766,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
         }
 	
 	/* test for AC'97 */
-	if (! (ac97->scaps & AC97_SCAP_AUDIO)) {
+	if (!(ac97->scaps & AC97_SCAP_SKIP_AUDIO) && !(ac97->scaps & AC97_SCAP_AUDIO)) {
 		/* test if we can write to the record gain volume register */
 		snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a06);
 		if ((err = snd_ac97_read(ac97, AC97_REC_GAIN)) == 0x8a06)
@@ -1714,13 +1780,22 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	}
 
 	/* test for MC'97 */
-	ac97->ext_mid = snd_ac97_read(ac97, AC97_EXTENDED_MID);
-	if (ac97->ext_mid == 0xffff)	/* invalid combination */
-		ac97->ext_mid = 0;
-	if (ac97->ext_mid & 1)
-		ac97->scaps |= AC97_SCAP_MODEM;
+	if (!(ac97->scaps & AC97_SCAP_SKIP_MODEM) && !(ac97->scaps & AC97_SCAP_MODEM)) {
+		ac97->ext_mid = snd_ac97_read(ac97, AC97_EXTENDED_MID);
+		if (ac97->ext_mid == 0xffff)	/* invalid combination */
+			ac97->ext_mid = 0;
+		if (ac97->ext_mid & 1)
+			ac97->scaps |= AC97_SCAP_MODEM;
+	}
 
-	if (ac97->reset) // FIXME: always skipping?
+	if (!ac97_is_audio(ac97) && !ac97_is_modem(ac97)) {
+		if (!(ac97->scaps & (AC97_SCAP_SKIP_AUDIO|AC97_SCAP_SKIP_MODEM)))
+			snd_printk(KERN_ERR "AC'97 %d access error (not audio or modem codec)\n", ac97->num, ac97->id);
+		snd_ac97_free(ac97);
+		return -EACCES;
+	}
+
+	if (bus->reset) // FIXME: always skipping?
 		goto __ready_ok;
 
 	/* FIXME: add powerdown control */
@@ -1739,12 +1814,43 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(HZ/10);
 		} while (time_after_eq(end_time, jiffies));
-		snd_printk("AC'97 %d:%d analog subsections not ready\n", ac97->num, ac97->addr);
+		snd_printk(KERN_ERR "AC'97 %d analog subsections not ready\n", ac97->num);
 	}
 
+	/* FIXME: add powerdown control */
+	if (ac97_is_modem(ac97)) {
+		unsigned char tmp;
+
+		/* nothing should be in powerdown mode */
+		/* note: it's important to set the rate at first */
+		tmp = AC97_MEA_GPIO;
+		if (ac97->ext_mid & AC97_MEI_LINE1) {
+			snd_ac97_write_cache(ac97, AC97_LINE1_RATE, 12000);
+			tmp |= AC97_MEA_ADC1 | AC97_MEA_DAC1;
+		}
+		if (ac97->ext_mid & AC97_MEI_LINE2) {
+			snd_ac97_write_cache(ac97, AC97_LINE2_RATE, 12000);
+			tmp |= AC97_MEA_ADC2 | AC97_MEA_DAC2;
+		}
+		if (ac97->ext_mid & AC97_MEI_HANDSET) {
+			snd_ac97_write_cache(ac97, AC97_HANDSET_RATE, 12000);
+			tmp |= AC97_MEA_HADC | AC97_MEA_HDAC;
+		}
+		snd_ac97_write_cache(ac97, AC97_EXTENDED_MSTATUS, 0xff00 & ~(tmp << 8));
+		udelay(100);
+		/* nothing should be in powerdown mode */
+		snd_ac97_write_cache(ac97, AC97_EXTENDED_MSTATUS, 0xff00 & ~(tmp << 8));
+		end_time = jiffies + (HZ / 10);
+		do {
+			if ((snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS) & tmp) == tmp)
+				goto __ready_ok;
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ/10);
+		} while (time_after_eq(end_time, jiffies));
+		snd_printk(KERN_ERR "MC'97 %d converters and GPIO not ready (0x%x)\n", ac97->num, snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS));
+	}
+	
       __ready_ok:
-	if (ac97->clock == 0)
-		ac97->clock = 48000;	/* standard value */
 	if (ac97_is_audio(ac97))
 		ac97->addr = (ac97->ext_id & AC97_EI_ADDR_MASK) >> AC97_EI_ADDR_SHIFT;
 	else
@@ -1783,8 +1889,8 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		ac97->scaps |= AC97_SCAP_CENTER_LFE_DAC;
 	}
 	/* additional initializations */
-	if (ac97->init)
-		ac97->init(ac97);
+	if (bus->init)
+		bus->init(ac97);
 	snd_ac97_get_name(ac97, ac97->id, name, 0);
 	snd_ac97_get_name(NULL, ac97->id, name, 0);  // ac97->id might be changed in the special setup code
 	if (ac97_is_audio(ac97)) {
@@ -1805,183 +1911,6 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 			return -ENOMEM;
 		}
 	}
-	snd_ac97_proc_init(card, ac97, "ac97");
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ac97, &ops)) < 0) {
-		snd_ac97_free(ac97);
-		return err;
-	}
-	*rac97 = ac97;
-	return 0;
-}
-
-/* wait for a while until registers are accessible after RESET
- * return 0 if ok, negative not ready
- */
-static int ac97_modem_reset_wait(ac97_t *ac97, int timeout)
-{
-	unsigned long end_time;
-	end_time = jiffies + timeout;
-	do {
-		unsigned short ext_mid;
-		
-		/* use preliminary reads to settle the communication */
-		snd_ac97_read(ac97, AC97_EXTENDED_MID);
-		snd_ac97_read(ac97, AC97_VENDOR_ID1);
-		snd_ac97_read(ac97, AC97_VENDOR_ID2);
-		ext_mid = snd_ac97_read(ac97, AC97_EXTENDED_MID);
-		if (ext_mid != 0xffff && (ext_mid & 1) != 0)
-			return 0;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
-	} while (time_after_eq(end_time, jiffies));
-	return -ENODEV;
-}
-
-/**
- * snd_ac97_modem - create an MC97 codec component
- * @card: the card instance
- * @_ac97: the template of ac97, including index, callbacks and
- *         the private data.
- * @rac97: the pointer to store the new ac97 instance.
- *
- * Creates an MC97 codec component.  An ac97_t instance is newly
- * allocated and initialized from the template (_ac97).  The codec
- * is then initialized by the standard procedure.
- *
- * The template must include the valid callbacks (at least read and
- * write), the codec number (num) and address (addr), and the private
- * data (private_data).  The other callbacks, wait and reset, are not
- * mandatory.
- * 
- * The clock is set to 48000.  If another clock is needed, reset
- * ac97->clock manually afterwards.
- *
- * The ac97 instance is registered as a low-level device, so you don't
- * have to release it manually.
- *
- * The ACs (Audio Codecs only) are only detected but valid. The PCM driver
- * have to check for ACs using the !ac97_is_modem() function.
- *
- * Returns zero if successful, or a negative error code on failure.
- */
-int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
-{
-	int err;
-	ac97_t *ac97;
-	char name[64];
-	unsigned long end_time;
-	unsigned short tmp;
-	static snd_device_ops_t ops = {
-		.dev_free =	snd_ac97_dev_free,
-	};
-
-	snd_assert(rac97 != NULL, return -EINVAL);
-	*rac97 = NULL;
-	snd_assert(card != NULL && _ac97 != NULL, return -EINVAL);
-	ac97 = snd_magic_kcalloc(ac97_t, 0, GFP_KERNEL);
-	if (ac97 == NULL)
-		return -ENOMEM;
-	*ac97 = *_ac97;
-	ac97->card = card;
-	spin_lock_init(&ac97->reg_lock);
-
-	ac97->pci = _ac97->pci;
-	if (ac97->pci) {
-		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_VENDOR_ID, &ac97->subsystem_vendor);
-		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_ID, &ac97->subsystem_device);
-	}
-
-	if (ac97->reset) {
-		ac97->reset(ac97);
-		goto __access_ok;
-	}
-
-	snd_ac97_write(ac97, AC97_EXTENDED_MID, 0);	/* reset to defaults */
-	if (ac97->wait)
-		ac97->wait(ac97);
-	else {
-		udelay(50);
-		if (ac97_modem_reset_wait(ac97, HZ/2) < 0) {
-			snd_printk("MC'97 %d:%d does not respond - MODEM RESET\n", ac97->num, ac97->addr);
-			snd_ac97_free(ac97);
-			return -ENXIO;
-		}
-	}
-      __access_ok:
-	ac97->id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;
-	ac97->id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
-	if (ac97->id == 0x00000000 || ac97->id == 0xffffffff) {
-		snd_printk("MC'97 %d:%d access is not valid [0x%x], removing modem controls.\n", ac97->num, ac97->addr, ac97->id);
-		snd_ac97_free(ac97);
-		return -EIO;
-	}
-	
-	/* test for MC'97 */
-	ac97->ext_mid = snd_ac97_read(ac97, AC97_EXTENDED_MID);
-	if (ac97->ext_mid == 0xffff)	/* invalid combination */
-		ac97->ext_mid = 0;
-	if (ac97->ext_mid & 1)
-		ac97->scaps |= AC97_SCAP_MODEM;
-
-	/* non-destructive test for AC'97 */
-	tmp = snd_ac97_read(ac97, AC97_RESET);
-	if (tmp == 0 || tmp == 0xffff) {
-		tmp = snd_ac97_read(ac97, AC97_EXTENDED_ID);
-		if (tmp == 0 || tmp == 0xffff) {
-			tmp = snd_ac97_read(ac97, AC97_REC_GAIN);
-			if (tmp == 0 || tmp == 0xffff)
-				tmp = snd_ac97_read(ac97, AC97_POWERDOWN);
-		}
-	}
-	if ((tmp != 0 && tmp != 0xffff) || !(ac97->scaps & AC97_SCAP_MODEM))
-		ac97->scaps |= AC97_SCAP_AUDIO;
-
-	if (ac97->reset) // FIXME: always skipping?
-		goto __ready_ok;
-
-	/* FIXME: add powerdown control */
-	if (ac97->scaps & AC97_SCAP_MODEM) {
-		/* nothing should be in powerdown mode */
-		/* note: it's important to set the rate at first */
-		tmp = AC97_MEA_GPIO;
-		if (ac97->ext_mid & AC97_MEI_LINE1) {
-			snd_ac97_write_cache(ac97, AC97_LINE1_RATE, 12000);
-			tmp |= AC97_MEA_ADC1 | AC97_MEA_DAC1;
-		}
-		if (ac97->ext_mid & AC97_MEI_LINE2) {
-			snd_ac97_write_cache(ac97, AC97_LINE2_RATE, 12000);
-			tmp |= AC97_MEA_ADC2 | AC97_MEA_DAC2;
-		}
-		if (ac97->ext_mid & AC97_MEI_HANDSET) {
-			snd_ac97_write_cache(ac97, AC97_HANDSET_RATE, 12000);
-			tmp |= AC97_MEA_HADC | AC97_MEA_HDAC;
-		}
-		snd_ac97_write_cache(ac97, AC97_EXTENDED_MSTATUS, 0xff00 & ~(tmp << 8));
-		udelay(100);
-		/* nothing should be in powerdown mode */
-		snd_ac97_write_cache(ac97, AC97_EXTENDED_MSTATUS, 0xff00 & ~(tmp << 8));
-		end_time = jiffies + (HZ / 10);
-		do {
-			if ((snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS) & tmp) == tmp)
-				goto __ready_ok;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
-		} while (time_after_eq(end_time, jiffies));
-		snd_printk("MC'97 %d:%d converters and GPIO not ready (0x%x)\n", ac97->num, ac97->addr, snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS));
-	}
-
-      __ready_ok:
-	/* additional initializations */
-	/* FIXME: ADD MODEM INITALIZATION */
-	if (ac97_is_modem(ac97))
-		ac97->addr = (ac97->ext_mid & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT;
-	else
-		ac97->addr = (ac97->ext_id & AC97_EI_ADDR_MASK) >> AC97_EI_ADDR_SHIFT;
-
-	if (ac97->init)
-		ac97->init(ac97);
-	snd_ac97_get_name(ac97, ac97->id, name, 1);
-	snd_ac97_get_name(NULL, ac97->id, name, 1);  // ac97->id might be changed in the special setup code
 	if (ac97_is_modem(ac97)) {
 		if (card->mixername[0] == '\0') {
 			strcpy(card->mixername, name);
@@ -1995,12 +1924,12 @@ int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 			snd_ac97_free(ac97);
 			return err;
 		}
+		if (snd_ac97_modem_build(card, ac97) < 0) {
+			snd_ac97_free(ac97);
+			return -ENOMEM;
+		}
 	}
-	if (ac97_is_modem(ac97) && snd_ac97_modem_build(card, ac97) < 0) {
-		snd_ac97_free(ac97);
-		return -ENOMEM;
-	}
-	snd_ac97_proc_init(card, ac97, "mc97");
+	snd_ac97_proc_init(ac97);
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ac97, &ops)) < 0) {
 		snd_ac97_free(ac97);
 		return err;
@@ -2106,7 +2035,7 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 	default:
 		return -EINVAL;
 	}
-	tmp = ((unsigned int)rate * ac97->clock) / 48000;
+	tmp = ((unsigned int)rate * ac97->bus->clock) / 48000;
 	if (tmp > 65535)
 		return -EINVAL;
 	snd_ac97_update(ac97, reg, tmp & 0xffff);
@@ -2148,8 +2077,8 @@ void snd_ac97_resume(ac97_t *ac97)
 {
 	int i, is_ad18xx, codec;
 
-	if (ac97->reset) {
-		ac97->reset(ac97);
+	if (ac97->bus->reset) {
+		ac97->bus->reset(ac97);
 		goto  __reset_ready;
 	}
 
@@ -2168,8 +2097,8 @@ void snd_ac97_resume(ac97_t *ac97)
 	}
 __reset_ready:
 
-	if (ac97->init)
-		ac97->init(ac97);
+	if (bus->init)
+		bus->init(ac97);
 
 	is_ad18xx = (ac97->flags & AC97_AD_MULTI);
 	if (is_ad18xx) {
@@ -2242,7 +2171,7 @@ int snd_ac97_remove_ctl(ac97_t *ac97, const char *name)
 	memset(&id, 0, sizeof(id));
 	strcpy(id.name, name);
 	id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
-	return snd_ctl_remove_id(ac97->card, &id);
+	return snd_ctl_remove_id(ac97->bus->card, &id);
 }
 
 static snd_kcontrol_t *ctl_find(ac97_t *ac97, const char *name)
@@ -2251,7 +2180,7 @@ static snd_kcontrol_t *ctl_find(ac97_t *ac97, const char *name)
 	memset(&sid, 0, sizeof(sid));
 	strcpy(sid.name, name);
 	sid.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
-	return snd_ctl_find_id(ac97->card, &sid);
+	return snd_ctl_find_id(ac97->bus->card, &sid);
 }
 
 int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst)
@@ -2358,8 +2287,8 @@ EXPORT_SYMBOL(snd_ac97_read);
 EXPORT_SYMBOL(snd_ac97_write_cache);
 EXPORT_SYMBOL(snd_ac97_update);
 EXPORT_SYMBOL(snd_ac97_update_bits);
+EXPORT_SYMBOL(snd_ac97_bus);
 EXPORT_SYMBOL(snd_ac97_mixer);
-EXPORT_SYMBOL(snd_ac97_modem);
 EXPORT_SYMBOL(snd_ac97_set_rate);
 EXPORT_SYMBOL(snd_ac97_tune_hardware);
 #ifdef CONFIG_PM

@@ -1784,7 +1784,6 @@ static int __init alsa_timer_init(void)
 	snd_oss_info_register(SNDRV_OSS_INFO_DEV_TIMERS, SNDRV_CARDS - 1, "system timer");
 #endif
 	if ((entry = snd_info_create_module_entry(THIS_MODULE, "timers", NULL)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = SNDRV_TIMER_DEVICES * 128;
 		entry->c.text.read = snd_timer_proc_read;
 		if (snd_info_register(entry) < 0) {

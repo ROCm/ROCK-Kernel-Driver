@@ -467,6 +467,7 @@ struct _snd_via82xx {
 
 	snd_rawmidi_t *rmidi;
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97;
 	unsigned int ac97_clock;
 	unsigned int ac97_secondary;	/* secondary AC'97 codec is present */
@@ -1528,6 +1529,12 @@ static snd_kcontrol_new_t snd_via8233_dxs_volume_control __devinitdata = {
 /*
  */
 
+static void snd_via82xx_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	via82xx_t *chip = snd_magic_cast(via82xx_t, bus->private_data, return);
+	chip->ac97_bus = NULL;
+}
+
 static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 {
 	via82xx_t *chip = snd_magic_cast(via82xx_t, ac97->private_data, return);
@@ -1546,18 +1553,25 @@ static struct ac97_quirk ac97_quirks[] = {
 
 static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
 {
+	ac97_bus_t bus;
 	ac97_t ac97;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_via82xx_codec_write;
+	bus.read = snd_via82xx_codec_read;
+	bus.wait = snd_via82xx_codec_wait;
+	bus.private_data = chip;
+	bus.private_free = snd_via82xx_mixer_free_ac97_bus;
+	bus.clock = chip->ac97_clock;
+	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_via82xx_codec_write;
-	ac97.read = snd_via82xx_codec_read;
-	ac97.wait = snd_via82xx_codec_wait;
 	ac97.private_data = chip;
 	ac97.private_free = snd_via82xx_mixer_free_ac97;
-	ac97.clock = chip->ac97_clock;
 	ac97.pci = chip->pci;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 
 	snd_ac97_tune_hardware(chip->ac97, ac97_quirks);
@@ -1706,7 +1720,7 @@ static void __devinit snd_via82xx_proc_init(via82xx_t *chip)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(chip->card, "via82xx", &entry))
-		snd_info_set_text_ops(entry, chip, snd_via82xx_proc_read);
+		snd_info_set_text_ops(entry, chip, 1024, snd_via82xx_proc_read);
 }
 
 /*

@@ -1534,16 +1534,21 @@ static struct {
 static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 {
 	snd_card_t *card = ensoniq->card;
+	ac97_bus_t bus, *pbus;
 	ac97_t ac97;
 	int err, idx;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_es1371_codec_write;
+	bus.read = snd_es1371_codec_read;
+	if ((err = snd_ac97_bus(card, &bus, &pbus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_es1371_codec_write;
-	ac97.read = snd_es1371_codec_read;
 	ac97.private_data = ensoniq;
 	ac97.private_free = snd_ensoniq_mixer_free_ac97;
 	ac97.scaps = AC97_SCAP_AUDIO;
-	if ((err = snd_ac97_mixer(card, &ac97, &ensoniq->u.es1371.ac97)) < 0)
+	if ((err = snd_ac97_mixer(pbus, &ac97, &ensoniq->u.es1371.ac97)) < 0)
 		return err;
 	for (idx = 0; es1371_spdif_present[idx].vid != (unsigned short)PCI_ANY_ID; idx++)
 		if (ensoniq->pci->vendor == es1371_spdif_present[idx].vid &&
@@ -1745,7 +1750,7 @@ static void __devinit snd_ensoniq_proc_init(ensoniq_t * ensoniq)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(ensoniq->card, "audiopci", &entry))
-		snd_info_set_text_ops(entry, ensoniq, snd_ensoniq_proc_read);
+		snd_info_set_text_ops(entry, ensoniq, 1024, snd_ensoniq_proc_read);
 }
 
 /*

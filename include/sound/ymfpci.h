@@ -346,6 +346,7 @@ struct _snd_ymfpci {
 	u32 active_bank;
 	ymfpci_voice_t voices[64];
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97;
 	snd_rawmidi_t *rawmidi;
 	snd_timer_t *timer;

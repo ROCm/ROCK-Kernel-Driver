@@ -455,18 +455,24 @@ static int rename_ctl(snd_card_t *card, const char *src, const char *dst)
 
 int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 {
-	ac97_t ac97;
 	int err, pcm;
 	snd_kcontrol_t *kctl;
 	snd_card_t *card = emu->card;
 
 	if (!emu->no_ac97) {
+		ac97_bus_t bus, *pbus;
+		ac97_t ac97;
+
+		memset(&bus, 0, sizeof(bus));
+		bus.write = snd_emu10k1_ac97_write;
+		bus.read = snd_emu10k1_ac97_read;
+		if ((err = snd_ac97_bus(emu->card, &bus, &pbus)) < 0)
+			return err;
+		
 		memset(&ac97, 0, sizeof(ac97));
-		ac97.write = snd_emu10k1_ac97_write;
-		ac97.read = snd_emu10k1_ac97_read;
 		ac97.private_data = emu;
 		ac97.private_free = snd_emu10k1_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(emu->card, &ac97, &emu->ac97)) < 0)
+		if ((err = snd_ac97_mixer(pbus, &ac97, &emu->ac97)) < 0)
 			return err;
 		if (emu->audigy) {
 			/* Master/PCM controls on ac97 of Audigy has no effect */

@@ -408,11 +408,7 @@ static int snd_pcm_stream_proc_init(snd_pcm_str_t *pstr)
 	pstr->proc_root = entry;
 
 	if ((entry = snd_info_create_card_entry(pcm->card, "info", pstr->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->mode = S_IFREG | S_IRUGO;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_pcm_stream_proc_info_read;
-		entry->private_data = pstr;
+		snd_info_set_text_ops(entry, pstr, 256, snd_pcm_stream_proc_info_read);
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;
@@ -455,11 +451,7 @@ static int snd_pcm_substream_proc_init(snd_pcm_substream_t *substream)
 	substream->proc_root = entry;
 
 	if ((entry = snd_info_create_card_entry(card, "info", substream->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->mode = S_IFREG | S_IRUGO;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_pcm_substream_proc_info_read;
-		entry->private_data = substream;
+		snd_info_set_text_ops(entry, substream, 256, snd_pcm_substream_proc_info_read);
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;
@@ -468,11 +460,7 @@ static int snd_pcm_substream_proc_init(snd_pcm_substream_t *substream)
 	substream->proc_info_entry = entry;
 
 	if ((entry = snd_info_create_card_entry(card, "hw_params", substream->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->mode = S_IFREG | S_IRUGO;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_pcm_substream_proc_hw_params_read;
-		entry->private_data = substream;
+		snd_info_set_text_ops(entry, substream, 256, snd_pcm_substream_proc_hw_params_read);
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;
@@ -481,11 +469,7 @@ static int snd_pcm_substream_proc_init(snd_pcm_substream_t *substream)
 	substream->proc_hw_params_entry = entry;
 
 	if ((entry = snd_info_create_card_entry(card, "sw_params", substream->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->mode = S_IFREG | S_IRUGO;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_pcm_substream_proc_sw_params_read;
-		entry->private_data = substream;
+		snd_info_set_text_ops(entry, substream, 256, snd_pcm_substream_proc_sw_params_read);
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;
@@ -494,11 +478,7 @@ static int snd_pcm_substream_proc_init(snd_pcm_substream_t *substream)
 	substream->proc_sw_params_entry = entry;
 
 	if ((entry = snd_info_create_card_entry(card, "status", substream->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->mode = S_IFREG | S_IRUGO;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_pcm_substream_proc_status_read;
-		entry->private_data = substream;
+		snd_info_set_text_ops(entry, substream, 256, snd_pcm_substream_proc_status_read);
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;
@@ -513,23 +493,23 @@ static int snd_pcm_substream_proc_done(snd_pcm_substream_t *substream)
 {
 	if (substream->proc_info_entry) {
 		snd_info_unregister(substream->proc_info_entry);
-		substream->proc_info_entry = 0;
+		substream->proc_info_entry = NULL;
 	}
 	if (substream->proc_hw_params_entry) {
 		snd_info_unregister(substream->proc_hw_params_entry);
-		substream->proc_hw_params_entry = 0;
+		substream->proc_hw_params_entry = NULL;
 	}
 	if (substream->proc_sw_params_entry) {
 		snd_info_unregister(substream->proc_sw_params_entry);
-		substream->proc_sw_params_entry = 0;
+		substream->proc_sw_params_entry = NULL;
 	}
 	if (substream->proc_status_entry) {
 		snd_info_unregister(substream->proc_status_entry);
-		substream->proc_status_entry = 0;
+		substream->proc_status_entry = NULL;
 	}
 	if (substream->proc_root) {
 		snd_info_unregister(substream->proc_root);
-		substream->proc_root = 0;
+		substream->proc_root = NULL;
 	}
 	return 0;
 }
@@ -982,9 +962,7 @@ static int __init alsa_pcm_init(void)
 
 	snd_ctl_register_ioctl(snd_pcm_control_ioctl);
 	if ((entry = snd_info_create_module_entry(THIS_MODULE, "pcm", NULL)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->c.text.read_size = SNDRV_CARDS * SNDRV_PCM_DEVICES * 128;
-		entry->c.text.read = snd_pcm_proc_read;
+		snd_info_set_text_ops(entry, NULL, SNDRV_CARDS * SNDRV_PCM_DEVICES * 128, snd_pcm_proc_read);
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;

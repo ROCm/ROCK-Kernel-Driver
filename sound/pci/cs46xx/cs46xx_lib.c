@@ -1804,6 +1804,13 @@ int __devinit snd_cs46xx_pcm_iec958(cs46xx_t *chip, int device, snd_pcm_t ** rpc
 /*
  *  Mixer routines
  */
+static void snd_cs46xx_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	cs46xx_t *chip = snd_magic_cast(cs46xx_t, bus->private_data, return);
+
+	chip->ac97_bus = NULL;
+}
+
 static void snd_cs46xx_mixer_free_ac97(ac97_t *ac97)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, ac97->private_data, return);
@@ -2445,6 +2452,7 @@ static void snd_cs46xx_codec_reset (ac97_t * ac97)
 int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 {
 	snd_card_t *card = chip->card;
+	ac97_bus_t bus;
 	ac97_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
@@ -2453,14 +2461,20 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	/* detect primary codec */
 	chip->nr_ac97_codecs = 0;
 	snd_printdd("snd_cs46xx: detecting primary codec\n");
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_cs46xx_ac97_write;
+	bus.read = snd_cs46xx_ac97_read;
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+	bus.reset = snd_cs46xx_codec_reset;
+#endif
+	bus.private_data = chip;
+	bus.private_free = snd_cs46xx_mixer_free_ac97_bus;
+	if ((err = snd_ac97_bus(card, &bus, &chip->ac97_bus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_cs46xx_ac97_write;
-	ac97.read = snd_cs46xx_ac97_read;
 	ac97.private_data = chip;
 	ac97.private_free = snd_cs46xx_mixer_free_ac97;
-#ifdef CONFIG_SND_CS46XX_NEW_DSP
-	ac97.reset = snd_cs46xx_codec_reset;
-#endif
 	chip->ac97[CS46XX_PRIMARY_CODEC_INDEX] = &ac97;
 
 	snd_cs46xx_ac97_write(&ac97, AC97_MASTER, 0x8000);
@@ -2474,7 +2488,7 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	return -ENXIO;
 
  _ok:
-	if ((err = snd_ac97_mixer(card, &ac97, &chip->ac97[CS46XX_PRIMARY_CODEC_INDEX])) < 0)
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97[CS46XX_PRIMARY_CODEC_INDEX])) < 0)
 		return err;
 	snd_printdd("snd_cs46xx: primary codec phase one\n");
 	chip->nr_ac97_codecs = 1;
@@ -2483,8 +2497,6 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	snd_printdd("snd_cs46xx: detecting seconadry codec\n");
 	/* try detect a secondary codec */
 	memset(&ac97, 0, sizeof(ac97));    
-	ac97.write = snd_cs46xx_ac97_write;
-	ac97.read = snd_cs46xx_ac97_read;
 	ac97.private_data = chip;
 	ac97.private_free = snd_cs46xx_mixer_free_ac97;
 	ac97.num = CS46XX_SECONDARY_CODEC_INDEX;
@@ -2516,13 +2528,7 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	/* well, one codec only ... */
 	goto _end;
  _ok2:
-	/* set secondary codec in extended mode */
-
-	/* use custom reset to set secondary codec in
-	   extended mode */
-	ac97.reset = snd_cs46xx_codec_reset;
-
-	if ((err = snd_ac97_mixer(card, &ac97, &chip->ac97[CS46XX_SECONDARY_CODEC_INDEX])) < 0)
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97[CS46XX_SECONDARY_CODEC_INDEX])) < 0)
 		return err;
 	chip->nr_ac97_codecs = 2;
 

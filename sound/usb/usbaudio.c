@@ -1869,7 +1869,7 @@ static void proc_pcm_format_add(snd_usb_stream_t *stream)
 
 	sprintf(name, "stream%d", stream->pcm_index);
 	if (! snd_card_proc_new(card, name, &entry))
-		snd_info_set_text_ops(entry, stream, proc_pcm_format_read);
+		snd_info_set_text_ops(entry, stream, 1024, proc_pcm_format_read);
 }
 
 

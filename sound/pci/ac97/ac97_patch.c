@@ -46,7 +46,7 @@ static int patch_build_controls(ac97_t * ac97, const snd_kcontrol_new_t *control
 	int idx, err;
 
 	for (idx = 0; idx < count; idx++)
-		if ((err = snd_ctl_add(ac97->card, snd_ac97_cnew(&controls[idx], ac97))) < 0)
+		if ((err = snd_ctl_add(ac97->bus->card, snd_ac97_cnew(&controls[idx], ac97))) < 0)
 			return err;
 	return 0;
 }
@@ -201,12 +201,12 @@ static int patch_yamaha_ymf753_3d(ac97_t * ac97)
 	snd_kcontrol_t *kctl;
 	int err;
 
-	if ((err = snd_ctl_add(ac97->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
+	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control - Wide");
 	kctl->private_value = AC97_3D_CONTROL | (9 << 8) | (7 << 16);
 	snd_ac97_write_cache(ac97, AC97_3D_CONTROL, 0x0000);
-	if ((err = snd_ctl_add(ac97->card, snd_ac97_cnew(&snd_ac97_ymf753_controls_speaker, ac97))) < 0)
+	if ((err = snd_ctl_add(ac97->bus->card, snd_ac97_cnew(&snd_ac97_ymf753_controls_speaker, ac97))) < 0)
 		return err;
 	snd_ac97_write_cache(ac97, AC97_YMF753_3D_MODE_SEL, 0x0c00);
 	return 0;
@@ -306,7 +306,7 @@ static int patch_sigmatel_stac9700_3d(ac97_t * ac97)
 	snd_kcontrol_t *kctl;
 	int err;
 
-	if ((err = snd_ctl_add(ac97->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
+	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control Sigmatel - Depth");
 	kctl->private_value = AC97_3D_CONTROL | (3 << 16);
@@ -319,11 +319,11 @@ static int patch_sigmatel_stac9708_3d(ac97_t * ac97)
 	snd_kcontrol_t *kctl;
 	int err;
 
-	if ((err = snd_ctl_add(ac97->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
+	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control Sigmatel - Depth");
 	kctl->private_value = AC97_3D_CONTROL | (3 << 16);
-	if ((err = snd_ctl_add(ac97->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
+	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control Sigmatel - Rear Depth");
 	kctl->private_value = AC97_3D_CONTROL | (2 << 8) | (3 << 16);

@@ -1450,13 +1450,17 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 	int err;
 
 	if (ice_has_con_ac97(ice)) {
+		ac97_bus_t bus, *pbus;
 		ac97_t ac97;
+		memset(&bus, 0, sizeof(bus));
+		bus.write = snd_ice1712_ac97_write;
+		bus.read = snd_ice1712_ac97_read;
+		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+			return err;
 		memset(&ac97, 0, sizeof(ac97));
-		ac97.write = snd_ice1712_ac97_write;
-		ac97.read = snd_ice1712_ac97_read;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0)
+		if ((err = snd_ac97_mixer(pbus, &ac97, &ice->ac97)) < 0)
 			printk(KERN_WARNING "ice1712: cannot initialize ac97 for consumer, skipped\n");
 		else {
 			if ((err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_mixer_digmix_route_ac97, ice))) < 0)
@@ -1466,13 +1470,17 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 	}
 
 	if (! (ice->eeprom.data[ICE_EEP1_ACLINK] & ICE1712_CFG_PRO_I2S)) {
+		ac97_bus_t bus, *pbus;
 		ac97_t ac97;
+		memset(&bus, 0, sizeof(bus));
+		bus.write = snd_ice1712_pro_ac97_write;
+		bus.read = snd_ice1712_pro_ac97_read;
+		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+			return err;
 		memset(&ac97, 0, sizeof(ac97));
-		ac97.write = snd_ice1712_pro_ac97_write;
-		ac97.read = snd_ice1712_pro_ac97_read;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0)
+		if ((err = snd_ac97_mixer(pbus, &ac97, &ice->ac97)) < 0)
 			printk(KERN_WARNING "ice1712: cannot initialize pro ac97, skipped\n");
 		else
 			return 0;
@@ -1533,7 +1541,7 @@ static void __devinit snd_ice1712_proc_init(ice1712_t * ice)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(ice->card, "ice1712", &entry))
-		snd_info_set_text_ops(entry, ice, snd_ice1712_proc_read);
+		snd_info_set_text_ops(entry, ice, 1024, snd_ice1712_proc_read);
 }
 
 /*

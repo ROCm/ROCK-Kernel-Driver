@@ -274,10 +274,12 @@
 
 
 /* ac97->scaps */
-#define AC97_SCAP_AUDIO		(1<<0)	/* audio AC'97 codec */
-#define AC97_SCAP_MODEM		(1<<1)	/* modem AC'97 codec */
+#define AC97_SCAP_AUDIO		(1<<0)	/* audio codec 97 */
+#define AC97_SCAP_MODEM		(1<<1)	/* modem codec 97 */
 #define AC97_SCAP_SURROUND_DAC	(1<<2)	/* surround L&R DACs are present */
 #define AC97_SCAP_CENTER_LFE_DAC (1<<3)	/* center and LFE DACs are present */
+#define AC97_SCAP_SKIP_AUDIO	(1<<4)	/* skip audio part of codec */
+#define AC97_SCAP_SKIP_MODEM	(1<<5)	/* skip modem part of codec */
 
 /* ac97->flags */
 #define AC97_HAS_PC_BEEP	(1<<0)	/* force PC Speaker usage */
@@ -298,6 +300,7 @@
  *
  */
 
+typedef struct _snd_ac97_bus ac97_bus_t;
 typedef struct _snd_ac97 ac97_t;
 
 struct snd_ac97_build_ops {
@@ -307,18 +310,33 @@ struct snd_ac97_build_ops {
 	int (*build_post_spdif) (ac97_t *ac97);
 };
 
-struct _snd_ac97 {
+struct _snd_ac97_bus {
+	/* -- lowlevel (hardware) driver specific -- */
 	void (*reset) (ac97_t *ac97);
 	void (*write) (ac97_t *ac97, unsigned short reg, unsigned short val);
 	unsigned short (*read) (ac97_t *ac97, unsigned short reg);
 	void (*wait) (ac97_t *ac97);
 	void (*init) (ac97_t *ac97);
+	void *private_data;
+	void (*private_free) (ac97_bus_t *bus);
+	/* --- */
+	snd_card_t *card;
+	unsigned int num;	/* bus number */
+	unsigned int clock;	/* AC'97 clock (usually 48000Hz) */
+	ac97_t *codec[4];
+	snd_info_entry_t *proc;
+};
+
+struct _snd_ac97 {
+	/* -- lowlevel (hardware) driver specific -- */
 	struct snd_ac97_build_ops * build_ops;
 	void *private_data;
 	void (*private_free) (ac97_t *ac97);
 	/* --- */
-	snd_card_t *card;
+	ac97_bus_t *bus;
 	struct pci_dev *pci;	/* assigned PCI device - used for quirks */
+	snd_info_entry_t *proc;
+	snd_info_entry_t *proc_regs;
 	unsigned short subsystem_vendor;
 	unsigned short subsystem_device;
 	spinlock_t reg_lock;
@@ -330,7 +348,6 @@ struct _snd_ac97 {
 	unsigned short ext_mid;	/* extended modem ID (register 3C) */
 	unsigned int scaps;	/* driver capabilities */
 	unsigned int flags;	/* specific code */
-	unsigned int clock;	/* AC'97 clock (usually 48000Hz) */
 	unsigned int rates[6];	/* see AC97_RATES_* defines */
 	unsigned int spdif_status;
 	unsigned short regs[0x80]; /* register cache */
@@ -368,8 +385,8 @@ static inline int ac97_can_amap(ac97_t * ac97)
 }
 
 /* functions */
-int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);	/* create mixer controls */
-int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);	/* create modem controls */
+int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus); /* create new AC97 bus */
+int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97);	/* create mixer controls */
 
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value);
 unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg);

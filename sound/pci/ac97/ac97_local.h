@@ -42,4 +42,7 @@ int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst);
 int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2);
 
 /* ac97_proc.c */
-void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97, const char *prefix);
+void snd_ac97_bus_proc_init(ac97_bus_t * ac97);
+void snd_ac97_bus_proc_done(ac97_bus_t * ac97);
+void snd_ac97_proc_init(ac97_t * ac97);
+void snd_ac97_proc_done(ac97_t * ac97);

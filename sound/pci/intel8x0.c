@@ -403,6 +403,7 @@ struct _snd_intel8x0 {
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
 	unsigned int ac97_sdin[3];
 
@@ -1529,6 +1530,12 @@ static int __devinit snd_intel8x0_pcm(intel8x0_t *chip)
  *  Mixer part
  */
 
+static void snd_intel8x0_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	intel8x0_t *chip = snd_magic_cast(intel8x0_t, bus->private_data, return);
+	chip->ac97_bus = NULL;
+}
+
 static void snd_intel8x0_mixer_free_ac97(ac97_t *ac97)
 {
 	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
@@ -1650,6 +1657,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 
 static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 {
+	ac97_bus_t bus;
 	ac97_t ac97, *x97;
 	ichdev_t *ichdev;
 	int err;
@@ -1683,17 +1691,21 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	}
 
 	chip->in_ac97_init = 1;
+	memset(&bus, 0, sizeof(bus));
+	bus.private_data = chip;
+	bus.private_free = snd_intel8x0_mixer_free_ac97_bus;
+	if (ac97_clock >= 8000 && ac97_clock <= 48000)
+		bus.clock = ac97_clock;
+	else
+		bus.clock = 48000;
+	
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
 	ac97.private_free = snd_intel8x0_mixer_free_ac97;
-	if (ac97_clock >= 8000 && ac97_clock <= 48000)
-		ac97.clock = ac97_clock;
-	else
-		ac97.clock = 48000;
 	if (chip->device_type != DEVICE_ALI) {
 		glob_sta = igetdword(chip, ICHREG(GLOB_STA));
-		ac97.write = snd_intel8x0_codec_write;
-		ac97.read = snd_intel8x0_codec_read;
+		bus.write = snd_intel8x0_codec_write;
+		bus.read = snd_intel8x0_codec_read;
 		if (chip->device_type == DEVICE_INTEL_ICH4) {
 			codecs = 0;
 			if (glob_sta & ICH_PCR)
@@ -1714,8 +1726,8 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 			codecs = glob_sta & ICH_SCR ? 2 : 1;
 		}
 	} else {
-		ac97.write = snd_intel8x0_ali_codec_write;
-		ac97.read = snd_intel8x0_ali_codec_read;
+		bus.write = snd_intel8x0_ali_codec_write;
+		bus.read = snd_intel8x0_ali_codec_read;
 		codecs = 1;
 		/* detect the secondary codec */
 		for (i = 0; i < 100; i++) {
@@ -1728,8 +1740,11 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 			udelay(1);
 		}
 	}
+	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+		goto __err;
 	ac97.pci = chip->pci;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0) {
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &x97)) < 0) {
+	      __err:
 		/* clear the cold-reset bit for the next chance */
 		if (chip->device_type != DEVICE_ALI)
 			iputdword(chip, ICHREG(GLOB_CNT), igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_AC97COLD);
@@ -1757,7 +1772,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		goto __skip_secondary;
 	for (i = 1, num = 1, _codecs = codecs; num < _codecs; num++) {
 		ac97.num = num;
-		if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0) {
+		if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &x97)) < 0) {
 			snd_printk("Unable to initialize codec #%i [device = %i, GLOB_STA = 0x%x]\n", i, chip->device_type, glob_sta);
 			codecs--;
 			continue;
@@ -2169,7 +2184,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	unsigned long flags;
 	struct timeval start_time, stop_time;
 
-	if (chip->ac97[0]->clock != 48000)
+	if (chip->ac97_bus->clock != 48000)
 		return; /* specified in module option */
 
 	subs = chip->pcm[0]->streams[0].substream;
@@ -2184,7 +2199,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 
 	/* set rate */
 	if (snd_ac97_set_rate(chip->ac97[0], AC97_PCM_FRONT_DAC_RATE, 48000) < 0) {
-		snd_printk(KERN_ERR "cannot set ac97 rate: clock = %d\n", chip->ac97[0]->clock);
+		snd_printk(KERN_ERR "cannot set ac97 rate: clock = %d\n", chip->ac97_bus->clock);
 		return;
 	}
 	snd_intel8x0_setup_periods(chip, ichdev);
@@ -2243,8 +2258,8 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 		printk(KERN_INFO "intel8x0: measured clock %ld rejected\n", pos);
 	else if (pos < 47500 || pos > 48500)
 		/* not 48000Hz, tuning the clock.. */
-		chip->ac97[0]->clock = (chip->ac97[0]->clock * 48000) / pos;
-	printk(KERN_INFO "intel8x0: clocking to %d\n", chip->ac97[0]->clock);
+		chip->ac97_bus->clock = (chip->ac97_bus->clock * 48000) / pos;
+	printk(KERN_INFO "intel8x0: clocking to %d\n", chip->ac97_bus->clock);
 }
 
 static void snd_intel8x0_proc_read(snd_info_entry_t * entry,
@@ -2278,7 +2293,7 @@ static void __devinit snd_intel8x0_proc_init(intel8x0_t * chip)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(chip->card, "intel8x0", &entry))
-		snd_info_set_text_ops(entry, chip, snd_intel8x0_proc_read);
+		snd_info_set_text_ops(entry, chip, 1024, snd_intel8x0_proc_read);
 }
 
 static int snd_intel8x0_dev_free(snd_device_t *device)

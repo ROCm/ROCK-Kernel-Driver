@@ -1708,6 +1708,12 @@ static snd_kcontrol_new_t snd_ymfpci_rear_shared __devinitdata = {
  *  Mixer routines
  */
 
+static void snd_ymfpci_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	ymfpci_t *chip = snd_magic_cast(ymfpci_t, bus->private_data, return);
+	chip->ac97_bus = NULL;
+}
+
 static void snd_ymfpci_mixer_free_ac97(ac97_t *ac97)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, ac97->private_data, return);
@@ -1716,17 +1722,24 @@ static void snd_ymfpci_mixer_free_ac97(ac97_t *ac97)
 
 int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 {
+	ac97_bus_t bus;
 	ac97_t ac97;
 	snd_kcontrol_t *kctl;
 	unsigned int idx;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_ymfpci_codec_write;
+	bus.read = snd_ymfpci_codec_read;
+	bus.private_data = chip;
+	bus.private_free = snd_ymfpci_mixer_free_ac97_bus;
+	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_ymfpci_codec_write;
-	ac97.read = snd_ymfpci_codec_read;
 	ac97.private_data = chip;
 	ac97.private_free = snd_ymfpci_mixer_free_ac97;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 
 	for (idx = 0; idx < YMFPCI_CONTROLS; idx++) {
@@ -1855,7 +1868,7 @@ static int __devinit snd_ymfpci_proc_init(snd_card_t * card, ymfpci_t *chip)
 	snd_info_entry_t *entry;
 	
 	if (! snd_card_proc_new(card, "ymfpci", &entry))
-		snd_info_set_text_ops(entry, chip, snd_ymfpci_proc_read);
+		snd_info_set_text_ops(entry, chip, 1024, snd_ymfpci_proc_read);
 	return 0;
 }
 

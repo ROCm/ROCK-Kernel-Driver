@@ -1981,14 +1981,19 @@ static void snd_m3_ac97_reset(m3_t *chip)
 
 static int __devinit snd_m3_mixer(m3_t *chip)
 {
+	ac97_bus_t bus, *pbus;
 	ac97_t ac97;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_m3_ac97_write;
+	bus.read = snd_m3_ac97_read;
+	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+		return err;
+	
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_m3_ac97_write;
-	ac97.read = snd_m3_ac97_read;
 	ac97.private_data = chip;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97)) < 0)
 		return err;
 
 	/* seems ac97 PCM needs initialization.. hack hack.. */

@@ -442,7 +442,6 @@ int snd_card_register(snd_card_t * card)
 		snd_printd("unable to create card entry\n");
 		goto __skip_info;
 	}
-	entry->content = SNDRV_INFO_CONTENT_TEXT;
 	entry->c.text.read_size = PAGE_SIZE;
 	entry->c.text.read = snd_card_id_read;
 	if (snd_info_register(entry) < 0) {
@@ -527,7 +526,6 @@ int __init snd_card_info_init(void)
 
 	entry = snd_info_create_module_entry(THIS_MODULE, "cards", NULL);
 	snd_runtime_check(entry != NULL, return -ENOMEM);
-	entry->content = SNDRV_INFO_CONTENT_TEXT;
 	entry->c.text.read_size = PAGE_SIZE;
 	entry->c.text.read = snd_card_info_read;
 	if (snd_info_register(entry) < 0) {
@@ -539,7 +537,6 @@ int __init snd_card_info_init(void)
 #ifdef MODULE
 	entry = snd_info_create_module_entry(THIS_MODULE, "modules", NULL);
 	if (entry) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = PAGE_SIZE;
 		entry->c.text.read = snd_card_module_info_read;
 		if (snd_info_register(entry) < 0)

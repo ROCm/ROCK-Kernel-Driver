@@ -479,6 +479,7 @@ struct snd_cs4281 {
 
 	int dual_codec;
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97;
 	ac97_t *ac97_secondary;
 
@@ -564,7 +565,7 @@ static inline unsigned int snd_cs4281_peekBA0(cs4281_t *chip, unsigned long offs
 }
 
 static void snd_cs4281_ac97_write(ac97_t *ac97,
-				   unsigned short reg, unsigned short val)
+				  unsigned short reg, unsigned short val)
 {
 	/*
 	 *  1. Write ACCAD = Command Address Register = 46Ch for AC97 register address
@@ -609,7 +610,7 @@ static void snd_cs4281_ac97_write(ac97_t *ac97,
 }
 
 static unsigned short snd_cs4281_ac97_read(ac97_t *ac97,
-					    unsigned short reg)
+					   unsigned short reg)
 {
 	cs4281_t *chip = snd_magic_cast(cs4281_t, ac97->private_data, return -ENXIO);
 	int count;
@@ -1119,6 +1120,12 @@ static snd_kcontrol_new_t snd_cs4281_pcm_vol =
 	.private_value = ((BA0_PPLVC << 16) | BA0_PPRVC),
 };
 
+static void snd_cs4281_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	cs4281_t *chip = snd_magic_cast(cs4281_t, bus->private_data, return);
+	chip->ac97_bus = NULL;
+}
+
 static void snd_cs4281_mixer_free_ac97(ac97_t *ac97)
 {
 	cs4281_t *chip = snd_magic_cast(cs4281_t, ac97->private_data, return);
@@ -1131,19 +1138,26 @@ static void snd_cs4281_mixer_free_ac97(ac97_t *ac97)
 static int __devinit snd_cs4281_mixer(cs4281_t * chip)
 {
 	snd_card_t *card = chip->card;
+	ac97_bus_t bus;
 	ac97_t ac97;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_cs4281_ac97_write;
+	bus.read = snd_cs4281_ac97_read;
+	bus.private_data = chip;
+	bus.private_free = snd_cs4281_mixer_free_ac97_bus;
+	if ((err = snd_ac97_bus(card, &bus, &chip->ac97_bus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_cs4281_ac97_write;
-	ac97.read = snd_cs4281_ac97_read;
 	ac97.private_data = chip;
 	ac97.private_free = snd_cs4281_mixer_free_ac97;
-	if ((err = snd_ac97_mixer(card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 	if (chip->dual_codec) {
 		ac97.num = 1;
-		if ((err = snd_ac97_mixer(card, &ac97, &chip->ac97_secondary)) < 0)
+		if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97_secondary)) < 0)
 			return err;
 	}
 	if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_cs4281_fm_vol, chip))) < 0)
@@ -1215,7 +1229,7 @@ static void __devinit snd_cs4281_proc_init(cs4281_t * chip)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(chip->card, "cs4281", &entry))
-		snd_info_set_text_ops(entry, chip, snd_cs4281_proc_read);
+		snd_info_set_text_ops(entry, chip, 1024, snd_cs4281_proc_read);
 	if (! snd_card_proc_new(chip->card, "cs4281_BA0", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = chip;

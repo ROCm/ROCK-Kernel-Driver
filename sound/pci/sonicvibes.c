@@ -1177,7 +1177,7 @@ static void __devinit snd_sonicvibes_proc_init(sonicvibes_t * sonic)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(sonic->card, "sonicvibes", &entry))
-		snd_info_set_text_ops(entry, sonic, snd_sonicvibes_proc_read);
+		snd_info_set_text_ops(entry, sonic, 1024, snd_sonicvibes_proc_read);
 }
 
 /*
