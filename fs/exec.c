@@ -839,7 +839,8 @@ int flush_old_exec(struct linux_binprm * bprm)
 	flush_thread();
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
-	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL))
+	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL) ||
+	    (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP))
 		current->mm->dumpable = 0;
 
 	/* An exec changes our domain. We are no longer part of the thread
@@ -1088,6 +1089,7 @@ int do_execve(char * filename,
 	bprm.file = file;
 	bprm.filename = filename;
 	bprm.interp = filename;
+	bprm.interp_flags = 0;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
