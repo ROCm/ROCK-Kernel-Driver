@@ -281,6 +281,7 @@ struct agp_bridge_data {
 #define INTEL_I7505_ATTBASE	0x78
 #define INTEL_I7505_ERRSTS	0x42
 #define INTEL_I7505_AGPCTRL	0x70
+#define INTEL_I7505_MCHCFG	0x50
 
 /* VIA register */
 #define VIA_APBASE	0x10

@@ -19,5 +19,4 @@ obj-$(CONFIG_AGP_HP_ZX1)	+= hp-agp.o
 obj-$(CONFIG_AGP_AMD_8151)	+= amd-k8-agp.o
 obj-$(CONFIG_AGP_ALPHA_CORE)	+= alpha-agp.o
 
-obj-$(CONFIG_AGP_I7x05)		+= i7x05-agp.o
 
