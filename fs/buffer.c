@@ -2684,7 +2684,7 @@ static int end_bio_bh_io_sync(struct bio *bio, unsigned int bytes_done, int err)
 	return 0;
 }
 
-int submit_bh(int rw, struct buffer_head * bh)
+void submit_bh(int rw, struct buffer_head * bh)
 {
 	struct bio *bio;
 
@@ -2722,7 +2722,7 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio->bi_end_io = end_bio_bh_io_sync;
 	bio->bi_private = bh;
 
-	return submit_bio(rw, bio);
+	submit_bio(rw, bio);
 }
 
 /**
