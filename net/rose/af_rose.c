@@ -788,7 +788,7 @@ static int rose_connect(struct socket *sock, struct sockaddr *uaddr, int addr_le
 
 	rose->dest_addr   = addr->srose_addr;
 	rose->dest_call   = addr->srose_call;
-	rose->rand        = ((int)rose & 0xFFFF) + rose->lci;
+	rose->rand        = ((long)rose & 0xFFFF) + rose->lci;
 	rose->dest_ndigis = addr->srose_ndigis;
 
 	if (addr_len == sizeof(struct full_sockaddr_rose)) {
