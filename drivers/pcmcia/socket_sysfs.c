@@ -47,8 +47,8 @@ static ssize_t pccard_show_type(struct class_device *dev, char *buf)
 	int val;
 	struct pcmcia_socket *s = to_socket(dev);
 
-        if (!(s->state & SOCKET_PRESENT))
-                return -ENODEV;
+	if (!(s->state & SOCKET_PRESENT))
+		return -ENODEV;
 	s->ops->get_status(s, &val);
 	if (val & SS_CARDBUS)
 		return sprintf(buf, "32-bit\n");
@@ -63,8 +63,8 @@ static ssize_t pccard_show_voltage(struct class_device *dev, char *buf)
 	int val;
 	struct pcmcia_socket *s = to_socket(dev);
 
-        if (!(s->state & SOCKET_PRESENT))
-                return -ENODEV;
+	if (!(s->state & SOCKET_PRESENT))
+		return -ENODEV;
 	s->ops->get_status(s, &val);
 	if (val & SS_3VCARD)
 		return sprintf(buf, "3.3V\n");
@@ -134,21 +134,24 @@ static struct class_device_attribute *pccard_socket_attributes[] = {
 
 static int __devinit pccard_sysfs_add_socket(struct class_device *class_dev)
 {
-	unsigned int i;
+	struct class_device_attribute **attr;
 	int ret = 0;
-        for (i = 0; (attr = pccard_socket_attributes[i]); i++) {
-                if ((ret = class_device_create_file(class_dev, attr)))
-			return (ret);
-        }
-	return (ret);
+
+	for (attr = pccard_socket_attributes; *attr; attr++) {
+		ret = class_device_create_file(class_dev, *attr);
+		if (ret)
+			break;
+	}
+
+	return ret;
 }
 
 static void __devexit pccard_sysfs_remove_socket(struct class_device *class_dev)
 {
-	struct class_device_attribute *attr;
-	unsigned int i;
-	for (i = 0; (attr = pccard_socket_attributes[i]); i++)
-		class_device_remove_file(class_dev, attr);
+	struct class_device_attribute **attr;
+
+	for (attr = pccard_socket_attributes; *attr; attr++)
+		class_device_remove_file(class_dev, *attr);
 }
 
 struct class_interface pccard_sysfs_interface = {
