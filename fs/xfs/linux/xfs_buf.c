@@ -390,45 +390,46 @@ void
 pagebuf_free(
 	page_buf_t		*pb)
 {
-	page_buf_flags_t	pb_flags = pb->pb_flags;
-	pb_hash_t		*hash;
-
-	PB_TRACE(pb, "free_object", 0);
-	pb->pb_flags |= PBF_FREED;
+	PB_TRACE(pb, "free", 0);
 
 	if (pb->pb_flags & _PBF_LOCKABLE) {
-		hash = pb_hash(pb);
+		 pb_hash_t	*hash = pb_hash(pb);
 
 		spin_lock(&hash->pb_hash_lock);
-		if (!list_empty(&pb->pb_hash_list))
+		/*
+		 * Someone grabbed a reference while we weren't looking,
+		 * try again later.
+		 */
+		if (unlikely(atomic_read(&pb->pb_hold))) {
+			spin_unlock(&hash->pb_hash_lock);
+			return;
+		} else if (!list_empty(&pb->pb_hash_list))
 			list_del_init(&pb->pb_hash_list);
 		spin_unlock(&hash->pb_hash_lock);
 	}
 
-	if (!(pb_flags & PBF_FREED)) {
-		/* release any virtual mapping */ ;
-		if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
-			void *vaddr = pagebuf_mapout_locked(pb);
-			if (vaddr) {
-				free_address(vaddr);
-			}
+	/* release any virtual mapping */ ;
+	if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
+		void *vaddr = pagebuf_mapout_locked(pb);
+		if (vaddr) {
+			free_address(vaddr);
 		}
+	}
 
-		if (pb->pb_flags & _PBF_MEM_ALLOCATED) {
-			if (pb->pb_pages) {
-				/* release the pages in the address list */
-				if ((pb->pb_pages[0]) &&
-				    (pb->pb_flags & _PBF_MEM_SLAB)) {
-					kfree(pb->pb_addr);
-				} else {
-					_pagebuf_freepages(pb);
-				}
-				if (pb->pb_pages != pb->pb_page_array)
-					kfree(pb->pb_pages);
-				pb->pb_pages = NULL;
+	if (pb->pb_flags & _PBF_MEM_ALLOCATED) {
+		if (pb->pb_pages) {
+			/* release the pages in the address list */
+			if ((pb->pb_pages[0]) &&
+			    (pb->pb_flags & _PBF_MEM_SLAB)) {
+				kfree(pb->pb_addr);
+			} else {
+				_pagebuf_freepages(pb);
 			}
-			pb->pb_flags &= ~(_PBF_MEM_ALLOCATED|_PBF_MEM_SLAB);
+			if (pb->pb_pages != pb->pb_page_array)
+				kfree(pb->pb_pages);
+			pb->pb_pages = NULL;
 		}
+		pb->pb_flags &= ~(_PBF_MEM_ALLOCATED|_PBF_MEM_SLAB);
 	}
 
 	pagebuf_deallocate(pb);
@@ -653,16 +654,15 @@ _pagebuf_find(				/* find buffer for block	*/
 	list_for_each(p, &h->pb_hash) {
 		pb = list_entry(p, page_buf_t, pb_hash_list);
 
-		if ((target == pb->pb_target) &&
-		    (pb->pb_file_offset == range_base) &&
-		    (pb->pb_buffer_length == range_length)) {
-			if (pb->pb_flags & PBF_FREED)
-				break;
+		if (pb->pb_target == target &&
+		    pb->pb_file_offset == range_base &&
+		    pb->pb_buffer_length == range_length &&
+		    atomic_read(&pb->pb_hold)) {
 			/* If we look at something bring it to the
 			 * front of the list for next time
 			 */
-			list_del(&pb->pb_hash_list);
-			list_add(&pb->pb_hash_list, &h->pb_hash);
+			atomic_inc(&pb->pb_hold);
+			list_move(&pb->pb_hash_list, &h->pb_hash);
 			goto found;
 		}
 	}
@@ -681,7 +681,6 @@ _pagebuf_find(				/* find buffer for block	*/
 	return (new_pb);
 
 found:
-	atomic_inc(&pb->pb_hold);
 	spin_unlock(&h->pb_hash_lock);
 
 	/* Attempt to get the semaphore without sleeping,

@@ -76,7 +76,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_ASYNC = (1 << 4),   /* initiator will not wait for completion  */
 	PBF_NONE = (1 << 5),    /* buffer not read at all                  */
 	PBF_DELWRI = (1 << 6),  /* buffer has dirty pages                  */
-	PBF_FREED = (1 << 7),   /* buffer has been freed and is invalid    */
 	PBF_SYNC = (1 << 8),    /* force updates to disk                   */
 	PBF_MAPPABLE = (1 << 9),/* use directly-addressable pages          */
 	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
@@ -90,7 +89,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 
 	/* flags used only internally */
 	_PBF_LOCKABLE = (1 << 16), /* page_buf_t may be locked		   */
-	_PBF_PRIVATE_BH = (1 << 17), /* do not use public buffer heads	   */
 	_PBF_ALL_PAGES_MAPPED = (1 << 18), /* all pages in range mapped	   */
 	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
 	_PBF_MEM_ALLOCATED = (1 << 20), /* underlying pages are allocated  */
