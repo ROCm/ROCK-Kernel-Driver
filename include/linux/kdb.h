@@ -39,6 +39,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <asm/atomic.h>
 #include <asm/kdb.h>
 
 #define KDB_MAJOR_VERSION	4
@@ -55,6 +56,7 @@ extern volatile int kdb_initial_cpu;
 #else
 #define KDB_IS_RUNNING() (0)
 #endif	/* CONFIG_KDB */
+extern atomic_t kdb_event;
 
 	/*
 	 * kdb_on

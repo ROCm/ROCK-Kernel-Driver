@@ -60,9 +60,16 @@
 
 #ifdef UNW_DEBUG
   static unsigned int unw_debug_level = UNW_DEBUG;
-#  define UNW_DEBUG_ON(n)	unw_debug_level >= n
-   /* Do not code a printk level, not all debug lines end in newline */
-#  define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
+#  ifdef CONFIG_KDB
+#    include <linux/kdb.h>
+#    define UNW_DEBUG_ON(n)	(unw_debug_level >= n && !KDB_IS_RUNNING())
+#    define UNW_DPRINT(n, ...)	if (UNW_DEBUG_ON(n)) kdb_printf(__VA_ARGS__)
+#  else	/* !CONFIG_KDB */
+#    define UNW_DEBUG_ON(n)	unw_debug_level >= n
+     /* Do not code a printk level, not all debug lines end in newline */
+#    define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
+#  endif /* CONFIG_KDB */
+#  undef inline
 #  define inline
 #else /* !UNW_DEBUG */
 #  define UNW_DEBUG_ON(n)  0

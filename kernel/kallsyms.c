@@ -26,7 +26,7 @@ extern unsigned long kallsyms_num_syms __attribute__((weak));
 extern char kallsyms_names[] __attribute__((weak));
 
 /* Defined by the linker script. */
-extern char _stext[], _etext[], _edata[], _sinittext[], _einittext[];
+extern char _stext[], _etext[], _sinittext[], _einittext[];
 extern char _end[];	/* for CONFIG_KDB */
 
 static inline int is_kernel_inittext(unsigned long addr)
@@ -42,6 +42,12 @@ static inline int is_kernel_text(unsigned long addr)
 	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext)
 		return 1;
 	return 0;
+}
+
+/* kdb treats all kernel addresses as valid, including data */
+static inline int is_kernel(unsigned long addr)
+{
+	return (addr >= (unsigned long)_stext && addr <= (unsigned long)_end);
 }
 
 /* Lookup the address for this symbol. Returns 0 if not found. */
@@ -61,19 +67,6 @@ unsigned long kallsyms_lookup_name(const char *name)
 		knames += strlen(knames) + 1;
 	}
 	return module_kallsyms_lookup_name(name);
-}
-
-static inline int is_kernel(unsigned long addr)
-{
-	if (addr >= (unsigned long)_stext && addr <=
-#ifdef	CONFIG_KDB
-			(unsigned long)_end
-#else
-			(unsigned long)_edata
-#endif
-		)
-		return 1;
-	return 0;
 }
 
 /* Lookup an address.  modname is set to NULL if it's in the kernel. */
@@ -115,6 +108,7 @@ const char *kallsyms_lookup(unsigned long addr,
 			symbol_end = (unsigned long)_einittext;
 		else
 			symbol_end = kdb ? (unsigned long)_end : (unsigned long)_etext;
+
 		*symbolsize = symbol_end - kallsyms_addresses[best];
 		*modname = NULL;
 		*offset = addr - kallsyms_addresses[best];

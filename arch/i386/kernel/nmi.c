@@ -440,11 +440,11 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 			bust_spinlocks(1);
 			printk("NMI Watchdog detected LOCKUP on CPU%d, eip %08lx, registers:\n", cpu, regs->eip);
 			show_registers(regs);
-			dump("NMI Watchdog detected LOCKUP", regs);
-			printk("console shuts up ...\n");
 #ifdef	CONFIG_KDB
 			kdb(KDB_REASON_NMI, 0, regs);
 #endif	/* CONFIG_KDB */
+			dump("NMI Watchdog detected LOCKUP", regs);
+			printk("console shuts up ...\n");
 			console_silent();
 			spin_unlock(&nmi_print_lock);
 			bust_spinlocks(0);

@@ -9,7 +9,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2003-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/config.h>
@@ -21,6 +21,7 @@
 #include <linux/sysrq.h>
 #include <linux/circ_buf.h>
 #include <linux/serial_reg.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
@@ -97,10 +98,10 @@ static DECLARE_TASKLET(sn_sal_tasklet, sn_sal_tasklet_action, 0);
 static unsigned long sn_interrupt_timeout;
 
 extern u64 master_node_bedrock_address;
-static int sn_debug_printf(const char *fmt, ...);
 
 #undef DEBUG
 #ifdef DEBUG
+static int sn_debug_printf(const char *fmt, ...);
 #define DPRINTF(x...) sn_debug_printf(x)
 #else
 #define DPRINTF(x...) do { } while (0)
@@ -262,6 +263,7 @@ early_printk_sn_sal(const char *s, unsigned count)
 	sn_func->sal_puts(s, count);
 }
 
+#ifdef DEBUG
 /* this is as "close to the metal" as we can get, used when the driver
  * itself may be broken */
 static int
@@ -277,6 +279,7 @@ sn_debug_printf(const char *fmt, ...)
 	va_end(args);
 	return printed_len;
 }
+#endif /* DEBUG */
 
 /*
  * Interrupt handling routines.
@@ -307,11 +310,13 @@ sn_receive_chars(struct pt_regs *regs, unsigned long *flags)
 		if (kdb_on) {
 			if (ch == *kdb_serial_ptr) {
 				if (!(*++kdb_serial_ptr)) {
+					spin_unlock_irqrestore(&sn_sal_lock, *flags);
 					if (!regs)
 						KDB_ENTER();	/* to get some registers */
 					else
 						kdb(KDB_REASON_KEYBOARD, 0, regs);
 					kdb_serial_ptr = (char *)kdb_serial_str;
+					spin_lock_irqsave(&sn_sal_lock, *flags);
 					break;
 				}
 			}
@@ -383,7 +388,7 @@ synch_flush_xmit(void)
 
 		if (xmit_count > 0) {
 			result = sn_func->sal_puts((char *)start, xmit_count);
-			if (!result)
+			if (!result || (result < 0))
 				DPRINTF("\n*** synch_flush_xmit failed to flush\n");
 			if (result > 0) {
 				xmit_count -= result;
@@ -781,14 +786,6 @@ sn_sal_hangup(struct tty_struct *tty)
 }
 
 
-static void
-sn_sal_wait_until_sent(struct tty_struct *tty, int timeout)
-{
-	/* this is SAL's problem */
-	DPRINTF("<sn_serial: should wait until sent>");
-}
-
-
 /*
  * sn_sal_read_proc
  *
@@ -824,7 +821,6 @@ static struct tty_operations sn_sal_driver_ops = {
 	.write_room	 = sn_sal_write_room,
 	.chars_in_buffer = sn_sal_chars_in_buffer,
 	.hangup		 = sn_sal_hangup,
-	.wait_until_sent = sn_sal_wait_until_sent,
 	.read_proc	 = sn_sal_read_proc,
 };
 static struct tty_driver *sn_sal_driver;
@@ -978,15 +974,61 @@ module_exit(sn_sal_module_exit);
 static void
 sn_sal_console_write(struct console *co, const char *s, unsigned count)
 {
-	unsigned long flags;
+	unsigned long flags = 0;
 	const char *s1;
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+	static int stole_lock = 0;
+#endif
 
 	BUG_ON(!sn_sal_is_asynch);
 
 	/* somebody really wants this output, might be an
 	 * oops, kdb, panic, etc.  make sure they get it. */
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	if (spin_is_locked(&sn_sal_lock)) {
+		int lhead = xmit.cb_head;
+		int ltail = xmit.cb_tail;
+		int counter, got_lock = 0;
+
+		/*
+		 * We attempt to determine if someone has died with the
+		 * lock. We wait ~20 secs after the head and tail ptrs
+		 * stop moving and assume the lock holder is not functional
+		 * and plow ahead. If the lock is freed within the time out
+		 * period we re-get the lock and go ahead normally. We also
+		 * remember if we have plowed ahead so that we don't have
+		 * to wait out the time out period again - the asumption
+		 * is that we will time out again.
+		 */
+
+		for (counter = 0; counter < 150; mdelay(125), counter++) {
+			if (!spin_is_locked(&sn_sal_lock) || stole_lock) {
+				if (!stole_lock) {
+					spin_lock_irqsave(&sn_sal_lock, flags);
+					got_lock = 1;
+				}
+				break;
+			}
+			else {
+				/* still locked */
+				if ((lhead != xmit.cb_head)
+						|| (ltail != xmit.cb_tail)) {
+					lhead = xmit.cb_head;
+					ltail = xmit.cb_tail;
+					counter = 0;
+				}
+			}
+		}
 		synch_flush_xmit();
+		if (got_lock) {
+			spin_unlock_irqrestore(&sn_sal_lock, flags);
+			stole_lock = 0;
+		}
+		else {
+			/* fell thru */
+			stole_lock = 1;
+		}
+
 		/* Output '\r' before each '\n' */
 		while ((s1 = memchr(s, '\n', count)) != NULL) {
 			sn_func->sal_puts(s, s1 - s);
@@ -995,11 +1037,13 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 			s = s1 + 1;
 		}
 		sn_func->sal_puts(s, count);
-	}
-	else if (in_interrupt()) {
+	} else {
+		stole_lock = 0;
+#endif
 		spin_lock_irqsave(&sn_sal_lock, flags);
 		synch_flush_xmit();
 		spin_unlock_irqrestore(&sn_sal_lock, flags);
+
 		/* Output '\r' before each '\n' */
 		while ((s1 = memchr(s, '\n', count)) != NULL) {
 			sn_func->sal_puts(s, s1 - s);
@@ -1008,16 +1052,6 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 			s = s1 + 1;
 		}
 		sn_func->sal_puts(s, count);
-	}
-	else {
-		/* Output '\r' before each '\n' */
-		while ((s1 = memchr(s, '\n', count)) != NULL) {
-			sn_sal_write(NULL, 0, s, s1 - s);
-			sn_sal_write(NULL, 0, "\r\n", 2);
-			count -= s1 + 1 - s;
-			s = s1 + 1;
-		}
-		sn_sal_write(NULL, 0, s, count);
 	}
 }
 
@@ -1064,7 +1098,6 @@ sn_sal_serial_console_init(void)
 }
 console_initcall(sn_sal_serial_console_init);
 
-
 #ifdef	CONFIG_KDB
 int
 l1_control_in_polled(int offset)
@@ -1098,8 +1131,8 @@ l1_serial_in_polled(void)
 
 	if (!ia64_sn_console_getc(&ch))
 		return ch;
-	else
-		return 0;
+
+	return 0;
 }
 #endif /* CONFIG_KDB */
 

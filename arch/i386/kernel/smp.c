@@ -150,13 +150,6 @@ inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	 */
 	cfg = __prepare_ICR(shortcut, vector);
 
-	if (vector == DUMP_VECTOR) {
-		/*
-		 * Setup DUMP IPI to be delivered as an NMI
-		 */
-		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
-	}
-
 #ifdef	CONFIG_KDB
 	if (vector == KDB_VECTOR) {
 		/*
@@ -165,6 +158,13 @@ inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
 		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
 	}
 #endif	/* CONFIG_KDB */
+
+	if (vector == DUMP_VECTOR) {
+		/*
+		 * Setup DUMP IPI to be delivered as an NMI
+		 */
+		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
+	}
 
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.

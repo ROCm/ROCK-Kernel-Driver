@@ -162,7 +162,8 @@ kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 	unsigned long symbolsize;
 	unsigned long offset;
 	static char *knt[100];	/* kdb name table, arbitrary size */
-	char *knt1 = kmalloc(128, GFP_ATOMIC);
+#define knt1_size 128		/* must be >= kallsyms table size */
+	char *knt1 = kmalloc(knt1_size, GFP_ATOMIC);
 
 	if (!knt1) {
 		kdb_printf("kdbnearsym: addr=0x%lx cannot kmalloc knt1\n", addr);
@@ -176,10 +177,21 @@ kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 	symtab->sym_name = kallsyms_lookup(addr, &symbolsize , &offset, (char **)(&symtab->mod_name), knt1);
 	symtab->sym_start = addr - offset;
 	symtab->sym_end = symtab->sym_start + symbolsize;
-	ret = (symtab->sym_name != 0);
+	ret = symtab->sym_name != NULL && *(symtab->sym_name) != '\0';
 
-	if (symtab->sym_name) {
+	if (ret) {
 		int i;
+		/* Another 2.6 kallsyms "feature".  Sometimes the sym_name is
+		 * set but the buffer passed into kallsyms_lookup is not used,
+		 * so it contains garbage.  The caller has to work out which
+		 * buffer needs to be saved.
+		 *
+		 * What was Rusty smoking when he wrote that code?
+		 */
+		if (symtab->sym_name != knt1) {
+			strncpy(knt1, symtab->sym_name, knt1_size);
+			knt1[knt1_size-1] = '\0';
+		}
 		for (i = 0; i < ARRAY_SIZE(knt); ++i) {
 			if (knt[i] && strcmp(knt[i], knt1) == 0)
 				break;
@@ -191,6 +203,7 @@ kdbnearsym(unsigned long addr, kdb_symtab_t *symtab)
 			kfree(knt1);
 			knt1 = knt[i];
 			memcpy(knt+i, knt+i+1, sizeof(knt[0])*(ARRAY_SIZE(knt)-i-1));
+			i = ARRAY_SIZE(knt) - 1;
 		}
 		knt[i] = knt1;
 		symtab->sym_name = knt[i];

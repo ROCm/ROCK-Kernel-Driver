@@ -1,3 +1,16 @@
+2004-04-15 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.5-ia64-040413-1.
+
+2004-03-06 Keith Owens  <kaos@sgi.com>
+
+	* Use kdb_print for unwind debugging.
+	* kdb v4.3-2.6.4-rc2-ia64-1.
+
+2004-02-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.4-rc1-ia64-1.
+
 2004-02-18 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.3-2.6.3-ia64-1.

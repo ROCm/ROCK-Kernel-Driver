@@ -498,6 +498,7 @@ kdb_printf(const char *fmt, ...)
 		KDB_STATE_SET(PRINTF_LOCK);
 		spin_lock(&kdb_printf_lock);
 		got_printf_lock = 1;
+		atomic_inc(&kdb_event);
 	}
 
 	diag = kdbgetintenv("LINES", &linecount);
@@ -597,6 +598,7 @@ kdb_printf(const char *fmt, ...)
 		got_printf_lock = 0;
 		spin_unlock(&kdb_printf_lock);
 		KDB_STATE_CLEAR(PRINTF_LOCK);
+		atomic_dec(&kdb_event);
 	}
 	if (do_longjmp)
 #ifdef KDB_HAVE_LONGJMP

@@ -290,13 +290,13 @@ void die(const char * str, struct pt_regs * regs, long err)
 	if (nl)
 		printk("\n");
 	show_registers(regs);
-	dump((char *)str, regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 #ifdef	CONFIG_KDB
 	kdb_diemsg = str;
 	kdb(KDB_REASON_OOPS, err, regs);
 #endif	/* CONFIG_KDB */
+	dump((char *)str, regs);
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 

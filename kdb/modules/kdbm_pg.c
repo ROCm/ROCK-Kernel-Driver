@@ -118,7 +118,7 @@ kdbm_buffers(int argc, const char **argv, const char **envp,
 	kdb_printf("  bno %llu size %d dev 0x%x\n",
 		(unsigned long long)bh.b_blocknr,
 		bh.b_size,
-		bh.b_bdev->bd_dev);
+		bh.b_bdev ? bh.b_bdev->bd_dev : 0);
 	kdb_printf("  count %d state 0x%lx [%s]\n",
 		bh.b_count.counter, bh.b_state,
 		map_flags(bh.b_state, bh_state_vals));
@@ -167,9 +167,9 @@ kdbm_page(int argc, const char **argv, const char **envp,
 		return(diag);
 
 	kdb_printf("struct page at 0x%lx\n", addr);
-	kdb_printf("  next 0x%p prev 0x%p addr space 0x%p index %lu (offset 0x%x)\n",
+	kdb_printf("  next 0x%p prev 0x%p addr space 0x%p index %lu (offset 0x%llx)\n",
 		   page.list.next, page.list.prev, page.mapping, page.index,
-		   (int)(page.index << PAGE_CACHE_SHIFT));
+		   (unsigned long long)page.index << PAGE_CACHE_SHIFT);
 	kdb_printf("  count %d flags %s\n",
 		   page.count.counter, page_flags(page.flags));
 	kdb_printf("  virtual 0x%p\n", page_address((struct page *)addr));

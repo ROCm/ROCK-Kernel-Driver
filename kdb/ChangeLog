@@ -1,3 +1,33 @@
+2004-04-11 Keith Owens  <kaos@sgi.com>
+
+	* Unlock sn_sal_lock before entering kdb from sn_serial.
+	* kdb v4.3-2.6.5-common-2.
+
+2004-04-05 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.5-common-1.
+
+2004-03-22 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.5-rc2-common-1.
+
+2004-03-12 Keith Owens  <kaos@sgi.com>
+
+	* More work to avoid spurious messages from WARN_CONSOLE_UNLOCKED().
+	* bh command bug fixes.  Nathan Scott.
+	* kdb v4.3-2.6.4-common-1.
+
+2004-03-06 Keith Owens  <kaos@sgi.com>
+
+	* Set KDB_IS_RUNNING() during kdb_init to avoid spurious messages from
+	  WARN_CONSOLE_UNLOCKED().
+	* Correct loss of symbol names in kdbnearsym.
+	* kdb v4.3-2.6.4-rc2-common-1.
+
+2004-02-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.4-rc1-common-1.
+
 2004-02-21 Keith Owens  <kaos@sgi.com>
 
 	* Correct build of kdb_cmds when using a separate object directory and

@@ -69,6 +69,7 @@
 	 */
 volatile int kdb_flags;
 volatile int kdb_enter_debugger;
+atomic_t kdb_event;
 
 	/*
 	 * kdb_lock protects updates to kdb_initial_cpu.  Used to
@@ -1681,9 +1682,10 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 {
 	kdb_intstate_t	int_state;	/* Interrupt state */
 	kdb_reason_t	reason2 = reason;
-	int		result = 1;	/* Default is kdb handled it */
+	int		result = 0;	/* Default is kdb did not handle it */
 	int		ss_event;
 	kdb_dbtrap_t 	db_result=KDB_DB_NOBPT;
+	atomic_inc(&kdb_event);
 
 	switch(reason) {
 	case KDB_REASON_OOPS:
@@ -1702,7 +1704,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 		KDB_FLAG_SET(ONLY_DO_DUMP);
 	}
 	if (!kdb_on && !KDB_FLAG(ONLY_DO_DUMP))
-		return 0;
+		goto out;
 
 	KDB_DEBUG_STATE("kdb 1", reason);
 	KDB_STATE_CLEAR(SUPPRESS);
@@ -1733,7 +1735,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	if ((reason == KDB_REASON_BREAK || reason == KDB_REASON_DEBUG)
 	 && db_result == KDB_DB_NOBPT) {
 		KDB_DEBUG_STATE("kdb 2", reason);
-		return 0;	/* Not one of mine */
+		goto out;	/* Not one of mine */
 	}
 
 	/* Turn off single step if it was being used */
@@ -1810,12 +1812,12 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 			}
 			if (!recover) {
 				kdb_printf("     Cannot recover, allowing event to proceed\n");
-				return(0);
+				goto out;
 			}
 		}
 	} else if (!KDB_IS_RUNNING()) {
 		kdb_printf("kdb: CPU switch without kdb running, I'm confused\n");
-		return(0);
+		goto out;
 	}
 
 	/*
@@ -1985,7 +1987,9 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	KDB_STATE_CLEAR(RECURSE);
 	KDB_STATE_CLEAR(LEAVING);	/* No more kdb work after this */
 	KDB_DEBUG_STATE("kdb 17", reason);
-	return(result != 0);
+out:
+	atomic_dec(&kdb_event);
+	return result != 0;
 }
 
 /*
@@ -3478,6 +3482,7 @@ static struct notifier_block kdb_block = { kdb_panic, NULL, 0 };
 void __init
 kdb_init(void)
 {
+	kdb_initial_cpu = smp_processor_id();
 	/*
 	 * This must be called before any calls to kdb_printf.
 	 */
@@ -3504,7 +3509,8 @@ kdb_init(void)
 	if (!kdbjmpbuf)
 		printk(KERN_ERR "Cannot allocate kdbjmpbuf, no kdb recovery will be possible\n");
 #endif	/* KDB_HAVE_LONGJMP */
-	
+
+	kdb_initial_cpu = -1;
 }
 
 EXPORT_SYMBOL(kdb_register);
