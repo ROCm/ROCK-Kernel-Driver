@@ -940,6 +940,17 @@ static int adjust_irq(adjust_t *adj)
 
 /*====================================================================*/
 
+static int nonstatic_adjust_resource_info(struct pcmcia_socket *s, adjust_t *adj)
+{
+	switch (adj->Resource) {
+	case RES_MEMORY_RANGE:
+		return adjust_memory(s, adj);
+	case RES_IO_RANGE:
+		return adjust_io(s, adj);
+	}
+	return CS_UNSUPPORTED_FUNCTION;
+}
+
 int pcmcia_adjust_resource_info(adjust_t *adj)
 {
 	struct pcmcia_socket *s;
@@ -950,14 +961,8 @@ int pcmcia_adjust_resource_info(adjust_t *adj)
 
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(s, &pcmcia_socket_list, socket_list) {
-		switch (adj->Resource) {
-		case RES_MEMORY_RANGE:
-			ret = adjust_memory(s, adj);
-			break;
-		case RES_IO_RANGE:
-			ret = adjust_io(s, adj);
-			break;
-		}
+		if (s->resource_ops->adjust_resource)
+			ret = s->resource_ops->adjust_resource(s, adj);
 	}
 	up_read(&pcmcia_socket_list_rwsem);
 
@@ -967,7 +972,7 @@ EXPORT_SYMBOL(pcmcia_adjust_resource_info);
 
 /*====================================================================*/
 
-void release_resource_db(struct pcmcia_socket *s)
+static void nonstatic_release_resource_db(struct pcmcia_socket *s)
 {
     resource_map_t *p, *q;
     
@@ -980,6 +985,7 @@ void release_resource_db(struct pcmcia_socket *s)
 	kfree(p);
     }
 }
+
 
 
 void pcmcia_validate_mem(struct pcmcia_socket *s)
@@ -1013,12 +1019,20 @@ struct resource *find_mem_region(u_long base, u_long num, u_long align,
 	return NULL;
 }
 
+void release_resource_db(struct pcmcia_socket *s)
+{
+	if (s->resource_ops->exit)
+		s->resource_ops->exit(s);
+}
+
 
 struct pccard_resource_ops pccard_static_ops = {
 	.validate_mem = NULL,
 	.adjust_io_region = NULL,
 	.find_io = NULL,
 	.find_mem = NULL,
+	.adjust_resource = NULL,
+	.exit = NULL,
 };
 
 struct pccard_resource_ops pccard_nonstatic_ops = {
@@ -1026,4 +1040,6 @@ struct pccard_resource_ops pccard_nonstatic_ops = {
 	.adjust_io_region = nonstatic_adjust_io_region,
 	.find_io = nonstatic_find_io_region,
 	.find_mem = nonstatic_find_mem_region,
+	.adjust_resource = nonstatic_adjust_resource_info,
+	.exit = nonstatic_release_resource_db,
 };
