@@ -4234,7 +4234,7 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = sys_schet_getaffinity(pid,
+	ret = sys_sched_getaffinity(pid,
 				    /* XXX Nice api... */
 				    sizeof(kernel_mask),
 				    &kernel_mask);
