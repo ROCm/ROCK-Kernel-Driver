@@ -2936,10 +2936,10 @@ S: 03600 Karkkila
 S: Finland
 
 N: Deepak Saxena
-E: deepak@csociety.purdue.edu
+E: dsaxena@plexity.net
 D: I2O kernel layer (config, block, core, pci, net). I2O disk support for LILO
-D: XScale(IOP310) porting
-S: Tempe, Arizona
+D: XScale(IOP, IXP) porting and other random ARM bits
+S: Portland, OR
 
 N: Eric Schenk
 E: Eric.Schenk@dna.lth.se
