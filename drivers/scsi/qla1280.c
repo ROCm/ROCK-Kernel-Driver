@@ -3119,6 +3119,7 @@ qla1280_marker(struct scsi_qla_host *ha, int bus, int id, int lun, u8 type)
  * Returns:
  *      0 = success, was able to issue command.
  */
+#ifdef QLA_64BIT_PTR
 static int
 qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 {
@@ -3381,9 +3382,8 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 
 	return status;
 }
+#else /* !QLA_64BIT_PTR */
 
-
-#ifndef QLA_64BIT_PTR
 /*
  * qla1280_32bit_start_scsi
  *      The start SCSI is responsible for building request packets on
