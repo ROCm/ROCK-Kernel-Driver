@@ -1250,9 +1250,10 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
                 return status;
         }
 
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	while (timeout && !awd.done) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 	}
 
         set_current_state(TASK_RUNNING);
