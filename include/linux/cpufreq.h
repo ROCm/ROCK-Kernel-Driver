@@ -152,6 +152,8 @@ void cpufreq_unregister_governor(struct cpufreq_governor *governor);
 #define CPUFREQ_RELATION_L 0  /* lowest frequency at or above target */
 #define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
 
+struct freq_attr;
+
 struct cpufreq_driver {
 	/* needed by all drivers */
 	int	(*verify)	(struct cpufreq_policy *policy);
@@ -166,6 +168,7 @@ struct cpufreq_driver {
 	/* optional, for the moment */
 	int	(*init)		(struct cpufreq_policy *policy);
 	int	(*exit)		(struct cpufreq_policy *policy);
+	struct freq_attr	**attr;
 };
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
@@ -297,6 +300,15 @@ int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   unsigned int target_freq,
 				   unsigned int relation,
 				   unsigned int *index);
+
+/* the following are really really optional */
+extern struct freq_attr cpufreq_freq_attr_scaling_available_freqs;
+
+void cpufreq_frequency_table_get_attr(struct cpufreq_frequency_table *table, 
+				      unsigned int cpu);
+
+void cpufreq_frequency_table_put_attr(unsigned int cpu);
+
 
 #endif /* CONFIG_CPU_FREQ_TABLE */
 

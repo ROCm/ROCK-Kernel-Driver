@@ -214,6 +214,7 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 		else
 			p4clockmod_table[i].frequency = (stock_freq * i)/8;
 	}
+	cpufreq_frequency_table_get_attr(p4clockmod_table, policy->cpu);
 	
 	/* cpuinfo and default policy values */
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
@@ -226,9 +227,14 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 
 static int cpufreq_p4_cpu_exit(struct cpufreq_policy *policy)
 {
+	cpufreq_frequency_table_put_attr(policy->cpu);    
 	return cpufreq_p4_setdc(policy->cpu, DC_DISABLE);
 }
 
+static struct freq_attr* p4clockmod_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
 
 static struct cpufreq_driver p4clockmod_driver = {
 	.verify 	= cpufreq_p4_verify,
@@ -237,6 +243,7 @@ static struct cpufreq_driver p4clockmod_driver = {
 	.exit		= cpufreq_p4_cpu_exit,
 	.name		= "p4-clockmod",
 	.owner		= THIS_MODULE,
+	.attr		= p4clockmod_attr,
 };
 
 

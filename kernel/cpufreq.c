@@ -340,6 +340,7 @@ static int cpufreq_add_dev (struct device * dev)
 	int ret = 0;
 	struct cpufreq_policy new_policy;
 	struct cpufreq_policy *policy;
+	struct freq_attr **drv_attr;
 
 	if (!kset_get(&cpufreq_interface.kset))
 		return -EINVAL;
@@ -378,7 +379,13 @@ static int cpufreq_add_dev (struct device * dev)
 	ret = kobject_register(&policy->kobj);
 	if (ret)
 		goto out;
-		
+
+	drv_attr = cpufreq_driver->attr;
+	while ((drv_attr) && (*drv_attr)) {
+		sysfs_create_file(&policy->kobj, &((*drv_attr)->attr));
+		drv_attr++;
+	}
+
 	/* set default policy */
 	ret = cpufreq_set_policy(&new_policy);
 	if (ret)
