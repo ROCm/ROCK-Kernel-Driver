@@ -45,9 +45,7 @@
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>
 #include <asm/tlbflush.h>
-#ifdef CONFIG_PPC_EEH
 #include <asm/eeh.h>
-#endif
 
 /*
  * Note:  pte   --> Linux PTE
@@ -346,13 +344,11 @@ int hash_page(unsigned long ea, unsigned long access)
 		mm = &init_mm;
 		vsid = get_kernel_vsid(ea);
 		break;
-#ifdef CONFIG_PPC_EEH
 	case IO_UNMAPPED_REGION_ID:
 		udbg_printf("EEH Error ea = 0x%lx\n", ea);
 		PPCDBG_ENTER_DEBUGGER();
 		panic("EEH Error ea = 0x%lx\n", ea);
 		break;
-#endif
 	case KERNEL_REGION_ID:
 		/*
 		 * As htab_initialize is now, we shouldn't ever get here since
