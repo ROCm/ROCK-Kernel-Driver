@@ -1,3 +1,4 @@
+
 /*
 
   Linux Driver for BusLogic MultiMaster and FlashPoint SCSI Host Adapters
@@ -2702,14 +2703,14 @@ static void BusLogic_InitializeHostStructure(BusLogic_HostAdapter_T
 }
 
 /*
-  BusLogic_SlaveAttach will actually set the queue depth on individual
+  BusLogic_SlaveConfigure will actually set the queue depth on individual
   scsi devices as they are permanently added to the device chain.  We
   shamelessly rip off the SelectQueueDepths code to make this work mostly
   like it used to.  Since we don't get called once at the end of the scan
   but instead get called for each device, we have to do things a bit
   differently.
 */
-int BusLogic_SlaveAttach(SCSI_Device_T *Device)
+int BusLogic_SlaveConfigure(SCSI_Device_T *Device)
 {
   BusLogic_HostAdapter_T *HostAdapter =
     (BusLogic_HostAdapter_T *) Device->host->hostdata;

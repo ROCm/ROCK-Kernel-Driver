@@ -1328,7 +1328,7 @@ static int device_queue_depth(hcb_p np, int target, int lun)
  * Linux entry point for device queue sizing.
  */
 int
-sym53c8xx_slave_attach(Scsi_Device *device)
+sym53c8xx_slave_configure(Scsi_Device *device)
 {
 	struct Scsi_Host *host = device->host;
 	hcb_p np;

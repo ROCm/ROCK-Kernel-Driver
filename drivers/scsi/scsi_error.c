@@ -201,7 +201,7 @@ static void scsi_eh_prt_fail_stats(Scsi_Cmnd *sc_list, struct Scsi_Host *shost)
 	int devices_failed = 0;
 
 
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
 		for (scmd = sc_list; scmd; scmd = scmd->bh_next) {
 			if (scmd->device == sdev) {
 				++total_failures;
@@ -246,7 +246,8 @@ static void scsi_eh_get_failed(Scsi_Cmnd **sc_list, struct Scsi_Host *shost)
 	Scsi_Device *sdev;
 	Scsi_Cmnd *scmd;
 
-	for (found = 0, sdev = shost->host_queue; sdev; sdev = sdev->next) {
+	found = 0;
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
 		for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
 			if (scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_ERR)) {
 				scmd->bh_next = *sc_list;
@@ -961,7 +962,7 @@ static int scsi_eh_bus_device_reset(Scsi_Cmnd *sc_todo, struct Scsi_Host *shost)
 
 	SCSI_LOG_ERROR_RECOVERY(3, printk("%s: Trying BDR\n", __FUNCTION__));
 
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
 		for (scmd = sc_todo; scmd; scmd = scmd->bh_next)
 			if ((scmd->device == sdev) &&
 			    scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_ERR))
@@ -1015,7 +1016,7 @@ static int scsi_try_bus_reset(Scsi_Cmnd *scmd)
 		/*
 		 * Mark all affected devices to expect a unit attention.
 		 */
-		for (sdev = scmd->host->host_queue; sdev; sdev = sdev->next)
+		list_for_each_entry(sdev, &scmd->host->my_devices, siblings)
 			if (scmd->channel == sdev->channel) {
 				sdev->was_reset = 1;
 				sdev->expecting_cc_ua = 1;
@@ -1051,7 +1052,7 @@ static int scsi_try_host_reset(Scsi_Cmnd *scmd)
 		/*
 		 * Mark all affected devices to expect a unit attention.
 		 */
-		for (sdev = scmd->host->host_queue; sdev; sdev = sdev->next)
+		list_for_each_entry(sdev, &scmd->host->my_devices, siblings)
 			if (scmd->channel == sdev->channel) {
 				sdev->was_reset = 1;
 				sdev->expecting_cc_ua = 1;
@@ -1457,7 +1458,7 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 * onto the head of the SCSI request queue for the device.  There
 	 * is no point trying to lock the door of an off-line device.
 	 */
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next)
+	list_for_each_entry(sdev, &shost->my_devices, siblings)
 		if (sdev->online && sdev->locked)
 			scsi_eh_lock_door(sdev);
 
@@ -1478,7 +1479,7 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 * requests are started.
 	 */
 	spin_lock_irqsave(shost->host_lock, flags);
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
 		if ((shost->can_queue > 0 &&
 		     (shost->host_busy >= shost->can_queue))
 		    || (shost->host_blocked)

@@ -4599,7 +4599,7 @@ static void gdth_flush(int hanum)
 
 #if LINUX_VERSION_CODE >= 0x020322
     sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-    scp  = scsi_allocate_device(sdev, 1, FALSE);
+    scp  = scsi_allocate_device(sdev, 1);
     scp->cmd_len = 12;
     scp->use_sg = 0;
 #else
@@ -4673,7 +4673,7 @@ void gdth_halt(void)
         memset(cmnd, 0xff, MAX_COMMAND_SIZE);
 #if LINUX_VERSION_CODE >= 0x020322
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        scp  = scsi_allocate_device(sdev, 1, FALSE);
+        scp  = scsi_allocate_device(sdev, 1);
         scp->cmd_len = 12;
         scp->use_sg = 0;
 #else

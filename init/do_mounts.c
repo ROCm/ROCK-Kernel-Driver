@@ -595,7 +595,8 @@ static int __init rd_load_image(char *from)
 
 #ifdef CONFIG_BLK_DEV_RAM
 	int in_fd, out_fd;
-	int nblocks, rd_blocks, devblocks, i;
+	unsigned long rd_blocks, devblocks;
+	int nblocks, i;
 	char *buf;
 	unsigned short rotate = 0;
 #if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC_ISERIES)

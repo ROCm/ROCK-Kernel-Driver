@@ -1364,13 +1364,13 @@ static int esp_host_info(struct esp *esp, char *ptr, off_t offset, int len)
 	copy_info(&info, "Target #\tconfig3\t\tSync Capabilities\tDisconnect\tWide\n");
 	for (i = 0; i < 15; i++) {
 		if (esp->targets_present & (1 << i)) {
-			Scsi_Device *SDptr = esp->ehost->host_queue;
+			Scsi_Device *SDptr;
 			struct esp_device *esp_dev;
 
-			while ((SDptr->host != esp->ehost) &&
-			       (SDptr->id != i) &&
-			       (SDptr->next))
-				SDptr = SDptr->next;
+			list_for_each_entry(SDptr, &esp->ehost->my_devices,
+					siblings)
+				if(SDptr->id == i)
+					break;
 
 			esp_dev = SDptr->hostdata;
 			copy_info(&info, "%d\t\t", i);

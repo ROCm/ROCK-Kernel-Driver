@@ -468,7 +468,7 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
 struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 				    uint id, uint lun)
 {
-	struct scsi_device *sdev;
+	struct scsi_device *sdev, *device;
 
 	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
 	if (sdev == NULL)
@@ -483,6 +483,8 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 		sdev->lun = lun;
 		sdev->channel = channel;
 		sdev->online = TRUE;
+		INIT_LIST_HEAD(&sdev->siblings);
+		INIT_LIST_HEAD(&sdev->same_target_siblings);
 		/*
 		 * Some low level driver could use device->type
 		 */
@@ -493,6 +495,12 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 		 * doesn't
 		 */
 		sdev->borken = 1;
+		if (shost->hostt->slave_alloc)
+			if (shost->hostt->slave_alloc(sdev)) {
+				kfree(sdev);
+				return NULL;
+			}
+
 		scsi_initialize_queue(sdev, shost);
 		sdev->request_queue.queuedata = (void *) sdev;
 
@@ -500,16 +508,21 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 		init_waitqueue_head(&sdev->scpnt_wait);
 
 		/*
-		 * Add it to the end of the shost->host_queue list.
+		 * If there are any same target siblings, add this to the
+		 * sibling list
 		 */
-		if (shost->host_queue != NULL) {
-			sdev->prev = shost->host_queue;
-			while (sdev->prev->next != NULL)
-				sdev->prev = sdev->prev->next;
-			sdev->prev->next = sdev;
-		} else
-			shost->host_queue = sdev;
-
+		list_for_each_entry(device, &shost->my_devices, siblings) {
+			if(device->id == sdev->id &&
+			   device->channel == sdev->channel) {
+				list_add_tail(&sdev->same_target_siblings,
+					      &device->same_target_siblings);
+				break;
+			}
+		}
+		/*
+		 * Add it to the end of the shost->my_devices list.
+		 */
+		list_add_tail(&sdev->siblings, &shost->my_devices);
 	}
 	return (sdev);
 }
@@ -524,14 +537,13 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
  **/
 void scsi_free_sdev(struct scsi_device *sdev)
 {
-	if (sdev->prev != NULL)
-		sdev->prev->next = sdev->next;
-	else
-		sdev->host->host_queue = sdev->next;
-	if (sdev->next != NULL)
-		sdev->next->prev = sdev->prev;
+	list_del(&sdev->siblings);
+	list_del(&sdev->same_target_siblings);
 
 	blk_cleanup_queue(&sdev->request_queue);
+	scsi_release_commandblocks(sdev);
+	if (sdev->host->hostt->slave_destroy)
+		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry != NULL)
 		kfree(sdev->inquiry);
 	kfree(sdev);
@@ -1082,32 +1094,6 @@ leave:
 }
 
 /**
- * scsi_find_scsi_level - return the scsi_level of a matching target
- *
- * Description:
- *     Return the scsi_level of any Scsi_Device matching @channel, @id,
- *     and @shost.
- * Notes:
- *     Needs to issue an INQUIRY to LUN 0 if no Scsi_Device matches, and
- *     if the INQUIRY can't be sent return a failure.
- **/
-static int scsi_find_scsi_level(unsigned int channel, unsigned int id,
-				struct Scsi_Host *shost)
-{
-	int res = SCSI_2;
-	Scsi_Device *sdev;
-
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next)
-		if ((id == sdev->id) && (channel == sdev->channel))
-			return (int) sdev->scsi_level;
-	/*
-	 * FIXME No matching target id is configured, this needs to get
-	 * the INQUIRY for LUN 0, and use it to determine the scsi_level.
-	 */
-	return res;
-}
-
-/**
  * scsi_probe_lun - probe a single LUN using a SCSI INQUIRY
  * @sreq:	used to send the INQUIRY
  * @inq_result:	area to store the INQUIRY result
@@ -1469,6 +1455,17 @@ static int scsi_probe_and_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	if (sdevscan->current_queue_depth == 0)
 		goto alloc_failed;
 
+	/*
+	 * Since we reuse the same sdevscan over and over with different
+	 * target and lun values, we have to destroy and then recreate
+	 * any possible low level attachments since they very will might
+	 * also store the id and lun numbers in some form and need updating
+	 * with each scan.
+	 */
+	if (sdevscan->host->hostt->slave_destroy)
+		sdevscan->host->hostt->slave_destroy(sdevscan);
+	if (sdevscan->host->hostt->slave_alloc)
+		sdevscan->host->hostt->slave_alloc(sdevscan);
 	sreq = scsi_allocate_request(sdevscan);
 	if (sreq == NULL)
 		goto alloc_failed;
@@ -1703,6 +1700,22 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 		 */
 		return 0;
 	}
+	/*
+	 * Since we reuse the same sdevscan over and over with different
+	 * target and lun values, we have to destroy and then recreate
+	 * any possible low level attachments since they very will might
+	 * also store the id and lun numbers in some form and need updating
+	 * with each scan.
+	 *
+	 * This is normally handled in probe_and_add_lun, but since this
+	 * one particular function wants to scan lun 0 on each device
+	 * itself and will possibly pick up a resed sdevscan when doing
+	 * so, it also needs this hack.
+	 */
+	if (sdevscan->host->hostt->slave_destroy)
+		sdevscan->host->hostt->slave_destroy(sdevscan);
+	if (sdevscan->host->hostt->slave_alloc)
+		sdevscan->host->hostt->slave_alloc(sdevscan);
 	sreq = scsi_allocate_request(sdevscan);
 
 	sprintf(devname, "host %d channel %d id %d", sdevscan->host->host_no,
@@ -1862,6 +1875,74 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 
 }
 
+int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
+{
+	struct scsi_device *sdevscan, *sdev;
+	struct Scsi_Host *shost;
+	int error = -ENODEV;
+
+	shost = scsi_host_hn_get(host);
+	if (!shost)
+		return -ENODEV;
+	sdev = scsi_find_device(shost, channel, id, lun);
+	if (sdev)
+		goto out;
+
+	error = -ENOMEM;
+	sdevscan = scsi_alloc_sdev(shost, channel, id, lun);
+	if (!sdevscan)
+		goto out;
+
+	if(!list_empty(&sdevscan->same_target_siblings)) {
+		sdev = list_entry(&sdevscan->same_target_siblings, Scsi_Device,
+					same_target_siblings);
+		sdevscan->scsi_level = sdev->scsi_level;
+		sdev = NULL;
+	} else
+		sdevscan->scsi_level = SCSI_2;
+	error = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
+	scsi_free_sdev(sdevscan);
+
+	if (error != SCSI_SCAN_LUN_PRESENT) 
+		goto out;
+
+	scsi_attach_device(sdev);
+	error = 0;
+
+out:
+	scsi_host_put(shost);
+	return error;
+}
+
+int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
+{
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost;
+	int error = -ENODEV;
+
+	shost = scsi_host_hn_get(host);
+	if (!shost)
+		return -ENODEV;
+	sdev = scsi_find_device(shost, channel, id, lun);
+	if (!sdev)
+		goto out;
+
+	error = -EBUSY;
+	if (sdev->access_count)
+		goto out;
+	scsi_detach_device(sdev);
+	if (sdev->attached)
+		goto out;
+
+	devfs_unregister(sdev->de);
+	scsi_free_sdev(sdev);
+	error = 0;
+
+out:
+	scsi_host_put(shost);
+	return error;
+}
+
 /**
  * scsi_scan_target - scan a target id, possibly including all LUNs on the
  *     target.
@@ -1927,111 +2008,56 @@ static void scsi_scan_target(Scsi_Device *sdevscan, struct Scsi_Host *shost,
 }
 
 /**
- * scsi_scan_selected_lun - probe and add one LUN
+ * scsi_scan_host - scan the given adapter
+ * @shost:	adapter to scan
  *
  * Description:
- *     Probe a single LUN on @shost, @channel, @id and @lun. If the LUN is
- *     found, set the queue depth, allocate command blocks, and call
- *     init/attach/finish of the upper level (sd, sg, etc.) drivers.
+ *     Iterate and call scsi_scan_target to scan all possible target id's
+ *     on all possible channels.
  **/
-static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
-				   uint id, uint lun)
+void scsi_scan_host(struct Scsi_Host *shost)
 {
-	Scsi_Device *sdevscan, *sdev = NULL;
-	int res;
+	struct scsi_device *sdevscan;
+	uint channel, id, order_id;
 
-	if ((channel > shost->max_channel) || (id >= shost->max_id) ||
-	    (lun >= shost->max_lun))
-		return;
-
-	sdevscan = scsi_alloc_sdev(shost, channel, id, lun);
+	/*
+	 * The blk layer queue allocation is a bit expensive to
+	 * repeat for each channel and id - for FCP max_id is near
+	 * 255: each call to scsi_alloc_sdev() implies a call to
+	 * blk_init_queue, and then blk_init_free_list, where 2 *
+	 * queue_nr_requests requests are allocated. Don't do so
+	 * here for scsi_scan_selected_lun, since we end up
+	 * calling select_queue_depths with an extra Scsi_Device
+	 * on the host_queue list.
+	 */
+	sdevscan = scsi_alloc_sdev(shost, 0, 0, 0);
 	if (sdevscan == NULL)
 		return;
-
-	sdevscan->scsi_level = scsi_find_scsi_level(channel, id, shost);
-	res = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
-	scsi_free_sdev(sdevscan);
-
-	if (res != SCSI_SCAN_LUN_PRESENT) 
-		return;
-
-	scsi_attach_device(sdev);
-}
-
-/**
- * scan_scsis - scan the given adapter, or scan a single LUN
- * @shost:	adapter to scan
- * @hardcoded:	1 if a single channel/id/lun should be scanned, else 0
- * @hchannel:	channel to scan for hardcoded case
- * @hid:	target id to scan for hardcoded case
- * @hlun:	lun to scan for hardcoded case
- *
- * Description:
- *     If @hardcoded is 1, call scsi_scan_selected_lun to scan a single
- *     LUN; else, iterate and call scsi_scan_target to scan all possible
- *     target id's on all possible channels.
- **/
-void scan_scsis(struct Scsi_Host *shost, uint hardcoded, uint hchannel,
-		uint hid, uint hlun)
-{
-	if (hardcoded == 1) {
+	/*
+	 * The sdevscan host, channel, id and lun are filled in as
+	 * needed to scan.
+	 */
+	for (channel = 0; channel <= shost->max_channel; channel++) {
 		/*
-		 * XXX Overload hchannel/hid/hlun to figure out what to
-		 * scan, and use the standard scanning code rather than
-		 * this function - that way, an entire bus (or fabric), or
-		 * target id can be scanned. There are problems with queue
-		 * depth and the init/attach/finish that must be resolved
-		 * before (re-)scanning can handle finding more than one new
-		 * LUN.
+		 * XXX adapter drivers when possible (FCP, iSCSI)
+		 * could modify max_id to match the current max,
+		 * not the absolute max.
 		 *
-		 * For example, set hchannel 0 and hid to 5, and hlun to -1
-		 * in order to scan all LUNs on channel 0, target id 5.
+		 * XXX add a shost id iterator, so for example,
+		 * the FC ID can be the same as a target id
+		 * without a huge overhead of sparse id's.
 		 */
-		scsi_scan_selected_lun(shost, hchannel, hid, hlun);
-	} else {
-		Scsi_Device *sdevscan;
-		uint channel;
-		unsigned int id, order_id;
-
-		/*
-		 * The blk layer queue allocation is a bit expensive to
-		 * repeat for each channel and id - for FCP max_id is near
-		 * 255: each call to scsi_alloc_sdev() implies a call to
-		 * blk_init_queue, and then blk_init_free_list, where 2 *
-		 * queue_nr_requests requests are allocated. Don't do so
-		 * here for scsi_scan_selected_lun, since we end up
-		 * calling select_queue_depths with an extra Scsi_Device
-		 * on the host_queue list.
-		 */
-		sdevscan = scsi_alloc_sdev(shost, 0, 0, 0);
-		if (sdevscan == NULL)
-			return;
-		/*
-		 * The sdevscan host, channel, id and lun are filled in as
-		 * needed to scan.
-		 */
-		for (channel = 0; channel <= shost->max_channel; channel++) {
-			/*
-			 * XXX adapter drivers when possible (FCP, iSCSI)
-			 * could modify max_id to match the current max,
-			 * not the absolute max.
-			 *
-			 * XXX add a shost id iterator, so for example,
-			 * the FC ID can be the same as a target id
-			 * without a huge overhead of sparse id's.
-			 */
-			for (id = 0; id < shost->max_id; ++id) {
-				if (shost->reverse_ordering)
-					/*
-					 * Scan from high to low id.
-					 */
-					order_id = shost->max_id - id - 1;
-				else
-					order_id = id;
-				scsi_scan_target(sdevscan, shost, channel,
-						 order_id);
-			}
+		for (id = 0; id < shost->max_id; ++id) {
+			if (shost->reverse_ordering)
+				/*
+				 * Scan from high to low id.
+				 */
+				order_id = shost->max_id - id - 1;
+			else
+				order_id = id;
+			scsi_scan_target(sdevscan, shost, channel,
+					 order_id);
 		}
-		scsi_free_sdev(sdevscan);
 	}
+	scsi_free_sdev(sdevscan);
 }

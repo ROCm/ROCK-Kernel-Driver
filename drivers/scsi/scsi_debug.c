@@ -812,13 +812,13 @@ static void timer_intr_handler(unsigned long indx)
 	spin_unlock_irqrestore(&queued_arr_lock, iflags);
 }
 
-static int scsi_debug_slave_attach(struct scsi_device * sdp)
+static int scsi_debug_slave_configure(struct scsi_device * sdp)
 {
 	int k;
 	struct sdebug_dev_info * devip; 
 
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
-		printk(KERN_INFO "scsi_debug: slave_attach <%u %u %u %u>\n",
+		printk(KERN_INFO "scsi_debug: slave_configure <%u %u %u %u>\n",
 		       sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
 	if (sdp->host->max_cmd_len != SCSI_DEBUG_MAX_CMD_LEN)
 		sdp->host->max_cmd_len = SCSI_DEBUG_MAX_CMD_LEN;
@@ -838,13 +838,13 @@ static int scsi_debug_slave_attach(struct scsi_device * sdp)
 	return 0;
 }
 
-static void scsi_debug_slave_detach(struct scsi_device * sdp)
+static void scsi_debug_slave_destroy(struct scsi_device * sdp)
 {
 	struct sdebug_dev_info * devip = 
 				(struct sdebug_dev_info *)sdp->hostdata;
 
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
-		printk(KERN_INFO "scsi_debug: slave_detach <%u %u %u %u>\n",
+		printk(KERN_INFO "scsi_debug: slave_destroy <%u %u %u %u>\n",
 		       sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
 	if (devip) {
 		/* make this slot avaliable for re-use */

@@ -208,6 +208,48 @@ static int scsi_remove_legacy_host(struct Scsi_Host *shost)
 	return 0;
 }
 
+static int scsi_check_device_busy(struct scsi_device *sdev)
+{
+	struct Scsi_Host *shost = sdev->host;
+	struct scsi_cmnd *scmd;
+
+	/*
+	 * Loop over all of the commands associated with the
+	 * device.  If any of them are busy, then set the state
+	 * back to inactive and bail.
+	 */
+	for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
+		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE)
+			goto active;
+
+		/*
+		 * No, this device is really free.  Mark it as such, and
+		 * continue on.
+		 */
+		scmd->state = SCSI_STATE_DISCONNECTING;
+		if (scmd->request)
+			scmd->request->rq_status = RQ_SCSI_DISCONNECTING;
+	}
+
+	return 0;
+
+active:
+	printk(KERN_ERR "SCSI device not inactive - rq_status=%d, target=%d, "
+			"pid=%ld, state=%d, owner=%d.\n",
+			scmd->request->rq_status, scmd->target,
+			scmd->pid, scmd->state, scmd->owner);
+
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+		for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
+			if (scmd->request->rq_status == RQ_SCSI_DISCONNECTING)
+				scmd->request->rq_status = RQ_INACTIVE;
+		}
+	}
+
+	printk(KERN_ERR "Device busy???\n");
+	return 1;
+}
+
 /**
  * scsi_remove_host - check a scsi host for release and release
  * @shost:	a pointer to a scsi host to release
@@ -218,59 +260,25 @@ static int scsi_remove_legacy_host(struct Scsi_Host *shost)
 int scsi_remove_host(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
-	struct scsi_cmnd *scmd;
+	struct list_head *le, *lh;
 
 	/*
 	 * FIXME Do ref counting.  We force all of the devices offline to
 	 * help prevent race conditions where other hosts/processors could
 	 * try and get in and queue a command.
 	 */
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) 
+	list_for_each_entry(sdev, &shost->my_devices, siblings)
 		sdev->online = FALSE;
 
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-		/*
-		 * Loop over all of the commands associated with the
-		 * device.  If any of them are busy, then set the state
-		 * back to inactive and bail.
-		 */
-		for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
-			if (scmd->request && scmd->request->rq_status !=
-			    RQ_INACTIVE) {
-				printk(KERN_ERR "SCSI device not inactive"
-				       "- rq_status=%d, target=%d, pid=%ld,"
-				       "state=%d, owner=%d.\n",
-				       scmd->request->rq_status,
-				       scmd->target, scmd->pid,
-				       scmd->state, scmd->owner);
-				for (sdev = shost->host_queue; sdev;
-				     sdev = sdev->next) {
-					for (scmd = sdev->device_queue; scmd;
-					     scmd = scmd->next)
-						if (scmd->request->rq_status ==
-						    RQ_SCSI_DISCONNECTING)
-							scmd->request->rq_status = RQ_INACTIVE;
-				}
-				printk(KERN_ERR "Device busy???\n");
-				return 1;
-			}
-			/*
-			 * No, this device is really free.  Mark it as such, and
-			 * continue on.
-			 */
-			scmd->state = SCSI_STATE_DISCONNECTING;
-			if (scmd->request)
-				scmd->request->rq_status =
-					RQ_SCSI_DISCONNECTING;	/* Mark as
-								   busy */
-		}
-	}
+	list_for_each_entry(sdev, &shost->my_devices, siblings)
+		if (scsi_check_device_busy(sdev))
+			return 1;
 
 	/*
 	 * Next we detach the high level drivers from the Scsi_Device
 	 * structures
 	 */
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
 		scsi_detach_device(sdev);
 
 		/* If something still attached, punt */
@@ -285,14 +293,8 @@ int scsi_remove_host(struct Scsi_Host *shost)
 
 	/* Next we free up the Scsi_Cmnd structures for this host */
 
-	for (sdev = shost->host_queue; sdev;
-	     sdev = shost->host_queue) {
-		blk_cleanup_queue(&sdev->request_queue);
-		/* Next free up the Scsi_Device structures for this host */
-		shost->host_queue = sdev->next;
-		if (sdev->inquiry)
-			kfree(sdev->inquiry);
-		kfree(sdev);
+	list_for_each_safe(le, lh, &shost->my_devices) {
+		scsi_free_sdev(list_entry(le, Scsi_Device, siblings));
 	}
 
 	return 0;
@@ -302,23 +304,21 @@ int scsi_add_host(struct Scsi_Host *shost)
 {
 	Scsi_Host_Template *sht = shost->hostt;
 	struct scsi_device *sdev;
-	int error = 0;
+	int error = 0, saved_error = 0;
 
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
 	device_register(&shost->host_driverfs_dev);
-	scan_scsis(shost, 0, 0, 0, 0);
+	scsi_scan_host(shost);
 			
-	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-		if (sdev->host->hostt != sht)
-			continue; /* XXX(hch): can this really happen? */
+	list_for_each_entry (sdev, &shost->my_devices, siblings) {
 		error = scsi_attach_device(sdev);
 		if (error)
-			break;
+			saved_error = error;
 	}
 
-	return error;
+	return saved_error;
 }
 
 /**
@@ -370,7 +370,6 @@ extern int blk_nohighio;
 struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 {
 	struct Scsi_Host *shost, *shost_scr;
-	struct list_head *lh;
 	int gfp_mask;
 	DECLARE_MUTEX_LOCKED(sem);
 
@@ -401,6 +400,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
 	atomic_set(&shost->host_active,0);
+	INIT_LIST_HEAD(&shost->my_devices);
 
 	init_waitqueue_head(&shost->host_wait);
 	shost->dma_channel = 0xff;
@@ -449,8 +449,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	 * orders the scsi_host_list by host number and just do a
 	 * list_add_tail.
 	 */
-	list_for_each(lh, &scsi_host_list) {
-		shost_scr = list_entry(lh, struct Scsi_Host, sh_list);
+	list_for_each_entry(shost_scr, &scsi_host_list, sh_list) {
 		if (shost->host_no < shost_scr->host_no) {
 			__list_add(&shost->sh_list, shost_scr->sh_list.prev,
 				   &shost_scr->sh_list);
@@ -683,10 +682,7 @@ void __init scsi_host_init(void)
  * Notes:
  *	Attach a single Scsi_Device to the Scsi_Host - this should
  *	be made to look like a "pseudo-device" that points to the
- *	HA itself.  For the moment, we include it at the head of
- *	the host_queue itself - I don't think we want to show this
- *	to the HA in select_queue_depths(), as this would probably confuse
- *	matters.
+ *	HA itself.
  *
  *	Note - this device is not accessible from any high-level
  *	drivers (including generics), which is probably not

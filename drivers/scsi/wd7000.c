@@ -1434,23 +1434,21 @@ static int wd7000_proc_info(char *buffer, char **start, off_t offset, int length
 	/*
 	 * Display driver information for each device attached to the board.
 	 */
-	scd = host->host_queue;
+	SPRINTF("\nAttached devices: %s\n", !list_empty(&host->my_devices) ?
+		       	"" : "none");
 
-	SPRINTF("\nAttached devices: %s\n", scd ? "" : "none");
+	list_for_each_entry (scd, &host->my_devices, siblings) {
+		SPRINTF("  [Channel: %02d, Id: %02d, Lun: %02d]  ", scd->channel, scd->id, scd->lun);
+		SPRINTF("%s ", (scd->type < MAX_SCSI_DEVICE_CODE) ? scsi_device_types[(short) scd->type] : "Unknown device");
 
-	for (; scd; scd = scd->next)
-		if (scd->host->host_no == hostno) {
-			SPRINTF("  [Channel: %02d, Id: %02d, Lun: %02d]  ", scd->channel, scd->id, scd->lun);
-			SPRINTF("%s ", (scd->type < MAX_SCSI_DEVICE_CODE) ? scsi_device_types[(short) scd->type] : "Unknown device");
+		for (i = 0; (i < 8) && (scd->vendor[i] >= 0x20); i++)
+			SPRINTF("%c", scd->vendor[i]);
+		SPRINTF(" ");
 
-			for (i = 0; (i < 8) && (scd->vendor[i] >= 0x20); i++)
-				SPRINTF("%c", scd->vendor[i]);
-			SPRINTF(" ");
-
-			for (i = 0; (i < 16) && (scd->model[i] >= 0x20); i++)
-				SPRINTF("%c", scd->model[i]);
-			SPRINTF("\n");
-		}
+		for (i = 0; (i < 16) && (scd->model[i] >= 0x20); i++)
+			SPRINTF("%c", scd->model[i]);
+		SPRINTF("\n");
+	}
 
 	SPRINTF("\n");
 

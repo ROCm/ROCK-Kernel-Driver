@@ -42,7 +42,6 @@ int aha152x_proc_info(char *buffer, char **start, off_t offset, int length, int 
 		  eh_bus_reset_handler:		aha152x_bus_reset,	\
 		  eh_host_reset_handler:	aha152x_host_reset,	\
                   release:			aha152x_release,	\
-                  slave_attach:			0,			\
                   bios_param:			aha152x_biosparam,	\
                   can_queue:			1,			\
                   this_id:			7,			\

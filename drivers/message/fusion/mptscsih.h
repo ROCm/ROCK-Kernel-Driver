@@ -206,12 +206,11 @@ struct mptscsih_driver_setup
 #define x_scsi_dev_reset	mptscsih_dev_reset
 #define x_scsi_host_reset	mptscsih_host_reset
 #define x_scsi_bios_param	mptscsih_bios_param
-#define x_scsi_slave_attach	mptscsih_slave_attach
+#define x_scsi_slave_configure	mptscsih_slave_configure
 
 #define x_scsi_taskmgmt_bh	mptscsih_taskmgmt_bh
 #define x_scsi_old_abort	mptscsih_old_abort
 #define x_scsi_old_reset	mptscsih_old_reset
-#define x_scsi_slave_attach	mptscsih_slave_attach
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -235,9 +234,8 @@ extern	int		 x_scsi_bios_param(Scsi_Device *, struct block_device *, sector_t, i
 #else
 extern	int		 x_scsi_bios_param(Disk *, kdev_t, int *);
 #endif
-extern	int		 x_scsi_slave_attach(Scsi_Device *);
+extern	int		 x_scsi_slave_configure(Scsi_Device *);
 extern	void		 x_scsi_taskmgmt_bh(void *);
-extern	int		 x_scsi_slave_attach(Scsi_Device *);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 #define PROC_SCSI_DECL
@@ -256,7 +254,7 @@ extern	int		 x_scsi_slave_attach(Scsi_Device *);
 	.release			= x_scsi_release,	\
 	.info				= x_scsi_info,		\
 	.queuecommand			= x_scsi_queuecommand,	\
-	.slave_attach			= x_scsi_slave_attach,	\
+	.slave_configure		= x_scsi_slave_configure,\
 	.eh_abort_handler		= x_scsi_abort,		\
 	.eh_device_reset_handler	= x_scsi_dev_reset,	\
 	.eh_bus_reset_handler		= x_scsi_bus_reset,	\
@@ -268,7 +266,6 @@ extern	int		 x_scsi_slave_attach(Scsi_Device *);
 	.max_sectors			= MPT_SCSI_MAX_SECTORS,	\
 	.cmd_per_lun			= MPT_SCSI_CMD_PER_LUN,	\
 	.use_clustering			= ENABLE_CLUSTERING,	\
-	.slave_attach			x_scsi_slave_attach,	\
 }
 
 #else  /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1) */

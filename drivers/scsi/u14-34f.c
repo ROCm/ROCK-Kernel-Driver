@@ -630,7 +630,7 @@ static int max_queue_depth = CONFIG_SCSI_U14_34F_MAX_TAGS;
 static int max_queue_depth = MAX_CMD_PER_LUN;
 #endif
 
-static int u14_34f_slave_attach(Scsi_Device *dev) {
+static int u14_34f_slave_configure(Scsi_Device *dev) {
    int j, tqd, utqd;
    char *tag_suffix, *link_suffix;
    struct Scsi_Host *host = dev->host;
