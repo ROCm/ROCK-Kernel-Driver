@@ -43,6 +43,8 @@
 
 extern rwlock_t xtime_lock;
 
+extern unsigned long wall_jiffies;
+
 u64 jiffies_64;
 
 enum sparc_clock_type sp_clock_typ;
@@ -114,6 +116,9 @@ __volatile__ unsigned int *master_l10_limit;
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
+
+#define TICK_SIZE (tick_nsec / 1000)
+
 void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	/* last time the cmos clock got updated */
@@ -142,8 +147,8 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	/* Determine when to update the Mostek clock. */
 	if ((time_status & STA_UNSYNC) == 0 &&
 	    xtime.tv_sec > last_rtc_update + 660 &&
-	    xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
-	    xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
+	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) TICK_SIZE) / 2 &&
+	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) TICK_SIZE) / 2) {
 	  if (set_rtc_mmss(xtime.tv_sec) == 0)
 	    last_rtc_update = xtime.tv_sec;
 	  else
@@ -400,7 +405,7 @@ void __init sbus_time_init(void)
 	mon = MSTK_REG_MONTH(mregs);
 	year = MSTK_CVT_YEAR( MSTK_REG_YEAR(mregs) );
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
 	mregs->creg &= ~MSTK_CREG_READ;
 	spin_unlock_irq(&mostek_lock);
 #ifdef CONFIG_SUN4
@@ -431,7 +436,7 @@ void __init sbus_time_init(void)
 		intersil_start(iregs);
 
 		xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-		xtime.tv_usec = 0;
+		xtime.tv_nsec = 0;
 		printk("%u/%u/%u %u:%u:%u\n",day,mon,year,hour,min,sec);
 	}
 #endif
@@ -467,48 +472,33 @@ extern __inline__ unsigned long do_gettimeoffset(void)
 	return offset + count;
 }
 
-/* This need not obtain the xtime_lock as it is coded in
- * an implicitly SMP safe way already.
+/* Ok, my cute asm atomicity trick doesn't work anymore.
+ * There are just too many variables that need to be protected
+ * now (both members of xtime, wall_jiffies, et al.)
  */
 void do_gettimeofday(struct timeval *tv)
 {
-	/* Load doubles must be used on xtime so that what we get
-	 * is guarenteed to be atomic, this is why we can run this
-	 * with interrupts on full blast.  Don't touch this... -DaveM
-	 */
-	__asm__ __volatile__(
-	"sethi	%hi(master_l10_counter), %o1\n\t"
-	"ld	[%o1 + %lo(master_l10_counter)], %g3\n\t"
-	"sethi	%hi(xtime), %g2\n"
-	"1:\n\t"
-	"ldd	[%g2 + %lo(xtime)], %o4\n\t"
-	"ld	[%g3], %o1\n\t"
-	"ldd	[%g2 + %lo(xtime)], %o2\n\t"
-	"xor	%o4, %o2, %o2\n\t"
-	"xor	%o5, %o3, %o3\n\t"
-	"orcc	%o2, %o3, %g0\n\t"
-	"bne	1b\n\t"
-	" cmp	%o1, 0\n\t"
-	"bge	1f\n\t"
-	" srl	%o1, 0xa, %o1\n\t"
-	"sethi	%hi(tick), %o3\n\t"
-	"ld	[%o3 + %lo(tick)], %o3\n\t"
-	"sethi	%hi(0x1fffff), %o2\n\t"
-	"or	%o2, %lo(0x1fffff), %o2\n\t"
-	"add	%o5, %o3, %o5\n\t"
-	"and	%o1, %o2, %o1\n"
-	"1:\n\t"
-	"add	%o5, %o1, %o5\n\t"
-	"sethi	%hi(1000000), %o2\n\t"
-	"or	%o2, %lo(1000000), %o2\n\t"
-	"cmp	%o5, %o2\n\t"
-	"bl,a	1f\n\t"
-	" st	%o4, [%o0 + 0x0]\n\t"
-	"add	%o4, 0x1, %o4\n\t"
-	"sub	%o5, %o2, %o5\n\t"
-	"st	%o4, [%o0 + 0x0]\n"
-	"1:\n\t"
-	"st	%o5, [%o0 + 0x4]\n");
+	unsigned long flags;
+	unsigned long usec, sec;
+
+	read_lock_irqsave(&xtime_lock, flags);
+	usec = do_gettimeoffset();
+	{
+		unsigned long lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * (1000000 / HZ);
+	}
+	sec = xtime.tv_sec;
+	usec += (xtime.tv_nsec / 1000);
+	read_unlock_irqrestore(&xtime_lock, flags);
+
+	while (usec >= 1000000) {
+		usec -= 1000000;
+		sec++;
+	}
+
+	tv->tv_sec = sec;
+	tv->tv_usec = usec;
 }
 
 void do_settimeofday(struct timeval *tv)
@@ -520,12 +510,20 @@ void do_settimeofday(struct timeval *tv)
 
 static void sbus_do_settimeofday(struct timeval *tv)
 {
+	/*
+	 * This is revolting. We need to set "xtime" correctly. However, the
+	 * value in this location is the value at the most recent update of
+	 * wall time.  Discover what correction gettimeofday() would have
+	 * made, and then undo it!
+	 */
 	tv->tv_usec -= do_gettimeoffset();
-	if(tv->tv_usec < 0) {
+	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+	while (tv->tv_usec < 0) {
 		tv->tv_usec += 1000000;
 		tv->tv_sec--;
 	}
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = (tv->tv_usec * 1000);
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;

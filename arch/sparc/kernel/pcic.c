@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 
 #include <asm/ebus.h>
 #include <asm/sbus.h> /* for sanity check... */
@@ -792,48 +793,54 @@ static __inline__ unsigned long do_gettimeoffset(void)
 	return offset + count;
 }
 
-extern volatile unsigned long wall_jiffies;
+extern unsigned long wall_jiffies;
+extern rwlock_t xtime_lock;
 
 static void pci_do_gettimeofday(struct timeval *tv)
 {
- 	unsigned long flags;
+	unsigned long flags;
+	unsigned long usec, sec;
 
-	local_irq_save(flags);
-	*tv = xtime;
-	tv->tv_usec += do_gettimeoffset();
+	read_lock_irqsave(&xtime_lock, flags);
+	usec = do_gettimeoffset();
+	{
+		unsigned long lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * (1000000 / HZ);
+	}
+	sec = xtime.tv_sec;
+	usec += (xtime.tv_nsec / 1000);
+	read_unlock_irqrestore(&xtime_lock, flags);
 
-	/*
-	 * xtime is atomically updated in timer_bh. The difference
-	 * between jiffies and wall_jiffies is nonzero if the timer
-	 * bottom half hasnt executed yet.
-	 */
-	if ((jiffies - wall_jiffies) != 0)
-		tv->tv_usec += USECS_PER_JIFFY;
+	while (usec >= 1000000) {
+		usec -= 1000000;
+		sec++;
+	}
 
-	local_irq_restore(flags);
-
-	if (tv->tv_usec >= 1000000) {
-		tv->tv_usec -= 1000000;
-		tv->tv_sec++;
-	}       
+	tv->tv_sec = sec;
+	tv->tv_usec = usec;
 }
 
 static void pci_do_settimeofday(struct timeval *tv)
 {
- 	unsigned long flags;
-
-	local_irq_save(flags);
+	/*
+	 * This is revolting. We need to set "xtime" correctly. However, the
+	 * value in this location is the value at the most recent update of
+	 * wall time.  Discover what correction gettimeofday() would have
+	 * made, and then undo it!
+	 */
 	tv->tv_usec -= do_gettimeoffset();
-	if(tv->tv_usec < 0) {
+	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+	while (tv->tv_usec < 0) {
 		tv->tv_usec += 1000000;
 		tv->tv_sec--;
 	}
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = (tv->tv_usec * 1000);
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	local_irq_restore(flags);
 }
 
 #if 0
