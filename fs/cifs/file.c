@@ -143,6 +143,10 @@ cifs_open(struct inode *inode, struct file *file)
 	/* Also refresh inode by passing in file_info buf returned by SMBOpen 
 	   and calling get_inode_info with returned buf (at least 
 	   helps non-Unix server case */
+
+	/* BB we can not do this if this is the second open of a file 
+	and the first handle has writebehind data, we might be 
+	able to simply do a filemap_fdatawrite/filemap_fdatawait first */
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
 		if (full_path)
@@ -275,7 +279,6 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	int desiredAccess = 0x20197;
 	int disposition = FILE_OPEN;
 	__u16 netfid;
-	FILE_ALL_INFO * buf = NULL;
 
 	if(inode == NULL)
 		return -EBADF;
@@ -328,21 +331,23 @@ and we can never tell if the caller already has the rename_sem */
 	else
 		oplock = FALSE;
 
-		/* BB pass O_SYNC flag through on file attributes .. BB */
+	
+	/* Can not refresh inode by passing in file_info buf to be returned
+	 by SMBOpen and then calling get_inode_info with returned buf 
+	 since file might have write behind data that needs to be flushed 
+	 and server version of file size can be stale. If we 
+	 knew for sure that inode was not dirty locally we could do this */
 
-		/* Also refresh inode by passing in file_info buf returned by SMBOpen
-		   and calling get_inode_info with returned buf (at least
-		   helps non-Unix server case */
-	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+/*	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
 		up(&pCifsFile->fh_sem);
 		if (full_path)
 			kfree(full_path);
 		FreeXid(xid);
 		return -ENOMEM;
-	}
+	}*/
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
-				CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
+				CREATE_NOT_DIR, &netfid, &oplock, NULL, cifs_sb->local_nls);
 	if (rc) {
 		up(&pCifsFile->fh_sem);
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
@@ -353,12 +358,18 @@ and we can never tell if the caller already has the rename_sem */
 		up(&pCifsFile->fh_sem);
 		pCifsInode = CIFS_I(inode);
 		if(pCifsInode) {
+			filemap_fdatawrite(inode->i_mapping);
+			filemap_fdatawait(inode->i_mapping);
+			/* temporarily disable caching while we
+			go to server to get inode info */
+			pCifsInode->clientCanCacheAll = FALSE;
+			pCifsInode->clientCanCacheRead = FALSE;
 			if (pTcon->ses->capabilities & CAP_UNIX)
 				rc = cifs_get_inode_info_unix(&inode,
 						full_path, inode->i_sb);
 			else
 				rc = cifs_get_inode_info(&inode,
-						full_path, buf, inode->i_sb);
+						full_path, NULL, inode->i_sb);
 
 			if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 				pCifsInode->clientCanCacheAll =  TRUE;
@@ -375,8 +386,6 @@ and we can never tell if the caller already has the rename_sem */
 		}
 	}
 
-	if (buf)
-		kfree(buf);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
