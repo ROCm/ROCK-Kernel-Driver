@@ -38,6 +38,7 @@ extern void paging_init(void);
 #define flush_dcache_page(page)			do { } while (0)
 #define flush_icache_range(start, end)          do { } while (0)
 #define flush_icache_page(vma,pg)               do { } while (0)
+#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
 /*
  * The S390 doesn't have any external MMU info: the kernel page

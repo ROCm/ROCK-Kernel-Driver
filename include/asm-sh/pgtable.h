@@ -41,6 +41,7 @@ extern void paging_init(void);
 #define flush_dcache_page(page)			do { } while (0)
 #define flush_icache_range(start, end)		do { } while (0)
 #define flush_icache_page(vma,pg)		do { } while (0)
+#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 #define flush_cache_sigtramp(vaddr)		do { } while (0)
 
 #define p3_cache_init()				do { } while (0)
@@ -64,6 +65,7 @@ extern void flush_cache_sigtramp(unsigned long addr);
 
 #define flush_page_to_ram(page)			do { } while (0)
 #define flush_icache_page(vma,pg)		do { } while (0)
+#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
 /* Initialization of P3 area for copy_user_page */
 extern void p3_cache_init(void);
