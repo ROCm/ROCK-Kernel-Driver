@@ -17,6 +17,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h> 
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
@@ -89,6 +90,12 @@ static int fid_codes[32] = {
     30, 190, 40, 200, 130, 135, 140, 210,
     150, 225, 160, 165, 170, 180, -1, -1,
 };
+
+/* This parameter is used in order to force ACPI instead of legacy method for
+ * configuration purpose.
+ */
+
+static int powernow_acpi_force;
 
 static struct cpufreq_frequency_table *powernow_table;
 
@@ -554,7 +561,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	}
 	dprintk(KERN_INFO PFX "FSB: %3d.%03d MHz\n", fsb/1000, fsb%1000);
 
-	if (dmi_broken & BROKEN_CPUFREQ) {
+	if ((dmi_broken & BROKEN_CPUFREQ) || powernow_acpi_force) {
 		printk (KERN_INFO PFX "PSB/PST known to be broken.  Trying ACPI instead\n");
 		result = powernow_acpi_init();
 	} else {
@@ -630,6 +637,10 @@ static void __exit powernow_exit (void)
 	if (powernow_table)
 		kfree(powernow_table);
 }
+
+module_param(powernow_acpi_force,  int, 0444);
+
+MODULE_PARM_DESC(powernow_acpi_force, "Force ACPI to be used");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Powernow driver for AMD K7 processors.");
