@@ -419,7 +419,31 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
 		*cmd &= ~AGPSTAT_FW;
 
-	/* Set speed. */
+	/*
+	 * Set speed.
+	 * Check for invalid speeds. This can happen when applications
+	 * written before the AGP 3.0 standard pass AGP2.x modes to AGP3 hardware
+	 */
+	if (*mode & AGPSTAT_MODE_3_0) {
+		/*
+		 * Caller hasn't a clue what its doing. We are in 3.0 mode,
+		 * have been passed a 3.0 mode, but with 2.x speed bits set.
+		 * AGP2.x 4x -> AGP3.0 4x.
+		 */
+		if (*mode & AGPSTAT2_4X) {
+			*mode &= ~AGPSTAT2_4X;
+			*mode |= AGPSTAT3_4X;
+		}
+	} else {
+		/*
+		 * The caller doesn't know what they are doing. We are in 3.0 mode,
+		 * but have been passed an AGP 2.x mode.
+		 * Convert AGP 1x,2x,4x -> AGP 3.0 4x.
+		 */
+		*mode &= ~(AGPSTAT2_4X | AGPSTAT2_2X | AGPSTAT2_1X);
+		*mode |= AGPSTAT3_4X;
+	}
+
 	if (!((*cmd & AGPSTAT3_8X) && (*tmp & AGPSTAT3_8X) && (*mode & AGPSTAT3_8X)))
 		*cmd &= ~AGPSTAT3_8X;
 
