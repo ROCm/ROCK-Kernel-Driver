@@ -420,7 +420,7 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
 	struct Scsi_Host *shost;
 	ORC_HCS *pHCB;
 	unsigned long port, bios;
-	int ok = -ENODEV;
+	int error = -ENODEV;
 	u32 sz;
 	unsigned long dBiosAdr;
 	char *pbBiosAdr;
@@ -433,17 +433,17 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
 		goto out_disable_device;
 	}
 
+	pci_set_master(pdev);
+
 	port = pci_resource_start(pdev, 0);
-	if (!request_region(pHCB->HCS_Base, 256, "inia100")) {
-		printk(KERN_WARNING "inia100: io port 0x%x, is busy.\n", 
-		       pHCB->HCS_Base);
-		goto out_disable_device; /* XXX: undo init_orchid() ?? */
+	if (!request_region(port, 256, "inia100")) {
+		printk(KERN_WARNING "inia100: io port 0x%lx, is busy.\n", port);
+		goto out_disable_device;
 	}
 
 	/* <02> read from base address + 0x50 offset to get the bios balue. */
 	bios = ORC_RDWORD(port, 0x50);
 
-	pci_set_master(pdev);
 
 	shost = scsi_host_alloc(&inia100_template, sizeof(ORC_HCS));
 	if (!shost)
@@ -460,7 +460,8 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
 
 	/* Get total memory needed for SCB */
 	sz = ORC_MAXQUEUE * sizeof(ORC_SCB);
-	pHCB->HCS_virScbArray = pci_alloc_consistent(pdev, sz, &pHCB->HCS_physScbArray);
+	pHCB->HCS_virScbArray = pci_alloc_consistent(pdev, sz,
+			&pHCB->HCS_physScbArray);
 	if (!pHCB->HCS_virScbArray) {
 		printk("inia100: SCB memory allocation error\n");
 		goto out_host_put;
@@ -469,7 +470,8 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
 
 	/* Get total memory needed for ESCB */
 	sz = ORC_MAXQUEUE * sizeof(ESCB);
-	pHCB->HCS_virEscbArray = pci_alloc_consistent(pdev, sz, &pHCB->HCS_physEscbArray);
+	pHCB->HCS_virEscbArray = pci_alloc_consistent(pdev, sz,
+			&pHCB->HCS_physEscbArray);
 	if (!pHCB->HCS_virEscbArray) {
 		printk("inia100: ESCB memory allocation error\n");
 		goto out_free_scb_array;
@@ -490,21 +492,23 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
 	shost->unique_id = shost->io_port;
 	shost->max_id = pHCB->HCS_MaxTar;
 	shost->max_lun = 16;
-	shost->irq = pHCB->HCS_Intr;
+	shost->irq = pHCB->HCS_Intr = pdev->irq;
 	shost->this_id = pHCB->HCS_SCSI_ID;	/* Assign HCS index */
 	shost->sg_tablesize = TOTAL_SG_ENTRY;
 
 	/* Initial orc chip           */
-	ok = request_irq(pHCB->HCS_Intr, inia100_intr, SA_SHIRQ, "inia100", shost);
-	if (ok < 0) {
-		printk(KERN_WARNING "inia100: unable to get irq %d\n", pHCB->HCS_Intr);
+	error = request_irq(pdev->irq, inia100_intr, SA_SHIRQ,
+			"inia100", shost);
+	if (error < 0) {
+		printk(KERN_WARNING "inia100: unable to get irq %d\n",
+				pdev->irq);
 		goto out_free_escb_array;
 	}
 
 	pci_set_drvdata(pdev, shost);
 
-	ok = scsi_add_host(shost, &pdev->dev);
-	if (!ok)
+	error = scsi_add_host(shost, &pdev->dev);
+	if (error)
 		goto out_free_irq;
 
 	scsi_scan_host(shost);
@@ -521,11 +525,11 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
  out_host_put:
 	scsi_host_put(shost);
  out_release_region:
-        release_region(pHCB->HCS_Base, 256);
+        release_region(port, 256);
  out_disable_device:
 	pci_disable_device(pdev);
  out:
-	return ok;
+	return error;
 }
 
 static void __devexit inia100_remove_one(struct pci_dev *pdev)
