@@ -83,8 +83,11 @@ void sigio_handler(int sig, union uml_pt_regs *regs)
 				 * can be freed here.
 				 */
 				next = irq_fd->next;
-				if(irq_fd->freed)
+				if(irq_fd->freed){
 					free_irq(irq_fd->irq, irq_fd->id);
+					free_irq_by_irq_and_dev(irq_fd->irq,
+								irq_fd->id);
+				}
 			}
 		}
 	}
