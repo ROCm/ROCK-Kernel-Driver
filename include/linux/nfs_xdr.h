@@ -67,6 +67,7 @@ struct nfs_fsinfo {
 	__u64			afiles;	/* # of files available to user */
 	__u32			linkmax;/* max # of hard links */
 	__u32			namelen;/* max name length */
+	__u32			lease_time; /* in seconds */
 };
 
 /*
