@@ -224,7 +224,7 @@ typedef unsigned char	byte;	/* used everywhere */
  * allowing each to have about 256 entries (8 bytes each) from this.
  */
 #define PRD_BYTES       8
-#define PRD_ENTRIES     (PAGE_SIZE / (2 * PRD_BYTES))
+#define PRD_ENTRIES	256
 
 /*
  * Some more useful definitions
