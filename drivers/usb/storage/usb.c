@@ -943,7 +943,7 @@ static void storage_disconnect(struct usb_interface *intf)
 
 	US_DEBUGP("storage_disconnect() called\n");
 
-       	ss = usb_get_intfdata(intf);
+	ss = usb_get_intfdata(intf);
 	usb_set_intfdata(intf, NULL);
 
 	/* serious error -- we're attempting to disconnect an interface but
