@@ -97,6 +97,15 @@ config I2C_NFORCE2
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-nforce2.
 
+config I2C_PHILIPSPAR
+	tristate "Philips style parallel port adapter"
+	depends on I2C_ALGOBIT && PARPORT
+	help
+	  This supports parallel-port I2C adapters made by Philips.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-philips-par.
+
 config I2C_PIIX4
 	tristate "Intel PIIX4"
 	depends on I2C && PCI && EXPERIMENTAL

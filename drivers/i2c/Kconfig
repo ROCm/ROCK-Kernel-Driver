@@ -48,16 +48,6 @@ config I2C_ALGOBIT
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-algo-bit.
 
-config I2C_PHILIPSPAR
-	tristate "Philips style parallel port adapter"
-	depends on I2C_ALGOBIT && PARPORT
-	---help---
-	  This supports parallel-port I2C adapters made by Philips.  Say Y if
-	  you own such an adapter.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-philips-par.
-
 config I2C_ELV
 	tristate "ELV adapter"
 	depends on I2C_ALGOBIT && ISA
