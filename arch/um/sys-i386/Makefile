@@ -1,13 +1,17 @@
-obj-y = bugs.o checksum.o extable.o fault.o ksyms.o ldt.o module.o \
-	ptrace.o ptrace_user.o semaphore.o sigcontext.o syscalls.o sysrq.o
+obj-y = bugs.o checksum.o fault.o ksyms.o ldt.o ptrace.o ptrace_user.o \
+	semaphore.o sigcontext.o syscalls.o sysrq.o bitops.o
+bitops-y = ../../i386/lib/bitops.o
 
 obj-$(CONFIG_HIGHMEM) += highmem.o
+obj-$(CONFIG_MODULES) += module.o
 
 USER_OBJS := bugs.o ptrace_user.o sigcontext.o fault.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 SYMLINKS = semaphore.c highmem.c module.c
 SYMLINKS := $(foreach f,$(SYMLINKS),$(src)/$f)
+
+clean-files := $(SYMLINKS)
 
 semaphore.c-dir = kernel
 highmem.c-dir = mm
@@ -24,19 +28,4 @@ $(USER_OBJS) : %.o: %.c
 $(SYMLINKS): 
 	$(call make_link,$@)
 
-clean:
-	$(MAKE) -C util clean
-
-fastdep:
-
-dep:
-
-archmrproper:
-	rm -f $(SYMLINKS)
-
-archclean:
-
-archdep:
-
-modules:
-
+subdir- := util

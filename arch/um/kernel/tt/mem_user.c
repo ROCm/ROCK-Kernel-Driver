@@ -25,14 +25,13 @@ void remap_data(void *segment_start, void *segment_end, int w)
 	size = (unsigned long) segment_end - 
 		(unsigned long) segment_start;
 	data = create_mem_file(size);
-	if((addr = mmap(NULL, size, PROT_WRITE | PROT_READ, 
-			MAP_SHARED, data, 0)) == MAP_FAILED){
+	addr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, data, 0);
+	if(addr == MAP_FAILED){
 		perror("mapping new data segment");
 		exit(1);
 	}
 	memcpy(addr, segment_start, size);
-	if(switcheroo(data, prot, addr, segment_start, 
-		      size) < 0){
+	if(switcheroo(data, prot, addr, segment_start, size) < 0){
 		printf("switcheroo failed\n");
 		exit(1);
 	}

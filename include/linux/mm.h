@@ -566,6 +566,9 @@ int clear_page_dirty_for_io(struct page *page);
  */
 typedef int (*shrinker_t)(int nr_to_scan, unsigned int gfp_mask);
 
+extern long do_mprotect(struct mm_struct *mm, unsigned long start, 
+			size_t len, unsigned long prot);
+
 /*
  * Add an aging callback.  The int is the number of 'seeks' it takes
  * to recreate one of the objects that these functions age.
@@ -575,6 +578,9 @@ typedef int (*shrinker_t)(int nr_to_scan, unsigned int gfp_mask);
 struct shrinker;
 extern struct shrinker *set_shrinker(int, shrinker_t);
 extern void remove_shrinker(struct shrinker *shrinker);
+
+extern long do_mprotect(struct mm_struct *mm, unsigned long start, 
+			size_t len, unsigned long prot);
 
 /*
  * On a two-level page table, this ends up being trivial. Thus the
@@ -634,9 +640,15 @@ extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
-extern unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
+extern unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file *file, 
+				   unsigned long addr, unsigned long len,
+				   unsigned long prot, unsigned long flag,
+				   unsigned long pgoff);
+static inline unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
-	unsigned long flag, unsigned long pgoff);
+	unsigned long flag, unsigned long pgoff) {
+	return __do_mmap_pgoff(current->mm, file, addr, len, prot, flag, pgoff);
+}
 
 static inline unsigned long do_mmap(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,

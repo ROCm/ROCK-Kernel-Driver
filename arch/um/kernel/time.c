@@ -4,24 +4,33 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
 #include <signal.h>
 #include <errno.h>
-#include "linux/module.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
 #include "process.h"
 #include "signal_user.h"
 #include "time_user.h"
+#include "kern_constants.h"
+
+/* XXX This really needs to be declared and initialized in a kernel file since 
+ * it's in <linux/time.h>
+ */
+extern struct timespec wall_to_monotonic;
 
 extern struct timeval xtime;
+
+struct timeval local_offset = { 0, 0 };
 
 void timer(void)
 {
 	gettimeofday(&xtime, NULL);
+	timeradd(&xtime, &local_offset, &xtime);
 }
 
 void set_interval(int timer_type)
@@ -41,6 +50,15 @@ void enable_timer(void)
 							{ 0, usec }});
 	if(setitimer(ITIMER_VIRTUAL, &enable, NULL))
 		printk("enable_timer - setitimer failed, errno = %d\n",
+		       errno);
+}
+
+void disable_timer(void)
+{
+	struct itimerval disable = ((struct itimerval) { { 0, 0 }, { 0, 0 }});
+	if((setitimer(ITIMER_VIRTUAL, &disable, NULL) < 0) ||
+	   (setitimer(ITIMER_REAL, &disable, NULL) < 0))
+		printk("disnable_timer - setitimer failed, errno = %d\n",
 		       errno);
 }
 
@@ -66,7 +84,7 @@ void switch_timers(int to_real)
 		       errno);
 }
 
-void idle_timer(void)
+void uml_idle_timer(void)
 {
 	if(signal(SIGVTALRM, SIG_IGN) == SIG_ERR)
 		panic("Couldn't unset SIGVTALRM handler");
@@ -76,14 +94,23 @@ void idle_timer(void)
 	set_interval(ITIMER_REAL);
 }
 
+extern int do_posix_clock_monotonic_gettime(struct timespec *tp);
+
 void time_init(void)
 {
+	struct timespec now;
+ 
 	if(signal(SIGVTALRM, boot_timer_handler) == SIG_ERR)
 		panic("Couldn't set SIGVTALRM handler");
 	set_interval(ITIMER_VIRTUAL);
+
+	do_posix_clock_monotonic_gettime(&now);
+	wall_to_monotonic.tv_sec = -now.tv_sec;
+	wall_to_monotonic.tv_nsec = -now.tv_nsec;
 }
 
-struct timeval local_offset = { 0, 0 };
+/* Declared in linux/time.h, which can't be included here */
+extern void clock_was_set(void);
 
 void do_gettimeofday(struct timeval *tv)
 {
@@ -96,15 +123,13 @@ void do_gettimeofday(struct timeval *tv)
 	clock_was_set();
 }
 
-EXPORT_SYMBOL(do_gettimeofday);
-
 int do_settimeofday(struct timespec *tv)
 {
 	struct timeval now;
 	unsigned long flags;
 	struct timeval tv_in;
 
-	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+	if ((unsigned long) tv->tv_nsec >= UM_NSEC_PER_SEC)
 		return -EINVAL;
 
 	tv_in.tv_sec = tv->tv_sec;
@@ -114,9 +139,9 @@ int do_settimeofday(struct timespec *tv)
 	gettimeofday(&now, NULL);
 	timersub(&tv_in, &now, &local_offset);
 	time_unlock(flags);
-}
 
-EXPORT_SYMBOL(do_settimeofday);
+	return(0);
+}
 
 void idle_sleep(int secs)
 {

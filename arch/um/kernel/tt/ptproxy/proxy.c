@@ -15,7 +15,6 @@ Jeff Dike (jdike@karaya.com) : Modified for integration into uml
 #include <unistd.h>
 #include <signal.h>
 #include <string.h>
-#include <fcntl.h>
 #include <termios.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -273,7 +272,7 @@ void fake_child_exit(void)
 
 	child_proxy(1, W_EXITCODE(0, 0));
 	while(debugger.waiting == 1){
-		pid = waitpid(debugger.pid, &status, WUNTRACED);
+		CATCH_EINTR(pid = waitpid(debugger.pid, &status, WUNTRACED));
 		if(pid != debugger.pid){
 			printk("fake_child_exit - waitpid failed, "
 			       "errno = %d\n", errno);
@@ -281,7 +280,7 @@ void fake_child_exit(void)
 		}
 		debugger_proxy(status, debugger.pid);
 	}
-	pid = waitpid(debugger.pid, &status, WUNTRACED);
+	CATCH_EINTR(pid = waitpid(debugger.pid, &status, WUNTRACED));
 	if(pid != debugger.pid){
 		printk("fake_child_exit - waitpid failed, "
 		       "errno = %d\n", errno);
@@ -293,10 +292,10 @@ void fake_child_exit(void)
 }
 
 char gdb_init_string[] = 
-"att 1
-b panic
-b stop
-handle SIGWINCH nostop noprint pass
+"att 1 \n\
+b panic \n\
+b stop \n\
+handle SIGWINCH nostop noprint pass \n\
 ";
 
 int start_debugger(char *prog, int startup, int stop, int *fd_out)
@@ -304,7 +303,8 @@ int start_debugger(char *prog, int startup, int stop, int *fd_out)
 	int slave, child;
 
 	slave = open_gdb_chan();
-	if((child = fork()) == 0){
+	child = fork();
+	if(child == 0){
 		char *tempname = NULL;
 		int fd;
 
@@ -327,18 +327,19 @@ int start_debugger(char *prog, int startup, int stop, int *fd_out)
 			exit(1);
 #endif
 		}
-		if((fd = make_tempfile("/tmp/gdb_init-XXXXXX", &tempname, 0)) < 0){
-			printk("start_debugger : make_tempfile failed, errno = %d\n",
-			       errno);
+		fd = make_tempfile("/tmp/gdb_init-XXXXXX", &tempname, 0);
+		if(fd < 0){
+			printk("start_debugger : make_tempfile failed,"
+			       "err = %d\n", -fd);
 			exit(1);
 		}
-		write(fd, gdb_init_string, sizeof(gdb_init_string) - 1);
+		os_write_file(fd, gdb_init_string, sizeof(gdb_init_string) - 1);
 		if(startup){
 			if(stop){
-				write(fd, "b start_kernel\n",
+				os_write_file(fd, "b start_kernel\n",
 				      strlen("b start_kernel\n"));
 			}
-			write(fd, "c\n", strlen("c\n"));
+			os_write_file(fd, "c\n", strlen("c\n"));
 		}
 		if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0){
 			printk("start_debugger :  PTRACE_TRACEME failed, "

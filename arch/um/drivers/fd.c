@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
+#include <errno.h>
 #include "user.h"
 #include "user_util.h"
 #include "chan_user.h"
@@ -35,7 +36,8 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 		printk("fd_init : couldn't parse file descriptor '%s'\n", str);
 		return(NULL);
 	}
-	if((data = um_kmalloc(sizeof(*data))) == NULL) return(NULL);
+	data = um_kmalloc(sizeof(*data));
+	if(data == NULL) return(NULL);
 	*data = ((struct fd_chan) { .fd  	= n,
 				    .raw  	= opts->raw });
 	return(data);
@@ -44,10 +46,16 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 int fd_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct fd_chan *data = d;
+	int err;
 
 	if(data->raw && isatty(data->fd)){
-		tcgetattr(data->fd, &data->tt);
-		raw(data->fd, 0);
+		CATCH_EINTR(err = tcgetattr(data->fd, &data->tt));
+		if(err)
+			return(err);
+
+		err = raw(data->fd);
+		if(err)
+			return(err);
 	}
 	sprintf(data->str, "%d", data->fd);
 	*dev_out = data->str;
@@ -57,9 +65,13 @@ int fd_open(int input, int output, int primary, void *d, char **dev_out)
 void fd_close(int fd, void *d)
 {
 	struct fd_chan *data = d;
+	int err;
 
 	if(data->raw && isatty(fd)){
-		tcsetattr(fd, TCSAFLUSH, &data->tt);
+		CATCH_EINTR(err = tcsetattr(fd, TCSAFLUSH, &data->tt));
+		if(err)
+			printk("Failed to restore terminal state - " 
+			       "errno = %d\n", -err);
 		data->raw = 0;
 	}
 }

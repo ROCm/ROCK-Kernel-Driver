@@ -29,6 +29,10 @@ static inline void switch_mm(struct mm_struct *prev,
 {
 	int cpu = smp_processor_id();
 
+#ifdef CONFIG_SMP
+	prev = cpu_tlbstate[cpu].active_mm;
+#endif
+
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
 		cpu_clear(cpu, prev->cpu_vm_mask);
@@ -50,7 +54,6 @@ static inline void switch_mm(struct mm_struct *prev,
 #ifdef CONFIG_SMP
 	else {
 		cpu_tlbstate[cpu].state = TLBSTATE_OK;
-		BUG_ON(cpu_tlbstate[cpu].active_mm != next);
 
 		if (!cpu_test_and_set(cpu, next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 

@@ -1,21 +1,23 @@
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_FORMAT(ELF_FORMAT)
 OUTPUT_ARCH(ELF_ARCH)
 ENTRY(_start)
 jiffies = jiffies_64;
 
-SEARCH_DIR("/usr/local/i686-pc-linux-gnu/lib"); SEARCH_DIR("/usr/local/lib"); SEARCH_DIR("/lib"); SEARCH_DIR("/usr/lib");
-/* Do we need any of these for elf?
-   __DYNAMIC = 0;    */
 SECTIONS
 {
   . = START + SIZEOF_HEADERS;
   .interp         : { *(.interp) }
-  . = ALIGN(4096);
   __binary_start = .;
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
   __init_begin = .;
-  .text.init : { *(.text.init) }
+  .init.text : { 
+	_sinittext = .;
+	*(.init.text)
+	_einittext = .;
+  }
 
   . = ALIGN(4096);
 
@@ -55,7 +57,9 @@ SECTIONS
   } =0x90909090
   .plt            : { *(.plt) }
   .text           : {
-    *(.text .stub .text.* .gnu.linkonce.t.*)
+    *(.text)
+    SCHED_TEXT
+    *(.stub .text.* .gnu.linkonce.t.*)
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
   } =0x90909090
@@ -67,7 +71,7 @@ SECTIONS
 
   #include "asm/common.lds.S"
 
-  .data.init : { *(.data.init) }
+  init.data : { *(.init.data) }
 
   /* Ensure the __preinit_array_start label is properly aligned.  We
      could instead move the label definition inside the section, but

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <errno.h>
 #include <sys/resource.h>
 #include <sys/mman.h>
 #include <sys/user.h>
@@ -16,6 +17,8 @@
 #include "kern_util.h"
 #include "mem_user.h"
 #include "signal_user.h"
+#include "time_user.h"
+#include "irq_user.h"
 #include "user.h"
 #include "init.h"
 #include "mode.h"
@@ -123,12 +126,14 @@ int main(int argc, char **argv, char **envp)
 
 	set_stklim();
 
-	if((new_argv = malloc((argc + 1) * sizeof(char *))) == NULL){
+	new_argv = malloc((argc + 1) * sizeof(char *));
+	if(new_argv == NULL){
 		perror("Mallocing argv");
 		exit(1);
 	}
 	for(i=0;i<argc;i++){
-		if((new_argv[i] = strdup(argv[i])) == NULL){
+		new_argv[i] = strdup(argv[i]);
+		if(new_argv[i] == NULL){
 			perror("Mallocing an arg");
 			exit(1);
 		}
@@ -144,7 +149,20 @@ int main(int argc, char **argv, char **envp)
 	
 	/* Reboot */
 	if(ret){
+		int err;
+
 		printf("\n");
+
+		/* Let any pending signals fire, then disable them.  This 
+		 * ensures that they won't be delivered after the exec, when 
+		 * they are definitely not expected.
+		 */
+		unblock_signals();
+		disable_timer();
+		err = deactivate_all_fds();
+		if(err)
+			printf("deactivate_all_fds failed, errno = %d\n", -err);
+
 		execvp(new_argv[0], new_argv);
 		perror("Failed to exec kernel");
 		ret = 1;
@@ -160,10 +178,21 @@ extern void *__real_malloc(int);
 
 void *__wrap_malloc(int size)
 {
-	if(CAN_KMALLOC())
-		return(um_kmalloc(size));
-	else
+	void *ret;
+
+	if(!CAN_KMALLOC())
 		return(__real_malloc(size));
+	else if(size <= PAGE_SIZE) /* finding contiguos pages is hard */
+		ret = um_kmalloc(size);
+	else ret = um_vmalloc(size);
+
+	/* glibc people insist that if malloc fails, errno should be
+	 * set by malloc as well. So we do.
+	 */
+	if(ret == NULL)
+		errno = ENOMEM;
+
+	return(ret);
 }
 
 void *__wrap_calloc(int n, int size)
@@ -177,9 +206,35 @@ void *__wrap_calloc(int n, int size)
 
 extern void __real_free(void *);
 
+extern unsigned long high_physmem;
+
 void __wrap_free(void *ptr)
 {
-	if(CAN_KMALLOC()) kfree(ptr);
+	unsigned long addr = (unsigned long) ptr;
+
+	/* We need to know how the allocation happened, so it can be correctly
+	 * freed.  This is done by seeing what region of memory the pointer is
+	 * in -
+	 * 	physical memory - kmalloc/kfree
+	 *	kernel virtual memory - vmalloc/vfree
+	 * 	anywhere else - malloc/free
+	 * If kmalloc is not yet possible, then the kernel memory regions
+	 * may not be set up yet, and the variables not set up.  So,
+	 * free is called.
+	 *
+	 * CAN_KMALLOC is checked because it would be bad to free a buffer
+	 * with kmalloc/vmalloc after they have been turned off during 
+	 * shutdown.
+	 */
+
+	if((addr >= uml_physmem) && (addr < high_physmem)){
+		if(CAN_KMALLOC())
+			kfree(ptr);
+	}
+	else if((addr >= start_vm) && (addr < end_vm)){
+		if(CAN_KMALLOC())
+			vfree(ptr);
+	}
 	else __real_free(ptr);
 }
 

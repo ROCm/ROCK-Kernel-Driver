@@ -4,7 +4,18 @@ else
 TOP_ADDR = 0xc0000000
 endif
 
+ifeq ($(CONFIG_MODE_SKAS),y)
+  ifneq ($(CONFIG_MODE_TT),y)
+     START = 0x8048000
+  endif
+endif
+
 CFLAGS += -U__$(SUBARCH)__ -U$(SUBARCH)
+
+ifneq ($(CONFIG_GPROF),y)
+ARCH_CFLAGS += -DUM_FASTCALL
+endif
+
 ELF_ARCH = $(SUBARCH)
 ELF_FORMAT = elf32-$(SUBARCH)
 
@@ -16,22 +27,27 @@ SYS_UTIL_DIR	:= $(ARCH_DIR)/sys-i386/util
 
 SYS_HEADERS = $(SYS_DIR)/sc.h $(SYS_DIR)/thread.h
 
+sys_prepare: $(SYS_DIR)/sc.h
+
 prepare: $(SYS_HEADERS)
 
+filechk_$(SYS_DIR)/sc.h := $(SYS_UTIL_DIR)/mk_sc
+
 $(SYS_DIR)/sc.h: $(SYS_UTIL_DIR)/mk_sc
-	$< > $@
+	$(call filechk,$@)
+
+filechk_$(SYS_DIR)/thread.h := $(SYS_UTIL_DIR)/mk_thread 
 
 $(SYS_DIR)/thread.h: $(SYS_UTIL_DIR)/mk_thread 
-	$< > $@
+	$(call filechk,$@)
 
-$(SYS_UTIL_DIR)/mk_sc: FORCE ; 
-	@$(call descend,$(SYS_UTIL_DIR),$@)
+$(SYS_UTIL_DIR)/mk_sc: scripts/basic/fixdep include/config/MARKER FORCE ; 
+	$(Q)$(MAKE) $(build)=$(SYS_UTIL_DIR) $@
 
-$(SYS_UTIL_DIR)/mk_thread: $(ARCH_SYMLINKS) $(GEN_HEADERS) FORCE ; 
-	@$(call descend,$(SYS_UTIL_DIR),$@)
+$(SYS_UTIL_DIR)/mk_thread: $(ARCH_SYMLINKS) $(GEN_HEADERS) sys_prepare FORCE ; 
+	$(Q)$(MAKE) $(build)=$(SYS_UTIL_DIR) $@
 
 $(SYS_UTIL_DIR): include/asm FORCE
-	@$(call descend,$@,)
+	$(Q)$(MAKE) $(build)=$(SYS_UTIL_DIR)
 
-sysclean :
-	rm -f $(SYS_HEADERS)
+CLEAN_FILES += $(SYS_HEADERS)

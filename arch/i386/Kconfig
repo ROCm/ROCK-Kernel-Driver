@@ -721,6 +721,10 @@ config X86_PAE
 	depends on HIGHMEM64G
 	default y
 
+config PROC_MM
+	bool "/proc/mm support"
+	default y
+
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation and Scheduler Support"

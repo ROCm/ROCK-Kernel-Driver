@@ -14,9 +14,11 @@
 #include "kern_util.h"
 #include "irq_user.h"
 #include "time_user.h"
+#include "signal_user.h"
 #include "mem_user.h"
 #include "os.h"
 #include "tlb.h"
+#include "mode.h"
 
 static int exec_tramp(void *sig_stack)
 {
@@ -38,8 +40,7 @@ void flush_thread_tt(void)
 		do_exit(SIGKILL);
 	}
 		
-	new_pid = start_fork_tramp((void *) current->thread.kernel_stack,
-				   stack, 0, exec_tramp);
+	new_pid = start_fork_tramp(current->thread_info, stack, 0, exec_tramp);
 	if(new_pid < 0){
 		printk(KERN_ERR 
 		       "flush_thread : new thread failed, errno = %d\n",
@@ -47,17 +48,19 @@ void flush_thread_tt(void)
 		do_exit(SIGKILL);
 	}
 
-	if(current->thread_info->cpu == 0)
+	if(current_thread->cpu == 0)
 		forward_interrupts(new_pid);
 	current->thread.request.op = OP_EXEC;
 	current->thread.request.u.exec.pid = new_pid;
-	unprotect_stack((unsigned long) current->thread_info);
+	unprotect_stack((unsigned long) current_thread);
 	os_usr1_process(os_getpid());
+	change_sig(SIGUSR1, 1);
 
+	change_sig(SIGUSR1, 0);
 	enable_timer();
 	free_page(stack);
 	protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 1, 0, 1);
-	task_protections((unsigned long) current->thread_info);
+	task_protections((unsigned long) current_thread);
 	force_flush_all();
 	unblock_signals();
 }

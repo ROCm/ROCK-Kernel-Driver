@@ -644,6 +644,8 @@ extern inline void prefetchw(const void *x)
 
 extern void select_idle_routine(const struct cpuinfo_x86 *c);
 
+extern int __init_new_context(struct mm_struct *mm, struct mm_struct *old_mm);
+
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
 
 #ifdef CONFIG_SCHED_SMT

@@ -23,8 +23,6 @@
 	} \
 } while (0)
 
-extern int foo;
-
 #endif
 
 #endif
