@@ -712,7 +712,7 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			sc->result = DID_RESET << 16;
 
 			/* GEM Workaround. */
-			if (hd->is_spi)
+			if (ioc->bus_type == SCSI)
 				mptscsih_no_negotiate(hd, sc->device->id);
 			break;
 
@@ -1107,7 +1107,7 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * max_lun = 1 + actual last lun,
 	 *	see hosts.h :o(
 	 */
-	if ((int)ioc->chip_type > (int)FC929) {
+	if (ioc->bus_type == SCSI) {
 		sh->max_id = MPT_MAX_SCSI_DEVICES;
 	} else {
 	/* For FC, increase the queue depth
@@ -1165,9 +1165,6 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hd = (MPT_SCSI_HOST *) sh->hostdata;
 	hd->ioc = ioc;
-
-	if ((int)ioc->chip_type > (int)FC929)
-		hd->is_spi = 1;
 
 	/* SCSI needs scsi_cmnd lookup table!
 	 * (with size equal to req_depth*PtrSz!)
@@ -1234,7 +1231,7 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Moved Earlier Pam D */
 	/* ioc->sh = sh;	*/
 
-	if (hd->is_spi) {
+	if (ioc->bus_type == SCSI) {
 		/* Update with the driver setup
 		 * values.
 		 */
@@ -1801,7 +1798,7 @@ mptscsih_qcmd(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 	SCpnt->host_scribble = NULL;
 
 #ifdef MPTSCSIH_ENABLE_DOMAIN_VALIDATION
-	if (hd->is_spi) {
+	if (hd->ioc->bus_type == SCSI) {
 		int dvStatus = hd->ioc->spi_data.dvStatus[target];
 		int issueCmd = 1;
 
@@ -2255,9 +2252,9 @@ mptscsih_dev_reset(struct scsi_cmnd * SCpnt)
 	printk(KERN_WARNING MYNAM ": %s: >> Attempting target reset! (sc=%p)\n",
 	       hd->ioc->name, SCpnt);
 
-	/* Unsupported for SCSI. Supported for FCP
+	/* Supported for FC only.
 	 */
-	if (hd->is_spi)
+	if (hd->ioc->bus_type == SCSI) 
 		return FAILED;
 
 	spin_unlock_irq(host_lock);
@@ -2589,7 +2586,7 @@ mptscsih_slave_alloc(struct scsi_device *device)
 	vdev->bus_id = device->channel;
 	vdev->raidVolume = 0;
 	hd->Targets[device->id] = vdev;
-	if (hd->is_spi) {
+	if (hd->ioc->bus_type == SCSI) {
 		if (hd->ioc->spi_data.isRaid & (1 << device->id)) {
 			vdev->raidVolume = 1;
 			ddvtprintk((KERN_INFO
@@ -2645,7 +2642,7 @@ mptscsih_slave_destroy(struct scsi_device *device)
 	kfree(hd->Targets[target]);
 	hd->Targets[target] = NULL;
 	
-	if (hd->is_spi) {
+	if (hd->ioc->bus_type == SCSI) {
 		if (mptscsih_is_raid_volume(hd, target)) {
 			hd->ioc->spi_data.forceDv |= MPT_SCSICFG_RELOAD_IOC_PG3;
 		} else {
@@ -2667,7 +2664,7 @@ mptscsih_set_queue_depth(struct scsi_device *device, MPT_SCSI_HOST *hd,
 	int	max_depth;
 	int	tagged;
 
-	if (hd->is_spi) {
+	if (hd->ioc->bus_type == SCSI) {
 		if (pTarget->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY) {
 			if (!(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES))
 				max_depth = 1;
@@ -2946,7 +2943,7 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 
 		/* 4. Renegotiate to all devices, if SCSI
 		 */
-		if (hd->is_spi) {
+		if (hd->ioc->bus_type == SCSI) {
 			dnegoprintk(("writeSDP1: ALL_IDS USE_NVRAM\n"));
 			mptscsih_writeSDP1(hd, 0, 0, MPT_SCSICFG_ALL_IDS | MPT_SCSICFG_USE_NVRAM);
 		}
@@ -2975,7 +2972,7 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 
 		/* 7. Set flag to force DV and re-read IOC Page 3
 		 */
-		if (hd->is_spi) {
+		if (ioc->bus_type == SCSI) {
 			ioc->spi_data.forceDv = MPT_SCSICFG_NEED_DV | MPT_SCSICFG_RELOAD_IOC_PG3;
 			ddvtprintk(("Set reload IOC Pg3 Flag\n"));
 		}
@@ -3006,7 +3003,7 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 		hd = NULL;
 		if (ioc->sh) {
 			hd = (MPT_SCSI_HOST *) ioc->sh->hostdata;
-			if (hd && (hd->is_spi) && (hd->soft_resets < -1))
+			if (hd && (ioc->bus_type == SCSI) && (hd->soft_resets < -1))
 				hd->soft_resets++;
 		}
 		break;
@@ -3035,7 +3032,7 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 		if (ioc->sh)
 			hd = (MPT_SCSI_HOST *) ioc->sh->hostdata;
 
-		if (hd && (hd->is_spi) && (hd->negoNvram == 0)) {
+		if (hd && (ioc->bus_type == SCSI) && (hd->negoNvram == 0)) {
 			ScsiCfgData	*pSpi;
 			Ioc3PhysDisk_t	*pPDisk;
 			int		 numPDisk;
@@ -3182,7 +3179,7 @@ mptscsih_initTarget(MPT_SCSI_HOST *hd, int bus_id, int target_id, u8 lun, char *
 	indexed_lun = (lun % 32);
 	vdev->luns[lun_index] |= (1 << indexed_lun);
 
-	if (hd->is_spi) {
+	if (hd->ioc->bus_type == SCSI) {
 		if ((data[0] == TYPE_PROCESSOR) && (hd->ioc->spi_data.Saf_Te)) {
 			/* Treat all Processors as SAF-TE if
 			 * command line option is set */
@@ -4463,7 +4460,7 @@ mptscsih_synchronize_cache(MPT_SCSI_HOST *hd, int portnum)
 	/* Write SDP1 for all SCSI devices
 	 * Alloc memory and set up config buffer
 	 */
-	if (hd->is_spi) {
+	if (ioc->bus_type == SCSI) {
 		if (ioc->spi_data.sdp1length > 0) {
 			pcfg1Data = (SCSIDevicePage1_t *)pci_alloc_consistent(ioc->pcidev,
 					 ioc->spi_data.sdp1length * 4, &cfg1_dma_addr);
@@ -4606,7 +4603,7 @@ mptscsih_domainValidation(void *arg)
 			msleep(250);
 
 			/* DV only to SCSI adapters */
-			if ((int)ioc->chip_type <= (int)FC929)
+			if (ioc->bus_type != SCSI)
 				continue;
 
 			/* Make sure everything looks ok */
