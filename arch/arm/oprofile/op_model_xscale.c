@@ -20,7 +20,8 @@
 #include <linux/sched.h>
 #include <linux/oprofile.h>
 #include <linux/interrupt.h>
-#include <asm/arch/irqs.h>
+#include <asm/irq.h>
+#include <asm/system.h>
 
 #include "op_counter.h"
 #include "op_arm_model.h"
@@ -399,8 +400,7 @@ static int xscale_detect_pmu(void)
 	int ret = 0;
 	u32 id;
 
-	__asm__ __volatile__ ("mrc p15, 0, %0, c0, c0, 0" : "=r" (id));
-	id = (id >> 13) & 0x7;
+	id = (read_cpuid(CPUID_ID) >> 13) & 0x7;
 
 	switch (id) {
 	case 1:

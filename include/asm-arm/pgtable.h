@@ -396,6 +396,11 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 #include <asm-generic/pgtable.h>
 
 /*
+ * We provide our own arch_get_unmapped_area to cope with VIPT caches.
+ */
+#define HAVE_ARCH_UNMAPPED_AREA
+
+/*
  * remap a physical address `phys' of size `size' with page protection `prot'
  * into virtual address `from'
  */

@@ -1615,7 +1615,10 @@ static int __init sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
 
 /* Fake monspecs to fill in fbinfo structure */
 static struct fb_monspecs monspecs __initdata = {
-	30000, 70000, 50, 65, 0	/* Generic */
+	.hfmin	= 30000,
+	.hfmax	= 70000,
+	.vfmin	= 50,
+	.vfmax	= 65,
 };
 
 
