@@ -96,9 +96,10 @@
 	LK1.3.5 (jgarzik)
 	- ethtool NWAY_RST, GLINK, [GS]MSGLVL support
 
-	LK1.3.6 (Ion Badulescu)
-	- Sparc64 support and fixes
-	- Better stats and error handling
+	LK1.3.6:
+	- Sparc64 support and fixes (Ion Badulescu)
+	- Better stats and error handling (Ion Badulescu)
+	- Use new pci_set_mwi() PCI API function (jgarzik)
 
 TODO:
 	- implement tx_timeout() properly
@@ -107,7 +108,7 @@ TODO:
 
 #define DRV_NAME	"starfire"
 #define DRV_VERSION	"1.03+LK1.3.6"
-#define DRV_RELDATE	"March 6, 2002"
+#define DRV_RELDATE	"March 7, 2002"
 
 #include <linux/version.h>
 #include <linux/module.h>
@@ -617,8 +618,10 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 	long ioaddr;
 	int drv_flags, io_size;
 	int boguscnt;
+#ifndef HAVE_PCI_SET_MWI
 	u16 cmd;
 	u8 cache;
+#endif
 
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -665,6 +668,9 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
+#ifdef HAVE_PCI_SET_MWI
+	pci_set_mwi(pdev);
+#else
 	/* enable MWI -- it vastly improves Rx performance on sparc64 */
 	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
 	cmd |= PCI_COMMAND_INVALIDATE;
@@ -679,6 +685,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
 				      SMP_CACHE_BYTES >> 2);
 	}
+#endif
 
 #ifdef ZEROCOPY
 	/* Starfire can do SG and TCP/UDP checksumming */
