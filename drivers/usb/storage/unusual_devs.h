@@ -368,6 +368,15 @@ UNUSUAL_DEV(  0x057b, 0x0000, 0x0300, 0x9999,
 		US_SC_DEVICE,  US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN),
 
+/* Reported by Johann Cardon <johann.cardon@free.fr>
+ * This entry is needed only because the device reports
+ * bInterfaceClass = 0xff (vendor-specific)
+ */
+UNUSUAL_DEV(  0x057b, 0x0022, 0x0000, 0x9999, 
+		"Y-E Data",
+		"Silicon Media R/W",
+		US_SC_DEVICE, US_PR_DEVICE, NULL, 0),
+
 /* Fabrizio Fellini <fello@libero.it> */
 UNUSUAL_DEV(  0x0595, 0x4343, 0x0000, 0x2210,
 		"Fujifilm",
