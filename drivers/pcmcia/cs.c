@@ -485,7 +485,6 @@ static void shutdown_socket(socket_info_t *s)
     set_socket(s, &s->socket);
     /* */
 #ifdef CONFIG_CARDBUS
-    cb_release_cis_mem(s);
     cb_free(s);
 #endif
     s->functions = 0;

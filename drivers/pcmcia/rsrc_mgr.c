@@ -745,9 +745,6 @@ static int adjust_memory(adjust_t *adj)
 	if (ret == CS_SUCCESS) {
 	    for (i = 0; i < sockets; i++) {
 		release_cis_mem(socket_table[i]);
-#ifdef CONFIG_CARDBUS
-		cb_release_cis_mem(socket_table[i]);
-#endif
 	    }
 	}
 	break;

@@ -123,7 +123,7 @@ static u_int xlate_rom_addr(u_char * b, u_int addr)
     
 =====================================================================*/
 
-void cb_release_cis_mem(socket_info_t * s)
+static void cb_release_cis_mem(socket_info_t * s)
 {
 	if (s->cb_cis_virt) {
 		DEBUG(1, "cs: cb_release_cis_mem()\n");
@@ -269,6 +269,8 @@ int cb_alloc(socket_info_t * s)
 void cb_free(socket_info_t * s)
 {
 	struct pci_dev *bridge = s->cap.cb_dev;
+
+	cb_release_cis_mem(s);
 
 	if (bridge)
 		pci_remove_behind_bridge(bridge);
