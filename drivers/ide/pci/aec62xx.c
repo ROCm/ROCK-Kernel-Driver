@@ -539,6 +539,7 @@ static struct pci_device_id aec62xx_pci_tbl[] = {
 	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP865R,  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4 },
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, aec62xx_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "AEC62xx IDE",
