@@ -115,16 +115,17 @@
 
 #include <asm/proc/domain.h>
 
-#define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_DOMAIN(DOMAIN_USER))
-#define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_DOMAIN(DOMAIN_KERNEL))
+#define _PAGE_USER_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_USER))
+#define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
 
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
-#define set_pmd(pmdp,pmd)	cpu_set_pmd(pmdp, pmd)
+#define set_pmd(pmdp,pmd)	do { *pmdp = pmd; cpu_flush_pmd(pmdp); } while (0)
 
 static inline void pmd_clear(pmd_t *pmdp)
 {
-	set_pmd(pmdp, __pmd(0));
-	set_pmd(pmdp + 1, __pmd(0));
+	pmdp[0], __pmd(0));
+	pmdp[1], __pmd(0));
+	cpu_flush_pmd(pmdp);
 }
 
 static inline pte_t *pmd_page_kernel(pmd_t pmd)

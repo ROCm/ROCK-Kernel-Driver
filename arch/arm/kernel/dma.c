@@ -13,7 +13,6 @@
  */
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/sched.h>
 #include <linux/mman.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>

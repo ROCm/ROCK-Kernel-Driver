@@ -989,42 +989,6 @@ nomem:
 	return rc;
 }
 
-static ecard_t *finding_pos;
-
-void ecard_startfind(void)
-{
-	finding_pos = NULL;
-}
-
-ecard_t *ecard_find(int cid, const card_ids *cids)
-{
-	if (!finding_pos)
-		finding_pos = cards;
-	else
-		finding_pos = finding_pos->next;
-
-	for (; finding_pos; finding_pos = finding_pos->next) {
-		if (finding_pos->claimed)
-			continue;
-
-		if (finding_pos->dev.driver)
-			continue;
-
-		if (!cids) {
-			if ((finding_pos->cid.id ^ cid) == 0)
-				break;
-		} else {
-			const struct ecard_id *id;
-
-			id = ecard_match_device(cids, finding_pos);
-			if (id)
-				break;
-		}
-	}
-
-	return finding_pos;
-}
-
 /*
  * Initialise the expansion card system.
  * Locate all hardware - interrupt management and
@@ -1087,10 +1051,15 @@ static int ecard_drv_probe(struct device *dev)
 	struct expansion_card *ec = ECARD_DEV(dev);
 	struct ecard_driver *drv = ECARD_DRV(dev->driver);
 	const struct ecard_id *id;
+	int ret;
 
 	id = ecard_match_device(drv->id_table, ec);
 
-	return drv->probe(ec, id);
+	ecard_claim(ec);
+	ret = drv->probe(ec, id);
+	if (ret)
+		ecard_release(ec);
+	return ret;
 }
 
 static int ecard_drv_remove(struct device *dev)
@@ -1099,6 +1068,7 @@ static int ecard_drv_remove(struct device *dev)
 	struct ecard_driver *drv = ECARD_DRV(dev->driver);
 
 	drv->remove(ec);
+	ecard_release(ec);
 
 	return 0;
 }
@@ -1144,12 +1114,8 @@ static int ecard_bus_init(void)
 
 postcore_initcall(ecard_bus_init);
 
-EXPORT_SYMBOL(ecard_startfind);
-EXPORT_SYMBOL(ecard_find);
 EXPORT_SYMBOL(ecard_readchunk);
 EXPORT_SYMBOL(ecard_address);
-
 EXPORT_SYMBOL(ecard_register_driver);
 EXPORT_SYMBOL(ecard_remove_driver);
-
 EXPORT_SYMBOL(ecard_bus_type);

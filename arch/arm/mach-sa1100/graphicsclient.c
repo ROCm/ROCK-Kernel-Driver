@@ -11,8 +11,6 @@
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/ptrace.h>
 
 #include <asm/hardware.h>

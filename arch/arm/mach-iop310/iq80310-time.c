@@ -11,14 +11,11 @@
  * published by the Free Software Foundation.
  *
  */
-#include <linux/module.h>
-#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/timex.h>
-#include <linux/smp.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>

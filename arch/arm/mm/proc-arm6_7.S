@@ -234,34 +234,14 @@ ENTRY(cpu_arm7_set_pgd)
 		mov	pc, lr
 
 /*
- * Function: arm6_set_pmd ()
+ * Function: arm6_flush_pmd(pmdp)
  *
  * Params  : r0 = Address to set
- *	   : r1 = value to set
  *
  * Purpose : Set a PMD and flush it out of any WB cache
  */
-ENTRY(cpu_arm6_set_pmd)
-		and	r2, r1, #11
-		teq	r2, #1
-		teqne	r2, #9
-		teqne	r2, #10
-		orreq	r1, r1, #16			@ Updatable = 1 if Page table/Cacheable section
-		str	r1, [r0]
-		mov	pc, lr
-
-/*
- * Function: arm7_set_pmd ()
- *
- * Params  : r0 = Address to set
- *	   : r1 = value to set
- *
- * Purpose : Set a PMD and flush it out of any WB cache
- */
-ENTRY(cpu_arm7_set_pmd)
-		tst	r1, #3
-		orrne	r1, r1, #16			@ Updatable bit is always set on ARM7
-		str	r1, [r0]
+ENTRY(cpu_arm6_flush_pmd)
+ENTRY(cpu_arm7_flush_pmd)
 		mov	pc, lr
 
 /*
@@ -368,7 +348,7 @@ ENTRY(arm6_processor_functions)
 
 		/* pgtable */
 		.word	cpu_arm6_set_pgd
-		.word	cpu_arm6_set_pmd
+		.word	cpu_arm6_flush_pmd
 		.word	cpu_arm6_set_pte
 
 		.size	arm6_processor_functions, . - arm6_processor_functions
@@ -402,7 +382,7 @@ ENTRY(arm7_processor_functions)
 
 		/* pgtable */
 		.word	cpu_arm7_set_pgd
-		.word	cpu_arm7_set_pmd
+		.word	cpu_arm7_flush_pmd
 		.word	cpu_arm7_set_pte
 
 		.size	arm7_processor_functions, . - arm7_processor_functions

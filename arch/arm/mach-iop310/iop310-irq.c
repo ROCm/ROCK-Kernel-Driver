@@ -14,7 +14,6 @@
  *
  */
 #include <linux/init.h>
-#include <linux/sched.h>
 #include <linux/interrupt.h>
 
 #include <asm/mach/irq.h>

@@ -34,14 +34,12 @@ apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3
 # Note that GCC is lame - it doesn't numerically define an
 # architecture version macro, but instead defines a whole
 # series of macros.
-arch-y				:=
 arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
 arch-$(CONFIG_CPU_32v4)		:=-D__LINUX_ARM_ARCH__=4 -march=armv4
 arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5
 arch-$(CONFIG_CPU_XSCALE)	:=-D__LINUX_ARM_ARCH__=5 -march=armv4 -Wa,-mxscale #-march=armv5te
 
 # This selects how we optimise for the processor.
-tune-y				:=
 tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
 tune-$(CONFIG_CPU_ARM710)	:=-mtune=arm710
 tune-$(CONFIG_CPU_ARM720T)	:=-mtune=arm7tdmi
@@ -58,122 +56,66 @@ CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,
 CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu
 AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float -Wa,-mno-fpu
 
+#Default value
+DATAADDR	:= .
+
 ifeq ($(CONFIG_CPU_26),y)
 PROCESSOR	:= armo
 HEAD		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
 LDFLAGS_BLOB	+= --oformat elf26-littlearm
   ifeq ($(CONFIG_ROM_KERNEL),y)
-    DATAADDR	 = 0x02080000
-    TEXTADDR	 = 0x03800000
+    DATAADDR	 := 0x02080000
+    textaddr-y	 := 0x03800000
   else
-    TEXTADDR	 = 0x02080000
+    textaddr-y	 := 0x02080000
   endif
 endif
 
 ifeq ($(CONFIG_CPU_32),y)
-PROCESSOR	 = armv
+PROCESSOR	:= armv
 HEAD		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
-TEXTADDR	 = 0xC0008000
 LDFLAGS_BLOB	+= --oformat elf32-littlearm
+textaddr-y	:= 0xC0008000
 endif
 
-ifeq ($(CONFIG_ARCH_ARCA5K),y)
-MACHINE		 = arc
-endif
-
-ifeq ($(CONFIG_ARCH_RPC),y)
-MACHINE		 = rpc
-endif
-
-ifeq ($(CONFIG_ARCH_EBSA110),y)
-MACHINE		 = ebsa110
-endif
-
-ifeq ($(CONFIG_ARCH_CLPS7500),y)
-MACHINE		 = clps7500
-INCDIR		 = cl7500
-endif
-
-ifeq ($(CONFIG_FOOTBRIDGE),y)
-MACHINE		 = footbridge
-INCDIR		 = ebsa285
-endif
-
-ifeq ($(CONFIG_ARCH_CO285),y)
-TEXTADDR	 = 0x60008000
-MACHINE		 = footbridge
-INCDIR		 = ebsa285
-endif
-
-ifeq ($(CONFIG_ARCH_FTVPCI),y)
-MACHINE		 = ftvpci
-INCDIR		 = nexuspci
-endif
-
-ifeq ($(CONFIG_ARCH_TBOX),y)
-MACHINE		 = tbox
-endif
-
-ifeq ($(CONFIG_ARCH_SHARK),y)
-MACHINE		 = shark
-endif
-
+ machine-$(CONFIG_ARCH_ARCA5K)	   := arc
+ machine-$(CONFIG_ARCH_RPC)	   := rpc
+ machine-$(CONFIG_ARCH_EBSA110)	   := ebsa110
+ machine-$(CONFIG_ARCH_CLPS7500)   := clps7500
+  incdir-$(CONFIG_ARCH_CLPS7500)   := cl7500
+ machine-$(CONFIG_FOOTBRIDGE)	   := footbridge
+  incdir-$(CONFIG_FOOTBRIDGE)	   := ebsa285
+textaddr-$(CONFIG_ARCH_CO285)	   := 0x60008000
+ machine-$(CONFIG_ARCH_CO285)	   := footbridge
+  incdir-$(CONFIG_ARCH_CO285)	   := ebsa285
+ machine-$(CONFIG_ARCH_FTVPCI)	   := ftvpci
+  incdir-$(CONFIG_ARCH_FTVPCI)	   := nexuspci
+ machine-$(CONFIG_ARCH_TBOX)	   := tbox
+ machine-$(CONFIG_ARCH_SHARK)	   := shark
+ machine-$(CONFIG_ARCH_SA1100)	   := sa1100
 ifeq ($(CONFIG_ARCH_SA1100),y)
-ifeq ($(CONFIG_SA1111),y)
 # SA1111 DMA bug: we don't want the kernel to live in precious DMA-able memory
-TEXTADDR	 = 0xc0208000
+textaddr-$(CONFIG_SA1111)	   := 0xc0208000
 endif
-MACHINE		 = sa1100
-endif
+ machine-$(CONFIG_ARCH_PXA)	   := pxa
+ machine-$(CONFIG_ARCH_L7200)	   := l7200
+ machine-$(CONFIG_ARCH_INTEGRATOR) := integrator
+ machine-$(CONFIG_ARCH_CAMELOT)	   := epxa10db
+textaddr-$(CONFIG_ARCH_CLPS711X)   := 0xc0028000
+ machine-$(CONFIG_ARCH_CLPS711X)   := clps711x
+textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
+ machine-$(CONFIG_ARCH_ANAKIN)	   := anakin
+ machine-$(CONFIG_ARCH_IOP310)	   := iop310
+ machine-$(CONFIG_ARCH_ADIFCC)	   := adifcc
 
-ifeq ($(CONFIG_ARCH_PXA),y)
-MACHINE		 = pxa
+MACHINE  := $(machine-y)
+TEXTADDR := $(textaddr-y)
+ifeq ($(incdir-y),)
+incdir-y := $(MACHINE)
 endif
-
-ifeq ($(CONFIG_ARCH_L7200),y)
-MACHINE		 = l7200
-endif
-
-ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
-MACHINE		 = integrator
-endif
-
-ifeq ($(CONFIG_ARCH_CAMELOT),y)
-MACHINE          = epxa10db
-endif
-
-ifeq ($(CONFIG_ARCH_CLPS711X),y)
-TEXTADDR	 = 0xc0028000
-MACHINE		 = clps711x
-endif
-
-ifeq ($(CONFIG_ARCH_FORTUNET),y)
-TEXTADDR	 = 0xc0008000
-endif
-
-ifeq ($(CONFIG_ARCH_ANAKIN),y)
-MACHINE		 = anakin
-endif
-
-ifeq ($(CONFIG_ARCH_IOP310),y)
-MACHINE		 = iop310
-endif
-
-ifeq ($(CONFIG_ARCH_ADIFCC),y)
-MACHINE		= adifcc
-endif
-
+INCDIR   := $(incdir-y)
+  
 export	MACHINE PROCESSOR TEXTADDR GZFLAGS CFLAGS_BOOT
-
-# Only set INCDIR if its not already defined above
-# Grr, ?= doesn't work as all the other assignment operators do.  Make bug?
-ifeq ($(origin INCDIR), undefined)
-INCDIR		:=$(MACHINE)
-endif
-
-ifeq ($(origin DATAADDR), undefined)
-DATAADDR	:= .
-endif
 
 # Do we have FASTFPE?
 FASTFPE		:=arch/arm/fastfpe
@@ -194,7 +136,10 @@ drivers-$(CONFIG_ARCH_L7200)	+= drivers/acorn/char/
 
 libs-y				+= arch/arm/lib/
 
-makeboot = $(call descend,arch/arm/boot,$(1))
+# Default target when executing plain make
+all: zImage
+
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/arm/boot $(1)
 
 #	Update machine arch and proc symlinks if something which affects
 #	them changed.  We use .arch and .proc to indicate when they were
@@ -217,13 +162,17 @@ prepare: maketools
 .PHONY: maketools FORCE
 maketools: include/asm-arm/.arch include/asm-arm/.proc \
 	   include/asm-arm/constants.h include/linux/version.h FORCE
-	+@$(call descend,arch/arm/tools, include/asm-arm/mach-types.h)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/arm/tools include/asm-arm/mach-types.h
+
+# Convert bzImage to zImage
+bzImage: vmlinux
+	$(call makeboot,arch/arm/boot/zImage)
 
 zImage Image bootpImage: vmlinux
-	+@$(call makeboot,arch/arm/boot/$@)
+	$(call makeboot,arch/arm/boot/$@)
 
-bzImage zinstall install: vmlinux
-	+@$(call makeboot,$@)
+zinstall install: vmlinux
+	$(call makeboot,$@)
 
 MRPROPER_FILES	+= \
 	include/asm-arm/arch include/asm-arm/.arch \
@@ -233,15 +182,15 @@ MRPROPER_FILES	+= \
 
 # We use MRPROPER_FILES and CLEAN_FILES now
 archmrproper:
-archclean: FORCE
-	+@$(call makeboot,clean)
+archclean:
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/arm/boot
 
 # My testing targets (that short circuit a few dependencies)
-zImg:;	+@$(call makeboot, zImage)
-Img:;	+@$(call makeboot, Image)
-i:;	+@$(call makeboot, install)
-zi:;	+@$(call makeboot, zinstall)
-bp:;	+@$(call makeboot, bootpImage)
+zImg:;	$(call makeboot, arch/arm/boot/zImage)
+Img:;	$(call makeboot, arch/arm/boot/Image)
+bp:;	$(call makeboot, arch/arm/boot/bootpImage)
+i:;	$(call makeboot, install)
+zi:;	$(call makeboot, zinstall)
 
 #
 # Configuration targets.  Use these to select a
@@ -261,10 +210,9 @@ bp:;	+@$(call makeboot, bootpImage)
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
+	@:
 
-include/asm-$(ARCH)/constants.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
-	@$(generate-asm-offsets.h) < $< > $@
-
-include/asm-$(ARCH)/constants.h: include/asm-$(ARCH)/constants.h.tmp
+include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
+	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)

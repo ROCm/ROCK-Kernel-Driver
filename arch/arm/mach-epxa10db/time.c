@@ -9,11 +9,9 @@
  * published by the Free Software Foundation.
  */
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
-
 
 
 extern int (*set_rtc)(void);

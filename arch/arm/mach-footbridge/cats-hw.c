@@ -5,7 +5,6 @@
  *
  * Copyright (C) 1998, 1999 Russell King, Phil Blundell
  */
-#include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/init.h>

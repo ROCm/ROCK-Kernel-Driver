@@ -13,132 +13,81 @@
 #   PARAMS_PHYS must be with 4MB of ZRELADDR
 #   INITRD_PHYS must be in RAM
 
-ifeq ($(CONFIG_CPU_26),y)
-ZRELADDR	 = 0x02080000
-PARAMS_PHYS	 = 0x0207c000
-INITRD_PHYS	 = 0x02180000
-endif
-
-ifeq ($(CONFIG_ARCH_RPC),y)
-ZRELADDR	 = 0x10008000
-PARAMS_PHYS	 = 0x10000100
-INITRD_PHYS	 = 0x18000000
-endif
-
-ifeq ($(CONFIG_ARCH_CLPS7500),y)
-ZRELADDR	 = 0x10008000
-endif
-
-ifeq ($(CONFIG_ARCH_EBSA110),y)
-ZRELADDR	 = 0x00008000
-PARAMS_PHYS	 = 0x00000400
-INITRD_PHYS	 = 0x00800000
-endif
-
-ifeq ($(CONFIG_ARCH_SHARK),y)
-ZTEXTADDR	 = 0x08508000
-ZRELADDR	 = 0x08008000
-endif
-
-ifeq ($(CONFIG_FOOTBRIDGE),y)
-ZRELADDR	 = 0x00008000
-PARAMS_PHYS	 = 0x00000100
-INITRD_PHYS	 = 0x00800000
-endif
-
-ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
-ZRELADDR	 = 0x00008000
-PARAMS_PHYS	 = 0x00000100
-INITRD_PHYS	 = 0x00800000
-endif
-
-ifeq ($(CONFIG_ARCH_CAMELOT),y)
-ZRELADDR	 = 0x00008000
-endif
-
-ifeq ($(CONFIG_ARCH_NEXUSPCI),y)
-ZRELADDR	 = 0x40008000
-endif
-
-ifeq ($(CONFIG_ARCH_L7200),y)
-ZRELADDR	 = 0xf0008000
-endif
-
+   zreladdr-$(CONFIG_CPU_26)		:= 0x02080000 
+params_phys-$(CONFIG_CPU_26)		:= 0x0207c000
+initrd_phys-$(CONFIG_CPU_26)		:= 0x02180000
+   zreladdr-$(CONFIG_ARCH_RPC)		:= 0x10008000
+params_phys-$(CONFIG_ARCH_RPC)		:= 0x10000100
+initrd_phys-$(CONFIG_ARCH_RPC)		:= 0x18000000
+   zreladdr-$(CONFIG_ARCH_CLPS7500)	:= 0x10008000
+   zreladdr-$(CONFIG_ARCH_CLPS7500)	:= 0x10008000
+   zreladdr-$(CONFIG_ARCH_EBSA110)	:= 0x00008000
+params_phys-$(CONFIG_ARCH_EBSA110)	:= 0x00000400
+initrd_phys-$(CONFIG_ARCH_EBSA110)	:= 0x00800000
+  ztextaddr-$(CONFIG_ARCH_SHARK)	:= 0x08508000
+   zreladdr-$(CONFIG_ARCH_SHARK)	:= 0x08008000
+   zreladdr-$(CONFIG_FOOTBRIDGE)	:= 0x00008000
+params_phys-$(CONFIG_FOOTBRIDGE)	:= 0x00000100
+initrd_phys-$(CONFIG_FOOTBRIDGE)	:= 0x00800000
+   zreladdr-$(CONFIG_ARCH_INTEGRATOR)	:= 0x00008000
+params_phys-$(CONFIG_ARCH_INTEGRATOR)	:= 0x00000100
+initrd_phys-$(CONFIG_ARCH_INTEGRATOR)	:= 0x00800000
+   zreladdr-$(CONFIG_ARCH_CAMELOT)	:= 0x00008000
+   zreladdr-$(CONFIG_ARCH_NEXUSPCI)	:= 0x40008000
+   zreladdr-$(CONFIG_ARCH_L7200)	:= 0xf0008000
 # The standard locations for stuff on CLPS711x type processors
-ifeq ($(CONFIG_ARCH_CLPS711X),y)
-ZRELADDR	 = 0xc0028000
-PARAMS_PHYS	 = 0xc0000100
-endif
-
+   zreladdr-$(CONFIG_ARCH_CLPS711X)	:= 0xc0028000 
+params_phys-$(CONFIG_ARCH_CLPS711X)	:= 0xc0000100
 # Should probably have some agreement on these...
-ifeq ($(CONFIG_ARCH_P720T),y)
-INITRD_PHYS	 = 0xc0400000
-endif
-ifeq ($(CONFIG_ARCH_CDB89712),y)
-INITRD_PHYS	 = 0x00700000
-endif
-
+initrd_phys-$(CONFIG_ARCH_P720T)	:= 0xc0400000
+initrd_phys-$(CONFIG_ARCH_CDB89712)	:= 0x00700000
+   zreladdr-$(CONFIG_ARCH_SA1100)	:= 0xc0008000
 ifeq ($(CONFIG_ARCH_SA1100),y)
-ZRELADDR	 = 0xc0008000
-# No defconfig file to move this into...
-#ifeq ($(CONFIG_SA1100_YOPY),y)
-#  ZTEXTADDR      = 0x00080000
-#  ZBSSADDR       = 0xc0200000
-#endif
-ifeq ($(CONFIG_SA1111),y)
-  ZRELADDR	 = 0xc0208000
+   zreladdr-$(CONFIG_SA1111)		:= 0xc0208000
 endif
-endif
+  zreladdr-$(CONFIG_ARCH_PXA)		:= 0xa0008000
+  zreladdr-$(CONFIG_ARCH_ANAKIN)	:= 0x20008000
+  zreladdr-$(CONFIG_ARCH_IQ80310)	:= 0xa0008000
+  zreladdr-$(CONFIG_ARCH_ADIFCC)	:= 0xc0008000
 
-ifeq ($(CONFIG_ARCH_PXA),y)
-ZRELADDR	 = 0xa0008000
-endif
-
-ifeq ($(CONFIG_ARCH_ANAKIN),y)
-ZRELADDR	 = 0x20008000
-endif
-
-ifeq ($(CONFIG_ARCH_IQ80310),y)
-ZRELADDR	 = 0xa0008000
-endif
-
-ifeq ($(CONFIG_ARCH_ADIFCC),y)
-ZRELADDR	 = 0xc0008000
-endif
-
+ZRELADDR    := $(zreladdr-y)
+ZTEXTADDR   := $(ztextaddr-y)
+PARAMS_PHYS := $(params_phys-y)
+INITRD_PHYS := $(initrd_phys-y)
 #
 # We now have a PIC decompressor implementation.  Decompressors running
 # from RAM should not define ZTEXTADDR.  Decompressors running directly
 # from ROM or Flash must define ZTEXTADDR (preferably via the config)
-#
+# FIXME: Previous assignment to ztextaddr-y is lost here. See SHARK
 ifeq ($(CONFIG_ZBOOT_ROM),y)
-ZTEXTADDR	=$(CONFIG_ZBOOT_ROM_TEXT)
-ZBSSADDR	=$(CONFIG_ZBOOT_ROM_BSS)
+ZTEXTADDR	:= $(CONFIG_ZBOOT_ROM_TEXT)
+ZBSSADDR	:= $(CONFIG_ZBOOT_ROM_BSS)
 else
-ZTEXTADDR	=0
-ZBSSADDR	=ALIGN(4)
+ZTEXTADDR	:= 0
+ZBSSADDR	:= ALIGN(4)
 endif
 
 export	ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-include $(TOPDIR)/Rules.make
+EXTRA_TARGETS := Image zImage bootpImage
 
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
-
-bzImage: $(obj)/zImage
+	@echo '  Kernel: $@ is ready'
 
 $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
+	@echo '  Kernel: $@ is ready'
 
 $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
 	$(call if_changed,objcopy)
+	@echo '  Kernel: $@ is ready'
 
 $(obj)/compressed/vmlinux: vmlinux FORCE
-	+@$(call descend,arch/arm/boot/compressed, $(obj)/compressed/vmlinux)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed $@
 
 $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-	+@$(call descend,arch/arm/boot/bootp, $(obj)/bootp/bootp)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed $@
 
 .PHONY: initrd
 initrd:
@@ -157,19 +106,16 @@ zinstall: $(obj)/zImage
 	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
 	$(obj)/zImage System.map "$(INSTALL_PATH)"
 
-clean:
-	$(RM) $(addprefix $(obj)/,Image zImage bootpImage)
-	+@$(call descend,arch/arm/boot/bootp, clean)
-	+@$(call descend,arch/arm/boot/compressed, clean)
+clean-files := $(addprefix $(obj)/,Image zImage bootpImage)
+subdir-	    := bootp compressed
 
 archhelp:
-	@echo  '* bzImage/zImage- Compressed kernel image (arch/$(ARCH)/boot/zImage)'
+	@echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
 	@echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
 	@echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+	@echo  '  initrd        - Create an initial image'
 	@echo  '  install       - Install uncompressed kernel'
 	@echo  '  zinstall      - Install compressed kernel'
 	@echo  '                  Install using (your) ~/bin/installkernel or'
 	@echo  '                  (distribution) /sbin/installkernel or'
 	@echo  '                  install to $$(INSTALL_PATH) and run lilo'
-
-

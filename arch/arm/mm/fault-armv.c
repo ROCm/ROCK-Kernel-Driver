@@ -131,21 +131,22 @@ do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
  * We take the easy way out of this problem - we make the
  * PTE uncacheable.  However, we leave the write buffer on.
  */
-static void adjust_pte(struct vm_area_struct *vma, unsigned long address)
+static int adjust_pte(struct vm_area_struct *vma, unsigned long address)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte, entry;
+	int ret = 0;
 
 	pgd = pgd_offset(vma->vm_mm, address);
 	if (pgd_none(*pgd))
-		return;
+		goto no_pgd;
 	if (pgd_bad(*pgd))
 		goto bad_pgd;
 
 	pmd = pmd_offset(pgd, address);
 	if (pmd_none(*pmd))
-		return;
+		goto no_pmd;
 	if (pmd_bad(*pmd))
 		goto bad_pmd;
 
@@ -161,23 +162,64 @@ static void adjust_pte(struct vm_area_struct *vma, unsigned long address)
 		pte_val(entry) &= ~L_PTE_CACHEABLE;
 		set_pte(pte, entry);
 		flush_tlb_page(vma, address);
+		ret = 1;
 	}
 	pte_unmap(pte);
-	return;
+	return ret;
 
 bad_pgd:
 	pgd_ERROR(*pgd);
 	pgd_clear(pgd);
-	return;
+no_pgd:
+	return 0;
 
 bad_pmd:
 	pmd_ERROR(*pmd);
 	pmd_clear(pmd);
-	return;
+no_pmd:
+	return 0;
+}
+
+void __flush_dcache_page(struct page *page)
+{
+	struct mm_struct *mm = current->active_mm;
+	struct list_head *l;
+	unsigned long kaddr = (unsigned long)page_address(page);
+
+	cpu_cache_clean_invalidate_range(kaddr, kaddr + PAGE_SIZE, 0);
+
+	if (!page->mapping)
+		return;
+
+	/*
+	 * With a VIVT cache, we need to also write back
+	 * and invalidate any user data.
+	 */
+	list_for_each(l, &page->mapping->i_mmap_shared) {
+		struct vm_area_struct *mpnt;
+		unsigned long off;
+
+		mpnt = list_entry(l, struct vm_area_struct, shared);
+
+		/*
+		 * If this VMA is not in our MM, we can ignore it.
+		 */
+		if (mpnt->vm_mm != mm)
+			continue;
+
+		if (page->index < mpnt->vm_pgoff)
+			continue;
+
+		off = page->index - mpnt->vm_pgoff;
+		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
+			continue;
+
+		flush_cache_page(mpnt, off);
+	}
 }
 
 static void
-make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page)
+make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page, int dirty)
 {
 	struct list_head *l;
 	struct mm_struct *mm = vma->vm_mm;
@@ -213,14 +255,17 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page)
 		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
 			continue;
 
+		off = mpnt->vm_start + (off << PAGE_SHIFT);
+
 		/*
 		 * Ok, it is within mpnt.  Fix it up.
 		 */
-		adjust_pte(mpnt, mpnt->vm_start + (off << PAGE_SHIFT));
-		aliases ++;
+		aliases += adjust_pte(mpnt, off);
 	}
 	if (aliases)
 		adjust_pte(vma, addr);
+	else
+		flush_cache_page(vma, addr);
 }
 
 /*
@@ -245,9 +290,12 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 		return;
 	page = pfn_to_page(pfn);
 	if (page->mapping) {
-		if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
-			__flush_dcache_page(page);
+		int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
+		unsigned long kaddr = (unsigned long)page_address(page);
 
-		make_coherent(vma, addr, page);
+		if (dirty)
+			cpu_cache_clean_invalidate_range(kaddr, kaddr + PAGE_SIZE, 0);
+
+		make_coherent(vma, addr, page, dirty);
 	}
 }
