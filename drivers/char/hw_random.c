@@ -1,5 +1,5 @@
 /*
- 	Hardware driver for the Intel/AMD/Via Random Number Generators (RNG)
+ 	Hardware driver for the Intel/AMD/VIA Random Number Generators (RNG)
 	(c) Copyright 2003 Red Hat Inc <jgarzik@redhat.com>
  
  	derived from
@@ -79,22 +79,21 @@
 #define RNG_MISCDEV_MINOR		183 /* official */
 
 static int rng_dev_open (struct inode *inode, struct file *filp);
-static int rng_dev_release (struct inode *inode, struct file *filp);
 static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
 			     loff_t * offp);
 
 static int __init intel_init (struct pci_dev *dev);
-static void __exit intel_cleanup(void);
+static void intel_cleanup(void);
 static unsigned int intel_data_present (void);
 static u32 intel_data_read (void);
 
 static int __init amd_init (struct pci_dev *dev);
-static void __exit amd_cleanup(void);
+static void amd_cleanup(void);
 static unsigned int amd_data_present (void);
 static u32 amd_data_read (void);
 
 static int __init via_init(struct pci_dev *dev);
-static void __exit via_cleanup(void);
+static void via_cleanup(void);
 static unsigned int via_data_present (void);
 static u32 via_data_read (void);
 
@@ -107,12 +106,9 @@ struct rng_operations {
 };
 static struct rng_operations *rng_ops;
 
-static struct semaphore rng_open_sem;	/* Semaphore for serializing rng_open/release */
-
 static struct file_operations rng_chrdev_ops = {
 	.owner		= THIS_MODULE,
 	.open		= rng_dev_open,
-	.release	= rng_dev_release,
 	.read		= rng_dev_read,
 };
 
@@ -262,7 +258,7 @@ err_out:
 	return rc;
 }
 
-static void __exit intel_cleanup(void)
+static void intel_cleanup(void)
 {
 	u8 hw_status;
 
@@ -333,7 +329,7 @@ err_out:
 	return rc;
 }
 
-static void __exit amd_cleanup(void)
+static void amd_cleanup(void)
 {
 	u8 rnen;
 
@@ -346,7 +342,7 @@ static void __exit amd_cleanup(void)
 
 /***********************************************************************
  *
- * Via RNG operations
+ * VIA RNG operations
  *
  */
 
@@ -448,14 +444,14 @@ static int __init via_init(struct pci_dev *dev)
 	   unneeded */
 	rdmsr(MSR_VIA_RNG, lo, hi);
 	if ((lo & VIA_RNG_ENABLE) == 0) {
-		printk(KERN_ERR PFX "cannot enable Via C3 RNG, aborting\n");
+		printk(KERN_ERR PFX "cannot enable VIA C3 RNG, aborting\n");
 		return -ENODEV;
 	}
 
 	return 0;
 }
 
-static void __exit via_cleanup(void)
+static void via_cleanup(void)
 {
 	u32 lo, hi;
 
@@ -473,26 +469,12 @@ static void __exit via_cleanup(void)
 
 static int rng_dev_open (struct inode *inode, struct file *filp)
 {
+	/* enforce read-only access to this chrdev */
 	if ((filp->f_mode & FMODE_READ) == 0)
 		return -EINVAL;
 	if (filp->f_mode & FMODE_WRITE)
 		return -EINVAL;
 
-	/* wait for device to become free */
-	if (filp->f_flags & O_NONBLOCK) {
-		if (down_trylock (&rng_open_sem))
-			return -EAGAIN;
-	} else {
-		if (down_interruptible (&rng_open_sem))
-			return -ERESTARTSYS;
-	}
-	return 0;
-}
-
-
-static int rng_dev_release (struct inode *inode, struct file *filp)
-{
-	up(&rng_open_sem);
 	return 0;
 }
 
@@ -595,8 +577,6 @@ static int __init rng_init (void)
 
 	DPRINTK ("ENTER\n");
 
-	init_MUTEX (&rng_open_sem);
-
 	/* Probe for Intel, AMD RNGs */
 	pci_for_each_dev(pdev) {
 		ent = pci_match_device (rng_pci_tbl, pdev);
@@ -607,7 +587,7 @@ static int __init rng_init (void)
 	}
 
 #ifdef __i386__
-	/* Probe for Via RNG */
+	/* Probe for VIA RNG */
 	if (cpu_has_xstore) {
 		rng_ops = &rng_vendor_ops[rng_hw_via];
 		pdev = NULL;
