@@ -73,7 +73,7 @@ int init_module(void);
 void cleanup_module(void);
 
 /* Hardware-specific functions */
-static int load_cyc2x(cycxhw_t *hw, cfm_t *cfm, u32 len);
+static int load_cyc2x(cycxhw_t *hw, struct cycx_firmware *cfm, u32 len);
 static void cycx_bootcfg(cycxhw_t *hw);
 
 static int reset_cyc2x(u32 addr);
@@ -398,10 +398,10 @@ static int cycx_code_boot(u32 addr, u8 *code, u32 len)
 /* Load adapter from the memory image of the CYCX firmware module. 
  * o verify firmware integrity and compatibility
  * o start adapter up */
-static int load_cyc2x(cycxhw_t *hw, cfm_t *cfm, u32 len)
+static int load_cyc2x(cycxhw_t *hw, struct cycx_firmware *cfm, u32 len)
 {
 	int i, j;
-	cycx_header_t *img_hdr;
+	struct cycx_fw_header *img_hdr;
 	u8 *reset_image,
 	   *data_image,
 	   *code_image;
@@ -430,17 +430,18 @@ static int load_cyc2x(cycxhw_t *hw, cfm_t *cfm, u32 len)
 	}
 
 	/* Verify firmware module length and checksum */
-	cksum = checksum((u8*)&cfm->info, sizeof(cfm_info_t) +
-					      cfm->info.codesize);
+	cksum = checksum((u8*)&cfm->info, sizeof(struct cycx_fw_info) +
+					  cfm->info.codesize);
 /*
         FIXME cfm->info.codesize is off by 2
-	if (((len - sizeof(cfm_t) - 1) != cfm->info.codesize) ||
+	if (((len - sizeof(struct cycx_firmware) - 1) != cfm->info.codesize) ||
 */
 	if (cksum != cfm->checksum) {
 		printk(KERN_ERR "%s:%s: firmware corrupted!\n",
 				modname, __FUNCTION__);
 		printk(KERN_ERR " cdsize = 0x%x (expected 0x%lx)\n",
-				len - sizeof(cfm_t) - 1, cfm->info.codesize);
+				len - sizeof(struct cycx_firmware) - 1,
+				cfm->info.codesize);
                 printk(KERN_ERR " chksum = 0x%x (expected 0x%x)\n",
 				cksum, cfm->checksum);
 		return -EINVAL;
@@ -448,14 +449,15 @@ static int load_cyc2x(cycxhw_t *hw, cfm_t *cfm, u32 len)
 
 	/* If everything is ok, set reset, data and code pointers */
 
-	img_hdr = (cycx_header_t*)(((u8*)cfm) + sizeof(cfm_t) - 1);
+	img_hdr = (struct cycx_fw_header *)(((u8 *)cfm) +
+					    sizeof(struct cycx_firmware) - 1);
 #ifdef FIRMWARE_DEBUG
 	printk(KERN_INFO "%s:%s: image sizes\n", __FUNCTION__, modname);
 	printk(KERN_INFO " reset=%lu\n", img_hdr->reset_size);
 	printk(KERN_INFO "  data=%lu\n", img_hdr->data_size);
 	printk(KERN_INFO "  code=%lu\n", img_hdr->code_size);
 #endif
-	reset_image = ((u8 *)img_hdr) + sizeof(cycx_header_t);
+	reset_image = ((u8 *)img_hdr) + sizeof(struct cycx_fw_header);
 	data_image = reset_image + img_hdr->reset_size;
 	code_image = data_image + img_hdr->data_size;
 
