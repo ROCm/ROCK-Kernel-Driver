@@ -609,6 +609,7 @@ static int dabusb_open (struct inode *inode, struct file *file)
 		down (&s->mutex);
 	}
 	if (usb_set_interface (s->usbdev, _DABUSB_IF, 1) < 0) {
+		up(&s->mutex);
 		err("set_interface failed");
 		return -EINVAL;
 	}
