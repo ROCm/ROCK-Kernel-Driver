@@ -1348,23 +1348,6 @@ static int set_xfer_rate (ide_drive_t *drive, int arg)
 	return err;
 }
 
-int ide_atapi_to_scsi (ide_drive_t *drive, int arg)
-{
-	if (drive->media == ide_disk) {
-		drive->scsi = 0;
-		return 0;
-	}
-
-	if (DRIVER(drive)->cleanup(drive)) {
-		drive->scsi = 0;
-		return 0;
-	}
-
-	drive->scsi = (u8) arg;
-	ata_attach(drive);
-	return 0;
-}
-
 void ide_add_generic_settings (ide_drive_t *drive)
 {
 /*
@@ -1379,8 +1362,6 @@ void ide_add_generic_settings (ide_drive_t *drive)
 	ide_add_setting(drive,	"init_speed",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	70,				1,		1,		&drive->init_speed,		NULL);
 	ide_add_setting(drive,	"current_speed",	SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	70,				1,		1,		&drive->current_speed,		set_xfer_rate);
 	ide_add_setting(drive,	"number",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	3,				1,		1,		&drive->dn,			NULL);
-	if (drive->media != ide_disk)
-		ide_add_setting(drive,	"ide-scsi",		SETTING_RW,					-1,		HDIO_SET_IDE_SCSI,		TYPE_BYTE,	0,	1,				1,		1,		&drive->scsi,			ide_atapi_to_scsi);
 }
 
 int system_bus_clock (void)
