@@ -137,15 +137,12 @@ extern ctl_table random_table[];
 
 static ssize_t proc_readsys(struct file *, char __user *, size_t, loff_t *);
 static ssize_t proc_writesys(struct file *, const char __user *, size_t, loff_t *);
-static int proc_sys_permission(struct inode *, int, struct nameidata *);
+static int proc_opensys(struct inode *, struct file *);
 
 struct file_operations proc_sys_file_operations = {
+	.open		= proc_opensys,
 	.read		= proc_readsys,
 	.write		= proc_writesys,
-};
-
-static struct inode_operations proc_sys_inode_operations = {
-	.permission	= proc_sys_permission,
 };
 
 extern struct proc_dir_entry *proc_sys_root;
@@ -1141,10 +1138,8 @@ static void register_proc_table(ctl_table * table, struct proc_dir_entry *root)
 			if (!de)
 				continue;
 			de->data = (void *) table;
-			if (table->proc_handler) {
+			if (table->proc_handler)
 				de->proc_fops = &proc_sys_file_operations;
-				de->proc_iops = &proc_sys_inode_operations;
-			}
 		}
 		table->de = de;
 		if (de->mode & S_IFDIR)
@@ -1213,6 +1208,20 @@ static ssize_t do_rw_proc(int write, struct file * file, char __user * buf,
 	return res;
 }
 
+static int proc_opensys(struct inode *inode, struct file *file)
+{
+	if (file->f_mode & FMODE_WRITE) {
+		/*
+		 * sysctl entries that are not writable,
+		 * are _NOT_ writable, capabilities or not.
+		 */
+		if (!(inode->i_mode & S_IWUSR))
+			return -EPERM;
+	}
+
+	return 0;
+}
+
 static ssize_t proc_readsys(struct file * file, char __user * buf,
 			    size_t count, loff_t *ppos)
 {
@@ -1223,11 +1232,6 @@ static ssize_t proc_writesys(struct file * file, const char __user * buf,
 			     size_t count, loff_t *ppos)
 {
 	return do_rw_proc(1, file, (char __user *) buf, count, ppos);
-}
-
-static int proc_sys_permission(struct inode *inode, int op, struct nameidata *nd)
-{
-	return test_perm(inode->i_mode, op);
 }
 
 /**
