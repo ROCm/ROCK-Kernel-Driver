@@ -913,92 +913,117 @@ static int __init sa1100_static_partitions(struct mtd_partition **parts)
 }
 #endif
 
-struct sa_info {
+struct sa_subdev_info {
 	unsigned long base;
 	unsigned long size;
 	int width;
 	void (*set_vpp)(struct map_info *, int);
 	char name[16];
-	struct map_info *map;
+	struct map_info map;
 	struct mtd_info *mtd;
 };
 
 #define NR_SUBMTD 4
 
-static struct sa_info info[NR_SUBMTD];
+static struct sa_subdev_info info[NR_SUBMTD];
 
-static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info **rmtd)
+static void sa1100_destroy_subdev(struct sa_subdev_info *subdev)
 {
-	struct mtd_info *subdev[nr];
-	struct map_info *maps;
-	int i, found = 0, ret = 0;
+	if (subdev->mtd)
+		map_destroy(subdev->mtd);
+	if (subdev->map.virt)
+		iounmap(subdev->map.virt);
+	release_mem_region(subdev->base, subdev->size);
+}
+
+static int sa1100_probe_subdev(struct sa_subdev_info *subdev)
+{
+	unsigned long phys;
+	unsigned int size;
+	int ret;
+
+	phys = subdev->base;
+	size = subdev->size;
 
 	/*
-	 * Allocate the map_info structs in one go.
+	 * Retrieve the bankwidth from the MSC registers.
+	 * We currently only implement CS0 and CS1 here.
 	 */
-	maps = kmalloc(sizeof(struct map_info) * nr, GFP_KERNEL);
-	if (!maps)
-		return -ENOMEM;
+	switch (phys) {
+	default:
+		printk(KERN_WARNING "SA1100 flash: unknown base address "
+		       "0x%08lx, assuming CS0\n", phys);
 
-	memset(maps, 0, sizeof(struct map_info) * nr);
+	case SA1100_CS0_PHYS:
+		subdev->map.bankwidth = (MSC0 & MSC_RBW) ? 2 : 4;
+		break;
+
+	case SA1100_CS1_PHYS:
+		subdev->map.bankwidth = ((MSC0 >> 16) & MSC_RBW) ? 2 : 4;
+		break;
+	}
+
+	if (!request_mem_region(phys, size, subdev->name)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	subdev->map.set_vpp = subdev->set_vpp;
+	subdev->map.phys = phys;
+	subdev->map.size = size;
+	subdev->map.virt = ioremap(phys, size);
+	if (!subdev->map.virt) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	simple_map_init(&subdev->map);
+
+	/*
+	 * Now let's probe for the actual flash.  Do it here since
+	 * specific machine settings might have been set above.
+	 */
+	subdev->mtd = do_map_probe(subdev->data->map_name, &subdev->map);
+	if (subdev->mtd == NULL) {
+		ret = -ENXIO;
+		goto err;
+	}
+	subdev->mtd->owner = THIS_MODULE;
+
+	printk(KERN_INFO "SA1100 flash: CFI device at 0x%08lx, %dMiB, "
+		"%d-bit\n", phys, subdev->mtd->size >> 20,
+		subdev->map.bankwidth * 8);
+
+	return 0;
+
+ err:
+	sa1100_destroy_subdev(subdev);
+ out:
+	return ret;
+}
+
+static int __init sa1100_setup_mtd(struct sa_subdev_info *sa, int nr, struct mtd_info **rmtd)
+{
+	struct mtd_info *cdev[nr];
+	int i, found = 0, ret = 0;
 
 	/*
 	 * Claim and then map the memory regions.
 	 */
 	for (i = 0; i < nr; i++) {
-		if (sa[i].base == (unsigned long)-1)
+		struct sa_subdev_info *subdev = &sa[i];
+		if (subdev->base == (unsigned long)-1)
 			break;
 
-		sa[i].map = maps + i;
-		sa[i].map->name = sa[i].name;
-		sprintf(sa[i].name, "sa1100-%d", i);
+		subdev->map.name = subdev->name;
+		sprintf(subdev->name, "sa1100-%d", i);
 
-		if (!request_mem_region(sa[i].base, sa[i].size, sa[i].name)) {
-			i -= 1;
-			ret = -EBUSY;
+		ret = sa1100_probe_subdev(subdev);
+		if (ret)
 			break;
-		}
 
-		sa[i].map->virt = ioremap(sa[i].base, sa[i].size);
-		if (!sa[i].map->virt) {
-			ret = -ENOMEM;
-			break;
-		}
-
-		sa[i].map->phys = sa[i].base;
-		sa[i].map->set_vpp = sa[i].set_vpp;
-		sa[i].map->bankwidth = sa[i].width;
-		sa[i].map->size = sa[i].size;
-
-		simple_map_init(sa[i].map);
-
-		/*
-		 * Now let's probe for the actual flash.  Do it here since
-		 * specific machine settings might have been set above.
-		 */
-		sa[i].mtd = do_map_probe("cfi_probe", sa[i].map);
-		if (sa[i].mtd == NULL) {
-			ret = -ENXIO;
-			break;
-		}
-		sa[i].mtd->owner = THIS_MODULE;
-		subdev[i] = sa[i].mtd;
-
-		printk(KERN_INFO "SA1100 flash: CFI device at 0x%08lx, %dMiB, "
-			"%d-bit\n", sa[i].base, sa[i].mtd->size >> 20,
-			sa[i].width * 8);
+		cdev[i] = subdev->mtd;
 		found += 1;
-	}
-
-	/*
-	 * ENXIO is special.  It means we didn't find a chip when
-	 * we probed.  We need to tear down the mapping, free the
-	 * resource and mark it as such.
-	 */
-	if (ret == -ENXIO) {
-		iounmap(sa[i].map->virt);
-		sa[i].map->virt = NULL;
-		release_mem_region(sa[i].base, sa[i].size);
 	}
 
 	/*
@@ -1008,7 +1033,7 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 	 */
 	if (ret == 0 || ret == -ENXIO) {
 		if (found == 1) {
-			*rmtd = subdev[0];
+			*rmtd = cdev[0];
 			ret = 0;
 		} else if (found > 1) {
 			/*
@@ -1016,7 +1041,7 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 			 * them together.
 			 */
 #ifdef CONFIG_MTD_CONCAT
-			*rmtd = mtd_concat_create(subdev, found,
+			*rmtd = mtd_concat_create(cdev, found,
 						  "sa1100");
 			if (*rmtd == NULL)
 				ret = -ENXIO;
@@ -1033,20 +1058,14 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 	 */
 	if (ret) {
 		do {
-			if (sa[i].mtd)
-				map_destroy(sa[i].mtd);
-			if (sa[i].map->virt)
-				iounmap(sa[i].map->virt);
-			release_mem_region(sa[i].base, sa[i].size);
+			sa1100_destroy_subdev(&sa[i]);
 		} while (i-- > 0);
-
-		kfree(maps);
 	}
 
 	return ret;
 }
 
-static void __exit sa1100_destroy_mtd(struct sa_info *sa, struct mtd_info *mtd)
+static void __exit sa1100_destroy_mtd(struct sa_subdev_info *sa, struct mtd_info *mtd)
 {
 	int i;
 
@@ -1057,14 +1076,8 @@ static void __exit sa1100_destroy_mtd(struct sa_info *sa, struct mtd_info *mtd)
 		mtd_concat_destroy(mtd);
 #endif
 
-	for (i = NR_SUBMTD; i >= 0; i--) {
-		if (sa[i].mtd)
-			map_destroy(sa[i].mtd);
-		if (sa[i].map->virt)
-			iounmap(sa[i].map->virt);
-		release_mem_region(sa[i].base, sa[i].size);
-	}
-	kfree(sa[0].map);
+	for (i = NR_SUBMTD; i >= 0; i--)
+		sa1100_destroy_subdev(&sa[i]);
 }
 
 static int __init sa1100_locate_flash(void)
