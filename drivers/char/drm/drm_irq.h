@@ -48,6 +48,44 @@
 #define DRM_IRQ_TYPE		0
 #endif
 
+/**
+ * Get interrupt from bus id.
+ * 
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_irq_busid structure.
+ * \return zero on success or a negative number on failure.
+ * 
+ * Finds the PCI device with the specified bus id and gets its IRQ number.
+ * This IOCTL is deprecated, and will now return EINVAL for any busid not equal
+ * to that of the device that this DRM instance attached to.
+ */
+int DRM(irq_by_busid)(struct inode *inode, struct file *filp,
+		   unsigned int cmd, unsigned long arg)
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_irq_busid_t p;
+
+	if (copy_from_user(&p, (drm_irq_busid_t *)arg, sizeof(p)))
+		return -EFAULT;
+
+	if ((p.busnum >> 8) != dev->pci_domain ||
+	    (p.busnum & 0xff) != dev->pci_bus ||
+	    p.devnum != dev->pci_slot ||
+	    p.funcnum != dev->pci_func)
+		return -EINVAL;
+
+	p.irq = dev->irq;
+
+	DRM_DEBUG("%d:%d:%d => IRQ %d\n",
+		  p.busnum, p.devnum, p.funcnum, p.irq);
+	if (copy_to_user((drm_irq_busid_t *)arg, &p, sizeof(p)))
+		return -EFAULT;
+	return 0;
+}
+
 #if __HAVE_IRQ
 
 /**
@@ -60,11 +98,11 @@
  * \c DRM(driver_irq_preinstall)() and \c DRM(driver_irq_postinstall)() functions
  * before and after the installation.
  */
-int DRM(irq_install)( drm_device_t *dev, int irq )
+int DRM(irq_install)( drm_device_t *dev )
 {
 	int ret;
-
-	if ( !irq )
+ 
+	if ( dev->irq == 0 )
 		return -EINVAL;
 
 	down( &dev->struct_sem );
@@ -75,22 +113,20 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 		return -EINVAL;
 	}
 
-	if ( dev->irq ) {
+	if ( dev->irq_enabled ) {
 		up( &dev->struct_sem );
 		return -EBUSY;
 	}
-	dev->irq = irq;
+	dev->irq_enabled = 1;
 	up( &dev->struct_sem );
 
-	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, irq );
+	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, dev->irq );
 
-	dev->context_flag = 0;
-	dev->interrupt_flag = 0;
-	dev->dma_flag = 0;
-
+#if __HAVE_DMA
 	dev->dma->next_buffer = NULL;
 	dev->dma->next_queue = NULL;
 	dev->dma->this_buffer = NULL;
+#endif
 
 #if __HAVE_IRQ_BH
 	INIT_WORK(&dev->work, DRM(irq_immediate_bh), dev);
@@ -114,7 +150,7 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 			   DRM_IRQ_TYPE, dev->devname, dev );
 	if ( ret < 0 ) {
 		down( &dev->struct_sem );
-		dev->irq = 0;
+		dev->irq_enabled = 0;
 		up( &dev->struct_sem );
 		return ret;
 	}
@@ -134,21 +170,21 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
  */
 int DRM(irq_uninstall)( drm_device_t *dev )
 {
-	int irq;
+	int irq_enabled;
 
 	down( &dev->struct_sem );
-	irq = dev->irq;
-	dev->irq = 0;
+	irq_enabled = dev->irq_enabled;
+	dev->irq_enabled = 0;
 	up( &dev->struct_sem );
 
-	if ( !irq )
+	if ( !irq_enabled )
 		return -EINVAL;
 
-	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, irq );
+	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, dev->irq );
 
 	DRM(driver_irq_uninstall)( dev );
 
-	free_irq( irq, dev );
+	free_irq( dev->irq, dev );
 
 	return 0;
 }
@@ -176,7 +212,10 @@ int DRM(control)( struct inode *inode, struct file *filp,
 
 	switch ( ctl.func ) {
 	case DRM_INST_HANDLER:
-		return DRM(irq_install)( dev, ctl.irq );
+		if (dev->if_version < DRM_IF_VERSION(1, 2) &&
+		    ctl.irq != dev->irq)
+			return -EINVAL;
+		return DRM(irq_install)( dev );
 	case DRM_UNINST_HANDLER:
 		return DRM(irq_uninstall)( dev );
 	default:

@@ -324,6 +324,7 @@ do {											\
 #define DRM_BUFCOUNT(x) ((x)->count - DRM_LEFTCOUNT(x))
 #define DRM_WAITCOUNT(dev,idx) DRM_BUFCOUNT(&dev->queuelist[idx]->waitlist)
 
+#define DRM_IF_VERSION(maj, min) (maj << 16 | min)
 /**
  * Get the private SAREA mapping.
  *
@@ -628,6 +629,7 @@ typedef struct drm_device {
 	dev_t		  device;	/**< Device number for mknod */
 	char		  *devname;	/**< For /proc/interrupts */
 	int		  minor;        /**< Minor device number */
+	int		  if_version;	/**< Highest interface version set */
 
 	int		  blocked;	/**< Blocked due to VC switch? */
 	struct proc_dir_entry *root;	/**< Root for this device's entries */
@@ -685,6 +687,7 @@ typedef struct drm_device {
 	/** \name Context support */
 	/*@{*/
 	int		  irq;		/**< Interrupt used by board */
+	int		  irq_enabled;	/**< True if irq handler is enabled */
 	__volatile__ long context_flag;	/**< Context swapping flag */
 	__volatile__ long interrupt_flag; /**< Interruption handler flag */
 	__volatile__ long dma_flag;	/**< DMA dispatch flag */
@@ -720,7 +723,12 @@ typedef struct drm_device {
 #if __REALLY_HAVE_AGP
 	drm_agp_head_t    *agp;	/**< AGP data */
 #endif
-	struct pci_dev *pdev;		/**< PCI device structure */
+
+	struct pci_dev    *pdev;	/**< PCI device structure */
+	int               pci_domain;	/**< PCI bus domain number */
+	int               pci_bus;	/**< PCI bus number */
+	int               pci_slot;	/**< PCI slot number */
+	int               pci_func;	/**< PCI function number */
 #ifdef __alpha__
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,3)
 	struct pci_controler *hose;
@@ -810,8 +818,8 @@ extern int           DRM(unbind_agp)(DRM_AGP_MEM *handle);
 #endif
 
 				/* Misc. IOCTL support (drm_ioctl.h) */
-extern int	     DRM(irq_busid)(struct inode *inode, struct file *filp,
-				    unsigned int cmd, unsigned long arg);
+extern int	     DRM(irq_by_busid)(struct inode *inode, struct file *filp,
+				       unsigned int cmd, unsigned long arg);
 extern int	     DRM(getunique)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
 extern int	     DRM(setunique)(struct inode *inode, struct file *filp,
@@ -916,7 +924,7 @@ extern int           DRM(control)( struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg );
 #endif
 #if __HAVE_IRQ
-extern int           DRM(irq_install)( drm_device_t *dev, int irq );
+extern int           DRM(irq_install)( drm_device_t *dev );
 extern int           DRM(irq_uninstall)( drm_device_t *dev );
 extern irqreturn_t   DRM(irq_handler)( DRM_IRQ_ARGS );
 extern void          DRM(driver_irq_preinstall)( drm_device_t *dev );

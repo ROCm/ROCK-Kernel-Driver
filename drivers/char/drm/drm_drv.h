@@ -173,7 +173,9 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]       = { DRM(version),     0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_UNIQUE)]    = { DRM(getunique),   0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAGIC)]     = { DRM(getmagic),    0, 0 },
-	[DRM_IOCTL_NR(DRM_IOCTL_IRQ_BUSID)]     = { DRM(irq_busid),   0, 1 },
+#if __HAVE_IRQ
+	[DRM_IOCTL_NR(DRM_IOCTL_IRQ_BUSID)]     = { DRM(irq_by_busid), 0, 1 },
+#endif
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAP)]       = { DRM(getmap),      0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_CLIENT)]    = { DRM(getclient),   0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_STATS)]     = { DRM(getstats),    0, 0 },
@@ -334,7 +336,7 @@ static int DRM(setup)( drm_device_t *dev )
 	dev->queue_reserved = 0;
 	dev->queue_slots = 0;
 	dev->queuelist = NULL;
-	dev->irq = 0;
+	dev->irq_enabled = 0;
 	dev->context_flag = 0;
 	dev->interrupt_flag = 0;
 	dev->dma_flag = 0;
@@ -342,6 +344,7 @@ static int DRM(setup)( drm_device_t *dev )
 	dev->last_switch = 0;
 	dev->last_checked = 0;
 	init_waitqueue_head( &dev->context_wait );
+	dev->if_version = 0;
 
 	dev->ctx_start = 0;
 	dev->lck_start = 0;
@@ -389,7 +392,7 @@ static int DRM(takedown)( drm_device_t *dev )
 
 	DRIVER_PRETAKEDOWN();
 #if __HAVE_IRQ
-	if ( dev->irq ) DRM(irq_uninstall)( dev );
+	if ( dev->irq_enabled ) DRM(irq_uninstall)( dev );
 #endif
 
 	down( &dev->struct_sem );
@@ -573,7 +576,14 @@ static int DRM(probe)(struct pci_dev *pdev)
 	dev->pdev   = pdev;
 #ifdef __alpha__
 	dev->hose   = pdev->sysdata;
+	dev->pci_domain = dev->hose->bus->number;
+#else
+	dev->pci_domain = 0;
 #endif
+	dev->pci_bus = pdev->bus->number;
+	dev->pci_slot = PCI_SLOT(pdev->devfn);
+	dev->pci_func = PCI_FUNC(pdev->devfn);
+	dev->irq = pdev->irq;
 
 	DRIVER_PREINIT();
 
@@ -626,7 +636,7 @@ static int DRM(probe)(struct pci_dev *pdev)
  *
  * \return zero on success or a negative number on failure.
  *
- * Allocates and initialize an array of drm_device structures, and attempts to
+ * Initializes an array of drm_device structures, and attempts to
  * initialize all available devices, using consecutive minors, registering the
  * stubs and initializing the AGP device.
  * 

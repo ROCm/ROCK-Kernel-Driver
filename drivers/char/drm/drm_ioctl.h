@@ -38,69 +38,6 @@
 #include "linux/pci.h"
 
 /**
- * Get interrupt from bus id.
- * 
- * \param inode device inode.
- * \param filp file pointer.
- * \param cmd command.
- * \param arg user argument, pointing to a drm_irq_busid structure.
- * \return zero on success or a negative number on failure.
- * 
- * Finds the PCI device with the specified bus id and gets its IRQ number.
- */
-int DRM(irq_busid)(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
-{
-	drm_irq_busid_t p;
-	struct pci_dev	*dev;
-
-	if (copy_from_user(&p, (drm_irq_busid_t *)arg, sizeof(p)))
-		return -EFAULT;
-#ifdef __alpha__
-	{
-		int domain = p.busnum >> 8;
-		p.busnum &= 0xff;
-
-		/*
-		 * Find the hose the device is on (the domain number is the
-		 * hose index) and offset the bus by the root bus of that
-		 * hose.
-		 */
-                for(dev = pci_find_device(PCI_ANY_ID,PCI_ANY_ID,NULL);
-                    dev;
-                    dev = pci_find_device(PCI_ANY_ID,PCI_ANY_ID,dev)) {
-			struct pci_controller *hose = dev->sysdata;
-			
-			if (hose->index == domain) {
-				p.busnum += hose->bus->number;
-				break;
-			}
-		}
-	}
-#endif
-	dev = pci_find_slot(p.busnum, PCI_DEVFN(p.devnum, p.funcnum));
-	if (!dev) {
-		DRM_ERROR("pci_find_slot failed for %d:%d:%d\n",
-			  p.busnum, p.devnum, p.funcnum);
-		p.irq = 0;
-		goto out;
-	}			
-	if (pci_enable_device(dev) != 0) {
-		DRM_ERROR("pci_enable_device failed for %d:%d:%d\n",
-			  p.busnum, p.devnum, p.funcnum);
-		p.irq = 0;
-		goto out;
-	}		
-	p.irq = dev->irq;
- out:
-	DRM_DEBUG("%d:%d:%d => IRQ %d\n",
-		  p.busnum, p.devnum, p.funcnum, p.irq);
-	if (copy_to_user((drm_irq_busid_t *)arg, &p, sizeof(p)))
-		return -EFAULT;
-	return 0;
-}
-
-/**
  * Get the bus id.
  * 
  * \param inode device inode.
@@ -139,9 +76,9 @@ int DRM(getunique)(struct inode *inode, struct file *filp,
  * \param arg user argument, pointing to a drm_unique structure.
  * \return zero on success or a negative number on failure.
  *
- * Copies the bus id from userspace into drm_device::unique, and searches for
- * the respective PCI device, updating drm_device::pdev.  Deprecated in
- * interface version 1.1 and will return EBUSY when setversion has requested
+ * Copies the bus id from userspace into drm_device::unique, and verifies that
+ * it matches the device this DRM is attached to (EINVAL otherwise).  Deprecated
+ * in interface version 1.1 and will return EBUSY when setversion has requested
  * version 1.1 or greater.
  */
 int DRM(setunique)(struct inode *inode, struct file *filp,
@@ -150,6 +87,7 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 	drm_file_t	 *priv	 = filp->private_data;
 	drm_device_t	 *dev	 = priv->dev;
 	drm_unique_t	 u;
+	int		 domain, bus, slot, func, ret;
 
 	if (dev->unique_len || dev->unique) return -EBUSY;
 
@@ -167,55 +105,25 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 
 	dev->devname = DRM(alloc)(strlen(dev->name) + strlen(dev->unique) + 2,
 				  DRM_MEM_DRIVER);
-	if(!dev->devname) {
-		DRM(free)(dev->devname, sizeof(*dev->devname), DRM_MEM_DRIVER);
+	if (!dev->devname)
 		return -ENOMEM;
-	}
+
 	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
 
-	do {
-		struct pci_dev *pci_dev;
-                int domain, b, d, f;
-                char *p;
- 
-                for(p = dev->unique; p && *p && *p != ':'; p++);
-                if (!p || !*p) break;
-                b = (int)simple_strtoul(p+1, &p, 10);
-                if (*p != ':') break;
-                d = (int)simple_strtoul(p+1, &p, 10);
-                if (*p != ':') break;
-                f = (int)simple_strtoul(p+1, &p, 10);
-                if (*p) break;
- 
-		domain = b >> 8;
-		b &= 0xff;
-
-#ifdef __alpha__
-		/*
-		 * Find the hose the device is on (the domain number is the
-		 * hose index) and offset the bus by the root bus of that
-		 * hose.
-		 */
-                for(pci_dev = pci_find_device(PCI_ANY_ID,PCI_ANY_ID,NULL);
-                    pci_dev;
-                    pci_dev = pci_find_device(PCI_ANY_ID,PCI_ANY_ID,pci_dev)) {
-			struct pci_controller *hose = pci_dev->sysdata;
-			
-			if (hose->index == domain) {
-				b += hose->bus->number;
-				break;
-			}
-		}
-#endif
-
-                pci_dev = pci_find_slot(b, PCI_DEVFN(d,f));
-                if (pci_dev) {
-			dev->pdev = pci_dev;
-#ifdef __alpha__
-			dev->hose = pci_dev->sysdata;
-#endif
-		}
-        } while(0);
+	/* Return error if the busid submitted doesn't match the device's actual
+	 * busid.
+	 */
+	ret = sscanf(dev->unique, "PCI:%d:%d:%d", &bus, &slot, &func);
+	if (ret != 3)
+		return DRM_ERR(EINVAL);
+	domain = bus >> 8;
+	bus &= 0xff;
+	
+	if ((domain != dev->pci_domain) ||
+	    (bus != dev->pci_bus) ||
+	    (slot != dev->pci_slot) ||
+	    (func != dev->pci_func))
+		return -EINVAL;
 
 	return 0;
 }
@@ -231,21 +139,8 @@ DRM(set_busid)(drm_device_t *dev)
 	if (dev->unique == NULL)
 		return ENOMEM;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,74)
-	snprintf(dev->unique, dev->unique_len, "pci:%s", pci_name(dev->pdev));
-#else
-	{
-		int domain = 0;
-#ifdef __alpha__
-		struct pci_controller *hose = pci_dev->sysdata;
-
-		domain = hose->bus->number;
-#endif
-		snprintf(dev->unique, dev->unique_len, "pci:%04x:%02x:%02x.%d",
-			domain, dev->pdev->bus->number,
-			PCI_SLOT(dev->pdev->devfn), PCI_FUNC(dev->pdev->devfn));
-	}
-#endif
+	snprintf(dev->unique, dev->unique_len, "pci:%04x:%02x:%02x.%d",
+		dev->pci_domain, dev->pci_bus, dev->pci_slot, dev->pci_func);
 
 	return 0;
 }
@@ -397,26 +292,31 @@ int DRM(getstats)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+#define DRM_IF_MAJOR	1
+#define DRM_IF_MINOR	2
+
 int DRM(setversion)(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 	drm_set_version_t sv;
 	drm_set_version_t retv;
+	int if_version;
 
 	DRM_COPY_FROM_USER_IOCTL(sv, (drm_set_version_t *)data, sizeof(sv));
 
-	retv.drm_di_major = 1;
-	retv.drm_di_minor = 1;
+	retv.drm_di_major = DRM_IF_MAJOR;
+	retv.drm_di_minor = DRM_IF_MINOR;
 	retv.drm_dd_major = DRIVER_MAJOR;
 	retv.drm_dd_minor = DRIVER_MINOR;
-	
+
 	DRM_COPY_TO_USER_IOCTL((drm_set_version_t *)data, retv, sizeof(sv));
 
 	if (sv.drm_di_major != -1) {
-		if (sv.drm_di_major != 1 || sv.drm_di_minor < 0)
+		if (sv.drm_di_major != DRM_IF_MAJOR ||
+		    sv.drm_di_minor < 0 || sv.drm_di_minor > DRM_IF_MINOR)
 			return EINVAL;
-		if (sv.drm_di_minor > 1)
-			return EINVAL;
+		if_version = DRM_IF_VERSION(sv.drm_di_major, sv.drm_dd_minor);
+		dev->if_version = DRM_MAX(if_version, dev->if_version);
 		if (sv.drm_di_minor >= 1) {
 			/*
 			 * Version 1.1 includes tying of DRM to specific device
@@ -426,12 +326,11 @@ int DRM(setversion)(DRM_IOCTL_ARGS)
 	}
 
 	if (sv.drm_dd_major != -1) {
-		if (sv.drm_dd_major != DRIVER_MAJOR || sv.drm_dd_minor < 0)
-			return EINVAL;
-		if (sv.drm_dd_minor > DRIVER_MINOR)
+		if (sv.drm_dd_major != DRIVER_MAJOR ||
+		    sv.drm_dd_minor < 0 || sv.drm_dd_minor > DRIVER_MINOR)
 			return EINVAL;
 #ifdef DRIVER_SETVERSION
-		DRIVER_SETVERSION(dev, sv);
+		DRIVER_SETVERSION(dev, &sv);
 #endif
 	}
 	return 0;
