@@ -745,10 +745,21 @@ static void sd_end_flush(request_queue_t *q, struct request *flush_rq)
 	struct scsi_cmnd *cmd = rq->special;
 	unsigned int bytes = rq->hard_nr_sectors << 9;
 
-	if (!flush_rq->errors)
+	if (!flush_rq->errors) {
+		spin_unlock(q->queue_lock);
 		scsi_io_completion(cmd, bytes, 0);
-	else
+		spin_lock(q->queue_lock);
+	} else if (blk_barrier_postflush(rq))
+		spin_unlock(q->queue_lock);
 		scsi_io_completion(cmd, 0, bytes);
+		spin_lock(q->queue_lock);
+	} else {
+		/*
+		 * force journal abort of barriers
+		 */
+		end_that_request_first(rq, -EOPNOTSUPP, rq->hard_nr_sectors);
+		end_that_request_last(rq);
+	}
 }
 
 static int sd_prepare_flush(request_queue_t *q, struct request *rq)
@@ -759,6 +770,7 @@ static int sd_prepare_flush(request_queue_t *q, struct request *rq)
 	if (sdkp->WCE) {
 		memset(rq->cmd, 0, sizeof(rq->cmd));
 		rq->flags = REQ_BLOCK_PC | REQ_SOFTBARRIER;
+		rq->timeout = SD_TIMEOUT;
 		rq->cmd[0] = SYNCHRONIZE_CACHE;
 		return 1;
 	}

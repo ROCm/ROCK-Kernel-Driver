@@ -330,8 +330,11 @@ static inline struct request *__elv_next_request(request_queue_t *q)
 		BUG_ON(q->ordered == QUEUE_ORDERED_NONE);
 
 		if (q->ordered == QUEUE_ORDERED_FLUSH &&
-		    !blk_barrier_preflush(rq))
+		    !blk_barrier_preflush(rq)) {
 			rq = blk_start_pre_flush(q, rq);
+			if (!rq)
+				blk_plug_device(q);
+		}
 	}
 
 	return rq;

@@ -366,14 +366,7 @@ static void blk_post_flush_end_io(struct request *flush_rq)
 
 	rq->flags |= REQ_BAR_POSTFLUSH;
 
-	/*
-	 * called from end_that_request_last(), so we know that the queue
-	 * lock is held
-	 */
-	spin_unlock(q->queue_lock);
 	q->end_flush_fn(q, flush_rq);
-	spin_lock(q->queue_lock);
-
 	clear_bit(QUEUE_FLAG_FLUSH, &q->queue_flags);
 }
 
@@ -382,6 +375,9 @@ struct request *blk_start_pre_flush(request_queue_t *q, struct request *rq)
 	struct request *flush_rq = q->flush_rq;
 
 	BUG_ON(!blk_barrier_rq(rq));
+
+	if (test_and_set_bit(QUEUE_FLAG_FLUSH, &q->queue_flags))
+		return NULL;
 
 	rq_init(q, flush_rq);
 	flush_rq->elevator_private = NULL;
@@ -395,10 +391,9 @@ struct request *blk_start_pre_flush(request_queue_t *q, struct request *rq)
 	 */
 	if (!q->prepare_flush_fn(q, flush_rq)) {
 		rq->flags |= REQ_BAR_PREFLUSH | REQ_BAR_POSTFLUSH;
+		clear_bit(QUEUE_FLAG_FLUSH, &q->queue_flags);
 		return rq;
 	}
-
-	set_bit(QUEUE_FLAG_FLUSH, &q->queue_flags);
 
 	/*
 	 * some drivers dequeue requests right away, some only after io

@@ -697,7 +697,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	int sense_valid = 0;
 	int sense_deferred = 0;
 
-	if (blk_complete_barrier_rq(q, req, good_bytes << 9))
+	if (blk_complete_barrier_rq(q, req, good_bytes >> 9))
 		return;
 
 	/*

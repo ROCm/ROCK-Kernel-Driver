@@ -715,12 +715,13 @@ static void idedisk_end_flush(request_queue_t *q, struct request *flush_rq)
 		blk_queue_issue_flush_fn(drive->queue, NULL);
 		good_sectors = 0;
 	} else if (flush_rq->errors) {
-		sector = ide_get_error_location(drive, flush_rq->buffer);
-		if ((sector >= rq->hard_sector) &&
-		    (sector < rq->hard_sector + rq->hard_nr_sectors))
-			good_sectors = sector - rq->hard_sector;
-		else
-			good_sectors = 0;
+		good_sectors = 0;
+		if (blk_barrier_preflush(rq)) {
+			sector = ide_get_error_location(drive,flush_rq->buffer);
+			if ((sector >= rq->hard_sector) &&
+			    (sector < rq->hard_sector + rq->hard_nr_sectors))
+				good_sectors = sector - rq->hard_sector;
+		}
 	}
 
 	if (flush_rq->errors)
@@ -732,14 +733,10 @@ static void idedisk_end_flush(request_queue_t *q, struct request *flush_rq)
 
 	bad_sectors = rq->hard_nr_sectors - good_sectors;
 
-	spin_lock(&ide_lock);
-
 	if (good_sectors)
 		__ide_end_request(drive, rq, 1, good_sectors);
 	if (bad_sectors)
 		__ide_end_request(drive, rq, 0, bad_sectors);
-
-	spin_unlock(&ide_lock);
 }
 
 static int idedisk_prepare_flush(request_queue_t *q, struct request *rq)
