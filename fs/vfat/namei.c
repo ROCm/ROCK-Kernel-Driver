@@ -1254,20 +1254,19 @@ struct inode_operations vfat_dir_inode_operations = {
 	setattr:	fat_notify_change,
 };
 
-struct super_block *vfat_read_super(struct super_block *sb,void *data,
-				    int silent)
+int vfat_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct super_block *res;
   
 	MSDOS_SB(sb)->options.isvfat = 1;
 	res = fat_read_super(sb, data, silent, &vfat_dir_inode_operations);
 	if (IS_ERR(res))
-		return NULL;
+		return PTR_ERR(res);
 	if (res == NULL) {
 		if (!silent)
 			printk(KERN_INFO "VFS: Can't find a valid"
 			       " VFAT filesystem on dev %s.\n", sb->s_id);
-		return NULL;
+		return -EINVAL;
 	}
 
 	if (parse_options((char *) data, &(MSDOS_SB(sb)->options))) {
@@ -1281,6 +1280,5 @@ struct super_block *vfat_read_super(struct super_block *sb,void *data,
 			sb->s_root->d_op = &vfat_dentry_ops[2];
 		}
 	}
-
-	return res;
+	return 0;
 }

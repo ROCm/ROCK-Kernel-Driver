@@ -92,8 +92,7 @@ romfs_checksum(void *data, int size)
 
 static struct super_operations romfs_ops;
 
-static struct super_block *
-romfs_read_super(struct super_block *s, void *data, int silent)
+static int romfs_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct buffer_head *bh;
 	struct romfs_super_block *rsb;
@@ -150,10 +149,10 @@ romfs_read_super(struct super_block *s, void *data, int silent)
 out:
 		brelse(bh);
 outnobh:
-		s = NULL;
+		return -EINVAL;
 	}
 
-	return s;
+	return 0;
 }
 
 /* That's simple too. */
@@ -529,7 +528,18 @@ static struct super_operations romfs_ops = {
 	statfs:		romfs_statfs,
 };
 
-static DECLARE_FSTYPE_DEV(romfs_fs_type, "romfs", romfs_read_super);
+static struct super_block *romfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, romfs_fill_super);
+}
+
+static struct file_system_type romfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"romfs",
+	get_sb:		romfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_romfs_fs(void)
 {

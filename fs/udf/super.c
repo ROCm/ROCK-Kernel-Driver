@@ -76,7 +76,7 @@
 static char error_buf[1024];
 
 /* These are the "meat" - everything else is stuffing */
-static struct super_block *udf_read_super(struct super_block *, void *, int);
+static int udf_fill_super(struct super_block *, void *, int);
 static void udf_put_super(struct super_block *);
 static void udf_write_super(struct super_block *);
 static int udf_remount_fs(struct super_block *, int *, char *);
@@ -96,7 +96,18 @@ static unsigned int udf_count_free(struct super_block *);
 static int udf_statfs(struct super_block *, struct statfs *);
 
 /* UDF filesystem type */
-static DECLARE_FSTYPE_DEV(udf_fstype, "udf", udf_read_super);
+static struct super_block *udf_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, udf_fill_super);
+}
+
+static struct file_system_type udf_fstype = {
+	owner:		THIS_MODULE,
+	name:		"udf",
+	get_sb:		udf_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static kmem_cache_t * udf_inode_cachep;
 
@@ -1387,8 +1398,7 @@ static void udf_close_lvid(struct super_block *sb)
  *	July 1, 1997 - Andrew E. Mileski
  *	Written, tested, and released.
  */
-static struct super_block *
-udf_read_super(struct super_block *sb, void *options, int silent)
+static int udf_fill_super(struct super_block *sb, void *options, int silent)
 {
 	int i;
 	struct inode *inode=NULL;
@@ -1545,7 +1555,7 @@ udf_read_super(struct super_block *sb, void *options, int silent)
 		goto error_out;
 	}
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
-	return sb;
+	return 0;
 
 error_out:
 	if (UDF_SB_VAT(sb))
@@ -1588,7 +1598,7 @@ error_out:
 		udf_close_lvid(sb);
 	udf_release_data(UDF_SB_LVIDBH(sb));
 	UDF_SB_FREE(sb);
-	return NULL;
+	return -EINVAL;
 }
 
 void udf_error(struct super_block *sb, const char *function,

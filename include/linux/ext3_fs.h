@@ -671,7 +671,6 @@ extern void ext3_write_super (struct super_block *);
 extern void ext3_write_super_lockfs (struct super_block *);
 extern void ext3_unlockfs (struct super_block *);
 extern int ext3_remount (struct super_block *, int *, char *);
-extern struct super_block * ext3_read_super (struct super_block *,void *,int);
 extern int ext3_statfs (struct super_block *, struct statfs *);
 
 #define ext3_std_error(sb, errno)				\

@@ -119,7 +119,6 @@ static void qnx4_write_inode(struct inode *inode, int unused)
 
 #endif
 
-static struct super_block *qnx4_read_super(struct super_block *, void *, int);
 static void qnx4_put_super(struct super_block *sb);
 static struct inode *qnx4_alloc_inode(struct super_block *sb);
 static void qnx4_destroy_inode(struct inode *inode);
@@ -337,8 +336,7 @@ static const char *qnx4_checkroot(struct super_block *sb)
 	return NULL;
 }
 
-static struct super_block *qnx4_read_super(struct super_block *s,
-					   void *data, int silent)
+static int qnx4_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct buffer_head *bh;
 	struct inode *root;
@@ -396,7 +394,7 @@ static struct super_block *qnx4_read_super(struct super_block *s,
 
 	brelse(bh);
 
-	return s;
+	return 0;
 
       outi:
 	iput(root);
@@ -404,7 +402,7 @@ static struct super_block *qnx4_read_super(struct super_block *s,
 	brelse(bh);
       outnobh:
 
-	return NULL;
+	return -EINVAL;
 }
 
 static void qnx4_put_super(struct super_block *sb)
@@ -541,7 +539,18 @@ static void destroy_inodecache(void)
 		       "qnx4_inode_cache: not all structures were freed\n");
 }
 
-static DECLARE_FSTYPE_DEV(qnx4_fs_type, "qnx4", qnx4_read_super);
+static struct super_block *qnx4_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, qnx4_fill_super);
+}
+
+static struct file_system_type qnx4_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"qnx4",
+	get_sb:		qnx4_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_qnx4_fs(void)
 {

@@ -934,8 +934,7 @@ static loff_t ext3_max_size(int bits)
 	return res;
 }
 
-struct super_block * ext3_read_super (struct super_block * sb, void * data,
-				      int silent)
+static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 {
 	struct buffer_head * bh;
 	struct ext3_super_block *es = 0;
@@ -1054,7 +1053,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		if (!bh) {
 			printk(KERN_ERR 
 			       "EXT3-fs: Can't read superblock on 2nd try.\n");
-			return NULL;
+			return -EINVAL;
 		}
 		es = (struct ext3_super_block *)(((char *)bh->b_data) + offset);
 		sbi->s_es = es;
@@ -1252,7 +1251,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		test_opt(sb,DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA ? "ordered":
 		"writeback");
 
-	return sb;
+	return 0;
 
 failed_mount3:
 	journal_destroy(sbi->s_journal);
@@ -1264,7 +1263,7 @@ failed_mount:
 	ext3_blkdev_remove(sbi);
 	brelse(bh);
 out_fail:
-	return NULL;
+	return -EINVAL;
 }
 
 static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
@@ -1769,7 +1768,18 @@ int ext3_statfs (struct super_block * sb, struct statfs * buf)
 	return 0;
 }
 
-static DECLARE_FSTYPE_DEV(ext3_fs_type, "ext3", ext3_read_super);
+static struct super_block *ext3_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, ext3_fill_super);
+}
+
+static struct file_system_type ext3_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"ext3",
+	get_sb:		ext3_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_ext3_fs(void)
 {

@@ -1050,8 +1050,7 @@ not_ntfs:
  *
  * NOTE : A context switch can happen in kernel code only if the code blocks
  * (= calls schedule() in kernel/sched.c). */
-struct super_block *ntfs_read_super(struct super_block *sb, void *options,
-		int silent)
+static int ntfs_fill_super(struct super_block *sb, void *options, int silent)
 {
 	ntfs_volume *vol;
 	struct buffer_head *bh;
@@ -1142,19 +1141,28 @@ struct super_block *ntfs_read_super(struct super_block *sb, void *options,
 		ntfs_error("Could not get root dir inode\n");
 		goto ntfs_read_super_mft;
 	}
-ntfs_read_super_ret:
-	ntfs_debug(DEBUG_OTHER, "read_super: done\n");
-	return sb;
+	return 0;
 ntfs_read_super_mft:
 	ntfs_free(vol->mft);
 ntfs_read_super_unl:
 ntfs_read_super_vol:
-	sb = NULL;
-	goto ntfs_read_super_ret;
+	ntfs_debug(DEBUG_OTHER, "read_super: done\n");
+	return -EINVAL;
 }
 
 /* Define the filesystem */
-static DECLARE_FSTYPE_DEV(ntfs_fs_type, "ntfs", ntfs_read_super);
+static struct super_block *ntfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, ntfs_fill_super);
+}
+
+static struct file_system_type ntfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"ntfs",
+	get_sb:		ntfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_ntfs_fs(void)
 {

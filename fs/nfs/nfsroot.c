@@ -453,7 +453,7 @@ static int __init root_nfs_get_handle(void)
 
 /*
  *  Get the NFS port numbers and file handle, and return the prepared 'data'
- *  argument for ->read_super() if everything went OK. Return NULL otherwise.
+ *  argument for mount() if everything went OK. Return NULL otherwise.
  */
 void * __init nfs_root_data(void)
 {

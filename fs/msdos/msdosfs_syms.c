@@ -25,7 +25,18 @@ EXPORT_SYMBOL(msdos_rmdir);
 EXPORT_SYMBOL(msdos_unlink);
 EXPORT_SYMBOL(msdos_put_super);
 
-static DECLARE_FSTYPE_DEV(msdos_fs_type, "msdos", msdos_read_super);
+static struct super_block *msdos_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, msdos_fill_super);
+}
+
+static struct file_system_type msdos_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"msdos",
+	get_sb:		msdos_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_msdos_fs(void)
 {

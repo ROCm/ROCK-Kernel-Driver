@@ -579,21 +579,21 @@ struct inode_operations msdos_dir_inode_operations = {
 	setattr:	fat_notify_change,
 };
 
-struct super_block *msdos_read_super(struct super_block *sb,void *data, int silent)
+int msdos_fill_super(struct super_block *sb,void *data, int silent)
 {
 	struct super_block *res;
 
 	MSDOS_SB(sb)->options.isvfat = 0;
 	res = fat_read_super(sb, data, silent, &msdos_dir_inode_operations);
 	if (IS_ERR(res))
-		return NULL;
+		return PTR_ERR(res);
 	if (res == NULL) {
 		if (!silent)
 			printk(KERN_INFO "VFS: Can't find a valid"
 			       " MSDOS filesystem on dev %s.\n", sb->s_id);
-		return NULL;
+		return -EINVAL;
 	}
 
 	sb->s_root->d_op = &msdos_dentry_operations;
-	return res;
+	return 0;
 }

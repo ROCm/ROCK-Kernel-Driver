@@ -195,7 +195,7 @@ static int jffs2_statfs(struct super_block *sb, struct statfs *buf)
 	return 0;
 }
 
-static struct super_block *jffs2_read_super(struct super_block *sb, void *data, int silent)
+static int jffs2_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct jffs2_sb_info *c;
 	struct inode *root_i;
@@ -206,7 +206,7 @@ static struct super_block *jffs2_read_super(struct super_block *sb, void *data, 
 	if (major(sb->s_dev) != MTD_BLOCK_MAJOR) {
 		if (!silent)
 			printk(KERN_DEBUG "jffs2: attempt to mount non-MTD device %s\n", kdevname(sb->s_dev));
-		return NULL;
+		return -EINVAL;
 	}
 
 	c = JFFS2_SB_INFO(sb);
@@ -215,7 +215,7 @@ static struct super_block *jffs2_read_super(struct super_block *sb, void *data, 
 	c->mtd = get_mtd_device(NULL, minor(sb->s_dev));
 	if (!c->mtd) {
 		D1(printk(KERN_DEBUG "jffs2: MTD device #%u doesn't appear to exist\n", MINOR(sb->s_dev)));
-		return NULL;
+		return -EINVAL;
 	}
 	c->sector_size = c->mtd->erasesize;
 	c->free_size = c->flash_size = c->mtd->size;
@@ -275,7 +275,7 @@ static struct super_block *jffs2_read_super(struct super_block *sb, void *data, 
 	sb->s_magic = JFFS2_SUPER_MAGIC;
 	if (!(sb->s_flags & MS_RDONLY))
 		jffs2_start_garbage_collect_thread(c);
-	return sb;
+	return 0;
 
  out_root_i:
 	iput(root_i);
@@ -285,7 +285,7 @@ static struct super_block *jffs2_read_super(struct super_block *sb, void *data, 
 	kfree(c->blocks);
  out_mtd:
 	put_mtd_device(c->mtd);
-	return NULL;
+	return -EINVAL;
 }
 
 void jffs2_put_super (struct super_block *sb)
@@ -340,8 +340,18 @@ void jffs2_write_super (struct super_block *sb)
 	jffs2_mark_erased_blocks(c);
 }
 
+static struct super_block *jffs2_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, jffs2_fill_super);
+}
 
-static DECLARE_FSTYPE_DEV(jffs2_fs_type, "jffs2", jffs2_read_super);
+static struct file_system_type jffs2_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"jffs2",
+	get_sb:		jffs2_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_jffs2_fs(void)
 {

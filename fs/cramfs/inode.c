@@ -188,12 +188,11 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 }
 			
 
-static struct super_block * cramfs_read_super(struct super_block *sb, void *data, int silent)
+static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	int i;
 	struct cramfs_super super;
 	unsigned long root_offset;
-	struct super_block * retval = NULL;
 
 	sb_set_blocksize(sb, PAGE_CACHE_SIZE);
 
@@ -252,9 +251,9 @@ static struct super_block * cramfs_read_super(struct super_block *sb, void *data
 	/* Set it all up.. */
 	sb->s_op = &cramfs_ops;
 	sb->s_root = d_alloc_root(get_cramfs_inode(sb, &super.root));
-	retval = sb;
+	return 0;
 out:
-	return retval;
+	return -EINVAL;
 }
 
 static int cramfs_statfs(struct super_block *sb, struct statfs *buf)
@@ -442,7 +441,18 @@ static struct super_operations cramfs_ops = {
 	statfs:		cramfs_statfs,
 };
 
-static DECLARE_FSTYPE_DEV(cramfs_fs_type, "cramfs", cramfs_read_super);
+static struct super_block *cramfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, cramfs_fill_super);
+}
+
+static struct file_system_type cramfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"cramfs",
+	get_sb:		cramfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_cramfs_fs(void)
 {

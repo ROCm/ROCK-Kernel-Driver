@@ -330,8 +330,7 @@ extern int msdos_mkdir(struct inode *dir, struct dentry *dentry, int mode);
 extern int msdos_unlink(struct inode *dir, struct dentry *dentry);
 extern int msdos_rename(struct inode *old_dir, struct dentry *old_dentry,
 			struct inode *new_dir, struct dentry *new_dentry);
-extern struct super_block *msdos_read_super(struct super_block *sb,
-					    void *data, int silent);
+extern int msdos_fill_super(struct super_block *sb, void *data, int silent);
 
 /* vfat/namei.c - these are for dmsdos */
 extern struct dentry *vfat_lookup(struct inode *dir, struct dentry *);
@@ -341,8 +340,7 @@ extern int vfat_unlink(struct inode *dir, struct dentry *dentry);
 extern int vfat_mkdir(struct inode *dir, struct dentry *dentry, int mode);
 extern int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 		       struct inode *new_dir, struct dentry *new_dentry);
-extern struct super_block *vfat_read_super(struct super_block *sb, void *data,
-					   int silent);
+extern int vfat_fill_super(struct super_block *sb, void *data, int silent);
 
 /* vfat/vfatfs_syms.c */
 extern struct file_system_type vfat_fs_type;

@@ -95,7 +95,18 @@ static struct super_operations hfs_super_operations = {
 
 /*================ File-local variables ================*/
 
-static DECLARE_FSTYPE_DEV(hfs_fs, "hfs", hfs_read_super);
+static struct super_block *hfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, hfs_fill_super);
+}
+
+static struct file_system_type hfs_fs = {
+	owner:		THIS_MODULE,
+	name:		"hfs",
+	get_sb:		hfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 /*================ File-local functions ================*/
 
@@ -429,8 +440,7 @@ done:
  * hfs_btree_init() to get the necessary data about the extents and
  * catalog B-trees and, finally, reading the root inode into memory.
  */
-struct super_block *hfs_read_super(struct super_block *s, void *data,
-				   int silent)
+int hfs_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct hfs_mdb *mdb;
 	struct hfs_cat_key key;
@@ -501,7 +511,7 @@ struct super_block *hfs_read_super(struct super_block *s, void *data,
 	s->s_root->d_op = &hfs_dentry_operations;
 
 	/* everything's okay */
-	return s;
+	return 0;
 
 bail_no_root: 
 	hfs_warn("hfs_fs: get root inode failed.\n");
@@ -511,7 +521,7 @@ bail1:
 bail2:
 	set_blocksize(dev, BLOCK_SIZE);
 bail3:
-	return NULL;	
+	return -EINVAL;	
 }
 
 static int __init init_hfs_fs(void)
