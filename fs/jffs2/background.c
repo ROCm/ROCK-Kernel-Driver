@@ -19,6 +19,7 @@
 #include <linux/completion.h>
 #include <linux/sched.h>
 #include <linux/unistd.h>
+#include <linux/suspend.h>
 #include "nodelist.h"
 
 
@@ -75,6 +76,9 @@ static int jffs2_garbage_collect_thread(void *_c)
 	struct jffs2_sb_info *c = _c;
 
 	daemonize("jffs2_gcd_mtd%d", c->mtd->index);
+	allow_signal(SIGKILL);
+	allow_signal(SIGSTOP);
+	allow_signal(SIGCONT);
 
 	c->gc_task = current;
 	up(&c->gc_thread_start);
@@ -82,10 +86,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 	set_user_nice(current, 10);
 
 	for (;;) {
-		spin_lock_irq(&current_sig_lock);
-		siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
-		recalc_sigpending();
-		spin_unlock_irq(&current_sig_lock);
+		allow_signal(SIGHUP);
 
 		if (!thread_should_wake(c)) {
 			set_current_state (TASK_INTERRUPTIBLE);
@@ -97,6 +98,13 @@ static int jffs2_garbage_collect_thread(void *_c)
 			schedule();
 		}
 
+		if (current->flags & PF_FREEZE) {
+			refrigerator(0);
+			/* refrigerator() should recalc sigpending for us
+			   but doesn't. No matter - allow_signal() will. */
+			continue;
+		}
+
 		cond_resched();
 
 		/* Put_super will send a SIGKILL and then wait on the sem. 
@@ -105,9 +113,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 			siginfo_t info;
 			unsigned long signr;
 
-			spin_lock_irq(&current_sig_lock);
-			signr = dequeue_signal(current, &current->blocked, &info);
-			spin_unlock_irq(&current_sig_lock);
+			signr = dequeue_signal_lock(current, &current->blocked, &info);
 
 			switch(signr) {
 			case SIGSTOP:
@@ -132,10 +138,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 			}
 		}
 		/* We don't want SIGHUP to interrupt us. STOP and KILL are OK though. */
-		spin_lock_irq(&current_sig_lock);
-		siginitsetinv (&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
-		recalc_sigpending();
-		spin_unlock_irq(&current_sig_lock);
+		disallow_signal(SIGHUP);
 
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): pass\n"));
 		if (jffs2_garbage_collect_pass(c) == -ENOSPC) {

@@ -576,6 +576,19 @@ extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *, int force_default);
 extern int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info);
+
+static inline int dequeue_signal_lock(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&tsk->sighand->siglock, flags);
+	ret = dequeue_signal(tsk, mask, info);
+	spin_unlock_irqrestore(&tsk->sighand->siglock, flags);
+
+	return ret;
+}	
+
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
@@ -673,6 +686,7 @@ extern NORET_TYPE void do_group_exit(int);
 extern void reparent_to_init(void);
 extern void daemonize(const char *, ...);
 extern int allow_signal(int);
+extern int disallow_signal(int);
 extern task_t *child_reaper;
 
 extern int do_execve(char *, char __user * __user *, char __user * __user *, struct pt_regs *);
