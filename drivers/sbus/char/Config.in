@@ -14,7 +14,7 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    tristate 'Videopix Frame Grabber (EXPERIMENTAL)' CONFIG_SUN_VIDEOPIX
    tristate 'Aurora Multiboard 1600se (EXPERIMENTAL)' CONFIG_SUN_AURORA
 
-   if [ "$ARCH" = "sparc" ]; then
+   if [ "$CONFIG_SPARC32" = "y" ]; then
       tristate 'Tadpole TS102 Microcontroller support (EXPERIMENTAL)' CONFIG_TADPOLE_TS102_UCTRL
 
       tristate 'JavaStation OS Flash SIMM (EXPERIMENTAL)' CONFIG_SUN_JSFLASH
