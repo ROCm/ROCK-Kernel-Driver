@@ -998,10 +998,7 @@ static int atalk_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 
 	if (sk) {
-		if (!sock_flag(sk, SOCK_DEAD)) {
-			sk->sk_state_change(sk);
-			sock_set_flag(sk, SOCK_DEAD);
-		}
+		sock_orphan(sk);
 		sock->sk = NULL;
 		atalk_destroy_socket(sk);
 	}
