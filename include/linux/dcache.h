@@ -5,6 +5,8 @@
 
 #include <asm/atomic.h>
 #include <linux/mount.h>
+#include <linux/list.h>
+#include <linux/spinlock.h>
 #include <asm/page.h>			/* for BUG() */
 
 /*

@@ -23,6 +23,8 @@
 #include <linux/time.h>
 #include <linux/string.h>
 #include <linux/wait.h>
+#include <linux/dcache.h>
+#include <linux/namei.h>
 #include <asm/uaccess.h>
 
 #ifdef DEBUG
