@@ -251,7 +251,7 @@ void *switch_to(void *prev, void *next, void *last)
 
 	reading = 1;
 	if((from->state == TASK_ZOMBIE) || (from->state == TASK_DEAD))
-		os_kill_process(os_getpid());
+		os_kill_process(os_getpid(), 0);
 
 	err = os_read_file(from->thread.switch_pipe[0], &c, sizeof(c));
 	if(err != sizeof(c))
@@ -295,7 +295,7 @@ void interrupt_end(void)
 
 void release_thread(struct task_struct *task)
 {
-	os_kill_process(task->thread.extern_pid);
+	os_kill_process(task->thread.extern_pid, 0);
 }
 
 void exit_thread(void)

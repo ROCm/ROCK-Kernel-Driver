@@ -102,15 +102,6 @@ int get_signals(void)
 	return(enable_mask(&mask));
 }
 
-int get_signals(void)
-{
-	sigset_t mask;
-	
-	if(sigprocmask(SIG_SETMASK, NULL, &mask) < 0)
-		panic("Failed to get signal mask");
-	return(enable_mask(&mask));
-}
-
 int set_signals(int enable)
 {
 	sigset_t mask;

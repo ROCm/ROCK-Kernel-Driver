@@ -18,7 +18,7 @@ static void kill_idlers(int me)
 	for(i = 0; i < sizeof(idle_threads)/sizeof(idle_threads[0]); i++){
 		p = idle_threads[i];
 		if((p != NULL) && (p->thread.extern_pid != me))
-			os_kill_process(p->thread.extern_pid);
+			os_kill_process(p->thread.extern_pid, 0);
 	}
 }
 #endif
@@ -31,10 +31,10 @@ static void kill_off_processes(void)
 	me = os_getpid();
 	for_each_process(p){
 		if(p->thread.extern_pid != me) 
-			os_kill_process(p->thread.extern_pid);
+			os_kill_process(p->thread.extern_pid, 0);
 	}
 	if(init_task.thread.extern_pid != me) 
-		os_kill_process(init_task.thread.extern_pid);
+		os_kill_process(init_task.thread.extern_pid, 0);
 #ifdef CONFIG_SMP
 	kill_idlers(me);
 #endif
@@ -51,7 +51,7 @@ void machine_restart(char * __unused)
 	do_uml_exitcalls();
 	kill_off_processes();
 	tracing_reboot();
-	os_kill_process(os_getpid());
+	os_kill_process(os_getpid(), 0);
 }
 
 void machine_power_off(void)
@@ -59,7 +59,7 @@ void machine_power_off(void)
 	do_uml_exitcalls();
 	kill_off_processes();
 	tracing_halt();
-	os_kill_process(os_getpid());
+	os_kill_process(os_getpid(), 0);
 }
 
 void machine_halt(void)

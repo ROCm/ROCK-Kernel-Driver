@@ -31,7 +31,9 @@ core-y			+= $(ARCH_DIR)/kernel/		 \
 			   $(ARCH_DIR)/drivers/          \
 			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
-ARCH_INCLUDE = $(TOPDIR)/$(ARCH_DIR)/include
+ARCH_INCLUDE = $(ARCH_DIR)/include
+MODE_INCLUDE = -I$(ARCH_DIR)/kernel/tt/include \
+	-I$(ARCH_DIR)/kernel/skas/include
 
 # -Derrno=kernel_errno - This turns all kernel references to errno into
 # kernel_errno to separate them from the libc errno.  This allows -fno-common
@@ -39,7 +41,8 @@ ARCH_INCLUDE = $(TOPDIR)/$(ARCH_DIR)/include
 # errnos.
 
 CFLAGS += $(DEBUG) $(PROFILE) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
-	-D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) -Derrno=kernel_errno
+	-D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) -Derrno=kernel_errno \
+	$(MODE_INCLUDE)
 
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
@@ -79,7 +82,8 @@ linux: arch/um/uml.lds.s vmlinux
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
-USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) -I$(ARCH_INCLUDE)
+USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) -I$(ARCH_INCLUDE) \
+	$(MODE_INCLUDE)
 
 # To get a definition of F_SETSIG
 USER_CFLAGS += -D_GNU_SOURCE
