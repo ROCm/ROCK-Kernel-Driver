@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-iop80310/timex.h
+ * linux/include/asm-arm/arch-iop3xx/timex.h
  *
  * IOP310 architecture timex specifications
  */
