@@ -62,7 +62,7 @@ unsigned long coda_timeout = 30; /* .. secs, then signals will dequeue */
 
 
 struct venus_comm coda_comms[MAX_CODADEVS];
-static struct class_simple coda_psdev_class;
+static struct class_simple *coda_psdev_class;
 
 /*
  * Device operations
