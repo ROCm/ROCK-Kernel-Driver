@@ -63,10 +63,6 @@ unsigned char keyboard_type = KB_101;
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
 #endif
 
-unsigned int video_font_height;
-unsigned int default_font_height;
-unsigned int video_scan_lines;
-
 /*
  * these are the valid i/o ports we're allowed to change. they map all the
  * video ports
@@ -372,13 +368,14 @@ do_unimap_ioctl(int cmd, struct unimapdesc *user_ud,int perm)
 int vt_ioctl(struct tty_struct *tty, struct file * file,
 	     unsigned int cmd, unsigned long arg)
 {
-	int i, perm;
+	struct vt_struct *vt = (struct vt_struct *)tty->driver_data;
+	struct vc_data *vc = vc_cons[vt->vc_num].d;
+	struct console_font_op op;	/* used in multiple places here */
+	struct kbd_struct * kbd;
 	unsigned int console;
 	unsigned char ucval;
-	struct kbd_struct * kbd;
-	struct vt_struct *vt = (struct vt_struct *)tty->driver_data;
-	struct console_font_op op;	/* used in multiple places here */
-
+	int i, perm;
+	
 	console = vt->vc_num;
 
 	if (!vc_cons_allocated(console)) 	/* impossible? */
@@ -853,7 +850,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		__get_user(clin, &vtconsize->v_clin);
 		__get_user(vcol, &vtconsize->v_vcol);
 		__get_user(ccol, &vtconsize->v_ccol);
-		vlin = vlin ? vlin : video_scan_lines;
+		vlin = vlin ? vlin : vc->vc_scan_lines;
 		if (clin) {
 			if (ll) {
 				if (ll != vlin/clin)
@@ -873,9 +870,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 			return -EINVAL;
 		    
 		if (vlin)
-			video_scan_lines = vlin;
+			vc->vc_scan_lines = vlin;
 		if (clin)
-			video_font_height = clin;
+			vc->vc_font.height = clin;
 	
 		for (i = 0; i < MAX_NR_CONSOLES; i++)
 			vc_resize(i, cc, ll);

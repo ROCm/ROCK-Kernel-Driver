@@ -792,6 +792,7 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 		memset(&ws, 0, sizeof(ws));
 		ws.ws_row = video_num_lines;
 		ws.ws_col = video_num_columns;
+		ws.ws_ypixel = video_scan_lines;
 		if ((ws.ws_row != cws->ws_row || ws.ws_col != cws->ws_col) &&
 		    vc_cons[currcons].d->vc_tty->pgrp > 0)
 			kill_pg(vc_cons[currcons].d->vc_tty->pgrp, SIGWINCH, 1);

@@ -52,7 +52,6 @@
 #include <linux/interrupt.h>
 #include <linux/fb.h>
 #include <linux/init.h>
-#include <linux/console.h>
 #include <linux/ioport.h>
 
 #include <asm/uaccess.h>

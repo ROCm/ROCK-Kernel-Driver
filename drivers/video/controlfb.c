@@ -43,7 +43,6 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/fb.h>
-#include <linux/selection.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/nvram.h>
@@ -162,7 +161,6 @@ static void control_cleanup(void);
 
 static struct fb_info_control *control_fb;
 
-static char fontname[40] __initdata = { 0 };
 static int default_vmode __initdata = VMODE_NVRAM;
 static int default_cmode __initdata = CMODE_NVRAM;
 
@@ -178,6 +176,7 @@ static struct fb_ops controlfb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= soft_cursor,
 };
 
 

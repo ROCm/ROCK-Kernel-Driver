@@ -29,7 +29,6 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/fb.h>
-#include <linux/selection.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/nvram.h>
@@ -37,15 +36,8 @@
 #include <asm/prom.h>
 #include <asm/pgtable.h>
 
-#include <video/fbcon.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb16.h>
-#include <video/fbcon-cfb32.h>
-#include <video/macmodes.h>
-
 #include "platinumfb.h"
-
-static char fontname[40] __initdata = { 0 };
+#include "macmodes.h"
 
 static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
@@ -59,7 +51,6 @@ struct fb_par_platinum {
 
 struct fb_info_platinum {
 	struct fb_info			info;
-	struct display			display; /* Will disappear */
 	struct fb_par_platinum		par;
 
 	struct {
@@ -118,16 +109,14 @@ int platinum_setup(char*);
 
 static struct fb_ops platinumfb_ops = {
 	.owner =	THIS_MODULE,
-	.fb_set_var	= gen_set_var,
 	.fb_check_var	= platinumfb_check_var,
 	.fb_set_par	= platinumfb_set_par,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= platinumfb_setcolreg,
 	.fb_blank	= platinumfb_blank,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= soft_cursor,
 };
 
 /*
@@ -338,22 +327,12 @@ static void platinum_set_hardware(struct fb_info_platinum *info, const struct fb
 static void __init platinum_init_info(struct fb_info *info, struct fb_info_platinum *p)
 {
 	/* Fill fb_info */
-	strcpy(info->modename, "platinum");
-	info->currcon = -1;
 	info->par = &p->par;
 	info->node = NODEV;
 	info->fbops = &platinumfb_ops;
-	info->disp = &p->display;
 	info->pseudo_palette = p->pseudo_palette;
         info->flags = FBINFO_FLAG_DEFAULT;
-        strncpy (info->fontname, fontname, sizeof (info->fontname));
-        info->fontname[sizeof (info->fontname) - 1] = 0;
-	info->changevar = NULL;
-        info->display_fg = NULL;
 	info->screen_base = (char *) p->frame_buffer + 0x20;
-	info->changevar  = NULL;
-	info->switch_con = gen_switch;
-	info->updatevar  = gen_update_var;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
 

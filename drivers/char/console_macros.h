@@ -1,4 +1,5 @@
 #define cons_num	(vc_cons[currcons].d->vc_num)
+#define video_scan_lines (vc_cons[currcons].d->vc_scan_lines)
 #define sw		(vc_cons[currcons].d->vc_sw)
 #define screenbuf	(vc_cons[currcons].d->vc_screenbuf)
 #define screenbuf_size	(vc_cons[currcons].d->vc_screenbuf_size)
