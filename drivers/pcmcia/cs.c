@@ -449,6 +449,7 @@ static void shutdown_socket(struct pcmcia_socket *s)
     s->state &= SOCKET_PRESENT|SOCKET_INUSE;
     s->socket = dead_socket;
     s->ops->init(s);
+    s->ops->set_socket(s, &s->socket);
     s->irq.AssignedIRQ = s->irq.Config = 0;
     s->lock_count = 0;
     destroy_cis_cache(s);
@@ -456,15 +457,6 @@ static void shutdown_socket(struct pcmcia_socket *s)
 	kfree(s->fake_cis);
 	s->fake_cis = NULL;
     }
-    /* Should not the socket be forced quiet as well?  e.g. turn off Vcc */
-    /* Without these changes, the socket is left hot, even though card-services */
-    /* realizes that no card is in place. */
-    s->socket.flags &= ~SS_OUTPUT_ENA;
-    s->socket.Vpp = 0;
-    s->socket.Vcc = 0;
-    s->socket.io_irq = 0;
-    s->ops->set_socket(s, &s->socket);
-    /* */
 #ifdef CONFIG_CARDBUS
     cb_free(s);
 #endif
@@ -484,6 +476,14 @@ static void shutdown_socket(struct pcmcia_socket *s)
     }
     free_regions(&s->a_region);
     free_regions(&s->c_region);
+
+    {
+	int status;
+	skt->ops->get_status(skt, &status);
+	if (status & SS_POWERON) {
+		printk(KERN_ERR "PCMCIA: socket %p: *** DANGER *** unable to remove socket power\n", skt);
+	}
+    }
 } /* shutdown_socket */
 
 /*======================================================================
@@ -638,6 +638,12 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(cs_to_timeout(vcc_settle));
 
+	skt->ops->get_status(skt, &status);
+	if (!(status & SS_POWERON)) {
+		pcmcia_error(skt, "unable to apply power.\n");
+		return CS_BAD_TYPE;
+	}
+
 	return socket_reset(skt);
 }
 
@@ -697,6 +703,7 @@ static int socket_resume(struct pcmcia_socket *skt)
 
 	skt->socket = dead_socket;
 	skt->ops->init(skt);
+	skt->ops->set_socket(skt, &skt->socket);
 
 	ret = socket_setup(skt, resume_delay);
 	if (ret == CS_SUCCESS) {
@@ -769,6 +776,7 @@ static int pccardd(void *__skt)
 
 	skt->socket = dead_socket;
 	skt->ops->init(skt);
+	skt->ops->set_socket(skt, &skt->socket);
 
 	/* register with the device core */
 	ret = class_device_register(&skt->dev);

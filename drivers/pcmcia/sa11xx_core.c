@@ -232,8 +232,6 @@ static int sa1100_pcmcia_sock_init(struct pcmcia_socket *sock)
 	DEBUG(2, "%s(): initializing socket %u\n", __FUNCTION__, skt->nr);
 
 	skt->ops->socket_init(skt);
-	sa1100_pcmcia_config_skt(skt, &dead_socket);
-
 	return 0;
 }
 
