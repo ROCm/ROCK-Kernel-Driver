@@ -311,21 +311,6 @@ static void inline do_trap(int trapnr, int signr, char *str, int vm86,
 	if (vm86 && regs->eflags & VM_MASK)
 		goto vm86_trap;
 
-#ifdef CONFIG_PNPBIOS		
-	if (regs->xcs == 0x60 || regs->xcs == 0x68)
-	{
-		extern u32 pnp_bios_fault_eip, pnp_bios_fault_esp;
-		extern u32 pnp_bios_is_utter_crap;
-		pnp_bios_is_utter_crap = 1;
-		printk(KERN_CRIT "PNPBIOS fault.. attempting recovery.\n");
-		__asm__ volatile(
-			"movl %0, %%esp\n\t"
-			"jmp *%1\n\t"
-			: "=a" (pnp_bios_fault_esp), "=b" (pnp_bios_fault_eip));
-		panic("do_trap: can't hit this");
-	}
-#endif	
-
 	if (!(regs->xcs & 3))
 		goto kernel_trap;
 
@@ -341,7 +326,23 @@ static void inline do_trap(int trapnr, int signr, char *str, int vm86,
 	}
 
 	kernel_trap: {
-		unsigned long fixup = search_exception_table(regs->eip);
+		unsigned long fixup;
+#ifdef CONFIG_PNPBIOS
+		if (unlikely((regs->xcs | 8) == 0x88)) /* 0x80 or 0x88 */
+		{
+			extern u32 pnp_bios_fault_eip, pnp_bios_fault_esp;
+			extern u32 pnp_bios_is_utter_crap;
+			pnp_bios_is_utter_crap = 1;
+			printk(KERN_CRIT "PNPBIOS fault.. attempting recovery.\n");
+			__asm__ volatile(
+				"movl %0, %%esp\n\t"
+				"jmp *%1\n\t"
+				: "=a" (pnp_bios_fault_esp), "=b" (pnp_bios_fault_eip));
+			panic("do_trap: can't hit this");
+		}
+#endif	
+		
+		fixup = search_exception_table(regs->eip);
 		if (fixup)
 			regs->eip = fixup;
 		else	
