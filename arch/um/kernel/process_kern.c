@@ -16,6 +16,7 @@
 #include "linux/module.h"
 #include "linux/init.h"
 #include "linux/capability.h"
+#include "linux/vmalloc.h"
 #include "linux/spinlock.h"
 #include "asm/unistd.h"
 #include "asm/mman.h"
@@ -299,6 +300,11 @@ void *um_kmalloc(int size)
 void *um_kmalloc_atomic(int size)
 {
 	return(kmalloc(size, GFP_ATOMIC));
+}
+
+void *um_vmalloc(int size)
+{
+	return(vmalloc(size));
 }
 
 unsigned long get_fault_addr(void)
