@@ -24,7 +24,7 @@
 #define MISC_MCELOG_MINOR 227
 #define NR_BANKS 5
 
-static int mce_disabled __initdata;
+static int mce_disabled;
 /* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic,
    3: never panic or exit (for testing only) */ 
 static int tolerant = 1;
