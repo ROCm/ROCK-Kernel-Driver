@@ -123,7 +123,7 @@ MODULE_PARM_DESC(osrun_time, "how many seconds to wait for the ICS2115 OS");
 #else
 #define DPRINT(cond, args...) \
        if ((dev->debug & (cond)) == (cond)) { \
-	     snd_printk (##args); \
+	     snd_printk (args); \
        }
 #endif
 #else
