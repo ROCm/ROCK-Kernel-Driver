@@ -83,21 +83,45 @@ static int sysctl_speed_limit_max = 200000;
 static struct ctl_table_header *raid_table_header;
 
 static ctl_table raid_table[] = {
-	{DEV_RAID_SPEED_LIMIT_MIN, "speed_limit_min",
-	 &sysctl_speed_limit_min, sizeof(int), 0644, NULL, &proc_dointvec},
-	{DEV_RAID_SPEED_LIMIT_MAX, "speed_limit_max",
-	 &sysctl_speed_limit_max, sizeof(int), 0644, NULL, &proc_dointvec},
-	{0}
+	{
+		.ctl_name	= DEV_RAID_SPEED_LIMIT_MIN,
+		.procname	= "speed_limit_min",
+		.data		= &sysctl_speed_limit_min,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= DEV_RAID_SPEED_LIMIT_MAX,
+		.procname	= "speed_limit_max",
+		.data		= &sysctl_speed_limit_max,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table raid_dir_table[] = {
-	{DEV_RAID, "raid", NULL, 0, 0555, raid_table},
-	{0}
+	{
+		.ctl_name	= DEV_RAID,
+		.procname	= "raid",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= raid_table,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table raid_root_table[] = {
-	{CTL_DEV, "dev", NULL, 0, 0555, raid_dir_table},
-	{0}
+	{
+		.ctl_name	= CTL_DEV,
+		.procname	= "dev",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.proc_handler	= raid_dir_table,
+	},
+	{ .ctl_name = 0 }
 };
 
 static void md_recover_arrays(void);
