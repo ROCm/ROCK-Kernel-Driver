@@ -695,7 +695,7 @@ struct ethtool_ops ixgb_ethtool_ops = {
 	.get_ethtool_stats = ixgb_get_ethtool_stats,
 };
 
-void set_ethtool_ops(struct net_device *netdev)
+void ixgb_set_ethtool_ops(struct net_device *netdev)
 {
 	SET_ETHTOOL_OPS(netdev, &ixgb_ethtool_ops);
 }
