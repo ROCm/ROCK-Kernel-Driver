@@ -72,7 +72,7 @@ static const char version[] =
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-#include <linux/timer.h>
+#include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
 #include <linux/crc32.h>
@@ -175,6 +175,7 @@ struct smc_local {
 	 * desired memory.  Then, I'll send it out and free it.
 	 */
 	struct sk_buff *saved_skb;
+	struct tasklet_struct tx_task;
 
  	/*
 	 * these are things that the kernel wants me to keep, so users
@@ -526,8 +527,9 @@ done:
  * This is called to actually send a packet to the chip.
  * Returns non-zero when successful.
  */
-static void smc_hardware_send_packet(struct net_device *dev)
+static void smc_hardware_send_pkt(unsigned long data)
 {
+	struct net_device *dev = (struct net_device *)data;
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
 	struct sk_buff *skb = lp->saved_skb;
@@ -542,7 +544,7 @@ static void smc_hardware_send_packet(struct net_device *dev)
 		printk("%s: Memory allocation failed.\n", dev->name);
 		lp->stats.tx_errors++;
 		lp->stats.tx_fifo_errors++;
-		dev_kfree_skb_any(skb);
+		dev_kfree_skb(skb);
 		return;
 	}
 
@@ -568,12 +570,29 @@ static void smc_hardware_send_packet(struct net_device *dev)
 	/* Send final ctl word with the last byte if there is one */
 	SMC_outw(((len & 1) ? (0x2000 | buf[len-1]) : 0), ioaddr, DATA_REG);
 
-	/* and let the chipset deal with it */
+	/*
+	 * If THROTTLE_TX_PKTS is set, we look at the TX_EMPTY flag
+	 * before queueing this packet for TX, and if it's clear then
+	 * we stop the queue here.  This will have the effect of
+	 * having at most 2 packets queued for TX in the chip's memory
+	 * at all time. If THROTTLE_TX_PKTS is not set then the queue
+	 * is stopped only when memory allocation (MC_ALLOC) does not
+	 * succeed right away.
+	 */
+	if (THROTTLE_TX_PKTS && !(SMC_GET_INT() & IM_TX_EMPTY_INT))
+		netif_stop_queue(dev);
+
+	/* queue the packet for TX */
 	SMC_SET_MMU_CMD(MC_ENQUEUE);
 	SMC_ACK_INT(IM_TX_EMPTY_INT);
 
+	if (!THROTTLE_TX_PKTS)
+		netif_wake_queue(dev);
+
+	SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
+
+	dev_kfree_skb(skb);
 	dev->trans_start = jiffies;
-	dev_kfree_skb_any(skb);
 	lp->stats.tx_packets++;
 	lp->stats.tx_bytes += len;
 }
@@ -641,20 +660,8 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		/*
 		 * Allocation succeeded: push packet to the chip's own memory
 		 * immediately.
-		 *
-		 * If THROTTLE_TX_PKTS is selected that means we don't want
-		 * more than a single TX packet taking up space in the chip's
-		 * internal memory at all time, in which case we stop the
-		 * queue right here until we're notified of TX completion.
-		 *
-		 * Otherwise we're quite happy to feed more TX packets right
-		 * away for better TX throughput, in which case the queue is
-		 * left active.
 		 */  
-		if (THROTTLE_TX_PKTS)
-			netif_stop_queue(dev);
-		smc_hardware_send_packet(dev);
-		SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
+		smc_hardware_send_pkt((unsigned long)dev);
 	}
 
 	return 0;
@@ -1192,11 +1199,8 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				netif_wake_queue(dev);
 		} else if (status & IM_ALLOC_INT) {
 			DBG(3, "%s: Allocation irq\n", dev->name);
-			smc_hardware_send_packet(dev);
-			mask |= (IM_TX_INT | IM_TX_EMPTY_INT);
+			tasklet_hi_schedule(&lp->tx_task);
 			mask &= ~IM_ALLOC_INT;
-			if (!THROTTLE_TX_PKTS)
-				netif_wake_queue(dev);
 		} else if (status & IM_TX_EMPTY_INT) {
 			DBG(3, "%s: TX empty\n", dev->name);
 			mask &= ~IM_TX_EMPTY_INT;
@@ -1814,6 +1818,7 @@ static int __init smc_probe(struct net_device *dev, unsigned long ioaddr)
 	dev->ethtool_ops = &smc_ethtool_ops;
 
 	spin_lock_init(&lp->lock);
+	tasklet_init(&lp->tx_task, smc_hardware_send_pkt, (unsigned long)dev);
 	lp->mii.phy_id_mask = 0x1f;
 	lp->mii.reg_num_mask = 0x1f;
 	lp->mii.force_media = 0;
