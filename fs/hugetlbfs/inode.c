@@ -105,6 +105,7 @@ hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
+	unsigned long start_addr;
 
 	if (len & ~HPAGE_MASK)
 		return -EINVAL;
@@ -119,12 +120,25 @@ hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 			return addr;
 	}
 
-	addr = ALIGN(mm->free_area_cache, HPAGE_SIZE);
+	start_addr = mm->free_area_cache;
+
+full_search:
+	addr = ALIGN(start_addr, HPAGE_SIZE);
 
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
-		if (TASK_SIZE - len < addr)
+		if (TASK_SIZE - len < addr) {
+			/*
+			 * Start a new search - just in case we missed
+			 * some holes.
+			 */
+			if (start_addr != TASK_UNMAPPED_BASE) {
+				start_addr = TASK_UNMAPPED_BASE;
+				goto full_search;
+			}
 			return -ENOMEM;
+		}
+
 		if (!vma || addr + len <= vma->vm_start)
 			return addr;
 		addr = ALIGN(vma->vm_end, HPAGE_SIZE);
