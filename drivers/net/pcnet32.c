@@ -237,6 +237,8 @@ static int full_duplex[MAX_UNITS];
  *	   Thomas Munck Steenholdt <tmus@tmus.dk> non-mii ioctl corrections.
  * v1.29   6 Apr 2004 Jim Lewis <jklewis@us.ibm.com> added physical
  *	   identification code (blink led's) and register dump.
+ *	   Don Fry added timer for 971/972 so skbufs don't remain on tx ring
+ *	   forever.
  */
 
 
@@ -497,9 +499,9 @@ static struct pcnet32_access pcnet32_dwio = {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void pcnet32_poll_controller(struct net_device *dev)
 {
-	disable_irq(dev->irq);
-	pcnet32_interrupt(0, dev, NULL);
-	enable_irq(dev->irq);
+    disable_irq(dev->irq);
+    pcnet32_interrupt(0, dev, NULL);
+    enable_irq(dev->irq);
 }
 #endif
 
@@ -842,12 +844,12 @@ static int pcnet32_phys_id(struct net_device *dev, u32 data)
     return 0;
 }
 
-int pcnet32_get_regs_len(struct net_device *dev)
+static int pcnet32_get_regs_len(struct net_device *dev)
 {
     return(PCNET32_NUM_REGS * sizeof(u16));
 }
 
-void pcnet32_get_regs(struct net_device *dev, struct ethtool_regs *regs,
+static void pcnet32_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	void *ptr)
 {
     int i, csr0;
@@ -893,7 +895,7 @@ void pcnet32_get_regs(struct net_device *dev, struct ethtool_regs *regs,
     *buff++ = a->read_csr(ioaddr, 114);
 
     for (i = 0; i <= 35; i++) {
-	*buff++ = a->read_bcr(ioaddr, i);
+	*buff++ = (i == 34) ? 0xdead : a->read_bcr(ioaddr, i); 
     }
 
     if (!(csr0 & 0x0004)) {	/* If not stopped */
@@ -1002,7 +1004,6 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     char *chipname;
     struct net_device *dev;
     struct pcnet32_access *a = NULL;
-    u8 promaddr[6];
     int ret = -ENODEV;
 
     /* reset the chip */
@@ -1104,6 +1105,13 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	ltint = 1;
     }
 
+    if (ltint) {
+	/* Enable timer to prevent skbuffs from remaining on the tx ring
+	 * forever if no other tx being done.  Set timer period to about
+	 * 122 ms */
+	a->write_bcr(ioaddr, 31, 0x253b);
+    }
+
     dev = alloc_etherdev(0);
     if (!dev) {
 	if (pcnet32_debug & NETIF_MSG_PROBE)
@@ -1116,40 +1124,12 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     if (pcnet32_debug & NETIF_MSG_PROBE)
 	printk(KERN_INFO PFX "%s at %#3lx,", chipname, ioaddr);
 
-    /* In most chips, after a chip reset, the ethernet address is read from the
-     * station address PROM at the base address and programmed into the
-     * "Physical Address Registers" CSR12-14.
-     * As a precautionary measure, we read the PROM values and complain if
-     * they disagree with the CSRs.  Either way, we use the CSR values, and
-     * double check that they are valid.
+    /* In early chips, the Physical Address Registers CSR12-14 are undefined.
+     * Later chips initialize the CSR12-14 from the EEPROM.
+     * Either way, we use the PROM values.
      */
-    for (i = 0; i < 3; i++) {
-	unsigned int val;
-	val = a->read_csr(ioaddr, i+12) & 0x0ffff;
-	/* There may be endianness issues here. */
-	dev->dev_addr[2*i] = val & 0x0ff;
-	dev->dev_addr[2*i+1] = (val >> 8) & 0x0ff;
-    }
-
-    /* read PROM address and compare with CSR address */
     for (i = 0; i < 6; i++)
-	promaddr[i] = inb(ioaddr + i);
-
-    if (memcmp(promaddr, dev->dev_addr, 6)
-	|| !is_valid_ether_addr(dev->dev_addr)) {
-#ifndef __powerpc__
-	if (is_valid_ether_addr(promaddr)) {
-#else
-	if (!is_valid_ether_addr(dev->dev_addr)
-	    && is_valid_ether_addr(promaddr)) {
-#endif
-	    if (pcnet32_debug & NETIF_MSG_PROBE) {
-		printk(" warning: CSR address invalid,\n");
-		printk(KERN_INFO "    using instead PROM address of");
-	    }
-	    memcpy(dev->dev_addr, promaddr, 6);
-	}
-    }
+	dev->dev_addr[i] = inb(ioaddr + i);
 
     /* if the ethernet address is not valid, force to 00:00:00:00:00:00 */
     if (!is_valid_ether_addr(dev->dev_addr))
@@ -1450,6 +1430,11 @@ pcnet32_open(struct net_device *dev)
     lp->a.write_csr (ioaddr, 4, 0x0915);
     lp->a.write_csr (ioaddr, 0, 0x0001);
 
+    if (lp->ltint) {
+	/* start the software timer */
+	lp->a.write_csr(ioaddr, 7, 0x0400);	/* set STINTE */
+    }
+
     netif_start_queue(dev);
 
     /* If we have mii, print the link status and start the watchdog */
@@ -1651,12 +1636,12 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
     int entry;
     unsigned long flags;
 
+    spin_lock_irqsave(&lp->lock, flags);
+
     if (netif_msg_tx_queued(lp)) {
 	printk(KERN_DEBUG "%s: pcnet32_start_xmit() called, csr0 %4.4x.\n",
 	       dev->name, lp->a.read_csr(ioaddr, 0));
     }
-
-    spin_lock_irqsave(&lp->lock, flags);
 
     /* Default status -- will not enable Successful-TxDone
      * interrupt when that option is available to us.
@@ -1718,7 +1703,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     struct net_device *dev = dev_id;
     struct pcnet32_private *lp;
     unsigned long ioaddr;
-    u16 csr0,rap;
+    u16 csr0, csr7, rap;
     int boguscnt =  max_interrupt_work;
     int must_restart;
 
@@ -1735,12 +1720,18 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     spin_lock(&lp->lock);
 
     rap = lp->a.read_rap(ioaddr);
-    while ((csr0 = lp->a.read_csr (ioaddr, 0)) & 0x8600 && --boguscnt >= 0) {
+    csr0 = lp->a.read_csr (ioaddr, 0);
+    csr7 = lp->ltint ? lp->a.read_csr(ioaddr, 7) : 0;
+
+    while ((csr0 & 0x8600 || csr7 & 0x0800) && --boguscnt >= 0) {
 	if (csr0 == 0xffff) {
 	    break;			/* PCMCIA remove happened */
 	}
 	/* Acknowledge all of the current interrupt sources ASAP. */
 	lp->a.write_csr (ioaddr, 0, csr0 & ~0x004f);
+
+	if (csr7 & 0x0800)
+	    lp->a.write_csr(ioaddr, 7, csr7);
 
 	must_restart = 0;
 
@@ -1751,7 +1742,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	if (csr0 & 0x0400)		/* Rx interrupt */
 	    pcnet32_rx(dev);
 
-	if (csr0 & 0x0200) {		/* Tx-done interrupt */
+	if (csr0 & 0x0200 || csr7 & 0x0800) {	/* Tx-done or Timer interrupt */
 	    unsigned int dirty_tx = lp->dirty_tx;
 	    int delta;
 
@@ -1858,6 +1849,9 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	    lp->a.write_csr (ioaddr, 0, 0x0004);
 	    pcnet32_restart(dev, 0x0002);
 	}
+
+	csr0 = lp->a.read_csr (ioaddr, 0);
+	csr7 = lp->ltint ? lp->a.read_csr(ioaddr, 7) : 0;
     }
 
     /* Clear any other interrupt, and set interrupt enable. */
@@ -1944,6 +1938,7 @@ pcnet32_rx(struct net_device *dev)
 		    if (i > RX_RING_SIZE -2) {
 			lp->stats.rx_dropped++;
 			lp->rx_ring[entry].status |= le16_to_cpu(0x8000);
+			wmb();	/* Make sure adapter sees owner change */
 			lp->cur_rx++;
 		    }
 		    break;
@@ -2007,6 +2002,10 @@ pcnet32_close(struct net_device *dev)
     /* We stop the PCNET32 here -- it occasionally polls memory if we don't. */
     lp->a.write_csr (ioaddr, 0, 0x0004);
 
+    if (lp->ltint) {	/* Disable timer interrupts */
+	lp->a.write_csr(ioaddr, 7, 0x0000);
+    }
+
     /*
      * Switch back to 16bit mode to avoid problems with dumb
      * DOS packet driver after a warm reboot
@@ -2017,9 +2016,12 @@ pcnet32_close(struct net_device *dev)
 
     free_irq(dev->irq, dev);
 
+    spin_lock_irqsave(&lp->lock, flags);
+
     /* free all allocated skbuffs */
     for (i = 0; i < RX_RING_SIZE; i++) {
 	lp->rx_ring[i].status = 0;
+	wmb();		/* Make sure adapter sees owner change */
 	if (lp->rx_skbuff[i]) {
 	    pci_unmap_single(lp->pci_dev, lp->rx_dma_addr[i], PKT_BUF_SZ-2,
 		    PCI_DMA_FROMDEVICE);
@@ -2030,6 +2032,8 @@ pcnet32_close(struct net_device *dev)
     }
 
     for (i = 0; i < TX_RING_SIZE; i++) {
+	lp->tx_ring[i].status = 0;	/* CPU owns buffer */
+	wmb();		/* Make sure adapter sees owner change */
 	if (lp->tx_skbuff[i]) {
 	    pci_unmap_single(lp->pci_dev, lp->tx_dma_addr[i],
 		    lp->tx_skbuff[i]->len, PCI_DMA_TODEVICE);
@@ -2038,6 +2042,8 @@ pcnet32_close(struct net_device *dev)
 	lp->tx_skbuff[i] = NULL;
 	lp->tx_dma_addr[i] = 0;
     }
+
+    spin_unlock_irqrestore(&lp->lock, flags);
 
     return 0;
 }
