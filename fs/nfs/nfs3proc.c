@@ -1109,7 +1109,6 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.dentry_ops	= &nfs_dentry_operations,
 	.file_inode_ops	= &nfs3_file_inode_operations,
 	.dir_inode_ops	= &nfs3_dir_inode_operations,
-	.special_inode_ops = &nfs3_special_inode_operations,
 	.getroot	= nfs3_proc_get_root,
 	.getattr	= nfs3_proc_getattr,
 	.setattr	= nfs3_proc_setattr,
@@ -1141,6 +1140,7 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.file_release	= nfs_release,
 	.lock		= nfs3_proc_lock,
 #ifdef CONFIG_NFS_ACL
+	.special_inode_ops = &nfs3_special_inode_operations,
 	.getacl		= nfs3_proc_getacl,
 	.setacl		= nfs3_proc_setacl,
 	.setacls	= nfs3_proc_setacls,

@@ -3,9 +3,6 @@
  *
  *  Copyright (C) 2003-2004 Eugene S. Weiss <eweiss@sbclobal.net>
  *
- *  * Feb 25, 2005: Cleaned up code and locking
- *                  Jeff Mahoney <jeffm@suse.com>
- *
  *  Distributed under the terms of the GNU General Public License version 2
  *  or above.
  */
@@ -29,20 +26,39 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 
-#define SUBFS_MAGIC 0x2c791058
-#define SUBFS_VER "0.9"
-#define SUBMOUNTD_PATH "/sbin/submountd"
-#define ROOT_MODE 0777
+#include "subfs.h"
 
-struct subfs_mount {
-	char *device;
-	char *options;
-	char *req_fs;
-        char *helper_prog;
-	struct super_block *sb;
-	struct semaphore sem;
-	int procuid;
-};
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Eugene S. Weiss");
+
+
+/* get_subfs_vfsmount tries to find the vfsmount structure assigned to
+ * the pending mount.  It looks for a vfsmount structure matching the
+ * superblock pointer sent.  This is not ideal, but I don't know of
+ * another way to find the structure without altering the code in the
+ * mount routines.
+ */
+static struct vfsmount *get_subfs_vfsmount(struct super_block *sb)
+{
+	struct fs_struct *init_fs;
+	struct list_head *entry, *head, *lh;
+	struct vfsmount *mnt;
+
+	/* Get the head of the global mount list from the init process. */
+	/* Is there a better way? */
+	init_fs = init_task.fs;
+	head = &init_fs->rootmnt->mnt_list;
+
+	/* Go through the list and look for a superblock pointer match. */
+	list_for_each_safe(entry, lh, head) {
+		mnt = list_entry(entry, struct vfsmount, mnt_list);
+		if (mnt->mnt_sb == sb)
+			return mnt;
+	}
+	ERR("subfs: Unable to find mount structure for superblock.\n");
+	return NULL;		/* If there was no match */
+}
+
 
 /* Same as set_fs_pwd from namespace.c.  There's a problem with the
  * symbol.  When it is fixed, discard this.
@@ -114,7 +130,7 @@ static void add_procuid(struct subfs_mount *sfs_mnt)
  * 0 if the userspace program exited normally, or an error if
  * it did not.
  */
-static int mount_real_fs(struct subfs_mount *sfs_mnt, struct vfsmount *mnt, unsigned long flags)
+static int mount_real_fs(struct subfs_mount *sfs_mnt)
 {
 	char *argv[7] =
 	    { sfs_mnt->helper_prog, NULL, NULL, NULL, NULL, NULL, NULL };
@@ -126,14 +142,15 @@ static int mount_real_fs(struct subfs_mount *sfs_mnt, struct vfsmount *mnt, unsi
 	path_buf = (char *) __get_free_page(GFP_KERNEL);
 	if (!path_buf)
 		return -ENOMEM;
-	argv[2] = d_path(mnt->mnt_mountpoint, mnt->mnt_parent,
-                         path_buf, PAGE_SIZE);
+	argv[2] =
+	    d_path(sfs_mnt->mount->mnt_mountpoint,
+		   sfs_mnt->mount->mnt_parent, path_buf, PAGE_SIZE);
 	argv[3] = sfs_mnt->req_fs;
 	if (!(argv[4] = kmalloc(17, GFP_KERNEL))) {
 		free_page((unsigned long) path_buf);
 		return -ENOMEM;	/* 64 bits on some platforms */
 	}
-	sprintf(argv[4], "%lx", flags);
+	sprintf(argv[4], "%lx", sfs_mnt->flags);
 	len = strlen(sfs_mnt->options);
 	if (sfs_mnt->procuid) 
 		add_procuid(sfs_mnt);
@@ -150,42 +167,42 @@ static int mount_real_fs(struct subfs_mount *sfs_mnt, struct vfsmount *mnt, unsi
 /*  This routine returns a pointer to the filesystem mounted on top
  *	of the subfs mountpoint, or an error pointer if it was unable to.
  */
-static struct vfsmount *get_child_mount (struct subfs_mount *sfs_mnt,
-                                         struct vfsmount *mnt)
+static struct vfsmount *get_child_mount(struct subfs_mount *sfs_mnt)
 {
 	struct vfsmount *child;
 	int result;
-        unsigned long flags = 0;
-
-        /* Lookup the child mount - if it's not mounted, mount it */
-        child = lookup_mnt (mnt, sfs_mnt->sb->s_root);
-        if (!child) {
-       		flags = sfs_mnt->sb->s_flags;
-		if (mnt->mnt_flags & MNT_NOSUID) flags |= MS_NOSUID;
-		if (mnt->mnt_flags & MNT_NODEV) flags |= MS_NODEV;
-		if (mnt->mnt_flags & MNT_NOEXEC) flags |= MS_NOEXEC;
-
-                result = mount_real_fs (sfs_mnt, mnt, flags);
+        /* First time: find the vfsmount structure that matches sfs_mnt. */
+	if (!sfs_mnt->mount) {
+		if(!(sfs_mnt->mount = get_subfs_vfsmount(sfs_mnt->sb)))
+			return ERR_PTR(-ENOMEDIUM);
+		sfs_mnt->flags = sfs_mnt->sb->s_flags;
+		if (sfs_mnt->mount->mnt_flags & MNT_NOSUID)
+			sfs_mnt->flags |= MS_NOSUID;
+		if (sfs_mnt->mount->mnt_flags & MNT_NODEV)
+			sfs_mnt->flags |= MS_NODEV;
+		if (sfs_mnt->mount->mnt_flags & MNT_NOEXEC)
+			sfs_mnt->flags |= MS_NOEXEC;
+	}
+	/* Check to see if a child mount does not already exist. */
+	if (&sfs_mnt->mount->mnt_mounts == sfs_mnt->mount->mnt_mounts.next) {
+		result = mount_real_fs(sfs_mnt);
 		if (result) {
-			printk (KERN_ERR "subfs: unsuccessful attempt to "
-                                "mount media (%d)\n", result);
+			ERR("subfs: unsuccessful attempt to mount media (%d)\n",
+			       result);
 			/* Workaround for call_usermodehelper return value bug. */
 			if(result < 0)
 				return ERR_PTR(result);
 			return ERR_PTR(-ENOMEDIUM);
 		}
-
-                child = lookup_mnt (mnt, sfs_mnt->sb->s_root);
-
-                /* The mount did succeed (error caught directly above), but
-                 * it was umounted already. Tell the process to retry. */
-                if (!child) {
-                    subfs_send_signal();
-                    return ERR_PTR(-ERESTARTSYS);
-                }
-        }
-
-        return child;
+		if (&sfs_mnt->mount->mnt_mounts
+				== sfs_mnt->mount->mnt_mounts.next) {
+			ERR("subfs: submountd mount failure.\n");
+			return ERR_PTR(-ENOMEDIUM);
+		}
+	}
+	child = list_entry(sfs_mnt->mount->mnt_mounts.next,
+			   struct vfsmount, mnt_child);
+	return child;
 }
 
 
@@ -209,15 +226,14 @@ static struct dentry *subfs_lookup(struct inode *dir,
 		down(&dir->i_sem);/*put the dir sem back down if interrupted*/
 		return ERR_PTR(-ERESTARTSYS);
 	}
-	child = get_child_mount(sfs_mnt, nd->mnt);
+	child = get_child_mount(sfs_mnt);
 	up(&sfs_mnt->sem);
 	down(&dir->i_sem);
 	if (IS_ERR(child))
 		return (void *) child;
 	subfs_send_signal();
-        if (nd->mnt == current->fs->pwdmnt)
-                subfs_set_fs_pwd(current->fs, child, child->mnt_root);
-        mntput (child);
+	if (sfs_mnt->mount == current->fs->pwdmnt)
+		subfs_set_fs_pwd(current->fs, child, child->mnt_root);
 	return ERR_PTR(-ERESTARTSYS);
 }
 
@@ -231,17 +247,15 @@ static int subfs_open(struct inode *inode, struct file *filp)
 {
 	struct subfs_mount *sfs_mnt = filp->f_dentry->d_sb->s_fs_info;
 	struct vfsmount *child;
-
 	if (down_interruptible(&sfs_mnt->sem))
 		return -ERESTARTSYS;
-	child = get_child_mount(sfs_mnt, filp->f_vfsmnt);
+	child = get_child_mount(sfs_mnt);
 	up(&sfs_mnt->sem);
 	if (IS_ERR(child))
 		return PTR_ERR(child);
 	subfs_send_signal();
-	if (filp->f_vfsmnt == current->fs->pwdmnt)
+	if (sfs_mnt->mount == current->fs->pwdmnt)
 		subfs_set_fs_pwd(current->fs, child, child->mnt_root);
-        mntput (child);
 	return -ERESTARTSYS;
 }
 
@@ -265,25 +279,9 @@ static int subfs_statfs(struct super_block *sb, struct kstatfs *buf)
 	if (IS_ERR(child))
 		return PTR_ERR(child);
 	subfs_send_signal();
-        mntput (child);
 	return -ERESTARTSYS;
 #endif
 }
-
-static struct super_operations subfs_s_ops = {
-	.statfs = subfs_statfs,
-	.drop_inode = generic_delete_inode,
-};
-
-
-static struct inode_operations subfs_dir_inode_operations = {
-	.lookup = subfs_lookup,
-};
-
-
-static struct file_operations subfs_file_ops = {
-	.open = subfs_open,
-};
 
 
 /*  Creates the inodes for subfs superblocks.
@@ -302,6 +300,7 @@ static struct inode *subfs_make_inode(struct super_block *sb, int mode)
 	}
 	return ret;
 }
+
 
 /*  Fills the fields for the superblock created when subfs is mounted.
  */
@@ -380,6 +379,7 @@ static int proc_opts(struct subfs_mount *sfs_mnt, void *data)
 }
 
 
+
 /* subfs_get_super is the subfs implementation of the get_sb method on
  * the file_system_type structure.  It should only be called in the
  * case of a mount.  It creates a new subfs_mount structure, fills
@@ -400,6 +400,7 @@ static struct super_block *subfs_get_super(struct file_system_type *fst,
 		return ERR_PTR(-ENOMEM);
 	newmount->req_fs = NULL;
 	newmount->sb = NULL;
+	newmount->mount = NULL;
 	newmount->procuid = 0;
 	sema_init(&newmount->sem, 1);
 	if (!(device = kmalloc((strlen(devname) + 1), GFP_KERNEL)))
@@ -443,12 +444,6 @@ static void subfs_kill_super(struct super_block *sb)
 	return;
 }
 
-static struct file_system_type subfs_type = {
-	.owner = THIS_MODULE,
-	.name = "subfs",
-	.get_sb = subfs_get_super,
-	.kill_sb = subfs_kill_super,
-};
 
 static int __init subfs_init(void)
 {
@@ -461,10 +456,6 @@ static void __exit subfs_exit(void)
 	printk(KERN_INFO "subfs exiting.\n");
 	unregister_filesystem(&subfs_type);
 }
-
-MODULE_DESCRIPTION("subfs virtual filesystem " SUBFS_VER );
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Eugene S. Weiss");
 
 module_init(subfs_init);
 module_exit(subfs_exit);

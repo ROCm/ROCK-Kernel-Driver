@@ -47,7 +47,7 @@ void sort(void *base, size_t num, size_t size,
 	  void (*swap)(void *, void *, int size))
 {
 	/* pre-scale counters for performance */
-	int i = (num/2) * size, n = num * size, c, r;
+	int i = ((num-1)/2) * size, n = num * size, c, r;
 
 	if (!swap)
 		swap = (size == 4 ? u32_swap : generic_swap);
