@@ -32,6 +32,7 @@
 #include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/proc_fs.h>
+#include <asm/mpspec.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 #include "include/acinterp.h"	/* for acpi_ex_eisa_id_to_string() */
@@ -46,6 +47,7 @@ MODULE_LICENSE("GPL");
 
 #define	PREFIX			"ACPI: "
 
+extern void eisa_set_level_irq(unsigned int irq);
 
 extern int			acpi_disabled;
 
@@ -1964,6 +1966,12 @@ acpi_bus_init (void)
 		printk(KERN_ERR PREFIX "Unable to get the FADT\n");
 		goto error1;
 	}
+
+	/* Ensure the SCI is set to level-triggered, active-low */
+	if (acpi_ioapic)
+		mp_override_legacy_irq(acpi_fadt.sci_int, 3, 3, acpi_fadt.sci_int);
+	else
+		eisa_set_level_irq(acpi_fadt.sci_int);
 
 	status = acpi_enable_subsystem(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
