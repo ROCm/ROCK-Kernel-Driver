@@ -1855,20 +1855,13 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 	int i, err = -1, vfreq, hfreq, pixclock;
 
 	i = 0;
-	if (!(info = kmalloc(sizeof(struct fb_info), GFP_KERNEL))) {
-		i810fb_release_resource(info, par);
-		return -ENOMEM;
-	}
-	memset(info, 0, sizeof(struct fb_info));
 
-	if(!(par = kmalloc(sizeof(struct i810fb_par), GFP_KERNEL))) {
-		i810fb_release_resource(info, par);
+	info = framebuffer_alloc(sizeof(struct i810fb_par), &dev->dev);
+	if (!info)
 		return -ENOMEM;
-	}
-	memset(par, 0, sizeof(struct i810fb_par));
 
+	par = (struct i810fb_par *) info->par;
 	par->dev = dev;
-	info->par = par;
 
 	if (!(info->pixmap.addr = kmalloc(64*1024, GFP_KERNEL))) {
 		i810fb_release_resource(info, par);
@@ -1941,38 +1934,36 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 static void i810fb_release_resource(struct fb_info *info, 
 				    struct i810fb_par *par)
 {
-	if (par) {
-		unset_mtrr(par);
-		if (par->drm_agp) {
-			drm_agp_t *agp = par->drm_agp;
-			struct gtt_data *gtt = &par->i810_gtt;
+	unset_mtrr(par);
+	if (par->drm_agp) {
+		drm_agp_t *agp = par->drm_agp;
+		struct gtt_data *gtt = &par->i810_gtt;
 
-			if (par->i810_gtt.i810_cursor_memory) 
-				agp->free_memory(gtt->i810_cursor_memory);
-			if (par->i810_gtt.i810_fb_memory) 
-				agp->free_memory(gtt->i810_fb_memory);
+		if (par->i810_gtt.i810_cursor_memory)
+			agp->free_memory(gtt->i810_cursor_memory);
+		if (par->i810_gtt.i810_fb_memory)
+			agp->free_memory(gtt->i810_fb_memory);
 
-			inter_module_put("drm_agp");
-			par->drm_agp = NULL;
-		}
-
-		if (par->mmio_start_virtual) 
-			iounmap(par->mmio_start_virtual);
-		if (par->aperture.virtual) 
-			iounmap(par->aperture.virtual);
-
-		if (par->res_flags & FRAMEBUFFER_REQ)
-			release_mem_region(par->aperture.physical, 
-					   par->aperture.size);
-		if (par->res_flags & MMIO_REQ)
-			release_mem_region(par->mmio_start_phys, MMIO_SIZE);
-
-		if (par->res_flags & PCI_DEVICE_ENABLED)
-			pci_disable_device(par->dev); 
-
-		kfree(par);
+		inter_module_put("drm_agp");
+		par->drm_agp = NULL;
 	}
-	kfree(info);
+
+	if (par->mmio_start_virtual)
+		iounmap(par->mmio_start_virtual);
+	if (par->aperture.virtual)
+		iounmap(par->aperture.virtual);
+
+	if (par->res_flags & FRAMEBUFFER_REQ)
+		release_mem_region(par->aperture.physical,
+				   par->aperture.size);
+	if (par->res_flags & MMIO_REQ)
+		release_mem_region(par->mmio_start_phys, MMIO_SIZE);
+
+	if (par->res_flags & PCI_DEVICE_ENABLED)
+		pci_disable_device(par->dev);
+
+	framebuffer_release(info);
+
 }
 
 static void __exit i810fb_remove_pci(struct pci_dev *dev)
