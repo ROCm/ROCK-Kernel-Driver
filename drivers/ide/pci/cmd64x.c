@@ -586,7 +586,7 @@ static int cmd646_1_ide_dma_end (ide_drive_t *drive)
 	return (dma_stat & 7) != 4;
 }
 
-static unsigned int __init init_chipset_cmd64x (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_cmd64x(struct pci_dev *dev, const char *name)
 {
 	u32 class_rev = 0;
 	u8 mrdmode = 0;
@@ -674,7 +674,7 @@ static unsigned int __init init_chipset_cmd64x (struct pci_dev *dev, const char 
 	return 0;
 }
 
-static unsigned int __init ata66_cmd64x (ide_hwif_t *hwif)
+static unsigned int __devinit ata66_cmd64x(ide_hwif_t *hwif)
 {
 	u8 ata66 = 0, mask = (hwif->channel) ? 0x02 : 0x01;
 
@@ -689,7 +689,7 @@ static unsigned int __init ata66_cmd64x (ide_hwif_t *hwif)
 	return (ata66 & mask) ? 1 : 0;
 }
 
-static void __init init_hwif_cmd64x (ide_hwif_t *hwif)
+static void __devinit init_hwif_cmd64x(ide_hwif_t *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int class_rev;

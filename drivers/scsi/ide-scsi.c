@@ -318,6 +318,13 @@ ide_startstop_t idescsi_atapi_error (ide_drive_t *drive, const char *msg, byte s
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 
+	/* retry only "normal" I/O: */
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
+		rq->errors = 1;
+		ide_end_drive_cmd(drive, stat, err);
+		return ide_stopped;
+	}
+
 	if (HWIF(drive)->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT))
 		/* force an abort */
 		HWIF(drive)->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
@@ -333,6 +340,13 @@ ide_startstop_t idescsi_atapi_abort (ide_drive_t *drive, const char *msg)
 
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 	       return ide_stopped;
+
+	/* retry only "normal" I/O: */
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
+		rq->errors = 1;
+		ide_end_drive_cmd(drive, BUSY_STAT, 0);
+		return ide_stopped;
+	}
 
 #if IDESCSI_DEBUG_LOG
 	printk(KERN_WARNING "idescsi_atapi_abort called for %lu\n",

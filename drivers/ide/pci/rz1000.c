@@ -33,8 +33,6 @@
 
 #include <asm/io.h>
 
-#include "rz1000.h"
-
 static void __init init_hwif_rz1000 (ide_hwif_t *hwif)
 {
 	u16 reg;
@@ -54,15 +52,23 @@ static void __init init_hwif_rz1000 (ide_hwif_t *hwif)
 	}
 }
 
+static ide_pci_device_t rz1000_chipset __devinitdata = {
+	.name		= "RZ100x",
+	.init_hwif	= init_hwif_rz1000,
+	.channels	= 2,
+	.autodma	= NODMA,
+	.bootable	= ON_BOARD,
+};
+
 static int __devinit rz1000_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &rz1000_chipsets[id->driver_data]);
+	ide_setup_pci_device(dev, &rz1000_chipset);
 	return 0;
 }
 
 static struct pci_device_id rz1000_pci_tbl[] = {
 	{ PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{ PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
 MODULE_DEVICE_TABLE(pci, rz1000_pci_tbl);

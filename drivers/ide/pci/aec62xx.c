@@ -409,7 +409,7 @@ static int aec62xx_irq_timeout (ide_drive_t *drive)
 	return 0;
 }
 
-static unsigned int __init init_chipset_aec62xx (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_aec62xx(struct pci_dev *dev, const char *name)
 {
 	int bus_speed = system_bus_clock();
 
@@ -435,7 +435,7 @@ static unsigned int __init init_chipset_aec62xx (struct pci_dev *dev, const char
 	return dev->irq;
 }
 
-static void __init init_hwif_aec62xx (ide_hwif_t *hwif)
+static void __devinit init_hwif_aec62xx(ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 	hwif->tuneproc = &aec62xx_tune_drive;
@@ -468,7 +468,7 @@ static void __init init_hwif_aec62xx (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
-static void __init init_dma_aec62xx (ide_hwif_t *hwif, unsigned long dmabase)
+static void __devinit init_dma_aec62xx(ide_hwif_t *hwif, unsigned long dmabase)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 
@@ -490,12 +490,12 @@ static void __init init_dma_aec62xx (ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __init init_setup_aec62xx (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_aec62xx(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_aec6x80 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_aec6x80(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	unsigned long bar4reg = pci_resource_start(dev, 4);
 

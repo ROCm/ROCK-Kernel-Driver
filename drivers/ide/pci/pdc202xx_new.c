@@ -404,7 +404,7 @@ static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 }
 #endif /* CONFIG_PPC_PMAC */
 
-static unsigned int __init init_chipset_pdcnew (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_pdcnew(struct pci_dev *dev, const char *name)
 {
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS,
@@ -429,7 +429,7 @@ static unsigned int __init init_chipset_pdcnew (struct pci_dev *dev, const char 
 	return dev->irq;
 }
 
-static void __init init_hwif_pdc202new (ide_hwif_t *hwif)
+static void __devinit init_hwif_pdc202new(ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 
@@ -457,12 +457,12 @@ static void __init init_hwif_pdc202new (ide_hwif_t *hwif)
 #endif /* PDC202_DEBUG_CABLE */
 }
 
-static void __init init_setup_pdcnew (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_pdcnew(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_pdc20270 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_pdc20270(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	struct pci_dev *findev = NULL;
 
@@ -488,7 +488,7 @@ static void __init init_setup_pdc20270 (struct pci_dev *dev, ide_pci_device_t *d
 	ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_pdc20276 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_pdc20276(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	if ((dev->bus->self) &&
 	    (dev->bus->self->vendor == PCI_VENDOR_ID_INTEL) &&

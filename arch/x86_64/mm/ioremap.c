@@ -158,6 +158,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	area = get_vm_area(size, VM_IOREMAP);
 	if (!area)
 		return NULL;
+	area->phys_addr = phys_addr;
 	addr = area->addr;
 	if (remap_area_pages((unsigned long) addr, phys_addr, size, flags)) {
 		vunmap(addr);

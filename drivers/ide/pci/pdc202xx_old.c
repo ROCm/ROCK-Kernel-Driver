@@ -670,7 +670,7 @@ static int pdc202xx_tristate (ide_drive_t * drive, int state)
 	return 0;
 }
 
-static unsigned int __init init_chipset_pdc202xx (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_pdc202xx(struct pci_dev *dev, const char *name)
 {
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS,
@@ -715,7 +715,7 @@ static unsigned int __init init_chipset_pdc202xx (struct pci_dev *dev, const cha
 	return dev->irq;
 }
 
-static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
+static void __devinit init_hwif_pdc202xx(ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 	hwif->tuneproc  = &config_chipset_for_pio;
@@ -755,7 +755,7 @@ static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
 #endif /* PDC202_DEBUG_CABLE */	
 }
 
-static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
+static void __devinit init_dma_pdc202xx(ide_hwif_t *hwif, unsigned long dmabase)
 {
 	u8 udma_speed_flag = 0, primary_mode = 0, secondary_mode = 0;
 
@@ -807,7 +807,7 @@ static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __init init_setup_pdc202ata4 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_pdc202ata4(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
 		u8 irq = 0, irq2 = 0;
@@ -837,7 +837,7 @@ static void __init init_setup_pdc202ata4 (struct pci_dev *dev, ide_pci_device_t 
 	ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_pdc20265 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_pdc20265(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	if ((dev->bus->self) &&
 	    (dev->bus->self->vendor == PCI_VENDOR_ID_INTEL) &&
@@ -866,7 +866,7 @@ static void __init init_setup_pdc20265 (struct pci_dev *dev, ide_pci_device_t *d
 	ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_pdc202xx (struct pci_dev *dev, ide_pci_device_t *d)
+static void __devinit init_setup_pdc202xx(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	ide_setup_pci_device(dev, d);
 }
