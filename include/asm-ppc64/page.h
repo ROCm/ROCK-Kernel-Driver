@@ -40,15 +40,19 @@
 #define ARCH_HAS_HUGEPAGE_ONLY_RANGE
 #define ARCH_HAS_PREPARE_HUGEPAGE_RANGE
 
-#define is_hugepage_low_range(addr, len) \
+#define touches_hugepage_low_range(addr, len) \
 	(((addr) > (TASK_HPAGE_BASE_32-(len))) && ((addr) < TASK_HPAGE_END_32))
-#define is_hugepage_high_range(addr, len) \
+#define touches_hugepage_high_range(addr, len) \
 	(((addr) > (TASK_HPAGE_BASE-(len))) && ((addr) < TASK_HPAGE_END))
+#define within_hugepage_low_range(addr, len) (((addr) >= TASK_HPAGE_BASE_32) \
+	  && ((addr)+(len) <= TASK_HPAGE_END_32) && ((addr)+(len) >= (addr)))
+#define within_hugepage_high_range(addr, len) (((addr) >= TASK_HPAGE_BASE) \
+	  && ((addr)+(len) <= TASK_HPAGE_END) && ((addr)+(len) >= (addr)))
 
 #define is_hugepage_only_range(addr, len) \
-	(is_hugepage_high_range((addr), (len)) || \
+	(touches_hugepage_high_range((addr), (len)) || \
 	 (current->mm->context.low_hpages \
-	  && is_hugepage_low_range((addr), (len))))
+	  && touches_hugepage_low_range((addr), (len))))
 #define hugetlb_free_pgtables free_pgtables
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 

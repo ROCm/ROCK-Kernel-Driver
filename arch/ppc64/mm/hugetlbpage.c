@@ -230,7 +230,8 @@ int is_aligned_hugepage_range(unsigned long addr, unsigned long len)
 		return -EINVAL;
 	if (addr & ~HPAGE_MASK)
 		return -EINVAL;
-	if (! is_hugepage_only_range(addr, len))
+	if (! (within_hugepage_low_range(addr, len)
+	       || within_hugepage_high_range(addr, len)) )
 		return -EINVAL;
 	return 0;
 }
@@ -300,9 +301,9 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 
 int prepare_hugepage_range(unsigned long addr, unsigned long len)
 {
-	if (is_hugepage_high_range(addr, len))
+	if (within_hugepage_high_range(addr, len))
 		return 0;
-	else if (is_hugepage_low_range(addr, len))
+	else if (within_hugepage_low_range(addr, len))
 		return open_32bit_htlbpage_range(current->mm);
 
 	return -EINVAL;
