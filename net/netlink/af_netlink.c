@@ -279,9 +279,9 @@ static int netlink_release(struct socket *sock)
 
 	skb_queue_purge(&sk->write_queue);
 
-	if (sk->protinfo.af_netlink->pid && !sk->protinfo.af_netlink->groups) {
+	if (nlk->pid && !nlk->groups) {
 		struct netlink_notify n = { protocol:sk->protocol,
-		                            pid:sk->protinfo.af_netlink->pid };
+		                            pid:nlk->pid };
 		notifier_call_chain(&netlink_chain, NETLINK_URELEASE, &n);
 	}	
 	
