@@ -1635,8 +1635,10 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 		if (err < 0)
 			return err;
 	}
-	if ((ensoniq->subsystem_vendor_id == 0x1274) &&
-	    (ensoniq->subsystem_device_id == 0x2000)) { /* GA-7DXR */
+	if (((ensoniq->subsystem_vendor_id == 0x1274) &&
+	    (ensoniq->subsystem_device_id == 0x2000)) || /* GA-7DXR */
+	    ((ensoniq->subsystem_vendor_id == 0x1458) &&
+	    (ensoniq->subsystem_device_id == 0xa000))) { /* GA-8IEXP */
 		 err = snd_ctl_add(card, snd_ctl_new1(&snd_ens1373_line, ensoniq));
 		 if (err < 0)
 			 return err;
