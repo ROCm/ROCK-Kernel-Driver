@@ -639,7 +639,6 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	x->props.header_len = 8 + esp->conf.ivlen;
 	if (x->props.mode)
 		x->props.header_len += 20;
-	x->props.trailer_len = esp->auth.authlen + crypto_tfm_alg_blocksize(esp->conf.tfm);
 	x->data = esp;
 	return 0;
 
