@@ -174,9 +174,14 @@ MODULE_LICENSE("GPL and additional rights");
 static int DRM(setup)( drm_device_t *dev )
 {
 	int i;
+	int ret;
 
 	if (dev->fn_tbl.presetup)
-		dev->fn_tbl.presetup(dev);
+	{
+		ret=dev->fn_tbl.presetup(dev);
+		if (ret!=0) 
+			return ret;
+	}
 
 	atomic_set( &dev->ioctl_count, 0 );
 	atomic_set( &dev->vma_count, 0 );
@@ -1066,7 +1071,7 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 	 * modules but is required by the Sparc driver.
 	 */
 	if (dev->fn_tbl.kernel_context_switch_unlock)
-		dev->fn_tbl.kernel_context_switch_unlock(dev);
+		dev->fn_tbl.kernel_context_switch_unlock(dev, &lock);
 	else {
 		DRM(lock_transfer)( dev, &dev->lock.hw_lock->lock, 
 				    DRM_KERNEL_CONTEXT );

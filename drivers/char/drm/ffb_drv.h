@@ -281,3 +281,6 @@ extern unsigned long ffb_get_unmapped_area(struct file *filp,
 					   unsigned long len,
 					   unsigned long pgoff,
 					   unsigned long flags);
+extern void ffb_set_context_ioctls(void);
+extern drm_ioctl_desc_t DRM(ioctls)[];
+

@@ -561,7 +561,7 @@ struct drm_driver_fn {
 	int (*context_ctor)(struct drm_device *dev, int context);
  	int (*context_dtor)(struct drm_device *dev, int context);
  	int (*kernel_context_switch)(struct drm_device *dev, int old, int new);
- 	int (*kernel_context_switch_unlock)(struct drm_device *dev);
+	void (*kernel_context_switch_unlock)(struct drm_device *dev, drm_lock_t *lock);
 	int (*vblank_wait)(struct drm_device *dev, unsigned int *sequence);
 	/* these have to be filled in */
 	irqreturn_t (*irq_handler)( DRM_IRQ_ARGS );
