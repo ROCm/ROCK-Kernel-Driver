@@ -63,6 +63,7 @@
 #define IF_IFACE_T1	0x1003		/* T1 telco serial interface	*/
 #define IF_IFACE_E1	0x1004		/* E1 telco serial interface	*/
 #define IF_IFACE_SYNC_SERIAL 0x1005	/* can't be set by software	*/
+#define IF_IFACE_X21D   0x1006          /* X.21 Dual Clocking (FarSite) */
 
 /* For definitions see hdlc.h */
 #define IF_PROTO_HDLC	0x2000		/* raw HDLC protocol		*/
@@ -77,6 +78,7 @@
 #define IF_PROTO_FR_DEL_ETH_PVC 0x2009	/*  Delete FR Ethernet-bridged PVC */
 #define IF_PROTO_FR_PVC	0x200A		/* for reading PVC status	*/
 #define IF_PROTO_FR_ETH_PVC 0x200B
+#define IF_PROTO_RAW    0x200C          /* RAW Socket                   */
 
 
 /*
