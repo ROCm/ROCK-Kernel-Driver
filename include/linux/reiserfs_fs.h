@@ -1781,25 +1781,25 @@ int reiserfs_convert_objectid_map_v1(struct super_block *) ;
 /* stree.c */
 int B_IS_IN_TREE(const struct buffer_head *);
 extern inline void copy_short_key (void * to, const void * from);
-extern inline void copy_item_head(struct item_head * p_v_to, 
+extern void copy_item_head(struct item_head * p_v_to,
 								  const struct item_head * p_v_from);
 
 // first key is in cpu form, second - le
-extern inline int comp_keys (const struct key * le_key, 
+extern int comp_keys (const struct key * le_key,
 			     const struct cpu_key * cpu_key);
-extern inline int  comp_short_keys (const struct key * le_key, 
+extern int  comp_short_keys (const struct key * le_key,
 				    const struct cpu_key * cpu_key);
-extern inline void le_key2cpu_key (struct cpu_key * to, const struct key * from);
+extern void le_key2cpu_key (struct cpu_key * to, const struct key * from);
 
 // both are cpu keys
-extern inline int comp_cpu_keys (const struct cpu_key *, const struct cpu_key *);
-extern inline int comp_short_cpu_keys (const struct cpu_key *, 
+extern  int comp_cpu_keys (const struct cpu_key *, const struct cpu_key *);
+extern int comp_short_cpu_keys (const struct cpu_key *,
 				       const struct cpu_key *);
-extern inline void cpu_key2cpu_key (struct cpu_key *, const struct cpu_key *);
+extern void cpu_key2cpu_key (struct cpu_key *, const struct cpu_key *);
 
 // both are in le form
-extern inline int comp_le_keys (const struct key *, const struct key *);
-extern inline int comp_short_le_keys (const struct key *, const struct key *);
+extern int comp_le_keys (const struct key *, const struct key *);
+extern int comp_short_le_keys (const struct key *, const struct key *);
 
 //
 // get key version from on disk key - kludge
