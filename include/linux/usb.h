@@ -61,6 +61,13 @@ struct usb_host_interface {
 	int extralen;
 };
 
+enum usb_interface_condition {
+	USB_INTERFACE_UNBOUND = 0,
+	USB_INTERFACE_BINDING,
+	USB_INTERFACE_BOUND,
+	USB_INTERFACE_UNBINDING,
+};
+
 /**
  * struct usb_interface - what usb device drivers talk to
  * @altsetting: array of interface structures, one for each alternate
@@ -75,6 +82,8 @@ struct usb_host_interface {
  *	be unused.  The driver should set this value in the probe()
  *	function of the driver, after it has been assigned a minor
  *	number from the USB core by calling usb_register_dev().
+ * @condition: binding state of the interface: not bound, binding
+ *	(in probe()), bound to a driver, or unbinding (in disconnect())
  * @dev: driver model's view of this device
  * @class_dev: driver model's class view of this device.
  *
@@ -113,6 +122,7 @@ struct usb_interface {
 	unsigned num_altsetting;	/* number of alternate settings */
 
 	int minor;			/* minor number this interface is bound to */
+	enum usb_interface_condition condition;		/* state of binding */
 	struct device dev;		/* interface specific device info */
 	struct class_device *class_dev;
 };
@@ -341,11 +351,12 @@ extern void usb_put_dev(struct usb_device *dev);
 
 extern void usb_lock_device(struct usb_device *udev);
 extern int usb_trylock_device(struct usb_device *udev);
+extern int usb_lock_device_for_reset(struct usb_device *udev,
+		struct usb_interface *iface);
 extern void usb_unlock_device(struct usb_device *udev);
 
-/* mostly for devices emulating SCSI over USB */
+/* USB port reset for device reinitialization */
 extern int usb_reset_device(struct usb_device *dev);
-extern int __usb_reset_device(struct usb_device *dev);
 
 extern struct usb_device *usb_find_device(u16 vendor_id, u16 product_id);
 

@@ -168,6 +168,7 @@ enum StirTestMask {
 
 struct stir_cb {
         struct usb_device *usbdev;      /* init: probe_irda */
+	struct usb_interface *usbintf;
         struct net_device *netdev;      /* network layer */
         struct irlap_cb   *irlap;       /* The link layer we are binded to */
         struct net_device_stats stats;	/* network statistics */
@@ -508,6 +509,7 @@ static int change_speed(struct stir_cb *stir, unsigned speed)
 {
 	int i, err;
 	__u8 mode;
+	int rc;
 
 	for (i = 0; i < ARRAY_SIZE(stir_modes); ++i) {
 		if (speed == stir_modes[i].speed)
@@ -521,7 +523,14 @@ static int change_speed(struct stir_cb *stir, unsigned speed)
 	pr_debug("speed change from %d to %d\n", stir->speed, speed);
 
 	/* sometimes needed to get chip out of stuck state */
+	rc = usb_lock_device_for_reset(stir->usbdev, stir->usbintf);
+	if (rc < 0) {
+		err = rc;
+		goto out;
+	}
 	err = usb_reset_device(stir->usbdev);
+	if (rc)
+		usb_unlock_device(stir->usbdev);
 	if (err)
 		goto out;
 
@@ -1066,6 +1075,7 @@ static int stir_probe(struct usb_interface *intf,
 	stir = net->priv;
 	stir->netdev = net;
 	stir->usbdev = dev;
+	stir->usbintf = intf;
 
 	ret = usb_reset_configuration(dev);
 	if (ret != 0) {

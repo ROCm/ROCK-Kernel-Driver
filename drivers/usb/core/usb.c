@@ -102,7 +102,10 @@ int usb_probe_interface(struct device *dev)
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
 		dev_dbg (dev, "%s - got id\n", __FUNCTION__);
+		intf->condition = USB_INTERFACE_BINDING;
 		error = driver->probe (intf, id);
+		intf->condition = error ? USB_INTERFACE_UNBOUND :
+				USB_INTERFACE_BOUND;
 	}
 
 	return error;
@@ -113,6 +116,8 @@ int usb_unbind_interface(struct device *dev)
 {
 	struct usb_interface *intf = to_usb_interface(dev);
 	struct usb_driver *driver = to_usb_driver(intf->dev.driver);
+
+	intf->condition = USB_INTERFACE_UNBINDING;
 
 	/* release all urbs for this interface */
 	usb_disable_interface(interface_to_usbdev(intf), intf);
@@ -125,6 +130,7 @@ int usb_unbind_interface(struct device *dev)
 			intf->altsetting[0].desc.bInterfaceNumber,
 			0);
 	usb_set_intfdata(intf, NULL);
+	intf->condition = USB_INTERFACE_UNBOUND;
 
 	return 0;
 }
@@ -324,6 +330,7 @@ int usb_driver_claim_interface(struct usb_driver *driver,
 
 	dev->driver = &driver->driver;
 	usb_set_intfdata(iface, priv);
+	iface->condition = USB_INTERFACE_BOUND;
 
 	/* if interface was already added, bind now; else let
 	 * the future device_add() bind it, bypassing probe()
@@ -363,6 +370,7 @@ void usb_driver_release_interface(struct usb_driver *driver,
 
 	dev->driver = NULL;
 	usb_set_intfdata(iface, NULL);
+	iface->condition = USB_INTERFACE_UNBOUND;
 }
 
 /**
@@ -906,6 +914,54 @@ int usb_trylock_device(struct usb_device *udev)
 	if (down_trylock(&udev->serialize)) {
 		up_read(&usb_all_devices_rwsem);
 		return 0;
+	}
+	return 1;
+}
+
+/**
+ * usb_lock_device_for_reset - cautiously acquire the lock for a
+ *	usb device structure
+ * @udev: device that's being locked
+ * @iface: interface bound to the driver making the request (optional)
+ *
+ * Attempts to acquire the device lock, but fails if the device is
+ * NOTATTACHED or SUSPENDED, or if iface is specified and the interface
+ * is neither BINDING nor BOUND.  Rather than sleeping to wait for the
+ * lock, the routine polls repeatedly.  This is to prevent deadlock with
+ * disconnect; in some drivers (such as usb-storage) the disconnect()
+ * callback will block waiting for a device reset to complete.
+ *
+ * Returns a negative error code for failure, otherwise 1 or 0 to indicate
+ * that the device will or will not have to be unlocked.  (0 can be
+ * returned when an interface is given and is BINDING, because in that
+ * case the driver already owns the device lock.)
+ */
+int usb_lock_device_for_reset(struct usb_device *udev,
+		struct usb_interface *iface)
+{
+	if (udev->state == USB_STATE_NOTATTACHED)
+		return -ENODEV;
+	if (udev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
+	if (iface) {
+		switch (iface->condition) {
+		  case USB_INTERFACE_BINDING:
+			return 0;
+		  case USB_INTERFACE_BOUND:
+			break;
+		  default:
+			return -EINTR;
+		}
+	}
+
+	while (!usb_trylock_device(udev)) {
+		msleep(15);
+		if (udev->state == USB_STATE_NOTATTACHED)
+			return -ENODEV;
+		if (udev->state == USB_STATE_SUSPENDED)
+			return -EHOSTUNREACH;
+		if (iface && iface->condition != USB_INTERFACE_BOUND)
+			return -EINTR;
 	}
 	return 1;
 }
@@ -1493,6 +1549,7 @@ EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 
 EXPORT_SYMBOL(usb_lock_device);
 EXPORT_SYMBOL(usb_trylock_device);
+EXPORT_SYMBOL(usb_lock_device_for_reset);
 EXPORT_SYMBOL(usb_unlock_device);
 
 EXPORT_SYMBOL(usb_driver_claim_interface);

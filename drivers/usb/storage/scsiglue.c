@@ -283,7 +283,7 @@ static int device_reset(struct scsi_cmnd *srb)
 static int bus_reset(struct scsi_cmnd *srb)
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
-	int result;
+	int result, rc;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
 	if (us->sm_state != US_STATE_IDLE) {
@@ -308,8 +308,16 @@ static int bus_reset(struct scsi_cmnd *srb)
 		result = -EBUSY;
 		US_DEBUGP("Refusing to reset a multi-interface device\n");
 	} else {
-		result = usb_reset_device(us->pusb_dev);
-		US_DEBUGP("usb_reset_device returns %d\n", result);
+		rc = usb_lock_device_for_reset(us->pusb_dev, us->pusb_intf);
+		if (rc < 0) {
+			US_DEBUGP("unable to lock device for reset: %d\n", rc);
+			result = rc;
+		} else {
+			result = usb_reset_device(us->pusb_dev);
+			if (rc)
+				usb_unlock_device(us->pusb_dev);
+			US_DEBUGP("usb_reset_device returns %d\n", result);
+		}
 	}
 	up(&(us->dev_semaphore));
 

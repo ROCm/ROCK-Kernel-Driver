@@ -826,7 +826,7 @@ static int hub_reset(struct usb_hub *hub)
 	else
 		return -1;
 
-	if (__usb_reset_device(hdev))
+	if (usb_reset_device(hdev))
 		return -1;
 
 	hub->urb->dev = hdev;                                                    
@@ -2759,8 +2759,10 @@ static int config_descriptors_changed(struct usb_device *udev)
  *
  * The caller must own the device lock.  For example, it's safe to use
  * this from a driver probe() routine after downloading new firmware.
+ * For calls that might not occur during probe(), drivers should lock
+ * the device using usb_lock_device_for_reset().
  */
-int __usb_reset_device(struct usb_device *udev)
+int usb_reset_device(struct usb_device *udev)
 {
 	struct usb_device *parent = udev->parent;
 	struct usb_device_descriptor descriptor = udev->descriptor;
@@ -2794,6 +2796,11 @@ int __usb_reset_device(struct usb_device *udev)
 		dev_err(&udev->dev, "Can't locate device's port!\n");
 		return -ENOENT;
 	}
+
+	/* ep0 maxpacket size may change; let the HCD know about it.
+	 * Other endpoints will be handled by re-enumeration. */
+	usb_disable_endpoint(udev, 0);
+	usb_disable_endpoint(udev, 0 + USB_DIR_IN);
 
 	ret = hub_port_init(parent, udev, port);
 	if (ret < 0)
@@ -2847,16 +2854,4 @@ int __usb_reset_device(struct usb_device *udev)
 re_enumerate:
 	hub_port_logical_disconnect(parent, port);
 	return -ENODEV;
-}
-EXPORT_SYMBOL(__usb_reset_device);
-
-int usb_reset_device(struct usb_device *udev)
-{
-	int r;
-	
-	down(&udev->serialize);
-	r = __usb_reset_device(udev);
-	up(&udev->serialize);
-
-	return r;
 }
