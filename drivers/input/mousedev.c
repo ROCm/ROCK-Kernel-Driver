@@ -177,7 +177,7 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 						case BTN_SIDE:   if (list->mode == 2) { index = 3; break; }
 						case BTN_2:
 						case BTN_STYLUS2:
-						case BTN_MIDDLE: index = 2; break;	
+						case BTN_MIDDLE: index = 2; break;
 						default: return;
 					}
 					switch (value) {
@@ -267,7 +267,7 @@ static int mousedev_release(struct inode * inode, struct file * file)
 				mousedev_free(list->mousedev);
 		}
 	}
-	
+
 	kfree(list);
 	return 0;
 }
@@ -301,11 +301,11 @@ static int mousedev_open(struct inode * inode, struct file * file)
 		if (list->mousedev->minor == MOUSEDEV_MIX) {
 			list_for_each_entry(handle, &mousedev_handler.h_list, h_node) {
 				mousedev = handle->private;
-				if (!mousedev->open && mousedev->exist)	
+				if (!mousedev->open && mousedev->exist)
 					input_open_device(handle);
 			}
-		} else 
-			if (!mousedev_mix.open && list->mousedev->exist)	
+		} else
+			if (!mousedev_mix.open && list->mousedev->exist)
 				input_open_device(&list->mousedev->handle);
 	}
 
@@ -327,7 +327,7 @@ static void mousedev_packet(struct mousedev_list *list, unsigned char off)
 		list->ps2[off + 3] = (list->ps2[off + 3] & 0x0f) | ((list->buttons & 0x18) << 1);
 		list->bufsiz++;
 	}
-	
+
 	if (list->mode == 1) {
 		list->ps2[off + 3] = (list->dz > 127 ? 127 : (list->dz < -127 ? -127 : list->dz));
 		list->dz -= list->ps2[off + 3];
@@ -403,7 +403,7 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 	kill_fasync(&list->fasync, SIGIO, POLL_IN);
 
 	wake_up_interruptible(&list->mousedev->wait);
-		
+
 	return count;
 }
 
@@ -431,7 +431,7 @@ static ssize_t mousedev_read(struct file * file, char * buffer, size_t count, lo
 	if (copy_to_user(buffer, list->ps2 + list->bufsiz - list->buffer - count, count))
 		return -EFAULT;
 
-	return count;	
+	return count;
 }
 
 /* No kernel lock - fine */
@@ -487,7 +487,7 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/mouse%d", minor);
-	class_simple_device_add(input_class, 
+	class_simple_device_add(input_class,
 				MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + minor),
 				dev->dev, "mouse%d", minor);
 
@@ -538,7 +538,7 @@ static struct input_device_id mousedev_ids[] = {
 };
 
 MODULE_DEVICE_TABLE(input, mousedev_ids);
-	
+
 static struct input_handler mousedev_handler = {
 	.event =	mousedev_event,
 	.connect =	mousedev_connect,

@@ -1,7 +1,7 @@
 /*
  * $Id: power.c,v 1.10 2001/09/25 09:17:15 vojtech Exp $
  *
- *  Copyright (c) 2001 "Crazy" James Simmons  
+ *  Copyright (c) 2001 "Crazy" James Simmons
  *
  *  Input driver Power Management.
  *
@@ -51,7 +51,7 @@ static void suspend_button_task_handler(void *data)
 
 static DECLARE_WORK(suspend_button_task, suspend_button_task_handler, NULL);
 
-static void power_event(struct input_handle *handle, unsigned int type, 
+static void power_event(struct input_handle *handle, unsigned int type,
 		        unsigned int code, int down)
 {
 	struct input_dev *dev = handle->dev;
@@ -73,7 +73,7 @@ static void power_event(struct input_handle *handle, unsigned int type,
 			case KEY_POWER:
 				/* Hum power down the machine. */
 				break;
-			default:	
+			default:
 				return;
 		}
 	} else {
@@ -83,9 +83,9 @@ static void power_event(struct input_handle *handle, unsigned int type,
 				/* This is risky. See pm.h for details. */
 				if (dev->state != PM_RESUME)
 					dev->state = PM_RESUME;
-				else 
-					dev->state = PM_SUSPEND;	
-				pm_send(dev->pm_dev, dev->state, dev); 	
+				else
+					dev->state = PM_SUSPEND;
+				pm_send(dev->pm_dev, dev->state, dev);
 				break;
 			case KEY_POWER:
 				/* Turn the input device off completely ? */
@@ -97,14 +97,14 @@ static void power_event(struct input_handle *handle, unsigned int type,
 	return;
 }
 
-static struct input_handle *power_connect(struct input_handler *handler, 
-					  struct input_dev *dev, 
+static struct input_handle *power_connect(struct input_handler *handler,
+					  struct input_dev *dev,
 					  struct input_device_id *id)
 {
 	struct input_handle *handle;
 
 	if (!test_bit(EV_KEY, dev->evbit) || !test_bit(EV_PWR, dev->evbit))
-		return NULL;	
+		return NULL;
 
 	if (!test_bit(KEY_SUSPEND, dev->keybit) || (!test_bit(KEY_POWER, dev->keybit)))
 		return NULL;
@@ -133,21 +133,21 @@ static struct input_device_id power_ids[] = {
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
 		.evbit = { BIT(EV_KEY) },
 		.keybit = { [LONG(KEY_SUSPEND)] = BIT(KEY_SUSPEND) }
-	},	
+	},
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
 		.evbit = { BIT(EV_KEY) },
 		.keybit = { [LONG(KEY_POWER)] = BIT(KEY_POWER) }
-	},	
+	},
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
 		.evbit = { BIT(EV_PWR) },
-	},	
+	},
 	{ }, 	/* Terminating entry */
 };
 
 MODULE_DEVICE_TABLE(input, power_ids);
-	
+
 static struct input_handler power_handler = {
 	.event =	power_event,
 	.connect =	power_connect,
