@@ -1,7 +1,7 @@
 /*
  * file_storage.c -- File-backed USB Storage Gadget, for USB development
  *
- * Copyright (C) 2003 Alan Stern
+ * Copyright (C) 2003, 2004 Alan Stern
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -244,7 +244,7 @@
 
 #define DRIVER_DESC		"File-backed Storage Gadget"
 #define DRIVER_NAME		"g_file_storage"
-#define DRIVER_VERSION		"14 January 2004"
+#define DRIVER_VERSION		"26 January 2004"
 
 static const char longname[] = DRIVER_DESC;
 static const char shortname[] = DRIVER_NAME;
@@ -435,7 +435,7 @@ static const char EP_INTR_IN_NAME [] = "ep3-bulk";
 #define LDBG(lun,fmt,args...) \
 	yprintk(lun , KERN_DEBUG , fmt , ## args)
 #define MDBG(fmt,args...) \
-	printk(KERN_DEBUG DRIVER_NAME ": " fmt, ## args)
+	printk(KERN_DEBUG DRIVER_NAME ": " fmt , ## args)
 #else
 #define DBG(fsg,fmt,args...) \
 	do { } while (0)
@@ -473,7 +473,7 @@ static const char EP_INTR_IN_NAME [] = "ep3-bulk";
 	yprintk(lun , KERN_INFO , fmt , ## args)
 
 #define MINFO(fmt,args...) \
-	printk(KERN_INFO DRIVER_NAME ": " fmt, ## args)
+	printk(KERN_INFO DRIVER_NAME ": " fmt , ## args)
 
 
 /*-------------------------------------------------------------------------*/
@@ -848,6 +848,7 @@ struct fsg_dev {
 	unsigned int		nluns;
 	struct lun		*luns;
 	struct lun		*curlun;
+	struct completion	lun_released;
 };
 
 typedef void (*fsg_routine_t)(struct fsg_dev *);
@@ -3771,6 +3772,13 @@ static DEVICE_ATTR(file, 0444, show_file, NULL);
 
 /*-------------------------------------------------------------------------*/
 
+static void lun_release(struct device *dev)
+{
+	struct fsg_dev	*fsg = (struct fsg_dev *) dev_get_drvdata(dev);
+
+	complete(&fsg->lun_released);
+}
+
 static void fsg_unbind(struct usb_gadget *gadget)
 {
 	struct fsg_dev		*fsg = get_gadget_data(gadget);
@@ -3782,12 +3790,14 @@ static void fsg_unbind(struct usb_gadget *gadget)
 	clear_bit(REGISTERED, &fsg->atomic_bitflags);
 
 	/* Unregister the sysfs attribute files and the LUNs */
+	init_completion(&fsg->lun_released);
 	for (i = 0; i < fsg->nluns; ++i) {
 		curlun = &fsg->luns[i];
 		if (curlun->registered) {
 			device_remove_file(&curlun->dev, &dev_attr_ro);
 			device_remove_file(&curlun->dev, &dev_attr_file);
-			device_unregister_wait(&curlun->dev);
+			device_unregister(&curlun->dev);
+			wait_for_completion(&fsg->lun_released);
 			curlun->registered = 0;
 		}
 	}
@@ -4140,6 +4150,7 @@ static int __init fsg_init(void)
 			INFO(fsg, "failed to register LUN%d: %d\n", i, rc);
 		else {
 			curlun->registered = 1;
+			curlun->dev.release = lun_release;
 			device_create_file(&curlun->dev, &dev_attr_ro);
 			device_create_file(&curlun->dev, &dev_attr_file);
 		}

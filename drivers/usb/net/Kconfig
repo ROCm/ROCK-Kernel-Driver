@@ -254,13 +254,14 @@ config USB_AX8817X
 	  10/100 Ethernet devices.
 
  	  This driver should work with at least the following devices:
+	    * Aten UC210T
 	    * ASIX AX88172
 	    * D-Link DUB-E100
 	    * Hawking UF200
 	    * Linksys USB200M
 	    * Netgear FA120
-	    * Intellinet
-	    * ST Lab USB Ethernet
+	    * Intellinet USB 2.0 Ethernet
+	    * ST Lab USB 2.0 Ethernet
 	    * TrendNet TU2-ET100
 
 	  This driver creates an interface named "ethX", where X depends on

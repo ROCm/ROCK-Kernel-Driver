@@ -179,7 +179,7 @@ static inline int
 hub_clear_tt_buffer (struct usb_device *hub, u16 devinfo, u16 tt)
 {
 	return usb_control_msg (hub, usb_rcvctrlpipe (hub, 0),
-		HUB_CLEAR_TT_BUFFER, USB_DIR_IN | USB_RECIP_OTHER,
+		HUB_CLEAR_TT_BUFFER, USB_RT_PORT,
 		devinfo, tt, 0, 0, HZ);
 }
 

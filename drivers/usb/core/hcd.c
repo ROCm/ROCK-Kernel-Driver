@@ -34,7 +34,10 @@
 #include <linux/slab.h>
 #include <linux/completion.h>
 #include <linux/uts.h>			/* for UTS_SYSNAME */
-#include <linux/pci.h>			/* for hcd->pdev and dma addressing */
+#include <linux/mm.h>
+#include <asm/io.h>
+#include <asm/scatterlist.h>
+#include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <asm/byteorder.h>
 
@@ -1474,16 +1477,16 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs 
 	if (hcd->controller->dma_mask) {
 		if (usb_pipecontrol (urb->pipe)
 			&& !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP))
-			pci_unmap_single (hcd->pdev, urb->setup_dma,
+			dma_unmap_single (hcd->controller, urb->setup_dma,
 					sizeof (struct usb_ctrlrequest),
-					PCI_DMA_TODEVICE);
+					DMA_TO_DEVICE);
 		if (urb->transfer_buffer_length != 0
 			&& !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP))
-			pci_unmap_single (hcd->pdev, urb->transfer_dma,
+			dma_unmap_single (hcd->controller, urb->transfer_dma,
 					urb->transfer_buffer_length,
 					usb_pipein (urb->pipe)
-					    ? PCI_DMA_FROMDEVICE
-					    : PCI_DMA_TODEVICE);
+					    ? DMA_FROM_DEVICE
+					    : DMA_TO_DEVICE);
 	}
 
 	/* pass ownership to the completion handler */
@@ -1513,7 +1516,9 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 		return IRQ_NONE;
 
 	hcd->saw_irq = 1;
-	hcd->driver->irq (hcd, r);
+	if (hcd->driver->irq (hcd, r) == IRQ_NONE)
+		return IRQ_NONE;
+
 	if (hcd->state != start && hcd->state == USB_STATE_HALT)
 		usb_hc_died (hcd);
 	return IRQ_HANDLED;

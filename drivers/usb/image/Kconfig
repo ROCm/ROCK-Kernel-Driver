@@ -17,19 +17,6 @@ config USB_MDC800
 	  To compile this driver as a module, choose M here: the
 	  module will be called mdc800.
 
-config USB_SCANNER
-	tristate "USB Scanner support (OBSOLETE)"
-	depends on USB
-	help
-	  Say Y here if you want to connect a USB scanner to your computer's
-	  USB port. Please read <file:Documentation/usb/scanner.txt> for more
-	  information.
-
-	  This driver has been obsoleted by support via libusb.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called scanner.
-
 config USB_MICROTEK
 	tristate "Microtek X6USB scanner support"
 	depends on USB && SCSI
