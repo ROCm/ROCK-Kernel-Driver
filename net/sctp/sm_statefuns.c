@@ -4272,8 +4272,7 @@ sctp_disposition_t sctp_sf_t1_timer_expire(const struct sctp_endpoint *ep,
 
 	SCTP_DEBUG_PRINTK("Timer T1 expired.\n");
 
-	if ((timeout < asoc->max_init_timeo) &&
-	    (attempts < asoc->max_init_attempts)) {
+	if (attempts < asoc->max_init_attempts) {
 		switch (timer) {
 		case SCTP_EVENT_TIMEOUT_T1_INIT:
 			bp = (struct sctp_bind_addr *) &asoc->base.bind_addr;
