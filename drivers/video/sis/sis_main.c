@@ -39,6 +39,7 @@
 #include <linux/moduleparam.h>
 #endif
 #include <linux/kernel.h>
+#include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/string.h>
