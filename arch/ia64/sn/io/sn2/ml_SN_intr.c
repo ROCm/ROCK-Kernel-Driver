@@ -36,6 +36,25 @@ extern irqpda_t	*irqpdaindr;
 extern cnodeid_t master_node_get(vertex_hdl_t vhdl);
 extern nasid_t master_nasid;
 
+cpuid_t
+sn_get_node_first_cpu(cnodeid_t cnode) {
+	int cpuid = -1, slice;
+
+	for (slice = CPUS_PER_NODE - 1; slice >= 0; slice--) {
+		cpuid = cnode_slice_to_cpuid(cnode, slice);
+		if (cpuid == NR_CPUS)
+			continue;
+		if (!cpu_online(cpuid))
+			continue;
+		break;
+	}
+	if (slice < 0) {
+		return CPU_NONE;
+	}
+	return cpuid;
+}
+
+
 /*  Initialize some shub registers for interrupts, both IO and error. */
 void intr_init_vecblk(cnodeid_t node)
 {
@@ -43,7 +62,6 @@ void intr_init_vecblk(cnodeid_t node)
 	sh_ii_int0_config_u_t		ii_int_config;
 	cpuid_t				cpu;
 	cpuid_t				cpu0, cpu1;
-	nodepda_t			*lnodepda;
 	sh_ii_int0_enable_u_t		ii_int_enable;
 	sh_int_node_id_config_u_t	node_id_config;
 	sh_local_int5_config_u_t	local5_config;
@@ -60,15 +78,13 @@ void intr_init_vecblk(cnodeid_t node)
 		HUB_S((unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_INT_NODE_ID_CONFIG),
 			node_id_config.sh_int_node_id_config_regval);
 		cnode = nasid_to_cnodeid(master_nasid);
-		lnodepda = NODEPDA(cnode);
-		cpu = lnodepda->node_first_cpu;
+		cpu = sn_get_node_first_cpu(cnode);
 		cpu = cpu_physical_id(cpu);
 		SAL_CALL(ret_stuff, SN_SAL_REGISTER_CE, nasid, cpu, master_nasid,0,0,0,0);
 		if (ret_stuff.status < 0)
 			printk("%s: SN_SAL_REGISTER_CE SAL_CALL failed\n",__FUNCTION__);
 	} else {
-		lnodepda = NODEPDA(node);
-		cpu = lnodepda->node_first_cpu;
+		cpu = sn_get_node_first_cpu(node);
 		cpu = cpu_physical_id(cpu);
 	}
 
