@@ -680,7 +680,7 @@ static int __init pci_iommu_init(void)
 	unsigned long iommu_start;
 	struct pci_dev *dev;
 		
-#ifndef CONFIG_AGP_AMD_8151
+#ifndef CONFIG_AGP_AMD64
 	no_agp = 1; 
 #else
 	/* Makefile puts PCI initialization via subsys_initcall first. */
