@@ -23,7 +23,6 @@
     This driver puts entries in /proc/sys/dev/sensors for each I2C device
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -31,14 +30,10 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/ioport.h>
-#include <asm/uaccess.h>
 #include <linux/i2c.h>
 #include <linux/i2c-proc.h>
 #include <linux/init.h>
-
-#ifndef THIS_MODULE
-#define THIS_MODULE NULL
-#endif
+#include <asm/uaccess.h>
 
 static int i2c_create_name(char **name, const char *prefix,
 			       struct i2c_adapter *adapter, int addr);
@@ -56,7 +51,6 @@ static int i2c_sysctl_chips(ctl_table * table, int *name, int nlen,
 
 #define SENSORS_ENTRY_MAX 20
 static struct ctl_table_header *i2c_entries[SENSORS_ENTRY_MAX];
-static unsigned short i2c_inodes[SENSORS_ENTRY_MAX];
 
 static struct i2c_client *i2c_clients[SENSORS_ENTRY_MAX];
 
@@ -197,8 +191,6 @@ int i2c_register_entry(struct i2c_client *client, const char *prefix,
 		return id;
 	}
 #endif				/* DEBUG */
-	i2c_inodes[id - 256] =
-	    new_header->ctl_table->child->child->de->low_ino;
 	new_header->ctl_table->child->child->de->owner = controlling_mod;
 
 	return id;

@@ -61,11 +61,7 @@ static int own   = 0;
 
 static int i2c_debug=0;
 static struct iic_ite gpi;
-#if (LINUX_VERSION_CODE < 0x020301)
-static struct wait_queue *iic_wait = NULL;
-#else
 static wait_queue_head_t iic_wait;
-#endif
 static int iic_pending;
 
 /* ----- global defines -----------------------------------------------	*/
@@ -236,9 +232,7 @@ static int __init iic_ite_init(void)
 		piic->iic_own = own;
 
 	iic_ite_data.data = (void *)piic;
-#if (LINUX_VERSION_CODE >= 0x020301)
 	init_waitqueue_head(&iic_wait);
-#endif
 	if (iic_hw_resrc_init() == 0) {
 		if (i2c_iic_add_bus(&iic_ite_ops) < 0)
 			return -ENODEV;
