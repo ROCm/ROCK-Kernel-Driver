@@ -473,6 +473,7 @@ static int __init snd_sb16_probe(int dev)
 			snd_card_free(card);
 			return -ENXIO;
 		}
+		chip->rmidi_callback = snd_mpu401_uart_interrupt;
 	}
 
 	if (fm_port[dev] > 0) {

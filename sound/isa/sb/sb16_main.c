@@ -396,8 +396,8 @@ void snd_sb16dsp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock(&chip->mixer_lock);
 	status = snd_sbmixer_read(chip, SB_DSP4_IRQSTATUS);
 	spin_unlock(&chip->mixer_lock);
-	if ((status & SB_IRQTYPE_MPUIN) && chip->rmidi)
-		snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
+	if ((status & SB_IRQTYPE_MPUIN) && chip->rmidi_callback)
+		chip->rmidi_callback(irq, chip->rmidi->private_data, regs);
 	if (status & SB_IRQTYPE_8BIT) {
 		ok = 0;
 		if (chip->mode & SB_MODE_PLAYBACK_8) {

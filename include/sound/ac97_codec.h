@@ -89,7 +89,7 @@
 #define AC97_BC_BASS_TREBLE	0x0004	/* Bass & Treble Control */
 #define AC97_BC_SIM_STEREO	0x0008	/* Simulated stereo */
 #define AC97_BC_HEADPHONE	0x0010	/* Headphone Out Support */
-#define AC97_BC_LOUDNESS	0x0020	/* Loudness (bass boost) Supporqt */
+#define AC97_BC_LOUDNESS	0x0020	/* Loudness (bass boost) Support */
 #define AC97_BC_16BIT_DAC	0x0000	/* 16-bit DAC resolution */
 #define AC97_BC_18BIT_DAC	0x0040	/* 18-bit DAC resolution */
 #define AC97_BC_20BIT_DAC	0x0080	/* 20-bit DAC resolution */
@@ -194,6 +194,10 @@
 #define AC97_CXR_SPDIF_MASK	(3<<0)
 #define AC97_CXR_SPDIF_PCM	0x0
 #define AC97_CXR_SPDIF_AC3	0x2
+
+/* specific - ALC */
+#define AC97_ALC650_MULTICH	0x6a
+#define AC97_ALC650_CLOCK	0x7a
 
 /* ac97->scaps */
 #define AC97_SCAP_AUDIO		(1<<0)	/* audio AC'97 codec */
