@@ -76,6 +76,7 @@ struct serio_dev {
 int serio_open(struct serio *serio, struct serio_dev *dev);
 void serio_close(struct serio *serio);
 void serio_rescan(struct serio *serio);
+void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags);
 
 void serio_register_port(struct serio *serio);
 void serio_unregister_port(struct serio *serio);
@@ -91,12 +92,6 @@ static __inline__ void serio_dev_write_wakeup(struct serio *serio)
 {
 	if (serio->dev && serio->dev->write_wakeup)
 		serio->dev->write_wakeup(serio);
-}
-
-static __inline__ void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
-{
-	if (serio->dev && serio->dev->interrupt) 
-		serio->dev->interrupt(serio, data, flags);
 }
 
 #define SERIO_TIMEOUT	1

@@ -111,6 +111,14 @@ void serio_rescan(struct serio *serio)
 	wake_up(&serio_wait);
 }
 
+void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+{       
+        if (serio->dev && serio->dev->interrupt) 
+                serio->dev->interrupt(serio, data, flags);
+	else
+		serio_rescan(serio);
+}
+
 void serio_register_port(struct serio *serio)
 {
 	serio->next = serio_list;	

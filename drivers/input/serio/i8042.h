@@ -28,12 +28,6 @@
  */
 
 /*
- * If you want to reset your i8042 upon boot, define this.
- */
-
-#undef I8042_RESET
-
-/*
  * If you want to trace all the i/o the i8042 module does for
  * debugging purposes, define this.
  */
@@ -61,6 +55,15 @@
  */
 
 #define I8042_CTL_TIMEOUT	10000
+
+/*
+ * When the device isn't opened and it's interrupts aren't used, we poll it at
+ * regular intervals to see if any characters arrived. If yes, we can start
+ * probing for any mouse / keyboard connected. This is the period of the
+ * polling.
+ */
+
+#define I8042_POLL_PERIOD	HZ/20
 
 /*
  * Register numbers.
