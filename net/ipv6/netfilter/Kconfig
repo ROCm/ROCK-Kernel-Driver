@@ -218,5 +218,17 @@ config IP6_NF_TARGET_MARK
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 #dep_tristate '  LOG target support' CONFIG_IP6_NF_TARGET_LOG $CONFIG_IP6_NF_IPTABLES
+config IP6_NF_RAW
+	tristate  'raw table support (required for TRACE)'
+	depends on IP6_NF_IPTABLES
+	help
+	  This option adds a `raw' table to ip6tables. This table is the very
+	  first in the netfilter framework and hooks in at the PREROUTING
+	  and OUTPUT chains.
+	
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  help
+
 endmenu
 

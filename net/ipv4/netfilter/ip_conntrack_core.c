@@ -67,6 +67,7 @@ int ip_conntrack_max;
 static atomic_t ip_conntrack_count = ATOMIC_INIT(0);
 struct list_head *ip_conntrack_hash;
 static kmem_cache_t *ip_conntrack_cachep;
+struct ip_conntrack ip_conntrack_untracked;
 
 extern struct ip_conntrack_protocol ip_conntrack_generic_protocol;
 
@@ -794,6 +795,15 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	int set_reply;
 	int ret;
 
+	/* Never happen */
+	if ((*pskb)->nh.iph->frag_off & htons(IP_OFFSET)) {
+		if (net_ratelimit()) {
+		printk(KERN_ERR "ip_conntrack_in: Frag of proto %u (hook=%u)\n",
+		       (*pskb)->nh.iph->protocol, hooknum);
+		}
+		return NF_DROP;
+	}
+
 	/* FIXME: Do this right please. --RR */
 	(*pskb)->nfcache |= NFC_UNKNOWN;
 
@@ -812,17 +822,9 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	}
 #endif
 
-	/* Previously seen (loopback)?  Ignore.  Do this before
-           fragment check. */
+	/* Previously seen (loopback or untracked)?  Ignore. */
 	if ((*pskb)->nfct)
 		return NF_ACCEPT;
-
-	/* Gather fragments. */
-	if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
-		*pskb = ip_ct_gather_frags(*pskb);
-		if (!*pskb)
-			return NF_STOLEN;
-	}
 
 	proto = ip_ct_find_proto((*pskb)->nh.iph->protocol);
 
@@ -1442,6 +1444,18 @@ int __init ip_conntrack_init(void)
 
 	/* For use by ipt_REJECT */
 	ip_ct_attach = ip_conntrack_attach;
+
+	/* Set up fake conntrack:
+	    - to never be deleted, not in any hashes */
+	atomic_set(&ip_conntrack_untracked.ct_general.use, 1);
+	/*  - and look it like as a confirmed connection */
+	set_bit(IPS_CONFIRMED_BIT, &ip_conntrack_untracked.status);
+	/*  - and prepare the ctinfo field for REJECT & NAT. */
+	ip_conntrack_untracked.infos[IP_CT_NEW].master =
+	ip_conntrack_untracked.infos[IP_CT_RELATED].master =
+	ip_conntrack_untracked.infos[IP_CT_RELATED + IP_CT_IS_REPLY].master = 
+			&ip_conntrack_untracked.ct_general;
+
 	return ret;
 
 err_free_hash:

@@ -1016,6 +1016,10 @@ int __init ip_nat_init(void)
 	/* FIXME: Man, this is a hack.  <SIGH> */
 	IP_NF_ASSERT(ip_conntrack_destroyed == NULL);
 	ip_conntrack_destroyed = &ip_nat_cleanup_conntrack;
+	
+	/* Initialize fake conntrack so that NAT will skip it */
+	ip_conntrack_untracked.nat.info.initialized |= 
+		(1 << IP_NAT_MANIP_SRC) | (1 << IP_NAT_MANIP_DST);
 
 	return 0;
 }
