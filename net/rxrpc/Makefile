@@ -2,7 +2,7 @@
 # Makefile for Linux kernel Rx RPC
 #
 
-rxrpc-objs := \
+rxrpc-y := \
 	call.o \
 	connection.o \
 	krxiod.o \
@@ -13,11 +13,7 @@ rxrpc-objs := \
 	rxrpc_syms.o \
 	transport.o
 
-ifeq ($(CONFIG_PROC_FS),y)
-rxrpc-objs += proc.o
-endif
-ifeq ($(CONFIG_SYSCTL),y)
-rxrpc-objs += sysctl.o
-endif
+rxrpc-$(CONFIG_PROC_FS) += proc.o
+rxrpc-$(CONFIG_SYSCTL)  += sysctl.o
 
 obj-$(CONFIG_RXRPC) := rxrpc.o
