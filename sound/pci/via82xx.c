@@ -248,6 +248,8 @@ DEFINE_VIA_REGSET(CAPTURE_8233, 0x60);
 #define VIA_REG_OFS_CAPTURE_FIFO	0x02	/* byte - bit 6 = fifo  enable */
 #define   VIA_REG_CAPTURE_FIFO_ENABLE	0x40
 
+#define VIA_DXS_MAX_VOLUME		31	/* max. volume (attenuation) of reg 0x32/33 */
+
 #define VIA_REG_CAPTURE_CHANNEL		0x63	/* byte - input select */
 #define   VIA_REG_CAPTURE_CHANNEL_MIC	0x4
 #define   VIA_REG_CAPTURE_CHANNEL_LINE	0
@@ -1481,7 +1483,7 @@ static int snd_via8233_dxs_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_in
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 2;
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 0xff;
+	uinfo->value.integer.max = VIA_DXS_MAX_VOLUME;
 	return 0;
 }
 
@@ -1489,8 +1491,8 @@ static int snd_via8233_dxs_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 {
 	via82xx_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned int idx = snd_ctl_get_ioff(kcontrol, &ucontrol->id);
-	ucontrol->value.integer.value[0] = 0xff - chip->playback_volume[idx][0];
-	ucontrol->value.integer.value[1] = 0xff - chip->playback_volume[idx][1];
+	ucontrol->value.integer.value[0] = VIA_DXS_MAX_VOLUME - chip->playback_volume[idx][0];
+	ucontrol->value.integer.value[1] = VIA_DXS_MAX_VOLUME - chip->playback_volume[idx][1];
 	return 0;
 }
 
@@ -1500,19 +1502,18 @@ static int snd_via8233_dxs_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 	unsigned int idx = snd_ctl_get_ioff(kcontrol, &ucontrol->id);
 	unsigned long port = chip->port + 0x10 * idx;
 	unsigned char val;
-	int change;
+	int i, change = 0;
 
-	val = 0xff - ucontrol->value.integer.value[0];
-	change = val != chip->playback_volume[idx][0];
-	if (change) {
-		chip->playback_volume[idx][0] = val;
-		outb(val, port + VIA_REG_OFS_PLAYBACK_VOLUME_L);
-	}
-	val = 0xff - ucontrol->value.integer.value[1];
-	change |= val != chip->playback_volume[idx][1];
-	if (change) {
-		chip->playback_volume[idx][1] = val;
-		outb(val, port + VIA_REG_OFS_PLAYBACK_VOLUME_R);
+	for (i = 0; i < 2; i++) {
+		val = ucontrol->value.integer.value[i];
+		if (val > VIA_DXS_MAX_VOLUME)
+			val = VIA_DXS_MAX_VOLUME;
+		val = VIA_DXS_MAX_VOLUME - val;
+		change |= val != chip->playback_volume[idx][i];
+		if (change) {
+			chip->playback_volume[idx][i] = val;
+			outb(val, port + VIA_REG_OFS_PLAYBACK_VOLUME_L + i);
+		}
 	}
 	return change;
 }
@@ -1986,6 +1987,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
 		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_ENABLE }, /* ASUS A7V600 */
 		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
+		{ .vendor = 0x1106, .device = 0x4161, .action = VIA_DXS_NO_VRA }, /* ASRock K7VT2 */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
 		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x147b, .device = 0x1401, .action = VIA_DXS_ENABLE }, /* ABIT KD7(-RAID) */
