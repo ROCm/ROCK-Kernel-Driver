@@ -46,6 +46,7 @@
 #include <asm/io.h>
 #include <asm/eeh.h>
 #include <asm/tlb.h>
+#include <asm/cacheflush.h>
 
 /*
  * Note:  pte   --> Linux PTE
@@ -347,6 +348,9 @@ repeat:
 				goto repeat;
                         }
 		}
+
+		if (unlikely(slot == -2))
+			panic("hash_page: pte_insert failed\n");
 
 		pte_val(new_pte) |= (slot<<12) & _PAGE_GROUP_IX;
 

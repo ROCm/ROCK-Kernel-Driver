@@ -89,11 +89,13 @@ extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 extern int abs(int);
 
 struct task_struct;
-extern void __switch_to(struct task_struct *, struct task_struct *);
-#define switch_to(prev, next, last) __switch_to((prev), (next))
+extern struct task_struct *__switch_to(struct task_struct *,
+				       struct task_struct *);
+#define switch_to(prev, next, last)	((last) = __switch_to((prev), (next)))
 
 struct thread_struct;
-extern void _switch(struct thread_struct *prev, struct thread_struct *next);
+extern struct task_struct * _switch(struct thread_struct *prev,
+				    struct thread_struct *next);
 
 struct pt_regs;
 extern void dump_regs(struct pt_regs *);

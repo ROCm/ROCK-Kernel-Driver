@@ -44,6 +44,8 @@ $(boottarget-y): vmlinux
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/ppc64/boot
 
+archmrproper:
+
 prepare: include/asm-ppc64/offsets.h
 
 arch/ppc64/kernel/asm-offsets.s: include/asm include/linux/version.h \
