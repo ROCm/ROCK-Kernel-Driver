@@ -2037,32 +2037,6 @@ out:
     return retval ;
 }
 
-/*
- * does the right thing for deciding when to lock a buffer and
- * mark it for io during a writepage.  make sure the buffer is
- * dirty before sending it here though.
- */
-static void lock_buffer_for_writepage(struct page *page, 
-                                      struct writeback_control *wbc, 
-			              struct buffer_head *bh)
-{
-    if (wbc->sync_mode != WB_SYNC_NONE) {
-	lock_buffer(bh);
-    } else {
-	if (test_set_buffer_locked(bh)) {
-	    __set_page_dirty_nobuffers(page);
-	    return;
-	}
-    }
-    if (test_clear_buffer_dirty(bh)) {
-	if (!buffer_uptodate(bh))
-	    buffer_error();
-	mark_buffer_async_write(bh);
-    } else {
-	unlock_buffer(bh);
-    }
-}
-
 /* 
  * mason@suse.com: updated in 2.5.54 to follow the same general io 
  * start/recovery path as __block_write_full_page, along with special
@@ -2110,28 +2084,49 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     }
     bh = head ;
     block = page->index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits) ;
+    /* first map all the buffers, logging any direct items we find */
     do {
-	get_bh(bh);
-	if (buffer_dirty(bh)) {
-	    if (buffer_mapped(bh) && bh->b_blocknr != 0) {
-		/* buffer mapped to an unformatted node */
-		lock_buffer_for_writepage(page, wbc, bh);
-	    } else {
-		/* not mapped yet, or it points to a direct item, search
-		 * the btree for the mapping info, and log any direct
-		 * items found
-		 */
-		if ((error = map_block_for_writepage(inode, bh, block))) {
-		    goto fail ;
-		}
-		if (buffer_mapped(bh) && bh->b_blocknr != 0)  {
-		    lock_buffer_for_writepage(page, wbc, bh);
-		} 
+	if (buffer_dirty(bh) && (!buffer_mapped(bh) ||
+	   (buffer_mapped(bh) && bh->b_blocknr == 0))) {
+	    /* not mapped yet, or it points to a direct item, search
+	     * the btree for the mapping info, and log any direct
+	     * items found
+	     */
+	    if ((error = map_block_for_writepage(inode, bh, block))) {
+		goto fail ;
 	    }
 	}
         bh = bh->b_this_page;
 	block++;
     } while(bh != head) ;
+
+    /* now go through and lock any dirty buffers on the page */
+    do {
+	get_bh(bh);
+	if (!buffer_mapped(bh))
+	    continue;
+	if (buffer_mapped(bh) && bh->b_blocknr == 0)
+	    continue;
+
+	/* from this point on, we know the buffer is mapped to a
+	 * real block and not a direct item
+	 */
+	if (wbc->sync_mode != WB_SYNC_NONE) {
+	    lock_buffer(bh);
+	} else {
+	    if (test_set_buffer_locked(bh)) {
+		__set_page_dirty_nobuffers(page);
+		continue;
+	    }
+	}
+	if (test_clear_buffer_dirty(bh)) {
+	    if (!buffer_uptodate(bh))
+		buffer_error();
+	    mark_buffer_async_write(bh);
+	} else {
+	    unlock_buffer(bh);
+	}
+    } while((bh = bh->b_this_page) != head);
 
     BUG_ON(PageWriteback(page));
     set_page_writeback(page);
