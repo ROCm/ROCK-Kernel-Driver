@@ -422,7 +422,7 @@ static inline void hidp_setup_input(struct hidp_session *session, struct hidp_co
 	input->id.version = req->version;
 
 	baswap(&bdaddr, &session->bdaddr);
-	sprintf(input->cdev.class_id, "hidp_%s", batostr(&bdaddr));
+	snprintf(input->cdev.class_id, BUS_ID_SIZE, "hidp_%s", batostr(&bdaddr));
 
 	if (req->subclass & 0x40) {
 		set_bit(EV_KEY, input->evbit);

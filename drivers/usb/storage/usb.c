@@ -320,7 +320,8 @@ static int usb_stor_control_thread(void * __us)
 
 		/* don't do anything if we are disconnecting */
 		if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
-			US_DEBUGP("No command during disconnect\n");
+			US_DEBUGP("Ignoring command during disconnect\n");
+			us->srb->result = DID_NO_CONNECT << 16;
 			goto SkipForDisconnect;
 		}
 
@@ -374,6 +375,7 @@ static int usb_stor_control_thread(void * __us)
 		/* lock access to the state */
 		scsi_lock(host);
 
+SkipForDisconnect:
 		/* indicate that the command is done */
 		if (us->srb->result != DID_ABORT << 16) {
 			US_DEBUGP("scsi cmd done, result=0x%x\n", 
@@ -393,7 +395,6 @@ SkipForAbort:
 			complete(&(us->notify));
 
 		/* empty the queue, reset the state, and release the lock */
-SkipForDisconnect:
 		us->srb = NULL;
 		us->sm_state = US_STATE_IDLE;
 		scsi_unlock(host);
