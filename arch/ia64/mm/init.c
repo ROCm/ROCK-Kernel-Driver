@@ -78,7 +78,7 @@ ia64_init_addr_space (void)
 		vma->vm_mm = current->mm;
 		vma->vm_start = IA64_RBS_BOT;
 		vma->vm_end = vma->vm_start + PAGE_SIZE;
-		vma->vm_page_prot = PAGE_COPY;
+		vma->vm_page_prot = protection_map[VM_READ | VM_WRITE];
 		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE|VM_GROWSUP;
 		vma->vm_ops = NULL;
 		vma->vm_pgoff = 0;
