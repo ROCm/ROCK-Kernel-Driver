@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.36 2003/02/18 09:15:14 mschwide Exp $
+ * $Id: ctcmain.c,v 1.40 2003/04/08 16:00:17 mschwide Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,13 +36,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.36 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.40 $
  *
  */
 
 #undef DEBUG
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -273,7 +272,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.36 $";
+	char vbuf[] = "$Revision: 1.40 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -1962,22 +1961,17 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	}
 	
 	priv = cdev->dev.driver_data;
-	ch = (struct channel *) intparm;
-	if ((ch != priv->channel[READ]) && (ch != priv->channel[WRITE]))
-		ch = NULL;
-	
-	if (!ch) {
-		/* Try to extract channel from driver data. */
-		if (priv->channel[READ]->cdev == cdev)
-			ch = priv->channel[READ];
-		else if (priv->channel[WRITE]->cdev == cdev)
-			ch = priv->channel[READ];
-		else {
-			printk(KERN_ERR
-			       "ctc: Can't determine channel for interrupt, "
-			       "device %s\n", cdev->dev.bus_id);
-			return;
-		}
+
+	/* Try to extract channel from driver data. */
+	if (priv->channel[READ]->cdev == cdev)
+		ch = priv->channel[READ];
+	else if (priv->channel[WRITE]->cdev == cdev)
+		ch = priv->channel[READ];
+	else {
+		printk(KERN_ERR
+		       "ctc: Can't determine channel for interrupt, "
+		       "device %s\n", cdev->dev.bus_id);
+		return;
 	}
 	
 	dev = (struct net_device *) (ch->netdev);
@@ -2392,7 +2386,6 @@ transmit_skb(struct channel *ch, struct sk_buff *skb)
 static int
 ctc_open(struct net_device * dev)
 {
-	MOD_INC_USE_COUNT;
 	fsm_event(((struct ctc_priv *) dev->priv)->fsm, DEV_EVENT_START, dev);
 	return 0;
 }
@@ -2409,7 +2402,6 @@ static int
 ctc_close(struct net_device * dev)
 {
 	fsm_event(((struct ctc_priv *) dev->priv)->fsm, DEV_EVENT_STOP, dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -2761,6 +2753,7 @@ ctc_init_netdevice(struct net_device * dev, int alloc_device,
 	dev->addr_len = 0;
 	dev->type = ARPHRD_SLIP;
 	dev->tx_queue_len = 100;
+	dev->owner = THIS_MODULE;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 	return dev;
 }

@@ -17,6 +17,7 @@
 #ifndef _LINUX_TCP_H
 #define _LINUX_TCP_H
 
+#include <linux/config.h>
 #include <linux/skbuff.h>
 #include <asm/byteorder.h>
 #include <net/sock.h>

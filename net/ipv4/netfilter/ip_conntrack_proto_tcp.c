@@ -96,13 +96,18 @@ static enum tcp_conntrack tcp_conntracks[2][5][TCP_CONNTRACK_MAX] = {
 	}
 };
 
-static int tcp_pkt_to_tuple(const void *datah, size_t datalen,
-			    struct ip_conntrack_tuple *tuple)
+static int tcp_pkt_to_tuple(const struct sk_buff *skb,
+			     unsigned int dataoff,
+			     struct ip_conntrack_tuple *tuple)
 {
-	const struct tcphdr *hdr = datah;
+	struct tcphdr hdr;
 
-	tuple->src.u.tcp.port = hdr->source;
-	tuple->dst.u.tcp.port = hdr->dest;
+	/* Actually only need first 8 bytes. */
+	if (skb_copy_bits(skb, dataoff, &hdr, 8) != 0)
+		return 0;
+
+	tuple->src.u.tcp.port = hdr.source;
+	tuple->dst.u.tcp.port = hdr.dest;
 
 	return 1;
 }
@@ -148,30 +153,26 @@ static unsigned int get_conntrack_index(const struct tcphdr *tcph)
 
 /* Returns verdict for packet, or -1 for invalid. */
 static int tcp_packet(struct ip_conntrack *conntrack,
-		      struct iphdr *iph, size_t len,
+		      const struct sk_buff *skb,
 		      enum ip_conntrack_info ctinfo)
 {
 	enum tcp_conntrack newconntrack, oldtcpstate;
-	struct tcphdr *tcph = (struct tcphdr *)((u_int32_t *)iph + iph->ihl);
+	struct tcphdr tcph;
 
-	/* We're guaranteed to have the base header, but maybe not the
-           options. */
-	if (len < (iph->ihl + tcph->doff) * 4) {
-		DEBUGP("ip_conntrack_tcp: Truncated packet.\n");
+	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4, &tcph, sizeof(tcph)) != 0)
 		return -1;
-	}
 
 	WRITE_LOCK(&tcp_lock);
 	oldtcpstate = conntrack->proto.tcp.state;
 	newconntrack
 		= tcp_conntracks
 		[CTINFO2DIR(ctinfo)]
-		[get_conntrack_index(tcph)][oldtcpstate];
+		[get_conntrack_index(&tcph)][oldtcpstate];
 
 	/* Invalid */
 	if (newconntrack == TCP_CONNTRACK_MAX) {
 		DEBUGP("ip_conntrack_tcp: Invalid dir=%i index=%u conntrack=%u\n",
-		       CTINFO2DIR(ctinfo), get_conntrack_index(tcph),
+		       CTINFO2DIR(ctinfo), get_conntrack_index(&tcph),
 		       conntrack->proto.tcp.state);
 		WRITE_UNLOCK(&tcp_lock);
 		return -1;
@@ -182,15 +183,15 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 	/* Poor man's window tracking: record SYN/ACK for handshake check */
 	if (oldtcpstate == TCP_CONNTRACK_SYN_SENT
 	    && CTINFO2DIR(ctinfo) == IP_CT_DIR_REPLY
-	    && tcph->syn && tcph->ack)
+	    && tcph.syn && tcph.ack)
 		conntrack->proto.tcp.handshake_ack
-			= htonl(ntohl(tcph->seq) + 1);
+			= htonl(ntohl(tcph.seq) + 1);
 
 	/* If only reply is a RST, we can consider ourselves not to
 	   have an established connection: this is a fairly common
 	   problem case, so we can delete the conntrack
 	   immediately.  --RR */
-	if (!test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status) && tcph->rst) {
+	if (!test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status) && tcph.rst) {
 		WRITE_UNLOCK(&tcp_lock);
 		if (del_timer(&conntrack->timeout))
 			conntrack->timeout.function((unsigned long)conntrack);
@@ -198,8 +199,8 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		/* Set ASSURED if we see see valid ack in ESTABLISHED after SYN_RECV */
 		if (oldtcpstate == TCP_CONNTRACK_SYN_RECV
 		    && CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL
-		    && tcph->ack && !tcph->syn
-		    && tcph->ack_seq == conntrack->proto.tcp.handshake_ack)
+		    && tcph.ack && !tcph.syn
+		    && tcph.ack_seq == conntrack->proto.tcp.handshake_ack)
 			set_bit(IPS_ASSURED_BIT, &conntrack->status);
 
 		WRITE_UNLOCK(&tcp_lock);
@@ -210,15 +211,17 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 }
 
 /* Called when a new connection for this protocol found. */
-static int tcp_new(struct ip_conntrack *conntrack,
-		   struct iphdr *iph, size_t len)
+static int tcp_new(struct ip_conntrack *conntrack, const struct sk_buff *skb)
 {
 	enum tcp_conntrack newconntrack;
-	struct tcphdr *tcph = (struct tcphdr *)((u_int32_t *)iph + iph->ihl);
+	struct tcphdr tcph;
+
+	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4, &tcph, sizeof(tcph)) != 0)
+		return -1;
 
 	/* Don't need lock here: this conntrack not in circulation yet */
 	newconntrack
-		= tcp_conntracks[0][get_conntrack_index(tcph)]
+		= tcp_conntracks[0][get_conntrack_index(&tcph)]
 		[TCP_CONNTRACK_NONE];
 
 	/* Invalid: delete conntrack */
@@ -232,15 +235,17 @@ static int tcp_new(struct ip_conntrack *conntrack,
 }
 
 static int tcp_exp_matches_pkt(struct ip_conntrack_expect *exp,
-			       struct sk_buff **pskb)
+			       const struct sk_buff *skb)
 {
-	struct iphdr *iph = (*pskb)->nh.iph;
-	struct tcphdr *tcph = (struct tcphdr *)((u_int32_t *)iph + iph->ihl);
+	const struct iphdr *iph = skb->nh.iph;
+	struct tcphdr tcph;
 	unsigned int datalen;
 
-	datalen = (*pskb)->len - iph->ihl*4 - tcph->doff*4;
+	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4, &tcph, sizeof(tcph)) != 0)
+		return 0;
+	datalen = skb->len - iph->ihl*4 - tcph.doff*4;
 
-	return between(exp->seq, ntohl(tcph->seq), ntohl(tcph->seq) + datalen);
+	return between(exp->seq, ntohl(tcph.seq), ntohl(tcph.seq) + datalen);
 }
 
 struct ip_conntrack_protocol ip_conntrack_protocol_tcp

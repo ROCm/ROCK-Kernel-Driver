@@ -730,15 +730,15 @@ manip_pkt(u_int16_t proto, struct iphdr *iph, size_t len,
 }
 
 static inline int exp_for_packet(struct ip_conntrack_expect *exp,
-			         struct sk_buff **pskb)
+			         struct sk_buff *skb)
 {
 	struct ip_conntrack_protocol *proto;
 	int ret = 1;
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	proto = __ip_ct_find_proto((*pskb)->nh.iph->protocol);
+	proto = __ip_ct_find_proto(skb->nh.iph->protocol);
 	if (proto->exp_matches_pkt)
-		ret = proto->exp_matches_pkt(exp, pskb);
+		ret = proto->exp_matches_pkt(exp, skb);
 
 	return ret;
 }
@@ -813,7 +813,7 @@ do_bindings(struct ip_conntrack *ct,
 			if (exp->sibling)
 				continue;
 
-			if (exp_for_packet(exp, pskb)) {
+			if (exp_for_packet(exp, *pskb)) {
 				/* FIXME: May be true multiple times in the case of UDP!! */
 				DEBUGP("calling nat helper (exp=%p) for packet\n",
 					exp);

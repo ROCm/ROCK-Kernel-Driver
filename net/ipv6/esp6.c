@@ -501,7 +501,7 @@ static struct xfrm_type esp6_type =
 static struct inet6_protocol esp6_protocol = {
 	.handler 	=	xfrm6_rcv,
 	.err_handler	=	esp6_err,
-	.no_policy	=	1,
+	.flags		=	INET6_PROTO_NOPOLICY,
 };
 
 int __init esp6_init(void)

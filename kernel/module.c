@@ -165,7 +165,7 @@ static unsigned long __find_symbol(const char *name,
 		if (gplok) {
 			for (i = 0; i < mod->num_gpl_syms; i++) {
 				if (strcmp(mod->gpl_syms[i].name, name) == 0) {
-					*crc = symversion(mod->crcs, i);
+					*crc = symversion(mod->gpl_crcs, i);
 					return mod->gpl_syms[i].value;
 				}
 			}

@@ -805,7 +805,6 @@ static int __init inet6_init(void)
 	sit_init();
 
 	/* Init v6 extension headers. */
-	ipv6_hopopts_init();
 	ipv6_rthdr_init();
 	ipv6_frag_init();
 	ipv6_nodata_init();

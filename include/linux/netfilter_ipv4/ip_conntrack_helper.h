@@ -25,7 +25,7 @@ struct ip_conntrack_helper
 	
 	/* Function to call when data passes; return verdict, or -1 to
            invalidate. */
-	int (*help)(const struct iphdr *, size_t len,
+	int (*help)(struct sk_buff *skb,
 		    struct ip_conntrack *ct,
 		    enum ip_conntrack_info conntrackinfo);
 };

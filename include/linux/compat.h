@@ -47,5 +47,29 @@ struct compat_iovec {
 	compat_size_t	iov_len;
 };
 
+struct compat_rlimit {
+	compat_ulong_t	rlim_cur;
+	compat_ulong_t	rlim_max;
+};
+
+struct compat_rusage {
+	struct compat_timeval ru_utime;
+	struct compat_timeval ru_stime;
+	compat_long_t	ru_maxrss;
+	compat_long_t	ru_ixrss;
+	compat_long_t	ru_idrss;
+	compat_long_t	ru_isrss;
+	compat_long_t	ru_minflt;
+	compat_long_t	ru_majflt;
+	compat_long_t	ru_nswap;
+	compat_long_t	ru_inblock;
+	compat_long_t	ru_oublock;
+	compat_long_t	ru_msgsnd;
+	compat_long_t	ru_msgrcv;
+	compat_long_t	ru_nsignals;
+	compat_long_t	ru_nvcsw;
+	compat_long_t	ru_nivcsw;
+};
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

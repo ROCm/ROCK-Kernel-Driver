@@ -279,9 +279,9 @@ ia32_sys_call_table:
 	.quad stub32_sigsuspend
 	.quad compat_sys_sigpending
 	.quad sys_sethostname
-	.quad sys32_setrlimit	/* 75 */
-	.quad sys32_old_getrlimit	/* old_getrlimit */
-	.quad sys32_getrusage
+	.quad compat_sys_setrlimit	/* 75 */
+	.quad compat_sys_old_getrlimit	/* old_getrlimit */
+	.quad compat_sys_getrusage
 	.quad sys32_gettimeofday
 	.quad sys32_settimeofday
 	.quad sys_getgroups16	/* 80 */
@@ -318,7 +318,7 @@ ia32_sys_call_table:
 	.quad sys_vhangup
 	.quad ni_syscall	/* old "idle" system call */
 	.quad sys32_vm86_warning	/* vm86old */ 
-	.quad sys32_wait4
+	.quad compat_sys_wait4
 	.quad sys_swapoff		/* 115 */
 	.quad sys32_sysinfo
 	.quad sys32_ipc
@@ -395,7 +395,7 @@ ia32_sys_call_table:
 	.quad ni_syscall		/* streams1 */
 	.quad ni_syscall		/* streams2 */
 	.quad stub32_vfork            /* 190 */
-	.quad sys32_getrlimit
+	.quad compat_sys_getrlimit
 	.quad sys32_mmap2
 	.quad sys_truncate
 	.quad sys_ftruncate

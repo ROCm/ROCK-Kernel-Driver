@@ -42,6 +42,7 @@
 # define NR_IRQS	40
 
 #elif defined(CONFIG_ALPHA_DP264) || \
+      defined(CONFIG_ALPHA_LYNX)  || \
       defined(CONFIG_ALPHA_SHARK) || \
       defined(CONFIG_ALPHA_EIGER)
 # define NR_IRQS	64

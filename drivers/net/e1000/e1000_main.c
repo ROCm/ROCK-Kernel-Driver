@@ -61,7 +61,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.0.43-k1";
+char e1000_driver_version[] = "5.0.43-k2";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -2000,10 +2000,16 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 	}
 
 #ifdef CONFIG_E1000_NAPI
-	/* Don't disable interrupts - rely on h/w interrupt
-	 * moderation to keep interrupts low.  netif_rx_schedule
-	 * is NOP if already polling. */
-	netif_rx_schedule(netdev);
+	if(netif_rx_schedule_prep(netdev)) {
+
+		/* Disable interrupts and register for poll. The flush 
+		  of the posted write is intentionally left out.
+		*/
+
+		atomic_inc(&adapter->irq_sem);
+		E1000_WRITE_REG(&adapter->hw, IMC, ~0);
+		__netif_rx_schedule(netdev);
+	}
 #else
 	for(i = 0; i < E1000_MAX_INTR; i++)
 		if(!e1000_clean_rx_irq(adapter) &&
@@ -2025,16 +2031,16 @@ e1000_clean(struct net_device *netdev, int *budget)
 	int work_to_do = min(*budget, netdev->quota);
 	int work_done = 0;
 	
-	while(work_done < work_to_do)
-		if(!e1000_clean_rx_irq(adapter, &work_done, work_to_do) &&
-		   !e1000_clean_tx_irq(adapter))
-			break;
+	e1000_clean_tx_irq(adapter);
+	e1000_clean_rx_irq(adapter, &work_done, work_to_do);
 
 	*budget -= work_done;
 	netdev->quota -= work_done;
 	
-	if(work_done < work_to_do)
+	if(work_done < work_to_do) {
 		netif_rx_complete(netdev);
+		e1000_irq_enable(adapter);
+	}
 
 	return (work_done >= work_to_do);
 }

@@ -146,6 +146,12 @@ check_for_demasq(struct sk_buff **pskb)
 			   server here (== DNAT).  Do SNAT icmp manips
 			   in POST_ROUTING handling. */
 			if (CTINFO2DIR(ctinfo) == IP_CT_DIR_REPLY) {
+				/* FIXME: Remove once NAT handled non-linear.
+				 */
+				if (skb_is_nonlinear(*pskb)
+				    && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+					return NF_DROP;
+
 				icmp_reply_translation(*pskb, ct,
 						       NF_IP_PRE_ROUTING,
 						       CTINFO2DIR(ctinfo));
@@ -160,7 +166,7 @@ check_for_demasq(struct sk_buff **pskb)
 	case IPPROTO_UDP:
 		IP_NF_ASSERT(((*pskb)->nh.iph->frag_off & htons(IP_OFFSET)) == 0);
 
-		if (!get_tuple(iph, (*pskb)->len, &tuple, protocol)) {
+		if (!get_tuple(iph, *pskb, iph->ihl*4, &tuple, protocol)) {
 			if (net_ratelimit())
 				printk("ip_fw_compat_masq: Can't get tuple\n");
 			return NF_ACCEPT;

@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.9 2002/12/02 15:25:13 aberg Exp $
+ * $Id: ctctty.c,v 1.10 2003/03/21 18:47:31 aberg Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -22,7 +22,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/tty.h>

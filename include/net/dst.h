@@ -11,6 +11,7 @@
 #include <linux/config.h>
 #include <linux/rtnetlink.h>
 #include <linux/rcupdate.h>
+#include <linux/jiffies.h>
 #include <net/neighbour.h>
 #include <asm/processor.h>
 
@@ -208,7 +209,7 @@ static inline void dst_set_expires(struct dst_entry *dst, int timeout)
 	if (expires == 0)
 		expires = 1;
 
-	if (dst->expires == 0 || (long)(dst->expires - expires) > 0)
+	if (dst->expires == 0 || time_before(expires, dst->expires))
 		dst->expires = expires;
 }
 

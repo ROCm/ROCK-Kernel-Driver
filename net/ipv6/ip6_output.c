@@ -110,7 +110,8 @@ int ip6_output(struct sk_buff *skb)
 		struct ipv6_pinfo* np = skb->sk ? inet6_sk(skb->sk) : NULL;
 
 		if (!(dev->flags & IFF_LOOPBACK) && (!np || np->mc_loop) &&
-		    ipv6_chk_mcast_addr(dev, &skb->nh.ipv6h->daddr)) {
+		    ipv6_chk_mcast_addr(dev, &skb->nh.ipv6h->daddr,
+				&skb->nh.ipv6h->saddr)) {
 			struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
 
 			/* Do not check for IFF_ALLMULTI; multicast routing
@@ -154,6 +155,7 @@ int ip6_route_me_harder(struct sk_buff *skb)
 	if (dst->error) {
 		if (net_ratelimit())
 			printk(KERN_DEBUG "ip6_route_me_harder: No more route.\n");
+		dst_release(dst);
 		return -EINVAL;
 	}
 

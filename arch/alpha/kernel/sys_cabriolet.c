@@ -132,11 +132,13 @@ common_init_irq(void (*srm_dev_int)(unsigned long v, struct pt_regs *r))
 	setup_irq(16+4, &isa_cascade_irqaction);
 }
 
+#ifndef CONFIG_ALPHA_PC164
 static void __init
 cabriolet_init_irq(void)
 {
 	common_init_irq(srm_device_interrupt);
 }
+#endif
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_PC164)
 /* In theory, the PC164 has the same interrupt hardware as the other

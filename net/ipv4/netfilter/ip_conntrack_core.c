@@ -120,31 +120,25 @@ hash_conntrack(const struct ip_conntrack_tuple *tuple)
 		% ip_conntrack_htable_size;
 }
 
-inline int
-get_tuple(const struct iphdr *iph, size_t len,
+int
+get_tuple(const struct iphdr *iph,
+	  const struct sk_buff *skb,
+	  unsigned int dataoff,
 	  struct ip_conntrack_tuple *tuple,
-	  struct ip_conntrack_protocol *protocol)
+	  const struct ip_conntrack_protocol *protocol)
 {
-	int ret;
-
 	/* Never happen */
 	if (iph->frag_off & htons(IP_OFFSET)) {
 		printk("ip_conntrack_core: Frag of proto %u.\n",
 		       iph->protocol);
 		return 0;
 	}
-	/* Guarantee 8 protocol bytes: if more wanted, use len param */
-	else if (iph->ihl * 4 + 8 > len)
-		return 0;
 
 	tuple->src.ip = iph->saddr;
 	tuple->dst.ip = iph->daddr;
 	tuple->dst.protonum = iph->protocol;
 
-	ret = protocol->pkt_to_tuple((u_int32_t *)iph + iph->ihl,
-				     len - 4*iph->ihl,
-				     tuple);
-	return ret;
+	return protocol->pkt_to_tuple(skb, dataoff, tuple);
 }
 
 static int
@@ -496,54 +490,40 @@ icmp_error_track(struct sk_buff *skb,
 		 enum ip_conntrack_info *ctinfo,
 		 unsigned int hooknum)
 {
-	const struct iphdr *iph;
-	struct icmphdr *hdr;
 	struct ip_conntrack_tuple innertuple, origtuple;
-	struct iphdr *inner;
-	size_t datalen;
+	struct {
+		struct icmphdr icmp;
+		struct iphdr ip;
+	} inside;
 	struct ip_conntrack_protocol *innerproto;
 	struct ip_conntrack_tuple_hash *h;
+	int dataoff;
 
-	IP_NF_ASSERT(iph->protocol == IPPROTO_ICMP);
 	IP_NF_ASSERT(skb->nfct == NULL);
 
-	iph = skb->nh.iph;
-	hdr = (struct icmphdr *)((u_int32_t *)iph + iph->ihl);
-	inner = (struct iphdr *)(hdr + 1);
-	datalen = skb->len - iph->ihl*4 - sizeof(*hdr);
-
-	if (skb->len < iph->ihl * 4 + sizeof(*hdr) + sizeof(*iph)) {
-		DEBUGP("icmp_error_track: too short\n");
+	/* Not enough header? */
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &inside, sizeof(inside))!=0)
 		return NULL;
-	}
 
-	if (hdr->type != ICMP_DEST_UNREACH
-	    && hdr->type != ICMP_SOURCE_QUENCH
-	    && hdr->type != ICMP_TIME_EXCEEDED
-	    && hdr->type != ICMP_PARAMETERPROB
-	    && hdr->type != ICMP_REDIRECT)
+	if (inside.icmp.type != ICMP_DEST_UNREACH
+	    && inside.icmp.type != ICMP_SOURCE_QUENCH
+	    && inside.icmp.type != ICMP_TIME_EXCEEDED
+	    && inside.icmp.type != ICMP_PARAMETERPROB
+	    && inside.icmp.type != ICMP_REDIRECT)
 		return NULL;
 
 	/* Ignore ICMP's containing fragments (shouldn't happen) */
-	if (inner->frag_off & htons(IP_OFFSET)) {
+	if (inside.ip.frag_off & htons(IP_OFFSET)) {
 		DEBUGP("icmp_error_track: fragment of proto %u\n",
-		       inner->protocol);
+		       inside.ip.protocol);
 		return NULL;
 	}
 
-	/* Ignore it if the checksum's bogus. */
-	if (ip_compute_csum((unsigned char *)hdr, sizeof(*hdr) + datalen)) {
-		DEBUGP("icmp_error_track: bad csum\n");
-		return NULL;
-	}
-
-	innerproto = ip_ct_find_proto(inner->protocol);
+	innerproto = ip_ct_find_proto(inside.ip.protocol);
+	dataoff = skb->nh.iph->ihl*4 + sizeof(inside.icmp) + inside.ip.ihl*4;
 	/* Are they talking about one of our connections? */
-	if (inner->ihl * 4 + 8 > datalen
-	    || !get_tuple(inner, datalen, &origtuple, innerproto)) {
-		DEBUGP("icmp_error: ! get_tuple p=%u (%u*4+%u dlen=%u)\n",
-		       inner->protocol, inner->ihl, 8,
-		       datalen);
+	if (!get_tuple(&inside.ip, skb, dataoff, &origtuple, innerproto)) {
+		DEBUGP("icmp_error: ! get_tuple p=%u", inside.ip.protocol);
 		return NULL;
 	}
 
@@ -679,7 +659,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	for (i=0; i < IP_CT_NUMBER; i++)
 		conntrack->infos[i].master = &conntrack->ct_general;
 
-	if (!protocol->new(conntrack, skb->nh.iph, skb->len)) {
+	if (!protocol->new(conntrack, skb)) {
 		kmem_cache_free(ip_conntrack_cachep, conntrack);
 		return NULL;
 	}
@@ -748,7 +728,7 @@ resolve_normal_ct(struct sk_buff *skb,
 
 	IP_NF_ASSERT((skb->nh.iph->frag_off & htons(IP_OFFSET)) == 0);
 
-	if (!get_tuple(skb->nh.iph, skb->len, &tuple, proto))
+	if (!get_tuple(skb->nh.iph, skb, skb->nh.iph->ihl*4, &tuple, proto))
 		return NULL;
 
 	/* look for tuple match */
@@ -823,10 +803,6 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	if ((*pskb)->nfct)
 		return NF_ACCEPT;
 
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	/* Gather fragments. */
 	if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
 		*pskb = ip_ct_gather_frags(*pskb);
@@ -851,7 +827,7 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 
 	IP_NF_ASSERT((*pskb)->nfct);
 
-	ret = proto->packet(ct, (*pskb)->nh.iph, (*pskb)->len, ctinfo);
+	ret = proto->packet(ct, *pskb, ctinfo);
 	if (ret == -1) {
 		/* Invalid */
 		nf_conntrack_put((*pskb)->nfct);
@@ -860,8 +836,7 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	}
 
 	if (ret != NF_DROP && ct->helper) {
-		ret = ct->helper->help((*pskb)->nh.iph, (*pskb)->len,
-				       ct, ctinfo);
+		ret = ct->helper->help(*pskb, ct, ctinfo);
 		if (ret == -1) {
 			/* Invalid */
 			nf_conntrack_put((*pskb)->nfct);
