@@ -1124,18 +1124,16 @@ static inline int ipmr_forward_finish(struct sk_buff *skb)
  *	Processing handlers for ipmr_forward
  */
 
-static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
-			   int vifi, int last)
+static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c, int vifi);
 {
 	struct iphdr *iph = skb->nh.iph;
 	struct vif_device *vif = &vif_table[vifi];
 	struct net_device *dev;
 	struct rtable *rt;
 	int    encap = 0;
-	struct sk_buff *skb2;
 
 	if (vif->dev == NULL)
-		return;
+		goto out_free;
 
 #ifdef CONFIG_IP_PIMSM
 	if (vif->flags & VIFF_REGISTER) {
@@ -1144,6 +1142,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 		((struct net_device_stats*)vif->dev->priv)->tx_bytes += skb->len;
 		((struct net_device_stats*)vif->dev->priv)->tx_packets++;
 		ipmr_cache_report(skb, vifi, IGMPMSG_WHOLEPKT);
+		kfree_skb(skb);
 		return;
 	}
 #endif
@@ -1156,7 +1155,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 						.tos = RT_TOS(iph->tos) } },
 				    .proto = IPPROTO_IPIP };
 		if (ip_route_output_key(&rt, &fl))
-			return;
+			goto out_free;
 		encap = sizeof(struct iphdr);
 	} else {
 		struct flowi fl = { .oif = vif->link,
@@ -1165,7 +1164,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 						.tos = RT_TOS(iph->tos) } },
 				    .proto = IPPROTO_IPIP };
 		if (ip_route_output_key(&rt, &fl))
-			return;
+			goto out_free;
 	}
 
 	dev = rt->u.dst.dev;
@@ -1178,43 +1177,34 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 
 		IP_INC_STATS_BH(IpFragFails);
 		ip_rt_put(rt);
-		return;
+		goto out_free;
 	}
 
-	encap += LL_RESERVED_SPACE(dev);
+	encap += LL_RESERVED_SPACE(dev) + rt->u.dst.header_len;
 
-	if (skb_headroom(skb) < encap || skb_cloned(skb) || !last)
-		skb2 = skb_realloc_headroom(skb, (encap + 15)&~15);
-	else if (atomic_read(&skb->users) != 1)
-		skb2 = skb_clone(skb, GFP_ATOMIC);
-	else {
-		atomic_inc(&skb->users);
-		skb2 = skb;
-	}
-
-	if (skb2 == NULL) {
-		ip_rt_put(rt);
-		return;
+	if (skb_cow(skb, encap)) {
+ 		ip_rt_put(rt);
+		goto out_free;
 	}
 
 	vif->pkt_out++;
 	vif->bytes_out+=skb->len;
 
-	dst_release(skb2->dst);
-	skb2->dst = &rt->u.dst;
-	iph = skb2->nh.iph;
+	dst_release(skb->dst);
+	skb->dst = &rt->u.dst;
+	iph = skb->nh.iph;
 	ip_decrease_ttl(iph);
 
 	/* FIXME: forward and output firewalls used to be called here.
 	 * What do we do with netfilter? -- RR */
 	if (vif->flags & VIFF_TUNNEL) {
-		ip_encap(skb2, vif->local, vif->remote);
+		ip_encap(skb, vif->local, vif->remote);
 		/* FIXME: extra output firewall step used to be here. --RR */
 		((struct ip_tunnel *)vif->dev->priv)->stat.tx_packets++;
-		((struct ip_tunnel *)vif->dev->priv)->stat.tx_bytes+=skb2->len;
+		((struct ip_tunnel *)vif->dev->priv)->stat.tx_bytes+=skb->len;
 	}
 
-	IPCB(skb2)->flags |= IPSKB_FORWARDED;
+	IPCB(skb)->flags |= IPSKB_FORWARDED;
 
 	/*
 	 * RFC1584 teaches, that DVMRP/PIM router must deliver packets locally
@@ -1227,8 +1217,13 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 	 * not mrouter) cannot join to more than one interface - it will
 	 * result in receiving multiple packets.
 	 */
-	NF_HOOK(PF_INET, NF_IP_FORWARD, skb2, skb->dev, dev, 
+	NF_HOOK(PF_INET, NF_IP_FORWARD, skb, skb->dev, dev, 
 		ipmr_forward_finish);
+	return;
+
+out_free:
+	kfree_skb(skb);
+	return;
 }
 
 static int ipmr_find_vif(struct net_device *dev)
@@ -1299,13 +1294,24 @@ static int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local
 	 */
 	for (ct = cache->mfc_un.res.maxvif-1; ct >= cache->mfc_un.res.minvif; ct--) {
 		if (skb->nh.iph->ttl > cache->mfc_un.res.ttls[ct]) {
-			if (psend != -1)
-				ipmr_queue_xmit(skb, cache, psend, 0);
+			if (psend != -1) {
+				struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
+				if (skb2)
+					ipmr_queue_xmit(skb2, cache, psend);
+			}
 			psend=ct;
 		}
 	}
-	if (psend != -1)
-		ipmr_queue_xmit(skb, cache, psend, !local);
+	if (psend != -1) {
+		if (local) {
+			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
+			if (skb2)
+				ipmr_queue_xmit(skb2, cache, psend);
+		} else {
+			ipmr_queue_xmit(skb, cache, psend);
+			return 0;
+		}
+	}
 
 dont_forward:
 	if (!local)
