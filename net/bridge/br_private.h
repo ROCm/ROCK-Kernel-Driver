@@ -57,7 +57,8 @@ struct net_bridge_port
 	struct net_bridge		*br;
 	struct net_device		*dev;
 	struct list_head		list;
-	int				port_no;
+	__u8				port_no;
+	__u8				priority;
 
 	/* STP */
 	port_id				port_id;
@@ -69,7 +70,6 @@ struct net_bridge_port
 	port_id				designated_port;
 	unsigned			topology_change_ack:1;
 	unsigned			config_pending:1;
-	int				priority;
 
 	struct timer_list		forward_delay_timer;
 	struct timer_list		hold_timer;
