@@ -90,7 +90,6 @@ extern struct page *vmem_map;
 #  define page_to_pfn(page)    ((unsigned long) (page - vmem_map))
 #  define pfn_to_page(pfn)     (vmem_map + (pfn))
 # endif
-#else /* !CONFIG_VIRTUAL_MEM_MAP */
 #define pfn_valid(pfn)		(((pfn) < max_mapnr) && ia64_pfn_valid(pfn))
 #define page_to_pfn(page)	((unsigned long) (page - mem_map))
 #define pfn_to_page(pfn)	(mem_map + (pfn))
