@@ -27,7 +27,7 @@
 static char *ICCVer[] __initdata =
 {"2070 A1/A3", "2070 B1", "2070 B2/B3", "2070 V2.4"};
 
-void
+void __init
 ICCVersion(struct IsdnCardState *cs, char *s)
 {
 	int val;
