@@ -49,10 +49,10 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *
 	// what lock protects these?
 	switch (usb_pipetype (urb->pipe)) {
 	case PIPE_ISOCHRONOUS:
-		ohci->hcd.self.bandwidth_isoc_reqs--;
+		hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs--;
 		break;
 	case PIPE_INTERRUPT:
-		ohci->hcd.self.bandwidth_int_reqs--;
+		hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs--;
 		break;
 	}
 
@@ -143,7 +143,7 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ohci->load [i] += ed->load;
 	}
-	ohci->hcd.self.bandwidth_allocated += ed->load / ed->interval;
+	hcd_to_bus (&ohci->hcd)->bandwidth_allocated += ed->load / ed->interval;
 }
 
 /* link an ed into one of the HC chains */
@@ -244,14 +244,11 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ohci->load [i] -= ed->load;
 	}	
-	ohci->hcd.self.bandwidth_allocated -= ed->load / ed->interval;
+	hcd_to_bus (&ohci->hcd)->bandwidth_allocated -= ed->load / ed->interval;
 
-#ifdef OHCI_VERBOSE_DEBUG
-	dbg ("%s: unlink %sed %p branch %d [%dus.], interval %d",
-		ohci->hcd.self.bus_name,
+	ohci_vdbg (ohci, "unlink %sed %p branch %d [%dus.], interval %d\n",
 		(ed->hwINFO & ED_ISO) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
-#endif
 }
 
 /* unlink an ed from one of the HC chains. 
@@ -576,7 +573,7 @@ static void td_submit_urb (
 	 */
 	case PIPE_INTERRUPT:
 		/* ... and periodic urbs have extra accounting */
-		ohci->hcd.self.bandwidth_int_reqs++;
+		hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs++;
 		/* FALLTHROUGH */
 	case PIPE_BULK:
 		info = is_out
@@ -644,7 +641,7 @@ static void td_submit_urb (
 				data + urb->iso_frame_desc [cnt].offset,
 				urb->iso_frame_desc [cnt].length, urb, cnt);
 		}
-		ohci->hcd.self.bandwidth_isoc_reqs++;
+		hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs++;
 		break;
 	}
 	// ASSERT (urb_priv->length == cnt);
@@ -687,11 +684,10 @@ static void td_done (struct urb *urb, struct td *td)
 		urb->iso_frame_desc [td->index].actual_length = dlen;
 		urb->iso_frame_desc [td->index].status = cc_to_error [cc];
 
-#ifdef VERBOSE_DEBUG
 		if (cc != TD_CC_NOERROR)
-			dbg ("  urb %p iso TD %p (%d) len %d CC %d",
+			ohci_vdbg (ohci,
+				"urb %p iso td %p (%d) len %d cc %d\n",
 				urb, td, 1 + td->index, dlen, cc);
-#endif
 
 	/* BULK, INT, CONTROL ... drivers see aggregate length/status,
 	 * except that "setup" bytes aren't counted and "short" transfers
@@ -730,13 +726,12 @@ static void td_done (struct urb *urb, struct td *td)
 					- td->data_dma;
 		}
 
-#ifdef VERBOSE_DEBUG
 		if (cc != TD_CC_NOERROR && cc < 0x0E)
-			dbg ("  urb %p TD %p (%d) CC %d, len=%d/%d",
+			ohci_vdbg (ohci,
+				"urb %p td %p (%d) cc %d, len=%d/%d\n",
 				urb, td, 1 + td->index, cc,
 				urb->actual_length,
 				urb->transfer_buffer_length);
-#endif
   	}
 }
 

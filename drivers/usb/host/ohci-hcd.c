@@ -125,6 +125,8 @@
 
 /*-------------------------------------------------------------------------*/
 
+static const char	hcd_name [] = "ohci-hcd";
+
 #include "ohci.h"
 
 static inline void disable (struct ohci_hcd *ohci)
@@ -381,9 +383,12 @@ static int hc_reset (struct ohci_hcd *ohci)
 {
 	u32 temp;
 
-	/* SMM owns the HC?  not for long! */
+	/* SMM owns the HC?  not for long!
+	 * On PA-RISC, PDC can leave IR set incorrectly; ignore it there.
+	 */
+#ifndef __hppa__
 	if (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
-		dev_dbg (ohci->hcd.controller, "USB HC TakeOver from BIOS/SMM\n");
+		ohci_dbg (ohci, "USB HC TakeOver from BIOS/SMM\n");
 
 		/* this timeout is arbitrary.  we make it long, so systems
 		 * depending on usb keyboards may be usable even if the
@@ -396,17 +401,18 @@ static int hc_reset (struct ohci_hcd *ohci)
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 			wait_ms (10);
 			if (--temp == 0) {
-				dev_err (ohci->hcd.controller, "USB HC TakeOver failed!\n");
+				ohci_err (ohci, "USB HC TakeOver failed!\n");
 				return -1;
 			}
 		}
 	}
+#endif
 
 	/* Disable HC interrupts */
 	writel (OHCI_INTR_MIE, &ohci->regs->intrdisable);
 
-	dev_dbg (ohci->hcd.controller, "USB HC reset_hc %s: ctrl = 0x%x ;\n",
-		ohci->hcd.self.bus_name,
+	ohci_dbg (ohci, "USB HC reset_hc %s: ctrl = 0x%x ;\n",
+		hcd_to_bus (&ohci->hcd)->bus_name,
 		readl (&ohci->regs->control));
 
   	/* Reset USB (needed by some controllers); RemoteWakeupConnected
@@ -451,8 +457,9 @@ static int hc_reset (struct ohci_hcd *ohci)
  */
 static int hc_start (struct ohci_hcd *ohci)
 {
-  	u32			mask;
+  	u32			mask, tmp;
   	struct usb_device	*udev;
+  	struct usb_bus		*bus;
 
 	spin_lock_init (&ohci->lock);
 	ohci->disabled = 1;
@@ -493,9 +500,20 @@ static int hc_start (struct ohci_hcd *ohci)
 	writel (mask, &ohci->regs->intrstatus);
 	writel (mask, &ohci->regs->intrenable);
 
-	/* hub power always on: required for AMD-756 and some Mac platforms */
-	writel ((roothub_a (ohci) | RH_A_NPS) & ~(RH_A_PSM | RH_A_OCPM),
-		&ohci->regs->roothub.a);
+	/* handle root hub init quirks ... */
+	tmp = roothub_a (ohci);
+	tmp &= ~(RH_A_PSM | RH_A_OCPM);
+	if (ohci->flags & OHCI_QUIRK_SUPERIO) {
+		/* NSC 87560 and maybe others */
+		tmp |= RH_A_NOCP;
+		tmp &= ~(RH_A_POTPGT | RH_A_NPS);
+	} else {
+		/* hub power always on; required for AMD-756 and some
+		 * Mac platforms, use this mode everywhere by default
+		 */
+		tmp |= RH_A_NPS;
+	}
+	writel (tmp, &ohci->regs->roothub.a);
 	writel (RH_HS_LPSC, &ohci->regs->roothub.status);
 	writel (0, &ohci->regs->roothub.b);
 
@@ -503,7 +521,8 @@ static int hc_start (struct ohci_hcd *ohci)
 	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
  
 	/* connect the virtual root hub */
-	ohci->hcd.self.root_hub = udev = usb_alloc_dev (NULL, &ohci->hcd.self);
+	bus = hcd_to_bus (&ohci->hcd);
+	bus->root_hub = udev = usb_alloc_dev (NULL, bus);
 	ohci->hcd.state = USB_STATE_READY;
 	if (!udev) {
 		disable (ohci);
@@ -514,9 +533,9 @@ static int hc_start (struct ohci_hcd *ohci)
 
 	usb_connect (udev);
 	udev->speed = USB_SPEED_FULL;
-	if (usb_register_root_hub (udev, ohci->hcd.controller) != 0) {
+	if (hcd_register_root (&ohci->hcd) != 0) {
 		usb_put_dev (udev);
-		ohci->hcd.self.root_hub = NULL;
+		bus->root_hub = NULL;
 		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
 		writel (ohci->hc_control, &ohci->regs->control);
@@ -629,8 +648,8 @@ static int hc_restart (struct ohci_hcd *ohci)
 
 	ohci->disabled = 1;
 	ohci->sleeping = 0;
-	if (ohci->hcd.self.root_hub)
-		usb_disconnect (&ohci->hcd.self.root_hub);
+	if (hcd_to_bus (&ohci->hcd)->root_hub)
+		usb_disconnect (&hcd_to_bus (&ohci->hcd)->root_hub);
 	
 	/* empty the interrupt branches */
 	for (i = 0; i < NUM_INTS; i++) ohci->load [i] = 0;
@@ -644,17 +663,15 @@ static int hc_restart (struct ohci_hcd *ohci)
 	ohci->ed_bulktail    = NULL;
 
 	if ((temp = hc_reset (ohci)) < 0 || (temp = hc_start (ohci)) < 0) {
-		err ("can't restart %s, %d", ohci->hcd.self.bus_name, temp);
+		ohci_err (ohci, "can't restart, %d\n", temp);
 		return temp;
 	} else
-		dbg ("restart %s completed", ohci->hcd.self.bus_name);
+		ohci_dbg (ohci, "restart complete\n");
 	return 0;
 }
 #endif
 
 /*-------------------------------------------------------------------------*/
-
-static const char	hcd_name [] = "ohci-hcd";
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
 

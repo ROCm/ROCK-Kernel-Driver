@@ -5,7 +5,6 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci-dbg.c,v 1.4 2002/03/27 20:40:40 dbrownell Exp $
  */
  
 /*-------------------------------------------------------------------------*/
@@ -318,8 +317,6 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	}
 }
 
-#define DRIVERFS_DEBUG_FILES 		/* only on 2.5 versions */
-
 #else
 static inline void ohci_dump (struct ohci_hcd *controller, int verbose) {}
 
@@ -327,7 +324,19 @@ static inline void ohci_dump (struct ohci_hcd *controller, int verbose) {}
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef DRIVERFS_DEBUG_FILES
+#ifdef STUB_DEBUG_FILES
+
+static inline void create_debug_files (struct ohci_hcd *bus) { }
+static inline void remove_debug_files (struct ohci_hcd *bus) { }
+
+#else
+
+static inline struct ohci_hcd *dev_to_ohci (struct device *dev)
+{
+	struct usb_hcd	*hcd = dev_get_drvdata (dev);
+
+	return hcd_to_ohci (hcd);
+}
 
 static ssize_t
 show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
@@ -513,7 +522,7 @@ static inline void create_debug_files (struct ohci_hcd *bus)
 	device_create_file (bus->hcd.controller, &dev_attr_async);
 	device_create_file (bus->hcd.controller, &dev_attr_periodic);
 	// registers
-	dev_dbg (bus->hcd.controller, "created debug files\n");
+	ohci_dbg (bus, "created debug files\n");
 }
 
 static inline void remove_debug_files (struct ohci_hcd *bus)
@@ -522,12 +531,7 @@ static inline void remove_debug_files (struct ohci_hcd *bus)
 	device_remove_file (bus->hcd.controller, &dev_attr_periodic);
 }
 
-#else /* empty stubs for creating those files */
-
-static inline void create_debug_files (struct ohci_hcd *bus) { }
-static inline void remove_debug_files (struct ohci_hcd *bus) { }
-
-#endif /* DRIVERFS_DEBUG_FILES */
+#endif
 
 /*-------------------------------------------------------------------------*/
 

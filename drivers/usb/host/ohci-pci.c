@@ -29,17 +29,6 @@
 
 /*-------------------------------------------------------------------------*/
 
-struct ohci_hcd *dev_to_ohci(struct device *dev) {
-	struct pci_dev *pdev = 
-		container_of (dev, struct pci_dev, dev);
-	struct ohci_hcd	*ohci = 
-		container_of (pci_get_drvdata (pdev), struct ohci_hcd, hcd);
-
-	return ohci;
-}
-
-/*-------------------------------------------------------------------------*/
-
 static int __devinit
 ohci_pci_start (struct usb_hcd *hcd)
 {
@@ -55,22 +44,43 @@ ohci_pci_start (struct usb_hcd *hcd)
 		/* AMD 756, for most chips (early revs), corrupts register
 		 * values on read ... so enable the vendor workaround.
 		 */
-		if (hcd->pdev->vendor == 0x1022
+		if (hcd->pdev->vendor == PCI_VENDOR_ID_AMD
 				&& hcd->pdev->device == 0x740c) {
 			ohci->flags = OHCI_QUIRK_AMD756;
-			info ("%s: AMD756 erratum 4 workaround",
-				hcd->self.bus_name);
+			ohci_info (ohci, "AMD756 erratum 4 workaround\n");
 		}
+
+		/* FIXME for some of the early AMD 760 southbridges, OHCI
+		 * won't work at all.  blacklist them.
+		 */
 
 		/* Apple's OHCI driver has a lot of bizarre workarounds
 		 * for this chip.  Evidently control and bulk lists
 		 * can get confused.  (B&W G3 models, and ...)
 		 */
-		else if (hcd->pdev->vendor == 0x1045
+		else if (hcd->pdev->vendor == PCI_VENDOR_ID_OPTI
 				&& hcd->pdev->device == 0xc861) {
-			info ("%s: WARNING: OPTi workarounds unavailable",
-				hcd->self.bus_name);
+			ohci_info (ohci,
+				"WARNING: OPTi workarounds unavailable\n");
 		}
+
+		/* Check for NSC87560. We have to look at the bridge (fn1) to
+		 * identify the USB (fn2). This quirk might apply to more or
+		 * even all NSC stuff.
+		 */
+		else if (hcd->pdev->vendor == PCI_VENDOR_ID_NS) {
+			struct pci_dev	*b, *hc;
+
+			hc = hcd->pdev;
+			b  = pci_find_slot (hc->bus->number,
+					PCI_DEVFN (PCI_SLOT (hc->devfn), 1));
+			if (b && b->device == PCI_DEVICE_ID_NS_87560_LIO
+					&& b->vendor == PCI_VENDOR_ID_NS) {
+				ohci->flags |= OHCI_QUIRK_SUPERIO;
+				ohci_info (ohci, "Using NSC SuperIO setup\n");
+			}
+		}
+	
 	}
 
         memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
