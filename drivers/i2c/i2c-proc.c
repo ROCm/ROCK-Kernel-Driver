@@ -270,7 +270,7 @@ static int i2c_sysctl_chips(ctl_table * table, int *name, int nlen,
 }
 
 
-/* This funcion reads or writes a 'real' value (encoded by the combination
+/* This function reads or writes a 'real' value (encoded by the combination
    of an integer and a magnitude, the last is the power of ten the value
    should be divided with) to a /proc/sys directory. To use this function,
    you must (before registering the ctl_table) set the extra2 field to the
