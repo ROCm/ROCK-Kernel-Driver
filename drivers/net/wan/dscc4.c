@@ -691,7 +691,7 @@ static void dscc4_free1(struct pci_dev *pdev)
 	root = ppriv->root;
 
 	for (i = 0; i < dev_per_card; i++)
-		unregister_hdlc_device(dscc4_to_dev(&root[i]));
+		unregister_hdlc_device(dscc4_to_dev(root + i));
 
 	pci_set_drvdata(pdev, NULL);
 
@@ -706,7 +706,6 @@ static int __devinit dscc4_init_one(struct pci_dev *pdev,
 {
 	struct dscc4_pci_priv *priv;
 	struct dscc4_dev_priv *dpriv;
-	static int cards_found = 0;
 	void __iomem *ioaddr;
 	int i, rc;
 
@@ -811,8 +810,6 @@ static int __devinit dscc4_init_one(struct pci_dev *pdev,
 	writel(0x0000000e, ioaddr + FIFOCR3);
 
 	writel(0xff200001, ioaddr + GCMDR);
-
-	cards_found++;
 
 	rc = 0;
 out:
@@ -966,7 +963,7 @@ static int dscc4_found1(struct pci_dev *pdev, void __iomem *ioaddr)
 err_unregister:
 	while (i-- > 0) {
 		dscc4_release_ring(root + i);
-		unregister_hdlc_device(dscc4_to_dev(&root[i]));
+		unregister_hdlc_device(dscc4_to_dev(root + i));
 	}
 	kfree(ppriv);
 	i = dev_per_card;
