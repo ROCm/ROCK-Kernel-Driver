@@ -729,6 +729,96 @@ void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose)
 	res->end += io_virt_offset;
 }
 
+
+static int get_bus_io_range(struct pci_bus *bus, unsigned long *start_phys,
+				unsigned long *start_virt, unsigned long *size)
+{
+	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	struct pci_bus_region region;
+	struct resource *res;
+
+	if (bus->self) {
+		res = bus->resource[0];
+		pcibios_resource_to_bus(bus->self, &region, res);
+		*start_phys = hose->io_base_phys + region.start;
+		*start_virt = (unsigned long) hose->io_base_virt + 
+				region.start;
+		if (region.end > region.start) 
+			*size = region.end - region.start + 1;
+		else {
+			printk("%s(): unexpected region 0x%lx->0x%lx\n", 
+					__FUNCTION__, region.start, region.end);
+			return 1;
+		}
+		
+	} else {
+		/* Root Bus */
+		res = &hose->io_resource;
+		*start_phys = hose->io_base_phys;
+		*start_virt = (unsigned long) hose->io_base_virt;
+		if (res->end > res->start)
+			*size = res->end - res->start + 1;
+		else {
+			printk("%s(): unexpected region 0x%lx->0x%lx\n", 
+					__FUNCTION__, res->start, res->end);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int unmap_bus_range(struct pci_bus *bus)
+{
+	unsigned long start_phys;
+	unsigned long start_virt;
+	unsigned long size;
+
+	if (!bus) {
+		printk(KERN_ERR "%s() expected bus\n", __FUNCTION__);
+		return 1;
+	}
+	
+	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
+		return 1;
+	if (iounmap_explicit((void *) start_virt, size))
+		return 1;
+
+	return 0;
+}
+EXPORT_SYMBOL(unmap_bus_range);
+
+int remap_bus_range(struct pci_bus *bus)
+{
+	unsigned long start_phys;
+	unsigned long start_virt;
+	unsigned long size;
+
+	if (!bus) {
+		printk(KERN_ERR "%s() expected bus\n", __FUNCTION__);
+		return 1;
+	}
+	
+	
+	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
+		return 1;
+	printk("mapping IO %lx -> %lx, size: %lx\n", start_phys, start_virt, size);
+	if (__ioremap_explicit(start_phys, start_virt, size, _PAGE_NO_CACHE))
+		return 1;
+
+	return 0;
+}
+EXPORT_SYMBOL(remap_bus_range);
+
+void phbs_remap_io(void)
+{
+	struct pci_controller *hose, *tmp;
+
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
+		remap_bus_range(hose->bus);
+}
+
+
 /*********************************************************************** 
  * pci_find_hose_for_OF_device
  *

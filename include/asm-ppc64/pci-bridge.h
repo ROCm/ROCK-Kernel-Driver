@@ -99,5 +99,7 @@ extern int pcibios_remove_root_bus(struct pci_controller *phb);
  */
 #define PCI_GET_DN(dev) ((struct device_node *)((dev)->sysdata))
 
+extern void phbs_remap_io(void);
+
 #endif
 #endif /* __KERNEL__ */
