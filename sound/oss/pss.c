@@ -149,6 +149,7 @@ static int      pss_initialized;
 static int      nonstandard_microcode;
 static int	pss_cdrom_port = -1;	/* Parameter for the PSS cdrom port */
 static int	pss_enable_joystick;    /* Parameter for enabling the joystick */
+static coproc_operations pss_coproc_operations;
 
 static void pss_write(pss_confdata *devc, int data)
 {
@@ -174,7 +175,7 @@ static void pss_write(pss_confdata *devc, int data)
  	printk(KERN_WARNING "PSS: DSP Command (%04x) Timeout.\n", data);
 }
 
-int __init probe_pss(struct address_info *hw_config)
+static int __init probe_pss(struct address_info *hw_config)
 {
 	unsigned short id;
 	int irq, dma;
@@ -188,13 +189,19 @@ int __init probe_pss(struct address_info *hw_config)
 		if (devc->base != 0x230 && devc->base != 0x250)		/* Some cards use these */
 			return 0;
 
-	if (check_region(devc->base, 0x19 /*16*/)) { 
+	if (!request_region(devc->base, 0x10, "PSS mixer, SB emulation")) {
 		printk(KERN_ERR "PSS: I/O port conflict\n");
 		return 0;
 	}
 	id = inw(REG(PSS_ID));
 	if ((id >> 8) != 'E') {
 		printk(KERN_ERR "No PSS signature detected at 0x%x (0x%x)\n",  devc->base,  id); 
+		release_region(devc->base, 0x10);
+		return 0;
+	}
+	if (!request_region(devc->base + 0x10, 0x9, "PSS config")) {
+		printk(KERN_ERR "PSS: I/O port conflict\n");
+		release_region(devc->base, 0x10);
 		return 0;
 	}
 	return 1;
@@ -685,7 +692,7 @@ void configure_nonsound_components(void)
 	}
 }
 
-void __init attach_pss(struct address_info *hw_config)
+static int __init attach_pss(struct address_info *hw_config)
 {
 	unsigned short  id;
 	char tmp[100];
@@ -697,10 +704,7 @@ void __init attach_pss(struct address_info *hw_config)
 	devc->ad_mixer_dev = NO_WSS_MIXER;
 
 	if (!probe_pss(hw_config))
-		return;
-
-	request_region(hw_config->io_base, 0x10, "PSS mixer, SB emulation");
-	request_region(hw_config->io_base + 0x10, 0x9, "PSS config");
+		return 0;
 
 	id = inw(REG(PSS_ID)) & 0x00ff;
 
@@ -714,17 +718,23 @@ void __init attach_pss(struct address_info *hw_config)
 	if (sound_alloc_dma(hw_config->dma, "PSS"))
 	{
 		printk("pss.c: Can't allocate DMA channel.\n");
-		return;
+		release_region(hw_config->io_base, 0x10);
+		release_region(hw_config->io_base+0x10, 0x9);
+		return 0;
 	}
 	if (!set_irq(devc, CONF_PSS, devc->irq))
 	{
 		printk("PSS: IRQ allocation error.\n");
-		return;
+		release_region(hw_config->io_base, 0x10);
+		release_region(hw_config->io_base+0x10, 0x9);
+		return 0;
 	}
 	if (!set_dma(devc, CONF_PSS, devc->dma))
 	{
 		printk(KERN_ERR "PSS: DMA allocation error\n");
-		return;
+		release_region(hw_config->io_base, 0x10);
+		release_region(hw_config->io_base+0x10, 0x9);
+		return 0;
 	}
 #endif
 
@@ -732,9 +742,10 @@ void __init attach_pss(struct address_info *hw_config)
 	pss_initialized = 1;
 	sprintf(tmp, "ECHO-PSS  Rev. %d", id);
 	conf_printf(tmp, hw_config);
+	return 1;
 }
 
-int __init probe_pss_mpu(struct address_info *hw_config)
+static int __init probe_pss_mpu(struct address_info *hw_config)
 {
 	int timeout;
 
@@ -746,25 +757,21 @@ int __init probe_pss_mpu(struct address_info *hw_config)
 		printk(KERN_ERR "PSS: MPU I/O port conflict\n");
 		return 0;
 	}
-	if (!set_io_base(devc, CONF_MIDI, hw_config->io_base))
-	{
-		  printk(KERN_ERR "PSS: MIDI base could not be set.\n");
-		  return 0;
+	if (!set_io_base(devc, CONF_MIDI, hw_config->io_base)) {
+		printk(KERN_ERR "PSS: MIDI base could not be set.\n");
+		goto fail;
 	}
-	if (!set_irq(devc, CONF_MIDI, hw_config->irq))
-	{
-		  printk(KERN_ERR "PSS: MIDI IRQ allocation error.\n");
-		  return 0;
+	if (!set_irq(devc, CONF_MIDI, hw_config->irq)) {
+		printk(KERN_ERR "PSS: MIDI IRQ allocation error.\n");
+		goto fail;
 	}
-	if (!pss_synthLen)
-	{
+	if (!pss_synthLen) {
 		printk(KERN_ERR "PSS: Can't enable MPU. MIDI synth microcode not available.\n");
-		return 0;
+		goto fail;
 	}
-	if (!pss_download_boot(devc, pss_synth, pss_synthLen, CPF_FIRST | CPF_LAST))
-	{
+	if (!pss_download_boot(devc, pss_synth, pss_synthLen, CPF_FIRST | CPF_LAST)) {
 		printk(KERN_ERR "PSS: Unable to load MIDI synth microcode to DSP.\n");
-		return 0;
+		goto fail;
 	}
 
 	/*
@@ -780,7 +787,15 @@ int __init probe_pss_mpu(struct address_info *hw_config)
 			break;	/* No more input */
 	}
 
-	return probe_mpu401(hw_config);
+	if (!probe_mpu401(hw_config))
+		goto fail;
+
+	attach_mpu401(hw_config, THIS_MODULE);	/* Slot 1 */
+	if (hw_config->slots[1] != -1)	/* The MPU driver installed itself */
+		midi_devs[hw_config->slots[1]]->coproc = &pss_coproc_operations;
+	return 1;
+fail:
+	return 0;
 }
 
 static int pss_coproc_open(void *dev_info, int sub_device)
@@ -1021,39 +1036,30 @@ static coproc_operations pss_coproc_operations =
 	&pss_data
 };
 
-static void __init attach_pss_mpu(struct address_info *hw_config)
-{
-	attach_mpu401(hw_config, THIS_MODULE);	/* Slot 1 */
-	if (hw_config->slots[1] != -1)	/* The MPU driver installed itself */
-		midi_devs[hw_config->slots[1]]->coproc = &pss_coproc_operations;
-}
-
 static int __init probe_pss_mss(struct address_info *hw_config)
 {
 	volatile int timeout;
+	int        my_mix = -999;	/* gcc shut up */
 
 	if (!pss_initialized)
 		return 0;
 
 	if (check_region(hw_config->io_base, 8))
 	{
-		  printk(KERN_ERR "PSS: WSS I/O port conflicts.\n");
-		  return 0;
+		printk(KERN_ERR "PSS: WSS I/O port conflicts.\n");
+		return 0;
 	}
-	if (!set_io_base(devc, CONF_WSS, hw_config->io_base))
-	{
+	if (!set_io_base(devc, CONF_WSS, hw_config->io_base)) {
 		printk("PSS: WSS base not settable.\n");
-		return 0;
+		goto fail;
 	}
-	if (!set_irq(devc, CONF_WSS, hw_config->irq))
-	{
+	if (!set_irq(devc, CONF_WSS, hw_config->irq)) {
 		printk("PSS: WSS IRQ allocation error.\n");
-		return 0;
+		goto fail;
 	}
-	if (!set_dma(devc, CONF_WSS, hw_config->dma))
-	{
+	if (!set_dma(devc, CONF_WSS, hw_config->dma)) {
 		printk(KERN_ERR "PSS: WSS DMA allocation error\n");
-		return 0;
+		goto fail;
 	}
 	/*
 	 * For some reason the card returns 0xff in the WSS status register
@@ -1071,13 +1077,9 @@ static int __init probe_pss_mss(struct address_info *hw_config)
 	  (timeout < 100000); timeout++)
 		;
 
-	return probe_ms_sound(hw_config);
-}
+	if (!probe_ms_sound(hw_config))
+		goto fail;
 
-static void __init attach_pss_mss(struct address_info *hw_config)
-{
-	int        my_mix = -999;	/* gcc shut up */
-	
 	devc->ad_mixer_dev = NO_WSS_MIXER;
 	if (pss_mixer) 
 	{
@@ -1088,7 +1090,7 @@ static void __init attach_pss_mss(struct address_info *hw_config)
 			devc)) < 0) 
 		{
 			printk(KERN_ERR "Could not install PSS mixer\n");
-			return;
+			goto fail;
 		}
 	}
 	pss_mixer_reset(devc);
@@ -1104,6 +1106,9 @@ static void __init attach_pss_mss(struct address_info *hw_config)
 			devc->ad_mixer_dev = audio_devs[hw_config->slots[0]]->mixer_dev;
 		}
 	}
+	return 1;
+fail:
+	return 0;
 }
 
 static inline void __exit unload_pss(struct address_info *hw_config)
@@ -1185,6 +1190,8 @@ static int __init init_pss(void)
 		printk(KERN_INFO "PSS: loading in no sound mode.\n");
 		disable_all_emulations();
 		configure_nonsound_components();
+		release_region(pss_io, 0x10);
+		release_region(pss_io + 0x10, 0x9);
 		return 0;
 	}
 
@@ -1206,20 +1213,16 @@ static int __init init_pss(void)
 		fw_load = 1;
 		pss_synthLen = mod_firmware_load(pss_firmware, (void *) &pss_synth);
 	}
-	if (!probe_pss(&cfg))
+	if (!attach_pss(&cfg))
 		return -ENODEV;
-	attach_pss(&cfg);
 	/*
 	 *    Attach stuff
 	 */
-	if (probe_pss_mpu(&cfg_mpu)) {
+	if (probe_pss_mpu(&cfg_mpu))
 		pssmpu = 1;
-		attach_pss_mpu(&cfg_mpu);
-	}
-	if (probe_pss_mss(&cfg2)) {
+
+	if (probe_pss_mss(&cfg2))
 		pssmss = 1;
-		attach_pss_mss(&cfg2);
-	}
 
 	return 0;
 }
