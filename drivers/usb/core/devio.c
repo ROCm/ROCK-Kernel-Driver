@@ -730,9 +730,6 @@ static int proc_connectinfo(struct dev_state *ps, void __user *arg)
 
 static int proc_resetdevice(struct dev_state *ps)
 {
-	/* FIXME when usb_reset_device() is fixed we'll need to grab
-	 * ps->dev->serialize before calling it.
-	 */
 	return usb_reset_device(ps->dev);
 
 }
