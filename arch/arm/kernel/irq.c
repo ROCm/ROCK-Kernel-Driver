@@ -376,7 +376,6 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 
 	do {
 		struct irqaction *action;
-		int ret;
 
 		action = desc->action;
 		if (!action)
@@ -387,9 +386,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 			desc->chip->unmask(irq);
 		}
 
-		ret = __do_irq(irq, action, regs);
-		if (ret != IRQ_HANDLED)
-			report_bad_irq(irq, regs, desc, ret);
+		__do_irq(irq, action, regs);
 	} while (desc->pending && !desc->disable_depth);
 
 	desc->running = 0;
