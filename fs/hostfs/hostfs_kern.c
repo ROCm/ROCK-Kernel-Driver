@@ -823,6 +823,10 @@ int hostfs_setattr(struct dentry *dentry, struct iattr *attr)
 	char *name;
 	int err;
 
+	err = inode_change_ok(dentry->d_inode, attr);
+	if (err)
+		return err;
+
 	if(append)
 		attr->ia_valid &= ~ATTR_SIZE;
 
