@@ -191,6 +191,9 @@
 #define LINX_FUTURE_1_PID   0xF44B   /* Linx future device */
 #define LINX_FUTURE_2_PID   0xF44C   /* Linx future device */
 
+/* Inside Accesso contactless reader (http://www.insidefr.com) */
+#define INSIDE_ACCESSO		0xFAD0
+
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */

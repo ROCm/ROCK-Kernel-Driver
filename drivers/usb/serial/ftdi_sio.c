@@ -354,6 +354,7 @@ static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_3, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_4, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_ELV_UO100_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, INSIDE_ACCESSO, 0, 0x3ff) },
 	{ }						/* Terminating entry */
 };
 
@@ -558,6 +559,7 @@ static struct usb_device_id id_table_combined [] = {
  	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_0_PID, 0x400, 0xffff) },
  	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_1_PID, 0x400, 0xffff) },
  	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_2_PID, 0x400, 0xffff) },
+	{ USB_DEVICE(FTDI_VID, INSIDE_ACCESSO) },
 	{ }						/* Terminating entry */
 };
 
