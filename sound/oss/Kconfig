@@ -1126,3 +1126,19 @@ config SOUND_TVMIXER
 	  Support for audio mixer facilities on the BT848 TV frame-grabber
 	  card.
 
+config SOUND_ALI5455
+	tristate "ALi5455 audio support"
+	depends on SOUND_PRIME!=n && PCI
+
+config SOUND_FORTE
+	tristate "ForteMedia FM801 driver"
+	depends on SOUND_PRIME!=n && PCI
+
+config SOUND_RME96XX
+	tristate "RME Hammerfall (RME96XX) support"
+	depends on SOUND_PRIME!=n && PCI
+
+config SOUND_AD1980
+	tristate "AD1980 front/back switch plugin"
+	depends on SOUND_PRIME!=n
+
