@@ -508,7 +508,7 @@ struct task_struct {
 	struct timer_list real_timer;
 	unsigned long utime, stime;
 	unsigned long nvcsw, nivcsw; /* context switch counts */
-	u64 start_time;
+	struct timespec start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
 	unsigned long min_flt, maj_flt;
 /* process credentials */
