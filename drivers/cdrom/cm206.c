@@ -855,10 +855,10 @@ static void do_cm206_request(request_queue_t * q)
 	struct request *req;
 
 	while (1) {	/* repeat until all requests have been satisfied */
-		if (blk_queue_empty(q))
+		req = elv_next_request(q);
+		if (!req)
 			return;
 
-		req = elv_next_request(q);
 		if (req->cmd != READ) {
 			debug(("Non-read command %d on cdrom\n", req->cmd));
 			end_request(req, 0);

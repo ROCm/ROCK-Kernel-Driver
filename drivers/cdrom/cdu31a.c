@@ -1583,13 +1583,13 @@ static void do_cdu31a_request(request_queue_t * q)
 		 * The beginning here is stolen from the hard disk driver.  I hope
 		 * it's right.
 		 */
-		if (blk_queue_empty(q))
+		req = elv_next_request(q);
+		if (!req)
 			goto end_do_cdu31a_request;
 
 		if (!sony_spun_up)
 			scd_spinup();
 
-		req = elv_next_request(q);
 		block = req->sector;
 		nblock = req->nr_sectors;
 

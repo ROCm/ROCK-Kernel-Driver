@@ -3181,10 +3181,10 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
      return false;
 
   while (true) {
-      if (blk_queue_empty(RequestQueue))
-          return false;
-
       Request = elv_next_request(RequestQueue);
+      if (!Request)
+	      return false;
+
       Command = DAC960_AllocateCommand(Controller);
       if (Command != NULL)
           break;

@@ -627,7 +627,7 @@ static void fd_error( void )
 		return;
 	}
 
-	if (blk_queue_empty(QUEUE))
+	if (!CURRENT)
 		return;
 
 	CURRENT->errors++;
@@ -1435,14 +1435,14 @@ static void redo_fd_request(void)
 	struct atari_floppy_struct *floppy;
 
 	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
-		CURRENT, !blk_queue_empty(QUEUE) ? CURRENT->rq_disk->disk_name : "",
-		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0 ));
+		CURRENT, CURRENT ? CURRENT->rq_disk->disk_name : "",
+		CURRENT ? CURRENT->sector : 0 ));
 
 	IsFormatting = 0;
 
 repeat:
 
-	if (blk_queue_empty(QUEUE))
+	if (!CURRENT)
 		goto the_end;
 
 	floppy = CURRENT->rq_disk->private_data;

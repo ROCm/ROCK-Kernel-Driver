@@ -726,10 +726,10 @@ static void do_pd_request(request_queue_t * q)
 	if (pd_busy)
 		return;
 repeat:
-	if (blk_queue_empty(q))
+	pd_req = elv_next_request(q);
+	if (!pd_req)
 		return;
 
-	pd_req = elv_next_request(q);
 	pd_block = pd_req->sector;
 	pd_run = pd_req->nr_sectors;
 	pd_count = pd_req->current_nr_sectors;

@@ -4852,7 +4852,9 @@ static void do_sbpcd_request(request_queue_t * q)
 #ifdef DEBUG_GTL
 	xnr=++xx_nr;
 
-	if(blk_queue_empty(q))
+	req = elv_next_request(q);
+
+	if (!req)
 	{
 		printk( "do_sbpcd_request[%di](NULL), Pid:%d, Time:%li\n",
 			xnr, current->pid, jiffies);
@@ -4861,15 +4863,14 @@ static void do_sbpcd_request(request_queue_t * q)
 		return;
 	}
 
-	req = elv_next_request(q);
-
 	printk(" do_sbpcd_request[%di](%p:%ld+%ld), Pid:%d, Time:%li\n",
 		xnr, req, req->sector, req->nr_sectors, current->pid, jiffies);
 #endif
-	if (blk_queue_empty(q))
+
+	req = elv_next_request(q);	/* take out our request so no other */
+	if (!req)
 		return;
 
-	req = elv_next_request(q);		/* take out our request so no other */
 	if (req -> sector == -1)
 		end_request(req, 0);
 	spin_unlock_irq(q->queue_lock);

@@ -516,7 +516,7 @@ static void start_request(struct floppy_state *fs)
 		wake_up(&fs->wait);
 		return;
 	}
-	while (!blk_queue_empty(&swim_queue) && fs->state == idle) {
+	while (CURRENT && fs->state == idle) {
 		if (CURRENT->bh && !buffer_locked(CURRENT->bh))
 			panic("floppy: block not locked");
 #if 0
