@@ -185,7 +185,7 @@ free_address(
 {
 	a_list_t	*aentry;
 
-	aentry = kmalloc(sizeof(a_list_t), GFP_ATOMIC);
+	aentry = kmalloc(sizeof(a_list_t), GFP_ATOMIC | __GFP_NO_COMP);
 	if (aentry) {
 		spin_lock(&as_lock);
 		aentry->next = as_free_head;
@@ -1258,6 +1258,7 @@ bio_end_io_pagebuf(
 	for (i = 0; i < bio->bi_vcnt; i++, bvec++) {
 		struct page	*page = bvec->bv_page;
 
+		BUG_ON(PageCompound(page));
 		if (pb->pb_error) {
 			SetPageError(page);
 		} else if (blocksize == PAGE_CACHE_SIZE) {

@@ -358,7 +358,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
   return 0;
 }
 
-static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr)
+static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr, char *pstart)
 {
 	int slen;
 	int rootflag;
@@ -370,16 +370,24 @@ static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr)
 		rootflag = 0;
 		switch (slp->flags & ~1) {
 		case 0:
+			if (rpnt - pstart + slp->len >= PAGE_SIZE)
+				return rpnt;
 			memcpy(rpnt, slp->text, slp->len);
 			rpnt+=slp->len;
 			break;
 		case 4:
+			if (rpnt - pstart + 1 >= PAGE_SIZE)
+				return rpnt;
 			*rpnt++='.';
 			/* fallthru */
 		case 2:
+			if (rpnt - pstart + 1 >= PAGE_SIZE)
+				return rpnt;
 			*rpnt++='.';
 			break;
 		case 8:
+			if (rpnt - pstart + 1 >= PAGE_SIZE)
+				return rpnt;
 			rootflag = 1;
 			*rpnt++='/';
 			break;
@@ -396,7 +404,9 @@ static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr)
 			 * If there is another SL record, and this component
 			 * record isn't continued, then add a slash.
 			 */
-			if ((!rootflag) && (rr->u.SL.flags & 1) && !(oldslp->flags & 1))
+			if ((!rootflag) && (rr->u.SL.flags & 1) &&
+			    !(oldslp->flags & 1) &&
+			    rpnt - pstart + 1 < PAGE_SIZE)
 				*rpnt++='/';
 			break;
 		}
@@ -404,7 +414,8 @@ static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr)
 		/*
 		 * If this component record isn't continued, then append a '/'.
 		 */
-		if (!rootflag && !(oldslp->flags & 1))
+		if (!rootflag && !(oldslp->flags & 1) &&
+		    rpnt - pstart + 1 < PAGE_SIZE)
 			*rpnt++='/';
 
 	}
@@ -487,7 +498,7 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 			CHECK_SP(goto out);
 			break;
 		case SIG('S', 'L'):
-			rpnt = get_symlink_chunk(rpnt, rr);
+			rpnt = get_symlink_chunk(rpnt, rr, link);
 			break;
 		case SIG('C', 'E'):
 			/* This tells is if there is a continuation record */

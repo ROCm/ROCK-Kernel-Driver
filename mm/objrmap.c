@@ -725,15 +725,31 @@ int fastcall anon_vma_prepare(struct vm_area_struct * vma)
 	anon_vma_t * anon_vma = vma->anon_vma;
 
 	might_sleep();
-	if (!anon_vma) {
+	if (unlikely(!anon_vma)) {
+		struct mm_struct * mm;
+
 		anon_vma = anon_vma_alloc();
 		if (!anon_vma)
 			return -ENOMEM;
+
+		mm = vma->vm_mm;
+		spin_lock(&mm->page_table_lock);
+		if (unlikely(vma->anon_vma))
+			goto out_unlock_free;
+
 		vma->anon_vma = anon_vma;
-		/* mmap_sem to protect against threads is enough */
+		/* page_table_lock to protect against threads is enough */
 		list_add(&vma->anon_vma_node, &anon_vma->anon_vma_head);
+
+		spin_unlock(&mm->page_table_lock);
 	}
+ out:
 	return 0;
+
+ out_unlock_free:
+	spin_unlock(&vma->vm_mm->page_table_lock);
+	anon_vma_free(anon_vma);
+	goto out;
 }
 
 void fastcall anon_vma_merge(struct vm_area_struct * vma,
