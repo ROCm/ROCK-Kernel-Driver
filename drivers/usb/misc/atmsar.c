@@ -701,9 +701,8 @@ struct sk_buff *atmsar_decode_rawcell (struct atmsar_vcc_data *list, struct sk_b
 		} else {
 			/* If data is corrupt and skb doesn't hold a whole cell, flush the lot */
 			if (skb_pull (skb, (list->flags & ATMSAR_USE_53BYTE_CELL ? 53 : 52)) ==
-			    NULL) {
-				skb_trim (skb, 0);
-			}
+			    NULL)
+				return NULL;
 		}
 	}
 

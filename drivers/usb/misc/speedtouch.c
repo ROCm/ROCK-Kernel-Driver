@@ -348,9 +348,11 @@ static void udsl_atm_processqueue (unsigned long data)
 	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
 	struct udsl_data_ctx *ctx;
 	unsigned long flags;
+	unsigned char *data_start;
+	struct sk_buff *skb;
 	struct urb *urb;
 	struct atmsar_vcc_data *atmsar_vcc = NULL;
-	struct sk_buff *new = NULL, *skb = NULL, *tmp = NULL;
+	struct sk_buff *new = NULL, *tmp = NULL;
 
 	PDEBUG ("udsl_atm_processqueue entered\n");
 
@@ -369,22 +371,11 @@ static void udsl_atm_processqueue (unsigned long data)
 
 			/* update the skb structure */
 			skb = ctx->skb;
+			skb_trim (skb, 0);
 			skb_put (skb, urb->actual_length);
+			data_start = skb->data;
 
-			/* get a new skb */
-			ctx->skb = dev_alloc_skb (UDSL_RECEIVE_BUFFER_SIZE);
-			if (!ctx->skb)
-				PDEBUG ("No skb, loosing urb.\n");
-			else {
-				usb_fill_bulk_urb (urb,
-						   instance->usb_dev,
-						   usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
-						   (unsigned char *) ctx->skb->data,
-						   UDSL_RECEIVE_BUFFER_SIZE, udsl_usb_data_receive, ctx);
-				usb_submit_urb (urb, GFP_ATOMIC);
-			}
-
-			PDEBUG ("skb = %p, skb->len = %d\n", skb, skb->len);
+			PDEBUG ("skb->len = %d\n", skb->len);
 			PACKETDEBUG (skb->data, skb->len);
 
 			while ((new =
@@ -423,8 +414,20 @@ static void udsl_atm_processqueue (unsigned long data)
 					break;
 				}
 			}
-			dev_kfree_skb (skb);
-		default:
+
+			/* restore skb */
+			skb_push (skb, skb->data - data_start);
+
+			usb_fill_bulk_urb (urb,
+					   instance->usb_dev,
+					   usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
+					   (unsigned char *) ctx->skb->data,
+					   UDSL_RECEIVE_BUFFER_SIZE, udsl_usb_data_receive, ctx);
+			if (!usb_submit_urb (urb, GFP_ATOMIC))
+				break;
+			PDEBUG ("udsl_atm_processqueue: submission failed\n");
+			/* fall through */
+		default: /* error or urb unlinked */
 			break;
 		}
 
