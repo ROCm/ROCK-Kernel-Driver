@@ -672,7 +672,7 @@ u32 __tcp_select_window(struct sock *sk)
 	if (free_space < full_space/2) {
 		tp->ack.quick = 0;
 
-		if (tcp_prot.memory_pressure)
+		if (tcp_memory_pressure)
 			tp->rcv_ssthresh = min(tp->rcv_ssthresh, 4U*tp->advmss);
 
 		if (free_space < mss)
