@@ -229,6 +229,8 @@ int conf_read(const char *name)
 	}
 	fclose(in);
 
+	if (modules_sym)
+		sym_calc_value(modules_sym);
 	for_all_symbols(i, sym) {
 		sym_calc_value(sym);
 		if (sym_has_value(sym) && !sym_is_choice_value(sym)) {
