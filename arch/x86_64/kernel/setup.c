@@ -78,6 +78,9 @@ int __initdata acpi_force = 0;
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
 
+/* Boot loader ID as an integer, for the benefit of proc_dointvec */
+int bootloader_type;
+
 unsigned long saved_video_mode;
 
 #ifdef CONFIG_SWIOTLB
@@ -452,6 +455,7 @@ void __init setup_arch(char **cmdline_p)
 	edid_info = EDID_INFO;
 	aux_device_present = AUX_DEVICE_INFO;
 	saved_video_mode = SAVED_VIDEO_MODE;
+	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
