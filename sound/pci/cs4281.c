@@ -1331,8 +1331,8 @@ static void snd_cs4281_free_gameport(cs4281_t *chip)
 	}
 }
 #else
-static inline int snd_cs4281_gameport(cs4281_t *chip) { return -ENOSYS; }
-static inline void snd_cs4281_gameport_free(cs4281_t *chip) { }
+static inline int snd_cs4281_create_gameport(cs4281_t *chip) { return -ENOSYS; }
+static inline void snd_cs4281_free_gameport(cs4281_t *chip) { }
 #endif /* CONFIG_GAMEPORT || (MODULE && CONFIG_GAMEPORT_MODULE) */
 
 

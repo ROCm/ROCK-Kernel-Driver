@@ -165,7 +165,7 @@ void snd_ymfpci_free_gameport(ymfpci_t *chip)
 	}
 }
 #else
-static inline int snc_ymfpci_create_gameport(ymfpci_t *chip, int dev, int l, int l2) { return -ENOSYS; }
+static inline int snd_ymfpci_create_gameport(ymfpci_t *chip, int dev, int l, int l2) { return -ENOSYS; }
 void snd_ymfpci_free_gameport(ymfpci_t *chip) { }
 #endif /* SUPPORT_JOYSTICK */
 

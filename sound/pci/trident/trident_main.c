@@ -3118,14 +3118,14 @@ static unsigned char snd_trident_gameport_read(struct gameport *gameport)
 	return inb(TRID_REG(chip, GAMEPORT_LEGACY));
 }
 
-static int snd_trident_gameport_trigger(struct gameport *gameport)
+static void snd_trident_gameport_trigger(struct gameport *gameport)
 {
 	trident_t *chip = gameport->port_data;
 
-	snd_assert(chip, return 0);
+	snd_assert(chip, return);
 	outb(0xff, TRID_REG(chip, GAMEPORT_LEGACY));
 
-	return 0;
+	return;
 }
 
 static int snd_trident_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
