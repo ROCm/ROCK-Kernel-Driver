@@ -242,7 +242,7 @@ void
 lca_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	wmb();
-	*(vip)LCA_IOC_TBIA = 0;
+	*(vulp)LCA_IOC_TBIA = 0;
 	mb();
 }
 
@@ -268,21 +268,25 @@ lca_init_arch(void)
 	/*
 	 * Set up the PCI to main memory translation windows.
 	 *
-	 * Window 0 is direct access 1GB at 1GB
-	 * Window 1 is scatter-gather 8MB at 8MB (for isa)
+	 * Mimic the SRM settings for the direct-map window.
+	 *   Window 0 is scatter-gather 8MB at 8MB (for isa).
+	 *   Window 1 is direct access 1GB at 1GB.
+	 *
+	 * Note that we do not try to save any of the DMA window CSRs
+	 * before setting them, since we cannot read those CSRs on LCA.
 	 */
 	hose->sg_isa = iommu_arena_new(hose, 0x00800000, 0x00800000, 0);
 	hose->sg_pci = NULL;
 	__direct_map_base = 0x40000000;
 	__direct_map_size = 0x40000000;
 
-	*(vulp)LCA_IOC_W_BASE0 = __direct_map_base | (2UL << 32);
-	*(vulp)LCA_IOC_W_MASK0 = (__direct_map_size - 1) & 0xfff00000;
-	*(vulp)LCA_IOC_T_BASE0 = 0;
+	*(vulp)LCA_IOC_W_BASE0 = hose->sg_isa->dma_base | (3UL << 32);
+	*(vulp)LCA_IOC_W_MASK0 = (hose->sg_isa->size - 1) & 0xfff00000;
+	*(vulp)LCA_IOC_T_BASE0 = virt_to_phys(hose->sg_isa->ptes);
 
-	*(vulp)LCA_IOC_W_BASE1 = hose->sg_isa->dma_base | (3UL << 32);
-	*(vulp)LCA_IOC_W_MASK1 = (hose->sg_isa->size - 1) & 0xfff00000;
-	*(vulp)LCA_IOC_T_BASE1 = virt_to_phys(hose->sg_isa->ptes);
+	*(vulp)LCA_IOC_W_BASE1 = __direct_map_base | (2UL << 32);
+	*(vulp)LCA_IOC_W_MASK1 = (__direct_map_size - 1) & 0xfff00000;
+	*(vulp)LCA_IOC_T_BASE1 = 0;
 
 	*(vulp)LCA_IOC_TB_ENA = 0x80;
 
@@ -294,6 +298,15 @@ lca_init_arch(void)
 	 * data parity errors.
 	 */
 	*(vulp)LCA_IOC_PAR_DIS = 1UL<<5;
+
+	/*
+	 * Finally, set up for restoring the correct HAE if using SRM.
+	 * Again, since we cannot read many of the CSRs on the LCA,
+	 * one of which happens to be the HAE, we save the value that
+	 * the SRM will expect...
+	 */
+	if (alpha_using_srm)
+		srm_hae = 0x80000000UL;
 }
 
 /*
@@ -447,8 +460,8 @@ lca_machine_check(unsigned long vector, unsigned long la_ptr,
 	}
 
 	/* Dump the logout area to give all info.  */
-#if DEBUG_MCHECK > 1
-	{
+#ifdef CONFIG_VERBOSE_MCHECK
+	if (alpha_verbose_mcheck > 1) {
 		unsigned long * ptr = (unsigned long *) la_ptr;
 		long i;
 		for (i = 0; i < el.c->size / sizeof(long); i += 2) {
@@ -456,7 +469,7 @@ lca_machine_check(unsigned long vector, unsigned long la_ptr,
 			       i*sizeof(long), ptr[i], ptr[i+1]);
 		}
 	}
-#endif
+#endif /* CONFIG_VERBOSE_MCHECK */
 }
 
 /*

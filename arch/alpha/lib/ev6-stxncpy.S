@@ -360,9 +360,9 @@ $unaligned:
 	lda	t2, -1		# E : for creating masks later
 	beq	t12, $u_head	# U : (stall)
 
-	nop
-	cmpbge	zero, t1, t8	# E : is there a zero?
 	extql	t2, a1, t2	# U :
+	cmpbge	zero, t1, t8	# E : is there a zero?
+	andnot	t2, t6, t12	# E : dest mask for a single word copy
 	or	t8, t10, t5	# E : test for end-of-count too
 
 	cmpbge	zero, t2, t3	# E :
@@ -379,13 +379,13 @@ $unaligned:
 	negq	t8, t6		# E : build bitmask of bytes <= zero
 	mskqh	t1, t4, t1	# U :
 
-	and	t6, t8, t12	# E :
-	subq	t12, 1, t6	# E : (stall)
-	or	t6, t12, t8	# E : (stall)
-	zapnot	t2, t8, t2	# U : prepare source word; mirror changes (stall)
+	and	t6, t8, t2	# E :
+	subq	t2, 1, t6	# E : (stall)
+	or	t6, t2, t8	# E : (stall)
+	zapnot	t12, t8, t12	# U : prepare source word; mirror changes (stall)
 
 	zapnot	t1, t8, t1	# U : to source validity mask
-	andnot	t0, t2, t0	# E : zero place for source to reside
+	andnot	t0, t12, t0	# E : zero place for source to reside
 	or	t0, t1, t0	# E : and put it there (stall both t0, t1)
 	stq_u	t0, 0(a0)	# L : (stall)
 

@@ -130,9 +130,11 @@ process_mcheck_info(unsigned long vector, unsigned long la_ptr,
 	 * ignore it.
 	 */
 
-#if DEBUG_MCHECK > 0
-	 printk(KERN_CRIT "%s machine check %s\n", machine,
-	        expected ? "expected." : "NOT expected!!!");
+#ifdef CONFIG_VERBOSE_MCHECK
+	if (alpha_verbose_mcheck > 1) {
+		printk(KERN_CRIT "%s machine check %s\n", machine,
+		       expected ? "expected." : "NOT expected!!!");
+	}
 #endif
 
 	if (expected) {
@@ -188,8 +190,8 @@ process_mcheck_info(unsigned long vector, unsigned long la_ptr,
 
 	dik_show_regs(regs, NULL);
 
-#if DEBUG_MCHECK > 1
-	{
+#ifdef CONFIG_VERBOSE_MCHECK
+	if (alpha_verbose_mcheck > 1) {
 		/* Dump the logout area to give all info.  */
 		unsigned long *ptr = (unsigned long *)la_ptr;
 		long i;
@@ -198,7 +200,7 @@ process_mcheck_info(unsigned long vector, unsigned long la_ptr,
 			       i*sizeof(long), ptr[i], ptr[i+1]);
 		}
 	}
-#endif
+#endif /* CONFIG_VERBOSE_MCHECK */
 }
 
 /*
