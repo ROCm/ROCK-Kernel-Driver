@@ -203,7 +203,7 @@ struct getdents_callback64 {
 static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 		     ino_t ino, unsigned int d_type)
 {
-	struct linux_dirent64 * dirent, d;
+	struct linux_dirent64 *dirent;
 	struct getdents_callback64 * buf = (struct getdents_callback64 *) __buf;
 	int reclen = ROUND_UP64(NAME_OFFSET(dirent) + namlen + 1);
 
@@ -211,23 +211,32 @@ static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 	if (reclen > buf->count)
 		return -EINVAL;
 	dirent = buf->previous;
-	if (dirent) {
-		d.d_off = offset;
-		copy_to_user(&dirent->d_off, &d.d_off, sizeof(d.d_off));
-	}
+	if (dirent)
+		if (__put_user(offset, &dirent->d_off))
+			goto efault;
+	else
+		if (__put_user(0, &dirent->d_off))
+			goto efault;
 	dirent = buf->current_dir;
 	buf->previous = dirent;
-	memset(&d, 0, NAME_OFFSET(&d));
-	d.d_ino = ino;
-	d.d_reclen = reclen;
-	d.d_type = d_type;
-	copy_to_user(dirent, &d, NAME_OFFSET(&d));
-	copy_to_user(dirent->d_name, name, namlen);
-	put_user(0, dirent->d_name + namlen);
+	if (__put_user(ino, &dirent->d_ino))
+		goto efault;
+	if (__put_user(0, &dirent->d_off))
+		goto efault;
+	if (__put_user(reclen, &dirent->d_reclen))
+		goto efault;
+	if (__put_user(d_type, &dirent->d_type))
+		goto efault;
+	if (copy_to_user(dirent->d_name, name, namlen))
+		goto efault;
+	if (put_user(0, dirent->d_name + namlen))
+		goto efault;
 	((char *) dirent) += reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
+efault:
+	return -EFAULT;
 }
 
 asmlinkage long sys_getdents64(unsigned int fd, void * dirent, unsigned int count)
@@ -236,6 +245,10 @@ asmlinkage long sys_getdents64(unsigned int fd, void * dirent, unsigned int coun
 	struct linux_dirent64 * lastdirent;
 	struct getdents_callback64 buf;
 	int error;
+
+	error = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, dirent, sizeof(struct linux_dirent64)))
+		goto out;
 
 	error = -EBADF;
 	file = fget(fd);
@@ -255,7 +268,7 @@ asmlinkage long sys_getdents64(unsigned int fd, void * dirent, unsigned int coun
 	if (lastdirent) {
 		struct linux_dirent64 d;
 		d.d_off = file->f_pos;
-		copy_to_user(&lastdirent->d_off, &d.d_off, sizeof(d.d_off));
+		__put_user(d.d_off, &lastdirent->d_off);
 		error = count - buf.count;
 	}
 
