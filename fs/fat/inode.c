@@ -1024,19 +1024,23 @@ out_fail:
 
 int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
-	int free,nr;
+	int free, nr;
        
-	lock_fat(sb);
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		free = MSDOS_SB(sb)->free_clusters;
 	else {
-		free = 0;
-		for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++)
-			if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
-				free++;
-		MSDOS_SB(sb)->free_clusters = free;
+		lock_fat(sb);
+		if (MSDOS_SB(sb)->free_clusters != -1)
+			free = MSDOS_SB(sb)->free_clusters;
+		else {
+			free = 0;
+			for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++)
+				if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
+					free++;
+			MSDOS_SB(sb)->free_clusters = free;
+		}
+		unlock_fat(sb);
 	}
-	unlock_fat(sb);
 
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = 1 << MSDOS_SB(sb)->cluster_bits;
