@@ -73,23 +73,28 @@
 struct net_device *alloc_netdev(int sizeof_priv, const char *mask,
 				       void (*setup)(struct net_device *))
 {
+	void *p;
 	struct net_device *dev;
 	int alloc_size;
 
-	/* ensure 32-byte alignment of the private area */
-	alloc_size = sizeof (*dev) + sizeof_priv + 31;
+	/* ensure 32-byte alignment of both the device and private area */
 
-	dev = (struct net_device *) kmalloc (alloc_size, GFP_KERNEL);
-	if (dev == NULL)
-	{
-		printk(KERN_ERR "alloc_dev: Unable to allocate device memory.\n");
+	alloc_size = (sizeof(struct net_device) + 31) & ~31;
+	alloc_size += sizeof_priv + 31;
+
+	p = kmalloc (alloc_size, GFP_KERNEL);
+	if (!p) {
+		printk(KERN_ERR "alloc_dev: Unable to allocate device.\n");
 		return NULL;
 	}
 
-	memset(dev, 0, alloc_size);
+	memset(p, 0, alloc_size);
+
+	dev = (struct net_device *)(((long)p + 31) & ~31);
+	dev->padded = (char *)dev - (char *)p;
 
 	if (sizeof_priv)
-		dev->priv = (void *) (((long)(dev + 1) + 31) & ~31);
+		dev->priv = netdev_priv(dev);
 
 	setup(dev);
 	strcpy(dev->name, mask);
