@@ -75,7 +75,7 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			break;
 
 		case FIONBIO:
-			if ((error = get_user(on, (int *)arg)) != 0)
+			if ((error = get_user(on, (int __user *)arg)) != 0)
 				break;
 			flag = O_NONBLOCK;
 #ifdef __sparc__
@@ -90,7 +90,7 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			break;
 
 		case FIOASYNC:
-			if ((error = get_user(on, (int *)arg)) != 0)
+			if ((error = get_user(on, (int __user *)arg)) != 0)
 				break;
 			flag = on ? FASYNC : 0;
 
@@ -114,7 +114,7 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			    S_ISREG(filp->f_dentry->d_inode->i_mode) ||
 			    S_ISLNK(filp->f_dentry->d_inode->i_mode)) {
 				loff_t res = inode_get_bytes(filp->f_dentry->d_inode);
-				error = copy_to_user((loff_t *)arg, &res, sizeof(res)) ? -EFAULT : 0;
+				error = copy_to_user((loff_t __user *)arg, &res, sizeof(res)) ? -EFAULT : 0;
 			}
 			else
 				error = -ENOTTY;

@@ -529,12 +529,12 @@ asmlinkage int sys_clone(struct pt_regs regs)
 	struct task_struct *p;
 	unsigned long clone_flags;
 	unsigned long newsp;
-	int *parent_tidptr, *child_tidptr;
+	int __user *parent_tidptr, *child_tidptr;
 
 	clone_flags = regs.ebx;
 	newsp = regs.ecx;
-	parent_tidptr = (int *)regs.edx;
-	child_tidptr = (int *)regs.edi;
+	parent_tidptr = (int __user *)regs.edx;
+	child_tidptr = (int __user *)regs.edi;
 	if (!newsp)
 		newsp = regs.esp;
 	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, parent_tidptr, child_tidptr);

@@ -134,7 +134,7 @@ __u32 sysctl_rmem_default = SK_RMEM_MAX;
 /* Maximal space eaten by iovec or ancilliary data plus some space */
 int sysctl_optmem_max = sizeof(unsigned long)*(2*UIO_MAXIOV + 512);
 
-static int sock_set_timeout(long *timeo_p, char *optval, int optlen)
+static int sock_set_timeout(long *timeo_p, char __user *optval, int optlen)
 {
 	struct timeval tv;
 
@@ -163,7 +163,7 @@ static void sock_warn_obsolete_bsdism(const char *name)
  */
 
 int sock_setsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int optlen)
+		    char __user *optval, int optlen)
 {
 	struct sock *sk=sock->sk;
 	struct sk_filter *filter;
@@ -188,7 +188,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
   	if(optlen<sizeof(int))
   		return(-EINVAL);
   	
-	if (get_user(val, (int *)optval))
+	if (get_user(val, (int __user *)optval))
 		return -EFAULT;
 	
   	valbool = val?1:0;
@@ -415,7 +415,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 
 
 int sock_getsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int *optlen)
+		    char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	
@@ -548,7 +548,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				return -ENOTCONN;
 			if (lv < len)
 				return -EINVAL;
-			if(copy_to_user((void*)optval, address, len))
+			if (copy_to_user(optval, address, len))
 				return -EFAULT;
 			goto lenout;
 		}
@@ -996,7 +996,8 @@ ssize_t sock_no_sendpage(struct socket *sock, struct page *page, int offset, siz
 	msg.msg_controllen = 0;
 	msg.msg_flags = flags;
 
-	iov.iov_base = kaddr + offset;
+	/* This cast is ok because of the "set_fs(KERNEL_DS)" */
+	iov.iov_base = (void __user *) (kaddr + offset);
 	iov.iov_len = size;
 
 	old_fs = get_fs();
