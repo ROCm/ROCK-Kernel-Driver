@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/pci/siimage.c		Version 1.06	June 11, 2003
+ * linux/drivers/ide/pci/siimage.c		Version 1.07	Nov 30, 2003
  *
  * Copyright (C) 2001-2002	Andre Hedrick <andre@linux-ide.org>
  * Copyright (C) 2003		Red Hat <alan@redhat.com>
@@ -1046,6 +1046,27 @@ static void __init init_mmio_iops_siimage (ide_hwif_t *hwif)
 	hwif->mmio			= 2;
 }
 
+static int is_dev_seagate_sata(ide_drive_t *drive)
+{
+	const char *s = &drive->id->model[0];
+	unsigned len;
+
+	if (!drive->present)
+		return 0;
+
+	len = strnlen(s, sizeof(drive->id->model));
+
+	if ((len > 4) && (!memcmp(s, "ST", 2))) {
+		if ((!memcmp(s + len - 2, "AS", 2)) ||
+		    (!memcmp(s + len - 3, "ASL", 3))) {
+			printk(KERN_INFO "%s: applying pessimistic Seagate "
+					 "errata fix\n", drive->name);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /**
  *	init_iops_siimage	-	set up iops
  *	@hwif: interface to set up
@@ -1067,7 +1088,7 @@ static void __init init_iops_siimage (ide_hwif_t *hwif)
 	hwif->hwif_data = 0;
 
 	hwif->rqsize = 128;
-	if (is_sata(hwif))
+	if (is_sata(hwif) && is_dev_seagate_sata(&hwif->drives[0]))
 		hwif->rqsize = 15;
 
 	if (pci_get_drvdata(dev) == NULL)
