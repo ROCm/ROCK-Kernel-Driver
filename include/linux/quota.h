@@ -248,7 +248,7 @@ struct quota_format_ops {
 
 /* Operations working with dquots */
 struct dquot_operations {
-	void (*initialize) (struct inode *, short);
+	void (*initialize) (struct inode *, int);
 	void (*drop) (struct inode *);
 	int (*alloc_space) (struct inode *, qsize_t, int);
 	int (*alloc_inode) (const struct inode *, unsigned long);

@@ -173,7 +173,7 @@ static inline void put_dquot_dup_ref(struct dquot *dquot)
 	dquot->dq_dup_ref--;
 }
 
-static inline int const hashfn(struct super_block *sb, unsigned int id, short type)
+static inline int const hashfn(struct super_block *sb, unsigned int id, int type)
 {
 	return((HASHDEV(sb->s_dev) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
 }
@@ -190,7 +190,7 @@ static inline void remove_dquot_hash(struct dquot *dquot)
 	INIT_LIST_HEAD(&dquot->dq_hash);
 }
 
-static inline struct dquot *find_dquot(unsigned int hashent, struct super_block *sb, unsigned int id, short type)
+static inline struct dquot *find_dquot(unsigned int hashent, struct super_block *sb, unsigned int id, int type)
 {
 	struct list_head *head;
 	struct dquot *dquot;
@@ -339,7 +339,7 @@ static int commit_dqblk(struct dquot *dquot)
 /* Invalidate all dquots on the list, wait for all users. Note that this function is called
  * after quota is disabled so no new quota might be created. As we only insert to the end of
  * inuse list, we don't have to restart searching... */
-static void invalidate_dquots(struct super_block *sb, short type)
+static void invalidate_dquots(struct super_block *sb, int type)
 {
 	struct dquot *dquot;
 	struct list_head *head;
@@ -368,7 +368,7 @@ restart:
 	}
 }
 
-int sync_dquots(struct super_block *sb, short type)
+int sync_dquots(struct super_block *sb, int type)
 {
 	struct list_head *head;
 	struct dquot *dquot;
@@ -515,7 +515,7 @@ static struct dquot *get_empty_dquot(struct super_block *sb, int type)
 	return dquot;
 }
 
-static struct dquot *dqget(struct super_block *sb, unsigned int id, short type)
+static struct dquot *dqget(struct super_block *sb, unsigned int id, int type)
 {
 	unsigned int hashent = hashfn(sb, id, type);
 	struct dquot *dquot, *empty = NODQUOT;
@@ -593,7 +593,7 @@ static void dqputduplicate(struct dquot *dquot)
 	dqstats.drops++;
 }
 
-static int dqinit_needed(struct inode *inode, short type)
+static int dqinit_needed(struct inode *inode, int type)
 {
 	int cnt;
 
@@ -607,7 +607,7 @@ static int dqinit_needed(struct inode *inode, short type)
 	return 0;
 }
 
-static void add_dquot_ref(struct super_block *sb, short type)
+static void add_dquot_ref(struct super_block *sb, int type)
 {
 	struct list_head *p;
 
@@ -641,7 +641,7 @@ static inline int dqput_blocks(struct dquot *dquot)
 }
 
 /* Remove references to dquots from inode - add dquot to list for freeing if needed */
-int remove_inode_dquot_ref(struct inode *inode, short type, struct list_head *tofree_head)
+int remove_inode_dquot_ref(struct inode *inode, int type, struct list_head *tofree_head)
 {
 	struct dquot *dquot = inode->i_dquot[type];
 	int cnt;
@@ -875,11 +875,11 @@ static int check_bdq(struct dquot *dquot, qsize_t space, int prealloc, char *war
  *
  * Note: this is a blocking operation.
  */
-void dquot_initialize(struct inode *inode, short type)
+void dquot_initialize(struct inode *inode, int type)
 {
 	struct dquot *dquot[MAXQUOTAS];
 	unsigned int id = 0;
-	short cnt;
+	int cnt;
 
 	if (IS_NOQUOTA(inode))
 		return;
@@ -925,7 +925,7 @@ void dquot_initialize(struct inode *inode, short type)
 void dquot_drop(struct inode *inode)
 {
 	struct dquot *dquot;
-	short cnt;
+	int cnt;
 
 	inode->i_flags &= ~S_QUOTA;
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
@@ -1020,7 +1020,7 @@ warn_put_all:
  */
 void dquot_free_space(struct inode *inode, qsize_t number)
 {
-	unsigned short cnt;
+	unsigned int cnt;
 	struct dquot *dquot;
 
 	/* NOBLOCK Start */
@@ -1042,7 +1042,7 @@ void dquot_free_space(struct inode *inode, qsize_t number)
  */
 void dquot_free_inode(const struct inode *inode, unsigned long number)
 {
-	unsigned short cnt;
+	unsigned int cnt;
 	struct dquot *dquot;
 
 	/* NOBLOCK Start */
@@ -1161,7 +1161,7 @@ struct dquot_operations dquot_operations = {
 	transfer:	dquot_transfer
 };
 
-static inline void set_enable_flags(struct quota_info *dqopt, short type)
+static inline void set_enable_flags(struct quota_info *dqopt, int type)
 {
 	switch (type) {
 		case USRQUOTA:
@@ -1173,7 +1173,7 @@ static inline void set_enable_flags(struct quota_info *dqopt, short type)
 	}
 }
 
-static inline void reset_enable_flags(struct quota_info *dqopt, short type)
+static inline void reset_enable_flags(struct quota_info *dqopt, int type)
 {
 	switch (type) {
 		case USRQUOTA:
@@ -1186,7 +1186,7 @@ static inline void reset_enable_flags(struct quota_info *dqopt, short type)
 }
 
 /* Function in inode.c - remove pointers to dquots in icache */
-extern void remove_dquot_ref(struct super_block *, short);
+extern void remove_dquot_ref(struct super_block *, int);
 
 /*
  * Turn quota off on a device. type == -1 ==> quotaoff for all types (umount)
@@ -1448,7 +1448,7 @@ static int read_stats(char *buffer, char **start, off_t offset, int count, int *
 }
 #endif
 
-struct quotactl_ops vfs_quotactl_ops {
+struct quotactl_ops vfs_quotactl_ops = {
 	quota_on:	vfs_quota_on,
 	quota_off:	vfs_quota_off,
 	quota_sync:	vfs_quota_sync,
