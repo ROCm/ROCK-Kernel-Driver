@@ -1113,7 +1113,7 @@ static struct net_proto_family llc_ui_family_ops = {
 	.create = llc_ui_create,
 };
 
-static struct proto_ops SOCKOPS_WRAPPED(llc_ui_ops) = {
+static struct proto_ops llc_ui_ops = {
 	.family	     = PF_LLC,
 	.release     = llc_ui_release,
 	.bind	     = llc_ui_bind,
@@ -1132,9 +1132,6 @@ static struct proto_ops SOCKOPS_WRAPPED(llc_ui_ops) = {
 	.mmap	     = sock_no_mmap,
 	.sendpage    = sock_no_sendpage,
 };
-
-#include <linux/smp_lock.h>
-SOCKOPS_WRAP(llc_ui, PF_LLC);
 
 static char llc_ui_banner[] __initdata =
 	KERN_INFO "NET4.0 IEEE 802.2 BSD sockets, Jay Schulist, 2001, Arnaldo C. Melo, 2002\n";
