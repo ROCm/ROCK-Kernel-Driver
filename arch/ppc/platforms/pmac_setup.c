@@ -469,10 +469,6 @@ pmac_restart(char *cmd)
 	struct adb_request req;
 #endif /* CONFIG_ADB_CUDA */
 
-#ifdef CONFIG_NVRAM
-	pmac_nvram_update();
-#endif
-
 	switch (sys_ctrler) {
 #ifdef CONFIG_ADB_CUDA
 	case SYS_CTRLER_CUDA:
@@ -497,10 +493,6 @@ pmac_power_off(void)
 #ifdef CONFIG_ADB_CUDA
 	struct adb_request req;
 #endif /* CONFIG_ADB_CUDA */
-
-#ifdef CONFIG_NVRAM
-	pmac_nvram_update();
-#endif
 
 	switch (sys_ctrler) {
 #ifdef CONFIG_ADB_CUDA
@@ -637,11 +629,6 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.get_rtc_time   = pmac_get_rtc_time;
 	ppc_md.calibrate_decr = pmac_calibrate_decr;
 
-#ifdef CONFIG_NVRAM
-	ppc_md.nvram_read_val	= pmac_nvram_read_byte;
-	ppc_md.nvram_write_val	= pmac_nvram_write_byte;
-#endif
-
 	ppc_md.find_end_of_memory = pmac_find_end_of_memory;
 
 	ppc_md.feature_call   = pmac_do_feature_call;
@@ -682,6 +669,14 @@ pmac_declare_of_platform_devices(void)
 		for (np = np->child; np != NULL; np = np->sibling)
 			if (strncmp(np->name, "i2c", 3) == 0) {
 				of_platform_device_create(np, "uni-n-i2c");
+				break;
+			}
+	}
+	np = find_devices("u3");
+	if (np) {
+		for (np = np->child; np != NULL; np = np->sibling)
+			if (strncmp(np->name, "i2c", 3) == 0) {
+				of_platform_device_create(np, "u3-i2c");
 				break;
 			}
 	}

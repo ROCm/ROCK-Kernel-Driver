@@ -41,6 +41,7 @@
 #include <asm/pmac_feature.h>
 #include <asm/dbdma.h>
 #include <asm/pci-bridge.h>
+#include <asm/pmac_low_i2c.h>
 
 #undef DEBUG_FEATURE
 
@@ -2601,6 +2602,99 @@ set_initial_features(void)
 		MACIO_BIC(HEATHROW_FCR, HRW_SOUND_POWER_N);
 	}
 
+	/* Hack for bumping clock speed on the new PowerBooks and the
+	 * iBook G4. This implements the "platform-do-clockspreading" OF
+	 * property. For safety, we also check the product ID in the
+	 * device-tree to make reasonably sure we won't set wrong values
+	 * in the clock chip.
+	 *
+	 * Of course, ultimately, we have to implement a real parser for
+	 * the platform-do-* stuff...
+	 */
+	while (machine_is_compatible("PowerBook5,2") ||
+	       machine_is_compatible("PowerBook5,3") ||
+	       machine_is_compatible("PowerBook6,2") ||
+	       machine_is_compatible("PowerBook6,3")) {
+		struct device_node *ui2c = of_find_node_by_type(NULL, "i2c");
+		struct device_node *dt = of_find_node_by_name(NULL, "device-tree");
+		u8 buffer[9];
+		u32 *productID;
+		int i, rc, changed = 0;
+		
+		if (dt == NULL)
+			break;
+		productID = (u32 *)get_property(dt, "pid#", NULL);
+		if (productID == NULL)
+			break;
+		while(ui2c) {
+			struct device_node *p = of_get_parent(ui2c);
+			if (p && !strcmp(p->name, "uni-n"))
+				break;
+			ui2c = of_find_node_by_type(np, "i2c");
+		}
+		if (ui2c == NULL)
+			break;
+		DBG("Trying to bump clock speed for PID: %08x...\n", *productID);
+		rc = pmac_low_i2c_open(ui2c, 1);
+		if (rc != 0)
+			break;
+		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_combined);
+		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_read, 0x80, buffer, 9);
+		DBG("read result: %d,", rc);
+		if (rc != 0) {
+			pmac_low_i2c_close(ui2c);
+			break;
+		}
+		for (i=0; i<9; i++)
+			DBG(" %02x", buffer[i]);
+		DBG("\n");
+		
+		switch(*productID) {
+		case 0x1182:	/* AlBook 12" rev 2 */
+		case 0x1183:	/* iBook G4 12" */
+			buffer[0] = (buffer[0] & 0x8f) | 0x70;
+			buffer[2] = (buffer[2] & 0x7f) | 0x00;
+			buffer[5] = (buffer[5] & 0x80) | 0x31;
+			buffer[6] = (buffer[6] & 0x40) | 0xb0;
+			buffer[7] = (buffer[7] & 0x00) | 0xc0;
+			buffer[8] = (buffer[8] & 0x00) | 0x30;
+			changed = 1;
+			break;
+		case 0x3142:	/* AlBook 15" (ATI M10) */
+		case 0x3143:	/* AlBook 17" (ATI M10) */
+			buffer[0] = (buffer[0] & 0xaf) | 0x50;
+			buffer[2] = (buffer[2] & 0x7f) | 0x00;
+			buffer[5] = (buffer[5] & 0x80) | 0x31;
+			buffer[6] = (buffer[6] & 0x40) | 0xb0;
+			buffer[7] = (buffer[7] & 0x00) | 0xd0;
+			buffer[8] = (buffer[8] & 0x00) | 0x30;
+			changed = 1;
+			break;
+		default:
+			DBG("i2c-hwclock: Machine model not handled\n");
+			break;
+		}
+		if (!changed) {
+			pmac_low_i2c_close(ui2c);
+			break;
+		}
+		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_stdsub);
+		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_write, 0x80, buffer, 9);
+		DBG("write result: %d,", rc);
+		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_combined);
+		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_read, 0x80, buffer, 9);
+		DBG("read result: %d,", rc);
+		if (rc != 0) {
+			pmac_low_i2c_close(ui2c);
+			break;
+		}
+		for (i=0; i<9; i++)
+			DBG(" %02x", buffer[i]);
+		pmac_low_i2c_close(ui2c);
+		break;
+	}
+
+#endif /* CONFIG_POWER4 */
 
 	/* On all machines, switch modem & serial ports off */
 	np = find_devices("ch-a");
@@ -2626,6 +2720,9 @@ pmac_feature_init(void)
 		printk(KERN_WARNING "No mac-io chip found\n");
 		return;
 	}
+
+	/* Setup low-level i2c stuffs */
+	pmac_init_low_i2c();
 
 	/* Probe machine type */
 	if (probe_motherboard())
