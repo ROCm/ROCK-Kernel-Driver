@@ -45,7 +45,7 @@
  * PMC flags
  */
 #define PFM_REGFL_OVFL_NOTIFY	0x1	/* send notification on overflow */
-#define PFM_REGFL_RANDOM	0x2	/* randomize sampling interval */
+#define PFM_REGFL_RANDOM	0x2	/* randomize sampling periods    */
 
 /*
  * PMD/PMC/IBR/DBR return flags (ignored on input)
@@ -87,8 +87,10 @@ typedef struct {
 	unsigned long	reg_short_reset;/* reset after counter overflow (small) */
 
 	unsigned long	reg_reset_pmds[4]; /* which other counters to reset on overflow */
+	unsigned long	reg_random_seed;   /* seed value when randomization is used */
+	unsigned long	reg_random_mask;   /* bitmask used to limit random value */
 
-	unsigned long   reserved[16];	/* for future use */
+	unsigned long   reserved[14];	/* for future use */
 } pfarg_reg_t;
 
 typedef struct {
