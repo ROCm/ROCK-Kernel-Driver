@@ -360,6 +360,18 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 	    }
 
 	    /*
+	     * Check to see if the section's size will overflow the
+	     * allowed task size. Note that p_filesz must always be
+	     * <= p_memsize so it is only necessary to check p_memsz.
+	     */
+	    k = load_addr + eppnt->p_vaddr;
+	    if (k > TASK_SIZE || eppnt->p_filesz > eppnt->p_memsz ||
+		eppnt->p_memsz > TASK_SIZE || TASK_SIZE - eppnt->p_memsz < k) {
+	        error = -ENOMEM;
+		goto out_close;
+	    }
+
+	    /*
 	     * Find the end of the file mapping for this phdr, and keep
 	     * track of the largest address we see for this.
 	     */
@@ -758,6 +770,19 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		k = elf_ppnt->p_vaddr;
 		if (k < start_code) start_code = k;
 		if (start_data < k) start_data = k;
+
+		/*
+		 * Check to see if the section's size will overflow the
+		 * allowed task size. Note that p_filesz must always be
+		 * <= p_memsz so it is only necessary to check p_memsz.
+		 */
+		if (k > TASK_SIZE || elf_ppnt->p_filesz > elf_ppnt->p_memsz ||
+		    elf_ppnt->p_memsz > TASK_SIZE ||
+		    TASK_SIZE - elf_ppnt->p_memsz < k) {
+			/* set_brk can never work.  Avoid overflows.  */
+			send_sig(SIGKILL, current, 0);
+			goto out_free_dentry;
+		}
 
 		k = elf_ppnt->p_vaddr + elf_ppnt->p_filesz;
 
