@@ -2170,7 +2170,7 @@ static inline struct tcp_tw_bucket *tw_next(struct tcp_tw_bucket *tw)
 		hlist_entry(tw->tw_node.next, typeof(*tw), tw_node) : NULL;
 }
 
-static void *listening_get_first(struct seq_file *seq, int noopenreq)
+static void *listening_get_first(struct seq_file *seq)
 {
 	struct tcp_iter_state* st = seq->private;
 	void *rc = NULL;
@@ -2188,7 +2188,7 @@ static void *listening_get_first(struct seq_file *seq, int noopenreq)
 		}
 	       	tp = tcp_sk(sk);
 		read_lock_bh(&tp->syn_wait_lock);
-		if (!noopenreq && tp->listen_opt && tp->listen_opt->qlen) {
+		if (tp->listen_opt && tp->listen_opt->qlen) {
 			st->uid		= sock_i_uid(sk);
 			st->syn_wait_sk = sk;
 			st->state	= TCP_SEQ_STATE_OPENREQ;
@@ -2210,7 +2210,7 @@ out:
 	return rc;
 }
 
-static void *listening_get_next(struct seq_file *seq, void *cur, int noopenreq)
+static void *listening_get_next(struct seq_file *seq, void *cur)
 {
 	struct tcp_opt *tp;
 	struct hlist_node *node;
@@ -2250,7 +2250,7 @@ get_sk:
 		}
 	       	tp = tcp_sk(sk);
 		read_lock_bh(&tp->syn_wait_lock);
-		if (!noopenreq && tp->listen_opt && tp->listen_opt->qlen) {
+		if (tp->listen_opt && tp->listen_opt->qlen) {
 			st->uid		= sock_i_uid(sk);
 			st->syn_wait_sk = sk;
 			st->state	= TCP_SEQ_STATE_OPENREQ;
@@ -2268,12 +2268,12 @@ out:
 	return cur;
 }
 
-static void *listening_get_idx(struct seq_file *seq, loff_t *pos, int noopenreq)
+static void *listening_get_idx(struct seq_file *seq, loff_t *pos)
 {
-	void *rc = listening_get_first(seq, noopenreq);
+	void *rc = listening_get_first(seq);
 
 	while (rc && *pos) {
-		rc = listening_get_next(seq, rc, noopenreq);
+		rc = listening_get_next(seq, rc);
 		--*pos;
 	}
 	return rc;
@@ -2370,54 +2370,40 @@ static void *established_get_idx(struct seq_file *seq, loff_t pos)
 	return rc;
 }
 
-static void *tcp_get_idx(struct seq_file *seq, loff_t pos, int listenonly)
+static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
 {
 	void *rc;
 	struct tcp_iter_state* st = seq->private;
 
 	tcp_listen_lock();
 	st->state = TCP_SEQ_STATE_LISTENING;
-	rc	  = listening_get_idx(seq, &pos, listenonly);
+	rc	  = listening_get_idx(seq, &pos);
 
 	if (!rc) {
 		tcp_listen_unlock();
-		if (!listenonly) { 
-			local_bh_disable();
-			st->state = TCP_SEQ_STATE_ESTABLISHED;
-			rc	  = established_get_idx(seq, pos);
-		}
+		local_bh_disable();
+		st->state = TCP_SEQ_STATE_ESTABLISHED;
+		rc	  = established_get_idx(seq, pos);
 	}
 
 	return rc;
 }
 
-void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
+static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct tcp_iter_state* st = seq->private;
 	st->state = TCP_SEQ_STATE_LISTENING;
 	st->num = 0;
-	return *pos ? tcp_get_idx(seq, *pos - 1, 0) : SEQ_START_TOKEN;
+	return *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
-EXPORT_SYMBOL(tcp_seq_start);
-
-void *tcp_listen_seq_start(struct seq_file *seq, loff_t *pos)
-{
-	struct tcp_iter_state* st = seq->private;
-	st->state = TCP_SEQ_STATE_LISTENING;
-	st->num = 0;
-	return *pos ? tcp_get_idx(seq, *pos - 1, 1) : SEQ_START_TOKEN;
-}
-
-EXPORT_SYMBOL(tcp_listen_seq_start);
-
-void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	void *rc = NULL;
 	struct tcp_iter_state* st;
 
 	if (v == SEQ_START_TOKEN) {
-		rc = tcp_get_idx(seq, 0, 0);
+		rc = tcp_get_idx(seq, 0);
 		goto out;
 	}
 	st = seq->private;
@@ -2425,7 +2411,7 @@ void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	switch (st->state) {
 	case TCP_SEQ_STATE_OPENREQ:
 	case TCP_SEQ_STATE_LISTENING:
-		rc = listening_get_next(seq, v, 0);
+		rc = listening_get_next(seq, v);
 		if (!rc) {
 			tcp_listen_unlock();
 			local_bh_disable();
@@ -2442,30 +2428,6 @@ out:
 	++*pos;
 	return rc;
 }
-
-EXPORT_SYMBOL(tcp_seq_next);
-
-void *tcp_listen_seq_next(struct seq_file *seq, void *v, loff_t *pos)
-{
-	void *rc = NULL;
-	struct tcp_iter_state* st;
-
-	if (v == SEQ_START_TOKEN) {
-		rc = tcp_get_idx(seq, 0, 1);
-		goto out;
-	}
-	st = seq->private;
-	rc = listening_get_next(seq, v, 1);
-	if (!rc) {
-		tcp_listen_unlock();
-	}
-
-out:
-	++*pos;
-	return rc;
-}
-
-EXPORT_SYMBOL(tcp_listen_seq_next);
 
 static void tcp_seq_stop(struct seq_file *seq, void *v)
 {
@@ -2505,8 +2467,8 @@ static int tcp_seq_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 	memset(s, 0, sizeof(*s));
 	s->family		= afinfo->family;
-	s->seq_ops.start	= afinfo->seq_start;
-	s->seq_ops.next		= afinfo->seq_next;
+	s->seq_ops.start	= tcp_seq_start;
+	s->seq_ops.next		= tcp_seq_next;
 	s->seq_ops.show		= afinfo->seq_show;
 	s->seq_ops.stop		= tcp_seq_stop;
 
@@ -2675,36 +2637,18 @@ static struct tcp_seq_afinfo tcp4_seq_afinfo = {
 	.owner		= THIS_MODULE,
 	.name		= "tcp",
 	.family		= AF_INET,
-	.seq_start	= tcp_seq_start, 
 	.seq_show	= tcp4_seq_show,
-	.seq_next	= tcp_seq_next,
 	.seq_fops	= &tcp4_seq_fops,
 };
 
-static struct file_operations tcp4_listen_seq_fops;
-static struct tcp_seq_afinfo tcp4_listen_seq_afinfo = {
-	.owner		= THIS_MODULE,
-	.name		= "tcp_listen",
-	.family		= AF_INET,
-	.seq_start	= tcp_listen_seq_start, 
-	.seq_show	= tcp4_seq_show,
-	.seq_next	= tcp_listen_seq_next,
-	.seq_fops	= &tcp4_listen_seq_fops,
-};
-
-
 int __init tcp4_proc_init(void)
 {
-	int err = tcp_proc_register(&tcp4_seq_afinfo);
-	if (err) 
-		return err;
-	return tcp_proc_register(&tcp4_listen_seq_afinfo);
+	return tcp_proc_register(&tcp4_seq_afinfo);
 }
 
 void tcp4_proc_exit(void)
 {
 	tcp_proc_unregister(&tcp4_seq_afinfo);
-	tcp_proc_unregister(&tcp4_listen_seq_afinfo);
 }
 #endif /* CONFIG_PROC_FS */
 
