@@ -28,6 +28,7 @@
 #include <linux/acpi.h>
 #include <asm/pgalloc.h>
 #include <asm/apic.h>
+#include <asm/io.h>
 #include <asm/mpspec.h>
 
 #if defined (CONFIG_X86_LOCAL_APIC)

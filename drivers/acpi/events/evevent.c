@@ -78,9 +78,9 @@ acpi_ev_initialize (
 	}
 
 	/*
-	 * Initialize the Fixed and General Purpose acpi_events prior. This is
-	 * done prior to enabling SCIs to prevent interrupts from occurring
-	 * before handers are installed.
+	 * Initialize the Fixed and General Purpose Events. This is
+	 * done prior to enabling SCIs to prevent interrupts from
+	 * occurring before handers are installed.
 	 */
 	status = acpi_ev_fixed_event_initialize ();
 	if (ACPI_FAILURE (status)) {
@@ -225,7 +225,7 @@ acpi_ev_fixed_event_detect (
 	(void) acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_ENABLE, &fixed_enable);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
-		"Fixed acpi_event Block: Enable %08X Status %08X\n",
+		"Fixed Event Block: Enable %08X Status %08X\n",
 		fixed_enable, fixed_status));
 
 	/*
@@ -282,7 +282,7 @@ acpi_ev_fixed_event_dispatch (
 				0, ACPI_MTX_DO_NOT_LOCK);
 
 		ACPI_REPORT_ERROR (
-			("ev_gpe_dispatch: No installed handler for fixed event [%08X]\n",
+			("No installed handler for fixed event [%08X]\n",
 			event));
 
 		return (ACPI_INTERRUPT_NOT_HANDLED);
