@@ -1046,30 +1046,33 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 		while ((void *) entry < madt_end) {
                 	if (entry->header.type == ACPI_MADT_INT_SRC_OVR &&
-			    acpi_fadt.sci_int == entry->bus_irq) {
-				/*
-				 * See the note at the end of ACPI 2.0b section
-				 * 5.2.10.8 for what this is about.
-				 */
-				flags = entry->flags;
-				acpi_fadt.sci_int = entry->global_irq;
-				irq = entry->global_irq;
-				break;
-			}
+			    acpi_fadt.sci_int == entry->bus_irq)
+				goto found;
 			
                 	entry = (struct acpi_table_int_src_ovr *)
                 	        ((unsigned long) entry + entry->header.length);
         	}
 	}
+	/*
+	 * Although the ACPI spec says that the SCI should be level/low
+	 * don't reprogram it unless there is an explicit MADT OVR entry
+	 * instructing us to do so -- otherwise we break Tyan boards which
+	 * have the SCI wired edge/high but no MADT OVR.
+	 */
+	return;
+
+found:
+	/*
+	 * See the note at the end of ACPI 2.0b section
+	 * 5.2.10.8 for what this is about.
+	 */
+	flags = entry->flags;
+	acpi_fadt.sci_int = entry->global_irq;
+	irq = entry->global_irq;
 
 	ioapic = mp_find_ioapic(irq);
 
 	ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
-
-	if (flags.polarity == 0)
-		flags.polarity = 0x3;	/* Active low */ 
-	if (flags.trigger == 0) 
-		flags.trigger = 0x3;	/* Level-triggered */
 
 	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 
 				(flags.trigger >> 1) , (flags.polarity >> 1));
