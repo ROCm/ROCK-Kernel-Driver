@@ -194,6 +194,7 @@ extern void buddha_init(void);
 extern void pnpide_init(int);
 #endif
 
+#ifdef CONFIG_BLK_DEV_IDE_MODES
 /*
  * Constant tables for PIO mode programming:
  */
@@ -282,6 +283,7 @@ static struct ide_pio_info {
         { "QUANTUM FIREBALL_1280", 3 },
 	{ NULL,	0 }
 };
+#endif
 
 /* default maximum number of failures */
 #define IDE_DEFAULT_MAX_FAILURES	1
@@ -314,7 +316,7 @@ int noautodma = 0;
  */
 ide_hwif_t ide_hwifs[MAX_HWIFS];	/* master data repository */
 
-
+#ifdef CONFIG_BLK_DEV_IDE_MODES
 /*
  * This routine searches the ide_pio_blacklist for an entry
  * matching the start/whole of the supplied model name.
@@ -332,6 +334,7 @@ int ide_scan_pio_blacklist (char *model)
 	}
 	return -1;
 }
+#endif
 
 /*
  * This routine returns the recommended PIO settings for a given drive,
@@ -445,7 +448,7 @@ static inline void set_recovery_timer (ide_hwif_t *hwif)
 /*
  * Do not even *think* about calling this!
  */
-static void init_hwif_data(ide_hwif_t *hwif, int index)
+static void init_hwif_data(ide_hwif_t *hwif, unsigned int index)
 {
 	static const byte ide_major[] = {
 		IDE0_MAJOR, IDE1_MAJOR, IDE2_MAJOR, IDE3_MAJOR, IDE4_MAJOR,
@@ -1866,7 +1869,7 @@ out_lock:
  * get_info_ptr() returns the (ide_drive_t *) for a given device number.
  * It returns NULL if the given device number does not match any present drives.
  */
-ide_drive_t *get_info_ptr (kdev_t i_rdev)
+ide_drive_t *get_info_ptr(kdev_t i_rdev)
 {
 	unsigned int major = major(i_rdev);
 	int h;
@@ -2174,8 +2177,7 @@ void ide_unregister(ide_hwif_t *hwif)
 	unsigned int p, minor;
 	ide_hwif_t old_hwif;
 
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
+	spin_lock_irqsave(&ide_lock, flags);
 	if (!hwif->present)
 		goto abort;
 	put_device(&hwif->device);
@@ -2198,7 +2200,7 @@ void ide_unregister(ide_hwif_t *hwif)
 	/*
 	 * All clear?  Then blow away the buffer cache
 	 */
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_unlock_irqrestore(&ide_lock, flags);
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		drive = &hwif->drives[unit];
 		if (!drive->present)
@@ -2210,13 +2212,11 @@ void ide_unregister(ide_hwif_t *hwif)
 				invalidate_device(devp, 0);
 			}
 		}
-
 	}
-
 #ifdef CONFIG_PROC_FS
 	destroy_proc_ide_drives(hwif);
 #endif
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_lock_irqsave(&ide_lock, flags);
 	hwgroup = hwif->hwgroup;
 
 	/*
@@ -2330,7 +2330,7 @@ void ide_unregister(ide_hwif_t *hwif)
 #endif
 	hwif->straight8		= old_hwif.straight8;
 abort:
-	restore_flags(flags);	/* all CPUs */
+	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
 /*
@@ -2375,23 +2375,23 @@ void ide_setup_ports (	hw_regs_t *hw,
  */
 int ide_register_hw(hw_regs_t *hw, ide_hwif_t **hwifp)
 {
-	int index, retry = 1;
+	int h, retry = 1;
 	ide_hwif_t *hwif;
 
 	do {
-		for (index = 0; index < MAX_HWIFS; ++index) {
-			hwif = &ide_hwifs[index];
+		for (h = 0; h < MAX_HWIFS; ++h) {
+			hwif = &ide_hwifs[h];
 			if (hwif->hw.io_ports[IDE_DATA_OFFSET] == hw->io_ports[IDE_DATA_OFFSET])
 				goto found;
 		}
-		for (index = 0; index < MAX_HWIFS; ++index) {
-			hwif = &ide_hwifs[index];
+		for (h = 0; h < MAX_HWIFS; ++h) {
+			hwif = &ide_hwifs[h];
 			if ((!hwif->present && !hwif->mate && !initializing) ||
 			    (!hwif->hw.io_ports[IDE_DATA_OFFSET] && initializing))
 				goto found;
 		}
-		for (index = 0; index < MAX_HWIFS; index++)
-			ide_unregister(&ide_hwifs[index]);
+		for (h = 0; h < MAX_HWIFS; ++h)
+			ide_unregister(&ide_hwifs[h]);
 	} while (retry--);
 	return -1;
 found:
@@ -2415,7 +2415,7 @@ found:
 	if (hwifp)
 		*hwifp = hwif;
 
-	return (initializing || hwif->present) ? index : -1;
+	return (initializing || hwif->present) ? h : -1;
 }
 
 /*
@@ -3476,6 +3476,7 @@ devfs_handle_t ide_devfs_handle;
 
 EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(drive_is_flashcard);
+EXPORT_SYMBOL(ide_timer_expiry);
 EXPORT_SYMBOL(ide_intr);
 EXPORT_SYMBOL(ide_get_queue);
 EXPORT_SYMBOL(ide_add_generic_settings);
@@ -3651,7 +3652,7 @@ static int __init ata_module_init(void)
 	pnpide_init(1);
 #endif
 
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULES)
+#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 # if defined(__mc68000__) || defined(CONFIG_APUS)
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET]) {
 		ide_get_lock(&ide_intr_lock, NULL, NULL);/* for atari only */

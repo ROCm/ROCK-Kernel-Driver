@@ -35,6 +35,7 @@
  */
 
 #define	ATA_PCI_IGNORE	((void *)-1)
+#define IDE_NO_DRIVER	((void *)-2)
 
 #ifdef CONFIG_BLK_DEV_AEC62XX
 extern unsigned int pci_init_aec62xx(struct pci_dev *);
@@ -313,7 +314,7 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886A, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
 	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886BF, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
 	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C561, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_NOADMA },
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK },
+	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK },
 	{0, 0, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0 }};
 
 /*
@@ -682,6 +683,11 @@ static void __init setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d)
 		autodma = 1;
 #endif
 
+	if (d->init_hwif == IDE_NO_DRIVER) {
+		printk(KERN_WARNING "%s: detected chipset, but driver not compiled in!\n", dev->name);
+		d->init_hwif = NULL;
+	}
+
 	if (pci_enable_device(dev)) {
 		printk(KERN_WARNING "%s: Could not enable PCI device.\n", dev->name);
 		return;
@@ -916,15 +922,17 @@ static void __init scan_pcidev(struct pci_dev *dev)
 	}
 }
 
-void __init ide_scan_pcibus (int scan_direction)
+void __init ide_scan_pcibus(int scan_direction)
 {
 	struct pci_dev *dev;
 
 	if (!scan_direction) {
-		pci_for_each_dev(dev)
+		pci_for_each_dev(dev) {
 			scan_pcidev(dev);
+		}
 	} else {
-		pci_for_each_dev_reverse(dev)
+		pci_for_each_dev_reverse(dev) {
 			scan_pcidev(dev);
+		}
 	}
 }
