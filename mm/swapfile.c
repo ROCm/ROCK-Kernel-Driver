@@ -959,7 +959,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 		p->lowest_bit = 0;
 		p->highest_bit = 0;
 		for (i = 1 ; i < 8*PAGE_SIZE ; i++) {
-			if (test_bit(i,(char *) swap_header)) {
+			if (test_bit(i,(unsigned long *) swap_header)) {
 				if (!p->lowest_bit)
 					p->lowest_bit = i;
 				p->highest_bit = i;
@@ -974,7 +974,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 			goto bad_swap;
 		}
 		for (i = 1 ; i < maxpages ; i++) {
-			if (test_bit(i,(char *) swap_header))
+			if (test_bit(i,(unsigned long *) swap_header))
 				p->swap_map[i] = 0;
 			else
 				p->swap_map[i] = SWAP_MAP_BAD;
