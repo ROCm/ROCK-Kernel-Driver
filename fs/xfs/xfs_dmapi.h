@@ -89,6 +89,8 @@ typedef enum {
 #define DM_EVENT_ENABLED_IO(vfsp, io, event) ( \
 	unlikely ((vfsp)->vfs_flag & VFS_DMI) && \
 		( ((io)->io_dmevmask & (1 << event)) || \
+		  ((ip)->i_mount->m_dmevmask & (1 << event)) ) \
+	)
 
 #define DM_XFS_VALID_FS_EVENTS		( \
 	(1 << DM_EVENT_PREUNMOUNT)	| \
