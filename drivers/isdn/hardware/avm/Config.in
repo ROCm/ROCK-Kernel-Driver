@@ -8,12 +8,12 @@ comment 'Drivers for active AVM cards'
 bool 'Support AVM cards' CONFIG_CAPI_AVM
 
 if [ "$CONFIG_CAPI_AVM" != "n" ]; then
-   dep_tristate '  AVM B1 ISA support' CONFIG_ISDN_DRV_AVMB1_B1ISA               $CONFIG_ISDN_CAPI
+   dep_tristate '  AVM B1 ISA support' CONFIG_ISDN_DRV_AVMB1_B1ISA               $CONFIG_ISDN_CAPI $CONFIG_SA
 
    dep_tristate '  AVM B1 PCI support'            CONFIG_ISDN_DRV_AVMB1_B1PCI    $CONFIG_ISDN_CAPI $CONFIG_PCI
    dep_mbool    '    AVM B1 PCI V4 support'       CONFIG_ISDN_DRV_AVMB1_B1PCIV4  $CONFIG_ISDN_DRV_AVMB1_B1PCI
 
-   dep_tristate '  AVM T1/T1-B ISA support'       CONFIG_ISDN_DRV_AVMB1_T1ISA    $CONFIG_ISDN_CAPI
+   dep_tristate '  AVM T1/T1-B ISA support'       CONFIG_ISDN_DRV_AVMB1_T1ISA    $CONFIG_ISDN_CAPI $CONFIG_ISA
 
    dep_tristate '  AVM B1/M1/M2 PCMCIA support'   CONFIG_ISDN_DRV_AVMB1_B1PCMCIA $CONFIG_ISDN_CAPI
 
