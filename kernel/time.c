@@ -35,8 +35,6 @@
  */
 struct timezone sys_tz;
 
-extern unsigned long last_time_offset;
-
 #if !defined(__alpha__) && !defined(__ia64__)
 
 /*
@@ -77,9 +75,10 @@ asmlinkage long sys_stime(int * tptr)
 	if (get_user(value, tptr))
 		return -EFAULT;
 	write_seqlock_irq(&xtime_lock);
+
+	time_interpolator_reset();
 	xtime.tv_sec = value;
 	xtime.tv_nsec = 0;
-	last_time_offset = 0;
 	time_adjust = 0;	/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
@@ -125,7 +124,7 @@ inline static void warp_clock(void)
 {
 	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec += sys_tz.tz_minuteswest * 60;
-	last_time_offset = 0;
+	time_interpolator_update(sys_tz.tz_minuteswest * 60 * NSEC_PER_SEC);
 	write_sequnlock_irq(&xtime_lock);
 }
 
@@ -381,7 +380,6 @@ leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
 	txc->calcnt	   = pps_calcnt;
 	txc->errcnt	   = pps_errcnt;
 	txc->stbcnt	   = pps_stbcnt;
-	last_time_offset = 0;
 	write_sequnlock_irq(&xtime_lock);
 	do_gettimeofday(&txc->time);
 	return(result);

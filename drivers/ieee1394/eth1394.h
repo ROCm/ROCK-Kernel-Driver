@@ -38,7 +38,7 @@
 #define ETHER1394_GASP_SPECIFIER_ID_LO	(ETHER1394_GASP_SPECIFIER_ID & 0xff)
 #define ETHER1394_GASP_VERSION		1
 
-#define ETHER1394_OVERHEAD (2 * sizeof(quadlet_t))  /* GASP header overhead */
+#define ETHER1394_GASP_OVERHEAD (2 * sizeof(quadlet_t))  /* GASP header overhead */
 
 /* Node set == 64 */
 #define NODE_SET			(ALL_NODES + 1)
@@ -56,10 +56,9 @@ struct pdg_list {
 struct eth1394_priv {
 	struct net_device_stats stats;	/* Device stats			 */
 	struct hpsb_host *host;		/* The card for this dev	 */
-	unsigned char max_rec[NODE_SET];/* Max payload per node		 */
+	u16 maxpayload[NODE_SET];	/* Max payload per node		 */
 	unsigned char sspd[NODE_SET];	/* Max speed per node		 */
-	u16 fifo_hi[ALL_NODES];		/* 16bit hi fifo offset per node */
-	u32 fifo_lo[ALL_NODES];		/* 32bit lo fifo offset per node */
+	u64 fifo[ALL_NODES];		/* FIFO offset per node		 */
 	u64 eui[ALL_NODES];		/* EUI-64 per node		 */
 	spinlock_t lock;		/* Private lock			 */
 	int broadcast_channel;		/* Async stream Broadcast Channel */
@@ -73,6 +72,21 @@ struct host_info {
 	struct hpsb_host *host;
 	struct net_device *dev;
 };
+
+
+/* Define a fake hardware header format for the networking core.  Note that
+ * header size cannot exceed 16 bytes as that is the size of the header cache.
+ * Also, we do not need the source address in the header so we omit it and
+ * keep the header to under 16 bytes */
+#define ETH1394_ALEN (8)
+#define ETH1394_HLEN (10)
+
+struct eth1394hdr {
+	unsigned char	h_dest[ETH1394_ALEN];	/* destination eth1394 addr	*/
+	unsigned short	h_proto;		/* packet type ID field	*/
+}  __attribute__((packed));
+
+
 
 typedef enum {ETH1394_GASP, ETH1394_WRREQ} eth1394_tx_type;
 

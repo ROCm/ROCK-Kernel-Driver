@@ -1814,7 +1814,6 @@ static int idedisk_attach(ide_drive_t *drive)
 	}
 	DRIVER(drive)->busy--;
 	g->minors = 1 << PARTN_BITS;
-	g->minor_shift = PARTN_BITS;
 	strcpy(g->devfs_name, drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;

@@ -3376,7 +3376,6 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	drive->driver_data = info;
 	DRIVER(drive)->busy++;
 	g->minors = 1;
-	g->minor_shift = 0;
 	snprintf(g->devfs_name, sizeof(g->devfs_name),
 			"%s/cd", drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;

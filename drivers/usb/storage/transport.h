@@ -160,9 +160,9 @@ extern void usb_stor_stop_transport(struct us_data*);
 
 extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
-		void *data, u16 size);
+		void *data, u16 size, int timeout);
+extern int usb_stor_clear_halt(struct us_data *us, unsigned int pipe);
 
-extern int usb_stor_clear_halt(struct us_data*, unsigned int pipe);
 extern int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);

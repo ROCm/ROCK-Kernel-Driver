@@ -10,6 +10,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include "iso.h"
 
 void hpsb_iso_stop(struct hpsb_iso *iso)
