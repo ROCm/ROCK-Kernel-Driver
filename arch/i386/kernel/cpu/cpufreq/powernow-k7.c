@@ -6,8 +6,6 @@
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by AMD.
  *
- *  BIG FAT DISCLAIMER: Work in progress code. Possibly *dangerous*
- *
  * Errata 5: Processor may fail to execute a FID/VID change in presence of interrupt.
  * - We cli/sti on stepping A0 CPUs around the FID/VID transition.
  * Errata 15: Processors with half frequency multipliers may hang upon wakeup from disconnect.
