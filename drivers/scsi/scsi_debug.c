@@ -169,7 +169,7 @@ struct sdebug_host_info {
 	container_of(d, struct sdebug_host_info, dev)
 
 static LIST_HEAD(sdebug_host_list);
-static spinlock_t sdebug_host_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sdebug_host_list_lock);
 
 typedef void (* done_funct_t) (struct scsi_cmnd *);
 
@@ -213,8 +213,8 @@ static int num_dev_resets = 0;
 static int num_bus_resets = 0;
 static int num_host_resets = 0;
 
-static spinlock_t queued_arr_lock = SPIN_LOCK_UNLOCKED;
-static rwlock_t atomic_rw = RW_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(queued_arr_lock);
+static DEFINE_RWLOCK(atomic_rw);
 
 static char sdebug_proc_name[] = "scsi_debug";
 

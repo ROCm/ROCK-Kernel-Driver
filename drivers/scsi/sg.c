@@ -108,7 +108,7 @@ static void sg_remove(struct class_device *);
 
 static Scsi_Request *dummy_cmdp;	/* only used for sizeof */
 
-static rwlock_t sg_dev_arr_lock = RW_LOCK_UNLOCKED;	/* Also used to lock
+static DEFINE_RWLOCK(sg_dev_arr_lock);	/* Also used to lock
 							   file descriptor list for device */
 
 static struct class_interface sg_interface = {

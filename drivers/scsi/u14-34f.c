@@ -612,7 +612,7 @@ struct hostdata {
 static struct Scsi_Host *sh[MAX_BOARDS + 1];
 static const char *driver_name = "Ux4F";
 static char sha[MAX_BOARDS];
-static spinlock_t driver_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(driver_lock);
 
 /* Initialize num_boards so that ihdlr can work while detect is in progress */
 static unsigned int num_boards = MAX_BOARDS;

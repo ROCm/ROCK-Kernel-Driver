@@ -156,7 +156,7 @@ pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
 }
 
 /* This lock protects only the memory allocation/free.  */
-static spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sym53c8xx_lock);
 
 static struct scsi_transport_template *sym2_transport_template = NULL;
 
