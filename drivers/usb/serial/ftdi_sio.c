@@ -17,6 +17,9 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (17/Oct/2003) Scott Allen
+ *      Added vid/pid for Perle Systems UltraPort USB serial converters
+ *
  * (21/Sep/2003) Ian Abbott
  *      Added VID/PID for Omnidirectional Control Technology US101 USB to
  *      RS-232 adapter (also rebadged as Dick Smith Electronics XH6381).
@@ -292,6 +295,7 @@ static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_4_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_5_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_6_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_PERLE_VID, FTDI_PERLE_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2101_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2102_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2103_PID, 0, 0x3ff) },
@@ -365,6 +369,7 @@ static struct usb_device_id id_table_FT232BM [] = {
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_4_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_5_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_6_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_PERLE_VID, FTDI_PERLE_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2101_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2102_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2103_PID, 0x400, 0xffff) },
@@ -451,6 +456,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_MTXORB_VID, FTDI_MTXORB_4_PID) },
 	{ USB_DEVICE(FTDI_MTXORB_VID, FTDI_MTXORB_5_PID) },
 	{ USB_DEVICE(FTDI_MTXORB_VID, FTDI_MTXORB_6_PID) },
+	{ USB_DEVICE(FTDI_PERLE_VID, FTDI_PERLE_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2101_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2102_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2103_PID) },

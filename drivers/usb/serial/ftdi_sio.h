@@ -60,6 +60,14 @@
 #define FTDI_MTXORB_6_PID      0xFA06  /* Matrix Orbital Product Id */
 
 /*
+ * The following are the values for the Perle Systems
+ * UltraPort USB serial converters
+ */
+#define FTDI_PERLE_VID		FTDI_VID	/* Perle Systems Vendor Id */
+#define FTDI_PERLE_PID		0xF0C0	/* Perle UltraPort Product Id
+*/
+
+/*
  * The following are the values for the Sealevel SeaLINK+ adapters.
  * (Original list sent by Tuan Hoang.  Ian Abbott renamed the macros and
  * removed some PIDs that don't seem to match any existing products.)
