@@ -143,12 +143,18 @@ CKRM_DEF_CB_ARG( USERDEL      , userdel,      struct user_struct *);
 CKRM_DEF_CB_ARG( LISTEN_START , listen_start, struct sock *       );
 CKRM_DEF_CB_ARG( LISTEN_STOP  , listen_stop,  struct sock *       );
 
-// and a few special one's
-void ckrm_cb_newtask(struct task_struct *);
-void ckrm_cb_exit(struct task_struct *);
 
 // some other functions required
+#ifdef CONFIG_CKRM
 extern void ckrm_init(void);
+void ckrm_cb_newtask(struct task_struct *);
+void ckrm_cb_exit(struct task_struct *);
+#else
+#define ckrm_init(x)		do { } while (0)
+#define ckrm_cb_newtask(x)	do { } while (0)
+#define ckrm_cb_exit(x)		do { } while (0)
+#endif
+
 extern int get_exe_path_name(struct task_struct *, char *, int);
 
 #endif // __KERNEL__
