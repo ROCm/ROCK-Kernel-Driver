@@ -1038,7 +1038,7 @@ static int velocity_rx_refill(struct velocity_info *vptr)
 		struct rx_desc *rd = vptr->rd_ring + dirty;
 
 		/* Fine for an all zero Rx desc at init time as well */
-		if (rd->rdesc0.owner == cpu_to_le32(OWNED_BY_NIC))
+		if (rd->rdesc0.owner == OWNED_BY_NIC)
 			break;
 
 		if (!vptr->rd_info[dirty].skb) {
