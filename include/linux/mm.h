@@ -431,10 +431,7 @@ extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
 
 /* mmap.c */
-extern void lock_vma_mappings(struct vm_area_struct *);
-extern void unlock_vma_mappings(struct vm_area_struct *);
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
-extern void __insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void build_mmap_rb(struct mm_struct *);
 extern void exit_mmap(struct mm_struct *);
 

@@ -132,45 +132,19 @@ int vm_enough_memory(long pages)
 }
 
 /* Remove one vm structure from the inode's i_mapping address space. */
-static inline void __remove_shared_vm_struct(struct vm_area_struct *vma)
+static inline void remove_shared_vm_struct(struct vm_area_struct *vma)
 {
-	struct file * file = vma->vm_file;
+	struct file *file = vma->vm_file;
 
 	if (file) {
 		struct inode *inode = file->f_dentry->d_inode;
+
+		spin_lock(&inode->i_mapping->i_shared_lock);
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_inc(&inode->i_writecount);
 		list_del_init(&vma->shared);
+		spin_unlock(&inode->i_mapping->i_shared_lock);
 	}
-}
-
-static inline void remove_shared_vm_struct(struct vm_area_struct *vma)
-{
-	lock_vma_mappings(vma);
-	__remove_shared_vm_struct(vma);
-	unlock_vma_mappings(vma);
-}
-
-void lock_vma_mappings(struct vm_area_struct *vma)
-{
-	struct address_space *mapping;
-
-	mapping = NULL;
-	if (vma->vm_file)
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
-	if (mapping)
-		spin_lock(&mapping->i_shared_lock);
-}
-
-void unlock_vma_mappings(struct vm_area_struct *vma)
-{
-	struct address_space *mapping;
-
-	mapping = NULL;
-	if (vma->vm_file)
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
-	if (mapping)
-		spin_unlock(&mapping->i_shared_lock);
 }
 
 /*
@@ -364,11 +338,18 @@ static void __vma_link(struct mm_struct * mm, struct vm_area_struct * vma,  stru
 static inline void vma_link(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev,
 			    struct rb_node ** rb_link, struct rb_node * rb_parent)
 {
+	struct address_space *mapping = NULL;
+
+	if (vma->vm_file)
+		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+
+	if (mapping)
+		spin_lock(&mapping->i_shared_lock);
 	spin_lock(&mm->page_table_lock);
-	lock_vma_mappings(vma);
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
-	unlock_vma_mappings(vma);
 	spin_unlock(&mm->page_table_lock);
+	if (mapping)
+		spin_unlock(&mapping->i_shared_lock);
 
 	mm->map_count++;
 	validate_mm(mm);
@@ -1085,12 +1066,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	if (new->vm_ops && new->vm_ops->open)
 		new->vm_ops->open(new);
 
-	spin_lock(&mm->page_table_lock);
-	lock_vma_mappings(vma);
-	__insert_vm_struct(mm, new);
-	unlock_vma_mappings(vma);
-	spin_unlock(&mm->page_table_lock);
-
+	insert_vm_struct(mm, new);
 	return 0;
 }
 
@@ -1334,19 +1310,6 @@ void exit_mmap(struct mm_struct * mm)
  * and into the inode's i_mmap ring.  If vm_file is non-NULL
  * then the i_shared_lock must be held here.
  */
-void __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
-{
-	struct vm_area_struct * __vma, * prev;
-	struct rb_node ** rb_link, * rb_parent;
-
-	__vma = find_vma_prepare(mm, vma->vm_start, &prev, &rb_link, &rb_parent);
-	if (__vma && __vma->vm_start < vma->vm_end)
-		BUG();
-	__vma_link(mm, vma, prev, rb_link, rb_parent);
-	mm->map_count++;
-	validate_mm(mm);
-}
-
 void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 {
 	struct vm_area_struct * __vma, * prev;
