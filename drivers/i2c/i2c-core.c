@@ -373,7 +373,7 @@ int i2c_attach_client(struct i2c_client *client)
 	}
 
 	DEB(dev_dbg(&adapter->dev, "client [%s] registered to adapter\n",
-			client->dev.name));
+			client->name));
 
 	if (client->flags & I2C_CLIENT_ALLOW_USE)
 		client->usage_count = 0;
