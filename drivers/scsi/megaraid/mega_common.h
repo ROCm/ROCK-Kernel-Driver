@@ -113,7 +113,6 @@ typedef struct {
  * @param max_channel		: maximum channel number supported - inclusive
  * @param max_target		: max target supported - inclusive
  * @param max_lun		: max lun supported - inclusive
- * @param list			: list of megaraid host structures
  * @param unique_id		: unique identifier for each adapter
  * @param irq			: IRQ for this adapter
  * @param ito			: internal timeout value, (-1) means no timeout
@@ -171,7 +170,6 @@ typedef struct {
 	uint16_t		max_target;
 	uint8_t			max_lun;
 
-	struct list_head	list;
 	uint32_t		unique_id;
 	uint8_t			irq;
 	uint8_t			ito;
@@ -243,19 +241,6 @@ typedef struct {
 		target = ((adp)->device_ids[SCP2CHANNEL(scp)]		\
 					[SCP2TARGET(scp)] & 0xFF);	\
 	}
-
-/**
- * struct mraid_driver_t - global driver data
- * @param driver_version	: driver version
- * @param device_list		: list of adapter_t structures
- *
- * mraid_driver_t contains information which is global to the driver.
- */
-typedef struct {
-	uint8_t			driver_version[8];
-	struct list_head	device_list;
-} mraid_driver_t;
-
 
 /*
  * ### Helper routines ###

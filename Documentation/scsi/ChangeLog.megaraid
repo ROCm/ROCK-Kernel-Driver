@@ -1,3 +1,124 @@
+Release Date	: Thu Aug 19 09:58:33 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.3.0 (scsi module), 2.20.2.0 (cmm module)
+Older Version	: 2.20.2.0 (scsi module), 2.20.1.0 (cmm module)
+
+i.	When copying the mailbox packets, copy only first 14 bytes (for 32-bit
+	mailboxes) and only first 22 bytes (for 64-bit mailboxes). This is to
+	avoid getting the stale values for busy bit. We want to set the busy
+	bit just before issuing command to the FW.
+
+ii.	In the reset handling, if the reseted command is not owned by the
+	driver, do not (wrongly) print information for the "attached" driver
+	packet.
+
+iii.	Have extended wait when issuing command in synchronous mode. This is
+	required for the cases where the option ROM is disabled and there is
+	no BIOS to start the controller. The FW starts to boot after receiving
+	the first command from the driver. The current driver has 1 second
+	timeout for the synchronous commands, which is far less than what is
+	actually required. We now wait up to MBOX_RESET_TIME (180 seconds) for
+	FW boot process.
+
+iv.	In megaraid_mbox_product_info, clear the mailbox contents completely
+	before preparing the command for inquiry3. This is to ensure that the
+	FW does not get junk values in the command.
+
+v.	Do away with the redundant LSI_CONFIG_COMPAT redefinition for
+	CONFIG_COMPAT. Replace <asm/ioctl32.h> with <linux/ioctl32.h>
+
+		- James Bottomley <James.Bottomley@SteelEye.com>, 08.17.2004
+		 linux-scsi mailing list
+
+vi.	Add support for 64-bit applications. Current drivers assume only
+	32-bit applications, even on 64-bit platforms. Use the "data" and
+	"buffer" fields of the mimd_t structure, instead of embedded 32-bit
+	addresses in application mailbox and passthru structures.
+
+vii.	Move the function declarations for the management module from
+	megaraid_mm.h to megaraid_mm.c
+
+		- Andrew Morton <akpm@osdl.org>, 08.19.2004
+		linux-scsi mailing list
+
+viii.	Change default values for MEGARAID_NEWGEN, MEGARAID_MM, and
+	MEGARAID_MAILBOX to 'n' in Kconfig.megaraid
+
+		- Andrew Morton <akpm@osdl.org>, 08.19.2004
+		linux-scsi mailing list
+
+ix.	replace udelay with msleep
+
+x.	Typos corrected in comments and whitespace adjustments, explicit
+	grouping of expressions.
+
+
+Release Date	: Fri Jul 23 15:22:07 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.2.0 (scsi module), 2.20.1.0 (cmm module)
+Older Version	: 2.20.1.0 (scsi module), 2.20.0.0 (cmm module)
+
+i.	Add PCI ids for Acer ROMB 2E solution
+
+ii.	Add PCI ids for I4
+
+iii.	Typo corrected for subsys id for megaraid sata 300-4x
+
+iv.	Remove yield() while mailbox handshake in synchronous commands
+
+
+	"My other main gripe is things like this:
+
+	+	// wait for maximum 1 second for status to post
+	+	for (i = 0; i < 40000; i++) {
+	+		if (mbox->numstatus != 0xFF) break;
+	+		udelay(25); yield();
+	+	}
+
+	which litter the driver.  Use of yield() in drivers is deprecated."
+
+		- James Bottomley <James.Bottomley@SteelEye.com>, 07.14.2004
+		 linux-scsi mailing list
+
+v.	Remove redundant __megaraid_busywait_mbox routine
+
+vi.	Fix bug in the managment module, which causes a system lockup when the
+	IO module is loaded and then unloaded, followed by executing any
+	management utility. The current version of management module does not
+	handle the adapter unregister properly.
+
+	Specifically, it still keeps a reference to the unregistered
+	controllers. To avoid this, the static array adapters has been
+	replaced by a dynamic list, which gets updated every time an adapter
+	is added or removed.
+
+	Also, during unregistration of the IO module, the resources are
+	now released in the exact reverse order of the allocation time
+	sequence.
+
+
+Release Date	: Fri Jun 25 18:58:43 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.1.0
+Older Version	: megaraid 2.20.0.1
+
+i.	Stale list pointer in adapter causes kernel panic when module
+	megaraid_mbox is unloaded
+
+
+Release Date	: Thu Jun 24 20:37:11 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.0.1
+Older Version	: megaraid 2.20.0.00
+
+i.	Modules are not 'y' by default, but depend on current definition of
+	SCSI & PCI.
+
+ii.	Redundant structure mraid_driver_t removed.
+
+iii.	Miscellaneous indentation and goto/label fixes.
+		- Christoph Hellwig <hch@infradead.org>, 06.24.2004 linux-scsi
+
+iv.	scsi_host_put(), do just before completing HBA shutdown.
+
+
+
 Release Date	: Mon Jun 21 19:53:54 EDT 2004 - Atul Mukker <atulm@lsil.com>
 Current Version	: 2.20.0.0
 Older Version	: megaraid 2.20.0.rc2 and 2.00.3
@@ -55,5 +176,5 @@ ix.	Better implementation of error handling and recovery. Driver now
 	performs extended errors recovery for instances like scsi cable pull.
 
 x.	Disassociate the management commands with an overlaid scsi command.
-	Driver now treats the mangement packets as special packets and has a
+	Driver now treats the management packets as special packets and has a
 	dedicated callback routine.

@@ -23,36 +23,21 @@
 #include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/list.h>
+#include <linux/ioctl32.h>
 
 #include "mbox_defs.h"
 #include "megaraid_ioctl.h"
 
 
-#define LSI_COMMON_MOD_VERSION	"2.20.0.0"
+#define LSI_COMMON_MOD_VERSION	"2.20.2.0"
 #define LSI_COMMON_MOD_EXT_VERSION	\
-		"(Release Date: Wed Jun 23 11:38:38 EDT 2004)"
+		"(Release Date: Thu Aug 19 09:58:33 EDT 2004)"
 
 
 #define LSI_DBGLVL			dbglevel
 
 // The smallest dma pool
 #define MRAID_MM_INIT_BUFF_SIZE		4096
-
-/*
- * Localizing ioctl32 differences
- */
-#if defined (CONFIG_COMPAT) || defined(__x86_64__) || defined(IA32_EMULATION)
-#if !defined(CONFIG_IA64)
-#define LSI_CONFIG_COMPAT
-#endif
-#endif
-
-#ifdef LSI_CONFIG_COMPAT
-#include <asm/ioctl32.h>
-#else
-#define register_ioctl32_conversion(a,b)	do{}while(0)
-#define unregister_ioctl32_conversion(a)	do{}while(0)
-#endif /* LSI_CONFIG_COMPAT */
 
 /**
  * mimd_t	: Old style ioctl packet structure (deprecated)
@@ -111,36 +96,6 @@ typedef struct mimd {
 #endif
 
 } __attribute__ ((packed))mimd_t;
-
-
-// Entry points for char node driver
-static int mraid_mm_open(struct inode *, struct file *);
-static int mraid_mm_ioctl(struct inode *, struct file *, uint, unsigned long);
-
-
-// routines to convert to and from the old the format
-static int mimd_to_kioc(mimd_t *, mraid_mmadp_t *, uioc_t *);
-static int kioc_to_mimd(uioc_t *, mimd_t *);
-
-
-// Helper functions
-static int handle_drvrcmd(unsigned long, uint8_t, int *);
-static int lld_ioctl(mraid_mmadp_t *, uioc_t *);
-static void ioctl_done(uioc_t *);
-static void lld_timedout(unsigned long);
-static void hinfo_to_cinfo(mraid_hba_info_t *, mcontroller_t *);
-static int mraid_mm_get_adpindex(mimd_t *, int *);
-static uioc_t *mraid_mm_alloc_kioc(mraid_mmadp_t *);
-static void mraid_mm_dealloc_kioc(mraid_mmadp_t *, uioc_t *);
-static int mraid_mm_attach_buf(mraid_mmadp_t *, uioc_t *, int);
-static int mraid_mm_setup_dma_pools(mraid_mmadp_t *);
-static void mraid_mm_free_adp_resources(mraid_mmadp_t *);
-static void mraid_mm_teardown_dma_pools(mraid_mmadp_t *);
-
-#ifdef LSI_CONFIG_COMPAT
-static int mraid_mm_compat_ioctl(unsigned int, unsigned int, unsigned long,
-		struct file *);
-#endif
 
 #endif // MEGARAID_MM_H
 

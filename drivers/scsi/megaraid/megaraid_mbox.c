@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid.c
- * Version	: v2.20.0.0 (June 23 2004)
+ * Version	: v2.20.2.0 (July 22 2004)
  *
  * Authors:
  * 	Atul Mukker		<Atul.Mukker@lsil.com>
@@ -46,11 +46,10 @@
  * LSI MegaRAID SCSI 320-4X		1000	0407	1000	0531
  * LSI MegaRAID SCSI 320-1E		1000	0408	1000	0001
  * LSI MegaRAID SCSI 320-2E		1000	0408	1000	0002
- * LSI MegaRAID SATA 150-2		1095	3112	1000	0534
  * LSI MegaRAID SATA 150-4		1000	1960	1000	4523
  * LSI MegaRAID SATA 150-6		1000	1960	1000	0523
- * LSI MegaRAID SATA 150-4X		1000	0409	1000	1504
- * LSI MegaRAID SATA 150-8X		1000	0409	1000	1508
+ * LSI MegaRAID SATA 300-4X		1000	0409	1000	3004
+ * LSI MegaRAID SATA 300-8X		1000	0409	1000	3008
  *
  * INTEL RAID Controller SRCU42X	1000	0407	8086	0532
  * INTEL RAID Controller SRCS16		1000	1960	8086	0523
@@ -65,7 +64,10 @@
  * FSC	MegaRAID PCI Express ROMB	1000	0408	1734	1065
  *
  *
- * For history of changes, see changelog.megaraid
+ * ACER	MegaRAID ROMB-2E		1000	0408	1025	004D
+ *
+ *
+ * For history of changes, see Documentation/ChangeLog.megaraid
  */
 
 #include "megaraid_mbox.h"
@@ -128,7 +130,6 @@ static irqreturn_t megaraid_isr(int, void *, struct pt_regs *);
 static inline int megaraid_ack_sequence(adapter_t *);
 
 static inline int megaraid_busywait_mbox(mraid_device_t *);
-static inline int __megaraid_busywait_mbox(mraid_device_t *);
 
 static int megaraid_cmm_register(adapter_t *);
 static int megaraid_cmm_unregister(adapter_t *);
@@ -205,9 +206,8 @@ MODULE_PARM_DESC(debug_level, "Debug level for driver (default=0)");
 /*
  * ### global data ###
  */
-mraid_driver_t mraid_driver_g = {
-	.driver_version	= { 0x02, 0x20, 0x00, 0x00, 6, 21, 20, 4},
-};
+static uint8_t megaraid_mbox_version[8] =
+	{ 0x02, 0x20, 0x02, 0x00, 7, 22, 20, 4 };
 
 
 /*
@@ -354,6 +354,12 @@ static struct pci_device_id pci_id_table_g[] =  {
 	},
 	{
 		PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_MEGARAID_I4_133_RAID,
+		PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_SUBSYS_ID_MEGARAID_I4_133_RAID,
+	},
+	{
+		PCI_VENDOR_ID_LSI_LOGIC,
 		PCI_DEVICE_ID_MEGARAID_SATA_150_4,
 		PCI_VENDOR_ID_LSI_LOGIC,
 		PCI_SUBSYS_ID_MEGARAID_SATA_150_4,
@@ -430,6 +436,12 @@ static struct pci_device_id pci_id_table_g[] =  {
 		PCI_SUBSYS_ID_FSC,
 		PCI_SUBSYS_ID_FSC_MEGARAID_PCI_EXPRESS_ROMB,
 	},
+	{
+		PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_MEGARAID_ACER_ROMB_2E,
+		PCI_VENDOR_ID_AI,
+		PCI_SUBSYS_ID_MEGARAID_ACER_ROMB_2E,
+	},
 	{0}	/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, pci_id_table_g);
@@ -450,15 +462,15 @@ static struct pci_driver megaraid_pci_driver_g = {
  * Scsi host template for megaraid unified driver
  */
 static struct scsi_host_template megaraid_template_g = {
-		.module				= THIS_MODULE,
-		.name				= "LSI Logic MegaRAID driver",
-		.proc_name			= "megaraid",
-		.queuecommand			= megaraid_queue_command,
-		.eh_abort_handler		= megaraid_abort_handler,
-		.eh_device_reset_handler	= megaraid_reset_handler,
-		.eh_bus_reset_handler		= megaraid_reset_handler,
-		.eh_host_reset_handler		= megaraid_reset_handler,
-		.use_clustering			= ENABLE_CLUSTERING,
+	.module				= THIS_MODULE,
+	.name				= "LSI Logic MegaRAID driver",
+	.proc_name			= "megaraid",
+	.queuecommand			= megaraid_queue_command,
+	.eh_abort_handler		= megaraid_abort_handler,
+	.eh_device_reset_handler	= megaraid_reset_handler,
+	.eh_bus_reset_handler		= megaraid_reset_handler,
+	.eh_host_reset_handler		= megaraid_reset_handler,
+	.use_clustering			= ENABLE_CLUSTERING,
 };
 
 
@@ -471,7 +483,7 @@ static struct scsi_host_template megaraid_template_g = {
 static int __init
 megaraid_init(void)
 {
-	int			rval;
+	int	rval;
 
 	// Announce the driver version
 	con_log(CL_ANN, (KERN_INFO "megaraid: %s %s\n", MEGARAID_VERSION,
@@ -487,11 +499,6 @@ megaraid_init(void)
 		megaraid_cmd_per_lun = MBOX_MAX_SCSI_CMDS;
 	}
 
-
-	/*
-	 * Setup the driver global data structures
-	 */
-	INIT_LIST_HEAD(&mraid_driver_g.device_list);
 
 	// register as a PCI hot-plug driver module
 	if ((rval = pci_module_init(&megaraid_pci_driver_g))) {
@@ -516,9 +523,6 @@ megaraid_exit(void)
 	// unregister as PCI hotplug driver
 	pci_unregister_driver(&megaraid_pci_driver_g);
 
-	// All adapters must be detached by now
-	ASSERT(list_empty(&mraid_driver_g.device_list));
-
 	return;
 }
 
@@ -535,10 +539,6 @@ static int __devinit
 megaraid_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	adapter_t	*adapter;
-	uint8_t		alloc_adapter_f	= 0;
-	uint8_t		init_mbox_f	= 0;
-	uint8_t		cmm_reg_f	= 0;
-	uint8_t		io_attach_f	= 0;
 
 
 	// detected a new controller
@@ -567,9 +567,8 @@ megaraid_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		con_log(CL_ANN, (KERN_WARNING
 		"megaraid: out of memory, %s %d.\n", __FUNCTION__, __LINE__));
 
-		goto fail_probe_one;
+		goto out_probe_one;
 	}
-	alloc_adapter_f = 1;
 	memset(adapter, 0, sizeof(adapter_t));
 
 
@@ -587,7 +586,7 @@ megaraid_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: pci_set_dma_mask failed:%d\n", __LINE__));
 
-		goto fail_probe_one;
+		goto out_free_adapter;
 	}
 
 
@@ -613,9 +612,8 @@ megaraid_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: maibox adapter did not initialize\n"));
 
-		goto fail_probe_one;
+		goto out_free_adapter;
 	}
-	init_mbox_f = 1;
 
 	// Register with LSI Common Management Module
 	if (megaraid_cmm_register(adapter) != 0) {
@@ -623,45 +621,30 @@ megaraid_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		con_log(CL_ANN, (KERN_WARNING
 		"megaraid: could not register with management module\n"));
 
-		goto fail_probe_one;
+		goto out_fini_mbox;
 	}
-	cmm_reg_f = 1;
 
 	// setup adapter handle in PCI soft state
 	pci_set_drvdata(pdev, adapter);
 
 	// attach with scsi mid-layer
 	if (megaraid_io_attach(adapter) != 0) {
-		con_log(CL_ANN, (KERN_WARNING "megaraid: io attach failed\n"));
-		goto fail_probe_one;
-	}
-	io_attach_f = 1;
 
-	// Adapter setup complete, put it in the global list of controllers
-	list_add_tail(&adapter->list, &mraid_driver_g.device_list);
+		con_log(CL_ANN, (KERN_WARNING "megaraid: io attach failed\n"));
+
+		goto out_cmm_unreg;
+	}
 
 	return 0;
 
-
-fail_probe_one:
-
-	if (io_attach_f) {
-		megaraid_io_detach(adapter);
-		pci_set_drvdata(pdev, NULL);
-	}
-
-	if (cmm_reg_f) {
-		megaraid_cmm_unregister(adapter);
-	}
-
-	if (init_mbox_f) {
-		megaraid_fini_mbox(adapter);
-	}
-
-	if (alloc_adapter_f) {
-		kfree(adapter);
-	}
-
+out_cmm_unreg:
+	pci_set_drvdata(pdev, NULL);
+	megaraid_cmm_unregister(adapter);
+out_fini_mbox:
+	megaraid_fini_mbox(adapter);
+out_free_adapter:
+	kfree(adapter);
+out_probe_one:
 	pci_disable_device(pdev);
 
 	return -ENODEV;
@@ -682,7 +665,8 @@ fail_probe_one:
 static void
 megaraid_detach_one(struct pci_dev *pdev)
 {
-	adapter_t	*adapter;
+	adapter_t		*adapter;
+	struct Scsi_Host	*host;
 
 
 	// Start a rollback on this adapter
@@ -704,14 +688,13 @@ megaraid_detach_one(struct pci_dev *pdev)
 	}
 
 
+	host = adapter->host;
+
 	// do not allow any more requests from the management module for this
 	// adapter.
 	// FIXME: How do we account for the request which might still be
 	// pending with us?
 	atomic_set(&adapter->being_detached, 1);
-
-	// remove the adapter from the global list of our controllers
-	list_del_init(&adapter->list);
 
 	// detach from the IO sub-system
 	megaraid_io_detach(adapter);
@@ -731,6 +714,8 @@ megaraid_detach_one(struct pci_dev *pdev)
 	megaraid_fini_mbox(adapter);
 
 	kfree(adapter);
+
+	scsi_host_put(host);
 
 	pci_disable_device(pdev);
 
@@ -839,8 +824,6 @@ megaraid_io_detach(adapter_t *adapter)
 
 	scsi_remove_host(host);
 
-	scsi_host_put(host);
-
 	return;
 }
 
@@ -866,14 +849,11 @@ megaraid_init_mbox(adapter_t *adapter)
 {
 	struct pci_dev		*pdev;
 	mraid_device_t		*raid_dev;
-	uint8_t			mem_region_f	= 0;
-	uint8_t			alloc_cmds_f	= 0;
-	uint8_t			irq_f		= 0;
 	int			i;
 
 
-	adapter->ito		= MBOX_TIMEOUT;
-	pdev			= adapter->pdev;
+	adapter->ito	= MBOX_TIMEOUT;
+	pdev		= adapter->pdev;
 
 	/*
 	 * Allocate and initialize the init data structure for mailbox
@@ -899,7 +879,7 @@ megaraid_init_mbox(adapter_t *adapter)
 		con_log(CL_ANN, (KERN_WARNING
 				"megaraid: mem region busy\n"));
 
-		goto fail_init;
+		goto out_free_raid_dev;
 	}
 
 	raid_dev->baseaddr = (unsigned long)
@@ -910,11 +890,8 @@ megaraid_init_mbox(adapter_t *adapter)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: could not map hba memory\n") );
 
-		pci_release_regions(pdev);
-
-		goto fail_init;
+		goto out_release_regions;
 	}
-	mem_region_f = 1;
 
 	//
 	// Setup the rest of the soft state using the library of FW routines
@@ -927,10 +904,8 @@ megaraid_init_mbox(adapter_t *adapter)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: Couldn't register IRQ %d!\n", adapter->irq));
 
-		goto fail_init;
+		goto out_iounmap;
 	}
-
-	irq_f = 1;
 
 
 	// initialize the mutual exclusion lock for the mailbox
@@ -938,13 +913,12 @@ megaraid_init_mbox(adapter_t *adapter)
 
 	// allocate memory required for commands
 	if (megaraid_alloc_cmd_packets(adapter) != 0) {
-		goto fail_init;
+		goto out_free_irq;
 	}
-	alloc_cmds_f = 1;
 
 	// Product info
 	if (megaraid_mbox_product_info(adapter) != 0) {
-		goto fail_init;
+		goto out_alloc_cmds;
 	}
 
 	// Do we support extended CDBs
@@ -1015,7 +989,7 @@ megaraid_init_mbox(adapter_t *adapter)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: could not set DMA mask for 64-bit.\n"));
 
-		goto fail_init;
+		goto out_alloc_cmds;
 	}
 
 	// setup tasklet for DPC
@@ -1027,18 +1001,15 @@ megaraid_init_mbox(adapter_t *adapter)
 
 	return 0;
 
-fail_init:
-	if (alloc_cmds_f) {
-		megaraid_free_cmd_packets(adapter);
-	}
-	if (irq_f) {
-		free_irq(adapter->irq, adapter);
-	}
-	if (mem_region_f) {
-		iounmap((caddr_t)raid_dev->baseaddr);
-		pci_release_regions(adapter->pdev);
-	}
-
+out_alloc_cmds:
+	megaraid_free_cmd_packets(adapter);
+out_free_irq:
+	free_irq(adapter->irq, adapter);
+out_iounmap:
+	iounmap((caddr_t)raid_dev->baseaddr);
+out_release_regions:
+	pci_release_regions(pdev);
+out_free_raid_dev:
 	kfree(raid_dev);
 
 	return -1;
@@ -1093,10 +1064,6 @@ megaraid_alloc_cmd_packets(adapter_t *adapter)
 	struct mraid_pci_blk	*epthru_pci_blk;
 	struct mraid_pci_blk	*sg_pci_blk;
 	struct mraid_pci_blk	*mbox_pci_blk;
-	uint8_t			alloc_ibuf_f 		= 0;
-	uint8_t			alloc_common_mbox_f 	= 0;
-	uint8_t			alloc_scb_f		= 0;
-	uint8_t			dma_pools_f		= 0;
 	int			i;
 
 	pdev = adapter->pdev;
@@ -1116,7 +1083,6 @@ megaraid_alloc_cmd_packets(adapter_t *adapter)
 		return -1;
 	}
 	memset(raid_dev->una_mbox64, 0, sizeof(mbox64_t));
-	alloc_common_mbox_f = 1;
 
 	/*
 	 * Align the mailbox at 16-byte boundary
@@ -1143,9 +1109,8 @@ megaraid_alloc_cmd_packets(adapter_t *adapter)
 			"megaraid: out of memory, %s %d\n", __FUNCTION__,
 			__LINE__));
 
-		goto fail_alloc_cmds;
+		goto out_free_common_mbox;
 	}
-	alloc_ibuf_f = 1;
 	memset(adapter->ibuf, 0, MBOX_IBUF_SIZE);
 
 	// Allocate memory for our SCSI Command Blocks and their associated
@@ -1166,9 +1131,8 @@ megaraid_alloc_cmd_packets(adapter_t *adapter)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: out of memory, %s %d\n", __FUNCTION__,
 			__LINE__));
-		goto fail_alloc_cmds;
+		goto out_free_ibuf;
 	}
-	alloc_scb_f = 1;
 	memset(adapter->kscb_list, 0, sizeof(scb_t) * MBOX_MAX_SCSI_CMDS);
 
 	// memory allocation for our command packets
@@ -1176,9 +1140,8 @@ megaraid_alloc_cmd_packets(adapter_t *adapter)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: out of memory, %s %d\n", __FUNCTION__,
 			__LINE__));
-		goto fail_alloc_cmds;
+		goto out_free_scb_list;
 	}
-	dma_pools_f = 1;
 
 	// Adjust the scb pointers and link in the free pool
 	epthru_pci_blk	= raid_dev->epthru_pool;
@@ -1199,7 +1162,7 @@ megaraid_alloc_cmd_packets(adapter_t *adapter)
 			con_log(CL_ANN, (KERN_CRIT
 				"megaraid mbox: not aligned on 16-bytes\n"));
 
-			goto fail_alloc_cmds;
+			goto out_teardown_dma_pools;
 		}
 
 		ccb->epthru		= (mraid_epassthru_t *)
@@ -1231,23 +1194,16 @@ megaraid_alloc_cmd_packets(adapter_t *adapter)
 
 	return 0;
 
-fail_alloc_cmds:
-	if (dma_pools_f) {
-		megaraid_mbox_teardown_dma_pools(adapter);
-	}
-
-	if (alloc_scb_f) kfree(adapter->kscb_list);
-
-	if (alloc_ibuf_f) {
-		pci_free_consistent(pdev, MBOX_IBUF_SIZE,
-			(void *)adapter->ibuf, adapter->ibuf_dma_h);
-	}
-
-	if (alloc_common_mbox_f) {
-		pci_free_consistent(adapter->pdev, sizeof(mbox64_t),
-			(caddr_t)raid_dev->una_mbox64,
-			raid_dev->una_mbox64_dma);
-	}
+out_teardown_dma_pools:
+	megaraid_mbox_teardown_dma_pools(adapter);
+out_free_scb_list:
+	kfree(adapter->kscb_list);
+out_free_ibuf:
+	pci_free_consistent(pdev, MBOX_IBUF_SIZE, (void *)adapter->ibuf,
+		adapter->ibuf_dma_h);
+out_free_common_mbox:
+	pci_free_consistent(adapter->pdev, sizeof(mbox64_t),
+		(caddr_t)raid_dev->una_mbox64, raid_dev->una_mbox64_dma);
 
 	return -1;
 }
@@ -1425,8 +1381,7 @@ megaraid_mbox_teardown_dma_pools(adapter_t *adapter)
  * @scp		: pointer to the scsi command to be executed
  * @done	: callback routine to be called after the cmd has be completed
  *
- * Queue entry point for mailbox based controllers. This entry point is common
- * for memory and IO based controllers
+ * Queue entry point for mailbox based controllers.
  */
 static int
 megaraid_queue_command(struct scsi_cmnd *scp, void (* done)(struct scsi_cmnd *))
@@ -1842,6 +1797,8 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 		}
 		return scb;
 	}
+
+	// NOT REACHED
 }
 
 
@@ -2197,7 +2154,7 @@ mbox_post_cmd(adapter_t *adapter, scb_t *scb)
 
 
 	// Copy this command's mailbox data into "adapter's" mailbox
-	memcpy((caddr_t)mbox64, (caddr_t)ccb->mbox64, 24);
+	memcpy((caddr_t)mbox64, (caddr_t)ccb->mbox64, 22);
 	mbox->cmdid = scb->sno;
 
 	adapter->outstanding_cmds++;
@@ -2769,9 +2726,8 @@ megaraid_abort_handler(struct scsi_cmnd *scp)
 
 	if (!found) {
 		con_log(CL_ANN, (KERN_WARNING
-			"megaraid abort: %ld:%d[%d:%d], do now own\n",
-			scp->serial_number, scb->sno, scb->dev_channel,
-			scb->dev_target));
+			"megaraid abort: scsi cmd:%ld, do now own\n",
+			scp->serial_number));
 
 		// FIXME: Should there be a callback for this command?
 		return SUCCESS;
@@ -2807,7 +2763,6 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 	int		recovery_window;
 	int		recovering;
 	int		i;
-	DECLARE_WAIT_QUEUE_HEAD(wq);
 
 	adapter		= SCP2ADAPTER(scp);
 	raid_dev	= ADAP2RAIDDEV(adapter);
@@ -2825,7 +2780,7 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 
 
 	// Under exceptional conditions, FW can take up to 3 minutes to
-	// complete command processing. Wait for additional 3 minutes for the
+	// complete command processing. Wait for additional 2 minutes for the
 	// pending commands counter to go down to 0. If it doesn't, let the
 	// controller be marked offline
 	// Also, reset all the commands currently owned by the driver
@@ -2876,8 +2831,7 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 			break;
 		}
 
-		//msleep(1000);
-		sleep_on_timeout(&wq, HZ);
+		msleep(1000);
 	}
 
 	spin_lock(adapter->host_lock);
@@ -2967,45 +2921,76 @@ mbox_post_sync_cmd(adapter_t *adapter, uint8_t raw_mbox[])
 	wmb();
 	WRINDOOR(raid_dev, raid_dev->mbox_dma | 0x1);
 
-	// wait for maximum 1 second for status to post
-	for (i = 0; i < 40000; i++) {
-		if (mbox->numstatus != 0xFF) break;
-		udelay(25); yield();
-	}
-	if (i == 40000) {
-		con_log(CL_ANN, (KERN_WARNING
-			"megaraid mailbox: status not available\n"));
-		return -1;
+	// wait for maximum 1 second for status to post. If the status is not
+	// available within 1 second, assume FW is initializing and wait
+	// for an extended amount of time
+	if (mbox->numstatus == 0xFF) {	// status not yet available
+		udelay(25);;
+
+		for (i = 0; mbox->numstatus == 0xFF && i < 1000; i++) {
+			rmb();
+			msleep(1);
+		}
+
+
+		if (i == 1000) {
+			con_log(CL_ANN, (KERN_NOTICE
+				"megaraid mailbox: wait for FW to boot."));
+
+			for (i = 0; (mbox->numstatus == 0xFF) &&
+					(i < MBOX_RESET_WAIT); i++) {
+				rmb();
+				con_log(CL_ANN, ("."));
+				msleep(1000);
+			}
+
+			if (i == MBOX_RESET_WAIT) {
+
+				con_log(CL_ANN, (KERN_WARNING
+				"\nmegaraid mailbox: status not available\n"));
+
+				return -1;
+			}
+			con_log(CL_ANN, ("[ok]\n"));
+		}
 	}
 
 	// wait for maximum 1 second for poll semaphore
-	for (i = 0; i < 40000; i++) {
-		if (mbox->poll == 0x77) break;
-		udelay(25); yield();
-	}
-	if (i == 40000) {
-		con_log(CL_ANN, (KERN_WARNING
-		"megaraid mailbox: could not get poll semaphore\n"));
-		return -1;
+	if (mbox->poll != 0x77) {
+		udelay(25);
+
+		for (i = 0; (mbox->poll != 0x77) && (i < 1000); i++) {
+			rmb();
+			msleep(1);
+		}
+
+		if (i == 1000) {
+			con_log(CL_ANN, (KERN_WARNING
+			"megaraid mailbox: could not get poll semaphore\n"));
+			return -1;
+		}
 	}
 
 	WRINDOOR(raid_dev, raid_dev->mbox_dma | 0x2);
 	wmb();
 
 	// wait for maximum 1 second for acknowledgement
-	for (i = 0; i < 40000; i++) {
-		if ((RDINDOOR(raid_dev) & 0x2) == 0) {
-			mbox->poll	= 0;
-			mbox->ack	= 0x77;
-			break;
+	if (RDINDOOR(raid_dev) & 0x2) {
+		udelay(25);
+
+		for (i = 0; (RDINDOOR(raid_dev) & 0x2) && (i < 1000); i++) {
+			rmb();
+			msleep(1);
 		}
-		udelay(25); yield();
+
+		if (i == 1000) {
+			con_log(CL_ANN, (KERN_WARNING
+				"megaraid mailbox: could not acknowledge\n"));
+			return -1;
+		}
 	}
-	if (i == 40000) {
-		con_log(CL_ANN, (KERN_WARNING
-			"megaraid mailbox: could not acknowledge\n"));
-		return -1;
-	}
+	mbox->poll	= 0;
+	mbox->ack	= 0x77;
 
 	status = mbox->status;
 
@@ -3049,7 +3034,7 @@ mbox_post_sync_cmd_fast(adapter_t *adapter, uint8_t raw_mbox[])
 	if (mbox->busy) return -1;
 
 	// Copy mailbox data into host structure
-	memcpy((caddr_t)mbox, (caddr_t)raw_mbox, 16);
+	memcpy((caddr_t)mbox, (caddr_t)raw_mbox, 14);
 	mbox->cmdid		= 0xFE;
 	mbox->busy		= 1;
 	mbox->poll		= 0;
@@ -3082,41 +3067,23 @@ mbox_post_sync_cmd_fast(adapter_t *adapter, uint8_t raw_mbox[])
  * @raid_dev	- RAID device (HBA) soft state
  *
  * wait until the controller's mailbox is available to accept more commands.
+ * wait for at most 1 second
  */
 static inline int
 megaraid_busywait_mbox(mraid_device_t *raid_dev)
 {
 	mbox_t	*mbox = raid_dev->mbox;
+	int	i = 0;
 
-	if (mbox->busy)
-		return __megaraid_busywait_mbox(raid_dev);
-
-	return 0;
-}
-
-
-/**
- * __megaraid_busywait_mbox() - Wait until controller's mailbox is available
- * @raid_dev	- mailbox data structures
- *
- * wait until the controller's mailbox is available to accept more commands.
- */
-static inline int
-__megaraid_busywait_mbox(mraid_device_t *raid_dev)
-{
-	mbox_t		*mbox = raid_dev->mbox;
-	unsigned long	counter;
-
-
-	for (counter = 0; counter < 10000; counter++) {
-
-		if (!mbox->busy) return 0;
-
-		udelay(100); yield();
+	if (mbox->busy) {
+		udelay(25);
+		for (i = 0; mbox->busy && i < 1000; i++)
+			msleep(1);
 	}
-	return -1;	// give up after 1 second
-}
 
+	if (i < 1000) return 0;
+	else return -1;
+}
 
 
 /**
@@ -3138,6 +3105,7 @@ megaraid_mbox_product_info(adapter_t *adapter)
 	int			i;
 
 
+	memset((caddr_t)raw_mbox, 0, sizeof(raw_mbox));
 	mbox = (mbox_t *)raw_mbox;
 
 	/*
@@ -3818,7 +3786,6 @@ wait_till_fw_empty(adapter_t *adapter)
 	unsigned long	flags = 0;
 	int		i;
 
-	DECLARE_WAIT_QUEUE_HEAD(wq);
 
 	/*
 	 * Set the quiescent flag to stop issuing cmds to FW.
@@ -3836,8 +3803,7 @@ wait_till_fw_empty(adapter_t *adapter)
 			"megaraid: FW has %d pending commands\n",
 			adapter->outstanding_cmds));
 
-		//msleep(1000);
-		sleep_on_timeout(&wq, HZ);
+		msleep(1000);
 	}
 
 	return adapter->outstanding_cmds;
@@ -3864,7 +3830,7 @@ megaraid_mbox_mm_done(adapter_t *adapter, scb_t *scb)
 	kioc->status		= 0;
 	mbox64			= (mbox64_t *)(unsigned long)kioc->cmdbuf;
 	mbox64->mbox32.status	= scb->status;
-	raw_mbox		= (uint8_t*) &mbox64->mbox32;
+	raw_mbox		= (uint8_t *)&mbox64->mbox32;
 
 
 	// put scb in the free pool
@@ -3900,6 +3866,10 @@ megaraid_mbox_mm_done(adapter_t *adapter, scb_t *scb)
 static int
 gather_hbainfo(adapter_t *adapter, mraid_hba_info_t *hinfo)
 {
+	uint8_t	dmajor;
+
+	dmajor			= megaraid_mbox_version[0];
+
 	hinfo->pci_vendor_id	= adapter->pdev->vendor;
 	hinfo->pci_device_id	= adapter->pdev->device;
 	hinfo->subsys_vendor_id	= adapter->pdev->subsystem_vendor;
