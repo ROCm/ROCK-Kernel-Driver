@@ -91,7 +91,7 @@ static struct dongle_reg dongle_plus = {
  *	So, we register a dongle of each sort and let irattach
  * pick the right one...
  */
-int __init actisys_init(void)
+static int __init actisys_init(void)
 {
 	int ret;
 
@@ -108,7 +108,7 @@ int __init actisys_init(void)
 	return 0;
 }
 
-void __exit actisys_cleanup(void)
+static void __exit actisys_cleanup(void)
 {
 	/* We have to remove both dongles */
 	irda_device_unregister_dongle(&dongle);

@@ -78,12 +78,12 @@ static struct dongle_driver old_belkin = {
 	.set_speed	= old_belkin_change_speed,
 };
 
-int __init old_belkin_init(void)
+static int __init old_belkin_init(void)
 {
 	return irda_register_dongle(&old_belkin);
 }
 
-void __exit old_belkin_cleanup(void)
+static void __exit old_belkin_cleanup(void)
 {
 	irda_unregister_dongle(&old_belkin);
 }

@@ -64,12 +64,12 @@ static struct dongle_driver litelink = {
 	.set_speed	= litelink_change_speed,
 };
 
-int __init litelink_sir_init(void)
+static int __init litelink_sir_init(void)
 {
 	return irda_register_dongle(&litelink);
 }
 
-void __exit litelink_sir_cleanup(void)
+static void __exit litelink_sir_cleanup(void)
 {
 	irda_unregister_dongle(&litelink);
 }

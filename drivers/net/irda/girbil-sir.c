@@ -72,12 +72,12 @@ static struct dongle_driver girbil = {
 	.set_speed	= girbil_change_speed,
 };
 
-int __init girbil_init(void)
+static int __init girbil_init(void)
 {
 	return irda_register_dongle(&girbil);
 }
 
-void __exit girbil_cleanup(void)
+static void __exit girbil_cleanup(void)
 {
 	irda_unregister_dongle(&girbil);
 }

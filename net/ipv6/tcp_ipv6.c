@@ -485,7 +485,7 @@ static int tcp_v6_check_established(struct sock *sk)
 
 unique:
 	BUG_TRAP(sk_unhashed(sk));
-	sk_add_node(sk, &head->chain);
+	__sk_add_node(sk, &head->chain);
 	sk->sk_hashent = hash;
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock_bh(&head->lock);

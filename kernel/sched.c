@@ -124,6 +124,9 @@
 	(NS_TO_JIFFIES((p)->sleep_avg) * MAX_BONUS / \
 		MAX_SLEEP_AVG)
 
+/* spinlock debugging needs this, even on !CONFIG_SMP */
+spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+
 #ifdef CONFIG_SMP
 #define TIMESLICE_GRANULARITY(p)	(MIN_TIMESLICE * \
 		(1 << (((MAX_BONUS - CURRENT_BONUS(p)) ? : 1) - 1)) * \
@@ -2867,7 +2870,6 @@ __init int migration_init(void)
  *
  * Don't use in new code.
  */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 EXPORT_SYMBOL(kernel_flag);
 #endif

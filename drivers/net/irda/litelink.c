@@ -56,12 +56,12 @@ static struct dongle_reg dongle = {
 	.owner = THIS_MODULE,
 };
 
-int __init litelink_init(void)
+static int __init litelink_init(void)
 {
 	return irda_device_register_dongle(&dongle);
 }
 
-void __exit litelink_cleanup(void)
+static void __exit litelink_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }
