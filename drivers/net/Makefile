@@ -59,11 +59,6 @@ obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o mii.o
 #
 
 obj-$(CONFIG_MII) += mii.o
-obj-$(CONFIG_AIRONET4500) 	+= aironet4500_core.o
-obj-$(CONFIG_AIRONET4500_CS) 	+= aironet4500_core.o
-obj-$(CONFIG_AIRONET4500_NONCS)  += aironet4500_card.o
-obj-$(CONFIG_AIRONET4500_PROC)	+= aironet4500_proc.o
-obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_proc.o
 
 obj-$(CONFIG_WINBOND_840) += mii.o
 obj-$(CONFIG_SUNDANCE) += sundance.o mii.o
