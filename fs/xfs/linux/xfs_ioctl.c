@@ -75,17 +75,9 @@ xfs_find_handle(
 	case XFS_IOC_PATH_TO_FSHANDLE:
 	case XFS_IOC_PATH_TO_HANDLE: {
 		struct nameidata	nd;
-		char			*path;
 		int			error;
 
-		/* we need the path */
-		path = getname(hreq.path);
-		if (IS_ERR(path))
-			return PTR_ERR(path);
-
-		/* traverse the path */
-		error = path_lookup(path, 0, &nd);
-		putname(path);
+		error = user_path_walk_link(hreq.path, &nd);
 		if (error)
 			return error;
 
@@ -107,7 +99,6 @@ xfs_find_handle(
 		ASSERT(file->f_dentry->d_inode);
 		inode = igrab(file->f_dentry->d_inode);
 		fput(file);
-
 		break;
 	}
 
