@@ -175,6 +175,7 @@ static void e1000_tx_timeout_task(struct net_device *dev);
 static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
+static void e1000_restore_vlan(struct e1000_adapter *adapter);
 
 static int e1000_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e1000_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
@@ -274,6 +275,7 @@ e1000_up(struct e1000_adapter *adapter)
 	/* hardware has been reset, we need to reload some things */
 
 	e1000_set_multi(netdev);
+	e1000_restore_vlan(adapter);
 
 	e1000_configure_tx(adapter);
 	e1000_setup_rctl(adapter);
@@ -2392,6 +2394,21 @@ e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid)
 	vfta = E1000_READ_REG_ARRAY(&adapter->hw, VFTA, index);
 	vfta &= ~(1 << (vid & 0x1F));
 	e1000_write_vfta(&adapter->hw, index, vfta);
+}
+
+static void
+e1000_restore_vlan(struct e1000_adapter *adapter)
+{
+	e1000_vlan_rx_register(adapter->netdev, adapter->vlgrp);
+
+	if(adapter->vlgrp) {
+		uint16_t vid;
+		for(vid = 0; vid < VLAN_GROUP_ARRAY_LEN; vid++) {
+			if(!adapter->vlgrp->vlan_devices[vid])
+				continue;
+			e1000_vlan_rx_add_vid(adapter->netdev, vid);
+		}
+	}
 }
 
 static int
