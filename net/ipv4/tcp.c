@@ -248,6 +248,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/poll.h>
@@ -2682,3 +2683,25 @@ void __init tcp_init(void)
 
 	tcpdiag_init();
 }
+
+EXPORT_SYMBOL(__tcp_mem_reclaim);
+EXPORT_SYMBOL(sysctl_tcp_rmem);
+EXPORT_SYMBOL(sysctl_tcp_wmem);
+EXPORT_SYMBOL(tcp_accept);
+EXPORT_SYMBOL(tcp_close);
+EXPORT_SYMBOL(tcp_close_state);
+EXPORT_SYMBOL(tcp_destroy_sock);
+EXPORT_SYMBOL(tcp_disconnect);
+EXPORT_SYMBOL(tcp_getsockopt);
+EXPORT_SYMBOL(tcp_ioctl);
+EXPORT_SYMBOL(tcp_openreq_cachep);
+EXPORT_SYMBOL(tcp_poll);
+EXPORT_SYMBOL(tcp_read_sock);
+EXPORT_SYMBOL(tcp_recvmsg);
+EXPORT_SYMBOL(tcp_sendmsg);
+EXPORT_SYMBOL(tcp_sendpage);
+EXPORT_SYMBOL(tcp_setsockopt);
+EXPORT_SYMBOL(tcp_shutdown);
+EXPORT_SYMBOL(tcp_sockets_allocated);
+EXPORT_SYMBOL(tcp_timewait_cachep);
+EXPORT_SYMBOL(tcp_write_space);

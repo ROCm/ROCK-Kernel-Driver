@@ -228,7 +228,6 @@ EXPORT_SYMBOL(flow_cache_genid);
 EXPORT_SYMBOL(udp_hash);
 EXPORT_SYMBOL(udp_hash_lock);
 
-EXPORT_SYMBOL(tcp_destroy_sock);
 EXPORT_SYMBOL(ip_queue_xmit);
 EXPORT_SYMBOL(memcpy_fromiovecend);
 EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
@@ -237,17 +236,7 @@ EXPORT_SYMBOL(udp_ioctl);
 EXPORT_SYMBOL(udp_connect);
 EXPORT_SYMBOL(udp_disconnect);
 EXPORT_SYMBOL(udp_sendmsg);
-EXPORT_SYMBOL(tcp_close);
-EXPORT_SYMBOL(tcp_disconnect);
-EXPORT_SYMBOL(tcp_accept);
 EXPORT_SYMBOL(tcp_write_wakeup);
-EXPORT_SYMBOL(tcp_write_space);
-EXPORT_SYMBOL(tcp_poll);
-EXPORT_SYMBOL(tcp_ioctl);
-EXPORT_SYMBOL(tcp_shutdown);
-EXPORT_SYMBOL(tcp_setsockopt);
-EXPORT_SYMBOL(tcp_getsockopt);
-EXPORT_SYMBOL(tcp_recvmsg);
 EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_check_req);
 EXPORT_SYMBOL(tcp_child_process);
@@ -258,11 +247,8 @@ EXPORT_SYMBOL(tcp_clear_xmit_timers);
 EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_rcv_state_process);
 EXPORT_SYMBOL(tcp_timewait_state_process);
-EXPORT_SYMBOL(tcp_timewait_cachep);
-EXPORT_SYMBOL(tcp_sendmsg);
 EXPORT_SYMBOL(tcp_create_openreq_child);
 EXPORT_SYMBOL(udp_prot);
-EXPORT_SYMBOL(tcp_openreq_cachep);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_transmit_skb);
 EXPORT_SYMBOL(tcp_connect);
@@ -273,14 +259,9 @@ EXPORT_SYMBOL(tcp_reset_keepalive_timer);
 EXPORT_SYMBOL(udp_port_rover);
 EXPORT_SYMBOL(tcp_sync_mss);
 EXPORT_SYMBOL(net_statistics); 
-EXPORT_SYMBOL(__tcp_mem_reclaim);
-EXPORT_SYMBOL(tcp_sockets_allocated);
 EXPORT_SYMBOL(sysctl_tcp_reordering);
-EXPORT_SYMBOL(sysctl_tcp_rmem);
-EXPORT_SYMBOL(sysctl_tcp_wmem);
 EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(tcp_cwnd_application_limited);
-EXPORT_SYMBOL(tcp_sendpage);
 
 EXPORT_SYMBOL(tcp_write_xmit);
 
@@ -295,7 +276,6 @@ EXPORT_SYMBOL(ip_generic_getfrag);
 
 #endif
 
-EXPORT_SYMBOL(tcp_read_sock);
 
 #ifdef CONFIG_IP_SCTP_MODULE
 EXPORT_SYMBOL(ip_setsockopt);
