@@ -780,7 +780,7 @@ static void exit_notify(struct task_struct *tsk)
 	tsk->flags |= PF_DEAD;
 }
 
-asmlinkage NORET_TYPE void do_exit(long code)
+fastcall NORET_TYPE void do_exit(long code)
 {
 	struct task_struct *tsk = current;
 	int group_dead;
