@@ -456,9 +456,7 @@ int security_context_to_sid(char *scontext, u32 scontext_len, u32 *sid)
 				goto out;
 			}
 		}
-		printk(KERN_ERR "security_context_to_sid: called before "
-		       "initial load_policy on unknown context %s\n", scontext);
-		rc = -EINVAL;
+		*sid = SECINITSID_KERNEL;
 		goto out;
 	}
 	*sid = SECSID_NULL;
