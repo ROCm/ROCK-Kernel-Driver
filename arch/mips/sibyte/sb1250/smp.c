@@ -73,7 +73,7 @@ void sb1250_smp_finish(void)
  */
 void core_send_ipi(int cpu, unsigned int action)
 {
-	__raw_writeq((((u64)action)<< 48), mailbox_set_regs[cpu]);
+	bus_writeq((((u64)action) << 48), mailbox_set_regs[cpu]);
 }
 
 void sb1250_mailbox_interrupt(struct pt_regs *regs)
@@ -83,10 +83,10 @@ void sb1250_mailbox_interrupt(struct pt_regs *regs)
 
 	kstat_this_cpu.irqs[K_INT_MBOX_0]++;
 	/* Load the mailbox register to figure out what we're supposed to do */
-	action = (____raw_readq(mailbox_regs[cpu]) >> 48) & 0xffff;
+	action = (__bus_readq(mailbox_regs[cpu]) >> 48) & 0xffff;
 
 	/* Clear the mailbox to clear the interrupt */
-	____raw_writeq(((u64)action)<<48, mailbox_clear_regs[cpu]);
+	__bus_writeq(((u64)action) << 48, mailbox_clear_regs[cpu]);
 
 	/*
 	 * Nothing to do for SMP_RESCHEDULE_YOURSELF; returning from the

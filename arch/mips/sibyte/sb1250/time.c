@@ -67,21 +67,24 @@ void sb1250_time_init(void)
 	sb1250_mask_irq(cpu, irq);
 
 	/* Map the timer interrupt to ip[4] of this cpu */
-	__raw_writeq(IMR_IP4_VAL, IOADDR(A_IMR_REGISTER(cpu, R_IMR_INTERRUPT_MAP_BASE) +
-					 (irq << 3)));
+	bus_writeq(IMR_IP4_VAL,
+		   IOADDR(A_IMR_REGISTER(cpu, R_IMR_INTERRUPT_MAP_BASE) +
+			  (irq << 3)));
 
 	/* the general purpose timer ticks at 1 Mhz independent if the rest of the system */
 	/* Disable the timer and set up the count */
-	__raw_writeq(0, IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
+	bus_writeq(0, IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
 #ifdef CONFIG_SIMULATION
-	__raw_writeq(50000 / HZ, IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_INIT)));
+	bus_writeq(50000 / HZ,
+		   IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_INIT)));
 #else
-	__raw_writeq(1000000/HZ, IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_INIT)));
+	bus_writeq(1000000/HZ,
+		   IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_INIT)));
 #endif
 
 	/* Set the timer running */
-	__raw_writeq(M_SCD_TIMER_ENABLE|M_SCD_TIMER_MODE_CONTINUOUS,
-		     IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
+	bus_writeq(M_SCD_TIMER_ENABLE | M_SCD_TIMER_MODE_CONTINUOUS,
+		   IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
 
 	sb1250_unmask_irq(cpu, irq);
 	sb1250_steal_irq(irq);
@@ -102,8 +105,8 @@ void sb1250_timer_interrupt(struct pt_regs *regs)
 	int irq = K_INT_TIMER_0 + cpu;
 
 	/* Reset the timer */
-	____raw_writeq(M_SCD_TIMER_ENABLE|M_SCD_TIMER_MODE_CONTINUOUS,
-		       IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
+	__bus_writeq(M_SCD_TIMER_ENABLE | M_SCD_TIMER_MODE_CONTINUOUS,
+		     IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
 
 	/*
 	 * CPU 0 handles the global timer interrupt job
@@ -127,7 +130,7 @@ void sb1250_timer_interrupt(struct pt_regs *regs)
 unsigned long sb1250_gettimeoffset(void)
 {
 	unsigned long count =
-		__raw_readq(IOADDR(A_SCD_TIMER_REGISTER(0, R_SCD_TIMER_CNT)));
+		bus_readq(IOADDR(A_SCD_TIMER_REGISTER(0, R_SCD_TIMER_CNT)));
 
 	return 1000000/HZ - count;
  }

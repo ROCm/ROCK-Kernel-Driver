@@ -611,6 +611,7 @@ endchoice
 config SIBYTE_SB1xxx_SOC
 	bool "Support for Broadcom BCM1xxx SOCs (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
+	select BOOT_ELF32
 	select DMA_COHERENT
 	select SWAP_IO_SPACE
 
@@ -721,6 +722,7 @@ choice
 config CPU_SB1_PASS_1
 	bool "1250 Pass1"
 	depends on SIBYTE_SB1250
+	select CPU_HAS_PREFETCH
 
 config CPU_SB1_PASS_2_1250
 	bool "1250 An"
@@ -732,12 +734,14 @@ config CPU_SB1_PASS_2_1250
 config CPU_SB1_PASS_2_2
 	bool "1250 Bn"
 	depends on SIBYTE_SB1250
+	select CPU_HAS_PREFETCH
 	help
 	  Also called BCM1250 Pass 2.2
 
 config CPU_SB1_PASS_4
 	bool "1250 Cn"
 	depends on SIBYTE_SB1250
+	select CPU_HAS_PREFETCH
 	help
 	  Also called BCM1250 Pass 3
 
@@ -749,6 +753,7 @@ config CPU_SB1_PASS_2_112x
 config CPU_SB1_PASS_3
 	bool "112x An"
 	depends on SIBYTE_BCM112X
+	select CPU_HAS_PREFETCH
 
 endchoice
 

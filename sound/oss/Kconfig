@@ -100,6 +100,16 @@ config SOUND_CS4281
 	  Picture and feature list at
 	  <http://www.pcbroker.com/crystal4281.html>.
 
+config SOUND_BCM_CS4297A
+	tristate "Crystal Sound CS4297a (for Swarm)"
+	depends on SOUND_PRIME!=n && SIBYTE_SWARM && SOUND
+	help
+	  The BCM91250A has a Crystal CS4297a on synchronous serial
+	  port B (in addition to the DB-9 serial port).  Say Y or M
+	  here to enable the sound chip instead of the UART.  Also
+	  note that CONFIG_KGDB should not be enabled at the same
+	  time, since it also attempts to use this UART port.
+
 config SOUND_ES1370
 	tristate "Ensoniq AudioPCI (ES1370)"
 	depends on SOUND_PRIME!=n && SOUND && PCI && SOUND_GAMEPORT
