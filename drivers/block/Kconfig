@@ -292,6 +292,15 @@ config BLK_DEV_NBD
 
 	  If unsure, say N.
 
+config BLK_DEV_CARMEL
+	tristate "Promise SATA SX8 (carmel) support"
+	depends on PCI
+	---help---
+	  Saying Y or M here will enable support for the 
+	  Promise SATA SX8 ("carmel") controllers.
+
+	  Use devices /dev/carmel/$N and /dev/carmel/$Np$M.
+
 config BLK_DEV_RAM
 	tristate "RAM disk support"
 	---help---
