@@ -263,18 +263,25 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
 	struct bio *bio = NULL;
 	unsigned page_idx;
 	sector_t last_block_in_bio = 0;
+	struct pagevec lru_pvec;
 
+	pagevec_init(&lru_pvec);
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 
 		prefetchw(&page->flags);
 		list_del(&page->list);
-		if (!add_to_page_cache(page, mapping, page->index))
+		if (!add_to_page_cache(page, mapping, page->index)) {
 			bio = do_mpage_readpage(bio, page,
 					nr_pages - page_idx,
 					&last_block_in_bio, get_block);
-		page_cache_release(page);
+			if (!pagevec_add(&lru_pvec, page))
+				__pagevec_lru_add(&lru_pvec);
+		} else {
+			page_cache_release(page);
+		}
 	}
+	pagevec_lru_add(&lru_pvec);
 	BUG_ON(!list_empty(pages));
 	if (bio)
 		mpage_bio_submit(READ, bio);
@@ -566,7 +573,8 @@ mpage_writepages(struct address_space *mapping,
 				bio = mpage_writepage(bio, page, get_block,
 						&last_block_in_bio, &ret);
 			}
-			if (!PageActive(page) && PageLRU(page)) {
+			if ((current->flags & PF_MEMALLOC) &&
+					!PageActive(page) && PageLRU(page)) {
 				if (!pagevec_add(&pvec, page))
 					pagevec_deactivate_inactive(&pvec);
 				page = NULL;

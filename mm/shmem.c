@@ -668,7 +668,7 @@ repeat:
 		page = page_cache_alloc(mapping);
 		if (!page)
 			goto no_mem;
-		error = add_to_page_cache(page, mapping, idx);
+		error = add_to_page_cache_lru(page, mapping, idx);
 		if (error < 0) {
 			page_cache_release(page);
 			goto no_mem;

@@ -21,6 +21,7 @@
 #include <linux/iobuf.h>
 #include <linux/hash.h>
 #include <linux/writeback.h>
+#include <linux/pagevec.h>
 #include <linux/security.h>
 /*
  * This is needed for the following functions:
@@ -530,25 +531,35 @@ int filemap_fdatawait(struct address_space * mapping)
  * In the case of swapcache, try_to_swap_out() has already locked the page, so
  * SetPageLocked() is ugly-but-OK there too.  The required page state has been
  * set up by swap_out_add_to_swap_cache().
+ *
+ * This function does not add the page to the LRU.  The caller must do that.
  */
 int add_to_page_cache(struct page *page,
-		struct address_space *mapping, unsigned long offset)
+		struct address_space *mapping, pgoff_t offset)
 {
 	int error;
 
+	page_cache_get(page);
 	write_lock(&mapping->page_lock);
 	error = radix_tree_insert(&mapping->page_tree, offset, page);
 	if (!error) {
 		SetPageLocked(page);
 		ClearPageDirty(page);
 		___add_to_page_cache(page, mapping, offset);
-		page_cache_get(page);
+	} else {
+		page_cache_release(page);
 	}
 	write_unlock(&mapping->page_lock);
-	/* Anon pages are already on the LRU */
-	if (!error && !PageSwapCache(page))
-		lru_cache_add(page);
 	return error;
+}
+
+int add_to_page_cache_lru(struct page *page,
+		struct address_space *mapping, pgoff_t offset)
+{
+	int ret = add_to_page_cache(page, mapping, offset);
+	if (ret == 0)
+		lru_cache_add(page);
+	return ret;
 }
 
 /*
@@ -566,7 +577,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
 	if (!page)
 		return -ENOMEM;
 
-	error = add_to_page_cache(page, mapping, offset);
+	error = add_to_page_cache_lru(page, mapping, offset);
 	if (!error) {
 		error = mapping->a_ops->readpage(file, page);
 		page_cache_release(page);
@@ -797,7 +808,7 @@ repeat:
 			if (!cached_page)
 				return NULL;
 		}
-		err = add_to_page_cache(cached_page, mapping, index);
+		err = add_to_page_cache_lru(cached_page, mapping, index);
 		if (!err) {
 			page = cached_page;
 			cached_page = NULL;
@@ -830,7 +841,7 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 		return NULL;
 	}
 	page = alloc_pages(mapping->gfp_mask & ~__GFP_FS, 0);
-	if (page && add_to_page_cache(page, mapping, index)) {
+	if (page && add_to_page_cache_lru(page, mapping, index)) {
 		page_cache_release(page);
 		page = NULL;
 	}
@@ -994,7 +1005,7 @@ no_cached_page:
 				break;
 			}
 		}
-		error = add_to_page_cache(cached_page, mapping, index);
+		error = add_to_page_cache_lru(cached_page, mapping, index);
 		if (error) {
 			if (error == -EEXIST)
 				goto find_page;
@@ -1704,7 +1715,7 @@ repeat:
 			if (!cached_page)
 				return ERR_PTR(-ENOMEM);
 		}
-		err = add_to_page_cache(cached_page, mapping, index);
+		err = add_to_page_cache_lru(cached_page, mapping, index);
 		if (err == -EEXIST)
 			goto repeat;
 		if (err < 0) {
@@ -1764,8 +1775,14 @@ retry:
 	return page;
 }
 
-static inline struct page * __grab_cache_page(struct address_space *mapping,
-				unsigned long index, struct page **cached_page)
+/*
+ * If the page was newly created, increment its refcount and add it to the
+ * caller's lru-buffering pagevec.  This function is specifically for
+ * generic_file_write().
+ */
+static inline struct page *
+__grab_cache_page(struct address_space *mapping, unsigned long index,
+			struct page **cached_page, struct pagevec *lru_pvec)
 {
 	int err;
 	struct page *page;
@@ -1782,6 +1799,9 @@ repeat:
 			goto repeat;
 		if (err == 0) {
 			page = *cached_page;
+			page_cache_get(page);
+			if (!pagevec_add(lru_pvec, page))
+				__pagevec_lru_add(lru_pvec);
 			*cached_page = NULL;
 		}
 	}
@@ -1828,6 +1848,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 	int		err;
 	unsigned	bytes;
 	time_t		time_now;
+	struct pagevec	lru_pvec;
 
 	if (unlikely((ssize_t)count < 0))
 		return -EINVAL;
@@ -1949,6 +1970,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		goto out_status;
 	}
 
+	pagevec_init(&lru_pvec);
 	do {
 		unsigned long index;
 		unsigned long offset;
@@ -1972,7 +1994,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 			__get_user(dummy, buf+bytes-1);
 		}
 
-		page = __grab_cache_page(mapping, index, &cached_page);
+		page = __grab_cache_page(mapping, index, &cached_page, &lru_pvec);
 		if (!page) {
 			status = -ENOMEM;
 			break;
@@ -2034,6 +2056,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 out_status:	
 	err = written ? written : status;
 out:
+	pagevec_lru_add(&lru_pvec);
 	return err;
 }
 

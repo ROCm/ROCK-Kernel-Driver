@@ -58,6 +58,8 @@ extern struct page * read_cache_page(struct address_space *mapping,
 
 extern int add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index);
+extern int add_to_page_cache_lru(struct page *page,
+		struct address_space *mapping, unsigned long index);
 extern void remove_from_page_cache(struct page *page);
 extern void __remove_from_page_cache(struct page *page);
 
