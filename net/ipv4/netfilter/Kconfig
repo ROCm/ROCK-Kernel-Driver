@@ -271,16 +271,6 @@ config IP_NF_MATCH_CONNTRACK
 	  If you want to compile it as a module, say M here and read
 	  Documentation/modules.txt.  If unsure, say `N'.
 
-config IP_NF_MATCH_UNCLEAN
-	tristate "Unclean match support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IP_NF_IPTABLES
-	help
-	  Unclean packet matching matches any strange or invalid packets, by
-	  looking at a series of fields in the IP, TCP, UDP and ICMP headers.
-
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-
 config IP_NF_MATCH_OWNER
 	tristate "Owner match support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && IP_NF_IPTABLES
