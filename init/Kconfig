@@ -283,6 +283,16 @@ config CC_OPTIMIZE_FOR_SIZE
 
 	  If unsure, say N.
 
+config LOCALVERSION
+	string "Local Version"
+	help
+	  Append an extra string to the end of your kernel version.
+	  This will show up when you type uname, for example.
+	  The string you set here will be appended after the contents of=20
+	  any files with a filename matching localversion* in your=20
+	  object and source tree, in that order.  Your total string can
+	  be a maximum of 64 characters.
+
 endmenu		# General setup
 
 menu "Loadable module support"

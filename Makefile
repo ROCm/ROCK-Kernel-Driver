@@ -141,7 +141,25 @@ VPATH		:= $(srctree)
 
 export srctree objtree VPATH TOPDIR
 
-KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
+nullstring :=
+space      := $(nullstring) # end of line
+
+# Take the contents of any files called localversion* and the config
+# variable CONFIG_LOCALVERSION and append them to KERNELRELEASE. Be
+# careful not to include files twice if building in the source
+# directory. LOCALVERSION from the command line override all of this
+
+ifeq ($(objtree),$(srctree))
+localversion-files := $(wildcard $(srctree)/localversion*)
+else
+localversion-files := $(wildcard $(objtree)/localversion* $(srctree)/localversion*)
+endif
+
+LOCALVERSION = $(subst $(space),, \
+	       $(shell cat /dev/null $(localversion-files)) \
+	       $(subst ",,$(CONFIG_LOCALVERSION)))
+
+KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)
 
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
@@ -329,8 +347,8 @@ CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__
 
-export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
-	CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
+export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION LOCALVERSION KERNELRELEASE \
+	ARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
 	HOSTCXX HOSTCXXFLAGS LDFLAGS_MODULE CHECK CHECKFLAGS
 
@@ -747,8 +765,8 @@ include/config/MARKER: include/linux/autoconf.h
 # Generate some files
 # ---------------------------------------------------------------------------
 
-#	version.h changes when $(KERNELRELEASE) etc change, as defined in
-#	this Makefile
+# KERNELRELEASE can change from a few different places, meaning version.h
+# needs to be updated, so this check is forced on all builds
 
 uts_len := 64
 
@@ -763,7 +781,7 @@ define filechk_version.h
 	)
 endef
 
-include/linux/version.h: Makefile
+include/linux/version.h: FORCE
 	$(call filechk,version.h)
 
 # ---------------------------------------------------------------------------
