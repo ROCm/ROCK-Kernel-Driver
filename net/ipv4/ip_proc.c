@@ -219,7 +219,7 @@ static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
 			 * temporary HACK till we have a solution to
 			 * get more state passed to seq_show -acme
 			 */
-			seq->private = (void *)(int)bucket;
+			seq->private = (void *)(long)bucket;
 			goto out;
 		}
 out:
@@ -289,7 +289,7 @@ static int udp_seq_show(struct seq_file *seq, void *v)
 	else {
 		char tmpbuf[129];
 
-		udp_format_sock(v, tmpbuf, (int)seq->private);
+		udp_format_sock(v, tmpbuf, (long)seq->private);
 		seq_printf(seq, "%-127s\n", tmpbuf);
 	}
 	return 0;
