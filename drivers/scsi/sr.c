@@ -87,6 +87,11 @@ static struct scsi_driver sr_template = {
 static unsigned long sr_index_bits[SR_DISKS / BITS_PER_LONG];
 static spinlock_t sr_index_lock = SPIN_LOCK_UNLOCKED;
 
+/* This semaphore is used to mediate the 0->1 reference get in the
+ * face of object destruction (i.e. we can't allow a get on an
+ * object after last put) */
+static DECLARE_MUTEX(sr_ref_sem);
+
 static int sr_open(struct cdrom_device_info *, int);
 static void sr_release(struct cdrom_device_info *);
 
@@ -113,26 +118,37 @@ static struct cdrom_device_ops sr_dops = {
 	.generic_packet		= sr_packet,
 };
 
-static void sr_kobject_release(struct kobject *kobj);
+static void sr_kref_release(struct kref *kref);
 
-static struct kobj_type scsi_cdrom_kobj_type = {
-	.release = sr_kobject_release,
-};
+static inline struct scsi_cd *scsi_cd(struct gendisk *disk)
+{
+	return container_of(disk->private_data, struct scsi_cd, driver);
+}
 
 /*
  * The get and put routines for the struct scsi_cd.  Note this entity
  * has a scsi_device pointer and owns a reference to this.
  */
-static inline int scsi_cd_get(struct scsi_cd *cd)
+static inline struct scsi_cd *scsi_cd_get(struct gendisk *disk)
 {
-	if (!kobject_get(&cd->kobj))
-		return -ENODEV;
-	return 0;
+	struct scsi_cd *cd = NULL;
+
+	down(&sr_ref_sem);
+	if (disk->private_data == NULL)
+		goto out;
+	cd = scsi_cd(disk);
+	if (!kref_get(&cd->kref))
+		cd = NULL;
+ out:
+	up(&sr_ref_sem);
+	return cd;
 }
 
 static inline void scsi_cd_put(struct scsi_cd *cd)
 {
-	kobject_put(&cd->kobj);
+	down(&sr_ref_sem);
+	kref_put(&cd->kref);
+	up(&sr_ref_sem);
 }
 
 /*
@@ -187,11 +203,6 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 	return retval;
 }
  
-static inline struct scsi_cd *scsi_cd(struct gendisk *disk)
-{
-	return container_of(disk->private_data, struct scsi_cd, driver);
-}
-
 /*
  * rw_intr is the interrupt routine for the device driver.
  *
@@ -440,8 +451,17 @@ queue:
 
 static int sr_block_open(struct inode *inode, struct file *file)
 {
+	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
-	return cdrom_open(&cd->cdi, inode, file);
+	int ret = 0;
+
+	if(!(cd = scsi_cd_get(disk)))
+		return -ENXIO;
+
+	if((ret = cdrom_open(&cd->cdi, inode, file)) != 0)
+		scsi_cd_put(cd);
+
+	return ret;
 }
 
 static int sr_block_release(struct inode *inode, struct file *file)
@@ -496,10 +516,6 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	struct scsi_device *sdev = cd->device;
 	int retval;
 
-	retval = scsi_cd_get(cd);
-	if (retval)
-		return retval;
-	
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
@@ -551,8 +567,7 @@ static int sr_probe(struct device *dev)
 		goto fail_put_sdev;
 	memset(cd, 0, sizeof(*cd));
 
-	kobject_init(&cd->kobj);
-	cd->kobj.ktype = &scsi_cdrom_kobj_type;
+	kref_init(&cd->kref, sr_kref_release);
 
 	disk = alloc_disk(1);
 	if (!disk)
@@ -898,18 +913,30 @@ static int sr_packet(struct cdrom_device_info *cdi,
 	return cgc->stat;
 }
 
-static void sr_kobject_release(struct kobject *kobj)
+/**
+ *	sr_kref_release - Called to free the scsi_cd structure
+ *	@kref: pointer to embedded kref
+ *
+ *	sr_ref_sem must be held entering this routine.  Because it is
+ *	called on last put, you should always use the scsi_cd_get()
+ *	scsi_cd_put() helpers which manipulate the semaphore directly
+ *	and never do a direct kref_put().
+ **/
+static void sr_kref_release(struct kref *kref)
 {
-	struct scsi_cd *cd = container_of(kobj, struct scsi_cd, kobj);
+	struct scsi_cd *cd = container_of(kref, struct scsi_cd, kref);
 	struct scsi_device *sdev = cd->device;
+	struct gendisk *disk = cd->disk;
 
 	spin_lock(&sr_index_lock);
-	clear_bit(cd->disk->first_minor, sr_index_bits);
+	clear_bit(disk->first_minor, sr_index_bits);
 	spin_unlock(&sr_index_lock);
 
 	unregister_cdrom(&cd->cdi);
 
-	put_disk(cd->disk);
+	disk->private_data = NULL;
+
+	put_disk(disk);
 
 	kfree(cd);
 
