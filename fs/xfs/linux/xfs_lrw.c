@@ -1843,7 +1843,8 @@ int
 xfs_dev_is_read_only(xfs_mount_t *mp, char *message)
 {
 	if (bdev_read_only(mp->m_ddev_targp->pbr_bdev) ||
-	    bdev_read_only(mp->m_logdev_targp->pbr_bdev)) {
+	    bdev_read_only(mp->m_logdev_targp->pbr_bdev) ||
+	   (mp->m_rtdev_targp && bdev_read_only(mp->m_rtdev_targp->pbr_bdev))) {
 		cmn_err(CE_NOTE,
 			"XFS: %s required on read-only device.", message);
 		cmn_err(CE_NOTE,
