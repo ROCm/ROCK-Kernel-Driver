@@ -62,7 +62,7 @@ struct oid_t isl_oid[] = {
 
 	/* 802.11 */
 	OID_U32_C(DOT11_OID_BSSTYPE, 0x10000000),
-	OID_STRUCT_C(DOT11_OID_BSSID, 0x10000001, u8[6], OID_TYPE_SSID),
+	OID_STRUCT_C(DOT11_OID_BSSID, 0x10000001, u8[6], OID_TYPE_RAW),
 	OID_STRUCT_C(DOT11_OID_SSID, 0x10000002, struct obj_ssid,
 		     OID_TYPE_SSID),
 	OID_U32(DOT11_OID_STATE, 0x10000003),
@@ -770,8 +770,9 @@ mgt_response_to_str(enum oid_num_t n, union oid_res_t *r, char *str)
 	case OID_TYPE_SSID:{
 			struct obj_ssid *ssid = r->ptr;
 			return snprintf(str, PRIV_STR_SIZE,
-					"length=%u\noctets=%s\n",
-					ssid->length, ssid->octets);
+					"length=%u\noctets=%.*s\n",
+					ssid->length, ssid->length,
+					ssid->octets);
 		}
 		break;
 	case OID_TYPE_KEY:{
