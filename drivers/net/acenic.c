@@ -443,7 +443,6 @@ static char version[] __initdata =
   "acenic.c: v0.92 08/05/2002  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
-#ifdef SET_ETHTOOL_OPS
 static int ace_get_settings(struct net_device *, struct ethtool_cmd *);
 static int ace_set_settings(struct net_device *, struct ethtool_cmd *);
 static void ace_get_drvinfo(struct net_device *, struct ethtool_drvinfo *);
@@ -453,7 +452,6 @@ static struct ethtool_ops ace_ethtool_ops = {
 	.set_settings = ace_set_settings,
 	.get_drvinfo = ace_get_drvinfo,
 };
-#endif
 
 static int __devinit acenic_probe_one(struct pci_dev *pdev,
 		const struct pci_device_id *id)
@@ -492,9 +490,7 @@ static int __devinit acenic_probe_one(struct pci_dev *pdev,
 	dev->hard_start_xmit = &ace_start_xmit;
 	dev->get_stats = &ace_get_stats;
 	dev->set_multicast_list = &ace_set_multicast_list;
-#ifdef SET_ETHTOOL_OPS
 	SET_ETHTOOL_OPS(dev, &ace_ethtool_ops);
-#endif
 	dev->set_mac_address = &ace_set_mac_addr;
 	dev->change_mtu = &ace_change_mtu;
 
@@ -2702,7 +2698,6 @@ static int ace_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-#ifdef SET_ETHTOOL_OPS
 static int ace_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
 	struct ace_private *ap = dev->priv;
@@ -2833,7 +2828,6 @@ static void ace_get_drvinfo(struct net_device *dev,
 			sizeof(info->bus_info));
 
 }
-#endif
 
 /*
  * Set the hardware MAC address.
