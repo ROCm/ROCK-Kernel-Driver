@@ -803,10 +803,9 @@ static void cpia_pp_attach (struct parport *port)
 }
 
 static struct parport_driver cpia_pp_driver = {
-	"cpia_pp",
-	cpia_pp_attach,
-	cpia_pp_detach,
-	NULL
+	.name = "cpia_pp",
+	.attach = cpia_pp_attach,
+	.detach = cpia_pp_detach,
 };
 
 int cpia_pp_init(void)
@@ -853,11 +852,6 @@ int init_module(void)
 			}
 		}
 	}
-#if defined(CONFIG_KMOD) && defined(CONFIG_PNP_PARPORT_MODULE)
-	if(parport_enumerate() && !parport_enumerate()->probe_info.model) {
-		request_module("parport_probe");
-	}
-#endif
 	return cpia_pp_init();
 }
 
