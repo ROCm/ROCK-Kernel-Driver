@@ -440,9 +440,6 @@ static void shutdown_super(struct super_block *sb)
 	kdev_t dev = sb->s_dev;
 	struct block_device *bdev = sb->s_bdev;
 
-	/* Need to clean after the sucker */
-	if (fs->fs_flags & FS_LITTER && sb->s_root)
-		d_genocide(sb->s_root);
 	generic_shutdown_super(sb);
 	if (bdev) {
 		bd_release(bdev);
