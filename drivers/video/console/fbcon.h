@@ -29,14 +29,11 @@ struct display {
     /* Filled in by the low-level console driver */
     struct fb_info *fb_info;        /* frame buffer for this console */
     int vrows;                      /* number of virtual rows */
-    unsigned short cursor_x;        /* current cursor position */
-    unsigned short cursor_y;
     char fontname[40];              /* Font associated to this display */	
     u_char *fontdata;
     int userfont;                   /* != 0 if fontdata kmalloc()ed */
     u_short scrollmode;             /* Scroll Method */
     short yscroll;                  /* Hardware scrolling */
-    unsigned char fgshift, bgshift;
 };
 
 /* drivers/video/console/fbcon.c */
@@ -48,23 +45,23 @@ extern void set_con2fb_map(int unit, int newidx);
      */
 
 /* Color */
-#define attr_fgcol(p,s)    \
-	(((s) >> ((p)->fgshift)) & 0x0f)
-#define attr_bgcol(p,s)    \
-	(((s) >> ((p)->bgshift)) & 0x0f)
-#define	attr_bgcol_ec(p,conp) \
-	((conp) ? (((conp)->vc_video_erase_char >> ((p)->bgshift)) & 0x0f) : 0)
-#define attr_fgcol_ec(p,vc) \
-	((vc) ? (((vc)->vc_video_erase_char >> ((p)->fgshift)) & 0x0f) : 0)
+#define attr_fgcol(fgshift,s)    \
+	(((s) >> (fgshift)) & 0x0f)
+#define attr_bgcol(bgshift,s)    \
+	(((s) >> (bgshift)) & 0x0f)
+#define	attr_bgcol_ec(bgshift,vc) \
+	((vc) ? (((vc)->vc_video_erase_char >> (bgshift)) & 0x0f) : 0)
+#define attr_fgcol_ec(fgshift,vc) \
+	((vc) ? (((vc)->vc_video_erase_char >> (fgshift)) & 0x0f) : 0)
 
 /* Monochrome */
-#define attr_bold(p,s) \
+#define attr_bold(s) \
 	((s) & 0x200)
-#define attr_reverse(p,s) \
-	(((s) & 0x800) ^ ((p)->inverse ? 0x800 : 0))
-#define attr_underline(p,s) \
+#define attr_reverse(s, inverse) \
+	(((s) & 0x800) ^ (inverse ? 0x800 : 0))
+#define attr_underline(s) \
 	((s) & 0x400)
-#define attr_blink(p,s) \
+#define attr_blink(s) \
 	((s) & 0x8000)
 	
     /*

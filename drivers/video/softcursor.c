@@ -19,12 +19,11 @@
 
 int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	static u8 src[64];
-	struct fb_image image;
-	unsigned int i, size, s_pitch, d_pitch;
 	unsigned dsize = ((cursor->image.width + 7)/8) * cursor->image.height;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
+	unsigned int i, size, s_pitch, d_pitch;
+	static u8 src[64];
 	u8 *dst;
 			  
 	s_pitch = (cursor->image.width + 7)/8;
@@ -32,7 +31,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	size = d_pitch * cursor->image.height + buf_align;
 	size &= ~buf_align;
 	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
-	image.data = dst;
+	info->cursor.image.data = dst;
 
 	if (cursor->enable) {
 		switch (cursor->rop) {
@@ -58,15 +57,15 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 			  	 cursor->image.height);
 	}
 
-	image.bg_color = cursor->image.bg_color;
-	image.fg_color = cursor->image.fg_color;
-	image.dx = cursor->image.dx;
-	image.dy = cursor->image.dy;
-	image.width = cursor->image.width;
-	image.height = cursor->image.height;
-	image.depth = cursor->image.depth;
+	info->cursor.image.bg_color = cursor->image.bg_color;
+	info->cursor.image.fg_color = cursor->image.fg_color;
+	info->cursor.image.dx = cursor->image.dx;
+	info->cursor.image.dy = cursor->image.dy;
+	info->cursor.image.width = cursor->image.width;
+	info->cursor.image.height = cursor->image.height;
+	info->cursor.image.depth = cursor->image.depth;
 
-	info->fbops->fb_imageblit(info, &image);
+	info->fbops->fb_imageblit(info, &info->cursor.image);
 	return 0;
 }
 

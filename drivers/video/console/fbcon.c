@@ -132,7 +132,6 @@ static int fbcon_is_default = 1;
 
 static void fbcon_free_font(struct display *);
 static int fbcon_set_origin(struct vc_data *);
-static int cursor_drawn;
 
 #define CURSOR_DRAW_DELAY		(1)
 
@@ -144,14 +143,9 @@ static int cursor_drawn;
 #define DEFAULT_CURSOR_BLINK_RATE	(20)
 
 static int vbl_cursor_cnt;
-static int cursor_on;
 static int cursor_blink_rate;
-
-static inline void cursor_undrawn(void)
-{
-	vbl_cursor_cnt = 0;
-	cursor_drawn = 0;
-}
+static int cursor_drawn;
+static int cursor_on;
 
 #define divides(a, b)	((!(a) || (b)%(a)) ? 0 : 1)
 
@@ -184,7 +178,7 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines);
  */
 static void fbcon_set_display(struct vc_data *vc, int init, int logo);
 static __inline__ int real_y(struct display *p, int ypos);
-static void fbcon_vbl_handler(int irq, void *dummy, struct pt_regs *fp);
+static void fb_vbl_handler(int irq, void *dummy, struct pt_regs *fp);
 static __inline__ void updatescrollmode(struct display *p, struct vc_data *vc);
 static __inline__ void ywrap_up(struct display *p, struct vc_data *vc,
 				int count);
@@ -203,7 +197,7 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
  */
 static int vbl_detected;
 
-static void fbcon_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
+static void fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 {
 	vbl_detected++;
 }
@@ -216,7 +210,9 @@ static struct timer_list cursor_timer =
 
 static void cursor_timer_handler(unsigned long dev_addr)
 {
-	fbcon_vbl_handler(0, NULL, NULL);
+	struct fb_info *info = (struct fb_info *) dev_addr;
+	
+	fb_vbl_handler(0, info, NULL);
 	cursor_timer.expires = jiffies + HZ / 50;
 	add_timer(&cursor_timer);
 }
@@ -404,13 +400,13 @@ void accel_bmove(struct vc_data *vc, struct fb_info *info, int sy,
 	info->fbops->fb_copyarea(info, &area);
 }
 
-void accel_clear(struct vc_data *vc, struct display *p, int sy,
+void accel_clear(struct vc_data *vc, struct fb_info *info, int sy,
 			int sx, int height, int width)
 {
-	struct fb_info *info = p->fb_info;
+	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	struct fb_fillrect region;
 
-	region.color = attr_bgcol_ec(p, vc);
+	region.color = attr_bgcol_ec(bgshift, vc);
 	region.dx = sx * vc->vc_font.width;
 	region.dy = sy * vc->vc_font.height;
 	region.width = width * vc->vc_font.width;
@@ -424,11 +420,13 @@ static void accel_putc(struct vc_data *vc, struct display *p,
                       int c, int ypos, int xpos)
 {
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
-	struct fb_info *info = p->fb_info;
+	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
+	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
 	unsigned int width = (vc->vc_font.width + 7)/8;
-	unsigned int size, pitch;
+	struct fb_info *info = p->fb_info;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
+	unsigned int size, pitch;
 	struct fb_image image;
 	u8 *src, *dst;
 
@@ -436,8 +434,8 @@ static void accel_putc(struct vc_data *vc, struct display *p,
 	image.dy = ypos * vc->vc_font.height;
 	image.width = vc->vc_font.width;
 	image.height = vc->vc_font.height;
-	image.fg_color = attr_fgcol(p, c);
-	image.bg_color = attr_bgcol(p, c);
+	image.fg_color = attr_fgcol(fgshift, c);
+	image.bg_color = attr_bgcol(bgshift, c);
 	image.depth = 0;
 
 	pitch = width + scan_align;
@@ -459,12 +457,14 @@ static void accel_putc(struct vc_data *vc, struct display *p,
 void accel_putcs(struct vc_data *vc, struct display *p,
 			const unsigned short *s, int count, int yy, int xx)
 {
+	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
+	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
 	struct fb_info *info = p->fb_info;
 	struct fb_image image;
 	u16 c = scr_readw(s);
 
-	image.fg_color = attr_fgcol(p, c);
-	image.bg_color = attr_bgcol(p, c);
+	image.fg_color = attr_fgcol(fgshift, c);
+	image.bg_color = attr_bgcol(bgshift, c);
 	image.dx = xx * vc->vc_font.width;
 	image.dy = yy * vc->vc_font.height;
 	image.height = vc->vc_font.height;
@@ -479,6 +479,7 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 void accel_clear_margins(struct vc_data *vc, struct display *p,
 				int bottom_only)
 {
+	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	struct fb_info *info = p->fb_info;
 	unsigned int cw = vc->vc_font.width;
 	unsigned int ch = vc->vc_font.height;
@@ -488,7 +489,7 @@ void accel_clear_margins(struct vc_data *vc, struct display *p,
 	unsigned int bs = info->var.yres - bh;
 	struct fb_fillrect region;
 
-	region.color = attr_bgcol_ec(p, vc);
+	region.color = attr_bgcol_ec(bgshift, vc);
 	region.rop = ROP_COPY;
 
 	if (rw && !bottom_only) {
@@ -508,105 +509,6 @@ void accel_clear_margins(struct vc_data *vc, struct display *p,
 	}	
 }	
 
-void accel_cursor(struct vc_data *vc, struct display *p, int flags, int xx, int yy)
-{
-	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
-	static int fgcolor, bgcolor, shape, width, height;
-	static char mask[64], image[64], *dest;
-	struct fb_info *info = p->fb_info;
-	struct fb_cursor cursor;
-	char *font;
-	int c;
-
-	cursor.set = FB_CUR_SETPOS;
-	
-	if (width != vc->vc_font.width || height != vc->vc_font.height) {
-		width = vc->vc_font.width;
-		height = vc->vc_font.height;
-		cursor.set |= FB_CUR_SETSIZE;
-	}	
-
-	if ((vc->vc_cursor_type & 0x0f) != shape) {
-		shape = vc->vc_cursor_type & 0x0f;
-		cursor.set |= FB_CUR_SETSHAPE;
-	}
-
-	c = scr_readw((u16 *) vc->vc_pos);
-
-	if (fgcolor != (int) attr_fgcol(p, c) ||
-	    bgcolor != (int) attr_bgcol(p, c)) {
-		fgcolor = (int) attr_fgcol(p, c);
-		bgcolor = (int) attr_bgcol(p, c);
-		cursor.set |= FB_CUR_SETCMAP;
-	}
-	c &= charmask;
-	font = p->fontdata + (c * ((width + 7) / 8) * height);
-	if (font != dest) {
-		dest = font;
-		cursor.set |= FB_CUR_SETDEST;
-	}
-
-	if (flags & FB_CUR_SETCUR)
-		cursor.enable = 1;
-	else
-		cursor.enable = 0;
-
-	if (cursor.set & FB_CUR_SETSIZE) {
-		memset(image, 0xff, 64);
-		cursor.set |= FB_CUR_SETSHAPE;
-	}		
-
-	if (cursor.set & FB_CUR_SETSHAPE) {
-		int w, cur_height, size, i = 0;
-
-		w = (width + 7) / 8;
-
-		switch (shape) {
-			case CUR_NONE:
-				cur_height = 0;
-				break;
-			case CUR_UNDERLINE:
-				cur_height = (height < 10) ? 1 : 2;
-				break;
-			case CUR_LOWER_THIRD:
-				cur_height = height/3;
-				break;
-			case CUR_LOWER_HALF:
-				cur_height = height/2;
-				break;
-			case CUR_TWO_THIRDS:
-				cur_height = (height * 2)/3;
-				break;
-			case CUR_BLOCK:
-			default:
-				cur_height = height;
-				break;
-		}
-
-		size = (height - cur_height) * w;
-		while (size--)
-			mask[i++] = 0;
-		size = cur_height * w;
-		while (size--)
-			mask[i++] = 0xff;
-	}
-	
-	cursor.image.width = width;
-	cursor.image.height = height;
-	cursor.image.dx = xx * width;
-	cursor.image.dy = yy * height;
-	cursor.image.depth = 0;
-	cursor.image.data = image;
-	cursor.image.bg_color = bgcolor;
-	cursor.image.fg_color = fgcolor;
-	cursor.mask = mask;
-	cursor.dest = dest;
-	cursor.rop = ROP_XOR;
-
-	if (info->fbops->fb_cursor)
-		info->fbops->fb_cursor(info, &cursor);
-}
-	
 /*
  *  Low Level Operations
  */
@@ -693,17 +595,17 @@ static const char *fbcon_startup(void)
 #ifdef CONFIG_AMIGA
 	if (MACH_IS_AMIGA) {
 		cursor_blink_rate = AMIGA_CURSOR_BLINK_RATE;
-		irqres = request_irq(IRQ_AMIGA_VERTB, fbcon_vbl_handler, 0,
-				     "console/cursor", fbcon_vbl_handler);
+		irqres = request_irq(IRQ_AMIGA_VERTB, fb_vbl_handler, 0,
+				     "framebuffer vbl", info);
 	}
 #endif				/* CONFIG_AMIGA */
 #ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI) {
 		cursor_blink_rate = ATARI_CURSOR_BLINK_RATE;
 		irqres =
-		    request_irq(IRQ_AUTO_4, fbcon_vbl_handler,
-				IRQ_TYPE_PRIO, "console/cursor",
-				fbcon_vbl_handler);
+		    request_irq(IRQ_AUTO_4, fb_vbl_handler,
+				IRQ_TYPE_PRIO, "framebuffer vbl",
+				info);
 	}
 #endif				/* CONFIG_ATARI */
 
@@ -718,8 +620,8 @@ static const char *fbcon_startup(void)
 		/*
 		 * Probe for VBL: set temp. handler ...
 		 */
-		irqres = request_irq(IRQ_MAC_VBL, fbcon_vbl_detect, 0,
-				     "console/cursor", fbcon_vbl_detect);
+		irqres = request_irq(IRQ_MAC_VBL, fb_vbl_detect, 0,
+				     "framebuffer vbl", info);
 		vbl_detected = 0;
 
 		/*
@@ -732,7 +634,7 @@ static const char *fbcon_startup(void)
 			printk
 			    ("fbcon_startup: No VBL detected, using timer based cursor.\n");
 
-		free_irq(IRQ_MAC_VBL, fbcon_vbl_detect);
+		free_irq(IRQ_MAC_VBL, fb_vbl_detect);
 
 		if (vbl_detected) {
 			/*
@@ -740,9 +642,9 @@ static const char *fbcon_startup(void)
 			 */
 			cursor_blink_rate = MAC_CURSOR_BLINK_RATE;
 			irqres =
-			    request_irq(IRQ_MAC_VBL, fbcon_vbl_handler, 0,
-					"console/cursor",
-					fbcon_vbl_handler);
+			    request_irq(IRQ_MAC_VBL, fb_vbl_handler, 0,
+					"framebuffer vbl",
+					info);
 		} else {
 			/*
 			 * VBL not detected: fall through, use timer based cursor
@@ -754,13 +656,14 @@ static const char *fbcon_startup(void)
 
 #if defined(__arm__) && defined(IRQ_VSYNCPULSE)
 	cursor_blink_rate = ARM_CURSOR_BLINK_RATE;
-	irqres = request_irq(IRQ_VSYNCPULSE, fbcon_vbl_handler, SA_SHIRQ,
-			     "console/cursor", fbcon_vbl_handler);
+	irqres = request_irq(IRQ_VSYNCPULSE, fb_vbl_handler, SA_SHIRQ,
+			     "framebuffer vbl", info);
 #endif
 
 	if (irqres) {
 		cursor_blink_rate = DEFAULT_CURSOR_BLINK_RATE;
 		cursor_timer.expires = jiffies + HZ / 50;
+		cursor_timer.data = (unsigned long ) info;
 		add_timer(&cursor_timer);
 	}
 	return display_desc;
@@ -937,14 +840,10 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 	vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
 	if (charcnt == 256) {
 		vc->vc_hi_font_mask = 0;
-		p->fgshift = 8;
-		p->bgshift = 12;
 	} else {
 		vc->vc_hi_font_mask = 0x100;
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask <<= 1;
-		p->fgshift = 9;
-		p->bgshift = 13;
 	}
 
 	if (!init) {
@@ -1031,7 +930,6 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 	struct display *p = &fb_display[unit];
 	struct fb_info *info = p->fb_info;
 	u_int y_break;
-	int redraw_cursor = 0;
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
@@ -1039,25 +937,16 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 	if (!height || !width)
 		return;
 
-	if ((sy <= p->cursor_y) && (p->cursor_y < sy + height) &&
-	    (sx <= vc->vc_x) && (vc->vc_x < sx + width)) {
-		cursor_undrawn();
-		redraw_cursor = 1;
-	}
-
 	/* Split blits that cross physical y_wrap boundary */
 
 	y_break = p->vrows - p->yscroll;
 	if (sy < y_break && sy + height - 1 >= y_break) {
 		u_int b = y_break - sy;
-		accel_clear(vc, p, real_y(p, sy), sx, b, width);
-		accel_clear(vc, p, real_y(p, sy + b), sx, height - b,
+		accel_clear(vc, info, real_y(p, sy), sx, b, width);
+		accel_clear(vc, info, real_y(p, sy + b), sx, height - b,
 				 width);
 	} else
-		accel_clear(vc, p, real_y(p, sy), sx, height, width);
-
-	if (redraw_cursor)
-		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
+		accel_clear(vc, info, real_y(p, sy), sx, height, width);
 }
 
 
@@ -1065,7 +954,6 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 {
 	struct display *p = &fb_display[vc->vc_num];
 	struct fb_info *info = p->fb_info;
-	int redraw_cursor = 0;
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
@@ -1073,17 +961,8 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
 
-	if ((vc->vc_x == xpos) && (p->cursor_y == ypos)) {
-		cursor_undrawn();
-		redraw_cursor = 1;
-	}
-
 	accel_putc(vc, p, c, real_y(p, ypos), xpos);
-
-	if (redraw_cursor)
-		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 }
-
 
 static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 			int count, int ypos, int xpos)
@@ -1091,7 +970,6 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	int unit = vc->vc_num;
 	struct display *p = &fb_display[unit];
 	struct fb_info *info = p->fb_info;
-	int redraw_cursor = 0;
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
@@ -1099,16 +977,116 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	if (vt_cons[unit]->vc_mode != KD_TEXT)
 		return;
 
-	if ((p->cursor_y == ypos) && (xpos <= vc->vc_x) &&
-	    (vc->vc_x < (xpos + count))) {
-		cursor_undrawn();
-		redraw_cursor = 1;
-	}
 	accel_putcs(vc, p, s, count, real_y(p, ypos), xpos);
-	if (redraw_cursor)
-		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 }
 
+void accel_cursor(struct vc_data *vc, struct display *p, int flags, int xx, int yy)
+{
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
+	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
+	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
+	static char mask[64], image[64];
+	int fg_color, bg_color, height, width, c;
+	struct fb_info *info = p->fb_info;
+	struct fb_cursor cursor;
+	static int shape;
+	char *font, *dest;
+
+	cursor.set = FB_CUR_SETPOS;
+
+	fg_color = info->cursor.image.fg_color;
+	bg_color = info->cursor.image.bg_color;
+	height = info->cursor.image.height;
+	width = info->cursor.image.width;
+	dest = info->cursor.dest;
+	
+	if (width != vc->vc_font.width || 
+	    height != vc->vc_font.height) {
+		width = vc->vc_font.width;
+		height = vc->vc_font.height;
+		cursor.set |= FB_CUR_SETSIZE;
+	}	
+
+	if ((vc->vc_cursor_type & 0x0f) != shape) {
+		shape = vc->vc_cursor_type & 0x0f;
+		cursor.set |= FB_CUR_SETSHAPE;
+	}
+
+	c = scr_readw((u16 *) vc->vc_pos);
+
+	if (fg_color != attr_fgcol(fgshift, c) ||
+	    bg_color != attr_bgcol(bgshift, c)) {
+		fg_color = attr_fgcol(fgshift, c);
+		bg_color = attr_bgcol(bgshift, c);
+		cursor.set |= FB_CUR_SETCMAP;
+	}
+	c &= charmask;
+	font = p->fontdata + (c * ((width + 7) / 8) * height);
+	if (font != dest) {
+		dest = font;
+		cursor.set |= FB_CUR_SETDEST;
+	}
+
+	if (flags & FB_CUR_SETCUR)
+		cursor.enable = 1;
+	else
+		cursor.enable = 0;
+
+	if (cursor.set & FB_CUR_SETSIZE) {
+		memset(image, 0xff, 64);
+		cursor.set |= FB_CUR_SETSHAPE;
+	}		
+
+	if (cursor.set & FB_CUR_SETSHAPE) {
+		int w, cur_height, size, i = 0;
+
+		w = (width + 7) / 8;
+
+		switch (shape) {
+			case CUR_NONE:
+				cur_height = 0;
+				break;
+			case CUR_UNDERLINE:
+				cur_height = (height < 10) ? 1 : 2;
+				break;
+			case CUR_LOWER_THIRD:
+				cur_height = height/3;
+				break;
+			case CUR_LOWER_HALF:
+				cur_height = height/2;
+				break;
+			case CUR_TWO_THIRDS:
+				cur_height = (height * 2)/3;
+				break;
+			case CUR_BLOCK:
+			default:
+				cur_height = height;
+				break;
+		}
+
+		size = (height - cur_height) * w;
+		while (size--)
+			mask[i++] = 0;
+		size = cur_height * w;
+		while (size--)
+			mask[i++] = 0xff;
+	}
+
+	cursor.image.bg_color = bg_color;
+	cursor.image.fg_color = fg_color;
+	cursor.image.width = width;
+	cursor.image.height = height;
+	cursor.image.dx = xx * width;
+	cursor.image.dy = yy * height;
+	cursor.image.depth = 0;
+	cursor.image.data = image;
+	cursor.mask = mask;
+	cursor.dest = dest;
+	cursor.rop = ROP_XOR;
+
+	info->fbops->fb_cursor(info, &cursor);
+}
+	
 static void fbcon_cursor(struct vc_data *vc, int mode)
 {
 	struct display *p = &fb_display[vc->vc_num];
@@ -1126,54 +1104,49 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 		fbcon_set_origin(vc);
 
 	/* Avoid flickering if there's no real change. */
-	if (p->cursor_x == vc->vc_x && p->cursor_y == y &&
-	    (mode == CM_ERASE) == !cursor_on)
+	if ((mode == CM_ERASE) == !cursor_on)
 		return;
 
 	cursor_on = 0;
-	if (cursor_drawn)
-		accel_cursor(vc, p, 0, p->cursor_x,
-				  real_y(p, p->cursor_y));
-
-	p->cursor_x = vc->vc_x;
-	p->cursor_y = y;
 
 	switch (mode) {
 	case CM_ERASE:
+		if (cursor_drawn)
+			accel_cursor(vc, p, 0, vc->vc_x,
+				  	real_y(p, y));
 		cursor_drawn = 0;
 		break;
 	case CM_MOVE:
 	case CM_DRAW:
 		if (cursor_drawn)
 			accel_cursor(vc, p, FB_CUR_SETCUR, vc->vc_x,
-					  real_y(p, p->cursor_y));
+					  real_y(p, y));
 		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 		cursor_on = 1;
 		break;
 	}
 }
 
-static void fbcon_vbl_handler(int irq, void *dummy, struct pt_regs *fp)
+static void fb_vbl_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
-	struct display *p;
-
+	struct fb_info *info = dev_id;
+	struct display *p = &fb_display[fg_console];
+	struct vc_data *vc = vc_cons[fg_console].d;
+	
 	if (!cursor_on)
 		return;
 
 	if (vbl_cursor_cnt && --vbl_cursor_cnt == 0) {
-		int flag;
+		int flag = 0;
 
-		p = &fb_display[fg_console];
-		flag = 0;
 		if (!cursor_drawn)
 			flag = FB_CUR_SETCUR;
-		accel_cursor(vc_cons[fg_console].d, p, flag, p->cursor_x,
-				  real_y(p, p->cursor_y));
+		accel_cursor(vc, p, flag, vc->vc_x, real_y(p, vc->vc_y));
 		cursor_drawn ^= 1;
-		vbl_cursor_cnt = cursor_blink_rate;
+		vbl_cursor_cnt = cursor_blink_rate; 
 	}
-}
-
+}	
+	
 static int scrollback_phys_max = 0;
 static int scrollback_max = 0;
 static int scrollback_current = 0;
@@ -1182,7 +1155,6 @@ int update_var(int con, struct fb_info *info)
 {
 	if (con == info->currcon) 
 		return fb_pan_display(&info->var, info);
-
 	return 0;
 }
 
@@ -1484,7 +1456,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 		case __SCROLL_YMOVE:
 			accel_bmove(vc, info, t + count, 0, t, 0,
 					 b - t - count, vc->vc_cols);
-			accel_clear(vc, p, b - count, 0, count,
+			accel_clear(vc, info, b - count, 0, count,
 					 vc->vc_cols);
 			break;
 
@@ -1533,7 +1505,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 		      redraw_up:
 			fbcon_redraw(vc, p, t, b - t - count,
 				     count * vc->vc_cols);
-			accel_clear(vc, p, real_y(p, b - count), 0,
+			accel_clear(vc, info, real_y(p, b - count), 0,
 					 count, vc->vc_cols);
 			scr_memsetw((unsigned short *) (vc->vc_origin +
 							vc->vc_size_row *
@@ -1551,7 +1523,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 		case __SCROLL_YMOVE:
 			accel_bmove(vc, info, t, 0, t + count, 0,
 					 b - t - count, vc->vc_cols);
-			accel_clear(vc, p, t, 0, count, vc->vc_cols);
+			accel_clear(vc, info, t, 0, count, vc->vc_cols);
 			break;
 
 		case __SCROLL_YWRAP:
@@ -1598,7 +1570,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 		      redraw_down:
 			fbcon_redraw(vc, p, b - 1, b - t - count,
 				     -count * vc->vc_cols);
-			accel_clear(vc, p, real_y(p, t), 0, count,
+			accel_clear(vc, info, real_y(p, t), 0, count,
 					 vc->vc_cols);
 			scr_memsetw((unsigned short *) (vc->vc_origin +
 							vc->vc_size_row *
@@ -1624,12 +1596,6 @@ static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 
 	if (!width || !height)
 		return;
-
-	if (((sy <= p->cursor_y) && (p->cursor_y < sy + height) &&
-	     (sx <= vc->vc_x) && (vc->vc_x < sx + width)) ||
-	    ((dy <= p->cursor_y) && (p->cursor_y < dy + height) &&
-	     (dx <= vc->vc_x) && (vc->vc_x < dx + width)))
-		fbcon_cursor(vc, CM_ERASE | CM_SOFTBACK);
 
 	/*  Split blits that cross physical y_wrap case.
 	 *  Pathological case involves 4 blits, better to use recursive
@@ -1804,21 +1770,14 @@ static int fbcon_blank(struct vc_data *vc, int blank)
 			height = vc->vc_rows;
 			y_break = p->vrows - p->yscroll;
 			if (height > y_break) {
-				accel_clear(vc, p,
-						 real_y(p, 0), 0,
-						 y_break,
-						 vc->vc_cols);
-				accel_clear(vc, p,
-						 real_y(p,
-						y_break),
-						0,
-						 height - y_break,
-						 vc->vc_cols);
+				accel_clear(vc, info, real_y(p, 0),
+					    0, y_break, vc->vc_cols);
+				accel_clear(vc, info, real_y(p, y_break),
+					    0, height - y_break, 
+					    vc->vc_cols);
 			} else
-				accel_clear(vc, p,
-						 real_y(p, 0), 0,
-						 height,
-						 vc->vc_cols);
+				accel_clear(vc, info, real_y(p, 0),
+					    0, height, vc->vc_cols);
 			vc->vc_video_erase_char = oldc;
 		} else
 			update_screen(vc->vc_num);
@@ -1923,8 +1882,6 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		vc->vc_hi_font_mask = 0;
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask >>= 1;
-		p->fgshift--;
-		p->bgshift--;
 
 		/* ++Edmund: reorder the attribute bits */
 		if (vc->vc_can_do_color) {
@@ -1946,8 +1903,6 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		vc->vc_hi_font_mask = 0x100;
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask <<= 1;
-		p->fgshift++;
-		p->bgshift++;
 
 		/* ++Edmund: reorder the attribute bits */
 		{
