@@ -77,6 +77,14 @@ void __pollwait(struct file * filp, wait_queue_head_t * wait_address, poll_table
 {
 	struct poll_table_page *table = p->table;
 
+	if (!p->queue)
+		return;
+
+	if (p->qproc) {
+		p->qproc(p->priv, wait_address);
+		return;
+	}
+
 	if (!table || POLL_TABLE_FULL(table)) {
 		struct poll_table_page *new_table;
 
