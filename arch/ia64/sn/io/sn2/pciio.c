@@ -947,15 +947,6 @@ pciio_info_get(vertex_hdl_t pciio)
 
     pciio_info = (pciio_info_t) hwgraph_fastinfo_get(pciio);
 
-#ifdef DEBUG_PCIIO
-    {
-	int pos;
-	char dname[256];
-	pos = devfs_generate_path(pciio, dname, 256);
-	printk("%s : path= %s\n", __FUNCTION__, &dname[pos]);
-    }
-#endif /* DEBUG_PCIIO */
-
     if ((pciio_info != NULL) &&
         (pciio_info->c_fingerprint != pciio_info_fingerprint)
         && (pciio_info->c_fingerprint != NULL)) {
@@ -1212,14 +1203,6 @@ pciio_device_info_register(
 
     pciio_info->c_vertex = pconn;
     pciio_info_set(pconn, pciio_info);
-#ifdef DEBUG_PCIIO
-    {
-	int pos;
-	char dname[256];
-	pos = devfs_generate_path(pconn, dname, 256);
-	printk("%s : pconn path= %s \n", __FUNCTION__, &dname[pos]);
-    }
-#endif /* DEBUG_PCIIO */
 
     /*
      * create link to our pci provider

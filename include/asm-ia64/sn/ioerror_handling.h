@@ -10,7 +10,6 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/devfs_fs_kernel.h>
 #include <asm/sn/sgi.h>
 
 #if __KERNEL__
