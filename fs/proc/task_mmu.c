@@ -18,12 +18,14 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 		"VmData:\t%8lu kB\n"
 		"VmStk:\t%8lu kB\n"
 		"VmExe:\t%8lu kB\n"
-		"VmLib:\t%8lu kB\n",
+		"VmLib:\t%8lu kB\n"
+		"VmPTE:\t%8lu kB\n",
 		(mm->total_vm - mm->reserved_vm) << (PAGE_SHIFT-10),
 		mm->locked_vm << (PAGE_SHIFT-10),
 		mm->rss << (PAGE_SHIFT-10),
 		data << (PAGE_SHIFT-10),
-		mm->stack_vm << (PAGE_SHIFT-10), text, lib);
+		mm->stack_vm << (PAGE_SHIFT-10), text, lib,
+		(PTRS_PER_PTE*sizeof(pte_t)*mm->nr_ptes) >> 10);
 	return buffer;
 }
 
