@@ -2369,7 +2369,7 @@ static void __exit apm_exit(void)
 		 * (pm_idle), Wait for all processors to update cached/local
 		 * copies of pm_idle before proceeding.
 		 */
-		synchronize_kernel();
+		cpu_idle_wait();
 	}
 	if (((apm_info.bios.flags & APM_BIOS_DISENGAGED) == 0)
 	    && (apm_info.connection_version > 0x0100)) {
