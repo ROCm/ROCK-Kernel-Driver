@@ -166,6 +166,7 @@ svc_sock_enqueue(struct svc_sock *svsk)
 		goto out_unlock;
 	}
 
+	set_bit(SOCK_NOSPACE, &svsk->sk_sock->flags);
 	if (((svsk->sk_reserved + serv->sv_bufsz)*2
 	     > svc_sock_wspace(svsk))
 	    && !test_bit(SK_CLOSE, &svsk->sk_flags)
@@ -176,6 +177,7 @@ svc_sock_enqueue(struct svc_sock *svsk)
 			svc_sock_wspace(svsk));
 		goto out_unlock;
 	}
+	clear_bit(SOCK_NOSPACE, &svsk->sk_sock->flags);
 
 	/* Mark socket as busy. It will remain in this state until the
 	 * server has processed all pending data and put the socket back
