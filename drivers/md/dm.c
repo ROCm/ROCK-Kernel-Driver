@@ -647,7 +647,7 @@ static int specific_minor(unsigned int minor)
 {
 	int r, m;
 
-	if (minor > (1 << MINORBITS))
+	if (minor >= (1 << MINORBITS))
 		return -EINVAL;
 
 	down(&_minor_lock);
@@ -697,7 +697,7 @@ static int next_free_minor(unsigned int *minor)
 		goto out;
 	}
 
-	if (m > (1 << MINORBITS)) {
+	if (m >= (1 << MINORBITS)) {
 		idr_remove(&_minor_idr, m);
 		r = -ENOSPC;
 		goto out;
