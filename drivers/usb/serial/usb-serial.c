@@ -1238,7 +1238,6 @@ int usb_serial_probe(struct usb_interface *interface,
 		port->dev.bus = &usb_serial_bus_type;
 
 		snprintf (&port->dev.bus_id[0], sizeof(port->dev.bus_id), "ttyUSB%d", port->number);
-		snprintf (&port->dev.name[0], sizeof(port->dev.name), "usb serial port %d", port->number);
 		dbg ("%s - registering %s", __FUNCTION__, port->dev.bus_id);
 		device_register (&port->dev);
 	}

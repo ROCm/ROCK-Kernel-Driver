@@ -296,6 +296,7 @@ ohci_sa1111_start (struct usb_hcd *hcd)
 		ohci_stop (hcd);
 		return -EBUSY;
 	}
+	create_debug_files (ohci);
 
 #ifdef	DEBUG
 	ohci_dump (ohci, 1);
