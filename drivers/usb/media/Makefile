@@ -2,7 +2,7 @@
 # Makefile for USB Media drivers
 #
 
-O_TARGET	:= usb-media.o
+O_TARGET	:= media.o
 
 export-objs	:= ov511.o pwc-uncompress.o
 

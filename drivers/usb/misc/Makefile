@@ -3,7 +3,7 @@
 # (the ones that don't fit into any other categories)
 #
 
-O_TARGET	:= usb-misc.o
+O_TARGET	:= misc.o
 
 obj-$(CONFIG_USB_AUERSWALD)	+= auerswald.o
 obj-$(CONFIG_USB_EMI26)		+= emi26.o

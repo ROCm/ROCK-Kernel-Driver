@@ -2,7 +2,7 @@
 # Makefile for the USB serial device drivers.
 #
 
-O_TARGET	:= usb-serial.o
+O_TARGET	:= serial.o
 
 # Object file lists.
 
