@@ -515,6 +515,7 @@ static dev_link_t *nmclan_attach(void)
 
     lp->tx_free_frames=AM2150_MAX_TX_FRAMES;
 
+    SET_MODULE_OWNER(dev);
     dev->hard_start_xmit = &mace_start_xmit;
     dev->set_config = &mace_config;
     dev->get_stats = &mace_get_stats;
@@ -974,7 +975,6 @@ static int mace_open(struct net_device *dev)
     return -ENODEV;
 
   link->open++;
-  MOD_INC_USE_COUNT;
 
   MACEBANK(0);
 
@@ -1003,8 +1003,6 @@ static int mace_close(struct net_device *dev)
   netif_stop_queue(dev);
   if (link->state & DEV_STALE_CONFIG)
     mod_timer(&link->release, jiffies + HZ/20);
-
-  MOD_DEC_USE_COUNT;
 
   return 0;
 } /* mace_close */

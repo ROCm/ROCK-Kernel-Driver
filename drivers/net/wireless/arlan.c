@@ -113,7 +113,7 @@ static int arlans_found;
 static  int 	arlan_probe_here(struct net_device *dev, int ioaddr);
 static  int 	arlan_open(struct net_device *dev);
 static  int 	arlan_tx(struct sk_buff *skb, struct net_device *dev);
-static  void 	arlan_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static  irqreturn_t arlan_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static  int 	arlan_close(struct net_device *dev);
 static  struct net_device_stats *
 		arlan_statistics		(struct net_device *dev);
@@ -1840,7 +1840,7 @@ end_int_process:
 	return;
 }
 
-static void arlan_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t arlan_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct arlan_private *priv = (struct arlan_private *) dev->priv;
@@ -1859,7 +1859,7 @@ static void arlan_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	priv->irq_test_done = 1;
 
 	ARLAN_DEBUG_EXIT("arlan_interrupt");
-	return;
+	return IRQ_HANDLED;
 
 }
 
