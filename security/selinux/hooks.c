@@ -2468,65 +2468,21 @@ out:
 
 static int selinux_socket_connect(struct socket *sock, struct sockaddr *address, int addrlen)
 {
-	int err;
-	struct sock *sk = sock->sk;
-	struct avc_audit_data ad;
-	struct task_security_struct *tsec;
-	struct inode_security_struct *isec;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	tsec = current->security;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__CONNECT, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__CONNECT);
 }
 
 static int selinux_socket_listen(struct socket *sock, int backlog)
 {
-	int err;
-	struct task_security_struct *tsec;
-	struct inode_security_struct *isec;
-	struct avc_audit_data ad;
-
-	tsec = current->security;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sock->sk;
-
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__LISTEN, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__LISTEN);
 }
 
 static int selinux_socket_accept(struct socket *sock, struct socket *newsock)
 {
 	int err;
-	struct task_security_struct *tsec;
 	struct inode_security_struct *isec;
 	struct inode_security_struct *newisec;
-	struct avc_audit_data ad;
 
-	tsec = current->security;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sock->sk;
-
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__ACCEPT, &isec->avcr, &ad);
+	err = socket_has_perm(current, sock, SOCKET__ACCEPT);
 	if (err)
 		return err;
 
@@ -2535,6 +2491,7 @@ static int selinux_socket_accept(struct socket *sock, struct socket *newsock)
 		return err;
 	newisec = SOCK_INODE(newsock)->i_security;
 
+	isec = SOCK_INODE(sock)->i_security;
 	newisec->sclass = isec->sclass;
 	newisec->sid = isec->sid;
 
@@ -2544,87 +2501,23 @@ static int selinux_socket_accept(struct socket *sock, struct socket *newsock)
 static int selinux_socket_sendmsg(struct socket *sock, struct msghdr *msg,
  				  int size)
 {
-	struct task_security_struct *tsec;
-	struct inode_security_struct *isec;
-	struct avc_audit_data ad;
-	struct sock *sk;
-	int err;
-
-	isec = SOCK_INODE(sock)->i_security;
-
-	tsec = current->security;
-
-	sk = sock->sk;
-
-	AVC_AUDIT_DATA_INIT(&ad, NET);
-	ad.u.net.sk = sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__WRITE, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__WRITE);
 }
 
 static int selinux_socket_recvmsg(struct socket *sock, struct msghdr *msg,
 				  int size, int flags)
 {
-	struct inode_security_struct *isec;
-	struct task_security_struct *tsec;
-	struct avc_audit_data ad;
-	int err;
-
-	isec = SOCK_INODE(sock)->i_security;
-	tsec = current->security;
-
-	AVC_AUDIT_DATA_INIT(&ad,NET);
-	ad.u.net.sk = sock->sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__READ, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__READ);
 }
 
 static int selinux_socket_getsockname(struct socket *sock)
 {
-	struct inode_security_struct *isec;
-	struct task_security_struct *tsec;
-	struct avc_audit_data ad;
-	int err;
-
-	tsec = current->security;
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad,NET);
-	ad.u.net.sk = sock->sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__GETATTR, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__GETATTR);
 }
 
 static int selinux_socket_getpeername(struct socket *sock)
 {
-	struct inode_security_struct *isec;
-	struct task_security_struct *tsec;
-	struct avc_audit_data ad;
-	int err;
-
-	tsec = current->security;
-	isec = SOCK_INODE(sock)->i_security;
-
-	AVC_AUDIT_DATA_INIT(&ad,NET);
-	ad.u.net.sk = sock->sk;
-	err = avc_has_perm(tsec->sid, isec->sid, isec->sclass,
-			   SOCKET__GETATTR, &isec->avcr, &ad);
-	if (err)
-		return err;
-
-	return 0;
+	return socket_has_perm(current, sock, SOCKET__GETATTR);
 }
 
 static int selinux_socket_setsockopt(struct socket *sock,int level,int optname)
