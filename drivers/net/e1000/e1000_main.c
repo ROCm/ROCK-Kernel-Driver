@@ -2256,6 +2256,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 					       buffer_info->length,
 					       PCI_DMA_TODEVICE);
 
+				wmb();
+
 				buffer_info->dma = 0;
 			}
 
