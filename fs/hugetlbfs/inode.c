@@ -575,6 +575,16 @@ static int hugetlbfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	return 0;
 }
 
+static void hugetlbfs_put_super(struct super_block *sb)
+{
+	struct hugetlbfs_sb_info *sbi = HUGETLBFS_SB(sb);
+
+	if (sbi) {
+		sb->s_fs_info = NULL;
+		kfree(sbi);
+	}
+}
+
 static struct address_space_operations hugetlbfs_aops = {
 	.readpage	= hugetlbfs_readpage,
 	.prepare_write	= hugetlbfs_prepare_write,
@@ -608,6 +618,7 @@ static struct inode_operations hugetlbfs_inode_operations = {
 static struct super_operations hugetlbfs_ops = {
 	.statfs		= hugetlbfs_statfs,
 	.drop_inode	= hugetlbfs_drop_inode,
+	.put_super	= hugetlbfs_put_super,
 };
 
 static int
@@ -709,19 +720,10 @@ static struct super_block *hugetlbfs_get_sb(struct file_system_type *fs_type,
 	return get_sb_nodev(fs_type, flags, data, hugetlbfs_fill_super);
 }
 
-static void hugetlbfs_kill_super(struct super_block *sb)
-{
-	if (sb) {
-		if(sb->s_fs_info)
-			kfree(sb->s_fs_info);
-		kill_litter_super(sb);
-	}
-}
-
 static struct file_system_type hugetlbfs_fs_type = {
 	.name		= "hugetlbfs",
 	.get_sb		= hugetlbfs_get_sb,
-	.kill_sb	= hugetlbfs_kill_super
+	.kill_sb	= kill_litter_super,
 };
 
 static struct vfsmount *hugetlbfs_vfsmount;
