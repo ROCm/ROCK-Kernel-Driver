@@ -455,13 +455,9 @@ extern void scsi_exit_procfs(void);
 
 extern void scsi_proc_host_add(struct Scsi_Host *);
 extern void scsi_proc_host_rm(struct Scsi_Host *);
-
-extern struct proc_dir_entry *proc_scsi;
-extern void proc_print_scsidevice(Scsi_Device * sdev, char *buffer, int *size, int len);
 #else
 static inline int scsi_init_procfs(void) { return 0; }
 static inline void scsi_exit_procfs(void) { ; }
-static inline void proc_print_scsidevice(Scsi_Device * sdev, char *buffer, int *size, int len) { ; }
 
 static inline void scsi_proc_host_add(struct Scsi_Host *);
 static inline void scsi_proc_host_rm(struct Scsi_Host *);
