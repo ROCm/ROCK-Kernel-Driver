@@ -49,7 +49,7 @@ static void qe_set_multicast(struct net_device *dev);
 
 #define QEC_RESET_TRIES 200
 
-static inline int qec_global_reset(unsigned long gregs)
+static inline int qec_global_reset(void __iomem *gregs)
 {
 	int tries = QEC_RESET_TRIES;
 
@@ -73,8 +73,8 @@ static inline int qec_global_reset(unsigned long gregs)
 
 static inline int qe_stop(struct sunqe *qep)
 {
-	unsigned long cregs = qep->qcregs;
-	unsigned long mregs = qep->mregs;
+	void __iomem *cregs = qep->qcregs;
+	void __iomem *mregs = qep->mregs;
 	int tries;
 
 	/* Reset the MACE, then the QEC channel. */
@@ -130,9 +130,9 @@ static void qe_init_rings(struct sunqe *qep)
 static int qe_init(struct sunqe *qep, int from_irq)
 {
 	struct sunqec *qecp = qep->parent;
-	unsigned long cregs = qep->qcregs;
-	unsigned long mregs = qep->mregs;
-	unsigned long gregs = qecp->gregs;
+	void __iomem *cregs = qep->qcregs;
+	void __iomem *mregs = qep->mregs;
+	void __iomem *gregs = qecp->gregs;
 	unsigned char *e = &qep->dev->dev_addr[0];
 	u32 tmp;
 	int i;
@@ -699,7 +699,7 @@ static void qe_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 static u32 qe_get_link(struct net_device *dev)
 {
 	struct sunqe *qep = dev->priv;
-	unsigned long mregs = qep->mregs;
+	void __iomem *mregs = qep->mregs;
 	u8 phyconfig;
 
 	spin_lock_irq(&qep->lock);
