@@ -93,9 +93,12 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x06bd, 0x2097) }, /* SnapScan e26 */
 	{ USB_DEVICE(0x06bd, 0x208d) }, /* Snapscan e40 */
 	/* Canon */
-	{ USB_DEVICE(0x04a9, 0x2202) }, /* FB620U */
+	{ USB_DEVICE(0x04a9, 0x2202) }, /* CanoScan FB620U */
+	{ USB_DEVICE(0x04a9, 0x2204) }, /* CanoScan FB630U/FB636U */
+	{ USB_DEVICE(0x04a9, 0x2206) }, /* CanoScan N650U/N656U */
+	{ USB_DEVICE(0x04a9, 0x2207) }, /* CanoScan N1220U */
+	{ USB_DEVICE(0x04a9, 0x2208) }, /* CanoScan D660U */ 
 	{ USB_DEVICE(0x04a9, 0x220b) }, /* D646U */
-	{ USB_DEVICE(0x04a9, 0x2207) }, /* 1220U */
 	/* Colorado -- See Primax/Colorado below */
 	/* Epson -- See Seiko/Epson below */
 	/* Genius */
