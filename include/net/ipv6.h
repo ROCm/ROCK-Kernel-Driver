@@ -299,7 +299,8 @@ extern int			ipv6_rcv(struct sk_buff *skb,
 extern int			ip6_xmit(struct sock *sk,
 					 struct sk_buff *skb,
 					 struct flowi *fl,
-					 struct ipv6_txoptions *opt);
+					 struct ipv6_txoptions *opt,
+					 int ipfragok);
 
 extern int			ip6_nd_hdr(struct sock *sk,
 					   struct sk_buff *skb,

@@ -196,7 +196,7 @@ static inline int ip6_maybe_reroute(struct sk_buff *skb)
  */
 
 int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
-	     struct ipv6_txoptions *opt)
+	     struct ipv6_txoptions *opt, int ipfragok)
 {
 	struct ipv6_pinfo *np = sk ? inet6_sk(sk) : NULL;
 	struct in6_addr *first_hop = &fl->fl6_dst;
@@ -258,13 +258,14 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	ipv6_addr_copy(&hdr->daddr, first_hop);
 
 	mtu = dst_pmtu(dst);
-	if (skb->len <= mtu) {
+	if ((skb->len <= mtu) || ipfragok) {
 		IP6_INC_STATS(Ip6OutRequests);
 		return NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, ip6_maybe_reroute);
 	}
 
 	if (net_ratelimit())
 		printk(KERN_DEBUG "IPv6: sending pkt_too_big to self\n");
+	skb->dev = dst->dev;
 	icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
 	kfree_skb(skb);
 	return -EMSGSIZE;
