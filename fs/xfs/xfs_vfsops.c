@@ -532,11 +532,8 @@ xfs_unmount(
 	rvp = XFS_ITOV(rip);
 
 	if (vfsp->vfs_flag & VFS_DMI) {
-		bhv_desc_t	*rbdp;
-
-		rbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rvp), &xfs_vnodeops);
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_PREUNMOUNT,
-				rbdp, DM_RIGHT_NULL, rbdp, DM_RIGHT_NULL,
+				rvp, DM_RIGHT_NULL, rvp, DM_RIGHT_NULL,
 				NULL, NULL, 0, 0,
 				(mp->m_dmevmask & (1<<DM_EVENT_PREUNMOUNT))?
 					0:DM_FLAGS_UNWANTED);

@@ -693,8 +693,8 @@ retry:
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) && !invisible) {
 
 		xfs_rwunlock(bdp, locktype);
-		error = XFS_SEND_NAMESP(xip->i_mount, DM_EVENT_NOSPACE, bdp,
-				DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
+		error = XFS_SEND_NAMESP(xip->i_mount, DM_EVENT_NOSPACE, vp,
+				DM_RIGHT_NULL, vp, DM_RIGHT_NULL, NULL, NULL,
 				0, 0, 0); /* Delay flag intentionally  unused */
 		if (error)
 			return -error;

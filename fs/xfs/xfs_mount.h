@@ -95,8 +95,8 @@ typedef int	(*xfs_send_data_t)(int, struct bhv_desc *,
 			xfs_off_t, size_t, int, vrwlock_t *);
 typedef int	(*xfs_send_mmap_t)(struct vm_area_struct *, uint);
 typedef int	(*xfs_send_destroy_t)(struct bhv_desc *, dm_right_t);
-typedef int	(*xfs_send_namesp_t)(dm_eventtype_t, struct bhv_desc *,
-			dm_right_t, struct bhv_desc *, dm_right_t,
+typedef int	(*xfs_send_namesp_t)(dm_eventtype_t, struct vnode *,
+			dm_right_t, struct vnode *, dm_right_t,
 			char *, char *, mode_t, int, int);
 typedef void	(*xfs_send_unmount_t)(struct vfs *, struct vnode *,
 			dm_right_t, mode_t, int, int);
