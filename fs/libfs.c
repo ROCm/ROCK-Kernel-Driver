@@ -32,7 +32,7 @@ int simple_sync_file(struct file * file, struct dentry *dentry, int datasync)
  
 int dcache_dir_open(struct inode *inode, struct file *file)
 {
-	static struct qstr cursor_name = {len:1, name:"."};
+	static struct qstr cursor_name = {.len = 1, .name = "."};
 
 	file->private_data = d_alloc(file->f_dentry, &cursor_name);
 
@@ -151,15 +151,15 @@ ssize_t generic_read_dir(struct file *filp, char *buf, size_t siz, loff_t *ppos)
 }
 
 struct file_operations simple_dir_operations = {
-	open:		dcache_dir_open,
-	release:	dcache_dir_close,
-	llseek:		dcache_dir_lseek,
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
+	.open		= dcache_dir_open,
+	.release	= dcache_dir_close,
+	.llseek		= dcache_dir_lseek,
+	.read		= generic_read_dir,
+	.readdir	= dcache_readdir,
 };
 
 struct inode_operations simple_dir_inode_operations = {
-	lookup:		simple_lookup,
+	.lookup		= simple_lookup,
 };
 
 /*
@@ -171,10 +171,10 @@ get_sb_pseudo(struct file_system_type *fs_type, char *name,
 	struct super_operations *ops, unsigned long magic)
 {
 	struct super_block *s = sget(fs_type, NULL, set_anon_super, NULL);
-	static struct super_operations default_ops = {statfs: simple_statfs};
+	static struct super_operations default_ops = {.statfs = simple_statfs};
 	struct dentry *dentry;
 	struct inode *root;
-	struct qstr d_name = {name:name, len:strlen(name)};
+	struct qstr d_name = {.name = name, .len = strlen(name)};
 
 	if (IS_ERR(s))
 		return s;

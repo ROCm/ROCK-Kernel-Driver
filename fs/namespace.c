@@ -239,10 +239,10 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 }
 
 struct seq_operations mounts_op = {
-	start:	m_start,
-	next:	m_next,
-	stop:	m_stop,
-	show:	show_vfsmnt
+	.start	= m_start,
+	.next	= m_next,
+	.stop	= m_stop,
+	.show	= show_vfsmnt
 };
 
 /*

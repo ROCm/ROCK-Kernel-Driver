@@ -1211,13 +1211,13 @@ warn_put_all:
  * Definitions of diskquota operations.
  */
 struct dquot_operations dquot_operations = {
-	initialize:	dquot_initialize,		/* mandatory */
-	drop:		dquot_drop,			/* mandatory */
-	alloc_space:	dquot_alloc_space,
-	alloc_inode:	dquot_alloc_inode,
-	free_space:	dquot_free_space,
-	free_inode:	dquot_free_inode,
-	transfer:	dquot_transfer
+	.initialize	= dquot_initialize,		/* mandatory */
+	.drop		= dquot_drop,			/* mandatory */
+	.alloc_space	= dquot_alloc_space,
+	.alloc_inode	= dquot_alloc_inode,
+	.free_space	= dquot_free_space,
+	.free_inode	= dquot_free_inode,
+	.transfer	= dquot_transfer
 };
 
 static inline void set_enable_flags(struct quota_info *dqopt, int type)
@@ -1471,13 +1471,13 @@ int vfs_set_dqinfo(struct super_block *sb, int type, struct if_dqinfo *ii)
 }
 
 struct quotactl_ops vfs_quotactl_ops = {
-	quota_on:	vfs_quota_on,
-	quota_off:	vfs_quota_off,
-	quota_sync:	vfs_quota_sync,
-	get_info:	vfs_get_dqinfo,
-	set_info:	vfs_set_dqinfo,
-	get_dqblk:	vfs_get_dqblk,
-	set_dqblk:	vfs_set_dqblk
+	.quota_on	= vfs_quota_on,
+	.quota_off	= vfs_quota_off,
+	.quota_sync	= vfs_quota_sync,
+	.get_info	= vfs_get_dqinfo,
+	.set_info	= vfs_set_dqinfo,
+	.get_dqblk	= vfs_get_dqblk,
+	.set_dqblk	= vfs_set_dqblk
 };
 
 static ctl_table fs_dqstats_table[] = {

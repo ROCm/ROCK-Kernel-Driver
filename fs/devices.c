@@ -168,7 +168,7 @@ int chrdev_open(struct inode * inode, struct file * filp)
  * depending on the special file...
  */
 static struct file_operations def_chr_fops = {
-	open:		chrdev_open,
+	.open		= chrdev_open,
 };
 
 /*
@@ -199,7 +199,7 @@ static int sock_no_open(struct inode *irrelevant, struct file *dontcare)
 }
 
 static struct file_operations bad_sock_fops = {
-	open:		sock_no_open
+	.open		= sock_no_open
 };
 
 void init_special_inode(struct inode *inode, umode_t mode, int rdev)
