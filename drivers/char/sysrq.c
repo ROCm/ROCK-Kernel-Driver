@@ -28,6 +28,7 @@
 #include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
+#include <linux/buffer_head.h>		/* for fsync_bdev()/wakeup_bdflush() */
 
 #include <linux/spinlock.h>
 

@@ -36,6 +36,7 @@
 #include <linux/genhd.h>
 #include <linux/module.h>               /* for EXPORT_SYMBOL */
 #include <linux/backing-dev.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 
