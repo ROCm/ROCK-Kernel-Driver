@@ -45,7 +45,7 @@ masquerade_check(const char *tablename,
 	const struct ip_nat_multi_range *mr = targinfo;
 
 	if (strcmp(tablename, "nat") != 0) {
-		DEBUGP("masquerade_check: bad table `%s'.\n", table);
+		DEBUGP("masquerade_check: bad table `%s'.\n", tablename);
 		return 0;
 	}
 	if (targinfosize != IPT_ALIGN(sizeof(*mr))) {
