@@ -255,6 +255,7 @@ static void free_huge_page(struct page *page)
 	BUG_ON(page->mapping);
 
 	INIT_LIST_HEAD(&page->list);
+	page[1].mapping = NULL;
 
 	spin_lock(&htlbpage_lock);
 	enqueue_huge_page(page);

@@ -11,6 +11,7 @@
 #include <linux/pagemap.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
+#include <linux/hugetlb.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -106,6 +107,13 @@ static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 
 	dir = pgd_offset(vma->vm_mm, address);
 	flush_cache_range(vma, address, end);
+
+	/* For hugepages we can't go walking the page table normally,
+	 * but that's ok, hugetlbfs is memory based, so we don't need
+	 * to do anything more on an msync() */
+	if (is_vm_hugetlb_page(vma))
+		goto out;
+
 	if (address >= end)
 		BUG();
 	do {
@@ -118,7 +126,7 @@ static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 	 * dirty bits.
 	 */
 	flush_tlb_range(vma, end - size, end);
-
+ out:
 	spin_unlock(&vma->vm_mm->page_table_lock);
 
 	return error;
