@@ -551,31 +551,6 @@ CONFIG_MAGIC_SYSRQ
   keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
   unless you really know what this hack does.
 
-CONFIG_ISDN
-  ISDN ("Integrated Services Digital Networks", called RNIS in France)
-  is a special type of fully digital telephone service; it's mostly
-  used to connect to your Internet service provider (with SLIP or
-  PPP).  The main advantage is that the speed is higher than ordinary
-  modem/telephone connections, and that you can have voice
-  conversations while downloading stuff.  It only works if your
-  computer is equipped with an ISDN card and both you and your service
-  provider purchased an ISDN line from the phone company.  For
-  details, read <http://alumni.caltech.edu/~dank/isdn/> on the WWW.
-
-  This driver allows you to use an ISDN-card for networking
-  connections and as dialin/out device.  The isdn-tty's have a built
-  in AT-compatible modem emulator.  Network devices support autodial,
-  channel-bundling, callback and caller-authentication without having
-  a daemon running.  A reduced T.70 protocol is supported with tty's
-  suitable for German BTX.  On D-Channel, the protocols EDSS1
-  (Euro-ISDN) and 1TR6 (German style) are supported.  See
-  <file:Documentation/isdn/README> for more information.
-
-  If you want to compile the ISDN code as a module ( = code which can
-  be inserted in and removed from the running kernel whenever you
-  want), say M here and read <file:Documentation/modules.txt>.  The
-  module will be called isdn.o. If unsure, say N.
-
 CONFIG_PROC_HARDWARE
   Say Y here to support the /proc/hardware file, which gives you
   access to information about the machine you're running on,
