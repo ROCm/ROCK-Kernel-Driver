@@ -48,9 +48,6 @@
 # define RPCDBG_FACILITY	RPCDBG_AUTH
 #endif
 
-struct xdr_netobj gss_mech_krb5_oid =
-   {9, "\052\206\110\206\367\022\001\002\002"};
-
 static inline int
 get_bytes(char **ptr, const char *end, void *res, int len)
 {
