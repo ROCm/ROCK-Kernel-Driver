@@ -268,10 +268,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	/*
 	 * Initialize blocksize to 4K.
 	 */
-	sb->s_blocksize = PSIZE;
-	sb->s_blocksize_bits = L2PSIZE;
-	set_blocksize(sb->s_dev, PSIZE);
-
+	sb_set_blocksize(sb, PSIZE);
 	sb->s_op = &jfs_sops;
 	/*
 	 * Initialize direct-mapping inode/address-space
