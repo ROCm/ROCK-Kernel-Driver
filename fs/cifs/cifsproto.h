@@ -75,7 +75,6 @@ extern int cifs_get_inode_info_unix(struct inode **pinode,
 			const unsigned char *search_path,
 			struct super_block *sb);
 
-extern int reopen_files(struct cifsTconInfo *, struct nls_table *);
 extern int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, 
 			struct nls_table * nls_info);
 extern int CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses);

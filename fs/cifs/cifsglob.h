@@ -211,7 +211,6 @@ struct cifsFileInfo {
 	struct inode * pInode; /* needed for oplock break */
 	int endOfSearch:1;	/* we have reached end of search */
 	int closePend:1;	/* file is marked to close */
-	int reopenPend:1;   /* reopen of file in progress */
 	int emptyDir:1;
 	int invalidHandle:1;  /* file closed via session abend */
 	char * search_resume_name;

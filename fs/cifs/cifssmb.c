@@ -41,10 +41,29 @@ static struct {
 	int index;
 	char *name;
 } protocols[] = {
-	{
-	CIFS_PROT, "\2NT LM 0.12"}, {
-	BAD_PROT, "\2"}
+	{CIFS_PROT, "\2NT LM 0.12"}, 
+	{BAD_PROT, "\2"}
 };
+
+
+/* Mark as invalid, all open files on tree connections since they
+   were closed when session to server was lost */
+void mark_open_files_invalid(struct cifsTconInfo * pTcon)
+{
+	struct cifsFileInfo *open_file = NULL;
+	struct list_head * tmp;
+	struct list_head * tmp1;
+
+/* list all files open on tree connection and mark them invalid */
+	write_lock(&GlobalSMBSeslock);
+	list_for_each_safe(tmp, tmp1, &pTcon->openFileList) {
+		open_file = list_entry(tmp,struct cifsFileInfo, tlist);
+		if(open_file) {
+			open_file->invalidHandle = TRUE;
+		}
+	}
+	write_unlock(&GlobalSMBSeslock);
+}
 
 int
 smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
@@ -75,15 +94,14 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 			if(tcon->ses->status == CifsNeedReconnect)
 				rc = setup_session(0, tcon->ses, nls_codepage);
 			if(!rc && (tcon->tidStatus == CifsNeedReconnect)) {
+				mark_open_files_invalid(tcon);
 				rc = CIFSTCon(0, tcon->ses, tcon->treeName, tcon,
 					nls_codepage);
 				up(&tcon->ses->sesSem);
 				cFYI(1, ("reconnect tcon rc = %d", rc));
-				/* Remove call to reopen files here - 
-					it is safer (and faster) to reopen
-					files as needed in read and write */
-				/* if(!rc)
-					reopen_files(tcon,nls_codepage);*/
+				/* Removed call to reopen open files here - 
+					it is safer (and faster) to reopen files
+					one at a time as needed in read and write */
 			} else {
 				up(&tcon->ses->sesSem);
 			}
