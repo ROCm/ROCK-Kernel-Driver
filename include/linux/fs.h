@@ -743,9 +743,9 @@ struct inode_operations {
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
-	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
-	ssize_t (*listxattr) (struct dentry *, char *, size_t);
-	int (*removexattr) (struct dentry *, const char *);
+	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t,int);
+	ssize_t (*listxattr) (struct dentry *, char *, size_t, int);
+	int (*removexattr) (struct dentry *, const char *, int);
 };
 
 struct seq_file;
@@ -1195,6 +1195,8 @@ extern int generic_file_readonly_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
+int generic_write_checks(struct inode *inode, struct file *file,
+			loff_t *pos, size_t *count, int isblk);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern ssize_t generic_file_aio_read(struct kiocb *, char *, size_t, loff_t);
 extern ssize_t generic_file_aio_write(struct kiocb *, const char *, size_t, loff_t);

@@ -631,7 +631,7 @@ hub_provider_shutdown(devfs_handle_t hub)
 }
 
 /*
- * Check that an address is in teh real small window widget 0 space
+ * Check that an address is in the real small window widget 0 space
  * or else in the big window we're using to emulate small window 0
  * in the kernel.
  */
@@ -708,7 +708,7 @@ hub_check_pci_equiv(void *addra, void *addrb)
 /*
  * hub_setup_prb(nasid, prbnum, credits, conveyor)
  *
- * 	Put a PRB into fire-and-forget mode if conveyor isn't set.  Otehrwise,
+ * 	Put a PRB into fire-and-forget mode if conveyor isn't set.  Otherwise,
  * 	put it into conveyor belt mode with the specified number of credits.
  */
 void

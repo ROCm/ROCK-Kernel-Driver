@@ -723,7 +723,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_removexattr
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
-	.llong .sys_futex
+	.llong .compat_sys_futex
 	.llong .sys32_sched_setaffinity
 	.llong .sys32_sched_getaffinity
 	.llong .sys_ni_syscall

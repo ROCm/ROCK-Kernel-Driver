@@ -164,17 +164,19 @@ int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, u64 start)
         return retval;
 }
 
-void hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
+int hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                          unsigned int channel)
 {
         if (channel > 63) {
                 HPSB_ERR("%s called with invalid channel", __FUNCTION__);
-                return;
+                return -EINVAL;
         }
 
         if (host->iso_listen_count[channel]++ == 0) {
-                host->driver->devctl(host, ISO_LISTEN_CHANNEL, channel);
+                return host->driver->devctl(host, ISO_LISTEN_CHANNEL, channel);
         }
+
+	return 0;
 }
 
 void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host, 

@@ -150,8 +150,8 @@ int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, u64 start);
  * Enable or disable receving a certain isochronous channel through the
  * iso_receive op.
  */
-void hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host, 
-                         unsigned int channel);
+int hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host, 
+			unsigned int channel);
 void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                            unsigned int channel);
 

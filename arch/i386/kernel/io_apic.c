@@ -668,7 +668,9 @@ static int __init find_isa_irq_pin(int irq, int type)
 
 		if ((mp_bus_id_to_type[lbus] == MP_BUS_ISA ||
 		     mp_bus_id_to_type[lbus] == MP_BUS_EISA ||
-		     mp_bus_id_to_type[lbus] == MP_BUS_MCA) &&
+		     mp_bus_id_to_type[lbus] == MP_BUS_MCA ||
+		     mp_bus_id_to_type[lbus] == MP_BUS_NEC98
+		    ) &&
 		    (mp_irqs[i].mpc_irqtype == type) &&
 		    (mp_irqs[i].mpc_srcbusirq == irq))
 
@@ -762,6 +764,12 @@ static int __init EISA_ELCR(unsigned int irq)
 #define default_MCA_trigger(idx)	(1)
 #define default_MCA_polarity(idx)	(0)
 
+/* NEC98 interrupts are always polarity zero edge triggered,
+ * when listed as conforming in the MP table. */
+
+#define default_NEC98_trigger(idx)     (0)
+#define default_NEC98_polarity(idx)    (0)
+
 static int __init MPBIOS_polarity(int idx)
 {
 	int bus = mp_irqs[idx].mpc_srcbus;
@@ -794,6 +802,11 @@ static int __init MPBIOS_polarity(int idx)
 				case MP_BUS_MCA: /* MCA pin */
 				{
 					polarity = default_MCA_polarity(idx);
+					break;
+				}
+				case MP_BUS_NEC98: /* NEC 98 pin */
+				{
+					polarity = default_NEC98_polarity(idx);
 					break;
 				}
 				default:
@@ -865,6 +878,11 @@ static int __init MPBIOS_trigger(int idx)
 					trigger = default_MCA_trigger(idx);
 					break;
 				}
+				case MP_BUS_NEC98: /* NEC 98 pin */
+				{
+					trigger = default_NEC98_trigger(idx);
+					break;
+				}
 				default:
 				{
 					printk(KERN_WARNING "broken BIOS!!\n");
@@ -926,6 +944,7 @@ static int pin_2_irq(int idx, int apic, int pin)
 		case MP_BUS_ISA: /* ISA pin */
 		case MP_BUS_EISA:
 		case MP_BUS_MCA:
+		case MP_BUS_NEC98:
 		{
 			irq = mp_irqs[idx].mpc_srcbusirq;
 			break;
@@ -1133,8 +1152,9 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 
 void __init UNEXPECTED_IO_APIC(void)
 {
-	printk(KERN_WARNING " WARNING: unexpected IO-APIC, please mail\n");
-	printk(KERN_WARNING "          to linux-smp@vger.kernel.org\n");
+	printk(KERN_WARNING "INFO: unexpected IO-APIC, please file a report at\n");
+	printk(KERN_WARNING "      http://bugzilla.kernel.org\n");
+	printk(KERN_WARNING "      if your kernel is less than 3 months old.\n");
 }
 
 void __init print_IO_APIC(void)

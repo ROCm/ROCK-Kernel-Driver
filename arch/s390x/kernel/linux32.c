@@ -4049,28 +4049,6 @@ asmlinkage int sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
 	return ret;
 }
 
-asmlinkage int 
-sys_futex(void *uaddr, int op, int val, struct timespec *utime);
-
-asmlinkage int
-sys32_futex(void *uaddr, int op, int val, 
-		 struct compat_timespec *timeout32)
-{
-	struct timespec tmp;
-	mm_segment_t old_fs;
-	int ret;
-
-	if (timeout32 && get_compat_timespec(&tmp, timeout32))
-		return -EINVAL;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_futex(uaddr, op, val, timeout32 ? &tmp : NULL);
-	set_fs(old_fs);
-
-	return ret;
-}
-
 asmlinkage ssize_t sys_read(unsigned int fd, char * buf, size_t count);
 
 asmlinkage compat_ssize_t sys32_read(unsigned int fd, char * buf, size_t count)

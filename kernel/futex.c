@@ -315,23 +315,6 @@ out:
 	return ret;
 }
 
-static inline int futex_wait_utime(unsigned long uaddr,
-		      int offset,
-		      int val,
-		      struct timespec* utime)
-{
-	unsigned long time = MAX_SCHEDULE_TIMEOUT;
-
-	if (utime) {
-		struct timespec t;
-		if (copy_from_user(&t, utime, sizeof(t)) != 0)
-			return -EFAULT;
-		time = timespec_to_jiffies(&t) + 1;
-	}
-
-	return futex_wait(uaddr, offset, val, time);
-}
-
 static int futex_close(struct inode *inode, struct file *filp)
 {
 	struct futex_q *q = filp->private_data;
@@ -437,7 +420,7 @@ out:
 	return ret;
 }
 
-asmlinkage int sys_futex(unsigned long uaddr, int op, int val, struct timespec *utime)
+long do_futex(unsigned long uaddr, int op, int val, unsinged long timeout)
 {
 	unsigned long pos_in_page;
 	int ret;
@@ -445,12 +428,12 @@ asmlinkage int sys_futex(unsigned long uaddr, int op, int val, struct timespec *
 	pos_in_page = uaddr % PAGE_SIZE;
 
 	/* Must be "naturally" aligned */
-	if (pos_in_page % sizeof(int))
+	if (pos_in_page % sizeof(u32))
 		return -EINVAL;
 
 	switch (op) {
 	case FUTEX_WAIT:
-		ret = futex_wait_utime(uaddr, pos_in_page, val, utime);
+		ret = futex_wait(uaddr, pos_in_page, val, timeout);
 		break;
 	case FUTEX_WAKE:
 		ret = futex_wake(uaddr, pos_in_page, val);
@@ -463,6 +446,20 @@ asmlinkage int sys_futex(unsigned long uaddr, int op, int val, struct timespec *
 		ret = -EINVAL;
 	}
 	return ret;
+}
+
+asmlinkage long sys_futex(u32 *uaddr, int op, int val, struct timespec *utime)
+{
+	struct timespec t;
+	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
+
+
+	if ((op == FUTEX_WAIT) && utime) {
+		if (copy_from_user(&t, utime, sizeof(t)) != 0)
+			return -EFAULT;
+		timeout = timespec_to_jiffies(t) + 1;
+	}
+	return do_futex((unsigned long)uaddr, op, val, timeout);
 }
 
 static struct super_block *

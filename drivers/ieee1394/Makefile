@@ -18,6 +18,8 @@ obj-$(CONFIG_IEEE1394_CMP) += cmp.o
 
 clean-files := oui.c
 
+ieee1394.o: $(ieee1394-objs)
+	$(LD) $(LDFLAGS) -r -o $@ $(ieee1394-objs)
 
 ifeq ($(obj),)
 obj = .

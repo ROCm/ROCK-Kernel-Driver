@@ -109,6 +109,7 @@ struct dma_rcv_ctx {
 	int ctrlClear;
 	int ctrlSet;
 	int cmdPtr;
+	int ctxtMatch;
 };
 
 /* DMA transmit context */	
@@ -145,7 +146,8 @@ struct ohci1394_iso_tasklet {
 	struct tasklet_struct tasklet;
 	struct list_head link;
 	int context;
-	enum { OHCI_ISO_TRANSMIT, OHCI_ISO_RECEIVE } type;
+	enum { OHCI_ISO_TRANSMIT, OHCI_ISO_RECEIVE,
+	       OHCI_ISO_MULTICHANNEL_RECEIVE } type;
 };
 
 struct ti_ohci {
@@ -170,7 +172,7 @@ struct ti_ohci {
 	/* dma buffer for self-id packets */
         quadlet_t *selfid_buf_cpu;
         dma_addr_t selfid_buf_bus;
-	
+
 	/* buffer for csr config rom */
         quadlet_t *csr_config_rom_cpu; 
         dma_addr_t csr_config_rom_bus; 
@@ -187,18 +189,28 @@ struct ti_ohci {
 	struct dma_trm_ctx at_req_context;
 
         /* iso receive */
-	struct dma_rcv_ctx ir_context;
-	struct ohci1394_iso_tasklet ir_tasklet;
-        spinlock_t IR_channel_lock;
 	int nb_iso_rcv_ctx;
 	unsigned long ir_ctx_usage; /* use test_and_set_bit() for atomicity */
+	unsigned long ir_multichannel_used; /* ditto */
+        spinlock_t IR_channel_lock;
+
+	/* iso receive (legacy API) */
+	u64 ir_legacy_channels; /* note: this differs from ISO_channel_usage;
+				   it only accounts for channels listened to
+				   by the legacy API, so that we can know when
+				   it is safe to free the legacy API context */
+
+	struct dma_rcv_ctx ir_legacy_context;
+	struct ohci1394_iso_tasklet ir_legacy_tasklet;
 	
         /* iso transmit */
-	struct dma_trm_ctx it_context;
-	struct ohci1394_iso_tasklet it_tasklet;
 	int nb_iso_xmit_ctx;
 	unsigned long it_ctx_usage; /* use test_and_set_bit() for atomicity */
-	
+
+	/* iso transmit (legacy API) */
+	struct dma_trm_ctx it_legacy_context;
+	struct ohci1394_iso_tasklet it_legacy_tasklet;
+
         u64 ISO_channel_usage;
 
         /* IEEE-1394 part follows */
@@ -213,10 +225,10 @@ struct ti_ohci {
 
 	/* Tasklets for iso receive and transmit, used by video1394,
 	 * amdtp and dv1394 */
-	
+
 	struct list_head iso_tasklet_list;
 	spinlock_t iso_tasklet_list_lock;
-	
+
 	/* Swap the selfid buffer? */
 	unsigned int selfid_swap:1;
 	/* Some Apple chipset seem to swap incoming headers for us */
@@ -385,7 +397,7 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 
 /* OHCI evt_* error types, table 3-2 of the OHCI 1.1 spec. */
 #define EVT_NO_STATUS		0x0	/* No event status */
-#define EVT_RESERVED		0x1	/* Reserved, not used !!! */
+#define EVT_RESERVED_A		0x1	/* Reserved, not used !!! */
 #define EVT_LONG_PACKET		0x2	/* The revc data was longer than the buf */
 #define EVT_MISSING_ACK		0x3	/* A subaction gap was detected before an ack
 					   arrived, or recv'd ack had a parity error */
@@ -404,6 +416,17 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 					   16-bit host memory write */
 #define EVT_BUS_RESET		0x9	/* Identifies a PHY packet in the recv buffer as
 					   being a synthesized bus reset packet */
+#define EVT_TIMEOUT		0xa	/* Indicates that the asynchronous transmit response
+					   packet expired and was not transmitted, or that an
+					   IT DMA context experienced a skip processing overflow */
+#define EVT_TCODE_ERR		0xb	/* A bad tCode is associated with this packet.
+					   The packet was flushed */
+#define EVT_RESERVED_B		0xc	/* Reserved, not used !!! */
+#define EVT_RESERVED_C		0xd	/* Reserved, not used !!! */
+#define EVT_UNKNOWN		0xe	/* An error condition has occurred that cannot be
+					   represented by any other event codes defined herein. */
+#define EVT_FLUSHED		0xf	/* Send by the link side of output FIFO when asynchronous
+					   packets are being flushed due to a bus reset. */
 
 #define OHCI1394_TCODE_PHY               0xE
 
@@ -416,8 +439,8 @@ int ohci1394_register_iso_tasklet(struct ti_ohci *ohci,
 void ohci1394_unregister_iso_tasklet(struct ti_ohci *ohci,
 				     struct ohci1394_iso_tasklet *tasklet);
 
-void ohci1394_stop_context      (struct ti_ohci *ohci, int reg, char *msg);
+/* returns zero if successful, one if DMA context is locked up */
+int ohci1394_stop_context      (struct ti_ohci *ohci, int reg, char *msg);
 struct ti_ohci *ohci1394_get_struct(int card_num);
 
 #endif
-
