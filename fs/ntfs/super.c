@@ -1424,31 +1424,23 @@ struct super_operations ntfs_sops = {
 						   called from iget(). */
 	dirty_inode:	ntfs_dirty_inode,	/* VFS: Called from
 						   __mark_inode_dirty(). */
-	write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
-	put_inode:	NULL,		/* VFS: Called whenever the reference
-					   count (i_count) of the inode is
-					   going to be decreased but before the
-					   actual decrease. */
-	delete_inode:	NULL,		/* VFS: Delete inode from disk. Called
-					   when i_count becomes 0 and i_nlink is
-					   also 0. */
+	//write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
+	//put_inode:	NULL,		/* VFS: Called whenever the reference
+	//				   count (i_count) of the inode is
+	//				   going to be decreased but before the
+	//				   actual decrease. */
+	//delete_inode:	NULL,		/* VFS: Delete inode from disk. Called
+	//				   when i_count becomes 0 and i_nlink is
+	//				   also 0. */
 	put_super:	ntfs_put_super,	/* Syscall: umount. */
-	write_super:	NULL,		/* Flush dirty super block to disk. */
-	write_super_lockfs:	NULL,	/* ? */
-	unlockfs:	NULL,		/* ? */
+	//write_super:	NULL,		/* Flush dirty super block to disk. */
+	//write_super_lockfs:	NULL,	/* ? */
+	//unlockfs:	NULL,		/* ? */
 	statfs:		ntfs_statfs,	/* Syscall: statfs */
 	remount_fs:	ntfs_remount,	/* Syscall: mount -o remount. */
 	clear_inode:	ntfs_clear_big_inode,	/* VFS: Called when an inode is
 						   removed from memory. */
-	umount_begin:	NULL,		/* Forced umount. */
-	/*
-	 * These are NFSd support functions but NTFS is a standard fs so
-	 * shouldn't need to implement these manually. At least we can try
-	 * without and if it doesn't work in some way we can always implement
-	 * something here.
-	 */
-	fh_to_dentry:	NULL,		/* Get dentry for given file handle. */
-	dentry_to_fh:	NULL,		/* Get file handle for given dentry. */
+	//umount_begin:	NULL,		/* Forced umount. */
 	show_options:	ntfs_show_options, /* Show mount options in proc. */
 };
 
