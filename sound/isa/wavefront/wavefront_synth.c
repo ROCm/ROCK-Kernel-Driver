@@ -1922,7 +1922,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 
 {
 	unsigned char section[WF_SECTION_MAX];
-	char section_length; /* yes, just a char; max value is WF_SECTION_MAX */
+	signed char section_length; /* yes, just a char; max value is WF_SECTION_MAX */
 	int section_cnt_downloaded = 0;
 	int fd;
 	int c;
