@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#130 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#131 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -5357,7 +5357,7 @@ ahd_linux_init(void)
        return (ahd_linux_detect(&aic79xx_driver_template) ? 0 : -ENODEV);
 #else
 	scsi_register_module(MODULE_SCSI_HA, &aic79xx_driver_template);
-	if (!driver_template.present) {
+	if (aic79xx_driver_template.present == 0) {
 		scsi_unregister_module(MODULE_SCSI_HA,
 				       &aic79xx_driver_template);
 		return (-ENODEV);

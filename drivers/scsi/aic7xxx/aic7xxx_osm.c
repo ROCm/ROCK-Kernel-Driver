@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#194 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#195 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -5228,7 +5228,7 @@ ahc_linux_init(void)
 	return (ahc_linux_detect(&aic7xxx_driver_template) ? 0 : -ENODEV);
 #else
 	scsi_register_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
-	if (!driver_template.present) {
+	if (aic7xxx_driver_template.present == 0) {
 		scsi_unregister_module(MODULE_SCSI_HA,
 				       &aic7xxx_driver_template);
 		return (-ENODEV);
