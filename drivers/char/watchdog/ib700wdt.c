@@ -1,5 +1,5 @@
 /*
- *	IB700 Single Board Computer WDT driver for Linux 2.4.x
+ *	IB700 Single Board Computer WDT driver
  *
  *	(c) Copyright 2001 Charles Howes <chowes@vsol.net>
  *
