@@ -200,23 +200,30 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	}
 
 	/* Ensure that we do not send more than 50 overlapping requests 
-		to the same server. We may make this configurable later or
-		use ses->maxReq */
+	   to the same server. We may make this configurable later or
+	   use ses->maxReq */
 
-	/* can not count locking commands against the total since
-		they are allowed to block on server */
-	if(long_op < 3) {
-		/* update # of requests on the wire to this server */
-		atomic_inc(&ses->server->inFlight); 
-	}
- 
-	if(atomic_read(&ses->server->inFlight) > CIFS_MAX_REQ) {
-		wait_event(ses->server->request_q,atomic_read(&ses->server->inFlight) <= CIFS_MAX_REQ);
+	spin_lock(&GlobalMid_Lock); 
+	while(1) {        
+		if(atomic_read(&ses->server->inFlight) >= CIFS_MAX_REQ) {
+			spin_unlock(&GlobalMid_Lock);         
+			wait_event(ses->server->request_q,atomic_read(&ses->server->inFlight) < CIFS_MAX_REQ);
+			spin_lock(&GlobalMid_Lock); 
+		} else {
+			/* can not count locking commands against the total since
+			   they are allowed to block on server */
+			if(long_op < 3) {
+				/* update # of requests on the wire to this server */
+				atomic_inc(&ses->server->inFlight); 
+			}
+			spin_unlock(&GlobalMid_Lock); 
+			break;
+		}
 	}
 
 	/* make sure that we sign in the same order that we send on this socket 
-		and avoid races inside tcp sendmsg code that could cause corruption
-		of smb data */
+	   and avoid races inside tcp sendmsg code that could cause corruption
+	   of smb data */
 
 	down(&ses->server->tcpSem); 
 
