@@ -171,6 +171,7 @@ DECLARE_MUTEX(jfs_log_sem);
 extern void txLazyUnlock(struct tblock * tblk);
 extern int jfs_stop_threads;
 extern struct completion jfsIOwait;
+extern int jfs_tlocks_low;
 
 /*
  * forward references
@@ -687,7 +688,8 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 		tblk->flag |= tblkGC_LAZY;
 
 	if ((!(log->cflag & logGC_PAGEOUT)) && (!list_empty(&log->cqueue)) &&
-	    (!(tblk->xflag & COMMIT_LAZY) || test_bit(log_FLUSH, &log->flag))) {
+	    (!(tblk->xflag & COMMIT_LAZY) || test_bit(log_FLUSH, &log->flag)
+	     || jfs_tlocks_low)) {
 		/*
 		 * No pageout in progress
 		 *
@@ -893,7 +895,7 @@ static void lmPostGC(struct lbuf * bp)
 	 */
 	if ((!list_empty(&log->cqueue)) &&
 	    ((log->gcrtc > 0) || (tblk->bp->l_wqnext != NULL) ||
-	     test_bit(log_FLUSH, &log->flag)))
+	     test_bit(log_FLUSH, &log->flag) || jfs_tlocks_low))
 		/*
 		 * Call lmGCwrite with new group leader
 		 */
