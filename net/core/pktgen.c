@@ -473,13 +473,13 @@ static inline __u64 tv_diff(const struct timeval* a, const struct timeval* b)
 
 static char version[] __initdata = VERSION;
 
-static ssize_t proc_pgctrl_read(struct file* file, char * buf, size_t count, loff_t *ppos);
-static ssize_t proc_pgctrl_write(struct file* file, const char * buf, size_t count, loff_t *ppos);
+static ssize_t proc_pgctrl_read(struct file* file, char __user * buf, size_t count, loff_t *ppos);
+static ssize_t proc_pgctrl_write(struct file* file, const char __user * buf, size_t count, loff_t *ppos);
 static int proc_if_read(char *buf , char **start, off_t offset, int len, int *eof, void *data);
 
 static int proc_thread_read(char *buf , char **start, off_t offset, int len, int *eof, void *data);
-static int proc_if_write(struct file *file, const char *user_buffer, unsigned long count, void *data);
-static int proc_thread_write(struct file *file, const char *user_buffer, unsigned long count, void *data);
+static int proc_if_write(struct file *file, const char __user *user_buffer, unsigned long count, void *data);
+static int proc_thread_write(struct file *file, const char __user *user_buffer, unsigned long count, void *data);
 static int create_proc_dir(void);
 static int remove_proc_dir(void);
 
@@ -510,7 +510,7 @@ static char module_fname[128];
 static struct proc_dir_entry *module_proc_ent = NULL;
 
 static struct notifier_block pktgen_notifier_block = {
-	notifier_call: pktgen_device_event,
+	.notifier_call = pktgen_device_event,
 };
 
 static struct file_operations pktgen_fops = {
@@ -527,7 +527,7 @@ static struct file_operations pktgen_fops = {
 static struct proc_dir_entry *pg_proc_dir = NULL;
 static int proc_pgctrl_read_eof=0;
 
-static ssize_t proc_pgctrl_read(struct file* file, char * buf,
+static ssize_t proc_pgctrl_read(struct file* file, char __user * buf,
                                  size_t count, loff_t *ppos)
 { 
 	char data[200];
@@ -560,7 +560,7 @@ static ssize_t proc_pgctrl_read(struct file* file, char * buf,
 	return len;
 }
 
-static ssize_t proc_pgctrl_write(struct file* file,const char * buf,
+static ssize_t proc_pgctrl_write(struct file* file,const char __user * buf,
 				 size_t count, loff_t *ppos)
 {
 	char *data = NULL;
@@ -734,7 +734,7 @@ static int proc_if_read(char *buf , char **start, off_t offset,
 }
 
 
-static int count_trail_chars(const char *user_buffer, unsigned int maxlen)
+static int count_trail_chars(const char __user *user_buffer, unsigned int maxlen)
 {
 	int i;
 
@@ -758,7 +758,7 @@ done:
 	return i;
 }
 
-static unsigned long num_arg(const char *user_buffer, unsigned long maxlen, 
+static unsigned long num_arg(const char __user *user_buffer, unsigned long maxlen, 
 			     unsigned long *num)
 {
 	int i = 0;
@@ -777,7 +777,7 @@ static unsigned long num_arg(const char *user_buffer, unsigned long maxlen,
 	return i;
 }
 
-static int strn_len(const char *user_buffer, unsigned int maxlen)
+static int strn_len(const char __user *user_buffer, unsigned int maxlen)
 {
 	int i = 0;
 
@@ -802,7 +802,7 @@ done_str:
 	return i;
 }
 
-static int proc_if_write(struct file *file, const char *user_buffer,
+static int proc_if_write(struct file *file, const char __user *user_buffer,
                             unsigned long count, void *data)
 {
 	int i = 0, max, len;
@@ -1392,7 +1392,7 @@ static int proc_thread_read(char *buf , char **start, off_t offset,
 	return p - buf;
 }
 
-static int proc_thread_write(struct file *file, const char *user_buffer,
+static int proc_thread_write(struct file *file, const char __user *user_buffer,
                                 unsigned long count, void *data)
 {
 	int i = 0, max, len, ret;
@@ -2941,7 +2941,7 @@ static int pktgen_add_device(struct pktgen_thread *t, const char* ifname)
                         return -ENODEV;
                 }
 
-                pkt_dev->proc_ent = create_proc_entry(pkt_dev->fname, 0600, 0);
+                pkt_dev->proc_ent = create_proc_entry(pkt_dev->fname, 0600, NULL);
                 if (!pkt_dev->proc_ent) {
                         printk("pktgen: cannot create %s procfs entry.\n", pkt_dev->fname);
 			if (pkt_dev->flows)
@@ -3005,7 +3005,7 @@ static int pktgen_create_thread(const char* name, int cpu)
 	t->cpu = cpu;
         
         sprintf(t->fname, "net/%s/%s", PG_PROC_DIR, t->name);
-        t->proc_ent = create_proc_entry(t->fname, 0600, 0);
+        t->proc_ent = create_proc_entry(t->fname, 0600, NULL);
         if (!t->proc_ent) {
                 printk("pktgen: cannot create %s procfs entry.\n", t->fname);
                 kfree(t);
@@ -3088,7 +3088,7 @@ static int __init pg_init(void)
 	create_proc_dir();
 
         sprintf(module_fname, "net/%s/pgctrl", PG_PROC_DIR);
-        module_proc_ent = create_proc_entry(module_fname, 0600, 0);
+        module_proc_ent = create_proc_entry(module_fname, 0600, NULL);
         if (!module_proc_ent) {
                 printk("pktgen: ERROR: cannot create %s procfs entry.\n", module_fname);
                 return -EINVAL;
