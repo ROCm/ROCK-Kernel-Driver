@@ -458,7 +458,7 @@ static _INLINE_ void check_modem_status(struct uart_sunsu_port *up)
 	wake_up_interruptible(&up->port.info->delta_msr_wait);
 }
 
-static void sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunsu_port *up = dev_id;
 	unsigned long flags;
@@ -476,6 +476,8 @@ static void sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	} while (!(serial_in(up, UART_IIR) & UART_IIR_NO_INT));
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 /* Separate interrupt handling path for keyboard/mouse ports.  */
@@ -548,7 +550,7 @@ static void receive_kbd_ms_chars(struct uart_sunsu_port *up, struct pt_regs *reg
 	} while (serial_in(up, UART_LSR) & UART_LSR_DR);
 }
 
-static void sunsu_kbd_ms_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunsu_kbd_ms_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunsu_port *up = dev_id;
 
@@ -559,6 +561,8 @@ static void sunsu_kbd_ms_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			receive_kbd_ms_chars(up, regs,
 					     (status & UART_LSR_BI) != 0);
 	}
+
+	return IRQ_HANDLED;
 }
 
 static unsigned int sunsu_tx_empty(struct uart_port *port)
