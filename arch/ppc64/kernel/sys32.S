@@ -1,5 +1,5 @@
 /* 
- * sys32.S: I-cache tricks for 32-bit compatability layer simple
+ * sys32.S: I-cache tricks for 32-bit compatibility layer simple
  *          conversions.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)

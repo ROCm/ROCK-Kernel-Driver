@@ -203,7 +203,7 @@
 #define DMA_ST_AB	1
 
 /*
- * DMA (MEMC) compatability
+ * DMA (MEMC) compatibility
  */
 #define HALF_SAM	vram_half_sam
 #define VDMA_ALIGNMENT	(HALF_SAM * 2)

@@ -1,5 +1,5 @@
 /*
- * irixsig.c: WHEEE, IRIX signals!  YOW, am I compatable or what?!?!
+ * irixsig.c: WHEEE, IRIX signals!  YOW, am I compatible or what?!?!
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  * Copyright (C) 1997 - 2000 Ralf Baechle (ralf@gnu.org)

@@ -1439,14 +1439,14 @@ static void ReconTimerExpiry (unsigned long data)
 				break;
 				}
 
-	        // test LBA and multiper sector transfer compatability
+	        // test LBA and multiper sector transfer compatibility
 			if (!pid->SupportLBA || (pid->NumSectorsPerInt < SECTORSXFER) || !pid->Valid_64_70 )
 				{
 				DEB (printk ("\npci2220i: sub 3"));
 				break;
 				}
 
-	        // test PIO/bus matering mode compatability
+	        // test PIO/bus matering mode compatibility
 			if ( (pid->MinPIOCycleWithoutFlow > 240) && !pid->SupportIORDYDisable && !padapter->timingPIO )
 				{
 				DEB (printk ("\npci2220i: sub 4"));

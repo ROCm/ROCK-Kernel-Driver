@@ -143,7 +143,7 @@ static int vtbl_signature_valid(__u8 signature[4])
  * using the keyword "blocksize". The blocksize written to the
  * volume-label is in bytes.
  *
- * We use this now only for compatability with old zftape version. We
+ * We use this now only for compatibility with old zftape version. We
  * store the blocksize directly as binary number in the vendor
  * extension part of the volume entry.
  */

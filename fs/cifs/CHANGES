@@ -128,7 +128,7 @@ clients.  basic posix file i/o tests now work on big endian machines, not just l
 Version 0.42
 ------------
 SessionSetup and NegotiateProtocol now work from Big Endian machines.
-Various Big Endian fixes found during testing on the Linux on 390.  Various fixes for compatability with older
+Various Big Endian fixes found during testing on the Linux on 390.  Various fixes for compatibility with older
 versions of 2.4 kernel (now builds and works again on kernels at least as early as 2.4.7).
 
 Version 0.41

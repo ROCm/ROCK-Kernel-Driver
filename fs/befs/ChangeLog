@@ -32,7 +32,7 @@ Version 0.64 (2002-02-07)
 * Andrew Farnham <andrewfarnham@uq.net.au> pointed out that the module
 	wouldn't work on older (<2.4.10) kernels due to an unresolved symbol.
 	This is bad, since 2.4.9 is still the current RedHat kernel. I added
-	a workaround for this problem (compatability.h) [WD]
+	a workaround for this problem (compatibility.h) [WD]
 
 * Sergey S. Kostyliov made befs_find_key() use a binary search to find 
 	keys within btree nodes, rather than the linear search we were using 

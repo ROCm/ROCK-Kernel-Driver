@@ -150,7 +150,7 @@ am_readbuffer(struct net_device *dev, u_int offset, unsigned char *buf, unsigned
 	}
 }
 #else
-#error Not compatable
+#error Not compatible
 #endif
 
 static int

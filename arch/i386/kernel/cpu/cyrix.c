@@ -74,7 +74,7 @@ static char cyrix_model_mult2[] __initdata = "12233445";
 
 /*
  * Reset the slow-loop (SLOP) bit on the 686(L) which is set by some old
- * BIOSes for compatability with DOS games.  This makes the udelay loop
+ * BIOSes for compatibility with DOS games.  This makes the udelay loop
  * work correctly, and improves performance.
  *
  * FIXME: our newer udelay uses the tsc. We dont need to frob with SLOP

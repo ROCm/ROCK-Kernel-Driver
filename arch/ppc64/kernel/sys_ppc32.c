@@ -812,7 +812,7 @@ asmlinkage long sys32_sysfs(u32 option, u32 arg1, u32 arg2)
 	return sys_sysfs((int)option, arg1, arg2);
 }
 
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 struct timex32 {
 	u32 modes;
 	s32 offset, freq, maxerror, esterror;

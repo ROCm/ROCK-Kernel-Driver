@@ -371,7 +371,7 @@ int is_iobrick( int nasid, int widget_num );
 
 
 
-/* macros for NIC compatability */
+/* macros for NIC compatibility */
 /* always invoked on "this" cbrick */
 #define HUB_VERTEX_MFG_INFO(v) \
     eeprom_vertex_info_set( C_BRICK, get_nasid(), (v), 0 )

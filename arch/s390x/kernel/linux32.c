@@ -3578,7 +3578,7 @@ asmlinkage int sys32_sendfile64(int out_fd, int in_fd,
 	return ret;
 }
 
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 
 struct timex32 {
 	u32 modes;

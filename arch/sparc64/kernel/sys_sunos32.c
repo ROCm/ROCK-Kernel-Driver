@@ -1,5 +1,5 @@
 /* $Id: sys_sunos32.c,v 1.64 2002/02/09 19:49:31 davem Exp $
- * sys_sunos32.c: SunOS binary compatability layer on sparc64.
+ * sys_sunos32.c: SunOS binary compatibility layer on sparc64.
  *
  * Copyright (C) 1995, 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
  * Copyright (C) 1995 Miguel de Icaza (miguel@nuclecu.unam.mx)

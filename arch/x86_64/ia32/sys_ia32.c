@@ -1573,7 +1573,7 @@ asmlinkage long sys32_modify_ldt(int func, void *ptr, unsigned long bytecount)
 	return ret;
 }
 
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 
 struct timex32 {
 	u32 modes;

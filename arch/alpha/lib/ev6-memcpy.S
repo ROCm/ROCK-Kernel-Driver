@@ -243,6 +243,6 @@ $nomoredata:
 
 	.end memcpy
 
-/* For backwards module compatability.  */
+/* For backwards module compatibility.  */
 __memcpy = memcpy
 .globl __memcpy

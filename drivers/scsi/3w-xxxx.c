@@ -8,7 +8,7 @@
 
    Copyright (C) 1999-2002 3ware Inc.
 
-   Kernel compatablity By: 	Andre Hedrick <andre@suse.com>
+   Kernel compatiblity By: 	Andre Hedrick <andre@suse.com>
    Non-Copyright (C) 2000	Andre Hedrick <andre@suse.com>
    
    Further tiny build fixes and trivial hoovering    Alan Cox
