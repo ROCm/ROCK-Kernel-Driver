@@ -2008,15 +2008,22 @@ qla1280_mem_alloc(struct scsi_qla_host *ha)
 						 ((RESPONSE_ENTRY_CNT + 1) *
 						  (sizeof(struct response))),
 						 &dma_handle);
-	if (!ha->request_ring)
+	if (!ha->response_ring)
 		goto error;
 	ha->response_dma = dma_handle;
 	status = 0;
+	goto finish;
 
  error:
 	if (status)
 		dprintk(2, "qla1280_mem_alloc: **** FAILED ****\n");
 
+	if (ha->request_ring)
+		pci_free_consistent(ha->pdev,
+                                    ((REQUEST_ENTRY_CNT + 1) *
+                                     (sizeof(request_t))),
+                                    ha->request_ring, ha->request_dma);
+ finish:
 	LEAVE("qla1280_mem_alloc");
 	return status;
 }
