@@ -311,7 +311,6 @@ struct isdn_netif_ops {
 typedef struct isdn_net_local_s {
   spinlock_t             lock;
   ulong                  magic;
-  char                   name[10];     /* Name of device                   */
   struct timer_list      dial_timer;   /* dial events timer                */
   int                    dial_event;   /* event in case of timer expiry    */
   struct net_device_stats stats;       /* Ethernet Statistics              */
@@ -410,6 +409,7 @@ typedef struct isdn_net_dev_s {
 					  channels, which are currently
 					  online                           */
   spinlock_t queue_lock;               /* lock to protect queue            */
+  char                   name[10];     /* Name of device                   */
   struct list_head global_list;        /* global list of all isdn_net_devs */
   struct net_device dev;               /* interface to upper levels        */
 #ifdef CONFIG_ISDN_PPP

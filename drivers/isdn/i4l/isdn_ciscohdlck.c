@@ -43,6 +43,7 @@ static int
 isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	isdn_net_local *lp = (isdn_net_local *) dev->priv;
+	isdn_net_dev *idev = lp->netdev;
 	unsigned long len = 0;
 	unsigned long expires = 0;
 	int tmp = 0;
@@ -77,7 +78,7 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				mod_timer(&lp->cisco_timer, expires);
 				printk(KERN_INFO "%s: Keepalive period set "
 					"to %d seconds.\n",
-					lp->name, lp->cisco_keepalive_period);
+					idev->name, lp->cisco_keepalive_period);
 			}
 			break;
 
@@ -111,6 +112,7 @@ static void
 isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 {
 	isdn_net_local *lp = (isdn_net_local *) data;
+	isdn_net_dev *idev = lp->netdev;
 	struct sk_buff *skb;
 	unsigned char *p;
 	unsigned long last_cisco_myseq = lp->cisco_myseq;
@@ -124,7 +126,7 @@ isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 		lp->cisco_line_state = 0;
 		printk (KERN_WARNING
 				"UPDOWN: Line protocol on Interface %s,"
-				" changed state to down\n", lp->name);
+				" changed state to down\n", idev->name);
 		/* should stop routing higher-level data accross */
 	} else if ((!lp->cisco_line_state) &&
 		(myseq_diff >= 0) && (myseq_diff <= 2)) {
@@ -132,17 +134,17 @@ isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 		lp->cisco_line_state = 1;
 		printk (KERN_WARNING
 				"UPDOWN: Line protocol on Interface %s,"
-				" changed state to up\n", lp->name);
+				" changed state to up\n", idev->name);
 		/* restart routing higher-level data accross */
 	}
 
 	if (lp->cisco_debserint)
 		printk (KERN_DEBUG "%s: HDLC "
 			"myseq %lu, mineseen %lu%c, yourseen %lu, %s\n",
-			lp->name, last_cisco_myseq, lp->cisco_mineseen,
-			((last_cisco_myseq == lp->cisco_mineseen) ? '*' : 040),
+			idev->name, last_cisco_myseq, lp->cisco_mineseen,
+			(last_cisco_myseq == lp->cisco_mineseen) ? '*' : 040,
 			lp->cisco_yourseq,
-			((lp->cisco_line_state) ? "line up" : "line down"));
+			(lp->cisco_line_state) ? "line up" : "line down");
 
 	skb = isdn_net_ciscohdlck_alloc_skb(lp, 4 + 14);
 	if (!skb)
@@ -268,6 +270,7 @@ isdn_net_ciscohdlck_slarp_send_reply(isdn_net_local *lp)
 static void
 isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
 {
+	isdn_net_dev *idev = lp->netdev;
 	unsigned char *p;
 	int period;
 	u32 code;
@@ -299,7 +302,7 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
 			"remote ip: %d.%d.%d.%d, "
 			"local ip: %d.%d.%d.%d "
 			"mask: %d.%d.%d.%d\n",
-		       lp->name,
+		       idev->name,
 		       HIPQUAD(addr),
 		       HIPQUAD(local),
 		       HIPQUAD(mask));
@@ -307,7 +310,7 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
   slarp_reply_out:
 		 printk(KERN_INFO "%s: got invalid slarp "
 				 "reply (%d.%d.%d.%d/%d.%d.%d.%d) "
-				 "- ignored\n", lp->name,
+				 "- ignored\n", idev->name,
 				 HIPQUAD(addr), HIPQUAD(mask));
 		break;
 	case CISCO_SLARP_KEEPALIVE:
@@ -318,7 +321,7 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
 				lp->cisco_last_slarp_in) {
 			printk(KERN_DEBUG "%s: Keepalive period mismatch - "
 				"is %d but should be %d.\n",
-				lp->name, period, lp->cisco_keepalive_period);
+				idev->name, period, lp->cisco_keepalive_period);
 		}
 		lp->cisco_last_slarp_in = jiffies;
 		p += get_u32(p, &my_seq);
@@ -352,7 +355,7 @@ isdn_ciscohdlck_receive(isdn_net_dev *idev, isdn_net_local *olp,
 	if ((addr != CISCO_ADDR_UNICAST && addr != CISCO_ADDR_BROADCAST) ||
 	    ctrl != CISCO_CTRL) {
 		printk(KERN_DEBUG "%s: Unknown Cisco header %#02x %#02x\n",
-		       lp->name, addr, ctrl);
+		       idev->name, addr, ctrl);
 		goto out_free;
 	}
 
@@ -363,7 +366,7 @@ isdn_ciscohdlck_receive(isdn_net_dev *idev, isdn_net_local *olp,
 	case CISCO_TYPE_CDP:
 		if (lp->cisco_debserint)
 			printk(KERN_DEBUG "%s: Received CDP packet. use "
-				"\"no cdp enable\" on cisco.\n", lp->name);
+				"\"no cdp enable\" on cisco.\n", idev->name);
 		goto out_free;
 	default:
 		/* no special cisco protocol */

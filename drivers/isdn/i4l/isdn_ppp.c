@@ -153,6 +153,7 @@ isdn_ppp_free(isdn_net_local * lp)
 int
 isdn_ppp_bind(isdn_net_local * lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	int i;
 	int unit = 0;
 	long flags;
@@ -194,9 +195,9 @@ isdn_ppp_bind(isdn_net_local * lp)
 		retval = -1;
 		goto out;
 	}
-	unit = isdn_ppp_if_get_unit(lp->name);	/* get unit number from interface name .. ugly! */
+	unit = isdn_ppp_if_get_unit(idev->name);	/* get unit number from interface name .. ugly! */
 	if (unit < 0) {
-		printk(KERN_ERR "isdn_ppp_bind: illegal interface name %s.\n", lp->name);
+		printk(KERN_ERR "isdn_ppp_bind: illegal interface name %s.\n", idev->name);
 		retval = -1;
 		goto out;
 	}
@@ -428,11 +429,13 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 	unsigned long val;
 	int r,i,j;
 	struct ippp_struct *is;
+	isdn_net_dev *idev;
 	isdn_net_local *lp;
 	struct isdn_ppp_comp_data data;
 
 	is = (struct ippp_struct *) file->private_data;
 	lp = is->lp;
+	idev = lp->netdev;
 
 	if (is->debug & 0x1)
 		printk(KERN_DEBUG "isdn_ppp_ioctl: minor: %d cmd: %x state: %x\n", is->minor, cmd, is->state);
@@ -461,7 +464,7 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 		case PPPIOCGIFNAME:
 			if(!lp)
 				return -EINVAL;
-			if ((r = set_arg((void *) arg, lp->name, strlen(lp->name))))
+			if ((r = set_arg((void *) arg, idev->name, strlen(idev->name))))
 				return r;
 			break;
 		case PPPIOCGMPFLAGS:	/* get configuration flags */

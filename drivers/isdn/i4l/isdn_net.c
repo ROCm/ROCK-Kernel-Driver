@@ -375,6 +375,8 @@ static void isdn_net_lp_disconnected(isdn_net_local *lp)
 
 static void isdn_net_connected(isdn_net_local *lp)
 {
+	isdn_net_dev *idev = lp->netdev;
+
 	lp->dialstate = ST_ACTIVE;
 	lp->hup_timer.expires = jiffies + HZ;
 	add_timer(&lp->hup_timer);
@@ -385,7 +387,7 @@ static void isdn_net_connected(isdn_net_local *lp)
 			isdn_net_add_to_bundle(nd, lp);
 		}
 	}
-	printk(KERN_INFO "isdn_net: %s connected\n", lp->name);
+	printk(KERN_INFO "isdn_net: %s connected\n", idev->name);
 	/* If first Chargeinfo comes before B-Channel connect,
 	 * we correct the timestamp here.
 	 */
@@ -538,7 +540,7 @@ do_dialout(isdn_net_local *lp)
 static int
 isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 {
-	isdn_net_dev *p = lp->netdev;
+	isdn_net_dev *idev = lp->netdev;
 	isdn_ctrl *c = arg;
 	isdn_ctrl cmd;
 
@@ -565,8 +567,8 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 
 			isdn_net_lp_disconnected(lp);
 			isdn_slot_all_eaz(lp->isdn_slot);
-			printk(KERN_INFO "%s: remote hangup\n", lp->name);
-			printk(KERN_INFO "%s: Chargesum is %d\n", lp->name,
+			printk(KERN_INFO "%s: remote hangup\n", idev->name);
+			printk(KERN_INFO "%s: Chargesum is %d\n", idev->name,
 			       lp->charge);
 			isdn_net_unbind_channel(lp);
 			return 1;
@@ -601,7 +603,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		case EV_NET_TIMER_CB:
 			/* Remote does callback. Hangup after cbdelay, 
 			 * then wait for incoming call */
-			printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
+			printk(KERN_INFO "%s: hangup waiting for callback ...\n", idev->name);
 			isdn_net_hangup(lp);
 			return 1;
 		case ISDN_STAT_DCONN:
@@ -616,7 +618,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		case ISDN_STAT_DHUP:
 			del_timer(&lp->dial_timer);
 			isdn_slot_all_eaz(lp->isdn_slot);
-			printk(KERN_INFO "%s: remote hangup\n", lp->name);
+			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
 		}
@@ -635,7 +637,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		case ISDN_STAT_DHUP:
 			del_timer(&lp->dial_timer);
 			isdn_slot_all_eaz(lp->isdn_slot);
-			printk(KERN_INFO "%s: remote hangup\n", lp->name);
+			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
 		}
@@ -656,7 +658,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		case ISDN_STAT_DHUP:
 			del_timer(&lp->dial_timer);
 			isdn_slot_all_eaz(lp->isdn_slot);
-			printk(KERN_INFO "%s: remote hangup\n", lp->name);
+			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
 		}
@@ -668,13 +670,13 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			break;
 		case ISDN_STAT_BCONN:
 			del_timer(&lp->dial_timer);
-			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
+			isdn_slot_set_rx_netdev(lp->isdn_slot, idev);
 			isdn_net_connected(lp);
 			return 1;
 		case ISDN_STAT_DHUP:
 			del_timer(&lp->dial_timer);
 			isdn_slot_all_eaz(lp->isdn_slot);
-			printk(KERN_INFO "%s: remote hangup\n", lp->name);
+			printk(KERN_INFO "%s: remote hangup\n", idev->name);
 			isdn_net_unbind_channel(lp);
 			return 1;
 		}
@@ -701,27 +703,29 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 void
 isdn_net_hangup(isdn_net_local *lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	isdn_ctrl cmd;
 
 	del_timer_sync(&lp->hup_timer);
 	if (isdn_net_bound(lp)) {
 		if (lp->slave != NULL) {
 			isdn_net_local *slp = (isdn_net_local *)lp->slave->priv;
+			isdn_net_dev *sidev = slp->netdev;
 			if (isdn_net_bound(slp)) {
 				printk(KERN_INFO
 					"isdn_net: hang up slave %s before %s\n",
-					slp->name, lp->name);
+					sidev->name, idev->name);
 				isdn_net_hangup(slp);
 			}
 		}
-		printk(KERN_INFO "isdn_net: local hangup %s\n", lp->name);
+		printk(KERN_INFO "isdn_net: local hangup %s\n", idev->name);
 		if (lp->ops->disconnected)
 			lp->ops->disconnected(lp);
 
 		isdn_net_lp_disconnected(lp);
 
 		isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
-		printk(KERN_INFO "%s: Chargesum is %d\n", lp->name, lp->charge);
+		printk(KERN_INFO "%s: Chargesum is %d\n", idev->name, lp->charge);
 		isdn_slot_all_eaz(lp->isdn_slot);
 	}
 	isdn_net_unbind_channel(lp);
@@ -746,6 +750,7 @@ typedef struct {
 static void
 isdn_net_log_skb(struct sk_buff * skb, isdn_net_local * lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	u_char *p = skb->nh.raw; /* hopefully, this was set correctly */
 	unsigned short proto = ntohs(skb->protocol);
 	int data_ofs;
@@ -758,7 +763,7 @@ isdn_net_log_skb(struct sk_buff * skb, isdn_net_local * lp)
 		/* fall back to old isdn_net_log_packet method() */
 		char * buf = skb->data;
 
-		printk(KERN_DEBUG "isdn_net: protocol %04x is buggy, dev %s\n", skb->protocol, lp->name);
+		printk(KERN_DEBUG "isdn_net: protocol %04x is buggy, dev %s\n", skb->protocol, idev->name);
 		p = buf;
 		proto = ETH_P_IP;
 		switch (lp->p_encap) {
@@ -878,6 +883,7 @@ static void isdn_net_softint(void *private)
  */
 void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
 {
+	isdn_net_dev *idev = lp->netdev;
 	int ret;
 	int len = skb->len;     /* save len */
 
@@ -895,7 +901,7 @@ void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
 	ret = isdn_slot_write(lp->isdn_slot, skb);
 	if (ret != len) {
 		/* we should never get here */
-		printk(KERN_WARNING "%s: HL driver queue full\n", lp->name);
+		printk(KERN_WARNING "%s: HL driver queue full\n", idev->name);
 		goto error;
 	}
 	
@@ -962,7 +968,7 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 		lp->transcount = 0;
 	}
 	if (dev->net_verbose > 3)
-		printk(KERN_DEBUG "%s: %d bogocps\n", lp->name, lp->cps);
+		printk(KERN_DEBUG "%s: %d bogocps\n", lp->netdev->name, lp->cps);
 
 	if (lp->cps > lp->triggercps) {
 		if (lp->slave) {
@@ -1213,6 +1219,7 @@ isdn_net_init(struct net_device *ndev)
 static int
 isdn_net_do_callback(isdn_net_local *lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	int slot;
 	/*
 	 * Is the state MANUAL?
@@ -1221,10 +1228,10 @@ isdn_net_do_callback(isdn_net_local *lp)
 	 */
 	if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
 		printk(KERN_INFO "incoming call for callback, interface %s `off' -> rejected\n",
-		       lp->name);
+		       idev->name);
 		return 3;
 	}
-	printk(KERN_DEBUG "%s: start callback\n", lp->name);
+	printk(KERN_DEBUG "%s: start callback\n", idev->name);
 	
 	/* Grab a free ISDN-Channel */
 	slot = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, lp->l3_proto,
@@ -1313,8 +1320,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		      isdn_slot_usage(idx));
 
 	list_for_each(l, &isdn_net_devs) {
-		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-		isdn_net_local *lp = &p->local;
+		isdn_net_dev *idev = list_entry(l, isdn_net_dev, global_list);
+		isdn_net_local *lp = &idev->local;
 
                 /* check acceptable call types for DOV */
 		dbg_net_icall("n_fi: if='%s', l.msn=%s, l.flags=%d, l.dstate=%d\n",
@@ -1378,17 +1385,17 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
 			restore_flags(flags);
 			printk(KERN_INFO "incoming call, interface %s `stopped' -> rejected\n",
-			       lp->name);
+			       idev->name);
 			return 3;
 		}
 		/*
 		 * Is the interface up?
 		 * If not, reject the call actively.
 		 */
-		if (!isdn_net_device_started(p)) {
+		if (!isdn_net_device_started(idev)) {
 			restore_flags(flags);
 			printk(KERN_INFO "%s: incoming call, interface down -> rejected\n",
-			       lp->name);
+			       idev->name);
 			return 3;
 		}
 		/* Interface is up, now see if it's a slave. If so, see if
@@ -1396,8 +1403,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		 */
 		if (lp->master) {
 			isdn_net_local *mlp = (isdn_net_local *) lp->master->priv;
-			printk(KERN_DEBUG "ICALLslv: %s\n", lp->name);
-			printk(KERN_DEBUG "master=%s\n", mlp->name);
+			printk(KERN_DEBUG "ICALLslv: %s\n", idev->name);
+			printk(KERN_DEBUG "master=%s\n", mlp->netdev->name);
 			if (isdn_net_bound(mlp)) {
 				printk(KERN_DEBUG "master online\n");
 				/* Master is online, find parent-slave (master if first slave) */
@@ -1419,7 +1426,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			restore_flags(flags);
 			return retval;
 		}
-		printk(KERN_DEBUG "%s: call from %s -> %s accepted\n", lp->name,
+		printk(KERN_DEBUG "%s: call from %s -> %s accepted\n", idev->name,
 		       nr, eaz);
 
 		strcpy(isdn_slot_num(idx), nr);
@@ -1462,7 +1469,7 @@ isdn_net_findif(char *name)
 
 	list_for_each(l, &isdn_net_devs) {
 		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-		if (!strcmp(p->local.name, name))
+		if (!strcmp(p->name, name))
 			return p;
 	}
 	return NULL;
@@ -1555,7 +1562,7 @@ isdn_net_new(char *name, struct net_device *master)
 		return -ENOMEM;
 	}
 	memset(netdev, 0, sizeof(isdn_net_dev));
-	strcpy(netdev->local.name, name);
+	strcpy(netdev->name, name);
 	strcpy(netdev->dev.name, name);
 	netdev->dev.priv = &netdev->local;
 	netdev->dev.init = isdn_net_init;
@@ -1926,11 +1933,11 @@ isdn_net_getcfg(isdn_net_ioctl_cfg * cfg)
 	cfg->dialtimeout = lp->dialtimeout >= 0 ? lp->dialtimeout / HZ : -1;
 	cfg->dialwait = lp->dialwait / HZ;
 	if (lp->slave)
-		strcpy(cfg->slave, ((isdn_net_local *) lp->slave->priv)->name);
+		strcpy(cfg->slave, ((isdn_net_local *) lp->slave->priv)->netdev->name);
 	else
 		cfg->slave[0] = '\0';
 	if (lp->master)
-		strcpy(cfg->master, ((isdn_net_local *) lp->master->priv)->name);
+		strcpy(cfg->master, ((isdn_net_local *) lp->master->priv)->netdev->name);
 	else
 		cfg->master[0] = '\0';
 
@@ -2137,12 +2144,12 @@ isdn_net_realrm(isdn_net_dev *p)
 	list_del(&p->global_list);
 	if (p->local.slave) {
 		/* If this interface has a slave, remove it also */
-		char *slavename = ((isdn_net_local *) (p->local.slave->priv))->name;
+		char *slavename = ((isdn_net_local *) (p->local.slave->priv))->netdev->name;
 		struct list_head *l;
 
 		list_for_each(l, &isdn_net_devs) {
 			isdn_net_dev *n = list_entry(l, isdn_net_dev, global_list);
-			if (!strcmp(n->local.name, slavename)) {
+			if (!strcmp(n->name, slavename)) {
 				isdn_net_realrm(n);
 				break;
 			}
@@ -2165,7 +2172,7 @@ isdn_net_rm(char *name)
 	/* Search name in netdev-chain */
 	list_for_each(l, &isdn_net_devs) {
 		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-		if (!strcmp(p->local.name, name))
+		if (!strcmp(p->name, name))
 			return isdn_net_realrm(p);
 	}
 	return -ENODEV;
