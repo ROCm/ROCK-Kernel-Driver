@@ -1658,9 +1658,17 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	serial_out(up, UART_IER, up->ier);
 
 	if (up->capabilities & UART_CAP_EFR) {
+		unsigned char efr = 0;
+		/*
+		 * TI16C752/Startech hardware flow control.  FIXME:
+		 * - TI16C752 requires control thresholds to be set.
+		 * - UART_MCR_RTS is ineffective if auto-RTS mode is enabled.
+		 */
+		if (termios->c_cflag & CRTSCTS)
+			efr |= UART_EFR_CTS;
+
 		serial_outp(up, UART_LCR, 0xBF);
-		serial_outp(up, UART_EFR,
-			    termios->c_cflag & CRTSCTS ? UART_EFR_CTS :0);
+		serial_outp(up, UART_EFR, efr);
 	}
 
 	if (up->capabilities & UART_NATSEMI) {
