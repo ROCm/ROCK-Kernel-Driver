@@ -954,6 +954,7 @@ struct e100_private {
 #ifdef CONFIG_PM
 	u32 pci_state[16];
 #endif
+	char ifname[IFNAMSIZ];
 };
 
 #define E100_AUTONEG        0

@@ -46,6 +46,15 @@
 
 /* Change Log
  *
+ * 2.1.24       10/7/02
+ *   o Bug fix: Wrong files under /proc/net/PRO_LAN_Adapters/ when interface
+ *     name is changed
+ *   o Bug fix: Rx skb corruption when Rx polling code and Rx interrupt code
+ *     are executing during stress traffic at shared interrupt system. 
+ *     Removed Rx polling code
+ *   o Added detailed printk if selftest failed when insmod
+ *   o Removed misleading printks
+ *
  * 2.1.12       8/2/02
  *   o Feature: ethtool register dump
  *   o Bug fix: Driver passes wrong name to /proc/interrupts
@@ -62,25 +71,6 @@
  *   o Bug fix: PHY loopback diagnostic fails
  *
  * 2.1.6        7/5/02
- *   o Added device ID support for Dell LOM.
- *   o Added device ID support for 82511QM mobile nics.
- *   o Bug fix: ethtool get/set EEPROM routines modified to use byte
- *     addressing rather than word addressing.
- *   o Feature: added MDIX mode support for 82550 and up.
- *   o Bug fix: added reboot notifer to setup WOL settings when
- *     shutting system down.
- *   o Cleanup: removed yield() redefinition (Andrew Morton, 
- *     akpm@zip.com.au).
- *   o Bug fix: flow control now working when link partner is 
- *     autoneg capable but not flow control capable.
- *   o Bug fix: added check for corrupted EEPROM
- *   o Bug fix: don't report checksum offloading for the older
- *     controllers that don't support the feature.
- *   o Bug fix: calculate cable diagnostics when link goes down
- *     rather than when queuering /proc file.
- *   o Cleanup: move mdi_access_lock to local get/set mdi routines.
- *
- * 2.0.30       5/30/02
  */
  
 #include <linux/config.h>
@@ -94,8 +84,8 @@
 #include "e100_vendor.h"
 
 #ifdef CONFIG_PROC_FS
-extern int e100_create_proc_subdir(struct e100_private *);
-extern void e100_remove_proc_subdir(struct e100_private *);
+extern int e100_create_proc_subdir(struct e100_private *, char *);
+extern void e100_remove_proc_subdir(struct e100_private *, char *);
 #else
 #define e100_create_proc_subdir(X) 0
 #define e100_remove_proc_subdir(X) do {} while(0)
@@ -145,7 +135,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.15-k1";
+char e100_driver_version[]="2.1.24-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -154,12 +144,19 @@ static int e100nics = 0;
 static int e100_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e100_suspend(struct pci_dev *pcid, u32 state);
 static int e100_resume(struct pci_dev *pcid);
-struct notifier_block e100_notifier = {
+struct notifier_block e100_notifier_reboot = {
         notifier_call:  e100_notify_reboot,
         next:           NULL,
         priority:       0
 };
 #endif
+static int e100_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
+ 
+struct notifier_block e100_notifier_netdev = {
+	notifier_call:  e100_notify_netdev,
+	next:           NULL,
+	priority:       0
+};
 
 static void e100_get_mdix_status(struct e100_private *bdp);
 
@@ -651,6 +648,8 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	if ((rc = register_netdev(dev)) != 0) {
 		goto err_pci;
 	}
+        memcpy(bdp->ifname, dev->name, IFNAMSIZ);
+        bdp->ifname[IFNAMSIZ-1] = 0;	
 
 	bdp->device_type = ent->driver_data;
 	printk(KERN_NOTICE
@@ -669,7 +668,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 			bdp->cable_status = "Not available";
 	}
 
-	if (e100_create_proc_subdir(bdp) < 0) {
+	if (e100_create_proc_subdir(bdp, bdp->ifname) < 0) {
 		printk(KERN_ERR "e100: Failed to create proc dir for %s\n",
 		       bdp->device->name);
 	}
@@ -733,7 +732,7 @@ e100_remove1(struct pci_dev *pcid)
 
 	unregister_netdev(dev);
 
-	e100_remove_proc_subdir(bdp);
+	e100_remove_proc_subdir(bdp, bdp->ifname);
 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 
@@ -767,10 +766,12 @@ e100_init_module(void)
 	int ret;
         ret = pci_module_init(&e100_driver);
 
-#ifdef CONFIG_PM	
-	if(ret >= 0)
-		register_reboot_notifier(&e100_notifier);
-#endif	
+	if(ret >= 0) {
+#ifdef CONFIG_PM
+		register_reboot_notifier(&e100_notifier_reboot);
+#endif 
+		register_netdevice_notifier(&e100_notifier_netdev);
+	}
 
 	return ret;
 }
@@ -779,8 +780,9 @@ static void __exit
 e100_cleanup_module(void)
 {
 #ifdef CONFIG_PM	
-	unregister_reboot_notifier(&e100_notifier);
-#endif	
+	unregister_reboot_notifier(&e100_notifier_reboot);
+#endif 
+	unregister_netdevice_notifier(&e100_notifier_netdev);
 
 	pci_unregister_driver(&e100_driver);
 }
@@ -4091,11 +4093,34 @@ exit:
 	spin_unlock_bh(&(bdp->bd_non_tx_lock));
 }
 
+int e100_notify_netdev(struct notifier_block *nb, unsigned long event, void *p)
+{
+	struct e100_private *bdp;
+	struct net_device *netdev = p;
+	
+	if(netdev == NULL)
+		return NOTIFY_DONE;
+	
+	switch(event) {
+	case NETDEV_CHANGENAME:
+		if(netdev->open == e100_open) {
+			bdp = netdev->priv;
+			/* rename the proc nodes the easy way */
+			e100_remove_proc_subdir(bdp, bdp->ifname);
+			memcpy(bdp->ifname, netdev->name, IFNAMSIZ);
+			bdp->ifname[IFNAMSIZ-1] = 0;
+			e100_create_proc_subdir(bdp, bdp->ifname);
+		}
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
 #ifdef CONFIG_PM
 static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
-        struct pci_dev *pdev = NULL;
+        struct pci_dev *pdev;
 	
         switch(event) {
         case SYS_DOWN:
