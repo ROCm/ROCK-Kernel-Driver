@@ -467,7 +467,7 @@ hwgraph_register(devfs_handle_t de, const char *name,
 		/*
 		 * We need to clean up!
 		 */
-		printk(KERN_WARNING "HCL: Unable to set the connect point to it's parent 0x%p\n",
+		printk(KERN_WARNING "HCL: Unable to set the connect point to its parent 0x%p\n",
 			(void *)new_devfs_handle);
 	}
 

@@ -14,7 +14,7 @@
  * bridge.h - header file for bridge chip and bridge portion of xbridge chip
  *
  * Also including offsets for unique PIC registers.
- * The PIC asic is a follow-on to Xbridge and most of it's registers are
+ * The PIC asic is a follow-on to Xbridge and most of its registers are
  * identical to those of Xbridge.  PIC is different than Xbridge in that
  * it will accept 64 bit register access and that, in some cases, data
  * is kept in bits 63:32.   PIC registers that are identical to Xbridge

@@ -19,7 +19,7 @@
  *
  * HISTORY
  *
- *  10/05/98 dgb  Split directory operations into it's own file
+ *  10/05/98 dgb  Split directory operations into its own file
  *                Implemented directory reads via do_udf_readdir
  *  10/06/98      Made directory operations work!
  *  11/17/98      Rewrote directory to support ICBTAG_FLAG_AD_LONG

@@ -440,7 +440,7 @@ marvel_smp_callin(void)
 		return;
 
 	/* 
-	 * There is a local IO7 - redirect all of it's interrupts here.
+	 * There is a local IO7 - redirect all of its interrupts here.
 	 */
 	printk("Redirecting IO7 interrupts to local CPU at PE %u\n", cpuid);
 

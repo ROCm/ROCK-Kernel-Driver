@@ -77,7 +77,7 @@ static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 };
 
 /* an argresp is stored in an allocated page and holds the 
- * size of the argument or response, along with it's content
+ * size of the argument or response, along with its content
  */
 struct argresp {
 	ssize_t size;

@@ -255,7 +255,7 @@ printk("Preparing to start counters\n");
 }
 
 /*
- * Open the device and initialize all of it's memory.  The device is only 
+ * Open the device and initialize all of its memory.  The device is only 
  * opened once, but can be "queried" by multiple processes that know its
  * file descriptor.
  */

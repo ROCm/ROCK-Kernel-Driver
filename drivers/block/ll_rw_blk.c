@@ -1893,7 +1893,7 @@ static inline void blk_partition_remap(struct bio *bio)
 }
 
 /**
- * generic_make_request: hand a buffer to it's device driver for I/O
+ * generic_make_request: hand a buffer to its device driver for I/O
  * @bio:  The bio describing the location in memory and on the device.
  *
  * generic_make_request() is used to make I/O requests of block

@@ -101,7 +101,7 @@ typedef enum {
 
 /*
  * ether3 read/write.  Slow things down a bit...
- * The SEEQ8005 doesn't like us writing to it's registers
+ * The SEEQ8005 doesn't like us writing to its registers
  * too quickly.
  */
 static inline void ether3_outb(int v, const int r)

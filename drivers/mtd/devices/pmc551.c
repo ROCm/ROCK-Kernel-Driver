@@ -30,7 +30,7 @@
  *	 
  * Notes:
  *	 Due to what I assume is more buggy SROM, the 64M PMC551 I
- *	 have available claims that all 4 of it's DRAM banks have 64M
+ *	 have available claims that all 4 of its DRAM banks have 64M
  *	 of ram configured (making a grand total of 256M onboard).
  *	 This is slightly annoying since the BAR0 size reflects the
  *	 aperture size, not the dram size, and the V370PDC supplies no

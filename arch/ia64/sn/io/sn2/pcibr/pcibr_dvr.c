@@ -849,7 +849,7 @@ pcibr_device_info_new(
      * will set the c_slot (which is suppose to represent the external
      * slot (i.e the slot number silk screened on the back of the I/O
      * brick)).  So for PIC we need to adjust this "internal slot" num
-     * passed into us, into it's external representation.  See comment
+     * passed into us, into its external representation.  See comment
      * for the PCIBR_DEVICE_TO_SLOT macro for more information.
      */
     NEW(pcibr_info);

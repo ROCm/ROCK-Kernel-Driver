@@ -1449,7 +1449,7 @@ pcibr_slot_addr_space_init(devfs_handle_t pcibr_vhdl,
 	/*
 	 * The Adaptec 1160 FC Controller WAR #767995:
 	 * The part incorrectly ignores the upper 32 bits of a 64 bit
-	 * address when decoding references to it's registers so to
+	 * address when decoding references to its registers so to
 	 * keep it from responding to a bus cycle that it shouldn't
 	 * we only use I/O space to get at it's registers.  Don't
 	 * enable memory space accesses on that PCI device.

@@ -278,7 +278,7 @@ acpi_rs_memory32_range_resource (
 	/*
 	 *  Point to the place in the output buffer where the data portion will
 	 *  begin.
-	 *  1. Set the RESOURCE_DATA * Data to point to it's own address, then
+	 *  1. Set the RESOURCE_DATA * Data to point to its own address, then
 	 *  2. Set the pointer to the next address.
 	 *
 	 *  NOTE: output_struct->Data is cast to u8, otherwise, this addition adds

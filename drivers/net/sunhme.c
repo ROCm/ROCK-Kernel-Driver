@@ -1651,7 +1651,7 @@ static int happy_meal_init(struct happy_meal *hp)
 		    hme_read32(hp, etxregs + ETX_CFG) | ETX_CFG_DMAENABLE);
 
 	/* This chip really rots, for the receiver sometimes when you
-	 * write to it's control registers not all the bits get there
+	 * write to its control registers not all the bits get there
 	 * properly.  I cannot think of a sane way to provide complete
 	 * coverage for this hardware bug yet.
 	 */

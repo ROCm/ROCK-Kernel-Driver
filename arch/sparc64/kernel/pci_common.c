@@ -583,7 +583,7 @@ static int __init pci_intmap_match(struct pci_dev *pdev, unsigned int *interrupt
 	 * the PBM.
 	 *
 	 * However if that parent bridge has interrupt map/mask
-	 * properties of it's own we use the PROM register property
+	 * properties of its own we use the PROM register property
 	 * of the next child device on the path to PDEV.
 	 *
 	 * In detail the two cases are (note that the 'X' below is the
