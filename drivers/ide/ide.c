@@ -2018,16 +2018,6 @@ static void __init probe_for_hwifs (void)
 #endif
 }
 
-/*
- *	Actually unregister the subdriver. Called with the
- *	request lock dropped.
- */
- 
-static int default_cleanup (ide_drive_t *drive)
-{
-	return ide_unregister_subdriver(drive);
-}
-
 static ide_startstop_t default_do_request (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_end_request(drive, 0, 0);
@@ -2063,14 +2053,6 @@ static ide_startstop_t default_special (ide_drive_t *drive)
 	return ide_stopped;
 }
 
-static int default_attach (ide_drive_t *drive)
-{
-	printk(KERN_ERR "%s: does not support hotswap of device class !\n",
-		drive->name);
-
-	return 0;
-}
-
 static ide_startstop_t default_abort(ide_drive_t *drive, struct request *rq)
 {
 	return __ide_abort(drive, rq);
@@ -2085,7 +2067,8 @@ static ide_startstop_t default_start_power_step(ide_drive_t *drive,
 
 static void setup_driver_defaults (ide_driver_t *d)
 {
-	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
+	BUG_ON(d->attach == NULL || d->cleanup == NULL);
+
 	if (d->do_request == NULL)	d->do_request = default_do_request;
 	if (d->end_request == NULL)	d->end_request = default_end_request;
 	if (d->error == NULL)		d->error = default_error;
@@ -2093,7 +2076,6 @@ static void setup_driver_defaults (ide_driver_t *d)
 	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;
 	if (d->capacity == NULL)	d->capacity = default_capacity;
 	if (d->special == NULL)		d->special = default_special;
-	if (d->attach == NULL)		d->attach = default_attach;
 	if (d->start_power_step == NULL)
 		d->start_power_step = default_start_power_step;
 }
