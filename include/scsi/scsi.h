@@ -372,6 +372,14 @@ struct scsi_lun {
 #define SCSI_INQ_PQ_NOT_CON     0x01
 #define SCSI_INQ_PQ_NOT_CAP     0x03
 
+/*
+ * default timeouts
+ */
+#define FORMAT_UNIT_TIMEOUT		(12 * 60 * 60 * HZ)
+#define START_STOP_TIMEOUT		(60 * HZ)
+#define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
+#define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
+#define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
 
 /*
  * Here are some scsi specific ioctl commands which are sometimes useful.

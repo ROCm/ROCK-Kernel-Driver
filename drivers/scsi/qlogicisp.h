@@ -63,7 +63,7 @@ int isp1020_release(struct Scsi_Host *);
 const char * isp1020_info(struct Scsi_Host *);
 int isp1020_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int isp1020_abort(Scsi_Cmnd *);
-int isp1020_reset(Scsi_Cmnd *, unsigned int);
+int isp1020_reset(Scsi_Cmnd *);
 int isp1020_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int[]);
 #endif /* _QLOGICISP_H */

@@ -246,7 +246,7 @@ static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 /*
  * rq_lock - lock a given runqueue and disable interrupts.
  */
-static runqueue_t *this_rq_lock(void)
+static inline runqueue_t *this_rq_lock(void)
 {
 	runqueue_t *rq;
 
@@ -915,7 +915,7 @@ void fastcall sched_exit(task_t * p)
  * with the lock held can cause deadlocks; see schedule() for
  * details.)
  */
-static void finish_task_switch(task_t *prev)
+static inline void finish_task_switch(task_t *prev)
 {
 	runqueue_t *rq = this_rq();
 	struct mm_struct *mm = rq->prev_mm;
@@ -1036,7 +1036,7 @@ unsigned long nr_iowait(void)
  * Note this does not disable interrupts like task_rq_lock,
  * you need to do so manually before calling.
  */
-static void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
+static inline void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
 {
 	if (rq1 == rq2)
 		spin_lock(&rq1->lock);
@@ -1057,7 +1057,7 @@ static void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
  * Note this does not restore interrupts like task_rq_unlock,
  * you need to do so manually after calling.
  */
-static void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
+static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 {
 	spin_unlock(&rq1->lock);
 	if (rq1 != rq2)
