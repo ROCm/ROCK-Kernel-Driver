@@ -146,6 +146,8 @@ extern int acpi_pci_irq_enable(struct pci_dev *dev);
 EXPORT_SYMBOL(acpi_pci_irq_enable);
 extern int acpi_pci_irq_lookup (int segment, int bus, int device, int pin);
 EXPORT_SYMBOL(acpi_pci_irq_lookup);
+EXPORT_SYMBOL(acpi_pci_register_driver);
+EXPORT_SYMBOL(acpi_pci_unregister_driver);
 #endif /*CONFIG_ACPI_PCI */
 
 #ifdef CONFIG_ACPI_EC
