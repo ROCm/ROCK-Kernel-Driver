@@ -380,8 +380,10 @@ static int __init rd_init(void)
 out_queue:
 	unregister_blkdev(RAMDISK_MAJOR, "ramdisk");
 out:
-	while (i--)
+	while (i--) {
 		put_disk(rd_disks[i]);
+		blk_cleanup_queue(rd_queue[i]);
+	}
 	return err;
 }
 
