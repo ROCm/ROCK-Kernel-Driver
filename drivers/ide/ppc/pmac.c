@@ -42,7 +42,6 @@
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #endif
-#include "ide_modes.h"
 
 extern void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq);
 

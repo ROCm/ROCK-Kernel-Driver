@@ -1794,6 +1794,24 @@ extern char *ide_xfer_verbose(u8 xfer_rate);
 extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern int ide_set_xfer_rate(ide_drive_t *drive, u8 rate);
 
+typedef struct ide_pio_timings_s {
+	int	setup_time;	/* Address setup (ns) minimum */
+	int	active_time;	/* Active pulse (ns) minimum */
+	int	cycle_time;	/* Cycle time (ns) minimum = (setup + active + recovery) */
+} ide_pio_timings_t;
+
+typedef struct ide_pio_data_s {
+	u8 pio_mode;
+	u8 use_iordy;
+	u8 overridden;
+	u8 blacklisted;
+	unsigned int cycle_time;
+} ide_pio_data_t;
+
+extern u8 ide_get_best_pio_mode (ide_drive_t *drive, u8 mode_wanted, u8 max_mode, ide_pio_data_t *d);
+extern const ide_pio_timings_t ide_pio_timings[6];
+
+
 extern spinlock_t ide_lock;
 extern struct semaphore ide_cfg_sem;
 /*

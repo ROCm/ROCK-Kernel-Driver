@@ -161,8 +161,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ide_modes.h"
-
 
 /* default maximum number of failures */
 #define IDE_DEFAULT_MAX_FAILURES 	1

@@ -62,7 +62,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "hpt366.h"
 
 #if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
