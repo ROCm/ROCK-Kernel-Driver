@@ -202,10 +202,6 @@ tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 	p->bstats.bytes += skb->len;
 	p->bstats.packets++;
 
-	if (skb_cloned(skb) ) {
-		if (pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
-			return -1;
-	}
 	/* yes, we have to worry about both in and out dev
 	 worry later - danger - this API seems to have changed
 	 from earlier kernels */
