@@ -150,8 +150,10 @@ linvfs_mknod(
 
 		if (S_ISCHR(mode) || S_ISBLK(mode))
 			ip->i_rdev = to_kdev_t(rdev);
-		validate_fields(dir);
+		else if (S_ISDIR(mode))
+			validate_fields(ip);
 		d_instantiate(dentry, ip);
+		validate_fields(dir);
 	}
 
 	if (!error && have_default_acl) {
