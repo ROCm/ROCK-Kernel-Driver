@@ -199,7 +199,7 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 extern	int		 x_scsi_slave_alloc(Scsi_Device *);
 extern	int		 x_scsi_slave_configure(Scsi_Device *);
 extern	void		 x_scsi_slave_destroy(Scsi_Device *);
-extern	int		 x_scsi_proc_info(char *, char **, off_t, int, int, int);
+extern	int		 x_scsi_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 

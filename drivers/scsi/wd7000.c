@@ -1372,34 +1372,15 @@ static int wd7000_set_info(char *buffer, int length, struct Scsi_Host *host)
 }
 
 
-static int wd7000_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
+static int wd7000_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length,  int inout)
 {
-	struct Scsi_Host *host = NULL;
-	Adapter *adapter;
+	Adapter *adapter = (Adapter *)host->hostdata;
 	unsigned long flags;
 	char *pos = buffer;
-	short i;
-
 #ifdef WD7000_DEBUG
 	Mailbox *ogmbs, *icmbs;
 	short count;
 #endif
-
-	/*
-	 * Find the specified host board.
-	 */
-	for (i = 0; i < UNITS; i++)
-		if (wd7000_host[i] && (wd7000_host[i]->host_no == hostno)) {
-			host = wd7000_host[i];
-
-			break;
-		}
-
-	/*
-	 * Host not found!
-	 */
-	if (!host)
-		return (-ESRCH);
 
 	/*
 	 * Has data been written to the file ?
@@ -1407,10 +1388,8 @@ static int wd7000_proc_info(char *buffer, char **start, off_t offset, int length
 	if (inout)
 		return (wd7000_set_info(buffer, length, host));
 
-	adapter = (Adapter *) host->hostdata;
-
 	spin_lock_irqsave(host->host_lock, flags);
-	SPRINTF("Host scsi%d: Western Digital WD-7000 (rev %d.%d)\n", hostno, adapter->rev1, adapter->rev2);
+	SPRINTF("Host scsi%d: Western Digital WD-7000 (rev %d.%d)\n", host->host_no, adapter->rev1, adapter->rev2);
 	SPRINTF("  IO base:      0x%x\n", adapter->iobase);
 	SPRINTF("  IRQ:          %d\n", adapter->irq);
 	SPRINTF("  DMA channel:  %d\n", adapter->dma);

@@ -80,9 +80,12 @@ static void dump_packet(const char *text, quadlet_t *data, int size)
 static void run_packet_complete(struct hpsb_packet *packet)
 {
 	if (packet->complete_routine != NULL) {
-		packet->complete_routine(packet->complete_data);
+		void (*complete_routine)(void*) = packet->complete_routine;
+		void *complete_data = packet->complete_data;
+
 		packet->complete_routine = NULL;
 		packet->complete_data = NULL;
+		complete_routine(complete_data);
 	}
 	return;
 }
@@ -938,7 +941,7 @@ void abort_requests(struct hpsb_host *host)
 {
         unsigned long flags;
         struct hpsb_packet *packet;
-        struct list_head *lh;
+        struct list_head *lh, *tlh;
         LIST_HEAD(llist);
 
         host->driver->devctl(host, CANCEL_REQUESTS, 0);
@@ -948,8 +951,9 @@ void abort_requests(struct hpsb_host *host)
         INIT_LIST_HEAD(&host->pending_packets);
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each(lh, &llist) {
+        list_for_each_safe(lh, tlh, &llist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
+                list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
                 up(&packet->state_change);
@@ -962,7 +966,7 @@ void abort_timedouts(struct hpsb_host *host)
         unsigned long flags;
         struct hpsb_packet *packet;
         unsigned long expire;
-        struct list_head *lh, *next;
+        struct list_head *lh, *next, *tlh;
         LIST_HEAD(expiredlist);
 
         spin_lock_irqsave(&host->csr.lock, flags);
@@ -990,8 +994,9 @@ void abort_timedouts(struct hpsb_host *host)
 
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each(lh, &expiredlist) {
+        list_for_each_safe(lh, tlh, &expiredlist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
+                list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
                 up(&packet->state_change);

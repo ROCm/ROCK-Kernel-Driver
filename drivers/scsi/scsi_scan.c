@@ -641,6 +641,13 @@ static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
 		sdev->borken = 0;
 
 	/*
+	 * Some devices may not want to have a start command automatically
+	 * issued when a device is added.
+	 */
+	if (*bflags & BLIST_NOSTARTONADD)
+		sdev->no_start_on_add = 1;
+
+	/*
 	 * If we need to allow I/O to only one of the luns attached to
 	 * this target id at a time set single_lun, and allocate or modify
 	 * sdev_target.

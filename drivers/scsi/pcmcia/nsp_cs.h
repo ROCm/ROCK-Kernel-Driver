@@ -281,8 +281,8 @@ static unsigned int nsphw_start_selection(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
 static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time);
 
 static const char *nsp_info(struct Scsi_Host *shpnt);
-static int nsp_proc_info(char *buffer, char **start, off_t offset,
-			 int length, int hostno, int inout);
+static int nsp_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			 int length, int inout);
 static int nsp_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 
 /*static int nsp_eh_abort(Scsi_Cmnd * SCpnt);*/

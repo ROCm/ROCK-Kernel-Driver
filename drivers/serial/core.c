@@ -2023,7 +2023,7 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 }
 
 /*
- * This reverses the affects of uart_configure_port, hanging up the
+ * This reverses the effects of uart_configure_port, hanging up the
  * port before removal.
  */
 static void

@@ -32,9 +32,6 @@
 #define MACSCSI_PUBLIC_RELEASE 2
 
 #ifndef ASM
-int macscsi_proc_info (char *buffer, char **start, off_t offset,
-			int length, int hostno, int inout);
-
 #ifndef NULL
 #define NULL 0
 #endif

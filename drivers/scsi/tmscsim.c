@@ -2855,12 +2855,11 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
  else SPRINTF(" No  ")
 
 
-int DC390_proc_info (char *buffer, char **start,
-		     off_t offset, int length, int hostno, int inout)
+int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
+		     off_t offset, int length, int inout)
 {
   int dev, spd, spd1;
   char *pos = buffer;
-  PSH shpnt = 0;
   PACB pACB;
   PDCB pDCB;
   PSCSICMD pcmd;
@@ -2870,13 +2869,12 @@ int DC390_proc_info (char *buffer, char **start,
 
   while(pACB != (PACB)-1)
      {
-	shpnt = pACB->pScsiHost;
-	if (shpnt->host_no == hostno) break;
+	if (shpnt == pACB->pScsiHost)
+		break;
 	pACB = pACB->pNextACB;
      }
 
   if (pACB == (PACB)-1) return(-ESRCH);
-  if(!shpnt) return(-ESRCH);
 
   if(inout) /* Has data been written to the file ? */
       return dc390_set_info(buffer, length, pACB);

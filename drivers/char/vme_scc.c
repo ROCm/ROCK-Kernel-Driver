@@ -90,7 +90,7 @@ static irqreturn_t scc_spcond_int(int irq, void *data, struct pt_regs *fp);
 static void scc_setsignals(struct scc_port *port, int dtr, int rts);
 static void scc_break_ctl(struct tty_struct *tty, int break_state);
 
-static struct tty_driver scc_driver, scc_callout_driver;
+static struct tty_driver scc_driver;
 
 static struct tty_struct *scc_table[2] = { NULL, };
 static struct termios * scc_termios[2];
@@ -167,23 +167,8 @@ static int scc_init_drivers(void)
 	scc_driver.hangup = gs_hangup;
 	scc_driver.break_ctl = scc_break_ctl;
 
-	scc_callout_driver = scc_driver;
-#ifdef CONFIG_DEVFS_FS
-	scc_callout_driver.name = "cua/";
-#else
-	scc_callout_driver.name = "cua";
-#endif
-	scc_callout_driver.major = TTYAUX_MAJOR;
-	scc_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
 	if ((error = tty_register_driver(&scc_driver))) {
 		printk(KERN_ERR "scc: Couldn't register scc driver, error = %d\n",
-		       error);
-		return 1;
-	}
-	if ((error = tty_register_driver(&scc_callout_driver))) {
-		tty_unregister_driver(&scc_driver);
-		printk(KERN_ERR "scc: Couldn't register scc callout driver, error = %d\n",
 		       error);
 		return 1;
 	}
@@ -202,7 +187,6 @@ static void scc_init_portstructs(void)
 
 	for (i = 0; i < 2; i++) {
 		port = scc_ports + i;
-		port->gs.callout_termios = tty_std_termios;
 		port->gs.normal_termios = tty_std_termios;
 		port->gs.magic = SCC_MAGIC;
 		port->gs.close_delay = HZ/2;
@@ -599,18 +583,11 @@ static irqreturn_t scc_stat_int(int irq, void *data, struct pt_regs *fp)
 		if (!(port->gs.flags & ASYNC_CHECK_CD))
 			;	/* Don't report DCD changes */
 		else if (port->c_dcd) {
-			if (~(port->gs.flags & ASYNC_NORMAL_ACTIVE) ||
-				~(port->gs.flags & ASYNC_CALLOUT_ACTIVE)) {
-				/* Are we blocking in open?*/
-				wake_up_interruptible(&port->gs.open_wait);
-			}
+			wake_up_interruptible(&port->gs.open_wait);
 		}
 		else {
-			if (!((port->gs.flags & ASYNC_CALLOUT_ACTIVE) &&
-					(port->gs.flags & ASYNC_CALLOUT_NOHUP))) {
-				if (port->gs.tty)
-					tty_hangup (port->gs.tty);
-			}
+			if (port->gs.tty)
+				tty_hangup (port->gs.tty);
 		}
 	}
 	SCCwrite(COMMAND_REG, CR_EXTSTAT_RESET);
@@ -949,15 +926,10 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 	}
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = port->gs.normal_termios;
-		else 
-			*tty->termios = port->gs.callout_termios;
+		*tty->termios = port->gs.normal_termios;
 		scc_set_real_termios (port);
 	}
 
-	port->gs.session = current->session;
-	port->gs.pgrp = current->pgrp;
 	port->c_dcd = scc_get_CD (port);
 
 	scc_enable_rx_interrupts(port);

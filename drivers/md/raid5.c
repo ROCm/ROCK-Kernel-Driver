@@ -20,7 +20,6 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/raid/raid5.h>
-#include <linux/bio.h>
 #include <linux/highmem.h>
 #include <asm/bitops.h>
 #include <asm/atomic.h>
@@ -458,6 +457,7 @@ static void raid5_build_block (struct stripe_head *sh, int i)
 
 static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
+	char b[BDEVNAME_SIZE];
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	PRINTK("raid5: error called\n");
 
@@ -477,7 +477,7 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 		printk (KERN_ALERT
 			"raid5: Disk failure on %s, disabling device."
 			" Operation continuing on %d devices\n",
-			bdev_partition_name(rdev->bdev), conf->working_disks);
+			bdevname(rdev->bdev,b), conf->working_disks);
 	}
 }	
 
@@ -919,7 +919,7 @@ static void handle_stripe(struct stripe_head *sh)
 	/* check if the array has lost two devices and, if so, some requests might
 	 * need to be failed
 	 */
-	if (failed > 1 && to_read+to_write) {
+	if (failed > 1 && to_read+to_write+written) {
 		spin_lock_irq(&conf->device_lock);
 		for (i=disks; i--; ) {
 			/* fail all writes first */
@@ -937,6 +937,20 @@ static void handle_stripe(struct stripe_head *sh)
 				}
 				bi = nextbi;
 			}
+			/* and fail all 'written' */
+			bi = sh->dev[i].written;
+			sh->dev[i].written = NULL;
+			while (bi && bi->bi_sector < dev->sector + STRIPE_SECTORS) {
+				struct bio *bi2 = bi->bi_next;
+				clear_bit(BIO_UPTODATE, &bi->bi_flags);
+				if (--bi->bi_phys_segments == 0) {
+					md_write_end(conf->mddev);
+					bi->bi_next = return_bi;
+					return_bi = bi;
+				}
+				bi = bi2;
+			}
+
 			/* fail any reads if this device is non-operational */
 			if (!test_bit(R5_Insync, &sh->dev[i].flags)) {
 				bi = sh->dev[i].toread;
@@ -1439,7 +1453,9 @@ static int run (mddev_t *mddev)
 		return -EIO;
 	}
 
-	mddev->private = kmalloc (sizeof (raid5_conf_t), GFP_KERNEL);
+	mddev->private = kmalloc (sizeof (raid5_conf_t)
+				  + mddev->raid_disks * sizeof(struct disk_info),
+				  GFP_KERNEL);
 	if ((conf = mddev->private) == NULL)
 		goto abort;
 	memset (conf, 0, sizeof (*conf));
@@ -1463,7 +1479,7 @@ static int run (mddev_t *mddev)
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		raid_disk = rdev->raid_disk;
-		if (raid_disk > mddev->raid_disks
+		if (raid_disk >= mddev->raid_disks
 		    || raid_disk < 0)
 			continue;
 		disk = conf->disks + raid_disk;
@@ -1471,8 +1487,9 @@ static int run (mddev_t *mddev)
 		disk->rdev = rdev;
 
 		if (rdev->in_sync) {
+			char b[BDEVNAME_SIZE];
 			printk(KERN_INFO "raid5: device %s operational as raid"
-				" disk %d\n", bdev_partition_name(rdev->bdev),
+				" disk %d\n", bdevname(rdev->bdev,b),
 				raid_disk);
 			conf->working_disks++;
 		}
@@ -1648,11 +1665,12 @@ static void print_raid5_conf (raid5_conf_t *conf)
 		 conf->working_disks, conf->failed_disks);
 
 	for (i = 0; i < conf->raid_disks; i++) {
+		char b[BDEVNAME_SIZE];
 		tmp = conf->disks + i;
 		if (tmp->rdev)
 		printk(" disk %d, o:%d, dev:%s\n",
 			i, !tmp->rdev->faulty,
-			bdev_partition_name(tmp->rdev->bdev));
+			bdevname(tmp->rdev->bdev,b));
 	}
 }
 

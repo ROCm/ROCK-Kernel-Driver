@@ -11,7 +11,6 @@
 /* Common forward declarations for all Linux-versions: */
 
 /* Interfaces to the midlevel Linux SCSI driver */
-static int ibmmca_proc_info (char *, char **, off_t, int, int, int);
 static int ibmmca_detect (Scsi_Host_Template *);
 static int ibmmca_release (struct Scsi_Host *);
 static int ibmmca_command (Scsi_Cmnd *);

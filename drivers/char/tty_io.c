@@ -1305,7 +1305,6 @@ static int tty_open(struct inode * inode, struct file * filp)
 	int index;
 	kdev_t device;
 	unsigned short saved_flags;
-	char	buf[64];
 
 	saved_flags = filp->f_flags;
 retry_open:
@@ -1379,7 +1378,7 @@ got_driver:
 	    tty->driver->subtype == PTY_TYPE_MASTER)
 		noctty = 1;
 #ifdef TTY_DEBUG_HANGUP
-	printk(KERN_DEBUG "opening %s...", tty_name(tty, buf));
+	printk(KERN_DEBUG "opening %s...", tty->name);
 #endif
 	if (tty->driver->open)
 		retval = tty->driver->open(tty, filp);
@@ -1393,7 +1392,7 @@ got_driver:
 	if (retval) {
 #ifdef TTY_DEBUG_HANGUP
 		printk(KERN_DEBUG "error %d in opening %s...", retval,
-		       tty_name(tty, buf));
+		       tty->name);
 #endif
 
 		release_dev(filp);
@@ -1418,19 +1417,6 @@ got_driver:
 		current->tty_old_pgrp = 0;
 		tty->session = current->session;
 		tty->pgrp = current->pgrp;
-	}
-	if ((tty->driver->type == TTY_DRIVER_TYPE_SERIAL) &&
-	    (tty->driver->subtype == SERIAL_TYPE_CALLOUT) &&
-	    (tty->count == 1)) {
-		static int nr_warns;
-		if (nr_warns < 5) {
-			printk(KERN_WARNING "tty_io.c: "
-				"process %d (%s) used obsolete /dev/%s - "
-				"update software to use /dev/ttyS%d\n",
-				current->pid, current->comm,
-				tty_name(tty, buf), TTY_NUMBER(tty));
-			nr_warns++;
-		}
 	}
 	return 0;
 }

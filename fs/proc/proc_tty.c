@@ -57,8 +57,6 @@ static void show_tty_range(struct seq_file *m, struct tty_driver *p,
 		break;
 	case TTY_DRIVER_TYPE_SERIAL:
 		seq_printf(m, "serial");
-		if (p->subtype == 2)
-			seq_printf(m, ":callout");
 		break;
 	case TTY_DRIVER_TYPE_PTY:
 		if (p->subtype == PTY_TYPE_MASTER)

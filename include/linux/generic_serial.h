@@ -37,11 +37,8 @@ struct gs_port {
   /*  struct semaphore        port_write_sem; */
   int                     flags;
   struct termios          normal_termios;
-  struct termios          callout_termios;
   wait_queue_head_t       open_wait;
   wait_queue_head_t       close_wait;
-  long                    session;
-  long                    pgrp;
   int                     count;
   int                     blocked_open;
   struct tty_struct       *tty;
@@ -67,8 +64,6 @@ struct gs_port {
 
 
 #define GS_TYPE_NORMAL   1
-#define GS_TYPE_CALLOUT  2
-
 
 #define GS_DEBUG_FLUSH   0x00000001
 #define GS_DEBUG_BTR     0x00000002
