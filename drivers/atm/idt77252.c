@@ -3841,7 +3841,7 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	return 0;
 }
 
-static struct pci_device_id idt77252_pci_tbl[] __devinitdata =
+static struct pci_device_id idt77252_pci_tbl[] =
 {
 	{ PCI_VENDOR_ID_IDT, PCI_DEVICE_ID_IDT_IDT77252,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },

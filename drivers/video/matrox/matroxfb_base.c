@@ -2012,7 +2012,7 @@ static void pci_remove_matrox(struct pci_dev* pdev) {
 	matroxfb_remove(PMINFO 1);
 }
 
-static struct pci_device_id matroxfb_devices[] __devinitdata = {
+static struct pci_device_id matroxfb_devices[] = {
 #ifdef CONFIG_FB_MATROX_MILLENIUM
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL,
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
