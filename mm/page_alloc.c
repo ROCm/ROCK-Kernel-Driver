@@ -43,14 +43,6 @@ static int zone_balance_ratio[MAX_NR_ZONES] __initdata = { 128, 128, 128, };
 static int zone_balance_min[MAX_NR_ZONES] __initdata = { 20 , 20, 20, };
 static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
 
-#define memlist_init(x) INIT_LIST_HEAD(x)
-#define memlist_add_head list_add
-#define memlist_add_tail list_add_tail
-#define memlist_del list_del
-#define memlist_entry list_entry
-#define memlist_next(x) ((x)->next)
-#define memlist_prev(x) ((x)->prev)
-
 /*
  * Temporary debugging check.
  */
@@ -145,13 +137,13 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		if (BAD_RANGE(zone,buddy2))
 			BUG();
 
-		memlist_del(&buddy1->list);
+		list_del(&buddy1->list);
 		mask <<= 1;
 		area++;
 		index >>= 1;
 		page_idx &= mask;
 	}
-	memlist_add_head(&(base + page_idx)->list, &area->free_list);
+	list_add(&(base + page_idx)->list, &area->free_list);
 
 	spin_unlock_irqrestore(&zone->lock, flags);
 	return;
@@ -181,7 +173,7 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 		area--;
 		high--;
 		size >>= 1;
-		memlist_add_head(&(page)->list, &(area)->free_list);
+		list_add(&(page)->list, &(area)->free_list);
 		MARK_USED(index, high, area);
 		index += size;
 		page += size;
@@ -203,15 +195,15 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 	spin_lock_irqsave(&zone->lock, flags);
 	do {
 		head = &area->free_list;
-		curr = memlist_next(head);
+		curr = head->next;
 
 		if (curr != head) {
 			unsigned int index;
 
-			page = memlist_entry(curr, struct page, list);
+			page = list_entry(curr, struct page, list);
 			if (BAD_RANGE(zone,page))
 				BUG();
-			memlist_del(curr);
+			list_del(curr);
 			index = page - zone->zone_mem_map;
 			if (curr_order != MAX_ORDER-1)
 				MARK_USED(index, curr_order, area);
@@ -673,7 +665,7 @@ void show_free_areas_core(pg_data_t *pgdat)
 				curr = head;
 				nr = 0;
 				for (;;) {
-					curr = memlist_next(curr);
+					curr = curr->next;
 					if (curr == head)
 						break;
 					nr++;
@@ -903,7 +895,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 			set_page_zone(page, nid * MAX_NR_ZONES + j);
 			set_page_count(page, 0);
 			SetPageReserved(page);
-			memlist_init(&page->list);
+			INIT_LIST_HEAD(&page->list);
 			if (j != ZONE_HIGHMEM)
 				set_page_address(page, __va(zone_start_paddr));
 			zone_start_paddr += PAGE_SIZE;
@@ -913,7 +905,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		for (i = 0; ; i++) {
 			unsigned long bitmap_size;
 
-			memlist_init(&zone->free_area[i].free_list);
+			INIT_LIST_HEAD(&zone->free_area[i].free_list);
 			if (i == MAX_ORDER-1) {
 				zone->free_area[i].map = NULL;
 				break;
