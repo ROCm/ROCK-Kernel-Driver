@@ -139,10 +139,8 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th,
 /* preallocated blocks don't need to be run through journal_mark_freed */
 void reiserfs_free_prealloc_block (struct reiserfs_transaction_handle *th, 
                           unsigned long block) {
-    struct super_block * s = th->t_super;
-
-    RFALSE(!s, "vs-4060: trying to free block on nonexistent device");
-    RFALSE(is_reusable (s, block, 1) == 0, "vs-4070: can not free such block");
+    RFALSE(!th->t_super, "vs-4060: trying to free block on nonexistent device");
+    RFALSE(is_reusable (th->t_super, block, 1) == 0, "vs-4070: can not free such block");
     _reiserfs_free_block(th, block) ;
 }
 
