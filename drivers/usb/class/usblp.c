@@ -610,7 +610,7 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 		if (!usblp->wcomplete) {
 			barrier();
 			if (file->f_flags & O_NONBLOCK)
-				return -EAGAIN;
+				return writecount ? writecount : -EAGAIN;
 
 			timeout = USBLP_WRITE_TIMEOUT;
 			add_wait_queue(&usblp->wait, &wait);
@@ -673,8 +673,8 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 
 		usblp->writeurb->dev = usblp->dev;
 		usblp->wcomplete = 0;
-		if (usb_submit_urb(usblp->writeurb, GFP_KERNEL)) {
-			count = -EIO;
+		if (err = usb_submit_urb(usblp->writeurb, GFP_KERNEL)) {
+			count = err != -ENOMEM ? -EIO : (writecount ? writecount : -ENOMEM);
 			up (&usblp->sem);
 			break;
 		}
