@@ -88,10 +88,6 @@
 #define u_int		unsigned int
 #define u_long		unsigned long
 
-#ifndef bcopy
-#define bcopy(s, d, n)	memcpy((d), (s), (n))
-#endif
-
 #ifndef bcmp
 #define bcmp(s, d, n)	memcmp((d), (s), (n))
 #endif
