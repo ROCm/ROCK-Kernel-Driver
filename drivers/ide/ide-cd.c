@@ -908,7 +908,7 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 	ide_set_handler(drive, handler, rq->timeout, cdrom_timer_expiry);
 
 	/* ATAPI commands get padded out to 12 bytes minimum */
-	cmd_len = rq->cmd_len;
+	cmd_len = COMMAND_SIZE(rq->cmd[0]);
 	if (cmd_len < ATAPI_MIN_CDB_BYTES)
 		cmd_len = ATAPI_MIN_CDB_BYTES;
 
