@@ -122,7 +122,7 @@ CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 NETWORKS	=net/network.o
 
 LIBS		=$(TOPDIR)/lib/lib.a
-SUBDIRS		=kernel lib drivers mm fs net ipc
+SUBDIRS		=kernel lib drivers mm fs net ipc sound
 
 DRIVERS-n :=
 DRIVERS-y :=
@@ -156,7 +156,7 @@ ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFI
 DRIVERS-y += drivers/cdrom/driver.o
 endif
 
-DRIVERS-$(CONFIG_SOUND) += drivers/sound/sounddrivers.o
+DRIVERS-$(CONFIG_SOUND) += sound/sound.o
 DRIVERS-$(CONFIG_PCI) += drivers/pci/driver.o
 DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
 DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
@@ -201,7 +201,7 @@ CLEAN_FILES = \
 	drivers/char/drm/*-mod.c \
 	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
 	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
-	drivers/sound/bin2hex drivers/sound/hex2hex \
+	sound/oss/bin2hex sound/oss/hex2hex \
 	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
 	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
 	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
@@ -222,11 +222,11 @@ MRPROPER_FILES = \
 	drivers/net/hamradio/soundmodem/sm_tbl_{hapn4800,psk4800}.h \
 	drivers/net/hamradio/soundmodem/sm_tbl_{afsk2400_7,afsk2400_8}.h \
 	drivers/net/hamradio/soundmodem/gentbl \
-	drivers/sound/*_boot.h drivers/sound/.*.boot \
-	drivers/sound/msndinit.c \
-	drivers/sound/msndperm.c \
-	drivers/sound/pndsperm.c \
-	drivers/sound/pndspini.c \
+	sound/oss/*_boot.h sound/oss/.*.boot \
+	sound/oss/msndinit.c \
+	sound/oss/msndperm.c \
+	sound/oss/pndsperm.c \
+	sound/oss/pndspini.c \
 	drivers/atm/fore200e_*_fw.c drivers/atm/.fore200e_*.fw \
 	.version .config* config.in config.old \
 	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
@@ -343,7 +343,7 @@ init/main.o: init/main.c include/config/MARKER
 init/do_mounts.o: init/do_mounts.c include/config/MARKER
 	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -c -o $*.o $<
 
-fs lib mm ipc kernel drivers net: dummy
+fs lib mm ipc kernel drivers net sound: dummy
 	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 TAGS: dummy

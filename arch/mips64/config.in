@@ -234,7 +234,7 @@ comment 'Sound'
 
 tristate 'Sound card support' CONFIG_SOUND
 if [ "$CONFIG_SOUND" != "n" ]; then
-   source drivers/sound/Config.in
+   source sound/Config.in
 fi
 endmenu
 

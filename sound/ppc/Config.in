@@ -1,0 +1,3 @@
+# ALSA PowerMac drivers
+
+dep_tristate 'PowerMac (AWACS, DACA, Burgundy, Tumbler, Keywest)' CONFIG_SND_POWERMAC $CONFIG_SND

@@ -1,0 +1,31 @@
+# ALSA ISA drivers
+
+dep_tristate 'Analog Devices SoundPort AD1816A' CONFIG_SND_AD1816A $CONFIG_SND
+dep_tristate 'Generic AD1848/CS4248 driver' CONFIG_SND_AD1848 $CONFIG_SND
+dep_tristate 'Generic Cirrus Logic CS4231 driver' CONFIG_SND_CS4231 $CONFIG_SND
+dep_tristate 'Generic Cirrus Logic CS4232 driver' CONFIG_SND_CS4232 $CONFIG_SND
+dep_tristate 'Generic Cirrus Logic CS4236+ driver' CONFIG_SND_CS4236 $CONFIG_SND
+dep_tristate 'Generic ESS ES968 driver' CONFIG_SND_ES968 $CONFIG_SND
+dep_tristate 'Generic ESS ES1688 driver' CONFIG_SND_ES1688 $CONFIG_SND
+dep_tristate 'Generic ESS ES18xx driver' CONFIG_SND_ES18XX $CONFIG_SND
+dep_tristate 'Gravis UltraSound Classic' CONFIG_SND_GUSCLASSIC $CONFIG_SND
+dep_tristate 'Gravis UltraSound Extreme' CONFIG_SND_GUSEXTREME $CONFIG_SND
+dep_tristate 'Gravis UltraSound MAX' CONFIG_SND_GUSMAX $CONFIG_SND
+dep_tristate 'AMD InterWave, Gravis UltraSound PnP' CONFIG_SND_INTERWAVE $CONFIG_SND
+dep_tristate 'AMD InterWave + TEA6330T (UltraSound 32-Pro)' CONFIG_SND_INTERWAVE_STB $CONFIG_SND
+dep_tristate 'OPTi 82C92x - AD1848' CONFIG_SND_OPTI92X_AD1848 $CONFIG_SND
+dep_tristate 'OPTi 82C92x - CS4231' CONFIG_SND_OPTI92X_CS4231 $CONFIG_SND
+dep_tristate 'OPTi 82C93x' CONFIG_SND_OPTI93X $CONFIG_SND
+dep_tristate 'Sound Blaster 1.0/2.0/Pro (8-bit)' CONFIG_SND_SB8 $CONFIG_SND
+dep_tristate 'Sound Blaster 16 (PnP)' CONFIG_SND_SB16 $CONFIG_SND
+dep_tristate 'Sound Blaster AWE (32,64) (PnP)' CONFIG_SND_SBAWE $CONFIG_SND
+if [ "$CONFIG_SND_SB16" != "n" -o "$CONFIG_SND_SBAWE" != "n" ]; then
+  dep_bool 'Sound Blaster 16/AWE CSP support' CONFIG_SND_SB16_CSP
+fi
+dep_tristate 'Turtle Beach Maui,Tropez,Tropez+ (Wavefront)' CONFIG_SND_WAVEFRONT $CONFIG_SND
+dep_tristate 'Avance Logic ALS100/ALS120' CONFIG_SND_ALS100 $CONFIG_SND
+dep_tristate 'Aztech Systems AZT2320' CONFIG_SND_AZT2320 $CONFIG_SND
+dep_tristate 'C-Media CMI8330' CONFIG_SND_CMI8330 $CONFIG_SND
+dep_tristate 'Diamond Technologies DT-0197H' CONFIG_SND_DT0197H $CONFIG_SND
+dep_tristate 'Yamaha OPL3-SA2/SA3' CONFIG_SND_OPL3SA2 $CONFIG_SND
+dep_tristate 'Aztech Sound Galaxy' CONFIG_SND_SGALAXY $CONFIG_SND
