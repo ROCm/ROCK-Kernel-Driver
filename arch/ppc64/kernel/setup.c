@@ -283,6 +283,10 @@ EXPORT_SYMBOL(machine_halt);
 unsigned long ppc_proc_freq;
 unsigned long ppc_tb_freq;
 
+#ifdef CONFIG_SMP
+DEFINE_PER_CPU(unsigned int, pvr);
+#endif
+
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
 	unsigned long cpu_id = (unsigned long)v - 1;
@@ -302,7 +306,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 
 #ifdef CONFIG_SMP
-	pvr = paca[cpu_id].pvr;
+	pvr = per_cpu(pvr, cpu_id);
 #else
 	pvr = _get_PVR();
 #endif

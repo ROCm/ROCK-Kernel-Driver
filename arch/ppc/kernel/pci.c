@@ -46,7 +46,9 @@ static int reparent_resources(struct resource *parent, struct resource *res);
 static void fixup_rev1_53c810(struct pci_dev* dev);
 static void fixup_cpc710_pci64(struct pci_dev* dev);
 #ifdef CONFIG_PPC_PMAC
-static void pcibios_fixup_cardbus(struct pci_dev* dev);
+extern void pmac_pci_fixup_cardbus(struct pci_dev* dev);
+extern void pmac_pci_fixup_pciata(struct pci_dev* dev);
+extern void pmac_pci_fixup_k2_sata(struct pci_dev* dev);
 #endif
 #ifdef CONFIG_PPC_OF
 static u8* pci_to_OF_bus_map;
@@ -69,7 +71,9 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pcibios_fixup_resources },
 #ifdef CONFIG_PPC_PMAC
 	/* We should add per-machine fixup support in xxx_setup.c or xxx_pci.c */
-	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_ANY_ID,			pcibios_fixup_cardbus },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_TI,	PCI_ANY_ID,			pmac_pci_fixup_cardbus },
+	{ PCI_FIXUP_FINAL,	PCI_ANY_ID,		PCI_ANY_ID,			pmac_pci_fixup_pciata },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS, 0x0240,			pmac_pci_fixup_k2_sata },
 #endif /* CONFIG_PPC_PMAC */
  	{ 0 }
 };
@@ -155,42 +159,6 @@ pcibios_fixup_resources(struct pci_dev *dev)
 		ppc_md.pcibios_fixup_resources(dev);
 }
 
-#ifdef CONFIG_PPC_PMAC
-static void
-pcibios_fixup_cardbus(struct pci_dev* dev)
-{
-	if (_machine != _MACH_Pmac)
-		return;
-	/*
-	 * Fix the interrupt routing on the various cardbus bridges
-	 * used on powerbooks
-	 */
-	if (dev->vendor != PCI_VENDOR_ID_TI)
-		return;
-	if (dev->device == PCI_DEVICE_ID_TI_1130 ||
-	    dev->device == PCI_DEVICE_ID_TI_1131) {
-		u8 val;
-	    	/* Enable PCI interrupt */
-		if (pci_read_config_byte(dev, 0x91, &val) == 0)
-			pci_write_config_byte(dev, 0x91, val | 0x30);
-		/* Disable ISA interrupt mode */
-		if (pci_read_config_byte(dev, 0x92, &val) == 0)
-			pci_write_config_byte(dev, 0x92, val & ~0x06);
-	}
-	if (dev->device == PCI_DEVICE_ID_TI_1210 ||
-	    dev->device == PCI_DEVICE_ID_TI_1211 ||
-	    dev->device == PCI_DEVICE_ID_TI_1410) {
-		u8 val;
-		/* 0x8c == TI122X_IRQMUX, 2 says to route the INTA
-		   signal out the MFUNC0 pin */
-		if (pci_read_config_byte(dev, 0x8c, &val) == 0)
-			pci_write_config_byte(dev, 0x8c, (val & ~0x0f) | 2);
-		/* Disable ISA interrupt mode */
-		if (pci_read_config_byte(dev, 0x92, &val) == 0)
-			pci_write_config_byte(dev, 0x92, val & ~0x06);
-	}
-}
-#endif /* CONFIG_PPC_PMAC */
 
 void
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
@@ -832,6 +800,17 @@ pci_busdev_to_OF_node(struct pci_bus *bus, int devfn)
 		return NULL;
 
 	/* Fixup bus number according to what OF think it is. */
+#ifdef CONFIG_PPC_PMAC
+	/* The G5 need a special case here. Basically, we don't remap all
+	 * busses on it so we don't create the pci-OF-map. However, we do
+	 * remap the AGP bus and so have to deal with it. A future better
+	 * fix has to be done by making the remapping per-host and always
+	 * filling the pci_to_OF map. --BenH
+	 */
+	if (_machine == _MACH_Pmac && busnr >= 0xf0)
+		busnr -= 0xf0;
+	else
+#endif
 	if (pci_to_OF_bus_map)
 		busnr = pci_to_OF_bus_map[busnr];
 	if (busnr == 0xff)
@@ -922,9 +901,10 @@ void __init
 pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			   struct device_node *dev, int primary)
 {
-	unsigned int *ranges, *prev;
+	static unsigned int static_lc_ranges[256] __initdata;
+	unsigned int *dt_ranges, *lc_ranges, *ranges, *prev;
 	unsigned int size;
-	int rlen = 0;
+	int rlen = 0, orig_rlen;
 	int memno = 0;
 	struct resource *res;
 	int np, na = prom_n_addr_cells(dev);
@@ -934,7 +914,22 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	 * that can have more than 3 ranges, fortunately using contiguous
 	 * addresses -- BenH
 	 */
-	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
+	dt_ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
+	if (!dt_ranges)
+		return;
+	/* Sanity check, though hopefully that never happens */
+	if (rlen > sizeof(static_lc_ranges)) {
+		printk(KERN_WARNING "OF ranges property too large !\n");
+		rlen = sizeof(static_lc_ranges);
+	}
+	lc_ranges = static_lc_ranges;
+	memcpy(lc_ranges, dt_ranges, rlen);
+	orig_rlen = rlen;
+
+	/* Let's work on a copy of the "ranges" property instead of damaging
+	 * the device-tree image in memory
+	 */
+	ranges = lc_ranges;
 	prev = NULL;
 	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
 		if (prev) {
@@ -959,10 +954,9 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	 *			(size depending on dev->n_addr_cells)
 	 *   cells 4+5 or 5+6:	the size of the range
 	 */
-	rlen = 0;
-	hose->io_base_phys = 0;
-	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
-	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
+	ranges = lc_ranges;
+	rlen = orig_rlen;
+	while (ranges && (rlen -= np * sizeof(unsigned int)) >= 0) {
 		res = NULL;
 		size = ranges[na+4];
 		switch (ranges[0] >> 24) {
@@ -1059,7 +1053,7 @@ do_update_p2p_io_resource(struct pci_bus *bus, int enable_vga)
 
  	res = *(bus->resource[0]);
 
-	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->name);
+	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->slot_name);
 	res.start -= ((unsigned long) hose->io_base_virt - isa_io_base);
 	res.end -= ((unsigned long) hose->io_base_virt - isa_io_base);
 	DBG("  IO window: %08lx-%08lx\n", res.start, res.end);
@@ -1662,12 +1656,23 @@ pci_bus_to_phys(unsigned int ba, int busnr)
  * Note that the returned IO or memory base is a physical address
  */
 
-long
-sys_pciconfig_iobase(long which, unsigned long bus, unsigned long devfn)
+long sys_pciconfig_iobase(long which, unsigned long bus, unsigned long devfn)
 {
-	struct pci_controller* hose = pci_bus_to_hose(bus);
+	struct pci_controller* hose;
 	long result = -EOPNOTSUPP;
 
+	/* Argh ! Please forgive me for that hack, but that's the
+	 * simplest way to get existing XFree to not lockup on some
+	 * G5 machines... So when something asks for bus 0 io base
+	 * (bus 0 is HT root), we return the AGP one instead.
+	 */
+#ifdef CONFIG_PPC_PMAC
+	if (_machine == _MACH_Pmac && machine_is_compatible("MacRISC4"))
+		if (bus == 0)
+			bus = 0xf0;
+#endif /* CONFIG_PPC_PMAC */
+
+	hose = pci_bus_to_hose(bus);
 	if (!hose)
 		return -ENODEV;
 

@@ -2034,7 +2034,7 @@ out_disable:
 	pci_free_consistent(pci_dev, 4 * DESC_SIZE * NR_RX_DESC, dev->rx_info.descs, dev->rx_info.phy_descs);
 	pci_disable_device(pci_dev);
 out_free:
-	kfree(dev);
+	free_netdev(&dev->net_dev);
 	pci_set_drvdata(pci_dev, NULL);
 out:
 	return err;

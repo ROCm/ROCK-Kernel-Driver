@@ -1,6 +1,8 @@
 /*
  * uninorth.h: definitions for using the "UniNorth" host bridge chip
  *             from Apple. This chip is used on "Core99" machines
+ *	       This also includes U2 used on more recent MacRISC2/3
+ *             machines and U3 (G5) 
  *
  */
 #ifdef __KERNEL__
@@ -8,23 +10,26 @@
 #define __ASM_UNINORTH_H__
 
 /*
- * Uni-N config space reg. definitions
+ * Uni-N and U3 config space reg. definitions
  *
  * (Little endian)
  */
 
 /* Address ranges selection. This one should work with Bandit too */
+/* Not U3 */
 #define UNI_N_ADDR_SELECT		0x48
 #define UNI_N_ADDR_COARSE_MASK		0xffff0000	/* 256Mb regions at *0000000 */
 #define UNI_N_ADDR_FINE_MASK		0x0000ffff	/*  16Mb regions at f*000000 */
 
 /* AGP registers */
+/* Not U3 */
 #define UNI_N_CFG_GART_BASE		0x8c
 #define UNI_N_CFG_AGP_BASE		0x90
 #define UNI_N_CFG_GART_CTRL		0x94
 #define UNI_N_CFG_INTERNAL_STATUS	0x98
 
 /* UNI_N_CFG_GART_CTRL bits definitions */
+/* Not U3 */
 #define UNI_N_CFG_GART_INVAL		0x00000001
 #define UNI_N_CFG_GART_ENABLE		0x00000100
 #define UNI_N_CFG_GART_2xRESET		0x00010000
@@ -90,6 +95,14 @@
 /* Version of the UniNorth chip */
 #define UNI_N_VERSION			0x0000		/* Known versions: 3,7 and 8 */
 
+#define UNI_N_VERSION_107		0x0003		/* 1.0.7 */
+#define UNI_N_VERSION_10A		0x0007		/* 1.0.10 */
+#define UNI_N_VERSION_150		0x0011		/* 1.5 */
+#define UNI_N_VERSION_200		0x0024		/* 2.0 */
+#define UNI_N_VERSION_PANGEA		0x00C0		/* Integrated U1 + K */
+#define UNI_N_VERSION_INTREPID		0x00D2		/* Integrated U2 + K */
+#define UNI_N_VERSION_300		0x0030		/* 3.0 (U3 on G5) */
+
 /* This register is used to enable/disable various clocks */
 #define UNI_N_CLOCK_CNTL		0x0020
 #define UNI_N_CLOCK_CNTL_PCI		0x00000001	/* PCI2 clock control */
@@ -130,6 +143,27 @@
 #define UNI_N_HWINIT_STATE_CPU1_FLAG	0x10000000
 
 /* Uninorth 1.5 rev. has additional perf. monitor registers at 0xf00-0xf50 */
+
+
+/*
+ * U3 specific registers
+ */
+
+
+/* U3 Toggle */
+#define U3_TOGGLE_REG			0x00e0
+#define U3_PMC_START_STOP		0x0001
+#define U3_MPIC_RESET			0x0002
+#define U3_MPIC_OUTPUT_ENABLE		0x0004
+
+/* U3 API PHY Config 1 */
+#define U3_API_PHY_CONFIG_1		0x23030
+
+/* U3 HyperTransport registers */
+#define U3_HT_CONFIG_BASE      		0x70000
+#define U3_HT_LINK_COMMAND		0x100
+#define U3_HT_LINK_CONFIG		0x110
+#define U3_HT_LINK_FREQ			0x120
 
 #endif /* __ASM_UNINORTH_H__ */
 #endif /* __KERNEL__ */

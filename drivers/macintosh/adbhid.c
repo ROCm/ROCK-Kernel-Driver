@@ -30,6 +30,8 @@
  * To do:
  *
  * Improve Kensington support.
+ * Split mouse/kbd
+ * Move to syfs
  */
 
 #include <linux/config.h>
@@ -63,6 +65,15 @@ static struct notifier_block adbhid_adb_notifier = {
 	.notifier_call	= adb_message_handler,
 };
 
+/* Some special keys */
+#define ADB_KEY_DEL		0x33
+#define ADB_KEY_CMD		0x37
+#define ADB_KEY_CAPSLOCK	0x39
+#define ADB_KEY_FN		0x3f
+#define ADB_KEY_FWDEL		0x75
+#define ADB_KEY_POWER_OLD	0x7e
+#define ADB_KEY_POWER		0x7f
+
 unsigned char adb_to_linux_keycodes[128] = {
 	 30, 31, 32, 33, 35, 34, 44, 45, 46, 47, 86, 48, 16, 17, 18, 19,
 	 21, 20,  2,  3,  4,  5,  7,  6, 13, 10,  8, 12,  9, 11, 27, 24,
@@ -84,7 +95,12 @@ struct adbhid {
 	unsigned char *keycode;
 	char name[64];
 	char phys[32];
+	int flags;
 };
+
+#define FLAG_FN_KEY_PRESSED	0x00000001
+#define FLAG_POWER_FROM_FN	0x00000002
+#define FLAG_EMU_FWDEL_DOWN	0x00000004
 
 static struct adbhid *adbhid[16] = { 0 };
 
@@ -148,28 +164,64 @@ adbhid_keyboard_input(unsigned char *data, int nb, struct pt_regs *regs, int apo
 static void
 adbhid_input_keycode(int id, int keycode, int repeat, struct pt_regs *regs)
 {
+	struct adbhid *ahid = adbhid[id];
 	int up_flag;
 
 	up_flag = (keycode & 0x80);
 	keycode &= 0x7f;
 
 	switch (keycode) {
-	case 0x39: /* Generate down/up events for CapsLock everytime. */
-		input_regs(&adbhid[id]->input, regs);
-		input_report_key(&adbhid[id]->input, KEY_CAPSLOCK, 1);
-		input_report_key(&adbhid[id]->input, KEY_CAPSLOCK, 0);
-		input_sync(&adbhid[id]->input);
-		return;
-	case 0x3f: /* ignore Powerbook Fn key */
+	case ADB_KEY_CAPSLOCK: /* Generate down/up events for CapsLock everytime. */
+		input_regs(&ahid->input, regs);
+		input_report_key(&ahid->input, KEY_CAPSLOCK, 1);
+		input_report_key(&ahid->input, KEY_CAPSLOCK, 0);
+		input_sync(&ahid->input);
 		return;
 #ifdef CONFIG_PPC_PMAC
-	case 0x7e: /* Power key on PBook 3400 needs remapping */
+	case ADB_KEY_POWER_OLD: /* Power key on PBook 3400 needs remapping */
 		switch(pmac_call_feature(PMAC_FTR_GET_MB_INFO,
 			NULL, PMAC_MB_INFO_MODEL, 0)) {
 		case PMAC_TYPE_COMET:
 		case PMAC_TYPE_HOOPER:
 		case PMAC_TYPE_KANGA:
-			keycode = 0x7f;
+			keycode = ADB_KEY_POWER;
+		}
+		break;
+	case ADB_KEY_POWER: 
+		/* Fn + Command will produce a bogus "power" keycode */
+		if (ahid->flags & FLAG_FN_KEY_PRESSED) {
+			keycode = ADB_KEY_CMD;
+			if (up_flag)
+				ahid->flags &= ~FLAG_POWER_FROM_FN;
+			else
+				ahid->flags |= FLAG_POWER_FROM_FN;
+		} else if (ahid->flags & FLAG_POWER_FROM_FN) {
+			keycode = ADB_KEY_CMD;
+			ahid->flags &= ~FLAG_POWER_FROM_FN;
+		}
+		break;
+	case ADB_KEY_FN:
+		/* Keep track of the Fn key state */
+		if (up_flag) {
+			ahid->flags &= ~FLAG_FN_KEY_PRESSED;
+			/* Emulate Fn+delete = forward delete */
+			if (ahid->flags & FLAG_EMU_FWDEL_DOWN) {
+				ahid->flags &= ~FLAG_EMU_FWDEL_DOWN;
+				keycode = ADB_KEY_FWDEL;
+				break;
+			}
+		} else
+			ahid->flags |= FLAG_FN_KEY_PRESSED;
+		/* Swallow the key press */
+		return;
+	case ADB_KEY_DEL:
+		/* Emulate Fn+delete = forward delete */
+		if (ahid->flags & FLAG_FN_KEY_PRESSED) {
+			keycode = ADB_KEY_FWDEL;
+			if (up_flag)
+				ahid->flags &= ~FLAG_EMU_FWDEL_DOWN;
+			else
+				ahid->flags |= FLAG_EMU_FWDEL_DOWN;
 		}
 		break;
 #endif /* CONFIG_PPC_PMAC */
@@ -500,6 +552,7 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 	adbhid[id]->original_handler_id = original_handler_id;
 	adbhid[id]->current_handler_id = current_handler_id;
 	adbhid[id]->mouse_kind = mouse_kind;
+	adbhid[id]->flags = 0;
 	adbhid[id]->input.private = adbhid[id];
 	adbhid[id]->input.name = adbhid[id]->name;
 	adbhid[id]->input.phys = adbhid[id]->phys;

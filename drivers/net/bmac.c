@@ -26,11 +26,9 @@
 #include <asm/pgtable.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
+#include <asm/macio.h>
 #include <asm/irq.h>
-#ifdef CONFIG_PMAC_PBOOK
-#include <linux/adb.h>
-#include <linux/pmu.h>
-#endif
+
 #include "bmac.h"
 
 #define trunc_page(x)	((void *)(((unsigned long)(x)) & ~((unsigned long)(PAGE_SIZE - 1))))
@@ -67,7 +65,7 @@ struct bmac_data {
 	int rx_dma_intr;
 	volatile struct dbdma_cmd *tx_cmds;	/* xmit dma command list */
 	volatile struct dbdma_cmd *rx_cmds;	/* recv dma command list */
-	struct device_node *node;
+	struct macio_dev *mdev;
 	int is_bmac_plus;
 	struct sk_buff *rx_bufs[N_RX_RING];
 	int rx_fill;
@@ -84,8 +82,9 @@ struct bmac_data {
 	unsigned short hash_use_count[64];
 	unsigned short hash_table_mask[4];
 	spinlock_t lock;
-	struct net_device *next_bmac;
 };
+
+#if 0 /* Move that to ethtool */
 
 typedef struct bmac_reg_entry {
 	char *name;
@@ -128,15 +127,9 @@ static bmac_reg_entry_t reg_entries[N_REG_ENTRIES] = {
 	{"RXCV", RXCV}
 };
 
-static struct net_device *bmac_devs;
-static unsigned char *bmac_emergency_rxbuf;
-
-#ifdef CONFIG_PMAC_PBOOK
-static int bmac_sleep_notify(struct pmu_sleep_notifier *self, int when);
-static struct pmu_sleep_notifier bmac_sleep_notifier = {
-	bmac_sleep_notify, SLEEP_LEVEL_NET,
-};
 #endif
+
+static unsigned char *bmac_emergency_rxbuf;
 
 /*
  * Number of bytes of private data per BMAC: allow enough for
@@ -149,7 +142,6 @@ static struct pmu_sleep_notifier bmac_sleep_notifier = {
 	+ sizeof(struct sk_buff_head))
 
 static unsigned char bitrev(unsigned char b);
-static void bmac_probe1(struct device_node *bmac, int is_bmac_plus);
 static int bmac_open(struct net_device *dev);
 static int bmac_close(struct net_device *dev);
 static int bmac_transmit_packet(struct sk_buff *skb, struct net_device *dev);
@@ -166,7 +158,6 @@ static irqreturn_t bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs);
 static irqreturn_t bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs);
 static void bmac_set_timeout(struct net_device *dev);
 static void bmac_tx_timeout(unsigned long data);
-static int bmac_proc_info ( char *buffer, char **start, off_t offset, int length);
 static int bmac_output(struct sk_buff *skb, struct net_device *dev);
 static void bmac_start(struct net_device *dev);
 
@@ -244,7 +235,7 @@ bmac_enable_and_reset_chip(struct net_device *dev)
 	if (td)
 		dbdma_reset(td);
 
-	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 1);
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, macio_get_of_node(bp->mdev), 0, 1);
 }
 
 #define MIFDELAY	udelay(10)
@@ -457,87 +448,80 @@ bmac_init_phy(struct net_device *dev)
 	}
 }
 
-static void
-bmac_init_chip(struct net_device *dev)
+static void bmac_init_chip(struct net_device *dev)
 {
 	bmac_init_phy(dev);
 	bmac_init_registers(dev);
 }
 
-#ifdef CONFIG_PMAC_PBOOK
-static int
-bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
+#ifdef CONFIG_PM
+static int bmac_suspend(struct macio_dev *mdev, u32 state)
 {
-	struct bmac_data *bp;
+	struct net_device* dev = macio_get_drvdata(mdev);	
+	struct bmac_data *bp = dev->priv;	
 	unsigned long flags;
 	unsigned short config;
-	struct net_device* dev = bmac_devs;
 	int i;
 	
-	if (bmac_devs == 0)
-		return PBOOK_SLEEP_OK;
-		
-	bp = (struct bmac_data *) dev->priv;
-	
-	switch (when) {
-	case PBOOK_SLEEP_REQUEST:
-		break;
-	case PBOOK_SLEEP_REJECT:
-		break;
-	case PBOOK_SLEEP_NOW:
-		netif_device_detach(dev);
-		/* prolly should wait for dma to finish & turn off the chip */
-		spin_lock_irqsave(&bp->lock, flags);
-		if (bp->timeout_active) {
-			del_timer(&bp->tx_timeout);
-			bp->timeout_active = 0;
-		}
-		disable_irq(dev->irq);
-		disable_irq(bp->tx_dma_intr);
-		disable_irq(bp->rx_dma_intr);
-		bp->sleeping = 1;
-		spin_unlock_irqrestore(&bp->lock, flags);
-		if (bp->opened) {
-			volatile struct dbdma_regs *rd = bp->rx_dma;
-			volatile struct dbdma_regs *td = bp->tx_dma;
-			
-			config = bmread(dev, RXCFG);
-			bmwrite(dev, RXCFG, (config & ~RxMACEnable));
-			config = bmread(dev, TXCFG);
-			bmwrite(dev, TXCFG, (config & ~TxMACEnable));
-			bmwrite(dev, INTDISABLE, DisableAll); /* disable all intrs */
-			/* disable rx and tx dma */
-			st_le32(&rd->control, DBDMA_CLEAR(RUN|PAUSE|FLUSH|WAKE));	/* clear run bit */
-			st_le32(&td->control, DBDMA_CLEAR(RUN|PAUSE|FLUSH|WAKE));	/* clear run bit */
-			/* free some skb's */
-			for (i=0; i<N_RX_RING; i++) {
-				if (bp->rx_bufs[i] != NULL) {
-					dev_kfree_skb(bp->rx_bufs[i]);
-					bp->rx_bufs[i] = NULL;
-				}
-			}
-			for (i = 0; i<N_TX_RING; i++) {
-				if (bp->tx_bufs[i] != NULL) {
-					dev_kfree_skb(bp->tx_bufs[i]);
-					bp->tx_bufs[i] = NULL;
-				}
-			}
-		}
-		pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
-		break;
-	case PBOOK_WAKE:
-		/* see if this is enough */
-		if (bp->opened)
-			bmac_reset_and_enable(dev);
-		enable_irq(dev->irq);
-		enable_irq(bp->tx_dma_intr);
-		enable_irq(bp->rx_dma_intr);
-		netif_device_attach(dev);
-		break;
+	netif_device_detach(dev);
+	/* prolly should wait for dma to finish & turn off the chip */
+	spin_lock_irqsave(&bp->lock, flags);
+	if (bp->timeout_active) {
+		del_timer(&bp->tx_timeout);
+		bp->timeout_active = 0;
 	}
-	return PBOOK_SLEEP_OK;
+	disable_irq(dev->irq);
+	disable_irq(bp->tx_dma_intr);
+	disable_irq(bp->rx_dma_intr);
+	bp->sleeping = 1;
+	spin_unlock_irqrestore(&bp->lock, flags);
+	if (bp->opened) {
+		volatile struct dbdma_regs *rd = bp->rx_dma;
+		volatile struct dbdma_regs *td = bp->tx_dma;
+			
+		config = bmread(dev, RXCFG);
+		bmwrite(dev, RXCFG, (config & ~RxMACEnable));
+		config = bmread(dev, TXCFG);
+       		bmwrite(dev, TXCFG, (config & ~TxMACEnable));
+		bmwrite(dev, INTDISABLE, DisableAll); /* disable all intrs */
+       		/* disable rx and tx dma */
+       		st_le32(&rd->control, DBDMA_CLEAR(RUN|PAUSE|FLUSH|WAKE));	/* clear run bit */
+       		st_le32(&td->control, DBDMA_CLEAR(RUN|PAUSE|FLUSH|WAKE));	/* clear run bit */
+       		/* free some skb's */
+       		for (i=0; i<N_RX_RING; i++) {
+       			if (bp->rx_bufs[i] != NULL) {
+       				dev_kfree_skb(bp->rx_bufs[i]);
+       				bp->rx_bufs[i] = NULL;
+       			}
+       		}
+       		for (i = 0; i<N_TX_RING; i++) {
+			if (bp->tx_bufs[i] != NULL) {
+		       		dev_kfree_skb(bp->tx_bufs[i]);
+	       			bp->tx_bufs[i] = NULL;
+		       	}
+		}
+	}
+       	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, macio_get_of_node(bp->mdev), 0, 0);
+	return 0;
 }
-#endif
+
+static int bmac_resume(struct macio_dev *mdev)
+{
+	struct net_device* dev = macio_get_drvdata(mdev);	
+	struct bmac_data *bp = dev->priv;	
+
+	/* see if this is enough */
+	if (bp->opened)
+		bmac_reset_and_enable(dev);
+
+	enable_irq(dev->irq);
+       	enable_irq(bp->tx_dma_intr);
+       	enable_irq(bp->rx_dma_intr);
+       	netif_device_attach(dev);
+
+	return 0;
+}
+#endif /* CONFIG_PM */
 
 static int bmac_set_address(struct net_device *dev, void *addr)
 {
@@ -1277,103 +1261,61 @@ static void bmac_reset_and_enable(struct net_device *dev)
 	spin_unlock_irqrestore(&bp->lock, flags);
 }
 
-static int __init bmac_probe(void)
-{
-	struct device_node *bmac;
-
-	MOD_INC_USE_COUNT;
-
-	for (bmac = find_devices("bmac"); bmac != 0; bmac = bmac->next)
-		bmac_probe1(bmac, 0);
-	for (bmac = find_compatible_devices("network", "bmac+"); bmac != 0;
-	     bmac = bmac->next)
-		bmac_probe1(bmac, 1);
-
-	if (bmac_devs != 0) {
-		proc_net_create ("bmac", 0, bmac_proc_info);
-#ifdef CONFIG_PMAC_PBOOK
-		pmu_register_sleep_notifier(&bmac_sleep_notifier);
-#endif
-	}
-
-	MOD_DEC_USE_COUNT;
-
-	return bmac_devs? 0: -ENODEV;
-}
-
-static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
+static int __devinit bmac_probe(struct macio_dev *mdev, const struct of_match *match)
 {
 	int j, rev, ret;
 	struct bmac_data *bp;
 	unsigned char *addr;
 	struct net_device *dev;
+	int is_bmac_plus = ((int)match->data) != 0;
 
-	if (bmac->n_addrs != 3 || bmac->n_intrs != 3) {
-		printk(KERN_ERR "can't use BMAC %s: need 3 addrs and 3 intrs\n",
-		       bmac->full_name);
-		return;
+	if (macio_resource_count(mdev) != 3 || macio_irq_count(mdev) != 3) {
+		printk(KERN_ERR "BMAC: can't use, need 3 addrs and 3 intrs\n");
+		return -ENODEV;
 	}
-	addr = get_property(bmac, "mac-address", NULL);
+	addr = get_property(macio_get_of_node(mdev), "mac-address", NULL);
 	if (addr == NULL) {
-		addr = get_property(bmac, "local-mac-address", NULL);
+		addr = get_property(macio_get_of_node(mdev), "local-mac-address", NULL);
 		if (addr == NULL) {
-			printk(KERN_ERR "Can't get mac-address for BMAC %s\n",
-			       bmac->full_name);
-			return;
-		}
-	}
-
-	if (bmac_emergency_rxbuf == NULL) {
-		bmac_emergency_rxbuf = kmalloc(RX_BUFLEN, GFP_KERNEL);
-		if (bmac_emergency_rxbuf == NULL) {
-			printk(KERN_ERR "BMAC: can't allocate emergency RX buffer\n");
-			return;
+			printk(KERN_ERR "BMAC: Can't get mac-address\n");
+			return -ENODEV;
 		}
 	}
 
 	dev = alloc_etherdev(PRIV_BYTES);
 	if (!dev) {
-		printk(KERN_ERR "alloc_etherdev failed, out of memory for BMAC %s\n",
-		       bmac->full_name);
-		return;
+		printk(KERN_ERR "BMAC: alloc_etherdev failed, out of memory\n");
+		return -ENOMEM;
 	}
 		
 	bp = (struct bmac_data *) dev->priv;
 	SET_MODULE_OWNER(dev);
-	bp->node = bmac;
+	SET_NETDEV_DEV(dev, &mdev->ofdev.dev);
+	macio_set_drvdata(mdev, dev);
+
+	bp->mdev = mdev;
 	spin_lock_init(&bp->lock);
 
-	if (!request_OF_resource(bmac, 0, " (bmac)")) {
+	if (macio_request_resources(mdev, "bmac")) {
 		printk(KERN_ERR "BMAC: can't request IO resource !\n");
-		goto out1;
-	}
-	if (!request_OF_resource(bmac, 1, " (bmac tx dma)")) {
-		printk(KERN_ERR "BMAC: can't request TX DMA resource !\n");
-		goto out2;
-	}
-	if (!request_OF_resource(bmac, 2, " (bmac rx dma)")) {
-		printk(KERN_ERR "BMAC: can't request RX DMA resource !\n");
-		goto out3;
+		goto out_free;
 	}
 
 	dev->base_addr = (unsigned long)
-		ioremap(bmac->addrs[0].address, bmac->addrs[0].size);
-	if (!dev->base_addr)
-		goto out4;
+		ioremap(macio_resource_start(mdev, 0), macio_resource_len(mdev, 0));
+	if (dev->base_addr == 0)
+		goto out_release;
 
-	dev->irq = bmac->intrs[0].line;
+	dev->irq = macio_irq(mdev, 0);
 
 	bmac_enable_and_reset_chip(dev);
 	bmwrite(dev, INTDISABLE, DisableAll);
 
-	printk(KERN_INFO "%s: BMAC%s at", dev->name, (is_bmac_plus? "+": ""));
 	rev = addr[0] == 0 && addr[1] == 0xA0;
 	for (j = 0; j < 6; ++j) {
 		dev->dev_addr[j] = rev? bitrev(addr[j]): addr[j];
 		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
 	}
-	XXDEBUG((", base_addr=%#0lx", dev->base_addr));
-	printk("\n");
 
 	/* Enable chip without interrupts for now */
 	bmac_enable_and_reset_chip(dev);
@@ -1392,15 +1334,15 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 
 	bp->is_bmac_plus = is_bmac_plus;
 	bp->tx_dma = (volatile struct dbdma_regs *)
-		ioremap(bmac->addrs[1].address, bmac->addrs[1].size);
+		ioremap(macio_resource_start(mdev, 1), macio_resource_len(mdev, 1));
 	if (!bp->tx_dma)
 		goto err_out_iounmap;
-	bp->tx_dma_intr = bmac->intrs[1].line;
+	bp->tx_dma_intr = macio_irq(mdev, 1);
 	bp->rx_dma = (volatile struct dbdma_regs *)
-		ioremap(bmac->addrs[2].address, bmac->addrs[2].size);
+		ioremap(macio_resource_start(mdev, 2), macio_resource_len(mdev, 2));
 	if (!bp->rx_dma)
 		goto err_out_iounmap_tx;
-	bp->rx_dma_intr = bmac->intrs[2].line;
+	bp->rx_dma_intr = macio_irq(mdev, 2);
 
 	bp->tx_cmds = (volatile struct dbdma_cmd *) DBDMA_ALIGN(bp + 1);
 	bp->rx_cmds = bp->tx_cmds + N_TX_RING + 1;
@@ -1415,14 +1357,14 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 		printk(KERN_ERR "BMAC: can't get irq %d\n", dev->irq);
 		goto err_out_iounmap_rx;
 	}
-	ret = request_irq(bmac->intrs[1].line, bmac_txdma_intr, 0, "BMAC-txdma", dev);
+	ret = request_irq(bp->tx_dma_intr, bmac_txdma_intr, 0, "BMAC-txdma", dev);
 	if (ret) {
-		printk(KERN_ERR "BMAC: can't get irq %d\n", bmac->intrs[1].line);
+		printk(KERN_ERR "BMAC: can't get irq %d\n", bp->tx_dma_intr);
 		goto err_out_irq0;
 	}
-	ret = request_irq(bmac->intrs[2].line, bmac_rxdma_intr, 0, "BMAC-rxdma", dev);
+	ret = request_irq(bp->rx_dma_intr, bmac_rxdma_intr, 0, "BMAC-rxdma", dev);
 	if (ret) {
-		printk(KERN_ERR "BMAC: can't get irq %d\n", bmac->intrs[2].line);
+		printk(KERN_ERR "BMAC: can't get irq %d\n", bp->rx_dma_intr);
 		goto err_out_irq1;
 	}
 
@@ -1430,22 +1372,23 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	 * re-enabled on open()
 	 */
 	disable_irq(dev->irq);
-	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, macio_get_of_node(bp->mdev), 0, 0);
 
 	if (register_netdev(dev) != 0) {
-		printk(KERN_ERR "registration failed for BMAC %s\n",
-		       bmac->full_name);
+		printk(KERN_ERR "BMAC: Ethernet registration failed\n");
 		goto err_out_irq2;
 	}
+
+	printk(KERN_INFO "%s: BMAC%s at", dev->name, (is_bmac_plus? "+": ""));
+	XXDEBUG((", base_addr=%#0lx", dev->base_addr));
+	printk("\n");
 	
-	bp->next_bmac = bmac_devs;
-	bmac_devs = dev;
-	return;
+	return 0;
 
 err_out_irq2:
-	free_irq(bmac->intrs[2].line, dev);
+	free_irq(bp->rx_dma_intr, dev);
 err_out_irq1:
-	free_irq(bmac->intrs[1].line, dev);
+	free_irq(bp->tx_dma_intr, dev);
 err_out_irq0:
 	free_irq(dev->irq, dev);
 err_out_iounmap_rx:
@@ -1454,15 +1397,13 @@ err_out_iounmap_tx:
 	iounmap((void *)bp->tx_dma);
 err_out_iounmap:
 	iounmap((void *)dev->base_addr);
-out4:
-	release_OF_resource(bp->node, 2);
-out3:
-	release_OF_resource(bp->node, 1);
-out2:
-	release_OF_resource(bp->node, 0);
-out1:
-	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
+out_release:
+	macio_release_resources(mdev);
+out_free:
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, macio_get_of_node(bp->mdev), 0, 0);
 	free_netdev(dev);
+
+	return -ENODEV;
 }
 
 static int bmac_open(struct net_device *dev)
@@ -1520,7 +1461,7 @@ static int bmac_close(struct net_device *dev)
 
 	bp->opened = 0;
 	disable_irq(dev->irq);
-	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, bp->node, 0, 0);
+	pmac_call_feature(PMAC_FTR_BMAC_ENABLE, macio_get_of_node(bp->mdev), 0, 0);
 
 	return 0;
 }
@@ -1649,6 +1590,7 @@ static void dump_dbdma(volatile struct dbdma_cmd *cp,int count)
 }
 #endif
 
+#if 0
 static int
 bmac_proc_info(char *buffer, char **start, off_t offset, int length)
 {
@@ -1683,46 +1625,86 @@ bmac_proc_info(char *buffer, char **start, off_t offset, int length)
 
 	return len;
 }
+#endif
 
-
-MODULE_AUTHOR("Randy Gobbel/Paul Mackerras");
-MODULE_DESCRIPTION("PowerMac BMAC ethernet driver.");
-MODULE_LICENSE("GPL");
-
-static void __exit bmac_cleanup (void)
+static int __devexit bmac_remove(struct macio_dev *mdev)
 {
-	struct bmac_data *bp;
-	struct net_device *dev;
+	struct net_device *dev = macio_get_drvdata(mdev);
+	struct bmac_data *bp = dev->priv;
+
+	unregister_netdev(dev);
+
+       	free_irq(dev->irq, dev);
+	free_irq(bp->tx_dma_intr, dev);	
+	free_irq(bp->rx_dma_intr, dev);
+
+	iounmap((void *)dev->base_addr);
+	iounmap((void *)bp->tx_dma);
+	iounmap((void *)bp->rx_dma);
+
+	macio_release_resources(mdev);
+
+	free_netdev(dev);
+
+	return 0;
+}
+
+static struct of_match bmac_match[] = 
+{
+	{
+	.name 		= "bmac",
+	.type		= OF_ANY_MATCH,
+	.compatible	= OF_ANY_MATCH,
+	.data		= (void *)0,
+	},
+	{
+	.name 		= OF_ANY_MATCH,
+	.type		= "network",
+	.compatible	= "bmac+",
+	.data		= (void *)1,
+	},
+	{},
+};
+
+static struct macio_driver bmac_driver = 
+{
+	.name 		= "bmac",
+	.match_table	= bmac_match,
+	.probe		= bmac_probe,
+	.remove		= bmac_remove,
+#ifdef CONFIG_PM
+	.suspend	= bmac_suspend,
+	.resume		= bmac_resume,
+#endif
+};
+
+
+static int __init bmac_init(void)
+{
+	if (bmac_emergency_rxbuf == NULL) {
+		bmac_emergency_rxbuf = kmalloc(RX_BUFLEN, GFP_KERNEL);
+		if (bmac_emergency_rxbuf == NULL) {
+			printk(KERN_ERR "BMAC: can't allocate emergency RX buffer\n");
+			return -ENOMEM;
+		}
+	}
+
+	return macio_register_driver(&bmac_driver);
+}
+
+static void __exit bmac_exit(void)
+{
+	macio_unregister_driver(&bmac_driver);
 
 	if (bmac_emergency_rxbuf != NULL) {
 		kfree(bmac_emergency_rxbuf);
 		bmac_emergency_rxbuf = NULL;
 	}
-
-	if (bmac_devs == 0)
-		return;
-#ifdef CONFIG_PMAC_PBOOK
-	pmu_unregister_sleep_notifier(&bmac_sleep_notifier);
-#endif
-	proc_net_remove("bmac");
-
-	do {
-		dev = bmac_devs;
-		bp = (struct bmac_data *) dev->priv;
-		bmac_devs = bp->next_bmac;
-
-		unregister_netdev(dev);
-
-		release_OF_resource(bp->node, 0);
-		release_OF_resource(bp->node, 1);
-		release_OF_resource(bp->node, 2);
-		free_irq(dev->irq, dev);
-		free_irq(bp->tx_dma_intr, dev);
-		free_irq(bp->rx_dma_intr, dev);
-
-		free_netdev(dev);
-	} while (bmac_devs != NULL);
 }
 
-module_init(bmac_probe);
-module_exit(bmac_cleanup);
+MODULE_AUTHOR("Randy Gobbel/Paul Mackerras");
+MODULE_DESCRIPTION("PowerMac BMAC ethernet driver.");
+MODULE_LICENSE("GPL");
+
+module_init(bmac_init);
+module_exit(bmac_exit);

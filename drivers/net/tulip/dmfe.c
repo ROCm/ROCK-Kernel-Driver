@@ -457,7 +457,7 @@ err_out_disable:
 	pci_disable_device(pdev);
 err_out_free:
 	pci_set_drvdata(pdev, NULL);
-	kfree(dev);
+	free_netdev(dev);
 
 	return err;
 }

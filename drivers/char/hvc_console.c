@@ -29,6 +29,7 @@
 #include <linux/kbd_kern.h>
 #include <asm/uaccess.h>
 #include <linux/spinlock.h>
+#include <linux/cpumask.h>
 
 extern int hvc_count(int *);
 extern int hvc_get_chars(int index, char *buf, int count);
@@ -223,10 +224,10 @@ static void hvc_poll(int index)
 	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
-#if defined (CONFIG_XMON)
-extern unsigned long cpus_in_xmon;
+#if defined(CONFIG_XMON) && defined(CONFIG_SMP)
+extern cpumask_t cpus_in_xmon;
 #else
-unsigned long cpus_in_xmon=0;
+static const cpumask_t cpus_in_xmon = CPU_MASK_NONE;
 #endif
 
 
@@ -237,7 +238,7 @@ int khvcd(void *unused)
 	daemonize("khvcd");
 
 	for (;;) {
-		if (!cpus_in_xmon) {
+		if (cpus_empty(cpus_in_xmon)) {
 			for (i = 0; i < MAX_NR_HVC_CONSOLES; ++i)
 				hvc_poll(i);
 		}
@@ -268,8 +269,9 @@ int __init hvc_init(void)
 		return -ENOMEM;
 
 	hvc_driver->owner = THIS_MODULE;
+	hvc_driver->devfs_name = "hvc/";
 	hvc_driver->driver_name = "hvc";
-	hvc_driver->name = "hvc/";
+	hvc_driver->name = "hvc";
 	hvc_driver->major = HVC_MAJOR;
 	hvc_driver->minor_start = HVC_MINOR;
 	hvc_driver->type = TTY_DRIVER_TYPE_SYSTEM;

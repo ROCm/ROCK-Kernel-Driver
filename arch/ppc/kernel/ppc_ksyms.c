@@ -75,6 +75,7 @@ int abs(int);
 extern unsigned long mm_ptov (unsigned long paddr);
 
 EXPORT_SYMBOL(clear_page);
+EXPORT_SYMBOL(clear_user_page);
 EXPORT_SYMBOL(do_signal);
 EXPORT_SYMBOL(do_syscall_trace);
 EXPORT_SYMBOL(transfer_to_handler);
@@ -236,12 +237,6 @@ EXPORT_SYMBOL(adb_try_handler_change);
 EXPORT_SYMBOL(cuda_request);
 EXPORT_SYMBOL(cuda_poll);
 #endif /* CONFIG_ADB_CUDA */
-#ifdef CONFIG_PMAC_BACKLIGHT
-EXPORT_SYMBOL(get_backlight_level);
-EXPORT_SYMBOL(set_backlight_level);
-EXPORT_SYMBOL(set_backlight_enable);
-EXPORT_SYMBOL(register_backlight_controller);
-#endif /* CONFIG_PMAC_BACKLIGHT */
 #ifdef CONFIG_PPC_MULTIPLATFORM
 EXPORT_SYMBOL(_machine);
 #endif
@@ -282,14 +277,6 @@ EXPORT_SYMBOL(note_scsi_host);
 #ifdef CONFIG_VT
 EXPORT_SYMBOL(kd_mksound);
 #endif
-#ifdef CONFIG_NVRAM
-EXPORT_SYMBOL(nvram_read_byte);
-EXPORT_SYMBOL(nvram_write_byte);
-#ifdef CONFIG_PPC_PMAC
-EXPORT_SYMBOL(pmac_xpram_read);
-EXPORT_SYMBOL(pmac_xpram_write);
-#endif
-#endif /* CONFIG_NVRAM */
 EXPORT_SYMBOL(to_tm);
 
 EXPORT_SYMBOL(pm_power_off);

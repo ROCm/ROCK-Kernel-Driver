@@ -91,6 +91,7 @@
 #define SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
 #define SPRN_TBWL	0x11C	/* Time Base Lower Register (super, R/W) */
 #define SPRN_TBWU	0x11D	/* Time Base Upper Register (super, R/W) */
+#define SPRN_HIOR	0x137	/* 970 Hypervisor interrupt offset */
 #define SPRN_DBAT0L	0x219	/* Data BAT 0 Lower Register */
 #define SPRN_DBAT0U	0x218	/* Data BAT 0 Upper Register */
 #define SPRN_DBAT1L	0x21B	/* Data BAT 1 Lower Register */
@@ -179,7 +180,10 @@
 #define HID1_PC3	(1<<13)		/* 7450 PLL_CFG[3] */
 #define HID1_SYNCBE	(1<<11)		/* 7450 ABE for sync, eieio */
 #define HID1_ABE	(1<<10)		/* 7450 Address Broadcast Enable */
+#define SPRN_HID2	0x3F8		/* Hardware Implementation Register 2 */
 #define SPRN_IABR	0x3F2	/* Instruction Address Breakpoint Register */
+#define SPRN_HID4	0x3F4		/* 970 HID4 */
+#define SPRN_HID5	0x3F6		/* 970 HID5 */
 #if !defined(SPRN_IAC1) && !defined(SPRN_IAC2)
 #define SPRN_IAC1	0x3F4		/* Instruction Address Compare 1 */
 #define SPRN_IAC2	0x3F5		/* Instruction Address Compare 2 */

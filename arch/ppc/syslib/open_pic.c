@@ -610,12 +610,15 @@ void openpic_request_IPIs(void)
 
 void __devinit do_openpic_setup_cpu(void)
 {
+#ifdef CONFIG_IRQ_ALL_CPUS
  	int i;
-	u32 msk = 1 << smp_hw_index[smp_processor_id()];
-
+	u32 msk;
+#endif
 	spin_lock(&openpic_setup_lock);
 
 #ifdef CONFIG_IRQ_ALL_CPUS
+	msk = 1 << smp_hw_index[smp_processor_id()];
+
  	/* let the openpic know we want intrs. default affinity
  	 * is 0xffffffff until changed via /proc
  	 * That's how it's done on x86. If we want it differently, then
@@ -788,15 +791,25 @@ static void openpic_set_sense(u_int irq, int sense)
  */
 static void openpic_ack_irq(unsigned int irq_nr)
 {
+#ifdef __SLOW_VERSION__
 	openpic_disable_irq(irq_nr);
 	openpic_eoi();
+#else
+	if ((irq_desc[irq_nr].status & IRQ_LEVEL) == 0)
+		openpic_eoi();
+#endif
 }
 
 static void openpic_end_irq(unsigned int irq_nr)
 {
+#ifdef __SLOW_VERSION__
 	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))
 	    && irq_desc[irq_nr].action)
 		openpic_enable_irq(irq_nr);
+#else
+	if ((irq_desc[irq_nr].status & IRQ_LEVEL) != 0)
+		openpic_eoi();
+#endif
 }
 
 static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask)

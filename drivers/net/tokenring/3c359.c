@@ -332,7 +332,7 @@ int __devinit xl_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		
 	if((i = xl_init(dev))) {
 		iounmap(xl_priv->xl_mmio) ; 
-		kfree(dev) ; 
+		free_netdev(dev) ; 
 		pci_release_regions(pdev) ; 
 		return i ; 
 	}				
@@ -352,7 +352,7 @@ int __devinit xl_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		printk(KERN_ERR "3C359, register netdev failed\n") ;  
 		pci_set_drvdata(pdev,NULL) ; 
 		iounmap(xl_priv->xl_mmio) ; 
-		kfree(dev) ; 
+		free_netdev(dev) ; 
 		pci_release_regions(pdev) ; 
 		return i ; 
 	}

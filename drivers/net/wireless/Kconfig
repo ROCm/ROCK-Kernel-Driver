@@ -221,6 +221,29 @@ config PCI_HERMES
 	  common.  Some of the built-in wireless adaptors in laptops are of
 	  this variety.
 
+config ATMEL
+      tristate "Atmel at76c50x chipset  802.11b support"
+      depends on NET_RADIO && EXPERIMENTAL
+      enable FW_LOADER
+      enable CRC32
+       ---help---
+        A driver 802.11b wireless cards based on the Atmel fast-vnet
+        chips. This driver supports standard Linux wireless extensions. 
+ 
+        Many  cards based on this chipset do not have flash memory
+        and need their firmware loaded at start-up. If yours is 
+        one of these, you will need to provide a firmware image
+        to be loaded into the card by the driver. The Atmel
+        firmware package can be downloaded from
+        http://www.thekelleys.org.uk/atmel
+
+config PCI_ATMEL
+      tristate "Atmel at76c506 PCI cards"
+      depends on ATMEL && PCI
+       ---help---
+        Enable support for PCI and mini-PCI cards containing the
+        Atmel at76c506 chip.
+
 # If Pcmcia is compiled in, offer Pcmcia cards...
 comment "Wireless 802.11b Pcmcia/Cardbus cards support"
 	depends on NET_RADIO && PCMCIA
@@ -268,21 +291,13 @@ config AIRO_CS
 	  available from <http://www.tldp.org/docs.html#howto>.
 
 config PCMCIA_ATMEL
-      tristate "Atmel at76c502/at76c504 PCMCIA cards"
-      depends on NET_RADIO && EXPERIMENTAL && PCMCIA
-      select FW_LOADER
-      select CRC32
-       ---help---
-         A driver for PCMCIA 802.11 wireless cards based on the 
-         Atmel fast-vnet chips. This driver supports standard
-         Linux wireless extensions. 
- 
-         Many  cards based on this chipset do not have flash memory
-         and need their firmware loaded at start-up. If yours is 
-         one of these, you will need to provide a firmware image
-	 to be loaded into the card by the driver. The Atmel
-	 firmware package can be downloaded from
-	 http://www.thekelleys.org.uk/atmel
+	tristate "Atmel at76c502/at76c504 PCMCIA cards"
+	depends on NET_RADIO && ATMEL && PCMCIA
+	select FW_LOADER
+	select CRC32
+	---help---
+	  Enable support for PCMCIA cards containing the
+	  Atmel at76c502 and at76c504 chips.
 
 config PCMCIA_WL3501
       tristate "Planet WL3501 PCMCIA cards"

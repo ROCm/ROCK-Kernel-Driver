@@ -168,6 +168,7 @@ static struct proc_dir_entry *proc_pmu_root;
 static struct proc_dir_entry *proc_pmu_info;
 static struct proc_dir_entry *proc_pmu_irqstats;
 static struct proc_dir_entry *proc_pmu_options;
+static int option_server_mode;
 
 #ifdef CONFIG_PMAC_PBOOK
 int pmu_battery_count;
@@ -334,7 +335,8 @@ find_via_pmu(void)
 		pmu_kind = PMU_PADDINGTON_BASED;
 	else if (device_is_compatible(vias->parent, "heathrow"))
 		pmu_kind = PMU_HEATHROW_BASED;
-	else if (device_is_compatible(vias->parent, "Keylargo")) {
+	else if (device_is_compatible(vias->parent, "Keylargo")
+		 || device_is_compatible(vias->parent, "K2-Keylargo")) {
 		struct device_node *gpio, *gpiop;
 
 		pmu_kind = PMU_KEYLARGO_BASED;
@@ -349,6 +351,8 @@ find_via_pmu(void)
 		if (gpiop && gpiop->n_addrs) {
 			gpio_reg = ioremap(gpiop->addrs->address, 0x10);
 			gpio = find_devices("extint-gpio1");
+			if (gpio == NULL)
+				gpio = find_devices("pmu-interrupt");
 			if (gpio && gpio->parent == gpiop && gpio->n_intrs)
 				gpio_irq = gpio->intrs[0].line;
 		}
@@ -564,7 +568,19 @@ init_pmu(void)
 	pmu_wait_complete(&req);
 	if (req.reply_len > 0)
 		pmu_version = req.reply[0];
-
+	
+	/* Read server mode setting */
+	if (pmu_kind == PMU_KEYLARGO_BASED) {
+		pmu_request(&req, NULL, 2, PMU_POWER_EVENTS,
+			    PMU_PWR_GET_POWERUP_EVENTS);
+		pmu_wait_complete(&req);
+		if (req.reply_len == 2) {
+			if (req.reply[1] & PMU_PWR_WAKEUP_AC_INSERT)
+				option_server_mode = 1;
+			printk(KERN_INFO "via-pmu: Server Mode is %s\n",
+			       option_server_mode ? "enabled" : "disabled");
+		}
+	}
 	return 1;
 }
 
@@ -583,6 +599,28 @@ static inline void wakeup_decrementer(void)
 	last_jiffy_stamp(0) = tb_last_stamp = get_tbl();
 }
 
+static void pmu_set_server_mode(int server_mode)
+{
+	struct adb_request req;
+
+	if (pmu_kind != PMU_KEYLARGO_BASED)
+		return;
+
+	option_server_mode = server_mode;
+	pmu_request(&req, NULL, 2, PMU_POWER_EVENTS, PMU_PWR_GET_POWERUP_EVENTS);
+	pmu_wait_complete(&req);
+	if (req.reply_len < 2)
+		return;
+	if (server_mode)
+		pmu_request(&req, NULL, 4, PMU_POWER_EVENTS,
+			    PMU_PWR_SET_POWERUP_EVENTS,
+			    req.reply[0], PMU_PWR_WAKEUP_AC_INSERT); 
+	else
+		pmu_request(&req, NULL, 4, PMU_POWER_EVENTS,
+			    PMU_PWR_CLR_POWERUP_EVENTS,
+			    req.reply[0], PMU_PWR_WAKEUP_AC_INSERT); 
+	pmu_wait_complete(&req);
+}
 
 #ifdef CONFIG_PMAC_PBOOK
 
@@ -845,6 +883,8 @@ proc_read_options(char *page, char **start, off_t off,
 	if (pmu_kind == PMU_KEYLARGO_BASED && can_sleep)
 		p += sprintf(p, "lid_wakeup=%d\n", option_lid_wakeup);
 #endif /* CONFIG_PMAC_PBOOK */
+	if (pmu_kind == PMU_KEYLARGO_BASED)
+		p += sprintf(p, "server_mode=%d\n", option_server_mode);
 
 	return p - page;
 }
@@ -884,6 +924,12 @@ proc_write_options(struct file *file, const char __user *buffer,
 		if (!strcmp(label, "lid_wakeup"))
 			option_lid_wakeup = ((*val) == '1');
 #endif /* CONFIG_PMAC_PBOOK */
+	if (pmu_kind == PMU_KEYLARGO_BASED && !strcmp(label, "server_mode")) {
+		int new_value;
+		new_value = ((*val) == '1');
+		if (new_value != option_server_mode)
+			pmu_set_server_mode(new_value);
+	}
 	return fcount;
 }
 
@@ -1758,6 +1804,11 @@ pmu_shutdown(void)
 		pmu_request(&req, NULL, 2, PMU_SET_INTR_MASK, PMU_INT_ADB |
 						PMU_INT_TICK );
 		pmu_wait_complete(&req);
+	} else {
+		/* Disable server mode on shutdown or we'll just
+		 * wake up again
+		 */
+		pmu_set_server_mode(0);
 	}
 
 	pmu_request(&req, NULL, 5, PMU_SHUTDOWN,

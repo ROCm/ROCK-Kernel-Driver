@@ -579,6 +579,7 @@ extern int sysctl_tcp_adv_win_scale;
 extern int sysctl_tcp_tw_reuse;
 extern int sysctl_tcp_frto;
 extern int sysctl_tcp_low_latency;
+extern int sysctl_tcp_westwood;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -738,7 +739,7 @@ DECLARE_SNMP_STAT(struct tcp_mib, tcp_statistics);
 #define TCP_ADD_STATS_BH(field, val)	SNMP_ADD_STATS_BH(tcp_statistics, field, val)
 #define TCP_ADD_STATS_USER(field, val)	SNMP_ADD_STATS_USER(tcp_statistics, field, val)
 
-extern inline void		tcp_put_port(struct sock *sk);
+extern void			tcp_put_port(struct sock *sk);
 extern void			tcp_inherit_port(struct sock *sk, struct sock *child);
 
 extern void			tcp_v4_err(struct sk_buff *skb, u32);
@@ -2019,4 +2020,67 @@ struct tcp_iter_state {
 extern int tcp_proc_register(struct tcp_seq_afinfo *afinfo);
 extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
 
+/* TCP Westwood functions and constants */
+
+#define TCP_WESTWOOD_INIT_RTT  (20*HZ)           /* maybe too conservative?! */
+#define TCP_WESTWOOD_RTT_MIN   (HZ/20)           /* 50ms */
+
+static inline void tcp_westwood_update_rtt(struct tcp_opt *tp, __u32 rtt_seq)
+{
+        if (sysctl_tcp_westwood)
+                tp->westwood.rtt = rtt_seq;
+}
+
+void __tcp_westwood_fast_bw(struct sock *, struct sk_buff *);
+void __tcp_westwood_slow_bw(struct sock *, struct sk_buff *);
+
+static inline void tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
+{
+        if (sysctl_tcp_westwood)
+                __tcp_westwood_fast_bw(sk, skb);
+}
+
+static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
+{
+        if (sysctl_tcp_westwood)
+                __tcp_westwood_slow_bw(sk, skb);
+}
+
+static inline __u32 __tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
+{
+        return max((tp->westwood.bw_est) * (tp->westwood.rtt_min) /
+		   (__u32) (tp->mss_cache),
+		   2U);
+}
+
+static inline __u32 tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
+{
+	return sysctl_tcp_westwood ? __tcp_westwood_bw_rttmin(tp) : 0;
+}
+
+static inline int tcp_westwood_ssthresh(struct tcp_opt *tp)
+{
+	__u32 ssthresh = 0;
+
+	if (sysctl_tcp_westwood) {
+		ssthresh = __tcp_westwood_bw_rttmin(tp);
+		if (ssthresh)
+			tp->snd_ssthresh = ssthresh;  
+	}
+
+	return (ssthresh != 0);
+}
+
+static inline int tcp_westwood_cwnd(struct tcp_opt *tp)
+{
+	__u32 cwnd = 0;
+
+	if (sysctl_tcp_westwood) {
+		cwnd = __tcp_westwood_bw_rttmin(tp);
+		if (cwnd)
+			tp->snd_cwnd = cwnd;
+	}
+
+	return (cwnd != 0);
+}
 #endif	/* _TCP_H */

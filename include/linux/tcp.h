@@ -374,6 +374,20 @@ struct tcp_opt {
 	__u32                   frto_highmark; /* snd_nxt when RTO occurred */
 
 	unsigned long last_synq_overflow; 
+
+/* TCP Westwood structure */
+        struct {
+                __u32    bw_sample;        /* bandwidth sample */
+                __u32    bw_ns_est;        /* first bandwidth estimation..not too smoothed 8) */
+                __u32    bw_est;           /* bandwidth estimate */
+                __u32    rtt_win_sx;       /* here starts a new evaluation... */
+                __u32    bk;
+                __u32    snd_una;          /* used for evaluating the number of acked bytes */
+                __u32    cumul_ack;
+                __u32    accounted;
+                __u32    rtt;
+                __u32    rtt_min;          /* minimum observed RTT */
+        } westwood;
 };
 
 /* WARNING: don't change the layout of the members in tcp_sock! */

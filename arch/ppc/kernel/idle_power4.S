@@ -28,17 +28,11 @@
 
 /*
  * Init idle, called at early CPU setup time from head.S for each CPU
- * Make sure no rest of NAP mode remains in HID0, save default
- * values for some CPU specific registers. Called with r24
- * containing CPU number and r3 reloc offset
+ * So nothing for now. Called with r24 containing CPU number and r3
+ * reloc offset
  */
  	.globl	init_idle_power4
 init_idle_power4:
-BEGIN_FTR_SECTION
-	mfspr	r4,SPRN_HID0
-	rlwinm	r4,r4,0,10,8	/* Clear NAP */
-	mtspr	SPRN_HID0, r4
-END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
 	blr
 
 /*
@@ -48,10 +42,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
  */
 	.globl	power4_idle
 power4_idle:
-	/* Check if we can nap or doze, put HID0 mask in r3
-	 */
-	lis	r3, 0
 BEGIN_FTR_SECTION
+	blr
+END_FTR_SECTION_IFCLR(CPU_FTR_CAN_NAP)
 	/* We must dynamically check for the NAP feature as it
 	 * can be cleared by CPU init after the fixups are done
 	 */
@@ -59,16 +52,11 @@ BEGIN_FTR_SECTION
 	lwz	r4,cur_cpu_spec@l(r4)
 	lwz	r4,CPU_SPEC_FEATURES(r4)
 	andi.	r0,r4,CPU_FTR_CAN_NAP
-	beq	1f
+	beqlr
 	/* Now check if user or arch enabled NAP mode */
 	lis	r4,powersave_nap@ha
 	lwz	r4,powersave_nap@l(r4)
 	cmpi	0,r4,0
-	beq	1f
-	lis	r3,HID0_NAP@h
-1:	
-END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
-	cmpi	0,r3,0
 	beqlr
 
 	/* Clear MSR:EE */
@@ -85,18 +73,6 @@ END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
 	blr
 1:	
 	/* Go to NAP now */	
-	mfspr	r4,SPRN_HID0
-	lis	r5,(HID0_NAP|HID0_SLEEP)@h
-	andc	r4,r4,r5
-	or	r4,r4,r3
-	oris	r4,r4,HID0_DPM@h	/* that should be done once for all  */
-	mtspr	SPRN_HID0,r4
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
-	mfspr	r0,SPRN_HID0
 BEGIN_FTR_SECTION
 	DSSALL
 	sync

@@ -228,7 +228,7 @@ static int bpck6_init_proto(PIA *pi)
 
 	if (p) {
 		memset(p, 0, sizeof(PPC));
-		pi->private = (int)p;
+		pi->private = (unsigned long)p;
 		return 0;
 	}
 

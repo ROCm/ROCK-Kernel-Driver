@@ -681,8 +681,7 @@ static int __init depca_hw_init (struct net_device *dev, struct device *device)
 	lp->sh_mem = ioremap(mem_start, mem_len);
 	if (lp->sh_mem == NULL) {
 		printk(KERN_ERR "depca: cannot remap ISA memory, aborting\n");
-		release_mem_region (mem_start, mem_len);
-		goto out_priv;
+		goto out1;
 	}
 
 	lp->mem_start = mem_start;
@@ -771,7 +770,7 @@ static int __init depca_hw_init (struct net_device *dev, struct device *device)
 		status = -ENXIO;
 		if (!irqnum) {
 			printk(" and failed to detect IRQ line.\n");
-			goto out_priv;
+			goto out2;
 		} else {
 			for (dev->irq = 0, i = 0; (depca_irq[i]) && (!dev->irq); i++)
 				if (irqnum == depca_irq[i]) {
@@ -781,7 +780,7 @@ static int __init depca_hw_init (struct net_device *dev, struct device *device)
 
 			if (!dev->irq) {
 				printk(" but incorrect IRQ line detected.\n");
-				return -ENXIO;
+				goto out2;
 			}
 		}
 	} else {
@@ -807,11 +806,14 @@ static int __init depca_hw_init (struct net_device *dev, struct device *device)
 	device->driver_data = dev;
 	SET_NETDEV_DEV (dev, device);
 	
-	register_netdev (dev);
-	return 0;
-
- out_priv:
-	
+	status = register_netdev(dev);
+	if (status == 0)
+		return 0;
+out2:
+	iounmap(lp->sh_mem);
+out1:
+	release_mem_region (mem_start, mem_len);
+out_priv:
 	return status;
 }
 

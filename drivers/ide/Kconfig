@@ -511,27 +511,6 @@ config IDEDMA_ONLYDISK
 
 	  Generally say N here.
 
-config IDEDMA_PCI_WIP
-	bool "ATA Work(s) In Progress (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	help
-	  If you enable this you will be able to use and test highly
-	  developmental projects. If you say N, the configurator will
-	  simply skip those options.
-
-	  It is SAFEST to say N to this question.
-
-config IDEDMA_NEW_DRIVE_LISTINGS
-	bool "Good-Bad DMA Model-Firmware (WIP)"
-	depends on IDEDMA_PCI_WIP
-	help
-	  If you say Y here, the model and firmware revision of your drive
-	  will be compared against a blacklist of buggy drives that claim to
-	  be (U)DMA capable but aren't. This is a blanket on/off test with no
-	  speed limit options.
-
-	  If in doubt, say N.
-
 config BLK_DEV_ADMA
 	bool
 	depends on PCI && BLK_DEV_IDEPCI
@@ -630,8 +609,8 @@ config BLK_DEV_HPT34X
 	  DVD II drives, by the manufacturer.
 
 config HPT34X_AUTODMA
-	bool "HPT34X AUTODMA support (WIP)"
-	depends on BLK_DEV_HPT34X && IDEDMA_PCI_WIP
+	bool "HPT34X AUTODMA support (EXPERIMENTAL)"
+	depends on BLK_DEV_HPT34X && EXPERIMENTAL
 	help
 	  This is a dangerous thing to attempt currently! Please read the
 	  comments at the top of <file:drivers/ide/pci/hpt34x.c>.  If you say Y

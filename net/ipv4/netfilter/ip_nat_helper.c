@@ -1,8 +1,11 @@
-/* ip_nat_mangle.c - generic support functions for NAT helpers 
+/* ip_nat_helper.c - generic support functions for NAT helpers 
  *
- * (C) 2000-2002 by Harald Welte <laforge@gnumonks.org>
+ * (C) 2000-2002 Harald Welte <laforge@netfilter.org>
+ * (C) 2003-2004 Netfilter Core Team <coreteam@netfilter.org>
  *
- * distributed under the terms of GNU GPL
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * 	14 Jan 2002 Harald Welte <laforge@gnumonks.org>:
  *		- add support for SACK adjustment 

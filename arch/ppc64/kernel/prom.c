@@ -2507,29 +2507,48 @@ int of_add_node(const char *path, struct property *proplist)
 
 /*
  * Remove an OF device node from the system.
+ * Caller should have already "gotten" np.
  */
 int of_remove_node(struct device_node *np)
 {
 	struct device_node *parent, *child;
 
 	parent = of_get_parent(np);
-	child = of_get_next_child(np, NULL);
-	if (child && !child->child && !child->sibling) {
-		/* For now, we will allow removal of a
-		 * node with one and only one child, so
-		 * that we can support removing a slot with
-		 * an IOA in it.  More general support for
-		 * subtree removal to be implemented later, if
-		 * necessary.
-		 */
-		of_remove_node(child);
-	}
-	else if (child) {
-		of_node_put(child);
-		of_node_put(parent);
+
+	if (!parent)
 		return -EINVAL;
+
+	/* Make sure we are not recursively removing
+	 * more than one level of nodes.  We need to
+	 * allow this so we can remove a slot containing
+	 * an IOA.
+	 */
+	for (child = of_get_next_child(np, NULL);
+	     child != NULL;
+	     child = of_get_next_child(np, child)) {
+		struct device_node *grandchild;
+
+		if ((grandchild = of_get_next_child(child, NULL))) {
+			/* Too deep */
+			of_node_put(grandchild);
+			of_node_put(child);
+			return -EBUSY;
+		}
 	}
-	of_node_put(child);
+
+	/* Now that we're reasonably sure that we won't
+	 * overflow our stack, remove any children of np.
+	 */
+	for (child = of_get_next_child(np, NULL);
+	     child != NULL;
+	     child = of_get_next_child(np, child)) {
+		int rc;
+
+		if ((rc = of_remove_node(child))) {
+			of_node_put(child);
+			return rc;
+		}
+	}
 
 	write_lock(&devtree_lock);
 	OF_MARK_STALE(np);
@@ -2545,8 +2564,8 @@ int of_remove_node(struct device_node *np)
 		prev->allnext = np->allnext;
 	}
 
-	if (np->parent->child == np)
-		np->parent->child = np->sibling;
+	if (parent->child == np)
+		parent->child = np->sibling;
 	else {
 		struct device_node *prevsib;
 		for (prevsib = np->parent->child;

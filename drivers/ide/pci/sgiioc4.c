@@ -653,7 +653,6 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->ide_dma_good_drive = &__ide_dma_good_drive;
 	hwif->ide_dma_count = &__ide_dma_count;
 	hwif->ide_dma_verbose = &sgiioc4_ide_dma_verbose;
-	hwif->ide_dma_retune = &__ide_dma_retune;
 	hwif->ide_dma_lostirq = &sgiioc4_ide_dma_lostirq;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->INB = &sgiioc4_INB;

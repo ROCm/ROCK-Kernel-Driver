@@ -57,7 +57,9 @@ obj-$(CONFIG_SONYPI) += sonypi.o
 obj-$(CONFIG_RTC) += rtc.o
 obj-$(CONFIG_GEN_RTC) += genrtc.o
 obj-$(CONFIG_EFI_RTC) += efirtc.o
-ifeq ($(CONFIG_PPC),)
+ifeq ($(CONFIG_GENERIC_NVRAM),y)
+  obj-$(CONFIG_NVRAM) += generic_nvram.o
+else
   obj-$(CONFIG_NVRAM) += nvram.o
 endif
 obj-$(CONFIG_TOSHIBA) += toshiba.o
