@@ -105,7 +105,7 @@ csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr, unsigned short len,
 	adcs	%0, %0, %5					\n\
 	adc	%0, %0, #0"
 	: "=&r"(sum)
-	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len) << 16), "Ir" (proto << 8)
+	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len)), "Ir" (ntohs(proto))
 	: "cc");
 	return sum;
 }	
@@ -127,7 +127,7 @@ csum_tcpudp_magic(unsigned long saddr, unsigned long daddr, unsigned short len,
 	addcs	%0, %0, #0x10000				\n\
 	mvn	%0, %0"
 	: "=&r"(sum)
-	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len)), "Ir" (proto << 8)
+	: "r" (sum), "r" (daddr), "r" (saddr), "r" (ntohs(len)), "Ir" (ntohs(proto))
 	: "cc");
 	return sum >> 16;
 }
