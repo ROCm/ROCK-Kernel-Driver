@@ -731,7 +731,6 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 		buflen = cmd->request_bufflen;
 	}
 
-	memset(buf, 0, buflen);
 	*buf_out = buf;
 	return buflen;
 }
@@ -780,6 +779,7 @@ void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
 	struct scsi_cmnd *cmd = args->cmd;
 
 	buflen = ata_scsi_rbuf_get(cmd, &rbuf);
+	memset(rbuf, 0, buflen);
 	rc = actor(args, rbuf, buflen);
 	ata_scsi_rbuf_put(cmd);
 
