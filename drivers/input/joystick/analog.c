@@ -136,6 +136,8 @@ struct analog_port {
 	int axtime;
 };
 
+static int analog_num;
+
 /*
  * Time macros.
  */
@@ -445,6 +447,7 @@ static void analog_init_device(struct analog_port *port, struct analog *analog, 
 	analog->dev.id.vendor = GAMEPORT_ID_VENDOR_ANALOG;
 	analog->dev.id.product = analog->mask >> 4;
 	analog->dev.id.version = 0x0100;
+	sprintf(analog->dev.cdev.class_id,"analog%d", analog_num++);
 
 	analog->dev.open = analog_open;
 	analog->dev.close = analog_close;

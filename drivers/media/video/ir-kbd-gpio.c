@@ -329,6 +329,8 @@ static int ir_probe(struct device *dev)
 	ir->input.phys = ir->phys;
 	ir->input.id.bustype = BUS_PCI;
 	ir->input.id.version = 1;
+	ir->input.dev = dev;
+	sprintf(ir->input.cdev.class_id,"irkbd-gpio-%s", pci_name(sub->core->pci)); 
 	if (sub->core->pci->subsystem_vendor) {
 		ir->input.id.vendor  = sub->core->pci->subsystem_vendor;
 		ir->input.id.product = sub->core->pci->subsystem_device;

@@ -205,6 +205,7 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 			cobra->dev[i].id.vendor = GAMEPORT_ID_VENDOR_CREATIVE;
 			cobra->dev[i].id.product = 0x0008;
 			cobra->dev[i].id.version = 0x0100;
+			sprintf(cobra->dev[i].cdev.class_id,"cobra%d", i);
 
 			cobra->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			cobra->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

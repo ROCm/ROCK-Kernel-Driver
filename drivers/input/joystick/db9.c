@@ -597,6 +597,7 @@ static struct db9 __init *db9_probe(int *config, int nargs)
 		db9->dev[i].id.vendor = 0x0002;
 		db9->dev[i].id.product = config[1];
 		db9->dev[i].id.version = 0x0100;
+		sprintf(db9->dev[i].cdev.class_id,"db9-%d",i);
 
 		db9->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 		for (j = 0; j < db9_buttons[db9->mode]; j++)

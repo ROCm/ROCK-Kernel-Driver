@@ -70,6 +70,8 @@ struct budget_ci {
 	char ir_dev_name[50];
 };
 
+static int budget_ci_num;
+
 static u32 budget_debiread (struct budget_ci* budget_ci, u32 config, int addr, int count)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
@@ -255,6 +257,8 @@ static int msp430_ir_init (struct budget_ci *budget_ci)
 		if (key_map[i])
 			set_bit(key_map[i], budget_ci->input_dev.keybit);
 
+	sprintf(&budget_ci->input_dev.cdev.class_id,"budget%d",
+		budget_ci_num++);
 	input_register_device(&budget_ci->input_dev);
 
 	budget_ci->input_dev.timer.function = msp430_ir_debounce;

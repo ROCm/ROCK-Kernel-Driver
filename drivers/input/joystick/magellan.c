@@ -62,6 +62,8 @@ struct magellan {
 	char phys[32];
 };
 
+static int magellan_num;
+
 /*
  * magellan_crunch_nibbles() verifies that the bytes sent from the Magellan
  * have correct upper nibbles for the lower ones, if not, the packet will
@@ -138,6 +140,7 @@ static void magellan_disconnect(struct serio *serio)
 {
 	struct magellan* magellan = serio->private;
 	input_unregister_device(&magellan->dev);
+	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(magellan);
 }
@@ -183,10 +186,13 @@ static void magellan_connect(struct serio *serio, struct serio_driver *drv)
 	magellan->dev.id.vendor = SERIO_MAGELLAN;
 	magellan->dev.id.product = 0x0001;
 	magellan->dev.id.version = 0x0100;
+	magellan->dev.dev = get_device(&serio->dev);
+	sprintf(magellan->dev.cdev.class_id,"magellan%d", magellan_num++);
 
 	serio->private = magellan;
 
 	if (serio_open(serio, drv)) {
+		put_device(&serio->dev);
 		kfree(magellan);
 		return;
 	}

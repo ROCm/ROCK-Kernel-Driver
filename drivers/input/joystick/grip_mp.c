@@ -583,6 +583,7 @@ static void register_slot(int slot, struct grip_mp *grip)
 	grip->dev[slot].id.product = 0x0100 + grip->mode[slot];
 	grip->dev[slot].id.version = 0x0100;
 	grip->dev[slot].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
+	sprintf(grip->dev[slot].cdev.class_id,"grip-mp%d",slot);
 
 	for (j = 0; (t = grip_abs[grip->mode[slot]][j]) >= 0; j++) {
 		set_bit(t, grip->dev[slot].absbit);

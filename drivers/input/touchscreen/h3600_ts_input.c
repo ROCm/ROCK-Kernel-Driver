@@ -109,6 +109,8 @@ struct h3600_dev {
 	char phys[32];
 };
 
+static int h3600_ts_num;
+
 static irqreturn_t action_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
         int down = (GPLR & GPIO_BITSY_ACTION_BUTTON) ? 0 : 1;
@@ -456,6 +458,8 @@ static void h3600ts_connect(struct serio *serio, struct serio_driver *drv)
 					h3600ts_pm_callback);
 	printk("registered pm callback\n");
 #endif
+	ts->dev.dev = get_device(&serio->dev);
+	sprintf(ts->dev.cdev.class_id,"ts%d", h3600_ts_num++);
 	input_register_device(&ts->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", h3600_name, serio->phys);
@@ -472,6 +476,7 @@ static void h3600ts_disconnect(struct serio *serio)
         free_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, &ts->dev);
         free_irq(IRQ_GPIO_BITSY_NPOWER_BUTTON, &ts->dev);
 	input_unregister_device(&ts->dev);
+	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(ts);
 }

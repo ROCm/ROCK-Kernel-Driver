@@ -81,7 +81,7 @@ static struct iforce_device iforce_device[] = {
 	{ 0x0000, 0x0000, "Unknown I-Force Device [%04x:%04x]",		btn_joystick, abs_joystick, ff_iforce }
 };
 
-
+static int iforce_num;
 
 static int iforce_input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
@@ -506,7 +506,7 @@ int iforce_init_device(struct iforce *iforce)
 /*
  * Register input device.
  */
-
+	sprintf(iforce->dev.cdev.class_id,"iforce%d",iforce_num++);
 	input_register_device(&iforce->dev);
 
 	printk(KERN_DEBUG "iforce->dev.open = %p\n", iforce->dev.open);

@@ -171,6 +171,7 @@ int __init av7110_ir_init(void)
 	keyup_timer.data = 0;
 
 	input_dev.name = "DVB on-card IR receiver";
+	sprintf(input_dev.cdev.class_id,"av7110_ir");
 
 	/**
 	 *  enable keys

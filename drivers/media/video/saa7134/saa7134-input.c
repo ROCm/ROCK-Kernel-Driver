@@ -332,6 +332,8 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 	ir->dev.phys = ir->phys;
 	ir->dev.id.bustype = BUS_PCI;
 	ir->dev.id.version = 1;
+	sprintf(ir->dev.cdev.class_id,"irkbd-saa7134-%s",
+		pci_name(dev->pci));
 	if (dev->pci->subsystem_vendor) {
 		ir->dev.id.vendor  = dev->pci->subsystem_vendor;
 		ir->dev.id.product = dev->pci->subsystem_device;

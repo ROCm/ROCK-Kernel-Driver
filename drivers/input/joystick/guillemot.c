@@ -76,6 +76,8 @@ struct guillemot {
 	char phys[32];
 };
 
+static int guillemot_num;
+
 static struct guillemot_type guillemot_type[] = {
 	{ 0x00, guillemot_abs_pad, guillemot_btn_pad, 1, "Guillemot Pad" },
 	{ 0 }};
@@ -228,6 +230,7 @@ static void guillemot_connect(struct gameport *gameport, struct gameport_dev *de
 	guillemot->dev.id.vendor = GAMEPORT_ID_VENDOR_GUILLEMOT;
 	guillemot->dev.id.product = guillemot_type[i].id;
 	guillemot->dev.id.version = (int)data[14] << 8 | data[15];
+	sprintf(guillemot->dev.cdev.class_id,"guillemot%d",guillemot_num++);
 
 	guillemot->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 

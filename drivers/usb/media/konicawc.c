@@ -123,6 +123,7 @@ struct konicawc {
 #endif
 };
 
+static int konicawc_num;
 
 #define konicawc_set_misc(uvd, req, value, index)		konicawc_ctrl_msg(uvd, USB_DIR_OUT, req, value, index, NULL, 0)
 #define konicawc_get_misc(uvd, req, value, index, buf, sz)	konicawc_ctrl_msg(uvd, USB_DIR_IN, req, value, index, buf, sz)
@@ -854,6 +855,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		cam->input.id.vendor = dev->descriptor.idVendor;
 		cam->input.id.product = dev->descriptor.idProduct;
 		cam->input.id.version = dev->descriptor.bcdDevice;
+		sprintf(cam->input.cdev.class_id,"konicawc%d", konicawc_num++);
 		input_register_device(&cam->input);
 		
 		usb_make_path(dev, cam->input_physname, 56);

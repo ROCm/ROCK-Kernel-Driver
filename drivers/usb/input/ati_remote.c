@@ -186,6 +186,8 @@ struct ati_remote {
 	int send_flags;
 };
 
+static int ati_remote_num;
+
 /* "Kinds" of messages sent from the hardware to the driver. */
 #define KIND_END        0
 #define KIND_LITERAL    1   /* Simply pass to input system */
@@ -672,6 +674,7 @@ static void ati_remote_input_init(struct ati_remote *ati_remote)
 	idev->id.vendor = ati_remote->udev->descriptor.idVendor;
 	idev->id.product = ati_remote->udev->descriptor.idProduct;
 	idev->id.version = ati_remote->udev->descriptor.bcdDevice;
+	sprintf(idev->cdev.class_id,"ati-remote-%d",ati_remote_num++);
 }
 
 static int ati_remote_initialize(struct ati_remote *ati_remote)

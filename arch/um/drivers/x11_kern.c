@@ -271,6 +271,7 @@ static int x11_probe(void)
 	kd->kbd.id.bustype = BUS_HOST;
 	kd->kbd.name = "virtual keyboard";
 	kd->kbd.phys = "x11/input0";
+	sprintf(kd->kbd.cdev.class_id,"x11kbd");
 	input_register_device(&kd->kbd);
 
 	/* mouse setup */
@@ -290,6 +291,7 @@ static int x11_probe(void)
 	kd->mouse.id.bustype = BUS_HOST;
 	kd->mouse.name = "virtual mouse";
 	kd->mouse.phys = "x11/input1";
+	sprintf(kd->mouse.cdev.class_id,"x11mouse");
 	input_register_device(&kd->mouse);
 
 	/* misc common kernel stuff */

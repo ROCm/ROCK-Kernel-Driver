@@ -356,6 +356,7 @@ static void grip_connect(struct gameport *gameport, struct gameport_dev *dev)
 			grip->dev[i].id.vendor = GAMEPORT_ID_VENDOR_GRAVIS;
 			grip->dev[i].id.product = grip->mode[i];
 			grip->dev[i].id.version = 0x0100;
+			sprintf(grip->dev[i].cdev.class_id,"grip%d",i);
 
 			grip->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 

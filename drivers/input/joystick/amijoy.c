@@ -138,6 +138,7 @@ static int __init amijoy_init(void)
 			amijoy_dev[i].id.vendor = 0x0001;
 			amijoy_dev[i].id.product = 0x0003;
 			amijoy_dev[i].id.version = 0x0100;
+			sprintf(amijoy[i].cdev.class_id,"amijoy%d",i);
 
 			amijoy_dev[i].private = amijoy_used + i;
 

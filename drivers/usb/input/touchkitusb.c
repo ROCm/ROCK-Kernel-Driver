@@ -70,6 +70,8 @@ struct touchkit_usb {
 	char phys[64];
 };
 
+static int touchkit_num;
+
 static struct usb_device_id touchkit_devices[] = {
 	{USB_DEVICE(0x3823, 0x0001)},
 	{USB_DEVICE(0x0eef, 0x0001)},
@@ -204,6 +206,7 @@ static int touchkit_probe(struct usb_interface *intf,
 	touchkit->input.id.product = udev->descriptor.idProduct;
 	touchkit->input.id.version = udev->descriptor.bcdDevice;
 	touchkit->input.dev = &intf->dev;
+	sprintf(touchkit->input.cdev.class_id,"touchkit%d", touchkit_num++);
 
 	touchkit->input.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 	touchkit->input.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

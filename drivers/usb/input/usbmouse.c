@@ -57,6 +57,8 @@ struct usb_mouse {
 	dma_addr_t data_dma;
 };
 
+static int usb_mouse_num;
+
 static void usb_mouse_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_mouse *mouse = urb->context;
@@ -184,6 +186,7 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 	mouse->dev.id.product = dev->descriptor.idProduct;
 	mouse->dev.id.version = dev->descriptor.bcdDevice;
 	mouse->dev.dev = &intf->dev;
+	sprintf(mouse->dev.cdev.class_id,"usbmouse%d",usb_mouse_num++);
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);

@@ -78,6 +78,8 @@ struct powermate_device {
 	char phys[64];
 };
 
+static int powermate_num;
+
 static char pm_name_powermate[] = "Griffin PowerMate";
 static char pm_name_soundknob[] = "Griffin SoundKnob";
 
@@ -394,6 +396,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 	pm->input.id.version = udev->descriptor.bcdDevice;
 	pm->input.event = powermate_input_event;
 	pm->input.dev = &intf->dev;
+	sprintf(pm->input.cdev.class_id,"powermate%d",powermate_num++);
 
 	input_register_device(&pm->input);
 

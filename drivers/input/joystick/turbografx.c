@@ -205,6 +205,7 @@ static struct tgfx __init *tgfx_probe(int *config, int nargs)
 			tgfx->dev[i].id.vendor = 0x0003;
 			tgfx->dev[i].id.product = config[i+1];
 			tgfx->dev[i].id.version = 0x0100;
+			sprintf(tgfx->dev[i].cdev.class_id,"turbografx%d",i);
 
 			tgfx->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			tgfx->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

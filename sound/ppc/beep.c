@@ -39,6 +39,8 @@ struct snd_pmac_beep {
 	struct input_dev dev;
 };
 
+static int pmac_beep_num;
+
 /*
  * stop beep if running
  */
@@ -236,6 +238,7 @@ int __init snd_pmac_attach_beep(pmac_t *chip)
 	beep->dev.id.vendor = 0x001f;
 	beep->dev.id.product = 0x0001;
 	beep->dev.id.version = 0x0100;
+	sprintf(beep->dev.cdev.class_id,"beep%d", pmac_beep_num++);
 
 	beep->volume = BEEP_VOLUME;
 	beep->running = 0;

@@ -82,6 +82,8 @@ struct usb_kbd {
 	dma_addr_t leds_dma;
 };
 
+static int usb_kbd_num;
+
 static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_kbd *kbd = urb->context;
@@ -300,6 +302,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	kbd->dev.id.product = dev->descriptor.idProduct;
 	kbd->dev.id.version = dev->descriptor.bcdDevice;
 	kbd->dev.dev = &iface->dev;
+	sprintf(kbd->dev.cdev.class_id,"usbkbd%d",usb_kbd_num++);
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		usb_free_urb(kbd->irq);

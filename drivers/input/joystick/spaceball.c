@@ -78,6 +78,8 @@ struct spaceball {
 	char phys[32];
 };
 
+static int spaceball_num;
+
 /*
  * spaceball_process_packet() decodes packets the driver receives from the
  * SpaceBall.
@@ -193,6 +195,7 @@ static void spaceball_disconnect(struct serio *serio)
 {
 	struct spaceball* spaceball = serio->private;
 	input_unregister_device(&spaceball->dev);
+	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(spaceball);
 }
@@ -253,6 +256,8 @@ static void spaceball_connect(struct serio *serio, struct serio_driver *drv)
 	spaceball->dev.id.vendor = SERIO_SPACEBALL;
 	spaceball->dev.id.product = id;
 	spaceball->dev.id.version = 0x0100;
+	spaceball->dev.dev = get_device(&serio->dev);
+	sprintf(spaceball->dev.cdev.class_id,"spaceball%d",spaceball_num++);
 
 	serio->private = spaceball;
 

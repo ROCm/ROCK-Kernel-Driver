@@ -814,6 +814,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		sprintf(sonypi_device.jog_dev.name, SONYPI_INPUTNAME);
 		sonypi_device.jog_dev.id.bustype = BUS_ISA;
 		sonypi_device.jog_dev.id.vendor = PCI_VENDOR_ID_SONY;
+		sprintf(sonypi_device.jog_dev.cdev.class_id,"sonypi-jogdial");
 	  
 		input_register_device(&sonypi_device.jog_dev);
 		printk(KERN_INFO "%s installed.\n", sonypi_device.jog_dev.name);

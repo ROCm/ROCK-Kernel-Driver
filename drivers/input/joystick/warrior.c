@@ -60,6 +60,8 @@ struct warrior {
 	char phys[32];
 };
 
+static int warrior_num;
+
 /*
  * warrior_process_packet() decodes packets the driver receives from the
  * Warrior. It updates the data accordingly.
@@ -131,6 +133,7 @@ static void warrior_disconnect(struct serio *serio)
 {
 	struct warrior* warrior = serio->private;
 	input_unregister_device(&warrior->dev);
+	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(warrior);
 }
@@ -192,6 +195,8 @@ static void warrior_connect(struct serio *serio, struct serio_driver *drv)
 		return;
 	}
 
+	warrior->dev.dev = get_device(&serio->dev);
+	sprintf(warrior->dev.cdev.class_id, "warrior%d", warrior_num++);
 	input_register_device(&warrior->dev);
 
 	printk(KERN_INFO "input: Logitech WingMan Warrior on %s\n", serio->phys);

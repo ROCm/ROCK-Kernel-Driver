@@ -107,6 +107,8 @@ struct wacom {
 	char phys[32];
 };
 
+static int wacom_num;
+
 #define USB_REQ_SET_REPORT	0x09
 static int usb_set_report(struct usb_interface *intf, unsigned char type,
 				unsigned char id, void *buf, int size)
@@ -697,6 +699,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 	wacom->dev.id.version = dev->descriptor.bcdDevice;
 	wacom->dev.dev = &intf->dev;
 	wacom->usbdev = dev;
+	sprintf(wacom->dev.cdev.class_id,"wacom%d",wacom_num++);
 
 	endpoint = &intf->cur_altsetting->endpoint[0].desc;
 

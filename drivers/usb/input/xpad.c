@@ -113,6 +113,8 @@ struct usb_xpad {
 	int open_count;				/* reference count */
 };
 
+static int usb_xpad_num;
+
 /*
  *	xpad_process_packet
  *
@@ -273,7 +275,8 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	xpad->dev.phys = xpad->phys;
 	xpad->dev.open = xpad_open;
 	xpad->dev.close = xpad_close;
-	
+	sprintf(xpad->dev.cdev.class_id,"xpad%d",usb_xpad_num++);
+
 	usb_make_path(udev, path, 64);
 	snprintf(xpad->phys, 64,  "%s/input0", path);
 	

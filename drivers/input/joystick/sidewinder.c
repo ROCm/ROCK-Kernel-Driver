@@ -721,6 +721,7 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 		sw->dev[i].id.vendor = GAMEPORT_ID_VENDOR_MICROSOFT;
 		sw->dev[i].id.product = sw->type;
 		sw->dev[i].id.version = 0x0100;
+		sprintf(sw->dev[i].cdev.class_id,"sidewinder%d", i );
 
 		sw->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 

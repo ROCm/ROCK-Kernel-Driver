@@ -397,6 +397,7 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 	ir->input.id.bustype = BUS_I2C;
 	ir->input.name       = ir->c.name;
 	ir->input.phys       = ir->phys;
+	sprintf(ir->input.cdev.class_id, "irkbd-i2c-%02x", addr);
 	input_register_device(&ir->input);
 	printk(DEVNAME ": %s detected at %s [%s]\n",
 	       ir->input.name,ir->input.phys,adap->name);

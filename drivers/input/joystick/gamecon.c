@@ -646,6 +646,7 @@ static struct gc __init *gc_probe(int *config, int nargs)
                 gc->dev[i].id.vendor = 0x0001;
                 gc->dev[i].id.product = config[i + 1];
                 gc->dev[i].id.version = 0x0100;
+		sprintf(gc->dev[i].cdev.class_id, "gamecon%d",i);
 	}
 
 	parport_release(gc->pd);

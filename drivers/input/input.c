@@ -25,7 +25,7 @@
 #include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
 
-#define INPUT_DEBUG
+#undef INPUT_DEBUG
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input core");
@@ -51,6 +51,8 @@ static LIST_HEAD(input_dev_list);
 static LIST_HEAD(input_handler_list);
 
 static struct input_handler *input_table[8];
+
+static int input_device_num;
 
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *proc_bus_input_dir;
@@ -506,6 +508,12 @@ void input_register_device(struct input_dev *dev)
 	dev->cdev.class = &input_device_class;
 	
 	dev->cdev.dev = get_device(dev->dev);
+	if (!dev->cdev.class_id[0]) {
+		printk(KERN_WARNING "No class name for input device %s at %s",
+		       dev->name, dev->phys);
+		sprintf(dev->cdev.class_id,"device%d", input_device_num++);
+	}
+
 	if (class_device_register(&dev->cdev)) {
 		if (dev->dev)
 			put_device(dev->dev);

@@ -85,6 +85,8 @@ struct mtouch_usb {
         char phys[64];
 };
 
+static int mtouch_usb_num;
+
 static struct usb_device_id mtouchusb_devices [] = {
         { USB_DEVICE(0x0596, 0x0001) },
         { }
@@ -227,6 +229,7 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         mtouch->input.id.product = udev->descriptor.idProduct;
         mtouch->input.id.version = udev->descriptor.bcdDevice;
         mtouch->input.dev = &intf->dev;
+	sprintf(mtouch->input.cdev.class_id,"mtouchusb%d",mtouch_usb_num++);
 
         mtouch->input.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
         mtouch->input.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

@@ -2821,6 +2821,9 @@ static struct input_dev awacs_beep_dev = {
 	.id		= {
 		.bustype	= BUS_HOST,
 	},
+	.cdev		= {
+		.class_id	= "dmasound_awacs",
+	},
 };
 
 int __init dmasound_awacs_init(void)

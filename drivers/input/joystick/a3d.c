@@ -69,6 +69,8 @@ struct a3d {
 	char adcphys[32];
 };
 
+static int a3d_num;
+
 /*
  * a3d_read_packet() reads an Assassin 3D packet.
  */
@@ -365,6 +367,7 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 	a3d->dev.id.vendor = GAMEPORT_ID_VENDOR_MADCATZ;
 	a3d->dev.id.product = a3d->mode;
 	a3d->dev.id.version = 0x0100;
+	sprintf(a3d->dev.cdev.class_id,"a3d-%d",a3d_num++);
 
 	input_register_device(&a3d->dev);
 	printk(KERN_INFO "input: %s on %s\n", a3d_names[a3d->mode], a3d->phys);

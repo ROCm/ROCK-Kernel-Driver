@@ -335,6 +335,8 @@ struct aiptek {
 	unsigned char *data;			/* incoming packet data          */
 };
 
+static int aiptek_num;
+
 /*
  * Permit easy lookup of keyboard events to send, versus
  * the bitmap which comes from the tablet. This hides the
@@ -2140,6 +2142,7 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	aiptek->inputdev.id.vendor = usbdev->descriptor.idVendor;
 	aiptek->inputdev.id.product = usbdev->descriptor.idProduct;
 	aiptek->inputdev.id.version = usbdev->descriptor.bcdDevice;
+	sprintf(aiptek->inputdev.cdev.class_id,"aiptek%d",aiptek_num++);
 
 	aiptek->usbdev = usbdev;
 	aiptek->ifnum = intf->altsetting[0].desc.bInterfaceNumber;

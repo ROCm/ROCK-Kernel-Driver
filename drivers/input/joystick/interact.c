@@ -63,6 +63,8 @@ struct interact {
 	char phys[32];
 };
 
+static int interact_num;
+
 static short interact_abs_hhfx[] =
 	{ ABS_RX, ABS_RY, ABS_X, ABS_Y, ABS_HAT0X, ABS_HAT0Y, -1 };
 static short interact_abs_pp8d[] =
@@ -277,6 +279,7 @@ static void interact_connect(struct gameport *gameport, struct gameport_dev *dev
 	for (i = 0; (t = interact_type[interact->type].btn[i]) >= 0; i++)
 		set_bit(t, interact->dev.keybit);
 
+	sprintf(interact->dev.cdev.class_id,"interact%d",interact_num++);
 	input_register_device(&interact->dev);
 	printk(KERN_INFO "input: %s on %s\n",
 		interact_type[interact->type].name, gameport->phys);

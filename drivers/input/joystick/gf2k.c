@@ -90,6 +90,8 @@ struct gf2k {
 	char phys[32];
 };
 
+static int gf2k_num;
+
 /*
  * gf2k_read_packet() reads a Genius Flight2000 packet.
  */
@@ -303,6 +305,7 @@ static void gf2k_connect(struct gameport *gameport, struct gameport_dev *dev)
 	gf2k->dev.id.vendor = GAMEPORT_ID_VENDOR_GENIUS;
 	gf2k->dev.id.product = gf2k->id;
 	gf2k->dev.id.version = 0x0100;
+	sprintf(gf2k->dev.cdev.class_id,"gf2k-%d",gf2k_num++);
 
 	for (i = 0; i < gf2k_axes[gf2k->id]; i++)
 		set_bit(gf2k_abs[i], gf2k->dev.absbit);
