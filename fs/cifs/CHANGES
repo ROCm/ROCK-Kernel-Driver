@@ -1,6 +1,13 @@
+Version 1.06
+------------
+Send NTCreateX with ATTR_POSIX if Linux/Unix extensions negotiated with server.
+This allows files that differ only in case and improves performance of file
+creation and file open to such servers.
+
 Version 1.05
 ------------
 fixes to cifs_readpages for fsx test case
+
 Version 1.04
 ------------
 Fix caching data integrity bug when extending file size especially when no
