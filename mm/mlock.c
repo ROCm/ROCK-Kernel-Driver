@@ -111,16 +111,8 @@ asmlinkage long sys_mlock(unsigned long start, size_t len)
 	lock_limit >>= PAGE_SHIFT;
 
 	/* check against resource limits */
-	if (locked > lock_limit)
-		goto out;
-
-	/* we may lock at most half of physical memory... */
-	/* (this check is pretty bogus, but doesn't hurt) */
-	if (locked > num_physpages/2)
-		goto out;
-
-	error = do_mlock(start, len, 1);
-out:
+	if (locked <= lock_limit)
+		error = do_mlock(start, len, 1);
 	up_write(&current->mm->mmap_sem);
 	return error;
 }
@@ -178,15 +170,8 @@ asmlinkage long sys_mlockall(int flags)
 	lock_limit >>= PAGE_SHIFT;
 
 	ret = -ENOMEM;
-	if (current->mm->total_vm > lock_limit)
-		goto out;
-
-	/* we may lock at most half of physical memory... */
-	/* (this check is pretty bogus, but doesn't hurt) */
-	if (current->mm->total_vm > num_physpages/2)
-		goto out;
-
-	ret = do_mlockall(flags);
+	if (current->mm->total_vm <= lock_limit)
+		ret = do_mlockall(flags);
 out:
 	up_write(&current->mm->mmap_sem);
 	return ret;
