@@ -84,6 +84,7 @@ static int nfs_stat_to_errno(int);
 				((3+NFS4_FHSIZE) >> 2))
 #define encode_getattr_maxsz    (op_encode_hdr_maxsz + 3)
 #define nfs4_name_maxsz		(1 + ((3 + NFS4_MAXNAMLEN) >> 2))
+#define nfs4_path_maxsz		(1 + ((3 + NFS4_MAXPATHLEN) >> 2))
 #define nfs4_fattr_bitmap_maxsz (36 + 2 * nfs4_name_maxsz)
 #define decode_getattr_maxsz    (op_decode_hdr_maxsz + 3 + \
                                 nfs4_fattr_bitmap_maxsz)
@@ -118,8 +119,13 @@ static int nfs_stat_to_errno(int);
 #define encode_link_maxsz	(op_encode_hdr_maxsz + \
 				nfs4_name_maxsz)
 #define decode_link_maxsz	(op_decode_hdr_maxsz + 5)
+#define encode_symlink_maxsz	(op_encode_hdr_maxsz + \
+				1 + nfs4_name_maxsz + \
+				nfs4_path_maxsz + \
+				nfs4_fattr_bitmap_maxsz)
+#define decode_symlink_maxsz	(op_decode_hdr_maxsz + 8)
 #define encode_create_maxsz	(op_encode_hdr_maxsz + \
-				2 + 2 * nfs4_name_maxsz + \
+				2 + nfs4_name_maxsz + \
 				nfs4_fattr_bitmap_maxsz)
 #define decode_create_maxsz	(op_decode_hdr_maxsz + 8)
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
@@ -313,6 +319,16 @@ static int nfs_stat_to_errno(int);
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
 				decode_link_maxsz)
+#define NFS4_enc_symlink_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_symlink_maxsz + \
+				encode_getattr_maxsz + \
+				encode_getfh_maxsz)
+#define NFS4_dec_symlink_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				decode_symlink_maxsz + \
+				decode_getattr_maxsz + \
+				decode_getfh_maxsz)
 #define NFS4_enc_create_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_create_maxsz + \
@@ -927,7 +943,7 @@ static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg 
 	WRITE32(OP_READDIR);
 	WRITE64(readdir->cookie);
 	WRITEMEM(readdir->verifier.data, sizeof(readdir->verifier.data));
-	WRITE32(readdir->count >> 5);  /* meaningless "dircount" field */
+	WRITE32(readdir->count >> 1);  /* We're not doing readdirplus */
 	WRITE32(readdir->count);
 	WRITE32(2);
 	WRITE32(FATTR4_WORD0_FILEID);
@@ -1241,6 +1257,14 @@ static int nfs4_xdr_enc_create(struct rpc_rqst *req, uint32_t *p, const struct n
 	status = encode_getfh(&xdr);
 out:
 	return status;
+}
+
+/*
+ * Encode SYMLINK request
+ */
+static int nfs4_xdr_enc_symlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
+{
+	return nfs4_xdr_enc_create(req, p, args);
 }
 
 /*
@@ -2817,8 +2841,8 @@ static int decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct n
 	struct kvec	*iov = rcvbuf->head;
 	unsigned int	nr, pglen = rcvbuf->page_len;
 	uint32_t	*end, *entry, *p, *kaddr;
-	uint32_t	len, attrlen, word;
-	int 		i, hdrlen, recvd, status;
+	uint32_t	len, attrlen;
+	int 		hdrlen, recvd, status;
 
 	status = decode_op_hdr(xdr, OP_READDIR);
 	if (status)
@@ -2839,42 +2863,24 @@ static int decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct n
 	for (nr = 0; *p++; nr++) {
 		if (p + 3 > end)
 			goto short_pkt;
-		p += 2;     /* cookie */
-		len = ntohl(*p++);  /* filename length */
+		p += 2;			/* cookie */
+		len = ntohl(*p++);	/* filename length */
 		if (len > NFS4_MAXNAMLEN) {
 			printk(KERN_WARNING "NFS: giant filename in readdir (len 0x%x)\n", len);
 			goto err_unmap;
 		}
-			
 		p += XDR_QUADLEN(len);
 		if (p + 1 > end)
 			goto short_pkt;
-		len = ntohl(*p++);  /* bitmap length */
-		if (len > 10) {
-			printk(KERN_WARNING "NFS: giant bitmap in readdir (len 0x%x)\n", len);
-			goto err_unmap;
-		}
-		if (p + len + 1 > end)
-			goto short_pkt;
-		attrlen = 0;
-		for (i = 0; i < len; i++) {
-			word = ntohl(*p++);
-			if (!word)
-				continue;
-			else if (i == 0 && word == FATTR4_WORD0_FILEID) {
-				attrlen = 8;
-				continue;
-			}
-			printk(KERN_WARNING "NFS: unexpected bitmap word in readdir (0x%x)\n", word);
-			goto err_unmap;
-		}
-		if (ntohl(*p++) != attrlen) {
-			printk(KERN_WARNING "NFS: unexpected attrlen in readdir\n");
-			goto err_unmap;
-		}
-		p += XDR_QUADLEN(attrlen);
+		len = ntohl(*p++);	/* bitmap length */
+		p += len;
 		if (p + 1 > end)
 			goto short_pkt;
+		attrlen = XDR_QUADLEN(ntohl(*p++));
+		p += attrlen;		/* attributes */
+		if (p + 2 > end)
+			goto short_pkt;
+		entry = p;
 	}
 	if (!nr && (entry[0] != 0 || entry[1] == 0))
 		goto short_pkt;
@@ -3219,6 +3225,14 @@ static int nfs4_xdr_dec_create(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_
 	status = decode_getfh(&xdr, res->fh);
 out:
 	return status;
+}
+
+/*
+ * Decode SYMLINK response
+ */
+static int nfs4_xdr_dec_symlink(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
+{
+	return nfs4_xdr_dec_create(rqstp, p, res);
 }
 
 /*
@@ -3667,6 +3681,7 @@ static int nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 
 uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
+	uint32_t bitmap[1] = {0};
 	uint32_t len;
 
 	if (!*p++) {
@@ -3689,11 +3704,17 @@ uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 	 */
 	entry->ino = 1;
 
-	len = ntohl(*p++);             /* bitmap length */
-	p += len;
-	len = ntohl(*p++);             /* attribute buffer length */
-	if (len)
-		p = xdr_decode_hyper(p, &entry->ino);
+	len = ntohl(*p++);		/* bitmap length */
+	if (len > 0) {
+		bitmap[0] = ntohl(*p);
+		p += len;
+	}
+	len = XDR_QUADLEN(ntohl(*p++));	/* attribute buffer length */
+	if (len > 0) {
+		if (bitmap[0] == FATTR4_WORD0_FILEID)
+			xdr_decode_hyper(p, &entry->ino);
+		p += len;
+	}
 
 	entry->eof = !p[0] && p[1];
 	return p;
@@ -3756,7 +3777,7 @@ nfs_stat_to_errno(int stat)
 		if (nfs_errtbl[i].stat == stat)
 			return nfs_errtbl[i].errno;
 	}
-	if (stat < 0) {
+	if (stat <= 10000 || stat > 10100) {
 		/* The server is looney tunes. */
 		return ESERVERFAULT;
 	}
@@ -3804,6 +3825,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(REMOVE,		enc_remove,	dec_remove),
   PROC(RENAME,		enc_rename,	dec_rename),
   PROC(LINK,		enc_link,	dec_link),
+  PROC(SYMLINK,		enc_symlink,	dec_symlink),
   PROC(CREATE,		enc_create,	dec_create),
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
   PROC(STATFS,		enc_statfs,	dec_statfs),

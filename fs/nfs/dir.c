@@ -610,7 +610,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 	verifier = nfs_save_change_attribute(dir);
 	error = nfs_cached_lookup(dir, dentry, &fhandle, &fattr);
 	if (!error) {
-		if (memcmp(NFS_FH(inode), &fhandle, sizeof(struct nfs_fh))!= 0)
+		if (nfs_compare_fh(NFS_FH(inode), &fhandle))
 			goto out_bad;
 		if (nfs_lookup_verify_inode(inode, isopen))
 			goto out_zap_parent;
@@ -623,7 +623,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
 	if (error)
 		goto out_bad;
-	if (memcmp(NFS_FH(inode), &fhandle, sizeof(struct nfs_fh))!= 0)
+	if (nfs_compare_fh(NFS_FH(inode), &fhandle))
 		goto out_bad;
 	if ((error = nfs_refresh_inode(inode, &fattr)) != 0)
 		goto out_bad;
@@ -850,22 +850,22 @@ static int nfs_open_revalidate(struct dentry *dentry, struct nameidata *nd)
 	unsigned long verifier;
 	int openflags, ret = 0;
 
-	/* NFS only supports OPEN for regular files */
-	if (inode && !S_ISREG(inode->i_mode))
-		goto no_open;
 	parent = dget_parent(dentry);
 	dir = parent->d_inode;
 	if (!is_atomic_open(dir, nd))
 		goto no_open;
+	/* We can't create new files in nfs_open_revalidate(), so we
+	 * optimize away revalidation of negative dentries.
+	 */
+	if (inode == NULL)
+		goto out;
+	/* NFS only supports OPEN on regular files */
+	if (!S_ISREG(inode->i_mode))
+		goto no_open;
 	openflags = nd->intent.open.flags;
-	if (openflags & O_CREAT) {
-		/* If this is a negative dentry, just drop it */
-		if (!inode)
-			goto out;
-		/* If this is exclusive open, just revalidate */
-		if (openflags & O_EXCL)
-			goto no_open;
-	}
+	/* We cannot do exclusive creation on a positive dentry */
+	if ((openflags & (O_CREAT|O_EXCL)) == (O_CREAT|O_EXCL))
+		goto no_open;
 	/* We can't create new files, or truncate existing ones here */
 	openflags &= ~(O_CREAT|O_TRUNC);
 
@@ -1299,19 +1299,6 @@ nfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	dfprintk(VFS, "NFS: symlink(%s/%ld, %s, %s)\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name, symname);
 
-	error = -ENAMETOOLONG;
-	switch (NFS_PROTO(dir)->version) {
-		case 2:
-			if (strlen(symname) > NFS2_MAXPATHLEN)
-				goto out;
-			break;
-		case 3:
-			if (strlen(symname) > NFS3_MAXPATHLEN)
-				goto out;
-		default:
-			break;
-	}
-
 #ifdef NFS_PARANOIA
 if (dentry->d_inode)
 printk("nfs_proc_symlink: %s/%s not negative!\n",
@@ -1341,8 +1328,6 @@ dentry->d_parent->d_name.name, dentry->d_name.name);
 		d_drop(dentry);
 	}
 	unlock_kernel();
-
-out:
 	return error;
 }
 
@@ -1498,10 +1483,56 @@ out:
 	return error;
 }
 
-int
-nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
+static int nfs_access_get_cached(struct inode *inode, struct rpc_cred *cred, struct nfs_access_entry *res)
 {
-	struct nfs_access_cache *cache = &NFS_I(inode)->cache_access;
+	struct nfs_access_entry *cache = &NFS_I(inode)->cache_access;
+
+	if (cache->cred != cred
+			|| time_after(jiffies, cache->jiffies + NFS_ATTRTIMEO(inode))
+			|| (NFS_FLAGS(inode) & NFS_INO_INVALID_ATTR))
+		return -ENOENT;
+	memcpy(res, cache, sizeof(*res));
+	return 0;
+}
+
+static void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
+{
+	struct nfs_access_entry *cache = &NFS_I(inode)->cache_access;
+
+	if (cache->cred != set->cred) {
+		if (cache->cred)
+			put_rpccred(cache->cred);
+		cache->cred = get_rpccred(set->cred);
+	}
+	cache->jiffies = set->jiffies;
+	cache->mask = set->mask;
+}
+
+static int nfs_do_access(struct inode *inode, struct rpc_cred *cred, int mask)
+{
+	struct nfs_access_entry cache;
+	int status;
+
+	status = nfs_access_get_cached(inode, cred, &cache);
+	if (status == 0)
+		goto out;
+
+	/* Be clever: ask server to check for all possible rights */
+	cache.mask = MAY_EXEC | MAY_WRITE | MAY_READ;
+	cache.cred = cred;
+	cache.jiffies = jiffies;
+	status = NFS_PROTO(inode)->access(inode, &cache);
+	if (status != 0)
+		return status;
+	nfs_access_add_cache(inode, &cache);
+out:
+	if ((cache.mask & mask) == mask)
+		return 0;
+	return -EACCES;
+}
+
+int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
+{
 	struct rpc_cred *cred;
 	int mode = inode->i_mode;
 	int res;
@@ -1542,39 +1573,13 @@ nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 		goto out_notsup;
 
 	cred = rpcauth_lookupcred(NFS_CLIENT(inode)->cl_auth, 0);
-	if (cache->cred == cred
-	    && time_before(jiffies, cache->jiffies + NFS_ATTRTIMEO(inode))
-	    && !(NFS_FLAGS(inode) & NFS_INO_INVALID_ATTR)) {
-		if (!(res = cache->err)) {
-			/* Is the mask a subset of an accepted mask? */
-			if ((cache->mask & mask) == mask)
-				goto out;
-		} else {
-			/* ...or is it a superset of a rejected mask? */
-			if ((cache->mask & mask) == cache->mask)
-				goto out;
-		}
-	}
-
-	res = NFS_PROTO(inode)->access(inode, cred, mask);
-	if (!res || res == -EACCES)
-		goto add_cache;
-out:
+	res = nfs_do_access(inode, cred, mask);
 	put_rpccred(cred);
 	unlock_kernel();
 	return res;
 out_notsup:
 	nfs_revalidate_inode(NFS_SERVER(inode), inode);
 	res = vfs_permission(inode, mask);
-	unlock_kernel();
-	return res;
-add_cache:
-	cache->jiffies = jiffies;
-	if (cache->cred)
-		put_rpccred(cache->cred);
-	cache->cred = cred;
-	cache->mask = mask;
-	cache->err = res;
 	unlock_kernel();
 	return res;
 }
