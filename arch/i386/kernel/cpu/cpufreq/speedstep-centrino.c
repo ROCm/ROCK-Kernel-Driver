@@ -53,6 +53,13 @@ static const struct cpu_id cpu_id_banias = {
 	.x86_mask = 5,
 };
 
+static const struct cpu_id cpu_id_dothan_a1 = {
+	.x86_vendor = X86_VENDOR_INTEL,
+	.x86 = 6,
+	.x86_model = 13,
+	.x86_mask = 1,
+};
+
 struct cpu_model
 {
 	const struct cpu_id *cpu_id;
@@ -392,10 +399,8 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	if (!cpu_has(cpu, X86_FEATURE_EST))
 		return -ENODEV;
 
-	/* Only Intel Pentium M stepping 5 for now - add new CPUs as
-	   they appear after making sure they use PERF_CTL in the same
-	   way. */
-	if (centrino_verify_cpu_id(cpu, &cpu_id_banias)) {
+	if ((centrino_verify_cpu_id(cpu, &cpu_id_banias)) &&
+	    (centrino_verify_cpu_id(cpu, &cpu_id_dothan_a1))) {
 		printk(KERN_INFO PFX "found unsupported CPU with Enhanced SpeedStep: "
 		       "send /proc/cpuinfo to " MAINTAINER "\n");
 		return -ENODEV;
