@@ -99,6 +99,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 
@@ -1000,6 +1001,7 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 	dmabuf->numfrag = SG_LEN;
 	dmabuf->fragsize = dmabuf->dmasize/dmabuf->numfrag;
 	dmabuf->fragsamples = dmabuf->fragsize >> 1;
+	dmabuf->fragshift = ffs(dmabuf->fragsize) - 1;
 	dmabuf->userfragsize = dmabuf->ossfragsize;
 	dmabuf->userfrags = dmabuf->dmasize/dmabuf->ossfragsize;
 
@@ -1007,16 +1009,12 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 
 	if(dmabuf->ossmaxfrags == 4) {
 		fragint = 8;
-		dmabuf->fragshift = 2;
 	} else if (dmabuf->ossmaxfrags == 8) {
 		fragint = 4;
-		dmabuf->fragshift = 3;
 	} else if (dmabuf->ossmaxfrags == 16) {
 		fragint = 2;
-		dmabuf->fragshift = 4;
 	} else {
 		fragint = 1;
-		dmabuf->fragshift = 5;
 	}
 	/*
 	 *	Now set up the ring 
@@ -1113,7 +1111,7 @@ static void __i810_update_lvi(struct i810_state *state, int rec)
 
 	/* MASKP2(swptr, fragsize) - 1 is the tail of our transfer */
 	x = MODULOP2(MASKP2(dmabuf->swptr, fragsize) - 1, dmabuf->dmasize);
-	x /= fragsize;
+	x >>= dmabuf->fragshift;
 	outb(x, port + OFF_LVI);
 }
 
@@ -1708,7 +1706,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 			goto ret;
 		}
 
-		swptr = (swptr + cnt) % dmabuf->dmasize;
+		swptr = MODULOP2(swptr + cnt, dmabuf->dmasize);
 
 		spin_lock_irqsave(&state->card->lock, flags);
                 if (PM_SUSPENDED(card)) {
