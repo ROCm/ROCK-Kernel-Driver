@@ -477,7 +477,7 @@ static int smctr_checksum_firmware(struct net_device *dev)
         return (0);
 }
 
-static int smctr_chk_mca(struct net_device *dev)
+static int __init smctr_chk_mca(struct net_device *dev)
 {
 #ifdef CONFIG_MCA
 	struct net_local *tp = (struct net_local *)dev->priv;
