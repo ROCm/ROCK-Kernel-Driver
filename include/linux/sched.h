@@ -1144,7 +1144,7 @@ static inline int try_to_freeze(unsigned long refrigerator_flags)
 }
 #else
 static inline void refrigerator(unsigned long flag) {}
-static inline int freeze_processes(void) { BUG(); }
+static inline int freeze_processes(void) { BUG(); return 0; }
 static inline void thaw_processes(void) {}
 
 static inline int try_to_freeze(unsigned long refrigerator_flags)
