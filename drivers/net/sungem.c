@@ -2742,23 +2742,6 @@ use_random:
 }
 #endif /* not Sparc and not PPC */
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-/*
- * Polling 'interrupt' - used by things like netconsole to send skbs
- * without having to re-enable interrupts. It's not called while
- * the interrupt routine is executing.
- */
-static void gem_netpoll(struct net_device *netdev)
-{
-	struct gem *gp = netdev->priv;
-	if (!gp->pdev)
-		return;
-	disable_irq(gp->pdev->irq);
-	gem_interrupt(gp->pdev->irq, netdev, NULL);
-	enable_irq(gp->pdev->irq);
-}
-#endif
-
 static int __devinit gem_get_device_address(struct gem *gp)
 {
 #if defined(__sparc__) || defined(CONFIG_PPC_PMAC)
@@ -2967,9 +2950,6 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->change_mtu = gem_change_mtu;
 	dev->irq = pdev->irq;
 	dev->dma = 0;
-#ifdef CONFIG_NET_POLL_CONTROLLER
-        dev->poll_controller = gem_poll_controller;
-#endif
 
 	if (register_netdev(dev)) {
 		printk(KERN_ERR PFX "Cannot register net device, "
