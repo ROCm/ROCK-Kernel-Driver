@@ -46,7 +46,7 @@ void process_task_mortuary(void);
  */
 static int task_free_notify(struct notifier_block * self, unsigned long val, void * data)
 {
-	struct task_struct * task = (struct task_struct *)data;
+	struct task_struct * task = data;
 	spin_lock(&task_mortuary);
 	list_add(&task->tasks, &dying_tasks);
 	spin_unlock(&task_mortuary);

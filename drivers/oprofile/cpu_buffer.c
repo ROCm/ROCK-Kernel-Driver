@@ -34,13 +34,12 @@ static void wq_sync_buffer(void *);
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
 int work_enabled;
 
-static void __free_cpu_buffers(int num)
+void free_cpu_buffers(void)
 {
 	int i;
  
 	for_each_online_cpu(i) {
-		if (cpu_buffer[i].buffer)
-			vfree(cpu_buffer[i].buffer);
+		vfree(cpu_buffer[i].buffer);
 	}
 }
  
@@ -72,16 +71,10 @@ int alloc_cpu_buffers(void)
 	return 0;
 
 fail:
-	__free_cpu_buffers(i);
+	free_cpu_buffers();
 	return -ENOMEM;
 }
  
-
-void free_cpu_buffers(void)
-{
-	__free_cpu_buffers(NR_CPUS);
-}
-
 
 void start_cpu_work(void)
 {
@@ -301,7 +294,7 @@ void oprofile_add_trace(unsigned long pc)
  */
 static void wq_sync_buffer(void * data)
 {
-	struct oprofile_cpu_buffer * b = (struct oprofile_cpu_buffer *)data;
+	struct oprofile_cpu_buffer * b = data;
 	if (b->cpu != smp_processor_id()) {
 		printk("WQ on CPU%d, prefer CPU%d\n",
 		       smp_processor_id(), b->cpu);
