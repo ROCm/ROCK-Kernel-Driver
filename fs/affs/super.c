@@ -111,7 +111,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		inode_init_once(&ei->vfs_inode);
 	}
 }
- 
+
 static int init_inodecache(void)
 {
 	affs_inode_cachep = kmem_cache_create("affs_inode_cache",
@@ -299,7 +299,7 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sbi)
 		return -ENOMEM;
 	sb->u.generic_sbp = sbi;
-	memset(sbi, 0, sizeof(struct affs_sb_info));
+	memset(sbi, 0, sizeof(*AFFS_SB));
 	init_MUTEX(&sbi->s_bmlock);
 
 	if (!parse_options(data,&uid,&gid,&i,&reserved,&root_block,
