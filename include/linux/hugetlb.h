@@ -75,7 +75,7 @@ static inline unsigned long hugetlb_total_pages(void)
 #define hugetlb_report_meminfo(buf)		0
 #define hugetlb_report_node_meminfo(n, buf)	0
 #define mark_mm_hugetlb(mm, vma)		do { } while (0)
-#define follow_huge_pmd(mm, addr, pmd, write)	0
+#define follow_huge_pmd(mm, addr, pmd, write)	NULL
 #define is_aligned_hugepage_range(addr, len)	0
 #define prepare_hugepage_range(addr, len)	(-EINVAL)
 #define pmd_huge(x)	0

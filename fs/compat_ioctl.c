@@ -788,7 +788,7 @@ static int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			ret |= copy_from_user (devname, compat_ptr(rtdev), 15);
 			r4.rt_dev = devname; devname[15] = 0;
 		} else
-			r4.rt_dev = 0;
+			r4.rt_dev = NULL;
 
 		r = (void *) &r4;
 	}
