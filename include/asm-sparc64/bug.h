@@ -13,5 +13,8 @@ extern void do_BUG(const char *file, int line);
 #define BUG()		__builtin_trap()
 #endif
 
+#define PAGE_BUG(page) do { \
+	BUG(); \
+} while (0)
 
 #endif
