@@ -55,9 +55,9 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 	if (!tty->link)
 		return;
 	tty->link->packet = 0;
+	set_bit(TTY_OTHER_CLOSED, &tty->link->flags);
 	wake_up_interruptible(&tty->link->read_wait);
 	wake_up_interruptible(&tty->link->write_wait);
-	set_bit(TTY_OTHER_CLOSED, &tty->link->flags);
 	if (tty->driver->subtype == PTY_TYPE_MASTER) {
 		set_bit(TTY_OTHER_CLOSED, &tty->flags);
 #ifdef CONFIG_UNIX98_PTYS
