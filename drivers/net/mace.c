@@ -86,9 +86,9 @@ static struct net_device_stats *mace_stats(struct net_device *dev);
 static void mace_set_multicast(struct net_device *dev);
 static void mace_reset(struct net_device *dev);
 static int mace_set_address(struct net_device *dev, void *addr);
-static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-static void mace_txdma_intr(int irq, void *dev_id, struct pt_regs *regs);
-static void mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t mace_txdma_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs);
 static void mace_set_timeout(struct net_device *dev);
 static void mace_tx_timeout(unsigned long data);
 static inline void dbdma_reset(volatile struct dbdma_regs *dma);
@@ -622,7 +622,7 @@ static void mace_handle_misc_intrs(struct mace_data *mp, int intr)
 	    printk(KERN_DEBUG "mace: jabbering transceiver\n");
 }
 
-static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *) dev_id;
     struct mace_data *mp = (struct mace_data *) dev->priv;
@@ -765,6 +765,7 @@ static void mace_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	mace_set_timeout(dev);
     }
     spin_unlock_irqrestore(&mp->lock, flags);
+    return IRQ_HANDLED;
 }
 
 static void mace_tx_timeout(unsigned long data)
@@ -833,11 +834,12 @@ out:
     spin_unlock_irqrestore(&mp->lock, flags);
 }
 
-static void mace_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mace_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
+	return IRQ_HANDLED;
 }
 
-static void mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *) dev_id;
     struct mace_data *mp = (struct mace_data *) dev->priv;
@@ -947,6 +949,7 @@ static void mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 	mp->rx_fill = i;
     }
     spin_unlock_irqrestore(&mp->lock, flags);
+    return IRQ_HANDLED;
 }
 
 MODULE_AUTHOR("Paul Mackerras");

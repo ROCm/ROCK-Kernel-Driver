@@ -147,7 +147,7 @@ MODULE_PARM(max_duration, "i");
 #ifdef SUSPMOD_DEBUG
 #define dprintk(msg...) printk(KERN_DEBUG "cpufreq:" msg)
 #else
-#define dprintk(msg...) do { } while(0);
+#define dprintk(msg...) do { } while(0)
 #endif
 
 /**

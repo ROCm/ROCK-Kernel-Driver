@@ -21,14 +21,6 @@ extern int lmc_setup(void);
 
 extern int madgemc_probe(void);
 
-/* Pad device name to IFNAMSIZ=16. F.e. __PAD6 is string of 9 zeros. */
-#define __PAD6 "\0\0\0\0\0\0\0\0\0"
-#define __PAD5 __PAD6 "\0"
-#define __PAD4 __PAD5 "\0"
-#define __PAD3 __PAD4 "\0"
-#define __PAD2 __PAD3 "\0"
-
-
 /*
  *	Devices in this list must do new style probing. That is they must
  *	allocate their own device objects and do their own bus scans.
@@ -84,7 +76,7 @@ static struct net_probe pci_probes[] __initdata = {
  *	into them.
  */
  
-static void __init network_probe(void)
+void __init net_device_init(void)
 {
 	struct net_probe *p = pci_probes;
 
@@ -93,29 +85,4 @@ static void __init network_probe(void)
 		p->status = p->probe();
 		p++;
 	}
-}
-
-static void __init special_device_init(void)
-{
-#ifdef CONFIG_NET_SB1000
-	extern int sb1000_probe(struct net_device *dev);
-
-	static struct net_device sb1000_dev = {
-		.name = "cm0" __PAD3,
-		.init = sb1000_probe,
-	};
-	register_netdev(&sb1000_dev);
-#endif
-}
-
-/*
- *	Initialise network devices
- */
- 
-void __init net_device_init(void)
-{
-	/* Devices supporting the new^H^H^Hold probing API */
-	network_probe();
-	/* Special devices */
-	special_device_init();
 }

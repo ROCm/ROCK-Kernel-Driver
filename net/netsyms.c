@@ -666,10 +666,13 @@ EXPORT_SYMBOL(register_gifconf);
 EXPORT_SYMBOL(softnet_data);
 
 #ifdef CONFIG_NET_RADIO
-/* Don't include the whole header mess for a single function */
-union iwreq_data;
-extern void wireless_send_event(struct net_device *dev, unsigned int cmd, union iwreq_data *wrqu, char *extra);
+#include <net/iw_handler.h>		/* Wireless Extensions driver API */
 EXPORT_SYMBOL(wireless_send_event);
+EXPORT_SYMBOL(iw_handler_set_spy);
+EXPORT_SYMBOL(iw_handler_get_spy);
+EXPORT_SYMBOL(iw_handler_set_thrspy);
+EXPORT_SYMBOL(iw_handler_get_thrspy);
+EXPORT_SYMBOL(wireless_spy_update);
 #endif	/* CONFIG_NET_RADIO */
 
 EXPORT_SYMBOL(linkwatch_fire_event);
