@@ -619,7 +619,7 @@ static ssize_t sock_aio_read(struct kiocb *iocb, char *ubuf,
  *	is readable by the user process.
  */
 
-static ssize_t sock_aio_write(struct kiocb *iocb, char *ubuf,
+static ssize_t sock_aio_write(struct kiocb *iocb, const char *ubuf,
 			  size_t size, loff_t pos)
 {
 	struct sock_iocb *x = kiocb_to_siocb(iocb);
