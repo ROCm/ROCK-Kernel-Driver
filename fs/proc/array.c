@@ -538,11 +538,11 @@ int proc_pid_statm(struct task_struct *task, char * buffer)
  *         + (index into the line)
  */
 /* for systems with sizeof(void*) == 4: */
-#define MAPS_LINE_FORMAT4	  "%08lx-%08lx %s %08lx %s %lu"
+#define MAPS_LINE_FORMAT4	  "%08lx-%08lx %s %08lx %02x:%02x %lu"
 #define MAPS_LINE_MAX4	49 /* sum of 8  1  8  1 4 1 8 1 5 1 10 1 */
 
 /* for systems with sizeof(void*) == 8: */
-#define MAPS_LINE_FORMAT8	  "%016lx-%016lx %s %016lx %s %lu"
+#define MAPS_LINE_FORMAT8	  "%016lx-%016lx %s %016lx %02x:%02x %lu"
 #define MAPS_LINE_MAX8	73 /* sum of 16  1  16  1 4 1 16 1 5 1 10 1 */
 
 #define MAPS_LINE_FORMAT	(sizeof(void*) == 4 ? MAPS_LINE_FORMAT4 : MAPS_LINE_FORMAT8)
@@ -554,7 +554,7 @@ static int proc_pid_maps_get_line (char *buf, struct vm_area_struct *map)
 	char *line;
 	char str[5];
 	int flags;
-	kdev_t dev;
+	dev_t dev;
 	unsigned long ino;
 	int len;
 
@@ -566,7 +566,7 @@ static int proc_pid_maps_get_line (char *buf, struct vm_area_struct *map)
 	str[3] = flags & VM_MAYSHARE ? 's' : 'p';
 	str[4] = 0;
 
-	dev = NODEV;
+	dev = 0;
 	ino = 0;
 	if (map->vm_file != NULL) {
 		dev = map->vm_file->f_dentry->d_inode->i_dev;
@@ -584,7 +584,7 @@ static int proc_pid_maps_get_line (char *buf, struct vm_area_struct *map)
 	len = sprintf(line,
 		      MAPS_LINE_FORMAT,
 		      map->vm_start, map->vm_end, str, map->vm_pgoff << PAGE_SHIFT,
-		      kdevname(dev), ino);
+		      MAJOR(dev), MINOR(dev), ino);
 
 	if(map->vm_file) {
 		int i;

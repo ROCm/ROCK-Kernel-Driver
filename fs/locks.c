@@ -1751,9 +1751,12 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 			       ? (fl->fl_type & F_UNLCK) ? "UNLCK" : "READ "
 			       : (fl->fl_type & F_WRLCK) ? "WRITE" : "READ ");
 	}
+	/*
+	 *	NOTE: it should be inode->i_sb->s_id, not kdevname(...).
+	 */
 	out += sprintf(out, "%d %s:%ld ",
 		     fl->fl_pid,
-		     inode ? kdevname(inode->i_dev) : "<none>",
+		     inode ? kdevname(to_kdev_t(inode->i_dev)) : "<none>",
 		     inode ? inode->i_ino : 0);
 	out += sprintf(out, "%Ld ", fl->fl_start);
 	if (fl->fl_end == OFFSET_MAX)
