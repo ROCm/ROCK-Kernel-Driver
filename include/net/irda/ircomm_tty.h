@@ -104,6 +104,14 @@ struct ircomm_tty_cb {
 	long pgrp;		/* pgrp of opening process */
 	int  open_count;
 	int  blocked_open;	/* # of blocked opens */
+
+	/* Protect concurent access to :
+	 *	o self->open_count
+	 *	o self->ctrl_skb
+	 *	o self->tx_skb
+	 * Maybe other things may gain to be protected as well...
+	 * Jean II */
+	spinlock_t spinlock;
 };
 
 void ircomm_tty_start(struct tty_struct *tty);

@@ -99,6 +99,8 @@ pi_param_info_t ircomm_param_info = { pi_major_call_table, 3, 0x0f, 4 };
  */
 int ircomm_param_flush(struct ircomm_tty_cb *self)
 {
+	/* we should lock here, but I guess this function is unused...
+	 * Jean II */
 	if (self->ctrl_skb) {
 		ircomm_control_request(self->ircomm, self->ctrl_skb);
 		self->ctrl_skb = NULL;	
@@ -132,14 +134,13 @@ int ircomm_param_request(struct ircomm_tty_cb *self, __u8 pi, int flush)
 	if (self->service_type == IRCOMM_3_WIRE_RAW)
 		return 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->spinlock, flags);
 
 	skb = self->ctrl_skb;	
 	if (!skb) {
 		skb = dev_alloc_skb(256);
 		if (!skb) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&self->spinlock, flags);
 			return -ENOMEM;
 		}
 		
@@ -154,12 +155,12 @@ int ircomm_param_request(struct ircomm_tty_cb *self, __u8 pi, int flush)
 				  &ircomm_param_info);
 	if (count < 0) {
 		WARNING(__FUNCTION__ "(), no room for parameter!\n");
-		restore_flags(flags);
+		spin_unlock_irqrestore(&self->spinlock, flags);
 		return -1;
 	}
 	skb_put(skb, count);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), skb->len=%d\n", skb->len);
 
