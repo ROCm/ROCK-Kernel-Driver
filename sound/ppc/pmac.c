@@ -223,15 +223,15 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 	/* We really want to execute a DMA stop command, after the AWACS
 	 * is initialized.
 	 * For reasons I don't understand, it stops the hissing noise
-	 * common to many PowerBook G3 systems (like mine :-).
+	 * common to many PowerBook G3 systems and random noise otherwise
+	 * captured on iBook2's about every third time. -ReneR
 	 */
 	spin_lock_irq(&chip->reg_lock);
 	snd_pmac_dma_stop(rec);
-	if (rec->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
-		snd_pmac_dma_set_command(rec, &chip->extra_dma);
-		snd_pmac_dma_run(rec, RUN);
-	}
+	st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
+	snd_pmac_dma_set_command(rec, &chip->extra_dma);
+	snd_pmac_dma_run(rec, RUN);
+	mdelay(5);
 	/* continuous DMA memory type doesn't provide the physical address,
 	 * so we need to resolve the address here...
 	 */
