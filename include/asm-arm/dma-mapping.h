@@ -129,6 +129,28 @@ dma_map_single(struct device *dev, void *cpu_addr, size_t size,
 }
 
 /**
+ * dma_map_page - map a portion of a page for streaming DMA
+ * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+ * @page: page that buffer resides in
+ * @offset: offset into page for start of buffer
+ * @size: size of buffer to map
+ * @dir: DMA transfer direction
+ *
+ * Ensure that any data held in the cache is appropriately discarded
+ * or written back.
+ *
+ * The device owns this memory once this call has completed.  The CPU
+ * can regain ownership by calling dma_unmap_page() or dma_sync_single().
+ */
+static inline dma_addr_t
+dma_map_page(struct device *dev, struct page *page,
+	     unsigned long offset, size_t size,
+	     enum dma_data_direction dir)
+{
+	return dma_map_single(dev, page_address(page) + offset, size, (int)dir);
+}
+
+/**
  * dma_unmap_single - unmap a single buffer previously mapped
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
  * @handle: DMA address of buffer
@@ -152,21 +174,26 @@ dma_unmap_single(struct device *dev, dma_addr_t handle, size_t size,
 	/* nothing to do */
 }
 
-#if 0
-static inline dma_addr_t
-dma_map_page(struct device *dev, struct page *page, unsigned long off,
-	     size_t size, enum dma_data_direction dir)
-{
-	/* fixme */
-}
-
+/**
+ * dma_unmap_page - unmap a buffer previously mapped through dma_map_page()
+ * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+ * @handle: DMA address of buffer
+ * @size: size of buffer to map
+ * @dir: DMA transfer direction
+ *
+ * Unmap a single streaming mode DMA translation.  The handle and size
+ * must match what was provided in the previous dma_map_single() call.
+ * All other usages are undefined.
+ *
+ * After this call, reads by the CPU to the buffer are guaranteed to see
+ * whatever the device wrote there.
+ */
 static inline void
 dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
 	       enum dma_data_direction dir)
 {
-	/* fixme */
+	dma_unmap_single(dev, handle, size, (int)dir);
 }
-#endif
 
 /**
  * dma_map_sg - map a set of SG buffers for streaming mode DMA

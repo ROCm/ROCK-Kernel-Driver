@@ -836,7 +836,7 @@ typedef void            (*ExcpHndlr) (void) ;
 
 #define GPIO1_RST		1	/* reset */
 #define GPIO6_MMCCLK		6	/* MMC Clock */
-#define GPIO8_48MHz		7	/* 48 MHz clock output */
+#define GPIO7_48MHz		7	/* 48 MHz clock output */
 #define GPIO8_MMCCS0		8	/* MMC Chip Select 0 */
 #define GPIO9_MMCCS1		9	/* MMC Chip Select 1 */
 #define GPIO10_RTCCLK		10	/* real time clock (1 Hz) */
@@ -939,7 +939,7 @@ typedef void            (*ExcpHndlr) (void) ;
 
 #define GPIO1_RTS_MD		( 1 | GPIO_ALT_FN_1_IN)
 #define GPIO6_MMCCLK_MD		( 6 | GPIO_ALT_FN_1_OUT)
-#define GPIO8_48MHz_MD		( 8 | GPIO_ALT_FN_1_OUT)
+#define GPIO7_48MHz_MD		( 7 | GPIO_ALT_FN_1_OUT)
 #define GPIO8_MMCCS0_MD		( 8 | GPIO_ALT_FN_1_OUT)
 #define GPIO9_MMCCS1_MD		( 9 | GPIO_ALT_FN_1_OUT)
 #define GPIO10_RTCCLK_MD	(10 | GPIO_ALT_FN_1_OUT)

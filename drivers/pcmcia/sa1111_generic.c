@@ -16,6 +16,7 @@
 
 #include <asm/hardware.h>
 #include <asm/hardware/sa1111.h>
+#include <asm/io.h>
 #include <asm/irq.h>
 
 #include "sa1111_generic.h"
@@ -118,16 +119,15 @@ void sa1111_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
 	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static int pcmcia_probe(struct device *dev)
+static int pcmcia_probe(struct sa1111_dev *dev)
 {
-	struct sa1111_dev *sadev = SA1111_DEV(dev);
 	char *base;
 
-	if (!request_mem_region(sadev->res.start, 512,
-				SA1111_DRIVER_NAME(sadev)))
+	if (!request_mem_region(dev->res.start, 512,
+				SA1111_DRIVER_NAME(dev)))
 		return -EBUSY;
 
-	base = sadev->mapbase;
+	base = dev->mapbase;
 
 	/*
 	 * Initialise the suspend state.
@@ -136,61 +136,68 @@ static int pcmcia_probe(struct device *dev)
 	sa1111_writel(PCCR_S0_FLT | PCCR_S1_FLT, base + SA1111_PCCR);
 
 #ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_init(dev);
+	pcmcia_adsbitsy_init(&dev->dev);
 #endif
 #ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_init(dev);
+	pcmcia_badge4_init(&dev->dev);
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_init(dev);
+	pcmcia_graphicsmaster_init(&dev->dev);
 #endif
 #ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_init(dev);
+	pcmcia_jornada720_init(&dev->dev);
 #endif
 #ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_init(dev);
+	pcmcia_neponset_init(&dev->dev);
 #endif
 #ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_init(dev);
+	pcmcia_pfs_init(&dev->dev);
 #endif
 #ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_init(dev);
+	pcmcia_system3_init(&dev->dev);
 #endif
 #ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_init(dev);
+	pcmcia_xp860_init(&dev->dev);
 #endif
 	return 0;
 }
 
-static int __devexit pcmcia_remove(struct device *dev)
+static int __devexit pcmcia_remove(struct sa1111_dev *dev)
 {
-	struct sa1111_dev *sadev = SA1111_DEV(dev);
-
-	sa11xx_drv_pcmcia_remove(dev);
-	release_mem_region(sadev->res.start, 512);
+	sa11xx_drv_pcmcia_remove(&dev->dev);
+	release_mem_region(dev->res.start, 512);
 	return 0;
+}
+
+static int pcmcia_suspend(struct sa1111_dev *dev, u32 state)
+{
+	return pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
+}
+
+static int pcmcia_resume(struct sa1111_dev *dev)
+{
+	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
 }
 
 static struct sa1111_driver pcmcia_driver = {
 	.drv = {
-		.name		= "sa1111-pcmcia",
-		.bus		= &sa1111_bus_type,
-		.probe		= pcmcia_probe,
-		.remove		= __devexit_p(pcmcia_remove),
-		.suspend 	= pcmcia_socket_dev_suspend,
-		.resume 	= pcmcia_socket_dev_resume,
+		.name	= "sa1111-pcmcia",
 	},
-	.devid			= SA1111_DEVID_PCMCIA,
+	.devid		= SA1111_DEVID_PCMCIA,
+	.probe		= pcmcia_probe,
+	.remove		= __devexit_p(pcmcia_remove),
+	.suspend	= pcmcia_suspend,
+	.resume		= pcmcia_resume,
 };
 
 static int __init sa1111_drv_pcmcia_init(void)
 {
-	return driver_register(&pcmcia_driver.drv);
+	return sa1111_driver_register(&pcmcia_driver);
 }
 
 static void __exit sa1111_drv_pcmcia_exit(void)
 {
-	driver_unregister(&pcmcia_driver.drv);
+	sa1111_driver_unregister(&pcmcia_driver);
 }
 
 module_init(sa1111_drv_pcmcia_init);

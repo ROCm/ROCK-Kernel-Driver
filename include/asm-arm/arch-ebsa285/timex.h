@@ -11,8 +11,8 @@
  */
 
 /*
- * On EBSA285 boards, the clock runs at 50MHz and is
- * divided by a 4-bit prescaler.  Other boards use an
- * ISA derived timer, and this is unused.
+ * We assume a constant here; this satisfies the maths in linux/timex.h
+ * and linux/time.h.  CLOCK_TICK_RATE is actually system dependent, but
+ * this must be a constant.
  */
-#define CLOCK_TICK_RATE		(mem_fclk_21285 / 16)
+#define CLOCK_TICK_RATE		(50000000/16)

@@ -15,6 +15,10 @@
 #define _IOP321_HW_H_
 
 
+/*
+ * This is needed for mixed drivers that need to work on all
+ * IOP3xx variants but behave slightly differently on each.
+ */
 #ifndef __ASSEMBLY__
 #define iop_is_321() ((processor_id & 0xfffff7e0) == 0x69052420)
 #endif

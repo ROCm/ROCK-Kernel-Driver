@@ -896,7 +896,7 @@ static DEVICE_ATTR(resource, S_IRUGO, ecard_show_resources, NULL);
 static ssize_t ecard_show_vendor(struct device *dev, char *buf)
 {
 	struct expansion_card *ec = ECARD_DEV(dev);
-	return sprintf(buf, "%u\n", ec->manufacturer);
+	return sprintf(buf, "%u\n", ec->cid.manufacturer);
 }
 
 static DEVICE_ATTR(vendor, S_IRUGO, ecard_show_vendor, NULL);
@@ -904,7 +904,7 @@ static DEVICE_ATTR(vendor, S_IRUGO, ecard_show_vendor, NULL);
 static ssize_t ecard_show_device(struct device *dev, char *buf)
 {
 	struct expansion_card *ec = ECARD_DEV(dev);
-	return sprintf(buf, "%u\n", ec->product);
+	return sprintf(buf, "%u\n", ec->cid.product);
 }
 
 static DEVICE_ATTR(device, S_IRUGO, ecard_show_device, NULL);
