@@ -17,6 +17,7 @@
 #include <linux/device.h>	/* for struct device */
 #include <linux/fs.h>		/* for struct file_operations */
 #include <linux/completion.h>	/* for struct completion */
+#include <linux/sched.h>	/* for current && schedule_timeout */
 
 
 static __inline__ void wait_ms(unsigned int ms)
@@ -239,6 +240,7 @@ struct usb_device {
 
 	int have_langid;		/* whether string_langid is valid yet */
 	int string_langid;		/* language ID for strings */
+	int present;			/* if device is present or not */
 
 	void *hcpriv;			/* Host Controller private data */
 	
