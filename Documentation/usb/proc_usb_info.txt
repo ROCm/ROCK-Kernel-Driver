@@ -1,32 +1,99 @@
 /proc/bus/usb filesystem output
 ===============================
-(version 2000.08.15)
+(version 2002.03.18)
 
 
-The /proc filesystem for USB devices generates
-/proc/bus/usb/drivers and /proc/bus/usb/devices.
+The /proc filesystem for USB devices provides /proc/bus/usb/drivers
+and /proc/bus/usb/devices, as well as /proc/bus/usb/BBB/DDD files.
 
-/proc/bus/usb/drivers lists the registered drivers,
-one per line, with each driver's USB minor dev node
-number range if applicable.
 
-**NOTE**: If /proc/bus/usb appears empty, you need
-          to mount the filesystem, issue the command (as root):
+**NOTE**: If /proc/bus/usb appears empty, and a host controller
+	  driver has been linked, then you need to mount the
+	  filesystem.  Issue the command (as root):
 
-      mount -t usbdevfs none /proc/bus/usb
+      mount -t usbfs none /proc/bus/usb
 
 	  An alternative and more permanent method would be to add
 
-      none  /proc/bus/usb  usbdevfs  defaults  0  0
+      none  /proc/bus/usb  usbfs  defaults  0  0
 
-	  to /etc/fstab.  This will mount usbdevfs at each reboot.
+	  to /etc/fstab.  This will mount usbfs at each reboot.
 	  You can then issue `cat /proc/bus/usb/devices` to extract
-	  USB device information.
+	  USB device information, and user mode drivers can use usbfs 
+	  to interact with USB devices.
 
-For more information on mounting the usbdevfs file system, see the
+	  There are a number of mount options supported by usbfs.
+	  Consult the source code (linux/drivers/usb/inode.c) for
+	  information about those options.
+
+**NOTE**: The filesystem has been renamed from "usbdevfs" to
+	  "usbfs", to reduce confusion with "devfs".  You may
+	  still see references to the older "usbdevfs" name.
+
+For more information on mounting the usbfs file system, see the
 "USB Device Filesystem" section of the USB Guide. The latest copy 
 of the USB Guide can be found at http://www.linux-usb.org/
 
+
+THE /proc/bus/usb/BBB/DDD FILES:
+--------------------------------
+Each connected USB device has one file.  The BBB indicates the bus
+number.  The DDD indicates the device address on that bus.  Both
+of these numbers are assigned sequentially, and can be reused, so
+you can't rely on them for stable access to devices.  For example,
+it's relatively common for devices to re-enumerate while they are
+still connected (perhaps someone jostled their power supply, hub,
+or USB cable), so a device might be 002/027 when you first connect
+it and 002/048 sometime later.
+
+These files can be read as binary data.  The binary data consists
+of first the device descriptor, then the descriptors for each
+configuration of the device.  That information is also shown in
+text form by the /proc/bus/usb/devices file, described later.
+
+These files may also be used to write user-level drivers for the USB
+devices.  You would open the /proc/bus/usb/BBB/DDD file read/write,
+read its descriptors to make sure it's the device you expect, and then
+bind to an interface (or perhaps several) using an ioctl call.  You
+would issue more ioctls to the device to communicate to it using
+control, bulk, or other kinds of USB transfers.  The IOCTLs are
+listed in the <linux/usbdevice_fs.h> file, and at this writing the
+source code (linux/drivers/usb/devio.c) is the primary reference
+for how to access devices through those files.
+
+Note that since by default these BBB/DDD files are writable only by
+root, only root can write such user mode drivers.  You can selectively
+grant read/write permissions to other users by using "chmod".  Also,
+usbfs mount options such as "devmode=0666" may be helpful.
+
+
+
+THE /proc/bus/usb/drivers FILE:
+-------------------------------
+Each of the USB device drivers linked into your kernel (statically,
+or dynamically using "modprobe") is listed in the "drivers" file.
+Here's an example from one system:
+
+         usbdevfs
+         hub
+  0- 15: usblp
+         usbnet
+         serial
+         usb-storage
+         pegasus
+
+If you see this file, "usbdevfs" and "hub" will always be listed,
+since those are part of the "usbcore" framework.
+
+Drivers that use the USB major number (180) to provide character devices
+will include a range of minor numbers, as shown above for the "usblp"
+(actually "printer.o") module.  USB device drivers can of course use any
+major number, but it's easy to use the USB range since there's explicit
+support for subdividing it in the USB device driver framework.
+
+
+THE /proc/bus/usb/devices FILE:
+-------------------------------
 In /proc/bus/usb/devices, each device's output has multiple
 lines of ASCII output.
 I made it ASCII instead of binary on purpose, so that someone
@@ -34,8 +101,6 @@ can obtain some useful data from it without the use of an
 auxiliary program.  However, with an auxiliary program, the numbers
 in the first 4 columns of each "T:" line (topology info:
 Lev, Prnt, Port, Cnt) can be used to build a USB topology diagram.
-(I think.  I haven't proved this, but I have tested it with 3
-different topo/connections and it looked possible.)
 
 Each line is tagged with a one-character ID for that line:
 
@@ -73,13 +138,29 @@ T:  Bus=dd Lev=dd Prnt=dd Port=dd Cnt=dd Dev#=ddd Spd=ddd MxCh=dd
 |   |__Bus number
 |__Topology info tag
 
+    Speed may be:
+    	1.5	Mbit/s for low speed USB
+	12	Mbit/s for full speed USB
+	480	Mbit/s for high speed USB (added for USB 2.0)
+
 
 Bandwidth info:
 B:  Alloc=ddd/ddd us (xx%), #Int=ddd, #Iso=ddd
-|   |                       |         |__Number if isochronous requests
+|   |                       |         |__Number of isochronous requests
 |   |                       |__Number of interrupt requests
 |   |__Total Bandwidth allocated to this bus
 |__Bandwidth info tag
+
+    Bandwidth allocation is an approximation of how much of one frame
+    (millisecond) is in use.  It reflects only periodic transfers, which
+    are the only transfers that reserve bandwidth.  Control and bulk
+    transfers use all other bandwidth, including reserved bandwidth that
+    is not used for transfers (such as for short packets).
+    
+    The percentage is how much of the "reserved" bandwidth is scheduled by
+    those transfers.  For a low or full speed bus (loosely, "USB 1.1"),
+    90% of the bus bandwidth is reserved.  For a high speed bus (loosely,
+    "USB 2.0") 80% is reserved.
 
 
 Device descriptor info & Product ID info:
@@ -109,37 +190,55 @@ String descriptor info:
 
 S:  Manufacturer=ssss
 |   |__Manufacturer of this device as read from the device.
+|      For USB host controller drivers (virtual root hubs) this may
+|      be omitted, or (for newer drivers) will identify the kernel
+|      version and the driver which provides this hub emulation.
 |__String info tag
 
 S:  Product=ssss
-|   |__Product description of this device as read from the device,
-|      except that it is a generated string for USB host controllers
-|      (virtual root hubs), in the form "USB *HCI Root Hub".
+|   |__Product description of this device as read from the device.
+|      For older USB host controller drivers (virtual root hubs) this
+|      indicates the driver; for newer ones, it's a product (and vendor)
+|      description that often comes from the kernel's PCI ID database.
 |__String info tag
 
 S:  SerialNumber=ssss
-|   |__Serial Number of this device as read from the device,
-|      except that it is a generated string for USB host controllers
-|      (virtual root hubs), and represents the host controller's
-|      unique identification in the system (currently I/O or
-|      memory-mapped base address).
+|   |__Serial Number of this device as read from the device.
+|      For USB host controller drivers (virtual root hubs) this is
+|      some unique ID, normally a bus ID (address or slot name) that
+|      can't be shared with any other device.
 |__String info tag
+
 
 
 Configuration descriptor info:
 
-C:  #Ifs=dd Cfg#=dd Atr=xx MPwr=dddmA
-|   |       |       |      |__MaxPower in mA
-|   |       |       |__Attributes
-|   |       |__ConfiguratioNumber
-|   |__NumberOfInterfaces
+C:* #Ifs=dd Cfg#=dd Atr=xx MPwr=dddmA
+| | |       |       |      |__MaxPower in mA
+| | |       |       |__Attributes
+| | |       |__ConfiguratioNumber
+| | |__NumberOfInterfaces
+| |__ "*" indicates the active configuration (others are " ")
 |__Config info tag
+    
+    USB devices may have multiple configurations, each of which act
+    rather differently.  For example, a bus-powered configuration
+    might be much less capable than one that is self-powered.  Only
+    one device configuration can be active at a time; most devices
+    have only one configuration.
+
+    Each configuration consists of one or more interfaces.  Each
+    interface serves a distinct "function", which is typically bound
+    to a different USB device driver.  One common example is a USB
+    speaker with an audio interface for playback, and a HID interface
+    for use with software volume control.
 
 
 Interface descriptor info (can be multiple per Config):
 
 I:  If#=dd Alt=dd #EPs=dd Cls=xx(sssss) Sub=xx Prot=xx Driver=ssss
 |   |      |      |       |             |      |       |__Driver name
+|   |      |      |       |             |      |          or "(none)"
 |   |      |      |       |             |      |__InterfaceProtocol
 |   |      |      |       |             |__InterfaceSubClass
 |   |      |      |       |__InterfaceClass
@@ -148,16 +247,38 @@ I:  If#=dd Alt=dd #EPs=dd Cls=xx(sssss) Sub=xx Prot=xx Driver=ssss
 |   |__InterfaceNumber
 |__Interface info tag
 
+    A given interface may have one or more "alternate" settings.
+    For example, default settings may not use more than a small
+    amount of periodic bandwidth.  To use significant fractions
+    of bus bandwidth, drivers must select a non-default altsetting.
+    
+    Only one setting for an interface may be active at a time, and
+    only one driver may bind to an interface at a time.  Most devices
+    have only one alternate setting per interface.
+
 
 Endpoint descriptor info (can be multiple per Interface):
 
 E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=dddms
-E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=dddms
-|   |        |            |         |__Interval
+|   |        |            |         |__Interval (max) between transfers
 |   |        |            |__EndpointMaxPacketSize
 |   |        |__Attributes(EndpointType)
 |   |__EndpointAddress(I=In,O=Out)
 |__Endpoint info tag
+
+    The interval is nonzero for all periodic (interrupt or isochronous)
+    endpoints.  For high speed endpoints the transfer interval may be
+    measured in microseconds rather than milliseconds.
+
+    For high speed periodic endpoints, the "MaxPacketSize" reflects
+    the per-microframe data transfer size.  For "high bandwidth"
+    endpoints, that can reflect two or three packets (for up to
+    3KBytes every 125 usec) per endpoint.
+
+    With the Linux-USB stack, periodic bandwidth reservations use the
+    transfer intervals and sizes provided by URBs, which can be less
+    than those found in endpoint descriptor.
+
 
 =======================================================================
 
