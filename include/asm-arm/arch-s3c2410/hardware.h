@@ -16,17 +16,13 @@
  *  12-Mar-2004 BJD  Fixed include protection, fixed type of clock vars
  *  14-Sep-2004 BJD  Added misccr and getpin to gpio
  *  01-Oct-2004 BJD  Added the new gpio functions
+ *  16-Oct-2004 BJD  Removed the clock variables
 */
 
 #ifndef __ASM_ARCH_HARDWARE_H
 #define __ASM_ARCH_HARDWARE_H
 
 #ifndef __ASSEMBLY__
-
-/* processor clock settings, in Hz */
-extern unsigned long s3c2410_pclk;
-extern unsigned long s3c2410_hclk;
-extern unsigned long s3c2410_fclk;
 
 /* external functions for GPIO support
  *

@@ -246,7 +246,8 @@ qla2x00_get_fcal_position_map(scsi_qla_host_t *ha, char *pos_map);
 /*
  * Global Function Prototypes in qla_isr.c source file.
  */
-extern irqreturn_t qla2x00_intr_handler(int, void *, struct pt_regs *);
+extern irqreturn_t qla2100_intr_handler(int, void *, struct pt_regs *);
+extern irqreturn_t qla2300_intr_handler(int, void *, struct pt_regs *);
 extern void qla2x00_process_response_queue(struct scsi_qla_host *);
 
 /*

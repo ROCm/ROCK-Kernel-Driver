@@ -50,6 +50,9 @@
 #include <asm/delay.h>
 
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_spi.h>
 
 #include "lasi700.h"
 #include "53c700.h"
@@ -104,29 +107,16 @@ lasi700_probe(struct parisc_device *dev)
 
 	NCR_700_set_mem_mapped(hostdata);
 
-	host = NCR_700_detect(&lasi700_template, hostdata);
+	host = NCR_700_detect(&lasi700_template, hostdata, &dev->dev,
+			      dev->irq, 7);
 	if (!host)
 		goto out_kfree;
 
-	host->irq = dev->irq;
-	if (request_irq(dev->irq, NCR_700_intr, SA_SHIRQ,
-				dev->dev.bus_id, host)) {
-		printk(KERN_ERR "%s: irq problem, detaching\n",
-		       dev->dev.bus_id);
-		goto out_put_host;
-	}
-
-	if (scsi_add_host(host, &dev->dev))
-		goto out_free_irq;
 	dev_set_drvdata(&dev->dev, host);
 	scsi_scan_host(host);
 
 	return 0;
 
- out_free_irq:
-	free_irq(host->irq, host);
- out_put_host:
-	scsi_host_put(host);
  out_kfree:
 	kfree(hostdata);
 	return -ENODEV;

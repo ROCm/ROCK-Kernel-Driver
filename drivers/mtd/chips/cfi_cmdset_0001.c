@@ -603,9 +603,9 @@ static void put_chip(struct map_info *map, struct flchip *chip, unsigned long ad
 				}
 				spin_unlock(&shared->lock);
 			}
+		} else {
+			spin_unlock(&shared->lock);
 		}
-	} else {
-		spin_unlock(&shared->lock);
 	}
 
 	switch(chip->oldstate) {

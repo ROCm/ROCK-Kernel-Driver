@@ -1,3 +1,9 @@
+Release Date	: Wed Oct 06 11:15:29 EDT 2004 - Sreenivas Bagalkote <sreenib@lsil.com>
+Current Version	: 2.20.4.0 (scsi module), 2.20.2.1 (cmm module)
+Older Version	: 2.20.4.0 (scsi module), 2.20.2.0 (cmm module)
+
+i.	Remove CONFIG_COMPAT around register_ioctl32_conversion
+
 Release Date	: Mon Sep 27 22:15:07 EDT 2004 - Atul Mukker <atulm@lsil.com>
 Current Version	: 2.20.4.0 (scsi module), 2.20.2.0 (cmm module)
 Older Version	: 2.20.3.1 (scsi module), 2.20.2.0 (cmm module)
