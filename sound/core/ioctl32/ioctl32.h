@@ -86,8 +86,8 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 	struct sndrv_##type *data;\
 	mm_segment_t oldseg;\
 	int err;\
-	data32 = kcalloc(sizeof(*data32), GFP_KERNEL); \
-	data = kcalloc(sizeof(*data), GFP_KERNEL); \
+	data32 = kmalloc(sizeof(*data32), GFP_KERNEL); \
+	data = kmalloc(sizeof(*data), GFP_KERNEL); \
 	if (data32 == NULL || data == NULL) { \
 		err = -ENOMEM; \
 		goto __end; \

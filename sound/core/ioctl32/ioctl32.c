@@ -23,6 +23,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/time.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <sound/core.h>
 #include <sound/control.h>
@@ -287,13 +288,13 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 	data->id = data32->id;
 	data->indirect = data32->indirect;
 	if (data->indirect) /* FIXME: this is not correct for long arrays */
-		data.value.integer.value_ptr = (void*)TO_PTR(data32->value.integer.value_ptr);
+		data->value.integer.value_ptr = (void*)TO_PTR(data32->value.integer.value_ptr);
 	type = get_ctl_type(file, &data->id);
 	if (type < 0) {
 		err = type;
 		goto __end;
 	}
-	if (! data.indirect) {
+	if (! data->indirect) {
 		switch (type) {
 		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
 		case SNDRV_CTL_ELEM_TYPE_INTEGER:
@@ -328,7 +329,7 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 	if (err < 0)
 		goto __end;
 	/* restore info to 32bit */
-	if (! data.indirect) {
+	if (! data->indirect) {
 		switch (type) {
 		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
 		case SNDRV_CTL_ELEM_TYPE_INTEGER:

@@ -20,6 +20,7 @@
 
 #include <sound/driver.h>
 #include <linux/time.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include "ioctl32.h"
@@ -230,7 +231,7 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 	snd_pcm_file_t *pcm_file;
 	snd_pcm_substream_t *substream;
 	struct sndrv_xfern32 data32, *srcptr = (struct sndrv_xfern32*)arg;
-	void *bufs = NULL;
+	void **bufs = NULL;
 	int err = 0, ch, i;
 	u32 *bufptr;
 	mm_segment_t oldseg;
@@ -260,7 +261,7 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 		return -EFAULT;
 	__get_user(data32.bufs, &srcptr->bufs);
 	bufptr = (u32*)TO_PTR(data32.bufs);
-	bufs = kmalloc(sizeof(void *) * 128, GFP_KERNEL)
+	bufs = kmalloc(sizeof(void *) * 128, GFP_KERNEL);
 	if (bufs == NULL)
 		return -ENOMEM;
 	for (i = 0; i < ch; i++) {
@@ -352,8 +353,8 @@ static int _snd_ioctl32_pcm_hw_params_old(unsigned int fd, unsigned int cmd, uns
 	mm_segment_t oldseg;
 	int err;
 
-	data32 = kcalloc(sizeof(*data32), GFP_KERNEL);
-	data = kcalloc(sizeof(*data), GFP_KERNEL);
+	data32 = snd_kcalloc(sizeof(*data32), GFP_KERNEL);
+	data = snd_kcalloc(sizeof(*data), GFP_KERNEL);
 	if (data32 == NULL || data == NULL) {
 		err = -ENOMEM;
 		goto __end;
