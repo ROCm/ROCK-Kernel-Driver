@@ -250,12 +250,6 @@ config SERIAL_CLPS711X_CONSOLE
 	  your boot loader (lilo or loadlin) about how to pass options to the
 	  kernel at boot time.)
 
-config SERIAL_CLPS711X_OLD_NAME
-	bool "Use the old 2.4 names for CLPS711X serial port"
-	depends on SERIAL_CLPS711X=y
-	help
-	  ::: To be written :::
-
 config SERIAL_DZ
 	bool "DECstation DZ serial driver"
 	depends on DECSTATION
