@@ -1,7 +1,6 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/binfmts.h>
-#include <linux/elf.h>
 #include <asm/param.h>
 #include <asm/signal.h>
 
@@ -16,17 +15,20 @@
 
 extern void put_dirty_page(struct task_struct *tsk, struct page *page, unsigned long address, pgprot_t prot);
 
-#undef	ELF_PLAT_INIT
-#define ELF_PLAT_INIT(_r,d) ilp32_init_addr_space()
+struct linux_binprm; struct elf32_hdr;
+static int ilp32_elf_setup_arg_pages (struct linux_binprm *);
+static void ilp32_elf_set_personality (struct elf32_hdr *, unsigned char);
 void ilp32_init_addr_space(void);
 
+#undef	ELF_PLAT_INIT
+#define ELF_PLAT_INIT(_r,d) ilp32_init_addr_space()
 #define setup_arg_pages(bprm)	ilp32_elf_setup_arg_pages(bprm)
-static int ilp32_elf_setup_arg_pages(struct linux_binprm *bprm);
-
 #undef SET_PERSONALITY
-#define SET_PERSONALITY(ex, ibcs2)	ilp32_elf_set_personality(&ex, ibcs2)
-static void ilp32_elf_set_personality(struct elfhdr *elf_ex, int exec_stack);
-
+#define SET_PERSONALITY(ex, ibcs2)	ilp32_elf_set_personality(&(ex), ibcs2)
+#undef ELF_CORE_WRITE_EXTRA_DATA
+#undef ELF_CORE_WRITE_EXTRA_PHDRS
+#undef ARCH_DLINFO
+#undef ELF_CORE_EXTRA_PHDRS
 #include "../../../fs/binfmt_elf.c"
 
 static int ilp32_elf_setup_arg_pages (struct linux_binprm *bprm)
@@ -77,7 +79,7 @@ static int ilp32_elf_setup_arg_pages (struct linux_binprm *bprm)
 	return 0;
 }
 
-static void ilp32_elf_set_personality (struct elfhdr *elf_ex, int exec_stack)
+static void ilp32_elf_set_personality (struct elfhdr *elf_ex, unsigned char exec_stack)
 {
 	set_personality(PER_LINUX_32BIT);
 	current->thread.map_base  = ILP32_MMAP_BASE;
