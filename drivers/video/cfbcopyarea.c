@@ -400,8 +400,10 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 	}
 }
 
+#ifdef MODULE
 int init_module(void) { return 0; };
 void cleanup_module(void) {};
+#endif
 
 EXPORT_SYMBOL(cfb_copyarea);
 

@@ -234,7 +234,7 @@ static void cursor_timer_handler(unsigned long dev_addr)
 	add_timer(&cursor_timer);
 }
 
-static int __init fbconsole_setup(char *this_opt)
+int __init fb_console_setup(char *this_opt)
 {
 	int unit, i, j;
 	char *options;
@@ -289,7 +289,7 @@ static int __init fbconsole_setup(char *this_opt)
 	return 0;
 }
 
-__setup("fbcon=", fbconsole_setup);
+__setup("fbcon=", fb_console_setup);
 
 void gen_set_disp(int con, struct fb_info *info)
 {
@@ -551,6 +551,7 @@ static const char *fbcon_startup(void)
 {
 	const char *display_desc = "frame buffer device";
 	struct font_desc *font = NULL;
+	struct module *owner;
 	struct fb_info *info;
 	struct vc_data *vc;
 	static int done = 0;
@@ -566,7 +567,14 @@ static const char *fbcon_startup(void)
 
 	info = registered_fb[num_registered_fb-1];	
 	if (!info)	return NULL;
-
+	info->currcon = -1;
+	
+	owner = info->fbops->owner;
+	if (owner)
+		__MOD_INC_USE_COUNT(owner);
+	if (info->fbops->fb_open && info->fbops->fb_open(info, 0) && owner)
+		__MOD_DEC_USE_COUNT(owner);
+	
 	if (info->fix.type != FB_TYPE_TEXT) {
 		if (fbcon_softback_size) {
 			if (!softback_buf) {
@@ -768,7 +776,7 @@ static int fbcon_changevar(int con)
 			p->fontdata = font->data;
 		}
 
-#ifdef FBCON_FONTWIDTH8_ONLY		
+#ifdef FONTWIDTH8_ONLY		
 		if (!fontwidthvalid(p, vc->vc_font.width)) {
 			/* ++Geert: changed from panic() to `correct and continue' */
 			printk(KERN_ERR
@@ -912,7 +920,7 @@ static void fbcon_set_display(int con, int init, int logo)
 		p->fontdata = font->data;
 	}
 
-#ifdef FBCON_FONTWIDTH8_ONLY		
+#ifdef FONTWIDTH8_ONLY		
 	if (!fontwidthvalid(p, vc->vc_font.width)) {
 		/* ++Geert: changed from panic() to `correct and continue' */
 		printk(KERN_ERR
@@ -1976,7 +1984,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 	u8 *fontdata = p->fontdata;
 	int i, j;
 
-#ifdef CONFIG_FBCON_FONTWIDTH8_ONLY
+#ifdef CONFIG_FONTWIDTH8_ONLY
 	if (fontwidth(p) != 8)
 		return -EINVAL;
 #endif
@@ -1995,7 +2003,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 			fontdata += j;
 		}
 	}
-#ifndef CONFIG_FBCON_FONTWIDTH8_ONLY
+#ifndef CONFIG_FONTWIDTH8_ONLY
 	else if (op->width <= 16) {
 		j = vc->vc_font.height * 2;
 		for (i = 0; i < op->charcount; i++) {
@@ -2177,7 +2185,7 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 	int i, k;
 	u8 *new_data, *data = op->data, *p;
 
-#ifdef CONFIG_FBCON_FONTWIDTH8_ONLY
+#ifdef CONFIG_FONTWIDTH8_ONLY
 	if (w != 8)
 		return -EINVAL;
 #endif
@@ -2209,7 +2217,7 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 			p += h;
 		}
 	}
-#ifndef CONFIG_FBCON_FONTWIDTH8_ONLY
+#ifndef CONFIG_FONTWIDTH8_ONLY
 	else if (w <= 16) {
 		h *= 2;
 		for (i = 0; i < op->charcount; i++) {
@@ -2665,18 +2673,19 @@ const struct consw fb_con = {
 	.con_getxy 		= fbcon_getxy,
 };
 
-static int __init fbconsole_init(void)
+int __init fb_console_init(void)
 {
 	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
 	return 0;
 }
 
-static void __exit fbconsole_exit(void)
+void __exit fb_console_exit(void)
 {
+	give_up_console(&fb_con);
 }	
 
-module_init(fbconsole_init);
-module_exit(fbconsole_exit);
+module_init(fb_console_init);
+module_exit(fb_console_exit);
 
 /*
  *  Visible symbols for modules

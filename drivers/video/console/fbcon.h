@@ -53,7 +53,7 @@ extern void set_con2fb_map(int unit, int newidx);
 
 #define fontheight(p) ((p)->_fontheight)
 
-#ifdef CONFIG_FBCON_FONTWIDTH8_ONLY
+#ifdef CONFIG_FONTWIDTH8_ONLY
 
 /* fontwidth w is supported by dispsw */
 #define FONTWIDTH(w)	(1 << ((8) - 1))

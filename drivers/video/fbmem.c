@@ -41,7 +41,9 @@
 #include <asm/pgtable.h>
 
 #include <linux/fb.h>
-
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+#include "console/fbcon.h"
+#endif
     /*
      *  Frame buffer device initialization and setup routines
      */
@@ -783,10 +785,6 @@ static devfs_handle_t devfs_handle;
 int
 register_framebuffer(struct fb_info *fb_info)
 {
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	static int fb_ever_opened[FB_MAX];
-	int j;
-#endif
 	char name_buf[8];
 	int i;
 
@@ -797,29 +795,7 @@ register_framebuffer(struct fb_info *fb_info)
 		if (!registered_fb[i])
 			break;
 	fb_info->node = mk_kdev(FB_MAJOR, i);
-	fb_info->currcon = -1;
 	registered_fb[i] = fb_info;
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	if (!fb_ever_opened[i]) {
-		struct module *owner = fb_info->fbops->owner;
-		/*
-		 *  We assume initial frame buffer devices can be opened this
-		 *  many times
-		 */
-		for (j = 0; j < MAX_NR_CONSOLES; j++)
-			if (con2fb_map[j] == i) {
-				if (owner)
-					__MOD_INC_USE_COUNT(owner);
-				if (!fb_info->fbops->fb_open)
-					continue;
-				if (!fb_info->fbops->fb_open(fb_info,0))
-					continue;
-				if (owner)
-					__MOD_DEC_USE_COUNT(owner);
-			}
-		fb_ever_opened[i] = 1;
-	}
-#endif
 	sprintf (name_buf, "%d", i);
 	fb_info->devfs_handle =
 	    devfs_register (devfs_handle, name_buf, DEVFS_FL_DEFAULT,
@@ -842,14 +818,9 @@ register_framebuffer(struct fb_info *fb_info)
 int
 unregister_framebuffer(struct fb_info *fb_info)
 {
-	int i, j;
+	int i;
 
 	i = minor(fb_info->node);
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	for (j = 0; j < MAX_NR_CONSOLES; j++)
-		if (con2fb_map[j] == i)
-			return -EBUSY;
-#endif
 	if (!registered_fb[i])
 		return -EINVAL;
 	devfs_unregister (fb_info->devfs_handle);

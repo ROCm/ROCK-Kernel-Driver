@@ -125,7 +125,7 @@ config FBCON_STI
 	depends on !FBCON_ADVANCED && FRAMEBUFFER_CONSOLE && FB_STI
 	default y
 
-config FBCON_FONTWIDTH8_ONLY
+config FONTWIDTH8_ONLY
 	bool "Support only 8 pixels wide fonts"
 	depends on FRAMEBUFFER_CONSOLE
 	help
@@ -136,19 +136,19 @@ config FBCON_FONTWIDTH8_ONLY
 
 config FONT_SUN8x16
 	bool "Sparc console 8x16 font"
-	depends on FRAMEBUFFER_CONSOLE && (!SPARC32 && !SPARC64 && FBCON_FONTS || SPARC32 || SPARC64)
+	depends on FRAMEBUFFER_CONSOLE && (!SPARC32 && !SPARC64 && FONTS || SPARC32 || SPARC64)
 	help
 	  This is the high resolution console font for Sun machines. Say Y.
 
 config FONT_SUN12x22
 	bool "Sparc console 12x22 font (not supported by all drivers)"
-	depends on FRAMEBUFFER_CONSOLE && !FBCON_FONTWIDTH8_ONLY && (!SPARC32 && !SPARC64 && FBCON_FONTS || SPARC32 || SPARC64)
+	depends on FRAMEBUFFER_CONSOLE && !FONTWIDTH8_ONLY && (!SPARC32 && !SPARC64 && FONTS || SPARC32 || SPARC64)
 	help
 	  This is the high resolution console font for Sun machines with very
 	  big letters (like the letters used in the SPARC PROM). If the
 	  standard font is unreadable for you, say Y, otherwise say N.
 
-config FBCON_FONTS
+config FONTS
 	bool "Select other fonts" if SPARC32 || SPARC64
 	depends on FRAMEBUFFER_CONSOLE
 	help
@@ -161,14 +161,14 @@ config FBCON_FONTS
 
 	  If unsure, say N (the default choices are safe).
 
-config FBCON_FONTS
+config FONTS
 	prompt "Select compiled-in fonts"
 	depends on FRAMEBUFFER_CONSOLE && !SPARC32 && !SPARC64
 
 config FONT_8x8
-	bool "VGA 8x8 font" if FBCON_FONTS
+	bool "VGA 8x8 font" if FONTS
 	depends on FRAMEBUFFER_CONSOLE
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS
+	default y if !SPARC32 && !SPARC64 && !FONTS
 	help
 	  This is the "high resolution" font for the VGA frame buffer (the one
 	  provided by the text console 80x50 (and higher) modes).
@@ -180,9 +180,9 @@ config FONT_8x8
 	  here is safe.
 
 config FONT_8x16
-	bool "VGA 8x16 font" if FBCON_FONTS
+	bool "VGA 8x16 font" if FONTS
 	depends on FRAMEBUFFER_CONSOLE || SGI_NEWPORT_CONSOLE=y
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS
+	default y if !SPARC32 && !SPARC64 && !FONTS
 	help
 	  This is the "high resolution" font for the VGA frame buffer (the one
 	  provided by the VGA text console 80x25 mode.
@@ -190,32 +190,32 @@ config FONT_8x16
 	  If unsure, say Y.
 
 config FONT_6x11
-	bool "Mac console 6x11 font (not supported by all drivers)" if FBCON_FONTS
-	depends on FRAMEBUFFER_CONSOLE && !FBCON_FONTWIDTH8_ONLY
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && MAC
+	bool "Mac console 6x11 font (not supported by all drivers)" if FONTS
+	depends on FRAMEBUFFER_CONSOLE && !FONTWIDTH8_ONLY
+	default y if !SPARC32 && !SPARC64 && !FONTS && MAC
 	help
 	  Small console font with Macintosh-style high-half glyphs.  Some Mac
 	  framebuffer drivers don't support this one at all.
 
 config FONT_PEARL_8x8
-	bool "Pearl (old m68k) console 8x8 font" if FBCON_FONTS
+	bool "Pearl (old m68k) console 8x8 font" if FONTS
 	depends on FRAMEBUFFER_CONSOLE
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && AMIGA
+	default y if !SPARC32 && !SPARC64 && !FONTS && AMIGA
 	help
 	  Small console font with PC-style control-character and high-half
 	  glyphs.
 
 config FONT_ACORN_8x8
-	bool "Acorn console 8x8 font" if FBCON_FONTS
+	bool "Acorn console 8x8 font" if FONTS
 	depends on FRAMEBUFFER_CONSOLE
-	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS && ARM && ARCH_ACORN
+	default y if !SPARC32 && !SPARC64 && !FONTS && ARM && ARCH_ACORN
 	help
 	  Small console font with PC-style control characters and high-half
 	  glyphs.
 
 config FONT_MINI_4x6
 	bool "Mini 4x6 font"
-	depends on !SPARC32 && !SPARC64 && FBCON_FONTS
+	depends on !SPARC32 && !SPARC64 && FONTS
 
 endmenu
 

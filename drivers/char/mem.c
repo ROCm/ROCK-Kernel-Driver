@@ -33,12 +33,6 @@ extern int i2c_init_all(void);
 #ifdef CONFIG_FB
 extern void fbmem_init(void);
 #endif
-#ifdef CONFIG_PROM_CONSOLE
-extern void prom_con_init(void);
-#endif
-#ifdef CONFIG_MDA_CONSOLE
-extern void mda_console_init(void);
-#endif
 #if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
 extern void tapechar_init(void);
 #endif
@@ -685,12 +679,6 @@ int __init chr_dev_init(void)
 #endif
 #if defined (CONFIG_FB)
 	fbmem_init();
-#endif
-#if defined (CONFIG_PROM_CONSOLE)
-	prom_con_init();
-#endif
-#if defined (CONFIG_MDA_CONSOLE)
-	mda_console_init();
 #endif
 	tty_init();
 #ifdef CONFIG_M68K_PRINTER

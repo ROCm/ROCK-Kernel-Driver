@@ -126,6 +126,15 @@ const struct consw *conswitchp;
 
 extern void vcs_make_devfs (unsigned int index, int unregister);
 extern void console_map_init(void);
+#ifdef CONFIG_PROM_CONSOLE
+extern void prom_con_init(void);
+#endif
+#ifdef CONFIG_MDA_CONSOLE
+extern void mda_console_init(void);
+#endif
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+extern int fb_console_init(void);
+#endif
 
 static struct tty_struct *console_table[MAX_NR_CONSOLES];
 static struct termios *console_termios[MAX_NR_CONSOLES];
@@ -2524,6 +2533,15 @@ int __init vty_init(void)
 
 	kbd_init();
 	console_map_init();
+#ifdef CONFIG_PROM_CONSOLE
+	prom_con_init();
+#endif
+#ifdef CONFIG_MDA_CONSOLE
+	mda_console_init();
+#endif
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+	fb_console_init();
+#endif	
 	con_init_devfs();
 	vcs_init();
 	return 0;

@@ -7,6 +7,34 @@
 
 export-objs    	:= fbcon.o fonts.o
 
+# Font handling
+font-objs := fonts.o
+
+ifeq ($(CONFIG_FONT_SUN8x16),y)
+	font-objs += font_sun8x16.o
+endif
+ifeq ($(CONFIG_FONT_SUN12x22),y)
+	font-objs += font_sun12x22.o
+endif	
+ifeq ($(CONFIG_FONT_8x8),y)
+	font-objs += font_8x8.o
+endif	
+ifeq ($(CONFIG_FONT_8x16),y)
+	font-objs += font_8x16.o
+endif	
+ifeq ($(CONFIG_FONT_6x11),y)
+	font-objs += font_6x11.o
+endif	
+ifeq ($(CONFIG_FONT_PEARL_8x8),y)
+	font-objs += font_pearl_8x8.o
+endif	
+ifeq ($(CONFIG_FONT_ACORN_8x8),y)
+	font-objs += font_acorn_8x8.o
+endif	
+ifeq ($(CONFIG_FONT_MINI_4x6),y)
+	font-objs += font_mini_4x6.o
+endif	
+
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_DUMMY_CONSOLE)       += dummycon.o
@@ -16,18 +44,6 @@ obj-$(CONFIG_STI_CONSOLE)         += sticon.o sticore.o
 obj-$(CONFIG_VGA_CONSOLE)         += vgacon.o
 obj-$(CONFIG_MDA_CONSOLE)         += mdacon.o
 obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o font.o
-
-obj-$(CONFIG_FONT_SUN8x16)        += font_sun8x16.o
-obj-$(CONFIG_FONT_SUN12x22)       += font_sun12x22.o
-obj-$(CONFIG_FONT_8x8)            += font_8x8.o
-obj-$(CONFIG_FONT_8x16)           += font_8x16.o
-obj-$(CONFIG_FONT_6x11)           += font_6x11.o
-obj-$(CONFIG_FONT_PEARL_8x8)      += font_pearl_8x8.o
-obj-$(CONFIG_FONT_ACORN_8x8)      += font_acorn_8x8.o
-obj-$(CONFIG_FONT_MINI_4x6)       += font_mini_4x6.o
-
-font-objs := fonts.o font_sun8x16.o font_sun12x22.o font_8x8.o font_8x16.o \
-	      font_6x11.o font_pearl_8x8.o font_acorn_8x8.o font_mini_4x6.o	
 
 # Generic Low Level Drivers
 
