@@ -1,5 +1,5 @@
 /*
- *	$Header: /cvsroot/osst/Driver/osst.h,v 1.14 2003/12/14 14:34:38 wriede Exp $
+ *	$Header: /cvsroot/osst/Driver/osst.h,v 1.16 2005/01/01 21:13:35 wriede Exp $
  */
 
 #include <asm/byteorder.h>
@@ -508,7 +508,7 @@ typedef struct os_header_s {
 //#define OSST_MAX_SG      2
 
 /* The OnStream tape buffer descriptor. */
-typedef struct {
+struct osst_buffer {
   unsigned char in_use;
   unsigned char dma;	/* DMA-able buffer */
   int buffer_size;
@@ -525,16 +525,16 @@ typedef struct {
   unsigned short sg_segs;      /* number of segments in s/g list                  */
   unsigned short orig_sg_segs; /* number of segments allocated at first try       */
   struct scatterlist sg[1];    /* MUST BE last item                               */
-} OSST_buffer;
+} ;
 
 /* The OnStream tape drive descriptor */
-typedef struct {
+struct osst_tape {
   struct scsi_driver *driver;
   unsigned capacity;
   Scsi_Device* device;
   struct semaphore lock;       /* for serialization */
   struct completion wait;      /* for SCSI commands */
-  OSST_buffer * buffer;
+  struct osst_buffer * buffer;
 
   /* Drive characteristics */
   unsigned char omit_blklims;
@@ -623,7 +623,7 @@ typedef struct {
   unsigned char last_sense[16];
 #endif
   struct gendisk *drive;
-} OS_Scsi_Tape;
+} ;
 
 /* Values of write_type */
 #define OS_WRITE_DATA      0
