@@ -19,7 +19,7 @@ Wed, 4 Feb 1998   Krzysztof G. Baranowski <kgb@manjak.knm.org.pl>
 	*    namei.c: removed static subdir(); is_subdir() from dcache.c
 		      is used instead. Cosmetic changes.
 
-Thu, 3 Dec 1998   Al Viro (viro@math.psu.edu)
+Thu, 3 Dec 1998   Al Viro (viro@parcelfarce.linux.theplanet.co.uk)
 	*    namei.c (sysv_rmdir):
 		      Bugectomy: old check for victim being busy
 		      (inode->i_count) wasn't replaced (with checking
