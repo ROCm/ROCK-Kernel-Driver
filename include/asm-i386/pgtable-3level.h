@@ -88,6 +88,13 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 	return res;
 }
 
+#define __HAVE_ARCH_PTEP_ESTABLISH
+#define ptep_establish(__vma, __address, __ptep, __entry)		\
+do {				  					\
+	set_pte_atomic(__ptep, __entry);				\
+	flush_tlb_page(__vma, __address);				\
+} while (0)
+
 static inline int pte_same(pte_t a, pte_t b)
 {
 	return a.pte_low == b.pte_low && a.pte_high == b.pte_high;
