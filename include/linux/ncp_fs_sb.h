@@ -10,12 +10,15 @@
 
 #include <linux/types.h>
 #include <linux/ncp_mount.h>
+#include <linux/net.h>
 
 #ifdef __KERNEL__
 
 #include <linux/workqueue.h>
 
 #define NCP_DEFAULT_OPTIONS 0		/* 2 for packet signatures */
+
+struct sock;
 
 struct ncp_server {
 

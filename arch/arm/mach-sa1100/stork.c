@@ -14,7 +14,6 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
-#include <linux/sched.h>
 #include <linux/delay.h>
 
 #include <asm/hardware.h>

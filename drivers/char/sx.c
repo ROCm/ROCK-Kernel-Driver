@@ -225,6 +225,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/miscdevice.h>
+#include <linux/bitops.h>
 
 /* The 3.0.0 version of sxboards/sxwindow.h  uses BYTE and WORD.... */
 #define BYTE u8

@@ -29,9 +29,7 @@
 #include <sound/info.h>
 #include <sound/version.h>
 #include <linux/proc_fs.h>
-#ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-#endif
 #include <stdarg.h>
 
 /*
@@ -965,20 +963,12 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 
 void snd_info_free_device(snd_info_entry_t * entry)
 {
-#ifdef CONFIG_DEVFS_FS
-	char dname[32];
-#endif
-
 	snd_runtime_check(entry, return);
 	down(&info_mutex);
 	snd_remove_proc_entry(snd_proc_dev, entry->p);
 	up(&info_mutex);
-#ifdef CONFIG_DEVFS_FS
-	if (entry->p && strncmp(entry->name, "controlC", 8)) {
-		sprintf(dname, "snd/%s", entry->name);
-		devfs_find_and_unregister(NULL, dname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-	}
-#endif
+	if (entry->p && strncmp(entry->name, "controlC", 8))
+		devfs_remove("snd/%s", entry->name);
 	snd_info_free_entry(entry);
 }
 

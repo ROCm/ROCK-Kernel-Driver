@@ -161,24 +161,25 @@
  */
 
 #include <linux/module.h>
-
-#include <stdarg.h>
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
-#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <asm/system.h>
-#include <asm/dma.h>
-#include <asm/io.h>
 #include <linux/ioport.h>
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
 #include <linux/version.h>
 #include <linux/init.h>
+
+#include <asm/system.h>
+#include <asm/dma.h>
+#include <asm/io.h>
+
 #include "scsi.h"
 #include "hosts.h"
+
 #include <scsi/scsicam.h>
 
 #define ANY2SCSI_INLINE		/* undef this to use old macros */

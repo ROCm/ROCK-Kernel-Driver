@@ -20,6 +20,7 @@
 #include <linux/binfmts.h>
 #include <linux/ptrace.h>
 #include <linux/profile.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -46,9 +47,9 @@ static struct dentry * __unhash_process(struct task_struct *p)
 	proc_dentry = p->proc_dentry;
 	if (unlikely(proc_dentry != NULL)) {
 		spin_lock(&dcache_lock);
-		if (!list_empty(&proc_dentry->d_hash)) {
+		if (!d_unhashed(proc_dentry)) {
 			dget_locked(proc_dentry);
-			list_del_init(&proc_dentry->d_hash);
+			__d_drop(proc_dentry);
 		} else
 			proc_dentry = NULL;
 		spin_unlock(&dcache_lock);

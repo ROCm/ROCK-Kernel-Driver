@@ -115,7 +115,7 @@ static int serio_thread(void *nothing)
 			refrigerator(PF_IOTHREAD);
 	} while (!signal_pending(current));
 
-	printk(KERN_DEBUG "serio: kseriod exiting");
+	printk(KERN_DEBUG "serio: kseriod exiting\n");
 
 	unlock_kernel();
 	complete_and_exit(&serio_exited, 0);
@@ -139,8 +139,9 @@ void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags
 {       
         if (serio->dev && serio->dev->interrupt) 
                 serio->dev->interrupt(serio, data, flags);
-	else
-		serio_rescan(serio);
+	else 
+		if (!flags)
+			serio_rescan(serio);
 }
 
 void serio_register_port(struct serio *serio)

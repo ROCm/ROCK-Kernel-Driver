@@ -403,8 +403,6 @@ open_scanner(struct inode * inode, struct file * file)
 
 	int err=0;
 
-	MOD_INC_USE_COUNT;
-
 	down(&scn_mutex);
 
 	scn_minor = USB_SCN_MINOR(inode);
@@ -413,7 +411,6 @@ open_scanner(struct inode * inode, struct file * file)
 
 	if (!p_scn_table[scn_minor]) {
 		up(&scn_mutex);
-		MOD_DEC_USE_COUNT;
 		err("open_scanner(%d): Unable to access minor data", scn_minor);
 		return -ENODEV;
 	}
@@ -455,9 +452,6 @@ out_error:
 
 	up(&(scn->sem)); /* Wake up any possible contending processes */
 
-	if (err)
-		MOD_DEC_USE_COUNT;
-
 	return err;
 }
 
@@ -487,8 +481,6 @@ close_scanner(struct inode * inode, struct file * file)
 
 	up(&scn_mutex);
 	up(&(scn->sem));
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -826,6 +818,7 @@ ioctl_scanner(struct inode *inode, struct file *file,
 
 static struct
 file_operations usb_scanner_fops = {
+	.owner =	THIS_MODULE,
 	.read =		read_scanner,
 	.write =	write_scanner,
 	.ioctl =	ioctl_scanner,
@@ -840,7 +833,7 @@ probe_scanner(struct usb_interface *intf,
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct scn_usb_data *scn;
 	struct usb_host_interface *interface;
-	struct usb_host_endpoint *endpoint;
+	struct usb_endpoint_descriptor *endpoint;
 
 	int ep_cnt;
 	int ix;
@@ -911,7 +904,6 @@ probe_scanner(struct usb_interface *intf,
 	}
 
 	interface = intf->altsetting;
-	endpoint = &interface->endpoint[0];
 
 /*
  * Start checking for two bulk endpoints OR two bulk endpoints *and* one
@@ -929,22 +921,23 @@ probe_scanner(struct usb_interface *intf,
 	ep_cnt = have_bulk_in = have_bulk_out = have_intr = 0;
 
 	while (ep_cnt < interface->desc.bNumEndpoints) {
+		endpoint = &interface->endpoint[ep_cnt].desc;
 
-		if (!have_bulk_in && IS_EP_BULK_IN(endpoint[ep_cnt])) {
+		if (!have_bulk_in && IS_EP_BULK_IN(endpoint)) {
 			ep_cnt++;
 			have_bulk_in = ep_cnt;
 			dbg("probe_scanner: bulk_in_ep:%d", have_bulk_in);
 			continue;
 		}
 
-		if (!have_bulk_out && IS_EP_BULK_OUT(endpoint[ep_cnt])) {
+		if (!have_bulk_out && IS_EP_BULK_OUT(endpoint)) {
 			ep_cnt++;
 			have_bulk_out = ep_cnt;
 			dbg("probe_scanner: bulk_out_ep:%d", have_bulk_out);
 			continue;
 		}
 
-		if (!have_intr && IS_EP_INTR(endpoint[ep_cnt])) {
+		if (!have_intr && IS_EP_INTR(endpoint)) {
 			ep_cnt++;
 			have_intr = ep_cnt;
 			dbg("probe_scanner: intr_ep:%d", have_intr);

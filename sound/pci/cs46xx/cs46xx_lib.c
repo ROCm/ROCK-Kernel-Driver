@@ -46,12 +46,13 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/pm.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
+
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -59,6 +60,9 @@
 #ifndef LINUX_2_2
 #include <linux/gameport.h>
 #endif
+
+#include <asm/io.h>
+
 #include "cs46xx_lib.h"
 #include "dsp_spos.h"
 
@@ -447,7 +451,7 @@ static void snd_cs46xx_reset(cs46xx_t *chip)
 
 static int cs46xx_wait_for_fifo(cs46xx_t * chip,int retry_timeout) 
 {
-	u32 i, status;
+	u32 i, status = 0;
 	/*
 	 * Make sure the previous FIFO write operation has completed.
 	 */

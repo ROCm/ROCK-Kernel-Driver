@@ -282,7 +282,7 @@ void hpfs_decide_conv(struct inode *, unsigned char *, unsigned);
 
 int hpfs_mkdir(struct inode *, struct dentry *, int);
 int hpfs_create(struct inode *, struct dentry *, int);
-int hpfs_mknod(struct inode *, struct dentry *, int, int);
+int hpfs_mknod(struct inode *, struct dentry *, int, dev_t);
 int hpfs_symlink(struct inode *, struct dentry *, const char *);
 int hpfs_unlink(struct inode *, struct dentry *);
 int hpfs_rmdir(struct inode *, struct dentry *);

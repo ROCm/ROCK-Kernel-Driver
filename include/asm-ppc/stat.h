@@ -19,6 +19,8 @@ struct __old_kernel_stat {
 	unsigned long  st_ctime;
 };
 
+#define STAT_HAVE_NSEC 1
+
 struct stat {
 	dev_t		st_dev;
 	ino_t		st_ino;
@@ -31,11 +33,11 @@ struct stat {
 	unsigned long  	st_blksize;
 	unsigned long  	st_blocks;
 	unsigned long  	st_atime;
-	unsigned long  	__unused1;
+	unsigned long  	st_atime_nsec;
 	unsigned long  	st_mtime;
-	unsigned long  	__unused2;
+	unsigned long  	st_mtime_nsec;
 	unsigned long  	st_ctime;
-	unsigned long  	__unused3;
+	unsigned long  	st_ctime_nsec;
 	unsigned long  	__unused4;
 	unsigned long  	__unused5;
 };
@@ -56,11 +58,11 @@ struct stat64 {
 
 	long long st_blocks;		/* Number 512-byte blocks allocated. */
 	long st_atime;			/* Time of last access.  */
-	unsigned long int __unused1;
+	unsigned long st_atime_nsec;
 	long st_mtime;			/* Time of last modification.  */
-	unsigned long int __unused2;
+	unsigned long int st_mtime_nsec;
 	long st_ctime;			/* Time of last status change.  */
-	unsigned long int __unused3;
+	unsigned long int st_ctime_nsec;
 	unsigned long int __unused4;
 	unsigned long int __unused5;
 };

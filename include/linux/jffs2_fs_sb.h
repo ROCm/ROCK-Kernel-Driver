@@ -1,4 +1,4 @@
-/* $Id: jffs2_fs_sb.h,v 1.32 2002/07/23 14:35:34 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.35 2002/11/12 09:42:18 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
@@ -21,6 +21,8 @@ struct jffs2_sb_info {
 	struct mtd_info *mtd;
 
 	uint32_t highest_ino;
+	uint32_t checked_ino;
+
 	unsigned int flags;
 
 	struct task_struct *gc_task;	/* GC task struct */
@@ -38,10 +40,12 @@ struct jffs2_sb_info {
 	uint32_t flash_size;
 	uint32_t used_size;
 	uint32_t dirty_size;
+	uint32_t wasted_size;
 	uint32_t free_size;
 	uint32_t erasing_size;
 	uint32_t bad_size;
 	uint32_t sector_size;
+	uint32_t unchecked_size;
 
 	uint32_t nr_free_blocks;
 	uint32_t nr_erasing_blocks;

@@ -36,21 +36,20 @@
 int __init
 pci_claim_resource(struct pci_dev *dev, int resource)
 {
-        struct resource *res = &dev->resource[resource];
+	struct resource *res = &dev->resource[resource];
 	struct resource *root = pci_find_parent_resource(dev, res);
+	char *dtype = resource < PCI_BRIDGE_RESOURCES ? "device" : "bridge";
 	int err;
 
 	err = -EINVAL;
-	if (root != NULL) {
+	if (root != NULL)
 		err = request_resource(root, res);
-		if (err) {
-			printk(KERN_ERR "PCI: Address space collision on "
-			       "region %d of device %s [%lx:%lx]\n",
-			       resource, dev->name, res->start, res->end);
-		}
-	} else {
-		printk(KERN_ERR "PCI: No parent found for region %d "
-		       "of device %s\n", resource, dev->name);
+
+	if (err) {
+		printk(KERN_ERR "PCI: %s region %d of %s %s [%lx:%lx]\n",
+		       root ? "Address space collision on" :
+			      "No parent found for",
+		       resource, dtype, dev->slot_name, res->start, res->end);
 	}
 
 	return err;
@@ -131,13 +130,13 @@ pci_assign_resource(struct pci_dev *dev, int i)
 	}
 
 	DBGC((KERN_ERR "  got res[%lx:%lx] for resource %d of %s\n", res->start,
-						res->end, i, dev->name));
+						res->end, i, dev->dev.name));
 
 	return 0;
 }
 
 /* Sort resources by alignment */
-void __init
+void __devinit
 pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 {
 	int i;
@@ -155,7 +154,7 @@ pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 		if (!r_align) {
 			printk(KERN_WARNING "PCI: Ignore bogus resource %d "
 					    "[%lx:%lx] of %s\n",
-					    i, r->start, r->end, dev->name);
+					    i, r->start, r->end, dev->dev.name);
 			continue;
 		}
 		r_align = (i < PCI_BRIDGE_RESOURCES) ? r_align + 1 : r->start;

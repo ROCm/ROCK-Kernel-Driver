@@ -4,11 +4,12 @@
 #ifdef __KERNEL__
 
 #include <asm/atomic.h>
-#include <linux/mount.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <asm/page.h>			/* for BUG() */
+
+struct vfsmount;
 
 /*
  * linux/include/linux/dcache.h
@@ -159,10 +160,15 @@ extern rwlock_t dparent_lock;
  * timeouts or autofs deletes).
  */
 
+static __inline__ void __d_drop(struct dentry * dentry)
+{
+	list_del_init(&dentry->d_hash);
+}
+
 static __inline__ void d_drop(struct dentry * dentry)
 {
 	spin_lock(&dcache_lock);
-	list_del_init(&dentry->d_hash);
+ 	__d_drop(dentry);
 	spin_unlock(&dcache_lock);
 }
 
@@ -228,8 +234,7 @@ extern struct dentry * __d_lookup(struct dentry *, struct qstr *);
 /* validate "insecure" dentry pointer */
 extern int d_validate(struct dentry *, struct dentry *);
 
-extern char * __d_path(struct dentry *, struct vfsmount *, struct dentry *,
-	struct vfsmount *, char *, int);
+extern char * d_path(struct dentry *, struct vfsmount *, char *, int);
   
 /* Allocation counts.. */
 

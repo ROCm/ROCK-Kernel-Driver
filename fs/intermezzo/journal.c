@@ -261,7 +261,7 @@ char * presto_path(struct dentry *dentry, struct dentry *root,
 
         *--end = '\0';
         buflen--;
-        if (dentry->d_parent != dentry && list_empty(&dentry->d_hash)) {
+        if (dentry->d_parent != dentry && d_unhashed(dentry)) {
                 buflen -= 10;
                 end -= 10;
                 memcpy(end, " (deleted)", 10);
@@ -420,7 +420,7 @@ static inline char *journal_log_suffix(char *buf, char *log,
 
         /* record number needs to be filled in after reservation 
            s.recno = cpu_to_le32(rec->recno); */ 
-        s.time = cpu_to_le32(CURRENT_TIME);
+        s.time = cpu_to_le32(get_seconds());
         s.len = p->len;
         return logit(buf, &s, sizeof(s));
 }
@@ -1518,7 +1518,7 @@ int presto_journal_setattr(struct rec_info *rec, struct presto_file_set *fset,
         }
 
         if (!dentry->d_inode || (dentry->d_inode->i_nlink == 0) 
-            || ((dentry->d_parent != dentry) && list_empty(&dentry->d_hash))) {
+            || ((dentry->d_parent != dentry) && d_unhashed(dentry))) {
                 EXIT;
                 return 0;
         }
@@ -1548,8 +1548,8 @@ int presto_journal_setattr(struct rec_info *rec, struct presto_file_set *fset,
         uid = iattr->ia_valid & ATTR_UID ? cpu_to_le32(iattr->ia_uid): 0;
         gid = iattr->ia_valid & ATTR_GID ? cpu_to_le32(iattr->ia_gid): 0;
         fsize = iattr->ia_valid & ATTR_SIZE ? cpu_to_le64(iattr->ia_size): 0;
-        mtime = iattr->ia_valid & ATTR_MTIME ? cpu_to_le64(iattr->ia_mtime): 0;
-        ctime = iattr->ia_valid & ATTR_CTIME ? cpu_to_le64(iattr->ia_ctime): 0;
+        mtime = iattr->ia_valid & ATTR_MTIME ? cpu_to_le64(iattr->ia_mtime.tv_sec): 0;
+        ctime = iattr->ia_valid & ATTR_CTIME ? cpu_to_le64(iattr->ia_ctime.tv_sec): 0;
         flags = iattr->ia_valid & ATTR_ATTR_FLAG ?
                 cpu_to_le32(iattr->ia_attr_flags): 0;
 
@@ -2129,7 +2129,7 @@ presto_journal_close(struct rec_info *rec, struct presto_file_set *fset,
         }
 
         if (!dentry->d_inode || (dentry->d_inode->i_nlink == 0) 
-            || ((dentry->d_parent != dentry) && list_empty(&dentry->d_hash))) {
+            || ((dentry->d_parent != dentry) && d_unhashed(dentry))) {
                 EXIT;
                 return 0;
         }
@@ -2391,7 +2391,7 @@ int presto_journal_set_ext_attr (struct rec_info *rec,
         }
 
         if (!dentry->d_inode || (dentry->d_inode->i_nlink == 0) 
-            || ((dentry->d_parent != dentry) && list_empty(&dentry->d_hash))) {
+            || ((dentry->d_parent != dentry) && d_unhashed(dentry))) {
                 EXIT;
                 return 0;
         }

@@ -202,40 +202,40 @@ void parport_gsc_dec_use_count(void)
 
 struct parport_operations parport_gsc_ops = 
 {
-	write_data:	parport_gsc_write_data,
-	read_data:	parport_gsc_read_data,
+	.write_data	= parport_gsc_write_data,
+	.read_data	= parport_gsc_read_data,
 
-	write_control:	parport_gsc_write_control,
-	read_control:	parport_gsc_read_control,
-	frob_control:	parport_gsc_frob_control,
+	.write_control	= parport_gsc_write_control,
+	.read_control	= parport_gsc_read_control,
+	.frob_control	= parport_gsc_frob_control,
 
-	read_status:	parport_gsc_read_status,
+	.read_status	= parport_gsc_read_status,
 
-	enable_irq:	parport_gsc_enable_irq,
-	disable_irq:	parport_gsc_disable_irq,
+	.enable_irq	= parport_gsc_enable_irq,
+	.disable_irq	= parport_gsc_disable_irq,
 
-	data_forward:	parport_gsc_data_forward,
-	data_reverse:	parport_gsc_data_reverse,
+	.data_forward	= parport_gsc_data_forward,
+	.data_reverse	= parport_gsc_data_reverse,
 
-	init_state:	parport_gsc_init_state,
-	save_state:	parport_gsc_save_state,
-	restore_state:	parport_gsc_restore_state,
+	.init_state	= parport_gsc_init_state,
+	.save_state	= parport_gsc_save_state,
+	.restore_state	= parport_gsc_restore_state,
 
-	inc_use_count:	parport_gsc_inc_use_count,
-	dec_use_count:	parport_gsc_dec_use_count,
+	.inc_use_count	= parport_gsc_inc_use_count,
+	.dec_use_count	= parport_gsc_dec_use_count,
 
-	epp_write_data:	parport_ieee1284_epp_write_data,
-	epp_read_data:	parport_ieee1284_epp_read_data,
-	epp_write_addr:	parport_ieee1284_epp_write_addr,
-	epp_read_addr:	parport_ieee1284_epp_read_addr,
+	.epp_write_data	= parport_ieee1284_epp_write_data,
+	.epp_read_data	= parport_ieee1284_epp_read_data,
+	.epp_write_addr	= parport_ieee1284_epp_write_addr,
+	.epp_read_addr	= parport_ieee1284_epp_read_addr,
 
-	ecp_write_data:	parport_ieee1284_ecp_write_data,
-	ecp_read_data:	parport_ieee1284_ecp_read_data,
-	ecp_write_addr:	parport_ieee1284_ecp_write_addr,
+	.ecp_write_data	= parport_ieee1284_ecp_write_data,
+	.ecp_read_data	= parport_ieee1284_ecp_read_data,
+	.ecp_write_addr	= parport_ieee1284_ecp_write_addr,
 
-	compat_write_data: 	parport_ieee1284_write_compat,
-	nibble_read_data:	parport_ieee1284_read_nibble,
-	byte_read_data:		parport_ieee1284_read_byte,
+	.compat_write_data 	= parport_ieee1284_write_compat,
+	.nibble_read_data	= parport_ieee1284_read_nibble,
+	.byte_read_data		= parport_ieee1284_read_byte,
 };
 
 /* --- Mode detection ------------------------------------- */
@@ -492,9 +492,9 @@ static struct parisc_device_id parport_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, parport_tbl);
 
 static struct parisc_driver parport_driver = {
-	name:		"Parallel",
-	id_table:	parport_tbl,
-	probe:		parport_init_chip,
+	.name		= "Parallel",
+	.id_table	= parport_tbl,
+	.probe		= parport_init_chip,
 };
 
 int __devinit parport_gsc_init(void)

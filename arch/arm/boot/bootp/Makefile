@@ -9,8 +9,6 @@ ZLDFLAGS	=-p -X -T $(obj)/bootp.lds \
 
 EXTRA_TARGETS := bootp
 
-include $(TOPDIR)/Rules.make
-
 # Note that bootp.lds picks up kernel.o and initrd.o
 $(obj)/bootp:	$(addprefix $(obj)/,init.o kernel.o initrd.o bootp.lds)
 		$(LD) $(ZLDFLAGS) -o $@ $(obj)/init.o
@@ -22,5 +20,3 @@ $(obj)/initrd.o: $(INITRD)
 		$(LD) -r -s -o $@ -b binary $(INITRD)
 
 .PHONY:		$(INITRD) $(ZSYSTEM)
-
-clean:;		$(RM) $(obj)/bootp

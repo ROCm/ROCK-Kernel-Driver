@@ -18,9 +18,9 @@
 extern void *switch_to(void *prev, void *next, void *last);
 
 extern int set_signals(int enable);
+extern int get_signals(void);
 extern void block_signals(void);
 extern void unblock_signals(void);
-extern int get_signals(void);
 
 #define local_save_flags(flags) do { (flags) = get_signals(); } while(0)
 #define local_irq_restore(flags) do { set_signals(flags); } while(0)
@@ -31,11 +31,11 @@ extern int get_signals(void);
 #define local_irq_enable() unblock_signals()
 #define local_irq_disable() block_signals()
 
-#define irqs_disabled()			\
-({					\
-	unsigned long flags;		\
-	local_save_flags(flags);	\
-	(flags != 0);			\
+#define irqs_disabled()                 \
+({                                      \
+        unsigned long flags;            \
+        local_save_flags(flags);        \
+        (flags == 0);                   \
 })
 
 #endif

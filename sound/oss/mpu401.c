@@ -19,6 +19,7 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #define USE_SEQ_MACROS
 #define USE_SIMPLE_MACROS

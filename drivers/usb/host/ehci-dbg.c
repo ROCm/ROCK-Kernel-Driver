@@ -272,6 +272,7 @@ static inline void remove_debug_files (struct ehci_hcd *bus) { }
 static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
 {
 	u32			scratch;
+	u32			hw_curr;
 	struct list_head	*entry;
 	struct ehci_qtd		*td;
 	unsigned		temp;
@@ -279,20 +280,22 @@ static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
 	char			*next = *nextp;
 
 	scratch = cpu_to_le32p (&qh->hw_info1);
-	temp = snprintf (next, size, "qh/%p dev%d %cs ep%d %08x %08x",
+	hw_curr = cpu_to_le32p (&qh->hw_current);
+	temp = snprintf (next, size, "qh/%p dev%d %cs ep%d %08x %08x (%08x %08x)",
 			qh, scratch & 0x007f,
 			speed_char (scratch),
 			(scratch >> 8) & 0x000f,
-			scratch, cpu_to_le32p (&qh->hw_info2));
+			scratch, cpu_to_le32p (&qh->hw_info2),
+			hw_curr, cpu_to_le32p (&qh->hw_token));
 	size -= temp;
 	next += temp;
 
 	list_for_each (entry, &qh->qtd_list) {
-		td = list_entry (entry, struct ehci_qtd,
-				qtd_list);
+		td = list_entry (entry, struct ehci_qtd, qtd_list);
 		scratch = cpu_to_le32p (&td->hw_token);
 		temp = snprintf (next, size,
-				"\n\ttd/%p %s len=%d %08x urb %p",
+				"\n\t%std/%p %s len=%d %08x urb %p",
+				(hw_curr == td->qtd_dma) ? "*" : "",
 				td, ({ char *tmp;
 				 switch ((scratch>>8)&0x03) {
 				 case 0: tmp = "out"; break;
@@ -552,8 +555,8 @@ show_registers (struct device *dev, char *buf, size_t count, loff_t off)
 	size -= temp;
 	next += temp;
 
-	temp = snprintf (next, size, "complete %ld unlink %ld qpatch %ld\n",
-		ehci->stats.complete, ehci->stats.unlink, ehci->stats.qpatch);
+	temp = snprintf (next, size, "complete %ld unlink %ld\n",
+		ehci->stats.complete, ehci->stats.unlink);
 	size -= temp;
 	next += temp;
 #endif

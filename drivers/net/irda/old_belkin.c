@@ -33,6 +33,7 @@
 #include <linux/tty.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/net.h>
 #include <linux/irda.h>
 
 #include <net/irda/irda.h>

@@ -507,7 +507,6 @@ static void start_cpu_timer(int cpu)
 	struct timer_list *rt = &reap_timers[cpu];
 
 	if (rt->function == NULL) {
-		printk(KERN_INFO "slab: reap timer started for cpu %d\n", cpu);
 		init_timer(rt);
 		rt->expires = jiffies + HZ + 3*cpu;
 		rt->function = reap_timer_fnc;
@@ -2123,6 +2122,10 @@ static int s_show(struct seq_file *m, void *p)
 	unsigned long	active_slabs = 0;
 	unsigned long	num_slabs;
 	const char *name; 
+	char *error = NULL;
+	mm_segment_t old_fs;
+	char tmp; 
+
 
 	if (p == (void*)1) {
 		/*
@@ -2143,38 +2146,45 @@ static int s_show(struct seq_file *m, void *p)
 	num_slabs = 0;
 	list_for_each(q,&cachep->lists.slabs_full) {
 		slabp = list_entry(q, struct slab, list);
-		if (slabp->inuse != cachep->num)
-			BUG();
+		if (slabp->inuse != cachep->num && !error)
+			error = "slabs_full accounting error";
 		active_objs += cachep->num;
 		active_slabs++;
 	}
 	list_for_each(q,&cachep->lists.slabs_partial) {
 		slabp = list_entry(q, struct slab, list);
-		BUG_ON(slabp->inuse == cachep->num || !slabp->inuse);
+		if (slabp->inuse == cachep->num && !error)
+			error = "slabs_partial inuse accounting error";
+		if (!slabp->inuse && !error)
+			error = "slabs_partial/inuse accounting error";
 		active_objs += slabp->inuse;
 		active_slabs++;
 	}
 	list_for_each(q,&cachep->lists.slabs_free) {
 		slabp = list_entry(q, struct slab, list);
-		if (slabp->inuse)
-			BUG();
+		if (slabp->inuse && !error)
+			error = "slabs_free/inuse accounting error";
 		num_slabs++;
 	}
 	num_slabs+=active_slabs;
 	num_objs = num_slabs*cachep->num;
-	BUG_ON(num_objs - active_objs != cachep->lists.free_objects);
+	if (num_objs - active_objs != cachep->lists.free_objects && !error)
+		error = "free_objects accounting error";
 
 	name = cachep->name; 
-	{
-	char tmp; 
-	mm_segment_t old_fs;
 
+	/*
+	 * Check to see if `name' resides inside a module which has been
+	 * unloaded (someone forgot to destroy their cache)
+	 */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	if (__get_user(tmp, name)) 
 		name = "broken"; 
 	set_fs(old_fs);
-	} 	
+
+	if (error)
+		printk(KERN_ERR "slab: cache %s error: %s\n", name, error);
 
 	seq_printf(m, "%-17s %6lu %6lu %6u %4lu %4lu %4u",
 		name, active_objs, num_objs, cachep->objsize,

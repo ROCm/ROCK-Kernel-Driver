@@ -10,6 +10,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 
 #include <asm/system.h>
 #include <asm/ebus.h>

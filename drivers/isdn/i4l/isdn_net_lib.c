@@ -490,7 +490,7 @@ isdn_net_dev_delete(isdn_net_dev *idev)
 	isdn_net_set_encap(mlp, -1);
 	isdn_net_rmallphone(idev);
 
-	if (idev->exclusive >= 0)
+	if (idev->exclusive)
 		isdn_slot_free(idev->exclusive);
 
 	list_del(&idev->slaves);

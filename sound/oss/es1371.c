@@ -109,6 +109,7 @@
 /*****************************************************************************/
       
 #include <linux/version.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
@@ -126,11 +127,12 @@
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
 #include <linux/wrapper.h>
-#include <asm/io.h>
-#include <asm/dma.h>
-#include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <linux/gameport.h>
+#include <linux/wait.h>
+
+#include <asm/io.h>
+#include <asm/page.h>
+#include <asm/uaccess.h>
 
 /* --------------------------------------------------------------------- */
 

@@ -58,6 +58,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -70,8 +71,9 @@
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 #include <linux/sysctl.h>
+#include <linux/wait.h>
 
-#include <asm/io.h>
+#include <asm/current.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -805,8 +807,8 @@ static int __init rtc_init(void)
 	struct linux_ebus *ebus;
 	struct linux_ebus_device *edev;
 #ifdef __sparc_v9__
-	struct isa_bridge *isa_br;
-	struct isa_device *isa_dev;
+	struct sparc_isa_bridge *isa_br;
+	struct sparc_isa_device *isa_dev;
 #endif
 #endif
 

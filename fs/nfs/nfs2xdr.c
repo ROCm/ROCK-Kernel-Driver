@@ -44,7 +44,6 @@ extern int			nfs_stat_to_errno(int stat);
 #define NFS_info_sz		5
 #define NFS_entry_sz		NFS_filename_sz+3
 
-#define NFS_enc_void_sz		0
 #define NFS_diropargs_sz	NFS_fhandle_sz+NFS_filename_sz
 #define NFS_sattrargs_sz	NFS_fhandle_sz+NFS_sattr_sz
 #define NFS_readlinkargs_sz	NFS_fhandle_sz
@@ -56,7 +55,6 @@ extern int			nfs_stat_to_errno(int stat);
 #define NFS_symlinkargs_sz	NFS_diropargs_sz+NFS_path_sz+NFS_sattr_sz
 #define NFS_readdirargs_sz	NFS_fhandle_sz+2
 
-#define NFS_dec_void_sz		0
 #define NFS_attrstat_sz		1+NFS_fattr_sz
 #define NFS_diropres_sz		1+NFS_fhandle_sz+NFS_fattr_sz
 #define NFS_readlinkres_sz	1
@@ -88,10 +86,20 @@ xdr_decode_fhandle(u32 *p, struct nfs_fh *fhandle)
 }
 
 static inline u32*
-xdr_decode_time(u32 *p, u64 *timep)
+xdr_encode_time(u32 *p, struct timespec *timep)
 {
-	u64 tmp = (u64)ntohl(*p++) << 32;
-	*timep = tmp + (u64)ntohl(*p++);
+	*p++ = htonl(timep->tv_sec);
+	/* Convert nanoseconds into microseconds */
+	*p++ = htonl(timep->tv_nsec / 1000);
+	return p;
+}
+
+static inline u32*
+xdr_decode_time(u32 *p, struct timespec *timep)
+{
+	timep->tv_sec = ntohl(*p++);
+	/* Convert microseconds into nanoseconds */
+	timep->tv_nsec = ntohl(*p++) * 1000;
 	return p;
 }
 
@@ -133,16 +141,14 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	SATTR(p, attr, ATTR_SIZE, ia_size);
 
 	if (attr->ia_valid & (ATTR_ATIME|ATTR_ATIME_SET)) {
-		*p++ = htonl(attr->ia_atime);
-		*p++ = 0;
+		p = xdr_encode_time(p, &attr->ia_atime);
 	} else {
 		*p++ = ~(u32) 0;
 		*p++ = ~(u32) 0;
 	}
 
 	if (attr->ia_valid & (ATTR_MTIME|ATTR_MTIME_SET)) {
-		*p++ = htonl(attr->ia_mtime);
-		*p++ = 0;
+		p = xdr_encode_time(p, &attr->ia_mtime);
 	} else {
 		*p++ = ~(u32) 0;	
 		*p++ = ~(u32) 0;
@@ -154,16 +160,6 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 /*
  * NFS encode functions
  */
-/*
- * Encode void argument
- */
-static int
-nfs_xdr_enc_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
-	return 0;
-}
-
 /*
  * Encode file handle argument
  * GETATTR, READLINK, STATFS
@@ -463,15 +459,6 @@ nfs_decode_dirent(u32 *p, struct nfs_entry *entry, int plus)
  * NFS XDR decode functions
  */
 /*
- * Decode void reply
- */
-static int
-nfs_xdr_dec_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	return 0;
-}
-
-/*
  * Decode simple status reply
  */
 static int
@@ -663,31 +650,29 @@ nfs_stat_to_errno(int stat)
 #endif
 
 #define PROC(proc, argtype, restype, timer)				\
-    { .p_procname =  "nfs_" #proc,					\
-      .p_encode   =  (kxdrproc_t) nfs_xdr_##argtype,			\
-      .p_decode   =  (kxdrproc_t) nfs_xdr_##restype,			\
-      .p_bufsiz   =  MAX(NFS_##argtype##_sz,NFS_##restype##_sz) << 2,	\
-      .p_timer    =  timer						\
-    }
-static struct rpc_procinfo	nfs_procedures[18] = {
-    PROC(null,		enc_void,	dec_void, 0),
-    PROC(getattr,	fhandle,	attrstat, 1),
-    PROC(setattr,	sattrargs,	attrstat, 0),
-    PROC(root,		enc_void,	dec_void, 0),
-    PROC(lookup,	diropargs,	diropres, 2),
-    PROC(readlink,	readlinkargs,	readlinkres, 3),
-    PROC(read,		readargs,	readres, 3),
-    PROC(writecache,	enc_void,	dec_void, 0),
-    PROC(write,		writeargs,	writeres, 4),
-    PROC(create,	createargs,	diropres, 0),
-    PROC(remove,	diropargs,	stat, 0),
-    PROC(rename,	renameargs,	stat, 0),
-    PROC(link,		linkargs,	stat, 0),
-    PROC(symlink,	symlinkargs,	stat, 0),
-    PROC(mkdir,		createargs,	diropres, 0),
-    PROC(rmdir,		diropargs,	stat, 0),
-    PROC(readdir,	readdirargs,	readdirres, 3),
-    PROC(statfs,	fhandle,	statfsres, 0),
+[NFSPROC_##proc] = {							\
+	.p_proc	    =  NFSPROC_##proc,					\
+	.p_encode   =  (kxdrproc_t) nfs_xdr_##argtype,			\
+	.p_decode   =  (kxdrproc_t) nfs_xdr_##restype,			\
+	.p_bufsiz   =  MAX(NFS_##argtype##_sz,NFS_##restype##_sz) << 2,	\
+	.p_timer    =  timer						\
+	}
+struct rpc_procinfo	nfs_procedures[] = {
+    PROC(GETATTR,	fhandle,	attrstat, 1),
+    PROC(SETATTR,	sattrargs,	attrstat, 0),
+    PROC(LOOKUP,	diropargs,	diropres, 2),
+    PROC(READLINK,	readlinkargs,	readlinkres, 3),
+    PROC(READ,		readargs,	readres, 3),
+    PROC(WRITE,		writeargs,	writeres, 4),
+    PROC(CREATE,	createargs,	diropres, 0),
+    PROC(REMOVE,	diropargs,	stat, 0),
+    PROC(RENAME,	renameargs,	stat, 0),
+    PROC(LINK,		linkargs,	stat, 0),
+    PROC(SYMLINK,	symlinkargs,	stat, 0),
+    PROC(MKDIR,		createargs,	diropres, 0),
+    PROC(RMDIR,		diropargs,	stat, 0),
+    PROC(READDIR,	readdirargs,	readdirres, 3),
+    PROC(STATFS,	fhandle,	statfsres, 0),
 };
 
 struct rpc_version		nfs_version2 = {

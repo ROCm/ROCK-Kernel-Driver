@@ -27,10 +27,13 @@ SECTIONS
   _edata  =  .;
   PROVIDE (edata = .);
   .fixup   : { *(.fixup) }
+
   . = ALIGN(16);
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
+
+  . = ALIGN(64);
   __start___ksymtab = .;
   __ksymtab  : { *(__ksymtab) }
   __stop___ksymtab = .;

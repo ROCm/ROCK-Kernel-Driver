@@ -2688,12 +2688,12 @@ static int pmu_ioctl(struct inode * inode, struct file *filp,
 }
 
 static struct file_operations pmu_device_fops = {
-	read:		pmu_read,
-	write:		pmu_write,
-	poll:		pmu_fpoll,
-	ioctl:		pmu_ioctl,
-	open:		pmu_open,
-	release:	pmu_release,
+	.read		= pmu_read,
+	.write		= pmu_write,
+	.poll		= pmu_fpoll,
+	.ioctl		= pmu_ioctl,
+	.open		= pmu_open,
+	.release	= pmu_release,
 };
 
 static struct miscdevice pmu_device = {

@@ -16,6 +16,7 @@
 #include <linux/dirent.h>
 #include <linux/smb_fs.h>
 #include <linux/pagemap.h>
+#include <linux/net.h>
 
 #include <asm/page.h>
 

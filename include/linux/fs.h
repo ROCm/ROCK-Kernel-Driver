@@ -12,23 +12,21 @@
 #include <linux/wait.h>
 #include <linux/types.h>
 #include <linux/vfs.h>
-#include <linux/net.h>
 #include <linux/kdev_t.h>
 #include <linux/ioctl.h>
 #include <linux/list.h>
 #include <linux/dcache.h>
 #include <linux/stat.h>
 #include <linux/cache.h>
-#include <linux/stddef.h>
-#include <linux/string.h>
 #include <linux/radix-tree.h>
-#include <linux/bitops.h>
-
 #include <asm/atomic.h>
 
-struct poll_table_struct;
+struct iovec;
 struct nameidata;
-
+struct pipe_inode_info;
+struct poll_table_struct;
+struct vm_area_struct;
+struct vfsmount;
 
 /*
  * It's silly to have NR_OPEN bigger than NR_FILE, but you can change
@@ -219,9 +217,6 @@ typedef int (get_blocks_t)(struct inode *inode, sector_t iblock,
 			unsigned long max_blocks,
 			struct buffer_head *bh_result, int create);
 
-#include <linux/pipe_fs_i.h>
-/* #include <linux/umsdos_fs_i.h> */
-
 /*
  * Attribute flags.  These should be or-ed together to figure out what
  * has been changed!
@@ -255,9 +250,9 @@ struct iattr {
 	uid_t		ia_uid;
 	gid_t		ia_gid;
 	loff_t		ia_size;
-	time_t		ia_atime;
-	time_t		ia_mtime;
-	time_t		ia_ctime;
+	struct timespec	ia_atime;
+	struct timespec	ia_mtime;
+	struct timespec	ia_ctime;
 	unsigned int	ia_attr_flags;
 };
 
@@ -271,10 +266,9 @@ struct iattr {
 #define ATTR_FLAG_NODIRATIME	16 	/* Don't update atime for directory */
 
 /*
- * Includes for diskquotas and mount structures.
+ * Includes for diskquotas.
  */
 #include <linux/quota.h>
-#include <linux/mount.h>
 
 /*
  * oh the beauties of C type declarations.
@@ -375,9 +369,9 @@ struct inode {
 	gid_t			i_gid;
 	kdev_t			i_rdev;
 	loff_t			i_size;
-	time_t			i_atime;
-	time_t			i_mtime;
-	time_t			i_ctime;
+	struct timespec		i_atime;
+	struct timespec		i_mtime;
+	struct timespec		i_ctime;
 	unsigned int		i_blkbits;
 	unsigned long		i_blksize;
 	unsigned long		i_blocks;
@@ -413,25 +407,8 @@ struct inode {
 	} u;
 };
 
-struct socket_alloc {
-	struct socket socket;
-	struct inode vfs_inode;
-};
-
-static inline struct socket *SOCKET_I(struct inode *inode)
-{
-	return &container_of(inode, struct socket_alloc, vfs_inode)->socket;
-}
-
-static inline struct inode *SOCK_INODE(struct socket *socket)
-{
-	return &container_of(socket, struct socket_alloc, socket)->vfs_inode;
-}
-
 /* will die */
 #include <linux/coda_fs_i.h>
-#include <linux/ext3_fs_i.h>
-#include <linux/efs_fs_i.h>
 
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
@@ -506,6 +483,10 @@ struct file {
 
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
+
+	/* Used by fs/eventpoll.c to link all the hooks to this file */
+	struct list_head	f_ep_links;
+	spinlock_t		f_ep_lock;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);
@@ -597,8 +578,8 @@ extern int posix_lock_file(struct file *, struct file_lock *);
 extern void posix_block_lock(struct file_lock *, struct file_lock *);
 extern void posix_unblock_lock(struct file *, struct file_lock *);
 extern int posix_locks_deadlock(struct file_lock *, struct file_lock *);
-extern int __get_lease(struct inode *inode, unsigned int flags);
-extern time_t lease_get_mtime(struct inode *);
+extern int __break_lease(struct inode *inode, unsigned int flags);
+extern void lease_get_mtime(struct inode *, struct timespec *time);
 extern int lock_may_read(struct inode *, loff_t start, unsigned long count);
 extern int lock_may_write(struct inode *, loff_t start, unsigned long count);
 
@@ -792,7 +773,7 @@ struct inode_operations {
 	int (*symlink) (struct inode *,struct dentry *,const char *);
 	int (*mkdir) (struct inode *,struct dentry *,int);
 	int (*rmdir) (struct inode *,struct dentry *);
-	int (*mknod) (struct inode *,struct dentry *,int,int);
+	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *);
 	int (*readlink) (struct dentry *, char *,int);
@@ -1071,10 +1052,10 @@ static inline int locks_verify_truncate(struct inode *inode,
 	return 0;
 }
 
-static inline int get_lease(struct inode *inode, unsigned int mode)
+static inline int break_lease(struct inode *inode, unsigned int mode)
 {
-	if (inode->i_flock && (inode->i_flock->fl_flags & FL_LEASE))
-		return __get_lease(inode, mode);
+	if (inode->i_flock)
+		return __break_lease(inode, mode);
 	return 0;
 }
 
@@ -1121,14 +1102,14 @@ extern void blk_run_queues(void);
 extern int register_chrdev(unsigned int, const char *, struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
-extern const char *__bdevname(kdev_t);
+extern const char *__bdevname(dev_t);
 extern inline const char *bdevname(struct block_device *bdev)
 {
-	return __bdevname(to_kdev_t(bdev->bd_dev));
+	return __bdevname(bdev->bd_dev);
 }
 extern const char * cdevname(kdev_t);
 extern const char * kdevname(kdev_t);
-extern void init_special_inode(struct inode *, umode_t, int);
+extern void init_special_inode(struct inode *, umode_t, dev_t);
 
 /* Invalid inode operations -- fs/bad_inode.c */
 extern void make_bad_inode(struct inode *);
@@ -1337,13 +1318,10 @@ extern struct inode_operations simple_dir_inode_operations;
 extern unsigned int real_root_dev;
 #endif
 
-extern ssize_t char_read(struct file *, char *, size_t, loff_t *);
-extern ssize_t block_read(struct file *, char *, size_t, loff_t *);
-extern ssize_t char_write(struct file *, const char *, size_t, loff_t *);
-extern ssize_t block_write(struct file *, const char *, size_t, loff_t *);
-
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);
+
+extern void inode_update_time(struct inode *inode, int ctime_too);
 
 static inline ino_t parent_ino(struct dentry *dentry)
 {

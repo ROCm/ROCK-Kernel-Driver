@@ -585,7 +585,7 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 		__xprt_put_cong(xprt, req);
 	       	if (!req->rq_nresend) {
 			unsigned timer =
-				rpcproc_timer(clnt, task->tk_msg.rpc_proc);
+				task->tk_msg.rpc_proc->p_timer;
 			if (timer)
 				rpc_update_rtt(&clnt->cl_rtt, timer,
 						(long)jiffies - req->rq_xtime);
@@ -1223,7 +1223,7 @@ do_xprt_transmit(struct rpc_task *task)
 	/* Set the task's receive timeout value */
 	if (!xprt->nocong) {
 		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt,
-				rpcproc_timer(clnt, task->tk_msg.rpc_proc));
+				task->tk_msg.rpc_proc->p_timer);
 		req->rq_ntimeo = 0;
 		if (task->tk_timeout > req->rq_timeout.to_maxval)
 			task->tk_timeout = req->rq_timeout.to_maxval;
@@ -1284,7 +1284,7 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	static u32	xid = 0;
 
 	if (!xid)
-		xid = CURRENT_TIME << 12;
+		xid = get_seconds() << 12;
 
 	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid, req, xid);
 	req->rq_timeout = xprt->timeout;

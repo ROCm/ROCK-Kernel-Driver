@@ -2,7 +2,7 @@
  *  Acorn RiscPC mouse driver for Linux/ARM
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
- *  Copyright (C) 1996-1998 Russell King
+ *  Copyright (C) 1996-2002 Russell King
  *
  */
 

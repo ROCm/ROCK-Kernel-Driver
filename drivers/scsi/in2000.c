@@ -114,18 +114,17 @@
  */
 
 #include <linux/module.h>
-
-#include <asm/system.h>
-#include <linux/sched.h>
+#include <linux/blk.h>
+#include <linux/blkdev.h>
+#include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
-#include <asm/io.h>
 #include <linux/ioport.h>
-#include <linux/blkdev.h>
-
-#include <linux/blk.h>
 #include <linux/stat.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
 
 #include "scsi.h"
 #include "hosts.h"

@@ -25,6 +25,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/bio.h>
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -309,7 +310,7 @@ static void __exit cpqarray_exit(void)
 			put_disk(ida_gendisk[i][j]);
 		}
 	}
-	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
+	devfs_remove("ida");
 	remove_proc_entry("cpqarray", proc_root_driver);
 }
 
@@ -436,7 +437,7 @@ Enomem2:
 	printk( KERN_ERR "cpqarray: out of memory");
 
 	if (!num_cntlrs_reg) {
-		devfs_find_and_unregister(NULL,"ida",0,0,0,0);
+		devfs_remove("ida");
 		remove_proc_entry("cpqarray", proc_root_driver);
 		return -ENODEV;
 	}

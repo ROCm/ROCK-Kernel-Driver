@@ -63,28 +63,30 @@ ifeq ($(CONFIG_CPU_XSCALE),y)
 OBJS		+= head-xscale.o
 endif
 
-SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/LOAD_ADDR/$(ZRELADDR)/;\
-s/BSS_START/$(ZBSSADDR)/;s#OBJ#$(obj)#
+SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/LOAD_ADDR/$(ZRELADDR)/;s/BSS_START/$(ZBSSADDR)/
 
-EXTRA_TARGETS := vmlinux piggy.o font.o head.o $(OBJS)
+EXTRA_TARGETS := vmlinux vmlinux.lds piggy piggy.gz\
+                 piggy.o font.o head.o $(OBJS)
 EXTRA_CFLAGS  := $(CFLAGS_BOOT) -fpic
 EXTRA_AFLAGS  := -traditional
-
-include $(TOPDIR)/Rules.make
 
 LDFLAGS_vmlinux := -p -X \
 	$(shell $(CC) $(CFLAGS) --print-libgcc-file-name) -T
 
 $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.o \
-	 	$(addprefix $(obj)/, $(OBJS))
+	 	$(addprefix $(obj)/, $(OBJS)) FORCE
 	$(call if_changed,ld)
+	@:
 
 
-$(obj)/piggy:    vmlinux;	$(call if_changed,objcopy)
-$(obj)/piggy.gz: $(obj)/piggy;	$(call if_changed,gzip)
+$(obj)/piggy: vmlinux FORCE
+	$(call if_changed,objcopy)
+
+$(obj)/piggy.gz: $(obj)/piggy FORCE
+	$(call if_changed,gzip)
 
 LDFLAGS_piggy.o := -r -b binary
-$(obj)/piggy.o:  $(obj)/piggy.gz
+$(obj)/piggy.o:  $(obj)/piggy.gz FORCE
 	$(call if_changed,ld)
 
 CFLAGS_font.o := -Dstatic=
@@ -93,9 +95,7 @@ $(obj)/font.o: $(FONTC)
 $(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in Makefile arch/arm/boot/Makefile .config
 	@sed "$(SEDFLAGS)" < $< > $@
 
-.PHONY:	clean
-clean:
-	rm -f $(addprefix $(obj)/,vmlinux core piggy* vmlinux.lds)
+clean-files := $(addprefix $(obj)/,vmlinux piggy* vmlinux.lds)
 
 $(obj)/misc.o: $(obj)/misc.c include/asm/arch/uncompress.h lib/inflate.c
 

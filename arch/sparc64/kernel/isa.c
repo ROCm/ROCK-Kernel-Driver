@@ -5,14 +5,14 @@
 #include <asm/oplib.h>
 #include <asm/isa.h>
 
-struct isa_bridge *isa_chain;
+struct sparc_isa_bridge *isa_chain;
 
 static void __init fatal_err(const char *reason)
 {
 	prom_printf("ISA: fatal error, %s.\n", reason);
 }
 
-static void __init report_dev(struct isa_device *isa_dev, int child)
+static void __init report_dev(struct sparc_isa_device *isa_dev, int child)
 {
 	if (child)
 		printk(" (%s)", isa_dev->prom_name);
@@ -20,7 +20,7 @@ static void __init report_dev(struct isa_device *isa_dev, int child)
 		printk(" [%s", isa_dev->prom_name);
 }
 
-static void __init isa_dev_get_resource(struct isa_device *isa_dev)
+static void __init isa_dev_get_resource(struct sparc_isa_device *isa_dev)
 {
 	struct linux_prom_registers regs[PROMREG_MAX];
 	unsigned long base, len;
@@ -67,7 +67,7 @@ static struct {
 	{ 0, 0x00 }	/* end of table */
 };
 
-static void __init isa_dev_get_irq(struct isa_device *isa_dev)
+static void __init isa_dev_get_irq(struct sparc_isa_device *isa_dev)
 {
 	int irq_prop;
 
@@ -96,7 +96,7 @@ static void __init isa_dev_get_irq(struct isa_device *isa_dev)
 	}
 }
 
-static void __init isa_fill_children(struct isa_device *parent_isa_dev)
+static void __init isa_fill_children(struct sparc_isa_device *parent_isa_dev)
 {
 	int node = prom_getchild(parent_isa_dev->prom_node);
 
@@ -105,7 +105,7 @@ static void __init isa_fill_children(struct isa_device *parent_isa_dev)
 
 	printk(" ->");
 	while (node != 0) {
-		struct isa_device *isa_dev;
+		struct sparc_isa_device *isa_dev;
 		int prop_len;
 
 		isa_dev = kmalloc(sizeof(*isa_dev), GFP_KERNEL);
@@ -147,12 +147,12 @@ static void __init isa_fill_children(struct isa_device *parent_isa_dev)
 	}
 }
 
-static void __init isa_fill_devices(struct isa_bridge *isa_br)
+static void __init isa_fill_devices(struct sparc_isa_bridge *isa_br)
 {
 	int node = prom_getchild(isa_br->prom_node);
 
 	while (node != 0) {
-		struct isa_device *isa_dev;
+		struct sparc_isa_device *isa_dev;
 		int prop_len;
 
 		isa_dev = kmalloc(sizeof(*isa_dev), GFP_KERNEL);
@@ -168,7 +168,7 @@ static void __init isa_fill_devices(struct isa_bridge *isa_br)
 		if (isa_br->devices == NULL) {
 			isa_br->devices = isa_dev;
 		} else {
-			struct isa_device *tmp = isa_br->devices;
+			struct sparc_isa_device *tmp = isa_br->devices;
 
 			while (tmp->next)
 				tmp = tmp->next;
@@ -220,7 +220,7 @@ void __init isa_init(void)
 	while ((pdev = pci_find_device(vendor, device, pdev)) != NULL) {
 		struct pcidev_cookie *pdev_cookie;
 		struct pci_pbm_info *pbm;
-		struct isa_bridge *isa_br;
+		struct sparc_isa_bridge *isa_br;
 		int prop_len;
 
 		pdev_cookie = pdev->sysdata;
@@ -233,7 +233,7 @@ void __init isa_init(void)
 
 		isa_br = kmalloc(sizeof(*isa_br), GFP_KERNEL);
 		if (!isa_br) {
-			fatal_err("cannot allocate isa_bridge");
+			fatal_err("cannot allocate sparc_isa_bridge");
 			prom_halt();
 		}
 

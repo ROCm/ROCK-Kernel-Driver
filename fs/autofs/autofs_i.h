@@ -25,6 +25,7 @@
 #include <linux/wait.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 #ifdef DEBUG

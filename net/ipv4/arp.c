@@ -90,6 +90,7 @@
 #include <linux/seq_file.h>
 #include <linux/stat.h>
 #include <linux/init.h>
+#include <linux/net.h>
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
@@ -1142,65 +1143,115 @@ struct arp_iter_state {
 	int is_pneigh, bucket;
 };
 
-static __inline__ struct neighbour *neigh_get_bucket(struct seq_file *seq,
-						     loff_t *pos)
+static struct neighbour *neigh_get_first(struct seq_file *seq)
 {
+	struct arp_iter_state* state = seq->private;
 	struct neighbour *n = NULL;
-	struct arp_iter_state* state = seq->private;
-	loff_t l = *pos;
-	int i;
 
-	for (; state->bucket <= NEIGH_HASHMASK; ++state->bucket)
-		for (i = 0, n = arp_tbl.hash_buckets[state->bucket]; n;
-		     ++i, n = n->next)
-			/* Do not confuse users "arp -a" with magic entries */
-			if ((n->nud_state & ~NUD_NOARP) && !l--) {
-				*pos = i;
-				goto out;
-			}
+	state->is_pneigh = 0;
+
+	for (state->bucket = 0;
+	     state->bucket <= NEIGH_HASHMASK;
+	     ++state->bucket) {
+		n = arp_tbl.hash_buckets[state->bucket];
+		while (n && !(n->nud_state & ~NUD_NOARP))
+			n = n->next;
+		if (n)
+			break;
+	}
+
+	return n;
+}
+
+static struct neighbour *neigh_get_next(struct seq_file *seq,
+					struct neighbour *n)
+{
+	struct arp_iter_state* state = seq->private;
+
+	do {
+		n = n->next;
+		/* Don't confuse "arp -a" w/ magic entries */
+try_again:
+	} while (n && !(n->nud_state & ~NUD_NOARP));
+
+	if (n)
+		goto out;
+	if (++state->bucket > NEIGH_HASHMASK)
+		goto out;
+	n = arp_tbl.hash_buckets[state->bucket];
+	goto try_again;
 out:
 	return n;
 }
 
-static __inline__ struct pneigh_entry *pneigh_get_bucket(struct seq_file *seq,
-							 loff_t *pos)
+static struct neighbour *neigh_get_idx(struct seq_file *seq, loff_t *pos)
 {
-	struct pneigh_entry *n = NULL;
-	struct arp_iter_state* state = seq->private;
-	loff_t l = *pos;
-	int i;
+	struct neighbour *n = neigh_get_first(seq);
 
-	for (; state->bucket <= PNEIGH_HASHMASK; ++state->bucket)
-		for (i = 0, n = arp_tbl.phash_buckets[state->bucket]; n;
-		     ++i, n = n->next)
-			if (!l--) {
-				*pos = i;
-				goto out;
-			}
-out:
-	return n;
+	if (n)
+		while (*pos && (n = neigh_get_next(seq, n)))
+			--*pos;
+	return *pos ? NULL : n;
 }
 
-static __inline__ void *arp_get_bucket(struct seq_file *seq, loff_t *pos)
+static struct pneigh_entry *pneigh_get_first(struct seq_file *seq)
 {
-	void *rc = neigh_get_bucket(seq, pos);
+	struct arp_iter_state* state = seq->private;
+	struct pneigh_entry *pn;
+
+	state->is_pneigh = 1;
+
+	for (state->bucket = 0;
+	     state->bucket <= PNEIGH_HASHMASK;
+	     ++state->bucket) {
+		pn = arp_tbl.phash_buckets[state->bucket];
+		if (pn)
+			break;
+	}
+	return pn;
+}
+
+static struct pneigh_entry *pneigh_get_next(struct seq_file *seq,
+					    struct pneigh_entry *pn)
+{
+	struct arp_iter_state* state = seq->private;
+
+	pn = pn->next;
+	while (!pn) {
+		if (++state->bucket > PNEIGH_HASHMASK)
+			break;
+		pn = arp_tbl.phash_buckets[state->bucket];
+	}
+	return pn;
+}
+
+static struct pneigh_entry *pneigh_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct pneigh_entry *pn = pneigh_get_first(seq);
+
+	if (pn)
+		while (pos && (pn = pneigh_get_next(seq, pn)))
+			--pos;
+	return pos ? NULL : pn;
+}
+
+static void *arp_get_idx(struct seq_file *seq, loff_t pos)
+{
+	void *rc;
+
+	read_lock_bh(&arp_tbl.lock);
+	rc = neigh_get_idx(seq, &pos);
 
 	if (!rc) {
-		struct arp_iter_state* state = seq->private;
-
 		read_unlock_bh(&arp_tbl.lock);
-		state->is_pneigh = 1;
-		state->bucket	 = 0;
-		*pos		 = 0;
-		rc = pneigh_get_bucket(seq, pos);
+		rc = pneigh_get_idx(seq, pos);
 	}
 	return rc;
 }
 
 static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	read_lock_bh(&arp_tbl.lock);
-	return *pos ? arp_get_bucket(seq, pos) : (void *)1;
+	return *pos ? arp_get_idx(seq, *pos - 1) : (void *)1;
 }
 
 static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -1209,38 +1260,19 @@ static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct arp_iter_state* state;
 
 	if (v == (void *)1) {
-		rc = arp_get_bucket(seq, pos);
+		rc = arp_get_idx(seq, 0);
 		goto out;
 	}
 
 	state = seq->private;
 	if (!state->is_pneigh) {
-		struct neighbour *n = v;
-
-		rc = n = n->next;
-		if (n)
-			goto out;
-		*pos = 0;
-		++state->bucket;
-		rc = neigh_get_bucket(seq, pos);
+		rc = neigh_get_next(seq, v);
 		if (rc)
 			goto out;
 		read_unlock_bh(&arp_tbl.lock);
-		state->is_pneigh = 1;
-		state->bucket	 = 0;
-		*pos		 = 0;
-		rc = pneigh_get_bucket(seq, pos);
-	} else {
-		struct pneigh_entry *pn = v;
-
-		pn = pn->next;
-		if (!pn) {
-			++state->bucket;
-			*pos = 0;
-			pn   = pneigh_get_bucket(seq, pos);
-		}
-		rc = pn;
-	}
+		rc = pneigh_get_first(seq);
+	} else
+		rc = pneigh_get_next(seq, v);
 out:
 	++*pos;
 	return rc;
@@ -1291,7 +1323,6 @@ static __inline__ void arp_format_neigh_entry(struct seq_file *seq,
 static __inline__ void arp_format_pneigh_entry(struct seq_file *seq,
 					       struct pneigh_entry *n)
 {
-
 	struct net_device *dev = n->dev;
 	int hatype = dev ? dev->type : 0;
 	char tbuf[16];

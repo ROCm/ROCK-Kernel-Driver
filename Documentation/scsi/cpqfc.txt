@@ -100,8 +100,6 @@ Tested with
 using "qa_test" (esp. io_test script) suite modified from Unix tests.
 	
 Installation:
-copy file cpqfcTS.patch to /usr/src/linux
-patch -p1 < cpqfcTS.patch
 make menuconfig
   (select SCSI low-level, Compaq FC HBA)
 make dep

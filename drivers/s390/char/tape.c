@@ -199,9 +199,10 @@ typedef struct {
 
 static struct file_operations tape_proc_devices_file_ops =
 {
-	read:tape_proc_devices_read,	/* read */
-	open:tape_proc_devices_open,	/* open */
-	release:tape_proc_devices_release,	/* close */
+	.owner = THIS_MODULE,
+	.read = tape_proc_devices_read,	/* read */
+	.open = tape_proc_devices_open,	/* open */
+	.release = tape_proc_devices_release,	/* close */
 };
 
 /* 
@@ -239,12 +240,9 @@ tape_proc_devices_open (struct inode *inode, struct file *file)
 	long lockflags,lockflags2;
 	tape_ccw_req_t *treq;
 
-	MOD_INC_USE_COUNT;
-
 	procinfo = kmalloc (sizeof(tape_procinfo_t),GFP_KERNEL);
 	if (!procinfo){
 		rc = -ENOMEM;
-		MOD_DEC_USE_COUNT;
 		goto out_no_lock;
 	}
 
@@ -349,7 +347,6 @@ tape_proc_devices_release (struct inode *inode, struct file *file)
 	tape_procinfo_t *p_info = (tape_procinfo_t *) file->private_data;
         vfree(p_info->data);
         kfree (p_info);
-        MOD_DEC_USE_COUNT;
 	return rc;
 }
 

@@ -7,48 +7,17 @@
  *                        of people at Linux Expo.
  */
 
-/*
- * The fundamental purpose of this file is to contain a library of utility
- * routines that can be used by low-level drivers.   Ultimately the idea
- * is that there should be a sufficiently rich number of functions that it
- * would be possible for a driver author to fashion a queueing function for
- * a low-level driver if they wished.   Note however that this file also
- * contains the "default" versions of these functions, as we don't want to
- * go through and retrofit queueing functions into all 30 some-odd drivers.
- */
-
-#include <linux/module.h>
-
-#include <linux/sched.h>
-#include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/bio.h>
-#include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/stat.h>
 #include <linux/blk.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
-
-
-#define __KERNEL_SYSCALLS__
-
-#include <linux/unistd.h>
-
-#include <asm/system.h>
-#include <asm/irq.h>
-#include <asm/dma.h>
 
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>
-
-/*
- * This entire source file deals with the new queueing code.
- */
 
 /*
  * Function:    scsi_insert_special_cmd()
@@ -101,6 +70,13 @@ int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
 int scsi_insert_special_req(Scsi_Request * SRpnt, int at_head)
 {
 	request_queue_t *q = &SRpnt->sr_device->request_queue;
+
+	/* This is used to insert SRpnt specials.  Because users of
+	 * this function are apt to reuse requests with no modification,
+	 * we have to sanitise the request flags here
+	 */
+
+	SRpnt->sr_request->flags &= ~REQ_DONTPREP;
 
 	blk_insert_request(q, SRpnt->sr_request, at_head, SRpnt);
 	return 0;
@@ -240,13 +216,19 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 		SCpnt->request->special = (void *) SCpnt;
 		if(blk_rq_tagged(SCpnt->request))
 			blk_queue_end_tag(q, SCpnt->request);
+		/* set REQ_SPECIAL - we have a command
+		 * clear REQ_DONTPREP - we assume the sg table has been 
+		 *	nuked so we need to set it up again.
+		 */
+		SCpnt->request->flags |= REQ_SPECIAL;
+		SCpnt->request->flags &= ~REQ_DONTPREP;
 		__elv_add_request(q, SCpnt->request, 0, 0);
 	}
 
 	/*
 	 * Just hit the requeue function for the queue.
 	 */
-	q->request_fn(q);
+	__blk_run_queue(q);
 
 	SDpnt = (Scsi_Device *) q->queuedata;
 	SHpnt = SDpnt->host;
@@ -259,8 +241,6 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	 * use function pointers to pick the right one.
 	 */
 	if (SDpnt->single_lun && blk_queue_empty(q) && SDpnt->device_busy ==0) {
-		request_queue_t *q;
-
 		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
 			if (((SHpnt->can_queue > 0)
 			     && (SHpnt->host_busy >= SHpnt->can_queue))
@@ -270,8 +250,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 				break;
 			}
 
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
+			__blk_run_queue(&SDpnt->request_queue);
 		}
 	}
 
@@ -286,7 +265,6 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	all_clear = 1;
 	if (SHpnt->some_device_starved) {
 		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
-			request_queue_t *q;
 			if ((SHpnt->can_queue > 0 && (SHpnt->host_busy >= SHpnt->can_queue))
 			    || (SHpnt->host_blocked) 
 			    || (SHpnt->host_self_blocked)) {
@@ -295,8 +273,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 			if (SDpnt->device_blocked || !SDpnt->starved) {
 				continue;
 			}
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
+			__blk_run_queue(&SDpnt->request_queue);
 			all_clear = 0;
 		}
 		if (SDpnt == NULL && all_clear) {
@@ -714,13 +691,15 @@ struct Scsi_Device_Template *scsi_get_request_dev(struct request *req)
  *
  * Arguments:   SCpnt   - Command descriptor we wish to initialize
  *
- * Returns:     1 on success.
+ * Returns:     0 on success
+ *		BLKPREP_DEFER if the failure is retryable
+ *		BLKPREP_KILL if the failure is fatal
  */
 static int scsi_init_io(Scsi_Cmnd *SCpnt)
 {
 	struct request     *req = SCpnt->request;
 	struct scatterlist *sgpnt;
-	int count, gfp_mask;
+	int count, gfp_mask, ret = 0;
 
 	/*
 	 * if this is a rq->data based REQ_BLOCK_PC, setup for a non-sg xfer
@@ -730,7 +709,7 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 		SCpnt->request_buffer = req->data;
 		req->buffer = req->data;
 		SCpnt->use_sg = 0;
-		return 1;
+		return 0;
 	}
 
 	/*
@@ -741,7 +720,7 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 	SCpnt->use_sg = req->nr_phys_segments;
 
 	gfp_mask = GFP_NOIO;
-	if (in_interrupt()) {
+	if (likely(in_atomic())) {
 		gfp_mask &= ~__GFP_WAIT;
 		gfp_mask |= __GFP_HIGH;
 	}
@@ -750,8 +729,11 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 	 * if sg table allocation fails, requeue request later.
 	 */
 	sgpnt = scsi_alloc_sgtable(SCpnt, gfp_mask);
-	if (unlikely(!sgpnt))
+	if (unlikely(!sgpnt)) {
+		req->flags |= REQ_SPECIAL;
+		ret = BLKPREP_DEFER;
 		goto out;
+	}
 
 	SCpnt->request_buffer = (char *) sgpnt;
 	SCpnt->request_bufflen = req->nr_sectors << 9;
@@ -768,12 +750,11 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 	/*
 	 * mapped well, send it off
 	 */
-	if (unlikely(count > SCpnt->use_sg))
-		goto incorrect;
-	SCpnt->use_sg = count;
-	return 1;
+	if (count <= SCpnt->use_sg) {
+		SCpnt->use_sg = count;
+		return 0;
+	}
 
-incorrect:
 	printk(KERN_ERR "Incorrect number of segments after building list\n");
 	printk(KERN_ERR "counted %d, received %d\n", count, SCpnt->use_sg);
 	printk(KERN_ERR "req nr_sec %lu, cur_nr_sec %u\n", req->nr_sectors,
@@ -784,8 +765,117 @@ incorrect:
 	 */
 	SCpnt = scsi_end_request(SCpnt, 0, req->nr_sectors);
 	BUG_ON(SCpnt);
+	ret = BLKPREP_KILL;
 out:
-	return 0;
+	return ret;
+}
+
+int scsi_prep_fn(struct request_queue *q, struct request *req)
+{
+	struct Scsi_Device_Template *STpnt;
+	Scsi_Cmnd *SCpnt;
+	Scsi_Device *SDpnt;
+
+	SDpnt = (Scsi_Device *) q->queuedata;
+	BUG_ON(!SDpnt);
+
+	/*
+	 * Find the actual device driver associated with this command.
+	 * The SPECIAL requests are things like character device or
+	 * ioctls, which did not originate from ll_rw_blk.  Note that
+	 * the special field is also used to indicate the SCpnt for
+	 * the remainder of a partially fulfilled request that can 
+	 * come up when there is a medium error.  We have to treat
+	 * these two cases differently.  We differentiate by looking
+	 * at request->cmd, as this tells us the real story.
+	 */
+	if (req->flags & REQ_SPECIAL) {
+		Scsi_Request *SRpnt;
+
+		STpnt = NULL;
+		SCpnt = (Scsi_Cmnd *) req->special;
+		SRpnt = (Scsi_Request *) req->special;
+		
+		if( SRpnt->sr_magic == SCSI_REQ_MAGIC ) {
+			SCpnt = scsi_allocate_device(SRpnt->sr_device, 
+						     FALSE, FALSE);
+			if (!SCpnt)
+				return BLKPREP_DEFER;
+			scsi_init_cmd_from_req(SCpnt, SRpnt);
+		}
+		
+	} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+		/*
+		 * Now try and find a command block that we can use.
+		 */
+		if (req->special) {
+				SCpnt = (Scsi_Cmnd *) req->special;
+		} else {
+			SCpnt = scsi_allocate_device(SDpnt, FALSE, FALSE);
+		}
+		/*
+		 * if command allocation failure, wait a bit
+		 */
+		if (unlikely(!SCpnt))
+			return BLKPREP_DEFER;
+		
+		/* pull a tag out of the request if we have one */
+		SCpnt->tag = req->tag;
+	} else {
+		blk_dump_rq_flags(req, "SCSI bad req");
+		return BLKPREP_KILL;
+	}
+	
+	/* note the overloading of req->special.  When the tag
+	 * is active it always means SCpnt.  If the tag goes
+	 * back for re-queueing, it may be reset */
+	req->special = SCpnt;
+	SCpnt->request = req;
+	
+	/*
+	 * FIXME: drop the lock here because the functions below
+	 * expect to be called without the queue lock held.  Also,
+	 * previously, we dequeued the request before dropping the
+	 * lock.  We hope REQ_STARTED prevents anything untoward from
+	 * happening now.
+	 */
+
+	if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+		int ret;
+
+		/*
+		 * This will do a couple of things:
+		 *  1) Fill in the actual SCSI command.
+		 *  2) Fill in any other upper-level specific fields
+		 * (timeout).
+		 *
+		 * If this returns 0, it means that the request failed
+		 * (reading past end of disk, reading offline device,
+		 * etc).   This won't actually talk to the device, but
+		 * some kinds of consistency checking may cause the	
+		 * request to be rejected immediately.
+		 */
+		STpnt = scsi_get_request_dev(req);
+		BUG_ON(!STpnt);
+
+		/* 
+		 * This sets up the scatter-gather table (allocating if
+		 * required).
+		 */
+		if ((ret = scsi_init_io(SCpnt)))
+			return ret;
+		
+		/*
+		 * Initialize the actual SCSI command for this request.
+		 */
+		if (!STpnt->init_command(SCpnt)) {
+			scsi_release_buffers(SCpnt);
+			return BLKPREP_KILL;
+		}
+	}
+	/* The request is now prepped, no need to come back here */
+	req->flags |= REQ_DONTPREP;
+	return BLKPREP_OK;
 }
 
 /*
@@ -811,10 +901,8 @@ void scsi_request_fn(request_queue_t * q)
 {
 	struct request *req;
 	Scsi_Cmnd *SCpnt;
-	Scsi_Request *SRpnt;
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *SHpnt;
-	struct Scsi_Device_Template *STpnt;
 
 	ASSERT_LOCK(q->queue_lock, 1);
 
@@ -836,6 +924,14 @@ void scsi_request_fn(request_queue_t * q)
 		 */
 		if (SHpnt->in_recovery || blk_queue_plugged(q))
 			return;
+
+		/*
+		 * get next queueable request.  We do this early to make sure
+		 * that the request is fully prepared even if we cannot 
+		 * accept it.  If there is no request, we'll detect this
+		 * lower down.
+		 */
+		req = elv_next_request(q);
 
 		if(SHpnt->host_busy == 0 && SHpnt->host_blocked) {
 			/* unblock after host_blocked iterates to zero */
@@ -888,141 +984,41 @@ void scsi_request_fn(request_queue_t * q)
 		if (blk_queue_empty(q))
 			break;
 
-		/*
-		 * get next queueable request.
-		 */
-		req = elv_next_request(q);
-
-		/*
-		 * Find the actual device driver associated with this command.
-		 * The SPECIAL requests are things like character device or
-		 * ioctls, which did not originate from ll_rw_blk.  Note that
-		 * the special field is also used to indicate the SCpnt for
-		 * the remainder of a partially fulfilled request that can 
-		 * come up when there is a medium error.  We have to treat
-		 * these two cases differently.  We differentiate by looking
-		 * at request->cmd, as this tells us the real story.
-		 */
-		if (req->flags & REQ_SPECIAL) {
-			STpnt = NULL;
-			SCpnt = (Scsi_Cmnd *) req->special;
-			SRpnt = (Scsi_Request *) req->special;
-
-			if( SRpnt->sr_magic == SCSI_REQ_MAGIC ) {
-				SCpnt = scsi_allocate_device(SRpnt->sr_device, 
-							     FALSE, FALSE);
-				if (!SCpnt)
-					break;
-				scsi_init_cmd_from_req(SCpnt, SRpnt);
-			}
-
-		} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
-			SRpnt = NULL;
-			STpnt = scsi_get_request_dev(req);
-			if (!STpnt) {
-				panic("Unable to find device associated with request");
-			}
-			/*
-			 * Now try and find a command block that we can use.
-			 */
-			if (req->special) {
-				SCpnt = (Scsi_Cmnd *) req->special;
-			} else {
-				SCpnt = scsi_allocate_device(SDpnt, FALSE, FALSE);
-			}
-			/*
-			 * If so, we are ready to do something.  Bump the count
-			 * while the queue is locked and then break out of the
-			 * loop. Otherwise loop around and try another request.
-			 */
-			if (!SCpnt)
-				break;
-
-			/* pull a tag out of the request if we have one */
-			SCpnt->tag = req->tag;
-		} else {
-			blk_dump_rq_flags(req, "SCSI bad req");
+		if(!req) {
+			/* If the device is busy, a returning I/O
+			 * will restart the queue.  Otherwise, we have
+			 * to plug the queue */
+			if(SDpnt->device_busy == 0)
+				blk_plug_device(q);
 			break;
 		}
 
+		SCpnt = (struct scsi_cmnd *)req->special;
+
+		/* Should be impossible for a correctly prepared request
+		 * please mail the stack trace to linux-scsi@vger.kernel.org
+		 */
+		BUG_ON(!SCpnt);
+
+		/*
+		 * Finally, before we release the lock, we copy the
+		 * request to the command block, and remove the
+		 * request from the request list.  Note that we always
+		 * operate on the queue head - there is absolutely no
+		 * reason to search the list, because all of the
+		 * commands in this queue are for the same device.
+		 */
+		if(!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
+			blkdev_dequeue_request(req);
+	
 		/*
 		 * Now bump the usage count for both the host and the
 		 * device.
 		 */
 		SHpnt->host_busy++;
 		SDpnt->device_busy++;
-
-		/*
-		 * Finally, before we release the lock, we copy the
-		 * request to the command block, and remove the
-		 * request from the request list.   Note that we always
-		 * operate on the queue head - there is absolutely no
-		 * reason to search the list, because all of the commands
-		 * in this queue are for the same device.
-		 */
-		if(!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
-			blkdev_dequeue_request(req);
-
-		/* note the overloading of req->special.  When the tag
-		 * is active it always means SCpnt.  If the tag goes
-		 * back for re-queueing, it may be reset */
-		req->special = SCpnt;
-		SCpnt->request = req;
-
-		/*
-		 * Now it is finally safe to release the lock.  We are
-		 * not going to noodle the request list until this
-		 * request has been queued and we loop back to queue
-		 * another.  
-		 */
-		req = NULL;
 		spin_unlock_irq(q->queue_lock);
 
-		if (!(SCpnt->request->flags & REQ_DONTPREP)
-		    && (SCpnt->request->flags & (REQ_CMD | REQ_BLOCK_PC))) {
-			/*
-			 * This will do a couple of things:
-			 *  1) Fill in the actual SCSI command.
-			 *  2) Fill in any other upper-level specific fields
-			 * (timeout).
-			 *
-			 * If this returns 0, it means that the request failed
-			 * (reading past end of disk, reading offline device,
-			 * etc).   This won't actually talk to the device, but
-			 * some kinds of consistency checking may cause the	
-			 * request to be rejected immediately.
-			 */
-			if (STpnt == NULL)
-				STpnt = scsi_get_request_dev(SCpnt->request);
-
-			/* 
-			 * This sets up the scatter-gather table (allocating if
-			 * required).
-			 */
-			if (!scsi_init_io(SCpnt)) {
-				scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_DEVICE_BUSY);
-				spin_lock_irq(q->queue_lock);
-				break;
-			}
-
-			/*
-			 * Initialize the actual SCSI command for this request.
-			 */
-			if (!STpnt->init_command(SCpnt)) {
-				scsi_release_buffers(SCpnt);
-				SCpnt = __scsi_end_request(SCpnt, 0, 
-							   SCpnt->request->nr_sectors, 0, 0);
-				if( SCpnt != NULL )
-				{
-					panic("Should not have leftover blocks\n");
-				}
-				spin_lock_irq(q->queue_lock);
-				SHpnt->host_busy--;
-				SDpnt->device_busy--;
-				continue;
-			}
-		}
-		SCpnt->request->flags |= REQ_DONTPREP;
 		/*
 		 * Finally, initialize any error handling parameters, and set up
 		 * the timers for timeouts.

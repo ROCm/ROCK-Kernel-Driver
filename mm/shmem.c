@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/backing-dev.h>
 #include <linux/shmem_fs.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 
@@ -1014,7 +1015,8 @@ static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
-struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
+static struct inode *
+shmem_get_inode(struct super_block *sb, int mode, dev_t dev)
 {
 	struct inode *inode;
 	struct shmem_inode_info *info;
@@ -1425,7 +1427,8 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 /*
  * File creation. Allocate an inode, and we're done..
  */
-static int shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
+static int
+shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	struct inode *inode = shmem_get_inode(dir->i_sb, mode, dev);
 	int error = -ENOSPC;

@@ -164,9 +164,9 @@ __setup("condev=", condev_setup);
 
 static int __init conmode_setup(char *str)
 {
-#if defined(CONFIG_HWC_CONSOLE)
-	if (strncmp(str, "hwc", 4) == 0)
-                SET_CONSOLE_HWC;
+#if defined(CONFIG_SCLP_CONSOLE)
+	if (strncmp(str, "hwc", 4) == 0 || strncmp(str, "sclp", 5) == 0)
+                SET_CONSOLE_SCLP;
 #endif
 #if defined(CONFIG_TN3215_CONSOLE)
 	if (strncmp(str, "3215", 5) == 0)
@@ -198,8 +198,8 @@ static void __init conmode_default(void)
 		 */
 		cpcmd("TERM CONMODE 3215", NULL, 0);
 		if (ptr == NULL) {
-#if defined(CONFIG_HWC_CONSOLE)
-			SET_CONSOLE_HWC;
+#if defined(CONFIG_SCLP_CONSOLE)
+			SET_CONSOLE_SCLP;
 #endif
 			return;
 		}
@@ -208,16 +208,16 @@ static void __init conmode_default(void)
 			SET_CONSOLE_3270;
 #elif defined(CONFIG_TN3215_CONSOLE)
 			SET_CONSOLE_3215;
-#elif defined(CONFIG_HWC_CONSOLE)
-			SET_CONSOLE_HWC;
+#elif defined(CONFIG_SCLP_CONSOLE)
+			SET_CONSOLE_SCLP;
 #endif
 		} else if (strncmp(ptr + 8, "3215", 4) == 0) {
 #if defined(CONFIG_TN3215_CONSOLE)
 			SET_CONSOLE_3215;
 #elif defined(CONFIG_TN3270_CONSOLE)
 			SET_CONSOLE_3270;
-#elif defined(CONFIG_HWC_CONSOLE)
-			SET_CONSOLE_HWC;
+#elif defined(CONFIG_SCLP_CONSOLE)
+			SET_CONSOLE_SCLP;
 #endif
 		}
         } else if (MACHINE_IS_P390) {
@@ -227,8 +227,8 @@ static void __init conmode_default(void)
 		SET_CONSOLE_3270;
 #endif
 	} else {
-#if defined(CONFIG_HWC_CONSOLE)
-		SET_CONSOLE_HWC;
+#if defined(CONFIG_SCLP_CONSOLE)
+		SET_CONSOLE_SCLP;
 #endif
 	}
 }
@@ -553,8 +553,8 @@ static void c_stop(struct seq_file *m, void *v)
 {
 }
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= show_cpuinfo,
 };

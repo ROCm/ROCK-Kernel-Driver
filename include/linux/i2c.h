@@ -48,7 +48,6 @@ struct i2c_msg;
 #endif
 
 #include <asm/page.h>			/* for 2.2.xx 			*/
-#include <linux/sched.h>
 #include <asm/semaphore.h>
 #include <linux/config.h>
 

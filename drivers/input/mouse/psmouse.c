@@ -312,6 +312,26 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		return PSMOUSE_PS2;
 
 /*
+ * Try Synaptics TouchPad magic ID
+ */
+
+       param[0] = 0;
+       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+       psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
+
+       if (param[1] == 0x47) {
+               /* We could do more here. But it's sufficient just
+                  to stop the subsequent probes from screwing the
+                  thing up. */
+               psmouse->vendor = "Synaptics";
+               psmouse->name = "TouchPad";
+               return PSMOUSE_PS2;
+       }
+
+/*
  * Try Genius NetMouse magic init.
  */
 
@@ -348,7 +368,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
 
 		int i;
 		static int logitech_4btn[] = { 12, 40, 41, 42, 43, 52, 73, 80, -1 };
-		static int logitech_wheel[] = { 52, 75, 76, 80, 81, 83, 88, -1 };
+		static int logitech_wheel[] = { 52, 53, 75, 76, 80, 81, 83, 88, -1 };
 		static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
 							76, 80, 81, 83, 88, 96, 97, -1 };
 		psmouse->vendor = "Logitech";

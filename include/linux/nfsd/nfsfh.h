@@ -263,8 +263,8 @@ fill_pre_wcc(struct svc_fh *fhp)
 
 	inode = fhp->fh_dentry->d_inode;
 	if (!fhp->fh_pre_saved) {
-		fhp->fh_pre_mtime = inode->i_mtime;
-			fhp->fh_pre_ctime = inode->i_ctime;
+		fhp->fh_pre_mtime = inode->i_mtime.tv_sec;
+		fhp->fh_pre_ctime = inode->i_ctime.tv_sec;
 			fhp->fh_pre_size  = inode->i_size;
 			fhp->fh_pre_saved = 1;
 	}
@@ -296,9 +296,9 @@ fill_post_wcc(struct svc_fh *fhp)
 	}
 	fhp->fh_post_rdev[0]    = htonl((u32)major(inode->i_rdev));
 	fhp->fh_post_rdev[1]    = htonl((u32)minor(inode->i_rdev));
-	fhp->fh_post_atime      = inode->i_atime;
-	fhp->fh_post_mtime      = inode->i_mtime;
-	fhp->fh_post_ctime      = inode->i_ctime;
+	fhp->fh_post_atime      = inode->i_atime.tv_sec;
+	fhp->fh_post_mtime      = inode->i_mtime.tv_sec;
+	fhp->fh_post_ctime      = inode->i_ctime.tv_sec;
 	fhp->fh_post_saved      = 1;
 }
 #else

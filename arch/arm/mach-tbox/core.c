@@ -7,7 +7,6 @@
  *  Extra MM routines for the Tbox architecture
  */
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/init.h>
 

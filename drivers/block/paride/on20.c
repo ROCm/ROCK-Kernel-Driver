@@ -122,17 +122,8 @@ static void on20_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void on20_init_proto( PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void on20_release_proto( PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol on20 = {
+	.owner		= THIS_MODULE,
 	.name		= "on20",
 	.max_mode	= 2,
 	.epp_first	= 2,
@@ -145,8 +136,6 @@ static struct pi_protocol on20 = {
 	.connect	= on20_connect,
 	.disconnect	= on20_disconnect,
 	.log_adapter	= on20_log_adapter,
-	.init_proto	= on20_init_proto,
-	.release_proto	= on20_release_proto,
 };
 
 static int __init on20_init(void)

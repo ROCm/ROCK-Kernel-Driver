@@ -4,8 +4,9 @@
  Copyright (c) 1995 Strom Systems, Inc. under the terms of the GNU
  General Public License. Written by Martin Kolinek, December 1995.
  Further development by: Chris Beauregard, Klaus Kudielka, Michael Lang
- See the file README.ibmmca for a detailed description of this driver,
- the commandline arguments and the history of its development.
+ See the file Documentation/scsi/ibmmca.txt for a detailed description
+ of this driver, the commandline arguments and the history of its
+ development.
  See the WWW-page: http://www.uni-mainz.de/~langm000/linux.html for latest
  updates, info and ADF-files for adapters supported by this driver.
 
@@ -16,6 +17,7 @@
  
  */
 
+#include <linux/config.h>
 #ifndef LINUX_VERSION_CODE
 #include <linux/version.h>
 #endif
@@ -27,22 +29,23 @@
 #include <linux/types.h>
 #include <linux/ctype.h>
 #include <linux/string.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/sched.h>
 #include <linux/blk.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/mca.h>
 #include <linux/string.h>
-#include <asm/system.h>
 #include <linux/spinlock.h>
-#include <asm/io.h>
 #include <linux/init.h>
+
+#include <asm/system.h>
+#include <asm/io.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include "ibmmca.h"
-#include <linux/config.h>
 
 /* current version of this driver-source: */
 #define IBMMCA_SCSI_DRIVER_VERSION "4.0b-ac"
@@ -1395,9 +1398,8 @@ static void internal_ibmmca_scsi_setup(char *str, int *ints)
 	io_base = 0;
 	id_base = 0;
 	if (str) {
-		token = strtok(str, ",");
 		j = 0;
-		while (token) {
+		while ((token = strsep(&str, ",")) != NULL) {
 			if (!strcmp(token, "activity"))
 				display_mode |= LED_ACTIVITY;
 			if (!strcmp(token, "display"))
@@ -1421,7 +1423,6 @@ static void internal_ibmmca_scsi_setup(char *str, int *ints)
 					scsi_id[id_base++] = simple_strtoul(token, NULL, 0);
 				j++;
 			}
-			token = strtok(NULL, ",");
 		}
 	} else if (ints) {
 		for (i = 0; i < IM_MAX_HOSTS && 2 * i + 2 < ints[0]; i++) {

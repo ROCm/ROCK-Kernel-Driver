@@ -8,6 +8,7 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/stat.h>
+#include <linux/string.h>
 
 static ssize_t device_read_name(struct device * dev, char * buf, size_t count, loff_t off)
 {

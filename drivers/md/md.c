@@ -1008,7 +1008,7 @@ static void md_update_sb(mddev_t * mddev)
 
 	mddev->sb_dirty = 0;
 repeat:
-	mddev->utime = CURRENT_TIME;
+	mddev->utime = get_seconds();
 	mddev->events ++;
 
 	if (!mddev->events) {
@@ -2107,7 +2107,7 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 	mddev->major_version = MD_MAJOR_VERSION;
 	mddev->minor_version = MD_MINOR_VERSION;
 	mddev->patch_version = MD_PATCHLEVEL_VERSION;
-	mddev->ctime         = CURRENT_TIME;
+	mddev->ctime         = get_seconds();
 
 	mddev->level         = info->level;
 	mddev->size          = info->size;
@@ -3133,20 +3133,6 @@ int __init md_init(void)
 #ifndef MODULE
 
 /*
- * When md (and any require personalities) are compiled into the kernel
- * (not a module), arrays can be assembles are boot time using with AUTODETECT
- * where specially marked partitions are registered with md_autodetect_dev(),
- * and with MD_BOOT where devices to be collected are given on the boot line
- * with md=.....
- * The code for that is here.
- */
-
-struct {
-	int set;
-	int noautodetect;
-} raid_setup_args __initdata;
-
-/*
  * Searches all registered partitions for autorun RAID arrays
  * at boot time.
  */
@@ -3187,262 +3173,9 @@ static void autostart_arrays(void)
 	autorun_devices();
 }
 
-static struct {
-	char device_set [MAX_MD_DEVS];
-	int pers[MAX_MD_DEVS];
-	int chunk[MAX_MD_DEVS];
-	char *device_names[MAX_MD_DEVS];
-} md_setup_args __initdata;
+#endif
 
-/*
- * Parse the command-line parameters given our kernel, but do not
- * actually try to invoke the MD device now; that is handled by
- * md_setup_drive after the low-level disk drivers have initialised.
- *
- * 27/11/1999: Fixed to work correctly with the 2.3 kernel (which
- *             assigns the task of parsing integer arguments to the
- *             invoked program now).  Added ability to initialise all
- *             the MD devices (by specifying multiple "md=" lines)
- *             instead of just one.  -- KTK
- * 18May2000: Added support for persistent-superblock arrays:
- *             md=n,0,factor,fault,device-list   uses RAID0 for device n
- *             md=n,-1,factor,fault,device-list  uses LINEAR for device n
- *             md=n,device-list      reads a RAID superblock from the devices
- *             elements in device-list are read by name_to_kdev_t so can be
- *             a hex number or something like /dev/hda1 /dev/sdb
- * 2001-06-03: Dave Cinege <dcinege@psychosis.com>
- *		Shifted name_to_kdev_t() and related operations to md_set_drive()
- *		for later execution. Rewrote section to make devfs compatible.
- */
-static int __init md_setup(char *str)
-{
-	int minor, level, factor, fault, pers;
-	char *pername = "";
-	char *str1 = str;
-
-	if (get_option(&str, &minor) != 2) {	/* MD Number */
-		printk(KERN_WARNING "md: Too few arguments supplied to md=.\n");
-		return 0;
-	}
-	if (minor >= MAX_MD_DEVS) {
-		printk(KERN_WARNING "md: md=%d, Minor device number too high.\n", minor);
-		return 0;
-	} else if (md_setup_args.device_names[minor]) {
-		printk(KERN_WARNING "md: md=%d, Specified more than once. "
-		       "Replacing previous definition.\n", minor);
-	}
-	switch (get_option(&str, &level)) {	/* RAID Personality */
-	case 2: /* could be 0 or -1.. */
-		if (level == 0 || level == LEVEL_LINEAR) {
-			if (get_option(&str, &factor) != 2 ||	/* Chunk Size */
-					get_option(&str, &fault) != 2) {
-				printk(KERN_WARNING "md: Too few arguments supplied to md=.\n");
-				return 0;
-			}
-			md_setup_args.pers[minor] = level;
-			md_setup_args.chunk[minor] = 1 << (factor+12);
-			switch(level) {
-			case LEVEL_LINEAR:
-				pers = LINEAR;
-				pername = "linear";
-				break;
-			case 0:
-				pers = RAID0;
-				pername = "raid0";
-				break;
-			default:
-				printk(KERN_WARNING
-				       "md: The kernel has not been configured for raid%d support!\n",
-				       level);
-				return 0;
-			}
-			md_setup_args.pers[minor] = pers;
-			break;
-		}
-		/* FALL THROUGH */
-	case 1: /* the first device is numeric */
-		str = str1;
-		/* FALL THROUGH */
-	case 0:
-		md_setup_args.pers[minor] = 0;
-		pername="super-block";
-	}
-
-	printk(KERN_INFO "md: Will configure md%d (%s) from %s, below.\n",
-		minor, pername, str);
-	md_setup_args.device_names[minor] = str;
-
-	return 1;
-}
-
-extern dev_t name_to_dev_t(char *line) __init;
-void __init md_setup_drive(void)
-{
-	int minor, i;
-	dev_t dev;
-	mddev_t*mddev;
-	dev_t devices[MD_SB_DISKS+1];
-
-	for (minor = 0; minor < MAX_MD_DEVS; minor++) {
-		int err = 0;
-		char *devname;
-		mdu_disk_info_t dinfo;
-
-		if (!(devname = md_setup_args.device_names[minor]))
-			continue;
-
-		for (i = 0; i < MD_SB_DISKS && devname != 0; i++) {
-
-			char *p;
-			void *handle;
-
-			p = strchr(devname, ',');
-			if (p)
-				*p++ = 0;
-
-			dev = name_to_dev_t(devname);
-			handle = devfs_get_handle(NULL, devname,
-						MAJOR(dev), MINOR(dev),
-						DEVFS_SPECIAL_BLK, 1);
-			if (handle != 0) {
-				unsigned major, minor;
-				devfs_get_maj_min(handle, &major, &minor);
-				dev = MKDEV(major, minor);
-				devfs_put(handle);
-			}
-			if (!dev) {
-				printk(KERN_WARNING "md: Unknown device name: %s\n", devname);
-				break;
-			}
-
-			devices[i] = dev;
-			md_setup_args.device_set[minor] = 1;
-
-			devname = p;
-		}
-		devices[i] = 0;
-
-		if (!md_setup_args.device_set[minor])
-			continue;
-
-		printk(KERN_INFO "md: Loading md%d: %s\n", minor, md_setup_args.device_names[minor]);
-
-		mddev = mddev_find(minor);
-		if (!mddev) {
-			printk(KERN_ERR "md: kmalloc failed - cannot start array %d\n", minor);
-			continue;
-		}
-		if (mddev_lock(mddev)) {
-			printk(KERN_WARNING
-			       "md: Ignoring md=%d, cannot lock!\n",
-			       minor);
-			mddev_put(mddev);
-			continue;
-		}
-
-		if (mddev->raid_disks || !list_empty(&mddev->disks)) {
-			printk(KERN_WARNING
-			       "md: Ignoring md=%d, already autodetected. (Use raid=noautodetect)\n",
-			       minor);
-			mddev_unlock(mddev);
-			mddev_put(mddev);
-			continue;
-		}
-		if (md_setup_args.pers[minor]) {
-			/* non-persistent */
-			mdu_array_info_t ainfo;
-			ainfo.level = pers_to_level(md_setup_args.pers[minor]);
-			ainfo.size = 0;
-			ainfo.nr_disks =0;
-			ainfo.raid_disks =0;
-			ainfo.md_minor =minor;
-			ainfo.not_persistent = 1;
-
-			ainfo.state = (1 << MD_SB_CLEAN);
-			ainfo.layout = 0;
-			ainfo.chunk_size = md_setup_args.chunk[minor];
-			err = set_array_info(mddev, &ainfo);
-			for (i = 0; !err && i <= MD_SB_DISKS; i++) {
-				dev = devices[i];
-				if (!dev)
-					break;
-				dinfo.number = i;
-				dinfo.raid_disk = i;
-				dinfo.state = (1<<MD_DISK_ACTIVE)|(1<<MD_DISK_SYNC);
-				dinfo.major = MAJOR(dev);
-				dinfo.minor = MINOR(dev);
-				mddev->raid_disks++;
-				err = add_new_disk (mddev, &dinfo);
-			}
-		} else {
-			/* persistent */
-			for (i = 0; i <= MD_SB_DISKS; i++) {
-				dev = devices[i];
-				if (!dev)
-					break;
-				dinfo.major = MAJOR(dev);
-				dinfo.minor = MINOR(dev);
-				add_new_disk (mddev, &dinfo);
-			}
-		}
-		if (!err)
-			err = do_md_run(mddev);
-		if (err) {
-			mddev->sb_dirty = 0;
-			do_md_stop(mddev, 0);
-			printk(KERN_WARNING "md: starting md%d failed\n", minor);
-		}
-		mddev_unlock(mddev);
-		mddev_put(mddev);
-	}
-}
-
-static int __init raid_setup(char *str)
-{
-	int len, pos;
-
-	len = strlen(str) + 1;
-	pos = 0;
-
-	while (pos < len) {
-		char *comma = strchr(str+pos, ',');
-		int wlen;
-		if (comma)
-			wlen = (comma-str)-pos;
-		else	wlen = (len-1)-pos;
-
-		if (!strncmp(str, "noautodetect", wlen))
-			raid_setup_args.noautodetect = 1;
-		pos += wlen+1;
-	}
-	raid_setup_args.set = 1;
-	return 1;
-}
-
-static int __init md_run_setup(void)
-{
-	if (raid_setup_args.noautodetect)
-		printk(KERN_INFO "md: Skipping autodetection of RAID arrays. (raid=noautodetect)\n");
-	else
-		autostart_arrays();
-	md_setup_drive();
-	return 0;
-}
-
-__setup("raid=", raid_setup);
-__setup("md=", md_setup);
-
-__initcall(md_init);
-__initcall(md_run_setup);
-
-#else /* It is a MODULE */
-
-int init_module(void)
-{
-	return md_init();
-}
-
-void cleanup_module(void)
+static __exit void md_exit(void)
 {
 	int i;
 	blk_unregister_region(MKDEV(MAJOR_NR,0), MAX_MD_DEVS);
@@ -3466,7 +3199,9 @@ void cleanup_module(void)
 		mddev_put(mddev);
 	}
 }
-#endif
+
+module_init(md_init)
+module_exit(md_exit)
 
 EXPORT_SYMBOL(md_size);
 EXPORT_SYMBOL(register_md_personality);

@@ -84,13 +84,13 @@ void unblock_signals(void)
 #define SIGIO_BIT 0
 #define SIGVTALRM_BIT 1
 
-static int disable_mask(sigset_t *mask)
+static int enable_mask(sigset_t *mask)
 {
 	int sigs;
 
-	sigs = sigismember(mask, SIGIO) ? 1 << SIGIO_BIT : 0;
-	sigs |= sigismember(mask, SIGVTALRM) ? 1 << SIGVTALRM_BIT : 0;
-	sigs |= sigismember(mask, SIGALRM) ? 1 << SIGVTALRM_BIT : 0;
+	sigs = sigismember(mask, SIGIO) ? 0 : 1 << SIGIO_BIT;
+	sigs |= sigismember(mask, SIGVTALRM) ? 0 : 1 << SIGVTALRM_BIT;
+	sigs |= sigismember(mask, SIGALRM) ? 0 : 1 << SIGVTALRM_BIT;
 	return(sigs);
 }
 
@@ -100,30 +100,28 @@ int get_signals(void)
 	
 	if(sigprocmask(SIG_SETMASK, NULL, &mask) < 0)
 		panic("Failed to get signal mask");
-	return(disable_mask(&mask));
+	return(enable_mask(&mask));
 }
 
-int set_signals(int disable)
+int set_signals(int enable)
 {
 	sigset_t mask;
 	int ret;
 
 	sigemptyset(&mask);
-	if(!(disable & (1 << SIGIO_BIT)))
+	if(enable & (1 << SIGIO_BIT)) 
 		sigaddset(&mask, SIGIO);
-	if(!(disable & (1 << SIGVTALRM_BIT))){
+	if(enable & (1 << SIGVTALRM_BIT)){
 		sigaddset(&mask, SIGVTALRM);
 		sigaddset(&mask, SIGALRM);
 	}
 	if(sigprocmask(SIG_UNBLOCK, &mask, &mask) < 0)
 		panic("Failed to enable signals");
-
-	ret = disable_mask(&mask);
-
+	ret = enable_mask(&mask);
 	sigemptyset(&mask);
-	if(disable & (1 << SIGIO_BIT))
+	if((enable & (1 << SIGIO_BIT)) == 0) 
 		sigaddset(&mask, SIGIO);
-	if(disable & (1 << SIGVTALRM_BIT)){
+	if((enable & (1 << SIGVTALRM_BIT)) == 0){
 		sigaddset(&mask, SIGVTALRM);
 		sigaddset(&mask, SIGALRM);
 	}

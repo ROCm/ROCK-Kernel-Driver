@@ -40,7 +40,7 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>

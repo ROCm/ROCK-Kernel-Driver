@@ -601,7 +601,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				    .uli_u = { .ports =
 					       { .sport = inet->sport,
 						 .dport = dport } } };
-		err = ip_route_output_flow(&rt, &fl, sk, msg->msg_flags&MSG_DONTWAIT);
+		err = ip_route_output_flow(&rt, &fl, sk, !(msg->msg_flags&MSG_DONTWAIT));
 		if (err)
 			goto out;
 
@@ -884,7 +884,7 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	err = ip_route_connect(&rt, usin->sin_addr.s_addr, saddr,
 			       RT_CONN_FLAGS(sk), oif,
 			       IPPROTO_UDP,
-			       inet->sport, usin->sin_port);
+			       inet->sport, usin->sin_port, sk);
 	if (err)
 		return err;
 	if ((rt->rt_flags&RTCF_BROADCAST) && !sk->broadcast) {
@@ -944,7 +944,7 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	/*
 	 *	Charge it to the socket, dropping if the queue is full.
 	 */
-	if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb)) {
 		kfree_skb(skb);
 		return -1;
 	}
@@ -1376,17 +1376,5 @@ int __init udp_proc_init(void)
 void __init udp_proc_exit(void)
 {
 	remove_proc_entry("udp", proc_net);
-}
-
-#else /* CONFIG_PROC_FS */
-
-int __init udp_proc_init(void)
-{
-	return 0;
-}
-
-void __init udp_proc_exit(void)
-{
-	return 0;
 }
 #endif /* CONFIG_PROC_FS */

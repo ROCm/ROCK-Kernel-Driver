@@ -21,6 +21,7 @@
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
 #include <linux/rwsem.h>
+#include <linux/uio.h>
 #include <asm/atomic.h>
 
 /*
@@ -410,9 +411,11 @@ out:
 }
 
 /*
- * Attempt tp put the current chunk of 'cur_page' into the current BIO.  If
+ * Attempt to put the current chunk of 'cur_page' into the current BIO.  If
  * that was successful then update final_block_in_bio and take a ref against
  * the just-added page.
+ *
+ * Return zero on success.  Non-zero means the caller needs to start a new BIO.
  */
 static int dio_bio_add_page(struct dio *dio)
 {
@@ -426,6 +429,8 @@ static int dio_bio_add_page(struct dio *dio)
 		dio->final_block_in_bio = dio->cur_page_block +
 			(dio->cur_page_len >> dio->blkbits);
 		ret = 0;
+	} else {
+		ret = 1;
 	}
 	return ret;
 }

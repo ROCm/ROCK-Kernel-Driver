@@ -1801,7 +1801,7 @@ out1:
 
 static void __exit sjcd_exit(void)
 {
-	devfs_find_and_unregister(NULL, "sjcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	devfs_remove("sjcd");
 	del_gendisk(sjcd_disk);
 	put_disk(sjcd_disk);
 	release_region(sjcd_base, 4);

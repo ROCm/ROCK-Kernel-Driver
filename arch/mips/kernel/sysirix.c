@@ -518,7 +518,7 @@ out:
 
 asmlinkage int irix_gtime(struct pt_regs *regs)
 {
-	return CURRENT_TIME;
+	return get_seconds();
 }
 
 int vm_enough_memory(long pages);

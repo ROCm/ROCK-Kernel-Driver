@@ -48,7 +48,6 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_pathconf_sz		
 #define NFS3_entry_sz		NFS3_filename_sz+3
 
-#define NFS3_enc_void_sz	0
 #define NFS3_sattrargs_sz	NFS3_fh_sz+NFS3_sattr_sz+3
 #define NFS3_diropargs_sz	NFS3_fh_sz+NFS3_filename_sz
 #define NFS3_accessargs_sz	NFS3_fh_sz+1
@@ -64,7 +63,6 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_readdirargs_sz	NFS3_fh_sz+2
 #define NFS3_commitargs_sz	NFS3_fh_sz+3
 
-#define NFS3_dec_void_sz	0
 #define NFS3_attrstat_sz	1+NFS3_fattr_sz
 #define NFS3_wccstat_sz		1+NFS3_wcc_data_sz
 #define NFS3_lookupres_sz	1+NFS3_fh_sz+(2 * NFS3_post_op_attr_sz)
@@ -130,26 +128,18 @@ xdr_decode_fhandle(u32 *p, struct nfs_fh *fh)
  * nanosecond field.
  */
 static inline u32 *
-xdr_encode_time(u32 *p, time_t time)
+xdr_encode_time3(u32 *p, struct timespec *timep)
 {
-	*p++ = htonl(time);
-	*p++ = 0;
+	*p++ = htonl(timep->tv_sec);
+	*p++ = htonl(timep->tv_nsec);
 	return p;
 }
 
 static inline u32 *
-xdr_decode_time3(u32 *p, u64 *timep)
+xdr_decode_time3(u32 *p, struct timespec *timep)
 {
-	u64 tmp = (u64)ntohl(*p++) << 32;
-	*timep = tmp + (u64)ntohl(*p++);
-	return p;
-}
-
-static inline u32 *
-xdr_encode_time3(u32 *p, u64 time)
-{
-	*p++ = htonl(time >> 32);
-	*p++ = htonl(time & 0xFFFFFFFF);
+	timep->tv_sec = ntohl(*p++);
+	timep->tv_nsec = ntohl(*p++);
 	return p;
 }
 
@@ -214,7 +204,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	}
 	if (attr->ia_valid & ATTR_ATIME_SET) {
 		*p++ = xdr_two;
-		p = xdr_encode_time(p, attr->ia_atime);
+		p = xdr_encode_time3(p, &attr->ia_atime);
 	} else if (attr->ia_valid & ATTR_ATIME) {
 		*p++ = xdr_one;
 	} else {
@@ -222,7 +212,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	}
 	if (attr->ia_valid & ATTR_MTIME_SET) {
 		*p++ = xdr_two;
-		p = xdr_encode_time(p, attr->ia_mtime);
+		p = xdr_encode_time3(p, &attr->ia_mtime);
 	} else if (attr->ia_valid & ATTR_MTIME) {
 		*p++ = xdr_one;
 	} else {
@@ -268,15 +258,6 @@ xdr_decode_wcc_data(u32 *p, struct nfs_fattr *fattr)
 /*
  * NFS encode functions
  */
-/*
- * Encode void argument
- */
-static int
-nfs3_xdr_enc_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
-	return 0;
-}
 
 /*
  * Encode file handle argument
@@ -299,7 +280,7 @@ nfs3_xdr_sattrargs(struct rpc_rqst *req, u32 *p, struct nfs3_sattrargs *args)
 	p = xdr_encode_sattr(p, args->sattr);
 	*p++ = htonl(args->guard);
 	if (args->guard)
-		p = xdr_encode_time3(p, args->guardtime);
+		p = xdr_encode_time3(p, &args->guardtime);
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
 	return 0;
 }
@@ -652,14 +633,6 @@ nfs3_xdr_commitargs(struct rpc_rqst *req, u32 *p, struct nfs_writeargs *args)
 /*
  * NFS XDR decode functions
  */
-/*
- * Decode void reply
- */
-static int
-nfs3_xdr_dec_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	return 0;
-}
 
 /*
  * Decode attrstat reply.
@@ -1004,36 +977,36 @@ nfs3_xdr_commitres(struct rpc_rqst *req, u32 *p, struct nfs_writeres *res)
 #endif
 
 #define PROC(proc, argtype, restype, timer)				\
-    { .p_procname  = "nfs3_" #proc,					\
-      .p_encode    = (kxdrproc_t) nfs3_xdr_##argtype,			\
-      .p_decode    = (kxdrproc_t) nfs3_xdr_##restype,			\
-      .p_bufsiz    = MAX(NFS3_##argtype##_sz,NFS3_##restype##_sz) << 2,	\
-      .p_timer     = timer						\
-    }
+[NFS3PROC_##proc] = {							\
+	.p_proc      = NFS3PROC_##proc,					\
+	.p_encode    = (kxdrproc_t) nfs3_xdr_##argtype,			\
+	.p_decode    = (kxdrproc_t) nfs3_xdr_##restype,			\
+	.p_bufsiz    = MAX(NFS3_##argtype##_sz,NFS3_##restype##_sz) << 2,	\
+	.p_timer     = timer						\
+	}
 
-static struct rpc_procinfo	nfs3_procedures[22] = {
-  PROC(null,		enc_void,	dec_void, 0),
-  PROC(getattr,		fhandle,	attrstat, 1),
-  PROC(setattr, 	sattrargs,	wccstat, 0),
-  PROC(lookup,		diropargs,	lookupres, 2),
-  PROC(access,		accessargs,	accessres, 1),
-  PROC(readlink,	readlinkargs,	readlinkres, 3),
-  PROC(read,		readargs,	readres, 3),
-  PROC(write,		writeargs,	writeres, 4),
-  PROC(create,		createargs,	createres, 0),
-  PROC(mkdir,		mkdirargs,	createres, 0),
-  PROC(symlink,		symlinkargs,	createres, 0),
-  PROC(mknod,		mknodargs,	createres, 0),
-  PROC(remove,		diropargs,	wccstat, 0),
-  PROC(rmdir,		diropargs,	wccstat, 0),
-  PROC(rename,		renameargs,	renameres, 0),
-  PROC(link,		linkargs,	linkres, 0),
-  PROC(readdir,		readdirargs,	readdirres, 3),
-  PROC(readdirplus,	readdirargs,	readdirres, 3),
-  PROC(fsstat,		fhandle,	fsstatres, 0),
-  PROC(fsinfo,  	fhandle,	fsinfores, 0),
-  PROC(pathconf,	fhandle,	pathconfres, 0),
-  PROC(commit,		commitargs,	commitres, 5),
+struct rpc_procinfo	nfs3_procedures[] = {
+  PROC(GETATTR,		fhandle,	attrstat, 1),
+  PROC(SETATTR, 	sattrargs,	wccstat, 0),
+  PROC(LOOKUP,		diropargs,	lookupres, 2),
+  PROC(ACCESS,		accessargs,	accessres, 1),
+  PROC(READLINK,	readlinkargs,	readlinkres, 3),
+  PROC(READ,		readargs,	readres, 3),
+  PROC(WRITE,		writeargs,	writeres, 4),
+  PROC(CREATE,		createargs,	createres, 0),
+  PROC(MKDIR,		mkdirargs,	createres, 0),
+  PROC(SYMLINK,		symlinkargs,	createres, 0),
+  PROC(MKNOD,		mknodargs,	createres, 0),
+  PROC(REMOVE,		diropargs,	wccstat, 0),
+  PROC(RMDIR,		diropargs,	wccstat, 0),
+  PROC(RENAME,		renameargs,	renameres, 0),
+  PROC(LINK,		linkargs,	linkres, 0),
+  PROC(READDIR,		readdirargs,	readdirres, 3),
+  PROC(READDIRPLUS,	readdirargs,	readdirres, 3),
+  PROC(FSSTAT,		fhandle,	fsstatres, 0),
+  PROC(FSINFO,  	fhandle,	fsinfores, 0),
+  PROC(PATHCONF,	fhandle,	pathconfres, 0),
+  PROC(COMMIT,		commitargs,	commitres, 5),
 };
 
 struct rpc_version		nfs_version3 = {

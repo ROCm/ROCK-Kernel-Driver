@@ -75,9 +75,9 @@
 
 #include <linux/module.h>
 
-#include <asm/irq.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/blk.h>
@@ -86,12 +86,15 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
-#include <linux/sched.h>
+//#include <linux/sched.h>
+#include <linux/slab.h>
 #include <linux/proc_fs.h>
+
 #include <asm/io.h>
+#include <asm/irq.h>
+
 #include "scsi.h"
 #include "hosts.h"
-#include <linux/slab.h>
 #include "inia100.h"
 
 static Scsi_Host_Template driver_template = INIA100;

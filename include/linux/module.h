@@ -1,535 +1,334 @@
+#ifndef _LINUX_MODULE_H
+#define _LINUX_MODULE_H
 /*
  * Dynamic loading of modules into the kernel.
  *
  * Rewritten by Richard Henderson <rth@tamu.edu> Dec 1996
+ * Rewritten again by Rusty Russell, 2002
  */
-
-#ifndef _LINUX_MODULE_H
-#define _LINUX_MODULE_H
-
 #include <linux/config.h>
+#include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
-#include <linux/errno.h>
+#include <linux/stat.h>
+#include <linux/compiler.h>
+#include <linux/cache.h>
+#include <linux/kmod.h>
+#include <linux/elf.h>
 
-#include <asm/atomic.h>
+#include <asm/module.h>
+#include <asm/uaccess.h> /* For struct exception_table_entry */
 
-/* Don't need to bring in all of uaccess.h just for this decl.  */
-struct exception_table_entry;
-
-/* Used by get_kernel_syms, which is obsolete.  */
-struct kernel_sym
-{
-	unsigned long value;
-	char name[60];		/* should have been 64-sizeof(long); oh well */
-};
-
-struct module_symbol
-{
-	unsigned long value;
-	const char *name;
-};
-
-struct module_ref
-{
-	struct module *dep;	/* "parent" pointer */
-	struct module *ref;	/* "child" pointer */
-	struct module_ref *next_ref;
-};
-
-/* TBD */
-struct module_persist;
-
-struct module
-{
-	unsigned long size_of_struct;	/* == sizeof(module) */
-	struct module *next;
-	const char *name;
-	unsigned long size;
-
-	union
-	{
-		atomic_t usecount;
-		long pad;
-	} uc;				/* Needs to keep its size - so says rth */
-
-	unsigned long flags;		/* AUTOCLEAN et al */
-
-	unsigned nsyms;
-	unsigned ndeps;
-
-	struct module_symbol *syms;
-	struct module_ref *deps;
-	struct module_ref *refs;
-	int (*init)(void);
-	void (*cleanup)(void);
-	const struct exception_table_entry *ex_table_start;
-	const struct exception_table_entry *ex_table_end;
-#ifdef __alpha__
-	unsigned long gp;
-#endif
-	/* Members past this point are extensions to the basic
-	   module support and are optional.  Use mod_member_present()
-	   to examine them.  */
-	const struct module_persist *persist_start;
-	const struct module_persist *persist_end;
-	int (*can_unload)(void);
-	int runsize;			/* In modutils, not currently used */
-	const char *kallsyms_start;	/* All symbols for kernel debugging */
-	const char *kallsyms_end;
-	const char *archdata_start;	/* arch specific data for module */
-	const char *archdata_end;
-	const char *kernel_data;	/* Reserved for kernel internal use */
-};
-
-struct module_info
-{
-	unsigned long addr;
-	unsigned long size;
-	unsigned long flags;
-	long usecount;
-};
-
-/* Bits of module.flags.  */
-
-#define MOD_UNINITIALIZED	0
-#define MOD_RUNNING		1
-#define MOD_DELETED		2
-#define MOD_AUTOCLEAN		4
-#define MOD_VISITED  		8
-#define MOD_USED_ONCE		16
-#define MOD_JUST_FREED		32
-#define MOD_INITIALIZING	64
-
-/* Values for query_module's which.  */
-
-#define QM_MODULES	1
-#define QM_DEPS		2
-#define QM_REFS		3
-#define QM_SYMBOLS	4
-#define QM_INFO		5
-
-/* Can the module be queried? */
-#define MOD_CAN_QUERY(mod) (((mod)->flags & (MOD_RUNNING | MOD_INITIALIZING)) && !((mod)->flags & MOD_DELETED))
-
-/* When struct module is extended, we must test whether the new member
-   is present in the header received from insmod before we can use it.  
-   This function returns true if the member is present.  */
-
-#define mod_member_present(mod,member) 					\
-	((unsigned long)(&((struct module *)0L)->member + 1)		\
-	 <= (mod)->size_of_struct)
-
-/*
- * Ditto for archdata.  Assumes mod->archdata_start and mod->archdata_end
- * are validated elsewhere.
- */
-#define mod_archdata_member_present(mod, type, member)			\
-	(((unsigned long)(&((type *)0L)->member) +			\
-	  sizeof(((type *)0L)->member)) <=				\
-	 ((mod)->archdata_end - (mod)->archdata_start))
-	 
-
-/* Check if an address p with number of entries n is within the body of module m */
-#define mod_bound(p, n, m) ((unsigned long)(p) >= ((unsigned long)(m) + ((m)->size_of_struct)) && \
-	         (unsigned long)((p)+(n)) <= (unsigned long)(m) + (m)->size)
-
-/* Backwards compatibility definition.  */
-
-#define GET_USE_COUNT(module)	(atomic_read(&(module)->uc.usecount))
-
-/* Poke the use count of a module.  */
-
-#define __MOD_INC_USE_COUNT(mod)					\
-	(atomic_inc(&(mod)->uc.usecount), (mod)->flags |= MOD_VISITED|MOD_USED_ONCE)
-#define __MOD_DEC_USE_COUNT(mod)					\
-	(atomic_dec(&(mod)->uc.usecount), (mod)->flags |= MOD_VISITED)
-#define __MOD_IN_USE(mod)						\
-	(mod_member_present((mod), can_unload) && (mod)->can_unload	\
-	 ? (mod)->can_unload() : atomic_read(&(mod)->uc.usecount))
-
-/* Indirect stringification.  */
-
+/* Indirect stringification */
 #define __MODULE_STRING_1(x)	#x
 #define __MODULE_STRING(x)	__MODULE_STRING_1(x)
 
-/* Generic inter module communication.
- *
- * NOTE: This interface is intended for small amounts of data that are
- *       passed between two objects and either or both of the objects
- *       might be compiled as modules.  Do not over use this interface.
- *
- *       If more than two objects need to communicate then you probably
- *       need a specific interface instead of abusing this generic
- *       interface.  If both objects are *always* built into the kernel
- *       then a global extern variable is good enough, you do not need
- *       this interface.
- *
- * Keith Owens <kaos@ocs.com.au> 28 Oct 2000.
- */
+/* Not Yet Implemented */
+#define MODULE_LICENSE(name)
+#define MODULE_AUTHOR(name)
+#define MODULE_DESCRIPTION(desc)
+#define MODULE_SUPPORTED_DEVICE(name)
+#define MODULE_PARM_DESC(var,desc)
+#define print_modules()
 
-#ifdef __KERNEL__
-#define HAVE_INTER_MODULE
-extern void inter_module_register(const char *, struct module *, const void *);
-extern void inter_module_unregister(const char *);
-extern const void *inter_module_get(const char *);
-extern const void *inter_module_get_request(const char *, const char *);
-extern void inter_module_put(const char *);
-
-struct inter_module_entry {
-	struct list_head list;
-	const char *im_name;
-	struct module *owner;
-	const void *userdata;
+#define MODULE_NAME_LEN (64 - sizeof(unsigned long))
+struct kernel_symbol
+{
+	unsigned long value;
+	char name[MODULE_NAME_LEN];
 };
 
-extern int try_inc_mod_count(struct module *mod);
-#endif /* __KERNEL__ */
+#ifdef MODULE
 
-#if defined(MODULE) && !defined(__GENKSYMS__)
-
-/* Embedded module documentation macros.  */
-
-/* For documentation purposes only.  */
-
-#define MODULE_AUTHOR(name)						   \
-const char __module_author[] __attribute__((section(".modinfo"))) = 	   \
-"author=" name
-
-#define MODULE_DESCRIPTION(desc)					   \
-const char __module_description[] __attribute__((section(".modinfo"))) =   \
-"description=" desc
-
-/* Could potentially be used by kmod...  */
-
-#define MODULE_SUPPORTED_DEVICE(dev)					   \
-const char __module_device[] __attribute__((section(".modinfo"))) = 	   \
-"device=" dev
-
-/* Used to verify parameters given to the module.  The TYPE arg should
-   be a string in the following format:
-   	[min[-max]]{b,h,i,l,s}
-   The MIN and MAX specifiers delimit the length of the array.  If MAX
-   is omitted, it defaults to MIN; if both are omitted, the default is 1.
-   The final character is a type specifier:
-	b	byte
-	h	short
-	i	int
-	l	long
-	s	string
-*/
-
-#define MODULE_PARM(var,type)			\
-const char __module_parm_##var[]		\
-__attribute__((section(".modinfo"))) =		\
-"parm_" __MODULE_STRING(var) "=" type
-
-#define MODULE_PARM_DESC(var,desc)		\
-const char __module_parm_desc_##var[]		\
-__attribute__((section(".modinfo"))) =		\
-"parm_desc_" __MODULE_STRING(var) "=" desc
-
-/*
- * MODULE_DEVICE_TABLE exports information about devices
- * currently supported by this module.  A device type, such as PCI,
- * is a C-like identifier passed as the first arg to this macro.
- * The second macro arg is the variable containing the device
- * information being made public.
- *
- * The following is a list of known device types (arg 1),
- * and the C types which are to be passed as arg 2.
- * pci - struct pci_device_id - List of PCI ids supported by this module
- * isapnp - struct isapnp_device_id - List of ISA PnP ids supported by this module
- * usb - struct usb_device_id - List of USB ids supported by this module
- */
 #define MODULE_GENERIC_TABLE(gtype,name)	\
 static const unsigned long __module_##gtype##_size \
   __attribute__ ((unused)) = sizeof(struct gtype##_id); \
 static const struct gtype##_id * __module_##gtype##_table \
   __attribute__ ((unused)) = name
 
-/*
- * The following license idents are currently accepted as indicating free
- * software modules
- *
- *	"GPL"				[GNU Public License v2 or later]
- *	"GPL v2"			[GNU Public License v2]
- *	"GPL and additional rights"	[GNU Public License v2 rights and more]
- *	"Dual BSD/GPL"			[GNU Public License v2 or BSD license choice]
- *	"Dual MPL/GPL"			[GNU Public License v2 or Mozilla license choice]
- *
- * The following other idents are available
- *
- *	"Proprietary"			[Non free products]
- *
- * There are dual licensed components, but when running with Linux it is the
- * GPL that is relevant so this is a non issue. Similarly LGPL linked with GPL
- * is a GPL combined work.
- *
- * This exists for several reasons
- * 1.	So modinfo can show license info for users wanting to vet their setup 
- *	is free
- * 2.	So the community can ignore bug reports including proprietary modules
- * 3.	So vendors can do likewise based on their own policies
- */
- 
-#define MODULE_LICENSE(license) 	\
-static const char __module_license[]	\
-  __attribute__((section(".modinfo"), unused)) = "license=" license
-
-/* Define the module variable, and usage macros.  */
+/* This is magically filled in by the linker, but THIS_MODULE must be
+   a constant so it works in initializers. */
 extern struct module __this_module;
+#define THIS_MODULE (&__this_module)
 
-#define THIS_MODULE		(&__this_module)
-#define MOD_INC_USE_COUNT	__MOD_INC_USE_COUNT(THIS_MODULE)
-#define MOD_DEC_USE_COUNT	__MOD_DEC_USE_COUNT(THIS_MODULE)
-#define MOD_IN_USE		__MOD_IN_USE(THIS_MODULE)
+#else  /* !MODULE */
 
-#include <linux/version.h>
-static const char __module_kernel_version[]
-  __attribute__((section(".modinfo"), unused)) =
-  "kernel_version=" UTS_RELEASE;
-#ifdef CONFIG_MODVERSIONS
-static const char __module_using_checksums[]
-  __attribute__((section(".modinfo"), unused)) =
-  "using_checksums=1";
+#define MODULE_GENERIC_TABLE(gtype,name)
+#define THIS_MODULE ((struct module *)0)
+
 #endif
-
-#else /* MODULE */
-
-#define MODULE_AUTHOR(name)
-#define MODULE_LICENSE(license)
-#define MODULE_DESCRIPTION(desc)
-#define MODULE_SUPPORTED_DEVICE(name)
-#define MODULE_PARM(var,type)
-#define MODULE_PARM_DESC(var,desc)
-
-/* Create a dummy reference to the table to suppress gcc unused warnings.  Put
- * the reference in the .data.exit section which is discarded when code is built
- * in, so the reference does not bloat the running kernel.  Note: cannot be
- * const, other exit data may be writable.
- */
-#define MODULE_GENERIC_TABLE(gtype,name) \
-static const struct gtype##_id * __module_##gtype##_table \
-  __attribute__ ((unused, __section__(".exit.data"))) = name
-
-#ifndef __GENKSYMS__
-
-#define THIS_MODULE		NULL
-#define MOD_INC_USE_COUNT	do { } while (0)
-#define MOD_DEC_USE_COUNT	do { } while (0)
-#define MOD_IN_USE		1
-
-#endif /* !__GENKSYMS__ */
-
-#endif /* MODULE */
 
 #define MODULE_DEVICE_TABLE(type,name)		\
   MODULE_GENERIC_TABLE(type##_device,name)
 
-/* Export a symbol either from the kernel or a module.
-
-   In the kernel, the symbol is added to the kernel's global symbol table.
-
-   In a module, it controls which variables are exported.  If no
-   variables are explicitly exported, the action is controled by the
-   insmod -[xX] flags.  Otherwise, only the variables listed are exported.
-   This obviates the need for the old register_symtab() function.  */
-
-/* So how does the CONFIG_MODVERSIONS magic work? 
- *
- * A module can only be loaded if it's undefined symbols can be resolved
- * using symbols the kernel exports for that purpose. The idea behind
- * CONFIG_MODVERSIONS is to mangle those symbols depending on their
- * definition (see man genksyms) - a change in the definition will thus
- * caused the mangled name to change, and the module will refuse to
- * load due to unresolved symbols.
- *
- * Let's start with taking a look how things work when we don't use
- * CONFIG_MODVERSIONS. In this case, the only thing which is worth
- * mentioning is the EXPORT_SYMBOL() macro. Using EXPORT_SYMBOL(foo)
- * will expand into __EXPORT_SYMBOL(foo, "foo"), which then uses
- * some ELF section magic to generate a list of pairs 
- * (address, symbol_name), which is used to resolve undefined 
- * symbols into addresses when loading a module.
- * 
- * That's easy. Let's get back to CONFIG_MODVERSIONS=y.
- *
- * The first step is to generate the checksums. This is done at
- * "make dep" time, code which exports symbols (using EXPORT_SYMTAB)
- * is preprocessed with the additional macro __GENKSYMS__ set and fed
- * into genksyms.
- * At this stage, for each file that exports symbols an corresponding
- * file in include/linux/module is generated, which for each exported
- * symbol contains
- *
- *         #define __ver_schedule_task     2d6c3d04
- *         #define schedule_task   _set_ver(schedule_task)
- *
- * In addition, include/linux/modversions.h is generated, which
- * looks like
- *
- *         #include <linux/modsetver.h>
- *         #include <linux/modules/kernel__context.ver>
- *        <<<lists all of the files just described>>>
- *
- * Let's see what happens for different cases during compilation.
- *
- * o compile a file into the kernel which does not export symbols:
- *
- *   Since the file is known to not export symbols (it's not listed
- *   in the export-objs variable in the corresponding Makefile), the
- *   kernel build system does compile it with no extra flags set.
- *   The macro EXPORT_SYMTAB is unset, and you can see below that
- *   files which still try to use EXPORT_SYMBOL() will be trapped.
- *   Other than that, just regular compilation.
- *
- * o compile a file into the kernel which does export symbols:
- *
- *   In this case, the file will compiled with the macro 
- *   EXPORT_SYMTAB defined.
- *   As MODULE is not set, we hit this case from below:
- *
- *         #define _set_ver(sym) sym
- *         #include <linux/modversions.h>
- *         
- *         #define EXPORT_SYMBOL(var) \
- *          __EXPORT_SYMBOL(var, __MODULE_STRING(__VERSIONED_SYMBOL(var)))
- *
- *   The first two lines will in essence include
- *
- *         #define __ver_schedule_task     2d6c3d04
- *         #define schedule_task   schedule_task
- *
- *   for each symbol. The second line really doesn't do much, but the
- *   first one gives us the checksums we generated before.
- *   
- *   So EXPORT_SYMBOL(schedule_task) will expand into
- *   __EXPORT_SYMBOL(schedule_task, "schedule_task_R2d6c3d04"),
- *   hence exporting the symbol for schedule_task under the name of
- *   schedule_task_R2d6c3d04.
- *
- * o compile a file into a module
- *   
- *   In this case, the kernel build system will add 
- *   "-include include/linux/modversions.h" to the command line. So
- *   modversions.h is prepended to the actual source, turning into
- *
- *         #define __ver_schedule_task     2d6c3d04
- *         #define schedule_task   schedule_task_R2d6c3d04
- *
- *   Though the source code says "schedule_task", the compiler will
- *   see the mangled symbol everywhere. So the module will end up with
- *   an undefined symbol "schedule_task_R2d6c3d04" - which is exactly
- *   the symbols which occurs in the kernel's list of symbols, with
- *   a value of &schedule_task - it all comes together nicely.
- *
- *   One question remains: What happens if a module itself exports
- *   a symbol - the answer is simple: It's actually handled as the
- *   CONFIG_MODVERSIONS=n case described first, only that the compiler
- *   sees the mangled symbol everywhere. So &foo_R12345678 is exported
- *   with the name "foo_R12345678". Think about it. It all makes sense.
- */
-
-#if defined(__GENKSYMS__)
-
-/* We want the EXPORT_SYMBOL tag left intact for recognition.  */
-
-#elif !defined(CONFIG_MODULES)
-
-#define __EXPORT_SYMBOL(sym,str)
-#define EXPORT_SYMBOL(var)
-#define EXPORT_SYMBOL_NOVERS(var)
-#define EXPORT_SYMBOL_GPL(var)
-
-#elif !defined(EXPORT_SYMTAB)
-
-#define __EXPORT_SYMBOL(sym,str)   error this_object_must_be_defined_as_export_objs_in_the_Makefile
-#define EXPORT_SYMBOL(var)	   error this_object_must_be_defined_as_export_objs_in_the_Makefile
-#define EXPORT_SYMBOL_NOVERS(var)  error this_object_must_be_defined_as_export_objs_in_the_Makefile
-#define EXPORT_SYMBOL_GPL(var)  error this_object_must_be_defined_as_export_objs_in_the_Makefile
-
-#else
-
-#define __EXPORT_SYMBOL(sym, str)			\
-const char __kstrtab_##sym[]				\
-__attribute__((section(".kstrtab"))) = str;		\
-const struct module_symbol __ksymtab_##sym 		\
-__attribute__((section("__ksymtab"))) =			\
-{ (unsigned long)&sym, __kstrtab_##sym }
-
-#define __EXPORT_SYMBOL_GPL(sym, str)			\
-const char __kstrtab_##sym[]				\
-__attribute__((section(".kstrtab"))) = "GPLONLY_" str;	\
-const struct module_symbol __ksymtab_##sym		\
-__attribute__((section("__ksymtab"))) =			\
-{ (unsigned long)&sym, __kstrtab_##sym }
-
-#if defined(CONFIG_MODVERSIONS) && !defined(MODULE)
-
-#define _set_ver(sym) sym
-#include <linux/modversions.h>
-
-#define EXPORT_SYMBOL(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(__VERSIONED_SYMBOL(var)))
-#define EXPORT_SYMBOL_GPL(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(__VERSIONED_SYMBOL(var)))
-
-#else /* !defined (CONFIG_MODVERSIONS) || defined(MODULE) */
-
-#define EXPORT_SYMBOL(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(var))
-#define EXPORT_SYMBOL_GPL(var)  __EXPORT_SYMBOL_GPL(var, __MODULE_STRING(var))
-
-#endif /* defined(CONFIG_MODVERSIONS) && !defined(MODULE) */
-
-#define EXPORT_SYMBOL_NOVERS(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(var))
-
-#endif /* __GENKSYMS__ */
-
-/* 
- * Force a module to export no symbols.
- * EXPORT_NO_SYMBOLS is default now, leave the define around for sources
- * which still have it
- */
-#define EXPORT_NO_SYMBOLS
-
-#ifdef CONFIG_MODULES
-/* 
- * Always allocate a section "__ksymtab". If we encounter EXPORT_SYMBOL,
- * the exported symbol will be added to it.
- * If it remains empty, that tells modutils that we do not want to
- * export any symbols (as opposed to it not being present, which means
- * "export all symbols" to modutils)
- */
-__asm__(".section __ksymtab,\"a\"\n.previous");
-#endif
-
-#ifdef CONFIG_MODULES
-#define SET_MODULE_OWNER(some_struct) do { (some_struct)->owner = THIS_MODULE; } while (0)
-#else
-#define SET_MODULE_OWNER(some_struct) do { } while (0)
-#endif
-
-extern void print_modules(void);
-
-#if defined(CONFIG_MODULES) || defined(CONFIG_KALLSYMS)
-
-extern struct module *module_list;
-
-/*
- * print_symbols takes a format string containing one %s.
- * If support for resolving symbols is compiled in, the %s will
- * be replaced by the closest symbol to the address and the entire
- * string is printk()ed. Otherwise, nothing is printed.
- */
-extern void print_symbol(const char *fmt, unsigned long address);
-
-#else
-
-static inline int
-print_symbol(const char *fmt, unsigned long address)
+struct kernel_symbol_group
 {
-	return -ESRCH;
+	/* Links us into the global symbol list */
+	struct list_head list;
+
+	/* Module which owns it (if any) */
+	struct module *owner;
+
+	unsigned int num_syms;
+	const struct kernel_symbol *syms;
+};
+
+struct exception_table
+{
+	struct list_head list;
+
+	unsigned int num_entries;
+	const struct exception_table_entry *entry;
+};
+
+
+#ifdef CONFIG_MODULES
+/* Get/put a kernel symbol (calls must be symmetric) */
+void *__symbol_get(const char *symbol);
+void *__symbol_get_gpl(const char *symbol);
+#define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
+
+/* For every exported symbol, place a struct in the __ksymtab section */
+#define EXPORT_SYMBOL(sym)				\
+	const struct kernel_symbol __ksymtab_##sym	\
+	__attribute__((section("__ksymtab")))		\
+	= { (unsigned long)&sym, #sym }
+
+#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
+#define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
+
+struct module_ref
+{
+	atomic_t count;
+} ____cacheline_aligned;
+
+struct module
+{
+	/* Am I live (yet)? */
+	int live;
+
+	/* Member of list of modules */
+	struct list_head list;
+
+	/* Unique handle for this module */
+	char name[MODULE_NAME_LEN];
+
+	/* Exported symbols */
+	struct kernel_symbol_group symbols;
+
+	/* Exception tables */
+	struct exception_table extable;
+
+	/* Startup function. */
+	int (*init)(void);
+
+	/* If this is non-NULL, vfree after init() returns */
+	void *module_init;
+
+	/* Here is the actual code + data, vfree'd on unload. */
+	void *module_core;
+
+	/* Here are the sizes of the init and core sections */
+	unsigned long init_size, core_size;
+
+	/* Arch-specific module values */
+	struct mod_arch_specific arch;
+
+	/* Am I unsafe to unload? */
+	int unsafe;
+
+#ifdef CONFIG_MODULE_UNLOAD
+	/* Reference counts */
+	struct module_ref ref[NR_CPUS];
+
+	/* What modules depend on me? */
+	struct list_head modules_which_use_me;
+
+	/* Who is waiting for us to be unloaded */
+	struct task_struct *waiter;
+
+	/* Destruction function. */
+	void (*exit)(void);
+#endif
+
+#ifdef CONFIG_KALLSYMS
+	/* We keep the symbol and string tables for kallsyms. */
+	Elf_Sym *symtab;
+	unsigned long num_syms;
+	char *strtab;
+#endif
+
+	/* The command line arguments (may be mangled).  People like
+	   keeping pointers to this stuff */
+	char args[0];
+};
+
+#ifdef CONFIG_MODULE_UNLOAD
+
+void __symbol_put(const char *symbol);
+#define symbol_put(x) __symbol_put(#x)
+void symbol_put_addr(void *addr);
+
+/* We only need protection against local interrupts. */
+#ifndef __HAVE_ARCH_LOCAL_INC
+#define local_inc(x) atomic_inc(x)
+#define local_dec(x) atomic_dec(x)
+#endif
+
+static inline int try_module_get(struct module *module)
+{
+	int ret = 1;
+
+	if (module) {
+		unsigned int cpu = get_cpu();
+		if (likely(module->live))
+			local_inc(&module->ref[cpu].count);
+		else
+			ret = 0;
+		put_cpu();
+	}
+	return ret;
 }
 
+static inline void module_put(struct module *module)
+{
+	if (module) {
+		unsigned int cpu = get_cpu();
+		local_dec(&module->ref[cpu].count);
+		/* Maybe they're waiting for us to drop reference? */
+		if (unlikely(!module->live))
+			wake_up_process(module->waiter);
+		put_cpu();
+	}
+}
+
+#else /*!CONFIG_MODULE_UNLOAD*/
+static inline int try_module_get(struct module *module)
+{
+	return !module || module->live;
+}
+static inline void module_put(struct module *module)
+{
+}
+#define symbol_put(x) do { } while(0)
+#define symbol_put_addr(p) do { } while(0)
+
+#endif /* CONFIG_MODULE_UNLOAD */
+
+/* This is a #define so the string doesn't get put in every .o file */
+#define module_name(mod)			\
+({						\
+	struct module *__mod = (mod);		\
+	__mod ? __mod->name : "kernel";		\
+})
+
+#define __unsafe(mod)							     \
+do {									     \
+	if (mod && !(mod)->unsafe) {					     \
+		printk(KERN_WARNING					     \
+		       "Module %s cannot be unloaded due to unsafe usage in" \
+		       " %s:%u\n", (mod)->name, __FILE__, __LINE__);	     \
+		(mod)->unsafe = 1;					     \
+	}								     \
+} while(0)
+
+/* For kallsyms to ask for address resolution.  NULL means not found. */
+const char *module_address_lookup(unsigned long addr,
+				  unsigned long *symbolsize,
+				  unsigned long *offset,
+				  char **modname);
+
+#else /* !CONFIG_MODULES... */
+#define EXPORT_SYMBOL(sym)
+#define EXPORT_SYMBOL_GPL(sym)
+#define EXPORT_SYMBOL_NOVERS(sym)
+
+/* Get/put a kernel symbol (calls should be symmetric) */
+#define symbol_get(x) (&(x))
+#define symbol_put(x) do { } while(0)
+#define symbol_put_addr(x) do { } while(0)
+
+#define try_module_get(module) 1
+#define module_put(module) do { } while(0)
+
+#define module_name(mod) "kernel"
+
+#define __unsafe(mod)
+
+/* For kallsyms to ask for address resolution.  NULL means not found. */
+static inline const char *module_address_lookup(unsigned long addr,
+						unsigned long *symbolsize,
+						unsigned long *offset,
+						char **modname)
+{
+	return NULL;
+}
+#endif /* CONFIG_MODULES */
+
+/* For archs to search exception tables */
+extern struct list_head extables;
+extern spinlock_t modlist_lock;
+
+#define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
+
+/* BELOW HERE ALL THESE ARE OBSOLETE AND WILL VANISH */
+#define __MOD_INC_USE_COUNT(mod) \
+	do { __unsafe(mod); (void)try_module_get(mod); } while(0)
+#define __MOD_DEC_USE_COUNT(mod) module_put(mod)
+#define SET_MODULE_OWNER(dev) ((dev)->owner = THIS_MODULE)
+
+/* People do this inside their init routines, when the module isn't
+   "live" yet.  They should no longer be doing that, but
+   meanwhile... */
+#if defined(CONFIG_MODULE_UNLOAD) && defined(MODULE)
+#define MOD_INC_USE_COUNT	\
+	do { __unsafe(THIS_MODULE); local_inc(&THIS_MODULE->ref[get_cpu()].count); put_cpu(); } while (0)
+#else
+#define MOD_INC_USE_COUNT \
+	do { __unsafe(THIS_MODULE); (void)try_module_get(THIS_MODULE); } while (0)
 #endif
+#define MOD_DEC_USE_COUNT module_put(THIS_MODULE)
+#define try_inc_mod_count(mod) try_module_get(mod)
+#define MODULE_PARM(parm,string)
+#define EXPORT_NO_SYMBOLS
+extern int module_dummy_usage;
+#define GET_USE_COUNT(module) (module_dummy_usage)
+#define MOD_IN_USE 0
+#define __mod_between(a_start, a_len, b_start, b_len)		\
+(((a_start) >= (b_start) && (a_start) <= (b_start)+(b_len))	\
+ || ((a_start)+(a_len) >= (b_start)				\
+     && (a_start)+(a_len) <= (b_start)+(b_len)))
+#define mod_bound(p, n, m)					\
+(((m)->module_init						\
+  && __mod_between((p),(n),(m)->module_init,(m)->init_size))	\
+ || __mod_between((p),(n),(m)->module_core,(m)->core_size))
+
+/* Old-style "I'll just call it init_module and it'll be run at
+   insert".  Use module_init(myroutine) instead. */
+#ifdef MODULE
+/* Used as "int init_module(void) { ... }".  Get funky to insert modname. */
+#define init_module(voidarg)						\
+	__initfn(void);							\
+	char __module_name[] __attribute__((section(".modulename"))) =	\
+	__stringify(KBUILD_MODNAME);					\
+	int __initfn(void)
+#define cleanup_module(voidarg) __exitfn(void)
+#endif
+
+/*
+ * The exception and symbol tables, and the lock
+ * to protect them.
+ */
+extern spinlock_t modlist_lock;
+extern struct list_head extables;
+extern struct list_head symbols;
+
+/* Use symbol_get and symbol_put instead.  You'll thank me. */
+#define HAVE_INTER_MODULE
+extern void inter_module_register(const char *, struct module *, const void *);
+extern void inter_module_unregister(const char *);
+extern const void *inter_module_get(const char *);
+extern const void *inter_module_get_request(const char *, const char *);
+extern void inter_module_put(const char *);
 
 #endif /* _LINUX_MODULE_H */

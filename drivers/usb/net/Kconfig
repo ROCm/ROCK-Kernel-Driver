@@ -124,20 +124,23 @@ config USB_RTL8150
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_USBNET
-	tristate "USB-to-USB Networking cable device support"
+	tristate "USB-to-USB Networking for cables, PDAs and other devices"
 	depends on USB && NET
 	---help---
 	  This driver supports network links over USB with USB "Network"
 	  or "data transfer" cables, often used to network laptops to PCs.
 	  Such cables have chips from suppliers such as Belkin/eTEK, GeneSys
-	  (GeneLink), NetChip and Prolific. Intelligent USB devices could also
-	  use this approach to provide Internet access, using standard USB
-	  cabling. You can find these chips also on some motherboards with
-	  USB PC2PC support.
+	  (GeneLink), NetChip and Prolific.  Some motherboards with USB PC2PC
+	  support include such chips.
+	  
+	  Intelligent USB devices, such as PDAs running Linux (like Yopy
+	  and Zaurus, or iPaqs after upgrading to Linux) can use the same
+	  approach to provide Internet access.
 
 	  These links will have names like "usb0", "usb1", etc.  They act
 	  like two-node Ethernets, so you can use 802.1d Ethernet Bridging
-	  (CONFIG_BRIDGE) to simplify your network routing.
+	  (CONFIG_BRIDGE) to simplify your network routing.  For more
+	  information see <http://www.linux-usb.org/usbnet/>.
 
 	  This code is also available as a kernel module (code which can be
 	  inserted in and removed from the running kernel whenever you want).

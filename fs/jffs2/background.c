@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: background.c,v 1.29 2002/06/07 10:04:28 dwmw2 Exp $
+ * $Id: background.c,v 1.33 2002/11/12 09:44:30 dwmw2 Exp $
  *
  */
 
@@ -83,21 +83,22 @@ static int jffs2_garbage_collect_thread(void *_c)
 	struct jffs2_sb_info *c = _c;
 
 	daemonize();
+
 	c->gc_task = current;
 	up(&c->gc_thread_start);
 
-        sprintf(current->comm, "jffs2_gcd_mtd%d", c->mtd->index);
+	sprintf(current->comm, "jffs2_gcd_mtd%d", c->mtd->index);
 
 	set_user_nice(current, 10);
 
 	for (;;) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current_sig_lock);
 		siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current_sig_lock);
 
 		if (!thread_should_wake(c)) {
-                        set_current_state (TASK_INTERRUPTIBLE);
+			set_current_state (TASK_INTERRUPTIBLE);
 			D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread sleeping...\n"));
 			/* Yes, there's a race here; we checked thread_should_wake() before
 			   setting current->state to TASK_INTERRUPTIBLE. But it doesn't
@@ -105,30 +106,30 @@ static int jffs2_garbage_collect_thread(void *_c)
 			   is only an optimisation anyway. */
 			schedule();
 		}
-                
+
 		cond_resched();
 
-                /* Put_super will send a SIGKILL and then wait on the sem. 
-                 */
-                while (signal_pending(current)) {
-                        siginfo_t info;
-                        unsigned long signr = 0 ;
+		/* Put_super will send a SIGKILL and then wait on the sem. 
+		 */
+		while (signal_pending(current)) {
+			siginfo_t info;
+			unsigned long signr;
 
-                        spin_lock_irq(&current->sig->siglock);
+			spin_lock_irq(&current_sig_lock);
 			signr = dequeue_signal(&current->blocked, &info);
-                        spin_unlock_irq(&current->sig->siglock);
+			spin_unlock_irq(&current_sig_lock);
 
-                        switch(signr) {
-                        case SIGSTOP:
-                                D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGSTOP received.\n"));
-                                set_current_state(TASK_STOPPED);
-                                schedule();
-                                break;
+			switch(signr) {
+			case SIGSTOP:
+				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGSTOP received.\n"));
+				set_current_state(TASK_STOPPED);
+				schedule();
+				break;
 
-                        case SIGKILL:
-                                D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGKILL received.\n"));
+			case SIGKILL:
+				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGKILL received.\n"));
 				spin_lock_bh(&c->erase_completion_lock);
-                                c->gc_task = NULL;
+				c->gc_task = NULL;
 				spin_unlock_bh(&c->erase_completion_lock);
 				complete_and_exit(&c->gc_thread_exit, 0);
 
@@ -137,14 +138,13 @@ static int jffs2_garbage_collect_thread(void *_c)
 				break;
 			default:
 				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): signal %ld received\n", signr));
-
-                        }
-                }
+			}
+		}
 		/* We don't want SIGHUP to interrupt us. STOP and KILL are OK though. */
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current_sig_lock);
 		siginitsetinv (&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current_sig_lock);
 
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): pass\n"));
 		jffs2_garbage_collect_pass(c);
@@ -153,23 +153,20 @@ static int jffs2_garbage_collect_thread(void *_c)
 
 static int thread_should_wake(struct jffs2_sb_info *c)
 {
-	uint32_t gcnodeofs = 0;
-	int ret;
+	int ret = 0;
 
-	/* Don't count any progress we've already made through the gcblock
-	   as dirty space, for the purposes of this calculation */
-	if (c->gcblock && c->gcblock->gc_node)
-		gcnodeofs = c->gcblock->gc_node->flash_offset & ~3 & (c->sector_size-1);
+	if (c->unchecked_size) {
+		D1(printk(KERN_DEBUG "thread_should_wake(): unchecked_size %d, checked_ino #%d\n",
+			  c->unchecked_size, c->checked_ino));
+		return 1;
+	}
 
-	if (c->nr_free_blocks + c->nr_erasing_blocks < JFFS2_RESERVED_BLOCKS_GCTRIGGER &&
-	    (c->dirty_size - gcnodeofs) > c->sector_size)
+	if (c->nr_free_blocks + c->nr_erasing_blocks < JFFS2_RESERVED_BLOCKS_GCTRIGGER && 
+			(c->dirty_size > c->sector_size)) 
 		ret = 1;
-	else 
-		ret = 0;
 
-	D1(printk(KERN_DEBUG "thread_should_wake(): nr_free_blocks %d, nr_erasing_blocks %d, dirty_size 0x%x (mod 0x%x): %s\n", 
-		  c->nr_free_blocks, c->nr_erasing_blocks, c->dirty_size,
-		  c->dirty_size - gcnodeofs, ret?"yes":"no"));
+	D1(printk(KERN_DEBUG "thread_should_wake(): nr_free_blocks %d, nr_erasing_blocks %d, dirty_size 0x%x: %s\n", 
+		  c->nr_free_blocks, c->nr_erasing_blocks, c->dirty_size, ret?"yes":"no"));
 
 	return ret;
 }

@@ -52,7 +52,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 	for(pos=0; pos<howmany; pos = next) {
 		next = pos+1;
 		res = &dev->resource[pos];
-		res->name = dev->name;
+		res->name = dev->dev.name;
 		reg = PCI_BASE_ADDRESS_0 + (pos << 2);
 		pci_read_config_dword(dev, reg, &l);
 		pci_write_config_dword(dev, reg, ~0);
@@ -112,7 +112,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 			sz = pci_size(sz, PCI_ROM_ADDRESS_MASK);
 			res->end = res->start + (unsigned long) sz;
 		}
-		res->name = dev->name;
+		res->name = dev->dev.name;
 	}
 }
 
@@ -129,7 +129,7 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		return;
 
 	if (dev->transparent) {
-		printk("Transparent bridge - %s\n", dev->name);
+		printk("Transparent bridge - %s\n", dev->dev.name);
 		for(i = 0; i < PCI_BUS_NUM_RESOURCES; i++)
 			child->resource[i] = child->parent->resource[i];
 		return;
@@ -355,7 +355,7 @@ int pci_setup_device(struct pci_dev * dev)
 	u32 class;
 
 	sprintf(dev->slot_name, "%02x:%02x.%d", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-	sprintf(dev->name, "PCI device %04x:%04x", dev->vendor, dev->device);
+	sprintf(dev->dev.name, "PCI device %04x:%04x", dev->vendor, dev->device);
 	INIT_LIST_HEAD(&dev->pools);
 	
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class);
@@ -384,7 +384,7 @@ int pci_setup_device(struct pci_dev * dev)
 		/* The PCI-to-PCI bridge spec requires that subtractive
 		   decoding (i.e. transparent) bridge must have programming
 		   interface code of 0x01. */ 
-		dev->transparent = ((class & 0xff) == 1);
+		dev->transparent = ((dev->class & 0xff) == 1);
 		pci_read_bases(dev, 2, PCI_ROM_ADDRESS1);
 		break;
 
@@ -447,7 +447,6 @@ struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 	pci_name_device(dev);
 
 	/* now put in global tree */
-	strcpy(dev->dev.name,dev->name);
 	strcpy(dev->dev.bus_id,dev->slot_name);
 
 	device_register(&dev->dev);

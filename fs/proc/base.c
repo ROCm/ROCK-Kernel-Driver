@@ -29,6 +29,7 @@
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/kallsyms.h>
+#include <linux/mount.h>
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.
@@ -257,20 +258,18 @@ out:
  */
 static int proc_pid_wchan(struct task_struct *task, char *buffer)
 {
-	const char *sym_name, *ignore;
-	unsigned long wchan, dummy;
+	char *modname;
+	const char *sym_name;
+	unsigned long wchan, size, offset;
 
 	wchan = get_wchan(task);
 
-	if (!kallsyms_address_to_symbol(wchan, &ignore, &dummy, &dummy,
-			&ignore, &dummy, &dummy, &sym_name,
-			&dummy, &dummy)) {
-		return sprintf(buffer, "%lu", wchan);
-	}
-
-	return sprintf(buffer, "%s", sym_name);
+	sym_name = kallsyms_lookup(wchan, &size, &offset, &modname);
+	if (sym_name)
+		return sprintf(buffer, "%s", sym_name);
+	return sprintf(buffer, "%lu", wchan);
 }
-#endif
+#endif /* CONFIG_KALLSYMS */
 
 /************************************************************************/
 /*                       Here the fs part begins                        */

@@ -2,7 +2,6 @@
 #define _LINUX_BLKDEV_H
 
 #include <linux/major.h>
-#include <linux/sched.h>
 #include <linux/genhd.h>
 #include <linux/list.h>
 #include <linux/pagemap.h>
@@ -322,6 +321,7 @@ extern int scsi_cmd_ioctl(struct block_device *, unsigned int, unsigned long);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
+extern void __blk_run_queue(request_queue_t *q);
 
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {

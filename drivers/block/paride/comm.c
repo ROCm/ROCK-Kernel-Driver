@@ -187,17 +187,8 @@ static void comm_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void comm_init_proto(PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void comm_release_proto(PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol comm = {
+	.owner		= THIS_MODULE,
 	.name		= "comm",
 	.max_mode	= 5,
 	.epp_first	= 2,
@@ -210,8 +201,6 @@ static struct pi_protocol comm = {
 	.connect	= comm_connect,
 	.disconnect	= comm_disconnect,
 	.log_adapter	= comm_log_adapter,
-	.init_proto	= comm_init_proto,
-	.release_proto	= comm_release_proto,
 };
 
 static int __init comm_init(void)

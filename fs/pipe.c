@@ -11,7 +11,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/fs.h>
-
+#include <linux/mount.h>
+#include <linux/pipe_fs_i.h>
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 

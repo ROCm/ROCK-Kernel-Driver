@@ -20,6 +20,7 @@
  */
 
 #include <linux/buffer_head.h>
+#include <linux/string.h>
 #include "sysv.h"
 
 /* We don't trust the value of

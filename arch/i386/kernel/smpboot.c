@@ -419,6 +419,7 @@ void __init smp_callin(void)
  	smp_store_cpu_info(cpuid);
 
 	disable_APIC_timer();
+	local_irq_disable();
 	/*
 	 * Allow the master to continue.
 	 */
@@ -1179,13 +1180,18 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 int __devinit __cpu_up(unsigned int cpu)
 {
 	/* This only works at boot for x86.  See "rewrite" above. */
-	if (test_bit(cpu, &smp_commenced_mask))
+	if (test_bit(cpu, &smp_commenced_mask)) {
+		local_irq_enable();
 		return -ENOSYS;
+	}
 
 	/* In case one didn't come up */
-	if (!test_bit(cpu, &cpu_callin_map))
+	if (!test_bit(cpu, &cpu_callin_map)) {
+		local_irq_enable();
 		return -EIO;
+	}
 
+	local_irq_enable();
 	/* Unleash the CPU! */
 	set_bit(cpu, &smp_commenced_mask);
 	while (!test_bit(cpu, &cpu_online_map))

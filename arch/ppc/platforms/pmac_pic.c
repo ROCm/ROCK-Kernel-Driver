@@ -21,6 +21,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/pci.h>
+#include <linux/interrupt.h>
 
 #include <asm/sections.h>
 #include <asm/io.h>

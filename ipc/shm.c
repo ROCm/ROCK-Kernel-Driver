@@ -88,7 +88,7 @@ static inline void shm_inc (int id) {
 
 	if(!(shp = shm_lock(id)))
 		BUG();
-	shp->shm_atim = CURRENT_TIME;
+	shp->shm_atim = get_seconds();
 	shp->shm_lprid = current->pid;
 	shp->shm_nattch++;
 	shm_unlock(shp);
@@ -137,7 +137,7 @@ static void shm_close (struct vm_area_struct *shmd)
 	if(!(shp = shm_lock(id)))
 		BUG();
 	shp->shm_lprid = current->pid;
-	shp->shm_dtim = CURRENT_TIME;
+	shp->shm_dtim = get_seconds();
 	shp->shm_nattch--;
 	if(shp->shm_nattch == 0 &&
 	   shp->shm_flags & SHM_DEST)
@@ -212,7 +212,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_cprid = current->pid;
 	shp->shm_lprid = 0;
 	shp->shm_atim = shp->shm_dtim = 0;
-	shp->shm_ctim = CURRENT_TIME;
+	shp->shm_ctim = get_seconds();
 	shp->shm_segsz = size;
 	shp->shm_nattch = 0;
 	shp->id = shm_buildid(id,shp->shm_perm.seq);
@@ -566,7 +566,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		shp->shm_perm.gid = setbuf.gid;
 		shp->shm_flags = (shp->shm_flags & ~S_IRWXUGO)
 			| (setbuf.mode & S_IRWXUGO);
-		shp->shm_ctim = CURRENT_TIME;
+		shp->shm_ctim = get_seconds();
 		break;
 	}
 

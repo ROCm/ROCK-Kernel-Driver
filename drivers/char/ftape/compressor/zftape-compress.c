@@ -1266,13 +1266,6 @@ MODULE_DESCRIPTION(
 "Compression routines for zftape. Uses the lzrw3 algorithm by Ross Williams");
 MODULE_LICENSE("GPL");
 
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
-static int can_unload(void)
-{
-	return keep_module_locked ? -EBUSY : 0;
-}
-#endif
-
 /* Called by modules package when installing the driver
  */
 int init_module(void)
@@ -1282,9 +1275,11 @@ int init_module(void)
 #if LINUX_VERSION_CODE < KERNEL_VER(2,1,18)
 	register_symtab(0); /* remove global ftape symbols */
 #else
+#if 0 /* FIXME --RR */
 	if (!mod_member_present(&__this_module, can_unload))
 		return -EBUSY;
 	__this_module.can_unload = can_unload;
+#endif
 #endif
 	result = zft_compressor_init();
 	keep_module_locked = 0;

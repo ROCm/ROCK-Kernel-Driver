@@ -673,31 +673,22 @@ void blk_recount_segments(request_queue_t *q, struct bio *bio)
 	seg_size = nr_phys_segs = nr_hw_segs = 0;
 	bio_for_each_segment(bv, bio, i) {
 		if (bvprv && cluster) {
-			int phys, seg;
-
-			if (seg_size + bv->bv_len > q->max_segment_size) {
-				nr_phys_segs++;
+			if (seg_size + bv->bv_len > q->max_segment_size)
 				goto new_segment;
-			}
-
-			phys = BIOVEC_PHYS_MERGEABLE(bvprv, bv);
-			seg = BIOVEC_SEG_BOUNDARY(q, bvprv, bv);
-			if (!phys || !seg)
-				nr_phys_segs++;
-			if (!seg)
+			if (!BIOVEC_PHYS_MERGEABLE(bvprv, bv))
 				goto new_segment;
-
-			if (!BIOVEC_VIRT_MERGEABLE(bvprv, bv))
+			if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bv))
 				goto new_segment;
 
 			seg_size += bv->bv_len;
 			bvprv = bv;
 			continue;
-		} else {
-			nr_phys_segs++;
 		}
 new_segment:
-		nr_hw_segs++;
+		if (!bvprv || !BIOVEC_VIRT_MERGEABLE(bvprv, bv))
+			nr_hw_segs++;
+
+		nr_phys_segs++;
 		bvprv = bv;
 		seg_size = bv->bv_len;
 	}
@@ -1047,6 +1038,16 @@ void blk_stop_queue(request_queue_t *q)
 }
 
 /**
+ * blk_run_queue - run a single device queue
+ * @q	The queue to run
+ */
+void __blk_run_queue(request_queue_t *q)
+{
+	blk_remove_plug(q);
+	q->request_fn(q);
+}
+
+/**
  * blk_run_queues - fire all plugged queues
  *
  * Description:
@@ -1386,7 +1387,6 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
 	int rw = rq_data_dir(rq);
-	unsigned int major, index;
 
 	if (!rq->rq_disk)
 		return;
@@ -1404,9 +1404,6 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 		disk_round_stats(rq->rq_disk);
 		rq->rq_disk->in_flight++;
 	}
-
-	major = rq->rq_disk->major;
-	index = rq->rq_disk->first_minor >> rq->rq_disk->minor_shift;
 }
 
 /*
@@ -2211,4 +2208,5 @@ EXPORT_SYMBOL(blk_queue_invalidate_tags);
 EXPORT_SYMBOL(blk_start_queue);
 EXPORT_SYMBOL(blk_stop_queue);
 EXPORT_SYMBOL(__blk_stop_queue);
+EXPORT_SYMBOL(__blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);

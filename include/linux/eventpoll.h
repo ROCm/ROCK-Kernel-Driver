@@ -34,8 +34,11 @@ asmlinkage int sys_epoll_ctl(int epfd, int op, int fd, unsigned int events);
 asmlinkage int sys_epoll_wait(int epfd, struct pollfd *events, int maxevents,
 			      int timeout);
 
+/* Used to initialize the epoll bits inside the "struct file" */
+void eventpoll_init_file(struct file *file);
+
 /* Used in fs/file_table.c:__fput() to unlink files from the eventpoll interface */
-void ep_notify_file_close(struct file *file);
+void eventpoll_release(struct file *file);
 
 #endif /* #ifdef __KERNEL__ */
 

@@ -126,7 +126,6 @@ static int mwave_open(struct inode *inode, struct file *file)
 	PRINTK_2(TRACE_MWAVE,
 		"mwavedd::mwave_open, exit return retval %x\n", retval);
 
-	MOD_INC_USE_COUNT;
 	return retval;
 }
 
@@ -141,7 +140,6 @@ static int mwave_close(struct inode *inode, struct file *file)
 	PRINTK_2(TRACE_MWAVE, "mwavedd::mwave_close, exit retval %x\n",
 		retval);
 
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 

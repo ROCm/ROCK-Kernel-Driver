@@ -74,7 +74,7 @@ static void evbug_disconnect(struct input_handle *handle)
 }
 
 static struct input_device_id evbug_ids[] = {
-	{ driver_info: 1 },	/* Matches all devices */
+	{ .driver_info = 1 },	/* Matches all devices */
 	{ },			/* Terminating zero entry */
 };
 
@@ -95,7 +95,12 @@ static struct device_interface evbug_intf = {
 
 int __init evbug_init(void)
 {
-	interface_register(&evbug_intf);
+	int retval;
+
+	retval = interface_register(&evbug_intf);
+	if(retval < 0)
+		return retval;
+
 	input_register_handler(&evbug_handler);
 	return 0;
 }
@@ -103,7 +108,7 @@ int __init evbug_init(void)
 void __exit evbug_exit(void)
 {
 	input_unregister_handler(&evbug_handler);
-	interface_register(&evbug_intf);
+	interface_unregister(&evbug_intf);
 }
 
 module_init(evbug_init);

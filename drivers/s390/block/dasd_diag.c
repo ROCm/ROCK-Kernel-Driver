@@ -464,19 +464,19 @@ dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req)
  * for one request. Give a little safety and the result is 240.
  */
 static dasd_discipline_t dasd_diag_discipline = {
-	owner:THIS_MODULE,
-	name:"DIAG",
-	ebcname:"DIAG",
-	max_blocks:240,
-	check_device:dasd_diag_check_device,
-	fill_geometry:dasd_diag_fill_geometry,
-	start_IO:dasd_start_diag,
-	examine_error:dasd_diag_examine_error,
-	erp_action:dasd_diag_erp_action,
-	erp_postaction:dasd_diag_erp_postaction,
-	build_cp:dasd_diag_build_cp,
-	dump_sense:dasd_diag_dump_sense,
-	fill_info:dasd_diag_fill_info,
+	.owner = THIS_MODULE,
+	.name = "DIAG",
+	.ebcname = "DIAG",
+	.max_blocks = 240,
+	.check_device = dasd_diag_check_device,
+	.fill_geometry = dasd_diag_fill_geometry,
+	.start_IO = dasd_start_diag,
+	.examine_error = dasd_diag_examine_error,
+	.erp_action = dasd_diag_erp_action,
+	.erp_postaction = dasd_diag_erp_postaction,
+	.build_cp = dasd_diag_build_cp,
+	.dump_sense = dasd_diag_dump_sense,
+	.fill_info = dasd_diag_fill_info,
 };
 
 int

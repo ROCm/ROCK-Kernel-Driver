@@ -652,6 +652,15 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			return copy_to_user((char *) arg, hid->name, len) ?
 				-EFAULT : len;
 		}
+
+		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGPHYS(0))) {
+			int len;
+			if (!hid->phys) return 0;
+			len = strlen(hid->phys) + 1;
+			if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+			return copy_to_user((char *) arg, hid->phys, len) ?
+				-EFAULT : len;
+		}
 	}
 	return -EINVAL;
 }
@@ -765,11 +774,7 @@ static /* const */ struct usb_driver hiddev_driver = {
 
 int __init hiddev_init(void)
 {
-	devfs_handle_t de;
-
-	de = devfs_get_handle(NULL, "usb", 0, 0, 0, 0);
-	hiddev_devfs_handle = devfs_mk_dir(de, "hid", NULL);
-	devfs_put(de);
+	hiddev_devfs_handle = devfs_mk_dir(NULL, "usb/hid", NULL);
 	usb_register(&hiddev_driver);
 	return 0;
 }

@@ -163,7 +163,7 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 
 	if (p[part-1].de)
 		return;
-	dir = devfs_get_parent(dev->disk_de);
+	dir = dev->de;
 	if (!dir)
 		return;
 	if (dev->flags & GENHD_FL_REMOVABLE)
@@ -178,7 +178,6 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 
 #ifdef CONFIG_DEVFS_FS
 static struct unique_numspace disc_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
-static devfs_handle_t cdroms;
 static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
 #endif
 
@@ -189,9 +188,6 @@ static void devfs_create_partitions(struct gendisk *dev)
 	devfs_handle_t dir, slave;
 	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	char dirname[64], symlink[16];
-	static devfs_handle_t devfs_handle;
-	int part, max_p = dev->minors;
-	struct hd_struct *p = dev->part;
 
 	if (dev->flags & GENHD_FL_REMOVABLE)
 		devfs_flags |= DEVFS_FL_REMOVABLE;
@@ -208,36 +204,25 @@ static void devfs_create_partitions(struct gendisk *dev)
 		sprintf(dirname, "../%s/disc%d", dev->disk_name,
 			dev->first_minor >> dev->minor_shift);
 		dir = devfs_mk_dir(NULL, dirname + 3, NULL);
+		dev->de = dir;
 	}
-	if (!devfs_handle)
-		devfs_handle = devfs_mk_dir(NULL, "discs", NULL);
 	dev->number = devfs_alloc_unique_number (&disc_numspace);
-	sprintf(symlink, "disc%d", dev->number);
-	devfs_mk_symlink (devfs_handle, symlink, DEVFS_FL_DEFAULT,
+	sprintf(symlink, "discs/disc%d", dev->number);
+	devfs_mk_symlink(NULL, symlink, DEVFS_FL_DEFAULT,
 			  dirname + pos, &slave, NULL);
 	dev->disk_de = devfs_register(dir, "disc", devfs_flags,
 			    dev->major, dev->first_minor,
 			    S_IFBLK | S_IRUSR | S_IWUSR, dev->fops, NULL);
-	devfs_auto_unregister(dev->disk_de, slave);
-	if (!(dev->flags & GENHD_FL_DEVFS))
-		devfs_auto_unregister (slave, dir);
 #endif
 }
 
 static void devfs_create_cdrom(struct gendisk *dev)
 {
 #ifdef CONFIG_DEVFS_FS
-	int pos = 0;
-	devfs_handle_t dir, slave;
-	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
-	char dirname[64], symlink[16];
 	char vname[23];
 
-	if (!cdroms)
-		cdroms = devfs_mk_dir (NULL, "cdroms", NULL);
-
 	dev->number = devfs_alloc_unique_number(&cdrom_numspace);
-	sprintf(vname, "cdrom%d", dev->number);
+	sprintf(vname, "cdroms/cdrom%d", dev->number);
 	if (dev->de) {
 		int pos;
 		devfs_handle_t slave;
@@ -251,10 +236,8 @@ static void devfs_create_cdrom(struct gendisk *dev)
 		pos = devfs_generate_path(dev->disk_de, rname+3, sizeof(rname)-3);
 		if (pos >= 0) {
 			strncpy(rname + pos, "../", 3);
-			devfs_mk_symlink(cdroms, vname,
-					 DEVFS_FL_DEFAULT,
+			devfs_mk_symlink(NULL, vname, DEVFS_FL_DEFAULT,
 					 rname + pos, &slave, NULL);
-			devfs_auto_unregister(dev->de, slave);
 		}
 	} else {
 		dev->disk_de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,
@@ -270,10 +253,18 @@ static void devfs_remove_partitions(struct gendisk *dev)
 #ifdef CONFIG_DEVFS_FS
 	devfs_unregister(dev->disk_de);
 	dev->disk_de = NULL;
-	if (dev->flags & GENHD_FL_CD)
+	if (dev->flags & GENHD_FL_CD) {
+		if (dev->de)
+			devfs_remove("cdroms/cdrom%d", dev->number);
 		devfs_dealloc_unique_number(&cdrom_numspace, dev->number);
-	else
+	} else {
+		devfs_remove("discs/disc%d", dev->number);
+		if (!(dev->flags & GENHD_FL_DEVFS)) {
+			devfs_unregister(dev->de);
+			dev->de = NULL;
+		}
 		devfs_dealloc_unique_number(&disc_numspace, dev->number);
+	}
 #endif
 }
 
@@ -458,8 +449,6 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	struct parsed_partitions *state;
 	int p, res;
 
-	if (!bdev->bd_invalidated)
-		return 0;
 	if (bdev->bd_part_count)
 		return -EBUSY;
 	res = invalidate_device(dev, 1);

@@ -189,7 +189,7 @@ int ah_output(struct sk_buff *skb)
 		top_iph->saddr = x->props.saddr.xfrm4_addr;
 		top_iph->daddr = x->id.daddr.xfrm4_addr;
 		ah = (struct ip_auth_hdr*)(top_iph+1);
-		ah->nexthdr = IPPROTO_IP;
+		ah->nexthdr = IPPROTO_IPIP;
 	} else {
 		memcpy(&tmp_iph, skb->data, iph->ihl*4);
 		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
@@ -234,11 +234,12 @@ int ah_output(struct sk_buff *skb)
 	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
 	if ((skb->dst = dst_pop(dst)) == NULL)
-		goto error;
+		goto error_nolock;
 	return NET_XMIT_BYPASS;
 
 error:
 	spin_unlock_bh(&x->lock);
+error_nolock:
 	kfree_skb(skb);
 	return err;
 }

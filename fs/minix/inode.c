@@ -384,7 +384,10 @@ static void V1_minix_read_inode(struct inode * inode)
 	inode->i_gid = (gid_t)raw_inode->i_gid;
 	inode->i_nlink = raw_inode->i_nlinks;
 	inode->i_size = raw_inode->i_size;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = raw_inode->i_time;
+	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec = raw_inode->i_time;
+	inode->i_mtime.tv_nsec = 0;
+	inode->i_atime.tv_nsec = 0;
+	inode->i_ctime.tv_nsec = 0;
 	inode->i_blocks = inode->i_blksize = 0;
 	for (i = 0; i < 9; i++)
 		minix_inode->u.i1_data[i] = raw_inode->i_zone[i];
@@ -412,9 +415,12 @@ static void V2_minix_read_inode(struct inode * inode)
 	inode->i_gid = (gid_t)raw_inode->i_gid;
 	inode->i_nlink = raw_inode->i_nlinks;
 	inode->i_size = raw_inode->i_size;
-	inode->i_mtime = raw_inode->i_mtime;
-	inode->i_atime = raw_inode->i_atime;
-	inode->i_ctime = raw_inode->i_ctime;
+	inode->i_mtime.tv_sec = raw_inode->i_mtime;
+	inode->i_atime.tv_sec = raw_inode->i_atime;
+	inode->i_ctime.tv_sec = raw_inode->i_ctime;
+	inode->i_mtime.tv_nsec = 0;
+	inode->i_atime.tv_nsec = 0;
+	inode->i_ctime.tv_nsec = 0;
 	inode->i_blocks = inode->i_blksize = 0;
 	for (i = 0; i < 10; i++)
 		minix_inode->u.i2_data[i] = raw_inode->i_zone[i];
@@ -451,7 +457,7 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 	raw_inode->i_gid = fs_high2lowgid(inode->i_gid);
 	raw_inode->i_nlinks = inode->i_nlink;
 	raw_inode->i_size = inode->i_size;
-	raw_inode->i_time = inode->i_mtime;
+	raw_inode->i_time = inode->i_mtime.tv_sec;
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 		raw_inode->i_zone[0] = kdev_t_to_nr(inode->i_rdev);
 	else for (i = 0; i < 9; i++)
@@ -478,9 +484,9 @@ static struct buffer_head * V2_minix_update_inode(struct inode * inode)
 	raw_inode->i_gid = fs_high2lowgid(inode->i_gid);
 	raw_inode->i_nlinks = inode->i_nlink;
 	raw_inode->i_size = inode->i_size;
-	raw_inode->i_mtime = inode->i_mtime;
-	raw_inode->i_atime = inode->i_atime;
-	raw_inode->i_ctime = inode->i_ctime;
+	raw_inode->i_mtime = inode->i_mtime.tv_sec;
+	raw_inode->i_atime = inode->i_atime.tv_sec;
+	raw_inode->i_ctime = inode->i_ctime.tv_sec;
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 		raw_inode->i_zone[0] = kdev_t_to_nr(inode->i_rdev);
 	else for (i = 0; i < 10; i++)

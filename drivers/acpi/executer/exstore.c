@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 173 $
+ *              $Revision: 174 $
  *
  *****************************************************************************/
 
@@ -81,7 +81,7 @@ acpi_ex_store (
 	if (ACPI_GET_DESCRIPTOR_TYPE (dest_desc) == ACPI_DESC_TYPE_NAMED) {
 		/*
 		 * Dest is a namespace node,
-		 * Storing an object into a Name "container"
+		 * Storing an object into a Named node.
 		 */
 		status = acpi_ex_store_object_to_node (source_desc,
 				 (acpi_namespace_node *) dest_desc, walk_state);
@@ -435,7 +435,7 @@ acpi_ex_store_object_to_node (
 		/*
 		 * For fields, copy the source data to the target field.
 		 */
-		status = acpi_ex_write_data_to_field (source_desc, target_desc);
+		status = acpi_ex_write_data_to_field (source_desc, target_desc, &walk_state->result_obj);
 		break;
 
 

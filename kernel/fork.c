@@ -28,6 +28,7 @@
 #include <linux/security.h>
 #include <linux/futex.h>
 #include <linux/ptrace.h>
+#include <linux/mount.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -205,12 +206,14 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	return tsk;
 }
 
-static inline int dup_mmap(struct mm_struct * mm)
+#ifdef CONFIG_MMU
+static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 {
 	struct vm_area_struct * mpnt, *tmp, **pprev;
 	int retval;
 	unsigned long charge = 0;
 
+	down_write(&oldmm->mmap_sem);
 	flush_cache_mm(current->mm);
 	mm->locked_vm = 0;
 	mm->mmap = NULL;
@@ -235,7 +238,6 @@ static inline int dup_mmap(struct mm_struct * mm)
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {
 		struct file *file;
 
-		retval = -ENOMEM;
 		if(mpnt->vm_flags & VM_DONTCOPY)
 			continue;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
@@ -280,18 +282,38 @@ static inline int dup_mmap(struct mm_struct * mm)
 			tmp->vm_ops->open(tmp);
 
 		if (retval)
-			goto fail_nomem;
+			goto fail;
 	}
 	retval = 0;
 	build_mmap_rb(mm);
 
 out:
 	flush_tlb_mm(current->mm);
+	up_write(&oldmm->mmap_sem);
 	return retval;
 fail_nomem:
+	retval = -ENOMEM;
+  fail:
 	vm_unacct_memory(charge);
 	goto out;
 }
+static inline int mm_alloc_pgd(struct mm_struct * mm)
+{
+	mm->pgd = pgd_alloc(mm);
+	if (unlikely(!mm->pgd))
+		return -ENOMEM;
+	return 0;
+}
+
+static inline void mm_free_pgd(struct mm_struct * mm)
+{
+	pgd_free(mm->pgd);
+}
+#else
+#define dup_mmap(mm, oldmm)	(0)
+#define mm_alloc_pgd(mm)	(0)
+#define mm_free_pgd(mm)
+#endif /* CONFIG_MMU */
 
 spinlock_t mmlist_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 int mmlist_nr;
@@ -314,8 +336,7 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
 	mm->free_area_cache = TASK_UNMAPPED_BASE;
 
-	mm->pgd = pgd_alloc(mm);
-	if (mm->pgd)
+	if (likely(!mm_alloc_pgd(mm)))
 		return mm;
 	free_mm(mm);
 	return NULL;
@@ -344,8 +365,8 @@ struct mm_struct * mm_alloc(void)
  */
 inline void __mmdrop(struct mm_struct *mm)
 {
-	if (mm == &init_mm) BUG();
-	pgd_free(mm->pgd);
+	BUG_ON(mm == &init_mm);
+	mm_free_pgd(mm);
 	destroy_context(mm);
 	free_mm(mm);
 }
@@ -388,12 +409,15 @@ void mm_release(void)
 		complete(vfork_done);
 	}
 	if (tsk->user_tid) {
+		int * user_tid = tsk->user_tid;
+		tsk->user_tid = NULL;
+
 		/*
 		 * We dont check the error code - if userspace has
 		 * not set up a proper pointer then tough luck.
 		 */
-		put_user(0, tsk->user_tid);
-		sys_futex((unsigned long)tsk->user_tid, FUTEX_WAKE, 1, NULL);
+		put_user(0, user_tid);
+		sys_futex((unsigned long)user_tid, FUTEX_WAKE, 1, NULL);
 	}
 }
 
@@ -444,10 +468,7 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (init_new_context(tsk,mm))
 		goto free_pt;
 
-	down_write(&oldmm->mmap_sem);
-	retval = dup_mmap(mm);
-	up_write(&oldmm->mmap_sem);
-
+	retval = dup_mmap(mm, oldmm);
 	if (retval)
 		goto free_pt;
 
@@ -657,6 +678,13 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 	if (!(clone_flags & CLONE_PTRACE))
 		p->ptrace = 0;
 	p->flags = new_flags;
+}
+
+asmlinkage int sys_set_tid_address(int *user_tid)
+{
+	current->user_tid = user_tid;
+
+	return current->pid;
 }
 
 /*

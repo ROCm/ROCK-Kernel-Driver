@@ -830,8 +830,6 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	ether3_banner();
 
-	ecard_claim(ec);
-
 	dev = init_etherdev(NULL, sizeof(struct dev_priv));
 	if (!dev) {
 		ret = -ENOMEM;
@@ -855,6 +853,7 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 	}
 
 	priv = (struct dev_priv *) dev->priv;
+	init_timer(&priv->timer);
 
 	/* Reset card...
 	 */
@@ -917,7 +916,6 @@ free:
 	unregister_netdev(dev);
 	kfree(dev);
 out:
-	ecard_release(ec);
 	return ret;
 }
 
@@ -930,8 +928,6 @@ static void __devexit ether3_remove(struct expansion_card *ec)
 	unregister_netdev(dev);
 	release_region(dev->base_addr, 128);
 	kfree(dev);
-
-	ecard_release(ec);
 }
 
 static const struct ecard_id ether3_ids[] = {

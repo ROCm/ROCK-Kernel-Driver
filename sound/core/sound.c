@@ -30,9 +30,7 @@
 #include <sound/control.h>
 #include <sound/initval.h>
 #include <linux/kmod.h>
-#ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-#endif
 
 #define SNDRV_OS_MINORS 256
 
@@ -351,16 +349,11 @@ static int __init alsa_sound_init(void)
 
 static void __exit alsa_sound_exit(void)
 {
-#ifdef CONFIG_DEVFS_FS
-	char controlname[24];
 	short controlnum;
 
-	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
-		sprintf(controlname, "snd/controlC%d", controlnum);
-		devfs_find_and_unregister(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-	}
-#endif
-	
+	for (controlnum = 0; controlnum < cards_limit; controlnum++)
+		devfs_remove("snd/controlC%d", controlnum);
+
 #ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_unregister();
 #endif

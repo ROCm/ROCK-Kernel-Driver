@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/futex.h>
 #include <linux/vcache.h>
+#include <linux/mount.h>
 
 #define FUTEX_HASHBITS 8
 
@@ -314,6 +315,23 @@ out:
 	return ret;
 }
 
+static inline int futex_wait_utime(unsigned long uaddr,
+		      int offset,
+		      int val,
+		      struct timespec* utime)
+{
+	unsigned long time = MAX_SCHEDULE_TIMEOUT;
+
+	if (utime) {
+		struct timespec t;
+		if (copy_from_user(&t, utime, sizeof(t)) != 0)
+			return -EFAULT;
+		time = timespec_to_jiffies(&t) + 1;
+	}
+
+	return futex_wait(uaddr, offset, val, time);
+}
+
 static int futex_close(struct inode *inode, struct file *filp)
 {
 	struct futex_q *q = filp->private_data;
@@ -421,16 +439,8 @@ out:
 
 asmlinkage int sys_futex(unsigned long uaddr, int op, int val, struct timespec *utime)
 {
-	unsigned long time = MAX_SCHEDULE_TIMEOUT;
 	unsigned long pos_in_page;
 	int ret;
-
-	if (utime) {
-		struct timespec t;
-		if (copy_from_user(&t, utime, sizeof(t)) != 0)
-			return -EFAULT;
-		time = timespec_to_jiffies(&t) + 1;
-	}
 
 	pos_in_page = uaddr % PAGE_SIZE;
 
@@ -440,7 +450,7 @@ asmlinkage int sys_futex(unsigned long uaddr, int op, int val, struct timespec *
 
 	switch (op) {
 	case FUTEX_WAIT:
-		ret = futex_wait(uaddr, pos_in_page, val, time);
+		ret = futex_wait_utime(uaddr, pos_in_page, val, utime);
 		break;
 	case FUTEX_WAKE:
 		ret = futex_wake(uaddr, pos_in_page, val);

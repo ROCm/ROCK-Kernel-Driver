@@ -23,14 +23,17 @@
 #ifndef _DEVICE_H_
 #define _DEVICE_H_
 
-#include <linux/types.h>
 #include <linux/config.h>
 #include <linux/ioport.h>
+#include <linux/kobject.h>
 #include <linux/list.h>
 #include <linux/sched.h>
-#include <linux/kobject.h>
+#include <linux/spinlock.h>
+#include <linux/types.h>
+#include <asm/atomic.h>
 
-#define DEVICE_NAME_SIZE	80
+#define DEVICE_NAME_SIZE	50
+#define DEVICE_NAME_HALF	__stringify(20)	/* Less than half to accommodate slop */
 #define DEVICE_ID_SIZE		32
 #define BUS_ID_SIZE		16
 
@@ -435,27 +438,27 @@ extern void device_resume(u32 level);
 extern void device_shutdown(void);
 
 
-/* drivrs/base/firmware.c */
+/* drivers/base/firmware.c */
 extern int firmware_register(struct subsystem *);
-extern void firmware_uregister(struct subsystem *);
+extern void firmware_unregister(struct subsystem *);
 
 /* debugging and troubleshooting/diagnostic helpers. */
 #ifdef DEBUG
 #define dev_dbg(dev, format, arg...)		\
 	printk (KERN_DEBUG "%s %s: " format ,	\
-		dev.driver->name , dev.bus_id , ## arg)
+		(dev).driver->name , (dev).bus_id , ## arg)
 #else
 #define dev_dbg(dev, format, arg...) do {} while (0)
 #endif
 
 #define dev_err(dev, format, arg...)		\
 	printk (KERN_ERR "%s %s: " format ,	\
-		dev.driver->name , dev.bus_id , ## arg)
+		(dev).driver->name , (dev).bus_id , ## arg)
 #define dev_info(dev, format, arg...)		\
 	printk (KERN_INFO "%s %s: " format ,	\
-		dev.driver->name , dev.bus_id , ## arg)
+		(dev).driver->name , (dev).bus_id , ## arg)
 #define dev_warn(dev, format, arg...)		\
-	printk (KERN_WARN "%s %s: " format ,	\
-		dev.driver->name , dev.bus_id , ## arg)
+	printk (KERN_WARNING "%s %s: " format ,	\
+		(dev).driver->name , (dev).bus_id , ## arg)
 
 #endif /* _DEVICE_H_ */

@@ -54,6 +54,7 @@ static inline int izo_ioctl_is_invalid(struct izo_ioctl_data *data);
 #ifdef __KERNEL__
 # include <linux/smp.h>
 # include <linux/fsfilter.h>
+# include <linux/mount.h>
 # include <linux/slab.h>
 # include <linux/vmalloc.h>
 # include <linux/smp_lock.h>

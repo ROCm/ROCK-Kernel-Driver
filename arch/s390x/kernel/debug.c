@@ -150,10 +150,11 @@ DECLARE_MUTEX(debug_lock);
 static int initialized;
 
 static struct file_operations debug_file_ops = {
-	read:    debug_output,
-	write:   debug_input,	
-	open:    debug_open,
-	release: debug_close,
+	.owner	 = THIS_MODULE,
+	.read    = debug_output,
+	.write   = debug_input,	
+	.open    = debug_open,
+	.release = debug_close,
 };
 
 static struct proc_dir_entry *debug_proc_root_entry;
@@ -497,7 +498,6 @@ static int debug_open(struct inode *inode, struct file *file)
 #ifdef DEBUG
 	printk("debug_open\n");
 #endif
-	MOD_INC_USE_COUNT;
 	down(&debug_lock);
 
 	/* find debug log and view */
@@ -554,8 +554,6 @@ static int debug_open(struct inode *inode, struct file *file)
 
       out:
 	up(&debug_lock);
-	if (rc != 0)
-		MOD_DEC_USE_COUNT;
 	return rc;
 }
 
@@ -575,7 +573,6 @@ static int debug_close(struct inode *inode, struct file *file)
 	debug_info_free(p_info->debug_info_snap);
 	debug_info_put(p_info->debug_info_org);
 	kfree(file->private_data);
-	MOD_DEC_USE_COUNT;
 	return 0;		/* success */
 }
 

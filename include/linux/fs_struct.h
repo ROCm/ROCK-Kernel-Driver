@@ -1,9 +1,8 @@
 #ifndef _LINUX_FS_STRUCT_H
 #define _LINUX_FS_STRUCT_H
-#ifdef __KERNEL__
 
-#include <linux/mount.h>
-#include <linux/dcache.h>
+struct dentry;
+struct vfsmount;
 
 struct fs_struct {
 	atomic_t count;
@@ -13,68 +12,17 @@ struct fs_struct {
 	struct vfsmount * rootmnt, * pwdmnt, * altrootmnt;
 };
 
-#define INIT_FS { \
-	ATOMIC_INIT(1), \
-	RW_LOCK_UNLOCKED, \
-	0022, \
-	NULL, NULL, NULL, NULL, NULL, NULL \
+#define INIT_FS {				\
+	.count		= ATOMIC_INIT(1),	\
+	.lock		= RW_LOCK_UNLOCKED,	\
+	.umask		= 0022, \
 }
 
 extern void exit_fs(struct task_struct *);
 extern void set_fs_altroot(void);
+extern void set_fs_root(struct fs_struct *, struct vfsmount *, struct dentry *);
+extern void set_fs_pwd(struct fs_struct *, struct vfsmount *, struct dentry *);
+extern struct fs_struct *copy_fs_struct(struct fs_struct *);
+extern void put_fs_struct(struct fs_struct *);
 
-/*
- * Replace the fs->{rootmnt,root} with {mnt,dentry}. Put the old values.
- * It can block. Requires the big lock held.
- */
-
-static inline void set_fs_root(struct fs_struct *fs,
-	struct vfsmount *mnt,
-	struct dentry *dentry)
-{
-	struct dentry *old_root;
-	struct vfsmount *old_rootmnt;
-	write_lock(&fs->lock);
-	spin_lock(&dcache_lock);
-	old_root = fs->root;
-	old_rootmnt = fs->rootmnt;
-	fs->rootmnt = mntget(mnt);
-	fs->root = dget(dentry);
-	spin_unlock(&dcache_lock);
-	write_unlock(&fs->lock);
-	if (old_root) {
-		dput(old_root);
-		mntput(old_rootmnt);
-	}
-}
-
-/*
- * Replace the fs->{pwdmnt,pwd} with {mnt,dentry}. Put the old values.
- * It can block. Requires the big lock held.
- */
-
-static inline void set_fs_pwd(struct fs_struct *fs,
-	struct vfsmount *mnt,
-	struct dentry *dentry)
-{
-	struct dentry *old_pwd;
-	struct vfsmount *old_pwdmnt;
-	write_lock(&fs->lock);
-	spin_lock(&dcache_lock);
-	old_pwd = fs->pwd;
-	old_pwdmnt = fs->pwdmnt;
-	fs->pwdmnt = mntget(mnt);
-	fs->pwd = dget(dentry);
-	spin_unlock(&dcache_lock);
-	write_unlock(&fs->lock);
-	if (old_pwd) {
-		dput(old_pwd);
-		mntput(old_pwdmnt);
-	}
-}
-
-struct fs_struct *copy_fs_struct(struct fs_struct *old);
-void put_fs_struct(struct fs_struct *fs);
-
-#endif
-#endif
+#endif /* _LINUX_FS_STRUCT_H */

@@ -20,6 +20,7 @@
 
 struct port_list {
 	struct list_head list;
+	int has_connection;
 	struct semaphore sem;
 	int port;
 	int fd;
@@ -49,28 +50,32 @@ static void pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct connection *conn = data;
 	int fd;
 
-	list_del(&conn->list);
-
  	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
 	if(fd < 0){
+		if(fd == -EAGAIN)
+			return;
+
 		printk("os_rcv_fd returned %d\n", -fd);
 		os_close_file(conn->fd);
 	}
+
+	list_del(&conn->list);
+
 	conn->fd = fd;
 	list_add(&conn->list, &conn->port->connections);
 
 	up(&conn->port->sem);
 }
 
-static void port_interrupt(int irq, void *data, struct pt_regs *regs)
+static int port_accept(struct port_list *port)
 {
-	struct port_list *port = data;
 	struct connection *conn;
-	int fd, socket[2], pid;
+	int fd, socket[2], pid, ret = 0;
 
 	fd = port_connection(port->fd, socket, &pid);
 	if(fd < 0){
-		printk("port_connection returned %d\n", -fd);
+		if(fd != -EAGAIN)
+			printk("port_connection returned %d\n", -fd);
 		goto out;
 	}
 
@@ -94,6 +99,7 @@ static void port_interrupt(int irq, void *data, struct pt_regs *regs)
 	}
 
 	list_add(&conn->list, &port->pending);
+	ret = 1;
 	goto out;
 
  out_free:
@@ -102,17 +108,45 @@ static void port_interrupt(int irq, void *data, struct pt_regs *regs)
 	os_close_file(fd);
 	if(pid != -1) os_kill_process(pid);
  out:
-	reactivate_fd(port->fd, ACCEPT_IRQ);
+	return(ret);
 } 
 
 DECLARE_MUTEX(ports_sem);
 struct list_head ports = LIST_HEAD_INIT(ports);
 
+void port_work_proc(void *unused)
+{
+	struct port_list *port;
+	struct list_head *ele;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	list_for_each(ele, &ports){
+		port = list_entry(ele, struct port_list, list);
+		if(!port->has_connection)
+			continue;
+		reactivate_fd(port->fd, ACCEPT_IRQ);
+		while(port_accept(port)) ;
+		port->has_connection = 0;
+	}
+	local_irq_restore(flags);
+}
+
+DECLARE_WORK(port_work, port_work_proc, NULL);
+
+static void port_interrupt(int irq, void *data, struct pt_regs *regs)
+{
+	struct port_list *port = data;
+
+	port->has_connection = 1;
+	schedule_work(&port_work);
+} 
+
 void *port_data(int port_num)
 {
 	struct list_head *ele;
 	struct port_list *port;
-	struct port_dev *dev;
+	struct port_dev *dev = NULL;
 	int fd;
 
 	down(&ports_sem);
@@ -140,13 +174,14 @@ void *port_data(int port_num)
 	}
 
 	*port = ((struct port_list) 
-		{ list : 	LIST_HEAD_INIT(port->list),
-		  sem :		__SEMAPHORE_INITIALIZER(port->sem, 0),
-		  lock :	SPIN_LOCK_UNLOCKED,
-		  port : 	port_num,
-		  fd : 		fd,
-		  pending :	LIST_HEAD_INIT(port->pending),
-		  connections :	LIST_HEAD_INIT(port->connections) });
+		{ list :	 	LIST_HEAD_INIT(port->list),
+		  has_connection :	0,
+		  sem :			__SEMAPHORE_INITIALIZER(port->sem, 0),
+		  lock :		SPIN_LOCK_UNLOCKED,
+		  port :	 	port_num,
+		  fd : 			fd,
+		  pending :		LIST_HEAD_INIT(port->pending),
+		  connections :		LIST_HEAD_INIT(port->connections) });
 	list_add(&port->list, &ports);
 
  found:
@@ -159,8 +194,7 @@ void *port_data(int port_num)
  	*dev = ((struct port_dev) { port : 		port,
  				    fd :		-1,
  				    helper_pid : 	-1 });
-	up(&ports_sem);
-	return(dev);
+	goto out;
 
  out_free:
 	kfree(port);
@@ -168,7 +202,7 @@ void *port_data(int port_num)
 	os_close_file(fd);
  out:
 	up(&ports_sem);
-	return(NULL);
+	return(dev);
 }
 
 void port_remove_dev(void *d)

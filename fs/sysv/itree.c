@@ -6,6 +6,8 @@
  */
 
 #include <linux/buffer_head.h>
+#include <linux/mount.h>
+#include <linux/string.h>
 #include "sysv.h"
 
 enum {DIRECT = 10, DEPTH = 4};	/* Have triple indirect */

@@ -465,13 +465,13 @@ netiucv_callback_connres(iucv_ConnectionResumed *eib, void *pgm_data)
 }
 
 static iucv_interrupt_ops_t netiucv_ops = {
-	ConnectionPending:  netiucv_callback_connreq,
-	ConnectionComplete: netiucv_callback_connack,
-	ConnectionSevered:  netiucv_callback_connrej,
-	ConnectionQuiesced: netiucv_callback_connsusp,
-	ConnectionResumed:  netiucv_callback_connres,
-	MessagePending:     netiucv_callback_rx,
-	MessageComplete:    netiucv_callback_txdone
+	.ConnectionPending  = netiucv_callback_connreq,
+	.ConnectionComplete = netiucv_callback_connack,
+	.ConnectionSevered  = netiucv_callback_connrej,
+	.ConnectionQuiesced = netiucv_callback_connsusp,
+	.ConnectionResumed  = netiucv_callback_connres,
+	.MessagePending     = netiucv_callback_rx,
+	.MessageComplete    = netiucv_callback_txdone
 };
 
 /**
@@ -1566,24 +1566,24 @@ netiucv_stat_read(struct file *file, char *buf, size_t count, loff_t *off)
 }
 
 static struct file_operations netiucv_stat_fops = {
-	read:    netiucv_stat_read,
-	write:   netiucv_stat_write,
-	open:    netiucv_stat_open,
-	release: netiucv_stat_close,
+	.read    = netiucv_stat_read,
+	.write   = netiucv_stat_write,
+	.open    = netiucv_stat_open,
+	.release = netiucv_stat_close,
 };
 
 static struct file_operations netiucv_buffer_fops = {
-	read:    netiucv_buffer_read,
-	write:   netiucv_buffer_write,
-	open:    netiucv_buffer_open,
-	release: netiucv_buffer_close,
+	.read    = netiucv_buffer_read,
+	.write   = netiucv_buffer_write,
+	.open    = netiucv_buffer_open,
+	.release = netiucv_buffer_close,
 };
 
 static struct file_operations netiucv_user_fops = {
-	read:    netiucv_user_read,
-	write:   netiucv_user_write,
-	open:    netiucv_user_open,
-	release: netiucv_user_close,
+	.read    = netiucv_user_read,
+	.write   = netiucv_user_write,
+	.open    = netiucv_user_open,
+	.release = netiucv_user_close,
 };
 
 static struct proc_dir_entry *netiucv_dir = NULL;

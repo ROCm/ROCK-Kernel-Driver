@@ -19,7 +19,7 @@
 #include <linux/seq_file.h>
 #include <linux/namespace.h>
 #include <linux/namei.h>
-
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
@@ -110,7 +110,7 @@ static void attach_mnt(struct vfsmount *mnt, struct nameidata *nd)
 	mnt->mnt_parent = mntget(nd->mnt);
 	mnt->mnt_mountpoint = dget(nd->dentry);
 	list_add(&mnt->mnt_hash, mount_hashtable+hash(nd->mnt, nd->dentry));
-	list_add(&mnt->mnt_child, &nd->mnt->mnt_mounts);
+	list_add_tail(&mnt->mnt_child, &nd->mnt->mnt_mounts);
 	nd->dentry->d_mounted++;
 }
 
@@ -879,6 +879,54 @@ out2:
 out1:
 	free_page(type_page);
 	return retval;
+}
+
+/*
+ * Replace the fs->{rootmnt,root} with {mnt,dentry}. Put the old values.
+ * It can block. Requires the big lock held.
+ */
+void set_fs_root(struct fs_struct *fs, struct vfsmount *mnt,
+		 struct dentry *dentry)
+{
+	struct dentry *old_root;
+	struct vfsmount *old_rootmnt;
+	write_lock(&fs->lock);
+	spin_lock(&dcache_lock);
+	old_root = fs->root;
+	old_rootmnt = fs->rootmnt;
+	fs->rootmnt = mntget(mnt);
+	fs->root = dget(dentry);
+	spin_unlock(&dcache_lock);
+	write_unlock(&fs->lock);
+	if (old_root) {
+		dput(old_root);
+		mntput(old_rootmnt);
+	}
+}
+
+/*
+ * Replace the fs->{pwdmnt,pwd} with {mnt,dentry}. Put the old values.
+ * It can block. Requires the big lock held.
+ */
+void set_fs_pwd(struct fs_struct *fs, struct vfsmount *mnt,
+		struct dentry *dentry)
+{
+	struct dentry *old_pwd;
+	struct vfsmount *old_pwdmnt;
+
+	write_lock(&fs->lock);
+	spin_lock(&dcache_lock);
+	old_pwd = fs->pwd;
+	old_pwdmnt = fs->pwdmnt;
+	fs->pwdmnt = mntget(mnt);
+	fs->pwd = dget(dentry);
+	spin_unlock(&dcache_lock);
+	write_unlock(&fs->lock);
+
+	if (old_pwd) {
+		dput(old_pwd);
+		mntput(old_pwdmnt);
+	}
 }
 
 static void chroot_fs_refs(struct nameidata *old_nd, struct nameidata *new_nd)

@@ -953,11 +953,11 @@ static void gdb_console_write(struct console *con, const char *s, unsigned n)
 }
 
 static struct console gdb_console = {
-	name:	"gdb",
-	write:	gdb_console_write,
-	device:	gdb_console_dev,
-	flags:	CON_PRINTBUFFER,
-	index:	-1
+	.name	= "gdb",
+	.write	= gdb_console_write,
+	.device	= gdb_console_dev,
+	.flags	= CON_PRINTBUFFER,
+	.index	= -1
 };
 
 __init void register_gdb_console(void)

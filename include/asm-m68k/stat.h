@@ -66,13 +66,13 @@ struct stat64 {
 	unsigned long	st_blocks;	/* Number 512-byte blocks allocated. */
 
 	unsigned long	st_atime;
-	unsigned long	__pad5;
+	unsigned long	st_atime_nsec;
 
 	unsigned long	st_mtime;
-	unsigned long	__pad6;
+	unsigned long	st_mtime_nsec;
 
 	unsigned long	st_ctime;
-	unsigned long	__pad7;		/* will be high 32 bits of ctime someday */
+	unsigned long	st_ctime_nsec;
 
 	unsigned long long	st_ino;
 };

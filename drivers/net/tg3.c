@@ -63,8 +63,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.1"
-#define DRV_MODULE_RELDATE	"Aug 30, 2002"
+#define DRV_MODULE_VERSION	"1.2"
+#define DRV_MODULE_RELDATE	"Nov 14, 2002"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -2377,13 +2377,28 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	/* No BH disabling for tx_lock here.  We are running in BH disabled
 	 * context and TX reclaim runs via tp->poll inside of a software
 	 * interrupt.  Rejoice!
+	 *
+	 * Actually, things are not so simple.  If we are to take a hw
+	 * IRQ here, we can deadlock, consider:
+	 *
+	 *       CPU1		CPU2
+	 *   tg3_start_xmit
+	 *   take tp->tx_lock
+	 *			tg3_timer
+	 *			take tp->lock
+	 *   tg3_interrupt
+	 *   spin on tp->lock
+	 *			spin on tp->tx_lock
+	 *
+	 * So we really do need to disable interrupts when taking
+	 * tx_lock here.
 	 */
-	spin_lock(&tp->tx_lock);
+	spin_lock_irq(&tp->tx_lock);
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
 		netif_stop_queue(dev);
-		spin_unlock(&tp->tx_lock);
+		spin_unlock_irq(&tp->tx_lock);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
 		return 1;
@@ -2535,7 +2550,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 
 out_unlock:
-	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->tx_lock);
 
 	dev->trans_start = jiffies;
 
@@ -2553,13 +2568,28 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* No BH disabling for tx_lock here.  We are running in BH disabled
 	 * context and TX reclaim runs via tp->poll inside of a software
 	 * interrupt.  Rejoice!
+	 *
+	 * Actually, things are not so simple.  If we are to take a hw
+	 * IRQ here, we can deadlock, consider:
+	 *
+	 *       CPU1		CPU2
+	 *   tg3_start_xmit
+	 *   take tp->tx_lock
+	 *			tg3_timer
+	 *			take tp->lock
+	 *   tg3_interrupt
+	 *   spin on tp->lock
+	 *			spin on tp->tx_lock
+	 *
+	 * So we really do need to disable interrupts when taking
+	 * tx_lock here.
 	 */
-	spin_lock(&tp->tx_lock);
+	spin_lock_irq(&tp->tx_lock);
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
 		netif_stop_queue(dev);
-		spin_unlock(&tp->tx_lock);
+		spin_unlock_irq(&tp->tx_lock);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
 		return 1;
@@ -2665,7 +2695,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (TX_BUFFS_AVAIL(tp) <= (MAX_SKB_FRAGS + 1))
 		netif_stop_queue(dev);
 
-	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->tx_lock);
 
 	dev->trans_start = jiffies;
 

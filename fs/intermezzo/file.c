@@ -496,7 +496,7 @@ int izo_purge_file(struct presto_file_set *fset, char *file)
 
         /* FIXME: take a lock here */
 
-        if (dentry->d_inode->i_atime > CURRENT_TIME - 5) {
+        if (dentry->d_inode->i_atime.tv_sec > get_seconds() - 5) {
                 /* We lost the race; this file was accessed while we were doing
                  * ioctls and lookups and whatnot. */
                 rc = -EBUSY;

@@ -30,6 +30,7 @@ get_swap_bio(int gfp_flags, struct page *page, bio_end_io_t end_io)
 		struct swap_info_struct *sis;
 		swp_entry_t entry;
 
+		BUG_ON(!PageSwapCache(page));
 		entry.val = page->index;
 		sis = get_swap_info_struct(swp_type(entry));
 
@@ -97,6 +98,7 @@ int swap_writepage(struct page *page)
 	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
 	if (bio == NULL) {
 		set_page_dirty(page);
+		unlock_page(page);
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -116,6 +118,7 @@ int swap_readpage(struct file *file, struct page *page)
 	ClearPageUptodate(page);
 	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);
 	if (bio == NULL) {
+		unlock_page(page);
 		ret = -ENOMEM;
 		goto out;
 	}

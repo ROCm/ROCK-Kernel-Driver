@@ -21,8 +21,6 @@
  */
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/blk.h>
 
@@ -32,7 +30,6 @@
 #include <asm/mach-types.h>
 
 #include <asm/mach/arch.h>
-#include <asm/mach/amba_kmi.h>
 
 extern void clps711x_map_io(void);
 extern void clps711x_init_irq(void);

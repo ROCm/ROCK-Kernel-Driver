@@ -176,7 +176,7 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 	hcd->irq = dev->irq[1];
 	hcd->regs = dev->mapbase;
 	hcd->pdev = SA1111_FAKE_PCIDEV;
-	hcd->parent = &dev->dev;
+	hcd->controller = &dev->dev;
 
 	retval = hcd_buffer_create (hcd);
 	if (retval != 0) {
@@ -291,8 +291,6 @@ ohci_sa1111_start (struct usb_hcd *hcd)
 		return ret;
 	}
 	ohci->regs = hcd->regs;
-
-	ohci->parent_dev = hcd->parent;
 
 	if (hc_reset (ohci) < 0) {
 		ohci_stop (hcd);

@@ -180,17 +180,8 @@ static void fit3_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void fit3_init_proto(PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void fit3_release_proto(PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol fit3 = {
+	.owner		= THIS_MODULE,
 	.name		= "fit3",
 	.max_mode	= 3,
 	.epp_first	= 2,
@@ -203,8 +194,6 @@ static struct pi_protocol fit3 = {
 	.connect	= fit3_connect,
 	.disconnect	= fit3_disconnect,
 	.log_adapter	= fit3_log_adapter,
-	.init_proto	= fit3_init_proto,
-	.release_proto	= fit3_release_proto,
 };
 
 static int __init fit3_init(void)

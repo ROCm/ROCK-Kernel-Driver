@@ -731,9 +731,9 @@ int uart00_remove_devices(void)
 }
 
 struct pld_hotswap_ops uart00_pldhs_ops={
-	name: "uart00",
-	add_device: uart00_add_device,
-	remove_devices:uart00_remove_devices,
+	.name		= "uart00",
+	.add_device	= uart00_add_device,
+	.remove_devices	= uart00_remove_devices,
 };
 
 #endif

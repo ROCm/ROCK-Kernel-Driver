@@ -263,11 +263,14 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	 * inode.
 	 */
 
-	if (!result->i_ctime) {
-		if (!(result->i_ctime = local_to_gmt(dir->i_sb, de->creation_date)))
-			result->i_ctime = 1;
-		result->i_mtime = local_to_gmt(dir->i_sb, de->write_date);
-		result->i_atime = local_to_gmt(dir->i_sb, de->read_date);
+	if (!result->i_ctime.tv_sec) {
+		if (!(result->i_ctime.tv_sec = local_to_gmt(dir->i_sb, de->creation_date)))
+			result->i_ctime.tv_sec = 1;
+		result->i_ctime.tv_nsec = 0;
+		result->i_mtime.tv_sec = local_to_gmt(dir->i_sb, de->write_date);
+		result->i_mtime.tv_nsec = 0;
+		result->i_atime.tv_sec = local_to_gmt(dir->i_sb, de->read_date);
+		result->i_atime.tv_nsec = 0;
 		hpfs_result->i_ea_size = de->ea_size;
 		if (!hpfs_result->i_ea_mode && de->read_only)
 			result->i_mode &= ~0222;

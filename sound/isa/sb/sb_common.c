@@ -21,15 +21,17 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/initval.h>
+
+#include <asm/io.h>
+#include <asm/dma.h>
 
 #define chip_t sb_t
 

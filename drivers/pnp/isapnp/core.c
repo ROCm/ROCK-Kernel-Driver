@@ -1055,10 +1055,10 @@ static int isapnp_disable_resources(struct pnp_dev *dev)
 }
 
 struct pnp_protocol isapnp_protocol = {
-	name:	"ISA Plug and Play",
-	get:	isapnp_get_resources,
-	set:	isapnp_set_resources,
-	disable:isapnp_disable_resources,
+	.name	= "ISA Plug and Play",
+	.get	= isapnp_get_resources,
+	.set	= isapnp_set_resources,
+	.disable = isapnp_disable_resources,
 };
 
 static inline int isapnp_init_device_tree(void)
@@ -1152,7 +1152,7 @@ int __init isapnp_init(void)
 				continue;
 			for (devlist = card->devices.next; devlist != &card->devices; devlist = devlist->next) {
 				struct pci_dev *dev = pci_dev_b(devlist);
-				printk(KERN_INFO "isapnp:   Device '%s'\n", dev->name[0]?card->name:"Unknown");
+				printk(KERN_INFO "isapnp:   Device '%s'\n", dev->dev.name[0]?card->name:"Unknown");
 			}
 		}
 	}

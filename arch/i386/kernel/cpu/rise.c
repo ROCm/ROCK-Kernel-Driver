@@ -31,13 +31,13 @@ static void __init init_rise(struct cpuinfo_x86 *c)
 static struct cpu_dev rise_cpu_dev __initdata = {
 	.c_vendor	= "Rise",
 	.c_ident	= { "RiseRiseRise" },
-	c_models: {
-		{ X86_VENDOR_RISE,	5,
+	.c_models = {
+		{ .vendor = X86_VENDOR_RISE, .family = 5, .model_names = 
 		  { 
-			  [0] "iDragon", 
-			  [2] "iDragon", 
-			  [8] "iDragon II", 
-			  [9] "iDragon II"
+			  [0] = "iDragon", 
+			  [2] = "iDragon", 
+			  [8] = "iDragon II", 
+			  [9] = "iDragon II"
 		  }
 		},
 	},

@@ -720,7 +720,7 @@ static int presto_rmdir(struct inode *dir, struct dentry *dentry)
         return error;
 }
 
-static int presto_mknod(struct inode * dir, struct dentry * dentry, int mode, int rdev)
+static int presto_mknod(struct inode * dir, struct dentry * dentry, int mode, dev_t rdev)
 {
         int error;
         struct presto_cache *cache;

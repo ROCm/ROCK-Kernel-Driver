@@ -171,7 +171,8 @@ static __u32 iommu_get_scsi_one_pflush(char *vaddr, unsigned long len, struct sb
 
 static void iommu_get_scsi_sgl_noflush(struct scatterlist *sg, int sz, struct sbus_bus *sbus)
 {
-	for (; sz >= 0; sz--) {
+	while (sz != 0) {
+		--sz;
 		sg[sz].dvma_address = (__u32) (page_address(sg[sz].page) + sg[sz].offset);
 		sg[sz].dvma_length = (__u32) (sg[sz].length);
 	}
@@ -180,7 +181,8 @@ static void iommu_get_scsi_sgl_noflush(struct scatterlist *sg, int sz, struct sb
 static void iommu_get_scsi_sgl_gflush(struct scatterlist *sg, int sz, struct sbus_bus *sbus)
 {
 	flush_page_for_dma(0);
-	for (; sz >= 0; sz--) {
+	while (sz != 0) {
+		--sz;
 		sg[sz].dvma_address = (__u32) (page_address(sg[sz].page) + sg[sz].offset);
 		sg[sz].dvma_length = (__u32) (sg[sz].length);
 	}
@@ -191,6 +193,7 @@ static void iommu_get_scsi_sgl_pflush(struct scatterlist *sg, int sz, struct sbu
 	unsigned long page, oldpage = 0;
 
 	while(sz >= 0) {
+		--sz;
 		page = ((unsigned long) sg[sz].offset) & PAGE_MASK;
 		if (oldpage == page)
 			page += PAGE_SIZE; /* We flushed that page already */
@@ -200,7 +203,6 @@ static void iommu_get_scsi_sgl_pflush(struct scatterlist *sg, int sz, struct sbu
 		}
 		sg[sz].dvma_address = (__u32) (page_address(sg[sz].page) + sg[sz].offset);
 		sg[sz].dvma_length = (__u32) (sg[sz].length);
-		sz--;
 		oldpage = page - PAGE_SIZE;
 	}
 }

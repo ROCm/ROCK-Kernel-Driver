@@ -9,7 +9,6 @@
  *
  *  Page table sludge for ARM v3 and v4 processor architectures.
  */
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
@@ -166,14 +165,13 @@ free:
 static inline void
 alloc_init_section(unsigned long virt, unsigned long phys, int prot)
 {
-	pmd_t *pmdp, pmd;
+	pmd_t *pmdp;
 
 	pmdp = pmd_offset(pgd_offset_k(virt), virt);
 	if (virt & (1 << 20))
 		pmdp++;
 
-	pmd_val(pmd) = phys | prot;
-	set_pmd(pmdp, pmd);
+	set_pmd(pmdp, __pmd(phys | prot));
 }
 
 /*
@@ -186,19 +184,20 @@ alloc_init_section(unsigned long virt, unsigned long phys, int prot)
 static inline void
 alloc_init_page(unsigned long virt, unsigned long phys, unsigned int prot_l1, pgprot_t prot)
 {
-	pmd_t *pmdp, pmd;
+	pmd_t *pmdp;
 	pte_t *ptep;
 
 	pmdp = pmd_offset(pgd_offset_k(virt), virt);
 
 	if (pmd_none(*pmdp)) {
+		unsigned long pmdval;
 		ptep = alloc_bootmem_low_pages(2 * PTRS_PER_PTE *
 					       sizeof(pte_t));
 
-		pmd_val(pmd) = __pa(ptep) | prot_l1;
-		set_pmd(pmdp, pmd);
-		pmd_val(pmd) += 256 * sizeof(pte_t);
-		set_pmd(pmdp + 1, pmd);
+		pmdval = __pa(ptep) | prot_l1;
+		pmdp[0] = __pmd(pmdval);
+		pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+		cpu_flush_pmd(pmdp);
 	}
 	ptep = pte_offset_kernel(pmdp, virt);
 
@@ -360,8 +359,9 @@ static void __init create_mapping(struct map_desc *md)
  */
 void setup_mm_for_reboot(char mode)
 {
+	unsigned long pmdval;
 	pgd_t *pgd;
-	pmd_t pmd;
+	pmd_t *pmd;
 	int i;
 
 	if (current->mm && current->mm->pgd)
@@ -370,10 +370,11 @@ void setup_mm_for_reboot(char mode)
 		pgd = init_mm.pgd;
 
 	for (i = 0; i < FIRST_USER_PGD_NR + USER_PTRS_PER_PGD; i++) {
-		pmd_val(pmd) = (i << PGDIR_SHIFT) |
-			PMD_SECT_AP_WRITE | PMD_SECT_AP_READ |
-			PMD_TYPE_SECT;
-		set_pmd(pmd_offset(pgd + i, i << PGDIR_SHIFT), pmd);
+		pmdval = (i << PGDIR_SHIFT) |
+			 PMD_SECT_AP_WRITE | PMD_SECT_AP_READ |
+			 PMD_BIT4 | PMD_TYPE_SECT;
+		pmd = pmd_offset(pgd + i, i << PGDIR_SHIFT);
+		set_pmd(pmd, __pmd(pmdval));
 	}
 }
 

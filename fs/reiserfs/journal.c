@@ -1246,7 +1246,7 @@ static unsigned long reiserfs_journal_kupdate(struct super_block *s) {
     i = (start + 1) % JOURNAL_LIST_COUNT ;
     while(i != start) {
         jl = SB_JOURNAL_LIST(s) + i  ;
-        age = CURRENT_TIME - jl->j_timestamp ;
+        age = get_seconds() - jl->j_timestamp ;
         if (jl->j_len > 0 && // age >= (JOURNAL_MAX_COMMIT_AGE * 2) && 
             atomic_read(&(jl->j_nonzerolen)) > 0 &&
             atomic_read(&(jl->j_commit_left)) == 0) {
@@ -1655,7 +1655,7 @@ static int journal_read(struct super_block *p_s_sb) {
   cur_dblock = SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
   printk("reiserfs: checking transaction log (%s) for (%s)\n",
 	 bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd), reiserfs_bdevname(p_s_sb));
-  start = CURRENT_TIME ;
+  start = get_seconds() ;
 
   /* step 1, read in the journal header block.  Check the transaction it says 
   ** is the first unflushed, and if that transaction is not valid, 
@@ -1783,7 +1783,7 @@ start_log_replay:
   SB_JOURNAL(p_s_sb)->j_first_unflushed_offset = SB_JOURNAL(p_s_sb)->j_start ; 
   if (replay_count > 0) {
     printk("reiserfs: replayed %d transactions in %lu seconds\n", replay_count, 
-	    CURRENT_TIME - start) ;
+	    get_seconds() - start) ;
   }
   if (!bdev_read_only(p_s_sb->s_bdev) && 
        _update_journal_header_block(p_s_sb, SB_JOURNAL(p_s_sb)->j_start, 
@@ -2141,7 +2141,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 ** transaction
 */
 int journal_transaction_should_end(struct reiserfs_transaction_handle *th, int new_alloc) {
-  time_t now = CURRENT_TIME ;
+  time_t now = get_seconds() ;
   if (reiserfs_dont_log(th->t_super)) 
     return 0 ;
   if ( SB_JOURNAL(th->t_super)->j_must_wait > 0 ||
@@ -2187,7 +2187,7 @@ void reiserfs_wait_on_write_block(struct super_block *s) {
 ** expect to use in nblocks.
 */
 static int do_journal_begin_r(struct reiserfs_transaction_handle *th, struct super_block * p_s_sb,unsigned long nblocks,int join) {
-  time_t now = CURRENT_TIME ;
+  time_t now = get_seconds() ;
   int old_trans_id  ;
 
   reiserfs_check_lock_depth("journal_begin") ;
@@ -2557,7 +2557,7 @@ int flush_old_commits(struct super_block *p_s_sb, int immediate) {
   struct reiserfs_transaction_handle th ; 
 
   start =  SB_JOURNAL_LIST_INDEX(p_s_sb) ;
-  now = CURRENT_TIME ;
+  now = get_seconds() ;
 
   /* safety check so we don't flush while we are replaying the log during mount */
   if (SB_JOURNAL_LIST_INDEX(p_s_sb) < 0) {
@@ -2673,7 +2673,7 @@ static int check_journal_end(struct reiserfs_transaction_handle *th, struct supe
   }
 
   /* deal with old transactions where we are the last writers */
-  now = CURRENT_TIME ;
+  now = get_seconds() ;
   if ((now - SB_JOURNAL(p_s_sb)->j_trans_start_time) > SB_JOURNAL_MAX_TRANS_AGE(p_s_sb)) {
     commit_now = 1 ;
     SB_JOURNAL(p_s_sb)->j_next_async_flush = 1 ;
@@ -3126,7 +3126,7 @@ printk("journal-2020: do_journal_end: BAD desc->j_len is ZERO\n") ;
     /* this check should always be run, to send old lists to disk */
     if (SB_JOURNAL_LIST(p_s_sb)[jindex].j_len > 0 && 
               SB_JOURNAL_LIST(p_s_sb)[jindex].j_timestamp < 
-	      (CURRENT_TIME - (SB_JOURNAL_MAX_TRANS_AGE(p_s_sb) * 4))) {
+	      (get_seconds() - (SB_JOURNAL_MAX_TRANS_AGE(p_s_sb) * 4))) {
 	flush_journal_list(p_s_sb, SB_JOURNAL_LIST(p_s_sb) + jindex, 1 ) ; 
     }
   }

@@ -115,6 +115,9 @@ simscsi_detect (Scsi_Host_Template *templ)
 {
 	templ->proc_name = "simscsi";
 	host = scsi_register(templ, 0);
+	if(host == NULL)
+		return 0;
+
 	return 1;	/* fake one SCSI host adapter */
 }
 

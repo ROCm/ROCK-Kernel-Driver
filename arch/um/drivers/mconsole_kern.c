@@ -111,6 +111,8 @@ void mconsole_version(struct mc_request *req)
     remove <dev> - Remove a device from UML
     sysrq <letter> - Performs the SysRq action controlled by the letter
     cad - invoke the Ctl-Alt-Del handler
+    stop - pause the UML; it will do nothing until it receives a 'go'
+    go - continue the UML after a 'stop'
 "
 
 void mconsole_help(struct mc_request *req)

@@ -66,8 +66,6 @@
 
 extern int			nfs_stat_to_errno(int);
 
-#define NFS4_enc_void_sz	0
-#define NFS4_dec_void_sz	0
 #define NFS4_enc_compound_sz	1024  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	1024  /* XXX: large enough? */
 
@@ -223,8 +221,8 @@ encode_attrs(struct nfs4_compound *cp, struct iattr *iap)
 		bmval1 |= FATTR4_WORD1_TIME_ACCESS_SET;
 		WRITE32(NFS4_SET_TO_CLIENT_TIME);
 		WRITE32(0);
-		WRITE32(iap->ia_mtime);
-		WRITE32(0);
+		WRITE32(iap->ia_mtime.tv_sec);
+		WRITE32(iap->ia_mtime.tv_nsec);
 	}
 	else if (iap->ia_valid & ATTR_ATIME) {
 		bmval1 |= FATTR4_WORD1_TIME_ACCESS_SET;
@@ -234,8 +232,8 @@ encode_attrs(struct nfs4_compound *cp, struct iattr *iap)
 		bmval1 |= FATTR4_WORD1_TIME_MODIFY_SET;
 		WRITE32(NFS4_SET_TO_CLIENT_TIME);
 		WRITE32(0);
-		WRITE32(iap->ia_mtime);
-		WRITE32(0);
+		WRITE32(iap->ia_mtime.tv_sec);
+		WRITE32(iap->ia_mtime.tv_nsec);
 	}
 	else if (iap->ia_valid & ATTR_MTIME) {
 		bmval1 |= FATTR4_WORD1_TIME_MODIFY_SET;
@@ -722,6 +720,7 @@ encode_write(struct nfs4_compound *cp, struct nfs4_write *write, struct rpc_rqst
 	ENCODE_TAIL;
 }
 
+/* FIXME: this sucks */
 static int
 encode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
 {
@@ -826,16 +825,6 @@ encode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
 
 
 /*
- * Encode void argument
- */
-static int
-nfs4_xdr_enc_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
-	return 0;
-}
-
-/*
  * Encode COMPOUND argument
  */
 static int
@@ -884,8 +873,8 @@ xdr_error:					\
 } while (0)
 #define READTIME(x)       do {			\
 	p++;					\
-	(x) = (u64)ntohl(*p++) << 32;		\
-	(x) |= ntohl(*p++);			\
+	(x.tv_sec) = ntohl(*p++);		\
+	(x.tv_nsec) = ntohl(*p++);		\
 } while (0)
 #define COPYMEM(x,nbytes) do {			\
 	memcpy((x), p, nbytes);			\
@@ -1239,19 +1228,19 @@ decode_getattr(struct nfs4_compound *cp, int nfserr, struct nfs4_getattr *getatt
                 READ_BUF(12);
                 len += 12;
                 READTIME(nfp->atime);
-                dprintk("read_attrs: atime=%d\n", (int)nfp->atime);
+                dprintk("read_attrs: atime=%ld\n", (long)nfp->atime.tv_sec);
         }
         if (bmval1 & FATTR4_WORD1_TIME_METADATA) {
                 READ_BUF(12);
                 len += 12;
                 READTIME(nfp->ctime);
-                dprintk("read_attrs: ctime=%d\n", (int)nfp->ctime);
+                dprintk("read_attrs: ctime=%ld\n", (long)nfp->ctime.tv_sec);
         }
         if (bmval1 & FATTR4_WORD1_TIME_MODIFY) {
                 READ_BUF(12);
                 len += 12;
                 READTIME(nfp->mtime);
-                dprintk("read_attrs: mtime=%d\n", (int)nfp->mtime);
+                dprintk("read_attrs: mtime=%ld\n", (long)nfp->mtime.tv_sec);
         }
         if (len != attrlen)
                 goto xdr_error;
@@ -1546,6 +1535,7 @@ decode_write(struct nfs4_compound *cp, int nfserr, struct nfs4_write *write)
 	DECODE_TAIL;
 }
 
+/* FIXME: this sucks */
 static int
 decode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
 {
@@ -1680,15 +1670,6 @@ decode_compound(struct nfs4_compound *cp, struct rpc_rqst *req)
  */
 
 /*
- * Decode void reply
- */
-static int
-nfs4_xdr_dec_void(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	return 0;
-}
-
-/*
  * Decode COMPOUND response
  */
 static int
@@ -1753,16 +1734,15 @@ nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus)
 #endif
 
 #define PROC(proc, argtype, restype)				\
-    { "nfs4_" #proc,						\
-      (kxdrproc_t) nfs4_xdr_##argtype,				\
-      (kxdrproc_t) nfs4_xdr_##restype,				\
-      MAX(NFS4_##argtype##_sz,NFS4_##restype##_sz) << 2,	\
-      0							\
+[NFSPROC4_##proc] = {						\
+	.p_proc   = NFSPROC4_##proc,				\
+	.p_encode = (kxdrproc_t) nfs4_xdr_##argtype,		\
+	.p_decode = (kxdrproc_t) nfs4_xdr_##restype,		\
+	.p_bufsiz = MAX(NFS4_##argtype##_sz,NFS4_##restype##_sz) << 2,	\
     }
 
-static struct rpc_procinfo	nfs4_procedures[] = {
-  PROC(null,		enc_void,	dec_void),
-  PROC(compound,	enc_compound,	dec_compound)
+struct rpc_procinfo	nfs4_procedures[] = {
+  PROC(COMPOUND,	enc_compound,	dec_compound)
 };
 
 struct rpc_version		nfs_version4 = {

@@ -6122,6 +6122,7 @@ static int idetape_cleanup (ide_drive_t *drive)
 	drive->driver_data = NULL;
 	devfs_unregister(tape->de_r);
 	devfs_unregister(tape->de_n);
+	devfs_unregister_tape(drive->disk->number);
 	kfree (tape);
 	drive->disk->fops = ide_fops;
 	return 0;
@@ -6269,7 +6270,7 @@ static int idetape_attach (ide_drive_t *drive)
 			    HWIF(drive)->major, minor + 128,
 			    S_IFCHR | S_IRUGO | S_IWUGO,
 			    &idetape_fops, NULL);
-	devfs_register_tape(tape->de_r);
+	drive->disk->number = devfs_register_tape(drive->de);
 	drive->disk->fops = &idetape_block_ops;
 	return 0;
 failed:

@@ -246,10 +246,10 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
-#include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
@@ -955,8 +955,8 @@ qla1280_detect(Scsi_Host_Template * template)
 		qla1280_setup(options, NULL);
 
 	printk(KERN_WARNING
-	       "qla1280: Please read the file /usr/src/linux/drivers"
-	       "/scsi/README.qla1280\n"
+	       "qla1280: Please read the file /usr/src/linux/Documentation"
+	       "/scsi/qla1280.txt\n"
 	       "qla1280: to see the proper way to specify options to the qla1280 "
 	       "module\n"
 	       "qla1280: Specifically, don't use any commas when passing "

@@ -47,7 +47,7 @@ EXPORT_SYMBOL(agp_enable);
 EXPORT_SYMBOL(agp_backend_acquire);
 EXPORT_SYMBOL(agp_backend_release);
 
-struct agp_bridge_data agp_bridge = { type: NOT_SUPPORTED };
+struct agp_bridge_data agp_bridge = { .type = NOT_SUPPORTED };
 static int agp_try_unsupported __initdata = 0;
 
 int agp_memory_reserved;

@@ -18,6 +18,8 @@
 #include <linux/config.h>	/* for CONFIG_SCSI_LOGGING */
 #include <linux/devfs_fs_kernel.h>
 #include <linux/proc_fs.h>
+#include <linux/init.h>
+
 
 /*
  * Some of the public constants are being moved to this file.
@@ -391,6 +393,11 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #include "scsi_obsolete.h"
 
 /*
+ * Forward-declaration of structs for prototypes.
+ */
+struct Scsi_Host;
+
+/*
  * Add some typedefs so that we can prototyope a bunch of the functions.
  */
 typedef struct scsi_device Scsi_Device;
@@ -404,15 +411,7 @@ typedef struct scsi_request Scsi_Request;
  * Here is where we prototype most of the mid-layer.
  */
 
-/*
- *  Initializes all SCSI devices.  This scans all scsi busses.
- */
-
 extern unsigned int scsi_logging_level;		/* What do we log? */
-extern unsigned int scsi_dma_free_sectors;	/* How much room do we have left */
-extern unsigned int scsi_need_isa_buffer;	/* True if some devices need indirection
-						   * buffers */
-extern volatile int in_scan_scsis;
 
 extern struct bus_type scsi_driverfs_bus_type;
 
@@ -455,6 +454,7 @@ extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
 extern void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt);
+extern int scsi_prep_fn(struct request_queue *q, struct request *req);
 extern void scsi_request_fn(request_queue_t * q);
 extern int scsi_starvation_completion(Scsi_Device * SDpnt);
 
@@ -480,9 +480,9 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			int timeout, int retries);
 extern int scsi_dev_init(void);
 extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
-extern void scsi_detect_device(struct scsi_device *);
 extern int scsi_attach_device(struct scsi_device *);
 extern void scsi_detach_device(struct scsi_device *);
+extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
 
 /*
  * Newer request-based interfaces.
@@ -500,17 +500,31 @@ extern void scsi_do_req(Scsi_Request *, const void *cmnd,
 extern int scsi_insert_special_req(Scsi_Request * SRpnt, int);
 extern void scsi_init_cmd_from_req(Scsi_Cmnd *, Scsi_Request *);
 
-
-/*
- * Prototypes for functions/data in hosts.c
- */
-extern int max_scsi_hosts;
-
 /*
  * Prototypes for functions in scsi_proc.c
  */
-extern void proc_print_scsidevice(Scsi_Device *, char *, int *, int);
+#ifdef CONFIG_PROC_FS
+extern int scsi_init_procfs(void);
+extern void scsi_exit_procfs(void);
+
+extern void scsi_proc_host_add(struct Scsi_Host *);
+extern void scsi_proc_host_rm(struct Scsi_Host *);
+
 extern struct proc_dir_entry *proc_scsi;
+#else
+static inline int scsi_init_procfs(void) { return 0; };
+static inline void scsi_exit_procfs(void) { };
+
+static inline void scsi_proc_host_add(struct Scsi_Host *);
+static inline void scsi_proc_host_rm(struct Scsi_Host *);
+#endif /* CONFIG_PROC_FS */
+
+/*
+ * Prototypes for functions in scsi_scan.c
+ */
+extern struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *,
+			uint, uint, uint);
+extern void scsi_free_sdev(struct scsi_device *);
 
 /*
  * Prototypes for functions in constants.c
@@ -526,6 +540,31 @@ extern void print_status(unsigned char status);
 extern int print_msg(const unsigned char *);
 extern const char *scsi_sense_key_string(unsigned char);
 extern const char *scsi_extd_sense_format(unsigned char, unsigned char);
+
+/*
+ * dev_info: for the black/white list in the old scsi_static_device_list
+ */
+struct dev_info {
+	char *vendor;
+	char *model;
+	char *revision;	/* revision known to be bad, unused */
+	unsigned flags;
+};
+
+extern struct dev_info scsi_static_device_list[] __initdata;
+
+/*
+ * scsi_dev_info_list: structure to hold black/white listed devices.
+ */
+struct scsi_dev_info_list {
+	struct list_head dev_info_list;
+	char vendor[8];
+	char model[16];
+	unsigned flags;
+	unsigned compatible; /* for use with scsi_static_device_list entries */
+};
+extern struct list_head scsi_dev_info_list;
+extern int scsi_dev_info_list_add_str(char *);
 
 /*
  *  The scsi_device struct contains what we know about each given scsi
@@ -837,25 +876,6 @@ struct scsi_cmnd {
 #define SCSI_MLQUEUE_HOST_BUSY   0x1055
 #define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
 
-#define SCSI_SLEEP(QUEUE, CONDITION) {		    \
-    if (CONDITION) {			            \
-	DECLARE_WAITQUEUE(wait, current);	    \
-	add_wait_queue(QUEUE, &wait);		    \
-	for(;;) {			            \
-	set_current_state(TASK_UNINTERRUPTIBLE);    \
-	if (CONDITION) {		            \
-            if (in_interrupt())	                    \
-	        panic("scsi: trying to call schedule() in interrupt" \
-		      ", file %s, line %d.\n", __FILE__, __LINE__);  \
-	    schedule();			\
-        }				\
-	else			        \
-	    break;      		\
-	}			        \
-	remove_wait_queue(QUEUE, &wait);\
-	current->state = TASK_RUNNING;	\
-    }; }
-
 /*
  * old style reset request from external source
  * (private to sg.c and scsi_error.c, supplied by scsi_obsolete.c)
@@ -885,8 +905,9 @@ extern int scsi_reset_provider(Scsi_Device *, int);
 static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
         request_queue_t *q = &SDpnt->request_queue;
 
-        if(SDpnt->tagged_supported && !blk_queue_tagged(q)) {
-                blk_queue_init_tags(q, depth);
+        if(SDpnt->tagged_supported) {
+		if(!blk_queue_tagged(q))
+			blk_queue_init_tags(q, depth);
 		scsi_adjust_queue_depth(SDpnt, MSG_ORDERED_TAG, depth);
         }
 }
@@ -895,9 +916,12 @@ static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
  * scsi_deactivate_tcq - turn off tag command queueing
  * @SDpnt:	device to turn off TCQ for
  **/
-static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt) {
-        blk_queue_free_tags(&SDpnt->request_queue);
-	scsi_adjust_queue_depth(SDpnt, 0, 2);
+static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt, int depth) {
+	request_queue_t *q = &SDpnt->request_queue;
+
+	if(blk_queue_tagged(q))
+		blk_queue_free_tags(q);
+	scsi_adjust_queue_depth(SDpnt, 0, depth);
 }
 
 /**

@@ -371,7 +371,6 @@ struct pci_dev {
 	struct resource dma_resource[DEVICE_COUNT_DMA];
 	struct resource irq_resource[DEVICE_COUNT_IRQ];
 
-	char		name[90];	/* device name */
 	char		slot_name[8];	/* slot name */
 	int		active;		/* ISAPnP: device is active */
 	int		ro;		/* ISAPnP: read only */
@@ -518,21 +517,6 @@ void pcibios_update_resource(struct pci_dev *, struct resource *,
 void pcibios_update_irq(struct pci_dev *, int irq);
 void pcibios_fixup_pbus_ranges(struct pci_bus *, struct pbus_set_ranges_data *);
 
-/* Backward compatibility, don't use in new code! */
-
-int pcibios_read_config_byte (unsigned char bus, unsigned char dev_fn,
-			      unsigned char where, unsigned char *val);
-int pcibios_read_config_word (unsigned char bus, unsigned char dev_fn,
-			      unsigned char where, unsigned short *val);
-int pcibios_read_config_dword (unsigned char bus, unsigned char dev_fn,
-			       unsigned char where, unsigned int *val);
-int pcibios_write_config_byte (unsigned char bus, unsigned char dev_fn,
-			       unsigned char where, unsigned char val);
-int pcibios_write_config_word (unsigned char bus, unsigned char dev_fn,
-			       unsigned char where, unsigned short val);
-int pcibios_write_config_dword (unsigned char bus, unsigned char dev_fn,
-				unsigned char where, unsigned int val);
-
 /* Generic PCI functions used internally */
 
 int pci_bus_exists(const struct list_head *list, int nr);
@@ -669,8 +653,6 @@ extern struct pci_dev *isa_bridge;
 static inline int pci_present(void) { return 0; }
 
 #define _PCI_NOP(o,s,t) \
-	static inline int pcibios_##o##_config_##s (u8 bus, u8 dfn, u8 where, t val) \
-		{ return PCIBIOS_FUNC_NOT_SUPPORTED; } \
 	static inline int pci_##o##_config_##s (struct pci_dev *dev, int where, t val) \
 		{ return PCIBIOS_FUNC_NOT_SUPPORTED; }
 #define _PCI_NOP_ALL(o,x)	_PCI_NOP(o,byte,u8 x) \

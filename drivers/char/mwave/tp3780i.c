@@ -47,6 +47,7 @@
 */
 
 #include <linux/version.h>
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/ptrace.h>
 #include <linux/ioport.h>

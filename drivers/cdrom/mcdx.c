@@ -60,7 +60,7 @@ static const char *mcdx_c_version
 #include <linux/module.h>
 
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/cdrom.h>
@@ -69,6 +69,7 @@ static const char *mcdx_c_version
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <asm/io.h>
+#include <asm/current.h>
 #include <asm/uaccess.h>
 
 #include <linux/major.h>
@@ -321,14 +322,14 @@ static struct request_queue mcdx_queue;
 MODULE_PARM(mcdx, "1-4i");
 
 static struct cdrom_device_ops mcdx_dops = {
-	open:mcdx_open,
-	release:mcdx_close,
-	media_changed:mcdx_media_changed,
-	tray_move:mcdx_tray_move,
-	lock_door:mcdx_lockdoor,
-	audio_ioctl:mcdx_audio_ioctl,
-	capability:CDC_OPEN_TRAY | CDC_LOCK | CDC_MEDIA_CHANGED |
-	    CDC_PLAY_AUDIO | CDC_DRIVE_STATUS,
+	.open		= mcdx_open,
+	.release	= mcdx_close,
+	.media_changed	= mcdx_media_changed,
+	.tray_move	= mcdx_tray_move,
+	.lock_door	= mcdx_lockdoor,
+	.audio_ioctl	= mcdx_audio_ioctl,
+	.capability	= CDC_OPEN_TRAY | CDC_LOCK | CDC_MEDIA_CHANGED |
+			  CDC_PLAY_AUDIO | CDC_DRIVE_STATUS,
 };
 
 /* KERNEL INTERFACE FUNCTIONS **************************************/

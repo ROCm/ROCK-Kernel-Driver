@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 112 $
+ *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -82,6 +82,31 @@ acpi_ex_read_data_from_field (
 			}
 		}
 	}
+	else if ((ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_LOCAL_REGION_FIELD) &&
+			 (obj_desc->field.region_obj->region.space_id == ACPI_ADR_SPACE_SMBUS)) {
+		/*
+		 * This is an SMBus read.  We must create a buffer to hold the data
+		 * and directly access the region handler.
+		 */
+		buffer_desc = acpi_ut_create_buffer_object (ACPI_SMBUS_BUFFER_SIZE);
+		if (!buffer_desc) {
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
+
+		/* Lock entire transaction if requested */
+
+		locked = acpi_ex_acquire_global_lock (obj_desc->common_field.field_flags);
+
+		/*
+		 * Perform the read.
+		 * Note: Smbus protocol value is passed in upper 16-bits of Function
+		 */
+		status = acpi_ex_access_region (obj_desc, 0,
+				  ACPI_CAST_PTR (acpi_integer, buffer_desc->buffer.pointer),
+				  ACPI_READ | (obj_desc->field.attribute << 16));
+		acpi_ex_release_global_lock (locked);
+		goto exit;
+	}
 
 	/*
 	 * Allocate a buffer for the contents of the field.
@@ -97,23 +122,10 @@ acpi_ex_read_data_from_field (
 	if (length > acpi_gbl_integer_byte_width) {
 		/* Field is too large for an Integer, create a Buffer instead */
 
-		buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		buffer_desc = acpi_ut_create_buffer_object (length);
 		if (!buffer_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
-
-		/* Create the actual read buffer */
-
-		buffer_desc->buffer.pointer = ACPI_MEM_CALLOCATE (length);
-		if (!buffer_desc->buffer.pointer) {
-			acpi_ut_remove_reference (buffer_desc);
-			return_ACPI_STATUS (AE_NO_MEMORY);
-		}
-
-		/* Complete the buffer object initialization */
-
-		buffer_desc->common.flags = AOPOBJ_DATA_VALID;
-		buffer_desc->buffer.length = length;
 		buffer = buffer_desc->buffer.pointer;
 	}
 	else {
@@ -138,17 +150,17 @@ acpi_ex_read_data_from_field (
 		obj_desc->common_field.start_field_bit_offset,
 		obj_desc->common_field.base_byte_offset));
 
+	/* Lock entire transaction if requested */
+
 	locked = acpi_ex_acquire_global_lock (obj_desc->common_field.field_flags);
 
 	/* Read from the field */
 
 	status = acpi_ex_extract_from_field (obj_desc, buffer, length);
-
-	/*
-	 * Release global lock if we acquired it earlier
-	 */
 	acpi_ex_release_global_lock (locked);
 
+
+exit:
 	if (ACPI_FAILURE (status)) {
 		acpi_ut_remove_reference (buffer_desc);
 	}
@@ -176,7 +188,8 @@ acpi_ex_read_data_from_field (
 acpi_status
 acpi_ex_write_data_to_field (
 	acpi_operand_object     *source_desc,
-	acpi_operand_object     *obj_desc)
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **result_desc)
 {
 	acpi_status             status;
 	u32                     length;
@@ -184,6 +197,7 @@ acpi_ex_write_data_to_field (
 	void                    *buffer;
 	void                    *new_buffer;
 	u8                      locked;
+	acpi_operand_object     *buffer_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ex_write_data_to_field", obj_desc);
@@ -206,6 +220,50 @@ acpi_ex_write_data_to_field (
 				return_ACPI_STATUS (status);
 			}
 		}
+	}
+	else if ((ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_LOCAL_REGION_FIELD) &&
+			 (obj_desc->field.region_obj->region.space_id == ACPI_ADR_SPACE_SMBUS)) {
+		/*
+		 * This is an SMBus write.  We will bypass the entire field mechanism
+		 * and handoff the buffer directly to the handler.
+		 *
+		 * Source must be a buffer of sufficient size (ACPI_SMBUS_BUFFER_SIZE).
+		 */
+		if (ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_BUFFER) {
+			ACPI_REPORT_ERROR (("SMBus write requires Buffer, found type %s\n",
+				acpi_ut_get_object_type_name (source_desc)));
+			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+		}
+
+		if (source_desc->buffer.length < ACPI_SMBUS_BUFFER_SIZE) {
+			ACPI_REPORT_ERROR (("SMBus write requires Buffer of length %X, found length %X\n",
+				ACPI_SMBUS_BUFFER_SIZE, source_desc->buffer.length));
+			return_ACPI_STATUS (AE_AML_BUFFER_LIMIT);
+		}
+
+		buffer_desc = acpi_ut_create_buffer_object (ACPI_SMBUS_BUFFER_SIZE);
+		if (!buffer_desc) {
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
+
+		buffer = buffer_desc->buffer.pointer;
+		ACPI_MEMCPY (buffer, source_desc->buffer.pointer, ACPI_SMBUS_BUFFER_SIZE);
+
+		/* Lock entire transaction if requested */
+
+		locked = acpi_ex_acquire_global_lock (obj_desc->common_field.field_flags);
+
+		/*
+		 * Perform the write (returns status and perhaps data in the same buffer)
+		 * Note: SMBus protocol type is passed in upper 16-bits of Function.
+		 */
+		status = acpi_ex_access_region (obj_desc, 0,
+				  (acpi_integer *) buffer,
+				  ACPI_WRITE | (obj_desc->field.attribute << 16));
+		acpi_ex_release_global_lock (locked);
+
+		*result_desc = buffer_desc;
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -267,16 +325,13 @@ acpi_ex_write_data_to_field (
 		obj_desc->common_field.start_field_bit_offset,
 		obj_desc->common_field.base_byte_offset));
 
+	/* Lock entire transaction if requested */
+
 	locked = acpi_ex_acquire_global_lock (obj_desc->common_field.field_flags);
 
-	/*
-	 * Write to the field
-	 */
-	status = acpi_ex_insert_into_field (obj_desc, buffer, length);
+	/* Write to the field */
 
-	/*
-	 * Release global lock if we acquired it earlier
-	 */
+	status = acpi_ex_insert_into_field (obj_desc, buffer, length);
 	acpi_ex_release_global_lock (locked);
 
 	/* Free temporary buffer if we used one */

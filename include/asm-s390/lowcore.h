@@ -136,7 +136,7 @@ struct _lowcore
 
         /* SMP info area: defined by DJB */
         __u64        jiffy_timer;              /* 0xc80 */
-	atomic_t     ext_call_fast;            /* 0xc88 */
+	__u32        ext_call_fast;            /* 0xc88 */
         __u8         pad11[0xe00-0xc8c];       /* 0xc8c */
 
         /* 0xe00 is used as indicator for dump tools */

@@ -60,64 +60,11 @@
 /* Forward declarations for internal helpers. */
 static int sctp_rcv_ootb(struct sk_buff *);
 sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
-				      const sockaddr_storage_t *laddr,
-				      const sockaddr_storage_t *paddr,
+				      const union sctp_addr *laddr,
+				      const union sctp_addr *paddr,
 				      sctp_transport_t **transportp);
-sctp_endpoint_t *__sctp_rcv_lookup_endpoint(const sockaddr_storage_t *laddr);
+sctp_endpoint_t *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr);
 
-/* Initialize a sockaddr_storage from in incoming skb.
- * FIXME:  This belongs with AF specific sctp_func_t.  --jgrimm
- */
-static sockaddr_storage_t *sctp_sockaddr_storage_init(sockaddr_storage_t *addr,
-						      const struct sk_buff *skb,
-						      int is_saddr)
-{
-	sockaddr_storage_t *ret = NULL;
-	void *to, *saddr, *daddr;
-	__u16 *port;
-	size_t len;
-	struct sctphdr *sh;
-
-	switch (skb->nh.iph->version) {
-	case 4:
-		to = &addr->v4.sin_addr.s_addr;
-		port = &addr->v4.sin_port;
-		saddr = &skb->nh.iph->saddr;
-		daddr = &skb->nh.iph->daddr;
-		len = sizeof(struct in_addr);
-		addr->v4.sin_family = AF_INET;
-		break;
-
-	case 6:
-		SCTP_V6(
-			to = &addr->v6.sin6_addr;
-			port = &addr->v6.sin6_port;
-			saddr = &skb->nh.ipv6h->saddr;
-			daddr = &skb->nh.ipv6h->daddr;
-			len = sizeof(struct in6_addr);
-			addr->v6.sin6_family = AF_INET6;
-			addr->v6.sin6_flowinfo = 0; /* FIXME */
-			addr->v6.sin6_scope_id = 0; /* FIXME */
-			break;
-			)
-
-	default:
-		goto out;
-	};
-
-	sh = (struct sctphdr *) skb->h.raw;
-	if (is_saddr) {
-		*port  = ntohs(sh->source);
-		memcpy(to, saddr, len);
-	} else {
-		*port = ntohs(sh->dest);
-		memcpy(to, daddr, len);
-	}
-
-	ret = addr;
-out:
-	return ret;
-}
 
 /* Calculate the SCTP checksum of an SCTP packet.  */
 static inline int sctp_rcv_checksum(struct sk_buff *skb)
@@ -147,8 +94,9 @@ int sctp_rcv(struct sk_buff *skb)
 	sctp_transport_t *transport = NULL;
 	sctp_chunk_t *chunk;
 	struct sctphdr *sh;
-	sockaddr_storage_t src;
-	sockaddr_storage_t dest;
+	union sctp_addr src;
+	union sctp_addr dest;
+	struct sctp_func *af;
 	int ret = 0;
 
 	if (skb->pkt_type!=PACKET_HOST)
@@ -163,10 +111,15 @@ int sctp_rcv(struct sk_buff *skb)
 	if (sctp_rcv_checksum(skb) < 0)
 		goto bad_packet;
 
-	skb_pull(skb, sizeof(struct sctphdr));
+	skb_pull(skb, sizeof(struct sctphdr));	
 
-	sctp_sockaddr_storage_init(&src, skb, 1);
-	sctp_sockaddr_storage_init(&dest, skb, 0);
+	af = sctp_get_af_specific(ipver2af(skb->nh.iph->version));
+	if (unlikely(!af)) 
+		goto bad_packet;
+
+	/* Initialize local addresses for lookups. */
+	af->from_skb(&src, skb, 1);
+	af->from_skb(&dest, skb, 0);
 
 	/* If the packet is to or from a non-unicast address,
 	 * silently discard the packet.
@@ -179,7 +132,7 @@ int sctp_rcv(struct sk_buff *skb)
 	 * IP broadcast addresses cannot be used in an SCTP transport
 	 * address."
 	 */
-	if (!sctp_addr_is_valid(&src) || !sctp_addr_is_valid(&dest))
+	if (!af->addr_valid(&src) || !af->addr_valid(&dest))
 		goto discard_it;
 
 	asoc = __sctp_rcv_lookup(skb, &src, &dest, &transport);
@@ -219,7 +172,7 @@ int sctp_rcv(struct sk_buff *skb)
 	chunk->sctp_hdr = sh;
 
 	/* Set the source and destination addresses of the incoming chunk.  */
-	sctp_init_addrs(chunk);
+	sctp_init_addrs(chunk, &src, &dest);
 
 	/* Remember where we came from.  */
 	chunk->transport = transport;
@@ -431,7 +384,7 @@ void sctp_unhash_endpoint(sctp_endpoint_t *ep)
 }
 
 /* Look up an endpoint. */
-sctp_endpoint_t *__sctp_rcv_lookup_endpoint(const sockaddr_storage_t *laddr)
+sctp_endpoint_t *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr)
 {
 	sctp_hashbucket_t *head;
 	sctp_endpoint_common_t *epb;
@@ -523,8 +476,8 @@ void __sctp_unhash_established(sctp_association_t *asoc)
 }
 
 /* Look up an association. */
-sctp_association_t *__sctp_lookup_association(const sockaddr_storage_t *laddr,
-					      const sockaddr_storage_t *paddr,
+sctp_association_t *__sctp_lookup_association(const union sctp_addr *laddr,
+					      const union sctp_addr *paddr,
 					      sctp_transport_t **transportp)
 {
 	sctp_hashbucket_t *head;
@@ -559,8 +512,8 @@ hit:
 }
 
 /* Look up an association. BH-safe. */
-sctp_association_t *sctp_lookup_association(const sockaddr_storage_t *laddr,
-					    const sockaddr_storage_t *paddr,
+sctp_association_t *sctp_lookup_association(const union sctp_addr *laddr,
+					    const union sctp_addr *paddr,
 					    sctp_transport_t **transportp)
 {
 	sctp_association_t *asoc;
@@ -568,13 +521,13 @@ sctp_association_t *sctp_lookup_association(const sockaddr_storage_t *laddr,
 	sctp_local_bh_disable();
 	asoc = __sctp_lookup_association(laddr, paddr, transportp);
 	sctp_local_bh_enable();
-	
+
 	return asoc;
 }
 
 /* Is there an association matching the given local and peer addresses? */
-int sctp_has_association(const sockaddr_storage_t *laddr,
-			 const sockaddr_storage_t *paddr)
+int sctp_has_association(const union sctp_addr *laddr,
+			 const union sctp_addr *paddr)
 {
 	sctp_association_t *asoc;
 	sctp_transport_t *transport;
@@ -606,20 +559,18 @@ int sctp_has_association(const sockaddr_storage_t *laddr,
  * in certain circumstances.
  *
  */
-static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
-	const sockaddr_storage_t *laddr, sctp_transport_t **transportp)
+static sctp_association_t *__sctp_rcv_init_lookup(struct sk_buff *skb,
+	const union sctp_addr *laddr, sctp_transport_t **transportp)
 {
 	sctp_association_t *asoc;
-	sockaddr_storage_t addr;
-	sockaddr_storage_t *paddr = &addr;
+	union sctp_addr addr;
+	union sctp_addr *paddr = &addr;
 	struct sctphdr *sh = (struct sctphdr *) skb->h.raw;
 	sctp_chunkhdr_t *ch;
-	__u8 *ch_end, *data;
-	sctp_paramhdr_t *parm;
+	union sctp_params params;
+	sctp_init_chunk_t *init;
 
 	ch = (sctp_chunkhdr_t *) skb->data;
-
-	ch_end = ((__u8 *) ch) + WORD_ROUND(ntohs(ch->length));
 
 	/* If this is INIT/INIT-ACK look inside the chunk too. */
 	switch (ch->type) {
@@ -646,24 +597,17 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 	/* Find the start of the TLVs and the end of the chunk.  This is
 	 * the region we search for address parameters.
 	 */
-	data = skb->data + sizeof(sctp_init_chunk_t);
+	init = (sctp_init_chunk_t *)skb->data;
 
-	/* See sctp_process_init() for how to go thru TLVs. */
-	while (data < ch_end) {
-		parm = (sctp_paramhdr_t *)data;
-
-		if (!parm->length)
-			break;
-
-		data += WORD_ROUND(ntohs(parm->length));
+	/* Walk the parameters looking for embedded addresses. */
+	sctp_walk_params(params, init, init_hdr.params) {
 
 		/* Note: Ignoring hostname addresses. */
-		if ((SCTP_PARAM_IPV4_ADDRESS != parm->type) &&
-		    (SCTP_PARAM_IPV6_ADDRESS != parm->type))
+		if ((SCTP_PARAM_IPV4_ADDRESS != params.p->type) &&
+		    (SCTP_PARAM_IPV6_ADDRESS != params.p->type))
 			continue;
 
-		sctp_param2sockaddr(paddr, (sctp_addr_param_t *)parm, 
-				    ntohs(sh->source));
+		sctp_param2sockaddr(paddr, params.addr, ntohs(sh->source));
 		asoc = __sctp_lookup_association(laddr, paddr, transportp);
 		if (asoc)
 			return asoc;
@@ -674,20 +618,20 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 
 /* Lookup an association for an inbound skb. */
 sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
-				      const sockaddr_storage_t *paddr,
-				      const sockaddr_storage_t *laddr,
+				      const union sctp_addr *paddr,
+				      const union sctp_addr *laddr,
 				      sctp_transport_t **transportp)
 {
 	sctp_association_t *asoc;
 
 	asoc = __sctp_lookup_association(laddr, paddr, transportp);
 
-	/* Further lookup for INIT-ACK packet.
+	/* Further lookup for INIT/INIT-ACK packets.
 	 * SCTP Implementors Guide, 2.18 Handling of address
 	 * parameters within the INIT or INIT-ACK.
 	 */
 	if (!asoc)
-		asoc = __sctp_rcv_initack_lookup(skb, laddr, transportp);
+		asoc = __sctp_rcv_init_lookup(skb, laddr, transportp);
 
 	return asoc;
 }

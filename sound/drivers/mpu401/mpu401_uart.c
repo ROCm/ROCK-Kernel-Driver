@@ -29,7 +29,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <sound/core.h>
 #include <sound/mpu401.h>
@@ -103,6 +103,7 @@ static void snd_mpu401_uart_add_timer (mpu401_t *mpu, int input)
 
 	spin_lock_irqsave (&mpu->timer_lock, flags);
 	if (mpu->timer_invoked == 0) {
+		init_timer(&mpu->timer);
 		mpu->timer.data = (unsigned long)mpu;
 		mpu->timer.function = snd_mpu401_uart_timer;
 		mpu->timer.expires = 1 + jiffies;

@@ -1127,7 +1127,7 @@ static int __init init_blkmtd(void)
     return 1;
   }
   /* get the block device */
-  bdev = bdget(kdev_t_to_nr(mk_kdev(maj, min)));
+  bdev = bdget(rdev);
   err = blkdev_get(bdev, mode, 0, BDEV_RAW);
   if (err)
     return 1;

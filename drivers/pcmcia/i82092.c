@@ -15,6 +15,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/workqueue.h>
+#include <linux/interrupt.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/ss.h>
@@ -31,41 +32,37 @@ MODULE_LICENSE("GPL");
 /* PCI core routines */
 static struct pci_device_id i82092aa_pci_ids[] = {
 	{
-	      vendor:PCI_VENDOR_ID_INTEL,
-	      device:PCI_DEVICE_ID_INTEL_82092AA_0,
-	      subvendor:PCI_ANY_ID,
-	      subdevice:PCI_ANY_ID,
-	      class: 0, class_mask:0,
-
+	      .vendor = PCI_VENDOR_ID_INTEL,
+	      .device = PCI_DEVICE_ID_INTEL_82092AA_0,
+	      .subvendor = PCI_ANY_ID,
+	      .subdevice = PCI_ANY_ID,
 	 },
 	 {} 
 };
 MODULE_DEVICE_TABLE(pci, i82092aa_pci_ids);
 
 static struct pci_driver i82092aa_pci_drv = {
-	name:           "i82092aa",
-	id_table:       i82092aa_pci_ids,
-	probe:          i82092aa_pci_probe,
-	remove:         __devexit_p(i82092aa_pci_remove),
-	suspend:        NULL,
-	resume:         NULL 
+	.name           = "i82092aa",
+	.id_table       = i82092aa_pci_ids,
+	.probe          = i82092aa_pci_probe,
+	.remove         = __devexit_p(i82092aa_pci_remove),
 };
 
 
 /* the pccard structure and its functions */
 static struct pccard_operations i82092aa_operations = {
-	init: 		 	i82092aa_init,
-	suspend:	   	i82092aa_suspend,
-	register_callback: 	i82092aa_register_callback,
-	inquire_socket:		i82092aa_inquire_socket,   
-	get_status:		i82092aa_get_status,
-	get_socket:		i82092aa_get_socket,
-	set_socket:		i82092aa_set_socket,
-	get_io_map:		i82092aa_get_io_map,
-	set_io_map:		i82092aa_set_io_map,
-	get_mem_map:		i82092aa_get_mem_map,
-	set_mem_map:		i82092aa_set_mem_map,
-	proc_setup:		i82092aa_proc_setup,
+	.init 		 	= i82092aa_init,
+	.suspend	   	= i82092aa_suspend,
+	.register_callback 	= i82092aa_register_callback,
+	.inquire_socket		= i82092aa_inquire_socket,   
+	.get_status		= i82092aa_get_status,
+	.get_socket		= i82092aa_get_socket,
+	.set_socket		= i82092aa_set_socket,
+	.get_io_map		= i82092aa_get_io_map,
+	.set_io_map		= i82092aa_set_io_map,
+	.get_mem_map		= i82092aa_get_mem_map,
+	.set_mem_map		= i82092aa_set_mem_map,
+	.proc_setup		= i82092aa_proc_setup,
 };
 
 /* The card can do upto 4 sockets, allocate a structure for each of them */

@@ -120,9 +120,9 @@ anslcd_open( struct inode * inode, struct file * file )
 }
 
 struct file_operations anslcd_fops = {
-	write:	anslcd_write,
-	ioctl:	anslcd_ioctl,
-	open:	anslcd_open,
+	.write	= anslcd_write,
+	.ioctl	= anslcd_ioctl,
+	.open	= anslcd_open,
 };
 
 static struct miscdevice anslcd_dev = {

@@ -146,10 +146,9 @@ extern long serial167_console_init(void);
 extern void console_8xx_init(void);
 extern int rs_8xx_init(void);
 extern void mac_scc_console_init(void);
-extern void hwc_console_init(void);
-extern void hwc_tty_init(void);
+extern void sclp_console_init(void);
+extern void sclp_tty_init(void);
 extern void con3215_init(void);
-extern void tty3215_init(void);
 extern void tub3270_con_init(void);
 extern void tub3270_init(void);
 extern void uart_console_init(void);
@@ -2050,14 +2049,7 @@ void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned
 
 void tty_unregister_devfs (struct tty_driver *driver, unsigned minor)
 {
-#ifdef CONFIG_DEVFS_FS
-	int idx = minor - driver->minor_start;
-	char buf[32];
-
-	sprintf(buf, driver->name, idx + driver->name_base);
-	devfs_find_and_unregister(NULL, buf, driver->major, minor,
-				  DEVFS_SPECIAL_CHR, 0);
-#endif /* CONFIG_DEVFS_FS */
+	devfs_remove(driver->name, minor-driver->minor_start+driver->name_base);
 }
 
 EXPORT_SYMBOL(tty_register_devfs);
@@ -2215,8 +2207,8 @@ void __init console_init(void)
 #ifdef CONFIG_TN3215
 	con3215_init();
 #endif
-#ifdef CONFIG_HWC
-        hwc_console_init();
+#ifdef CONFIG_SCLP_CONSOLE
+        sclp_console_init();
 #endif
 #ifdef CONFIG_STDIO_CONSOLE
 	stdio_console_init();
@@ -2356,8 +2348,8 @@ void __init tty_init(void)
 #ifdef CONFIG_TN3215
 	tty3215_init();
 #endif
-#ifdef CONFIG_HWC
-	hwc_tty_init();
+#ifdef CONFIG_SCLP
+	sclp_tty_init();
 #endif
 #ifdef CONFIG_A2232
 	a2232board_init();

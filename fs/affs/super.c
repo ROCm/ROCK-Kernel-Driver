@@ -44,7 +44,7 @@ affs_put_super(struct super_block *sb)
 
 	if (!(sb->s_flags & MS_RDONLY)) {
 		AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->bm_flag = be32_to_cpu(1);
-		secs_to_datestamp(CURRENT_TIME,
+		secs_to_datestamp(get_seconds(),
 				  &AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->disk_change);
 		affs_fix_checksum(sb, sbi->s_root_bh);
 		mark_buffer_dirty(sbi->s_root_bh);
@@ -72,7 +72,7 @@ affs_write_super(struct super_block *sb)
 		//		if (buffer_dirty(sbi->s_bitmap[i].bm_bh)) {
 		//			clean = 0;
 		AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->bm_flag = be32_to_cpu(clean);
-		secs_to_datestamp(CURRENT_TIME,
+		secs_to_datestamp(get_seconds(),
 				  &AFFS_ROOT_TAIL(sb, sbi->s_root_bh)->disk_change);
 		affs_fix_checksum(sb, sbi->s_root_bh);
 		mark_buffer_dirty(sbi->s_root_bh);
@@ -80,7 +80,6 @@ affs_write_super(struct super_block *sb)
 	} else
 		sb->s_dirt = 0;
 
-	pr_debug("AFFS: write_super() at %lu, clean=%d\n", CURRENT_TIME, clean);
 	unlock_kernel();
 }
 

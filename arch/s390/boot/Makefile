@@ -1,28 +1,27 @@
 #
-# arch/s390/boot/Makefile
+# Makefile for the linux s390-specific parts of the memory manager.
 #
 
 EXTRA_AFLAGS := -traditional
 
 include $(TOPDIR)/Rules.make
 
-%.lnk: %.o
-	$(LD) $(LDFLAGS) -Ttext 0x0 -o $@ $<
+quiet_cmd_listing = OBJDUMP $(echo_target)
+cmd_listing	  = $(OBJDUMP) --disassemble --disassemble-all \
+			--disassemble-zeroes --reloc vmlinux > $@
 
-%.boot: %.lnk
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+$(obj)/image: vmlinux
+	$(call if_changed,objcopy)
 
-image: $(TOPDIR)/vmlinux \
-	iplfba.boot ipleckd.boot ipldump.boot
-	$(OBJCOPY) $(OBJCOPYFLAGS) $(TOPDIR)/vmlinux image
-	$(NM) $(TOPDIR)/vmlinux | grep -v '\(compiled\)\|\( [aUw] \)\|\(\.\)\|\(LASH[RL]DI\)' | sort > $(TOPDIR)/System.map
+$(obj)/listing: vmlinux
+	$(call if_changed,listing)
 
-listing: ../../../vmlinux
-	$(OBJDUMP) --disassemble --disassemble-all --disassemble-zeroes --reloc $(TOPDIR)/vmlinux > listing
+image: $(obj)/image
+
+listing: $(obj)/listing
 
 clean:
-	rm -f image listing iplfba.boot ipleckd.boot ipldump.boot
+	rm -f $(obj)/image $(obj)/listing
 
 install: $(CONFIGURE) $(BOOTIMAGE)
-	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map $(TOPDIR)/Kerntypes "$(INSTALL_PATH)"
-
+	sh -x $(obj)/install.sh $(KERNELRELEASE) $(BOOTIMAGE) System.map Kerntypes "$(INSTALL_PATH)"

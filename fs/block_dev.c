@@ -20,8 +20,10 @@
 #include <linux/blkpg.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
-
+#include <linux/mount.h>
+#include <linux/uio.h>
 #include <asm/uaccess.h>
+
 
 static sector_t max_block(struct block_device *bdev)
 {
@@ -518,7 +520,7 @@ int full_check_disk_change(struct block_device *bdev)
 	if (bdev->bd_contains != bdev)
 		BUG();
 	down(&bdev->bd_sem);
-	if (check_disk_change(bdev)) {
+	if (check_disk_change(bdev) && bdev->bd_invalidated) {
 		rescan_partitions(bdev->bd_disk, bdev);
 		res = 1;
 	}
@@ -783,14 +785,14 @@ int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 	return res;
 }
 
-const char *__bdevname(kdev_t dev)
+const char *__bdevname(dev_t dev)
 {
 	static char buffer[32];
-	const char * name = blkdevs[major(dev)];
+	const char * name = blkdevs[MAJOR(dev)];
 
 	if (!name)
 		name = "unknown-block";
 
-	sprintf(buffer, "%s(%d,%d)", name, major(dev), minor(dev));
+	sprintf(buffer, "%s(%d,%d)", name, MAJOR(dev), MINOR(dev));
 	return buffer;
 }

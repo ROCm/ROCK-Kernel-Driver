@@ -732,9 +732,6 @@ void esp_initialize(struct NCR_ESP *esp)
 	/* Reset the thing before we try anything... */
 	esp_bootup_reset(esp, eregs);
 
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
 	esps_in_use++;
 }
 
@@ -3638,7 +3635,6 @@ int init_module(void) { return 0; }
 void cleanup_module(void) {}
 void esp_release(void)
 {
-	MOD_DEC_USE_COUNT;
 	esps_in_use--;
 	esps_running = esps_in_use;
 }

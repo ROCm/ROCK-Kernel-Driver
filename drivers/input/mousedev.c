@@ -41,6 +41,7 @@ struct mousedev {
 	int exist;
 	int open;
 	int minor;
+	int misc;
 	char name[16];
 	wait_queue_head_t wait;
 	struct list_head list;
@@ -489,7 +490,11 @@ static struct device_interface mousedev_intf = {
 
 static int __init mousedev_init(void)
 {
-	interface_register(&mousedev_intf);
+	int retval;
+
+	if((retval = interface_register(&mousedev_intf)) < 0)
+		return retval;
+
 	input_register_handler(&mousedev_handler);
 
 	memset(&mousedev_mix, 0, sizeof(struct mousedev));
@@ -499,8 +504,10 @@ static int __init mousedev_init(void)
 	mousedev_mix.exist = 1;
 	mousedev_mix.minor = MOUSEDEV_MIX;
 	mousedev_mix.devfs = input_register_minor("mice", MOUSEDEV_MIX, MOUSEDEV_MINOR_BASE);
+
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
-	misc_register(&psaux_mouse);
+	if (!(mousedev_mix.misc = !misc_register(&psaux_mouse)))
+		printk(KERN_WARNING "mice: could not misc_register the device\n");
 #endif
 
 	printk(KERN_INFO "mice: PS/2 mouse device common for all mice\n");
@@ -511,7 +518,8 @@ static int __init mousedev_init(void)
 static void __exit mousedev_exit(void)
 {
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
-	misc_deregister(&psaux_mouse);
+	if (mousedev_mix.misc)
+		misc_deregister(&psaux_mouse);
 #endif
 	input_unregister_minor(mousedev_mix.devfs);
 	input_unregister_handler(&mousedev_handler);

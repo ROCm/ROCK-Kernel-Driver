@@ -45,7 +45,6 @@
 
 extern int do_pipe(int *);
 extern asmlinkage unsigned long sys_brk(unsigned long);
-extern asmlinkage unsigned long sys_create_module(char *, unsigned long);
 
 /*
  * Brk needs to return an error.  Still support Linux's brk(0) query idiom,
@@ -103,7 +102,7 @@ struct osf_dirent {
 struct osf_dirent_callback {
 	struct osf_dirent *dirent;
 	long *basep;
-	int count;
+	unsigned int count;
 	int error;
 };
 
@@ -113,7 +112,7 @@ osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 {
 	struct osf_dirent *dirent;
 	struct osf_dirent_callback *buf = (struct osf_dirent_callback *) __buf;
-	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
+	unsigned int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
 
 	buf->error = -EINVAL;	/* only used if we fail */
 	if (reclen > buf->count)
@@ -418,18 +417,6 @@ osf_utsname(char *name)
 	return error;
 }
 
-asmlinkage int
-osf_swapon(const char *path, int flags, int lowat, int hiwat)
-{
-	int ret;
-
-	/* for now, simply ignore lowat and hiwat... */
-	lock_kernel();
-	ret = sys_swapon(path, flags);
-	unlock_kernel();
-	return ret;
-}
-
 asmlinkage unsigned long
 sys_getpagesize(void)
 {
@@ -639,33 +626,6 @@ osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
 	error = 0;
  out:
 	return error;
-}
-
-/*
- * The Linux kernel isn't good at returning values that look
- * like negative longs (they are mistaken as error values).
- * Until that is fixed, we need this little workaround for
- * create_module() because it's one of the few system calls
- * that return kernel addresses (which are negative).
- */
-
-asmlinkage unsigned long
-do_alpha_create_module(char *module_name, unsigned long size,
-		       struct pt_regs *regs)
-{
-	long retval;
-
-	lock_kernel();
-	retval = sys_create_module(module_name, size);
-
-	/* We get either a module address or an error number, and we know
-	   the error number is a small negative number, while the address
-	   is always negative but much larger.  */
-	if (retval + 1000 < 0)
-		regs->r0 = 0;
-
-        unlock_kernel();
-	return retval;
 }
 
 asmlinkage long
@@ -1343,14 +1303,14 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 	if (addr) {
 		addr = arch_get_unmapped_area_1 (PAGE_ALIGN(addr), len, limit);
-		if (addr != -ENOMEM)
+		if (addr != (unsigned long) -ENOMEM)
 			return addr;
 	}
 
 	/* Next, try allocating at TASK_UNMAPPED_BASE.  */
 	addr = arch_get_unmapped_area_1 (PAGE_ALIGN(TASK_UNMAPPED_BASE),
 					 len, limit);
-	if (addr != -ENOMEM)
+	if (addr != (unsigned long) -ENOMEM)
 		return addr;
 
 	/* Finally, try allocating in low memory.  */

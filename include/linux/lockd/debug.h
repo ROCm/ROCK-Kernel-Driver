@@ -28,10 +28,6 @@
 # define ifdebug(flag)		if (0)
 #endif
 
-#ifdef LOCKD_DEBUG
-char *		  nlm_procname(u32);
-#endif
-
 #endif /* __KERNEL__ */
 
 /*

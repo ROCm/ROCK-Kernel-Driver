@@ -237,7 +237,7 @@ static int umsdos_nevercreat (struct inode *dir, struct dentry *dentry,
  * The same is true for directory creation.
  */
 static int umsdos_create_any (struct inode *dir, struct dentry *dentry,
-				int mode, int rdev, char flags)
+				int mode, dev_t rdev, char flags)
 {
 	struct dentry *fake;
 	struct inode *inode;
@@ -257,7 +257,7 @@ static int umsdos_create_any (struct inode *dir, struct dentry *dentry,
 	info.entry.flags = flags;
 	info.entry.uid = current->fsuid;
 	info.entry.gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
-	info.entry.ctime = info.entry.atime = info.entry.mtime = CURRENT_TIME;
+	info.entry.ctime = info.entry.atime = info.entry.mtime = get_seconds();
 	info.entry.nlink = 1;
 	ret = umsdos_newentry (dentry->d_parent, &info);
 	if (ret)
@@ -781,7 +781,7 @@ int UMSDOS_mkdir (struct inode *dir, struct dentry *dentry, int mode)
 	info.entry.rdev = 0;
 	info.entry.uid = current->fsuid;
 	info.entry.gid = (dir->i_mode & S_ISGID) ? dir->i_gid : current->fsgid;
-	info.entry.ctime = info.entry.atime = info.entry.mtime = CURRENT_TIME;
+	info.entry.ctime = info.entry.atime = info.entry.mtime = get_seconds();
 	info.entry.flags = 0;
 	info.entry.nlink = 1;
 	ret = umsdos_newentry (dentry->d_parent, &info);
@@ -861,7 +861,7 @@ out_remove:
  * in particular and other parts of the kernel I guess.
  */
 int UMSDOS_mknod (struct inode *dir, struct dentry *dentry,
-		 int mode, int rdev)
+		 int mode, dev_t rdev)
 {
 	return umsdos_create_any (dir, dentry, mode, rdev, 0);
 }

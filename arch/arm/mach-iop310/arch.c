@@ -13,7 +13,7 @@
 #include <linux/init.h>
 #include <linux/major.h>
 #include <linux/fs.h>
-#include <asm/types.h>
+
 #include <asm/setup.h>
 #include <asm/system.h>
 #include <asm/memory.h>

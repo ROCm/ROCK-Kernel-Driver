@@ -26,7 +26,8 @@
 
 #include <linux/spinlock.h>
 
-void cs4281_null(struct pci_dev *pcidev) { return; }
+int cs4281_resume_null(struct pci_dev *pcidev) { return 0; }
+int cs4281_suspend_null(struct pci_dev *pcidev, u32 state) { return 0; }
 #define cs4x_mem_map_reserve(page) mem_map_reserve(page)
 #define cs4x_mem_map_unreserve(page) mem_map_unreserve(page)
 

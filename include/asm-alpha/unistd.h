@@ -343,7 +343,13 @@
 #define __NR_alloc_hugepages		403
 #define __NR_free_hugepages		404
 #define __NR_exit_group			405
-#define NR_SYSCALLS			406
+#define __NR_lookup_dcookie		406
+#define __NR_sys_epoll_create		407
+#define __NR_sys_epoll_ctl		408
+#define __NR_sys_epoll_wait		409
+#define __NR_remap_file_pages		410
+#define __NR_set_tid_address		411
+#define NR_SYSCALLS			412
 
 #if defined(__GNUC__)
 

@@ -1,16 +1,9 @@
 /*
  * Common routines for a handful of drivers.
- * Unrelated to CF/SM - just USB stuff.
- *
- * This is mostly a thin layer on top of transport.c.
- * It converts routines that return values like -EPIPE
- * into routines that return USB_STOR_TRANSPORT_ABORTED etc.
- *
- * There is also some debug printing here.
+ * Unrelated to CF/SM - just scatter-gather stuff.
  */
 
-#include "debug.h"
-#include "transport.h"
+#include "usb.h"
 #include "raw_bulk.h"
 
 /*

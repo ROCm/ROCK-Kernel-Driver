@@ -74,13 +74,6 @@
 #include <linux/kmod.h>
 #endif
 
-struct proc_dir_entry *proc_scsi;
-
-#ifdef CONFIG_PROC_FS
-static int scsi_proc_info(char *buffer, char **start, off_t offset, int length);
-static void scsi_dump_status(int level);
-#endif
-
 #define SG_MEMPOOL_NR		5
 #define SG_MEMPOOL_SIZE		32
 
@@ -135,7 +128,7 @@ static struct softscsi_data softscsi_data[NR_CPUS] __cacheline_aligned;
 /*
  * List of all highlevel drivers.
  */
-static struct Scsi_Device_Template *scsi_devicelist;
+LIST_HEAD(scsi_devicelist);
 static DECLARE_RWSEM(scsi_devicelist_mutex);
 
 /*
@@ -162,18 +155,16 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] =
 	"Enclosure        ",
 };
 
-static char * scsi_null_device_strs = "nullnullnullnull";
+static const char * const spaces = "                "; /* 16 of them */
+
+static unsigned scsi_default_dev_flags;
+LIST_HEAD(scsi_dev_info_list);
 
 /* 
  * Function prototypes.
  */
 extern void scsi_times_out(Scsi_Cmnd * SCpnt);
 void scsi_build_commandblocks(Scsi_Device * SDpnt);
-
-/*
- * Private interface into the new error handling code.
- */
-extern int scsi_new_reset(Scsi_Cmnd *SCpnt, unsigned int flag);
 
 /*
  * Function:    scsi_initialize_queue()
@@ -226,6 +217,8 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 
 	if (!SHpnt->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
+
+        blk_queue_prep_rq(q, scsi_prep_fn);
 }
 
 #ifdef MODULE
@@ -1668,305 +1661,239 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 	spin_unlock_irqrestore(&device_request_lock, flags);
 }
 
-#ifdef CONFIG_PROC_FS
-static int scsi_proc_info(char *buffer, char **start, off_t offset, int length)
+/*
+ * scsi_strcpy_devinfo: called from scsi_dev_info_list_add to copy into
+ * devinfo vendor and model strings.
+ */
+static void scsi_strcpy_devinfo(char *name, char *to, size_t to_length,
+				char *from, int compatible)
 {
-	Scsi_Device *scd;
-	struct Scsi_Host *HBA_ptr;
-	int size, len = 0;
-	off_t begin = 0;
-	off_t pos = 0;
+	size_t from_length;
 
-	/*
-	 * First, see if there are any attached devices or not.
-	 */
-	for (HBA_ptr = scsi_host_get_next(NULL); HBA_ptr;
-	     HBA_ptr = scsi_host_get_next(HBA_ptr)) {
-		if (HBA_ptr->host_queue != NULL) {
-			break;
-		}
-	}
-	size = sprintf(buffer + len, "Attached devices: %s\n", (HBA_ptr) ? "" : "none");
-	len += size;
-	pos = begin + len;
-	for (HBA_ptr = scsi_host_get_next(NULL); HBA_ptr;
-	     HBA_ptr = scsi_host_get_next(HBA_ptr)) {
-#if 0
-		size += sprintf(buffer + len, "scsi%2d: %s\n", (int) HBA_ptr->host_no,
-				HBA_ptr->hostt->procname);
-		len += size;
-		pos = begin + len;
-#endif
-		for (scd = HBA_ptr->host_queue; scd; scd = scd->next) {
-			proc_print_scsidevice(scd, buffer, &size, len);
-			len += size;
-			pos = begin + len;
-
-			if (pos < offset) {
-				len = 0;
-				begin = pos;
-			}
-			if (pos > offset + length)
-				goto stop_output;
-		}
-	}
-
-stop_output:
-	*start = buffer + (offset - begin);	/* Start of wanted data */
-	len -= (offset - begin);	/* Start slop */
-	if (len > length)
-		len = length;	/* Ending slop */
-	return (len);
-}
-
-static int proc_scsi_gen_write(struct file * file, const char * buf,
-                              unsigned long length, void *data)
-{
-	Scsi_Device *scd;
-	struct Scsi_Host *HBA_ptr;
-	char *p;
-	int host, channel, id, lun;
-	char * buffer;
-	int err;
-
-	if (!buf || length>PAGE_SIZE)
-		return -EINVAL;
-
-	if (!(buffer = (char *) __get_free_page(GFP_KERNEL)))
-		return -ENOMEM;
-	if(copy_from_user(buffer, buf, length))
-	{
-		err =-EFAULT;
-		goto out;
-	}
-
-	err = -EINVAL;
-
-	if (length < PAGE_SIZE)
-		buffer[length] = '\0';
-	else if (buffer[PAGE_SIZE-1])
-		goto out;
-
-	if (length < 11 || strncmp("scsi", buffer, 4))
-		goto out;
-
-	/*
-	 * Usage: echo "scsi dump #N" > /proc/scsi/scsi
-	 * to dump status of all scsi commands.  The number is used to specify the level
-	 * of detail in the dump.
-	 */
-	if (!strncmp("dump", buffer + 5, 4)) {
-		unsigned int level;
-
-		p = buffer + 10;
-
-		if (*p == '\0')
-			goto out;
-
-		level = simple_strtoul(p, NULL, 0);
-		scsi_dump_status(level);
-	}
-	/*
-	 * Usage: echo "scsi log token #N" > /proc/scsi/scsi
-	 * where token is one of [error,scan,mlqueue,mlcomplete,llqueue,
-	 * llcomplete,hlqueue,hlcomplete]
-	 */
-#ifdef CONFIG_SCSI_LOGGING		/* { */
-
-	if (!strncmp("log", buffer + 5, 3)) {
-		char *token;
-		unsigned int level;
-
-		p = buffer + 9;
-		token = p;
-		while (*p != ' ' && *p != '\t' && *p != '\0') {
-			p++;
-		}
-
-		if (*p == '\0') {
-			if (strncmp(token, "all", 3) == 0) {
-				/*
-				 * Turn on absolutely everything.
-				 */
-				scsi_logging_level = ~0;
-			} else if (strncmp(token, "none", 4) == 0) {
-				/*
-				 * Turn off absolutely everything.
-				 */
-				scsi_logging_level = 0;
-			} else {
-				goto out;
-			}
-		} else {
-			*p++ = '\0';
-
-			level = simple_strtoul(p, NULL, 0);
-
+	from_length = strlen(from);
+	strncpy(to, from, min(to_length, from_length));
+	if (from_length < to_length) {
+		if (compatible) {
 			/*
-			 * Now figure out what to do with it.
+			 * NUL terminate the string if it is short.
 			 */
-			if (strcmp(token, "error") == 0) {
-				SCSI_SET_ERROR_RECOVERY_LOGGING(level);
-			} else if (strcmp(token, "timeout") == 0) {
-				SCSI_SET_TIMEOUT_LOGGING(level);
-			} else if (strcmp(token, "scan") == 0) {
-				SCSI_SET_SCAN_BUS_LOGGING(level);
-			} else if (strcmp(token, "mlqueue") == 0) {
-				SCSI_SET_MLQUEUE_LOGGING(level);
-			} else if (strcmp(token, "mlcomplete") == 0) {
-				SCSI_SET_MLCOMPLETE_LOGGING(level);
-			} else if (strcmp(token, "llqueue") == 0) {
-				SCSI_SET_LLQUEUE_LOGGING(level);
-			} else if (strcmp(token, "llcomplete") == 0) {
-				SCSI_SET_LLCOMPLETE_LOGGING(level);
-			} else if (strcmp(token, "hlqueue") == 0) {
-				SCSI_SET_HLQUEUE_LOGGING(level);
-			} else if (strcmp(token, "hlcomplete") == 0) {
-				SCSI_SET_HLCOMPLETE_LOGGING(level);
-			} else if (strcmp(token, "ioctl") == 0) {
-				SCSI_SET_IOCTL_LOGGING(level);
-			} else {
-				goto out;
-			}
-		}
-
-		printk(KERN_INFO "scsi logging level set to 0x%8.8x\n", scsi_logging_level);
-	}
-#endif	/* CONFIG_SCSI_LOGGING */ /* } */
-
-	/*
-	 * Usage: echo "scsi add-single-device 0 1 2 3" >/proc/scsi/scsi
-	 * with  "0 1 2 3" replaced by your "Host Channel Id Lun".
-	 * Consider this feature BETA.
-	 *     CAUTION: This is not for hotplugging your peripherals. As
-	 *     SCSI was not designed for this you could damage your
-	 *     hardware !
-	 * However perhaps it is legal to switch on an
-	 * already connected device. It is perhaps not
-	 * guaranteed this device doesn't corrupt an ongoing data transfer.
-	 */
-	if (!strncmp("add-single-device", buffer + 5, 17)) {
-		p = buffer + 23;
-
-		host = simple_strtoul(p, &p, 0);
-		channel = simple_strtoul(p + 1, &p, 0);
-		id = simple_strtoul(p + 1, &p, 0);
-		lun = simple_strtoul(p + 1, &p, 0);
-
-		printk(KERN_INFO "scsi singledevice %d %d %d %d\n", host, channel,
-		       id, lun);
-
-		for (HBA_ptr = scsi_host_get_next(NULL); HBA_ptr;
-		     HBA_ptr = scsi_host_get_next(HBA_ptr)) {
-			if (HBA_ptr->host_no == host) {
-				break;
-			}
-		}
-		err = -ENXIO;
-		if (!HBA_ptr)
-			goto out;
-
-		for (scd = HBA_ptr->host_queue; scd; scd = scd->next) {
-			if ((scd->channel == channel
-			     && scd->id == id
-			     && scd->lun == lun)) {
-				break;
-			}
-		}
-
-		err = -ENOSYS;
-		if (scd)
-			goto out;	/* We do not yet support unplugging */
-
-		scan_scsis(HBA_ptr, 1, channel, id, lun);
-		err = length;
-		goto out;
-	}
-	/*
-	 * Usage: echo "scsi remove-single-device 0 1 2 3" >/proc/scsi/scsi
-	 * with  "0 1 2 3" replaced by your "Host Channel Id Lun".
-	 *
-	 * Consider this feature pre-BETA.
-	 *
-	 *     CAUTION: This is not for hotplugging your peripherals. As
-	 *     SCSI was not designed for this you could damage your
-	 *     hardware and thoroughly confuse the SCSI subsystem.
-	 *
-	 */
-	else if (!strncmp("remove-single-device", buffer + 5, 20)) {
-		p = buffer + 26;
-
-		host = simple_strtoul(p, &p, 0);
-		channel = simple_strtoul(p + 1, &p, 0);
-		id = simple_strtoul(p + 1, &p, 0);
-		lun = simple_strtoul(p + 1, &p, 0);
-
-
-		for (HBA_ptr = scsi_host_get_next(NULL); HBA_ptr;
-		     HBA_ptr = scsi_host_get_next(HBA_ptr)) {
-			if (HBA_ptr->host_no == host) {
-				break;
-			}
-		}
-		err = -ENODEV;
-		if (!HBA_ptr)
-			goto out;
-
-		for (scd = HBA_ptr->host_queue; scd; scd = scd->next) {
-			if ((scd->channel == channel
-			     && scd->id == id
-			     && scd->lun == lun)) {
-				break;
-			}
-		}
-
-		if (scd == NULL)
-			goto out;	/* there is no such device attached */
-
-		err = -EBUSY;
-		if (scd->access_count)
-			goto out;
-
-		scsi_detach_device(scd);
-
-		if (scd->attached == 0) {
-			devfs_unregister (scd->de);
-
-			/* Now we can remove the device structure */
-			if (scd->next != NULL)
-				scd->next->prev = scd->prev;
-
-			if (scd->prev != NULL)
-				scd->prev->next = scd->next;
-
-			if (HBA_ptr->host_queue == scd) {
-				HBA_ptr->host_queue = scd->next;
-			}
-			blk_cleanup_queue(&scd->request_queue);
-			if (scd->inquiry)
-				kfree(scd->inquiry);
-			kfree((char *) scd);
+			to[from_length] = '\0';
 		} else {
-			goto out;
+			/* 
+			 * space pad the string if it is short. 
+			 */
+			strncpy(&to[from_length], spaces,
+				to_length - from_length);
 		}
-		err = 0;
 	}
-out:
-	
-	free_page((unsigned long) buffer);
-	return err;
+	if (from_length > to_length)
+		 printk(KERN_WARNING "%s: %s string '%s' is too long\n",
+			__FUNCTION__, name, from);
 }
-#endif
 
-void scsi_detect_device(struct scsi_device *sdev)
+/**
+ * scsi_dev_info_list_add: add one dev_info list entry.
+ * @vendor:	vendor string
+ * @model:	model (product) string
+ * @strflags:	integer string
+ * @flag:	if strflags NULL, use this flag value
+ *
+ * Description:
+ * 	Create and add one dev_info entry for @vendor, @model, @strflags or
+ * 	@flag. If @compatible, add to the tail of the list, do not space
+ * 	pad, and set devinfo->compatible. The scsi_static_device_list entries
+ * 	are added with @compatible 1 and @clfags NULL.
+ *
+ * Returns: 0 OK, -error on failure.
+ **/
+static int scsi_dev_info_list_add(int compatible, char *vendor, char *model,
+			    char *strflags, int flags)
 {
-	struct Scsi_Device_Template *sdt;
+	struct scsi_dev_info_list *devinfo;
 
-	down_read(&scsi_devicelist_mutex);
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->detect)
-			(*sdt->detect)(sdev);
-	up_read(&scsi_devicelist_mutex);
+	devinfo = kmalloc(sizeof(*devinfo), GFP_KERNEL);
+	if (!devinfo) {
+		printk(KERN_ERR "%s: no memory\n", __FUNCTION__);
+		return -ENOMEM;
+	}
+
+	scsi_strcpy_devinfo("vendor", devinfo->vendor, sizeof(devinfo->vendor),
+			    vendor, compatible);
+	scsi_strcpy_devinfo("model", devinfo->model, sizeof(devinfo->model),
+			    model, compatible);
+
+	if (strflags)
+		devinfo->flags = simple_strtoul(strflags, NULL, 0);
+	else
+		devinfo->flags = flags;
+
+	devinfo->compatible = compatible;
+
+	if (compatible)
+		list_add_tail(&devinfo->dev_info_list, &scsi_dev_info_list);
+	else
+		list_add(&devinfo->dev_info_list, &scsi_dev_info_list);
+
+	return 0;
+}
+
+/**
+ * scsi_dev_info_list_add_str: parse dev_list and add to the
+ * scsi_dev_info_list.
+ * @dev_list:	string of device flags to add
+ *
+ * Description:
+ * 	Parse dev_list, and add entries to the scsi_dev_info_list.
+ * 	dev_list is of the form "vendor:product:flag,vendor:product:flag".
+ * 	dev_list is modified via strsep. Can be called for command line
+ * 	addition, for proc or mabye a sysfs interface.
+ *
+ * Returns: 0 if OK, -error on failure.
+ **/
+int scsi_dev_info_list_add_str (char *dev_list)
+{
+	char *vendor, *model, *strflags, *next;
+	char *next_check;
+	int res = 0;
+
+	next = dev_list;
+	if (next && next[0] == '"') {
+		/*
+		 * Ignore both the leading and trailing quote.
+		 */
+		next++;
+		next_check = ",\"";
+	} else {
+		next_check = ",";
+	}
+
+	/*
+	 * For the leading and trailing '"' case, the for loop comes
+	 * through the last time with vendor[0] == '\0'.
+	 */
+	for (vendor = strsep(&next, ":"); vendor && (vendor[0] != '\0')
+	     && (res == 0); vendor = strsep(&next, ":")) {
+		strflags = NULL;
+		model = strsep(&next, ":");
+		if (model)
+			strflags = strsep(&next, next_check);
+		if (!model || !strflags) {
+			printk(KERN_ERR "%s: bad dev info string '%s' '%s'"
+			       " '%s'\n", __FUNCTION__, vendor, model,
+			       strflags);
+			res = -EINVAL;
+		} else
+			res = scsi_dev_info_list_add(0 /* compatible */, vendor,
+						     model, strflags, 0);
+	}
+	return res;
+}
+
+/**
+ * scsi_dev_list_init: set up the dynamic device list.
+ * @dev_list:	string of device flags to add
+ *
+ * Description:
+ * 	Add command line @dev_list entries, then add
+ * 	scsi_static_device_list entries to the scsi device info list.
+ **/
+static void scsi_dev_info_list_init (char *dev_list)
+{
+	int i;
+
+	if (scsi_dev_info_list_add_str(dev_list) == -ENOMEM)
+		return;
+	for (i = 0; scsi_static_device_list[i].vendor != NULL; i++)
+		if (scsi_dev_info_list_add(1 /* compatibile */,
+			   scsi_static_device_list[i].vendor,
+			   scsi_static_device_list[i].model,
+			   NULL,
+			   scsi_static_device_list[i].flags) == -ENOMEM)
+			return;
+}
+
+/**
+ * scsi_dev_info_list_delete: called from scsi.c:exit_scsi to remove
+ * 	the scsi_dev_info_list.
+ **/
+static void scsi_dev_info_list_delete (void)
+{
+	struct list_head *lh, *lh_next;
+	struct scsi_dev_info_list *devinfo;
+
+	list_for_each_safe(lh, lh_next, &scsi_dev_info_list) {
+		devinfo = list_entry(lh, struct scsi_dev_info_list,
+				     dev_info_list);
+		kfree(devinfo);
+	}
+}
+
+/**
+ * get_device_flags - get device specific flags from the dynamic device
+ * list. Called during scan time.
+ * @vendor:	vendor name
+ * @model:	model name
+ *
+ * Description:
+ *     Search the scsi_dev_info_list for an entry matching @vendor and
+ *     @model, if found, return the matching flags value, else return
+ *     scsi_default_dev_flags.
+ **/
+int scsi_get_device_flags(unsigned char *vendor, unsigned char *model)
+{
+	struct scsi_dev_info_list *devinfo;
+
+	list_for_each_entry(devinfo, &scsi_dev_info_list, dev_info_list) {
+		if (devinfo->compatible) {
+			/*
+			 * Behave like the older version of get_device_flags.
+			 */
+			size_t max;
+			/*
+			 * XXX why skip leading spaces? If an odd INQUIRY
+			 * value, that should have been part of the
+			 * scsi_static_device_list[] entry, such as "  FOO"
+			 * rather than "FOO". Since this code is already
+			 * here, and we don't know what device it is
+			 * trying to work with, leave it as-is.
+			 */
+			max = 8;	/* max length of vendor */
+			while ((max > 0) && *vendor == ' ') {
+				max--;
+				vendor++;
+			}
+			/*
+			 * XXX removing the following strlen() would be
+			 * good, using it means that for a an entry not in
+			 * the list, we scan every byte of every vendor
+			 * listed in scsi_static_device_list[], and never match
+			 * a single one (and still have to compare at
+			 * least the first byte of each vendor).
+			 */
+			if (memcmp(devinfo->vendor, vendor,
+				    min(max, strlen(devinfo->vendor))))
+				continue;
+			/*
+			 * Skip spaces again.
+			 */
+			max = 16;	/* max length of model */
+			while ((max > 0) && *model == ' ') {
+				max--;
+				model++;
+			}
+			if (memcmp(devinfo->model, model,
+				   min(max, strlen(devinfo->model))))
+				continue;
+			return devinfo->flags;
+		} else {
+			if (!memcmp(devinfo->vendor, vendor,
+				     sizeof(devinfo->vendor)) &&
+			     !memcmp(devinfo->model, model,
+				      sizeof(devinfo->model)))
+				return devinfo->flags;
+		}
+	}
+	return scsi_default_dev_flags;
 }
 
 int scsi_attach_device(struct scsi_device *sdev)
@@ -1974,22 +1901,22 @@ int scsi_attach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->attach)
+	list_for_each_entry(sdt, &scsi_devicelist, list)
+		if (sdt->attach) {
 			/*
 			 * XXX check result when the upper level attach
 			 * return values are fixed, and on failure goto
 			 * fail.
 			 */
-			(*sdt->attach) (sdev);
+			if(try_module_get(sdt->module)) {
+				(*sdt->attach)(sdev);
+				module_put(sdt->module);
+			} else {
+				printk(KERN_WARNING "SCSI module %s not ready, skipping attach.\n", sdt->name);
+			}
+		}
 	up_read(&scsi_devicelist_mutex);
 	return 0;
-
-fail:
-	printk(KERN_ERR "%s: Allocation failure during SCSI scanning, "
-			"some SCSI devices might not be configured\n",
-			__FUNCTION__);
-	return -ENOMEM;
 }
 
 void scsi_detach_device(struct scsi_device *sdev)
@@ -1997,9 +1924,15 @@ void scsi_detach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->detach)
-			(*sdt->detach)(sdev);
+	list_for_each_entry(sdt, &scsi_devicelist, list)
+		if (sdt->detach) {
+			if(try_module_get(sdt->module)) {
+				(*sdt->detach)(sdev);
+				module_put(sdt->module);
+			} else {
+				printk(KERN_WARNING "SCSI module %s not ready, skipping detach.\n", sdt->name);
+			}
+		}
 	up_read(&scsi_devicelist_mutex);
 }
 
@@ -2064,24 +1997,34 @@ void scsi_slave_detach(struct scsi_device *sdev)
 /*
  * This entry point should be called by a loadable module if it is trying
  * add a high level scsi driver to the system.
+ *
+ * This entry point is called from the upper level module's module_init()
+ * routine.  That implies that when this function is called, the
+ * scsi_mod module is locked down because of upper module layering and
+ * that the high level driver module is locked down by being in it's
+ * init routine.  So, the *only* thing we have to do to protect adds 
+ * we perform in this function is to make sure that all call's
+ * to the high level driver's attach() and detach() call in points, other
+ * than via scsi_register_device and scsi_unregister_device which are in
+ * the module_init and module_exit code respectively and therefore already
+ * locked down by the kernel module loader, are wrapped by try_module_get()
+ * and module_put() to avoid races on device adds and removes.
  */
 int scsi_register_device(struct Scsi_Device_Template *tpnt)
 {
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
-	int out_of_space = 0;
 
 #ifdef CONFIG_KMOD
 	if (scsi_host_get_next(NULL) == NULL)
 		request_module("scsi_hostadapter");
 #endif
 
-	if (tpnt->next)
+	if (!list_empty(&tpnt->list))
 		return 1;
 
 	down_write(&scsi_devicelist_mutex);
-	tpnt->next = scsi_devicelist;
-	scsi_devicelist = tpnt;
+	list_add_tail(&tpnt->list, &scsi_devicelist);
 	up_write(&scsi_devicelist_mutex);
 
 	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
@@ -2089,22 +2032,6 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 
 	driver_register(&tpnt->scsi_driverfs_driver);
 
-	/*
-	 * First scan the devices that we know about, and see if we notice them.
-	 */
-
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		for (SDpnt = shpnt->host_queue; SDpnt;
-		     SDpnt = SDpnt->next) {
-			if (tpnt->detect)
-				(*tpnt->detect) (SDpnt);
-		}
-	}
-
-	/*
-	 * Now actually connect the devices to the new driver.
-	 */
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
 	     shpnt = scsi_host_get_next(shpnt)) {
 		for (SDpnt = shpnt->host_queue; SDpnt;
@@ -2120,13 +2047,6 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 		}
 	}
 
-	MOD_INC_USE_COUNT;
-
-	if (out_of_space) {
-		scsi_unregister_device(tpnt);	/* easiest way to clean up?? */
-		return 1;
-	}
-
 	return 0;
 }
 
@@ -2134,16 +2054,7 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 {
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
-	struct Scsi_Device_Template *spnt;
-	struct Scsi_Device_Template *prev_spnt;
 	
-	lock_kernel();
-	/*
-	 * If we are busy, this is not going to fly.
-	 */
-	if (GET_USE_COUNT(tpnt->module) != 0)
-		goto error_out;
-
 	driver_unregister(&tpnt->scsi_driverfs_driver);
 
 	/*
@@ -2162,126 +2073,54 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	 * Extract the template from the linked list.
 	 */
 	down_write(&scsi_devicelist_mutex);
-	spnt = scsi_devicelist;
-	prev_spnt = NULL;
-	while (spnt != tpnt) {
-		prev_spnt = spnt;
-		spnt = spnt->next;
-	}
-	if (prev_spnt == NULL)
-		scsi_devicelist = tpnt->next;
-	else
-		prev_spnt->next = spnt->next;
+	list_del(&tpnt->list);
 	up_write(&scsi_devicelist_mutex);
 
-	MOD_DEC_USE_COUNT;
-	unlock_kernel();
 	/*
 	 * Final cleanup for the driver is done in the driver sources in the
 	 * cleanup function.
 	 */
 	return 0;
-error_out:
-	unlock_kernel();
-	return -1;
 }
 
-#ifdef CONFIG_PROC_FS
-/*
- * Function:    scsi_dump_status
- *
- * Purpose:     Brain dump of scsi system, used for problem solving.
- *
- * Arguments:   level - used to indicate level of detail.
- *
- * Notes:       The level isn't used at all yet, but we need to find some way
- *              of sensibly logging varying degrees of information.  A quick one-line
- *              display of each command, plus the status would be most useful.
- *
- *              This does depend upon CONFIG_SCSI_LOGGING - I do want some way of turning
- *              it all off if the user wants a lean and mean kernel.  It would probably
- *              also be useful to allow the user to specify one single host to be dumped.
- *              A second argument to the function would be useful for that purpose.
- *
- *              FIXME - some formatting of the output into tables would be very handy.
- */
-static void scsi_dump_status(int level)
-{
-#ifdef CONFIG_SCSI_LOGGING		/* { */
-	int i;
-	struct Scsi_Host *shpnt;
-	Scsi_Cmnd *SCpnt;
-	Scsi_Device *SDpnt;
-	printk(KERN_INFO "Dump of scsi host parameters:\n");
-	i = 0;
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		printk(KERN_INFO " %d %d %d : %d %d\n",
-		       shpnt->host_failed,
-		       shpnt->host_busy,
-		       atomic_read(&shpnt->host_active),
-		       shpnt->host_blocked,
-		       shpnt->host_self_blocked);
-	}
-
-	printk(KERN_INFO "\n\n");
-	printk(KERN_INFO "Dump of scsi command parameters:\n");
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		printk(KERN_INFO "h:c:t:l (dev sect nsect cnumsec sg) (ret all flg) (to/cmd to ito) cmd snse result\n");
-		for (SDpnt = shpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
-			for (SCpnt = SDpnt->device_queue; SCpnt; SCpnt = SCpnt->next) {
-				/*  (0) h:c:t:l (dev sect nsect cnumsec sg) (ret all flg) (to/cmd to ito) cmd snse result %d %x      */
-				printk(KERN_INFO "(%3d) %2d:%1d:%2d:%2d (%6s %4llu %4ld %4ld %4x %1d) (%1d %1d 0x%2x) (%4d %4d %4d) 0x%2.2x 0x%2.2x 0x%8.8x\n",
-				       i++,
-
-				       SCpnt->host->host_no,
-				       SCpnt->channel,
-                                       SCpnt->target,
-                                       SCpnt->lun,
-
-                                       SCpnt->request->rq_disk ?
-                                       SCpnt->request->rq_disk->disk_name : "?",
-                                       (unsigned long long)SCpnt->request->sector,
-				       SCpnt->request->nr_sectors,
-				       (long)SCpnt->request->current_nr_sectors,
-				       SCpnt->request->rq_status,
-				       SCpnt->use_sg,
-
-				       SCpnt->retries,
-				       SCpnt->allowed,
-				       SCpnt->flags,
-
-				       SCpnt->timeout_per_command,
-				       SCpnt->timeout,
-				       SCpnt->internal_timeout,
-
-				       SCpnt->cmnd[0],
-				       SCpnt->sense_buffer[2],
-				       SCpnt->result);
-			}
-		}
-	}
-#endif	/* CONFIG_SCSI_LOGGING */ /* } */
-}
-#endif				/* CONFIG_PROC_FS */
-
-static char *scsihosts;
-
-MODULE_PARM(scsihosts, "s");
+static char *scsi_dev_flags;
+MODULE_PARM(scsi_dev_flags, "s");
+MODULE_PARM_DESC(scsi_dev_flags,
+	 "Given scsi_dev_flags=vendor:model:flags, add a black/white list"
+	 " entry for vendor and model with an integer value of flags"
+	 " to the scsi device info list");
+MODULE_PARM(scsi_default_dev_flags, "i");
+MODULE_PARM_DESC(scsi_default_dev_flags,
+		 "scsi default device flag integer value");
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
 
 #ifndef MODULE
-int __init scsi_setup(char *str)
+
+int __init setup_scsi_dev_flags(char *str)
 {
-	scsihosts = str;
+	scsi_dev_flags = str;
 	return 1;
 }
+__setup("scsi_dev_flags=", setup_scsi_dev_flags);
 
-__setup("scsihosts=", scsi_setup);
+static int __init setup_scsi_default_dev_flags(char *str)
+{
+	unsigned int tmp;
+	if (get_option(&str, &tmp) == 1) {
+		scsi_default_dev_flags = tmp;
+		printk(KERN_WARNING "%s %d\n", __FUNCTION__,
+		       scsi_default_dev_flags);
+		return 1;
+	} else {
+		printk(KERN_WARNING "%s: usage scsi_default_dev_flags=intr\n",
+		       __FUNCTION__);
+		return 0;
+	}
+}
+__setup("scsi_default_dev_flags=", setup_scsi_default_dev_flags);
+
 #endif
-
 static void *scsi_pool_alloc(int gfp_mask, void *data)
 {
 	return kmem_cache_alloc(data, gfp_mask);
@@ -2359,13 +2198,12 @@ static int scsi_bus_match(struct device *scsi_driverfs_dev,
 }
 
 struct bus_type scsi_driverfs_bus_type = {
-        name: "scsi",
-        match: scsi_bus_match,
+        .name	= "scsi",
+        .match	= scsi_bus_match,
 };
 
 static int __init init_scsi(void)
 {
-	struct proc_dir_entry *generic;
 	int i;
 
 	printk(KERN_INFO "SCSI subsystem driver " REVISION "\n");
@@ -2379,40 +2217,19 @@ static int __init init_scsi(void)
 
 		sgp->slab = kmem_cache_create(sgp->name, size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!sgp->slab)
-			panic("SCSI: can't init sg slab\n");
+			printk(KERN_ERR "SCSI: can't init sg slab %s\n", sgp->name);
 
 		sgp->pool = mempool_create(SG_MEMPOOL_SIZE, scsi_pool_alloc, scsi_pool_free, sgp->slab);
 		if (!sgp->pool)
-			panic("SCSI: can't init sg mempool\n");
+			printk(KERN_ERR "SCSI: can't init sg mempool %s\n", sgp->name);
 	}
 
-	/*
-	 * This makes /proc/scsi and /proc/scsi/scsi visible.
-	 */
-#ifdef CONFIG_PROC_FS
-	proc_scsi = proc_mkdir("scsi", 0);
-	if (!proc_scsi) {
-		printk (KERN_ERR "cannot init /proc/scsi\n");
-		return -ENOMEM;
-	}
-	generic = create_proc_info_entry ("scsi/scsi", 0, 0, scsi_proc_info);
-	if (!generic) {
-		printk (KERN_ERR "cannot init /proc/scsi/scsi\n");
-		remove_proc_entry("scsi", 0);
-		return -ENOMEM;
-	}
-	generic->write_proc = proc_scsi_gen_write;
-#endif
-
-        scsi_devfs_handle = devfs_mk_dir (NULL, "scsi", NULL);
-
-	scsi_host_hn_init(scsihosts);
-
+	scsi_init_procfs();
+	scsi_devfs_handle = devfs_mk_dir(NULL, "scsi", NULL);
+	scsi_host_init();
+	scsi_dev_info_list_init(scsi_dev_flags);
 	bus_register(&scsi_driverfs_bus_type);
-
-	/* Where we handle work queued by scsi_done */
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
-
 	return 0;
 }
 
@@ -2420,16 +2237,11 @@ static void __exit exit_scsi(void)
 {
 	int i;
 
-        devfs_unregister (scsi_devfs_handle);
+	bus_unregister(&scsi_driverfs_bus_type);
+	scsi_dev_info_list_delete();
+	devfs_unregister(scsi_devfs_handle);
+	scsi_exit_procfs();
 
-	scsi_host_hn_release();
-
-#ifdef CONFIG_PROC_FS
-	/* No, we're not here anymore. Don't show the /proc/scsi files. */
-	remove_proc_entry ("scsi/scsi", 0);
-	remove_proc_entry ("scsi", 0);
-#endif
-	
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {
 		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
 		mempool_destroy(sgp->pool);
@@ -2441,204 +2253,3 @@ static void __exit exit_scsi(void)
 
 module_init(init_scsi);
 module_exit(exit_scsi);
-
-/*
- * Function:    scsi_get_host_dev()
- *
- * Purpose:     Create a Scsi_Device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     The Scsi_Device or NULL
- *
- * Notes:
- */
-Scsi_Device * scsi_get_host_dev(struct Scsi_Host * SHpnt)
-{
-        Scsi_Device * SDpnt;
-
-        /*
-         * Attach a single Scsi_Device to the Scsi_Host - this should
-         * be made to look like a "pseudo-device" that points to the
-         * HA itself.  For the moment, we include it at the head of
-         * the host_queue itself - I don't think we want to show this
-         * to the HA in select_queue_depths(), as this would probably confuse
-         * matters.
-         * Note - this device is not accessible from any high-level
-         * drivers (including generics), which is probably not
-         * optimal.  We can add hooks later to attach 
-         */
-        SDpnt = (Scsi_Device *) kmalloc(sizeof(Scsi_Device),
-                                        GFP_ATOMIC);
-        if(SDpnt == NULL)
-        	return NULL;
-        	
-        memset(SDpnt, 0, sizeof(Scsi_Device));
-	SDpnt->vendor = scsi_null_device_strs;
-	SDpnt->model = scsi_null_device_strs;
-	SDpnt->rev = scsi_null_device_strs;
-
-        SDpnt->host = SHpnt;
-        SDpnt->id = SHpnt->this_id;
-        SDpnt->type = -1;
-	SDpnt->new_queue_depth = 1;
-        
-	scsi_build_commandblocks(SDpnt);
-	if(SDpnt->current_queue_depth == 0) {
-		kfree(SDpnt);
-		return NULL;
-	}
-
-	scsi_initialize_queue(SDpnt, SHpnt);
-
-	SDpnt->online = TRUE;
-
-        /*
-         * Initialize the object that we will use to wait for command blocks.
-         */
-	init_waitqueue_head(&SDpnt->scpnt_wait);
-        return SDpnt;
-}
-
-/*
- * Function:    scsi_free_host_dev()
- *
- * Purpose:     Create a Scsi_Device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     Nothing
- *
- * Notes:
- */
-void scsi_free_host_dev(Scsi_Device * SDpnt)
-{
-        if( (unsigned char) SDpnt->id != (unsigned char) SDpnt->host->this_id )
-        {
-                panic("Attempt to delete wrong device\n");
-        }
-
-        blk_cleanup_queue(&SDpnt->request_queue);
-
-        /*
-         * We only have a single SCpnt attached to this device.  Free
-         * it now.
-         */
-	scsi_release_commandblocks(SDpnt);
-	if (SDpnt->inquiry)
-		kfree(SDpnt->inquiry);
-        kfree(SDpnt);
-}
-
-/*
- * Function:	scsi_reset_provider_done_command
- *
- * Purpose:	Dummy done routine.
- *
- * Notes:	Some low level drivers will call scsi_done and end up here,
- *		others won't bother.
- *		We don't want the bogus command used for the bus/device
- *		reset to find its way into the mid-layer so we intercept
- *		it here.
- */
-static void
-scsi_reset_provider_done_command(Scsi_Cmnd *SCpnt)
-{
-}
-
-/*
- * Function:	scsi_reset_provider
- *
- * Purpose:	Send requested reset to a bus or device at any phase.
- *
- * Arguments:	device	- device to send reset to
- *		flag - reset type (see scsi.h)
- *
- * Returns:	SUCCESS/FAILURE.
- *
- * Notes:	This is used by the SCSI Generic driver to provide
- *		Bus/Device reset capability.
- */
-int
-scsi_reset_provider(Scsi_Device *dev, int flag)
-{
-	Scsi_Cmnd SC, *SCpnt = &SC;
-        struct request req;
-	int rtn;
-
-        SCpnt->request = &req;
-	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
-	SCpnt->host                    	= dev->host;
-	SCpnt->device                  	= dev;
-	SCpnt->target                  	= dev->id;
-	SCpnt->lun                     	= dev->lun;
-	SCpnt->channel                 	= dev->channel;
-	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
-	SCpnt->request->waiting        	= NULL;
-	SCpnt->use_sg                  	= 0;
-	SCpnt->old_use_sg              	= 0;
-	SCpnt->old_cmd_len             	= 0;
-	SCpnt->underflow               	= 0;
-	SCpnt->transfersize            	= 0;
-	SCpnt->resid			= 0;
-	SCpnt->serial_number           	= 0;
-	SCpnt->serial_number_at_timeout	= 0;
-	SCpnt->host_scribble           	= NULL;
-	SCpnt->next                    	= NULL;
-	SCpnt->state                   	= SCSI_STATE_INITIALIZING;
-	SCpnt->owner	     		= SCSI_OWNER_MIDLEVEL;
-    
-	memset(&SCpnt->cmnd, '\0', sizeof(SCpnt->cmnd));
-    
-	SCpnt->scsi_done		= scsi_reset_provider_done_command;
-	SCpnt->done			= NULL;
-	SCpnt->reset_chain		= NULL;
-        
-	SCpnt->buffer			= NULL;
-	SCpnt->bufflen			= 0;
-	SCpnt->request_buffer		= NULL;
-	SCpnt->request_bufflen		= 0;
-
-	SCpnt->internal_timeout		= NORMAL_TIMEOUT;
-	SCpnt->abort_reason		= DID_ABORT;
-
-	SCpnt->cmd_len			= 0;
-
-	SCpnt->sc_data_direction	= SCSI_DATA_UNKNOWN;
-	SCpnt->sc_request		= NULL;
-	SCpnt->sc_magic			= SCSI_CMND_MAGIC;
-
-	/*
-	 * Sometimes the command can get back into the timer chain,
-	 * so use the pid as an identifier.
-	 */
-	SCpnt->pid			= 0;
-
-        rtn = scsi_new_reset(SCpnt, flag);
-
-	scsi_delete_timer(SCpnt);
-	return rtn;
-}
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

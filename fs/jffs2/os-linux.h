@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: os-linux.h,v 1.19 2002/05/20 14:56:38 dwmw2 Exp $
+ * $Id: os-linux.h,v 1.21 2002/11/12 09:44:30 dwmw2 Exp $
  *
  */
 
@@ -37,9 +37,9 @@
 #define JFFS2_F_I_MODE(f) (OFNI_EDONI_2SFFJ(f)->i_mode)
 #define JFFS2_F_I_UID(f) (OFNI_EDONI_2SFFJ(f)->i_uid)
 #define JFFS2_F_I_GID(f) (OFNI_EDONI_2SFFJ(f)->i_gid)
-#define JFFS2_F_I_CTIME(f) (OFNI_EDONI_2SFFJ(f)->i_ctime)
-#define JFFS2_F_I_MTIME(f) (OFNI_EDONI_2SFFJ(f)->i_mtime)
-#define JFFS2_F_I_ATIME(f) (OFNI_EDONI_2SFFJ(f)->i_atime)
+#define JFFS2_F_I_CTIME(f) (OFNI_EDONI_2SFFJ(f)->i_ctime.tv_sec)
+#define JFFS2_F_I_MTIME(f) (OFNI_EDONI_2SFFJ(f)->i_mtime.tv_sec)
+#define JFFS2_F_I_ATIME(f) (OFNI_EDONI_2SFFJ(f)->i_atime.tv_sec)
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,1)
 #define JFFS2_F_I_RDEV_MIN(f) (minor(OFNI_EDONI_2SFFJ(f)->i_rdev))
@@ -49,11 +49,19 @@
 #define JFFS2_F_I_RDEV_MAJ(f) (MAJOR(to_kdev_t(OFNI_EDONI_2SFFJ(f)->i_rdev)))
 #endif
 
+/* Hmmm. P'raps generic code should only ever see versions of signal
+   functions which do the locking automatically? */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,40)
+#define current_sig_lock current->sigmask_lock
+#else
+#define current_sig_lock current->sig->siglock
+#endif
+
 static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 {
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 	f->highest_version = 0;
-	f->fraglist = NULL;
+	f->fragtree = RB_ROOT;
 	f->metadata = NULL;
 	f->dents = NULL;
 	f->flags = 0;

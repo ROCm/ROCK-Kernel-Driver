@@ -181,7 +181,7 @@
 #define __NR_setdomainname      163 /* Common                                      */
 #define __NR_utrap_install	164 /* SYSV ABI/v9 required			   */
 #define __NR_quotactl           165 /* Common                                      */
-/* #define __NR_exportfs        166    SunOS Specific                              */
+#define __NR_set_tid_address    166 /* Linux specific, exportfs under SunOS        */
 #define __NR_mount              167 /* Common                                      */
 #define __NR_ustat              168 /* Common                                      */
 #define __NR_setxattr           169 /* SunOS: semsys                               */

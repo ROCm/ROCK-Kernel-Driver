@@ -284,17 +284,8 @@ static void epia_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void epia_init_proto( PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void epia_release_proto( PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol epia = {
+	.owner		= THIS_MODULE,
 	.name		= "epia",
 	.max_mode	= 6,
 	.epp_first	= 3,
@@ -308,8 +299,6 @@ static struct pi_protocol epia = {
 	.disconnect	= epia_disconnect,
 	.test_proto	= epia_test_proto,
 	.log_adapter	= epia_log_adapter,
-	.init_proto	= epia_init_proto,
-	.release_proto	= epia_release_proto,
 };
 
 static int __init epia_init(void)

@@ -23,16 +23,16 @@ static int rds_users = 0;
 
 static int rds_f_open(struct inode *in, struct file *fi)
 {
-	if(rds_users)
+	if (rds_users)
 		return -EBUSY;
 
+	rds_users++;
 	if ((text_buffer=kmalloc(66, GFP_KERNEL)) == 0) {
+		rds_users--;
 		printk(KERN_NOTICE "aci-rds: Out of memory by open()...\n");
 		return -ENOMEM;
 	}
 
-	rds_users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -41,7 +41,6 @@ static int rds_f_release(struct inode *in, struct file *fi)
 	kfree(text_buffer);
 
 	rds_users--;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -106,6 +105,7 @@ static ssize_t rds_f_read(struct file *file, char *buffer, size_t length, loff_t
 }
 
 static struct file_operations rds_f_ops = {
+	owner:	THIS_MODULE,
 	read:    rds_f_read,
 	open:    rds_f_open,
 	release: rds_f_release

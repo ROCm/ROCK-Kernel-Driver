@@ -25,17 +25,19 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
-#include <asm/dma.h>
-#include <asm/irq.h>
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <sound/core.h>
 #include <sound/cs4231.h>
 #include <sound/pcm_params.h>
+
+#include <asm/io.h>
+#include <asm/dma.h>
+#include <asm/irq.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for control of CS4231(A)/CS4232/InterWave & compatible chips");

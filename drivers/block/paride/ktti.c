@@ -97,17 +97,8 @@ static void ktti_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void ktti_init_proto( PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void ktti_release_proto( PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol ktti = {
+	.owner		= THIS_MODULE,
 	.name		= "ktti",
 	.max_mode	= 1,
 	.epp_first	= 2,
@@ -120,8 +111,6 @@ static struct pi_protocol ktti = {
 	.connect	= ktti_connect,
 	.disconnect	= ktti_disconnect,
 	.log_adapter	= ktti_log_adapter,
-	.init_proto	= ktti_init_proto,
-	.release_proto	= ktti_release_proto,
 };
 
 static int __init ktti_init(void)

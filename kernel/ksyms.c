@@ -53,6 +53,7 @@
 #include <linux/percpu.h>
 #include <linux/smp_lock.h>
 #include <linux/dnotify.h>
+#include <linux/mount.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -70,14 +71,6 @@ __attribute__((section("__ksymtab"))) = {
 	1 /* Version version */, "Using_Versions"
 };
 #endif
-
-
-EXPORT_SYMBOL(inter_module_register);
-EXPORT_SYMBOL(inter_module_unregister);
-EXPORT_SYMBOL(inter_module_get);
-EXPORT_SYMBOL(inter_module_get_request);
-EXPORT_SYMBOL(inter_module_put);
-EXPORT_SYMBOL(try_inc_mod_count);
 
 /* process memory management */
 EXPORT_SYMBOL(do_mmap_pgoff);
@@ -174,7 +167,7 @@ EXPORT_SYMBOL(d_alloc);
 EXPORT_SYMBOL(d_alloc_anon);
 EXPORT_SYMBOL(d_splice_alias);
 EXPORT_SYMBOL(d_lookup);
-EXPORT_SYMBOL(__d_path);
+EXPORT_SYMBOL(d_path);
 EXPORT_SYMBOL(mark_buffer_dirty);
 EXPORT_SYMBOL(end_buffer_io_sync);
 EXPORT_SYMBOL(__mark_inode_dirty);
@@ -276,7 +269,7 @@ EXPORT_SYMBOL(generic_fillattr);
 EXPORT_SYMBOL(generic_file_llseek);
 EXPORT_SYMBOL(remote_llseek);
 EXPORT_SYMBOL(no_llseek);
-EXPORT_SYMBOL(__pollwait);
+EXPORT_SYMBOL(poll_initwait);
 EXPORT_SYMBOL(poll_freewait);
 EXPORT_SYMBOL(ROOT_DEV);
 EXPORT_SYMBOL(find_get_page);
@@ -294,7 +287,7 @@ EXPORT_SYMBOL(page_follow_link);
 EXPORT_SYMBOL(page_symlink_inode_operations);
 EXPORT_SYMBOL(page_symlink);
 EXPORT_SYMBOL(vfs_readdir);
-EXPORT_SYMBOL(__get_lease);
+EXPORT_SYMBOL(__break_lease);
 EXPORT_SYMBOL(lease_get_mtime);
 EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
@@ -601,3 +594,5 @@ EXPORT_SYMBOL(__per_cpu_offset);
 
 /* debug */
 EXPORT_SYMBOL(dump_stack);
+
+EXPORT_SYMBOL(current_kernel_time); 

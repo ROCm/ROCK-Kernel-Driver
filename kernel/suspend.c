@@ -103,7 +103,7 @@ static int nr_copy_pages_check;
 
 static int resume_status = 0;
 static char resume_file[256] = "";			/* For resume= kernel option */
-static kdev_t resume_device;
+static dev_t resume_device;
 /* Local variables that should not be affected by save */
 unsigned int nr_copy_pages __nosavedata = 0;
 
@@ -1143,13 +1143,13 @@ static int read_suspend_image(const char * specialfile, int noresume)
 	unsigned long scratch_page = 0;
 	int error;
 
-	resume_device = to_kdev_t(name_to_dev_t(specialfile));
+	resume_device = name_to_dev_t(specialfile);
 	scratch_page = get_zeroed_page(GFP_ATOMIC);
 	cur = (void *) scratch_page;
 	if (cur) {
 		struct block_device *bdev;
 		printk("Resuming from device %s\n", __bdevname(resume_device));
-		bdev = bdget(kdev_t_to_nr(resume_device));
+		bdev = bdget(resume_device);
 		if (!bdev) {
 			printk("No such block device ?!\n");
 			BUG();

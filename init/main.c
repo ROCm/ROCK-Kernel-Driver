@@ -63,6 +63,7 @@ extern void init_IRQ(void);
 extern void init_modules(void);
 extern void sock_init(void);
 extern void fork_init(unsigned long);
+extern void extable_init(void);
 extern void mca_init(void);
 extern void sbus_init(void);
 extern void sysctl_init(void);
@@ -394,6 +395,7 @@ asmlinkage void __init start_kernel(void)
 	printk("Kernel command line: %s\n", saved_command_line);
 	parse_options(command_line);
 	trap_init();
+	extable_init();
 	rcu_init();
 	init_IRQ();
 	sched_init();
@@ -406,9 +408,6 @@ asmlinkage void __init start_kernel(void)
 	 * this. But we do want output early, in case something goes wrong.
 	 */
 	console_init();
-#ifdef CONFIG_MODULES
-	init_modules();
-#endif
 	profile_init();
 	kmem_cache_init();
 	local_irq_enable();
@@ -456,6 +455,8 @@ asmlinkage void __init start_kernel(void)
 }
 
 struct task_struct *child_reaper = &init_task;
+
+extern initcall_t __initcall_start, __initcall_end;
 
 static void __init do_initcalls(void)
 {

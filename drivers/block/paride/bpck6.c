@@ -222,38 +222,27 @@ static void bpck6_log_adapter( PIA *pi, char * scratch, int verbose )
 		pi->unit,pi->mode,mode_string[pi->mode],pi->delay);
 }
 
-static void bpck6_init_proto(PIA *pi)
+static int bpck6_init_proto(PIA *pi)
 {
-	int i;
+	PPC *p = kmalloc(sizeof(PPC), GFP_KERNEL);
 
-	/* allocate a state structure for this item */
-	pi->private=(int)kmalloc(sizeof(PPC),GFP_KERNEL);
-
-	if(pi->private==(int)NULL)
-	{
-		printk(KERN_ERR "%s: ERROR COULDN'T ALLOCATE MEMORY\n",pi->device); 
-		return;
-	}
-	else
-	{	
-		MOD_INC_USE_COUNT; 
+	if (p) {
+		memset(p, 0, sizeof(PPC));
+		pi->private = (int)p;
+		return 0;
 	}
 
-	for(i=0;i<sizeof(PPC);i++)
-	{
-		((unsigned char *)(pi->private))[i]=0;
-	}
+	printk(KERN_ERR "%s: ERROR COULDN'T ALLOCATE MEMORY\n", pi->device); 
+	return -1;
 }
 
 static void bpck6_release_proto(PIA *pi)
 {
-	MOD_DEC_USE_COUNT;
-	/* free after use count decremented so that we aren't using it
-		when it is decremented */
 	kfree((void *)(pi->private)); 
 }
 
 static struct pi_protocol bpck6 = {
+	.owner		= THIS_MODULE,
 	.name		= "bpck6",
 	.max_mode	= 5,
 	.epp_first	= 2, /* 2-5 use epp (need 8 ports) */

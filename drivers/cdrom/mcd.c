@@ -82,8 +82,8 @@
 #include <linux/module.h>
 
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <linux/signal.h>
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/timer.h>
 #include <linux/fs.h>
@@ -99,6 +99,7 @@
 /* #define REALLY_SLOW_IO  */
 #include <asm/system.h>
 #include <asm/io.h>
+#include <asm/current.h>
 #include <asm/uaccess.h>
 #include <linux/blk.h>
 

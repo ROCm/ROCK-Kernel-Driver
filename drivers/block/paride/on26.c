@@ -287,17 +287,8 @@ static void on26_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void on26_init_proto( PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void on26_release_proto( PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol on26 = {
+	.owner		= THIS_MODULE,
 	.name		= "on26",
 	.max_mode	= 5,
 	.epp_first	= 2,
@@ -311,8 +302,6 @@ static struct pi_protocol on26 = {
 	.disconnect	= on26_disconnect,
 	.test_port	= on26_test_port,
 	.log_adapter	= on26_log_adapter,
-	.init_proto	= on26_init_proto,
-	.release_proto	= on26_release_proto,
 };
 
 static int __init on26_init(void)

@@ -23,7 +23,7 @@
 #include <linux/smp_lock.h>
 #include <linux/cache.h>
 #include <linux/module.h>
-
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 #define DCACHE_PARANOIA 1
@@ -55,15 +55,17 @@ struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
 
-/* no dcache_lock, please */
-static inline void d_free(struct dentry *dentry)
+/*
+ * no dcache_lock, please.  The caller must decrement dentry_stat.nr_dentry
+ * inside dcache_lock.
+ */
+static void d_free(struct dentry *dentry)
 {
 	if (dentry->d_op && dentry->d_op->d_release)
 		dentry->d_op->d_release(dentry);
 	if (dname_external(dentry)) 
 		kfree(dentry->d_name.name);
 	kmem_cache_free(dentry_cache, dentry); 
-	dentry_stat.nr_dentry--;
 }
 
 /*
@@ -135,7 +137,7 @@ repeat:
 			goto unhash_it;
 	}
 	/* Unreachable? Get rid of it */
-	if (list_empty(&dentry->d_hash))
+ 	if (d_unhashed(dentry))
 		goto kill_it;
 	list_add(&dentry->d_lru, &dentry_unused);
 	dentry_stat.nr_unused++;
@@ -144,11 +146,12 @@ repeat:
 	return;
 
 unhash_it:
-	list_del_init(&dentry->d_hash);
+	__d_drop(dentry);
 
 kill_it: {
 		struct dentry *parent;
 		list_del(&dentry->d_child);
+		dentry_stat.nr_dentry--;	/* For d_free, below */
 		/* drops the lock, at that point nobody can reach this dentry */
 		dentry_iput(dentry);
 		parent = dentry->d_parent;
@@ -178,7 +181,7 @@ int d_invalidate(struct dentry * dentry)
 	 * If it's already been dropped, return OK.
 	 */
 	spin_lock(&dcache_lock);
-	if (list_empty(&dentry->d_hash)) {
+	if (d_unhashed(dentry)) {
 		spin_unlock(&dcache_lock);
 		return 0;
 	}
@@ -209,7 +212,7 @@ int d_invalidate(struct dentry * dentry)
 		}
 	}
 
-	list_del_init(&dentry->d_hash);
+	__d_drop(dentry);
 	spin_unlock(&dcache_lock);
 	return 0;
 }
@@ -256,7 +259,7 @@ struct dentry * d_find_alias(struct inode *inode)
 		tmp = next;
 		next = tmp->next;
 		alias = list_entry(tmp, struct dentry, d_alias);
-		if (!list_empty(&alias->d_hash)) {
+ 		if (!d_unhashed(alias)) {
 			if (alias->d_flags & DCACHE_DISCONNECTED)
 				discon_alias = alias;
 			else {
@@ -305,8 +308,9 @@ static inline void prune_one_dentry(struct dentry * dentry)
 {
 	struct dentry * parent;
 
-	list_del_init(&dentry->d_hash);
+	__d_drop(dentry);
 	list_del(&dentry->d_child);
+	dentry_stat.nr_dentry--;	/* For d_free, below */
 	dentry_iput(dentry);
 	parent = dentry->d_parent;
 	d_free(dentry);
@@ -569,11 +573,25 @@ void shrink_dcache_anon(struct list_head *head)
 }
 
 /*
- * This is called from kswapd when we think we need some
- * more memory. 
+ * This is called from kswapd when we think we need some more memory.
+ *
+ * We don't want the VM to steal _all_ unused dcache.  Because that leads to
+ * the VM stealing all unused inodes, which shoots down recently-used
+ * pagecache.  So what we do is to tell fibs to the VM about how many reapable
+ * objects there are in this cache.   If the number of unused dentries is
+ * less than half of the total dentry count then return zero.  The net effect
+ * is that the number of unused dentries will be, at a minimum, equal to the
+ * number of used ones.
+ *
+ * If unused_ratio is set to 5, the number of unused dentries will not fall
+ * below 5* the number of used ones.
  */
 static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 {
+	int nr_used;
+	int nr_unused;
+	const int unused_ratio = 1;
+
 	if (nr) {
 		/*
 		 * Nasty deadlock avoidance.
@@ -589,7 +607,11 @@ static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 		if (gfp_mask & __GFP_FS)
 			prune_dcache(nr);
 	}
-	return dentry_stat.nr_dentry;
+	nr_unused = dentry_stat.nr_unused;
+	nr_used = dentry_stat.nr_dentry - nr_unused;
+	if (nr_unused < nr_used * unused_ratio)
+		return 0;
+	return nr_unused - nr_used * unused_ratio;
 }
 
 #define NAME_ALLOC_LEN(len)	((len+16) & ~15)
@@ -642,16 +664,20 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 	INIT_LIST_HEAD(&dentry->d_lru);
 	INIT_LIST_HEAD(&dentry->d_subdirs);
 	INIT_LIST_HEAD(&dentry->d_alias);
+
 	if (parent) {
 		dentry->d_parent = dget(parent);
 		dentry->d_sb = parent->d_sb;
-		spin_lock(&dcache_lock);
-		list_add(&dentry->d_child, &parent->d_subdirs);
-		spin_unlock(&dcache_lock);
-	} else
+	} else {
 		INIT_LIST_HEAD(&dentry->d_child);
+	}
 
+	spin_lock(&dcache_lock);
+	if (parent)
+		list_add(&dentry->d_child, &parent->d_subdirs);
 	dentry_stat.nr_dentry++;
+	spin_unlock(&dcache_lock);
+
 	return dentry;
 }
 
@@ -971,7 +997,7 @@ void d_delete(struct dentry * dentry)
 void d_rehash(struct dentry * entry)
 {
 	struct list_head *list = d_hash(entry->d_parent, entry->d_name.hash);
-	if (!list_empty(&entry->d_hash)) BUG();
+	if (!d_unhashed(entry)) BUG();
 	spin_lock(&dcache_lock);
 	list_add(&entry->d_hash, list);
 	spin_unlock(&dcache_lock);
@@ -1039,11 +1065,10 @@ void d_move(struct dentry * dentry, struct dentry * target)
 
 	spin_lock(&dcache_lock);
 	/* Move the dentry to the target hash queue */
-	list_del(&dentry->d_hash);
-	list_add(&dentry->d_hash, &target->d_hash);
+	list_move(&dentry->d_hash, &target->d_hash);
 
 	/* Unhash the target: dput() will then get rid of it */
-	list_del_init(&target->d_hash);
+	__d_drop(target);
 
 	list_del(&dentry->d_child);
 	list_del(&target->d_child);
@@ -1085,9 +1110,9 @@ void d_move(struct dentry * dentry, struct dentry * target)
  *
  * "buflen" should be %PAGE_SIZE or more. Caller holds the dcache_lock.
  */
-char * __d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
-		struct dentry *root, struct vfsmount *rootmnt,
-		char *buffer, int buflen)
+static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
+			struct dentry *root, struct vfsmount *rootmnt,
+			char *buffer, int buflen)
 {
 	char * end = buffer+buflen;
 	char * retval;
@@ -1095,7 +1120,7 @@ char * __d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 
 	*--end = '\0';
 	buflen--;
-	if (!IS_ROOT(dentry) && list_empty(&dentry->d_hash)) {
+	if (!IS_ROOT(dentry) && d_unhashed(dentry)) {
 		buflen -= 10;
 		end -= 10;
 		memcpy(end, " (deleted)", 10);
@@ -1140,6 +1165,25 @@ global_root:
 	return retval;
 }
 
+/* write full pathname into buffer and return start of pathname */
+char * d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
+				char *buf, int buflen)
+{
+	char *res;
+	struct vfsmount *rootmnt;
+	struct dentry *root;
+	read_lock(&current->fs->lock);
+	rootmnt = mntget(current->fs->rootmnt);
+	root = dget(current->fs->root);
+	read_unlock(&current->fs->lock);
+	spin_lock(&dcache_lock);
+	res = __d_path(dentry, vfsmnt, root, rootmnt, buf, buflen);
+	spin_unlock(&dcache_lock);
+	dput(root);
+	mntput(rootmnt);
+	return res;
+}
+
 /*
  * NOTE! The user-level library version returns a
  * character pointer. The kernel system call just
@@ -1178,7 +1222,7 @@ asmlinkage long sys_getcwd(char *buf, unsigned long size)
 	error = -ENOENT;
 	/* Has the current directory has been unlinked? */
 	spin_lock(&dcache_lock);
-	if (pwd->d_parent == pwd || !list_empty(&pwd->d_hash)) {
+	if (pwd->d_parent == pwd || !d_unhashed(pwd)) {
 		unsigned long len;
 		char * cwd;
 

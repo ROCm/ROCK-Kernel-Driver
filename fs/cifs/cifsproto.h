@@ -55,8 +55,8 @@ extern void header_assemble(struct smb_hdr *, char /* command */ ,
 			const struct cifsTconInfo *, int
 			/* length of fixed section (word count) in two byte units  */
 			);
-extern time_t cifs_NTtimeToUnix(u64 /* utc nanoseconds since 1601 */ );
-extern u64 cifs_UnixTimeToNT(time_t);
+extern struct timespec cifs_NTtimeToUnix(u64 /* utc nanoseconds since 1601 */ );
+extern u64 cifs_UnixTimeToNT(struct timespec);
 extern void RevUcode_to_Ucode(char *revUnicode, char *UnicodeName);
 extern void Ucode_to_RevUcode(char *Unicode, char *revUnicodeName);
 extern void RevUcode_to_Ucode_with_Len(char *revUnicode, char *UnicodeName,

@@ -4,6 +4,7 @@
 
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/net.h>
 
 #include "getopt.h"
 

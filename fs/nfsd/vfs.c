@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/major.h>
 #include <linux/ext2_fs.h>
 #include <linux/proc_fs.h>
@@ -229,13 +230,13 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 #define BOTH_TIME_SET (ATTR_ATIME_SET | ATTR_MTIME_SET)
 #define	MAX_TOUCH_TIME_ERROR (30*60)
 	if ((iap->ia_valid & BOTH_TIME_SET) == BOTH_TIME_SET
-	    && iap->ia_mtime == iap->ia_atime
+	    && iap->ia_mtime.tv_sec == iap->ia_atime.tv_sec
 	    ) {
 	    /* Looks probable.  Now just make sure time is in the right ballpark.
 	     * Solaris, at least, doesn't seem to care what the time request is.
 	     * We require it be within 30 minutes of now.
 	     */
-	    time_t delta = iap->ia_atime - CURRENT_TIME;
+	    time_t delta = iap->ia_atime.tv_sec - get_seconds();
 	    if (delta<0) delta = -delta;
 	    if (delta < MAX_TOUCH_TIME_ERROR &&
 		inode_change_ok(inode, iap) != 0) {
@@ -258,7 +259,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 		 * If we are changing the size of the file, then
 		 * we need to break all leases.
 		 */
-		err = get_lease(inode, FMODE_WRITE);
+		err = break_lease(inode, FMODE_WRITE);
 		if (err)
 			goto out_nfserr;
 
@@ -292,7 +293,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	iap->ia_valid |= ATTR_CTIME;
 
 	err = nfserr_notsync;
-	if (!check_guard || guardtime == inode->i_ctime) {
+	if (!check_guard || guardtime == inode->i_ctime.tv_sec) {
 		fh_lock(fhp);
 		err = notify_change(dentry, iap);
 		err = nfserrno(err);
@@ -452,7 +453,7 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 	 * Check to see if there are any leases on this file.
 	 * This may block while leases are broken.
 	 */
-	err = get_lease(inode, (access & MAY_WRITE) ? FMODE_WRITE : 0);
+	err = break_lease(inode, (access & MAY_WRITE) ? FMODE_WRITE : 0);
 	if (err)
 		goto out_nfserr;
 
@@ -1029,8 +1030,8 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 			}
 			break;
 		case NFS3_CREATE_EXCLUSIVE:
-			if (   dchild->d_inode->i_mtime == v_mtime
-			    && dchild->d_inode->i_atime == v_atime
+			if (   dchild->d_inode->i_mtime.tv_sec == v_mtime
+			    && dchild->d_inode->i_atime.tv_sec == v_atime
 			    && dchild->d_inode->i_mode  == v_mode
 			    && dchild->d_inode->i_size  == 0 )
 				break;
@@ -1062,8 +1063,11 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		iap->ia_valid = ATTR_MTIME|ATTR_ATIME
 			| ATTR_MTIME_SET|ATTR_ATIME_SET
 			| ATTR_MODE;
-		iap->ia_mtime = v_mtime;
-		iap->ia_atime = v_atime;
+		/* XXX someone who knows this better please fix it for nsec */ 
+		iap->ia_mtime.tv_sec = v_mtime;
+		iap->ia_atime.tv_sec = v_atime;
+		iap->ia_mtime.tv_nsec = 0;
+		iap->ia_atime.tv_nsec = 0;
 		iap->ia_mode  = v_mode;
 	}
 

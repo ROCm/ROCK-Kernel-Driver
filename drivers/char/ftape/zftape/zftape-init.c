@@ -415,8 +415,6 @@ int init_module(void)
 void cleanup_module(void)
 {
 	int i;
-	char devname[9];
-
 	TRACE_FUN(ft_t_flow);
 
 	if (unregister_chrdev(QIC117_TAPE_MAJOR, "zft") != 0) {
@@ -425,18 +423,12 @@ void cleanup_module(void)
 		TRACE(ft_t_info, "successful");
 	}
         for (i = 0; i < 4; i++) {
-		sprintf(devname, "qft%i", i);
-		devfs_find_and_unregister(NULL, devname, QIC117_TAPE_MAJOR, i, DEVFS_SPECIAL_CHR, 0);
-		sprintf(devname, "nqft%i", i);
-		devfs_find_and_unregister(NULL, devname, QIC117_TAPE_MAJOR, i + 4, DEVFS_SPECIAL_CHR, 0);
-		sprintf(devname, "zqft%i", i);
-		devfs_find_and_unregister(NULL, devname, QIC117_TAPE_MAJOR, i + 16, DEVFS_SPECIAL_CHR, 0);
-		sprintf(devname, "nzqft%i", i);
-		devfs_find_and_unregister(NULL, devname, QIC117_TAPE_MAJOR, i + 20, DEVFS_SPECIAL_CHR, 0);
-		sprintf(devname, "rawqft%i", i);
-		devfs_find_and_unregister(NULL, devname, QIC117_TAPE_MAJOR, i + 32, DEVFS_SPECIAL_CHR, 0);
-		sprintf(devname, "nrawqft%i", i);
-		devfs_find_and_unregister(NULL, devname, QIC117_TAPE_MAJOR, i + 36, DEVFS_SPECIAL_CHR, 0);
+		devfs_remove("qft%i", i);
+		devfs_remove("nqft%i", i);
+		devfs_remove("zqft%i", i);
+		devfs_remove("nzqft%i", i);
+		devfs_remove("rawqft%i", i);
+		devfs_remove("nrawqft%i", i);
 	}
 	zft_uninit_mem(); /* release remaining memory, if any */
         printk(KERN_INFO "zftape successfully unloaded.\n");

@@ -530,7 +530,7 @@ jffs_add_virtual_root(struct jffs_control *c)
 	root->ino = JFFS_MIN_INO;
 	root->mode = S_IFDIR | S_IRWXU | S_IRGRP
 		     | S_IXGRP | S_IROTH | S_IXOTH;
-	root->atime = root->mtime = root->ctime = CURRENT_TIME;
+	root->atime = root->mtime = root->ctime = get_seconds();
 	root->nlink = 1;
 	root->c = c;
 	root->version_head = root->version_tail = node;

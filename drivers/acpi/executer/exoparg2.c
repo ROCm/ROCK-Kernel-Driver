@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 113 $
+ *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -414,39 +414,10 @@ acpi_ex_opcode_2A_1T_1R (
 				goto cleanup;
 			}
 
-			if ((ACPI_GET_OBJECT_TYPE (operand[2]) == ACPI_TYPE_INTEGER) &&
-				(operand[2]->common.flags & AOPOBJ_AML_CONSTANT)) {
-				/*
-				 * There is no actual result descriptor (the Zero_op/Constant Result
-				 * descriptor is a placeholder), so just delete the placeholder and
-				 * return a reference to the package element
-				 */
-				acpi_ut_remove_reference (operand[2]);
-			}
-
-			else {
-				/*
-				 * Each element of the package is an internal object.  Get the one
-				 * we are after.
-				 */
-				temp_desc                        = operand[0]->package.elements [index];
-				return_desc->reference.opcode    = AML_INDEX_OP;
-				return_desc->reference.target_type = ACPI_GET_OBJECT_TYPE (temp_desc);
-				return_desc->reference.object    = temp_desc;
-
-				status = acpi_ex_store (return_desc, operand[2], walk_state);
-				return_desc->reference.object    = NULL;
-			}
-
-			/*
-			 * The local return object must always be a reference to the package element,
-			 * not the element itself.
-			 */
-			return_desc->reference.opcode    = AML_INDEX_OP;
 			return_desc->reference.target_type = ACPI_TYPE_PACKAGE;
+			return_desc->reference.object    = operand[0]->package.elements [index];
 			return_desc->reference.where     = &operand[0]->package.elements [index];
 		}
-
 		else {
 			/* Object to be indexed is a Buffer */
 
@@ -457,13 +428,20 @@ acpi_ex_opcode_2A_1T_1R (
 				goto cleanup;
 			}
 
-			return_desc->reference.opcode      = AML_INDEX_OP;
 			return_desc->reference.target_type = ACPI_TYPE_BUFFER_FIELD;
-			return_desc->reference.object      = operand[0];
-			return_desc->reference.offset      = index;
-
-			status = acpi_ex_store (return_desc, operand[2], walk_state);
+			return_desc->reference.object    = operand[0];
 		}
+
+		/* Complete the Index reference object */
+
+		return_desc->reference.opcode    = AML_INDEX_OP;
+		return_desc->reference.offset    = index;
+
+		/* Store the reference to the Target */
+
+		status = acpi_ex_store (return_desc, operand[2], walk_state);
+
+		/* Return the reference */
 
 		walk_state->result_obj = return_desc;
 		goto cleanup;
@@ -490,7 +468,9 @@ store_result_to_target:
 			goto cleanup;
 		}
 
-		walk_state->result_obj = return_desc;
+		if (!walk_state->result_obj) {
+			walk_state->result_obj = return_desc;
+		}
 	}
 
 

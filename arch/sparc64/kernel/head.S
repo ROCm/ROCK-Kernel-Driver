@@ -482,7 +482,7 @@ cheetah_tlb_fixup:
 	membar	#Sync
 
 	mov	2, %g2		/* Set TLB type to cheetah+. */
-	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g5,g2,1f)
+	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g5,g7,1f)
 
 	mov	1, %g2		/* Set TLB type to cheetah. */
 

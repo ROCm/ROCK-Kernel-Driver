@@ -74,19 +74,39 @@ static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 	return -EINVAL;
 }
 
-static void crypto_init_ops(struct crypto_tfm *tfm)
+static int crypto_init_ops(struct crypto_tfm *tfm)
 {
 	switch (crypto_tfm_alg_type(tfm)) {
 	case CRYPTO_ALG_TYPE_CIPHER:
-		crypto_init_cipher_ops(tfm);
+		return crypto_init_cipher_ops(tfm);
+		
+	case CRYPTO_ALG_TYPE_DIGEST:
+		return crypto_init_digest_ops(tfm);
+		
+	case CRYPTO_ALG_TYPE_COMP:
+		return crypto_init_compress_ops(tfm);
+	
+	default:
+		break;
+	}
+	
+	BUG();
+	return -EINVAL;
+}
+
+static void crypto_exit_ops(struct crypto_tfm *tfm)
+{
+	switch (crypto_tfm_alg_type(tfm)) {
+	case CRYPTO_ALG_TYPE_CIPHER:
+		crypto_exit_cipher_ops(tfm);
 		break;
 		
 	case CRYPTO_ALG_TYPE_DIGEST:
-		crypto_init_digest_ops(tfm);
+		crypto_exit_digest_ops(tfm);
 		break;
 		
 	case CRYPTO_ALG_TYPE_COMP:
-		crypto_init_compress_ops(tfm);
+		crypto_exit_compress_ops(tfm);
 		break;
 	
 	default:
@@ -110,6 +130,8 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 
 	memset(tfm, 0, sizeof(*tfm));
 
+	memset(tfm, 0, sizeof(*tfm));
+	
 	if (alg->cra_ctxsize) {
 		tfm->crt_ctx = kmalloc(alg->cra_ctxsize, GFP_KERNEL);
 		if (tfm->crt_ctx == NULL)
@@ -128,8 +150,11 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 	if (crypto_init_flags(tfm, flags))
 		goto out_free_work_block;
 		
-	crypto_init_ops(tfm);
-	
+	if (crypto_init_ops(tfm)) {
+		crypto_exit_ops(tfm);
+		goto out_free_ctx;
+	}
+
 	goto out;
 
 out_free_work_block:
@@ -263,8 +288,7 @@ static int c_show(struct seq_file *m, void *p)
 	struct crypto_alg *alg = (struct crypto_alg *)p;
 	
 	seq_printf(m, "name         : %s\n", alg->cra_name);
-	seq_printf(m, "module       : %s\n", alg->cra_module ?
-					alg->cra_module->name : "[static]");
+	seq_printf(m, "module       : %s\n", module_name(alg->cra_module));
 	seq_printf(m, "blocksize    : %u\n", alg->cra_blocksize);
 	
 	switch (alg->cra_flags & CRYPTO_ALG_TYPE_MASK) {

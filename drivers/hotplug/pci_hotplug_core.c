@@ -36,6 +36,7 @@
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/mount.h>
 #include <linux/namei.h>
 #include <linux/pci.h>
 #include <linux/dnotify.h>
@@ -120,7 +121,7 @@ static struct proc_dir_entry *slotdir = NULL;
 static const char *slotdir_name = "slots";
 #endif
 
-static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int dev)
+static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, dev_t dev)
 {
 	struct inode *inode = new_inode(sb);
 
@@ -152,7 +153,7 @@ static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int de
 }
 
 /* SMP-safe */
-static int pcihpfs_mknod (struct inode *dir, struct dentry *dentry, int mode, int dev)
+static int pcihpfs_mknod (struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	struct inode *inode = pcihpfs_get_inode(dir->i_sb, mode, dev);
 	int error = -ENOSPC;

@@ -70,7 +70,10 @@ static int afs_inode_map_status(afs_vnode_t *vnode)
 	inode->i_gid		= 0;
 	inode->i_rdev		= NODEV;
 	inode->i_size		= vnode->status.size;
-	inode->i_atime		= inode->i_mtime = inode->i_ctime = vnode->status.mtime_server;
+	inode->i_atime.tv_sec		= inode->i_mtime.tv_sec = inode->i_ctime.tv_sec = vnode->status.mtime_server;
+	inode->i_atime.tv_nsec = 
+	inode->i_mtime.tv_nsec = 
+		inode->i_ctime.tv_nsec = 0;
 	inode->i_blksize	= PAGE_CACHE_SIZE;
 	inode->i_blocks		= 0;
 	inode->i_version	= vnode->fid.unique;
@@ -145,7 +148,7 @@ static int afs_iget5_set(struct inode *inode, void *opaque)
  */
 inline int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inode)
 {
-	struct afs_iget_data data = { fid: *fid };
+	struct afs_iget_data data = { .fid = *fid };
 	struct afs_super_info *as;
 	struct inode *inode;
 	afs_vnode_t *vnode;

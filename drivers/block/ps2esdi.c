@@ -37,14 +37,13 @@
 #define DEVICE_NR(device) (minor(device) >> 6)
 
 #include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
+#include <linux/wait.h>
+#include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/genhd.h>
 #include <linux/ps2esdi.h>
 #include <linux/blk.h>
-#include <linux/blkpg.h>
 #include <linux/mca.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -508,7 +507,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 	}
 
 	if (req->sector+req->current_nr_sectors > get_capacity(req->rq_disk)) {
-		printk("Grrr. error. ps2esdi_drives: %d, %lu %llu\n",
+		printk("Grrr. error. ps2esdi_drives: %d, %llu %llu\n",
 		    ps2esdi_drives, req->sector,
 		    (unsigned long long)get_capacity(req->rq_disk));
 		end_request(req, FAIL);

@@ -111,9 +111,9 @@ static void qnx4_write_inode(struct inode *inode, int unused)
 	raw_inode->di_gid   = cpu_to_le16(fs_high2lowgid(inode->i_gid));
 	raw_inode->di_nlink = cpu_to_le16(inode->i_nlink);
 	raw_inode->di_size  = cpu_to_le32(inode->i_size);
-	raw_inode->di_mtime = cpu_to_le32(inode->i_mtime);
-	raw_inode->di_atime = cpu_to_le32(inode->i_atime);
-	raw_inode->di_ctime = cpu_to_le32(inode->i_ctime);
+	raw_inode->di_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+	raw_inode->di_atime = cpu_to_le32(inode->i_atime.tv_sec);
+	raw_inode->di_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
 	raw_inode->di_first_xtnt.xtnt_size = cpu_to_le32(inode->i_blocks);
 	mark_buffer_dirty(bh);
 	brelse(bh);
@@ -480,9 +480,12 @@ static void qnx4_read_inode(struct inode *inode)
 	inode->i_gid     = (gid_t)le16_to_cpu(raw_inode->di_gid);
 	inode->i_nlink   = le16_to_cpu(raw_inode->di_nlink);
 	inode->i_size    = le32_to_cpu(raw_inode->di_size);
-	inode->i_mtime   = le32_to_cpu(raw_inode->di_mtime);
-	inode->i_atime   = le32_to_cpu(raw_inode->di_atime);
-	inode->i_ctime   = le32_to_cpu(raw_inode->di_ctime);
+	inode->i_mtime.tv_sec   = le32_to_cpu(raw_inode->di_mtime);
+	inode->i_mtime.tv_nsec = 0;
+	inode->i_atime.tv_sec   = le32_to_cpu(raw_inode->di_atime);
+	inode->i_atime.tv_nsec = 0;
+	inode->i_ctime.tv_sec   = le32_to_cpu(raw_inode->di_ctime);
+	inode->i_ctime.tv_nsec = 0;
 	inode->i_blocks  = le32_to_cpu(raw_inode->di_first_xtnt.xtnt_size);
 	inode->i_blksize = QNX4_DIR_ENTRY_SIZE;
 

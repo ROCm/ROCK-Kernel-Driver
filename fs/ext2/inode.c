@@ -66,7 +66,7 @@ void ext2_delete_inode (struct inode * inode)
 {
 	if (is_bad_inode(inode))
 		goto no_delete;
-	EXT2_I(inode)->i_dtime	= CURRENT_TIME;
+	EXT2_I(inode)->i_dtime	= get_seconds();
 	mark_inode_dirty(inode);
 	ext2_update_inode(inode, inode_needs_sync(inode));
 
@@ -999,9 +999,10 @@ void ext2_read_inode (struct inode * inode)
 	}
 	inode->i_nlink = le16_to_cpu(raw_inode->i_links_count);
 	inode->i_size = le32_to_cpu(raw_inode->i_size);
-	inode->i_atime = le32_to_cpu(raw_inode->i_atime);
-	inode->i_ctime = le32_to_cpu(raw_inode->i_ctime);
-	inode->i_mtime = le32_to_cpu(raw_inode->i_mtime);
+	inode->i_atime.tv_sec = le32_to_cpu(raw_inode->i_atime);
+	inode->i_ctime.tv_sec = le32_to_cpu(raw_inode->i_ctime);
+	inode->i_mtime.tv_sec = le32_to_cpu(raw_inode->i_mtime);
+	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
 	ei->i_dtime = le32_to_cpu(raw_inode->i_dtime);
 	/* We now have enough fields to check if the inode was active or not.
 	 * This is needed because nfsd might try to access dead inodes
@@ -1120,9 +1121,10 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 	}
 	raw_inode->i_links_count = cpu_to_le16(inode->i_nlink);
 	raw_inode->i_size = cpu_to_le32(inode->i_size);
-	raw_inode->i_atime = cpu_to_le32(inode->i_atime);
-	raw_inode->i_ctime = cpu_to_le32(inode->i_ctime);
-	raw_inode->i_mtime = cpu_to_le32(inode->i_mtime);
+	raw_inode->i_atime = cpu_to_le32(inode->i_atime.tv_sec);
+	raw_inode->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+	raw_inode->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
+
 	raw_inode->i_blocks = cpu_to_le32(inode->i_blocks);
 	raw_inode->i_dtime = cpu_to_le32(ei->i_dtime);
 	raw_inode->i_flags = cpu_to_le32(ei->i_flags);

@@ -9,12 +9,9 @@
  */
 
 #include <linux/config.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 
 #include <asm/dma.h>
-#include <asm/io.h>
-
 #include <asm/mach/dma.h>
 
 void __init arch_dma_init(dma_t *dma)

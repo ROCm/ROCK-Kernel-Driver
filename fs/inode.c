@@ -371,6 +371,8 @@ static int can_unuse(struct inode *inode)
 		return 0;
 	if (atomic_read(&inode->i_count))
 		return 0;
+	if (inode->i_data.nrpages)
+		return 0;
 	return 1;
 }
 
@@ -383,6 +385,9 @@ static int can_unuse(struct inode *inode)
  * the front of the inode_unused list.  So look for it there and if the
  * inode is still freeable, proceed.  The right inode is found 99.9% of the
  * time in testing on a 4-way.
+ *
+ * If the inode has metadata buffers attached to mapping->private_list then
+ * try to remove them.
  */
 static void prune_icache(int nr_to_scan)
 {
@@ -399,14 +404,15 @@ static void prune_icache(int nr_to_scan)
 
 		inode = list_entry(inode_unused.prev, struct inode, i_list);
 
-		if (!can_unuse(inode)) {
+		if (inode->i_state || atomic_read(&inode->i_count)) {
 			list_move(&inode->i_list, &inode_unused);
 			continue;
 		}
-		if (inode->i_data.nrpages) {
+		if (inode_has_buffers(inode) || inode->i_data.nrpages) {
 			__iget(inode);
 			spin_unlock(&inode_lock);
-			invalidate_inode_pages(&inode->i_data);
+			if (remove_inode_buffers(inode))
+				invalidate_inode_pages(&inode->i_data);
 			iput(inode);
 			spin_lock(&inode_lock);
 
@@ -414,8 +420,6 @@ static void prune_icache(int nr_to_scan)
 						struct inode, i_list))
 				continue;	/* wrong inode or list_empty */
 			if (!can_unuse(inode))
-				continue;
-			if (inode->i_data.nrpages)
 				continue;
 		}
 		list_del_init(&inode->i_hash);
@@ -1067,7 +1071,10 @@ sector_t bmap(struct inode * inode, sector_t block)
  
 void update_atime(struct inode *inode)
 {
-	if (inode->i_atime == CURRENT_TIME)
+	struct timespec now = CURRENT_TIME; 
+
+	/* Can later do this more lazily with a per superblock interval */
+	if (timespec_equal(&inode->i_atime, &now))
 		return;
 	if (IS_NOATIME(inode))
 		return;
@@ -1075,9 +1082,32 @@ void update_atime(struct inode *inode)
 		return;
 	if (IS_RDONLY(inode))
 		return;
-	inode->i_atime = CURRENT_TIME;
+	inode->i_atime = now;
 	mark_inode_dirty_sync(inode);
 }
+
+/**
+ *	inode_update_time	-	update mtime and ctime time
+ *	@inode: inode accessed
+ *	@ctime_too: update ctime too
+ *
+ *	Update the mtime time on an inode and mark it for writeback.
+ *	This function automatically handles read only file systems and media.
+ *	When ctime_too is specified update the ctime too.
+ */
+
+void inode_update_time(struct inode *inode, int ctime_too)
+{
+	struct timespec now = CURRENT_TIME; 
+	if (timespec_equal(&inode->i_mtime, &now) &&
+	    !(ctime_too && !timespec_equal(&inode->i_ctime, &now)))
+		return;
+	inode->i_mtime = now;
+	if (ctime_too) 
+		inode->i_ctime = now;
+	mark_inode_dirty_sync(inode);
+}
+EXPORT_SYMBOL(inode_update_time);
 
 int inode_needs_sync(struct inode *inode)
 {

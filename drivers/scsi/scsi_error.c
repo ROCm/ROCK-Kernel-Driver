@@ -177,8 +177,7 @@ void scsi_times_out(Scsi_Cmnd *scmd)
  **/
 int scsi_block_when_processing_errors(Scsi_Device *sdev)
 {
-
-	SCSI_SLEEP(&sdev->host->host_wait, sdev->host->in_recovery);
+	wait_event(sdev->host->host_wait, (sdev->host->in_recovery == 0));
 
 	SCSI_LOG_ERROR_RECOVERY(5, printk("%s: rtn: %d\n", __FUNCTION__,
 					  sdev->online));
@@ -1480,8 +1479,6 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 */
 	spin_lock_irqsave(shost->host_lock, flags);
 	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-		request_queue_t *q = &sdev->request_queue;
-
 		if ((shost->can_queue > 0 &&
 		     (shost->host_busy >= shost->can_queue))
 		    || (shost->host_blocked)
@@ -1489,7 +1486,7 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 			break;
 		}
 
-		q->request_fn(q);
+		__blk_run_queue(&sdev->request_queue);
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 }
@@ -1715,7 +1712,7 @@ void scsi_error_handler(void *data)
  * Return value:
  *    SUCCESS/FAILED.
  **/
-int scsi_new_reset(Scsi_Cmnd *scmd, int flag)
+static int scsi_new_reset(Scsi_Cmnd *scmd, int flag)
 {
 	int rtn;
 
@@ -1737,5 +1734,84 @@ int scsi_new_reset(Scsi_Cmnd *scmd, int flag)
 		rtn = FAILED;
 	}
 
+	return rtn;
+}
+
+static void
+scsi_reset_provider_done_command(Scsi_Cmnd *SCpnt)
+{
+}
+
+/*
+ * Function:	scsi_reset_provider
+ *
+ * Purpose:	Send requested reset to a bus or device at any phase.
+ *
+ * Arguments:	device	- device to send reset to
+ *		flag - reset type (see scsi.h)
+ *
+ * Returns:	SUCCESS/FAILURE.
+ *
+ * Notes:	This is used by the SCSI Generic driver to provide
+ *		Bus/Device reset capability.
+ */
+int
+scsi_reset_provider(Scsi_Device *dev, int flag)
+{
+	struct scsi_cmnd SC, *SCpnt = &SC;
+	struct request req;
+	int rtn;
+
+	SCpnt->request = &req;
+	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
+	SCpnt->host                    	= dev->host;
+	SCpnt->device                  	= dev;
+	SCpnt->target                  	= dev->id;
+	SCpnt->lun                     	= dev->lun;
+	SCpnt->channel                 	= dev->channel;
+	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
+	SCpnt->request->waiting        	= NULL;
+	SCpnt->use_sg                  	= 0;
+	SCpnt->old_use_sg              	= 0;
+	SCpnt->old_cmd_len             	= 0;
+	SCpnt->underflow               	= 0;
+	SCpnt->transfersize            	= 0;
+	SCpnt->resid			= 0;
+	SCpnt->serial_number           	= 0;
+	SCpnt->serial_number_at_timeout	= 0;
+	SCpnt->host_scribble           	= NULL;
+	SCpnt->next                    	= NULL;
+	SCpnt->state                   	= SCSI_STATE_INITIALIZING;
+	SCpnt->owner	     		= SCSI_OWNER_MIDLEVEL;
+    
+	memset(&SCpnt->cmnd, '\0', sizeof(SCpnt->cmnd));
+    
+	SCpnt->scsi_done		= scsi_reset_provider_done_command;
+	SCpnt->done			= NULL;
+	SCpnt->reset_chain		= NULL;
+        
+	SCpnt->buffer			= NULL;
+	SCpnt->bufflen			= 0;
+	SCpnt->request_buffer		= NULL;
+	SCpnt->request_bufflen		= 0;
+
+	SCpnt->internal_timeout		= NORMAL_TIMEOUT;
+	SCpnt->abort_reason		= DID_ABORT;
+
+	SCpnt->cmd_len			= 0;
+
+	SCpnt->sc_data_direction	= SCSI_DATA_UNKNOWN;
+	SCpnt->sc_request		= NULL;
+	SCpnt->sc_magic			= SCSI_CMND_MAGIC;
+
+	/*
+	 * Sometimes the command can get back into the timer chain,
+	 * so use the pid as an identifier.
+	 */
+	SCpnt->pid			= 0;
+
+	rtn = scsi_new_reset(SCpnt, flag);
+
+	scsi_delete_timer(SCpnt);
 	return rtn;
 }

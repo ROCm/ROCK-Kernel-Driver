@@ -81,11 +81,11 @@ static int presto_e2_has_all_data(struct inode *inode)
 }
 
 struct journal_ops presto_ext2_journal_ops = {
-        tr_all_data: presto_e2_has_all_data,
-        tr_avail: presto_e2_freespace,
-        tr_start: presto_e2_trans_start,
-        tr_commit: presto_e2_trans_commit,
-        tr_journal_data: NULL
+        .tr_all_data            = presto_e2_has_all_data,
+        .tr_avail               = presto_e2_freespace,
+        .tr_start               = presto_e2_trans_start,
+        .tr_commit              = presto_e2_trans_commit,
+        .tr_journal_data        = NULL
 };
 
 #endif /* CONFIG_EXT2_FS */

@@ -28,6 +28,7 @@
 #include <linux/quotaops.h>
 #include <linux/namei.h>
 #include <linux/buffer_head.h>		/* for fsync_super() */
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 #include <linux/security.h>

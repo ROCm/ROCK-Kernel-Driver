@@ -73,14 +73,14 @@ int cciss_scsi_reset(Scsi_Cmnd *cmd);
 #endif
 
 static struct cciss_scsi_hba_t ccissscsi[MAX_CTLR] = {
-	{ name: "cciss0", ndevices: 0 },
-	{ name: "cciss1", ndevices: 0 },
-	{ name: "cciss2", ndevices: 0 },
-	{ name: "cciss3", ndevices: 0 },
-	{ name: "cciss4", ndevices: 0 },
-	{ name: "cciss5", ndevices: 0 },
-	{ name: "cciss6", ndevices: 0 },
-	{ name: "cciss7", ndevices: 0 },
+	{ .name = "cciss0", .ndevices = 0 },
+	{ .name = "cciss1", .ndevices = 0 },
+	{ .name = "cciss2", .ndevices = 0 },
+	{ .name = "cciss3", .ndevices = 0 },
+	{ .name = "cciss4", .ndevices = 0 },
+	{ .name = "cciss5", .ndevices = 0 },
+	{ .name = "cciss6", .ndevices = 0 },
+	{ .name = "cciss7", .ndevices = 0 },
 };
 
 /* We need one Scsi_Host_Template *per controller* instead of 

@@ -238,6 +238,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp.h>
 #include <linux/blk.h>
+#include <linux/interrupt.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "aic7xxx_old/aic7xxx.h"
@@ -9310,7 +9311,8 @@ aic7xxx_detect(Scsi_Host_Template *template)
           pci_write_config_dword(pdev, DEVCONFIG, devconfig);
 #endif /* AIC7XXX_STRICT_PCI_SETUP */
 
-          if(temp_p->base && check_region(temp_p->base, MAXREG - MINREG))
+          if(temp_p->base && !request_region(temp_p->base, MAXREG - MINREG,
+				  "aic7xxx"))
           {
             printk("aic7xxx: <%s> at PCI %d/%d/%d\n", 
               board_names[aic_pdevs[i].board_name_index],
@@ -9387,12 +9389,6 @@ aic7xxx_detect(Scsi_Host_Template *template)
             }
           }
 #endif
-
-          /*
-           * Lock out other contenders for our i/o space.
-           */
-          if(temp_p->base)
-            request_region(temp_p->base, MAXREG - MINREG, "aic7xxx");
 
           /*
            * We HAVE to make sure the first pause_sequencer() and all other
@@ -9742,7 +9738,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
   {
     base = SLOTBASE(slot) + MINREG;
 
-    if (check_region(base, MAXREG - MINREG))
+    if (!request_region(base, MAXREG - MINREG, "aic7xxx"))
     {
       /*
        * Some other driver has staked a
@@ -9755,6 +9751,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
     type = aic7xxx_probe(slot, base + AHC_HID0, &flags);
     if (type == -1)
     {
+      release_region(base, MAXREG - MINREG);
       slot++;
       continue;
     }
@@ -9762,13 +9759,10 @@ aic7xxx_detect(Scsi_Host_Template *template)
     if (temp_p == NULL)
     {
       printk(KERN_WARNING "aic7xxx: Unable to allocate device space.\n");
+      release_region(base, MAXREG - MINREG);
       slot++;
       continue; /* back to the beginning of the while loop */
     }
-    /*
-     * Lock out other contenders for our i/o space.
-     */
-    request_region(base, MAXREG - MINREG, "aic7xxx");
 
     /*
      * Pause the card preserving the IRQ type.  Allow the operator
@@ -10972,6 +10966,10 @@ aic7xxx_reset(Scsi_Cmnd *cmd)
  *
  * Description:
  *   Return the disk geometry for the given SCSI device.
+ *
+ * Note:
+ *   This function is broken for today's really large drives and needs
+ *   fixed.
  *-F*************************************************************************/
 int
 aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,

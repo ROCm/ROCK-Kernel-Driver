@@ -5,10 +5,11 @@
     copyright            : (C) 2000 by Adaptec
     email                : deanna_bonds@adaptec.com
 
-    			   July 30, 2001 First version being submitted
+			   July 30, 2001 First version being submitted
 			   for inclusion in the kernel.  V2.4
 
-    See README.dpti for history, notes, license info, and credits
+    See Documentation/scsi/dpti.txt for history, notes, license info
+    and credits
  ***************************************************************************/
 
 /***************************************************************************
@@ -111,9 +112,9 @@ static adpt_hba* hba_chain = NULL;
 static int hba_count = 0;
 
 static struct file_operations adpt_fops = {
-	ioctl: adpt_ioctl,
-	open: adpt_open,
-	release: adpt_close
+	.ioctl		= adpt_ioctl,
+	.open		= adpt_open,
+	.release	= adpt_close
 };
 
 #ifdef REBOOT_NOTIFIER

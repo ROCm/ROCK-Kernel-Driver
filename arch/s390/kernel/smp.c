@@ -274,7 +274,7 @@ void machine_power_off_smp(void)
 
 void do_ext_call_interrupt(struct pt_regs *regs, __u16 code)
 {
-        int bits;
+        unsigned long bits;
 
         /*
          * handle bit signal external calls
@@ -282,9 +282,7 @@ void do_ext_call_interrupt(struct pt_regs *regs, __u16 code)
          * For the ec_schedule signal we have to do nothing. All the work
          * is done automatically when we return from the interrupt.
          */
-        do {
-                bits = atomic_read(&S390_lowcore.ext_call_fast);
-        } while (atomic_compare_and_swap(bits,0,&S390_lowcore.ext_call_fast));
+	bits = xchg(&S390_lowcore.ext_call_fast, 0);
 
 	if (test_bit(ec_call_function, &bits)) 
 		do_call_function();
@@ -296,13 +294,12 @@ void do_ext_call_interrupt(struct pt_regs *regs, __u16 code)
  */
 static sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig)
 {
-        struct _lowcore *lowcore = lowcore_ptr[cpu];
         sigp_ccode ccode;
 
         /*
          * Set signaling bit in lowcore of target cpu and kick it
          */
-        atomic_set_mask(1<<sig, &lowcore->ext_call_fast);
+	set_bit(sig, (unsigned long *) &lowcore_ptr[cpu]->ext_call_fast);
         ccode = signal_processor(cpu, sigp_external_call);
         return ccode;
 }
@@ -323,7 +320,7 @@ static void smp_ext_bitcall_others(ec_bit_sig sig)
                 /*
                  * Set signaling bit in lowcore of target cpu and kick it
                  */
-                atomic_set_mask(1<<sig, &lowcore->ext_call_fast);
+		set_bit(sig, (unsigned long *) &lowcore_ptr[i]->ext_call_fast);
                 while (signal_processor(i, sigp_external_call) == sigp_busy)
 			udelay(10);
         }

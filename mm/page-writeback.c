@@ -613,6 +613,7 @@ int __set_page_dirty_nobuffers(struct page *page)
 		if (mapping) {
 			write_lock(&mapping->page_lock);
 			if (page->mapping) {	/* Race with truncate? */
+				BUG_ON(page->mapping != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
 					inc_page_state(nr_dirty);
 				list_del(&page->list);

@@ -499,7 +499,12 @@ static struct device_interface joydev_intf = {
 
 static int __init joydev_init(void)
 {
-	interface_register(&joydev_intf);
+	int retval;
+
+	retval = interface_register(&joydev_intf);
+	if(retval < 0)
+		return retval;
+
 	input_register_handler(&joydev_handler);
 	return 0;
 }

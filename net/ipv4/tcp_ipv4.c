@@ -780,7 +780,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	tmp = ip_route_connect(&rt, nexthop, inet->saddr,
 			       RT_CONN_FLAGS(sk), sk->bound_dev_if,
 			       IPPROTO_TCP,
-			       inet->sport, usin->sin_port);
+			       inet->sport, usin->sin_port, sk);
 	if (tmp < 0)
 		return tmp;
 
@@ -837,7 +837,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (err)
 		goto failure;
 
-	err = ip_route_newports(&rt, inet->sport, inet->dport);
+	err = ip_route_newports(&rt, inet->sport, inet->dport, sk);
 	if (err)
 		goto failure;
 
@@ -1896,7 +1896,7 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 			       RT_TOS(inet->tos) | sk->localroute,
 			       sk->bound_dev_if,
 			       IPPROTO_TCP,
-			       inet->sport, inet->dport);
+			       inet->sport, inet->dport, sk);
 	if (err)
 		return err;
 

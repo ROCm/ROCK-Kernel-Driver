@@ -144,6 +144,9 @@ struct digest_tfm {
 	void (*dit_final)(struct crypto_tfm *tfm, u8 *out);
 	void (*dit_digest)(struct crypto_tfm *tfm, struct scatterlist *sg,
 	                   unsigned int nsg, u8 *out);
+#ifdef CONFIG_CRYPTO_HMAC
+	void *dit_hmac_block;
+#endif
 };
 
 struct compress_tfm {
@@ -196,12 +199,7 @@ static inline const char *crypto_tfm_alg_name(struct crypto_tfm *tfm)
 
 static inline const char *crypto_tfm_alg_modname(struct crypto_tfm *tfm)
 {
-	struct crypto_alg *alg = tfm->__crt_alg;
-	
-	if (alg->cra_module)
-		return alg->cra_module->name;
-	else
-		return NULL;
+	return module_name(tfm->__crt_alg->cra_module);
 }
 
 static inline u32 crypto_tfm_alg_type(struct crypto_tfm *tfm)

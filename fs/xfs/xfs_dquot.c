@@ -244,7 +244,7 @@ xfs_qm_adjust_dqtimers(
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) >= INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) ||
 		    (INT_GET(d->d_blk_hardlimit, ARCH_CONVERT) &&
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) >= INT_GET(d->d_blk_hardlimit, ARCH_CONVERT)))) {
-			INT_SET(d->d_btimer, ARCH_CONVERT, CURRENT_TIME + XFS_QI_BTIMELIMIT(mp));
+			INT_SET(d->d_btimer, ARCH_CONVERT, get_seconds() + XFS_QI_BTIMELIMIT(mp));
 		}
 	} else {
 		if ((INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT) ||
@@ -260,7 +260,7 @@ xfs_qm_adjust_dqtimers(
 		    (INT_GET(d->d_icount, ARCH_CONVERT) >= INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) ||
 		    (INT_GET(d->d_ino_hardlimit, ARCH_CONVERT) &&
 		    (INT_GET(d->d_icount, ARCH_CONVERT) >= INT_GET(d->d_ino_hardlimit, ARCH_CONVERT)))) {
-			INT_SET(d->d_itimer, ARCH_CONVERT, CURRENT_TIME + XFS_QI_ITIMELIMIT(mp));
+			INT_SET(d->d_itimer, ARCH_CONVERT, get_seconds() + XFS_QI_ITIMELIMIT(mp));
 		}
 	} else {
 		if ((INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT) ||

@@ -74,9 +74,6 @@ EXPORT_SYMBOL(scsi_free_host_dev);
 
 EXPORT_SYMBOL(scsi_sleep);
 
-EXPORT_SYMBOL(proc_print_scsidevice);
-EXPORT_SYMBOL(proc_scsi);
-
 EXPORT_SYMBOL(scsi_io_completion);
 EXPORT_SYMBOL(scsi_end_request);
 

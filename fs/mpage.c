@@ -210,10 +210,11 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	}
 
 	if (first_hole != blocks_per_page) {
-		memset(kmap(page) + (first_hole << blkbits), 0,
+		char *kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr + (first_hole << blkbits), 0,
 				PAGE_CACHE_SIZE - (first_hole << blkbits));
 		flush_dcache_page(page);
-		kunmap(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		if (first_hole == 0) {
 			SetPageUptodate(page);
 			unlock_page(page);
@@ -427,12 +428,14 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 	if (page->index >= end_index) {
 		unsigned offset = inode->i_size & (PAGE_CACHE_SIZE - 1);
+		char *kaddr;
 
 		if (page->index > end_index || !offset)
 			goto confused;
-		memset(kmap(page) + offset, 0, PAGE_CACHE_SIZE - offset);
+		kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
 		flush_dcache_page(page);
-		kunmap(page);
+		kunmap_atomic(kaddr, KM_USER0);
 	}
 
 page_is_mapped:
@@ -587,12 +590,19 @@ mpage_writepages(struct address_space *mapping,
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 
+		/*
+		 * At this point we hold neither mapping->page_lock nor
+		 * lock on the page itself: the page may be truncated or
+		 * invalidated (changing page->mapping to NULL), or even
+		 * swizzled back from swapper_space to tmpfs file mapping.
+		 */
+
 		lock_page(page);
 
 		if (sync)
 			wait_on_page_writeback(page);
 
-		if (page->mapping && !PageWriteback(page) &&
+		if (page->mapping == mapping && !PageWriteback(page) &&
 					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page);

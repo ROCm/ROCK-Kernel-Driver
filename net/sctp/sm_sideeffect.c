@@ -41,6 +41,7 @@
  *    Dajiang Zhang	    <dajiang.zhang@nokia.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -68,11 +69,13 @@ static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *, sctp_association_t *asoc);
 static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *, sctp_association_t *asoc,
 				  sctp_event_t event_type, sctp_chunk_t *chunk);
-static void sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
-				  sctp_chunk_t *chunk,
-				  sctp_init_chunk_t *peer_init,
-				  int priority);
+static int sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
+				 sctp_chunk_t *chunk,
+				 sctp_init_chunk_t *peer_init,
+				 int priority);
 static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *, sctp_association_t *);
+static void sctp_cmd_hb_timers_update(sctp_cmd_seq_t *, sctp_association_t *,
+				      sctp_transport_t *);
 static void sctp_cmd_set_bind_addrs(sctp_cmd_seq_t *, sctp_association_t *,
 				    sctp_bind_addr_t *);
 static void sctp_cmd_transport_reset(sctp_cmd_seq_t *, sctp_association_t *,
@@ -83,6 +86,8 @@ static int sctp_cmd_process_sack(sctp_cmd_seq_t *, sctp_association_t *,
 				 sctp_sackhdr_t *);
 static void sctp_cmd_setup_t2(sctp_cmd_seq_t *, sctp_association_t *,
 			      sctp_chunk_t *);
+static void sctp_cmd_new_state(sctp_cmd_seq_t *, sctp_association_t *,
+			       sctp_state_t);
 
 /* These three macros allow us to pull the debugging code out of the
  * main flow of sctp_do_sm() to keep attention focused on the real
@@ -193,6 +198,7 @@ int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
 		/* BUG--we should now recover some memory, probably by
 		 * reneging...
 		 */
+		error = -ENOMEM;
 		break;
 
         case SCTP_DISPOSITION_DELETE_TCB:
@@ -301,8 +307,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_NEW_STATE:
 			/* Enter a new state.  */
-			asoc->state = command->obj.state;
-			asoc->state_timestamp = jiffies;
+			sctp_cmd_new_state(commands, asoc, command->obj.state);
 			break;
 
 		case SCTP_CMD_REPORT_TSN:
@@ -339,9 +344,14 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_PEER_INIT:
-			/* Process a unified INIT from the peer.  */
-			sctp_cmd_process_init(commands, asoc, chunk,
-					      command->obj.ptr, priority);
+			/* Process a unified INIT from the peer.
+			 * Note: Only used during INIT-ACK processing.  If
+			 * there is an error just return to the outter
+			 * layer which will bail.
+			 */
+			error = sctp_cmd_process_init(commands, asoc, chunk,
+						      command->obj.ptr,
+						      priority);
 			break;
 
 		case SCTP_CMD_GEN_COOKIE_ECHO:
@@ -561,6 +571,11 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			sctp_cmd_hb_timers_start(commands, asoc);
 			break;
 
+		case SCTP_CMD_HB_TIMERS_UPDATE:
+			t = command->obj.transport;
+			sctp_cmd_hb_timers_update(commands, asoc, t);
+			break;
+
 		case SCTP_CMD_REPORT_ERROR:
 			error = command->obj.error;
 			break;
@@ -581,11 +596,18 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			chunk->pdiscard = 1;
 			break;
 
+		case SCTP_CMD_RTO_PENDING:
+			t = command->obj.transport;
+			t->rto_pending = 1;	
+			break;
+
 		default:
 			printk(KERN_WARNING "Impossible command: %u, %p\n",
 			       command->verb, command->obj.ptr);
 			break;
 		};
+		if (error)
+			return error;
 	}
 
 	return error;
@@ -648,7 +670,7 @@ static sctp_chunk_t *sctp_do_ecn_ecne_work(sctp_association_t *asoc,
 	}
 
 	/* Always try to quiet the other end.  In case of lost CWR,
-	 * resend last_cwr_tsn.  
+	 * resend last_cwr_tsn.
 	 */
 	repl = sctp_make_cwr(asoc, asoc->last_cwr_tsn, chunk);
 
@@ -978,7 +1000,7 @@ static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 	 */
 	asoc->overall_error_count++;
 
-	if (transport->state.active &&
+	if (transport->active &&
 	    (transport->error_count++ >= transport->error_threshold)) {
 		SCTP_DEBUG_PRINTK("transport_strike: transport "
 				  "IP:%d.%d.%d.%d failed.\n",
@@ -1058,22 +1080,32 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 }
 
 /* Process an init chunk (may be real INIT/INIT-ACK or an embedded INIT
- * inside the cookie.
+ * inside the cookie.  In reality, this is only used for INIT-ACK processing
+ * since all other cases use "temporary" associations and can do all
+ * their work in statefuns directly. 
  */
-static void sctp_cmd_process_init(sctp_cmd_seq_t *commands,
-				  sctp_association_t *asoc,
-				  sctp_chunk_t *chunk,
-				  sctp_init_chunk_t *peer_init,
-				  int priority)
+static int sctp_cmd_process_init(sctp_cmd_seq_t *commands,
+				 sctp_association_t *asoc,
+				 sctp_chunk_t *chunk,
+				 sctp_init_chunk_t *peer_init,
+				 int priority)
 {
-	/* The command sequence holds commands assuming that the
-	 * processing will happen successfully.  If this is not the
-	 * case, rewind the sequence and add appropriate  error handling
-	 * to the sequence.
+	int error;
+
+	/* We only process the init as a sideeffect in a single
+	 * case.   This is when we process the INIT-ACK.   If we
+	 * fail during INIT processing (due to malloc problems),
+	 * just return the error and stop processing the stack.
 	 */
-	sctp_process_init(asoc, chunk->chunk_hdr->type,
-			  sctp_source(chunk), peer_init,
-			  priority);
+
+	if (!sctp_process_init(asoc, chunk->chunk_hdr->type,
+			       sctp_source(chunk), peer_init,
+			       priority))
+		error = -ENOMEM;
+	else
+		error = 0;
+
+	return error;
 }
 
 /* Helper function to break out starting up of heartbeat timers.  */
@@ -1094,6 +1126,16 @@ static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *cmds,
 			sctp_transport_hold(t);
 		}
 	}
+}
+
+/* Helper function to update the heartbeat timer. */
+static void sctp_cmd_hb_timers_update(sctp_cmd_seq_t *cmds,
+				   sctp_association_t *asoc,
+				   sctp_transport_t *t)
+{
+	/* Update the heartbeat timer.  */
+	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + jiffies))
+		sctp_transport_hold(t);
 }
 
 /* Helper function to break out SCTP_CMD_SET_BIND_ADDR handling.  */
@@ -1131,7 +1173,7 @@ static void sctp_cmd_transport_on(sctp_cmd_seq_t *cmds,
 	/* Mark the destination transport address as active if it is not so
 	 * marked.
 	 */
-	if (!t->state.active)
+	if (!t->active)
 		sctp_assoc_control_transport(asoc, t, SCTP_TRANSPORT_UP,
 					     SCTP_HEARTBEAT_SUCCESS);
 
@@ -1154,10 +1196,6 @@ static void sctp_cmd_transport_reset(sctp_cmd_seq_t *cmds,
 
 	/* Mark one strike against a transport.  */
 	sctp_do_8_2_transport_strike(asoc, t);
-
-	/* Update the heartbeat timer.  */
-	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + jiffies))
-		sctp_transport_hold(t);
 }
 
 /* Helper function to process the process SACK command.  */
@@ -1195,4 +1233,19 @@ static void sctp_cmd_setup_t2(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 	asoc->shutdown_last_sent_to = t;
 	asoc->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] = t->rto;
 	chunk->transport = t;
+}
+
+/* Helper function to change the state of an association. */
+static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
+			       sctp_state_t state)
+{
+	asoc->state = state;
+	asoc->state_timestamp = jiffies;
+
+	/* Wake up any process waiting for the association to
+	 * get established.
+	 */
+	if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
+	    (waitqueue_active(&asoc->wait)))
+		wake_up_interruptible(&asoc->wait);
 }

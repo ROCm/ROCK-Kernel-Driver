@@ -274,21 +274,21 @@ static struct {
 };
 
 static char *flavour_names[] = {
-	[FSTYPE_XENIX]	"Xenix",
-	[FSTYPE_SYSV4]	"SystemV",
-	[FSTYPE_SYSV2]	"SystemV Release 2",
-	[FSTYPE_COH]	"Coherent",
-	[FSTYPE_V7]	"V7",
-	[FSTYPE_AFS]	"AFS",
+	[FSTYPE_XENIX]	= "Xenix",
+	[FSTYPE_SYSV4]	= "SystemV",
+	[FSTYPE_SYSV2]	= "SystemV Release 2",
+	[FSTYPE_COH]	= "Coherent",
+	[FSTYPE_V7]	= "V7",
+	[FSTYPE_AFS]	= "AFS",
 };
 
 static void (*flavour_setup[])(struct sysv_sb_info *) = {
-	[FSTYPE_XENIX]	detected_xenix,
-	[FSTYPE_SYSV4]	detected_sysv4,
-	[FSTYPE_SYSV2]	detected_sysv2,
-	[FSTYPE_COH]	detected_coherent,
-	[FSTYPE_V7]	detected_v7,
-	[FSTYPE_AFS]	detected_sysv4,
+	[FSTYPE_XENIX]	= detected_xenix,
+	[FSTYPE_SYSV4]	= detected_sysv4,
+	[FSTYPE_SYSV2]	= detected_sysv2,
+	[FSTYPE_COH]	= detected_coherent,
+	[FSTYPE_V7]	= detected_v7,
+	[FSTYPE_AFS]	= detected_sysv4,
 };
 
 static int complete_read_super(struct super_block *sb, int silent, int size)

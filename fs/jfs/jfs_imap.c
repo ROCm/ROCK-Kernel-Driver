@@ -3037,9 +3037,12 @@ static int copy_from_dinode(struct dinode * dip, struct inode *ip)
 	ip->i_uid = le32_to_cpu(dip->di_uid);
 	ip->i_gid = le32_to_cpu(dip->di_gid);
 	ip->i_size = le64_to_cpu(dip->di_size);
-	ip->i_atime = le32_to_cpu(dip->di_atime.tv_sec);
-	ip->i_mtime = le32_to_cpu(dip->di_mtime.tv_sec);
-	ip->i_ctime = le32_to_cpu(dip->di_ctime.tv_sec);
+	ip->i_atime.tv_sec = le32_to_cpu(dip->di_atime.tv_sec);
+	ip->i_atime.tv_nsec = le32_to_cpu(dip->di_atime.tv_nsec);
+	ip->i_mtime.tv_sec = le32_to_cpu(dip->di_mtime.tv_sec);
+	ip->i_mtime.tv_nsec = le32_to_cpu(dip->di_mtime.tv_nsec);
+	ip->i_ctime.tv_sec = le32_to_cpu(dip->di_ctime.tv_sec);
+	ip->i_ctime.tv_nsec = le32_to_cpu(dip->di_ctime.tv_nsec);
 	ip->i_blksize = ip->i_sb->s_blocksize;
 	ip->i_blocks = LBLK2PBLK(ip->i_sb, le64_to_cpu(dip->di_nblocks));
 	ip->i_generation = le32_to_cpu(dip->di_gen);
@@ -3096,12 +3099,12 @@ static void copy_to_dinode(struct dinode * dip, struct inode *ip)
 	 * Trust i_mode for the lower order ones
 	 */
 	dip->di_mode = cpu_to_le32((jfs_ip->mode2 & 0xffff0000) | ip->i_mode);
-	dip->di_atime.tv_sec = cpu_to_le32(ip->i_atime);
-	dip->di_atime.tv_nsec = 0;
-	dip->di_ctime.tv_sec = cpu_to_le32(ip->i_ctime);
-	dip->di_ctime.tv_nsec = 0;
-	dip->di_mtime.tv_sec = cpu_to_le32(ip->i_mtime);
-	dip->di_mtime.tv_nsec = 0;
+	dip->di_atime.tv_sec = cpu_to_le32(ip->i_atime.tv_sec);
+	dip->di_atime.tv_nsec = cpu_to_le32(ip->i_atime.tv_nsec);
+	dip->di_ctime.tv_sec = cpu_to_le32(ip->i_ctime.tv_sec);
+	dip->di_ctime.tv_nsec = cpu_to_le32(ip->i_ctime.tv_nsec);
+	dip->di_mtime.tv_sec = cpu_to_le32(ip->i_mtime.tv_sec);
+	dip->di_mtime.tv_nsec = cpu_to_le32(ip->i_mtime.tv_nsec);
 	dip->di_ixpxd = jfs_ip->ixpxd;	/* in-memory pxd's are little-endian */
 	dip->di_acl = jfs_ip->acl;	/* as are dxd's */
 	dip->di_ea = jfs_ip->ea;

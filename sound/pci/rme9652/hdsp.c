@@ -20,12 +20,11 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
-#include <asm/byteorder.h>
 #include <linux/delay.h>
-#include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
+
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -34,6 +33,10 @@
 #include <sound/rawmidi.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+
+#include <asm/byteorder.h>
+#include <asm/current.h>
+#include <asm/io.h>
 
 #include "multiface_firmware.dat"
 #include "digiface_firmware.dat"
@@ -409,10 +412,13 @@ extern void snd_hammerfall_free_buffer(struct pci_dev *, void *ptr);
 #endif
 
 static struct pci_device_id snd_hdsp_ids[] __devinitdata = {
-	{PCI_VENDOR_ID_XILINX,
-	 PCI_DEVICE_ID_XILINX_HAMMERFALL_DSP, 
-	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0,}, /* RME Hammerfall-DSP */
-	{0,}
+	{
+		.vendor	   = PCI_VENDOR_ID_XILINX,
+		.device	   = PCI_DEVICE_ID_XILINX_HAMMERFALL_DSP, 
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	}, /* RME Hammerfall-DSP */
+	{ 0, },
 };
 
 MODULE_DEVICE_TABLE(pci, snd_hdsp_ids);
@@ -3116,10 +3122,10 @@ static void __devexit snd_hdsp_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	.name = "RME Hammerfall DSP",
+	.name	  = "RME Hammerfall DSP",
 	.id_table = snd_hdsp_ids,
-	.probe = snd_hdsp_probe,
-	.remove = __devexit_p(snd_hdsp_remove),
+	.probe	  = snd_hdsp_probe,
+	.remove	  = __devexit_p(snd_hdsp_remove),
 };
 
 static int __init alsa_card_hdsp_init(void)

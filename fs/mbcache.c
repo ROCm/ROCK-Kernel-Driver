@@ -12,7 +12,7 @@
  *
  * There can only be one cache entry in a cache per device and block number.
  * Additional indexes need not be unique in this sense. The number of
- * additional indexes (=other criteria) can be hardwired (at compile time)
+ * additional indexes (=other criteria) can be hardwired at compile time
  * or specified at cache create time.
  *
  * Each cache entry is of fixed size. An entry may be `valid' or `invalid'
@@ -22,7 +22,8 @@
  *
  * A valid cache entry is only in the lru list if no handles refer to it.
  * Invalid cache entries will be freed when the last handle to the cache
- * entry is released.
+ * entry is released. Entries that cannot be freed immediately are put
+ * back on the lru list.
  */
 
 #include <linux/kernel.h>
@@ -76,8 +77,8 @@ EXPORT_SYMBOL(mb_cache_entry_find_next);
 
 /*
  * Global data: list of all mbcache's, lru list, and a spinlock for
- * accessing cache data structures on SMP machines. (The lru list is
- * global across all mbcaches.)
+ * accessing cache data structures on SMP machines. The lru list is
+ * global across all mbcaches.
  */
 
 static LIST_HEAD(mb_cache_list);
@@ -101,90 +102,43 @@ mb_cache_indexes(struct mb_cache *cache)
 
 static int mb_cache_shrink_fn(int nr_to_scan, unsigned int gfp_mask);
 
-static inline void
-__mb_cache_entry_takeout_lru(struct mb_cache_entry *ce)
-{
-	if (!list_empty(&ce->e_lru_list))
-		list_del_init(&ce->e_lru_list);
-}
-
-
-static inline void
-__mb_cache_entry_into_lru(struct mb_cache_entry *ce)
-{
-	list_add(&ce->e_lru_list, &mb_cache_lru_list);
-}
-
 
 static inline int
-__mb_cache_entry_in_lru(struct mb_cache_entry *ce)
+__mb_cache_entry_is_hashed(struct mb_cache_entry *ce)
 {
-	return (!list_empty(&ce->e_lru_list));
+	return !list_empty(&ce->e_block_list);
 }
 
 
-/*
- * Insert the cache entry into all hashes.
- */
 static inline void
-__mb_cache_entry_link(struct mb_cache_entry *ce)
+__mb_cache_entry_unhash(struct mb_cache_entry *ce)
 {
-	struct mb_cache *cache = ce->e_cache;
-	unsigned int bucket;
 	int n;
-	
-	bucket = hash_long((unsigned long)ce->e_bdev +
-			   (ce->e_block & 0xffffff), cache->c_bucket_bits);
-	list_add(&ce->e_block_list, &cache->c_block_hash[bucket]);
-	for (n=0; n<mb_cache_indexes(cache); n++) {
-		bucket = hash_long(ce->e_indexes[n].o_key,
-				   cache->c_bucket_bits);
-		list_add(&ce->e_indexes[n].o_list,
-		         &cache->c_indexes_hash[n][bucket]);
+
+	if (__mb_cache_entry_is_hashed(ce)) {
+		list_del_init(&ce->e_block_list);
+		for (n=0; n<mb_cache_indexes(ce->e_cache); n++)
+			list_del(&ce->e_indexes[n].o_list);
 	}
 }
 
 
-/*
- * Remove the cache entry from all hashes.
- */
 static inline void
-__mb_cache_entry_unlink(struct mb_cache_entry *ce)
-{
-	int n;
-
-	list_del_init(&ce->e_block_list);
-	for (n = 0; n < mb_cache_indexes(ce->e_cache); n++)
-		list_del(&ce->e_indexes[n].o_list);
-}
-
-
-static inline int
-__mb_cache_entry_is_linked(struct mb_cache_entry *ce)
-{
-	return (!list_empty(&ce->e_block_list));
-}
-
-
-static inline struct mb_cache_entry *
-__mb_cache_entry_read(struct mb_cache_entry *ce)
-{
-	__mb_cache_entry_takeout_lru(ce);
-	atomic_inc(&ce->e_used);
-	return ce;
-}
-
-
-static inline void
-__mb_cache_entry_forget(struct mb_cache_entry *ce)
+__mb_cache_entry_forget(struct mb_cache_entry *ce, int gfp_mask)
 {
 	struct mb_cache *cache = ce->e_cache;
 
 	mb_assert(atomic_read(&ce->e_used) == 0);
-	atomic_dec(&cache->c_entry_count);
-	if (cache->c_op.free)
-		cache->c_op.free(ce);
-	kmem_cache_free(cache->c_entry_cache, ce);
+	if (cache->c_op.free && cache->c_op.free(ce, gfp_mask)) {
+		/* free failed -- put back on the lru list
+		   for freeing later. */
+		spin_lock(&mb_cache_spinlock);
+		list_add(&ce->e_lru_list, &mb_cache_lru_list);
+		spin_unlock(&mb_cache_spinlock);
+	} else {
+		kmem_cache_free(cache->c_entry_cache, ce);
+		atomic_dec(&cache->c_entry_count);
+	}
 }
 
 
@@ -192,15 +146,15 @@ static inline void
 __mb_cache_entry_release_unlock(struct mb_cache_entry *ce)
 {
 	if (atomic_dec_and_test(&ce->e_used)) {
-		if (!__mb_cache_entry_is_linked(ce))
+		if (!__mb_cache_entry_is_hashed(ce))
 			goto forget;
-		__mb_cache_entry_into_lru(ce);
+		list_add_tail(&ce->e_lru_list, &mb_cache_lru_list);
 	}
 	spin_unlock(&mb_cache_spinlock);
 	return;
 forget:
 	spin_unlock(&mb_cache_spinlock);
-	__mb_cache_entry_forget(ce);
+	__mb_cache_entry_forget(ce, GFP_KERNEL);
 }
 
 
@@ -219,11 +173,11 @@ static int
 mb_cache_shrink_fn(int nr_to_scan, unsigned int gfp_mask)
 {
 	LIST_HEAD(free_list);
-	struct list_head *l;
+	struct list_head *l, *ltmp;
 	int count = 0;
 
 	spin_lock(&mb_cache_spinlock);
-	list_for_each_prev(l, &mb_cache_list) {
+	list_for_each(l, &mb_cache_list) {
 		struct mb_cache *cache =
 			list_entry(l, struct mb_cache, c_cache_list);
 		mb_debug("cache %s (%d)", cache->c_name,
@@ -235,26 +189,19 @@ mb_cache_shrink_fn(int nr_to_scan, unsigned int gfp_mask)
 		spin_unlock(&mb_cache_spinlock);
 		goto out;
 	}
-	while (nr_to_scan && !list_empty(&mb_cache_lru_list)) {
+	while (nr_to_scan-- && !list_empty(&mb_cache_lru_list)) {
 		struct mb_cache_entry *ce =
-			list_entry(mb_cache_lru_list.prev,
+			list_entry(mb_cache_lru_list.next,
 				   struct mb_cache_entry, e_lru_list);
-		list_move(&ce->e_lru_list, &free_list);
-		if (__mb_cache_entry_is_linked(ce))
-			__mb_cache_entry_unlink(ce);
-		nr_to_scan--;
+		list_move_tail(&ce->e_lru_list, &free_list);
+		__mb_cache_entry_unhash(ce);
 	}
 	spin_unlock(&mb_cache_spinlock);
-	l = free_list.prev;
-	while (l != &free_list) {
-		struct mb_cache_entry *ce = list_entry(l,
-			struct mb_cache_entry, e_lru_list);
-		l = l->prev;
-		__mb_cache_entry_forget(ce);
-		count--;
+	list_for_each_safe(l, ltmp, &free_list) {
+		__mb_cache_entry_forget(list_entry(l, struct mb_cache_entry,
+						   e_lru_list), gfp_mask);
 	}
 out:
-	mb_debug("%d remaining entries ", count);
 	return count;
 }
 
@@ -292,10 +239,9 @@ mb_cache_create(const char *name, struct mb_cache_op *cache_op,
 	if (!cache)
 		goto fail;
 	cache->c_name = name;
+	cache->c_op.free = NULL;
 	if (cache_op)
 		cache->c_op.free = cache_op->free;
-	else
-		cache->c_op.free = NULL;
 	atomic_set(&cache->c_entry_count, 0);
 	cache->c_bucket_bits = bucket_bits;
 #ifdef MB_CACHE_INDEXES_COUNT
@@ -354,27 +300,21 @@ void
 mb_cache_shrink(struct mb_cache *cache, struct block_device *bdev)
 {
 	LIST_HEAD(free_list);
-	struct list_head *l;
+	struct list_head *l, *ltmp;
 
 	spin_lock(&mb_cache_spinlock);
-	l = mb_cache_lru_list.prev;
-	while (l != &mb_cache_lru_list) {
+	list_for_each_safe(l, ltmp, &mb_cache_lru_list) {
 		struct mb_cache_entry *ce =
 			list_entry(l, struct mb_cache_entry, e_lru_list);
-		l = l->prev;
 		if (ce->e_bdev == bdev) {
-			list_move(&ce->e_lru_list, &free_list);
-			if (__mb_cache_entry_is_linked(ce))
-				__mb_cache_entry_unlink(ce);
+			list_move_tail(&ce->e_lru_list, &free_list);
+			__mb_cache_entry_unhash(ce);
 		}
 	}
 	spin_unlock(&mb_cache_spinlock);
-	l = free_list.prev;
-	while (l != &free_list) {
-		struct mb_cache_entry *ce =
-			list_entry(l, struct mb_cache_entry, e_lru_list);
-		l = l->prev;
-		__mb_cache_entry_forget(ce);
+	list_for_each_safe(l, ltmp, &free_list) {
+		__mb_cache_entry_forget(list_entry(l, struct mb_cache_entry,
+						   e_lru_list), GFP_KERNEL);
 	}
 }
 
@@ -390,30 +330,24 @@ void
 mb_cache_destroy(struct mb_cache *cache)
 {
 	LIST_HEAD(free_list);
-	struct list_head *l;
+	struct list_head *l, *ltmp;
 	int n;
 
 	spin_lock(&mb_cache_spinlock);
-	l = mb_cache_lru_list.prev;
-	while (l != &mb_cache_lru_list) {
+	list_for_each_safe(l, ltmp, &mb_cache_lru_list) {
 		struct mb_cache_entry *ce =
 			list_entry(l, struct mb_cache_entry, e_lru_list);
-		l = l->prev;
 		if (ce->e_cache == cache) {
-			list_move(&ce->e_lru_list, &free_list);
-			if (__mb_cache_entry_is_linked(ce))
-				__mb_cache_entry_unlink(ce);
+			list_move_tail(&ce->e_lru_list, &free_list);
+			__mb_cache_entry_unhash(ce);
 		}
 	}
 	list_del(&cache->c_cache_list);
 	spin_unlock(&mb_cache_spinlock);
 
-	l = free_list.prev;
-	while (l != &free_list) {
-		struct mb_cache_entry *ce =
-			list_entry(l, struct mb_cache_entry, e_lru_list);
-		l = l->prev;
-		__mb_cache_entry_forget(ce);
+	list_for_each_safe(l, ltmp, &free_list) {
+		__mb_cache_entry_forget(list_entry(l, struct mb_cache_entry,
+						   e_lru_list), GFP_KERNEL);
 	}
 
 	if (atomic_read(&cache->c_entry_count) > 0) {
@@ -427,7 +361,6 @@ mb_cache_destroy(struct mb_cache *cache)
 	for (n=0; n < mb_cache_indexes(cache); n++)
 		kfree(cache->c_indexes_hash[n]);
 	kfree(cache->c_block_hash);
-
 	kfree(cache);
 }
 
@@ -481,8 +414,8 @@ mb_cache_entry_insert(struct mb_cache_entry *ce, struct block_device *bdev,
 	struct list_head *l;
 	int error = -EBUSY, n;
 
-	bucket =  hash_long((unsigned long)bdev + (block & 0xffffffff), 
-			    cache->c_bucket_bits);
+	bucket = hash_long((unsigned long)bdev + (block & 0xffffffff), 
+			   cache->c_bucket_bits);
 	spin_lock(&mb_cache_spinlock);
 	list_for_each_prev(l, &cache->c_block_hash[bucket]) {
 		struct mb_cache_entry *ce =
@@ -490,12 +423,16 @@ mb_cache_entry_insert(struct mb_cache_entry *ce, struct block_device *bdev,
 		if (ce->e_bdev == bdev && ce->e_block == block)
 			goto out;
 	}
-	mb_assert(!__mb_cache_entry_is_linked(ce));
+	__mb_cache_entry_unhash(ce);
 	ce->e_bdev = bdev;
 	ce->e_block = block;
-	for (n=0; n<mb_cache_indexes(cache); n++)
+	list_add(&ce->e_block_list, &cache->c_block_hash[bucket]);
+	for (n=0; n<mb_cache_indexes(cache); n++) {
 		ce->e_indexes[n].o_key = keys[n];
-	__mb_cache_entry_link(ce);
+		bucket = hash_long(keys[n], cache->c_bucket_bits);
+		list_add(&ce->e_indexes[n].o_list,
+			 &cache->c_indexes_hash[n][bucket]);
+	}
 out:
 	spin_unlock(&mb_cache_spinlock);
 	return error;
@@ -528,9 +465,8 @@ void
 mb_cache_entry_takeout(struct mb_cache_entry *ce)
 {
 	spin_lock(&mb_cache_spinlock);
-	mb_assert(!__mb_cache_entry_in_lru(ce));
-	if (__mb_cache_entry_is_linked(ce))
-		__mb_cache_entry_unlink(ce);
+	mb_assert(list_empty(&ce->e_lru_list));
+	__mb_cache_entry_unhash(ce);
 	spin_unlock(&mb_cache_spinlock);
 }
 
@@ -545,9 +481,8 @@ void
 mb_cache_entry_free(struct mb_cache_entry *ce)
 {
 	spin_lock(&mb_cache_spinlock);
-	mb_assert(!__mb_cache_entry_in_lru(ce));
-	if (__mb_cache_entry_is_linked(ce))
-		__mb_cache_entry_unlink(ce);
+	mb_assert(list_empty(&ce->e_lru_list));
+	__mb_cache_entry_unhash(ce);
 	__mb_cache_entry_release_unlock(ce);
 }
 
@@ -587,7 +522,9 @@ mb_cache_entry_get(struct mb_cache *cache, struct block_device *bdev,
 	list_for_each(l, &cache->c_block_hash[bucket]) {
 		ce = list_entry(l, struct mb_cache_entry, e_block_list);
 		if (ce->e_bdev == bdev && ce->e_block == block) {
-			ce = __mb_cache_entry_read(ce);
+			if (!list_empty(&ce->e_lru_list))
+				list_del_init(&ce->e_lru_list);
+			atomic_inc(&ce->e_used);
 			goto cleanup;
 		}
 	}
@@ -608,11 +545,11 @@ __mb_cache_entry_find(struct list_head *l, struct list_head *head,
 		struct mb_cache_entry *ce =
 			list_entry(l, struct mb_cache_entry,
 			           e_indexes[index].o_list);
-		if (ce->e_bdev == bdev &&
-		    ce->e_indexes[index].o_key == key) {
-			ce = __mb_cache_entry_read(ce);
-			if (ce)
-				return ce;
+		if (ce->e_bdev == bdev && ce->e_indexes[index].o_key == key) {
+			if (!list_empty(&ce->e_lru_list))
+				list_del_init(&ce->e_lru_list);
+			atomic_inc(&ce->e_used);
+			return ce;
 		}
 		l = l->next;
 	}

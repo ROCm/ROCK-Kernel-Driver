@@ -131,17 +131,8 @@ static void aten_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void aten_init_proto( PIA *pi )
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void aten_release_proto( PIA *pi )
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol aten = {
+	.owner		= THIS_MODULE,
 	.name		= "aten",
 	.max_mode	= 2,
 	.epp_first	= 2,
@@ -154,8 +145,6 @@ static struct pi_protocol aten = {
 	.connect	= aten_connect,
 	.disconnect	= aten_disconnect,
 	.log_adapter	= aten_log_adapter,
-	.init_proto	= aten_init_proto,
-	.release_proto	= aten_release_proto,
 };
 
 static int __init aten_init(void)

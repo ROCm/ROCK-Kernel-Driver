@@ -1076,7 +1076,7 @@ static int tries;		/* ibid?? */
 static int timeout = 0;
 
 static void poll(unsigned long data);
-static struct timer_list req_timer = {function: poll};
+static struct timer_list req_timer = {.function = poll};
 
 
 static void poll(unsigned long data)
@@ -2067,7 +2067,7 @@ static int __init optcd_init(void)
 
 static void __exit optcd_exit(void)
 {
-	devfs_find_and_unregister(NULL, "optcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	devfs_remove("optcd");
 	del_gendisk(optcd_disk);
 	put_disk(optcd_disk);
 	if (unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {

@@ -815,14 +815,16 @@ alloc_new_skb:
 				alloclen = maxfraglen;
 			else
 				alloclen = datalen + fragheaderlen;
-			if (!(flags & MSG_DONTWAIT) || transhdrlen) {
+			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk, 
 						alloclen + hh_len + 15,
 						(flags & MSG_DONTWAIT), &err);
 			} else {
-				skb = sock_wmalloc(sk, 
-						alloclen + hh_len + 15, 1,
-						sk->allocation);
+				skb = NULL;
+				if (atomic_read(&sk->wmem_alloc) <= 2*sk->sndbuf)
+					skb = sock_wmalloc(sk, 
+							   alloclen + hh_len + 15, 1,
+							   sk->allocation);
 				if (unlikely(skb == NULL))
 					err = -ENOBUFS;
 			}

@@ -111,8 +111,6 @@ static int uinput_open(struct inode *inode, struct file *file)
 	struct uinput_device	*newdev;
 	struct input_dev	*newinput;
 
-	MOD_INC_USE_COUNT;
-
 	newdev = kmalloc(sizeof(struct uinput_device), GFP_KERNEL);
 	if (!newdev)
 		goto error;
@@ -131,7 +129,6 @@ static int uinput_open(struct inode *inode, struct file *file)
 cleanup:
 	kfree(newdev);
 error:
-	MOD_DEC_USE_COUNT;
 	return -ENOMEM;
 }
 
@@ -296,11 +293,7 @@ static int uinput_burn_device(struct uinput_device *udev)
 
 static int uinput_close(struct inode *inode, struct file *file)
 {
-	int	retval;
-
-	retval = uinput_burn_device((struct uinput_device *)file->private_data);
-	MOD_DEC_USE_COUNT;
-	return retval;
+	return uinput_burn_device((struct uinput_device *)file->private_data);
 }
 
 static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)

@@ -40,11 +40,12 @@
  */
 static struct file_operations tape_fops =
 {
-	read:tapechar_read,
-	write:tapechar_write,
-	ioctl:tapechar_ioctl,
-	open:tapechar_open,
-	release:tapechar_release,
+	.owner = THIS_MODULE,
+	.read = tapechar_read,
+	.write = tapechar_write,
+	.ioctl = tapechar_ioctl,
+	.open = tapechar_open,
+	.release = tapechar_release,
 };
 
 int tapechar_major = TAPECHAR_MAJOR;
@@ -548,8 +549,6 @@ tapechar_open (struct inode *inode, struct file *filp)
 	int  rc = 0;
 	long lockflags;
 
-	MOD_INC_USE_COUNT;
-
 	tape_sprintf_event (tape_dbf_area,6,"c:open: %x\n",td->first_minor); 
 
 	inode = filp->f_dentry->d_inode;
@@ -580,7 +579,6 @@ out:
 	s390irq_spin_unlock_irqrestore(td->devinfo.irq,lockflags);
 error:
 	if(rc != 0){
-		MOD_DEC_USE_COUNT;
 		if (td!=NULL)
 			tape_put_device(td);
 	}
@@ -625,6 +623,5 @@ tapechar_release (struct inode *inode, struct file *filp)
 	if ( td->discipline->owner )
 		__MOD_DEC_USE_COUNT(td->discipline->owner);
 	tape_put_device(td);
-	MOD_DEC_USE_COUNT;
 	return rc;
 }

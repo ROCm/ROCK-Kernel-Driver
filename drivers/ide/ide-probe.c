@@ -1047,7 +1047,6 @@ Enomem:
 static void init_gendisk (ide_hwif_t *hwif)
 {
 	unsigned int unit;
-	extern devfs_handle_t ide_devfs_handle;
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t * drive = &hwif->drives[unit];
@@ -1059,13 +1058,13 @@ static void init_gendisk (ide_hwif_t *hwif)
 			 "%s","IDE Drive");
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
-		sprintf (name, "host%d/bus%d/target%d/lun%d",
+		sprintf (name, "ide/host%d/bus%d/target%d/lun%d",
 			(hwif->channel && hwif->mate) ?
 			hwif->mate->index : hwif->index,
 			hwif->channel, unit, drive->lun);
 		if (drive->present) {
 			device_register(&drive->gendev);
-			drive->de = devfs_mk_dir(ide_devfs_handle, name, NULL);
+			drive->de = devfs_mk_dir(NULL, name, NULL);
 		}
 	}
 	blk_register_region(MKDEV(hwif->major, 0), MAX_DRIVES << PARTN_BITS,

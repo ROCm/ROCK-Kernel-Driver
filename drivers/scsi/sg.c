@@ -111,7 +111,6 @@ static int sg_allow_dio = SG_ALLOW_DIO_DEF;
 #define SG_DEV_ARR_LUMP 6	/* amount to over allocate sg_dev_arr by */
 
 static int sg_attach(Scsi_Device *);
-static int sg_detect(Scsi_Device *);
 static void sg_detach(Scsi_Device *);
 
 static Scsi_Request *dummy_cmdp;	/* only used for sizeof */
@@ -121,10 +120,10 @@ static rwlock_t sg_dev_arr_lock = RW_LOCK_UNLOCKED;	/* Also used to lock
 
 static struct Scsi_Device_Template sg_template = {
 	.module = THIS_MODULE,
+	.list = LIST_HEAD_INIT(sg_template.list),
 	.name = "generic",
 	.tag = "sg",
 	.scsi_type = 0xff,
-	.detect = sg_detect,
 	.attach = sg_attach,
 	.detach = sg_detach
 };
@@ -233,7 +232,6 @@ static int sg_last_dev(void);
 #endif
 
 static Sg_device **sg_dev_arr = NULL;
-static int sg_dev_noticed;
 static int sg_dev_max;
 static int sg_nr_dev;
 
@@ -261,8 +259,8 @@ sg_open(struct inode *inode, struct file *filp)
 
 	/* This driver's module count bumped by fops_get in <linux/fs.h> */
 	/* Prevent the device driver from vanishing while we sleep */
-	if (sdp->device->host->hostt->module)
-		__MOD_INC_USE_COUNT(sdp->device->host->hostt->module);
+	if (!try_module_get(sdp->device->host->hostt->module))
+		return -ENXIO;
 	sdp->device->access_count++;
 
 	if (!((flags & O_NONBLOCK) ||
@@ -317,8 +315,7 @@ sg_open(struct inode *inode, struct file *filp)
 
       error_out:
 	sdp->device->access_count--;
-	if ((!sdp->detached) && sdp->device->host->hostt->module)
-		__MOD_DEC_USE_COUNT(sdp->device->host->hostt->module);
+	module_put(sdp->device->host->hostt->module);
 	return retval;
 }
 
@@ -336,9 +333,7 @@ sg_release(struct inode *inode, struct file *filp)
 	if (0 == sg_remove_sfp(sdp, sfp)) {	/* Returns 1 when sdp gone */
 		if (!sdp->detached) {
 			sdp->device->access_count--;
-			if (sdp->device->host->hostt->module)
-				__MOD_DEC_USE_COUNT(sdp->device->host->hostt->
-						    module);
+			module_put(sdp->device->host->hostt->module);
 		}
 		sdp->exclude = 0;
 		wake_up_interruptible(&sdp->o_excl_wait);
@@ -1304,11 +1299,8 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 			SCSI_LOG_TIMEOUT(1, printk("sg...bh: already closed, final cleanup\n"));
 			if (0 == sg_remove_sfp(sdp, sfp)) {	/* device still present */
 				sdp->device->access_count--;
-				if (sdp->device->host->hostt->module)
-					__MOD_DEC_USE_COUNT(sdp->device->host->hostt->module);
+				module_put(sdp->device->host->hostt->module);
 			}
-			if (sg_template.module)
-				__MOD_DEC_USE_COUNT(sg_template.module);
 			sfp = NULL;
 		}
 	} else if (srp && srp->orphan) {
@@ -1337,13 +1329,6 @@ static struct file_operations sg_fops = {
 	.release = sg_release,
 	.fasync = sg_fasync,
 };
-
-static int
-sg_detect(Scsi_Device * scsidp)
-{
-	sg_dev_noticed++;
-	return 1;
-}
 
 #ifndef MODULE
 static int __init
@@ -1539,12 +1524,7 @@ sg_detach(Scsi_Device * scsidp)
 				}
 				if (sfp->closed) {
 					sdp->device->access_count--;
-					if (sg_template.module)
-						__MOD_DEC_USE_COUNT(sg_template.module);
-					if (sdp->device->host->hostt->module)
-						__MOD_DEC_USE_COUNT(
-							sdp->device->host->
-							 hostt->module);
+					module_put(sdp->device->host->hostt->module);
 					__sg_remove_sfp(sdp, sfp);
 				} else {
 					delay = 1;
@@ -1563,7 +1543,6 @@ sg_detach(Scsi_Device * scsidp)
 		}
 		scsi_slave_detach(scsidp);
 		sg_nr_dev--;
-		sg_dev_noticed--;	/* from <dan@lectra.fr> */
 		break;
 	}
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
@@ -2530,13 +2509,12 @@ sg_remove_sfp(Sg_device * sdp, Sg_fd * sfp)
 		}
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 	} else {
-		sfp->closed = 1;	/* flag dirty state on this fd */
-		sdp->device->access_count++;
 		/* MOD_INC's to inhibit unloading sg and associated adapter driver */
-		if (sg_template.module)
-			__MOD_INC_USE_COUNT(sg_template.module);
-		if (sdp->device->host->hostt->module)
-			__MOD_INC_USE_COUNT(sdp->device->host->hostt->module);
+		/* only bump the access_count if we actually succeeded in
+		 * throwing another counter on the host module */
+		if(try_module_get(sdp->device->host->hostt->module))
+			sdp->device->access_count++;
+		sfp->closed = 1;	/* flag dirty state on this fd */
 		SCSI_LOG_TIMEOUT(1, printk("sg_remove_sfp: worrisome, %d writes pending\n",
 				  dirty));
 	}

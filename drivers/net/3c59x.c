@@ -1300,8 +1300,6 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 			else
 				phyx = phy;
 			mii_status = mdio_read(dev, phyx, 1);
-			printk("phy=%d, phyx=%d, mii_status=0x%04x\n",
-				phy, phyx, mii_status);
 			if (mii_status  &&  mii_status != 0xffff) {
 				vp->phys[phy_idx++] = phyx;
 				if (print_info) {

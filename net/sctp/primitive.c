@@ -38,6 +38,7 @@
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Narasimha Budihal     <narasimha@refcode.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -180,6 +181,28 @@ DECLARE_PRIMITIVE(ABORT);
  */
 
 DECLARE_PRIMITIVE(SEND);
+
+/* 10.1 ULP-to-SCTP
+ * J) Request Heartbeat
+ *
+ * Format: REQUESTHEARTBEAT(association id, destination transport address)
+ *
+ * -> result
+ *
+ * Instructs the local endpoint to perform a HeartBeat on the specified
+ * destination transport address of the given association. The returned
+ * result should indicate whether the transmission of the HEARTBEAT
+ * chunk to the destination address is successful.
+ *
+ * Mandatory attributes:
+ *
+ * o association id - local handle to the SCTP association
+ *
+ * o destination transport address - the transport address of the
+ *   asociation on which a heartbeat should be issued.
+ */
+
+DECLARE_PRIMITIVE(REQUESTHEARTBEAT);
 
 /* COMMENT BUG.  Find out where this is mentioned in the spec.  */
 int sctp_other_icmp_unreachfrag(sctp_association_t *asoc, void *arg)

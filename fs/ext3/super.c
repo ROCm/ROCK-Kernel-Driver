@@ -308,12 +308,12 @@ void ext3_update_dynamic_rev(struct super_block *sb)
 /*
  * Open the external journal device
  */
-static struct block_device *ext3_blkdev_get(kdev_t dev)
+static struct block_device *ext3_blkdev_get(dev_t dev)
 {
 	struct block_device *bdev;
 	int err = -ENODEV;
 
-	bdev = bdget(kdev_t_to_nr(dev));
+	bdev = bdget(dev);
 	if (bdev == NULL)
 		goto fail;
 	err = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
@@ -769,7 +769,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 			"running e2fsck is recommended\n");
 	else if (le32_to_cpu(es->s_checkinterval) &&
 		(le32_to_cpu(es->s_lastcheck) +
-			le32_to_cpu(es->s_checkinterval) <= CURRENT_TIME))
+			le32_to_cpu(es->s_checkinterval) <= get_seconds()))
 		printk (KERN_WARNING
 			"EXT3-fs warning: checktime reached, "
 			"running e2fsck is recommended\n");
@@ -784,7 +784,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 		es->s_max_mnt_count =
 			(__s16) cpu_to_le16(EXT3_DFL_MAX_MNT_COUNT);
 	es->s_mnt_count=cpu_to_le16(le16_to_cpu(es->s_mnt_count) + 1);
-	es->s_mtime = cpu_to_le32(CURRENT_TIME);
+	es->s_mtime = cpu_to_le32(get_seconds());
 	ext3_update_dynamic_rev(sb);
 	EXT3_SET_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
 
@@ -1422,7 +1422,7 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 }
 
 static journal_t *ext3_get_dev_journal(struct super_block *sb,
-				       kdev_t j_dev)
+				       dev_t j_dev)
 {
 	struct buffer_head * bh;
 	journal_t *journal;
@@ -1508,7 +1508,7 @@ static int ext3_load_journal(struct super_block * sb,
 {
 	journal_t *journal;
 	int journal_inum = le32_to_cpu(es->s_journal_inum);
-	kdev_t journal_dev = to_kdev_t(le32_to_cpu(es->s_journal_dev));
+	dev_t journal_dev = le32_to_cpu(es->s_journal_dev);
 	int err = 0;
 	int really_read_only;
 
@@ -1534,7 +1534,7 @@ static int ext3_load_journal(struct super_block * sb,
 		}
 	}
 
-	if (journal_inum && !kdev_none(journal_dev)) {
+	if (journal_inum && journal_dev) {
 		printk(KERN_ERR "EXT3-fs: filesystem has both journal "
 		       "and inode journals!\n");
 		return -EINVAL;
@@ -1617,7 +1617,7 @@ static void ext3_commit_super (struct super_block * sb,
 			       struct ext3_super_block * es,
 			       int sync)
 {
-	es->s_wtime = cpu_to_le32(CURRENT_TIME);
+	es->s_wtime = cpu_to_le32(get_seconds());
 	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "marking dirty");
 	mark_buffer_dirty(EXT3_SB(sb)->s_sbh);
 	if (sync) {

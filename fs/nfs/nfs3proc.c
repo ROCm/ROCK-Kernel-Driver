@@ -19,6 +19,8 @@
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
+extern struct rpc_procinfo nfs3_procedures[];
+
 /* A wrapper to handle the EJUKEBOX error message */
 static int
 nfs3_rpc_wrapper(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
@@ -42,7 +44,7 @@ static inline int
 nfs3_rpc_call_wrapper(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
 {
 	struct rpc_message msg = {
-		.rpc_proc	= proc,
+		.rpc_proc	= &nfs3_procedures[proc],
 		.rpc_argp	= argp,
 		.rpc_resp	= resp,
 	};
@@ -156,7 +158,7 @@ nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 		.fattr		= &fattr,
 	};
 	struct rpc_message msg = {
-		.rpc_proc	= NFS3PROC_ACCESS,
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_ACCESS],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
 		.rpc_cred	= cred
@@ -227,7 +229,7 @@ nfs3_proc_read(struct inode *inode, struct rpc_cred *cred,
 		.count		= count,
 	};
 	struct rpc_message	msg = {
-		.rpc_proc	= NFS3PROC_READ,
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_READ],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
 		.rpc_cred	= cred
@@ -262,7 +264,7 @@ nfs3_proc_write(struct inode *inode, struct rpc_cred *cred,
 		.verf		= verf,
 	};
 	struct rpc_message	msg = {
-		.rpc_proc	= NFS3PROC_WRITE,
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_WRITE],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
 		.rpc_cred	= cred
@@ -369,7 +371,7 @@ nfs3_proc_remove(struct inode *dir, struct qstr *name)
 		.len		= name->len
 	};
 	struct rpc_message	msg = {
-		.rpc_proc	= NFS3PROC_REMOVE,
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_REMOVE],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &dir_attr,
 	};
@@ -397,7 +399,7 @@ nfs3_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr 
 	arg->name = name->name;
 	arg->len = name->len;
 	res->valid = 0;
-	msg->rpc_proc = NFS3PROC_REMOVE;
+	msg->rpc_proc = &nfs3_procedures[NFS3PROC_REMOVE];
 	msg->rpc_argp = arg;
 	msg->rpc_resp = res;
 	return 0;
@@ -580,7 +582,7 @@ nfs3_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 		.plus		= plus
 	};
 	struct rpc_message	msg = {
-		.rpc_proc	= NFS3PROC_READDIR,
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_READDIR],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
 		.rpc_cred	= cred
@@ -590,7 +592,7 @@ nfs3_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 	lock_kernel();
 
 	if (plus)
-		msg.rpc_proc = NFS3PROC_READDIRPLUS;
+		msg.rpc_proc = &nfs3_procedures[NFS3PROC_READDIRPLUS];
 
 	dprintk("NFS call  readdir%s %d\n",
 			plus? "plus" : "", (unsigned int) cookie);
@@ -697,7 +699,12 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	struct inode		*inode = data->inode;
 	struct nfs_page		*req;
 	int			flags;
-	struct rpc_message	msg;
+	struct rpc_message	msg = {
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_READ],
+		.rpc_argp	= &data->u.v3.args,
+		.rpc_resp	= &data->u.v3.res,
+		.rpc_cred	= data->cred,
+	};
 	
 	req = nfs_list_entry(data->pages.next);
 	data->u.v3.args.fh     = NFS_FH(inode);
@@ -718,10 +725,6 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	/* Release requests */
 	task->tk_release = nfs_readdata_release;
 
-	msg.rpc_proc = NFS3PROC_READ;
-	msg.rpc_argp = &data->u.v3.args;
-	msg.rpc_resp = &data->u.v3.res;
-	msg.rpc_cred = data->cred;
 	rpc_call_setup(&data->task, &msg, 0);
 }
 
@@ -744,7 +747,12 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	struct nfs_page		*req;
 	int			stable;
 	int			flags;
-	struct rpc_message	msg;
+	struct rpc_message	msg = {
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_WRITE],
+		.rpc_argp	= &data->u.v3.args,
+		.rpc_resp	= &data->u.v3.res,
+		.rpc_cred	= data->cred,
+	};
 
 	if (how & FLUSH_STABLE) {
 		if (!NFS_I(inode)->ncommit)
@@ -774,10 +782,6 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	/* Release requests */
 	task->tk_release = nfs_writedata_release;
 
-	msg.rpc_proc = NFS3PROC_WRITE;
-	msg.rpc_argp = &data->u.v3.args;
-	msg.rpc_resp = &data->u.v3.res;
-	msg.rpc_cred = data->cred;
 	rpc_call_setup(&data->task, &msg, 0);
 }
 
@@ -795,7 +799,12 @@ nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	struct rpc_task		*task = &data->task;
 	struct inode		*inode = data->inode;
 	int			flags;
-	struct rpc_message	msg;
+	struct rpc_message	msg = {
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_COMMIT],
+		.rpc_argp	= &data->u.v3.args,
+		.rpc_resp	= &data->u.v3.res,
+		.rpc_cred	= data->cred,
+	};
 
 	data->u.v3.args.fh     = NFS_FH(data->inode);
 	data->u.v3.args.offset = start;
@@ -813,10 +822,6 @@ nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	/* Release requests */
 	task->tk_release = nfs_commit_release;
 	
-	msg.rpc_proc = NFS3PROC_COMMIT;
-	msg.rpc_argp = &data->u.v3.args;
-	msg.rpc_resp = &data->u.v3.res;
-	msg.rpc_cred = data->cred;
 	rpc_call_setup(&data->task, &msg, 0);
 }
 

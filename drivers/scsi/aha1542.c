@@ -27,28 +27,26 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/pci.h>
 #include <linux/isapnp.h>
-#include <asm/dma.h>
-#include <asm/system.h>
-#include <asm/io.h>
 #include <linux/blk.h>
 #include <linux/mca.h>
 
+#include <asm/dma.h>
+#include <asm/system.h>
+#include <asm/io.h>
+
 #include "scsi.h"
 #include "hosts.h"
-
-
 #include "aha1542.h"
 
 #define SCSI_BUF_PA(address)	isa_virt_to_bus(address)

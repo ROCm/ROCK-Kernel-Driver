@@ -1,6 +1,6 @@
 /*
    SCSI Tape Driver for Linux version 1.1 and newer. See the accompanying
-   file README.st for more information.
+   file Documentation/scsi/st.txt for more information.
 
    History:
    Rewritten from Dwayne Forsyth's SCSI tape driver by Kai Makisara.
@@ -170,15 +170,14 @@ static int sgl_map_user_pages(struct scatterlist *, const unsigned int,
 static int sgl_unmap_user_pages(struct scatterlist *, const unsigned int, int);
 
 static int st_attach(Scsi_Device *);
-static int st_detect(Scsi_Device *);
 static void st_detach(Scsi_Device *);
 
 static struct Scsi_Device_Template st_template = {
 	.module =	THIS_MODULE,
+	.list =		LIST_HEAD_INIT(st_template.list),
 	.name =		"tape", 
 	.tag =		"st", 
 	.scsi_type =	TYPE_TAPE,
-	.detect =	st_detect, 
 	.attach =	st_attach, 
 	.detach =	st_detach
 };
@@ -992,13 +991,13 @@ static int st_open(struct inode *inode, struct file *filp)
 		DEB( printk(ST_DEB_MSG "%s: Device already in use.\n", name); )
 		return (-EBUSY);
 	}
+	if(!try_module_get(STp->device->host->hostt->module))
+		return (-ENXIO);
+	STp->device->access_count++;
 	STp->in_use = 1;
 	write_unlock(&st_dev_arr_lock);
 	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;
 
-	if (STp->device->host->hostt->module)
-		__MOD_INC_USE_COUNT(STp->device->host->hostt->module);
-	STp->device->access_count++;
 
 	if (!scsi_block_when_processing_errors(STp->device)) {
 		retval = (-ENXIO);
@@ -1040,8 +1039,7 @@ static int st_open(struct inode *inode, struct file *filp)
 	normalize_buffer(STp->buffer);
 	STp->in_use = 0;
 	STp->device->access_count--;
-	if (STp->device->host->hostt->module)
-	    __MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
+	module_put(STp->device->host->hostt->module);
 	return retval;
 
 }
@@ -1175,8 +1173,7 @@ static int st_release(struct inode *inode, struct file *filp)
 	STp->in_use = 0;
 	write_unlock(&st_dev_arr_lock);
 	STp->device->access_count--;
-	if (STp->device->host->hostt->module)
-		__MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
+	module_put(STp->device->host->hostt->module);
 
 	return result;
 }
@@ -3576,7 +3573,7 @@ static void validate_options(void)
 }
 
 #ifndef MODULE
-/* Set the boot options. Syntax is defined in README.st.
+/* Set the boot options. Syntax is defined in Documenation/scsi/st.txt.
  */
 static int __init st_setup(char *str)
 {
@@ -3874,7 +3871,7 @@ static int st_attach(Scsi_Device * SDp)
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	}
-	devfs_register_tape (tpnt->de_r[0]);
+	disk->number = devfs_register_tape(SDp->de);
 
 	printk(KERN_WARNING
 	"Attached scsi tape %s at scsi%d, channel %d, id %d, lun %d\n",
@@ -3884,13 +3881,6 @@ static int st_attach(Scsi_Device * SDp)
 
 	return 0;
 };
-
-static int st_detect(Scsi_Device * SDp)
-{
-	if (SDp->type != TYPE_TAPE || st_incompatible(SDp))
-		return 0;
-	return 1;
-}
 
 static void st_detach(Scsi_Device * SDp)
 {
@@ -3908,6 +3898,7 @@ static void st_detach(Scsi_Device * SDp)
 				devfs_unregister (tpnt->de_n[mode]);
 				tpnt->de_n[mode] = NULL;
 			}
+			devfs_unregister_tape(tpnt->disk->number);
 			scsi_tapes[i] = 0;
 			scsi_slave_detach(SDp);
 			st_nr_dev--;

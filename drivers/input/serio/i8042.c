@@ -10,16 +10,16 @@
  * the Free Software Foundation.
  */
 
-#include <asm/io.h>
-
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/config.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/serio.h>
-#include <linux/sched.h>
+
+#include <asm/io.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");

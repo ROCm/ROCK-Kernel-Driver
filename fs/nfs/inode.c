@@ -32,6 +32,7 @@
 #include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
+#include <linux/mount.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -655,9 +656,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		goto out_no_inode;
 
 	if (inode->i_state & I_NEW) {
-		__u64		new_size, new_mtime;
-		loff_t		new_isize;
-		time_t		new_atime;
+		struct nfs_inode *nfsi = NFS_I(inode);
 
 		/* We set i_ino for the few things that still rely on it,
 		 * such as stat(2) */
@@ -685,22 +684,17 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		else
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
 
-		new_mtime = fattr->mtime;
-		new_size = fattr->size;
-		new_isize = nfs_size_to_loff_t(fattr->size);
-		new_atime = nfs_time_to_secs(fattr->atime);
-
-		NFS_READTIME(inode) = fattr->timestamp;
-		NFS_CACHE_CTIME(inode) = fattr->ctime;
-		inode->i_ctime = nfs_time_to_secs(fattr->ctime);
-		inode->i_atime = new_atime;
-		NFS_CACHE_MTIME(inode) = new_mtime;
-		inode->i_mtime = nfs_time_to_secs(new_mtime);
-		NFS_MTIME_UPDATE(inode) = fattr->timestamp;
-		NFS_CACHE_ISIZE(inode) = new_size;
+		nfsi->read_cache_jiffies = fattr->timestamp;
+		inode->i_atime = fattr->atime;
+		inode->i_mtime = fattr->mtime;
+		inode->i_ctime = fattr->ctime;
+		nfsi->read_cache_ctime = fattr->ctime;
+		nfsi->read_cache_mtime = fattr->mtime;
+		nfsi->cache_mtime_jiffies = fattr->timestamp;
+		nfsi->read_cache_isize = fattr->size;
 		if (fattr->valid & NFS_ATTR_FATTR_V4)
-			NFS_CHANGE_ATTR(inode) = fattr->change_attr;
-		inode->i_size = new_isize;
+			nfsi->change_attr = fattr->change_attr;
+		inode->i_size = nfs_size_to_loff_t(fattr->size);
 		inode->i_mode = fattr->mode;
 		inode->i_nlink = fattr->nlink;
 		inode->i_uid = fattr->uid;
@@ -715,10 +709,10 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 			inode->i_blocks = fattr->du.nfs2.blocks;
 			inode->i_blksize = fattr->du.nfs2.blocksize;
 		}
-		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
-		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
-		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
-		NFS_I(inode)->cache_access.cred = NULL;
+		nfsi->attrtimeo = NFS_MINATTRTIMEO(inode);
+		nfsi->attrtimeo_timestamp = jiffies;
+		memset(nfsi->cookieverf, 0, sizeof(nfsi->cookieverf));
+		nfsi->cache_access.cred = NULL;
 
 		unlock_new_inode(inode);
 	} else
@@ -784,9 +778,10 @@ printk("nfs_setattr: revalidate failed, error=%d\n", error);
 	 * now to avoid invalidating the page cache.
 	 */
 	if (!(fattr.valid & NFS_ATTR_WCC)) {
-		fattr.pre_size = NFS_CACHE_ISIZE(inode);
-		fattr.pre_mtime = NFS_CACHE_MTIME(inode);
-		fattr.pre_ctime = NFS_CACHE_CTIME(inode);
+		struct nfs_inode *nfsi = NFS_I(inode);
+		fattr.pre_size = nfsi->read_cache_isize;
+		fattr.pre_mtime = nfsi->read_cache_mtime;
+		fattr.pre_ctime = nfsi->read_cache_ctime;
 		fattr.valid |= NFS_ATTR_WCC;
 	}
 	/* Force an attribute cache update */
@@ -959,14 +954,18 @@ out:
 static inline
 int nfs_fattr_obsolete(struct inode *inode, struct nfs_fattr *fattr)
 {
-	s64 cdif;
+	struct nfs_inode *nfsi = NFS_I(inode);
+	long cdif;
 
-	if (time_after(jiffies, NFS_READTIME(inode)+NFS_ATTRTIMEO(inode)))
+	if (time_after(jiffies, nfsi->read_cache_jiffies + nfsi->attrtimeo))
 		goto out_valid;
-	if ((cdif = (s64)fattr->ctime - (s64)NFS_CACHE_CTIME(inode)) > 0)
+	cdif = fattr->ctime.tv_sec - nfsi->read_cache_ctime.tv_sec;
+	if (cdif == 0)
+		cdif = fattr->ctime.tv_nsec - nfsi->read_cache_ctime.tv_nsec;
+	if (cdif > 0)
 		goto out_valid;
 	/* Ugh... */
-	if (cdif == 0 && fattr->size > NFS_CACHE_ISIZE(inode))
+	if (cdif == 0 && fattr->size > nfsi->read_cache_isize)
 		goto out_valid;
 	return -1;
  out_valid:
@@ -988,19 +987,20 @@ int nfs_fattr_obsolete(struct inode *inode, struct nfs_fattr *fattr)
 int
 __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 {
-	__u64		new_size, new_mtime;
+	struct nfs_inode *nfsi = NFS_I(inode);
+	__u64		new_size;
 	loff_t		new_isize;
-	time_t		new_atime;
 	int		invalid = 0;
+	int		mtime_update = 0;
 
 	dfprintk(VFS, "NFS: refresh_inode(%s/%ld ct=%d info=0x%x)\n",
 			inode->i_sb->s_id, inode->i_ino,
 			atomic_read(&inode->i_count), fattr->valid);
 
-	if (NFS_FILEID(inode) != fattr->fileid) {
+	if (nfsi->fileid != fattr->fileid) {
 		printk(KERN_ERR "nfs_refresh_inode: inode number mismatch\n"
 		       "expected (%s/0x%Lx), got (%s/0x%Lx)\n",
-		       inode->i_sb->s_id, (long long)NFS_FILEID(inode),
+		       inode->i_sb->s_id, (long long)nfsi->fileid,
 		       inode->i_sb->s_id, (long long)fattr->fileid);
 		goto out_err;
 	}
@@ -1014,11 +1014,9 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	if ((inode->i_mode & S_IFMT) != (fattr->mode & S_IFMT))
 		goto out_changed;
 
- 	new_mtime = fattr->mtime;
 	new_size = fattr->size;
  	new_isize = nfs_size_to_loff_t(fattr->size);
 
-	new_atime = nfs_time_to_secs(fattr->atime);
 	/* Avoid races */
 	if (nfs_fattr_obsolete(inode, fattr))
 		goto out_nochange;
@@ -1026,13 +1024,13 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	/*
 	 * Update the read time so we don't revalidate too often.
 	 */
-	NFS_READTIME(inode) = fattr->timestamp;
+	nfsi->read_cache_jiffies = fattr->timestamp;
 
 	/*
 	 * Note: NFS_CACHE_ISIZE(inode) reflects the state of the cache.
 	 *       NOT inode->i_size!!!
 	 */
-	if (NFS_CACHE_ISIZE(inode) != new_size) {
+	if (nfsi->read_cache_isize != new_size) {
 #ifdef NFS_DEBUG_VERBOSE
 		printk(KERN_DEBUG "NFS: isize change on %s/%ld\n", inode->i_sb->s_id, inode->i_ino);
 #endif
@@ -1044,15 +1042,16 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	 *       can change this value in VFS without requiring a
 	 *	 cache revalidation.
 	 */
-	if (NFS_CACHE_MTIME(inode) != new_mtime) {
+	if (!timespec_equal(&nfsi->read_cache_mtime, &fattr->mtime)) {
 #ifdef NFS_DEBUG_VERBOSE
 		printk(KERN_DEBUG "NFS: mtime change on %s/%ld\n", inode->i_sb->s_id, inode->i_ino);
 #endif
 		invalid = 1;
+		mtime_update = 1;
 	}
 
 	if ((fattr->valid & NFS_ATTR_FATTR_V4)
-	    && NFS_CHANGE_ATTR(inode) != fattr->change_attr) {
+	    && nfsi->change_attr != fattr->change_attr) {
 #ifdef NFS_DEBUG_VERBOSE
 		printk(KERN_DEBUG "NFS: change_attr change on %s/%ld\n",
 		       inode->i_sb->s_id, inode->i_ino);
@@ -1066,12 +1065,12 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
          * operation, so there's no need to invalidate the caches.
          */
 	if ((fattr->valid & NFS_ATTR_PRE_CHANGE)
-	    && NFS_CHANGE_ATTR(inode) == fattr->pre_change_attr) {
+	    && nfsi->change_attr == fattr->pre_change_attr) {
 		invalid = 0;
 	}
 	else if ((fattr->valid & NFS_ATTR_WCC)
-	    && NFS_CACHE_ISIZE(inode) == fattr->pre_size
-	    && NFS_CACHE_MTIME(inode) == fattr->pre_mtime) {
+	    && nfsi->read_cache_isize == fattr->pre_size
+	    && timespec_equal(&nfsi->read_cache_mtime, &fattr->pre_mtime)) {
 		invalid = 0;
 	}
 
@@ -1082,19 +1081,18 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	if (nfs_have_writebacks(inode) && new_isize < inode->i_size)
 		new_isize = inode->i_size;
 
-	NFS_CACHE_CTIME(inode) = fattr->ctime;
-	inode->i_ctime = nfs_time_to_secs(fattr->ctime);
+	nfsi->read_cache_ctime = fattr->ctime;
+	inode->i_ctime = fattr->ctime;
+	inode->i_atime = fattr->atime;
 
-	inode->i_atime = new_atime;
-
-	if (NFS_CACHE_MTIME(inode) != new_mtime) {
+	if (mtime_update) {
 		if (invalid)
-			NFS_MTIME_UPDATE(inode) = fattr->timestamp;
-		NFS_CACHE_MTIME(inode) = new_mtime;
-		inode->i_mtime = nfs_time_to_secs(new_mtime);
+			nfsi->cache_mtime_jiffies = fattr->timestamp;
+		nfsi->read_cache_mtime = fattr->mtime;
+		inode->i_mtime = fattr->mtime;
 	}
 
-	NFS_CACHE_ISIZE(inode) = new_size;
+	nfsi->read_cache_isize = new_size;
 	inode->i_size = new_isize;
 
 	if (inode->i_mode != fattr->mode ||
@@ -1108,7 +1106,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	}
 
 	if (fattr->valid & NFS_ATTR_FATTR_V4)
-		NFS_CHANGE_ATTR(inode) = fattr->change_attr;
+		nfsi->change_attr = fattr->change_attr;
 
 	inode->i_mode = fattr->mode;
 	inode->i_nlink = fattr->nlink;
@@ -1128,20 +1126,20 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  
 	/* Update attrtimeo value */
 	if (invalid) {
-		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
-		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
+		nfsi->attrtimeo = NFS_MINATTRTIMEO(inode);
+		nfsi->attrtimeo_timestamp = jiffies;
 		invalidate_inode_pages(inode->i_mapping);
 		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
-	} else if (time_after(jiffies, NFS_ATTRTIMEO_UPDATE(inode)+NFS_ATTRTIMEO(inode))) {
-		if ((NFS_ATTRTIMEO(inode) <<= 1) > NFS_MAXATTRTIMEO(inode))
-			NFS_ATTRTIMEO(inode) = NFS_MAXATTRTIMEO(inode);
-		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
+	} else if (time_after(jiffies, nfsi->attrtimeo_timestamp+nfsi->attrtimeo)) {
+		if ((nfsi->attrtimeo <<= 1) > NFS_MAXATTRTIMEO(inode))
+			nfsi->attrtimeo = NFS_MAXATTRTIMEO(inode);
+		nfsi->attrtimeo_timestamp = jiffies;
 	}
 
 	return 0;
  out_nochange:
-	if (new_atime - inode->i_atime > 0)
-		inode->i_atime = new_atime;
+	if (!timespec_equal(&fattr->atime, &inode->i_atime))
+		inode->i_atime = fattr->atime;
 	return 0;
  out_changed:
 	/*

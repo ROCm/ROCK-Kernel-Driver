@@ -18,7 +18,7 @@ CFLAGS_aha152x.o =   -DAHA152X_STAT -DAUTOCONF
 CFLAGS_gdth.o    = # -DDEBUG_GDTH=2 -D__SERIAL__ -D__COM2__ -DGDTH_STATISTICS
 CFLAGS_seagate.o =   -DARBITRATE -DPARITY -DSEAGATE_USE_ASM
 
-export-objs	:= scsi_syms.o 53c700.o
+export-objs	:= scsi_syms.o scsi_proc.o 53c700.o
 
 subdir-$(CONFIG_PCMCIA)		+= pcmcia
 
@@ -123,8 +123,11 @@ obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
 obj-$(CONFIG_CHR_DEV_SG)	+= sg.o
 
 scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o scsicam.o \
-			scsi_proc.o scsi_error.o scsi_lib.o scsi_scan.o \
-			scsi_syms.o
+		   scsi_error.o scsi_lib.o scsi_scan.o scsi_syms.o
+
+ifdef CONFIG_PROC_FS
+scsi_mod-objs	+= scsi_proc.o
+endif
 			
 sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: dir.c,v 1.71 2002/07/23 17:00:45 dwmw2 Exp $
+ * $Id: dir.c,v 1.73 2002/08/26 15:00:51 dwmw2 Exp $
  *
  */
 
@@ -32,7 +32,7 @@ static int jffs2_unlink (struct inode *,struct dentry *);
 static int jffs2_symlink (struct inode *,struct dentry *,const char *);
 static int jffs2_mkdir (struct inode *,struct dentry *,int);
 static int jffs2_rmdir (struct inode *,struct dentry *);
-static int jffs2_mknod (struct inode *,struct dentry *,int,int);
+static int jffs2_mknod (struct inode *,struct dentry *,int,dev_t);
 static int jffs2_rename (struct inode *, struct dentry *,
                         struct inode *, struct dentry *);
 
@@ -211,7 +211,8 @@ static int jffs2_create(struct inode *dir_i, struct dentry *dentry, int mode)
 		return ret;
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = ri->ctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(ri->ctime);
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 
 	jffs2_free_raw_inode(ri);
 	d_instantiate(dentry, inode);
@@ -233,7 +234,8 @@ static int jffs2_unlink(struct inode *dir_i, struct dentry *dentry)
 
 	ret = jffs2_do_unlink(c, dir_f, dentry->d_name.name, 
 			       dentry->d_name.len, dead_f);
-	dentry->d_inode->i_nlink = dead_f->inocache->nlink;
+	if (dead_f->inocache)
+		dentry->d_inode->i_nlink = dead_f->inocache->nlink;
 	return ret;
 }
 /***********************************************************************/
@@ -246,6 +248,10 @@ static int jffs2_link (struct dentry *old_dentry, struct inode *dir_i, struct de
 	struct jffs2_inode_info *dir_f = JFFS2_INODE_INFO(dir_i);
 	int ret;
 	uint8_t type;
+
+	/* Don't let people make hard links to bad inodes. */
+	if (!f->inocache)
+		return -EIO;
 
 	if (S_ISDIR(old_dentry->d_inode->i_mode))
 		return -EPERM;
@@ -317,13 +323,14 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 
 	f = JFFS2_INODE_INFO(inode);
 
-	inode->i_size = ri->isize = ri->dsize = ri->csize = strlen(target);
-	ri->totlen = sizeof(*ri) + ri->dsize;
-	ri->hdr_crc = crc32(0, ri, sizeof(struct jffs2_unknown_node)-4);
+	inode->i_size = strlen(target);
+	ri->isize = ri->dsize = ri->csize = cpu_to_je32(inode->i_size);
+	ri->totlen = cpu_to_je32(sizeof(*ri) + inode->i_size);
+	ri->hdr_crc = cpu_to_je32(crc32(0, ri, sizeof(struct jffs2_unknown_node)-4));
 
 	ri->compr = JFFS2_COMPR_NONE;
-	ri->data_crc = crc32(0, target, strlen(target));
-	ri->node_crc = crc32(0, ri, sizeof(*ri)-8);
+	ri->data_crc = cpu_to_je32(crc32(0, target, strlen(target)));
+	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 	
 	fn = jffs2_write_dnode(c, f, ri, target, strlen(target), phys_ofs, &writtenlen);
 
@@ -369,19 +376,19 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	dir_f = JFFS2_INODE_INFO(dir_i);
 	down(&dir_f->sem);
 
-	rd->magic = JFFS2_MAGIC_BITMASK;
-	rd->nodetype = JFFS2_NODETYPE_DIRENT;
-	rd->totlen = sizeof(*rd) + namelen;
-	rd->hdr_crc = crc32(0, rd, sizeof(struct jffs2_unknown_node)-4);
+	rd->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
+	rd->nodetype = cpu_to_je16(JFFS2_NODETYPE_DIRENT);
+	rd->totlen = cpu_to_je32(sizeof(*rd) + namelen);
+	rd->hdr_crc = cpu_to_je32(crc32(0, rd, sizeof(struct jffs2_unknown_node)-4));
 
-	rd->pino = dir_i->i_ino;
-	rd->version = ++dir_f->highest_version;
-	rd->ino = inode->i_ino;
-	rd->mctime = CURRENT_TIME;
+	rd->pino = cpu_to_je32(dir_i->i_ino);
+	rd->version = cpu_to_je32(++dir_f->highest_version);
+	rd->ino = cpu_to_je32(inode->i_ino);
+	rd->mctime = cpu_to_je32(get_seconds());
 	rd->nsize = namelen;
 	rd->type = DT_LNK;
-	rd->node_crc = crc32(0, rd, sizeof(*rd)-8);
-	rd->name_crc = crc32(0, dentry->d_name.name, namelen);
+	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
+	rd->name_crc = cpu_to_je32(crc32(0, dentry->d_name.name, namelen));
 
 	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, &writtenlen);
 
@@ -395,7 +402,8 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = rd->mctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(rd->mctime);
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 
 	jffs2_free_raw_dirent(rd);
 
@@ -459,8 +467,8 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 
 	f = JFFS2_INODE_INFO(inode);
 
-	ri->data_crc = 0;
-	ri->node_crc = crc32(0, ri, sizeof(*ri)-8);
+	ri->data_crc = cpu_to_je32(0);
+	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 	
 	fn = jffs2_write_dnode(c, f, ri, NULL, 0, phys_ofs, &writtenlen);
 
@@ -506,19 +514,19 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	dir_f = JFFS2_INODE_INFO(dir_i);
 	down(&dir_f->sem);
 
-	rd->magic = JFFS2_MAGIC_BITMASK;
-	rd->nodetype = JFFS2_NODETYPE_DIRENT;
-	rd->totlen = sizeof(*rd) + namelen;
-	rd->hdr_crc = crc32(0, rd, sizeof(struct jffs2_unknown_node)-4);
+	rd->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
+	rd->nodetype = cpu_to_je16(JFFS2_NODETYPE_DIRENT);
+	rd->totlen = cpu_to_je32(sizeof(*rd) + namelen);
+	rd->hdr_crc = cpu_to_je32(crc32(0, rd, sizeof(struct jffs2_unknown_node)-4));
 
-	rd->pino = dir_i->i_ino;
-	rd->version = ++dir_f->highest_version;
-	rd->ino = inode->i_ino;
-	rd->mctime = CURRENT_TIME;
+	rd->pino = cpu_to_je32(dir_i->i_ino);
+	rd->version = cpu_to_je32(++dir_f->highest_version);
+	rd->ino = cpu_to_je32(inode->i_ino);
+	rd->mctime = cpu_to_je32(get_seconds());
 	rd->nsize = namelen;
 	rd->type = DT_DIR;
-	rd->node_crc = crc32(0, rd, sizeof(*rd)-8);
-	rd->name_crc = crc32(0, dentry->d_name.name, namelen);
+	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
+	rd->name_crc = cpu_to_je32(crc32(0, dentry->d_name.name, namelen));
 
 	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, &writtenlen);
 	
@@ -532,7 +540,8 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = rd->mctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(rd->mctime);
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 	dir_i->i_nlink++;
 
 	jffs2_free_raw_dirent(rd);
@@ -564,7 +573,7 @@ static int jffs2_rmdir (struct inode *dir_i, struct dentry *dentry)
 	return ret;
 }
 
-static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, int rdev)
+static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, dev_t rdev)
 {
 	struct jffs2_inode_info *f, *dir_f;
 	struct jffs2_sb_info *c;
@@ -614,13 +623,13 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, in
 
 	f = JFFS2_INODE_INFO(inode);
 
-	ri->dsize = ri->csize = devlen;
-	ri->totlen = sizeof(*ri) + ri->csize;
-	ri->hdr_crc = crc32(0, ri, sizeof(struct jffs2_unknown_node)-4);
+	ri->dsize = ri->csize = cpu_to_je32(devlen);
+	ri->totlen = cpu_to_je32(sizeof(*ri) + devlen);
+	ri->hdr_crc = cpu_to_je32(crc32(0, ri, sizeof(struct jffs2_unknown_node)-4));
 
 	ri->compr = JFFS2_COMPR_NONE;
-	ri->data_crc = crc32(0, &dev, devlen);
-	ri->node_crc = crc32(0, ri, sizeof(*ri)-8);
+	ri->data_crc = cpu_to_je32(crc32(0, &dev, devlen));
+	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 	
 	fn = jffs2_write_dnode(c, f, ri, (char *)&dev, devlen, phys_ofs, &writtenlen);
 
@@ -666,22 +675,22 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, in
 	dir_f = JFFS2_INODE_INFO(dir_i);
 	down(&dir_f->sem);
 
-	rd->magic = JFFS2_MAGIC_BITMASK;
-	rd->nodetype = JFFS2_NODETYPE_DIRENT;
-	rd->totlen = sizeof(*rd) + namelen;
-	rd->hdr_crc = crc32(0, rd, sizeof(struct jffs2_unknown_node)-4);
+	rd->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
+	rd->nodetype = cpu_to_je16(JFFS2_NODETYPE_DIRENT);
+	rd->totlen = cpu_to_je32(sizeof(*rd) + namelen);
+	rd->hdr_crc = cpu_to_je32(crc32(0, rd, sizeof(struct jffs2_unknown_node)-4));
 
-	rd->pino = dir_i->i_ino;
-	rd->version = ++dir_f->highest_version;
-	rd->ino = inode->i_ino;
-	rd->mctime = CURRENT_TIME;
+	rd->pino = cpu_to_je32(dir_i->i_ino);
+	rd->version = cpu_to_je32(++dir_f->highest_version);
+	rd->ino = cpu_to_je32(inode->i_ino);
+	rd->mctime = cpu_to_je32(get_seconds());
 	rd->nsize = namelen;
 
 	/* XXX: This is ugly. */
 	rd->type = (mode & S_IFMT) >> 12;
 
-	rd->node_crc = crc32(0, rd, sizeof(*rd)-8);
-	rd->name_crc = crc32(0, dentry->d_name.name, namelen);
+	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
+	rd->name_crc = cpu_to_je32(crc32(0, dentry->d_name.name, namelen));
 
 	fd = jffs2_write_dirent(c, dir_f, rd, dentry->d_name.name, namelen, phys_ofs, &writtenlen);
 	
@@ -695,7 +704,8 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, in
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = rd->mctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = je32_to_cpu(rd->mctime);
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 
 	jffs2_free_raw_dirent(rd);
 
@@ -786,7 +796,8 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 		struct jffs2_inode_info *f = JFFS2_INODE_INFO(old_dentry->d_inode);
 		down(&f->sem);
 		old_dentry->d_inode->i_nlink++;
-		f->inocache->nlink++;
+		if (f->inocache)
+			f->inocache->nlink++;
 		up(&f->sem);
 
 		printk(KERN_NOTICE "jffs2_rename(): Link succeeded, unlink failed (err %d). You now have a hard link\n", ret);

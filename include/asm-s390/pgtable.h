@@ -320,7 +320,7 @@ extern inline pte_t pte_wrprotect(pte_t pte)
 
 extern inline pte_t pte_mkwrite(pte_t pte) 
 {
-	pte_val(pte) &= ~_PAGE_RO;
+	pte_val(pte) &= ~(_PAGE_RO | _PAGE_ISCLEAN);
 	return pte;
 }
 

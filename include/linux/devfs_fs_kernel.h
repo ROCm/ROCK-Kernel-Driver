@@ -41,6 +41,8 @@ typedef struct devfs_entry * devfs_handle_t;
 
 #ifdef CONFIG_DEVFS_FS
 
+extern void devfs_remove(const char *fmt, ...) __attribute__((format (printf, 1, 2)));
+
 struct unique_numspace
 {
     spinlock_t init_lock;
@@ -88,7 +90,8 @@ extern void devfs_auto_unregister (devfs_handle_t master,devfs_handle_t slave);
 extern devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master);
 extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
 extern int devfs_only (void);
-extern void devfs_register_tape (devfs_handle_t de);
+extern int devfs_register_tape (devfs_handle_t de);
+extern void devfs_unregister_tape(int num);
 extern void devfs_register_series (devfs_handle_t dir, const char *format,
 				   unsigned int num_entries,
 				   unsigned int flags, unsigned int major,
@@ -156,6 +159,9 @@ static inline void devfs_find_and_unregister (devfs_handle_t dir,
 					      unsigned int major,
 					      unsigned int minor,
 					      char type, int traverse_symlinks)
+{
+}
+static inline void devfs_remove(const char *fmt, ...)
 {
 }
 static inline int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
@@ -230,11 +236,13 @@ static inline int devfs_only (void)
 {
     return 0;
 }
-static inline void devfs_register_tape (devfs_handle_t de)
+static inline int devfs_register_tape (devfs_handle_t de)
 {
-    return;
+    return -1;
 }
-
+static inline void devfs_unregister_tape(int num)
+{
+}
 static inline void devfs_register_series (devfs_handle_t dir,
 					  const char *format,
 					  unsigned int num_entries,

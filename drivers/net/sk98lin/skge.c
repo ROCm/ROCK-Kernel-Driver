@@ -315,8 +315,6 @@
 
 /* function prototypes ******************************************************/
 static void	FreeResources(struct net_device *dev);
-int		init_module(void);
-void		cleanup_module(void);
 static int	SkGeBoardInit(struct net_device *dev, SK_AC *pAC);
 static SK_BOOL	BoardAllocMem(SK_AC *pAC);
 static void	BoardFreeMem(SK_AC *pAC);

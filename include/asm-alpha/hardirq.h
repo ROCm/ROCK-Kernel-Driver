@@ -3,6 +3,8 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <linux/cache.h>
+
 
 /* entry.S is sensitive to the offsets of these fields */
 typedef struct {

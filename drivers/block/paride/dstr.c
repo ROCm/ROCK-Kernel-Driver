@@ -202,17 +202,8 @@ static void dstr_log_adapter( PIA *pi, char * scratch, int verbose )
 
 }
 
-static void dstr_init_proto( PIA *pi)
-
-{       MOD_INC_USE_COUNT;
-}
-
-static void dstr_release_proto( PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol dstr = {
+	.owner		= THIS_MODULE,
 	.name		= "dstr",
 	.max_mode	= 5,
 	.epp_first	= 2,
@@ -225,8 +216,6 @@ static struct pi_protocol dstr = {
 	.connect	= dstr_connect,
 	.disconnect	= dstr_disconnect,
 	.log_adapter	= dstr_log_adapter,
-	.init_proto	= dstr_init_proto,
-	.release_proto	= dstr_release_proto,
 };
 
 static int __init dstr_init(void)

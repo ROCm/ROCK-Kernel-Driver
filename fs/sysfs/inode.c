@@ -34,7 +34,7 @@
 #include <linux/slab.h>
 #include <linux/backing-dev.h>
 #include <linux/kobject.h>
-
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 /* Random magic number */
@@ -87,7 +87,7 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 	return inode;
 }
 
-static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
+static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
 	struct inode *inode;
 	int error = 0;
@@ -243,7 +243,7 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (kobj && kobj->subsys)
 		ops = kobj->subsys->sysfs_ops;
 	if (!ops || !ops->store)
-		return 0;
+		return -EINVAL;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)

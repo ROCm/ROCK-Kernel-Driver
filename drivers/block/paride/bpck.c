@@ -443,17 +443,8 @@ static void bpck_log_adapter( PIA *pi, char * scratch, int verbose )
 		pi->mode,mode_string[pi->mode],pi->delay);
 }
 
-static void bpck_init_proto( PIA *pi)
-
-{	MOD_INC_USE_COUNT;
-}
-
-static void bpck_release_proto( PIA *pi)
-
-{       MOD_DEC_USE_COUNT;
-}
-
 static struct pi_protocol bpck = {
+	.owner		= THIS_MODULE,
 	.name		= "bpck",
 	.max_mode	= 5,
 	.epp_first	= 2,
@@ -469,8 +460,6 @@ static struct pi_protocol bpck = {
 	.probe_unit	= bpck_probe_unit,
 	.test_proto	= bpck_test_proto,
 	.log_adapter	= bpck_log_adapter,
-	.init_proto	= bpck_init_proto,
-	.release_proto	= bpck_release_proto,
 };
 
 static int __init bpck_init(void)

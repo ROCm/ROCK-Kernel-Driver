@@ -47,10 +47,10 @@
 
 #define DRIVER_NAME		"r128"
 #define DRIVER_DESC		"ATI Rage 128"
-#define DRIVER_DATE		"20010917"
+#define DRIVER_DATE		"20021029"
 
 #define DRIVER_MAJOR		2
-#define DRIVER_MINOR		2
+#define DRIVER_MINOR		3
 #define DRIVER_PATCHLEVEL	0
 
 
@@ -70,7 +70,8 @@
    [DRM_IOCTL_NR(DRM_IOCTL_R128_BLIT)]       = { r128_cce_blit,     1, 0 }, \
    [DRM_IOCTL_NR(DRM_IOCTL_R128_DEPTH)]      = { r128_cce_depth,    1, 0 }, \
    [DRM_IOCTL_NR(DRM_IOCTL_R128_STIPPLE)]    = { r128_cce_stipple,  1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_INDIRECT)]   = { r128_cce_indirect, 1, 1 },
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_INDIRECT)]   = { r128_cce_indirect, 1, 1 }, \
+   [DRM_IOCTL_NR(DRM_IOCTL_R128_GETPARAM)]   = { r128_getparam, 1, 1 },
 
 /* Driver customization:
  */
@@ -90,6 +91,9 @@
 /* DMA customization:
  */
 #define __HAVE_DMA		1
+#define __HAVE_DMA_IRQ		1
+#define __HAVE_VBL_IRQ		1
+#define __HAVE_SHARED_IRQ       1
 
 #if 0
 /* GH: Remove this for now... */
