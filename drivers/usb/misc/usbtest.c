@@ -490,7 +490,7 @@ static int set_altsetting (struct usbtest_dev *dev, int alternate)
 	struct usb_interface		*iface = dev->intf;
 	struct usb_device		*udev;
 
-	if (alternate < 0 || alternate >= iface->num_altsetting)
+	if (alternate < 0 || alternate >= 256)
 		return -EINVAL;
 
 	udev = interface_to_usbdev (iface);
@@ -556,23 +556,19 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 {
 	struct usb_interface	*iface = dev->intf;
 	struct usb_device	*udev = interface_to_usbdev (iface);
-	int			i, retval;
+	int			i, alt, retval;
 
 	/* [9.2.3] if there's more than one altsetting, we need to be able to
 	 * set and get each one.  mostly trusts the descriptors from usbcore.
 	 */
 	for (i = 0; i < iface->num_altsetting; i++) {
 
-		/* 9.2.3 constrains the range here, and Linux ensures
-		 * they're ordered meaningfully in this array
-		 */
-		if (iface->altsetting [i].desc.bAlternateSetting != i) {
+		/* 9.2.3 constrains the range here */
+		alt = iface->altsetting [i].desc.bAlternateSetting;
+		if (alt < 0 || alt >= iface->num_altsetting) {
 			dev_dbg (&iface->dev,
 					"invalid alt [%d].bAltSetting = %d\n",
-					i, 
-					iface->altsetting [i].desc
-						.bAlternateSetting);
-			return -EDOM;
+					i, alt);
 		}
 
 		/* [real world] get/set unimplemented if there's only one */
@@ -580,18 +576,18 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 			continue;
 
 		/* [9.4.10] set_interface */
-		retval = set_altsetting (dev, i);
+		retval = set_altsetting (dev, alt);
 		if (retval) {
 			dev_dbg (&iface->dev, "can't set_interface = %d, %d\n",
-					i, retval);
+					alt, retval);
 			return retval;
 		}
 
 		/* [9.4.4] get_interface always works */
 		retval = get_altsetting (dev);
-		if (retval != i) {
+		if (retval != alt) {
 			dev_dbg (&iface->dev, "get alt should be %d, was %d\n",
-					i, retval);
+					alt, retval);
 			return (retval < 0) ? retval : -EDOM;
 		}
 
