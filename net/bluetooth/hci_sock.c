@@ -86,7 +86,7 @@ static struct bluez_sock_list hci_sk_list = {
 /* Send frame to RAW socket */
 void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct sock * sk;
+	struct sock *sk;
 
 	BT_DBG("hdev %p len %d", hdev, skb->len);
 
@@ -105,13 +105,13 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 		/* Apply filter */
 		flt = &hci_pi(sk)->filter;
 
-		if (!hci_test_bit((skb->pkt_type & HCI_FLT_TYPE_BITS), &flt->type_mask))
+		if (!test_bit((skb->pkt_type & HCI_FLT_TYPE_BITS), &flt->type_mask))
 			continue;
 
 		if (skb->pkt_type == HCI_EVENT_PKT) {
 			register int evt = (*(__u8 *)skb->data & HCI_FLT_EVENT_BITS);
 			
-			if (!hci_test_bit(evt, &flt->event_mask))
+			if (!test_bit(evt, flt->event_mask))
 				continue;
 
 			if (flt->opcode && ((evt == EVT_CMD_COMPLETE && 
@@ -249,7 +249,7 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long a
 		err = hci_sock_bound_ioctl(sk, cmd, arg);
 		release_sock(sk);
 		return err;
-	};
+	}
 }
 
 static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
@@ -393,12 +393,12 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		err = -EPERM;
 
 		if (skb->pkt_type == HCI_COMMAND_PKT) {
-			__u16 opcode = __le16_to_cpu(*(__u16 *)skb->data);
-			__u16 ogf = cmd_opcode_ogf(opcode) - 1;
-			__u16 ocf = cmd_opcode_ocf(opcode) & HCI_FLT_OCF_BITS;
+			u16 opcode = __le16_to_cpu(*(__u16 *)skb->data);
+			u16 ogf = cmd_opcode_ogf(opcode) - 1;
+			u16 ocf = cmd_opcode_ocf(opcode) & HCI_FLT_OCF_BITS;
 
 			if (ogf > HCI_SFLT_MAX_OGF ||
-					!hci_test_bit(ocf, &hci_sec_filter.ocf_mask[ogf]))
+					!test_bit(ocf, hci_sec_filter.ocf_mask[ogf]))
 				goto drop;
 		} else
 			goto drop;
@@ -420,8 +420,8 @@ drop:
 
 int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int len)
 {
+	struct hci_ufilter uf = { .opcode = 0 };
 	struct sock *sk = sock->sk;
-	struct hci_filter flt = { opcode: 0 };
 	int err = 0, opt = 0;
 
 	BT_DBG("sk %p, opt %d", sk, optname);
@@ -454,32 +454,40 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 		break;
 
 	case HCI_FILTER:
-		len = MIN(len, sizeof(struct hci_filter));
-		if (copy_from_user(&flt, optval, len)) {
+		len = MIN(len, sizeof(uf));
+		if (copy_from_user(&uf, optval, len)) {
 			err = -EFAULT;
 			break;
 		}
 
 		if (!capable(CAP_NET_RAW)) {
-			flt.type_mask     &= hci_sec_filter.type_mask;
-			flt.event_mask[0] &= hci_sec_filter.event_mask[0];
-			flt.event_mask[1] &= hci_sec_filter.event_mask[1];
+			uf.type_mask &= hci_sec_filter.type_mask;
+			uf.event_mask[0] &= *((u32 *) hci_sec_filter.event_mask + 0);
+			uf.event_mask[1] &= *((u32 *) hci_sec_filter.event_mask + 1);
 		}
+
+		{	
+			struct hci_filter *f = &hci_pi(sk)->filter;
 		
-		memcpy(&hci_pi(sk)->filter, &flt, len);
-		break;
+			f->type_mask = uf.type_mask;
+			f->opcode    = uf.opcode;
+			*((u32 *) f->event_mask + 0) = uf.event_mask[0];
+			*((u32 *) f->event_mask + 1) = uf.event_mask[0];
+		}
+		break; 
 
 	default:
 		err = -ENOPROTOOPT;
 		break;
-	};
-
+	}
+	
 	release_sock(sk);
 	return err;
 }
 
 int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
 {
+	struct hci_ufilter uf;
 	struct sock *sk = sock->sk;
 	int len, opt; 
 
@@ -508,15 +516,24 @@ int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 		break;
 
 	case HCI_FILTER:
-		len = MIN(len, sizeof(struct hci_filter));
-		if (copy_to_user(optval, &hci_pi(sk)->filter, len))
+		{
+			struct hci_filter *f = &hci_pi(sk)->filter;
+		
+			uf.type_mask = f->type_mask;
+			uf.opcode    = f->opcode;
+			uf.event_mask[0] = *((u32 *) f->event_mask + 0);
+			uf.event_mask[0] = *((u32 *) f->event_mask + 1);
+		}
+
+		len = MIN(len, sizeof(uf));
+		if (copy_to_user(optval, &uf, len))
 			return -EFAULT;
 		break;
 
 	default:
 		return -ENOPROTOOPT;
 		break;
-	};
+	}
 
 	return 0;
 }
