@@ -32,37 +32,6 @@
 #include "ntfs.h"
 
 /**
- * ntfs_readpage - external declaration, function is in fs/ntfs/aops.c
- */
-extern int ntfs_readpage(struct file *, struct page *);
-
-#ifdef NTFS_RW
-/**
- * ntfs_mft_writepage - forward declaration, function is further below
- */
-static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc);
-#endif /* NTFS_RW */
-
-/**
- * ntfs_mft_aops - address space operations for access to $MFT
- *
- * Address space operations for access to $MFT. This allows us to simply use
- * ntfs_map_page() in map_mft_record_page().
- */
-struct address_space_operations ntfs_mft_aops = {
-	.readpage	= ntfs_readpage,	/* Fill page with data. */
-	.sync_page	= block_sync_page,	/* Currently, just unplugs the
-						   disk request queue. */
-#ifdef NTFS_RW
-	.writepage	= ntfs_mft_writepage,	/* Write out the dirty mft
-						   records in a page. */
-	.set_page_dirty	= __set_page_dirty_nobuffers,	/* Set the page dirty
-						   without touching the buffers
-						   belonging to the page. */
-#endif /* NTFS_RW */
-};
-
-/**
  * map_mft_record_page - map the page in which a specific mft record resides
  * @ni:		ntfs inode whose mft record page to map
  *
@@ -112,57 +81,6 @@ err_out:
 	ni->page_ofs = 0;
 	ntfs_error(vol->sb, "Failed with error code %lu.", -PTR_ERR(page));
 	return (void*)page;
-}
-
-/**
- * try_map_mft_record - attempt to map, pin and lock an mft record
- * @ni:		ntfs inode whose MFT record to map
- *
- * First, attempt to take the mrec_lock semaphore.  If the semaphore is already
- * taken by someone else, return the error code -EALREADY.  Otherwise continue
- * as described below.
- *
- * The page of the record is mapped using map_mft_record_page() before being
- * returned to the caller.
- *
- * This in turn uses ntfs_map_page() to get the page containing the wanted mft
- * record (it in turn calls read_cache_page() which reads it in from disk if
- * necessary, increments the use count on the page so that it cannot disappear
- * under us and returns a reference to the page cache page).
- *
- * The mft record is now ours and we return a pointer to it.  You need to check
- * the returned pointer with IS_ERR() and if that is true, PTR_ERR() will return
- * the error code.
- *
- * For further details see the description of map_mft_record() below.
- */
-MFT_RECORD *try_map_mft_record(ntfs_inode *ni)
-{
-	MFT_RECORD *m;
-
-	ntfs_debug("Entering for mft_no 0x%lx.", ni->mft_no);
-
-	/* Make sure the ntfs inode doesn't go away. */
-	atomic_inc(&ni->count);
-
-	/*
-	 * Serialize access to this mft record.  If someone else is already
-	 * holding the lock, abort instead of waiting for the lock.
-	 */
-	if (unlikely(down_trylock(&ni->mrec_lock))) {
-		ntfs_debug("Mft record is already locked, aborting.");
-		atomic_dec(&ni->count);
-		return ERR_PTR(-EALREADY);
-	}
-
-	m = map_mft_record_page(ni);
-	if (likely(!IS_ERR(m)))
-		return m;
-
-	up(&ni->mrec_lock);
-	atomic_dec(&ni->count);
-	ntfs_error(ni->vol->sb, "Failed with error code %lu.", -PTR_ERR(m));
-	return m;
 }
 
 /**
@@ -462,7 +380,8 @@ void __mark_mft_record_dirty(ntfs_inode *ni)
 
 	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
 	BUG_ON(NInoAttr(ni));
-	mark_ntfs_record_dirty(ni, ni->page, ni->page_ofs);
+	mark_ntfs_record_dirty(NTFS_I(ni->vol->mft_ino), ni->page,
+			ni->page_ofs);
 	/* Determine the base vfs inode and mark it dirty, too. */
 	down(&ni->extent_lock);
 	if (likely(ni->nr_extents >= 0))
@@ -478,13 +397,14 @@ static const char *ntfs_please_email = "Please email "
 		"this message.  Thank you.";
 
 /**
- * sync_mft_mirror_umount - synchronise an mft record to the mft mirror
- * @ni:		ntfs inode whose mft record to synchronize
+ * ntfs_sync_mft_mirror_umount - synchronise an mft record to the mft mirror
+ * @vol:	ntfs volume on which the mft record to synchronize resides
+ * @mft_no:	mft record number of mft record to synchronize
  * @m:		mapped, mst protected (extent) mft record to synchronize
  *
- * Write the mapped, mst protected (extent) mft record @m described by the
- * (regular or extent) ntfs inode @ni to the mft mirror ($MFTMirr) bypassing
- * the page cache and the $MFTMirr inode itself.
+ * Write the mapped, mst protected (extent) mft record @m with mft record
+ * number @mft_no to the mft mirror ($MFTMirr) of the ntfs volume @vol,
+ * bypassing the page cache and the $MFTMirr inode itself.
  *
  * This function is only for use at umount time when the mft mirror inode has
  * already been disposed off.  We BUG() if we are called while the mft mirror
@@ -498,10 +418,9 @@ static const char *ntfs_please_email = "Please email "
  * alternative would be either to BUG() or to get a NULL pointer dereference
  * and Oops.
  */
-static int sync_mft_mirror_umount(ntfs_inode *ni, MFT_RECORD *m)
+static int ntfs_sync_mft_mirror_umount(ntfs_volume *vol,
+		const unsigned long mft_no, MFT_RECORD *m)
 {
-	ntfs_volume *vol = ni->vol;
-
 	BUG_ON(vol->mftmirr_ino);
 	ntfs_error(vol->sb, "Umount time mft mirror syncing is not "
 			"implemented yet.  %s", ntfs_please_email);
@@ -509,25 +428,26 @@ static int sync_mft_mirror_umount(ntfs_inode *ni, MFT_RECORD *m)
 }
 
 /**
- * sync_mft_mirror - synchronize an mft record to the mft mirror
- * @ni:		ntfs inode whose mft record to synchronize
+ * ntfs_sync_mft_mirror - synchronize an mft record to the mft mirror
+ * @vol:	ntfs volume on which the mft record to synchronize resides
+ * @mft_no:	mft record number of mft record to synchronize
  * @m:		mapped, mst protected (extent) mft record to synchronize
  * @sync:	if true, wait for i/o completion
  *
- * Write the mapped, mst protected (extent) mft record @m described by the
- * (regular or extent) ntfs inode @ni to the mft mirror ($MFTMirr).
+ * Write the mapped, mst protected (extent) mft record @m with mft record
+ * number @mft_no to the mft mirror ($MFTMirr) of the ntfs volume @vol.
  *
  * On success return 0.  On error return -errno and set the volume errors flag
- * in the ntfs_volume to which @ni belongs.
+ * in the ntfs volume @vol.
  *
  * NOTE:  We always perform synchronous i/o and ignore the @sync parameter.
  *
  * TODO:  If @sync is false, want to do truly asynchronous i/o, i.e. just
  * schedule i/o via ->writepage or do it via kntfsd or whatever.
  */
-static int sync_mft_mirror(ntfs_inode *ni, MFT_RECORD *m, int sync)
+int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
+		MFT_RECORD *m, int sync)
 {
-	ntfs_volume *vol = ni->vol;
 	struct page *page;
 	unsigned int blocksize = vol->sb->s_blocksize;
 	int max_bhs = vol->mft_record_size / blocksize;
@@ -537,17 +457,17 @@ static int sync_mft_mirror(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	unsigned int block_start, block_end, m_start, m_end;
 	int i_bhs, nr_bhs, err = 0;
 
-	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
+	ntfs_debug("Entering for inode 0x%lx.", mft_no);
 	BUG_ON(!max_bhs);
 	if (unlikely(!vol->mftmirr_ino)) {
 		/* This could happen during umount... */
-		err = sync_mft_mirror_umount(ni, m);
+		err = ntfs_sync_mft_mirror_umount(vol, mft_no, m);
 		if (likely(!err))
 			return err;
 		goto err_out;
 	}
 	/* Get the page containing the mirror copy of the mft record @m. */
-	page = ntfs_map_page(vol->mftmirr_ino->i_mapping, ni->mft_no >>
+	page = ntfs_map_page(vol->mftmirr_ino->i_mapping, mft_no >>
 			(PAGE_CACHE_SHIFT - vol->mft_record_size_bits));
 	if (IS_ERR(page)) {
 		ntfs_error(vol->sb, "Failed to map mft mirror page.");
@@ -561,23 +481,17 @@ static int sync_mft_mirror(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	 * make sure no one is writing from elsewhere.
 	 */
 	lock_page(page);
+	BUG_ON(!PageUptodate(page));
+	ClearPageUptodate(page);
 	/* The address in the page of the mirror copy of the mft record @m. */
-	kmirr = page_address(page) + ((ni->mft_no << vol->mft_record_size_bits)
-			& ~PAGE_CACHE_MASK);
+	kmirr = page_address(page) + ((mft_no << vol->mft_record_size_bits) &
+			~PAGE_CACHE_MASK);
 	/* Copy the mst protected mft record to the mirror. */
 	memcpy(kmirr, m, vol->mft_record_size);
 	/* Make sure we have mapped buffers. */
-	if (!page_has_buffers(page)) {
-no_buffers_err_out:
-		ntfs_error(vol->sb, "Writing mft mirror records without "
-				"existing buffers is not implemented yet.  %s",
-				ntfs_please_email);
-		err = -EOPNOTSUPP;
-		goto unlock_err_out;
-	}
+	BUG_ON(!page_has_buffers(page));
 	bh = head = page_buffers(page);
-	if (!bh)
-		goto no_buffers_err_out;
+	BUG_ON(!bh);
 	nr_bhs = 0;
 	block_start = 0;
 	m_start = kmirr - (u8*)page_address(page);
@@ -587,22 +501,8 @@ no_buffers_err_out:
 		/* If the buffer is outside the mft record, skip it. */
 		if ((block_end <= m_start) || (block_start >= m_end))
 			continue;
-		if (!buffer_mapped(bh)) {
-			ntfs_error(vol->sb, "Writing mft mirror records "
-					"without existing mapped buffers is "
-					"not implemented yet.  %s",
-					ntfs_please_email);
-			err = -EOPNOTSUPP;
-			continue;
-		}
-		if (!buffer_uptodate(bh)) {
-			ntfs_error(vol->sb, "Writing mft mirror records "
-					"without existing uptodate buffers is "
-					"not implemented yet.  %s",
-					ntfs_please_email);
-			err = -EOPNOTSUPP;
-			continue;
-		}
+		BUG_ON(!buffer_mapped(bh));
+		BUG_ON(!buffer_uptodate(bh));
 		BUG_ON(!nr_bhs && (m_start != block_start));
 		BUG_ON(nr_bhs >= max_bhs);
 		bhs[nr_bhs++] = bh;
@@ -630,11 +530,10 @@ no_buffers_err_out:
 			if (unlikely(!buffer_uptodate(tbh))) {
 				err = -EIO;
 				/*
-				 * Set the buffer uptodate so the page & buffer
-				 * states don't become out of sync.
+				 * Set the buffer uptodate so the page and
+				 * buffer states do not become out of sync.
 				 */
-				if (PageUptodate(page))
-					set_buffer_uptodate(tbh);
+				set_buffer_uptodate(tbh);
 			}
 		}
 	} else /* if (unlikely(err)) */ {
@@ -642,29 +541,25 @@ no_buffers_err_out:
 		for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++)
 			clear_buffer_dirty(bhs[i_bhs]);
 	}
-unlock_err_out:
 	/* Current state: all buffers are clean, unlocked, and uptodate. */
 	/* Remove the mst protection fixups again. */
 	post_write_mst_fixup((NTFS_RECORD*)kmirr);
 	flush_dcache_page(page);
+	SetPageUptodate(page);
 	unlock_page(page);
 	ntfs_unmap_page(page);
-	if (unlikely(err)) {
-		/* I/O error during writing.  This is really bad! */
+	if (likely(!err)) {
+		ntfs_debug("Done.");
+	} else {
 		ntfs_error(vol->sb, "I/O error while writing mft mirror "
-				"record 0x%lx!  You should unmount the volume "
-				"and run chkdsk or ntfsfix.", ni->mft_no);
-		goto err_out;
-	}
-	ntfs_debug("Done.");
-	return 0;
+				"record 0x%lx!", mft_no);
 err_out:
-	ntfs_error(vol->sb, "Failed to synchronize $MFTMirr (error code %i).  "
-			"Volume will be left marked dirty on umount.  Run "
-			"ntfsfix on the partition after umounting to correct "
-			"this.", -err);
-	/* We don't want to clear the dirty bit on umount. */
-	NVolSetErrors(vol);
+		ntfs_error(vol->sb, "Failed to synchronize $MFTMirr (error "
+				"code %i).  Volume will be left marked dirty "
+				"on umount.  Run ntfsfix on the partition "
+				"after umounting to correct this.", -err);
+		NVolSetErrors(vol);
+	}
 	return err;
 }
 
@@ -785,7 +680,7 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	}
 	/* Synchronize the mft mirror now if not @sync. */
 	if (!sync && ni->mft_no < vol->mftmirr_size)
-		sync_mft_mirror(ni, m, sync);
+		ntfs_sync_mft_mirror(vol, ni->mft_no, m, sync);
 	/* Wait on i/o completion of buffers. */
 	for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++) {
 		struct buffer_head *tbh = bhs[i_bhs];
@@ -803,7 +698,7 @@ int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	}
 	/* If @sync, now synchronize the mft mirror. */
 	if (sync && ni->mft_no < vol->mftmirr_size)
-		sync_mft_mirror(ni, m, sync);
+		ntfs_sync_mft_mirror(vol, ni->mft_no, m, sync);
 	/* Remove the mst protection fixups again. */
 	post_write_mst_fixup((NTFS_RECORD*)m);
 	flush_dcache_mft_record_page(ni);
@@ -839,221 +734,257 @@ err_out:
 }
 
 /**
- * ntfs_mft_writepage - check if a metadata page contains dirty mft records
- * @page:	metadata page possibly containing dirty mft records
- * @wbc:	writeback control structure
+ * ntfs_may_write_mft_record - check if an mft record may be written out
+ * @vol:	[IN]  ntfs volume on which the mft record to check resides
+ * @mft_no:	[IN]  mft record number of the mft record to check
+ * @m:		[IN]  mapped mft record to check
+ * @locked_ni:	[OUT] caller has to unlock this ntfs inode if one is returned
  *
- * This is called from the VM when it wants to have a dirty $MFT/$DATA metadata
- * page cache page cleaned.  The VM has already locked the page and marked it
- * clean.  Instead of writing the page as a conventional ->writepage function
- * would do, we check if the page still contains any dirty mft records (it must
- * have done at some point in the past since the page was marked dirty) and if
- * none are found, i.e. all mft records are clean, we unlock the page and
- * return.  The VM is then free to do with the page as it pleases.  If on the
- * other hand we do find any dirty mft records in the page, we redirty the page
- * before unlocking it and returning so the VM knows that the page is still
- * busy and cannot be thrown out.
+ * Check if the mapped (base or extent) mft record @m with mft record number
+ * @mft_no belonging to the ntfs volume @vol may be written out.  If necessary
+ * and possible the ntfs inode of the mft record is locked and the base vfs
+ * inode is pinned.  The locked ntfs inode is then returned in @locked_ni.  The
+ * caller is responsible for unlocking the ntfs inode and unpinning the base
+ * vfs inode.
  *
- * Note, we do not actually write any dirty mft records here because they are
- * dirty inodes and hence will be written by the VFS inode dirty code paths.
- * There is no need to write them from the VM page dirty code paths, too and in
- * fact once we implement journalling it would be a complete nightmare having
- * two code paths leading to mft record writeout.
+ * Return TRUE if the mft record may be written out and FALSE if not.
+ *
+ * The caller has locked the page and cleared the uptodate flag on it which
+ * means that we can safely write out any dirty mft records that do not have
+ * their inodes in icache as determined by ilookup5() as anyone
+ * opening/creating such an inode would block when attempting to map the mft
+ * record in read_cache_page() until we are finished with the write out.
+ *
+ * Here is a description of the tests we perform:
+ *
+ * If the inode is found in icache we know the mft record must be a base mft
+ * record.  If it is dirty, we do not write it and return FALSE as the vfs
+ * inode write paths will result in the access times being updated which would
+ * cause the base mft record to be redirtied and written out again.  (We know
+ * the access time update will modify the base mft record because Windows
+ * chkdsk complains if the standard information attribute is not in the base
+ * mft record.)
+ *
+ * If the inode is in icache and not dirty, we attempt to lock the mft record
+ * and if we find the lock was already taken, it is not safe to write the mft
+ * record and we return FALSE.
+ *
+ * If we manage to obtain the lock we have exclusive access to the mft record,
+ * which also allows us safe writeout of the mft record.  We then set
+ * @locked_ni to the locked ntfs inode and return TRUE.
+ *
+ * Note we cannot just lock the mft record and sleep while waiting for the lock
+ * because this would deadlock due to lock reversal (normally the mft record is
+ * locked before the page is locked but we already have the page locked here
+ * when we try to lock the mft record).
+ *
+ * If the inode is not in icache we need to perform further checks.
+ *
+ * If the mft record is not a FILE record or it is a base mft record, we can
+ * safely write it and return TRUE.
+ *
+ * We now know the mft record is an extent mft record.  We check if the inode
+ * corresponding to its base mft record is in icache and obtain a reference to
+ * it if it is.  If it is not, we can safely write it and return TRUE.
+ *
+ * We now have the base inode for the extent mft record.  We check if it has an
+ * ntfs inode for the extent mft record attached and if not it is safe to write
+ * the extent mft record and we return TRUE.
+ *
+ * The ntfs inode for the extent mft record is attached to the base inode so we
+ * attempt to lock the extent mft record and if we find the lock was already
+ * taken, it is not safe to write the extent mft record and we return FALSE.
+ *
+ * If we manage to obtain the lock we have exclusive access to the extent mft
+ * record, which also allows us safe writeout of the extent mft record.  We
+ * set the ntfs inode of the extent mft record clean and then set @locked_ni to
+ * the now locked ntfs inode and return TRUE.
+ *
+ * Note, the reason for actually writing dirty mft records here and not just
+ * relying on the vfs inode dirty code paths is that we can have mft records
+ * modified without them ever having actual inodes in memory.  Also we can have
+ * dirty mft records with clean ntfs inodes in memory.  None of the described
+ * cases would result in the dirty mft records being written out if we only
+ * relied on the vfs inode dirty code paths.  And these cases can really occur
+ * during allocation of new mft records and in particular when the
+ * initialized_size of the $MFT/$DATA attribute is extended and the new space
+ * is initialized using ntfs_mft_record_format().  The clean inode can then
+ * appear if the mft record is reused for a new inode before it got written
+ * out.
  */
-static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
+BOOL ntfs_may_write_mft_record(ntfs_volume *vol, const unsigned long mft_no,
+		const MFT_RECORD *m, ntfs_inode **locked_ni)
 {
-	struct inode *mft_vi = page->mapping->host;
-	struct super_block *sb = mft_vi->i_sb;
-	ntfs_volume *vol = NTFS_SB(sb);
-	u8 *maddr;
-	MFT_RECORD *m;
-	ntfs_inode **extent_nis;
-	unsigned long mft_no;
-	int nr, i, j;
-	BOOL is_dirty = FALSE;
+	struct super_block *sb = vol->sb;
+	struct inode *mft_vi = vol->mft_ino;
+	struct inode *vi;
+	ntfs_inode *ni, *eni, **extent_nis;
+	int i;
+	ntfs_attr na;
 
-	BUG_ON(!PageLocked(page));
-	BUG_ON(PageWriteback(page));
-	BUG_ON(mft_vi != vol->mft_ino);
-	/* The first mft record number in the page. */
-	mft_no = page->index << (PAGE_CACHE_SHIFT - vol->mft_record_size_bits);
-	/* Number of mft records in the page. */
-	nr = PAGE_CACHE_SIZE >> vol->mft_record_size_bits;
-	BUG_ON(!nr);
-	ntfs_debug("Entering for %i inodes starting at 0x%lx.", nr, mft_no);
-	/* Iterate over the mft records in the page looking for a dirty one. */
-	maddr = (u8*)kmap(page);
+	ntfs_debug("Entering for inode 0x%lx.", mft_no);
 	/*
-	 * Clear the page uptodate flag.  This will cause anyone trying to get
-	 * hold of the page to block on the page lock in read_cache_page().
+	 * Normally we do not return a locked inode so set @locked_ni to NULL.
 	 */
-	BUG_ON(!PageUptodate(page));
-	ClearPageUptodate(page);
-	for (i = 0; i < nr; ++i, ++mft_no, maddr += vol->mft_record_size) {
-		struct inode *vi;
-		ntfs_inode *ni, *eni;
-		ntfs_attr na;
-
-		na.mft_no = mft_no;
-		na.name = NULL;
-		na.name_len = 0;
-		na.type = AT_UNUSED;
-		/*
-		 * Check if the inode corresponding to this mft record is in
-		 * the VFS inode cache and obtain a reference to it if it is.
-		 */
-		ntfs_debug("Looking for inode 0x%lx in icache.", mft_no);
-		/*
-		 * For inode 0, i.e. $MFT itself, we cannot use ilookup5() from
-		 * here or we deadlock because the inode is already locked by
-		 * the kernel (fs/fs-writeback.c::__sync_single_inode()) and
-		 * ilookup5() waits until the inode is unlocked before
-		 * returning it and it never gets unlocked because
-		 * ntfs_mft_writepage() never returns.  )-:  Fortunately, we
-		 * have inode 0 pinned in icache for the duration of the mount
-		 * so we can access it directly.
-		 */
-		if (!mft_no) {
-			/* Balance the below iput(). */
-			vi = igrab(mft_vi);
-			BUG_ON(vi != mft_vi);
-		} else
-			vi = ilookup5(sb, mft_no, (test_t)ntfs_test_inode, &na);
-		if (vi) {
-			ntfs_debug("Inode 0x%lx is in icache.", mft_no);
-			/* The inode is in icache.  Check if it is dirty. */
-			ni = NTFS_I(vi);
-			if (!NInoDirty(ni)) {
-				/* The inode is not dirty, skip this record. */
-				ntfs_debug("Inode 0x%lx is not dirty, "
-						"continuing search.", mft_no);
-				iput(vi);
-				continue;
-			}
-			ntfs_debug("Inode 0x%lx is dirty, aborting search.",
-					mft_no);
-			/* The inode is dirty, no need to search further. */
-			iput(vi);
-			is_dirty = TRUE;
-			break;
-		}
-		ntfs_debug("Inode 0x%lx is not in icache.", mft_no);
-		/* The inode is not in icache. */
-		/* Skip the record if it is not a mft record (type "FILE"). */
-		if (!ntfs_is_mft_recordp((le32*)maddr)) {
-			ntfs_debug("Mft record 0x%lx is not a FILE record, "
-					"continuing search.", mft_no);
-			continue;
-		}
-		m = (MFT_RECORD*)maddr;
-		/*
-		 * Skip the mft record if it is not in use.  FIXME:  What about
-		 * deleted/deallocated (extent) inodes?  (AIA)
-		 */
-		if (!(m->flags & MFT_RECORD_IN_USE)) {
-			ntfs_debug("Mft record 0x%lx is not in use, "
-					"continuing search.", mft_no);
-			continue;
-		}
-		/* Skip the mft record if it is a base inode. */
-		if (!m->base_mft_record) {
-			ntfs_debug("Mft record 0x%lx is a base record, "
-					"continuing search.", mft_no);
-			continue;
-		}
-		/*
-		 * This is an extent mft record.  Check if the inode
-		 * corresponding to its base mft record is in icache.
-		 */
-		na.mft_no = MREF_LE(m->base_mft_record);
-		ntfs_debug("Mft record 0x%lx is an extent record.  Looking "
-				"for base inode 0x%lx in icache.", mft_no,
-				na.mft_no);
-		vi = ilookup5(sb, na.mft_no, (test_t)ntfs_test_inode,
-				&na);
-		if (!vi) {
-			/*
-			 * The base inode is not in icache.  Skip this extent
-			 * mft record.
-			 */
-			ntfs_debug("Base inode 0x%lx is not in icache, "
-					"continuing search.", na.mft_no);
-			continue;
-		}
-		ntfs_debug("Base inode 0x%lx is in icache.", na.mft_no);
-		/*
-		 * The base inode is in icache.  Check if it has the extent
-		 * inode corresponding to this extent mft record attached.
-		 */
+	BUG_ON(!locked_ni);
+	*locked_ni = NULL;
+	/*
+	 * Check if the inode corresponding to this mft record is in the VFS
+	 * inode cache and obtain a reference to it if it is.
+	 */
+	ntfs_debug("Looking for inode 0x%lx in icache.", mft_no);
+	na.mft_no = mft_no;
+	na.name = NULL;
+	na.name_len = 0;
+	na.type = AT_UNUSED;
+	/*
+	 * For inode 0, i.e. $MFT itself, we cannot use ilookup5() from here or
+	 * we deadlock because the inode is already locked by the kernel
+	 * (fs/fs-writeback.c::__sync_single_inode()) and ilookup5() waits
+	 * until the inode is unlocked before returning it and it never gets
+	 * unlocked because ntfs_should_write_mft_record() never returns.  )-:
+	 * Fortunately, we have inode 0 pinned in icache for the duration of
+	 * the mount so we can access it directly.
+	 */
+	if (!mft_no) {
+		/* Balance the below iput(). */
+		vi = igrab(mft_vi);
+		BUG_ON(vi != mft_vi);
+	} else
+		vi = ilookup5(sb, mft_no, (test_t)ntfs_test_inode, &na);
+	if (vi) {
+		ntfs_debug("Base inode 0x%lx is in icache.", mft_no);
+		/* The inode is in icache. */
 		ni = NTFS_I(vi);
-		down(&ni->extent_lock);
-		if (ni->nr_extents <= 0) {
-			/*
-			 * The base inode has no attached extent inodes.  Skip
-			 * this extent mft record.
-			 */
-			up(&ni->extent_lock);
+		/* Take a reference to the ntfs inode. */
+		atomic_inc(&ni->count);
+		/* If the inode is dirty, do not write this record. */
+		if (NInoDirty(ni)) {
+			ntfs_debug("Inode 0x%lx is dirty, do not write it.",
+					mft_no);
+			atomic_dec(&ni->count);
 			iput(vi);
-			continue;
+			return FALSE;
 		}
-		/* Iterate over the attached extent inodes. */
-		extent_nis = ni->ext.extent_ntfs_inos;
-		for (eni = NULL, j = 0; j < ni->nr_extents; ++j) {
-			if (mft_no == extent_nis[j]->mft_no) {
-				/*
-				 * Found the extent inode corresponding to this
-				 * extent mft record.
-				 */
-				eni = extent_nis[j];
-				break;
-			}
+		ntfs_debug("Inode 0x%lx is not dirty.", mft_no);
+		/* The inode is not dirty, try to take the mft record lock. */
+		if (unlikely(down_trylock(&ni->mrec_lock))) {
+			ntfs_debug("Mft record 0x%lx is already locked, do "
+					"not write it.", mft_no);
+			atomic_dec(&ni->count);
+			iput(vi);
+			return FALSE;
 		}
+		ntfs_debug("Managed to lock mft record 0x%lx, write it.",
+				mft_no);
 		/*
-		 * If the extent inode was not attached to the base inode, skip
-		 * this extent mft record.
+		 * The write has to occur while we hold the mft record lock so
+		 * return the locked ntfs inode.
 		 */
-		if (!eni) {
-			up(&ni->extent_lock);
-			iput(vi);
-			continue;
-		}
+		*locked_ni = ni;
+		return TRUE;
+	}
+	ntfs_debug("Inode 0x%lx is not in icache.", mft_no);
+	/* The inode is not in icache. */
+	/* Write the record if it is not a mft record (type "FILE"). */
+	if (!ntfs_is_mft_record(m->magic)) {
+		ntfs_debug("Mft record 0x%lx is not a FILE record, write it.",
+				mft_no);
+		return TRUE;
+	}
+	/* Write the mft record if it is a base inode. */
+	if (!m->base_mft_record) {
+		ntfs_debug("Mft record 0x%lx is a base record, write it.",
+				mft_no);
+		return TRUE;
+	}
+	/*
+	 * This is an extent mft record.  Check if the inode corresponding to
+	 * its base mft record is in icache and obtain a reference to it if it
+	 * is.
+	 */
+	na.mft_no = MREF_LE(m->base_mft_record);
+	ntfs_debug("Mft record 0x%lx is an extent record.  Looking for base "
+			"inode 0x%lx in icache.", mft_no, na.mft_no);
+	vi = ilookup5(sb, na.mft_no, (test_t)ntfs_test_inode, &na);
+	if (!vi) {
 		/*
-		 * Found the extent inode corrsponding to this extent mft
-		 * record.  If it is dirty, no need to search further.
+		 * The base inode is not in icache, write this extent mft
+		 * record.
 		 */
-		if (NInoDirty(eni)) {
-			up(&ni->extent_lock);
-			iput(vi);
-			is_dirty = TRUE;
-			break;
-		}
-		/* The extent inode is not dirty, so do the next record. */
+		ntfs_debug("Base inode 0x%lx is not in icache, write the "
+				"extent record.", na.mft_no);
+		return TRUE;
+	}
+	ntfs_debug("Base inode 0x%lx is in icache.", na.mft_no);
+	/*
+	 * The base inode is in icache.  Check if it has the extent inode
+	 * corresponding to this extent mft record attached.
+	 */
+	ni = NTFS_I(vi);
+	down(&ni->extent_lock);
+	if (ni->nr_extents <= 0) {
+		/*
+		 * The base inode has no attached extent inodes, write this
+		 * extent mft record.
+		 */
 		up(&ni->extent_lock);
 		iput(vi);
+		ntfs_debug("Base inode 0x%lx has no attached extent inodes, "
+				"write the extent record.", na.mft_no);
+		return TRUE;
 	}
-	SetPageUptodate(page);
-	kunmap(page);
-	/* If a dirty mft record was found, redirty the page. */
-	if (is_dirty) {
-		ntfs_debug("Inode 0x%lx is dirty.  Redirtying the page "
-				"starting at inode 0x%lx.", mft_no,
-				page->index << (PAGE_CACHE_SHIFT -
-				vol->mft_record_size_bits));
-		redirty_page_for_writepage(wbc, page);
-		unlock_page(page);
-	} else {
-		/*
-		 * Keep the VM happy.  This must be done otherwise the
-		 * radix-tree tag PAGECACHE_TAG_DIRTY remains set even though
-		 * the page is clean.
-		 */
-		BUG_ON(PageWriteback(page));
-		set_page_writeback(page);
-		unlock_page(page);
-		end_page_writeback(page);
+	/* Iterate over the attached extent inodes. */
+	extent_nis = ni->ext.extent_ntfs_inos;
+	for (eni = NULL, i = 0; i < ni->nr_extents; ++i) {
+		if (mft_no == extent_nis[i]->mft_no) {
+			/*
+			 * Found the extent inode corresponding to this extent
+			 * mft record.
+			 */
+			eni = extent_nis[i];
+			break;
+		}
 	}
-	ntfs_debug("Done.");
-	return 0;
+	/*
+	 * If the extent inode was not attached to the base inode, write this
+	 * extent mft record.
+	 */
+	if (!eni) {
+		up(&ni->extent_lock);
+		iput(vi);
+		ntfs_debug("Extent inode 0x%lx is not attached to its base "
+				"inode 0x%lx, write the extent record.",
+				mft_no, na.mft_no);
+		return TRUE;
+	}
+	ntfs_debug("Extent inode 0x%lx is attached to its base inode 0x%lx.",
+			mft_no, na.mft_no);
+	/* Take a reference to the extent ntfs inode. */
+	atomic_inc(&eni->count);
+	up(&ni->extent_lock);
+	/*
+	 * Found the extent inode coresponding to this extent mft record.
+	 * Try to take the mft record lock.
+	 */
+	if (unlikely(down_trylock(&eni->mrec_lock))) {
+		atomic_dec(&eni->count);
+		iput(vi);
+		ntfs_debug("Extent mft record 0x%lx is already locked, do "
+				"not write it.", mft_no);
+		return FALSE;
+	}
+	ntfs_debug("Managed to lock extent mft record 0x%lx, write it.",
+			mft_no);
+	if (NInoTestClearDirty(eni))
+		ntfs_debug("Extent inode 0x%lx is dirty, marking it clean.",
+				mft_no);
+	/*
+	 * The write has to occur while we hold the mft record lock so return
+	 * the locked extent ntfs inode.
+	 */
+	*locked_ni = eni;
+	return TRUE;
 }
 
 static const char *es = "  Leaving inconsistent metadata.  Unmount and run "

@@ -56,7 +56,6 @@ extern kmem_cache_t *ntfs_index_ctx_cache;
 extern struct super_operations ntfs_sops;
 extern struct address_space_operations ntfs_aops;
 extern struct address_space_operations ntfs_mst_aops;
-extern struct address_space_operations ntfs_mft_aops;
 
 extern struct  file_operations ntfs_file_ops;
 extern struct inode_operations ntfs_file_inode_ops;

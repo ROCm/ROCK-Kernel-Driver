@@ -946,8 +946,8 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	/* No VFS initiated operations allowed for $MFTMirr. */
 	tmp_ino->i_op = &ntfs_empty_inode_ops;
 	tmp_ino->i_fop = &ntfs_empty_file_ops;
-	/* Put back our special address space operations. */
-	tmp_ino->i_mapping->a_ops = &ntfs_mft_aops;
+	/* Put in our special address space operations. */
+	tmp_ino->i_mapping->a_ops = &ntfs_mst_aops;
 	tmp_ni = NTFS_I(tmp_ino);
 	/* The $MFTMirr, like the $MFT is multi sector transfer protected. */
 	NInoSetMstProtected(tmp_ni);

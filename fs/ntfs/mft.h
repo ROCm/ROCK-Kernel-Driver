@@ -29,7 +29,6 @@
 
 #include "inode.h"
 
-extern MFT_RECORD *try_map_mft_record(ntfs_inode *ni);
 extern MFT_RECORD *map_mft_record(ntfs_inode *ni);
 extern void unmap_mft_record(ntfs_inode *ni);
 
@@ -77,6 +76,9 @@ static inline void mark_mft_record_dirty(ntfs_inode *ni)
 		__mark_mft_record_dirty(ni);
 }
 
+extern int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
+		MFT_RECORD *m, int sync);
+
 extern int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync);
 
 /**
@@ -111,6 +113,10 @@ static inline int write_mft_record(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	unlock_page(page);
 	return err;
 }
+
+extern BOOL ntfs_may_write_mft_record(ntfs_volume *vol,
+		const unsigned long mft_no, const MFT_RECORD *m,
+		ntfs_inode **locked_ni);
 
 extern int ntfs_extent_mft_record_free(ntfs_inode *ni, MFT_RECORD *m);
 

@@ -968,7 +968,6 @@ skip_large_dir_stuff:
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_dir_inode_ops;
 		vi->i_fop = &ntfs_dir_ops;
-		vi->i_mapping->a_ops = &ntfs_mst_aops;
 	} else {
 		/* It is a file. */
 		ntfs_attr_reinit_search_ctx(ctx);
@@ -1112,8 +1111,11 @@ no_data_attr_special_case:
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_file_inode_ops;
 		vi->i_fop = &ntfs_file_ops;
-		vi->i_mapping->a_ops = &ntfs_aops;
 	}
+	if (NInoMstProtected(ni))
+		vi->i_mapping->a_ops = &ntfs_mst_aops;
+	else
+		vi->i_mapping->a_ops = &ntfs_aops;
 	/*
 	 * The number of 512-byte blocks used on disk (for stat). This is in so
 	 * far inaccurate as it doesn't account for any named streams or other
@@ -1766,7 +1768,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	vi->i_generation = ni->seq_no = le16_to_cpu(m->sequence_number);
 
 	/* Provides readpage() and sync_page() for map_mft_record(). */
-	vi->i_mapping->a_ops = &ntfs_mft_aops;
+	vi->i_mapping->a_ops = &ntfs_mst_aops;
 
 	ctx = ntfs_attr_get_search_ctx(ni, m);
 	if (!ctx) {
@@ -2028,8 +2030,6 @@ int ntfs_read_inode_mount(struct inode *vi)
 			/* No VFS initiated operations allowed for $MFT. */
 			vi->i_op = &ntfs_empty_inode_ops;
 			vi->i_fop = &ntfs_empty_file_ops;
-			/* Put back our special address space operations. */
-			vi->i_mapping->a_ops = &ntfs_mft_aops;
 		}
 
 		/* Get the lowest vcn for the next extent. */
@@ -2514,8 +2514,8 @@ int ntfs_write_inode(struct inode *vi, int sync)
 	 * this function returns.
 	 */
 	if (modified && !NInoTestSetDirty(ctx->ntfs_ino))
-		mark_ntfs_record_dirty(ctx->ntfs_ino, ctx->ntfs_ino->page,
-				ctx->ntfs_ino->page_ofs);
+		mark_ntfs_record_dirty(NTFS_I(ni->vol->mft_ino),
+				ctx->ntfs_ino->page, ctx->ntfs_ino->page_ofs);
 	ntfs_attr_put_search_ctx(ctx);
 	/* Now the access times are updated, write the base mft record. */
 	if (NInoDirty(ni))

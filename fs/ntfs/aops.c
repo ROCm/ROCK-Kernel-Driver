@@ -26,6 +26,7 @@
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/buffer_head.h>
+#include <linux/writeback.h>
 
 #include "aops.h"
 #include "debug.h"
@@ -777,24 +778,24 @@ lock_retry_remap:
 	return err;
 }
 
-static const char *ntfs_please_email = "Please email "
-		"linux-ntfs-dev@lists.sourceforge.net and say that you saw "
-		"this message.  Thank you.";
-
 /**
  * ntfs_write_mst_block - write a @page to the backing store
  * @wbc:	writeback control structure
  * @page:	page cache page to write out
  *
  * This function is for writing pages belonging to non-resident, mst protected
- * attributes to their backing store.  The only supported attribute is the
- * index allocation attribute.  Both directory inodes and index inodes are
- * supported.
+ * attributes to their backing store.  The only supported attributes are index
+ * allocation and $MFT/$DATA.  Both directory inodes and index inodes are
+ * supported for the index allocation case.
  *
  * The page must remain locked for the duration of the write because we apply
  * the mst fixups, write, and then undo the fixups, so if we were to unlock the
  * page before undoing the fixups, any other user of the page will see the
  * page contents as corrupt.
+ *
+ * We clear the page uptodate flag for the duration of the function to ensure
+ * exclusion for the $MFT/$DATA case against someone mapping an mft record we
+ * are about to apply the mst fixups to.
  *
  * Return 0 on success and -errno on error.
  *
@@ -810,60 +811,53 @@ static int ntfs_write_mst_block(struct writeback_control *wbc,
 	ntfs_volume *vol = ni->vol;
 	u8 *kaddr;
 	unsigned int bh_size = 1 << vi->i_blkbits;
-	unsigned int rec_size;
-	struct buffer_head *bh, *head;
+	unsigned int rec_size = ni->itype.index.block_size;
+	ntfs_inode *locked_nis[PAGE_CACHE_SIZE / rec_size];
+	struct buffer_head *bh, *head, *tbh;
 	int max_bhs = PAGE_CACHE_SIZE / bh_size;
 	struct buffer_head *bhs[max_bhs];
-	int i, nr_recs, nr_bhs, bhs_per_rec, err;
-	unsigned char bh_size_bits;
-	BOOL rec_is_dirty;
+	int i, nr_locked_nis, nr_recs, nr_bhs, bhs_per_rec, err;
+	unsigned char bh_size_bits, rec_size_bits;
+	BOOL sync, is_mft, page_is_dirty, rec_is_dirty;
 
 	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx.", vi->i_ino, ni->type, page->index);
 	BUG_ON(!NInoNonResident(ni));
 	BUG_ON(!NInoMstProtected(ni));
-	BUG_ON(!(S_ISDIR(vi->i_mode) ||
+	is_mft = (S_ISREG(vi->i_mode) && !vi->i_ino);
+	BUG_ON(!(is_mft || S_ISDIR(vi->i_mode) ||
 			(NInoAttr(ni) && ni->type == AT_INDEX_ALLOCATION)));
-	BUG_ON(PageWriteback(page));
-	BUG_ON(!PageUptodate(page));
 	BUG_ON(!max_bhs);
 
+	/* Were we called for sync purposes? */
+	sync = (wbc->sync_mode == WB_SYNC_ALL);
+
 	/* Make sure we have mapped buffers. */
-	if (unlikely(!page_has_buffers(page))) {
-no_buffers_err_out:
-		ntfs_error(vol->sb, "Writing ntfs records without existing "
-				"buffers is not implemented yet.  %s",
-				ntfs_please_email);
-		err = -EOPNOTSUPP;
-		goto err_out;
-	}
+	BUG_ON(!page_has_buffers(page));
 	bh = head = page_buffers(page);
-	if (unlikely(!bh))
-		goto no_buffers_err_out;
+	BUG_ON(!bh);
 
 	bh_size_bits = vi->i_blkbits;
-	rec_size = ni->itype.index.block_size;
-	nr_recs = PAGE_CACHE_SIZE / rec_size;
-	BUG_ON(!nr_recs);
+	rec_size_bits = ni->itype.index.block_size_bits;
+	BUG_ON(!(PAGE_CACHE_SIZE >> rec_size_bits));
 	bhs_per_rec = rec_size >> bh_size_bits;
 	BUG_ON(!bhs_per_rec);
 
 	/* The first block in the page. */
-	rec_block = block = (s64)page->index <<
+	rec_block = block = (sector_t)page->index <<
 			(PAGE_CACHE_SHIFT - bh_size_bits);
 
 	/* The first out of bounds block for the data size. */
 	dblock = (vi->i_size + bh_size - 1) >> bh_size_bits;
 
-	err = nr_bhs = 0;
-	/* Need this to silence a stupid gcc warning. */
-	rec_is_dirty = FALSE;
+	err = nr_bhs = nr_recs = nr_locked_nis = 0;
+	page_is_dirty = rec_is_dirty = FALSE;
 	do {
 		if (unlikely(block >= dblock)) {
 			/*
 			 * Mapped buffers outside i_size will occur, because
 			 * this page can be outside i_size when there is a
-			 * truncate in progress. The contents of such buffers
+			 * truncate in progress.  The contents of such buffers
 			 * were zeroed by ntfs_writepage().
 			 *
 			 * FIXME: What about the small race window where
@@ -876,7 +870,7 @@ no_buffers_err_out:
 		}
 		if (rec_block == block) {
 			/* This block is the first one in the record. */
-			rec_block += rec_size >> bh_size_bits;
+			rec_block += bhs_per_rec;
 			if (!buffer_dirty(bh)) {
 				/* Clean buffers are not written out. */
 				rec_is_dirty = FALSE;
@@ -892,54 +886,91 @@ no_buffers_err_out:
 			}
 			BUG_ON(!rec_is_dirty);
 		}
-		if (!buffer_mapped(bh)) {
-			ntfs_error(vol->sb, "Writing ntfs records without "
-					"existing mapped buffers is not "
-					"implemented yet.  %s",
-					ntfs_please_email);
-			clear_buffer_dirty(bh);
-			err = -EOPNOTSUPP;
-			goto cleanup_out;
-		}
-		if (!buffer_uptodate(bh)) {
-			ntfs_error(vol->sb, "Writing ntfs records without "
-					"existing uptodate buffers is not "
-					"implemented yet.  %s",
-					ntfs_please_email);
-			clear_buffer_dirty(bh);
-			err = -EOPNOTSUPP;
-			goto cleanup_out;
-		}
+		BUG_ON(!buffer_mapped(bh));
+		BUG_ON(!buffer_uptodate(bh));
 		bhs[nr_bhs++] = bh;
 		BUG_ON(nr_bhs > max_bhs);
 	} while (block++, (bh = bh->b_this_page) != head);
 	/* If there were no dirty buffers, we are done. */
 	if (!nr_bhs)
 		goto done;
-	/* Apply the mst protection fixups. */
+	/* Map the page so we can access its contents. */
 	kaddr = kmap(page);
+	/* Clear the page uptodate flag whilst the mst fixups are applied. */
+	BUG_ON(!PageUptodate(page));
+	ClearPageUptodate(page);
 	for (i = 0; i < nr_bhs; i++) {
-		if (!(i % bhs_per_rec)) {
-			err = pre_write_mst_fixup((NTFS_RECORD*)(kaddr +
-					bh_offset(bhs[i])), rec_size);
-			if (err) {
-				ntfs_error(vol->sb, "Failed to apply mst "
-						"fixups (inode 0x%lx, "
-						"attribute type 0x%x, page "
-						"index 0x%lx)!  Umount and "
-						"run chkdsk.", vi->i_ino,
-						ni->type,
-				page->index);
-				nr_bhs = i;
-				goto mst_cleanup_out;
+		unsigned int ofs;
+
+		/* Skip buffers which are not at the beginning of records. */
+		if (i % bhs_per_rec)
+			continue;
+		tbh = bhs[i];
+		ofs = bh_offset(tbh);
+		if (is_mft) {
+			ntfs_inode *tni;
+			unsigned long mft_no;
+
+			/* Get the mft record number. */
+			mft_no = (((s64)page->index << PAGE_CACHE_SHIFT) + ofs)
+					>> rec_size_bits;
+			/* Check whether to write this mft record. */
+			tni = NULL;
+			if (!ntfs_may_write_mft_record(vol, mft_no,
+					(MFT_RECORD*)(kaddr + ofs), &tni)) {
+				/*
+				 * The record should not be written.  This
+				 * means we need to redirty the page before
+				 * returning.
+				 */
+				page_is_dirty = TRUE;
+				/*
+				 * Remove the buffers in this mft record from
+				 * the list of buffers to write.
+				 */
+				do {
+					bhs[i] = NULL;
+				} while (++i % bhs_per_rec);
+				continue;
 			}
+			/*
+			 * The record should be written.  If a locked ntfs
+			 * inode was returned, add it to the array of locked
+			 * ntfs inodes.
+			 */
+			if (tni)
+				locked_nis[nr_locked_nis++] = tni;
 		}
+		/* Apply the mst protection fixups. */
+		err = pre_write_mst_fixup((NTFS_RECORD*)(kaddr + ofs),
+				rec_size);
+		if (unlikely(err)) {
+			ntfs_error(vol->sb, "Failed to apply mst fixups "
+					"(inode 0x%lx, attribute type 0x%x, "
+					"page index 0x%lx, page offset 0x%x)!"
+					"  Unmount and run chkdsk.", vi->i_ino,
+					ni->type, page->index, ofs);
+			/*
+			 * Mark all the buffers in this record clean as we do
+			 * not want to write corrupt data to disk.
+			 */
+			do {
+				clear_buffer_dirty(bhs[i]);
+				bhs[i] = NULL;
+			} while (++i % bhs_per_rec);
+			continue;
+		}
+		nr_recs++;
 	}
+	/* If no records are to be written out, we are done. */
+	if (!nr_recs)
+		goto unm_done;
 	flush_dcache_page(page);
 	/* Lock buffers and start synchronous write i/o on them. */
 	for (i = 0; i < nr_bhs; i++) {
-		struct buffer_head *tbh = bhs[i];
-
+		tbh = bhs[i];
+		if (!tbh)
+			continue;
 		if (unlikely(test_set_buffer_locked(tbh)))
 			BUG();
 		if (unlikely(!test_clear_buffer_dirty(tbh))) {
@@ -952,65 +983,130 @@ no_buffers_err_out:
 		tbh->b_end_io = end_buffer_write_sync;
 		submit_bh(WRITE, tbh);
 	}
+	/* Synchronize the mft mirror now if not @sync. */
+	if (is_mft && !sync)
+		goto do_mirror;
+do_wait:
 	/* Wait on i/o completion of buffers. */
 	for (i = 0; i < nr_bhs; i++) {
-		struct buffer_head *tbh = bhs[i];
-
+		tbh = bhs[i];
+		if (!tbh)
+			continue;
 		wait_on_buffer(tbh);
 		if (unlikely(!buffer_uptodate(tbh))) {
+			ntfs_error(vol->sb, "I/O error while writing ntfs "
+					"record buffer (inode 0x%lx, "
+					"attribute type 0x%x, page index "
+					"0x%lx, page offset 0x%lx)!  Unmount "
+					"and run chkdsk.", vi->i_ino, ni->type,
+					page->index, bh_offset(tbh));
 			err = -EIO;
 			/*
-			 * Set the buffer uptodate so the page & buffer states
-			 * don't become out of sync.
+			 * Set the buffer uptodate so the page and buffer
+			 * states do not become out of sync.
 			 */
-			if (PageUptodate(page))
-				set_buffer_uptodate(tbh);
+			set_buffer_uptodate(tbh);
 		}
 	}
+	/* If @sync, now synchronize the mft mirror. */
+	if (is_mft && sync) {
+do_mirror:
+		for (i = 0; i < nr_bhs; i++) {
+			unsigned long mft_no;
+			unsigned int ofs;
+
+			/*
+			 * Skip buffers which are not at the beginning of
+			 * records.
+			 */
+			if (i % bhs_per_rec)
+				continue;
+			tbh = bhs[i];
+			/* Skip removed buffers (and hence records). */
+			if (!tbh)
+				continue;
+			ofs = bh_offset(tbh);
+			/* Get the mft record number. */
+			mft_no = (((s64)page->index << PAGE_CACHE_SHIFT) + ofs)
+					>> rec_size_bits;
+			if (mft_no < vol->mftmirr_size)
+				ntfs_sync_mft_mirror(vol, mft_no,
+						(MFT_RECORD*)(kaddr + ofs),
+						sync);
+		}
+		if (!sync)
+			goto do_wait;
+	}
 	/* Remove the mst protection fixups again. */
 	for (i = 0; i < nr_bhs; i++) {
-		if (!(i % bhs_per_rec))
+		if (!(i % bhs_per_rec)) {
+			tbh = bhs[i];
+			if (!tbh)
+				continue;
 			post_write_mst_fixup((NTFS_RECORD*)(kaddr +
-					bh_offset(bhs[i])));
+					bh_offset(tbh)));
+		}
 	}
 	flush_dcache_page(page);
-	kunmap(page);
-	if (unlikely(err)) {
-		/* I/O error during writing.  This is really bad! */
-		ntfs_error(vol->sb, "I/O error while writing ntfs record "
-				"(inode 0x%lx, attribute type 0x%x, page "
-				"index 0x%lx)!  Umount and run chkdsk.",
-				vi->i_ino, ni->type, page->index);
-		goto err_out;
+unm_done:
+	/* Unlock any locked inodes. */
+	while (nr_locked_nis-- > 0) {
+		ntfs_inode *tni, *base_tni;
+		
+		tni = locked_nis[nr_locked_nis];
+		/* Get the base inode. */
+		down(&tni->extent_lock);
+		if (tni->nr_extents >= 0)
+			base_tni = tni;
+		else {
+			base_tni = tni->ext.base_ntfs_ino;
+			BUG_ON(!base_tni);
+		}
+		up(&tni->extent_lock);
+		ntfs_debug("Unlocking %s inode 0x%lx.",
+				tni == base_tni ? "base" : "extent",
+				tni->mft_no);
+		up(&tni->mrec_lock);
+		atomic_dec(&tni->count);
+		iput(VFS_I(base_tni));
 	}
+	if (unlikely(err)) {
+		SetPageError(page);
+		NVolSetErrors(vol);
+	}
+	SetPageUptodate(page);
+	kunmap(page);
 done:
-	set_page_writeback(page);
-	unlock_page(page);
-	end_page_writeback(page);
-	if (!err)
+	if (page_is_dirty) {
+		ntfs_debug("Page still contains one or more dirty ntfs "
+				"records.  Redirtying the page starting at "
+				"record 0x%lx.", page->index <<
+				(PAGE_CACHE_SHIFT - rec_size_bits));
+		redirty_page_for_writepage(wbc, page);
+		unlock_page(page);
+	} else {
+		/*
+		 * Keep the VM happy.  This must be done otherwise the
+		 * radix-tree tag PAGECACHE_TAG_DIRTY remains set even though
+		 * the page is clean.
+		 */
+		BUG_ON(PageWriteback(page));
+		set_page_writeback(page);
+		unlock_page(page);
+		end_page_writeback(page);
+	}
+	if (likely(!err))
 		ntfs_debug("Done.");
 	return err;
-mst_cleanup_out:
-	/* Remove the mst protection fixups again. */
-	for (i = 0; i < nr_bhs; i++) {
-		if (!(i % bhs_per_rec))
-			post_write_mst_fixup((NTFS_RECORD*)(kaddr +
-					bh_offset(bhs[i])));
-	}
-	kunmap(page);
-cleanup_out:
-	/* Clean the buffers. */
-	for (i = 0; i < nr_bhs; i++)
-		clear_buffer_dirty(bhs[i]);
-err_out:
-	SetPageError(page);
-	goto done;
 }
 
 /**
  * ntfs_writepage - write a @page to the backing store
  * @page:	page cache page to write out
  * @wbc:	writeback control structure
+ *
+ * This is called from the VM when it wants to have a dirty ntfs page cache
+ * page cleaned.  The VM has already locked the page and marked it clean.
  *
  * For non-resident attributes, ntfs_writepage() writes the @page by calling
  * the ntfs version of the generic block_write_full_page() function,
@@ -1021,8 +1117,6 @@ err_out:
  * the data to the mft record (which at this stage is most likely in memory).
  * The mft record is then marked dirty and written out asynchronously via the
  * vfs inode dirty code path.
- *
- * Note the caller clears the page dirty flag before calling ntfs_writepage().
  *
  * Based on ntfs_readpage() and fs/buffer.c::block_write_full_page().
  *
@@ -2038,7 +2132,7 @@ struct address_space_operations ntfs_mst_aops = {
 
 /**
  * mark_ntfs_record_dirty - mark an ntfs record dirty
- * @ni:		ntfs inode to which the ntfs record to be marked dirty belongs
+ * @ni:		ntfs inode containing the ntfs record to be marked dirty
  * @page:	page containing the ntfs record to mark dirty
  * @rec_start:	byte offset within @page at which the ntfs record begins
  *

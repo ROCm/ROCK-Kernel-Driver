@@ -85,6 +85,31 @@ ToDo/Notes:
 	- Provide exclusion between opening an inode / mapping an mft record
 	  and accessing the mft record in fs/ntfs/mft.c::ntfs_mft_writepage()
 	  by setting the page not uptodate throughout ntfs_mft_writepage().
+	- Clear the page uptodate flag in fs/ntfs/aops.c::ntfs_write_mst_block()
+	  to ensure noone can see the page whilst the mst fixups are applied.
+	- Add the helper fs/ntfs/mft.c::ntfs_may_write_mft_record() which
+	  checks if an mft record may be written out safely obtaining any
+	  necessary locks in the process.  This is used by
+	  fs/ntfs/aops.c::ntfs_write_mst_block().
+	- Modify fs/ntfs/aops.c::ntfs_write_mst_block() to also work for
+	  writing mft records and improve its error handling in the process.
+	  Now if any of the records in the page fail to be written out, all
+	  other records will be written out instead of aborting completely.
+	- Remove ntfs_mft_aops and update all users to use ntfs_mst_aops.
+	- Modify fs/ntfs/inode.c::ntfs_read_locked_inode() to set the
+	  ntfs_mst_aops for all inodes which are NInoMstProtected() and
+	  ntfs_aops for all other inodes.
+	- Rename fs/ntfs/mft.c::sync_mft_mirror{,_umount}() to
+	  ntfs_sync_mft_mirror{,_umount}() and change their parameters so they
+	  no longer require an ntfs inode to be present.  Update all callers.
+	- Cleanup the error handling in fs/ntfs/mft.c::ntfs_sync_mft_mirror().
+	- Clear the page uptodate flag in fs/ntfs/mft.c::ntfs_sync_mft_mirror()
+	  to ensure noone can see the page whilst the mst fixups are applied.
+	- Remove the no longer needed fs/ntfs/mft.c::ntfs_mft_writepage() and
+	  fs/ntfs/mft.c::try_map_mft_record().
+	- Fix callers of fs/ntfs/aops.c::mark_ntfs_record_dirty() to call it
+	  with the ntfs inode which contains the page rather than the ntfs
+	  inode the mft record of which is in the page.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
