@@ -133,8 +133,6 @@ struct acpi_processor {
 	struct acpi_processor_limit limit;
 };
 
-extern int acpi_processor_get_platform_limit (
-	struct acpi_processor*	pr);
 extern int acpi_processor_register_performance (
 	struct acpi_processor_performance * performance,
 	struct acpi_processor ** pr,
