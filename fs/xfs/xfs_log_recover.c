@@ -3454,12 +3454,16 @@ xlog_do_recovery_pass(
 			goto bread_err1;
 		offset = xlog_align(log, tail_blk, 1, hbp);
 		rhead = (xlog_rec_header_t *)offset;
-		ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
-						XLOG_HEADER_MAGIC_NUM);
-		if ((INT_GET(rhead->h_version, ARCH_CONVERT) &
-				(~XLOG_VERSION_OKBITS)) != 0) {
-			xlog_warn(
-	"XFS: xlog_do_recovery_pass: unrecognised log version number.");
+		if (unlikely(
+		    (INT_GET(rhead->h_magicno, ARCH_CONVERT) !=
+					XLOG_HEADER_MAGIC_NUM) ||
+		    (INT_ISZERO(rhead->h_version, ARCH_CONVERT)) ||
+		    (INT_GET(rhead->h_version, ARCH_CONVERT) &
+					(~XLOG_VERSION_OKBITS)) != 0)) {
+			xlog_warn("XFS: %s: bad log magic/version (0x%x/%d)",
+				__FUNCTION__,
+				INT_GET(rhead->h_magicno, ARCH_CONVERT),
+				INT_GET(rhead->h_version, ARCH_CONVERT));
 			error = XFS_ERROR(EIO);
 			goto bread_err1;
 		}
