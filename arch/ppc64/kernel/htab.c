@@ -290,9 +290,7 @@ static long hpte_selectslot_iSeries( unsigned long vpn )
 	if ( hpte.dw0.dw0.v ) {		/* If valid ...what do we do now? */
 		udbg_printf( "hpte_selectslot_iSeries: vpn 0x%016lx already valid at slot 0x%016lx\n", vpn, ret_slot );
 		udbg_printf( "hpte_selectslot_iSeries: returned hpte 0x%016lx 0x%016lx\n", hpte.dw0.dword0, hpte.dw1.dword1 );
-
-		return (0x8000000000000000); 
-		/*			panic("select_hpte_slot found entry already valid\n"); */
+		panic("select_hpte_slot found entry already valid\n");
 	}
 	if ( ret_slot == -1 ) {		/* -1 indicates no available slots */
 
@@ -484,14 +482,6 @@ void build_valid_hpte( unsigned long vsid, unsigned long ea, unsigned long pa,
 	hpte_slot = ppc_md.hpte_selectslot( vpn );
 	hash = 0;
 	if ( hpte_slot < 0 ) {
-		if ( hpte_slot == 0x8000000000000000 ) {
-			udbg_printf("hash_page: ptep    = 0x%016lx\n", 
-				    (unsigned long)ptep );
-			udbg_printf("hash_page: ea      = 0x%016lx\n", ea );
-			udbg_printf("hash_page: vpn     = 0x%016lx\n", vpn );
-               
-			panic("hash_page: hpte already exists\n");
-		}
 		hash = 1;
 		hpte_slot = -hpte_slot;
 	}
@@ -794,7 +784,7 @@ int hash_page(unsigned long ea, unsigned long access)
 	void * pgdir = NULL;
 	unsigned long va, vsid, vpn;
 	unsigned long newpp, hash_ind, prpn;
-	unsigned long hpteflags, regionid;
+	unsigned long hpteflags;
 	long slot;
 	struct mm_struct *mm;
 	pte_t old_pte, new_pte, *ptep;
@@ -803,8 +793,7 @@ int hash_page(unsigned long ea, unsigned long access)
 	if (!IS_VALID_EA(ea))
 		return 1;
 
-	regionid =  REGION_ID(ea);
-	switch ( regionid ) {
+	switch (REGION_ID(ea)) {
 	case USER_REGION_ID:
 		mm = current->mm;
 		if (mm == NULL)
@@ -854,10 +843,10 @@ int hash_page(unsigned long ea, unsigned long access)
 	 * Lock the Linux page table to prevent mmap and kswapd
 	 * from modifying entries while we search and update
 	 */
-	
-	spin_lock( &mm->page_table_lock );
-	
-	ptep = find_linux_pte( pgdir, ea );
+	spin_lock(&mm->page_table_lock);
+
+	ptep = find_linux_pte(pgdir, ea);
+
 	/* If no pte found, send the problem up to do_page_fault */
 	if ( ! ptep ) {
 	  spin_unlock( &mm->page_table_lock );
@@ -984,21 +973,6 @@ int hash_page(unsigned long ea, unsigned long access)
 			 * Find an available HPTE slot
  			 */
 			slot = ppc_md.hpte_selectslot( vpn );
-
-			/* Debug code */
-			if ( slot == 0x8000000000000000 ) {
-				unsigned long xold_pte = pte_val(old_pte);
-				unsigned long xnew_pte = pte_val(new_pte);
-				
-				udbg_printf("hash_page: ptep    = 0x%016lx\n", (unsigned long)ptep );
-				udbg_printf("hash_page: old_pte = 0x%016lx\n", xold_pte );
-				udbg_printf("hash_page: new_pte = 0x%016lx\n", xnew_pte );
-				udbg_printf("hash_page: ea      = 0x%016lx\n", ea );
-				udbg_printf("hash_page: va      = 0x%016lx\n", va );
-				udbg_printf("hash_page: access  = 0x%016lx\n", access );
-			
-				panic("hash_page: hpte already exists\n");
-			}
 
 			hash_ind = 0;
 			if ( slot < 0 ) {
