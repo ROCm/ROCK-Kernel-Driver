@@ -97,6 +97,7 @@
 #define FB_ACCEL_SIS_GLAMOUR    36	/* SiS 300/630/540              */
 #define FB_ACCEL_3DLABS_PERMEDIA3 37	/* 3Dlabs Permedia 3		*/
 #define FB_ACCEL_ATI_RADEON	38	/* ATI Radeon family		*/
+#define FB_ACCEL_I810           39      /* Intel 810/815                */
 
 #define FB_ACCEL_NEOMAGIC_NM2070 90	/* NeoMagic NM2070              */
 #define FB_ACCEL_NEOMAGIC_NM2090 91	/* NeoMagic NM2090              */
@@ -427,6 +428,9 @@ struct fb_info {
 #define fb_writeb __raw_writeb
 #define fb_writew __raw_writew
 #define fb_writel __raw_writel
+#if defined(__alpha__) || defined(__hppa__) || defined(__ia64__)
+#define fb_writeq __raw_writeq
+#endif
 #define fb_memset memset_io
 
 #else
@@ -434,9 +438,11 @@ struct fb_info {
 #define fb_readb(addr) (*(volatile u8 *) (addr))
 #define fb_readw(addr) (*(volatile u16 *) (addr))
 #define fb_readl(addr) (*(volatile u32 *) (addr))
+#define fb_readq(addr) (*(volatile u64 *) (addr))
 #define fb_writeb(b,addr) (*(volatile u8 *) (addr) = (b))
 #define fb_writew(b,addr) (*(volatile u16 *) (addr) = (b))
 #define fb_writel(b,addr) (*(volatile u32 *) (addr) = (b))
+#define fb_writeq(b,addr) (*(volatile u64 *) (addr) = (b))
 #define fb_memset memset
 
 #endif
@@ -456,9 +462,9 @@ extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
 /* drivers/video/fbmem.c */
 extern int register_framebuffer(struct fb_info *fb_info);
 extern int unregister_framebuffer(struct fb_info *fb_info);
-
-extern int num_registered_fb;
+extern int fb_show_logo(struct fb_info *fb_info);
 extern struct fb_info *registered_fb[FB_MAX];
+extern int num_registered_fb;
 
 /* drivers/video/fbmon.c */
 extern int fbmon_valid_timings(u_int pixclock, u_int htotal, u_int vtotal,

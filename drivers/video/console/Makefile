@@ -45,9 +45,7 @@ obj-$(CONFIG_VGA_CONSOLE)         += vgacon.o
 obj-$(CONFIG_MDA_CONSOLE)         += mdacon.o
 obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o font.o
 
-# Generic Low Level Drivers
-
-obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
+obj-$(CONFIG_FB_STI)              += sticore.o
 
 # Files generated that shall be removed upon make clean
 clean-files := promcon_tbl.c

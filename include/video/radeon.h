@@ -1,22 +1,7 @@
 #ifndef _RADEON_H
 #define _RADEON_H
 
-
-/* radeon PCI ids */
-#define PCI_DEVICE_ID_RADEON_QD		0x5144
-#define PCI_DEVICE_ID_RADEON_QE		0x5145
-#define PCI_DEVICE_ID_RADEON_QF		0x5146
-#define PCI_DEVICE_ID_RADEON_QG		0x5147
-#define PCI_DEVICE_ID_RADEON_QY		0x5159
-#define PCI_DEVICE_ID_RADEON_QZ		0x515a
-#define PCI_DEVICE_ID_RADEON_LW		0x4c57
-#define PCI_DEVICE_ID_RADEON_LY		0x4c59
-#define PCI_DEVICE_ID_RADEON_LZ		0x4c5a
-#define PCI_DEVICE_ID_RADEON_QL		0x514c
-#define PCI_DEVICE_ID_RADEON_QW		0x5157
-
 #define RADEON_REGSIZE			0x4000
-
 
 #define MM_INDEX                               0x0000  
 #define MM_DATA                                0x0004  

@@ -378,6 +378,9 @@ struct sti_struct {
 	/* PCI data structures (pg. 17ff from sti.pdf) */
 	struct pci_dev *pd;
 	u8 rm_entry[16]; /* pci region mapper array == pci config space offset */
+
+	/* pointer to the fb_info where this STI device is used */
+	struct fb_info *info;
 };
 
 

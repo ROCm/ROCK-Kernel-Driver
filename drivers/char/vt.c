@@ -130,7 +130,7 @@ extern void console_map_init(void);
 extern void prom_con_init(void);
 #endif
 #ifdef CONFIG_MDA_CONSOLE
-extern void mda_console_init(void);
+extern int mda_console_init(void);
 #endif
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 extern int fb_console_init(void);
