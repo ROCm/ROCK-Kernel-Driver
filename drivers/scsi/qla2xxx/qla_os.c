@@ -46,72 +46,72 @@ int apiHBAInstance;
  * Module parameter information and variables
  */
 int ql2xmaxqdepth;
-module_param(ql2xmaxqdepth, int, 0);
+module_param(ql2xmaxqdepth, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(ql2xmaxqdepth,
 		"Maximum queue depth to report for target devices.");
 
 int ql2xlogintimeout = 20;
-module_param(ql2xlogintimeout, int, 0);
+module_param(ql2xlogintimeout, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql2xlogintimeout,
 		"Login timeout value in seconds.");
 
 int qlport_down_retry;
-module_param(qlport_down_retry, int, 0);
+module_param(qlport_down_retry, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(qlport_down_retry,
 		"Maximum number of command retries to a port that returns"
 		"a PORT-DOWN status.");
 
 int ql2xretrycount = 20;
-module_param(ql2xretrycount, int, 0);
+module_param(ql2xretrycount, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(ql2xretrycount,
 		"Maximum number of mid-layer retries allowed for a command.  "
 		"Default value is 20, ");
 
 int displayConfig;
-module_param(displayConfig, int, 0);
+module_param(displayConfig, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(displayConfig,
 		"If 1 then display the configuration used in /etc/modprobe.conf.");
 
 int ql2xplogiabsentdevice;
-module_param(ql2xplogiabsentdevice, int, 0);
+module_param(ql2xplogiabsentdevice, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(ql2xplogiabsentdevice,
 		"Option to enable PLOGI to devices that are not present after "
 		"a Fabric scan.  This is needed for several broken switches."
 		"Default is 0 - no PLOGI. 1 - perfom PLOGI.");
 
 int ql2xintrdelaytimer = 10;
-module_param(ql2xintrdelaytimer, int, 0);
+module_param(ql2xintrdelaytimer, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql2xintrdelaytimer,
 		"ZIO: Waiting time for Firmware before it generates an "
 		"interrupt to the host to notify completion of request.");
 
 int ConfigRequired;
-module_param(ConfigRequired, int, 0);
+module_param(ConfigRequired, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ConfigRequired,
 		"If 1, then only configured devices passed in through the"
 		"ql2xopts parameter will be presented to the OS");
 
 int Bind = BIND_BY_PORT_NAME;
-module_param(Bind, int, 0);
+module_param(Bind, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(Bind,
 		"Target persistent binding method: "
 		"0 by Portname (default); 1 by PortID; 2 by Nodename. ");
 
 int ql2xsuspendcount = SUSPEND_COUNT;
-module_param(ql2xsuspendcount, int, 0);
+module_param(ql2xsuspendcount, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(ql2xsuspendcount,
 		"Number of 6-second suspend iterations to perform while a "
 		"target returns a <NOT READY> status.  Default is 10 "
 		"iterations.");
 
 int ql2xdoinitscan = 1;
-module_param(ql2xdoinitscan, int, 0);
+module_param(ql2xdoinitscan, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(ql2xdoinitscan,
 		"Signal mid-layer to perform scan after driver load: 0 -- no "
 		"signal sent to mid-layer.");
 
 int ql2xloginretrycount = 0;
-module_param(ql2xloginretrycount, int, 0);
+module_param(ql2xloginretrycount, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql2xloginretrycount,
 		"Specify an alternate value for the NVRAM login retry count.");
 
