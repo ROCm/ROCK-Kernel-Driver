@@ -1,3 +1,51 @@
+2002-01-13  Niels Kristian Bech Jensen  <nkbj@image.dk>
+
+	* parport_pc.c: Change some occurrences of frob_set_mode to
+	ECR_WRITE.  This fixes PLIP.
+
+2001-10-25  Damian Gruszka  <damian.gruszka@VisionSystems.de>
+
+	* parport_pc.c (ECR_WRITE): Define.  If there are forbidden bits
+	in the ECR register for some chips, this will be a useful place to
+	put that knowledge.
+	(change_mode): Use ECR_WRITE.
+	(parport_pc_restore_state): Likewise.
+	(parport_ECPPS2_supported): Likewise.
+	(parport_ECPEPP_supported): Likewise.
+	(irq_probe_EPP): Likewise.
+	(programmable_irq_support): Likewise.
+	(programmable_dma_support): Likewise.
+	(parport_pc_probe_port): Likewise.
+
+	(frob_set_mode): New function.  Set the mode bits of the ECR.
+	(get_fifo_residue): Use frob_set_mode.
+	(parport_pc_ecpepp_read_data): Likewise.
+	(parport_pc_ecpepp_write_data): Likewise.
+	(parport_pc_ecpepp_read_addr): Likewise.
+	(parport_pc_ecpepp_write_addr): Likewise.
+	(parport_pc_compat_write_block_pio): Likewise.
+	(parport_pc_ecp_write_block_pio): Likewise.
+	(parport_ECR_present): Likewise.
+	(parport_ECP_supported): Likewise.
+	(parport_EPP_supported): Likewise.
+	(parport_ECPEPP_supported): Likewise.
+	(programmable_irq_support): Likewise.
+	(irq_probe_ECP): Likewise.
+	(programmable_dma_support): Likewise.
+
+	(parport_pc_enable_irq): Only enable interrupts if we know which
+	IRQ line they will come from.
+	(parport_pc_init_state): Set nErrIntrEn at initialisation.
+	(parport_pc_restore_state): Only write writable bits of CTR.
+	(parport_irq_probe): If no IRQ is found, take ackIntEn out of the
+	writable bit set.
+
+2001-10-25  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_fifo_write_block_pio): Correct typo.
+	(parport_pc_init_state): Only set ackIntEn if we know which IRQ
+	line the interrupts will come from.
+
 2001-12-07  Tim Waugh  <twaugh@redhat.com>
 
 	* ieee1284_ops.c (parport_ieee1284_epp_write_addr,
