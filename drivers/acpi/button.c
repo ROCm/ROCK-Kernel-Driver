@@ -33,13 +33,6 @@
 #include "acpi_drivers.h"
 
 
-#define _COMPONENT		ACPI_BUTTON_COMPONENT
-ACPI_MODULE_NAME		("acpi_button")
-
-MODULE_AUTHOR("Paul Diefenbaugh");
-MODULE_DESCRIPTION(ACPI_BUTTON_DRIVER_NAME);
-MODULE_LICENSE("GPL");
-
 #define ACPI_BUTTON_COMPONENT		0x00080000
 #define ACPI_BUTTON_DRIVER_NAME		"ACPI Button Driver"
 #define ACPI_BUTTON_CLASS		"button"
@@ -65,6 +58,13 @@ MODULE_LICENSE("GPL");
 #define ACPI_BUTTON_HID_LID		"PNP0C0D"
 #define ACPI_BUTTON_DEVICE_NAME_LID	"Lid Switch"
 #define ACPI_BUTTON_TYPE_LID		0x05
+
+#define _COMPONENT		ACPI_BUTTON_COMPONENT
+ACPI_MODULE_NAME		("acpi_button")
+
+MODULE_AUTHOR("Paul Diefenbaugh");
+MODULE_DESCRIPTION(ACPI_BUTTON_DRIVER_NAME);
+MODULE_LICENSE("GPL");
 
 
 int acpi_button_add (struct acpi_device *device);

@@ -33,13 +33,6 @@
 #include "acpi_drivers.h"
 
 
-#define _COMPONENT		ACPI_AC_COMPONENT
-ACPI_MODULE_NAME		("acpi_ac")
-
-MODULE_AUTHOR("Paul Diefenbaugh");
-MODULE_DESCRIPTION(ACPI_AC_DRIVER_NAME);
-MODULE_LICENSE("GPL");
-
 #define ACPI_AC_COMPONENT		0x00020000
 #define ACPI_AC_CLASS			"ac_adapter"
 #define ACPI_AC_HID 			"ACPI0003"
@@ -50,6 +43,13 @@ MODULE_LICENSE("GPL");
 #define ACPI_AC_STATUS_OFFLINE		0x00
 #define ACPI_AC_STATUS_ONLINE		0x01
 #define ACPI_AC_STATUS_UNKNOWN		0xFF
+
+#define _COMPONENT		ACPI_AC_COMPONENT
+ACPI_MODULE_NAME		("acpi_ac")
+
+MODULE_AUTHOR("Paul Diefenbaugh");
+MODULE_DESCRIPTION(ACPI_AC_DRIVER_NAME);
+MODULE_LICENSE("GPL");
 
 int acpi_ac_add (struct acpi_device *device);
 int acpi_ac_remove (struct acpi_device *device, int type);

@@ -43,14 +43,6 @@
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
-
-#define _COMPONENT		ACPI_PROCESSOR_COMPONENT
-ACPI_MODULE_NAME		("acpi_processor")
-
-MODULE_AUTHOR("Paul Diefenbaugh");
-MODULE_DESCRIPTION(ACPI_PROCESSOR_DRIVER_NAME);
-MODULE_LICENSE("GPL");
-
 #define ACPI_PROCESSOR_COMPONENT	0x01000000
 #define ACPI_PROCESSOR_CLASS		"processor"
 #define ACPI_PROCESSOR_DRIVER_NAME	"ACPI Processor Driver"
@@ -83,6 +75,14 @@ const u32 POWER_OF_2[] = {1,2,4,8,16,32,64};
 
 #define ACPI_PROCESSOR_LIMIT_USER	0
 #define ACPI_PROCESSOR_LIMIT_THERMAL	1
+
+#define _COMPONENT		ACPI_PROCESSOR_COMPONENT
+ACPI_MODULE_NAME		("acpi_processor")
+
+MODULE_AUTHOR("Paul Diefenbaugh");
+MODULE_DESCRIPTION(ACPI_PROCESSOR_DRIVER_NAME);
+MODULE_LICENSE("GPL");
+
 
 static int acpi_processor_add (struct acpi_device *device);
 static int acpi_processor_remove (struct acpi_device *device, int type);

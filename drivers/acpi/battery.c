@@ -33,14 +33,6 @@
 #include "acpi_drivers.h"
 
 
-#define _COMPONENT		ACPI_BATTERY_COMPONENT
-ACPI_MODULE_NAME		("acpi_battery")
-
-MODULE_AUTHOR("Paul Diefenbaugh");
-MODULE_DESCRIPTION(ACPI_BATTERY_DRIVER_NAME);
-MODULE_LICENSE("GPL");
-
-
 #define ACPI_BATTERY_VALUE_UNKNOWN 0xFFFFFFFF
 
 #define ACPI_BATTERY_FORMAT_BIF	"NNNNNNNNNSSSS"
@@ -58,6 +50,14 @@ MODULE_LICENSE("GPL");
 #define ACPI_BATTERY_NOTIFY_INFO	0x81
 #define ACPI_BATTERY_UNITS_WATTS	"mW"
 #define ACPI_BATTERY_UNITS_AMPS		"mA"
+
+
+#define _COMPONENT		ACPI_BATTERY_COMPONENT
+ACPI_MODULE_NAME		("acpi_battery")
+
+MODULE_AUTHOR("Paul Diefenbaugh");
+MODULE_DESCRIPTION(ACPI_BATTERY_DRIVER_NAME);
+MODULE_LICENSE("GPL");
 
 static int acpi_battery_add (struct acpi_device *device);
 static int acpi_battery_remove (struct acpi_device *device, int type);

@@ -42,18 +42,6 @@
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
-
-#define _COMPONENT		ACPI_THERMAL_COMPONENT
-ACPI_MODULE_NAME		("acpi_thermal")
-
-MODULE_AUTHOR("Paul Diefenbaugh");
-MODULE_DESCRIPTION(ACPI_THERMAL_DRIVER_NAME);
-MODULE_LICENSE("GPL");
-
-static int tzp = 0;
-MODULE_PARM(tzp, "i");
-MODULE_PARM_DESC(tzp, "Thermal zone polling frequency, in 1/10 seconds.\n");
-
 #define ACPI_THERMAL_COMPONENT		0x04000000
 #define ACPI_THERMAL_CLASS		"thermal_zone"
 #define ACPI_THERMAL_DRIVER_NAME	"ACPI Thermal Zone Driver"
@@ -75,6 +63,18 @@ MODULE_PARM_DESC(tzp, "Thermal zone polling frequency, in 1/10 seconds.\n");
 #define ACPI_THERMAL_MAX_ACTIVE	10
 
 #define KELVIN_TO_CELSIUS(t)	((t-2732+5)/10)
+
+#define _COMPONENT		ACPI_THERMAL_COMPONENT
+ACPI_MODULE_NAME		("acpi_thermal")
+
+MODULE_AUTHOR("Paul Diefenbaugh");
+MODULE_DESCRIPTION(ACPI_THERMAL_DRIVER_NAME);
+MODULE_LICENSE("GPL");
+
+static int tzp = 0;
+MODULE_PARM(tzp, "i");
+MODULE_PARM_DESC(tzp, "Thermal zone polling frequency, in 1/10 seconds.\n");
+
 
 static int acpi_thermal_add (struct acpi_device *device);
 static int acpi_thermal_remove (struct acpi_device *device, int type);
