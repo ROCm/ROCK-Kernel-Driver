@@ -4,7 +4,9 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.54 2001/09/09
+ * Portions Copyright (c) 2001 Matrox Graphics Inc.
+ *
+ * Version: 1.62 2001/11/29
  *
  * See matroxfb_base.c for contributors.
  *
@@ -16,6 +18,7 @@
 #include "matroxfb_DAC1064.h"
 #include "matroxfb_misc.h"
 #include "matroxfb_accel.h"
+#include "g450_pll.h"
 #include <linux/matroxfb.h>
 
 #ifdef NEED_DAC1064
@@ -217,19 +220,20 @@ static const unsigned char MGA1064_DAC[] = {
 		0x00,
 		0x00, 0x00, 0xFF, 0xFF};
 
-static void DAC1064_setpclk(CPMINFO struct matrox_hw_state* hw, unsigned long fout) {
+static void DAC1064_setpclk(WPMINFO unsigned long fout) {
 	unsigned int m, n, p;
 
 	DBG("DAC1064_setpclk")
 
 	DAC1064_calcclock(PMINFO fout, ACCESS_FBINFO(max_pixel_clock), &m, &n, &p);
-	hw->DACclk[0] = m;
-	hw->DACclk[1] = n;
-	hw->DACclk[2] = p;
+	ACCESS_FBINFO(hw).DACclk[0] = m;
+	ACCESS_FBINFO(hw).DACclk[1] = n;
+	ACCESS_FBINFO(hw).DACclk[2] = p;
 }
 
-static void DAC1064_setmclk(CPMINFO struct matrox_hw_state* hw, int oscinfo, unsigned long fmem){
+static void DAC1064_setmclk(WPMINFO int oscinfo, unsigned long fmem) {
 	u_int32_t mx;
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
 	DBG("DAC1064_setmclk")
 
@@ -289,7 +293,9 @@ static void DAC1064_setmclk(CPMINFO struct matrox_hw_state* hw, int oscinfo, uns
 	hw->MXoptionReg = mx;
 }
 
-void DAC1064_global_init(CPMINFO struct matrox_hw_state* hw) {
+void DAC1064_global_init(WPMINFO2) {
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
 	hw->DACreg[POS1064_XMISCCTRL] &= M1064_XMISCCTRL_DAC_WIDTHMASK;
 	hw->DACreg[POS1064_XMISCCTRL] |= M1064_XMISCCTRL_LUT_EN;
 	hw->DACreg[POS1064_XPIXCLKCTRL] = M1064_XPIXCLKCTRL_PLL_UP | M1064_XPIXCLKCTRL_EN | M1064_XPIXCLKCTRL_SRC_PLL;
@@ -314,7 +320,9 @@ void DAC1064_global_init(CPMINFO struct matrox_hw_state* hw) {
 		hw->DACreg[POS1064_XMISCCTRL] |= M1064_XMISCCTRL_DAC_EN;
 }
 
-void DAC1064_global_restore(CPMINFO const struct matrox_hw_state* hw) {
+void DAC1064_global_restore(WPMINFO2) {
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
 	outDAC1064(PMINFO M1064_XPIXCLKCTRL, hw->DACreg[POS1064_XPIXCLKCTRL]);
 	outDAC1064(PMINFO M1064_XMISCCTRL, hw->DACreg[POS1064_XMISCCTRL]);
 	if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG400) {
@@ -328,7 +336,9 @@ void DAC1064_global_restore(CPMINFO const struct matrox_hw_state* hw) {
 	}
 }
 
-static int DAC1064_init_1(CPMINFO struct matrox_hw_state* hw, struct my_timming* m, struct display *p) {
+static int DAC1064_init_1(WPMINFO struct my_timming* m, struct display *p) {
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
 	DBG("DAC1064_init_1")
 
 	memcpy(hw->DACreg, MGA1064_DAC, sizeof(MGA1064_DAC_regs));
@@ -359,7 +369,7 @@ static int DAC1064_init_1(CPMINFO struct matrox_hw_state* hw, struct my_timming*
 		}
 	}
 
-	DAC1064_global_init(PMINFO hw);
+	DAC1064_global_init(PMINFO2);
 	hw->DACreg[POS1064_XVREFCTRL] = ACCESS_FBINFO(features.DAC1064.xvrefctrl);
 	hw->DACreg[POS1064_XGENCTRL] &= ~M1064_XGENCTRL_SYNC_ON_GREEN_MASK;
 	hw->DACreg[POS1064_XGENCTRL] |= (m->sync & FB_SYNC_ON_GREEN)?M1064_XGENCTRL_SYNC_ON_GREEN:M1064_XGENCTRL_NO_SYNC_ON_GREEN;
@@ -368,7 +378,8 @@ static int DAC1064_init_1(CPMINFO struct matrox_hw_state* hw, struct my_timming*
 	return 0;
 }
 
-static int DAC1064_init_2(CPMINFO struct matrox_hw_state* hw, struct my_timming* m, struct display* p) {
+static int DAC1064_init_2(WPMINFO struct my_timming* m, struct display* p) {
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
 	DBG("DAC1064_init_2")
 
@@ -409,21 +420,22 @@ static int DAC1064_init_2(CPMINFO struct matrox_hw_state* hw, struct my_timming*
 	return 0;
 }
 
-static void DAC1064_restore_1(WPMINFO const struct matrox_hw_state* hw, const struct matrox_hw_state* oldhw) {
+static void DAC1064_restore_1(WPMINFO2) {
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
 	CRITFLAGS
 
 	DBG("DAC1064_restore_1")
 
 	CRITBEGIN
 
-	outDAC1064(PMINFO DAC1064_XSYSPLLM, hw->DACclk[3]);
-	outDAC1064(PMINFO DAC1064_XSYSPLLN, hw->DACclk[4]);
-	outDAC1064(PMINFO DAC1064_XSYSPLLP, hw->DACclk[5]);
-	/*
-	 * We must ALWAYS reprogram hardware due to broken XF4 matrox drivers...
-	 *
-	 * if (!oldhw || memcmp(hw->DACreg, oldhw->DACreg, sizeof(MGA1064_DAC_regs))) 
-	 */
+	if ((inDAC1064(PMINFO DAC1064_XSYSPLLM) != hw->DACclk[3]) ||
+	    (inDAC1064(PMINFO DAC1064_XSYSPLLN) != hw->DACclk[4]) ||
+	    (inDAC1064(PMINFO DAC1064_XSYSPLLP) != hw->DACclk[5])) {
+		outDAC1064(PMINFO DAC1064_XSYSPLLM, hw->DACclk[3]);
+		outDAC1064(PMINFO DAC1064_XSYSPLLN, hw->DACclk[4]);
+		outDAC1064(PMINFO DAC1064_XSYSPLLP, hw->DACclk[5]);
+	}
 	{
 		unsigned int i;
 
@@ -433,12 +445,12 @@ static void DAC1064_restore_1(WPMINFO const struct matrox_hw_state* hw, const st
 		}
 	}
 
-	DAC1064_global_restore(PMINFO hw);
+	DAC1064_global_restore(PMINFO2);
 
 	CRITEND
 };
 
-static void DAC1064_restore_2(WPMINFO const struct matrox_hw_state* hw, const struct matrox_hw_state* oldhw, struct display* p) {
+static void DAC1064_restore_2(WPMINFO struct display* p) {
 #ifdef DEBUG
 	unsigned int i;
 #endif
@@ -449,45 +461,48 @@ static void DAC1064_restore_2(WPMINFO const struct matrox_hw_state* hw, const st
 #ifdef DEBUG
 	dprintk(KERN_DEBUG "DAC1064regs ");
 	for (i = 0; i < sizeof(MGA1064_DAC_regs); i++) {
-		dprintk("R%02X=%02X ", MGA1064_DAC_regs[i], hw->DACreg[i]);
+		dprintk("R%02X=%02X ", MGA1064_DAC_regs[i], ACCESS_FBINFO(hw).DACreg[i]);
 		if ((i & 0x7) == 0x7) dprintk("\n" KERN_DEBUG "continuing... ");
 	}
 	dprintk("\n" KERN_DEBUG "DAC1064clk ");
 	for (i = 0; i < 6; i++)
-		dprintk("C%02X=%02X ", i, hw->DACclk[i]);
+		dprintk("C%02X=%02X ", i, ACCESS_FBINFO(hw).DACclk[i]);
 	dprintk("\n");
 #endif
 }
 
-static int m1064_compute(void* outdev, struct my_timming* m, struct matrox_hw_state* hw) {
+static int m1064_compute(void* outdev, struct my_timming* m) {
 #define minfo ((struct matrox_fb_info*)outdev)
-	DAC1064_setpclk(PMINFO hw, m->pixclock);
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+		matroxfb_g450_setclk(PMINFO m->pixclock, M_PIXEL_PLL_C);
+	} else {
+		int i;
+		int tmout;
+		CRITFLAGS
+
+		DAC1064_setpclk(PMINFO m->pixclock);
+
+		CRITBEGIN
+
+		for (i = 0; i < 3; i++)
+			outDAC1064(PMINFO M1064_XPIXPLLCM + i, ACCESS_FBINFO(hw).DACclk[i]);
+		for (tmout = 500000; tmout; tmout--) {
+			if (inDAC1064(PMINFO M1064_XPIXPLLSTAT) & 0x40)
+				break;
+			udelay(10);
+		};
+
+		CRITEND
+
+		if (!tmout)
+			printk(KERN_ERR "matroxfb: Pixel PLL not locked after 5 secs\n");
+	}
 #undef minfo
 	return 0;
 }
 
-static int m1064_program(void* outdev, const struct matrox_hw_state* hw) {
-#define minfo ((struct matrox_fb_info*)outdev)
-	int i;
-	int tmout;
-	CRITFLAGS
-
-	CRITBEGIN
-
-	for (i = 0; i < 3; i++)
-		outDAC1064(PMINFO M1064_XPIXPLLCM + i, hw->DACclk[i]);
-	for (tmout = 500000; tmout; tmout--) {
-		if (inDAC1064(PMINFO M1064_XPIXPLLSTAT) & 0x40)
-			break;
-		udelay(10);
-	};
-
-	CRITEND
-
-	if (!tmout)
-		printk(KERN_ERR "matroxfb: Pixel PLL not locked after 5 secs\n");
-
-#undef minfo
+static int m1064_program(void* outdev) {
+	/* nothing, hardware is set in m1064_compute */
 	return 0;
 }
 
@@ -522,12 +537,13 @@ static struct matrox_altout m1064 = {
 #endif /* NEED_DAC1064 */
 
 #ifdef CONFIG_FB_MATROX_MYSTIQUE
-static int MGA1064_init(CPMINFO struct matrox_hw_state* hw, struct my_timming* m, struct display* p) {
+static int MGA1064_init(WPMINFO struct my_timming* m, struct display* p) {
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
 	DBG("MGA1064_init")
 
-	if (DAC1064_init_1(PMINFO hw, m, p)) return 1;
-	if (matroxfb_vgaHWinit(PMINFO hw, m, p)) return 1;
+	if (DAC1064_init_1(PMINFO m, p)) return 1;
+	if (matroxfb_vgaHWinit(PMINFO m, p)) return 1;
 
 	hw->MiscOutReg = 0xCB;
 	if (m->sync & FB_SYNC_HOR_HIGH_ACT)
@@ -537,19 +553,20 @@ static int MGA1064_init(CPMINFO struct matrox_hw_state* hw, struct my_timming* m
 	if (m->sync & FB_SYNC_COMP_HIGH_ACT) /* should be only FB_SYNC_COMP */
 		hw->CRTCEXT[3] |= 0x40;
 
-	if (DAC1064_init_2(PMINFO hw, m, p)) return 1;
+	if (DAC1064_init_2(PMINFO m, p)) return 1;
 	return 0;
 }
 #endif
 
 #ifdef CONFIG_FB_MATROX_G100
-static int MGAG100_init(CPMINFO struct matrox_hw_state* hw, struct my_timming* m, struct display* p) {
+static int MGAG100_init(WPMINFO struct my_timming* m, struct display* p) {
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
 	DBG("MGAG100_init")
 
-	if (DAC1064_init_1(PMINFO hw, m, p)) return 1;
+	if (DAC1064_init_1(PMINFO m, p)) return 1;
 	hw->MXoptionReg &= ~0x2000;
-	if (matroxfb_vgaHWinit(PMINFO hw, m, p)) return 1;
+	if (matroxfb_vgaHWinit(PMINFO m, p)) return 1;
 
 	hw->MiscOutReg = 0xEF;
 	if (m->sync & FB_SYNC_HOR_HIGH_ACT)
@@ -559,13 +576,13 @@ static int MGAG100_init(CPMINFO struct matrox_hw_state* hw, struct my_timming* m
 	if (m->sync & FB_SYNC_COMP_HIGH_ACT) /* should be only FB_SYNC_COMP */
 		hw->CRTCEXT[3] |= 0x40;
 
-	if (DAC1064_init_2(PMINFO hw, m, p)) return 1;
+	if (DAC1064_init_2(PMINFO m, p)) return 1;
 	return 0;
 }
 #endif	/* G100 */
 
 #ifdef CONFIG_FB_MATROX_MYSTIQUE
-static void MGA1064_ramdac_init(WPMINFO struct matrox_hw_state* hw){
+static void MGA1064_ramdac_init(WPMINFO2) {
 
 	DBG("MGA1064_ramdac_init");
 
@@ -579,7 +596,7 @@ static void MGA1064_ramdac_init(WPMINFO struct matrox_hw_state* hw){
 	ACCESS_FBINFO(features.pll.post_shift_max) = 3;
 	ACCESS_FBINFO(features.DAC1064.xvrefctrl) = DAC1064_XVREFCTRL_EXTERNAL;
 	/* maybe cmdline MCLK= ?, doc says gclk=44MHz, mclk=66MHz... it was 55/83 with old values */
-	DAC1064_setmclk(PMINFO hw, DAC1064_OPT_MDIV2 | DAC1064_OPT_GDIV3 | DAC1064_OPT_SCLK_PLL, 133333);
+	DAC1064_setmclk(PMINFO DAC1064_OPT_MDIV2 | DAC1064_OPT_GDIV3 | DAC1064_OPT_SCLK_PLL, 133333);
 }
 #endif
 
@@ -591,7 +608,7 @@ static int x7AF4 = 0x10;	/* flags, maybe 0x10 = SDRAM, 0x00 = SGRAM??? */
 static int def50 = 0;	/* reg50, & 0x0F, & 0x3000 (only 0x0000, 0x1000, 0x2000 (0x3000 disallowed and treated as 0) */
 #endif
 
-static void MGAG100_progPixClock(CPMINFO int flags, int m, int n, int p){
+static void MGAG100_progPixClock(CPMINFO int flags, int m, int n, int p) {
 	int reg;
 	int selClk;
 	int clk;
@@ -635,7 +652,7 @@ static void MGAG100_progPixClock(CPMINFO int flags, int m, int n, int p){
 	outDAC1064(PMINFO M1064_XPIXCLKCTRL, inDAC1064(PMINFO M1064_XPIXCLKCTRL) & ~M1064_XPIXCLKCTRL_DIS);
 }
 
-static void MGAG100_setPixClock(CPMINFO int flags, int freq){
+static void MGAG100_setPixClock(CPMINFO int flags, int freq) {
 	unsigned int m, n, p;
 
 	DBG("MGAG100_setPixClock")
@@ -646,10 +663,12 @@ static void MGAG100_setPixClock(CPMINFO int flags, int freq){
 #endif
 
 #ifdef CONFIG_FB_MATROX_MYSTIQUE
-static int MGA1064_preinit(WPMINFO struct matrox_hw_state* hw){
+static int MGA1064_preinit(WPMINFO2) {
 	static const int vxres_mystique[] = { 512,        640, 768,  800,  832,  960,
 					     1024, 1152, 1280,      1600, 1664, 1920,
 					     2048,    0};
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
 	DBG("MGA1064_preinit")
 
 	/* ACCESS_FBINFO(capable.cfb4) = 0; ... preinitialized by 0 */
@@ -680,7 +699,7 @@ static int MGA1064_preinit(WPMINFO struct matrox_hw_state* hw){
 	return 0;
 }
 
-static void MGA1064_reset(WPMINFO struct matrox_hw_state* hw){
+static void MGA1064_reset(WPMINFO2) {
 
 	DBG("MGA1064_reset");
 
@@ -688,15 +707,130 @@ static void MGA1064_reset(WPMINFO struct matrox_hw_state* hw){
 	if (ACCESS_FBINFO(devflags.hwcursor))
 		ACCESS_FBINFO(video.len_usable) -= 1024;
 	matroxfb_fastfont_init(MINFO);
-	MGA1064_ramdac_init(PMINFO hw);
+	MGA1064_ramdac_init(PMINFO2);
 }
 #endif
 
 #ifdef CONFIG_FB_MATROX_G100
-static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
+static void g450_mclk_init(WPMINFO2) {
+	/* switch all clocks to PCI source */
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg | 4);
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION3_REG, ACCESS_FBINFO(values).reg.opt3 & ~0x00300C03);
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg);
+	
+	if (((ACCESS_FBINFO(values).reg.opt3 & 0x000003) == 0x000003) ||
+	    ((ACCESS_FBINFO(values).reg.opt3 & 0x000C00) == 0x000C00) ||
+	    ((ACCESS_FBINFO(values).reg.opt3 & 0x300000) == 0x300000)) {
+		matroxfb_g450_setclk(PMINFO ACCESS_FBINFO(values.pll.video), M_VIDEO_PLL);
+	} else {
+		/* slow down video clocks... */
+		matroxfb_g450_setclk(PMINFO 0, M_VIDEO_PLL);
+	}
+	matroxfb_g450_setclk(PMINFO ACCESS_FBINFO(values.pll.system), M_SYSTEM_PLL);
+	
+	/* switch clocks to their real PLL source(s) */
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg | 4);
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION3_REG, ACCESS_FBINFO(values).reg.opt3);
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg);
+
+}
+
+static void g450_memory_init(WPMINFO2) {
+	/* disable memory refresh */
+	ACCESS_FBINFO(hw).MXoptionReg &= ~0x001F8000;
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg);
+	
+	/* set memory interface parameters */
+	ACCESS_FBINFO(hw).MXoptionReg &= ~0x00207E00;
+	ACCESS_FBINFO(hw).MXoptionReg |= 0x00207E00 & ACCESS_FBINFO(values).reg.opt;
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg);
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, ACCESS_FBINFO(values).reg.opt2);
+	
+	mga_outl(M_CTLWTST, ACCESS_FBINFO(values).reg.mctlwtst);
+	
+	/* first set up memory interface with disabled memory interface clocks */
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_MEMMISC_REG, ACCESS_FBINFO(values).reg.memmisc & ~0x80000000U);
+	mga_outl(M_MEMRDBK, ACCESS_FBINFO(values).reg.memrdbk);
+	mga_outl(M_MACCESS, ACCESS_FBINFO(values).reg.maccess);
+	/* start memory clocks */
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_MEMMISC_REG, ACCESS_FBINFO(values).reg.memmisc | 0x80000000U);
+
+	udelay(200);
+	
+	if (ACCESS_FBINFO(values).memory.ddr && (!ACCESS_FBINFO(values).memory.emrswen || !ACCESS_FBINFO(values).memory.dll)) {
+		mga_outl(M_MEMRDBK, ACCESS_FBINFO(values).reg.memrdbk & ~0x1000);
+	}
+	mga_outl(M_MACCESS, ACCESS_FBINFO(values).reg.maccess | 0x8000);
+	
+	udelay(200);
+	
+	ACCESS_FBINFO(hw).MXoptionReg |= 0x001F8000 & ACCESS_FBINFO(values).reg.opt;
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg);
+	
+	/* value is written to memory chips only if old != new */
+	mga_outl(M_PLNWT, 0);
+	mga_outl(M_PLNWT, ~0);
+	
+	if (ACCESS_FBINFO(values).reg.mctlwtst != ACCESS_FBINFO(values).reg.mctlwtst_core) {
+		mga_outl(M_CTLWTST, ACCESS_FBINFO(values).reg.mctlwtst_core);
+	}
+	
+}
+
+static void g450_preinit(WPMINFO2) {
+	u_int32_t c2ctl;
+	u_int8_t curctl;
+	u_int8_t c1ctl;
+	
+	/* ACCESS_FBINFO(hw).MXoptionReg = minfo->values.reg.opt; */
+	ACCESS_FBINFO(hw).MXoptionReg &= 0xC0000100;
+	ACCESS_FBINFO(hw).MXoptionReg |= 0x00000020;
+	if (ACCESS_FBINFO(devflags.novga))
+		ACCESS_FBINFO(hw).MXoptionReg &= ~0x00000100;
+	if (ACCESS_FBINFO(devflags.nobios))
+		ACCESS_FBINFO(hw).MXoptionReg &= ~0x40000000;
+	if (ACCESS_FBINFO(devflags.nopciretry))
+		ACCESS_FBINFO(hw).MXoptionReg |=  0x20000000;
+	ACCESS_FBINFO(hw).MXoptionReg |= ACCESS_FBINFO(values).reg.opt & 0x03400040;
+	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, ACCESS_FBINFO(hw).MXoptionReg);
+
+	/* Init system clocks */
+		
+	/* stop crtc2 */
+	c2ctl = mga_inl(M_C2CTL);
+	mga_outl(M_C2CTL, c2ctl & ~1);
+	/* stop cursor */
+	curctl = inDAC1064(PMINFO M1064_XCURCTRL);
+	outDAC1064(PMINFO M1064_XCURCTRL, 0);
+	/* stop crtc1 */
+	c1ctl = mga_readr(M_SEQ_INDEX, 1);
+	mga_setr(M_SEQ_INDEX, 1, c1ctl | 0x20);
+
+	g450_mclk_init(PMINFO2);
+	g450_memory_init(PMINFO2);
+	
+	/* set legacy VGA clock sources for DOSEmu or VMware... */
+	matroxfb_g450_setclk(PMINFO 25175, M_PIXEL_PLL_A);
+	matroxfb_g450_setclk(PMINFO 28322, M_PIXEL_PLL_B);
+
+	/* restore crtc1 */
+	mga_setr(M_SEQ_INDEX, 1, c1ctl);
+	
+	/* restore cursor */
+	outDAC1064(PMINFO M1064_XCURCTRL, curctl);
+
+	/* restore crtc2 */
+	mga_outl(M_C2CTL, c2ctl);
+	
+	return;
+}
+
+static int MGAG100_preinit(WPMINFO2) {
 	static const int vxres_g100[] = {  512,        640, 768,  800,  832,  960,
                                           1024, 1152, 1280,      1600, 1664, 1920,
                                           2048, 0};
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
         u_int32_t reg50;
 #if 0
 	u_int32_t q;
@@ -710,7 +844,9 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 	} else {
 		ACCESS_FBINFO(features.pll.vco_freq_min) = 62000;
 	}
-	ACCESS_FBINFO(features.pll.ref_freq)	 = 27000;
+	if (!ACCESS_FBINFO(features.pll.ref_freq)) {
+		ACCESS_FBINFO(features.pll.ref_freq)	 = 27000;
+	}
 	ACCESS_FBINFO(features.pll.feed_div_min) = 7;
 	ACCESS_FBINFO(features.pll.feed_div_max) = 127;
 	ACCESS_FBINFO(features.pll.in_div_min)	 = 1;
@@ -734,6 +870,10 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 	}
 	if (ACCESS_FBINFO(devflags.noinit))
 		return 0;
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+		g450_preinit(PMINFO2);
+		return 0;
+	}
 	hw->MXoptionReg &= 0xC0000100;
 	hw->MXoptionReg |= 0x00000020;
 	if (ACCESS_FBINFO(devflags.novga))
@@ -743,12 +883,12 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 	if (ACCESS_FBINFO(devflags.nopciretry))
 		hw->MXoptionReg |=  0x20000000;
 	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, hw->MXoptionReg);
-	DAC1064_setmclk(PMINFO hw, DAC1064_OPT_MDIV2 | DAC1064_OPT_GDIV3 | DAC1064_OPT_SCLK_PCI, 133333);
+	DAC1064_setmclk(PMINFO DAC1064_OPT_MDIV2 | DAC1064_OPT_GDIV3 | DAC1064_OPT_SCLK_PCI, 133333);
 
 	if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG100) {
-		pci_read_config_dword(ACCESS_FBINFO(pcidev), 0x50, &reg50);
+		pci_read_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, &reg50);
 		reg50 &= ~0x3000;
-		pci_write_config_dword(ACCESS_FBINFO(pcidev), 0x50, reg50);
+		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, reg50);
 
 		hw->MXoptionReg |= 0x1080;
 		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, hw->MXoptionReg);
@@ -763,7 +903,7 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 		udelay(100);
 		reg50 &= ~0xFF;
 		reg50 |=  0x07;
-		pci_write_config_dword(ACCESS_FBINFO(pcidev), 0x50, reg50);
+		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, reg50);
 		/* it should help with G100 */
 		mga_outb(M_GRAPHICS_INDEX, 6);
 		mga_outb(M_GRAPHICS_DATA, (mga_inb(M_GRAPHICS_DATA) & 3) | 4);
@@ -778,29 +918,30 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 		}
 #endif
 		hw->MXoptionReg |= 0x00078020;
-	} else 	if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG200) {
-		pci_read_config_dword(ACCESS_FBINFO(pcidev), 0x50, &reg50);
+	} else if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG200) {
+		pci_read_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, &reg50);
 		reg50 &= ~0x3000;
-		pci_write_config_dword(ACCESS_FBINFO(pcidev), 0x50, reg50);
+		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, reg50);
 
 		if (ACCESS_FBINFO(devflags.memtype) == -1)
-			ACCESS_FBINFO(devflags.memtype) = 3;
-		hw->MXoptionReg |= (ACCESS_FBINFO(devflags.memtype) & 7) << 10;
+			hw->MXoptionReg |= ACCESS_FBINFO(values).reg.opt & 0x1C00;
+		else
+			hw->MXoptionReg |= (ACCESS_FBINFO(devflags.memtype) & 7) << 10;
 		if (ACCESS_FBINFO(devflags.sgram))
 			hw->MXoptionReg |= 0x4000;
-		mga_outl(M_CTLWTST, 0x042450A1);
-		mga_outl(M_MEMRDBK, 0x00000108);
+		mga_outl(M_CTLWTST, ACCESS_FBINFO(values).reg.mctlwtst);
+		mga_outl(M_MEMRDBK, ACCESS_FBINFO(values).reg.memrdbk);
 		udelay(200);
 		mga_outl(M_MACCESS, 0x00000000);
 		mga_outl(M_MACCESS, 0x00008000);
 		udelay(100);
-		mga_outw(M_MEMRDBK, 0x00000108);
+		mga_outw(M_MEMRDBK, ACCESS_FBINFO(values).reg.memrdbk);
 		hw->MXoptionReg |= 0x00078020;
 	} else {
-		pci_read_config_dword(ACCESS_FBINFO(pcidev), 0x50, &reg50);
+		pci_read_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, &reg50);
 		reg50 &= ~0x00000100;
 		reg50 |=  0x00000000;
-		pci_write_config_dword(ACCESS_FBINFO(pcidev), 0x50, reg50);
+		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, reg50);
 
 		if (ACCESS_FBINFO(devflags.memtype) == -1)
 			ACCESS_FBINFO(devflags.memtype) = 0;
@@ -820,8 +961,9 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 	return 0;
 }
 
-static void MGAG100_reset(WPMINFO struct matrox_hw_state* hw){
+static void MGAG100_reset(WPMINFO2) {
 	u_int8_t b;
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
 
 	DBG("MGAG100_reset")
 
@@ -845,13 +987,20 @@ static void MGAG100_reset(WPMINFO struct matrox_hw_state* hw){
 #endif
 		if (!ACCESS_FBINFO(devflags.noinit)) {
 			if (x7AF4 & 8) {
-				hw->MXoptionReg |= 0x40;
+				hw->MXoptionReg |= 0x40;	/* FIXME... */
 				pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, hw->MXoptionReg);
 			}
 			mga_setr(M_EXTVGA_INDEX, 0x06, 0x50);
 		}
 	}
-	DAC1064_setmclk(PMINFO hw, DAC1064_OPT_RESERVED | DAC1064_OPT_MDIV2 | DAC1064_OPT_GDIV1 | DAC1064_OPT_SCLK_PLL, 133333);
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+		/* either leave MCLK as is... or they were set in preinit */
+		hw->DACclk[3] = inDAC1064(PMINFO DAC1064_XSYSPLLM);
+		hw->DACclk[4] = inDAC1064(PMINFO DAC1064_XSYSPLLN);
+		hw->DACclk[5] = inDAC1064(PMINFO DAC1064_XSYSPLLP);
+	} else {
+		DAC1064_setmclk(PMINFO DAC1064_OPT_RESERVED | DAC1064_OPT_MDIV2 | DAC1064_OPT_GDIV1 | DAC1064_OPT_SCLK_PLL, 133333);
+	}
 	if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG400) {
 		if (ACCESS_FBINFO(devflags.dfp_type) == -1) {
 			ACCESS_FBINFO(devflags.dfp_type) = inDAC1064(PMINFO 0x1F);
@@ -859,20 +1008,25 @@ static void MGAG100_reset(WPMINFO struct matrox_hw_state* hw){
 	}
 	if (ACCESS_FBINFO(devflags.noinit))
 		return;
-	MGAG100_setPixClock(PMINFO 4, 25175);
-	MGAG100_setPixClock(PMINFO 5, 28322);
-	if (x7AF4 & 0x10) {
-		b = inDAC1064(PMINFO M1064_XGENIODATA) & ~1;
-		outDAC1064(PMINFO M1064_XGENIODATA, b);
-		b = inDAC1064(PMINFO M1064_XGENIOCTRL) | 1;
-		outDAC1064(PMINFO M1064_XGENIOCTRL, b);
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+	} else {
+		MGAG100_setPixClock(PMINFO 4, 25175);
+		MGAG100_setPixClock(PMINFO 5, 28322);
+		if (x7AF4 & 0x10) {
+			b = inDAC1064(PMINFO M1064_XGENIODATA) & ~1;
+			outDAC1064(PMINFO M1064_XGENIODATA, b);
+			b = inDAC1064(PMINFO M1064_XGENIOCTRL) | 1;
+			outDAC1064(PMINFO M1064_XGENIOCTRL, b);
+		}
 	}
 }
 #endif
 
 #ifdef CONFIG_FB_MATROX_MYSTIQUE
-static void MGA1064_restore(WPMINFO struct matrox_hw_state* hw, struct matrox_hw_state* oldhw, struct display* p) {
+static void MGA1064_restore(WPMINFO struct display* p) {
 	int i;
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
 	CRITFLAGS
 
 	DBG("MGA1064_restore")
@@ -885,17 +1039,19 @@ static void MGA1064_restore(WPMINFO struct matrox_hw_state* hw, struct matrox_hw
 
 	CRITEND
 
-	DAC1064_restore_1(PMINFO hw, oldhw);
-	matroxfb_vgaHWrestore(PMINFO hw, oldhw);
+	DAC1064_restore_1(PMINFO2);
+	matroxfb_vgaHWrestore(PMINFO2);
 	for (i = 0; i < 6; i++)
 		mga_setr(M_EXTVGA_INDEX, i, hw->CRTCEXT[i]);
-	DAC1064_restore_2(PMINFO hw, oldhw, p);
+	DAC1064_restore_2(PMINFO p);
 }
 #endif
 
 #ifdef CONFIG_FB_MATROX_G100
-static void MGAG100_restore(WPMINFO struct matrox_hw_state* hw, struct matrox_hw_state* oldhw, struct display* p) {
+static void MGAG100_restore(WPMINFO struct display* p) {
 	int i;
+	struct matrox_hw_state* hw = &ACCESS_FBINFO(hw);
+
 	CRITFLAGS
 
 	DBG("MGAG100_restore")
@@ -905,15 +1061,15 @@ static void MGAG100_restore(WPMINFO struct matrox_hw_state* hw, struct matrox_hw
 	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, hw->MXoptionReg);
 	CRITEND
 
-	DAC1064_restore_1(PMINFO hw, oldhw);
-	matroxfb_vgaHWrestore(PMINFO hw, oldhw);
+	DAC1064_restore_1(PMINFO2);
+	matroxfb_vgaHWrestore(PMINFO2);
 #ifdef CONFIG_FB_MATROX_32MB
 	if (ACCESS_FBINFO(devflags.support32MB))
 		mga_setr(M_EXTVGA_INDEX, 8, hw->CRTCEXT[8]);
 #endif
 	for (i = 0; i < 6; i++)
 		mga_setr(M_EXTVGA_INDEX, i, hw->CRTCEXT[i]);
-	DAC1064_restore_2(PMINFO hw, oldhw, p);
+	DAC1064_restore_2(PMINFO p);
 }
 #endif
 

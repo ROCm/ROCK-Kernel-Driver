@@ -10,7 +10,7 @@ Advantages:
 
  * It provides a nice large console (128 cols + 48 lines with 1024x768)
    without using tiny, unreadable fonts.
- * You can run XF68_FBDev on top of /dev/fb0
+ * You can run XF{68,86}_FBDev or XFree86 fbdev driver on top of /dev/fb0
  * Most important: boot logo :-)
 
 Disadvantages:
@@ -27,9 +27,6 @@ or using `fbset' program.
 
 If you want, for example, enable a resolution of 1280x1024x24bpp you should
 pass to the kernel this command line: "video=matrox:vesa:0x1BB".
-Note that the same line, if 'appended' as a lilo parameter in lilo.conf will
-read "video=matrox:vesa:443" because lilo pass integer parameters as decimal
-numbers to the kernel.
 
 You should compile in both vgacon (to boot if you remove you Matrox from
 box) and matroxfb (for graphics mode). You should not compile-in vesafb
@@ -82,13 +79,16 @@ example 1600x1200x32bpp can be specified by `video=matrox:vesa:0x11C,depth:32'.
 X11
 ===
 
-XF68_FBDev should work just fine, but it is non-accelerated. On non-intel
+XF{68,86}_FBDev should work just fine, but it is non-accelerated. On non-intel
 architectures there are some glitches for 24bpp videomodes. 8, 16 and 32bpp
 works fine.
 
 Running another (accelerated) X-Server like XF86_SVGA works too. But (at least)
 XFree servers have big troubles in multihead configurations (even on first
-head, not even talking about second).
+head, not even talking about second). Running XFree86 4.x accelerated mga 
+driver is possible, but you must not enable DRI - if you do, resolution and
+color depth of your X desktop must match resolution and color depths of your
+virtual consoles, otherwise X will corrupt accelerator settings.
 
 
 SVGALib

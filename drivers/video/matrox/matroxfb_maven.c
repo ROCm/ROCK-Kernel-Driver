@@ -4,7 +4,9 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.51 2001/01/19
+ * Portions Copyright (c) 2001 Matrox Graphics Inc.
+ *
+ * Version: 1.62 2001/11/29
  *
  * See matroxfb_base.c for contributors.
  *
@@ -25,10 +27,14 @@
 #define MODE_TV(x)	(((x) == MODE_PAL) || ((x) == MODE_NTSC))
 #define MODE_MONITOR	MATROXFB_OUTPUT_MODE_MONITOR
 
+#define MGATVO_B	1
+#define MGATVO_C	2
+
 struct maven_data {
 	struct matrox_fb_info*		primary_head;
 	struct i2c_client*		client;
 	int				mode;
+	int				version;
 };
 
 static int maven_get_reg(struct i2c_client* c, char reg) {
@@ -623,8 +629,13 @@ static inline int maven_compute_timming(struct maven_data* md,
 		m->regs[0xA2] = mt->VTotal - mt->VSyncStart - 1;	/* stop vblanking */
 		m->regs[0xA3] = (mt->VTotal - mt->VSyncStart - 1) >> 8;
 		/* something end... [A6]+1..[A8] */
-		m->regs[0xA4] = 0x01;
-		m->regs[0xA5] = 0x00;
+		if (md->version == MGATVO_B) {
+			m->regs[0xA4] = 0x04;
+			m->regs[0xA5] = 0x00;
+		} else {
+			m->regs[0xA4] = 0x01;
+			m->regs[0xA5] = 0x00;
+		}
 		/* something start... 0..[A4]-1 */
 		m->regs[0xA6] = 0x00;
 		m->regs[0xA7] = 0x00;
@@ -862,12 +873,20 @@ static int maven_get_output_mode(struct maven_data* md, u_int32_t *arg) {
 
 /******************************************************/
 
-static int maven_out_compute(void* md, struct my_timming* mt, struct matrox_hw_state* mr) {
-	return maven_compute_timming(md, mt, &mr->maven);
+static int maven_out_compute(void* md, struct my_timming* mt) {
+#define mdinfo ((struct maven_data*)md)
+#define minfo (mdinfo->primary_head)
+	return maven_compute_timming(md, mt, &ACCESS_FBINFO(hw).maven);
+#undef minfo
+#undef mdinfo
 }
 
-static int maven_out_program(void* md, const struct matrox_hw_state* mr) {
-	return maven_program_timming(md, &mr->maven);
+static int maven_out_program(void* md) {
+#define mdinfo ((struct maven_data*)md)
+#define minfo (mdinfo->primary_head)
+	return maven_program_timming(md, &ACCESS_FBINFO(hw).maven);
+#undef minfo
+#undef mdinfo
 }
 
 static int maven_out_start(void* md) {
@@ -916,6 +935,11 @@ static int maven_init_client(struct i2c_client* clnt) {
 	ACCESS_FBINFO(altout.output) = &maven_altout;
 	up_write(&ACCESS_FBINFO(altout.lock));
 	ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
+	if (maven_get_reg(clnt, 0xB2) < 0x14) {
+		md->version = MGATVO_B;
+	} else {
+		md->version = MGATVO_C;
+	}
 	return 0;
 }
 

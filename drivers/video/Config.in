@@ -128,7 +128,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	          dep_tristate '      G400 second head support' CONFIG_FB_MATROX_MAVEN $CONFIG_FB_MATROX_I2C
 	       fi
             fi
-            dep_tristate '      G450/G550 second head support' CONFIG_FB_MATROX_G450 $CONFIG_FB_MATROX_G100
+            dep_tristate '      G450/G550 second head support (mandatory for G550)' CONFIG_FB_MATROX_G450 $CONFIG_FB_MATROX_G100
 	    bool '    Multihead support' CONFIG_FB_MATROX_MULTIHEAD
 	 fi
 	 tristate '  ATI Mach64 display support (EXPERIMENTAL)' CONFIG_FB_ATY
