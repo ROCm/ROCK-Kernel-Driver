@@ -679,19 +679,19 @@ static int obsolete_params(const char *name,
 	if (!kp)
 		return -ENOMEM;
 
-	DEBUGP("Module %s has %u obsolete params\n", name, num);
-	for (i = 0; i < num; i++)
-		DEBUGP("Param %i: %s type %s\n",
-		       num, obsparm[i].name, obsparm[i].type);
-
 	for (i = 0; i < num; i++) {
+		char sym_name[128 + sizeof(MODULE_SYMBOL_PREFIX)];
+
+		snprintf(sym_name, sizeof(sym_name), "%s%s",
+			 MODULE_SYMBOL_PREFIX, obsparm[i].name);
+
 		kp[i].name = obsparm[i].name;
 		kp[i].perm = 000;
 		kp[i].set = set_obsolete;
 		kp[i].get = NULL;
 		obsparm[i].addr
 			= (void *)find_local_symbol(sechdrs, symindex, strtab,
-						    obsparm[i].name);
+						    sym_name);
 		if (!obsparm[i].addr) {
 			printk("%s: falsely claims to have parameter %s\n",
 			       name, obsparm[i].name);
