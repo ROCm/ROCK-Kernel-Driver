@@ -888,6 +888,10 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	/* Set the VRM version */
 	data->vrm = LM85_INIT_VRM ;
 
+	/* Initialize the LM85 chip */
+	lm85_init_client(new_client);
+
+	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_fan_input1);
 	device_create_file(&new_client->dev, &dev_attr_fan_input2);
 	device_create_file(&new_client->dev, &dev_attr_fan_input3);
@@ -930,8 +934,6 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	device_create_file(&new_client->dev, &dev_attr_vid);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
-	/* Initialize the LM85 chip */
-	lm85_init_client(new_client);
 	return 0;
 
 	/* Error out and cleanup code */
