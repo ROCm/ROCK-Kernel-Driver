@@ -839,14 +839,10 @@ void ide_unregister (unsigned int index)
 	hwif->ide_dma_end		= old_hwif.ide_dma_end;
 	hwif->ide_dma_check		= old_hwif.ide_dma_check;
 	hwif->ide_dma_on		= old_hwif.ide_dma_on;
-	hwif->ide_dma_off		= old_hwif.ide_dma_off;
 	hwif->ide_dma_off_quietly	= old_hwif.ide_dma_off_quietly;
 	hwif->ide_dma_test_irq		= old_hwif.ide_dma_test_irq;
 	hwif->ide_dma_host_on		= old_hwif.ide_dma_host_on;
 	hwif->ide_dma_host_off		= old_hwif.ide_dma_host_off;
-	hwif->ide_dma_bad_drive		= old_hwif.ide_dma_bad_drive;
-	hwif->ide_dma_good_drive	= old_hwif.ide_dma_good_drive;
-	hwif->ide_dma_count		= old_hwif.ide_dma_count;
 	hwif->ide_dma_verbose		= old_hwif.ide_dma_verbose;
 	hwif->ide_dma_lostirq		= old_hwif.ide_dma_lostirq;
 	hwif->ide_dma_timeout		= old_hwif.ide_dma_timeout;
@@ -1324,6 +1320,7 @@ static int set_io_32bit(ide_drive_t *drive, int arg)
 
 static int set_using_dma (ide_drive_t *drive, int arg)
 {
+#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!drive->id || !(drive->id->capability & 1))
 		return -EPERM;
 	if (HWIF(drive)->ide_dma_check == NULL)
@@ -1332,9 +1329,13 @@ static int set_using_dma (ide_drive_t *drive, int arg)
 		if (HWIF(drive)->ide_dma_check(drive)) return -EIO;
 		if (HWIF(drive)->ide_dma_on(drive)) return -EIO;
 	} else {
-		if (HWIF(drive)->ide_dma_off(drive)) return -EIO;
+		if (__ide_dma_off(drive))
+			return -EIO;
 	}
 	return 0;
+#else
+	return -EPERM;
+#endif
 }
 
 static int set_pio_mode (ide_drive_t *drive, int arg)

@@ -103,10 +103,10 @@ extern int hgafb_setup(char*);
 extern int matroxfb_init(void);
 extern int matroxfb_setup(char*);
 extern int hpfb_init(void);
+extern int platinumfb_init(void);
+extern int platinumfb_setup(char*);
 extern int control_init(void);
 extern int control_setup(char*);
-extern int platinum_init(void);
-extern int platinum_setup(char*);
 extern int valkyriefb_init(void);
 extern int valkyriefb_setup(char*);
 extern int chips_init(void);
@@ -136,6 +136,8 @@ extern int tx3912fb_init(void);
 extern int tx3912fb_setup(char*);
 extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
+extern int radeonfb_old_init(void);
+extern int radeonfb_old_setup(char*);
 extern int e1355fb_init(void);
 extern int e1355fb_setup(char*);
 extern int pvr2fb_init(void);
@@ -224,13 +226,13 @@ static struct {
 	{ "radeonfb", radeonfb_init, radeonfb_setup },
 #endif
 #ifdef CONFIG_FB_RADEON_OLD
-	{ "radeonfb_old", radeonfb_init, radeonfb_setup },
+	{ "radeonfb_old", radeonfb_old_init, radeonfb_old_setup },
 #endif
 #ifdef CONFIG_FB_CONTROL
 	{ "controlfb", control_init, control_setup },
 #endif
 #ifdef CONFIG_FB_PLATINUM
-	{ "platinumfb", platinum_init, platinum_setup },
+	{ "platinumfb", platinumfb_init, platinumfb_setup },
 #endif
 #ifdef CONFIG_FB_VALKYRIE
 	{ "valkyriefb", valkyriefb_init, valkyriefb_setup },

@@ -1529,11 +1529,16 @@ tcp_match(const struct sk_buff *skb,
 		      == tcpinfo->flg_cmp,
 		      IPT_TCP_INV_FLAGS))
 		return 0;
-	if (tcpinfo->option &&
-	    !tcp_find_option(tcpinfo->option, skb, tcph.doff*4 - sizeof(tcph),
-			     tcpinfo->invflags & IPT_TCP_INV_OPTION,
-			     hotdrop))
-		return 0;
+	if (tcpinfo->option) {
+		if (tcph.doff * 4 < sizeof(tcph)) {
+			*hotdrop = 1;
+			return 0;
+		}
+		if (!tcp_find_option(tcpinfo->option, skb, tcph.doff*4 - sizeof(tcph),
+				     tcpinfo->invflags & IPT_TCP_INV_OPTION,
+				     hotdrop))
+			return 0;
+	}
 	return 1;
 }
 
