@@ -855,7 +855,7 @@ s64 __ntfs_cluster_free(struct inode *vi, const VCN start_vcn, s64 count,
 		err = PTR_ERR(rl);
 		goto err_out;
 	}
-	if (unlikely(rl->lcn < (LCN)LCN_HOLE)) {
+	if (unlikely(rl->lcn < LCN_HOLE)) {
 		if (!is_rollback)
 			ntfs_error(vol->sb, "First runlist element has "
 					"invalid lcn, aborting.");
@@ -895,7 +895,7 @@ s64 __ntfs_cluster_free(struct inode *vi, const VCN start_vcn, s64 count,
 	 * free them.
 	 */
 	for (; rl->length && count != 0; ++rl) {
-		if (unlikely(rl->lcn < (LCN)LCN_HOLE)) {
+		if (unlikely(rl->lcn < LCN_HOLE)) {
 			VCN vcn;
 
 			/*
@@ -926,7 +926,7 @@ s64 __ntfs_cluster_free(struct inode *vi, const VCN start_vcn, s64 count,
 							"element.");
 				goto err_out;
 			}
-			if (unlikely(rl->lcn < (LCN)LCN_HOLE)) {
+			if (unlikely(rl->lcn < LCN_HOLE)) {
 				if (!is_rollback)
 					ntfs_error(vol->sb, "Runlist element "
 							"has invalid lcn "

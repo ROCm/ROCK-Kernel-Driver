@@ -530,7 +530,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	si = di = 0;
 
 	/* Skip any unmapped start element(s) in the source runlist. */
-	while (srl[si].length && srl[si].lcn < (LCN)LCN_HOLE)
+	while (srl[si].length && srl[si].lcn < LCN_HOLE)
 		si++;
 
 	/* Can't have an entirely unmapped source runlist. */
@@ -563,7 +563,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 	for (dend = di; drl[dend].length; dend++)
 		;
 
-	if (srl[send].lcn == (LCN)LCN_ENOENT)
+	if (srl[send].lcn == LCN_ENOENT)
 		marker_vcn = srl[marker = send].vcn;
 
 	/* Scan to the last element with lcn >= LCN_HOLE. */
@@ -624,7 +624,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 						"with LCN_ENOENT.",
 						(unsigned long long)
 						drl[ds].lcn);
-				drl[ds].lcn = (LCN)LCN_ENOENT;
+				drl[ds].lcn = LCN_ENOENT;
 				goto finished;
 			}
 			/*
@@ -632,11 +632,11 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 			 * @drl or extend an existing one before adding the
 			 * ENOENT terminator.
 			 */
-			if (drl[ds].lcn == (LCN)LCN_ENOENT) {
+			if (drl[ds].lcn == LCN_ENOENT) {
 				ds--;
 				slots = 1;
 			}
-			if (drl[ds].lcn != (LCN)LCN_RL_NOT_MAPPED) {
+			if (drl[ds].lcn != LCN_RL_NOT_MAPPED) {
 				/* Add an unmapped runlist element. */
 				if (!slots) {
 					/* FIXME/TODO: We need to have the
@@ -651,7 +651,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 				if (slots != 1)
 					drl[ds].vcn = drl[ds - 1].vcn +
 							drl[ds - 1].length;
-				drl[ds].lcn = (LCN)LCN_RL_NOT_MAPPED;
+				drl[ds].lcn = LCN_RL_NOT_MAPPED;
 				/* We now used up a slot. */
 				slots--;
 			}
@@ -666,7 +666,7 @@ runlist_element *ntfs_runlists_merge(runlist_element *drl,
 					goto critical_error;
 			}
 			drl[ds].vcn = marker_vcn;
-			drl[ds].lcn = (LCN)LCN_ENOENT;
+			drl[ds].lcn = LCN_ENOENT;
 			drl[ds].length = (s64)0;
 		}
 	}
@@ -753,8 +753,8 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		return ERR_PTR(-ENOMEM);
 	/* Insert unmapped starting element if necessary. */
 	if (vcn) {
-		rl->vcn = (VCN)0;
-		rl->lcn = (LCN)LCN_RL_NOT_MAPPED;
+		rl->vcn = 0;
+		rl->lcn = LCN_RL_NOT_MAPPED;
 		rl->length = vcn;
 		rlpos++;
 	}
@@ -819,7 +819,7 @@ runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		 * to LCN_HOLE.
 		 */
 		if (!(*buf & 0xf0))
-			rl[rlpos].lcn = (LCN)LCN_HOLE;
+			rl[rlpos].lcn = LCN_HOLE;
 		else {
 			/* Get the lcn change which really can be negative. */
 			u8 b2 = *buf & 0xf;
@@ -892,7 +892,7 @@ mpa_err:
 					(unsigned long long)max_cluster);
 			rl[rlpos].vcn = vcn;
 			vcn += rl[rlpos].length = max_cluster - deltaxcn;
-			rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
+			rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 			rlpos++;
 		} else if (unlikely(deltaxcn > max_cluster)) {
 			ntfs_error(vol->sb, "Corrupt attribute. deltaxcn = "
@@ -901,9 +901,9 @@ mpa_err:
 					(unsigned long long)max_cluster);
 			goto mpa_err;
 		}
-		rl[rlpos].lcn = (LCN)LCN_ENOENT;
+		rl[rlpos].lcn = LCN_ENOENT;
 	} else /* Not the base extent. There may be more extents to follow. */
-		rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
+		rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 
 	/* Setup terminating runlist element. */
 	rl[rlpos].vcn = vcn;
@@ -962,11 +962,11 @@ LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 	 * necessary.
 	 */
 	if (unlikely(!rl))
-		return (LCN)LCN_RL_NOT_MAPPED;
+		return LCN_RL_NOT_MAPPED;
 
 	/* Catch out of lower bounds vcn. */
 	if (unlikely(vcn < rl[0].vcn))
-		return (LCN)LCN_ENOENT;
+		return LCN_ENOENT;
 
 	for (i = 0; likely(rl[i].length); i++) {
 		if (unlikely(vcn < rl[i+1].vcn)) {
@@ -982,7 +982,7 @@ LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 	if (likely(rl[i].lcn < (LCN)0))
 		return rl[i].lcn;
 	/* Just in case... We could replace this with BUG() some day. */
-	return (LCN)LCN_ENOENT;
+	return LCN_ENOENT;
 }
 
 /**
