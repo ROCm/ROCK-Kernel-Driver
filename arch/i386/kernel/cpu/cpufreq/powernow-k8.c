@@ -718,7 +718,7 @@ find_psb_table(void)
 
 /* Converts a frequency (that might not necessarily be a multiple of 200) */
 /* to a fid.                                                              */
-u32
+static u32
 find_closest_fid(u32 freq, int searchup)
 {
 	if (searchup == SEARCH_UP)
