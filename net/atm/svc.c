@@ -444,7 +444,7 @@ int __init atmsvc_init(void)
 	return sock_register(&svc_family_ops);
 }
 
-void __exit atmsvc_exit(void)
+void atmsvc_exit(void)
 {
 	sock_unregister(PF_ATMSVC);
 }

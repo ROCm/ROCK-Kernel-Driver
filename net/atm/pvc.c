@@ -121,7 +121,7 @@ int __init atmpvc_init(void)
 	return sock_register(&pvc_family_ops);
 }
 
-void __exit atmpvc_exit(void)
+void atmpvc_exit(void)
 {
 	sock_unregister(PF_ATMPVC);
 }
