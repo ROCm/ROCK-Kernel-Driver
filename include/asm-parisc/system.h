@@ -51,6 +51,7 @@ extern struct task_struct *_switch_to(struct task_struct *, struct task_struct *
 #define smp_mb()	mb()
 #define smp_rmb()	rmb()
 #define smp_wmb()	wmb()
+#define smp_read_barrier_depends()	do { } while(0)
 #else
 /* This is simply the barrier() macro from linux/kernel.h but when serial.c
  * uses tqueue.h uses smp_mb() defined using barrier(), linux/kernel.h
@@ -59,6 +60,7 @@ extern struct task_struct *_switch_to(struct task_struct *, struct task_struct *
 #define smp_mb()	__asm__ __volatile__("":::"memory");
 #define smp_rmb()	__asm__ __volatile__("":::"memory");
 #define smp_wmb()	__asm__ __volatile__("":::"memory");
+#define smp_read_barrier_depends()	do { } while(0)
 #endif
 
 /* interrupt control */
@@ -120,6 +122,7 @@ static inline void set_eiem(unsigned long val)
 
 #define mb()  __asm__ __volatile__ ("sync" : : :"memory")
 #define wmb() mb()
+#define read_barrier_depends()	do { } while(0)
 #define set_mb(var, value)  do { var = value; mb(); } while (0)
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 

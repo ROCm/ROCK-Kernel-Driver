@@ -4,6 +4,7 @@
 #if defined(__KERNEL__) || defined(_LVM_H_INCLUDE)
 
 #include <linux/prefetch.h>
+#include <asm/system.h>
 
 /*
  * Simple doubly linked list implementation.
@@ -71,6 +72,49 @@ static inline void list_add_tail(struct list_head *new, struct list_head *head)
 }
 
 /*
+ * Insert a new entry between two known consecutive entries. 
+ *
+ * This is only for internal list manipulation where we know
+ * the prev/next entries already!
+ */
+static __inline__ void __list_add_rcu(struct list_head * new,
+	struct list_head * prev,
+	struct list_head * next)
+{
+	new->next = next;
+	new->prev = prev;
+	wmb();
+	next->prev = new;
+	prev->next = new;
+}
+
+/**
+ * list_add_rcu - add a new entry to rcu-protected list
+ * @new: new entry to be added
+ * @head: list head to add it after
+ *
+ * Insert a new entry after the specified head.
+ * This is good for implementing stacks.
+ */
+static __inline__ void list_add_rcu(struct list_head *new, struct list_head *head)
+{
+	__list_add_rcu(new, head, head->next);
+}
+
+/**
+ * list_add_tail_rcu - add a new entry to rcu-protected list
+ * @new: new entry to be added
+ * @head: list head to add it before
+ *
+ * Insert a new entry before the specified head.
+ * This is useful for implementing queues.
+ */
+static __inline__ void list_add_tail_rcu(struct list_head *new, struct list_head *head)
+{
+	__list_add_rcu(new, head->prev, head);
+}
+
+/*
  * Delete a list entry by making the prev/next entries
  * point to each other.
  *
@@ -90,6 +134,17 @@ static inline void __list_del(struct list_head * prev, struct list_head * next)
  * in an undefined state.
  */
 static inline void list_del(struct list_head *entry)
+{
+	__list_del(entry->prev, entry->next);
+}
+/**
+ * list_del_rcu - deletes entry from list without re-initialization
+ * @entry: the element to delete from the list.
+ * Note: list_empty on entry does not return true after this, 
+ * the entry is in an undefined state. It is useful for RCU based
+ * lockfree traversal.
+ */
+static inline void list_del_rcu(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
 }
@@ -239,6 +294,30 @@ static inline void list_splice_init(struct list_head *list,
 	     &pos->member != (head); 					\
 	     pos = list_entry(pos->member.next, typeof(*pos), member),	\
 		     prefetch(pos->member.next))
+
+/**
+ * list_for_each_rcu	-	iterate over an rcu-protected list
+ * @pos:	the &struct list_head to use as a loop counter.
+ * @head:	the head for your list.
+ */
+#define list_for_each_rcu(pos, head) \
+	for (pos = (head)->next, prefetch(pos->next); pos != (head); \
+        	pos = pos->next, ({ read_barrier_depends(); 0;}), prefetch(pos->next))
+        	
+#define __list_for_each_rcu(pos, head) \
+	for (pos = (head)->next; pos != (head); \
+        	pos = pos->next, ({ read_barrier_depends(); 0;}))
+        	
+/**
+ * list_for_each_safe_rcu	-	iterate over an rcu-protected list safe
+ *					against removal of list entry
+ * @pos:	the &struct list_head to use as a loop counter.
+ * @n:		another &struct list_head to use as temporary storage
+ * @head:	the head for your list.
+ */
+#define list_for_each_safe_rcu(pos, n, head) \
+	for (pos = (head)->next, n = pos->next; pos != (head); \
+		pos = n, ({ read_barrier_depends(); 0;}), n = pos->next)
 
 #endif /* __KERNEL__ || _LVM_H_INCLUDE */
 
