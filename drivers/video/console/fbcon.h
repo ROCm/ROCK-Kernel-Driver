@@ -25,10 +25,7 @@
 
 struct display {
     /* Filled in by the frame buffer device */
-    u_short can_soft_blank;         /* zero if no hardware blanking */
     u_short inverse;                /* != 0 text black on white as default */
-    struct display_switch *dispsw;  /* low level operations */
-
     /* Filled in by the low-level console driver */
     struct fb_info *fb_info;        /* frame buffer for this console */
     int vrows;                      /* number of virtual rows */
@@ -41,19 +38,11 @@ struct display {
     u_short scrollmode;             /* Scroll Method */
     short yscroll;                  /* Hardware scrolling */
     unsigned char fgshift, bgshift;
-    unsigned short charmask;        /* 0xff or 0x1ff */
-    unsigned int fontwidthmask;      /* 1 at (1 << (width - 1)) if width is supported */
 };
 
 /* drivers/video/console/fbcon.c */
-extern struct display fb_display[MAX_NR_CONSOLES];
 extern char con2fb_map[MAX_NR_CONSOLES];
 extern void set_con2fb_map(int unit, int newidx);
-
-/* fontwidth w is supported by dispsw */
-#define FONTWIDTH(w)	(1 << ((w) - 1))
-/* fontwidths w1-w2 inclusive are supported by dispsw */
-#define FONTWIDTHRANGE(w1,w2)	(FONTWIDTH(w2+1) - FONTWIDTH(w1))
 
     /*
      *  Attribute Decoding

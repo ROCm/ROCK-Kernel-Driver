@@ -302,6 +302,7 @@ static void putcs_unaligned(struct vc_data *vc, struct display *p,
                            struct fb_info *info, struct fb_image *image,
                            int count, const unsigned short *s)
 {
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	unsigned int width = (vc->vc_font.width + 7)/8;
 	unsigned int cellsize = vc->vc_font.height * width;
 	unsigned int maxcnt = info->pixmap.size/cellsize;
@@ -310,7 +311,6 @@ static void putcs_unaligned(struct vc_data *vc, struct display *p,
 	unsigned int buf_align = info->pixmap.buf_align - 1;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int idx = vc->vc_font.width/8;
-	unsigned short charmask = p->charmask;
 	u8 mask, *src, *dst, *dst0;
 
 	while (count) {
@@ -350,13 +350,13 @@ static void putcs_aligned(struct vc_data *vc, struct display *p,
                          struct fb_info *info, struct fb_image *image,
                          int count, const unsigned short *s)
 {
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	unsigned int width = vc->vc_font.width/8;
 	unsigned int cellsize = vc->vc_font.height * width;
 	unsigned int maxcnt = info->pixmap.size/cellsize;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
 	unsigned int pitch, cnt, size, k;
-	unsigned short charmask = p->charmask;
 	u8 *src, *dst, *dst0;
 
 	while (count) {
@@ -423,13 +423,13 @@ void accel_clear(struct vc_data *vc, struct display *p, int sy,
 static void accel_putc(struct vc_data *vc, struct display *p,
                       int c, int ypos, int xpos)
 {
-	struct fb_image image;
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct fb_info *info = p->fb_info;
-	unsigned short charmask = p->charmask;
 	unsigned int width = (vc->vc_font.width + 7)/8;
 	unsigned int size, pitch;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
+	struct fb_image image;
 	u8 *src, *dst;
 
 	image.dx = xpos * vc->vc_font.width;
@@ -510,6 +510,7 @@ void accel_clear_margins(struct vc_data *vc, struct display *p,
 
 void accel_cursor(struct vc_data *vc, struct display *p, int flags, int xx, int yy)
 {
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	static int fgcolor, bgcolor, shape, width, height;
 	static char mask[64], image[64], *dest;
 	struct fb_info *info = p->fb_info;
@@ -538,7 +539,7 @@ void accel_cursor(struct vc_data *vc, struct display *p, int flags, int xx, int 
 		bgcolor = (int) attr_bgcol(p, c);
 		cursor.set |= FB_CUR_SETCMAP;
 	}
-	c &= p->charmask;
+	c &= charmask;
 	font = p->fontdata + (c * ((width + 7) / 8) * height);
 	if (font != dest) {
 		dest = font;
@@ -773,7 +774,6 @@ static void fbcon_init(struct vc_data *vc, int init)
 	/* on which frame buffer will we open this console? */
 	info = registered_fb[(int) con2fb_map[unit]];
 	
-	fb_display[unit].can_soft_blank = info->fbops->fb_blank ? 1 : 0;
 	if (info->var.accel_flags)
 		fb_display[unit].scrollmode = SCROLL_YNOMOVE;
 	else
@@ -789,8 +789,6 @@ static void fbcon_deinit(struct vc_data *vc)
 
 	fbcon_free_font(p);
 }
-
-#define fontwidthvalid(p,w) ((p)->fontwidthmask & FONTWIDTH(w))
 
 static __inline__ void updatescrollmode(struct display *p, struct vc_data *vc)
 {
@@ -828,12 +826,6 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 
 	info->var.xoffset = info->var.yoffset = p->yscroll = 0;	/* reset wrap/pan */
 
-	/*
-	 * FIXME: need to set this in order for KDFONTOP ioctl
-	 *        to work
-	 */
-	p->fontwidthmask = FONTWIDTHRANGE(1,16);
-
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		if (vc && i != vc->vc_num && fb_display[i].fb_info == info &&
 		    fb_display[i].fontdata)
@@ -844,7 +836,7 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 		struct display *q = &fb_display[i];
 		struct vc_data *tmp = vc_cons[i].d;
 		
-		if (!fontwidthvalid(p, vc->vc_font.width)) {
+		if (vc->vc_font.width > 32) {
 			/* If we are not the first console on this
 			   fb, copy the font from that console */
 			vc->vc_font.width = tmp->vc_font.width;
@@ -947,14 +939,12 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 		vc->vc_hi_font_mask = 0;
 		p->fgshift = 8;
 		p->bgshift = 12;
-		p->charmask = 0xff;
 	} else {
 		vc->vc_hi_font_mask = 0x100;
 		if (vc->vc_can_do_color)
 			vc->vc_complement_mask <<= 1;
 		p->fgshift = 9;
 		p->bgshift = 13;
-		p->charmask = 0x1ff;
 	}
 
 	if (!init) {
@@ -1016,7 +1006,7 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
  *
  *	fbcon_bmove_physical_8()    -- These functions fast implementations
  *	fbcon_clear_physical_8()    -- of original fbcon_XXX fns.
- *	fbcon_putc_physical_8()	    -- (fontwidth != 8) may be added later
+ *	fbcon_putc_physical_8()	    -- (font width != 8) may be added later
  *
  *  WARNING:
  *
@@ -1039,10 +1029,11 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 {
 	int unit = vc->vc_num;
 	struct display *p = &fb_display[unit];
+	struct fb_info *info = p->fb_info;
 	u_int y_break;
 	int redraw_cursor = 0;
 
-	if (!p->can_soft_blank && console_blanked)
+	if (!info->fbops->fb_blank && console_blanked)
 		return;
 
 	if (!height || !width)
@@ -1073,9 +1064,10 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 {
 	struct display *p = &fb_display[vc->vc_num];
+	struct fb_info *info = p->fb_info;
 	int redraw_cursor = 0;
 
-	if (!p->can_soft_blank && console_blanked)
+	if (!info->fbops->fb_blank && console_blanked)
 		return;
 
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
@@ -1098,9 +1090,10 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 {
 	int unit = vc->vc_num;
 	struct display *p = &fb_display[unit];
+	struct fb_info *info = p->fb_info;
 	int redraw_cursor = 0;
 
-	if (!p->can_soft_blank && console_blanked)
+	if (!info->fbops->fb_blank && console_blanked)
 		return;
 
 	if (vt_cons[unit]->vc_mode != KD_TEXT)
@@ -1466,7 +1459,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 	struct fb_info *info = p->fb_info;
 	int scroll_partial = !(p->scrollmode & __SCROLL_YNOPARTIAL);
 
-	if (!p->can_soft_blank && console_blanked)
+	if (!info->fbops->fb_blank && console_blanked)
 		return 0;
 
 	if (!count || vt_cons[unit]->vc_mode != KD_TEXT)
@@ -1625,8 +1618,9 @@ static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 {
 	int unit = vc->vc_num;
 	struct display *p = &fb_display[unit];
-
-	if (!p->can_soft_blank && console_blanked)
+	struct fb_info *info = p->fb_info;
+	
+	if (!info->fbops->fb_blank && console_blanked)
 		return;
 
 	if (!width || !height)
@@ -1791,6 +1785,7 @@ static int fbcon_switch(struct vc_data *vc)
 
 static int fbcon_blank(struct vc_data *vc, int blank)
 {
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct display *p = &fb_display[vc->vc_num];
 	struct fb_info *info = p->fb_info;
 
@@ -1799,14 +1794,14 @@ static int fbcon_blank(struct vc_data *vc, int blank)
 
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
 
-	if (!p->can_soft_blank) {
+	if (!info->fbops->fb_blank) {
 		if (blank) {
 			unsigned short oldc;
 			u_int height;
 			u_int y_break;
 
 			oldc = vc->vc_video_erase_char;
-			vc->vc_video_erase_char &= p->charmask;
+			vc->vc_video_erase_char &= charmask;
 			height = vc->vc_rows;
 			y_break = p->vrows - p->yscroll;
 			if (height > y_break) {
@@ -1850,7 +1845,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 
 	op->width = vc->vc_font.width;
 	op->height = vc->vc_font.height;
-	op->charcount = (p->charmask == 0x1ff) ? 512 : 256;
+	op->charcount = vc->vc_hi_font_mask ? 512 : 256;
 	if (!op->data)
 		return 0;
 
@@ -1904,7 +1899,7 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	int cnt;
 	char *old_data = NULL;
 
-	if (!fontwidthvalid(p, w)) {
+	if (!w > 32) {
 		if (userfont && op->op != KD_FONT_OP_COPY)
 			kfree(data - FONT_EXTRA_WORDS * sizeof(int));
 		return -ENXIO;
@@ -1931,7 +1926,6 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 			vc->vc_complement_mask >>= 1;
 		p->fgshift--;
 		p->bgshift--;
-		p->charmask = 0xff;
 
 		/* ++Edmund: reorder the attribute bits */
 		if (vc->vc_can_do_color) {
@@ -1955,7 +1949,6 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 			vc->vc_complement_mask <<= 1;
 		p->fgshift++;
 		p->bgshift++;
-		p->charmask = 0x1ff;
 
 		/* ++Edmund: reorder the attribute bits */
 		{
@@ -2177,7 +2170,7 @@ static int fbcon_set_palette(struct vc_data *vc, unsigned char *table)
 	u8 val;
 
 	if (!vc->vc_can_do_color
-	    || (!p->can_soft_blank && console_blanked))
+	    || (!info->fbops->fb_blank && console_blanked))
 		return -EINVAL;
 	for (i = j = 0; i < 16; i++) {
 		k = table[i];
@@ -2336,7 +2329,7 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines)
 	if (scrollback_current == scrollback_old)
 		return 0;
 
-	if (!p->can_soft_blank &&
+	if (!info->fbops->fb_blank &&
 	    (console_blanked || vt_cons[unit]->vc_mode != KD_TEXT
 	     || !lines))
 		return 0;

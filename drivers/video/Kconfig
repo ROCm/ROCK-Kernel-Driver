@@ -38,7 +38,7 @@ config FB
 	  (e.g. an accelerated X server) and that are not frame buffer
 	  device-aware may cause unexpected results. If unsure, say N.
 
-config FB_CLGEN
+config FB_CIRRUS
 	tristate "Cirrus Logic support"
 	depends on FB && (AMIGA || PCI)
 	---help---
@@ -48,7 +48,7 @@ config FB_CLGEN
 	  If you have a PCI-based system, this enables support for these
 	  chips: GD-543x, GD-544x, GD-5480.
 
-	  Please read the file <file:Documentation/fb/clgenfb.txt>.
+	  Please read the file <file:Documentation/fb/cirrusfb.txt>.
 
 	  Say N unless you have such a graphics board or plan to get one
 	  before you next recompile the kernel.
@@ -282,7 +282,7 @@ config FB_S3TRIO
 	  If you have a S3 Trio say Y. Say N for S3 Virge.
 
 config FB_VGA16
-	tristate "VGA 16-color graphics console"
+	tristate "VGA 16-color graphics support"
 	depends on FB && (X86 || PPC)
 	help
 	  This is the frame buffer device driver for VGA 16 color graphic
@@ -329,7 +329,7 @@ config FB_TGA
 	  cards. Say Y if you have one of those.
 
 config FB_VESA
-	bool "VESA VGA graphics console"
+	bool "VESA VGA graphics support"
 	depends on FB && (X86 || X86_64)
 	help
 	  This is the frame buffer device driver for generic VESA 2.0
@@ -343,7 +343,7 @@ config VIDEO_SELECT
 	default y
 
 config FB_HGA
-	tristate "Hercules mono graphics console"
+	tristate "Hercules mono graphics support"
 	depends on FB && X86
 	help
 	  Say Y here if you have a Hercules mono graphics card.
@@ -927,9 +927,13 @@ config FB_VIRTUAL
 	  say M here and read <file:Documentation/modules.txt>.
 
 	  If unsure, say N.
+if VT
+	source "drivers/video/console/Kconfig"
+endif
 
-source "drivers/video/console/Kconfig"
-source "drivers/video/logo/Kconfig"
+if FB || SGI_NEWPORT_CONSOLE
+	source "drivers/video/logo/Kconfig"
+endif
 
 endmenu
 

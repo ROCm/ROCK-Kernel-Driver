@@ -343,6 +343,7 @@ struct fb_pixmap {
 	u8   (*inbuf) (u8 *addr);
 	unsigned long lock_flags;         /* flags for locking             */
 	spinlock_t lock;                  /* spinlock                      */
+	atomic_t count;
 };
 #ifdef __KERNEL__
 
