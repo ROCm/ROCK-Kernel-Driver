@@ -383,18 +383,15 @@ static void config_chipset_for_pio (ide_drive_t *drive, u8 set_speed)
 
 static int cmd64x_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
 
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 regU = 0, pciU	= (hwif->channel) ? UDIDETCR1 : UDIDETCR0;
 	u8 regD = 0, pciD	= (hwif->channel) ? BMIDESR1 : BMIDESR0;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	u8 speed	= ide_rate_filter(cmd64x_ratemask(drive), xferspeed);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (speed > XFER_PIO_4) {
 		(void) pci_read_config_byte(dev, pciD, &regD);
 		(void) pci_read_config_byte(dev, pciU, &regU);
@@ -405,10 +402,8 @@ static int cmd64x_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		(void) pci_read_config_byte(dev, pciD, &regD);
 		(void) pci_read_config_byte(dev, pciU, &regU);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	switch(speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_5:	regU |= (unit ? 0x0A : 0x05); break;
 		case XFER_UDMA_4:	regU |= (unit ? 0x4A : 0x15); break;
 		case XFER_UDMA_3:	regU |= (unit ? 0x8A : 0x25); break;
@@ -421,7 +416,6 @@ static int cmd64x_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_SW_DMA_2:	regD |= (unit ? 0x40 : 0x10); break;
 		case XFER_SW_DMA_1:	regD |= (unit ? 0x80 : 0x20); break;
 		case XFER_SW_DMA_0:	regD |= (unit ? 0xC0 : 0x30); break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:	cmd64x_tuneproc(drive, 4); break;
 		case XFER_PIO_3:	cmd64x_tuneproc(drive, 3); break;
 		case XFER_PIO_2:	cmd64x_tuneproc(drive, 2); break;
@@ -432,29 +426,26 @@ static int cmd64x_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 			return 1;
 	}
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (speed > XFER_PIO_4) {
 		(void) pci_write_config_byte(dev, pciU, regU);
 		regD |= (unit ? 0x40 : 0x20);
 		(void) pci_write_config_byte(dev, pciD, regD);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	return (ide_config_drive_speed(drive, speed));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static int config_chipset_for_dma (ide_drive_t *drive)
 {
 	u8 speed	= ide_dma_speed(drive, cmd64x_ratemask(drive));
 
-	config_chipset_for_pio(drive, (!(speed)));
+	config_chipset_for_pio(drive, !speed);
 
-	if ((!(speed)))
+	if (!speed)
 		return 0;
 
-	if (HWIF(drive)->speedproc(drive, speed))
-		return 0;
+	if(ide_set_xfer_rate(drive, speed))
+		return 0; 
 
 	if (!drive->init_speed)
 		drive->init_speed = speed;
@@ -593,7 +584,6 @@ static int cmd646_1_ide_dma_end (ide_drive_t *drive)
 	/* verify good DMA status */
 	return (dma_stat & 7) != 4;
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static unsigned int __init init_chipset_cmd64x (struct pci_dev *dev, const char *name)
 {
@@ -732,7 +722,6 @@ static void __init init_hwif_cmd64x (ide_hwif_t *hwif)
 	if (dev->device == PCI_DEVICE_ID_CMD_648)
 		hwif->ultra_mask = 0x1f;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &cmd64x_config_drive_for_dma;
 	if (!(hwif->udma_four))
 		hwif->udma_four = ata66_cmd64x(hwif);
@@ -755,7 +744,6 @@ static void __init init_hwif_cmd64x (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_cmd64x (ide_hwif_t *hwif, unsigned long dmabase)
