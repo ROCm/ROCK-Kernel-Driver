@@ -82,7 +82,7 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	int rc = -EACCES;
 	int xid;
 	char *full_path = NULL;
-	char target_path[257];
+	char * target_path;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 
@@ -91,7 +91,11 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	cFYI(1, ("Full path: %s inode = 0x%p", full_path, inode));
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
-
+	target_path = kmalloc(PATH_MAX, GFP_KERNEL);
+	if(target_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	/* can not call the following line due to EFAULT in vfs_readlink which is presumably expecting a user space buffer */
 	/* length = cifs_readlink(direntry,target_path, sizeof(target_path) - 1);    */
 
@@ -99,7 +103,7 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	if (pTcon->ses->capabilities & CAP_UNIX)
 		rc = CIFSSMBUnixQuerySymLink(xid, pTcon, full_path,
 					     target_path,
-					     sizeof (target_path) - 1,
+					     PATH_MAX-1,
 					     cifs_sb->local_nls);
 	else {
 		/* rc = CIFSSMBQueryReparseLinkInfo */
@@ -109,11 +113,13 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	/* BB Should we be using page symlink ops here? */
 
 	if (rc == 0) {
-		target_path[256] = 0;
+		target_path[PATH_MAX-1] = 0;
 		rc = vfs_follow_link(nd, target_path);
 	}
 	/* else EACCESS */
 
+	if (target_path)
+		kfree(target_path);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
@@ -180,7 +186,8 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
-	char tmpbuffer[256];
+	char * tmpbuffer;
+	int len;
 	__u16 fid;
 
 	xid = GetXid();
@@ -190,20 +197,28 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	cFYI(1,
 	     ("Full path: %s inode = 0x%p pBuffer = 0x%p buflen = %d",
 	      full_path, inode, pBuffer, buflen));
-
+	if(buflen > PATH_MAX)
+		len = PATH_MAX;
+	else
+		len = buflen;
+	tmpbuffer = kmalloc(len,GFP_KERNEL);   
+	if(tmpbuffer == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 /* BB add read reparse point symlink code and Unix extensions symlink code here BB */
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
 		rc = CIFSSMBUnixQuerySymLink(xid, pTcon, full_path,
-					tmpbuffer,
-					sizeof (tmpbuffer) - 1,
-					cifs_sb->local_nls);
+				tmpbuffer,
+				len - 1,
+				cifs_sb->local_nls);
 	else {
 		rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, GENERIC_READ,
 				OPEN_REPARSE_POINT,&fid, &oplock, cifs_sb->local_nls);
 		if(!rc) {
 			rc = CIFSSMBQueryReparseLinkInfo(xid, pTcon, full_path,
 				tmpbuffer,
-				sizeof(tmpbuffer) - 1, 
+				len - 1, 
 				fid,
 				cifs_sb->local_nls);
 			if(CIFSSMBClose(xid, pTcon, fid)) {
@@ -216,15 +231,15 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	/* BB Should we be using page ops here? */
 
 	/* BB null terminate returned string in pBuffer? BB */
-	if (buflen > sizeof (tmpbuffer))
-		buflen = sizeof (tmpbuffer);
 	if (rc == 0) {
-		rc = vfs_readlink(direntry, pBuffer, buflen, tmpbuffer);
+		rc = vfs_readlink(direntry, pBuffer, len, tmpbuffer);
 		cFYI(1,
 		     ("vfs_readlink called from cifs_readlink returned %d",
 		      rc));
 	}
 
+	if (tmpbuffer)
+		kfree(tmpbuffer);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
