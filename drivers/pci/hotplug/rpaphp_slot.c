@@ -29,8 +29,36 @@
 #include <linux/pci.h>
 #include "rpaphp.h"
 
-/* free up the memory user by a slot */
+static ssize_t location_read_file (struct hotplug_slot *php_slot, char *buf)
+{
+        char *value;
+        int retval = -ENOENT;
+	struct slot *slot = (struct slot *)php_slot->private;
 
+	if (!slot)
+		return retval;
+
+        value = slot->location;
+        retval = sprintf (buf, "%s\n", value);
+        return retval;
+}
+
+static struct hotplug_slot_attribute hotplug_slot_attr_location = {
+	.attr = {.name = "phy_location", .mode = S_IFREG | S_IRUGO},
+	.show = location_read_file,
+};
+
+static void rpaphp_sysfs_add_attr_location (struct hotplug_slot *slot)
+{
+	sysfs_create_file(&slot->kobj, &hotplug_slot_attr_location.attr);
+}
+
+void rpaphp_sysfs_remove_attr_location (struct hotplug_slot *slot)
+{
+	sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_location.attr);
+}
+
+/* free up the memory user by a slot */
 static void rpaphp_release_slot(struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = hotplug_slot? (struct slot *) hotplug_slot->private:NULL;
@@ -76,9 +104,17 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 		return (NULL);
 	}
 	memset(slot->hotplug_slot->info, 0, sizeof (struct hotplug_slot_info));
-	slot->hotplug_slot->name = kmalloc(strlen(drc_name) + 1, GFP_KERNEL);
+	slot->hotplug_slot->name = kmalloc(BUS_ID_SIZE + 1, GFP_KERNEL);
 	if (!slot->hotplug_slot->name) {
 		kfree(slot->hotplug_slot->info);
+		kfree(slot->hotplug_slot);
+		kfree(slot);
+		return (NULL);
+	}
+	slot->location = kmalloc(strlen(drc_name) + 1, GFP_KERNEL);
+	if (!slot->location) {
+		kfree(slot->hotplug_slot->info);
+		kfree(slot->hotplug_slot->name);
 		kfree(slot->hotplug_slot);
 		kfree(slot);
 		return (NULL);
@@ -86,7 +122,7 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 	slot->name = slot->hotplug_slot->name;
 	slot->dn = dn;
 	slot->index = drc_index;
-	strcpy(slot->name, drc_name);
+	strcpy(slot->location, drc_name);
 	slot->power_domain = power_domain;
 	slot->magic = SLOT_MAGIC;
 	slot->hotplug_slot->private = slot;
@@ -110,41 +146,9 @@ int register_slot(struct slot *slot)
 		rpaphp_release_slot(slot->hotplug_slot);
 		return (retval);
 	}
-	switch (slot->dev_type) {
-	case PCI_DEV:
-		/* create symlink between slot->name and it's bus_id */
-
-		dbg("%s: sysfs_create_link: %s --> %s\n", __FUNCTION__,
-		    pci_name(slot->bridge), slot->name);
-
-		retval = sysfs_create_link(slot->hotplug_slot->kobj.parent,
-					   &slot->hotplug_slot->kobj,
-					   pci_name(slot->bridge));
-		if (retval) {
-			err("sysfs_create_link failed with error %d\n", retval);
-			rpaphp_release_slot(slot->hotplug_slot);
-			return (retval);
-		}
-		break;
-	case VIO_DEV:
-		/* create symlink between slot->name and it's uni-address */
-		vio_uni_addr = strchr(slot->dn->full_name, '@');
-		if (!vio_uni_addr)
-			return (1);
-		dbg("%s: sysfs_create_link: %s --> %s\n", __FUNCTION__,
-		    vio_uni_addr, slot->name);
-		retval = sysfs_create_link(slot->hotplug_slot->kobj.parent,
-					   &slot->hotplug_slot->kobj,
-					   vio_uni_addr);
-		if (retval) {
-			err("sysfs_create_link failed with error %d\n", retval);
-			rpaphp_release_slot(slot->hotplug_slot);
-			return (retval);
-		}
-		break;
-	default:
-		return (1);
-	}
+	
+	/* create "phy_locatoin" file */
+	rpaphp_sysfs_add_attr_location(slot->hotplug_slot);	
 
 	/* add slot to our internal list */
 	dbg("%s adding slot[%s] to rpaphp_slot_list\n",
