@@ -416,13 +416,14 @@ int cleanup_journal_tail(journal_t *journal)
 		blocknr = journal->j_head;
 	}
 	spin_unlock(&journal->j_list_lock);
-	spin_unlock(&journal->j_state_lock);
-	J_ASSERT (blocknr != 0);
+	J_ASSERT(blocknr != 0);
 
 	/* If the oldest pinned transaction is at the tail of the log
            already then there's not much we can do right now. */
-	if (journal->j_tail_sequence == first_tid)
+	if (journal->j_tail_sequence == first_tid) {
+		spin_unlock(&journal->j_state_lock);
 		return 1;
+	}
 
 	/* OK, update the superblock to recover the freed space.
 	 * Physical blocks come first: have we wrapped beyond the end of
@@ -439,6 +440,7 @@ int cleanup_journal_tail(journal_t *journal)
 	journal->j_free += freed;
 	journal->j_tail_sequence = first_tid;
 	journal->j_tail = blocknr;
+	spin_unlock(&journal->j_state_lock);
 	if (!(journal->j_flags & JFS_ABORT))
 		journal_update_superblock(journal, 1);
 	return 0;

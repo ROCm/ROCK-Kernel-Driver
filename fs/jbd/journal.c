@@ -850,12 +850,14 @@ void journal_update_superblock(journal_t *journal, int wait)
 	journal_superblock_t *sb = journal->j_superblock;
 	struct buffer_head *bh = journal->j_sb_buffer;
 
+	spin_lock(&journal->j_state_lock);
 	jbd_debug(1,"JBD: updating superblock (start %ld, seq %d, errno %d)\n",
 		  journal->j_tail, journal->j_tail_sequence, journal->j_errno);
 
 	sb->s_sequence = htonl(journal->j_tail_sequence);
 	sb->s_start    = htonl(journal->j_tail);
 	sb->s_errno    = htonl(journal->j_errno);
+	spin_unlock(&journal->j_state_lock);
 
 	BUFFER_TRACE(bh, "marking dirty");
 	mark_buffer_dirty(bh);
@@ -1260,18 +1262,21 @@ int journal_flush(journal_t *journal)
 	 * the magic code for a fully-recovered superblock.  Any future
 	 * commits of data to the journal will restore the current
 	 * s_start value. */
+	spin_lock(&journal->j_state_lock);
 	old_tail = journal->j_tail;
 	journal->j_tail = 0;
+	spin_unlock(&journal->j_state_lock);
 	journal_update_superblock(journal, 1);
+	spin_lock(&journal->j_state_lock);
 	journal->j_tail = old_tail;
-
-	unlock_journal(journal);
 
 	J_ASSERT(!journal->j_running_transaction);
 	J_ASSERT(!journal->j_committing_transaction);
 	J_ASSERT(!journal->j_checkpoint_transactions);
 	J_ASSERT(journal->j_head == journal->j_tail);
 	J_ASSERT(journal->j_tail_sequence == journal->j_transaction_sequence);
+	spin_unlock(&journal->j_state_lock);
+	unlock_journal(journal);
 	
 	return err;
 }
@@ -1289,7 +1294,7 @@ int journal_flush(journal_t *journal)
  * we merely suppress recovery.
  */
 
-int journal_wipe (journal_t *journal, int write)
+int journal_wipe(journal_t *journal, int write)
 {
 	journal_superblock_t *sb;
 	int err = 0;
