@@ -527,8 +527,6 @@ static inline int pci_present(void)
 	return !list_empty(&pci_devices);
 }
 
-#define pci_for_each_dev(dev) \
-	for(dev = pci_dev_g(pci_devices.next); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.next))
 #define pci_for_each_dev_reverse(dev) \
 	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
 #define pci_for_each_bus(bus) \
@@ -713,9 +711,6 @@ static inline int pci_save_state(struct pci_dev *dev, u32 *buffer) { return 0; }
 static inline int pci_restore_state(struct pci_dev *dev, u32 *buffer) { return 0; }
 static inline int pci_set_power_state(struct pci_dev *dev, int state) { return 0; }
 static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { return 0; }
-
-#define pci_for_each_dev(dev) \
-	for(dev = NULL; 0; )
 
 #define	isa_bridge	((struct pci_dev *)NULL)
 
