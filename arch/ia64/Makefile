@@ -22,7 +22,7 @@ CFLAGS := $(CFLAGS) -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
 # -ffunction-sections
 CFLAGS_KERNEL := -mconstant-gp
 
-GCC_VERSION=$(shell $(CROSS_COMPILE)$(HOSTCC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
+GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
 ifneq ($(GCC_VERSION),2)
 	CFLAGS += -frename-registers --param max-inline-insns=2000
