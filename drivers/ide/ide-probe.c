@@ -628,9 +628,6 @@ static int init_irq(struct ata_channel *ch)
 			return 1;
 		}
 		memset(hwgroup, 0, sizeof(*hwgroup));
-		init_timer(&hwgroup->timer);
-		hwgroup->timer.function = &ide_timer_expiry;
-		hwgroup->timer.data = (unsigned long) hwgroup;
 	}
 
 	/*
@@ -659,6 +656,11 @@ static int init_irq(struct ata_channel *ch)
 	 * Everything is okay. Tag us as member of this hardware group.
 	 */
 	ch->hwgroup = hwgroup;
+
+	init_timer(&ch->timer);
+	ch->timer.function = &ide_timer_expiry;
+	ch->timer.data = (unsigned long) ch;
+
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		struct ata_device *drive = &ch->drives[i];
 		request_queue_t *q;
@@ -667,8 +669,8 @@ static int init_irq(struct ata_channel *ch)
 		if (!drive->present)
 			continue;
 
-		if (!hwgroup->XXX_drive)
-			hwgroup->XXX_drive = drive;
+		if (!ch->drive)
+			ch->drive = drive;
 
 		/*
 		 * Init the per device request queue
@@ -842,7 +844,6 @@ static void channel_init(struct ata_channel *ch)
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		char name[80];
 
-		ide_add_generic_settings(ch->drives + unit);
 		ch->drives[unit].dn = ((ch->unit ? 2 : 0) + unit);
 		sprintf(name, "host%d/bus%d/target%d/lun%d",
 			ch->index, ch->unit, unit, ch->drives[unit].lun);

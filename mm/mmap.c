@@ -17,7 +17,10 @@
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
-#include <asm/tlbflush.h>
+#include <asm/tlb.h>
+
+extern void unmap_page_range(mmu_gather_t *,struct vm_area_struct *vma, unsigned long address, unsigned long size);
+extern void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr);
 
 /*
  * WARNING: the debugging will use recursive algorithms so never enable this
@@ -329,11 +332,11 @@ static void __vma_link(struct mm_struct * mm, struct vm_area_struct * vma,  stru
 static inline void vma_link(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev,
 			    rb_node_t ** rb_link, rb_node_t * rb_parent)
 {
-	lock_vma_mappings(vma);
 	spin_lock(&mm->page_table_lock);
+	lock_vma_mappings(vma);
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
-	spin_unlock(&mm->page_table_lock);
 	unlock_vma_mappings(vma);
+	spin_unlock(&mm->page_table_lock);
 
 	mm->map_count++;
 	validate_mm(mm);
@@ -781,13 +784,11 @@ static struct vm_area_struct * unmap_fixup(struct mm_struct *mm,
 		 */
 		area->vm_end = addr;
 		lock_vma_mappings(area);
-		spin_lock(&mm->page_table_lock);
 	} else if (addr == area->vm_start) {
 		area->vm_pgoff += (end - area->vm_start) >> PAGE_SHIFT;
 		/* same locking considerations of the above case */
 		area->vm_start = end;
 		lock_vma_mappings(area);
-		spin_lock(&mm->page_table_lock);
 	} else {
 	/* Unmapping a hole: area->vm_start < addr <= end < area->vm_end */
 		/* Add end mapping -- leave beginning for below */
@@ -814,12 +815,10 @@ static struct vm_area_struct * unmap_fixup(struct mm_struct *mm,
 		 * things correctly.
 		 */
 		lock_vma_mappings(area);
-		spin_lock(&mm->page_table_lock);
 		__insert_vm_struct(mm, mpnt);
 	}
 
 	__insert_vm_struct(mm, area);
-	spin_unlock(&mm->page_table_lock);
 	unlock_vma_mappings(area);
 	return extra;
 }
@@ -837,12 +836,13 @@ static struct vm_area_struct * unmap_fixup(struct mm_struct *mm,
  * "prev", if it exists, points to a vma before the one
  * we just free'd - but there's no telling how much before.
  */
-static void free_pgtables(struct mm_struct * mm, struct vm_area_struct *prev,
+static void free_pgtables(mmu_gather_t *tlb, struct vm_area_struct *prev,
 	unsigned long start, unsigned long end)
 {
 	unsigned long first = start & PGDIR_MASK;
 	unsigned long last = end + PGDIR_SIZE - 1;
 	unsigned long start_index, end_index;
+	struct mm_struct *mm = tlb->mm;
 
 	if (!prev) {
 		prev = mm->mmap;
@@ -877,7 +877,7 @@ no_mmaps:
 	start_index = pgd_index(first);
 	end_index = pgd_index(last);
 	if (end_index > start_index) {
-		clear_page_tables(mm, start_index, end_index - start_index);
+		clear_page_tables(tlb, start_index, end_index - start_index);
 		flush_tlb_pgtables(mm, first & PGDIR_MASK, last & PGDIR_MASK);
 	}
 }
@@ -889,6 +889,7 @@ no_mmaps:
  */
 int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 {
+	mmu_gather_t *tlb;
 	struct vm_area_struct *mpnt, *prev, **npp, *free, *extra;
 
 	if ((addr & ~PAGE_MASK) || addr > TASK_SIZE || len > TASK_SIZE-addr)
@@ -933,7 +934,8 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
 	}
 	mm->mmap_cache = NULL;	/* Kill the cache. */
-	spin_unlock(&mm->page_table_lock);
+
+	tlb = tlb_gather_mmu(mm);
 
 	/* Ok - we have the memory areas we should free on the 'free' list,
 	 * so release them, and unmap the page range..
@@ -942,7 +944,7 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 	 * In that case we have to be careful with VM_DENYWRITE.
 	 */
 	while ((mpnt = free) != NULL) {
-		unsigned long st, end, size;
+		unsigned long st, end;
 		struct file *file = NULL;
 
 		free = free->vm_next;
@@ -950,7 +952,6 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 		st = addr < mpnt->vm_start ? mpnt->vm_start : addr;
 		end = addr+len;
 		end = end > mpnt->vm_end ? mpnt->vm_end : end;
-		size = end - st;
 
 		if (mpnt->vm_flags & VM_DENYWRITE &&
 		    (st != mpnt->vm_start || end != mpnt->vm_end) &&
@@ -960,12 +961,12 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 		remove_shared_vm_struct(mpnt);
 		mm->map_count--;
 
-		zap_page_range(mpnt, st, size);
+		unmap_page_range(tlb, mpnt, st, end);
 
 		/*
 		 * Fix the mapping, and free the old area if it wasn't reused.
 		 */
-		extra = unmap_fixup(mm, mpnt, st, size, extra);
+		extra = unmap_fixup(mm, mpnt, st, end-st, extra);
 		if (file)
 			atomic_inc(&file->f_dentry->d_inode->i_writecount);
 	}
@@ -975,7 +976,9 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 	if (extra)
 		kmem_cache_free(vm_area_cachep, extra);
 
-	free_pgtables(mm, prev, addr, addr+len);
+	free_pgtables(tlb, prev, addr, addr+len);
+	tlb_finish_mmu(tlb, addr, addr+len);
+	spin_unlock(&mm->page_table_lock);
 
 	return 0;
 }
@@ -1092,44 +1095,58 @@ void build_mmap_rb(struct mm_struct * mm)
 /* Release all mmaps. */
 void exit_mmap(struct mm_struct * mm)
 {
+	mmu_gather_t *tlb;
 	struct vm_area_struct * mpnt;
 
 	release_segments(mm);
 	spin_lock(&mm->page_table_lock);
-	mpnt = mm->mmap;
-	mm->mmap = mm->mmap_cache = NULL;
-	mm->mm_rb = RB_ROOT;
-	mm->rss = 0;
-	spin_unlock(&mm->page_table_lock);
-	mm->total_vm = 0;
-	mm->locked_vm = 0;
+
+	tlb = tlb_gather_mmu(mm);
 
 	flush_cache_mm(mm);
+	mpnt = mm->mmap;
 	while (mpnt) {
-		struct vm_area_struct * next = mpnt->vm_next;
 		unsigned long start = mpnt->vm_start;
 		unsigned long end = mpnt->vm_end;
-		unsigned long size = end - start;
 
-		if (mpnt->vm_ops) {
-			if (mpnt->vm_ops->close)
-				mpnt->vm_ops->close(mpnt);
-		}
 		mm->map_count--;
 		remove_shared_vm_struct(mpnt);
-		zap_page_range(mpnt, start, size);
-		if (mpnt->vm_file)
-			fput(mpnt->vm_file);
-		kmem_cache_free(vm_area_cachep, mpnt);
-		mpnt = next;
+		unmap_page_range(tlb, mpnt, start, end);
+		mpnt = mpnt->vm_next;
 	}
-	flush_tlb_mm(mm);
 
 	/* This is just debugging */
 	if (mm->map_count)
 		BUG();
 
-	clear_page_tables(mm, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
+	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
+	tlb_finish_mmu(tlb, FIRST_USER_PGD_NR*PGDIR_SIZE, USER_PTRS_PER_PGD*PGDIR_SIZE);
+
+	mpnt = mm->mmap;
+	mm->mmap = mm->mmap_cache = NULL;
+	mm->mm_rb = RB_ROOT;
+	mm->rss = 0;
+	mm->total_vm = 0;
+	mm->locked_vm = 0;
+
+	spin_unlock(&mm->page_table_lock);
+
+	/*
+	 * Walk the list again, actually closing and freeing it
+	 * without holding any MM locks.
+	 */
+	while (mpnt) {
+		struct vm_area_struct * next = mpnt->vm_next;
+		if (mpnt->vm_ops) {
+			if (mpnt->vm_ops->close)
+				mpnt->vm_ops->close(mpnt);
+		}
+		if (mpnt->vm_file)
+			fput(mpnt->vm_file);
+		kmem_cache_free(vm_area_cachep, mpnt);
+		mpnt = next;
+	}
+		
 }
 
 /* Insert vm structure into process list sorted by address

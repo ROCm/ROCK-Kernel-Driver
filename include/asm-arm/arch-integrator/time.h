@@ -129,7 +129,6 @@ void __init time_init(void)
 	timer2->TimerControl = 0;
 
 	timer1->TimerLoad    = TIMER_RELOAD;
-	timer1->TimerValue   = TIMER_RELOAD;
 	timer1->TimerControl = TIMER_CTRL | 0x40;	/* periodic */
 
 	/* 

@@ -213,6 +213,8 @@ typedef struct HYSDN_CARD {
 		int in_idx, out_idx;	/* indexes to buffer ring */
 		int sk_count;		/* number of buffers currently in ring */
 		struct sk_buff *tx_skb;	/* buffer for tx operation */
+	  
+		struct list_head ncci_head;
 	} *hyctrlinfo;
 #endif /* CONFIG_HYSDN_CAPI */
 } hysdn_card;
@@ -284,7 +286,7 @@ extern void hycapi_remove_ctr(struct capi_ctr *);
 extern void hycapi_register_appl(struct capi_ctr *, __u16 appl,
 				 capi_register_params *);
 extern void hycapi_release_appl(struct capi_ctr *, __u16 appl);
-extern void hycapi_send_message(struct capi_ctr *, struct sk_buff *skb);
+extern u16  hycapi_send_message(struct capi_ctr *, struct sk_buff *skb);
 extern char *hycapi_procinfo(struct capi_ctr *);
 extern int hycapi_read_proc(char *page, char **start, off_t off,
 			    int count, int *eof, struct capi_ctr *card);

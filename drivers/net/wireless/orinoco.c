@@ -1,4 +1,4 @@
-/* orinoco.c 0.11a	- (formerly known as dldwd_cs.c and orinoco_cs.c)
+/* orinoco.c 0.11b	- (formerly known as dldwd_cs.c and orinoco_cs.c)
  *
  * A driver for Hermes or Prism 2 chipset based PCMCIA wireless
  * adaptors, with Lucent/Agere, Intersil or Symbol firmware.
@@ -256,7 +256,7 @@
  *	o Fixes for recent Symbol firmwares which lack AP density
  *	  (Pavel Roskin).
  *
- * v0.11 -> v0.11a - 29 Apr 2002 - David Gibson
+ * v0.11 -> v0.11b - 29 Apr 2002 - David Gibson
  *	o Handle different register spacing, necessary for Prism 2.5
  *	  PCI adaptors (Steve Hill).
  *	o Cleaned up initialization of card structures in orinoco_cs
@@ -274,15 +274,21 @@
  *	o Makefile changes for better integration into David Hinds
  *	  pcmcia-cs package.
  *
+ * v0.11a -> v0.11b - 1 May 2002 - David Gibson
+ *	o Better error reporting in orinoco_plx_init_one()
+ *	o Fixed multiple bad kfree() bugs introduced by the
+ *	  alloc_orinocodev() changes.
+ *
  * TODO
- *	o Re-assess our encapsulation detection strategy
+ *	o New wireless extensions API
  *	o Handle de-encapsulation within network layer, provide 802.11
  *	  headers
  *	o Fix possible races in SPY handling.
  *	o Disconnect wireless extensions from fundamental configuration.
  *
  *	o Convert /proc debugging stuff to seqfile
- *	o Use multiple Tx buffers */
+ *	o Use multiple Tx buffers
+ */
 /* Notes on locking:
  *
  * The basic principle of operation is that everything except the
@@ -351,7 +357,7 @@
 #define SPY_NUMBER(priv)	0
 #endif /* WIRELESS_SPY */
 
-static char version[] __initdata = "orinoco.c 0.11a (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco.c 0.11b (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for Lucent Orinoco, Prism II based and similar wireless cards");
 #ifdef MODULE_LICENSE

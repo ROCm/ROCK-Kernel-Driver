@@ -110,7 +110,7 @@ int stream_size;
 
 #undef NEEDBYTE
 #undef NEXTBYTE
-#define NEEDBYTE {if(z->avail_in==0)goto empty;r=f;}
+#define NEEDBYTE {if(z->avail_in==0)goto empty;r=trv;}
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
 int ZEXPORT zlib_inflate(z, f)

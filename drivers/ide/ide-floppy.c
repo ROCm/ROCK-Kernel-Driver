@@ -692,7 +692,7 @@ static int idefloppy_end_request(struct ata_device *drive, struct request *rq, i
 		return 0;
 	}
 	rq->errors = error;
-	ide_end_drive_cmd (drive, 0, 0);
+	ide_end_drive_cmd (drive, rq, 0, 0);
 
 	return 0;
 }
@@ -1006,7 +1006,7 @@ static ide_startstop_t idefloppy_transfer_pc(struct ata_device *drive, struct re
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	idefloppy_ireason_reg_t ireason;
 
-	if (ide_wait_stat (&startstop,drive,DRQ_STAT,BUSY_STAT,WAIT_READY)) {
+	if (ide_wait_stat (&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
 		printk (KERN_ERR "ide-floppy: Strange, packet command initiated yet DRQ isn't asserted\n");
 		return startstop;
 	}
@@ -1043,13 +1043,13 @@ static int idefloppy_transfer_pc2(struct ata_device *drive, struct request *__rq
 	return IDEFLOPPY_WAIT_CMD;		/* Timeout for the packet command */
 }
 
-static ide_startstop_t idefloppy_transfer_pc1(struct ata_device *drive, struct request *__rq)
+static ide_startstop_t idefloppy_transfer_pc1(struct ata_device *drive, struct request *rq)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	ide_startstop_t startstop;
 	idefloppy_ireason_reg_t ireason;
 
-	if (ide_wait_stat (&startstop,drive,DRQ_STAT,BUSY_STAT,WAIT_READY)) {
+	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
 		printk (KERN_ERR "ide-floppy: Strange, packet command initiated yet DRQ isn't asserted\n");
 		return startstop;
 	}
@@ -1960,14 +1960,6 @@ static int idefloppy_identify_device (ide_drive_t *drive,struct hd_driveid *id)
 	return 0;
 }
 
-static void idefloppy_add_settings(ide_drive_t *drive)
-{
-	ide_add_setting(drive,	"bios_cyl",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	1023,				1,	1,	&drive->bios_cyl,		NULL);
-	ide_add_setting(drive,	"bios_head",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	255,				1,	1,	&drive->bios_head,		NULL);
-	ide_add_setting(drive,	"bios_sect",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	63,				1,	1,	&drive->bios_sect,		NULL);
-
-}
-
 /*
  *	Driver initialization.
  */
@@ -2009,7 +2001,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	}
 
 	(void) idefloppy_get_capacity (drive);
-	idefloppy_add_settings(drive);
+
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		struct ata_channel *hwif = drive->channel;
 

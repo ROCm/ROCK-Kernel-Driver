@@ -611,6 +611,7 @@ cpu_elf_name:
 
 	.section ".proc.info", #alloc, #execinstr
 
+#ifdef CONFIG_CPU_SA110
 	.type	__sa110_proc_info,#object
 __sa110_proc_info:
 	.long	0x4401a100
@@ -623,9 +624,11 @@ __sa110_proc_info:
 	.long	cpu_sa110_info
 	.long	sa110_processor_functions
 	.long	v4wb_tlb_fns
-	.long	v4_user_fns
+	.long	v4wb_user_fns
 	.size	__sa110_proc_info, . - __sa110_proc_info
+#endif
 
+#ifdef CONFIG_CPU_SA1100
 	.type	__sa1100_proc_info,#object
 __sa1100_proc_info:
 	.long	0x4401a110
@@ -655,3 +658,4 @@ __sa1110_proc_info:
 	.long	v4wb_tlb_fns
 	.long	v4_mc_user_fns
 	.size	__sa1110_proc_info, . - __sa1110_proc_info
+#endif

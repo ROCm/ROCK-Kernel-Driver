@@ -8,10 +8,9 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+USE_STANDARD_AS_RULE := true
+
+EXTRA_AFLAGS := $(CFLAGS)
 
 O_TARGET := ip22-kern.o
 

@@ -670,8 +670,8 @@ static void hpt366_tune_chipset(struct ata_device *drive, byte speed)
 	 * Disable the "fast interrupt" prediction.
 	 */
 	pci_read_config_byte(dev, regfast, &drive_fast);
-	if (drive_fast & 0x02)
-		pci_write_config_byte(dev, regfast, drive_fast & ~0x20);
+	if (drive_fast & 0x80)
+		pci_write_config_byte(dev, regfast, drive_fast & ~0x80);
 
 	pci_read_config_dword(dev, regtime, &reg1);
 	reg2 = pci_bus_clock_list(speed,

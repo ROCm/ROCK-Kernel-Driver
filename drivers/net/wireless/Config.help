@@ -55,7 +55,6 @@ CONFIG_PLX_HERMES
   Support for these adaptors is so far still incomplete and buggy.
   You have been warned.
 
-Prism 2.5 PCI 802.11b adaptor support
 CONFIG_PCI_HERMES
   Enable support for PCI and mini-PCI 802.11b wireless NICs based on
   the Prism 2.5 chipset.  These are true PCI cards, not the 802.11b

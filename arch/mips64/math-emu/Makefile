@@ -6,11 +6,6 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
-
-EXTRA_ASFLAGS = -mips2 -mcpu=r4000
-
 O_TARGET:= fpu_emulator.o
 
 obj-y	:= cp1emu.o ieee754m.o ieee754d.o ieee754dp.o ieee754sp.o ieee754.o \

@@ -1,4 +1,4 @@
-#
+q#
 # Makefile for Linux arch/m68k/sun3 source directory
 #
 # Note! Dependencies are done automagically by 'make dep', which also
@@ -6,9 +6,6 @@
 # unless it's something special (ie not a .c file).
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
-
-.S.o:
-	$(CC) $(AFLAGS) -traditional -Wa,-m68020 -c $< -o $*.o
 
 O_TARGET := sun3.o 
 
