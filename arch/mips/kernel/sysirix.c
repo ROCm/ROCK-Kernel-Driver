@@ -968,7 +968,7 @@ asmlinkage int irix_shmsys(int opcode, unsigned long arg0, unsigned long arg1,
 {
 	switch (opcode) {
 	case 0:
-		return sys_shmat((int) arg0, (char *)arg1, (int) arg2,
+		return do_shmat((int) arg0, (char *)arg1, (int) arg2,
 				 (unsigned long *) arg3);
 	case 1:
 		return sys_shmctl((int)arg0, (int)arg1, (struct shmid_ds *)arg2);

@@ -106,7 +106,7 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 			if ((ret = verify_area(VERIFY_WRITE, (ulong*) third,
 					       sizeof(ulong))))
 				break;
-			ret = sys_shmat (first, (char *) ptr, second, &raddr);
+			ret = do_shmat (first, (char *) ptr, second, &raddr);
 			if (ret)
 				break;
 			ret = put_user (raddr, (ulong *) third);
@@ -115,7 +115,7 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 		case 1:	/* iBCS2 emulator entry point */
 			if (!segment_eq(get_fs(), get_ds()))
 				break;
-			ret = sys_shmat (first, (char *) ptr, second,
+			ret = do_shmat (first, (char *) ptr, second,
 					 (ulong *) third);
 			break;
 		}

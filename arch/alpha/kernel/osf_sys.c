@@ -464,7 +464,7 @@ osf_shmat(int shmid, void *shmaddr, int shmflg)
 	unsigned long raddr;
 	long err;
 
-	err = sys_shmat(shmid, shmaddr, shmflg, &raddr);
+	err = do_shmat(shmid, shmaddr, shmflg, &raddr);
 
 	/*
 	 * This works because all user-level addresses are

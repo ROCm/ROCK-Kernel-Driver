@@ -122,7 +122,7 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 		switch (version) {
 		default: {
 			ulong raddr;
-			ret = sys_shmat (first, (char *) ptr, second, &raddr);
+			ret = do_shmat (first, (char *) ptr, second, &raddr);
 			if (ret)
 				break;
 			ret = put_user (raddr, (ulong *) third);
@@ -132,7 +132,7 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 			ret = -EINVAL;
 			if (!segment_eq(get_fs(), get_ds()))
 				break;
-			ret = sys_shmat (first, (char *) ptr, second,
+			ret = do_shmat (first, (char *) ptr, second,
 					 (ulong *) third);
 			break;
 		}

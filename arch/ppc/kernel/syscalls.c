@@ -119,7 +119,7 @@ sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fif
 		if ((ret = verify_area(VERIFY_WRITE, (ulong __user *) third,
 				       sizeof(ulong))))
 			break;
-		ret = sys_shmat (first, (char __user *) ptr, second, &raddr);
+		ret = do_shmat (first, (char __user *) ptr, second, &raddr);
 		if (ret)
 			break;
 		ret = put_user (raddr, (ulong __user *) third);

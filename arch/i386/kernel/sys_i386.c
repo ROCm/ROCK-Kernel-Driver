@@ -186,7 +186,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		switch (version) {
 		default: {
 			ulong raddr;
-			ret = sys_shmat (first, (char __user *) ptr, second, &raddr);
+			ret = do_shmat (first, (char __user *) ptr, second, &raddr);
 			if (ret)
 				return ret;
 			return put_user (raddr, (ulong __user *) third);
@@ -195,7 +195,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 			if (!segment_eq(get_fs(), get_ds()))
 				return -EINVAL;
 			/* The "(ulong *) third" is valid _only_ because of the kernel segment thing */
-			return sys_shmat (first, (char __user *) ptr, second, (ulong *) third);
+			return do_shmat (first, (char __user *) ptr, second, (ulong *) third);
 		}
 	case SHMDT: 
 		return sys_shmdt ((char __user *)ptr);
