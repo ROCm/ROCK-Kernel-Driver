@@ -69,6 +69,8 @@
 #define	AX25_UA			0x63	/* Unnumbered acknowledge */
 #define	AX25_FRMR		0x87	/* Frame reject */
 #define	AX25_UI			0x03	/* Unnumbered information */
+#define	AX25_XID		0xaf	/* Exchange information */
+#define	AX25_TEST		0xe3	/* Test */
 
 #define	AX25_PF			0x10	/* Poll/final bit for standard AX.25 */
 #define	AX25_EPF		0x01	/* Poll/final bit for extended AX.25 */
