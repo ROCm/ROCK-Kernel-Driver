@@ -213,7 +213,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 		kunmap(vec->bv_page);
 
 		if (rw == READ) {
-			flush_dcache_page(page);
+			flush_dcache_page(sbh->b_page);
 		} else {
 			SetPageDirty(page);
 		}
