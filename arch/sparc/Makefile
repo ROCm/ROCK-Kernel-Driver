@@ -31,7 +31,6 @@ CFLAGS := $(CFLAGS) -m32 -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7
 endif
 
 #LDFLAGS_vmlinux = -N -Ttext 0xf0004000
-LDFLAGS_vmlinux = -T arch/sparc/vmlinux.lds
 
 HEAD := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
 

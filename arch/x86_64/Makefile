@@ -35,7 +35,7 @@ export IA32_CC IA32_LD IA32_AS IA32_OBJCOPY IA32_CPP
 
 LD=$(CROSS_COMPILE)ld -m elf_x86_64
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
-LDFLAGS_vmlinux := -T arch/x86_64/vmlinux.lds -e stext
+LDFLAGS_vmlinux := -e stext
 
 CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
@@ -65,8 +65,6 @@ endif
 CORE_FILES += $(core-y)
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-vmlinux: arch/x86_64/vmlinux.lds
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper

@@ -210,18 +210,18 @@ out:
 }
 
 static struct quota_format_ops v1_format_ops = {
-	check_quota_file:	v1_check_quota_file,
-	read_file_info:		v1_read_file_info,
-	write_file_info:	v1_write_file_info,
-	free_file_info:		NULL,
-	read_dqblk:		v1_read_dqblk,
-	commit_dqblk:		v1_commit_dqblk,
+	.check_quota_file	= v1_check_quota_file,
+	.read_file_info		= v1_read_file_info,
+	.write_file_info	= v1_write_file_info,
+	.free_file_info		= NULL,
+	.read_dqblk		= v1_read_dqblk,
+	.commit_dqblk		= v1_commit_dqblk,
 };
 
 static struct quota_format_type v1_quota_format = {
-	qf_fmt_id:	QFMT_VFS_OLD,
-	qf_ops:		&v1_format_ops,
-	qf_owner:	THIS_MODULE
+	.qf_fmt_id	= QFMT_VFS_OLD,
+	.qf_ops		= &v1_format_ops,
+	.qf_owner	= THIS_MODULE
 };
 
 static int __init init_v1_quota_format(void)

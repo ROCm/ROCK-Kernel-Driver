@@ -20,7 +20,6 @@
 FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align 
 
 OBJCOPY_FLAGS =-O binary -R .note -R .comment -S
-LDFLAGS_vmlinux =-T arch/parisc/vmlinux.lds
 
 CFLAGS_PIPE := -pipe
 CFLAGS_NSR  := -fno-strength-reduce

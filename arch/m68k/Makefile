@@ -24,10 +24,8 @@ ifneq ($(COMPILE_ARCH),$(ARCH))
 	CROSS_COMPILE = m68k-linux-
 endif
 
-ifndef CONFIG_SUN3
-LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux.lds
-else
-LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux-sun3.lds -N
+ifdef CONFIG_SUN3
+LDFLAGS_vmlinux = -N
 endif
 
 # without -fno-strength-reduce the 53c7xx.c driver fails ;-(

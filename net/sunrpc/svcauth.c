@@ -31,14 +31,9 @@ static void	svcauth_null(struct svc_rqst *rqstp, u32 *statp, u32 *authp);
 static void	svcauth_unix(struct svc_rqst *rqstp, u32 *statp, u32 *authp);
 
 /*
- * Max number of authentication flavors we support
- */
-#define RPC_SVCAUTH_MAX	8
-
-/*
  * Table of authenticators
  */
-static auth_fn_t	authtab[RPC_SVCAUTH_MAX] = {
+static auth_fn_t	authtab[RPC_AUTH_MAXFLAVOR] = {
 	svcauth_null,
 	svcauth_unix,
 	NULL,
@@ -47,17 +42,17 @@ static auth_fn_t	authtab[RPC_SVCAUTH_MAX] = {
 void
 svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 {
-	u32		flavor;
-	auth_fn_t	func;
+	rpc_authflavor_t	flavor;
+	auth_fn_t		func;
 
 	*statp = rpc_success;
 	*authp = rpc_auth_ok;
 
-	svc_getlong(&rqstp->rq_argbuf, flavor);
+	svc_getu32(&rqstp->rq_argbuf, flavor);
 	flavor = ntohl(flavor);
 
 	dprintk("svc: svc_authenticate (%d)\n", flavor);
-	if (flavor >= RPC_SVCAUTH_MAX || !(func = authtab[flavor])) {
+	if (flavor >= RPC_AUTH_MAXFLAVOR || !(func = authtab[flavor])) {
 		*authp = rpc_autherr_badcred;
 		return;
 	}
@@ -67,18 +62,18 @@ svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 }
 
 int
-svc_auth_register(u32 flavor, auth_fn_t func)
+svc_auth_register(rpc_authflavor_t flavor, auth_fn_t func)
 {
-	if (flavor >= RPC_SVCAUTH_MAX || authtab[flavor])
+	if (flavor >= RPC_AUTH_MAXFLAVOR || authtab[flavor])
 		return -EINVAL;
 	authtab[flavor] = func;
 	return 0;
 }
 
 void
-svc_auth_unregister(u32 flavor)
+svc_auth_unregister(rpc_authflavor_t flavor)
 {
-	if (flavor < RPC_SVCAUTH_MAX)
+	if (flavor < RPC_AUTH_MAXFLAVOR)
 		authtab[flavor] = NULL;
 }
 
@@ -110,8 +105,8 @@ svcauth_null(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 
 	/* Put NULL verifier */
 	rqstp->rq_verfed = 1;
-	svc_putlong(resp, RPC_AUTH_NULL);
-	svc_putlong(resp, 0);
+	svc_putu32(resp, RPC_AUTH_NULL);
+	svc_putu32(resp, 0);
 }
 
 static void
@@ -157,8 +152,8 @@ svcauth_unix(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 
 	/* Put NULL verifier */
 	rqstp->rq_verfed = 1;
-	svc_putlong(resp, RPC_AUTH_NULL);
-	svc_putlong(resp, 0);
+	svc_putu32(resp, RPC_AUTH_NULL);
+	svc_putu32(resp, 0);
 
 	return;
 

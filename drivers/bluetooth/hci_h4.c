@@ -253,13 +253,13 @@ static int h4_recv(struct n_hci *n_hci, void *data, int count)
 }
 
 static struct hci_uart_proto h4p = {
-	id:    HCI_UART_H4,
-	open:  h4_open,
-	close: h4_close,
-	send:  h4_send,
-	recv:  h4_recv,
-	preq:  h4_preq,
-	flush: h4_flush,
+	.id    = HCI_UART_H4,
+	.open  = h4_open,
+	.close = h4_close,
+	.send  = h4_send,
+	.recv  = h4_recv,
+	.preq  = h4_preq,
+	.flush = h4_flush,
 };
 	      
 int h4_init(void)

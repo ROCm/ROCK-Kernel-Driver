@@ -79,6 +79,7 @@ extern struct page_state {
 	unsigned long nr_page_table_pages;
 	unsigned long nr_reverse_maps;
 	unsigned long nr_mapped;
+	unsigned long nr_slab;
 } ____cacheline_aligned_in_smp page_states[NR_CPUS];
 
 extern void get_page_state(struct page_state *ret);

@@ -2,147 +2,49 @@
  *	linux/mm/mlock.c
  *
  *  (C) Copyright 1995 Linus Torvalds
+ *  (C) Copyright 2002 Christoph Hellwig
  */
-#include <linux/slab.h>
-#include <linux/shm.h>
+
 #include <linux/mman.h>
-#include <linux/smp_lock.h>
-#include <linux/pagemap.h>
+#include <linux/mm.h>
 
-#include <asm/uaccess.h>
-#include <asm/pgtable.h>
-
-static inline int mlock_fixup_all(struct vm_area_struct * vma, int newflags)
-{
-	spin_lock(&vma->vm_mm->page_table_lock);
-	vma->vm_flags = newflags;
-	spin_unlock(&vma->vm_mm->page_table_lock);
-	return 0;
-}
-
-static inline int mlock_fixup_start(struct vm_area_struct * vma,
-	unsigned long end, int newflags)
-{
-	struct vm_area_struct * n;
-
-	n = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!n)
-		return -EAGAIN;
-	*n = *vma;
-	n->vm_end = end;
-	n->vm_flags = newflags;
-	n->vm_raend = 0;
-	if (n->vm_file)
-		get_file(n->vm_file);
-	if (n->vm_ops && n->vm_ops->open)
-		n->vm_ops->open(n);
-	vma->vm_pgoff += (end - vma->vm_start) >> PAGE_SHIFT;
-	lock_vma_mappings(vma);
-	spin_lock(&vma->vm_mm->page_table_lock);
-	vma->vm_start = end;
-	__insert_vm_struct(current->mm, n);
-	spin_unlock(&vma->vm_mm->page_table_lock);
-	unlock_vma_mappings(vma);
-	return 0;
-}
-
-static inline int mlock_fixup_end(struct vm_area_struct * vma,
-	unsigned long start, int newflags)
-{
-	struct vm_area_struct * n;
-
-	n = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!n)
-		return -EAGAIN;
-	*n = *vma;
-	n->vm_start = start;
-	n->vm_pgoff += (n->vm_start - vma->vm_start) >> PAGE_SHIFT;
-	n->vm_flags = newflags;
-	n->vm_raend = 0;
-	if (n->vm_file)
-		get_file(n->vm_file);
-	if (n->vm_ops && n->vm_ops->open)
-		n->vm_ops->open(n);
-	lock_vma_mappings(vma);
-	spin_lock(&vma->vm_mm->page_table_lock);
-	vma->vm_end = start;
-	__insert_vm_struct(current->mm, n);
-	spin_unlock(&vma->vm_mm->page_table_lock);
-	unlock_vma_mappings(vma);
-	return 0;
-}
-
-static inline int mlock_fixup_middle(struct vm_area_struct * vma,
-	unsigned long start, unsigned long end, int newflags)
-{
-	struct vm_area_struct * left, * right;
-
-	left = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!left)
-		return -EAGAIN;
-	right = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!right) {
-		kmem_cache_free(vm_area_cachep, left);
-		return -EAGAIN;
-	}
-	*left = *vma;
-	*right = *vma;
-	left->vm_end = start;
-	right->vm_start = end;
-	right->vm_pgoff += (right->vm_start - left->vm_start) >> PAGE_SHIFT;
-	vma->vm_flags = newflags;
-	left->vm_raend = 0;
-	right->vm_raend = 0;
-	if (vma->vm_file)
-		atomic_add(2, &vma->vm_file->f_count);
-
-	if (vma->vm_ops && vma->vm_ops->open) {
-		vma->vm_ops->open(left);
-		vma->vm_ops->open(right);
-	}
-	vma->vm_raend = 0;
-	vma->vm_pgoff += (start - vma->vm_start) >> PAGE_SHIFT;
-	lock_vma_mappings(vma);
-	spin_lock(&vma->vm_mm->page_table_lock);
-	vma->vm_start = start;
-	vma->vm_end = end;
-	vma->vm_flags = newflags;
-	__insert_vm_struct(current->mm, left);
-	__insert_vm_struct(current->mm, right);
-	spin_unlock(&vma->vm_mm->page_table_lock);
-	unlock_vma_mappings(vma);
-	return 0;
-}
 
 static int mlock_fixup(struct vm_area_struct * vma, 
 	unsigned long start, unsigned long end, unsigned int newflags)
 {
-	int pages, retval;
+	struct mm_struct * mm = vma->vm_mm;
+	int pages, error;
 
 	if (newflags == vma->vm_flags)
 		return 0;
 
-	if (start == vma->vm_start) {
-		if (end == vma->vm_end)
-			retval = mlock_fixup_all(vma, newflags);
-		else
-			retval = mlock_fixup_start(vma, end, newflags);
-	} else {
-		if (end == vma->vm_end)
-			retval = mlock_fixup_end(vma, start, newflags);
-		else
-			retval = mlock_fixup_middle(vma, start, end, newflags);
+	if (start != vma->vm_start) {
+		error = split_vma(mm, vma, start, 1);
+		if (error)
+			return -EAGAIN;
 	}
-	if (!retval) {
-		/* keep track of amount of locked VM */
-		pages = (end - start) >> PAGE_SHIFT;
-		if (newflags & VM_LOCKED) {
-			pages = -pages;
-			make_pages_present(start, end);
-		}
-		vma->vm_mm->locked_vm -= pages;
+
+	if (end != vma->vm_end) {
+		error = split_vma(mm, vma, end, 0);
+		if (error)
+			return -EAGAIN;
 	}
-	return retval;
+	
+	spin_lock(&mm->page_table_lock);
+	vma->vm_flags = newflags;
+	spin_unlock(&mm->page_table_lock);
+
+	/*
+	 * Keep track of amount of locked VM.
+	 */
+	pages = (end - start) >> PAGE_SHIFT;
+	if (newflags & VM_LOCKED) {
+		pages = -pages;
+		make_pages_present(start, end);
+	}
+
+	vma->vm_mm->locked_vm -= pages;
+	return 0;
 }
 
 static int do_mlock(unsigned long start, size_t len, int on)

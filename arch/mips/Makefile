@@ -266,11 +266,8 @@ endif
 # error messages during linking.  Select a default linkscript if
 # none has been choosen above.
 #
-vmlinux: arch/$(ARCH)/ld.script
 
-arch/$(ARCH)/ld.script: arch/$(ARCH)/ld.script.in arch/$(ARCH)/Makefile
-	sed -e 's/@@LOADADDR@@/$(LOADADDR)/' <$< >$@
-LDFLAGS_vmlinux	+= -T arch/$(ARCH)/ld.script
+AFLAGS_vmlinux.lds.o := -DLOADADDR=$(LOADADDR)
 
 HEAD := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
 

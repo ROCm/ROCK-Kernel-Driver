@@ -16,10 +16,10 @@
 #include <asm/uaccess.h>
 
 struct file_operations generic_ro_fops = {
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	mmap:		generic_file_mmap,
-	sendfile:	generic_file_sendfile,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.mmap		= generic_file_mmap,
+	.sendfile	= generic_file_sendfile,
 };
 
 loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)

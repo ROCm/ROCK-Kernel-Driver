@@ -53,8 +53,6 @@ ifeq ($(CONFIG_MCOUNT),y)
   CFLAGS := $(CFLAGS) -pg
 endif
 
-LDFLAGS_vmlinux = -T arch/sparc64/vmlinux.lds
-
 HEAD := arch/sparc64/kernel/head.o arch/sparc64/kernel/init_task.o
 
 SUBDIRS += arch/sparc64/kernel arch/sparc64/lib arch/sparc64/mm \

@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
@@ -28,11 +29,12 @@
 #include <linux/ioport.h>
 #include <linux/circ_buf.h>
 #include <linux/serial.h>
+#include <linux/sysrq.h>
 #include <linux/console.h>
-#include <linux/spinlock.h>
 #ifdef CONFIG_SERIO
 #include <linux/serio.h>
 #endif
+#include <linux/serial_reg.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 
@@ -44,8 +46,12 @@
 #include <asm/isa.h>
 #endif
 
+/* #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ) */
+#if defined(CONFIG_MAGIC_SYSRQ)
+#define SUPPORT_SYSRQ
+#endif
+
 #include <linux/serial_core.h>
-#include <linux/serial_reg.h>
 
 #include "suncore.h"
 
@@ -88,6 +94,7 @@ struct uart_sunsu_port {
 
 	/* Probing information.  */
 	enum su_type		su_type;
+	unsigned int		type_probed;	/* XXX Stupid */
 	int			port_node;
 	unsigned int		irq;
 
@@ -333,7 +340,8 @@ receive_chars(struct uart_sunsu_port *up, unsigned char *status, struct pt_regs 
 			if (*status & UART_LSR_BI) {
 				*status &= ~(UART_LSR_FE | UART_LSR_PE);
 				up->port.icount.brk++;
-				if (up->port.line == up->port.cons->index)
+				if (up->port.cons != NULL &&
+				    up->port.line == up->port.cons->index)
 					saw_console_brk = 1;
 				/*
 				 * We do the SysRQ and SAK checking
@@ -355,7 +363,8 @@ receive_chars(struct uart_sunsu_port *up, unsigned char *status, struct pt_regs 
 			 */
 			*status &= up->port.read_status_mask;
 
-			if (up->port.line == up->port.cons->index) {
+			if (up->port.cons != NULL &&
+			    up->port.line == up->port.cons->index) {
 				/* Recover the break flag from console xmit */
 				*status |= up->lsr_break_flag;
 				up->lsr_break_flag = 0;
@@ -910,6 +919,16 @@ static int sunsu_request_port(struct uart_port *port)
 
 static void sunsu_config_port(struct uart_port *port, int flags)
 {
+	struct uart_sunsu_port *up = (struct uart_sunsu_port *) port;
+
+	if (flags & UART_CONFIG_TYPE) {
+		/*
+		 * We are supposed to call autoconfig here, but this requires
+		 * splitting all the OBP probing crap from the UART probing.
+		 * We'll do it when we kill sunsu.c altogether.
+		 */
+		port->type = up->type_probed;	/* XXX */
+	}
 }
 
 static int
@@ -1020,6 +1039,7 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 	if (!up->port_node || !up->su_type)
 		return;
 
+	up->type_probed = PORT_UNKNOWN;
 	up->port.iotype = SERIAL_IO_MEM;
 
 	/*
@@ -1028,7 +1048,16 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 	for_each_ebus(ebus) {
 		for_each_ebusdev(dev, ebus) {
 			if (dev->prom_node == up->port_node) {
+				/*
+				 * The EBus is broken on sparc; it delivers
+				 * virtual addresses in resources. Oh well...
+				 * This is correct on sparc64, though.
+				 */
 				up->port.membase = (char *) dev->resource[0].start;
+				/*
+				 * This is correct on both architectures.
+				 */
+				up->port.mapbase = dev->resource[0].start;
 				up->irq = dev->irqs[0];
 				goto ebus_done;
 			}
@@ -1039,7 +1068,9 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 	for_each_isa(isa_br) {
 		for_each_isadev(isa_dev, isa_br) {
 			if (isa_dev->prom_node == up->port_node) {
+				/* Same on sparc64. Cool architecure... */
 				up->port.membase = (char *) isa_dev->resource.start;
+				up->port.mapbase = isa_dev->resource.start;
 				up->irq = isa_dev->irq;
 				goto ebus_done;
 			}
@@ -1067,6 +1098,7 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 		    reg0.which_io, reg0.phys_addr);
 		return;
 	}
+	up->port.mapbase = reg0.phys_addr;
 	if ((up->port.membase = ioremap(reg0.phys_addr, reg0.reg_size)) == 0) {
 		prom_printf("sunsu: Cannot map registers.\n");
 		return;
@@ -1203,6 +1235,7 @@ ebus_done:
 
 	if (up->port.type == PORT_UNKNOWN)
 		goto out;
+	up->type_probed = up->port.type;	/* XXX */
 
 	/*
 	 * Reset the UART.
@@ -1454,6 +1487,7 @@ static int __init sunsu_serial_init(void)
 		    up->su_type == SU_PORT_KBD)
 			continue;
 
+		up->port.flags |= ASYNC_BOOT_AUTOCONF;
 		up->port.type = PORT_UNKNOWN;
 		up->port.uartclk = (SU_BASE_BAUD * 16);
 
@@ -1475,7 +1509,6 @@ static int __init sunsu_serial_init(void)
 	if (ret < 0)
 		return ret;
 
-	instance = 0;
 	for (i = 0; i < UART_NR; i++) {
 		struct uart_sunsu_port *up = &sunsu_ports[i];
 
@@ -1645,9 +1678,6 @@ static int __init sunsu_probe(void)
 	/*
 	 * Console must be initiated after the generic initialization.
 	 */
-	sunsu_reg.cons = &sunsu_cons;
-	sunsu_reg.nr = scan.devices;
-
        	sunsu_serial_init();
 	sunsu_serial_console_init();
 

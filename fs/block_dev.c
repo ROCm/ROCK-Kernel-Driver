@@ -198,9 +198,9 @@ static struct super_block *bd_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type bd_type = {
-	name:		"bdev",
-	get_sb:		bd_get_sb,
-	kill_sb:	kill_anon_super,
+	.name		= "bdev",
+	.get_sb		= bd_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 static struct vfsmount *bd_mnt;

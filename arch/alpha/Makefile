@@ -10,7 +10,7 @@
 
 NM := $(NM) -B
 
-LDFLAGS_vmlinux = -static -T arch/alpha/vmlinux.lds.s -N #-relax
+LDFLAGS_vmlinux = -static -N #-relax
 CFLAGS := $(CFLAGS) -pipe -mno-fp-regs -ffixed-8
 
 # Determine if we can use the BWX instructions with GAS.
@@ -125,8 +125,6 @@ archclean:
 
 archmrproper:
 	rm -f include/asm-alpha/asm_offsets.h
-
-vmlinux: arch/alpha/vmlinux.lds.s
 
 bootpfile:
 	@$(MAKEBOOT) bootpfile

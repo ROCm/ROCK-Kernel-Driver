@@ -662,18 +662,18 @@ static int v2_commit_dquot(struct dquot *dquot)
 }
 
 static struct quota_format_ops v2_format_ops = {
-	check_quota_file:	v2_check_quota_file,
-	read_file_info:		v2_read_file_info,
-	write_file_info:	v2_write_file_info,
-	free_file_info:		NULL,
-	read_dqblk:		v2_read_dquot,
-	commit_dqblk:		v2_commit_dquot,
+	.check_quota_file	= v2_check_quota_file,
+	.read_file_info		= v2_read_file_info,
+	.write_file_info	= v2_write_file_info,
+	.free_file_info		= NULL,
+	.read_dqblk		= v2_read_dquot,
+	.commit_dqblk		= v2_commit_dquot,
 };
 
 static struct quota_format_type v2_quota_format = {
-	qf_fmt_id:	QFMT_VFS_V0,
-	qf_ops:		&v2_format_ops,
-	qf_owner:	THIS_MODULE
+	.qf_fmt_id	= QFMT_VFS_V0,
+	.qf_ops		= &v2_format_ops,
+	.qf_owner	= THIS_MODULE
 };
 
 static int __init init_v2_quota_format(void)

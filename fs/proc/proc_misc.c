@@ -171,6 +171,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Dirty:        %8lu kB\n"
 		"Writeback:    %8lu kB\n"
 		"Mapped:       %8lu kB\n"
+		"Slab:         %8lu kB\n"
 		"Committed_AS: %8u kB\n"
 		"PageTables:   %8lu kB\n"
 		"ReverseMaps:  %8lu\n",
@@ -191,6 +192,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(ps.nr_dirty),
 		K(ps.nr_writeback),
 		K(ps.nr_mapped),
+		K(ps.nr_slab),
 		K(committed),
 		K(ps.nr_page_table_pages),
 		ps.nr_reverse_maps

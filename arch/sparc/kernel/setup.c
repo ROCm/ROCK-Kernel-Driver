@@ -171,31 +171,23 @@ static void __init boot_flags_init(char *commands)
 		/* Process any command switches, otherwise skip it. */
 		if (*commands == '\0')
 			break;
-		else if (*commands == '-') {
+		if (*commands == '-') {
 			commands++;
 			while (*commands && *commands != ' ')
 				process_switch(*commands++);
 		} else {
 			if (!strncmp(commands, "console=", 8)) {
 				commands += 8;
-				if (!strncmp (commands, "ttya", 4)) {
-					console_fb = 2;
-					prom_printf ("Using /dev/ttya as console.\n");
-				} else if (!strncmp (commands, "ttyb", 4)) {
-					console_fb = 3;
-					prom_printf ("Using /dev/ttyb as console.\n");
 #if defined(CONFIG_PROM_CONSOLE)
-				} else if (!strncmp (commands, "prom", 4)) {
+				if (!strncmp (commands, "prom", 4)) {
 					char *p;
 					
 					for (p = commands - 8; *p && *p != ' '; p++)
 						*p = ' ';
 					conswitchp = &prom_con;
 					console_fb = 1;
-#endif
-				} else {
-					console_fb = 1;
 				}
+#endif
 			} else if (!strncmp(commands, "mem=", 4)) {
 				/*
 				 * "mem=XXX[kKmM] overrides the PROM-reported
@@ -342,33 +334,28 @@ void __init setup_arch(char **cmdline_p)
 #ifndef CONFIG_SERIAL_CONSOLE	/* Not CONFIG_SERIAL_SUNCORE: to be gone. */
 	serial_console = 0;
 #else
-	switch (console_fb) {
-	case 0: /* Let get our io devices from prom */
-		{
-			int idev = prom_query_input_device();
-			int odev = prom_query_output_device();
-			if (idev == PROMDEV_IKBD && odev == PROMDEV_OSCREEN) {
-				serial_console = 0;
-			} else if (idev == PROMDEV_ITTYA && odev == PROMDEV_OTTYA) {
-				serial_console = 1;
-			} else if (idev == PROMDEV_ITTYB && odev == PROMDEV_OTTYB) {
-				serial_console = 2;
-			} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OTTYA) {
-				prom_printf("MrCoffee ttya\n");
-				serial_console = 1;
-			} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OSCREEN) {
-				serial_console = 0;
-				prom_printf("MrCoffee keyboard\n");
-			} else {
-				prom_printf("Inconsistent or unknown console\n");
-				prom_printf("You cannot mix serial and non serial input/output devices\n");
-				prom_halt();
-			}
+	if (console_fb != 0) {
+		serial_console = 0;
+	} else {
+		int idev = prom_query_input_device();
+		int odev = prom_query_output_device();
+		if (idev == PROMDEV_IKBD && odev == PROMDEV_OSCREEN) {
+			serial_console = 0;
+		} else if (idev == PROMDEV_ITTYA && odev == PROMDEV_OTTYA) {
+			serial_console = 1;
+		} else if (idev == PROMDEV_ITTYB && odev == PROMDEV_OTTYB) {
+			serial_console = 2;
+		} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OTTYA) {
+			prom_printf("MrCoffee ttya\n");
+			serial_console = 1;
+		} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OSCREEN) {
+			serial_console = 0;
+			prom_printf("MrCoffee keyboard\n");
+		} else {
+			prom_printf("Confusing console (idev %d, odev %d)\n",
+			    idev, odev);
+			serial_console = 1;
 		}
-		break;
-	case 1: serial_console = 0; break; /* Force one of the framebuffers as console */
-	case 2: serial_console = 1; break; /* Force ttya as console */
-	case 3: serial_console = 2; break; /* Force ttyb as console */
 	}
 #endif
 

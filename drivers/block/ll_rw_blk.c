@@ -12,38 +12,21 @@
 /*
  * This handles all read/write requests to block devices
  */
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/kernel_stat.h>
-#include <linux/errno.h>
-#include <linux/string.h>
 #include <linux/config.h>
-#include <linux/bio.h>
-#include <linux/mm.h>
-#include <linux/swap.h>
-#include <linux/init.h>
-#include <linux/smp_lock.h>
-#include <linux/bootmem.h>
-#include <linux/completion.h>
-#include <linux/compiler.h>
-#include <linux/buffer_head.h>
-#include <scsi/scsi.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/backing-dev.h>
-
-#include <asm/system.h>
-#include <asm/io.h>
+#include <linux/bio.h>
 #include <linux/blk.h>
 #include <linux/highmem.h>
+#include <linux/mm.h>
+#include <linux/kernel_stat.h>
+#include <linux/string.h>
+#include <linux/init.h>
+#include <linux/bootmem.h>	/* for max_pfn/max_low_pfn */
+#include <linux/completion.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 
-/*
- * MAC Floppy IWM hooks
- */
-
-#ifdef CONFIG_MAC_FLOPPY_IWM
-extern int mac_floppy_init(void);
-#endif
 
 /*
  * For the allocated request tables
@@ -221,6 +204,11 @@ void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
  **/
 void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
 {
+	if ((max_sectors << 9) < PAGE_CACHE_SIZE) {
+		max_sectors = 1 << (PAGE_CACHE_SHIFT - 9);
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_sectors);
+	}
+
 	q->max_sectors = max_sectors;
 }
 
@@ -236,6 +224,11 @@ void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
  **/
 void blk_queue_max_phys_segments(request_queue_t *q, unsigned short max_segments)
 {
+	if (!max_segments) {
+		max_segments = 1;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_segments);
+	}
+
 	q->max_phys_segments = max_segments;
 }
 
@@ -252,6 +245,11 @@ void blk_queue_max_phys_segments(request_queue_t *q, unsigned short max_segments
  **/
 void blk_queue_max_hw_segments(request_queue_t *q, unsigned short max_segments)
 {
+	if (!max_segments) {
+		max_segments = 1;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_segments);
+	}
+
 	q->max_hw_segments = max_segments;
 }
 
@@ -266,6 +264,11 @@ void blk_queue_max_hw_segments(request_queue_t *q, unsigned short max_segments)
  **/
 void blk_queue_max_segment_size(request_queue_t *q, unsigned int max_size)
 {
+	if (max_size < PAGE_CACHE_SIZE) {
+		max_size = PAGE_CACHE_SIZE;
+		printk("%s: set to minimum %d\n", __FUNCTION__, max_size);
+	}
+
 	q->max_segment_size = max_size;
 }
 
@@ -292,6 +295,11 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
  **/
 void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 {
+	if (mask < PAGE_CACHE_SIZE - 1) {
+		mask = PAGE_CACHE_SIZE - 1;
+		printk("%s: set to minimum %lx\n", __FUNCTION__, mask);
+	}
+
 	q->seg_boundary_mask = mask;
 }
 
@@ -1568,10 +1576,8 @@ get_rq:
 		/*
 		 * READA bit set
 		 */
-		if (bio->bi_rw & (1 << BIO_RW_AHEAD)) {
-			set_bit(BIO_RW_BLOCK, &bio->bi_flags);
+		if (bio_flagged(bio, BIO_RW_AHEAD))
 			goto end_io;
-		}
 
 		freereq = get_request_wait(q, rw);
 		spin_lock_irq(q->queue_lock);
@@ -1608,7 +1614,7 @@ out:
 	return 0;
 
 end_io:
-	bio->bi_end_io(bio);
+	bio_endio(bio, nr_sectors << 9, -EWOULDBLOCK);
 	return 0;
 }
 
@@ -1697,7 +1703,7 @@ void generic_make_request(struct bio *bio)
 			       bdevname(bio->bi_bdev),
 			       (long long) bio->bi_sector);
 end_io:
-			bio->bi_end_io(bio);
+			bio_endio(bio, 0, -EIO);
 			break;
 		}
 
@@ -1713,17 +1719,6 @@ end_io:
 		blk_put_queue(q);
 
 	} while (ret);
-}
-
-/*
- * our default bio end_io callback handler for a buffer_head mapping.
- */
-static void end_bio_bh_io_sync(struct bio *bio)
-{
-	struct buffer_head *bh = bio->bi_private;
-
-	bh->b_end_io(bh, test_bit(BIO_UPTODATE, &bio->bi_flags));
-	bio_put(bio);
 }
 
 /**
@@ -1758,161 +1753,6 @@ int submit_bio(int rw, struct bio *bio)
 	generic_make_request(bio);
 	return 1;
 }
-
-/**
- * submit_bh: submit a buffer_head to the block device layer for I/O
- * @rw: whether to %READ or %WRITE, or maybe to %READA (read ahead)
- * @bh: The &struct buffer_head which describes the I/O
- *
- **/
-int submit_bh(int rw, struct buffer_head * bh)
-{
-	struct bio *bio;
-
-	BUG_ON(!buffer_locked(bh));
-	BUG_ON(!buffer_mapped(bh));
-	BUG_ON(!bh->b_end_io);
-
-	if ((rw == READ || rw == READA) && buffer_uptodate(bh))
-		buffer_error();
-	if (rw == WRITE && !buffer_uptodate(bh))
-		buffer_error();
-	if (rw == READ && buffer_dirty(bh))
-		buffer_error();
-				
-	set_buffer_req(bh);
-
-	/*
-	 * from here on down, it's all bio -- do the initial mapping,
-	 * submit_bio -> generic_make_request may further map this bio around
-	 */
-	bio = bio_alloc(GFP_NOIO, 1);
-
-	bio->bi_sector = bh->b_blocknr * (bh->b_size >> 9);
-	bio->bi_bdev = bh->b_bdev;
-	bio->bi_io_vec[0].bv_page = bh->b_page;
-	bio->bi_io_vec[0].bv_len = bh->b_size;
-	bio->bi_io_vec[0].bv_offset = bh_offset(bh);
-
-	bio->bi_vcnt = 1;
-	bio->bi_idx = 0;
-	bio->bi_size = bh->b_size;
-
-	bio->bi_end_io = end_bio_bh_io_sync;
-	bio->bi_private = bh;
-
-	return submit_bio(rw, bio);
-}
-
-/**
- * ll_rw_block: low-level access to block devices
- * @rw: whether to %READ or %WRITE or maybe %READA (readahead)
- * @nr: number of &struct buffer_heads in the array
- * @bhs: array of pointers to &struct buffer_head
- *
- * ll_rw_block() takes an array of pointers to &struct buffer_heads,
- * and requests an I/O operation on them, either a %READ or a %WRITE.
- * The third %READA option is described in the documentation for
- * generic_make_request() which ll_rw_block() calls.
- *
- * This function provides extra functionality that is not in
- * generic_make_request() that is relevant to buffers in the buffer
- * cache or page cache.  In particular it drops any buffer that it
- * cannot get a lock on (with the BH_Lock state bit), any buffer that
- * appears to be clean when doing a write request, and any buffer that
- * appears to be up-to-date when doing read request.  Further it marks
- * as clean buffers that are processed for writing (the buffer cache
- * wont assume that they are actually clean until the buffer gets
- * unlocked).
- *
- * ll_rw_block sets b_end_io to simple completion handler that marks
- * the buffer up-to-date (if approriate), unlocks the buffer and wakes
- * any waiters.  As client that needs a more interesting completion
- * routine should call submit_bh() (or generic_make_request())
- * directly.
- *
- * Caveat:
- *  All of the buffers must be for the same device, and must also be
- *  a multiple of the current approved size for the device.
- *
- **/
-
-void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
-{
-	unsigned int major;
-	int correct_size;
-	int i;
-
-	if (!nr)
-		return;
-
-	major = major(to_kdev_t(bhs[0]->b_bdev->bd_dev));
-
-	/* Determine correct block size for this device. */
-	correct_size = bdev_hardsect_size(bhs[0]->b_bdev);
-
-	/* Verify requested block sizes. */
-	for (i = 0; i < nr; i++) {
-		struct buffer_head *bh = bhs[i];
-		if (bh->b_size & (correct_size - 1)) {
-			printk(KERN_NOTICE "ll_rw_block: device %s: "
-			       "only %d-char blocks implemented (%u)\n",
-			       bdevname(bhs[0]->b_bdev),
-			       correct_size, bh->b_size);
-			goto sorry;
-		}
-	}
-
-	if ((rw & WRITE) && bdev_read_only(bhs[0]->b_bdev)) {
-		printk(KERN_NOTICE "Can't write to read-only device %s\n",
-		       bdevname(bhs[0]->b_bdev));
-		goto sorry;
-	}
-
-	for (i = 0; i < nr; i++) {
-		struct buffer_head *bh = bhs[i];
-
-		/* Only one thread can actually submit the I/O. */
-		if (test_set_buffer_locked(bh))
-			continue;
-
-		/* We have the buffer lock */
-		atomic_inc(&bh->b_count);
-		bh->b_end_io = end_buffer_io_sync;
-
-		switch(rw) {
-		case WRITE:
-			if (!test_clear_buffer_dirty(bh))
-				/* Hmmph! Nothing to write */
-				goto end_io;
-			break;
-
-		case READA:
-		case READ:
-			if (buffer_uptodate(bh))
-				/* Hmmph! Already have it */
-				goto end_io;
-			break;
-		default:
-			BUG();
-	end_io:
-			bh->b_end_io(bh, buffer_uptodate(bh));
-			continue;
-		}
-
-		submit_bh(rw, bh);
-	}
-	return;
-
-sorry:
-	/* Make sure we don't get infinite dirty retries.. */
-	for (i = 0; i < nr; i++)
-		clear_buffer_dirty(bhs[i]);
-}
-
-#ifdef CONFIG_STRAM_SWAP
-extern int stram_device_init (void);
-#endif
 
 inline void blk_recalc_rq_segments(struct request *rq)
 {
@@ -1962,8 +1802,8 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
  * @nr_sectors: number of sectors to end I/O on
  *
  * Description:
- *     Ends I/O on the first buffer attached to @req, and sets it up
- *     for the next buffer_head (if any) in the cluster.
+ *     Ends I/O on a number of sectors attached to @req, and sets it up
+ *     for the next range of segments (if any) in the cluster.
  *
  * Return:
  *     0 - we are done with this request, call end_that_request_last()
@@ -1983,6 +1823,7 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 	total_nsect = 0;
 	while ((bio = req->bio)) {
 		nsect = bio_iovec(bio)->bv_len >> 9;
+		total_nsect += nsect;
 
 		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
 
@@ -1992,38 +1833,31 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 		if (unlikely(nsect > nr_sectors)) {
 			int partial = nr_sectors << 9;
 
-			bio->bi_size -= partial;
 			bio_iovec(bio)->bv_offset += partial;
 			bio_iovec(bio)->bv_len -= partial;
-			blk_recalc_rq_sectors(req, nr_sectors);
+			blk_recalc_rq_sectors(req, total_nsect);
 			blk_recalc_rq_segments(req);
+			bio_endio(bio, partial, !uptodate ? -EIO : 0);
 			return 1;
 		}
 
 		/*
-		 * account transfer
+		 * if bio->bi_end_io returns 0, this bio is done. move on
 		 */
-		bio->bi_size -= bio_iovec(bio)->bv_len;
-		bio->bi_idx++;
-
-		nr_sectors -= nsect;
-		total_nsect += nsect;
-
-		if (!bio->bi_size) {
-			req->bio = bio->bi_next;
-
-			bio_endio(bio, uptodate);
-
-			total_nsect = 0;
+		req->bio = bio->bi_next;
+		if (bio_endio(bio, nsect << 9, !uptodate ? -EIO : 0)) {
+			bio->bi_idx++;
+			req->bio = bio;
 		}
 
-		if ((bio = req->bio)) {
-			blk_recalc_rq_sectors(req, nsect);
+		nr_sectors -= nsect;
 
+		if ((bio = req->bio)) {
 			/*
 			 * end more in this run, or just return 'not-done'
 			 */
 			if (unlikely(nr_sectors <= 0)) {
+				blk_recalc_rq_sectors(req, total_nsect);
 				blk_recalc_rq_segments(req);
 				return 1;
 			}

@@ -431,10 +431,7 @@ extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
 
 /* mmap.c */
-extern void lock_vma_mappings(struct vm_area_struct *);
-extern void unlock_vma_mappings(struct vm_area_struct *);
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
-extern void __insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void build_mmap_rb(struct mm_struct *);
 extern void exit_mmap(struct mm_struct *);
 
@@ -504,6 +501,8 @@ extern int expand_stack(struct vm_area_struct * vma, unsigned long address);
 extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);
 extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned long addr,
 					     struct vm_area_struct **pprev);
+extern int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
+		     unsigned long addr, int new_below);
 
 /* Look up the first VMA which intersects the interval start_addr..end_addr-1,
    NULL if none.  Assume start_addr < end_addr. */

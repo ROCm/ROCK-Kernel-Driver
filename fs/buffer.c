@@ -35,6 +35,7 @@
 #include <linux/hash.h>
 #include <linux/suspend.h>
 #include <linux/buffer_head.h>
+#include <linux/bio.h>
 #include <asm/bitops.h>
 
 static void invalidate_bh_lrus(void);
@@ -1622,6 +1623,7 @@ void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 		__brelse(old_bh);
 	}
 }
+EXPORT_SYMBOL(unmap_underlying_metadata);
 
 /*
  * NOTE! All mapped/uptodate combinations are valid:
@@ -2409,6 +2411,155 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 	}
 
 	return err ? err : transferred;
+}
+
+static int end_bio_bh_io_sync(struct bio *bio, unsigned int bytes_done, int err)
+{
+	struct buffer_head *bh = bio->bi_private;
+
+	if (bio->bi_size)
+		return 1;
+
+	bh->b_end_io(bh, test_bit(BIO_UPTODATE, &bio->bi_flags));
+	bio_put(bio);
+	return 0;
+}
+
+int submit_bh(int rw, struct buffer_head * bh)
+{
+	struct bio *bio;
+
+	BUG_ON(!buffer_locked(bh));
+	BUG_ON(!buffer_mapped(bh));
+	BUG_ON(!bh->b_end_io);
+
+	if ((rw == READ || rw == READA) && buffer_uptodate(bh))
+		buffer_error();
+	if (rw == WRITE && !buffer_uptodate(bh))
+		buffer_error();
+	if (rw == READ && buffer_dirty(bh))
+		buffer_error();
+				
+	set_buffer_req(bh);
+
+	/*
+	 * from here on down, it's all bio -- do the initial mapping,
+	 * submit_bio -> generic_make_request may further map this bio around
+	 */
+	bio = bio_alloc(GFP_NOIO, 1);
+
+	bio->bi_sector = bh->b_blocknr * (bh->b_size >> 9);
+	bio->bi_bdev = bh->b_bdev;
+	bio->bi_io_vec[0].bv_page = bh->b_page;
+	bio->bi_io_vec[0].bv_len = bh->b_size;
+	bio->bi_io_vec[0].bv_offset = bh_offset(bh);
+
+	bio->bi_vcnt = 1;
+	bio->bi_idx = 0;
+	bio->bi_size = bh->b_size;
+
+	bio->bi_end_io = end_bio_bh_io_sync;
+	bio->bi_private = bh;
+
+	return submit_bio(rw, bio);
+}
+
+/**
+ * ll_rw_block: low-level access to block devices (DEPRECATED)
+ * @rw: whether to %READ or %WRITE or maybe %READA (readahead)
+ * @nr: number of &struct buffer_heads in the array
+ * @bhs: array of pointers to &struct buffer_head
+ *
+ * ll_rw_block() takes an array of pointers to &struct buffer_heads,
+ * and requests an I/O operation on them, either a %READ or a %WRITE.
+ * The third %READA option is described in the documentation for
+ * generic_make_request() which ll_rw_block() calls.
+ *
+ * This function drops any buffer that it cannot get a lock on (with the
+ * BH_Lock state bit), any buffer that appears to be clean when doing a
+ * write request, and any buffer that appears to be up-to-date when doing
+ * read request.  Further it marks as clean buffers that are processed for
+ * writing (the buffer cache wont assume that they are actually clean until
+ * the buffer gets unlocked).
+ *
+ * ll_rw_block sets b_end_io to simple completion handler that marks
+ * the buffer up-to-date (if approriate), unlocks the buffer and wakes
+ * any waiters. 
+ *
+ * All of the buffers must be for the same device, and must also be a
+ * multiple of the current approved size for the device.
+ */
+void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
+{
+	unsigned int major;
+	int correct_size;
+	int i;
+
+	if (!nr)
+		return;
+
+	major = major(to_kdev_t(bhs[0]->b_bdev->bd_dev));
+
+	/* Determine correct block size for this device. */
+	correct_size = bdev_hardsect_size(bhs[0]->b_bdev);
+
+	/* Verify requested block sizes. */
+	for (i = 0; i < nr; i++) {
+		struct buffer_head *bh = bhs[i];
+		if (bh->b_size & (correct_size - 1)) {
+			printk(KERN_NOTICE "ll_rw_block: device %s: "
+			       "only %d-char blocks implemented (%u)\n",
+			       bdevname(bhs[0]->b_bdev),
+			       correct_size, bh->b_size);
+			goto sorry;
+		}
+	}
+
+	if ((rw & WRITE) && bdev_read_only(bhs[0]->b_bdev)) {
+		printk(KERN_NOTICE "Can't write to read-only device %s\n",
+		       bdevname(bhs[0]->b_bdev));
+		goto sorry;
+	}
+
+	for (i = 0; i < nr; i++) {
+		struct buffer_head *bh = bhs[i];
+
+		/* Only one thread can actually submit the I/O. */
+		if (test_set_buffer_locked(bh))
+			continue;
+
+		/* We have the buffer lock */
+		atomic_inc(&bh->b_count);
+		bh->b_end_io = end_buffer_io_sync;
+
+		switch(rw) {
+		case WRITE:
+			if (!test_clear_buffer_dirty(bh))
+				/* Hmmph! Nothing to write */
+				goto end_io;
+			break;
+
+		case READA:
+		case READ:
+			if (buffer_uptodate(bh))
+				/* Hmmph! Already have it */
+				goto end_io;
+			break;
+		default:
+			BUG();
+	end_io:
+			bh->b_end_io(bh, buffer_uptodate(bh));
+			continue;
+		}
+
+		submit_bh(rw, bh);
+	}
+	return;
+
+sorry:
+	/* Make sure we don't get infinite dirty retries.. */
+	for (i = 0; i < nr; i++)
+		clear_buffer_dirty(bhs[i]);
 }
 
 /*

@@ -111,7 +111,7 @@ struct rpc_procinfo {
 
 struct rpc_clnt *rpc_create_client(struct rpc_xprt *xprt, char *servname,
 				struct rpc_program *info,
-				u32 version, int authflavor);
+				u32 version, rpc_authflavor_t authflavor);
 int		rpc_shutdown_client(struct rpc_clnt *);
 int		rpc_destroy_client(struct rpc_clnt *);
 void		rpc_release_client(struct rpc_clnt *);

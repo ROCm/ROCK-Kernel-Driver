@@ -11,12 +11,16 @@
 
 #define RPC_VERSION 2
 
-enum rpc_auth_flavor {
+/* spec defines authentication flavor as an unsigned 32 bit integer */
+typedef u32	rpc_authflavor_t;
+
+enum rpc_auth_flavors {
 	RPC_AUTH_NULL  = 0,
 	RPC_AUTH_UNIX  = 1,
 	RPC_AUTH_SHORT = 2,
 	RPC_AUTH_DES   = 3,
 	RPC_AUTH_KRB   = 4,
+	RPC_AUTH_MAXFLAVOR = 8,
 };
 
 enum rpc_msg_type {

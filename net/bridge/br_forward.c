@@ -49,6 +49,9 @@ static int __br_forward_finish(struct sk_buff *skb)
 static void __br_deliver(struct net_bridge_port *to, struct sk_buff *skb)
 {
 	skb->dev = to->dev;
+#ifdef CONFIG_NETFILTER_DEBUG
+	skb->nf_debug = 0;
+#endif
 	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_OUT, skb, NULL, skb->dev,
 			__br_forward_finish);
 }

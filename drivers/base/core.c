@@ -97,15 +97,10 @@ static int device_attach(struct device * dev)
 
 static void device_detach(struct device * dev)
 {
-	struct device_driver * drv; 
+	struct device_driver * drv = dev->driver;
 
-	if (dev->driver) {
+	if (drv) {
 		devclass_remove_device(dev);
-		spin_lock(&device_lock);
-		drv = dev->driver;
-		spin_unlock(&device_lock);
-
-		/* detach from driver */
 		if (drv && drv->remove)
 			drv->remove(dev);
 

@@ -53,7 +53,7 @@ static kmem_cache_t	*kioctx_cachep;
 /* Used for rare fput completion. */
 static void aio_fput_routine(void *);
 static struct tq_struct	fput_tqueue = {
-	routine:	aio_fput_routine,
+	.routine	= aio_fput_routine,
 };
 
 static spinlock_t	fput_lock = SPIN_LOCK_UNLOCKED;
