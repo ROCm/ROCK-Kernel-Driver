@@ -330,7 +330,7 @@ static void auerchain_complete (struct urb * urb)
                 urb    = acep->urbp;
                 dbg ("auerchain_complete: submitting next urb from chain");
 		urb->status = 0;	/* needed! */
-		result = usb_submit_urb( urb);
+		result = usb_submit_urb(urb, GFP_KERNEL);
 
                 /* check for submit errors */
                 if (result) {
@@ -408,7 +408,7 @@ static int auerchain_submit_urb_list (pauerchain_t acp, struct urb * urb, int ea
         if (acep) {
                 dbg("submitting urb immediate");
 		urb->status = 0;	/* needed! */
-                result = usb_submit_urb( urb);
+                result = usb_submit_urb(urb, GFP_KERNEL);
                 /* check for submit errors */
                 if (result) {
                         urb->status = result;
@@ -1128,7 +1128,7 @@ static int auerswald_int_open (pauerswald_t cp)
         FILL_INT_URB (cp->inturbp, cp->usbdev, usb_rcvintpipe (cp->usbdev,AU_IRQENDP), cp->intbufp, irqsize, auerswald_int_complete, cp, ep->bInterval);
         /* start the urb */
 	cp->inturbp->status = 0;	/* needed! */
-	ret = usb_submit_urb (cp->inturbp);
+	ret = usb_submit_urb (cp->inturbp, GFP_KERNEL);
 
 intoend:
         if (ret < 0) {

@@ -765,7 +765,7 @@ static void stv680_video_irq (struct urb *urb)
 	/* Resubmit urb for new data */
 	urb->status = 0;
 	urb->dev = stv680->udev;
-	if (usb_submit_urb (urb))
+	if (usb_submit_urb (urb, GFP_KERNEL))
 		PDEBUG (0, "STV(e): urb burned down in video irq");
 	return;
 }				/*  _video_irq  */
@@ -816,7 +816,7 @@ static int stv680_start_stream (struct usb_stv *stv680)
 		urb->timeout = PENCAM_TIMEOUT * 2;
 		urb->transfer_flags |= USB_QUEUE_BULK;
 		stv680->urb[i] = urb;
-		err = usb_submit_urb (stv680->urb[i]);
+		err = usb_submit_urb (stv680->urb[i], GFP_KERNEL);
 		if (err)
 			PDEBUG (0, "STV(e): urb burned down in start stream");
 	}			/* i STV680_NUMSBUF */

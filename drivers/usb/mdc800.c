@@ -605,7 +605,7 @@ static int mdc800_device_open (struct inode* inode, struct file *file)
 
 	retval=0;
 	mdc800->irq_urb->dev = mdc800->dev;
-	if (usb_submit_urb (mdc800->irq_urb))
+	if (usb_submit_urb (mdc800->irq_urb, GFP_KERNEL))
 	{
 		err ("request USB irq fails (submit_retval=%i urb_status=%i).",retval, mdc800->irq_urb->status);
 		errn = -EIO;
@@ -694,7 +694,7 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
 
 				/* Download -> Request new bytes */
 				mdc800->download_urb->dev = mdc800->dev;
-				if (usb_submit_urb (mdc800->download_urb))
+				if (usb_submit_urb (mdc800->download_urb, GFP_KERNEL))
 				{
 					err ("Can't submit download urb (status=%i)",mdc800->download_urb->status);
 					up (&mdc800->io_lock);
@@ -808,7 +808,7 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 			mdc800->state=WORKING;
 			memcpy (mdc800->write_urb->transfer_buffer, mdc800->in,8);
 			mdc800->write_urb->dev = mdc800->dev;
-			if (usb_submit_urb (mdc800->write_urb))
+			if (usb_submit_urb (mdc800->write_urb, GFP_KERNEL))
 			{
 				err ("submitting write urb fails (status=%i)", mdc800->write_urb->status);
 				up (&mdc800->io_lock);

@@ -335,7 +335,7 @@ static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int
 			  (unsigned char*)dr, urb->transfer_buffer, len, bluetooth_ctrl_callback, bluetooth);
 
 	/* send it down the pipe */
-	status = usb_submit_urb(urb);
+	status = usb_submit_urb(urb, GFP_KERNEL);
 	if (status)
 		dbg(__FUNCTION__ " - usb_submit_urb(control) failed with status = %d", status);
 	
@@ -390,7 +390,7 @@ static int bluetooth_open (struct tty_struct *tty, struct file * filp)
 			       bluetooth->bulk_in_buffer,
 			       bluetooth->bulk_in_buffer_size,
 			       bluetooth_read_bulk_callback, bluetooth);
-		result = usb_submit_urb(bluetooth->read_urb);
+		result = usb_submit_urb(bluetooth->read_urb, GFP_KERNEL);
 		if (result)
 			dbg(__FUNCTION__ " - usb_submit_urb(read bulk) failed with status %d", result);
 #endif
@@ -400,7 +400,7 @@ static int bluetooth_open (struct tty_struct *tty, struct file * filp)
 			      bluetooth->interrupt_in_buffer_size,
 			      bluetooth_int_callback, bluetooth,
 			      bluetooth->interrupt_in_interval);
-		result = usb_submit_urb(bluetooth->interrupt_in_urb);
+		result = usb_submit_urb(bluetooth->interrupt_in_urb, GFP_KERNEL);
 		if (result)
 			dbg(__FUNCTION__ " - usb_submit_urb(interrupt in) failed with status %d", result);
 	}
@@ -540,7 +540,7 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 				urb->transfer_flags |= USB_QUEUE_BULK;
 
 				/* send it down the pipe */
-				retval = usb_submit_urb(urb);
+				retval = usb_submit_urb(urb, GFP_KERNEL);
 				if (retval) {
 					dbg(__FUNCTION__ " - usb_submit_urb(write bulk) failed with error = %d", retval);
 					goto exit;
@@ -730,7 +730,7 @@ void btusb_enable_bulk_read(struct tty_struct *tty){
 			      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 			      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
 			      bluetooth_read_bulk_callback, bluetooth);
-		result = usb_submit_urb(bluetooth->read_urb);
+		result = usb_submit_urb(bluetooth->read_urb, GFP_KERNEL);
 		if (result)
 			err (__FUNCTION__ " - failed submitting read urb, error %d", result);
 	}
@@ -921,7 +921,7 @@ static void bluetooth_read_bulk_callback (struct urb *urb)
 			      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 			      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
 			      bluetooth_read_bulk_callback, bluetooth);
-		result = usb_submit_urb(bluetooth->read_urb);
+		result = usb_submit_urb(bluetooth->read_urb, GFP_KERNEL);
 		if (result)
 			err (__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 
@@ -982,7 +982,7 @@ exit:
 		      usb_rcvbulkpipe(bluetooth->dev, bluetooth->bulk_in_endpointAddress),
 		      bluetooth->bulk_in_buffer, bluetooth->bulk_in_buffer_size, 
 		      bluetooth_read_bulk_callback, bluetooth);
-	result = usb_submit_urb(bluetooth->read_urb);
+	result = usb_submit_urb(bluetooth->read_urb, GFP_KERNEL);
 	if (result)
 		err (__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 

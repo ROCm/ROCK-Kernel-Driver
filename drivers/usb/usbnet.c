@@ -373,7 +373,7 @@ static int gl_interrupt_read (struct usbnet *dev)
 	// issue usb interrupt read
 	if (priv && priv->irq_urb) {
 		// submit urb
-		if ((retval = usb_submit_urb (priv->irq_urb)) != 0)
+		if ((retval = usb_submit_urb (priv->irq_urb, GFP_KERNEL)) != 0)
 			dbg ("gl_interrupt_read: submit fail - %X...", retval);
 		else
 			dbg ("gl_interrupt_read: submit success...");
@@ -1281,7 +1281,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);
 
 	if (netif_running (&dev->net)) {
-		if ((retval = usb_submit_urb (urb)) != 0) {
+		if ((retval = usb_submit_urb (urb, GFP_ATOMIC)) != 0) {
 			dbg ("%s rx submit, %d", dev->net.name, retval);
 			tasklet_schedule (&dev->bh);
 		} else {
@@ -1642,7 +1642,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 #endif	/* CONFIG_USB_NET1080 */
 
 	netif_stop_queue (net);
-	if ((retval = usb_submit_urb (urb)) != 0) {
+	if ((retval = usb_submit_urb (urb, GFP_ATOMIC)) != 0) {
 		netif_start_queue (net);
 		dbg ("%s tx: submit urb err %d", net->name, retval);
 	} else {

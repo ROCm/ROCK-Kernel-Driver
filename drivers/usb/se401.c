@@ -556,7 +556,7 @@ static void se401_video_irq(struct urb *urb)
 	/* Resubmit urb for new data */
 	urb->status=0;
 	urb->dev=se401->dev;
-	if(usb_submit_urb(urb))
+	if(usb_submit_urb(urb, GFP_KERNEL))
 		info("urb burned down");
 	return;
 }
@@ -657,7 +657,7 @@ static int se401_start_stream(struct usb_se401 *se401)
 
 		se401->urb[i]=urb;
 
-		err=usb_submit_urb(se401->urb[i]);
+		err=usb_submit_urb(se401->urb[i], GFP_KERNEL);
 		if(err)
 			err("urb burned down");
 	}
@@ -1477,7 +1477,7 @@ static int se401_init(struct usb_se401 *se401)
 	    se401,
 	    HZ/10
 	);
-	if (usb_submit_urb(se401->inturb)) {
+	if (usb_submit_urb(se401->inturb, GFP_KERNEL)) {
 		info("int urb burned down");
 		return 1;
 	}
