@@ -80,14 +80,11 @@ static void vpeirq (unsigned long data)
 		return;
 
         if (newdma > olddma) { /* no wraparound, dump olddma..newdma */
-               	if(mem[olddma] == 0x47)
                         dvb_dmx_swfilter_packets(&budget->demux, 
         	                mem+olddma, (newdma-olddma) / 188);
         } else { /* wraparound, dump olddma..buflen and 0..newdma */
-                if(mem[olddma] == 0x47)
 	                dvb_dmx_swfilter_packets(&budget->demux,
         	                mem+olddma, (TS_BUFLEN-olddma) / 188);
-                if(mem[0] == 0x47)
                         dvb_dmx_swfilter_packets(&budget->demux,
                                 mem, newdma / 188);
         }
