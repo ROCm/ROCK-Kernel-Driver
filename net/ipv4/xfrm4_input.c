@@ -9,6 +9,7 @@
  * 	
  */
 
+#include <linux/string.h>
 #include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
@@ -18,9 +19,10 @@ int xfrm4_rcv(struct sk_buff *skb)
 	return xfrm4_rcv_encap(skb, 0);
 }
 
-static inline void ipip_ecn_decapsulate(struct iphdr *outer_iph, struct sk_buff *skb)
+static inline void ipip_ecn_decapsulate(struct sk_buff *skb)
 {
-	struct iphdr *inner_iph = skb->nh.iph;
+	struct iphdr *outer_iph = skb->nh.iph;
+	struct iphdr *inner_iph = skb->h.ipiph;
 
 	if (INET_ECN_is_ce(outer_iph->tos) &&
 	    INET_ECN_is_not_ce(inner_iph->tos))
@@ -95,10 +97,16 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 		if (x->props.mode) {
 			if (iph->protocol != IPPROTO_IPIP)
 				goto drop;
-			skb->nh.raw = skb->data;
+			if (!pskb_may_pull(skb, sizeof(struct iphdr)))
+				goto drop;
+			if (skb_cloned(skb) &&
+			    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
+				goto drop;
 			if (!(x->props.flags & XFRM_STATE_NOECN))
-				ipip_ecn_decapsulate(iph, skb);
-			iph = skb->nh.iph;
+				ipip_ecn_decapsulate(skb);
+			skb->mac.raw = memmove(skb->data - skb->mac_len,
+					       skb->mac.raw, skb->mac_len);
+			skb->nh.raw = skb->data;
 			memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
 			decaps = 1;
 			break;

@@ -120,7 +120,7 @@ static int ip6_parse_tlv(struct tlvtype_proc *procs, struct sk_buff *skb)
 			for (curr=procs; curr->type >= 0; curr++) {
 				if (curr->type == skb->nh.raw[off]) {
 					/* type specific length/alignment 
-					   checks will be perfomed in the 
+					   checks will be performed in the 
 					   func(). */
 					if (curr->func(skb, off) == 0)
 						return 0;

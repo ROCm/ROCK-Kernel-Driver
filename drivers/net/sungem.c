@@ -1961,7 +1961,6 @@ static void gem_init_hw(struct gem *gp, int restart_link)
  */
 static void gem_apple_powerup(struct gem *gp)
 {
-	u16 cmd;
 	u32 mif_cfg;
 
 	mb();
