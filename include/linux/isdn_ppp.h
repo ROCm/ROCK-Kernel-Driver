@@ -8,7 +8,6 @@
 #ifndef _LINUX_ISDN_PPP_H
 #define _LINUX_ISDN_PPP_H
 
-
 #define CALLTYPE_INCOMING 0x1
 #define CALLTYPE_OUTGOING 0x2
 #define CALLTYPE_CALLBACK 0x4
@@ -39,15 +38,6 @@ struct pppcallinfo
 #define SC_OUT_SHORT_SEQ 0x00000800
 #define SC_IN_SHORT_SEQ  0x00004000
 
-#define SC_DECOMP_ON		0x01
-#define SC_COMP_ON		0x02
-#define SC_DECOMP_DISCARD	0x04
-#define SC_COMP_DISCARD		0x08
-#define SC_LINK_DECOMP_ON	0x10
-#define SC_LINK_COMP_ON		0x20
-#define SC_LINK_DECOMP_DISCARD	0x40
-#define SC_LINK_COMP_DISCARD	0x80
-
 #define ISDN_PPP_COMP_MAX_OPTIONS 16
 
 #define IPPP_COMP_FLAG_XMIT 0x1
@@ -64,7 +54,8 @@ struct isdn_ppp_comp_data {
 
 
 #include <linux/config.h>
-
+#include <linux/skbuff.h>
+#include <linux/ppp_defs.h>
 
 #define DECOMP_ERR_NOMEM	(-10)
 
@@ -172,8 +163,8 @@ enum ippp_ccp_reset_states {
 
 struct ippp_ccp_reset_state {
   enum ippp_ccp_reset_states state;	/* State of this transaction */
-  struct ippp_struct *is;		/* Backlink to device stuff */
-  unsigned char id;			/* Backlink id index */
+  struct ippp_ccp *ccp;                 /* Backlink */
+  unsigned char id;			/* id index */
   unsigned char ta:1;			/* The timer is active (flag) */
   unsigned char expra:1;		/* We expect a ResetAck at all */
   int dlen;				/* Databytes stored in data */
@@ -189,35 +180,6 @@ struct ippp_ccp_reset_state {
 struct ippp_ccp_reset {
   struct ippp_ccp_reset_state *rs[256];	/* One per possible id */
   unsigned char lastid;			/* Last id allocated by the engine */
-};
-
-struct ippp_struct {
-  struct ippp_struct *next_link;
-  int state;
-  struct sk_buff_head rq;
-  wait_queue_head_t wq;
-  struct task_struct *tk;
-  unsigned int mpppcfg;
-  unsigned int pppcfg;
-  unsigned int mru;
-  unsigned int mpmru;
-  unsigned int mpmtu;
-  unsigned int maxcid;
-  struct isdn_net_dev_s *idev;
-  int unit;
-  int minor;
-  unsigned int last_link_seqno;
-  long mp_seqno;
-#ifdef CONFIG_ISDN_PPP_VJ
-  unsigned char *cbuf;
-  struct slcompress *slcomp;
-#endif
-  unsigned long debug;
-  struct isdn_ppp_compressor *compressor,*decompressor;
-  struct isdn_ppp_compressor *link_compressor,*link_decompressor;
-  void *decomp_stat,*comp_stat,*link_decomp_stat,*link_comp_stat;
-  struct ippp_ccp_reset *reset;	/* Allocated on demand, may never be needed */
-  unsigned long compflags;
 };
 
 #endif /* __KERNEL__ */

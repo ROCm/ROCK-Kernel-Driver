@@ -14,138 +14,29 @@
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/isdn.h>
-  			      /* Definitions for hupflags:                */
-#define ISDN_CHARGEHUP   4      /* We want to use the charge mechanism      */
-#define ISDN_INHUP       8      /* Even if incoming, close after huptimeout */
-#define ISDN_MANCHARGE  16      /* Charge Interval manually set             */
 
-/*
- * Definitions for Cisco-HDLC header.
- */
+void isdn_net_init(void);
+void isdn_net_exit(void);
+void isdn_net_lib_init(void);
+void isdn_net_lib_exit(void);
+void isdn_net_hangup_all(void);
+int  isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
 
-#define CISCO_ADDR_UNICAST    0x0f
-#define CISCO_ADDR_BROADCAST  0x8f
-#define CISCO_CTRL            0x00
-#define CISCO_TYPE_CDP        0x2000
-#define CISCO_TYPE_SLARP      0x8035
-#define CISCO_SLARP_REQUEST   0
-#define CISCO_SLARP_REPLY     1
-#define CISCO_SLARP_KEEPALIVE 2
+int  register_isdn_netif(int encap, struct isdn_netif_ops *ops);
+int  isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
+void isdn_net_online(isdn_net_dev *idev);
+void isdn_net_offline(isdn_net_dev *idev);
 
-extern void isdn_net_init(void);
-extern void isdn_net_exit(void);
-extern void isdn_net_lib_init(void);
-extern void isdn_net_lib_exit(void);
-extern void isdn_net_hangup_all(void);
-extern int isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
+int  isdn_net_stat_callback(int, isdn_ctrl *);
+int  isdn_net_find_icall(int, int, int, setup_parm *);
+int  isdn_net_rcv_skb(int, struct sk_buff *);
 
-extern int register_isdn_netif(int encap, struct isdn_netif_ops *ops);
-extern int isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
-extern int isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
-
-extern int  isdn_net_dial(isdn_net_dev *idev);
-
-extern int  isdn_net_bsent(isdn_net_dev *idev, isdn_ctrl *c);
-
-extern int isdn_net_stat_callback(int, isdn_ctrl *);
-extern int isdn_net_find_icall(int, int, int, setup_parm *);
-extern int isdn_net_hangup(isdn_net_dev *);
-extern int isdn_net_rcv_skb(int, struct sk_buff *);
-extern int isdn_net_dial_req(isdn_net_dev *);
-extern void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
-extern void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
-extern int isdn_net_online(isdn_net_dev *);
-
-enum {
-	ST_CHARGE_NULL,
-	ST_CHARGE_GOT_CINF,  /* got a first charge info */
-	ST_CHARGE_HAVE_CINT, /* got a second chare info and thus the timing */
-};
-
-#define ISDN_NET_MAX_QUEUE_LENGTH 2
-
-/*
- * is this particular channel busy?
- */
-static inline int
-isdn_net_dev_busy(isdn_net_dev *idev)
-{
-	if (atomic_read(&idev->frame_cnt) < ISDN_NET_MAX_QUEUE_LENGTH)
-		return 0;
-	else 
-		return 1;
-}
-
-/*
- * For the given net device, this will get a non-busy channel out of the
- * corresponding bundle. The returned channel is locked.
- */
-static inline isdn_net_dev *
-isdn_net_get_locked_dev(isdn_net_local *mlp)
-{
-	unsigned long flags;
-	isdn_net_dev *idev;
-
-	spin_lock_irqsave(&mlp->online_lock, flags);
-
-	list_for_each_entry(idev, &mlp->online, online) {
-		spin_lock_bh(&idev->xmit_lock);
-		if (!isdn_net_dev_busy(idev)) {
-			/* point the head to next online channel */
-			list_del(&mlp->online);
-			list_add(&mlp->online, &idev->online);
-			goto found;
-		}
-		spin_unlock_bh(&idev->xmit_lock);
-	}
-	idev = NULL;
-
- found:
-	spin_unlock_irqrestore(&mlp->online_lock, flags);
-	return idev;
-}
-
-/*
- * add a channel to a bundle
- */
-static inline void
-isdn_net_add_to_bundle(isdn_net_local *mlp, isdn_net_dev *idev)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&mlp->online_lock, flags);
-	list_add(&idev->online, &mlp->online);
-	spin_unlock_irqrestore(&mlp->online_lock, flags);
-}
-/*
- * remove a channel from the bundle it belongs to
- */
-static inline void
-isdn_net_rm_from_bundle(isdn_net_dev *idev)
-{
-	isdn_net_local *mlp = idev->mlp;
-	unsigned long flags;
-
-	spin_lock_irqsave(&mlp->online_lock, flags);
-	//	list_del(&idev->online); FIXME
-	spin_unlock_irqrestore(&mlp->online_lock, flags);
-}
-
-/*
- * wake up the network -> net_device queue.
- * For slaves, wake the corresponding master interface.
- */
-static inline void
-isdn_net_dev_wake_queue(isdn_net_dev *idev)
-{
-	netif_wake_queue(&idev->mlp->dev);
-}
-
-static inline int
-isdn_net_bound(isdn_net_dev *idev)
-{
-	return idev->isdn_slot >= 0;
-}
+int  isdn_net_hangup(isdn_net_dev *);
+int  isdn_net_dial_req(isdn_net_dev *);
+void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
+void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
+int  isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
+isdn_net_dev *isdn_net_get_xmit_dev(isdn_net_local *mlp);
 
 static inline int
 put_u8(unsigned char *p, u8 x)
