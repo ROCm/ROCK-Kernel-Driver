@@ -1222,7 +1222,6 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 	}
 
 	rqstp->rq_secure  = ntohs(rqstp->rq_addr.sin_port) < 1024;
-	rqstp->rq_userset = 0;
 	rqstp->rq_chandle.defer = svc_defer;
 
 	if (serv->sv_stats)

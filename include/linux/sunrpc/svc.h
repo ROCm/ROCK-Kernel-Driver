@@ -125,7 +125,6 @@ struct svc_rqst {
 	u32			rq_proc;	/* procedure number */
 	u32			rq_prot;	/* IP protocol */
 	unsigned short
-				rq_userset : 1,	/* auth->setuser OK */
 				rq_secure  : 1;	/* secure port */
 
 
