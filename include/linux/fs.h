@@ -1113,6 +1113,10 @@ extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
 extern void sync_filesystems(int wait);
+extern void emergency_sync(void);
+extern void emergency_remount(void);
+extern int do_remount_sb(struct super_block *sb, int flags,
+			void *data, int force);
 extern sector_t bmap(struct inode *, sector_t);
 extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);
