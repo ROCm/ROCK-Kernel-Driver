@@ -189,7 +189,7 @@ void ufs_error (struct super_block * sb, const char * function,
 	struct ufs_super_block_first * usb1;
 	va_list args;
 
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	
 	if (!(sb->s_flags & MS_RDONLY)) {
@@ -201,7 +201,7 @@ void ufs_error (struct super_block * sb, const char * function,
 	va_start (args, fmt);
 	vsprintf (error_buf, fmt, args);
 	va_end (args);
-	switch (sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_ONERROR) {
+	switch (UFS_SB(sb)->s_mount_opt & UFS_MOUNT_ONERROR) {
 	case UFS_MOUNT_ONERROR_PANIC:
 		panic ("UFS-fs panic (device %s): %s: %s\n", 
 			sb->s_id, function, error_buf);
@@ -221,7 +221,7 @@ void ufs_panic (struct super_block * sb, const char * function,
 	struct ufs_super_block_first * usb1;
 	va_list args;
 	
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	
 	if (!(sb->s_flags & MS_RDONLY)) {
@@ -317,6 +317,7 @@ static int ufs_parse_options (char * options, unsigned * mount_options)
  * Read on-disk structures associated with cylinder groups
  */
 int ufs_read_cylinder_structures (struct super_block * sb) {
+	struct ufs_sb_info * sbi = UFS_SB(sb);
 	struct ufs_sb_private_info * uspi;
 	struct ufs_buffer_head * ubh;
 	unsigned char * base, * space;
@@ -324,7 +325,7 @@ int ufs_read_cylinder_structures (struct super_block * sb) {
 	
 	UFSD(("ENTER\n"))
 	
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = sbi->s_uspi;
 	
 	/*
 	 * Read cs structures from (usually) first data block
@@ -343,7 +344,7 @@ int ufs_read_cylinder_structures (struct super_block * sb) {
 		if (!ubh)
 			goto failed;
 		ubh_ubhcpymem (space, ubh, size);
-		sb->u.ufs_sb.s_csp[ufs_fragstoblks(i)] = (struct ufs_csum *)space;
+		sbi->s_csp[ufs_fragstoblks(i)] = (struct ufs_csum *)space;
 		space += size;
 		ubh_brelse (ubh);
 		ubh = NULL;
@@ -353,41 +354,41 @@ int ufs_read_cylinder_structures (struct super_block * sb) {
 	 * Read cylinder group (we read only first fragment from block
 	 * at this time) and prepare internal data structures for cg caching.
 	 */
-	if (!(sb->u.ufs_sb.s_ucg = kmalloc (sizeof(struct buffer_head *) * uspi->s_ncg, GFP_KERNEL)))
+	if (!(sbi->s_ucg = kmalloc (sizeof(struct buffer_head *) * uspi->s_ncg, GFP_KERNEL)))
 		goto failed;
 	for (i = 0; i < uspi->s_ncg; i++) 
-		sb->u.ufs_sb.s_ucg[i] = NULL;
+		sbi->s_ucg[i] = NULL;
 	for (i = 0; i < UFS_MAX_GROUP_LOADED; i++) {
-		sb->u.ufs_sb.s_ucpi[i] = NULL;
-		sb->u.ufs_sb.s_cgno[i] = UFS_CGNO_EMPTY;
+		sbi->s_ucpi[i] = NULL;
+		sbi->s_cgno[i] = UFS_CGNO_EMPTY;
 	}
 	for (i = 0; i < uspi->s_ncg; i++) {
 		UFSD(("read cg %u\n", i))
-		if (!(sb->u.ufs_sb.s_ucg[i] = sb_bread(sb, ufs_cgcmin(i))))
+		if (!(sbi->s_ucg[i] = sb_bread(sb, ufs_cgcmin(i))))
 			goto failed;
-		if (!ufs_cg_chkmagic (sb, (struct ufs_cylinder_group *) sb->u.ufs_sb.s_ucg[i]->b_data))
+		if (!ufs_cg_chkmagic (sb, (struct ufs_cylinder_group *) sbi->s_ucg[i]->b_data))
 			goto failed;
 #ifdef UFS_SUPER_DEBUG_MORE
-		ufs_print_cylinder_stuff(sb, (struct ufs_cylinder_group *) sb->u.ufs_sb.s_ucg[i]->b_data);
+		ufs_print_cylinder_stuff(sb, (struct ufs_cylinder_group *) sbi->s_ucg[i]->b_data);
 #endif
 	}
 	for (i = 0; i < UFS_MAX_GROUP_LOADED; i++) {
-		if (!(sb->u.ufs_sb.s_ucpi[i] = kmalloc (sizeof(struct ufs_cg_private_info), GFP_KERNEL)))
+		if (!(sbi->s_ucpi[i] = kmalloc (sizeof(struct ufs_cg_private_info), GFP_KERNEL)))
 			goto failed;
-		sb->u.ufs_sb.s_cgno[i] = UFS_CGNO_EMPTY;
+		sbi->s_cgno[i] = UFS_CGNO_EMPTY;
 	}
-	sb->u.ufs_sb.s_cg_loaded = 0;
+	sbi->s_cg_loaded = 0;
 	UFSD(("EXIT\n"))
 	return 1;
 
 failed:
 	if (base) kfree (base);
-	if (sb->u.ufs_sb.s_ucg) {
+	if (sbi->s_ucg) {
 		for (i = 0; i < uspi->s_ncg; i++)
-			if (sb->u.ufs_sb.s_ucg[i]) brelse (sb->u.ufs_sb.s_ucg[i]);
-		kfree (sb->u.ufs_sb.s_ucg);
+			if (sbi->s_ucg[i]) brelse (sbi->s_ucg[i]);
+		kfree (sbi->s_ucg);
 		for (i = 0; i < UFS_MAX_GROUP_LOADED; i++)
-			if (sb->u.ufs_sb.s_ucpi[i]) kfree (sb->u.ufs_sb.s_ucpi[i]);
+			if (sbi->s_ucpi[i]) kfree (sbi->s_ucpi[i]);
 	}
 	UFSD(("EXIT (FAILED)\n"))
 	return 0;
@@ -398,6 +399,7 @@ failed:
  * write them back to disk
  */
 void ufs_put_cylinder_structures (struct super_block * sb) {
+	struct ufs_sb_info * sbi = UFS_SB(sb);
 	struct ufs_sb_private_info * uspi;
 	struct ufs_buffer_head * ubh;
 	unsigned char * base, * space;
@@ -405,11 +407,11 @@ void ufs_put_cylinder_structures (struct super_block * sb) {
 	
 	UFSD(("ENTER\n"))
 	
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = sbi->s_uspi;
 
 	size = uspi->s_cssize;
 	blks = (size + uspi->s_fsize - 1) >> uspi->s_fshift;
-	base = space = (char*) sb->u.ufs_sb.s_csp[0];
+	base = space = (char*) sbi->s_csp[0];
 	for (i = 0; i < blks; i += uspi->s_fpb) {
 		size = uspi->s_bsize;
 		if (i + uspi->s_fpb > blks)
@@ -421,21 +423,22 @@ void ufs_put_cylinder_structures (struct super_block * sb) {
 		ubh_mark_buffer_dirty (ubh);
 		ubh_brelse (ubh);
 	}
-	for (i = 0; i < sb->u.ufs_sb.s_cg_loaded; i++) {
+	for (i = 0; i < sbi->s_cg_loaded; i++) {
 		ufs_put_cylinder (sb, i);
-		kfree (sb->u.ufs_sb.s_ucpi[i]);
+		kfree (sbi->s_ucpi[i]);
 	}
 	for (; i < UFS_MAX_GROUP_LOADED; i++) 
-		kfree (sb->u.ufs_sb.s_ucpi[i]);
+		kfree (sbi->s_ucpi[i]);
 	for (i = 0; i < uspi->s_ncg; i++) 
-		brelse (sb->u.ufs_sb.s_ucg[i]);
-	kfree (sb->u.ufs_sb.s_ucg);
+		brelse (sbi->s_ucg[i]);
+	kfree (sbi->s_ucg);
 	kfree (base);
 	UFSD(("EXIT\n"))
 }
 
 static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 {
+	struct ufs_sb_info * sbi;
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;
 	struct ufs_super_block_second * usb2;
@@ -451,6 +454,12 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 	
 	UFSD(("ENTER\n"))
 		
+	sbi = kmalloc(sizeof(struct ufs_sb_info), GFP_KERNEL);
+	if (!sbi)
+		goto failed_nomem;
+	sb->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(struct ufs_sb_info));
+
 	UFSD(("flag %u\n", (int)(sb->s_flags & MS_RDONLY)))
 	
 #ifndef CONFIG_UFS_FS_WRITE
@@ -464,22 +473,22 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 	 * Set default mount options
 	 * Parse mount options
 	 */
-	sb->u.ufs_sb.s_mount_opt = 0;
-	ufs_set_opt (sb->u.ufs_sb.s_mount_opt, ONERROR_LOCK);
-	if (!ufs_parse_options ((char *) data, &sb->u.ufs_sb.s_mount_opt)) {
+	sbi->s_mount_opt = 0;
+	ufs_set_opt (sbi->s_mount_opt, ONERROR_LOCK);
+	if (!ufs_parse_options ((char *) data, &sbi->s_mount_opt)) {
 		printk("wrong mount options\n");
 		goto failed;
 	}
-	if (!(sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE)) {
+	if (!(sbi->s_mount_opt & UFS_MOUNT_UFSTYPE)) {
 		printk("You didn't specify the type of your ufs filesystem\n\n"
 		"mount -t ufs -o ufstype="
 		"sun|sunx86|44bsd|old|hp|nextstep|netxstep-cd|openstep ...\n\n"
 		">>>WARNING<<< Wrong ufstype may corrupt your filesystem, "
 		"default is ufstype=old\n");
-		ufs_set_opt (sb->u.ufs_sb.s_mount_opt, UFSTYPE_OLD);
+		ufs_set_opt (sbi->s_mount_opt, UFSTYPE_OLD);
 	}
 
-	sb->u.ufs_sb.s_uspi = uspi =
+	sbi->s_uspi = uspi =
 		kmalloc (sizeof(struct ufs_sb_private_info), GFP_KERNEL);
 	if (!uspi)
 		goto failed;
@@ -488,7 +497,7 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 	   this but as I don't know which I'll let those in the know loosen
 	   the rules */
 	   
-	switch (sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE) {
+	switch (sbi->s_mount_opt & UFS_MOUNT_UFSTYPE) {
 	case UFS_MOUNT_UFSTYPE_44BSD:
 		UFSD(("ufstype=44bsd\n"))
 		uspi->s_fsize = block_size = 512;
@@ -596,7 +605,10 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	
 again:	
-	sb_set_blocksize(sb, block_size);
+	if (sb_set_blocksize(sb, block_size)) {
+		printk(KERN_ERR "UFS: failed to set blocksize\n");
+		goto failed;
+	}
 
 	/*
 	 * read ufs super block from device
@@ -617,7 +629,7 @@ again:
 		case UFS_MAGIC_LFN:
 	        case UFS_MAGIC_FEA:
 	        case UFS_MAGIC_4GB:
-			sb->u.ufs_sb.s_bytesex = BYTESEX_LE;
+			sbi->s_bytesex = BYTESEX_LE;
 			goto magic_found;
 	}
 	switch (__constant_be32_to_cpu(usb3->fs_magic)) {
@@ -625,13 +637,13 @@ again:
 		case UFS_MAGIC_LFN:
 	        case UFS_MAGIC_FEA:
 	        case UFS_MAGIC_4GB:
-			sb->u.ufs_sb.s_bytesex = BYTESEX_BE;
+			sbi->s_bytesex = BYTESEX_BE;
 			goto magic_found;
 	}
 
-	if ((((sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE) == UFS_MOUNT_UFSTYPE_NEXTSTEP) 
-	  || ((sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE) == UFS_MOUNT_UFSTYPE_NEXTSTEP_CD) 
-	  || ((sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE) == UFS_MOUNT_UFSTYPE_OPENSTEP)) 
+	if ((((sbi->s_mount_opt & UFS_MOUNT_UFSTYPE) == UFS_MOUNT_UFSTYPE_NEXTSTEP) 
+	  || ((sbi->s_mount_opt & UFS_MOUNT_UFSTYPE) == UFS_MOUNT_UFSTYPE_NEXTSTEP_CD) 
+	  || ((sbi->s_mount_opt & UFS_MOUNT_UFSTYPE) == UFS_MOUNT_UFSTYPE_OPENSTEP)) 
 	  && uspi->s_sbbase < 256) {
 		ubh_brelse_uspi(uspi);
 		ubh = NULL;
@@ -652,32 +664,32 @@ magic_found:
 	uspi->s_fshift = fs32_to_cpu(sb, usb1->fs_fshift);
 
 	if (uspi->s_fsize & (uspi->s_fsize - 1)) {
-		printk("ufs_read_super: fragment size %u is not a power of 2\n",
+		printk(KERN_ERR "ufs_read_super: fragment size %u is not a power of 2\n",
 			uspi->s_fsize);
 			goto failed;
 	}
 	if (uspi->s_fsize < 512) {
-		printk("ufs_read_super: fragment size %u is too small\n",
+		printk(KERN_ERR "ufs_read_super: fragment size %u is too small\n",
 			uspi->s_fsize);
 		goto failed;
 	}
 	if (uspi->s_fsize > 4096) {
-		printk("ufs_read_super: fragment size %u is too large\n",
+		printk(KERN_ERR "ufs_read_super: fragment size %u is too large\n",
 			uspi->s_fsize);
 		goto failed;
 	}
 	if (uspi->s_bsize & (uspi->s_bsize - 1)) {
-		printk("ufs_read_super: block size %u is not a power of 2\n",
+		printk(KERN_ERR "ufs_read_super: block size %u is not a power of 2\n",
 			uspi->s_bsize);
 		goto failed;
 	}
 	if (uspi->s_bsize < 4096) {
-		printk("ufs_read_super: block size %u is too small\n",
+		printk(KERN_ERR "ufs_read_super: block size %u is too small\n",
 			uspi->s_bsize);
 		goto failed;
 	}
 	if (uspi->s_bsize / uspi->s_fsize > 8) {
-		printk("ufs_read_super: too many fragments per block (%u)\n",
+		printk(KERN_ERR "ufs_read_super: too many fragments per block (%u)\n",
 			uspi->s_bsize / uspi->s_fsize);
 		goto failed;
 	}
@@ -801,12 +813,12 @@ magic_found:
 	uspi->s_bpf = uspi->s_fsize << 3;
 	uspi->s_bpfshift = uspi->s_fshift + 3;
 	uspi->s_bpfmask = uspi->s_bpf - 1;
-	if ((sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE) ==
+	if ((sbi->s_mount_opt & UFS_MOUNT_UFSTYPE) ==
 	    UFS_MOUNT_UFSTYPE_44BSD)
 		uspi->s_maxsymlinklen =
 		    fs32_to_cpu(sb, usb3->fs_u2.fs_44.fs_maxsymlinklen);
 	
-	sb->u.ufs_sb.s_flags = flags;
+	sbi->s_flags = flags;
 
 	inode = iget(sb, UFS_ROOTINO);
 	if (!inode || is_bad_inode(inode))
@@ -831,8 +843,14 @@ dalloc_failed:
 failed:
 	if (ubh) ubh_brelse_uspi (uspi);
 	if (uspi) kfree (uspi);
+	if (sbi) kfree(sbi);
+	sb->u.generic_sbp = NULL;
 	UFSD(("EXIT (FAILED)\n"))
 	return -EINVAL;
+
+failed_nomem:
+	UFSD(("EXIT (NOMEM)\n"))
+	return -ENOMEM;
 }
 
 void ufs_write_super (struct super_block * sb) {
@@ -844,8 +862,8 @@ void ufs_write_super (struct super_block * sb) {
 	lock_kernel();
 
 	UFSD(("ENTER\n"))
-	flags = sb->u.ufs_sb.s_flags;
-	uspi = sb->u.ufs_sb.s_uspi;
+	flags = UFS_SB(sb)->s_flags;
+	uspi = UFS_SB(sb)->s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	usb3 = ubh_get_usb_third(USPI_UBH);
 
@@ -864,17 +882,17 @@ void ufs_write_super (struct super_block * sb) {
 
 void ufs_put_super (struct super_block * sb)
 {
-	struct ufs_sb_private_info * uspi;
+	struct ufs_sb_info * sbi = UFS_SB(sb);
 		
 	UFSD(("ENTER\n"))
-
-	uspi = sb->u.ufs_sb.s_uspi;
 
 	if (!(sb->s_flags & MS_RDONLY))
 		ufs_put_cylinder_structures (sb);
 	
-	ubh_brelse_uspi (uspi);
-	kfree (sb->u.ufs_sb.s_uspi);
+	ubh_brelse_uspi (sbi->s_uspi);
+	kfree (sbi->s_uspi);
+	kfree (sbi);
+	sb->u.generic_sbp = NULL;
 	return;
 }
 
@@ -887,8 +905,8 @@ int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
 	unsigned new_mount_opt, ufstype;
 	unsigned flags;
 	
-	uspi = sb->u.ufs_sb.s_uspi;
-	flags = sb->u.ufs_sb.s_flags;
+	uspi = UFS_SB(sb)->s_uspi;
+	flags = UFS_SB(sb)->s_flags;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	usb3 = ubh_get_usb_third(USPI_UBH);
 	
@@ -896,7 +914,7 @@ int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
 	 * Allow the "check" option to be passed as a remount option.
 	 * It is not possible to change ufstype option during remount
 	 */
-	ufstype = sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE;
+	ufstype = UFS_SB(sb)->s_mount_opt & UFS_MOUNT_UFSTYPE;
 	new_mount_opt = 0;
 	ufs_set_opt (new_mount_opt, ONERROR_LOCK);
 	if (!ufs_parse_options (data, &new_mount_opt))
@@ -910,7 +928,7 @@ int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
 	}
 
 	if ((*mount_flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY)) {
-		sb->u.ufs_sb.s_mount_opt = new_mount_opt;
+		UFS_SB(sb)->s_mount_opt = new_mount_opt;
 		return 0;
 	}
 	
@@ -950,7 +968,7 @@ int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
 		sb->s_flags &= ~MS_RDONLY;
 #endif
 	}
-	sb->u.ufs_sb.s_mount_opt = new_mount_opt;
+	UFS_SB(sb)->s_mount_opt = new_mount_opt;
 	return 0;
 }
 
@@ -961,7 +979,7 @@ int ufs_statfs (struct super_block * sb, struct statfs * buf)
 
 	lock_kernel();
 
-	uspi = sb->u.ufs_sb.s_uspi;
+	uspi = UFS_SB(sb)->s_uspi;
 	usb1 = ubh_get_usb_first (USPI_UBH);
 	
 	buf->f_type = UFS_MAGIC;
