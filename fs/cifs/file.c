@@ -3,7 +3,7 @@
  *
  *   vfs operations that deal with files
  * 
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -144,6 +144,10 @@ cifs_open(struct inode *inode, struct file *file)
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
 			pCifsInode = CIFS_I(file->f_dentry->d_inode);
 			if(pCifsInode) {
+				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+				write_unlock(&GlobalSMBSeslock);
+				write_unlock(&file->f_owner.lock);
+
 		                if (pTcon->ses->capabilities & CAP_UNIX)
 					rc = cifs_get_inode_info_unix(&file->f_dentry->d_inode,
 						full_path, inode->i_sb);
@@ -151,16 +155,16 @@ cifs_open(struct inode *inode, struct file *file)
 					rc = cifs_get_inode_info(&file->f_dentry->d_inode,
 						full_path, buf, inode->i_sb);
 
-				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
 				if(oplock == OPLOCK_EXCLUSIVE) {
 					pCifsInode->clientCanCacheAll = TRUE;
 					pCifsInode->clientCanCacheRead = TRUE;
 					cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
 				} else if(oplock == OPLOCK_READ)
 					pCifsInode->clientCanCacheRead = TRUE;
+			} else {
+				write_unlock(&GlobalSMBSeslock);
+				write_unlock(&file->f_owner.lock);
 			}
-			write_unlock(&GlobalSMBSeslock);
-			write_unlock(&file->f_owner.lock);
 			if(file->f_flags & O_CREAT) {           
 				/* time to set mode which we can not set earlier due
 				 to problems creating new read-only files */
@@ -221,16 +225,21 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 			if(file) {                
 				file->private_data = NULL;
 				read_unlock(&GlobalSMBSeslock);
-				rc = cifs_open(file->f_dentry->d_inode,file);
-				read_lock(&GlobalSMBSeslock);
-				if(rc) {
-					cFYI(1,("reconnecting file %s failed with %d",
-						file->f_dentry->d_name.name,rc));
+				if(file->f_dentry == 0) {
+					cFYI(1,("Null dentry for file %p",file));
+					read_lock(&GlobalSMBSeslock);
 				} else {
-					cFYI(1,("reconnection of %s succeeded",
-						file->f_dentry->d_name.name));
-				}
-			} 
+					rc = cifs_open(file->f_dentry->d_inode,file);
+					read_lock(&GlobalSMBSeslock);
+					if(rc) {
+						cFYI(1,("reconnecting file %s failed with %d",
+							file->f_dentry->d_name.name,rc));
+					} else {
+						cFYI(1,("reconnection of %s succeeded",
+							file->f_dentry->d_name.name));
+					}
+				} 
+			}
 		}
 	}
 	read_unlock(&GlobalSMBSeslock);
