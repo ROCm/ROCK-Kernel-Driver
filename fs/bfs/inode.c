@@ -191,7 +191,7 @@ static void bfs_put_super(struct super_block *s)
 	s->s_fs_info = NULL;
 }
 
-static int bfs_statfs(struct super_block *s, struct statfs *buf)
+static int bfs_statfs(struct super_block *s, struct kstatfs *buf)
 {
 	struct bfs_sb_info *info = BFS_SB(s);
 	buf->f_type = BFS_MAGIC;

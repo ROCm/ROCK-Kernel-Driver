@@ -1,7 +1,7 @@
 /* Linux driver for NAND Flash Translation Layer      */
 /* (c) 1999 Machine Vision Holdings, Inc.             */
 /* Author: David Woodhouse <dwmw2@infradead.org>      */
-/* $Id: nftlcore.c,v 1.92 2003/05/23 11:41:47 dwmw2 Exp $ */
+/* $Id: nftlcore.c,v 1.94 2003/06/23 12:00:08 dwmw2 Exp $ */
 
 /*
   The contents of this file are distributed under the GNU General
@@ -101,7 +101,7 @@ static void nftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 			(long)nftl->sectors );
 	}
 
-	if (add_mtd_blktrans_dev) {
+	if (add_mtd_blktrans_dev(&nftl->mbd)) {
 		if (nftl->ReplUnitTable)
 			kfree(nftl->ReplUnitTable);
 		if (nftl->EUNtable)
@@ -699,28 +699,16 @@ static int nftl_readblock(struct mtd_blktrans_dev *mbd, unsigned long block,
 	return 0;
 }
 
-static int nftl_ioctl(struct mtd_blktrans_dev *dev,
-		     struct inode * inode, struct file * file, 
-		     unsigned int cmd, unsigned long arg)
+static int nftl_getgeo(struct mtd_blktrans_dev *dev,  struct hd_geometry *geo)
 {
 	struct NFTLrecord *nftl = (void *)dev;
 
-	switch (cmd) {
-	case HDIO_GETGEO: {
-		struct hd_geometry g;
+	geo->heads = nftl->heads;
+	geo->sectors = nftl->sectors;
+	geo->cylinders = nftl->cylinders;
 
-		g.heads = nftl->heads;
-		g.sectors = nftl->sectors;
-		g.cylinders = nftl->cylinders;
-		g.start = 0;
-		return copy_to_user((void *)arg, &g, sizeof g) ? -EFAULT : 0;
-	}
-
-	default:
-		return -ENOTTY;
-	}
+	return 0;
 }
-
 
 /****************************************************************************
  *
@@ -733,7 +721,7 @@ struct mtd_blktrans_ops nftl_tr = {
 	.name		= "nftl",
 	.major		= NFTL_MAJOR,
 	.part_bits	= NFTL_PARTN_BITS,
-	.ioctl		= nftl_ioctl,
+	.getgeo		= nftl_getgeo,
 	.readsect	= nftl_readblock,
 #ifdef CONFIG_NFTL_RW
 	.writesect	= nftl_writeblock,
@@ -747,7 +735,7 @@ extern char nftlmountrev[];
 
 int __init init_nftl(void)
 {
-	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.92 $, nftlmount.c %s\n", nftlmountrev);
+	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.94 $, nftlmount.c %s\n", nftlmountrev);
 
 	return register_mtd_blktrans(&nftl_tr);
 }

@@ -390,7 +390,7 @@ struct sol_statvfs64 {
 
 static int report_statvfs(struct vfsmount *mnt, struct inode *inode, u32 buf)
 {
-	struct statfs s;
+	struct kstatfs s;
 	int error;
 	struct sol_statvfs *ss = (struct sol_statvfs *)A(buf);
 
@@ -424,7 +424,7 @@ static int report_statvfs(struct vfsmount *mnt, struct inode *inode, u32 buf)
 
 static int report_statvfs64(struct vfsmount *mnt, struct inode *inode, u32 buf)
 {
-	struct statfs s;
+	struct kstatfs s;
 	int error;
 	struct sol_statvfs64 *ss = (struct sol_statvfs64 *)A(buf);
 			

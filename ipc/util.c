@@ -541,15 +541,9 @@ int copy_semundo(unsigned long clone_flags, struct task_struct *tsk)
 	return 0;
 }
 
-void exit_semundo(struct task_struct *tsk)
+void exit_sem(struct task_struct *tsk)
 {
 	return;
-}
-
-
-void sem_exit (void)
-{
-    return;
 }
 
 asmlinkage long sys_semget (key_t key, int nsems, int semflg)

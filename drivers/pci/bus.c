@@ -93,7 +93,11 @@ void __devinit pci_bus_add_devices(struct pci_bus *bus)
 			continue;
 
 		device_add(&dev->dev);
+
+		spin_lock(&pci_bus_lock);
 		list_add_tail(&dev->global_list, &pci_devices);
+		spin_unlock(&pci_bus_lock);
+
 		pci_proc_attach_device(dev);
 		pci_create_sysfs_dev_files(dev);
 
@@ -108,7 +112,9 @@ void __devinit pci_bus_add_devices(struct pci_bus *bus)
 		 * it and then scan for unattached PCI devices.
 		 */
 		if (dev->subordinate && list_empty(&dev->subordinate->node)) {
+			spin_lock(&pci_bus_lock);
 			list_add_tail(&dev->subordinate->node, &dev->bus->children);
+			spin_unlock(&pci_bus_lock);
 			pci_bus_add_devices(dev->subordinate);
 		}
 	}

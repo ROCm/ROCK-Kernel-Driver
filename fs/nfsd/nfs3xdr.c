@@ -866,7 +866,7 @@ int
 nfs3svc_encode_fsstatres(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_fsstatres *resp)
 {
-	struct statfs	*s = &resp->stats;
+	struct kstatfs	*s = &resp->stats;
 	u64		bs = s->f_bsize;
 
 	*p++ = xdr_zero;	/* no post_op_attr */

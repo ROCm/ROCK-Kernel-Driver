@@ -69,7 +69,7 @@ ext3_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
 	 */
 	if (ret <= 0)
 		return ret;
-	
+
 	/*
 	 * If the inode is IS_SYNC, or is O_SYNC and we are doing data
 	 * journalling then we need to make sure that we force the transaction
@@ -97,14 +97,14 @@ ext3_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
 	 */
 	if (!IS_SYNC(inode))
 		return ret;
-	
+
 	/*
 	 * Open question #2 --- should we force data to disk here too?  If we
 	 * don't, the only impact is that data=writeback filesystems won't
 	 * flush data to disk automatically on IS_SYNC, only metadata (but
 	 * historically, that is what ext2 has done.)
 	 */
-	
+
 force_commit:
 	err = ext3_force_commit(inode->i_sb);
 	if (err) 

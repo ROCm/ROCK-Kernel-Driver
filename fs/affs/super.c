@@ -33,7 +33,7 @@
 
 extern struct timezone sys_tz;
 
-static int affs_statfs(struct super_block *sb, struct statfs *buf);
+static int affs_statfs(struct super_block *sb, struct kstatfs *buf);
 static int affs_remount (struct super_block *sb, int *flags, char *data);
 
 static void
@@ -524,7 +524,7 @@ affs_remount(struct super_block *sb, int *flags, char *data)
 }
 
 static int
-affs_statfs(struct super_block *sb, struct statfs *buf)
+affs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int		 free;
 

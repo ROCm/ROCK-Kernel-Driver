@@ -698,7 +698,7 @@ NORET_TYPE void do_exit(long code)
 	acct_process(code);
 	__exit_mm(tsk);
 
-	sem_exit();
+	exit_sem(tsk);
 	__exit_files(tsk);
 	__exit_fs(tsk);
 	exit_namespace(tsk);

@@ -176,7 +176,7 @@ outnobh:
 /* That's simple too. */
 
 static int
-romfs_statfs(struct super_block *sb, struct statfs *buf)
+romfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	buf->f_type = ROMFS_MAGIC;
 	buf->f_bsize = ROMBSIZE;

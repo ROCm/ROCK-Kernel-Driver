@@ -246,6 +246,8 @@
 #define __NR_sys_clock_gettime		1254
 #define __NR_sys_clock_getres		1255
 #define __NR_sys_clock_nanosleep	1256
+#define __NR_sys_fstatfs64		1257
+#define __NR_sys_statfs64		1258
 
 #ifdef __KERNEL__
 

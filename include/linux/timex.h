@@ -176,7 +176,7 @@
 #define TICK_NSEC (SH_DIV (1000000UL * 1000, ACTHZ, 8))
 
 /* TICK_USEC is the time between ticks in usec assuming fake USER_HZ */
-#define TICK_USEC ((TICK_NSEC + 1000UL/2) / 1000UL)
+#define TICK_USEC ((1000000UL + USER_HZ/2) / USER_HZ)
 
 /* TICK_USEC_TO_NSEC is the time between ticks in nsec assuming real ACTHZ and	*/
 /* a value TUSEC for TICK_USEC (can be set bij adjtimex)		*/

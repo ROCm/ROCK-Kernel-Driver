@@ -58,3 +58,6 @@ struct pci_visit {
 extern int pci_visit_dev(struct pci_visit *fn,
 			 struct pci_dev_wrapped *wrapped_dev,
 			 struct pci_bus_wrapped *wrapped_parent);
+
+/* Lock for read/write access to pci device and bus lists */
+extern spinlock_t pci_bus_lock;

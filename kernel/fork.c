@@ -39,7 +39,7 @@
 #include <asm/tlbflush.h>
 
 extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
-extern void exit_semundo(struct task_struct *tsk);
+extern void exit_sem(struct task_struct *tsk);
 
 /* The idle threads do not count..
  * Protected by write_lock_irq(&tasklist_lock)
@@ -887,13 +887,11 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if (retval)
 		goto bad_fork_cleanup_namespace;
 
-	if (clone_flags & CLONE_CHILD_SETTID)
-		p->set_child_tid = child_tidptr;
+	p->set_child_tid = (clone_flags & CLONE_CHILD_SETTID) ? child_tidptr : NULL;
 	/*
 	 * Clear TID on mm_release()?
 	 */
-	if (clone_flags & CLONE_CHILD_CLEARTID)
-		p->clear_child_tid = child_tidptr;
+	p->clear_child_tid = (clone_flags & CLONE_CHILD_CLEARTID) ? child_tidptr: NULL;
 
 	/*
 	 * Syscall tracing should be turned off in the child regardless
@@ -1034,7 +1032,7 @@ bad_fork_cleanup_fs:
 bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
 bad_fork_cleanup_semundo:
-	exit_semundo(p);
+	exit_sem(p);
 bad_fork_cleanup_security:
 	security_task_free(p);
 bad_fork_cleanup:

@@ -1,5 +1,5 @@
 /*
- * $Id: edb7312.c,v 1.8 2003/05/21 12:45:18 dwmw2 Exp $
+ * $Id: edb7312.c,v 1.9 2003/06/23 11:48:18 dwmw2 Exp $
  *
  * Handle mapping of the NOR flash on Cogent EDB7312 boards
  *
@@ -67,7 +67,6 @@ static struct mtd_partition static_partitions[3] =
 	},
 };
 
-#define NB_OF(x) (sizeof (x) / sizeof (x[0]))
 static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 
 #endif
@@ -109,7 +108,7 @@ int __init init_edb7312nor(void)
 		if (mtd_parts_nb == 0)
 		{
 			mtd_parts = static_partitions;
-			mtd_parts_nb = NB_OF(static_partitions);
+			mtd_parts_nb = ARRAY_SIZE(static_partitions);
 			part_type = "static";
 		}
 #endif

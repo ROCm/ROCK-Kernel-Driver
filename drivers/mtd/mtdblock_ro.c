@@ -1,11 +1,12 @@
 /*
- * $Id: mtdblock_ro.c,v 1.17 2003/05/18 19:27:27 dwmw2 Exp $
+ * $Id: mtdblock_ro.c,v 1.18 2003/06/23 12:00:08 dwmw2 Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
  * Simple read-only (writable only for RAM) mtdblock driver
  */
 
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/blktrans.h>

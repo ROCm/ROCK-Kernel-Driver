@@ -40,7 +40,7 @@ MODULE_LICENSE("GPL");
 
 static void hfs_read_inode(struct inode *);
 static void hfs_put_super(struct super_block *);
-static int hfs_statfs(struct super_block *, struct statfs *);
+static int hfs_statfs(struct super_block *, struct kstatfs *);
 static void hfs_write_super(struct super_block *);
 
 static kmem_cache_t * hfs_inode_cachep;
@@ -195,7 +195,7 @@ static void hfs_put_super(struct super_block *sb)
  *
  * changed f_files/f_ffree to reflect the fs_ablock/free_ablocks.
  */
-static int hfs_statfs(struct super_block *sb, struct statfs *buf)
+static int hfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct hfs_mdb *mdb = HFS_SB(sb)->s_mdb;
 

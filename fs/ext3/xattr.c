@@ -481,7 +481,7 @@ ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	unsigned int name_len;
 	int min_offs = sb->s_blocksize, not_found = 1, free, error;
 	char *end;
-	
+
 	/*
 	 * header -- Points either into bh, or to a temporarily
 	 *           allocated buffer.
@@ -493,7 +493,7 @@ ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	 *             towards the end of the block).
 	 * end -- Points right after the block pointed to by header.
 	 */
-	
+
 	ea_idebug(inode, "name=%d.%s, value=%p, value_len=%ld",
 		  name_index, name, value, (long)value_len);
 
@@ -736,11 +736,11 @@ ext3_xattr_set_handle2(handle_t *handle, struct inode *inode,
 			ea_bdebug(new_bh, "%s block %ld",
 				(old_bh == new_bh) ? "keeping" : "reusing",
 				new_bh->b_blocknr);
-			
+
 			error = -EDQUOT;
 			if (DQUOT_ALLOC_BLOCK(inode, 1))
 				goto cleanup;
-			
+
 			error = ext3_journal_get_write_access(handle, new_bh);
 			if (error)
 				goto cleanup;
@@ -782,7 +782,7 @@ getblk_failed:
 			set_buffer_uptodate(new_bh);
 			unlock_buffer(new_bh);
 			ext3_xattr_cache_insert(new_bh);
-			
+
 			ext3_xattr_update_super_block(handle, sb);
 		}
 		error = ext3_journal_dirty_metadata(handle, new_bh);
@@ -1108,7 +1108,7 @@ static void ext3_xattr_rehash(struct ext3_xattr_header *header,
 {
 	struct ext3_xattr_entry *here;
 	__u32 hash = 0;
-	
+
 	ext3_xattr_hash_entry(header, entry);
 	here = ENTRY(header+1);
 	while (!IS_LAST_ENTRY(here)) {
@@ -1131,7 +1131,7 @@ int __init
 init_ext3_xattr(void)
 {
 	int	err;
-	
+
 	err = ext3_xattr_register(EXT3_XATTR_INDEX_USER,
 				  &ext3_xattr_user_handler);
 	if (err)

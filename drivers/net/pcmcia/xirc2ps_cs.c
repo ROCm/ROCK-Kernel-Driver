@@ -225,9 +225,7 @@ MODULE_PARM(pc_debug, "i");
 #else
 #define DEBUG(n, args...)
 #endif
-static char *version =
-"xirc2ps_cs.c 1.31 1998/12/09 19:32:55 (dd9jn+kvh)";
-	    /* !--- CVS revision */
+
 #define KDBG_XIRC KERN_DEBUG   "xirc2ps_cs: "
 #define KERR_XIRC KERN_ERR     "xirc2ps_cs: "
 #define KWRN_XIRC KERN_WARNING "xirc2ps_cs: "

@@ -85,7 +85,7 @@ void __log_wait_for_space(journal_t *journal, int nblocks)
 			return;
 		spin_unlock(&journal->j_state_lock);
 		down(&journal->j_checkpoint_sem);
-		
+
 		/*
 		 * Test again, another process may have checkpointed while we
 		 * were waiting for the checkpoint lock
@@ -232,7 +232,7 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
 
 	if (buffer_dirty(bh) && !buffer_locked(bh) && jh->b_jlist == BJ_None) {
 		J_ASSERT_JH(jh, jh->b_transaction == NULL);
-		
+
 		/*
 		 * Important: we are about to write the buffer, and
 		 * possibly block, while still holding the journal lock.
@@ -267,7 +267,6 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
 	return ret;
 }
 
-	
 /*
  * Perform an actual checkpoint.  We don't write out only enough to
  * satisfy the current blocked requests: rather we submit a reasonably
@@ -373,7 +372,7 @@ int log_do_checkpoint(journal_t *journal, int nblocks)
 	result = cleanup_journal_tail(journal);
 	if (result < 0)
 		return result;
-	
+
 	return 0;
 }
 
@@ -524,7 +523,7 @@ void __journal_remove_checkpoint(struct journal_head *jh)
 	journal_t *journal;
 
 	JBUFFER_TRACE(jh, "entry");
-	
+
 	if ((transaction = jh->b_cp_transaction) == NULL) {
 		JBUFFER_TRACE(jh, "not on transaction");
 		goto out;

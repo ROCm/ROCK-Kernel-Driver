@@ -197,7 +197,7 @@ void journal_commit_transaction(journal_t *journal)
 	commit_transaction->t_log_start = journal->j_head;
 	wake_up(&journal->j_wait_transaction_locked);
 	spin_unlock(&journal->j_state_lock);
-	
+
 	jbd_debug (3, "JBD: commit phase 2\n");
 
 	/*
@@ -368,7 +368,7 @@ sync_datalist_empty:
 				__journal_abort_hard(journal);
 				continue;
 			}
-			
+
 			bh = jh2bh(descriptor);
 			jbd_debug(4, "JBD: got buffer %llu (%p)\n",
 				(unsigned long long)bh->b_blocknr, bh->b_data);
@@ -622,7 +622,7 @@ skip_commit: /* The journal should be unlocked by now. */
 
 	if (err)
 		__journal_abort_hard(journal);
-	
+
 	/*
 	 * Call any callbacks that had been registered for handles in this
 	 * transaction.  It is up to the callback to free any allocated
@@ -714,7 +714,7 @@ skip_commit: /* The journal should be unlocked by now. */
 			clear_buffer_freed(bh);
 			clear_buffer_jbddirty(bh);
 		}
-			
+
 		if (buffer_jbddirty(bh)) {
 			JBUFFER_TRACE(jh, "add to new checkpointing trans");
 			__journal_insert_checkpoint(jh, commit_transaction);

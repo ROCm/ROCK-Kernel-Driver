@@ -137,7 +137,7 @@ extern int get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 			const char *old_path, const struct nls_table *nls_codepage, 
 			unsigned int *pnum_referrals, unsigned char ** preferrals);
 extern int CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
-			struct statfs *FSData,
+			struct kstatfs *FSData,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBQFSAttributeInfo(const int xid,
 			struct cifsTconInfo *tcon,

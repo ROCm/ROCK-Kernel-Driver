@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: dir.c,v 1.76 2003/05/26 09:50:38 dwmw2 Exp $
+ * $Id: dir.c,v 1.77 2003/06/05 14:42:24 dwmw2 Exp $
  *
  */
 
@@ -356,7 +356,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	up(&f->sem);
 
 	/* Work out where to put the dirent node now. */
-	writtenlen = (writtenlen+3)&~3;
+	writtenlen = PAD(writtenlen);
 	phys_ofs += writtenlen;
 	alloclen -= writtenlen;
 
@@ -653,7 +653,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	up(&f->sem);
 
 	/* Work out where to put the dirent node now. */
-	writtenlen = (writtenlen+3)&~3;
+	writtenlen = PAD(writtenlen);
 	phys_ofs += writtenlen;
 	alloclen -= writtenlen;
 

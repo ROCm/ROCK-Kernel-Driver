@@ -1,5 +1,5 @@
 /*
- * $Id: arctic-mtd.c,v 1.8 2003/05/21 12:45:17 dwmw2 Exp $
+ * $Id: arctic-mtd.c,v 1.10 2003/06/02 16:37:59 trini Exp $
  * 
  * drivers/mtd/maps/arctic-mtd.c MTD mappings and partition tables for 
  *                              IBM 405LP Arctic boards.
@@ -45,18 +45,23 @@
 #include <asm/ibm4xx.h>
 
 /*
- * fe000000 -- ff9fffff  Arctic FFS (26MB)
- * ffa00000 -- fff5ffff  kernel (5.504MB)
- * fff60000 -- ffffffff  firmware (640KB)
+ * 0 : 0xFE00 0000 - 0xFEFF FFFF : Filesystem 1 (16MiB)
+ * 1 : 0xFF00 0000 - 0xFF4F FFFF : kernel (5.12MiB)
+ * 2 : 0xFF50 0000 - 0xFFF5 FFFF : Filesystem 2 (10.624MiB) (if non-XIP)
+ * 3 : 0xFFF6 0000 - 0xFFFF FFFF : PIBS Firmware (640KiB)
  */
 
-#define ARCTIC_FFS_SIZE		0x01a00000 /* 26 M */
-#define ARCTIC_FIRMWARE_SIZE	0x000a0000 /* 640K */
+#define FFS1_SIZE	0x01000000 /* 16MiB */
+#define KERNEL_SIZE	0x00500000 /* 5.12MiB */
+#define FFS2_SIZE	0x00a60000 /* 10.624MiB */
+#define FIRMWARE_SIZE	0x000a0000 /* 640KiB */
 
-#define NAME     "Arctic Linux Flash"
-#define PADDR    SUBZERO_BOOTFLASH_PADDR
-#define SIZE     SUBZERO_BOOTFLASH_SIZE
-#define BUSWIDTH 2
+
+#define NAME     	"Arctic Linux Flash"
+#define PADDR    	SUBZERO_BOOTFLASH_PADDR
+#define BUSWIDTH	2
+#define SIZE		SUBZERO_BOOTFLASH_SIZE
+#define PARTITIONS	4
 
 /* Flash memories on these boards are memory resources, accessed big-endian. */
 
@@ -73,17 +78,19 @@ static struct map_info arctic_mtd_map = {
 
 static struct mtd_info *arctic_mtd;
 
-static struct mtd_partition arctic_partitions[3] = {
-	{ .name		= "Arctic FFS",
-	  .size		= ARCTIC_FFS_SIZE,
+static struct mtd_partition arctic_partitions[PARTITIONS] = {
+	{ .name		= "Filesystem",
+	  .size		= FFS1_SIZE,
 	  .offset	= 0,},
-	{ .name		= "Kernel",
-	  .size		= SUBZERO_BOOTFLASH_SIZE - ARCTIC_FFS_SIZE -
-	  		  ARCTIC_FIRMWARE_SIZE,
-	  .offset	= ARCTIC_FFS_SIZE,},
+        { .name		= "Kernel",
+	  .size		= KERNEL_SIZE,
+	  .offset	= FFS1_SIZE,},
+	{ .name		= "Filesystem",
+	  .size		= FFS2_SIZE,
+	  .offset	= FFS1_SIZE + KERNEL_SIZE,},
 	{ .name		= "Firmware",
-	  .size		= ARCTIC_FIRMWARE_SIZE,
-	  .offset	= SUBZERO_BOOTFLASH_SIZE - ARCTIC_FIRMWARE_SIZE,},
+	  .size		= FIRMWARE_SIZE,
+	  .offset	= SUBZERO_BOOTFLASH_SIZE - FIRMWARE_SIZE,},
 };
 
 static int __init
@@ -107,7 +114,7 @@ init_arctic_mtd(void)
 
 	arctic_mtd->owner = THIS_MODULE;
 
-	return add_mtd_partitions(arctic_mtd, arctic_partitions, 3);
+	return add_mtd_partitions(arctic_mtd, arctic_partitions, PARTITIONS);
 }
 
 static void __exit

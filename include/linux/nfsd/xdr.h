@@ -113,7 +113,7 @@ struct nfsd_readdirres {
 };
 
 struct nfsd_statfsres {
-	struct statfs		stats;
+	struct kstatfs		stats;
 };
 
 /*

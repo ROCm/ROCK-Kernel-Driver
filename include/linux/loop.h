@@ -14,6 +14,9 @@
 #define LO_KEY_SIZE	32
 
 #ifdef __KERNEL__
+#include <linux/bio.h>
+#include <linux/blk.h>
+#include <linux/spinlock.h>
 
 /* Possible states of device */
 enum {
@@ -22,18 +25,20 @@ enum {
 	Lo_rundown,
 };
 
+struct loop_func_table;
+
 struct loop_device {
 	int		lo_number;
 	int		lo_refcnt;
 	int		lo_offset;
-	int		lo_encrypt_type;
-	int		lo_encrypt_key_size;
 	int		lo_flags;
 	int		(*transfer)(struct loop_device *, int cmd,
 				    char *raw_buf, char *loop_buf, int size,
 				    sector_t real_block);
 	char		lo_name[LO_NAME_SIZE];
 	char		lo_encrypt_key[LO_KEY_SIZE];
+	int		lo_encrypt_key_size;
+	struct loop_func_table *lo_encryption;
 	__u32           lo_init[2];
 	uid_t		lo_key_owner;	/* Who set the key */
 	int		(*ioctl)(struct loop_device *, int cmd, 
@@ -129,9 +134,7 @@ struct loop_func_table {
 	/* release is called from loop_unregister_transfer or clr_fd */
 	int (*release)(struct loop_device *); 
 	int (*ioctl)(struct loop_device *, int cmd, unsigned long arg);
-	/* lock and unlock manage the module use counts */ 
-	void (*lock)(struct loop_device *);
-	void (*unlock)(struct loop_device *);
+	struct module *owner;
 }; 
 
 int loop_register_transfer(struct loop_func_table *funcs);

@@ -43,6 +43,7 @@ struct genapic {
 			   struct mpc_config_translation *t); 
 	void (*setup_portio_remap)(void); 
 	int (*check_phys_apicid_present)(int boot_cpu_physical_apicid);
+	void (*enable_apic_mode)(void);
 
 	/* mpparse */
 	void (*mpc_oem_bus_info)(struct mpc_config_bus *, char *, 
@@ -101,6 +102,7 @@ struct genapic {
 	APICFUNC(send_IPI_mask), \
 	APICFUNC(send_IPI_allbutself), \
 	APICFUNC(send_IPI_all), \
+	APICFUNC(enable_apic_mode), \
 	}
 
 extern struct genapic *genapic;

@@ -172,7 +172,7 @@ static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short
 	return (int) (ret & 0xff00) >> 8;
 }
 
-static int __pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 {
 	unsigned long result = 0;
 	unsigned long flags;
@@ -227,7 +227,7 @@ static int __pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len,
 	return (int)((result & 0xff00) >> 8);
 }
 
-static int __pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
 	unsigned long result = 0;
 	unsigned long flags;
@@ -282,24 +282,12 @@ static int __pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len
 	return (int)((result & 0xff00) >> 8);
 }
 
-static int pci_bios_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
-{
-	return __pci_bios_read(0, bus->number, PCI_SLOT(devfn), 
-		PCI_FUNC(devfn), where, size, value);
-}
-
-static int pci_bios_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
-{
-	return __pci_bios_write(0, bus->number, PCI_SLOT(devfn),
-		PCI_FUNC(devfn), where, size, value);
-}
-
 
 /*
  * Function table for BIOS32 access
  */
 
-static struct pci_ops pci_bios_access = {
+static struct pci_raw_ops pci_bios_access = {
 	.read =		pci_bios_read,
 	.write =	pci_bios_write
 };
@@ -308,7 +296,7 @@ static struct pci_ops pci_bios_access = {
  * Try to find PCI BIOS.
  */
 
-static struct pci_ops * __devinit pci_find_bios(void)
+static struct pci_raw_ops * __devinit pci_find_bios(void)
 {
 	union bios32 *check;
 	unsigned char sum;
@@ -484,7 +472,7 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq)
 static int __init pci_pcbios_init(void)
 {
 	if ((pci_probe & PCI_PROBE_BIOS) 
-		&& ((pci_root_ops = pci_find_bios()))) {
+		&& ((raw_pci_ops = pci_find_bios()))) {
 		pci_probe |= PCI_BIOS_SORT;
 		pci_bios_present = 1;
 	}

@@ -20,7 +20,17 @@ config ACORN_PARTITION
 	help
 	  Support hard disks partitioned under Acorn operating systems.
 
-#      bool '    Cumana partition support' CONFIG_ACORN_PARTITION_CUMANA
+config ACORN_PARTITION_CUMANA
+	bool "Cumana partition support" if PARTITION_ADVANCED && ACORN_PARTITION
+	default y if !PARTITION_ADVANCED && ARCH_ACORN
+	help
+	  Say Y here if you would like to use hard disks under Linux which
+	  were partitioned using the Cumana interface on Acorn machines.
+
+config ACORN_PARTITION_EESOX
+	bool "EESOX partition support" if PARTITION_ADVANCED && ACORN_PARTITION
+	default y if !PARTITION_ADVANCED && ARCH_ACORN
+
 config ACORN_PARTITION_ICS
 	bool "ICS partition support" if PARTITION_ADVANCED && ACORN_PARTITION
 	default y if !PARTITION_ADVANCED && ARCH_ACORN

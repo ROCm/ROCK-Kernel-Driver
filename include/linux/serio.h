@@ -26,7 +26,6 @@ struct serio {
 	void *driver;
 	char *name;
 	char *phys;
-	int number;
 
 	unsigned short idbus;
 	unsigned short idvendor;

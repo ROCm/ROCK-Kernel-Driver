@@ -721,7 +721,7 @@ static irqreturn_t yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned char iir;
 	int counter = 100;
 	int i;
-
+	int handled = 0;
 
 	for (i = 0; i < NR_PORTS; i++) {
 		yp = &yam_ports[i];
@@ -735,14 +735,17 @@ static irqreturn_t yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			unsigned char lsr = inb(LSR(dev->base_addr));
 			unsigned char rxb;
 
+			handled = 1;
+
 			if (lsr & LSR_OE)
 				++yp->stats.rx_fifo_errors;
 
 			yp->dcd = (msr & RX_DCD) ? 1 : 0;
 
 			if (--counter <= 0) {
-				printk(KERN_ERR "%s: too many irq iir=%d\n", dev->name, iir);
-				return;
+				printk(KERN_ERR "%s: too many irq iir=%d\n",
+						dev->name, iir);
+				goto out;
 			}
 			if (msr & TX_RDY) {
 				++yp->nb_mdint;
@@ -758,7 +761,8 @@ static irqreturn_t yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
-	return IRQ_HANDLED;
+out:
+	return IRQ_RETVAL(handled);
 }
 
 static int yam_net_get_info(char *buffer, char **start, off_t offset, int length)

@@ -1782,7 +1782,7 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 
 int
 CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
-	       struct statfs *FSData, const struct nls_table *nls_codepage)
+	       struct kstatfs *FSData, const struct nls_table *nls_codepage)
 {
 /* level 0x103 SMB_QUERY_FILE_SYSTEM_INFO */
 	TRANSACTION2_QFSI_REQ *pSMB = NULL;
@@ -1846,8 +1846,9 @@ CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 			FSData->f_bfree = FSData->f_bavail =
 			    le64_to_cpu(response_data->FreeAllocationUnits);
 			cFYI(1,
-			     ("Blocks: %ld  Free: %ld Block size %ld",
-			      FSData->f_blocks, FSData->f_bfree,
+			     ("Blocks: %lld  Free: %lld Block size %ld",
+			      (unsigned long long)FSData->f_blocks,
+			      (unsigned long long)FSData->f_bfree,
 			      FSData->f_bsize));
 		}
 	}

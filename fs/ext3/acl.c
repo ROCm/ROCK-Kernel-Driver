@@ -361,7 +361,7 @@ ext3_init_acl(handle_t *handle, struct inode *inode, struct inode *dir)
 		error = -ENOMEM;
 		if (!clone)
 			goto cleanup;
-		
+
 		mode = inode->i_mode;
 		error = posix_acl_create_masq(clone, &mode);
 		if (error >= 0) {

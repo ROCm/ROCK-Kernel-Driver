@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001.c,v 1.40 2003/05/20 21:03:07 dwmw2 Exp $
+ * $Id: doc2001.c,v 1.41 2003/06/11 09:45:19 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -359,9 +359,10 @@ static void DoCMil_init(struct mtd_info *mtd)
 
 	mtd->type = MTD_NANDFLASH;
 	mtd->flags = MTD_CAP_NANDFLASH;
+	mtd->ecctype = MTD_ECC_RS_DiskOnChip;
 	mtd->size = 0;
 
-	/* FIXME: erase size is not always 8kB */
+	/* FIXME: erase size is not always 8KiB */
 	mtd->erasesize = 0x2000;
 
 	mtd->oobblock = 512;

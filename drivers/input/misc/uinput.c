@@ -49,11 +49,11 @@ static int uinput_dev_event(struct input_dev *dev, unsigned int type, unsigned i
 
 	udev = (struct uinput_device *)dev->private;
 
-	udev->head = (udev->head + 1) % UINPUT_BUFFER_SIZE;
 	udev->buff[udev->head].type = type;
 	udev->buff[udev->head].code = code;
 	udev->buff[udev->head].value = value;
 	do_gettimeofday(&udev->buff[udev->head].time);
+	udev->head = (udev->head + 1) % UINPUT_BUFFER_SIZE;
 
 	wake_up_interruptible(&udev->waitq);
 
@@ -82,6 +82,7 @@ static int uinput_create_device(struct uinput_device *udev)
 	udev->dev->event = uinput_dev_event;
 	udev->dev->upload_effect = uinput_dev_upload_effect;
 	udev->dev->erase_effect = uinput_dev_erase_effect;
+	udev->dev->private = udev;
 
 	init_waitqueue_head(&(udev->waitq));
 
@@ -264,7 +265,7 @@ static ssize_t uinput_read(struct file *file, char *buffer, size_t count, loff_t
 		return -ENODEV;
 
 	while ((udev->head != udev->tail) && 
-	    (retval + sizeof(struct uinput_device) <= count)) {
+	    (retval + sizeof(struct input_event) <= count)) {
 		if (copy_to_user(buffer + retval, &(udev->buff[udev->tail]),
 		    sizeof(struct input_event))) return -EFAULT;
 		udev->tail = (udev->tail + 1) % UINPUT_BUFFER_SIZE;

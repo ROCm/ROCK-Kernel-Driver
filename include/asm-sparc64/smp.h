@@ -80,11 +80,11 @@ extern atomic_t sparc64_num_cpus_online;
 extern atomic_t sparc64_num_cpus_possible;
 #define num_possible_cpus()	(atomic_read(&sparc64_num_cpus_possible))
 
-static inline int any_online_cpu(unsigned long mask)
+static inline unsigned int any_online_cpu(unsigned long mask)
 {
 	if ((mask &= cpu_online_map) != 0UL)
 		return __ffs(mask);
-	return -1;
+	return NR_CPUS;
 }
 
 /*
