@@ -41,6 +41,7 @@
 #include <asm/spinlock.h>
 
 int __lockfunc _spin_trylock(spinlock_t *lock);
+int __lockfunc _read_trylock(rwlock_t *lock);
 int __lockfunc _write_trylock(rwlock_t *lock);
 
 void __lockfunc _spin_lock(spinlock_t *lock)	__acquires(spinlock_t);
@@ -73,6 +74,7 @@ void __lockfunc _write_unlock_irq(rwlock_t *lock)				__releases(rwlock_t);
 void __lockfunc _write_unlock_bh(rwlock_t *lock)				__releases(rwlock_t);
 
 int __lockfunc _spin_trylock_bh(spinlock_t *lock);
+int __lockfunc generic_raw_read_trylock(rwlock_t *lock);
 int in_lock_functions(unsigned long addr);
 
 #else
@@ -219,9 +221,13 @@ typedef struct {
 #define _raw_read_unlock(lock)	do { (void)(lock); } while(0)
 #define _raw_write_lock(lock)	do { (void)(lock); } while(0)
 #define _raw_write_unlock(lock)	do { (void)(lock); } while(0)
+#define _raw_read_trylock(lock) ({ (void)(lock); (1); })
 #define _raw_write_trylock(lock) ({ (void)(lock); (1); })
 
 #define _spin_trylock(lock)	({preempt_disable(); _raw_spin_trylock(lock) ? \
+				1 : ({preempt_enable(); 0;});})
+
+#define _read_trylock(lock)	({preempt_disable();_raw_read_trylock(lock) ? \
 				1 : ({preempt_enable(); 0;});})
 
 #define _write_trylock(lock)	({preempt_disable(); _raw_write_trylock(lock) ? \
@@ -425,16 +431,12 @@ do { \
  * methods are defined as nops in the case they are not required.
  */
 #define spin_trylock(lock)	__cond_lock(_spin_trylock(lock))
+#define read_trylock(lock)	__cond_lock(_read_trylock(lock))
 #define write_trylock(lock)	__cond_lock(_write_trylock(lock))
-
-/* Where's read_trylock? */
 
 #define spin_lock(lock)		_spin_lock(lock)
 #define write_lock(lock)	_write_lock(lock)
 #define read_lock(lock)		_read_lock(lock)
-#define spin_unlock(lock)	_spin_unlock(lock)
-#define write_unlock(lock)	_write_unlock(lock)
-#define read_unlock(lock)	_read_unlock(lock)
 
 #ifdef CONFIG_SMP
 #define spin_lock_irqsave(lock, flags)	flags = _spin_lock_irqsave(lock)
@@ -454,6 +456,11 @@ do { \
 
 #define write_lock_irq(lock)		_write_lock_irq(lock)
 #define write_lock_bh(lock)		_write_lock_bh(lock)
+
+#define spin_unlock(lock)	_spin_unlock(lock)
+#define write_unlock(lock)	_write_unlock(lock)
+#define read_unlock(lock)	_read_unlock(lock)
+
 #define spin_unlock_irqrestore(lock, flags)	_spin_unlock_irqrestore(lock, flags)
 #define spin_unlock_irq(lock)		_spin_unlock_irq(lock)
 #define spin_unlock_bh(lock)		_spin_unlock_bh(lock)
@@ -490,6 +497,7 @@ extern void _metered_read_lock    (rwlock_t *lock);
 extern void _metered_read_unlock  (rwlock_t *lock);
 extern void _metered_write_lock   (rwlock_t *lock);
 extern void _metered_write_unlock (rwlock_t *lock);
+extern int  _metered_read_trylock (rwlock_t *lock);
 extern int  _metered_write_trylock(rwlock_t *lock);
 #endif
 
@@ -519,8 +527,11 @@ static inline void bit_spin_lock(int bitnum, unsigned long *addr)
 	preempt_disable();
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
 	while (test_and_set_bit(bitnum, addr)) {
-		while (test_bit(bitnum, addr))
+		while (test_bit(bitnum, addr)) {
+			preempt_enable();
 			cpu_relax();
+			preempt_disable();
+		}
 	}
 #endif
 	__acquire(bitlock);

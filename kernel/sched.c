@@ -3441,6 +3441,37 @@ void __sched __cond_resched(void)
 
 EXPORT_SYMBOL(__cond_resched);
 
+/*
+ * cond_resched_lock() - if a reschedule is pending, drop the given lock,
+ * call schedule, and on return reacquire the lock.
+ *
+ * This works OK both with and without CONFIG_PREEMPT.  We do strange low-level
+ * operations here to prevent schedule() from being called twice (once via
+ * spin_unlock(), once by hand).
+ */
+int cond_resched_lock(spinlock_t * lock)
+{
+#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+	if (lock->break_lock) {
+		lock->break_lock = 0;
+		spin_unlock(lock);
+		cpu_relax();
+		spin_lock(lock);
+	}
+#endif
+	if (need_resched()) {
+		_raw_spin_unlock(lock);
+		preempt_enable_no_resched();
+		set_current_state(TASK_RUNNING);
+		schedule();
+		spin_lock(lock);
+		return 1;
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL(cond_resched_lock);
+
 /**
  * yield - yield the current processor to other threads.
  *

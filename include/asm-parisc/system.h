@@ -176,6 +176,9 @@ typedef struct {
 	void *previous;
 	struct task_struct * task;
 #endif
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 #define __lock_aligned __attribute__((__section__(".data.lock_aligned")))
