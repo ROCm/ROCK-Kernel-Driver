@@ -1,4 +1,4 @@
-build-targets	:= mk_task mk_constants
+always		:= mk_task mk_constants
 targets		:= mk_task_user.o mk_task_kern.o \
 		   mk_constants_user.o mk_constants_kern.o
 

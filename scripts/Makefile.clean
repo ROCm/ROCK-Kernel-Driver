@@ -28,15 +28,12 @@ subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 
 # Add subdir path
 
-extra-y		:= $(addprefix $(obj)/,$(extra-y) $(EXTRA_TARGETS))
-targets		:= $(addprefix $(obj)/,$(targets))
-clean-files	:= $(addprefix $(obj)/,$(clean-files))
-host-progs	:= $(addprefix $(obj)/,$(host-progs))
 subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
+__clean-files	:= $(wildcard $(addprefix $(obj)/, \
+		   $(extra-y) $(EXTRA_TARGETS) $(always) $(host-progs) \
+		   $(targets) $(clean-files)))
 
 # ==========================================================================
-
-__clean-files := $(wildcard $(extra-y) $(host-progs) $(clean-files) $(targets))
 
 quiet_cmd_clean = CLEAN   $(obj)
       cmd_clean = rm -f $(__clean-files); $(clean-rule)

@@ -19,6 +19,10 @@ ifdef EXTRA_TARGETS
 $(warning kbuild: $(obj)/Makefile - Usage of EXTRA_TARGETS is obsolete in 2.5. Please fix!)
 endif
 
+ifdef build-targets
+$(warning kbuild: $(obj)/Makefile - Usage of build-targets is obsolete in 2.5. Please fix!)
+endif
+
 ifdef export-objs
 $(warning kbuild: $(obj)/Makefile - Usage of export-objs is obsolete in 2.5. Please fix!)
 endif
@@ -59,7 +63,7 @@ touch-module = @echo $(@:.o=.ko) > $(MODVERDIR)/$(@F:.o=.mod)
 
 __build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(extra-y)) \
 	 $(if $(KBUILD_MODULES),$(obj-m)) \
-	 $(subdir-ym) $(build-targets)
+	 $(subdir-ym) $(always)
 	@:
 
 # Module versioning
@@ -202,8 +206,7 @@ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S FORCE
 	$(call if_changed_dep,as_o_S)
 
-targets += $(real-objs-y) $(real-objs-m) $(extra-y) $(MAKECMDGOALS) \
-	   $(build-targets)
+targets += $(real-objs-y) $(real-objs-m) $(extra-y) $(MAKECMDGOALS) $(always)
 
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
