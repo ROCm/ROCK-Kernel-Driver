@@ -130,7 +130,7 @@ out:
  * swapper_space doesn't have a real inode, so it gets a special vm_writeback()
  * so we don't need swap special cases in generic_vm_writeback().
  *
- * Swap pages are PageLocked and PageWriteback while under writeout so that
+ * Swap pages are !PageLocked and PageWriteback while under writeout so that
  * memory allocators will throttle against them.
  */
 static int swap_vm_writeback(struct page *page, int *nr_to_write)

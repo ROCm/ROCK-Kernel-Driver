@@ -3,10 +3,12 @@ Changes since 2.5.0:
 --- 
 [recommended]
 
-New helpers: sb_bread(), sb_getblk(), sb_get_hash_table(), set_bh(),
+New helpers: sb_bread(), sb_getblk(), sb_find_get_block(), set_bh(),
 	sb_set_blocksize() and sb_min_blocksize().
 
 Use them.
+
+(sb_find_get_block() replaces 2.4's get_hash_table())
 
 --- 
 [recommended]

@@ -23,8 +23,6 @@
 
 #include <asm/uaccess.h>
 
-#define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
-
 static unsigned long max_block(struct block_device *bdev)
 {
 	unsigned int retval = ~0U;

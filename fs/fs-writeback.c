@@ -287,8 +287,9 @@ out:
  *
  * This is a "memory cleansing" operation, not a "data integrity" operation.
  */
-void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
-				unsigned long *older_than_this)
+void writeback_unlocked_inodes(int *nr_to_write,
+			       enum writeback_sync_modes sync_mode,
+			       unsigned long *older_than_this)
 {
 	struct super_block *sb;
 

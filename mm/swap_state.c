@@ -21,16 +21,9 @@
 /*
  * swapper_inode doesn't do anything much.  It is really only here to
  * avoid some special-casing in other parts of the kernel.
- *
- * We set i_size to "infinity" to keep the page I/O functions happy.  The swap
- * block allocator makes sure that allocations are in-range.  A strange
- * number is chosen to prevent various arith overflows elsewhere.  For example,
- * `lblock' in block_read_full_page().
  */
 static struct inode swapper_inode = {
 	i_mapping:	&swapper_space,
-	i_size:		PAGE_SIZE * 0xffffffffLL,
-	i_blkbits:	PAGE_SHIFT,
 };
 
 extern struct address_space_operations swap_aops;
