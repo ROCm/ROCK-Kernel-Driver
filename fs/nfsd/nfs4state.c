@@ -1793,7 +1793,8 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 	unsigned int strhashval;
 
 	dprintk("NFSD: nfsd4_lock: start=%Ld length=%Ld\n",
-		lock->lk_offset, lock->lk_length);
+		(long long) lock->lk_offset,
+		(long long) lock->lk_length);
 
 	lock->lk_stateowner = NULL;
 	nfs4_lock_state();
@@ -2042,7 +2043,8 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	int status;
 						        
 	dprintk("NFSD: nfsd4_locku: start=%Ld length=%Ld\n",
-		locku->lu_offset, locku->lu_length);
+		(long long) locku->lu_offset,
+		(long long) locku->lu_length);
 	nfs4_lock_state();
 									        
 	if ((status = nfs4_preprocess_seqid_op(current_fh, 
