@@ -4505,6 +4505,8 @@ static ssize_t proc_read( struct file *file,
 		len = priv->readlen - pos;
 	if (copy_to_user(buffer, priv->rbuffer + pos, len))
 		return -EFAULT;
+	if (pos + len > priv->writelen)
+		priv->writelen = pos + len;
 	*offset = pos + len;
 	return len;
 }
