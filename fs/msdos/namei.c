@@ -193,7 +193,8 @@ static struct dentry_operations msdos_dentry_operations = {
  */
 
 /***** Get inode using directory and name */
-struct dentry *msdos_lookup(struct inode *dir,struct dentry *dentry, struct nameidata *nd)
+static struct dentry *msdos_lookup(struct inode *dir, struct dentry *dentry,
+		struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode = NULL;
@@ -257,12 +258,8 @@ static int msdos_add_entry(struct inode *dir, const unsigned char *name,
 	return 0;
 }
 
-/*
- * AV. Huh??? It's exported. Oughtta check usage.
- */
-
 /***** Create a file */
-int msdos_create(struct inode *dir,struct dentry *dentry,int mode,
+static int msdos_create(struct inode *dir, struct dentry *dentry, int mode,
 		struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
@@ -307,7 +304,7 @@ int msdos_create(struct inode *dir,struct dentry *dentry,int mode,
 }
 
 /***** Remove a directory */
-int msdos_rmdir(struct inode *dir, struct dentry *dentry)
+static int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
 	loff_t i_pos;
@@ -346,7 +343,7 @@ rmdir_done:
 }
 
 /***** Make a directory */
-int msdos_mkdir(struct inode *dir,struct dentry *dentry,int mode)
+static int msdos_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct super_block *sb = dir->i_sb;
 	struct buffer_head *bh;
@@ -413,7 +410,7 @@ out_exist:
 }
 
 /***** Unlink a file */
-int msdos_unlink( struct inode *dir, struct dentry *dentry)
+static int msdos_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
 	loff_t i_pos;
@@ -539,8 +536,8 @@ degenerate_case:
 }
 
 /***** Rename, a wrapper for rename_same_dir & rename_diff_dir */
-int msdos_rename(struct inode *old_dir,struct dentry *old_dentry,
-		 struct inode *new_dir,struct dentry *new_dentry)
+static int msdos_rename(struct inode *old_dir, struct dentry *old_dentry,
+		struct inode *new_dir, struct dentry *new_dentry)
 {
 	struct buffer_head *old_bh;
 	struct msdos_dir_entry *old_de;
@@ -576,9 +573,7 @@ rename_done:
 	return error;
 }
 
-
-/* The public inode operations for the msdos fs */
-struct inode_operations msdos_dir_inode_operations = {
+static struct inode_operations msdos_dir_inode_operations = {
 	.create		= msdos_create,
 	.lookup		= msdos_lookup,
 	.unlink		= msdos_unlink,
@@ -588,7 +583,7 @@ struct inode_operations msdos_dir_inode_operations = {
 	.setattr	= fat_notify_change,
 };
 
-int msdos_fill_super(struct super_block *sb,void *data, int silent)
+static int msdos_fill_super(struct super_block *sb,void *data, int silent)
 {
 	int res;
 
@@ -599,3 +594,34 @@ int msdos_fill_super(struct super_block *sb,void *data, int silent)
 	sb->s_root->d_op = &msdos_dentry_operations;
 	return 0;
 }
+
+static struct super_block *msdos_get_sb(struct file_system_type *fs_type,
+	int flags, const char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, msdos_fill_super);
+}
+
+static struct file_system_type msdos_fs_type = {
+	.owner		= THIS_MODULE,
+	.name		= "msdos",
+	.get_sb		= msdos_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
+};
+
+static int __init init_msdos_fs(void)
+{
+	return register_filesystem(&msdos_fs_type);
+}
+
+static void __exit exit_msdos_fs(void)
+{
+	unregister_filesystem(&msdos_fs_type);
+}
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Werner Almesberger");
+MODULE_DESCRIPTION("MS-DOS filesystem support");
+
+module_init(init_msdos_fs)
+module_exit(exit_msdos_fs)

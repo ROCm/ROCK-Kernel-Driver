@@ -805,7 +805,8 @@ static int vfat_find(struct inode *dir,struct qstr* qname,
 	return res ? res : -ENOENT;
 }
 
-struct dentry *vfat_lookup(struct inode *dir,struct dentry *dentry, struct nameidata *nd)
+static struct dentry *vfat_lookup(struct inode *dir, struct dentry *dentry,
+		struct nameidata *nd)
 {
 	int res;
 	struct vfat_slot_info sinfo;
@@ -854,7 +855,7 @@ error:
 	return dentry;
 }
 
-int vfat_create(struct inode *dir,struct dentry* dentry,int mode,
+static int vfat_create(struct inode *dir, struct dentry* dentry, int mode,
 		struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
@@ -908,7 +909,7 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 	brelse(bh);
 }
 
-int vfat_rmdir(struct inode *dir,struct dentry* dentry)
+static int vfat_rmdir(struct inode *dir, struct dentry* dentry)
 {
 	int res;
 	struct vfat_slot_info sinfo;
@@ -936,7 +937,7 @@ out:
 	return res;
 }
 
-int vfat_unlink(struct inode *dir, struct dentry* dentry)
+static int vfat_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int res;
 	struct vfat_slot_info sinfo;
@@ -959,8 +960,7 @@ out:
 	return res;
 }
 
-
-int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
+static int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode = NULL;
@@ -1005,8 +1005,8 @@ mkdir_failed:
 	goto out;
 }
  
-int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
-		struct inode *new_dir,struct dentry *new_dentry)
+static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
+		struct inode *new_dir, struct dentry *new_dentry)
 {
 	struct buffer_head *old_bh,*new_bh,*dotdot_bh;
 	struct msdos_dir_entry *old_de,*new_de,*dotdot_de;
@@ -1094,9 +1094,7 @@ rename_done:
 
 }
 
-
-/* Public inode operations for the VFAT fs */
-struct inode_operations vfat_dir_inode_operations = {
+static struct inode_operations vfat_dir_inode_operations = {
 	.create		= vfat_create,
 	.lookup		= vfat_lookup,
 	.unlink		= vfat_unlink,
@@ -1106,7 +1104,7 @@ struct inode_operations vfat_dir_inode_operations = {
 	.setattr	= fat_notify_change,
 };
 
-int vfat_fill_super(struct super_block *sb, void *data, int silent)
+static int vfat_fill_super(struct super_block *sb, void *data, int silent)
 {
 	int res;
 
@@ -1121,3 +1119,34 @@ int vfat_fill_super(struct super_block *sb, void *data, int silent)
 
 	return 0;
 }
+
+static struct super_block *vfat_get_sb(struct file_system_type *fs_type,
+	int flags, const char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, vfat_fill_super);
+}
+
+static struct file_system_type vfat_fs_type = {
+	.owner		= THIS_MODULE,
+	.name		= "vfat",
+	.get_sb		= vfat_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
+};
+
+static int __init init_vfat_fs(void)
+{
+	return register_filesystem(&vfat_fs_type);
+}
+
+static void __exit exit_vfat_fs(void)
+{
+	unregister_filesystem(&vfat_fs_type);
+}
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("VFAT filesystem support");
+MODULE_AUTHOR("Gordon Chaffee");
+
+module_init(init_vfat_fs)
+module_exit(exit_vfat_fs)
