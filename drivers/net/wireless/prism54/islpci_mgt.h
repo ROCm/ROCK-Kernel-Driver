@@ -24,15 +24,6 @@
 #include <linux/wireless.h>
 #include <linux/skbuff.h>
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-# include <linux/workqueue.h>
-#else
-# include <linux/tqueue.h>
-# define work_struct tq_struct
-# define INIT_WORK INIT_TQUEUE
-# define schedule_work schedule_task
-#endif
-
 /*
  *  Function definitions
  */

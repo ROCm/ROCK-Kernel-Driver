@@ -26,6 +26,7 @@
 #include <linux/etherdevice.h>
 #include <linux/if_arp.h>
 
+#include "prismcompat.h"
 #include "isl_38xx.h"
 #include "islpci_eth.h"
 #include "islpci_mgt.h"

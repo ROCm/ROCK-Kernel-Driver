@@ -16,6 +16,7 @@
  *
  */
 
+#include "prismcompat.h"
 #include "islpci_dev.h"
 #include "islpci_mgt.h"
 #include "isl_oid.h"

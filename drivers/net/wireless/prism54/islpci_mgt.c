@@ -22,12 +22,12 @@
 #include <linux/netdevice.h>
 #include <linux/module.h>
 #include <linux/pci.h>
-#include <linux/moduleparam.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 #include <linux/if_arp.h>
 
+#include "prismcompat.h"
 #include "isl_38xx.h"
 #include "islpci_mgt.h"
 #include "isl_oid.h"		/* additional types and defs for isl38xx fw */
@@ -456,21 +456,12 @@ islpci_mgt_transaction(struct net_device *ndev,
 	const long wait_cycle_jiffies = (ISL38XX_WAIT_CYCLE * 10 * HZ) / 1000;
 	long timeout_left = ISL38XX_MAX_WAIT_CYCLES * wait_cycle_jiffies;
 	int err;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	DEFINE_WAIT(wait);
-#else
-	DECLARE_WAITQUEUE(wait, current);
-#endif
 
 	if (down_interruptible(&priv->mgmt_sem))
 		return -ERESTARTSYS;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	prepare_to_wait(&priv->mgmt_wqueue, &wait, TASK_UNINTERRUPTIBLE);
-#else
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&priv->mgmt_wqueue, &wait);
-#endif
 	err = islpci_mgt_transmit(ndev, operation, oid, senddata, sendlen);
 	if(err)
 		goto out;
@@ -499,12 +490,7 @@ islpci_mgt_transaction(struct net_device *ndev,
 
 	/* TODO: we should reset the device here */     
  out:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	finish_wait(&priv->mgmt_wqueue, &wait);
-#else
-	remove_wait_queue(&priv->mgmt_wqueue, &wait);
-	set_current_state(TASK_RUNNING);
-#endif
 	up(&priv->mgmt_sem);
 	return err;
 }

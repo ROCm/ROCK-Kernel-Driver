@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/init.h> /* For __init, __exit */
 
+#include "prismcompat.h"
 #include "islpci_dev.h"
 #include "islpci_mgt.h"		/* for pc_debug */
 #include "isl_oid.h"

@@ -25,17 +25,11 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 
-#include "isl_38xx.h"
-#include <linux/firmware.h>
-
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-#include <linux/config.h>
-#if !defined(CONFIG_FW_LOADER) && !defined(CONFIG_FW_LOADER_MODULE)
-#error No Firmware Loading configured in the kernel !
-#endif
-
+#include "prismcompat.h"
+#include "isl_38xx.h"
 #include "islpci_dev.h"
 #include "islpci_mgt.h"
 
@@ -233,130 +227,6 @@ isl38xx_enable_common_interrupts(void *device_base) {
 			ISL38XX_INT_IDENT_SLEEP | ISL38XX_INT_IDENT_WAKEUP);
 	isl38xx_w32_flush(device_base, reg, ISL38XX_INT_EN_REG);
 	udelay(ISL38XX_WRITEIO_DELAY);
-}
-
-int
-isl38xx_upload_firmware(char *fw_id, _REQ_FW_DEV_T dev, void *device_base,
-			dma_addr_t host_address)
-{
-	u32 reg, rc;
-
-#if VERBOSE > SHOW_ERROR_MESSAGES
-	DEBUG(SHOW_ERROR_MESSAGES, "isl38xx_upload_firmware(0x%lx, 0x%lx)\n",
-	      (long) device_base, (long) host_address);
-#endif
-
-	/* clear the RAMBoot and the Reset bit */
-	reg = readl(device_base + ISL38XX_CTRL_STAT_REG);
-	reg &= ~ISL38XX_CTRL_STAT_RESET;
-	reg &= ~ISL38XX_CTRL_STAT_RAMBOOT;
-	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
-	wmb();
-	udelay(ISL38XX_WRITEIO_DELAY);
-
-	/* set the Reset bit without reading the register ! */
-	reg |= ISL38XX_CTRL_STAT_RESET;
-	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
-	wmb();
-	udelay(ISL38XX_WRITEIO_DELAY);
-
-	/* clear the Reset bit */
-	reg &= ~ISL38XX_CTRL_STAT_RESET;
-	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
-	wmb();
-
-	/* wait a while for the device to reboot */
-	mdelay(50);
-
-	{
-		const struct firmware *fw_entry = 0;
-		long fw_len;
-		const u32 *fw_ptr;
-
-		rc = request_firmware(&fw_entry, fw_id, dev);
-		if (rc) {
-			printk(KERN_ERR
-			       "%s: request_firmware() failed for '%s'\n",
-			       "prism54", fw_id);
-			return rc;
-		}
-		/* prepare the Direct Memory Base register */
-		reg = ISL38XX_DEV_FIRMWARE_ADDRES;
-
-		fw_ptr = (u32 *) fw_entry->data;
-		fw_len = fw_entry->size;
-
-		if (fw_len % 4) {
-			printk(KERN_ERR
-			       "%s: firmware '%s' size is not multiple of 32bit, aborting!\n",
-			       "prism54", fw_id);
-			release_firmware(fw_entry);
-			return EILSEQ; /* Illegal byte sequence  */;
-		}
-
-		while (fw_len > 0) {
-			long _fw_len =
-			    (fw_len >
-			     ISL38XX_MEMORY_WINDOW_SIZE) ?
-			    ISL38XX_MEMORY_WINDOW_SIZE : fw_len;
-			u32 *dev_fw_ptr = device_base + ISL38XX_DIRECT_MEM_WIN;
-
-			/* set the cards base address for writting the data */
-			isl38xx_w32_flush(device_base, reg,
-					  ISL38XX_DIR_MEM_BASE_REG);
-			wmb();	/* be paranoid */
-
-			/* increment the write address for next iteration */
-			reg += _fw_len;
-			fw_len -= _fw_len;
-
-			/* write the data to the Direct Memory Window 32bit-wise */
-			/* memcpy_toio() doesn't guarantee 32bit writes :-| */
-			while (_fw_len > 0) {
-				/* use non-swapping writel() */
-				__raw_writel(*fw_ptr, dev_fw_ptr);
-				fw_ptr++, dev_fw_ptr++;
-				_fw_len -= 4;
-			}
-
-			/* flush PCI posting */
-			(void) readl(device_base + ISL38XX_PCI_POSTING_FLUSH);
-			wmb();	/* be paranoid again */
-
-			BUG_ON(_fw_len != 0);
-		}
-
-		BUG_ON(fw_len != 0);
-
-		release_firmware(fw_entry);
-	}
-
-	/* now reset the device
-	 * clear the Reset & ClkRun bit, set the RAMBoot bit */
-	reg = readl(device_base + ISL38XX_CTRL_STAT_REG);
-	reg &= ~ISL38XX_CTRL_STAT_CLKRUN;
-	reg &= ~ISL38XX_CTRL_STAT_RESET;
-	reg |= ISL38XX_CTRL_STAT_RAMBOOT;
-	isl38xx_w32_flush(device_base, reg, ISL38XX_CTRL_STAT_REG);
-	wmb();
-	udelay(ISL38XX_WRITEIO_DELAY);
-
-	/* set the reset bit latches the host override and RAMBoot bits
-	 * into the device for operation when the reset bit is reset */
-	reg |= ISL38XX_CTRL_STAT_RESET;
-	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
-	/* don't do flush PCI posting here! */
-	wmb();
-	udelay(ISL38XX_WRITEIO_DELAY);
-
-	/* clear the reset bit should start the whole circus */
-	reg &= ~ISL38XX_CTRL_STAT_RESET;
-	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
-	/* don't do flush PCI posting here! */
-	wmb();
-	udelay(ISL38XX_WRITEIO_DELAY);
-
-	return 0;
 }
 
 int

@@ -30,18 +30,13 @@
 
 #include <asm/io.h>
 
+#include "prismcompat.h"
 #include "isl_38xx.h"
 #include "isl_ioctl.h"
 #include "islpci_dev.h"
 #include "islpci_mgt.h"
 #include "islpci_eth.h"
 #include "oid_mgt.h"
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
-#define prism54_synchronize_irq(irq) synchronize_irq()
-#else
-#define prism54_synchronize_irq(irq) synchronize_irq(irq)
-#endif
 
 #define ISL3877_IMAGE_FILE	"isl3877"
 #define ISL3890_IMAGE_FILE	"isl3890"
@@ -54,6 +49,125 @@
  * matter, as you are suppose to be able to change it anytime via
  * ndev->set_mac_address. Jean II */
 const unsigned char	dummy_mac[6] = { 0x00, 0x30, 0xB4, 0x00, 0x00, 0x00 };
+
+static int
+isl_upload_firmware(islpci_private *priv)
+{
+	u32 reg, rc;
+	void *device_base = priv->device_base;
+
+	/* clear the RAMBoot and the Reset bit */
+	reg = readl(device_base + ISL38XX_CTRL_STAT_REG);
+	reg &= ~ISL38XX_CTRL_STAT_RESET;
+	reg &= ~ISL38XX_CTRL_STAT_RAMBOOT;
+	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
+	wmb();
+	udelay(ISL38XX_WRITEIO_DELAY);
+
+	/* set the Reset bit without reading the register ! */
+	reg |= ISL38XX_CTRL_STAT_RESET;
+	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
+	wmb();
+	udelay(ISL38XX_WRITEIO_DELAY);
+
+	/* clear the Reset bit */
+	reg &= ~ISL38XX_CTRL_STAT_RESET;
+	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
+	wmb();
+
+	/* wait a while for the device to reboot */
+	mdelay(50);
+
+	{
+		const struct firmware *fw_entry = 0;
+		long fw_len;
+		const u32 *fw_ptr;
+
+		rc = request_firmware(&fw_entry, priv->firmware, PRISM_FW_PDEV);
+		if (rc) {
+			printk(KERN_ERR
+			       "%s: request_firmware() failed for '%s'\n",
+			       "prism54", priv->firmware);
+			return rc;
+		}
+		/* prepare the Direct Memory Base register */
+		reg = ISL38XX_DEV_FIRMWARE_ADDRES;
+
+		fw_ptr = (u32 *) fw_entry->data;
+		fw_len = fw_entry->size;
+
+		if (fw_len % 4) {
+			printk(KERN_ERR
+			       "%s: firmware '%s' size is not multiple of 32bit, aborting!\n",
+			       "prism54", priv->firmware);
+			release_firmware(fw_entry);
+			return EILSEQ; /* Illegal byte sequence  */;
+		}
+
+		while (fw_len > 0) {
+			long _fw_len =
+			    (fw_len >
+			     ISL38XX_MEMORY_WINDOW_SIZE) ?
+			    ISL38XX_MEMORY_WINDOW_SIZE : fw_len;
+			u32 *dev_fw_ptr = device_base + ISL38XX_DIRECT_MEM_WIN;
+
+			/* set the cards base address for writting the data */
+			isl38xx_w32_flush(device_base, reg,
+					  ISL38XX_DIR_MEM_BASE_REG);
+			wmb();	/* be paranoid */
+
+			/* increment the write address for next iteration */
+			reg += _fw_len;
+			fw_len -= _fw_len;
+
+			/* write the data to the Direct Memory Window 32bit-wise */
+			/* memcpy_toio() doesn't guarantee 32bit writes :-| */
+			while (_fw_len > 0) {
+				/* use non-swapping writel() */
+				__raw_writel(*fw_ptr, dev_fw_ptr);
+				fw_ptr++, dev_fw_ptr++;
+				_fw_len -= 4;
+			}
+
+			/* flush PCI posting */
+			(void) readl(device_base + ISL38XX_PCI_POSTING_FLUSH);
+			wmb();	/* be paranoid again */
+
+			BUG_ON(_fw_len != 0);
+		}
+
+		BUG_ON(fw_len != 0);
+
+		release_firmware(fw_entry);
+	}
+
+	/* now reset the device
+	 * clear the Reset & ClkRun bit, set the RAMBoot bit */
+	reg = readl(device_base + ISL38XX_CTRL_STAT_REG);
+	reg &= ~ISL38XX_CTRL_STAT_CLKRUN;
+	reg &= ~ISL38XX_CTRL_STAT_RESET;
+	reg |= ISL38XX_CTRL_STAT_RAMBOOT;
+	isl38xx_w32_flush(device_base, reg, ISL38XX_CTRL_STAT_REG);
+	wmb();
+	udelay(ISL38XX_WRITEIO_DELAY);
+
+	/* set the reset bit latches the host override and RAMBoot bits
+	 * into the device for operation when the reset bit is reset */
+	reg |= ISL38XX_CTRL_STAT_RESET;
+	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
+	/* don't do flush PCI posting here! */
+	wmb();
+	udelay(ISL38XX_WRITEIO_DELAY);
+
+	/* clear the reset bit should start the whole circus */
+	reg &= ~ISL38XX_CTRL_STAT_RESET;
+	writel(reg, device_base + ISL38XX_CTRL_STAT_REG);
+	/* don't do flush PCI posting here! */
+	wmb();
+	udelay(ISL38XX_WRITEIO_DELAY);
+
+	return 0;
+}
 
 /******************************************************************************
     Device Interrupt Handler
@@ -324,14 +438,7 @@ islpci_upload_fw(islpci_private *priv)
 
 	printk(KERN_DEBUG "%s: uploading firmware...\n", priv->ndev->name);
 
-	rc = isl38xx_upload_firmware(priv->firmware,
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,75))
-		&priv->pdev->dev,
-#else
-		pci_name(priv->pdev),
-#endif
-		priv->device_base,
-		priv->device_host_address);
+	rc = isl_upload_firmware(priv);
 	if (rc) {
 		/* error uploading the firmware */
 		printk(KERN_ERR "%s: could not upload firmware ('%s')\n",
@@ -357,15 +464,8 @@ islpci_reset_if(islpci_private *priv)
 	int result = -ETIME;
 	int count;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	/* This is 2.6 specific, nicer, shorter, but not in 2.4 yet */
 	DEFINE_WAIT(wait);
 	prepare_to_wait(&priv->reset_done, &wait, TASK_UNINTERRUPTIBLE);
-#else
-	DECLARE_WAITQUEUE(wait, current);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&priv->reset_done, &wait);
-#endif
 	
 	/* now the last step is to reset the interface */
 	isl38xx_interface_reset(priv->device_base, priv->device_host_address);
@@ -390,13 +490,7 @@ islpci_reset_if(islpci_private *priv)
 
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	/* 2.6 specific too */
 	finish_wait(&priv->reset_done, &wait);
-#else
-	remove_wait_queue(&priv->reset_done, &wait);
-	set_current_state(TASK_RUNNING);
-#endif
 
 	if(result)
 		return result;

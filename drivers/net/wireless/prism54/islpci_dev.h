@@ -29,20 +29,6 @@
 #include <net/iw_handler.h>
 #include <linux/list.h>
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-# include <linux/workqueue.h>
-#else
-# include <linux/tqueue.h>
-# define work_struct tq_struct
-# define INIT_WORK INIT_TQUEUE
-# define schedule_work schedule_task
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,23)
-#define free_netdev(x) kfree(x) 
-#define pci_name(x) x->slot_name 
-#endif
-
 #include "isl_38xx.h"
 #include "isl_oid.h"
 #include "islpci_mgt.h"
@@ -209,12 +195,6 @@ islpci_get_state(islpci_private *priv)
 islpci_state_t islpci_set_state(islpci_private *priv, islpci_state_t new_state);
 
 #define ISLPCI_TX_TIMEOUT               (2*HZ)
-
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,75))
-# define irqreturn_t void
-# define IRQ_HANDLED
-# define IRQ_NONE
-#endif
 
 irqreturn_t islpci_interrupt(int, void *, struct pt_regs *);
 
