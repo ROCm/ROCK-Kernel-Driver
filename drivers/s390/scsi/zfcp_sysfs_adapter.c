@@ -26,18 +26,18 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.33 $"
+#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.36 $"
 
 #include "zfcp_ext.h"
 
 #define ZFCP_LOG_AREA                   ZFCP_LOG_AREA_CONFIG
 
 static const char fc_topologies[5][25] = {
-	{"<error>"},
-	{"point-to-point"},
-	{"fabric"},
-	{"arbitrated loop"},
-	{"fabric (virt. adapter)"}
+	"<error>",
+	"point-to-point",
+	"fabric",
+	"arbitrated loop",
+	"fabric (virt. adapter)"
 };
 
 /**
@@ -74,29 +74,8 @@ ZFCP_DEFINE_ADAPTER_ATTR(hardware_version, "0x%08x\n",
 			 adapter->hardware_version);
 ZFCP_DEFINE_ADAPTER_ATTR(serial_number, "%17s\n", adapter->serial_number);
 ZFCP_DEFINE_ADAPTER_ATTR(scsi_host_no, "0x%x\n", adapter->scsi_host_no);
-
-/**
- * zfcp_sysfs_adapter_in_recovery_show - recovery state of adapter
- * @dev: pointer to belonging device
- * @buf: pointer to input buffer
- *
- * Show function of "in_recovery" attribute of adapter. Will be
- * "0" if no error recovery is pending for adapter, otherwise "1".
- */
-static ssize_t
-zfcp_sysfs_adapter_in_recovery_show(struct device *dev, char *buf)
-{
-	struct zfcp_adapter *adapter;
-
-	adapter = dev_get_drvdata(dev);
-	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_INUSE, &adapter->status))
-		return sprintf(buf, "1\n");
-	else
-		return sprintf(buf, "0\n");
-}
-
-static DEVICE_ATTR(in_recovery, S_IRUGO,
-		   zfcp_sysfs_adapter_in_recovery_show, NULL);
+ZFCP_DEFINE_ADAPTER_ATTR(in_recovery, "%d\n", atomic_test_mask
+			 (ZFCP_STATUS_COMMON_ERP_INUSE, &adapter->status));
 
 /**
  * zfcp_sysfs_port_add_store - add a port to sysfs tree
@@ -138,7 +117,7 @@ zfcp_sysfs_port_add_store(struct device *dev, const char *buf, size_t count)
 	zfcp_port_put(port);
  out:
 	up(&zfcp_data.config_sema);
-	return retval ? retval : count;
+	return retval ? retval : (ssize_t) count;
 }
 
 static DEVICE_ATTR(port_add, S_IWUSR, NULL, zfcp_sysfs_port_add_store);
@@ -197,7 +176,7 @@ zfcp_sysfs_port_remove_store(struct device *dev, const char *buf, size_t count)
 	zfcp_port_dequeue(port);
  out:
 	up(&zfcp_data.config_sema);
-	return retval ? retval : count;
+	return retval ? retval : (ssize_t) count;
 }
 
 static DEVICE_ATTR(port_remove, S_IWUSR, NULL, zfcp_sysfs_port_remove_store);
@@ -241,7 +220,7 @@ zfcp_sysfs_adapter_failed_store(struct device *dev,
 	zfcp_erp_wait(adapter);
  out:
 	up(&zfcp_data.config_sema);
-	return retval ? retval : count;
+	return retval ? retval : (ssize_t) count;
 }
 
 /**

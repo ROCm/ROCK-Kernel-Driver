@@ -31,7 +31,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.51 $"
+#define ZFCP_EXT_REVISION "$Revision: 1.53 $"
 
 #include "zfcp_def.h"
 
@@ -117,9 +117,11 @@ extern struct zfcp_fsf_req *zfcp_fsf_send_fcp_command_task_management(
 extern struct zfcp_fsf_req *zfcp_fsf_abort_fcp_command(
 	unsigned long, struct zfcp_adapter *, struct zfcp_unit *, int);
 
-/******************************** FCP ****************************************/
+/******************************* FC/FCP **************************************/
 extern int  zfcp_nameserver_enqueue(struct zfcp_adapter *);
 extern int  zfcp_ns_gid_pn_request(struct zfcp_erp_action *);
+extern int  zfcp_check_ct_response(struct ct_hdr *);
+extern int  zfcp_handle_els_rjt(u32, struct zfcp_ls_rjt_par *);
 
 /******************************* SCSI ****************************************/
 extern int  zfcp_adapter_scsi_register(struct zfcp_adapter *);

@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.81 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.83 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -296,13 +296,11 @@ struct fcp_logo {
 #define ZFCP_LS_RJT_COMMAND_NOT_SUPPORTED	0x0B
 #define ZFCP_LS_RJT_VENDOR_UNIQUE_ERROR		0xFF
 
-struct zfcp_ls_rjt {
-	u8		code;
-	u8		field[3];
-	u8		reserved;
-	u8	reason_code;
-	u8		reason_expl;
-	u8	vendor_unique;
+struct zfcp_ls_rjt_par {
+	u8 action;
+ 	u8 reason_code;
+ 	u8 reason_expl;
+ 	u8 vendor_unique;
 } __attribute__ ((packed));
 
 struct zfcp_ls_rtv {
@@ -423,6 +421,11 @@ struct zfcp_ls_rnid_acc {
 			specific_id;
 } __attribute__((packed));
 
+struct zfcp_rc_entry {
+	u8 code;
+	const char *description;
+};
+
 /*
  * FC-GS-2 stuff
  */
@@ -431,9 +434,9 @@ struct zfcp_ls_rnid_acc {
 #define ZFCP_CT_NAME_SERVER		0x02
 #define ZFCP_CT_SYNCHRONOUS		0x00
 #define ZFCP_CT_GID_PN			0x0121
-#define ZFCP_CT_GA_NXT			0x0100
 #define ZFCP_CT_MAX_SIZE		0x1020
 #define ZFCP_CT_ACCEPT			0x8002
+#define ZFCP_CT_REJECT			0x8001
 
 /*
  * FC-GS-4 stuff
@@ -851,7 +854,7 @@ struct zfcp_gid_pn_data {
         struct zfcp_port *port;
 };
 
-typedef int (*zfcp_send_els_handler_t)(unsigned long);
+typedef void (*zfcp_send_els_handler_t)(unsigned long);
 
 /* used to pass parameters to zfcp_send_els() */
 /* ToDo merge send_ct() and send_els() and corresponding structs */
