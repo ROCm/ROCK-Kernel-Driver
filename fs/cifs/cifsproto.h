@@ -57,6 +57,8 @@ extern void header_assemble(struct smb_hdr *, char /* command */ ,
 			const struct cifsTconInfo *, int
 			/* length of fixed section (word count) in two byte units  */
 			);
+struct oplock_q_entry * AllocOplockQEntry(struct file *,struct cifsTconInfo *);
+void DeleteOplockQEntry(struct oplock_q_entry *);
 extern struct timespec cifs_NTtimeToUnix(u64 /* utc nanoseconds since 1601 */ );
 extern u64 cifs_UnixTimeToNT(struct timespec);
 extern void RevUcode_to_Ucode(char *revUnicode, char *UnicodeName);
@@ -104,8 +106,12 @@ extern int CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 extern int CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 			FILE_DIRECTORY_INFO * findData,
 			T2_FNEXT_RSP_PARMS * findParms,
-			const __u16 searchHandle, const __u32 resumeKey,
+			const __u16 searchHandle, char * resume_name,
+			int name_length, __u32 resume_key,
 			int *UnicodeFlag, int *pUnixFlag);
+
+extern int CIFSFindClose(const int, struct cifsTconInfo *tcon,
+			const __u16 search_handle);
 
 extern int CIFSSMBQPathInfo(const int xid, struct cifsTconInfo *tcon,
 			const unsigned char *searchName,

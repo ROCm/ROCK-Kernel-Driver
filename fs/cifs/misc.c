@@ -27,6 +27,7 @@
 #include "cifs_debug.h"
 
 extern kmem_cache_t *cifs_req_cachep;
+extern struct task_struct * oplockThread;
 
 __u16 GlobalMid;		/* multiplex id - rotating counter */
 
@@ -336,6 +337,7 @@ is_valid_oplock_break(struct smb_hdr *buf)
 			list_for_each(tmp1,&tcon->openFileList){
 				netfile = list_entry(tmp1,struct cifsFileInfo,tlist);
 				if(pSMB->Fid == netfile->netfid) {
+					struct cifsInodeInfo *pCifsInode;
 			/* BB Add following logic: 
 			  2) look up inode from tcon->openFileList->file->f_dentry->d_inode
 			  3) flush dirty pages and cached byte range locks and mark inode
@@ -345,6 +347,15 @@ is_valid_oplock_break(struct smb_hdr *buf)
 			  6) send oplock break response to server */
 					read_unlock(&GlobalSMBSeslock);
 					cFYI(1,("Matching file id, processing oplock break"));
+					pCifsInode = 
+						CIFS_I(netfile->pfile->f_dentry->d_inode);
+					pCifsInode->clientCanCacheAll = FALSE;
+					if(pSMB->OplockLevel == 0)
+						pCifsInode->clientCanCacheRead = FALSE;
+					pCifsInode->oplockPending = TRUE;
+					AllocOplockQEntry(netfile->pfile, tcon);
+                    cFYI(1,("about to wake up oplock thd"));
+					wake_up_process(oplockThread);               
 					return TRUE;
 				}
 			}

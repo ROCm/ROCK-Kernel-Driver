@@ -38,6 +38,7 @@
 #define SMB_COM_WRITE_ANDX            0x2F
 #define SMB_COM_TRANSACTION2	      0x32
 #define SMB_COM_TRANSACTION2_SECONDARY 0x33
+#define SMB_COM_FIND_CLOSE2           0x34
 #define SMB_COM_TREE_DISCONNECT       0x71
 #define SMB_COM_NEGOTIATE             0x72
 #define SMB_COM_SESSION_SETUP_ANDX    0x73
@@ -584,7 +585,7 @@ typedef union smb_com_tree_disconnect {	/* as an altetnative can use flag on tre
 
 typedef struct smb_com_close_req {
 	struct smb_hdr hdr;	/* wct = 3 */
-	__u16 FileID;		/* target file attributes */
+	__u16 FileID;
 	__u32 LastWriteTime;	/* should be zero */
 	__u16 ByteCount;	/* 0 */
 } CLOSE_REQ;
@@ -593,6 +594,12 @@ typedef struct smb_com_close_rsp {
 	struct smb_hdr hdr;	/* wct = 0 */
 	__u16 ByteCount;	/* bct = 0 */
 } CLOSE_RSP;
+
+typedef struct smb_com_findclose_req {
+	struct smb_hdr hdr; /* wct = 1 */
+	__u16 FileID;
+	__u16 ByteCount;    /* 0 */
+} FINDCLOSE_REQ;
 
 /* OpenFlags */
 #define REQ_OPLOCK         0x00000002
@@ -1152,7 +1159,7 @@ typedef struct smb_com_transaction2_fnext_req {
 	__u16 InformationLevel;
 	__u32 ResumeKey;
 	__u16 SearchFlags;
-	char ResumeFileName[1];	/* will be null string actually since we set bit 3 - resume from previous ending place */
+	char ResumeFileName[1];
 } TRANSACTION2_FNEXT_REQ;
 
 typedef struct smb_com_transaction2_fnext_rsp {
@@ -1509,7 +1516,7 @@ typedef struct {
 	__u32 ExtFileAttributes;
 	__u32 FileNameLength;
 	char FileName[1];
-} FILE_DIRECTORY_INFO;		/* level 257 FF response data area */
+} FILE_DIRECTORY_INFO;   /* level 257 FF response data area */
 
 struct gea {
 	unsigned char cbName;
