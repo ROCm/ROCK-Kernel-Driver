@@ -3,6 +3,12 @@
  *
  * We support both the old "powersurge" SMP architecture
  * and the current Core99 (G4 PowerMac) machines.
+ * 
+ * Note that we don't support the very first rev. of
+ * Apple/DayStar 2 CPUs board, the one with the funky
+ * watchdog. Hopefully, none of these should be there except
+ * maybe internally to Apple. I should probably still add some
+ * code to detect this card though and disable SMP. --BenH.
  *
  * Support Macintosh G4 SMP by Troy Benjegerdes (hozer@drgw.net)
  * and Ben Herrenschmidt <benh@kernel.crashing.org>.
@@ -92,14 +98,15 @@ static volatile u32 *psurge_pri_intr;
 static volatile u8 *psurge_sec_intr;
 static volatile u32 *psurge_start;
 
-/* what sort of powersurge board we have */
-static int psurge_type;
-
 /* values for psurge_type */
+#define PSURGE_NONE		-1
 #define PSURGE_DUAL		0
 #define PSURGE_QUAD_OKEE	1
 #define PSURGE_QUAD_COTTON	2
 #define PSURGE_QUAD_ICEGRASS	3
+
+/* what sort of powersurge board we have */
+static int psurge_type = PSURGE_NONE;
 
 volatile static long int core99_l2_cache;
 volatile static long int core99_l3_cache;
@@ -107,10 +114,6 @@ volatile static long int core99_l3_cache;
 static void __init
 core99_init_caches(int cpu)
 {
-	/* Check cache presence on cpu 0, we assume all CPUs have
-	 * same features here. We also assume that if we don't have
-	 * L2CR, we don't have L3CR neither
-	 */
 	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
 		return;
 
@@ -143,6 +146,8 @@ core99_init_caches(int cpu)
  */
 static inline void psurge_set_ipi(int cpu)
 {
+	if (psurge_type == PSURGE_NONE)
+		return;
 	if (cpu == 0)
 		in_be32(psurge_pri_intr);
 	else if (psurge_type == PSURGE_DUAL)
@@ -154,10 +159,14 @@ static inline void psurge_set_ipi(int cpu)
 static inline void psurge_clr_ipi(int cpu)
 {
 	if (cpu > 0) {
-		if (psurge_type == PSURGE_DUAL)
+		switch(psurge_type) {
+		case PSURGE_DUAL:
 			out_8(psurge_sec_intr, ~0);
-		else
+		case PSURGE_NONE:
+			break;
+		default:
 			PSURGE_QUAD_OUT(PSURGE_QUAD_IRQ_CLR, 1 << cpu);
+		}
 	}
 }
 
@@ -312,6 +321,7 @@ static int __init smp_psurge_probe(void)
 		if ((in_8(hhead_base + HHEAD_CONFIG) & 0x02) == 0) {
 			/* not a dual-cpu card */
 			iounmap((void *) hhead_base);
+			psurge_type = PSURGE_NONE;
 			return 1;
 		}
 		ncpus = 2;
