@@ -420,7 +420,7 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 		add_timer(&fw_priv->timeout);
 	}
 
-	kobject_hotplug("add", &class_dev->kobj);
+	kobject_hotplug(&class_dev->kobj, KOBJ_ADD);
 	wait_for_completion(&fw_priv->completion);
 	set_bit(FW_STATUS_DONE, &fw_priv->status);
 
