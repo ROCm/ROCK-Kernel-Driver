@@ -122,7 +122,7 @@ int __init irlan_init(void)
 	struct irlan_cb *new;
 	__u16 hints;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 	/* Allocate master structure */
 	irlan = hashbin_new(HB_LOCK);	/* protect from /proc */
 	if (irlan == NULL) {
@@ -133,7 +133,7 @@ int __init irlan_init(void)
 	create_proc_info_entry("irlan", 0, proc_irda, irlan_proc_read);
 #endif /* CONFIG_PROC_FS */
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	hints = irlmp_service_to_hint(S_LAN);
 
 	/* Register with IrLMP as a client */
@@ -157,7 +157,7 @@ int __init irlan_init(void)
 
 void __exit irlan_cleanup(void) 
 {
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	irlmp_unregister_client(ckey);
 	irlmp_unregister_service(skey);
@@ -181,7 +181,7 @@ int irlan_register_netdev(struct irlan_cb *self)
 {
 	int i=0;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	/* Check if we should call the device eth<x> or irlan<x> */
 	if (!eth) {
@@ -192,7 +192,7 @@ int irlan_register_netdev(struct irlan_cb *self)
 	}
 	
 	if (register_netdev(&self->dev) != 0) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), register_netdev() failed!\n");
+		IRDA_DEBUG(2, "%s(), register_netdev() failed!\n", __FUNCTION__ );
 		return -1;
 	}
 	return 0;
@@ -208,7 +208,7 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 {
 	struct irlan_cb *self;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 	ASSERT(irlan != NULL, return NULL;);
 
 	/* 
@@ -264,7 +264,7 @@ static void __irlan_close(struct irlan_cb *self)
 {
 	struct sk_buff *skb;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 	
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -301,7 +301,7 @@ void irlan_connect_indication(void *instance, void *sap, struct qos_info *qos,
 	struct irlan_cb *self;
 	struct tsap_cb *tsap;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 	
 	self = (struct irlan_cb *) instance;
 	tsap = (struct tsap_cb *) sap;
@@ -390,7 +390,7 @@ void irlan_disconnect_indication(void *instance, void *sap, LM_REASON reason,
 	struct irlan_cb *self;
 	struct tsap_cb *tsap;
 
-	IRDA_DEBUG(0, __FUNCTION__ "(), reason=%d\n", reason);
+	IRDA_DEBUG(0, "%s(), reason=%d\n", __FUNCTION__ , reason);
 	
 	self = (struct irlan_cb *) instance;
 	tsap = (struct tsap_cb *) sap;
@@ -409,19 +409,19 @@ void irlan_disconnect_indication(void *instance, void *sap, LM_REASON reason,
 	
 	switch (reason) {
 	case LM_USER_REQUEST: /* User request */
-		IRDA_DEBUG(2, __FUNCTION__ "(), User requested\n");
+		IRDA_DEBUG(2, "%s(), User requested\n", __FUNCTION__ );
 		break;
 	case LM_LAP_DISCONNECT: /* Unexpected IrLAP disconnect */
-		IRDA_DEBUG(2, __FUNCTION__ "(), Unexpected IrLAP disconnect\n");
+		IRDA_DEBUG(2, "%s(), Unexpected IrLAP disconnect\n", __FUNCTION__ );
 		break;
 	case LM_CONNECT_FAILURE: /* Failed to establish IrLAP connection */
-		IRDA_DEBUG(2, __FUNCTION__ "(), IrLAP connect failed\n");
+		IRDA_DEBUG(2, "%s(), IrLAP connect failed\n", __FUNCTION__ );
 		break;
 	case LM_LAP_RESET:  /* IrLAP reset */
-		IRDA_DEBUG(2, __FUNCTION__ "(), IrLAP reset\n");
+		IRDA_DEBUG(2, "%s(), IrLAP reset\n", __FUNCTION__ );
 		break;
 	case LM_INIT_DISCONNECT:
-		IRDA_DEBUG(2, __FUNCTION__ "(), IrLMP connect failed\n");
+		IRDA_DEBUG(2, "%s(), IrLMP connect failed\n", __FUNCTION__ );
 		break;
 	default:
 		ERROR("%s(), Unknown disconnect reason\n", __FUNCTION__);
@@ -446,7 +446,7 @@ void irlan_open_data_tsap(struct irlan_cb *self)
 	struct tsap_cb *tsap;
 	notify_t notify;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -468,7 +468,7 @@ void irlan_open_data_tsap(struct irlan_cb *self)
 
 	tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT, &notify);
 	if (!tsap) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), Got no tsap!\n");
+		IRDA_DEBUG(2, "%s(), Got no tsap!\n", __FUNCTION__ );
 		return;
 	}
 	self->tsap_data = tsap;
@@ -482,7 +482,7 @@ void irlan_open_data_tsap(struct irlan_cb *self)
 
 void irlan_close_tsaps(struct irlan_cb *self)
 {
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -572,7 +572,7 @@ int irlan_run_ctrl_tx_queue(struct irlan_cb *self)
 {
 	struct sk_buff *skb;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	if (irda_lock(&self->client.tx_busy) == FALSE)
 		return -EBUSY;
@@ -591,7 +591,7 @@ int irlan_run_ctrl_tx_queue(struct irlan_cb *self)
 		dev_kfree_skb(skb);
 		return -1;
 	}
-	IRDA_DEBUG(2, __FUNCTION__ "(), sending ...\n");
+	IRDA_DEBUG(2, "%s(), sending ...\n", __FUNCTION__ );
 
 	return irttp_data_request(self->client.tsap_ctrl, skb);
 }
@@ -604,7 +604,7 @@ int irlan_run_ctrl_tx_queue(struct irlan_cb *self)
  */
 void irlan_ctrl_data_request(struct irlan_cb *self, struct sk_buff *skb)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	/* Queue command */
 	skb_queue_tail(&self->client.txq, skb);
@@ -624,7 +624,7 @@ void irlan_get_provider_info(struct irlan_cb *self)
 	struct sk_buff *skb;
 	__u8 *frame;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -656,7 +656,7 @@ void irlan_open_data_channel(struct irlan_cb *self)
 	struct sk_buff *skb;
 	__u8 *frame;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -688,7 +688,7 @@ void irlan_close_data_channel(struct irlan_cb *self)
 	struct sk_buff *skb;
 	__u8 *frame;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -727,7 +727,7 @@ void irlan_open_unicast_addr(struct irlan_cb *self)
 	struct sk_buff *skb;
 	__u8 *frame;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);	
@@ -765,7 +765,7 @@ void irlan_set_broadcast_filter(struct irlan_cb *self, int status)
 	struct sk_buff *skb;
 	__u8 *frame;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -804,7 +804,7 @@ void irlan_set_multicast_filter(struct irlan_cb *self, int status)
 	struct sk_buff *skb;
 	__u8 *frame;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -844,7 +844,7 @@ void irlan_get_unicast_addr(struct irlan_cb *self)
 	struct sk_buff *skb;
 	__u8 *frame;
 		
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -879,7 +879,7 @@ void irlan_get_media_char(struct irlan_cb *self)
 	struct sk_buff *skb;
 	__u8 *frame;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -964,7 +964,7 @@ static int __irlan_insert_param(struct sk_buff *skb, char *param, int type,
 	int n=0;
 	
 	if (skb == NULL) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), Got NULL skb\n");
+		IRDA_DEBUG(2, "%s(), Got NULL skb\n", __FUNCTION__ );
 		return 0;
 	}	
 
@@ -981,7 +981,7 @@ static int __irlan_insert_param(struct sk_buff *skb, char *param, int type,
 		ASSERT(value_len > 0, return 0;);
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__ "(), Unknown parameter type!\n");
+		IRDA_DEBUG(2, "%s(), Unknown parameter type!\n", __FUNCTION__ );
 		return 0;
 		break;
 	}
@@ -991,7 +991,7 @@ static int __irlan_insert_param(struct sk_buff *skb, char *param, int type,
 
 	/* Make space for data */
 	if (skb_tailroom(skb) < (param_len+value_len+3)) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), No more space at end of skb\n");
+		IRDA_DEBUG(2, "%s(), No more space at end of skb\n", __FUNCTION__ );
 		return 0;
 	}	
 	skb_put(skb, param_len+value_len+3);
@@ -1038,13 +1038,13 @@ int irlan_extract_param(__u8 *buf, char *name, char *value, __u16 *len)
 	__u16 val_len;
 	int n=0;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
 	/* get length of parameter name (1 byte) */
 	name_len = buf[n++];
 	
 	if (name_len > 254) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), name_len > 254\n");
+		IRDA_DEBUG(2, "%s(), name_len > 254\n", __FUNCTION__ );
 		return -RSP_INVALID_COMMAND_FORMAT;
 	}
 	
@@ -1061,7 +1061,7 @@ int irlan_extract_param(__u8 *buf, char *name, char *value, __u16 *len)
 	le16_to_cpus(&val_len); n+=2;
 	
 	if (val_len > 1016) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), parameter length to long\n");
+		IRDA_DEBUG(2, "%s(), parameter length to long\n", __FUNCTION__ );
 		return -RSP_INVALID_COMMAND_FORMAT;
 	}
 	*len = val_len;
