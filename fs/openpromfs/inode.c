@@ -1027,7 +1027,7 @@ static int openprom_remount(struct super_block *sb, int *flags, char *data)
 static struct super_operations openprom_sops = { 
 	.read_inode	= openprom_read_inode,
 	.statfs		= simple_statfs,
-	.remount	= openprom_remount,
+	.remount_fs	= openprom_remount,
 };
 
 static int openprom_fill_super(struct super_block *s, void *data, int silent)
