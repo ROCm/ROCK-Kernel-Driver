@@ -1188,7 +1188,7 @@ static int dvb_ca_en50221_io_ioctl(struct inode *inode, struct file *file, unsig
  *
  * @return Number of bytes read, or <0 on error.
  */
-static ssize_t dvb_ca_en50221_io_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+static ssize_t dvb_ca_en50221_io_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
         struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         struct dvb_ca_private *ca=(struct dvb_ca_private*) dvbdev->priv;
@@ -1303,7 +1303,7 @@ nextslot:
  *
  * @return Number of bytes read, or <0 on error.
  */
-static ssize_t dvb_ca_en50221_io_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+static ssize_t dvb_ca_en50221_io_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
         struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         struct dvb_ca_private *ca=(struct dvb_ca_private*) dvbdev->priv;

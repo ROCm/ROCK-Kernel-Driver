@@ -71,7 +71,7 @@ typedef struct
 	int pgbuf;	/* buffer where page will be stored */
 	int start;	/* start of requested part of page */
 	int end;	/* end of requested part of page */
-	void *buffer;	/* pointer to beginning of destination buffer */
+	void __user *buffer;	/* pointer to beginning of destination buffer */
 }
 vtx_pagereq_t;
 

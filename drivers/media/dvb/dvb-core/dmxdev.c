@@ -97,7 +97,7 @@ static inline int dvb_dmxdev_buffer_write(struct dmxdev_buffer *buf, const u8 *s
 }
 
 static ssize_t dvb_dmxdev_buffer_read(struct dmxdev_buffer *src,
-		int non_blocking, char *buf, size_t count, loff_t *ppos)
+		int non_blocking, char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned long todo=count;
 	int split, avail, error;
@@ -253,7 +253,7 @@ static int dvb_dvr_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t dvb_dvr_write(struct file *file, const char *buf,
+static ssize_t dvb_dvr_write(struct file *file, const char __user *buf,
 		size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -271,7 +271,7 @@ static ssize_t dvb_dvr_write(struct file *file, const char *buf,
 	return ret;
 }
 
-static ssize_t dvb_dvr_read(struct file *file, char *buf, size_t count,
+static ssize_t dvb_dvr_read(struct file *file, char __user *buf, size_t count,
 		loff_t *ppos)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
@@ -806,7 +806,7 @@ static int dvb_dmxdev_pes_filter_set(struct dmxdev *dmxdev,
 }
 
 static ssize_t dvb_dmxdev_read_sec(struct dmxdev_filter *dfil,
-		struct file *file, char *buf, size_t count, loff_t *ppos)
+		struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	int result, hcount;
 	int done=0;
@@ -845,7 +845,7 @@ static ssize_t dvb_dmxdev_read_sec(struct dmxdev_filter *dfil,
 
 
 ssize_t 
-dvb_demux_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+dvb_demux_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct dmxdev_filter *dmxdevfilter=dvb_dmxdev_file_to_filter(file);
 	int ret=0;

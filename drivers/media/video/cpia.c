@@ -585,7 +585,7 @@ static unsigned long int value(char **buffer, unsigned long *count, int *err)
 	return ret;
 }
 
-static int cpia_write_proc(struct file *file, const char *buf,
+static int cpia_write_proc(struct file *file, const char __user *buf,
                            unsigned long count, void *data)
 {
 	struct cam_data *cam = data;
@@ -3299,7 +3299,7 @@ static int cpia_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t cpia_read(struct file *file, char *buf,
+static ssize_t cpia_read(struct file *file, char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	struct video_device *dev = file->private_data;

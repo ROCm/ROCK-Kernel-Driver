@@ -179,7 +179,7 @@ static int w9966_i2c_rbyte(struct w9966_dev* cam);
 
 static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
 			   unsigned int cmd, unsigned long arg);
-static ssize_t w9966_v4l_read(struct file *file, char *buf,
+static ssize_t w9966_v4l_read(struct file *file, char __user *buf,
 			      size_t count, loff_t *ppos);
 
 static struct file_operations w9966_fops = {
@@ -555,6 +555,14 @@ static inline void w9966_i2c_setsda(struct w9966_dev* cam, int state)
 	udelay(5);
 }
 
+// Get peripheral clock line
+// Expects a claimed pdev.
+static inline int w9966_i2c_getscl(struct w9966_dev* cam)
+{
+	const unsigned char state = w9966_rReg(cam, 0x18);
+	return ((state & W9966_I2C_R_CLOCK) > 0);
+}
+
 // Sets the clock line on the i2c bus.
 // Expects a claimed pdev. -1 on error
 static inline int w9966_i2c_setscl(struct w9966_dev* cam, int state)
@@ -586,14 +594,6 @@ static inline int w9966_i2c_getsda(struct w9966_dev* cam)
 {
 	const unsigned char state = w9966_rReg(cam, 0x18);
 	return ((state & W9966_I2C_R_DATA) > 0);
-}
-
-// Get peripheral clock line
-// Expects a claimed pdev.
-static inline int w9966_i2c_getscl(struct w9966_dev* cam)
-{
-	const unsigned char state = w9966_rReg(cam, 0x18);
-	return ((state & W9966_I2C_R_CLOCK) > 0);
 }
 
 // Write a byte with ack to the i2c bus.
@@ -867,13 +867,13 @@ static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
 }
 
 // Capture data
-static ssize_t w9966_v4l_read(struct file *file, char *buf,
+static ssize_t w9966_v4l_read(struct file *file, char  __user *buf,
 			      size_t count, loff_t *ppos)
 {
 	struct video_device *vdev = video_devdata(file);
 	struct w9966_dev *cam = (struct w9966_dev *)vdev->priv;
 	unsigned char addr = 0xa0;	// ECP, read, CCD-transfer, 00000
-	unsigned char* dest = (unsigned char*)buf;
+	unsigned char __user *dest = (unsigned char __user *)buf;
 	unsigned long dleft = count;
 	unsigned char *tbuf;
 	

@@ -196,7 +196,7 @@ zoran_read_proc (char  *buffer,
 
 static int
 zoran_write_proc (struct file   *file,
-		  const char    *buffer,
+		  const char    __user *buffer,
 		  unsigned long  count,
 		  void          *data)
 {

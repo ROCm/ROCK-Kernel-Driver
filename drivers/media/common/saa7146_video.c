@@ -1450,7 +1450,7 @@ static void video_irq_done(struct saa7146_dev *dev, unsigned long st)
 	spin_unlock(&dev->slock);
 }
 
-static ssize_t video_read(struct file *file, char *data, size_t count, loff_t *ppos)
+static ssize_t video_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;

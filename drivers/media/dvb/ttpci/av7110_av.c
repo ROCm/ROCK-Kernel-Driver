@@ -487,7 +487,7 @@ static ssize_t dvb_play_kernel(struct av7110 *av7110, const u8 *buf,
 	return count - todo;
 }
 
-static ssize_t dvb_aplay(struct av7110 *av7110, const u8 *buf,
+static ssize_t dvb_aplay(struct av7110 *av7110, const u8 __user *buf,
 			 unsigned long count, int nonblock, int type)
 {
 	unsigned long todo = count, n;
@@ -896,7 +896,7 @@ static unsigned int dvb_video_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
-static ssize_t dvb_video_write(struct file *file, const char *buf,
+static ssize_t dvb_video_write(struct file *file, const char __user *buf,
 			       size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
@@ -932,7 +932,7 @@ static unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
-static ssize_t dvb_audio_write(struct file *file, const char *buf,
+static ssize_t dvb_audio_write(struct file *file, const char __user *buf,
 			       size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
@@ -951,7 +951,7 @@ u8 iframe_header[] = { 0x00, 0x00, 0x01, 0xe0, 0x00, 0x00, 0x80, 0x00, 0x00 };
 
 #define MIN_IFRAME 400000
 
-static int play_iframe(struct av7110 *av7110, u8 *buf, unsigned int len, int nonblock)
+static int play_iframe(struct av7110 *av7110, u8 __user *buf, unsigned int len, int nonblock)
 {
 	int i, n;
 

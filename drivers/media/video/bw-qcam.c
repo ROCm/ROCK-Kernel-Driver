@@ -599,7 +599,7 @@ static inline int qc_readbytes(struct qcam_device *q, char buffer[])
  * n=2^(bit depth)-1.  Ask me for more details if you don't understand
  * this. */
 
-long qc_capture(struct qcam_device * q, char *buf, unsigned long len)
+long qc_capture(struct qcam_device * q, char __user *buf, unsigned long len)
 {
 	int i, j, k, yield;
 	int bytes;
@@ -855,7 +855,7 @@ static int qcam_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, qcam_do_ioctl);
 }
 
-static ssize_t qcam_read(struct file *file, char *buf,
+static ssize_t qcam_read(struct file *file, char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	struct video_device *v = video_devdata(file);

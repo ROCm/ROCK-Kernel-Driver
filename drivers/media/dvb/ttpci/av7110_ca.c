@@ -142,7 +142,7 @@ int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
 }
 
 static ssize_t ci_ll_write(struct dvb_ringbuffer *cibuf, struct file *file,
-			   const char *buf, size_t count, loff_t *ppos)
+			   const char __user *buf, size_t count, loff_t *ppos)
 {
 	int free;
 	int non_blocking = file->f_flags & O_NONBLOCK;
@@ -181,7 +181,7 @@ out:
 }
 
 static ssize_t ci_ll_read(struct dvb_ringbuffer *cibuf, struct file *file,
-			  char *buf, size_t count, loff_t *ppos)
+			  char __user *buf, size_t count, loff_t *ppos)
 {
 	int avail;
 	int non_blocking = file->f_flags & O_NONBLOCK;
@@ -317,7 +317,7 @@ static int dvb_ca_ioctl(struct inode *inode, struct file *file,
 	return 0;
 }
 
-static ssize_t dvb_ca_write(struct file *file, const char *buf,
+static ssize_t dvb_ca_write(struct file *file, const char __user *buf,
 			    size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
@@ -327,7 +327,7 @@ static ssize_t dvb_ca_write(struct file *file, const char *buf,
 	return ci_ll_write(&av7110->ci_wbuffer, file, buf, count, ppos);
 }
 
-static ssize_t dvb_ca_read(struct file *file, char *buf,
+static ssize_t dvb_ca_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
