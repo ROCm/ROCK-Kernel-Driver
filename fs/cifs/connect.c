@@ -408,6 +408,10 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 	char *value;
 	char *data;
 	int  temp_len, i, j;
+	char separator[2];
+
+	separator[0] = ',';
+	separator[1] = 0; 
 
 	vol->linux_uid = current->uid;	/* current->euid instead? */
 	vol->linux_gid = current->gid;
@@ -421,7 +425,16 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 	if (!options)
 		return 1;
 
-	while ((data = strsep(&options, ",")) != NULL) {
+	if(strncmp(options,"sep=",4) == 0) {
+		if(options[4] != 0) {
+			separator[0] = options[4];
+			options += 5;
+		} else {
+			cFYI(1,("Null separator not allowed"));
+		}
+	}
+		
+	while ((data = strsep(&options, separator)) != NULL) {
 		if (!*data)
 			continue;
 		if ((value = strchr(data, '=')) != NULL)
@@ -457,12 +470,12 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			/* NB: password legally can have multiple commas and
 			the only illegal character in a password is null */
 				
-			if ((value[temp_len] == 0) && (value[temp_len+1] == ',')) {
+			if ((value[temp_len] == 0) && (value[temp_len+1] == separator[0])) {
 				/* reinsert comma */
-				value[temp_len] = ',';
+				value[temp_len] = separator[0];
 				temp_len+=2;  /* move after the second comma */
 				while(value[temp_len] != 0)  {
-					if((value[temp_len] == ',') && (value[temp_len+1] != ',')) {
+					if((value[temp_len] == separator[0]) && (value[temp_len+1] != separator[0])) {
 						/* single comma indicating start of next parm */
 						break;
 					}
@@ -479,7 +492,7 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				vol->password = cifs_kcalloc(temp_len, GFP_KERNEL);
 				for(i=0,j=0;i<temp_len;i++,j++) {
 					vol->password[j] = value[i];
-					if(value[i] == ',' && value[i+1] == ',') {
+					if(value[i] == separator[0] && value[i+1] == separator[0]) {
 						/* skip second comma */
 						i++;
 					}
