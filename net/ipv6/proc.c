@@ -57,36 +57,34 @@ static int sockstat6_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct snmp_item snmp6_ipstats_list[] = {
+static struct snmp_mib snmp6_ipstats_list[] = {
 /* ipv6 mib according to RFC 2465 */
-#define SNMP6_GEN(x)	SNMP_ITEM(struct ipstats_mib, x, "Ip6" #x)
-	SNMP6_GEN(InReceives),
-	SNMP6_GEN(InHdrErrors),
-	SNMP6_GEN(InTooBigErrors),
-	SNMP6_GEN(InNoRoutes),
-	SNMP6_GEN(InAddrErrors),
-	SNMP6_GEN(InUnknownProtos),
-	SNMP6_GEN(InTruncatedPkts),
-	SNMP6_GEN(InDiscards),
-	SNMP6_GEN(InDelivers),
-	SNMP6_GEN(OutForwDatagrams),
-	SNMP6_GEN(OutRequests),
-	SNMP6_GEN(OutDiscards),
-	SNMP6_GEN(OutNoRoutes),
-	SNMP6_GEN(ReasmTimeout),
-	SNMP6_GEN(ReasmReqds),
-	SNMP6_GEN(ReasmOKs),
-	SNMP6_GEN(ReasmFails),
-	SNMP6_GEN(FragOKs),
-	SNMP6_GEN(FragFails),
-	SNMP6_GEN(FragCreates),
-	SNMP6_GEN(InMcastPkts),
-	SNMP6_GEN(OutMcastPkts),
-#undef SNMP6_GEN
-	SNMP_ITEM_SENTINEL
+	SNMP_MIB_ITEM("Ip6InReceives", IPSTATS_MIB_INRECEIVES),
+	SNMP_MIB_ITEM("Ip6InHdrErrors", IPSTATS_MIB_INHDRERRORS),
+	SNMP_MIB_ITEM("Ip6InTooBigErrors", IPSTATS_MIB_INTOOBIGERRORS),
+	SNMP_MIB_ITEM("Ip6InNoRoutes", IPSTATS_MIB_INNOROUTES),
+	SNMP_MIB_ITEM("Ip6InAddrErrors", IPSTATS_MIB_INADDRERRORS),
+	SNMP_MIB_ITEM("Ip6InUnknownProtos", IPSTATS_MIB_INUNKNOWNPROTOS),
+	SNMP_MIB_ITEM("Ip6InTruncatedPkts", IPSTATS_MIB_INTRUNCATEDPKTS),
+	SNMP_MIB_ITEM("Ip6InDiscards", IPSTATS_MIB_INDISCARDS),
+	SNMP_MIB_ITEM("Ip6InDelivers", IPSTATS_MIB_INDELIVERS),
+	SNMP_MIB_ITEM("Ip6OutForwDatagrams", IPSTATS_MIB_OUTFORWDATAGRAMS),
+	SNMP_MIB_ITEM("Ip6OutRequests", IPSTATS_MIB_OUTREQUESTS),
+	SNMP_MIB_ITEM("Ip6OutDiscards", IPSTATS_MIB_OUTDISCARDS),
+	SNMP_MIB_ITEM("Ip6OutNoRoutes", IPSTATS_MIB_OUTNOROUTES),
+	SNMP_MIB_ITEM("Ip6ReasmTimeout", IPSTATS_MIB_REASMTIMEOUT),
+	SNMP_MIB_ITEM("Ip6ReasmReqds", IPSTATS_MIB_REASMREQDS),
+	SNMP_MIB_ITEM("Ip6ReasmOKs", IPSTATS_MIB_REASMOKS),
+	SNMP_MIB_ITEM("Ip6ReasmFails", IPSTATS_MIB_REASMFAILS),
+	SNMP_MIB_ITEM("Ip6FragOKs", IPSTATS_MIB_FRAGOKS),
+	SNMP_MIB_ITEM("Ip6FragFails", IPSTATS_MIB_FRAGFAILS),
+	SNMP_MIB_ITEM("Ip6FragCreates", IPSTATS_MIB_FRAGCREATES),
+	SNMP_MIB_ITEM("Ip6InMcastPkts", IPSTATS_MIB_INMCASTPKTS),
+	SNMP_MIB_ITEM("Ip6OutMcastPkts", IPSTATS_MIB_OUTMCASTPKTS),
+	SNMP_MIB_SENTINEL
 };
 
-static struct snmp_item snmp6_icmp6_list[] = {
+static struct snmp_mib snmp6_icmp6_list[] = {
 /* icmpv6 mib according to RFC 2466
 
    Exceptions:  {In|Out}AdminProhibs are removed, because I see
@@ -97,47 +95,43 @@ static struct snmp_item snmp6_icmp6_list[] = {
 		OutRouterAdvertisements too.
 		OutGroupMembQueries too.
  */
-#define SNMP6_GEN(x)	SNMP_ITEM(struct icmpv6_mib, x, #x)
-	SNMP6_GEN(Icmp6InMsgs),
-	SNMP6_GEN(Icmp6InErrors),
-	SNMP6_GEN(Icmp6InDestUnreachs),
-	SNMP6_GEN(Icmp6InPktTooBigs),
-	SNMP6_GEN(Icmp6InTimeExcds),
-	SNMP6_GEN(Icmp6InParmProblems),
-	SNMP6_GEN(Icmp6InEchos),
-	SNMP6_GEN(Icmp6InEchoReplies),
-	SNMP6_GEN(Icmp6InGroupMembQueries),
-	SNMP6_GEN(Icmp6InGroupMembResponses),
-	SNMP6_GEN(Icmp6InGroupMembReductions),
-	SNMP6_GEN(Icmp6InRouterSolicits),
-	SNMP6_GEN(Icmp6InRouterAdvertisements),
-	SNMP6_GEN(Icmp6InNeighborSolicits),
-	SNMP6_GEN(Icmp6InNeighborAdvertisements),
-	SNMP6_GEN(Icmp6InRedirects),
-	SNMP6_GEN(Icmp6OutMsgs),
-	SNMP6_GEN(Icmp6OutDestUnreachs),
-	SNMP6_GEN(Icmp6OutPktTooBigs),
-	SNMP6_GEN(Icmp6OutTimeExcds),
-	SNMP6_GEN(Icmp6OutParmProblems),
-	SNMP6_GEN(Icmp6OutEchoReplies),
-	SNMP6_GEN(Icmp6OutRouterSolicits),
-	SNMP6_GEN(Icmp6OutNeighborSolicits),
-	SNMP6_GEN(Icmp6OutNeighborAdvertisements),
-	SNMP6_GEN(Icmp6OutRedirects),
-	SNMP6_GEN(Icmp6OutGroupMembResponses),
-	SNMP6_GEN(Icmp6OutGroupMembReductions),
-#undef SNMP6_GEN
-	SNMP_ITEM_SENTINEL
+	SNMP_MIB_ITEM("Icmp6InMsgs", ICMP6_MIB_INMSGS),
+	SNMP_MIB_ITEM("Icmp6InErrors", ICMP6_MIB_INERRORS),
+	SNMP_MIB_ITEM("Icmp6InDestUnreachs", ICMP6_MIB_INDESTUNREACHS),
+	SNMP_MIB_ITEM("Icmp6InPktTooBigs", ICMP6_MIB_INPKTTOOBIGS),
+	SNMP_MIB_ITEM("Icmp6InTimeExcds", ICMP6_MIB_INTIMEEXCDS),
+	SNMP_MIB_ITEM("Icmp6InParmProblems", ICMP6_MIB_INPARMPROBLEMS),
+	SNMP_MIB_ITEM("Icmp6InEchos", ICMP6_MIB_INECHOS),
+	SNMP_MIB_ITEM("Icmp6InEchoReplies", ICMP6_MIB_INECHOREPLIES),
+	SNMP_MIB_ITEM("Icmp6InGroupMembQueries", ICMP6_MIB_INGROUPMEMBQUERIES),
+	SNMP_MIB_ITEM("Icmp6InGroupMembResponses", ICMP6_MIB_INGROUPMEMBRESPONSES),
+	SNMP_MIB_ITEM("Icmp6InGroupMembReductions", ICMP6_MIB_INGROUPMEMBREDUCTIONS),
+	SNMP_MIB_ITEM("Icmp6InRouterSolicits", ICMP6_MIB_INROUTERSOLICITS),
+	SNMP_MIB_ITEM("Icmp6InRouterAdvertisements", ICMP6_MIB_INROUTERADVERTISEMENTS),
+	SNMP_MIB_ITEM("Icmp6InNeighborSolicits", ICMP6_MIB_INNEIGHBORSOLICITS),
+	SNMP_MIB_ITEM("Icmp6InNeighborAdvertisements", ICMP6_MIB_INNEIGHBORADVERTISEMENTS),
+	SNMP_MIB_ITEM("Icmp6InRedirects", ICMP6_MIB_INREDIRECTS),
+	SNMP_MIB_ITEM("Icmp6OutMsgs", ICMP6_MIB_OUTMSGS),
+	SNMP_MIB_ITEM("Icmp6OutDestUnreachs", ICMP6_MIB_OUTDESTUNREACHS),
+	SNMP_MIB_ITEM("Icmp6OutPktTooBigs", ICMP6_MIB_OUTPKTTOOBIGS),
+	SNMP_MIB_ITEM("Icmp6OutTimeExcds", ICMP6_MIB_OUTTIMEEXCDS),
+	SNMP_MIB_ITEM("Icmp6OutParmProblems", ICMP6_MIB_OUTPARMPROBLEMS),
+	SNMP_MIB_ITEM("Icmp6OutEchoReplies", ICMP6_MIB_OUTECHOREPLIES),
+	SNMP_MIB_ITEM("Icmp6OutRouterSolicits", ICMP6_MIB_OUTROUTERSOLICITS),
+	SNMP_MIB_ITEM("Icmp6OutNeighborSolicits", ICMP6_MIB_OUTNEIGHBORSOLICITS),
+	SNMP_MIB_ITEM("Icmp6OutNeighborAdvertisements", ICMP6_MIB_OUTNEIGHBORADVERTISEMENTS),
+	SNMP_MIB_ITEM("Icmp6OutRedirects", ICMP6_MIB_OUTREDIRECTS),
+	SNMP_MIB_ITEM("Icmp6OutGroupMembResponses", ICMP6_MIB_OUTGROUPMEMBRESPONSES),
+	SNMP_MIB_ITEM("Icmp6OutGroupMembReductions", ICMP6_MIB_OUTGROUPMEMBREDUCTIONS),
+	SNMP_MIB_SENTINEL
 };
 
-static struct snmp_item snmp6_udp6_list[] = {
-#define SNMP6_GEN(x)	SNMP_ITEM(struct udp_mib, Udp##x, "Udp6" #x)
-	SNMP6_GEN(InDatagrams),
-	SNMP6_GEN(NoPorts),
-	SNMP6_GEN(InErrors),
-	SNMP6_GEN(OutDatagrams),
-#undef SNMP6_GEN
-	SNMP_ITEM_SENTINEL
+static struct snmp_mib snmp6_udp6_list[] = {
+	SNMP_MIB_ITEM("Udp6InDatagrams", UDP_MIB_INDATAGRAMS),
+	SNMP_MIB_ITEM("Udp6NoPorts", UDP_MIB_NOPORTS),
+	SNMP_MIB_ITEM("Udp6InErrors", UDP_MIB_INERRORS),
+	SNMP_MIB_ITEM("Udp6OutDatagrams", UDP_MIB_OUTDATAGRAMS),
+	SNMP_MIB_SENTINEL
 };
 
 static unsigned long
@@ -149,23 +143,19 @@ fold_field(void *mib[], int offt)
         for (i = 0; i < NR_CPUS; i++) {
                 if (!cpu_possible(i))
                         continue;
-                res +=
-                    *((unsigned long *) (((void *)per_cpu_ptr(mib[0], i)) +
-                                         offt));
-                res +=
-                    *((unsigned long *) (((void *)per_cpu_ptr(mib[1], i)) +
-                                         offt));
+                res += *(((unsigned long *)per_cpu_ptr(mib[0], i)) + offt);
+                res += *(((unsigned long *)per_cpu_ptr(mib[1], i)) + offt);
         }
         return res;
 }
 
 static inline void
-snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp_item *itemlist)
+snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp_mib *itemlist)
 {
 	int i;
 	for (i=0; itemlist[i].name; i++)
 		seq_printf(seq, "%-32s\t%lu\n", itemlist[i].name, 
-				fold_field(mib, itemlist[i].offset));
+				fold_field(mib, itemlist[i].entry));
 }
 
 static int snmp6_seq_show(struct seq_file *seq, void *v)

@@ -307,7 +307,7 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, void __user *arg)
 	atmvcc->user_back = pvcc;
 	atmvcc->push = pppoatm_push;
 	atmvcc->pop = pppoatm_pop;
-	(void) try_module_get(THIS_MODULE);
+	__module_get(THIS_MODULE);
 	return 0;
 }
 

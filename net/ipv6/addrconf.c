@@ -1544,7 +1544,7 @@ int addrconf_set_dstaddr(void __user *arg)
 		p.iph.ihl = 5;
 		p.iph.protocol = IPPROTO_IPV6;
 		p.iph.ttl = 64;
-		ifr.ifr_ifru.ifru_data = (void*)&p;
+		ifr.ifr_ifru.ifru_data = (void __user *)&p;
 
 		oldfs = get_fs(); set_fs(KERNEL_DS);
 		err = dev->do_ioctl(dev, &ifr, SIOCADDTUNNEL);
