@@ -138,6 +138,8 @@ static struct hd_i_struct hd_info[MAX_HD];
 static int NR_HD;
 #endif
 
+static struct gendisk *hd_gendisk[MAX_HD];
+
 static struct timer_list device_timer;
 
 #define TIMEOUT_VALUE (6*HZ)
@@ -590,14 +592,15 @@ repeat:
 	dev = DEVICE_NR(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	nsect = CURRENT->nr_sectors;
-	if (dev >= NR_HD || block >= get_capacity(hd_gendisk+dev) ||
-	    ((block+nsect) > get_capacity(hd_gendisk+unit))) {
-		if (dev >= NR_HD)
-			printk("hd: bad minor number: device=%s\n",
-			       kdevname(CURRENT->rq_dev));
-		else
-			printk("hd%c: bad access: block=%d, count=%d\n",
-				dev+'a', block, nsect);
+	if (dev >= NR_HD) {
+		printk("hd: bad disk number: %d\n", dev);
+		end_request(CURRENT, 0);
+		goto repeat;
+	}
+	if (block >= get_capacity(hd_gendisk[dev]) ||
+	    ((block+nsect) > get_capacity(hd_gendisk[dev]))) {
+		printk("%s: bad access: block=%d, count=%d\n",
+			hd_gendisk[dev]->disk_name, block, nsect);
 		end_request(CURRENT, 0);
 		goto repeat;
 	}
@@ -691,22 +694,6 @@ static int hd_open(struct inode * inode, struct file * filp)
 
 extern struct block_device_operations hd_fops;
 
-static struct gendisk hd_gendisk[2] = {
-{
-	.major =	MAJOR_NR,
-	.first_minor =	0,
-	.disk_name =	"hda",
-	.minor_shift =	6,
-	.fops =		&hd_fops,
-},{
-	.major =	MAJOR_NR,
-	.first_minor =	64,
-	.disk_name =	"hdb",
-	.minor_shift =	6,
-	.fops =		&hd_fops,
-}
-};
-	
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	void (*handler)(void) = do_hd;
@@ -733,10 +720,18 @@ static struct block_device_operations hd_fops = {
  * We enable interrupts in some of the routines after making sure it's
  * safe.
  */
-static void __init hd_geninit(void)
+
+static int __init hd_init(void)
 {
 	int drive;
-
+	if (register_blkdev(MAJOR_NR,"hd",&hd_fops)) {
+		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);
+		return -1;
+	}
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_hd_request, &hd_lock);
+	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
+	init_timer(&device_timer);
+	device_timer.function = hd_times_out;
 	blk_queue_hardsect_size(QUEUE, 512);
 
 #ifdef __i386__
@@ -805,57 +800,68 @@ static void __init hd_geninit(void)
 			" on kernel command line\n");
 	}
 #endif
+	if (!NR_HD)
+		goto out;
 
+	for (drive=0 ; drive < NR_HD ; drive++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto Enomem;
+		disk->major = MAJOR_NR;
+		disk->first_minor = drive << 6;
+		disk->minor_shift = 6;
+		disk->fops = &hd_fops;
+		sprintf(disk->disk_name, "hd%c", 'a'+drive);
+		hd_gendisk[drive] = disk;
+	}
 	for (drive=0 ; drive < NR_HD ; drive++) {
 		sector_t size = hd_info[drive].head *
 			hd_info[drive].sect * hd_info[drive].cyl;
-		set_capacity(hd_gendisk + drive, size);
-		printk ("%s: %ldMB, CHS=%d/%d/%d\n", hd_gendisk[drive].disk_name,
+		set_capacity(hd_gendisk[drive], size);
+		printk ("%s: %ldMB, CHS=%d/%d/%d\n",
+			hd_gendisk[drive]->disk_name,
 			size / 2048, hd_info[drive].cyl,
 			hd_info[drive].head, hd_info[drive].sect);
 	}
-	if (!NR_HD)
-		return;
 
 	if (request_irq(HD_IRQ, hd_interrupt, SA_INTERRUPT, "hd", NULL)) {
 		printk("hd: unable to get IRQ%d for the hard disk driver\n",
 			HD_IRQ);
-		NR_HD = 0;
-		return;
+		goto out1;
 	}
 	if (!request_region(HD_DATA, 8, "hd")) {
 		printk(KERN_WARNING "hd: port 0x%x busy\n", HD_DATA);
-		NR_HD = 0;
-		free_irq(HD_IRQ, NULL);
-		return;
+		goto out2;
 	}
 	if (!request_region(HD_CMD, 1, "hd(cmd)")) {
 		printk(KERN_WARNING "hd: port 0x%x busy\n", HD_CMD);
-		NR_HD = 0;
-		free_irq(HD_IRQ, NULL);
-		release_region(HD_DATA, 8);
-		return;
+		goto out3;
 	}
 
 	for(drive=0; drive < NR_HD; drive++) {
 		struct hd_i_struct *p = hd_info + drive;
-		set_capacity(hd_gendisk + drive, p->head * p->sect * p->cyl);
-		add_disk(hd_gendisk + drive);
+		set_capacity(hd_gendisk[drive], p->head * p->sect * p->cyl);
+		add_disk(hd_gendisk[drive]);
 	}
-}
-
-static int __init hd_init(void)
-{
-	if (register_blkdev(MAJOR_NR,"hd",&hd_fops)) {
-		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);
-		return -1;
-	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_hd_request, &hd_lock);
-	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
-	init_timer(&device_timer);
-	device_timer.function = hd_times_out;
-	hd_geninit();
 	return 0;
+
+out3:
+	release_region(HD_DATA, 8);
+out2:
+	free_irq(HD_IRQ, NULL);
+out1:
+	for (drive = 0; drive < NR_HD; drive++)
+		put_disk(hd_gendisk[drive]);
+	NR_HD = 0;
+out:
+	del_timer(&device_timer);
+	unregister_blkdev(MAJOR_NR,"hd");
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	return -1;
+Enomem:
+	while (drive--)
+		put_disk(hd_gendisk[drive]);
+	goto out;
 }
 
 static int parse_hd_setup (char *line) {
