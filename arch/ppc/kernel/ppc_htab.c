@@ -19,6 +19,7 @@
 #include <linux/ctype.h>
 #include <linux/threads.h>
 #include <linux/smp_lock.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -104,7 +105,6 @@ static char *pmc2_lookup(unsigned long mmcr0)
 static int ppc_htab_show(struct seq_file *m, void *v)
 {
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
-	int n = 0;
 #if defined(CONFIG_PPC_STD_MMU) && !defined(CONFIG_PPC64BRIDGE)
 	unsigned int kptes = 0, uptes = 0;
 	PTE *ptr;
@@ -199,7 +199,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	unsigned long tmp;
 	char buffer[16];
 
-	if (!capable(CAPS_SYS_ADMIN))
+	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 	if (strncpy_from_user(buffer, ubuffer, 15))
 		return -EFAULT;
