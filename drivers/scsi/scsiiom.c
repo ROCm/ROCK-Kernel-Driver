@@ -1155,7 +1155,7 @@ dc390_Disconnect( struct dc390_acb* pACB )
      }
     DC390_write8 (ScsiCmd, EN_SEL_RESEL);
     pSRB = pDCB->pActiveSRB;
-    pACB->pActiveDCB = 0;
+    pACB->pActiveDCB = NULL;
     pSRB->ScsiPhase = SCSI_NOP0;
     if( pSRB->SRBState & SRB_UNEXPECT_RESEL )
     {
@@ -1175,7 +1175,7 @@ dc390_Disconnect( struct dc390_acb* pACB )
 	    dc390_Free_insert (pACB, pSRB);
 	    pSRB = psrb;
 	}
-	pDCB->pGoingSRB = 0;
+	pDCB->pGoingSRB = NULL;
 	dc390_Waiting_process (pACB);
     }
     else
@@ -1204,7 +1204,7 @@ dc390_Disconnect( struct dc390_acb* pACB )
 	{
 disc1:
 	    dc390_freetag (pDCB, pSRB);
-	    pDCB->pActiveSRB = 0;
+	    pDCB->pActiveSRB = NULL;
 	    pSRB->SRBState = SRB_FREE;
 	    dc390_SRBdone( pACB, pDCB, pSRB);
 	}
@@ -1644,7 +1644,7 @@ dc390_ScsiRstDetect( struct dc390_acb* pACB )
 	pACB->ACBFlag |= RESET_DETECT;
 
 	dc390_ResetDevParam( pACB );
-	dc390_DoingSRB_Done( pACB, 0 );
+	dc390_DoingSRB_Done( pACB, NULL );
 	//dc390_RecoverSRB( pACB );
 	pACB->pActiveDCB = NULL;
 	pACB->ACBFlag = 0;

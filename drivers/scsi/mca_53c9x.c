@@ -238,15 +238,15 @@ int mca_esp_detect(Scsi_Host_Template *tpnt)
 
 			/* Optional functions */
 
-			esp->dma_barrier = 0;
-			esp->dma_drain = 0;
-			esp->dma_invalidate = 0;
-			esp->dma_irq_entry = 0;
-			esp->dma_irq_exit = 0;
+			esp->dma_barrier = NULL;
+			esp->dma_drain = NULL;
+			esp->dma_invalidate = NULL;
+			esp->dma_irq_entry = NULL;
+			esp->dma_irq_exit = NULL;
 			esp->dma_led_on = dma_led_on;
 			esp->dma_led_off = dma_led_off;
-			esp->dma_poll = 0;
-			esp->dma_reset = 0;
+			esp->dma_poll = NULL;
+			esp->dma_reset = NULL;
 
 			/* Set the command buffer */
 

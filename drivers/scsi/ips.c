@@ -215,7 +215,7 @@ MODULE_PARM(ips, "s");
 #endif
 #else
 #define IPS_SG_ADDRESS(sg)      (page_address((sg)->page) ? \
-                                     page_address((sg)->page)+(sg)->offset : 0)
+                                   page_address((sg)->page)+(sg)->offset : NULL)
 #define IPS_LOCK_SAVE(lock,flags) do{spin_lock(lock);(void)flags;}while(0)
 #define IPS_UNLOCK_RESTORE(lock,flags) do{spin_unlock(lock);(void)flags;}while(0)
 #endif
@@ -6854,8 +6854,8 @@ ips_abort_init(ips_ha_t * ha, int index)
 {
 	ha->active = 0;
 	ips_free(ha);
-	ips_ha[index] = 0;
-	ips_sh[index] = 0;
+	ips_ha[index] = NULL;
+	ips_sh[index] = NULL;
 	return -1;
 }
 

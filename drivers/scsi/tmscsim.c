@@ -604,12 +604,12 @@ static u8 __devinit dc390_CheckEEpromCheckSum(struct pci_dev *pdev, u8 index)
  **********************************************************************/
 static struct dc390_dcb __inline__ *dc390_findDCB ( struct dc390_acb* pACB, u8 id, u8 lun)
 {
-   struct dc390_dcb* pDCB = pACB->pLinkDCB; if (!pDCB) return 0;
+   struct dc390_dcb* pDCB = pACB->pLinkDCB; if (!pDCB) return NULL;
    while (pDCB->TargetID != id || pDCB->TargetLUN != lun)
      {
 	pDCB = pDCB->pNextDCB;
 	if (pDCB == pACB->pLinkDCB)
-	     return 0;
+	     return NULL;
      }
    DCBDEBUG1( printk (KERN_DEBUG "DCB %p (%02x,%02x) found.\n",	\
 		      pDCB, pDCB->TargetID, pDCB->TargetLUN));
@@ -1382,7 +1382,7 @@ static void __devinit dc390_set_pci_cfg (struct pci_dev *pdev)
 static int dc390_slave_alloc(struct scsi_device *scsi_device)
 {
 	struct dc390_acb *pACB = (struct dc390_acb*) scsi_device->host->hostdata;
-	struct dc390_dcb *pDCB, *pDCB2 = 0;
+	struct dc390_dcb *pDCB, *pDCB2 = NULL;
 	uint id = scsi_device->id;
 	uint lun = scsi_device->lun;
 
