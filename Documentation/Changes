@@ -61,9 +61,9 @@ o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  quota-tools            3.09                    # quota -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
+o  nfs-utils              1.0.4                   # showmount --version
 o  procps                 2.0.9                   # ps --version
 o  oprofile               0.5.3                   # oprofiled --version
-o  nfs-utils              1.0.3                   # showmount --version
 
 Kernel compilation
 ==================
@@ -280,6 +280,34 @@ Isdn4k-utils
 Due to changes in the length of the phone number field, isdn4k-utils
 needs to be recompiled or (preferably) upgraded.
 
+NFS-utils
+---------
+
+In 2.4 and earlier kernels, the nfs server needed to know about any
+client that expected to be able to access files via NFS.  This
+information would be given to the kernel by "mountd" when the client
+mounted the filesystem, or by "exportfs" at system startup.  exportfs
+would take information about active clients from /var/lib/nfs/rmtab.
+
+This approach is quite fragile as it depends on rmtab being correct
+which is not always easy, particularly when trying to implement
+fail-over.  Even when the system is working well, rmtab suffers from
+getting lots of old entries that never get removed.
+
+With 2.6 we have the option of having the kernel tell mountd when it
+gets a request from an unknown host, and mountd can give appropriate
+export information to the kernel.  This removes the dependency on
+rmtab and means that the kernel only needs to know about currently
+active clients.
+
+To enable this new functionality, you need to:
+
+  mount -t nfsd nfsd /proc/fs/nfs
+
+before running exportfs or mountd.  It is recommended that all NFS
+services be protected from the internet-at-large by a firewall where
+that is possible.
+
 Getting updated software
 ========================
 
@@ -367,6 +395,10 @@ o  <ftp://ftp.samba.org/pub/ppp/ppp-2.4.0.tar.gz>
 Isdn4k-utils
 ------------
 o  <ftp://ftp.isdn4linux.de/pub/isdn4linux/utils/isdn4k-utils.v3.1pre1.tar.gz>
+
+NFS-utils
+---------
+o  <http://sourceforge.net/project/showfiles.php?group_id=14>
 
 Netfilter
 ---------
