@@ -24,13 +24,13 @@
 		PCI suspend/resume  - Felipe Damasio <felipewd@terra.com.br>
 		LinkChg interrupt   - Felipe Damasio <felipewd@terra.com.br>
 			
-	TODO, in rough priority order:
+	TODO:
 	* Test Tx checksumming thoroughly
 	* dev->tx_timeout
-	* Constants (module parms?) for Rx work limit
+
+	Low priority TODO:
 	* Complete reset on PciErr
 	* Consider Rx interrupt mitigation using TimerIntr
-	* Handle netif_rx return value
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
 	* Adjust Rx FIFO threshold and Max Rx DMA burst on Rx FIFO error
@@ -39,7 +39,7 @@
 	  Tx descriptor bit
 	* The real minimum of CP_MIN_MTU is 4 bytes.  However,
 	  for this to be supported, one must(?) turn on packet padding.
-	* Support external MII transceivers
+	* Support external MII transceivers (patch available)
 
 	NOTES:
 	* TX checksumming is considered experimental.  It is off by
