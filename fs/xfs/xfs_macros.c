@@ -2219,14 +2219,6 @@ xfs_sb_version_toold(unsigned v)
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XLOG_BTOLRBB)
-int
-xlog_btolrbb(int b)
-{
-	return XLOG_BTOLRBB(b);
-}
-#endif
-
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XLOG_GRANT_ADD_SPACE)
 void
 xlog_grant_add_space(xlog_t *log, int bytes, int type)
