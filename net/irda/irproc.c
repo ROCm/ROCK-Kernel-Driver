@@ -27,9 +27,9 @@
 #include <linux/proc_fs.h>
 #define __NO_VERSION__
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irlap.h>
 #include <net/irda/irlmp.h>
 
@@ -62,7 +62,7 @@ static struct irda_entry dir[] = {
  *    Register irda entry in /proc file system
  *
  */
-void irda_proc_register(void) 
+void __init irda_proc_register(void) 
 {
 	int i;
 
@@ -81,7 +81,7 @@ void irda_proc_register(void)
  *    Unregister irda entry in /proc file system
  *
  */
-void irda_proc_unregister(void) 
+void __exit irda_proc_unregister(void) 
 {
 	int i;
 

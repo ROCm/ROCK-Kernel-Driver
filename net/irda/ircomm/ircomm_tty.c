@@ -141,8 +141,7 @@ int __init ircomm_tty_init(void)
 	return 0;
 }
 
-#ifdef MODULE
-static void __ircomm_tty_cleanup(struct ircomm_tty_cb *self)
+static void __exit __ircomm_tty_cleanup(struct ircomm_tty_cb *self)
 {
 	IRDA_DEBUG(0, __FUNCTION__ "()\n");
 
@@ -161,7 +160,7 @@ static void __ircomm_tty_cleanup(struct ircomm_tty_cb *self)
  *    Remove IrCOMM TTY layer/driver
  *
  */
-void ircomm_tty_cleanup(void)
+void __exit ircomm_tty_cleanup(void)
 {
 	int ret;
 
@@ -175,7 +174,6 @@ void ircomm_tty_cleanup(void)
 
 	hashbin_delete(ircomm_tty, (FREE_FUNC) __ircomm_tty_cleanup);
 }
-#endif /* MODULE */
 
 /*
  * Function ircomm_startup (self)
@@ -1390,23 +1388,9 @@ done:
 }
 #endif /* CONFIG_PROC_FS */
 
-#ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("IrCOMM serial TTY driver");
 MODULE_LICENSE("GPL");
 
-int init_module(void) 
-{
-	return ircomm_tty_init();
-}
-
-void cleanup_module(void)
-{
-	ircomm_tty_cleanup();
-}
-
-#endif /* MODULE */
-
-
-
-
+module_init(ircomm_tty_init);
+module_exit(ircomm_tty_cleanup);

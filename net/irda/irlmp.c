@@ -35,7 +35,6 @@
 #include <linux/random.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/timer.h>
 #include <net/irda/qos.h>
 #include <net/irda/irlap.h>
@@ -108,7 +107,7 @@ int __init irlmp_init(void)
  *    Remove IrLMP layer
  *
  */
-void irlmp_cleanup(void)
+void __exit irlmp_cleanup(void) 
 {
 	/* Check for main structure */
 	ASSERT(irlmp != NULL, return;);
@@ -648,6 +647,9 @@ int irlmp_disconnect_request(struct lsap_cb *self, struct sk_buff *userdata)
 	ASSERT(self->lap->lsaps != NULL, return -1;);
 
 	lsap = hashbin_remove(self->lap->lsaps, (int) self, NULL);
+#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	self->lap->cache.valid = FALSE;
+#endif
 
 	ASSERT(lsap != NULL, return -1;);
 	ASSERT(lsap->magic == LMP_LSAP_MAGIC, return -1;);

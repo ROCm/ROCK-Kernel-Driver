@@ -61,8 +61,6 @@
 
 #include <net/irda/wrapper.h>
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
-#include <net/irda/irlap_frame.h>
 #include <net/irda/irda_device.h>
 
 #include <net/irda/nsc-ircc.h>
@@ -123,9 +121,7 @@ static char *dongle_types[] = {
 
 /* Some prototypes */
 static int  nsc_ircc_open(int i, chipio_t *info);
-#ifdef MODULE
 static int  nsc_ircc_close(struct nsc_ircc_cb *self);
-#endif /* MODULE */
 static int  nsc_ircc_setup(chipio_t *info);
 static void nsc_ircc_pio_receive(struct nsc_ircc_cb *self);
 static int  nsc_ircc_dma_receive(struct nsc_ircc_cb *self); 
@@ -225,8 +221,7 @@ int __init nsc_ircc_init(void)
  *    Close all configured chips
  *
  */
-#ifdef MODULE
-static void nsc_ircc_cleanup(void)
+static void __exit nsc_ircc_cleanup(void)
 {
 	int i;
 
@@ -237,7 +232,6 @@ static void nsc_ircc_cleanup(void)
 			nsc_ircc_close(dev_self[i]);
 	}
 }
-#endif /* MODULE */
 
 /*
  * Function nsc_ircc_open (iobase, irq)
@@ -245,7 +239,7 @@ static void nsc_ircc_cleanup(void)
  *    Open driver instance
  *
  */
-static int nsc_ircc_open(int i, chipio_t *info)
+static int __init nsc_ircc_open(int i, chipio_t *info)
 {
 	struct net_device *dev;
 	struct nsc_ircc_cb *self;
@@ -384,14 +378,13 @@ static int nsc_ircc_open(int i, chipio_t *info)
 	return 0;
 }
 
-#ifdef MODULE
 /*
  * Function nsc_ircc_close (self)
  *
  *    Close driver instance
  *
  */
-static int nsc_ircc_close(struct nsc_ircc_cb *self)
+static int __exit nsc_ircc_close(struct nsc_ircc_cb *self)
 {
 	int iobase;
 
@@ -424,7 +417,6 @@ static int nsc_ircc_close(struct nsc_ircc_cb *self)
 	
 	return 0;
 }
-#endif /* MODULE */
 
 /*
  * Function nsc_ircc_init_108 (iobase, cfg_base, irq, dma)
@@ -2046,7 +2038,6 @@ static int nsc_ircc_pmproc(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("NSC IrDA Device Driver");
 MODULE_LICENSE("GPL");
@@ -2063,14 +2054,6 @@ MODULE_PARM_DESC(dma, "DMA channels");
 MODULE_PARM(dongle_id, "i");
 MODULE_PARM_DESC(dongle_id, "Type-id of used dongle");
 
-int init_module(void)
-{
-	return nsc_ircc_init();
-}
-
-void cleanup_module(void)
-{
-	nsc_ircc_cleanup();
-}
-#endif /* MODULE */
+module_init(nsc_ircc_init);
+module_exit(nsc_ircc_cleanup);
 
