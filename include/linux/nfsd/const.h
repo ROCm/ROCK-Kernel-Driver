@@ -12,6 +12,7 @@
 #include <linux/nfs.h>
 #include <linux/nfs2.h>
 #include <linux/nfs3.h>
+#include <linux/nfs4.h>
 
 /*
  * Maximum protocol version supported by knfsd

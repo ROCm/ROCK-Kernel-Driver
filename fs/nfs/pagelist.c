@@ -14,6 +14,7 @@
 #include <linux/file.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs3.h>
+#include <linux/nfs4.h>
 #include <linux/nfs_page.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_flushd.h>
@@ -506,7 +507,7 @@ nfs_try_to_free_pages(struct nfs_server *server)
 			continue;
 		}
 
-#ifdef CONFIG_NFS_V3
+#if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 		/* Let's try to free up some completed NFSv3 unstable writes */
 		nfs_scan_lru_commit(server, &head);
 		if (!list_empty(&head)) {

@@ -1,6 +1,5 @@
-
-EXTRA_CFLAGS	+= -I$(TOPDIR)/drivers/scsi
-
+# Adaptec aacraid
+ 
 obj-$(CONFIG_SCSI_AACRAID) := aacraid.o
 
 aacraid-objs	:= linit.o aachba.o commctrl.o comminit.o commsup.o \

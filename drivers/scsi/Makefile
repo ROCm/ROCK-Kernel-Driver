@@ -137,7 +137,7 @@ include $(TOPDIR)/Rules.make
 $(obj)/53c7,8xx.o: $(obj)/53c8xx_d.h $(obj)/53c8xx_u.h
 $(obj)/53c7xx.o:   $(obj)/53c7xx_d.h $(obj)/53c7xx_u.h
 $(obj)/sim710.o:   $(obj)/sim710_d.h
-$(obj)/53c700.o $(MODVERDIR)/53c700.ver: $(obj)/53c700_d.h
+$(obj)/53c700.o $(MODVERDIR)/$(obj)/53c700.ver: $(obj)/53c700_d.h
 
 # If you want to play with the firmware, uncomment
 # GENERATE_FIRMWARE := 1

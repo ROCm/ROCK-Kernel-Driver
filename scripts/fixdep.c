@@ -61,7 +61,7 @@
  *
  * It is invoked as
  *
- *   fixdep <depfile> <target> <topdir> <cmdline>
+ *   fixdep <depfile> <target> <cmdline>
  *
  * and will read the dependency file <depfile>
  *
@@ -111,7 +111,6 @@
 #define INT_NFIG ntohl(0x4e464947)
 #define INT_FIG_ ntohl(0x4649475f)
 
-char *topdir;
 char *target;
 char *depfile;
 char *cmdline;
@@ -119,7 +118,7 @@ char *cmdline;
 void usage(void)
 
 {
-	fprintf(stderr, "Usage: fixdep <depfile> <target> <topdir> <cmdline>\n");
+	fprintf(stderr, "Usage: fixdep <depfile> <target> <cmdline>\n");
 	exit(1);
 }
 
@@ -364,13 +363,12 @@ int main(int argc, char *argv[])
 {
 	traps();
 
-	if (argc != 5)
+	if (argc != 4)
 		usage();
 		
 	depfile = argv[1];
 	target = argv[2];
-	topdir = argv[3];
-	cmdline = argv[4];
+	cmdline = argv[3];
 
 	print_cmdline();
 	print_deps();
