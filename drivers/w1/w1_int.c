@@ -96,7 +96,7 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 	err = device_register(&dev->dev);
 	if (err) {
 		printk(KERN_ERR "Failed to register master device. err=%d\n", err);
-		if (dev->nls->sk_socket)
+		if (dev->nls && dev->nls->sk_socket)
 			sock_release(dev->nls->sk_socket);
 		memset(dev, 0, sizeof(struct w1_master));
 		kfree(dev);
