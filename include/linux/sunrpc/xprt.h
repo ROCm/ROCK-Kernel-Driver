@@ -98,6 +98,10 @@ struct rpc_rqst {
 
 	struct list_head	rq_list;
 
+	struct xdr_buf		rq_private_buf;		/* The receive buffer
+							 * used in the softirq.
+							 */
+
 	/*
 	 * For authentication (e.g. auth_des)
 	 */

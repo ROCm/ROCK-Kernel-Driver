@@ -797,6 +797,10 @@ call_decode(struct rpc_task *task)
 		return;
 	}
 
+	/* Check that the softirq receive buffer is valid */
+	WARN_ON(memcmp(&req->rq_rcv_buf, &req->rq_private_buf,
+				sizeof(req->rq_rcv_buf)) != 0);
+
 	/* Verify the RPC header */
 	if (!(p = call_verify(task))) {
 		if (task->tk_action == NULL)

@@ -726,11 +726,11 @@ udp_data_ready(struct sock *sk, int len)
 
 	dprintk("RPC: %4d received reply\n", task->tk_pid);
 
-	if ((copied = rovr->rq_rlen) > repsize)
+	if ((copied = rovr->rq_private_buf.len) > repsize)
 		copied = repsize;
 
 	/* Suck it into the iovec, verify checksum if not done by hw. */
-	if (csum_partial_copy_to_xdr(&rovr->rq_rcv_buf, skb))
+	if (csum_partial_copy_to_xdr(&rovr->rq_private_buf, skb))
 		goto out_unlock;
 
 	/* Something worked... */
@@ -853,7 +853,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 		return;
 	}
 
-	rcvbuf = &req->rq_rcv_buf;
+	rcvbuf = &req->rq_private_buf;
 	len = desc->count;
 	if (len > xprt->tcp_reclen - xprt->tcp_offset) {
 		skb_reader_t my_desc;
@@ -871,7 +871,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 	xprt->tcp_copied += len;
 	xprt->tcp_offset += len;
 
-	if (xprt->tcp_copied == req->rq_rlen)
+	if (xprt->tcp_copied == req->rq_private_buf.len)
 		xprt->tcp_flags &= ~XPRT_COPY_DATA;
 	else if (xprt->tcp_offset == xprt->tcp_reclen) {
 		if (xprt->tcp_flags & XPRT_LAST_FRAG)
@@ -1130,11 +1130,6 @@ xprt_prepare_transmit(struct rpc_task *task)
 		err = -ENOTCONN;
 		goto out_unlock;
 	}
-
-	if (list_empty(&req->rq_list)) {
-		list_add_tail(&req->rq_list, &xprt->recv);
-		req->rq_received = 0;
-	}
 out_unlock:
 	spin_unlock_bh(&xprt->sock_lock);
 	return err;
@@ -1158,6 +1153,20 @@ xprt_transmit(struct rpc_task *task)
 
 		*marker = htonl(0x80000000|(req->rq_slen-sizeof(*marker)));
 	}
+
+	smp_rmb();
+	if (!req->rq_received) {
+		if (list_empty(&req->rq_list)) {
+			spin_lock_bh(&xprt->sock_lock);
+			/* Update the softirq receive buffer */
+			memcpy(&req->rq_private_buf, &req->rq_rcv_buf,
+					sizeof(req->rq_private_buf));
+			/* Add request to the receive list */
+			list_add_tail(&req->rq_list, &xprt->recv);
+			spin_unlock_bh(&xprt->sock_lock);
+		}
+	} else if (!req->rq_bytes_sent)
+		return;
 
 	/* Continue transmitting the packet/record. We must be careful
 	 * to cope with writespace callbacks arriving _after_ we have
