@@ -2888,7 +2888,7 @@ xfs_iflush(
 	enum { INT_DELWRI = (1 << 0), INT_ASYNC = (1 << 1) };
 	SPLDECL(s);
 
-	XFS_STATS_INC(xfsstats.xs_iflush_count);
+	XFS_STATS_INC(xs_iflush_count);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
@@ -3061,8 +3061,8 @@ xfs_iflush(
 	mutex_spinunlock(&ch->ch_lock, s);
 
 	if (clcount) {
-		XFS_STATS_INC(xfsstats.xs_icluster_flushcnt);
-		XFS_STATS_ADD(xfsstats.xs_icluster_flushinode, clcount);
+		XFS_STATS_INC(xs_icluster_flushcnt);
+		XFS_STATS_ADD(xs_icluster_flushinode, clcount);
 	}
 
 	/*

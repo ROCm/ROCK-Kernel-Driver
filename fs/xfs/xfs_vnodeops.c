@@ -891,7 +891,7 @@ xfs_setattr(
 	if (timeflags && !(flags & ATTR_DMI))
 		xfs_ichgtime(ip, timeflags);
 
-	XFS_STATS_INC(xfsstats.xs_ig_attrchg);
+	XFS_STATS_INC(xs_ig_attrchg);
 
 	/*
 	 * If this is a synchronous mount, make sure that the

@@ -564,7 +564,7 @@ xfs_bmap_add_extent(
 	int			logflags; /* returned value */
 	xfs_extnum_t		nextents; /* number of extents in file now */
 
-	XFS_STATS_INC(xfsstats.xs_add_exlist);
+	XFS_STATS_INC(xs_add_exlist);
 	cur = *curp;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
@@ -2836,7 +2836,7 @@ xfs_bmap_del_extent(
 	xfs_filblks_t		temp;	/* for indirect length calculations */
 	xfs_filblks_t		temp2;	/* for indirect length calculations */
 
-	XFS_STATS_INC(xfsstats.xs_del_exlist);
+	XFS_STATS_INC(xs_del_exlist);
 	mp = ip->i_mount;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
@@ -3461,7 +3461,7 @@ xfs_bmap_do_search_extents(
 		low = 0;
 		high = nextents - 1;
 		while (low <= high) {
-			XFS_STATS_INC(xfsstats.xs_cmp_exlist);
+			XFS_STATS_INC(xs_cmp_exlist);
 			lastx = (low + high) >> 1;
 			ep = base + lastx;
 			got.br_startoff = xfs_bmbt_get_startoff(ep);
@@ -3531,7 +3531,7 @@ xfs_bmap_search_extents(
 	xfs_extnum_t    lastx;          /* last extent index used */
 	xfs_extnum_t    nextents;       /* extent list size */
 
-	XFS_STATS_INC(xfsstats.xs_look_exlist);
+	XFS_STATS_INC(xs_look_exlist);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	lastx = ifp->if_lastex;
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
@@ -4629,9 +4629,9 @@ xfs_bmapi(
 	ASSERT(ifp->if_ext_max ==
 	       XFS_IFORK_SIZE(ip, whichfork) / (uint)sizeof(xfs_bmbt_rec_t));
 	if ((wr = (flags & XFS_BMAPI_WRITE)) != 0)
-		XFS_STATS_INC(xfsstats.xs_blk_mapw);
+		XFS_STATS_INC(xs_blk_mapw);
 	else
-		XFS_STATS_INC(xfsstats.xs_blk_mapr);
+		XFS_STATS_INC(xs_blk_mapr);
 	delay = (flags & XFS_BMAPI_DELAY) != 0;
 	trim = (flags & XFS_BMAPI_ENTIRE) == 0;
 	userdata = (flags & XFS_BMAPI_METADATA) == 0;
@@ -5115,7 +5115,7 @@ xfs_bmapi_single(
 	}
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
-	XFS_STATS_INC(xfsstats.xs_blk_mapr);
+	XFS_STATS_INC(xs_blk_mapr);
 	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
 	    (error = xfs_iread_extents(tp, ip, whichfork)))
 		return error;
@@ -5204,7 +5204,7 @@ xfs_bunmapi(
 		*done = 1;
 		return 0;
 	}
-	XFS_STATS_INC(xfsstats.xs_blk_unmap);
+	XFS_STATS_INC(xs_blk_unmap);
 	isrt = (whichfork == XFS_DATA_FORK) &&
 	       (ip->i_d.di_flags & XFS_DIFLAG_REALTIME);
 	start = bno;

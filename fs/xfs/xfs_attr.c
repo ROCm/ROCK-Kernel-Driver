@@ -131,7 +131,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
 		return EFAULT;		/* match IRIX behaviour */
-	XFS_STATS_INC(xfsstats.xs_attr_get);
+	XFS_STATS_INC(xs_attr_get);
 
 	if (XFS_IFORK_Q(ip) == 0)
 		return ENOATTR;
@@ -210,7 +210,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	if (namelen >= MAXNAMELEN)
 		return EFAULT; /* match irix behaviour */
 
-	XFS_STATS_INC(xfsstats.xs_attr_set);
+	XFS_STATS_INC(xs_attr_set);
 	/*
 	 * Do we answer them, or ignore them?
 	 */
@@ -468,7 +468,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	if (namelen>=MAXNAMELEN)
 		return EFAULT; /* match irix behaviour */
 
-	XFS_STATS_INC(xfsstats.xs_attr_remove);
+	XFS_STATS_INC(xs_attr_remove);
 
 	/*
 	 * Do we answer them, or ignore them?
@@ -620,7 +620,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	xfs_inode_t *dp;
 	int error;
 
-	XFS_STATS_INC(xfsstats.xs_attr_list);
+	XFS_STATS_INC(xs_attr_list);
 
 	/*
 	 * Validate the cursor.
