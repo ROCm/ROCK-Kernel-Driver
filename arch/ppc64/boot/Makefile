@@ -97,5 +97,5 @@ $(obj)/imagesize.c: $(obj)/vmlinux.gz
 clean:
 	@rm -f $(OBJS)
 	@rm -f $(addprefix $(obj)/,piggyback note addnote zImage \
-		zImage.initrd vmlinux.gz no_initrd.o imagesize.c addSystemMap
+		zImage.initrd vmlinux.gz no_initrd.o imagesize.c addSystemMap \
 		vmlinux.sm addRamDisk vmlinux.initrd vmlinux.sminitrd)
