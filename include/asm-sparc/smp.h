@@ -148,7 +148,10 @@ extern __inline__ int hard_smp_processor_id(void)
 }
 #endif
 
-#define smp_processor_id() hard_smp_processor_id()
+#define smp_processor_id()	(current_thread_info()->cpu)
+
+#define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
+#define prof_counter(__cpu)		cpu_data(__cpu).counter
 
 #endif /* !(__ASSEMBLY__) */
 
