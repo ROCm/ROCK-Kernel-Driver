@@ -487,9 +487,13 @@ EXPORT_SYMBOL(fail_writepage);
 int filemap_fdatawrite(struct address_space *mapping)
 {
 	int ret;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_ALL,
+		.nr_to_write = mapping->nrpages * 2,
+	};
 
 	current->flags |= PF_SYNC;
-	ret = do_writepages(mapping, NULL);
+	ret = do_writepages(mapping, &wbc);
 	current->flags &= ~PF_SYNC;
 	return ret;
 }

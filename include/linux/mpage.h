@@ -10,14 +10,16 @@
  * nested includes.  Get it right in the .c file).
  */
 
+struct writeback_control;
+
 int mpage_readpages(struct address_space *mapping, struct list_head *pages,
 				unsigned nr_pages, get_block_t get_block);
 int mpage_readpage(struct page *page, get_block_t get_block);
 int mpage_writepages(struct address_space *mapping,
-		int *nr_to_write, get_block_t get_block);
+		struct writeback_control *wbc, get_block_t get_block);
 
 static inline int
-generic_writepages(struct address_space *mapping, int *nr_to_write)
+generic_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
-	return mpage_writepages(mapping, nr_to_write, NULL);
+	return mpage_writepages(mapping, wbc, NULL);
 }

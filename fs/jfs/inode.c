@@ -282,9 +282,10 @@ static int jfs_writepage(struct page *page)
 	return block_write_full_page(page, jfs_get_block);
 }
 
-static int jfs_writepages(struct address_space *mapping, int *nr_to_write)
+static int jfs_writepages(struct address_space *mapping,
+			struct writeback_control *wbc)
 {
-	return mpage_writepages(mapping, nr_to_write, jfs_get_block);
+	return mpage_writepages(mapping, wbc, jfs_get_block);
 }
 
 static int jfs_readpage(struct file *file, struct page *page)

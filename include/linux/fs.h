@@ -279,6 +279,7 @@ struct iattr {
  */
 struct page;
 struct address_space;
+struct writeback_control;
 
 struct address_space_operations {
 	int (*writepage)(struct page *);
@@ -286,10 +287,10 @@ struct address_space_operations {
 	int (*sync_page)(struct page *);
 
 	/* Write back some dirty pages from this mapping. */
-	int (*writepages)(struct address_space *, int *nr_to_write);
+	int (*writepages)(struct address_space *, struct writeback_control *);
 
 	/* Perform a writeback as a memory-freeing operation. */
-	int (*vm_writeback)(struct page *, int *nr_to_write);
+	int (*vm_writeback)(struct page *, struct writeback_control *);
 
 	/* Set a page dirty */
 	int (*set_page_dirty)(struct page *page);
@@ -1261,7 +1262,8 @@ extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t remote_llseek(struct file *file, loff_t offset, int origin);
 extern int generic_file_open(struct inode * inode, struct file * filp);
 
-extern int generic_vm_writeback(struct page *page, int *nr_to_write);
+extern int generic_vm_writeback(struct page *page,
+				struct writeback_control *wbc);
 
 extern struct file_operations generic_ro_fops;
 

@@ -111,8 +111,7 @@ static void write_inode(struct inode *inode, int sync)
 /*
  * Write a single inode's dirty pages and inode data out to disk.
  * If `sync' is set, wait on the writeout.
- * If `nr_to_write' is not NULL, subtract the number of written pages
- * from *nr_to_write.
+ * Subtract the number of written pages from nr_to_write.
  *
  * Normally it is not legal for a single process to lock more than one
  * page at a time, due to ab/ba deadlock problems.  But writepages()
@@ -127,7 +126,9 @@ static void write_inode(struct inode *inode, int sync)
  *
  * Called under inode_lock.
  */
-static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
+static void
+__sync_single_inode(struct inode *inode, int wait,
+			struct writeback_control *wbc)
 {
 	unsigned dirty;
 	unsigned long orig_dirtied_when;
@@ -144,7 +145,7 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 	mapping->dirtied_when = 0;	/* assume it's whole-file writeback */
 	spin_unlock(&inode_lock);
 
-	do_writepages(mapping, nr_to_write);
+	do_writepages(mapping, wbc);
 
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
@@ -181,7 +182,8 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
  * Write out an inode's dirty pages.  Called under inode_lock.
  */
 static void
-__writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
+__writeback_single_inode(struct inode *inode, int sync,
+			struct writeback_control *wbc)
 {
 	if (current_is_pdflush() && (inode->i_state & I_LOCK))
 		return;
@@ -193,7 +195,7 @@ __writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
 		iput(inode);
 		spin_lock(&inode_lock);
 	}
-	__sync_single_inode(inode, sync, nr_to_write);
+	__sync_single_inode(inode, sync, wbc);
 }
 
 /*
@@ -226,8 +228,7 @@ __writeback_single_inode(struct inode *inode, int sync, int *nr_to_write)
  * thrlttled threads: we don't want them all piling up on __wait_on_inode.
  */
 static void
-sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
-	int sync_mode, int *nr_to_write, unsigned long *older_than_this)
+sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 {
 	struct list_head *tmp;
 	struct list_head *head;
@@ -241,7 +242,7 @@ sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
 		struct backing_dev_info *bdi;
 		int really_sync;
 
-		if (single_bdi && mapping->backing_dev_info != single_bdi) {
+		if (wbc->bdi && mapping->backing_dev_info != wbc->bdi) {
 			if (sb != blockdev_superblock)
 				break;		/* inappropriate superblock */
 			list_move(&inode->i_list, &sb->s_dirty);
@@ -252,23 +253,23 @@ sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
 		if (time_after(mapping->dirtied_when, start))
 			break;
 
-		if (older_than_this &&
-			time_after(mapping->dirtied_when, *older_than_this))
+		if (wbc->older_than_this && time_after(mapping->dirtied_when,
+						*wbc->older_than_this))
 			goto out;
 
 		bdi = mapping->backing_dev_info;
 		if (current_is_pdflush() && !writeback_acquire(bdi))
 			break;
 
-		really_sync = (sync_mode == WB_SYNC_ALL);
-		if ((sync_mode == WB_SYNC_LAST) && (head->prev == head))
+		really_sync = (wbc->sync_mode == WB_SYNC_ALL);
+		if ((wbc->sync_mode == WB_SYNC_LAST) && (head->prev == head))
 			really_sync = 1;
 
 		BUG_ON(inode->i_state & I_FREEING);
 		__iget(inode);
 		list_move(&inode->i_list, &sb->s_dirty);
-		__writeback_single_inode(inode, really_sync, nr_to_write);
-		if (sync_mode == WB_SYNC_HOLD) {
+		__writeback_single_inode(inode, really_sync, wbc);
+		if (wbc->sync_mode == WB_SYNC_HOLD) {
 			mapping->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
@@ -277,7 +278,7 @@ sync_sb_inodes(struct backing_dev_info *single_bdi, struct super_block *sb,
 		spin_unlock(&inode_lock);
 		iput(inode);
 		spin_lock(&inode_lock);
-		if (nr_to_write && *nr_to_write <= 0)
+		if (wbc->nr_to_write <= 0)
 			break;
 	}
 out:
@@ -285,37 +286,6 @@ out:
 	 * Leave any unwritten inodes on s_io.
 	 */
 	return;
-}
-
-/*
- * If `bdi' is non-zero then we will scan the first inode against each
- * superblock until we find the matching ones.  One group will be the dirty
- * inodes against a filesystem.  Then when we hit the dummy blockdev superblock,
- * sync_sb_inodes will seekout the blockdev which matches `bdi'.  Maybe not
- * super-efficient but we're about to do a ton of I/O...
- */
-static void
-__writeback_unlocked_inodes(struct backing_dev_info *bdi, int *nr_to_write,
-				enum writeback_sync_modes sync_mode,
-				unsigned long *older_than_this)
-{
-	struct super_block *sb;
-
-	spin_lock(&inode_lock);
-	spin_lock(&sb_lock);
-	sb = sb_entry(super_blocks.prev);
-	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.prev)) {
-		if (!list_empty(&sb->s_dirty) || !list_empty(&sb->s_io)) {
-			spin_unlock(&sb_lock);
-			sync_sb_inodes(bdi, sb, sync_mode, nr_to_write,
-					older_than_this);
-			spin_lock(&sb_lock);
-		}
-		if (nr_to_write && *nr_to_write <= 0)
-			break;
-	}
-	spin_unlock(&sb_lock);
-	spin_unlock(&inode_lock);
 }
 
 /*
@@ -331,28 +301,31 @@ __writeback_unlocked_inodes(struct backing_dev_info *bdi, int *nr_to_write,
  * If `older_than_this' is non-zero then only flush inodes which have a
  * flushtime older than *older_than_this.
  *
- * This is a "memory cleansing" operation, not a "data integrity" operation.
+ * If `bdi' is non-zero then we will scan the first inode against each
+ * superblock until we find the matching ones.  One group will be the dirty
+ * inodes against a filesystem.  Then when we hit the dummy blockdev superblock,
+ * sync_sb_inodes will seekout the blockdev which matches `bdi'.  Maybe not
+ * super-efficient but we're about to do a ton of I/O...
  */
-void writeback_unlocked_inodes(int *nr_to_write,
-				enum writeback_sync_modes sync_mode,
-				unsigned long *older_than_this)
+void
+writeback_inodes(struct writeback_control *wbc)
 {
-	__writeback_unlocked_inodes(NULL, nr_to_write,
-				sync_mode, older_than_this);
-}
-/*
- * Perform writeback of dirty data against a particular queue.
- *
- * This is for writer throttling.  We don't want processes to write back
- * other process's data, espsecially when the other data belongs to a
- * different spindle.
- */
-void writeback_backing_dev(struct backing_dev_info *bdi, int *nr_to_write,
-			enum writeback_sync_modes sync_mode,
-			unsigned long *older_than_this)
-{
-	__writeback_unlocked_inodes(bdi, nr_to_write,
-				sync_mode, older_than_this);
+	struct super_block *sb;
+
+	spin_lock(&inode_lock);
+	spin_lock(&sb_lock);
+	sb = sb_entry(super_blocks.prev);
+	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.prev)) {
+		if (!list_empty(&sb->s_dirty) || !list_empty(&sb->s_io)) {
+			spin_unlock(&sb_lock);
+			sync_sb_inodes(sb, wbc);
+			spin_lock(&sb_lock);
+		}
+		if (wbc->nr_to_write <= 0)
+			break;
+	}
+	spin_unlock(&sb_lock);
+	spin_unlock(&inode_lock);
 }
 
 /*
@@ -366,14 +339,17 @@ void writeback_backing_dev(struct backing_dev_info *bdi, int *nr_to_write,
 void sync_inodes_sb(struct super_block *sb, int wait)
 {
 	struct page_state ps;
-	int nr_to_write;
+	struct writeback_control wbc = {
+		.bdi		= NULL,
+		.sync_mode	= wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
+		.older_than_this = NULL,
+		.nr_to_write	= 0,
+	};
 
 	get_page_state(&ps);
-	nr_to_write = ps.nr_dirty + ps.nr_dirty / 4;
-
+	wbc.nr_to_write = ps.nr_dirty + ps.nr_dirty / 4;
 	spin_lock(&inode_lock);
-	sync_sb_inodes(NULL, sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
-				&nr_to_write, NULL);
+	sync_sb_inodes(sb, &wbc);
 	spin_unlock(&inode_lock);
 }
 
@@ -466,8 +442,12 @@ void sync_inodes(int wait)
  
 void write_inode_now(struct inode *inode, int sync)
 {
+	struct writeback_control wbc = {
+		.nr_to_write = LONG_MAX,
+	};
+
 	spin_lock(&inode_lock);
-	__writeback_single_inode(inode, sync, NULL);
+	__writeback_single_inode(inode, sync, &wbc);
 	spin_unlock(&inode_lock);
 	if (sync)
 		wait_on_inode(inode);
