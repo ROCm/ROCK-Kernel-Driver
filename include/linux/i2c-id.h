@@ -20,7 +20,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* $Id: i2c-id.h,v 1.63 2003/01/21 08:08:16 kmalkki Exp $ */
+/* $Id: i2c-id.h,v 1.68 2003/02/25 02:55:18 mds Exp $ */
 
 #ifndef LINUX_I2C_ID_H
 #define LINUX_I2C_ID_H
@@ -150,6 +150,7 @@
 #define I2C_DRIVERID_BMCSENSORS 1036
 #define I2C_DRIVERID_FS451 1037
 #define I2C_DRIVERID_W83627HF 1038
+#define I2C_DRIVERID_LM85 1039
 
 /*
  * ---- Adapter types ----------------------------------------------------
@@ -171,6 +172,7 @@
 #define I2C_ALGO_MPC824X 0x0a0000	/* Motorola 8240 / 8245         */
 #define I2C_ALGO_IPMI 	0x0b0000	/* IPMI dummy adapter */
 #define I2C_ALGO_IPMB 	0x0c0000	/* IPMB adapter */
+#define I2C_ALGO_MPC107 0x0d0000
 #define I2C_ALGO_EC     0x100000        /* ACPI embedded controller     */
 
 #define I2C_ALGO_MPC8XX 0x110000	/* MPC8xx PowerPC I2C algorithm */
@@ -209,6 +211,8 @@
 #define I2C_HW_B_IOC	0x11	/* IOC bit-wiggling			*/
 #define I2C_HW_B_TSUNA  0x12	/* DEC Tsunami chipset			*/
 #define I2C_HW_B_FRODO  0x13    /* 2d3D, Inc. SA-1110 Development Board */
+#define I2C_HW_B_OMAHA  0x14    /* Omaha I2C interface (ARM)		*/
+#define I2C_HW_B_GUIDE  0x15    /* Guide bit-basher			*/
 
 /* --- PCF 8584 based algorithms					*/
 #define I2C_HW_P_LP	0x00	/* Parallel port interface		*/
@@ -244,6 +248,7 @@
 #define I2C_HW_SMBUS_SIS645	0x09
 #define I2C_HW_SMBUS_AMD8111	0x0a
 #define I2C_HW_SMBUS_SCX200	0x0b
+#define I2C_HW_SMBUS_NFORCE2	0x0c
 
 /* --- ISA pseudo-adapter						*/
 #define I2C_HW_ISA 0x00
@@ -253,5 +258,8 @@
 
 /* --- IPMB adapter						*/
 #define I2C_HW_IPMB 0x00
+
+/* --- MCP107 adapter */
+#define I2C_HW_MPC107 0x00
 
 #endif /* LINUX_I2C_ID_H */
