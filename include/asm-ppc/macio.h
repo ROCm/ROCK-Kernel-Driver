@@ -42,6 +42,9 @@ struct macio_dev
 #define	to_macio_device(d) container_of(d, struct macio_dev, ofdev.dev)
 #define	of_to_macio_device(d) container_of(d, struct macio_dev, ofdev)
 
+extern struct macio_dev *macio_dev_get(struct macio_dev *dev);
+extern void macio_dev_put(struct macio_dev *dev);
+
 /*
  * A driver for a mac-io chip based device
  */
@@ -54,8 +57,8 @@ struct macio_driver
 	int	(*probe)(struct macio_dev* dev, const struct of_match *match);
 	int	(*remove)(struct macio_dev* dev);
 
-	int	(*suspend)(struct macio_dev* dev, u32 state, u32 level);
-	int	(*resume)(struct macio_dev* dev, u32 level);
+	int	(*suspend)(struct macio_dev* dev, u32 state);
+	int	(*resume)(struct macio_dev* dev);
 	int	(*shutdown)(struct macio_dev* dev);
 
 	struct device_driver	driver;
