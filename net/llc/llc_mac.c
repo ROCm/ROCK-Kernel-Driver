@@ -40,36 +40,6 @@ static void llc_station_rcv(struct sk_buff *skb);
 static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
 
 /**
- *	mac_send_pdu - Sends PDU to specific device.
- *	@skb: pdu which must be sent
- *
- *	If module is not initialized then returns failure, else figures out
- *	where to direct this PDU. Sends PDU to specific device, at this point a
- *	device must has been assigned to the PDU; If not, can't transmit the
- *	PDU. PDU sent to MAC layer, is free to re-send at a later time. Returns
- *	0 on success, 1 for failure.
- */
-int mac_send_pdu(struct sk_buff *skb)
-{
-	struct sk_buff *skb2;
-	int pri = GFP_ATOMIC, rc = -1;
-
-	if (!skb->dev) {
-		dprintk("%s: skb->dev == NULL!", __FUNCTION__);
-		goto out;
-	}
-	if (skb->sk)
-		pri = (int)skb->sk->priority;
-	skb2 = skb_clone(skb, pri);
-	if (!skb2)
-		goto out;
-	rc = 0;
-	dev_queue_xmit(skb2);
-out:
-	return rc;
-}
-
-/**
  *	llc_rcv - 802.2 entry point from net lower layers
  *	@skb: received pdu
  *	@dev: device that receive pdu
