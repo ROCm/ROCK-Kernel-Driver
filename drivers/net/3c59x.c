@@ -884,7 +884,7 @@ static struct media_table {
 static int vortex_probe1(struct device *gendev, long ioaddr, int irq,
 				   int chip_idx, int card_idx);
 static void vortex_up(struct net_device *dev);
-static void vortex_down(struct net_device *dev);
+static void vortex_down(struct net_device *dev, int final);
 static int vortex_open(struct net_device *dev);
 static void mdio_sync(long ioaddr, int bits);
 static int mdio_read(struct net_device *dev, int phy_id, int location);
@@ -948,7 +948,7 @@ static int vortex_suspend (struct pci_dev *pdev, u32 state)
 	if (dev && dev->priv) {
 		if (netif_running(dev)) {
 			netif_device_detach(dev);
-			vortex_down(dev);
+			vortex_down(dev, 1);
 		}
 	}
 	return 0;
@@ -2059,7 +2059,8 @@ vortex_error(struct net_device *dev, int status)
 				printk(KERN_ERR "%s: PCI bus error, bus status %8.8x\n", dev->name, bus_status);
 
 			/* In this case, blow the card away */
-			vortex_down(dev);
+			/* Must not enter D3 or we can't legally issue the reset! */
+			vortex_down(dev, 0);
 			issue_and_wait(dev, TotalReset | 0xff);
 			vortex_up(dev);		/* AKPM: bug.  vortex_up() assumes that the rx ring is full. It may not be. */
 		} else if (fifo_diag & 0x0400)
@@ -2656,7 +2657,7 @@ rx_oom_timer(unsigned long arg)
 }
 
 static void
-vortex_down(struct net_device *dev)
+vortex_down(struct net_device *dev, int final_down)
 {
 	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
@@ -2685,7 +2686,7 @@ vortex_down(struct net_device *dev)
 	if (vp->full_bus_master_tx)
 		outl(0, ioaddr + DownListPtr);
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
+	if (final_down && VORTEX_PCI(vp) && vp->enable_wol) {
 		pci_save_state(VORTEX_PCI(vp), vp->power_state);
 		acpi_set_WOL(dev);
 	}
@@ -2699,7 +2700,7 @@ vortex_close(struct net_device *dev)
 	int i;
 
 	if (netif_device_present(dev))
-		vortex_down(dev);
+		vortex_down(dev, 1);
 
 	if (vortex_debug > 1) {
 		printk(KERN_DEBUG"%s: vortex_close() status %4.4x, Tx status %2.2x.\n",
@@ -2869,7 +2870,7 @@ static struct ethtool_ops vortex_ethtool_ops = {
 	.get_drvinfo =		vortex_get_drvinfo,
 };
 
-static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int vortex_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
@@ -2903,6 +2904,30 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	return retval;
 }
+
+/*
+ *	Must power the device up to do MDIO operations
+ */
+static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	int err;
+	struct vortex_private *vp = netdev_priv(dev);
+	int state = 0;
+
+	if(VORTEX_PCI(vp))
+		state = VORTEX_PCI(vp)->current_state;
+
+	/* The kernel core really should have pci_get_power_state() */
+
+	if(state != 0)
+		pci_set_power_state(VORTEX_PCI(vp), 0);
+	err = vortex_do_ioctl(dev, rq, cmd);
+	if(state != 0)
+		pci_set_power_state(VORTEX_PCI(vp), state);
+
+	return err;
+}
+
 
 /* Pre-Cyclone chips have no documented multicast filter, so the only
    multicast setting is to receive all multicast frames.  At least
@@ -3059,14 +3084,14 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 	 * here
 	 */
 	unregister_netdev(dev);
-	/* Should really use issue_and_wait() here */
-	outw(TotalReset|0x14, dev->base_addr + EL3_CMD);
 
 	if (VORTEX_PCI(vp) && vp->enable_wol) {
 		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
 		if (vp->pm_state_valid)
 			pci_restore_state(VORTEX_PCI(vp), vp->power_state);
 	}
+	/* Should really use issue_and_wait() here */
+	outw(TotalReset|0x14, dev->base_addr + EL3_CMD);
 
 	pci_free_consistent(pdev,
 						sizeof(struct boom_rx_desc) * RX_RING_SIZE
