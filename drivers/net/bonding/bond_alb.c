@@ -1228,8 +1228,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 			break;
 		}
 
-		if (ipx_hdr(skb)->ipx_type !=
-		    __constant_htons(IPX_TYPE_NCP)) {
+		if (ipx_hdr(skb)->ipx_type != IPX_TYPE_NCP) {
 			/* The only protocol worth balancing in
 			 * this family since it has an "ARP" like
 			 * mechanism
