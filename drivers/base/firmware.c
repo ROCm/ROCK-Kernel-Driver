@@ -19,12 +19,10 @@ void firmware_unregister(struct subsystem * s)
 	subsystem_unregister(s);
 }
 
-static int __init firmware_init(void)
+int __init firmware_init(void)
 {
 	return subsystem_register(&firmware_subsys);
 }
-
-core_initcall(firmware_init);
 
 EXPORT_SYMBOL(firmware_register);
 EXPORT_SYMBOL(firmware_unregister);

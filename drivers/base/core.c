@@ -309,12 +309,10 @@ void device_unregister(struct device * dev)
 	put_device(dev);
 }
 
-static int __init device_subsys_init(void)
+int __init devices_init(void)
 {
 	return subsystem_register(&devices_subsys);
 }
-
-core_initcall(device_subsys_init);
 
 EXPORT_SYMBOL(device_initialize);
 EXPORT_SYMBOL(device_add);
