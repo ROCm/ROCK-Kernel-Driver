@@ -52,7 +52,7 @@ struct cycx_device {
 	char in_isr;			/* interrupt-in-service flag */
 	char buff_int_mode_unbusy;      /* flag for carrying out dev_tint */
 	wait_queue_head_t wait_stats;  /* to wait for the STATS indication */
-	void *mbox;			/* -> mailbox */
+	void __iomem *mbox;			/* -> mailbox */
 	void (*isr)(struct cycx_device* card);	/* interrupt service routine */
 	int (*exec)(struct cycx_device* card, void* u_cmd, void* u_data);
 	union {
