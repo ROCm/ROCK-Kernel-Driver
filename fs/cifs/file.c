@@ -1216,7 +1216,7 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	}
 }
 
-void
+static void
 construct_dentry(struct qstr *qstring, struct file *file,
 		 struct inode **ptmp_inode, struct dentry **pnew_dentry)
 {
@@ -1252,13 +1252,36 @@ construct_dentry(struct qstr *qstring, struct file *file,
 	*pnew_dentry = tmp_dentry;
 }
 
-void
+static void reset_resume_key(struct file * dir_file, 
+						unsigned char * filename, 
+						unsigned int len) {
+	struct cifsFileInfo *cifsFile;
+
+	cifsFile = (struct cifsFileInfo *)dir_file->private_data;
+	if(cifsFile == NULL)
+		return;
+	if(cifsFile->search_resume_name) {
+		kfree(cifsFile->search_resume_name);
+	}
+
+	cifsFile->resume_name_length = len;
+	cifsFile->search_resume_name = 
+			kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
+	memcpy(cifsFile->search_resume_name, filename, 
+		   cifsFile->resume_name_length);
+	cFYI(1,("Reset resume key to: %s",filename));
+	return;
+}
+
+
+
+static int
 cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	     struct file *file, filldir_t filldir, void *direntry)
 {
 	struct inode *tmp_inode;
 	struct dentry *tmp_dentry;
-	int object_type;
+	int object_type,rc;
 
 	pqstring->name = pfindData->FileName;
 	pqstring->len = pfindData->FileNameLength;
@@ -1266,19 +1289,26 @@ cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 
 	fill_in_inode(tmp_inode, pfindData, &object_type);
-	filldir(direntry, pfindData->FileName, pqstring->len, file->f_pos,
+	rc = filldir(direntry, pfindData->FileName, pqstring->len, file->f_pos,
 		tmp_inode->i_ino, object_type);
+	if(rc) {
+		/* due to readdir error we need to recalculate resume 
+		key so next readdir will restart on right entry */
+		reset_resume_key(file, pfindData->FileName, pqstring->len);
+		cFYI(1,("Error %d on filldir of %s",rc ,pfindData->FileName));
+	}
 	dput(tmp_dentry);
+	return rc;
 }
 
-void
+static int
 cifs_filldir_unix(struct qstr *pqstring,
 		  FILE_UNIX_INFO * pUnixFindData, struct file *file,
 		  filldir_t filldir, void *direntry)
 {
 	struct inode *tmp_inode;
 	struct dentry *tmp_dentry;
-	int object_type;
+	int object_type, rc;
 
 	pqstring->name = pUnixFindData->FileName;
 	pqstring->len = strnlen(pUnixFindData->FileName, MAX_PATHCONF);
@@ -1286,9 +1316,16 @@ cifs_filldir_unix(struct qstr *pqstring,
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 
 	unix_fill_in_inode(tmp_inode, pUnixFindData, &object_type);
-	filldir(direntry, pUnixFindData->FileName, pqstring->len,
+	rc = filldir(direntry, pUnixFindData->FileName, pqstring->len,
 		file->f_pos, tmp_inode->i_ino, object_type);
+	if(rc) {
+		/* due to readdir error we need to recalculate resume 
+			key so next readdir will restart on right entry */
+		reset_resume_key(file, pUnixFindData->FileName,pqstring->len);
+		cFYI(1,("Error %d on filldir of %s",rc ,pUnixFindData->FileName));
+	}
 	dput(tmp_dentry);
+	return rc;
 }
 
 int
@@ -1468,10 +1505,16 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 						    FileName[0] != '.')
 						|| (pfindData->
 						    FileName[1] != '.'))) {
-						cifs_filldir(&qstring,
+						if(cifs_filldir(&qstring,
 							     pfindData,
 							     file, filldir,
-							     direntry);
+							     direntry)) {
+							/* do not end search if
+								kernel not ready to take
+								remaining entries yet */
+							findParms.EndofSearch = 0;
+							break;
+						}
 						file->f_pos++;
 					}
 				} else {	/* UnixSearch */
@@ -1498,11 +1541,17 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 						    FileName[0] != '.')
 						|| (pfindDataUnix->
 						    FileName[1] != '.'))) {
-						cifs_filldir_unix(&qstring,
+						if(cifs_filldir_unix(&qstring,
 								  pfindDataUnix,
 								  file,
 								  filldir,
-								  direntry);
+								  direntry)) {
+							/* do not end search if
+								kernel not ready to take
+								remaining entries yet */
+							findParms.EndofSearch = 0;
+							break;
+						}
 						file->f_pos++;
 					}
 				}
@@ -1570,6 +1619,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 						rc = -ENOMEM;
 						break;
 					}
+					/* Free the memory allocated by previous findfirst 
+					or findnext call - we can not reuse the memory since
+					the resume name may not be same string length */
+					if(cifsFile->search_resume_name)
+						kfree(cifsFile->search_resume_name);
 					cifsFile->search_resume_name = 
 						kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
 					cFYI(1,("Last file: %s with name %d bytes long",
@@ -1600,6 +1654,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 						rc = -ENOMEM;
 						break;
 					}
+					/* Free the memory allocated by previous findfirst 
+					or findnext call - we can not reuse the memory since
+					the resume name may not be same string length */
+					if(cifsFile->search_resume_name)
+						kfree(cifsFile->search_resume_name);
 					cifsFile->search_resume_name = 
 						kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
 					cFYI(1,("fnext last file: %s with name %d bytes long",
@@ -1631,11 +1690,17 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 							|| (pfindData->FileName[0] != '.')
 							|| (pfindData->FileName[1] !=
 							    '.'))) {
-							cifs_filldir
+							if(cifs_filldir
 							    (&qstring,
 							     pfindData,
 							     file, filldir,
-							     direntry);
+							     direntry)) {
+							/* do not end search if
+								kernel not ready to take
+								remaining entries yet */
+								findNextParms.EndofSearch = 0;
+								break;
+							}
 							file->f_pos++;
 						}
 					} else {	/* UnixSearch */
@@ -1665,11 +1730,17 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 							|| (pfindDataUnix->
 							    FileName[1] !=
 							    '.'))) {
-							cifs_filldir_unix
+							if(cifs_filldir_unix
 							    (&qstring,
 							     pfindDataUnix,
 							     file, filldir,
-							     direntry);
+							     direntry)) {
+								/* do not end search if
+								kernel not ready to take
+								remaining entries yet */
+								findNextParms.EndofSearch = 0;
+								break;
+							}
 							file->f_pos++;
 						}
 					}
