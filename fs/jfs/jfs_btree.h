@@ -71,19 +71,16 @@ struct btpage {
 		MP = (struct metapage *)&JFS_IP(IP)->bxflag;\
 		P = (TYPE *)&JFS_IP(IP)->ROOT;\
 		RC = 0;\
-		jEVENT(0,("%d BT_GETPAGE returning root\n", __LINE__));\
 	}\
 	else\
 	{\
-		jEVENT(0,("%d BT_GETPAGE reading block %d\n", __LINE__,\
-			 (int)BN));\
 		MP = read_metapage((IP), BN, SIZE, 1);\
 		if (MP) {\
 			RC = 0;\
 			P = (MP)->data;\
 		} else {\
 			P = NULL;\
-			jERROR(1,("bread failed!\n"));\
+			jfs_err("bread failed!");\
 			RC = EIO;\
 		}\
 	}\
