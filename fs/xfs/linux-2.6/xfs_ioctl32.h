@@ -30,12 +30,5 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <linux/config.h>
-
-#ifdef CONFIG_COMPAT
-extern int xfs_ioctl32_init(void);
-extern void xfs_ioctl32_exit(void);
-#else
-static inline int xfs_ioctl32_init(void) { return 0; }
-static inline void xfs_ioctl32_exit(void) { }
-#endif
+long xfs_compat_ioctl(struct file *f, unsigned cmd, unsigned long arg);
+long xfs_compat_invis_ioctl(struct file *f, unsigned cmd, unsigned long arg);
