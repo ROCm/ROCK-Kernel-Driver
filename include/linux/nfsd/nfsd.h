@@ -90,7 +90,7 @@ int		nfsd_access(struct svc_rqst *, struct svc_fh *, u32 *);
 int		nfsd_create_v3(struct svc_rqst *, struct svc_fh *,
 				char *name, int len, struct iattr *attrs,
 				struct svc_fh *res, int createmode,
-				u32 *verifier);
+				u32 *verifier, int *truncp);
 int		nfsd_commit(struct svc_rqst *, struct svc_fh *,
 				off_t, unsigned long);
 #endif /* CONFIG_NFSD_V3 */
