@@ -429,11 +429,14 @@ enum {
 
 #define TCA_ATM_MAX	TCA_ATM_STATE
 
-/* Delay section */
-struct tc_dly_qopt
+/* Network emulator */
+struct tc_netem_qopt
 {
-	__u32	latency;
-	__u32   limit;
-	__u32	loss;
+	__u32	latency;	/* added delay (us) */
+	__u32   limit;		/* fifo limit (packets) */
+	__u32	loss;		/* random packet loss (0=none ~0=100%) */
+	__u32	gap;		/* re-ordering gap (0 for delay all) */
+	__u32   duplicate;	/* random packet dup  (0=none ~0=100%) */
+	__u32	rate;		/* maximum transmit rate (bytes/sec) */
 };
 #endif

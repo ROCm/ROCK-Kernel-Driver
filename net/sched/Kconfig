@@ -164,12 +164,12 @@ config NET_SCH_DSMARK
 	  To compile this code as a module, choose M here: the
 	  module will be called sch_dsmark.
 
-config NET_SCH_DELAY
-	tristate "Delay simulator"
+config NET_SCH_NETEM
+	tristate "Network emulator"
 	depends on NET_SCHED
 	help
-	  Say Y if you want to delay packets by a fixed amount of
-	  time. This is often useful to simulate network delay when
+	  Say Y if you want to emulate network delay, loss, and packet
+	  re-ordering. This is often useful to simulate networks when
 	  testing applications or protocols.
 
 	  To compile this driver as a module, choose M here: the module
