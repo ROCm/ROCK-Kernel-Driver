@@ -309,8 +309,7 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 static int coda_psdev_release(struct inode * inode, struct file * file)
 {
         struct venus_comm *vcp = (struct venus_comm *) file->private_data;
-        struct upc_req *req;
-	struct list_head *lh, *next;
+        struct upc_req *req, *tmp;
 
 	lock_kernel();
 	if ( !vcp->vc_inuse ) {
@@ -325,8 +324,7 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
 	}
         
         /* Wakeup clients so they can return. */
-	list_for_each_safe(lh, next, &vcp->vc_pending) {
-		req = list_entry(lh, struct upc_req, uc_chain);
+	list_for_each_entry_safe(req, tmp, &vcp->vc_pending, uc_chain) {
 		/* Async requests need to be freed here */
 		if (req->uc_flags & REQ_ASYNC) {
 			CODA_FREE(req->uc_data, sizeof(struct coda_in_hdr));
