@@ -575,8 +575,8 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 	for ( ; i < nsbuf; i++, sbp++) {
 		attrnames_t	*namesp;
 
-		namesp = (sfe->flags & XFS_ATTR_SECURE) ? &attr_secure :
-			((sfe->flags & XFS_ATTR_ROOT) ? &attr_trusted :
+		namesp = (sbp->flags & XFS_ATTR_SECURE) ? &attr_secure :
+			((sbp->flags & XFS_ATTR_ROOT) ? &attr_trusted :
 			  &attr_user);
 
 		if (cursor->hashval != INT_GET(sbp->hash, ARCH_CONVERT)) {
@@ -587,8 +587,7 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 			ASSERT(context->flags & ATTR_KERNAMELS);
 			context->count += namesp->attr_namelen +
 						sbp->namelen + 1;
-		}
-		else {
+		} else {
 			if (xfs_attr_put_listent(context, namesp,
 					sbp->name, sbp->namelen,
 					INT_GET(sbp->valuelen, ARCH_CONVERT)))
