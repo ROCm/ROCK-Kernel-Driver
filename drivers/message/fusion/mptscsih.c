@@ -340,19 +340,18 @@ mptscsih_getFreeChainBuffer(MPT_ADAPTER *ioc, int *retIndex)
 	dsgprintk((MYIOC_s_INFO_FMT "getFreeChainBuffer called\n",
 			ioc->name));
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
-	if (!Q_IS_EMPTY(&ioc->FreeChainQ)) {
-
+	if (!list_empty(&ioc->FreeChainQ)) {
 		int offset;
 
-		chainBuf = ioc->FreeChainQ.head;
-		Q_DEL_ITEM(&chainBuf->u.frame.linkage);
+		chainBuf = list_entry(ioc->FreeChainQ.next, MPT_FRAME_HDR,
+				u.frame.linkage.list);
+		list_del(&chainBuf->u.frame.linkage.list);
 		offset = (u8 *)chainBuf - (u8 *)ioc->ChainBuffer;
 		chain_idx = offset / ioc->req_sz;
 		rc = SUCCESS;
 		dsgprintk((MYIOC_s_INFO_FMT "getFreeChainBuffer (index %d), got buf=%p\n",
 			ioc->name, *retIndex, chainBuf));
-	}
-	else {
+	} else {
 		rc = FAILED;
 		chain_idx = MPT_HOST_NO_CHAIN;
 		dfailprintk((MYIOC_s_ERR_FMT "getFreeChainBuffer failed\n",
@@ -360,9 +359,7 @@ mptscsih_getFreeChainBuffer(MPT_ADAPTER *ioc, int *retIndex)
 	}
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
-
 	*retIndex = chain_idx;
-
 	return rc;
 } /* mptscsih_getFreeChainBuffer() */
 
@@ -1217,12 +1214,6 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dprintk((MYIOC_s_INFO_FMT "ScsiLookup @ %p, sz=%d\n",
 		 ioc->name, hd->ScsiLookup, sz));
-		
-	/* Initialize this Scsi_Host
-	 * internal task Q.
-	 */
-	Q_INIT(&hd->taskQ, MPT_FRAME_HDR);
-	hd->taskQcnt = 0;
 		
 	/* Allocate memory for the device structures.
 	 * A non-Null pointer at an offset
@@ -2102,9 +2093,9 @@ mptscsih_freeChainBuffers(MPT_ADAPTER *ioc, int req_idx)
 
 		chain = (MPT_FRAME_HDR *) (ioc->ChainBuffer
 					+ (chain_idx * ioc->req_sz));
+
 		spin_lock_irqsave(&ioc->FreeQlock, flags);
-		Q_ADD_TAIL(&ioc->FreeChainQ.head,
-					&chain->u.frame.linkage, MPT_FRAME_HDR);
+		list_add_tail(&chain->u.frame.linkage.list, &ioc->FreeChainQ);
 		spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
 		dmfprintk((MYIOC_s_INFO_FMT "FreeChainBuffers (index %d)\n",
@@ -2664,8 +2655,6 @@ mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *m
 		if (hd->tmPtr) {
 			del_timer(&hd->TMtimer);
 		}
-		dtmprintk((MYIOC_s_WARN_FMT "taskQcnt (%d)\n",
-			ioc->name, hd->taskQcnt));
 	} else {
 		dtmprintk((MYIOC_s_WARN_FMT "TaskMgmt Complete: NULL Scsi Host Ptr\n",
 			ioc->name));
@@ -2799,9 +2788,6 @@ mptscsih_slave_alloc(struct scsi_device *device)
 		} else {
 			memset(vdev, 0, sizeof(VirtDevice));
 			rwlock_init(&vdev->VdevLock);
-			Q_INIT(&vdev->WaitQ, void);
-			Q_INIT(&vdev->SentQ, void);
-			Q_INIT(&vdev->DoneQ, void);
 			vdev->tflags = MPT_TARGET_FLAGS_Q_YES;
 			vdev->ioc_id = hd->ioc->id;
 			vdev->target_id = device->id;

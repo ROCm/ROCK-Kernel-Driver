@@ -226,8 +226,7 @@ struct mpt_pci_driver{
 
 typedef union _MPT_FRAME_TRACKER {
 	struct {
-		struct _MPT_FRAME_HDR	*forw;
-		struct _MPT_FRAME_HDR	*back;
+		struct list_head	list;
 		u32			 arg1;
 		u32			 pad;
 		void			*argp1;
@@ -290,15 +289,6 @@ typedef struct _MPT_FRAME_HDR {
 
 #define MPT_REQ_MSGFLAGS_DROPME		0x80
 
-/* Used for tracking the free request frames
- * and free reply frames.
- */
-typedef struct _MPT_Q_TRACKER {
-	MPT_FRAME_HDR	*head;
-	MPT_FRAME_HDR	*tail;
-} MPT_Q_TRACKER;
-
-
 typedef struct _MPT_SGL_HDR {
 	SGESimple32_t	 sge[1];
 } MPT_SGL_HDR;
@@ -307,16 +297,6 @@ typedef struct _MPT_SGL64_HDR {
 	SGESimple64_t	 sge[1];
 } MPT_SGL64_HDR;
 
-
-typedef struct _Q_ITEM {
-	struct _Q_ITEM	*forw;
-	struct _Q_ITEM	*back;
-} Q_ITEM;
-
-typedef struct _Q_TRACKER {
-	struct _Q_ITEM	*head;
-	struct _Q_ITEM	*tail;
-} Q_TRACKER;
 
 /*
  *  Chip-specific stuff... FC929 delineates break between
@@ -401,8 +381,6 @@ typedef struct _ScsiCmndTracker {
  *	(used to be FCSCSI_TARGET)
  */
 typedef struct _VirtDevice {
-	struct _VirtDevice	*forw;
-	struct _VirtDevice	*back;
 	struct scsi_device	*device;
 	rwlock_t		 VdevLock;
 	int			 ref_cnt;
@@ -426,9 +404,6 @@ typedef struct _VirtDevice {
 	struct timer_list	 stall_timer;
 	struct timer_list	 retry_timer;
 	struct timer_list	 gone_timer;
-	ScsiCmndTracker		 WaitQ;
-	ScsiCmndTracker		 SentQ;
-	ScsiCmndTracker		 DoneQ;
 	u32			 num_luns;
 	u32			 luns[8];		/* Max LUNs is 256 */
 	u8			 pad[4];
@@ -575,8 +550,6 @@ typedef	struct _ScsiCfgData {
  */
 typedef struct _MPT_ADAPTER
 {
-	struct _MPT_ADAPTER	*forw;
-	struct _MPT_ADAPTER	*back;
 	int			 id;		/* Unique adapter id N {0,1,2,...} */
 	int			 pci_irq;	/* This irq           */
 	char			 name[MPT_NAME_LENGTH];	/* "iocN"             */
@@ -607,7 +580,7 @@ typedef struct _MPT_ADAPTER
 	int			*ChainToChain;
 	u8			*ChainBuffer;
 	dma_addr_t		 ChainBufferDMA;
-	MPT_Q_TRACKER		 FreeChainQ;
+	struct list_head	 FreeChainQ;
 	spinlock_t		 FreeChainQlock;
 	CHIP_TYPE		 chip_type;
 		/* We (host driver) get to manage our own RequestQueue! */
@@ -617,7 +590,7 @@ typedef struct _MPT_ADAPTER
 	int			 req_depth;	/* Number of request frames */
 	int			 req_sz;	/* Request frame size (bytes) */
 	spinlock_t		 FreeQlock;
-	MPT_Q_TRACKER		 FreeQ;
+	struct list_head	 FreeQ;
 		/* Pool of SCSI sense buffers for commands coming from
 		 * the SCSI mid-layer.  We have one 256 byte sense buffer
 		 * for each REQ entry.
@@ -648,7 +621,7 @@ typedef struct _MPT_ADAPTER
 	struct _mpt_ioctl_events *events;	/* pointer to event log */
 	u8			*cached_fw;	/* Pointer to FW */
 	dma_addr_t	 	cached_fw_dma;
-	Q_TRACKER		 configQ;	/* linked list of config. requests */
+	struct list_head	 configQ;	/* linked list of config. requests */
 	int			 hs_reply_idx;
 #ifndef MFCNT
 	u32			 pad0;
@@ -902,34 +875,6 @@ typedef struct _mpt_sge {
 #define MPT_INDEX_2_RFPTR(ioc,idx) \
 	(MPT_FRAME_HDR*)( (u8*)(ioc)->reply_frames + (ioc)->req_sz * (idx) )
 
-#define Q_INIT(q,type)  (q)->head = (q)->tail = (type*)(q)
-#define Q_IS_EMPTY(q)   ((Q_ITEM*)(q)->head == (Q_ITEM*)(q))
-
-#define Q_ADD_TAIL(qt,i,type) { \
-	Q_TRACKER	*_qt = (Q_TRACKER*)(qt); \
-	Q_ITEM		*oldTail = _qt->tail; \
-	(i)->forw = (type*)_qt; \
-	(i)->back = (type*)oldTail; \
-	oldTail->forw = (Q_ITEM*)(i); \
-	_qt->tail = (Q_ITEM*)(i); \
-}
-
-#define Q_ADD_HEAD(qt,i,type) { \
-	Q_TRACKER	*_qt = (Q_TRACKER*)(qt); \
-	Q_ITEM		*oldHead = _qt->head; \
-	(i)->forw = (type*)oldHead; \
-	(i)->back = (type*)_qt; \
-	oldHead->back = (Q_ITEM*)(i); \
-	_qt->head = (Q_ITEM*)(i); \
-}
-
-#define Q_DEL_ITEM(i) { \
-	Q_ITEM  *_forw = (Q_ITEM*)(i)->forw; \
-	Q_ITEM  *_back = (Q_ITEM*)(i)->back; \
-	_back->forw = _forw; \
-	_forw->back = _back; \
-}
-
 #define SWAB4(value) \
 	(u32)(   (((value) & 0x000000ff) << 24) \
 	       | (((value) & 0x0000ff00) << 8)  \
@@ -1017,8 +962,6 @@ typedef struct _MPT_SCSI_HOST {
 		/* Pool of memory for holding SCpnts before doing
 		 * OS callbacks. freeQ is the free pool.
 		 */
-	MPT_Q_TRACKER		  taskQ;		/* TM request Q */
-	int			  taskQcnt;
 	u8			  tmPending;
 	u8			  resetPending;
 	u8			  is_spi;		/* Parallel SCSI i/f */
@@ -1069,7 +1012,7 @@ typedef struct _DmpServices {
  * Generic structure passed to the base mpt_config function.
  */
 typedef struct _x_config_parms {
-	Q_ITEM			 linkage;	/* linked list */
+	struct list_head	 linkage;	/* linked list */
 	struct timer_list	 timer;		/* timer function for this request  */
 	ConfigPageHeader_t	*hdr;
 	dma_addr_t		 physAddr;

@@ -437,7 +437,7 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 
 			/*  Put Request back on FreeQ!  */
 			spin_lock_irqsave(&ioc->FreeQlock, flags);
-			Q_ADD_TAIL(&ioc->FreeQ, &mf->u.frame.linkage, MPT_FRAME_HDR);
+			list_add_tail(&mf->u.frame.linkage.list, &ioc->FreeQ);
 #ifdef MFCNT
 			ioc->mfcnt--;
 #endif
@@ -533,7 +533,7 @@ mpt_base_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 			del_timer(&pCfg->timer);
 
 			spin_lock_irqsave(&ioc->FreeQlock, flags);
-			Q_DEL_ITEM(&pCfg->linkage);
+			list_del(&pCfg->linkage);
 			spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
 			/*
@@ -819,11 +819,12 @@ mpt_get_msg_frame(int handle, MPT_ADAPTER *ioc)
 		return NULL;
 
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
-	if (! Q_IS_EMPTY(&ioc->FreeQ)) {
+	if (!list_empty(&ioc->FreeQ)) {
 		int req_offset;
 
-		mf = ioc->FreeQ.head;
-		Q_DEL_ITEM(&mf->u.frame.linkage);
+		mf = list_entry(ioc->FreeQ.next, MPT_FRAME_HDR,
+				u.frame.linkage.list);
+		list_del(&mf->u.frame.linkage.list);
 		mf->u.frame.hwhdr.msgctxu.fld.cb_idx = handle;	/* byte */
 		req_offset = (u8 *)mf - (u8 *)ioc->req_frames;
 								/* u16! */
@@ -919,7 +920,7 @@ mpt_free_msg_frame(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf)
 
 	/*  Put Request back on FreeQ!  */
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
-	Q_ADD_TAIL(&ioc->FreeQ, &mf->u.frame.linkage, MPT_FRAME_HDR);
+	list_add_tail(&mf->u.frame.linkage.list, &ioc->FreeQ);
 #ifdef MFCNT
 	ioc->mfcnt--;
 #endif
@@ -1198,7 +1199,7 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Initialize the running configQ head.
 	 */
-	Q_INIT(&ioc->configQ, Q_ITEM);
+	INIT_LIST_HEAD(&ioc->configQ);
 
 	/* Find lookup slot. */
 	INIT_LIST_HEAD(&ioc->list);
@@ -3592,14 +3593,14 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 		/* Initialize the free chain Q.
 	 	*/
 
-		Q_INIT(&ioc->FreeChainQ, MPT_FRAME_HDR);
+		INIT_LIST_HEAD(&ioc->FreeChainQ);
 
 		/* Post the chain buffers to the FreeChainQ.
 	 	*/
 		mem = (u8 *)ioc->ChainBuffer;
 		for (i=0; i < num_chain; i++) {
 			mf = (MPT_FRAME_HDR *) mem;
-			Q_ADD_TAIL(&ioc->FreeChainQ.head, &mf->u.frame.linkage, MPT_FRAME_HDR);
+			list_add_tail(&mf->u.frame.linkage.list, &ioc->FreeChainQ);
 			mem += ioc->req_sz;
 		}
 
@@ -3609,12 +3610,13 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 		mem = (u8 *) ioc->req_frames;
 
 		spin_lock_irqsave(&ioc->FreeQlock, flags);
-		Q_INIT(&ioc->FreeQ, MPT_FRAME_HDR);
+		INIT_LIST_HEAD(&ioc->FreeQ);
 		for (i = 0; i < ioc->req_depth; i++) {
 			mf = (MPT_FRAME_HDR *) mem;
 
 			/*  Queue REQUESTs *internally*!  */
-			Q_ADD_TAIL(&ioc->FreeQ.head, &mf->u.frame.linkage, MPT_FRAME_HDR);
+			list_add_tail(&mf->u.frame.linkage.list, &ioc->FreeQ);
+
 			mem += ioc->req_sz;
 		}
 		spin_unlock_irqrestore(&ioc->FreeQlock, flags);
@@ -4903,7 +4905,7 @@ mpt_config(MPT_ADAPTER *ioc, CONFIGPARMS *pCfg)
 
 	/* Add to end of Q, set timer and then issue this command */
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
-	Q_ADD_TAIL(&ioc->configQ.head, &pCfg->linkage, Q_ITEM);
+	list_add_tail(&pCfg->linkage, &ioc->configQ);
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
 	add_timer(&pCfg->timer);
@@ -5014,7 +5016,7 @@ mpt_toolbox(MPT_ADAPTER *ioc, CONFIGPARMS *pCfg)
 
 	/* Add to end of Q, set timer and then issue this command */
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
-	Q_ADD_TAIL(&ioc->configQ.head, &pCfg->linkage, Q_ITEM);
+	list_add_tail(&pCfg->linkage, &ioc->configQ);
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
 	add_timer(&pCfg->timer);
@@ -5081,13 +5083,8 @@ mpt_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		 * the FIFO's are primed.
 		 */
 		spin_lock_irqsave(&ioc->FreeQlock, flags);
-		if (! Q_IS_EMPTY(&ioc->configQ)){
-			pCfg = (CONFIGPARMS *)ioc->configQ.head;
-			do {
-				del_timer(&pCfg->timer);
-				pCfg = (CONFIGPARMS *) (pCfg->linkage.forw);
-			} while (pCfg != (CONFIGPARMS *)&ioc->configQ);
-		}
+		list_for_each_entry(pCfg, &ioc->configQ, linkage)
+			del_timer(&pCfg->timer);
 		spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
 	} else {
@@ -5097,19 +5094,12 @@ mpt_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		 * Flush the Q, and wake up all suspended threads.
 		 */
 		spin_lock_irqsave(&ioc->FreeQlock, flags);
-		if (! Q_IS_EMPTY(&ioc->configQ)){
-			pCfg = (CONFIGPARMS *)ioc->configQ.head;
-			do {
-				pNext = (CONFIGPARMS *) pCfg->linkage.forw;
+		list_for_each_entry_safe(pCfg, pNext, &ioc->configQ, linkage) {
+			list_del(&pCfg->linkage);
 
-				Q_DEL_ITEM(&pCfg->linkage);
-
-				pCfg->status = MPT_CONFIG_ERROR;
-				pCfg->wait_done = 1;
-				wake_up(&mpt_waitq);
-
-				pCfg = pNext;
-			} while (pCfg != (CONFIGPARMS *)&ioc->configQ);
+			pCfg->status = MPT_CONFIG_ERROR;
+			pCfg->wait_done = 1;
+			wake_up(&mpt_waitq);
 		}
 		spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 	}
