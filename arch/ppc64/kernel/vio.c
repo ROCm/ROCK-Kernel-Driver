@@ -504,8 +504,8 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
  	/* Client asked for way to much space.  This is checked later anyway */
 	/* It is easier to debug here for the drivers than in the tce tables.*/
  	if(order >= IOMAP_MAX_ORDER) {
- 		printk("VIO_DMA: vio_alloc_consistent size to large: 0x%lx \n", size);
- 		return (void *)DMA_ERROR_CODE;
+ 		printk("VIO_DMA: vio_alloc_consistent size too large: 0x%lx \n", size);
+ 		return NULL;
  	}
 
 	tbl = dev->iommu_table;
