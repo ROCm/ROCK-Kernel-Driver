@@ -484,7 +484,7 @@ static int udp_getfrag(const void *p, char * to, unsigned int offset, unsigned i
 		if (skb->ip_summed == CHECKSUM_HW) {
 			skb->csum = offsetof(struct udphdr, check);
 			ufh->uh.check = ~csum_tcpudp_magic(ufh->saddr, ufh->daddr, 
-					  ntohs(ufh->uh.len), IPPROTO_UDP, ufh->wcheck);
+					  ntohs(ufh->uh.len), IPPROTO_UDP, 0);
 			memcpy(to, ufh, sizeof(struct udphdr));
 			return memcpy_fromiovecend(to+sizeof(struct udphdr), ufh->iov, offset,
 					   fraglen-sizeof(struct udphdr));
@@ -730,7 +730,9 @@ do_confirm:
 
 do_append_data:
 	up->len += ulen;
-	err = ip_append_data(sk, generic_getfrag, msg->msg_iov, ulen, sizeof(struct udphdr), &ipc, rt, msg->msg_flags);
+	err = ip_append_data(sk, ip_generic_getfrag, msg->msg_iov, ulen, 
+			sizeof(struct udphdr), &ipc, rt, 
+			corkreq ? msg->msg_flags|MSG_MORE : msg->msg_flags);
 	if (err)
 		udp_flush_pending_frames(sk);
 	else if (!corkreq)
@@ -1122,15 +1124,15 @@ int udp_rcv(struct sk_buff *skb)
 	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
 		goto no_header;
 
-	ulen = ntohs(skb->h.uh->len);
+	uh = skb->h.uh;
+
+	ulen = ntohs(uh->len);
 
 	if (ulen > len || ulen < sizeof(*uh))
 		goto short_packet;
 
 	if (pskb_trim(skb, ulen))
 		goto short_packet;
-
-  	uh = skb->h.uh;
 
 	if (udp_checksum_init(skb, uh, ulen, saddr, daddr) < 0)
 		goto csum_error;
@@ -1161,7 +1163,14 @@ int udp_rcv(struct sk_buff *skb)
 	return(0);
 
 short_packet:
-	NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "UDP: short packet: %d/%d\n", ulen, len));
+	NETDEBUG(if (net_ratelimit())
+		printk(KERN_DEBUG "UDP: short packet: From %u.%u.%u.%u:%u %d/%d to %u.%u.%u.%u:%u\n",
+			NIPQUAD(saddr),
+			ntohs(uh->source),
+			ulen,
+			len,
+			NIPQUAD(daddr),
+			ntohs(uh->dest)));
 no_header:
 	UDP_INC_STATS_BH(UdpInErrors);
 	kfree_skb(skb);
