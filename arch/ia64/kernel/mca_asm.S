@@ -203,9 +203,9 @@ begin_tlb_purge_and_reload:
 	srlz.d
 	;;
 	// 3. Purge ITR for PAL code.
-	adds r17=40,r23
+	GET_THIS_PADDR(r2, ia64_mca_pal_base)
 	;;
-	ld8 r16=[r17]
+	ld8 r16=[r2]
 	mov r18=IA64_GRANULE_SHIFT<<2
 	;;
 	ptr.i r16,r18
