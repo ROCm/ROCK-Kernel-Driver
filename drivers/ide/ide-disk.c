@@ -1445,22 +1445,23 @@ static int set_using_tcq(ide_drive_t *drive, int arg)
 }
 #endif
 
-static int probe_lba_addressing (ide_drive_t *drive, int arg)
+/*
+ * drive->addressing:
+ *	0: 28-bit
+ *	1: 48-bit
+ *	2: 48-bit capable doing 28-bit
+ */
+static int set_lba_addressing(ide_drive_t *drive, int arg)
 {
 	drive->addressing =  0;
 
-	if (HWIF(drive)->addressing)
+	if (HWIF(drive)->no_lba48)
 		return 0;
 
 	if (!idedisk_supports_lba48(drive->id))
                 return -EIO;
 	drive->addressing = arg;
 	return 0;
-}
-
-static int set_lba_addressing (ide_drive_t *drive, int arg)
-{
-	return probe_lba_addressing(drive, arg);
 }
 
 static void idedisk_add_settings(ide_drive_t *drive)
@@ -1578,7 +1579,7 @@ static void idedisk_setup (ide_drive_t *drive)
 		}
 	}
 
-	(void) probe_lba_addressing(drive, 1);
+	(void)set_lba_addressing(drive, 1);
 
 	if (drive->addressing == 1) {
 		ide_hwif_t *hwif = HWIF(drive);
@@ -1616,6 +1617,15 @@ static void idedisk_setup (ide_drive_t *drive)
 
 	/* calculate drive capacity, and select LBA if possible */
 	init_idedisk_capacity (drive);
+
+	/* limit drive capacity to 137GB if LBA48 cannot be used */
+	if (drive->addressing == 0 && drive->capacity64 > 1ULL << 28) {
+		printk("%s: cannot use LBA48 - full capacity "
+		       "%llu sectors (%llu MB)\n",
+		       drive->name,
+		       drive->capacity64, sectors_to_MB(drive->capacity64));
+		drive->capacity64 = 1ULL << 28;
+	}
 
 	/*
 	 * if possible, give fdisk access to more of the drive,

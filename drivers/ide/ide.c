@@ -904,7 +904,7 @@ void ide_unregister (unsigned int index)
 
 	hwif->mmio			= old_hwif.mmio;
 	hwif->rqsize			= old_hwif.rqsize;
-	hwif->addressing		= old_hwif.addressing;
+	hwif->no_lba48			= old_hwif.no_lba48;
 #ifndef CONFIG_BLK_DEV_IDECS
 	hwif->irq			= old_hwif.irq;
 #endif /* CONFIG_BLK_DEV_IDECS */

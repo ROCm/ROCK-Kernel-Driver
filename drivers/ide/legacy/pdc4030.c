@@ -227,7 +227,7 @@ int __init setup_pdc4030(ide_hwif_t *hwif)
 	hwif2->mate	= hwif;
 	hwif2->channel	= 1;
 	hwif->rqsize	= hwif2->rqsize = 127;
-	hwif->addressing = hwif2->addressing = 1;
+	hwif->no_lba48 = hwif2->no_lba48 = 1;
 	hwif->selectproc = hwif2->selectproc = &promise_selectproc;
 	hwif->serialized = hwif2->serialized = 1;
 	/* DC4030 hosted drives need their own identify... */

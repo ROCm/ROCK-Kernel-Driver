@@ -1007,7 +1007,6 @@ typedef struct hwif_s {
 
 	int		mmio;		/* hosts iomio (0), mmio (1) or custom (2) select */
 	int		rqsize;		/* max sectors per request */
-	int		addressing;	/* hosts addressing */
 	int		irq;		/* our irq number */
 	int		initializing;	/* set while initializing self */
 
@@ -1036,6 +1035,7 @@ typedef struct hwif_s {
 	unsigned	reset      : 1;	/* reset after probe */
 	unsigned	autodma    : 1;	/* auto-attempt using DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
+	unsigned	no_lba48   : 1; /* 1 = cannot do LBA48 */
 	unsigned	no_dsc     : 1;	/* 0 default, 1 dsc_overlap disabled */
 	unsigned	auto_poll  : 1; /* supports nop auto-poll */
 
