@@ -361,65 +361,42 @@ static int usb_stor_control_thread(void * __us)
 
 		BUG_ON(action != US_ACT_COMMAND);
 
+		/* lock the device pointers */
+		down(&(us->dev_semaphore));
+
 		/* reject the command if the direction indicator 
 		 * is UNKNOWN
 		 */
 		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
 			US_DEBUGP("UNKNOWN data direction\n");
 			us->srb->result = DID_ERROR << 16;
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
 		/* reject if target != 0 or if LUN is higher than
 		 * the maximum known LUN
 		 */
-		if (us->srb->target && 
+		else if (us->srb->target && 
 				!(us->flags & US_FL_SCM_MULT_TARG)) {
 			US_DEBUGP("Bad target number (%d/%d)\n",
 				  us->srb->target, us->srb->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
-
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
-		if (us->srb->lun > us->max_lun) {
+		else if (us->srb->lun > us->max_lun) {
 			US_DEBUGP("Bad LUN (%d/%d)\n",
 				  us->srb->target, us->srb->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
-
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
 		/* handle those devices which can't do a START_STOP */
-		if ((us->srb->cmnd[0] == START_STOP) &&
+		else if ((us->srb->cmnd[0] == START_STOP) &&
 		    (us->flags & US_FL_START_STOP)) {
 			US_DEBUGP("Skipping START_STOP command\n");
 			us->srb->result = GOOD << 1;
-
-			scsi_lock(host);
-			us->srb->scsi_done(us->srb);
-			us->srb = NULL;
-			scsi_unlock(host);
-			continue;
 		}
 
-		/* lock the device pointers */
-		down(&(us->dev_semaphore));
-
 		/* our device has gone - pretend not ready */
-		if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
+		else if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
 			US_DEBUGP("Request is for removed device\n");
 			/* For REQUEST_SENSE, it's the data.  But
 			 * for anything else, it should look like
@@ -443,24 +420,25 @@ static int usb_stor_control_thread(void * __us)
 				       sizeof(usb_stor_sense_notready));
 				us->srb->result = CHECK_CONDITION << 1;
 			}
-		} else { /* test_bit(DEV_ATTACHED, &us->bitflags) */
+		}  /* test_bit(DEV_ATTACHED, &us->bitflags) */
 
-			/* Handle those devices which need us to fake 
-			 * their inquiry data */
-			if ((us->srb->cmnd[0] == INQUIRY) &&
+		/* Handle those devices which need us to fake 
+		 * their inquiry data */
+		else if ((us->srb->cmnd[0] == INQUIRY) &&
 			    (us->flags & US_FL_FIX_INQUIRY)) {
-				unsigned char data_ptr[36] = {
-				    0x00, 0x80, 0x02, 0x02,
-				    0x1F, 0x00, 0x00, 0x00};
+			unsigned char data_ptr[36] = {
+			    0x00, 0x80, 0x02, 0x02,
+			    0x1F, 0x00, 0x00, 0x00};
 
-				US_DEBUGP("Faking INQUIRY command\n");
-				fill_inquiry_response(us, data_ptr, 36);
-				us->srb->result = GOOD << 1;
-			} else {
-				/* we've got a command, let's do it! */
-				US_DEBUG(usb_stor_show_command(us->srb));
-				us->proto_handler(us->srb, us);
-			}
+			US_DEBUGP("Faking INQUIRY command\n");
+			fill_inquiry_response(us, data_ptr, 36);
+			us->srb->result = GOOD << 1;
+		}
+
+		/* we've got a command, let's do it! */
+		else {
+			US_DEBUG(usb_stor_show_command(us->srb));
+			us->proto_handler(us->srb, us);
 		}
 
 		/* unlock the device pointers */
@@ -487,54 +465,114 @@ static int usb_stor_control_thread(void * __us)
 	return 0;
 }	
 
-/* Set up the IRQ pipe and handler
+/* Set up the URB, the usb_ctrlrequest, and the IRQ pipe and handler.
+ * ss->dev_semaphore should already be locked.
  * Note that this function assumes that all the data in the us_data
  * strucuture is current.  This includes the ep_int field, which gives us
  * the endpoint for the interrupt.
  * Returns non-zero on failure, zero on success
  */ 
-static int usb_stor_allocate_irq(struct us_data *ss)
+static int usb_stor_allocate_urbs(struct us_data *ss)
 {
 	unsigned int pipe;
 	int maxp;
 	int result;
 
-	US_DEBUGP("Allocating IRQ for CBI transport\n");
-
-	/* lock access to the data structure */
-	down(&(ss->irq_urb_sem));
-
-	/* allocate the URB */
-	ss->irq_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!ss->irq_urb) {
-		up(&(ss->irq_urb_sem));
-		US_DEBUGP("couldn't allocate interrupt URB");
+	/* allocate the URB we're going to use */
+	US_DEBUGP("Allocating URB\n");
+	ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!ss->current_urb) {
+		US_DEBUGP("allocation failed\n");
 		return 1;
 	}
 
-	/* calculate the pipe and max packet size */
-	pipe = usb_rcvintpipe(ss->pusb_dev, ss->ep_int->bEndpointAddress & 
-			      USB_ENDPOINT_NUMBER_MASK);
-	maxp = usb_maxpacket(ss->pusb_dev, pipe, usb_pipeout(pipe));
-	if (maxp > sizeof(ss->irqbuf))
-		maxp = sizeof(ss->irqbuf);
-
-	/* fill in the URB with our data */
-	FILL_INT_URB(ss->irq_urb, ss->pusb_dev, pipe, ss->irqbuf, maxp, 
-		     usb_stor_CBI_irq, ss, ss->ep_int->bInterval); 
-
-	/* submit the URB for processing */
-	result = usb_submit_urb(ss->irq_urb, GFP_KERNEL);
-	US_DEBUGP("usb_submit_urb() returns %d\n", result);
-	if (result) {
-		usb_free_urb(ss->irq_urb);
-		up(&(ss->irq_urb_sem));
+	/* allocate the usb_ctrlrequest for control packets */
+	US_DEBUGP("Allocating usb_ctrlrequest\n");
+	ss->dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
+	if (!ss->dr) {
+		US_DEBUGP("allocation failed\n");
 		return 2;
 	}
 
-	/* unlock the data structure and return success */
+	/* allocate the IRQ URB, if it is needed */
+	if (ss->protocol == US_PR_CBI) {
+		US_DEBUGP("Allocating IRQ for CBI transport\n");
+
+		/* lock access to the data structure */
+		down(&(ss->irq_urb_sem));
+
+		/* allocate the URB */
+		ss->irq_urb = usb_alloc_urb(0, GFP_KERNEL);
+		if (!ss->irq_urb) {
+			up(&(ss->irq_urb_sem));
+			US_DEBUGP("couldn't allocate interrupt URB");
+			return 3;
+		}
+
+		/* calculate the pipe and max packet size */
+		pipe = usb_rcvintpipe(ss->pusb_dev,
+		    ss->ep_int->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
+		maxp = usb_maxpacket(ss->pusb_dev, pipe, usb_pipeout(pipe));
+		if (maxp > sizeof(ss->irqbuf))
+			maxp = sizeof(ss->irqbuf);
+
+		/* fill in the URB with our data */
+		FILL_INT_URB(ss->irq_urb, ss->pusb_dev, pipe, ss->irqbuf,
+			maxp, usb_stor_CBI_irq, ss, ss->ep_int->bInterval); 
+
+		/* submit the URB for processing */
+		result = usb_submit_urb(ss->irq_urb, GFP_KERNEL);
+		US_DEBUGP("usb_submit_urb() returns %d\n", result);
+		if (result) {
+			up(&(ss->irq_urb_sem));
+			return 4;
+		}
+
+		/* unlock the data structure */
+		up(&(ss->irq_urb_sem));
+
+	} /* ss->protocol == US_PR_CBI */
+
+	return 0;	/* success */
+}
+
+/* Deallocate the URB, the usb_ctrlrequest, and the IRQ pipe.
+ * ss->dev_semaphore must already be locked.
+ */
+static void usb_stor_deallocate_urbs(struct us_data *ss)
+{
+	int result;
+
+	/* release the IRQ, if we have one */
+	down(&(ss->irq_urb_sem));
+	if (ss->irq_urb) {
+		US_DEBUGP("-- releasing irq URB\n");
+		result = usb_unlink_urb(ss->irq_urb);
+		US_DEBUGP("-- usb_unlink_urb() returned %d\n", result);
+		usb_free_urb(ss->irq_urb);
+		ss->irq_urb = NULL;
+	}
 	up(&(ss->irq_urb_sem));
-	return 0;
+
+	/* free the usb_ctrlrequest buffer */
+	if (ss->dr) {
+		kfree(ss->dr);
+		ss->dr = NULL;
+	}
+
+	/* free up the main URB for this device */
+	if (ss->current_urb) {
+		US_DEBUGP("-- releasing main URB\n");
+		result = usb_unlink_urb(ss->current_urb);
+		US_DEBUGP("-- usb_unlink_urb() returned %d\n", result);
+		usb_free_urb(ss->current_urb);
+		ss->current_urb = NULL;
+	}
+
+	/* mark the device as gone */
+	clear_bit(DEV_ATTACHED, &ss->bitflags);
+	usb_put_dev(ss->pusb_dev);
+	ss->pusb_dev = NULL;
 }
 
 /* Probe to see if a new device is actually a SCSI device */
@@ -712,13 +750,8 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			USB_ENDPOINT_NUMBER_MASK;
 		ss->ep_int = ep_int;
 
-		/* allocate an IRQ callback if one is needed */
-		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss))
-			goto BadDevice;
-
-		/* allocate the URB we're going to use */
-		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!ss->current_urb)
+		/* allocate the URB, the usb_ctrlrequest, and the IRQ URB */
+		if (usb_stor_allocate_urbs(ss))
 			goto BadDevice;
 
                 /* Re-Initialize the device if it needs it */
@@ -740,11 +773,6 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		}
 		memset(ss, 0, sizeof(struct us_data));
 		new_device = 1;
-
-		/* allocate the URB we're going to use */
-		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!ss->current_urb)
-			goto BadDevice;
 
 		/* Initialize the mutexes only when the struct is new */
 		init_completion(&(ss->notify));
@@ -943,8 +971,8 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		}
 		US_DEBUGP("Protocol: %s\n", ss->protocol_name);
 
-		/* allocate an IRQ callback if one is needed */
-		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss))
+		/* allocate the URB, the usb_ctrlrequest, and the IRQ URB */
+		if (usb_stor_allocate_urbs(ss))
 			goto BadDevice;
 
 		/*
@@ -1020,26 +1048,11 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	/* we come here if there are any problems */
 	BadDevice:
 	US_DEBUGP("storage_probe() failed\n");
-	down(&ss->irq_urb_sem);
-	if (ss->irq_urb) {
-		usb_unlink_urb(ss->irq_urb);
-		usb_free_urb(ss->irq_urb);
-		ss->irq_urb = NULL;
-	}
-	up(&ss->irq_urb_sem);
-	if (ss->current_urb) {
-		usb_unlink_urb(ss->current_urb);
-		usb_free_urb(ss->current_urb);
-		ss->current_urb = NULL;
-	}
-
-	clear_bit(DEV_ATTACHED, &ss->bitflags);
-	ss->pusb_dev = NULL;
+	usb_stor_deallocate_urbs(ss);
 	if (new_device)
 		kfree(ss);
 	else
 		up(&ss->dev_semaphore);
-	usb_put_dev(dev);
 	return NULL;
 }
 
@@ -1047,7 +1060,6 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 static void storage_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct us_data *ss = ptr;
-	int result;
 
 	US_DEBUGP("storage_disconnect() called\n");
 
@@ -1057,33 +1069,8 @@ static void storage_disconnect(struct usb_device *dev, void *ptr)
 		return;
 	}
 
-	/* lock access to the device data structure */
 	down(&(ss->dev_semaphore));
-
-	/* release the IRQ, if we have one */
-	down(&(ss->irq_urb_sem));
-	if (ss->irq_urb) {
-		US_DEBUGP("-- releasing irq URB\n");
-		result = usb_unlink_urb(ss->irq_urb);
-		US_DEBUGP("-- usb_unlink_urb() returned %d\n", result);
-		usb_free_urb(ss->irq_urb);
-		ss->irq_urb = NULL;
-	}
-	up(&(ss->irq_urb_sem));
-
-	/* free up the main URB for this device */
-	US_DEBUGP("-- releasing main URB\n");
-	result = usb_unlink_urb(ss->current_urb);
-	US_DEBUGP("-- usb_unlink_urb() returned %d\n", result);
-	usb_free_urb(ss->current_urb);
-	ss->current_urb = NULL;
-
-	/* mark the device as gone */
-	usb_put_dev(ss->pusb_dev);
-	ss->pusb_dev = NULL;
-	clear_bit(DEV_ATTACHED, &ss->bitflags);
-
-	/* unlock access to the device data structure */
+	usb_stor_deallocate_urbs(ss);
 	up(&(ss->dev_semaphore));
 }
 

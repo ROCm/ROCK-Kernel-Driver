@@ -185,6 +185,7 @@ struct us_data {
 	/* control and bulk communications data */
 	struct semaphore	current_urb_sem; /* to protect irq_urb	 */
 	struct urb		*current_urb;	 /* non-int USB requests */
+	struct usb_ctrlrequest	*dr;		 /* control requests	 */
 
 	/* the semaphore for sleeping the control thread */
 	struct semaphore	sema;		 /* to sleep thread on   */
