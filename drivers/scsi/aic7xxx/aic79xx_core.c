@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#186 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#189 $
  *
  * $FreeBSD$
  */
@@ -556,6 +556,26 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 		       ahd_name(ahd), seqintcode);
 #endif
 	switch (seqintcode) {
+	case BAD_SCB_STATUS:
+	{
+		struct	scb *scb;
+		u_int	scbid;
+		int	cmds_pending;
+
+		scbid = ahd_get_scbptr(ahd);
+		scb = ahd_lookup_scb(ahd, scbid);
+		if (scb != NULL) {
+			ahd_complete_scb(ahd, scb);
+		} else {
+			printf("%s: WARNING no command for scb %d "
+			       "(bad status)\n", ahd_name(ahd), scbid);
+			ahd_dump_card_state(ahd);
+		}
+		cmds_pending = ahd_inw(ahd, CMDS_PENDING);
+		if (cmds_pending > 0)
+			ahd_outw(ahd, CMDS_PENDING, cmds_pending - 1);
+		break;
+	}
 	case ENTERING_NONPACK:
 	{
 		struct	scb *scb;
@@ -7742,7 +7762,6 @@ ahd_handle_scsi_status(struct ahd_softc *ahd, struct scb *scb)
 {
 	struct hardware_scb *hscb;
 	u_int  qfreeze_cnt;
-	u_int  maxloops;
 
 	/*
 	 * The sequencer freezes its select-out queue
@@ -7751,25 +7770,6 @@ ahd_handle_scsi_status(struct ahd_softc *ahd, struct scb *scb)
 	 * to allow the sequencer to continue.
 	 */
 	hscb = scb->hscb; 
-
-	/*
-	 * Wait until any pending selections have been processed.
-	 */
-	maxloops = 1000;
-	do {
-		ahd_pause(ahd);
-		ahd_clear_critical_section(ahd);
-		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
-		if (((ahd_inb(ahd, SCSISEQ0) & ENSELO) == 0
-		  && (ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) == 0)
-		 || (ahd_inb(ahd, SSTAT1) & SELTO) != 0)
-			break;
-		ahd_unpause(ahd);
-		ahd_delay(200);
-	} while (--maxloops);
-
-	if (maxloops == 0)
-		ahd_pause(ahd);
 
 	/* Freeze the queue until the client sees the error. */
 	ahd_freeze_devq(ahd, scb);
@@ -7784,7 +7784,7 @@ ahd_handle_scsi_status(struct ahd_softc *ahd, struct scb *scb)
 	if (qfreeze_cnt == 0)
 		ahd_outb(ahd, SEQ_FLAGS2,
 			 ahd_inb(ahd, SEQ_FLAGS2) & ~SELECTOUT_QFROZEN);
-	ahd_unpause(ahd);
+
 	/* Don't want to clobber the original sense code */
 	if ((scb->flags & SCB_SENSE) != 0) {
 		/*

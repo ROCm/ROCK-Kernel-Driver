@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#154 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#155 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2070,7 +2070,6 @@ aic79xx_setup(char *s)
 			s = aic_parse_brace_option("tag_info", p + n, end,
 			    2, ahd_linux_setup_tag_info, 0);
 		} else if (strncmp(p, "rd_strm", n) == 0) {
-			printf("Calling brace parse for %s\n", p);
 			s = aic_parse_brace_option("rd_strm", p + n, end,
 			    1, ahd_linux_setup_rd_strm_info, 0);
 		} else if (strncmp(p, "dv", n) == 0) {

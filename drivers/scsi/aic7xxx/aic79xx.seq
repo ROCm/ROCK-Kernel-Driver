@@ -40,7 +40,7 @@
  * $FreeBSD$
  */
 
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#90 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#91 $"
 PATCH_ARG_LIST = "struct ahd_softc *ahd"
 PREFIX = "ahd_"
 
@@ -175,12 +175,31 @@ END_CRITICAL;
 scbdma_tohost_done:
 	test	CCSCBCTL, CCARREN jz fill_qoutfifo_dmadone;
 	/*
-	 * A complete SCB upload requires no intervention.
-	 * The SCB is already on the COMPLETE_SCB list
-	 * and its completion notification will now be
-	 * handled just like any other SCB.
+	 * An SCB has been succesfully uploaded to the host.
+	 * If the SCB was uploaded for some reason other than
+	 * bad SCSI status (currently only for underruns), we
+	 * queue the SCB for normal completion.  Otherwise, we
+	 * wait until any select-out activity has halted, and
+	 * then notify the host so that the transaction can be
+	 * dealt with.
 	 */
-	and	CCSCBCTL, ~(CCARREN|CCSCBEN) ret;
+	test	SCB_SCSI_STATUS, 0xff jnz scbdma_notify_host;
+	and	CCSCBCTL, ~(CCARREN|CCSCBEN);
+	bmov	COMPLETE_DMA_SCB_HEAD, SCB_NEXT_COMPLETE, 2;
+	bmov	SCB_NEXT_COMPLETE, COMPLETE_SCB_HEAD, 2;
+	bmov	COMPLETE_SCB_HEAD, SCBPTR, 2 ret;
+scbdma_notify_host:
+	SET_MODE(M_SCSI, M_SCSI)
+	test	SCSISEQ0, ENSELO jnz return;
+	test	SSTAT0, (SELDO|SELINGO) jnz return;
+	SET_MODE(M_CCHAN, M_CCHAN)
+	/*
+	 * Remove SCB and notify host.
+	 */
+	and	CCSCBCTL, ~(CCARREN|CCSCBEN);
+	bmov	COMPLETE_DMA_SCB_HEAD, SCB_NEXT_COMPLETE, 2;
+	SET_SEQINTCODE(BAD_SCB_STATUS)
+	ret;
 fill_qoutfifo_dmadone:
 	and	CCSCBCTL, ~(CCARREN|CCSCBEN);
 	call	qoutfifo_updated;
@@ -325,15 +344,7 @@ fetch_new_scb:
 dma_complete_scb:
 	bmov	SCBPTR, COMPLETE_DMA_SCB_HEAD, 2;
 	bmov	SCBHADDR, SCB_BUSADDR, 4;
-	mvi	CCARREN|CCSCBEN|CCSCBRESET call dma_scb;
-	/*
-	 * Now that we've started the DMA, push us onto
-	 * the normal completion queue to have our SCBID
-	 * posted to the kernel.
-	 */
-	bmov	COMPLETE_DMA_SCB_HEAD, SCB_NEXT_COMPLETE, 2;
-	bmov	SCB_NEXT_COMPLETE, COMPLETE_SCB_HEAD, 2;
-	bmov	COMPLETE_SCB_HEAD, SCBPTR, 2 ret;
+	mvi	CCARREN|CCSCBEN|CCSCBRESET jmp dma_scb;
 END_CRITICAL;
 
 /*
@@ -1615,25 +1626,32 @@ export seq_isr:
 		 * and deffer the test by one instruction.
 		 */
 		mov	REG_ISR, LQISTAT2;
-		test	REG_ISR, LQIWORKONLQ jz data_valid;
-		test	SEQINTSRC, SAVEPTRS  jz data_valid;
+		test	REG_ISR, LQIWORKONLQ jz main_isr;
+		test	SEQINTSRC, SAVEPTRS  jz main_isr;
 		test	LONGJMP_ADDR[1], INVALID_ADDR jz saveptr_active_fifo;
 		/*
-		 * Switch to the active FIFO.
+		 * Switch to the active FIFO after clearing the snapshot
+		 * savepointer in the current FIFO.  We do this so that
+		 * a pending CTXTDONE or SAVEPTR is visible in the active
+		 * FIFO.  This status is the only way we can detect if we
+		 * have lost the race (e.g. host paused us) and our attepts
+		 * to disable the channel occurred after all REQs were
+		 * already seen and acked (REQINIT never comes true).
 		 */
+		mvi	DFFSXFRCTL, CLRCHN;
 		xor	MODE_PTR, MK_MODE(M_DFF1, M_DFF1);
-		test	DFCNTRL, DIRECTION jz snapshot_other_fifo;
+		test	DFCNTRL, DIRECTION jz interrupt_return;
 		and	DFCNTRL, ~SCSIEN;
-		test	SSTAT1, REQINIT	jz .;
+snapshot_wait_data_valid:
+		test	SEQINTSRC, (CTXTDONE|SAVEPTRS) jnz snapshot_data_valid;
+		test	SSTAT1, REQINIT	jz snapshot_wait_data_valid;
+snapshot_data_valid:
 		or	DFCNTRL, SCSIEN;
-		/* FALLTHROUGH */
-snapshot_other_fifo:
-		xor	MODE_PTR, MK_MODE(M_DFF1, M_DFF1);
-		/* FALLTHROUGH */
+		or	SEQINTCTL, IRET ret;
 snapshot_saveptr:
 		mvi	DFFSXFRCTL, CLRCHN;
 		or	SEQINTCTL, IRET ret;
-data_valid:
+main_isr:
 	}
 	test	SEQINTSRC, CFG4DATA	jnz cfg4data_intr;
 	test	SEQINTSRC, CFG4ISTAT	jnz cfg4istat_intr;
@@ -1666,10 +1684,11 @@ saveptr_active_fifo:
 	or	SEQINTCTL, IRET ret;
 
 cfg4data_intr:
-	inc	SCB_FIFO_USE_COUNT;
-	test	SCB_SGPTR[0], SG_LIST_NULL jnz pkt_handle_overrun;
+	test	SCB_SGPTR[0], SG_LIST_NULL jnz pkt_handle_overrun_inc_use_count;
 	call	load_first_seg;
 	call	pkt_handle_xfer;
+	inc	SCB_FIFO_USE_COUNT;
+interrupt_return:
 	or	SEQINTCTL, IRET ret;
 
 cfg4istat_intr:
@@ -1961,6 +1980,8 @@ illegal_phase:
  * data.  Otherwise use an overrun buffer in the host to simulate
  * BITBUCKET.
  */
+pkt_handle_overrun_inc_use_count:
+	inc	SCB_FIFO_USE_COUNT;
 pkt_handle_overrun:
 	SET_SEQINTCODE(CFG4OVERRUN)
 	call	freeze_queue;
@@ -1987,8 +2008,8 @@ pkt_overrun_end:
 	or	SCB_RESIDUAL_SGPTR, SG_OVERRUN_RESID;
 	test	SEQINTSRC, CTXTDONE jz unexpected_nonpkt_phase;
 	dec	SCB_FIFO_USE_COUNT;
-	test	SCB_CONTROL, STATUS_RCVD jnz pkt_complete_scb_if_fifos_idle;
 	or	LONGJMP_ADDR[1], INVALID_ADDR;
+	test	SCB_CONTROL, STATUS_RCVD jnz pkt_complete_scb_if_fifos_idle;
 	mvi	DFFSXFRCTL, CLRCHN ret;
 
 if ((ahd->bugs & AHD_PKT_BITBUCKET_BUG) != 0) {

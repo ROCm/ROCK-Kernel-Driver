@@ -39,7 +39,7 @@
  *
  * $FreeBSD$
  */
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.reg#66 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.reg#67 $"
 
 /*
  * This file is processed by the aic7xxx_asm utility for use in assembling
@@ -194,7 +194,8 @@ register SEQINTCODE {
 		TRACEPOINT1,
 		TRACEPOINT2,
 		TRACEPOINT3,
-		SAW_HWERR
+		SAW_HWERR,
+		BAD_SCB_STATUS
 	}
 }
 
