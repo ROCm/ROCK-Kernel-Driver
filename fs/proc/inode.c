@@ -213,8 +213,7 @@ out_fail:
 	goto out;
 }			
 
-struct super_block *proc_read_super(struct super_block *s,void *data, 
-				    int silent)
+int proc_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 	struct task_struct *p;
@@ -237,11 +236,11 @@ struct super_block *proc_read_super(struct super_block *s,void *data,
 	if (!s->s_root)
 		goto out_no_root;
 	parse_options(data, &root_inode->i_uid, &root_inode->i_gid);
-	return s;
+	return 0;
 
 out_no_root:
 	printk("proc_read_super: get root inode failed\n");
 	iput(root_inode);
-	return NULL;
+	return -ENOMEM;
 }
 MODULE_LICENSE("GPL");

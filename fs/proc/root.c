@@ -23,7 +23,16 @@ struct proc_dir_entry *proc_net, *proc_bus, *proc_root_fs, *proc_root_driver;
 struct proc_dir_entry *proc_sys_root;
 #endif
 
-static DECLARE_FSTYPE(proc_fs_type, "proc", proc_read_super, FS_SINGLE);
+static struct super_block *proc_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, proc_fill_super);
+}
+
+static struct file_system_type proc_fs_type = {
+	name:		"proc",
+	get_sb:		proc_get_sb,
+};
 
 extern int __init proc_init_inodecache(void);
 void __init proc_root_init(void)
