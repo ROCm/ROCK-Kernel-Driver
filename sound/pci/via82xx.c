@@ -1897,14 +1897,14 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 
 	chip->port = pci_resource_start(pci, 0);
 	if ((chip->res_port = request_region(chip->port, 256, card->driver)) == NULL) {
-		snd_via82xx_free(chip);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->port, chip->port + 256 - 1);
+		snd_via82xx_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_via82xx_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			card->driver, (void *)chip)) {
-		snd_via82xx_free(chip);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_via82xx_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;

@@ -2551,14 +2551,14 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 
 	chip->io_port = pci_resource_start(pci, 0);
 	if ((chip->res_io_port = request_region(chip->io_port, 0x100, "ESS Maestro")) == NULL) {
-		snd_es1968_free(chip);
 		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->io_port, chip->io_port + 0x100 - 1);
+		snd_es1968_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_es1968_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			"ESS Maestro", (void*)chip)) {
-		snd_es1968_free(chip);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_es1968_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;

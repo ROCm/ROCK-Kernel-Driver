@@ -1796,20 +1796,20 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 	synchronize_irq(pci->irq);
 
 	if ((ice->res_port = request_region(ice->port, 32, "ICE1724 - Controller")) == NULL) {
-		snd_vt1724_free(ice);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->port, ice->port + 32 - 1);
+		snd_vt1724_free(ice);
 		return -EIO;
 	}
 
 	if ((ice->res_profi_port = request_region(ice->profi_port, 128, "ICE1724 - Professional")) == NULL) {
-		snd_vt1724_free(ice);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->profi_port, ice->profi_port + 16 - 1);
+		snd_vt1724_free(ice);
 		return -EIO;
 	}
 		
 	if (request_irq(pci->irq, snd_vt1724_interrupt, SA_INTERRUPT|SA_SHIRQ, "ICE1724", (void *) ice)) {
-		snd_vt1724_free(ice);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_vt1724_free(ice);
 		return -EIO;
 	}
 

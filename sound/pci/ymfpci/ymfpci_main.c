@@ -2288,13 +2288,13 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	pci_set_master(pci);
 
 	if ((chip->res_reg_area = request_mem_region(chip->reg_area_phys, 0x8000, "YMFPCI")) == NULL) {
-		snd_ymfpci_free(chip);
 		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", chip->reg_area_phys, chip->reg_area_phys + 0x8000 - 1);
+		snd_ymfpci_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_ymfpci_interrupt, SA_INTERRUPT|SA_SHIRQ, "YMFPCI", (void *) chip)) {
-		snd_ymfpci_free(chip);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_ymfpci_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;

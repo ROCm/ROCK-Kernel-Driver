@@ -1902,20 +1902,20 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	ensoniq->irq = -1;
 	ensoniq->port = pci_resource_start(pci, 0);
 	if ((ensoniq->res_port = request_region(ensoniq->port, 0x40, "Ensoniq AudioPCI")) == NULL) {
-		snd_ensoniq_free(ensoniq);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ensoniq->port, ensoniq->port + 0x40 - 1);
+		snd_ensoniq_free(ensoniq);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_audiopci_interrupt, SA_INTERRUPT|SA_SHIRQ, "Ensoniq AudioPCI", (void *)ensoniq)) {
-		snd_ensoniq_free(ensoniq);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_ensoniq_free(ensoniq);
 		return -EBUSY;
 	}
 	ensoniq->irq = pci->irq;
 #ifdef CHIP1370
 	if ((ensoniq->bugbuf = snd_malloc_pci_pages(pci, 16, &ensoniq->bugbuf_addr)) == NULL) {
-		snd_ensoniq_free(ensoniq);
 		snd_printk("unable to allocate space for phantom area - bugbuf\n");
+		snd_ensoniq_free(ensoniq);
 		return -EBUSY;
 	}
 #endif
