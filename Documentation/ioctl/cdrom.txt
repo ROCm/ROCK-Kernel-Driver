@@ -34,7 +34,7 @@ are as follows:
 				  (struct cdrom_multisession)
 	CDROM_GET_MCN		Obtain the "Universal Product Code"
 				   if available (struct cdrom_mcn)
-	CDROM_GET_UPC		CDROM_GET_MCN  (deprecated)
+	CDROM_GET_UPC		Deprecated, use CDROM_GET_MCN instead.
 	CDROMRESET		hard-reset the drive
 	CDROMVOLREAD		Get the drive's volume setting
 					  (struct cdrom_volctrl)
@@ -44,8 +44,8 @@ are as follows:
 	CDROMSEEK		seek msf address
 	CDROMPLAYBLK		scsi-cd only, (struct cdrom_blk)
 	CDROMREADALL		read all 2646 bytes
-	CDROMGETSPINDOWN
-	CDROMSETSPINDOWN
+	CDROMGETSPINDOWN	return 4-bit spindown value
+	CDROMSETSPINDOWN	set 4-bit spindown value
 	CDROMCLOSETRAY		pendant of CDROMEJECT
 	CDROM_SET_OPTIONS	Set behavior options
 	CDROM_CLEAR_OPTIONS	Clear behavior options
@@ -79,10 +79,12 @@ code.  It is likely that some corrections will be made over time.
 General:
 
 	Unless otherwise specified, all ioctl calls return 0 on success
-	and -1 with errno set to an appropriate value on error.
+	and -1 with errno set to an appropriate value on error.  (Some
+	ioctls return non-negative data values.)
 
-	Unless otherwise specified, all ioctl calls return EFAULT on a
-	failed attempt to copy data to or from user address space.
+	Unless otherwise specified, all ioctl calls return -1 and set
+	errno to EFAULT on a failed attempt to copy data to or from user
+	address space.
 
 	Individual drivers may return error codes not listed here.
 
@@ -136,6 +138,9 @@ CDROMPLAYMSF			Play Audio MSF (struct cdrom_msf)
 	  ENOSYS	cd drive not audio-capable.
 
 	notes:
+	  MSF stands for minutes-seconds-frames
+	  LBA stands for logical block address
+
 	  Segment is described as start and end times, where each time
 	  is described as minutes:seconds:frames.  A frame is 1/75 of
 	  a second.
@@ -196,8 +201,11 @@ CDROMREADTOCENTRY		Read TOC entry (struct cdrom_tocentry)
 	error return:
 	  ENOSYS	cd drive not audio-capable.
 	  EINVAL	entry.cdte_format not CDROM_MSF or CDROM_LBA
+	  EINVAL	requested track out of bounds
+	  EIO		I/O error reading TOC
 
 	notes:
+	  TOC stands for Table Of Contents
 	  MSF stands for minutes-seconds-frames
 	  LBA stands for logical block address
 
@@ -216,6 +224,10 @@ CDROMSTOP			Stop the cdrom drive
 	error return:
 	  ENOSYS	cd drive not audio-capable.
 
+	notes:
+	  Exact interpretation of this ioctl depends on the device,
+	  but most seem to spin the drive down.
+
 
 CDROMSTART			Start the cdrom drive
 
@@ -230,6 +242,11 @@ CDROMSTART			Start the cdrom drive
 	error return:
 	  ENOSYS	cd drive not audio-capable.
 
+	notes:
+	  Exact interpretation of this ioctl depends on the device,
+	  but most seem to spin the drive up and/or close the tray.
+	  Other devices ignore the ioctl completely.
+
 
 CDROMEJECT			Ejects the cdrom media
 
@@ -241,9 +258,12 @@ CDROMEJECT			Ejects the cdrom media
 
 	outputs:	none
 
-	error return:
+	error returns:
 	  ENOSYS	cd drive not capable of ejecting
-	  EBUSY		other processes have drive open or door is locked
+	  EBUSY		other processes are accessing drive, or door is locked
+
+	notes:
+	  See CDROM_LOCKDOOR, below.
 
 
 
@@ -257,9 +277,12 @@ CDROMCLOSETRAY			pendant of CDROMEJECT
 
 	outputs:	none
 
-	error return:
+	error returns:
 	  ENOSYS	cd drive not capable of ejecting
-	  EBUSY		other processes have drive open or door is locked
+	  EBUSY		other processes are accessing drive, or door is locked
+
+	notes:
+	  See CDROM_LOCKDOOR, below.
 
 
 
@@ -577,7 +600,7 @@ CDROM_SET_OPTIONS		Set behavior options
 
 	inputs:
 	  New values for drive options.  The logical 'or' of:
-	    CDO_AUTO_CLOSE	close tray on first open
+	    CDO_AUTO_CLOSE	close tray on first open(2)
 	    CDO_AUTO_EJECT	open tray on last release
 	    CDO_USE_FFLAGS	use O_NONBLOCK information on open
 	    CDO_LOCK		lock tray on open files
@@ -918,6 +941,10 @@ CDROM_NEXT_WRITABLE		get next writable block
 	outputs:
 	  The next writable block.
 
+	notes:
+	  If the device does not support this ioctl directly, the
+	  ioctl will return CDROM_LAST_WRITTEN + 7.
+
 
 
 CDROM_LAST_WRITTEN		get last block written on disc
@@ -925,11 +952,15 @@ CDROM_LAST_WRITTEN		get last block written on disc
 	usage:
 
 	  long last;
-	  ioctl(fd, CDROM_NEXT_WRITABLE, &last);
+	  ioctl(fd, CDROM_LAST_WRITTEN, &last);
 
 	inputs:		none
 
 	outputs:
 	  The last block written on disc
 
-
+	notes:
+	  If the device does not support this ioctl directly, the
+	  result is derived from the disc's table of contents.  If the
+	  table of contents can't be read, this ioctl returns an
+	  error.

@@ -28,7 +28,7 @@ are as follows:
 	HDIO_GET_IDENTITY	get IDE identification info
 	HDIO_GET_WCACHE		get write cache mode on|off
 	HDIO_GET_ACOUSTIC	get acoustic value
-	HDIO_GET_ADDRESS
+	HDIO_GET_ADDRESS	get sector addressing mode
 	HDIO_GET_BUSSTATE	get the bus state of the hwif
 	HDIO_TRISTATE_HWIF	execute a channel tristate
 	HDIO_DRIVE_RESET	execute a device reset
@@ -55,8 +55,8 @@ are as follows:
 	HDIO_SET_QDMA		change use-qdma flag
 	HDIO_SET_ADDRESS	change lba addressing modes
 
-	HDIO_SET_IDE_SCSI
-	HDIO_SET_SCSI_IDE
+	HDIO_SET_IDE_SCSI	Set scsi emulation mode on/off
+	HDIO_SET_SCSI_IDE	not implemented yet
 
 
 The information that follows was determined from reading kernel source
@@ -73,8 +73,9 @@ General:
 	Unless otherwise specified, all ioctl calls return 0 on success
 	and -1 with errno set to an appropriate value on error.
 
-	Unless otherwise specified, all ioctl calls return EFAULT on a
-	failed attempt to copy data to or from user address space.
+	Unless otherwise specified, all ioctl calls return -1 and set
+	errno to EFAULT on a failed attempt to copy data to or from user
+	address space.
 
 	Unless otherwise specified, all data structures and constants
 	are defined in <linux/hdreg.h>
@@ -145,7 +146,7 @@ HDIO_SET_UNMASKINTR		permit other irqs during I/O
 
 	usage:
 
-	  long val;
+	  unsigned long val;
 	  ioctl(fd, HDIO_SET_UNMASKINTR, val);
 
 	inputs:
@@ -204,7 +205,7 @@ HDIO_SET_MULTCOUNT		change IDE blockmode
 
 	    This is tightly woven into the driver->do_special can not
 	    touch.  DON'T do it again until a total personality rewrite
-	    is committed."
+	    is committed.
 
 	  If blockmode has already been set, this ioctl will fail with
 	  EBUSY
@@ -371,14 +372,12 @@ HDIO_SET_NICE			set nice flags
 
 	usage:
 
-	  int nice;
+	  unsigned long nice;
 	  ...
 	  ioctl(fd, HDIO_SET_NICE, nice);
 
 	inputs:
-	  args[0]	io address to probe
-	  args[1]	control address to probe
-	  args[2]	irq number
+	  bitmask of nice flags.
 
 	outputs:	none
 
@@ -391,6 +390,9 @@ HDIO_SET_NICE			set nice flags
 
 	  This ioctl sets the DSC_OVERLAP and NICE_1 flags from values
 	  provided by the user.
+
+	  Nice flags are listed in <linux/hdreg.h>, starting with
+	  IDE_NICE_DSC_OVERLAP.  These values represent shifts.
 
 
 
@@ -509,7 +511,7 @@ HDIO_DRIVE_RESET		execute a device reset
 
 	notes:
 
-	  Aborts any current command, prevent anything else from being
+	  Abort any current command, prevent anything else from being
 	  queued, execute a reset on the device, and issue BLKRRPART
 	  ioctl on the block device.
 
@@ -522,6 +524,10 @@ HDIO_DRIVE_TASKFILE		execute raw taskfile
 
 	Note:  If you don't have a copy of the ANSI ATA specification
 	handy, you should probably ignore this ioctl.
+
+	Execute an ATA disk command directly by writing the "taskfile"
+	registers of the drive.  Requires ADMIN and RAWIO access
+	privileges.
 
 	usage:
 
@@ -541,27 +547,27 @@ HDIO_DRIVE_TASKFILE		execute raw taskfile
 
 	  (See below for details on memory area passed to ioctl.)
 
-	  io_ports[]	values to be written to taskfile registers
-	  hob_ports[]	values to be written to taskfile registers
+	  io_ports[8]	values to be written to taskfile registers
+	  hob_ports[8]	high-order bytes, for extended commands.
 	  out_flags	flags indicating which registers are valid
 	  in_flags	flags indicating which registers should be returned
 	  data_phase	see below
 	  req_cmd	command type to be executed
 	  out_size	size of output buffer
 	  outbuf	buffer of data to be transmitted to disk
-	  inbuf		buffer of data to be received from disk
+	  inbuf		buffer of data to be received from disk (see [1])
 
 	outputs:
 
 	  io_ports[]	values returned in the taskfile registers
-	  hob_ports[]	values returned in the taskfile registers
-	  out_flags	flags indicating which registers are valid
+	  hob_ports[]	high-order bytes, for extended commands.
+	  out_flags	flags indicating which registers are valid (see [2])
 	  in_flags	flags indicating which registers should be returned
-	  outbuf	buffer of data to be transmitted to disk
+	  outbuf	buffer of data to be transmitted to disk (see [1])
 	  inbuf		buffer of data to be received from disk
 
 	error returns:
-	  EACCES	CAP_SYS_ADMIN or CAP_SYS_RAWIO privelege not set.
+	  EACCES	CAP_SYS_ADMIN or CAP_SYS_RAWIO privilege not set.
 	  ENOMSG	Device is not a disk drive.
 	  ENOMEM	Unable to allocate memory for task
 	  EFAULT	req_cmd == TASKFILE_IN_OUT (not implemented as of 2.6.8)
@@ -571,9 +577,14 @@ HDIO_DRIVE_TASKFILE		execute raw taskfile
 
 	notes:
 
-	  Execute an ATA disk command directly by writing the "taskfile"
-	  registers of the drive.  Requires ADMIN and RAWIO access
-	  privileges.
+	  [1] Currently (2.6.8), both the input and output buffers are
+	  copied from the user and written back to the user, even when
+	  not used.  This may be a bug.
+
+	  [2] The out_flags and in_flags are returned to the user after
+	  the ioctl completes.	Currently (2.6.8) these are the same
+	  as the input values, unchanged.  In the future, they may have
+	  more significance.
 
 	  Extreme caution should be used with using this ioctl.  A
 	  mistake can easily corrupt data or hang the system.
@@ -590,7 +601,7 @@ HDIO_DRIVE_TASKFILE		execute raw taskfile
 	    hob_ports[8]	high-order bytes, for extended commands
 	    out_flags		flags indicating which entries in the
 	    			io_ports[] and hob_ports[] arrays
-				contain valid values.
+				contain valid values.  Type ide_reg_valid_t.
 	    in_flags		flags indicating which entries in the
 	    			io_ports[] and hob_ports[] arrays
 				are expected to contain valid values
@@ -600,8 +611,11 @@ HDIO_DRIVE_TASKFILE		execute raw taskfile
 	    out_size		output (user->drive) buffer size, bytes
 	    in_size		input (drive->user) buffer size, bytes
 
-	  Unused fields of io_ports[] and hob_ports[] should be set to
-	  zero.
+	  This ioctl does not necessarily respect all flags in the
+	  out_flags and in_flags values -- some taskfile registers
+	  may be written or read even if not requested in the flags.
+	  Unused fields of io_ports[] and hob_ports[] should be set
+	  to zero.
 
 	  The data_phase field describes the data transfer to be
 	  performed.  Value is one of:
@@ -630,10 +644,6 @@ HDIO_DRIVE_TASKFILE		execute raw taskfile
 	    IDE_DRIVE_TASK_IN
 	    IDE_DRIVE_TASK_OUT
 	    IDE_DRIVE_TASK_RAW_WRITE
-
-	  Currently (2.6.8), both the input and output buffers are
-	  copied from the user and written back to the user, even when
-	  not used.
 
 
 
@@ -666,11 +676,17 @@ HDIO_DRIVE_CMD			execute a special drive command
 	    args[0]	status
 	    args[1]	error
 	    args[2]	NSECTOR
+	    args[3]	undefined
+	    args[4+]	NSECTOR * 512 bytes of data returned by the command.
 
 	error returns:
 	  EACCES	Access denied:  requires CAP_SYS_RAWIO
 	  ENOMEM	Unable to allocate memory for task
 
+	notes:
+
+	  Taskfile registers IDE_LCYL, IDE_HCYL, and IDE_SELECT are
+	  set to zero before executing the command.
 
 
 
