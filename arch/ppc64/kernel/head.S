@@ -303,12 +303,14 @@ exception_marker:
 	. = n;						\
 	.globl label##_Pseries;				\
 label##_Pseries:					\
+	HMT_MEDIUM;					\
 	mtspr	SPRG1,r13;		/* save r13 */	\
 	EXCEPTION_PROLOG_PSERIES(PACA_EXGEN, label##_common)
 
 #define STD_EXCEPTION_ISERIES(n, label, area)		\
 	.globl label##_Iseries;				\
 label##_Iseries:					\
+	HMT_MEDIUM;					\
 	mtspr	SPRG1,r13;		/* save r13 */	\
 	EXCEPTION_PROLOG_ISERIES_1(area);		\
 	EXCEPTION_PROLOG_ISERIES_2;			\
@@ -317,6 +319,7 @@ label##_Iseries:					\
 #define MASKABLE_EXCEPTION_ISERIES(n, label)				\
 	.globl label##_Iseries;						\
 label##_Iseries:							\
+	HMT_MEDIUM;							\
 	mtspr	SPRG1,r13;		/* save r13 */			\
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXGEN);				\
 	lbz	r10,PACAPROFENABLED(r13);				\
@@ -410,12 +413,14 @@ __start_interrupts:
 
 	. = 0x200
 _MachineCheckPseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_PSERIES(PACA_EXMC, MachineCheck_common)
 
 	. = 0x300
 	.globl DataAccess_Pseries
 DataAccess_Pseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13
 BEGIN_FTR_SECTION
 	mtspr	SPRG2,r12
@@ -434,6 +439,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	. = 0x380
 	.globl DataAccessSLB_Pseries
 DataAccessSLB_Pseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13
 	mfspr	r13,SPRG3		/* get paca address into r13 */
 	std	r9,PACA_EXSLB+EX_R9(r13)	/* save r9 - r12 */
@@ -461,6 +467,7 @@ DataAccessSLB_Pseries:
 	. = 0x480
 	.globl InstructionAccessSLB_Pseries
 InstructionAccessSLB_Pseries:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13
 	mfspr	r13,SPRG3		/* get paca address into r13 */
 	std	r9,PACA_EXSLB+EX_R9(r13)	/* save r9 - r12 */
@@ -494,6 +501,7 @@ InstructionAccessSLB_Pseries:
 	. = 0xc00
 	.globl	SystemCall_Pseries
 SystemCall_Pseries:
+	HMT_MEDIUM
 	mr	r9,r13
 	mfmsr	r10
 	mfspr	r13,SPRG3
@@ -747,10 +755,12 @@ fwnmi_data_area:
 	. = 0x8000
 	.globl SystemReset_FWNMI
 SystemReset_FWNMI:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_PSERIES(PACA_EXGEN, SystemReset_common)
 	.globl MachineCheck_FWNMI
 MachineCheck_FWNMI:
+	HMT_MEDIUM
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_PSERIES(PACA_EXMC, MachineCheck_common)
 
