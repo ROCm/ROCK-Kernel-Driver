@@ -69,7 +69,8 @@ static struct device_driver usb_generic_driver = {
 	.probe = generic_probe,
 	.remove = generic_remove,
 };
-	
+
+/* needs to be called with BKL held */
 int usb_device_probe(struct device *dev)
 {
 	struct usb_interface * intf = to_usb_interface(dev);
@@ -83,11 +84,8 @@ int usb_device_probe(struct device *dev)
 	if (!driver->probe)
 		return error;
 
-	if (driver->owner) {
-		m = try_inc_mod_count(driver->owner);
-		if (m == 0)
-			return error;
-	}
+	if (!try_module_get(driver->owner))
+		return error;
 
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
@@ -99,8 +97,7 @@ int usb_device_probe(struct device *dev)
 	if (!error)
 		intf->driver = driver;
 
-	if (driver->owner)
-		__MOD_DEC_USE_COUNT(driver->owner);
+	put_module(driver->owner);
 
 	return error;
 }
@@ -120,14 +117,12 @@ int usb_device_remove(struct device *dev)
 		return -ENODEV;
 	}
 
-	if (driver->owner) {
-		m = try_inc_mod_count(driver->owner);
-		if (m == 0) {
-			// FIXME this happens even when we just rmmod
-			// drivers that aren't in active use... 
-			err("Dieing driver still bound to device.\n");
-			return -EIO;
-		}
+	m = try_module_get(driver->owner);
+	if (m == 0) {
+		// FIXME this happens even when we just rmmod
+		// drivers that aren't in active use...
+		err("Dieing driver still bound to device.\n");
+		return -EIO;
 	}
 
 	/* if we sleep here on an umanaged driver 
@@ -143,8 +138,7 @@ int usb_device_remove(struct device *dev)
 		usb_driver_release_interface(driver, intf);
 
 	up(&driver->serialize);
-	if (driver->owner)
-		__MOD_DEC_USE_COUNT(driver->owner);
+	module_put(driver->owner)
 
 	return 0;
 }

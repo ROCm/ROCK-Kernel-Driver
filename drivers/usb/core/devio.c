@@ -860,7 +860,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 		if (uurb.buffer_length > 16384)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
-			return -EFAULT;   
+			return -EFAULT;
 		break;
 
 	default:
@@ -955,10 +955,10 @@ static int processcompl(struct async *as)
 	if (!(usb_pipeisoc(urb->pipe)))
 		return 0;
 	for (i = 0; i < urb->number_of_packets; i++) {
-		if (put_user(urb->iso_frame_desc[i].actual_length, 
+		if (put_user(urb->iso_frame_desc[i].actual_length,
 			     &((struct usbdevfs_urb *)as->userurb)->iso_frame_desc[i].actual_length))
 			return -EFAULT;
-		if (put_user(urb->iso_frame_desc[i].status, 
+		if (put_user(urb->iso_frame_desc[i].status,
 			     &((struct usbdevfs_urb *)as->userurb)->iso_frame_desc[i].status))
 			return -EFAULT;
 	}
@@ -1122,18 +1122,16 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			unlock_kernel();
 			retval = -ENOSYS;
 		} else {
-			if (driver->owner
-					&& !try_inc_mod_count (driver->owner)) {
+			if (!try_module_get (driver->owner)) {
 				unlock_kernel();
 				retval = -ENOSYS;
 				break;
 			}
 			unlock_kernel ();
 			retval = driver->ioctl (ifp, ctrl.ioctl_code, buf);
-			if (driver->owner)
-				__MOD_DEC_USE_COUNT (driver->owner);
+			put_module (driver->owner);
 		}
-		
+
 		if (retval == -ENOIOCTLCMD)
 			retval = -ENOTTY;
 	}
@@ -1188,7 +1186,7 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	case USBDEVFS_RESET:
 		ret = proc_resetdevice(ps);
 		break;
-	
+
 	case USBDEVFS_CLEAR_HALT:
 		ret = proc_clearhalt(ps, (void *)arg);
 		if (ret >= 0)
