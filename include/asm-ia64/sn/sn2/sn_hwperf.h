@@ -41,7 +41,15 @@ struct sn_hwperf_object_info {
 #define sn_hwp_is_shared	f.fields.is_shared
 #define sn_hwp_flags		f.b.flags
 
-#define SN_HWPERF_FOREIGN(x)	(!(x)->sn_hwp_this_part && !(x)->sn_hwp_is_shared)
+/* macros for object classification */
+#define SN_HWPERF_IS_NODE(x)		((x) && strstr((x)->name, "SHub"))
+#define SN_HWPERF_IS_IONODE(x)		((x) && strstr((x)->name, "TIO"))
+#define SN_HWPERF_IS_ROUTER(x)		((x) && strstr((x)->name, "Router"))
+#define SN_HWPERF_IS_NL3ROUTER(x)	((x) && strstr((x)->name, "NL3Router"))
+#define SN_HWPERF_FOREIGN(x)		((x) && !(x)->sn_hwp_this_part && !(x)->sn_hwp_is_shared)
+#define SN_HWPERF_SAME_OBJTYPE(x,y)	((SN_HWPERF_IS_NODE(x) && SN_HWPERF_IS_NODE(y)) ||\
+					(SN_HWPERF_IS_IONODE(x) && SN_HWPERF_IS_IONODE(y)) ||\
+					(SN_HWPERF_IS_ROUTER(x) && SN_HWPERF_IS_ROUTER(y)))
 
 /* numa port structure, SN_HWPERF_ENUM_PORTS returns an array of these */
 struct sn_hwperf_port_info {

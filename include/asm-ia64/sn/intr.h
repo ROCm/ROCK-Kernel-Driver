@@ -43,7 +43,7 @@ struct sn_irq_info {
 	int		irq_share_cnt;	/* num devices sharing IRQ   */
 };
 
-extern void sn_send_IPI_phys(long, int, int);
+extern void sn_send_IPI_phys(int, long, int, int);
 
 #define CPU_VECTOR_TO_IRQ(cpuid,vector) (vector)
 

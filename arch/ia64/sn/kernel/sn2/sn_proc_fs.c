@@ -80,7 +80,8 @@ static int sn_force_interrupt_open(struct inode *inode, struct file *file)
 
 static int coherence_id_show(struct seq_file *s, void *p)
 {
-	seq_printf(s, "%d\n", cpuid_to_coherence_id(smp_processor_id()));
+	seq_printf(s, "%d\n", partition_coherence_id());
+
 	return 0;
 }
 
