@@ -263,7 +263,7 @@ struct pci_fixup pcibios_fixups[] = {
 void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 {
 	if (debug_pci)
-		printk("PCI: Assigning IRQ %02d to %s\n", irq, dev->dev.name);
+		printk("PCI: Assigning IRQ %02d to %s\n", irq, pci_name(dev));
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
 }
 
