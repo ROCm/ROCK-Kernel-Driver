@@ -134,10 +134,18 @@ struct cipher_tfm {
 			   struct scatterlist *dst,
 			   struct scatterlist *src,
 			   unsigned int nbytes);
+	int (*cit_encrypt_iv)(struct crypto_tfm *tfm,
+	                      struct scatterlist *dst,
+	                      struct scatterlist *src,
+	                      unsigned int nbytes, u8 *iv);
 	int (*cit_decrypt)(struct crypto_tfm *tfm,
 			   struct scatterlist *dst,
 			   struct scatterlist *src,
 			   unsigned int nbytes);
+	int (*cit_decrypt_iv)(struct crypto_tfm *tfm,
+			   struct scatterlist *dst,
+			   struct scatterlist *src,
+			   unsigned int nbytes, u8 *iv);
 	void (*cit_xor_block)(u8 *dst, const u8 *src);
 };
 
@@ -286,6 +294,16 @@ static inline int crypto_cipher_encrypt(struct crypto_tfm *tfm,
 	return tfm->crt_cipher.cit_encrypt(tfm, dst, src, nbytes);
 }                                        
 
+static inline int crypto_cipher_encrypt_iv(struct crypto_tfm *tfm,
+                                           struct scatterlist *dst,
+                                           struct scatterlist *src,
+                                           unsigned int nbytes, u8 *iv)
+{
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
+	BUG_ON(tfm->crt_cipher.cit_mode == CRYPTO_TFM_MODE_ECB);
+	return tfm->crt_cipher.cit_encrypt_iv(tfm, dst, src, nbytes, iv);
+}                                        
+
 static inline int crypto_cipher_decrypt(struct crypto_tfm *tfm,
                                         struct scatterlist *dst,
                                         struct scatterlist *src,
@@ -293,6 +311,16 @@ static inline int crypto_cipher_decrypt(struct crypto_tfm *tfm,
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->crt_cipher.cit_decrypt(tfm, dst, src, nbytes);
+}
+
+static inline int crypto_cipher_decrypt_iv(struct crypto_tfm *tfm,
+                                           struct scatterlist *dst,
+                                           struct scatterlist *src,
+                                           unsigned int nbytes, u8 *iv)
+{
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
+	BUG_ON(tfm->crt_cipher.cit_mode == CRYPTO_TFM_MODE_ECB);
+	return tfm->crt_cipher.cit_decrypt_iv(tfm, dst, src, nbytes, iv);
 }
 
 static inline void crypto_cipher_set_iv(struct crypto_tfm *tfm,
