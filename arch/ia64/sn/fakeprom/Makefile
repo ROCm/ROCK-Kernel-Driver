@@ -6,6 +6,10 @@
 #  Copyright (c) 2000-2001 Silicon Graphics, Inc.  All rights reserved.
 #
 
+USE_STANDARD_AS_RULE := true
+
+EXTRA_AFLAGS := $(AFLAGS_KERNEL)
+
 TOPDIR=../../../..
 HPATH           = $(TOPDIR)/include
 
@@ -16,11 +20,6 @@ obj-y=fprom
 
 fprom: $(OBJ)
 	$(LD) -static -Tfprom.lds -o fprom $(OBJ) $(LIB)
-
-.S.o:
-	$(CC)  -D__ASSEMBLY__ $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
-.c.o:
-	$(CC)  $(CFLAGS) $(CFLAGS_KERNEL) -c -o $*.o $<
 
 clean:
 	rm -f *.o fprom

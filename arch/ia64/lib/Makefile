@@ -2,8 +2,9 @@
 # Makefile for ia64-specific library routines..
 #
 
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c $< -o $@
+USE_STANDARD_AS_RULE := true
+
+EXTRA_AFLAGS := $(AFLAGS_KERNEL)
 
 L_TARGET = lib.a
 

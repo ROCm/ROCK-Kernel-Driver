@@ -5,10 +5,7 @@
 # Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) -c -o $*.o $<
+USE_STANDARD_AS_RULE := true
 
 all: dig.a
 

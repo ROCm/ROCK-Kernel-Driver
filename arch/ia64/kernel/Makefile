@@ -2,10 +2,9 @@
 # Makefile for the linux kernel.
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
+USE_STANDARD_AS_RULE := true
+
+EXTRA_AFLAGS := $(AFLAGS_KERNEL)
 
 all: kernel.o head.o init_task.o
 
