@@ -2419,6 +2419,14 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		/* START_ARRAY doesn't need to lock the array as autostart_array
 		 * does the locking, and it could even be a different array
 		 */
+		static int cnt = 3;
+		if (cnt > 0 ) {
+			printk(KERN_WARNING
+			       "md: %s(pid %d) used deprecated START_ARRAY ioctl. "
+			       "This will not be supported beyond 2.6\n",
+			       current->comm, current->pid);
+			cnt--;
+		}
 		err = autostart_array(new_decode_dev(arg));
 		if (err) {
 			printk(KERN_WARNING "md: autostart %s failed!\n",
