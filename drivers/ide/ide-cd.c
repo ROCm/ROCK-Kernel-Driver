@@ -305,8 +305,9 @@
 #include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <linux/cdrom.h>
-#include <linux/ide.h>
 #include <linux/completion.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>

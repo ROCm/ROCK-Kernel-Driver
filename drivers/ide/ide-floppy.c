@@ -94,9 +94,10 @@
 #include <linux/genhd.h>
 #include <linux/slab.h>
 #include <linux/cdrom.h>
+#include <linux/buffer_head.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/atapi.h>
-#include <linux/buffer_head.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>

@@ -419,9 +419,10 @@
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
+#include <linux/buffer_head.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/atapi.h>
-#include <linux/buffer_head.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -1249,7 +1250,7 @@ char *idetape_sense_key_verbose(u8 idetape_sense_key)
 	}
 }
 
-char *idetape_command_key_verbose (byte idetape_command_key)
+char *idetape_command_key_verbose(u8 idetape_command_key)
 {
 	switch (idetape_command_key) {
 		case IDETAPE_TEST_UNIT_READY_CMD:	return("TEST_UNIT_READY_CMD");
@@ -1439,7 +1440,7 @@ static void idetape_analyze_error(struct ata_device *drive, atapi_request_sense_
 # if IDETAPE_DEBUG_LOG_VERBOSE
 	if (tape->debug_level >= 1)
 		printk (KERN_INFO "ide-tape: pc = %s, sense key = %x, asc = %x, ascq = %x\n",
-			idetape_command_key_verbose((byte) pc->c[0]),
+			idetape_command_key_verbose(pc->c[0]),
 			result->sense_key,
 			result->asc,
 			result->ascq);
@@ -2166,7 +2167,7 @@ static void idetape_pc_callback(struct ata_device *drive, struct request *rq)
 /*
  *	A mode sense command is used to "sense" tape parameters.
  */
-static void idetape_create_mode_sense_cmd(struct atapi_packet_command *pc, byte page_code)
+static void idetape_create_mode_sense_cmd(struct atapi_packet_command *pc, u8 page_code)
 {
 	atapi_init_pc(pc);
 	pc->c[0] = IDETAPE_MODE_SENSE_CMD;
@@ -3225,7 +3226,7 @@ static int __idetape_discard_read_pipeline(struct ata_device *drive)
  *	of the request queue and wait for their completion.
  *
  */
-static int idetape_position_tape(struct ata_device *drive, unsigned int block, byte partition, int skip)
+static int idetape_position_tape(struct ata_device *drive, unsigned int block, u8 partition, int skip)
 {
 	idetape_tape_t *tape = drive->driver_data;
 	int retval;
@@ -3981,7 +3982,7 @@ static int idetape_add_chrdev_read_request(struct ata_device *drive,int blocks)
 		printk (KERN_ERR "ide-tape: bug: trying to return more bytes than requested\n");
 		bytes_read=blocks*tape->tape_block_size;
 	}
-#endif /* IDETAPE_DEBUG_BUGS */
+#endif
 	return (bytes_read);
 }
 
