@@ -142,8 +142,9 @@ static inline void write3byte(struct sysv_sb_info *sbi,
 }
 
 static struct inode_operations sysv_symlink_inode_operations = {
-	.readlink	= page_readlink,
-	.follow_link	= page_follow_link,
+	.readlink	= generic_readlink,
+	.follow_link	= page_follow_link_light,
+	.put_link	= page_put_link,
 	.getattr	= sysv_getattr,
 };
 
@@ -232,12 +233,12 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %d is out of range\n",
 		       inode->i_sb->s_id, ino);
-		return 0;
+		return NULL;
 	}
 	raw_inode = sysv_raw_inode(sb, ino, &bh);
 	if (!raw_inode) {
 		printk("unable to read i-node block\n");
-		return 0;
+		return NULL;
 	}
 
 	raw_inode->i_mode = cpu_to_fs16(sbi, inode->i_mode);

@@ -36,8 +36,8 @@ extern void cpm_interrupt_init(void);
 asmlinkage void system_call(void);
 asmlinkage void buserr(void);
 asmlinkage void trap(void);
-asmlinkage void bad_interrupt(void);
-asmlinkage void inthandler(void);
+asmlinkage irqreturn_t bad_interrupt(void);
+asmlinkage irqreturn_t inthandler(void);
 
 extern void *_ramvec[];
 
@@ -141,7 +141,7 @@ void M68360_insert_irq(irq_node_t **list, irq_node_t *node)
 	irq_node_t *cur;
 
 	if (!node->dev_id)
-		printk("%s: Warning: dev_id of %s is zero\n",
+		printk(KERN_INFO "%s: Warning: dev_id of %s is zero\n",
 		       __FUNCTION__, node->devname);
 
 	local_irq_save(flags);
@@ -176,30 +176,34 @@ void M68360_delete_irq(irq_node_t **list, void *dev_id)
 		}
 	}
 	local_irq_restore(flags);
-	printk ("%s: tried to remove invalid irq\n", __FUNCTION__);
+	printk (KERN_INFO "%s: tried to remove invalid irq\n", __FUNCTION__);
 }
 #endif
 
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
-                unsigned long flags, const char *devname, void *dev_id)
+int request_irq(
+	unsigned int irq,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long flags,
+	const char *devname,
+	void *dev_id)
 {
 	int mask = (1<<irq);
 
 	irq += (CPM_VECTOR_BASE<<4);
 
 	if (irq >= INTERNAL_IRQS) {
-		printk ("%s: Unknown IRQ %d from %s\n", __FUNCTION__, irq, devname);
+		printk (KERN_ERR "%s: Unknown IRQ %d from %s\n", __FUNCTION__, irq, devname);
 		return -ENXIO;
 	}
 
 	if (!(int_irq_list[irq].flags & IRQ_FLG_STD)) {
 		if (int_irq_list[irq].flags & IRQ_FLG_LOCK) {
-			printk("%s: IRQ %d from %s is not replaceable\n",
+			printk(KERN_ERR "%s: IRQ %d from %s is not replaceable\n",
 			       __FUNCTION__, irq, int_irq_list[irq].devname);
 			return -EBUSY;
 		}
 		if (flags & IRQ_FLG_REPLACE) {
-			printk("%s: %s can't replace IRQ %d from %s\n",
+			printk(KERN_ERR "%s: %s can't replace IRQ %d from %s\n",
 			       __FUNCTION__, devname, irq, int_irq_list[irq].devname);
 			return -EBUSY;
 		}
@@ -222,12 +226,12 @@ EXPORT_SYMBOL(request_irq);
 void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= INTERNAL_IRQS) {
-		printk ("%s: Unknown IRQ %d\n", __FUNCTION__, irq);
+		printk (KERN_ERR "%s: Unknown IRQ %d\n", __FUNCTION__, irq);
 		return;
 	}
 
 	if (int_irq_list[irq].dev_id != dev_id)
-		printk("%s: removing probably wrong IRQ %d from %s\n",
+		printk(KERN_INFO "%s: removing probably wrong IRQ %d from %s\n",
 		       __FUNCTION__, irq, int_irq_list[irq].devname);
 	int_irq_list[irq].handler = NULL;
 	int_irq_list[irq].flags   = IRQ_FLG_STD;
@@ -250,7 +254,7 @@ EXPORT_SYMBOL(free_irq);
 void M68360_enable_irq(unsigned int irq)
 {
 	if (irq >= INTERNAL_IRQS) {
-		printk("%s: Unknown IRQ %d\n", __FUNCTION__, irq);
+		printk(KERN_ERR "%s: Unknown IRQ %d\n", __FUNCTION__, irq);
 		return;
 	}
 
@@ -264,7 +268,7 @@ void M68360_enable_irq(unsigned int irq)
 void M68360_disable_irq(unsigned int irq)
 {
 	if (irq >= INTERNAL_IRQS) {
-		printk("%s: Unknown IRQ %d\n", __FUNCTION__, irq);
+		printk(KERN_ERR "%s: Unknown IRQ %d\n", __FUNCTION__, irq);
 		return;
 	}
 
@@ -281,15 +285,14 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i = *(loff_t *) v;
 
 	if (i < NR_IRQS) {
-		if (int_irq_list[i].flags & IRQ_FLG_STD)
-			continue;
-
-		seq_printf(p, "%3d: %10u ", i, kstat_cpu(0).irqs[i]);
-		if (int_irq_list[i].flags & IRQ_FLG_LOCK)
-			seq_printf(p, "L ");
-		else
-			seq_printf(p, "  ");
-		seq_printf(p, "%s\n", int_irq_list[i].devname);
+		if (int_irq_list[i].devname) {
+			seq_printf(p, "%3d: %10u ", i, kstat_cpu(0).irqs[i]);
+			if (int_irq_list[i].flags & IRQ_FLG_LOCK)
+				seq_printf(p, "L ");
+			else
+				seq_printf(p, "  ");
+			seq_printf(p, "%s\n", int_irq_list[i].devname);
+		}
 	}
 	if (i == NR_IRQS)
 		seq_printf(p, "   : %10u   spurious\n", num_spurious);
@@ -323,9 +326,10 @@ void process_int(int vec, struct pt_regs *fp)
 		kstat_cpu(0).irqs[irq]++;
 		pquicc->intr_cisr = (1 << vec); /* indicate that irq has been serviced */
 	} else {
-		printk("unregistered interrupt %d!\nTurning it off in the CIMR...\n", irq);
+		printk(KERN_ERR "unregistered interrupt %d!\nTurning it off in the CIMR...\n", irq);
 		/* *(volatile unsigned long *)0xfffff304 |= mask; */
 		pquicc->intr_cimr &= ~(1 << vec);
 		num_spurious += 1;
 	}
+	return(IRQ_HANDLED);
 }

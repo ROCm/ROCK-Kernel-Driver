@@ -1,6 +1,7 @@
 #ifndef __ASMARM_TLB_H
 #define __ASMARM_TLB_H
 
+#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
 /*

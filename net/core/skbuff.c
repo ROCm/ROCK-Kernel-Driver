@@ -49,6 +49,9 @@
 #include <linux/inet.h>
 #include <linux/slab.h>
 #include <linux/netdevice.h>
+#ifdef CONFIG_NET_CLS_ACT
+#include <net/pkt_sched.h>
+#endif
 #include <linux/string.h>
 #include <linux/skbuff.h>
 #include <linux/cache.h>
@@ -241,6 +244,15 @@ void __kfree_skb(struct sk_buff *skb)
 	nf_bridge_put(skb->nf_bridge);
 #endif
 #endif
+/* XXX: IS this still necessary? - JHS */
+#ifdef CONFIG_NET_SCHED
+	skb->tc_index = 0;
+#ifdef CONFIG_NET_CLS_ACT
+	skb->tc_verd = 0;
+	skb->tc_classid = 0;
+#endif
+#endif
+
 	kfree_skbmem(skb);
 }
 
@@ -312,6 +324,14 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 #endif
 #ifdef CONFIG_NET_SCHED
 	C(tc_index);
+#ifdef CONFIG_NET_CLS_ACT
+	n->tc_verd = SET_TC_VERD(skb->tc_verd,0);
+	n->tc_verd = CLR_TC_OK2MUNGE(skb->tc_verd);
+	n->tc_verd = CLR_TC_MUNGED(skb->tc_verd);
+	C(input_dev);
+	C(tc_classid);
+#endif
+
 #endif
 	C(truesize);
 	atomic_set(&n->users, 1);
@@ -366,6 +386,9 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 #endif
 #endif
 #ifdef CONFIG_NET_SCHED
+#ifdef CONFIG_NET_CLS_ACT
+	new->tc_verd = old->tc_verd;
+#endif
 	new->tc_index	= old->tc_index;
 #endif
 	atomic_set(&new->users, 1);
@@ -1091,6 +1114,165 @@ void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
 	}
 }
 
+/**
+ *	skb_dequeue - remove from the head of the queue
+ *	@list: list to dequeue from
+ *
+ *	Remove the head of the list. The list lock is taken so the function
+ *	may be used safely with other locking list functions. The head item is
+ *	returned or %NULL if the list is empty.
+ */
+
+struct sk_buff *skb_dequeue(struct sk_buff_head *list)
+{
+	unsigned long flags;
+	struct sk_buff *result;
+
+	spin_lock_irqsave(&list->lock, flags);
+	result = __skb_dequeue(list);
+	spin_unlock_irqrestore(&list->lock, flags);
+	return result;
+}
+
+/**
+ *	skb_dequeue_tail - remove from the tail of the queue
+ *	@list: list to dequeue from
+ *
+ *	Remove the tail of the list. The list lock is taken so the function
+ *	may be used safely with other locking list functions. The tail item is
+ *	returned or %NULL if the list is empty.
+ */
+struct sk_buff *skb_dequeue_tail(struct sk_buff_head *list)
+{
+	unsigned long flags;
+	struct sk_buff *result;
+
+	spin_lock_irqsave(&list->lock, flags);
+	result = __skb_dequeue_tail(list);
+	spin_unlock_irqrestore(&list->lock, flags);
+	return result;
+}
+
+/**
+ *	skb_queue_purge - empty a list
+ *	@list: list to empty
+ *
+ *	Delete all buffers on an &sk_buff list. Each buffer is removed from
+ *	the list and one reference dropped. This function takes the list
+ *	lock and is atomic with respect to other list locking functions.
+ */
+void skb_queue_purge(struct sk_buff_head *list)
+{
+	struct sk_buff *skb;
+	while ((skb = skb_dequeue(list)) != NULL)
+		kfree_skb(skb);
+}
+
+/**
+ *	skb_queue_head - queue a buffer at the list head
+ *	@list: list to use
+ *	@newsk: buffer to queue
+ *
+ *	Queue a buffer at the start of the list. This function takes the
+ *	list lock and can be used safely with other locking &sk_buff functions
+ *	safely.
+ *
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+void skb_queue_head(struct sk_buff_head *list, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&list->lock, flags);
+	__skb_queue_head(list, newsk);
+	spin_unlock_irqrestore(&list->lock, flags);
+}
+
+/**
+ *	skb_queue_tail - queue a buffer at the list tail
+ *	@list: list to use
+ *	@newsk: buffer to queue
+ *
+ *	Queue a buffer at the tail of the list. This function takes the
+ *	list lock and can be used safely with other locking &sk_buff functions
+ *	safely.
+ *
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+void skb_queue_tail(struct sk_buff_head *list, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&list->lock, flags);
+	__skb_queue_tail(list, newsk);
+	spin_unlock_irqrestore(&list->lock, flags);
+}
+/**
+ *	skb_unlink	-	remove a buffer from a list
+ *	@skb: buffer to remove
+ *
+ *	Place a packet after a given packet in a list. The list locks are taken
+ *	and this function is atomic with respect to other list locked calls
+ *
+ *	Works even without knowing the list it is sitting on, which can be
+ *	handy at times. It also means that THE LIST MUST EXIST when you
+ *	unlink. Thus a list must have its contents unlinked before it is
+ *	destroyed.
+ */
+void skb_unlink(struct sk_buff *skb)
+{
+	struct sk_buff_head *list = skb->list;
+
+	if (list) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&list->lock, flags);
+		if (skb->list == list)
+			__skb_unlink(skb, skb->list);
+		spin_unlock_irqrestore(&list->lock, flags);
+	}
+}
+
+
+/**
+ *	skb_append	-	append a buffer
+ *	@old: buffer to insert after
+ *	@newsk: buffer to insert
+ *
+ *	Place a packet after a given packet in a list. The list locks are taken
+ *	and this function is atomic with respect to other list locked calls.
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+
+void skb_append(struct sk_buff *old, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&old->list->lock, flags);
+	__skb_append(old, newsk);
+	spin_unlock_irqrestore(&old->list->lock, flags);
+}
+
+
+/**
+ *	skb_insert	-	insert a buffer
+ *	@old: buffer to insert before
+ *	@newsk: buffer to insert
+ *
+ *	Place a packet before a given packet in a list. The list locks are taken
+ *	and this function is atomic with respect to other list locked calls
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+
+void skb_insert(struct sk_buff *old, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&old->list->lock, flags);
+	__skb_insert(newsk, old->prev, old, old->list);
+	spin_unlock_irqrestore(&old->list->lock, flags);
+}
+
 #if 0
 /*
  * 	Tune the memory allocator for a new MTU size.
@@ -1103,6 +1285,81 @@ void skb_add_mtu(int mtu)
 	kmem_add_cache_size(mtu);
 }
 #endif
+
+static void inline skb_split_inside_header(struct sk_buff *skb,
+					   struct sk_buff* skb1,
+					   const u32 len, const int pos)
+{
+	int i;
+
+	memcpy(skb_put(skb1, pos - len), skb->data + len, pos - len);
+
+	/* And move data appendix as is. */
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+		skb_shinfo(skb1)->frags[i] = skb_shinfo(skb)->frags[i];
+
+	skb_shinfo(skb1)->nr_frags = skb_shinfo(skb)->nr_frags;
+	skb_shinfo(skb)->nr_frags  = 0;
+	skb1->data_len		   = skb->data_len;
+	skb1->len		   += skb1->data_len;
+	skb->data_len		   = 0;
+	skb->len		   = len;
+	skb->tail		   = skb->data + len;
+}
+
+static void inline skb_split_no_header(struct sk_buff *skb,
+				       struct sk_buff* skb1,
+				       const u32 len, int pos)
+{
+	int i, k = 0;
+	const int nfrags = skb_shinfo(skb)->nr_frags;
+
+	skb_shinfo(skb)->nr_frags = 0;
+	skb1->len		  = skb1->data_len = skb->len - len;
+	skb->len		  = len;
+	skb->data_len		  = len - pos;
+
+	for (i = 0; i < nfrags; i++) {
+		int size = skb_shinfo(skb)->frags[i].size;
+
+		if (pos + size > len) {
+			skb_shinfo(skb1)->frags[k] = skb_shinfo(skb)->frags[i];
+
+			if (pos < len) {
+				/* Split frag.
+				 * We have to variants in this case:
+				 * 1. Move all the frag to the second
+				 *    part, if it is possible. F.e.
+				 *    this approach is mandatory for TUX,
+				 *    where splitting is expensive.
+				 * 2. Split is accurately. We make this.
+				 */
+				get_page(skb_shinfo(skb)->frags[i].page);
+				skb_shinfo(skb1)->frags[0].page_offset += len - pos;
+				skb_shinfo(skb1)->frags[0].size -= len - pos;
+				skb_shinfo(skb)->frags[i].size	= len - pos;
+				skb_shinfo(skb)->nr_frags++;
+			}
+			k++;
+		} else
+			skb_shinfo(skb)->nr_frags++;
+		pos += size;
+	}
+	skb_shinfo(skb1)->nr_frags = k;
+}
+
+/**
+ * skb_split - Split fragmented skb to two parts at length len.
+ */
+void skb_split(struct sk_buff *skb, struct sk_buff *skb1, const u32 len)
+{
+	int pos = skb_headlen(skb);
+
+	if (len < pos)	/* Split line is inside header. */
+		skb_split_inside_header(skb, skb1, len, pos);
+	else		/* Second chunk has no header, nothing to copy. */
+		skb_split_no_header(skb, skb1, len, pos);
+}
 
 void __init skb_init(void)
 {
@@ -1133,3 +1390,12 @@ EXPORT_SYMBOL(skb_over_panic);
 EXPORT_SYMBOL(skb_pad);
 EXPORT_SYMBOL(skb_realloc_headroom);
 EXPORT_SYMBOL(skb_under_panic);
+EXPORT_SYMBOL(skb_dequeue);
+EXPORT_SYMBOL(skb_dequeue_tail);
+EXPORT_SYMBOL(skb_insert);
+EXPORT_SYMBOL(skb_queue_purge);
+EXPORT_SYMBOL(skb_queue_head);
+EXPORT_SYMBOL(skb_queue_tail);
+EXPORT_SYMBOL(skb_unlink);
+EXPORT_SYMBOL(skb_append);
+EXPORT_SYMBOL(skb_split);

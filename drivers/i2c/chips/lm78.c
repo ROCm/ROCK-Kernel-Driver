@@ -123,55 +123,6 @@ static inline u8 DIV_TO_REG(int val)
 }
 #define DIV_FROM_REG(val) (1 << (val))
 
-/* Initial limits. To keep them sane, we use the 'standard' translation as
-   specified in the LM78 sheet. Use the config file to set better limits. */
-#define LM78_INIT_IN_0(vid) ((vid)==3500 ? 2800 : (vid))
-#define LM78_INIT_IN_1(vid) ((vid)==3500 ? 2800 : (vid))
-#define LM78_INIT_IN_2 3300
-#define LM78_INIT_IN_3 (((5000)   * 100)/168)
-#define LM78_INIT_IN_4 (((12000)  * 10)/38)
-#define LM78_INIT_IN_5 (((-12000) * -604)/2100)
-#define LM78_INIT_IN_6 (((-5000)  * -604)/909)
-
-#define LM78_INIT_IN_PERCENTAGE 10
-
-#define LM78_INIT_IN_MIN_0(vid) (LM78_INIT_IN_0(vid) - \
-	LM78_INIT_IN_0(vid) * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MAX_0(vid) (LM78_INIT_IN_0(vid) + \
-	LM78_INIT_IN_0(vid) * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MIN_1(vid) (LM78_INIT_IN_1(vid) - \
-	LM78_INIT_IN_1(vid) * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MAX_1(vid) (LM78_INIT_IN_1(vid) + \
-	LM78_INIT_IN_1(vid) * LM78_INIT_IN_PERCENTAGE / 100)
-
-#define LM78_INIT_IN_MIN_2 \
-        (LM78_INIT_IN_2 - LM78_INIT_IN_2 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MAX_2 \
-        (LM78_INIT_IN_2 + LM78_INIT_IN_2 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MIN_3 \
-        (LM78_INIT_IN_3 - LM78_INIT_IN_3 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MAX_3 \
-        (LM78_INIT_IN_3 + LM78_INIT_IN_3 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MIN_4 \
-        (LM78_INIT_IN_4 - LM78_INIT_IN_4 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MAX_4 \
-        (LM78_INIT_IN_4 + LM78_INIT_IN_4 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MIN_5 \
-        (LM78_INIT_IN_5 - LM78_INIT_IN_5 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MAX_5 \
-        (LM78_INIT_IN_5 + LM78_INIT_IN_5 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MIN_6 \
-        (LM78_INIT_IN_6 - LM78_INIT_IN_6 * LM78_INIT_IN_PERCENTAGE / 100)
-#define LM78_INIT_IN_MAX_6 \
-        (LM78_INIT_IN_6 + LM78_INIT_IN_6 * LM78_INIT_IN_PERCENTAGE / 100)
-
-#define LM78_INIT_FAN_MIN_1 3000
-#define LM78_INIT_FAN_MIN_2 3000
-#define LM78_INIT_FAN_MIN_3 3000
-
-#define LM78_INIT_TEMP_OVER 60000
-#define LM78_INIT_TEMP_HYST 50000
-
 /* There are some complications in a module like this. First off, LM78 chips
    may be both present on the SMBus and the ISA bus, and we have to handle
    those cases separately at some places. Second, there might be several
@@ -192,6 +143,7 @@ static inline u8 DIV_TO_REG(int val)
    dynamically allocated, at the same time when a new lm78 client is
    allocated. */
 struct lm78_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -280,7 +232,7 @@ static ssize_t							\
 	return show_in(dev, buf, 0x##offset);			\
 }								\
 static DEVICE_ATTR(in##offset##_input, S_IRUGO, 		\
-		show_in##offset, NULL)				\
+		show_in##offset, NULL);				\
 static ssize_t							\
 	show_in##offset##_min (struct device *dev, char *buf)   \
 {								\
@@ -302,9 +254,9 @@ static ssize_t set_in##offset##_max (struct device *dev,	\
 	return set_in_max(dev, buf, count, 0x##offset);		\
 }								\
 static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR,		\
-		show_in##offset##_min, set_in##offset##_min)    \
+		show_in##offset##_min, set_in##offset##_min);	\
 static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR,		\
-		show_in##offset##_max, set_in##offset##_max)
+		show_in##offset##_max, set_in##offset##_max);
 
 show_in_offset(0);
 show_in_offset(1);
@@ -353,11 +305,11 @@ static ssize_t set_temp_hyst(struct device *dev, const char *buf, size_t count)
 	return count;
 }
 
-static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL)
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL);
 static DEVICE_ATTR(temp1_max, S_IRUGO | S_IWUSR,
-		show_temp_over, set_temp_over)
+		show_temp_over, set_temp_over);
 static DEVICE_ATTR(temp1_max_hyst, S_IRUGO | S_IWUSR,
-		show_temp_hyst, set_temp_hyst)
+		show_temp_hyst, set_temp_hyst);
 
 /* 3 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr)
@@ -438,9 +390,9 @@ static ssize_t set_fan_##offset##_min (struct device *dev,		\
 {									\
 	return set_fan_min(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL) \
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL);\
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR,		\
-		show_fan_##offset##_min, set_fan_##offset##_min)
+		show_fan_##offset##_min, set_fan_##offset##_min);
 
 static ssize_t set_fan_1_div(struct device *dev, const char *buf,
 		size_t count)
@@ -460,10 +412,10 @@ show_fan_offset(3);
 
 /* Fan 3 divisor is locked in H/W */
 static DEVICE_ATTR(fan1_div, S_IRUGO | S_IWUSR,
-		show_fan_1_div, set_fan_1_div)
+		show_fan_1_div, set_fan_1_div);
 static DEVICE_ATTR(fan2_div, S_IRUGO | S_IWUSR,
-		show_fan_2_div, set_fan_2_div)
-static DEVICE_ATTR(fan3_div, S_IRUGO, show_fan_3_div, NULL)
+		show_fan_2_div, set_fan_2_div);
+static DEVICE_ATTR(fan3_div, S_IRUGO, show_fan_3_div, NULL);
 
 /* VID */
 static ssize_t show_vid(struct device *dev, char *buf)
@@ -487,7 +439,7 @@ static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
      * when a new adapter is inserted (and lm78_driver is still present) */
 static int lm78_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, lm78_detect);
 }
@@ -552,16 +504,13 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access lm78_{read,write}_value. */
 
-	if (!(new_client = kmalloc((sizeof(struct i2c_client)) +
-				   sizeof(struct lm78_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct lm78_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR1;
 	}
-	memset(new_client, 0, sizeof(struct i2c_client) + 
-			      sizeof(struct lm78_data));
+	memset(data, 0, sizeof(struct lm78_data));
 
-	data = (struct lm78_data *) (new_client + 1);
+	new_client = &data->client;
 	if (is_isa)
 		init_MUTEX(&data->lock);
 	i2c_set_clientdata(new_client, data);
@@ -625,6 +574,12 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Initialize the LM78 chip */
 	lm78_init_client(new_client);
 
+	/* A few vars need to be filled upon startup */
+	for (i = 0; i < 3; i++) {
+		data->fan_min[i] = lm78_read_value(new_client,
+					LM78_REG_FAN_MIN(i));
+	}
+
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in0_input);
 	device_create_file(&new_client->dev, &dev_attr_in0_min);
@@ -665,7 +620,7 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 ERROR2:
-	kfree(new_client);
+	kfree(data);
 ERROR1:
 	if (is_isa)
 		release_region(address, LM78_EXTENT);
@@ -688,7 +643,7 @@ static int lm78_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }
@@ -751,45 +706,6 @@ static void lm78_init_client(struct i2c_client *client)
 	else
 		vid |= 0x10;
 	vid = VID_FROM_REG(vid);
-
-	lm78_write_value(client, LM78_REG_IN_MIN(0),
-			 IN_TO_REG(LM78_INIT_IN_MIN_0(vid)));
-	lm78_write_value(client, LM78_REG_IN_MAX(0),
-			 IN_TO_REG(LM78_INIT_IN_MAX_0(vid)));
-	lm78_write_value(client, LM78_REG_IN_MIN(1),
-			 IN_TO_REG(LM78_INIT_IN_MIN_1(vid)));
-	lm78_write_value(client, LM78_REG_IN_MAX(1),
-			 IN_TO_REG(LM78_INIT_IN_MAX_1(vid)));
-	lm78_write_value(client, LM78_REG_IN_MIN(2),
-			 IN_TO_REG(LM78_INIT_IN_MIN_2));
-	lm78_write_value(client, LM78_REG_IN_MAX(2),
-			 IN_TO_REG(LM78_INIT_IN_MAX_2));
-	lm78_write_value(client, LM78_REG_IN_MIN(3),
-			 IN_TO_REG(LM78_INIT_IN_MIN_3));
-	lm78_write_value(client, LM78_REG_IN_MAX(3),
-			 IN_TO_REG(LM78_INIT_IN_MAX_3));
-	lm78_write_value(client, LM78_REG_IN_MIN(4),
-			 IN_TO_REG(LM78_INIT_IN_MIN_4));
-	lm78_write_value(client, LM78_REG_IN_MAX(4),
-			 IN_TO_REG(LM78_INIT_IN_MAX_4));
-	lm78_write_value(client, LM78_REG_IN_MIN(5),
-			 IN_TO_REG(LM78_INIT_IN_MIN_5));
-	lm78_write_value(client, LM78_REG_IN_MAX(5),
-			 IN_TO_REG(LM78_INIT_IN_MAX_5));
-	lm78_write_value(client, LM78_REG_IN_MIN(6),
-			 IN_TO_REG(LM78_INIT_IN_MIN_6));
-	lm78_write_value(client, LM78_REG_IN_MAX(6),
-			 IN_TO_REG(LM78_INIT_IN_MAX_6));
-	lm78_write_value(client, LM78_REG_FAN_MIN(0),
-			 FAN_TO_REG(LM78_INIT_FAN_MIN_1, 2));
-	lm78_write_value(client, LM78_REG_FAN_MIN(1),
-			 FAN_TO_REG(LM78_INIT_FAN_MIN_2, 2));
-	lm78_write_value(client, LM78_REG_FAN_MIN(2),
-			 FAN_TO_REG(LM78_INIT_FAN_MIN_3, 2));
-	lm78_write_value(client, LM78_REG_TEMP_OVER,
-			 TEMP_TO_REG(LM78_INIT_TEMP_OVER));
-	lm78_write_value(client, LM78_REG_TEMP_HYST,
-			 TEMP_TO_REG(LM78_INIT_TEMP_HYST));
 
 	/* Start monitoring */
 	lm78_write_value(client, LM78_REG_CONFIG,

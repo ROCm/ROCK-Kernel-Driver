@@ -34,7 +34,7 @@ Module options in detail:
 	mpu_irq: This is the MPU401's IRQ.
 
 If you'd like to use the OPL3 FM Synthesizer, make sure you enable
-CONFIG_YM3812 (in 'make config'). That'll build the opl3.o module.
+CONFIG_SOUND_YM3812 (in 'make config'). That'll build the opl3.o module.
 
 Then a simple 'insmod opl3 io=0x388', and you now have FM Synth.
 

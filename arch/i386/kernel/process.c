@@ -36,7 +36,6 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -50,7 +49,6 @@
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
 #endif
-#include <asm/debugreg.h>
 
 #include <linux/irq.h>
 #include <linux/err.h>
@@ -204,6 +202,10 @@ static int __init idle_setup (char *str)
 	if (!strncmp(str, "poll", 4)) {
 		printk("using polling idle threads.\n");
 		pm_idle = poll_idle;
+#ifdef CONFIG_X86_SMP
+		if (smp_num_siblings > 1)
+			printk("WARNING: polling idle and HT enabled, performance may degrade.\n");
+#endif
 	} else if (!strncmp(str, "halt", 4)) {
 		printk("using halt in idle threads.\n");
 		pm_idle = default_idle;
@@ -269,7 +271,6 @@ __asm__(".section .text\n"
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	struct pt_regs regs;
-	int ret = 0;
 
 	memset(&regs, 0, sizeof(regs));
 
@@ -281,15 +282,10 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.orig_eax = -1;
 	regs.eip = (unsigned long) kernel_thread_helper;
 	regs.xcs = __KERNEL_CS;
-	regs.eflags = 0x286;
+	regs.eflags = X86_EFLAGS_IF | X86_EFLAGS_SF | X86_EFLAGS_PF | 0x2;
 
 	/* Ok, create the new process.. */
-	ret = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	if (ret > 0)
-		TRIG_EVENT(kthread_hook, ret, (int) fn);
-#endif
-	return  ret;
+	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
 
 /*
@@ -308,16 +304,12 @@ void exit_thread(void)
 		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
 		put_cpu();
 	}
-	if (tsk->thread.debugreg[7])
-		dr_dec_use_count(tsk->thread.debugreg[7]);
 }
 
 void flush_thread(void)
 {
 	struct task_struct *tsk = current;
 
-	if (tsk->thread.debugreg[7])
-		dr_dec_use_count(tsk->thread.debugreg[7]); 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
 	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
 	/*
@@ -361,7 +353,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	int err;
 
 	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
-	struct_cpy(childregs, regs);
+	*childregs = *regs;
 	childregs->eax = 0;
 	childregs->esp = esp;
 	p->set_child_tid = p->clear_child_tid = NULL;
@@ -406,9 +398,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		desc->a = LDT_entry_a(&info);
 		desc->b = LDT_entry_b(&info);
 	}
-
-	if (tsk->thread.debugreg[7])
-		dr_inc_use_count(tsk->thread.debugreg[7]);
 
 	err = 0;
  out:
@@ -552,24 +541,6 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	/*
 	 * Now maybe reload the debug registers
 	 */
-#ifdef CONFIG_DEBUGREG
-{
-	/*
-	 * Don't reload global debug registers. Don't touch the global debug
-	 * register settings in dr7.
-	 */
-	unsigned long next_dr7 = next->debugreg[7];
-	if (unlikely(next_dr7)) {
-		if (DR7_L0(next_dr7)) loaddebug(next, 0);
-		if (DR7_L1(next_dr7)) loaddebug(next, 1);
-		if (DR7_L2(next_dr7)) loaddebug(next, 2);
-		if (DR7_L3(next_dr7)) loaddebug(next, 3);
-		/* no 4 and 5 */
-		loaddebug(next, 6);
-		load_process_dr7(next_dr7);
-	}
-}
-#else
 	if (unlikely(next->debugreg[7])) {
 		loaddebug(next, 0);
 		loaddebug(next, 1);
@@ -579,7 +550,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		loaddebug(next, 6);
 		loaddebug(next, 7);
 	}
-#endif
+
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
 		if (next->io_bitmap_ptr) {
 			/*
@@ -666,13 +637,6 @@ out:
 	return error;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
 #define top_esp                (THREAD_SIZE - sizeof(unsigned long))
 #define top_ebp                (THREAD_SIZE - 2*sizeof(unsigned long))
 
@@ -693,14 +657,12 @@ unsigned long get_wchan(struct task_struct *p)
 		if (ebp < stack_page || ebp > top_ebp+stack_page)
 			return 0;
 		eip = *(unsigned long *) (ebp+4);
-		if (eip < first_sched || eip >= last_sched)
+		if (!in_sched_functions(eip))
 			return eip;
 		ebp = *(unsigned long *) ebp;
 	} while (count++ < 16);
 	return 0;
 }
-#undef last_sched
-#undef first_sched
 
 /*
  * sys_alloc_thread_area: get a yet unused TLS descriptor index.
@@ -779,7 +741,7 @@ asmlinkage int sys_set_thread_area(struct user_desc __user *u_info)
 	((desc)->a & 0x0ffff) | \
 	 ((desc)->b & 0xf0000) )
 	
-#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_32BIT(desc)		(((desc)->b >> 22) & 1)
 #define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
 #define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
 #define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)

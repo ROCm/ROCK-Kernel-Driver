@@ -1131,7 +1131,7 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
 	port->event = 0;
-	port->tty = 0;
+	port->tty = NULL;
 	if (port->blocked_open) {
 		if (port->close_delay) {
 			current->state = TASK_INTERRUPTIBLE;
@@ -1380,7 +1380,7 @@ static inline void rc_send_break(struct riscom_port * port, unsigned long length
 }
 
 static inline int rc_set_serial_info(struct riscom_port * port,
-				     struct serial_struct * newinfo)
+				     struct serial_struct __user * newinfo)
 {
 	struct serial_struct tmp;
 	struct riscom_board *bp = port_Board(port);
@@ -1427,7 +1427,7 @@ static inline int rc_set_serial_info(struct riscom_port * port,
 }
 
 static inline int rc_get_serial_info(struct riscom_port * port,
-				     struct serial_struct * retinfo)
+				     struct serial_struct __user *retinfo)
 {
 	struct serial_struct tmp;
 	struct riscom_board *bp = port_Board(port);
@@ -1450,6 +1450,7 @@ static int rc_ioctl(struct tty_struct * tty, struct file * filp,
 		    
 {
 	struct riscom_port *port = (struct riscom_port *)tty->driver_data;
+	void __user *argp = (void __user *)arg;
 	int retval;
 				
 	if (rc_paranoia_check(port, tty->name, "rc_ioctl"))
@@ -1472,18 +1473,18 @@ static int rc_ioctl(struct tty_struct * tty, struct file * filp,
 		rc_send_break(port, arg ? arg*(HZ/10) : HZ/4);
 		break;
 	 case TIOCGSOFTCAR:
-		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned int *) arg);
+		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned __user *)argp);
 	 case TIOCSSOFTCAR:
-		if (get_user(arg,(unsigned int *) arg))
+		if (get_user(arg,(unsigned __user *) argp))
 			return -EFAULT;
 		tty->termios->c_cflag =
 			((tty->termios->c_cflag & ~CLOCAL) |
 			(arg ? CLOCAL : 0));
 		break;
 	 case TIOCGSERIAL:	
-		return rc_get_serial_info(port, (struct serial_struct *) arg);
+		return rc_get_serial_info(port, argp);
 	 case TIOCSSERIAL:	
-		return rc_set_serial_info(port, (struct serial_struct *) arg);
+		return rc_set_serial_info(port, argp);
 	 default:
 		return -ENOIOCTLCMD;
 	}
@@ -1607,7 +1608,7 @@ static void rc_hangup(struct tty_struct * tty)
 	port->event = 0;
 	port->count = 0;
 	port->flags &= ~ASYNC_NORMAL_ACTIVE;
-	port->tty = 0;
+	port->tty = NULL;
 	wake_up_interruptible(&port->open_wait);
 }
 

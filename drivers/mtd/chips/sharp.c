@@ -4,7 +4,7 @@
  * Copyright 2000,2001 David A. Schleef <ds@schleef.org>
  *           2000,2001 Lineo, Inc.
  *
- * $Id: sharp.c,v 1.12 2003/05/28 15:39:52 dwmw2 Exp $
+ * $Id: sharp.c,v 1.13 2004/07/12 14:06:34 dwmw2 Exp $
  *
  * Devices supported:
  *   LH28F016SCT Symmetrical block flash memory, 2Mx8
@@ -30,6 +30,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/cfi.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #define CMD_RESET		0xffffffff
 #define CMD_READ_ID		0x90909090
@@ -154,7 +155,7 @@ struct mtd_info *sharp_probe(struct map_info *map)
 	map->fldrv = &sharp_chipdrv;
 	map->fldrv_priv = sharp;
 
-	MOD_INC_USE_COUNT;
+	__module_get(THIS_MODULE);
 	return mtd;
 }
 

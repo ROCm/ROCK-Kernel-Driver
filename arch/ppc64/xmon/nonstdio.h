@@ -20,9 +20,3 @@ extern void xmon_fprintf(void *, const char *, ...);
 extern void xmon_sprintf(char *, const char *, ...);
 
 #define perror(s)	printf("%s: no files!\n", (s))
-
-/* So that our copy doesn't collide with kdb's... */
-#define print_insn_powerpc	xmon_print_insn_powerpc
-#define powerpc_opcodes		xmon_powerpc_opcodes
-#define powerpc_num_opcodes	xmon_num_powerpc_opcodes
-#define powerpc_operands	xmon_powerpc_operands

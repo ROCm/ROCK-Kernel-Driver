@@ -53,7 +53,7 @@ extern int atari_dont_touch_floppy_select;
 #define ATARI_SWITCH_OVSC_SND6	(ATARI_SWITCH_SND6 << ATARI_SWITCH_OVSC_SHIFT)
 #define ATARI_SWITCH_OVSC_SND7	(ATARI_SWITCH_SND7 << ATARI_SWITCH_OVSC_SHIFT)
 #define ATARI_SWITCH_OVSC_MASK	0xffff0000
-	
+
 /*
  * Define several Hardware-Chips for indication so that for the ATARI we do
  * no longer decide whether it is a Falcon or other machine . It's just
@@ -151,8 +151,8 @@ static inline void dma_cache_maintenance( unsigned long paddr,
 }
 
 
-/* 
-** Shifter  
+/*
+** Shifter
  */
 #define ST_LOW  0
 #define ST_MID  1
@@ -161,22 +161,22 @@ static inline void dma_cache_maintenance( unsigned long paddr,
 #define TT_MID  4
 #define TT_HIGH 6
 
-#define SHF_BAS (0xffff8200)    
-struct SHIFTER 
+#define SHF_BAS (0xffff8200)
+struct SHIFTER
  {
- 	u_char pad1;
+	u_char pad1;
 	u_char bas_hi;
 	u_char pad2;
 	u_char bas_md;
 	u_char pad3;
 	u_char volatile vcounthi;
- 	u_char pad4;
- 	u_char volatile vcountmid;
- 	u_char pad5;
- 	u_char volatile vcountlow;
- 	u_char volatile syncmode;
- 	u_char pad6;
- 	u_char pad7; 
+	u_char pad4;
+	u_char volatile vcountmid;
+	u_char pad5;
+	u_char volatile vcountlow;
+	u_char volatile syncmode;
+	u_char pad6;
+	u_char pad7;
 	u_char bas_lo;
  };
 # define shifter ((*(volatile struct SHIFTER *)SHF_BAS))
@@ -186,7 +186,7 @@ struct SHIFTER_F030
  {
   u_short off_next;
   u_short scn_width;
- };                             
+ };
 # define shifter_f030 ((*(volatile struct SHIFTER_F030 *)SHF_FBAS))
 
 
@@ -278,9 +278,9 @@ struct VIDEL {
 
 /*
 ** DMA/WD1772 Disk Controller
- */                          
- 
-#define FWD_BAS (0xffff8604)  
+ */
+
+#define FWD_BAS (0xffff8604)
 struct DMA_WD
  {
   u_short fdc_acces_seccount;
@@ -364,9 +364,9 @@ struct TT_5380 {
 #define	tt_scsi_regp	((volatile char *)TT_5380_BAS)
 
 
-/* 
+/*
 ** Falcon DMA Sound Subsystem
- */     
+ */
 
 #define MATRIX_BASE (0xffff8930)
 struct MATRIX
@@ -419,8 +419,8 @@ struct BLITTER
   u_short src_x_inc;
   u_short src_y_inc;
   u_long src_address;
-  u_short endmask1;  
-  u_short endmask2;  
+  u_short endmask1;
+  u_short endmask2;
   u_short endmask3;
   u_short dst_x_inc;
   u_short dst_y_inc;
@@ -430,7 +430,7 @@ struct BLITTER
   u_short hlf_op_reg;
   u_short log_op_reg;
   u_short lin_nm_reg;
-  u_short skew_reg;  
+  u_short skew_reg;
  };
 # define blitter ((*(volatile struct BLITTER *)BLT_BAS))
 
@@ -438,7 +438,7 @@ struct BLITTER
 /*
 ** SCC Z8530
  */
- 
+
 #define SCC_BAS (0xffff8c81)
 struct SCC
  {
@@ -462,7 +462,7 @@ struct SCC
 #define	tt_scc_dma	((*(volatile struct TT_DMA *)TT_SCC_DMA_BAS))
 
 /*
-** VIDEL Palette Register 
+** VIDEL Palette Register
  */
 
 #define FPL_BAS (0xffff9800)
@@ -487,7 +487,7 @@ struct DSP56K_HOST_INTERFACE {
 #define DSP56K_ICR_HM0	0x20
 #define DSP56K_ICR_HM1	0x40
 #define DSP56K_ICR_INIT	0x80
-  
+
   u_char cvr;
 #define DSP56K_CVR_HV_MASK 0x1f
 #define DSP56K_CVR_HC	0x80
@@ -500,7 +500,7 @@ struct DSP56K_HOST_INTERFACE {
 #define DSP56K_ISR_HF3	0x10
 #define DSP56K_ISR_DMA	0x40
 #define DSP56K_ISR_HREQ	0x80
-  
+
   u_char ivr;
 
   union {
@@ -510,11 +510,11 @@ struct DSP56K_HOST_INTERFACE {
   } data;
 };
 #define dsp56k_host_interface ((*(volatile struct DSP56K_HOST_INTERFACE *)DSP56K_HOST_INTERFACE_BASE))
- 
+
 /*
 ** MFP 68901
  */
- 
+
 #define MFP_BAS (0xfffffa01)
 struct MFP
  {
@@ -649,7 +649,7 @@ struct TT_RTC {
 #define ACIA_IRQ  (1<<7)	/* Interrupt Request */
 
 #define ACIA_BAS (0xfffffc00)
-struct ACIA 
+struct ACIA
  {
   u_char key_ctrl;
   u_char char_dummy1;
@@ -686,17 +686,17 @@ struct TT_DMASND {
 	u_char	pad11[12];
 	u_char	track_select;	/* Falcon */
 	u_char	mode;
- 	u_char	pad12[14];
- 	/* Falcon only: */
- 	u_short	cbar_src;
- 	u_short cbar_dst;
- 	u_char	ext_div;
- 	u_char	int_div;
- 	u_char	rec_track_select;
- 	u_char	dac_src;
- 	u_char	adc_src;
- 	u_char	input_gain;
- 	u_short	output_atten;
+	u_char	pad12[14];
+	/* Falcon only: */
+	u_short	cbar_src;
+	u_short cbar_dst;
+	u_char	ext_div;
+	u_char	int_div;
+	u_char	rec_track_select;
+	u_char	dac_src;
+	u_char	adc_src;
+	u_char	input_gain;
+	u_short	output_atten;
 };
 # define tt_dmasnd ((*(volatile struct TT_DMASND *)TT_DMASND_BAS))
 
@@ -721,7 +721,7 @@ struct TT_DMASND {
 #define	DMASND_MODE_12KHZ	  0x01
 #define	DMASND_MODE_25KHZ	  0x02
 #define	DMASND_MODE_50KHZ	  0x03
- 
+
 
 #define DMASNDSetBase(bufstart)						\
     do {								\

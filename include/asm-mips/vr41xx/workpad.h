@@ -1,17 +1,21 @@
 /*
- * FILE NAME
- *	include/asm-mips/vr41xx/workpad.h
+ *  workpad.h, Include file for IBM WorkPad z50.
  *
- * BRIEF MODULE DESCRIPTION
- *	Include file for IBM WorkPad z50.
+ *  Copyright (C) 2002-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
- * Copyright 2002 Yoichi Yuasa
- *                yuasa@hh.iij4u.or.jp
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
  *
- *  This program is free software; you can redistribute it and/or modify it
- *  under the terms of the GNU General Public License as published by the
- *  Free Software Foundation; either version 2 of the License, or (at your
- *  option) any later version.
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #ifndef __IBM_WORKPAD_H
 #define __IBM_WORKPAD_H
@@ -29,10 +33,11 @@
 #define VR41XX_ISA_IO_BASE		0x15000000
 #define VR41XX_ISA_IO_SIZE		0x03000000
 
+#define ISA_BUS_IO_BASE			0
+#define ISA_BUS_IO_SIZE			VR41XX_ISA_IO_SIZE
+
 #define IO_PORT_BASE			KSEG1ADDR(VR41XX_ISA_IO_BASE)
-#define IO_PORT_RESOURCE_START		0
-#define IO_PORT_RESOURCE_END		VR41XX_ISA_IO_SIZE
-#define IO_MEM_RESOURCE_START		VR41XX_ISA_MEM_BASE
-#define IO_MEM_RESOURCE_END		(VR41XX_ISA_MEM_BASE + VR41XX_ISA_MEM_SIZE)
+#define IO_PORT_RESOURCE_START		ISA_BUS_IO_BASE
+#define IO_PORT_RESOURCE_END		(ISA_BUS_IO_BASE + ISA_BUS_IO_SIZE - 1)
 
 #endif /* __IBM_WORKPAD_H */

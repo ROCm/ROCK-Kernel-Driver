@@ -191,7 +191,7 @@ nlm4_encode_testres(u32 *p, struct nlm_res *resp)
 
 	dprintk("xdr: before encode_testres (p %p resp %p)\n", p, resp);
 	if (!(p = nlm4_encode_cookie(p, &resp->cookie)))
-		return 0;
+		return NULL;
 	*p++ = resp->status;
 
 	if (resp->status == nlm_lck_denied) {
@@ -202,7 +202,7 @@ nlm4_encode_testres(u32 *p, struct nlm_res *resp)
 
 		/* Encode owner handle. */
 		if (!(p = xdr_encode_netobj(p, &resp->lock.oh)))
-			return 0;
+			return NULL;
 
 		start = loff_t_to_s64(fl->fl_start);
 		if (fl->fl_end == OFFSET_MAX)

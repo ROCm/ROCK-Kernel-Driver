@@ -276,6 +276,9 @@ static void tc589_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
+    if (link->dev)
+	unregister_netdev(dev);
+
     if (link->state & DEV_CONFIG)
 	tc589_release(link);
     
@@ -284,8 +287,6 @@ static void tc589_detach(dev_link_t *link)
     
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    if (link->dev)
-	unregister_netdev(dev);
     free_netdev(dev);
 } /* tc589_detach */
 
@@ -308,7 +309,7 @@ static void tc589_config(dev_link_t *link)
     tuple_t tuple;
     cisparse_t parse;
     u16 buf[32], *phys_addr;
-    int last_fn, last_ret, i, j, multi = 0;
+    int last_fn, last_ret, i, j, multi = 0, fifo;
     ioaddr_t ioaddr;
     char *ram_split[] = {"5:3", "3:1", "1:1", "3:5"};
     
@@ -357,11 +358,6 @@ static void tc589_config(dev_link_t *link)
 	
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
-    if (register_netdev(dev) != 0) {
-	printk(KERN_ERR "3c589_cs: register_netdev() failed\n");
-	goto failed;
-    }
-    
     ioaddr = dev->base_addr;
     EL3WINDOW(0);
 
@@ -382,13 +378,10 @@ static void tc589_config(dev_link_t *link)
 	}
     }
 
-    strcpy(lp->node.dev_name, dev->name);
-    link->dev = &lp->node;
-    link->state &= ~DEV_CONFIG_PENDING;
-    
     /* The address and resource configuration register aren't loaded from
        the EEPROM and *must* be set to 0 and IRQ3 for the PCMCIA version. */
     outw(0x3f00, ioaddr + 8);
+    fifo = inl(ioaddr);
 
     /* The if_port symbol can be set when the module is loaded */
     if ((if_port >= 0) && (if_port <= 3))
@@ -396,14 +389,24 @@ static void tc589_config(dev_link_t *link)
     else
 	printk(KERN_ERR "3c589_cs: invalid if_port requested\n");
     
+    link->dev = &lp->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
+    if (register_netdev(dev) != 0) {
+	printk(KERN_ERR "3c589_cs: register_netdev() failed\n");
+	link->dev = NULL;
+	goto failed;
+    }
+
+    strcpy(lp->node.dev_name, dev->name);
+
     printk(KERN_INFO "%s: 3Com 3c%s, io %#3lx, irq %d, hw_addr ",
 	   dev->name, (multi ? "562" : "589"), dev->base_addr,
 	   dev->irq);
     for (i = 0; i < 6; i++)
 	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
-    i = inl(ioaddr);
     printk(KERN_INFO "  %dK FIFO split %s Rx:Tx, %s xcvr\n",
-	   (i & 7) ? 32 : 8, ram_split[(i >> 16) & 3],
+	   (fifo & 7) ? 32 : 8, ram_split[(fifo >> 16) & 3],
 	   if_names[dev->if_port]);
     return;
 
@@ -454,10 +457,8 @@ static int tc589_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 	    netif_device_detach(dev);
-	    tc589_release(link);
-	}
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
@@ -711,12 +712,13 @@ static void pop_tx_status(struct net_device *dev)
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     ioaddr_t ioaddr = dev->base_addr;
+    struct el3_private *priv = netdev_priv(dev);
 
     DEBUG(3, "%s: el3_start_xmit(length = %ld) called, "
 	  "status %4.4x.\n", dev->name, (long)skb->len,
 	  inw(ioaddr + EL3_STATUS));
 
-    ((struct el3_private *)dev->priv)->stats.tx_bytes += skb->len;
+    priv->stats.tx_bytes += skb->len;
 
     /* Put out the doubleword header... */
     outw(skb->len, ioaddr + TX_FIFO);

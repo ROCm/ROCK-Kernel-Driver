@@ -93,7 +93,7 @@ void bad_trap (struct pt_regs *regs, long lvl)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLTRP;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = lvl;
 	force_sig_info(SIGILL, &info, current);
 }
@@ -133,7 +133,7 @@ void instruction_access_exception(struct pt_regs *regs,
 	info.si_signo = SIGSEGV;
 	info.si_errno = 0;
 	info.si_code = SEGV_MAPERR;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGSEGV, &info, current);
 }
@@ -176,7 +176,7 @@ void data_access_exception (struct pt_regs *regs,
 	info.si_signo = SIGSEGV;
 	info.si_errno = 0;
 	info.si_code = SEGV_MAPERR;
-	info.si_addr = (void *)sfar;
+	info.si_addr = (void __user *)sfar;
 	info.si_trapno = 0;
 	force_sig_info(SIGSEGV, &info, current);
 }
@@ -1617,7 +1617,7 @@ void do_fpe_common(struct pt_regs *regs)
 		}
 		info.si_signo = SIGFPE;
 		info.si_errno = 0;
-		info.si_addr = (void *)regs->tpc;
+		info.si_addr = (void __user *)regs->tpc;
 		info.si_trapno = 0;
 		info.si_code = __SI_FAULT;
 		if ((fsr & 0x1c000) == (1 << 14)) {
@@ -1672,7 +1672,7 @@ void do_tof(struct pt_regs *regs)
 	info.si_signo = SIGEMT;
 	info.si_errno = 0;
 	info.si_code = EMT_TAGOVF;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGEMT, &info, current);
 }
@@ -1690,7 +1690,7 @@ void do_div0(struct pt_regs *regs)
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
 	info.si_code = FPE_INTDIV;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGFPE, &info, current);
 }
@@ -1708,7 +1708,7 @@ void instruction_dump (unsigned int *pc)
 	printk("\n");
 }
 
-void user_instruction_dump (unsigned int *pc)
+static void user_instruction_dump (unsigned int __user *pc)
 {
 	int i;
 	unsigned int buf[9];
@@ -1758,13 +1758,6 @@ void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 #ifndef CONFIG_KALLSYMS
 	printk("\n");
 #endif
-}
-
-void show_trace_task(struct task_struct *tsk)
-{
-	if (tsk)
-		show_stack(tsk,
-			   (unsigned long *) tsk->thread_info->ksp);
 }
 
 void dump_stack(void)
@@ -1820,7 +1813,7 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 			regs->tpc &= 0xffffffff;
 			regs->tnpc &= 0xffffffff;
 		}
-		user_instruction_dump ((unsigned int *) regs->tpc);
+		user_instruction_dump ((unsigned int __user *) regs->tpc);
 	}
 #ifdef CONFIG_SMP
 	smp_report_regs();
@@ -1845,7 +1838,7 @@ void do_illegal_instruction(struct pt_regs *regs)
 		die_if_kernel("Kernel illegal instruction", regs);
 	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
-	if (get_user(insn, (u32 *)pc) != -EFAULT) {
+	if (get_user(insn, (u32 __user *) pc) != -EFAULT) {
 		if ((insn & 0xc1ffc000) == 0x81700000) /* POPC */ {
 			if (handle_popc(insn, regs))
 				return;
@@ -1857,7 +1850,7 @@ void do_illegal_instruction(struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	force_sig_info(SIGILL, &info, current);
 }
@@ -1869,14 +1862,17 @@ void mem_address_unaligned(struct pt_regs *regs, unsigned long sfar, unsigned lo
 	if (regs->tstate & TSTATE_PRIV) {
 		extern void kernel_unaligned_trap(struct pt_regs *regs,
 						  unsigned int insn, 
-						  unsigned long sfar, unsigned long sfsr);
+						  unsigned long sfar,
+						  unsigned long sfsr);
 
-		return kernel_unaligned_trap(regs, *((unsigned int *)regs->tpc), sfar, sfsr);
+		kernel_unaligned_trap(regs, *((unsigned int *)regs->tpc),
+				      sfar, sfsr);
+		return;
 	}
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRALN;
-	info.si_addr = (void *)sfar;
+	info.si_addr = (void __user *)sfar;
 	info.si_trapno = 0;
 	force_sig_info(SIGBUS, &info, current);
 }
@@ -1892,7 +1888,7 @@ void do_privop(struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_PRVOPC;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGILL, &info, current);
 }

@@ -185,8 +185,6 @@ static void __exit com20020_exit(void)
 #ifndef MODULE
 static int __init com20020isa_setup(char *s)
 {
-	struct net_device *dev;
-	struct arcnet_local *lp;
 	int ints[8];
 
 	s = get_options(s, 8, ints);

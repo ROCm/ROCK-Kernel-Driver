@@ -8,14 +8,12 @@ obj-y := acpi.o entry.o efi.o efi_stub.o gate-data.o fsys.o ia64_ksyms.o irq.o i
 	 irq_lsapic.o ivt.o machvec.o pal.o patch.o process.o perfmon.o ptrace.o sal.o		\
 	 salinfo.o semaphore.o setup.o signal.o sys_ia64.o time.o traps.o unaligned.o unwind.o mca.o mca_asm.o
 
-obj-$(CONFIG_EFI_VARS)		+= efivars.o
 obj-$(CONFIG_IA64_BRL_EMU)	+= brl_emu.o
 obj-$(CONFIG_IA64_GENERIC)	+= acpi-ext.o
 obj-$(CONFIG_IA64_HP_ZX1)	+= acpi-ext.o
 obj-$(CONFIG_IA64_PALINFO)	+= palinfo.o
 obj-$(CONFIG_IOSAPIC)		+= iosapic.o
 obj-$(CONFIG_MODULES)		+= module.o
-obj-$(CONFIG_KPROBES)           += kprobes.o
 obj-$(CONFIG_SMP)		+= smp.o smpboot.o
 obj-$(CONFIG_PERFMON)		+= perfmon_default_smpl.o
 obj-$(CONFIG_IA64_CYCLONE)	+= cyclone.o
@@ -24,6 +22,9 @@ obj-$(CONFIG_IA64_CYCLONE)	+= cyclone.o
 targets += gate.so gate-syms.o
 
 extra-y += gate.so gate-syms.o gate.lds.s gate.o
+
+# fp_emulate() expects f2-f5,f16-f31 to contain the user-level state.
+CFLAGS_traps.o  += -mfixed-range=f2-f5,f16-f31
 
 AFLAGS_gate.lds.o += -P -C -U$(ARCH)
 
@@ -45,5 +46,3 @@ $(obj)/gate-syms.o: $(src)/gate.lds.s $(obj)/gate.o FORCE
 # We must build gate.so before we can assemble it.
 # Note: kbuild does not track this dependency due to usage of .incbin
 $(obj)/gate-data.o: $(obj)/gate.so
-
-CFLAGS_mca.o	+= -I $(TOPDIR)/arch/$(ARCH)/kdb

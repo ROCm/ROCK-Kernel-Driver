@@ -203,10 +203,10 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		default:
 			return -ENOSYS;
 		}
-	if (call <= MSGCTL) 
+	if (call <= MSGCTL)
 		switch (call) {
 		case MSGSND:
-			return sys_msgsnd (first, (struct msgbuf *) ptr, 
+			return sys_msgsnd (first, (struct msgbuf *) ptr,
 					  second, third);
 		case MSGRCV:
 			switch (version) {
@@ -234,7 +234,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		default:
 			return -ENOSYS;
 		}
-	if (call <= SHMCTL) 
+	if (call <= SHMCTL)
 		switch (call) {
 		case SHMAT:
 			switch (version) {
@@ -247,7 +247,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 				return put_user (raddr, (ulong *) third);
 			}
 			}
-		case SHMDT: 
+		case SHMDT:
 			return sys_shmdt ((char *)ptr);
 		case SHMGET:
 			return sys_shmget (first, second, third);
@@ -442,7 +442,7 @@ cache_flush_060 (unsigned long addr, int scope, int cache, unsigned long len)
   unsigned long paddr, i;
 
   /*
-   * 68060 manual says: 
+   * 68060 manual says:
    *  cpush %dc : flush DC, remains valid (with our %cacr setup)
    *  cpush %ic : invalidate IC
    *  cpush %bc : flush DC + invalidate IC

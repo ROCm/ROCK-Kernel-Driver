@@ -22,26 +22,17 @@
 #include <linux/profile.h>
 #include <linux/mount.h>
 #include <linux/proc_fs.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif
-#include <linux/ckrm.h>
-#include <linux/ckrm_tsk.h>
-#include <linux/audit.h>
-#include <linux/trigevent_hooks.h>
-#include <linux/ltt.h>
+#include <linux/mempolicy.h>
 
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
-
-/* tng related changes */
-int (*tng_exitfunc)(int) = NULL;
 
 extern void sem_exit (void);
 extern struct task_struct *child_reaper;
 
-int getrusage(struct task_struct *, int, struct rusage *);
+int getrusage(struct task_struct *, int, struct rusage __user *);
 
 static void __unhash_process(struct task_struct *p)
 {
@@ -265,8 +256,6 @@ void reparent_to_init(void)
 	write_unlock_irq(&tasklist_lock);
 }
 
-EXPORT_SYMBOL(reparent_to_init);
-
 void __set_special_pids(pid_t session, pid_t pgrp)
 {
 	struct task_struct *curr = current;
@@ -290,8 +279,6 @@ void set_special_pids(pid_t session, pid_t pgrp)
 	write_unlock_irq(&tasklist_lock);
 }
 
-EXPORT_SYMBOL(set_special_pids);
-
 /*
  * Let kernel threads use this to say that they
  * allow a certain signal (since daemonize() will
@@ -309,7 +296,7 @@ int allow_signal(int sig)
 		   Let the signal code know it'll be handled, so
 		   that they don't get converted to SIGKILL or
 		   just silently dropped */
-		current->sighand->action[(sig)-1].sa.sa_handler = (void *)2;
+		current->sighand->action[(sig)-1].sa.sa_handler = (void __user *)2;
 	}
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
@@ -400,6 +387,19 @@ static inline void close_files(struct files_struct * files)
 	}
 }
 
+struct files_struct *get_files_struct(struct task_struct *task)
+{
+	struct files_struct *files;
+
+	task_lock(task);
+	files = task->files;
+	if (files)
+		atomic_inc(&files->count);
+	task_unlock(task);
+
+	return files;
+}
+
 void fastcall put_files_struct(struct files_struct *files)
 {
 	if (atomic_dec_and_test(&files->count)) {
@@ -435,8 +435,6 @@ void exit_files(struct task_struct *tsk)
 {
 	__exit_files(tsk);
 }
-
-EXPORT_SYMBOL(exit_files);
 
 static inline void __put_fs_struct(struct fs_struct *fs)
 {
@@ -661,8 +659,6 @@ static void exit_notify(struct task_struct *tsk)
 	struct task_struct *t;
 	struct list_head ptrace_dead, *_p, *_n;
 
-	ckrm_cb_exit(tsk);
-
 	if (signal_pending(tsk) && !tsk->signal->group_exit
 	    && !thread_group_empty(tsk)) {
 		/*
@@ -825,22 +821,13 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	}
 
 	acct_process(code);
-#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
-	if (AUDITING(tsk))
-		audit_exit(tsk, code);
-	audit_free(tsk->audit);
-#endif
 	__exit_mm(tsk);
 
-	TRACE_CLEANUP();  
-	TRIG_EVENT(process_exit_hook, tsk->pid);
 	exit_sem(tsk);
 	__exit_files(tsk);
 	__exit_fs(tsk);
 	exit_namespace(tsk);
 	exit_thread();
-	mpol_free(tsk->mempolicy);
-	tsk->mempolicy = NULL;
 
 	if (tsk->signal->leader)
 		disassociate_ctty(1);
@@ -850,12 +837,11 @@ asmlinkage NORET_TYPE void do_exit(long code)
 		module_put(tsk->binfmt->module);
 
 	tsk->exit_code = code;
-#ifdef CONFIG_CKRM_TYPE_TASKCLASS
-	numtasks_put_ref(tsk->taskclass);
-#endif
 	exit_notify(tsk);
-	if (unlikely(tng_exitfunc))
-        	(*tng_exitfunc)((int) code);
+#ifdef CONFIG_NUMA
+	mpol_free(tsk->mempolicy);
+	tsk->mempolicy = NULL;
+#endif
 	schedule();
 	BUG();
 	/* Avoid "noreturn function does return".  */
@@ -877,24 +863,17 @@ asmlinkage long sys_exit(int error_code)
 	do_exit((error_code&0xff)<<8);
 }
 
-task_t fastcall *next_thread(task_t *p)
+task_t fastcall *next_thread(const task_t *p)
 {
-	struct pid_link *link = p->pids + PIDTYPE_TGID;
-	struct list_head *tmp, *head = &link->pidptr->task_list;
+	const struct pid_link *link = p->pids + PIDTYPE_TGID;
+	const struct list_head *tmp, *head = &link->pidptr->task_list;
 
 #ifdef CONFIG_SMP
-#ifdef	CONFIG_KDB
-	/* kdb does not take locks */
-	if (!KDB_IS_RUNNING()) {
-#endif
 	if (!p->sighand)
 		BUG();
 	if (!spin_is_locked(&p->sighand->siglock) &&
 				!rwlock_is_locked(&tasklist_lock))
 		BUG();
-#ifdef	CONFIG_KDB
-	}
-#endif
 #endif
 	tmp = link->pid_chain.next;
 	if (tmp == head)
@@ -994,7 +973,7 @@ static int eligible_child(pid_t pid, int options, task_t *p)
  * the lock and this task is uninteresting.  If we return nonzero, we have
  * released the lock and the system call should return.
  */
-static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *ru)
+static int wait_task_zombie(task_t *p, unsigned int __user *stat_addr, struct rusage __user *ru)
 {
 	unsigned long state;
 	int retval;
@@ -1039,20 +1018,17 @@ static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *r
 		if (p->real_parent != p->parent) {
 			__ptrace_unlink(p);
 			p->state = TASK_ZOMBIE;
-			/* If this is a detached thread, this is where it goes away.  */
-			if (p->exit_signal == -1) {
-				/* release_task takes the lock itself.  */
-				write_unlock_irq(&tasklist_lock);
-				release_task (p);
-			}
-			else {
+			/*
+			 * If this is not a detached task, notify the parent.  If it's
+			 * still not detached after that, don't release it now.
+			 */
+			if (p->exit_signal != -1) {
 				do_notify_parent(p, p->exit_signal);
-				write_unlock_irq(&tasklist_lock);
+				if (p->exit_signal != -1)
+					p = NULL;
 			}
-			p = NULL;
 		}
-		else
-			write_unlock_irq(&tasklist_lock);
+		write_unlock_irq(&tasklist_lock);
 	}
 	if (p != NULL)
 		release_task(p);
@@ -1067,7 +1043,8 @@ static int wait_task_zombie(task_t *p, unsigned int *stat_addr, struct rusage *r
  * released the lock and the system call should return.
  */
 static int wait_task_stopped(task_t *p, int delayed_group_leader,
-			     unsigned int *stat_addr, struct rusage *ru)
+			     unsigned int __user *stat_addr,
+			     struct rusage __user *ru)
 {
 	int retval, exit_code;
 
@@ -1137,7 +1114,7 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader,
 	return retval;
 }
 
-asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struct rusage * ru)
+asmlinkage long sys_wait4(pid_t pid,unsigned int __user *stat_addr, int options, struct rusage __user *ru)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct task_struct *tsk;
@@ -1146,7 +1123,6 @@ asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struc
 	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
 		return -EINVAL;
 
-	TRIG_EVENT(process_wait_hook, pid);
 	add_wait_queue(&current->wait_chldexit,&wait);
 repeat:
 	flag = 0;
@@ -1221,16 +1197,13 @@ end_wait4:
 	return retval;
 }
 
-EXPORT_SYMBOL(sys_wait4); /* kernel/arch/ia64/sn/kernel/xpc.ko needs unknown symbol sys_wait4 */
-
-#if !defined(__alpha__) && !defined(__ia64__) && \
-    !defined(__arm__) && !defined(__s390__)
+#ifdef __ARCH_WANT_SYS_WAITPID
 
 /*
  * sys_waitpid() remains for compatibility. waitpid() should be
  * implemented by calling sys_wait4() from libc.a.
  */
-asmlinkage long sys_waitpid(pid_t pid,unsigned int * stat_addr, int options)
+asmlinkage long sys_waitpid(pid_t pid, unsigned __user *stat_addr, int options)
 {
 	return sys_wait4(pid, stat_addr, options, NULL);
 }

@@ -26,8 +26,6 @@ enum bh_state_bits {
 	BH_Delay,	/* Buffer is not yet allocated on disk */
 	BH_Boundary,	/* Block is followed by a discontiguity */
 	BH_Write_EIO,	/* I/O error on write */
-	BH_Ordered,	/* ordered write */
-	BH_Eopnotsupp,	/* operation not supported (barrier) */
 
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
@@ -62,13 +60,6 @@ struct buffer_head {
  	void *b_private;		/* reserved for b_end_io */
 	struct list_head b_assoc_buffers; /* associated with another mapping */
 };
-
-/*
- * Debug
- */
-
-void __buffer_error(char *file, int line);
-#define buffer_error() __buffer_error(__FILE__, __LINE__)
 
 /*
  * macro tricks to expand the set_buffer_foo(), clear_buffer_foo()
@@ -119,9 +110,7 @@ BUFFER_FNS(Async_Read, async_read)
 BUFFER_FNS(Async_Write, async_write)
 BUFFER_FNS(Delay, delay)
 BUFFER_FNS(Boundary, boundary)
-BUFFER_FNS(Write_EIO, write_io_error)
-BUFFER_FNS(Ordered, ordered)
-BUFFER_FNS(Eopnotsupp, eopnotsupp)
+BUFFER_FNS(Write_EIO,write_io_error)
 
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
 #define touch_buffer(bh)	mark_page_accessed(bh->b_page)
@@ -181,9 +170,10 @@ struct buffer_head *__bread(struct block_device *, sector_t block, int size);
 struct buffer_head *alloc_buffer_head(int gfp_flags);
 void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
+void FASTCALL(__lock_buffer(struct buffer_head *bh));
 void ll_rw_block(int, int, struct buffer_head * bh[]);
-int sync_dirty_buffer(struct buffer_head *bh);
-int submit_bh(int, struct buffer_head *);
+void sync_dirty_buffer(struct buffer_head *bh);
+void submit_bh(int, struct buffer_head *);
 void write_boundary_block(struct block_device *bdev,
 			sector_t bblock, unsigned blocksize);
 
@@ -211,6 +201,12 @@ int file_fsync(struct file *, struct dentry *, int);
 int nobh_prepare_write(struct page*, unsigned, unsigned, get_block_t*);
 int nobh_commit_write(struct file *, struct page *, unsigned, unsigned);
 int nobh_truncate_page(struct address_space *, loff_t);
+
+#define OSYNC_METADATA	(1<<0)
+#define OSYNC_DATA	(1<<1)
+#define OSYNC_INODE	(1<<2)
+int generic_osync_inode(struct inode *, struct address_space *, int);
+
 
 /*
  * inline definitions
@@ -284,8 +280,8 @@ static inline void wait_on_buffer(struct buffer_head *bh)
 
 static inline void lock_buffer(struct buffer_head *bh)
 {
-	while (test_set_buffer_locked(bh))
-		__wait_on_buffer(bh);
+	if (test_set_buffer_locked(bh))
+		__lock_buffer(bh);
 }
 
 #endif /* _LINUX_BUFFER_HEAD_H */

@@ -21,10 +21,6 @@
 #define ND_OPT_REDIRECT_HDR		4
 #define ND_OPT_MTU			5
 
-/* Mobile IPv6 specific ndisc options */ 
-#define ND_OPT_RTR_ADV_INTERVAL		7 
-#define ND_OPT_HOME_AGENT_INFO		8  
-
 #define MAX_RTR_SOLICITATION_DELAY	HZ
 
 #define ND_REACHABLE_TIME		(30*HZ)
@@ -46,11 +42,6 @@ extern struct neigh_table nd_tbl;
 struct nd_msg {
         struct icmp6hdr	icmph;
         struct in6_addr	target;
-	__u8		opt[0];
-};
-
-struct rs_msg {
-	struct icmp6hdr	icmph;
 	__u8		opt[0];
 };
 

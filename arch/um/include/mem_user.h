@@ -32,38 +32,43 @@
 #ifndef _MEM_USER_H
 #define _MEM_USER_H
 
-struct iomem_region {
-	struct iomem_region *next;
+struct mem_region {
 	char *driver;
+	unsigned long start_pfn;
+	unsigned long start;
+	unsigned long len;
+	void *mem_map;
 	int fd;
-	int size;
-	unsigned long phys;
-	unsigned long virt;
 };
 
-extern struct iomem_region *iomem_regions;
-extern int iomem_size;
+extern struct mem_region *regions[];
+extern struct mem_region physmem_region;
 
 #define ROUND_4M(n) ((((unsigned long) (n)) + (1 << 22)) & ~((1 << 22) - 1))
 
 extern unsigned long host_task_size;
 extern unsigned long task_size;
 
-extern void check_devanon(void);
 extern int init_mem_user(void);
 extern int create_mem_file(unsigned long len);
+extern void setup_range(int fd, char *driver, unsigned long start,
+			unsigned long pfn, unsigned long total, int need_vm, 
+			struct mem_region *region, void *reserved);
 extern void setup_memory(void *entry);
 extern unsigned long find_iomem(char *driver, unsigned long *len_out);
-extern int init_maps(unsigned long physmem, unsigned long iomem, 
-		     unsigned long highmem);
+extern int init_maps(struct mem_region *region);
+extern int nregions(void);
+extern int reserve_vm(unsigned long start, unsigned long end, void *e);
 extern unsigned long get_vm(unsigned long len);
 extern void setup_physmem(unsigned long start, unsigned long usable,
-			  unsigned long len, unsigned long highmem);
+			  unsigned long len);
+extern int setup_region(struct mem_region *region, void *entry);
 extern void add_iomem(char *name, int fd, unsigned long size);
+extern struct mem_region *phys_region(unsigned long phys);
 extern unsigned long phys_offset(unsigned long phys);
 extern void unmap_physmem(void);
-extern void map_memory(unsigned long virt, unsigned long phys, 
-		       unsigned long len, int r, int w, int x);
+extern int map_memory(unsigned long virt, unsigned long phys, 
+		      unsigned long len, int r, int w, int x);
 extern int protect_memory(unsigned long addr, unsigned long len, 
 			  int r, int w, int x, int must_succeed);
 extern unsigned long get_kmem_end(void);

@@ -194,7 +194,7 @@ static int gemtek_do_ioctl(struct inode *inode, struct file *file,
 		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio *v = 0;
+			struct video_audio *v = arg;
 			memset(v,0, sizeof(*v));
 			v->flags|=VIDEO_AUDIO_MUTABLE;
 			v->volume=1;

@@ -53,15 +53,12 @@ asmlinkage int sys_cacheflush(void *addr, int bytes, int cache)
 	return 0;
 }
 
-void flush_dcache_page(struct page *page)
+void __flush_dcache_page(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
 	unsigned long addr;
 
-	if (mapping &&
-	    prio_tree_empty(&mapping->i_mmap) &&
-	    prio_tree_empty(&mapping->i_mmap_shared) &&
-	    list_empty(&mapping->i_mmap_nonlinear)) {
+	if (mapping && !mapping_mapped(mapping)) {
 		SetPageDcacheDirty(page);
 		return;
 	}
@@ -74,6 +71,8 @@ void flush_dcache_page(struct page *page)
 	addr = (unsigned long) page_address(page);
 	flush_data_cache_page(addr);
 }
+
+EXPORT_SYMBOL(__flush_dcache_page);
 
 void __update_cache(struct vm_area_struct *vma, unsigned long address,
 	pte_t pte)
@@ -93,8 +92,6 @@ void __update_cache(struct vm_area_struct *vma, unsigned long address,
 		ClearPageDcacheDirty(page);
 	}
 }
-
-EXPORT_SYMBOL(flush_dcache_page);
 
 extern void ld_mmu_r23000(void);
 extern void ld_mmu_r4xx0(void);

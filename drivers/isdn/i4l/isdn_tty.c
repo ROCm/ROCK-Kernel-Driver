@@ -134,7 +134,7 @@ isdn_tty_readmodem(void)
 						if (c > 0) {
 							r = isdn_readbchan(info->isdn_driver, info->isdn_channel,
 									   tty->flip.char_buf_ptr,
-									   tty->flip.flag_buf_ptr, c, 0);
+									   tty->flip.flag_buf_ptr, c, NULL);
 							/* CISCO AsyncPPP Hack */
 							if (!(info->emu.mdmreg[REG_CPPP] & BIT_CPPP))
 								memset(tty->flip.flag_buf_ptr, 0, r);
@@ -1359,14 +1359,14 @@ isdn_tty_unthrottle(struct tty_struct *tty)
  *          allows RS485 driver to be written in user space.
  */
 static int
-isdn_tty_get_lsr_info(modem_info * info, uint * value)
+isdn_tty_get_lsr_info(modem_info * info, uint __user * value)
 {
 	u_char status;
 	uint result;
 
 	status = info->lsr;
 	result = ((status & UART_LSR_TEMT) ? TIOCSER_TEMT : 0);
-	return put_user(result, (uint *) value);
+	return put_user(result, value);
 }
 
 
@@ -1468,12 +1468,12 @@ isdn_tty_ioctl(struct tty_struct *tty, struct file *file,
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "ttyI%d ioctl TIOCGSOFTCAR\n", info->line);
 #endif
-			return put_user(C_CLOCAL(tty) ? 1 : 0, (ulong *) arg);
+			return put_user(C_CLOCAL(tty) ? 1 : 0, (ulong __user *) arg);
 		case TIOCSSOFTCAR:
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "ttyI%d ioctl TIOCSSOFTCAR\n", info->line);
 #endif
-			if (get_user(arg, (ulong *) arg))
+			if (get_user(arg, (ulong __user *) arg))
 				return -EFAULT;
 			tty->termios->c_cflag =
 			    ((tty->termios->c_cflag & ~CLOCAL) |
@@ -1483,7 +1483,7 @@ isdn_tty_ioctl(struct tty_struct *tty, struct file *file,
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "ttyI%d ioctl TIOCSERGETLSR\n", info->line);
 #endif
-			return isdn_tty_get_lsr_info(info, (uint *) arg);
+			return isdn_tty_get_lsr_info(info, (uint __user *) arg);
 		default:
 #ifdef ISDN_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "UNKNOWN ioctl 0x%08x on ttyi%d\n", cmd, info->line);
@@ -1751,7 +1751,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
-	info->tty = 0;
+	info->tty = NULL;
 	info->ncarrier = 0;
 	tty->closing = 0;
 	module_put(info->owner);
@@ -1780,7 +1780,7 @@ isdn_tty_hangup(struct tty_struct *tty)
 	isdn_tty_shutdown(info);
 	info->count = 0;
 	info->flags &= ~(ISDN_ASYNC_NORMAL_ACTIVE | ISDN_ASYNC_CALLOUT_ACTIVE);
-	info->tty = 0;
+	info->tty = NULL;
 	wake_up_interruptible(&info->open_wait);
 }
 
@@ -1959,7 +1959,7 @@ isdn_tty_modem_init(void)
 		isdn_tty_modem_reset_regs(info, 1);
 		info->magic = ISDN_ASYNC_MAGIC;
 		info->line = i;
-		info->tty = 0;
+		info->tty = NULL;
 		info->x_char = 0;
 		info->count = 0;
 		info->blocked_open = 0;
@@ -2373,8 +2373,8 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 	char *p;
 	char c;
 	u_long flags;
-	struct sk_buff *skb = 0;
-	char *sp = 0;
+	struct sk_buff *skb = NULL;
+	char *sp = NULL;
 
 	if (!msg) {
 		printk(KERN_WARNING "isdn_tty: Null-Message in isdn_tty_at_cout\n");

@@ -1,4 +1,5 @@
 /* $XFree86$ */
+/* $XdotOrg$ */
 /*
  * General type definitions for universal mode switching modules
  *
@@ -31,13 +32,10 @@
  * * 2) Redistributions in binary form must reproduce the above copyright
  * *    notice, this list of conditions and the following disclaimer in the
  * *    documentation and/or other materials provided with the distribution.
- * * 3) All advertising materials mentioning features or use of this software
- * *    must display the following acknowledgement: "This product includes
- * *    software developed by Thomas Winischhofer, Vienna, Austria."
- * * 4) The name of the author may not be used to endorse or promote products
+ * * 3) The name of the author may not be used to endorse or promote products
  * *    derived from this software without specific prior written permission.
  * *
- * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESSED OR
  * * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -121,21 +119,17 @@ typedef IOADDRESS SISIOADDRESS;
 #endif
 #endif
 
-#ifndef LINUX_KERNEL   /* For the linux kernel, this is defined in sisfb.h */
-#ifndef SIS_CHIP_TYPE
-typedef enum _SIS_CHIP_TYPE {
+enum _SIS_CHIP_TYPE {
     SIS_VGALegacy = 0,
-#ifdef LINUX_XF86
     SIS_530,
     SIS_OLD,
-#endif
     SIS_300,
     SIS_630,
     SIS_730,
     SIS_540,
     SIS_315H,   /* SiS 310 */
     SIS_315,
-    SIS_315PRO, /* SiS 325 */
+    SIS_315PRO,
     SIS_550,
     SIS_650,
     SIS_740,
@@ -144,29 +138,13 @@ typedef enum _SIS_CHIP_TYPE {
     SIS_741,
     SIS_660,
     SIS_760,
+    SIS_761,
+    SIS_340,
     MAX_SIS_CHIP
-} SIS_CHIP_TYPE;
-#endif
-#endif
+};
 
-#ifndef SIS_VB_CHIP_TYPE
-typedef enum _SIS_VB_CHIP_TYPE {
-    VB_CHIP_Legacy = 0,
-    VB_CHIP_301,
-    VB_CHIP_301B,
-    VB_CHIP_301LV,
-    VB_CHIP_302,
-    VB_CHIP_302B,
-    VB_CHIP_302LV,
-    VB_CHIP_301C,
-    VB_CHIP_302ELV,
-    VB_CHIP_UNKNOWN, /* other video bridge or no video bridge */
-    MAX_VB_CHIP
-} SIS_VB_CHIP_TYPE;
-#endif
-
-#ifndef SIS_LCD_TYPE
-typedef enum _SIS_LCD_TYPE {
+#ifdef LINUX_KERNEL
+enum _SIS_LCD_TYPE {
     LCD_INVALID = 0,
     LCD_800x600,
     LCD_1024x768,
@@ -176,28 +154,22 @@ typedef enum _SIS_LCD_TYPE {
     LCD_1600x1200,
     LCD_1920x1440,
     LCD_2048x1536,
-    LCD_320x480,       /* FSTN, DSTN */
+    LCD_320x480,       /* FSTN */
     LCD_1400x1050,
     LCD_1152x864,
     LCD_1152x768,
     LCD_1280x768,
     LCD_1024x600,
-    LCD_640x480_2,     /* FSTN, DSTN */
-    LCD_640x480_3,     /* FSTN, DSTN */
+    LCD_640x480_2,     /* DSTN */
+    LCD_640x480_3,     /* DSTN */
     LCD_848x480,
     LCD_1280x800,
     LCD_1680x1050,
+    LCD_1280x720,
     LCD_CUSTOM,
     LCD_UNKNOWN
-} SIS_LCD_TYPE;
-#endif
-
-#ifndef PSIS_DSReg
-typedef struct _SIS_DSReg
-{
-  UCHAR  jIdx;
-  UCHAR  jVal;
-} SIS_DSReg, *PSIS_DSReg;
+};
+typedef unsigned int SIS_LCD_TYPE;
 #endif
 
 #ifndef SIS_HW_INFO
@@ -220,97 +192,84 @@ struct _SIS_HW_INFO
                                  /* of Linear VGA memory */
 
     ULONG  ulVideoMemorySize;    /* size, in bytes, of the memory on the board */
-    SISIOADDRESS ulIOAddress;    /* base I/O address of VGA ports (0x3B0) */
+
+    SISIOADDRESS ulIOAddress;    /* base I/O address of VGA ports (0x3B0; relocated) */
+
     UCHAR  jChipType;            /* Used to Identify SiS Graphics Chip */
-                                 /* defined in the data structure type  */
-                                 /* "SIS_CHIP_TYPE" */
+                                 /* defined in the enum "SIS_CHIP_TYPE" (above or sisfb.h) */
 
     UCHAR  jChipRevision;        /* Used to Identify SiS Graphics Chip Revision */
-    UCHAR  ujVBChipID;           /* the ID of video bridge */
-                                 /* defined in the data structure type */
-                                 /* "SIS_VB_CHIP_TYPE" */
+
+    BOOLEAN bIntegratedMMEnabled;/* supporting integration MM enable */
+
 #ifdef LINUX_KERNEL
-    BOOLEAN Is301BDH;
-#endif
-
-    USHORT usExternalChip;       /* NO VB or other video bridge (other than  */
-                                 /* SiS video bridge) */
-
     ULONG  ulCRT2LCDType;        /* defined in the data structure type */
                                  /* "SIS_LCD_TYPE" */
-                                     
-    BOOLEAN bIntegratedMMEnabled;/* supporting integration MM enable */
-                                      
-    BOOLEAN bSkipDramSizing;     /* True: Skip video memory sizing. */
-
-#ifdef LINUX_KERNEL
-    PSIS_DSReg  pSR;             /* restore SR registers in initial function. */
-                                 /* end data :(idx, val) =  (FF, FF). */
-                                 /* Note : restore SR registers if  */
-                                 /* bSkipDramSizing = TRUE */
-
-    PSIS_DSReg  pCR;             /* restore CR registers in initial function. */
-                                 /* end data :(idx, val) =  (FF, FF) */
-                                 /* Note : restore cR registers if  */
-                                 /* bSkipDramSizing = TRUE */
 #endif
-
-    PSIS_QUERYSPACE  pQueryVGAConfigSpace; /* Get/Set VGA Configuration  */
-                                           /* space */
- 
-    PSIS_QUERYSPACE  pQueryNorthBridgeSpace;/* Get/Set North Bridge  */
-                                            /* space  */
 };
 #endif
 
-/* Addtional IOCTL for communication sisfb <> X driver        */
+/* Addtional IOCTLs for communication sisfb <> X driver        */
 /* If changing this, sisfb.h must also be changed (for sisfb) */
 
 #ifdef LINUX_XF86  /* We don't want the X driver to depend on the kernel source */
 
 /* ioctl for identifying and giving some info (esp. memory heap start) */
-#define SISFB_GET_INFO    0x80046ef8  /* Wow, what a terrible hack... */
+#define SISFB_GET_INFO_SIZE	0x8004f300
+#define SISFB_GET_INFO		0x8000f301  /* Must be patched with result from ..._SIZE at D[29:16] */
+/* deprecated ioctl number (for older versions of sisfb) */
+#define SISFB_GET_INFO_OLD    	0x80046ef8
+
+/* ioctls for tv parameters (position) */
+#define SISFB_SET_TVPOSOFFSET   0x4004f304
+
+/* lock sisfb from register access */
+#define SISFB_SET_LOCK		0x4004f306
 
 /* Structure argument for SISFB_GET_INFO ioctl  */
 typedef struct _SISFB_INFO sisfb_info, *psisfb_info;
 
 struct _SISFB_INFO {
-	unsigned long sisfb_id;         /* for identifying sisfb */
+	CARD32 	sisfb_id;         	/* for identifying sisfb */
 #ifndef SISFB_ID
 #define SISFB_ID	  0x53495346    /* Identify myself with 'SISF' */
 #endif
- 	int    chip_id;			/* PCI ID of detected chip */
-	int    memory;			/* video memory in KB which sisfb manages */
-	int    heapstart;               /* heap start (= sisfb "mem" argument) in KB */
-	unsigned char fbvidmode;	/* current sisfb mode */
+ 	CARD32 	chip_id;		/* PCI ID of detected chip */
+	CARD32	memory;			/* video memory in KB which sisfb manages */
+	CARD32	heapstart;             	/* heap start (= sisfb "mem" argument) in KB */
+	CARD8 	fbvidmode;		/* current sisfb mode */
 
-	unsigned char sisfb_version;
-	unsigned char sisfb_revision;
-	unsigned char sisfb_patchlevel;
+	CARD8 	sisfb_version;
+	CARD8	sisfb_revision;
+	CARD8 	sisfb_patchlevel;
 
-	unsigned char sisfb_caps;	/* sisfb's capabilities */
+	CARD8 	sisfb_caps;		/* sisfb's capabilities */
 
-	int    sisfb_tqlen;		/* turbo queue length (in KB) */
+	CARD32 	sisfb_tqlen;		/* turbo queue length (in KB) */
 
-	unsigned int sisfb_pcibus;      /* The card's PCI ID */
-	unsigned int sisfb_pcislot;
-	unsigned int sisfb_pcifunc;
+	CARD32 	sisfb_pcibus;      	/* The card's PCI ID */
+	CARD32 	sisfb_pcislot;
+	CARD32 	sisfb_pcifunc;
 
-	unsigned char sisfb_lcdpdc;
-	
-	unsigned char sisfb_lcda;
+	CARD8 	sisfb_lcdpdc;
 
-	unsigned long sisfb_vbflags;
-	unsigned long sisfb_currentvbflags;
+	CARD8	sisfb_lcda;
 
-	int sisfb_scalelcd;
-	unsigned long sisfb_specialtiming;
+	CARD32	sisfb_vbflags;
+	CARD32	sisfb_currentvbflags;
 
-	unsigned char sisfb_haveemi;
-	unsigned char sisfb_emi30,sisfb_emi31,sisfb_emi32,sisfb_emi33;
-	unsigned char sisfb_haveemilcd;
+	CARD32 	sisfb_scalelcd;
+	CARD32 	sisfb_specialtiming;
 
-	char reserved[213]; 		/* for future use */
+	CARD8 	sisfb_haveemi;
+	CARD8 	sisfb_emi30,sisfb_emi31,sisfb_emi32,sisfb_emi33;
+	CARD8 	sisfb_haveemilcd;
+
+	CARD8 	sisfb_lcdpdca;
+
+	CARD16  sisfb_tvxpos, sisfb_tvypos;  	/* Warning: Values + 32 ! */
+
+	CARD8 reserved[208]; 			/* for future use */
 };
 #endif
 

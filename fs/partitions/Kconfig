@@ -187,13 +187,6 @@ config LDM_DEBUG
 
 	  If unsure, say N.
 
-config NEC98_PARTITION
-	bool "NEC PC-9800 partition table support" if PARTITION_ADVANCED
-	default y if !PARTITION_ADVANCED && X86_PC9800
-	help
-	  Say Y here if you would like to be able to read the hard disk
-	  partition table format used by NEC PC-9800 machines.
-
 config SGI_PARTITION
 	bool "SGI partition support" if PARTITION_ADVANCED
 	default y if !PARTITION_ADVANCED && (SGI_IP22 || SGI_IP27)

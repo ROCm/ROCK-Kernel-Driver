@@ -627,7 +627,7 @@ static int irlap_state_query(struct irlap_cb *self, IRLAP_EVENT event,
 		if (irda_device_is_receiving(self->netdev) && !self->add_wait) {
 			IRDA_DEBUG(2, "%s(), device is slow to answer, "
 				   "waiting some more!\n", __FUNCTION__);
-			irlap_start_slot_timer(self, MSECS_TO_JIFFIES(10));
+			irlap_start_slot_timer(self, msecs_to_jiffies(10));
 			self->add_wait = TRUE;
 			return ret;
 		}
@@ -849,7 +849,7 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
  *  1.5 times the time taken to transmit a SNRM frame. So this time should
  *  between 15 msecs and 45 msecs.
  */
-			irlap_start_backoff_timer(self, MSECS_TO_JIFFIES(20 +
+			irlap_start_backoff_timer(self, msecs_to_jiffies(20 +
 						        (jiffies % 30)));
 		} else {
 			/* Always switch state before calling upper layers */
@@ -1506,7 +1506,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 		if (irda_device_is_receiving(self->netdev) && !self->add_wait) {
 			IRDA_DEBUG(1, "FINAL_TIMER_EXPIRED when receiving a "
 			      "frame! Waiting a little bit more!\n");
-			irlap_start_final_timer(self, MSECS_TO_JIFFIES(300));
+			irlap_start_final_timer(self, msecs_to_jiffies(300));
 
 			/*
 			 *  Don't allow this to happen one more time in a row,
@@ -2236,6 +2236,14 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);
 		break;
 	case RECV_DM_RSP:
+		/* IrLAP-1.1 p.82: in SCLOSE, S and I type RSP frames
+		 * shall take us down into default NDM state, like DM_RSP
+		 */
+	case RECV_RR_RSP:
+	case RECV_RNR_RSP:
+	case RECV_REJ_RSP:
+	case RECV_SREJ_RSP:
+	case RECV_I_RSP:
 		/* Always switch state before calling upper layers */
 		irlap_next_state(self, LAP_NDM);
 
@@ -2253,6 +2261,17 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);
 		break;
 	default:
+		/* IrLAP-1.1 p.82: in SCLOSE, basically any received frame
+		 * with pf=1 shall restart the wd-timer and resend the rd:rsp
+		 */
+		if (info != NULL  &&  info->pf) {
+			del_timer(&self->wd_timer);
+			irlap_wait_min_turn_around(self, &self->qos_tx);
+			irlap_send_rd_frame(self);
+			irlap_start_wd_timer(self, self->wd_timeout);
+			break;		/* stay in SCLOSE */
+		}
+
 		IRDA_DEBUG(1, "%s(), Unknown event %d, (%s)\n", __FUNCTION__,
 			   event, irlap_event[event]);
 

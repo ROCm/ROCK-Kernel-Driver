@@ -118,6 +118,7 @@
 #include <net/protocol.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/xfrm.h>
 #include <linux/ipsec.h>
 
 #include <linux/filter.h>
@@ -442,7 +443,8 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		struct timeval tm;
 	} v;
 	
-	unsigned int lv=sizeof(int),len;
+	unsigned int lv = sizeof(int);
+	int len;
   	
   	if(get_user(len,optlen))
   		return -EFAULT;
@@ -522,7 +524,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				v.tm.tv_usec = 0;
 			} else {
 				v.tm.tv_sec = sk->sk_rcvtimeo / HZ;
-				v.tm.tv_usec = ((sk->sk_rcvtimeo % HZ) * 1000) / HZ;
+				v.tm.tv_usec = ((sk->sk_rcvtimeo % HZ) * 1000000) / HZ;
 			}
 			break;
 
@@ -533,7 +535,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				v.tm.tv_usec = 0;
 			} else {
 				v.tm.tv_sec = sk->sk_sndtimeo / HZ;
-				v.tm.tv_usec = ((sk->sk_sndtimeo % HZ) * 1000) / HZ;
+				v.tm.tv_usec = ((sk->sk_sndtimeo % HZ) * 1000000) / HZ;
 			}
 			break;
 
@@ -650,6 +652,14 @@ void sk_free(struct sock *sk)
 		printk(KERN_DEBUG "%s: optmem leakage (%d bytes) detected.\n",
 		       __FUNCTION__, atomic_read(&sk->sk_omem_alloc));
 
+	/*
+	 * If sendmsg cached page exists, toss it.
+	 */
+	if (sk->sk_sndmsg_page) {
+		__free_page(sk->sk_sndmsg_page);
+		sk->sk_sndmsg_page = NULL;
+	}
+
 	security_sk_free(sk);
 	kmem_cache_free(sk->sk_slab, sk);
 	module_put(owner);
@@ -658,7 +668,7 @@ void sk_free(struct sock *sk)
 void __init sk_init(void)
 {
 	sk_cachep = kmem_cache_create("sock", sizeof(struct sock), 0,
-				      SLAB_HWCACHE_ALIGN, 0, 0);
+				      SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!sk_cachep)
 		printk(KERN_CRIT "sk_init: Cannot create sock SLAB cache!");
 
@@ -700,6 +710,27 @@ void sock_rfree(struct sk_buff *skb)
 	struct sock *sk = skb->sk;
 
 	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
+}
+
+
+int sock_i_uid(struct sock *sk)
+{
+	int uid;
+
+	read_lock(&sk->sk_callback_lock);
+	uid = sk->sk_socket ? SOCK_INODE(sk->sk_socket)->i_uid : 0;
+	read_unlock(&sk->sk_callback_lock);
+	return uid;
+}
+
+unsigned long sock_i_ino(struct sock *sk)
+{
+	unsigned long ino;
+
+	read_lock(&sk->sk_callback_lock);
+	ino = sk->sk_socket ? SOCK_INODE(sk->sk_socket)->i_ino : 0;
+	read_unlock(&sk->sk_callback_lock);
+	return ino;
 }
 
 /*
@@ -917,6 +948,31 @@ void __release_sock(struct sock *sk)
 	} while((skb = sk->sk_backlog.head) != NULL);
 }
 
+/**
+ * sk_wait_data - wait for data to arrive at sk_receive_queue
+ * sk - sock to wait on
+ * timeo - for how long
+ *
+ * Now socket state including sk->sk_err is changed only under lock,
+ * hence we may omit checks after joining wait queue.
+ * We check receive queue before schedule() only as optimization;
+ * it is very likely that release_sock() added new data.
+ */
+int sk_wait_data(struct sock *sk, long *timeo)
+{
+	int rc;
+	DEFINE_WAIT(wait);
+
+	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
+	rc = sk_wait_event(sk, timeo, !skb_queue_empty(&sk->sk_receive_queue));
+	clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
+	finish_wait(sk->sk_sleep, &wait);
+	return rc;
+}
+
+EXPORT_SYMBOL(sk_wait_data);
+
 /*
  * Set of default routines for initialising struct proto_ops when
  * the protocol does not support a particular function. In certain
@@ -977,13 +1033,13 @@ int sock_no_shutdown(struct socket *sock, int how)
 }
 
 int sock_no_setsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int optlen)
+		    char __user *optval, int optlen)
 {
 	return -EOPNOTSUPP;
 }
 
 int sock_no_getsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int *optlen)
+		    char __user *optval, int __user *optlen)
 {
 	return -EOPNOTSUPP;
 }
@@ -1009,30 +1065,12 @@ int sock_no_mmap(struct file *file, struct socket *sock, struct vm_area_struct *
 ssize_t sock_no_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags)
 {
 	ssize_t res;
-	struct msghdr msg;
-	struct iovec iov;
-	mm_segment_t old_fs;
-	char *kaddr;
-
-	kaddr = kmap(page);
-
-	msg.msg_name = NULL;
-	msg.msg_namelen = 0;
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_flags = flags;
-
-	/* This cast is ok because of the "set_fs(KERNEL_DS)" */
-	iov.iov_base = (void __user *) (kaddr + offset);
+	struct msghdr msg = {.msg_flags = flags};
+	struct kvec iov;
+	char *kaddr = kmap(page);
+	iov.iov_base = kaddr + offset;
 	iov.iov_len = size;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	res = sock_sendmsg(sock, &msg, size);
-	set_fs(old_fs);
-
+	res = kernel_sendmsg(sock, &msg, &iov, 1, size);
 	kunmap(page);
 	return res;
 }
@@ -1099,11 +1137,30 @@ void sk_send_sigurg(struct sock *sk)
 			sk_wake_async(sk, 3, POLL_PRI);
 }
 
+void sk_reset_timer(struct sock *sk, struct timer_list* timer,
+		    unsigned long expires)
+{
+	if (!mod_timer(timer, expires))
+		sock_hold(sk);
+}
+
+EXPORT_SYMBOL(sk_reset_timer);
+
+void sk_stop_timer(struct sock *sk, struct timer_list* timer)
+{
+	if (timer_pending(timer) && del_timer(timer))
+		__sock_put(sk);
+}
+
+EXPORT_SYMBOL(sk_stop_timer);
+
 void sock_init_data(struct socket *sock, struct sock *sk)
 {
 	skb_queue_head_init(&sk->sk_receive_queue);
 	skb_queue_head_init(&sk->sk_write_queue);
 	skb_queue_head_init(&sk->sk_error_queue);
+
+	sk->sk_send_head	=	NULL;
 
 	init_timer(&sk->sk_timer);
 	
@@ -1131,9 +1188,13 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_error_report	=	sock_def_error_report;
 	sk->sk_destruct		=	sock_def_destruct;
 
+	sk->sk_sndmsg_page	=	NULL;
+	sk->sk_sndmsg_off	=	0;
+
 	sk->sk_peercred.pid 	=	0;
 	sk->sk_peercred.uid	=	-1;
 	sk->sk_peercred.gid	=	-1;
+	sk->sk_write_pending	=	0;
 	sk->sk_rcvlowat		=	1;
 	sk->sk_rcvtimeo		=	MAX_SCHEDULE_TIMEOUT;
 	sk->sk_sndtimeo		=	MAX_SCHEDULE_TIMEOUT;
@@ -1145,7 +1206,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	atomic_set(&sk->sk_refcnt, 1);
 }
 
-void lock_sock(struct sock *sk)
+void fastcall lock_sock(struct sock *sk)
 {
 	might_sleep();
 	spin_lock_bh(&(sk->sk_lock.slock));
@@ -1157,7 +1218,7 @@ void lock_sock(struct sock *sk)
 
 EXPORT_SYMBOL(lock_sock);
 
-void release_sock(struct sock *sk)
+void fastcall release_sock(struct sock *sk)
 {
 	spin_lock_bh(&(sk->sk_lock.slock));
 	if (sk->sk_backlog.tail)
@@ -1172,7 +1233,7 @@ EXPORT_SYMBOL(release_sock);
 /* When > 0 there are consumers of rx skb time stamps */
 atomic_t netstamp_needed = ATOMIC_INIT(0); 
 
-int sock_get_timestamp(struct sock *sk, struct timeval *userstamp)
+int sock_get_timestamp(struct sock *sk, struct timeval __user *userstamp)
 { 
 	if (!sock_flag(sk, SOCK_TIMESTAMP))
 		sock_enable_timestamp(sk);
@@ -1202,6 +1263,93 @@ void sock_disable_timestamp(struct sock *sk)
 	}
 }
 EXPORT_SYMBOL(sock_disable_timestamp);
+
+/*
+ *	Get a socket option on an socket.
+ *
+ *	FIX: POSIX 1003.1g is very ambiguous here. It states that
+ *	asynchronous errors should be reported by getsockopt. We assume
+ *	this means if you specify SO_ERROR (otherwise whats the point of it).
+ */
+int sock_common_getsockopt(struct socket *sock, int level, int optname,
+			   char __user *optval, int __user *optlen)
+{
+	struct sock *sk = sock->sk;
+
+	return sk->sk_prot->getsockopt(sk, level, optname, optval, optlen);
+}
+
+EXPORT_SYMBOL(sock_common_getsockopt);
+
+int sock_common_recvmsg(struct kiocb *iocb, struct socket *sock,
+			struct msghdr *msg, size_t size, int flags)
+{
+	struct sock *sk = sock->sk;
+	int addr_len = 0;
+	int err;
+
+	err = sk->sk_prot->recvmsg(iocb, sk, msg, size, flags & MSG_DONTWAIT,
+				   flags & ~MSG_DONTWAIT, &addr_len);
+	if (err >= 0)
+		msg->msg_namelen = addr_len;
+	return err;
+}
+
+EXPORT_SYMBOL(sock_common_recvmsg);
+
+/*
+ *	Set socket options on an inet socket.
+ */
+int sock_common_setsockopt(struct socket *sock, int level, int optname,
+			   char __user *optval, int optlen)
+{
+	struct sock *sk = sock->sk;
+
+	return sk->sk_prot->setsockopt(sk, level, optname, optval, optlen);
+}
+
+EXPORT_SYMBOL(sock_common_setsockopt);
+
+void sk_common_release(struct sock *sk)
+{
+	if (sk->sk_prot->destroy)
+		sk->sk_prot->destroy(sk);
+
+	/*
+	 * Observation: when sock_common_release is called, processes have
+	 * no access to socket. But net still has.
+	 * Step one, detach it from networking:
+	 *
+	 * A. Remove from hash tables.
+	 */
+
+	sk->sk_prot->unhash(sk);
+
+	/*
+	 * In this point socket cannot receive new packets, but it is possible
+	 * that some packets are in flight because some CPU runs receiver and
+	 * did hash table lookup before we unhashed socket. They will achieve
+	 * receive queue and will be purged by socket destructor.
+	 *
+	 * Also we still have packets pending on receive queue and probably,
+	 * our own packets waiting in device queues. sock_destroy will drain
+	 * receive queue, but transmitted packets will delay socket destruction
+	 * until the last reference will be released.
+	 */
+
+	sock_orphan(sk);
+
+	xfrm_sk_free_policy(sk);
+
+#ifdef INET_REFCNT_DEBUG
+	if (atomic_read(&sk->sk_refcnt) != 1)
+		printk(KERN_DEBUG "Destruction of the socket %p delayed, c=%d\n",
+		       sk, atomic_read(&sk->sk_refcnt));
+#endif
+	sock_put(sk);
+}
+
+EXPORT_SYMBOL(sk_common_release);
 
 EXPORT_SYMBOL(__lock_sock);
 EXPORT_SYMBOL(__release_sock);
@@ -1235,6 +1383,8 @@ EXPORT_SYMBOL(sock_rmalloc);
 EXPORT_SYMBOL(sock_setsockopt);
 EXPORT_SYMBOL(sock_wfree);
 EXPORT_SYMBOL(sock_wmalloc);
+EXPORT_SYMBOL(sock_i_uid);
+EXPORT_SYMBOL(sock_i_ino);
 #ifdef CONFIG_SYSCTL
 EXPORT_SYMBOL(sysctl_optmem_max);
 EXPORT_SYMBOL(sysctl_rmem_max);

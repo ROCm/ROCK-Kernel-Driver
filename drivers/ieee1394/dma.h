@@ -14,7 +14,7 @@
 #include <asm/scatterlist.h>
 
 /* struct dma_prog_region
-   
+
    a small, physically-contiguous DMA buffer with random-access,
    synchronous usage characteristics
 */
@@ -37,7 +37,7 @@ static inline dma_addr_t dma_prog_region_offset_to_bus(struct dma_prog_region *p
 }
 
 /* struct dma_region
-   
+
    a large, non-physically-contiguous DMA buffer with streaming,
    asynchronous usage characteristics
 */

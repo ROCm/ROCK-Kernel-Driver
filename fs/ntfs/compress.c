@@ -2,7 +2,7 @@
  * compress.c - NTFS kernel compressed attributes handling.
  *		Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -10,13 +10,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -195,11 +195,17 @@ static int ntfs_decompress(struct page *dest_pages[], int *dest_index,
 
 	ntfs_debug("Entering, cb_size = 0x%x.", cb_size);
 do_next_sb:
-	ntfs_debug("Beginning sub-block at offset = 0x%x in the cb.",
+	ntfs_debug("Beginning sub-block at offset = 0x%zx in the cb.",
 			cb - cb_start);
-
-	/* Have we reached the end of the compression block? */
-	if (cb == cb_end || !le16_to_cpup((u16*)cb)) {
+	/*
+	 * Have we reached the end of the compression block or the end of the
+	 * decompressed data?  The latter can happen for example if the current
+	 * position in the compression block is one byte before its end so the
+	 * first two checks do not detect it.
+	 */
+	if (cb == cb_end || !le16_to_cpup((u16*)cb) ||
+			(*dest_index == dest_max_index &&
+			*dest_ofs == dest_max_ofs)) {
 		int i;
 
 		ntfs_debug("Completed. Returning success (0).");
@@ -357,7 +363,7 @@ do_next_tag:
 			continue;
 		}
 
-		/* 
+		/*
 		 * We have a phrase token. Make sure it is not the first tag in
 		 * the sb as this is illegal and would confuse the code below.
 		 */
@@ -427,7 +433,7 @@ do_next_tag:
 	goto do_next_tag;
 
 return_overflow:
-	ntfs_error(NULL, "Failed. Returning -EOVERFLOW.\n");
+	ntfs_error(NULL, "Failed. Returning -EOVERFLOW.");
 	goto return_error;
 }
 
@@ -597,8 +603,9 @@ lock_retry_remap:
 			lcn = vcn_to_lcn(rl, vcn);
 		} else
 			lcn = (LCN)LCN_RL_NOT_MAPPED;
-		ntfs_debug("Reading vcn = 0x%Lx, lcn = 0x%Lx.",
-				(long long)vcn, (long long)lcn);
+		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
+				(unsigned long long)vcn,
+				(unsigned long long)lcn);
 		if (lcn < 0) {
 			/*
 			 * When we reach the first sparse cluster we have
@@ -643,7 +650,7 @@ lock_retry_remap:
 			unlock_buffer(tbh);
 			continue;
 		}
-		atomic_inc(&tbh->b_count);
+		get_bh(tbh);
 		tbh->b_end_io = end_buffer_read_sync;
 		submit_bh(READ, tbh);
 	}
@@ -844,7 +851,7 @@ lock_retry_remap:
 		if (err) {
 			ntfs_error(vol->sb, "ntfs_decompress() failed in inode "
 					"0x%lx with error code %i. Skipping "
-					"this compression block.\n",
+					"this compression block.",
 					ni->mft_no, -err);
 			/* Release the unfinished pages. */
 			for (; prev_cur_page < cur_page; prev_cur_page++) {
@@ -881,7 +888,8 @@ lock_retry_remap:
 		if (page) {
 			ntfs_error(vol->sb, "Still have pages left! "
 					"Terminating them with extreme "
-					"prejudice.");
+					"prejudice.  Inode 0x%lx, page index "
+					"0x%lx.", ni->mft_no, page->index);
 			if (cur_page == xpage && !xpage_done)
 				SetPageError(page);
 			flush_dcache_page(page);
@@ -943,4 +951,3 @@ err_out:
 	kfree(pages);
 	return -EIO;
 }
-

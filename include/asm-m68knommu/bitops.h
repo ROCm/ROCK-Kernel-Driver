@@ -77,12 +77,6 @@ static inline int __ffs(int x)
 }
 
 /*
- * fls: find last bit set.
- */
-#define fls(x) generic_fls(x)
-
-
-/*
  * Every architecture must define this function. It's the fastest
  * way of searching a 140-bit bitmap where the first 100 bits are
  * unlikely to be set. It's guaranteed that at least one of the 140
@@ -283,7 +277,7 @@ static __inline__ int __constant_test_bit(int nr, const volatile unsigned long *
 	return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
 }
 
-static __inline__ int __test_bit(int nr, const unsigned long * addr)
+static __inline__ int __test_bit(int nr, const volatile unsigned long * addr)
 {
 	int 	* a = (int *) addr;
 	int	mask;
@@ -335,6 +329,48 @@ found_first:
 	tmp |= ~0UL >> size;
 found_middle:
 	return result + ffz(tmp);
+}
+
+/*
+ * Find next one bit in a bitmap reasonably efficiently.
+ */
+static __inline__ unsigned long find_next_bit(const unsigned long *addr,
+	unsigned long size, unsigned long offset)
+{
+	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
+	unsigned int result = offset & ~31UL;
+	unsigned int tmp;
+
+	if (offset >= size)
+		return size;
+	size -= result;
+	offset &= 31UL;
+	if (offset) {
+		tmp = *p++;
+		tmp &= ~0UL << offset;
+		if (size < 32)
+			goto found_first;
+		if (tmp)
+			goto found_middle;
+		size -= 32;
+		result += 32;
+	}
+	while (size >= 32) {
+		if ((tmp = *p++) != 0)
+			goto found_middle;
+		result += 32;
+		size -= 32;
+	}
+	if (!size)
+		return result;
+	tmp = *p;
+
+found_first:
+	tmp &= ~0UL >> (32 - size);
+	if (tmp == 0UL)        /* Are any bits set? */
+		return result + size; /* Nope. */
+found_middle:
+	return result + __ffs(tmp);
 }
 
 /*
@@ -477,5 +513,10 @@ found_middle:
 #define hweight8(x) generic_hweight8(x)
 
 #endif /* __KERNEL__ */
+
+/*
+ * fls: find last bit set.
+ */
+#define fls(x) generic_fls(x)
 
 #endif /* _M68KNOMMU_BITOPS_H */

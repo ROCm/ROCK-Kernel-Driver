@@ -174,7 +174,7 @@ static int bcm203x_probe(struct usb_interface *intf, const struct usb_device_id 
 
 	BT_DBG("intf %p id %p", intf, id);
 
-	if (intf->altsetting->desc.bInterfaceNumber != 0)
+	if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
 		return -ENODEV;
 
 	data = kmalloc(sizeof(*data), GFP_KERNEL);

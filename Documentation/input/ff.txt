@@ -20,7 +20,7 @@ devices. Please read joystick.txt before reading further this document.
 2. Instructions to the user
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here are instructions on how to compile and use the driver. In fact, this
-driver is the normal iforce.o, input.o and evdev.o drivers written by Vojtech
+driver is the normal iforce, input and evdev drivers written by Vojtech
 Pavlik, plus additions to support force feedback.
 
 Before you start, let me WARN you that some devices shake violently during the

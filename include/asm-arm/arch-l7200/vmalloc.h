@@ -13,6 +13,3 @@
 #define VMALLOC_OFFSET	  (8*1024*1024)
 #define VMALLOC_START	  (((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #define VMALLOC_END       (PAGE_OFFSET + 0x10000000)
-
-#define MODULE_START	(PAGE_OFFSET - 16*1048576)
-#define MODULE_END	(PAGE_OFFSET)

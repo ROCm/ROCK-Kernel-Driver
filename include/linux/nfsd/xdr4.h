@@ -241,7 +241,7 @@ struct nfsd4_read {
 	stateid_t	rd_stateid;         /* request */
 	u64		rd_offset;          /* request */
 	u32		rd_length;          /* request */
-	struct iovec	rd_iov[RPCSVC_MAXPAGES];
+	struct kvec	rd_iov[RPCSVC_MAXPAGES];
 	int		rd_vlen;
 	
 	struct svc_rqst *rd_rqstp;          /* response */
@@ -324,7 +324,7 @@ struct nfsd4_write {
 	u64		wr_offset;          /* request */
 	u32		wr_stable_how;      /* request */
 	u32		wr_buflen;          /* request */
-	struct iovec	wr_vec[RPCSVC_MAXPAGES]; /* request */
+	struct kvec	wr_vec[RPCSVC_MAXPAGES]; /* request */
 	int		wr_vlen;
 
 	u32		wr_bytes_written;   /* response */
@@ -378,6 +378,7 @@ struct nfsd4_compoundargs {
 	u32 *				tmpp;
 	struct tmpbuf {
 		struct tmpbuf *next;
+		void (*release)(const void *);
 		void *buf;
 	}				*to_free;
 
@@ -449,6 +450,7 @@ extern int nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 extern int
 nfsd4_release_lockowner(struct svc_rqst *rqstp,
 		struct nfsd4_release_lockowner *rlockowner);
+extern void nfsd4_release_compoundargs(struct nfsd4_compoundargs *);
 #endif
 
 /*

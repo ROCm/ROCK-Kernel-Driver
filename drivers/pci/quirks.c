@@ -694,28 +694,43 @@ static int __initdata asus_hides_smbus = 0;
 
 static void __init asus_hides_smbus_hostbridge(struct pci_dev *dev)
 {
-	if (likely(dev->subsystem_vendor != PCI_VENDOR_ID_ASUSTEK))
-		return;
-
-	if (dev->device == PCI_DEVICE_ID_INTEL_82845_HB)
-		switch(dev->subsystem_device) {
-		case 0x8070: /* P4B */
-	    	case 0x8088: /* P4B533 */
-			asus_hides_smbus = 1;
-		}
-	if (dev->device == PCI_DEVICE_ID_INTEL_82845G_HB)
-		switch(dev->subsystem_device) {
-		case 0x80b2: /* P4PE */
- 		case 0x8093: /* P4B533-V */
-			asus_hides_smbus = 1;
-		}
-	if ((dev->device == PCI_DEVICE_ID_INTEL_82850_HB) &&
-	    (dev->subsystem_device == 0x8030)) /* P4T533 */
-		asus_hides_smbus = 1;
-	if ((dev->device == PCI_DEVICE_ID_INTEL_7205_0) &&
-	    (dev->subsystem_device == 0x8070)) /* P4G8X Deluxe */
-		asus_hides_smbus = 1;
-	return;
+	if (unlikely(dev->subsystem_vendor == PCI_VENDOR_ID_ASUSTEK)) {
+		if (dev->device == PCI_DEVICE_ID_INTEL_82845_HB)
+			switch(dev->subsystem_device) {
+			case 0x8070: /* P4B */
+			case 0x8088: /* P4B533 */
+				asus_hides_smbus = 1;
+			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_82845G_HB)
+			switch(dev->subsystem_device) {
+			case 0x80b1: /* P4GE-V */
+			case 0x80b2: /* P4PE */
+			case 0x8093: /* P4B533-V */
+				asus_hides_smbus = 1;
+			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_82850_HB)
+			switch(dev->subsystem_device) {
+			case 0x8030: /* P4T533 */
+				asus_hides_smbus = 1;
+			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_7205_0)
+			switch (dev->subsystem_device) {
+			case 0x8070: /* P4G8X Deluxe */
+				asus_hides_smbus = 1;
+			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_82855GM_HB)
+			switch (dev->subsystem_device) {
+			case 0x1751: /* M2N notebook */
+				asus_hides_smbus = 1;
+			}
+	} else if (unlikely(dev->subsystem_vendor == PCI_VENDOR_ID_HP)) {
+		if (dev->device ==  PCI_DEVICE_ID_INTEL_82855PM_HB)
+			switch(dev->subsystem_device) {
+			case 0x088C: /* HP Compaq nc8000 */
+			case 0x0890: /* HP Compaq nc6000 */
+				asus_hides_smbus = 1;
+			}
+	}
 }
 
 static void __init asus_hides_smbus_lpc(struct pci_dev *dev)
@@ -816,6 +831,7 @@ static void __init quirk_alder_ioapic(struct pci_dev *pdev)
 static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 {
 	u8 prog, comb, tmp;
+	int ich = 0;
 
 	/*
 	 * Narrow down to Intel SATA PCI devices.
@@ -826,8 +842,12 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 	case 0x24df:
 	case 0x25a3:
 	case 0x25b0:
+		ich = 5;
+		break;
 	case 0x2651:
 	case 0x2652:
+	case 0x2653:
+		ich = 6;
 		break;
 	default:
 		/* we do not handle this PCI device */
@@ -838,13 +858,25 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 	 * Read combined mode register.
 	 */
 	pci_read_config_byte(pdev, 0x90, &tmp);	/* combined mode reg */
-	tmp &= 0x6;     /* interesting bits 2:1, PATA primary/secondary */
-	if (tmp == 0x4)		/* bits 10x */
-		comb = (1 << 0);		/* SATA port 0, PATA port 1 */
-	else if (tmp == 0x6)	/* bits 11x */
-		comb = (1 << 2);		/* PATA port 0, SATA port 1 */
-	else
-		return;				/* not in combined mode */
+
+	if (ich == 5) {
+		tmp &= 0x6;  /* interesting bits 2:1, PATA primary/secondary */
+		if (tmp == 0x4)		/* bits 10x */
+			comb = (1 << 0);	/* SATA port 0, PATA port 1 */
+		else if (tmp == 0x6)	/* bits 11x */
+			comb = (1 << 2);	/* PATA port 0, SATA port 1 */
+		else
+			return;			/* not in combined mode */
+	} else {
+		WARN_ON(ich != 6);
+		tmp &= 0x3;  /* interesting bits 1:0 */
+		if (tmp & (1 << 0))
+			comb = (1 << 2);	/* PATA port 0, SATA port 1 */
+		else if (tmp & (1 << 1))
+			comb = (1 << 0);	/* SATA port 0, PATA port 1 */
+		else
+			return;			/* not in combined mode */
+	}
 
 	/*
 	 * Read programming interface register.
@@ -867,6 +899,13 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 		request_region(0x170, 8, "libata");	/* port 1 */
 }
 #endif /* CONFIG_SCSI_SATA */
+
+int pciehp_msi_quirk;
+
+static void __devinit quirk_pciehp_msi(struct pci_dev *pdev)
+{
+	pciehp_msi_quirk = 1;
+}
 
 
 #define UHCI_USBLEGSUP		0xc0		/* legacy support */
@@ -930,13 +969,6 @@ static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
 }
 #endif
 
-int pciehp_msi_quirk;
-
-static void __devinit quirk_pciehp_msi(struct pci_dev *pdev)
-{
-	pciehp_msi_quirk = 1;
-}
-
 /*
  *  The main table of quirks.
  *
@@ -996,7 +1028,18 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_vt82c586_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_vt82c686_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	quirk_piix4_acpi },
+
+	/* Intel LPC interface bridges all have 128 bytes of magic ACPI/TCO regs and 64 bytes of GPIO */
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801AA_0,	quirk_ich4_lpc_acpi },
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801AB_0,	quirk_ich4_lpc_acpi },
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801BA_0,	quirk_ich4_lpc_acpi },
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801BA_10,	quirk_ich4_lpc_acpi },
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801CA_0,	quirk_ich4_lpc_acpi },
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801CA_12,	quirk_ich4_lpc_acpi },
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801DB_0,	quirk_ich4_lpc_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_12,	quirk_ich4_lpc_acpi },
+	{ PCI_FIXUP_HEADER,     PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801EB_0,	quirk_ich4_lpc_acpi },
+
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_AL,	PCI_DEVICE_ID_AL_M7101,		quirk_ali7101_acpi },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371SB_2,	quirk_piix3_usb },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_2,	quirk_piix3_usb },
@@ -1037,13 +1080,17 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 
 	/*
 	 * on Asus P4B boards, the i801SMBus device is disabled at startup.
+	 * this also goes for boards in HP Compaq nc6000 and nc8000 notebooks.
 	 */
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82845_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82845G_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82850_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_7205_0,	asus_hides_smbus_hostbridge },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82855PM_HB,	asus_hides_smbus_hostbridge },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82855GM_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_0,	asus_hides_smbus_lpc },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801BA_0,	asus_hides_smbus_lpc },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_12,	asus_hides_smbus_lpc },
 
 #ifdef CONFIG_SCSI_SATA
 	/* Fixup BIOSes that configure Parallel ATA (PATA / IDE) and

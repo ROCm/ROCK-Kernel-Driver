@@ -27,8 +27,9 @@
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 
+#include <scsi/scsi.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
-#include "scsi.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -54,7 +55,7 @@ static int proc_scsi_read(char *buffer, char **start, off_t offset,
 	return n;
 }
 
-static int proc_scsi_write_proc(struct file *file, const char *buf,
+static int proc_scsi_write_proc(struct file *file, const char __user *buf,
                            unsigned long count, void *data)
 {
 	struct Scsi_Host *shost = data;
@@ -311,7 +312,7 @@ int __init scsi_init_procfs(void)
 {
 	struct proc_dir_entry *pde;
 
-	proc_scsi = proc_mkdir("scsi", 0);
+	proc_scsi = proc_mkdir("scsi", NULL);
 	if (!proc_scsi)
 		goto err1;
 
@@ -323,13 +324,13 @@ int __init scsi_init_procfs(void)
 	return 0;
 
 err2:
-	remove_proc_entry("scsi", 0);
+	remove_proc_entry("scsi", NULL);
 err1:
 	return -ENOMEM;
 }
 
 void scsi_exit_procfs(void)
 {
-	remove_proc_entry("scsi/scsi", 0);
-	remove_proc_entry("scsi", 0);
+	remove_proc_entry("scsi/scsi", NULL);
+	remove_proc_entry("scsi", NULL);
 }

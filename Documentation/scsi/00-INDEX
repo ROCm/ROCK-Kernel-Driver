@@ -62,6 +62,8 @@ scsi_mid_low_api.txt
 	- info on API between SCSI layer and low level drivers
 st.txt
 	- info on scsi tape driver
+sym53c500_cs.txt
+	- info on PCMCIA driver for Symbios Logic 53c500 based adapters
 sym53c8xx_2.txt
 	- info on second generation driver for sym53c8xx based adapters
 tmscsim.txt

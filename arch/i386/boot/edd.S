@@ -4,7 +4,7 @@
  * conformant to T13 Committee www.t13.org
  *   projects 1572D, 1484D, 1386D, 1226DT
  * disk signature read by Matt Domsch <Matt_Domsch@dell.com>
- *	and Andrew Wilks <Andrew_Wilks@dell.com> September 2003
+ *	and Andrew Wilks <Andrew_Wilks@dell.com> September 2003, June 2004
  * legacy CHS retreival by Patrick J. LoPresti <patl@users.sourceforge.net>
  *      March 2004
  */
@@ -12,28 +12,39 @@
 #include <linux/edd.h>
 
 #if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
-# Read the first sector of device 80h and store the 4-byte signature
+# Read the first sector of each BIOS disk device and store the 4-byte signature
+edd_mbr_sig_start:
+	movb	$0, (EDD_MBR_SIG_NR_BUF)	# zero value at EDD_MBR_SIG_NR_BUF
+	movb	$0x80, %dl			# from device 80
+	movw	$EDD_MBR_SIG_BUF, %bx		# store buffer ptr in bx
+edd_mbr_sig_read:
 	movl	$0xFFFFFFFF, %eax
-	movl	%eax, (DISK80_SIG_BUFFER)	# assume failure
+	movl	%eax, (%bx)			# assume failure
+	pushw	%bx
 	movb	$READ_SECTORS, %ah
 	movb	$1, %al				# read 1 sector
-	movb	$0x80, %dl			# from device 80
 	movb	$0, %dh				# at head 0
 	movw	$1, %cx				# cylinder 0, sector 0
 	pushw	%es
 	pushw	%ds
 	popw	%es
-	movw	$EDDBUF, %bx
-	pushw   %dx             # work around buggy BIOSes
+    	movw	$EDDBUF, %bx			# disk's data goes into EDDBUF
+	pushw	%dx             # work around buggy BIOSes
 	stc                     # work around buggy BIOSes
-	int     $0x13
+	int	$0x13
 	sti                     # work around buggy BIOSes
-	popw    %dx
-	jc	disk_sig_done
-	movl	(EDDBUF+MBR_SIG_OFFSET), %eax
-	movl	%eax, (DISK80_SIG_BUFFER)	# store success
-disk_sig_done:
+	popw	%dx
 	popw	%es
+	popw	%bx
+	jc	edd_mbr_sig_done		# on failure, we're done.
+	movl	(EDDBUF+EDD_MBR_SIG_OFFSET), %eax # read sig out of the MBR
+	movl	%eax, (%bx)			# store success
+	incb	(EDD_MBR_SIG_NR_BUF)		# note that we stored something
+	incb	%dl				# increment to next device
+	addw	$4, %bx				# increment sig buffer ptr
+	cmpb	$EDD_MBR_SIG_MAX, (EDD_MBR_SIG_NR_BUF)	# Out of space?
+	jb	edd_mbr_sig_read		# keep looping
+edd_mbr_sig_done:
 
 # Do the BIOS Enhanced Disk Drive calls
 # This consists of two calls:

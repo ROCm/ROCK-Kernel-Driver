@@ -1,6 +1,8 @@
 /*
  * Processor capabilities determination functions.
  *
+ * Copyright (C) xxxx  the Anonymous
+ * Copyright (C) 2003  Maciej W. Rozycki
  * Copyright (C) 1994 - 2003 Ralf Baechle
  * Copyright (C) 2001 MIPS Inc.
  *
@@ -49,6 +51,14 @@ static void r4k_wait(void)
 		".set\tmips0");
 }
 
+/*
+ * The Au1xxx wait is available only if we run CONFIG_PM and
+ * the timer setup found we had a 32KHz counter available.
+ * There are still problems with functions that may call au1k_wait
+ * directly, but that will be discovered pretty quickly.
+ */
+extern void (*au1k_wait_ptr)(void);
+
 void au1k_wait(void)
 {
 #ifdef CONFIG_PM
@@ -90,7 +100,6 @@ static inline void check_wait(void)
 	case CPU_R5000:
 	case CPU_NEVADA:
 	case CPU_RM7000:
-/*	case CPU_RM9000: */
 	case CPU_TX49XX:
 	case CPU_4KC:
 	case CPU_4KEC:
@@ -102,12 +111,19 @@ static inline void check_wait(void)
 		cpu_wait = r4k_wait;
 		printk(" available.\n");
 		break;
+#ifdef CONFIG_PM
 	case CPU_AU1000:
 	case CPU_AU1100:
 	case CPU_AU1500:
-		cpu_wait = au1k_wait;
-		printk(" available.\n");
+		if (au1k_wait_ptr != NULL) {
+			cpu_wait = au1k_wait_ptr;
+			printk(" available.\n");
+		}
+		else {
+			printk(" unavailable.\n");
+		}
 		break;
+#endif
 	default:
 		printk(" unavailable.\n");
 		break;
@@ -172,8 +188,7 @@ static inline void cpu_probe_legacy(struct cpuinfo_mips *c)
 	case PRID_IMP_R2000:
 		c->cputype = CPU_R2000;
 		c->isa_level = MIPS_CPU_ISA_I;
-		c->options = MIPS_CPU_TLB | MIPS_CPU_NOFPUEX |
-		             MIPS_CPU_LLSC;
+		c->options = MIPS_CPU_TLB | MIPS_CPU_NOFPUEX;
 		if (__cpu_has_fpu())
 			c->options |= MIPS_CPU_FPU;
 		c->tlbsize = 64;
@@ -187,8 +202,7 @@ static inline void cpu_probe_legacy(struct cpuinfo_mips *c)
 		else
 			c->cputype = CPU_R3000;
 		c->isa_level = MIPS_CPU_ISA_I;
-		c->options = MIPS_CPU_TLB | MIPS_CPU_NOFPUEX |
-		             MIPS_CPU_LLSC;
+		c->options = MIPS_CPU_TLB | MIPS_CPU_NOFPUEX;
 		if (__cpu_has_fpu())
 			c->options |= MIPS_CPU_FPU;
 		c->tlbsize = 64;
@@ -240,8 +254,8 @@ static inline void cpu_probe_legacy(struct cpuinfo_mips *c)
 			break;
 		default:
 			printk(KERN_INFO "Unexpected CPU of NEC VR4100 series\n");
-				c->cputype = CPU_VR41XX;
-				break;
+			c->cputype = CPU_VR41XX;
+			break;
 		}
 		c->isa_level = MIPS_CPU_ISA_III;
 		c->options = R4K_OPTS;
@@ -373,7 +387,7 @@ static inline void cpu_probe_legacy(struct cpuinfo_mips *c)
 		c->cputype = CPU_RM9000;
 		c->isa_level = MIPS_CPU_ISA_IV;
 		c->options = R4K_OPTS | MIPS_CPU_FPU | MIPS_CPU_32FPR |
-			     MIPS_CPU_LLSC;
+		             MIPS_CPU_LLSC;
 		/*
 		 * Bit 29 in the info register of the RM9000
 		 * indicates if the TLB has 48 or 64 entries.
@@ -408,9 +422,6 @@ static inline void cpu_probe_legacy(struct cpuinfo_mips *c)
 			     MIPS_CPU_COUNTER | MIPS_CPU_WATCH |
 		             MIPS_CPU_LLSC;
 		c->tlbsize = 64;
-		break;
-	default:
-		c->cputype = CPU_UNKNOWN;
 		break;
 	}
 }
@@ -477,9 +488,6 @@ static inline void cpu_probe_mips(struct cpuinfo_mips *c)
 		/* Probe for L2 cache */
 		c->scache.flags &= ~MIPS_CACHE_NOT_PRESENT;
 		break;
-	default:
-		c->cputype = CPU_UNKNOWN;
-		break;
 	}
 }
 
@@ -499,14 +507,14 @@ static inline void cpu_probe_alchemy(struct cpuinfo_mips *c)
 		case 2:
 			c->cputype = CPU_AU1100;
 			break;
+		case 3:
+			c->cputype = CPU_AU1550;
+			break;
 		default:
 			panic("Unknown Au Core!");
 			break;
 		}
 		c->isa_level = MIPS_CPU_ISA_M32;
- 		break;
-	default:
-		c->cputype = CPU_UNKNOWN;
 		break;
 	}
 }
@@ -527,9 +535,6 @@ static inline void cpu_probe_sibyte(struct cpuinfo_mips *c)
 		c->options |= MIPS_CPU_FPU | MIPS_CPU_32FPR;
 #endif
 		break;
-	default:
-		c->cputype = CPU_UNKNOWN;
-		break;
 	}
 }
 
@@ -541,13 +546,10 @@ static inline void cpu_probe_sandcraft(struct cpuinfo_mips *c)
 		c->cputype = CPU_SR71000;
 		c->isa_level = MIPS_CPU_ISA_M64;
 		c->options = MIPS_CPU_TLB | MIPS_CPU_4KEX |
-                                    MIPS_CPU_4KTLB | MIPS_CPU_FPU |
+		             MIPS_CPU_4KTLB | MIPS_CPU_FPU |
 		             MIPS_CPU_COUNTER | MIPS_CPU_MCHECK;
 		c->scache.ways = 8;
 		c->tlbsize = 64;
-		break;
-	default:
-		c->cputype = CPU_UNKNOWN;
 		break;
 	}
 }
@@ -562,7 +564,6 @@ __init void cpu_probe(void)
 
 	c->processor_id = read_c0_prid();
 	switch (c->processor_id & 0xff0000) {
-
 	case PRID_COMP_LEGACY:
 		cpu_probe_legacy(c);
 		break;

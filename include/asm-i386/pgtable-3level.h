@@ -8,24 +8,6 @@
  * Copyright (C) 1999 Ingo Molnar <mingo@redhat.com>
  */
 
-/*
- * PGDIR_SHIFT determines what a top-level page table entry can map
- */
-#define PGDIR_SHIFT	30
-#define PTRS_PER_PGD	4
-
-/*
- * PMD_SHIFT determines the size of the area a middle-level
- * page table can map
- */
-#define PMD_SHIFT	21
-#define PTRS_PER_PMD	512
-
-/*
- * entries per page directory level
- */
-#define PTRS_PER_PTE	512
-
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %p(%08lx%08lx).\n", __FILE__, __LINE__, &(e), (e).pte_high, (e).pte_low)
 #define pmd_ERROR(e) \
@@ -36,6 +18,29 @@
 static inline int pgd_none(pgd_t pgd)		{ return 0; }
 static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
+
+/*
+ * Is the pte executable?
+ */
+static inline int pte_x(pte_t pte)
+{
+	return !(pte_val(pte) & _PAGE_NX);
+}
+
+/*
+ * All present user-pages with !NX bit are user-executable:
+ */
+static inline int pte_exec(pte_t pte)
+{
+	return pte_user(pte) && pte_x(pte);
+}
+/*
+ * All present pages with !NX bit are kernel-executable:
+ */
+static inline int pte_exec_kernel(pte_t pte)
+{
+	return pte_x(pte);
+}
 
 /* Rules for using set_pte: the pte being assigned *must* be
  * either not present or in a state where the hardware will
@@ -101,18 +106,24 @@ static inline unsigned long pte_pfn(pte_t pte)
 		(pte.pte_high << (32 - PAGE_SHIFT));
 }
 
+extern unsigned long long __supported_pte_mask;
+
 static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 {
 	pte_t pte;
 
-	pte.pte_high = page_nr >> (32 - PAGE_SHIFT);
-	pte.pte_low = (page_nr << PAGE_SHIFT) | pgprot_val(pgprot);
+	pte.pte_high = (page_nr >> (32 - PAGE_SHIFT)) | \
+					(pgprot_val(pgprot) >> 32);
+	pte.pte_high &= (__supported_pte_mask >> 32);
+	pte.pte_low = ((page_nr << PAGE_SHIFT) | pgprot_val(pgprot)) & \
+							__supported_pte_mask;
 	return pte;
 }
 
 static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 {
-	return __pmd(((unsigned long long)page_nr << PAGE_SHIFT) | pgprot_val(pgprot));
+	return __pmd((((unsigned long long)page_nr << PAGE_SHIFT) | \
+			pgprot_val(pgprot)) & __supported_pte_mask);
 }
 
 /*
@@ -122,7 +133,5 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 #define pte_to_pgoff(pte) ((pte).pte_high)
 #define pgoff_to_pte(off) ((pte_t) { _PAGE_FILE, (off) })
 #define PTE_FILE_MAX_BITS       32
-
-extern struct kmem_cache_s *pae_pgd_cachep;
 
 #endif /* _I386_PGTABLE_3LEVEL_H */

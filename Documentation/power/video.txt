@@ -1,7 +1,7 @@
 
 		Video issues with S3 resume
 		~~~~~~~~~~~~~~~~~~~~~~~~~~~
-		     2003, Pavel Machek
+		  2003-2004, Pavel Machek
 
 During S3 resume, hardware needs to be reinitialized. For most
 devices, this is easy, and kernel driver knows how to do
@@ -15,7 +15,7 @@ run normally so video card is normally initialized.
 
 There are three types of systems where video works after S3 resume:
 
-* systems where video state is preserved over S3. (HP Omnibook xe3)
+* systems where video state is preserved over S3. (Athlon HP Omnibook xe3s)
 
 * systems that initialize video card into vga text mode and where BIOS
   works well enough to be able to set video mode. Use
@@ -25,6 +25,10 @@ There are three types of systems where video works after S3 resume:
   resume. Unfortunately, it is not correct to call video BIOS at that
   point, but it happens to work on some machines. Use
   acpi_sleep=s3_bios (Athlon64 desktop system)
+
+* radeon systems, where X can soft-boot your video card. You'll need
+  patched X, and plain text console (no vesafb or radeonfb), see
+  http://www.doesi.gmxhome.de/linux/tm800s3/s3.html. (Acer TM 800)
 
 Now, if you pass acpi_sleep=something, and it does not work with your
 bios, you'll get hard crash during resume. Be carefull.

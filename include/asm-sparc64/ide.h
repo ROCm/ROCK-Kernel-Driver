@@ -13,7 +13,6 @@
 #include <linux/config.h>
 #include <asm/pgalloc.h>
 #include <asm/io.h>
-#include <asm/hdreg.h>
 #include <asm/page.h>
 #include <asm/spitfire.h>
 
@@ -25,37 +24,8 @@
 # endif
 #endif
 
-static __inline__ int ide_default_irq(unsigned long base)
-{
-	return 0;
-}
-
-static __inline__ unsigned long ide_default_io_base(int index)
-{
-	return 0;
-}
-
-static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port, unsigned long ctrl_port, int *irq)
-{
-	unsigned long reg = data_port;
-	int i;
-
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-		hw->io_ports[i] = reg;
-		reg += 1;
-	}
-	if (ctrl_port) {
-		hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
-	} else {
-		hw->io_ports[IDE_CONTROL_OFFSET] = hw->io_ports[IDE_DATA_OFFSET] + 0x206;
-	}
-	if (irq != NULL)
-		*irq = 0;
-	hw->io_ports[IDE_IRQ_OFFSET] = 0;
-}
-
-/* There are no standard ports. */
-static inline void ide_init_default_hwifs(void)	{ ; }
+#define IDE_ARCH_OBSOLETE_INIT
+#define ide_default_io_ctl(base)	((base) + 0x206) /* obsolete */
 
 #define __ide_insl(data_reg, buffer, wcount) \
 	__ide_insw(data_reg, buffer, (wcount)<<1)

@@ -11,29 +11,6 @@ config NET_ETHERNET
 	bool
 	depends on ETRAX_ETHERNET
 	default y
-	---help---
-	  Ethernet (also called IEEE 802.3 or ISO 8802-2) is the most common
-	  type of Local Area Network (LAN) in universities and companies.
-
-	  Common varieties of Ethernet are: 10BASE-2 or Thinnet (10 Mbps over
-	  coaxial cable, linking computers in a chain), 10BASE-T or twisted
-	  pair (10 Mbps over twisted pair cable, linking computers to central
-	  hubs), 10BASE-F (10 Mbps over optical fiber links, using hubs),
-	  100BASE-TX (100 Mbps over two twisted pair cables, using hubs),
-	  100BASE-T4 (100 Mbps over 4 standard voice-grade twisted pair
-	  cables, using hubs), 100BASE-FX (100 Mbps over optical fiber links)
-	  [the 100BASE varieties are also known as Fast Ethernet], and Gigabit
-	  Ethernet (1 Gbps over optical fiber or short copper links).
-
-	  If your Linux machine will be connected to an Ethernet and you have
-	  an Ethernet network interface card (NIC) installed in your computer,
-	  say Y here and read the Ethernet-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>. You will then also have
-	  to say Y to the driver for your particular NIC.
-
-	  Note that the answer to this question won't directly affect the
-	  kernel: saying N will just cause the configurator to skip all
-	  the questions about Ethernet network cards. If unsure, say N.
 
 choice
 	prompt "Network LED behavior"
@@ -108,6 +85,32 @@ config ETRAX_SERIAL_PORT0
 	  Enables the ETRAX 100 serial driver for ser0 (ttyS0)
 	  Normally you want this on, unless you use external DMA 1 that uses
 	  the same DMA channels.
+
+choice
+	prompt "Ser0 DMA out assignment"
+	depends on ETRAX_SERIAL_PORT0
+	default ETRAX_SERIAL_PORT0_DMA6_OUT
+
+config CONFIG_ETRAX_SERIAL_PORT0_NO_DMA_OUT
+       bool "No DMA out"
+
+config CONFIG_ETRAX_SERIAL_PORT0_DMA6_OUT
+       bool "DMA 6"
+
+endchoice
+
+choice
+	prompt "Ser0 DMA in assignment"
+	depends on ETRAX_SERIAL_PORT0
+	default ETRAX_SERIAL_PORT0_DMA7_IN
+
+config CONFIG_ETRAX_SERIAL_PORT0_NO_DMA_IN
+       bool "No DMA in"
+
+config CONFIG_ETRAX_SERIAL_PORT0_DMA7_IN
+       bool "DMA 7"
+
+endchoice
 
 choice
 	prompt "Ser0 DTR, RI, DSR and CD assignment"
@@ -196,6 +199,32 @@ config ETRAX_SERIAL_PORT1
 	depends on ETRAX_SERIAL
 	help
 	  Enables the ETRAX 100 serial driver for ser1 (ttyS1).
+
+choice
+	prompt "Ser1 DMA out assignment"
+	depends on ETRAX_SERIAL_PORT1
+	default ETRAX_SERIAL_PORT1_DMA8_OUT
+
+config CONFIG_ETRAX_SERIAL_PORT1_NO_DMA_OUT
+       bool "No DMA out"
+
+config CONFIG_ETRAX_SERIAL_PORT1_DMA8_OUT
+       bool "DMA 8"
+
+endchoice
+
+choice
+	prompt "Ser1 DMA in assignment"
+	depends on ETRAX_SERIAL_PORT1
+	default ETRAX_SERIAL_PORT1_DMA9_IN
+
+config CONFIG_ETRAX_SERIAL_PORT1_NO_DMA_IN
+       bool "No DMA in"
+
+config CONFIG_ETRAX_SERIAL_PORT1_DMA9_IN
+       bool "DMA 9"
+
+endchoice
 
 choice
 	prompt "Ser1 DTR, RI, DSR and CD assignment"
@@ -289,6 +318,32 @@ config ETRAX_SERIAL_PORT2
 	  Enables the ETRAX 100 serial driver for ser2 (ttyS2).
 
 choice
+	prompt "Ser2 DMA out assignment"
+	depends on ETRAX_SERIAL_PORT2
+	default ETRAX_SERIAL_PORT2_DMA2_OUT
+
+config CONFIG_ETRAX_SERIAL_PORT2_NO_DMA_OUT
+       bool "No DMA out"
+
+config CONFIG_ETRAX_SERIAL_PORT2_DMA2_OUT
+       bool "DMA 2"
+
+endchoice
+
+choice
+	prompt "Ser2 DMA in assignment"
+	depends on ETRAX_SERIAL_PORT2
+	default ETRAX_SERIAL_PORT2_DMA3_IN
+
+config CONFIG_ETRAX_SERIAL_PORT2_NO_DMA_IN
+       bool "No DMA in"
+
+config CONFIG_ETRAX_SERIAL_PORT2_DMA3_IN
+       bool "DMA 3"
+
+endchoice
+
+choice
 	prompt "Ser2 DTR, RI, DSR and CD assignment"
 	depends on ETRAX_SERIAL_PORT2
 	default ETRAX_SER2_DTR_RI_DSR_CD_ON_NONE
@@ -375,6 +430,32 @@ config ETRAX_SERIAL_PORT3
 	depends on ETRAX_SERIAL
 	help
 	  Enables the ETRAX 100 serial driver for ser3 (ttyS3).
+
+choice
+	prompt "Ser3 DMA out assignment"
+	depends on ETRAX_SERIAL_PORT3
+	default ETRAX_SERIAL_PORT3_DMA4_OUT
+
+config CONFIG_ETRAX_SERIAL_PORT3_NO_DMA_OUT
+       bool "No DMA out"
+
+config CONFIG_ETRAX_SERIAL_PORT3_DMA4_OUT
+       bool "DMA 4"
+
+endchoice
+
+choice
+	prompt "Ser3 DMA in assignment"
+	depends on ETRAX_SERIAL_PORT3
+	default ETRAX_SERIAL_PORT3_DMA5_IN
+
+config CONFIG_ETRAX_SERIAL_PORT3_NO_DMA_IN
+       bool "No DMA in"
+
+config CONFIG_ETRAX_SERIAL_PORT3_DMA5_IN
+       bool "DMA 5"
+
+endchoice
 
 choice
 	prompt "Ser3 DTR, RI, DSR and CD assignment"
@@ -465,6 +546,95 @@ config ETRAX_RS485_DISABLE_RECEIVER
 	  It's necessary to disable the serial receiver to avoid serial
 	  loopback.  Not all products are able to do this in software only.
 	  Axis 2400/2401 must disable receiver.
+
+config ETRAX_IDE
+	bool "ATA/IDE support"
+	help
+	  Enable this to get support for ATA/IDE.
+	  You can't use parallell ports or SCSI ports
+	  at the same time.
+
+# here we should add the CONFIG_'s necessary to enable the basic
+# general ide drivers so the common case does not need to go
+# into that config submenu. enable disk and CD support. others
+# need to go fiddle in the submenu..
+config IDE
+	tristate
+	depends on ETRAX_IDE
+	default y
+
+config BLK_DEV_IDE
+	tristate
+	depends on ETRAX_IDE
+	default y
+
+config BLK_DEV_IDEDISK
+	tristate
+	depends on ETRAX_IDE
+	default y
+
+config BLK_DEV_IDECD
+	tristate
+	depends on ETRAX_IDE
+	default y
+
+config BLK_DEV_IDEDMA
+	bool
+	depends on ETRAX_IDE
+	default y
+
+config DMA_NONPCI
+	bool
+	depends on ETRAX_IDE
+	default y
+
+config ETRAX_IDE_DELAY
+	int "Delay for drives to regain consciousness"
+	depends on ETRAX_IDE
+	default 15
+	help
+	  Number of seconds to wait for IDE drives to spin up after an IDE
+	  reset.
+choice
+	prompt "IDE reset pin"
+	depends on ETRAX_IDE
+	default ETRAX_IDE_PB7_RESET
+
+config ETRAX_IDE_PB7_RESET
+	bool "Port_PB_Bit_7"
+	help
+	  IDE reset on pin 7 on port B
+
+config ETRAX_IDE_G27_RESET
+        bool "Port_G_Bit_27"
+	help
+	  IDE reset on pin 27 on port G
+
+endchoice
+
+
+config ETRAX_USB_HOST
+	bool "USB host"
+	help
+	   This option enables the host functionality of the ETRAX 100LX
+	   built-in USB controller. In host mode the controller is designed
+	   for CTRL and BULK traffic only, INTR traffic may work as well
+	   however (depending on the requirements of timeliness).
+
+config USB
+       tristate
+       depends on ETRAX_USB_HOST
+       default y
+
+config ETRAX_USB_HOST_PORT1
+       bool "  USB port 1 enabled"
+       depends on ETRAX_USB_HOST
+       default n
+
+config ETRAX_USB_HOST_PORT2
+       bool "  USB port 2 enabled"
+       depends on ETRAX_USB_HOST
+       default n
 
 config ETRAX_AXISFLASHMAP
 	bool "Axis flash-map support"

@@ -161,6 +161,7 @@ void nlmclnt_mark_reclaim(struct nlm_host *host)
 static inline
 void nlmclnt_prepare_reclaim(struct nlm_host *host, u32 newstate)
 {
+	host->h_monitored = 0;
 	host->h_nsmstate = newstate;
 	host->h_state++;
 	host->h_nextrebind = 0;
@@ -227,7 +228,6 @@ restart:
 	}
 
 	host->h_reclaiming = 0;
-	wake_up(&host->h_gracewait);
 
 	/* Now, wake up all processes that sleep on a blocked lock */
 	for (block = nlm_blocked; block; block = block->b_next) {

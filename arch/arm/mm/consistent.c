@@ -12,17 +12,14 @@
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/string.h>
-#include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 
+#include <asm/cacheflush.h>
 #include <asm/io.h>
-#include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
 #define CONSISTENT_BASE	(0xffc00000)
@@ -162,6 +159,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, int gfp,
 	if ((limit && size >= limit) || size >= (CONSISTENT_END - CONSISTENT_BASE)) {
 		printk(KERN_WARNING "coherent allocation too big (requested %#x mask %#Lx)\n",
 		       size, mask);
+		*handle = ~0;
 		return NULL;
 	}
 
@@ -196,7 +194,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, int gfp,
 		/*
 		 * Set the "dma handle"
 		 */
-		*handle = page_to_bus(page);
+		*handle = page_to_dma(dev, page);
 
 		do {
 			BUG_ON(!pte_none(*pte));

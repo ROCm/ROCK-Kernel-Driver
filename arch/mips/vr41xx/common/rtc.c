@@ -1,7 +1,7 @@
 /*
  *  rtc.c, RTC(has only timer function) routines for NEC VR4100 series.
  *
- *  Copyright (C) 2003  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  Copyright (C) 2003-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -259,7 +259,7 @@ void vr41xx_set_epoch_time(unsigned long time)
 	epoch_time = time;
 }
 
-void __init vr41xx_time_init(void)
+static void __init vr41xx_time_init(void)
 {
 	switch (current_cpu_data.cputype) {
 	case CPU_VR4111:
@@ -291,7 +291,7 @@ void __init vr41xx_time_init(void)
 	rtc_set_time = vr41xx_set_time;
 }
 
-void __init vr41xx_timer_setup(struct irqaction *irq)
+static void __init vr41xx_timer_setup(struct irqaction *irq)
 {
 	do_gettimeoffset = vr41xx_gettimeoffset;
 
@@ -309,3 +309,13 @@ void __init vr41xx_timer_setup(struct irqaction *irq)
 
 	setup_irq(ELAPSEDTIME_IRQ, irq);
 }
+
+static int __init vr41xx_rtc_init(void)
+{
+	board_time_init = vr41xx_time_init;
+	board_timer_setup = vr41xx_timer_setup;
+
+	return 0;
+}
+
+early_initcall(vr41xx_rtc_init);

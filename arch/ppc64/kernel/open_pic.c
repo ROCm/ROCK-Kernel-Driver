@@ -168,7 +168,7 @@ void __init pSeries_init_openpic(void)
         struct device_node *np;
         int i;
         unsigned int *addrp;
-        unsigned char* chrp_int_ack_special = 0;
+        unsigned char* chrp_int_ack_special = NULL;
         unsigned char init_senses[NR_IRQS - NUM_ISA_INTERRUPTS];
         int nmi_irq = -1;
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)
@@ -591,7 +591,7 @@ static inline u32 physmask(u32 cpumask)
 void openpic_init_processor(u_int cpumask)
 {
 	openpic_write(&OpenPIC->Global.Processor_Initialization,
-		      physmask(cpumask & cpus_coerce(cpu_online_map)));
+		      physmask(cpumask & cpus_addr(cpu_online_map)[0]));
 }
 
 #ifdef CONFIG_SMP
@@ -625,7 +625,7 @@ void openpic_cause_IPI(u_int ipi, u_int cpumask)
 	CHECK_THIS_CPU;
 	check_arg_ipi(ipi);
 	openpic_write(&OpenPIC->THIS_CPU.IPI_Dispatch(ipi),
-		      physmask(cpumask & cpus_coerce(cpu_online_map)));
+		      physmask(cpumask & cpus_addr(cpu_online_map)[0]));
 }
 
 void openpic_request_IPIs(void)
@@ -642,13 +642,13 @@ void openpic_request_IPIs(void)
 
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(openpic_vec_ipi, openpic_ipi_action, SA_INTERRUPT,
-		    "IPI0 (call function)", 0);
+		    "IPI0 (call function)", NULL);
 	request_irq(openpic_vec_ipi+1, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI1 (reschedule)", 0);
+		   "IPI1 (reschedule)", NULL);
 	request_irq(openpic_vec_ipi+2, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI2 (unused)", 0);
+		   "IPI2 (unused)", NULL);
 	request_irq(openpic_vec_ipi+3, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI3 (debugger break)", 0);
+		   "IPI3 (debugger break)", NULL);
 
 	for ( i = 0; i < OPENPIC_NUM_IPI ; i++ )
 		openpic_enable_ipi(openpic_vec_ipi+i);
@@ -711,7 +711,7 @@ static void __init openpic_maptimer(u_int timer, u_int cpumask)
 {
 	check_arg_timer(timer);
 	openpic_write(&OpenPIC->Global.Timer[timer].Destination,
-		      physmask(cpumask & cpus_coerce(cpu_online_map)));
+		      physmask(cpumask & cpus_addr(cpu_online_map)[0]));
 }
 
 
@@ -844,7 +844,7 @@ static void openpic_set_affinity(unsigned int irq_nr, cpumask_t cpumask)
 	cpumask_t tmp;
 
 	cpus_and(tmp, cpumask, cpu_online_map);
-	openpic_mapirq(irq_nr - open_pic_irq_offset, physmask(cpus_coerce(tmp)));
+	openpic_mapirq(irq_nr - open_pic_irq_offset, physmask(cpus_addr(tmp)[0]));
 }
 
 #ifdef CONFIG_SMP

@@ -49,6 +49,7 @@ static char version[] = "sb1000.c:v1.1.2 6/01/98 (fventuri@mediaone.net)\n";
 #include <linux/delay.h>	/* for udelay() */
 #include <linux/etherdevice.h>
 #include <linux/pnp.h>
+#include <linux/init.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -798,7 +799,7 @@ skipped_frame:
 			skb ? session_id : session_id | 0x40, frame_id);
 	if (skb) {
 		dev_kfree_skb(skb);
-		skb = 0;
+		skb = NULL;
 	}
 
 good_frame:
@@ -874,7 +875,7 @@ printk("cm0: IP identification: %02x%02x  fragment offset: %02x%02x\n", buffer[3
 	dev->last_rx = jiffies;
 	stats->rx_bytes+=dlen;
 	stats->rx_packets++;
-	lp->rx_skb[ns] = 0;
+	lp->rx_skb[ns] = NULL;
 	lp->rx_session_id[ns] |= 0x40;
 	return 0;
 
@@ -892,7 +893,7 @@ dropped_frame:
 	if (ns < NPIDS) {
 		if ((skb = lp->rx_skb[ns])) {
 			dev_kfree_skb(skb);
-			lp->rx_skb[ns] = 0;
+			lp->rx_skb[ns] = NULL;
 		}
 		lp->rx_session_id[ns] |= 0x40;
 	}
@@ -1030,14 +1031,14 @@ static int sb1000_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case SIOCGCMFREQUENCY:		/* get frequency */
 		if ((status = sb1000_get_frequency(ioaddr, name, &frequency)))
 			return status;
-		if(put_user(frequency, (int*) ifr->ifr_data))
+		if(put_user(frequency, (int __user *) ifr->ifr_data))
 			return -EFAULT;
 		break;
 
 	case SIOCSCMFREQUENCY:		/* set frequency */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if(get_user(frequency, (int*) ifr->ifr_data))
+		if(get_user(frequency, (int __user *) ifr->ifr_data))
 			return -EFAULT;
 		if ((status = sb1000_set_frequency(ioaddr, name, frequency)))
 			return status;

@@ -224,12 +224,12 @@ static struct dentry *ibmasmfs_create_dir (struct super_block *sb,
 	return dentry;
 }
 
-int ibmasmfs_register()
+int ibmasmfs_register(void)
 {
 	return register_filesystem(&ibmasmfs_type);
 }
 
-void ibmasmfs_unregister()
+void ibmasmfs_unregister(void)
 {
 	unregister_filesystem(&ibmasmfs_type);
 }
@@ -287,7 +287,7 @@ static int command_file_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t command_file_read(struct file *file, char *buf, size_t count, loff_t *offset)
+static ssize_t command_file_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	struct ibmasmfs_command_data *command_data = file->private_data;
 	struct command *cmd;
@@ -324,7 +324,7 @@ static ssize_t command_file_read(struct file *file, char *buf, size_t count, lof
 	return len;
 }
 
-static ssize_t command_file_write(struct file *file, const char *ubuff, size_t count, loff_t *offset)
+static ssize_t command_file_write(struct file *file, const char __user *ubuff, size_t count, loff_t *offset)
 {
 	struct ibmasmfs_command_data *command_data = file->private_data;
 	struct command *cmd;
@@ -345,7 +345,7 @@ static ssize_t command_file_write(struct file *file, const char *ubuff, size_t c
 	if (!cmd)
 		return -ENOMEM;
 
-	if (copy_from_user((void *)cmd->buffer, (void *)ubuff, count)) {
+	if (copy_from_user(cmd->buffer, ubuff, count)) {
 		command_put(cmd);
 		return -EFAULT;
 	}
@@ -395,7 +395,7 @@ static int event_file_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t event_file_read(struct file *file, char *buf, size_t count, loff_t *offset)
+static ssize_t event_file_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	struct ibmasmfs_event_data *event_data = file->private_data;
 	struct event_reader *reader = &event_data->reader;
@@ -421,7 +421,7 @@ static ssize_t event_file_read(struct file *file, char *buf, size_t count, loff_
 	return reader->data_size;
 }
 
-static ssize_t event_file_write(struct file *file, const char *buf, size_t count, loff_t *offset)
+static ssize_t event_file_write(struct file *file, const char __user *buf, size_t count, loff_t *offset)
 {
 	struct ibmasmfs_event_data *event_data = file->private_data;
 
@@ -462,7 +462,7 @@ static int r_heartbeat_file_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t r_heartbeat_file_read(struct file *file, char *buf, size_t count, loff_t *offset)
+static ssize_t r_heartbeat_file_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	struct ibmasmfs_heartbeat_data *rhbeat = file->private_data;
 	unsigned long flags;
@@ -490,7 +490,7 @@ static ssize_t r_heartbeat_file_read(struct file *file, char *buf, size_t count,
 	return result;
 }
 
-static ssize_t r_heartbeat_file_write(struct file *file, const char *buf, size_t count, loff_t *offset)
+static ssize_t r_heartbeat_file_write(struct file *file, const char __user *buf, size_t count, loff_t *offset)
 {
 	struct ibmasmfs_heartbeat_data *rhbeat = file->private_data;
 
@@ -518,7 +518,7 @@ static int remote_settings_file_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t remote_settings_file_read(struct file *file, char *buf, size_t count, loff_t *offset)
+static ssize_t remote_settings_file_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	unsigned long address = (unsigned long)file->private_data;
 	unsigned char *page;
@@ -552,7 +552,7 @@ exit:
 	return retval;
 }
 
-static ssize_t remote_settings_file_write(struct file *file, const char *ubuff, size_t count, loff_t *offset)
+static ssize_t remote_settings_file_write(struct file *file, const char __user *ubuff, size_t count, loff_t *offset)
 {
 	unsigned long address = (unsigned long)file->private_data;
 	char *buff;
@@ -571,7 +571,7 @@ static ssize_t remote_settings_file_write(struct file *file, const char *ubuff, 
 
 	memset(buff, 0x0, count + 1);
 
-	if (copy_from_user((void *)buff, (void *)ubuff, count)) {
+	if (copy_from_user(buff, ubuff, count)) {
 		kfree(buff);
 		return -EFAULT;
 	}
@@ -618,7 +618,7 @@ static int remote_event_file_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t remote_event_file_read(struct file *file, char *buf, size_t count, loff_t *offset)
+static ssize_t remote_event_file_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	struct service_processor *sp = file->private_data;
 	struct remote_queue *q = &sp->remote_queue;
@@ -663,7 +663,7 @@ static struct file_operations event_fops = {
 	.open =		event_file_open,
 	.release =	event_file_close,
 	.read =		event_file_read,
-	.write 		event_file_write,
+	.write =	event_file_write,
 };
 
 static struct file_operations r_heartbeat_fops = {

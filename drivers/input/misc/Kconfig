@@ -14,7 +14,7 @@ config INPUT_MISC
 
 config INPUT_PCSPKR
 	tristate "PC Speaker support"
-	depends on INPUT && INPUT_MISC
+	depends on (ALPHA || X86 || X86_64 || MIPS) && INPUT && INPUT_MISC
 	help
 	  Say Y here if you want the standard PC Speaker to be used for
 	  bells and whistles.
@@ -39,10 +39,6 @@ config INPUT_SPARCSPKR
 config INPUT_M68K_BEEP
 	tristate "M68k Beeper support"
 	depends on M68K && INPUT && INPUT_MISC
-
-config INPUT_98SPKR
-	tristate "PC-9800 Speaker support"
-	depends on X86_PC9800 && INPUT && INPUT_MISC
 
 config INPUT_UINPUT
 	tristate "User level driver support"

@@ -47,7 +47,7 @@
 #	define DPRINTK( x, args... )	/* nix */
 #endif
 
-static int system3_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int system3_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	skt->irq = skt->nr ? IRQ_S1_READY_NINT : IRQ_S0_READY_NINT;
 
@@ -55,12 +55,12 @@ static int system3_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 	return 0;
 }
 
-void system3_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+void system3_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
 }
 
 static void
-system3_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state *state)
+system3_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
 {
 	unsigned long status = PCSR;
 

@@ -7,12 +7,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <termios.h>
 #include "chan_user.h"
 #include "user.h"
 #include "user_util.h"
 #include "kern_util.h"
-#include "os.h"
 
 struct pty_chan {
 	void (*announce)(char *dev_name, int dev);
@@ -26,8 +26,7 @@ void *pty_chan_init(char *str, int device, struct chan_opts *opts)
 {
 	struct pty_chan *data;
 
-	data = um_kmalloc(sizeof(*data));
-	if(data == NULL) return(NULL);
+	if((data = um_kmalloc(sizeof(*data))) == NULL) return(NULL);
 	*data = ((struct pty_chan) { .announce  	= opts->announce, 
 				     .dev  		= device,
 				     .raw  		= opts->raw });
@@ -40,8 +39,7 @@ int pts_open(int input, int output, int primary, void *d, char **dev_out)
 	char *dev;
 	int fd;
 
-	fd = get_pty();
-	if(fd < 0){
+	if((fd = get_pty()) < 0){
 		printk("open_pts : Failed to open pts\n");
 		return(-errno);
 	}
@@ -59,27 +57,29 @@ int pts_open(int input, int output, int primary, void *d, char **dev_out)
 
 int getmaster(char *line)
 {
+	struct stat stb;
 	char *pty, *bank, *cp;
-	int master, err;
+	int master;
 
 	pty = &line[strlen("/dev/ptyp")];
 	for (bank = "pqrs"; *bank; bank++) {
 		line[strlen("/dev/pty")] = *bank;
 		*pty = '0';
-		if (os_stat_file(line, NULL) < 0)
+		if (stat(line, &stb) < 0)
 			break;
 		for (cp = "0123456789abcdef"; *cp; cp++) {
 			*pty = *cp;
-			master = os_open_file(line, of_rdwr(OPENFLAGS()), 0);
+			master = open(line, O_RDWR);
 			if (master >= 0) {
 				char *tp = &line[strlen("/dev/")];
+				int ok;
 
 				/* verify slave side is usable */
 				*tp = 't';
-				err = os_access(line, OS_ACC_RW_OK);
+				ok = access(line, R_OK|W_OK) == 0;
 				*tp = 'p';
-				if(err == 0) return(master);
-				(void) os_close_file(master);
+				if (ok) return(master);
+				(void) close(master);
 			}
 		}
 	}

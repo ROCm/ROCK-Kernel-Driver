@@ -265,21 +265,18 @@ static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n;
-	loff_t pos = *ppos;
-	
-	/* XXX - needs seek locking */
 	if (power_on_time == 0)
 		n = sprintf(buf, "Power on time not set\n");
 	else
 		n = sprintf(buf, "%lu\n", power_on_time);
 
-	if (pos != (unsigned int)pos || pos >= strlen(buf))
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > strlen(buf) - pos)
-		n = strlen(buf) - pos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -305,19 +302,15 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n = 0;
-	loff_t pos = *ppos;
-	
-	/* XXX - needs seek locking */
-	
 	if (progress_led != NULL)
 		n = sprintf (buf, "%s\n", progress_led);
-	if (pos != (unsigned int)pos || pos >= strlen(buf))
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > strlen(buf) - pos)
-		n = strlen(buf) - pos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -353,13 +346,7 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 {
 	unsigned int year, mon, day, hour, min, sec;
 	unsigned long *ret = kmalloc(4*8, GFP_KERNEL);
-	loff_t pos = *ppos;
 	int n, error;
-	
-	if(ret == NULL)
-		return -ENOMEM;
-		
-	/* Needs seek locking */
 
 	error = call_rtas("get-time-of-day", 0, 8, ret);
 
@@ -375,13 +362,13 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	}
 	kfree(ret);
 
-	if (pos != (unsigned int)pos || pos >= strlen(buf))
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > strlen(buf) - pos)
-		n = strlen(buf) - pos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -747,19 +734,15 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n;
-	loff_t pos = *ppos;
-	
-	/* XXX - needs seek locking */
-	
 	n = sprintf(buf, "%lu\n", rtas_tone_frequency);
 
-	if (pos != (unsigned long)pos || pos >= strlen(buf))
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > strlen(buf) - pos)
-		n = strlen(buf) - pos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 /* ****************************************************************** */
@@ -791,16 +774,15 @@ static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
-	int n = sprintf(buf, "%lu\n", rtas_tone_volume);
-	loff_t pos = *ppos;
+	int n;
+	n = sprintf(buf, "%lu\n", rtas_tone_volume);
 
-	/* XXX - Needs locking - actual shouldnt these all have ONE helper */
-	if (pos != (unsigned int) pos || pos >= strlen(buf))
+	if (*ppos >= strlen(buf))
 		return 0;
-	if (n > strlen(buf) - pos)
-		n = strlen(buf) - pos;
+	if (n > strlen(buf) - *ppos)
+		n = strlen(buf) - *ppos;
 	if (n > count)
 		n = count;
-	*ppos =  pos + n;
+	*ppos += n;
 	return n;
 }

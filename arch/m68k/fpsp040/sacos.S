@@ -12,7 +12,7 @@
 |
 |	Accuracy and Monotonicity: The returned result is within 3 ulps in
 |		64 significant bit, i.e. within 0.5001 ulp to 53 bits if the
-|		result is subsequently rounded to double precision. The 
+|		result is subsequently rounded to double precision. The
 |		result is provably monotonic in double precision.
 |
 |	Speed: The program sCOS takes approximately 310 cycles.
@@ -38,8 +38,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |SACOS	idnt	2,1 | Motorola 040 Floating Point Software Package
@@ -74,17 +74,17 @@ sacos:
 |--ACOS(X) = 2 * ATAN(	SQRT( (1-X)/(1+X) )	)
 
 	fmoves		#0x3F800000,%fp1
-	faddx		%fp0,%fp1	 	| ...1+X
-	fnegx		%fp0	 	| ... -X
+	faddx		%fp0,%fp1		| ...1+X
+	fnegx		%fp0		| ... -X
 	fadds		#0x3F800000,%fp0	| ...1-X
-	fdivx		%fp1,%fp0	 	| ...(1-X)/(1+X)
+	fdivx		%fp1,%fp0		| ...(1-X)/(1+X)
 	fsqrtx		%fp0		| ...SQRT((1-X)/(1+X))
 	fmovemx	%fp0-%fp0,(%a0)	| ...overwrite input
 	movel		%d1,-(%sp)	|save original users fpcr
 	clrl		%d1
 	bsr		satan		| ...ATAN(SQRT([1-X]/[1+X]))
 	fmovel		(%sp)+,%fpcr	|restore users exceptions
-	faddx		%fp0,%fp0	 	| ...2 * ATAN( STUFF )
+	faddx		%fp0,%fp0		| ...2 * ATAN( STUFF )
 	bra		t_frcinx
 
 ACOSBIG:
@@ -110,6 +110,6 @@ ACOSBIG:
 ACOSP1:
 	fmovel		%d1,%FPCR
 	fmoves		#0x00000000,%fp0
-	rts				|Facos ; of +1 is exact	
+	rts				|Facos ; of +1 is exact
 
 	|end

@@ -41,18 +41,18 @@ void Un_impl(void)
 
   RE_ENTRANT_CHECK_OFF;
   /* No need to verify_area(), we have previously fetched these bytes. */
-  printk("Unimplemented FPU Opcode at eip=%p : ", (void *) address);
+  printk("Unimplemented FPU Opcode at eip=%p : ", (void __user *) address);
   if ( FPU_CS == __USER_CS )
     {
       while ( 1 )
 	{
-	  FPU_get_user(byte1, (u_char *) address);
+	  FPU_get_user(byte1, (u_char __user *) address);
 	  if ( (byte1 & 0xf8) == 0xd8 ) break;
 	  printk("[%02x]", byte1);
 	  address++;
 	}
       printk("%02x ", byte1);
-      FPU_get_user(FPU_modrm, 1 + (u_char *) address);
+      FPU_get_user(FPU_modrm, 1 + (u_char __user *) address);
       
       if (FPU_modrm >= 0300)
 	printk("%02x (%02x+%d)\n", FPU_modrm, FPU_modrm & 0xf8, FPU_modrm & 7);
@@ -98,7 +98,7 @@ void FPU_printall(void)
 #define MAX_PRINTED_BYTES 20
       for ( i = 0; i < MAX_PRINTED_BYTES; i++ )
 	{
-	  FPU_get_user(byte1, (u_char *) address);
+	  FPU_get_user(byte1, (u_char __user *) address);
 	  if ( (byte1 & 0xf8) == 0xd8 )
 	    {
 	      printk(" %02x", byte1);
@@ -111,7 +111,7 @@ void FPU_printall(void)
 	printk(" [more..]\n");
       else
 	{
-	  FPU_get_user(FPU_modrm, 1 + (u_char *) address);
+	  FPU_get_user(FPU_modrm, 1 + (u_char __user *) address);
 	  
 	  if (FPU_modrm >= 0300)
 	    printk(" %02x (%02x+%d)\n", FPU_modrm, FPU_modrm & 0xf8, FPU_modrm & 7);

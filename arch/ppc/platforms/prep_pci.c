@@ -311,11 +311,11 @@ static char Genesis2_pci_IRQ_map[23] __prepdata =
 	0,	/* Slot 7  - unused */
 	0,	/* Slot 8  - unused */
 	0,	/* Slot 9  - unused */
-	0,	/* Slot 10 - Ethernet */
-	0,	/* Slot 11 - Universe PCI - VME Bridge */
-	3,	/* Slot 12 - unused */
-	0,	/* Slot 13 - unused */
-	2,	/* Slot 14 - SCSI */
+	0,	/* Slot 10 - unused */
+	0,	/* Slot 11 - IDE */
+	3,	/* Slot 12 - SCSI */
+	5,	/* Slot 13 - Universe PCI - VME Bridge */
+	2,	/* Slot 14 - Ethernet */
 	0,	/* Slot 15 - unused */
 	9,	/* Slot 16 - PMC 1 */
 	12,	/* Slot 17 - pci */
@@ -741,7 +741,7 @@ raven_init(void)
 	}
 
 	/* Check the first PCI device to see if it is a Raven. */
-	early_read_config_dword(0, 0, 0, PCI_VENDOR_ID, &devid);
+	early_read_config_dword(NULL, 0, 0, PCI_VENDOR_ID, &devid);
 
 	switch (devid & 0xffff0000) {
 	case MPIC_RAVEN_ID:
@@ -757,7 +757,7 @@ raven_init(void)
 
 
 	/* Read the memory base register. */
-	early_read_config_dword(0, 0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
+	early_read_config_dword(NULL, 0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
 
 	if (pci_membase == 0) {
 		OpenPIC_Addr = NULL;

@@ -32,10 +32,13 @@ static int mlock_fixup(struct vm_area_struct * vma,
 			goto out;
 		}
 	}
-	
-	spin_lock(&mm->page_table_lock);
+
+	/*
+	 * vm_flags is protected by the mmap_sem held in write mode.
+	 * It's okay if try_to_unmap_one unmaps a page just after we
+	 * set VM_LOCKED, make_pages_present below will bring it back.
+	 */
 	vma->vm_flags = newflags;
-	spin_unlock(&mm->page_table_lock);
 
 	/*
 	 * Keep track of amount of locked VM.
@@ -44,13 +47,6 @@ static int mlock_fixup(struct vm_area_struct * vma,
 	if (newflags & VM_LOCKED) {
 		pages = -pages;
 		ret = make_pages_present(start, end);
-		/* Ran into a hole. This should be an error, but 
-		   some users specify too long lengths e.g. for 
-		   file maps. Ignore it for now.
-		   RED-PEN can locked_vm become negative when this happens? 
-		   Hopefully not. */
-		if (ret == -1) 
-			ret = 0;
 	}
 
 	vma->vm_mm->locked_vm -= pages;
@@ -64,7 +60,7 @@ static int do_mlock(unsigned long start, size_t len, int on)
 	struct vm_area_struct * vma, * next;
 	int error;
 
-	if (on && !can_do_mlock())
+	if (on && !capable(CAP_IPC_LOCK))
 		return -EPERM;
 	len = PAGE_ALIGN(len);
 	end = start + len;
@@ -146,7 +142,7 @@ static int do_mlockall(int flags)
 	unsigned int def_flags;
 	struct vm_area_struct * vma;
 
-	if (!can_do_mlock())
+	if (!capable(CAP_IPC_LOCK))
 		return -EPERM;
 
 	def_flags = 0;

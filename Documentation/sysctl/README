@@ -60,11 +60,11 @@ debug/		<empty>
 dev/		device specific information (eg dev/cdrom/info)
 fs/		specific filesystems
 		filehandle, inode, dentry and quota tuning
-		binfmt_misc <linux/Documentation/binfmt_misc.txt>
+		binfmt_misc <Documentation/binfmt_misc.txt>
 kernel/		global kernel info / tuning
 		miscellaneous stuff
 net/		networking stuff, for documentation look in:
-		<linux/Documentation/networking/>
+		<Documentation/networking/>
 proc/		<empty>
 sunrpc/		SUN Remote Procedure Call (NFS)
 vm/		memory management tuning

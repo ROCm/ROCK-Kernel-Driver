@@ -132,7 +132,7 @@ int DRM(finish)(struct inode *inode, struct file *filp, unsigned int cmd,
 
 	DRM_DEBUG("\n");
 
-	if (copy_from_user(&lock, (drm_lock_t *)arg, sizeof(lock)))
+	if (copy_from_user(&lock, (drm_lock_t __user *)arg, sizeof(lock)))
 		return -EFAULT;
 	ret = DRM(flush_block_and_flush)(dev, lock.context, lock.flags);
 	DRM(flush_unblock)(dev, lock.context, lock.flags);

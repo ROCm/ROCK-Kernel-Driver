@@ -1,5 +1,5 @@
 /*
- * linux/drivers/s390/block/dasd_cmb.c ($Revision: 1.7.2.1 $)
+ * linux/drivers/s390/block/dasd_cmb.c ($Revision: 1.6 $)
  *
  * Linux on zSeries Channel Measurement Facility support
  *  (dasd device driver interface)
@@ -58,7 +58,7 @@ static int
 dasd_ioctl_readall_cmb(struct block_device *bdev, int no, long args)
 {
 	struct dasd_device *device;
-	struct cmbdata * __user udata;
+	struct cmbdata __user *udata;
 	struct cmbdata data;
 	size_t size;
 	int ret;
@@ -66,7 +66,7 @@ dasd_ioctl_readall_cmb(struct block_device *bdev, int no, long args)
 	device = bdev->bd_disk->private_data;
 	if (!device)
 		return -EINVAL;
-	udata = (void *) args;
+	udata = (void __user *) args;
 	size = _IOC_SIZE(no);
 
 	if (!access_ok(VERIFY_WRITE, udata, size))

@@ -7,11 +7,10 @@
 #
 FONTMAPFILE = cp437.uni
 
-obj-y	 += mem.o random.o tty_io.o n_tty.o tty_ioctl.o pty.o misc.o lirc/
+obj-y	 += mem.o random.o tty_io.o n_tty.o tty_ioctl.o pty.o misc.o
 
 obj-$(CONFIG_VT)		+= vt_ioctl.o vc_screen.o consolemap.o \
 				   consolemap_deftbl.o selection.o keyboard.o
-obj-$(CONFIG_ECC)		+= ecc.o
 obj-$(CONFIG_HW_CONSOLE)	+= vt.o defkeymap.o
 obj-$(CONFIG_MAGIC_SYSRQ)	+= sysrq.o
 obj-$(CONFIG_ESPSERIAL)		+= esp.o
@@ -40,27 +39,25 @@ obj-$(CONFIG_N_HDLC)		+= n_hdlc.o
 obj-$(CONFIG_AMIGA_BUILTIN_SERIAL) += amiserial.o
 obj-$(CONFIG_SX)		+= sx.o generic_serial.o
 obj-$(CONFIG_RIO)		+= rio/ generic_serial.o
-obj-$(CONFIG_SH_SCI)		+= sh-sci.o generic_serial.o
-obj-$(CONFIG_HVC_CONSOLE)	+= hvc_console.o hvsi.o
+obj-$(CONFIG_HVC_CONSOLE)	+= hvc_console.o
 obj-$(CONFIG_RAW_DRIVER)	+= raw.o
-obj-$(CONFIG_MMTIMER)		+= mmtimer.o
-obj-$(CONFIG_SGI_L1_SERIAL)	+= sn_serial.o
-obj-$(CONFIG_FETCHOP)		+= fetchop.o
 obj-$(CONFIG_VIOCONS) += viocons.o
 obj-$(CONFIG_VIOTAPE)		+= viotape.o
 obj-$(CONFIG_HVCS)		+= hvcs.o
 
 obj-$(CONFIG_PRINTER) += lp.o
 obj-$(CONFIG_TIPAR) += tipar.o
-obj-$(CONFIG_PC9800_OLDLP) += lp_old98.o
 
 obj-$(CONFIG_DTLK) += dtlk.o
 obj-$(CONFIG_R3964) += n_r3964.o
 obj-$(CONFIG_APPLICOM) += applicom.o
 obj-$(CONFIG_SONYPI) += sonypi.o
 obj-$(CONFIG_RTC) += rtc.o
+obj-$(CONFIG_HPET) += hpet.o
 obj-$(CONFIG_GEN_RTC) += genrtc.o
 obj-$(CONFIG_EFI_RTC) += efirtc.o
+obj-$(CONFIG_SGI_DS1286) += ds1286.o
+obj-$(CONFIG_SGI_IP27_RTC) += ip27-rtc.o
 ifeq ($(CONFIG_GENERIC_NVRAM),y)
   obj-$(CONFIG_NVRAM) += generic_nvram.o
 else
@@ -72,9 +69,8 @@ obj-$(CONFIG_DS1620) += ds1620.o
 obj-$(CONFIG_HW_RANDOM) += hw_random.o
 obj-$(CONFIG_QIC02_TAPE) += tpqic02.o
 obj-$(CONFIG_FTAPE) += ftape/
-obj-$(CONFIG_H8) += h8.o
+obj-$(CONFIG_COBALT_LCD) += lcd.o
 obj-$(CONFIG_PPDEV) += ppdev.o
-obj-$(CONFIG_DZ) += dz.o
 obj-$(CONFIG_NWBUTTON) += nwbutton.o
 obj-$(CONFIG_NWFLASH) += nwflash.o
 obj-$(CONFIG_SCx200_GPIO) += scx200_gpio.o
@@ -85,7 +81,6 @@ obj-$(CONFIG_AGP) += agp/
 obj-$(CONFIG_DRM) += drm/
 obj-$(CONFIG_PCMCIA) += pcmcia/
 obj-$(CONFIG_IPMI_HANDLER) += ipmi/
-obj-$(CONFIG_VTUNE) += vtune/
 
 obj-$(CONFIG_HANGCHECK_TIMER) += hangcheck-timer.o
 

@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: partitions.h,v 1.14 2003/05/20 21:56:29 dwmw2 Exp $
+ * $Id: partitions.h,v 1.15 2003/07/09 11:15:43 dwmw2 Exp $
  */
 
 #ifndef MTD_PARTITIONS_H
@@ -50,7 +50,7 @@ struct mtd_partition {
 #define MTDPART_SIZ_FULL	(0)
 
 
-int add_mtd_partitions(struct mtd_info *, struct mtd_partition *, int);
+int add_mtd_partitions(struct mtd_info *, const struct mtd_partition *, int);
 int del_mtd_partitions(struct mtd_info *);
 
 /*

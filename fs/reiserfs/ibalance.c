@@ -922,7 +922,7 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 
 
 	if ( tb->blknum[h] != 1 )
-	    reiserfs_panic(0, "balance_internal: One new node required for creating the new root");
+	    reiserfs_panic(NULL, "balance_internal: One new node required for creating the new root");
 	/* S[h] = empty buffer from the list FEB. */
 	tbSh = get_FEB (tb);
         blkh = B_BLK_HEAD(tbSh);
@@ -964,7 +964,7 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 
 	dest_bi.tb = tb;
 	dest_bi.bi_bh = S_new;
-	dest_bi.bi_parent = 0;
+	dest_bi.bi_parent = NULL;
 	dest_bi.bi_position = 0;
 	src_bi.tb = tb;
 	src_bi.bi_bh = tbSh;

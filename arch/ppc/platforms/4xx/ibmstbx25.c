@@ -9,22 +9,51 @@
  * or implied.
  */
 
-#include <linux/config.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <asm/ocp.h>
-#include "ibmstbx25.h"
+#include <platforms/4xx/ibmstbx25.h>
 
-struct ocp_def core_ocp[]  __initdata = {
-	{OCP_VENDOR_IBM, OCP_FUNC_PLB, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
-	{OCP_VENDOR_IBM, OCP_FUNC_OPB, OPB_BASE_START, OCP_IRQ_NA, OCP_CPM_NA},
-	{OCP_VENDOR_IBM, OCP_FUNC_16550, UART0_IO_BASE, UART0_INT,IBM_CPM_UART0},
-	{OCP_VENDOR_IBM, OCP_FUNC_16550, UART1_IO_BASE, UART1_INT, IBM_CPM_UART1},
-	{OCP_VENDOR_IBM, OCP_FUNC_16550, UART2_IO_BASE,UART2_INT, IBM_CPM_UART2},
-	{OCP_VENDOR_IBM, OCP_FUNC_IIC, IIC0_BASE, IIC0_IRQ, IBM_CPM_IIC0},
-	{OCP_VENDOR_IBM, OCP_FUNC_GPIO, GPIO0_BASE, OCP_IRQ_NA, IBM_CPM_GPIO0},
-	{OCP_VENDOR_IBM, OCP_FUNC_IDE, IDE0_BASE, IDE0_IRQ, OCP_CPM_NA},
-	{OCP_VENDOR_IBM, OCP_FUNC_EXT, EBIU_BASE_START, OCP_IRQ_NA,IBM_CPM_EBIU},
-	{OCP_VENDOR_INVALID, OCP_FUNC_INVALID, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
+static struct ocp_func_iic_data ibmstbx25_iic0_def = {
+	.fast_mode	= 0,		/* Use standad mode (100Khz) */
+};
+OCP_SYSFS_IIC_DATA()
 
+struct ocp_def core_ocp[] __initdata = {
+	{ .vendor	= OCP_VENDOR_IBM,
+	  .function	= OCP_FUNC_16550,
+	  .index        = 0,
+	  .paddr	= UART0_IO_BASE,
+	  .irq		= UART0_INT,
+	  .pm		= IBM_CPM_UART0,
+	},
+	{ .vendor	= OCP_VENDOR_IBM,
+	  .function	= OCP_FUNC_16550,
+	  .index	= 1,
+	  .paddr	= UART1_IO_BASE,
+	  .irq		= UART1_INT,
+	  .pm		= IBM_CPM_UART1,
+	},
+	{ .vendor	= OCP_VENDOR_IBM,
+	  .function	= OCP_FUNC_16550,
+	  .index	= 2,
+	  .paddr	= UART2_IO_BASE,
+	  .irq		= UART2_INT,
+	  .pm		= IBM_CPM_UART2,
+	},
+	{ .vendor	= OCP_VENDOR_IBM,
+	  .function	= OCP_FUNC_IIC,
+	  .paddr	= IIC0_BASE,
+	  .irq		= IIC0_IRQ,
+	  .pm		= IBM_CPM_IIC0,
+	  .additions	= &ibmstbx25_iic0_def,
+	  .show		= &ocp_show_iic_data
+	},
+	{ .vendor	= OCP_VENDOR_IBM,
+	  .function	= OCP_FUNC_GPIO,
+	  .paddr	= GPIO0_BASE,
+	  .irq		= OCP_IRQ_NA,
+	  .pm		= IBM_CPM_GPIO0,
+	},
+	{ .vendor	= OCP_VENDOR_INVALID
+	}
 };

@@ -21,41 +21,32 @@
 #
 
 # User may have a custom install script
+if [ -x ~/bin/installkernel ]; then exec ~/bin/installkernel "$@"; fi
+if [ -x /sbin/installkernel ]; then exec /sbin/installkernel "$@"; fi
 
-if [ -x /sbin/installkernel ]; then
-  exec /sbin/installkernel "$@"
-fi
-
-if [ "$2" = "zImage" ]; then
+if [ "$(basename $2)" = "zImage" ]; then
 # Compressed install
   echo "Installing compressed kernel"
-  if [ -f $4/vmlinuz-$1 ]; then
-    mv $4/vmlinuz-$1 $4/vmlinuz.old
-  fi
-
-  if [ -f $4/System.map-$1 ]; then
-    mv $4/System.map-$1 $4/System.old
-  fi
-
-  cat $2 > $4/vmlinuz-$1
-  cp $3 $4/System.map-$1
+  base=vmlinuz
 else
 # Normal install
   echo "Installing normal kernel"
-  if [ -f $4/vmlinux-$1 ]; then
-    mv $4/vmlinux-$1 $4/vmlinux.old
-  fi
-
-  if [ -f $4/System.map ]; then
-    mv $4/System.map $4/System.old
-  fi
-
-  cat $2 > $4/vmlinux-$1
-  cp $3 $4/System.map
+  base=vmlinux
 fi
 
+if [ -f $4/$base-$1 ]; then
+  mv $4/$base-$1 $4/$base-$1.old
+fi
+cat $2 > $4/$base-$1
+
+# Install system map file
+if [ -f $4/System.map-$1 ]; then
+  mv $4/System.map-$1 $4/System.map-$1.old
+fi
+cp $3 $4/System.map-$1
+
 if [ -x /sbin/loadmap ]; then
-  /sbin/loadmap --rdev /dev/ima
+  /sbin/loadmap
 else
   echo "You have to install it yourself"
 fi

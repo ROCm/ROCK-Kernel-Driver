@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.6 2003/04/28 05:31:46 starvik Exp $
+/* $Id: head.S,v 1.7 2004/05/14 07:58:01 starvik Exp $
  * 
  * Head of the kernel - alter with care
  *
@@ -7,6 +7,9 @@
  * Authors:	Bjorn Wesen (bjornw@axis.com)
  * 
  * $Log: head.S,v $
+ * Revision 1.7  2004/05/14 07:58:01  starvik
+ * Merge of changes from 2.4
+ *
  * Revision 1.6  2003/04/28 05:31:46  starvik
  * Added section attributes
  *
@@ -331,7 +334,16 @@ _inflash:
 	move.d START_ETHERNET_CLOCK, $r0
 	move.d $r0, [R_NETWORK_GEN_CONFIG]
 #endif
-		
+
+	;; Set up waitstates etc according to kernel configuration.
+#ifndef CONFIG_SVINTO_SIM
+	move.d   CONFIG_ETRAX_DEF_R_WAITSTATES, $r0
+	move.d   $r0, [R_WAITSTATES]
+
+	move.d   CONFIG_ETRAX_DEF_R_BUS_CONFIG, $r0
+	move.d   $r0, [R_BUS_CONFIG]
+#endif
+
 	;; We need to initialze DRAM registers before we start using the DRAM
 
 	cmp.d	RAM_INIT_MAGIC, $r8	; Already initialized?
@@ -626,8 +638,19 @@ _start_it:
 		| IO_STATE (R_GEN_CONFIG, dma4, extdma0),$r0
 #endif
 
-#if defined(CONFIG_BLUETOOTH) && (defined(CONFIG_BLUETOOTH_RESET_G10) || defined(CONFIG_BLUETOOTH_RESET_G11))
-	or.d	  IO_STATE (R_GEN_CONFIG, g8_15dir, out),$r0
+#if defined(CONFIG_ETRAX_DEF_R_PORT_G0_DIR_OUT)
+        or.d      IO_STATE (R_GEN_CONFIG, g0dir, out),$r0
+#endif
+
+#if defined(CONFIG_ETRAX_DEF_R_PORT_G8_15_DIR_OUT)
+        or.d      IO_STATE (R_GEN_CONFIG, g8_15dir, out),$r0
+#endif
+#if defined(CONFIG_ETRAX_DEF_R_PORT_G16_23_DIR_OUT)
+       or.d      IO_STATE (R_GEN_CONFIG, g16_23dir, out),$r0
+#endif
+
+#if defined(CONFIG_ETRAX_DEF_R_PORT_G24_DIR_OUT)
+       or.d      IO_STATE (R_GEN_CONFIG, g24dir, out),$r0
 #endif
 
 	move.d	$r0,[genconfig_shadow] ; init a shadow register of R_GEN_CONFIG

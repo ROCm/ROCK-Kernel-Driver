@@ -180,9 +180,9 @@ extern int setup_irq(unsigned int irq, struct irqaction *irqaction);
 extern void mips_cpu_irq_init(u32 irq_base);
 
 static struct irqaction cascade =
-	{ no_action, SA_INTERRUPT, 0, "cascade", NULL, NULL };
+	{ no_action, SA_INTERRUPT, CPU_MASK_NONE, "cascade", NULL, NULL };
 static struct irqaction reserved =
-	{ no_action, SA_INTERRUPT, 0, "cascade", NULL, NULL };
+	{ no_action, SA_INTERRUPT, CPU_MASK_NONE, "cascade", NULL, NULL };
 
 void __init init_IRQ(void)
 {

@@ -278,8 +278,9 @@
 #define __NR_mq_timedreceive	265
 #define __NR_mq_notify		266
 #define __NR_mq_getsetattr	267
+#define __NR_kexec_load		268
 
-#define __NR_syscalls		268
+#define __NR_syscalls		269
 #ifdef __KERNEL__
 #define NR_syscalls	__NR_syscalls
 #endif
@@ -418,6 +419,28 @@ static inline _syscall3(int, execve, __const__ char *, file, char **, argv,
 #include <linux/compiler.h>
 #include <linux/linkage.h>
 
+#define __ARCH_WANT_IPC_PARSE_VERSION
+#define __ARCH_WANT_OLD_READDIR
+#define __ARCH_WANT_STAT64
+#define __ARCH_WANT_SYS_ALARM
+#define __ARCH_WANT_SYS_GETHOSTNAME
+#define __ARCH_WANT_SYS_PAUSE
+#define __ARCH_WANT_SYS_SGETMASK
+#define __ARCH_WANT_SYS_SIGNAL
+#define __ARCH_WANT_SYS_TIME
+#define __ARCH_WANT_SYS_UTIME
+#define __ARCH_WANT_SYS_WAITPID
+#define __ARCH_WANT_SYS_SOCKETCALL
+#define __ARCH_WANT_SYS_FADVISE64
+#define __ARCH_WANT_SYS_GETPGRP
+#define __ARCH_WANT_SYS_LLSEEK
+#define __ARCH_WANT_SYS_NICE
+#define __ARCH_WANT_SYS_OLD_GETRLIMIT
+#define __ARCH_WANT_SYS_OLDUMOUNT
+#define __ARCH_WANT_SYS_SIGPENDING
+#define __ARCH_WANT_SYS_SIGPROCMASK
+#define __ARCH_WANT_SYS_RT_SIGACTION
+
 unsigned long sys_mmap(unsigned long addr, size_t len, unsigned long prot,
 		       unsigned long flags, unsigned long fd, off_t offset);
 struct pt_regs;
@@ -433,7 +456,7 @@ int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
 int sys_vfork(unsigned long p1, unsigned long p2, unsigned long p3,
 		unsigned long p4, unsigned long p5, unsigned long p6,
 		struct pt_regs *regs);
-int sys_pipe(int *fildes);
+int sys_pipe(int __user *fildes);
 int sys_ptrace(long request, long pid, long addr, long data);
 struct sigaction;
 long sys_rt_sigaction(int sig, const struct sigaction __user *act,

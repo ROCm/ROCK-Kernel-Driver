@@ -33,12 +33,14 @@
 #include <linux/time.h>
 #include <asm/byteorder.h>
 
-#if  __LITTLE_ENDIAN == 1234
+#ifdef  __LITTLE_ENDIAN
 #define SNDRV_LITTLE_ENDIAN
-#elif __BIG_ENDIAN == 4321
+#else
+#ifdef __BIG_ENDIAN
 #define SNDRV_BIG_ENDIAN
 #else
 #error "Unsupported endian..."
+#endif
 #endif
 
 #else /* !__KERNEL__ */
@@ -135,7 +137,7 @@ struct sndrv_hwdep_dsp_status {
 struct sndrv_hwdep_dsp_image {
 	unsigned int index;		/* W: DSP index */
 	unsigned char name[64];		/* W: ID (e.g. file name) */
-	unsigned char *image;		/* W: binary image */
+	unsigned char __user *image;	/* W: binary image */
 	size_t length;			/* W: size of image in bytes */
 	unsigned long driver_data;	/* W: driver-specific data */
 };
@@ -153,7 +155,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 6)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 7)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;
@@ -428,15 +430,31 @@ struct sndrv_pcm_mmap_control {
 	sndrv_pcm_uframes_t avail_min;	/* RW: min available frames for wakeup */
 };
 
+#define SNDRV_PCM_SYNC_PTR_HWSYNC	(1<<0)	/* execute hwsync */
+#define SNDRV_PCM_SYNC_PTR_APPL		(1<<1)	/* get appl_ptr from driver (r/w op) */
+#define SNDRV_PCM_SYNC_PTR_AVAIL_MIN	(1<<2)	/* get avail_min from driver */
+
+struct sndrv_pcm_sync_ptr {
+	unsigned int flags;
+	union {
+		struct sndrv_pcm_mmap_status status;
+		unsigned char reserved[64];
+	} s;
+	union {
+		struct sndrv_pcm_mmap_control control;
+		unsigned char reserved[64];
+	} c;
+};
+
 struct sndrv_xferi {
 	sndrv_pcm_sframes_t result;
-	void *buf;
+	void __user *buf;
 	sndrv_pcm_uframes_t frames;
 };
 
 struct sndrv_xfern {
 	sndrv_pcm_sframes_t result;
-	void **bufs;
+	void __user * __user *bufs;
 	sndrv_pcm_uframes_t frames;
 };
 
@@ -451,6 +469,7 @@ enum {
 	SNDRV_PCM_IOCTL_STATUS = _IOR('A', 0x20, struct sndrv_pcm_status),
 	SNDRV_PCM_IOCTL_DELAY = _IOR('A', 0x21, sndrv_pcm_sframes_t),
 	SNDRV_PCM_IOCTL_HWSYNC = _IO('A', 0x22),
+	SNDRV_PCM_IOCTL_SYNC_PTR = _IOWR('A', 0x23, struct sndrv_pcm_sync_ptr),
 	SNDRV_PCM_IOCTL_CHANNEL_INFO = _IOR('A', 0x32, struct sndrv_pcm_channel_info),
 	SNDRV_PCM_IOCTL_PREPARE = _IO('A', 0x40),
 	SNDRV_PCM_IOCTL_RESET = _IO('A', 0x41),
@@ -759,7 +778,7 @@ struct sndrv_ctl_elem_list {
 	unsigned int space;		/* W: count of element IDs to get */
 	unsigned int used;		/* R: count of element IDs set */
 	unsigned int count;		/* R: count of all elements */
-	struct sndrv_ctl_elem_id *pids; /* R: IDs */
+	struct sndrv_ctl_elem_id __user *pids; /* R: IDs */
 	unsigned char reserved[50];
 };
 

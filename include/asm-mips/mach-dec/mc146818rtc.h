@@ -23,7 +23,7 @@ extern unsigned long dec_kn_slot_size;
 #define RTC_PORT(x)	CPHYSADDR(dec_rtc_base)
 #define RTC_IO_EXTENT	dec_kn_slot_size
 #define RTC_IOMAPPED	0
-#define RTC_IRQ		0
+#undef RTC_IRQ
 
 #define RTC_DEC_YEAR	0x3f	/* Where we store the real year on DECs.  */
 

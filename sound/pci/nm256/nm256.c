@@ -275,11 +275,15 @@ struct snd_nm256 {
 #ifndef PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO
 #define PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO 0x8006
 #endif
+#ifndef PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO
+#define PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO 0x8016
+#endif
 
 
 static struct pci_device_id snd_nm256_ids[] = {
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256AV_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{PCI_VENDOR_ID_NEOMAGIC, PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0,},
 };
 
@@ -680,7 +684,7 @@ static int
 snd_nm256_playback_copy(snd_pcm_substream_t *substream,
 			int channel, /* not used (interleaved data) */
 			snd_pcm_uframes_t pos,
-			void *src,
+			void __user *src,
 			snd_pcm_uframes_t count)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -699,7 +703,7 @@ static int
 snd_nm256_capture_copy(snd_pcm_substream_t *substream,
 		       int channel, /* not used (interleaved data) */
 		       snd_pcm_uframes_t pos,
-		       void *dst,
+		       void __user *dst,
 		       snd_pcm_uframes_t count)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1505,6 +1509,10 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		/* this workaround will cause lock-up after suspend/resume on Sony PCG-F305 */
 		chip->latitude_workaround = 0;
 	}
+	if (subsystem_vendor == 0x1028 && subsystem_device == 0x0080) {
+		/* this workaround will cause lock-up after suspend/resume on a Dell laptop */
+		chip->latitude_workaround = 0;
+	}
 
 	snd_nm256_init_chip(chip);
 
@@ -1532,6 +1540,21 @@ __error:
 }
 
 
+struct nm256_quirk {
+	unsigned short vendor;
+	unsigned short device;
+	int type;
+};
+
+#define NM_BLACKLISTED	1
+
+static struct nm256_quirk nm256_quirks[] __devinitdata = {
+	/* HP omnibook 4150 has cs4232 codec internally */
+	{ .vendor = 0x103c, .device = 0x0007, .type = NM_BLACKLISTED },
+	{ } /* terminator */
+};
+
+
 static int __devinit snd_nm256_probe(struct pci_dev *pci,
 				     const struct pci_device_id *pci_id)
 {
@@ -1540,6 +1563,8 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 	nm256_t *chip;
 	int err;
 	unsigned int xbuffer_top;
+	struct nm256_quirk *q;
+	u16 subsystem_vendor, subsystem_device;
 
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
@@ -1549,6 +1574,18 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
+	}
+
+	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
+	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
+
+	for (q = nm256_quirks; q->vendor; q++) {
+		if (q->vendor == subsystem_vendor && q->device == subsystem_device) {
+			if (q->type == NM_BLACKLISTED) {
+				printk(KERN_INFO "nm256: The device is blacklisted.  Loading stopped\n");
+				return -ENODEV;
+			}
+		}
 	}
 
 	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
@@ -1561,6 +1598,9 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 		break;
 	case PCI_DEVICE_ID_NEOMAGIC_NM256ZX_AUDIO:
 		strcpy(card->driver, "NM256ZX");
+		break;
+	case PCI_DEVICE_ID_NEOMAGIC_NM256XL_PLUS_AUDIO:
+		strcpy(card->driver, "NM256XL+");
 		break;
 	default:
 		snd_printk("invalid device id 0x%x\n", pci->device);

@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: pnc2000.c,v 1.14 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: pnc2000.c,v 1.15 2004/07/12 21:59:44 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -29,7 +29,7 @@
 struct map_info pnc_map = {
 	.name = "PNC-2000",
 	.size = WINDOW_SIZE,
-	.buswidth = 4,
+	.bankwidth = 4,
 	.phys = 0xFFFFFFFF,
 	.virt = WINDOW_ADDR,
 };

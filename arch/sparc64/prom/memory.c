@@ -114,7 +114,7 @@ void __init prom_meminit(void)
 		prom_prom_taken[iter].num_bytes =
 			prom_reg_memlist[iter].reg_size;
 		prom_prom_taken[iter].theres_more =
-			&prom_phys_total[iter+1];
+			&prom_prom_taken[iter+1];
 	}
 	prom_prom_taken[iter-1].theres_more = 0x0;
 

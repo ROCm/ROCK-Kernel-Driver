@@ -328,6 +328,34 @@ sn_pci_fixup_slot(struct pci_dev *dev)
 			cmd |= PCI_COMMAND_MEMORY;
 	}
 
+        /*
+	 * Assign addresses to the ROMs, but don't enable them yet
+	 * Also note that we only map display card ROMs due to PIO mapping
+	 * space scarcity.
+	 */
+        if ((dev->class >> 16) == PCI_BASE_CLASS_DISPLAY) {
+                unsigned long addr;
+                size = dev->resource[PCI_ROM_RESOURCE].end -
+                        dev->resource[PCI_ROM_RESOURCE].start;
+
+                if (size) {
+                        addr = (unsigned long) pciio_pio_addr(vhdl, 0,
+					      PCIIO_SPACE_ROM,
+					      0, size, 0, PIOMAP_FIXED);
+                        if (!addr) {
+                                dev->resource[PCI_ROM_RESOURCE].start = 0;
+                                dev->resource[PCI_ROM_RESOURCE].end = 0;
+                                printk("sn_pci_fixup(): ROM pio map failure "
+				       "for %s\n", dev->slot_name);
+                        }
+                        addr |= __IA64_UNCACHED_OFFSET;
+                        dev->resource[PCI_ROM_RESOURCE].start = addr;
+                        dev->resource[PCI_ROM_RESOURCE].end = addr + size;
+                        if (dev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_MEM)
+                                cmd |= PCI_COMMAND_MEMORY;
+                }
+        }
+
 	/*
 	 * Update the Command Word on the Card.
 	 */
@@ -712,7 +740,7 @@ pci_bus_to_hcl_cvlink(void)
 			
 			/* Is this PCI bus associated with this moduleid? */
 			moduleid = NODE_MODULEID(
-				NASID_TO_COMPACT_NODEID(pcibr_soft->bs_nasid));
+				nasid_to_cnodeid(pcibr_soft->bs_nasid));
 			if (sn_modules[i]->id == moduleid) {
 				struct pcibr_list_s *new_element;
 
@@ -791,8 +819,7 @@ sn_pci_init (void)
 	struct list_head *ln;
 	struct pci_bus *pci_bus = NULL;
 	struct pci_dev *pci_dev = NULL;
-	extern int numnodes;
-	int cnode, ret;
+	int ret;
 #ifdef CONFIG_PROC_FS
 	extern void register_sn_procfs(void);
 #endif
@@ -811,13 +838,7 @@ sn_pci_init (void)
 	/*
 	 * set pci_raw_ops, etc.
 	 */
-
 	sgi_master_io_infr_init();
-
-	for (cnode = 0; cnode < numnodes; cnode++) {
-		extern void intr_init_vecblk(cnodeid_t);
-		intr_init_vecblk(cnode);
-	}
 
 	sn_init_cpei_timer();
 
@@ -826,16 +847,16 @@ sn_pci_init (void)
 #endif
 
 	controller = kmalloc(sizeof(struct pci_controller), GFP_KERNEL);
-	if (controller) {
-		memset(controller, 0, sizeof(struct pci_controller));
-		/* just allocate some devices and fill in the pci_dev structs */
-		for (i = 0; i < PCI_BUSES_TO_SCAN; i++)
-			pci_scan_bus(i, &sn_pci_ops, controller);
+	if (!controller) {
+		printk(KERN_WARNING "cannot allocate PCI controller\n");
+		return 0;
 	}
 
-	/*
-	 * actually find devices and fill in hwgraph structs
-	 */
+	memset(controller, 0, sizeof(struct pci_controller));
+
+	for (i = 0; i < PCI_BUSES_TO_SCAN; i++)
+		if (pci_bus_to_vertex(i))
+			pci_scan_bus(i, &sn_pci_ops, controller);
 
 	done_probing = 1;
 
@@ -857,13 +878,8 @@ sn_pci_init (void)
 	 * set the root start and end so that drivers calling check_region()
 	 * won't see a conflict
 	 */
-
-#ifdef CONFIG_IA64_SGI_SN_SIM
-	if (! IS_RUNNING_ON_SIMULATOR()) {
-		ioport_resource.start  = 0xc000000000000000;
-		ioport_resource.end =    0xcfffffffffffffff;
-	}
-#endif
+	ioport_resource.start = 0xc000000000000000;
+	ioport_resource.end = 0xcfffffffffffffff;
 
 	/*
 	 * Set the root start and end for Mem Resource.

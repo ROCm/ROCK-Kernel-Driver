@@ -7,6 +7,7 @@
 #include <linux/xattr_acl.h>
 
 #define EXT3_ACL_VERSION	0x0001
+#define EXT3_ACL_MAX_ENTRIES	32
 
 typedef struct {
 	__u16		e_tag;

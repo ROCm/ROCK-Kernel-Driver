@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.27.2.2 $
+ * $Revision: 1.30 $
  */
 
 #include <linux/config.h>
@@ -431,7 +431,7 @@ dasd_devmap_from_cdev(struct ccw_device *cdev)
 	struct dasd_devmap *devmap;
 
 	devmap = dasd_find_busid(cdev->dev.bus_id);
-	if (IS_ERR(devmap)) 
+	if (IS_ERR(devmap))
 		devmap = dasd_add_busid(cdev->dev.bus_id, DASD_FEATURE_DEFAULT);
 	return devmap;
 }

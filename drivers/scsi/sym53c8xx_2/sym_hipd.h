@@ -613,10 +613,10 @@ struct sym_pmc {
  *  LUN(s) > 0.
  */
 #if SYM_CONF_MAX_LUN <= 1
-#define sym_lp(np, tp, lun) (!lun) ? (tp)->lun0p : 0
+#define sym_lp(np, tp, lun) (!lun) ? (tp)->lun0p : NULL
 #else
 #define sym_lp(np, tp, lun) \
-	(!lun) ? (tp)->lun0p : (tp)->lunmp ? (tp)->lunmp[(lun)] : 0
+	(!lun) ? (tp)->lun0p : (tp)->lunmp ? (tp)->lunmp[(lun)] : NULL
 #endif
 
 /*

@@ -14,9 +14,9 @@
 #include <linux/ide.h>
 
 #include <asm/traps.h>
-#include <asm/bootinfo.h> 
-#include <asm/macintosh.h> 
-#include <asm/macints.h> 
+#include <asm/bootinfo.h>
+#include <asm/macintosh.h>
+#include <asm/macints.h>
 #include <asm/mac_baboon.h>
 
 /* #define DEBUG_BABOON */

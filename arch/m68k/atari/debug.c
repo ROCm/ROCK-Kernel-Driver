@@ -4,7 +4,7 @@
  * Atari debugging and serial console stuff
  *
  * Assembled of parts of former atari/config.c 97-12-18 by Roman Hodek
- *  
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
@@ -23,12 +23,12 @@
 extern char m68k_debug_device[];
 
 /* Flag that Modem1 port is already initialized and used */
-int atari_MFP_init_done = 0;
+int atari_MFP_init_done;
 /* Flag that Modem1 port is already initialized and used */
-int atari_SCC_init_done = 0;
+int atari_SCC_init_done;
 /* Can be set somewhere, if a SCC master reset has already be done and should
  * not be repeated; used by kgdb */
-int atari_SCC_reset_done = 0;
+int atari_SCC_reset_done;
 
 static struct console atari_console_driver = {
 	.name =		"debug",
@@ -99,7 +99,7 @@ static int ata_par_out (char c)
     while( (mfp.par_dt_reg & 1) && --i ) /* wait for BUSY == L */
 	;
     if (!i) return( 0 );
-    
+
     sound_ym.rd_data_reg_sel = 15;  /* select port B */
     sound_ym.wd_data = c;           /* put char onto port */
     sound_ym.rd_data_reg_sel = 14;  /* select port A */
@@ -177,7 +177,7 @@ void atari_init_mfp_port( int cflag )
     if (baud < B1200 || baud > B38400+2)
 	baud = B9600; /* use default 9600bps for non-implemented rates */
     baud -= B1200; /* baud_table[] starts at 1200bps */
-	
+
     mfp.trn_stat &= ~0x01; /* disable TX */
     mfp.usart_ctr = parity | csize | 0x88; /* 1:16 clk mode, 1 stop bit */
     mfp.tim_ct_cd &= 0x70;  /* stop timer D */
@@ -204,7 +204,7 @@ void atari_init_mfp_port( int cflag )
 	for( i = 100; i > 0; --i )		\
 	    MFPDELAY();				\
     } while(0)
-    
+
 #ifndef CONFIG_SERIAL_CONSOLE
 static void __init atari_init_scc_port( int cflag )
 #else
@@ -214,20 +214,20 @@ void atari_init_scc_port( int cflag )
     extern int atari_SCC_reset_done;
     static int clksrc_table[9] =
 	/* reg 11: 0x50 = BRG, 0x00 = RTxC, 0x28 = TRxC */
-    	{ 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x00, 0x00 };
+	{ 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x50, 0x00, 0x00 };
     static int brgsrc_table[9] =
 	/* reg 14: 0 = RTxC, 2 = PCLK */
-    	{ 2, 2, 2, 2, 2, 2, 0, 2, 2 };
+	{ 2, 2, 2, 2, 2, 2, 0, 2, 2 };
     static int clkmode_table[9] =
 	/* reg 4: 0x40 = x16, 0x80 = x32, 0xc0 = x64 */
-    	{ 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0xc0, 0x80 };
+	{ 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0xc0, 0x80 };
     static int div_table[9] =
 	/* reg12 (BRG low) */
-    	{ 208, 138, 103, 50, 24, 11, 1, 0, 0 };
+	{ 208, 138, 103, 50, 24, 11, 1, 0, 0 };
 
     int baud = cflag & CBAUD;
     int clksrc, clkmode, div, reg3, reg5;
-    
+
     if (cflag & CBAUDEX)
 	baud += B38400;
     if (baud < B1200 || baud > B38400+2)
@@ -248,7 +248,7 @@ void atari_init_scc_port( int cflag )
 
     reg3 = (cflag & CSIZE) == CS8 ? 0xc0 : 0x40;
     reg5 = (cflag & CSIZE) == CS8 ? 0x60 : 0x20 | 0x82 /* assert DTR/RTS */;
-    
+
     (void)scc.cha_b_ctrl;	/* reset reg pointer */
     SCC_WRITE( 9, 0xc0 );	/* reset */
     LONG_DELAY();		/* extra delay after WR9 access */
@@ -267,12 +267,12 @@ void atari_init_scc_port( int cflag )
     SCC_WRITE( 14, brgsrc_table[baud] | (div ? 1 : 0) );
     SCC_WRITE( 3, reg3 | 1 );
     SCC_WRITE( 5, reg5 | 8 );
-    
+
     atari_SCC_reset_done = 1;
     atari_SCC_init_done = 1;
 }
 
-#ifndef CONFIG_SERIAL_CONSOLE 
+#ifndef CONFIG_SERIAL_CONSOLE
 static void __init atari_init_midi_port( int cflag )
 #else
 void atari_init_midi_port( int cflag )

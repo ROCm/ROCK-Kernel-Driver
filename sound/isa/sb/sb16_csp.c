@@ -89,9 +89,9 @@ static int read_register(sb_t *chip, unsigned char reg);
 static int set_mode_register(sb_t *chip, unsigned char mode);
 static int get_version(sb_t *chip);
 
-static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * code);
+static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t __user * code);
 static int snd_sb_csp_unload(snd_sb_csp_t * p);
-static int snd_sb_csp_load(snd_sb_csp_t * p, const unsigned char *buf, int size, int load_flags);
+static int snd_sb_csp_load_user(snd_sb_csp_t * p, const unsigned char __user *buf, int size, int load_flags);
 static int snd_sb_csp_autoload(snd_sb_csp_t * p, int pcm_sfmt, int play_rec_mode);
 static int snd_sb_csp_check_version(snd_sb_csp_t * p);
 
@@ -213,7 +213,7 @@ static int snd_sb_csp_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cm
 		info.run_width = p->run_width;
 		info.version = p->version;
 		info.state = p->running;
-		if (copy_to_user((void *) arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			err = -EFAULT;
 		else
 			err = 0;
@@ -222,7 +222,7 @@ static int snd_sb_csp_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cm
 		/* load CSP microcode */
 	case SNDRV_SB_CSP_IOCTL_LOAD_CODE:
 		err = (p->running & SNDRV_SB_CSP_ST_RUNNING ?
-		       -EBUSY : snd_sb_csp_riff_load(p, (snd_sb_csp_microcode_t *) arg));
+		       -EBUSY : snd_sb_csp_riff_load(p, (snd_sb_csp_microcode_t __user *) arg));
 		break;
 	case SNDRV_SB_CSP_IOCTL_UNLOAD_CODE:
 		err = (p->running & SNDRV_SB_CSP_ST_RUNNING ?
@@ -231,7 +231,7 @@ static int snd_sb_csp_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cm
 
 		/* change CSP running state */
 	case SNDRV_SB_CSP_IOCTL_START:
-		if (copy_from_user(&start_info, (void *) arg, sizeof(start_info)))
+		if (copy_from_user(&start_info, (void __user *) arg, sizeof(start_info)))
 			err = -EFAULT;
 		else
 			err = snd_sb_csp_start(p, start_info.sample_width, start_info.channels);
@@ -297,11 +297,12 @@ static int snd_sb_csp_unuse(snd_sb_csp_t * p)
  * load microcode via ioctl: 
  * code is user-space pointer
  */
-static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode)
+static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t __user * mcode)
 {
 	snd_sb_csp_mc_header_t info;
 
-	unsigned char *data_ptr, *data_end;
+	unsigned char __user *data_ptr;
+	unsigned char __user *data_end;
 	unsigned short func_nr = 0;
 
 	riff_header_t file_h, item_h, code_h;
@@ -372,8 +373,8 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 				if (code_h.name != INIT_HEADER)
 					break;
 				data_ptr += sizeof(code_h);
-				err = snd_sb_csp_load(p, data_ptr, LE_INT(code_h.len),
-						      SNDRV_SB_CSP_LOAD_INITBLOCK | SNDRV_SB_CSP_LOAD_FROMUSER);
+				err = snd_sb_csp_load_user(p, data_ptr, LE_INT(code_h.len),
+						      SNDRV_SB_CSP_LOAD_INITBLOCK);
 				if (err)
 					return err;
 				data_ptr += LE_INT(code_h.len);
@@ -387,8 +388,8 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 				return -EINVAL;
 			}
 			data_ptr += sizeof(code_h);
-			err = snd_sb_csp_load(p, data_ptr, LE_INT(code_h.len),
-					      SNDRV_SB_CSP_LOAD_FROMUSER);
+			err = snd_sb_csp_load_user(p, data_ptr,
+						   LE_INT(code_h.len), 0);
 			if (err)
 				return err;
 
@@ -627,28 +628,10 @@ static int snd_sb_csp_load(snd_sb_csp_t * p, const unsigned char *buf, int size,
 	/* Send high byte */
 	snd_sbdsp_command(p->chip, (unsigned char)((size - 1) >> 8));
 	/* send microcode sequence */
-	if (load_flags & SNDRV_SB_CSP_LOAD_FROMUSER) {
-		/* copy microcode from user space */
-		unsigned char *kbuf, *_kbuf;
-		_kbuf = kbuf = kmalloc (size, GFP_KERNEL);
-		if (copy_from_user(kbuf, buf, size)) {
-			result = -EFAULT;
-			kfree (_kbuf);
+	/* load from kernel space */
+	while (size--) {
+		if (!snd_sbdsp_command(p->chip, *buf++))
 			goto __fail;
-		}
-		while (size--) {
-			if (!snd_sbdsp_command(p->chip, *kbuf++)) {
-				kfree (_kbuf);
-				goto __fail;
-			}
-		}
-		kfree (_kbuf);
-	} else {
-		/* load from kernel space */
-		while (size--) {
-			if (!snd_sbdsp_command(p->chip, *buf++))
-				goto __fail;
-		}
 	}
 	if (snd_sbdsp_get_byte(p->chip))
 		goto __fail;
@@ -691,6 +674,20 @@ static int snd_sb_csp_load(snd_sb_csp_t * p, const unsigned char *buf, int size,
       __fail:
 	spin_unlock_irqrestore(&p->chip->reg_lock, flags);
 	return result;
+}
+ 
+static int snd_sb_csp_load_user(snd_sb_csp_t * p, const unsigned char __user *buf, int size, int load_flags)
+{
+	int err = -ENOMEM;
+	unsigned char *kbuf = kmalloc(size, GFP_KERNEL);
+	if (kbuf) {
+		if (copy_from_user(kbuf, buf, size))
+			err = -EFAULT;
+		else
+			err = snd_sb_csp_load(p, kbuf, size, load_flags);
+		kfree(kbuf);
+	}
+	return err;
 }
 
 #include "sb16_csp_codecs.h"

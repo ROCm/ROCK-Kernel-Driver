@@ -9,7 +9,7 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  * For changes and modifications please read
- * ../../../Documentation/isdn/HiSax.cert
+ * Documentation/isdn/HiSax.cert
  *
  * Thanks to Eicon Technology for documents and information
  *
@@ -1158,7 +1158,7 @@ ready:
 		cs->writeisacfifo = &MemWriteISACfifo_IPACX;
 		cs->BC_Read_Reg  = &MemReadHSCX_IPACX;
 		cs->BC_Write_Reg = &MemWriteHSCX_IPACX;
-		cs->BC_Send_Data = 0; // function located in ipacx module
+		cs->BC_Send_Data = NULL; // function located in ipacx module
 		cs->irq_func = &diva_irq_ipacx_pci;
 		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 
 			MemReadISAC_IPACX(cs, IPACX_ID) &0x3F);

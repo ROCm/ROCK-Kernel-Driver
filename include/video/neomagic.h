@@ -55,6 +55,20 @@
 #define NEO_MODE1_X_1600        0x1c00
 #define NEO_MODE1_BLT_ON_ADDR   0x2000
 
+/* These are offseted in MMIO space by par->CursorOff */
+#define NEOREG_CURSCNTL		0x00
+#define NEOREG_CURSX		0x04
+#define NEOREG_CURSY		0x08
+#define NEOREG_CURSBGCOLOR	0x0C
+#define NEOREG_CURSFGCOLOR	0x10
+#define NEOREG_CURSMEMPOS	0x14
+
+#define NEO_CURS_DISABLE	0x00000000
+#define NEO_CURS_ENABLE		0x00000001
+#define NEO_ICON64_ENABLE	0x00000008
+#define NEO_ICON128_ENABLE	0x0000000C
+#define NEO_ICON_BLANK		0x00000010
+
 #ifdef __KERNEL__
 
 #ifdef NEOFB_DEBUG
@@ -75,48 +89,46 @@
 
 
 struct xtimings {
-  unsigned int pixclock;
-  unsigned int HDisplay;
-  unsigned int HSyncStart;
-  unsigned int HSyncEnd;
-  unsigned int HTotal;
-  unsigned int VDisplay;
-  unsigned int VSyncStart;
-  unsigned int VSyncEnd;
-  unsigned int VTotal;
-  unsigned int sync;
-  int	       dblscan;
-  int	       interlaced;
+	unsigned int pixclock;
+	unsigned int HDisplay;
+	unsigned int HSyncStart;
+	unsigned int HSyncEnd;
+	unsigned int HTotal;
+	unsigned int VDisplay;
+	unsigned int VSyncStart;
+	unsigned int VSyncEnd;
+	unsigned int VTotal;
+	unsigned int sync;
+	int dblscan;
+	int interlaced;
 };
 
 
 /* --------------------------------------------------------------------- */
 
 typedef volatile struct {
-  __u32 bltStat;
-  __u32 bltCntl;
-  __u32 xpColor;
-  __u32 fgColor;
-  __u32 bgColor;
-  __u32 pitch;
-  __u32 clipLT;
-  __u32 clipRB;
-  __u32 srcBitOffset;
-  __u32 srcStart;
-  __u32 reserved0;
-  __u32 dstStart;
-  __u32 xyExt;
+	__u32 bltStat;
+	__u32 bltCntl;
+	__u32 xpColor;
+	__u32 fgColor;
+	__u32 bgColor;
+	__u32 pitch;
+	__u32 clipLT;
+	__u32 clipRB;
+	__u32 srcBitOffset;
+	__u32 srcStart;
+	__u32 reserved0;
+	__u32 dstStart;
+	__u32 xyExt;
 
-  __u32 reserved1[19];
+	__u32 reserved1[19];
 
-  __u32 pageCntl;
-  __u32 pageBase;
-  __u32 postBase;
-  __u32 postPtr;
-  __u32 dataPtr;
+	__u32 pageCntl;
+	__u32 pageBase;
+	__u32 postBase;
+	__u32 postPtr;
+	__u32 dataPtr;
 } Neo2200;
-
-#define NR_PALETTE	256
 
 #define MMIO_SIZE 0x200000
 
@@ -124,142 +136,69 @@ typedef volatile struct {
 #define NEO_EXT_GR_MAX 0xC7
 
 struct neofb_par {
-  
-  unsigned char MiscOutReg;     /* Misc */
-  unsigned char CRTC[25];       /* Crtc Controller */
-  unsigned char Sequencer[5];   /* Video Sequencer */
-  unsigned char Graphics[9];    /* Video Graphics */
-  unsigned char Attribute[21];  /* Video Atribute */
+	struct vgastate state;
+	atomic_t ref_count;
 
-  unsigned char GeneralLockReg;
-  unsigned char ExtCRTDispAddr;
-  unsigned char ExtCRTOffset;
-  unsigned char SysIfaceCntl1;
-  unsigned char SysIfaceCntl2;
-  unsigned char ExtColorModeSelect;
-  unsigned char biosMode;
+	unsigned char MiscOutReg;	/* Misc */
+	unsigned char CRTC[25];		/* Crtc Controller */
+	unsigned char Sequencer[5];	/* Video Sequencer */
+	unsigned char Graphics[9];	/* Video Graphics */
+	unsigned char Attribute[21];	/* Video Atribute */
 
-  unsigned char PanelDispCntlReg1;
-  unsigned char PanelDispCntlReg2;
-  unsigned char PanelDispCntlReg3;
-  unsigned char PanelVertCenterReg1;
-  unsigned char PanelVertCenterReg2;
-  unsigned char PanelVertCenterReg3;
-  unsigned char PanelVertCenterReg4;
-  unsigned char PanelVertCenterReg5;
-  unsigned char PanelHorizCenterReg1;
-  unsigned char PanelHorizCenterReg2;
-  unsigned char PanelHorizCenterReg3;
-  unsigned char PanelHorizCenterReg4;
-  unsigned char PanelHorizCenterReg5;
+	unsigned char GeneralLockReg;
+	unsigned char ExtCRTDispAddr;
+	unsigned char ExtCRTOffset;
+	unsigned char SysIfaceCntl1;
+	unsigned char SysIfaceCntl2;
+	unsigned char ExtColorModeSelect;
+	unsigned char biosMode;
 
-  int           ProgramVCLK;
-  unsigned char VCLK3NumeratorLow;
-  unsigned char VCLK3NumeratorHigh;
-  unsigned char VCLK3Denominator;
-  unsigned char VerticalExt;
+	unsigned char PanelDispCntlReg1;
+	unsigned char PanelDispCntlReg2;
+	unsigned char PanelDispCntlReg3;
+	unsigned char PanelVertCenterReg1;
+	unsigned char PanelVertCenterReg2;
+	unsigned char PanelVertCenterReg3;
+	unsigned char PanelVertCenterReg4;
+	unsigned char PanelVertCenterReg5;
+	unsigned char PanelHorizCenterReg1;
+	unsigned char PanelHorizCenterReg2;
+	unsigned char PanelHorizCenterReg3;
+	unsigned char PanelHorizCenterReg4;
+	unsigned char PanelHorizCenterReg5;
+
+	int ProgramVCLK;
+	unsigned char VCLK3NumeratorLow;
+	unsigned char VCLK3NumeratorHigh;
+	unsigned char VCLK3Denominator;
+	unsigned char VerticalExt;
 
 #ifdef CONFIG_MTRR
-  int    mtrr;
+	int mtrr;
 #endif
-  u8    *mmio_vbase;
+	u8 *mmio_vbase;
+	u8 cursorOff;
+	u8 *cursorPad;		/* Must die !! */
 
-  Neo2200 *neo2200;
+	Neo2200 *neo2200;
 
-  /* Panels size */
-  int NeoPanelWidth;
-  int NeoPanelHeight;
+	/* Panels size */
+	int NeoPanelWidth;
+	int NeoPanelHeight;
 
-  int maxClock;
+	int maxClock;
 
-  int pci_burst;
-  int lcd_stretch;
-  int internal_display;
-  int external_display;
-  int libretto;
+	int pci_burst;
+	int lcd_stretch;
+	int internal_display;
+	int external_display;
+	int libretto;
 };
 
 typedef struct {
-    int x_res;
-    int y_res;
-    int mode;
+	int x_res;
+	int y_res;
+	int mode;
 } biosMode;
 
-/* vga IO functions */
-static inline u8 VGArCR (u8 index)
-{
-  outb (index, 0x3d4);
-  return inb (0x3d5);
-}
-
-static inline void VGAwCR (u8 index, u8 val)
-{
-  outb (index, 0x3d4);
-  outb (val, 0x3d5);
-}
-
-static inline u8 VGArGR (u8 index)
-{
-  outb (index, 0x3ce);
-  return inb (0x3cf);
-}
-
-static inline void VGAwGR (u8 index, u8 val)
-{
-  outb (index, 0x3ce);
-  outb (val, 0x3cf);
-}
-
-static inline u8 VGArSEQ (u8 index)
-{
-  outb (index, 0x3c4);
-  return inb (0x3c5);
-}
-
-static inline void VGAwSEQ (u8 index, u8 val)
-{
-  outb (index, 0x3c4);
-  outb (val, 0x3c5);
-}
-
-
-static int paletteEnabled = 0;
-
-static inline void VGAenablePalette (void)
-{
-  u8 tmp;
-
-  tmp = inb (0x3da);
-  outb (0x00, 0x3c0);
-  paletteEnabled = 1;
-}
-
-static inline void VGAdisablePalette (void)
-{
-  u8 tmp;
-
-  tmp = inb (0x3da);
-  outb (0x20, 0x3c0);
-  paletteEnabled = 0;
-}
-
-static inline void VGAwATTR (u8 index, u8 value)
-{
-  u8 tmp;
-
-  if (paletteEnabled)
-    index &= ~0x20;
-  else
-    index |= 0x20;
-
-  tmp = inb (0x3da);
-  outb (index, 0x3c0);
-  outb (value, 0x3c0);
-}
-
-static inline void VGAwMISC (u8 value)
-{
-  outb (value, 0x3c2);
-}
 #endif
-

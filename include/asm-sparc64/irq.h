@@ -150,4 +150,8 @@ static __inline__ unsigned long get_softint(void)
 	return retval;
 }
 
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif

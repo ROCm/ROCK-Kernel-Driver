@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.59.2.5 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.65 $"
 
 #include "zfcp_ext.h"
 
@@ -50,6 +50,8 @@ static struct zfcp_unit *zfcp_unit_lookup(struct zfcp_adapter *, int, scsi_id_t,
 					  scsi_lun_t);
 
 static struct device_attribute *zfcp_sysfs_sdev_attrs[];
+
+struct scsi_transport_template *zfcp_transport_template;
 
 struct zfcp_data zfcp_data = {
 	.scsi_host_template = {
@@ -766,6 +768,7 @@ zfcp_adapter_scsi_register(struct zfcp_adapter *adapter)
 	adapter->scsi_host->max_channel = 0;
 	adapter->scsi_host->unique_id = unique_id++;	/* FIXME */
 	adapter->scsi_host->max_cmd_len = ZFCP_MAX_SCSI_CMND_LENGTH;
+	adapter->scsi_host->transportt = zfcp_transport_template;
 	/*
 	 * Reverse mapping of the host number to avoid race condition
 	 */
@@ -821,6 +824,44 @@ zfcp_fsf_start_scsi_er_timer(struct zfcp_adapter *adapter)
 	add_timer(&adapter->scsi_er_timer);
 }
 
+/*
+ * Support functions for FC transport class
+ */
+static void
+zfcp_get_port_id(struct scsi_device *sdev)
+{
+	struct zfcp_unit *unit;
+
+	unit = (struct zfcp_unit *) sdev->hostdata;
+	fc_port_id(sdev) = unit->port->d_id;
+}
+
+static void
+zfcp_get_port_name(struct scsi_device *sdev)
+{
+	struct zfcp_unit *unit;
+
+	unit = (struct zfcp_unit *) sdev->hostdata;
+	fc_port_name(sdev) = unit->port->wwpn;
+}
+
+static void
+zfcp_get_node_name(struct scsi_device *sdev)
+{
+	struct zfcp_unit *unit;
+
+	unit = (struct zfcp_unit *) sdev->hostdata;
+	fc_node_name(sdev) = unit->port->wwnn;
+}
+
+struct fc_function_template zfcp_transport_functions = {
+	.get_port_id = zfcp_get_port_id,
+	.get_port_name = zfcp_get_port_name,
+	.get_node_name = zfcp_get_node_name,
+	.show_port_id = 1,
+	.show_port_name = 1,
+	.show_node_name = 1,
+};
 
 /**
  * ZFCP_DEFINE_SCSI_ATTR

@@ -145,6 +145,7 @@ static int (*drives[4])[6] = {&drive0, &drive1, &drive2, &drive3};
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/mtio.h>
+#include <linux/device.h>
 
 #include <asm/uaccess.h>
 
@@ -211,9 +212,9 @@ static int pt_open(struct inode *inode, struct file *file);
 static int pt_ioctl(struct inode *inode, struct file *file,
 		    unsigned int cmd, unsigned long arg);
 static int pt_release(struct inode *inode, struct file *file);
-static ssize_t pt_read(struct file *filp, char *buf,
+static ssize_t pt_read(struct file *filp, char __user *buf,
 		       size_t count, loff_t * ppos);
-static ssize_t pt_write(struct file *filp, const char *buf,
+static ssize_t pt_write(struct file *filp, const char __user *buf,
 			size_t count, loff_t * ppos);
 static int pt_detect(void);
 
@@ -259,6 +260,9 @@ static struct file_operations pt_fops = {
 	.open = pt_open,
 	.release = pt_release,
 };
+
+/* sysfs class support */
+static struct class_simple *pt_class;
 
 static inline int status_reg(struct pi_adapter *pi)
 {
@@ -706,12 +710,12 @@ static int pt_ioctl(struct inode *inode, struct file *file,
 	 unsigned int cmd, unsigned long arg)
 {
 	struct pt_unit *tape = file->private_data;
+	struct mtop __user *p = (void __user *)arg;
 	struct mtop mtop;
 
 	switch (cmd) {
 	case MTIOCTOP:
-		if (copy_from_user((char *) &mtop, (char *) arg,
-				   sizeof (struct mtop)))
+		if (copy_from_user(&mtop, p, sizeof(struct mtop)))
 			return -EFAULT;
 
 		switch (mtop.mt_op) {
@@ -760,7 +764,7 @@ pt_release(struct inode *inode, struct file *file)
 
 }
 
-static ssize_t pt_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
+static ssize_t pt_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 {
 	struct pt_unit *tape = filp->private_data;
 	struct pi_adapter *pi = tape->pi;
@@ -857,7 +861,7 @@ static ssize_t pt_read(struct file *filp, char *buf, size_t count, loff_t * ppos
 
 }
 
-static ssize_t pt_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
+static ssize_t pt_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 {
 	struct pt_unit *tape = filp->private_data;
 	struct pi_adapter *pi = tape->pi;
@@ -959,33 +963,62 @@ static ssize_t pt_write(struct file *filp, const char *buf, size_t count, loff_t
 
 static int __init pt_init(void)
 {
-	int unit;
+	int unit, err = 0;
 
-	if (disable)
-		return -1;
+	if (disable) {
+		err = -1;
+		goto out;
+	}
 
-	if (pt_detect())
-		return -1;
+	if (pt_detect()) {
+		err = -1;
+		goto out;
+	}
 
 	if (register_chrdev(major, name, &pt_fops)) {
 		printk("pt_init: unable to get major number %d\n", major);
 		for (unit = 0; unit < PT_UNITS; unit++)
 			if (pt[unit].present)
 				pi_release(pt[unit].pi);
-		return -1;
+		err = -1;
+		goto out;
+	}
+	pt_class = class_simple_create(THIS_MODULE, "pt");
+	if (IS_ERR(pt_class)) {
+		err = PTR_ERR(pt_class);
+		goto out_chrdev;
 	}
 
 	devfs_mk_dir("pt");
 	for (unit = 0; unit < PT_UNITS; unit++)
 		if (pt[unit].present) {
-			devfs_mk_cdev(MKDEV(major, unit),
+			class_simple_device_add(pt_class, MKDEV(major, unit), 
+					NULL, "pt%d", unit);
+			err = devfs_mk_cdev(MKDEV(major, unit),
 				      S_IFCHR | S_IRUSR | S_IWUSR,
 				      "pt/%d", unit);
-			devfs_mk_cdev(MKDEV(major, unit + 128),
+			if (err) {
+				class_simple_device_remove(MKDEV(major, unit));
+				goto out_class;
+			}
+			class_simple_device_add(pt_class, MKDEV(major, unit + 128),
+					NULL, "pt%dn", unit);
+			err = devfs_mk_cdev(MKDEV(major, unit + 128),
 				      S_IFCHR | S_IRUSR | S_IWUSR,
 				      "pt/%dn", unit);
+			if (err) {
+				class_simple_device_remove(MKDEV(major, unit + 128));
+				goto out_class;
+			}
 		}
-	return 0;
+	goto out;
+
+out_class:
+	class_simple_destroy(pt_class);
+out_chrdev:
+	unregister_chrdev(major, "pt");
+out:
+	return err;
 }
 
 static void __exit pt_exit(void)
@@ -993,9 +1026,12 @@ static void __exit pt_exit(void)
 	int unit;
 	for (unit = 0; unit < PT_UNITS; unit++)
 		if (pt[unit].present) {
+			class_simple_device_remove(MKDEV(major, unit));
 			devfs_remove("pt/%d", unit);
+			class_simple_device_remove(MKDEV(major, unit + 128));
 			devfs_remove("pt/%dn", unit);
 		}
+	class_simple_destroy(pt_class);
 	devfs_remove("pt");
 	unregister_chrdev(major, name);
 	for (unit = 0; unit < PT_UNITS; unit++)

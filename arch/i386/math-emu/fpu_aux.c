@@ -30,7 +30,7 @@ void fclex(void)
 }
 
 /* Needs to be externally visible */
-void finit()
+void finit(void)
 {
   control_word = 0x037f;
   partial_status = 0;
@@ -58,7 +58,7 @@ static FUNC const finit_table[] = {
   fsetpm, FPU_illegal, FPU_illegal, FPU_illegal
 };
 
-void finit_()
+void finit_(void)
 {
   (finit_table[FPU_rm])();
 }
@@ -75,7 +75,7 @@ static FUNC const fstsw_table[] = {
   FPU_illegal, FPU_illegal, FPU_illegal, FPU_illegal
 };
 
-void fstsw_()
+void fstsw_(void)
 {
   (fstsw_table[FPU_rm])();
 }
@@ -86,13 +86,13 @@ static FUNC const fp_nop_table[] = {
   FPU_illegal, FPU_illegal, FPU_illegal, FPU_illegal
 };
 
-void fp_nop()
+void fp_nop(void)
 {
   (fp_nop_table[FPU_rm])();
 }
 
 
-void fld_i_()
+void fld_i_(void)
 {
   FPU_REG *st_new_ptr;
   int i;
@@ -124,7 +124,7 @@ void fld_i_()
 }
 
 
-void fxch_i()
+void fxch_i(void)
 {
   /* fxch st(i) */
   FPU_REG t;
@@ -173,14 +173,14 @@ void fxch_i()
 }
 
 
-void ffree_()
+void ffree_(void)
 {
   /* ffree st(i) */
   FPU_settagi(FPU_rm, TAG_Empty);
 }
 
 
-void ffreep()
+void ffreep(void)
 {
   /* ffree st(i) + pop - unofficial code */
   FPU_settagi(FPU_rm, TAG_Empty);
@@ -188,14 +188,14 @@ void ffreep()
 }
 
 
-void fst_i_()
+void fst_i_(void)
 {
   /* fst st(i) */
   FPU_copy_to_regi(&st(0), FPU_gettag0(), FPU_rm);
 }
 
 
-void fstp_i()
+void fstp_i(void)
 {
   /* fstp st(i) */
   FPU_copy_to_regi(&st(0), FPU_gettag0(), FPU_rm);

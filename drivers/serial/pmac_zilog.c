@@ -245,7 +245,7 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 				drop = 1;
 			if (ZS_IS_ASLEEP(uap))
-				return 0;
+				return NULL;
 			if (!ZS_IS_OPEN(uap))
 				goto retry;
 		}
@@ -1433,6 +1433,7 @@ static int __init pmz_init_port(struct uart_pmac_port *uap)
 			ioremap(np->addrs[np->n_addrs - 1].address, 0x1000);
 		if (uap->rx_dma_regs == NULL) {	
 			iounmap((void *)uap->tx_dma_regs);
+			uap->tx_dma_regs = NULL;
 			uap->flags &= ~PMACZILOG_FLAG_HAS_DMA;
 			goto no_dma;
 		}
@@ -1507,10 +1508,13 @@ static void pmz_dispose_port(struct uart_pmac_port *uap)
 {
 	struct device_node *np;
 
-	iounmap((void *)uap->control_reg);
 	np = uap->node;
+	iounmap((void *)uap->rx_dma_regs);
+	iounmap((void *)uap->tx_dma_regs);
+	iounmap((void *)uap->control_reg);
 	uap->node = NULL;
 	of_node_put(np);
+	memset(uap, 0, sizeof(struct uart_pmac_port));
 }
 
 /*
@@ -1797,7 +1801,7 @@ static int __init pmz_register(void)
 	 * Register this driver with the serial core
 	 */
 	rc = uart_register_driver(&pmz_uart_reg);
-	if (rc != 0)
+	if (rc)
 		return rc;
 
 	/*
@@ -1807,10 +1811,19 @@ static int __init pmz_register(void)
 		struct uart_pmac_port *uport = &pmz_ports[i];
 		/* NULL node may happen on wallstreet */
 		if (uport->node != NULL)
-			uart_add_one_port(&pmz_uart_reg, &uport->port);
+			rc = uart_add_one_port(&pmz_uart_reg, &uport->port);
+		if (rc)
+			goto err_out;
 	}
 
 	return 0;
+err_out:
+	while (i-- > 0) {
+		struct uart_pmac_port *uport = &pmz_ports[i];
+		uart_remove_one_port(&pmz_uart_reg, &uport->port);
+	}
+	uart_unregister_driver(&pmz_uart_reg);
+	return rc;
 }
 
 static struct of_match pmz_match[] = 
@@ -1840,6 +1853,7 @@ static struct macio_driver pmz_driver =
 
 static int __init init_pmz(void)
 {
+	int rc, i;
 	printk(KERN_INFO "%s\n", version);
 
 	/* 
@@ -1861,7 +1875,16 @@ static int __init init_pmz(void)
 	/*
 	 * Now we register with the serial layer
 	 */
-	pmz_register();
+	rc = pmz_register();
+	if (rc) {
+		printk(KERN_ERR 
+			"pmac_zilog: Error registering serial device, disabling pmac_zilog.\n"
+		 	"pmac_zilog: Did another serial driver already claim the minors?\n"); 
+		/* effectively "pmz_unprobe()" */
+		for (i=0; i < pmz_ports_count; i++)
+			pmz_dispose_port(&pmz_ports[i]);
+		return rc;
+	}
 	
 	/*
 	 * Then we register the macio driver itself
@@ -1906,15 +1929,15 @@ static void pmz_console_write(struct console *con, const char *s, unsigned int c
 	write_zsreg(uap, R5, uap->curregs[5] | TxENABLE | RTS | DTR);
 
 	for (i = 0; i < count; i++) {
+		/* Wait for the transmit buffer to empty. */
+		while ((read_zsreg(uap, R0) & Tx_BUF_EMP) == 0)
+			udelay(5);
+		write_zsdata(uap, s[i]);
 		if (s[i] == 10) {
 			while ((read_zsreg(uap, R0) & Tx_BUF_EMP) == 0)
 				udelay(5);
 			write_zsdata(uap, R13);
 		}
-		/* Wait for the transmit buffer to empty. */
-		while ((read_zsreg(uap, R0) & Tx_BUF_EMP) == 0)
-			udelay(5);
-		write_zsdata(uap, s[i]);
 	}
 
 	/* Restore the values in the registers. */
@@ -1936,9 +1959,6 @@ static int __init pmz_console_setup(struct console *co, char *options)
 	int parity = 'n';
 	int flow = 'n';
 	unsigned long pwr_delay;
-
-	if(!(machine_is_compatible("MacRISC") || machine_is_compatible("MacRISC3")))
-			return -ENODEV;
 
 	/*
 	 * XServe's default to 57600 bps
@@ -1988,8 +2008,6 @@ static int __init pmz_console_init(void)
 	/* Probe ports */
 	pmz_probe();
 
-#ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
-#endif
 	/* TODO: Autoprobe console based on OF */
 	/* pmz_console.index = i; */
 	register_console(&pmz_console);

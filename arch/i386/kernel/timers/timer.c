@@ -2,7 +2,6 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <asm/timer.h>
-#include <asm/vsyscall-gtod.h>
 
 #ifdef CONFIG_HPET_TIMER
 /*
@@ -20,10 +19,10 @@ static struct timer_opts* timers[] = {
 #ifdef CONFIG_HPET_TIMER
 	&timer_hpet,
 #endif
-	&timer_tsc,
 #ifdef CONFIG_X86_PM_TIMER
 	&timer_pmtmr,
 #endif
+	&timer_tsc,
 	&timer_pit,
 	NULL,
 };
@@ -45,9 +44,6 @@ __setup("clock=", clock_setup);
 void clock_fallback(void)
 {
 	cur_timer = &timer_pit;
-
-	/* set vsyscall to use selected time source */
-	vsyscall_set_timesource(cur_timer->name);
 }
 
 /* iterates through the list of timers, returning the first 

@@ -49,54 +49,53 @@ unsigned long m68k_mmutype;
 unsigned long vme_brdtype;
 #endif
 
-int m68k_is040or060 = 0;
+int m68k_is040or060;
 
 extern int end;
 extern unsigned long availmem;
 
-int m68k_num_memory = 0;
-int m68k_realnum_memory = 0;
+int m68k_num_memory;
+int m68k_realnum_memory;
 unsigned long m68k_memoffset;
 struct mem_info m68k_memory[NUM_MEMINFO];
 
-static struct mem_info m68k_ramdisk = { 0, 0 };
+static struct mem_info m68k_ramdisk;
 
 static char m68k_command_line[CL_SIZE];
-char saved_command_line[CL_SIZE];
 
 char m68k_debug_device[6] = "";
 
 void (*mach_sched_init) (irqreturn_t (*handler)(int, void *, struct pt_regs *)) __initdata = NULL;
 /* machine dependent irq functions */
 void (*mach_init_IRQ) (void) __initdata = NULL;
-irqreturn_t (*(*mach_default_handler)[]) (int, void *, struct pt_regs *) = NULL;
-void (*mach_get_model) (char *model) = NULL;
-int (*mach_get_hardware_list) (char *buffer) = NULL;
-int (*mach_get_irq_list) (struct seq_file *, void *) = NULL;
-irqreturn_t (*mach_process_int) (int, struct pt_regs *) = NULL;
+irqreturn_t (*(*mach_default_handler)[]) (int, void *, struct pt_regs *);
+void (*mach_get_model) (char *model);
+int (*mach_get_hardware_list) (char *buffer);
+int (*mach_get_irq_list) (struct seq_file *, void *);
+irqreturn_t (*mach_process_int) (int, struct pt_regs *);
 /* machine dependent timer functions */
 unsigned long (*mach_gettimeoffset) (void);
-int (*mach_hwclk) (int, struct rtc_time*) = NULL;
-int (*mach_set_clock_mmss) (unsigned long) = NULL;
-unsigned int (*mach_get_ss)(void) = NULL;
-int (*mach_get_rtc_pll)(struct rtc_pll_info *) = NULL;
-int (*mach_set_rtc_pll)(struct rtc_pll_info *) = NULL;
+int (*mach_hwclk) (int, struct rtc_time*);
+int (*mach_set_clock_mmss) (unsigned long);
+unsigned int (*mach_get_ss)(void);
+int (*mach_get_rtc_pll)(struct rtc_pll_info *);
+int (*mach_set_rtc_pll)(struct rtc_pll_info *);
 void (*mach_reset)( void );
-void (*mach_halt)( void ) = NULL;
-void (*mach_power_off)( void ) = NULL;
+void (*mach_halt)( void );
+void (*mach_power_off)( void );
 long mach_max_dma_address = 0x00ffffff; /* default set to the lower 16MB */
-#if defined(CONFIG_AMIGA_FLOPPY) || defined(CONFIG_ATARI_FLOPPY) 
+#if defined(CONFIG_AMIGA_FLOPPY) || defined(CONFIG_ATARI_FLOPPY)
 void (*mach_floppy_setup) (char *, int *) __initdata = NULL;
 #endif
 #ifdef CONFIG_HEARTBEAT
-void (*mach_heartbeat) (int) = NULL;
+void (*mach_heartbeat) (int);
 EXPORT_SYMBOL(mach_heartbeat);
 #endif
 #ifdef CONFIG_M68K_L2_CACHE
-void (*mach_l2_flush) (int) = NULL;
+void (*mach_l2_flush) (int);
 #endif
 #if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
-void (*mach_beep)(unsigned int, unsigned int) = NULL;
+void (*mach_beep)(unsigned int, unsigned int);
 #endif
 #if defined(CONFIG_ISA) && defined(MULTI_ISA)
 int isa_type;
@@ -143,7 +142,7 @@ static void __init m68k_parse_bootinfo(const struct bi_record *record)
 		/* Already set up by head.S */
 		break;
 
- 	    case BI_MEMCHUNK:
+	    case BI_MEMCHUNK:
 		if (m68k_num_memory < NUM_MEMINFO) {
 		    m68k_memory[m68k_num_memory].addr = data[0];
 		    m68k_memory[m68k_num_memory].size = data[1];
@@ -236,7 +235,19 @@ void __init setup_arch(char **cmdline_p)
 		volatile int zero = 0;
 		asm __volatile__ ("frestore %0" : : "m" (zero));
 	}
-#endif	
+#endif
+
+	if (CPU_IS_060) {
+		u32 pcr;
+
+		asm (".chip 68060; movec %%pcr,%0; .chip 68k"
+		     : "=d" (pcr));
+		if (((pcr >> 8) & 0xff) <= 5) {
+			printk("Enabling workaround for errata I14\n");
+			asm (".chip 68060; movec %0,%%pcr; .chip 68k"
+			     : : "d" (pcr | 0x20));
+		}
+	}
 
 	init_mm.start_code = PAGE_OFFSET;
 	init_mm.end_code = (unsigned long) &_etext;
@@ -296,28 +307,28 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_SUN3
 	    case MACH_SUN3:
-	    	config_sun3();
-	    	break;
+		config_sun3();
+		break;
 #endif
 #ifdef CONFIG_APOLLO
 	    case MACH_APOLLO:
-	    	config_apollo();
-	    	break;
+		config_apollo();
+		break;
 #endif
 #ifdef CONFIG_MVME147
 	    case MACH_MVME147:
-	    	config_mvme147();
-	    	break;
+		config_mvme147();
+		break;
 #endif
 #ifdef CONFIG_MVME16x
 	    case MACH_MVME16x:
-	    	config_mvme16x();
-	    	break;
+		config_mvme16x();
+		break;
 #endif
 #ifdef CONFIG_BVME6000
 	    case MACH_BVME6000:
-	    	config_bvme6000();
-	    	break;
+		config_bvme6000();
+		break;
 #endif
 #ifdef CONFIG_HP300
 	    case MACH_HP300:
@@ -384,11 +395,11 @@ void __init setup_arch(char **cmdline_p)
 
 /* set ISA defs early as possible */
 #if defined(CONFIG_ISA) && defined(MULTI_ISA)
-#if defined(CONFIG_Q40) 
+#if defined(CONFIG_Q40)
 	if (MACH_IS_Q40) {
 	    isa_type = Q40_ISA;
 	    isa_sex = 0;
-	} 
+	}
 #elif defined(CONFIG_GG2)
 	if (MACH_IS_AMIGA && AMIGAHW_PRESENT(GG2_ISA)){
 	    isa_type = GG2_ISA;

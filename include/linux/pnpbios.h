@@ -141,6 +141,7 @@ extern int pnp_bios_isapnp_config (struct pnp_isa_config_struc *data);
 extern int pnp_bios_escd_info (struct escd_info_struc *data);
 extern int pnp_bios_read_escd (char *data, u32 nvram_base);
 extern int pnp_bios_dock_station_info(struct pnp_docking_station_info *data);
+#define needed 0
 #if needed
 extern int pnp_bios_get_event (u16 *message);
 extern int pnp_bios_send_message (u16 message);

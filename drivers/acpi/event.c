@@ -42,7 +42,7 @@ out_busy:
 static ssize_t
 acpi_system_read_event (
 	struct file		*file,
-	char			*buffer,
+	char			__user *buffer,
 	size_t			count,
 	loff_t			*ppos)
 {
@@ -63,9 +63,8 @@ acpi_system_read_event (
 			return_VALUE(-EAGAIN);
 
 		result = acpi_bus_receive_event(&event);
-		if (result) {
-			return_VALUE(-EIO);
-		}
+		if (result)
+			return result;
 
 		chars_remaining = sprintf(str, "%s %s %08x %08x\n", 
 			event.device_class?event.device_class:"<unknown>",

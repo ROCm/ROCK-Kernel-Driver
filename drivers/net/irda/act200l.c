@@ -148,7 +148,7 @@ static int act200l_change_speed(struct irda_task *task)
 			irda_task_next_state(task, IRDA_TASK_CHILD_WAIT);
 
 			/* Give reset 1 sec to finish */
-			ret = MSECS_TO_JIFFIES(1000);
+			ret = msecs_to_jiffies(1000);
 		}
 		break;
 	case IRDA_TASK_CHILD_WAIT:
@@ -187,7 +187,7 @@ static int act200l_change_speed(struct irda_task *task)
 		/* Write control bytes */
 		self->write(self->dev, control, 3);
 		irda_task_next_state(task, IRDA_TASK_WAIT);
-		ret = MSECS_TO_JIFFIES(5);
+		ret = msecs_to_jiffies(5);
 		break;
 	case IRDA_TASK_WAIT:
 		/* Go back to normal mode */
@@ -237,14 +237,14 @@ static int act200l_reset(struct irda_task *task)
 		self->set_dtr_rts(self->dev, TRUE, TRUE);
 
 		irda_task_next_state(task, IRDA_TASK_WAIT1);
-		ret = MSECS_TO_JIFFIES(50);
+		ret = msecs_to_jiffies(50);
 		break;
 	case IRDA_TASK_WAIT1:
 		/* Reset the dongle : set RTS low for 25 ms */
 		self->set_dtr_rts(self->dev, TRUE, FALSE);
 
 		irda_task_next_state(task, IRDA_TASK_WAIT2);
-		ret = MSECS_TO_JIFFIES(50);
+		ret = msecs_to_jiffies(50);
 		break;
 	case IRDA_TASK_WAIT2:
 		/* Clear DTR and set RTS to enter command mode */
@@ -253,7 +253,7 @@ static int act200l_reset(struct irda_task *task)
 		/* Write control bytes */
 		self->write(self->dev, control, 9);
 		irda_task_next_state(task, IRDA_TASK_WAIT3);
-		ret = MSECS_TO_JIFFIES(15);
+		ret = msecs_to_jiffies(15);
 		break;
 	case IRDA_TASK_WAIT3:
 		/* Go back to normal mode */

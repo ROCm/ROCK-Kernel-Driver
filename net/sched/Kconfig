@@ -1,6 +1,61 @@
 #
 # Traffic control configuration.
 # 
+choice
+	prompt "Packet scheduler clock source"
+	depends on NET_SCHED
+	default NET_SCH_CLK_JIFFIES
+	help
+	  Packet schedulers need a monotonic clock that increments at a static
+	  rate. The kernel provides several suitable interfaces, each with
+	  different properties:
+	  
+	  - high resolution (us or better)
+	  - fast to read (minimal locking, no i/o access)
+	  - synchronized on all processors
+	  - handles cpu clock frequency changes
+
+	  but nothing provides all of the above.
+
+config NET_SCH_CLK_JIFFIES
+	bool "Timer interrupt"
+	help
+	  Say Y here if you want to use the timer interrupt (jiffies) as clock
+	  source. This clock source is fast, synchronized on all processors and
+	  handles cpu clock frequency changes, but its resolution is too low
+	  for accurate shaping except at very low speed.
+
+config NET_SCH_CLK_GETTIMEOFDAY
+	bool "gettimeofday"
+	help
+	  Say Y here if you want to use gettimeofday as clock source. This clock
+	  source has high resolution, is synchronized on all processors and
+	  handles cpu clock frequency changes, but it is slow.
+
+	  Choose this if you need a high resolution clock source but can't use
+	  the CPU's cycle counter.
+
+config NET_SCH_CLK_CPU
+	bool "CPU cycle counter"
+	depends on X86_TSC || X86_64 || ALPHA || SPARC64 || PPC64 || IA64
+	help
+	  Say Y here if you want to use the CPU's cycle counter as clock source.
+	  This is a cheap and high resolution clock source, but on some
+	  architectures it is not synchronized on all processors and doesn't
+	  handle cpu clock frequency changes.
+
+	  The useable cycle counters are:
+
+	  	x86/x86_64	- Timestamp Counter
+		alpha		- Cycle Counter
+		sparc64		- %ticks register
+		ppc64		- Time base
+		ia64		- Interval Time Counter
+
+	  Choose this if your CPU's cycle counter is working properly.
+
+endchoice
+
 config NET_SCH_CBQ
 	tristate "CBQ packet scheduler"
 	depends on NET_SCHED
@@ -48,21 +103,6 @@ config NET_SCH_HFSC
 
 	  To compile this code as a module, choose M here: the
 	  module will be called sch_hfsc.
-
-config NET_SCH_CSZ
-	tristate "CSZ packet scheduler"
-	depends on NET_SCHED
-	---help---
-	  Say Y here if you want to use the Clark-Shenker-Zhang (CSZ) packet
-	  scheduling algorithm for some of your network devices.  At the
-	  moment, this is the only algorithm that can guarantee service for
-	  real-time applications (see the top of <file:net/sched/sch_csz.c>
-	  for details and references about the algorithm).
-
-	  Note: this scheduler is currently broken.
-
-	  To compile this code as a module, choose M here: the
-	  module will be called sch_csz.
 
 #tristate '  H-PFQ packet scheduler' CONFIG_NET_SCH_HPFQ
 config NET_SCH_ATM
@@ -164,27 +204,29 @@ config NET_SCH_DSMARK
 	  To compile this code as a module, choose M here: the
 	  module will be called sch_dsmark.
 
-config NET_SCH_DELAY
-	tristate "Delay simulator"
+config NET_SCH_NETEM
+	tristate "Network emulator"
 	depends on NET_SCHED
 	help
-	  Say Y if you want to delay packets by a fixed amount of
-	  time. This is often useful to simulate network delay when
+	  Say Y if you want to emulate network delay, loss, and packet
+	  re-ordering. This is often useful to simulate networks when
 	  testing applications or protocols.
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called sch_delay.
+	  will be called sch_netem.
+
+	  If unsure, say N.
 
 config NET_SCH_INGRESS
 	tristate "Ingress Qdisc"
-	depends on NET_SCHED && NETFILTER
+	depends on NET_SCHED 
 	help
 	  If you say Y here, you will be able to police incoming bandwidth
 	  and drop packets when this bandwidth exceeds your desired rate.
 	  If unsure, say Y.
 
 	  To compile this code as a module, choose M here: the
-	  module will be called cls_ingress.
+	  module will be called sch_ingress.
 
 config NET_QOS
 	bool "QoS support"
@@ -242,6 +284,7 @@ config NET_CLS_TCINDEX
 config NET_CLS_ROUTE4
 	tristate "Routing table based classifier"
 	depends on NET_CLS
+	select NET_CLS_ROUTE
 	help
 	  If you say Y here, you will be able to classify outgoing packets
 	  according to the route table entry they matched. If unsure, say Y.
@@ -251,8 +294,7 @@ config NET_CLS_ROUTE4
 
 config NET_CLS_ROUTE
 	bool
-	depends on NET_CLS_ROUTE4
-	default y
+	default n
 
 config NET_CLS_FW
 	tristate "Firewall based classifier"
@@ -273,6 +315,24 @@ config NET_CLS_U32
 
 	  To compile this code as a module, choose M here: the
 	  module will be called cls_u32.
+
+config CLS_U32_PERF
+	bool "     U32 classifier performance counters"
+	depends on NET_CLS_U32
+	help
+	  gathers stats that could be used to tune u32 classifier performance.
+	  Requires a new iproute2
+	  You MUST NOT turn this on if you dont have an update iproute2.
+
+config NET_CLS_IND
+	bool "classify input device (slows things u32/fw) "
+	depends on NET_CLS_U32 || NET_CLS_FW
+	help
+	  This option will be killed eventually when a 
+          metadata action appears because it slows things a little
+          Available only for u32 and fw classifiers.
+	  Requires a new iproute2
+	  You MUST NOT turn this on if you dont have an update iproute2.
 
 config NET_CLS_RSVP
 	tristate "Special RSVP classifier"
@@ -303,9 +363,26 @@ config NET_CLS_RSVP6
 	  To compile this code as a module, choose M here: the
 	  module will be called cls_rsvp6.
 
+config NET_CLS_ACT
+	bool '  Packet ACTION ' 
+	depends on EXPERIMENTAL && NET_CLS && NET_QOS
+	---help---
+	This option requires you have a new iproute2. It enables
+	tc extensions which can be used with tc classifiers.
+	Only the u32 and fw classifiers are supported at the moment.
+	  You MUST NOT turn this on if you dont have an update iproute2.
+
+config NET_ACT_POLICE
+	tristate '      Policing Actions' 
+        depends on NET_CLS_ACT 
+        ---help---
+        If you are using a newer iproute2 select this one, otherwise use one
+	below to select a policer.
+	  You MUST NOT turn this on if you dont have an update iproute2.
+
 config NET_CLS_POLICE
 	bool "Traffic policing (needed for in/egress)"
-	depends on NET_CLS && NET_QOS
+	depends on NET_CLS && NET_QOS && NET_ACT_POLICE!=y && NET_ACT_POLICE!=m
 	help
 	  Say Y to support traffic policing (bandwidth limits).  Needed for
 	  ingress and egress rate limiting.

@@ -52,7 +52,7 @@
 #include <asm/mac_via.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "mac_scsi.h"
 #include "NCR5380.h"
 

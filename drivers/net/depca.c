@@ -1937,7 +1937,7 @@ static void depca_dbg_open(struct net_device *dev)
 static int depca_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct depca_private *lp = (struct depca_private *) dev->priv;
-	struct depca_ioctl *ioc = (struct depca_ioctl *) &rq->ifr_data;
+	struct depca_ioctl *ioc = (struct depca_ioctl *) &rq->ifr_ifru;
 	int i, status = 0;
 	u_long ioaddr = dev->base_addr;
 	union {

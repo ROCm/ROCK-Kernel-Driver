@@ -60,7 +60,7 @@
  *
  *  Initial implementation of mandatory locks. SunOS turned out to be
  *  a rotten model, so I implemented the "obvious" semantics.
- *  See 'linux/Documentation/mandatory.txt' for details.
+ *  See 'Documentation/mandatory.txt' for details.
  *  Andy Walker (andy@lysaker.kvaerner.no), April 06, 1996.
  *
  *  Don't allow mandatory locks on mmap()'ed files. Added simple functions to
@@ -117,7 +117,6 @@
 #include <linux/capability.h>
 #include <linux/file.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/security.h>
@@ -134,7 +133,6 @@
 
 int leases_enable = 1;
 int lease_break_time = 45;
-int check_deadlocks = 1;
 
 #define for_each_lock(inode, lockp) \
 	for (lockp = &inode->i_flock; *lockp != NULL; lockp = &(*lockp)->fl_next)
@@ -179,7 +177,7 @@ void locks_init_lock(struct file_lock *fl)
 	init_waitqueue_head(&fl->fl_wait);
 	fl->fl_next = NULL;
 	fl->fl_fasync = NULL;
-	fl->fl_owner = 0;
+	fl->fl_owner = NULL;
 	fl->fl_pid = 0;
 	fl->fl_file = NULL;
 	fl->fl_flags = 0;
@@ -750,7 +748,7 @@ static int __posix_lock_file(struct inode *inode, struct file_lock *request)
 			if (!(request->fl_flags & FL_SLEEP))
 				goto out;
 			error = -EDEADLK;
-			if (check_deadlocks && posix_locks_deadlock(request, fl))
+			if (posix_locks_deadlock(request, fl))
 				goto out;
 			error = -EAGAIN;
 			locks_insert_block(fl, request);
@@ -1322,8 +1320,6 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	int can_sleep, unlock;
 	int error;
 
-	FSHOOK_BEGIN(flock, error, .fd = fd, .cmd = cmd)
-
 	error = -EBADF;
 	filp = fget(fd);
 	if (!filp)
@@ -1366,8 +1362,6 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
  out_putf:
 	fput(filp);
  out:
-	FSHOOK_END(flock, error)
-
 	return error;
 }
 
@@ -1459,13 +1453,10 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 	 * and shared.
 	 */
 	if (IS_MANDLOCK(inode) &&
-	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID) {
-		struct address_space *mapping = filp->f_mapping;
-		if (!prio_tree_empty(&mapping->i_mmap_shared) ||
-			!list_empty(&mapping->i_mmap_nonlinear)) {
-			error = -EAGAIN;
-			goto out;
-		}
+	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID &&
+	    mapping_writably_mapped(filp->f_mapping)) {
+		error = -EAGAIN;
+		goto out;
 	}
 
 	error = flock_to_posix_lock(filp, file_lock, &flock);
@@ -1597,13 +1588,10 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 	 * and shared.
 	 */
 	if (IS_MANDLOCK(inode) &&
-	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID) {
-		struct address_space *mapping = filp->f_mapping;
-		if (!prio_tree_empty(&mapping->i_mmap_shared) ||
-			!list_empty(&mapping->i_mmap_nonlinear)) {
-			error = -EAGAIN;
-			goto out;
-		}
+	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID &&
+	    mapping_writably_mapped(filp->f_mapping)) {
+		error = -EAGAIN;
+		goto out;
 	}
 
 	error = flock64_to_posix_lock(filp, file_lock, &flock);
@@ -1828,7 +1816,7 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 			       : (fl->fl_type & F_WRLCK) ? "WRITE" : "READ ");
 	}
 	if (inode) {
-#if WE_CAN_BREAK_LSLK_NOW
+#ifdef WE_CAN_BREAK_LSLK_NOW
 		out += sprintf(out, "%d %s:%ld ", fl->fl_pid,
 				inode->i_sb->s_id, inode->i_ino);
 #else
@@ -1998,7 +1986,7 @@ static inline void __steal_locks(struct file *file, fl_owner_t from)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct file_lock *fl = inode->i_flock;
-	
+
 	while (fl) {
 		if (fl->fl_file == file && fl->fl_owner == from)
 			fl->fl_owner = current->files;
@@ -2026,7 +2014,7 @@ void steal_locks(fl_owner_t from)
 		unsigned long set;
 		i = j * __NFDBITS;
 		if (i >= files->max_fdset || i >= files->max_fds)
-                        break;
+			break;
 		set = files->open_fds->fds_bits[j++];
 		while (set) {
 			if (set & 1) {
@@ -2045,9 +2033,8 @@ EXPORT_SYMBOL(steal_locks);
 static int __init filelock_init(void)
 {
 	filelock_cache = kmem_cache_create("file_lock_cache",
-			sizeof(struct file_lock), 0, 0, init_once, NULL);
-	if (!filelock_cache)
-		panic("cannot create file lock slab cache");
+			sizeof(struct file_lock), 0, SLAB_PANIC,
+			init_once, NULL);
 	return 0;
 }
 

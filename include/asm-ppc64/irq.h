@@ -98,6 +98,6 @@ extern int call_handle_irq_event(int irq, struct pt_regs *regs,
 #define irq_ctx_init()
 
 #endif /* CONFIG_IRQSTACKS */
-  
+
 #endif /* _ASM_IRQ_H */
 #endif /* __KERNEL__ */

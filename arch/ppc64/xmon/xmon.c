@@ -30,6 +30,7 @@
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
+#include <asm/rtas.h>
 
 #include "nonstdio.h"
 #include "privinst.h"
@@ -43,15 +44,6 @@ static unsigned long xmon_taken = 1;
 static int xmon_owner;
 static int xmon_gate;
 #endif /* CONFIG_SMP */
-
-#define TRAP(regs)	((regs)->trap)
-#define FULL_REGS(regs)	1
-
-#ifdef CONFIG_XMON_DEFAULT
-int xmon_enabled = 1;
-#else
-int xmon_enabled;
-#endif
 
 static unsigned long in_xmon = 0;
 
@@ -273,13 +265,15 @@ static inline void disable_surveillance(void)
 		 * real possibility of deadlock.
 		 */
 		args.token = rtas_token("set-indicator");
+		if (args.token == RTAS_UNKNOWN_SERVICE)
+			return;
 		args.nargs = 3;
 		args.nret = 1;
 		args.rets = &args.args[3];
 		args.args[0] = SURVEILLANCE_TOKEN;
 		args.args[1] = 0;
 		args.args[2] = 0;
-		enter_rtas((void *) __pa(&args));
+		enter_rtas(__pa(&args));
 	}
 #endif
 }
@@ -349,7 +343,7 @@ int xmon_core(struct pt_regs *regs, int fromipi)
 	if (cpu_isset(cpu, cpus_in_xmon)) {
 		get_output_lock();
 		excprint(regs);
-		printf("cpu 0x%s: Exception %lx %s in xmon, "
+		printf("cpu 0x%x: Exception %lx %s in xmon, "
 		       "returning to main loop\n",
 		       cpu, regs->trap, getvecname(TRAP(regs)));
 		longjmp(xmon_fault_jmp[cpu], 1);
@@ -397,7 +391,7 @@ int xmon_core(struct pt_regs *regs, int fromipi)
 			secondary = test_and_set_bit(0, &in_xmon);
 		}
 		barrier();
-	} 
+	}
 
 	if (!secondary && !xmon_gate) {
 		/* we are the first cpu to come in */
@@ -1406,7 +1400,7 @@ static void xmon_show_stack(unsigned long sp, unsigned long lr,
 		/* Look for "regshere" marker to see if this is
 		   an exception frame. */
 		if (mread(sp + 0x60, &marker, sizeof(unsigned long))
-		    && marker == 0x7265677368657265) {
+		    && marker == 0x7265677368657265ul) {
 			if (mread(sp + 0x70, &regs, sizeof(regs))
 			    != sizeof(regs)) {
 				printf("Couldn't read registers at %lx\n",
@@ -1618,7 +1612,7 @@ super_regs()
 		ptrPaca = get_paca();
     
 		printf("  Local Processor Control Area (LpPaca): \n");
-		ptrLpPaca = ptrPaca->xLpPacaPtr;
+		ptrLpPaca = ptrPaca->lppaca_ptr;
 		printf("    Saved Srr0=%.16lx  Saved Srr1=%.16lx \n",
 		       ptrLpPaca->xSavedSrr0, ptrLpPaca->xSavedSrr1);
 		printf("    Saved Gpr3=%.16lx  Saved Gpr4=%.16lx \n",
@@ -1626,7 +1620,7 @@ super_regs()
 		printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->xSavedGpr5);
     
 		printf("  Local Processor Register Save Area (LpRegSave): \n");
-		ptrLpRegSave = ptrPaca->xLpRegSavePtr;
+		ptrLpRegSave = ptrPaca->reg_save_ptr;
 		printf("    Saved Sprg0=%.16lx  Saved Sprg1=%.16lx \n",
 		       ptrLpRegSave->xSPRG0, ptrLpRegSave->xSPRG0);
 		printf("    Saved Sprg2=%.16lx  Saved Sprg3=%.16lx \n",
@@ -2528,7 +2522,7 @@ static void dump_slb(void)
 static void dump_stab(void)
 {
 	int i;
-	unsigned long *tmp = (unsigned long *)get_paca()->xStab_data.virt;
+	unsigned long *tmp = (unsigned long *)get_paca()->stab_addr;
 
 	printf("Segment table contents of cpu %x\n", smp_processor_id());
 
@@ -2545,7 +2539,7 @@ static void dump_stab(void)
 	}
 }
 
-void xmon_become_debugger(void)
+void xmon_init(void)
 {
 	__debugger = xmon;
 	__debugger_ipi = xmon_ipi;
@@ -2554,11 +2548,6 @@ void xmon_become_debugger(void)
 	__debugger_iabr_match = xmon_iabr_match;
 	__debugger_dabr_match = xmon_dabr_match;
 	__debugger_fault_handler = xmon_fault_handler;
-
-	if (__debugger_on != NULL)
-		*__debugger_on = 0;
-	__debugger_on = &xmon_enabled;
-	xmon_enabled = 1;
 }
 
 void dump_segments(void)

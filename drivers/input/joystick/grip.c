@@ -48,8 +48,8 @@ MODULE_LICENSE("GPL");
 #define GRIP_STROBE_GPP		200	/* 200 us */
 #define GRIP_LENGTH_XT		4
 #define GRIP_STROBE_XT		64	/* 64 us */
-#define GRIP_MAX_CHUNKS_XT	10	
-#define GRIP_MAX_BITS_XT	30	
+#define GRIP_MAX_CHUNKS_XT	10
+#define GRIP_MAX_BITS_XT	30
 
 #define GRIP_REFRESH_TIME	HZ/50	/* 20 ms */
 
@@ -76,8 +76,8 @@ static int grip_abs_dc[] = { ABS_X, ABS_Y, ABS_RX, ABS_RY, ABS_THROTTLE, ABS_HAT
 
 static char *grip_name[] = { NULL, "Gravis GamePad Pro", "Gravis Blackhawk Digital",
 				"Gravis Xterminator Digital", "Gravis Xterminator DualControl" };
-static int *grip_abs[] = { 0, grip_abs_gpp, grip_abs_bd, grip_abs_xt, grip_abs_dc };
-static int *grip_btn[] = { 0, grip_btn_gpp, grip_btn_bd, grip_btn_xt, grip_btn_dc };
+static int *grip_abs[] = { NULL, grip_abs_gpp, grip_abs_bd, grip_abs_xt, grip_abs_dc };
+static int *grip_btn[] = { NULL, grip_btn_gpp, grip_btn_bd, grip_btn_xt, grip_btn_dc };
 static char grip_anx[] = { 0, 0, 3, 5, 5 };
 static char grip_cen[] = { 0, 0, 2, 2, 4 };
 
@@ -153,7 +153,7 @@ static int grip_xt_read_packet(struct gameport *gameport, int shift, unsigned in
 				buf = (buf << 1) | (u >> 1);
 				t = strobe;
 				i++;
-			} else 
+			} else
 
 			if ((((u ^ v) & (v ^ w)) >> 1) & ~(u | v | w) & 1) {
 				if (i == 20) {

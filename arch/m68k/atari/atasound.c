@@ -70,7 +70,7 @@ void atari_mksound (unsigned int hz, unsigned int ticks)
 	if (hz) {
 	    /* Convert from frequency value to PSG period value (base
 	       frequency 125 kHz).  */
-		
+
 	    period = PSG_FREQ / hz;
 
 	    if (period > 0xfff) period = 0xfff;

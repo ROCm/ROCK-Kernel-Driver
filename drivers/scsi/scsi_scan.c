@@ -32,17 +32,24 @@
 #include <linux/blkdev.h>
 #include <asm/semaphore.h>
 
+#include <scsi/scsi.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_devinfo.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_request.h>
 #include <scsi/scsi_transport.h>
-#include "scsi.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
 
 #define ALLOC_FAILURE_MSG	KERN_ERR "%s: Allocation failure during" \
 	" SCSI scanning, some SCSI devices might not be configured\n"
+
+/*
+ * Default timeout
+ */
+#define SCSI_TIMEOUT (2*HZ)
 
 /*
  * Prefix values for the SCSI id's (stored in driverfs name field)
@@ -94,17 +101,7 @@ MODULE_PARM_DESC(max_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
 
-/* Some AChip ARC765 based DVD-ROM's take 15 or more seconds
- * to reset.  A scan will fail if made right after a reset.
- * It's completely broken device behaviour: SCSI specification
- * says devices need to be able to respond to INQUIRY always
- * (after a selection timeout ... of 250ms).
- */
-#ifdef __powerpc64__
-static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+25;
-#else
 static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+3;
-#endif
 
 module_param_named(inq_timeout, scsi_inq_timeout, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(inq_timeout, 
@@ -220,7 +217,6 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	sdev->id = id;
 	sdev->lun = lun;
 	sdev->channel = channel;
-	sdev->online = TRUE;
 	sdev->sdev_state = SDEV_CREATED;
 	INIT_LIST_HEAD(&sdev->siblings);
 	INIT_LIST_HEAD(&sdev->same_target_siblings);
@@ -228,8 +224,9 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	INIT_LIST_HEAD(&sdev->starved_entry);
 	spin_lock_init(&sdev->list_lock);
 
-	/* if the device needs this changing, it may do so in the detect
-	 * function */
+
+	/* if the device needs this changing, it may do so in the
+	 * slave_configure function */
 	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
 
 	/*
@@ -350,6 +347,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 	struct scsi_device *sdev = sreq->sr_device;	/* a bit ugly */
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int possible_inq_resp_len;
+	int count = 0;
 
 	*bflags = 0;
  repeat_inquiry:
@@ -370,19 +368,24 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 1st INQUIRY %s with"
 			" code 0x%x\n", sreq->sr_result ?
 			"failed" : "successful", sreq->sr_result));
+	++count;
 
 	if (sreq->sr_result) {
 		if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) != 0 &&
 		    (sreq->sr_sense_buffer[2] & 0xf) == UNIT_ATTENTION &&
-		    sreq->sr_sense_buffer[12] == 0x28 &&
+		    (sreq->sr_sense_buffer[12] == 0x28 ||
+		     sreq->sr_sense_buffer[12] == 0x29) &&
 		    sreq->sr_sense_buffer[13] == 0) {
-			/* not-ready to ready transition - good */
+			/* not-ready to ready transition or power-on - good */
 			/* dpg: bogus? INQUIRY never returns UNIT_ATTENTION */
-		} else
-			/*
-			 * assume no peripheral if any other sort of error
-			 */
-			return;
+			/* Supposedly, but many buggy devices do so anyway */
+			if (count < 3)
+				goto repeat_inquiry;
+		}
+		/*
+		 * assume no peripheral if any other sort of error
+		 */
+		return;
 	}
 
 	/*
@@ -568,6 +571,7 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	 * attach. So remove ((inq_result[0] >> 5) & 7) == 1 check.
 	 */ 
 
+	sdev->inq_periph_qual = (inq_result[0] >> 5) & 7;
 	sdev->removable = (0x80 & inq_result[1]) >> 7;
 	sdev->lockable = sdev->removable;
 	sdev->soft_reset = (inq_result[7] & 1) && ((inq_result[3] & 7) == 2);
@@ -658,6 +662,9 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 
 	if (*bflags & BLIST_MS_192_BYTES_FOR_3F)
 		sdev->use_192_bytes_for_3f = 1;
+
+	if (*bflags & BLIST_NOT_LOCKABLE)
+		sdev->lockable = 0;
 
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);

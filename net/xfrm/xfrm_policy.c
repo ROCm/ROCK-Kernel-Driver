@@ -21,7 +21,6 @@
 #include <linux/workqueue.h>
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
-#include <linux/netfilter.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 
@@ -149,6 +148,8 @@ static void xfrm_policy_timer(unsigned long data)
 	int warn = 0;
 	int dir;
 
+	read_lock(&xp->lock);
+
 	if (xp->dead)
 		goto out;
 
@@ -198,10 +199,12 @@ static void xfrm_policy_timer(unsigned long data)
 		xfrm_pol_hold(xp);
 
 out:
+	read_unlock(&xp->lock);
 	xfrm_pol_put(xp);
 	return;
 
 expired:
+	read_unlock(&xp->lock);
 	km_policy_expired(xp, dir, 1);
 	xfrm_policy_delete(xp, dir);
 	xfrm_pol_put(xp);
@@ -909,7 +912,6 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 
 	if (_decode_session(skb, &fl, family) < 0)
 		return 0;
-	nf_nat_decode_session(skb, &fl, family);
 
 	/* First, check used SA against their selectors. */
 	if (skb->sp) {

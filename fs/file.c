@@ -159,7 +159,7 @@ void free_fdset(fd_set *array, int num)
  */
 int expand_fdset(struct files_struct *files, int nr)
 {
-	fd_set *new_openset = 0, *new_execset = 0;
+	fd_set *new_openset = NULL, *new_execset = NULL;
 	int error, nfds = 0;
 
 	error = -EMFILE;

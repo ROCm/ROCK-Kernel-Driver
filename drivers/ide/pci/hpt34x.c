@@ -235,7 +235,7 @@ no_dma_set:
  */
 #define	HPT34X_PCI_INIT_REG		0x80
 
-static unsigned int __init init_chipset_hpt34x (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_hpt34x(struct pci_dev *dev, const char *name)
 {
 	int i = 0;
 	unsigned long hpt34xIoBase = pci_resource_start(dev, 4);
@@ -289,7 +289,7 @@ static unsigned int __init init_chipset_hpt34x (struct pci_dev *dev, const char 
 	return dev->irq;
 }
 
-static void __init init_hwif_hpt34x (ide_hwif_t *hwif)
+static void __devinit init_hwif_hpt34x(ide_hwif_t *hwif)
 {
 	u16 pcicmd = 0;
 

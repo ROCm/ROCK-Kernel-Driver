@@ -78,7 +78,7 @@ static int min_lap_keepalive_time = 100;	/* 100us */
  * us on that - Jean II */
 
 static int do_devname(ctl_table *table, int write, struct file *filp,
-		      void *buffer, size_t *lenp)
+		      void __user *buffer, size_t *lenp)
 {
 	int ret;
 

@@ -161,7 +161,7 @@ static int softdog_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t softdog_write(struct file *file, const char *data, size_t len, loff_t *ppos)
+static ssize_t softdog_write(struct file *file, const char __user *data, size_t len, loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
@@ -194,6 +194,8 @@ static ssize_t softdog_write(struct file *file, const char *data, size_t len, lo
 static int softdog_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	int new_margin;
 	static struct watchdog_info ident = {
 		.options =		WDIOF_SETTIMEOUT |
@@ -206,23 +208,23 @@ static int softdog_ioctl(struct inode *inode, struct file *file,
 		default:
 			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
-			return copy_to_user((struct watchdog_info *)arg, &ident,
+			return copy_to_user(argp, &ident,
 				sizeof(ident)) ? -EFAULT : 0;
 		case WDIOC_GETSTATUS:
 		case WDIOC_GETBOOTSTATUS:
-			return put_user(0,(int *)arg);
+			return put_user(0, p);
 		case WDIOC_KEEPALIVE:
 			softdog_keepalive();
 			return 0;
 		case WDIOC_SETTIMEOUT:
-			if (get_user(new_margin, (int *)arg))
+			if (get_user(new_margin, p))
 				return -EFAULT;
 			if (softdog_set_heartbeat(new_margin))
 				return -EINVAL;
 			softdog_keepalive();
 			/* Fall */
 		case WDIOC_GETTIMEOUT:
-			return put_user(soft_margin, (int *)arg);
+			return put_user(soft_margin, p);
 	}
 }
 

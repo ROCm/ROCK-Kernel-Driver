@@ -83,7 +83,7 @@ struct pt_regs {
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__) 
 #define user_mode(regs) (!!((regs)->cs & 3))
 #define instruction_pointer(regs) ((regs)->rip)
-void signal_fault(struct pt_regs *regs, void *frame, char *where);
+void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 
 enum {
         EF_CF   = 0x00000001,

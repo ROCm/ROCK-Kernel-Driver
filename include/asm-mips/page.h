@@ -11,20 +11,18 @@
 
 #include <linux/config.h>
 
-#ifdef CONFIG_MIPS32
-#include <asm/page-32.h>
-#endif
-#ifdef CONFIG_MIPS64
-#include <asm/page-64.h>
-#endif
-
 #ifdef __KERNEL__
+
+#include <spaces.h>
 
 /*
  * PAGE_SHIFT determines the page size
  */
 #ifdef CONFIG_PAGE_SIZE_4KB
 #define PAGE_SHIFT	12
+#endif
+#ifdef CONFIG_PAGE_SIZE_8KB
+#define PAGE_SHIFT	13
 #endif
 #ifdef CONFIG_PAGE_SIZE_16KB
 #define PAGE_SHIFT	14
@@ -134,5 +132,9 @@ static __inline__ int get_order(unsigned long size)
 #define CAC_ADDR(addr)		((addr) - UNCAC_BASE + PAGE_OFFSET)
 
 #endif /* defined (__KERNEL__) */
+
+#ifdef CONFIG_LIMITED_DMA
+#define WANT_PAGE_VIRTUAL
+#endif
 
 #endif /* _ASM_PAGE_H */

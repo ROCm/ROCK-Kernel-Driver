@@ -91,6 +91,7 @@
 
 #define MPTIOCINFO		_IOWR(MPT_MAGIC_NUMBER,17,struct mpt_ioctl_iocinfo)
 #define MPTIOCINFO1		_IOWR(MPT_MAGIC_NUMBER,17,struct mpt_ioctl_iocinfo_rev0)
+#define MPTIOCINFO2		_IOWR(MPT_MAGIC_NUMBER,17,struct mpt_ioctl_iocinfo_rev1)
 #define MPTTARGETINFO		_IOWR(MPT_MAGIC_NUMBER,18,struct mpt_ioctl_targetinfo)
 #define MPTTEST			_IOWR(MPT_MAGIC_NUMBER,19,struct mpt_ioctl_test)
 #define MPTEVENTQUERY		_IOWR(MPT_MAGIC_NUMBER,21,struct mpt_ioctl_eventquery)
@@ -114,7 +115,7 @@
 struct mpt_fw_xfer {
 	unsigned int	 iocnum;	/* IOC unit number */
 	unsigned int	 fwlen;
-	void		*bufp;		/* Pointer to firmware buffer */
+	void		__user *bufp;	/* Pointer to firmware buffer */
 };
 
 #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
@@ -165,6 +166,18 @@ struct mpt_ioctl_pci_info {
 	} u;
 };
 
+struct mpt_ioctl_pci_info2 {
+	union {
+		struct {
+			unsigned int  deviceNumber   :  5;
+			unsigned int  functionNumber :  3;
+			unsigned int  busNumber      : 24;
+		} bits;
+		unsigned int  asUlong;
+	} u;
+  int segmentID;
+};
+
 /*
  *  Adapter Information Page
  *  Read only.
@@ -175,6 +188,24 @@ struct mpt_ioctl_pci_info {
 #define MPT_IOCTL_VERSION_LENGTH	(32)
 
 struct mpt_ioctl_iocinfo {
+	mpt_ioctl_header hdr;
+	int		 adapterType;	/* SCSI or FCP */
+	int		 port;		/* port number */
+	int		 pciId;		/* PCI Id. */
+	int		 hwRev;		/* hardware revision */
+	int		 subSystemDevice;	/* PCI subsystem Device ID */
+	int		 subSystemVendor;	/* PCI subsystem Vendor ID */
+	int		 numDevices;		/* number of devices */
+	int		 FWVersion;		/* FW Version (integer) */
+	int		 BIOSVersion;		/* BIOS Version (integer) */
+	char		 driverVersion[MPT_IOCTL_VERSION_LENGTH];	/* Driver Version (string) */
+	char		 busChangeEvent;
+	char		 hostId;
+	char		 rsvd[2];
+	struct mpt_ioctl_pci_info2  pciInfo; /* Added Rev 2 */
+};
+
+struct mpt_ioctl_iocinfo_rev1 {
 	mpt_ioctl_header hdr;
 	int		 adapterType;	/* SCSI or FCP */
 	int		 port;		/* port number */
@@ -301,10 +332,10 @@ typedef struct mpt_ioctl_replace_fw {
 struct mpt_ioctl_command {
 	mpt_ioctl_header hdr;
 	int		timeout;	/* optional (seconds) */
-	char		*replyFrameBufPtr;
-	char		*dataInBufPtr;
-	char		*dataOutBufPtr;
-	char		*senseDataPtr;
+	char		__user *replyFrameBufPtr;
+	char		__user *dataInBufPtr;
+	char		__user *dataOutBufPtr;
+	char		__user *senseDataPtr;
 	int		maxReplyBytes;
 	int		dataInSize;
 	int		dataOutSize;

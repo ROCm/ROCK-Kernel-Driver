@@ -361,7 +361,7 @@ static int
 snd_rme96_playback_copy(snd_pcm_substream_t *substream,
 			int channel, /* not used (interleaved data) */
 			snd_pcm_uframes_t pos,
-			void *src,
+			void __user *src,
 			snd_pcm_uframes_t count)
 {
 	rme96_t *rme96 = _snd_pcm_substream_chip(substream);
@@ -376,7 +376,7 @@ static int
 snd_rme96_capture_copy(snd_pcm_substream_t *substream,
 		       int channel, /* not used (interleaved data) */
 		       snd_pcm_uframes_t pos,
-		       void *dst,
+		       void __user *dst,
 		       snd_pcm_uframes_t count)
 {
 	rme96_t *rme96 = _snd_pcm_substream_chip(substream);

@@ -159,10 +159,6 @@ extern void acpi_reserve_bootmem(void);
 extern int acpi_disabled;
 extern int acpi_pci_disabled;
 
-#define dmi_broken (0)
-#define BROKEN_ACPI_Sx		0x0001
-#define BROKEN_INIT_AFTER_S1	0x0002
-
 #endif /*__KERNEL__*/
 
 #endif /*_ASM_ACPI_H*/

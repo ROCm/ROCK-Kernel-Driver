@@ -14,7 +14,7 @@
 
 #include <asm/qeth.h>
 
-#define VERSION_QETH_MPC_H "$Revision: 1.27.2.6 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.36 $"
 
 extern const char *VERSION_QETH_MPC_C;
 
@@ -34,7 +34,7 @@ extern unsigned char IPA_PDU_HEADER[];
 #define QETH_MCL_LENGTH		4
 #define OSA_ADDR_LEN		6
 
-#define QETH_TIMEOUT 		(10 * HZ)	
+#define QETH_TIMEOUT 		(10 * HZ)
 #define QETH_IPA_TIMEOUT 	(45 * HZ)
 #define QETH_IDX_COMMAND_SEQNO 	0xffff0000
 #define SR_INFO_LEN		16
@@ -225,7 +225,7 @@ struct qeth_ipacmd_setdelip4 {
 	__u8   mask[4];
 	__u32  flags;
 } __attribute__ ((packed));
-	
+
 struct qeth_ipacmd_setdelip6 {
 	__u8   ip_addr[16];
 	__u8   mask[16];
@@ -269,7 +269,7 @@ struct qeth_ipacmd_setassparms {
 	struct qeth_ipacmd_setassparms_hdr hdr;
 	union {
 		__u32 flags_32bit;
-		struct qeth_arp_cache_entry add_arp_entry; 
+		struct qeth_arp_cache_entry add_arp_entry;
 		struct qeth_arp_query_data query_arp;
 		__u8 ip[16];
 	} data;
@@ -391,7 +391,7 @@ struct qeth_ipa_cmd {
 	} data;
 } __attribute__ ((packed));
 
-/* 
+/*
  * special command for ARP processing.
  * this is not included in setassparms command before, because we get
  * problem with the size of struct qeth_ipacmd_setassparms otherwise
@@ -471,7 +471,7 @@ extern unsigned char ULP_SETUP[];
 #define QETH_ULP_SETUP_RESP_CONNECTION_TOKEN(buffer) \
 		(PDU_ENCAPSULATION(buffer)+0x1a)
 
-	
+
 extern unsigned char DM_ACT[];
 #define DM_ACT_SIZE 0x55
 #define QETH_DM_ACT_DEST_ADDR(buffer) (buffer+0x2c)

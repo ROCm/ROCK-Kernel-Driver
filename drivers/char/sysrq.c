@@ -313,36 +313,18 @@ void __sysrq_put_key_op (int key, struct sysrq_key_op *op_p) {
 }
 
 /*
- * This function is called by the keyboard handler when SysRq is pressed
- * and any other keycode arrives.
- */
-
-void handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
-{
-	if (!sysrq_enabled)
-		return;
-
-	__sysrq_lock_table();
-	__handle_sysrq_nolock(key, pt_regs, tty);
-	__sysrq_unlock_table();
-}
-
-/*
  * This is the non-locking version of handle_sysrq
  * It must/can only be called by sysrq key handlers,
  * as they are inside of the lock
  */
 
-void __handle_sysrq_nolock(int key, struct pt_regs *pt_regs,
-		  	   struct tty_struct *tty) 
+void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
 {
 	struct sysrq_key_op *op_p;
 	int orig_log_level;
 	int i, j;
-	
-	if (!sysrq_enabled)
-		return;
 
+	__sysrq_lock_table();
 	orig_log_level = console_loglevel;
 	console_loglevel = 7;
 	printk(KERN_INFO "SysRq : ");
@@ -364,10 +346,22 @@ void __handle_sysrq_nolock(int key, struct pt_regs *pt_regs,
 		printk ("\n");
 		console_loglevel = orig_log_level;
 	}
+	__sysrq_unlock_table();
+}
+
+/*
+ * This function is called by the keyboard handler when SysRq is pressed
+ * and any other keycode arrives.
+ */
+
+void handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
+{
+	if (!sysrq_enabled)
+		return;
+	__handle_sysrq(key, pt_regs, tty);
 }
 
 EXPORT_SYMBOL(handle_sysrq);
-EXPORT_SYMBOL(__handle_sysrq_nolock);
 EXPORT_SYMBOL(__sysrq_lock_table);
 EXPORT_SYMBOL(__sysrq_unlock_table);
 EXPORT_SYMBOL(__sysrq_get_key_op);

@@ -12,11 +12,11 @@
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/namei.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 void generic_fillattr(struct inode *inode, struct kstat *stat)
 {
@@ -37,7 +37,7 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 
 EXPORT_SYMBOL(generic_fillattr);
 
-int vfs_getattr_it(struct vfsmount *mnt, struct dentry *dentry, struct lookup_intent *it, struct kstat *stat)
+int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
 	int retval;
@@ -46,8 +46,6 @@ int vfs_getattr_it(struct vfsmount *mnt, struct dentry *dentry, struct lookup_in
 	if (retval)
 		return retval;
 
-	if (inode->i_op->getattr_it)
-		return inode->i_op->getattr_it(mnt, dentry, it, stat);
 	if (inode->i_op->getattr)
 		return inode->i_op->getattr(mnt, dentry, stat);
 
@@ -64,24 +62,16 @@ int vfs_getattr_it(struct vfsmount *mnt, struct dentry *dentry, struct lookup_in
 
 EXPORT_SYMBOL(vfs_getattr);
 
-int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
-{
-	return vfs_getattr_it(mnt, dentry, NULL, stat);
-}
-
 int vfs_stat(char __user *name, struct kstat *stat)
 {
 	struct nameidata nd;
 	int error;
-	intent_init(&nd.intent, IT_GETATTR);
 
-	FSHOOK_BEGIN_USER_PATH_WALK_IT(stat, error, name, nd, path, .link = false)
-
-		error = vfs_getattr_it(nd.mnt, nd.dentry, &nd.intent, stat);
+	error = user_path_walk(name, &nd);
+	if (!error) {
+		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(stat, error, path)
-
+	}
 	return error;
 }
 
@@ -91,15 +81,12 @@ int vfs_lstat(char __user *name, struct kstat *stat)
 {
 	struct nameidata nd;
 	int error;
-	intent_init(&nd.intent, IT_GETATTR);
 
-	FSHOOK_BEGIN_USER_PATH_WALK_LINK_IT(stat, error, name, nd, path, .link = true)
-
-		error = vfs_getattr_it(nd.mnt, nd.dentry, &nd.intent, stat);
+	error = user_path_walk_link(name, &nd);
+	if (!error) {
+		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(stat, error, path)
-
+	}
 	return error;
 }
 
@@ -107,31 +94,19 @@ EXPORT_SYMBOL(vfs_lstat);
 
 int vfs_fstat(unsigned int fd, struct kstat *stat)
 {
-	int error;
-	struct nameidata nd;
-	intent_init(&nd.intent, IT_GETATTR);
-
-	FSHOOK_BEGIN(fstat, error, .fd = fd)
-
 	struct file *f = fget(fd);
+	int error = -EBADF;
 
-	error = -EBADF;
 	if (f) {
-		error = vfs_getattr_it(f->f_vfsmnt, f->f_dentry, &nd.intent, stat);
-		intent_release(&nd.intent);
+		error = vfs_getattr(f->f_vfsmnt, f->f_dentry, stat);
 		fput(f);
 	}
-
-	FSHOOK_END(fstat, error)	
-
 	return error;
 }
 
 EXPORT_SYMBOL(vfs_fstat);
 
-#if !defined(__alpha__) && !defined(__sparc__) && !defined(__ia64__) \
-  && !defined(CONFIG_ARCH_S390) && !defined(__hppa__) \
-  && !defined(__arm__) && !defined(CONFIG_V850) && !defined(__powerpc64__)
+#ifdef __ARCH_WANT_OLD_STAT
 
 /*
  * For backward compatibility?  Maybe this should be moved
@@ -156,6 +131,8 @@ static int cp_old_stat(struct kstat *stat, struct __old_kernel_stat __user * sta
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
+	if (tmp.st_nlink != stat->nlink)
+		return -EOVERFLOW;
 	SET_UID(tmp.st_uid, stat->uid);
 	SET_GID(tmp.st_gid, stat->gid);
 	tmp.st_rdev = old_encode_dev(stat->rdev);
@@ -201,7 +178,7 @@ asmlinkage long sys_fstat(unsigned int fd, struct __old_kernel_stat __user * sta
 	return error;
 }
 
-#endif
+#endif /* __ARCH_WANT_OLD_STAT */
 
 static int cp_new_stat(struct kstat *stat, struct stat __user *statbuf)
 {
@@ -224,6 +201,8 @@ static int cp_new_stat(struct kstat *stat, struct stat __user *statbuf)
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
+	if (tmp.st_nlink != stat->nlink)
+		return -EOVERFLOW;
 	SET_UID(tmp.st_uid, stat->uid);
 	SET_GID(tmp.st_gid, stat->gid);
 #if BITS_PER_LONG == 32
@@ -288,8 +267,8 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 	if (bufsiz <= 0)
 		return -EINVAL;
 
-	FSHOOK_BEGIN_USER_PATH_WALK_LINK(readlink, error, path, nd, path)
-
+	error = user_path_walk_link(path, &nd);
+	if (!error) {
 		struct inode * inode = nd.dentry->d_inode;
 
 		error = -EINVAL;
@@ -301,15 +280,13 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 			}
 		}
 		path_release(&nd);
-
-	FSHOOK_END_USER_WALK(readlink, error, path)
-
+	}
 	return error;
 }
 
 
 /* ---------- LFS-64 ----------- */
-#if !defined(__ia64__) && !defined(__mips64) && !defined(__x86_64__) && !defined(CONFIG_ARCH_S390X)
+#ifdef __ARCH_WANT_STAT64
 
 static long cp_new_stat64(struct kstat *stat, struct stat64 __user *statbuf)
 {
@@ -377,7 +354,7 @@ asmlinkage long sys_fstat64(unsigned long fd, struct stat64 __user * statbuf)
 	return error;
 }
 
-#endif /* LFS-64 */
+#endif /* __ARCH_WANT_STAT64 */
 
 void inode_add_bytes(struct inode *inode, loff_t bytes)
 {
@@ -423,6 +400,8 @@ EXPORT_SYMBOL(inode_get_bytes);
 
 void inode_set_bytes(struct inode *inode, loff_t bytes)
 {
+	/* Caller is here responsible for sufficient locking
+	 * (ie. inode->i_lock) */
 	inode->i_blocks = bytes >> 9;
 	inode->i_bytes = bytes & 511;
 }

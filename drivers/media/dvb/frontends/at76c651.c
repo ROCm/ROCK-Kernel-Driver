@@ -71,9 +71,7 @@ static struct dvb_frontend_info at76c651_info = {
 	    FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
 	    FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO |
 	    FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 | FE_CAN_QAM_128 |
-	    FE_CAN_QAM_256 /* | FE_CAN_QAM_512 | FE_CAN_QAM_1024 */ |
-	    FE_CAN_RECOVER | FE_CAN_CLEAN_SETUP | FE_CAN_MUTE_TS
-
+	    FE_CAN_MUTE_TS | FE_CAN_QAM_256 | FE_CAN_RECOVER
 };
 
 #if ! defined(__powerpc__)
@@ -361,6 +359,7 @@ static int at76c651_set_parameters(struct dvb_i2c_bus *i2c,
 	at76c651_set_symbolrate(i2c, p->u.qam.symbol_rate);
 	at76c651_set_inversion(i2c, p->inversion);
 	at76c651_set_auto_config(i2c);
+        at76c651_reset(i2c);
 
 	return 0;
 
@@ -462,8 +461,14 @@ static int at76c651_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	case FE_INIT:
 		return at76c651_set_defaults(fe->i2c);
 
-	case FE_RESET:
-		return at76c651_reset(fe->i2c);
+	case FE_GET_TUNE_SETTINGS:
+	{
+	        struct dvb_frontend_tune_settings* fesettings = (struct dvb_frontend_tune_settings*) arg;
+	        fesettings->min_delay_ms = 50;
+	        fesettings->step_size = 0;
+	        fesettings->max_drift = 0;
+	        return 0;
+	}	    
 
 	default:
 		return -ENOIOCTLCMD;

@@ -205,8 +205,6 @@ void ext3_delete_inode (struct inode * inode)
 		 * need to make sure that the in-core orphan linked list
 		 * is properly cleaned up. */
 		ext3_orphan_del(NULL, inode);
-
-		ext3_std_error(inode->i_sb, PTR_ERR(handle));
 		goto no_delete;
 	}
 
@@ -289,7 +287,7 @@ static int ext3_alloc_block (handle_t *handle,
 				 &ei->i_prealloc_count,
 				 &ei->i_prealloc_block, err);
 		else
-			result = ext3_new_block (inode, goal, 0, 0, err);
+			result = ext3_new_block(inode, goal, NULL, NULL, err);
 		/*
 		 * AKPM: this is somewhat sticky.  I'm not surprised it was
 		 * disabled in 2.2's ext3.  Need to integrate b_committed_data
@@ -298,7 +296,7 @@ static int ext3_alloc_block (handle_t *handle,
 		 */
 	}
 #else
-	result = ext3_new_block (handle, inode, goal, 0, 0, err);
+	result = ext3_new_block(handle, inode, goal, NULL, NULL, err);
 #endif
 	return result;
 }
@@ -861,7 +859,7 @@ changed:
 static int ext3_get_block(struct inode *inode, sector_t iblock,
 			struct buffer_head *bh_result, int create)
 {
-	handle_t *handle = 0;
+	handle_t *handle = NULL;
 	int ret;
 
 	if (create) {
@@ -883,25 +881,41 @@ ext3_direct_io_get_blocks(struct inode *inode, sector_t iblock,
 	handle_t *handle = journal_current_handle();
 	int ret = 0;
 
-	if (handle && handle->h_buffer_credits <= EXT3_RESERVE_TRANS_BLOCKS) {
+	if (!handle)
+		goto get_block;		/* A read */
+
+	if (handle->h_transaction->t_state == T_LOCKED) {
+		/*
+		 * Huge direct-io writes can hold off commits for long
+		 * periods of time.  Let this commit run.
+		 */
+		ext3_journal_stop(handle);
+		handle = ext3_journal_start(inode, DIO_CREDITS);
+		if (IS_ERR(handle))
+			ret = PTR_ERR(handle);
+		goto get_block;
+	}
+
+	if (handle->h_buffer_credits <= EXT3_RESERVE_TRANS_BLOCKS) {
 		/*
 		 * Getting low on buffer credits...
 		 */
-		if (!ext3_journal_extend(handle, DIO_CREDITS)) {
+		ret = ext3_journal_extend(handle, DIO_CREDITS);
+		if (ret > 0) {
 			/*
-			 * Couldn't extend the transaction.  Start a new one
+			 * Couldn't extend the transaction.  Start a new one.
 			 */
 			ret = ext3_journal_restart(handle, DIO_CREDITS);
 		}
 	}
+
+get_block:
 	if (ret == 0)
 		ret = ext3_get_block_handle(handle, inode, iblock,
 					bh_result, create, 0);
-	if (ret == 0)
-		bh_result->b_size = (1 << inode->i_blkbits);
+	bh_result->b_size = (1 << inode->i_blkbits);
 	return ret;
 }
-
 
 /*
  * `handle' can be NULL if create is zero
@@ -1081,8 +1095,8 @@ static int ext3_prepare_write(struct file *file, struct page *page,
 {
 	struct inode *inode = page->mapping->host;
 	int ret, needed_blocks = ext3_writepage_trans_blocks(inode);
-	int retries = 0;
 	handle_t *handle;
+	int retries = 0;
 
 retry:
 	handle = ext3_journal_start(inode, needed_blocks);
@@ -1091,7 +1105,7 @@ retry:
 		goto out;
 	}
 	ret = block_prepare_write(page, from, to, ext3_get_block);
-	if (ret != 0)
+	if (ret)
 		goto prepare_write_failed;
 
 	if (ext3_should_journal_data(inode)) {
@@ -1359,18 +1373,10 @@ static int ext3_ordered_writepage(struct page *page,
 
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
-		/* an ENOMEM failure isn't horribly surprising, we're
-		 * doing GFP_NOFS allocations here.  Just redirty the
-		 * page and try again later
-		 */
-		if (ret == -ENOMEM)
-			ret = 0;
 		goto out_fail;
 	}
 
 	if (!page_has_buffers(page)) {
-		if (!PageUptodate(page))
-			buffer_error();
 		create_empty_buffers(page, inode->i_sb->s_blocksize,
 				(1 << BH_Dirty)|(1 << BH_Uptodate));
 	}
@@ -1425,12 +1431,6 @@ static int ext3_writeback_writepage(struct page *page,
 	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
-		/* an ENOMEM failure isn't horribly surprising, we're
-		 * doing GFP_NOFS allocations here.  Just redirty the
-		 * page and try again later
-		 */
-		if (ret == -ENOMEM)
-			ret = 0;
 		goto out_fail;
 	}
 
@@ -1460,12 +1460,6 @@ static int ext3_journalled_writepage(struct page *page,
 	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
-		/* an ENOMEM failure isn't horribly surprising, we're
-		 * doing GFP_NOFS allocations here.  Just redirty the
-		 * page and try again later
-		 */
-		if (ret == -ENOMEM)
-			ret = 0;
 		goto no_write;
 	}
 
@@ -2795,9 +2789,28 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 
 	if ((ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid) ||
 		(ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid)) {
+		handle_t *handle;
+
+		/* (user+group)*(old+new) structure, inode write (sb,
+		 * inode block, ? - but truncate inode update has it) */
+		handle = ext3_journal_start(inode, 4*EXT3_QUOTA_INIT_BLOCKS+3);
+		if (IS_ERR(handle)) {
+			error = PTR_ERR(handle);
+			goto err_out;
+		}
 		error = DQUOT_TRANSFER(inode, attr) ? -EDQUOT : 0;
-		if (error)
+		if (error) {
+			ext3_journal_stop(handle);
 			return error;
+		}
+		/* Update corresponding info in inode so that everything is in
+		 * one transaction */
+		if (attr->ia_valid & ATTR_UID)
+			inode->i_uid = attr->ia_uid;
+		if (attr->ia_valid & ATTR_GID)
+			inode->i_gid = attr->ia_gid;
+		error = ext3_mark_inode_dirty(handle, inode);
+		ext3_journal_stop(handle);
 	}
 
 	if (S_ISREG(inode->i_mode) &&
@@ -2876,7 +2889,9 @@ int ext3_writepage_trans_blocks(struct inode *inode)
 		ret = 2 * (bpp + indirects) + 2;
 
 #ifdef CONFIG_QUOTA
-	ret += 2 * EXT3_SINGLEDATA_TRANS_BLOCKS;
+	/* We know that structure was already allocated during DQUOT_INIT so
+	 * we will be updating only the data blocks + inodes */
+	ret += 2*EXT3_QUOTA_TRANS_BLOCKS;
 #endif
 
 	return ret;

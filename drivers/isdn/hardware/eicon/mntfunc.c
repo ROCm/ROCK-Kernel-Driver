@@ -34,10 +34,10 @@ static DESCRIPTOR MaintDescriptor =
 extern void *diva_os_malloc_tbuffer(unsigned long flags,
 				    unsigned long size);
 extern void diva_os_free_tbuffer(unsigned long flags, void *ptr);
-extern int diva_os_copy_to_user(void *os_handle, void *dst,
+extern int diva_os_copy_to_user(void *os_handle, void __user *dst,
 				const void *src, int length);
 extern int diva_os_copy_from_user(void *os_handle, void *dst,
-				  const void *src, int length);
+				  const void __user *src, int length);
 
 static void no_printf(unsigned char *x, ...)
 {
@@ -102,7 +102,7 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
 			req.didd_notify.info.callback = (void *)didd_callback;
-			req.didd_notify.info.context = 0;
+			req.didd_notify.info.context = NULL;
 			DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff)
 				return (0);
@@ -148,7 +148,7 @@ static void DIVA_EXIT_FUNCTION disconnect_didd(void)
 /*
  * read/write maint
  */
-int maint_read_write(void *buf, int count)
+int maint_read_write(void __user *buf, int count)
 {
 	byte data[128];
 	dword cmd, id, mask;
@@ -228,7 +228,7 @@ int maint_read_write(void *buf, int count)
 			diva_os_spin_lock_magic_t old_irql;
 			word size;
 			diva_dbg_entry_head_t *pmsg;
-			byte *pbuf = 0;
+			byte *pbuf = NULL;
 			int written = 0;
 
 			if (mask < 4096) {

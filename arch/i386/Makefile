@@ -18,13 +18,12 @@
 LDFLAGS		:= -m elf_i386
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux :=
+CHECK		:= $(CHECK) -D__i386__=1
 
 CFLAGS += -pipe -msoft-float
 
 # prevent gcc from keeping the stack 16 byte aligned
 CFLAGS += $(call check_gcc,-mpreferred-stack-boundary=2,)
-
-CFLAGS += $(call check_gcc,-funit-at-a-time,)
 
 align := $(subst -functions=0,,$(call check_gcc,-falign-functions=0,-malign-functions=0))
 
@@ -49,7 +48,6 @@ cflags-$(CONFIG_MWINCHIP2)	+= $(call check_gcc,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MWINCHIP3D)	+= $(call check_gcc,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MCYRIXIII)	+= $(call check_gcc,-march=c3,-march=i486) $(align)-functions=0 $(align)-jumps=0 $(align)-loops=0
 cflags-$(CONFIG_MVIAC3_2)	+= $(call check_gcc,-march=c3-2,-march=i686)
-cflags-$(CONFIG_KDB)		+= $(call check_gcc,-fno-optimize-sibling-calls,) 
 
 # AMD Elan support
 cflags-$(CONFIG_X86_ELAN)	+= -march=i486
@@ -59,15 +57,9 @@ cflags-$(CONFIG_X86_ELAN)	+= -march=i486
 GCC_VERSION			:= $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC))
 cflags-$(CONFIG_REGPARM) 	+= $(shell if [ $(GCC_VERSION) -ge 0300 ] ; then echo "-mregparm=3"; fi ;)
 
-# Enable unit-at-a-time mode when possible. It shrinks the
-# kernel considerably.
-CFLAGS += $(call check_gcc,-funit-at-a-time,)
-
-# m586 and genericarch is likely a distribution kernel. optimize for the
-# most common CPU (686)
-ifeq ($(CONFIG_X86_GENERICARCH),y)
-cflags-$(CONFIG_M586) += -mcpu=i686
-endif
+# Disable unit-at-a-time mode, it makes gcc use a lot more stack
+# due to the lack of sharing of stacklots.
+CFLAGS += $(call check_gcc,-fno-unit-at-a-time,)
 
 CFLAGS += $(cflags-y)
 
@@ -112,13 +104,13 @@ head-y := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 libs-y 					+= arch/i386/lib/
 core-y					+= arch/i386/kernel/ \
 					   arch/i386/mm/ \
-					   arch/i386/$(mcore-y)/
+					   arch/i386/$(mcore-y)/ \
+					   arch/i386/crypto/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
 drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
-drivers-$(CONFIG_KDB)			+= arch/i386/kdb/
 
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)
@@ -130,22 +122,23 @@ boot := arch/i386/boot
 
 all: bzImage
 
-BOOTIMAGE=arch/i386/boot/bzImage
-zImage zlilo zdisk: BOOTIMAGE=arch/i386/boot/zImage
+# KBUILD_IMAGE specify target image being built
+                    KBUILD_IMAGE := $(boot)/bzImage
+zImage zlilo zdisk: KBUILD_IMAGE := arch/i386/boot/zImage
 
 zImage bzImage: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)
+	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
 
 compressed: zImage
 
 zlilo bzlilo: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zlilo
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) zlilo
 
 zdisk bzdisk: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zdisk
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) zdisk
 
 install fdimage fdimage144 fdimage288: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) $@
 
 prepare: include/asm-$(ARCH)/asm_offsets.h
 CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h

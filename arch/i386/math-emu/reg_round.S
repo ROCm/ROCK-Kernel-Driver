@@ -105,7 +105,6 @@ FPU_denormal:
 
 .text
 .globl fpu_reg_round
-.globl fpu_reg_round_sqrt
 .globl fpu_Arith_exit
 
 /* Entry point when called from C */

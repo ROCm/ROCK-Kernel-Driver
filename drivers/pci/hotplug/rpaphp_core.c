@@ -211,25 +211,7 @@ static int get_max_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_spe
 
 int rpaphp_remove_slot(struct slot *slot)
 {
-	int retval = 0;
-	struct hotplug_slot *php_slot = slot->hotplug_slot;
-
-	list_del(&slot->rpaphp_slot_list);
-	
-	/* remove "phy_location" file */
-	rpaphp_sysfs_remove_attr_location(php_slot);
-
-	/* remove "phy_removable" file */
-	rpaphp_sysfs_remove_attr_removable(php_slot);
-
-	retval = pci_hp_deregister(php_slot);
-	if (retval)
-		err("Problem unregistering a slot %s\n", slot->name);
-
-	num_slots--;
-
-	dbg("%s - Exit: rc[%d]\n", __FUNCTION__, retval);
-	return retval;
+	return deregister_slot(slot);
 }
 
 static int get_dn_properties(struct device_node *dn, int **indexes, int **names, 
@@ -278,39 +260,39 @@ static int is_dr_dn(struct device_node *dn, int **indexes, int **names, int **ty
 	return get_dn_properties(dn->parent, indexes, names, types, power_domains);
 }
 
+static inline int is_vdevice_root(struct device_node *dn)
+{
+	return !strcmp(dn->name, "vdevice");
+}
+
 char *rpaphp_get_drc_name(struct device_node *dn)
 {
-        char *name, *ptr = NULL;
-        int *drc_names, *drc_indexes, i;
-	struct device_node *parent = dn->parent;
+	char *name, *ptr = NULL;
+	int *drc_names, *drc_indexes, i;
+	struct device_node *parent = dn->parent;	
 	u32 *my_drc_index;
-
-	my_drc_index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
-	if (!my_drc_index)
-		return NULL;
 
 	if (!parent)
 		return NULL;
 
-        drc_names = (int *) get_property(parent, "ibm,drc-names", NULL);
-        drc_indexes = (int *) get_property(parent, "ibm,drc-indexes", NULL);
-        if (!drc_names || !drc_indexes)
+	my_drc_index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
+	if (!my_drc_index)
+		return NULL;	
+
+	drc_names = (int *) get_property(parent, "ibm,drc-names", NULL);
+	drc_indexes = (int *) get_property(parent, "ibm,drc-indexes", NULL);
+	if (!drc_names || !drc_indexes)
 		return NULL;
 
 	name = (char *) &drc_names[1];
 	for (i = 0; i < drc_indexes[0]; i++, name += (strlen(name) + 1)) {
 		if (drc_indexes[i + 1] == *my_drc_index) {
-                	ptr = (char *) name;
+			ptr = (char *) name;
 			break;
 		}
 	}
 
-        return ptr;
-}
-
-static inline int is_vdevice_root(struct device_node *dn)
-{
-	return !strcmp(dn->name, "vdevice");
+	return ptr;
 }
 
 /****************************************************************

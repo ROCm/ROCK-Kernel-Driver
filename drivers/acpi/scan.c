@@ -101,7 +101,7 @@ acpi_bus_get_power_flags (
 	struct acpi_device	*device)
 {
 	acpi_status             status = 0;
-	acpi_handle		handle = 0;
+	acpi_handle		handle = NULL;
 	u32                     i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_get_power_flags");
@@ -799,8 +799,8 @@ static int acpi_bus_scan (struct acpi_device	*start)
 	acpi_status		status = AE_OK;
 	struct acpi_device	*parent = NULL;
 	struct acpi_device	*child = NULL;
-	acpi_handle		phandle = 0;
-	acpi_handle		chandle = 0;
+	acpi_handle		phandle = NULL;
+	acpi_handle		chandle = NULL;
 	acpi_object_type	type = 0;
 	u32			level = 1;
 
@@ -843,7 +843,7 @@ static int acpi_bus_scan (struct acpi_device	*start)
 		if (type == ACPI_TYPE_LOCAL_SCOPE) {
 			level++;
 			phandle = chandle;
-			chandle = 0;
+			chandle = NULL;
 			continue;
 		}
 
@@ -883,11 +883,11 @@ static int acpi_bus_scan (struct acpi_device	*start)
 		 */
 		if (child->status.present) {
 			status = acpi_get_next_object(ACPI_TYPE_ANY, chandle,
-				0, NULL);
+						      NULL, NULL);
 			if (ACPI_SUCCESS(status)) {
 				level++;
 				phandle = chandle;
-				chandle = 0;
+				chandle = NULL;
 				parent = child;
 			}
 		}

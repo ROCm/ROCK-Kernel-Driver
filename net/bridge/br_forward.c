@@ -15,9 +15,7 @@
 
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
-#include <linux/inetdevice.h>
 #include <linux/skbuff.h>
-#include <linux/if_bridge.h>
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
 
@@ -25,6 +23,7 @@ static inline int should_deliver(const struct net_bridge_port *p,
 				 const struct sk_buff *skb)
 {
 	if (skb->dev == p->dev ||
+	    skb->len > p->dev->mtu ||
 	    p->state != BR_STATE_FORWARDING)
 		return 0;
 

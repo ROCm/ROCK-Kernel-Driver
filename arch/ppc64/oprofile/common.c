@@ -90,13 +90,6 @@ static int op_ppc64_create_files(struct super_block *sb, struct dentry *root)
 {
 	int i;
 
-        /* There is one mmcr0, mmcr1 and mmcra for setting the events for all of the
-	   counters.
-	*/
-	oprofilefs_create_ulong(sb, root, "mmcr0", &sys.mmcr0);
-	oprofilefs_create_ulong(sb, root, "mmcr1", &sys.mmcr1);
-	oprofilefs_create_ulong(sb, root, "mmcra", &sys.mmcra);
-
 	for (i = 0; i < model->num_counters; ++i) {
 		struct dentry *dir;
 		char buf[3];
@@ -161,8 +154,8 @@ int __init oprofile_arch_init(struct oprofile_operations **ops)
 			oprof_ppc64_ops.cpu_type = "ppc64/power4";
 			break;
 
-		case PV_GPUL:
-		case PV_GPULp:
+		case PV_970:
+		case PV_970FX:
 			model = &op_model_power4;
 			model->num_counters = 8;
 			oprof_ppc64_ops.cpu_type = "ppc64/970";

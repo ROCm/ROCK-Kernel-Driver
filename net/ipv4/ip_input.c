@@ -150,7 +150,7 @@
  *	SNMP management statistics
  */
 
-DEFINE_SNMP_STAT(struct ip_mib, ip_statistics);
+DEFINE_SNMP_STAT(struct ipstats_mib, ip_statistics);
 
 /*
  *	Process Router Attention IP option
@@ -177,14 +177,6 @@ int ip_call_ra_chain(struct sk_buff *skb)
 					read_unlock(&ip_ra_lock);
 					return 1;
 				}
-				if (skb->dst == NULL) {
-					/* IP conntrack zaps skb->dst before queueing fragments,
-					 * and fixes up the skb before reinjecting it.
-					 * Too bad if the module is unloaded inbetween.
-					 */
-					 kfree_skb(skb);
-					 return 1;
-				 }
 			}
 			if (last) {
 				struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
@@ -214,6 +206,10 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 
 	__skb_pull(skb, ihl);
 
+	/* Free reference early: we don't need it any more, and it may
+           hold ip_conntrack module loaded indefinitely. */
+	nf_reset(skb);
+
         /* Point into the IP datagram, just past the header. */
         skb->h.raw = skb->data;
 
@@ -223,18 +219,11 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		int protocol = skb->nh.iph->protocol;
 		int hash;
 		struct sock *raw_sk;
-		struct inet_protocol *ipprot;
+		struct net_protocol *ipprot;
 
 	resubmit:
 		hash = protocol & (MAX_INET_PROTOS - 1);
 		raw_sk = sk_head(&raw_v4_htable[hash]);
-		ipprot = inet_protos[hash];
-		smp_read_barrier_depends();
-
-		if (nf_xfrm_local_done(skb, ipprot)) {
-			nf_rcv_postxfrm_local(skb);
-			goto out;
-		}
 
 		/* If there maybe a raw socket we must check - if not we
 		 * don't care less
@@ -242,31 +231,30 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		if (raw_sk)
 			raw_v4_input(skb, skb->nh.iph, hash);
 
-		if (ipprot != NULL) {
+		if ((ipprot = inet_protos[hash]) != NULL) {
 			int ret;
 
-			if (!ipprot->no_policy) {
-				if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
-					kfree_skb(skb);
-					goto out;
-				}
-				nf_reset(skb);
+			smp_read_barrier_depends();
+			if (!ipprot->no_policy &&
+			    !xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+				kfree_skb(skb);
+				goto out;
 			}
 			ret = ipprot->handler(skb);
 			if (ret < 0) {
 				protocol = -ret;
 				goto resubmit;
 			}
-			IP_INC_STATS_BH(IpInDelivers);
+			IP_INC_STATS_BH(IPSTATS_MIB_INDELIVERS);
 		} else {
 			if (!raw_sk) {
 				if (xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
-					IP_INC_STATS_BH(IpInUnknownProtos);
+					IP_INC_STATS_BH(IPSTATS_MIB_INUNKNOWNPROTOS);
 					icmp_send(skb, ICMP_DEST_UNREACH,
 						  ICMP_PROT_UNREACH, 0);
 				}
 			} else
-				IP_INC_STATS_BH(IpInDelivers);
+				IP_INC_STATS_BH(IPSTATS_MIB_INDELIVERS);
 			kfree_skb(skb);
 		}
 	}
@@ -289,18 +277,10 @@ int ip_local_deliver(struct sk_buff *skb)
 		skb = ip_defrag(skb);
 		if (!skb)
 			return 0;
-		if (skb->dst == NULL) {
-			/* IP conntrack zaps skb->dst before queueing fragments,
-			 * and fixes up the skb before reinjecting it.
-			 * Too bad if the module is unloaded inbetween.
-			 */
-			 kfree_skb(skb);
-			 return 0;
-		 }
 	}
 
-	return NF_HOOK_COND(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,
-	                    ip_local_deliver_finish, nf_hook_input_cond(skb));
+	return NF_HOOK(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,
+		       ip_local_deliver_finish);
 }
 
 static inline int ip_rcv_finish(struct sk_buff *skb)
@@ -316,9 +296,6 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		if (ip_route_input(skb, iph->daddr, iph->saddr, iph->tos, dev))
 			goto drop; 
 	}
-
-	if (nf_xfrm_nonlocal_done(skb))
-		return nf_rcv_postxfrm_nonlocal(skb);
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	if (skb->dst->tclassid) {
@@ -343,7 +320,7 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		*/
 
 		if (skb_cow(skb, skb_headroom(skb))) {
-			IP_INC_STATS_BH(IpInDiscards);
+			IP_INC_STATS_BH(IPSTATS_MIB_INDISCARDS);
 			goto drop;
 		}
 		iph = skb->nh.iph;
@@ -372,7 +349,7 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 	return dst_input(skb);
 
 inhdr_error:
-	IP_INC_STATS_BH(IpInHdrErrors);
+	IP_INC_STATS_BH(IPSTATS_MIB_INHDRERRORS);
 drop:
         kfree_skb(skb);
         return NET_RX_DROP;
@@ -391,10 +368,10 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	if (skb->pkt_type == PACKET_OTHERHOST)
 		goto drop;
 
-	IP_INC_STATS_BH(IpInReceives);
+	IP_INC_STATS_BH(IPSTATS_MIB_INRECEIVES);
 
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL) {
-		IP_INC_STATS_BH(IpInDiscards);
+		IP_INC_STATS_BH(IPSTATS_MIB_INDISCARDS);
 		goto out;
 	}
 
@@ -441,11 +418,11 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 		}
 	}
 
-	return NF_HOOK_COND(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
-	                    ip_rcv_finish, nf_hook_input_cond(skb));
+	return NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
+		       ip_rcv_finish);
 
 inhdr_error:
-	IP_INC_STATS_BH(IpInHdrErrors);
+	IP_INC_STATS_BH(IPSTATS_MIB_INHDRERRORS);
 drop:
         kfree_skb(skb);
 out:

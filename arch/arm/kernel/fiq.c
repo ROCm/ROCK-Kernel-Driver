@@ -37,15 +37,12 @@
  */
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/mman.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
 
+#include <asm/cacheflush.h>
 #include <asm/fiq.h>
-#include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pgalloc.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 

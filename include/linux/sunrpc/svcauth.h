@@ -87,12 +87,12 @@ struct auth_domain {
  */
 struct auth_ops {
 	char *	name;
+	struct module *owner;
 	int	flavour;
 	int	(*accept)(struct svc_rqst *rq, u32 *authp);
 	int	(*release)(struct svc_rqst *rq);
 	void	(*domain_release)(struct auth_domain *);
 };
-extern struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR];
 
 #define	SVC_GARBAGE	1
 #define	SVC_SYSERR	2

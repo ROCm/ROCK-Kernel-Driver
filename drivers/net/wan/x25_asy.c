@@ -627,7 +627,7 @@ static void x25_asy_close_tty(struct tty_struct *tty)
 		(void) dev_close(sl->dev);
 	}
 
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 	sl->tty = NULL;
 	x25_asy_free(sl);
 }
@@ -733,7 +733,7 @@ static int x25_asy_ioctl(struct tty_struct *tty, struct file *file,
 
 	switch(cmd) {
 	case SIOCGIFNAME:
-		if (copy_to_user((void *)arg, sl->dev->name,
+		if (copy_to_user((void __user *)arg, sl->dev->name,
 					strlen(sl->dev->name) + 1))
 			return -EFAULT;
 		return 0;

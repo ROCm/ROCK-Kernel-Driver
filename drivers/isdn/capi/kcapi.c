@@ -193,7 +193,7 @@ static void notify_down(u32 contr)
 	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
 		ap = get_capi_appl_by_nr(applid);
 		if (ap && ap->callback && !ap->release_in_progress)
-			ap->callback(KCI_CONTRDOWN, contr, 0);
+			ap->callback(KCI_CONTRDOWN, contr, NULL);
 	}
 }
 
@@ -421,7 +421,7 @@ attach_capi_ctr(struct capi_ctr *card)
 	card->traceflag = showcapimsgs;
 
 	sprintf(card->procfn, "capi/controllers/%d", card->cnr);
-	card->procent = create_proc_entry(card->procfn, 0, 0);
+	card->procent = create_proc_entry(card->procfn, 0, NULL);
 	if (card->procent) {
 	   card->procent->read_proc = 
 		(int (*)(char *,char **,off_t,int,int *,void *))
@@ -445,8 +445,8 @@ int detach_capi_ctr(struct capi_ctr *card)
 	ncards--;
 
 	if (card->procent) {
-	   remove_proc_entry(card->procfn, 0);
-	   card->procent = 0;
+	   remove_proc_entry(card->procfn, NULL);
+	   card->procent = NULL;
 	}
 	capi_cards[card->cnr - 1] = NULL;
 	printk(KERN_NOTICE "kcapi: Controller %d: %s unregistered\n",
@@ -524,7 +524,7 @@ u16 capi20_register(struct capi20_appl *ap)
 	ap->nrecvdatapkt = 0;
 	ap->nsentctlpkt = 0;
 	ap->nsentdatapkt = 0;
-	ap->callback = 0;
+	ap->callback = NULL;
 	init_MUTEX(&ap->recv_sem);
 	skb_queue_head_init(&ap->recv_queue);
 	INIT_WORK(&ap->recv_work, recv_handler, (void *)ap);
@@ -711,14 +711,14 @@ u16 capi20_get_profile(u32 contr, struct capi_profile *profp)
 EXPORT_SYMBOL(capi20_get_profile);
 
 #ifdef CONFIG_AVMB1_COMPAT
-static int old_capi_manufacturer(unsigned int cmd, void *data)
+static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 {
 	avmb1_loadandconfigdef ldef;
 	avmb1_extcarddef cdef;
 	avmb1_resetdef rdef;
 	capicardparams cparams;
 	struct capi_ctr *card;
-	struct capi_driver *driver = 0;
+	struct capi_driver *driver = NULL;
 	capiloaddata ldata;
 	struct list_head *l;
 	unsigned long flags;
@@ -728,12 +728,12 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 	case AVMB1_ADDCARD:
 	case AVMB1_ADDCARD_WITH_TYPE:
 		if (cmd == AVMB1_ADDCARD) {
-		   if ((retval = copy_from_user((void *) &cdef, data,
+		   if ((retval = copy_from_user(&cdef, data,
 					    sizeof(avmb1_carddef))))
 			   return retval;
 		   cdef.cardtype = AVM_CARDTYPE_B1;
 		} else {
-		   if ((retval = copy_from_user((void *) &cdef, data,
+		   if ((retval = copy_from_user(&cdef, data,
 					    sizeof(avmb1_extcarddef))))
 			   return retval;
 		}
@@ -758,7 +758,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 				}
 				break;
 			default:
-				driver = 0;
+				driver = NULL;
 				break;
 		}
 		if (!driver) {
@@ -780,13 +780,13 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 	case AVMB1_LOAD_AND_CONFIG:
 
 		if (cmd == AVMB1_LOAD) {
-			if (copy_from_user((void *)&ldef, data,
+			if (copy_from_user(&ldef, data,
 					   sizeof(avmb1_loaddef)))
 				return -EFAULT;
 			ldef.t4config.len = 0;
-			ldef.t4config.data = 0;
+			ldef.t4config.data = NULL;
 		} else {
-			if (copy_from_user((void *)&ldef, data,
+			if (copy_from_user(&ldef, data,
 					   sizeof(avmb1_loadandconfigdef)))
 				return -EFAULT;
 		}
@@ -843,7 +843,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		return 0;
 
 	case AVMB1_RESETCARD:
-		if (copy_from_user((void *)&rdef, data, sizeof(avmb1_resetdef)))
+		if (copy_from_user(&rdef, data, sizeof(avmb1_resetdef)))
 			return -EFAULT;
 		card = get_capi_ctr_by_nr(rdef.contr);
 		if (!card)
@@ -869,7 +869,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 }
 #endif
 
-int capi20_manufacturer(unsigned int cmd, void *data)
+int capi20_manufacturer(unsigned int cmd, void __user *data)
 {
         struct capi_ctr *card;
 
@@ -886,7 +886,7 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 	{
 		kcapi_flagdef fdef;
 
-		if (copy_from_user((void *)&fdef, data, sizeof(kcapi_flagdef)))
+		if (copy_from_user(&fdef, data, sizeof(kcapi_flagdef)))
 			return -EFAULT;
 
 		card = get_capi_ctr_by_nr(fdef.contr);
@@ -901,13 +901,12 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 	case KCAPI_CMD_ADDCARD:
 	{
 		struct list_head *l;
-		struct capi_driver *driver = 0;
+		struct capi_driver *driver = NULL;
 		capicardparams cparams;
 		kcapi_carddef cdef;
 		int retval;
 
-		if ((retval = copy_from_user((void *) &cdef, data,
-							sizeof(cdef))))
+		if ((retval = copy_from_user(&cdef, data, sizeof(cdef))))
 			return retval;
 
 		cparams.port = cdef.port;

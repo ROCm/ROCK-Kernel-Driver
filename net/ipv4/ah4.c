@@ -1,6 +1,5 @@
 #include <linux/config.h>
 #include <linux/module.h>
-#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/ah.h>
@@ -54,10 +53,10 @@ static int ip_clear_mutable_options(struct iphdr *iph, u32 *daddr)
 	return 0;
 }
 
-static int ah_output(struct sk_buff *skb)
+static int ah_output(struct sk_buff **pskb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
+	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x  = dst->xfrm;
 	struct iphdr *iph, *top_iph;
 	struct ip_auth_hdr *ah;
@@ -67,52 +66,31 @@ static int ah_output(struct sk_buff *skb)
 		char 		buf[60];
 	} tmp_iph;
 
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
-		err = -EINVAL;
-		goto error_nolock;
+	top_iph = (*pskb)->nh.iph;
+	iph = &tmp_iph.iph;
+
+	iph->tos = top_iph->tos;
+	iph->ttl = top_iph->ttl;
+	iph->frag_off = top_iph->frag_off;
+
+	if (top_iph->ihl != 5) {
+		iph->daddr = top_iph->daddr;
+		memcpy(iph+1, top_iph+1, top_iph->ihl*4 - sizeof(struct iphdr));
+		err = ip_clear_mutable_options(top_iph, &top_iph->daddr);
+		if (err)
+			goto error;
 	}
 
-	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, skb, AF_INET);
-	if (err)
-		goto error;
+	ah = (struct ip_auth_hdr *)((char *)top_iph+top_iph->ihl*4);
+	ah->nexthdr = top_iph->protocol;
 
-	iph = skb->nh.iph;
-	if (x->props.mode) {
-		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
-		top_iph->ihl = 5;
-		top_iph->version = 4;
-		top_iph->tos = 0;
-		top_iph->tot_len = htons(skb->len);
-		top_iph->frag_off = 0;
-		if (!(iph->frag_off&htons(IP_DF)))
-			__ip_select_ident(top_iph, dst, 0);
-		top_iph->ttl = 0;
-		top_iph->protocol = IPPROTO_AH;
-		top_iph->check = 0;
-		top_iph->saddr = x->props.saddr.a4;
-		top_iph->daddr = x->id.daddr.a4;
-		ah = (struct ip_auth_hdr*)(top_iph+1);
-		ah->nexthdr = IPPROTO_IPIP;
-	} else {
-		memcpy(&tmp_iph, skb->data, iph->ihl*4);
-		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
-		memcpy(top_iph, &tmp_iph, iph->ihl*4);
-		iph = &tmp_iph.iph;
-		top_iph->tos = 0;
-		top_iph->tot_len = htons(skb->len);
-		top_iph->frag_off = 0;
-		top_iph->ttl = 0;
-		top_iph->protocol = IPPROTO_AH;
-		top_iph->check = 0;
-		if (top_iph->ihl != 5) {
-			err = ip_clear_mutable_options(top_iph, &top_iph->daddr);
-			if (err)
-				goto error;
-		}
-		ah = (struct ip_auth_hdr*)((char*)top_iph+iph->ihl*4);
-		ah->nexthdr = iph->protocol;
-	}
+	top_iph->tos = 0;
+	top_iph->tot_len = htons((*pskb)->len);
+	top_iph->frag_off = 0;
+	top_iph->ttl = 0;
+	top_iph->protocol = IPPROTO_AH;
+	top_iph->check = 0;
+
 	ahp = x->data;
 	ah->hdrlen  = (XFRM_ALIGN8(sizeof(struct ip_auth_hdr) + 
 				   ahp->icv_trunc_len) >> 2) - 2;
@@ -120,38 +98,21 @@ static int ah_output(struct sk_buff *skb)
 	ah->reserved = 0;
 	ah->spi = x->id.spi;
 	ah->seq_no = htonl(++x->replay.oseq);
-	ahp->icv(ahp, skb, ah->auth_data);
+	ahp->icv(ahp, *pskb, ah->auth_data);
+
 	top_iph->tos = iph->tos;
 	top_iph->ttl = iph->ttl;
-	if (x->props.mode) {
-		if (x->props.flags & XFRM_STATE_NOECN)
-			IP_ECN_clear(top_iph);
-		top_iph->frag_off = iph->frag_off&~htons(IP_MF|IP_OFFSET);
-		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-	} else {
-		top_iph->frag_off = iph->frag_off;
+	top_iph->frag_off = iph->frag_off;
+	if (top_iph->ihl != 5) {
 		top_iph->daddr = iph->daddr;
-		if (iph->ihl != 5)
-			memcpy(top_iph+1, iph+1, iph->ihl*4 - sizeof(struct iphdr));
+		memcpy(top_iph+1, iph+1, top_iph->ihl*4 - sizeof(struct iphdr));
 	}
+
 	ip_send_check(top_iph);
 
-	skb->nh.raw = skb->data;
-
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++;
-	spin_unlock_bh(&x->lock);
-	if ((skb->dst = dst_pop(dst)) == NULL) {
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
-	return NET_XMIT_BYPASS;
+	err = 0;
 
 error:
-	spin_unlock_bh(&x->lock);
-error_nolock:
-	kfree_skb(skb);
 	return err;
 }
 
@@ -340,11 +301,10 @@ static struct xfrm_type ah_type =
 	.output		= ah_output
 };
 
-static struct inet_protocol ah4_protocol = {
+static struct net_protocol ah4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ah4_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init ah4_init(void)

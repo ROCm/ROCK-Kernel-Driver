@@ -26,13 +26,10 @@ enum writeback_sync_modes {
 	WB_SYNC_NONE,	/* Don't wait on anything */
 	WB_SYNC_ALL,	/* Wait on every mapping */
 	WB_SYNC_HOLD,	/* Hold the inode on sb_dirty for sys_sync() */
-	WB_SYNC_FAST,	/* Really don't wait on anything */
 };
 
 /*
- * A control structure which tells the writeback code what to do.  These are
- * always on the stack, and hence need no locking.  They are always initialised
- * in a manner such that unspecified fields are set to zero.
+ * A control structure which tells the writeback code what to do
  */
 struct writeback_control {
 	struct backing_dev_info *bdi;	/* If !NULL, only write back this
@@ -43,19 +40,10 @@ struct writeback_control {
 	long nr_to_write;		/* Write this many pages, and decrement
 					   this for each page written */
 	long pages_skipped;		/* Pages which were not written */
-
-	/*
-	 * For a_ops->writepages(): is start or end are non-zero then this is
-	 * a hint that the filesystem need only write out the pages inside that
-	 * byterange.  The byte at `end' is included in the writeout request.
-	 */
-	loff_t start;
-	loff_t end;
-
-	int nonblocking:1;		/* Don't get stuck on request queues */
-	int encountered_congestion:1;	/* An output: a queue is full */
-	int for_kupdate:1;		/* A kupdate writeback */
-	int for_reclaim:1;		/* Invoked from the page allocator */
+	int nonblocking;		/* Don't get stuck on request queues */
+	int encountered_congestion;	/* An output: a queue is full */
+	int for_kupdate;		/* A kupdate writeback */
+	int for_reclaim;		/* Invoked from the page allocator */
 };
 
 /*
@@ -84,7 +72,8 @@ static inline void wait_on_inode(struct inode *inode)
  * mm/page-writeback.c
  */
 int wakeup_bdflush(long nr_pages);
-void disk_is_spun_up(int postpone_writeback);
+void laptop_io_completion(void);
+void laptop_sync_completion(void);
 
 /* These are exported to sysctl. */
 extern int dirty_background_ratio;
@@ -103,10 +92,6 @@ void page_writeback_init(void);
 void balance_dirty_pages_ratelimited(struct address_space *mapping);
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
 int do_writepages(struct address_space *mapping, struct writeback_control *wbc);
-ssize_t sync_page_range(struct inode *inode, struct address_space *mapping,
-			loff_t pos, size_t count);
-ssize_t sync_page_range_nolock(struct inode *inode, struct address_space
-		*mapping, loff_t pos, size_t count);
 
 /* pdflush.c */
 extern int nr_pdflush_threads;	/* Global so it can be exported to sysctl

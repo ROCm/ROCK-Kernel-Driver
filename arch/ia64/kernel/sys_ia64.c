@@ -8,7 +8,6 @@
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/sched.h>
@@ -19,7 +18,6 @@
 #include <linux/syscalls.h>
 #include <linux/highuid.h>
 #include <linux/hugetlb.h>
-#include <linux/audit.h>
 
 #include <asm/shmparam.h>
 #include <asm/uaccess.h>
@@ -119,8 +117,6 @@ ia64_brk (unsigned long brk)
 	 * check and the clearing of r8.  However, we can't call sys_brk() because we need
 	 * to acquire the mmap_sem before we can do the test...
 	 */
-	audit_intercept(AUDIT_brk, brk);
-
 	down_write(&mm->mmap_sem);
 
 	if (brk < mm->end_code)
@@ -159,7 +155,7 @@ out:
 	retval = mm->brk;
 	up_write(&mm->mmap_sem);
 	force_successful_syscall_return();
-	return audit_lresult(retval);
+	return retval;
 }
 
 /*
@@ -186,27 +182,14 @@ sys_pipe (long arg0, long arg1, long arg2, long arg3,
 static inline unsigned long
 do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, unsigned long pgoff)
 {
-	int error;
-
-	FSHOOK_BEGIN(mmap,
-		error,
-		.paddr = &addr,
-		.length = len,
-		.prot = prot,
-		.flags = flags,
-		.fd = fd,
-		.offset = (loff_t)pgoff << PAGE_SHIFT)
-
 	unsigned long roff;
 	struct file *file = 0;
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
-		if (!file) {
-			addr = -EBADF;
-			goto no_file;
-		}
+		if (!file)
+			return -EBADF;
 
 		if (!file->f_op || !file->f_op->mmap) {
 			addr = -ENODEV;
@@ -245,9 +228,6 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 
 out:	if (file)
 		fput(file);
-no_file:
-	FSHOOK_END(mmap, !IS_ERR((void *)addr) ? 0 : addr, addr = error)
-
 	return addr;
 }
 

@@ -120,8 +120,7 @@ static inline unsigned long mc146818_get_cmos_time(void)
 		BCD_TO_BIN(mon);
 		BCD_TO_BIN(year);
 	}
-	if ((year += 1900) < 1970)
-		year += 100;
+	year = mc146818_decode_year(year);
 
 	return mktime(year, mon, day, hour, min, sec);
 }

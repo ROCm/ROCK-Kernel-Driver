@@ -76,20 +76,8 @@ struct thread_struct {
 #define SPARC_FLAG_UNALIGNED    0x2    /* is allowed to do unaligned accesses */
 
 #define INIT_THREAD  { \
-/* kregs, _pad1, */ \
-   0, 0,  \
-/* fork_kpsr, fork_kwim */ \
-   0,         0, \
-/* FPU regs */   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
-                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, }, \
-/* FPU status, FPU qdepth, FPU queue */ \
-   0,          0,  { { 0, 0, }, }, \
-/* flags,              current_ds, */ \
-   SPARC_FLAG_KTHREAD, KERNEL_DS, \
-/* core_exec */ \
-{ 0, }, \
-/* new_signal */ \
-  0, \
+	.flags = SPARC_FLAG_KTHREAD, \
+	.current_ds = KERNEL_DS, \
 }
 
 /* Return saved PC of a blocked thread. */

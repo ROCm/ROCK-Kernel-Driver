@@ -9,20 +9,12 @@ mounts-$(CONFIG_BLK_DEV_RAM)	+= do_mounts_rd.o
 mounts-$(CONFIG_BLK_DEV_INITRD)	+= do_mounts_initrd.o
 mounts-$(CONFIG_BLK_DEV_MD)	+= do_mounts_md.o
 
-extra-$(CONFIG_KERNTYPES)	+= kerntypes.o
-#For IA64, compile kerntypes in dwarf-2 format.
-ifeq ($(CONFIG_IA64),y)
-CFLAGS_kerntypes.o             := -gdwarf-2 -fno-eliminate-unused-debug-types
-else
-CFLAGS_kerntypes.o             := -gstabs
-endif
-
 # files to be removed upon make clean
 clean-files := ../include/linux/compile.h
 
 # dependencies on generated files need to be listed explicitly
 
-$(obj)/version.o $(obj)/kerntypes.o: include/linux/compile.h
+$(obj)/version.o: include/linux/compile.h
 
 # compile.h changes depending on hostname, generation number, etc,
 # so we regenerate it always.
@@ -32,4 +24,3 @@ $(obj)/version.o $(obj)/kerntypes.o: include/linux/compile.h
 include/linux/compile.h: FORCE
 	@echo '  CHK     $@'
 	@$(CONFIG_SHELL) $(srctree)/scripts/mkcompile_h $@ "$(UTS_MACHINE)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"
-

@@ -34,7 +34,6 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 				       that will be inserted in the
 				       tree. */
 
-    BUG_ON (!th->t_trans_id);
 
     REISERFS_SB(sb)->s_direct2indirect ++;
 
@@ -185,8 +184,6 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
     loff_t pos, pos1; /* position of first byte of the tail */
     struct cpu_key key;
 
-    BUG_ON (!th->t_trans_id);
-
     REISERFS_SB(p_s_sb)->s_indirect2direct ++;
 
     *p_c_mode = M_SKIP_BALANCING;
@@ -226,7 +223,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
 
 
     /* Set direct item header to insert. */
-    make_le_item_head (&s_ih, 0, get_inode_item_key_version (p_s_inode), pos1 + 1,
+    make_le_item_head (&s_ih, NULL, get_inode_item_key_version (p_s_inode), pos1 + 1,
 		       TYPE_DIRECT, round_tail_len, 0xffff/*ih_free_space*/);
 
     /* we want a pointer to the first byte of the tail in the page.

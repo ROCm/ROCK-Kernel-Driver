@@ -20,12 +20,9 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
-#include <linux/mm.h>
-#include <linux/tty.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/fb.h>
@@ -36,7 +33,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mach-types.h>
-#include <asm/uaccess.h>
+#include <asm/pgtable.h>
 
 #include "acornfb.h"
 
@@ -70,12 +67,37 @@
  */
 #define NR_MONTYPES	6
 static struct fb_monspecs monspecs[NR_MONTYPES] __initdata = {
-	{ 15469, 15781, 49,  51, 0 },	/* TV		*/
-	{     0, 99999,  0, 199, 0 },	/* Multi Freq	*/
-	{ 58608, 58608, 64,  64, 0 },	/* Hi-res mono	*/
-	{ 30000, 70000, 60,  60, 0 },	/* VGA		*/
-	{ 30000, 70000, 56,  75, 0 },	/* SVGA		*/
-	{ 30000, 70000, 60,  60, 0 }
+	{	/* TV		*/
+		.hfmin	= 15469,
+		.hfmax	= 15781,
+		.vfmin	= 49,
+		.vfmax	= 51,
+	}, {	/* Multi Freq	*/
+		.hfmin	= 0,
+		.hfmax	= 99999,
+		.vfmin	= 0,
+		.vfmax	= 199,
+	}, {	/* Hi-res mono	*/
+		.hfmin	= 58608,
+		.hfmax	= 58608,
+		.vfmin	= 64,
+		.vfmax	= 64,
+	}, {	/* VGA		*/
+		.hfmin	= 30000,
+		.hfmax	= 70000,
+		.vfmin	= 60,
+		.vfmax	= 60,
+	}, {	/* SVGA		*/
+		.hfmin	= 30000,
+		.hfmax	= 70000,
+		.vfmin	= 56,
+		.vfmax	= 75,
+	}, {
+		.hfmin	= 30000,
+		.hfmax	= 70000,
+		.vfmin	= 60,
+		.vfmax	= 60,
+	}
 };
 
 static struct fb_info fb_info;
@@ -1224,6 +1246,8 @@ acornfb_detect_monitortype(void)
 
 /*
  * This enables the unused memory to be freed on older Acorn machines.
+ * We are freeing memory on behalf of the architecture initialisation
+ * code here.
  */
 static inline void
 free_unused_pages(unsigned int virtual_start, unsigned int virtual_end)
@@ -1246,7 +1270,7 @@ free_unused_pages(unsigned int virtual_start, unsigned int virtual_end)
 		 */
 		page = virt_to_page(virtual_start);
 		ClearPageReserved(page);
-		atomic_set(&page->count, 1);
+		set_page_count(page, 1);
 		free_page(virtual_start);
 
 		virtual_start += PAGE_SIZE;

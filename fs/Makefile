@@ -31,7 +31,6 @@ obj-$(CONFIG_BINFMT_FLAT)	+= binfmt_flat.o
 
 obj-$(CONFIG_FS_MBCACHE)	+= mbcache.o
 obj-$(CONFIG_FS_POSIX_ACL)	+= posix_acl.o xattr_acl.o
-obj-$(CONFIG_NFS_ACL_SUPPORT)	+= nfsacl.o
 
 obj-$(CONFIG_QUOTA)		+= dquot.o
 obj-$(CONFIG_QFMT_V1)		+= quota_v1.o
@@ -40,10 +39,8 @@ obj-$(CONFIG_QUOTACTL)		+= quota.o
 
 obj-$(CONFIG_PROC_FS)		+= proc/
 obj-y				+= partitions/
-obj-y				+= sysfs/
+obj-$(CONFIG_SYSFS)		+= sysfs/
 obj-y				+= devpts/
-
-obj-$(CONFIG_FSHOOKS)		+= fshooks.o
 
 obj-$(CONFIG_PROFILING)		+= dcookies.o
  
@@ -52,13 +49,10 @@ obj-$(CONFIG_REISERFS_FS)	+= reiserfs/
 obj-$(CONFIG_EXT3_FS)		+= ext3/ # Before ext2 so root fs can be ext3
 obj-$(CONFIG_JBD)		+= jbd/
 obj-$(CONFIG_EXT2_FS)		+= ext2/
-obj-$(CONFIG_XIP2_FS)		+= xip2fs/
 obj-$(CONFIG_CRAMFS)		+= cramfs/
 obj-$(CONFIG_RAMFS)		+= ramfs/
 obj-$(CONFIG_HUGETLBFS)		+= hugetlbfs/
-obj-$(CONFIG_RELAYFS_FS)	+= relayfs/
 obj-$(CONFIG_CODA_FS)		+= coda/
-obj-$(CONFIG_INTERMEZZO_FS)	+= intermezzo/
 obj-$(CONFIG_MINIX_FS)		+= minix/
 obj-$(CONFIG_FAT_FS)		+= fat/
 obj-$(CONFIG_UMSDOS_FS)		+= umsdos/
@@ -97,6 +91,3 @@ obj-$(CONFIG_JFS_FS)		+= jfs/
 obj-$(CONFIG_XFS_FS)		+= xfs/
 obj-$(CONFIG_AFS_FS)		+= afs/
 obj-$(CONFIG_BEFS_FS)		+= befs/
-obj-$(CONFIG_HOSTFS)		+= hostfs/
-obj-$(CONFIG_HPPFS)		+= hppfs/
-obj-$(CONFIG_RCFS_FS)		+= rcfs/

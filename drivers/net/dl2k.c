@@ -107,7 +107,7 @@ static int change_mtu (struct net_device *dev, int new_mtu);
 static void set_multicast (struct net_device *dev);
 static struct net_device_stats *get_stats (struct net_device *dev);
 static int clear_stats (struct net_device *dev);
-static int rio_ethtool_ioctl (struct net_device *dev, void *useraddr);
+static int rio_ethtool_ioctl (struct net_device *dev, void __user *useraddr);
 static int rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 static int rio_close (struct net_device *dev);
 static int find_miiphy (struct net_device *dev);
@@ -583,7 +583,7 @@ alloc_list (struct net_device *dev)
 
 	/* Initialize Tx descriptors, TFDListPtr leaves in start_xmit(). */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		np->tx_skbuff[i] = 0;
+		np->tx_skbuff[i] = NULL;
 		np->tx_ring[i].status = cpu_to_le64 (TFDDone);
 		np->tx_ring[i].next_desc = cpu_to_le64 (np->tx_ring_dma +
 					      ((i+1)%TX_RING_SIZE) *
@@ -597,7 +597,7 @@ alloc_list (struct net_device *dev)
 						sizeof (struct netdev_desc));
 		np->rx_ring[i].status = 0;
 		np->rx_ring[i].fraginfo = 0;
-		np->rx_skbuff[i] = 0;
+		np->rx_skbuff[i] = NULL;
 	}
 
 	/* Allocate the rx buffers */
@@ -770,7 +770,7 @@ rio_free_tx (struct net_device *dev, int irq)
 		else
 			dev_kfree_skb (skb);
 
-		np->tx_skbuff[entry] = 0;
+		np->tx_skbuff[entry] = NULL;
 		entry = (entry + 1) % TX_RING_SIZE;
 		tx_use++;
 	}
@@ -1195,7 +1195,7 @@ set_multicast (struct net_device *dev)
 }
 
 static int
-rio_ethtool_ioctl (struct net_device *dev, void *useraddr)
+rio_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
 {
 	struct netdev_private *np = dev->priv;
        	u32 ethcmd;
@@ -1325,7 +1325,7 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	int phy_addr;
 	struct netdev_private *np = dev->priv;
-	struct mii_data *miidata = (struct mii_data *) &rq->ifr_data;
+	struct mii_data *miidata = (struct mii_data *) &rq->ifr_ifru;
 	
 	struct netdev_desc *desc;
 	int i;
@@ -1333,7 +1333,7 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	phy_addr = np->phy_addr;
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return rio_ethtool_ioctl (dev, (void *) rq->ifr_data);		
+		return rio_ethtool_ioctl(dev, rq->ifr_data);		
 	case SIOCDEVPRIVATE:
 		break;
 	
@@ -1818,7 +1818,7 @@ rio_close (struct net_device *dev)
 			pci_unmap_single (np->pdev, np->rx_ring[i].fraginfo,
 					  skb->len, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb (skb);
-			np->rx_skbuff[i] = 0;
+			np->rx_skbuff[i] = NULL;
 		}
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
@@ -1827,7 +1827,7 @@ rio_close (struct net_device *dev)
 			pci_unmap_single (np->pdev, np->tx_ring[i].fraginfo,
 					  skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb (skb);
-			np->tx_skbuff[i] = 0;
+			np->tx_skbuff[i] = NULL;
 		}
 	}
 

@@ -30,7 +30,7 @@ extern int reiserfs_default_io_size; /* default io size devuned in super.c */
 
 static int reiserfs_get_block (struct inode * inode, sector_t block,
 			       struct buffer_head * bh_result, int create);
-static int reiserfs_commit_write(struct file *f, struct page *page, 
+static int reiserfs_commit_write(struct file *f, struct page *page,
                                  unsigned from, unsigned to);
 
 void reiserfs_delete_inode (struct inode * inode)
@@ -47,32 +47,21 @@ void reiserfs_delete_inode (struct inode * inode)
 
 	reiserfs_delete_xattrs (inode);
 
-	if (journal_begin(&th, inode->i_sb, jbegin_count)) {
-            up (&inode->i_sem);
-            goto out;
-        }
+	journal_begin(&th, inode->i_sb, jbegin_count) ;
 	reiserfs_update_inode_transaction(inode) ;
 
-	if (reiserfs_delete_object (&th, inode)) {
-            up (&inode->i_sem);
-            goto out;
-        }
+	reiserfs_delete_object (&th, inode);
 
-	if (journal_end(&th, inode->i_sb, jbegin_count)) {
-            up (&inode->i_sem);
-            goto out;
-        }
+	journal_end(&th, inode->i_sb, jbegin_count) ;
 
         up (&inode->i_sem);
 
         /* all items of file are deleted, so we can remove "save" link */
-	remove_save_link (inode, 0/* not truncate */); /* we can't do anything
-                                                        * about an error here */
+	remove_save_link (inode, 0/* not truncate */);
     } else {
 	/* no object items are in the tree */
 	;
     }
-out:
     clear_inode (inode); /* note this must go after the journal_end to prevent deadlock */
     inode->i_blocks = 0;
     reiserfs_write_unlock(inode->i_sb);
@@ -212,28 +201,20 @@ static int file_capable (struct inode * inode, long block)
     return 0;
 }
 
-/*static*/ int restart_transaction(struct reiserfs_transaction_handle *th,
+/*static*/ void restart_transaction(struct reiserfs_transaction_handle *th,
 				struct inode *inode, struct path *path) {
   struct super_block *s = th->t_super ;
   int len = th->t_blocks_allocated ;
-  int err;
-
-  BUG_ON (!th->t_trans_id);
-  BUG_ON (!th->t_refcount);
 
   /* we cannot restart while nested */
   if (th->t_refcount > 1) {
-      return 0  ;
+      return  ;
   }
   pathrelse(path) ;
   reiserfs_update_sd(th, inode) ;
-  err = journal_end(th, s, len) ;
-  if (!err) {
-      err = journal_begin(th, s, JOURNAL_PER_BALANCE_CNT * 6) ;
-      if (!err)
-        reiserfs_update_inode_transaction(inode) ;
-  }
-  return err;
+  journal_end(th, s, len) ;
+  journal_begin(th, s, JOURNAL_PER_BALANCE_CNT * 6) ;
+  reiserfs_update_inode_transaction(inode) ;
 }
 
 // it is called by get_block when create == 0. Returns block number
@@ -460,13 +441,11 @@ static int reiserfs_get_blocks_direct_io(struct inode *inode,
        reiserfs_get_block() */
     bh_result->b_size = (1 << inode->i_blkbits);
 
-    ret = reiserfs_get_block(inode, iblock, bh_result, 
+    ret = reiserfs_get_block(inode, iblock, bh_result,
                              create | GET_BLOCK_NO_DANGLE) ;
-    if (ret)
-        goto out;
 
     /* don't allow direct io onto tail pages */
-    if (buffer_mapped(bh_result) && bh_result->b_blocknr == 0) {
+    if (ret == 0 && buffer_mapped(bh_result) && bh_result->b_blocknr == 0) {
         /* make sure future calls to the direct io funcs for this offset
         ** in the file fail by unmapping the buffer
         */
@@ -476,15 +455,11 @@ static int reiserfs_get_blocks_direct_io(struct inode *inode,
     /* Possible unpacked tail. Flush the data before pages have
        disappeared */
     if (REISERFS_I(inode)->i_flags & i_pack_on_close_mask) {
-        int err;
         lock_kernel();
-        err = reiserfs_commit_for_inode(inode);
+        reiserfs_commit_for_inode(inode);
         REISERFS_I(inode)->i_flags &= ~i_pack_on_close_mask;
         unlock_kernel();
-        if (err < 0)
-            ret = err;
     }
-out:
     return ret ;
 }
 
@@ -564,7 +539,6 @@ static inline int _allocate_block(struct reiserfs_transaction_handle *th,
 			   b_blocknr_t *allocated_block_nr, 
 			   struct path * path,
 			   int flags) {
-    BUG_ON (!th->t_trans_id);
   
 #ifdef REISERFS_PREALLOCATE
     if (!(flags & GET_BLOCK_NO_ISEM)) {
@@ -577,12 +551,12 @@ static inline int _allocate_block(struct reiserfs_transaction_handle *th,
 int reiserfs_get_block (struct inode * inode, sector_t block,
 			struct buffer_head * bh_result, int create)
 {
-    int repeat, retval = 0;
+    int repeat, retval;
     b_blocknr_t allocated_block_nr = 0;// b_blocknr_t is (unsigned) 32 bit int
     INITIALIZE_PATH(path);
     int pos_in_item;
     struct cpu_key key;
-    struct buffer_head * bh, * unbh = 0;
+    struct buffer_head * bh, * unbh = NULL;
     struct item_head * ih, tmp_ih;
     __u32 * item;
     int done;
@@ -623,11 +597,11 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	reiserfs_write_unlock(inode->i_sb);
 	return ret;
     }
-    /* 
+    /*
      * if we're already in a transaction, make sure to close
      * any new transactions we start in this func
      */
-    if ((create & GET_BLOCK_NO_DANGLE) || 
+    if ((create & GET_BLOCK_NO_DANGLE) ||
         reiserfs_transaction_running(inode->i_sb))
         dangle = 0;
 
@@ -681,9 +655,7 @@ start_trans:
 	    ** research if we succeed on the second try
 	    */
 	    SB_JOURNAL(inode->i_sb)->j_next_async_flush = 1;
-	    retval = restart_transaction(th, inode, &path) ; 
-            if (retval)
-                goto failure;
+	    restart_transaction(th, inode, &path) ;
 	    repeat = _allocate_block(th, block, inode, &allocated_block_nr, NULL, create);
 
 	    if (repeat != NO_DISK_SPACE && repeat != QUOTA_EXCEEDED) {
@@ -724,9 +696,8 @@ start_trans:
 	}
 	set_block_dev_mapped(bh_result, unfm_ptr, inode);
 	pathrelse (&path);
-        retval = 0;
 	if (!dangle && th)
-	    retval = reiserfs_end_persistent_transaction(th);
+	    reiserfs_end_persistent_transaction(th);
 
 	reiserfs_write_unlock(inode->i_sb);
 	 
@@ -734,7 +705,7 @@ start_trans:
 	** there is no need to make sure the inode is updated with this 
 	** transaction
 	*/
-	return retval;
+	return 0;
     }
 
     if (!th) {
@@ -795,12 +766,9 @@ start_trans:
 		 * ugly, but we can only end the transaction if
 		 * we aren't nested
 		 */
-                BUG_ON (!th->t_refcount);
 		if (th->t_refcount == 1) {
-		    retval = reiserfs_end_persistent_transaction(th);
+		    reiserfs_end_persistent_transaction(th);
 		    th = NULL;
-                    if (retval)
-                        goto failure;
 		}
 
 		retval = convert_tail_for_hole(inode, bh_result, tail_offset) ;
@@ -930,9 +898,7 @@ start_trans:
 	** ending their transaction will be able to continue.
 	*/
 	if (journal_transaction_should_end(th, th->t_blocks_allocated)) {
-	  retval = restart_transaction(th, inode, &path) ; 
-          if (retval)
-            goto failure;
+	  restart_transaction(th, inode, &path) ;
 	}
 	/* inserting indirect pointers for a hole can take a 
 	** long time.  reschedule if needed
@@ -963,15 +929,10 @@ start_trans:
     retval = 0;
 
  failure:
-    if (th && (!dangle || (retval && !th->t_trans_id))) {
-        int err;
-        if (th->t_trans_id)
-            reiserfs_update_sd(th, inode);
-        err = reiserfs_end_persistent_transaction(th);
-        if (err)
-            retval = err;
+    if (th && !dangle) {
+      reiserfs_update_sd(th, inode) ;
+      reiserfs_end_persistent_transaction(th);
     }
-
     reiserfs_write_unlock(inode->i_sb);
     reiserfs_check_path(&path) ;
     return retval;
@@ -1007,7 +968,7 @@ static int real_space_diff(struct inode *inode, int sd_size)
     return bytes ;
 }
 
-static inline loff_t to_real_used_space(struct inode *inode, ulong blocks, 
+static inline loff_t to_real_used_space(struct inode *inode, ulong blocks,
                                         int sd_size)
 {
     if (S_ISLNK(inode->i_mode) || S_ISDIR(inode->i_mode)) {
@@ -1021,7 +982,7 @@ static inline ulong to_fake_used_blocks(struct inode *inode, int sd_size)
 {
     loff_t bytes = inode_get_bytes(inode) ;
     loff_t real_space = real_space_diff(inode, sd_size) ;
-    
+
     /* keeps fsck and non-quota versions of reiserfs happy */
     if (S_ISLNK(inode->i_mode) || S_ISDIR(inode->i_mode)) {
         bytes += (loff_t)511 ;
@@ -1029,7 +990,7 @@ static inline ulong to_fake_used_blocks(struct inode *inode, int sd_size)
 
     /* files from before the quota patch might i_blocks such that
     ** bytes < real_space.  Deal with that here to prevent it from
-    ** going negative.  
+    ** going negative.
     */
     if (bytes < real_space)
         return 0 ;
@@ -1107,7 +1068,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	if (inode->i_blocks & 1) {
 	    inode->i_blocks++ ;
 	}
-	inode_set_bytes(inode, to_real_used_space(inode, inode->i_blocks, 
+	inode_set_bytes(inode, to_real_used_space(inode, inode->i_blocks,
 	                                          SD_V1_SIZE));
 	/* nopack is initially zero for v1 objects. For v2 objects,
 	   nopack is initialised from sd_attrs */
@@ -1141,7 +1102,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	    set_inode_item_key_version (inode, KEY_FORMAT_3_6);
 	REISERFS_I(inode)->i_first_direct_byte = 0;
 	set_inode_sd_version (inode, STAT_DATA_V2);
-	inode_set_bytes(inode, to_real_used_space(inode, inode->i_blocks, 
+	inode_set_bytes(inode, to_real_used_space(inode, inode->i_blocks,
 	                                          SD_V2_SIZE));
 	/* read persistent inode attributes from sd and initalise
 	   generic inode flags from them */
@@ -1220,7 +1181,7 @@ static void inode2sd_v1 (void * sd, struct inode * inode, loff_t size)
 /* NOTE, you must prepare the buffer head before sending it here,
 ** and then log it after the call
 */
-static void update_stat_data (struct path * path, struct inode * inode, 
+static void update_stat_data (struct path * path, struct inode * inode,
                               loff_t size)
 {
     struct buffer_head * bh;
@@ -1244,7 +1205,7 @@ static void update_stat_data (struct path * path, struct inode * inode,
 }
 
 
-void reiserfs_update_sd_size (struct reiserfs_transaction_handle *th, 
+void reiserfs_update_sd_size (struct reiserfs_transaction_handle *th,
 			      struct inode * inode, loff_t size)
 {
     struct cpu_key key;
@@ -1253,8 +1214,6 @@ void reiserfs_update_sd_size (struct reiserfs_transaction_handle *th,
     int fs_gen ;
     struct item_head *ih, tmp_ih ;
     int retval;
-
-    BUG_ON (!th->t_trans_id);
 
     make_cpu_key (&key, inode, SD_OFFSET, TYPE_STAT_DATA, 3);//key type is unimportant
     
@@ -1276,7 +1235,7 @@ void reiserfs_update_sd_size (struct reiserfs_transaction_handle *th,
 		return;
 	    }
 	    reiserfs_warning (inode->i_sb, "vs-13060: reiserfs_update_sd: "
-			      "stat data of object %k (nlink == %d) not found (pos %d)", 
+			      "stat data of object %k (nlink == %d) not found (pos %d)",
 			      INODE_PKEY (inode), inode->i_nlink, pos);
 	    reiserfs_check_path(&path) ;
 	    return;
@@ -1384,7 +1343,7 @@ void reiserfs_read_locked_inode (struct inode * inode, struct reiserfs_iget_args
 	    reiserfs_warning (inode->i_sb,
 			      "vs-13075: reiserfs_read_locked_inode: "
 			      "dead inode read from disk %K. "
-			      "This is likely to be race with knfsd. Ignore", 
+			      "This is likely to be race with knfsd. Ignore",
 			      &key );
 	    reiserfs_make_bad_inode( inode );
     }
@@ -1435,7 +1394,7 @@ struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key
     if (comp_short_keys (INODE_PKEY (inode), key) || is_bad_inode (inode)) {
 	/* either due to i/o error or a stale NFS handle */
 	iput (inode);
-	inode = 0;
+	inode = NULL;
     }
     return inode;
 }
@@ -1550,11 +1509,9 @@ void reiserfs_write_inode (struct inode * inode, int do_sync) {
     int jbegin_count = 1 ;
 
     if (inode->i_sb->s_flags & MS_RDONLY) {
-#if 0
         reiserfs_warning (inode->i_sb,
-			  "clm-6005: writing inode %lu on readonly FS", 
+			  "clm-6005: writing inode %lu on readonly FS",
 			  inode->i_ino) ;
-#endif
         return ;
     }
     /* memory pressure can sometimes initiate write_inode calls with sync == 1,
@@ -1564,10 +1521,9 @@ void reiserfs_write_inode (struct inode * inode, int do_sync) {
     */
     if (do_sync && !(current->flags & PF_MEMALLOC)) {
 	reiserfs_write_lock(inode->i_sb);
-	if (!journal_begin(&th, inode->i_sb, jbegin_count)) {
-            reiserfs_update_sd (&th, inode);
-            journal_end_sync(&th, inode->i_sb, jbegin_count) ;
-        }
+	journal_begin(&th, inode->i_sb, jbegin_count) ;
+	reiserfs_update_sd (&th, inode);
+	journal_end_sync(&th, inode->i_sb, jbegin_count) ;
 	reiserfs_write_unlock(inode->i_sb);
     }
 }
@@ -1594,8 +1550,6 @@ static int reiserfs_new_directory (struct reiserfs_transaction_handle *th,
     char * body = empty_dir;
     struct cpu_key key;
     int retval;
-
-    BUG_ON (!th->t_trans_id);
     
     _make_cpu_key (&key, KEY_FORMAT_3_5, le32_to_cpu (ih->ih_key.k_dir_id),
 		   le32_to_cpu (ih->ih_key.k_objectid), DOT_OFFSET, TYPE_DIRENTRY, 3/*key length*/);
@@ -1604,13 +1558,13 @@ static int reiserfs_new_directory (struct reiserfs_transaction_handle *th,
        old type (ITEM_VERSION_1). Do not set key (second arg is 0), it
        is done by reiserfs_new_inode */
     if (old_format_only (sb)) {
-	make_le_item_head (ih, 0, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE_V1, 2);
+	make_le_item_head (ih, NULL, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE_V1, 2);
 	
 	make_empty_dir_item_v1 (body, ih->ih_key.k_dir_id, ih->ih_key.k_objectid,
 				INODE_PKEY (dir)->k_dir_id, 
 				INODE_PKEY (dir)->k_objectid );
     } else {
-	make_le_item_head (ih, 0, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE, 2);
+	make_le_item_head (ih, NULL, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE, 2);
 	
 	make_empty_dir_item (body, ih->ih_key.k_dir_id, ih->ih_key.k_objectid,
 		   		INODE_PKEY (dir)->k_dir_id, 
@@ -1647,14 +1601,12 @@ static int reiserfs_new_symlink (struct reiserfs_transaction_handle *th,
     struct cpu_key key;
     int retval;
 
-    BUG_ON (!th->t_trans_id);
-
     _make_cpu_key (&key, KEY_FORMAT_3_5, 
 		   le32_to_cpu (ih->ih_key.k_dir_id), 
 		   le32_to_cpu (ih->ih_key.k_objectid),
 		   1, TYPE_DIRECT, 3/*key length*/);
 
-    make_le_item_head (ih, 0, KEY_FORMAT_3_5, 1, TYPE_DIRECT, item_len, 0/*free_space*/);
+    make_le_item_head (ih, NULL, KEY_FORMAT_3_5, 1, TYPE_DIRECT, item_len, 0/*free_space*/);
 
     /* look for place in the tree for new item */
     retval = search_item (sb, &key, path);
@@ -1699,8 +1651,6 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     struct stat_data sd;
     int retval;
     int err;
-
-    BUG_ON (!th->t_trans_id);
   
     if (!dir || !dir->i_nlink) {
 	err = -EPERM;
@@ -1751,7 +1701,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     REISERFS_I(inode)->i_prealloc_block = 0;
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
-    REISERFS_I(inode)->i_jl = 0;
+    REISERFS_I(inode)->i_jl = NULL;
     REISERFS_I(inode)->i_attrs =
 	REISERFS_I(dir)->i_attrs & REISERFS_INHERIT_MASK;
     sd_attrs_to_i_attrs( REISERFS_I(inode) -> i_attrs, inode );
@@ -1760,9 +1710,9 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     init_rwsem (&REISERFS_I(inode)->xattr_sem);
 
     if (old_format_only (sb))
-	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
+	make_le_item_head (&ih, NULL, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
     else
-	make_le_item_head (&ih, 0, KEY_FORMAT_3_6, SD_OFFSET, TYPE_STAT_DATA, SD_SIZE, MAX_US_INT);
+	make_le_item_head (&ih, NULL, KEY_FORMAT_3_6, SD_OFFSET, TYPE_STAT_DATA, SD_SIZE, MAX_US_INT);
 
     /* key to search for correct place for new stat data */
     _make_cpu_key (&key, KEY_FORMAT_3_6, le32_to_cpu (ih.ih_key.k_dir_id),
@@ -1975,7 +1925,7 @@ unlock:
 **
 ** some code taken from block_truncate_page
 */
-int reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
+void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     struct reiserfs_transaction_handle th ;
     /* we want the offset for the first byte after the end of the file */
     unsigned long offset = p_s_inode->i_size & (PAGE_CACHE_SIZE - 1) ;
@@ -2011,28 +1961,18 @@ int reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     /* it is enough to reserve space in transaction for 2 balancings:
        one for "save" link adding and another for the first
        cut_from_item. 1 is for update_sd */
-    error = journal_begin (&th, p_s_inode->i_sb,
-                           JOURNAL_PER_BALANCE_CNT * 2 + 1);
-    if (error)
-        goto out;
+    journal_begin(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 + 1 ) ;
     reiserfs_update_inode_transaction(p_s_inode) ;
     if (update_timestamps)
 	    /* we are doing real truncate: if the system crashes before the last
 	       transaction of truncating gets committed - on reboot the file
 	       either appears truncated properly or not truncated at all */
 	add_save_link (&th, p_s_inode, 1);
-    error = reiserfs_do_truncate (&th, p_s_inode, page, update_timestamps) ;
-    if (error)
-        goto out;
-    error = journal_end (&th, p_s_inode->i_sb, JOURNAL_PER_BALANCE_CNT * 2 + 1);
-    if (error)
-        goto out;
+    reiserfs_do_truncate (&th, p_s_inode, page, update_timestamps) ;
+    journal_end(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 + 1 ) ;
 
-    if (update_timestamps) {
-	error = remove_save_link (p_s_inode, 1/* truncate */);
-        if (error)
-            goto out;
-    }
+    if (update_timestamps)
+	remove_save_link (p_s_inode, 1/* truncate */);
 
     if (page) {
         length = offset & (blocksize - 1) ;
@@ -2054,14 +1994,6 @@ int reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     }
 
     reiserfs_write_unlock(p_s_inode->i_sb);
-    return 0;
-out:
-    if (page) {
-        unlock_page (page);
-        page_cache_release (page);
-    }
-    reiserfs_write_unlock(p_s_inode->i_sb);
-    return error;
 }
 
 static int map_block_for_writepage(struct inode *inode, 
@@ -2088,7 +2020,6 @@ static int map_block_for_writepage(struct inode *inode,
     th.t_trans_id = 0;
 
     if (!buffer_uptodate(bh_result)) {
-        buffer_error();
 	return -EIO;
     }
 
@@ -2132,9 +2063,7 @@ research:
 
 	if (!trans_running) {
 	    /* vs-3050 is gone, no need to drop the path */
-	    retval = journal_begin(&th, inode->i_sb, jbegin_count) ;
-            if (retval)
-                goto out;
+	    journal_begin(&th, inode->i_sb, jbegin_count) ;
 	    reiserfs_update_inode_transaction(inode) ;
 	    trans_running = 1;
 	    if (fs_changed(fs_gen, inode->i_sb) && item_moved(&tmp_ih, &path)) {
@@ -2174,9 +2103,7 @@ research:
 out:
     pathrelse(&path) ;
     if (trans_running) {
-        int err = journal_end(&th, inode->i_sb, jbegin_count) ;
-        if (err)
-            retval = err;
+	journal_end(&th, inode->i_sb, jbegin_count) ;
 	trans_running = 0;
     }
     reiserfs_write_unlock(inode->i_sb);
@@ -2232,8 +2159,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
      * in the BH_Uptodate is just a sanity check.
      */
     if (!page_has_buffers(page)) {
-	if (!PageUptodate(page))
-	    buffer_error();
 	create_empty_buffers(page, s->s_blocksize,
 	                    (1 << BH_Dirty) | (1 << BH_Uptodate));
     }
@@ -2284,11 +2209,7 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     if (checked) {
 	ClearPageChecked(page);
 	reiserfs_write_lock(s);
-	error = journal_begin(&th, s, bh_per_page + 1);
-	if (error) {
-	    reiserfs_write_unlock(s);
-	    goto fail;
-	}
+	journal_begin(&th, s, bh_per_page + 1);
 	reiserfs_update_inode_transaction(inode);
     }
     /* now go through and lock any dirty buffers on the page */
@@ -2316,8 +2237,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	    }
 	}
 	if (test_clear_buffer_dirty(bh)) {
-	    if (!buffer_uptodate(bh))
-		buffer_error();
 	    mark_buffer_async_write(bh);
 	} else {
 	    unlock_buffer(bh);
@@ -2325,10 +2244,8 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     } while((bh = bh->b_this_page) != head);
 
     if (checked) {
-	error = journal_end(&th, s, bh_per_page + 1);
+	journal_end(&th, s, bh_per_page + 1);
 	reiserfs_write_unlock(s);
-	if (error)
-	    goto fail;
     }
     BUG_ON(PageWriteback(page));
     set_page_writeback(page);
@@ -2434,9 +2351,7 @@ int reiserfs_prepare_write(struct file *f, struct page *page,
     fix_tail_page_for_writing(page) ;
     if (reiserfs_transaction_running(inode->i_sb)) {
 	struct reiserfs_transaction_handle *th;
-	th = (struct reiserfs_transaction_handle *)current->journal_info;
-        BUG_ON (!th->t_refcount);
-        BUG_ON (!th->t_trans_id);
+        th = (struct reiserfs_transaction_handle *)current->journal_info;
 	old_ref = th->t_refcount;
 	th->t_refcount++;
     }
@@ -2445,30 +2360,27 @@ int reiserfs_prepare_write(struct file *f, struct page *page,
     if (ret && reiserfs_transaction_running(inode->i_sb)) {
     	struct reiserfs_transaction_handle *th = current->journal_info;
 	/* this gets a little ugly.  If reiserfs_get_block returned an
-	 * error and left a transacstion running, we've got to close it, 
+	 * error and left a transacstion running, we've got to close it,
 	 * and we've got to free handle if it was a persistent transaction.
 	 *
 	 * But, if we had nested into an existing transaction, we need
-	 * to just drop the ref count on the handle. 
+	 * to just drop the ref count on the handle.
 	 *
-	 * If old_ref == 0, the transaction is from reiserfs_get_block, 
+	 * If old_ref == 0, the transaction is from reiserfs_get_block,
 	 * and it was a persistent trans.  Otherwise, it was nested above.
 	 */
 	if (th->t_refcount > old_ref) {
 	    if (old_ref)
 	    	th->t_refcount--;
 	    else {
-                int err;
 		reiserfs_write_lock(inode->i_sb);
-		err = reiserfs_end_persistent_transaction(th);
+		reiserfs_end_persistent_transaction(th);
 		reiserfs_write_unlock(inode->i_sb);
-                if (err)
-                    ret = err;
 	    }
 	}
     }
     return ret;
-     
+
 }
 
 
@@ -2480,7 +2392,7 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
                                  unsigned from, unsigned to) {
     struct inode *inode = page->mapping->host ;
     loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-    int ret = 0; 
+    int ret = 0;
     int update_sd = 0;
     struct reiserfs_transaction_handle *th = NULL;
     
@@ -2504,49 +2416,31 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
 	     (have_small_tails (inode->i_sb) && inode->i_size > i_block_size(inode)) )
 	    REISERFS_I(inode)->i_flags &= ~i_pack_on_close_mask ;
 
-	ret = journal_begin(&myth, inode->i_sb, 1) ;
-        if (ret) {
-            reiserfs_write_unlock(inode->i_sb);
-            goto journal_error;
-        }
+	journal_begin(&myth, inode->i_sb, 1) ;
 	reiserfs_update_inode_transaction(inode) ;
 	inode->i_size = pos ;
-	/* 
-	 * this will just nest into our transaction.  It's important
-	 * to use mark_inode_dirty so the inode gets pushed around on the
-	 * dirty lists, and so that O_SYNC works as expected
-	 */
-	mark_inode_dirty(inode);
 	reiserfs_update_sd(&myth, inode) ;
 	update_sd = 1;
-	ret = journal_end(&myth, inode->i_sb, 1) ;
+	journal_end(&myth, inode->i_sb, 1) ;
 	reiserfs_write_unlock(inode->i_sb);
-        if (ret)
-            goto journal_error;
     }
-    if (th) {
-	reiserfs_write_lock(inode->i_sb);
-	if (!update_sd)
-	    mark_inode_dirty(inode);
-        ret = reiserfs_end_persistent_transaction(th);
-	reiserfs_write_unlock(inode->i_sb);
-        if (ret)
-            goto out;
-    }
-
-out:
-    return ret ;
-
-journal_error:
     if (th) {
 	reiserfs_write_lock(inode->i_sb);
 	if (!update_sd)
 	    reiserfs_update_sd(th, inode) ;
-        ret = reiserfs_end_persistent_transaction(th);
+        reiserfs_end_persistent_transaction(th);
 	reiserfs_write_unlock(inode->i_sb);
     }
-
-    return ret;
+ 
+    /* we test for O_SYNC here so we can commit the transaction
+    ** for any packed tails the file might have had
+    */
+    if (f && (f->f_flags & O_SYNC)) {
+	reiserfs_write_lock(inode->i_sb);
+ 	reiserfs_commit_for_inode(inode) ;
+	reiserfs_write_unlock(inode->i_sb);
+    }
+    return ret ;
 }
 
 void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode )
@@ -2604,23 +2498,23 @@ static int invalidatepage_can_drop(struct inode *inode, struct buffer_head *bh)
 {
     int ret = 1 ;
     struct reiserfs_journal *j = SB_JOURNAL(inode->i_sb) ;
-    
+
     spin_lock(&j->j_dirty_buffers_lock) ;
     if (!buffer_mapped(bh)) {
         goto free_jh;
     }
     /* the page is locked, and the only places that log a data buffer
-     * also lock the page.  
+     * also lock the page.
      */
     if (reiserfs_file_data_log(inode)) {
 	/*
 	 * very conservative, leave the buffer pinned if
-	 * anyone might need it. 
+	 * anyone might need it.
 	 */
         if (buffer_journaled(bh) || buffer_journal_dirty(bh)) {
 	    ret = 0 ;
 	}
-    } else  
+    } else
     if (buffer_dirty(bh) || buffer_locked(bh)) {
 	struct reiserfs_journal_list *jl;
 	struct reiserfs_jh *jh = bh->b_private;
@@ -2711,7 +2605,7 @@ static int reiserfs_set_page_dirty(struct page *page) {
  * in the buffers at page_buffers(page).
  *
  * even in -o notail mode, we can't be sure an old mount without -o notail
- * didn't create files with tails.  
+ * didn't create files with tails.
  */
 static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
 {
@@ -2772,16 +2666,11 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
         if (attr->ia_size > inode->i_size) {
 	    error = generic_cont_expand(inode, attr->ia_size) ;
 	    if (REISERFS_I(inode)->i_prealloc_count > 0) {
-                int err;
 		struct reiserfs_transaction_handle th ;
 		/* we're changing at most 2 bitmaps, inode + super */
-		err = journal_begin(&th, inode->i_sb, 4) ;
-                if (!err) {
-                    reiserfs_discard_prealloc (&th, inode);
-                    err = journal_end(&th, inode->i_sb, 4) ;
-                }
-                if (err)
-                    error = err;
+		journal_begin(&th, inode->i_sb, 4) ;
+		reiserfs_discard_prealloc (&th, inode);
+		journal_end(&th, inode->i_sb, 4) ;
 	    }
 	    if (error)
 	        goto out;
@@ -2793,7 +2682,7 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
 	(get_inode_sd_version (inode) == STAT_DATA_V1)) {
 		/* stat data of format v3.5 has 16 bit uid and gid */
 	    error = -EINVAL;
-	    goto out;	
+	    goto out;
 	}
 
     error = inode_change_ok(inode, attr) ;
@@ -2809,7 +2698,7 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
             error = inode_setattr(inode, attr) ;
     }
 
- 
+
     if (!error && reiserfs_posixacl (inode->i_sb)) {
         if (attr->ia_valid & ATTR_MODE)
             error = reiserfs_acl_chmod (inode);

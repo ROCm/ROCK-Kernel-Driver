@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */
- 
+
 /* Copyright(c) 1996 Kars de Jong */
 /* Based on the ide driver from 1.2.13pl8 */
 
@@ -49,38 +49,6 @@
 #ifndef MAX_HWIFS
 #define MAX_HWIFS	4	/* same as the other archs */
 #endif
-
-
-static __inline__ int ide_default_irq(unsigned long base)
-{
-	  return 0;
-}
-
-static __inline__ unsigned long ide_default_io_base(int index)
-{
-          return 0;
-}
-
-
-/*
- * Set up a hw structure for a specified data port, control port and IRQ.
- * This should follow whatever the default interface uses.
- */
-static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
-					   unsigned long data_port,
-					   unsigned long ctrl_port, int *irq)
-{
-	if (data_port || ctrl_port)
-		printk("ide_init_hwif_ports: must not be called\n");
-}
-
-/*
- * This registers the standard ports for this architecture with the IDE
- * driver.
- */
-static __inline__ void ide_init_default_hwifs(void)
-{
-}
 
 /*
  * Get rid of defs from io.h - ide has its private and conflicting versions

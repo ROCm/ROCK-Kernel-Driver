@@ -15,7 +15,7 @@
 #include <asm/irq.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "53c7xx.h"
 #include "mvme16x.h"
 

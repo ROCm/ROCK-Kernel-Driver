@@ -48,18 +48,10 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 #include <linux/ioctl.h>
-
-
-#include "kobil_sct.h"
-//#include "../core/usb-debug.c"
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
+#include "kobil_sct.h"
+
+static int debug;
 
 /* Version Information */
 #define DRIVER_VERSION "21/05/2004"
@@ -113,7 +105,7 @@ static struct usb_driver kobil_driver = {
 };
 
 
-struct usb_serial_device_type kobil_device = {
+static struct usb_serial_device_type kobil_device = {
 	.owner =		THIS_MODULE,
 	.name =			"KOBIL USB smart card terminal",
 	.id_table =		id_table,
@@ -186,7 +178,7 @@ static int kobil_startup (struct usb_serial *serial)
 	pdev = serial->dev;
  	actconfig = pdev->actconfig;
  	interface = actconfig->interface[0];
-	altsetting = interface->altsetting;
+	altsetting = interface->cur_altsetting;
  	endpoint = altsetting->endpoint;
   
  	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
@@ -232,9 +224,6 @@ static int kobil_open (struct usb_serial_port *port, struct file *filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	priv = usb_get_serial_port_data(port);
 	priv->line_state = 0;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
 
 	// someone sets the dev to 0 if the close method has been called
 	port->interrupt_in_urb->dev = port->serial->dev;
@@ -364,7 +353,7 @@ static void kobil_close (struct usb_serial_port *port, struct file *filp)
 	if (port->write_urb){
 		usb_unlink_urb( port->write_urb );
 		usb_free_urb( port->write_urb );
-		port->write_urb = 0;
+		port->write_urb = NULL;
 	}
 	if (port->interrupt_in_urb){
 		usb_unlink_urb (port->interrupt_in_urb);
@@ -459,7 +448,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 		memcpy (priv->buf + priv->filled, buf, count);
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count, priv->buf + priv->filled);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, priv->buf + priv->filled);
 
 	priv->filled = priv->filled + count;
 
@@ -491,14 +480,12 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 				);
 
 			priv->cur_pos = priv->cur_pos + length;
-			result = usb_submit_urb( port->write_urb, GFP_ATOMIC );
+			result = usb_submit_urb( port->write_urb, GFP_NOIO );
 			dbg("%s - port %d Send write URB returns: %i", __FUNCTION__, port->number, result);
 			todo = priv->filled - priv->cur_pos;
 
 			if (todo > 0) {
-				//mdelay(16);
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(24 * HZ / 1000);
+				msleep(24);
 			}
 
 		} // end while
@@ -514,7 +501,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 			// someone sets the dev to 0 if the close method has been called
 			port->interrupt_in_urb->dev = port->serial->dev;
 			
-			result = usb_submit_urb( port->interrupt_in_urb, GFP_ATOMIC ); 
+			result = usb_submit_urb( port->interrupt_in_urb, GFP_NOIO ); 
 			dbg("%s - port %d Send read URB returns: %i", __FUNCTION__, port->number, result);
 		}
 	}
@@ -648,6 +635,7 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 	unsigned char *transfer_buffer;
 	int transfer_buffer_length = 8;
 	char *settings;
+	void __user *user_arg = (void __user *)arg;
 
 	priv = usb_get_serial_port_data(port);
 	if ((priv->device_type == KOBIL_USBTWIN_PRODUCT_ID) || (priv->device_type == KOBIL_KAAN_SIM_PRODUCT_ID)) {
@@ -657,12 +645,12 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 
 	switch (cmd) {
 	case TCGETS:   // 0x5401
-		result = verify_area(VERIFY_WRITE, (void *)arg, sizeof(struct termios));
+		result = verify_area(VERIFY_WRITE, user_arg, sizeof(struct termios));
 		if (result) {
 			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
 			return(result);
 		}
-		if (kernel_termios_to_user_termios((struct termios *)arg,
+		if (kernel_termios_to_user_termios((struct termios __user *)arg,
 						   &priv->internal_termios))
 			return -EFAULT;
 		return 0;
@@ -672,13 +660,13 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 			dbg("%s - port %d Error: port->tty->termios is NULL", __FUNCTION__, port->number);
 			return -ENOTTY;
 		}
-		result = verify_area(VERIFY_READ, (void *)arg, sizeof(struct termios));
+		result = verify_area(VERIFY_READ, user_arg, sizeof(struct termios));
 		if (result) {
 			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
 			return result;
 		}
 		if (user_termios_to_kernel_termios(&priv->internal_termios,
-						   (struct termios *)arg))
+						   (struct termios __user *)arg))
 			return -EFAULT;
 		
 		settings = (unsigned char *) kmalloc(50, GFP_KERNEL);  
@@ -792,5 +780,5 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE( "GPL" );
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");

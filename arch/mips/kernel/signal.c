@@ -18,6 +18,7 @@
 #include <linux/errno.h>
 #include <linux/wait.h>
 #include <linux/ptrace.h>
+#include <linux/suspend.h>
 #include <linux/unistd.h>
 
 #include <asm/asm.h>
@@ -33,8 +34,6 @@
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
 extern asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs);
-
-extern asmlinkage void do_syscall_trace(void);
 
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
@@ -232,7 +231,7 @@ asmlinkage void sys_sigreturn(struct pt_regs regs)
 	 * Don't let your children do this ...
 	 */
 	if (current_thread_info()->flags & TIF_SYSCALL_TRACE)
-		do_syscall_trace();
+		do_syscall_trace(&regs, 1);
 	__asm__ __volatile__(
 		"move\t$29, %0\n\t"
 		"j\tsyscall_exit"
@@ -350,7 +349,7 @@ static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
  	sp -= 32;
 
 	/* This is the X/Open sanctioned signal stack switching.  */
-	if ((ka->sa.sa_flags & SA_ONSTACK) && ! on_sig_stack(sp))
+	if ((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags (sp) == 0))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
 	return (void *)((sp - frame_size) & ALMASK);
@@ -549,6 +548,19 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 	}
 #endif
 
+	/*
+	 * We want the common case to go fast, which is why we may in certain
+	 * cases get here from kernel mode. Just return without doing anything
+	 * if so.
+	 */
+	if (!user_mode(regs))
+		return 1;
+
+	if (current->flags & PF_FREEZE) {
+		refrigerator(0);
+		goto no_signal;
+	}
+
 	if (!oldset)
 		oldset = &current->blocked;
 
@@ -558,6 +570,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		return 1;
 	}
 
+no_signal:
 	/*
 	 * Who's code doesn't conform to the restartable syscall convention
 	 * dies here!!!  The li instruction, a single machine instruction,

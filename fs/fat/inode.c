@@ -172,14 +172,11 @@ void fat_put_super(struct super_block *sb)
 		unload_nls(sbi->nls_io);
 		sbi->nls_io = NULL;
 	}
-	/*
-	 * Note: the iocharset option might have been specified
-	 * without enabling nls_io, so check for it here.
-	 */
 	if (sbi->options.iocharset) {
 		kfree(sbi->options.iocharset);
 		sbi->options.iocharset = NULL;
 	}
+
 	sb->s_fs_info = NULL;
 	kfree(sbi);
 }
@@ -196,11 +193,10 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_printf(m, ",gid=%u", opts->fs_gid);
 	seq_printf(m, ",fmask=%04o", opts->fs_fmask);
 	seq_printf(m, ",dmask=%04o", opts->fs_dmask);
-	if (sbi->nls_disk)
+	if (sbi->nls_disk && opts->codepage)
 		seq_printf(m, ",codepage=%s", sbi->nls_disk->charset);
 	if (isvfat) {
-		if (sbi->nls_io
-		    && strcmp(sbi->nls_io->charset, CONFIG_NLS_DEFAULT))
+		if (sbi->nls_io && opts->iocharset)
 			seq_printf(m, ",iocharset=%s", sbi->nls_io->charset);
 
 		switch (opts->shortname) {
@@ -351,7 +347,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 	*debug = 0;
 
 	if (!options)
-		return 1;
+		return 0;
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		int token;
@@ -437,10 +433,11 @@ static int parse_options(char *options, int is_vfat, int *debug,
 
 		/* vfat specific */
 		case Opt_charset:
-			kfree(opts->iocharset);
+			if (opts->iocharset)
+				kfree(opts->iocharset);
 			opts->iocharset = match_strdup(&args[0]);
-			if (!opts->iocharset)
-				return 0;
+			if (opts->iocharset == NULL)
+				return -ENOMEM;
 			break;
 		case Opt_shortname_lower:
 			opts->shortname = VFAT_SFN_DISPLAY_LOWER
@@ -486,14 +483,13 @@ static int parse_options(char *options, int is_vfat, int *debug,
 		default:
 			printk(KERN_ERR "FAT: Unrecognized mount option \"%s\" "
 			       "or missing value\n", p);
-			return 0;
+			return -EINVAL;
 		}
 	}
-
 	if (opts->unicode_xlate)
 		opts->utf8 = 0;
-	
-	return 1;
+
+	return 0;
 }
 
 static int fat_calc_dir_size(struct inode *inode)
@@ -557,11 +553,13 @@ static int fat_read_root(struct inode *inode)
  *  0/  i_ino - for fast, reliable lookup if still in the cache
  *  1/  i_generation - to see if i_ino is still valid
  *          bit 0 == 0 iff directory
- *  2/  i_pos - if ino has changed, but still in cache (hi)
- *  3/  i_pos - if ino has changed, but still in cache (low)
- *  4/  i_logstart - to semi-verify inode found at i_location
- *  5/  parent->i_logstart - maybe used to hunt for the file on disc
+ *  2/  i_pos(8-39) - if ino has changed, but still in cache
+ *  3/  i_pos(4-7)|i_logstart - to semi-verify inode found at i_pos
+ *  4/  i_pos(0-3)|parent->i_logstart - maybe used to hunt for the file on disc
  *
+ * Hack for NFSv2: Maximum FAT entry number is 28bits and maximum
+ * i_pos is 40bits (blocknr(32) + dir offset(8)), so two 4bits
+ * of i_logstart is used to store the directory entry offset.
  */
 
 struct dentry *fat_decode_fh(struct super_block *sb, __u32 *fh,
@@ -572,7 +570,7 @@ struct dentry *fat_decode_fh(struct super_block *sb, __u32 *fh,
 
 	if (fhtype != 3)
 		return ERR_PTR(-ESTALE);
-	if (len < 6)
+	if (len < 5)
 		return ERR_PTR(-ESTALE);
 
 	return sb->s_export_op->find_exported_dentry(sb, fh, NULL, acceptable, context);
@@ -585,13 +583,17 @@ struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
 	__u32 *fh = inump;
 
 	inode = iget(sb, fh[0]);
-	if (!inode || is_bad_inode(inode) ||
-	    inode->i_generation != fh[1]) {
-		if (inode) iput(inode);
+	if (!inode || is_bad_inode(inode) || inode->i_generation != fh[1]) {
+		if (inode)
+			iput(inode);
 		inode = NULL;
 	}
 	if (!inode) {
-		loff_t i_pos = ((loff_t)fh[2] << 32) | fh[3];
+		loff_t i_pos;
+		int i_logstart = fh[3] & 0x0fffffff;
+
+		i_pos = (loff_t)fh[2] << 8;
+		i_pos |= ((fh[3] >> 24) & 0xf0) | (fh[4] >> 28);
 
 		/* try 2 - see if i_pos is in F-d-c
 		 * require i_logstart to be the same
@@ -599,7 +601,7 @@ struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
 		 */
 
 		inode = fat_iget(sb, i_pos);
-		if (inode && MSDOS_I(inode)->i_logstart != fh[4]) {
+		if (inode && MSDOS_I(inode)->i_logstart != i_logstart) {
 			iput(inode);
 			inode = NULL;
 		}
@@ -638,17 +640,21 @@ int fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
 {
 	int len = *lenp;
 	struct inode *inode =  de->d_inode;
+	u32 ipos_h, ipos_m, ipos_l;
 	
-	if (len < 6)
+	if (len < 5)
 		return 255; /* no room */
-	*lenp = 6;
+
+	ipos_h = MSDOS_I(inode)->i_pos >> 8;
+	ipos_m = (MSDOS_I(inode)->i_pos & 0xf0) << 24;
+	ipos_l = (MSDOS_I(inode)->i_pos & 0x0f) << 28;
+	*lenp = 5;
 	fh[0] = inode->i_ino;
 	fh[1] = inode->i_generation;
-	fh[2] = (__u32)(MSDOS_I(inode)->i_pos >> 32);
-	fh[3] = (__u32)MSDOS_I(inode)->i_pos;
-	fh[4] = MSDOS_I(inode)->i_logstart;
+	fh[2] = ipos_h;
+	fh[3] = ipos_m | MSDOS_I(inode)->i_logstart;
 	spin_lock(&de->d_lock);
-	fh[5] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
+	fh[4] = ipos_l | MSDOS_I(de->d_parent->d_inode)->i_logstart;
 	spin_unlock(&de->d_lock);
 	return 3;
 }
@@ -734,6 +740,12 @@ void __exit fat_destroy_inodecache(void)
 		printk(KERN_INFO "fat_inode_cache: not all structures were freed\n");
 }
 
+static int fat_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 static struct super_operations fat_sops = { 
 	.alloc_inode	= fat_alloc_inode,
 	.destroy_inode	= fat_destroy_inode,
@@ -742,6 +754,7 @@ static struct super_operations fat_sops = {
 	.put_super	= fat_put_super,
 	.statfs		= fat_statfs,
 	.clear_inode	= fat_clear_inode,
+	.remount_fs	= fat_remount,
 
 	.read_inode	= make_bad_inode,
 
@@ -755,6 +768,66 @@ static struct export_operations fat_export_ops = {
 	.get_parent	= fat_get_parent,
 };
 
+static int fat_load_nls(struct super_block *sb)
+{
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	struct fat_mount_options *opts = &sbi->options;
+	char codepage[50], *iocharset;
+	int error = 0, not_specified = 0;
+
+	if (opts->codepage)
+		snprintf(codepage, sizeof(codepage), "cp%d", opts->codepage);
+	else {
+		not_specified = 1;
+		strcpy(codepage, "default");
+	}
+	sbi->nls_disk = load_nls(codepage);
+	if (sbi->nls_disk == NULL) {
+		printk(KERN_ERR "FAT: codepage %s not found\n", codepage);
+		error = -EINVAL;
+		goto out;
+	}
+
+	if (opts->isvfat) {
+		if (opts->iocharset)
+			iocharset = opts->iocharset;
+		else {
+			not_specified = 1;
+			iocharset = "default";
+		}
+		/*
+		 * FIXME: utf8 is using iocharset for upper/lower conversion
+		 * UTF8 doesn't provide FAT semantics
+		 */
+		if (!strcmp(iocharset, "utf8")) {
+			printk(KERN_WARNING
+			       "FAT: utf8 is not a recommended IO charset"
+			       " for FAT filesystem,"
+			       " filesystem will be case sensitive!\n");
+		}
+		sbi->nls_io = load_nls(iocharset);
+		if (sbi->nls_io == NULL) {
+			printk(KERN_ERR "FAT: IO charset %s not found\n",
+			       iocharset);
+			error = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (not_specified) {
+		unsigned long not_ro = !(sb->s_flags & MS_RDONLY);
+		if (not_ro)
+			sb->s_flags |= MS_RDONLY;
+
+		printk(KERN_INFO "FAT: %s option didn't specified\n"
+		       "     File name can not access proper%s\n",
+		       opts->isvfat ? "codepage or iocharset" : "codepage",
+		       not_ro ? " (mounted as read-only)" : "");
+	}
+out:
+	return error;
+}
+
 /*
  * Read the super block of an MS-DOS FS.
  */
@@ -767,10 +840,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
-	int debug, cp, first;
+	int debug, first;
 	unsigned int media;
 	long error;
-	char buf[50];
 
 	sbi = kmalloc(sizeof(struct msdos_sb_info), GFP_KERNEL);
 	if (!sbi)
@@ -784,8 +856,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sb->s_export_op = &fat_export_ops;
 	sbi->dir_ops = fs_dir_inode_ops;
 
-	error = -EINVAL;
-	if (!parse_options(data, isvfat, &debug, &sbi->options))
+	error = parse_options(data, isvfat, &debug, &sbi->options);
+	if (error)
 		goto out_fail;
 
 	fat_cache_init(sb);
@@ -813,18 +885,12 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	if (!b->secs_track) {
-		if (!silent)
-			printk(KERN_ERR "FAT: bogus sectors-per-track value\n");
-		brelse(bh);
-		goto out_invalid;
-	}
-	if (!b->heads) {
-		if (!silent)
-			printk(KERN_ERR "FAT: bogus number-of-heads value\n");
-		brelse(bh);
-		goto out_invalid;
-	}
+
+	/*
+	 * Earlier we checked here that b->secs_track and b->head are nonzero,
+	 * but it turns out valid FAT filesystems can have zero there.
+	 */
+
 	media = b->media;
 	if (!FAT_VALID_MEDIA(media)) {
 		if (!silent)
@@ -991,33 +1057,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		goto out_invalid;
 	}
 
-	error = -EINVAL;
-	cp = sbi->options.codepage ? sbi->options.codepage : 437;
-	sprintf(buf, "cp%d", cp);
-	sbi->nls_disk = load_nls(buf);
-	if (!sbi->nls_disk) {
-		/* Fail only if explicit charset specified */
-		if (sbi->options.codepage != 0) {
-			printk(KERN_ERR "FAT: codepage %s not found\n", buf);
-			goto out_fail;
-		}
-		sbi->options.codepage = 0; /* already 0?? */
-		sbi->nls_disk = load_nls_default();
-	}
-
-	/* FIXME: utf8 is using iocharset for upper/lower conversion */
-	if (sbi->options.isvfat) {
-		if (sbi->options.iocharset != NULL) {
-			sbi->nls_io = load_nls(sbi->options.iocharset);
-			if (!sbi->nls_io) {
-				printk(KERN_ERR
-				       "FAT: IO charset %s not found\n",
-				       sbi->options.iocharset);
-				goto out_fail;
-			}
-		} else
-			sbi->nls_io = load_nls_default();
-	}
+	error = fat_load_nls(sb);
+	if (error)
+		goto out_fail;
 
 	error = -ENOMEM;
 	root_inode = new_inode(sb);
@@ -1228,7 +1270,7 @@ retry:
 	lock_kernel();
 	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
 		printk(KERN_ERR "FAT: unable to read inode block "
-		       "for updating (i_pos %lld)", i_pos);
+		       "for updating (i_pos %lld)\n", i_pos);
 		unlock_kernel();
 		return /* -EIO */;
 	}

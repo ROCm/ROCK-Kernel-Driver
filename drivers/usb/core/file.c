@@ -79,14 +79,25 @@ static struct class usb_class = {
 
 int usb_major_init(void)
 {
-	if (register_chrdev(USB_MAJOR, "usb", &usb_fops)) {
+	int error;
+
+	error = register_chrdev(USB_MAJOR, "usb", &usb_fops);
+	if (error) {
 		err("unable to get major %d for usb devices", USB_MAJOR);
-		return -EBUSY;
+		goto out;
+	}
+
+	error = class_register(&usb_class);
+	if (error) {
+		err("class_register failed for usb devices");
+		unregister_chrdev(USB_MAJOR, "usb");
+		goto out;
 	}
 
 	devfs_mk_dir("usb");
-	class_register(&usb_class);
-	return 0;
+
+out:
+	return error;
 }
 
 void usb_major_cleanup(void)

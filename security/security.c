@@ -20,42 +20,11 @@
 
 #define SECURITY_SCAFFOLD_VERSION	"1.0.0"
 
-/* garloff@suse.de, 2004-05-21:
- * lsm causes a performance problem, if compiled in, due to various
- * non-inlined indirect function calls.
- * This can be avoided by putting a branch in the inlined security
- * stubs in include/linux/security.h, calling directly into the cap_
- * functions from commoncap.
- * This has some consequences:
- * - If no security module is loaded, default will be the capability
- *   security fns, not the dummy ones.
- * - If a security module is loaded, it will override the defaults;
- *   this module might be capability itself, overriding itself, 
- *   only causing a slowdown. This means that capability should NOT 
- *   be compiled into the kernel.
- * - Another module can be loaded, and capability, being a module again,
- *   might be stacked as secondary module.
- * - Unfortunately, we can't get rid of dummy, as we don't want to
- *   change the default behaviour if a security module is loaded and
- *   some stubs are not implemented in which case these default to
- *   dummy (which behaves differently to capability for some stubs). 
- * - If no security module is loaded, we set security_ops to point
- *   to capability_security_ops; it will not normally be used except for 
- *   one situation: When a security module is unloaded; the value of 
- *   security_enabled may still be evaluated to 1 when the security_ops 
- *   is already changed. The behaviour is consistent here, as we do
- *   change security_ops back to point to capability_security_ops.
- * - commoncaps needs to be compiled in unconditionally.
- */ 
-
 /* things that live in dummy.c */
+extern struct security_operations dummy_security_ops;
 extern void security_fixup_ops (struct security_operations *ops);
-/* default security ops */
-extern struct security_operations capability_security_ops;
 
 struct security_operations *security_ops;	/* Initialized to NULL */
-int security_enabled;				/* ditto */
-EXPORT_SYMBOL(security_enabled);
 
 static inline int verify (struct security_operations *ops)
 {
@@ -88,16 +57,14 @@ int __init security_scaffolding_startup (void)
 {
 	printk (KERN_INFO "Security Scaffold v" SECURITY_SCAFFOLD_VERSION
 		" initialized\n");
-	
-	if (verify (&capability_security_ops)) {
+
+	if (verify (&dummy_security_ops)) {
 		printk (KERN_ERR "%s could not verify "
 			"dummy_security_ops structure.\n", __FUNCTION__);
 		return -EIO;
 	}
-	security_enabled = 0;
-	security_ops = &capability_security_ops;
-	
-	/* Init compiled-in security modules */
+
+	security_ops = &dummy_security_ops;
 	do_security_initcalls();
 
 	return 0;
@@ -123,14 +90,13 @@ int register_security (struct security_operations *ops)
 		return -EINVAL;
 	}
 
-	if (security_ops != &capability_security_ops) {
+	if (security_ops != &dummy_security_ops) {
 		printk (KERN_INFO "There is already a security "
 			"framework initialized, %s failed.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
 	security_ops = ops;
-	security_enabled = 1;
 
 	return 0;
 }
@@ -150,14 +116,13 @@ int unregister_security (struct security_operations *ops)
 {
 	if (ops != security_ops) {
 		printk (KERN_INFO "%s: trying to unregister "
-			"a security_ops structure that is not "
+			"a security_opts structure that is not "
 			"registered, failing.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
-	security_enabled = 0;
-	security_ops = &capability_security_ops;
-	
+	security_ops = &dummy_security_ops;
+
 	return 0;
 }
 

@@ -67,13 +67,18 @@ static struct adapter_parm adapter_parm[] = {
 		.getsda	= { 0x40, STAT, 1 },
 		.getscl	= { 0x08, STAT, 1 },
 	},
-	/* type 4: ADM1025 and ADM1032 evaluation boards */
+	/* type 4: ADM1032 evaluation board */
 	{
 		.setsda	= { 0x02, DATA, 1 },
 		.setscl	= { 0x01, DATA, 1 },
 		.getsda	= { 0x10, STAT, 1 },
-		.init	= { 0xf0, DATA, 0 }, /* ADM1025 doesn't need this,
-						but it doesn't hurt */
+		.init	= { 0xf0, DATA, 0 },
+	},
+	/* type 5: ADM1025, ADM1030 and ADM1031 evaluation boards */
+	{
+		.setsda	= { 0x02, DATA, 1 },
+		.setscl	= { 0x01, DATA, 1 },
+		.getsda	= { 0x10, STAT, 1 },
 	},
 };
 
@@ -85,4 +90,5 @@ MODULE_PARM_DESC(type,
 	" 1 = home brew teletext adapter\n"
 	" 2 = Velleman K8000 adapter\n"
 	" 3 = ELV adapter\n"
-	" 4 = ADM1025 and ADM1032 evaluation boards\n");
+	" 4 = ADM1032 evaluation board\n"
+	" 5 = ADM1025, ADM1030 and ADM1031 evaluation boards\n");

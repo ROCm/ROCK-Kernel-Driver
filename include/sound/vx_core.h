@@ -254,13 +254,13 @@ inline static unsigned int snd_vx_inl(vx_core_t *chip, int reg)
 inline static void snd_vx_outb(vx_core_t *chip, int reg, unsigned char val)
 {
 	snd_assert(chip->ops->out8, return);
-	return chip->ops->out8(chip, reg, val);
+	chip->ops->out8(chip, reg, val);
 }
 
 inline static void snd_vx_outl(vx_core_t *chip, int reg, unsigned int val)
 {
 	snd_assert(chip->ops->out32, return);
-	return chip->ops->out32(chip, reg, val);
+	chip->ops->out32(chip, reg, val);
 }
 
 #define vx_inb(chip,reg)	snd_vx_inb(chip, VX_##reg)

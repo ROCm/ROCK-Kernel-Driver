@@ -18,6 +18,7 @@
 #include <linux/pci.h>
 #include <asm/pci-bridge.h>
 #include <asm/semaphore.h>
+#include <asm/rtas.h>
 #include "../pci.h"
 #include "rpaphp.h"
 #include "rpadlpar.h"
@@ -34,7 +35,7 @@ static struct device_node *find_php_slot_vio_node(char *drc_name)
 		return NULL;
 
 	for (child = of_get_next_child(parent, NULL);
-	     child; child = of_get_next_child(parent, child)) {
+		child; child = of_get_next_child(parent, child)) {
 		loc_code = get_property(child, "ibm,loc-code", NULL);
 		if (loc_code && !strncmp(loc_code, drc_name, strlen(drc_name)))
 			return child;
@@ -346,7 +347,7 @@ int dlpar_remove_slot(char *drc_name)
 		rc = -EINVAL;
 		goto exit;
 	}
-
+	
 	switch (slot->dev_type) {
 		case PCI_DEV:
 			rc = dlpar_remove_pci_slot(slot, drc_name);

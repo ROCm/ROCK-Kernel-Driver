@@ -370,8 +370,6 @@ static void mdacon_init(struct vc_data *c, int init)
 
 	if (mda_display_fg == NULL)
 		mda_display_fg = c;
-
-	MOD_INC_USE_COUNT;
 }
 
 static void mdacon_deinit(struct vc_data *c)
@@ -380,8 +378,6 @@ static void mdacon_deinit(struct vc_data *c)
 
 	if (mda_display_fg == c)
 		mda_display_fg = NULL;
-
-	MOD_DEC_USE_COUNT;
 }
 
 static inline u16 mda_convert_attr(u16 ch)
@@ -502,7 +498,7 @@ static int mdacon_set_palette(struct vc_data *c, unsigned char *table)
 	return -EINVAL;
 }
 
-static int mdacon_blank(struct vc_data *c, int blank)
+static int mdacon_blank(struct vc_data *c, int blank, int mode_switch)
 {
 	if (mda_type == TYPE_MDA) {
 		if (blank) 
@@ -519,11 +515,6 @@ static int mdacon_blank(struct vc_data *c, int blank)
 				mda_mode_port);
 		return 0;
 	}
-}
-
-static int mdacon_font_op(struct vc_data *c, struct console_font_op *op)
-{
-	return -ENOSYS;
 }
 
 static int mdacon_scrolldelta(struct vc_data *c, int lines)
@@ -586,6 +577,7 @@ static int mdacon_scroll(struct vc_data *c, int t, int b, int dir, int lines)
  */
 
 const struct consw mda_con = {
+	.owner =		THIS_MODULE,
 	.con_startup =		mdacon_startup,
 	.con_init =		mdacon_init,
 	.con_deinit =		mdacon_deinit,
@@ -597,7 +589,6 @@ const struct consw mda_con = {
 	.con_bmove =		mdacon_bmove,
 	.con_switch =		mdacon_switch,
 	.con_blank =		mdacon_blank,
-	.con_font_op =		mdacon_font_op,
 	.con_set_palette =	mdacon_set_palette,
 	.con_scrolldelta =	mdacon_scrolldelta,
 	.con_build_attr =	mdacon_build_attr,
@@ -609,8 +600,7 @@ int __init mda_console_init(void)
 	if (mda_first_vc > mda_last_vc)
 		return 1;
 
-	take_over_console(&mda_con, mda_first_vc-1, mda_last_vc-1, 0);
-	return 0;
+	return take_over_console(&mda_con, mda_first_vc-1, mda_last_vc-1, 0);
 }
 
 void __exit mda_console_exit(void)

@@ -516,7 +516,7 @@ static int ac97_mixer_ioctl(struct ac97_codec *codec, unsigned int cmd, unsigned
 		strlcpy(info.id, codec->name, sizeof(info.id));
 		strlcpy(info.name, codec->name, sizeof(info.name));
 		info.modify_counter = codec->modcnt;
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
@@ -525,7 +525,7 @@ static int ac97_mixer_ioctl(struct ac97_codec *codec, unsigned int cmd, unsigned
 		memset(&info, 0, sizeof(info));
 		strlcpy(info.id, codec->name, sizeof(info.id));
 		strlcpy(info.name, codec->name, sizeof(info.name));
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
@@ -534,7 +534,7 @@ static int ac97_mixer_ioctl(struct ac97_codec *codec, unsigned int cmd, unsigned
 		return -EINVAL;
 
 	if (cmd == OSS_GETVERSION)
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, (int __user *)arg);
 
 	if (_SIOC_DIR(cmd) == _SIOC_READ) {
 		switch (_IOC_NR(cmd)) {
@@ -573,12 +573,12 @@ static int ac97_mixer_ioctl(struct ac97_codec *codec, unsigned int cmd, unsigned
 			val = codec->mixer_state[i];
  			break;
 		}
-		return put_user(val, (int *)arg);
+		return put_user(val, (int __user *)arg);
 	}
 
 	if (_SIOC_DIR(cmd) == (_SIOC_WRITE|_SIOC_READ)) {
 		codec->modcnt++;
-		if (get_user(val, (int *)arg))
+		if (get_user(val, (int __user *)arg))
 			return -EFAULT;
 
 		switch (_IOC_NR(cmd)) {

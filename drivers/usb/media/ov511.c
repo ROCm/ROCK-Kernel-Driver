@@ -16,7 +16,7 @@
  * Based on the Linux CPiA driver written by Peter Pregler,
  * Scott J. Bertin and Johannes Erdfelt.
  * 
- * Please see the file: linux/Documentation/usb/ov511.txt 
+ * Please see the file: Documentation/usb/ov511.txt
  * and the website at:  http://alpha.dyndns.org/ov511
  * for more info.
  *
@@ -1900,7 +1900,7 @@ sensor_get_exposure(struct usb_ov511 *ov, unsigned char *val)
 	case SEN_KS0127:
 	case SEN_KS0127B:
 	case SEN_SAA7111A:
-		val = 0;
+		val = NULL;
 		PDEBUG(3, "Unsupported with this sensor");
 		return -EPERM;
 	default:
@@ -4593,7 +4593,7 @@ ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 }
 
 static ssize_t
-ov51x_v4l1_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
+ov51x_v4l1_read(struct file *file, char __user *buf, size_t cnt, loff_t *ppos)
 {
 	struct video_device *vdev = file->private_data;
 	int noblock = file->f_flags&O_NONBLOCK;
@@ -5603,8 +5603,16 @@ ov518_configure(struct usb_ov511 *ov)
 
 	if (ov->bridge == BRG_OV518)
 	{
-		struct usb_interface *ifp = ov->dev->config[0].interface[0];
-		__u16 mxps = ifp->altsetting[7].endpoint[0].desc.wMaxPacketSize;
+		struct usb_interface *ifp;
+		struct usb_host_interface *alt;
+		__u16 mxps = 0;
+
+		ifp = usb_ifnum_to_if(ov->dev, 0);
+		if (ifp) {
+			alt = usb_altnum_to_altsetting(ifp, 7);
+			if (alt)
+				mxps = alt->endpoint[0].desc.wMaxPacketSize;
+		}
 
 		/* Some OV518s have packet numbering by default, some don't */
 		if (mxps == 897)
@@ -5805,7 +5813,7 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	if (dev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	idesc = &intf->altsetting[0].desc;
+	idesc = &intf->cur_altsetting->desc;
 
 	if (idesc->bInterfaceClass != 0xFF)
 		return -ENODEV;

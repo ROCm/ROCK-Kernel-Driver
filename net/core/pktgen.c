@@ -56,6 +56,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/types.h>
@@ -870,7 +871,7 @@ static int proc_read(char *buf , char **start, off_t offset,
 	return p - buf;
 }
 
-static int count_trail_chars(const char *user_buffer, unsigned int maxlen)
+static int count_trail_chars(const char __user *user_buffer, unsigned int maxlen)
 {
 	int i;
 
@@ -895,7 +896,7 @@ done:
 	return i;
 }
 
-static unsigned long num_arg(const char *user_buffer, unsigned long maxlen,
+static unsigned long num_arg(const char __user *user_buffer, unsigned long maxlen,
 			     unsigned long *num)
 {
 	int i = 0;
@@ -916,7 +917,7 @@ static unsigned long num_arg(const char *user_buffer, unsigned long maxlen,
 	return i;
 }
 
-static int strn_len(const char *user_buffer, unsigned int maxlen)
+static int strn_len(const char __user *user_buffer, unsigned int maxlen)
 {
 	int i = 0;
 
@@ -940,7 +941,7 @@ done_str:
 	return i;
 }
 
-static int proc_write(struct file *file, const char *user_buffer,
+static int proc_write(struct file *file, const char __user *user_buffer,
 			 unsigned long count, void *data)
 {
 	int i = 0, max, len;
@@ -1355,7 +1356,7 @@ static int __init init(void)
 		pginfos[i].udp_dst_max = 9;
 		
 		sprintf(pginfos[i].fname, "net/%s/pg%i", PG_PROC_DIR, i);
-		pginfos[i].proc_ent = create_proc_entry(pginfos[i].fname, 0600, 0);
+		pginfos[i].proc_ent = create_proc_entry(pginfos[i].fname, 0600, NULL);
 		if (!pginfos[i].proc_ent) {
 			printk("pktgen: Error: cannot create net/%s/pg procfs entry.\n", PG_PROC_DIR);
 			goto cleanup_mem;
@@ -1366,7 +1367,7 @@ static int __init init(void)
 		pginfos[i].proc_ent->owner = THIS_MODULE;
 
 		sprintf(pginfos[i].busy_fname, "net/%s/pg_busy%i",  PG_PROC_DIR, i);
-		pginfos[i].busy_proc_ent = create_proc_entry(pginfos[i].busy_fname, 0, 0);
+		pginfos[i].busy_proc_ent = create_proc_entry(pginfos[i].busy_fname, 0, NULL);
 		if (!pginfos[i].busy_proc_ent) {
 			printk("pktgen: Error: cannot create net/%s/pg_busy procfs entry.\n", PG_PROC_DIR);
 			goto cleanup_mem;
@@ -1409,7 +1410,7 @@ module_exit(cleanup);
 MODULE_AUTHOR("Robert Olsson <robert.olsson@its.uu.se");
 MODULE_DESCRIPTION("Packet Generator tool");
 MODULE_LICENSE("GPL");
-MODULE_PARM(count_d, "i");
-MODULE_PARM(ipg_d, "i");
-MODULE_PARM(cpu_speed, "i");
-MODULE_PARM(clone_skb_d, "i");
+module_param(count_d, int, 0);
+module_param(ipg_d, int, 0);
+module_param(cpu_speed, int, 0);
+module_param(clone_skb_d, int, 0);

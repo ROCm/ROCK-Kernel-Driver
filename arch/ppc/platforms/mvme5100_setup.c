@@ -138,6 +138,7 @@ mvme5100_init_IRQ(void)
 
 #ifdef CONFIG_MVME5100_IPMC761_PRESENT
 	openpic_init(1, NUM_8259_INTERRUPTS, NULL, -1);
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS,"82c59 cascade",&i8259_irq);
 
 	for(i=0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;

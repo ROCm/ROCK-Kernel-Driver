@@ -10,9 +10,6 @@
 
 /* PMD_SHIFT determines the size of the area a second-level page table can map */
 #define SUN4C_PMD_SHIFT       22
-#define SUN4C_PMD_SIZE        (1UL << SUN4C_PMD_SHIFT)
-#define SUN4C_PMD_MASK        (~(SUN4C_PMD_SIZE-1))
-#define SUN4C_PMD_ALIGN(addr) (((addr)+SUN4C_PMD_SIZE-1)&SUN4C_PMD_MASK)
 
 /* PGDIR_SHIFT determines what a third-level page table entry can map */
 #define SUN4C_PGDIR_SHIFT       22
@@ -73,6 +70,21 @@
 #define SUN4C_PAGE_READONLY	__pgprot(_SUN4C_PAGE_PRESENT|_SUN4C_READABLE)
 #define SUN4C_PAGE_KERNEL	__pgprot(_SUN4C_READABLE|_SUN4C_WRITEABLE|\
 					 _SUN4C_PAGE_DIRTY|_SUN4C_PAGE_PRIV)
+
+/* SUN4C swap entry encoding
+ *
+ * We use 5 bits for the type and 19 for the offset.  This gives us
+ * 32 swapfiles of 4GB each.  Encoding looks like:
+ *
+ * RRRRRRRRooooooooooooooooooottttt
+ * fedcba9876543210fedcba9876543210
+ *
+ * The top 8 bits are reserved for protection and status bits, especially
+ * FILE and PRESENT.
+ */
+#define SUN4C_SWP_TYPE_MASK	0x1f
+#define SUN4C_SWP_OFF_MASK	0x7ffff
+#define SUN4C_SWP_OFF_SHIFT	5
 
 #ifndef __ASSEMBLY__
 

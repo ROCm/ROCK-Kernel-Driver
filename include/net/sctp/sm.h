@@ -322,6 +322,9 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 				const struct sctp_chunk *chunk,
 				sctp_cmd_seq_t *commands,
 				struct sctp_chunk *err_chunk);
+int sctp_eat_data(const struct sctp_association *asoc,
+		  struct sctp_chunk *chunk,
+		  sctp_cmd_seq_t *commands);
 
 /* 3rd level prototypes */
 __u32 sctp_generate_tag(const struct sctp_endpoint *);
@@ -438,6 +441,23 @@ static inline void sctp_add_cmd_sf(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_a
 {
 	if (unlikely(!sctp_add_cmd(seq, verb, obj)))
 		BUG();
+}
+
+/* Check VTAG of the packet matches the sender's own tag. */
+static inline int
+sctp_vtag_verify(const struct sctp_chunk *chunk,
+		 const struct sctp_association *asoc)
+{
+	/* RFC 2960 Sec 8.5 When receiving an SCTP packet, the endpoint
+	 * MUST ensure that the value in the Verification Tag field of
+	 * the received SCTP packet matches its own Tag. If the received
+	 * Verification Tag value does not match the receiver's own
+	 * tag value, the receiver shall silently discard the packet...
+	 */
+        if (ntohl(chunk->sctp_hdr->vtag) == asoc->c.my_vtag)
+                return 1;
+
+	return 0;
 }
 
 /* Check VTAG of the packet matches the sender's own tag OR its peer's

@@ -4,91 +4,17 @@
 
 menu "File systems"
 
-config XIP2_FS
-	tristate "Execute-in-Place (XIP2) fs support"
-	depends on ARCH_S390
-	help
-	  Cool read-only file system for DCSS.
-
-config XIP2_FS_XATTR
-	bool "XIP2 extended attributes"
-	depends on XIP2_FS
-	help
-	  Extended attributes are name:value pairs associated with inodes by
-	  the kernel or by users (see the attr(5) manual page, or visit
-	  <http://acl.bestbits.at/> for details).
-
-	  If unsure, say N.
-
-config XIP2_FS_POSIX_ACL
-	bool "XIP2 POSIX Access Control Lists"
-	depends on XIP2_FS_XATTR
-	help
-	  Posix Access Control Lists (ACLs) support permissions for users and
-	  groups beyond the owner/group/world scheme.
-
-	  To learn more about Access Control Lists, visit the Posix ACLs for
-	  Linux website <http://acl.bestbits.at/>.
-
-	  If you don't know what Access Control Lists are, say N
-
-config XIP2_FS_SECURITY
-	bool "XIP2 Security Labels"
-	depends on XIP2_FS_XATTR
-	help
-	  Security labels support alternative access control models
-	  implemented by security modules like SELinux.  This option
-	  enables an extended attribute handler for file security
-	  labels in the ext2 filesystem.
-
-	  If you are not using a security module that requires using
-	  extended attributes for file security labels, say N.
-
-
 config EXT2_FS
 	tristate "Second extended fs support"
 	help
-	  This is the de facto standard Linux file system (method to organize
-	  files on a storage device) for hard disks.
-
-	  You want to say Y here, unless you intend to use Linux exclusively
-	  from inside a DOS partition using the UMSDOS file system. The
-	  advantage of the latter is that you can get away without
-	  repartitioning your hard drive (which often implies backing
-	  everything up and restoring afterwards); the disadvantage is that
-	  Linux becomes susceptible to DOS viruses and that UMSDOS is somewhat
-	  slower than ext2fs. Even if you want to run Linux in this fashion,
-	  it might be a good idea to have ext2fs around: it enables you to
-	  read more floppy disks and facilitates the transition to a *real*
-	  Linux partition later. Another (rare) case which doesn't require
-	  ext2fs is a diskless Linux box which mounts all files over the
-	  network using NFS (in this case it's sufficient to say Y to "NFS
-	  file system support" below). Saying Y here will enlarge your kernel
-	  by about 44 KB.
-
-	  The Ext2fs-Undeletion mini-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>, gives information about
-	  how to retrieve deleted files on ext2fs file systems.
-
-	  To change the behavior of ext2 file systems, you can use the tune2fs
-	  utility ("man tune2fs"). To modify attributes of files and
-	  directories on ext2 file systems, use chattr ("man chattr").
-
-	  Ext2fs partitions can be read from within DOS using the ext2tool
-	  command line tool package (available from
-	  <ftp://ibiblio.org/pub/Linux/system/filesystems/ext2/>) and from
-	  within Windows NT using the ext2nt command line tool package from
-	  <ftp://ibiblio.org/pub/Linux/utils/dos/>.  Explore2fs is a
-	  graphical explorer for ext2fs partitions which runs on Windows 95
-	  and Windows NT and includes experimental write support; it is
-	  available from
-	  <http://jnewbigin-pc.it.swin.edu.au/Linux/Explore2fs.htm>.
+	  Ext2 is a standard Linux file system for hard disks.
 
 	  To compile this file system support as a module, choose M here: the
 	  module will be called ext2.  Be aware however that the file system
 	  of your root partition (the one containing the directory /) cannot
-	  be compiled as a module, and so this could be dangerous.  Most
-	  everyone wants to say Y here.
+	  be compiled as a module, and so this could be dangerous.
+
+	  If unsure, say Y.
 
 config EXT2_FS_XATTR
 	bool "Ext2 extended attributes"
@@ -230,9 +156,9 @@ config JBD_DEBUG
 config FS_MBCACHE
 # Meta block cache for Extended Attributes (ext2/ext3)
 	tristate
-	depends on EXT2_FS_XATTR || EXT3_FS_XATTR || XIP2_FS_XATTR
-	default y if EXT2_FS=y || EXT3_FS=y || XIP2_FS=y
-	default m if EXT2_FS=m || EXT3_FS=m || XIP2_FS=m
+	depends on EXT2_FS_XATTR || EXT3_FS_XATTR
+	default y if EXT2_FS=y || EXT3_FS=y
+	default m if EXT2_FS=m || EXT3_FS=m
 
 config REISERFS_FS
 	tristate "Reiserfs support"
@@ -340,20 +266,6 @@ config JFS_POSIX_ACL
 
 	  If you don't know what Access Control Lists are, say N
 
-config JFS_DMAPI
-	bool "JFS DMAPI (XDSM) Support"
-	depends on JFS_FS
-	help
-	  The Data Storage Management (XDSM) API is a CAE Specification.  It
-	  defines APIs which use events to notify Data Management (DM)
-	  applications about operations on files, enable DM applications to
-	  store arbitrary attribute information with a file, support managed
-	  regions within a file, and use DMAPI access rights to control 
-	  access to a file object.  DMAPI refers to the interface defined by
-	  the XDSM Specification.
-
-	  If you don't know what DMAPI is, say N.
-
 config JFS_DEBUG
 	bool "JFS debugging"
 	depends on JFS_FS
@@ -377,13 +289,11 @@ config FS_POSIX_ACL
 # 	Never use this symbol for ifdefs.
 #
 	bool
-	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL \
-		|| REISERFS_FS_POSIX_ACL || XIP2_FS_POSIX_ACL
+	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL || REISERFS_FS_POSIX_ACL
 	default y
 
 config XFS_FS
 	tristate "XFS filesystem support"
-	select QSORT
 	help
 	  XFS is a high performance journaling filesystem which originated
 	  on the SGI IRIX platform.  It is completely multi-threaded, can
@@ -419,7 +329,7 @@ config XFS_RT
 	  If unsure, say N.
 
 config XFS_QUOTA
-	tristate "Quota support"
+	bool "Quota support"
 	depends on XFS_FS
 	help
 	  If you say Y here, you will be able to set limits for disk usage on
@@ -434,18 +344,6 @@ config XFS_QUOTA
 	  README.quota in the xfsprogs package.  XFS quota can be used either
 	  with or without the generic quota support enabled (CONFIG_QUOTA) -
 	  they are completely independent subsystems.
-
-config XFS_DMAPI
-	tristate "DMAPI support"
-	depends on XFS_FS
-	help
-	  The Data Management API is a system interface used to implement
-	  the interface defined in the X/Open document:
-	  "Systems Management: Data Storage Management (XDSM) API",
-	  dated February 1997.  This interface is used by hierarchical
-	  storage management systems.
-
-	  If unsure, say N.
 
 config XFS_SECURITY
 	bool "Security Label support"
@@ -470,31 +368,6 @@ config XFS_POSIX_ACL
 	  Linux website <http://acl.bestbits.at/>.
 
 	  If you don't know what Access Control Lists are, say N.
-
-config XFS_DEBUG
-	bool "Debugging support (EXPERIMENTAL)"
-	depends on XFS_FS && EXPERIMENTAL
-	help
-	  Say Y here to get an XFS build with many debugging features,
-	  including ASSERT checks, function wrappers around macros,
-	  and extra sanity-checking functions in various code paths.
-
-	  Note that the resulting code will be HUGE and SLOW, and probably
-	  not useful unless you are debugging a particular problem.
-
-	  Say N unless you are an XFS developer, or you play one on TV.
-
-config XFS_TRACE
-	bool "Tracing support (EXPERIMENTAL)"
-	depends on XFS_FS && EXPERIMENTAL
-	help
-	  Say Y here to get an XFS build with activity tracing enabled.	
-	  Enabling this option will attach historical information to XFS
-	  inodes, buffers, certain locks, the log, the IO path, and a
-	  few other key areas within XFS.  These traces can be examined
-	  using the kdb kernel debugger.
-
-	  Say N unless you are an XFS developer.
 
 config MINIX_FS
 	tristate "Minix fs support"
@@ -534,18 +407,21 @@ config QUOTA
 	help
 	  If you say Y here, you will be able to set per user limits for disk
 	  usage (also called disk quotas). Currently, it works for the
-	  ext2, ext3, and reiserfs file system. You need additional software
-	  in order to use quota support (you can download sources from
+	  ext2, ext3, and reiserfs file system. ext3 also supports journalled
+	  quotas for which you don't need to run quotacheck(8) after an unclean
+	  shutdown. You need additional software in order to use quota support
+	  (you can download sources from
 	  <http://www.sf.net/projects/linuxquota/>). For further details, read
 	  the Quota mini-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>. Probably the quota
-	  support is only useful for multi user systems. If unsure, say N.
+	  <http://www.tldp.org/docs.html#howto>, or the documentation provided
+	  with the quota tools. Probably the quota support is only useful for
+	  multi user systems. If unsure, say N.
 
 config QFMT_V1
 	tristate "Old quota format support"
 	depends on QUOTA
 	help
-	  This quota format was (is) used by kernels earlier than 2.4.??. If
+	  This quota format was (is) used by kernels earlier than 2.4.22. If
 	  you have quota working and you don't want to convert to new quota
 	  format say Y here.
 
@@ -554,8 +430,8 @@ config QFMT_V2
 	depends on QUOTA
 	help
 	  This quota format allows using quotas with 32-bit UIDs/GIDs. If you
-	  need this functionality say Y here. Note that you will need latest
-	  quota utilities for new quota format with this kernel.
+	  need this functionality say Y here. Note that you will need recent
+	  quota utilities (>= 3.01) for new quota format with this kernel.
 
 config QUOTACTL
 	bool
@@ -593,7 +469,7 @@ config AUTOFS4_FS
 	  automounter (amd), which is a pure user space daemon.
 
 	  To use the automounter you need the user-space tools from
-	  <ftp://ftp.kernel.org/pub/linux/daemons/autofs/testing-v4/>; you also
+	  <ftp://ftp.kernel.org/pub/linux/daemons/autofs/v4/>; you also
 	  want to answer Y to "NFS file system support", below.
 
 	  To compile this support as a module, choose M here: the module will be
@@ -666,55 +542,22 @@ config UDF_FS
 
 	  If unsure, say N.
 
+config UDF_NLS
+	bool
+	default y
+	depends on (UDF_FS=m && NLS) || (UDF_FS=y && NLS=y)
+
 endmenu
 
 menu "DOS/FAT/NT Filesystems"
 
 config FAT_FS
-	tristate "DOS FAT fs support"
+	tristate
 	select NLS
-	help
-	  If you want to use one of the FAT-based file systems (the MS-DOS,
-	  VFAT (Windows 95) and UMSDOS (used to run Linux on top of an
-	  ordinary DOS partition) file systems), then you must say Y or M here
-	  to include FAT support. You will then be able to mount partitions or
-	  diskettes with FAT-based file systems and transparently access the
-	  files on them, i.e. MSDOS files will look and behave just like all
-	  other Unix files.
-
-	  This FAT support is not a file system in itself, it only provides
-	  the foundation for the other file systems. You will have to say Y or
-	  M to at least one of "MSDOS fs support" or "VFAT fs support" in
-	  order to make use of it.
-
-	  Another way to read and write MSDOS floppies and hard drive
-	  partitions from within Linux (but not transparently) is with the
-	  mtools ("man mtools") program suite. You don't need to say Y here in
-	  order to do that.
-
-	  If you need to move large files on floppies between a DOS and a
-	  Linux box, say Y here, mount the floppy under Linux with an MSDOS
-	  file system and use GNU tar's M option. GNU tar is a program
-	  available for Unix and DOS ("man tar" or "info tar").
-
-	  It is now also becoming possible to read and write compressed FAT
-	  file systems; read <file:Documentation/filesystems/fat_cvf.txt> for
-	  details.
-
-	  The FAT support will enlarge your kernel by about 37 KB. If unsure,
-	  say Y.
-
-	  To compile this as a module, choose M here: the module will be called
-	  fat.  Note that if you compile the FAT support as a module, you
-	  cannot compile any of the FAT-based file systems into the kernel
-	  -- they will have to be modules as well.
-	  The file system of your root partition (the one containing the
-	  directory /) cannot be a module, so don't say M here if you intend
-	  to use UMSDOS as your root file system.
 
 config MSDOS_FS
 	tristate "MSDOS fs support"
-	depends on FAT_FS
+	select FAT_FS
 	help
 	  This allows you to mount MSDOS partitions of your hard drive (unless
 	  they are compressed; to access compressed MSDOS partitions under
@@ -743,7 +586,7 @@ config MSDOS_FS
 
 config VFAT_FS
 	tristate "VFAT (Windows-95) fs support"
-	depends on FAT_FS
+	select FAT_FS
 	help
 	  This option provides support for normal Windows file systems with
 	  long filenames.  That includes non-compressed FAT-based file systems
@@ -908,6 +751,30 @@ config PROC_KCORE
 	bool
 	default y if !ARM
 
+config SYSFS
+	bool "sysfs file system support" if EMBEDDED
+	default y
+	help
+	The sysfs filesystem is a virtual filesystem that the kernel uses to
+	export internal kernel objects, their attributes, and their
+	relationships to one another.
+
+	Users can use sysfs to ascertain useful information about the running
+	kernel, such as the devices the kernel has discovered on each bus and
+	which driver each is bound to. sysfs can also be used to tune devices
+	and other kernel subsystems.
+
+	Some system agents rely on the information in sysfs to operate.
+	/sbin/hotplug uses device and object attributes in sysfs to assist in
+	delegating policy decisions, like persistantly naming devices.
+
+	sysfs is currently used by the block subsystem to mount the root
+	partition.  If sysfs is disabled you must specify the boot device on
+	the kernel boot command line via its major and minor numbers.  For
+	example, "root=03:01" for /dev/hda1.
+
+	Designers of embedded systems may wish to say N here to conserve space.
+
 config DEVFS_FS
 	bool "/dev file system support (OBSOLETE)"
 	depends on EXPERIMENTAL
@@ -1013,56 +880,6 @@ config RAMFS
 	  To compile this as a module, choose M here: the module will be called
 	  ramfs.
 
-config RELAYFS_FS
-	tristate "Relayfs file system support"
-	---help---
-	  Relayfs is a high-speed data relay filesystem designed to provide
-	  an efficient mechanism for tools and facilities to relay large
-	  amounts of data from kernel space to user space.  It's not useful
-	  on its own, and should only be enabled if other facilities that
-	  need it are enabled, such as for example klog or the Linux Trace
-	  Toolkit.
-
-	  See <file:Documentation/filesystems/relayfs.txt> for further
-	  information.
-
-	  This file system is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called relayfs.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-	  If unsure, say N.
-
-config KLOG_CHANNEL
-	bool "Enable klog debugging support"
-	depends on RELAYFS_FS
-	help
-	  If you say Y to this, a relayfs channel named klog will be created
-	  in the root of the relayfs file system.  You can write to the klog
-	  channel using klog() or klog_raw() from within the kernel or
-	  kernel modules, and read from the klog channel by mounting relayfs
-	  and using read(2) to read from it (or using cat).  If you're not  
-	  sure, say N.
-
-config KLOG_CHANNEL_AUTOENABLE
-	bool "Enable klog logging on startup"
-	depends on KLOG_CHANNEL
-	default y
-	help
-	  If you say Y to this, the klog channel will be automatically enabled
-	  on startup.  Otherwise, to turn klog logging on, you need use
-	  sysctl (fs.relayfs.klog_enabled).  This option is used in cases where
-	  you don't actually want the channel to be written to until it's
-	  enabled.  If you're not sure, say Y.
-
-config KLOG_CHANNEL_SHIFT
-	depends on KLOG_CHANNEL
-	int "klog debugging channel size (14 => 16KB, 22 => 4MB)"
-	range 14 22
-	default 21
-	help
-	  Select klog debugging channel size as a power of 2.
-
 endmenu
 
 menu "Miscellaneous filesystems"
@@ -1142,7 +959,7 @@ config HFSPLUS_FS
 	  style features such as file ownership and permissions.
 
 config BEFS_FS
-	tristate "BeOS file systemv(BeFS) support (read only) (EXPERIMENTAL)"
+	tristate "BeOS file system (BeFS) support (read only) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	select NLS
 	help
@@ -1223,17 +1040,15 @@ config JFFS_FS_VERBOSE
 
 config JFFS_PROC_FS
 	bool "JFFS stats available in /proc filesystem"
-	depends on JFFS_FS && PROC
+	depends on JFFS_FS && PROC_FS
 	help
 	  Enabling this option will cause statistics from mounted JFFS file systems
 	  to be made available to the user in the /proc/fs/jffs/ directory.
 
 config JFFS2_FS
 	tristate "Journalling Flash File System v2 (JFFS2) support"
-	depends on MTD
 	select CRC32
-	select ZLIB_INFLATE
-	select ZLIB_DEFLATE
+	depends on MTD
 	help
 	  JFFS2 is the second generation of the Journalling Flash File System
 	  for use on diskless embedded devices. It provides improved wear
@@ -1276,6 +1091,73 @@ config JFFS2_FS_NAND
 
 	  Say 'N' unless you have NAND flash and you are willing to test and
 	  develop JFFS2 support for it.
+
+config JFFS2_COMPRESSION_OPTIONS
+	bool "Advanced compression options for JFFS2"
+	default n
+	help
+	  Enabling this option allows you to explicitly choose which
+	  compression modules, if any, are enabled in JFFS2. Removing
+	  compressors and mean you cannot read existing file systems,
+	  and enabling experimental compressors can mean that you
+	  write a file system which cannot be read by a standard kernel.
+
+	  If unsure, you should _definitely_ say 'N'.
+
+config JFFS2_ZLIB
+	bool "JFFS2 ZLIB compression support" if JFFS2_COMPRESSION_OPTIONS
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
+	depends on JFFS2_FS
+	default y
+        help
+          Zlib is designed to be a free, general-purpose, legally unencumbered,
+          lossless data-compression library for use on virtually any computer 
+          hardware and operating system. See http://www.gzip.org/zlib/ for
+          further information.
+          
+          Say 'Y' if unsure.
+
+config JFFS2_RTIME
+	bool "JFFS2 RTIME compression support" if JFFS2_COMPRESSION_OPTIONS
+	depends on JFFS2_FS
+	default y
+        help
+          Rtime does manage to recompress already-compressed data. Say 'Y' if unsure.
+
+config JFFS2_RUBIN
+	bool "JFFS2 RUBIN compression support" if JFFS2_COMPRESSION_OPTIONS
+	depends on JFFS2_FS
+	default n
+        help
+          RUBINMIPS and DYNRUBIN compressors. Say 'N' if unsure.
+
+choice
+        prompt "JFFS2 default compression mode" if JFFS2_COMPRESSION_OPTIONS
+        default JFFS2_CMODE_PRIORITY
+        depends on JFFS2_FS
+        help
+          You can set here the default compression mode of JFFS2 from 
+          the avaiable compression modes. Don't touch if unsure.
+
+config JFFS2_CMODE_NONE
+        bool "no compression"
+        help
+          Uses no compression.
+
+config JFFS2_CMODE_PRIORITY
+        bool "priority"
+        help
+          Tries the compressors in a predefinied order and chooses the first 
+          successful one.
+
+config JFFS2_CMODE_SIZE
+        bool "size (EXPERIMENTAL)"
+        help
+          Tries all compressors and chooses the one which has the smallest 
+          result.
+
+endchoice
 
 config CRAMFS
 	tristate "Compressed ROM file system support"
@@ -1327,6 +1209,8 @@ config HPFS_FS
 	  To compile this file system support as a module, choose M here: the
 	  module will be called hpfs.  If unsure, say N.
 
+
+
 config QNX4FS_FS
 	tristate "QNX4 file system support (read only)"
 	help
@@ -1351,6 +1235,8 @@ config QNX4FS_RW
 
 	  It's currently broken, so for now:
 	  answer N.
+
+
 
 config SYSV_FS
 	tristate "System V/Xenix/V7/Coherent file system support"
@@ -1387,6 +1273,8 @@ config SYSV_FS
 	  sysv.
 
 	  If you haven't heard about all of this before, it's safe to say N.
+
+
 
 config UFS_FS
 	tristate "UFS file system support (read only)"
@@ -1437,7 +1325,6 @@ config NFS_FS
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFS_ACL
 	help
 	  If you are connected to some other (usually local) Unix computer
 	  (using SLIP, PLIP, PPP or Ethernet) and want to mount files residing
@@ -1479,17 +1366,6 @@ config NFS_V3
 	  version 3 of the NFS protocol.
 
 	  If unsure, say Y.
-
-config NFS_ACL
-	bool "NFS_ACL protocol extension"
-	depends on NFS_V3
-	select QSORT
-	help
-	  Implement the NFS_ACL protocol extension for manipulating POSIX
-	  Access Control Lists.  The server must also implement the NFS_ACL
-	  protocol extension; see the CONFIG_NFSD_ACL option.
-
-	  If unsure, say N.
 
 config NFS_V4
 	bool "Provide NFSv4 client support (EXPERIMENTAL)"
@@ -1533,7 +1409,6 @@ config NFSD
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFSD_ACL
 	help
 	  If you want your Linux box to act as an NFS *server*, so that other
 	  computers on your local network which support NFS can access certain
@@ -1564,19 +1439,6 @@ config NFSD_V3
 	  If you would like to include the NFSv3 server as well as the NFSv2
 	  server, say Y here.  If unsure, say Y.
 
-config NFSD_ACL
-	bool "NFS_ACL protocol extension"
-	depends on NFSD_V3
-	select QSORT
-	help
-	  Implement the NFS_ACL protocol extension for manipulating POSIX
-	  Access Control Lists on exported file systems.  The clients must
-	  also implement the NFS_ACL protocol extension; see the
-	  CONFIG_NFS_ACL option.  If unsure, say N.
-
-config NFS_ACL_SUPPORT
-	tristate
-
 config NFSD_V4
 	bool "Provide NFSv4 server support (EXPERIMENTAL)"
 	depends on NFSD_V3 && EXPERIMENTAL
@@ -1587,11 +1449,13 @@ config NFSD_V4
 	  If unsure, say N.
 
 config NFSD_TCP
-	bool "Provide NFS server over TCP support (EXPERIMENTAL)"
-	depends on NFSD && EXPERIMENTAL
+	bool "Provide NFS server over TCP support"
+	depends on NFSD
+	default y
 	help
-	  Enable NFS service over TCP connections.  This the officially
-	  still experimental, but seems to work well.
+	  If you want your NFS server to support TCP connections, say Y here.
+	  TCP connections usually perform better than the default UDP when
+	  the network is lossy or congested.  If unsure, say Y.
 
 config ROOT_NFS
 	bool "Root file system on NFS"
@@ -1609,10 +1473,6 @@ config ROOT_NFS
 
 config LOCKD
 	tristate
-
-config STATD
-	bool "Use kernel statd implementation"
-	depends on LOCKD && EXPERIMENTAL
 
 config LOCKD_V4
 	bool
@@ -1703,27 +1563,62 @@ config SMB_NLS_REMOTE
 	  smbmount from samba 2.2.0 or later supports this.
 
 config CIFS
-	tristate "CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)(EXPERIMENTAL)"
+	tristate "CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)"
 	depends on INET
 	select NLS
 	help
 	  This is the client VFS module for the Common Internet File System
 	  (CIFS) protocol which is the successor to the Server Message Block 
 	  (SMB) protocol, the native file sharing mechanism for most early
-	  PC operating systems.  CIFS is fully supported by current network
-	  file servers such as Windows 2000 (including Windows NT version 4 
+	  PC operating systems.  The CIFS protocol is fully supported by 
+	  file servers such as Windows 2000 (including Windows 2003, NT 4  
 	  and Windows XP) as well by Samba (which provides excellent CIFS
-	  server support for Linux and many other operating systems).  For
-	  production systems the smbfs module may be used instead of this
-	  cifs module since smbfs is currently more stable and provides
-	  support for older servers.  The intent of this module is to provide the
-	  most advanced network file system function for CIFS compliant servers, 
+	  server support for Linux and many other operating systems). Currently
+	  you must use the smbfs client filesystem to access older SMB servers
+	  such as Windows 9x and OS/2.
+
+	  The intent of the cifs module is to provide an advanced
+	  network file system client for mounting to CIFS compliant servers, 
 	  including support for dfs (hierarchical name space), secure per-user
 	  session establishment, safe distributed caching (oplock), optional
-	  packet signing, Unicode and other internationalization improvements, and
-	  optional Winbind (nsswitch) integration.  This module is in an early
-	  development stage, so unless you are specifically interested in this
-	  filesystem, just say N.
+	  packet signing, Unicode and other internationalization improvements, 
+	  and optional Winbind (nsswitch) integration. You do not need to enable
+	  cifs if running only a (Samba) server. It is possible to enable both
+	  smbfs and cifs (e.g. if you are using CIFS for accessing Windows 2003
+	  and Samba 3 servers, and smbfs for accessing old servers). If you need 
+	  to mount to Samba or Windows 2003 servers from this machine, say Y.
+
+config CIFS_STATS
+        bool "CIFS statistics"
+        depends on CIFS
+        help
+          Enabling this option will cause statistics for each server share
+	  mounted by the cifs client to be displayed in /proc/fs/cifs/Stats
+
+config CIFS_XATTR
+        bool "CIFS extended attributes (EXPERIMENTAL)"
+        depends on CIFS
+        help
+          Extended attributes are name:value pairs associated with inodes by
+          the kernel or by users (see the attr(5) manual page, or visit
+          <http://acl.bestbits.at/> for details).  CIFS maps the name of
+          extended attributes beginning with the user namespace prefix
+          to SMB/CIFS EAs. EAs are stored on Windows servers without the
+          user namespace prefix, but their names are seen by Linux cifs clients
+          prefaced by the user namespace prefix. The system namespace
+          (used by some filesystems to store ACLs) is not supported at
+          this time.
+                                                                                                    
+          If unsure, say N.
+
+config CIFS_POSIX
+        bool "CIFS POSIX Extensions (EXPERIMENTAL)"
+        depends on CIFS
+        help
+          Enabling this option will cause the cifs client to attempt to
+	  negotiate a newer dialect with servers, such as Samba 3.0.5
+	  or later, that optionally can handle more POSIX like (rather
+	  than Windows like) file behavior.  If unsure, say N.
 
 config NCP_FS
 	tristate "NCP file system support (to mount NetWare volumes)"
@@ -1784,22 +1679,6 @@ config CODA_FS_OLD_API
 	  
 	  For most cases you probably want to say N.
 
-#
-# Intermezzo broke when we added the expanded NGROUPS patches
-#
-config INTERMEZZO_FS
-	tristate "InterMezzo file system support (replicating fs) (EXPERIMENTAL)"
-	depends on INET && EXPERIMENTAL 
-	help
-	  InterMezzo is a networked file system with disconnected operation
-	  and kernel level write back caching.  It is most often used for
-	  replicating potentially large trees or keeping laptop/desktop copies
-	  in sync.
-
-	  If you say Y or M your kernel or module will provide InterMezzo
-	  support.  You will also need a file server daemon, which you can get
-	  from <http://www.inter-mezzo.org/>.
-
 config AFS_FS
 # for fs/nls/Config.in
 	tristate "Andrew File System support (AFS) (Experimental)"
@@ -1828,9 +1707,3 @@ source "fs/nls/Kconfig"
 
 endmenu
 
-
-config FSHOOKS
-	bool "File system hooks"
-	default y
-	help
-	  Provide capability to monitor file system activity

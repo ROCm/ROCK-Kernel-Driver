@@ -28,6 +28,8 @@
 #include "saa7134-reg.h"
 #include "saa7134.h"
 
+#define V4L2_I2C_CLIENTS 1
+
 /* ------------------------------------------------------------------ */
 
 static unsigned int video_debug   = 0;
@@ -148,10 +150,29 @@ static struct saa7134_format formats[] = {
 };
 #define FORMATS ARRAY_SIZE(formats)
 
+#define NORM_625_50			\
+		.h_start       = 0,	\
+		.h_stop        = 719,	\
+		.video_v_start = 24,	\
+		.video_v_stop  = 311,	\
+		.vbi_v_start   = 7,	\
+		.vbi_v_stop    = 22,	\
+		.src_timing    = 4
+
+#define NORM_525_60			\
+		.h_start       = 0,	\
+		.h_stop        = 703,	\
+		.video_v_start = 22,	\
+		.video_v_stop  = 22+239, \
+		.vbi_v_start   = 10, /* FIXME */ \
+		.vbi_v_stop    = 21, /* FIXME */ \
+		.src_timing    = 1
+
 static struct saa7134_tvnorm tvnorms[] = {
 	{
-		.name          = "PAL",
+		.name          = "PAL", /* autodetect */
 		.id            = V4L2_STD_PAL,
+		NORM_625_50,
 
 		.sync_control  = 0x18,
 		.luma_control  = 0x40,
@@ -160,16 +181,46 @@ static struct saa7134_tvnorm tvnorms[] = {
 		.chroma_ctrl2  = 0x06,
 		.vgate_misc    = 0x1c,
 
-		.h_start       = 0,
-		.h_stop        = 719,
-		.video_v_start = 24,
-		.video_v_stop  = 311,
-		.vbi_v_start   = 7,
-		.vbi_v_stop    = 22,
-		.src_timing    = 4,
+	},{
+		.name          = "PAL-BG",
+		.id            = V4L2_STD_PAL_BG,
+		NORM_625_50,
+
+		.sync_control  = 0x18,
+		.luma_control  = 0x40,
+		.chroma_ctrl1  = 0x81,
+		.chroma_gain   = 0x2a,
+		.chroma_ctrl2  = 0x06,
+		.vgate_misc    = 0x1c,
+
+	},{
+		.name          = "PAL-I",
+		.id            = V4L2_STD_PAL_I,
+		NORM_625_50,
+
+		.sync_control  = 0x18,
+		.luma_control  = 0x40,
+		.chroma_ctrl1  = 0x81,
+		.chroma_gain   = 0x2a,
+		.chroma_ctrl2  = 0x06,
+		.vgate_misc    = 0x1c,
+
+	},{
+		.name          = "PAL-DK",
+		.id            = V4L2_STD_PAL_DK,
+		NORM_625_50,
+
+		.sync_control  = 0x18,
+		.luma_control  = 0x40,
+		.chroma_ctrl1  = 0x81,
+		.chroma_gain   = 0x2a,
+		.chroma_ctrl2  = 0x06,
+		.vgate_misc    = 0x1c,
+
 	},{
 		.name          = "NTSC",
 		.id            = V4L2_STD_NTSC,
+		NORM_525_60,
 
 		.sync_control  = 0x59,
 		.luma_control  = 0x40,
@@ -178,16 +229,10 @@ static struct saa7134_tvnorm tvnorms[] = {
 		.chroma_ctrl2  = 0x0e,
 		.vgate_misc    = 0x18,
 
-		.h_start       = 0,
-		.h_stop        = 703,
-		.video_v_start = 22,
-		.video_v_stop  = 22+239,
-		.vbi_v_start   = 10, /* FIXME */
-		.vbi_v_stop    = 21, /* FIXME */
-		.src_timing    = 1,
 	},{
 		.name          = "SECAM",
 		.id            = V4L2_STD_SECAM,
+		NORM_625_50,
 
 		.sync_control  = 0x18, /* old: 0x58, */
 		.luma_control  = 0x1b,
@@ -196,16 +241,10 @@ static struct saa7134_tvnorm tvnorms[] = {
 		.chroma_ctrl2  = 0x00,
 		.vgate_misc    = 0x1c,
 
-		.h_start       = 0,
-		.h_stop        = 719,
-		.video_v_start = 24,
-		.video_v_stop  = 311,
-		.vbi_v_start   = 7,
-		.vbi_v_stop    = 22,
-		.src_timing    = 4,
 	},{
 		.name          = "PAL-M",
 		.id            = V4L2_STD_PAL_M,
+		NORM_525_60,
 
 		.sync_control  = 0x59,
 		.luma_control  = 0x40,
@@ -214,16 +253,10 @@ static struct saa7134_tvnorm tvnorms[] = {
 		.chroma_ctrl2  = 0x0e,
 		.vgate_misc    = 0x18,
 
-		.h_start       = 0,
-		.h_stop        = 719,
-		.video_v_start = 22,
-		.video_v_stop  = 22+240,
-		.vbi_v_start   = 10, /* FIXME */
-		.vbi_v_stop    = 21, /* FIXME */
-		.src_timing    = 1,
 	},{
 		.name          = "PAL-Nc",
 		.id            = V4L2_STD_PAL_Nc,
+		NORM_625_50,
 
 		.sync_control  = 0x18,
 		.luma_control  = 0x40,
@@ -232,35 +265,6 @@ static struct saa7134_tvnorm tvnorms[] = {
 		.chroma_ctrl2  = 0x06,
 		.vgate_misc    = 0x1c,
 
-		.h_start       = 0,
-		.h_stop        = 719,
-		.video_v_start = 24,
-		.video_v_stop  = 311,
-		.vbi_v_start   = 7,
-		.vbi_v_stop    = 22,
-		.src_timing    = 4,
-#if 0
-	},{
-		.name          = "AUTO",
-		.id            = V4L2_STD_PAL|V4L2_STD_NTSC|V4L2_STD_SECAM,
-		.width         = 768,
-		.height        = 576,
-
-		.sync_control  = 0x98,
-		.luma_control  = 0x40,
-		.chroma_ctrl1  = 0x8b,
-		.chroma_gain   = 0x00,
-		.chroma_ctrl2  = 0x00,
-		.vgate_misc    = 0x18,
-
-		.h_start       = 0,
-		.h_stop        = 719,
-		.video_v_start = 24,
-		.video_v_stop  = 311,
-		.vbi_v_start   = 7,
-		.vbi_v_stop    = 22,
-		.src_timing    = 4,
-#endif
 	}
 };
 #define TVNORMS ARRAY_SIZE(tvnorms)
@@ -429,7 +433,6 @@ void res_free(struct saa7134_dev *dev, struct saa7134_fh *fh, unsigned int bits)
 
 static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 {
-	struct video_channel c;
 	int luma_control,sync_control,mux;
 
 	dprintk("set tv norm = %s\n",norm->name);
@@ -489,15 +492,22 @@ static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 	saa_writeb(SAA7134_RAW_DATA_GAIN,         0x40);
 	saa_writeb(SAA7134_RAW_DATA_OFFSET,       0x80);
 
-	/* pass down info to the i2c chips (v4l1) */
-	memset(&c,0,sizeof(c));
-	c.channel = dev->ctl_input;
-	c.norm = VIDEO_MODE_PAL;
-	if (norm->id & V4L2_STD_NTSC)
-		c.norm = VIDEO_MODE_NTSC;
-	if (norm->id & V4L2_STD_SECAM)
-		c.norm = VIDEO_MODE_SECAM;
-	saa7134_i2c_call_clients(dev,VIDIOCSCHAN,&c);
+#ifdef V4L2_I2C_CLIENTS
+	saa7134_i2c_call_clients(dev,VIDIOC_S_STD,&norm->id);
+#else
+	{
+		/* pass down info to the i2c chips (v4l1) */
+		struct video_channel c;
+		memset(&c,0,sizeof(c));
+		c.channel = dev->ctl_input;
+		c.norm = VIDEO_MODE_PAL;
+		if (norm->id & V4L2_STD_NTSC)
+			c.norm = VIDEO_MODE_NTSC;
+		if (norm->id & V4L2_STD_SECAM)
+			c.norm = VIDEO_MODE_SECAM;
+		saa7134_i2c_call_clients(dev,VIDIOCSCHAN,&c);
+	}
+#endif
 }
 
 static void video_mux(struct saa7134_dev *dev, int input)
@@ -583,7 +593,7 @@ static void set_size(struct saa7134_dev *dev, int task,
 	v_start = dev->crop_current.top/2;
 	h_stop  = (dev->crop_current.left + dev->crop_current.width -1);
 	v_stop  = (dev->crop_current.top + dev->crop_current.height -1)/2;
-	
+
 	saa_writeb(SAA7134_VIDEO_H_START1(task), h_start &  0xff);
 	saa_writeb(SAA7134_VIDEO_H_START2(task), h_start >> 8);
 	saa_writeb(SAA7134_VIDEO_H_STOP1(task),  h_stop  &  0xff);
@@ -1228,7 +1238,7 @@ static int video_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-video_read(struct file *file, char *data, size_t count, loff_t *ppos)
+video_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct saa7134_fh *fh = file->private_data;
 
@@ -1672,9 +1682,13 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		v4l2_std_id *id = arg;
 		unsigned int i;
 
-		for(i = 0; i < TVNORMS; i++)
-			if (*id & tvnorms[i].id)
+		for (i = 0; i < TVNORMS; i++)
+			if (*id == tvnorms[i].id)
 				break;
+		if (i == TVNORMS)
+			for (i = 0; i < TVNORMS; i++)
+				if (*id & tvnorms[i].id)
+					break;
 		if (i == TVNORMS)
 			return -EINVAL;
 
@@ -1687,6 +1701,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			spin_unlock_irqrestore(&dev->slock,flags);
 		} else 
 			set_tvnorm(dev,&tvnorms[i]);
+		saa7134_tvaudio_do_scan(dev);
 		up(&dev->lock);
 		return 0;
 	}
@@ -1716,7 +1731,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOC_G_CROP:
 	{
 		struct v4l2_crop * crop = arg;
-		
+
 		if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE &&
 		    crop->type != V4L2_BUF_TYPE_VIDEO_OVERLAY)
 			return -EINVAL;
@@ -1727,7 +1742,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 	{
 		struct v4l2_crop *crop = arg;
 		struct v4l2_rect *b = &dev->crop_bounds;
-		
+
 		if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE &&
 		    crop->type != V4L2_BUF_TYPE_VIDEO_OVERLAY)
 			return -EINVAL;
@@ -1747,7 +1762,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			crop->c.top = b->top + b->height;
 		if (crop->c.height > b->top - crop->c.top + b->height)
 			crop->c.height = b->top - crop->c.top + b->height;
-		
+
 		if (crop->c.left < b->left)
 			crop->c.top = b->left;
 		if (crop->c.left > b->left + b->width)
@@ -1819,7 +1834,11 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
 		down(&dev->lock);
 		dev->ctl_freq = f->frequency;
+#ifdef V4L2_I2C_CLIENTS
+		saa7134_i2c_call_clients(dev,VIDIOC_S_FREQUENCY,f);
+#else
 		saa7134_i2c_call_clients(dev,VIDIOCSFREQ,&dev->ctl_freq);
+#endif
 		saa7134_tvaudio_do_scan(dev);
 		up(&dev->lock);
 		return 0;
@@ -2066,7 +2085,6 @@ static int radio_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOC_G_TUNER:
 	{
 		struct v4l2_tuner *t = arg;
-		struct video_tuner vt;
 
 		if (0 != t->index)
 			return -EINVAL;
@@ -2075,10 +2093,17 @@ static int radio_do_ioctl(struct inode *inode, struct file *file,
 		strcpy(t->name, "Radio");
                 t->rangelow  = (int)(65*16);
                 t->rangehigh = (int)(108*16);
-		
-		memset(&vt,0,sizeof(vt));
-		saa7134_i2c_call_clients(dev,VIDIOCGTUNER,&vt);
-		t->signal = vt.signal;
+
+#ifdef V4L2_I2C_CLIENTS
+		saa7134_i2c_call_clients(dev,VIDIOC_G_TUNER,t);
+#else
+		{
+			struct video_tuner vt;
+			memset(&vt,0,sizeof(vt));
+			saa7134_i2c_call_clients(dev,VIDIOCGTUNER,&vt);
+			t->signal = vt.signal;
+		}
+#endif
 		return 0;
 	}
 	case VIDIOC_ENUMINPUT:

@@ -62,5 +62,13 @@ Hans-Frieder Vogt <hfvogt@arcor.de>
   for his work on calculating and checking the crc's for the
   TechnoTrend/Hauppauge DEC driver firmware
 
+Michael Dreher <michael@5dot1.de>
+Andreas 'randy' Weinberger
+  for the support of the Fujitsu-Siemens Activy budget DVB-S
+
+Kenneth Aafløy <ke-aa@frisurf.no>
+  for adding support for Typhoon DVB-S budget card
+
+
 (If you think you should be in this list, but you are not, drop a
  line to the DVB mailing list)

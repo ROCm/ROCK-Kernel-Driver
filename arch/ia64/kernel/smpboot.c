@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/acpi.h>
 #include <linux/bootmem.h>
+#include <linux/cpu.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -22,10 +23,12 @@
 #include <linux/kernel.h>
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
+#include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 #include <linux/efi.h>
+#include <linux/percpu.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
@@ -44,6 +47,7 @@
 #include <asm/ptrace.h>
 #include <asm/sal.h>
 #include <asm/system.h>
+#include <asm/tlbflush.h>
 #include <asm/unistd.h>
 
 #define SMP_DEBUG 0
@@ -69,17 +73,22 @@ static volatile unsigned long go[SLAVE + 1];
 
 #define DEBUG_ITC_SYNC	0
 
-extern void __init calibrate_delay (void);
+extern void __devinit calibrate_delay (void);
 extern void start_ap (void);
 extern unsigned long ia64_iobase;
 
 task_t *task_for_booting_cpu;
 
-/* Bitmask of currently online CPUs */
+/*
+ * State for each CPU
+ */
+DEFINE_PER_CPU(int, cpu_state);
+
+/* Bitmasks of currently online, and possible CPUs */
 cpumask_t cpu_online_map;
 EXPORT_SYMBOL(cpu_online_map);
-cpumask_t phys_cpu_present_map;
-EXPORT_SYMBOL(phys_cpu_present_map);
+cpumask_t cpu_possible_map;
+EXPORT_SYMBOL(cpu_possible_map);
 
 /* which logical CPU number maps to which CPU (physical APIC ID) */
 volatile int ia64_cpu_to_sapicid[NR_CPUS];
@@ -99,6 +108,7 @@ static int __init
 nointroute (char *str)
 {
 	no_int_routing = 1;
+	printk ("no_int_routing on\n");
 	return 1;
 }
 
@@ -192,7 +202,6 @@ ia64_sync_itc (unsigned int master)
 {
 	long i, delta, adj, adjust_latency = 0, done = 0;
 	unsigned long flags, rt, master_time_stamp, bound;
-	extern void ia64_cpu_local_tick (void);
 #if DEBUG_ITC_SYNC
 	struct {
 		long rt;	/* roundtrip time */
@@ -201,6 +210,14 @@ ia64_sync_itc (unsigned int master)
 		long lat;	/* estimate of itc adjustment latency */
 	} t[NUM_ROUNDS];
 #endif
+
+	/*
+	 * Make sure local timer ticks are disabled while we sync.  If
+	 * they were enabled, we'd have to worry about nasty issues
+	 * like setting the ITC ahead of (or a long time before) the
+	 * next scheduled tick.
+	 */
+	BUG_ON((ia64_get_itv() & (1 << 16)) == 0);
 
 	go[MASTER] = 1;
 
@@ -247,27 +264,17 @@ ia64_sync_itc (unsigned int master)
 
 	printk(KERN_INFO "CPU %d: synchronized ITC with CPU %u (last diff %ld cycles, "
 	       "maxerr %lu cycles)\n", smp_processor_id(), master, delta, rt);
-
-	/*
-	 * Check whether we sync'd the itc ahead of the next timer interrupt.  If so, just
-	 * reset it.
-	 */
-	if (time_after(ia64_get_itc(), local_cpu_data->itm_next)) {
-		Dprintk("CPU %d: oops, jumped a timer tick; resetting timer.\n",
-			smp_processor_id());
-		ia64_cpu_local_tick();
-	}
 }
 
 /*
  * Ideally sets up per-cpu profiling hooks.  Doesn't do much now...
  */
-static inline void __init
+static inline void __devinit
 smp_setup_percpu_timer (void)
 {
 }
 
-static void __init
+static void __devinit
 smp_callin (void)
 {
 	int cpuid, phys_id;
@@ -280,23 +287,17 @@ smp_callin (void)
 	cpuid = smp_processor_id();
 	phys_id = hard_smp_processor_id();
 
-	if (cpu_test_and_set(cpuid, cpu_online_map)) {
+	if (cpu_online(cpuid)) {
 		printk(KERN_ERR "huh, phys CPU#0x%x, CPU#0x%x already present??\n",
 		       phys_id, cpuid);
 		BUG();
 	}
 
+	lock_ipi_calllock();
+	cpu_set(cpuid, cpu_online_map);
+	unlock_ipi_calllock();
+
 	smp_setup_percpu_timer();
-
-	/*
-	 * Get our bogomips.
-	 */
-	ia64_init_itm();
-
-	/*
-	 * Set I/O port base per CPU
-	 */
-	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
 
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP & enable */
 
@@ -305,11 +306,6 @@ smp_callin (void)
 #endif
 
 	local_irq_enable();
-	calibrate_delay();
-	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
-#ifdef CONFIG_IA32_SUPPORT
-	ia32_gdt_init();
-#endif
 
 	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
 		/*
@@ -323,6 +319,17 @@ smp_callin (void)
 	}
 
 	/*
+	 * Get our bogomips.
+	 */
+	ia64_init_itm();
+	calibrate_delay();
+	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
+
+#ifdef CONFIG_IA32_SUPPORT
+	ia32_gdt_init();
+#endif
+
+	/*
 	 * Allow the master to continue.
 	 */
 	cpu_set(cpuid, cpu_callin_map);
@@ -333,10 +340,13 @@ smp_callin (void)
 /*
  * Activate a secondary processor.  head.S calls this.
  */
-int __init
+int __devinit
 start_secondary (void *unused)
 {
 	extern int cpu_idle (void);
+
+	/* Early console may use I/O ports */
+	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
 
 	Dprintk("start_secondary: starting CPU 0x%x\n", hard_smp_processor_id());
 	efi_map_pal_code();
@@ -346,7 +356,7 @@ start_secondary (void *unused)
 	return cpu_idle();
 }
 
-static struct task_struct * __init
+static struct task_struct * __devinit
 fork_by_hand (void)
 {
 	/*
@@ -356,29 +366,51 @@ fork_by_hand (void)
 	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, 0, 0, NULL, NULL);
 }
 
-static int __init
+struct create_idle {
+	struct task_struct *idle;
+	struct completion done;
+};
+
+void
+do_fork_idle(void *_c_idle)
+{
+	struct create_idle *c_idle = _c_idle;
+
+	c_idle->idle = fork_by_hand();
+	complete(&c_idle->done);
+}
+
+static int __devinit
 do_boot_cpu (int sapicid, int cpu)
 {
-	struct task_struct *idle;
 	int timeout;
+	struct create_idle c_idle;
+	DECLARE_WORK(work, do_fork_idle, &c_idle);
 
+	init_completion(&c_idle.done);
 	/*
 	 * We can't use kernel_thread since we must avoid to reschedule the child.
 	 */
-	idle = fork_by_hand();
-	if (IS_ERR(idle))
+	if (!keventd_up() || current_is_keventd())
+		work.func(work.data);
+	else {
+		schedule_work(&work);
+		wait_for_completion(&c_idle.done);
+	}
+
+	if (IS_ERR(c_idle.idle))
 		panic("failed fork for CPU %d", cpu);
-	wake_up_forked_process(idle);
+	wake_up_forked_process(c_idle.idle);
 
 	/*
 	 * We remove it from the pidhash and the runqueue
 	 * once we got the process:
 	 */
-	init_idle(idle, cpu);
+	init_idle(c_idle.idle, cpu);
 
-	unhash_process(idle);
+	unhash_process(c_idle.idle);
 
-	task_for_booting_cpu = idle;
+	task_for_booting_cpu = c_idle.idle;
 
 	Dprintk("Sending wakeup vector %lu to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);
 
@@ -437,18 +469,23 @@ smp_build_cpu_map (void)
 	int sapicid, cpu, i;
 	int boot_cpu_id = hard_smp_processor_id();
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++)
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		ia64_cpu_to_sapicid[cpu] = -1;
+#ifdef CONFIG_HOTPLUG_CPU
+		cpu_set(cpu, cpu_possible_map);
+#endif
+	}
 
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
-	cpus_clear(phys_cpu_present_map);
-	cpu_set(0, phys_cpu_present_map);
-
+	cpus_clear(cpu_present_map);
+	cpu_set(0, cpu_present_map);
+	cpu_set(0, cpu_possible_map);
 	for (cpu = 1, i = 0; i < smp_boot_data.cpu_count; i++) {
 		sapicid = smp_boot_data.cpu_phys_id[i];
 		if (sapicid == boot_cpu_id)
 			continue;
-		cpu_set(cpu, phys_cpu_present_map);
+		cpu_set(cpu, cpu_present_map);
+		cpu_set(cpu, cpu_possible_map);
 		ia64_cpu_to_sapicid[cpu] = sapicid;
 		cpu++;
 	}
@@ -461,7 +498,6 @@ u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_to_node_map);
 /* which logical CPUs are on which nodes */
 cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
-EXPORT_SYMBOL(node_to_cpu_mask);
 
 /*
  * Build cpu to node mapping and initialize the per node cpu masks.
@@ -488,7 +524,7 @@ build_cpu_to_node_map (void)
 #else
 #		error Fixme: Dunno how to build CPU-to-node map.
 #endif
-		cpu_to_node_map[cpu] = node;
+		cpu_to_node_map[cpu] = (node >= 0) ? node : 0;
 		if (node >= 0)
 			cpu_set(cpu, node_to_cpu_mask[node]);
 	}
@@ -530,9 +566,11 @@ smp_prepare_cpus (unsigned int max_cpus)
 	if (!max_cpus) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
 		cpus_clear(cpu_online_map);
-		cpus_clear(phys_cpu_present_map);
+		cpus_clear(cpu_present_map);
+		cpus_clear(cpu_possible_map);
 		cpu_set(0, cpu_online_map);
-		cpu_set(0, phys_cpu_present_map);
+		cpu_set(0, cpu_present_map);
+		cpu_set(0, cpu_possible_map);
 		return;
 	}
 }
@@ -542,6 +580,74 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(smp_processor_id(), cpu_online_map);
 	cpu_set(smp_processor_id(), cpu_callin_map);
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+extern void fixup_irqs(void);
+/* must be called with cpucontrol mutex held */
+static int __devinit cpu_enable(unsigned int cpu)
+{
+	per_cpu(cpu_state,cpu) = CPU_UP_PREPARE;
+	wmb();
+
+	while (!cpu_online(cpu))
+		cpu_relax();
+	return 0;
+}
+
+int __cpu_disable(void)
+{
+	int cpu = smp_processor_id();
+
+	/*
+	 * dont permit boot processor for now
+	 */
+	if (cpu == 0)
+		return -EBUSY;
+
+	fixup_irqs();
+	local_flush_tlb_all();
+	printk ("Disabled cpu %u\n", smp_processor_id());
+	return 0;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	unsigned int i;
+
+	for (i = 0; i < 100; i++) {
+		/* They ack this in play_dead by setting CPU_DEAD */
+		if (per_cpu(cpu_state, cpu) == CPU_DEAD)
+		{
+			/*
+			 * TBD: Enable this when physical removal
+			 * or when we put the processor is put in
+			 * SAL_BOOT_RENDEZ mode
+			 * cpu_clear(cpu, cpu_callin_map);
+			 */
+			return;
+		}
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout(HZ/10);
+	}
+ 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
+}
+#else /* !CONFIG_HOTPLUG_CPU */
+static int __devinit cpu_enable(unsigned int cpu)
+{
+	return 0;
+}
+
+int __cpu_disable(void)
+{
+	return -ENOSYS;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We said "no" in __cpu_disable */
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 void
 smp_cpus_done (unsigned int dummy)
@@ -571,6 +677,17 @@ __cpu_up (unsigned int cpu)
 	if (sapicid == -1)
 		return -EINVAL;
 
+	/*
+	 * Already booted.. just enable and get outa idle lool
+	 */
+	if (cpu_isset(cpu, cpu_callin_map))
+	{
+		cpu_enable(cpu);
+		local_irq_enable();
+		while (!cpu_isset(cpu, cpu_online_map))
+			mb();
+		return 0;
+	}
 	/* Processor goes to start_secondary(), sets online flag */
 	ret = do_boot_cpu(sapicid, cpu);
 	if (ret < 0)

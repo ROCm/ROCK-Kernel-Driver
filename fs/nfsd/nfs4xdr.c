@@ -58,93 +58,94 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
 
-/*
- * From Peter Astrand <peter@cendio.se>: The following routines check
- * whether a filename supplied by the client is valid.
- */
-static const char trailing_bytes_for_utf8[256] = {
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+static const char utf8_byte_len[256] = {
 	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-	2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,3,4,4,4,4,5,5,5,5
+	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+	3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3, 4,4,4,4,4,4,4,4,5,5,5,5,6,6,0,0
 };
 
 static inline int
-is_legal_iso_utf8_sequence(unsigned char *source, int length)
+is_legal_utf8_sequence(unsigned char *source, int length)
 {
-	unsigned char a;
-	unsigned char *srcptr;
+	unsigned char *ptr;
+	unsigned char c;
 
-	srcptr = source + length;
+	if (length==1) return 1;
 
-	switch (length) {
-		/* Everything else falls through when "1"... */
+	/* Check for overlong sequence, and check second byte */
+	c = *(source + 1);
+	switch (*source) {
+	case 0xE0: /* 3 bytes */
+		if ( c < 0xA0 ) return 0;
+		break;
+	case 0xF0: /* 4 bytes */
+		if ( c < 0x90 ) return 0;
+		break;
+	case 0xF8: /* 5 bytes */
+		if ( c < 0xC8 ) return 0;
+		break;
+	case 0xFC: /* 6 bytes */
+		if ( c < 0x84 ) return 0;
+		break;
 	default:
-		/* Sequences with more than 6 bytes are invalid */
-		return 0;
-
-		/*
-		   Byte 3-6 must be 80..BF
-		*/
-	case 6:
-		if ((a = (*--srcptr)) < 0x80 || a > 0xBF) return 0;
-	case 5:
-		if ((a = (*--srcptr)) < 0x80 || a > 0xBF) return 0;
-	case 4:
-		if ((a = (*--srcptr)) < 0x80 || a > 0xBF) return 0;
-	case 3:
-		if ((a = (*--srcptr)) < 0x80 || a > 0xBF) return 0;
-
-	case 2:
-		a = *--srcptr;
-
-		/* Upper limit */
-		if (a > 0xBF)
-			/* 2nd byte may never be > 0xBF */
-			return 0;
-
-		/*
-		   Lower limits checks, to detect non-shortest forms.
-		   No fall-through in this inner switch.
-		*/
-		switch (*source) {
-		case 0xE0: /* 3 bytes */
-			if (a < 0xA0) return 0;
-			break;
-		case 0xF0: /* 4 bytes */
-			if (a < 0x90) return 0;
-			break;
-		case 0xF8: /* 5 bytes */
-			if (a < 0xC8) return 0;
-			break;
-		case 0xFC: /* 6 bytes */
-			if (a < 0x84) return 0;
-			break;
-		default:
-			/* In all cases, 2nd byte must be >= 0x80 (because leading
-			   10...) */
-			if (a < 0x80) return 0;
-		}
-
-	case 1:
-		/* Invalid ranges */
-		if (*source >= 0x80 && *source < 0xC2)
-			/* Multibyte char with value < 0xC2, non-shortest */
-			return 0;
-		if (*source > 0xFD)
-			/* Leading byte starting with 11111110 is illegal */
-			return 0;
-		if (!*source)
-			return 0;
+		if ( (c & 0xC0) != 0x80) return 0;
 	}
 
+	/* Check that trailing bytes look like 10xxxxxx */
+	for (ptr = source++ + length - 1; ptr>source; ptr--)
+		if ( ((*ptr) & 0xC0) != 0x80 ) return 0;
 	return 1;
 }
 
+/* This does some screening on disallowed unicode characters.  It is NOT
+ * comprehensive.
+ */
+static int
+is_allowed_utf8_char(unsigned char *source, int length)
+{
+	/* We assume length and source point to a valid utf8 sequence */
+	unsigned char c;
+
+	/* Disallow F0000 and up (in utf8, F3B08080) */
+	if (*source > 0xF3 ) return 0;
+	c = *(source + 1);
+	switch (*source) {
+	case 0xF3:
+		if (c >= 0xB0) return 0;
+		break;
+	/* Disallow D800-F8FF (in utf8, EDA080-EFA3BF */
+	case 0xED:
+		if (c >= 0xA0) return 0;
+		break;
+	case 0xEE:
+		return 0;
+		break;
+	case 0xEF:
+		if (c <= 0xA3) return 0;
+	/* Disallow FFF9-FFFF (EFBFB9-EFBFBF) */
+		if (c==0xBF)
+			/* Don't need to check <=0xBF, since valid utf8 */
+			if ( *(source+2) >= 0xB9) return 0;
+		break;
+	}
+	return 1;
+}
+
+/* This routine should really check to see that the proper stringprep
+ * mappings have been applied.  Instead, we do a simple screen of some
+ * of the more obvious illegal values by calling is_allowed_utf8_char.
+ * This will allow many illegal strings through, but if a client behaves,
+ * it will get full functionality.  The other option (apart from full
+ * stringprep checking) is to limit everything to an easily handled subset,
+ * such as 7-bit ascii.
+ *
+ * Note - currently calling routines ignore return value except as boolean.
+ */
 static int
 check_utf8(char *str, int len)
 {
@@ -155,11 +156,17 @@ check_utf8(char *str, int len)
 	sourceend = str + len;
 
 	while (chunk < sourceend) {
-		chunklen = trailing_bytes_for_utf8[*chunk]+1;
+		chunklen = utf8_byte_len[*chunk];
+		if (!chunklen)
+			return nfserr_inval;
 		if (chunk + chunklen > sourceend)
 			return nfserr_inval;
-		if (!is_legal_iso_utf8_sequence(chunk, chunklen))
+		if (!is_legal_utf8_sequence(chunk, chunklen))
 			return nfserr_inval;
+		if (!is_allowed_utf8_char(chunk, chunklen))
+			return nfserr_inval;
+		if ( (chunklen==1) && (!*chunk) )
+			return nfserr_inval; /* Disallow embedded nulls */
 		chunk += chunklen;
 	}
 
@@ -280,27 +287,40 @@ u32 *read_buf(struct nfsd4_compoundargs *argp, int nbytes)
 	return p;
 }
 
-char *savemem(struct nfsd4_compoundargs *argp, u32 *p, int nbytes)
+static int
+defer_free(struct nfsd4_compoundargs *argp,
+		void (*release)(const void *), void *p)
 {
 	struct tmpbuf *tb;
+
+	tb = kmalloc(sizeof(*tb), GFP_KERNEL);
+	if (!tb)
+		return -ENOMEM;
+	tb->buf = p;
+	tb->release = release;
+	tb->next = argp->to_free;
+	argp->to_free = tb;
+	return 0;
+}
+
+char *savemem(struct nfsd4_compoundargs *argp, u32 *p, int nbytes)
+{
+	void *new = NULL;
 	if (p == argp->tmp) {
-		p = kmalloc(nbytes, GFP_KERNEL);
-		if (!p) return NULL;
+		new = kmalloc(nbytes, GFP_KERNEL);
+		if (!new) return NULL;
+		p = new;
 		memcpy(p, argp->tmp, nbytes);
 	} else {
 		if (p != argp->tmpp)
 			BUG();
 		argp->tmpp = NULL;
 	}
-	tb = kmalloc(sizeof(*tb), GFP_KERNEL);
-	if (!tb) {
-		kfree(p);
+	if (defer_free(argp, kfree, p)) {
+		kfree(new);
 		return NULL;
-	}
-	tb->buf = p;
-	tb->next = argp->to_free;
-	argp->to_free = tb;
-	return (char*)p;
+	} else
+		return (char *)p;
 }
 
 
@@ -477,11 +497,14 @@ nfsd4_decode_access(struct nfsd4_compoundargs *argp, struct nfsd4_access *access
 	DECODE_TAIL;
 }
 
+#define NFS4_STATE_NOT_LOCKED	((void *)-1)
+
 static int
 nfsd4_decode_close(struct nfsd4_compoundargs *argp, struct nfsd4_close *close)
 {
 	DECODE_HEAD;
 
+	close->cl_stateowner = NFS4_STATE_NOT_LOCKED;
 	READ_BUF(4 + sizeof(stateid_t));
 	READ32(close->cl_seqid);
 	READ32(close->cl_stateid.si_generation);
@@ -528,9 +551,8 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 	case NF4SOCK:
 	case NF4FIFO:
 	case NF4DIR:
-		break;
 	default:
-		goto xdr_error;
+		break;
 	}
 
 	READ_BUF(4);
@@ -572,6 +594,7 @@ nfsd4_decode_lock(struct nfsd4_compoundargs *argp, struct nfsd4_lock *lock)
 {
 	DECODE_HEAD;
 
+	lock->lk_stateowner = NFS4_STATE_NOT_LOCKED;
 	/*
 	* type, reclaim(boolean), offset, length, new_lock_owner(boolean)
 	*/
@@ -629,6 +652,7 @@ nfsd4_decode_locku(struct nfsd4_compoundargs *argp, struct nfsd4_locku *locku)
 {
 	DECODE_HEAD;
 
+	locku->lu_stateowner = NFS4_STATE_NOT_LOCKED;
 	READ_BUF(24 + sizeof(stateid_t));
 	READ32(locku->lu_type);
 	if ((locku->lu_type < NFS4_READ_LT) || (locku->lu_type > NFS4_WRITEW_LT))
@@ -664,6 +688,7 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 
 	memset(open->op_bmval, 0, sizeof(open->op_bmval));
 	open->op_iattr.ia_valid = 0;
+	open->op_stateowner = NFS4_STATE_NOT_LOCKED;
 
 	/* seqid, share_access, share_deny, clientid, ownerlen */
 	READ_BUF(16 + sizeof(clientid_t));
@@ -739,6 +764,7 @@ nfsd4_decode_open_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_open_con
 {
 	DECODE_HEAD;
 		    
+	open_conf->oc_stateowner = NFS4_STATE_NOT_LOCKED;
 	READ_BUF(4 + sizeof(stateid_t));
 	READ32(open_conf->oc_req_stateid.si_generation);
 	COPYMEM(&open_conf->oc_req_stateid.si_opaque, sizeof(stateid_opaque_t));
@@ -752,6 +778,7 @@ nfsd4_decode_open_downgrade(struct nfsd4_compoundargs *argp, struct nfsd4_open_d
 {
 	DECODE_HEAD;
 		    
+	open_down->od_stateowner = NFS4_STATE_NOT_LOCKED;
 	READ_BUF(4 + sizeof(stateid_t));
 	READ32(open_down->od_stateid.si_generation);
 	COPYMEM(&open_down->od_stateid.si_opaque, sizeof(stateid_opaque_t));
@@ -1252,7 +1279,8 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
  */
 
 #define ENCODE_SEQID_OP_TAIL(stateowner) do {			\
-	if (seqid_mutating_err(nfserr) && stateowner) {		\
+	if (seqid_mutating_err(nfserr) && stateowner		\
+	    && (stateowner != NFS4_STATE_NOT_LOCKED)) { 	\
 		if (stateowner->so_confirmed)			\
 			stateowner->so_seqid++;			\
 		stateowner->so_replay.rp_status = nfserr;   	\
@@ -1260,7 +1288,10 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			  (((char *)(resp)->p - (char *)save)); \
 		memcpy(stateowner->so_replay.rp_buf, save,      \
  			stateowner->so_replay.rp_buflen); 	\
-	} } while(0)
+	}							\
+	if (stateowner != NFS4_STATE_NOT_LOCKED)		\
+		nfs4_unlock_state();				\
+	} while (0);
 
 
 static u32 nfs4_ftypes[16] = {
@@ -1269,6 +1300,39 @@ static u32 nfs4_ftypes[16] = {
         NF4REG,  NF4BAD,  NF4LNK, NF4BAD,
         NF4SOCK, NF4BAD,  NF4LNK, NF4BAD,
 };
+
+static int
+nfsd4_encode_name(struct svc_rqst *rqstp, int group, uid_t id,
+			u32 **p, int *buflen)
+{
+	int status;
+
+	if (*buflen < (XDR_QUADLEN(IDMAP_NAMESZ) << 2) + 4)
+		return nfserr_resource;
+	if (group)
+		status = nfsd_map_gid_to_name(rqstp, id, (u8 *)(*p + 1));
+	else
+		status = nfsd_map_uid_to_name(rqstp, id, (u8 *)(*p + 1));
+	if (status < 0)
+		return nfserrno(status);
+	*p = xdr_encode_opaque(*p, NULL, status);
+	*buflen -= (XDR_QUADLEN(status) << 2) + 4;
+	BUG_ON(*buflen < 0);
+	return 0;
+}
+
+static inline int
+nfsd4_encode_user(struct svc_rqst *rqstp, uid_t uid, u32 **p, int *buflen)
+{
+	return nfsd4_encode_name(rqstp, uid, 0, p, buflen);
+}
+
+static inline int
+nfsd4_encode_group(struct svc_rqst *rqstp, uid_t gid, u32 **p, int *buflen)
+{
+	return nfsd4_encode_name(rqstp, gid, 1, p, buflen);
+}
+
 
 /*
  * Note: @fhp can be NULL; in this case, we might have to compose the filehandle
@@ -1285,10 +1349,6 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	u32 bmval0 = bmval[0];
 	u32 bmval1 = bmval[1];
 	struct kstat stat;
-	char owner[IDMAP_NAMESZ];
-	u32 ownerlen = 0;
-	char group[IDMAP_NAMESZ];
-	u32 grouplen = 0;
 	struct svc_fh tempfh;
 	struct kstatfs statfs;
 	int buflen = *countp << 2;
@@ -1319,23 +1379,6 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 			goto out;
 		fhp = &tempfh;
 	}
-	if (bmval1 & FATTR4_WORD1_OWNER) {
-		int temp = nfsd_map_uid_to_name(rqstp, stat.uid, owner);
-		if (temp < 0) {
-			status = temp;
-			goto out_nfserr;
-		}
-		ownerlen = (unsigned) temp;
-	}
-	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		int temp = nfsd_map_gid_to_name(rqstp, stat.gid, group);
-		if (temp < 0) {
-			status = temp;
-			goto out_nfserr;
-		}
-		grouplen = (unsigned) temp;
-	}
-
 	if ((buflen -= 16) < 0)
 		goto out_resource;
 
@@ -1517,18 +1560,18 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		WRITE32(stat.nlink);
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER) {
-		buflen -= (XDR_QUADLEN(ownerlen) << 2) + 4;
-		if (buflen < 0)
+		status = nfsd4_encode_user(rqstp, stat.uid, &p, &buflen);
+		if (status == nfserr_resource)
 			goto out_resource;
-		WRITE32(ownerlen);
-		WRITEMEM(owner, ownerlen);
+		if (status)
+			goto out;
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		buflen -= (XDR_QUADLEN(grouplen) << 2) + 4;
-		if (buflen < 0)
+		status = nfsd4_encode_group(rqstp, stat.gid, &p, &buflen);
+		if (status == nfserr_resource)
 			goto out_resource;
-		WRITE32(grouplen);
-		WRITEMEM(group, grouplen);
+		if (status)
+			goto out;
 	}
 	if (bmval1 & FATTR4_WORD1_RAWDEV) {
 		if ((buflen -= 8) < 0)
@@ -1588,7 +1631,18 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		WRITE32(stat.mtime.tv_sec);
 		WRITE32(stat.mtime.tv_nsec);
 	}
+	if (bmval1 & FATTR4_WORD1_MOUNTED_ON_FILEID) {
+		struct dentry *mnt_pnt, *mnt_root;
 
+		if ((buflen -= 8) < 0)
+                	goto out_resource;
+		mnt_root = exp->ex_mnt->mnt_root;
+		if (mnt_root->d_inode == dentry->d_inode) {
+			mnt_pnt = exp->ex_mnt->mnt_mountpoint;
+			WRITE64((u64) mnt_pnt->d_inode->i_ino);
+		} else
+                	WRITE64((u64) stat.ino);
+	}
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
 	*countp = p - buffer;
 	status = nfs_ok;
@@ -1656,6 +1710,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 			goto error;
 		}
 
+		exp_get(exp);
 		if (d_mountpoint(dentry)) {
 			if ((nfserr = nfsd_cross_mnt(cd->rd_rqstp, &dentry, 
 					 &exp))) {	
@@ -1667,6 +1722,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 			 * this call will be retried.
 			 */
 				dput(dentry);
+				exp_put(exp);
 				nfserr = nfserr_dropit;
 				goto error;
 			}
@@ -1676,6 +1732,8 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		nfserr = nfsd4_encode_fattr(NULL, exp,
 				dentry, p, &buflen, cd->rd_bmval,
 				cd->rd_rqstp);
+		dput(dentry);
+		exp_put(exp);
 		if (!nfserr) {
 			p += buflen;
 			goto out;
@@ -1899,7 +1957,7 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 	ENCODE_SEQID_OP_HEAD;
 
 	if (nfserr)
-		return;
+		goto out;
 
 	RESERVE_SPACE(36 + sizeof(stateid_t));
 	WRITE32(open->op_stateid.si_generation);
@@ -1954,7 +2012,7 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 		BUG();
 	}
 	/* XXX save filehandle here */
-
+out:
 	ENCODE_SEQID_OP_TAIL(open->op_stateowner);
 }
 
@@ -2161,6 +2219,8 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	    readdir->common.err == nfserr_toosmall &&
 	    readdir->buffer == page) 
 		nfserr = nfserr_toosmall;
+	if (nfserr == nfserr_symlink)
+		nfserr = nfserr_notdir;
 	if (nfserr)
 		goto err_no_verf;
 
@@ -2277,14 +2337,8 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 
 	RESERVE_SPACE(8);
 	WRITE32(op->opnum);
-	if ((op->opnum != OP_SETATTR) && (op->opnum != OP_LOCK) && (op->opnum != OP_LOCKT) && (op->opnum != OP_SETCLIENTID) && (op->status)) {
-		*p++ = op->status;
-		ADJUST_ARGS();
-		return;
-	} else {
-		statp = p++;        /* to be backfilled at the end */
-		ADJUST_ARGS();
-	}
+	statp = p++;	/* to be backfilled at the end */
+	ADJUST_ARGS();
 
 	switch (op->opnum) {
 	case OP_ACCESS:
@@ -2388,6 +2442,8 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
  * 
  * XDR note: do not encode rp->rp_buflen: the buffer contains the
  * previously sent already encoded operation.
+ *
+ * called with nfs4_lock_state() held
  */
 void
 nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
@@ -2405,6 +2461,7 @@ nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 	RESERVE_SPACE(rp->rp_buflen);
 	WRITEMEM(rp->rp_buf, rp->rp_buflen);
 	ADJUST_ARGS();
+	nfs4_unlock_state();
 }
 
 /*
@@ -2415,6 +2472,24 @@ int
 nfs4svc_encode_voidres(struct svc_rqst *rqstp, u32 *p, void *dummy)
 {
         return xdr_ressize_check(rqstp, p);
+}
+
+void nfsd4_release_compoundargs(struct nfsd4_compoundargs *args)
+{
+	if (args->ops != args->iops) {
+		kfree(args->ops);
+		args->ops = args->iops;
+	}
+	if (args->tmpp) {
+		kfree(args->tmpp);
+		args->tmpp = NULL;
+	}
+	while (args->to_free) {
+		struct tmpbuf *tb = args->to_free;
+		args->to_free = tb->next;
+		tb->release(tb->buf);
+		kfree(tb);
+	}
 }
 
 int
@@ -2433,20 +2508,7 @@ nfs4svc_decode_compoundargs(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compoun
 
 	status = nfsd4_decode_compound(args);
 	if (status) {
-		if (args->ops != args->iops) {
-			kfree(args->ops);
-			args->ops = args->iops;
-		}
-		if (args->tmpp) {
-			kfree(args->tmpp);
-			args->tmpp = NULL;
-		}
-		while (args->to_free) {
-			struct tmpbuf *tb = args->to_free;
-			args->to_free = tb->next;
-			kfree(tb->buf);
-			kfree(tb);
-		}
+		nfsd4_release_compoundargs(args);
 	}
 	return !status;
 }
@@ -2457,7 +2519,7 @@ nfs4svc_encode_compoundres(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compound
 	/*
 	 * All that remains is to write the tag and operation count...
 	 */
-	struct iovec *iov;
+	struct kvec *iov;
 	p = resp->tagp;
 	*p++ = htonl(resp->taglen);
 	memcpy(p, resp->tag, resp->taglen);

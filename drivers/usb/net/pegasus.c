@@ -1030,7 +1030,7 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 	int cmd;
 
 	pegasus = net->priv;
-	if (get_user(cmd, (int *) uaddr))
+	if (get_user(cmd, (int __user *) uaddr))
 		return -EFAULT;
 	switch (cmd) {
 	case ETHTOOL_GDRVINFO:{
@@ -1107,13 +1107,13 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 #endif
 static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
-	__u16 *data = (__u16 *) & rq->ifr_data;
+	__u16 *data = (__u16 *) & rq->ifr_ifru;
 	pegasus_t *pegasus = net->priv;
 	int res;
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		res = pegasus_ethtool_ioctl(net, (void __user *)rq->ifr_data);
+		res = pegasus_ethtool_ioctl(net, rq->ifr_data);
 		break;
 	case SIOCDEVPRIVATE:
 		data[0] = pegasus->phy;
@@ -1137,8 +1137,6 @@ static void pegasus_set_multicast(struct net_device *net)
 {
 	pegasus_t *pegasus = net->priv;
 
-	netif_stop_queue(net);
-
 	if (net->flags & IFF_PROMISC) {
 		pegasus->eth_regs[EthCtrl2] |= RX_PROMISCUOUS;
 		info("%s: Promiscuous mode enabled", net->name);
@@ -1154,8 +1152,6 @@ static void pegasus_set_multicast(struct net_device *net)
 
 	pegasus->flags |= ETH_REGS_CHANGE;
 	ctrl_callback(pegasus->ctrl_urb, NULL);
-
-	netif_wake_queue(net);
 }
 
 static __u8 mii_phy_probe(pegasus_t * pegasus)
@@ -1321,13 +1317,13 @@ static struct usb_driver pegasus_driver = {
 	.id_table = pegasus_ids,
 };
 
-int __init pegasus_init(void)
+static int __init pegasus_init(void)
 {
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return usb_register(&pegasus_driver);
 }
 
-void __exit pegasus_exit(void)
+static void __exit pegasus_exit(void)
 {
 	usb_deregister(&pegasus_driver);
 }

@@ -24,13 +24,14 @@
 /*
  * Calculate 440GP clocks
  */
-void __init ibm440gp_get_clocks(struct ibm440gp_clocks* p,
+void __init ibm440gp_get_clocks(struct ibm44x_clocks* p,
 				unsigned int sys_clk,
 				unsigned int ser_clk)
 {
 	u32 cpc0_sys0 = mfdcr(DCRN_CPC0_SYS0);
 	u32 cpc0_cr0 = mfdcr(DCRN_CPC0_CR0);
-	u32 opdv, epdv;
+	u32 opdv = ((cpc0_sys0 >> 10) & 0x3) + 1;
+	u32 epdv = ((cpc0_sys0 >> 8) & 0x3) + 1;
 
 	if (cpc0_sys0 & 0x2){
 		/* Bypass system PLL */
@@ -60,19 +61,16 @@ void __init ibm440gp_get_clocks(struct ibm440gp_clocks* p,
 		p->plb = vco / fwdvb;
 	}
 
-	opdv = ((cpc0_sys0 >> 10) & 0x3) + 1;
-	epdv = ((cpc0_sys0 >> 8) & 0x3) + 1;
-
 	p->opb = p->plb / opdv;
 	p->ebc = p->opb / epdv;
 
 	if (cpc0_cr0 & 0x00400000){
 		/* External UART clock */
-		p->uart = ser_clk;
+		p->uart0 = p->uart1 = ser_clk;
 	}
 	else {
 		/* Internal UART clock */
     		u32 uart_div = ((cpc0_cr0 >> 16) & 0x1f) + 1;
-		p->uart = p->plb / uart_div;
+		p->uart0 = p->uart1 = p->plb / uart_div;
 	}
 }

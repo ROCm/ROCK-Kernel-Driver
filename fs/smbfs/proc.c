@@ -56,6 +56,7 @@ static struct smb_ops smb_ops_os2;
 static struct smb_ops smb_ops_win95;
 static struct smb_ops smb_ops_winNT;
 static struct smb_ops smb_ops_unix;
+static struct smb_ops smb_ops_null;
 
 static void
 smb_init_dirent(struct smb_sb_info *server, struct smb_fattr *fattr);
@@ -901,7 +902,6 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 
 	/* chain into the data_ready callback */
 	server->data_ready = xchg(&sk->sk_data_ready, smb_data_ready);
-	server->write_space = xchg(&sk->sk_write_space, smb_write_space);
 
 	/* check if we have an old smbmount that uses seconds for the 
 	   serverzone */
@@ -982,6 +982,9 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 	smbiod_wake_up();
 	if (server->opt.capabilities & SMB_CAP_UNIX)
 		smb_proc_query_cifsunix(server);
+
+	server->conn_complete++;
+	wake_up_interruptible_all(&server->conn_wq);
 	return error;
 
 out:
@@ -2306,16 +2309,14 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 	 */
 	mask = param + 12;
 
-	mask_len = smb_encode_path(server, mask, SMB_MAXPATHLEN+1, dir, &star);
-	if (mask_len < 0) {
-		result = mask_len;
+	result = smb_encode_path(server, mask, SMB_MAXPATHLEN+1, dir, &star);
+	if (result <= 0)
 		goto out_free;
-	}
-	mask_len--;	/* mask_len is strlen, not #bytes */
+	mask_len = result - 1;	/* mask_len is strlen, not #bytes */
+	result = 0;
 	first = 1;
 	VERBOSE("starting mask_len=%d, mask=%s\n", mask_len, mask);
 
-	result = 0;
 	entries_seen = 2;
 	ff_eos = 0;
 
@@ -2371,7 +2372,7 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 		if (req->rq_rcls != 0) {
 			result = smb_errno(req);
 			PARANOIA("name=%s, result=%d, rcls=%d, err=%d\n",
-				 mask, result, server->rcls, server->err);
+				 mask, result, req->rq_rcls, req->rq_err);
 			break;
 		}
 
@@ -2461,8 +2462,6 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 			/*
 			 * Update the mask string for the next message.
 			 */
-			if (mask_len < 0)
-				mask_len = 0;
 			if (mask_len > 255)
 				mask_len = 255;
 			if (mask_len)
@@ -2527,7 +2526,7 @@ smb_proc_getattr_ff(struct smb_sb_info *server, struct dentry *dentry,
 	result = smb_add_request(req);
 	if (result < 0)
 		goto out_free;
-	if (server->rcls != 0) {
+	if (req->rq_rcls != 0) {
 		result = smb_errno(req);
 #ifdef SMBFS_PARANOIA
 		if (result != -ENOENT)
@@ -2640,7 +2639,7 @@ smb_proc_getattr_trans2(struct smb_sb_info *server, struct dentry *dir,
 	result = smb_add_request(req);
 	if (result < 0)
 		goto out;
-	if (server->rcls != 0) {
+	if (req->rq_rcls != 0) {
 		VERBOSE("for %s: result=%d, rcls=%d, err=%d\n",
 			&param[6], result, req->rq_rcls, req->rq_err);
 		result = smb_errno(req);
@@ -2795,10 +2794,45 @@ out:
 }
 
 static int
-smb_proc_getattr_null(struct smb_sb_info *server, struct dentry *dir,
-		      struct smb_fattr *attr)
+smb_proc_ops_wait(struct smb_sb_info *server)
 {
-	return -EIO;
+	int result;
+
+	result = wait_event_interruptible_timeout(server->conn_wq,
+				server->conn_complete, 30*HZ);
+
+	if (!result || signal_pending(current))
+		return -EIO;
+
+	return 0;
+}
+
+static int
+smb_proc_getattr_null(struct smb_sb_info *server, struct dentry *dir,
+			  struct smb_fattr *fattr)
+{
+	int result;
+
+	if (smb_proc_ops_wait(server) < 0)
+		return -EIO;
+
+	smb_init_dirent(server, fattr);
+	result = server->ops->getattr(server, dir, fattr);
+	smb_finish_dirent(server, fattr);
+
+	return result;
+}
+
+static int
+smb_proc_readdir_null(struct file *filp, void *dirent, filldir_t filldir,
+		      struct smb_cache_control *ctl)
+{
+	struct smb_sb_info *server = server_from_dentry(filp->f_dentry);
+
+	if (smb_proc_ops_wait(server) < 0)
+		return -EIO;
+
+	return server->ops->readdir(filp, dirent, filldir, ctl);
 }
 
 int
@@ -3219,7 +3253,7 @@ smb_proc_read_link(struct smb_sb_info *server, struct dentry *d,
 	if (result < 0)
 		goto out_free;
 	DEBUG1("for %s: result=%d, rcls=%d, err=%d\n",
-		&param[6], result, server->rcls, server->err);
+		&param[6], result, req->rq_rcls, req->rq_err);
 
 	/* copy data up to the \0 or buffer length */
 	result = len;
@@ -3269,7 +3303,7 @@ smb_proc_symlink(struct smb_sb_info *server, struct dentry *d,
 		goto out_free;
 
 	DEBUG1("for %s: result=%d, rcls=%d, err=%d\n",
-		&param[6], result, server->rcls, server->err);
+		&param[6], result, req->rq_rcls, req->rq_err);
 	result = 0;
 
 out_free:
@@ -3316,7 +3350,7 @@ smb_proc_link(struct smb_sb_info *server, struct dentry *dentry,
 		goto out_free;
 
 	DEBUG1("for %s: result=%d, rcls=%d, err=%d\n",
-	       &param[6], result, server->rcls, server->err);
+	       &param[6], result, req->rq_rcls, req->rq_err);
 	result = 0;
 
 out_free:
@@ -3432,6 +3466,7 @@ static struct smb_ops smb_ops_unix =
 /* Place holder until real ops are in place */
 static struct smb_ops smb_ops_null =
 {
+	.readdir	= smb_proc_readdir_null,
 	.getattr	= smb_proc_getattr_null,
 };
 

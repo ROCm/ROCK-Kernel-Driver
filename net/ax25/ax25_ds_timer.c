@@ -180,7 +180,7 @@ void ax25_ds_idletimer_expiry(ax25_cb *ax25)
 			ax25->sk->sk_state_change(ax25->sk);
 			sock_set_flag(ax25->sk, SOCK_DEAD);
 		}
-		bh_lock_sock(ax25->sk);
+		bh_unlock_sock(ax25->sk);
 	}
 }
 

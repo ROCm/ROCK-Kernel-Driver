@@ -49,15 +49,15 @@
  * Machine setup..
  */
 unsigned int console_mode = 0;
-unsigned int console_device = -1;
+unsigned int console_devno = -1;
 unsigned int console_irq = -1;
 unsigned long memory_size = 0;
 unsigned long machine_flags = 0;
-struct { unsigned long addr, size, type; } memory_chunk[16] = { { 0 } };
+struct {
+	unsigned long addr, size, type;
+} memory_chunk[MEMORY_CHUNKS] = { { 0 } };
 #define CHUNK_READ_WRITE 0
 #define CHUNK_READ_ONLY 1
-int cpus_initialized = 0;
-static cpumask_t cpu_initialized;
 volatile int __cpu_logical_map[NR_CPUS]; /* logical cpu to cpu address */
 
 /*
@@ -74,7 +74,6 @@ extern int _text,_etext, _edata, _end;
 #include <asm/setup.h>
 
 static char command_line[COMMAND_LINE_SIZE] = { 0, };
-       char saved_command_line[COMMAND_LINE_SIZE];
 
 static struct resource code_resource = { "Kernel code", 0x100000, 0 };
 static struct resource data_resource = { "Kernel data", 0, 0 };
@@ -84,14 +83,7 @@ static struct resource data_resource = { "Kernel data", 0, 0 };
  */
 void __devinit cpu_init (void)
 {
-        int nr = smp_processor_id();
         int addr = hard_smp_processor_id();
-
-        if (cpu_test_and_set(nr,cpu_initialized)) {
-                printk("CPU#%d ALREADY INITIALIZED!!!!!!!!!\n", nr);
-                for (;;) local_irq_enable();
-        }
-        cpus_initialized++;
 
         /*
          * Store processor id in lowcore (used e.g. in timer_interrupt)
@@ -159,7 +151,7 @@ static int __init condev_setup(char *str)
 
 	vdev = simple_strtoul(str, &str, 0);
 	if (vdev >= 0 && vdev < 65536) {
-		console_device = vdev;
+		console_devno = vdev;
 		console_irq = -1;
 	}
 	return 1;
@@ -193,7 +185,7 @@ static void __init conmode_default(void)
 
         if (MACHINE_IS_VM) {
 		cpcmd("QUERY CONSOLE", query_buffer, 1024);
-		console_device = simple_strtoul(query_buffer + 5, NULL, 16);
+		console_devno = simple_strtoul(query_buffer + 5, NULL, 16);
 		ptr = strstr(query_buffer, "SUBCHANNEL =");
 		console_irq = simple_strtoul(ptr + 13, NULL, 16);
 		cpcmd("QUERY TERM", query_buffer, 1024);
@@ -647,4 +639,14 @@ int show_interrupts(struct seq_file *p, void *v)
         }
 	
         return 0;
+}
+
+/*
+ * For compatibilty only. S/390 specific setup of interrupts et al. is done
+ * much later in init_channel_subsystem().
+ */
+void __init
+init_IRQ(void)
+{
+	/* nothing... */
 }

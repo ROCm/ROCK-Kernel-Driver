@@ -231,7 +231,7 @@ nfs_xdr_readargs(struct rpc_rqst *req, u32 *p, struct nfs_readargs *args)
 static int
 nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 {
-	struct iovec *iov = req->rq_rvec;
+	struct kvec *iov = req->rq_rcv_buf.head;
 	int	status, count, recvd, hdrlen;
 
 	if ((status = ntohl(*p++)))
@@ -250,7 +250,7 @@ nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 		xdr_shift_buf(&req->rq_rcv_buf, iov->iov_len - hdrlen);
 	}
 
-	recvd = req->rq_received - hdrlen;
+	recvd = req->rq_rcv_buf.len - hdrlen;
 	if (count > recvd) {
 		printk(KERN_WARNING "NFS: server cheating in read reply: "
 			"count %d > recvd %d\n", count, recvd);
@@ -375,7 +375,7 @@ static int
 nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, void *dummy)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
-	struct iovec *iov = rcvbuf->head;
+	struct kvec *iov = rcvbuf->head;
 	struct page **page;
 	int hdrlen, recvd;
 	int status, nr;
@@ -396,7 +396,7 @@ nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, void *dummy)
 	}
 
 	pglen = rcvbuf->page_len;
-	recvd = req->rq_received - hdrlen;
+	recvd = rcvbuf->len - hdrlen;
 	if (pglen > recvd)
 		pglen = recvd;
 	page = rcvbuf->pages;
@@ -530,7 +530,7 @@ static int
 nfs_xdr_readlinkres(struct rpc_rqst *req, u32 *p, void *dummy)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
-	struct iovec *iov = rcvbuf->head;
+	struct kvec *iov = rcvbuf->head;
 	unsigned int hdrlen;
 	u32	*strlen, len;
 	char	*string;
@@ -547,7 +547,7 @@ nfs_xdr_readlinkres(struct rpc_rqst *req, u32 *p, void *dummy)
 	strlen = (u32*)kmap_atomic(rcvbuf->pages[0], KM_USER0);
 	/* Convert length of symlink */
 	len = ntohl(*strlen);
-	if (len >= rcvbuf->page_len - 4) {
+	if (len > rcvbuf->page_len) {
 		dprintk(KERN_WARNING "nfs: server returned giant symlink!\n");
 		kunmap_atomic(strlen, KM_USER0);
 		return -ENAMETOOLONG;

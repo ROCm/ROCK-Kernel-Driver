@@ -5,15 +5,15 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |	fpsp.h --- stack frame offsets during FPSP exception handling
 |
 |	These equates are used to access the exception frame, the fsave
 |	frame and any local variables needed by the FPSP package.
-|	
+|
 |	All FPSP handlers begin by executing:
 |
 |		link	a6,#-LOCAL_SIZE
@@ -90,13 +90,13 @@
 	.set	USER_FP2,LV+40		| saved user FP2
 	.set	USER_FP3,LV+52		| saved user FP3
 	.set	USER_FPCR,LV+64		| saved user FPCR
-	.set	FPCR_ENABLE,USER_FPCR+2	| 	FPCR exception enable 
-	.set	FPCR_MODE,USER_FPCR+3	| 	FPCR rounding mode control
+	.set	FPCR_ENABLE,USER_FPCR+2	|	FPCR exception enable
+	.set	FPCR_MODE,USER_FPCR+3	|	FPCR rounding mode control
 	.set	USER_FPSR,LV+68		| saved user FPSR
-	.set	FPSR_CC,USER_FPSR+0	| 	FPSR condition code
-	.set	FPSR_QBYTE,USER_FPSR+1	| 	FPSR quotient
-	.set	FPSR_EXCEPT,USER_FPSR+2	| 	FPSR exception
-	.set	FPSR_AEXCEPT,USER_FPSR+3	| 	FPSR accrued exception
+	.set	FPSR_CC,USER_FPSR+0	|	FPSR condition code
+	.set	FPSR_QBYTE,USER_FPSR+1	|	FPSR quotient
+	.set	FPSR_EXCEPT,USER_FPSR+2	|	FPSR exception
+	.set	FPSR_AEXCEPT,USER_FPSR+3	|	FPSR accrued exception
 	.set	USER_FPIAR,LV+72		| saved user FPIAR
 	.set	FP_SCR1,LV+76		| room for a temporary float value
 	.set	FP_SCR2,LV+92		| room for a temporary float value
@@ -143,8 +143,8 @@
 	.set	CMDREG3B,LV-48		| cmd reg for E3 exceptions (2 bytes)
 |
 	.set	NMNEXC,LV-44		| NMNEXC (unsup,snan bits only)
-	.set	nmn_unsup_bit,1	| 
-	.set	nmn_snan_bit,0	| 
+	.set	nmn_unsup_bit,1	|
+	.set	nmn_snan_bit,0	|
 |
 	.set	NMCEXC,LV-43		| NMNEXC & NMCEXC
 	.set	nmn_operr_bit,7
@@ -249,7 +249,7 @@
 	.set	inf_mask,0x02000000
 	.set	nan_mask,0x01000000
 |
-	.set	bsun_mask,0x00008000	| 
+	.set	bsun_mask,0x00008000	|
 	.set	snan_mask,0x00004000
 	.set	operr_mask,0x00002000
 	.set	ovfl_mask,0x00001000
@@ -268,7 +268,7 @@
 |
 	.set	dzinf_mask,inf_mask+dz_mask+adz_mask
 	.set	opnan_mask,nan_mask+operr_mask+aiop_mask
-	.set	nzi_mask,0x01ffffff 	|  clears N, Z, and I
+	.set	nzi_mask,0x01ffffff	|  clears N, Z, and I
 	.set	unfinx_mask,unfl_mask+inex2_mask+aunfl_mask+ainex_mask
 	.set	unf2inx_mask,unfl_mask+inex2_mask+ainex_mask
 	.set	ovfinx_mask,ovfl_mask+inex2_mask+aovfl_mask+ainex_mask

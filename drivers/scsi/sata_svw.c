@@ -1,5 +1,10 @@
 /*
- *  ata_k2.c - Broadcom (Apple K2) SATA
+ *  sata_svw.c - ServerWorks / Apple K2 SATA
+ *
+ *  Maintained by: Benjamin Herrenschmidt <benh@kernel.crashing.org> and
+ *		   Jeff Garzik <jgarzik@pobox.com>
+ *  		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
  *
  *  Copyright 2003 Benjamin Herrenschmidt <benh@kernel.crashing.org>
  *
@@ -35,7 +40,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #ifdef CONFIG_PPC_OF
@@ -226,10 +231,13 @@ static struct ata_port_operations k2_sata_ops = {
 	.check_status		= k2_stat_check_status,
 	.exec_command		= ata_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
+	.bmdma_setup            = ata_bmdma_setup_mmio,
 	.bmdma_start            = ata_bmdma_start_mmio,
-	.fill_sg		= ata_fill_sg,
+	.qc_prep		= ata_qc_prep,
+	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
 	.irq_handler		= ata_interrupt,
+	.irq_clear		= ata_bmdma_irq_clear,
 	.scr_read		= k2_sata_scr_read,
 	.scr_write		= k2_sata_scr_write,
 	.port_start		= ata_port_start,
@@ -284,7 +292,7 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	/* Request PCI regions */
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
-		return rc;
+		goto err_out;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
@@ -355,6 +363,8 @@ err_out_free_ent:
 	kfree(probe_ent);
 err_out_regions:
 	pci_release_regions(pdev);
+err_out:
+	pci_disable_device(pdev);
 	return rc;
 }
 

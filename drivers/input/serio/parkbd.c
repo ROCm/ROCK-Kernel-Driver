@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -86,20 +86,9 @@ static int parkbd_write(struct serio *port, unsigned char c)
 	return 0;
 }
 
-static int parkbd_open(struct serio *port)
-{
-	return 0;
-}
-
-static void parkbd_close(struct serio *port)
-{
-}
-
 static struct serio parkbd_port =
 {
 	.write	= parkbd_write,
-	.open	= parkbd_open,
-	.close	= parkbd_close,
 	.name	= parkbd_name,
 	.phys	= parkbd_phys,
 };
@@ -115,7 +104,7 @@ static void parkbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			parkbd_writing = 0;
 			parkbd_writelines(3);
 			return;
-		}	
+		}
 
 		parkbd_writelines(((parkbd_buffer >> parkbd_counter++) & 1) | 2);
 
@@ -131,7 +120,7 @@ static void parkbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if ((parkbd_counter == parkbd_mode + 10) || time_after(jiffies, parkbd_last + HZ/100)) {
 			parkbd_counter = 0;
 			parkbd_buffer = 0;
-		}	
+		}
 
 		parkbd_buffer |= (parkbd_readlines() >> 1) << parkbd_counter++;
 

@@ -168,5 +168,5 @@ static void make_reg_snap (int irq, void *dummy, struct pt_regs *regs)
 
 static int reg_snap_dev_id;
 static struct irqaction reg_snap_action = {
-	make_reg_snap, 0, 0, "reg_snap", &reg_snap_dev_id, 0
+	make_reg_snap, 0, CPU_MASK_NONE, "reg_snap", &reg_snap_dev_id, 0
 };

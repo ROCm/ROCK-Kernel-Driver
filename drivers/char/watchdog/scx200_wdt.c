@@ -25,6 +25,7 @@
 #include <linux/watchdog.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
+#include <linux/fs.h>
 #include <linux/pci.h>
 #include <linux/scx200.h>
 
@@ -131,7 +132,7 @@ static struct notifier_block scx200_wdt_notifier =
 	.notifier_call = scx200_wdt_notify_sys,
 };
 
-static ssize_t scx200_wdt_write(struct file *file, const char *data,
+static ssize_t scx200_wdt_write(struct file *file, const char __user *data,
 				     size_t len, loff_t *ppos)
 {
 	if (ppos != &file->f_pos)
@@ -162,6 +163,8 @@ static ssize_t scx200_wdt_write(struct file *file, const char *data,
 static int scx200_wdt_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident = {
 		.identity = "NatSemi SCx200 Watchdog",
 		.firmware_version = 1,
@@ -173,20 +176,19 @@ static int scx200_wdt_ioctl(struct inode *inode, struct file *file,
 	default:
 		return -ENOIOCTLCMD;
 	case WDIOC_GETSUPPORT:
-		if(copy_to_user((struct watchdog_info *)arg, &ident,
-				sizeof(ident)))
+		if(copy_to_user(argp, &ident, sizeof(ident)))
 			return -EFAULT;
 		return 0;
 	case WDIOC_GETSTATUS:
 	case WDIOC_GETBOOTSTATUS:
-		if (put_user(0, (int *)arg))
+		if (put_user(0, p))
 			return -EFAULT;
 		return 0;
 	case WDIOC_KEEPALIVE:
 		scx200_wdt_ping();
 		return 0;
 	case WDIOC_SETTIMEOUT:
-		if (get_user(new_margin, (int *)arg))
+		if (get_user(new_margin, p))
 			return -EFAULT;
 		if (new_margin < 1)
 			return -EINVAL;
@@ -194,7 +196,7 @@ static int scx200_wdt_ioctl(struct inode *inode, struct file *file,
 		scx200_wdt_update_margin();
 		scx200_wdt_ping();
 	case WDIOC_GETTIMEOUT:
-		if (put_user(margin, (int *)arg))
+		if (put_user(margin, p))
 			return -EFAULT;
 		return 0;
 	}
@@ -220,10 +222,16 @@ static int __init scx200_wdt_init(void)
 
 	printk(KERN_DEBUG NAME ": NatSemi SCx200 Watchdog Driver\n");
 
-	/* First check that this really is a NatSemi SCx200 CPU */
+	/*
+	 * First check that this really is a NatSemi SCx200 CPU or a Geode
+	 * SC1100 processor
+	 */
 	if ((pci_find_device(PCI_VENDOR_ID_NS,
 			     PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-			     NULL)) == NULL)
+			     NULL)) == NULL
+	    && (pci_find_device(PCI_VENDOR_ID_NS,
+				PCI_DEVICE_ID_NS_SC1100_BRIDGE,
+				NULL)) == NULL)
 		return -ENODEV;
 
 	/* More sanity checks, verify that the configuration block is there */

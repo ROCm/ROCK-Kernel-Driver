@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 
 #include "dvb_frontend.h"
+#include "dvb_functions.h"
 
 static int debug = 0;
 #define dprintk	if (debug) printk
@@ -67,10 +68,10 @@ static struct dvb_frontend_info ves1x93_info = {
  */
 
 static u8 init_1893_tab [] = {
-	0x01, 0xa4, 0x35, 0x81, 0x2a, 0x0d, 0x55, 0xc4,
+	0x01, 0xa4, 0x35, 0x80, 0x2a, 0x0b, 0x55, 0xc4,
 	0x09, 0x69, 0x00, 0x86, 0x4c, 0x28, 0x7f, 0x00,
 	0x00, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x80, 0x00, 0x31, 0xb0, 0x14, 0x00, 0xdc, 0x00,
+	0x80, 0x00, 0x21, 0xb0, 0x14, 0x00, 0xdc, 0x00,
 	0x81, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x55, 0x00, 0x00, 0x7f, 0x00
@@ -108,6 +109,11 @@ static u8 init_1993_wtab[] =
 	1,1,1,0,0,0,0,0, 0,0,1,1,0,0,0,0,
 	1,1,1,0,1,1,1,1, 1,1,1,1,1
 };
+
+struct ves1x93_state {
+	fe_spectral_inversion_t inversion;
+};
+
 
 
 static int ves1x93_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
@@ -247,8 +253,16 @@ static int ves1x93_clr_bit (struct dvb_i2c_bus *i2c)
 {
         ves1x93_writereg (i2c, 0, init_1x93_tab[0] & 0xfe);
         ves1x93_writereg (i2c, 0, init_1x93_tab[0]);
+	dvb_delay(5);
+	return 0;
+}
+
+static int ves1x93_init_aquire (struct dvb_i2c_bus *i2c)
+{
         ves1x93_writereg (i2c, 3, 0x00);
-        return ves1x93_writereg (i2c, 3, init_1x93_tab[3]);
+	ves1x93_writereg (i2c, 3, init_1x93_tab[3]);
+	dvb_delay(5);
+	return 0;
 }
 
 
@@ -275,10 +289,7 @@ static int ves1x93_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion
 		return -EINVAL;
 	}
 
-	/* needs to be saved for FE_GET_FRONTEND */
-	init_1x93_tab[0x0c] = (init_1x93_tab[0x0c] & 0x3f) | val;
-
-	return ves1x93_writereg (i2c, 0x0c, init_1x93_tab[0x0c]);
+	return ves1x93_writereg (i2c, 0x0c, (init_1x93_tab[0x0c] & 0x3f) | val);
 }
 
 
@@ -403,6 +414,25 @@ static int ves1x93_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 }
 
 
+static int ves1x93_afc (struct dvb_i2c_bus *i2c, u32 freq, u32 srate)
+{
+	int afc;
+
+	afc = ((int)((ves1x93_readreg (i2c, 0x0a) << 1) & 0xff))/2;
+	afc = (afc * (int)(srate/1000/8))/16;
+    
+	if (afc) {
+	
+		freq -= afc;
+
+		tuner_set_tv_freq (i2c, freq, 0);
+
+		ves1x93_init_aquire (i2c);
+	}
+       
+	return 0;
+}
+
 static int ves1x93_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
 {
 	switch (voltage) {
@@ -421,6 +451,7 @@ static int ves1x93_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltag
 static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	struct dvb_i2c_bus *i2c = fe->i2c;
+	struct ves1x93_state *state = (struct ves1x93_state*) fe->data;
 
         switch (cmd) {
         case FE_GET_INFO:
@@ -497,6 +528,8 @@ static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		ves1x93_set_inversion (i2c, p->inversion);
 		ves1x93_set_fec (i2c, p->u.qpsk.fec_inner);
 		ves1x93_set_symbolrate (i2c, p->u.qpsk.symbol_rate);
+		ves1x93_afc (i2c, p->frequency, p->u.qpsk.symbol_rate);	    
+		state->inversion = p->inversion;
                 break;
         }
 
@@ -514,7 +547,7 @@ static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		 * inversion indicator is only valid
 		 * if auto inversion was used
 		 */
-		if (!(init_1x93_tab[0x0c] & 0x80))
+		if (state->inversion == INVERSION_AUTO)
 			p->inversion = (ves1x93_readreg (i2c, 0x0f) & 2) ? 
 					INVERSION_OFF : INVERSION_ON;
 		p->u.qpsk.fec_inner = ves1x93_get_fec (i2c);
@@ -529,9 +562,6 @@ static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
         case FE_INIT:
 		return ves1x93_init (i2c);
-
-	case FE_RESET:
-		return ves1x93_clr_bit (i2c);
 
 	case FE_SET_TONE:
 		return -EOPNOTSUPP;  /* the ves1893 can generate the 22k */
@@ -552,14 +582,21 @@ static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 static int ves1x93_attach (struct dvb_i2c_bus *i2c, void **data)
 {
 	u8 identity = ves1x93_readreg(i2c, 0x1e);
+	struct ves1x93_state* state;
 
 	switch (identity) {
 	case 0xdc: /* VES1893A rev1 */
+		printk("ves1x93: Detected ves1893a rev1\n");
+		demod_type = DEMOD_VES1893;
+		ves1x93_info.name[4] = '8';
+		break;
 	case 0xdd: /* VES1893A rev2 */
+		printk("ves1x93: Detected ves1893a rev2\n");
 		demod_type = DEMOD_VES1893;
 		ves1x93_info.name[4] = '8';
 		break;
 	case 0xde: /* VES1993 */
+		printk("ves1x93: Detected ves1993\n");
 		demod_type = DEMOD_VES1993;
 		ves1x93_info.name[4] = '9';
 		break;
@@ -568,12 +605,19 @@ static int ves1x93_attach (struct dvb_i2c_bus *i2c, void **data)
 		return -ENODEV;
 	}
 
-	return dvb_register_frontend (ves1x93_ioctl, i2c, NULL, &ves1x93_info);
+	if ((state = kmalloc(sizeof(struct ves1x93_state), GFP_KERNEL)) == NULL) {
+		return -ENOMEM;
+	}
+	state->inversion = INVERSION_OFF;
+	*data = state;
+
+	return dvb_register_frontend (ves1x93_ioctl, i2c, (void*) state, &ves1x93_info);
 }
 
 
 static void ves1x93_detach (struct dvb_i2c_bus *i2c, void *data)
 {
+	kfree(data);
 	dvb_unregister_frontend (ves1x93_ioctl, i2c);
 }
 

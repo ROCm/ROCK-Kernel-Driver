@@ -10,6 +10,7 @@
 #include <linux/wait.h>
 #include <linux/list.h>
 #endif
+#include <linux/compiler.h>
 
 /* Responses from hook functions. */
 #define NF_DROP 0
@@ -64,11 +65,11 @@ struct nf_sockopt_ops
 	/* Non-inclusive ranges: use 0/0/NULL to never get called. */
 	int set_optmin;
 	int set_optmax;
-	int (*set)(struct sock *sk, int optval, void *user, unsigned int len);
+	int (*set)(struct sock *sk, int optval, void __user *user, unsigned int len);
 
 	int get_optmin;
 	int get_optmax;
-	int (*get)(struct sock *sk, int optval, void *user, int *len);
+	int (*get)(struct sock *sk, int optval, void __user *user, int *len);
 
 	/* Number of users inside set() or get(). */
 	unsigned int use;
@@ -99,6 +100,24 @@ void nf_unregister_sockopt(struct nf_sockopt_ops *reg);
 
 extern struct list_head nf_hooks[NPROTO][NF_MAX_HOOKS];
 
+typedef void nf_logfn(unsigned int hooknum,
+		      const struct sk_buff *skb,
+		      const struct net_device *in,
+		      const struct net_device *out,
+		      const char *prefix);
+
+/* Function to register/unregister log function. */
+int nf_log_register(int pf, nf_logfn *logfn);
+void nf_log_unregister(int pf, nf_logfn *logfn);
+
+/* Calls the registered backend logging function */
+void nf_log_packet(int pf,
+		   unsigned int hooknum,
+		   const struct sk_buff *skb,
+		   const struct net_device *in,
+		   const struct net_device *out,
+		   const char *fmt, ...);
+                   
 /* Activate hook; either okfn or kfree_skb called, unless a hook
    returns NF_STOLEN (in which case, it's up to the hook to deal with
    the consequences).
@@ -119,14 +138,12 @@ extern struct list_head nf_hooks[NPROTO][NF_MAX_HOOKS];
 /* This is gross, but inline doesn't cut it for avoiding the function
    call in fast path: gcc doesn't inline (needs value tracking?). --RR */
 #ifdef CONFIG_NETFILTER_DEBUG
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
-(!(cond)								\
- ? (okfn)(skb) 								\
- : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
+#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
+ nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN)
 #define NF_HOOK_THRESH nf_hook_slow
 #else
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
-(!(cond) || list_empty(&nf_hooks[(pf)][(hook)])				\
+#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
+(list_empty(&nf_hooks[(pf)][(hook)])					\
  ? (okfn)(skb)								\
  : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
 #define NF_HOOK_THRESH(pf, hook, skb, indev, outdev, okfn, thresh)	\
@@ -134,17 +151,15 @@ extern struct list_head nf_hooks[NPROTO][NF_MAX_HOOKS];
  ? (okfn)(skb)								\
  : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), (thresh)))
 #endif
-#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
- NF_HOOK_COND((pf), (hook), (skb), (indev), (outdev), (okfn), 1)
 
 int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 		 struct net_device *indev, struct net_device *outdev,
 		 int (*okfn)(struct sk_buff *), int thresh);
 
 /* Call setsockopt() */
-int nf_setsockopt(struct sock *sk, int pf, int optval, char *opt, 
+int nf_setsockopt(struct sock *sk, int pf, int optval, char __user *opt, 
 		  int len);
-int nf_getsockopt(struct sock *sk, int pf, int optval, char *opt,
+int nf_getsockopt(struct sock *sk, int pf, int optval, char __user *opt,
 		  int *len);
 
 /* Packet queuing */
@@ -157,11 +172,13 @@ extern void nf_reinject(struct sk_buff *skb,
 			struct nf_info *info,
 			unsigned int verdict);
 
+extern inline struct ipt_target *
+ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
+extern inline struct ip6t_target *
+ip6t_find_target_lock(const char *name, int *error, struct semaphore *mutex);
+extern inline struct arpt_target *
+arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
 extern void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-extern void (*ip6_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-#endif
 
 #ifdef CONFIG_NETFILTER_DEBUG
 extern void nf_dump_skb(int pf, struct sk_buff *skb);
@@ -172,24 +189,7 @@ extern void nf_invalidate_cache(int pf);
 
 #else /* !CONFIG_NETFILTER */
 #define NF_HOOK(pf, hook, skb, indev, outdev, okfn) (okfn)(skb)
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond) (okfn)(skb)
 #endif /*CONFIG_NETFILTER*/
-
-#ifdef CONFIG_XFRM
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-struct flowi;
-extern void nf_nat_decode_session4(struct sk_buff *skb, struct flowi *fl);
-
-static inline void
-nf_nat_decode_session(struct sk_buff *skb, struct flowi *fl, int family)
-{
-	if (family == AF_INET)
-		nf_nat_decode_session4(skb, fl);
-}
-#else /* CONFIG_IP_NF_NAT_NEEDED */
-#define nf_nat_decode_session(skb,fl,family)
-#endif /* CONFIG_IP_NF_NAT_NEEDED */
-#endif /* CONFIG_XFRM */
 
 #endif /*__KERNEL__*/
 #endif /*__LINUX_NETFILTER_H*/

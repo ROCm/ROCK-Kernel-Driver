@@ -39,30 +39,30 @@
 static int titan_read_config(struct pci_bus *bus, unsigned int devfn, int reg,
 	int size, u32 * val)
 {
-	int dev, bus, func;
+	int dev, busno, func;
 	uint32_t address_reg, data_reg;
 	uint32_t address;
 
-	bus = device->bus->number;
-	dev = PCI_SLOT(device->devfn);
-	func = PCI_FUNC(device->devfn);
+	busno = bus->number;
+	dev = PCI_SLOT(devfn);
+	func = PCI_FUNC(devfn);
 
 	address_reg = TITAN_PCI_0_CONFIG_ADDRESS;
 	data_reg = TITAN_PCI_0_CONFIG_DATA;
 
-	address = (bus << 16) | (dev << 11) | (func << 8) |
-		(offset & 0xfc) | 0x80000000;
+	address = (busno << 16) | (dev << 11) | (func << 8) |
+	          (reg & 0xfc) | 0x80000000;
 
 	/* start the configuration cycle */
 	TITAN_WRITE(address_reg, address);
 
 	switch (size) {
 	case 1:
-		TITAN_READ_8(data_reg + (offset & 0x3), val);
+		TITAN_READ_8(data_reg + (reg & 0x3), val);
 		break;
 
 	case 2:
-		TITAN_READ_16(data_reg + (offset & 0x2), val);
+		TITAN_READ_16(data_reg + (reg & 0x2), val);
 		break;
 
 	case 4:
@@ -80,17 +80,17 @@ static int titan_write_config(struct pci_bus *bus, unsigned int devfn, int reg,
 	int size, u32 val)
 {
 	uint32_t address_reg, data_reg, address;
-	int dev, bus, func;
+	int dev, busno, func;
 
-	bus = device->bus->number;
-	dev = PCI_SLOT(device->devfn);
-	func = PCI_FUNC(device->devfn);
+	busno = bus->number;
+	dev = PCI_SLOT(devfn);
+	func = PCI_FUNC(devfn);
 
 	address_reg = TITAN_PCI_0_CONFIG_ADDRESS;
 	data_reg = TITAN_PCI_0_CONFIG_DATA;
 
-	address = (bus << 16) | (dev << 11) | (func << 8) |
-		(offset & 0xfc) | 0x80000000;
+	address = (busno << 16) | (dev << 11) | (func << 8) |
+		(reg & 0xfc) | 0x80000000;
 
 	/* start the configuration cycle */
 	TITAN_WRITE(address_reg, address);
@@ -98,11 +98,11 @@ static int titan_write_config(struct pci_bus *bus, unsigned int devfn, int reg,
 	/* write the data */
 	switch (size) {
 	case 1:
-		TITAN_WRITE_8(data_reg + (offset & 0x3), val);
+		TITAN_WRITE_8(data_reg + (reg & 0x3), val);
 		break;
 
 	case 2:
-		TITAN_WRITE_16(data_reg + (offset & 0x2), val);
+		TITAN_WRITE_16(data_reg + (reg & 0x2), val);
 		break;
 
 	case 4:

@@ -39,7 +39,7 @@
 #define ACK_TARDY                0xb
 #define ACK_CONFLICT_ERROR       0xc
 #define ACK_DATA_ERROR           0xd
-#define ACK_TYPE_ERROR           0xe 
+#define ACK_TYPE_ERROR           0xe
 #define ACK_ADDRESS_ERROR        0xf
 
 /* Non-standard "ACK codes" for internal use */
@@ -74,7 +74,7 @@ extern const char *hpsb_speedto_str[];
 #define SELFID_PORT_CHILD        0x3
 #define SELFID_PORT_PARENT       0x2
 #define SELFID_PORT_NCONN        0x1
-#define SELFID_PORT_NONE         0x0   
+#define SELFID_PORT_NONE         0x0
 
 
 #include <asm/byteorder.h>

@@ -23,18 +23,18 @@ static struct pcmcia_irqs irqs[] = {
 	{ 1, IRQ_GPIO_H3600_PCMCIA_CD1, "PCMCIA CD1" }
 };
 
-static int h3600_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int h3600_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	skt->irq = skt->nr ? IRQ_GPIO_H3600_PCMCIA_IRQ1
 			   : IRQ_GPIO_H3600_PCMCIA_IRQ0;
 
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void h3600_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void h3600_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
   
 	/* Disable CF bus: */
 	clr_h3600_egpio(IPAQ_EGPIO_OPT_NVRAM_ON);
@@ -43,7 +43,7 @@ static void h3600_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 }
 
 static void
-h3600_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state *state)
+h3600_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
 {
 	unsigned long levels = GPLR;
 
@@ -71,7 +71,7 @@ h3600_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state 
 }
 
 static int
-h3600_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
+h3600_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
 {
 	if (state->Vcc != 0 && state->Vcc != 33 && state->Vcc != 50) {
 		printk(KERN_ERR "h3600_pcmcia: unrecognized Vcc %u.%uV\n",
@@ -89,7 +89,7 @@ h3600_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_sta
 	return 0;
 }
 
-static void h3600_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void h3600_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
 	/* Enable CF bus: */
 	set_h3600_egpio(IPAQ_EGPIO_OPT_NVRAM_ON);
@@ -99,12 +99,12 @@ static void h3600_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(10*HZ / 1000);
 
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void h3600_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void h3600_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 
 	/*
 	 * FIXME:  This doesn't fit well.  We don't have the mechanism in

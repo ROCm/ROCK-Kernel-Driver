@@ -143,6 +143,7 @@ struct htb_class
     /* general class parameters */
     u32 classid;
     struct tc_stats	stats;	/* generic stats */
+    spinlock_t		*stats_lock;
     struct tc_htb_xstats xstats;/* our special stats */
     int refcnt;			/* usage count of this class */
 
@@ -297,7 +298,7 @@ static inline u32 htb_classid(struct htb_class *cl)
 	return (cl && cl != HTB_DIRECT) ? cl->classid : TC_H_UNSPEC;
 }
 
-static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
+static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch, int *qres)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
 	struct htb_class *cl;
@@ -315,9 +316,33 @@ static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
 
 	tcf = q->filter_list;
 	while (tcf && (result = tc_classify(skb, tcf, &res)) >= 0) {
+#ifdef CONFIG_NET_CLS_ACT
+		int terminal = 0;
+		switch (result) {
+		case TC_ACT_SHOT: /* Stop and kfree */
+			*qres = NET_XMIT_DROP;
+			terminal = 1;
+			break;
+		case TC_ACT_QUEUED:
+		case TC_ACT_STOLEN: 
+			terminal = 1;
+			break;
+		case TC_ACT_RECLASSIFY:  /* Things look good */
+		case TC_ACT_OK:
+		case TC_ACT_UNSPEC:
+		default:
+		break;
+		}
+
+		if (terminal) {
+			kfree_skb(skb);
+			return NULL;
+		}
+#else
 #ifdef CONFIG_NET_CLS_POLICE
 		if (result == TC_POLICE_SHOT)
 			return NULL;
+#endif
 #endif
 		if ((cl = (void*)res.class) == NULL) {
 			if (res.classid == sch->handle)
@@ -367,7 +392,7 @@ static void htb_debug_dump (struct htb_sched *q)
 		struct list_head *l;
 		list_for_each (l,q->hash+i) {
 			struct htb_class *cl = list_entry(l,struct htb_class,hlist);
-			long diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer, 0);
+			long diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer);
 			printk(KERN_DEBUG "htb*c%x m=%d t=%ld c=%ld pq=%lu df=%ld ql=%d "
 					"pa=%x f:",
 				cl->classid,cl->cmode,cl->tokens,cl->ctokens,
@@ -686,9 +711,24 @@ htb_deactivate(struct htb_sched *q,struct htb_class *cl)
 
 static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 {
+    int ret = NET_XMIT_SUCCESS;
     struct htb_sched *q = (struct htb_sched *)sch->data;
-    struct htb_class *cl = htb_classify(skb,sch);
+    struct htb_class *cl = htb_classify(skb,sch,&ret);
 
+
+#ifdef CONFIG_NET_CLS_ACT
+    if (cl == HTB_DIRECT ) {
+	if (q->direct_queue.qlen < q->direct_qlen ) {
+	    __skb_queue_tail(&q->direct_queue, skb);
+	    q->direct_pkts++;
+	}
+    } else if (!cl) {
+	    if (NET_XMIT_DROP == ret) {
+		    sch->stats.drops++;
+	    }
+	    return ret;
+    }
+#else
     if (cl == HTB_DIRECT || !cl) {
 	/* enqueue to helper queue */
 	if (q->direct_queue.qlen < q->direct_qlen && cl) {
@@ -699,7 +739,9 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	    sch->stats.drops++;
 	    return NET_XMIT_DROP;
 	}
-    } else if (cl->un.leaf.q->enqueue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
+    }
+#endif
+    else if (cl->un.leaf.q->enqueue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
 	sch->stats.drops++;
 	cl->stats.drops++;
 	return NET_XMIT_DROP;
@@ -718,7 +760,8 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
     struct htb_sched *q = (struct htb_sched *)sch->data;
-    struct htb_class *cl = htb_classify(skb,sch);
+    int ret =  NET_XMIT_SUCCESS;
+    struct htb_class *cl = htb_classify(skb,sch, &ret);
     struct sk_buff *tskb;
 
     if (cl == HTB_DIRECT || !cl) {
@@ -807,14 +850,19 @@ static void htb_charge_class(struct htb_sched *q,struct htb_class *cl,
 
 	while (cl) {
 		HTB_CHCL(cl);
-		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer, 0);
+		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer);
 #ifdef HTB_DEBUG
 		if (diff > cl->mbuffer || diff < 0 || PSCHED_TLESS(q->now, cl->t_c)) {
 			if (net_ratelimit())
 				printk(KERN_ERR "HTB: bad diff in charge, cl=%X diff=%lX now=%Lu then=%Lu j=%lu\n",
 				       cl->classid, diff,
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
+				       q->now.tv_sec * 1000000ULL + q->now.tv_usec,
+				       cl->t_c.tv_sec * 1000000ULL + cl->t_c.tv_usec,
+#else
 				       (unsigned long long) q->now,
 				       (unsigned long long) cl->t_c,
+#endif
 				       q->jiffies);
 			diff = 1000;
 		}
@@ -878,14 +926,19 @@ static long htb_do_events(struct htb_sched *q,int level)
 			return cl->pq_key - q->jiffies;
 		}
 		htb_safe_rb_erase(p,q->wait_pq+level);
-		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer, 0);
+		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32)cl->mbuffer);
 #ifdef HTB_DEBUG
 		if (diff > cl->mbuffer || diff < 0 || PSCHED_TLESS(q->now, cl->t_c)) {
 			if (net_ratelimit())
 				printk(KERN_ERR "HTB: bad diff in events, cl=%X diff=%lX now=%Lu then=%Lu j=%lu\n",
 				       cl->classid, diff,
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
+				       q->now.tv_sec * 1000000ULL + q->now.tv_usec,
+				       cl->t_c.tv_sec * 1000000ULL + cl->t_c.tv_usec,
+#else
 				       (unsigned long long) q->now,
 				       (unsigned long long) cl->t_c,
+#endif
 				       q->jiffies);
 			diff = 1000;
 		}
@@ -1008,7 +1061,6 @@ next:
 static void htb_delay_by(struct Qdisc *sch,long delay)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
-	if (netif_queue_stopped(sch->dev)) return;
 	if (delay <= 0) delay = 1;
 	if (unlikely(delay > 5*HZ)) {
 		if (net_ratelimit())

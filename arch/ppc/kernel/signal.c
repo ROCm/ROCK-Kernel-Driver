@@ -33,7 +33,7 @@
 #include <asm/pgtable.h>
 #include <asm/cacheflush.h>
 
-#define DEBUG_SIG 0
+#undef DEBUG_SIG
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
@@ -183,11 +183,11 @@ struct rt_sigframe
 
 /*
  * Save the current user registers on the user stack.
- * We only save the altivec registers if the process has used
- * altivec instructions at some point.
+ * We only save the altivec/spe registers if the process has used
+ * altivec/spe instructions at some point.
  */
 static int
-save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
+save_user_regs(struct pt_regs *regs, struct mcontext __user *frame, int sigret)
 {
 	/* save general and floating-point registers */
 	CHECK_FULL_REGS(regs);
@@ -197,6 +197,10 @@ save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
 #ifdef CONFIG_ALTIVEC
 	if (current->thread.used_vr && (regs->msr & MSR_VEC))
 		giveup_altivec(current);
+#endif /* CONFIG_ALTIVEC */
+#ifdef CONFIG_SPE
+	if (current->thread.used_spe && (regs->msr & MSR_SPE))
+		giveup_spe(current);
 #endif /* CONFIG_ALTIVEC */
 	preempt_enable();
 
@@ -225,9 +229,27 @@ save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
 	 * significant bits of a vector, we "cheat" and stuff VRSAVE in the
 	 * most significant bits of that same vector. --BenH
 	 */
-	if (__put_user(current->thread.vrsave, (u32 *)&frame->mc_vregs[32]))
+	if (__put_user(current->thread.vrsave, (u32 __user *)&frame->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
+
+#ifdef CONFIG_SPE
+	/* save spe registers */
+	if (current->thread.used_spe) {
+		if (__copy_to_user(&frame->mc_vregs, current->thread.evr,
+				   ELF_NEVRREG * sizeof(u32)))
+			return 1;
+		/* set MSR_SPE in the saved MSR value to indicate that
+		   frame->mc_vregs contains valid data */
+		if (__put_user(regs->msr | MSR_SPE, &frame->mc_gregs[PT_MSR]))
+			return 1;
+	}
+	/* else assert((regs->msr & MSR_SPE) == 0) */
+
+	/* We always copy to/from spefscr */
+	if (__put_user(current->thread.spefscr, (u32 *)&frame->mc_vregs + ELF_NEVRREG))
+		return 1;
+#endif /* CONFIG_SPE */
 
 	if (sigret) {
 		/* Set up the sigreturn trampoline: li r0,sigret; sc */
@@ -249,7 +271,7 @@ static int
 restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 {
 	unsigned long save_r2;
-#ifdef CONFIG_ALTIVEC
+#if defined(CONFIG_ALTIVEC) || defined(CONFIG_SPE)
 	unsigned long msr;
 #endif
 
@@ -286,9 +308,26 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 		memset(&current->thread.vr, 0, ELF_NVRREG * sizeof(vector128));
 
 	/* Always get VRSAVE back */
-	if (__get_user(current->thread.vrsave, (u32 *)&sr->mc_vregs[32]))
+	if (__get_user(current->thread.vrsave, (u32 __user *)&sr->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
+
+#ifdef CONFIG_SPE
+	/* force the process to reload the spe registers from
+	   current->thread when it next does spe instructions */
+	regs->msr &= ~MSR_SPE;
+	if (!__get_user(msr, &sr->mc_gregs[PT_MSR]) && (msr & MSR_SPE) != 0) {
+		/* restore spe registers from the stack */
+		if (__copy_from_user(current->thread.evr, &sr->mc_vregs,
+				     sizeof(sr->mc_vregs)))
+			return 1;
+	} else if (current->thread.used_spe)
+		memset(&current->thread.evr, 0, ELF_NEVRREG * sizeof(u32));
+
+	/* Always get SPEFSCR back */
+	if (__get_user(current->thread.spefscr, (u32 *)&sr->mc_vregs + ELF_NEVRREG))
+		return 1;
+#endif /* CONFIG_SPE */
 
 	return 0;
 }
@@ -361,7 +400,7 @@ handle_rt_signal(unsigned long sig, struct k_sigaction *ka,
 	return;
 
 badframe:
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("badframe in handle_rt_signal, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
 #endif
@@ -373,7 +412,7 @@ badframe:
 static int do_setcontext(struct ucontext __user *ucp, struct pt_regs *regs, int sig)
 {
 	sigset_t set;
-	struct mcontext *mcp;
+	struct mcontext __user *mcp;
 
 	if (__copy_from_user(&set, &ucp->uc_sigmask, sizeof(set))
 	    || __get_user(mcp, &ucp->uc_regs))
@@ -408,8 +447,8 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 	if (new_ctx == NULL)
 		return 0;
 	if (verify_area(VERIFY_READ, new_ctx, sizeof(*new_ctx))
-	    || __get_user(tmp, (u8 *) new_ctx)
-	    || __get_user(tmp, (u8 *) (new_ctx + 1) - 1))
+	    || __get_user(tmp, (u8 __user *) new_ctx)
+	    || __get_user(tmp, (u8 __user *) (new_ctx + 1) - 1))
 		return -EFAULT;
 
 	/*
@@ -485,7 +524,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	/* create a stack frame for the caller of the handler */
 	newsp -= __SIGNAL_FRAMESIZE;
 
-	if (verify_area(VERIFY_WRITE, (void *) newsp, origsp - newsp))
+	if (verify_area(VERIFY_WRITE, (void __user *) newsp, origsp - newsp))
 		goto badframe;
 
 #if _NSIG != 64
@@ -513,9 +552,9 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	return;
 
 badframe:
-#if DEBUG_SIG
-	printk("badframe in handle_signal, regs=%p frame=%lx newsp=%lx\n",
-	       regs, frame, *newspp);
+#ifdef DEBUG_SIG
+	printk("badframe in handle_signal, regs=%p frame=%p newsp=%lx\n",
+	       regs, frame, newsp);
 #endif
 	if (sig == SIGSEGV)
 		ka->sa.sa_handler = SIG_DFL;
@@ -544,7 +583,7 @@ int sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	set.sig[1] = sigctx._unused[3];
 	restore_sigmask(&set);
 
-	sr = (struct mcontext *) sigctx.regs;
+	sr = (struct mcontext __user *) sigctx.regs;
 	if (verify_area(VERIFY_READ, sr, sizeof(*sr))
 	    || restore_user_regs(regs, sr, 1))
 		goto badframe;

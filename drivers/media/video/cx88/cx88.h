@@ -114,17 +114,20 @@ extern struct sram_channel cx88_sram_channels[];
 /* card configuration                                          */
 
 #define CX88_BOARD_NOAUTO        UNSET
-#define CX88_BOARD_UNKNOWN           0
-#define CX88_BOARD_HAUPPAUGE         1
-#define CX88_BOARD_GDI               2
-#define CX88_BOARD_PIXELVIEW         3
-#define CX88_BOARD_ATI_WONDER_PRO    4
-#define CX88_BOARD_WINFAST2000XP     5
-#define CX88_BOARD_AVERTV_303        6
-#define CX88_BOARD_MSI_TVANYWHERE    7
-#define CX88_BOARD_WINFAST_DV2000    8
-#define CX88_BOARD_LEADTEK_PVR2000   9
-
+#define CX88_BOARD_UNKNOWN               0
+#define CX88_BOARD_HAUPPAUGE             1
+#define CX88_BOARD_GDI                   2
+#define CX88_BOARD_PIXELVIEW             3
+#define CX88_BOARD_ATI_WONDER_PRO        4
+#define CX88_BOARD_WINFAST2000XP         5
+#define CX88_BOARD_AVERTV_303            6
+#define CX88_BOARD_MSI_TVANYWHERE_MASTER 7
+#define CX88_BOARD_WINFAST_DV2000        8
+#define CX88_BOARD_LEADTEK_PVR2000       9
+#define CX88_BOARD_IODATA_GVVCP3PCI      10
+#define CX88_BOARD_PROLINK_PLAYTVPVR     11
+#define CX88_BOARD_ASUS_PVR_416          12
+#define CX88_BOARD_MSI_TVANYWHERE        13
 
 enum cx88_itype {
 	CX88_VMUX_COMPOSITE1 = 1,
@@ -354,7 +357,8 @@ extern const unsigned int cx88_bcount;
 extern struct cx88_subid cx88_subids[];
 extern const unsigned int cx88_idcount;
 
-extern void __devinit cx88_card_setup(struct cx8800_dev *dev);
+extern void cx88_card_list(struct cx8800_dev *dev);
+extern void cx88_card_setup(struct cx8800_dev *dev);
 
 /* ----------------------------------------------------------- */
 /* cx88-tvaudio.c                                              */

@@ -20,10 +20,10 @@
 #define TITAN_HAE_ADDRESS	(&alpha_mv.hae_cache)
 #define WILDFIRE_HAE_ADDRESS	(&alpha_mv.hae_cache)
 
-#if CIA_ONE_HAE_WINDOW
+#ifdef CIA_ONE_HAE_WINDOW
 #define CIA_HAE_ADDRESS		(&alpha_mv.hae_cache)
 #endif
-#if MCPCIA_ONE_HAE_WINDOW
+#ifdef MCPCIA_ONE_HAE_WINDOW
 #define MCPCIA_HAE_ADDRESS	(&alpha_mv.hae_cache)
 #endif
 

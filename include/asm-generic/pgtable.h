@@ -8,12 +8,29 @@
  *  - update the page tables
  *  - inform the TLB about the new one
  *
- * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
+ * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock.
+ *
+ * Note: the old pte is known to not be writable, so we don't need to
+ * worry about dirty bits etc getting lost.
  */
 #define ptep_establish(__vma, __address, __ptep, __entry)		\
-do {									\
+do {				  					\
 	set_pte(__ptep, __entry);					\
 	flush_tlb_page(__vma, __address);				\
+} while (0)
+#endif
+
+#ifndef __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
+/*
+ * Largely same as above, but only sets the access flags (dirty,
+ * accessed, and writable). Furthermore, we know it always gets set
+ * to a "more permissive" setting, which allows most architectures
+ * to optimize this.
+ */
+#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+do {				  					  \
+	set_pte(__ptep, __entry);					  \
+	flush_tlb_page(__vma, __address);				  \
 } while (0)
 #endif
 
@@ -103,6 +120,10 @@ static inline void ptep_mkdirty(pte_t *ptep)
 
 #ifndef __HAVE_ARCH_PAGE_TEST_AND_CLEAR_YOUNG
 #define page_test_and_clear_young(page) (0)
+#endif
+
+#ifndef __HAVE_ARCH_PGD_OFFSET_GATE
+#define pgd_offset_gate(mm, addr)	pgd_offset(mm, addr)
 #endif
 
 #endif /* _ASM_GENERIC_PGTABLE_H */

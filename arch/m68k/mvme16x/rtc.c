@@ -33,7 +33,7 @@
 #define BCD2BIN(val) (((val)&15) + ((val)>>4)*10)
 #define BIN2BCD(val) ((((val)/10)<<4) + (val)%10)
 
-static unsigned char days_in_mo[] =
+static const unsigned char days_in_mo[] =
 {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 static atomic_t rtc_ready = ATOMIC_INIT(1);
@@ -43,7 +43,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	volatile MK48T08ptr_t rtc = (MK48T08ptr_t)MVME_RTC_BASE;
 	unsigned long flags;
-	struct rtc_time wtime; 
+	struct rtc_time wtime;
 
 	switch (cmd) {
 	case RTC_RD_TIME:	/* Read the time/date from RTC	*/
@@ -101,7 +101,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 		if (yrs >= 2070)
 			return -EINVAL;
-		
+
 		local_irq_save(flags);
 		rtc->ctrl     = RTC_WRITE;
 

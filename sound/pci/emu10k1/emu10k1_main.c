@@ -690,7 +690,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	if (extin_mask == 0)
 		extin_mask = 0x3fcf;
 	if (extout_mask == 0)
-		extout_mask = 0x1fff;
+		extout_mask = 0x7fff;
 	emu->fx8010.extin_mask = extin_mask;
 	emu->fx8010.extout_mask = extout_mask;
 

@@ -32,6 +32,7 @@
  * 18 Dec 2001	Initial implementation for 2.4  --cel
  * 08 Jul 2002	Version for 2.4.19, with bug fixes --trondmy
  * 08 Jun 2003	Port to 2.5 APIs  --cel
+ * 31 Mar 2004	Handle direct I/O without VFS support  --cel
  *
  */
 
@@ -128,6 +129,7 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
 		.inode		= inode,
 		.args		= {
 			.fh		= NFS_FH(inode),
+			.lockowner	= current->files,
 		},
 		.res		= {
 			.fattr		= &rdata.fattr,
@@ -251,15 +253,13 @@ nfs_direct_write_seg(struct inode *inode, struct file *file,
 {
 	const unsigned int wsize = NFS_SERVER(inode)->wsize;
 	size_t request;
-	int need_commit;
-	int tot_bytes;
-	int result;
-	int curpage;
+	int curpage, need_commit, result, tot_bytes;
 	struct nfs_writeverf first_verf;
 	struct nfs_write_data	wdata = {
 		.inode		= inode,
 		.args		= {
 			.fh		= NFS_FH(inode),
+			.lockowner	= current->files,
 		},
 		.res		= {
 			.fattr		= &wdata.fattr,
@@ -321,8 +321,6 @@ retry:
 	 * Commit data written so far, even in the event of an error
 	 */
 	if (need_commit) {
-		int result;
-
 		wdata.args.count = tot_bytes;
 		wdata.args.offset = file_offset;
 
@@ -335,11 +333,11 @@ retry:
 						VERF_SIZE) != 0)
 			goto sync_retry;
 	}
-
 	result = tot_bytes;
 
 out:
 	nfs_end_data_update_defer(inode);
+
 	return result;
 
 sync_retry:
@@ -409,12 +407,6 @@ nfs_direct_write(struct inode *inode, struct file *file,
  * file_offset: offset in file to begin the operation
  * nr_segs: size of iovec array
  *
- * Usually a file system implements direct I/O by calling out to
- * blockdev_direct_IO.  The NFS client doesn't have a backing block
- * device, so we do everything by hand instead.
- *
- * The inode's i_sem is no longer held by the VFS layer before it calls
- * this function to do a write.
  */
 ssize_t
 nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
@@ -429,9 +421,7 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	 * No support for async yet
 	 */
 	if (!is_sync_kiocb(iocb))
-		goto out;
-
-	up(&inode->i_sem);
+		return result;
 
 	switch (rw) {
 	case READ:
@@ -451,10 +441,160 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	default:
 		break;
 	}
+	return result;
+}
 
-	down(&inode->i_sem);
+/**
+ * nfs_file_direct_read - file direct read operation for NFS files
+ * @iocb: target I/O control block
+ * @buf: user's buffer into which to read data
+ * count: number of bytes to read
+ * pos: byte offset in file where reading starts
+ *
+ * We use this function for direct reads instead of calling
+ * generic_file_aio_read() in order to avoid gfar's check to see if
+ * the request starts before the end of the file.  For that check
+ * to work, we must generate a GETATTR before each direct read, and
+ * even then there is a window between the GETATTR and the subsequent
+ * READ where the file size could change.  So our preference is simply
+ * to do all reads the application wants, and the server will take
+ * care of managing the end of file boundary.
+ * 
+ * This function also eliminates unnecessarily updating the file's
+ * atime locally, as the NFS server sets the file's atime, and this
+ * client must read the updated atime from the server back into its
+ * cache.
+ */
+ssize_t
+nfs_file_direct_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos)
+{
+	ssize_t retval = -EINVAL;
+	loff_t *ppos = &iocb->ki_pos;
+	struct file *file = iocb->ki_filp;
+	struct dentry *dentry = file->f_dentry;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	struct iovec iov = {
+		.iov_base = buf,
+		.iov_len = count,
+	};
+
+	dprintk("nfs: direct read(%s/%s, %lu@%lu)\n",
+		dentry->d_parent->d_name.name, dentry->d_name.name,
+		(unsigned long) count, (unsigned long) pos);
+
+	if (!is_sync_kiocb(iocb))
+		goto out;
+	if (count < 0)
+		goto out;
+	retval = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, iov.iov_base, iov.iov_len))
+		goto out;
+	retval = 0;
+	if (!count)
+		goto out;
+
+	if (mapping->nrpages) {
+		retval = filemap_fdatawrite(mapping);
+		if (retval == 0)
+			retval = filemap_fdatawait(mapping);
+		if (retval)
+			goto out;
+	}
+
+	retval = nfs_direct_read(inode, file, &iov, pos, 1);
+	if (retval > 0)
+		*ppos = pos + retval;
 
 out:
-	dprintk("NFS: direct_IO result=%d\n", result);
-	return result;
+	return retval;
+}
+
+/**
+ * nfs_file_direct_write - file direct write operation for NFS files
+ * @iocb: target I/O control block
+ * @buf: user's buffer from which to write data
+ * count: number of bytes to write
+ * pos: byte offset in file where writing starts
+ *
+ * We use this function for direct writes instead of calling
+ * generic_file_aio_write() in order to avoid taking the inode
+ * semaphore and updating the i_size.  The NFS server will set
+ * the new i_size and this client must read the updated size
+ * back into its cache.  We let the server do generic write
+ * parameter checking and report problems.
+ *
+ * We also avoid an unnecessary invocation of generic_osync_inode(),
+ * as it is fairly meaningless to sync the metadata of an NFS file.
+ *
+ * We eliminate local atime updates, see direct read above.
+ *
+ * We avoid unnecessary page cache invalidations for normal cached
+ * readers of this file.
+ *
+ * Note that O_APPEND is not supported for NFS direct writes, as there
+ * is no atomic O_APPEND write facility in the NFS protocol.
+ */
+ssize_t
+nfs_file_direct_write(struct kiocb *iocb, const char __user *buf, size_t count, loff_t pos)
+{
+	ssize_t retval = -EINVAL;
+	loff_t *ppos = &iocb->ki_pos;
+	unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+	struct file *file = iocb->ki_filp;
+	struct dentry *dentry = file->f_dentry;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	struct iovec iov = {
+		.iov_base = (char __user *)buf,
+		.iov_len = count,
+	};
+
+	dfprintk(VFS, "nfs: direct write(%s/%s(%ld), %lu@%lu)\n",
+		dentry->d_parent->d_name.name, dentry->d_name.name,
+		inode->i_ino, (unsigned long) count, (unsigned long) pos);
+
+	if (!is_sync_kiocb(iocb))
+		goto out;
+	if (count < 0)
+		goto out;
+        if (pos < 0)
+		goto out;
+	retval = -EFAULT;
+	if (!access_ok(VERIFY_READ, iov.iov_base, iov.iov_len))
+		goto out;
+        if (file->f_error) {
+                retval = file->f_error;
+                file->f_error = 0;
+                goto out;
+        }
+	retval = -EFBIG;
+	if (limit != RLIM_INFINITY) {
+		if (pos >= limit) {
+			send_sig(SIGXFSZ, current, 0);
+			goto out;
+		}
+		if (count > limit - (unsigned long) pos)
+			count = limit - (unsigned long) pos;
+	}
+	retval = 0;
+	if (!count)
+		goto out;
+
+	if (mapping->nrpages) {
+		retval = filemap_fdatawrite(mapping);
+		if (retval == 0)
+			retval = filemap_fdatawait(mapping);
+		if (retval)
+			goto out;
+	}
+
+	retval = nfs_direct_write(inode, file, &iov, pos, 1);
+	if (mapping->nrpages)
+		invalidate_inode_pages2(mapping);
+	if (retval > 0)
+		*ppos = pos + retval;
+
+out:
+	return retval;
 }

@@ -36,7 +36,6 @@
 #include <linux/utsname.h>
 #include <linux/file.h>
 #include <linux/unistd.h>
-#include <linux/fshooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -68,7 +67,7 @@ sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fif
 		break;
 	case SEMTIMEDOP:
 		ret = sys_semtimedop (first, (struct sembuf __user *)ptr,
-				      second, (const struct timespec *) fifth);
+				      second, (const struct timespec __user *) fifth);
 		break;
 	case SEMGET:
 		ret = sys_semget (first, second, third);
@@ -79,7 +78,7 @@ sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fif
 		if (!ptr)
 			break;
 		if ((ret = verify_area (VERIFY_READ, ptr, sizeof(long)))
-		    || (ret = get_user(fourth.__pad, (void *__user *)ptr)))
+		    || (ret = get_user(fourth.__pad, (void __user *__user *)ptr)))
 			break;
 		ret = sys_semctl (first, second, third, fourth);
 		break;
@@ -163,20 +162,9 @@ do_mmap2(unsigned long addr, size_t len,
 	 unsigned long prot, unsigned long flags,
 	 unsigned long fd, unsigned long pgoff)
 {
-	int ret;
-
-	FSHOOK_BEGIN(mmap,
-		ret,
-		.paddr = &addr,
-		.length = len,
-		.prot = prot,
-		.flags = flags,
-		.fd = fd,
-		.offset = (loff_t)pgoff << PAGE_SHIFT)
-
 	struct file * file = NULL;
+	int ret = -EBADF;
 
-	ret = -EBADF;
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		if (!(file = fget(fd)))
@@ -184,13 +172,11 @@ do_mmap2(unsigned long addr, size_t len,
 	}
 
 	down_write(&current->mm->mmap_sem);
-	addr = ret = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	ret = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
 	if (file)
 		fput(file);
 out:
-	FSHOOK_END(mmap, !IS_ERR((void *)ret) ? 0 : ret)
-
 	return ret;
 }
 
@@ -222,17 +208,17 @@ out:
  * sys_select() with the appropriate args. -- Cort
  */
 int
-ppc_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
+ppc_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, struct timeval __user *tvp)
 {
 	if ( (unsigned long)n >= 4096 )
 	{
 		unsigned long __user *buffer = (unsigned long __user *)n;
 		if (verify_area(VERIFY_READ, buffer, 5*sizeof(unsigned long))
 		    || __get_user(n, buffer)
-		    || __get_user(inp, ((fd_set **)(buffer+1)))
-		    || __get_user(outp, ((fd_set **)(buffer+2)))
-		    || __get_user(exp, ((fd_set **)(buffer+3)))
-		    || __get_user(tvp, ((struct timeval **)(buffer+4))))
+		    || __get_user(inp, ((fd_set __user * __user *)(buffer+1)))
+		    || __get_user(outp, ((fd_set  __user * __user *)(buffer+2)))
+		    || __get_user(exp, ((fd_set  __user * __user *)(buffer+3)))
+		    || __get_user(tvp, ((struct timeval  __user * __user *)(buffer+4))))
 			return -EFAULT;
 	}
 	return sys_select(n, inp, outp, exp, tvp);

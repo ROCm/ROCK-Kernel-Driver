@@ -157,7 +157,7 @@ static int vortex_wt_GetReg(vortex_t * vortex, char reg, int wt)
 		return hwread(vortex->mmio, WT_PARM(wt, 3));
 	}
 	if (reg == 7) {
-		return hwread(vortex->mmio, WT_GMODE(wt));;
+		return hwread(vortex->mmio, WT_GMODE(wt));
 	}
 
 	return 0;

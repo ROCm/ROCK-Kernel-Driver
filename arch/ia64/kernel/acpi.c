@@ -171,8 +171,6 @@ acpi_parse_lapic_addr_ovr (
 	if (BAD_MADT_ENTRY(lapic, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
 	if (lapic->address) {
 		iounmap((void *) ipi_base_addr);
 		ipi_base_addr = (unsigned long) ioremap(lapic->address, 0);
@@ -191,24 +189,12 @@ acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
 	if (BAD_MADT_ENTRY(lsapic, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
-	printk(KERN_INFO "CPU %d (0x%04x)", total_cpus, (lsapic->id << 8) | lsapic->eid);
-
-	if (!lsapic->flags.enabled)
-		printk(" disabled");
-	else {
-		printk(" enabled");
+	if (lsapic->flags.enabled) {
 #ifdef CONFIG_SMP
 		smp_boot_data.cpu_phys_id[available_cpus] = (lsapic->id << 8) | lsapic->eid;
-		if (hard_smp_processor_id()
-		    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
-			printk(" (BSP)");
 #endif
 		++available_cpus;
 	}
-
-	printk("\n");
 
 	total_cpus++;
 	return 0;
@@ -225,8 +211,6 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header, const unsigned long end)
 	if (BAD_MADT_ENTRY(lacpi_nmi, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
 	/* TBD: Support lapic_nmi entries */
 	return 0;
 }
@@ -241,8 +225,6 @@ acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
 
 	if (BAD_MADT_ENTRY(iosapic, end))
 		return -EINVAL;
-
-	acpi_table_print_madt_entry(header);
 
 	iosapic_init(iosapic->address, iosapic->global_irq_base);
 
@@ -261,8 +243,6 @@ acpi_parse_plat_int_src (
 
 	if (BAD_MADT_ENTRY(plintsrc, end))
 		return -EINVAL;
-
-	acpi_table_print_madt_entry(header);
 
 	/*
 	 * Get vector assignment for this interrupt, set attributes,
@@ -292,8 +272,6 @@ acpi_parse_int_src_ovr (
 	if (BAD_MADT_ENTRY(p, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
 	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
 				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
 				 (p->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
@@ -310,8 +288,6 @@ acpi_parse_nmi_src (acpi_table_entry_header *header, const unsigned long end)
 
 	if (BAD_MADT_ENTRY(nmi_src, end))
 		return -EINVAL;
-
-	acpi_table_print_madt_entry(header);
 
 	/* TBD: Support nimsrc entries */
 	return 0;
@@ -369,16 +345,11 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 #undef SLIT_DEBUG
 
 #define PXM_FLAG_LEN ((MAX_PXM_DOMAINS + 1)/32)
-#define	PXM_MAGIC	(255)
 
 static int __initdata srat_num_cpus;			/* number of cpus */
 static u32 __initdata pxm_flag[PXM_FLAG_LEN];
-static u32 __initdata mpxm_flag[PXM_FLAG_LEN];
 #define pxm_bit_set(bit)	(set_bit(bit,(void *)pxm_flag))
-#define	pxm_bit_clear(bit)	(clear_bit(bit, (void *)pxm_flag))
 #define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
-#define	mpxm_bit_set(bit)	(set_bit(bit, (void *) mpxm_flag))
-#define	mpxm_bit_test(bit)	(test_bit(bit, (void *) mpxm_flag))
 /* maps to convert between proximity domain and logical node ID */
 int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
 int __initdata nid_to_pxm_map[MAX_NUMNODES];
@@ -454,110 +425,6 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	num_node_memblks++;
 }
 
-static void __init
-acpi_pxm_magic_slit_fix(void)
-{
-	u8		distance, x;
-	int		i, j, nid;
-#define	SLIT_IDENTITY	10
-
-
-	if (!pxm_bit_test(PXM_MAGIC) || slit_table->localities >= PXM_MAGIC)
-		return;
-
-	nid = pxm_to_nid_map[PXM_MAGIC];
-
-	for (distance = SLIT_IDENTITY*2, i = 0; i < slit_table->localities; i++) {
-		if (!pxm_bit_test(i))
-			continue;
-		for (j = 0; j < slit_table->localities; j++) {
-			if (!pxm_bit_test(j) || (i == j))
-				continue;
-
-			x = (slit_table->entry[i*slit_table->localities + j] + SLIT_IDENTITY) / 2;
-			distance = min(x, distance);
-		}
-	}
-
-	/*
-	 * Fill in distances for PXM magic.
-	 */
-
-	for (i = 0; i < numnodes;  i++) 
-		node_distance(i, nid) = distance;
-
-	for (i = 0; i < (numnodes - 1); i++)
-		node_distance(nid, i) = distance;
-
-	node_distance(nid, nid) = SLIT_IDENTITY;
-
-
-	return;
-}
-
-static void __init
-acpi_pxm_magic_fix(void)
-{
-	struct node_memblk_s	*p;
-	int			i, nnode, nid, cpu, pxm;
-
-
-	/*
-	 * If every nid has memory then we are done.
-	 */
-
-	for (nnode = 0, p = &node_memblk[0]; p < &node_memblk[num_node_memblks]; p++) 
-		if (!mpxm_bit_test(p->nid)) {
-			mpxm_bit_set(p->nid);
-			nnode++;
-		}
-	
-	/*
-	 * All nids with memory.
-	 */
-
-	if (nnode == numnodes) 
-		return;
-
-	/*
-	 * Change logical node id for nids without memory.
-	 * If we are removing a nid without memory, then
-	 * move that nid's cpus to nnode-1 which will become
-	 * the magic PXM's logical node id.  The node_cpu[X].nid
-	 * is the PXM but will change later to logical node
-	 * id.
-	 */
-
-	for (nid = 0, i = 0; i < numnodes; i++) 
-		if (mpxm_bit_test(i)) {
-			if (i == nid) {
-				nid++;
-				continue;
-			}
-
-			for (p = &node_memblk[0]; p < &node_memblk[num_node_memblks]; p++)
-				if (p->nid == i)
-					p->nid = nid;
-
-			pxm = nid_to_pxm_map[i];
-			pxm_to_nid_map[pxm] = nid;
-			nid_to_pxm_map[nid] = pxm;
-			nid++;
-		}
-		else {
-			for (cpu = 0; cpu < srat_num_cpus; cpu++)
-				if (node_cpuid[cpu].nid == nid_to_pxm_map[i])
-					node_cpuid[cpu].nid = PXM_MAGIC;
-
-			pxm_to_nid_map[i] = nnode - 1;
-			pxm_bit_clear(nid_to_pxm_map[i]);
-		}
-
-	numnodes = nnode;
-
-	return;
-}
-
 void __init
 acpi_numa_arch_fixup (void)
 {
@@ -586,8 +453,6 @@ acpi_numa_arch_fixup (void)
 	for (i = 0; i < num_node_memblks; i++)
 		node_memblk[i].nid = pxm_to_nid_map[node_memblk[i].nid];
 
-	acpi_pxm_magic_fix();
-
 	/* assign memory bank numbers for each chunk on each node */
 	for (i = 0; i < numnodes; i++) {
 		int bank;
@@ -605,13 +470,8 @@ acpi_numa_arch_fixup (void)
 	printk(KERN_INFO "Number of logical nodes in system = %d\n", numnodes);
 	printk(KERN_INFO "Number of memory chunks in system = %d\n", num_node_memblks);
 
-	if (!slit_table) 
-		return;
-
+	if (!slit_table) return;
 	memset(numa_slit, -1, sizeof(numa_slit));
-
-	acpi_pxm_magic_slit_fix();
-
 	for (i=0; i<slit_table->localities; i++) {
 		if (!pxm_bit_test(i))
 			continue;
@@ -636,6 +496,18 @@ acpi_numa_arch_fixup (void)
 }
 #endif /* CONFIG_ACPI_NUMA */
 
+unsigned int
+acpi_register_gsi (u32 gsi, int edge_level, int active_high_low)
+{
+	if (has_8259 && gsi < 16)
+		return isa_irq_to_vector(gsi);
+
+	return iosapic_register_intr(gsi,
+			(active_high_low == ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+			(edge_level == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
+}
+EXPORT_SYMBOL(acpi_register_gsi);
+
 static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
@@ -657,7 +529,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (fadt->iapc_boot_arch & BAF_LEGACY_DEVICES)
 		acpi_legacy_devices = 1;
 
-	acpi_register_irq(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
+	acpi_register_gsi(fadt->sci_int, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
 	return 0;
 }
 
@@ -754,16 +626,6 @@ acpi_boot_init (void)
 	return 0;
 }
 
-/* deprecated in favor of acpi_gsi_to_irq */
-int
-acpi_irq_to_vector (u32 gsi)
-{
-	if (has_8259 && gsi < 16)
-		return isa_irq_to_vector(gsi);
-
-	return gsi_to_vector(gsi);
-}
-
 int
 acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 {
@@ -780,17 +642,5 @@ acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 	}
 	return 0;
 }
-
-int
-acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
-{
-	if (has_8259 && gsi < 16)
-		return isa_irq_to_vector(gsi);
-
-	return iosapic_register_intr(gsi,
-			(polarity == ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
-			(trigger == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
-}
-EXPORT_SYMBOL(acpi_register_irq);
 
 #endif /* CONFIG_ACPI_BOOT */

@@ -8,10 +8,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/ptrace.h>
 #include <linux/mm.h>
 #include <linux/bitops.h>
 #include <linux/vmalloc.h>
@@ -19,116 +18,8 @@
 #include <linux/pagemap.h>
 
 #include <asm/cacheflush.h>
-#include <asm/io.h>
-#include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
-
-#include "fault.h"
-
-/*
- * Some section permission faults need to be handled gracefully.
- * They can happen due to a __{get,put}_user during an oops.
- */
-static int
-do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-{
-	struct task_struct *tsk = current;
-	do_bad_area(tsk, tsk->active_mm, addr, fsr, regs);
-	return 0;
-}
-
-/*
- * This abort handler always returns "fault".
- */
-static int
-do_bad(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-{
-	return 1;
-}
-
-static struct fsr_info {
-	int	(*fn)(unsigned long addr, unsigned int fsr, struct pt_regs *regs);
-	int	sig;
-	const char *name;
-} fsr_info[] = {
-	/*
-	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
-	 * defines these to be "precise" aborts.
-	 */
-	{ do_bad,		SIGSEGV, "vector exception"		   },
-	{ do_bad,		SIGILL,	 "alignment exception"		   },
-	{ do_bad,		SIGKILL, "terminal exception"		   },
-	{ do_bad,		SIGILL,	 "alignment exception"		   },
-	{ do_bad,		SIGBUS,	 "external abort on linefetch"	   },
-	{ do_translation_fault,	SIGSEGV, "section translation fault"	   },
-	{ do_bad,		SIGBUS,	 "external abort on linefetch"	   },
-	{ do_page_fault,	SIGSEGV, "page translation fault"	   },
-	{ do_bad,		SIGBUS,	 "external abort on non-linefetch" },
-	{ do_bad,		SIGSEGV, "section domain fault"		   },
-	{ do_bad,		SIGBUS,	 "external abort on non-linefetch" },
-	{ do_bad,		SIGSEGV, "page domain fault"		   },
-	{ do_bad,		SIGBUS,	 "external abort on translation"   },
-	{ do_sect_fault,	SIGSEGV, "section permission fault"	   },
-	{ do_bad,		SIGBUS,	 "external abort on translation"   },
-	{ do_page_fault,	SIGSEGV, "page permission fault"	   },
-	/*
-	 * The following are "imprecise" aborts, which are signalled by bit
-	 * 10 of the FSR, and may not be recoverable.  These are only
-	 * supported if the CPU abort handler supports bit 10.
-	 */
-	{ do_bad,		SIGBUS,  "unknown 16"			   },
-	{ do_bad,		SIGBUS,  "unknown 17"			   },
-	{ do_bad,		SIGBUS,  "unknown 18"			   },
-	{ do_bad,		SIGBUS,  "unknown 19"			   },
-	{ do_bad,		SIGBUS,  "lock abort"			   }, /* xscale */
-	{ do_bad,		SIGBUS,  "unknown 21"			   },
-	{ do_bad,		SIGBUS,  "imprecise external abort"	   }, /* xscale */
-	{ do_bad,		SIGBUS,  "unknown 23"			   },
-	{ do_bad,		SIGBUS,  "dcache parity error"		   }, /* xscale */
-	{ do_bad,		SIGBUS,  "unknown 25"			   },
-	{ do_bad,		SIGBUS,  "unknown 26"			   },
-	{ do_bad,		SIGBUS,  "unknown 27"			   },
-	{ do_bad,		SIGBUS,  "unknown 28"			   },
-	{ do_bad,		SIGBUS,  "unknown 29"			   },
-	{ do_bad,		SIGBUS,  "unknown 30"			   },
-	{ do_bad,		SIGBUS,  "unknown 31"			   }
-};
-
-void __init
-hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
-		int sig, const char *name)
-{
-	if (nr >= 0 && nr < ARRAY_SIZE(fsr_info)) {
-		fsr_info[nr].fn   = fn;
-		fsr_info[nr].sig  = sig;
-		fsr_info[nr].name = name;
-	}
-}
-
-/*
- * Dispatch a data abort to the relevant handler.
- */
-asmlinkage void
-do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-{
-	const struct fsr_info *inf = fsr_info + (fsr & 15) + ((fsr & (1 << 10)) >> 6);
-
-	if (!inf->fn(addr, fsr, regs))
-		return;
-
-	printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n",
-		inf->name, fsr, addr);
-	force_sig(inf->sig, current);
-	show_pte(current->mm, addr);
-	die_if_kernel("Oops", regs, 0);
-}
-
-asmlinkage void
-do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
-{
-	do_translation_fault(addr, 0, regs);
-}
 
 static unsigned long shared_pte_mask = L_PTE_CACHEABLE;
 
@@ -185,11 +76,11 @@ no_pmd:
 	return 0;
 }
 
-void __flush_dcache_page(struct page *page)
+static void __flush_dcache_page(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
 	struct mm_struct *mm = current->active_mm;
-	struct vm_area_struct *mpnt;
+	struct vm_area_struct *mpnt = NULL;
 	struct prio_tree_iter iter;
 	unsigned long offset;
 	pgoff_t pgoff;
@@ -204,53 +95,71 @@ void __flush_dcache_page(struct page *page)
 	 * and invalidate any user data.
 	 */
 	pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
-	mpnt = __vma_prio_tree_first(&mapping->i_mmap_shared,
-					&iter, pgoff, pgoff);
-	while (mpnt) {
+
+	flush_dcache_mmap_lock(mapping);
+	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
+					&iter, pgoff, pgoff)) != NULL) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 */
-		if (mpnt->vm_mm == mm) {
-			offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
-			flush_cache_page(mpnt, mpnt->vm_start + offset);
-		}
-		mpnt = __vma_prio_tree_next(mpnt, &mapping->i_mmap_shared,
-						&iter, pgoff, pgoff);
+		if (mpnt->vm_mm != mm)
+			continue;
+		if (!(mpnt->vm_flags & VM_MAYSHARE))
+			continue;
+		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
+		flush_cache_page(mpnt, mpnt->vm_start + offset);
 	}
+	flush_dcache_mmap_unlock(mapping);
 }
+
+void flush_dcache_page(struct page *page)
+{
+	struct address_space *mapping = page_mapping(page);
+
+	if (mapping && !mapping_mapped(mapping))
+		set_bit(PG_dcache_dirty, &page->flags);
+	else
+		__flush_dcache_page(page);
+}
+EXPORT_SYMBOL(flush_dcache_page);
 
 static void
 make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page, int dirty)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 	struct mm_struct *mm = vma->vm_mm;
-	struct vm_area_struct *mpnt;
+	struct vm_area_struct *mpnt = NULL;
 	struct prio_tree_iter iter;
 	unsigned long offset;
 	pgoff_t pgoff;
 	int aliases = 0;
+
+	if (!mapping)
+		return;
+
+	pgoff = vma->vm_pgoff + ((addr - vma->vm_start) >> PAGE_SHIFT);
 
 	/*
 	 * If we have any shared mappings that are in the same mm
 	 * space, then we need to handle them specially to maintain
 	 * cache coherency.
 	 */
-	pgoff = vma->vm_pgoff + ((addr - vma->vm_start) >> PAGE_SHIFT);
-	mpnt = __vma_prio_tree_first(&mapping->i_mmap_shared,
-					&iter, pgoff, pgoff);
-	while (mpnt) {
+	flush_dcache_mmap_lock(mapping);
+	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
+					&iter, pgoff, pgoff)) != NULL) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 * Note that we intentionally mask out the VMA
 		 * that we are fixing up.
 		 */
-		if (mpnt->vm_mm == mm && mpnt != vma) {
-			offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
-			aliases += adjust_pte(mpnt, mpnt->vm_start + offset);
-		}
-		mpnt = __vma_prio_tree_next(mpnt, &mapping->i_mmap_shared,
-						&iter, pgoff, pgoff);
+		if (mpnt->vm_mm != mm || mpnt == vma)
+			continue;
+		if (!(mpnt->vm_flags & VM_MAYSHARE))
+			continue;
+		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
+		aliases += adjust_pte(mpnt, mpnt->vm_start + offset);
 	}
+	flush_dcache_mmap_unlock(mapping);
 	if (aliases)
 		adjust_pte(vma, addr);
 	else

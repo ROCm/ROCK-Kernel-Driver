@@ -29,12 +29,12 @@
 #include <net/irda/irlan_common.h>
 
 /*
- * Function handle_filter_request (self, skb)
+ * Function irlan_filter_request (self, skb)
  *
  *    Handle filter request from client peer device
  *
  */
-void handle_filter_request(struct irlan_cb *self, struct sk_buff *skb)
+void irlan_filter_request(struct irlan_cb *self, struct sk_buff *skb)
 {
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);

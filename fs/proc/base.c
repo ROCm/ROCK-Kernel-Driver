@@ -60,7 +60,6 @@ enum pid_directory_inos {
 	PROC_TGID_MAPS,
 	PROC_TGID_MOUNTS,
 	PROC_TGID_WCHAN,
-	PROC_TGID_MAPBASE,
 #ifdef CONFIG_SECURITY
 	PROC_TGID_ATTR,
 	PROC_TGID_ATTR_CURRENT,
@@ -69,8 +68,6 @@ enum pid_directory_inos {
 	PROC_TGID_ATTR_FSCREATE,
 #endif
 	PROC_TGID_FD_DIR,
-	PROC_TGID_OOM_SCORE,
-	PROC_TGID_OOM_ADJUST,
 	PROC_TID_INO,
 	PROC_TID_STATUS,
 	PROC_TID_MEM,
@@ -93,13 +90,7 @@ enum pid_directory_inos {
 	PROC_TID_ATTR_EXEC,
 	PROC_TID_ATTR_FSCREATE,
 #endif
-#ifdef CONFIG_DELAY_ACCT
-        PROC_TID_DELAY_ACCT,
-        PROC_TGID_DELAY_ACCT,
-#endif
 	PROC_TID_FD_DIR = 0x8000,	/* 0x8000-0xffff */
-	PROC_TID_OOM_SCORE,
-	PROC_TID_OOM_ADJUST,
 };
 
 struct pid_entry {
@@ -126,20 +117,12 @@ static struct pid_entry tgid_base_stuff[] = {
 	E(PROC_TGID_ROOT,      "root",    S_IFLNK|S_IRWXUGO),
 	E(PROC_TGID_EXE,       "exe",     S_IFLNK|S_IRWXUGO),
 	E(PROC_TGID_MOUNTS,    "mounts",  S_IFREG|S_IRUGO),
-#ifdef __HAS_ARCH_PROC_MAPPED_BASE
-   	E(PROC_TGID_MAPBASE,	"mapped_base",	S_IFREG|S_IRUSR|S_IWUSR),
-#endif
 #ifdef CONFIG_SECURITY
 	E(PROC_TGID_ATTR,      "attr",    S_IFDIR|S_IRUGO|S_IXUGO),
-#endif
-#ifdef CONFIG_DELAY_ACCT
-	E(PROC_TGID_DELAY_ACCT,"delay",   S_IFREG|S_IRUGO),
 #endif
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TGID_WCHAN,     "wchan",   S_IFREG|S_IRUGO),
 #endif
-	E(PROC_TGID_OOM_SCORE, "oom_score",S_IFREG|S_IRUGO),
-	E(PROC_TGID_OOM_ADJUST,"oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
 	{0,0,NULL,0}
 };
 static struct pid_entry tid_base_stuff[] = {
@@ -159,14 +142,9 @@ static struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_SECURITY
 	E(PROC_TID_ATTR,       "attr",    S_IFDIR|S_IRUGO|S_IXUGO),
 #endif
-#ifdef CONFIG_DELAY_ACCT
-	E(PROC_TGID_DELAY_ACCT,"delay",   S_IFREG|S_IRUGO),
-#endif
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TID_WCHAN,      "wchan",   S_IFREG|S_IRUGO),
 #endif
-	E(PROC_TID_OOM_SCORE,  "oom_score",S_IFREG|S_IRUGO),
-	E(PROC_TID_OOM_ADJUST, "oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
 	{0,0,NULL,0}
 };
 
@@ -203,7 +181,6 @@ int proc_pid_stat(struct task_struct*,char*);
 int proc_pid_status(struct task_struct*,char*);
 int proc_pid_statm(struct task_struct*,char*);
 int proc_pid_cpu(struct task_struct*,char*);
-int proc_pid_delay(struct task_struct*,char*);
 
 static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)
 {
@@ -212,11 +189,7 @@ static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsm
 	struct file *file;
 	int fd = proc_type(inode) - PROC_TID_FD_DIR;
 
-	task_lock(task);
-	files = task->files;
-	if (files)
-		atomic_inc(&files->count);
-	task_unlock(task);
+	files = get_files_struct(task);
 	if (files) {
 		spin_lock(&files->file_lock);
 		file = fcheck_files(files, fd);
@@ -424,14 +397,6 @@ static int proc_pid_wchan(struct task_struct *task, char *buffer)
 }
 #endif /* CONFIG_KALLSYMS */
 
-/* The badness from the OOM killer */
-int badness(struct task_struct *p);
-static int proc_oom_score(struct task_struct *task, char *buffer)
-{
-	int points = badness(task);
-	return sprintf(buffer, "%i\n", points);
-}
-
 /************************************************************************/
 /*                       Here the fs part begins                        */
 /************************************************************************/
@@ -546,7 +511,7 @@ static struct file_operations proc_mounts_operations = {
 
 #define PROC_BLOCK_SIZE	(3*1024)		/* 4K page size but our output routines use some slack for overruns */
 
-static ssize_t proc_info_read(struct file * file, char * buf,
+static ssize_t proc_info_read(struct file * file, char __user * buf,
 			  size_t count, loff_t *ppos)
 {
 	struct inode * inode = file->f_dentry->d_inode;
@@ -554,7 +519,6 @@ static ssize_t proc_info_read(struct file * file, char * buf,
 	ssize_t length;
 	ssize_t end;
 	struct task_struct *task = proc_task(inode);
-	loff_t pos = *ppos;
 
 	if (count > PROC_BLOCK_SIZE)
 		count = PROC_BLOCK_SIZE;
@@ -568,14 +532,14 @@ static ssize_t proc_info_read(struct file * file, char * buf,
 		return length;
 	}
 	/* Static 4kB (or whatever) block capacity */
-	if (pos < 0 || pos >= length) {
+	if (*ppos >= length) {
 		free_page(page);
 		return 0;
 	}
-	if (count > length - pos)
-		count = length - pos;
-	end = count + pos;
-	if (copy_to_user(buf, (char *) page + pos, count))
+	if (count + *ppos > length)
+		count = length - *ppos;
+	end = count + *ppos;
+	if (copy_to_user(buf, (char *) page + *ppos, count))
 		count = -EFAULT;
 	else
 		*ppos = end;
@@ -593,7 +557,7 @@ static int mem_open(struct inode* inode, struct file* file)
 	return 0;
 }
 
-static ssize_t mem_read(struct file * file, char * buf,
+static ssize_t mem_read(struct file * file, char __user * buf,
 			size_t count, loff_t *ppos)
 {
 	struct task_struct *task = proc_task(file->f_dentry->d_inode);
@@ -721,104 +685,6 @@ static struct file_operations proc_mem_operations = {
 	.open		= mem_open,
 };
 
-#ifdef __HAS_ARCH_PROC_MAPPED_BASE
-static ssize_t mapbase_read(struct file * file, char * buf,
-			size_t count, loff_t *ppos)
-{
-	struct task_struct *task = proc_task(file->f_dentry->d_inode);
-	char buffer[64];
-	size_t len;
-
-	len = sprintf(buffer, "%li\n", task->map_base) + 1;
-	if (*ppos >= len)
-		return 0;
-	if (count > len-*ppos)
-		count = len-*ppos;
-	if (copy_to_user(buf, buffer + *ppos, count)) 
-		return -EFAULT;
-	*ppos += count;
-	return count;
-}
-
-static ssize_t mapbase_write(struct file * file, const char * buf,
-			 size_t count, loff_t *ppos)
-{
-	struct task_struct *task = proc_task(file->f_dentry->d_inode);
-	char buffer[64], *end;
-	unsigned long newbase;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	memset(buffer, 0, 64);	
-	if (count > 62)
-		count = 62;
-	if (copy_from_user(buffer, buf, count)) 
-		return -EFAULT;
-	newbase = simple_strtoul(buffer, &end, 0);
-	if (*end == '\n')
-		end++;
-	if (newbase > 0)
-		task->map_base = newbase;
-	if (end - buffer == 0) 
-		return -EIO;
-	return end - buffer;
-}
-
-static struct file_operations proc_mapbase_operations = {
-	read:		mapbase_read,
-	write:		mapbase_write,
-};
-#endif /* __HAS_ARCH_PROC_MAPPED_BASE */
-
-static ssize_t oom_adjust_read(struct file * file, char * buf,
-				size_t count, loff_t *ppos)
-{
-	struct task_struct *task = proc_task(file->f_dentry->d_inode);
-	char buffer[8];
-	size_t len;
-	int oom_adjust = task->oomkilladj;
-
-	len = sprintf(buffer, "%i\n", oom_adjust) + 1;
-	if (*ppos >= len)
-		return 0;
-	if (count > len-*ppos)
-		count = len-*ppos;
-	if (copy_to_user(buf, buffer + *ppos, count)) 
-		return -EFAULT;
-	*ppos += count;
-	return count;
-}
-
-static ssize_t oom_adjust_write(struct file * file, const char * buf,
-				size_t count, loff_t *ppos)
-{
-	struct task_struct *task = proc_task(file->f_dentry->d_inode);
-	char buffer[8], *end;
-	int oom_adjust;
-
-	if (!capable(CAP_SYS_RESOURCE))
-		return -EPERM;
-	memset(buffer, 0, 8);	
-	if (count > 6)
-		count = 6;
-	if (copy_from_user(buffer, buf, count)) 
-		return -EFAULT;
-	oom_adjust = simple_strtol(buffer, &end, 0);
-	if (oom_adjust < -16 || oom_adjust > 15)
-		return -EINVAL;
-	if (*end == '\n')
-		end++;
-	task->oomkilladj = oom_adjust;
-	if (end - buffer == 0) 
-		return -EIO;
-	return end - buffer;
-}
-
-static struct file_operations proc_oom_adjust_operations = {
-	read:		oom_adjust_read,
-	write:		oom_adjust_write,
-};
-
 static struct inode_operations proc_mem_inode_operations = {
 	.permission	= proc_permission,
 };
@@ -844,7 +710,7 @@ out:
 }
 
 static int do_proc_readlink(struct dentry *dentry, struct vfsmount *mnt,
-			    char *buffer, int buflen)
+			    char __user *buffer, int buflen)
 {
 	struct inode * inode;
 	char *tmp = (char*)__get_free_page(GFP_KERNEL), *path;
@@ -869,7 +735,7 @@ static int do_proc_readlink(struct dentry *dentry, struct vfsmount *mnt,
 	return len;
 }
 
-static int proc_pid_readlink(struct dentry * dentry, char * buffer, int buflen)
+static int proc_pid_readlink(struct dentry * dentry, char __user * buffer, int buflen)
 {
 	int error = -EACCES;
 	struct inode *inode = dentry->d_inode;
@@ -936,11 +802,7 @@ static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
 				goto out;
 			filp->f_pos++;
 		default:
-			task_lock(p);
-			files = p->files;
-			if (files)
-				atomic_inc(&files->count);
-			task_unlock(p);
+			files = get_files_struct(p);
 			if (!files)
 				goto out;
 			spin_lock(&files->file_lock);
@@ -1139,11 +1001,7 @@ static int tid_fd_revalidate(struct dentry *dentry, struct nameidata *nd)
 	int fd = proc_type(inode) - PROC_TID_FD_DIR;
 	struct files_struct *files;
 
-	task_lock(task);
-	files = task->files;
-	if (files)
-		atomic_inc(&files->count);
-	task_unlock(task);
+	files = get_files_struct(task);
 	if (files) {
 		spin_lock(&files->file_lock);
 		if (fcheck_files(files, fd)) {
@@ -1247,11 +1105,7 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry, 
 	if (!inode)
 		goto out;
 	ei = PROC_I(inode);
-	task_lock(task);
-	files = task->files;
-	if (files)
-		atomic_inc(&files->count);
-	task_unlock(task);
+	files = get_files_struct(task);
 	if (!files)
 		goto out_unlock;
 	inode->i_mode = S_IFLNK;
@@ -1308,7 +1162,7 @@ static struct inode_operations proc_task_inode_operations = {
 };
 
 #ifdef CONFIG_SECURITY
-static ssize_t proc_pid_attr_read(struct file * file, char * buf,
+static ssize_t proc_pid_attr_read(struct file * file, char __user * buf,
 				  size_t count, loff_t *ppos)
 {
 	struct inode * inode = file->f_dentry->d_inode;
@@ -1334,7 +1188,7 @@ static ssize_t proc_pid_attr_read(struct file * file, char * buf,
 		free_page(page);
 		return 0;
 	}
-	if (count > length - *ppos)
+	if (count + *ppos > length)
 		count = length - *ppos;
 	end = count + *ppos;
 	if (copy_to_user(buf, (char *) page + *ppos, count))
@@ -1345,7 +1199,7 @@ static ssize_t proc_pid_attr_read(struct file * file, char * buf,
 	return count;
 }
 
-static ssize_t proc_pid_attr_write(struct file * file, const char * buf,
+static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
 				   size_t count, loff_t *ppos)
 { 
 	struct inode * inode = file->f_dentry->d_inode;
@@ -1483,11 +1337,6 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 		case PROC_TGID_MAPS:
 			inode->i_fop = &proc_maps_operations;
 			break;
-#ifdef __HAS_ARCH_PROC_MAPPED_BASE
- 		case PROC_TGID_MAPBASE:
- 			inode->i_fop = &proc_mapbase_operations;
- 			break;
-#endif
 		case PROC_TID_MEM:
 		case PROC_TGID_MEM:
 			inode->i_op = &proc_mem_inode_operations;
@@ -1519,13 +1368,6 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			inode->i_fop = &proc_pid_attr_operations;
 			break;
 #endif
-#ifdef CONFIG_DELAY_ACCT
-		case PROC_TID_DELAY_ACCT:
-		case PROC_TGID_DELAY_ACCT:
-			inode->i_fop = &proc_info_file_operations;
-			ei->op.proc_read = proc_pid_delay;
-			break;
-#endif
 #ifdef CONFIG_KALLSYMS
 		case PROC_TID_WCHAN:
 		case PROC_TGID_WCHAN:
@@ -1533,15 +1375,6 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			ei->op.proc_read = proc_pid_wchan;
 			break;
 #endif
-		case PROC_TID_OOM_SCORE:	
-		case PROC_TGID_OOM_SCORE:
-			inode->i_fop = &proc_info_file_operations;
-			ei->op.proc_read = proc_oom_score;
-			break;
-		case PROC_TID_OOM_ADJUST:
-		case PROC_TGID_OOM_ADJUST:
-			inode->i_fop = &proc_oom_adjust_operations;
-			break;
 		default:
 			printk("procfs: impossible type (%d)",p->type);
 			iput(inode);
@@ -1630,7 +1463,8 @@ static struct inode_operations proc_tid_attr_inode_operations = {
 /*
  * /proc/self:
  */
-static int proc_self_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int proc_self_readlink(struct dentry *dentry, char __user *buffer,
+			      int buflen)
 {
 	char tmp[30];
 	sprintf(tmp, "%d", current->tgid);
@@ -1914,7 +1748,9 @@ int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir)
 		ino_t ino = fake_ino(tgid,PROC_TGID_INO);
 		unsigned long j = PROC_NUMBUF;
 
-		do buf[--j] = '0' + (tgid % 10); while (tgid/=10);
+		do
+			buf[--j] = '0' + (tgid % 10);
+		while ((tgid /= 10) != 0);
 
 		if (filldir(dirent, buf+j, PROC_NUMBUF-j, filp->f_pos, ino, DT_DIR) < 0) {
 			filp->f_version = tgid;
@@ -1966,7 +1802,7 @@ static int proc_task_readdir(struct file * filp, void * dirent, filldir_t filldi
 
 		do
 			buf[--j] = '0' + (tid % 10);
-		while (tid /= 10);
+		while ((tid /= 10) != 0);
 
 		if (filldir(dirent, buf+j, PROC_NUMBUF-j, pos, ino, DT_DIR) < 0)
 			break;

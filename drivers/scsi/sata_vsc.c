@@ -1,6 +1,10 @@
 /*
  *  sata_vsc.c - Vitesse VSC7174 4 port DPA SATA
  *
+ *  Maintained by:  Jeremy Higdon @ SGI
+ * 		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
+ *
  *  Copyright 2004 SGI
  *
  *  Bits from Jeff Garzik, Copyright RedHat, Inc.
@@ -18,7 +22,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_vsc"
@@ -43,10 +47,9 @@
 #define VSC_SATA_TF_ALTSTATUS_OFFSET	0x28
 #define VSC_SATA_TF_CTL_OFFSET		0x29
 
+/* DMA base */
 #define VSC_SATA_UP_DESCRIPTOR_OFFSET	0x64
 #define VSC_SATA_UP_DATA_BUFFER_OFFSET	0x6C
-
-/* DMA base */
 #define VSC_SATA_DMA_CMD_OFFSET		0x70
 
 /* SCRs base */
@@ -172,7 +175,7 @@ irqreturn_t vsc_sata_interrupt (int irq, void *dev_instance, struct pt_regs *reg
 				struct ata_queued_cmd *qc;
 
 				qc = ata_qc_from_tag(ap, ap->active_tag);
-				if (qc && ((qc->flags & ATA_QCFLAG_POLL) == 0))
+				if (qc && (!(qc->tf.ctl & ATA_NIEN)))
 					handled += ata_host_intr(ap, qc);
 			}
 		}
@@ -210,10 +213,13 @@ static struct ata_port_operations vsc_sata_ops = {
 	.exec_command		= ata_exec_command_mmio,
 	.check_status		= ata_check_status_mmio,
 	.phy_reset		= sata_phy_reset,
+	.bmdma_setup            = ata_bmdma_setup_mmio,
 	.bmdma_start            = ata_bmdma_start_mmio,
-	.fill_sg		= ata_fill_sg,
+	.qc_prep		= ata_qc_prep,
+	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
 	.irq_handler		= vsc_sata_interrupt,
+	.irq_clear		= ata_bmdma_irq_clear,
 	.scr_read		= vsc_sata_scr_read,
 	.scr_write		= vsc_sata_scr_write,
 	.port_start		= ata_port_start,
@@ -260,12 +266,14 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 	/*
 	 * Check if we have needed resource mapped.
 	 */
-	if (pci_resource_len(pdev, 0) == 0)
-		return -ENODEV;
+	if (pci_resource_len(pdev, 0) == 0) {
+		rc = -ENODEV;
+		goto err_out;
+	}
 
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
-		return rc;
+		goto err_out;
 
 	/*
 	 * Use 32 bit DMA mask, because 64 bit address support is poor.
@@ -332,6 +340,8 @@ err_out_free_ent:
 	kfree(probe_ent);
 err_out_regions:
 	pci_release_regions(pdev);
+err_out:
+	pci_disable_device(pdev);
 	return rc;
 }
 

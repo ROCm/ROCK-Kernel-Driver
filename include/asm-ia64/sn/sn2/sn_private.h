@@ -233,7 +233,7 @@ extern void sysctlr_keepalive(void);
  * address.
  */
 #define paddr_dimm(_pa)		((_pa & MD_BANK_MASK) >> MD_BANK_SHFT)
-#define paddr_cnode(_pa)	(NASID_TO_COMPACT_NODEID(NASID_GET(_pa)))
+#define paddr_cnode(_pa)	(nasid_to_cnodeid(NASID_GET(_pa)))
 extern void membank_pathname_get(paddr_t, char *);
 
 extern void crbx(nasid_t nasid, void (*pf) (char *, ...));

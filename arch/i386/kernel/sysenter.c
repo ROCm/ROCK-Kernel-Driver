@@ -45,7 +45,7 @@ static int __init sysenter_setup(void)
 {
 	unsigned long page = get_zeroed_page(GFP_ATOMIC);
 
-	__set_fixmap(FIX_VSYSCALL, __pa(page), PAGE_READONLY);
+	__set_fixmap(FIX_VSYSCALL, __pa(page), PAGE_READONLY_EXEC);
 
 	if (!boot_cpu_has(X86_FEATURE_SEP)) {
 		memcpy((void *) page,

@@ -10,6 +10,7 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/wait.h>
+#include <linux/init.h>
 #include <asm/semaphore.h>
 #include <asm/semaphore-helper.h>
 
@@ -103,7 +104,7 @@ void __up(struct semaphore *sem)
 	tsk->state = TASK_RUNNING;		\
 	remove_wait_queue(&sem->wait, &wait);
 
-void __down(struct semaphore * sem)
+void __sched __down(struct semaphore * sem)
 {
 	DOWN_VAR
 	DOWN_HEAD(TASK_UNINTERRUPTIBLE)
@@ -113,7 +114,7 @@ void __down(struct semaphore * sem)
 	DOWN_TAIL(TASK_UNINTERRUPTIBLE)
 }
 
-int __down_interruptible(struct semaphore * sem)
+int __sched __down_interruptible(struct semaphore * sem)
 {
 	int ret = 0;
 	DOWN_VAR

@@ -155,6 +155,7 @@ struct saa7134_format {
 #define SAA7134_BOARD_NOVAC_PRIMETV7133 34
 #define SAA7134_BOARD_AVERMEDIA_305    35
 #define SAA7133_BOARD_UPMOST_PURPLE_TV 36
+#define SAA7134_BOARD_ITEMS_MTV005     37
 
 #define SAA7134_INPUT_MAX 8
 
@@ -396,12 +397,12 @@ struct saa7134_dev {
 	int                        ctl_mirror;
 	int                        ctl_y_odd;
 	int                        ctl_y_even;
-	
+
 	/* crop */
 	struct v4l2_rect           crop_bounds;
 	struct v4l2_rect           crop_defrect;
 	struct v4l2_rect           crop_current;
-	
+
 	/* other global state info */
 	unsigned int               automute;
 	struct saa7134_thread      thread;

@@ -46,6 +46,8 @@ int task_has_security(struct task_struct *tsk,
 	struct task_security_struct *tsec;
 
 	tsec = tsk->security;
+	if (!tsec)
+		return -EACCES;
 
 	return avc_has_perm(tsec->sid, SECINITSID_SECURITY,
 			    SECCLASS_SECURITY, perms, NULL, NULL);
@@ -61,11 +63,12 @@ enum sel_inos {
 	SEL_RELABEL,	/* compute relabeling decision */
 	SEL_USER,	/* compute reachable user contexts */
 	SEL_POLICYVERS,	/* return policy version for this kernel */
-	SEL_COMMIT_BOOLS,
-	SEL_MLS		/* return if MLS policy is enabled */
+	SEL_COMMIT_BOOLS, /* commit new boolean values */
+	SEL_MLS,	/* return if MLS policy is enabled */
+	SEL_DISABLE	/* disable SELinux until next reboot */
 };
 
-static ssize_t sel_read_enforce(struct file *filp, char *buf,
+static ssize_t sel_read_enforce(struct file *filp, char __user *buf,
 				size_t count, loff_t *ppos)
 {
 	char *page;
@@ -102,7 +105,7 @@ out:
 }
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
-static ssize_t sel_write_enforce(struct file * file, const char * buf,
+static ssize_t sel_write_enforce(struct file * file, const char __user * buf,
 				 size_t count, loff_t *ppos)
 
 {
@@ -151,7 +154,54 @@ static struct file_operations sel_enforce_ops = {
 	.write		= sel_write_enforce,
 };
 
-static ssize_t sel_read_policyvers(struct file *filp, char *buf,
+#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+static ssize_t sel_write_disable(struct file * file, const char __user * buf,
+				 size_t count, loff_t *ppos)
+
+{
+	char *page;
+	ssize_t length;
+	int new_value;
+	extern int selinux_disable(void);
+
+	if (count < 0 || count >= PAGE_SIZE)
+		return -ENOMEM;
+	if (*ppos != 0) {
+		/* No partial writes. */
+		return -EINVAL;
+	}
+	page = (char*)__get_free_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+	memset(page, 0, PAGE_SIZE);
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
+	length = -EINVAL;
+	if (sscanf(page, "%d", &new_value) != 1)
+		goto out;
+
+	if (new_value) {
+		length = selinux_disable();
+		if (length < 0)
+			goto out;
+	}
+
+	length = count;
+out:
+	free_page((unsigned long) page);
+	return length;
+}
+#else
+#define sel_write_disable NULL
+#endif
+
+static struct file_operations sel_disable_ops = {
+	.write		= sel_write_disable,
+};
+
+static ssize_t sel_read_policyvers(struct file *filp, char __user *buf,
                                    size_t count, loff_t *ppos)
 {
 	char *page;
@@ -194,7 +244,7 @@ static struct file_operations sel_policyvers_ops = {
 /* declaration for sel_write_load */
 static int sel_make_bools(void);
 
-static ssize_t sel_read_mls(struct file *filp, char *buf,
+static ssize_t sel_read_mls(struct file *filp, char __user *buf,
 				size_t count, loff_t *ppos)
 {
 	char *page;
@@ -234,7 +284,7 @@ static struct file_operations sel_mls_ops = {
 	.read		= sel_read_mls,
 };
 
-static ssize_t sel_write_load(struct file * file, const char * buf,
+static ssize_t sel_write_load(struct file * file, const char __user * buf,
 			      size_t count, loff_t *ppos)
 
 {
@@ -284,7 +334,7 @@ static struct file_operations sel_load_ops = {
 };
 
 
-static ssize_t sel_write_context(struct file * file, const char * buf,
+static ssize_t sel_write_context(struct file * file, const char __user * buf,
 				 size_t count, loff_t *ppos)
 
 {
@@ -356,7 +406,7 @@ struct argresp {
  * possibly a read which collects the result - which is stored in a
  * file-local buffer.
  */
-static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t *pos)
+static ssize_t TA_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
 {
 	ino_t ino =  file->f_dentry->d_inode->i_ino;
 	struct argresp *ar;
@@ -395,7 +445,7 @@ static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t 
 	return rv;
 }
 
-static ssize_t TA_read(struct file *file, char *buf, size_t size, loff_t *pos)
+static ssize_t TA_read(struct file *file, char __user *buf, size_t size, loff_t *pos)
 {
 	struct argresp *ar;
 	ssize_t rv = 0;
@@ -694,7 +744,7 @@ static struct inode *sel_make_inode(struct super_block *sb, int mode)
 
 #define BOOL_INO_OFFSET 30
 
-static ssize_t sel_read_bool(struct file *filep, char *buf,
+static ssize_t sel_read_bool(struct file *filep, char __user *buf,
 			     size_t count, loff_t *ppos)
 {
 	char *page = NULL;
@@ -756,7 +806,7 @@ out:
 	return ret;
 }
 
-static ssize_t sel_write_bool(struct file *filep, const char *buf,
+static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 			      size_t count, loff_t *ppos)
 {
 	char *page = NULL;
@@ -783,8 +833,10 @@ static ssize_t sel_write_bool(struct file *filep, const char *buf,
 		goto out;
 	}
 	page = (char*)__get_free_page(GFP_KERNEL);
-	if (!page)
-		return -ENOMEM;
+	if (!page) {
+		length = -ENOMEM;
+		goto out;
+	}
 	memset(page, 0, PAGE_SIZE);
 
 	if (copy_from_user(page, buf, count))
@@ -813,7 +865,8 @@ static struct file_operations sel_bool_ops = {
 	.write          = sel_write_bool,
 };
 
-static ssize_t sel_commit_bools_write(struct file *filep, const char *buf,
+static ssize_t sel_commit_bools_write(struct file *filep,
+				      const char __user *buf,
 				      size_t count, loff_t *ppos)
 {
 	char *page = NULL;
@@ -839,8 +892,10 @@ static ssize_t sel_commit_bools_write(struct file *filep, const char *buf,
 		goto out;
 	}
 	page = (char*)__get_free_page(GFP_KERNEL);
-	if (!page)
-		return -ENOMEM;
+	if (!page) {
+		length = -ENOMEM;
+		goto out;
+	}
 
 	memset(page, 0, PAGE_SIZE);
 
@@ -1005,6 +1060,7 @@ static int sel_fill_super(struct super_block * sb, void * data, int silent)
 		[SEL_POLICYVERS] = {"policyvers", &sel_policyvers_ops, S_IRUGO},
 		[SEL_COMMIT_BOOLS] = {"commit_pending_bools", &sel_commit_bools_ops, S_IWUSR},
 		[SEL_MLS] = {"mls", &sel_mls_ops, S_IRUGO},
+		[SEL_DISABLE] = {"disable", &sel_disable_ops, S_IWUSR},
 		/* last one */ {""}
 	};
 	ret = simple_fill_super(sb, SELINUX_MAGIC, selinux_files);
@@ -1054,3 +1110,10 @@ static int __init init_sel_fs(void)
 }
 
 __initcall(init_sel_fs);
+
+#ifdef CONFIG_SECURITY_SELINUX_DISABLE
+void exit_sel_fs(void)
+{
+	unregister_filesystem(&sel_fs_type);
+}
+#endif

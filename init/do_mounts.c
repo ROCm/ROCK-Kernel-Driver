@@ -141,9 +141,11 @@ dev_t __init name_to_dev_t(char *name)
 	dev_t res = 0;
 	int part;
 
+#ifdef CONFIG_SYSFS
 	sys_mkdir("/sys", 0700);
 	if (sys_mount("sysfs", "/sys", "sysfs", 0, NULL) < 0)
 		goto out;
+#endif
 
 	if (strncmp(name, "/dev/", 5) != 0) {
 		unsigned maj, min;
@@ -192,9 +194,11 @@ dev_t __init name_to_dev_t(char *name)
 	p[-1] = '\0';
 	res = try_name(s, part);
 done:
+#ifdef CONFIG_SYSFS
 	sys_umount("/sys", 0);
 out:
 	sys_rmdir("/sys");
+#endif
 	return res;
 fail:
 	res = 0;

@@ -87,8 +87,6 @@
 		"rtl8139-diag -mmmaaavvveefN" output
 		enable RTL8139_DEBUG below, and look at 'dmesg' or kernel log
 
-		See 8139too.txt for more details.
-
 */
 
 #define DRV_NAME	"8139too"
@@ -167,8 +165,16 @@ static int multicast_filter_limit = 32;
 /* bitmapped message enable number */
 static int debug = -1;
 
-/* Ring size is now a config option */
-#define RX_BUF_LEN	(8192 << CONFIG_8139_RXBUF_IDX)
+/*
+ * Receive ring size 
+ * Warning: 64K ring has hardware issues and may lock up.
+ */
+#if defined(CONFIG_SH_DREAMCAST)
+#define RX_BUF_IDX	1	/* 16K ring */
+#else
+#define RX_BUF_IDX	2	/* 32K ring */
+#endif
+#define RX_BUF_LEN	(8192 << RX_BUF_IDX)
 #define RX_BUF_PAD	16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
 
@@ -692,22 +698,22 @@ static const u16 rtl8139_norx_intr_mask =
 	PCIErr | PCSTimeout | RxUnderrun |
 	TxErr | TxOK | RxErr ;
 
-#if CONFIG_8139_RXBUF_IDX == 0
+#if RX_BUF_IDX == 0
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv8K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
-#elif CONFIG_8139_RXBUF_IDX == 1
+#elif RX_BUF_IDX == 1
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv16K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
-#elif CONFIG_8139_RXBUF_IDX == 2
+#elif RX_BUF_IDX == 2
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv32K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
-#elif CONFIG_8139_RXBUF_IDX == 3
+#elif RX_BUF_IDX == 3
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv64K |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
@@ -771,7 +777,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	u8 tmp8;
 	int rc;
 	unsigned int i;
-	u32 pio_start, pio_end, pio_flags, pio_len;
+	unsigned long pio_start, pio_end, pio_flags, pio_len;
 	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
 	u32 version;
 
@@ -1619,7 +1625,7 @@ static int rtl8139_thread (void *data)
 			timeout = interruptible_sleep_on_timeout (&tp->thr_wait, timeout);
 			/* make swsusp happy with our thread */
 			if (current->flags & PF_FREEZE)
-				refrigerator(PF_IOTHREAD);
+				refrigerator(PF_FREEZE);
 		} while (!signal_pending (current) && (timeout > 0));
 
 		if (signal_pending (current)) {
@@ -1673,11 +1679,17 @@ static void rtl8139_tx_timeout (struct net_device *dev)
 	u8 tmp8;
 	unsigned long flags;
 
-	DPRINTK ("%s: Transmit timeout, status %2.2x %4.4x "
-		 "media %2.2x.\n", dev->name,
-		 RTL_R8 (ChipCmd),
-		 RTL_R16 (IntrStatus),
-		 RTL_R8 (MediaStatus));
+	printk (KERN_DEBUG "%s: Transmit timeout, status %2.2x %4.4x %4.4x "
+		"media %2.2x.\n", dev->name, RTL_R8 (ChipCmd),
+		RTL_R16(IntrStatus), RTL_R16(IntrMask), RTL_R8(MediaStatus));
+	/* Emit info to figure out what went wrong. */
+	printk (KERN_DEBUG "%s: Tx queue start entry %ld  dirty entry %ld.\n",
+		dev->name, tp->cur_tx, tp->dirty_tx);
+	for (i = 0; i < NUM_TX_DESC; i++)
+		printk (KERN_DEBUG "%s:  Tx descriptor %d is %8.8lx.%s\n",
+			dev->name, i, RTL_R32 (TxStatus0 + (i * 4)),
+			i == tp->dirty_tx % NUM_TX_DESC ?
+				" (queue head)" : "");
 
 	tp->xstats.tx_timeouts++;
 
@@ -1690,15 +1702,6 @@ static void rtl8139_tx_timeout (struct net_device *dev)
 	/* Disable interrupts by clearing the interrupt mask. */
 	RTL_W16 (IntrMask, 0x0000);
 
-	/* Emit info to figure out what went wrong. */
-	printk (KERN_DEBUG "%s: Tx queue start entry %ld  dirty entry %ld.\n",
-		dev->name, tp->cur_tx, tp->dirty_tx);
-	for (i = 0; i < NUM_TX_DESC; i++)
-		printk (KERN_DEBUG "%s:  Tx descriptor %d is %8.8lx.%s\n",
-			dev->name, i, RTL_R32 (TxStatus0 + (i * 4)),
-			i == tp->dirty_tx % NUM_TX_DESC ?
-				" (queue head)" : "");
-
 	/* Stop a shared interrupt from scavenging while we are. */
 	spin_lock_irqsave (&tp->lock, flags);
 	rtl8139_tx_clear (tp);
@@ -1710,7 +1713,6 @@ static void rtl8139_tx_timeout (struct net_device *dev)
 		netif_wake_queue (dev);
 	}
 	spin_unlock(&tp->rx_lock);
-	
 }
 
 
@@ -1911,7 +1913,7 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 #endif
 }
 
-#if CONFIG_8139_RXBUF_IDX == 3
+#if RX_BUF_IDX == 3
 static __inline__ void wrap_copy(struct sk_buff *skb, const unsigned char *ring,
 				 u32 offset, unsigned int size)
 {
@@ -1997,7 +1999,7 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 		if (likely(skb)) {
 			skb->dev = dev;
 			skb_reserve (skb, 2);	/* 16 byte align the IP fields. */
-#if CONFIG_8139_RXBUF_IDX == 3
+#if RX_BUF_IDX == 3
 			wrap_copy(skb, rx_ring, ring_offset+4, pkt_size);
 #else
 			eth_copy_and_sum (skb, &rx_ring[ring_offset + 4], pkt_size, 0);
@@ -2454,14 +2456,13 @@ static struct ethtool_ops rtl8139_ethtool_ops = {
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct rtl8139_private *np = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	int rc;
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
 	spin_lock_irq(&np->lock);
-	rc = generic_mii_ioctl(&np->mii, data, cmd, NULL);
+	rc = generic_mii_ioctl(&np->mii, if_mii(rq), cmd, NULL);
 	spin_unlock_irq(&np->lock);
 
 	return rc;
@@ -2554,6 +2555,8 @@ static int rtl8139_suspend (struct pci_dev *pdev, u32 state)
 	void *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 
+	pci_save_state (pdev, tp->pci_state);
+
 	if (!netif_running (dev))
 		return 0;
 
@@ -2572,7 +2575,6 @@ static int rtl8139_suspend (struct pci_dev *pdev, u32 state)
 	spin_unlock_irqrestore (&tp->lock, flags);
 
 	pci_set_power_state (pdev, 3);
-	pci_save_state (pdev, tp->pci_state);
 
 	return 0;
 }
@@ -2583,9 +2585,9 @@ static int rtl8139_resume (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata (pdev);
 	struct rtl8139_private *tp = dev->priv;
 
+	pci_restore_state (pdev, tp->pci_state);
 	if (!netif_running (dev))
 		return 0;
-	pci_restore_state (pdev, tp->pci_state);
 	pci_set_power_state (pdev, 0);
 	rtl8139_init_ring (dev);
 	rtl8139_hw_start (dev);

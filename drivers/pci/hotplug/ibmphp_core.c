@@ -1146,7 +1146,7 @@ error_power:
 * OUTPUT: SUCCESS 0 ; FAILURE: UNCONFIGURE , VALIDATE         *
           DISABLE POWER ,                                    *
 **************************************************************/
-int ibmphp_disable_slot (struct hotplug_slot *hotplug_slot)
+static int ibmphp_disable_slot (struct hotplug_slot *hotplug_slot)
 {
 	struct slot *slot = hotplug_slot->private;
 	int rc;

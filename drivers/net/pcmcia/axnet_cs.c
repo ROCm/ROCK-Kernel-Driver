@@ -231,6 +231,9 @@ static void axnet_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
+    if (link->dev)
+	unregister_netdev(dev);
+
     if (link->state & DEV_CONFIG)
 	axnet_release(link);
 
@@ -239,8 +242,6 @@ static void axnet_detach(dev_link_t *link)
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    if (link->dev)
-	unregister_netdev(dev);
     free_netdev(dev);
 } /* axnet_detach */
 
@@ -430,18 +431,10 @@ static void axnet_config(dev_link_t *link)
     ei_status.block_input = &block_input;
     ei_status.block_output = &block_output;
 
-    strcpy(info->node.dev_name, dev->name);
-
     if (inb(dev->base_addr + AXNET_TEST) != 0)
 	info->flags |= IS_AX88790;
     else
 	info->flags |= IS_AX88190;
-
-    printk(KERN_INFO "%s: Asix AX88%d90: io %#3lx, irq %d, hw_addr ",
-	   dev->name, ((info->flags & IS_AX88790) ? 7 : 1),
-	   dev->base_addr, dev->irq);
-    for (i = 0; i < 6; i++)
-	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
 
     if (info->flags & IS_AX88790)
 	outb(0x10, dev->base_addr + AXNET_GPIO);  /* select Internal PHY */
@@ -463,19 +456,27 @@ static void axnet_config(dev_link_t *link)
     }
 
     info->phy_id = (i < 32) ? i : -1;
-    if (i < 32) {
-	DEBUG(0, "  MII transceiver at index %d, status %x.\n", i, j);
-    } else {
-	printk(KERN_NOTICE "  No MII transceivers found!\n");
-    }
+    link->dev = &info->node;
+    link->state &= ~DEV_CONFIG_PENDING;
 
     if (register_netdev(dev) != 0) {
 	printk(KERN_NOTICE "axnet_cs: register_netdev() failed\n");
+	link->dev = NULL;
 	goto failed;
     }
 
-    link->dev = &info->node;
-    link->state &= ~DEV_CONFIG_PENDING;
+    strcpy(info->node.dev_name, dev->name);
+
+    printk(KERN_INFO "%s: Asix AX88%d90: io %#3lx, irq %d, hw_addr ",
+	   dev->name, ((info->flags & IS_AX88790) ? 7 : 1),
+	   dev->base_addr, dev->irq);
+    for (i = 0; i < 6; i++)
+	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
+    if (info->phy_id != -1) {
+	DEBUG(0, "  MII transceiver at index %d, status %x.\n", info->phy_id, j);
+    } else {
+	printk(KERN_NOTICE "  No MII transceivers found!\n");
+    }
     return;
 
 cs_failed:
@@ -525,10 +526,8 @@ static int axnet_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 	    netif_device_detach(dev);
-	    axnet_release(link);
-	}
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
@@ -778,7 +777,7 @@ static struct ethtool_ops netdev_ethtool_ops = {
 static int axnet_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
     axnet_dev_t *info = PRIV(dev);
-    u16 *data = (u16 *)&rq->ifr_data;
+    u16 *data = (u16 *)&rq->ifr_ifru;
     ioaddr_t mii_addr = dev->base_addr + AXNET_MII_EEP;
     switch (cmd) {
     case SIOCGMIIPHY:
@@ -937,7 +936,6 @@ module_exit(exit_axnet_cs);
 static const char *version_8390 =
     "8390.c:v1.10cvs 9/23/94 Donald Becker (becker@scyld.com)\n";
 
-#include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/irq.h>
 #include <linux/fcntl.h>

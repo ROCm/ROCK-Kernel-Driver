@@ -1,13 +1,11 @@
-ToDo:
+ToDo/Notes:
 	- Find and fix bugs.
-	- Enable NFS exporting of NTFS.
-	- Implement aops->set_page_dirty() in order to take control of buffer
-	  dirtying. Not having it means if page_has_buffers(), all buffers
-	  will be dirtied with the page. And if not they won't be. That is
-	  fine for the moment but will break once we enable metadata updates.
-	- Implement sops->dirty_inode() to implement {a,m,c} time updates and
-	  such things.
-	- Implement sops->write_inode().
+	- Checkpoint or disable the user space journal ($UsnJrnl).
+	- Implement sops->dirty_inode() to implement {a,m,c}time updates and
+	  such things.  This should probably just flag the ntfs inode such that
+	  sops->write_inode(), i.e. ntfs_write_inode(), will copy the times
+	  when it is invoked rather than having to update the mft record
+	  every time.
 	- In between ntfs_prepare/commit_write, need exclusion between
 	  simultaneous file extensions. Need perhaps an NInoResizeUnderway()
 	  flag which we can set in ntfs_prepare_write() and clear again in
@@ -19,6 +17,245 @@ ToDo:
 	  OTOH, perhaps i_sem, which is held accross generic_file_write is
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
+	- Implement mft.c::sync_mft_mirror_umount().  We currently will just
+	  leave the volume dirty on umount if the final iput(vol->mft_ino)
+	  causes a write of any mirrored mft records due to the mft mirror
+	  inode having been discarded already.  Whether this can actually ever
+	  happen is unclear however so it is worth waiting until someone hits
+	  the problem.
+	- Enable the code for setting the NT4 compatibility flag when we start
+	  making NTFS 1.2 specific modifications.
+
+2.1.15 - Invalidate quotas when (re)mounting read-write.
+
+	- Add new element itype.index.collation_rule to the ntfs inode
+	  structure and set it appropriately in ntfs_read_locked_inode().
+	- Implement a new inode type "index" to allow efficient access to the
+	  indices found in various system files and adapt inode handling
+	  accordingly (fs/ntfs/inode.[hc]).  An index inode is essentially an
+	  attribute inode (NInoAttr() is true) with an attribute type of
+	  AT_INDEX_ALLOCATION.  As such, it is no longer allowed to call
+	  ntfs_attr_iget() with an attribute type of AT_INDEX_ALLOCATION as
+	  there would be no way to distinguish between normal attribute inodes
+	  and index inodes.  The function to obtain an index inode is
+	  ntfs_index_iget() and it uses the helper function
+	  ntfs_read_locked_index_inode().  Note, we do not overload
+	  ntfs_attr_iget() as indices consist of multiple attributes so using
+	  ntfs_attr_iget() to obtain an index inode would be confusing.
+	- Ensure that there is no overflow when doing page->index <<
+	  PAGE_CACHE_SHIFT by casting page->index to s64 in fs/ntfs/aops.c.
+	- Use atomic kmap instead of kmap() in fs/ntfs/aops.c::ntfs_read_page()
+	  and ntfs_read_block().
+	- Use case sensitive attribute lookups instead of case insensitive ones.
+	- Lock all page cache pages belonging to mst protected attributes while
+	  accessing them to ensure we never see corrupt data while the page is
+	  under writeout.
+	- Add framework for generic ntfs collation (fs/ntfs/collation.[hc]).
+	  We have ntfs_is_collation_rule_supported() to check if the collation
+	  rule you want to use is supported and ntfs_collation() which actually
+	  collates two data items.  We currently only support COLLATION_BINARY
+	  and COLLATION_NTOFS_ULONG but support for other collation rules will
+	  be added as the need arises.
+	- Add a new type, ntfs_index_context, to allow retrieval of an index
+	  entry using the corresponding index key.  To get an index context,
+	  use ntfs_index_ctx_get() and to release it, use ntfs_index_ctx_put().
+	  This also adds a new slab cache for the index contexts.  To lookup a
+	  key in an index inode, use ntfs_index_lookup().  After modifying an
+	  index entry, call ntfs_index_entry_flush_dcache_page() followed by
+	  ntfs_index_entry_mark_dirty() to ensure the changes are written out
+	  to disk.  For details see fs/ntfs/index.[hc].  Note, at present, if
+	  an index entry is in the index allocation attribute rather than the
+	  index root attribute it will not be written out (you will get a
+	  warning message about discarded changes instead).
+	- Load the quota file ($Quota) and check if quota tracking is enabled
+	  and if so, mark the quotas out of date.  This causes windows to
+	  rescan the volume on boot and update all quota entries.
+	- Add a set_page_dirty address space operation for ntfs_m[fs]t_aops.
+	  It is simply set to __set_page_dirty_nobuffers() to make sure that
+	  running set_page_dirty() on a page containing mft/ntfs records will
+	  not affect the dirty state of the page buffers.
+	- Add fs/ntfs/index.c::__ntfs_index_entry_mark_dirty() which sets all
+	  buffers that are inside the ntfs record in the page dirty after which
+	  it sets the page dirty.  This allows ->writepage to only write the
+	  dirty index records rather than having to write all the records in
+	  the page.  Modify fs/ntfs/index.h::ntfs_index_entry_mark_dirty() to
+	  use this rather than __set_page_dirty_nobuffers().
+	- Implement fs/ntfs/aops.c::ntfs_write_mst_block() which enables the
+	  writing of page cache pages belonging to mst protected attributes
+	  like the index allocation attribute in directory indices and other
+	  indices like $Quota/$Q, etc.  This means that the quota is now marked
+	  out of date on all volumes rather than only on ones where the quota
+	  defaults entry is in the index root attribute of the $Quota/$Q index.
+
+2.1.14 - Fix an NFSd caused deadlock reported by several users.
+
+	- Modify fs/ntfs/ntfs_readdir() to copy the index root attribute value
+	  to a buffer so that we can put the search context and unmap the mft
+	  record before calling the filldir() callback.  We need to do this
+	  because of NFSd which calls ->lookup() from its filldir callback()
+	  and this causes NTFS to deadlock as ntfs_lookup() maps the mft record
+	  of the directory and since ntfs_readdir() has got it mapped already
+	  ntfs_lookup() deadlocks.
+
+2.1.13 - Enable overwriting of resident files and housekeeping of system files.
+
+	- Implement writing of mft records (fs/ntfs/mft.[hc]), which includes
+	  keeping the mft mirror in sync with the mft when mirrored mft records
+	  are written.  The functions are write_mft_record{,_nolock}().  The
+	  implementation is quite rudimentary for now with lots of things not
+	  implemented yet but I am not sure any of them can actually occur so
+	  I will wait for people to hit each one and only then implement it.
+	- Commit open system inodes at umount time.  This should make it
+	  virtually impossible for sync_mft_mirror_umount() to ever be needed.
+	- Implement ->write_inode (fs/ntfs/inode.c::ntfs_write_inode()) for the
+	  ntfs super operations.  This gives us inode writing via the VFS inode
+	  dirty code paths.  Note:  Access time updates are not implemented yet.
+	- Implement fs/ntfs/mft.[hc]::{,__}mark_mft_record_dirty() and make
+	  fs/ntfs/aops.c::ntfs_writepage() and ntfs_commit_write() use it, thus
+	  finally enabling resident file overwrite!  (-8  This also includes a
+	  placeholder for ->writepage (ntfs_mft_writepage()), which for now
+	  just redirties the page and returns.  Also, at umount time, we for
+	  now throw away all mft data page cache pages after the last call to
+	  ntfs_commit_inode() in the hope that all inodes will have been
+	  written out by then and hence no dirty (meta)data will be lost.  We
+	  also check for this case and emit an error message telling the user
+	  to run chkdsk.
+	- Use set_page_writeback() and end_page_writeback() in the resident
+	  attribute code path of fs/ntfs/aops.c::ntfs_writepage() otherwise
+	  the radix-tree tag PAGECACHE_TAG_DIRTY remains set even though the
+	  page is clean.
+	- Implement ntfs_mft_writepage() so it now checks if any of the mft
+	  records in the page are dirty and if so redirties the page and
+	  returns.  Otherwise it just returns (after doing set_page_writeback(),
+	  unlock_page(), end_page_writeback() or the radix-tree tag
+	  PAGECACHE_TAG_DIRTY remains set even though the page is clean), thus
+	  alowing the VM to do with the page as it pleases.  Also, at umount
+	  time, now only throw away dirty mft (meta)data pages if dirty inodes
+	  are present and ask the user to email us if they see this happening.
+	- Add functions ntfs_{clear,set}_volume_flags(), to modify the volume
+	  information flags (fs/ntfs/super.c).
+	- Mark the volume dirty when (re)mounting read-write and mark it clean
+	  when unmounting or remounting read-only.  If any volume errors are
+	  found, the volume is left marked dirty to force chkdsk to run.
+	- Add code to set the NT4 compatibility flag when (re)mounting
+	  read-write for newer NTFS versions but leave it commented out for now
+	  since we do not make any modifications that are NTFS 1.2 specific yet
+	  and since setting this flag breaks Captive-NTFS which is not nice.
+	  This code must be enabled once we start writing NTFS 1.2 specific
+	  changes otherwise Windows NTFS driver might crash / cause corruption.
+
+2.1.12 - Fix the second fix to the decompression engine and some cleanups.
+
+	- Add a new address space operations struct, ntfs_mst_aops, for mst
+	  protected attributes.  This is because the default ntfs_aops do not
+	  make sense with mst protected data and were they to write anything to
+	  such an attribute they would cause data corruption so we provide
+	  ntfs_mst_aops which does not have any write related operations set.
+	- Cleanup dirty ntfs inode handling (fs/ntfs/inode.[hc]) which also
+	  includes an adapted ntfs_commit_inode() and an implementation of
+	  ntfs_write_inode() which for now just cleans dirty inodes without
+	  writing them (it does emit a warning that this is happening).
+	- Undo the second decompression engine fix (see 2.1.9 release ChangeLog
+	  entry) as it was only fixing a theoretical bug but at the same time
+	  it badly broke the handling of sparse and uncompressed compression
+	  blocks.
+
+2.1.11 - Driver internal cleanups.
+
+	- Only build logfile.o if building the driver with read-write support.
+	- Really final white space cleanups.
+	- Use generic_ffs() instead of ffs() in logfile.c which allows the
+	  log_page_size variable to be optimized by gcc into a constant.
+	- Rename uchar_t to ntfschar everywhere as uchar_t is unsigned 1-byte
+	  char as defined by POSIX and as found on some systems.
+
+2.1.10 - Force read-only (re)mounting of volumes with unsupported volume flags.
+
+	- Finish off the white space cleanups (remove trailing spaces, etc).
+	- Clean up ntfs_fill_super() and ntfs_read_inode_mount() by removing
+	  the kludges around the first iget().  Instead of (re)setting ->s_op
+	  we have the $MFT inode set up by explicit new_inode() / set ->i_ino /
+	  insert_inode_hash() / call ntfs_read_inode_mount() directly.  This
+	  kills the need for second super_operations and allows to return error
+	  from ntfs_read_inode_mount() without resorting to ugly "poisoning"
+	  tricks.  (Al Viro)
+	- Force read-only (re)mounting if any of the following bits are set in
+	  the volume information flags:
+	  	VOLUME_IS_DIRTY, VOLUME_RESIZE_LOG_FILE,
+		VOLUME_UPGRADE_ON_MOUNT, VOLUME_DELETE_USN_UNDERWAY,
+		VOLUME_REPAIR_OBJECT_ID, VOLUME_MODIFIED_BY_CHKDSK
+	  To make this easier we define VOLUME_MUST_MOUNT_RO_MASK with all the
+	  above bits set so the test is made easy.
+
+2.1.9 - Fix two bugs in decompression engine.
+
+	- Fix a bug where we would not always detect that we have reached the
+	  end of a compression block because we were ending at minus one byte
+	  which is effectively the same as being at the end.  The fix is to
+	  check whether the uncompressed buffer has been fully filled and if so
+	  we assume we have reached the end of the compression block.  A big
+	  thank you to Marcin Gibuła for the bug report, the assistance in
+	  tracking down the bug and testing the fix.
+	- Fix a possible bug where when a compressed read is truncated to the
+	  end of the file, the offset inside the last page was not truncated.
+
+2.1.8 - Handle $MFT mirror and $LogFile, improve time handling, and cleanups.
+
+	- Use get_bh() instead of manual atomic_inc() in fs/ntfs/compress.c.
+	- Modify fs/ntfs/time.c::ntfs2utc(), get_current_ntfs_time(), and
+	  utc2ntfs() to work with struct timespec instead of time_t on the
+	  Linux UTC time side thus preserving the full precision of the NTFS
+	  time and only loosing up to 99 nano-seconds in the Linux UTC time.
+	- Move fs/ntfs/time.c to fs/ntfs/time.h and make the time functions
+	  static inline.
+	- Remove unused ntfs_dirty_inode().
+	- Cleanup super operations declaration in fs/ntfs/super.c.
+	- Wrap flush_dcache_mft_record_page() in #ifdef NTFS_RW.
+	- Add NInoTestSetFoo() and NInoTestClearFoo() macro magic to
+	  fs/ntfs/inode.h and use it to declare NInoTest{Set,Clear}Dirty.
+	- Move typedefs for ntfs_attr and test_t from fs/ntfs/inode.c to
+	  fs/ntfs/inode.h so they can be used elsewhere.
+	- Determine the mft mirror size as the number of mirrored mft records
+	  and store it in ntfs_volume->mftmirr_size (fs/ntfs/super.c).
+	- Load the mft mirror at mount time and compare the mft records stored
+	  in it to the ones in the mft.  Force a read-only mount if the two do
+	  not match (fs/ntfs/super.c).
+	- Fix type casting related warnings on 64-bit architectures.  Thanks
+	  to Meelis Roos for reporting them.
+	- Move %L to %ll as %L is floating point and %ll is integer which is
+	  what we want.
+	- Read the journal ($LogFile) and determine if the volume has been
+	  shutdown cleanly and force a read-only mount if not (fs/ntfs/super.c
+	  and fs/ntfs/logfile.c).  This is a little bit of a crude check in
+	  that we only look at the restart areas and not at the actual log
+	  records so that there will be a very small number of cases where we
+	  think that a volume is dirty when in fact it is clean.  This should
+	  only affect volumes that have not been shutdown cleanly and did not
+	  have any pending, non-check-pointed i/o.
+	- If the $LogFile indicates a clean shutdown and a read-write (re)mount
+	  is requested, empty $LogFile by overwriting it with 0xff bytes to
+	  ensure that Windows cannot cause data corruption by replaying a stale
+	  journal after Linux has written to the volume.
+
+2.1.7 - Enable NFS exporting of mounted NTFS volumes.
+
+	- Set i_generation in the VFS inode from the seq_no of the NTFS inode.
+	- Make ntfs_lookup() NFS export safe, i.e. use d_splice_alias(), etc.
+	- Implement ->get_dentry() in fs/ntfs/namei.c::ntfs_get_dentry() as the
+	  default doesn't allow inode number 0 which is a valid inode on NTFS
+	  and even if it did allow that it uses iget() instead of ntfs_iget()
+	  which makes it useless for us.
+	- Implement ->get_parent() in fs/ntfs/namei.c::ntfs_get_parent() as the
+	  default just returns -EACCES which is not very useful.
+	- Define export operations (->s_export_op) for NTFS (ntfs_export_ops)
+	  and set them up in the super block at mount time (super.c) this
+	  allows mounted NTFS volumes to be exported via NFS.
+	- Add missing return -EOPNOTSUPP; in
+	  fs/ntfs/aops.c::ntfs_commit_nonresident_write().
+	- Enforce no atime and no dir atime updates at mount/remount time as
+	  they are not implemented yet anyway.
+	- Move a few assignments in fs/ntfs/attrib.c::load_attribute_list() to
+	  after a NULL check.  Thanks to Dave Jones for pointing this out.
 
 2.1.6 - Fix minor bug in handling of compressed directories.
 
@@ -60,6 +297,10 @@ ToDo:
 	- Reduce function local stack usage from 0x3d4 bytes to just noise in
 	  fs/ntfs/upcase.c. (Randy Dunlap <rddunlap@osdl.ord>)
 	- Remove compiler warnings for newer gcc.
+	- Pages are no longer kmapped by mm/filemap.c::generic_file_write()
+	  around calls to ->{prepare,commit}_write.  Adapt NTFS appropriately
+	  in fs/ntfs/aops.c::ntfs_prepare_nonresident_write() by using
+	  kmap_atomic(KM_USER0).
 
 2.1.0 - First steps towards write support: implement file overwrite.
 
@@ -509,12 +750,12 @@ tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 	  types of inode names readdir() returns and modify ntfs_filldir()
 	  accordingly. There are several parameters to show_inodes:
 		system:	system files
-	  	win32:	long file names (including POSIX file names) [DEFAULT]
+		win32:	long file names (including POSIX file names) [DEFAULT]
 		long:	same as win32
-	  	dos:	short file names only (excluding POSIX file names)
+		dos:	short file names only (excluding POSIX file names)
 		short:	same as dos
 		posix:	same as both win32 and dos
-	  	all:	all file names
+		all:	all file names
 	  Note that the options are additive, i.e. specifying:
 		-o show_inodes=system,show_inodes=win32,show_inodes=dos
 	  is the same as specifying:
@@ -604,7 +845,7 @@ tng-0.0.7 - 13/02/2002 - The driver is now feature complete for read-only!
 	- Change parameters to find_attr() and lookup_attr(). We no longer
 	  pass in the upcase table and its length. These can be gotten from
 	  ctx->ntfs_ino->vol->upcase{_len}. Update all callers.
-	- Cleanups in attrib.c. 
+	- Cleanups in attrib.c.
 	- Implement merging of run lists, attrib.c::merge_run_lists() and its
 	  helpers. (Richard Russon)
 	- Attribute lists part 2, attribute extents and multi part run lists:
@@ -807,4 +1048,3 @@ tng-0.0.0 - Initial version tag.
 	working nicely, too. Proof of inode metadata in the page cache and non-
 	resident file unnamed stream data in the page cache concepts is thus
 	complete.
-

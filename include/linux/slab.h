@@ -44,6 +44,7 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define SLAB_STORE_USER		0x00010000UL	/* store the last owner for bug hunting */
 #define SLAB_RECLAIM_ACCOUNT	0x00020000UL	/* track pages allocated to indicate
 						   what is reclaimable later*/
+#define SLAB_PANIC		0x00040000UL	/* panic if kmem_cache_create() fails */
 
 /* flags passed to a constructor func */
 #define	SLAB_CTOR_CONSTRUCTOR	0x001UL		/* if not set, then deconstructor */
@@ -60,6 +61,7 @@ extern kmem_cache_t *kmem_cache_create(const char *, size_t, size_t, unsigned lo
 extern int kmem_cache_destroy(kmem_cache_t *);
 extern int kmem_cache_shrink(kmem_cache_t *);
 extern void *kmem_cache_alloc(kmem_cache_t *, int);
+extern void *kmem_cache_alloc_node(kmem_cache_t *, int);
 extern void kmem_cache_free(kmem_cache_t *, void *);
 extern unsigned int kmem_cache_size(kmem_cache_t *);
 
@@ -116,11 +118,6 @@ extern kmem_cache_t	*bio_cachep;
 void ptrinfo(unsigned long addr);
 
 extern atomic_t slab_reclaim_pages;
-
-void *kzmalloc(size_t size, int gfp_flags);
-char *kstrdup(const char *p, int gfp_flags);
-char **kstrdup_vec(char **vec, int gfp_flags);
-void kfree_strvec(char **vec);
 
 #endif	/* __KERNEL__ */
 

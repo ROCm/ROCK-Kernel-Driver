@@ -68,19 +68,20 @@ static int crypt(struct crypto_tfm *tfm,
 
 	for(;;) {
 		u8 *src_p, *dst_p;
+		int in_place;
 
 		scatterwalk_map(&walk_in, 0);
 		scatterwalk_map(&walk_out, 1);
 		src_p = scatterwalk_whichbuf(&walk_in, bsize, tmp_src);
 		dst_p = scatterwalk_whichbuf(&walk_out, bsize, tmp_dst);
+		in_place = scatterwalk_samebuf(&walk_in, &walk_out,
+					       src_p, dst_p);
 
 		nbytes -= bsize;
 
 		scatterwalk_copychunks(src_p, &walk_in, bsize, 0);
 
-		prfn(tfm, dst_p, src_p, crfn, enc, info,
-		     scatterwalk_samebuf(&walk_in, &walk_out,
-					 src_p, dst_p));
+		prfn(tfm, dst_p, src_p, crfn, enc, info, in_place);
 
 		scatterwalk_done(&walk_in, 0, nbytes);
 

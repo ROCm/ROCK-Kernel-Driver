@@ -5,10 +5,10 @@
 |Production Release P1.00 -- October 10, 1994
 |
 |M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
-| 
+|
 |THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 |To the maximum extent permitted by applicable law,
-|MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+|MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 |INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 |and any warranty against infringement with regard to the SOFTWARE
 |(INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -40,7 +40,7 @@
 
 
 |################################
-| (1) EXAMPLE CALL-OUTS 	#
+| (1) EXAMPLE CALL-OUTS		#
 |				#
 | _060_isp_done()		#
 | _060_real_chk()		#
@@ -56,7 +56,7 @@
 | _060_isp_done():
 |
 | This is and example main exit point for the Unimplemented Integer
-| Instruction exception handler. For a normal exit, the 
+| Instruction exception handler. For a normal exit, the
 | _isp_unimp() branches to here so that the operating system
 | can do any clean-up desired. The stack frame is the
 | Unimplemented Integer Instruction stack frame with
@@ -118,9 +118,9 @@ real_chk_end:
 |
 | _060_real_divbyzero:
 |
-| This is an alternate exit point for the Unimplemented Integer 
+| This is an alternate exit point for the Unimplemented Integer
 | Instruction exception handler isp_unimp(). If the instruction is a 64-bit
-| integer divide where the source operand is a zero, then the _isp_unimp() 
+| integer divide where the source operand is a zero, then the _isp_unimp()
 | creates a Divide-by-zero exception stack frame from the Unimplemented
 | Integer Instruction stack frame and branches to this routine.
 |
@@ -128,7 +128,7 @@ real_chk_end:
 | no action associated with the "chk" exception. If tracing is enabled,
 | then it create a Trace exception stack frame from the "chk" exception
 | stack frame and branches to the _real_trace() entry point.
-| 
+|
 | Linux/68k: commented out test for tracing
 
 	.global		_060_real_divbyzero
@@ -185,7 +185,7 @@ _060_real_cas2:
 | Entry point for the operating system`s routine to "lock" a page
 | from being paged out. This routine is needed by the cas/cas2
 | algorithms so that no page faults occur within the "core" code
-| region. Note: the routine must lock two pages if the operand 
+| region. Note: the routine must lock two pages if the operand
 | spans two pages.
 | NOTE: THE ROUTINE SHOULD RETURN AN FSLW VALUE IN D0 ON FAILURE
 | SO THAT THE 060SP CAN CREATE A PROPER ACCESS ERROR FRAME.
@@ -196,13 +196,57 @@ _060_real_cas2:
 | Expected outputs:
 |	d0 = 0 -> success; non-zero -> failure
 |
-| Linux/68k: As long as ints are disabled, no swapping out should
-| occur (hopefully...)
+| Linux/m68k: Make sure the page is properly paged in, so we use
+| plpaw and handle any exception here. The kernel must not be
+| preempted until _060_unlock_page(), so that the page stays mapped.
 |
 	.global		_060_real_lock_page
 _060_real_lock_page:
-	clr.l		%d0
+	move.l	%d2,-(%sp)
+	| load sfc/dfc
+	tst.b	%d0
+	jne	1f
+	moveq	#1,%d0
+	jra	2f
+1:	moveq	#5,%d0
+2:	movec.l	%dfc,%d2
+	movec.l	%d0,%dfc
+	movec.l	%d0,%sfc
+
+	clr.l	%d0
+	| prefetch address
+	.chip	68060
+	move.l	%a0,%a1
+1:	plpaw	(%a1)
+	addq.w	#1,%a0
+	tst.b	%d1
+	jeq	2f
+	addq.w	#2,%a0
+2:	plpaw	(%a0)
+3:	.chip	68k
+
+	| restore sfc/dfc
+	movec.l	%d2,%dfc
+	movec.l	%d2,%sfc
+	move.l	(%sp)+,%d2
 	rts
+
+.section __ex_table,"a"
+	.align	4
+	.long	1b,11f
+	.long	2b,21f
+.previous
+.section .fixup,"ax"
+	.even
+11:	move.l	#0x020003c0,%d0
+	or.l	%d2,%d0
+	swap	%d0
+	jra	3b
+21:	move.l	#0x02000bc0,%d0
+	or.l	%d2,%d0
+	swap	%d0
+	jra	3b
+.previous
 
 |
 | _060_unlock_page():
@@ -212,12 +256,11 @@ _060_real_lock_page:
 | Note: the routine must unlock two pages if the operand spans
 | two pages.
 | Arguments:
-| 	a0 = operand address
+|	a0 = operand address
 |	d0 = `xxxxxxff -> supervisor; `xxxxxx00 -> user
 |	d1 = `xxxxxxff -> longword; `xxxxxx00 -> word
 |
-| Linux/68k: As we do no special locking operation, also no unlocking
-| is needed...
+| Linux/m68k: perhaps reenable preemption here...
 
 	.global		_060_real_unlock_page
 _060_real_unlock_page:

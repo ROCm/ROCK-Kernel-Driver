@@ -30,10 +30,10 @@
 extern struct mpoa_client *mpcs;
 extern struct proc_dir_entry *atm_proc_root;  /* from proc.c. */
 
-static ssize_t proc_mpc_read(struct file *file, char *buff,
+static ssize_t proc_mpc_read(struct file *file, char __user *buff,
 			     size_t count, loff_t *pos);
 
-static ssize_t proc_mpc_write(struct file *file, const char *buff,
+static ssize_t proc_mpc_write(struct file *file, const char __user *buff,
                               size_t nbytes, loff_t *ppos);
 
 static int parse_qos(const char *buff, int len);
@@ -98,22 +98,19 @@ static const char *egress_state_string(int state){
 
 /*
  * READING function - called when the /proc/atm/mpoa file is read from.
- * FIXME: needs seek locking
  */
-static ssize_t proc_mpc_read(struct file *file, char *buff,
+static ssize_t proc_mpc_read(struct file *file, char __user *buff,
 			     size_t count, loff_t *pos){
         unsigned long page = 0;
 	unsigned char *temp;
-        int length = 0;
+        ssize_t length = 0;
 	int i = 0;
 	struct mpoa_client *mpc = mpcs;
 	in_cache_entry *in_entry;
 	eg_cache_entry *eg_entry;
 	struct timeval now;
 	unsigned char ip_string[16];
-	loff_t n = *pos;
-	
-	if(count == 0 || n < 0)
+	if(count == 0)
 	        return 0;
 	page = get_zeroed_page(GFP_KERNEL);
 	if(!page)
@@ -154,27 +151,26 @@ static ssize_t proc_mpc_read(struct file *file, char *buff,
 		mpc = mpc->next;
 	}
 
-	if (n >= length)
-		count = 0;
+	if (*pos >= length) length = 0;
 	else {
-	  if (count  > length - n) count = length - n;
+	  if ((count + *pos) > length) count = length - *pos;
 	  if (copy_to_user(buff, (char *)page , count)) {
  		  free_page(page);
 		  return -EFAULT;
           }
-	  *pos = n + count;
+	  *pos += count;
 	}
 
  	free_page(page);
-        return count;
+        return length;
 }
 
-static ssize_t proc_mpc_write(struct file *file, const char *buff,
+static ssize_t proc_mpc_write(struct file *file, const char __user *buff,
                               size_t nbytes, loff_t *ppos)
 {
         int incoming, error, retval;
         char *page, c;
-        const char *tmp;
+        const char __user *tmp;
 
         if (nbytes == 0) return 0;
         if (nbytes >= PAGE_SIZE) nbytes = PAGE_SIZE-1;
@@ -199,6 +195,8 @@ static ssize_t proc_mpc_write(struct file *file, const char *buff,
                 printk("mpoa: proc_mpc_write: copy_from_user() failed\n");
                 return -EFAULT;
         }
+
+        *ppos += incoming;
 
         page[incoming] = '\0';
 	retval = parse_qos(page, incoming);

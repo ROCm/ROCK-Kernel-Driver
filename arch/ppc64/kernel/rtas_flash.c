@@ -238,7 +238,7 @@ static ssize_t rtas_flash_read(struct file *file, char *buf,
 	if (msglen > count)
 		msglen = count;
 
-	if (*ppos != 0)
+	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 
 	error = verify_area(VERIFY_WRITE, buf, msglen);
@@ -248,7 +248,8 @@ static ssize_t rtas_flash_read(struct file *file, char *buf,
 	if (copy_to_user(buf, msg, msglen))
 		return -EFAULT;
 
-	*ppos = msglen;
+	if (ppos)
+		*ppos = msglen;
 	return msglen;
 }
 
@@ -343,8 +344,8 @@ static void manage_flash(struct rtas_manage_flash_t *args_buf)
 	s32 rc;
 
 	while (1) {
-		rc = (s32) rtas_call(rtas_token("ibm,manage-flash-image"), 1, 
-				1, NULL, (long) args_buf->op);
+		rc = rtas_call(rtas_token("ibm,manage-flash-image"), 1, 
+			       1, NULL, args_buf->op);
 		if (rc == RTAS_RC_BUSY)
 			udelay(1);
 		else if (rtas_is_extended_busy(rc)) {
@@ -374,7 +375,7 @@ static ssize_t manage_flash_read(struct file *file, char *buf,
 	if (msglen > count)
 		msglen = count;
 
-	if (*ppos != 0)
+	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 
 	error = verify_area(VERIFY_WRITE, buf, msglen);
@@ -384,7 +385,8 @@ static ssize_t manage_flash_read(struct file *file, char *buf,
 	if (copy_to_user(buf, msg, msglen))
 		return -EFAULT;
 
-	*ppos = msglen;
+	if (ppos)
+		*ppos = msglen;
 	return msglen;
 }
 
@@ -427,15 +429,15 @@ static void validate_flash(struct rtas_validate_flash_t *args_buf)
 {
 	int token = rtas_token("ibm,validate-flash-image");
 	unsigned int wait_time;
-	long update_results;
+	int update_results;
 	s32 rc;	
 
 	rc = 0;
 	while(1) {
 		spin_lock(&rtas_data_buf_lock);
 		memcpy(rtas_data_buf, args_buf->buf, VALIDATE_BUF_SIZE);
-		rc = (s32) rtas_call(token, 2, 2, &update_results, 
-				     __pa(rtas_data_buf), args_buf->buf_size);
+		rc = rtas_call(token, 2, 2, &update_results, 
+			       (u32) __pa(rtas_data_buf), args_buf->buf_size);
 		memcpy(args_buf->buf, rtas_data_buf, VALIDATE_BUF_SIZE);
 		spin_unlock(&rtas_data_buf_lock);
 			
@@ -449,7 +451,7 @@ static void validate_flash(struct rtas_validate_flash_t *args_buf)
 	}
 
 	args_buf->status = rc;
-	args_buf->update_results = (u32) update_results;
+	args_buf->update_results = update_results;
 }
 
 static int get_validate_flash_msg(struct rtas_validate_flash_t *args_buf, 
@@ -479,7 +481,7 @@ static ssize_t validate_flash_read(struct file *file, char *buf,
 
 	args_buf = (struct rtas_validate_flash_t *) dp->data;
 
-	if (*ppos != 0)
+	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 	
 	msglen = get_validate_flash_msg(args_buf, msg);
@@ -493,7 +495,8 @@ static ssize_t validate_flash_read(struct file *file, char *buf,
 	if (copy_to_user(buf, msg, msglen))
 		return -EFAULT;
 
-	*ppos = msglen;
+	if (ppos)
+		*ppos = msglen;
 	return msglen;
 }
 

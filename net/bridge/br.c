@@ -20,8 +20,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/init.h>
-#include <linux/if_bridge.h>
-#include <asm/uaccess.h>
+
 #include "br_private.h"
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
@@ -32,6 +31,8 @@ int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
 
 static int __init br_init(void)
 {
+	br_fdb_init();
+
 #ifdef CONFIG_BRIDGE_NETFILTER
 	if (br_netfilter_init())
 		return 1;
@@ -55,16 +56,18 @@ static void __exit br_deinit(void)
 #endif
 	unregister_netdevice_notifier(&br_device_notifier);
 	brioctl_set(NULL);
-	br_handle_frame_hook = NULL;
+
+	br_cleanup_bridges();
+
+	synchronize_net();
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
 	br_fdb_get_hook = NULL;
 	br_fdb_put_hook = NULL;
 #endif
 
-	br_cleanup_bridges();
-
-	synchronize_net();
+	br_handle_frame_hook = NULL;
+	br_fdb_fini();
 }
 
 EXPORT_SYMBOL(br_should_route_hook);

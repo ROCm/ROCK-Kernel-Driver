@@ -1,456 +1,211 @@
-/*
- * audit.h
+/* audit.h -- Auditing support -*- linux-c -*-
  *
- * Copyright (c) 2003 SuSE Linux AG
- * Written by okir@suse.de, based on ideas from systrace, written by
- * Niels Provos (OpenBSD) and ported to Linux by Marius Aamodt Eriksen.
+ * Copyright 2003-2004 Red Hat Inc., Durham, North Carolina.
+ * All Rights Reserved.
  *
- * GPL goes here
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Written by Rickard E. (Rik) Faith <faith@redhat.com>
+ *
  */
 
-#ifndef _AUDIT_H
-#define _AUDIT_H
+#ifndef _LINUX_AUDIT_H_
+#define _LINUX_AUDIT_H_
 
-#ifdef __KERNEL__
-# include <linux/config.h>
+/* Request and reply types */
+#define AUDIT_GET      1000	/* Get status */
+#define AUDIT_SET      1001	/* Set status (enable/disable/auditd) */
+#define AUDIT_LIST     1002	/* List filtering rules */
+#define AUDIT_ADD      1003	/* Add filtering rule */
+#define AUDIT_DEL      1004	/* Delete filtering rule */
+#define AUDIT_USER     1005	/* Send a message from user-space */
+#define AUDIT_LOGIN    1006     /* Define the login id and informaiton */
+#define AUDIT_KERNEL   2000	/* Asynchronous audit record. NOT A REQUEST. */
+
+/* Rule flags */
+#define AUDIT_PER_TASK 0x01	/* Apply rule at task creation (not syscall) */
+#define AUDIT_AT_ENTRY 0x02	/* Apply rule at syscall entry */
+#define AUDIT_AT_EXIT  0x04	/* Apply rule at syscall exit */
+#define AUDIT_PREPEND  0x10	/* Prepend to front of list */
+
+/* Rule actions */
+#define AUDIT_NEVER    0	/* Do not build context if rule matches */
+#define AUDIT_POSSIBLE 1	/* Build context if rule matches  */
+#define AUDIT_ALWAYS   2	/* Generate audit record if rule matches */
+
+/* Rule structure sizes -- if these change, different AUDIT_ADD and
+ * AUDIT_LIST commands must be implemented. */
+#define AUDIT_MAX_FIELDS   64
+#define AUDIT_BITMASK_SIZE 64
+#define AUDIT_WORD(nr) ((__u32)((nr)/32))
+#define AUDIT_BIT(nr)  (1 << ((nr) - AUDIT_WORD(nr)*32))
+
+/* Rule fields */
+				/* These are useful when checking the
+				 * task structure at task creation time
+				 * (AUDIT_PER_TASK).  */
+#define AUDIT_PID	0
+#define AUDIT_UID	1
+#define AUDIT_EUID	2
+#define AUDIT_SUID	3
+#define AUDIT_FSUID	4
+#define AUDIT_GID	5
+#define AUDIT_EGID	6
+#define AUDIT_SGID	7
+#define AUDIT_FSGID	8
+#define AUDIT_LOGINUID	9
+#define AUDIT_PERS	10
+
+				/* These are ONLY useful when checking
+				 * at syscall exit time (AUDIT_AT_EXIT). */
+#define AUDIT_DEVMAJOR	100
+#define AUDIT_DEVMINOR	101
+#define AUDIT_INODE	102
+#define AUDIT_EXIT	103
+#define AUDIT_SUCCESS   104	/* exit >= 0; value ignored */
+
+#define AUDIT_ARG0      200
+#define AUDIT_ARG1      (AUDIT_ARG0+1)
+#define AUDIT_ARG2      (AUDIT_ARG0+2)
+#define AUDIT_ARG3      (AUDIT_ARG0+3)
+
+#define AUDIT_NEGATE    0x80000000
+
+
+/* Status symbols */
+				/* Mask values */
+#define AUDIT_STATUS_ENABLED		0x0001
+#define AUDIT_STATUS_FAILURE		0x0002
+#define AUDIT_STATUS_PID		0x0004
+#define AUDIT_STATUS_RATE_LIMIT		0x0008
+#define AUDIT_STATUS_BACKLOG_LIMIT	0x0010
+				/* Failure-to-log actions */
+#define AUDIT_FAIL_SILENT	0
+#define AUDIT_FAIL_PRINTK	1
+#define AUDIT_FAIL_PANIC	2
+
+#ifndef __KERNEL__
+struct audit_message {
+	struct nlmsghdr nlh;
+	char		data[1200];
+};
 #endif
 
-#if !defined(__KERNEL__) || defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
-
-# ifdef __KERNEL__
-#  include <linux/limits.h>
-#  include <linux/slab.h>
-#  include <linux/sys.h>
-#  include <linux/time.h>
-#  include <asm/semaphore.h>
-# else
-#  include <limits.h>
-#  include <stdint.h>
-# endif
-
-# define AUDIT_API_VERSION	0x20040305
-
-# define AUD_MAX_HOSTNAME	256
-# define AUD_MAX_ADDRESS		256
-# define AUD_MAX_TERMINAL	256
-# define AUD_MAX_EVNAME		16
-
-/*
- * System call intercept policy
- */
-struct audit_policy {
-	unsigned int	code;
-	unsigned int	action;
-	unsigned int	filter;
+struct audit_status {
+	__u32		mask;		/* Bit mask for valid entries */
+	__u32		enabled;	/* 1 = enabled, 0 = disbaled */
+	__u32		failure;	/* Failure-to-log action */
+	__u32		pid;		/* pid of auditd process */
+	__u32		rate_limit;	/* messages rate limit (per second) */
+	__u32		backlog_limit;	/* waiting messages limit */
+	__u32		lost;		/* messages lost */
+	__u32		backlog;	/* messages waiting in queue */
 };
 
-# define AUDIT_IGNORE		0x0000
-# define AUDIT_LOG		0x0001
-/* Policy flags that can be set in filter rules using
- * the return() predicate
- */
-# define AUDIT_VERBOSE		0x0002
-
-
-/*
- * Values for aud_msg_syscall.major and audit_policy.code
- */
-enum audit_call {
-	AUDIT_invalid = -1,
-	AUDIT_access,
-	AUDIT_acct,
-	AUDIT_adjtimex,
-	AUDIT_brk,
-	AUDIT_bind,
-	AUDIT_capset,
-	AUDIT_chdir,
-	AUDIT_chmod,
-	AUDIT_chown,
-	AUDIT_chroot,
-	AUDIT_clone,
-	AUDIT_delete_module,
-	AUDIT_execve,
-	AUDIT_fchdir,
-	AUDIT_fchmod,
-	AUDIT_fchown,
-	AUDIT_fremovexattr,
-	AUDIT_fsetxattr,
-	AUDIT_ftruncate,
-	AUDIT_init_module,
-	AUDIT_ioctl,
-	AUDIT_ioperm,
-	AUDIT_iopl,
-	AUDIT_kill,
-	AUDIT_lchmod,
-	AUDIT_lchown,
-	AUDIT_link,
-	AUDIT_lremovexattr,
-	AUDIT_lsetxattr,
-	AUDIT_mkdir,
-	AUDIT_mknod,
-	AUDIT_mount,
-	AUDIT_msgctl,
-	AUDIT_msgget,
-	AUDIT_msgrcv,
-	AUDIT_msgsnd,
-	AUDIT_open,
-	AUDIT_ptrace,
-	AUDIT_quotactl,
-	AUDIT_reboot,
-	AUDIT_removexattr,
-	AUDIT_rename,
-	AUDIT_rmdir,
-	AUDIT_semctl,
-	AUDIT_semget,
-	AUDIT_semop,
-	AUDIT_semtimedop,
-	AUDIT_setdomainname,
-	AUDIT_setfsgid,
-	AUDIT_setfsuid,
-	AUDIT_setgid,
-	AUDIT_setgroups,
-	AUDIT_sethostname,
-	AUDIT_setpgid,
-	AUDIT_setpriority,
-	AUDIT_setregid,
-	AUDIT_setresgid,
-	AUDIT_setresuid,
-	AUDIT_setreuid,
-	AUDIT_setrlimit,
-	AUDIT_setsid,
-	AUDIT_settimeofday,
-	AUDIT_setuid,
-	AUDIT_setxattr,
-	AUDIT_shmat,
-	AUDIT_shmctl,
-	AUDIT_shmdt,
-	AUDIT_shmget,
-	AUDIT_socket,
-	AUDIT_swapoff,
-	AUDIT_swapon,
-	AUDIT_symlink,
-	AUDIT_syslog,
-	AUDIT_tgkill,
-	AUDIT_tkill,
-	AUDIT_truncate,
-	AUDIT_umask,
-	AUDIT_umount,
-	AUDIT_unlink,
-	AUDIT_utimes,
-	audit_NUM_CALLS,
-# ifdef __KERNEL__
-#  if BITS_PER_LONG == 64
-	AUDIT_32 = 0x4000,
-#  elif BITS_PER_LONG == 32
-	AUDIT_32 = 0,
-#  else
-#   error Unsupported!
-#  endif
-# endif
-};
-
-/*
- * Special values for audit_policy.code
- */
-enum {
-	__AUD_POLICY_LAST_SYSCALL = 299,
-	AUD_POLICY_FORK,
-	AUD_POLICY_EXIT,
-	AUD_POLICY_NETLINK,
-	AUD_POLICY_LOGIN,
-	AUD_POLICY_USERMSG,
-
-	__AUD_MAX_POLICY
-};
-
-/*
- * Filter setup.
- */
-struct audit_filter {
-	unsigned short	num;
-	unsigned short	op;
-	char		event[AUD_MAX_EVNAME];
-	union {
-		struct {
-			unsigned short	target;
-			unsigned short	filter;
-		} apply;
-		struct {
-			unsigned short	filt1, filt2;
-		} boolean;
-		struct {
-			unsigned int	action;
-		} freturn;
-		struct {
-			uint64_t	value;
-			uint64_t	mask;
-		} integer;
-		struct {
-			char *		value;
-		} string;
-	} u;
-};
-
-enum {
-	/* Boolean operations */
-	AUD_FILT_OP_AND = 0,		/* pair of filters */
-	AUD_FILT_OP_OR,			/* pair of filters */
-	AUD_FILT_OP_NOT,		/* single filter */
-	AUD_FILT_OP_APPLY,		/* target + predicate filter */
-	AUD_FILT_OP_RETURN,		/* return immediately */
-	AUD_FILT_OP_TRUE,		/* always true */
-	AUD_FILT_OP_FALSE,		/* always false */
-
-	/* Filter predicates, taking one argument */
-	AUD_FILT_OP_EQ = 0x10,		/* int */
-	AUD_FILT_OP_NE,			/* int */
-	AUD_FILT_OP_GT,			/* int */
-	AUD_FILT_OP_GE,			/* int */
-	AUD_FILT_OP_LE,			/* int */
-	AUD_FILT_OP_LT,			/* int */
-	AUD_FILT_OP_MASK,		/* int */
-	AUD_FILT_OP_STREQ = 0x20,	/* string */
-	AUD_FILT_OP_PREFIX,		/* path */
-};
-# define AUD_FILT_ARGTYPE_INT(op)	(((op) >> 4) == 1)
-# define AUD_FILT_ARGTYPE_STR(op)	(((op) >> 4) == 2)
-
-enum {
-	/* target values < 128 denote syscall arguments 0 .. 127
-	 * (in case anyone ever comes up with a system call
-	 * taking 127 arguments :)
-	 */
-	AUD_FILT_TGT_USERMSG_EVNAME = 0xFD,
-	AUD_FILT_TGT_MINOR_CODE = 0xFE,
-	AUD_FILT_TGT_RETURN_CODE = 0xFF,
-
-	AUD_FILT_TGT_UID = 0x100,
-	AUD_FILT_TGT_GID,
-	AUD_FILT_TGT_DUMPABLE,
-	AUD_FILT_TGT_EXIT_CODE,
-	AUD_FILT_TGT_LOGIN_UID,
-
-	AUD_FILT_TGT_FILE_MODE = 0x200,
-	AUD_FILT_TGT_FILE_DEV,
-	AUD_FILT_TGT_FILE_INO,
-	AUD_FILT_TGT_FILE_UID,
-	AUD_FILT_TGT_FILE_GID,
-	AUD_FILT_TGT_FILE_RDEV_MAJOR,
-	AUD_FILT_TGT_FILE_RDEV_MINOR,
-
-	AUD_FILT_TGT_SOCK_FAMILY = 0x300,
-	AUD_FILT_TGT_SOCK_TYPE,
-
-	AUD_FILT_TGT_NETLINK_TYPE = 0x400,
-	AUD_FILT_TGT_NETLINK_FLAGS,
-	AUD_FILT_TGT_NETLINK_FAMILY,
-};
-# define AUD_FILT_TGT_SYSCALL_ATTR(x)	(((x) >> 8) == 0)
-# define AUD_FILT_TGT_PROCESS_ATTR(x)	(((x) >> 8) == 1)
-# define AUD_FILT_TGT_FILE_ATTR(x)	(((x) >> 8) == 2)
-# define AUD_FILT_TGT_SOCK_ATTR(x)	(((x) >> 8) == 3)
-# define AUD_FILT_TGT_NETLINK_ATTR(x)	(((x) >> 8) == 4)
-
-
-/*
- * Login data
- */
 struct audit_login {
-	uid_t		uid;
-	char		hostname[AUD_MAX_HOSTNAME];
-	char		address[AUD_MAX_ADDRESS];
-	char		terminal[AUD_MAX_TERMINAL];
+	__u32		loginuid;
+	int		msglen;
+	char		msg[1024];
 };
 
-/*
- * Message passing from user space
- */
-struct audit_message {
-	unsigned int	msg_type;
-	char		msg_evname[AUD_MAX_EVNAME];
-	void *		msg_data;
-	size_t		msg_size;
+struct audit_rule {		/* for AUDIT_LIST, AUDIT_ADD, and AUDIT_DEL */
+	__u32		flags;	/* AUDIT_PER_{TASK,CALL}, AUDIT_PREPEND */
+	__u32		action;	/* AUDIT_NEVER, AUDIT_POSSIBLE, AUDIT_ALWAYS */
+	__u32		field_count;
+	__u32		mask[AUDIT_BITMASK_SIZE];
+	__u32		fields[AUDIT_MAX_FIELDS];
+	__u32		values[AUDIT_MAX_FIELDS];
 };
 
-/*
- * IOCTLs to configure the audit subsystem
- */
-# define AUD_MAGIC '@'
+#ifdef __KERNEL__
 
-/* The _IOR's are in fact wrong; they should be _IOW's :-( */
-# define AUIOCATTACH		_IO(AUD_MAGIC, 101)
-# define AUIOCDETACH		_IO(AUD_MAGIC, 102)
-# define AUIOCSUSPEND		_IO(AUD_MAGIC, 103)
-# define AUIOCRESUME		_IO(AUD_MAGIC, 104)
-# define AUIOCCLRPOLICY		_IO(AUD_MAGIC, 105)
-# define AUIOCSETPOLICY		_IOR(AUD_MAGIC, 106, struct audit_policy)
-# define AUIOCIAMAUDITD		_IO(AUD_MAGIC, 107)
-# define AUIOCSETAUDITID		_IO(AUD_MAGIC, 108)
-# define AUIOCLOGIN		_IOR(AUD_MAGIC, 110, struct audit_login)
-# define AUIOCUSERMESSAGE	_IOR(AUD_MAGIC, 111, struct audit_message)
-# define AUIOCCLRFILTER		_IO(AUD_MAGIC, 112)
-# define AUIOCSETFILTER		_IOR(AUD_MAGIC, 113, struct audit_filter)
-# define AUIOCVERSION		_IO(AUD_MAGIC, 114)
-# define AUIOCRESET		_IO(AUD_MAGIC, 115)
+#ifdef CONFIG_AUDIT
+struct audit_buffer;
+struct audit_context;
+#endif
 
-/* Pass as ioctl(fd, AUIOCIAMAUDITD, AUDIT_TRACE_ALL) */
-# define AUDIT_TRACE_ALL		1
+#ifdef CONFIG_AUDITSYSCALL
+/* These are defined in auditsc.c */
+				/* Public API */
+extern int  audit_alloc(struct task_struct *task);
+extern void audit_free(struct task_struct *task);
+extern void audit_syscall_entry(struct task_struct *task,
+				int major, unsigned long a0, unsigned long a1,
+				unsigned long a2, unsigned long a3);
+extern void audit_syscall_exit(struct task_struct *task, int return_code);
+extern void audit_getname(const char *name);
+extern void audit_putname(const char *name);
+extern void audit_inode(const char *name, unsigned long ino, dev_t rdev);
 
-/*
- * This message is generated when a process forks
- * or exits, to help auditd with book-keeping.
- */
-struct aud_msg_child {
-        pid_t			new_pid;
-};
+				/* Private API (for audit.c only) */
+extern int  audit_receive_filter(int type, int pid, int uid, int seq,
+				 void *data);
+extern void audit_get_stamp(struct audit_context *ctx,
+			    struct timespec *t, int *serial);
+extern int  audit_set_loginuid(struct audit_context *ctx, uid_t loginuid);
+#else
+#define audit_alloc(t) ({ 0; })
+#define audit_free(t) do { ; } while (0)
+#define audit_syscall_entry(t,a,b,c,d,e) do { ; } while (0)
+#define audit_syscall_exit(t,r) do { ; } while (0)
+#define audit_getname(n) do { ; } while (0)
+#define audit_putname(n) do { ; } while (0)
+#define audit_inode(n,i,d) do { ; } while (0)
+#endif
 
-/*
- * This message reports system call arguments.
- *
- * personality	execution domain (see linux/personality.h)
- * code		the system call code
- * result	return value of system call
- * length	length of data field
- * data field	contains all arguments, TLV encoded as follows:
- *
- *   type	4 octets	(AUDIT_ARG_xxx)
- *   length	4 octets	length of argument
- *   ...	N octets	argument data
- *
- * Note that path name arguments are subjected to a realpath()
- * style operation prior to sending them up to user land.
- */
-struct aud_msg_syscall {
-	int		personality;
+#ifdef CONFIG_AUDIT
+/* These are defined in audit.c */
+				/* Public API */
+extern void		    audit_log(struct audit_context *ctx,
+				      const char *fmt, ...)
+			    __attribute__((format(printf,2,3)));
 
-	/* System call codes can have major/minor number.
-	 * for instance in the socketcall() case, major
-	 * would be __NR_socketcall, and minor would be
-	 * SYS_ACCEPT (or whatever the specific call is).
-	 */
-	int		major, minor;
+extern struct audit_buffer *audit_log_start(struct audit_context *ctx);
+extern void		    audit_log_format(struct audit_buffer *ab,
+					     const char *fmt, ...)
+			    __attribute__((format(printf,2,3)));
+extern void		    audit_log_end(struct audit_buffer *ab);
+extern void		    audit_log_end_fast(struct audit_buffer *ab);
+extern void		    audit_log_end_irq(struct audit_buffer *ab);
+extern void		    audit_log_d_path(struct audit_buffer *ab,
+					     const char *prefix,
+					     struct dentry *dentry,
+					     struct vfsmount *vfsmnt);
+extern int		    audit_set_rate_limit(int limit);
+extern int		    audit_set_backlog_limit(int limit);
+extern int		    audit_set_enabled(int state);
+extern int		    audit_set_failure(int state);
 
-	int		result;
-	unsigned int	length;
-	unsigned char	data[0];
-};
-
-/*
- * The LOGIN message is generated by the kernel when
- * a user application performs an AUIOCLOGIN ioctl.
- */
-struct aud_msg_login {
-	unsigned int	uid;
-	char		hostname[AUD_MAX_HOSTNAME];
-	char		address[AUD_MAX_ADDRESS];
-	char		terminal[AUD_MAX_TERMINAL];
-	char		executable[PATH_MAX];
-};
-
-/*
- * Exit message
- */
-struct aud_msg_exit {
-	long		code;
-};
-
-/*
- * Network config (rtnetlink) call
- */
-struct aud_msg_netlink {
-	unsigned int	groups, dst_groups;
-	int		result;
-	unsigned int	length;
-	unsigned char	data[0];
-};
-
-/* Values for msg_type */
-# define AUDIT_MSG_LOGIN		1
-# define AUDIT_MSG_SYSCALL	2
-# define AUDIT_MSG_EXIT		3
-# define AUDIT_MSG_NETLINK	4
-# define AUDIT_MSG_USERBASE	256	/* user land messages start here */
-
-/* Values for msg_arch */
-enum {
-	AUDIT_ARCH_I386,
-	AUDIT_ARCH_PPC,
-	AUDIT_ARCH_PPC64,
-	AUDIT_ARCH_S390,
-	AUDIT_ARCH_S390X,
-	AUDIT_ARCH_X86_64,
-	AUDIT_ARCH_IA64,
-};
-
-
-struct aud_message {
-	uint32_t	msg_seqnr;
-	uint16_t	msg_type;
-	uint16_t	msg_arch;	
-
-	pid_t		msg_pid;
-	size_t		msg_size;
-	unsigned long	msg_timestamp;
-
-	unsigned int	msg_audit_id;
-	unsigned int	msg_login_uid;
-	unsigned int	msg_euid, msg_ruid, msg_suid, msg_fsuid;
-	unsigned int	msg_egid, msg_rgid, msg_sgid, msg_fsgid;
-
-	/* Event name */
-	char		msg_evname[AUD_MAX_EVNAME];
-
-	unsigned char	msg_data[0];
-};
-
-/*
- * Encoding of arguments passed up to auditd
- */
-enum audit_arg {
-	AUDIT_ARG_END,
-	AUDIT_ARG_IMMEDIATE,
-	AUDIT_ARG_POINTER,
-	AUDIT_ARG_STRING,
-	AUDIT_ARG_PATH,
-	AUDIT_ARG_NULL,
-	AUDIT_ARG_ERROR,
-	AUDIT_ARG_VECTOR,	/* for execve */
-
-# ifdef __KERNEL__
-	/* Internal use only */
-	AUDIT_ARG_ARRAY = 100,
-	AUDIT_ARG_FILEDESC,
-	AUDIT_ARG_GROUP_INFO,
-	AUDIT_ARG_IPC_MSG
-# endif
-
-};
-
-# ifdef __KERNEL__
-
-struct sk_buff;
-struct aud_process;
-
-extern struct aud_process *audit_alloc(void);
-static void __inline__ audit_free(struct aud_process *pinfo) { if (pinfo) kfree(pinfo); }
-extern void audit_intercept(enum audit_call, ...);
-extern long audit_lresult(long);
-#  define audit_result(result) ((int)audit_lresult(result))
-extern void audit_fork(struct task_struct *, struct task_struct *);
-extern void audit_exit(struct task_struct *, long);
-extern void audit_netlink_msg(struct sk_buff *, int);
-
-#  define AUDITING(tsk) ((tsk)->audit != 0)
-
-# endif /* __KERNEL__ */
-
-#elif defined(__KERNEL__) /* with auditing disabled */
-
-# define AUDITING(tsk) 0
-# define audit_intercept(code, args...) ((void)0)
-# define audit_result(result) (result)
-# define audit_lresult(result) (result)
-
-#endif /* auditing enabled */
-
-#endif /* _AUDIT_H */
+				/* Private API (for auditsc.c only) */
+extern void		    audit_send_reply(int pid, int seq, int type,
+					     int done, int multi,
+					     void *payload, int size);
+extern void		    audit_log_lost(const char *message);
+#else
+#define audit_log(t,f,...) do { ; } while (0)
+#define audit_log_start(t) ({ NULL; })
+#define audit_log_vformat(b,f,a) do { ; } while (0)
+#define audit_log_format(b,f,...) do { ; } while (0)
+#define audit_log_end(b) do { ; } while (0)
+#define audit_log_end_fast(b) do { ; } while (0)
+#define audit_log_end_irq(b) do { ; } while (0)
+#define audit_log_d_path(b,p,d,v) do { ; } while (0)
+#define audit_set_rate_limit(l) do { ; } while (0)
+#define audit_set_backlog_limit(l) do { ; } while (0)
+#define audit_set_enabled(s) do { ; } while (0)
+#define audit_set_failure(s) do { ; } while (0)
+#endif
+#endif
+#endif

@@ -73,7 +73,10 @@ __setup("hlt", hlt_setup);
  * The following aren't currently used.
  */
 void (*pm_idle)(void);
+EXPORT_SYMBOL(pm_idle);
+
 void (*pm_power_off)(void);
+EXPORT_SYMBOL(pm_power_off);
 
 /*
  * This is our default idle handler.  We need to disable
@@ -301,6 +304,7 @@ static void default_fp_init(union fp_state *fp)
 }
 
 void (*fp_init)(union fp_state *) = default_fp_init;
+EXPORT_SYMBOL(fp_init);
 
 void flush_thread(void)
 {
@@ -310,10 +314,16 @@ void flush_thread(void)
 	memset(thread->used_cp, 0, sizeof(thread->used_cp));
 	memset(&tsk->thread.debug, 0, sizeof(struct debug_info));
 	fp_init(&thread->fpstate);
+#if defined(CONFIG_VFP)
+	vfp_flush_thread(&thread->vfpstate);
+#endif
 }
 
 void release_thread(struct task_struct *dead_task)
 {
+#if defined(CONFIG_VFP)
+	vfp_release_thread(&dead_task->thread_info->vfpstate);
+#endif
 }
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
@@ -350,6 +360,7 @@ int dump_fpu (struct pt_regs *regs, struct user_fp *fp)
 
 	return used_math != 0;
 }
+EXPORT_SYMBOL(dump_fpu);
 
 /*
  * fill in the user structure for a core dump..
@@ -378,6 +389,7 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->regs = *regs;
 	dump->u_fpvalid = dump_fpu (regs, &dump->u_fp);
 }
+EXPORT_SYMBOL(dump_thread);
 
 /*
  * Shuffle the argument into the correct register before calling the
@@ -385,13 +397,15 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
  * the thread function, and r3 points to the exit function.
  */
 extern void kernel_thread_helper(void);
-asm(	".align\n"
+asm(	".section .text\n"
+"	.align\n"
 "	.type	kernel_thread_helper, #function\n"
 "kernel_thread_helper:\n"
 "	mov	r0, r1\n"
 "	mov	lr, r3\n"
 "	mov	pc, r2\n"
-"	.size	kernel_thread_helper, . - kernel_thread_helper");
+"	.size	kernel_thread_helper, . - kernel_thread_helper\n"
+"	.previous");
 
 /*
  * Create a kernel thread.
@@ -410,14 +424,7 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 
 	return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
-
-/*
- * These bracket the sleeping functions..
- */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
+EXPORT_SYMBOL(kernel_thread);
 
 unsigned long get_wchan(struct task_struct *p)
 {
@@ -433,9 +440,10 @@ unsigned long get_wchan(struct task_struct *p)
 		if (fp < stack_page || fp > 4092+stack_page)
 			return 0;
 		lr = pc_pointer (((unsigned long *)fp)[-1]);
-		if (lr < first_sched || lr > last_sched)
+		if (!in_sched_functions(lr))
 			return lr;
 		fp = *(unsigned long *) (fp - 12);
 	} while (count ++ < 16);
 	return 0;
 }
+EXPORT_SYMBOL(get_wchan);

@@ -89,15 +89,15 @@ unsigned long	top_of_ram;
 
 void show_mem(void)
 {
-	int total = 0, reserved = 0;
-	int shared = 0, cached = 0;
+	unsigned long total = 0, reserved = 0;
+	unsigned long shared = 0, cached = 0;
 	struct page *page;
 	pg_data_t *pgdat;
 	unsigned long i;
 
 	printk("Mem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+	printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 	for_each_pgdat(pgdat) {
 		for (i = 0; i < pgdat->node_spanned_pages; i++) {
 			page = pgdat->node_mem_map + i;
@@ -110,10 +110,10 @@ void show_mem(void)
 				shared += page_count(page) - 1;
 		}
 	}
-	printk("%d pages of RAM\n",total);
-	printk("%d reserved pages\n",reserved);
-	printk("%d pages shared\n",shared);
-	printk("%d pages swap cached\n",cached);
+	printk("%ld pages of RAM\n", total);
+	printk("%ld reserved pages\n", reserved);
+	printk("%ld pages shared\n", shared);
+	printk("%ld pages swap cached\n", cached);
 }
 
 #ifdef CONFIG_PPC_ISERIES
@@ -407,7 +407,7 @@ int iounmap_explicit(void *addr, unsigned long size)
 	area = im_get_area((unsigned long) addr, size, 
 			    IM_REGION_EXISTS | IM_REGION_SUBSET);
 	if (area == NULL) {
-		printk(KERN_ERR "%s() cannot unmap nonexistant range 0x%lx\n",
+		printk(KERN_ERR "%s() cannot unmap nonexistent range 0x%lx\n",
 				__FUNCTION__, (unsigned long) addr);
 		return 1;
 	}
@@ -545,6 +545,8 @@ void __init do_init_bootmem(void)
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
 
+	max_pfn = max_low_pfn;
+
 	/* add all physical memory to the bootmem map. Also find the first */
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
@@ -629,7 +631,6 @@ void __init mem_init(void)
 
 	num_physpages = max_low_pfn;	/* RAM is assumed contiguous */
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
-	max_pfn = max_low_pfn;
 
 #ifdef CONFIG_DISCONTIGMEM
 {
@@ -654,7 +655,7 @@ void __init mem_init(void)
 
 	totalram_pages += free_all_bootmem();
 
-	for (addr = KERNELBASE; addr <= (unsigned long)__va(lmb_end_of_DRAM());
+	for (addr = KERNELBASE; addr < (unsigned long)__va(lmb_end_of_DRAM());
 	     addr += PAGE_SIZE) {
 		if (!PageReserved(virt_to_page(addr)))
 			continue;
@@ -795,11 +796,11 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 
 	vsid = get_vsid(vma->vm_mm->context.id, ea);
 
+	local_irq_save(flags);
 	tmp = cpumask_of_cpu(smp_processor_id());
 	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
 		local = 1;
 
-	local_irq_save(flags);
 	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep,
 		    0x300, local);
 	local_irq_restore(flags);

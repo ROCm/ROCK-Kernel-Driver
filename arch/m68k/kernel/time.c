@@ -120,14 +120,28 @@ void do_gettimeofday(struct timeval *tv)
 	extern unsigned long wall_jiffies;
 	unsigned long seq;
 	unsigned long usec, sec, lost;
+	unsigned long max_ntp_tick = tick_usec - tickadj;
 
 	do {
 		seq = read_seqbegin_irqsave(&xtime_lock, flags);
 
 		usec = mach_gettimeoffset();
 		lost = jiffies - wall_jiffies;
-		if (lost)
-			usec += lost * (1000000/HZ);
+
+		/*
+		 * If time_adjust is negative then NTP is slowing the clock
+		 * so make sure not to go into next possible interval.
+		 * Better to lose some accuracy than have time go backwards..
+		 */
+		if (unlikely(time_adjust < 0)) {
+			usec = min(usec, max_ntp_tick);
+
+			if (lost)
+				usec += lost * max_ntp_tick;
+		}
+		else if (unlikely(lost))
+			usec += lost * tick_usec;
+
 		sec = xtime.tv_sec;
 		usec += xtime.tv_nsec/1000;
 	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));

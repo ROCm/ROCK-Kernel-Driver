@@ -4,8 +4,9 @@
  *
  * Copyright (C) 2002,2003 Jun Nakajima <jun.nakajima@intel.com>
  * Copyright (C) 2002,2003 Suresh Siddha <suresh.b.siddha@intel.com>
- *
  */
+
+#include <linux/compiler.h>
 
 /* define this macro to get some asm stmts included in 'c' files */
 #define ASM_SUPPORTED
@@ -23,7 +24,7 @@
 extern void ia64_bad_param_for_setreg (void);
 extern void ia64_bad_param_for_getreg (void);
 
-register unsigned long ia64_r13 asm ("r13");
+register unsigned long ia64_r13 asm ("r13") __attribute_used__;
 
 #define ia64_setreg(regnum, val)						\
 ({										\
@@ -377,8 +378,15 @@ register unsigned long ia64_r13 asm ("r13");
 })
 
 #define ia64_srlz_i()	asm volatile (";; srlz.i ;;" ::: "memory")
-
 #define ia64_srlz_d()	asm volatile (";; srlz.d" ::: "memory");
+
+#ifdef HAVE_SERIALIZE_DIRECTIVE
+# define ia64_dv_serialize_data()		asm volatile (".serialize.data");
+# define ia64_dv_serialize_instruction()	asm volatile (".serialize.instruction");
+#else
+# define ia64_dv_serialize_data()
+# define ia64_dv_serialize_instruction()
+#endif
 
 #define ia64_nop(x)	asm volatile ("nop %0"::"i"(x));
 
@@ -481,10 +489,16 @@ register unsigned long ia64_r13 asm ("r13");
 #define ia64_ptce(addr)	asm volatile ("ptc.e %0" :: "r"(addr))
 
 #define ia64_ptcga(addr, size)							\
-	asm volatile ("ptc.ga %0,%1" :: "r"(addr), "r"(size) : "memory")
+do {										\
+	asm volatile ("ptc.ga %0,%1" :: "r"(addr), "r"(size) : "memory");	\
+	ia64_dv_serialize_data();						\
+} while (0)
 
-#define ia64_ptcl(addr, size)						\
-	asm volatile ("ptc.l %0,%1" :: "r"(addr), "r"(size) : "memory")
+#define ia64_ptcl(addr, size)							\
+do {										\
+	asm volatile ("ptc.l %0,%1" :: "r"(addr), "r"(size) : "memory");	\
+	ia64_dv_serialize_data();						\
+} while (0)
 
 #define ia64_ptri(addr, size)						\
 	asm volatile ("ptr.i %0,%1" :: "r"(addr), "r"(size) : "memory")
@@ -573,7 +587,7 @@ register unsigned long ia64_r13 asm ("r13");
 
 #define ia64_intrin_local_irq_restore(x)			\
 do {								\
-	asm volatile ("     cmp.ne p6,p7=%0,r0;;"		\
+	asm volatile (";;   cmp.ne p6,p7=%0,r0;;"		\
 		      "(p6) ssm psr.i;"				\
 		      "(p7) rsm psr.i;;"			\
 		      "(p6) srlz.d"				\

@@ -172,15 +172,12 @@ static int __devinit mace_probe(struct macio_dev *mdev, const struct of_match *m
 	}
 	dev->irq = macio_irq(mdev, 0);
 
-	printk(KERN_INFO "%s: MACE at", dev->name);
 	rev = addr[0] == 0 && addr[1] == 0xA0;
 	for (j = 0; j < 6; ++j) {
 		dev->dev_addr[j] = rev? bitrev(addr[j]): addr[j];
-		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
 	}
 	mp->chipid = (in_8(&mp->mace->chipid_hi) << 8) |
 			in_8(&mp->mace->chipid_lo);
-	printk(", chip revision %d.%d\n", mp->chipid >> 8, mp->chipid & 0xff);
 		
 
 	mp = (struct mace_data *) dev->priv;
@@ -259,9 +256,15 @@ static int __devinit mace_probe(struct macio_dev *mdev, const struct of_match *m
 
 	rc = register_netdev(dev);
 	if (rc) {
-		printk(KERN_ERR "Cannot register net device, aborting.\n");
+		printk(KERN_ERR "MACE: Cannot register net device, aborting.\n");
 		goto err_free_rx_irq;
 	}
+
+	printk(KERN_INFO "%s: MACE at", dev->name);
+	for (j = 0; j < 6; ++j) {
+		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
+	}
+	printk(", chip revision %d.%d\n", mp->chipid >> 8, mp->chipid & 0xff);
 
 	return 0;
  
@@ -429,7 +432,7 @@ static inline void mace_clean_rings(struct mace_data *mp)
     for (i = 0; i < N_RX_RING; ++i) {
 	if (mp->rx_bufs[i] != 0) {
 	    dev_kfree_skb(mp->rx_bufs[i]);
-	    mp->rx_bufs[i] = 0;
+	    mp->rx_bufs[i] = NULL;
 	}
     }
     for (i = mp->tx_empty; i != mp->tx_fill; ) {
@@ -472,7 +475,7 @@ static int mace_open(struct net_device *dev)
 	cp->xfer_status = 0;
 	++cp;
     }
-    mp->rx_bufs[i] = 0;
+    mp->rx_bufs[i] = NULL;
     st_le16(&cp->command, DBDMA_STOP);
     mp->rx_fill = i;
     mp->rx_empty = 0;
@@ -956,7 +959,7 @@ static irqreturn_t mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 		mp->stats.rx_bytes += skb->len;
 		netif_rx(skb);
 		dev->last_rx = jiffies;
-		mp->rx_bufs[i] = 0;
+		mp->rx_bufs[i] = NULL;
 		++mp->stats.rx_packets;
 	    }
 	} else {

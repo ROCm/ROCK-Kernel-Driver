@@ -71,6 +71,6 @@ sn_mmiob (void)
 {
 	while ((((volatile unsigned long) (*pda->pio_write_status_addr)) & SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) != 
 				SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK)
-		udelay(1);
+		cpu_relax();
 }
 EXPORT_SYMBOL(sn_mmiob);

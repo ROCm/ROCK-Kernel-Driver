@@ -1,5 +1,6 @@
 #include <linux/types.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svcsock.h>
@@ -337,8 +338,8 @@ void svcauth_unix_purge(void)
 static int
 svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct iovec	*argv = &rqstp->rq_arg.head[0];
-	struct iovec	*resv = &rqstp->rq_res.head[0];
+	struct kvec	*argv = &rqstp->rq_arg.head[0];
+	struct kvec	*resv = &rqstp->rq_res.head[0];
 	int		rv=0;
 	struct ip_map key, *ipm;
 
@@ -411,6 +412,7 @@ svcauth_null_release(struct svc_rqst *rqstp)
 
 struct auth_ops svcauth_null = {
 	.name		= "null",
+	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_NULL,
 	.accept 	= svcauth_null_accept,
 	.release	= svcauth_null_release,
@@ -420,8 +422,8 @@ struct auth_ops svcauth_null = {
 int
 svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct iovec	*argv = &rqstp->rq_arg.head[0];
-	struct iovec	*resv = &rqstp->rq_res.head[0];
+	struct kvec	*argv = &rqstp->rq_arg.head[0];
+	struct kvec	*resv = &rqstp->rq_res.head[0];
 	struct svc_cred	*cred = &rqstp->rq_cred;
 	u32		slen, i;
 	int		len   = argv->iov_len;
@@ -515,6 +517,7 @@ svcauth_unix_release(struct svc_rqst *rqstp)
 
 struct auth_ops svcauth_unix = {
 	.name		= "unix",
+	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_UNIX,
 	.accept 	= svcauth_unix_accept,
 	.release	= svcauth_unix_release,

@@ -1,5 +1,5 @@
 /*
- * Miscellaneous Mac68K-specific stuff 
+ * Miscellaneous Mac68K-specific stuff
  */
 
 #include <linux/config.h>
@@ -67,7 +67,7 @@ static void adb_write_time(long data)
 	volatile struct adb_request req;
 
 	data += RTC_OFFSET;
-	
+
 	adb_request((struct adb_request *) &req, NULL,
 			ADBREQ_RAW|ADBREQ_SYNC,
 			6, CUDA_PACKET, CUDA_SET_TIME,
@@ -324,7 +324,7 @@ void pmu_restart(void)
 	adb_request(NULL, NULL, ADBREQ_RAW|ADBREQ_SYNC,
 			3, PMU_PACKET, PMU_SET_INTR_MASK,
 			PMU_INT_ADB|PMU_INT_TICK);
-	
+
 	adb_request(NULL, NULL, ADBREQ_RAW|ADBREQ_SYNC,
 			2, PMU_PACKET, PMU_RESET);
 }
@@ -477,7 +477,7 @@ void mac_reset(void)
                     ".chip 68030\n\t"
 		    "lea %/pc@(1f),%/a0\n\t"
 		    "addl %0,%/a0\n\t"/* fixup target address and stack ptr */
-		    "addl %0,%/sp\n\t" 
+		    "addl %0,%/sp\n\t"
 		    "pflusha\n\t"
 		    "jmp %/a0@\n\t" /* jump into physical memory */
 		    "0:.long 0\n\t" /* a constant zero. */
@@ -494,7 +494,7 @@ void mac_reset(void)
 		    "movec %/a0, %/cacr\n\t" /* flush i&d caches */
 		    "movew #0x2700,%/sr\n\t" /* set up status register */
 		    "movel %1@(0x0),%/a0\n\t"/* load interrupt stack pointer */
-		    "movec %/a0, %/isp\n\t" 
+		    "movec %/a0, %/isp\n\t"
 		    "movel %1@(0x4),%/a0\n\t" /* load reset vector */
 		    "reset\n\t" /* reset external devices */
 		    "jmp %/a0@\n\t" /* jump to the reset vector */
@@ -579,7 +579,7 @@ static void unmktime(unsigned long time, long offset,
 	return;
 }
 
-/* 
+/*
  * Read/write the hardware clock.
  */
 

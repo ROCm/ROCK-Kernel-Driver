@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -23,15 +23,16 @@
   Contact Information:
   Linux NICS <linux.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
+
 *******************************************************************************/
 
 #include "ixgb_hw.h"
 #include "ixgb_ee.h"
 /* Local prototypes */
-static u16 ixgb_shift_in_bits(struct ixgb_hw *hw);
+static uint16_t ixgb_shift_in_bits(struct ixgb_hw *hw);
 
 static void ixgb_shift_out_bits(struct ixgb_hw *hw,
-				u16 data, u16 count);
+				uint16_t data, uint16_t count);
 static void ixgb_standby_eeprom(struct ixgb_hw *hw);
 
 static boolean_t ixgb_wait_eeprom_command(struct ixgb_hw *hw);
@@ -44,8 +45,7 @@ static void ixgb_cleanup_eeprom(struct ixgb_hw *hw);
  * hw - Struct containing variables accessed by shared code
  * eecd_reg - EECD's current value
  *****************************************************************************/
-static void
-ixgb_raise_clock(struct ixgb_hw *hw, u32 * eecd_reg)
+static void ixgb_raise_clock(struct ixgb_hw *hw, uint32_t * eecd_reg)
 {
 	/* Raise the clock input to the EEPROM (by setting the SK bit), and then
 	 *  wait 50 microseconds.
@@ -59,14 +59,13 @@ ixgb_raise_clock(struct ixgb_hw *hw, u32 * eecd_reg)
 /******************************************************************************
  * Lowers the EEPROM's clock input.
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  * eecd_reg - EECD's current value
  *****************************************************************************/
-static void
-ixgb_lower_clock(struct ixgb_hw *hw, u32 * eecd_reg)
+static void ixgb_lower_clock(struct ixgb_hw *hw, uint32_t * eecd_reg)
 {
-	/* Lower the clock input to the EEPROM (by clearing the SK bit), and then 
-	 * wait 50 microseconds. 
+	/* Lower the clock input to the EEPROM (by clearing the SK bit), and then
+	 * wait 50 microseconds.
 	 */
 	*eecd_reg = *eecd_reg & ~IXGB_EECD_SK;
 	IXGB_WRITE_REG(hw, EECD, *eecd_reg);
@@ -82,14 +81,14 @@ ixgb_lower_clock(struct ixgb_hw *hw, u32 * eecd_reg)
  * count - number of bits to shift out
  *****************************************************************************/
 static void
-ixgb_shift_out_bits(struct ixgb_hw *hw, u16 data, u16 count)
+ixgb_shift_out_bits(struct ixgb_hw *hw, uint16_t data, uint16_t count)
 {
-	u32 eecd_reg;
-	u32 mask;
+	uint32_t eecd_reg;
+	uint32_t mask;
 
 	/* We need to shift "count" bits out to the EEPROM. So, value in the
 	 * "data" parameter will be shifted out to the EEPROM one bit at a time.
-	 * In order to do this, "data" must be broken down into bits. 
+	 * In order to do this, "data" must be broken down into bits.
 	 */
 	mask = 0x01 << (count - 1);
 	eecd_reg = IXGB_READ_REG(hw, EECD);
@@ -127,17 +126,16 @@ ixgb_shift_out_bits(struct ixgb_hw *hw, u16 data, u16 count)
  *
  * hw - Struct containing variables accessed by shared code
  *****************************************************************************/
-static u16
-ixgb_shift_in_bits(struct ixgb_hw *hw)
+static uint16_t ixgb_shift_in_bits(struct ixgb_hw *hw)
 {
-	u32 eecd_reg;
-	u32 i;
-	u16 data;
+	uint32_t eecd_reg;
+	uint32_t i;
+	uint16_t data;
 
-	/* In order to read a register from the EEPROM, we need to shift 16 bits 
+	/* In order to read a register from the EEPROM, we need to shift 16 bits
 	 * in from the EEPROM. Bits are "shifted in" by raising the clock input to
 	 * the EEPROM (setting the SK bit), and then reading the value of the "DO"
-	 * bit.  During this "shifting in" process the "DI" bit should always be 
+	 * bit.  During this "shifting in" process the "DI" bit should always be
 	 * clear..
 	 */
 
@@ -167,13 +165,12 @@ ixgb_shift_in_bits(struct ixgb_hw *hw)
  *
  * hw - Struct containing variables accessed by shared code
  *
- * Lowers EEPROM clock. Clears input pin. Sets the chip select pin. This 
+ * Lowers EEPROM clock. Clears input pin. Sets the chip select pin. This
  * function should be called before issuing a command to the EEPROM.
  *****************************************************************************/
-static void
-ixgb_setup_eeprom(struct ixgb_hw *hw)
+static void ixgb_setup_eeprom(struct ixgb_hw *hw)
 {
-	u32 eecd_reg;
+	uint32_t eecd_reg;
 
 	eecd_reg = IXGB_READ_REG(hw, EECD);
 
@@ -189,13 +186,12 @@ ixgb_setup_eeprom(struct ixgb_hw *hw)
 
 /******************************************************************************
  * Returns EEPROM to a "standby" state
- * 
+ *
  * hw - Struct containing variables accessed by shared code
  *****************************************************************************/
-static void
-ixgb_standby_eeprom(struct ixgb_hw *hw)
+static void ixgb_standby_eeprom(struct ixgb_hw *hw)
 {
-	u32 eecd_reg;
+	uint32_t eecd_reg;
 
 	eecd_reg = IXGB_READ_REG(hw, EECD);
 
@@ -226,10 +222,9 @@ ixgb_standby_eeprom(struct ixgb_hw *hw)
  *
  * hw - Struct containing variables accessed by shared code
  *****************************************************************************/
-static void
-ixgb_clock_eeprom(struct ixgb_hw *hw)
+static void ixgb_clock_eeprom(struct ixgb_hw *hw)
 {
-	u32 eecd_reg;
+	uint32_t eecd_reg;
 
 	eecd_reg = IXGB_READ_REG(hw, EECD);
 
@@ -250,10 +245,9 @@ ixgb_clock_eeprom(struct ixgb_hw *hw)
  *
  * hw - Struct containing variables accessed by shared code
  *****************************************************************************/
-static void
-ixgb_cleanup_eeprom(struct ixgb_hw *hw)
+static void ixgb_cleanup_eeprom(struct ixgb_hw *hw)
 {
-	u32 eecd_reg;
+	uint32_t eecd_reg;
 
 	eecd_reg = IXGB_READ_REG(hw, EECD);
 
@@ -271,18 +265,17 @@ ixgb_cleanup_eeprom(struct ixgb_hw *hw)
  * hw - Struct containing variables accessed by shared code
  *
  * The command is done when the EEPROM's data out pin goes high.
- * 
+ *
  * Returns:
  *      TRUE: EEPROM data pin is high before timeout.
  *      FALSE:  Time expired.
  *****************************************************************************/
-static boolean_t
-ixgb_wait_eeprom_command(struct ixgb_hw *hw)
+static boolean_t ixgb_wait_eeprom_command(struct ixgb_hw *hw)
 {
-	u32 eecd_reg;
-	u32 i;
+	uint32_t eecd_reg;
+	uint32_t i;
 
-	/* Toggle the CS line.  This in effect tells to EEPROM to actually execute 
+	/* Toggle the CS line.  This in effect tells to EEPROM to actually execute
 	 * the command in question.
 	 */
 	ixgb_standby_eeprom(hw);
@@ -305,7 +298,7 @@ ixgb_wait_eeprom_command(struct ixgb_hw *hw)
 
 /******************************************************************************
  * Verifies that the EEPROM has a valid checksum
- * 
+ *
  * hw - Struct containing variables accessed by shared code
  *
  * Reads the first 64 16 bit words of the EEPROM and sums the values read.
@@ -316,16 +309,15 @@ ixgb_wait_eeprom_command(struct ixgb_hw *hw)
  *  TRUE: Checksum is valid
  *  FALSE: Checksum is not valid.
  *****************************************************************************/
-boolean_t
-ixgb_validate_eeprom_checksum(struct ixgb_hw * hw)
+boolean_t ixgb_validate_eeprom_checksum(struct ixgb_hw * hw)
 {
-	u16 checksum = 0;
-	u16 i;
+	uint16_t checksum = 0;
+	uint16_t i;
 
 	for (i = 0; i < (EEPROM_CHECKSUM_REG + 1); i++)
 		checksum += ixgb_read_eeprom(hw, i);
 
-	if (checksum == (u16) EEPROM_SUM)
+	if (checksum == (uint16_t) EEPROM_SUM)
 		return (TRUE);
 	else
 		return (FALSE);
@@ -339,16 +331,15 @@ ixgb_validate_eeprom_checksum(struct ixgb_hw * hw)
  * Sums the first 63 16 bit words of the EEPROM. Subtracts the sum from 0xBABA.
  * Writes the difference to word offset 63 of the EEPROM.
  *****************************************************************************/
-void
-ixgb_update_eeprom_checksum(struct ixgb_hw *hw)
+void ixgb_update_eeprom_checksum(struct ixgb_hw *hw)
 {
-	u16 checksum = 0;
-	u16 i;
+	uint16_t checksum = 0;
+	uint16_t i;
 
 	for (i = 0; i < EEPROM_CHECKSUM_REG; i++)
 		checksum += ixgb_read_eeprom(hw, i);
 
-	checksum = (u16) EEPROM_SUM - checksum;
+	checksum = (uint16_t) EEPROM_SUM - checksum;
 
 	ixgb_write_eeprom(hw, EEPROM_CHECKSUM_REG, checksum);
 	return;
@@ -361,18 +352,17 @@ ixgb_update_eeprom_checksum(struct ixgb_hw *hw)
  * reg - offset within the EEPROM to be written to
  * data - 16 bit word to be writen to the EEPROM
  *
- * If ixgb_update_eeprom_checksum is not called after this function, the 
+ * If ixgb_update_eeprom_checksum is not called after this function, the
  * EEPROM will most likely contain an invalid checksum.
  *
  *****************************************************************************/
-void
-ixgb_write_eeprom(struct ixgb_hw *hw, u16 offset, u16 data)
+void ixgb_write_eeprom(struct ixgb_hw *hw, uint16_t offset, uint16_t data)
 {
 	/*  Prepare the EEPROM for writing  */
 	ixgb_setup_eeprom(hw);
 
 	/*  Send the 9-bit EWEN (write enable) command to the EEPROM (5-bit opcode
-	 *  plus 4-bit dummy).  This puts the EEPROM into write/erase mode. 
+	 *  plus 4-bit dummy).  This puts the EEPROM into write/erase mode.
 	 */
 	ixgb_shift_out_bits(hw, EEPROM_EWEN_OPCODE, 5);
 	ixgb_shift_out_bits(hw, 0, 4);
@@ -414,17 +404,16 @@ ixgb_write_eeprom(struct ixgb_hw *hw, u16 offset, u16 data)
  * Returns:
  *  The 16-bit value read from the eeprom
  *****************************************************************************/
-u16
-ixgb_read_eeprom(struct ixgb_hw * hw, u16 offset)
+uint16_t ixgb_read_eeprom(struct ixgb_hw * hw, uint16_t offset)
 {
-	u16 data;
+	uint16_t data;
 
 	/*  Prepare the EEPROM for reading  */
 	ixgb_setup_eeprom(hw);
 
 	/*  Send the READ command (opcode + addr)  */
 	ixgb_shift_out_bits(hw, EEPROM_READ_OPCODE, 3);
-	/* 
+	/*
 	 * We have a 64 word EEPROM, there are 6 address bits
 	 */
 	ixgb_shift_out_bits(hw, offset, 6);
@@ -442,32 +431,31 @@ ixgb_read_eeprom(struct ixgb_hw * hw, u16 offset)
  * Reads eeprom and stores data in shared structure.
  * Validates eeprom checksum and eeprom signature.
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
  * Returns:
  *      TRUE: if eeprom read is successful
  *      FALSE: otherwise.
  *****************************************************************************/
-boolean_t
-ixgb_get_eeprom_data(struct ixgb_hw * hw)
+boolean_t ixgb_get_eeprom_data(struct ixgb_hw * hw)
 {
-	u16 i;
-	u16 checksum = 0;
+	uint16_t i;
+	uint16_t checksum = 0;
 	struct ixgb_ee_map_type *ee_map;
 
 	DEBUGFUNC("ixgb_get_eeprom_data");
 
-	ee_map = (struct ixgb_ee_map_type *) hw->eeprom;
+	ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	DEBUGOUT("ixgb_ee: Reading eeprom data\n");
 	for (i = 0; i < IXGB_EEPROM_SIZE; i++) {
-		u16 ee_data;
+		uint16_t ee_data;
 		ee_data = ixgb_read_eeprom(hw, i);
 		checksum += ee_data;
 		hw->eeprom[i] = le16_to_cpu(ee_data);
 	}
 
-	if (checksum != (u16) EEPROM_SUM) {
+	if (checksum != (uint16_t) EEPROM_SUM) {
 		DEBUGOUT("ixgb_ee: Checksum invalid.\n");
 		return (FALSE);
 	}
@@ -485,17 +473,15 @@ ixgb_get_eeprom_data(struct ixgb_hw * hw)
  * Local function to check if the eeprom signature is good
  * If the eeprom signature is good, calls ixgb)get_eeprom_data.
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
  * Returns:
  *      TRUE: eeprom signature was good and the eeprom read was successful
  *      FALSE: otherwise.
  ******************************************************************************/
-static boolean_t
-ixgb_check_and_get_eeprom_data(struct ixgb_hw *hw)
+static boolean_t ixgb_check_and_get_eeprom_data(struct ixgb_hw *hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if ((ee_map->init_ctrl_reg_1 & le16_to_cpu(EEPROM_ICW1_SIGNATURE_MASK))
 	    == le16_to_cpu(EEPROM_ICW1_SIGNATURE_VALID)) {
@@ -506,19 +492,37 @@ ixgb_check_and_get_eeprom_data(struct ixgb_hw *hw)
 }
 
 /******************************************************************************
+ * return a word from the eeprom
+ *
+ * hw - Struct containing variables accessed by shared code
+ * index - Offset of eeprom word
+ *
+ * Returns:
+ *          Word at indexed offset in eeprom, if valid, 0 otherwise.
+ ******************************************************************************/
+uint16_t ixgb_get_eeprom_word(struct ixgb_hw * hw, uint16_t index)
+{
+
+	if ((index < IXGB_EEPROM_SIZE) &&
+	    (ixgb_check_and_get_eeprom_data(hw) == TRUE)) {
+		return (hw->eeprom[index]);
+	}
+
+	return (0);
+}
+
+/******************************************************************************
  * return the mac address from EEPROM
  *
- * hw       - Struct containing variables accessed by shared code 
+ * hw       - Struct containing variables accessed by shared code
  * mac_addr - Ethernet Address if EEPROM contents are valid, 0 otherwise
  *
  * Returns: None.
  ******************************************************************************/
-void
-ixgb_get_ee_mac_addr(struct ixgb_hw *hw, u8 * mac_addr)
+void ixgb_get_ee_mac_addr(struct ixgb_hw *hw, uint8_t * mac_addr)
 {
 	int i;
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	DEBUGFUNC("ixgb_get_ee_mac_addr");
 
@@ -533,16 +537,14 @@ ixgb_get_ee_mac_addr(struct ixgb_hw *hw, u8 * mac_addr)
 /******************************************************************************
  * return the compatibility flags from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          compatibility flags if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_compatibility(struct ixgb_hw *hw)
+uint16_t ixgb_get_ee_compatibility(struct ixgb_hw *hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->compatibility);
@@ -553,13 +555,12 @@ ixgb_get_ee_compatibility(struct ixgb_hw *hw)
 /******************************************************************************
  * return the Printed Board Assembly number from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          PBA number if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u32
-ixgb_get_ee_pba_number(struct ixgb_hw * hw)
+uint32_t ixgb_get_ee_pba_number(struct ixgb_hw * hw)
 {
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (le16_to_cpu(hw->eeprom[EEPROM_PBA_1_2_REG])
@@ -576,11 +577,9 @@ ixgb_get_ee_pba_number(struct ixgb_hw * hw)
  * Returns:
  *          Initialization Control Word 1 if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_init_ctrl_reg_1(struct ixgb_hw * hw)
+uint16_t ixgb_get_ee_init_ctrl_reg_1(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->init_ctrl_reg_1);
@@ -591,16 +590,14 @@ ixgb_get_ee_init_ctrl_reg_1(struct ixgb_hw * hw)
 /******************************************************************************
  * return the Initialization Control Word 2 from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          Initialization Control Word 2 if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_init_ctrl_reg_2(struct ixgb_hw * hw)
+uint16_t ixgb_get_ee_init_ctrl_reg_2(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->init_ctrl_reg_2);
@@ -611,16 +608,14 @@ ixgb_get_ee_init_ctrl_reg_2(struct ixgb_hw * hw)
 /******************************************************************************
  * return the Subsystem Id from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          Subsystem Id if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_subsystem_id(struct ixgb_hw * hw)
+uint16_t ixgb_get_ee_subsystem_id(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->subsystem_id);
@@ -631,16 +626,14 @@ ixgb_get_ee_subsystem_id(struct ixgb_hw * hw)
 /******************************************************************************
  * return the Sub Vendor Id from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          Sub Vendor Id if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_subvendor_id(struct ixgb_hw * hw)
+uint16_t ixgb_get_ee_subvendor_id(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->subvendor_id);
@@ -651,16 +644,14 @@ ixgb_get_ee_subvendor_id(struct ixgb_hw * hw)
 /******************************************************************************
  * return the Device Id from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          Device Id if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_device_id(struct ixgb_hw * hw)
+uint16_t ixgb_get_ee_device_id(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->device_id);
@@ -671,16 +662,14 @@ ixgb_get_ee_device_id(struct ixgb_hw * hw)
 /******************************************************************************
  * return the Vendor Id from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          Device Id if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_vendor_id(struct ixgb_hw * hw)
+uint16_t ixgb_get_ee_vendor_id(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->vendor_id);
@@ -691,16 +680,14 @@ ixgb_get_ee_vendor_id(struct ixgb_hw * hw)
 /******************************************************************************
  * return the Software Defined Pins Register from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          SDP Register if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u16
-ixgb_get_ee_swdpins_reg(struct ixgb_hw * hw)
+uint16_t ixgb_get_ee_swdpins_reg(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->swdpins_reg);
@@ -711,16 +698,14 @@ ixgb_get_ee_swdpins_reg(struct ixgb_hw * hw)
 /******************************************************************************
  * return the D3 Power Management Bits from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          D3 Power Management Bits if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u8
-ixgb_get_ee_d3_power(struct ixgb_hw * hw)
+uint8_t ixgb_get_ee_d3_power(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->d3_power);
@@ -731,16 +716,14 @@ ixgb_get_ee_d3_power(struct ixgb_hw * hw)
 /******************************************************************************
  * return the D0 Power Management Bits from EEPROM
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
- * Returns: 
+ * Returns:
  *          D0 Power Management Bits if EEPROM contents are valid, 0 otherwise
  ******************************************************************************/
-u8
-ixgb_get_ee_d0_power(struct ixgb_hw * hw)
+uint8_t ixgb_get_ee_d0_power(struct ixgb_hw * hw)
 {
-	struct ixgb_ee_map_type *ee_map =
-	    (struct ixgb_ee_map_type *) hw->eeprom;
+	struct ixgb_ee_map_type *ee_map = (struct ixgb_ee_map_type *)hw->eeprom;
 
 	if (ixgb_check_and_get_eeprom_data(hw) == TRUE)
 		return (ee_map->d0_power);

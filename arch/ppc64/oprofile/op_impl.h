@@ -46,11 +46,6 @@
 /* enable sampling */
 #define MMCRA_SAMPLE_ENABLE	(1UL << (63 - 63))
 
-#define POWER4_MMCR0_KERNEL_DISABLE (1UL << (30))   /* Freeze in Supervisor state */
-#define POWER4_MMCR0_PROBLEM_DISABLE (1UL << (29))  /* Freeze in problem state */
-
-
-
 /* Per-counter configuration as set via oprofilefs.  */
 struct op_counter_config {
 	unsigned long valid;
@@ -65,9 +60,6 @@ struct op_counter_config {
 
 /* System-wide configuration as set via oprofilefs.  */
 struct op_system_config {
-	unsigned long mmcr0;
-	u64           mmcr1;
-	unsigned long mmcra;
 	unsigned long enable_kernel;
 	unsigned long enable_user;
 };

@@ -164,4 +164,7 @@ unsigned long mpc10x_get_mem_size(uint mem_map);
 int mpc10x_enable_store_gathering(struct pci_controller *hose);
 int mpc10x_disable_store_gathering(struct pci_controller *hose);
 
+/* For MPC107 boards that use the built-in openpic */
+void mpc10x_set_openpic(void);
+
 #endif	/* __PPC_KERNEL_MPC10X_H */

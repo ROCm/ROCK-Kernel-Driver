@@ -29,6 +29,7 @@ extern void iq80310_init_irq(void);
 #ifdef CONFIG_ARCH_IQ80321
 extern void iq80321_map_io(void);
 extern void iop321_init_irq(void);
+extern void iop321_init_time(void);
 #endif
 
 #ifdef CONFIG_ARCH_IQ80310
@@ -67,6 +68,7 @@ MACHINE_START(IQ80321, "Intel IQ80321")
 	FIXUP(fixup_iop321)
 	MAPIO(iq80321_map_io)
 	INITIRQ(iop321_init_irq)
+	INITTIME(iop321_init_time)
 MACHINE_END
 
 #else

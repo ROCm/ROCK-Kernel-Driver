@@ -188,7 +188,7 @@ static void wdt_keepalive(void)
  * /dev/watchdog handling
  */
 
-static ssize_t fop_write(struct file * file, const char * buf, size_t count, loff_t * ppos)
+static ssize_t fop_write(struct file * file, const char __user * buf, size_t count, loff_t * ppos)
 {
 	/* We can't seek */
 	if(ppos != &file->f_pos)
@@ -249,6 +249,8 @@ static int fop_close(struct inode * inode, struct file * file)
 static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident=
 	{
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
@@ -261,10 +263,10 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		default:
 			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
-			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
+			return copy_to_user(argp, &ident, sizeof(ident))?-EFAULT:0;
 		case WDIOC_GETSTATUS:
 		case WDIOC_GETBOOTSTATUS:
-			return put_user(0, (int *)arg);
+			return put_user(0, p);
 		case WDIOC_KEEPALIVE:
 			wdt_keepalive();
 			return 0;
@@ -272,7 +274,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		{
 			int new_options, retval = -EINVAL;
 
-			if(get_user(new_options, (int *)arg))
+			if(get_user(new_options, p))
 				return -EFAULT;
 
 			if(new_options & WDIOS_DISABLECARD) {
@@ -291,7 +293,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		{
 			int new_timeout;
 
-			if(get_user(new_timeout, (int *)arg))
+			if(get_user(new_timeout, p))
 				return -EFAULT;
 
 			if(new_timeout < 1 || new_timeout > 3600) /* arbitrary upper limit */
@@ -302,7 +304,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			/* Fall through */
 		}
 		case WDIOC_GETTIMEOUT:
-			return put_user(timeout, (int *)arg);
+			return put_user(timeout, p);
 	}
 }
 

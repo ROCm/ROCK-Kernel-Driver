@@ -51,7 +51,7 @@ static inline unsigned int get_rtc_ss(void)
 		return mach_get_ss();
 	else{
 		struct rtc_time h;
-		
+
 		get_rtc_time(&h);
 		return h.tm_sec;
 	}

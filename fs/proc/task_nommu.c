@@ -1,6 +1,7 @@
 
 #include <linux/mm.h>
 #include <linux/file.h>
+#include <linux/seq_file.h>
 
 /*
  * Logic: we've got two memory sums for each process, "shared", and
@@ -101,8 +102,24 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
  * Albert D. Cahalan suggested to fake entries for the traditional
  * sections here.  This might be worth investigating.
  */
-ssize_t proc_pid_read_maps(struct task_struct *task, struct file *file,
-			   char *buf, size_t count, loff_t *ppos)
+static int show_map(struct seq_file *m, void *v)
 {
 	return 0;
 }
+static void *m_start(struct seq_file *m, loff_t *pos)
+{
+	return NULL;
+}
+static void m_stop(struct seq_file *m, void *v)
+{
+}
+static void *m_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	return NULL;
+}
+struct seq_operations proc_pid_maps_op = {
+	.start	= m_start,
+	.next	= m_next,
+	.stop	= m_stop,
+	.show	= show_map
+};

@@ -43,7 +43,7 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	if (dev->bus == &vio_bus_type)
 		return vio_alloc_consistent(to_vio_dev(dev), size, dma_handle);
 	BUG();
-	return 0;
+	return NULL;
 }
 EXPORT_SYMBOL(dma_alloc_coherent);
 

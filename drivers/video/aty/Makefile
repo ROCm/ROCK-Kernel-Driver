@@ -5,7 +5,6 @@ obj-$(CONFIG_FB_RADEON) += radeonfb.o
 atyfb-y				:= atyfb_base.o mach64_accel.o
 atyfb-$(CONFIG_FB_ATY_GX)	+= mach64_gx.o
 atyfb-$(CONFIG_FB_ATY_CT)	+= mach64_ct.o mach64_cursor.o
-atyfb-$(CONFIG_FB_ATY_XL_INIT) += xlinit.o
 atyfb-objs			:= $(atyfb-y)
 
 radeonfb-y			:= radeon_base.o radeon_pm.o radeon_monitor.o radeon_accel.o

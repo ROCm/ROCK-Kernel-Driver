@@ -6,7 +6,7 @@
  *      (C) Copyright 2000-2001, Greg Ungerer (gerg@snapgear.com)
  *      (C) Copyright 2001-2002, SnapGear (www.snapgear.com)
  *
- *	$Id: nettel.c,v 1.4 2003/05/20 20:59:30 dwmw2 Exp $
+ *	$Id: nettel.c,v 1.5 2004/07/12 21:59:44 dwmw2 Exp $
  */
 
 /****************************************************************************/
@@ -65,7 +65,7 @@ static struct mtd_info *amd_mtd;
 static struct map_info nettel_intel_map = {
 	.name = "SnapGear Intel",
 	.size = 0,
-	.buswidth = INTEL_BUSWIDTH,
+	.bankwidth = INTEL_BUSWIDTH,
 };
 
 static struct mtd_partition nettel_intel_partitions[] = {
@@ -103,7 +103,7 @@ static struct mtd_partition nettel_intel_partitions[] = {
 static struct map_info nettel_amd_map = {
 	.name = "SnapGear AMD",
 	.size = AMD_WINDOW_MAXSIZE,
-	.buswidth = AMD_BUSWIDTH,
+	.bankwidth = AMD_BUSWIDTH,
 };
 
 static struct mtd_partition nettel_amd_partitions[] = {

@@ -64,6 +64,8 @@ enum tbl_flag {
 	COMET_MAC_ADDR		= 0x0800,
 	HAS_PCI_MWI		= 0x1000,
 	HAS_PHY_IRQ		= 0x2000,
+	HAS_SWAPPED_SEEPROM	= 0x4000,
+	NEEDS_FAKE_MEDIA_TABLE	= 0x8000,
 };
 
 
@@ -407,7 +409,7 @@ void pnic2_lnk_change(struct net_device *dev, int csr5);
 
 /* eeprom.c */
 void tulip_parse_eeprom(struct net_device *dev);
-int tulip_read_eeprom(long ioaddr, int location, int addr_len);
+int tulip_read_eeprom(struct net_device *dev, int location, int addr_len);
 
 /* interrupt.c */
 extern unsigned int tulip_max_interrupt_work;
@@ -469,18 +471,16 @@ static inline void tulip_start_rxtx(struct tulip_private *tp)
 	(void) inl(ioaddr + CSR6); /* mmio sync */
 }
 
-static inline int tulip_stop_rxtx(struct tulip_private *tp)
+static inline void tulip_stop_rxtx(struct tulip_private *tp)
 {
 	long ioaddr = tp->base_addr;
 	u32 csr6 = inl(ioaddr + CSR6);
-	unsigned int i = 13; /* min of 1250usec */
 
 	if (csr6 & RxTx) {
 		outl(csr6 & ~RxTx, ioaddr + CSR6);
 		barrier();
-		while (i-- && ((inl(ioaddr + CSR5) & (TxDied|RxDied)) != (TxDied|RxDied))) udelay(100); /* mmio sync */
+		(void) inl(ioaddr + CSR6); /* mmio sync */
 	}
-	return (!(i>0)); /* return 0 (success) or 1 (failure) */;
 }
 
 static inline void tulip_restart_rxtx(struct tulip_private *tp)

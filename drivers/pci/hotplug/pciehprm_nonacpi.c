@@ -52,11 +52,6 @@ int pciehprm_print_pirt(void)
 	return 0;
 }
 
-void * pciehprm_get_slot(struct slot *slot)
-{
-	return NULL;
-}
-
 int pciehprm_get_physical_slot_number(struct controller *ctrl, u32 *sun, u8 busnum, u8 devnum)
 {
 
@@ -281,7 +276,7 @@ static int pciehprm_delete_resource(
 
 static int bind_pci_resources_to_slots ( struct controller *ctrl)
 {
-	struct pci_func *func;
+	struct pci_func *func, new_func;
 	int busn = ctrl->slot_bus;
 	int devn, funn;
 	u32	vid;
@@ -302,11 +297,19 @@ static int bind_pci_resources_to_slots ( struct controller *ctrl)
 				vid, busn, devn, funn);
 				func = pciehp_slot_find(busn, devn, funn);
 				dbg("%s: func = %p\n", __FUNCTION__,func);
-				if (!func)
-					continue;
-				configure_existing_function(ctrl, func);
+				if (!func) {
+					memset(&new_func, 0, sizeof(struct pci_func));
+					new_func.bus = busn;
+					new_func.device = devn;
+					new_func.function = funn;
+					new_func.is_a_board = 1;
+					configure_existing_function(ctrl, &new_func);
+					phprm_dump_func_res(&new_func);
+				} else {
+					configure_existing_function(ctrl, func);
+					phprm_dump_func_res(func);
+				}
 				dbg("aCCF:existing PCI 0x%x Func ResourceDump\n", ctrl->bus);
-				phprm_dump_func_res(func);
 			}
 		}
 	}

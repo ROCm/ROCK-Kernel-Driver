@@ -244,7 +244,7 @@ extern void prom_getstring(int node, char *prop, char *buf, int bufsize);
 /* Does the passed node have the given "name"? YES=1 NO=0 */
 extern int prom_nodematch(int thisnode, char *name);
 
-/* Puts in buffer a prom name in the form name@x,y or name (x for which_io 
+/* Puts in buffer a prom name in the form name@x,y or name (x for which_io
  * and y for first regs phys address
  */
 extern int prom_getname(int node, char *buf, int buflen);
@@ -272,7 +272,7 @@ extern int prom_node_has_property(int node, char *property);
  */
 extern int prom_setprop(int node, char *prop_name, char *prop_value,
 			int value_size);
-			
+
 extern int prom_pathtoinode(char *path);
 extern int prom_inst2pkg(int);
 
@@ -290,8 +290,8 @@ extern void prom_adjust_ranges(struct linux_prom_ranges *cranges, int ncranges,
 extern void prom_apply_obio_ranges(struct linux_prom_registers *obioregs, int nregs);
 
 /* Apply ranges of any prom node (and optionally parent node as well) to registers. */
-extern void prom_apply_generic_ranges(int node, int parent, 
+extern void prom_apply_generic_ranges(int node, int parent,
 				      struct linux_prom_registers *sbusregs, int nregs);
-				   
+
 
 #endif /* !(__SPARC_OPLIB_H) */

@@ -195,9 +195,6 @@ struct ip_mc_list
 #define IGMPV3_QQIC(value) IGMPV3_EXP(0x80, 4, 3, value)
 #define IGMPV3_MRC(value) IGMPV3_EXP(0x80, 4, 3, value)
 
-extern int register_multicast_notifier(struct notifier_block *nb);
-extern int unregister_multicast_notifier(struct notifier_block *nb);
-
 extern int ip_check_mc(struct in_device *dev, u32 mc_addr, u32 src_addr, u16 proto);
 extern int igmp_rcv(struct sk_buff *);
 extern int ip_mc_join_group(struct sock *sk, struct ip_mreqn *imr);
@@ -207,9 +204,9 @@ extern int ip_mc_source(int add, int omode, struct sock *sk,
 		struct ip_mreq_source *mreqs, int ifindex);
 extern int ip_mc_msfilter(struct sock *sk, struct ip_msfilter *msf,int ifindex);
 extern int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
-		struct ip_msfilter *optval, int *optlen);
+		struct ip_msfilter __user *optval, int __user *optlen);
 extern int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
-		struct group_filter *optval, int *optlen);
+		struct group_filter __user *optval, int __user *optlen);
 extern int ip_mc_sf_allow(struct sock *sk, u32 local, u32 rmt, int dif);
 extern void ip_mr_init(void);
 extern void ip_mc_init_dev(struct in_device *);

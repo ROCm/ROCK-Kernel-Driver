@@ -1,4 +1,4 @@
-// $Id: octagon-5066.c,v 1.24 2003/05/21 15:15:07 dwmw2 Exp $
+// $Id: octagon-5066.c,v 1.26 2004/07/12 22:38:29 dwmw2 Exp $
 /* ######################################################################
 
    Octagon 5066 MTD Driver. 
@@ -62,32 +62,12 @@ static inline void oct5066_page(struct map_info *map, unsigned long ofs)
 }
 
 
-static __u8 oct5066_read8(struct map_info *map, unsigned long ofs)
+static map_word oct5066_read8(struct map_info *map, unsigned long ofs)
 {
-	__u8 ret;
+	map_word ret;
 	spin_lock(&oct5066_spin);
 	oct5066_page(map, ofs);
-	ret = readb(iomapadr + (ofs & WINDOW_MASK));
-	spin_unlock(&oct5066_spin);
-	return ret;
-}
-
-static __u16 oct5066_read16(struct map_info *map, unsigned long ofs)
-{
-	__u16 ret;
-	spin_lock(&oct5066_spin);
-	oct5066_page(map, ofs);
-	ret = readw(iomapadr + (ofs & WINDOW_MASK));
-	spin_unlock(&oct5066_spin);
-	return ret;
-}
-
-static __u32 oct5066_read32(struct map_info *map, unsigned long ofs)
-{
-	__u32 ret;
-	spin_lock(&oct5066_spin);
-	oct5066_page(map, ofs);
-	ret = readl(iomapadr + (ofs & WINDOW_MASK));
+	ret.x[0] = readb(iomapadr + (ofs & WINDOW_MASK));
 	spin_unlock(&oct5066_spin);
 	return ret;
 }
@@ -109,27 +89,11 @@ static void oct5066_copy_from(struct map_info *map, void *to, unsigned long from
 	}
 }
 
-static void oct5066_write8(struct map_info *map, __u8 d, unsigned long adr)
+static void oct5066_write8(struct map_info *map, map_word d, unsigned long adr)
 {
 	spin_lock(&oct5066_spin);
 	oct5066_page(map, adr);
-	writeb(d, iomapadr + (adr & WINDOW_MASK));
-	spin_unlock(&oct5066_spin);
-}
-
-static void oct5066_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	spin_lock(&oct5066_spin);
-	oct5066_page(map, adr);
-	writew(d, iomapadr + (adr & WINDOW_MASK));
-	spin_unlock(&oct5066_spin);
-}
-
-static void oct5066_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	spin_lock(&oct5066_spin);
-	oct5066_page(map, adr);
-	writel(d, iomapadr + (adr & WINDOW_MASK));
+	writeb(d.x[0], iomapadr + (adr & WINDOW_MASK));
 	spin_unlock(&oct5066_spin);
 }
 
@@ -155,14 +119,10 @@ static struct map_info oct5066_map[2] = {
 		.name = "Octagon 5066 Socket",
 		.phys = NO_XIP,
 		.size = 512 * 1024,
-		.buswidth = 1,
-		.read8 = oct5066_read8,
-		.read16 = oct5066_read16,
-		.read32 = oct5066_read32,
+		.bankwidth = 1,
+		.read = oct5066_read8,
 		.copy_from = oct5066_copy_from,
-		.write8 = oct5066_write8,
-		.write16 = oct5066_write16,
-		.write32 = oct5066_write32,
+		.write = oct5066_write8,
 		.copy_to = oct5066_copy_to,
 		.map_priv_1 = 1<<6
 	},
@@ -170,14 +130,10 @@ static struct map_info oct5066_map[2] = {
 		.name = "Octagon 5066 Internal Flash",
 		.phys = NO_XIP,
 		.size = 2 * 1024 * 1024,
-		.buswidth = 1,
-		.read8 = oct5066_read8,
-		.read16 = oct5066_read16,
-		.read32 = oct5066_read32,
+		.bankwidth = 1,
+		.read = oct5066_read8,
 		.copy_from = oct5066_copy_from,
-		.write8 = oct5066_write8,
-		.write16 = oct5066_write16,
-		.write32 = oct5066_write32,
+		.write = oct5066_write8,
 		.copy_to = oct5066_copy_to,
 		.map_priv_1 = 2<<6
 	}

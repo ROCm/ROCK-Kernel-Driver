@@ -41,7 +41,7 @@ struct timezone {
  * Have the 32 bit jiffies value wrap 5 minutes after boot
  * so jiffies wrap bugs show up earlier.
  */
-#define INITIAL_JIFFIES ((unsigned long)(0))
+#define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
 
 /*
  * Change timeval to jiffies, trying to avoid the
@@ -177,6 +177,34 @@ struct timezone {
 	(SH_DIV((MAX_JIFFY_OFFSET >> SEC_JIFFIE_SC) * TICK_NSEC, NSEC_PER_SEC, 1) - 1)
 
 #endif
+
+/*
+ * Convert jiffies to milliseconds and back.
+ *
+ * Avoid unnecessary multiplications/divisions in the
+ * two most common HZ cases:
+ */
+static inline unsigned int jiffies_to_msecs(const unsigned long j)
+{
+#if HZ <= 1000 && !(1000 % HZ)
+	return (1000 / HZ) * j;
+#elif HZ > 1000 && !(HZ % 1000)
+	return (j + (HZ / 1000) - 1)/(HZ / 1000);
+#else
+	return (j * 1000) / HZ;
+#endif
+}
+static inline unsigned long msecs_to_jiffies(const unsigned int m)
+{
+#if HZ <= 1000 && !(1000 % HZ)
+	return (m + (1000 / HZ) - 1) / (1000 / HZ);
+#elif HZ > 1000 && !(HZ % 1000)
+	return m * (HZ / 1000);
+#else
+	return (m * HZ + 999) / 1000;
+#endif
+}
+
 /*
  * The TICK_NSEC - 1 rounds up the value to the next resolution.  Note
  * that a remainder subtract here would not do the right thing as the
@@ -189,7 +217,7 @@ struct timezone {
  * value to a scaled second value.
  */
 static __inline__ unsigned long
-timespec_to_jiffies(struct timespec *value)
+timespec_to_jiffies(const struct timespec *value)
 {
 	unsigned long sec = value->tv_sec;
 	long nsec = value->tv_nsec + TICK_NSEC - 1;
@@ -205,7 +233,7 @@ timespec_to_jiffies(struct timespec *value)
 }
 
 static __inline__ void
-jiffies_to_timespec(unsigned long jiffies, struct timespec *value)
+jiffies_to_timespec(const unsigned long jiffies, struct timespec *value)
 {
 	/*
 	 * Convert jiffies to nanoseconds and separate with
@@ -228,7 +256,7 @@ jiffies_to_timespec(unsigned long jiffies, struct timespec *value)
  * instruction above the way it was done above.
  */
 static __inline__ unsigned long
-timeval_to_jiffies(struct timeval *value)
+timeval_to_jiffies(const struct timeval *value)
 {
 	unsigned long sec = value->tv_sec;
 	long usec = value->tv_usec;
@@ -243,7 +271,7 @@ timeval_to_jiffies(struct timeval *value)
 }
 
 static __inline__ void
-jiffies_to_timeval(unsigned long jiffies, struct timeval *value)
+jiffies_to_timeval(const unsigned long jiffies, struct timeval *value)
 {
 	/*
 	 * Convert jiffies to nanoseconds and separate with

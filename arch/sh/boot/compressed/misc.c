@@ -1,7 +1,7 @@
 /*
  * arch/sh/boot/compressed/misc.c
- * 
- * This is a collection of several routines from gzip-1.0.3 
+ *
+ * This is a collection of several routines from gzip-1.0.3
  * adapted for Linux.
  *
  * malloc by Hannu Savolainen 1993 and Matthias Urlichs 1994
@@ -52,7 +52,7 @@ static unsigned outcnt = 0;  /* bytes in output buffer */
 #define RESERVED     0xC0 /* bit 6,7:   reserved */
 
 #define get_byte()  (inptr < insize ? inbuf[inptr++] : fill_inbuf())
-		
+
 /* Diagnostic functions */
 #ifdef DEBUG
 #  define Assert(cond,msg) {if(!(cond)) error(msg);}
@@ -75,7 +75,7 @@ static void flush_window(void);
 static void error(char *m);
 static void gzip_mark(void **);
 static void gzip_release(void **);
-  
+
 extern char input_data[];
 extern int input_len;
 
@@ -83,20 +83,19 @@ static long bytes_out = 0;
 static uch *output_data;
 static unsigned long output_ptr = 0;
 
- 
 static void *malloc(int size);
 static void free(void *where);
 static void error(char *m);
 static void gzip_mark(void **);
 static void gzip_release(void **);
- 
-static void puts(const char *);
-  
+
+int puts(const char *);
+
 extern int _text;		/* Defined in vmlinux.lds.S */
 extern int _end;
 static unsigned long free_mem_ptr;
 static unsigned long free_mem_end_ptr;
- 
+
 #define HEAP_SIZE             0x10000
 
 #include "../../../../lib/inflate.c"
@@ -134,7 +133,7 @@ static void gzip_release(void **ptr)
 }
 
 #ifdef CONFIG_SH_STANDARD_BIOS
-static int strlen(const char *s)
+size_t strlen(const char *s)
 {
 	int i = 0;
 
@@ -143,14 +142,17 @@ static int strlen(const char *s)
 	return i;
 }
 
-void puts(const char *s)
+int puts(const char *s)
 {
-	sh_bios_console_write(s, strlen(s));
+	int len = strlen(s);
+	sh_bios_console_write(s, len);
+	return len;
 }
 #else
-void puts(const char *s)
+int puts(const char *s)
 {
-  /* This should be updated to use the sh-sci routines */
+	/* This should be updated to use the sh-sci routines */
+	return 0;
 }
 #endif
 
@@ -198,9 +200,9 @@ static void flush_window(void)
     ulg c = crc;         /* temporary variable */
     unsigned n;
     uch *in, *out, ch;
-    
+
     in = window;
-    out = &output_data[output_ptr]; 
+    out = &output_data[output_ptr];
     for (n = 0; n < outcnt; n++) {
 	    ch = *out++ = *in++;
 	    c = crc_32_tab[((int)c ^ ch) & 0xff] ^ (c >> 8);

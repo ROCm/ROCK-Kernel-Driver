@@ -47,60 +47,103 @@ struct prio_sched_data
 };
 
 
-static __inline__ unsigned prio_classify(struct sk_buff *skb, struct Qdisc *sch)
+struct Qdisc *prio_classify(struct sk_buff *skb, struct Qdisc *sch,int *r)
 {
 	struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
+	u32 band = skb->priority;
 	struct tcf_result res;
-	u32 band;
 
-	band = skb->priority;
 	if (TC_H_MAJ(skb->priority) != sch->handle) {
+#ifdef CONFIG_NET_CLS_ACT
+		int result = 0, terminal = 0;
+		result = tc_classify(skb, q->filter_list, &res);
+
+		switch (result) {
+			case TC_ACT_SHOT:
+				*r = NET_XMIT_DROP;
+				terminal = 1;
+				break;
+			case TC_ACT_STOLEN:
+			case TC_ACT_QUEUED:
+				terminal = 1;
+				break;
+			case TC_ACT_RECLASSIFY:
+			case TC_ACT_OK:
+			case TC_ACT_UNSPEC:
+			default:
+			break;
+		};
+		if (terminal) {
+			kfree_skb(skb);
+			return NULL;
+		} 
+
+		if (!q->filter_list ) {
+#else
 		if (!q->filter_list || tc_classify(skb, q->filter_list, &res)) {
+#endif
 			if (TC_H_MAJ(band))
 				band = 0;
-			return q->prio2band[band&TC_PRIO_MAX];
+			return q->queues[q->prio2band[band&TC_PRIO_MAX]];
 		}
 		band = res.classid;
 	}
 	band = TC_H_MIN(band) - 1;
-	return band < q->bands ? band : q->prio2band[0];
+	if (band > q->bands)
+		return q->queues[q->prio2band[0]];
+
+	return q->queues[band];
 }
 
 static int
 prio_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 {
-	struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
 	struct Qdisc *qdisc;
-	int ret;
+	int ret = NET_XMIT_SUCCESS;
 
-	qdisc = q->queues[prio_classify(skb, sch)];
+	qdisc = prio_classify(skb, sch, &ret);
 
-	if ((ret = qdisc->enqueue(skb, qdisc)) == 0) {
+	if (NULL == qdisc)
+		goto dropped;
+
+	if ((ret = qdisc->enqueue(skb, qdisc)) == NET_XMIT_SUCCESS) {
 		sch->stats.bytes += skb->len;
 		sch->stats.packets++;
 		sch->q.qlen++;
-		return 0;
+		return NET_XMIT_SUCCESS;
 	}
-	sch->stats.drops++;
-	return ret;
+
+dropped:
+#ifdef CONFIG_NET_CLS_ACT
+	if (NET_XMIT_DROP == ret) {
+#endif
+		sch->stats.drops++;
+#ifdef CONFIG_NET_CLS_ACT
+	} else {
+		sch->stats.overlimits++; /* abuse, but noone uses it */
+	}
+#endif
+	return ret; 
 }
 
 
 static int
 prio_requeue(struct sk_buff *skb, struct Qdisc* sch)
 {
-	struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
 	struct Qdisc *qdisc;
-	int ret;
+	int ret = NET_XMIT_DROP;
 
-	qdisc = q->queues[prio_classify(skb, sch)];
+	qdisc = prio_classify(skb, sch, &ret);
+	if (qdisc == NULL)
+		goto dropped;
 
 	if ((ret = qdisc->ops->requeue(skb, qdisc)) == 0) {
 		sch->q.qlen++;
 		return 0;
 	}
+dropped:
 	sch->stats.drops++;
-	return ret;
+	return NET_XMIT_DROP;
 }
 
 

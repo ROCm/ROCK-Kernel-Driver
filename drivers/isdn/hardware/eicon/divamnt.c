@@ -53,7 +53,7 @@ static struct timeval start_time;
 
 extern int mntfunc_init(int *, void **, unsigned long);
 extern void mntfunc_finit(void);
-extern int maint_read_write(void *buf, int count);
+extern int maint_read_write(void __user *buf, int count);
 
 /*
  *  helper functions
@@ -90,12 +90,12 @@ void diva_os_free_tbuffer(unsigned long flags, void *ptr)
 /*
  * kernel/user space copy functions
  */
-int diva_os_copy_to_user(void *os_handle, void *dst, const void *src,
+int diva_os_copy_to_user(void *os_handle, void __user *dst, const void *src,
 			 int length)
 {
 	return (copy_to_user(dst, src, length));
 }
-int diva_os_copy_from_user(void *os_handle, void *dst, const void *src,
+int diva_os_copy_from_user(void *os_handle, void *dst, const void __user *src,
 			   int length)
 {
 	return (copy_from_user(dst, src, length));
@@ -142,9 +142,9 @@ static struct proc_dir_entry *maint_proc_entry = NULL;
   to read unstructured traces, formated as ascii string only
   */
 static ssize_t
-maint_read(struct file *file, char *buf, size_t count, loff_t * off)
+maint_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 {
-	diva_dbg_entry_head_t *pmsg = 0;
+	diva_dbg_entry_head_t *pmsg = NULL;
 	diva_os_spin_lock_magic_t old_irql;
 	word size;
 	char *pstr, *dli_label = "UNK";
@@ -264,20 +264,20 @@ maint_read(struct file *file, char *buf, size_t count, loff_t * off)
 
 	if (diva_os_copy_to_user(NULL, buf, pstr, str_length)) {
 		diva_os_free_tbuffer(0, str_msg);
-		file->private_data = 0;
+		file->private_data = NULL;
 		return (-EFAULT);
 	}
 	str_msg[1] += str_length;
 	if ((str_msg[0] - str_msg[1]) <= 0) {
 		diva_os_free_tbuffer(0, str_msg);
-		file->private_data = 0;
+		file->private_data = NULL;
 	}
 
 	return (str_length);
 }
 
 static ssize_t
-maint_write(struct file *file, const char *buf, size_t count, loff_t * off)
+maint_write(struct file *file, const char __user *buf, size_t count, loff_t * off)
 {
 	return (-ENODEV);
 }
@@ -304,7 +304,7 @@ static int maint_open(struct inode *ino, struct file *filep)
 	opened++;
 	up(&opened_sem);
 
-	filep->private_data = 0;
+	filep->private_data = NULL;
 
 	return (0);
 }
@@ -313,7 +313,7 @@ static int maint_close(struct inode *ino, struct file *filep)
 {
 	if (filep->private_data) {
 		diva_os_free_tbuffer(0, filep->private_data);
-		filep->private_data = 0;
+		filep->private_data = NULL;
 	}
 
 	down(&opened_sem);
@@ -360,13 +360,13 @@ static void remove_maint_proc(void)
 /*
  * device node operations
  */
-static ssize_t divas_maint_write(struct file *file, const char *buf,
+static ssize_t divas_maint_write(struct file *file, const char __user *buf,
 				 size_t count, loff_t * ppos)
 {
-	return (maint_read_write((char *) buf, (int) count));
+	return (maint_read_write((char __user *) buf, (int) count));
 }
 
-static ssize_t divas_maint_read(struct file *file, char *buf,
+static ssize_t divas_maint_read(struct file *file, char __user *buf,
 				size_t count, loff_t * ppos)
 {
 	return (maint_read_write(buf, (int) count));
@@ -416,7 +416,7 @@ static int DIVA_INIT_FUNCTION maint_init(void)
 {
 	char tmprev[50];
 	int ret = 0;
-	void *buffer = 0;
+	void *buffer = NULL;
 
 	do_gettimeofday(&start_time);
 	init_waitqueue_head(&msgwaitq);

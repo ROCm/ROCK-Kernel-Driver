@@ -18,7 +18,6 @@
 #include <asm/scatterlist.h>
 #include <linux/crypto.h>
 #include <linux/pfkeyv2.h>
-#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/icmp.h>
@@ -114,89 +113,45 @@ static int ipcomp_compress(struct xfrm_state *x, struct sk_buff *skb)
 		goto out;
 	}
 	
-	memcpy(start, scratch, dlen);
-	pskb_trim(skb, ihlen + dlen);
+	memcpy(start + sizeof(struct ip_comp_hdr), scratch, dlen);
+	pskb_trim(skb, ihlen + dlen + sizeof(struct ip_comp_hdr));
 	
 out:	
 	return err;
 }
 
-static void ipcomp_tunnel_encap(struct xfrm_state *x, struct sk_buff *skb)
-{
-	struct dst_entry *dst = skb->dst;
-	struct iphdr *iph, *top_iph;
-
-	iph = skb->nh.iph;
-	top_iph = (struct iphdr *)skb_push(skb, sizeof(struct iphdr));
-	top_iph->ihl = 5;
-	top_iph->version = 4;
-	top_iph->tos = iph->tos;
-	top_iph->tot_len = htons(skb->len);
-	if (!(iph->frag_off&htons(IP_DF)))
-		__ip_select_ident(top_iph, dst, 0);
-	top_iph->ttl = iph->ttl;
-	top_iph->check = 0;
-	top_iph->saddr = x->props.saddr.a4;
-	top_iph->daddr = x->id.daddr.a4;
-	top_iph->frag_off = iph->frag_off&~htons(IP_MF|IP_OFFSET);
-	memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-	skb->nh.raw = skb->data;
-}
-
-static int ipcomp_output(struct sk_buff *skb)
+static int ipcomp_output(struct sk_buff **pskb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
+	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x = dst->xfrm;
-	struct iphdr *iph, *top_iph;
+	struct iphdr *iph;
 	struct ip_comp_hdr *ipch;
 	struct ipcomp_data *ipcd = x->data;
-	union {
-		struct iphdr	iph;
-		char 		buf[60];
-	} tmp_iph;
 	int hdr_len = 0;
 
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
-		err = -EINVAL;
-		goto error_nolock;
-	}
-
-	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, skb, AF_INET);
-	if (err)
-		goto error;
-
-	/* Don't bother compressing */
-	if (!x->props.mode) {
-		iph = skb->nh.iph;
-		hdr_len = iph->ihl * 4;
-	}
-	if ((skb->len - hdr_len) < ipcd->threshold) {
+	iph = (*pskb)->nh.iph;
+	iph->tot_len = htons((*pskb)->len);
+	hdr_len = iph->ihl * 4;
+	if (((*pskb)->len - hdr_len) < ipcd->threshold) {
+		/* Don't bother compressing */
 		if (x->props.mode) {
-			ipcomp_tunnel_encap(x, skb);
-			iph = skb->nh.iph;
-			iph->protocol = IPPROTO_IPIP;
 			ip_send_check(iph);
 		}
 		goto out_ok;
 	}
 
-	if (x->props.mode) 
-		ipcomp_tunnel_encap(x, skb);
-
-	if ((skb_is_nonlinear(skb) || skb_cloned(skb)) &&
-	    skb_linearize(skb, GFP_ATOMIC) != 0) {
+	if ((skb_is_nonlinear(*pskb) || skb_cloned(*pskb)) &&
+	    skb_linearize(*pskb, GFP_ATOMIC) != 0) {
 	    	err = -ENOMEM;
 	    	goto error;
 	}
 	
-	err = ipcomp_compress(x, skb);
+	err = ipcomp_compress(x, *pskb);
 	if (err) {
 		if (err == -EMSGSIZE) {
 			if (x->props.mode) {
-				iph = skb->nh.iph;
-				iph->protocol = IPPROTO_IPIP;
+				iph = (*pskb)->nh.iph;
 				ip_send_check(iph);
 			}
 			goto out_ok;
@@ -205,42 +160,20 @@ static int ipcomp_output(struct sk_buff *skb)
 	}
 
 	/* Install ipcomp header, convert into ipcomp datagram. */
-	iph = skb->nh.iph;
-	memcpy(&tmp_iph, iph, iph->ihl * 4);
-	top_iph = (struct iphdr *)skb_push(skb, sizeof(struct ip_comp_hdr));
-	memcpy(top_iph, &tmp_iph, iph->ihl * 4);
-	iph = top_iph;
-	if (x->props.mode && (x->props.flags & XFRM_STATE_NOECN))
-		IP_ECN_clear(iph);
-	iph->tot_len = htons(skb->len);
-	iph->protocol = IPPROTO_COMP;
-	iph->check = 0;
+	iph = (*pskb)->nh.iph;
+	iph->tot_len = htons((*pskb)->len);
 	ipch = (struct ip_comp_hdr *)((char *)iph + iph->ihl * 4);
-	ipch->nexthdr = x->props.mode ? IPPROTO_IPIP : tmp_iph.iph.protocol;
+	ipch->nexthdr = iph->protocol;
 	ipch->flags = 0;
 	ipch->cpi = htons((u16 )ntohl(x->id.spi));
+	iph->protocol = IPPROTO_COMP;
 	ip_send_check(iph);
-	skb->nh.raw = skb->data;
 
 out_ok:
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++;
-	spin_unlock_bh(&x->lock);
-	
-	if ((skb->dst = dst_pop(dst)) == NULL) {
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
-	err = NET_XMIT_BYPASS;
+	err = 0;
 
-out_exit:
-	return err;
 error:
-	spin_unlock_bh(&x->lock);
-error_nolock:
-	kfree_skb(skb);
-	goto out_exit;
+	return err;
 }
 
 static void ipcomp4_err(struct sk_buff *skb, u32 info)
@@ -340,6 +273,7 @@ static void ipcomp_destroy(struct xfrm_state *x)
 	struct ipcomp_data *ipcd = x->data;
 	if (!ipcd)
 		return;
+	xfrm_state_delete_tunnel(x);
 	ipcomp_free_data(ipcd);
 	kfree(ipcd);
 }
@@ -360,7 +294,7 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 		goto error;
 
 	memset(ipcd, 0, sizeof(*ipcd));
-	x->props.header_len = sizeof(struct ip_comp_hdr);
+	x->props.header_len = 0;
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
 
@@ -404,11 +338,10 @@ static struct xfrm_type ipcomp_type = {
 	.output		= ipcomp_output
 };
 
-static struct inet_protocol ipcomp4_protocol = {
+static struct net_protocol ipcomp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ipcomp4_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init ipcomp4_init(void)

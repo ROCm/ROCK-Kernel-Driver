@@ -1,6 +1,7 @@
 #ifndef _LINUX_KD_H
 #define _LINUX_KD_H
 #include <linux/types.h>
+#include <linux/compiler.h>
 
 /* 0x4B is 'K', to avoid collision with termios and vt */
 
@@ -12,7 +13,7 @@
 struct consolefontdesc {
 	unsigned short charcount;	/* characters in font (256 or 512) */
 	unsigned short charheight;	/* scan lines per character (1-32) */
-	char *chardata;			/* font data in expanded form */
+	char __user *chardata;		/* font data in expanded form */
 };
 
 #define PIO_FONTRESET   0x4B6D	/* reset to default font */
@@ -63,7 +64,7 @@ struct unipair {
 };
 struct unimapdesc {
 	unsigned short entry_ct;
-	struct unipair *entries;
+	struct unipair __user *entries;
 };
 #define PIO_UNIMAP	0x4B67	/* put unicode-to-font mapping in kernel */
 #define PIO_UNIMAPCLR	0x4B68	/* clear table, possibly advise hash algorithm */
@@ -146,6 +147,12 @@ struct kbd_repeat {
 struct console_font_op {
 	unsigned int op;	/* operation code KD_FONT_OP_* */
 	unsigned int flags;	/* KD_FONT_FLAG_* */
+	unsigned int width, height;	/* font size */
+	unsigned int charcount;
+	unsigned char __user *data;	/* font data with height fixed to 32 */
+};
+
+struct console_font {
 	unsigned int width, height;	/* font size */
 	unsigned int charcount;
 	unsigned char *data;	/* font data with height fixed to 32 */

@@ -1,5 +1,5 @@
 /*
- * $Id: impa7.c,v 1.9 2003/06/23 11:47:43 dwmw2 Exp $
+ * $Id: impa7.c,v 1.11 2004/07/14 09:52:55 dwmw2 Exp $
  *
  * Handle mapping of the NOR flash on implementa A7 boards
  *
@@ -30,25 +30,25 @@
 #define NUM_FLASHBANKS 2
 #define BUSWIDTH     4
 
-/* can be { "cfi_probe", "jedec_probe", "map_rom", 0 }; */
-#define PROBETYPES { "jedec_probe", 0 }
+/* can be { "cfi_probe", "jedec_probe", "map_rom", NULL } */
+#define PROBETYPES { "jedec_probe", NULL }
 
 #define MSG_PREFIX "impA7:"   /* prefix for our printk()'s */
 #define MTDID      "impa7-%d"  /* for mtdparts= partitioning */
 
-static struct mtd_info *impa7_mtd[NUM_FLASHBANKS] = { 0 };
+static struct mtd_info *impa7_mtd[NUM_FLASHBANKS];
 
 
 static struct map_info impa7_map[NUM_FLASHBANKS] = {
 	{
 		.name = "impA7 NOR Flash Bank #0",
 		.size = WINDOW_SIZE0,
-		.buswidth = BUSWIDTH,
+		.bankwidth = BUSWIDTH,
 	},
 	{
 		.name = "impA7 NOR Flash Bank #1",
 		.size = WINDOW_SIZE1,
-		.buswidth = BUSWIDTH,
+		.bankwidth = BUSWIDTH,
 	},
 };
 

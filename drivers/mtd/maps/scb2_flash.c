@@ -1,6 +1,6 @@
 /*
  * MTD map driver for BIOS Flash on Intel SCB2 boards
- * $Id: scb2_flash.c,v 1.6 2003/05/21 12:45:20 dwmw2 Exp $
+ * $Id: scb2_flash.c,v 1.8 2004/07/12 21:59:45 dwmw2 Exp $
  * Copyright (C) 2002 Sun Microsystems, Inc.
  * Tim Hockin <thockin@sun.com>
  *
@@ -67,7 +67,7 @@ static struct mtd_info *scb2_mtd;
 struct map_info scb2_map = {
 	.name =      "SCB2 BIOS Flash",
 	.size =      0,
-	.buswidth =  1,
+	.bankwidth =  1,
 };
 static int region_fail;
 

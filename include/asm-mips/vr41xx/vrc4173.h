@@ -1,19 +1,24 @@
 /*
- * FILE NAME
- *	include/asm-mips/vr41xx/vrc4173.h
+ *  vrc4173.h, Include file for NEC VRC4173.
  *
- * BRIEF MODULE DESCRIPTION
- *	Include file for NEC VRC4173.
+ *  Copyright (C) 2000  Michael R. McDonald
+ *  Copyright (C) 2001-2003 Montavista Software Inc.
+ *    Author: Yoichi Yuasa <yyuasa@mvista.com, or source@mvista.com>
+ *  Copyright (C) 2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
- * This file is subject to the terms and conditions of the GNU General Public
- * License.  See the file "COPYING" in the main directory of this archive
- * for more details.
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
  *
- * Copyright (C) 2000 by Michael R. McDonald
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
  *
- * Copyright 2001-2003 Montavista Software Inc.
- * Author: Yoichi Yuasa
- *         yyuasa@mvista.com or source@mvista.com
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #ifndef __NEC_VRC4173_H 
 #define __NEC_VRC4173_H 
@@ -72,35 +77,38 @@ extern unsigned long vrc4173_io_offset;
 /*
  * Clock Mask Unit
  */
-#define VRC4173_PIU_CLOCK		0x0001
-#define VRC4173_KIU_CLOCK		0x0002
-#define VRC4173_AIU_CLOCK		0x0004
-#define VRC4173_PS2CH1_CLOCK		0x0008
-#define VRC4173_PS2CH2_CLOCK		0x0010
-#define VRC4173_USBU_PCI_CLOCK		0x0020
-#define VRC4173_CARDU1_PCI_CLOCK	0x0040
-#define VRC4173_CARDU2_PCI_CLOCK	0x0080
-#define VRC4173_AC97U_PCI_CLOCK		0x0100
-#define VRC4173_USBU_48MHz_CLOCK	0x0400
-#define VRC4173_EXT_48MHz_CLOCK		0x0800
-#define VRC4173_48MHz_CLOCK		0x1000
+typedef enum vrc4173_clock {
+	VRC4173_PIU_CLOCK,
+	VRC4173_KIU_CLOCK,
+	VRC4173_AIU_CLOCK,
+	VRC4173_PS2_CH1_CLOCK,
+	VRC4173_PS2_CH2_CLOCK,
+	VRC4173_USBU_PCI_CLOCK,
+	VRC4173_CARDU1_PCI_CLOCK,
+	VRC4173_CARDU2_PCI_CLOCK,
+	VRC4173_AC97U_PCI_CLOCK,
+	VRC4173_USBU_48MHz_CLOCK,
+	VRC4173_EXT_48MHz_CLOCK,
+	VRC4173_48MHz_CLOCK,
+} vrc4173_clock_t;
 
-extern void vrc4173_clock_supply(u16 mask);
-extern void vrc4173_clock_mask(u16 mask);
+extern void vrc4173_supply_clock(vrc4173_clock_t clock);
+extern void vrc4173_mask_clock(vrc4173_clock_t clock);
 
 /*
  * General-Purpose I/O Unit
  */
-enum {
-	PS2CH1_SELECT,
-	PS2CH2_SELECT,
-	TOUCHPANEL_SELECT,
-	KIU8_SELECT,
-	KIU10_SELECT,
-	KIU12_SELECT,
-	GPIO_SELECT
-};
+typedef enum vrc4173_function {
+	PS2_CHANNEL1,
+	PS2_CHANNEL2,
+	TOUCHPANEL,
+	KEYBOARD_8SCANLINES,
+	KEYBOARD_10SCANLINES,
+	KEYBOARD_12SCANLINES,
+	GPIO_0_15PINS,
+	GPIO_16_20PINS,
+} vrc4173_function_t;
 
-extern void vrc4173_select_function(int func);
+extern void vrc4173_select_function(vrc4173_function_t function);
 
 #endif /* __NEC_VRC4173_H */

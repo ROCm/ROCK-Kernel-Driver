@@ -209,7 +209,7 @@ flash_safe_write(struct mtd_info *mtd, loff_t to,
 
 
 static int
-flash_safe_writev(struct mtd_info *mtd, const struct iovec *vecs,
+flash_safe_writev(struct mtd_info *mtd, const struct kvec *vecs,
 			unsigned long iovec_cnt, loff_t to)
 {
 	size_t retlen, retlen_a;
@@ -409,7 +409,7 @@ jffs_create_file(struct jffs_control *c,
 	if (!(f = (struct jffs_file *)kmalloc(sizeof(struct jffs_file),
 					      GFP_KERNEL))) {
 		D(printk("jffs_create_file(): Failed!\n"));
-		return 0;
+		return NULL;
 	}
 	no_jffs_file++;
 	memset(f, 0, sizeof(struct jffs_file));
@@ -438,8 +438,8 @@ jffs_create_control(struct super_block *sb)
 		goto fail_control;
 	}
 	DJM(no_jffs_control++);
-	c->root = 0;
-	c->gc_task = 0;
+	c->root = NULL;
+	c->gc_task = NULL;
 	c->hash_len = JFFS_HASH_SIZE;
 	s = sizeof(struct list_head) * c->hash_len;
 	if (!(c->hash = (struct list_head *)kmalloc(s, GFP_KERNEL))) {
@@ -752,7 +752,7 @@ jffs_scan_flash(struct jffs_control *c)
 {
 	char name[JFFS_MAX_NAME_LEN + 2];
 	struct jffs_raw_inode raw_inode;
-	struct jffs_node *node = 0;
+	struct jffs_node *node = NULL;
 	struct jffs_fmcontrol *fmc = c->fmc;
 	__u32 checksum;
 	__u8 tmp_accurate;
@@ -904,7 +904,7 @@ jffs_scan_flash(struct jffs_control *c)
 				        D1(printk("Dirty space: Starting 0x%x for 0x%x bytes\n",
 						  (unsigned int) start, (unsigned int) (pos - start)));
 					jffs_fmalloced(fmc, (__u32) start,
-						       (__u32) (pos - start), 0);
+						       (__u32) (pos - start), NULL);
 				}else{
 					/* "Flipping bits" detected. This means that our scan for them
 					   did not catch this offset. See check_partly_erased_sectors() for
@@ -964,7 +964,7 @@ jffs_scan_flash(struct jffs_control *c)
 					 D1(printk("Dirty space: Starting 0x%x for 0x%x bytes\n",
 						   (unsigned int) start, (unsigned int) (pos - start)));
 					 jffs_fmalloced(fmc, (__u32) start,
-							(__u32) (pos - start), 0);				           
+							(__u32) (pos - start), NULL);				           
 				 }
 				 
 			}
@@ -986,7 +986,7 @@ jffs_scan_flash(struct jffs_control *c)
 			D1(printk("jffs_scan_flash(): 0x00 ended at "
 				  "pos 0x%lx.\n", (long)pos));
 			jffs_fmalloced(fmc, (__u32) start,
-				       (__u32) (pos - start), 0);
+				       (__u32) (pos - start), NULL);
 			continue;
 
 		case JFFS_MAGIC_BITMASK:
@@ -1020,7 +1020,7 @@ jffs_scan_flash(struct jffs_control *c)
 			   which really does contain crap. */
 			jffs_fmalloced(fmc, (__u32) start,
 				       (__u32) (pos - start),
-				       0);
+				       NULL);
 			
 			continue;
 		}/* switch */
@@ -1067,7 +1067,7 @@ jffs_scan_flash(struct jffs_control *c)
 				  checksum, raw_inode.chksum));
 			pos += sizeof(struct jffs_raw_inode);
 			jffs_fmalloced(fmc, (__u32) start,
-				       (__u32) (pos - start), 0);
+				       (__u32) (pos - start), NULL);
 			/* Reuse this unused struct jffs_node.  */
 			continue;
 		}
@@ -1121,7 +1121,7 @@ jffs_scan_flash(struct jffs_control *c)
 					  "raw_inode.nchksum = %u\n",
 					  checksum, raw_inode.nchksum));
 				jffs_fmalloced(fmc, (__u32) start,
-					       (__u32) (pos - start), 0);
+					       (__u32) (pos - start), NULL);
 				/* Reuse this unused struct jffs_node.  */
 				continue;
 			}
@@ -1139,7 +1139,7 @@ jffs_scan_flash(struct jffs_control *c)
 			if (jffs_checksum_flash(fmc->mtd, pos, raw_inode.dsize, &checksum)) {
 				printk("jffs_checksum_flash() failed to calculate a checksum\n");
 				jffs_fmalloced(fmc, (__u32) start,
-					       (__u32) (pos - start), 0);
+					       (__u32) (pos - start), NULL);
 				/* Reuse this unused struct jffs_node.  */
 				continue;
 			}				
@@ -1152,7 +1152,7 @@ jffs_scan_flash(struct jffs_control *c)
 					  "raw_inode.dchksum = %u\n",
 					  checksum, raw_inode.dchksum));
 				jffs_fmalloced(fmc, (__u32) start,
-					       (__u32) (pos - start), 0);
+					       (__u32) (pos - start), NULL);
 				/* Reuse this unused struct jffs_node.  */
 				continue;
 			}
@@ -1194,7 +1194,7 @@ jffs_scan_flash(struct jffs_control *c)
 
 				return -ENOMEM;
 			}
-			if ((err = jffs_insert_node(c, 0, &raw_inode,
+			if ((err = jffs_insert_node(c, NULL, &raw_inode,
 						    name, node)) < 0) {
 				printk("JFFS: Failed to handle raw inode. "
 				       "(err = %d)\n", err);
@@ -1224,11 +1224,11 @@ jffs_scan_flash(struct jffs_control *c)
 				node->data_size = 0;
 			}
 			D3(jffs_print_node(node));
-			node = 0; /* Don't free the node!  */
+			node = NULL; /* Don't free the node!  */
 		}
 		else {
 			jffs_fmalloced(fmc, (__u32) start,
-				       (__u32) (pos - start), 0);
+				       (__u32) (pos - start), NULL);
 			D3(printk("jffs_scan_flash(): Just found an obsolete "
 				  "raw_inode. Continuing the scan...\n"));
 			/* Reuse this unused struct jffs_node.  */
@@ -1312,8 +1312,8 @@ jffs_insert_node(struct jffs_control *c, struct jffs_file *f,
 		/* This is the first node.  */
 		f->version_head = node;
 		f->version_tail = node;
-		node->version_prev = 0;
-		node->version_next = 0;
+		node->version_prev = NULL;
+		node->version_next = NULL;
 		f->highest_version = node->version;
 		update_name = 1;
 		f->mode = raw_inode->mode;
@@ -1328,7 +1328,7 @@ jffs_insert_node(struct jffs_control *c, struct jffs_file *f,
 		/* Insert at the end of the list.  I.e. this node is the
 		   newest one so far.  */
 		node->version_prev = f->version_tail;
-		node->version_next = 0;
+		node->version_next = NULL;
 		f->version_tail->version_next = node;
 		f->version_tail = node;
 		f->highest_version = node->version;
@@ -1343,7 +1343,7 @@ jffs_insert_node(struct jffs_control *c, struct jffs_file *f,
 	}
 	else if (f->version_head->version > node->version) {
 		/* Insert at the bottom of the list.  */
-		node->version_prev = 0;
+		node->version_prev = NULL;
 		node->version_next = f->version_head;
 		f->version_head->version_prev = node;
 		f->version_head = node;
@@ -1556,9 +1556,9 @@ jffs_insert_file_into_tree(struct jffs_file *f)
 	if (!(parent = jffs_find_file(f->c, f->pino))) {
 		if (f->pino == 0) {
 			f->c->root = f;
-			f->parent = 0;
-			f->sibling_prev = 0;
-			f->sibling_next = 0;
+			f->parent = NULL;
+			f->sibling_prev = NULL;
+			f->sibling_next = NULL;
 			return 0;
 		}
 		else {
@@ -1573,7 +1573,7 @@ jffs_insert_file_into_tree(struct jffs_file *f)
 	if (f->sibling_next) {
 		f->sibling_next->sibling_prev = f;
 	}
-	f->sibling_prev = 0;
+	f->sibling_prev = NULL;
 	parent->children = f;
 	return 0;
 }
@@ -1740,7 +1740,7 @@ jffs_write_node(struct jffs_control *c, struct jffs_node *node,
 {
 	struct jffs_fmcontrol *fmc = c->fmc;
 	struct jffs_fm *fm;
-	struct iovec node_iovec[4];
+	struct kvec node_iovec[4];
 	unsigned long iovec_cnt;
 
 	__u32 pos;
@@ -2311,7 +2311,7 @@ jffs_insert_data(struct jffs_file *f, struct jffs_node *node)
 	retry:
 	if (node->data_offset == f->size) {
 		/* A simple append.  This is the most common operation.  */
-		node->range_next = 0;
+		node->range_next = NULL;
 		node->range_prev = f->range_tail;
 		if (node->range_prev) {
 			node->range_prev->range_next = node;
@@ -2389,10 +2389,10 @@ jffs_insert_data(struct jffs_file *f, struct jffs_node *node)
 		virtual_node->removed_size = 0;
 		virtual_node->fm_offset = 0;
 		virtual_node->name_size = 0;
-		virtual_node->fm = 0; /* This is a virtual data holder.  */
-		virtual_node->version_prev = 0;
-		virtual_node->version_next = 0;
-		virtual_node->range_next = 0;
+		virtual_node->fm = NULL; /* This is a virtual data holder.  */
+		virtual_node->version_prev = NULL;
+		virtual_node->version_next = NULL;
+		virtual_node->range_next = NULL;
 
 		/* Are there any data at all in the file yet?  */
 		if (f->range_head) {
@@ -2407,7 +2407,7 @@ jffs_insert_data(struct jffs_file *f, struct jffs_node *node)
 		else {
 			virtual_node->data_offset = 0;
 			virtual_node->data_size = node->data_offset;
-			virtual_node->range_prev = 0;
+			virtual_node->range_prev = NULL;
 			f->range_head = virtual_node;
 		}
 

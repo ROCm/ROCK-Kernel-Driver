@@ -41,7 +41,7 @@
  *    of least surprise ... (be careful when you change it)
  */
 
-int badness(struct task_struct *p)
+static int badness(struct task_struct *p)
 {
 	int points, cpu_time, run_time, s;
 
@@ -93,21 +93,6 @@ int badness(struct task_struct *p)
 	 */
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
 		points /= 4;
-
-	/* 
-	 * Adjust the score by oomkilladj.
-	 */
-	if (p->oomkilladj) {
-		if (p->oomkilladj > 0)
-			points <<= p->oomkilladj;
-		else
-			points >>= -(p->oomkilladj);
-	}
-	/* 
-	 * One point for already having received a warning 
-	 */
-	points += p->rcvd_sigterm;
-		
 #ifdef DEBUG
 	printk(KERN_DEBUG "OOMkill: task %d (%s) got %d points\n",
 	p->pid, p->comm, points);
@@ -167,13 +152,11 @@ static void __oom_kill_task(task_t *p)
 	p->flags |= PF_MEMALLOC | PF_MEMDIE;
 
 	/* This process has hardware access, be more careful. */
-	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
+	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO)) {
 		force_sig(SIGTERM, p);
-	else if (p->rcvd_sigterm++)
+	} else {
 		force_sig(SIGKILL, p);
-	else
-		force_sig(SIGTERM, p);
-
+	}
 }
 
 static struct mm_struct *oom_kill_task(task_t *p)
@@ -237,7 +220,7 @@ retry:
 /**
  * out_of_memory - is the system out of memory?
  */
-void out_of_memory(void)
+void out_of_memory(int gfp_mask)
 {
 	/*
 	 * oom_lock protects out_of_memory()'s static variables.
@@ -246,12 +229,6 @@ void out_of_memory(void)
 	static spinlock_t oom_lock = SPIN_LOCK_UNLOCKED;
 	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
-
-	/*
-	 * Enough swap space left?  Not OOM.
-	 */
-	if (nr_swap_pages > 0)
-		return;
 
 	spin_lock(&oom_lock);
 	now = jiffies;
@@ -262,7 +239,6 @@ void out_of_memory(void)
 	 * If it's been a long time since last failure,
 	 * we're not oom.
 	 */
-	last = now;
 	if (since > 5*HZ)
 		goto reset;
 
@@ -294,6 +270,9 @@ void out_of_memory(void)
 	 * Ok, really out of memory. Kill something.
 	 */
 	lastkill = now;
+
+	printk("oom-killer: gfp_mask=0x%x\n", gfp_mask);
+	show_free_areas();
 
 	/* oom_kill() sleeps */
 	spin_unlock(&oom_lock);

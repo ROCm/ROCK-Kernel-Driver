@@ -87,14 +87,14 @@ read_word(const void __user *buf, int offset, int mode)
 	unsigned short c;
 	if (mode & SNDRV_SFNT_SAMPLE_8BITS) {
 		unsigned char cc;
-		get_user(cc, (unsigned char*)buf + offset);
+		get_user(cc, (unsigned char __user *)buf + offset);
 		c = cc << 8; /* convert 8bit -> 16bit */
 	} else {
 #ifdef SNDRV_LITTLE_ENDIAN
-		get_user(c, (unsigned short*)buf + offset);
+		get_user(c, (unsigned short __user *)buf + offset);
 #else
 		unsigned short cc;
-		get_user(cc, (unsigned short*)buf + offset);
+		get_user(cc, (unsigned short __user *)buf + offset);
 		c = swab16(cc);
 #endif
 	}

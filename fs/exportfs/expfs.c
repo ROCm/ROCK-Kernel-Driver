@@ -155,11 +155,15 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 
 		if (!IS_ROOT(pd)) {
 			/* must have found a connected parent - great */
+			spin_lock(&pd->d_lock);
 			pd->d_flags &= ~DCACHE_DISCONNECTED;
+			spin_unlock(&pd->d_lock);
 			noprogress = 0;
 		} else if (pd == sb->s_root) {
 			printk(KERN_ERR "export: Eeek filesystem root is not connected, impossible\n");
+			spin_lock(&pd->d_lock);
 			pd->d_flags &= ~DCACHE_DISCONNECTED;
+			spin_unlock(&pd->d_lock);
 			noprogress = 0;
 		} else {
 			/* we have hit the top of a disconnected path.  Try
@@ -278,15 +282,7 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 
 	/* drat - I just cannot find anything acceptable */
 	dput(result);
-
-	/* Originally, we would return ESTALE here. This is not
-	 * correct, however, as the file handle is valid; it just
-	 * failed our acceptance test.
-	 * This will lead to unexpected results in the client if
-	 * there are two processes accessing the same file; one
-	 * with proper permissions and one without.
-	 */
-	return ERR_PTR(-EACCES);
+	return ERR_PTR(-ESTALE);
 
  err_target:
 	dput(target_dir);

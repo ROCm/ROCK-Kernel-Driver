@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/pcmcia/synclink_cs.c
  *
- * $Id: synclink_cs.c,v 4.21 2004/03/08 15:29:23 paulkf Exp $
+ * $Id: synclink_cs.c,v 4.22 2004/06/01 20:27:46 paulkf Exp $
  *
  * Device driver for Microgate SyncLink PC Card
  * multiprotocol serial adapter.
@@ -257,6 +257,11 @@ typedef struct _mgslpc_info {
     
 #define CHA     0x00   /* channel A offset */
 #define CHB     0x40   /* channel B offset */
+
+/*
+ *  FIXME: PPC has PVR defined in asm/reg.h.  For now we just undef it.
+ */
+#undef PVR
     
 #define RXFIFO  0
 #define TXFIFO  0
@@ -438,15 +443,15 @@ static void bh_status(MGSLPC_INFO *info);
 static int tiocmget(struct tty_struct *tty, struct file *file);
 static int tiocmset(struct tty_struct *tty, struct file *file,
 		    unsigned int set, unsigned int clear);
-static int get_stats(MGSLPC_INFO *info, struct mgsl_icount *user_icount);
-static int get_params(MGSLPC_INFO *info, MGSL_PARAMS *user_params);
-static int set_params(MGSLPC_INFO *info, MGSL_PARAMS *new_params);
-static int get_txidle(MGSLPC_INFO *info, int*idle_mode);
+static int get_stats(MGSLPC_INFO *info, struct mgsl_icount __user *user_icount);
+static int get_params(MGSLPC_INFO *info, MGSL_PARAMS __user *user_params);
+static int set_params(MGSLPC_INFO *info, MGSL_PARAMS __user *new_params);
+static int get_txidle(MGSLPC_INFO *info, int __user *idle_mode);
 static int set_txidle(MGSLPC_INFO *info, int idle_mode);
 static int set_txenable(MGSLPC_INFO *info, int enable);
 static int tx_abort(MGSLPC_INFO *info);
 static int set_rxenable(MGSLPC_INFO *info, int enable);
-static int wait_events(MGSLPC_INFO *info, int *mask);
+static int wait_events(MGSLPC_INFO *info, int __user *mask);
 
 #define jiffies_from_ms(a) ((((a) * HZ)/1000)+1)
 
@@ -489,7 +494,7 @@ MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICE_COUNT) "i");
 MODULE_LICENSE("GPL");
 
 static char *driver_name = "SyncLink PC Card driver";
-static char *driver_version = "$Revision: 4.21 $";
+static char *driver_version = "$Revision: 4.22 $";
 
 static struct tty_driver *serial_driver;
 
@@ -521,8 +526,10 @@ static dev_link_t *dev_list = NULL;
  * (gdb) to get the .text address for the add-symbol-file command.
  * This allows remote debugging of dynamically loadable modules.
  */
-static void* mgslpc_get_text_ptr(void);
-static void* mgslpc_get_text_ptr() {return mgslpc_get_text_ptr;}
+static void* mgslpc_get_text_ptr(void)
+{
+	return mgslpc_get_text_ptr;
+}
 
 static dev_link_t *mgslpc_attach(void)
 {
@@ -847,9 +854,8 @@ static inline int mgslpc_paranoia_check(MGSLPC_INFO *info,
 static BOOLEAN wait_command_complete(MGSLPC_INFO *info, unsigned char channel) 
 {
 	int i = 0;
-	unsigned char status;
 	/* wait for command completion */ 
-	while ((status = read_reg(info, (unsigned char)(channel+STAR)) & BIT2)) {
+	while (read_reg(info, (unsigned char)(channel+STAR)) & BIT2) {
 		udelay(1);
 		if (i++ == 1000)
 			return FALSE;
@@ -1511,7 +1517,7 @@ static void shutdown(MGSLPC_INFO * info)
 
 	if (info->tx_buf) {
 		free_page((unsigned long) info->tx_buf);
-		info->tx_buf = 0;
+		info->tx_buf = NULL;
 	}
 
 	spin_lock_irqsave(&info->lock,flags);
@@ -1955,7 +1961,7 @@ static void mgslpc_unthrottle(struct tty_struct * tty)
 
 /* get the current serial statistics
  */
-static int get_stats(MGSLPC_INFO * info, struct mgsl_icount *user_icount)
+static int get_stats(MGSLPC_INFO * info, struct mgsl_icount __user *user_icount)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -1968,7 +1974,7 @@ static int get_stats(MGSLPC_INFO * info, struct mgsl_icount *user_icount)
 
 /* get the current serial parameters
  */
-static int get_params(MGSLPC_INFO * info, MGSL_PARAMS *user_params)
+static int get_params(MGSLPC_INFO * info, MGSL_PARAMS __user *user_params)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -1988,7 +1994,7 @@ static int get_params(MGSLPC_INFO * info, MGSL_PARAMS *user_params)
  *
  * Returns:	0 if success, otherwise error code
  */
-static int set_params(MGSLPC_INFO * info, MGSL_PARAMS *new_params)
+static int set_params(MGSLPC_INFO * info, MGSL_PARAMS __user *new_params)
 {
  	unsigned long flags;
 	MGSL_PARAMS tmp_params;
@@ -2014,7 +2020,7 @@ static int set_params(MGSLPC_INFO * info, MGSL_PARAMS *new_params)
 	return 0;
 }
 
-static int get_txidle(MGSLPC_INFO * info, int*idle_mode)
+static int get_txidle(MGSLPC_INFO * info, int __user *idle_mode)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2037,7 +2043,7 @@ static int set_txidle(MGSLPC_INFO * info, int idle_mode)
 	return 0;
 }
 
-static int get_interface(MGSLPC_INFO * info, int*if_mode)
+static int get_interface(MGSLPC_INFO * info, int __user *if_mode)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2136,7 +2142,7 @@ static int set_rxenable(MGSLPC_INFO * info, int enable)
  *				of events triggerred,
  * 			otherwise error code
  */
-static int wait_events(MGSLPC_INFO * info, int * mask_ptr)
+static int wait_events(MGSLPC_INFO * info, int __user *mask_ptr)
 {
  	unsigned long flags;
 	int s;
@@ -2409,20 +2415,21 @@ int ioctl_common(MGSLPC_INFO *info, unsigned int cmd, unsigned long arg)
 {
 	int error;
 	struct mgsl_icount cnow;	/* kernel counter temps */
-	struct serial_icounter_struct *p_cuser;	/* user space */
+	struct serial_icounter_struct __user *p_cuser;	/* user space */
+	void __user *argp = (void __user *)arg;
 	unsigned long flags;
 	
 	switch (cmd) {
 	case MGSL_IOCGPARAMS:
-		return get_params(info,(MGSL_PARAMS *)arg);
+		return get_params(info, argp);
 	case MGSL_IOCSPARAMS:
-		return set_params(info,(MGSL_PARAMS *)arg);
+		return set_params(info, argp);
 	case MGSL_IOCGTXIDLE:
-		return get_txidle(info,(int*)arg);
+		return get_txidle(info, argp);
 	case MGSL_IOCSTXIDLE:
-		return set_txidle(info,(int)arg);
+		return set_txidle(info, (int)arg);
 	case MGSL_IOCGIF:
-		return get_interface(info,(int*)arg);
+		return get_interface(info, argp);
 	case MGSL_IOCSIF:
 		return set_interface(info,(int)arg);
 	case MGSL_IOCTXENABLE:
@@ -2432,16 +2439,16 @@ int ioctl_common(MGSLPC_INFO *info, unsigned int cmd, unsigned long arg)
 	case MGSL_IOCTXABORT:
 		return tx_abort(info);
 	case MGSL_IOCGSTATS:
-		return get_stats(info,(struct mgsl_icount*)arg);
+		return get_stats(info, argp);
 	case MGSL_IOCWAITEVENT:
-		return wait_events(info,(int*)arg);
+		return wait_events(info, argp);
 	case TIOCMIWAIT:
 		return modem_input_wait(info,(int)arg);
 	case TIOCGICOUNT:
 		spin_lock_irqsave(&info->lock,flags);
 		cnow = info->icount;
 		spin_unlock_irqrestore(&info->lock,flags);
-		p_cuser = (struct serial_icounter_struct *) arg;
+		p_cuser = argp;
 		PUT_USER(error,cnow.cts, &p_cuser->cts);
 		if (error) return error;
 		PUT_USER(error,cnow.dsr, &p_cuser->dsr);
@@ -2588,7 +2595,7 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 	shutdown(info);
 	
 	tty->closing = 0;
-	info->tty = 0;
+	info->tty = NULL;
 	
 	if (info->blocked_open) {
 		if (info->close_delay) {
@@ -2692,7 +2699,7 @@ static void mgslpc_hangup(struct tty_struct *tty)
 	
 	info->count = 0;	
 	info->flags &= ~ASYNC_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 
 	wake_up_interruptible(&info->open_wait);
 }
@@ -2869,7 +2876,7 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 cleanup:			
 	if (retval) {
 		if (tty->count == 1)
-			info->tty = 0; /* tty layer will release tty struct */
+			info->tty = NULL;/* tty layer will release tty struct */
 		if(info->count)
 			info->count--;
 	}
@@ -3130,9 +3137,35 @@ static struct tty_operations mgslpc_ops = {
 	.tiocmset = tiocmset,
 };
 
+static void synclink_cs_cleanup(void)
+{
+	int rc;
+
+	printk("Unloading %s: version %s\n", driver_name, driver_version);
+
+	while(mgslpc_device_list)
+		mgslpc_remove_device(mgslpc_device_list);
+
+	if (serial_driver) {
+		if ((rc = tty_unregister_driver(serial_driver)))
+			printk("%s(%d) failed to unregister tty driver err=%d\n",
+			       __FILE__,__LINE__,rc);
+		put_tty_driver(serial_driver);
+	}
+
+	pcmcia_unregister_driver(&mgslpc_driver);
+
+	/* XXX: this really needs to move into generic code.. */
+	while (dev_list != NULL) {
+		if (dev_list->state & DEV_CONFIG)
+			mgslpc_release((u_long)dev_list);
+		mgslpc_detach(dev_list);
+	}
+}
+
 static int __init synclink_cs_init(void)
 {
-    int error;
+    int rc;
 
     if (break_on_load) {
 	    mgslpc_get_text_ptr();
@@ -3141,14 +3174,13 @@ static int __init synclink_cs_init(void)
 
     printk("%s %s\n", driver_name, driver_version);
 
-    serial_driver = alloc_tty_driver(MAX_DEVICE_COUNT);
-    if (!serial_driver)
-	    return -ENOMEM;
+    if ((rc = pcmcia_register_driver(&mgslpc_driver)) < 0)
+	    return rc;
 
-    error = pcmcia_register_driver(&mgslpc_driver);
-    if (error) {
-	    put_tty_driver(serial_driver);
-	    return error;
+    serial_driver = alloc_tty_driver(MAX_DEVICE_COUNT);
+    if (!serial_driver) {
+	    rc = -ENOMEM;
+	    goto error;
     }
 
     /* Initialize the tty_driver structure */
@@ -3166,39 +3198,28 @@ static int __init synclink_cs_init(void)
     serial_driver->flags = TTY_DRIVER_REAL_RAW;
     tty_set_operations(serial_driver, &mgslpc_ops);
 
-    if (tty_register_driver(serial_driver) < 0)
+    if ((rc = tty_register_driver(serial_driver)) < 0) {
 	    printk("%s(%d):Couldn't register serial driver\n",
 		   __FILE__,__LINE__);
+	    put_tty_driver(serial_driver);
+	    serial_driver = NULL;
+	    goto error;
+    }
 			
     printk("%s %s, tty major#%d\n",
 	   driver_name, driver_version,
 	   serial_driver->major);
 	
     return 0;
+
+error:
+    synclink_cs_cleanup();
+    return rc;
 }
 
 static void __exit synclink_cs_exit(void) 
 {
-	int rc;
-
-	printk("Unloading %s: version %s\n", driver_name, driver_version);
-
-	while(mgslpc_device_list)
-		mgslpc_remove_device(mgslpc_device_list);
-
-	if ((rc = tty_unregister_driver(serial_driver)))
-		printk("%s(%d) failed to unregister tty driver err=%d\n",
-		       __FILE__,__LINE__,rc);
-	put_tty_driver(serial_driver);
-
-	pcmcia_unregister_driver(&mgslpc_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			mgslpc_release((u_long)dev_list);
-		mgslpc_detach(dev_list);
-	}
+	synclink_cs_cleanup();
 }
 
 module_init(synclink_cs_init);

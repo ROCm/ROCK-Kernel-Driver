@@ -17,7 +17,6 @@
  */
  
 #include <asm/hardware.h>
-#include <asm/mach-types.h>
 #include <asm/io.h>
 
 #include <asm/arch/bus.h>
@@ -454,7 +453,6 @@ int usb_hcd_omap_probe (const struct hc_driver *driver,
  */
 void usb_hcd_omap_remove (struct usb_hcd *hcd, struct omap_dev *dev)
 {
-	struct usb_device	*hub;
 	void *base;
 
 	info ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
@@ -462,11 +460,10 @@ void usb_hcd_omap_remove (struct usb_hcd *hcd, struct omap_dev *dev)
 	if (in_interrupt ())
 		BUG ();
 
-	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;
 
 	dbg ("%s: roothub graceful disconnect", hcd->self.bus_name);
-	usb_disconnect (&hub);
+	usb_disconnect (&hcd->self.root_hub);
 
 	hcd->driver->stop (hcd);
 	hcd_buffer_destroy (hcd);
@@ -565,6 +562,10 @@ static const struct hc_driver ohci_omap_hc_driver = {
 	 */
 	.hub_status_data =	ohci_hub_status_data,
 	.hub_control =		ohci_hub_control,
+#ifdef	CONFIG_USB_SUSPEND
+	.hub_suspend =		ohci_hub_suspend,
+	.hub_resume =		ohci_hub_resume,
+#endif
 };
 
 /*-------------------------------------------------------------------------*/

@@ -17,10 +17,11 @@ static spinlock_t _lock = SPIN_LOCK_UNLOCKED;
 
 int dm_register_dirty_log_type(struct dirty_log_type *type)
 {
+	if (!try_module_get(type->module))
+		return -EINVAL;
+
 	spin_lock(&_lock);
 	type->use_count = 0;
-	try_module_get(type->module);
-
 	list_add(&type->list, &_log_types);
 	spin_unlock(&_lock);
 
@@ -567,6 +568,7 @@ static region_t core_get_sync_count(struct dirty_log *log)
 
 static struct dirty_log_type _core_type = {
 	.name = "core",
+	.module = THIS_MODULE,
 	.ctr = core_ctr,
 	.dtr = core_dtr,
 	.get_region_size = core_get_region_size,
@@ -582,6 +584,7 @@ static struct dirty_log_type _core_type = {
 
 static struct dirty_log_type _disk_type = {
 	.name = "disk",
+	.module = THIS_MODULE,
 	.ctr = disk_ctr,
 	.dtr = disk_dtr,
 	.suspend = disk_flush,
@@ -597,7 +600,7 @@ static struct dirty_log_type _disk_type = {
         .get_sync_count = core_get_sync_count
 };
 
-__init int dm_dirty_log_init(void)
+int __init dm_dirty_log_init(void)
 {
 	int r;
 
@@ -622,7 +625,5 @@ void dm_dirty_log_exit(void)
 
 EXPORT_SYMBOL(dm_register_dirty_log_type);
 EXPORT_SYMBOL(dm_unregister_dirty_log_type);
-EXPORT_SYMBOL(dm_dirty_log_init);
-EXPORT_SYMBOL(dm_dirty_log_exit);
 EXPORT_SYMBOL(dm_create_dirty_log);
 EXPORT_SYMBOL(dm_destroy_dirty_log);

@@ -199,28 +199,25 @@ static int plc_imsk_act = PL_PCM_CODE | PL_TRACE_PROP | PL_PCM_BREAK |
 			PL_PCM_ENABLED | PL_SELF_TEST | PL_EBUF_ERR;
 
 /* external functions */
-void	all_selection_criteria ();
+void all_selection_criteria(struct s_smc *smc);
 
 /* internal functions */
-static void pcm_fsm() ;
-static void pc_rcode_actions() ;
-static void pc_tcode_actions() ;
-static void reset_lem_struct() ;
-static void plc_init() ;
-static void sm_ph_lem_start() ;
-static void sm_ph_lem_stop() ;
-static void sm_ph_linestate() ;
-static void real_init_plc() ;
+static void pcm_fsm(struct s_smc *smc, struct s_phy *phy, int cmd);
+static void pc_rcode_actions(struct s_smc *smc, int bit, struct s_phy *phy);
+static void pc_tcode_actions(struct s_smc *smc, const int bit, struct s_phy *phy);
+static void reset_lem_struct(struct s_phy *phy);
+static void plc_init(struct s_smc *smc, int p);
+static void sm_ph_lem_start(struct s_smc *smc, int np, int threshold);
+static void sm_ph_lem_stop(struct s_smc *smc, int np);
+static void sm_ph_linestate(struct s_smc *smc, int phy, int ls);
+static void real_init_plc(struct s_smc *smc);
 
 /*
  * SMT timer interface
  *      start PCM timer 0
  */
-static void start_pcm_timer0(smc,value,event,phy)
-struct s_smc *smc ;
-u_long value;
-int event;
-struct s_phy *phy;
+static void start_pcm_timer0(struct s_smc *smc, u_long value, int event,
+			     struct s_phy *phy)
 {
 	phy->timer0_exp = FALSE ;       /* clear timer event flag */
 	smt_timer_start(smc,&phy->pcm_timer0,value,
@@ -230,9 +227,7 @@ struct s_phy *phy;
  * SMT timer interface
  *      stop PCM timer 0
  */
-static void stop_pcm_timer0(smc,phy)
-struct s_smc *smc ;
-struct s_phy *phy;
+static void stop_pcm_timer0(struct s_smc *smc, struct s_phy *phy)
 {
 	if (phy->pcm_timer0.tm_active)
 		smt_timer_stop(smc,&phy->pcm_timer0) ;
@@ -242,8 +237,7 @@ struct s_phy *phy;
 	init PCM state machine (called by driver)
 	clear all PCM vars and flags
 */
-void pcm_init(smc)
-struct s_smc *smc ;
+void pcm_init(struct s_smc *smc)
 {
 	int		i ;
 	int		np ;
@@ -407,8 +401,7 @@ struct s_smc *smc ;
 	real_init_plc(smc) ;
 }
 
-void init_plc(smc)
-struct s_smc *smc ;
+void init_plc(struct s_smc *smc)
 {
 	SK_UNUSED(smc) ;
 
@@ -421,8 +414,7 @@ struct s_smc *smc ;
 	 */
 }
 
-static void real_init_plc(smc)
-struct s_smc *smc ;
+static void real_init_plc(struct s_smc *smc)
 {
 	int	p ;
 
@@ -430,9 +422,7 @@ struct s_smc *smc ;
 		plc_init(smc,p) ;
 }
 
-static void plc_init(smc,p)
-struct s_smc *smc ;
-int p;
+static void plc_init(struct s_smc *smc, int p)
 {
 	int	i ;
 #ifndef	MOT_ELM
@@ -495,10 +485,7 @@ int p;
 /*
  * control PCM state machine
  */
-static void plc_go_state(smc,p,state)
-struct s_smc *smc ;
-int p;
-int state;
+static void plc_go_state(struct s_smc *smc, int p, int state)
 {
 	HW_PTR port ;
 	int val ;
@@ -514,9 +501,7 @@ int state;
 /*
  * read current line state (called by ECM & PCM)
  */
-int sm_pm_get_ls(smc,phy)
-struct s_smc *smc ;
-int phy;
+int sm_pm_get_ls(struct s_smc *smc, int phy)
 {
 	int	state ;
 
@@ -549,10 +534,7 @@ int phy;
 	return(state) ;
 }
 
-static int plc_send_bits(smc,phy,len)
-struct s_smc *smc ;
-struct s_phy *phy;
-int len;
+static int plc_send_bits(struct s_smc *smc, struct s_phy *phy, int len)
 {
 	int np = phy->np ;		/* PHY index */
 	int	n ;
@@ -589,9 +571,7 @@ int len;
 /*
  * config plc muxes
  */
-void plc_config_mux(smc,mux)
-struct s_smc *smc ;
-int mux ;
+void plc_config_mux(struct s_smc *smc, int mux)
 {
 	if (smc->s.sas != SMT_DAS)
 		return ;
@@ -615,10 +595,7 @@ int mux ;
 		process event
 	until SM is stable
 */
-void pcm(smc,np,event)
-struct s_smc *smc ;
-const int np;
-int event;
+void pcm(struct s_smc *smc, const int np, int event)
 {
 	int	state ;
 	int	oldstate ;
@@ -697,10 +674,7 @@ int event;
 /*
  * PCM state machine
  */
-static void pcm_fsm(smc,phy,cmd)
-struct s_smc *smc ;
-struct s_phy *phy;
-int cmd;
+static void pcm_fsm(struct s_smc *smc, struct s_phy *phy, int cmd)
 {
 	int	i ;
 	int	np = phy->np ;		/* PHY index */
@@ -1063,10 +1037,7 @@ int cmd;
 /*
  * force line state on a PHY output	(only in MAINT state)
  */
-static void sm_ph_linestate(smc,phy,ls)
-struct s_smc *smc ;
-int phy;
-int ls;
+static void sm_ph_linestate(struct s_smc *smc, int phy, int ls)
 {
 	int	cntrl ;
 
@@ -1095,9 +1066,7 @@ int ls;
 	outpw(PLC(phy,PL_CNTRL_B),cntrl) ;
 }
 
-
-static void reset_lem_struct(phy)
-struct s_phy *phy;
+static void reset_lem_struct(struct s_phy *phy)
 {
 	struct lem_counter *lem = &phy->lem ;
 
@@ -1108,9 +1077,7 @@ struct s_phy *phy;
 /*
  * link error monitor
  */
-static void lem_evaluate(smc,phy)
-struct s_smc *smc ;
-struct s_phy *phy;
+static void lem_evaluate(struct s_smc *smc, struct s_phy *phy)
 {
 	int ber ;
 	u_long errors ;
@@ -1210,8 +1177,7 @@ struct s_phy *phy;
 /*
  * called by SMT to calculate LEM bit error rate
  */
-void sm_lem_evaluate(smc)
-struct s_smc *smc ;
+void sm_lem_evaluate(struct s_smc *smc)
 {
 	int np ;
 
@@ -1219,9 +1185,7 @@ struct s_smc *smc ;
 		lem_evaluate(smc,&smc->y[np]) ;
 }
 
-static void lem_check_lct(smc,phy)
-struct s_smc *smc ;
-struct s_phy	*phy ;
+static void lem_check_lct(struct s_smc *smc, struct s_phy *phy)
 {
 	struct lem_counter	*lem = &phy->lem ;
 	struct fddi_mib_p	*mib ;
@@ -1265,10 +1229,7 @@ struct s_phy	*phy ;
 /*
  * LEM functions
  */
-static void sm_ph_lem_start(smc,np,threshold)
-struct s_smc *smc ;
-int np;
-int threshold;
+static void sm_ph_lem_start(struct s_smc *smc, int np, int threshold)
 {
 	struct lem_counter *lem = &smc->y[np].lem ;
 
@@ -1286,9 +1247,7 @@ int threshold;
 	SETMASK(PLC(np,PL_INTR_MASK),PL_LE_CTR,PL_LE_CTR) ;
 }
 
-static void sm_ph_lem_stop(smc,np)
-struct s_smc *smc ;
-int np;
+static void sm_ph_lem_stop(struct s_smc *smc, int np)
 {
 	struct lem_counter *lem = &smc->y[np].lem ;
 
@@ -1297,10 +1256,8 @@ int np;
 }
 
 /* ARGSUSED */
-void sm_pm_ls_latch(smc,phy,on_off)
-struct s_smc *smc ;
-int phy;
-int on_off;		/* en- or disable ident. ls */
+void sm_pm_ls_latch(struct s_smc *smc, int phy, int on_off)
+/* int on_off;	en- or disable ident. ls */
 {
 	SK_UNUSED(smc) ;
 
@@ -1317,10 +1274,7 @@ int on_off;		/* en- or disable ident. ls */
 /*
  * PCM pseudo code 5.1 .. 6.1
  */
-static void pc_rcode_actions(smc,bit,phy)
-struct s_smc *smc ;
-int bit;
-struct s_phy *phy;
+static void pc_rcode_actions(struct s_smc *smc, int bit, struct s_phy *phy)
 {
 	struct fddi_mib_p	*mib ;
 
@@ -1456,10 +1410,7 @@ struct s_phy *phy;
 /*
  * PCM pseudo code 5.1 .. 6.1
  */
-static void pc_tcode_actions(smc,bit,phy)
-struct s_smc *smc ;
-const int bit;
-struct s_phy *phy;
+static void pc_tcode_actions(struct s_smc *smc, const int bit, struct s_phy *phy)
 {
 	int	np = phy->np ;
 	struct fddi_mib_p	*mib ;
@@ -1638,8 +1589,7 @@ struct s_phy *phy;
 /*
  * return status twisted (called by SMT)
  */
-int pcm_status_twisted(smc)
-struct s_smc *smc ;
+int pcm_status_twisted(struct s_smc *smc)
 {
 	int	twist = 0 ;
 	if (smc->s.sas != SMT_DAS)
@@ -1658,13 +1608,8 @@ struct s_smc *smc ;
  *	remote phy type
  *	remote mac yes/no
  */
-void pcm_status_state(smc,np,type,state,remote,mac)
-struct s_smc *smc ;
-int np;
-int *type;
-int *state;
-int *remote;
-int *mac;
+void pcm_status_state(struct s_smc *smc, int np, int *type, int *state,
+		      int *remote, int *mac)
 {
 	struct s_phy	*phy = &smc->y[np] ;
 	struct fddi_mib_p	*mib ;
@@ -1687,8 +1632,7 @@ int *mac;
 /*
  * return rooted station status (called by SMT)
  */
-int pcm_rooted_station(smc)
-struct s_smc *smc ;
+int pcm_rooted_station(struct s_smc *smc)
 {
 	int	n ;
 
@@ -1703,10 +1647,8 @@ struct s_smc *smc ;
 /*
  * Interrupt actions for PLC & PCM events
  */
-void plc_irq(smc,np,cmd)
-struct s_smc *smc ;
-int np;			/* PHY index */
-unsigned int cmd;
+void plc_irq(struct s_smc *smc, int np, unsigned int cmd)
+/* int np;	PHY index */
 {
 	struct s_phy *phy = &smc->y[np] ;
 	struct s_plc *plc = &phy->plc ;
@@ -1919,9 +1861,7 @@ unsigned int cmd;
 #endif
 }
 
-void pcm_set_lct_short(smc,n)
-struct s_smc *smc ;
-int n ;
+void pcm_set_lct_short(struct s_smc *smc, int n)
 {
 	if (n <= 0 || n > 1000)
 		return ;
@@ -1932,9 +1872,7 @@ int n ;
 /*
  * fill state struct
  */
-void pcm_get_state(smc,state)
-struct s_smc *smc ;
-struct smt_state *state ;
+void pcm_get_state(struct s_smc *smc, struct smt_state *state)
 {
 	struct s_phy	*phy ;
 	struct pcm_state *pcs ;
@@ -1968,9 +1906,7 @@ struct smt_state *state ;
 	}
 }
 
-int get_pcm_state(smc,np)
-struct s_smc *smc ;
-int np;
+int get_pcm_state(struct s_smc *smc, int np)
 {
 	int pcs ;
 
@@ -1992,9 +1928,7 @@ int np;
 	return(pcs) ;
 }
 
-char *get_linestate(smc,np)
-struct s_smc *smc ;
-int np;
+char *get_linestate(struct s_smc *smc, int np)
 {
 	char *ls = "" ;
 
@@ -2016,9 +1950,7 @@ int np;
 	return(ls) ;
 }
 
-char *get_pcmstate(smc,np)
-struct s_smc *smc ;
-int np;
+char *get_pcmstate(struct s_smc *smc, int np)
 {
 	char *pcs ;
 	
@@ -2040,8 +1972,7 @@ int np;
 	return(pcs) ;
 }
 
-void list_phy(smc)
-struct s_smc *smc ;
+void list_phy(struct s_smc *smc)
 {
 	struct s_plc *plc ;
 	int np ;
@@ -2069,8 +2000,7 @@ struct s_smc *smc ;
 
 
 #ifdef	CONCENTRATOR
-void pcm_lem_dump(smc)
-struct s_smc *smc ;
+void pcm_lem_dump(struct s_smc *smc)
 {
 	int		i ;
 	struct s_phy	*phy ;

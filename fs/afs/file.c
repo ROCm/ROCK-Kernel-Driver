@@ -31,8 +31,8 @@ static int afs_file_readpage(struct file *file, struct page *page);
 static int afs_file_invalidatepage(struct page *page, unsigned long offset);
 static int afs_file_releasepage(struct page *page, int gfp_flags);
 
-static ssize_t afs_file_write(struct file *file, const char *buf, size_t size,
-			      loff_t *off);
+static ssize_t afs_file_write(struct file *file, const char __user *buf,
+			      size_t size, loff_t *off);
 
 struct inode_operations afs_file_inode_operations = {
 	.getattr	= afs_inode_getattr,
@@ -61,8 +61,8 @@ struct address_space_operations afs_fs_aops = {
 /*
  * AFS file write
  */
-static ssize_t afs_file_write(struct file *file, const char *buf, size_t size,
-			      loff_t *off)
+static ssize_t afs_file_write(struct file *file, const char __user *buf,
+			      size_t size, loff_t *off)
 {
 	struct afs_vnode *vnode;
 

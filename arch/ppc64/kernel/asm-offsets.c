@@ -48,6 +48,8 @@ int main(void)
 	DEFINE(THREAD_SHIFT, THREAD_SHIFT);
 	DEFINE(THREAD_SIZE, THREAD_SIZE);
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
+	DEFINE(TI_PREEMPT, offsetof(struct thread_info, preempt_count));
+	DEFINE(TI_SC_NOERR, offsetof(struct thread_info, syscall_noerror));
 
 	/* task_struct->thread */
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
@@ -77,30 +79,36 @@ int main(void)
 
 	/* paca */
         DEFINE(PACA_SIZE, sizeof(struct paca_struct));
-        DEFINE(PACAPACAINDEX, offsetof(struct paca_struct, xPacaIndex));
-        DEFINE(PACAPROCSTART, offsetof(struct paca_struct, xProcStart));
-        DEFINE(PACAKSAVE, offsetof(struct paca_struct, xKsave));
-	DEFINE(PACACURRENT, offsetof(struct paca_struct, xCurrent));
-        DEFINE(PACASAVEDMSR, offsetof(struct paca_struct, xSavedMsr));
-        DEFINE(PACASTABREAL, offsetof(struct paca_struct, xStab_data.real));
-        DEFINE(PACASTABVIRT, offsetof(struct paca_struct, xStab_data.virt));
-	DEFINE(PACASTABRR, offsetof(struct paca_struct, xStab_data.next_round_robin));
-        DEFINE(PACAR1, offsetof(struct paca_struct, xR1));
-        DEFINE(PACALPQUEUE, offsetof(struct paca_struct, lpQueuePtr));
-	DEFINE(PACATOC, offsetof(struct paca_struct, xTOC));
-	DEFINE(PACAEXCSP, offsetof(struct paca_struct, exception_sp));
-	DEFINE(PACAPROCENABLED, offsetof(struct paca_struct, xProcEnabled));
+        DEFINE(PACAPACAINDEX, offsetof(struct paca_struct, paca_index));
+        DEFINE(PACAPROCSTART, offsetof(struct paca_struct, cpu_start));
+        DEFINE(PACAKSAVE, offsetof(struct paca_struct, kstack));
+	DEFINE(PACACURRENT, offsetof(struct paca_struct, __current));
+        DEFINE(PACASAVEDMSR, offsetof(struct paca_struct, saved_msr));
+        DEFINE(PACASTABREAL, offsetof(struct paca_struct, stab_real));
+        DEFINE(PACASTABVIRT, offsetof(struct paca_struct, stab_addr));
+	DEFINE(PACASTABRR, offsetof(struct paca_struct, stab_rr));
+        DEFINE(PACAR1, offsetof(struct paca_struct, saved_r1));
+	DEFINE(PACATOC, offsetof(struct paca_struct, kernel_toc));
+	DEFINE(PACAPROCENABLED, offsetof(struct paca_struct, proc_enabled));
+	DEFINE(PACASLBCACHE, offsetof(struct paca_struct, slb_cache));
+	DEFINE(PACASLBCACHEPTR, offsetof(struct paca_struct, slb_cache_ptr));
+	DEFINE(PACACONTEXTID, offsetof(struct paca_struct, context.id));
+	DEFINE(PACASLBR3, offsetof(struct paca_struct, slb_r3));
+#ifdef CONFIG_HUGETLB_PAGE
+	DEFINE(PACAHTLBSEGS, offsetof(struct paca_struct, context.htlb_segs));
+#endif /* CONFIG_HUGETLB_PAGE */
 	DEFINE(PACADEFAULTDECR, offsetof(struct paca_struct, default_decr));
 	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled));
 	DEFINE(PACAPROFLEN, offsetof(struct paca_struct, prof_len));
 	DEFINE(PACAPROFSHIFT, offsetof(struct paca_struct, prof_shift));
 	DEFINE(PACAPROFBUFFER, offsetof(struct paca_struct, prof_buffer));
 	DEFINE(PACAPROFSTEXT, offsetof(struct paca_struct, prof_stext));
-	DEFINE(PACALPPACA, offsetof(struct paca_struct, xLpPaca));
-        DEFINE(LPPACA, offsetof(struct paca_struct, xLpPaca));
-        DEFINE(PACAREGSAV, offsetof(struct paca_struct, xRegSav));
-        DEFINE(PACAEXC, offsetof(struct paca_struct, exception_stack));
-        DEFINE(PACAGUARD, offsetof(struct paca_struct, guard));
+        DEFINE(PACA_EXGEN, offsetof(struct paca_struct, exgen));
+        DEFINE(PACA_EXMC, offsetof(struct paca_struct, exmc));
+        DEFINE(PACA_EXSLB, offsetof(struct paca_struct, exslb));
+        DEFINE(PACA_EXDSI, offsetof(struct paca_struct, exdsi));
+        DEFINE(PACAEMERGSP, offsetof(struct paca_struct, emergency_sp));
+	DEFINE(PACALPPACA, offsetof(struct paca_struct, lppaca));
         DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
         DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
 	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xIntDword.xAnyInt));
@@ -136,6 +144,10 @@ int main(void)
 	DEFINE(GPR7, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[7]));
 	DEFINE(GPR8, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[8]));
 	DEFINE(GPR9, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[9]));
+	DEFINE(GPR10, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[10]));
+	DEFINE(GPR11, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[11]));
+	DEFINE(GPR12, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[12]));
+	DEFINE(GPR13, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[13]));
 	DEFINE(GPR20, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[20]));
 	DEFINE(GPR21, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[21]));
 	DEFINE(GPR22, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[22]));
@@ -154,7 +166,7 @@ int main(void)
 	DEFINE(_DSISR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
 	DEFINE(ORIG_GPR3, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, orig_gpr3));
 	DEFINE(RESULT, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, result));
-	DEFINE(TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
+	DEFINE(_TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
 	DEFINE(SOFTE, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, softe));
 
 	/* These _only_ to be used with {PROM,RTAS}_FRAME_SIZE!!! */

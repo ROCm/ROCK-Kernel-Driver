@@ -28,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_QDIO_C_REVISION "$Revision: 1.16.2.2 $"
+#define ZFCP_QDIO_C_REVISION "$Revision: 1.19 $"
 
 #include "zfcp_ext.h"
 
@@ -637,7 +637,7 @@ zfcp_qdio_sbale_next(struct zfcp_fsf_req *fsf_req, unsigned long sbtype)
 
 /**
  * zfcp_qdio_sbals_zero - initialize SBALs between first and last in queue
- *	with zero from 
+ *	with zero from
  */
 static inline int
 zfcp_qdio_sbals_zero(struct zfcp_qdio_queue *queue, int first, int last)

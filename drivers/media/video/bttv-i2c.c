@@ -108,8 +108,8 @@ static struct i2c_adapter bttv_i2c_adap_sw_template = {
 	.inc_use           = bttv_inc_use,
 	.dec_use           = bttv_dec_use,
 #endif
-#ifdef I2C_ADAP_CLASS_TV_ANALOG
-	.class             = I2C_ADAP_CLASS_TV_ANALOG,
+#ifdef I2C_CLASS_TV_ANALOG
+	.class             = I2C_CLASS_TV_ANALOG,
 #endif
 	I2C_DEVNAME("bt848"),
 	.id                = I2C_HW_B_BT848,
@@ -291,8 +291,8 @@ static struct i2c_adapter bttv_i2c_adap_hw_template = {
 	.inc_use       = bttv_inc_use,
 	.dec_use       = bttv_dec_use,
 #endif
-#ifdef I2C_ADAP_CLASS_TV_ANALOG
-	.class         = I2C_ADAP_CLASS_TV_ANALOG,
+#ifdef I2C_CLASS_TV_ANALOG
+	.class         = I2C_CLASS_TV_ANALOG,
 #endif
 	I2C_DEVNAME("bt878"),
 	.id            = I2C_ALGO_BIT | I2C_HW_B_BT848 /* FIXME */,

@@ -1,5 +1,5 @@
 /*
- * $Id: synclinkmp.c,v 4.19 2004/03/08 15:29:23 paulkf Exp $
+ * $Id: synclinkmp.c,v 4.22 2004/06/03 14:50:10 paulkf Exp $
  *
  * Device driver for Microgate SyncLink Multiport
  * high speed multiprotocol serial adapter.
@@ -361,6 +361,10 @@ typedef struct _synclinkmp_info {
 #define TMCS	0x64
 #define TEPR	0x65
 
+/*
+ *  FIXME: DAR here clashed with asm-ppc/reg.h and asm-sh/.../dma.h
+ */
+#undef DAR
 /* DMA Controller Register macros */
 #define DAR	0x80
 #define DARL	0x80
@@ -494,7 +498,7 @@ MODULE_PARM(maxframe,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 
 static char *driver_name = "SyncLink MultiPort driver";
-static char *driver_version = "$Revision: 4.19 $";
+static char *driver_version = "$Revision: 4.22 $";
 
 static int synclinkmp_init_one(struct pci_dev *dev,const struct pci_device_id *ent);
 static void synclinkmp_remove_one(struct pci_dev *dev);
@@ -567,17 +571,17 @@ static struct net_device_stats *sppp_cb_net_stats(struct net_device *dev);
 
 /* ioctl handlers */
 
-static int  get_stats(SLMP_INFO *info, struct mgsl_icount *user_icount);
-static int  get_params(SLMP_INFO *info, MGSL_PARAMS *params);
-static int  set_params(SLMP_INFO *info, MGSL_PARAMS *params);
-static int  get_txidle(SLMP_INFO *info, int*idle_mode);
+static int  get_stats(SLMP_INFO *info, struct mgsl_icount __user *user_icount);
+static int  get_params(SLMP_INFO *info, MGSL_PARAMS __user *params);
+static int  set_params(SLMP_INFO *info, MGSL_PARAMS __user *params);
+static int  get_txidle(SLMP_INFO *info, int __user *idle_mode);
 static int  set_txidle(SLMP_INFO *info, int idle_mode);
 static int  tx_enable(SLMP_INFO *info, int enable);
 static int  tx_abort(SLMP_INFO *info);
 static int  rx_enable(SLMP_INFO *info, int enable);
 static int  map_status(int signals);
 static int  modem_input_wait(SLMP_INFO *info,int arg);
-static int  wait_mgsl_event(SLMP_INFO *info, int *mask_ptr);
+static int  wait_mgsl_event(SLMP_INFO *info, int __user *mask_ptr);
 static int  tiocmget(struct tty_struct *tty, struct file *file);
 static int  tiocmset(struct tty_struct *tty, struct file *file,
 		     unsigned int set, unsigned int clear);
@@ -692,7 +696,7 @@ static u32 sca_pci_load_interval = 64;
  * This allows remote debugging of dynamically loadable modules.
  */
 static void* synclinkmp_get_text_ptr(void);
-static void* synclinkmp_get_text_ptr() {return synclinkmp_get_text_ptr;}
+static void* synclinkmp_get_text_ptr(void) {return synclinkmp_get_text_ptr;}
 
 static inline int sanity_check(SLMP_INFO *info,
 			       char *name, const char *routine)
@@ -796,7 +800,7 @@ static int open(struct tty_struct *tty, struct file *filp)
 cleanup:
 	if (retval) {
 		if (tty->count == 1)
-			info->tty = 0; /* tty layer will release tty struct */
+			info->tty = NULL;/* tty layer will release tty struct */
 		if(info->count)
 			info->count--;
 	}
@@ -871,7 +875,7 @@ static void close(struct tty_struct *tty, struct file *filp)
 	shutdown(info);
 
 	tty->closing = 0;
-	info->tty = 0;
+	info->tty = NULL;
 
 	if (info->blocked_open) {
 		if (info->close_delay) {
@@ -910,7 +914,7 @@ static void hangup(struct tty_struct *tty)
 
 	info->count = 0;
 	info->flags &= ~ASYNC_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1333,8 +1337,9 @@ static int ioctl(struct tty_struct *tty, struct file *file,
 	SLMP_INFO *info = (SLMP_INFO *)tty->driver_data;
 	int error;
 	struct mgsl_icount cnow;	/* kernel counter temps */
-	struct serial_icounter_struct *p_cuser;	/* user space */
+	struct serial_icounter_struct __user *p_cuser;	/* user space */
 	unsigned long flags;
+	void __user *argp = (void __user *)arg;
 
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):%s ioctl() cmd=%08X\n", __FILE__,__LINE__,
@@ -1351,23 +1356,23 @@ static int ioctl(struct tty_struct *tty, struct file *file,
 
 	switch (cmd) {
 	case MGSL_IOCGPARAMS:
-		return get_params(info,(MGSL_PARAMS *)arg);
+		return get_params(info, argp);
 	case MGSL_IOCSPARAMS:
-		return set_params(info,(MGSL_PARAMS *)arg);
+		return set_params(info, argp);
 	case MGSL_IOCGTXIDLE:
-		return get_txidle(info,(int*)arg);
+		return get_txidle(info, argp);
 	case MGSL_IOCSTXIDLE:
-		return set_txidle(info,(int)arg);
+		return set_txidle(info, (int)arg);
 	case MGSL_IOCTXENABLE:
-		return tx_enable(info,(int)arg);
+		return tx_enable(info, (int)arg);
 	case MGSL_IOCRXENABLE:
-		return rx_enable(info,(int)arg);
+		return rx_enable(info, (int)arg);
 	case MGSL_IOCTXABORT:
 		return tx_abort(info);
 	case MGSL_IOCGSTATS:
-		return get_stats(info,(struct mgsl_icount*)arg);
+		return get_stats(info, argp);
 	case MGSL_IOCWAITEVENT:
-		return wait_mgsl_event(info,(int*)arg);
+		return wait_mgsl_event(info, argp);
 	case MGSL_IOCLOOPTXDONE:
 		return 0; // TODO: Not supported, need to document
 		/* Wait for modem input (DCD,RI,DSR,CTS) change
@@ -1386,7 +1391,7 @@ static int ioctl(struct tty_struct *tty, struct file *file,
 		spin_lock_irqsave(&info->lock,flags);
 		cnow = info->icount;
 		spin_unlock_irqrestore(&info->lock,flags);
-		p_cuser = (struct serial_icounter_struct *) arg;
+		p_cuser = argp;
 		PUT_USER(error,cnow.cts, &p_cuser->cts);
 		if (error) return error;
 		PUT_USER(error,cnow.dsr, &p_cuser->dsr);
@@ -2606,7 +2611,7 @@ static void shutdown(SLMP_INFO * info)
 
 	if (info->tx_buf) {
 		kfree(info->tx_buf);
-		info->tx_buf = 0;
+		info->tx_buf = NULL;
 	}
 
 	spin_lock_irqsave(&info->lock,flags);
@@ -2762,7 +2767,7 @@ static void change_params(SLMP_INFO *info)
 	program_hw(info);
 }
 
-static int get_stats(SLMP_INFO * info, struct mgsl_icount *user_icount)
+static int get_stats(SLMP_INFO * info, struct mgsl_icount __user *user_icount)
 {
 	int err;
 
@@ -2781,7 +2786,7 @@ static int get_stats(SLMP_INFO * info, struct mgsl_icount *user_icount)
 	return 0;
 }
 
-static int get_params(SLMP_INFO * info, MGSL_PARAMS *user_params)
+static int get_params(SLMP_INFO * info, MGSL_PARAMS __user *user_params)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2799,7 +2804,7 @@ static int get_params(SLMP_INFO * info, MGSL_PARAMS *user_params)
 	return 0;
 }
 
-static int set_params(SLMP_INFO * info, MGSL_PARAMS *new_params)
+static int set_params(SLMP_INFO * info, MGSL_PARAMS __user *new_params)
 {
  	unsigned long flags;
 	MGSL_PARAMS tmp_params;
@@ -2825,7 +2830,7 @@ static int set_params(SLMP_INFO * info, MGSL_PARAMS *new_params)
 	return 0;
 }
 
-static int get_txidle(SLMP_INFO * info, int*idle_mode)
+static int get_txidle(SLMP_INFO * info, int __user *idle_mode)
 {
 	int err;
 
@@ -2938,7 +2943,7 @@ static int map_status(int signals)
 
 /* wait for specified event to occur
  */
-static int wait_mgsl_event(SLMP_INFO * info, int * mask_ptr)
+static int wait_mgsl_event(SLMP_INFO * info, int __user *mask_ptr)
 {
  	unsigned long flags;
 	int s;
@@ -3547,22 +3552,22 @@ void release_resources(SLMP_INFO *info)
 
 	if (info->memory_base){
 		iounmap(info->memory_base);
-		info->memory_base = 0;
+		info->memory_base = NULL;
 	}
 
 	if (info->sca_base) {
 		iounmap(info->sca_base - info->sca_offset);
-		info->sca_base=0;
+		info->sca_base=NULL;
 	}
 
 	if (info->statctrl_base) {
 		iounmap(info->statctrl_base - info->statctrl_offset);
-		info->statctrl_base=0;
+		info->statctrl_base=NULL;
 	}
 
 	if (info->lcr_base){
 		iounmap(info->lcr_base - info->lcr_offset);
-		info->lcr_base = 0;
+		info->lcr_base = NULL;
 	}
 
 	if ( debug_level >= DEBUG_LEVEL_INFO )
@@ -3781,56 +3786,7 @@ static struct tty_operations ops = {
 	.tiocmset = tiocmset,
 };
 
-/* Driver initialization entry point.
- */
-
-static int __init synclinkmp_init(void)
-{
-	if (break_on_load) {
-	 	synclinkmp_get_text_ptr();
-  		BREAKPOINT();
-	}
-
- 	printk("%s %s\n", driver_name, driver_version);
-
-	synclinkmp_adapter_count = -1;
-	pci_register_driver(&synclinkmp_pci_driver);
-
-	if ( !synclinkmp_device_list ) {
-		printk("%s(%d):No SyncLink devices found.\n",__FILE__,__LINE__);
-		return -ENODEV;
-	}
-
-	serial_driver = alloc_tty_driver(synclinkmp_device_count);
-	if (!serial_driver)
-		return -ENOMEM;
-
-	/* Initialize the tty_driver structure */
-
-	serial_driver->owner = THIS_MODULE;
-	serial_driver->driver_name = "synclinkmp";
-	serial_driver->name = "ttySLM";
-	serial_driver->major = ttymajor;
-	serial_driver->minor_start = 64;
-	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver->subtype = SERIAL_TYPE_NORMAL;
-	serial_driver->init_termios = tty_std_termios;
-	serial_driver->init_termios.c_cflag =
-		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver->flags = TTY_DRIVER_REAL_RAW;
-	tty_set_operations(serial_driver, &ops);
-	if (tty_register_driver(serial_driver) < 0)
-		printk("%s(%d):Couldn't register serial driver\n",
-			__FILE__,__LINE__);
-
- 	printk("%s %s, tty major#%d\n",
-		driver_name, driver_version,
-		serial_driver->major);
-
-	return 0;
-}
-
-static void __exit synclinkmp_exit(void)
+static void synclinkmp_cleanup(void)
 {
 	unsigned long flags;
 	int rc;
@@ -3839,10 +3795,12 @@ static void __exit synclinkmp_exit(void)
 
 	printk("Unloading %s %s\n", driver_name, driver_version);
 
-	if ((rc = tty_unregister_driver(serial_driver)))
-		printk("%s(%d) failed to unregister tty driver err=%d\n",
-		       __FILE__,__LINE__,rc);
-	put_tty_driver(serial_driver);
+	if (serial_driver) {
+		if ((rc = tty_unregister_driver(serial_driver)))
+			printk("%s(%d) failed to unregister tty driver err=%d\n",
+			       __FILE__,__LINE__,rc);
+		put_tty_driver(serial_driver);
+	}
 
 	info = synclinkmp_device_list;
 	while(info) {
@@ -3880,6 +3838,69 @@ static void __exit synclinkmp_exit(void)
 	}
 
 	pci_unregister_driver(&synclinkmp_pci_driver);
+}
+
+/* Driver initialization entry point.
+ */
+
+static int __init synclinkmp_init(void)
+{
+	int rc;
+
+	if (break_on_load) {
+	 	synclinkmp_get_text_ptr();
+  		BREAKPOINT();
+	}
+
+ 	printk("%s %s\n", driver_name, driver_version);
+
+	if ((rc = pci_register_driver(&synclinkmp_pci_driver)) < 0) {
+		printk("%s:failed to register PCI driver, error=%d\n",__FILE__,rc);
+		return rc;
+	}
+
+	serial_driver = alloc_tty_driver(128);
+	if (!serial_driver) {
+		rc = -ENOMEM;
+		goto error;
+	}
+
+	/* Initialize the tty_driver structure */
+
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "synclinkmp";
+	serial_driver->name = "ttySLM";
+	serial_driver->major = ttymajor;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
+		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &ops);
+	if ((rc = tty_register_driver(serial_driver)) < 0) {
+		printk("%s(%d):Couldn't register serial driver\n",
+			__FILE__,__LINE__);
+		put_tty_driver(serial_driver);
+		serial_driver = NULL;
+		goto error;
+	}
+
+ 	printk("%s %s, tty major#%d\n",
+		driver_name, driver_version,
+		serial_driver->major);
+
+	return 0;
+
+error:
+	synclinkmp_cleanup();
+	return rc;
+}
+
+static void __exit synclinkmp_exit(void)
+{
+	synclinkmp_cleanup();
 }
 
 module_init(synclinkmp_init);
@@ -5126,7 +5147,7 @@ int loopback_test(SLMP_INFO *info)
 	u32 speed = info->params.clock_speed;
 
 	info->params.clock_speed = 3686400;
-	info->tty = 0;
+	info->tty = NULL;
 
 	/* assume failure */
 	info->init_error = DiagStatus_DmaFailure;

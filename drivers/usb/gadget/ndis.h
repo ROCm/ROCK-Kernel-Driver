@@ -26,10 +26,40 @@
 #define NDIS_STATUS_MULTICAST_EXISTS      0xC001000A
 #define NDIS_STATUS_MULTICAST_NOT_FOUND   0xC001000B
 
+enum NDIS_DEVICE_POWER_STATE {
+	NdisDeviceStateUnspecified = 0,
+	NdisDeviceStateD0,
+	NdisDeviceStateD1,
+	NdisDeviceStateD2,
+	NdisDeviceStateD3,
+	NdisDeviceStateMaximum
+};
+
+struct NDIS_PM_WAKE_UP_CAPABILITIES {
+	enum NDIS_DEVICE_POWER_STATE  MinMagicPacketWakeUp;
+	enum NDIS_DEVICE_POWER_STATE  MinPatternWakeUp;
+	enum NDIS_DEVICE_POWER_STATE  MinLinkChangeWakeUp;
+};
+
 /* NDIS_PNP_CAPABILITIES.Flags constants */
 #define NDIS_DEVICE_WAKE_UP_ENABLE                0x00000001
 #define NDIS_DEVICE_WAKE_ON_PATTERN_MATCH_ENABLE  0x00000002
 #define NDIS_DEVICE_WAKE_ON_MAGIC_PACKET_ENABLE   0x00000004
+
+struct NDIS_PNP_CAPABILITIES {
+	u32					Flags;
+	struct NDIS_PM_WAKE_UP_CAPABILITIES	WakeUpCapabilities;
+};
+
+struct NDIS_PM_PACKET_PATTERN {
+	u32	Priority;
+	u32	Reserved;
+	u32	MaskSize;
+	u32	PatternOffset;
+	u32	PatternSize;
+	u32	PatternFlags;
+};
+
 
 /* Required Object IDs (OIDs) */
 #define OID_GEN_SUPPORTED_LIST            0x00010101

@@ -110,7 +110,7 @@ int hid_tmff_init(struct hid_device *hid)
 {
 	struct tmff_device *private;
 	struct list_head *pos;
-	struct hid_input *hidinput = list_entry(&hid->inputs, struct hid_input, list);
+	struct hid_input *hidinput = list_entry(hid->inputs.next, struct hid_input, list);
 
 	private = kmalloc(sizeof(struct tmff_device), GFP_KERNEL);
 	if (!private)

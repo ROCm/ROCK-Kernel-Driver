@@ -222,7 +222,7 @@ void i810fb_fill_var_timings(struct fb_var_screeninfo *var) { }
 u32 i810_get_watermark(const struct fb_var_screeninfo *var,
 		       struct i810fb_par *par)
 {
-	struct wm_info *wmark = 0;
+	struct wm_info *wmark = NULL;
 	u32 i, size = 0, pixclock, wm_best = 0, min, diff;
 
 	if (par->mem_freq == 100) {

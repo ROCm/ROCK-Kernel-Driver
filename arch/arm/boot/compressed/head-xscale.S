@@ -66,7 +66,4 @@ __XScale_start:
 		mov	r7, #MACH_TYPE_IQ80310
 #endif
 
-#ifdef CONFIG_ARCH_ADI_EVB
-		mov	r7, #MACH_TYPE_ADI_EVB
-#endif
 

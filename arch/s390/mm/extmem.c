@@ -55,7 +55,9 @@ struct dcss_segment {
 
 static spinlock_t dcss_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head dcss_list = LIST_HEAD_INIT(dcss_list);
-extern struct {unsigned long addr, size, type;} memory_chunk[16];
+extern struct {
+	unsigned long addr, size, type;
+} memory_chunk[MEMORY_CHUNKS];
 
 /*
  * Create the 8 bytes, ebcdic VM segment name from
@@ -258,16 +260,16 @@ int segment_load(char *name, int segtype, unsigned long *addr,
                    shared segment */
                 dcss_diag_query(dcss_name, &rwattr, &shattr, &segstart, &segend);
 		/* does segment collide with main memory? */
-		for (i=0; i<16; i++) {
-					if (memory_chunk[i].type != 0)
-						continue;
-					if (memory_chunk[i].addr > segend)
-						continue;
-					if (memory_chunk[i].addr + memory_chunk[i].size <= segstart)
-						continue;
-					spin_unlock(&dcss_lock);
-				        return -ENOENT;
-				}
+		for (i=0; i < MEMORY_CHUNKS; i++) {
+			if (memory_chunk[i].type != 0)
+				continue;
+			if (memory_chunk[i].addr > segend)
+				continue;
+			if (memory_chunk[i].addr + memory_chunk[i].size <= segstart)
+				continue;
+			spin_unlock(&dcss_lock);
+			return -ENOENT;
+		}
 		/* or does it collide with other (loaded) segments? */
         	list_for_each(l, &dcss_list) {
                 	tmp = list_entry(l, struct dcss_segment, list);

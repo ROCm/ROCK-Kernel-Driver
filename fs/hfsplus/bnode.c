@@ -34,7 +34,7 @@ void hfs_bnode_read(struct hfs_bnode *node, void *buf, int off, int len)
 	memcpy(buf, kmap(*pagep) + off, l);
 	kunmap(*pagep);
 
-	while ((len -= l)) {
+	while ((len -= l) != 0) {
 		buf += l;
 		l = min(len, (int)PAGE_CACHE_SIZE);
 		memcpy(buf, kmap(*++pagep), l);
@@ -87,7 +87,7 @@ void hfs_bnode_write(struct hfs_bnode *node, void *buf, int off, int len)
 	set_page_dirty(*pagep);
 	kunmap(*pagep);
 
-	while ((len -= l)) {
+	while ((len -= l) != 0) {
 		buf += l;
 		l = min(len, (int)PAGE_CACHE_SIZE);
 		memcpy(kmap(*++pagep), buf, l);
@@ -117,7 +117,7 @@ void hfs_bnode_clear(struct hfs_bnode *node, int off, int len)
 	set_page_dirty(*pagep);
 	kunmap(*pagep);
 
-	while ((len -= l)) {
+	while ((len -= l) != 0) {
 		l = min(len, (int)PAGE_CACHE_SIZE);
 		memset(kmap(*++pagep), 0, l);
 		set_page_dirty(*pagep);
@@ -150,7 +150,7 @@ void hfs_bnode_copy(struct hfs_bnode *dst_node, int dst,
 		set_page_dirty(*dst_page);
 		kunmap(*dst_page);
 
-		while ((len -= l)) {
+		while ((len -= l) != 0) {
 			l = min(len, (int)PAGE_CACHE_SIZE);
 			memcpy(kmap(*++dst_page), kmap(*++src_page), l);
 			kunmap(*src_page);
@@ -258,7 +258,7 @@ void hfs_bnode_move(struct hfs_bnode *node, int dst, int src, int len)
 			set_page_dirty(*dst_page);
 			kunmap(*dst_page);
 
-			while ((len -= l)) {
+			while ((len -= l) != 0) {
 				l = min(len, (int)PAGE_CACHE_SIZE);
 				memmove(kmap(*++dst_page), kmap(*++src_page), l);
 				kunmap(*src_page);

@@ -3,10 +3,6 @@
  *
  * The kernel statd client.
  *
- * When using the kernel statd implementation, none of the
- * stuff inside this file is used. 
- * Instead look at statd.c
- *
  * Copyright (C) 1996, Olaf Kirch <okir@monad.swb.de>
  */
 
@@ -19,9 +15,6 @@
 #include <linux/lockd/sm_inter.h>
 
 
-
-#ifndef CONFIG_STATD
-
 #define NLMDBG_FACILITY		NLMDBG_MONITOR
 
 static struct rpc_clnt *	nsm_create(void);
@@ -29,8 +22,7 @@ static struct rpc_clnt *	nsm_create(void);
 extern struct rpc_program	nsm_program;
 
 /*
- * Local NSM state.
- * This should really be initialized somehow.
+ * Local NSM state
  */
 u32				nsm_local_state;
 
@@ -73,20 +65,17 @@ nsm_mon_unmon(struct nlm_host *host, u32 proc, struct nsm_res *res)
 int
 nsm_monitor(struct nlm_host *host)
 {
-	struct nsm_handle *nsm;
 	struct nsm_res	res;
 	int		status;
 
 	dprintk("lockd: nsm_monitor(%s)\n", host->h_name);
-	if ((nsm = host->h_nsmhandle) == NULL)
-		BUG();
 
 	status = nsm_mon_unmon(host, SM_MON, &res);
 
 	if (status < 0 || res.status != 0)
 		printk(KERN_NOTICE "lockd: cannot monitor %s\n", host->h_name);
 	else
-		nsm->sm_monitored = 1;
+		host->h_monitored = 1;
 	return status;
 }
 
@@ -96,25 +85,16 @@ nsm_monitor(struct nlm_host *host)
 int
 nsm_unmonitor(struct nlm_host *host)
 {
-	struct nsm_handle *nsm;
 	struct nsm_res	res;
 	int		status;
 
-	nsm = host->h_nsmhandle;
-	host->h_nsmhandle = NULL;
+	dprintk("lockd: nsm_unmonitor(%s)\n", host->h_name);
 
-	if (!nsm || !atomic_dec_and_test(&nsm->sm_count))
-	 	return 0;
-
-	if (nsm->sm_monitored && !nsm->sm_sticky) {
-		dprintk("lockd: nsm_unmonitor(%s)\n", host->h_name);
-		status = nsm_mon_unmon(host, SM_UNMON, &res);
-		if (status < 0)
-			printk(KERN_NOTICE "lockd: cannot unmonitor %s\n",
-				       	host->h_name);
-		else
-			nsm->sm_monitored = 0;
-	}
+	status = nsm_mon_unmon(host, SM_UNMON, &res);
+	if (status < 0)
+		printk(KERN_NOTICE "lockd: cannot unmonitor %s\n", host->h_name);
+	else
+		host->h_monitored = 0;
 	return status;
 }
 
@@ -266,5 +246,3 @@ struct rpc_program		nsm_program = {
 		.version	= nsm_version,
 		.stats		= &nsm_stats
 };
-
-#endif

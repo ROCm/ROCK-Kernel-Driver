@@ -26,28 +26,17 @@
 static const char ID_sccs[] = "@(#)smttimer.c	2.4 97/08/04 (C) SK " ;
 #endif
 
-/*
- * external function declarations
- */
-extern u_long hwt_read() ;
-extern void hwt_stop() ;
-extern void hwt_start() ;
+static void timer_done(struct s_smc *smc, int restart);
 
-static void timer_done() ;
-
-
-void smt_timer_init(smc)
-struct s_smc *smc ;
+void smt_timer_init(struct s_smc *smc)
 {
-	smc->t.st_queue = 0 ;
+	smc->t.st_queue = NULL;
 	smc->t.st_fast.tm_active = FALSE ;
-	smc->t.st_fast.tm_next = 0 ;
+	smc->t.st_fast.tm_next = NULL;
 	hwt_init(smc) ;
 }
 
-void smt_timer_stop(smc,timer)
-struct s_smc *smc ;
-struct smt_timer *timer ;
+void smt_timer_stop(struct s_smc *smc, struct smt_timer *timer)
 {
 	struct smt_timer	**prev ;
 	struct smt_timer	*tm ;
@@ -70,11 +59,8 @@ struct smt_timer *timer ;
 	}
 }
 
-void smt_timer_start(smc,timer,time,token)
-struct s_smc *smc ;
-struct smt_timer *timer ;
-u_long		time ;
-u_long		token ;
+void smt_timer_start(struct s_smc *smc, struct smt_timer *timer, u_long time,
+		     u_long token)
 {
 	struct smt_timer	**prev ;
 	struct smt_timer	*tm ;
@@ -89,7 +75,7 @@ u_long		token ;
 	timer->tm_active = TRUE ;
 	if (!smc->t.st_queue) {
 		smc->t.st_queue = timer ;
-		timer->tm_next = 0 ;
+		timer->tm_next = NULL;
 		timer->tm_delta = time ;
 		hwt_start(smc,time) ;
 		return ;
@@ -121,21 +107,17 @@ u_long		token ;
 	hwt_start(smc,smc->t.st_queue->tm_delta) ;
 }
 
-void smt_force_irq(smc)
-struct s_smc *smc ;
+void smt_force_irq(struct s_smc *smc)
 {
 	smt_timer_start(smc,&smc->t.st_fast,32L, EV_TOKEN(EVENT_SMT,SM_FAST)); 
 }
 
-void smt_timer_done(smc)
-struct s_smc *smc ;
+void smt_timer_done(struct s_smc *smc)
 {
 	timer_done(smc,1) ;
 }
 
-static void timer_done(smc,restart)
-struct s_smc *smc ;
-int restart ;
+static void timer_done(struct s_smc *smc, int restart)
 {
 	u_long			delta ;
 	struct smt_timer	*tm ;
@@ -159,7 +141,7 @@ int restart ;
 			done = 1 ;
 		}
 	}
-	*last = 0 ;
+	*last = NULL;
 	next = smc->t.st_queue ;
 	smc->t.st_queue = tm ;
 
@@ -171,3 +153,4 @@ int restart ;
 	if (restart && smc->t.st_queue)
 		hwt_start(smc,smc->t.st_queue->tm_delta) ;
 }
+

@@ -39,7 +39,7 @@ static const char ID_sccs[] = "@(#)hwt.c	1.13 97/04/23 (C) SK " ;
  * Prototypes of local functions.
  */
 /* 28-Jun-1994 sw - Note: hwt_restart() is also used in module 'drvfbi.c'. */
-/*static*/ void hwt_restart() ;
+/*static void hwt_restart() ; */
 
 /************************
  *
@@ -60,9 +60,7 @@ static const char ID_sccs[] = "@(#)hwt.c	1.13 97/04/23 (C) SK " ;
  ************************/
 #define	HWT_MAX	(65000)
 
-void hwt_start(smc, time)
-struct s_smc *smc ;
-u_long time ;
+void hwt_start(struct s_smc *smc, u_long time)
 {
 	u_short	cnt ;
 
@@ -115,8 +113,7 @@ u_long time ;
  *	Nothing.
  *
  ************************/
-void hwt_stop(smc)
-struct s_smc *smc ;
+void hwt_stop(struct s_smc *smc)
 {
 #ifndef PCI
 	/* stop counter 0 by switching to mode 0 */
@@ -145,8 +142,7 @@ struct s_smc *smc ;
  *	Nothing.
  *
  ************************/
-void hwt_init(smc)
-struct s_smc *smc ;
+void hwt_init(struct s_smc *smc)
 {
 	smc->hw.t_start = 0 ;
 	smc->hw.t_stop	= 0 ;
@@ -169,8 +165,7 @@ struct s_smc *smc ;
  *	Nothing.
  *
  ************************/
-void hwt_restart(smc)
-struct s_smc *smc ;
+void hwt_restart(struct s_smc *smc)
 {
 	hwt_stop(smc) ;
 #ifndef	PCI
@@ -193,8 +188,7 @@ struct s_smc *smc ;
  *	The elapsed time since last start in units of 16us.
  *
  ************************/
-u_long hwt_read(smc)
-struct s_smc *smc ;
+u_long hwt_read(struct s_smc *smc)
 {
 	u_short	tr ;
 #ifndef	PCI
@@ -238,8 +232,7 @@ struct s_smc *smc ;
  *	current timer value in units of 80ns.
  *
  ************************/
-u_long hwt_quick_read(smc)
-struct s_smc *smc ;
+u_long hwt_quick_read(struct s_smc *smc)
 {
 	u_long interval ;
 	u_long time ;
@@ -267,10 +260,7 @@ struct s_smc *smc ;
  * NOTE: The fuction will return immediately, if the timer is not 
  *	 started
  ************************/
-void hwt_wait_time(smc,start,duration)
-struct s_smc *smc ;
-u_long	start ;
-long	duration ;
+void hwt_wait_time(struct s_smc *smc, u_long start, long int duration)
 {
 	long	diff ;
 	long	interval ;
@@ -312,3 +302,4 @@ long	duration ;
 	}
 }
 #endif
+

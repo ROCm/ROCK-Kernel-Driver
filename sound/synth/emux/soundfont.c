@@ -34,7 +34,7 @@
 
 /* Prototypes for static functions */
 
-static int open_patch(snd_sf_list_t *sflist, const char *data, int count, int client);
+static int open_patch(snd_sf_list_t *sflist, const char __user *data, int count, int client);
 static snd_soundfont_t *newsf(snd_sf_list_t *sflist, int type, char *name);
 static int is_identical_font(snd_soundfont_t *sf, int type, unsigned char *name);
 static int close_patch(snd_sf_list_t *sflist);

@@ -65,10 +65,9 @@
 #include "cirrus.h"
 #include "vg468.h"
 #include "ricoh.h"
-#include "o2micro.h"
 
 #ifdef DEBUG
-static const char *version =
+static const char version[] =
 "i82365.c 1.265 1999/11/10 18:36:21 (David Hinds)";
 
 static int pc_debug;
@@ -104,7 +103,8 @@ static int extra_sockets = 0;
 static int ignore = -1;
 /* Bit map or list of interrupts to choose from */
 static u_int irq_mask = 0xffff;
-static int irq_list[16] = { -1 };
+static int irq_list[16];
+static int irq_list_count;
 /* The card status change interrupt -- 0 means autoselect */
 static int cs_irq = 0;
 
@@ -130,27 +130,27 @@ static int async_clock = -1;
 static int cable_mode = -1;
 static int wakeup = 0;
 
-MODULE_PARM(i365_base, "i");
-MODULE_PARM(ignore, "i");
-MODULE_PARM(extra_sockets, "i");
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-16i");
-MODULE_PARM(cs_irq, "i");
-MODULE_PARM(async_clock, "i");
-MODULE_PARM(cable_mode, "i");
-MODULE_PARM(wakeup, "i");
+module_param(i365_base, int, 0444);
+module_param(ignore, int, 0444);
+module_param(extra_sockets, int, 0444);
+module_param(irq_mask, int, 0444);
+module_param_array(irq_list, int, irq_list_count, 0444);
+module_param(cs_irq, int, 0444);
+module_param(async_clock, int, 0444);
+module_param(cable_mode, int, 0444);
+module_param(wakeup, int, 0444);
 
-MODULE_PARM(do_scan, "i");
-MODULE_PARM(poll_interval, "i");
-MODULE_PARM(cycle_time, "i");
-MODULE_PARM(has_dma, "i");
-MODULE_PARM(has_led, "i");
-MODULE_PARM(has_ring, "i");
-MODULE_PARM(dynamic_mode, "i");
-MODULE_PARM(freq_bypass, "i");
-MODULE_PARM(setup_time, "i");
-MODULE_PARM(cmd_time, "i");
-MODULE_PARM(recov_time, "i");
+module_param(do_scan, int, 0444);
+module_param(poll_interval, int, 0444);
+module_param(cycle_time, int, 0444);
+module_param(has_dma, int, 0444);
+module_param(has_led, int, 0444);
+module_param(has_ring, int, 0444);
+module_param(dynamic_mode, int, 0444);
+module_param(freq_bypass, int, 0444);
+module_param(setup_time, int, 0444);
+module_param(cmd_time, int, 0444);
+module_param(recov_time, int, 0444);
 
 /*====================================================================*/
 
@@ -705,10 +705,10 @@ static void __init add_pcic(int ns, int type)
     printk(", %d socket%s\n", ns, ((ns > 1) ? "s" : ""));
 
     /* Set host options, build basic interrupt mask */
-    if (irq_list[0] == -1)
+    if (irq_list_count == 0)
 	mask = irq_mask;
     else
-	for (i = mask = 0; i < 16; i++)
+	for (i = mask = 0; i < irq_list_count; i++)
 	    mask |= (1<<irq_list[i]);
     mask &= I365_MASK & set_bridge_opts(base, ns);
     /* Scan for ISA interrupts */
@@ -1307,10 +1307,10 @@ static int pcic_set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
 static int pcic_init(struct pcmcia_socket *s)
 {
 	int i;
+	struct resource res = { .start = 0, .end = 0x1000 };
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { 0, 0, 0, 0, 0, 0 };
+	pccard_mem_map mem = { .res = &res, .sys_stop = 0x1000, };
 
-	mem.sys_stop = 0x1000;
 	for (i = 0; i < 2; i++) {
 		io.map = i;
 		pcic_set_io_map(s, &io);
@@ -1371,8 +1371,15 @@ static int __init init_i82365(void)
 {
     int i, ret;
 
-    if (driver_register(&i82365_driver))
-	return -1;
+    ret = driver_register(&i82365_driver);
+    if (ret)
+	return ret;
+
+    ret = platform_device_register(&i82365_device);
+    if (ret) {
+	driver_unregister(&i82365_driver);
+	return ret;
+    }
 
     printk(KERN_INFO "Intel ISA PCIC probe: ");
     sockets = 0;
@@ -1381,11 +1388,10 @@ static int __init init_i82365(void)
 
     if (sockets == 0) {
 	printk("not found.\n");
+	platform_device_unregister(&i82365_device);
 	driver_unregister(&i82365_driver);
 	return -ENODEV;
     }
-
-    platform_device_register(&i82365_device);
 
     /* Set up interrupt handler(s) */
     if (grab_irq != 0)

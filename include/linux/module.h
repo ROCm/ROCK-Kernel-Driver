@@ -16,13 +16,14 @@
 #include <linux/kmod.h>
 #include <linux/elf.h>
 #include <linux/stringify.h>
+#include <linux/kobject.h>
+#include <linux/moduleparam.h>
 #include <asm/local.h>
 
 #include <asm/module.h>
 
 /* Not Yet Implemented */
 #define MODULE_SUPPORTED_DEVICE(name)
-#define print_modules()
 
 /* v850 toolchain uses a `_' prefix for all user symbols */
 #ifndef MODULE_SYMBOL_PREFIX
@@ -207,6 +208,39 @@ enum module_state
 	MODULE_STATE_GOING,
 };
 
+/* sysfs stuff */
+struct module_attribute
+{
+	struct attribute attr;
+	struct kernel_param *param;
+};
+
+struct module_kobject
+{
+	/* Everyone should have one of these. */
+	struct kobject kobj;
+
+	/* We always have refcnt, we may have others from module_param(). */
+	unsigned int num_attributes;
+	struct module_attribute attr[0];
+};
+
+/* Similar stuff for section attributes. */
+#define MODULE_SECT_NAME_LEN 32
+struct module_sect_attr
+{
+	struct attribute attr;
+	char name[MODULE_SECT_NAME_LEN];
+	unsigned long address;
+};
+
+struct module_sections
+{
+	struct kobject kobj;
+	struct module_sect_attr attrs[0];
+};
+
+
 struct module
 {
 	enum module_state state;
@@ -216,6 +250,9 @@ struct module
 
 	/* Unique handle for this module */
 	char name[MODULE_NAME_LEN];
+
+	/* Sysfs stuff. */
+	struct module_kobject *mkobj;
 
 	/* Exported symbols */
 	const struct kernel_symbol *syms;
@@ -267,6 +304,9 @@ struct module
 
 	/* Destruction function. */
 	void (*exit)(void);
+
+	/* Fake kernel param for refcnt. */
+	struct kernel_param refcnt_param;
 #endif
 
 #ifdef CONFIG_KALLSYMS
@@ -274,6 +314,9 @@ struct module
 	Elf_Sym *symtab;
 	unsigned long num_symtab;
 	char *strtab;
+
+	/* Section attributes */
+	struct module_sections *sect_attrs;
 #endif
 
 	/* Per-cpu data. */
@@ -284,9 +327,6 @@ struct module
 	char *args;
 };
 
-/* Locate a module by name. */
-extern struct module *get_module(const char *name);
-
 /* FIXME: It'd be nice to isolate modules during init, too, so they
    aren't used before they (may) fail.  But presently too much code
    (IDE & SCSI) require entry into the module during init.*/
@@ -295,8 +335,9 @@ static inline int module_is_live(struct module *mod)
 	return mod->state != MODULE_STATE_GOING;
 }
 
-/* Is this address in a module? */
+/* Is this address in a module? (second is with no locks, for oops) */
 struct module *module_text_address(unsigned long addr);
+struct module *__module_text_address(unsigned long addr);
 
 /* Returns module and fills in value, defined and namebuf, or NULL if
    symnum out of range. */
@@ -402,9 +443,8 @@ const struct exception_table_entry *search_module_extables(unsigned long addr);
 
 int register_module_notifier(struct notifier_block * nb);
 int unregister_module_notifier(struct notifier_block * nb);
-int register_rmmodule_notifier(struct notifier_block * nb);
-int unregister_rmmodule_notifier(struct notifier_block * nb);
 
+extern void print_modules(void);
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -419,6 +459,12 @@ search_module_extables(unsigned long addr)
 
 /* Is this address in a module? */
 static inline struct module *module_text_address(unsigned long addr)
+{
+	return NULL;
+}
+
+/* Is this address in a module? (don't take a lock, we're oopsing) */
+static inline struct module *__module_text_address(unsigned long addr)
 {
 	return NULL;
 }
@@ -483,18 +529,11 @@ static inline int unregister_module_notifier(struct notifier_block * nb)
 	return 0;
 }
 
-static inline int register_rmmodule_notifier(struct notifier_block * nb)
-{
-	return 0;
-}
-
-static inline int unregister_rmmodule_notifier(struct notifier_block * nb)
-{
-	return 0;
-}
-
 #define module_put_and_exit(code) do_exit(code)
 
+static inline void print_modules(void)
+{
+}
 #endif /* CONFIG_MODULES */
 
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)

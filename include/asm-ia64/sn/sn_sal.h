@@ -13,7 +13,6 @@
 
 
 #include <linux/config.h>
-#include <asm/sn/sgi.h>
 #include <asm/sal.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/arch.h>
@@ -34,6 +33,7 @@
 #define  SN_SAL_NO_FAULT_ZONE_VIRTUAL		   0x02000010
 #define  SN_SAL_NO_FAULT_ZONE_PHYSICAL		   0x02000011
 #define  SN_SAL_PRINT_ERROR			   0x02000012
+#define  SN_SAL_SET_ERROR_HANDLING_FEATURES	   0x0200001a	// reentrant
 #define  SN_SAL_CONSOLE_PUTC                       0x02000021
 #define  SN_SAL_CONSOLE_GETC                       0x02000022
 #define  SN_SAL_CONSOLE_PUTS                       0x02000023
@@ -93,6 +93,19 @@
 #define SALRET_INVALID_ARG	-2
 #define SALRET_ERROR		-3
 
+/*
+ * SN_SAL_SET_ERROR_HANDLING_FEATURES bit settings
+ */
+enum 
+{
+	/* if "rz always" is set, have the mca slaves call os_init_slave */
+	SN_SAL_EHF_MCA_SLV_TO_OS_INIT_SLV=0,
+	/* do not rz on tlb checks, even if "rz always" is set */
+	SN_SAL_EHF_NO_RZ_TLBC,
+	/* do not rz on PIO reads to I/O space, even if "rz always" is set */
+	SN_SAL_EHF_NO_RZ_IO_READ,
+};
+
 
 /**
  * sn_sal_rev_major - get the major SGI SAL revision number
@@ -128,8 +141,8 @@ sn_sal_rev_minor(void)
  * Specify the minimum PROM revsion required for this kernel.
  * Note that they're stored in hex format...
  */
-#define SN_SAL_MIN_MAJOR	0x1  /* SN2 kernels need at least PROM 1.0 */
-#define SN_SAL_MIN_MINOR	0x0
+#define SN_SAL_MIN_MAJOR	0x3  /* SN2 kernels need at least PROM 3.40 */
+#define SN_SAL_MIN_MINOR	0x40
 
 u64 ia64_sn_probe_io_slot(long paddr, long size, void *data_ptr);
 
@@ -289,7 +302,7 @@ ia64_sn_plat_specific_err_print(int (*hook)(const char*, ...), char *rec)
 	ret_stuff.v0 = 0;
 	ret_stuff.v1 = 0;
 	ret_stuff.v2 = 0;
-	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_PRINT_ERROR, (uint64_t)hook, (uint64_t)rec, 0, 0, 0, 0, 0);
+	SAL_CALL_REENTRANT(ret_stuff, SN_SAL_PRINT_ERROR, (uint64_t)hook, (uint64_t)rec, 0, 0, 0, 0, 0);
 
 	return ret_stuff.status;
 }
@@ -669,6 +682,26 @@ ia64_sn_sysctl_iobrick_pci_op(nasid_t n, u64 connection_type,
 	if (rv.status)
 	    	return rv.v0;
 	return 0;
+}
+
+/*
+ * Tell the prom how the OS wants to handle specific error features.
+ * It takes an array of 7 u64.
+ */
+static inline u64
+ia64_sn_set_error_handling_features(const u64 *feature_bits)
+{
+	struct ia64_sal_retval rv = {0, 0, 0, 0};
+
+	SAL_CALL_REENTRANT(rv, SN_SAL_SET_ERROR_HANDLING_FEATURES,
+			feature_bits[0],
+			feature_bits[1],
+			feature_bits[2],
+			feature_bits[3],
+			feature_bits[4],
+			feature_bits[5],
+			feature_bits[6]);
+	return rv.status;
 }
 
 #endif /* _ASM_IA64_SN_SN_SAL_H */

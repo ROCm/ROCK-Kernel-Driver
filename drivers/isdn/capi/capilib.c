@@ -30,8 +30,8 @@ struct capilib_ncci {
 static inline void mq_init(struct capilib_ncci * np)
 {
 	u_int i;
-	np->msgidqueue = 0;
-	np->msgidlast = 0;
+	np->msgidqueue = NULL;
+	np->msgidlast = NULL;
 	np->nmsg = 0;
 	memset(np->msgidpool, 0, sizeof(np->msgidpool));
 	np->msgidfree = &np->msgidpool[0];
@@ -48,7 +48,7 @@ static inline int mq_enqueue(struct capilib_ncci * np, u16 msgid)
 		return 0;
 	np->msgidfree = mq->next;
 	mq->msgid = msgid;
-	mq->next = 0;
+	mq->next = NULL;
 	if (np->msgidlast)
 		np->msgidlast->next = mq;
 	np->msgidlast = mq;
@@ -66,7 +66,7 @@ static inline int mq_dequeue(struct capilib_ncci * np, u16 msgid)
 			struct capilib_msgidqueue *mq = *pp;
 			*pp = mq->next;
 			if (mq == np->msgidlast)
-				np->msgidlast = 0;
+				np->msgidlast = NULL;
 			mq->next = np->msgidfree;
 			np->msgidfree = mq;
 			np->nmsg--;

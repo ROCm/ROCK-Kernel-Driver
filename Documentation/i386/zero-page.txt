@@ -38,6 +38,7 @@ Offset	Type		Description
 0x1e0	unsigned long	ALT_MEM_K, alternative mem check, in Kb
 0x1e8	char		number of entries in E820MAP (below)
 0x1e9	unsigned char	number of entries in EDDBUF (below)
+0x1ea	unsigned char	number of entries in EDD_MBR_SIG_BUFFER (below)
 0x1f1	char		size of setup.S, number of sectors
 0x1f2	unsigned short	MOUNT_ROOT_RDONLY (if !=0)
 0x1f4	unsigned short	size of compressed kernel-part in the
@@ -72,7 +73,7 @@ Offset	Type		Description
 0x21c	unsigned long	INITRD_SIZE, size in bytes of ramdisk image
 0x220	4 bytes		(setup.S)
 0x224	unsigned short	setup.S heap end pointer
-0x2cc	4 bytes		DISK80_SIG_BUFFER (setup.S)
+0x290 - 0x2cf		EDD_MBR_SIG_BUFFER (edd.S)
 0x2d0 - 0x600		E820MAP
-0x600 - 0x7ff		EDDBUF (setup.S) for disk signature read sector
-0x600 - 0x7eb		EDDBUF (setup.S) for edd data
+0x600 - 0x7ff		EDDBUF (edd.S) for disk signature read sector
+0x600 - 0x7eb		EDDBUF (edd.S) for edd data

@@ -2,9 +2,14 @@
 #define _NET_ESP_H
 
 #include <net/xfrm.h>
+#include <asm/scatterlist.h>
+
+#define ESP_NUM_FAST_SG		4
 
 struct esp_data
 {
+	struct scatterlist		sgbuf[ESP_NUM_FAST_SG];
+
 	/* Confidentiality */
 	struct {
 		u8			*key;		/* Key */

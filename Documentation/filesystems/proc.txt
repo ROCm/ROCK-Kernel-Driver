@@ -38,6 +38,7 @@ Table of Contents
   2.8	/proc/sys/net/ipv4 - IPV4 settings
   2.9	Appletalk
   2.10	IPX
+  2.11	/proc/sys/fs/mqueue - POSIX message queues filesystem
 
 ------------------------------------------------------------------------------
 Preface
@@ -200,7 +201,7 @@ Table 1-3: Kernel info in /proc
  devices     Available devices (block and character)           
  dma         Used DMS channels                                 
  filesystems Supported filesystems                             
- driver	     Various drivers grouped here, currently rtc	(2.4)
+ driver	     Various drivers grouped here, currently rtc (2.4)
  execdomains Execdomains, related to security			(2.4)
  fb	     Frame Buffer devices				(2.4)
  fs	     File system parameters, currently nfs/exports	(2.4)
@@ -851,7 +852,8 @@ this time.
 The value  in  file-max  denotes  the  maximum number of file handles that the
 Linux kernel will allocate. When you get a lot of error messages about running
 out of  file handles, you might want to raise this limit. The default value is
-4096. To change it, just write the new number into the file:
+10% of  RAM in kilobytes.  To  change it, just  write the new number  into the
+file:
 
   # cat /proc/sys/fs/file-max 
   4096 
@@ -863,11 +865,14 @@ out of  file handles, you might want to raise this limit. The default value is
 This method  of  revision  is  useful  for  all customizable parameters of the
 kernel - simply echo the new value to the corresponding file.
 
-The three  values  in file-nr denote the number of allocated file handles, the
-number of  used file handles, and the maximum number of file handles. When the
-allocated file  handles  come close to the maximum, but the number of actually
-used ones  is  far  behind,  you've  encountered  a peak in your usage of file
-handles and you don't need to increase the maximum.
+Historically, the three values in file-nr denoted the number of allocated file
+handles,  the number of  allocated but  unused file  handles, and  the maximum
+number of file handles. Linux 2.6 always  reports 0 as the number of free file
+handles -- this  is not an error,  it just means that the  number of allocated
+file handles exactly matches the number of used file handles.
+
+Attempts to  allocate more  file descriptors than  file-max are  reported with
+printk, look for "VFS: file-max limit <number> reached".
 
 inode-state and inode-nr
 ------------------------
@@ -1110,6 +1115,18 @@ program to load modules on demand.
 The files  in  this directory can be used to tune the operation of the virtual
 memory (VM)  subsystem  of  the  Linux  kernel.
 
+vfs_cache_pressure
+------------------
+
+Controls the tendency of the kernel to reclaim the memory which is used for
+caching of directory and inode objects.
+
+At the default value of vfs_cache_pressure=100 the kernel will attempt to
+reclaim dentries and inodes at a "fair" rate with respect to pagecache and
+swapcache reclaim.  Decreasing vfs_cache_pressure causes the kernel to prefer
+to retain dentry and inode caches.  Increasing vfs_cache_pressure beyond 100
+causes the kernel to prefer to reclaim dentries and inodes.
+
 dirty_background_ratio
 ----------------------
 
@@ -1206,6 +1223,26 @@ malloc(), when in fact the system has enough memory for the program to run.
 On the  other  hand,  enabling this feature can cause you to run out of memory
 and thrash the system to death, so large and/or important servers will want to
 set this value to 0.
+
+nr_hugepages and hugetlb_shm_group
+----------------------------------
+
+nr_hugepages configures number of hugetlb page reserved for the system.
+
+hugetlb_shm_group contains group id that is allowed to create SysV shared
+memory segment using hugetlb page.
+
+laptop_mode
+-----------
+
+laptop_mode is a knob that controls "laptop mode". All the things that are
+controlled by this knob are discussed in Documentation/laptop-mode.txt.
+
+block_dump
+----------
+
+block_dump enables block I/O debugging when set to a nonzero value. More
+information on block I/O debugging is in Documentation/laptop-mode.txt.
 
 2.5 /proc/sys/dev - Device specific parameters
 ----------------------------------------------
@@ -1627,7 +1664,8 @@ flush
 
 Writing to this file results in a flush of the routing cache.
 
-gc_elastic, gc_interval, gc_min_interval, gc_tresh, gc_timeout
+gc_elasticity, gc_interval, gc_min_interval, gc_tresh, gc_timeout,
+gc_thresh, gc_thresh1, gc_thresh2, gc_thresh3
 --------------------------------------------------------------
 
 Values to  control  the  frequency  and  behavior  of  the  garbage collection
@@ -1814,6 +1852,30 @@ The /proc/net/ipx_route  table  holds  a list of IPX routes. For each route it
 gives the  destination  network, the router node (or Directly) and the network
 address of the router (or Connected) for internal networks.
 
+2.11 /proc/sys/fs/mqueue - POSIX message queues filesystem
+----------------------------------------------------------
+
+The "mqueue"  filesystem provides  the necessary kernel features to enable the
+creation of a  user space  library that  implements  the  POSIX message queues
+API (as noted by the  MSG tag in the  POSIX 1003.1-2001 version  of the System
+Interfaces specification.)
+
+The "mqueue" filesystem contains values for determining/setting  the amount of
+resources used by the file system.
+
+/proc/sys/fs/mqueue/queues_max is a read/write  file for  setting/getting  the
+maximum number of message queues allowed on the system.
+
+/proc/sys/fs/mqueue/msg_max  is  a  read/write file  for  setting/getting  the
+maximum number of messages in a queue value.  In fact it is the limiting value
+for another (user) limit which is set in mq_open invocation. This attribute of
+a queue must be less or equal then msg_max.
+
+/proc/sys/fs/mqueue/msgsize_max is  a read/write  file for setting/getting the
+maximum  message size value (it is every  message queue's attribute set during
+its creation).
+
+
 ------------------------------------------------------------------------------
 Summary
 ------------------------------------------------------------------------------
@@ -1823,10 +1885,3 @@ need to  recompile  the kernel, or even to reboot the system. The files in the
 command to write value into these files, thereby changing the default settings
 of the kernel.
 ------------------------------------------------------------------------------
-
-
-
-
-
-
-

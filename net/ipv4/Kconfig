@@ -196,8 +196,7 @@ config NET_IPIP
 	  can be useful if you want to make your (or some other) machine
 	  appear on a different network than it physically is, or to use
 	  mobile-IP facilities (allowing laptops to seamlessly move between
-	  networks without changing their IP addresses; check out
-	  <http://anchor.cs.binghamton.edu/~mobileip/LJ/index.html>).
+	  networks without changing their IP addresses).
 
 	  Saying Y to this option will produce two modules ( = code which can
 	  be inserted in and removed from the running kernel whenever you
@@ -359,29 +358,6 @@ config INET_IPCOMP
 	  for IPsec.
 	  
 	  If unsure, say Y.
-
-config ACCEPT_QUEUES 
-	bool "IP: TCP Multiple accept queues support"
-	depends on INET && NETFILTER
-	---help---
-	  Support multiple accept queues per listening socket. If you say Y
-	  here, multiple accept queues will be configured per listening
-	  socket.
-	  
-	  Each queue is mapped to a priority class. Incoming connection 
-	  requests can be classified (see iptables(8), MARK target), depending
-	  on the packet's src/dest address or other parameters, into one of 
-	  the priority classes. The requests are then queued to the relevant
-	  accept queue. 
-
-	  Each of the queues can be assigned a weight. The accept()ance 
-	  of packets is then scheduled in accordance with the weight 
-	  assigned to the priority class. 
-	  
-	  Be sure to enable "Network packet filtering" if you wish
-	  to use this feature.
-
-	  If unsure, say N.
 
 source "net/ipv4/ipvs/Kconfig"
 

@@ -13,7 +13,6 @@
 #include <linux/kernel.h>
 #include <linux/smp_lock.h>
 #include <linux/security.h>
-#include <linux/audit.h>
 
 /* Check validity of quotactl */
 static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
@@ -115,9 +114,10 @@ restart:
 	list_for_each(head, &super_blocks) {
 		struct super_block *sb = list_entry(head, struct super_block, s_list);
 
+		/* This test just improves performance so it needn't be reliable... */
 		for (cnt = 0, dirty = 0; cnt < MAXQUOTAS; cnt++)
 			if ((type == cnt || type == -1) && sb_has_quota_enabled(sb, cnt)
-			    && info_any_dquot_dirty(&sb_dqopt(sb)->info[cnt]))
+			    && info_any_dirty(&sb_dqopt(sb)->info[cnt]))
 				dirty = 1;
 		if (!dirty)
 			continue;
@@ -141,7 +141,7 @@ void sync_dquots(struct super_block *sb, int type)
 			sb->s_qcop->quota_sync(sb, type);
 	}
 	else {
-		while ((sb = get_super_to_sync(type))) {
+		while ((sb = get_super_to_sync(type)) != 0) {
 			if (sb->s_qcop->quota_sync)
 				sb->s_qcop->quota_sync(sb, type);
 			drop_super(sb);
@@ -150,7 +150,7 @@ void sync_dquots(struct super_block *sb, int type)
 }
 
 /* Copy parameters and call proper function */
-static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, caddr_t addr)
+static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, void __user *addr)
 {
 	int ret;
 
@@ -264,13 +264,13 @@ static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, cadd
  * calls. Maybe we need to add the process quotas etc. in the future,
  * but we probably should use rlimits for that.
  */
-asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, caddr_t addr)
+asmlinkage long sys_quotactl(unsigned int cmd, const char __user *special, qid_t id, void __user *addr)
 {
 	uint cmds, type;
 	struct super_block *sb = NULL;
 	struct block_device *bdev;
-	char *tmp = NULL;
-	int ret = 0;
+	char *tmp;
+	int ret;
 
 	cmds = cmd >> SUBCMDSHIFT;
 	type = cmd & SUBCMDMASK;
@@ -280,29 +280,20 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 		if (IS_ERR(tmp))
 			return PTR_ERR(tmp);
 		bdev = lookup_bdev(tmp);
+		putname(tmp);
 		if (IS_ERR(bdev))
-			ret = PTR_ERR(bdev);
-		else {
-			sb = get_super(bdev);
-			bdput(bdev);
-			if (!sb)
-				ret = -ENODEV;
-		}
+			return PTR_ERR(bdev);
+		sb = get_super(bdev);
+		bdput(bdev);
+		if (!sb)
+			return -ENODEV;
 	}
 
-	audit_intercept(AUDIT_quotactl, cmd, tmp, id, addr);
-
-	if (!ret) {
-		ret = check_quotactl_valid(sb, type, cmds, id);
-		if (ret >= 0)
-			ret = do_quotactl(sb, type, cmds, id, addr);
-	}
+	ret = check_quotactl_valid(sb, type, cmds, id);
+	if (ret >= 0)
+		ret = do_quotactl(sb, type, cmds, id, addr);
 	if (sb)
 		drop_super(sb);
 
-	(void)audit_result(ret);
-
-	if (tmp)
-		putname(tmp);
 	return ret;
 }

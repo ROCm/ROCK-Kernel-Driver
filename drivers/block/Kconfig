@@ -6,7 +6,7 @@ menu "Block devices"
 
 config BLK_DEV_FD
 	tristate "Normal floppy disk support"
-	depends on (!X86_PC9800 && !ARCH_S390 && !M68K && !IA64) || Q40 || (SUN3X && BROKEN)
+	depends on (!ARCH_S390 && !M68K && !IA64) || Q40 || (SUN3X && BROKEN)
 	---help---
 	  If you want to use the floppy disk drive(s) of your PC under Linux,
 	  say Y. Information about this driver, especially important for IBM
@@ -26,19 +26,19 @@ config ATARI_FLOPPY
 	tristate "Atari floppy support"
 	depends on ATARI
 
-config BLK_DEV_FD98
-	tristate "NEC PC-9800 floppy disk support"
-	depends on X86_PC9800
-	---help---
-	  If you want to use the floppy disk drive(s) of NEC PC-9801/PC-9821,
-	  say Y.
-
 config BLK_DEV_SWIM_IOP
 	bool "Macintosh IIfx/Quadra 900/Quadra 950 floppy support (EXPERIMENTAL)"
 	depends on MAC && EXPERIMENTAL && BROKEN
 	help
 	  Say Y here to support the SWIM (Super Woz Integrated Machine) IOP
 	  floppy controller on the Macintosh IIfx and Quadra 900/950.
+
+config MAC_FLOPPY
+	tristate "Support for PowerMac floppy"
+	depends on PPC_PMAC && !PPC_PMAC64
+	help
+	  If you have a SWIM-3 (Super Woz Integrated Machine 3; from Apple)
+	  floppy controller, say Y here. Most commonly found in PowerMacs.
 
 config BLK_DEV_PS2
 	tristate "PS/2 ESDI hard disk support"
@@ -292,14 +292,14 @@ config BLK_DEV_NBD
 
 	  If unsure, say N.
 
-config BLK_DEV_CARMEL
-	tristate "Promise SATA SX8 (carmel) support"
+config BLK_DEV_SX8
+	tristate "Promise SATA SX8 support"
 	depends on PCI
 	---help---
 	  Saying Y or M here will enable support for the 
-	  Promise SATA SX8 ("carmel") controllers.
+	  Promise SATA SX8 controllers.
 
-	  Use devices /dev/carmel/$N and /dev/carmel/$Np$M.
+	  Use devices /dev/sx8/$N and /dev/sx8/$Np$M.
 
 config BLK_DEV_RAM
 	tristate "RAM disk support"
@@ -321,12 +321,13 @@ config BLK_DEV_RAM
 	  thus say N here.
 
 config BLK_DEV_RAM_SIZE
-	int "Default RAM disk size"
+	int "Default RAM disk size (kbytes)"
 	depends on BLK_DEV_RAM
 	default "4096"
 	help
-	  The default value is 4096. Only change this if you know what are
-	  you doing. If you are using IBM S/390, then set this to 8192.
+	  The default value is 4096 kilobytes. Only change this if you know
+	  what are you doing. If you are using IBM S/390, then set this to
+	  8192.
 
 config BLK_DEV_INITRD
 	bool "Initial RAM disk (initrd) support"
@@ -345,12 +346,6 @@ config LBD
 	  Say Y here if you want to attach large (bigger than 2TB) discs to
 	  your machine, or if you want to have a raid or loopback device
 	  bigger than 2TB.  Otherwise say N.
-
-config CIPHER_TWOFISH
-	tristate "Twofish encryption for loop device for old S.u.S.E. crypto partitions"
-	depends on BLK_DEV_LOOP
-	help
-	  Say Y here if you want to support old S.u.S.E. crypto partitions. 
 
 source "drivers/s390/block/Kconfig"
 

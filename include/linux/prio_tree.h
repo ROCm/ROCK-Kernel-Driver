@@ -2,9 +2,9 @@
 #define _LINUX_PRIO_TREE_H
 
 struct prio_tree_node {
-	struct prio_tree_node *left;
-	struct prio_tree_node *right;
-	struct prio_tree_node *parent;
+	struct prio_tree_node	*left;
+	struct prio_tree_node	*right;
+	struct prio_tree_node	*parent;
 };
 
 struct prio_tree_root {
@@ -19,30 +19,27 @@ struct prio_tree_iter {
 	int			size_level;
 };
 
-#define PRIO_TREE_ROOT	(struct prio_tree_root) {NULL, 1}
-
-#define PRIO_TREE_ROOT_INIT	{NULL, 1}
-
 #define INIT_PRIO_TREE_ROOT(ptr)	\
 do {					\
 	(ptr)->prio_tree_node = NULL;	\
 	(ptr)->index_bits = 1;		\
 } while (0)
 
-#define PRIO_TREE_NODE_INIT(name)	{&(name), &(name), &(name)}
-
-#define PRIO_TREE_NODE(name) \
-	struct prio_tree_node name = PRIO_TREE_NODE_INIT(name)
-
 #define INIT_PRIO_TREE_NODE(ptr)				\
 do {								\
 	(ptr)->left = (ptr)->right = (ptr)->parent = (ptr);	\
 } while (0)
 
-#define	prio_tree_entry(ptr, type, member) \
-       ((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
+#define INIT_PRIO_TREE_ITER(ptr)	\
+do {					\
+	(ptr)->cur = NULL;		\
+	(ptr)->mask = 0UL;		\
+	(ptr)->value = 0UL;		\
+	(ptr)->size_level = 0;		\
+} while (0)
 
-#define	PRIO_TREE_ITER	(struct prio_tree_iter) {NULL, 0UL, 0UL, 0}
+#define prio_tree_entry(ptr, type, member) \
+       ((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
 
 static inline int prio_tree_empty(const struct prio_tree_root *root)
 {
@@ -64,15 +61,4 @@ static inline int prio_tree_right_empty(const struct prio_tree_node *node)
 	return node->right == node;
 }
 
-extern struct prio_tree_node *prio_tree_insert(struct prio_tree_root *,
-	struct prio_tree_node *);
-
-extern void prio_tree_remove(struct prio_tree_root *, struct prio_tree_node *);
-
-extern struct prio_tree_node *prio_tree_first(struct prio_tree_root *,
-	struct prio_tree_iter *, unsigned long, unsigned long);
-
-extern struct prio_tree_node *prio_tree_next(struct prio_tree_root *,
-	struct prio_tree_iter *, unsigned long, unsigned long);
-
-#endif
+#endif /* _LINUX_PRIO_TREE_H */

@@ -190,7 +190,7 @@ found:
 	if (cl)
 		tp->q->ops->cl_ops->unbind_tcf(tp->q,cl);
 #ifdef CONFIG_NET_CLS_POLICE
-	tcf_police_release(r->police);
+	tcf_police_release(r->police, TCA_ACT_UNBIND);
 #endif
 	if (f)
 		kfree(f);
@@ -333,7 +333,7 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 		tcf_tree_lock(tp);
 		police = xchg(&r->police,police);
 		tcf_tree_unlock(tp);
-		tcf_police_release(police);
+		tcf_police_release(police,TCA_ACT_UNBIND);
 	}
 #endif
 	if (r != &new_filter_result)

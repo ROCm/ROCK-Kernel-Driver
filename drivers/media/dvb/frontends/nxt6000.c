@@ -55,7 +55,12 @@ static struct dvb_frontend_info nxt6000_info = {
 	.symbol_rate_max = 9360000,	/* FIXME */
 	.symbol_rate_tolerance = 4000,
 	.notifier_delay = 0,
-	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 | FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO | FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO | FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
+	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
+                FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 | 
+                FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO | 
+                FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO | 
+                FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO | 
+                FE_CAN_HIERARCHY_AUTO,
 };
 
 struct nxt6000_config {
@@ -762,9 +767,6 @@ static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 			nxt6000_setup(fe);
 		break;
 
-	case FE_RESET:
-			break;
-		
 		case FE_SET_FRONTEND:
 		{
 			struct nxt6000_config *nxt = FE2NXT(fe);

@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2000 - 2003 Jeff Dike (jdike@addtoit.com)
+ * Copyright (C) 2000 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
@@ -36,40 +36,39 @@ long um_mount(char * dev_name, char * dir_name, char * type,
 
 long sys_fork(void)
 {
-	long ret;
+	struct task_struct *p;
 
 	current->thread.forking = 1;
-        ret = do_fork(SIGCHLD, 0, NULL, 0, NULL, NULL);
+        p = do_fork(SIGCHLD, 0, NULL, 0, NULL, NULL);
 	current->thread.forking = 0;
-	return(ret);
+	return(IS_ERR(p) ? PTR_ERR(p) : p->pid);
 }
 
-long sys_clone(unsigned long clone_flags, unsigned long newsp, 
-	       int *parent_tid, int *child_tid)
+long sys_clone(unsigned long clone_flags, unsigned long newsp)
 {
-	long ret;
+	struct task_struct *p;
 
 	current->thread.forking = 1;
-	ret = do_fork(clone_flags, newsp, NULL, 0, parent_tid, child_tid);
+	p = do_fork(clone_flags, newsp, NULL, 0, NULL, NULL);
 	current->thread.forking = 0;
-	return(ret);
+	return(IS_ERR(p) ? PTR_ERR(p) : p->pid);
 }
 
 long sys_vfork(void)
 {
-	long ret;
+	struct task_struct *p;
 
 	current->thread.forking = 1;
-	ret = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, 0, NULL, 0, NULL, 
-		      NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, 0, NULL, 0, NULL, NULL);
 	current->thread.forking = 0;
-	return(ret);
+	return(IS_ERR(p) ? PTR_ERR(p) : p->pid);
 }
 
 /* common code for old and new mmaps */
-long do_mmap2(struct mm_struct *mm, unsigned long addr, unsigned long len,
-	      unsigned long prot, unsigned long flags, unsigned long fd,
-	      unsigned long pgoff)
+static inline long do_mmap2(
+	unsigned long addr, unsigned long len,
+	unsigned long prot, unsigned long flags,
+	unsigned long fd, unsigned long pgoff)
 {
 	int error = -EBADF;
 	struct file * file = NULL;
@@ -81,9 +80,9 @@ long do_mmap2(struct mm_struct *mm, unsigned long addr, unsigned long len,
 			goto out;
 	}
 
-	down_write(&mm->mmap_sem);
-	error = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
-	up_write(&mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
+	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	up_write(&current->mm->mmap_sem);
 
 	if (file)
 		fput(file);
@@ -95,7 +94,7 @@ long sys_mmap2(unsigned long addr, unsigned long len,
 	       unsigned long prot, unsigned long flags,
 	       unsigned long fd, unsigned long pgoff)
 {
-	return do_mmap2(current->mm, addr, len, prot, flags, fd, pgoff);
+	return do_mmap2(addr, len, prot, flags, fd, pgoff);
 }
 
 /*
@@ -122,8 +121,7 @@ int old_mmap(unsigned long addr, unsigned long len,
 	if (offset & ~PAGE_MASK)
 		goto out;
 
-	err = do_mmap2(current->mm, addr, len, prot, flags, fd, 
-		       offset >> PAGE_SHIFT);
+	err = do_mmap2(addr, len, prot, flags, fd, offset >> PAGE_SHIFT);
  out:
 	return err;
 }
@@ -138,10 +136,41 @@ int sys_pipe(unsigned long * fildes)
 
         error = do_pipe(fd);
         if (!error) {
-		if (copy_to_user(fildes, fd, sizeof(fd)))
+                if (copy_to_user(fildes, fd, 2*sizeof(int)))
                         error = -EFAULT;
         }
         return error;
+}
+
+int sys_sigaction(int sig, const struct old_sigaction *act,
+			 struct old_sigaction *oact)
+{
+	struct k_sigaction new_ka, old_ka;
+	int ret;
+
+	if (act) {
+		old_sigset_t mask;
+		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
+		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
+			return -EFAULT;
+		__get_user(new_ka.sa.sa_flags, &act->sa_flags);
+		__get_user(mask, &act->sa_mask);
+		siginitset(&new_ka.sa.sa_mask, mask);
+	}
+
+	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
+
+	if (!ret && oact) {
+		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
+		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
+			return -EFAULT;
+		__put_user(old_ka.sa.sa_flags, &oact->sa_flags);
+		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
+	}
+
+	return ret;
 }
 
 /*
@@ -225,7 +254,7 @@ int sys_ipc (uint call, int first, int second,
 		return sys_shmctl (first, second,
 				   (struct shmid_ds *) ptr);
 	default:
-		return -ENOSYS;
+		return -EINVAL;
 	}
 }
 
@@ -272,6 +301,11 @@ int sys_olduname(struct oldold_utsname * name)
 	error = error ? -EFAULT : 0;
 
 	return error;
+}
+
+int sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+{
+	return(do_sigaltstack(uss, uoss, PT_REGS_SP(&current->thread.regs)));
 }
 
 long execute_syscall(void *r)

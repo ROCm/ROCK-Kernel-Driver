@@ -5,6 +5,10 @@
 #include <asm/proto.h>
 
 int iommu_merge = 0;
+EXPORT_SYMBOL(iommu_merge);
+
+dma_addr_t bad_dma_address;
+EXPORT_SYMBOL(bad_dma_address);
 
 /* 
  * Dummy IO MMU functions

@@ -27,7 +27,7 @@ extern void device_shutdown(void);
  */
 extern struct semaphore dpm_sem;
 
-/* 
+/*
  * The PM lists.
  */
 extern struct list_head dpm_active;
@@ -37,12 +37,12 @@ extern struct list_head dpm_off_irq;
 
 static inline struct dev_pm_info * to_pm_info(struct list_head * entry)
 {
-	return container_of(entry,struct dev_pm_info,entry);
+	return container_of(entry, struct dev_pm_info, entry);
 }
 
 static inline struct device * to_device(struct list_head * entry)
 {
-	return container_of(to_pm_info(entry),struct device,power);
+	return container_of(to_pm_info(entry), struct device, power);
 }
 
 extern int device_pm_add(struct device *);
@@ -56,7 +56,7 @@ extern int dpm_sysfs_add(struct device *);
 extern void dpm_sysfs_remove(struct device *);
 
 /*
- * resume.c 
+ * resume.c
  */
 
 extern void dpm_resume(void);

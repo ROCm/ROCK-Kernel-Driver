@@ -22,8 +22,6 @@
     
 */
 
-#define __NO_VERSION__ 1
-
 #include <linux/module.h>
 #include <linux/init.h>
 
@@ -128,8 +126,8 @@ static struct i2c_adapter cx8800_i2c_adap_template = {
 	.inc_use           = cx8800_inc_use,
 	.dec_use           = cx8800_dec_use,
 #endif
-#ifdef I2C_ADAP_CLASS_TV_ANALOG
-	.class             = I2C_ADAP_CLASS_TV_ANALOG,
+#ifdef I2C_CLASS_TV_ANALOG
+	.class             = I2C_CLASS_TV_ANALOG,
 #endif
 	I2C_DEVNAME("cx2388x"),
 	.id                = I2C_HW_B_BT848,

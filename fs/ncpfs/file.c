@@ -99,7 +99,7 @@ out:
 }
 
 static ssize_t
-ncp_file_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+ncp_file_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct dentry *dentry = file->f_dentry;
 	struct inode *inode = dentry->d_inode;
@@ -187,7 +187,7 @@ outrel:
 }
 
 static ssize_t
-ncp_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+ncp_file_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct dentry *dentry = file->f_dentry;
 	struct inode *inode = dentry->d_inode;

@@ -67,7 +67,7 @@ static void __init timer_enable(void)
 }
 
 static struct irqaction timer_irq  =
-{ timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
+{ timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer", NULL, NULL};
 
 void __init time_init(void)
 {

@@ -78,9 +78,7 @@ int __init afs_fs_init(void)
 
 	_enter("");
 
-#ifdef AFS_AUTOMOUNT_SUPPORT
 	afs_timer_init(&afs_mntpt_expiry_timer, &afs_mntpt_expiry_timer_ops);
-#endif
 
 	/* create ourselves an inode cache */
 	atomic_set(&afs_count_active_inodes, 0);
@@ -172,7 +170,7 @@ static int afs_super_parse_options(struct afs_mount_params *params,
 	options[PAGE_SIZE - 1] = 0;
 
 	ret = 0;
-	while ((key = strsep(&options, ",")))
+	while ((key = strsep(&options, ",")) != 0)
 	{
 		value = strchr(key, '=');
 		if (value)

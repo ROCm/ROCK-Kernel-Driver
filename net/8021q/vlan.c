@@ -49,7 +49,7 @@ static char vlan_copyright[] = "Ben Greear <greearb@candelatech.com>";
 static char vlan_buggyright[] = "David S. Miller <davem@redhat.com>";
 
 static int vlan_device_event(struct notifier_block *, unsigned long, void *);
-static int vlan_ioctl_handler(unsigned long);
+static int vlan_ioctl_handler(void __user *);
 static int unregister_vlan_dev(struct net_device *, unsigned short );
 
 struct notifier_block vlan_notifier_block = {
@@ -471,10 +471,6 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	new_dev->flags = real_dev->flags;
 	new_dev->flags &= ~IFF_UP;
 
-	/* ipv6 shared card related stuff */
-	new_dev->dev_id = real_dev->dev_id;
-	new_dev->generate_eui64 = real_dev->generate_eui64;
-
 	/* need 4 bytes for extra VLAN header info,
 	 * hope the underlying device can handle it.
 	 */
@@ -665,9 +661,9 @@ out:
 /*
  *	VLAN IOCTL handler.
  *	o execute requested action or pass command to the device driver
- *   arg is really a void* to a vlan_ioctl_args structure.
+ *   arg is really a struct vlan_ioctl_args __user *.
  */
-static int vlan_ioctl_handler(unsigned long arg)
+static int vlan_ioctl_handler(void __user *arg)
 {
 	int err = 0;
 	struct vlan_ioctl_args args;
@@ -679,8 +675,7 @@ static int vlan_ioctl_handler(unsigned long arg)
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	if (copy_from_user(&args, (void*)arg,
-                           sizeof(struct vlan_ioctl_args)))
+	if (copy_from_user(&args, arg, sizeof(struct vlan_ioctl_args)))
 		return -EFAULT;
 
 	/* Null terminate this sucker, just in case. */

@@ -100,6 +100,7 @@
 #include <linux/workqueue.h>
 #include <linux/bootmem.h>
 #include <linux/pm.h>
+#include <linux/font.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -152,7 +153,7 @@ static void gotoxy(int currcons, int new_x, int new_y);
 static void save_cur(int currcons);
 static void reset_terminal(int currcons, int do_clear);
 static void con_flush_chars(struct tty_struct *tty);
-static void set_vesa_blanking(unsigned long arg);
+static void set_vesa_blanking(char __user *p);
 static void set_cursor(int currcons);
 static void hide_cursor(int currcons);
 static void console_callback(void *ignored);
@@ -661,11 +662,14 @@ int vc_cons_allocated(unsigned int i)
 static void visual_init(int currcons, int init)
 {
     /* ++Geert: sw->con_init determines console size */
+    if (sw)
+	module_put(sw->owner);
     sw = conswitchp;
 #ifndef VT_SINGLE_DRIVER
     if (con_driver_map[currcons])
 	sw = con_driver_map[currcons];
 #endif
+    __module_get(sw->owner);
     cons_num = currcons;
     display_fg = &master_display_fg;
     vc_cons[currcons].d->vc_uni_pagedir_loc = &vc_cons[currcons].d->vc_uni_pagedir;
@@ -773,16 +777,16 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	old_row_size = video_size_row;
 	old_screen_size = screenbuf_size;
 
-	video_num_lines = new_rows;
-	video_num_columns = new_cols;
-	video_size_row = new_row_size;
-	screenbuf_size = new_screen_size;
-
 	err = resize_screen(currcons, new_cols, new_rows);
 	if (err) {
 		kfree(newscreen);
 		return err;
 	}
+
+	video_num_lines = new_rows;
+	video_num_columns = new_cols;
+	video_size_row = new_row_size;
+	screenbuf_size = new_screen_size;
 
 	rlth = min(old_row_size, new_row_size);
 	rrem = new_row_size - rlth;
@@ -808,8 +812,6 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	screenbuf = newscreen;
 	kmalloced = 1;
 	screenbuf_size = new_screen_size;
-	if (IS_VISIBLE)
-		err = resize_screen(currcons, new_cols, new_rows);
 	set_origin(currcons);
 
 	/* do part of a reset_terminal() */
@@ -1183,7 +1185,7 @@ static void csi_m(int currcons)
 	update_attr(currcons);
 }
 
-static void respond_string(const char * p, struct tty_struct * tty)
+static void respond_string(const char *p, struct tty_struct *tty)
 {
 	while (*p) {
 		tty_insert_flip_char(tty, *p, 0);
@@ -1192,7 +1194,7 @@ static void respond_string(const char * p, struct tty_struct * tty)
 	con_schedule_flip(tty);
 }
 
-static void cursor_report(int currcons, struct tty_struct * tty)
+static void cursor_report(int currcons, struct tty_struct *tty)
 {
 	char buf[40];
 
@@ -1200,7 +1202,7 @@ static void cursor_report(int currcons, struct tty_struct * tty)
 	respond_string(buf, tty);
 }
 
-static inline void status_report(struct tty_struct * tty)
+static inline void status_report(struct tty_struct *tty)
 {
 	respond_string("\033[0n", tty);	/* Terminal ok */
 }
@@ -1210,7 +1212,7 @@ static inline void respond_ID(struct tty_struct * tty)
 	respond_string(VT102ID, tty);
 }
 
-void mouse_report(struct tty_struct * tty, int butt, int mrx, int mry)
+void mouse_report(struct tty_struct *tty, int butt, int mrx, int mry)
 {
 	char buf[8];
 
@@ -1864,11 +1866,10 @@ static void do_con_trol(struct tty_struct *tty, unsigned int currcons, int c)
  * kernel memory allocation is available.
  */
 char con_buf[PAGE_SIZE];
-#define CON_BUF_SIZE	PAGE_SIZE
 DECLARE_MUTEX(con_buf_sem);
 
 /* acquires console_sem */
-static int do_con_write(struct tty_struct * tty, int from_user,
+static int do_con_write(struct tty_struct *tty, int from_user,
 			const unsigned char *buf, int count)
 {
 #ifdef VT_BUF_VRAM_ONLY
@@ -1894,7 +1895,7 @@ static int do_con_write(struct tty_struct * tty, int from_user,
 	might_sleep();
 
 	acquire_console_sem();
-	vt = (struct vt_struct *)tty->driver_data;
+	vt = tty->driver_data;
 	if (vt == NULL) {
 		printk(KERN_ERR "vt: argh, driver_data is NULL !\n");
 		release_console_sem();
@@ -1942,7 +1943,7 @@ again:
 
 	acquire_console_sem();
 
-	vt = (struct vt_struct *)tty->driver_data;
+	vt = tty->driver_data;
 	if (vt == NULL) {
 		printk(KERN_ERR "vt: argh, driver_data _became_ NULL !\n");
 		release_console_sem();
@@ -2103,7 +2104,8 @@ static void console_callback(void *ignored)
 	acquire_console_sem();
 
 	if (want_console >= 0) {
-		if (want_console != fg_console && vc_cons_allocated(want_console)) {
+		if (want_console != fg_console &&
+		    vc_cons_allocated(want_console)) {
 			hide_cursor(fg_console);
 			change_console(want_console);
 			/* we only changed when the console had already
@@ -2147,7 +2149,7 @@ struct tty_driver *console_driver;
  * The console must be locked when we get here.
  */
 
-void vt_console_print(struct console *co, const char * b, unsigned count)
+void vt_console_print(struct console *co, const char *b, unsigned count)
 {
 	int currcons = fg_console;
 	unsigned char c;
@@ -2272,6 +2274,7 @@ struct console vt_console_driver = {
 int tioclinux(struct tty_struct *tty, unsigned long arg)
 {
 	char type, data;
+	char __user *p = (char __user *)arg;
 	int lines;
 	int ret;
 
@@ -2279,14 +2282,14 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 		return -EINVAL;
 	if (current->signal->tty != tty && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (get_user(type, (char *)arg))
+	if (get_user(type, p))
 		return -EFAULT;
 	ret = 0;
 	switch (type)
 	{
 		case TIOCL_SETSEL:
 			acquire_console_sem();
-			ret = set_selection((struct tiocl_selection *)((char *)arg+1), tty, 1);
+			ret = set_selection((struct tiocl_selection __user *)(p+1), tty);
 			release_console_sem();
 			break;
 		case TIOCL_PASTESEL:
@@ -2296,7 +2299,7 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 			unblank_screen();
 			break;
 		case TIOCL_SELLOADLUT:
-			ret = sel_loadlut(arg);
+			ret = sel_loadlut(p);
 			break;
 		case TIOCL_GETSHIFTSTATE:
 			
@@ -2307,20 +2310,20 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 	 * related to the kernel should not use this.
 	 */
 	 		data = shift_state;
-			ret = __put_user(data, (char *) arg);
+			ret = __put_user(data, p);
 			break;
 		case TIOCL_GETMOUSEREPORTING:
 			data = mouse_reporting();
-			ret = __put_user(data, (char *) arg);
+			ret = __put_user(data, p);
 			break;
 		case TIOCL_SETVESABLANK:
-			set_vesa_blanking(arg);
+			set_vesa_blanking(p);
 			break;
 		case TIOCL_SETKMSGREDIRECT:
 			if (!capable(CAP_SYS_ADMIN)) {
 				ret = -EPERM;
 			} else {
-				if (get_user(data, (char *)arg+1))
+				if (get_user(data, p+1))
 					ret = -EFAULT;
 				else
 					kmsg_redirect = data;
@@ -2330,7 +2333,7 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 			ret = fg_console;
 			break;
 		case TIOCL_SCROLLCONSOLE:
-			if (get_user(lines, (s32 *)((char *)arg+4))) {
+			if (get_user(lines, (s32 __user *)(p+4))) {
 				ret = -EFAULT;
 			} else {
 				scrollfront(lines);
@@ -2352,10 +2355,10 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 }
 
 /*
- *	/dev/ttyN handling
+ * /dev/ttyN handling
  */
 
-static int con_write(struct tty_struct * tty, int from_user,
+static int con_write(struct tty_struct *tty, int from_user,
 		     const unsigned char *buf, int count)
 {
 	int	retval;
@@ -2370,7 +2373,7 @@ static int con_write(struct tty_struct * tty, int from_user,
 static void con_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	if (in_interrupt())
-		return;		/* n_r3964 calls put_char() from interrupt context */
+		return;	/* n_r3964 calls put_char() from interrupt context */
 	pm_access(pm_con);
 	do_con_write(tty, 0, &ch, 1);
 }
@@ -2398,7 +2401,7 @@ static void con_throttle(struct tty_struct *tty)
 
 static void con_unthrottle(struct tty_struct *tty)
 {
-	struct vt_struct *vt = (struct vt_struct *) tty->driver_data;
+	struct vt_struct *vt = tty->driver_data;
 
 	wake_up_interruptible(&vt->paste_wait);
 }
@@ -2444,7 +2447,7 @@ static void con_flush_chars(struct tty_struct *tty)
 	
 	/* if we race with con_close(), vt may be null */
 	acquire_console_sem();
-	vt = (struct vt_struct *)tty->driver_data;
+	vt = tty->driver_data;
 	if (vt)
 		set_cursor(vt->vc_num);
 	release_console_sem();
@@ -2453,36 +2456,42 @@ static void con_flush_chars(struct tty_struct *tty)
 /*
  * Allocate the console screen memory.
  */
-static int con_open(struct tty_struct *tty, struct file * filp)
+static int con_open(struct tty_struct *tty, struct file *filp)
 {
-	unsigned int	currcons;
-	int i;
-
-	currcons = tty->index;
+	unsigned int currcons = tty->index;
+	int ret = 0;
 
 	acquire_console_sem();
-	i = vc_allocate(currcons);
-	if (i) {
-		release_console_sem();
-		return i;
-	}
-	vt_cons[currcons]->vc_num = currcons;
-	tty->driver_data = vt_cons[currcons];
-	vc_cons[currcons].d->vc_tty = tty;
+	if (tty->count == 1) {
+		ret = vc_allocate(currcons);
+		if (ret == 0) {
+			vt_cons[currcons]->vc_num = currcons;
+			tty->driver_data = vt_cons[currcons];
+			vc_cons[currcons].d->vc_tty = tty;
 
+			if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
+				tty->winsize.ws_row = video_num_lines;
+				tty->winsize.ws_col = video_num_columns;
+			}
+			release_console_sem();
+			vcs_make_devfs(tty);
+			return ret;
+		}
+	}
 	release_console_sem();
-
-	if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
-		tty->winsize.ws_row = video_num_lines;
-		tty->winsize.ws_col = video_num_columns;
-	}
-	if (tty->count == 1)
-		vcs_make_devfs(tty);
-	return 0;
+	return ret;
 }
 
+/*
+ * We take tty_sem in here to prevent another thread from coming in via init_dev
+ * and taking a ref against the tty while we're in the process of forgetting
+ * about it and cleaning things up.
+ *
+ * This is because vcs_remove_devfs() can sleep and will drop the BKL.
+ */
 static void con_close(struct tty_struct *tty, struct file *filp)
 {
+	down(&tty_sem);
 	acquire_console_sem();
 	if (tty && tty->count == 1) {
 		struct vt_struct *vt;
@@ -2490,15 +2499,22 @@ static void con_close(struct tty_struct *tty, struct file *filp)
 		vt = tty->driver_data;
 		if (vt)
 			vc_cons[vt->vc_num].d->vc_tty = NULL;
-		tty->driver_data = 0;
+		tty->driver_data = NULL;
 		release_console_sem();
 		vcs_remove_devfs(tty);
+		up(&tty_sem);
+		/*
+		 * tty_sem is released, but we still hold BKL, so there is
+		 * still exclusion against init_dev()
+		 */
 		return;
 	}
 	release_console_sem();
+	up(&tty_sem);
 }
 
-static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols, int do_clear)
+static void vc_init(unsigned int currcons, unsigned int rows,
+			unsigned int cols, int do_clear)
 {
 	int j, k ;
 
@@ -2603,6 +2619,8 @@ static struct tty_operations con_ops = {
 
 int __init vty_init(void)
 {
+	vcs_init();
+
 	console_driver = alloc_tty_driver(MAX_NR_CONSOLES);
 	if (!console_driver)
 		panic("Couldn't allocate console driver\n");
@@ -2630,7 +2648,6 @@ int __init vty_init(void)
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	fb_console_init();
 #endif	
-	vcs_init();
 	return 0;
 }
 
@@ -2653,25 +2670,38 @@ static void clear_buffer_attributes(int currcons)
  *	and become default driver for newly opened ones.
  */
 
-void take_over_console(const struct consw *csw, int first, int last, int deflt)
+int take_over_console(const struct consw *csw, int first, int last, int deflt)
 {
 	int i, j = -1;
 	const char *desc;
+	struct module *owner;
+
+	owner = csw->owner;
+	if (!try_module_get(owner))
+		return -ENODEV;
 
 	acquire_console_sem();
 
 	desc = csw->con_startup();
 	if (!desc) {
 		release_console_sem();
-		return;
+		module_put(owner);
+		return -ENODEV;
 	}
-	if (deflt)
+	if (deflt) {
+		if (conswitchp)
+			module_put(conswitchp->owner);
+		__module_get(owner);
 		conswitchp = csw;
+	}
 
 	for (i = first; i <= last; i++) {
 		int old_was_color;
 		int currcons = i;
 
+		if (con_driver_map[i])
+			module_put(con_driver_map[i]->owner);
+		__module_get(owner);
 		con_driver_map[i] = csw;
 
 		if (!vc_cons[i].d || !vc_cons[i].d->vc_sw)
@@ -2682,6 +2712,10 @@ void take_over_console(const struct consw *csw, int first, int last, int deflt)
 			save_screen(i);
 		old_was_color = vc_cons[i].d->vc_can_do_color;
 		vc_cons[i].d->vc_sw->con_deinit(vc_cons[i].d);
+		origin = (unsigned long) screenbuf;
+		visible_origin = origin;
+		scr_end = origin + screenbuf_size;
+		pos = origin + video_size_row*y + 2*x;
 		visual_init(i, 0);
 		update_attr(i);
 
@@ -2706,6 +2740,9 @@ void take_over_console(const struct consw *csw, int first, int last, int deflt)
 		printk("to %s\n", desc);
 
 	release_console_sem();
+
+	module_put(owner);
+	return 0;
 }
 
 void give_up_console(const struct consw *csw)
@@ -2713,8 +2750,10 @@ void give_up_console(const struct consw *csw)
 	int i;
 
 	for(i = 0; i < MAX_NR_CONSOLES; i++)
-		if (con_driver_map[i] == csw)
+		if (con_driver_map[i] == csw) {
+			module_put(csw->owner);
 			con_driver_map[i] = NULL;
+		}
 }
 
 #endif
@@ -2723,11 +2762,10 @@ void give_up_console(const struct consw *csw)
  *	Screen blanking
  */
 
-static void set_vesa_blanking(unsigned long arg)
+static void set_vesa_blanking(char __user *p)
 {
-    char *argp = (char *)arg + 1;
     unsigned int mode;
-    get_user(mode, argp);
+    get_user(mode, p + 1);
     vesa_blank_mode = (mode < 4) ? mode : 0;
 }
 
@@ -2903,7 +2941,7 @@ void set_palette(int currcons)
 		sw->con_set_palette(vc_cons[currcons].d, color_table);
 }
 
-static int set_get_cmap(unsigned char *arg, int set)
+static int set_get_cmap(unsigned char __user *arg, int set)
 {
     int i, j, k;
 
@@ -2938,7 +2976,7 @@ static int set_get_cmap(unsigned char *arg, int set)
  * map, 3 bytes per colour, 16 colours, range from 0 to 255.
  */
 
-int con_set_cmap(unsigned char *arg)
+int con_set_cmap(unsigned char __user *arg)
 {
 	int rc;
 
@@ -2949,7 +2987,7 @@ int con_set_cmap(unsigned char *arg)
 	return rc;
 }
 
-int con_get_cmap(unsigned char *arg)
+int con_get_cmap(unsigned char __user *arg)
 {
 	int rc;
 
@@ -2986,95 +3024,180 @@ void reset_palette(int currcons)
 
 #define max_font_size 65536
 
-int con_font_op(int currcons, struct console_font_op *op)
+int con_font_get(int currcons, struct console_font_op *op)
 {
+	struct console_font font;
 	int rc = -EINVAL;
-	int size = max_font_size, set;
-	u8 *temp = NULL;
-	struct console_font_op old_op;
+	int c;
 
 	if (vt_cons[currcons]->vc_mode != KD_TEXT)
-		goto quit;
-	memcpy(&old_op, op, sizeof(old_op));
-	if (op->op == KD_FONT_OP_SET) {
-		if (!op->data)
-			return -EINVAL;
-		if (op->charcount > 512)
-			goto quit;
-		if (!op->height) {		/* Need to guess font height [compat] */
-			int h, i;
-			u8 *charmap = op->data, tmp;
-			
-			/* If from KDFONTOP ioctl, don't allow things which can be done in userland,
-			   so that we can get rid of this soon */
-			if (!(op->flags & KD_FONT_FLAG_OLD))
-				goto quit;
-			rc = -EFAULT;
-			for (h = 32; h > 0; h--)
-				for (i = 0; i < op->charcount; i++) {
-					if (get_user(tmp, &charmap[32*i+h-1]))
-						goto quit;
-					if (tmp)
-						goto nonzero;
-				}
-			rc = -EINVAL;
-			goto quit;
-		nonzero:
-			rc = -EINVAL;
-			op->height = h;
-		}
-		if (op->width > 32 || op->height > 32)
-			goto quit;
-		size = (op->width+7)/8 * 32 * op->charcount;
-		if (size > max_font_size)
-			return -ENOSPC;
-		set = 1;
-	} else if (op->op == KD_FONT_OP_GET)
-		set = 0;
-	else {
-		acquire_console_sem();
-		rc = sw->con_font_op(vc_cons[currcons].d, op);
-		release_console_sem();
-		return rc;
-	}
+		return -EINVAL;
+
 	if (op->data) {
-		temp = kmalloc(size, GFP_KERNEL);
-		if (!temp)
+		font.data = kmalloc(max_font_size, GFP_KERNEL);
+		if (!font.data)
 			return -ENOMEM;
-		if (set && copy_from_user(temp, op->data, size)) {
-			rc = -EFAULT;
-			goto quit;
-		}
-		op->data = temp;
-	}
+	} else
+		font.data = NULL;
 
 	acquire_console_sem();
-	rc = sw->con_font_op(vc_cons[currcons].d, op);
+	if (sw->con_font_get)
+		rc = sw->con_font_get(vc_cons[currcons].d, &font);
+	else
+		rc = -ENOSYS;
 	release_console_sem();
 
-	op->data = old_op.data;
-	if (!rc && !set) {
-		int c = (op->width+7)/8 * 32 * op->charcount;
-		
-		if (op->data && op->charcount > old_op.charcount)
+	if (rc)
+		goto out;
+
+	c = (font.width+7)/8 * 32 * font.charcount;
+	
+	if (op->data && font.charcount > op->charcount)
+		rc = -ENOSPC;
+	if (!(op->flags & KD_FONT_FLAG_OLD)) {
+		if (font.width > op->width || font.height > op->height) 
 			rc = -ENOSPC;
-		if (!(op->flags & KD_FONT_FLAG_OLD)) {
-			if (op->width > old_op.width || 
-			    op->height > old_op.height)
-				rc = -ENOSPC;
-		} else {
-			if (op->width != 8)
-				rc = -EIO;
-			else if ((old_op.height && op->height > old_op.height) ||
-			         op->height > 32)
-				rc = -ENOSPC;
-		}
-		if (!rc && op->data && copy_to_user(op->data, temp, c))
-			rc = -EFAULT;
+	} else {
+		if (font.width != 8)
+			rc = -EIO;
+		else if ((op->height && font.height > op->height) ||
+			 font.height > 32)
+			rc = -ENOSPC;
 	}
-quit:	if (temp)
-		kfree(temp);
+	if (rc)
+		goto out;
+
+	if (op->data && copy_to_user(op->data, font.data, c))
+		rc = -EFAULT;
+
+out:
+	kfree(font.data);
 	return rc;
+}
+
+int con_font_set(int currcons, struct console_font_op *op)
+{
+	struct console_font font;
+	int rc = -EINVAL;
+	int size;
+
+	if (vt_cons[currcons]->vc_mode != KD_TEXT)
+		return -EINVAL;
+	if (!op->data)
+		return -EINVAL;
+	if (op->charcount > 512)
+		return -EINVAL;
+	if (!op->height) {		/* Need to guess font height [compat] */
+		int h, i;
+		u8 __user *charmap = op->data;
+		u8 tmp;
+		
+		/* If from KDFONTOP ioctl, don't allow things which can be done in userland,
+		   so that we can get rid of this soon */
+		if (!(op->flags & KD_FONT_FLAG_OLD))
+			return -EINVAL;
+		for (h = 32; h > 0; h--)
+			for (i = 0; i < op->charcount; i++) {
+				if (get_user(tmp, &charmap[32*i+h-1]))
+					return -EFAULT;
+				if (tmp)
+					goto nonzero;
+			}
+		return -EINVAL;
+	nonzero:
+		op->height = h;
+	}
+	if (op->width <= 0 || op->width > 32 || op->height > 32)
+		return -EINVAL;
+	size = (op->width+7)/8 * 32 * op->charcount;
+	if (size > max_font_size)
+		return -ENOSPC;
+	font.charcount = op->charcount;
+	font.height = op->height;
+	font.width = op->width;
+	font.data = kmalloc(size, GFP_KERNEL);
+	if (!font.data)
+		return -ENOMEM;
+	if (copy_from_user(font.data, op->data, size)) {
+		kfree(font.data);
+		return -EFAULT;
+	}
+	acquire_console_sem();
+	if (sw->con_font_set)
+		rc = sw->con_font_set(vc_cons[currcons].d, &font, op->flags);
+	else
+		rc = -ENOSYS;
+	release_console_sem();
+	kfree(font.data);
+	return rc;
+}
+
+int con_font_default(int currcons, struct console_font_op *op)
+{
+	struct console_font font = {.width = op->width, .height = op->height};
+	char name[MAX_FONT_NAME];
+	char *s = name;
+	int rc;
+
+	if (vt_cons[currcons]->vc_mode != KD_TEXT)
+		return -EINVAL;
+
+	if (!op->data)
+		s = NULL;
+	else if (strncpy_from_user(name, op->data, MAX_FONT_NAME - 1) < 0)
+		return -EFAULT;
+	else
+		name[MAX_FONT_NAME - 1] = 0;
+
+	acquire_console_sem();
+	if (sw->con_font_default)
+		rc = sw->con_font_default(vc_cons[currcons].d, &font, s);
+	else
+		rc = -ENOSYS;
+	release_console_sem();
+	if (!rc) {
+		op->width = font.width;
+		op->height = font.height;
+	}
+	return rc;
+}
+
+int con_font_copy(int currcons, struct console_font_op *op)
+{
+	int con = op->height;
+	struct vc_data *vc;
+	int rc;
+
+	if (vt_cons[currcons]->vc_mode != KD_TEXT)
+		return -EINVAL;
+
+	acquire_console_sem();
+	vc = vc_cons[currcons].d;
+	if (!sw->con_font_copy)
+		rc = -ENOSYS;
+	else if (con < 0 || !vc_cons_allocated(con))
+		rc = -ENOTTY;
+	else if (con == vc->vc_num)	/* nothing to do */
+		rc = 0;
+	else
+		rc = sw->con_font_copy(vc, con);
+	release_console_sem();
+	return rc;
+}
+
+int con_font_op(int currcons, struct console_font_op *op)
+{
+	switch (op->op) {
+	case KD_FONT_OP_SET:
+		return con_font_set(currcons, op);
+	case KD_FONT_OP_GET:
+		return con_font_get(currcons, op);
+	case KD_FONT_OP_SET_DEFAULT:
+		return con_font_default(currcons, op);
+	case KD_FONT_OP_COPY:
+		return con_font_copy(currcons, op);
+	}
+	return -ENOSYS;
 }
 
 /*
@@ -3143,31 +3266,6 @@ static int pm_con_request(struct pm_dev *dev, pm_request_t rqst, void *data)
 	}
 	return 0;
 }
-
-#ifdef CONFIG_BOOTSPLASH
-void con_remap_def_color(int currcons, int new_color)
-{
-       unsigned short *sbuf = screenbuf;
-       unsigned c, len = screenbuf_size >> 1;
-       int old_color;
-
-       if (sbuf) {
-	       old_color = def_color << 8;
-	       new_color <<= 8;
-	       while(len--) {
-		       c = *sbuf;
-		       if (((c ^ old_color) & 0xf000) == 0)
-			       *sbuf ^= (old_color ^ new_color) & 0xf000;
-		       if (((c ^ old_color) & 0x0f00) == 0)
-			       *sbuf ^= (old_color ^ new_color) & 0x0f00;
-		       sbuf++;
-	       }
-	       new_color >>= 8;
-       }
-       def_color = color = new_color;
-       update_attr(currcons);
-}
-#endif
 
 /*
  *	Visible symbols for modules

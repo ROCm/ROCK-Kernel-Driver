@@ -40,6 +40,8 @@
 static void force_interrupt(int irq);
 extern void pcibr_force_interrupt(pcibr_intr_t intr);
 extern int sn_force_interrupt_flag;
+struct irq_desc * sn_irq_desc(unsigned int irq);
+extern cpumask_t    __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 struct sn_intr_list_t {
 	struct sn_intr_list_t *next;
@@ -70,6 +72,21 @@ sn_enable_irq(unsigned int irq)
 {
 }
 
+static inline void sn_move_irq(int irq)
+{
+	/* note - we hold desc->lock */
+	cpumask_t tmp;
+	irq_desc_t *desc = irq_descp(irq);
+
+	if (!cpus_empty(pending_irq_cpumask[irq])) {
+		cpus_and(tmp, pending_irq_cpumask[irq], cpu_online_map);
+		if (unlikely(!cpus_empty(tmp))) {
+			desc->handler->set_affinity(irq, pending_irq_cpumask[irq]);
+		}
+		cpus_clear(pending_irq_cpumask[irq]);
+	}
+}
+
 static void
 sn_ack_irq(unsigned int irq)
 {
@@ -93,6 +110,7 @@ sn_ack_irq(unsigned int irq)
 	}
 	HUB_S((unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_EVENT_OCCURRED_ALIAS), mask );
 	__set_bit(irq, (volatile void *)pda->sn_in_service_ivecs);
+	sn_move_irq(irq);
 }
 
 static void
@@ -101,6 +119,8 @@ sn_end_irq(unsigned int irq)
 	int nasid;
 	int ivec;
 	unsigned long event_occurred;
+	irq_desc_t *desc = sn_irq_desc(irq);
+	unsigned int status = desc->status;
 
 	ivec = irq & 0xff;
 	if (ivec == SGI_UART_VECTOR) {
@@ -115,7 +135,8 @@ sn_end_irq(unsigned int irq)
 	}
 	__clear_bit(ivec, (volatile void *)pda->sn_in_service_ivecs);
 	if (sn_force_interrupt_flag)
-		force_interrupt(irq);
+		if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))
+			force_interrupt(irq);
 }
 
 static void

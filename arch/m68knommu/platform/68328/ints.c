@@ -63,15 +63,15 @@ asmlinkage void trap44(void);
 asmlinkage void trap45(void);
 asmlinkage void trap46(void);
 asmlinkage void trap47(void);
-asmlinkage void bad_interrupt(int, void *, struct pt_regs *);
-asmlinkage void inthandler(void);
-asmlinkage void inthandler1(void);
-asmlinkage void inthandler2(void);
-asmlinkage void inthandler3(void);
-asmlinkage void inthandler4(void);
-asmlinkage void inthandler5(void);
-asmlinkage void inthandler6(void);
-asmlinkage void inthandler7(void);
+asmlinkage irqreturn_t bad_interrupt(int, void *, struct pt_regs *);
+asmlinkage irqreturn_t inthandler(void);
+asmlinkage irqreturn_t inthandler1(void);
+asmlinkage irqreturn_t inthandler2(void);
+asmlinkage irqreturn_t inthandler3(void);
+asmlinkage irqreturn_t inthandler4(void);
+asmlinkage irqreturn_t inthandler5(void);
+asmlinkage irqreturn_t inthandler6(void);
+asmlinkage irqreturn_t inthandler7(void);
 
 extern e_vector *_ramvec;
 
@@ -83,27 +83,22 @@ unsigned int local_irq_count[NR_CPUS];
 static irq_node_t int_irq_list[NR_IRQS];
 
 #if !defined(CONFIG_DRAGEN2)
-asm ("
-	.global _start, __ramend
-	.section .romvec
- 
-e_vectors:
-	.long __ramend-4, _start, buserr, trap, trap, trap, trap, trap
-	.long trap, trap, trap, trap, trap, trap, trap, trap
-	.long trap, trap, trap, trap, trap, trap, trap, trap
-	.long trap, trap, trap, trap
-	.long trap, trap, trap, trap
+asm (".global _start, __ramend/n/t"
+     ".section .romvec/n"
+     "e_vectors:\n\t"
+     ".long __ramend-4, _start, buserr, trap, trap, trap, trap, trap\n\t"
+     ".long trap, trap, trap, trap, trap, trap, trap, trap\n\t"
+     ".long trap, trap, trap, trap, trap, trap, trap, trap\n\t"
+     ".long trap, trap, trap, trap\n\t"
+     ".long trap, trap, trap, trap\n\t"
 	/*.long inthandler, inthandler, inthandler, inthandler
 	.long inthandler4, inthandler, inthandler, inthandler   */
 	/* TRAP #0-15 */
-	.long system_call, trap, trap, trap, trap, trap, trap, trap
-	.long trap, trap, trap, trap, trap, trap, trap, trap
-	.long 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.text
-
-ignore: rte
-
-");
+     ".long system_call, trap, trap, trap, trap, trap, trap, trap\n\t"
+     ".long trap, trap, trap, trap, trap, trap, trap, trap\n\t"
+     ".long 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n\t"
+     ".text\n"
+     "ignore: rte");
 #endif
 
 /*
@@ -116,17 +111,17 @@ void init_IRQ(void)
 
 	/* set up the vectors */
 	for (i = 72; i < 256; ++i)
-		_ramvec[i] = (e_vector)bad_interrupt;
+		_ramvec[i] = (e_vector) bad_interrupt;
 
 	_ramvec[32] = system_call;
 
-	_ramvec[65] = inthandler1;
-	_ramvec[66] = inthandler2;
-	_ramvec[67] = inthandler3;
-	_ramvec[68] = inthandler4;
-	_ramvec[69] = inthandler5;
-	_ramvec[70] = inthandler6;
-	_ramvec[71] = inthandler7;
+	_ramvec[65] = (e_vector) inthandler1;
+	_ramvec[66] = (e_vector) inthandler2;
+	_ramvec[67] = (e_vector) inthandler3;
+	_ramvec[68] = (e_vector) inthandler4;
+	_ramvec[69] = (e_vector) inthandler5;
+	_ramvec[70] = (e_vector) inthandler6;
+	_ramvec[71] = (e_vector) inthandler7;
  
 	IVR = 0x40; /* Set DragonBall IVR (interrupt base) to 64 */
 
@@ -142,22 +137,26 @@ void init_IRQ(void)
 	IMR = ~0;
 }
 
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
-                         unsigned long flags, const char *devname, void *dev_id)
+int request_irq(
+	unsigned int irq,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long flags,
+	const char *devname,
+	void *dev_id)
 {
 	if (irq >= NR_IRQS) {
-		printk ("%s: Unknown IRQ %d from %s\n", __FUNCTION__, irq, devname);
+		printk (KERN_ERR "%s: Unknown IRQ %d from %s\n", __FUNCTION__, irq, devname);
 		return -ENXIO;
 	}
 
 	if (!(int_irq_list[irq].flags & IRQ_FLG_STD)) {
 		if (int_irq_list[irq].flags & IRQ_FLG_LOCK) {
-			printk("%s: IRQ %d from %s is not replaceable\n",
+			printk(KERN_ERR "%s: IRQ %d from %s is not replaceable\n",
 			       __FUNCTION__, irq, int_irq_list[irq].devname);
 			return -EBUSY;
 		}
 		if (flags & IRQ_FLG_REPLACE) {
-			printk("%s: %s can't replace IRQ %d from %s\n",
+			printk(KERN_ERR "%s: %s can't replace IRQ %d from %s\n",
 			       __FUNCTION__, devname, irq, int_irq_list[irq].devname);
 			return -EBUSY;
 		}
@@ -178,12 +177,12 @@ EXPORT_SYMBOL(request_irq);
 void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= NR_IRQS) {
-		printk ("%s: Unknown IRQ %d\n", __FUNCTION__, irq);
+		printk (KERN_ERR "%s: Unknown IRQ %d\n", __FUNCTION__, irq);
 		return;
 	}
 
 	if (int_irq_list[irq].dev_id != dev_id)
-		printk("%s: removing probably wrong IRQ %d from %s\n",
+		printk(KERN_INFO "%s: removing probably wrong IRQ %d from %s\n",
 		       __FUNCTION__, irq, int_irq_list[irq].devname);
 
 	int_irq_list[irq].handler = bad_interrupt;
@@ -201,15 +200,14 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i = *(loff_t *) v;
 
 	if (i < NR_IRQS) {
-		if (int_irq_list[i].flags & IRQ_FLG_STD)
-			continue;
-
-		seq_printf(p, "%3d: %10u ", i, kstat_cpu(0).irqs[i]);
-		if (int_irq_list[i].flags & IRQ_FLG_LOCK)
-			seq_printf(p, "L ");
-		else
-			seq_printf(p, "  ");
-		seq_printf(p, "%s\n", int_irq_list[i].devname);
+		if (int_irq_list[i].devname) {
+			seq_printf(p, "%3d: %10u ", i, kstat_cpu(0).irqs[i]);
+			if (int_irq_list[i].flags & IRQ_FLG_LOCK)
+				seq_printf(p, "L ");
+			else
+				seq_printf(p, "  ");
+			seq_printf(p, "%s\n", int_irq_list[i].devname);
+		}
 	}
 	if (i == NR_IRQS)
 		seq_printf(p, "   : %10u   spurious\n", num_spurious);
@@ -279,7 +277,7 @@ void process_int(int vec, struct pt_regs *fp)
 		if (int_irq_list[irq].handler) {
 			int_irq_list[irq].handler(irq, int_irq_list[irq].dev_id, fp);
 		} else {
-			printk("unregistered interrupt %d!\nTurning it off in the IMR...\n", irq);
+			printk(KERN_ERR "unregistered interrupt %d!\nTurning it off in the IMR...\n", irq);
 			IMR |= mask;
 		}
 		pend &= ~mask;

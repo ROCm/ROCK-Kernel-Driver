@@ -411,7 +411,6 @@ struct config_param {
 #define HEADER_802_2_SIZE              3
 #define HEADER_SNAP_SIZE               5
 #define HEADER_VLAN_SIZE               4
-#define HEADER_ALIGN_LAYER_3           2
 
 #define MIN_MTU                       46
 #define MAX_PYLD                    1500
@@ -754,8 +753,8 @@ static inline u64 readq(void *addr)
 {
 	u64 ret = 0;
 	ret = readl(addr + 4);
-	(u64) ret <<= 32;
-	(u64) ret |= readl(addr);
+	ret <<= 32;
+	ret |= readl(addr);
 
 	return ret;
 }
@@ -825,7 +824,7 @@ static inline void writeq(u64 val, void *addr)
  */
 static int __devinit s2io_init_nic(struct pci_dev *pdev,
 				   const struct pci_device_id *pre);
-static void __exit s2io_rem_nic(struct pci_dev *pdev);
+static void __devexit s2io_rem_nic(struct pci_dev *pdev);
 static int initSharedMem(struct s2io_nic *sp);
 static void freeSharedMem(struct s2io_nic *sp);
 static int initNic(struct s2io_nic *nic);

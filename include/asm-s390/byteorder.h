@@ -14,7 +14,7 @@
 #ifdef __GNUC__
 
 #ifdef __s390x__
-static __inline__ __u64 ___arch__swab64p(__u64 *x)
+static __inline__ __u64 ___arch__swab64p(const __u64 *x)
 {
 	__u64 result;
 
@@ -40,7 +40,7 @@ static __inline__ void ___arch__swab64s(__u64 *x)
 }
 #endif /* __s390x__ */
 
-static __inline__ __u32 ___arch__swab32p(__u32 *x)
+static __inline__ __u32 ___arch__swab32p(const __u32 *x)
 {
 	__u32 result;
 	
@@ -77,7 +77,7 @@ static __inline__ void ___arch__swab32s(__u32 *x)
 	*x = ___arch__swab32p(x);
 }
 
-static __inline__ __u16 ___arch__swab16p(__u16 *x)
+static __inline__ __u16 ___arch__swab16p(const __u16 *x)
 {
 	__u16 result;
 	

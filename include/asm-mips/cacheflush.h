@@ -11,6 +11,7 @@
 
 /* Keep includes the same across arches.  */
 #include <linux/mm.h>
+#include <asm/cpu-features.h>
 
 /* Cache flushing:
  *
@@ -35,7 +36,18 @@ extern void (*flush_cache_range)(struct vm_area_struct *vma,
 	unsigned long start, unsigned long end);
 extern void (*flush_cache_page)(struct vm_area_struct *vma,
 	unsigned long page);
-extern void flush_dcache_page(struct page *page);
+extern void __flush_dcache_page(struct page *page);
+
+static inline void flush_dcache_page(struct page *page)
+{
+	if (cpu_has_dc_aliases)
+		__flush_dcache_page(page);
+
+}
+
+#define flush_dcache_mmap_lock(mapping)		do { } while (0)
+#define flush_dcache_mmap_unlock(mapping)	do { } while (0)
+
 extern void (*flush_icache_page)(struct vm_area_struct *vma,
 	struct page *page);
 extern void (*flush_icache_range)(unsigned long start, unsigned long end);

@@ -152,7 +152,7 @@ static void atmtcp_v_close(struct atm_vcc *vcc)
 }
 
 
-static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
+static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 {
 	struct atm_cirange ci;
 	struct atm_vcc *vcc;
@@ -161,7 +161,7 @@ static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 	int i;
 
 	if (cmd != ATM_SETCIRANGE) return -ENOIOCTLCMD;
-	if (copy_from_user(&ci,(void *) arg,sizeof(ci))) return -EFAULT;
+	if (copy_from_user(&ci, arg,sizeof(ci))) return -EFAULT;
 	if (ci.vpi_bits == ATM_CI_MAX) ci.vpi_bits = MAX_VPI_BITS;
 	if (ci.vci_bits == ATM_CI_MAX) ci.vci_bits = MAX_VCI_BITS;
 	if (ci.vpi_bits > MAX_VPI_BITS || ci.vpi_bits < 0 ||

@@ -127,16 +127,6 @@ config IP_NF_MATCH_PKTTYPE
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-config IP_NF_MATCH_POLICY
-	tristate "IPsec policy match support"
-	depends on IP_NF_IPTABLES && XFRM
-	help
-	  Policy matching allows you to match packets based on the
-	  IPsec policy that was used during decapsulation/will
-	  be used during encapsulation.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
 config IP_NF_MATCH_MARK
 	tristate "netfilter MARK match support"
 	depends on IP_NF_IPTABLES
@@ -589,19 +579,54 @@ config IP_NF_COMPAT_IPFWADM
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-config IP_NF_CONNTRACK_MARK
-	bool  'Connection mark tracking support'
-config IP_NF_TARGET_CONNMARK
-	tristate  'CONNMARK target support'
-	depends on IP_NF_MANGLE
-config IP_NF_MATCH_CONNMARK
-	tristate  ' Connection mark match support'
+config IP_NF_TARGET_NOTRACK
+	tristate  'NOTRACK target support'
+	depends on IP_NF_RAW
+	depends on IP_NF_CONNTRACK
+	help
+	  The NOTRACK target allows a select rule to specify
+	  which packets *not* to enter the conntrack/NAT
+	  subsystem with all the consequences (no ICMP error tracking,
+	  no protocol helpers for the selected packets).
+	
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_RAW
+	tristate  'raw table support (required for NOTRACK/TRACE)'
 	depends on IP_NF_IPTABLES
+	help
+	  This option adds a `raw' table to iptables. This table is the very
+	  first in the netfilter framework and hooks in at the PREROUTING
+	  and OUTPUT chains.
+	
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 	  help
 
-config IP_NF_TARGET_CLUSTERIP
-	tristate ' CLUSTERIP target support'
-	depends on IP_NF_CONNTRACK_MARK!=n && IP_NF_IPTABLES!=n
+config IP_NF_MATCH_ADDRTYPE
+	tristate  'address type match support'
+	depends on IP_NF_IPTABLES
+	help
+	  This option allows you to match what routing thinks of an address,
+	  eg. UNICAST, LOCAL, BROADCAST, ...
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
+
+config IP_NF_MATCH_REALM
+	tristate  'realm match support'
+	depends on IP_NF_IPTABLES
+	select NET_CLS_ROUTE
+	help
+	  This option adds a `realm' match, which allows you to use the realm
+	  key from the routing subsytem inside iptables.
+	
+	  This match pretty much resembles the CONFIG_NET_CLS_ROUTE4 option 
+	  in tc world.
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
 
 endmenu
 

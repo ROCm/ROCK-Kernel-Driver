@@ -10,11 +10,8 @@ ipv6-objs :=	af_inet6.o anycast.o ip6_output.o ip6_input.o addrconf.o sit.o \
 		exthdrs.o sysctl_net_ipv6.o datagram.o proc.o \
 		ip6_flowlabel.o ipv6_syms.o
 
-ifeq ($(CONFIG_IPV6_MOBILITY),m)
-	ipv6-objs += mipglue.o
-endif
-
-ipv6-$(CONFIG_XFRM) += xfrm6_policy.o xfrm6_state.o xfrm6_input.o
+ipv6-$(CONFIG_XFRM) += xfrm6_policy.o xfrm6_state.o xfrm6_input.o \
+	xfrm6_tunnel.o xfrm6_output.o
 ipv6-objs += $(ipv6-y)
 
 obj-$(CONFIG_INET6_AH) += ah6.o
@@ -22,7 +19,6 @@ obj-$(CONFIG_INET6_ESP) += esp6.o
 obj-$(CONFIG_INET6_IPCOMP) += ipcomp6.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 
-obj-$(CONFIG_IPV6_TUNNEL)   += ipv6_tunnel.o
-obj-$(CONFIG_IPV6_MOBILITY) += mobile_ip6/
+obj-$(CONFIG_IPV6_TUNNEL) += ip6_tunnel.o
 
 obj-y += exthdrs_core.o

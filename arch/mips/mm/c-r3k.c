@@ -311,6 +311,9 @@ static void r3k_flush_cache_sigtramp(unsigned long addr)
 
 static void r3k_dma_cache_wback_inv(unsigned long start, unsigned long size)
 {
+	/* Catch bad driver code */
+	BUG_ON(size == 0);
+
 	iob();
 	r3k_flush_dcache_range(start, start + size);
 }

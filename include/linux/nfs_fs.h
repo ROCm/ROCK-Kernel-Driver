@@ -69,6 +69,8 @@
 #define FLUSH_SYNC		1	/* file being synced, or contention */
 #define FLUSH_WAIT		2	/* wait for completion */
 #define FLUSH_STABLE		4	/* commit to stable storage */
+#define FLUSH_LOWPRI		8	/* low priority background flush */
+#define FLUSH_HIGHPRI		16	/* high priority memory reclaim flush */
 
 #ifdef __KERNEL__
 
@@ -287,22 +289,6 @@ extern struct inode_operations nfs_file_inode_operations;
 extern struct file_operations nfs_file_operations;
 extern struct address_space_operations nfs_file_aops;
 
-/*
- * linux/fs/nfs/xattr.c
- */
-#ifdef CONFIG_NFS_ACL
-extern ssize_t nfs_listxattr(struct dentry *, char *, size_t);
-extern ssize_t nfs_getxattr(struct dentry *, const char *, void *, size_t);
-extern int nfs_setxattr(struct dentry *, const char *,
-			const void *, size_t, int);
-extern int nfs_removexattr (struct dentry *, const char *name);
-#else
-# define nfs_listxattr NULL
-# define nfs_getxattr NULL
-# define nfs_setxattr NULL
-# define nfs_removexattr NULL
-#endif
-
 static __inline__ struct rpc_cred *
 nfs_file_cred(struct file *file)
 {
@@ -320,6 +306,10 @@ nfs_file_cred(struct file *file)
  */
 extern ssize_t nfs_direct_IO(int, struct kiocb *, const struct iovec *, loff_t,
 			unsigned long);
+extern ssize_t nfs_file_direct_read(struct kiocb *iocb, char __user *buf,
+			size_t count, loff_t pos);
+extern ssize_t nfs_file_direct_write(struct kiocb *iocb, const char __user *buf,
+			size_t count, loff_t pos);
 
 /*
  * linux/fs/nfs/dir.c
@@ -352,10 +342,8 @@ extern int  nfs_writepages(struct address_space *, struct writeback_control *);
 extern int  nfs_flush_incompatible(struct file *file, struct page *page);
 extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned int);
 extern void nfs_writeback_done(struct rpc_task *task);
-extern void nfs_writedata_release(struct rpc_task *task);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-extern void nfs_commit_release(struct rpc_task *task);
 extern void nfs_commit_done(struct rpc_task *);
 #endif
 
@@ -393,12 +381,16 @@ nfs_wb_all(struct inode *inode)
 /*
  * Write back all requests on one page - we do this before reading it.
  */
-static inline int
-nfs_wb_page(struct inode *inode, struct page* page)
+static inline int nfs_wb_page_priority(struct inode *inode, struct page* page, int how)
 {
 	int error = nfs_sync_inode(inode, page->index, 1,
-						FLUSH_WAIT | FLUSH_STABLE);
+			how | FLUSH_WAIT | FLUSH_STABLE);
 	return (error < 0) ? error : 0;
+}
+
+static inline int nfs_wb_page(struct inode *inode, struct page* page)
+{
+	return nfs_wb_page_priority(inode, page, 0);
 }
 
 /* Hack for future NFS swap support */
@@ -414,7 +406,6 @@ extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
 extern int  nfs_pagein_list(struct list_head *, int);
 extern void nfs_readpage_result(struct rpc_task *);
-extern void nfs_readdata_release(struct rpc_task *);
 
 /*
  * linux/fs/mount_clnt.c

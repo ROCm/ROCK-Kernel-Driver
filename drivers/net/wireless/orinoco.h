@@ -37,20 +37,6 @@ typedef void irqreturn_t;
 /* To enable debug messages */
 //#define ORINOCO_DEBUG		3
 
-#ifndef ETH_P_ECONET
-#define ETH_P_ECONET   0x0018    /* needed for 2.2.x kernels */
-#endif
-
-#define ETH_P_80211_RAW        (ETH_P_ECONET + 1)
-
-#ifndef ARPHRD_IEEE80211
-#define ARPHRD_IEEE80211 801     /* kernel 2.4.6 */
-#endif
-
-#ifndef ARPHRD_IEEE80211_PRISM  /* kernel 2.4.18 */
-#define ARPHRD_IEEE80211_PRISM 802
-#endif
-
 #if (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10)
 #error "orinoco driver requires Wireless extensions v10 or later."
 #endif /* (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10) */
@@ -68,158 +54,6 @@ struct orinoco_key {
 				HERMES_EV_TXEXC | HERMES_EV_WTERR | HERMES_EV_INFO | \
 				HERMES_EV_INFDROP )
 
-#define WLAN_DEVNAMELEN_MAX 16
-
-/* message data item for INT, BOUNDEDINT, ENUMINT */
-typedef struct p80211item_uint32
-{
-	uint32_t		did		__attribute__ ((packed));
-	uint16_t		status	__attribute__ ((packed));
-	uint16_t		len		__attribute__ ((packed));
-	uint32_t		data	__attribute__ ((packed));
-} __attribute__ ((packed)) p80211item_uint32_t;
-
-typedef struct p80211msg
-{
-	uint32_t	msgcode		__attribute__ ((packed));
-	uint32_t	msglen		__attribute__ ((packed));
-	uint8_t	devname[WLAN_DEVNAMELEN_MAX]	__attribute__ ((packed));
-} __attribute__ ((packed)) p80211msg_t;
-
-#define DIDmsg_lnxind_wlansniffrm 0x0041
-#define DIDmsg_lnxind_wlansniffrm_hosttime 0x1041
-#define DIDmsg_lnxind_wlansniffrm_mactime 0x2041
-#define DIDmsg_lnxind_wlansniffrm_channel 0x3041
-#define DIDmsg_lnxind_wlansniffrm_rssi 0x4041
-#define DIDmsg_lnxind_wlansniffrm_sq 0x5041
-#define DIDmsg_lnxind_wlansniffrm_signal 0x6041
-#define DIDmsg_lnxind_wlansniffrm_noise 0x7041
-#define DIDmsg_lnxind_wlansniffrm_rate 0x8041
-#define DIDmsg_lnxind_wlansniffrm_istx 0x9041
-#define DIDmsg_lnxind_wlansniffrm_frmlen 0xA041
-
-typedef struct p80211msg_lnxind_wlansniffrm
-{
-	uint32_t		msgcode;
-	uint32_t		msglen;
-	uint8_t		    devname[WLAN_DEVNAMELEN_MAX];
-	p80211item_uint32_t	hosttime;
-	p80211item_uint32_t	mactime;
-	p80211item_uint32_t	channel;
-	p80211item_uint32_t	rssi;
-	p80211item_uint32_t	sq;
-	p80211item_uint32_t	signal;
-	p80211item_uint32_t	noise;
-	p80211item_uint32_t	rate;
-	p80211item_uint32_t	istx;
-	p80211item_uint32_t	frmlen;
-} __attribute__ ((packed)) p80211msg_lnxind_wlansniffrm_t;
-
-#define P80211ENUM_truth_false			0
-#define P80211ENUM_truth_true			1
-#define P80211ENUM_resultcode_success		1
-#define P80211ENUM_resultcode_invalid_parameters	2
-#define P80211ENUM_resultcode_not_supported	3
-#define P80211ENUM_resultcode_timeout		4
-#define P80211ENUM_resultcode_too_many_req	5
-#define P80211ENUM_resultcode_refused		6
-#define P80211ENUM_resultcode_bss_already	7
-#define P80211ENUM_resultcode_invalid_access	8
-#define P80211ENUM_resultcode_invalid_mibattribute	9
-#define P80211ENUM_resultcode_cant_set_readonly_mib	10
-#define P80211ENUM_resultcode_implementation_failure	11
-#define P80211ENUM_resultcode_cant_get_writeonly_mib	12
-#define P80211ENUM_msgitem_status_data_ok		0
-#define P80211ENUM_msgitem_status_no_value		1
-#define P80211ENUM_msgitem_status_invalid_itemname	2
-#define P80211ENUM_msgitem_status_invalid_itemdata	3
-#define P80211ENUM_msgitem_status_missing_itemdata	4
-#define P80211ENUM_msgitem_status_incomplete_itemdata	5
-#define P80211ENUM_msgitem_status_invalid_msg_did	6
-#define P80211ENUM_msgitem_status_invalid_mib_did	7
-#define P80211ENUM_msgitem_status_missing_conv_func	8
-#define P80211ENUM_msgitem_status_string_too_long	9
-#define P80211ENUM_msgitem_status_data_out_of_range	10
-#define P80211ENUM_msgitem_status_string_too_short	11
-#define P80211ENUM_msgitem_status_missing_valid_func	12
-#define P80211ENUM_msgitem_status_unknown		13
-#define P80211ENUM_msgitem_status_invalid_did		14
-#define P80211ENUM_msgitem_status_missing_print_func	15
-
-#define WLAN_GET_FC_FTYPE(n)	(((n) & 0x0C) >> 2)
-#define WLAN_GET_FC_FSTYPE(n)	(((n) & 0xF0) >> 4)
-#define WLAN_GET_FC_TODS(n) 	(((n) & 0x0100) >> 8)
-#define WLAN_GET_FC_FROMDS(n)	(((n) & 0x0200) >> 9)
-
-/*--- Sizes -----------------------------------------------*/
-#define WLAN_ADDR_LEN			6
-#define WLAN_CRC_LEN			4
-#define WLAN_BSSID_LEN			6
-#define WLAN_BSS_TS_LEN			8
-#define WLAN_HDR_A3_LEN			24
-#define WLAN_HDR_A4_LEN			30
-#define WLAN_SSID_MAXLEN		32
-#define WLAN_DATA_MAXLEN		2312
-
-/*--- Frame Control Field -------------------------------------*/
-/* Frame Types */
-#define WLAN_FTYPE_MGMT			0x00
-#define WLAN_FTYPE_CTL			0x01
-#define WLAN_FTYPE_DATA			0x02
-
-/* Frame subtypes */
-/* Management */
-#define WLAN_FSTYPE_ASSOCREQ		0x00
-#define WLAN_FSTYPE_ASSOCRESP		0x01
-#define WLAN_FSTYPE_REASSOCREQ		0x02
-#define WLAN_FSTYPE_REASSOCRESP		0x03
-#define WLAN_FSTYPE_PROBEREQ		0x04 
-#define WLAN_FSTYPE_PROBERESP		0x05
-#define WLAN_FSTYPE_BEACON		0x08
-#define WLAN_FSTYPE_ATIM		0x09
-#define WLAN_FSTYPE_DISASSOC		0x0a
-#define WLAN_FSTYPE_AUTHEN		0x0b
-#define WLAN_FSTYPE_DEAUTHEN		0x0c
-
-/* Control */
-#define WLAN_FSTYPE_PSPOLL		0x0a
-#define WLAN_FSTYPE_RTS			0x0b
-#define WLAN_FSTYPE_CTS			0x0c
-#define WLAN_FSTYPE_ACK			0x0d
-#define WLAN_FSTYPE_CFEND		0x0e
-#define WLAN_FSTYPE_CFENDCFACK		0x0f
-
-/* Data */
-#define WLAN_FSTYPE_DATAONLY		0x00
-#define WLAN_FSTYPE_DATA_CFACK		0x01
-#define WLAN_FSTYPE_DATA_CFPOLL		0x02
-#define WLAN_FSTYPE_DATA_CFACK_CFPOLL	0x03
-#define WLAN_FSTYPE_NULL		0x04
-#define WLAN_FSTYPE_CFACK		0x05
-#define WLAN_FSTYPE_CFPOLL		0x06
-#define WLAN_FSTYPE_CFACK_CFPOLL	0x07
-
-/*----------------------------------------------------------------*/
-/* Magic number, a quick test to see we're getting the desired struct */
-
-#define P80211_IOCTL_MAGIC	(0x4a2d464dUL)
-
-/*================================================================*/
-/* Types */
-
-/*----------------------------------------------------------------*/
-/* A ptr to the following structure type is passed as the third */
-/*  argument to the ioctl system call when issuing a request to */
-/*  the p80211 module. */
-
-typedef struct p80211ioctl_req
-{
-	char 	name[WLAN_DEVNAMELEN_MAX] __attribute__ ((packed));
-	void	*data 		__attribute__ ((packed));
-	uint32_t	magic 	__attribute__ ((packed));
-	uint16_t	len 	__attribute__ ((packed));
-	uint32_t	result 	__attribute__ ((packed));
-} __attribute__ ((packed)) p80211ioctl_req_t;
 
 struct orinoco_private {
 	void *card;	/* Pointer to card dependent structure */
@@ -282,9 +116,6 @@ struct orinoco_private {
 	/* Configuration dependent variables */
 	int port_type, createibss;
 	int promiscuous, mc_count;
-
-	uint16_t		presniff_port_type;
-	uint16_t		presniff_wepflags;
 };
 
 #ifdef ORINOCO_DEBUG
@@ -294,8 +125,8 @@ extern int orinoco_debug;
 #define DEBUG(n, args...) do { } while (0)
 #endif	/* ORINOCO_DEBUG */
 
-#define TRACE_ENTER(devname) DEBUG(2, "%s: -> " __FUNCTION__ "()\n", devname);
-#define TRACE_EXIT(devname)  DEBUG(2, "%s: <- " __FUNCTION__ "()\n", devname);
+#define TRACE_ENTER(devname) DEBUG(2, "%s: -> %s()\n", devname, __FUNCTION__);
+#define TRACE_EXIT(devname)  DEBUG(2, "%s: <- %s()\n", devname, __FUNCTION__);
 
 extern struct net_device *alloc_orinocodev(int sizeof_card,
 					   int (*hard_reset)(struct orinoco_private *));
@@ -331,13 +162,5 @@ extern inline void orinoco_unlock(struct orinoco_private *priv,
 {
 	spin_unlock_irqrestore(&priv->lock, *flags);
 }
-
-/*================================================================*/
-/* Function Declarations */
-
-struct ieee802_11_hdr;
-
-void orinoco_int_rxmonitor( struct orinoco_private *dev, uint16_t rxfid, int len,
-                            struct hermes_rx_descriptor *rxdesc, struct ieee802_11_hdr *hdr);
 
 #endif /* _ORINOCO_H */

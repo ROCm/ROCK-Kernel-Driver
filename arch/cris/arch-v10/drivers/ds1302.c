@@ -4,9 +4,18 @@
 *!
 *! DESCRIPTION: Implements an interface for the DS1302 RTC through Etrax I/O
 *!
-*! Functions exported: ds1302_readreg, ds1302_writereg, ds1302_init, get_rtc_status
+*! Functions exported: ds1302_readreg, ds1302_writereg, ds1302_init
 *!
 *! $Log: ds1302.c,v $
+*! Revision 1.13  2004/05/28 09:26:59  starvik
+*! Modified I2C initialization to work in 2.6.
+*!
+*! Revision 1.12  2004/05/14 07:58:03  starvik
+*! Merge of changes from 2.4
+*!
+*! Revision 1.10  2004/02/04 09:25:12  starvik
+*! Merge of Linux 2.6.2
+*!
 *! Revision 1.9  2003/07/04 08:27:37  starvik
 *! Merge of Linux 2.5.74
 *!
@@ -114,7 +123,7 @@
 *!
 *! (C) Copyright 1999, 2000, 2001  Axis Communications AB, LUND, SWEDEN
 *!
-*! $Id: ds1302.c,v 1.9 2003/07/04 08:27:37 starvik Exp $
+*! $Id: ds1302.c,v 1.13 2004/05/28 09:26:59 starvik Exp $
 *!
 *!***************************************************************************/
 
@@ -283,12 +292,23 @@ ds1302_readreg(int reg)
 void
 ds1302_writereg(int reg, unsigned char val) 
 {
-	ds1302_wenable();
-	start();
-	out_byte(0x80 | (reg << 1)); /* write register */
-	out_byte(val);
-	stop();
-	ds1302_wdisable();
+#ifndef CONFIG_ETRAX_RTC_READONLY
+	int do_writereg = 1;
+#else
+	int do_writereg = 0;
+
+	if (reg == RTC_TRICKLECHARGER)
+		do_writereg = 1;
+#endif
+
+	if (do_writereg) {
+		ds1302_wenable();
+		start();
+		out_byte(0x80 | (reg << 1)); /* write register */
+		out_byte(val);
+		stop();
+		ds1302_wdisable();
+	}
 }
 
 void
@@ -426,19 +446,32 @@ rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			tcs_val = RTC_TCR_PATTERN | (tcs_val & 0x0F);
 			ds1302_writereg(RTC_TRICKLECHARGER, tcs_val);
 			return 0;
-		}                
+		}
+		case RTC_VLOW_RD:
+		{
+			/* TODO:
+			 * Implement voltage low detection support
+			 */
+			printk(KERN_WARNING "DS1302: RTC Voltage Low detection"
+			       " is not supported\n");
+			return 0;
+		}
+		case RTC_VLOW_SET:
+		{
+			/* TODO:
+			 * Nothing to do since Voltage Low detection is not supported
+			 */
+			return 0;
+		}
 		default:
 			return -ENOIOCTLCMD;
 	}
 }
 
-int
-get_rtc_status(char *buf) 
+static void
+print_rtc_status(void)
 {
-	char *p;
 	struct rtc_time tm;
-
-	p = buf;
 
 	get_rtc_time(&tm);
 
@@ -447,15 +480,11 @@ get_rtc_status(char *buf)
 	 * time or for Universal Standard Time (GMT). Probably local though.
 	 */
 
-	p += sprintf(p,
-		"rtc_time\t: %02d:%02d:%02d\n"
-		"rtc_date\t: %04d-%02d-%02d\n",
-		tm.tm_hour, tm.tm_min, tm.tm_sec,
-		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-
-	return  p - buf;
+	printk(KERN_INFO "rtc_time\t: %02d:%02d:%02d\n",
+	       tm.tm_hour, tm.tm_min, tm.tm_sec);
+	printk(KERN_INFO "rtc_date\t: %04d-%02d-%02d\n",
+	       tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
-
 
 /* The various file operations we support. */
 
@@ -487,11 +516,10 @@ ds1302_probe(void)
 	out_byte(0xc1); /* read RAM byte 0 */
 
 	if((res = in_byte()) == MAGIC_PATTERN) {
-		char buf[100];
 		stop();
 		ds1302_wdisable();
-		printk("%s: RTC found.\n", ds1302_name);
-		printk("%s: SDA, SCL, RST on PB%i, PB%i, %s%i\n",
+		printk(KERN_INFO "%s: RTC found.\n", ds1302_name);
+		printk(KERN_INFO "%s: SDA, SCL, RST on PB%i, PB%i, %s%i\n",
 		       ds1302_name,
 		       CONFIG_ETRAX_DS1302_SDABIT,
 		       CONFIG_ETRAX_DS1302_SCLBIT,
@@ -501,12 +529,10 @@ ds1302_probe(void)
 		       "PB",
 #endif
 		       CONFIG_ETRAX_DS1302_RSTBIT);
-                get_rtc_status(buf);
-                printk(buf);
+                print_rtc_status();
 		retval = 1;
 	} else {
 		stop();
-		printk("%s: RTC not found.\n", ds1302_name);
 		retval = 0;
 	}
 
@@ -518,7 +544,9 @@ ds1302_probe(void)
 
 int __init
 ds1302_init(void) 
-{ 
+{
+	i2c_init();
+
 	if (!ds1302_probe()) {
 #ifdef CONFIG_ETRAX_DS1302_RST_ON_GENERIC_PORT
 #if CONFIG_ETRAX_DS1302_RSTBIT == 27
@@ -539,16 +567,20 @@ ds1302_init(void)
 				   (IO_STATE(R_GEN_CONFIG, g0dir, out)));    
     		*R_GEN_CONFIG = genconfig_shadow;
 #endif
-		if (!ds1302_probe())
+		if (!ds1302_probe()) {
+			printk(KERN_WARNING "%s: RTC not found.\n", ds1302_name);
       			return -1;
+		}
 #else
+		printk(KERN_WARNING "%s: RTC not found.\n", ds1302_name);
     		return -1;
 #endif
   	}
-  
 	/* Initialise trickle charger */
 	ds1302_writereg(RTC_TRICKLECHARGER,
 			RTC_TCR_PATTERN |(CONFIG_ETRAX_DS1302_TRICKLE_CHARGE & 0x0F));
+        /* Start clock by resetting CLOCK_HALT */
+	ds1302_writereg(RTC_SECONDS, (ds1302_readreg(RTC_SECONDS) & 0x7F));
 	return 0;
 }
 

@@ -121,7 +121,7 @@ void *module_alloc(unsigned long size)
 			goto fail;
 	}
 	
-	if (map_vm_area(area, PAGE_KERNEL_EXECUTABLE, &pages))
+	if (map_vm_area(area, PAGE_KERNEL_EXEC, &pages))
 		goto fail;
 	
 	memset(addr, 0, size);

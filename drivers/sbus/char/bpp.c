@@ -482,7 +482,7 @@ static int bpp_release(struct inode *inode, struct file *f)
       return 0;
 }
 
-static long read_nibble(unsigned minor, char *c, unsigned long cnt)
+static long read_nibble(unsigned minor, char __user *c, unsigned long cnt)
 {
       unsigned long remaining = cnt;
       long rc;
@@ -535,7 +535,7 @@ static long read_nibble(unsigned minor, char *c, unsigned long cnt)
       return cnt - remaining;
 }
 
-static long read_ecp(unsigned minor, char *c, unsigned long cnt)
+static long read_ecp(unsigned minor, char __user *c, unsigned long cnt)
 {
       unsigned long remaining;
       long rc;
@@ -630,7 +630,7 @@ static long read_ecp(unsigned minor, char *c, unsigned long cnt)
       return cnt - remaining;
 }
 
-static ssize_t bpp_read(struct file *f, char *c, size_t cnt, loff_t * ppos)
+static ssize_t bpp_read(struct file *f, char __user *c, size_t cnt, loff_t * ppos)
 {
       long rc;
       unsigned minor = iminor(f->f_dentry->d_inode);
@@ -692,7 +692,7 @@ static ssize_t bpp_read(struct file *f, char *c, size_t cnt, loff_t * ppos)
  * Compatibility mode handshaking is a matter of writing data,
  * strobing it, and waiting for the printer to stop being busy.
  */
-static long write_compat(unsigned minor, const char *c, unsigned long cnt)
+static long write_compat(unsigned minor, const char __user *c, unsigned long cnt)
 {
       long rc;
       unsigned short pins = get_pins(minor);
@@ -730,7 +730,7 @@ static long write_compat(unsigned minor, const char *c, unsigned long cnt)
  * Write data using ECP mode. Watch out that the port may be set up
  * for reading. If so, turn the port around.
  */
-static long write_ecp(unsigned minor, const char *c, unsigned long cnt)
+static long write_ecp(unsigned minor, const char __user *c, unsigned long cnt)
 {
       unsigned short pins = get_pins(minor);
       unsigned long remaining = cnt;
@@ -783,7 +783,7 @@ static long write_ecp(unsigned minor, const char *c, unsigned long cnt)
  * that. Otherwise, terminate and do my writing in compat mode. This
  * is the safest course as any device can handle it.
  */
-static ssize_t bpp_write(struct file *f, const char *c, size_t cnt, loff_t * ppos)
+static ssize_t bpp_write(struct file *f, const char __user *c, size_t cnt, loff_t * ppos)
 {
       long errno = 0;
       unsigned minor = iminor(f->f_dentry->d_inode);

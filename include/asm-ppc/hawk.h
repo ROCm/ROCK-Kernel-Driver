@@ -29,4 +29,4 @@ extern int hawk_init(struct pci_controller *hose,
 extern unsigned long hawk_get_mem_size(unsigned int smc_base);
 extern int hawk_mpic_init(unsigned int pci_mem_offset);
 
-#endif				/* __ASMPPC_PPLUS_H */
+#endif	/* __ASMPPC_HAWK_H */

@@ -39,11 +39,10 @@ struct _diva_dma_map_entry {
   Create local mapping structure and init it to default state
   */
 struct _diva_dma_map_entry* diva_alloc_dma_map (void* os_context, int nentries) {
-  diva_dma_map_entry_t* pmap;
-  if (!(pmap = diva_os_malloc (0, sizeof(*pmap)*(nentries+1))))
-    return (0);
-  memset (pmap, 0x00, sizeof(*pmap)*(nentries+1));
-  return (pmap);
+  diva_dma_map_entry_t* pmap = diva_os_malloc(0, sizeof(*pmap)*(nentries+1));
+  if (pmap)
+	  memset (pmap, 0, sizeof(*pmap)*(nentries+1));
+  return pmap;
 }
 /*
   Free local map (context should be freed before) if any

@@ -330,9 +330,9 @@ int txInit(void)
 void txExit(void)
 {
 	vfree(TxLock);
-	TxLock = 0;
+	TxLock = NULL;
 	vfree(TxBlock);
-	TxBlock = 0;
+	TxBlock = NULL;
 }
 
 
@@ -1554,7 +1554,7 @@ static int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		hold_metapage(mp, 0);
 		atomic_dec(&mp->nohomeok);
 		discard_metapage(mp);
-		tlck->mp = 0;
+		tlck->mp = NULL;
 		return 0;
 	}
 
@@ -2270,7 +2270,7 @@ static void txUpdateMap(struct tblock * tblk)
 	struct pxd_lock pxdlock;
 	int maptype;
 	int k, nlock;
-	struct metapage *mp = 0;
+	struct metapage *mp = NULL;
 
 	ipimap = JFS_SBI(tblk->sb)->ipimap;
 
@@ -2358,7 +2358,7 @@ static void txUpdateMap(struct tblock * tblk)
 			assert(atomic_read(&mp->nohomeok) == 1);
 			atomic_dec(&mp->nohomeok);
 			discard_metapage(mp);
-			tlck->mp = 0;
+			tlck->mp = NULL;
 		}
 	}
 	/*
@@ -2580,7 +2580,7 @@ void txFreelock(struct inode *ip)
 	TXN_LOCK();
 	xtlck = (struct tlock *) &jfs_ip->atlhead;
 
-	while ((lid = xtlck->next)) {
+	while ((lid = xtlck->next) != 0) {
 		tlck = lid_to_tlock(lid);
 		if (tlck->flag & tlckFREELOCK) {
 			xtlck->next = tlck->next;
@@ -2778,7 +2778,7 @@ int jfs_lazycommit(void *arg)
 
 		if (current->flags & PF_FREEZE) {
 			LAZY_UNLOCK(flags);
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 		} else {
 			DECLARE_WAITQUEUE(wq, current);
 
@@ -2989,7 +2989,7 @@ int jfs_sync(void *arg)
 
 		if (current->flags & PF_FREEZE) {
 			TXN_UNLOCK();
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 		} else {
 			DECLARE_WAITQUEUE(wq, current);
 

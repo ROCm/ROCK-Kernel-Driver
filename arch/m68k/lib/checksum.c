@@ -32,6 +32,7 @@
  *		csum_partial_copy_from_user.
  */
 
+#include <linux/module.h>
 #include <net/checksum.h>
 
 /*

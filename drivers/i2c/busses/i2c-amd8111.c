@@ -276,7 +276,7 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 	}
 
 	if (~temp[0] & AMD_SMB_STS_DONE) {
-		i2c_delay(HZ/100);
+		msleep(1);
 		amd_ec_read(smbus, AMD_SMB_STS, temp + 0);
 	}
 
@@ -359,7 +359,7 @@ static int __devinit amd8111_probe(struct pci_dev *dev, const struct pci_device_
 	smbus->adapter.owner = THIS_MODULE;
 	snprintf(smbus->adapter.name, I2C_NAME_SIZE,
 		"SMBus2 AMD8111 adapter at %04x", smbus->base);
-	smbus->adapter.class = I2C_ADAP_CLASS_SMBUS;
+	smbus->adapter.class = I2C_CLASS_HWMON;
 	smbus->adapter.algo = &smbus_algorithm;
 	smbus->adapter.algo_data = smbus;
 

@@ -21,9 +21,6 @@
 #include <linux/personality.h> /* for STICKY_TIMEOUTS */
 #include <linux/file.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
-#include <linux/aio.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 
@@ -40,12 +37,6 @@ struct poll_table_page {
 	struct poll_table_page * next;
 	struct poll_table_entry * entry;
 	struct poll_table_entry entries[0];
-};
-
-struct aio_poll_table {
-	int init;
-	struct poll_wqueues wq;
-	struct poll_table_page table;
 };
 
 #define POLL_TABLE_FULL(table) \
@@ -118,34 +109,12 @@ void __pollwait(struct file *filp, wait_queue_head_t *wait_address, poll_table *
 	/* Add a new entry */
 	{
 		struct poll_table_entry * entry = table->entry;
-		wait_queue_t *wait;
-		wait_queue_t *aio_wait = current->io_wait;
-
-		if (aio_wait) {
-			/* for aio, there can only be one wait_address.
-			 * we might be adding it again via a retry call
-			 * if so, just return.
-			 * if not, bad things are happening
-			 */
-			if (table->entry != table->entries) {
-				if (table->entries[0].wait_address != wait_address)
-					BUG();
-				return;
-			}
-		}
-
 		table->entry = entry+1;
 	 	get_file(filp);
 	 	entry->filp = filp;
 		entry->wait_address = wait_address;
 		init_waitqueue_entry(&entry->wait, current);
-
-		/* if we're in aioland, use current->io_wait */
-		if (aio_wait)
-			wait = aio_wait;
-		else
-			wait = &entry->wait;
-		add_wait_queue(wait_address,wait);
+		add_wait_queue(wait_address,&entry->wait);
 	}
 }
 
@@ -215,14 +184,12 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	int retval, i;
 	long __timeout = *timeout;
 
-	FSHOOK_BEGIN(select, retval, .n = n, .fds = fds, .timeout = __timeout)
-
  	spin_lock(&current->files->file_lock);
 	retval = max_select_fd(n, fds);
 	spin_unlock(&current->files->file_lock);
 
 	if (retval < 0)
-		goto out;
+		return retval;
 	n = retval;
 
 	poll_initwait(&table);
@@ -258,7 +225,6 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 					continue;
 				file = fget(i);
 				if (file) {
-					TRIG_EVENT(select_hook, i, __timeout);
 					f_op = file->f_op;
 					mask = DEFAULT_POLLMASK;
 					if (f_op && f_op->poll)
@@ -302,9 +268,6 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	 * Up-to-date the caller timeout.
 	 */
 	*timeout = __timeout;
-out:
-	FSHOOK_END(select, retval)
-
 	return retval;
 }
 
@@ -449,7 +412,6 @@ static void do_pollfd(unsigned int num, struct pollfd * fdpage,
 			struct file * file = fget(fd);
 			mask = POLLNVAL;
 			if (file != NULL) {
-				TRIG_EVENT(poll_hook, fd);
 				mask = DEFAULT_POLLMASK;
 				if (file->f_op && file->f_op->poll)
 					mask = file->f_op->poll(file, *pwait);
@@ -473,8 +435,6 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 
 	if (!timeout)
 		pt = NULL;
-
-	FSHOOK_BEGIN(poll, count, .n = nfds, .list = list, .timeout = timeout)
  
 	for (;;) {
 		struct poll_list *walk;
@@ -493,9 +453,6 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 		timeout = schedule_timeout(timeout);
 	}
 	__set_current_state(TASK_RUNNING);
-
-	FSHOOK_END(poll, count)
-
 	return count;
 }
 
@@ -575,77 +532,4 @@ out_fds:
 	}
 	poll_freewait(&table);
 	return err;
-}
-
-static void aio_poll_freewait(struct aio_poll_table *ap, struct kiocb *iocb)
-{
-	struct poll_table_page * p = ap->wq.table;
-	if (p) {
-		struct poll_table_entry * entry = p->entry;
-		if (entry > p->entries) {
-			/*
-			 * there is only one entry for aio polls
-			 */
-			entry = p->entries;
-			if (iocb)
-				finish_wait(entry->wait_address,&iocb->ki_wait);
-			else
-				wake_up(entry->wait_address);
-			fput(entry->filp);
-		}
-	}
-	ap->init = 0;
-}
-
-static int
-aio_poll_cancel(struct kiocb *iocb, struct io_event *evt)
-{
-	struct aio_poll_table *aio_table;
-	aio_table = (struct aio_poll_table *)iocb->private;
-	
-	evt->obj = (u64)(unsigned long)iocb->ki_user_obj;
-	evt->data = iocb->ki_user_data;
-	evt->res = iocb->ki_nbytes - iocb->ki_left;
-	if (evt->res == 0)
-	        evt->res = -EINTR;
-	evt->res2 = 0;
-	if (aio_table->init)
-		aio_poll_freewait(aio_table, NULL);
-	aio_put_req(iocb);
-	return 0;
-}
-
-ssize_t generic_aio_poll(struct kiocb *iocb, unsigned events)
-{
-	struct aio_poll_table *aio_table;
-	unsigned mask;
-	struct file *file = iocb->ki_filp;
-	aio_table = (struct aio_poll_table *)iocb->private;
-
-	/* fast path */
-	mask = file->f_op->poll(file, NULL);
-	mask &= events | POLLERR | POLLHUP;
-	if (mask)
-		return mask;
-
-	if ((sizeof(*aio_table) + sizeof(struct poll_table_entry)) >
-	    sizeof(iocb->private))
-		BUG();
-
-	if (!aio_table->init) {
-		aio_table->init = 1;
-		poll_initwait(&aio_table->wq);
-		aio_table->wq.table = &aio_table->table;
-		aio_table->table.next = NULL;
-		aio_table->table.entry = aio_table->table.entries;
-	}
-	iocb->ki_cancel = aio_poll_cancel;
-
-	mask = file->f_op->poll(file, &aio_table->wq.pt);
-	mask &= events | POLLERR | POLLHUP;
-	if (mask) {
-		aio_poll_freewait(aio_table, iocb);
-		return mask;
-	}
-	return -EIOCBRETRY;
 }

@@ -40,7 +40,7 @@ struct mcf_stats {
 
 struct mcf_serial {
 	int			magic;
-	unsigned int		addr;		/* UART memory address */
+	volatile unsigned char	*addr;		/* UART memory address */
 	int			irq;
 	int			flags; 		/* defined in tty.h */
 	int			type; 		/* UART type */

@@ -3,7 +3,6 @@
 
 #include <linux/config.h>
 #include <asm/system.h>
-
 /* Copyright (C) 2000 Philipp Rumpf <prumpf@tux.org>.  */
 
 /*
@@ -15,33 +14,47 @@
  */
 
 #ifdef CONFIG_SMP
-/* Use an array of spinlocks for our atomic_ts.
-** Hash function to index into a different SPINLOCK.
-** Since "a" is usually an address, ">>8" makes one spinlock per 64-bytes.
-*/
-#  define ATOMIC_HASH_SIZE 4
-#  define ATOMIC_HASH(a) (&__atomic_hash[(((unsigned long) a)>>8)&(ATOMIC_HASH_SIZE-1)])
+#include <asm/cache.h>		/* we use L1_CACHE_BYTES */
 
-extern spinlock_t __atomic_hash[ATOMIC_HASH_SIZE];
-/* copied from <asm/spinlock.h> and modified */
-#  define SPIN_LOCK(x) \
-	do { while(__ldcw(&(x)->lock) == 0); } while(0)
-	
-#  define SPIN_UNLOCK(x) \
-	do { (x)->lock = 1; } while(0)
+typedef spinlock_t atomic_lock_t;
+
+/* Use an array of spinlocks for our atomic_ts.
+ * Hash function to index into a different SPINLOCK.
+ * Since "a" is usually an address, use one spinlock per cacheline.
+ */
+#  define ATOMIC_HASH_SIZE 4
+#  define ATOMIC_HASH(a) (&(__atomic_hash[ (((unsigned long) a)/L1_CACHE_BYTES) & (ATOMIC_HASH_SIZE-1) ]))
+
+extern atomic_lock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned;
+
+static inline void atomic_spin_lock(atomic_lock_t *a)
+{
+	while (__ldcw(a) == 0)
+		while (a->lock[0] == 0);
+}
+
+static inline void atomic_spin_unlock(atomic_lock_t *a)
+{
+	a->lock[0] = 1;
+}
+
 #else
 #  define ATOMIC_HASH_SIZE 1
 #  define ATOMIC_HASH(a)	(0)
-
-/* copied from <linux/spinlock.h> and modified */
-#  define SPIN_LOCK(x) (void)(x)
-	
-#  define SPIN_UNLOCK(x) do { } while(0)
+#  define atomic_spin_lock(x) (void)(x)
+#  define atomic_spin_unlock(x) do { } while(0)
 #endif
 
 /* copied from <linux/spinlock.h> and modified */
-#define SPIN_LOCK_IRQSAVE(lock, flags)		do { local_irq_save(flags);       SPIN_LOCK(lock); } while (0)
-#define SPIN_UNLOCK_IRQRESTORE(lock, flags)	do { SPIN_UNLOCK(lock);  local_irq_restore(flags); } while (0)
+#define atomic_spin_lock_irqsave(lock, flags)	do { 	\
+	local_irq_save(flags);				\
+	atomic_spin_lock(lock); 			\
+} while (0)
+
+#define atomic_spin_unlock_irqrestore(lock, flags) do {	\
+	atomic_spin_unlock(lock);			\
+	local_irq_restore(flags);			\
+} while (0)
 
 /* Note that we need not lock read accesses - aligned word writes/reads
  * are atomic, so a reader never sees unconsistent values.
@@ -137,22 +150,22 @@ static __inline__ int __atomic_add_return(int i, atomic_t *v)
 {
 	int ret;
 	unsigned long flags;
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(v), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(v), flags);
 
 	ret = (v->counter += i);
 
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(v), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(v), flags);
 	return ret;
 }
 
 static __inline__ void atomic_set(atomic_t *v, int i) 
 {
 	unsigned long flags;
-	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(v), flags);
+	atomic_spin_lock_irqsave(ATOMIC_HASH(v), flags);
 
 	v->counter = i;
 
-	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(v), flags);
+	atomic_spin_unlock_irqrestore(ATOMIC_HASH(v), flags);
 }
 
 static __inline__ int atomic_read(const atomic_t *v)

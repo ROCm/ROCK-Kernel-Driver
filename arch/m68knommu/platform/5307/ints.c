@@ -47,7 +47,7 @@ unsigned int local_irq_count[NR_CPUS];
 static irqreturn_t default_irq_handler(int irq, void *ptr, struct pt_regs *regs)
 {
 #if 1
-	printk("%s(%d): default irq handler vec=%d [0x%x]\n",
+	printk(KERN_INFO "%s(%d): default irq handler vec=%d [0x%x]\n",
 		__FILE__, __LINE__, irq, irq);
 #endif
 	return(IRQ_HANDLED);
@@ -94,7 +94,7 @@ irq_node_t *new_irq_node(void)
 		if (!node->handler)
 			return node;
 
-	printk("new_irq_node: out of nodes\n");
+	printk(KERN_INFO "new_irq_node: out of nodes\n");
 	return NULL;
 }
 
@@ -106,19 +106,19 @@ int request_irq(
 	void *dev_id)
 {
 	if (irq < 0 || irq >= NR_IRQS) {
-		printk("%s: Incorrect IRQ %d from %s\n", __FUNCTION__,
+		printk(KERN_WARNING "%s: Incorrect IRQ %d from %s\n", __FUNCTION__,
 			irq, devname);
 		return -ENXIO;
 	}
 
 	if (!(irq_list[irq].flags & IRQ_FLG_STD)) {
 		if (irq_list[irq].flags & IRQ_FLG_LOCK) {
-			printk("%s: IRQ %d from %s is not replaceable\n",
+			printk(KERN_WARNING "%s: IRQ %d from %s is not replaceable\n",
 			       __FUNCTION__, irq, irq_list[irq].devname);
 			return -EBUSY;
 		}
 		if (flags & IRQ_FLG_REPLACE) {
-			printk("%s: %s can't replace IRQ %d from %s\n",
+			printk(KERN_WARNING "%s: %s can't replace IRQ %d from %s\n",
 			       __FUNCTION__, devname, irq, irq_list[irq].devname);
 			return -EBUSY;
 		}
@@ -142,12 +142,12 @@ EXPORT_SYMBOL(request_irq);
 void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= NR_IRQS) {
-		printk("%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
+		printk(KERN_WARNING "%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
 		return;
 	}
 
 	if (irq_list[irq].dev_id != dev_id)
-		printk("%s: Removing probably wrong IRQ %d from %s\n",
+		printk(KERN_WARNING "%s: Removing probably wrong IRQ %d from %s\n",
 		       __FUNCTION__, irq, irq_list[irq].devname);
 
 	if (irq_list[irq].flags & IRQ_FLG_FAST) {
@@ -173,7 +173,7 @@ int sys_request_irq(unsigned int irq,
                     unsigned long flags, const char *devname, void *dev_id)
 {
 	if (irq > IRQ7) {
-		printk("%s: Incorrect IRQ %d from %s\n",
+		printk(KERN_WARNING "%s: Incorrect IRQ %d from %s\n",
 		       __FUNCTION__, irq, devname);
 		return -ENXIO;
 	}
@@ -181,12 +181,12 @@ int sys_request_irq(unsigned int irq,
 #if 0
 	if (!(irq_list[irq].flags & IRQ_FLG_STD)) {
 		if (irq_list[irq].flags & IRQ_FLG_LOCK) {
-			printk("%s: IRQ %d from %s is not replaceable\n",
+			printk(KERN_WARNING "%s: IRQ %d from %s is not replaceable\n",
 			       __FUNCTION__, irq, irq_list[irq].devname);
 			return -EBUSY;
 		}
 		if (!(flags & IRQ_FLG_REPLACE)) {
-			printk("%s: %s can't replace IRQ %d from %s\n",
+			printk(KERN_WARNING "%s: %s can't replace IRQ %d from %s\n",
 			       __FUNCTION__, devname, irq, irq_list[irq].devname);
 			return -EBUSY;
 		}
@@ -203,12 +203,12 @@ int sys_request_irq(unsigned int irq,
 void sys_free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq > IRQ7) {
-		printk("%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
+		printk(KERN_WARNING "%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
 		return;
 	}
 
 	if (irq_list[irq].dev_id != dev_id)
-		printk("%s: Removing probably wrong IRQ %d from %s\n",
+		printk(KERN_WARNING "%s: Removing probably wrong IRQ %d from %s\n",
 		       __FUNCTION__, irq, irq_list[irq].devname);
 
 	irq_list[irq].handler = (*mach_default_handler)[irq];
@@ -257,21 +257,20 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i = *(loff_t *) v;
 
 	if (i < NR_IRQS) {
-		if (irq_list[i].flags & IRQ_FLG_STD)
-			continue;
-
-		seq_printf(p, "%3d: %10u ", i,
-			(i ? kstat_cpu(0).irqs[i] : num_spurious));
-		if (irq_list[i].flags & IRQ_FLG_LOCK)
-			seq_printf(p, "L ");
-		else
-			seq_printf(p, "  ");
-		seq_printf(p, "%s\n", irq_list[i].devname);
+		if (! (irq_list[i].flags & IRQ_FLG_STD)) {
+			seq_printf(p, "%3d: %10u ", i,
+				(i ? kstat_cpu(0).irqs[i] : num_spurious));
+			if (irq_list[i].flags & IRQ_FLG_LOCK)
+				seq_printf(p, "L ");
+			else
+				seq_printf(p, "  ");
+			seq_printf(p, "%s\n", irq_list[i].devname);
+		}
 	}
 
 	if (i == NR_IRQS && mach_get_irq_list)
 		mach_get_irq_list(p, v);
-	return(0);
+	return 0;
 }
 
 void init_irq_proc(void)

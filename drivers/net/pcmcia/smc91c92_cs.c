@@ -411,6 +411,9 @@ static void smc91c92_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
+    if (link->dev)
+	unregister_netdev(dev);
+
     if (link->state & DEV_CONFIG)
 	smc91c92_release(link);
 
@@ -419,8 +422,6 @@ static void smc91c92_detach(dev_link_t *link)
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
-    if (link->dev)
-	unregister_netdev(dev);
     free_netdev(dev);
 } /* smc91c92_detach */
 
@@ -901,6 +902,7 @@ static void smc91c92_config(dev_link_t *link)
     char *name;
     int i, j, rev;
     ioaddr_t ioaddr;
+    u_long mir;
 
     DEBUG(0, "smc91c92_config(0x%p)\n", link);
 
@@ -952,11 +954,6 @@ static void smc91c92_config(dev_link_t *link)
     else
 	printk(KERN_NOTICE "smc91c92_cs: invalid if_port requested\n");
 
-    if (register_netdev(dev) != 0) {
-	printk(KERN_ERR "smc91c92_cs: register_netdev() failed\n");
-	goto config_undo;
-    }
-
     switch (smc->manfid) {
     case MANFID_OSITECH:
     case MANFID_PSION:
@@ -977,8 +974,6 @@ static void smc91c92_config(dev_link_t *link)
 	goto config_undo;
     }
 
-    strcpy(smc->node.dev_name, dev->name);
-    link->dev = &smc->node;
     smc->duplex = 0;
     smc->rx_ovrn = 0;
 
@@ -993,25 +988,16 @@ static void smc91c92_config(dev_link_t *link)
 	case 8: name = "100-FD"; break;
 	case 9: name = "110"; break;
 	}
-    printk(KERN_INFO "%s: smc91c%s rev %d: io %#3lx, irq %d, "
-	   "hw_addr ", dev->name, name, (rev & 0x0f), dev->base_addr,
-	   dev->irq);
-    for (i = 0; i < 6; i++)
-	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
 
     ioaddr = dev->base_addr;
     if (rev > 0) {
-	u_long mir, mcr;
+	u_long mcr;
 	SMC_SELECT_BANK(0);
 	mir = inw(ioaddr + MEMINFO) & 0xff;
 	if (mir == 0xff) mir++;
 	/* Get scale factor for memory size */
 	mcr = ((rev >> 4) > 3) ? inw(ioaddr + MEMCFG) : 0x0200;
 	mir *= 128 * (1<<((mcr >> 9) & 7));
-	if (mir & 0x3ff)
-	    printk(KERN_INFO "  %lu byte", mir);
-	else
-	    printk(KERN_INFO "  %lu kb", mir>>10);
 	SMC_SELECT_BANK(1);
 	smc->cfg = inw(ioaddr + CONFIG) & ~CFG_AUI_SELECT;
 	smc->cfg |= CFG_NO_WAIT | CFG_16BIT | CFG_STATIC;
@@ -1019,9 +1005,8 @@ static void smc91c92_config(dev_link_t *link)
 	    smc->cfg |= CFG_IRQ_SEL_1 | CFG_IRQ_SEL_0;
 	if ((rev >> 4) >= 7)
 	    smc->cfg |= CFG_MII_SELECT;
-	printk(" buffer, %s xcvr\n", (smc->cfg & CFG_MII_SELECT) ?
-	       "MII" : if_names[dev->if_port]);
-    }
+    } else
+	mir = 0;
 
     if (smc->cfg & CFG_MII_SELECT) {
 	SMC_SELECT_BANK(3);
@@ -1031,16 +1016,45 @@ static void smc91c92_config(dev_link_t *link)
 	    if ((j != 0) && (j != 0xffff)) break;
 	}
 	smc->mii_if.phy_id = (i < 32) ? i : -1;
-	if (i < 32) {
-	    DEBUG(0, "  MII transceiver at index %d, status %x.\n", i, j);
-	} else {
-    	    printk(KERN_NOTICE "  No MII transceivers found!\n");
-	}
 
 	SMC_SELECT_BANK(0);
     }
 
+    link->dev = &smc->node;
     link->state &= ~DEV_CONFIG_PENDING;
+
+    if (register_netdev(dev) != 0) {
+	printk(KERN_ERR "smc91c92_cs: register_netdev() failed\n");
+	link->dev = NULL;
+	goto config_undo;
+    }
+
+    strcpy(smc->node.dev_name, dev->name);
+
+    printk(KERN_INFO "%s: smc91c%s rev %d: io %#3lx, irq %d, "
+	   "hw_addr ", dev->name, name, (rev & 0x0f), dev->base_addr,
+	   dev->irq);
+    for (i = 0; i < 6; i++)
+	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
+
+    if (rev > 0) {
+	if (mir & 0x3ff)
+	    printk(KERN_INFO "  %lu byte", mir);
+	else
+	    printk(KERN_INFO "  %lu kb", mir>>10);
+	printk(" buffer, %s xcvr\n", (smc->cfg & CFG_MII_SELECT) ?
+	       "MII" : if_names[dev->if_port]);
+    }
+
+    if (smc->cfg & CFG_MII_SELECT) {
+	if (smc->mii_if.phy_id != -1) {
+	    DEBUG(0, "  MII transceiver at index %d, status %x.\n",
+		  smc->mii_if.phy_id, j);
+	} else {
+    	    printk(KERN_NOTICE "  No MII transceivers found!\n");
+	}
+    }
+
     return;
 
 config_undo:
@@ -1099,10 +1113,8 @@ static int smc91c92_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 	    netif_device_detach(dev);
-	    smc91c92_release(link);
-	}
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
@@ -1260,7 +1272,7 @@ static int smc_open(struct net_device *dev)
     link->open++;
 
     netif_start_queue(dev);
-    smc->saved_skb = 0;
+    smc->saved_skb = NULL;
     smc->packets_waiting = 0;
 
     smc_reset(dev);
@@ -2106,12 +2118,12 @@ static int smc_netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
     return 0;
 }
 
-static int smc_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static int smc_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
 {
     u32 ethcmd;
     struct smc_private *smc = netdev_priv(dev);
 
-    if (get_user(ethcmd, (u32 *)useraddr))
+    if (get_user(ethcmd, (u32 __user *)useraddr))
 	return -EFAULT;
 
     switch (ethcmd) {
@@ -2208,7 +2220,7 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     u_short saved_bank;
     ioaddr_t ioaddr = dev->base_addr;
 
-    mii = (struct mii_ioctl_data *) &rq->ifr_data;
+    mii = if_mii(rq);
     if (!netif_running(dev))
     	return -EINVAL;
 
@@ -2216,7 +2228,7 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     case SIOCETHTOOL:
 	saved_bank = inw(ioaddr + BANK_SELECT);
 	SMC_SELECT_BANK(3);
-	rc = smc_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	rc = smc_ethtool_ioctl(dev, rq->ifr_data);
 	SMC_SELECT_BANK(saved_bank);
 	break;
 

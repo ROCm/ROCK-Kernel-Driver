@@ -7,17 +7,17 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: compr_rubin.c,v 1.17 2002/05/20 14:56:37 dwmw2 Exp $
+ * $Id: compr_rubin.c,v 1.20 2004/06/23 16:34:40 havasi Exp $
  *
  */
 
  
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/jffs2.h>
 #include "compr_rubin.h"
 #include "histo_mips.h"
-
-
+#include "compr.h"
 
 static void init_rubin(struct rubin_state *rs, int div, int *bits)
 {	
@@ -223,13 +223,13 @@ static int rubin_do_compress(int bit_divider, int *bits, unsigned char *data_in,
 #if 0
 /* _compress returns the compressed size, -1 if bigger */
 int jffs2_rubinmips_compress(unsigned char *data_in, unsigned char *cpage_out, 
-		   uint32_t *sourcelen, uint32_t *dstlen)
+		   uint32_t *sourcelen, uint32_t *dstlen, void *model)
 {
 	return rubin_do_compress(BIT_DIVIDER_MIPS, bits_mips, data_in, cpage_out, sourcelen, dstlen);
 }
 #endif
 int jffs2_dynrubin_compress(unsigned char *data_in, unsigned char *cpage_out, 
-		   uint32_t *sourcelen, uint32_t *dstlen)
+		   uint32_t *sourcelen, uint32_t *dstlen, void *model)
 {
 	int bits[8];
 	unsigned char histo[256];
@@ -306,14 +306,15 @@ static void rubin_do_decompress(int bit_divider, int *bits, unsigned char *cdata
 }		   
 
 
-void jffs2_rubinmips_decompress(unsigned char *data_in, unsigned char *cpage_out, 
-		   uint32_t sourcelen, uint32_t dstlen)
+int jffs2_rubinmips_decompress(unsigned char *data_in, unsigned char *cpage_out, 
+		   uint32_t sourcelen, uint32_t dstlen, void *model)
 {
 	rubin_do_decompress(BIT_DIVIDER_MIPS, bits_mips, data_in, cpage_out, sourcelen, dstlen);
+        return 0;
 }
 
-void jffs2_dynrubin_decompress(unsigned char *data_in, unsigned char *cpage_out, 
-		   uint32_t sourcelen, uint32_t dstlen)
+int jffs2_dynrubin_decompress(unsigned char *data_in, unsigned char *cpage_out, 
+		   uint32_t sourcelen, uint32_t dstlen, void *model)
 {
 	int bits[8];
 	int c;
@@ -322,4 +323,51 @@ void jffs2_dynrubin_decompress(unsigned char *data_in, unsigned char *cpage_out,
 		bits[c] = data_in[c];
 
 	rubin_do_decompress(256, bits, data_in+8, cpage_out, sourcelen-8, dstlen);
+        return 0;
+}
+
+static struct jffs2_compressor jffs2_rubinmips_comp = {
+    .priority = JFFS2_RUBINMIPS_PRIORITY,
+    .name = "rubinmips",
+    .compr = JFFS2_COMPR_DYNRUBIN,
+    .compress = NULL, /*&jffs2_rubinmips_compress,*/
+    .decompress = &jffs2_rubinmips_decompress,
+#ifdef JFFS2_RUBINMIPS_DISABLED
+    .disabled = 1,
+#else
+    .disabled = 0,
+#endif
+};
+
+int jffs2_rubinmips_init(void)
+{
+    return jffs2_register_compressor(&jffs2_rubinmips_comp);
+}
+
+void jffs2_rubinmips_exit(void)
+{
+    jffs2_unregister_compressor(&jffs2_rubinmips_comp);
+}
+
+static struct jffs2_compressor jffs2_dynrubin_comp = {
+    .priority = JFFS2_DYNRUBIN_PRIORITY,
+    .name = "dynrubin",
+    .compr = JFFS2_COMPR_RUBINMIPS,
+    .compress = jffs2_dynrubin_compress,
+    .decompress = &jffs2_dynrubin_decompress,
+#ifdef JFFS2_DYNRUBIN_DISABLED
+    .disabled = 1,
+#else
+    .disabled = 0,
+#endif
+};
+
+int jffs2_dynrubin_init(void)
+{
+    return jffs2_register_compressor(&jffs2_dynrubin_comp);
+}
+
+void jffs2_dynrubin_exit(void)
+{
+    jffs2_unregister_compressor(&jffs2_dynrubin_comp);
 }

@@ -1,7 +1,7 @@
 /*
  *	Mac bong noise generator. Note - we ought to put a boingy noise
  *	here 8)
- *	 
+ *
  *	----------------------------------------------------------------------
  *	16.11.98:
  *	rewrote some functions, added support for Enhanced ASC (Quadras)
@@ -15,15 +15,15 @@
 #include <asm/macintosh.h>
 #include <asm/mac_asc.h>
 
-static int mac_asc_inited = 0;
+static int mac_asc_inited;
 /*
  * dumb triangular wave table
  */
 static __u8 mac_asc_wave_tab[ 0x800 ];
 
 /*
- * Alan's original sine table; needs interpolating to 0x800 
- * (hint: interpolate or hardwire [0 -> Pi/2[, it's symmetric) 
+ * Alan's original sine table; needs interpolating to 0x800
+ * (hint: interpolate or hardwire [0 -> Pi/2[, it's symmetric)
  */
 static const signed char sine_data[] = {
 	0,  39,  75,  103,  121,  127,  121,  103,  75,  39,
@@ -35,23 +35,23 @@ static const signed char sine_data[] = {
  */
 static volatile __u8* mac_asc_regs = ( void* )0x50F14000;
 
-/* 
- * sample rate; is this a good default value? 
+/*
+ * sample rate; is this a good default value?
  */
-static unsigned long mac_asc_samplespersec = 11050;  
-static int mac_bell_duration = 0;
+static unsigned long mac_asc_samplespersec = 11050;
+static int mac_bell_duration;
 static unsigned long mac_bell_phase; /* 0..2*Pi -> 0..0x800 (wavetable size) */
 static unsigned long mac_bell_phasepersample;
 
 /*
- * some function protos 
+ * some function protos
  */
 static void mac_init_asc( void );
 static void mac_nosound( unsigned long );
 static void mac_quadra_start_bell( unsigned int, unsigned int, unsigned int );
 static void mac_quadra_ring_bell( unsigned long );
 static void mac_av_start_bell( unsigned int, unsigned int, unsigned int );
-static void ( *mac_special_bell )( unsigned int, unsigned int, unsigned int ) = NULL;
+static void ( *mac_special_bell )( unsigned int, unsigned int, unsigned int );
 
 /*
  * our timer to start/continue/stop the bell
@@ -67,11 +67,11 @@ static void mac_init_asc( void )
 {
 	int i;
 
-	/* 
-	 * do some machine specific initialization 
+	/*
+	 * do some machine specific initialization
 	 * BTW:
 	 * the NetBSD Quadra patch identifies the Enhanced Apple Sound Chip via
-	 * 	mac_asc_regs[ 0x800 ] & 0xF0 != 0
+	 *	mac_asc_regs[ 0x800 ] & 0xF0 != 0
 	 * this makes no sense here, because we have to set the default sample
 	 * rate anyway if we want correct frequencies
 	 */
@@ -83,27 +83,27 @@ static void mac_init_asc( void )
 			 */
 			mac_asc_regs = ( void* )0x50010000;
 			break;
-			/* 
-			 * not sure about how correct this list is 
-			 * machines with the EASC enhanced apple sound chip 
+			/*
+			 * not sure about how correct this list is
+			 * machines with the EASC enhanced apple sound chip
 			 */
 		case MAC_MODEL_Q630:
 		case MAC_MODEL_P475:
 			mac_special_bell = mac_quadra_start_bell;
 			mac_asc_samplespersec = 22150;
-			break;	
+			break;
 		case MAC_MODEL_C660:
 		case MAC_MODEL_Q840:
 			/*
 			 * The Quadra 660AV and 840AV use the "Singer" custom ASIC for sound I/O.
-			 * It appears to be similar to the "AWACS" custom ASIC in the Power Mac 
-			 * [678]100.  Because Singer and AWACS may have a similar hardware 
-			 * interface, this would imply that the code in drivers/sound/dmasound.c 
+			 * It appears to be similar to the "AWACS" custom ASIC in the Power Mac
+			 * [678]100.  Because Singer and AWACS may have a similar hardware
+			 * interface, this would imply that the code in drivers/sound/dmasound.c
 			 * for AWACS could be used as a basis for Singer support.  All we have to
-			 * do is figure out how to do DMA on the 660AV/840AV through the PSC and 
+			 * do is figure out how to do DMA on the 660AV/840AV through the PSC and
 			 * figure out where the Singer hardware sits in memory. (I'd look in the
-			 * vicinity of the AWACS location in a Power Mac [678]100 first, or the 
-			 * current location of the Apple Sound Chip--ASC--in other Macs.)  The 
+			 * vicinity of the AWACS location in a Power Mac [678]100 first, or the
+			 * current location of the Apple Sound Chip--ASC--in other Macs.)  The
 			 * Power Mac [678]100 info can be found in MkLinux Mach kernel sources.
 			 *
 			 * Quoted from Apple's Tech Info Library, article number 16405:
@@ -111,7 +111,7 @@ static void mac_init_asc( void )
 			 *   Macintosh models have 16-bit audio input and output capability
 			 *   because of the AT&T DSP3210 hardware circuitry and the 16-bit Singer
 			 *   codec circuitry in the AVs.  The Audio Waveform Amplifier and
-			 *   Converter (AWAC) chip in the Power Macintosh performs the same 
+			 *   Converter (AWAC) chip in the Power Macintosh performs the same
 			 *   16-bit I/O functionality.  The PowerBook 500 series computers
 			 *   support 16-bit stereo output, but only mono input."
 			 *
@@ -139,8 +139,8 @@ static void mac_init_asc( void )
 			break;
 	}
 
-	/* 
-	 * init the wave table with a simple triangular wave 
+	/*
+	 * init the wave table with a simple triangular wave
 	 * A sine wave would sure be nicer here ...
 	 */
 	for ( i = 0; i < 0x400; i++ )
@@ -149,15 +149,15 @@ static void mac_init_asc( void )
 		mac_asc_wave_tab[ i + 0x400 ] = 0xFF - i / 4;
 	}
 	mac_asc_inited = 1;
-}	
+}
 
 /*
- * Called to make noise; current single entry to the boing driver. 
+ * Called to make noise; current single entry to the boing driver.
  * Does the job for simple ASC, calls other routines else.
  * XXX Fixme:
- * Should be split into asc_mksound, easc_mksound, av_mksound and 
- * function pointer set in mac_init_asc which would be called at 
- * init time. 
+ * Should be split into asc_mksound, easc_mksound, av_mksound and
+ * function pointer set in mac_init_asc which would be called at
+ * init time.
  * _This_ is rather ugly ...
  */
 void mac_mksound( unsigned int freq, unsigned int length )
@@ -192,7 +192,7 @@ void mac_mksound( unsigned int freq, unsigned int length )
 	del_timer( &mac_sound_timer );
 
 	for ( i = 0; i < 0x800; i++ )
-		mac_asc_regs[ i ] = 0;	
+		mac_asc_regs[ i ] = 0;
 	for ( i = 0; i < 0x800; i++ )
 		mac_asc_regs[ i ] = mac_asc_wave_tab[ i ];
 
@@ -218,7 +218,7 @@ void mac_mksound( unsigned int freq, unsigned int length )
 static void mac_nosound( unsigned long ignored )
 {
 	mac_asc_regs[ ASC_ENABLE ] = 0;
-}	
+}
 
 /*
  * EASC entry; init EASC, don't load wavetable, schedule 'start whining'.
@@ -237,7 +237,7 @@ static void mac_quadra_start_bell( unsigned int freq, unsigned int length, unsig
 	mac_bell_duration = length;
 	mac_bell_phase = 0;
 	mac_bell_phasepersample = ( freq * sizeof( mac_asc_wave_tab ) ) / mac_asc_samplespersec;
-	/* this is reasonably big for small frequencies */ 
+	/* this is reasonably big for small frequencies */
 
 	local_irq_save(flags);
 
@@ -247,11 +247,11 @@ static void mac_quadra_start_bell( unsigned int freq, unsigned int length, unsig
 	/* set up the ASC registers */
 	if ( mac_asc_regs[ 0x801 ] != 1 )
 	{
-		/* select mono mode */	
+		/* select mono mode */
 		mac_asc_regs[ 0x807 ] = 0;
 		/* select sampled sound mode */
 		mac_asc_regs[ 0x802 ] = 0;
-	 	/* ??? */	
+		/* ??? */
 		mac_asc_regs[ 0x801 ] = 1;
 		mac_asc_regs[ 0x803 ] |= 0x80;
 		mac_asc_regs[ 0x803 ] &= 0x7F;
@@ -266,12 +266,12 @@ static void mac_quadra_start_bell( unsigned int freq, unsigned int length, unsig
 
 /*
  * EASC 'start/continue whining'; I'm not sure why the above function didn't
- * already load the wave table, or at least call this one... 
+ * already load the wave table, or at least call this one...
  * This piece keeps reloading the wave table until done.
  */
 static void mac_quadra_ring_bell( unsigned long ignored )
 {
-	int 	i, count = mac_asc_samplespersec / HZ;
+	int	i, count = mac_asc_samplespersec / HZ;
 	__u32 flags;
 
 	/*
@@ -282,7 +282,7 @@ static void mac_quadra_ring_bell( unsigned long ignored )
 	 */
 
 	local_irq_save(flags);
-	
+
 	del_timer( &mac_sound_timer );
 
 	if ( mac_bell_duration-- > 0 )
@@ -297,7 +297,7 @@ static void mac_quadra_ring_bell( unsigned long ignored )
 	}
 	else
 		mac_asc_regs[ 0x801 ] = 0;
-	
+
 	local_irq_restore(flags);
 }
 
@@ -306,4 +306,4 @@ static void mac_quadra_ring_bell( unsigned long ignored )
  */
 static void mac_av_start_bell( unsigned int freq, unsigned int length, unsigned int volume )
 {
-} 
+}

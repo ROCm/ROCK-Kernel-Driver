@@ -39,7 +39,7 @@ extern unsigned char __per_cpu_start[], __per_cpu_end[];
 extern struct desc_ptr cpu_gdt_descr[];
 struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table }; 
 
-char boot_cpu_stack[IRQSTACKSIZE] __cacheline_aligned;
+char boot_cpu_stack[IRQSTACKSIZE] __attribute__((section(".bss.page_aligned")));
 
 unsigned long __supported_pte_mask = ~0UL;
 static int do_not_nx __initdata = 0;
@@ -190,7 +190,8 @@ void pda_init(int cpu)
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
 
-char boot_exception_stacks[N_EXCEPTION_STACKS * EXCEPTION_STKSZ];
+char boot_exception_stacks[N_EXCEPTION_STACKS * EXCEPTION_STKSZ] 
+__attribute__((section(".bss.page_aligned")));
 
 void __init syscall_init(void)
 {

@@ -1,6 +1,6 @@
 /*
  * csr1212.c -- IEEE 1212 Control and Status Register support for Linux
- * 
+ *
  * Copyright (C) 2003 Francois Retief <fgretief@sun.ac.za>
  *                    Steve Kinneberg <kinnebergsteve@acmsystems.com>
  *
@@ -173,7 +173,7 @@ struct csr1212_csr *csr1212_create_csr(struct csr1212_bus_ops *ops,
 	if (!csr)
 		return NULL;
 
-	csr->cache_head = 
+	csr->cache_head =
 		csr1212_rom_cache_malloc(CSR1212_CONFIG_ROM_SPACE_OFFSET,
 					 CSR1212_CONFIG_ROM_SPACE_SIZE);
 	if (!csr->cache_head) {
@@ -206,7 +206,9 @@ struct csr1212_csr *csr1212_create_csr(struct csr1212_bus_ops *ops,
 void csr1212_init_local_csr(struct csr1212_csr *csr,
 			    const u_int32_t *bus_info_data, int max_rom)
 {
-	csr->max_rom = max_rom;
+	static const int mr_map[] = { 4, 64, 1024, 0 };
+
+	csr->max_rom = mr_map[max_rom];
 	memcpy(csr->bus_info_data, bus_info_data, csr->bus_info_len);
 }
 
@@ -238,7 +240,7 @@ static struct csr1212_keyval *csr1212_new_keyval(u_int8_t type, u_int8_t key)
 struct csr1212_keyval *csr1212_new_immediate(u_int8_t key, u_int32_t value)
 {
 	struct csr1212_keyval *kv = csr1212_new_keyval(CSR1212_KV_TYPE_IMMEDIATE, key);
-	
+
 	if (!kv)
 		return NULL;
 
@@ -253,7 +255,7 @@ struct csr1212_keyval *csr1212_new_leaf(u_int8_t key, const void *data, size_t d
 
 	if (!kv)
 		return NULL;
-	
+
 	if (data_len > 0) {
 		kv->value.leaf.data = CSR1212_MALLOC(data_len);
 		if (!kv->value.leaf.data) {
@@ -571,7 +573,7 @@ struct csr1212_keyval *csr1212_new_modifiable_descriptor_leaf(u_int16_t max_size
 	CSR1212_MODIFIABLE_DESCRIPTOR_SET_MAX_SIZE(kv, max_size);
 	CSR1212_MODIFIABLE_DESCRIPTOR_SET_ADDRESS_HI(kv, address);
 	CSR1212_MODIFIABLE_DESCRIPTOR_SET_ADDRESS_LO(kv, address);
-        
+
 	return kv;
 }
 
@@ -620,7 +622,7 @@ struct csr1212_keyval *csr1212_new_keyword_leaf(int strc, const char *strv[])
 
 	/* make sure last quadlet is zeroed out */
 	*((u_int32_t*)&(buffer[(data_len - 1) & ~0x3])) = 0;
-	
+
 	/* Copy keyword(s) into leaf data buffer */
 	for (i = 0; i < strc; i++) {
 		int len = strlen(strv[i]) + 1;
@@ -642,7 +644,7 @@ void csr1212_detach_keyval_from_directory(struct csr1212_keyval *dir,
 		return;
 
 	dentry = csr1212_find_keyval(dir, kv);
-	
+
 	if (!dentry)
 		return;
 
@@ -1059,6 +1061,10 @@ void csr1212_fill_cache(struct csr1212_csr_rom_cache *cache)
 		}
 
 		nkv = kv->next;
+		if (kv->prev)
+			kv->prev->next = NULL;
+		if (kv->next)
+			kv->next->prev = NULL;
 		kv->prev = NULL;
 		kv->next = NULL;
 	}
@@ -1117,11 +1123,10 @@ int csr1212_generate_csr_image(struct csr1212_csr *csr)
 	/* Remove unused, excess cache regions */
 	while (cache) {
 		struct csr1212_csr_rom_cache *oc = cache;
-		
+
 		cache = cache->next;
 		csr1212_remove_cache(csr, oc);
 	}
-
 
 	/* Go through the list backward so that when done, the correct CRC
 	 * will be calculated for the Extended ROM areas. */
@@ -1133,7 +1138,7 @@ int csr1212_generate_csr_image(struct csr1212_csr *csr)
 			/* Make sure the Extended ROM leaf is a multiple of
 			 * max_rom in size. */
 			leaf_size = (cache->len + (csr->max_rom - 1)) &
-				(csr->max_rom - 1);
+				~(csr->max_rom - 1);
 
 			/* Zero out the unused ROM region */
 			memset(cache->data + bytes_to_quads(cache->len), 0x00,
@@ -1261,7 +1266,7 @@ static inline int csr1212_parse_dir_entry(struct csr1212_keyval *dir,
 			ret = CSR1212_ENOMEM;
 			goto fail;
 		}
-		
+
 		k->refcnt = 0;	/* Don't keep local reference when parsing. */
 		break;
 
@@ -1448,7 +1453,7 @@ int _csr1212_read_keyval(struct csr1212_csr *csr, struct csr1212_keyval *kv)
 			newcr = CSR1212_MALLOC(sizeof(struct csr1212_cache_region));
 			if (!newcr)
 				return CSR1212_ENOMEM;
-			
+
 			newcr->offset_start = cache_index & ~(csr->max_rom - 1);
 			newcr->offset_end = newcr->offset_start;
 			newcr->next = cr;
@@ -1472,7 +1477,7 @@ int _csr1212_read_keyval(struct csr1212_csr *csr, struct csr1212_keyval *kv)
 		newcr = CSR1212_MALLOC(sizeof(struct csr1212_cache_region));
 		if (!newcr)
 			return CSR1212_ENOMEM;
-			
+
 		newcr->offset_start = cache_index & ~(csr->max_rom - 1);
 		newcr->offset_end = newcr->offset_start;
 		newcr->prev = cr;

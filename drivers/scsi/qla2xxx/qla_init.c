@@ -135,10 +135,6 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	/* Initialize target map database. */
 	qla2x00_init_tgt_map(ha);
 
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-	/* Get Flash Version */
-	qla2x00_get_flash_version(ha);
-#endif
 	qla_printk(KERN_INFO, ha, "Configure NVRAM parameters...\n");
 	qla2x00_nvram_config(ha);
 
@@ -152,13 +148,8 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	 */
 	if (ql2xdevconf) {
 		ha->cmdline = ql2xdevconf;
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-		if (!qla2x00_failover_enabled(ha))
-			qla2x00_get_properties(ha, ql2xdevconf);
-#else
 		qla2x00_get_properties(ha, ql2xdevconf);
 	}
-#endif
 #endif
 
 	retry = 10;
@@ -1602,21 +1593,7 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 		    test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)) {
 			rval = QLA_FUNCTION_FAILED;
 		} else {
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-			if (!qla2x00_failover_enabled(ha)) {
-				qla2x00_config_os(ha);
-			} else {
-				DEBUG(printk("scsi(%ld): schedule FAILBACK "
-				    "EVENT\n", ha->host_no));
-				if (!(test_and_set_bit(FAILOVER_EVENT_NEEDED,
-				    &ha->dpc_flags))) {
-					ha->failback_delay = ql2xfailbackTime;
-				}
-				ha->failover_type = MP_NOTIFY_LOOP_UP;
-			}
-#else
 			qla2x00_config_os(ha);
-#endif
 			atomic_set(&ha->loop_state, LOOP_READY);
 
 			DEBUG(printk("scsi(%ld): LOOP READY\n", ha->host_no));
@@ -1876,11 +1853,7 @@ qla2x00_update_fcport(scsi_qla_host_t *ha, fc_port_t *fcport)
 	    PORT_RETRY_TIME;
 	atomic_set(&fcport->port_down_timer, ha->port_down_retry_count *
 	    PORT_RETRY_TIME);
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-	fcport->flags &= ~(FCF_FAILOVER_NEEDED | FCF_LOGIN_NEEDED);
-#else
 	fcport->flags &= ~FCF_LOGIN_NEEDED;
-#endif
 
 	/*
 	 * Check for outstanding cmd on tape Bypass LUN discovery if active
@@ -2165,13 +2138,6 @@ qla2x00_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
 	}
 
 	fcport->device_type = inq->inq[0];
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-	/* Does this port require special failover handling? */
-	if (qla2x00_failover_enabled(ha)) {
-		fcport->cfg_id = qla2x00_cfg_lookup_device(&inq->inq[0]);
-		qla2x00_set_device_flags(ha, fcport);
-	}
-#endif
 	fclun = qla2x00_add_lun(fcport, lun);
 
 	if (fclun != NULL) {
@@ -3230,10 +3196,6 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 			ha->done_q_cnt,
 			ha->scsi_retry_q_cnt);)
 
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-	if (qla2x00_failover_enabled(ha))
-		qla2xxx_start_all_adapters(ha);
-#endif
 	if (!list_empty(&ha->done_queue))
 		qla2x00_done(ha);
 }
@@ -3258,14 +3220,7 @@ qla2x00_rescan_fcports(scsi_qla_host_t *ha)
 
 	/* Update OS target and lun structures if necessary. */
 	if (rescan_done) {
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-		if (!qla2x00_failover_enabled(ha))
-			qla2x00_config_os(ha);
-		else
-			qla2x00_cfg_remap(ha);
-#else
 		qla2x00_config_os(ha);
-#endif
 	}
 }
 
@@ -3414,12 +3369,7 @@ qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport)
 		tq->port_down_retry_count = ha->port_down_retry_count;
 
 #if 0
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-		if (!qla2x00_failover_enabled(ha))
-			qla2x00_get_lun_mask_from_config(ha, fcport, tgt, 0);
-#else
 		qla2x00_get_lun_mask_from_config(ha, fcport, tgt, 0);
-#endif
 #endif
 	}
 
@@ -3780,7 +3730,6 @@ qla2x00_get_prop_xstr(scsi_qla_host_t *ha,
 {
 	char		*propstr;
 	int		rval = -1;
-//XXX
 	static char	buf[LINESIZE];
 
 	/* Get the requested property string */

@@ -1841,7 +1841,7 @@ wl_his_gather(struct net_device *	dev,
 #endif	/* HISTOGRAM */
 
 static inline int
-wl_netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+wl_netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 
@@ -2764,7 +2764,7 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
   switch(cmd)
     {
     case SIOCETHTOOL:
-      ret = wl_netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+      ret = wl_netdev_ethtool_ioctl(dev, rq->ifr_data);
       break;
 
       /* ------------------- OTHER IOCTL ------------------- */

@@ -39,11 +39,13 @@
 #ifndef IRDA_DEVICE_H
 #define IRDA_DEVICE_H
 
+#include <linux/config.h>
 #include <linux/tty.h>
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
 #include <linux/skbuff.h>		/* struct sk_buff */
 #include <linux/irda.h>
+#include <linux/types.h>
 
 #include <net/pkt_sched.h>
 #include <net/irda/irda.h>
@@ -236,7 +238,7 @@ dongle_t *irda_device_dongle_init(struct net_device *dev, int type);
 int irda_device_dongle_cleanup(dongle_t *dongle);
 
 #ifdef CONFIG_ISA
-void irda_setup_dma(int channel, char *buffer, int count, int mode);
+void irda_setup_dma(int channel, dma_addr_t buffer, int count, int mode);
 #endif
 
 void irda_task_delete(struct irda_task *task);

@@ -42,7 +42,6 @@ static char *version = "sun3lance.c: v1.2 1/12/2001  Sam Creasey (sammy@sammy.ne
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 #include <asm/dvma.h>
 #include <asm/idprom.h>
 #include <asm/machines.h>

@@ -23,7 +23,7 @@ diva_data_q_init(diva_um_idi_data_queue_t * q,
 	q->segments = max_segments;
 
 	for (i = 0; i < q->segments; i++) {
-		q->data[i] = 0;
+		q->data[i] = NULL;
 		q->length[i] = 0;
 	}
 	q->read = q->write = q->count = q->segment_pending = 0;
@@ -46,7 +46,7 @@ int diva_data_q_finit(diva_um_idi_data_queue_t * q)
 		if (q->data[i]) {
 			diva_os_free(0, q->data[i]);
 		}
-		q->data[i] = 0;
+		q->data[i] = NULL;
 		q->length[i] = 0;
 	}
 	q->read = q->write = q->count = q->segment_pending = 0;
@@ -66,7 +66,7 @@ void *diva_data_q_get_segment4write(diva_um_idi_data_queue_t * q)
 		return (q->data[q->write]);
 	}
 
-	return (0);
+	return NULL;
 }
 
 void
@@ -89,7 +89,7 @@ const void *diva_data_q_get_segment4read(const diva_um_idi_data_queue_t *
 	if (q->count) {
 		return (q->data[q->read]);
 	}
-	return (0);
+	return NULL;
 }
 
 int diva_data_q_get_segment_length(const diva_um_idi_data_queue_t * q)

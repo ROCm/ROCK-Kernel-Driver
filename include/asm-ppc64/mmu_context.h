@@ -136,7 +136,7 @@ destroy_context(struct mm_struct *mm)
 }
 
 extern void flush_stab(struct task_struct *tsk, struct mm_struct *mm);
-extern void flush_slb(struct task_struct *tsk, struct mm_struct *mm);
+extern void switch_slb(struct task_struct *tsk, struct mm_struct *mm);
 
 /*
  * switch_mm is the entry point called from the architecture independent
@@ -161,7 +161,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		return;
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB)
-		flush_slb(tsk, next);
+		switch_slb(tsk, next);
 	else
 		flush_stab(tsk, next);
 }
@@ -181,10 +181,6 @@ static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
 	local_irq_restore(flags);
 }
 
-#define VSID_RANDOMIZER 42470972311
-#define VSID_MASK	0xfffffffff
-
-
 /* This is only valid for kernel (including vmalloc, imalloc and bolted) EA's
  */
 static inline unsigned long
@@ -195,15 +191,15 @@ get_kernel_vsid( unsigned long ea )
 	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | (ea >> 60);
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
-	ifppcdebug(PPCDBG_HTABSTRESS) {
-		/* For debug, this path creates a very poor vsid distribuition.
-		 * A user program can access virtual addresses in the form
-		 * 0x0yyyyxxxx000 where yyyy = xxxx to cause multiple mappings
-		 * to hash to the same page table group.
-		 */ 
-		ordinal = ((ea >> 28) & 0x1fff) | (ea >> 44);
-		vsid = ordinal & VSID_MASK;
-	}
+#ifdef HTABSTRESS
+	/* For debug, this path creates a very poor vsid distribuition.
+	 * A user program can access virtual addresses in the form
+	 * 0x0yyyyxxxx000 where yyyy = xxxx to cause multiple mappings
+	 * to hash to the same page table group.
+	 */
+	ordinal = ((ea >> 28) & 0x1fff) | (ea >> 44);
+	vsid = ordinal & VSID_MASK;
+#endif /* HTABSTRESS */
 
 	return vsid;
 } 
@@ -218,11 +214,11 @@ get_vsid( unsigned long context, unsigned long ea )
 	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | context;
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
-	ifppcdebug(PPCDBG_HTABSTRESS) {
-		/* See comment above. */
-		ordinal = ((ea >> 28) & 0x1fff) | (context << 16);
-		vsid = ordinal & VSID_MASK;
-	}
+#ifdef HTABSTRESS
+	/* See comment above. */
+	ordinal = ((ea >> 28) & 0x1fff) | (context << 16);
+	vsid = ordinal & VSID_MASK;
+#endif /* HTABSTRESS */
 
 	return vsid;
 }

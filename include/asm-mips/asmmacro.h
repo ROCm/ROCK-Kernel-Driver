@@ -9,6 +9,7 @@
 #define _ASM_ASMMACRO_H
  
 #include <linux/config.h>
+#include <asm/hazards.h>
  
 #ifdef CONFIG_MIPS32
 #include <asm/asmmacro-32.h>
@@ -21,6 +22,7 @@
 	mfc0	\reg, CP0_STATUS
 	ori	\reg, \reg, 1
 	mtc0	\reg, CP0_STATUS
+	irq_enable_hazard
 	.endm
 
 	.macro	local_irq_disable reg=t0
@@ -28,7 +30,7 @@
 	ori	\reg, \reg, 1
 	xori	\reg, \reg, 1
 	mtc0	\reg, CP0_STATUS
-	SSNOP; SSNOP; SSNOP
+	irq_disable_hazard
 	.endm
 
 #ifdef CONFIG_CPU_SB1

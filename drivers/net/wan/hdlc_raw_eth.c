@@ -46,7 +46,7 @@ static int eth_tx(struct sk_buff *skb, struct net_device *dev)
 
 int hdlc_raw_eth_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
-	raw_hdlc_proto *raw_s = ifr->ifr_settings.ifs_ifsu.raw_hdlc;
+	raw_hdlc_proto __user *raw_s = ifr->ifr_settings.ifs_ifsu.raw_hdlc;
 	const size_t size = sizeof(raw_hdlc_proto);
 	raw_hdlc_proto new_settings;
 	hdlc_device *hdlc = dev_to_hdlc(dev);

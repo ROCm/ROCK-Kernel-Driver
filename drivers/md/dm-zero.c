@@ -35,6 +35,7 @@ static void zero_fill_bio(struct bio *bio)
 	bio_for_each_segment(bv, bio, i) {
 		char *data = bvec_kmap_irq(bv, &flags);
 		memset(data, 0, bv->bv_len);
+		flush_dcache_page(bv->bv_page);
 		bvec_kunmap_irq(data, &flags);
 	}
 }
@@ -65,6 +66,7 @@ static int zero_map(struct dm_target *ti, struct bio *bio,
 
 static struct target_type zero_target = {
 	.name   = "zero",
+	.version = {1, 0, 0},
 	.module = THIS_MODULE,
 	.ctr    = zero_ctr,
 	.map    = zero_map,

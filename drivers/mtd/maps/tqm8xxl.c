@@ -2,7 +2,7 @@
  * Handle mapping of the flash memory access routines 
  * on TQM8xxL based devices.
  *
- * $Id: tqm8xxl.c,v 1.9 2003/06/23 11:48:18 dwmw2 Exp $
+ * $Id: tqm8xxl.c,v 1.11 2004/07/12 21:59:45 dwmw2 Exp $
  *
  * based on rpxlite.c
  *
@@ -105,7 +105,7 @@ static struct mtd_partition tqm8xxl_fs_partitions[] = {
 	  .name = "jffs",
 	  .offset = 0x00200000,
 	  .size = 0x00200000,
-	  .//size = MTDPART_SIZ_FULL,
+	  //.size = MTDPART_SIZ_FULL,
 	}
 };
 #endif
@@ -151,7 +151,7 @@ int __init init_tqm_mtd(void)
 		sprintf(map_banks[idx]->name, "TQM8xxL%d", idx);
 
 		map_banks[idx]->size = flash_size;
-		map_banks[idx]->buswidth = 4;
+		map_banks[idx]->bankwidth = 4;
 
 		simple_map_init(map_banks[idx]);
 

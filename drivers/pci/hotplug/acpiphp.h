@@ -47,7 +47,6 @@
 #define info(format, arg...) printk(KERN_INFO "%s: " format, MY_NAME , ## arg)
 #define warn(format, arg...) printk(KERN_WARNING "%s: " format, MY_NAME , ## arg)
 
-#define SLOT_MAGIC	0x67267322
 /* name size which is used for entries in pcihpfs */
 #define SLOT_NAME_SIZE	KOBJ_NAME_LEN		/* {_SUN} */
 
@@ -59,7 +58,6 @@ struct pci_resource;
  * struct slot - slot information for each *physical* slot
  */
 struct slot {
-	u32 magic;
 	u8 number;
 	struct hotplug_slot	*hotplug_slot;
 	struct list_head	slot_list;
@@ -220,9 +218,7 @@ extern void acpiphp_glue_exit (void);
 extern int acpiphp_get_num_slots (void);
 extern struct acpiphp_slot *get_slot_from_id (int id);
 typedef int (*acpiphp_callback)(struct acpiphp_slot *slot, void *data);
-extern int acpiphp_for_each_slot (acpiphp_callback fn, void *data);
 
-extern int acpiphp_check_bridge (struct acpiphp_bridge *bridge);
 extern int acpiphp_enable_slot (struct acpiphp_slot *slot);
 extern int acpiphp_disable_slot (struct acpiphp_slot *slot);
 extern u8 acpiphp_get_power_status (struct acpiphp_slot *slot);
@@ -241,7 +237,6 @@ extern int acpiphp_init_func_resource (struct acpiphp_func *func);
 
 /* acpiphp_res.c */
 extern struct pci_resource *acpiphp_get_io_resource (struct pci_resource **head, u32 size);
-extern struct pci_resource *acpiphp_get_max_resource (struct pci_resource **head, u32 size);
 extern struct pci_resource *acpiphp_get_resource (struct pci_resource **head, u32 size);
 extern struct pci_resource *acpiphp_get_resource_with_base (struct pci_resource **head, u64 base, u32 size);
 extern int acpiphp_resource_sort_and_combine (struct pci_resource **head);

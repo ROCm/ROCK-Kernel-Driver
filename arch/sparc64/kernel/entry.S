@@ -26,7 +26,7 @@
 
 #define curptr      g6
 
-#define NR_SYSCALLS 273      /* Each OS is different... */
+#define NR_SYSCALLS 283      /* Each OS is different... */
 
 	.text
 	.align		32
@@ -1496,28 +1496,30 @@ sunos_getgid:
 	/* SunOS's execv() call only specifies the argv argument, the
 	 * environment settings are the same as the calling processes.
 	 */
-	.globl	sunos_execv, sys_execve, sys32_execve
+	.globl	sunos_execv
 sys_execve:
 	sethi		%hi(sparc_execve), %g1
 	ba,pt		%xcc, execve_merge
 	 or		%g1, %lo(sparc_execve), %g1
+#ifdef CONFIG_COMPAT
+	.globl	sys_execve
 sunos_execv:
 	stx		%g0, [%sp + PTREGS_OFF + PT_V9_I2]
+	.globl	sys32_execve
 sys32_execve:
 	sethi		%hi(sparc32_execve), %g1
 	or		%g1, %lo(sparc32_execve), %g1
+#endif
 execve_merge:
 	flushw
 	jmpl		%g1, %g0
 	 add		%sp, PTREGS_OFF, %o0
 
 	.globl	sys_pipe, sys_sigpause, sys_nis_syscall
-	.globl	sys_sigsuspend, sys_rt_sigsuspend, sys32_rt_sigsuspend
+	.globl	sys_sigsuspend, sys_rt_sigsuspend
 	.globl	sys_rt_sigreturn
-	.globl	sys32_sigreturn, sys32_rt_sigreturn
-	.globl	sys32_execve, sys_ptrace
-	.globl	sys_sigaltstack, sys32_sigaltstack
-	.globl	sys32_sigstack
+	.globl	sys_ptrace
+	.globl	sys_sigaltstack
 	.align	32
 sys_pipe:	ba,pt		%xcc, sparc_pipe
 		 add		%sp, PTREGS_OFF, %o0
@@ -1528,12 +1530,15 @@ sys_memory_ordering:
 		 add		%sp, PTREGS_OFF, %o1
 sys_sigaltstack:ba,pt		%xcc, do_sigaltstack
 		 add		%i6, STACK_BIAS, %o2
+#ifdef CONFIG_COMPAT
+	.globl	sys32_sigstack
 sys32_sigstack:	ba,pt		%xcc, do_sys32_sigstack
 		 mov		%i6, %o2
+	.globl	sys32_sigaltstack
 sys32_sigaltstack:
 		ba,pt		%xcc, do_sys32_sigaltstack
 		 mov		%i6, %o2
-
+#endif
 		.align		32
 sys_sigsuspend:	add		%sp, PTREGS_OFF, %o0
 		call		do_sigsuspend
@@ -1544,31 +1549,40 @@ sys_rt_sigsuspend: /* NOTE: %o0,%o1 have a correct value already */
 		call		do_rt_sigsuspend
 		 add		%o7, 1f-.-4, %o7
 		nop
+#ifdef CONFIG_COMPAT
+	.globl	sys32_rt_sigsuspend
 sys32_rt_sigsuspend: /* NOTE: %o0,%o1 have a correct value already */
 		srl		%o0, 0, %o0
 		add		%sp, PTREGS_OFF, %o2
 		call		do_rt_sigsuspend32
 		 add		%o7, 1f-.-4, %o7
+#endif
 		/* NOTE: %o0 has a correct value already */
 sys_sigpause:	add		%sp, PTREGS_OFF, %o1
 		call		do_sigpause
 		 add		%o7, 1f-.-4, %o7
 		nop
+#ifdef CONFIG_COMPAT
+	.globl	sys32_sigreturn
 sys32_sigreturn:
 		add		%sp, PTREGS_OFF, %o0
 		call		do_sigreturn32
 		 add		%o7, 1f-.-4, %o7
 		nop
+#endif
 sys_rt_sigreturn:
 		add		%sp, PTREGS_OFF, %o0
 		call		do_rt_sigreturn
 		 add		%o7, 1f-.-4, %o7
 		nop
+#ifdef CONFIG_COMPAT
+	.globl	sys32_rt_sigreturn
 sys32_rt_sigreturn:
 		add		%sp, PTREGS_OFF, %o0
 		call		do_rt_sigreturn32
 		 add		%o7, 1f-.-4, %o7
 		nop
+#endif
 sys_ptrace:	add		%sp, PTREGS_OFF, %o0
 		call		do_ptrace
 		 add		%o7, 1f-.-4, %o7
@@ -1697,12 +1711,12 @@ linux_sparc_syscall32:
 	 add		%sp, PTREGS_OFF, %o0
 	srl		%i0, 0, %o0
 #endif
-	mov		%i4, %o4				! IEU1
+	srl		%i4, 0, %o4				! IEU1
 	lduw		[%l7 + %l4], %l7			! Load
 	srl		%i1, 0, %o1				! IEU0	Group
 	ldx		[%curptr + TI_FLAGS], %l0		! Load
 
-	mov		%i5, %o5				! IEU1
+	srl		%i5, 0, %o5				! IEU1
 	srl		%i2, 0, %o2				! IEU0	Group
 	andcc		%l0, _TIF_SYSCALL_TRACE, %g0		! IEU0	Group
 	bne,pn		%icc, linux_syscall_trace32		! CTI
@@ -1751,42 +1765,44 @@ ret_sys_call:
 	ldx		[%sp + PTREGS_OFF + PT_V9_TNPC], %l1 ! pc = npc
 	sra		%o0, 0, %o0
 	mov		%ulo(TSTATE_XCARRY | TSTATE_ICARRY), %g2
-	cmp		%o0, -ENOIOCTLCMD
 	sllx		%g2, 32, %g2
+
+	/* Check if force_successful_syscall_return()
+	 * was invoked.
+	 */
+	ldx		[%curptr + TI_FLAGS], %l0
+	andcc		%l0, _TIF_SYSCALL_SUCCESS, %g0
+	be,pt		%icc, 1f
+	 andn		%l0, _TIF_SYSCALL_SUCCESS, %l0
+	ba,pt		%xcc, 80f
+	 stx		%l0, [%curptr + TI_FLAGS]
+
+1:
+	cmp		%o0, -ENOIOCTLCMD
 	bgeu,pn		%xcc, 1f
 	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
 80:
-	andn		%g3, %g2, %g3		/* System call success, clear Carry condition code. */
+	/* System call success, clear Carry condition code. */
+	andn		%g3, %g2, %g3
 	stx		%g3, [%sp + PTREGS_OFF + PT_V9_TSTATE]	
 	bne,pn		%icc, linux_syscall_trace2
-	 add		%l1, 0x4, %l2				         ! npc = npc+4
+	 add		%l1, 0x4, %l2			! npc = npc+4
 	stx		%l1, [%sp + PTREGS_OFF + PT_V9_TPC]
 	ba,pt		%xcc, rtrap_clr_l6
 	 stx		%l2, [%sp + PTREGS_OFF + PT_V9_TNPC]
 
 1:
-	/* Really a failure?  Check if force_successful_syscall_return()
-	 * was invoked.
-	 */
-	ldx		[%curptr + TI_FLAGS], %l0		! Load
-	andcc		%l0, _TIF_SYSCALL_SUCCESS, %g0
-	be,pt		%icc, 1f
-	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
-	andn		%l0, _TIF_SYSCALL_SUCCESS, %l0
-	ba,pt		%xcc, 80b
-	 stx		%l0, [%curptr + TI_FLAGS]
-
 	/* System call failure, set Carry condition code.
 	 * Also, get abs(errno) to return to the process.
 	 */
-1:
+	andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
 	sub		%g0, %o0, %o0
 	or		%g3, %g2, %g3
 	stx		%o0, [%sp + PTREGS_OFF + PT_V9_I0]
 	mov		1, %l6
 	stx		%g3, [%sp + PTREGS_OFF + PT_V9_TSTATE]
 	bne,pn		%icc, linux_syscall_trace2
-	 add		%l1, 0x4, %l2				         !npc = npc+4
+	 add		%l1, 0x4, %l2			! npc = npc+4
 	stx		%l1, [%sp + PTREGS_OFF + PT_V9_TPC]
 
 	b,pt		%xcc, rtrap

@@ -24,6 +24,7 @@
  */
 #include <linux/pci.h>
 #include <asm/pci-bridge.h>
+#include <asm/rtas.h>
 #include "../pci.h"		/* for pci_add_new_bus */
 
 #include "rpaphp.h"
@@ -133,7 +134,7 @@ int rpaphp_get_pci_adapter_status(struct slot *slot, int is_init, u8 * value)
 			else if (rpaphp_find_pci_dev(slot->dn->child))
 				*value = CONFIGURED;
 			else {
-				info("%s: can't find pdev of adapter in slot[%s]\n", 
+				err("%s: can't find pdev of adapter in slot[%s]\n", 
 					__FUNCTION__, slot->dn->full_name);
 				*value = NOT_CONFIGURED;
 			}
@@ -340,6 +341,7 @@ exit:
 	return rc;
 }
 
+
 static void rpaphp_eeh_remove_bus_device(struct pci_dev *dev)
 {
 	eeh_remove_device(dev);
@@ -361,7 +363,7 @@ static void rpaphp_eeh_remove_bus_device(struct pci_dev *dev)
 int rpaphp_unconfig_pci_adapter(struct slot *slot)
 {
 	int retval = 0;
-	struct list_head *ln, *tmp;
+	struct list_head *ln;
 
 	dbg("Entry %s: slot[%s]\n", __FUNCTION__, slot->name);
 	if (list_empty(&slot->dev.pci_funcs)) {
@@ -372,7 +374,7 @@ int rpaphp_unconfig_pci_adapter(struct slot *slot)
 		goto exit;
 	}
 	/* remove the devices from the pci core */
-	list_for_each_safe (ln, tmp, &slot->dev.pci_funcs) {
+	list_for_each (ln, &slot->dev.pci_funcs) {
 		struct rpaphp_pci_func *func;
 	
 		func = list_entry(ln, struct rpaphp_pci_func, sibling);
@@ -428,25 +430,10 @@ static int setup_pci_slot(struct slot *slot)
 				__FUNCTION__, slot->name);
 			goto exit_rc;
 		}
-
-		if (slot->hotplug_slot->info->adapter_status == NOT_CONFIGURED) {
-			dbg("%s CONFIGURING pci adapter in slot[%s]\n",  __FUNCTION__, slot->name);
-			if (rpaphp_config_pci_adapter(slot)) {
-				err("%s: CONFIG pci adapter failed\n", __FUNCTION__);
-				goto exit_rc;		
-			}
-		} else if (slot->hotplug_slot->info->adapter_status == CONFIGURED) {
-			if (init_slot_pci_funcs(slot)) {
-				err("%s: init_slot_pci_funcs failed\n", __FUNCTION__);
-				goto exit_rc;
-			}
-
-		} else {
-			err("%s: slot[%s]'s adapter_status is NOT_VALID.\n",
-				__FUNCTION__, slot->name);
+		if (init_slot_pci_funcs(slot)) {
+			err("%s: init_slot_pci_funcs failed\n", __FUNCTION__);
 			goto exit_rc;
 		}
-		
 		print_slot_pci_funcs(slot);
 		if (!list_empty(&slot->dev.pci_funcs)) {
 			slot->state = CONFIGURED;
@@ -529,7 +516,7 @@ struct hotplug_slot *rpaphp_find_hotplug_slot(struct pci_dev *dev)
 		slot = list_entry(tmp, struct slot, rpaphp_slot_list);
 		if (slot->bridge == NULL) {
 			if (slot->dev_type == PCI_DEV) {
-				printk (KERN_WARNING "PCI slot missing bridge %s %s \n", 
+				printk(KERN_WARNING "PCI slot missing bridge %s %s \n", 
 				                    slot->name, slot->location);
 			}
 			continue;

@@ -7,3 +7,5 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
 		timer_int.o )
 
 oprofile-y				:= $(DRIVER_OBJS) init.o
+oprofile-$(CONFIG_CPU_XSCALE)		+= common.o op_model_xscale.o
+

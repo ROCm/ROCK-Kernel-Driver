@@ -33,7 +33,6 @@
 #include <asm/unistd.h>
 #include <asm/delay.h>
 #include <asm/tlbflush.h>
-#include <asm/e820.h>
 
 extern spinlock_t rtc_lock;
 
@@ -152,6 +151,7 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 #undef strcmp 
 #undef strcpy 
 #undef strcat
+#undef memcmp
 
 extern void * memset(void *,int,__kernel_size_t);
 extern size_t strlen(const char *);
@@ -162,6 +162,7 @@ extern void *memchr(const void *s, int c, size_t n);
 extern void * memcpy(void *,const void *,__kernel_size_t);
 extern void * __memcpy(void *,const void *,__kernel_size_t);
 extern char * strcat(char *, const char *);
+extern int memcmp(const void * cs,const void * ct,size_t count);
 
 EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL_NOVERS(strlen);
@@ -179,6 +180,7 @@ EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(memscan);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(__memcpy);
+EXPORT_SYMBOL_NOVERS(memcmp);
 
 /* syscall export needed for misdesigned sound drivers. */
 EXPORT_SYMBOL(sys_read);
@@ -211,26 +213,8 @@ EXPORT_SYMBOL(__supported_pte_mask);
 
 EXPORT_SYMBOL(clear_page);
 
-#ifdef CONFIG_CRASH_DUMP_MODULE
-#ifdef CONFIG_SMP
-extern irq_desc_t irq_desc[NR_IRQS];
-extern unsigned long irq_affinity[NR_IRQS];
-extern void stop_this_cpu(void *);
-EXPORT_SYMBOL(irq_desc);
-EXPORT_SYMBOL(irq_affinity);
-EXPORT_SYMBOL(dump_send_ipi);
-EXPORT_SYMBOL(stop_this_cpu);
-#endif
-extern int page_is_ram(unsigned long);
-EXPORT_SYMBOL(page_is_ram);
-#endif
-
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(flush_tlb_page);
 EXPORT_SYMBOL_GPL(flush_tlb_all);
 #endif
 
-EXPORT_SYMBOL(sys_ioctl);
-
-EXPORT_SYMBOL(memcpy_toio);
-EXPORT_SYMBOL(memcpy_fromio);

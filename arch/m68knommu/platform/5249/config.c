@@ -43,6 +43,8 @@ unsigned int   dma_base_addr[MAX_M68K_DMA_CHANNELS] = {
         MCF_MBAR + MCFDMA_BASE3,
 };
 
+unsigned int dma_device_address[MAX_M68K_DMA_CHANNELS];
+
 /***************************************************************************/
 
 void mcf_autovector(unsigned int vec)

@@ -214,8 +214,6 @@ __tlb_remove_tlb_entry (struct mmu_gather *tlb, pte_t *ptep, unsigned long addre
 
 #define tlb_migrate_finish(mm)	platform_tlb_migrate_finish(mm)
 
-#define tlb_migrate_prepare(mm) flush_tlb_mm(mm)
-
 #define tlb_start_vma(tlb, vma)			do { } while (0)
 #define tlb_end_vma(tlb, vma)			do { } while (0)
 

@@ -79,7 +79,7 @@
 #define RNG_MISCDEV_MINOR		183 /* official */
 
 static int rng_dev_open (struct inode *inode, struct file *filp);
-static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
+static ssize_t rng_dev_read (struct file *filp, char __user *buf, size_t size,
 			     loff_t * offp);
 
 static int __init intel_init (struct pci_dev *dev);
@@ -92,10 +92,12 @@ static void amd_cleanup(void);
 static unsigned int amd_data_present (void);
 static u32 amd_data_read (void);
 
+#ifdef __i386__
 static int __init via_init(struct pci_dev *dev);
 static void via_cleanup(void);
 static unsigned int via_data_present (void);
 static u32 via_data_read (void);
+#endif
 
 struct rng_operations {
 	int (*init) (struct pci_dev *dev);
@@ -137,8 +139,10 @@ static struct rng_operations rng_vendor_ops[] = {
 	/* rng_hw_amd */
 	{ amd_init, amd_cleanup, amd_data_present, amd_data_read, 4 },
 
+#ifdef __i386__
 	/* rng_hw_via */
 	{ via_init, via_cleanup, via_data_present, via_data_read, 1 },
+#endif
 };
 
 /*
@@ -341,6 +345,7 @@ static void amd_cleanup(void)
 	/* FIXME: twiddle pmio, also? */
 }
 
+#ifdef __i386__
 /***********************************************************************
  *
  * VIA RNG operations
@@ -456,6 +461,7 @@ static void via_cleanup(void)
 {
 	/* do nothing */
 }
+#endif
 
 
 /***********************************************************************
@@ -476,7 +482,7 @@ static int rng_dev_open (struct inode *inode, struct file *filp)
 }
 
 
-static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
+static ssize_t rng_dev_read (struct file *filp, char __user *buf, size_t size,
 			     loff_t * offp)
 {
 	static spinlock_t rng_lock = SPIN_LOCK_UNLOCKED;

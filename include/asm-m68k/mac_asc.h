@@ -1,14 +1,14 @@
 /*
- *	Apple Sound Chip 
+ *	Apple Sound Chip
  */
- 
+
 #ifndef __ASM_MAC_ASC_H
 #define __ASM_MAC_ASC_H
 
 /*
  *	ASC offsets and controls
  */
- 
+
 #define ASC_BUF_BASE	0x00	/* RAM buffer offset */
 #define ASC_BUF_SIZE	0x800
 
@@ -23,5 +23,5 @@
 #define ASC_VOLUME	0x806
 #define ASC_CHAN	0x807	/* ??? */
 
- 
+
 #endif

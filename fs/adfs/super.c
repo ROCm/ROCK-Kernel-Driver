@@ -192,6 +192,7 @@ static int parse_options(struct super_block *sb, char *options)
 
 static int adfs_remount(struct super_block *sb, int *flags, char *data)
 {
+	*flags |= MS_NODIRATIME;
 	return parse_options(sb, data);
 }
 

@@ -16,25 +16,9 @@
  * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  
  */
 
-#include <linux/ide.h>
 #include <linux/init.h>
-
 #include <linux/pnp.h>
-
-#define GENERIC_HD_DATA		0
-#define GENERIC_HD_ERROR	1
-#define GENERIC_HD_NSECTOR	2
-#define GENERIC_HD_SECTOR	3
-#define GENERIC_HD_LCYL		4
-#define GENERIC_HD_HCYL		5
-#define GENERIC_HD_SELECT	6
-#define GENERIC_HD_STATUS	7
-
-static int generic_ide_offsets[IDE_NR_PORTS] = {
-	GENERIC_HD_DATA, GENERIC_HD_ERROR, GENERIC_HD_NSECTOR, 
-	GENERIC_HD_SECTOR, GENERIC_HD_LCYL, GENERIC_HD_HCYL,
-	GENERIC_HD_SELECT, GENERIC_HD_STATUS, -1, -1
-};
+#include <linux/ide.h>
 
 /* Add your devices here :)) */
 struct pnp_device_id idepnp_devices[] = {
@@ -52,12 +36,11 @@ static int idepnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id
 	if (!(pnp_port_valid(dev, 0) && pnp_port_valid(dev, 1) && pnp_irq_valid(dev, 0)))
 		return -1;
 
-	ide_setup_ports(&hw, (unsigned long) pnp_port_start(dev, 0),
-			generic_ide_offsets,
-			(unsigned long) pnp_port_start(dev, 1),
-			0, NULL,
-//			generic_pnp_ide_iops,
-			pnp_irq(dev, 0));
+	memset(&hw, 0, sizeof(hw));
+	ide_std_init_ports(&hw, pnp_port_start(dev, 0),
+				pnp_port_start(dev, 1));
+	hw.irq = pnp_irq(dev, 0);
+	hw.dma = NO_DMA;
 
 	index = ide_register_hw(&hw, &hwif);
 
@@ -86,11 +69,7 @@ static struct pnp_driver idepnp_driver = {
 	.remove		= idepnp_remove,
 };
 
-
-void pnpide_init(int enable)
+void __init pnpide_init(void)
 {
-	if(enable)
-		pnp_register_driver(&idepnp_driver);
-	else
-		pnp_unregister_driver(&idepnp_driver);
+	pnp_register_driver(&idepnp_driver);
 }

@@ -63,7 +63,6 @@
 #include <linux/ioport.h>
 #include <linux/serial.h>
 #include <linux/pci.h>
-#include <linux/ioport.h>
 #include <linux/parport.h>
 #include <linux/parport_pc.h>
 #include <linux/termios.h>
@@ -71,6 +70,7 @@
 #include <linux/serial_core.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>

@@ -124,6 +124,8 @@ static int fifo=0x8;	/* don't change */
 
 #include "ni52.h"
 
+#define DRV_NAME "ni52"
+
 #define DEBUG       /* debug on */
 #define SYSBUSVAL 1 /* 8 Bit */
 
@@ -424,7 +426,7 @@ static int __init ni52_probe1(struct net_device *dev,int ioaddr)
 	dev->mem_start = memstart;
 	dev->mem_end = memend;
 
-	if (!request_region(ioaddr, NI52_TOTAL_SIZE, dev->name))
+	if (!request_region(ioaddr, NI52_TOTAL_SIZE, DRV_NAME))
 		return -EBUSY;
 
 	if( !(inb(ioaddr+NI52_MAGIC1) == NI52_MAGICVAL1) ||

@@ -10,7 +10,7 @@ unsigned long sgivwfb_mem_size;
 
 long long mem_size __initdata = 0;
 
-static inline char * __init machine_specific_memory_setup(void)
+static char * __init machine_specific_memory_setup(void)
 {
 	long long gfx_mem_size = 8 * MB;
 

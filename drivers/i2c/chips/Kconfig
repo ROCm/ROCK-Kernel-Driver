@@ -22,6 +22,26 @@ config SENSORS_ADM1021
 	  This driver can also be built as a module.  If so, the module
 	  will be called adm1021.
 
+config SENSORS_ADM1025
+	tristate "Analog Devices ADM1025 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Analog Devices ADM1025
+	  and Philips NE1619 sensor chips.
+	  This driver can also be built as a module.  If so, the module
+	  will be called adm1025.
+
+config SENSORS_ADM1031
+	tristate "Analog Devices ADM1031 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Analog Devices ADM1031 
+	  and ADM1030 sensor chips.
+	  This driver can also be built as a module.  If so, the module
+	  will be called adm1031.
+
 config SENSORS_ASB100
 	tristate "Asus ASB100 Bach"
 	depends on I2C && EXPERIMENTAL
@@ -83,11 +103,26 @@ config SENSORS_LM75
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for National Semiconductor LM75
-	  sensor chips and clones: Dallas Semi DS75 and DS1775, TelCon
-	  TCN75, and National Semiconductor LM77.
+	  sensor chips and clones: Dallas Semiconductor DS75 and DS1775 (in
+	  9-bit precision mode), and TelCom (now Microchip) TCN75.
+
+	  The DS75 and DS1775 in 10- to 12-bit precision modes will require
+	  a force module parameter. The driver will not handle the extra
+	  precision anyhow.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm75.
+
+config SENSORS_LM77
+	tristate "National Semiconductor LM77"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for National Semiconductor LM77
+	  sensor chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called lm77.
 
 config SENSORS_LM78
 	tristate "National Semiconductor LM78 and compatibles"
@@ -136,18 +171,29 @@ config SENSORS_LM85
 
 config SENSORS_LM90
 	tristate "National Semiconductor LM90 and compatibles"
-	depends on I2C && EXPERIMENTAL
+	depends on I2C
 	select I2C_SENSOR
 	help
-	  If you say yes here you get support for National Semiconductor LM90
-	  and Analog Devices ADM1032 sensor chips.
+	  If you say yes here you get support for National Semiconductor LM90,
+	  LM86, LM89 and LM99, Analog Devices ADM1032 and Maxim MAX6657 and
+	  MAX6658 sensor chips.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm90.
 
+config SENSORS_MAX1619
+	tristate "Maxim MAX1619 sensor chip"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for MAX1619 sensor chip.
+	  
+	  This driver can also be built as a module.  If so, the module
+	  will be called max1619.
+
 config SENSORS_VIA686A
 	tristate "VIA686A"
-	depends on I2C && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
 	select I2C_SENSOR
 	select I2C_ISA
 	help
@@ -163,7 +209,7 @@ config SENSORS_W83781D
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for the Winbond W8378x series
-	  of sensor chips: the W83781D, W83782D, W83783S and W83682HF,
+	  of sensor chips: the W83781D, W83782D, W83783S and W83627HF,
 	  and the similar Asus AS99127F.
 	  
 	  This driver can also be built as a module.  If so, the module
@@ -208,5 +254,36 @@ config SENSORS_EEPROM
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called eeprom.
+
+config SENSORS_PCF8574
+	tristate "Philips PCF8574 and PCF8574A"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Philips PCF8574 and 
+	  PCF8574A chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called pcf8574.
+
+config SENSORS_PCF8591
+	tristate "Philips PCF8591"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Philips PCF8591 chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called pcf8591.
+
+config SENSORS_RTC8564
+	tristate "Epson 8564 RTC chip"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for the Epson 8564 RTC chip.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-rtc8564.
 
 endmenu

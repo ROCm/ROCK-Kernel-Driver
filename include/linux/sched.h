@@ -29,11 +29,6 @@
 #include <linux/completion.h>
 #include <linux/pid.h>
 #include <linux/percpu.h>
-#include <linux/mempolicy.h>
-
-#if defined(CONFIG_NUMA) && !defined(__x86_64__)
-#define CONFIG_NUMA_SCHED 1 
-#endif
 
 struct exec_domain;
 
@@ -96,7 +91,6 @@ extern unsigned long avenrun[];		/* Load averages */
 extern int nr_threads;
 extern int last_pid;
 DECLARE_PER_CPU(unsigned long, process_counts);
-DECLARE_PER_CPU(struct runqueue, runqueues);
 extern int nr_processes(void);
 extern unsigned long nr_running(void);
 extern unsigned long nr_uninterruptible(void);
@@ -139,7 +133,6 @@ struct sched_param {
 
 #ifdef __KERNEL__
 
-#include <linux/taskdelays.h>
 #include <linux/spinlock.h>
 
 /*
@@ -154,11 +147,13 @@ extern spinlock_t mmlist_lock;
 typedef struct task_struct task_t;
 
 extern void sched_init(void);
+extern void sched_init_smp(void);
 extern void init_idle(task_t *idle, int cpu);
+
+extern cpumask_t nohz_cpu_mask;
 
 extern void show_state(void);
 extern void show_regs(struct pt_regs *);
-extern void show_trace_task(task_t *tsk);
 
 /*
  * TASK is a pointer to the task whose backtrace we want to see (or NULL for current
@@ -173,16 +168,17 @@ long io_schedule_timeout(long timeout);
 extern void cpu_init (void);
 extern void trap_init(void);
 extern void update_process_times(int user);
-extern void update_one_process(struct task_struct *p, unsigned long user,
-			       unsigned long system, int cpu);
 extern void scheduler_tick(int user_tick, int system);
 extern unsigned long cache_decay_ticks;
 
+/* Attach to any functions which should be ignored in wchan output. */
+#define __sched		__attribute__((__section__(".sched.text")))
+/* Is this address in the __sched functions? */
+extern int in_sched_functions(unsigned long addr);
 
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
 asmlinkage void schedule(void);
-extern int max_timeslice, min_timeslice;
 
 struct namespace;
 
@@ -219,9 +215,6 @@ struct mm_struct {
 	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
 
 	unsigned dumpable:1;
-#ifdef CONFIG_HUGETLB_PAGE
-	int used_hugetlb;
-#endif
 	cpumask_t cpu_vm_mask;
 
 	/* Architecture-specific MM context */
@@ -277,7 +270,7 @@ struct signal_struct {
 	int			group_stop_count;
 
 	/* POSIX.1b Interval Timers */
-	struct list_head	posix_timers;
+	struct list_head posix_timers;
 
 	/* job control IDs */
 	pid_t pgrp;
@@ -287,7 +280,6 @@ struct signal_struct {
 	int leader;
 
 	struct tty_struct *tty; /* NULL if no tty */
-#define HAS_TTY_STRUCT_IN_SIGNAL_STRUCT 42
 };
 
 /*
@@ -296,7 +288,7 @@ struct signal_struct {
  * in the range MAX_RT_PRIO..MAX_PRIO-1. Priority values
  * are inverted: lower p->prio value means higher priority.
  *
- * The MAX_RT_USER_PRIO value allows the actual maximum
+ * The MAX_USER_RT_PRIO value allows the actual maximum
  * RT priority to be separate from the value exported to
  * user-space.  This allows kernel threads to set their
  * priority to a value higher than any user task. Note:
@@ -318,6 +310,8 @@ struct user_struct {
 	atomic_t processes;	/* How many processes does this user have? */
 	atomic_t files;		/* How many open files does this user have? */
 	atomic_t sigpending;	/* How many pending signals does this user have? */
+	/* protected by mq_lock	*/
+	unsigned long mq_bytes;	/* How many bytes can be allocated to mqueue? */
 
 	/* Hash table maintenance information */
 	struct list_head uidhash_list;
@@ -349,6 +343,8 @@ struct k_itimer {
 	struct task_struct *it_process;	/* process to send signal to */
 	struct timer_list it_timer;
 	struct sigqueue *sigq;		/* signal queue entry. */
+	struct list_head abs_timer_entry; /* clock abs_timer_list */
+	struct timespec wall_to_prev;   /* wall_to_monotonic used when set */
 };
 
 
@@ -365,6 +361,12 @@ struct group_info {
 	gid_t *blocks[0];
 };
 
+/*
+ * get_group_info() must be called with the owning task locked (via task_lock())
+ * when task != current.  The reason being that the vast majority of callers are
+ * looking at current->group_info, which can not be changed except by the
+ * current task.  Changing current->group_info requires the task lock, too.
+ */
 #define get_group_info(group_info) do { \
 	atomic_inc(&(group_info)->usage); \
 } while (0)
@@ -381,9 +383,9 @@ int set_current_groups(struct group_info *group_info);
 #define GROUP_AT(gi, i) \
     ((gi)->blocks[(i)/NGROUPS_PER_BLOCK][(i)%NGROUPS_PER_BLOCK])
 
-#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
-struct aud_process;
-#endif
+
+struct audit_context;		/* See audit.c */
+struct mempolicy;
 
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
@@ -408,6 +410,10 @@ struct task_struct {
 	unsigned int time_slice, first_time_slice;
 
 	struct list_head tasks;
+	/*
+	 * ptrace_list/ptrace_children forms the list of my children
+	 * that were stolen by a ptracer.
+	 */
 	struct list_head ptrace_children;
 	struct list_head ptrace_list;
 
@@ -429,6 +435,10 @@ struct task_struct {
 	 */
 	struct task_struct *real_parent; /* real parent process (when being debugged) */
 	struct task_struct *parent;	/* parent process */
+	/*
+	 * children/sibling forms the list of my children plus the
+	 * tasks I'm ptracing.
+	 */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
 	struct task_struct *group_leader;	/* threadgroup leader */
@@ -459,9 +469,7 @@ struct task_struct {
 	struct user_struct *user;
 /* limits */
 	struct rlimit rlim[RLIM_NLIMITS];
-	unsigned short used_math:1;
-	unsigned short rcvd_sigterm:1;	/* Received SIGTERM by oom killer already */
-	short oomkilladj:5;		/* OOM kill score adjustment (bit shift) */
+	unsigned short used_math;
 	char comm[16];
 /* file system info */
 	int link_count, total_link_count;
@@ -489,6 +497,7 @@ struct task_struct {
 	sigset_t *notifier_mask;
 	
 	void *security;
+	struct audit_context *audit_context;
 
 /* Thread group tracking */
    	u32 parent_exec_id;
@@ -502,7 +511,7 @@ struct task_struct {
 
 /* journalling filesystem info */
 	void *journal_info;
-	
+
 /* VM state */
 	struct reclaim_state *reclaim_state;
 
@@ -513,32 +522,10 @@ struct task_struct {
 
 	unsigned long ptrace_message;
 	siginfo_t *last_siginfo; /* For ptrace use.  */
-/*
- * current io wait handle: wait queue entry to use for io waits
- * If this thread is processing aio, this points at the waitqueue
- * inside the currently handled kiocb. It may be NULL (i.e. default
- * to a stack based synchronous wait) if its doing sync IO.
- */
-	wait_queue_t *io_wait;
 
-#ifdef CONFIG_CKRM
-	spinlock_t  ckrm_tsklock; 
-	void       *ce_data;
-#ifdef CONFIG_CKRM_TYPE_TASKCLASS
-	struct ckrm_task_class *taskclass;
-	struct list_head        taskclass_link;
-#endif // CONFIG_CKRM_TYPE_TASKCLASS
-#endif // CONFIG_CKRM
-
-	/* this is empty if CONFIG_DELAY_ACCT is not set */
-	struct task_delay_info  delays;
-/* TASK_UNMAPPED_BASE */
-	unsigned long map_base;
-
-	struct mempolicy *mempolicy;
-	short il_next;		/* could be shared with used_math */
-#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
-	struct aud_process *audit;
+#ifdef CONFIG_NUMA
+  	struct mempolicy *mempolicy;
+  	short il_next;		/* could be shared with used_math */
 #endif
 };
 
@@ -551,12 +538,6 @@ extern void __put_task_struct(struct task_struct *tsk);
 #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
 #define put_task_struct(tsk) \
 do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
-
-#ifndef __TASK_UNMAPPED_BASE
-#define __TASK_UNMAPPED_BASE 0UL
-#else
-#define __HAS_ARCH_PROC_MAPPED_BASE
-#endif
 
 /*
  * Per process flags
@@ -575,7 +556,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_FLUSHER	0x00002000	/* responsible for disk writeback */
 
 #define PF_FREEZE	0x00004000	/* this task should be frozen for suspend */
-#define PF_IOTHREAD	0x00008000	/* this thread is needed for doing I/O to swap */
+#define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
 #define PF_FROZEN	0x00010000	/* frozen for system suspend */
 #define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */
 #define PF_KSWAPD	0x00040000	/* I am kswapd */
@@ -583,22 +564,12 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_LESS_THROTTLE 0x00100000	/* Throttle me less: I clean memory */
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 
-#define PF_MEMIO   	0x00400000      /* I am  potentially doing I/O for mem */
-#define PF_IOWAIT       0x00800000      /* I am waiting on disk I/O */
-
 #ifdef CONFIG_SMP
 #define SCHED_LOAD_SCALE	128UL	/* increase resolution of load */
 
 #define SD_BALANCE_NEWIDLE	1	/* Balance when about to become idle */
 #define SD_BALANCE_EXEC		2	/* Balance on exec */
-#ifdef __ia64__
-/* Disable clone balance on ia64 for now, since it is questionable it will scale
-   to the big machines. This should be done in IA64 specific domain setup instead
-   of here. */
-#define SD_BALANCE_CLONE	0
-#else
 #define SD_BALANCE_CLONE	4	/* Balance on clone */
-#endif
 #define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
 #define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
 #define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
@@ -682,14 +653,14 @@ struct sched_domain {
 	.nr_balance_failed	= 0,			\
 }
 
-#ifdef CONFIG_NUMA_SCHED
+#ifdef CONFIG_NUMA
 /* Common values for NUMA nodes */
 #define SD_NODE_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\
 	.parent			= NULL,			\
 	.groups			= NULL,			\
 	.min_interval		= 8,			\
-	.max_interval		= 256*fls(num_online_cpus()),\
+	.max_interval		= 32,			\
 	.busy_factor		= 32,			\
 	.imbalance_pct		= 125,			\
 	.cache_hot_time		= (10*1000000),		\
@@ -722,68 +693,14 @@ extern void sched_balance_exec(void);
 #define sched_balance_exec()   {}
 #endif
 
-/* Move tasks off this (offline) CPU onto another. */
-extern void migrate_all_tasks(void);
+extern void sched_idle_next(void);
 extern void set_user_nice(task_t *p, long nice);
-extern int task_prio(task_t *p);
-extern int task_nice(task_t *p);
-extern int task_curr(task_t *p);
+extern int task_prio(const task_t *p);
+extern int task_nice(const task_t *p);
+extern int task_curr(const task_t *p);
 extern int idle_cpu(int cpu);
 
 void yield(void);
-
-/*
- * These are the runqueue data structures:
- */
-
-#define BITMAP_SIZE ((((MAX_PRIO+1+7)/8)+sizeof(long)-1)/sizeof(long))
-
-typedef struct runqueue runqueue_t;
-
-struct prio_array {
-	unsigned int nr_active;
-	unsigned long bitmap[BITMAP_SIZE];
-	struct list_head queue[MAX_PRIO];
-};
-
-/*
- * This is the main, per-CPU runqueue data structure.
- *
- * Locking rule: those places that want to lock multiple runqueues
- * (such as the load balancing or the thread migration code), lock
- * acquire operations must be ordered by ascending &runqueue.
- */
-struct runqueue {
-	spinlock_t lock;
-
-	/*
-	 * nr_running and cpu_load should be in the same cacheline because
-	 * remote CPUs use both these fields when doing load calculation.
-	 */
-	unsigned long nr_running;
-#ifdef CONFIG_SMP
-	unsigned long cpu_load;
-#endif
-	unsigned long long nr_switches;
-	unsigned long expired_timestamp, nr_uninterruptible;
-	unsigned long long timestamp_last_tick;
-	task_t *curr, *idle;
-	struct mm_struct *prev_mm;
-	prio_array_t *active, *expired, arrays[2];
-	int best_expired_prio;
-	atomic_t nr_iowait;
-
-#ifdef CONFIG_SMP
-	struct sched_domain *sd;
-
-	/* For active balancing */
-	int active_balance;
-	int push_cpu;
-
-	task_t *migration_thread;
-	struct list_head migration_queue;
-#endif
-};
 
 /*
  * The default (Linux) execution domain.
@@ -840,7 +757,7 @@ extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
  static inline void kick_process(struct task_struct *tsk) { }
  static inline void wake_up_forked_thread(struct task_struct * tsk)
  {
-	return wake_up_forked_process(tsk);
+	wake_up_forked_process(tsk);
  }
 #endif
 extern void FASTCALL(sched_fork(task_t * p));
@@ -926,12 +843,6 @@ static inline int capable(int cap)
 }
 #endif
 
-extern int sysctl_disable_cap_mlock;
-static inline int can_do_mlock(void)
-{
-	return likely(sysctl_disable_cap_mlock || capable(CAP_IPC_LOCK));
-}
-
 /*
  * Routines for handling mm_structs
  */
@@ -1013,7 +924,7 @@ extern void wait_task_inactive(task_t * p);
 #define while_each_thread(g, t) \
 	while ((t = next_thread(t)) != g)
 
-extern task_t * FASTCALL(next_thread(task_t *p));
+extern task_t * FASTCALL(next_thread(const task_t *p));
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
@@ -1029,7 +940,10 @@ static inline int thread_group_empty(task_t *p)
 
 extern void unhash_process(struct task_struct *p);
 
-/* Protects ->fs, ->files, ->mm, and synchronises with wait4().
+/*
+ * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info and synchronises with
+ * wait4().
+ *
  * Nests both inside and outside of read_lock(&tasklist_lock).
  * It must not be nested with write_lock_irq(&tasklist_lock),
  * neither inside nor outside.
@@ -1151,7 +1065,7 @@ extern void signal_wake_up(struct task_struct *t, int resume_stopped);
  */
 #ifdef CONFIG_SMP
 
-static inline unsigned int task_cpu(struct task_struct *p)
+static inline unsigned int task_cpu(const struct task_struct *p)
 {
 	return p->thread_info->cpu;
 }
@@ -1163,7 +1077,7 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 
 #else
 
-static inline unsigned int task_cpu(struct task_struct *p)
+static inline unsigned int task_cpu(const struct task_struct *p)
 {
 	return 0;
 }
@@ -1173,60 +1087,6 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 }
 
 #endif /* CONFIG_SMP */
-
-
-/* API for registering delay info */
-#ifdef CONFIG_DELAY_ACCT
-
-#define test_delay_flag(tsk,flg)                ((tsk)->flags & (flg))
-#define set_delay_flag(tsk,flg)                 ((tsk)->flags |= (flg))
-#define clear_delay_flag(tsk,flg)               ((tsk)->flags &= ~(flg))
-
-#define def_delay_var(var)		        unsigned long long var
-#define get_delay(tsk,field)                    ((tsk)->delays.field)
-#define delay_value(x)				(((unsigned long)(x))/1000)
-
-#define start_delay(var)                        ((var) = sched_clock())
-#define start_delay_set(var,flg)                (set_delay_flag(current,flg),(var) = sched_clock())
-
-#define inc_delay(tsk,field) (((tsk)->delays.field)++)
-#define add_delay_ts(tsk,field,start_ts,end_ts) ((tsk)->delays.field += delay_value((end_ts)-(start_ts)))
-#define add_delay_clear(tsk,field,start_ts,flg) (add_delay_ts(tsk,field,start_ts,sched_clock()),clear_delay_flag(tsk,flg))
-
-static inline void add_io_delay(unsigned long dstart) 
-{
-	struct task_struct * tsk = current;
-	unsigned long val = delay_value(sched_clock()-dstart);
-	if (test_delay_flag(tsk,PF_MEMIO)) {
-		tsk->delays.mem_iowait_total += val;
-		tsk->delays.num_memwaits++;
-	} else {
-		tsk->delays.iowait_total += val;
-		tsk->delays.num_iowaits++;
-	}
-	clear_delay_flag(tsk,PF_IOWAIT);
-}
-
-
-#else
-
-#define test_delay_flag(tsk,flg)                (0)
-#define set_delay_flag(tsk,flg)                 do { } while (0)
-#define clear_delay_flag(tsk,flg)               do { } while (0)
-
-#define def_delay_var(var)			      
-#define get_delay(tsk,field)                    (0)
-
-#define start_delay(var)                        do { } while (0)
-#define start_delay_set(var,flg)                do { } while (0)
-
-#define inc_delay(tsk,field)                    do { } while (0)
-#define add_delay_ts(tsk,field,start_ts,now)    do { } while (0)
-#define add_delay_clear(tsk,field,start_ts,flg) do { } while (0)
-#define add_io_delay(dstart)			do { } while (0) 
-#endif
-
-
 
 #endif /* __KERNEL__ */
 

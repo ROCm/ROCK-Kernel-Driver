@@ -641,14 +641,14 @@ sys32_getdents_wrapper:
 	llgfr	%r4,%r4			# unsigned int
 	jg	sys32_getdents		# branch to system call
 
-	.globl  sys32_select_wrapper 
-sys32_select_wrapper:
+	.globl  compat_sys_select_wrapper
+compat_sys_select_wrapper:
 	lgfr	%r2,%r2			# int
-	llgtr	%r3,%r3			# fd_set *
-	llgtr	%r4,%r4			# fd_set *
-	llgtr	%r5,%r5			# fd_set *
-	llgtr	%r6,%r6			# struct timeval_emu31 *
-	jg	sys32_select		# branch to system call
+	llgtr	%r3,%r3			# compat_fd_set *
+	llgtr	%r4,%r4			# compat_fd_set *
+	llgtr	%r5,%r5			# compat_fd_set *
+	llgtr	%r6,%r6			# struct compat_timeval *
+	jg	compat_sys_select	# branch to system call
 
 	.globl  sys32_flock_wrapper 
 sys32_flock_wrapper:
@@ -663,19 +663,19 @@ sys32_msync_wrapper:
 	lgfr	%r4,%r4			# int
 	jg	sys_msync		# branch to system call
 
-	.globl  sys32_readv_wrapper 
-sys32_readv_wrapper:
+	.globl  compat_sys_readv_wrapper
+compat_sys_readv_wrapper:
 	lgfr	%r2,%r2			# int
-	llgtr	%r3,%r3			# const struct iovec_emu31 *
+	llgtr	%r3,%r3			# const struct compat_iovec *
 	llgfr	%r4,%r4			# unsigned long
-	jg	sys32_readv		# branch to system call
+	jg	compat_sys_readv	# branch to system call
 
-	.globl  sys32_writev_wrapper 
-sys32_writev_wrapper:
+	.globl  compat_sys_writev_wrapper
+compat_sys_writev_wrapper:
 	lgfr	%r2,%r2			# int
-	llgtr	%r3,%r3			# const struct iovec_emu31 *
+	llgtr	%r3,%r3			# const struct compat_iovec *
 	llgfr	%r4,%r4			# unsigned long
-	jg	sys32_writev		# branch to system call
+	jg	compat_sys_writev	# branch to system call
 
 	.globl  sys32_getsid_wrapper 
 sys32_getsid_wrapper:
@@ -786,12 +786,12 @@ sys32_poll_wrapper:
 	lgfr	%r4,%r4			# long 
 	jg	sys_poll		# branch to system call
 
-	.globl  sys32_nfsservctl_wrapper 
-sys32_nfsservctl_wrapper:
+	.globl  compat_sys_nfsservctl_wrapper
+compat_sys_nfsservctl_wrapper:
 	lgfr	%r2,%r2			# int 
-	llgtr	%r3,%r3			# struct nfsctl_arg_emu31 * 
-	llgtr	%r4,%r4			# union nfsctl_res_emu31 * 
-	jg	sys32_nfsservctl	# branch to system call
+	llgtr	%r3,%r3			# struct compat_nfsctl_arg*
+	llgtr	%r4,%r4			# union compat_nfsctl_res*
+	jg	compat_sys_nfsservctl	# branch to system call
 
 	.globl  sys32_setresgid16_wrapper 
 sys32_setresgid16_wrapper:
@@ -1097,6 +1097,8 @@ compat_sys_futex_wrapper:
 	lgfr	%r4,%r4			# int
 	llgtr	%r5,%r5			# struct compat_timespec *
 	llgtr	%r6,%r6			# u32 *
+	lgf	%r0,164(%r15)		# int
+	stg	%r0,160(%r15)
 	jg	compat_sys_futex	# branch to system call
 
 	.globl	sys32_setxattr_wrapper
@@ -1234,6 +1236,14 @@ sys_epoll_wait_wrapper:
 	lgfr	%r5,%r5			# int
 	jg	sys_epoll_wait		# branch to system call
 
+	.globl	sys32_lookup_dcookie_wrapper
+sys32_lookup_dcookie_wrapper:
+	sllg	%r2,%r2,32		# get high word of 64bit dcookie
+	or	%r2,%r3			# get low word of 64bit dcookie
+	llgtr	%r3,%r4			# char *
+	llgfr	%r4,%r5			# size_t
+	jg	sys_lookup_dcookie
+
 	.globl	sys32_fadvise64_wrapper
 sys32_fadvise64_wrapper:
 	lgfr	%r2,%r2			# int
@@ -1352,3 +1362,47 @@ compat_sys_fstatfs64_wrapper:
 	llgfr	%r3,%r3			# compat_size_t
 	llgtr	%r4,%r4			# struct compat_statfs64 *
 	jg	compat_fstatfs64
+
+	.globl	compat_sys_mq_open_wrapper
+compat_sys_mq_open_wrapper:
+	llgtr	%r2,%r2			# const char *
+	lgfr	%r3,%r3			# int
+	llgfr	%r4,%r4			# mode_t
+	llgtr	%r5,%r5			# struct compat_mq_attr *
+	jg	compat_sys_mq_open
+
+	.globl	sys32_mq_unlink_wrapper
+sys32_mq_unlink_wrapper:
+	llgtr	%r2,%r2			# const char *
+	jg	sys_mq_unlink
+
+	.globl	compat_sys_mq_timedsend_wrapper
+compat_sys_mq_timedsend_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# const char *
+	llgfr	%r4,%r4			# size_t
+	llgfr	%r5,%r5			# unsigned int
+	llgtr	%r6,%r6			# const struct compat_timespec *
+	jg	compat_sys_mq_timedsend
+
+	.globl	compat_sys_mq_timedreceive_wrapper
+compat_sys_mq_timedreceive_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# char *
+	llgfr	%r4,%r4			# size_t
+	llgtr	%r5,%r5			# unsigned int *
+	llgtr	%r6,%r6			# const struct compat_timespec *
+	jg	compat_sys_mq_timedreceive
+
+	.globl	compat_sys_mq_notify_wrapper
+compat_sys_mq_notify_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# struct compat_sigevent *
+	jg	compat_sys_mq_notify
+
+	.globl	compat_sys_mq_getsetattr_wrapper
+compat_sys_mq_getsetattr_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# struct compat_mq_attr *
+	llgtr	%r4,%r4			# struct compat_mq_attr *
+	jg	compat_sys_mq_getsetattr

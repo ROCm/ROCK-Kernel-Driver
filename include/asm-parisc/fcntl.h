@@ -19,6 +19,7 @@
 #define O_NOCTTY	00400000 /* not fcntl */
 #define O_DSYNC		01000000 /* HPUX only */
 #define O_RSYNC		02000000 /* HPUX only */
+#define O_NOATIME	04000000
 
 #define FASYNC		00020000 /* fcntl, for BSD compatibility */
 #define O_DIRECT	00040000 /* direct disk access hint - currently ignored */

@@ -12,6 +12,12 @@
 *!                                 don't use PB_I2C if DS1302 uses same bits,
 *!                                 use PB.
 *! $Log: i2c.c,v $
+*! Revision 1.7  2004/05/28 09:26:59  starvik
+*! Modified I2C initialization to work in 2.6.
+*!
+*! Revision 1.6  2004/05/14 07:58:03  starvik
+*! Merge of changes from 2.4
+*!
 *! Revision 1.4  2002/12/11 13:13:57  starvik
 *! Added arch/ to v10 specific includes
 *! Added fix from Linux 2.4 in serial.c (flush_to_flip_buffer)
@@ -63,7 +69,7 @@
 *! (C) Copyright 1999-2002 Axis Communications AB, LUND, SWEDEN
 *!
 *!***************************************************************************/
-/* $Id: i2c.c,v 1.4 2002/12/11 13:13:57 starvik Exp $ */
+/* $Id: i2c.c,v 1.7 2004/05/28 09:26:59 starvik Exp $ */
 
 /****************** INCLUDE FILES SECTION ***********************************/
 
@@ -310,6 +316,12 @@ i2c_inbyte(void)
 	}
 	i2c_clk(I2C_CLOCK_HIGH);
 	i2c_delay(CLOCK_HIGH_TIME);
+
+        /*
+	 * we leave the clock low, getbyte is usually followed
+	 * by sendack/nack, they assume the clock to be low
+	 */
+        i2c_clk(I2C_CLOCK_LOW);
 	return aBitByte;
 }
 
@@ -372,6 +384,13 @@ i2c_getack(void)
 	}
 
 	/*
+	 * our clock is high now, make sure data is low
+	 * before we enable our output. If we keep data high
+	 * and enable output, we would generate a stop condition.
+	 */
+	i2c_data(I2C_DATA_LOW);
+
+	/*
 	 * end clock pulse
 	 */
 	i2c_enable();
@@ -423,6 +442,37 @@ i2c_sendack(void)
 	i2c_data(I2C_DATA_HIGH);
 	i2c_delay(CLOCK_LOW_TIME);
 	
+	i2c_dir_in();
+}
+
+/*#---------------------------------------------------------------------------
+*#
+*# FUNCTION NAME: i2c_sendnack
+*#
+*# DESCRIPTION  : Sends NACK on received data
+*#
+*#--------------------------------------------------------------------------*/
+void
+i2c_sendnack(void)
+{
+	/*
+	 * enable output
+	 */
+	i2c_delay(CLOCK_LOW_TIME);
+	i2c_dir_out();
+	/*
+	 * set data high
+	 */
+	i2c_data(I2C_DATA_HIGH);
+	/*
+	 * generate clock pulse
+	 */
+	i2c_delay(CLOCK_HIGH_TIME/6);
+	i2c_clk(I2C_CLOCK_HIGH);
+	i2c_delay(CLOCK_HIGH_TIME);
+	i2c_clk(I2C_CLOCK_LOW);
+	i2c_delay(CLOCK_LOW_TIME);
+
 	i2c_dir_in();
 }
 
@@ -489,7 +539,7 @@ i2c_writereg(unsigned char theSlave, unsigned char theReg,
 	} while(error && cntr--);
 
 	i2c_delay(CLOCK_LOW_TIME);
-	
+
 	return -error;
 }
 
@@ -557,7 +607,8 @@ i2c_readreg(unsigned char theSlave, unsigned char theReg)
 		 */
 		b = i2c_inbyte();
 		/*
-		 * send Ack
+		 * last received byte needs to be nacked
+		 * instead of acked
 		 */
 		i2c_sendack();
 		/*
@@ -634,11 +685,9 @@ static struct file_operations i2c_fops = {
 	.release  = i2c_release,
 };
 
-static int __init
+int __init
 i2c_init(void)
 {
-	int res;
-
 	/* Setup and enable the Port B I2C interface */
 
 #ifndef CONFIG_ETRAX_I2C_USES_PB_NOT_PB_I2C
@@ -656,21 +705,28 @@ i2c_init(void)
 			  IO_STATE(R_PORT_PB_DIR, dir0, input)  |
 			  IO_STATE(R_PORT_PB_DIR, dir1, output));
 
-	/* register char device */
+	return 0;
+}
 
-	res = register_chrdev(I2C_MAJOR, i2c_name, &i2c_fops);
+static int __init
+i2c_register(void)
+{
+	int res;
+
+	i2c_init();
+  	res = register_chrdev(I2C_MAJOR, i2c_name, &i2c_fops);
 	if(res < 0) {
 		printk(KERN_ERR "i2c: couldn't get a major number.\n");
 		return res;
 	}
 
-	printk("I2C driver v2.2, (c) 1999-2001 Axis Communications AB\n");
+	printk(KERN_INFO "I2C driver v2.2, (c) 1999-2001 Axis Communications AB\n");
 	
 	return 0;
 }
 
-/* this makes sure that i2c_init is called during boot */
+/* this makes sure that i2c_register is called during boot */
 
-module_init(i2c_init);
+module_init(i2c_register);
 
 /****************** END OF FILE i2c.c ********************************/

@@ -19,6 +19,6 @@ int sgiwd93_release(struct Scsi_Host *instance);
 const char *wd33c93_info(void);
 int wd33c93_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int wd33c93_abort(Scsi_Cmnd *);
-int wd33c93_reset(Scsi_Cmnd *, unsigned int);
+int wd33c93_host_reset(Scsi_Cmnd * SCpnt);
 
 #endif /* !(_SGIWD93_H) */

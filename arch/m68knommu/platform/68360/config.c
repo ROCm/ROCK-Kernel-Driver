@@ -181,12 +181,12 @@ void config_BSP(char *command, int len)
      }
   }
 
-  printk("\n68360 QUICC support (C) 2000 Lineo Inc.\n");
+  printk(KERN_INFO "\n68360 QUICC support (C) 2000 Lineo Inc.\n");
 
 #if defined(CONFIG_UCQUICC) && 0
-  printk("uCquicc serial string [%s]\n",getserialnum());
+  printk(KERN_INFO "uCquicc serial string [%s]\n",getserialnum());
   p = scc1_hwaddr = gethwaddr(0);
-  printk("uCquicc hwaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+  printk(KERN_INFO "uCquicc hwaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
          p[0], p[1], p[2], p[3], p[4], p[5]);
 
   p = getbenv("APPEND");

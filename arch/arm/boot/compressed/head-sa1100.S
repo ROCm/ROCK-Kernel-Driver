@@ -30,6 +30,9 @@ __SA1100_start:
 		mov	r8, #0
 #endif
 
+#ifdef CONFIG_SA1100_COLLIE
+		mov	r7, #MACH_TYPE_COLLIE
+#endif
 #ifdef CONFIG_SA1100_PFS168
 		@ REVISIT_PFS168: Temporary until firmware updated to use assigned machine number
 		mov	r7, #MACH_TYPE_PFS168

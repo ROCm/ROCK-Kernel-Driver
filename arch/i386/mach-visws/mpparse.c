@@ -28,6 +28,7 @@ unsigned int boot_cpu_logical_apicid = -1U;
 /* Bitmask of physically existing CPUs */
 physid_mask_t phys_cpu_present_map;
 
+unsigned int __initdata maxcpus = NR_CPUS;
 
 /*
  * The Visual Workstation is Intel MP compliant in the hardware
@@ -56,12 +57,12 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		boot_cpu_logical_apicid = logical_apicid;
 	}
 
-	if (m->mpc_apicid > MAX_APICS) {
+	ver = m->mpc_apicver;
+	if ((ver >= 0x14 && m->mpc_apicid >= 0xff) || m->mpc_apicid >= 0xf) {
 		printk(KERN_ERR "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
 		return;
 	}
-	ver = m->mpc_apicver;
 
 	apic_cpus = apicid_to_cpu_present(m->mpc_apicid);
 	physids_or(phys_cpu_present_map, phys_cpu_present_map, apic_cpus);
@@ -88,6 +89,9 @@ void __init find_smp_config(void)
 
 		ncpus = CO_CPU_MAX;
 	}
+
+	if (ncpus > maxcpus)
+		ncpus = maxcpus;
 
 	smp_found_config = 1;
 	while (ncpus--)

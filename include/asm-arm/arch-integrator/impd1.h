@@ -14,6 +14,5 @@
 
 struct device;
 
-void impd1_set_vco(struct device *dev, int vconr, unsigned long period);
 void impd1_tweak_control(struct device *dev, u32 mask, u32 val);
 

@@ -32,7 +32,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -499,11 +498,11 @@ static int hci_uart_tty_ioctl(struct tty_struct *tty, struct file * file,
 /*
  * We don't provide read/write/poll interface for user space.
  */
-static ssize_t hci_uart_tty_read(struct tty_struct *tty, struct file *file, unsigned char *buf, size_t nr)
+static ssize_t hci_uart_tty_read(struct tty_struct *tty, struct file *file, unsigned char __user *buf, size_t nr)
 {
 	return 0;
 }
-static ssize_t hci_uart_tty_write(struct tty_struct *tty, struct file *file, const unsigned char *data, size_t count)
+static ssize_t hci_uart_tty_write(struct tty_struct *tty, struct file *file, const unsigned char __user *data, size_t count)
 {
 	return 0;
 }

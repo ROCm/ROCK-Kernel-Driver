@@ -24,7 +24,7 @@ typedef struct pbe {
 #define SWAP_FILENAME_MAXLENGTH	32
 
 struct suspend_header {
-	__u32 version_code;
+	u32 version_code;
 	unsigned long num_physpages;
 	char machine[8];
 	char version[20];
@@ -67,19 +67,16 @@ extern int pm_prepare_console(void);
 extern void pm_restore_console(void);
 
 #else
-static inline void refrigerator(unsigned long flag)
-{
-
-}
-static inline int freeze_processes(void)
-{
-	return 0;
-}
-static inline void thaw_processes(void)
-{
-
-}
+static inline void refrigerator(unsigned long flag) {}
 #endif	/* CONFIG_PM */
+
+#ifdef CONFIG_SMP
+extern void disable_nonboot_cpus(void);
+extern void enable_nonboot_cpus(void);
+#else
+static inline void disable_nonboot_cpus(void) {}
+static inline void enable_nonboot_cpus(void) {}
+#endif
 
 asmlinkage void do_magic(int is_resume);
 asmlinkage void do_magic_resume_1(void);
@@ -87,10 +84,10 @@ asmlinkage void do_magic_resume_2(void);
 asmlinkage void do_magic_suspend_1(void);
 asmlinkage void do_magic_suspend_2(void);
 
-asmlinkage extern void do_magic(int is_resume);
-asmlinkage extern void do_magic_resume_1(void);
-asmlinkage extern void do_magic_resume_2(void);
-asmlinkage extern void do_magic_suspend_1(void);
-asmlinkage extern void do_magic_suspend_2(void);
+void save_processor_state(void);
+void restore_processor_state(void);
+struct saved_context;
+void __save_processor_state(struct saved_context *ctxt);
+void __restore_processor_state(struct saved_context *ctxt);
 
 #endif /* _LINUX_SWSUSP_H */

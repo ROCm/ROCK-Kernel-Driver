@@ -15,7 +15,63 @@
 #include <linux/config.h>
 #include <asm/arch/memory.h>
 
+#ifndef TASK_SIZE
+/*
+ * TASK_SIZE - the maximum size of a user space task.
+ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+ */
+#define TASK_SIZE		(0xbf000000UL)
+#define TASK_UNMAPPED_BASE	(0x40000000UL)
+#endif
+
+/*
+ * The maximum size of a 26-bit user space task.
+ */
+#define TASK_SIZE_26		(0x04000000UL)
+
+/*
+ * Page offset: 3GB
+ */
+#ifndef PAGE_OFFSET
+#define PAGE_OFFSET		(0xc0000000UL)
+#endif
+
+/*
+ * Physical vs virtual RAM address space conversion.  These are
+ * private definitions which should NOT be used outside memory.h
+ * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+ */
+#ifndef __virt_to_phys
+#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
+#endif
+
+/*
+ * The module space lives between the addresses given by TASK_SIZE
+ * and PAGE_OFFSET - it must be within 32MB of the kernel text.
+ */
+#define MODULE_END	(PAGE_OFFSET)
+#define MODULE_START	(MODULE_END - 16*1048576)
+
+#if TASK_SIZE > MODULE_START
+#error Top of user space clashes with start of module space
+#endif
+
 #ifndef __ASSEMBLY__
+
+/*
+ * The DMA mask corresponding to the maximum bus address allocatable
+ * using GFP_DMA.  The default here places no restriction on DMA
+ * allocations.  This must be the smallest DMA mask in the system,
+ * so a successful GFP_DMA allocation will always satisfy this.
+ */
+#ifndef ISA_DMA_THRESHOLD
+#define ISA_DMA_THRESHOLD	(0xffffffffULL)
+#endif
+
+#ifndef arch_adjust_zones
+#define arch_adjust_zones(node,size,holes) do { } while (0)
+#endif
 
 /*
  * PFNs are used to describe any physical page; this means
@@ -117,9 +173,18 @@ static inline void *phys_to_virt(unsigned long x)
 #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
 
 /*
+ * Optional device DMA address remapping. Do _not_ use directly!
  * We should really eliminate virt_to_bus() here - it's deprecated.
  */
-#define page_to_bus(page)	(virt_to_bus(page_address(page)))
+#ifndef __arch_page_to_dma
+#define page_to_dma(dev, page)		((dma_addr_t)__virt_to_bus(page_address(page)))
+#define dma_to_virt(dev, addr)		(__bus_to_virt(addr))
+#define virt_to_dma(dev, addr)		(__virt_to_bus(addr))
+#else
+#define page_to_dma(dev, page)		(__arch_page_to_dma(dev, page))
+#define dma_to_virt(dev, addr)		(__arch_dma_to_virt(dev, addr))
+#define virt_to_dma(dev, addr)		(__arch_virt_to_dma(dev, addr))
+#endif
 
 #endif
 

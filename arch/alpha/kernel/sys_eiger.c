@@ -194,27 +194,20 @@ eiger_swizzle(struct pci_dev *dev, u8 *pinp)
 	   case 0x0f: bridge_count = 4; break; /* 4 */
 	};
 
-	/*  Check first for the built-in bridges on hose 0. */
-	if (hose->index == 0
-	    && PCI_SLOT(dev->bus->self->devfn) > 20-bridge_count) {
-		slot = PCI_SLOT(dev->devfn);
-	} else {
-		/* Must be a card-based bridge.  */
-		do {
-			/* Check for built-in bridges on hose 0. */
-			if (hose->index == 0
-			    && (PCI_SLOT(dev->bus->self->devfn)
-				> 20 - bridge_count)) {
-                  		slot = PCI_SLOT(dev->devfn);
-				break;
-			}
-			pin = bridge_swizzle(pin, PCI_SLOT(dev->devfn));
-
-			/* Move up the chain of bridges.  */
-			dev = dev->bus->self;
-			/* Slot of the next bridge.  */
+	slot = PCI_SLOT(dev->devfn);
+	while (dev->bus->self) {
+		/* Check for built-in bridges on hose 0. */
+		if (hose->index == 0
+		    && (PCI_SLOT(dev->bus->self->devfn)
+			> 20 - bridge_count)) {
 			slot = PCI_SLOT(dev->devfn);
-		} while (dev->bus->self);
+			break;
+		}
+		/* Must be a card-based bridge.  */
+		pin = bridge_swizzle(pin, PCI_SLOT(dev->devfn));
+
+		/* Move up the chain of bridges.  */
+		dev = dev->bus->self;
 	}
 	*pinp = pin;
 	return slot;

@@ -44,13 +44,9 @@
 #include <linux/smp_lock.h>
 #include <linux/irq.h>
 #include <linux/bootmem.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
@@ -86,6 +82,7 @@ int smp_threads_ready;
 extern unsigned char trampoline_data [];
 extern unsigned char trampoline_end  [];
 static unsigned char *trampoline_base;
+static int trampoline_exec;
 
 /*
  * Currently trivial. Write the real->protected mode
@@ -112,6 +109,10 @@ void __init smp_alloc_memory(void)
 	 */
 	if (__pa(trampoline_base) >= 0x9F000)
 		BUG();
+	/*
+	 * Make the SMP trampoline executable:
+	 */
+	trampoline_exec = set_kernel_exec((unsigned long)trampoline_base, 1);
 }
 
 /*
@@ -424,11 +425,6 @@ void __init smp_callin(void)
 	 */
 	cpu_set(cpuid, cpu_callin_map);
 
-#ifdef	CONFIG_KDB
-	/* Activate any preset global breakpoints on this cpu */
-	kdb(KDB_REASON_SILENT, 0, 0);
-#endif	/* CONFIG_KDB */
-
 	/*
 	 *      Synchronize the TSC with the BP
 	 */
@@ -531,7 +527,7 @@ static inline void unmap_cpu_to_node(int cpu)
 	printk("Unmapping cpu %d from all nodes\n", cpu);
 	for (node = 0; node < MAX_NUMNODES; node ++)
 		cpu_clear(cpu, node_2_cpu_mask[node]);
-	cpu_2_node[cpu] = -1;
+	cpu_2_node[cpu] = 0;
 }
 #else /* !CONFIG_NUMA */
 
@@ -823,6 +819,8 @@ static int __init do_boot_cpu(int apicid)
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 	/* Stack for startup_32 can be just as for start_secondary onwards */
 	stack_start.esp = (void *) idle->thread.esp;
+
+	irq_ctx_init(cpu);
 
 	/*
 	 * This grunge runs the startup process for
@@ -1116,11 +1114,12 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			cpu_set(cpu, cpu_sibling_map[cpu]);
 		}
 
-		if (siblings != smp_num_siblings) {
+		if (siblings != smp_num_siblings)
 			printk(KERN_WARNING "WARNING: %d siblings found for CPU%d, should be %d\n", siblings, cpu, smp_num_siblings);
-			smp_num_siblings = siblings;
-		}
 	}
+
+	if (nmi_watchdog == NMI_LOCAL_APIC)
+		check_nmi_watchdog();
 
 	smpboot_setup_io_apic();
 
@@ -1198,7 +1197,9 @@ __init void arch_init_sched_domains(void)
 		int j;
 		cpumask_t nodemask;
 		struct sched_group *node = &sched_group_nodes[i];
-		cpus_and(nodemask, node_to_cpumask(i), cpu_possible_map);
+		cpumask_t node_cpumask = node_to_cpumask(i);
+
+		cpus_and(nodemask, node_cpumask, cpu_possible_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1234,7 +1235,9 @@ __init void arch_init_sched_domains(void)
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		struct sched_group *cpu = &sched_group_nodes[i];
 		cpumask_t nodemask;
-		cpus_and(nodemask, node_to_cpumask(i), cpu_possible_map);
+		cpumask_t node_cpumask = node_to_cpumask(i);
+
+		cpus_and(nodemask, node_cpumask, cpu_possible_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1374,10 +1377,13 @@ int __devinit __cpu_up(unsigned int cpu)
 void __init smp_cpus_done(unsigned int max_cpus)
 {
 #ifdef CONFIG_X86_IO_APIC
-	cpumask_t targets = CPU_MASK_ALL;
-	setup_ioapic_dest(targets);
+	setup_ioapic_dest();
 #endif
 	zap_low_mappings();
+	/*
+	 * Disable executability of the SMP trampoline:
+	 */
+	set_kernel_exec((unsigned long)trampoline_base, trampoline_exec);
 }
 
 void __init smp_intr_init(void)

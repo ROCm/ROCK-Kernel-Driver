@@ -59,7 +59,7 @@ void disable_IO_APIC(void);
 void print_IO_APIC(void);
 int IO_APIC_get_PCI_irq_vector(int bus, int slot, int fn);
 void send_IPI(int dest, int vector);
-void setup_ioapic_dest(cpumask_t mask);
+void setup_ioapic_dest(void);
 
 extern unsigned long io_apic_irqs;
 

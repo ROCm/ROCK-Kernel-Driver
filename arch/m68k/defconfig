@@ -101,7 +101,7 @@ CONFIG_INET=y
 # CONFIG_ATM is not set
 
 #
-#  
+#
 #
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set

@@ -245,4 +245,5 @@ MACHINE_START(BADGE4, "Hewlett-Packard Laboratories BadgePAD 4")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(badge4_map_io)
 	INITIRQ(sa1100_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END

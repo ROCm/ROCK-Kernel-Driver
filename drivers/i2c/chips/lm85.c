@@ -351,6 +351,7 @@ struct lm85_autofan {
 };
 
 struct lm85_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -450,9 +451,9 @@ static ssize_t set_fan_##offset##_min (struct device *dev, 		\
 {									\
 	return set_fan_min(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL) \
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL);\
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, 		\
-		show_fan_##offset##_min, set_fan_##offset##_min)
+		show_fan_##offset##_min, set_fan_##offset##_min);
 
 show_fan_offset(1);
 show_fan_offset(2);
@@ -467,7 +468,7 @@ static ssize_t show_vid_reg(struct device *dev, char *buf)
 	return sprintf(buf, "%ld\n", (long) vid_from_reg(data->vid, data->vrm));
 }
 
-static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
+static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL);
 
 static ssize_t show_vrm_reg(struct device *dev, char *buf)
 {
@@ -486,7 +487,7 @@ static ssize_t store_vrm_reg(struct device *dev, const char *buf, size_t count)
 	return count;
 }
 
-static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg)
+static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg);
 
 static ssize_t show_alarms_reg(struct device *dev, char *buf)
 {
@@ -494,7 +495,7 @@ static ssize_t show_alarms_reg(struct device *dev, char *buf)
 	return sprintf(buf, "%ld\n", (long) ALARMS_FROM_REG(data->alarms));
 }
 
-static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL)
+static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL);
 
 /* pwm */
 
@@ -541,8 +542,8 @@ static ssize_t show_pwm_enable##offset (struct device *dev, char *buf)	\
 	return show_pwm_enable(dev, buf, 0x##offset - 1);			\
 }									\
 static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, 			\
-		show_pwm_##offset, set_pwm_##offset)			\
-static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO, show_pwm_enable##offset, NULL)
+		show_pwm_##offset, set_pwm_##offset);			\
+static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO, show_pwm_enable##offset, NULL);
 
 show_pwm_reg(1);
 show_pwm_reg(2);
@@ -616,11 +617,11 @@ static ssize_t set_in_##offset##_max (struct device *dev, 		\
 {									\
 	return set_in_max(dev, buf, count, 0x##offset);			\
 }									\
-static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_in_##offset, NULL)	\
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_in_##offset, NULL);	\
 static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR, 		\
-		show_in_##offset##_min, set_in_##offset##_min)		\
+		show_in_##offset##_min, set_in_##offset##_min);		\
 static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR, 		\
-		show_in_##offset##_max, set_in_##offset##_max)
+		show_in_##offset##_max, set_in_##offset##_max);
 
 show_in_reg(0);
 show_in_reg(1);
@@ -696,11 +697,11 @@ static ssize_t set_temp_##offset##_max (struct device *dev, 		\
 {									\
 	return set_temp_max(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL)	\
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL);	\
 static DEVICE_ATTR(temp##offset##_min, S_IRUGO | S_IWUSR, 		\
-		show_temp_##offset##_min, set_temp_##offset##_min)	\
+		show_temp_##offset##_min, set_temp_##offset##_min);	\
 static DEVICE_ATTR(temp##offset##_max, S_IRUGO | S_IWUSR, 		\
-		show_temp_##offset##_max, set_temp_##offset##_max)
+		show_temp_##offset##_max, set_temp_##offset##_max);
 
 show_temp_reg(1);
 show_temp_reg(2);
@@ -736,16 +737,13 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access lm85_{read,write}_value. */
 
-	if (!(new_client = kmalloc((sizeof(struct i2c_client)) +
-				    sizeof(struct lm85_data),
-				    GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct lm85_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR0;
 	}
+	memset(data, 0, sizeof(struct lm85_data));
 
-	memset(new_client, 0, sizeof(struct i2c_client) +
-			      sizeof(struct lm85_data));
-	data = (struct lm85_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -886,7 +884,7 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 
 	/* Error out and cleanup code */
     ERROR1:
-	kfree(new_client);
+	kfree(data);
     ERROR0:
 	return err;
 }
@@ -894,7 +892,7 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 int lm85_detach_client(struct i2c_client *client)
 {
 	i2c_detach_client(client);
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

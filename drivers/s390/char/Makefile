@@ -4,9 +4,10 @@
 
 obj-y += ctrlchar.o keyboard.o defkeymap.o
 
-tub3270-objs := raw3270.o tty3270.o fs3270.o
-obj-$(CONFIG_TN3270) += tub3270.o
+obj-$(CONFIG_TN3270) += raw3270.o
 obj-$(CONFIG_TN3270_CONSOLE) += con3270.o
+obj-$(CONFIG_TN3270_TTY) += tty3270.o
+obj-$(CONFIG_TN3270_FS) += fs3270.o
 
 obj-$(CONFIG_TN3215) += con3215.o
 

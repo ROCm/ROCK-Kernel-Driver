@@ -48,12 +48,12 @@
 #include "usb.h"
 #include "debug.h"
 #include "transport.h"
+#include "protocol.h"
 
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <scsi/scsi_devinfo.h>
 #include <scsi/scsi_host.h>
-
 
 /***********************************************************************
  * Host functions 
@@ -62,6 +62,20 @@
 static const char* host_info(struct Scsi_Host *host)
 {
 	return "SCSI emulation for USB Mass Storage devices";
+}
+
+static int slave_alloc (struct scsi_device *sdev)
+{
+	/*
+	 * Set default bflags. These can be overridden for individual
+	 * models and vendors via the scsi devinfo mechanism.  The only
+	 * flag we need is to force 36-byte INQUIRYs; we don't use any
+	 * of the extra data and many devices choke if asked for more or
+	 * less than 36 bytes.
+	 */
+	sdev->sdev_bflags = BLIST_INQUIRY_36;
+
+	return 0;
 }
 
 static int slave_configure(struct scsi_device *sdev)
@@ -84,11 +98,48 @@ static int slave_configure(struct scsi_device *sdev)
 	 * reduce the maximum transfer size to 64 KB = 128 sectors. */
 
 #define USB_VENDOR_ID_GENESYS	0x05e3		// Needs a standard location
+
 	if (us->pusb_dev->descriptor.idVendor == USB_VENDOR_ID_GENESYS &&
-			us->pusb_dev->speed == USB_SPEED_HIGH)
+			us->pusb_dev->speed == USB_SPEED_HIGH &&
+			sdev->request_queue->max_sectors > 128)
 		blk_queue_max_sectors(sdev->request_queue, 128);
 
-	/* this is to satisify the compiler, tho I don't think the 
+	/* We can't put these settings in slave_alloc() because that gets
+	 * called before the device type is known.  Consequently these
+	 * settings can't be overridden via the scsi devinfo mechanism. */
+	if (sdev->type == TYPE_DISK) {
+
+		/* Disk-type devices use MODE SENSE(6) if the protocol
+		 * (SubClass) is Transparent SCSI, otherwise they use
+		 * MODE SENSE(10). */
+		if (us->subclass != US_SC_SCSI)
+			sdev->use_10_for_ms = 1;
+
+		/* Many disks only accept MODE SENSE transfer lengths of
+		 * 192 bytes (that's what Windows uses). */
+		sdev->use_192_bytes_for_3f = 1;
+
+		/* A number of devices have problems with MODE SENSE for
+		 * page x08, so we will skip it. */
+		sdev->skip_ms_page_8 = 1;
+
+#ifndef CONFIG_USB_STORAGE_RW_DETECT
+		/* Some devices may not like MODE SENSE with page=0x3f.
+		 * Now that we're using 192-byte transfers this may no
+		 * longer be a problem.  So this will be a configuration
+		 * option. */
+		sdev->skip_ms_page_3f = 1;
+#endif
+
+	} else {
+
+		/* Non-disk-type devices don't need to blacklist any pages
+		 * or to force 192-byte transfer lengths for MODE SENSE.
+		 * But they do need to use MODE SENSE(10). */
+		sdev->use_10_for_ms = 1;
+	}
+
+	/* this is to satisfy the compiler, tho I don't think the 
 	 * return code is ever checked anywhere. */
 	return 0;
 }
@@ -148,13 +199,17 @@ static int command_abort( Scsi_Cmnd *srb )
 		return FAILED;
 	}
 
-	/* Set state to ABORTING, set the ABORTING bit, and release the lock */
+	/* Set state to ABORTING and set the ABORTING bit, but only if
+	 * a device reset isn't already in progress (to avoid interfering
+	 * with the reset).  To prevent races with auto-reset, we must
+	 * stop any ongoing USB transfers while still holding the host
+	 * lock. */
 	us->sm_state = US_STATE_ABORTING;
-	set_bit(US_FLIDX_ABORTING, &us->flags);
+	if (!test_bit(US_FLIDX_RESETTING, &us->flags)) {
+		set_bit(US_FLIDX_ABORTING, &us->flags);
+		usb_stor_stop_transport(us);
+	}
 	scsi_unlock(host);
-
-	/* Stop an ongoing USB transfer */
-	usb_stor_stop_transport(us);
 
 	/* Wait for the aborted command to finish */
 	wait_for_completion(&us->notify);
@@ -243,18 +298,17 @@ static int bus_reset( Scsi_Cmnd *srb )
 }
 
 /* Report a driver-initiated device reset to the SCSI layer.
- * Calling this for a SCSI-initiated reset is unnecessary but harmless. */
+ * Calling this for a SCSI-initiated reset is unnecessary but harmless.
+ * The caller must own the SCSI host lock. */
 void usb_stor_report_device_reset(struct us_data *us)
 {
 	int i;
 
-	scsi_lock(us->host);
 	scsi_report_device_reset(us->host, 0, 0);
 	if (us->flags & US_FL_SCM_MULT_TARG) {
 		for (i = 1; i < us->host->max_id; ++i)
 			scsi_report_device_reset(us->host, 0, i);
 	}
-	scsi_unlock(us->host);
 }
 
 /***********************************************************************
@@ -377,6 +431,7 @@ struct scsi_host_template usb_stor_host_template = {
 	/* unknown initiator id */
 	.this_id =			-1,
 
+	.slave_alloc =			slave_alloc,
 	.slave_configure =		slave_configure,
 
 	/* lots of sg segments can be handled */
@@ -394,12 +449,11 @@ struct scsi_host_template usb_stor_host_template = {
 	/* emulated HBA */
 	.emulated =			TRUE,
 
+	/* we do our own delay after a device or bus reset */
+	.skip_settle_delay =		1,
+
 	/* sysfs device attributes */
 	.sdev_attrs =			sysfs_device_attr_list,
-
-	/* modify scsi_device bits on probe */
-	.flags = (BLIST_MS_SKIP_PAGE_08 | BLIST_MS_SKIP_PAGE_3F |
-		  BLIST_USE_10_BYTE_MS),
 
 	/* module management */
 	.module =			THIS_MODULE

@@ -10,5 +10,7 @@ obj-$(CONFIG_ETRAX_I2C_EEPROM)          += eeprom.o
 obj-$(CONFIG_ETRAX_GPIO) 	        += gpio.o
 obj-$(CONFIG_ETRAX_DS1302)              += ds1302.o
 obj-$(CONFIG_ETRAX_PCF8563)		+= pcf8563.o
+obj-$(CONFIG_ETRAX_IDE)                 += ide.o
+obj-$(CONFIG_ETRAX_USB_HOST)            += usb-host.o
 
 

@@ -37,7 +37,8 @@ static spinlock_t nvram_lock = SPIN_LOCK_UNLOCKED;
 static ssize_t pSeries_nvram_read(char *buf, size_t count, loff_t *index)
 {
 	unsigned int i;
-	unsigned long len, done;
+	unsigned long len;
+	int done;
 	unsigned long flags;
 	char *p = buf;
 
@@ -80,7 +81,8 @@ static ssize_t pSeries_nvram_read(char *buf, size_t count, loff_t *index)
 static ssize_t pSeries_nvram_write(char *buf, size_t count, loff_t *index)
 {
 	unsigned int i;
-	unsigned long len, done;
+	unsigned long len;
+	int done;
 	unsigned long flags;
 	const char *p = buf;
 

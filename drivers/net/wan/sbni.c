@@ -349,7 +349,7 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 
 	if( sbni_card_probe( ioaddr ) ) {
 		release_region( ioaddr, SBNI_IO_EXTENT );
-		return  0;
+		return NULL;
 	}
 
 	outb( 0, ioaddr + CSR0 );
@@ -368,7 +368,7 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 			printk( KERN_ERR "%s: can't detect device irq!\n",
 				dev->name );
 			release_region( ioaddr, SBNI_IO_EXTENT );
-			return  0;
+			return NULL;
 		}
 	} else if( irq == 2 )
 		irq = 9;
@@ -381,7 +381,7 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 	if( !nl ) {
 		printk( KERN_ERR "%s: unable to get memory!\n", dev->name );
 		release_region( ioaddr, SBNI_IO_EXTENT );
-		return  0;
+		return NULL;
 	}
 
 	dev->priv = nl;
@@ -1342,7 +1342,7 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 			return  -EPERM;
 
 		spin_lock( &nl->lock );
-		flags = *(struct sbni_flags*) &ifr->ifr_data;
+		flags = *(struct sbni_flags*) &ifr->ifr_ifru;
 		if( flags.fixed_rxl )
 			nl->delta_rxl = 0,
 			nl->cur_rxl_index = flags.rxl;
@@ -1578,7 +1578,7 @@ calc_crc32( u32  crc,  u8  *p,  u32  len )
 	register u32  _crc;
 	_crc = crc;
 	
-	__asm __volatile (
+	__asm__ __volatile__ (
 		"xorl	%%ebx, %%ebx\n"
 		"movl	%2, %%esi\n" 
 		"movl	%3, %%ecx\n" 

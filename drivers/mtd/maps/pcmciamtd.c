@@ -1,5 +1,5 @@
 /*
- * $Id: pcmciamtd.c,v 1.48 2003/06/24 07:14:38 spse Exp $
+ * $Id: pcmciamtd.c,v 1.51 2004/07/12 22:38:29 dwmw2 Exp $
  *
  * pcmciamtd.c - MTD driver for PCMCIA flash memory cards
  *
@@ -49,7 +49,7 @@ static const int debug = 0;
 
 
 #define DRIVER_DESC	"PCMCIA Flash memory card driver"
-#define DRIVER_VERSION	"$Revision: 1.48 $"
+#define DRIVER_VERSION	"$Revision: 1.51 $"
 
 /* Size of the PCMCIA address space: 26 bits = 64 MB */
 #define MAX_PCMCIA_ADDR	0x4000000
@@ -73,7 +73,7 @@ static dev_link_t *dev_list;
 /* Module parameters */
 
 /* 2 = do 16-bit transfers, 1 = do 8-bit transfers */
-static int buswidth = 2;
+static int bankwidth = 2;
 
 /* Speed of memory accesses, in ns */
 static int mem_speed;
@@ -93,8 +93,8 @@ static int mem_type;
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Simon Evans <spse@secret.org.uk>");
 MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_PARM(buswidth, "i");
-MODULE_PARM_DESC(buswidth, "Set buswidth (1=8 bit, 2=16 bit, default=2)");
+MODULE_PARM(bankwidth, "i");
+MODULE_PARM_DESC(bankwidth, "Set bankwidth (1=8 bit, 2=16 bit, default=2)");
 MODULE_PARM(mem_speed, "i");
 MODULE_PARM_DESC(mem_speed, "Set memory access speed in ns");
 MODULE_PARM(force_size, "i");
@@ -135,32 +135,32 @@ static caddr_t remap_window(struct map_info *map, unsigned long to)
 }
 
 
-static u8 pcmcia_read8_remap(struct map_info *map, unsigned long ofs)
+static map_word pcmcia_read8_remap(struct map_info *map, unsigned long ofs)
 {
 	caddr_t addr;
-	u8 d;
+	map_word d = {{0}};
 
 	addr = remap_window(map, ofs);
 	if(!addr)
-		return 0;
+		return d;
 
-	d = readb(addr);
-	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%02x", ofs, addr, d);
+	d.x[0] = readb(addr);
+	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%02x", ofs, addr, d.x[0]);
 	return d;
 }
 
 
-static u16 pcmcia_read16_remap(struct map_info *map, unsigned long ofs)
+static map_word pcmcia_read16_remap(struct map_info *map, unsigned long ofs)
 {
 	caddr_t addr;
-	u16 d;
+	map_word d = {{0}};
 
 	addr = remap_window(map, ofs);
 	if(!addr)
-		return 0;
+		return d;
 
-	d = readw(addr);
-	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%04x", ofs, addr, d);
+	d.x[0] = readw(addr);
+	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%04x", ofs, addr, d.x[0]);
 	return d;
 }
 
@@ -191,26 +191,26 @@ static void pcmcia_copy_from_remap(struct map_info *map, void *to, unsigned long
 }
 
 
-static void pcmcia_write8_remap(struct map_info *map, u8 d, unsigned long adr)
+static void pcmcia_write8_remap(struct map_info *map, map_word d, unsigned long adr)
 {
 	caddr_t addr = remap_window(map, adr);
 
 	if(!addr)
 		return;
 
-	DEBUG(3, "adr = 0x%08lx (%p)  data = 0x%02x", adr, addr, d);
-	writeb(d, addr);
+	DEBUG(3, "adr = 0x%08lx (%p)  data = 0x%02x", adr, addr, d.x[0]);
+	writeb(d.x[0], addr);
 }
 
 
-static void pcmcia_write16_remap(struct map_info *map, u16 d, unsigned long adr)
+static void pcmcia_write16_remap(struct map_info *map, map_word d, unsigned long adr)
 {
 	caddr_t addr = remap_window(map, adr);
 	if(!addr)
 		return;
 
-	DEBUG(3, "adr = 0x%08lx (%p)  data = 0x%04x", adr, addr, d);
-	writew(d, addr);
+	DEBUG(3, "adr = 0x%08lx (%p)  data = 0x%04x", adr, addr, d.x[0]);
+	writew(d.x[0], addr);
 }
 
 
@@ -244,30 +244,30 @@ static void pcmcia_copy_to_remap(struct map_info *map, unsigned long to, const v
 
 #define DEV_REMOVED(x)  (!(*(u_int *)x->map_priv_1 & DEV_PRESENT))
 
-static u8 pcmcia_read8(struct map_info *map, unsigned long ofs)
+static map_word pcmcia_read8(struct map_info *map, unsigned long ofs)
 {
 	caddr_t win_base = (caddr_t)map->map_priv_2;
-	u8 d;
+	map_word d = {{0}};
 
 	if(DEV_REMOVED(map))
-		return 0;
+		return d;
 
-	d = readb(win_base + ofs);
-	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%02x", ofs, win_base + ofs, d);
+	d.x[0] = readb(win_base + ofs);
+	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%02x", ofs, win_base + ofs, d.x[0]);
 	return d;
 }
 
 
-static u16 pcmcia_read16(struct map_info *map, unsigned long ofs)
+static map_word pcmcia_read16(struct map_info *map, unsigned long ofs)
 {
 	caddr_t win_base = (caddr_t)map->map_priv_2;
-	u16 d;
+	map_word d = {{0}};
 
 	if(DEV_REMOVED(map))
-		return 0;
+		return d;
 
-	d = readw(win_base + ofs);
-	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%04x", ofs, win_base + ofs, d);
+	d.x[0] = readw(win_base + ofs);
+	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%04x", ofs, win_base + ofs, d.x[0]);
 	return d;
 }
 
@@ -439,9 +439,9 @@ static void card_settings(struct pcmciamtd_dev *dev, dev_link_t *link, int *new_
 		case CISTPL_DEVICE_GEO: {
 			cistpl_device_geo_t *t = &parse.device_geo;
 			int i;
-			dev->pcmcia_map.buswidth = t->geo[0].buswidth;
+			dev->pcmcia_map.bankwidth = t->geo[0].buswidth;
 			for(i = 0; i < t->ngeo; i++) {
-				DEBUG(2, "region: %d buswidth = %u", i, t->geo[i].buswidth);
+				DEBUG(2, "region: %d bankwidth = %u", i, t->geo[i].buswidth);
 				DEBUG(2, "region: %d erase_block = %u", i, t->geo[i].erase_block);
 				DEBUG(2, "region: %d read_block = %u", i, t->geo[i].read_block);
 				DEBUG(2, "region: %d write_block = %u", i, t->geo[i].write_block);
@@ -460,17 +460,17 @@ static void card_settings(struct pcmciamtd_dev *dev, dev_link_t *link, int *new_
 	if(!dev->pcmcia_map.size)
 		dev->pcmcia_map.size = MAX_PCMCIA_ADDR;
 
-	if(!dev->pcmcia_map.buswidth)
-		dev->pcmcia_map.buswidth = 2;
+	if(!dev->pcmcia_map.bankwidth)
+		dev->pcmcia_map.bankwidth = 2;
 
 	if(force_size) {
 		dev->pcmcia_map.size = force_size << 20;
 		DEBUG(2, "size forced to %dM", force_size);
 	}
 
-	if(buswidth) {
-		dev->pcmcia_map.buswidth = buswidth;
-		DEBUG(2, "buswidth forced to %d", buswidth);
+	if(bankwidth) {
+		dev->pcmcia_map.bankwidth = bankwidth;
+		DEBUG(2, "bankwidth forced to %d", bankwidth);
 	}		
 
 	dev->pcmcia_map.name = dev->mtd_name;
@@ -480,7 +480,7 @@ static void card_settings(struct pcmciamtd_dev *dev, dev_link_t *link, int *new_
 	}
 
 	DEBUG(1, "Device: Size: %lu Width:%d Name: %s",
-	      dev->pcmcia_map.size, dev->pcmcia_map.buswidth << 3, dev->mtd_name);
+	      dev->pcmcia_map.size, dev->pcmcia_map.bankwidth << 3, dev->mtd_name);
 }
 
 
@@ -522,12 +522,15 @@ static void pcmciamtd_config(dev_link_t *link)
 	card_settings(dev, link, &new_name);
 
 	dev->pcmcia_map.phys = NO_XIP;
-	dev->pcmcia_map.read8 = pcmcia_read8_remap;
-	dev->pcmcia_map.read16 = pcmcia_read16_remap;
 	dev->pcmcia_map.copy_from = pcmcia_copy_from_remap;
-	dev->pcmcia_map.write8 = pcmcia_write8_remap;
-	dev->pcmcia_map.write16 = pcmcia_write16_remap;
 	dev->pcmcia_map.copy_to = pcmcia_copy_to_remap;
+	if (dev->pcmcia_map.bankwidth == 1) {
+		dev->pcmcia_map.read = pcmcia_read8_remap;
+		dev->pcmcia_map.write = pcmcia_write8_remap;
+	} else {
+		dev->pcmcia_map.read = pcmcia_read16_remap;
+		dev->pcmcia_map.write = pcmcia_write16_remap;
+	}
 	if(setvpp == 1)
 		dev->pcmcia_map.set_vpp = pcmciamtd_set_vpp;
 
@@ -536,7 +539,7 @@ static void pcmciamtd_config(dev_link_t *link)
 	   whole card - otherwise we try smaller windows until we succeed */
 
 	req.Attributes =  WIN_MEMORY_TYPE_CM | WIN_ENABLE;
-	req.Attributes |= (dev->pcmcia_map.buswidth == 1) ? WIN_DATA_WIDTH_8 : WIN_DATA_WIDTH_16;
+	req.Attributes |= (dev->pcmcia_map.bankwidth == 1) ? WIN_DATA_WIDTH_8 : WIN_DATA_WIDTH_16;
 	req.Base = 0;
 	req.AccessSpeed = mem_speed;
 	link->win = (window_handle_t)link->handle;
@@ -657,11 +660,14 @@ static void pcmciamtd_config(dev_link_t *link)
 		DEBUG(1, "Using non remapping memory functions");
 		dev->pcmcia_map.map_priv_1 = (unsigned long)&(dev->link.state);
 		dev->pcmcia_map.map_priv_2 = (unsigned long)dev->win_base;
-		dev->pcmcia_map.read8 = pcmcia_read8;
-		dev->pcmcia_map.read16 = pcmcia_read16;
+		if (dev->pcmcia_map.bankwidth == 1) {
+			dev->pcmcia_map.read = pcmcia_read8;
+			dev->pcmcia_map.write = pcmcia_write8;
+		} else {
+			dev->pcmcia_map.read = pcmcia_read16;
+			dev->pcmcia_map.write = pcmcia_write16;
+		}
 		dev->pcmcia_map.copy_from = pcmcia_copy_from;
-		dev->pcmcia_map.write8 = pcmcia_write8;
-		dev->pcmcia_map.write16 = pcmcia_write16;
 		dev->pcmcia_map.copy_to = pcmcia_copy_to;
 	}
 
@@ -828,9 +834,9 @@ static int __init init_pcmciamtd(void)
 {
 	info(DRIVER_DESC " " DRIVER_VERSION);
 
-	if(buswidth && buswidth != 1 && buswidth != 2) {
-		info("bad buswidth (%d), using default", buswidth);
-		buswidth = 2;
+	if(bankwidth && bankwidth != 1 && bankwidth != 2) {
+		info("bad bankwidth (%d), using default", bankwidth);
+		bankwidth = 2;
 	}
 	if(force_size && (force_size < 1 || force_size > 64)) {
 		info("bad force_size (%d), using default", force_size);

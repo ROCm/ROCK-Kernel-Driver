@@ -225,7 +225,7 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 	 *	Reserve I/O resource for exclusive use by this driver
 	 */
 
-	if (!request_region(ioaddr, EL1_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, EL1_IO_EXTENT, DRV_NAME))
 		return -ENODEV;
 
 	/*

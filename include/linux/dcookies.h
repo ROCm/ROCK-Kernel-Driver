@@ -50,7 +50,7 @@ int get_dcookie(struct dentry * dentry, struct vfsmount * vfsmnt,
 
 struct dcookie_user * dcookie_register(void)
 {
-	return 0;
+	return NULL;
 }
 
 void dcookie_unregister(struct dcookie_user * user)

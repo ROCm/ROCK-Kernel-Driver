@@ -31,8 +31,6 @@ struct linux_romvec *romvec;
 /* prom vector table */
 e_vector *sun3x_prom_vbr;
 
-extern e_vector vectors[256];  /* arch/m68k/kernel/traps.c */
-
 /* Handle returning to the prom */
 void sun3x_halt(void)
 {
@@ -121,13 +119,13 @@ void sun3x_prom_init(void)
      * XXX this is futile since we restore the vbr first - oops
      */
     vectors[VEC_TRAP14] = sun3x_prom_abort;
-    
+
     /* If debug=prom was specified, start the debug console */
 
     if (!strcmp(m68k_debug_device, "prom"))
         register_console(&sun3x_debug);
 
-    
+
 }
 
 /* some prom functions to export */
@@ -161,7 +159,7 @@ prom_get_idprom(char *idbuf, int num_bytes)
         int i;
 
 	/* make a copy of the idprom structure */
-	for(i = 0; i < num_bytes; i++) 
+	for(i = 0; i < num_bytes; i++)
 		idbuf[i] = ((char *)SUN3X_IDPROM)[i];
 
         return idbuf[0];

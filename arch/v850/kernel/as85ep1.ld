@@ -2,7 +2,7 @@
    (CONFIG_V850E_AS85EP1).  */
 
 MEMORY {
-	/* 1MB of internal memory (ÆâÂ¢Ì¿ÎáRAM).  */
+	/* 1MB of internal instruction memory. */
 	iMEM0 : ORIGIN = 0,	     LENGTH = 0x00100000
 
 	/* 1MB of static RAM.  */

@@ -164,7 +164,7 @@ static int __init oaknet_init(void)
 	ret = -EAGAIN;
 	if (request_irq(dev->irq, ei_interrupt, 0, name, dev)) {
 		printk("%s: unable to request interrupt %d.\n",
-		       dev->name, dev->irq);
+		       name, dev->irq);
 		goto out_region;
 	}
 

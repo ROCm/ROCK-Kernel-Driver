@@ -59,6 +59,20 @@
 #define REST_16VR(n,b,base)	REST_8VR(n,b,base); REST_8VR(n+8,b,base)
 #define REST_32VR(n,b,base)	REST_16VR(n,b,base); REST_16VR(n+16,b,base)
 
+#define SAVE_EVR(n,s,base)	evmergehi s,s,n; stw s,THREAD_EVR0+4*(n)(base)
+#define SAVE_2EVR(n,s,base)	SAVE_EVR(n,s,base); SAVE_EVR(n+1,s,base)
+#define SAVE_4EVR(n,s,base)	SAVE_2EVR(n,s,base); SAVE_2EVR(n+2,s,base)
+#define SAVE_8EVR(n,s,base)	SAVE_4EVR(n,s,base); SAVE_4EVR(n+4,s,base)
+#define SAVE_16EVR(n,s,base)	SAVE_8EVR(n,s,base); SAVE_8EVR(n+8,s,base)
+#define SAVE_32EVR(n,s,base)	SAVE_16EVR(n,s,base); SAVE_16EVR(n+16,s,base)
+
+#define REST_EVR(n,s,base)	lwz s,THREAD_EVR0+4*(n)(base); evmergelo n,s,n
+#define REST_2EVR(n,s,base)	REST_EVR(n,s,base); REST_EVR(n+1,s,base)
+#define REST_4EVR(n,s,base)	REST_2EVR(n,s,base); REST_2EVR(n+2,s,base)
+#define REST_8EVR(n,s,base)	REST_4EVR(n,s,base); REST_4EVR(n+4,s,base)
+#define REST_16EVR(n,s,base)	REST_8EVR(n,s,base); REST_8EVR(n+8,s,base)
+#define REST_32EVR(n,s,base)	REST_16EVR(n,s,base); REST_16EVR(n+16,s,base)
+
 #ifdef CONFIG_PPC601_SYNC_FIX
 #define SYNC				\
 BEGIN_FTR_SECTION			\
@@ -107,7 +121,14 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 	bdnz	0b
 #endif
 
-#if !defined(CONFIG_44x)
+#ifdef CONFIG_BOOKE
+#define tophys(rd,rs)				\
+	addis	rd,rs,0
+
+#define tovirt(rd,rs)				\
+	addis	rd,rs,0
+
+#else  /* CONFIG_BOOKE */
 /*
  * On APUS (Amiga PowerPC cpu upgrade board), we don't know the
  * physical base address of RAM at compile time.
@@ -125,15 +146,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 	.align  1;				\
 	.long   0b;				\
 	.previous
-#else  /* CONFIG_44x */
-
-#define tophys(rd,rs)				\
-	mr	rd,rs
-
-#define tovirt(rd,rs)				\
-	mr	rd,rs
-
-#endif /* CONFIG_44x */
+#endif  /* CONFIG_BOOKE */
 
 /*
  * On 64-bit cpus, we use the rfid instruction instead of rfi, but
@@ -160,6 +173,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 #define MTMSRD(r)	mtmsr	r
 #define CLR_TOP32(r)
 #endif /* CONFIG_PPC64BRIDGE */
+
+#define RFMCI		.long 0x4c00004c	/* rfmci instruction */
 
 #ifdef CONFIG_IBM405_ERR77
 #define PPC405_ERR77(ra,rb)	dcbt	ra, rb;
@@ -286,6 +301,39 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 #define	vr29	29
 #define	vr30	30
 #define	vr31	31
+
+#define	evr0	0
+#define	evr1	1
+#define	evr2	2
+#define	evr3	3
+#define	evr4	4
+#define	evr5	5
+#define	evr6	6
+#define	evr7	7
+#define	evr8	8
+#define	evr9	9
+#define	evr10	10
+#define	evr11	11
+#define	evr12	12
+#define	evr13	13
+#define	evr14	14
+#define	evr15	15
+#define	evr16	16
+#define	evr17	17
+#define	evr18	18
+#define	evr19	19
+#define	evr20	20
+#define	evr21	21
+#define	evr22	22
+#define	evr23	23
+#define	evr24	24
+#define	evr25	25
+#define	evr26	26
+#define	evr27	27
+#define	evr28	28
+#define	evr29	29
+#define	evr30	30
+#define	evr31	31
 
 /* some stab codes */
 #define N_FUN	36

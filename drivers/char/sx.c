@@ -251,11 +251,13 @@
 #define PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8 0x2000
 #endif
 
+#ifdef CONFIG_PCI
 static struct pci_device_id sx_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SPECIALIX, PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, sx_pci_tbl);
+#endif /* CONFIG_PCI */
 
 /* Configurable options: 
    (Don't be too sure that it'll work if you toggle them) */
@@ -1025,8 +1027,8 @@ static void sx_transmit_chars (struct sx_port *port)
 		if (c == 0) break;
 
 
-		memcpy_toio ((char *)port->board->base + CHAN_OFFSET(port,hi_txbuf) + tx_ip, 
-		             (char *)port->gs.xmit_buf + port->gs.xmit_tail, c);
+		memcpy_toio (port->board->base + CHAN_OFFSET(port,hi_txbuf) + tx_ip, 
+		             port->gs.xmit_buf + port->gs.xmit_tail, c);
 
 		/* Update the pointer in the card */
 		sx_write_channel_byte (port, hi_txipos, (tx_ip+c) & 0xff);
@@ -1095,7 +1097,7 @@ static inline void sx_receive_chars (struct sx_port *port)
 		            read_sx_byte (port->board, CHAN_OFFSET(port,hi_rxbuf) + rx_op),
 		            CHAN_OFFSET(port, hi_rxbuf)); 
 		memcpy_fromio (tty->flip.char_buf_ptr, 
-		               (char *)port->board->base + CHAN_OFFSET(port,hi_rxbuf) + rx_op, c);
+		               port->board->base + CHAN_OFFSET(port,hi_rxbuf) + rx_op, c);
 		memset(tty->flip.flag_buf_ptr, TTY_NORMAL, c);
 
 		/* Update the kernel buffer end */
@@ -1419,10 +1421,8 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	}
 
 	line = tty->index;
-#if 0
 	sx_dprintk (SX_DEBUG_OPEN, "%d: opening line %d. tty=%p ctty=%p, np=%d)\n", 
 	            current->pid, line, tty, current->signal->tty, sx_nports);
-#endif
 
 	if ((line < 0) || (line >= SX_NPORTS) || (line >= sx_nports))
 		return -ENODEV;
@@ -1594,7 +1594,8 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
                         unsigned int cmd, unsigned long arg)
 {
 	int rc = 0;
-	int *descr = (int *)arg, i;
+	int __user *descr = (int __user *)arg;
+	int i;
 	static struct sx_board *board = NULL;
 	int nbytes, offset;
 	unsigned long data;
@@ -1670,7 +1671,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 		get_user (data,	 descr++);
 		while (nbytes && data) {
 			for (i=0;i<nbytes;i += SX_CHUNK_SIZE) {
-				if (copy_from_user(tmp, (char *)data + i, 
+				if (copy_from_user(tmp, (char __user *)data+i, 
 						   (i + SX_CHUNK_SIZE >
 						    nbytes) ? nbytes - i :
 						   	      SX_CHUNK_SIZE)) {
@@ -1776,6 +1777,7 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 {
 	int rc;
 	struct sx_port *port = tty->driver_data;
+	void __user *argp = (void __user *)arg;
 	int ival;
 
 	/* func_enter2(); */
@@ -1784,24 +1786,20 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 	switch (cmd) {
 	case TIOCGSOFTCAR:
 		rc = put_user(((tty->termios->c_cflag & CLOCAL) ? 1 : 0),
-		              (unsigned int *) arg);
+		              (unsigned __user *) argp);
 		break;
 	case TIOCSSOFTCAR:
-		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
+		if ((rc = get_user(ival, (unsigned __user *) argp)) == 0) {
 			tty->termios->c_cflag =
 				(tty->termios->c_cflag & ~CLOCAL) |
 				(ival ? CLOCAL : 0);
 		}
 		break;
 	case TIOCGSERIAL:
-		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
-		                      sizeof(struct serial_struct))) == 0)
-			rc = gs_getserial(&port->gs, (struct serial_struct *) arg);
+		rc = gs_getserial(&port->gs, argp);
 		break;
 	case TIOCSSERIAL:
-		if ((rc = verify_area(VERIFY_READ, (void *) arg,
-		                      sizeof(struct serial_struct))) == 0)
-			rc = gs_setserial(&port->gs, (struct serial_struct *) arg);
+		rc = gs_setserial(&port->gs, argp);
 		break;
 	default:
 		rc = -ENOIOCTLCMD;

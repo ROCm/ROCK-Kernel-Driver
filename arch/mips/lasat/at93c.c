@@ -41,9 +41,9 @@ static u32 at93c_datareg_read(void)
 static void at93c_cycle_clk(u32 data)
 {
 	at93c_reg_write(data | at93c->clk);
-	ndelay(250);
+	lasat_ndelay(250);
 	at93c_reg_write(data & ~at93c->clk);
-	ndelay(250);
+	lasat_ndelay(250);
 }
 
 static void at93c_write_databit(u8 bit)
@@ -55,7 +55,7 @@ static void at93c_write_databit(u8 bit)
 		data &= ~(1 << at93c->wdata_shift);
 
 	at93c_reg_write(data);
-	ndelay(100);
+	lasat_ndelay(100);
 	at93c_cycle_clk(data);
 }
 
@@ -95,13 +95,13 @@ static void at93c_write_bits(u32 data, int size)
 static void at93c_init_op(void)
 {
 	at93c_reg_write((at93c_reg_read() | at93c->cs) & ~at93c->clk & ~(1 << at93c->rdata_shift));
-	ndelay(50);
+	lasat_ndelay(50);
 }
 
 static void at93c_end_op(void)
 {
 	at93c_reg_write(at93c_reg_read() & ~at93c->cs);
-	ndelay(250);
+	lasat_ndelay(250);
 }
 
 static void at93c_wait(void) 

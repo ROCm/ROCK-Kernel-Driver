@@ -12,6 +12,7 @@
 #define COMMAND_LINE_SIZE 	896
 #define RAMDISK_ORIGIN		0x800000
 #define RAMDISK_SIZE		0x800000
+#define MEMORY_CHUNKS		16	/* max 0x7fff */
 
 #ifndef __ASSEMBLY__
 
@@ -35,7 +36,6 @@ extern unsigned long machine_flags;
 #define MACHINE_IS_P390		(machine_flags & 4)
 #define MACHINE_HAS_MVPG	(machine_flags & 16)
 #define MACHINE_HAS_DIAG44	(machine_flags & 32)
-#define MACHINE_NEW_STIDP	(machine_flags & 64)
 #define MACHINE_HAS_IDTE	(machine_flags & 128)
 
 #ifndef __s390x__
@@ -53,7 +53,7 @@ extern unsigned long machine_flags;
  * Console mode. Override with conmode=
  */
 extern unsigned int console_mode;
-extern unsigned int console_device;
+extern unsigned int console_devno;
 extern unsigned int console_irq;
 
 #define CONSOLE_IS_UNDEFINED	(console_mode == 0)

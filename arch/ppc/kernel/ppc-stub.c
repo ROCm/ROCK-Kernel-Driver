@@ -105,6 +105,8 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/init.h>
+#include <linux/sysrq.h>
 
 #include <asm/cacheflush.h>
 #include <asm/system.h>
@@ -232,7 +234,7 @@ mem2hex(const char *mem, char *buf, int count)
 	} else {
 		/* error condition */
 	}
-	debugger_fault_handler = 0;
+	debugger_fault_handler = NULL;
 	*buf = 0;
 	return buf;
 }
@@ -298,7 +300,7 @@ hex2mem(char *buf, char *mem, int count)
 	} else {
 		/* error condition */
 	}
-	debugger_fault_handler = 0;
+	debugger_fault_handler = NULL;
 	return mem;
 }
 
@@ -329,7 +331,7 @@ hexToInt(char **ptr, int *intValue)
 	} else {
 		/* error condition */
 	}
-	debugger_fault_handler = 0;
+	debugger_fault_handler = NULL;
 
 	return (numChars);
 }
@@ -855,3 +857,23 @@ kgdb_output_string (const char* s, unsigned int count)
 	return 1;
 }
 #endif
+
+static void sysrq_handle_gdb(int key, struct pt_regs *pt_regs,
+			     struct tty_struct *tty)
+{
+	printk("Entering GDB stub\n");
+	breakpoint();
+}
+static struct sysrq_key_op sysrq_gdb_op = {
+        .handler        = sysrq_handle_gdb,
+        .help_msg       = "Gdb",
+        .action_msg     = "GDB",
+};
+
+static int gdb_register_sysrq(void)
+{
+	printk("Registering GDB sysrq handler\n");
+	register_sysrq_key('g', &sysrq_gdb_op);
+	return 0;
+}
+module_init(gdb_register_sysrq);

@@ -52,7 +52,7 @@
 
 #define NUM_MAC_SOURCES		72
 
-/* 
+/*
  * clean way to separate IRQ into its source and index
  */
 
@@ -74,7 +74,7 @@
 #define IRQ_VIA1_0	  (8)		/* one second int. */
 #define IRQ_VIA1_1        (9)		/* VBlank int. */
 #define IRQ_MAC_VBL	  IRQ_VIA1_1
-#define IRQ_VIA1_2 	  (10)		/* ADB SR shifts complete */
+#define IRQ_VIA1_2	  (10)		/* ADB SR shifts complete */
 #define IRQ_MAC_ADB	  IRQ_VIA1_2
 #define IRQ_MAC_ADB_SR	  IRQ_VIA1_2
 #define IRQ_VIA1_3	  (11)		/* ADB SR CB2 ?? */
@@ -92,7 +92,7 @@
 #define IRQ_MAC_SCSIDRQ	  IRQ_VIA2_0
 #define IRQ_VIA2_1        (17)
 #define IRQ_MAC_NUBUS	  IRQ_VIA2_1
-#define IRQ_VIA2_2 	  (18)
+#define IRQ_VIA2_2	  (18)
 #define IRQ_VIA2_3	  (19)
 #define IRQ_MAC_SCSI	  IRQ_VIA2_3
 #define IRQ_VIA2_4        (20)
@@ -108,7 +108,7 @@
 #define IRQ_PSC3_3	  (27)
 
 /* Level 4 (SCC) interrupts */
-#define IRQ_SCC 	     (32)
+#define IRQ_SCC		     (32)
 #define IRQ_SCCA	     (33)
 #define IRQ_SCCB	     (34)
 #if 0 /* FIXME: are there multiple interrupt conditions on the SCC ?? */

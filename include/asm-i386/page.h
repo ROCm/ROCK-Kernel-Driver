@@ -40,15 +40,20 @@
  * These are used to make use of C type-checking..
  */
 #ifdef CONFIG_X86_PAE
+extern unsigned long long __supported_pte_mask;
+extern int nx_enabled;
 typedef struct { unsigned long pte_low, pte_high; } pte_t;
 typedef struct { unsigned long long pmd; } pmd_t;
 typedef struct { unsigned long long pgd; } pgd_t;
+typedef struct { unsigned long long pgprot; } pgprot_t;
 #define pte_val(x)	((x).pte_low | ((unsigned long long)(x).pte_high << 32))
 #define HPAGE_SHIFT	21
 #else
+#define nx_enabled 0
 typedef struct { unsigned long pte_low; } pte_t;
 typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
+typedef struct { unsigned long pgprot; } pgprot_t;
 #define boot_pte_t pte_t /* or would you rather have a typedef */
 #define pte_val(x)	((x).pte_low)
 #define HPAGE_SHIFT	22
@@ -61,7 +66,6 @@ typedef struct { unsigned long pgd; } pgd_t;
 #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
 #endif
 
-typedef struct { unsigned long pgprot; } pgprot_t;
 
 #define pmd_val(x)	((x).pmd)
 #define pgd_val(x)	((x).pgd)
@@ -94,14 +98,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
  * This much address space is reserved for vmalloc() and iomap()
  * as well as fixmap mappings.
  */
-#define __VMALLOC_RESERVE_MIN		(32 << 20)
-#define __VMALLOC_RESERVE_DEFAULT	(128 << 20)
-#define __VMALLOC_RESERVE_MAX		(800 << 20)
-#define __RESERVED_AREA			(10 << 20)
+#define __VMALLOC_RESERVE	(128 << 20)
 
 #ifndef __ASSEMBLY__
-
-extern unsigned long vmalloc_reserve;
 
 /* Pure 2^n version of get_order */
 static __inline__ int get_order(unsigned long size)
@@ -127,14 +126,11 @@ static __inline__ int get_order(unsigned long size)
 
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
-#define KERNEL_MEMORY		((unsigned long)(FIXADDR_START - __PAGE_OFFSET))
-#define RESERVED_AREA		((unsigned long)__RESERVED_AREA) 
-#define KERNEL_MAXMEM		((unsigned long)(KERNEL_MEMORY - RESERVED_AREA))
-#define __MAXMEM		(-__PAGE_OFFSET-__VMALLOC_RESERVE_MAX)
-#define MAXMEM			((unsigned long)(-PAGE_OFFSET-vmalloc_reserve))
+#define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
+#define MAXMEM			(-__PAGE_OFFSET-__VMALLOC_RESERVE)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+#define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
 #ifndef CONFIG_DISCONTIGMEM
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map))
@@ -144,8 +140,10 @@ static __inline__ int get_order(unsigned long size)
 
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
-#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
-				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+#define VM_DATA_DEFAULT_FLAGS \
+	(VM_READ | VM_WRITE | \
+	((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0 ) | \
+		 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
 #endif /* __KERNEL__ */
 

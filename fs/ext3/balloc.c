@@ -480,43 +480,19 @@ static int ext3_has_free_blocks(struct ext3_sb_info *sbi)
 }
 
 /*
- * Ext3_should_retry_alloc is called when ENOSPC is returned, and if
+ * ext3_should_retry_alloc() is called when ENOSPC is returned, and if
  * it is profitable to retry the operation, this function will wait
  * for the current or commiting transaction to complete, and then
  * return TRUE.
  */
 int ext3_should_retry_alloc(struct super_block *sb, int *retries)
 {
-	transaction_t *transaction = NULL;
-	journal_t *journal = EXT3_SB(sb)->s_journal;
-	tid_t tid;
-
 	if (!ext3_has_free_blocks(EXT3_SB(sb)) || (*retries)++ > 3)
 		return 0;
 
 	jbd_debug(1, "%s: retrying operation after ENOSPC\n", sb->s_id);
 
-	/* 
-	 * We can only force the running transaction if we don't have
-	 * an active handle; otherwise, we will deadlock.
-	 */
-	spin_lock(&journal->j_state_lock);
-	if (journal->j_running_transaction && !current->journal_info) {
-		transaction = journal->j_running_transaction;
-		__log_start_commit(journal, transaction->t_tid);
-	} else if (journal->j_committing_transaction)
-		transaction = journal->j_committing_transaction;
-
-	if (!transaction) {
-		spin_unlock(&journal->j_state_lock);
-		return 0;	/* Nothing to retry */
-	}
-		
-	tid = transaction->t_tid;
-	spin_unlock(&journal->j_state_lock);
-	log_wait_commit(journal, tid);
-
-	return 1;
+	return journal_force_commit_nested(EXT3_SB(sb)->s_journal);
 }
 
 /*

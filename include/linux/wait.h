@@ -17,8 +17,8 @@
 #include <asm/system.h>
 
 typedef struct __wait_queue wait_queue_t;
-typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int sync);
-extern int default_wake_function(wait_queue_t *wait, unsigned mode, int sync);
+typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int sync, void *key);
+int default_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 
 struct __wait_queue {
 	unsigned int flags;
@@ -80,15 +80,6 @@ static inline int waitqueue_active(wait_queue_head_t *q)
 	return !list_empty(&q->task_list);
 }
 
-/*
- * Used to distinguish between sync and async io wait context:
- * sync i/o typically specifies a NULL wait queue entry or a wait
- * queue entry bound to a task (current task) to wake up.
- * aio specifies a wait queue entry with an async notification
- * callback routine, not associated with any task.
- */
-#define is_sync_wait(wait)	(!(wait) || ((wait)->task))
-
 extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
@@ -113,34 +104,31 @@ static inline void __remove_wait_queue(wait_queue_head_t *head,
 	list_del(&old->task_list);
 }
 
-extern void FASTCALL(__wake_up(wait_queue_head_t *q, unsigned int mode, int nr));
+void FASTCALL(__wake_up(wait_queue_head_t *q, unsigned int mode, int nr, void *key));
 extern void FASTCALL(__wake_up_locked(wait_queue_head_t *q, unsigned int mode));
 extern void FASTCALL(__wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr));
 
-#define wake_up(x)			__wake_up((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1)
-#define wake_up_nr(x, nr)		__wake_up((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr)
-#define wake_up_all(x)			__wake_up((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0)
+#define wake_up(x)			__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, NULL)
+#define wake_up_nr(x, nr)		__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, NULL)
+#define wake_up_all(x)			__wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0, NULL)
 #define wake_up_all_sync(x)			__wake_up_sync((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0)
-#define wake_up_interruptible(x)	__wake_up((x),TASK_INTERRUPTIBLE, 1)
-#define wake_up_interruptible_nr(x, nr)	__wake_up((x),TASK_INTERRUPTIBLE, nr)
-#define wake_up_interruptible_all(x)	__wake_up((x),TASK_INTERRUPTIBLE, 0)
+#define wake_up_interruptible(x)	__wake_up(x, TASK_INTERRUPTIBLE, 1, NULL)
+#define wake_up_interruptible_nr(x, nr)	__wake_up(x, TASK_INTERRUPTIBLE, nr, NULL)
+#define wake_up_interruptible_all(x)	__wake_up(x, TASK_INTERRUPTIBLE, 0, NULL)
 #define	wake_up_locked(x)		__wake_up_locked((x), TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE)
 #define wake_up_interruptible_sync(x)   __wake_up_sync((x),TASK_INTERRUPTIBLE, 1)
 
 #define __wait_event(wq, condition) 					\
 do {									\
-	wait_queue_t __wait;						\
-	init_waitqueue_entry(&__wait, current);				\
+	DEFINE_WAIT(__wait);						\
 									\
-	add_wait_queue(&wq, &__wait);					\
 	for (;;) {							\
-		set_current_state(TASK_UNINTERRUPTIBLE);		\
+		prepare_to_wait(&wq, &__wait, TASK_UNINTERRUPTIBLE);	\
 		if (condition)						\
 			break;						\
 		schedule();						\
 	}								\
-	current->state = TASK_RUNNING;					\
-	remove_wait_queue(&wq, &__wait);				\
+	finish_wait(&wq, &__wait);					\
 } while (0)
 
 #define wait_event(wq, condition) 					\
@@ -152,12 +140,10 @@ do {									\
 
 #define __wait_event_interruptible(wq, condition, ret)			\
 do {									\
-	wait_queue_t __wait;						\
-	init_waitqueue_entry(&__wait, current);				\
+	DEFINE_WAIT(__wait);						\
 									\
-	add_wait_queue(&wq, &__wait);					\
 	for (;;) {							\
-		set_current_state(TASK_INTERRUPTIBLE);			\
+		prepare_to_wait(&wq, &__wait, TASK_INTERRUPTIBLE);	\
 		if (condition)						\
 			break;						\
 		if (!signal_pending(current)) {				\
@@ -167,8 +153,7 @@ do {									\
 		ret = -ERESTARTSYS;					\
 		break;							\
 	}								\
-	current->state = TASK_RUNNING;					\
-	remove_wait_queue(&wq, &__wait);				\
+	finish_wait(&wq, &__wait);					\
 } while (0)
 
 #define wait_event_interruptible(wq, condition)				\
@@ -181,12 +166,10 @@ do {									\
 
 #define __wait_event_interruptible_timeout(wq, condition, ret)		\
 do {									\
-	wait_queue_t __wait;						\
-	init_waitqueue_entry(&__wait, current);				\
+	DEFINE_WAIT(__wait);						\
 									\
-	add_wait_queue(&wq, &__wait);					\
 	for (;;) {							\
-		set_current_state(TASK_INTERRUPTIBLE);			\
+		prepare_to_wait(&wq, &__wait, TASK_INTERRUPTIBLE);	\
 		if (condition)						\
 			break;						\
 		if (!signal_pending(current)) {				\
@@ -198,8 +181,7 @@ do {									\
 		ret = -ERESTARTSYS;					\
 		break;							\
 	}								\
-	current->state = TASK_RUNNING;					\
-	remove_wait_queue(&wq, &__wait);				\
+	finish_wait(&wq, &__wait);					\
 } while (0)
 
 #define wait_event_interruptible_timeout(wq, condition, timeout)	\
@@ -209,7 +191,34 @@ do {									\
 		__wait_event_interruptible_timeout(wq, condition, __ret); \
 	__ret;								\
 })
-	
+
+#define __wait_event_interruptible_exclusive(wq, condition, ret)	\
+do {									\
+	DEFINE_WAIT(__wait);						\
+									\
+	for (;;) {							\
+		prepare_to_wait_exclusive(&wq, &__wait,			\
+					TASK_INTERRUPTIBLE);		\
+		if (condition)						\
+			break;						\
+		if (!signal_pending(current)) {				\
+			schedule();					\
+			continue;					\
+		}							\
+		ret = -ERESTARTSYS;					\
+		break;							\
+	}								\
+	finish_wait(&wq, &__wait);					\
+} while (0)
+
+#define wait_event_interruptible_exclusive(wq, condition)		\
+({									\
+	int __ret = 0;							\
+	if (!(condition))						\
+		__wait_event_interruptible_exclusive(wq, condition, __ret);\
+	__ret;								\
+})
+
 /*
  * Must be called with the spinlock in the wait_queue_head_t held.
  */
@@ -249,7 +258,7 @@ void FASTCALL(prepare_to_wait(wait_queue_head_t *q,
 void FASTCALL(prepare_to_wait_exclusive(wait_queue_head_t *q,
 				wait_queue_t *wait, int state));
 void FASTCALL(finish_wait(wait_queue_head_t *q, wait_queue_t *wait));
-int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync);
+int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 
 #define DEFINE_WAIT(name)						\
 	wait_queue_t name = {						\

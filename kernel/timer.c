@@ -31,9 +31,9 @@
 #include <linux/time.h>
 #include <linux/jiffies.h>
 #include <linux/cpu.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 #include <asm/div64.h>
 #include <asm/timex.h>
 
@@ -205,6 +205,7 @@ repeat:
 		spin_unlock(&old_base->lock);
 	spin_unlock(&new_base->lock);
 	spin_unlock_irqrestore(&timer->lock, flags);
+
 	return ret;
 }
 
@@ -318,13 +319,13 @@ EXPORT_SYMBOL(del_timer);
  * Synchronization rules: callers must prevent restarting of the timer,
  * otherwise this function is meaningless. It must not be called from
  * interrupt contexts. The caller must not hold locks which would prevent
- * completion of the timer's handler. Upon exit the timer is not queued and
+ * completion of the timer's handler.  Upon exit the timer is not queued and
  * the handler is not running on any CPU.
  *
  * The function returns whether it has deactivated a pending timer or not.
  *
  * del_timer_sync() is slow and complicated because it copes with timer
- * handlers which re-arm the timer (periodic timers). If the timer handler
+ * handlers which re-arm the timer (periodic timers).  If the timer handler
  * is known to not do this (a single shot timer) then use
  * del_singleshot_timer_sync() instead.
  */
@@ -338,7 +339,7 @@ int del_timer_sync(struct timer_list *timer)
 del_again:
 	ret += del_timer(timer);
 
-	for_each_cpu(i) {
+	for_each_online_cpu(i) {
 		base = &per_cpu(tvec_bases, i);
 		if (base->running_timer == timer) {
 			while (base->running_timer == timer) {
@@ -366,8 +367,8 @@ EXPORT_SYMBOL(del_timer_sync);
  *
  * Synchronization rules: callers must prevent restarting of the timer,
  * otherwise this function is meaningless. It must not be called from
- * interrupt contexts. The caller must not hold locks which would prevent
- * completion of the timer's handler. Upon exit the timer is not queued and
+ * interrupt contexts. The caller must not hold locks which wold prevent
+ * completion of the timer's handler.  Upon exit the timer is not queued and
  * the handler is not running on any CPU.
  *
  * The function returns whether it has deactivated a pending timer or not.
@@ -465,7 +466,7 @@ repeat:
 #ifdef CONFIG_NO_IDLE_HZ
 /*
  * Find out when the next timer event is due to happen. This
- * is used on S/390 to stop all activity when all cpus are idle.
+ * is used on S/390 to stop all activity when a cpus is idle.
  * This functions needs to be called disabled.
  */
 unsigned long next_timer_interrupt(void)
@@ -791,12 +792,12 @@ static inline void do_process_times(struct task_struct *p,
 
 	psecs = (p->utime += user);
 	psecs += (p->stime += system);
-	if (psecs / HZ > p->rlim[RLIMIT_CPU].rlim_cur) {
+	if (psecs / HZ >= p->rlim[RLIMIT_CPU].rlim_cur) {
 		/* Send SIGXCPU every second.. */
 		if (!(psecs % HZ))
 			send_sig(SIGXCPU, p, 1);
 		/* and SIGKILL when we go over max.. */
-		if (psecs / HZ > p->rlim[RLIMIT_CPU].rlim_max)
+		if (psecs / HZ >= p->rlim[RLIMIT_CPU].rlim_max)
 			send_sig(SIGKILL, p, 1);
 	}
 }
@@ -828,7 +829,7 @@ static inline void do_it_prof(struct task_struct *p)
 	}
 }
 
-void update_one_process(struct task_struct *p, unsigned long user,
+static void update_one_process(struct task_struct *p, unsigned long user,
 			unsigned long system, int cpu)
 {
 	do_process_times(p, user, system);
@@ -905,9 +906,8 @@ EXPORT_SYMBOL(xtime_lock);
  */
 static void run_timer_softirq(struct softirq_action *h)
 {
-	TRIG_EVENT(kernel_timer_hook, NULL);
-
 	tvec_base_t *base = &__get_cpu_var(tvec_bases);
+
 	if (time_after_eq(jiffies, base->timer_jiffies))
 		__run_timers(base);
 }
@@ -948,13 +948,12 @@ void do_timer(struct pt_regs *regs)
 #ifndef CONFIG_SMP
 	/* SMP process accounting uses the local APIC timer */
 
-	TRIG_EVENT(timer_hook, regs);
 	update_process_times(user_mode(regs));
 #endif
 	update_times();
 }
 
-#if !defined(__alpha__) && !defined(__ia64__)
+#ifdef __ARCH_WANT_SYS_ALARM
 
 /*
  * For backwards compatibility?  This can be done in libc so Alpha
@@ -1072,7 +1071,6 @@ asmlinkage long sys_getegid(void)
 
 static void process_timeout(unsigned long __data)
 {
-	TRIG_EVENT(timer_expired_hook, (task_t *)__data);
 	wake_up_process((task_t *)__data);
 }
 
@@ -1102,7 +1100,7 @@ static void process_timeout(unsigned long __data)
  *
  * In all cases the return value is guaranteed to be non-negative.
  */
-fastcall signed long schedule_timeout(signed long timeout)
+fastcall signed long __sched schedule_timeout(signed long timeout)
 {
 	struct timer_list timer;
 	unsigned long expire;
@@ -1137,7 +1135,6 @@ fastcall signed long schedule_timeout(signed long timeout)
 		}
 	}
 
-	TRIG_EVENT(settimeout_hook, timeout);
 	expire = timeout + jiffies;
 
 	init_timer(&timer);
@@ -1163,7 +1160,7 @@ asmlinkage long sys_gettid(void)
 	return current->pid;
 }
 
-static long nanosleep_restart(struct restart_block *restart)
+static long __sched nanosleep_restart(struct restart_block *restart)
 {
 	unsigned long expire = restart->arg0, now = jiffies;
 	struct timespec __user *rmtp = (struct timespec __user *) restart->arg1;
@@ -1489,3 +1486,20 @@ unregister_time_interpolator(struct time_interpolator *ti)
 	spin_unlock(&time_interpolator_lock);
 }
 #endif /* CONFIG_TIME_INTERPOLATION */
+
+/**
+ * msleep - sleep safely even with waitqueue interruptions
+ * @msecs: Time in milliseconds to sleep for
+ */
+void msleep(unsigned int msecs)
+{
+	unsigned long timeout = msecs_to_jiffies(msecs);
+
+	while (timeout) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
+	}
+}
+
+EXPORT_SYMBOL(msleep);
+

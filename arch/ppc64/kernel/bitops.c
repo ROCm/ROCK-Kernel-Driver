@@ -7,10 +7,10 @@
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 
-unsigned long find_next_zero_bit(unsigned long *addr, unsigned long size,
+unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
 				 unsigned long offset)
 {
-	unsigned long *p = addr + (offset >> 6);
+	const unsigned long *p = addr + (offset >> 6);
 	unsigned long result = offset & ~63UL;
 	unsigned long tmp;
 
@@ -48,10 +48,10 @@ found_middle:
 
 EXPORT_SYMBOL(find_next_zero_bit);
 
-unsigned long find_next_bit(unsigned long *addr, unsigned long size,
+unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
 			    unsigned long offset)
 {
-	unsigned long *p = addr + (offset >> 6);
+	const unsigned long *p = addr + (offset >> 6);
 	unsigned long result = offset & ~63UL;
 	unsigned long tmp;
 
@@ -106,10 +106,10 @@ static inline unsigned int ext2_ffz(unsigned int x)
 	return rc;
 }
 
-unsigned long find_next_zero_le_bit(unsigned long *addr, unsigned long size,
+unsigned long find_next_zero_le_bit(const unsigned long *addr, unsigned long size,
 				    unsigned long offset)
 {
-	unsigned int *p = ((unsigned int *)addr) + (offset >> 5);
+	const unsigned int *p = ((const unsigned int *)addr) + (offset >> 5);
 	unsigned int result = offset & ~31;
 	unsigned int tmp;
 

@@ -20,7 +20,6 @@ obj-$(CONFIG_PARPORT)		+= parport/
 obj-y				+= base/ block/ misc/ net/ media/
 obj-$(CONFIG_NUBUS)		+= nubus/
 obj-$(CONFIG_ATM)		+= atm/
-obj-$(CONFIG_IBM_CRYPTO)	+= ibmcrypto/
 obj-$(CONFIG_PPC_PMAC)		+= macintosh/
 obj-$(CONFIG_IDE)		+= ide/
 obj-$(CONFIG_FC4)		+= fc4/
@@ -43,6 +42,7 @@ obj-$(CONFIG_GAMEPORT)		+= input/gameport/
 obj-$(CONFIG_SERIO)		+= input/serio/
 obj-$(CONFIG_I2O)		+= message/
 obj-$(CONFIG_I2C)		+= i2c/
+obj-$(CONFIG_W1)		+= w1/
 obj-$(CONFIG_PHONE)		+= telephony/
 obj-$(CONFIG_MD)		+= md/
 obj-$(CONFIG_BT)		+= bluetooth/
@@ -50,10 +50,4 @@ obj-$(CONFIG_ISDN)		+= isdn/
 obj-$(CONFIG_MCA)		+= mca/
 obj-$(CONFIG_EISA)		+= eisa/
 obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
-obj-$(CONFIG_INFINIBAND)	+= infiniband/
 obj-y				+= firmware/
-obj-$(CONFIG_CRASH_DUMP)	+= dump/
-ifneq (,$(findstring $(CONFIG_AUDIT),y m))
-obj-y				+= audit/
-endif
-obj-$(CONFIG_DPROBES)		+= dprobes/

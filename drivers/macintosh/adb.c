@@ -36,6 +36,8 @@
 #include <linux/spinlock.h>
 #include <linux/completion.h>
 #include <linux/device.h>
+#include <linux/devfs_fs_kernel.h>
+
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #ifdef CONFIG_PPC
@@ -137,10 +139,9 @@ static void printADBreply(struct adb_request *req)
 static __inline__ void adb_wait_ms(unsigned int ms)
 {
 	if (current->pid && adb_probe_task_pid &&
-	  adb_probe_task_pid == current->pid) {
-		set_task_state(current, TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1 + ms * HZ / 1000);
-	} else
+	  adb_probe_task_pid == current->pid)
+		msleep(ms);
+	else
 		mdelay(ms);
 }
 
@@ -294,10 +295,6 @@ int __init adb_init(void)
 
 #ifdef CONFIG_PPC32
 	if ( (_machine != _MACH_chrp) && (_machine != _MACH_Pmac) )
-		return 0;
-#endif
-#ifdef CONFIG_PPC64
-	if (_machine != _MACH_Pmac)
 		return 0;
 #endif
 #ifdef CONFIG_MAC
@@ -563,7 +560,7 @@ adb_unregister(int index)
 			write_lock_irq(&adb_handler_lock);
 		}
 		ret = 0;
-		adb_handler[index].handler = 0;
+		adb_handler[index].handler = NULL;
 	}
 	write_unlock_irq(&adb_handler_lock);
 	up(&adb_handler_sem);
@@ -904,6 +901,9 @@ adbdev_init(void)
 		printk(KERN_ERR "adb: unable to get major %d\n", ADB_MAJOR);
 		return;
 	}
+
+	devfs_mk_cdev(MKDEV(ADB_MAJOR, 0), S_IFCHR | S_IRUSR | S_IWUSR, "adb");
+
 	adb_dev_class = class_simple_create(THIS_MODULE, "adb");
 	if (IS_ERR(adb_dev_class)) {
 		return;

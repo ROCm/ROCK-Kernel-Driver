@@ -169,7 +169,7 @@ extern inline int __test_and_clear_bit(int nr, void *addr)
 	return retval;
 }
 /**
- * test_and_change_bit - Change a bit and return its new value
+ * test_and_change_bit - Change a bit and return its old value
  * @nr: Bit to change
  * @addr: Address to count from
  *
@@ -296,6 +296,50 @@ extern inline int find_next_zero_bit (void * addr, int size, int offset)
 }
 
 /**
+ * find_next_bit - find the first set bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search
+ */
+static __inline__ int find_next_bit(void *addr, int size, int offset)
+{
+	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
+        unsigned long result = offset & ~31UL;
+        unsigned long tmp;
+
+        if (offset >= size)
+                return size;
+        size -= result;
+        offset &= 31UL;
+        if (offset) {
+                tmp = *(p++);
+                tmp &= (~0UL << offset);
+                if (size < 32)
+                        goto found_first;
+                if (tmp)
+                        goto found_middle;
+                size -= 32;
+                result += 32;
+        }
+        while (size & ~31UL) {
+                if ((tmp = *(p++)))
+                        goto found_middle;
+                result += 32;
+                size -= 32;
+        }
+        if (!size)
+                return result;
+        tmp = *p;
+
+found_first:
+        tmp &= (~0UL >> (32 - size));
+        if (tmp == 0UL)        /* Are any bits set? */
+                return result + size; /* Nope. */
+found_middle:
+        return result + __ffs(tmp);
+}
+
+/**
  * find_first_zero_bit - find the first zero bit in a memory region
  * @addr: The address to start the search at
  * @size: The maximum size to search
@@ -306,6 +350,8 @@ extern inline int find_next_zero_bit (void * addr, int size, int offset)
 
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
+#define find_first_bit(addr, size) \
+        find_next_bit((addr), (size), 0)
 
 #define ext2_set_bit                 test_and_set_bit
 #define ext2_set_bit_atomic(l,n,a)   test_and_set_bit(n,a)

@@ -68,6 +68,8 @@ static char version[] =
 #include "sunhme.h"
 
 
+#define DRV_NAME "sunhme"
+
 static int macaddr[6];
 
 /* accept MAC address of the form macaddr=0x08,0x00,0x20,0x30,0x40,0x50 */
@@ -526,8 +528,10 @@ static void happy_meal_tcvr_write(struct happy_meal *hp,
 	ASD(("happy_meal_tcvr_write: reg=0x%02x value=%04x\n", reg, value));
 
 	/* Welcome to Sun Microsystems, can I take your order please? */
-	if (!(hp->happy_flags & HFLAG_FENABLE))
-		return happy_meal_bb_write(hp, tregs, reg, value);
+	if (!(hp->happy_flags & HFLAG_FENABLE)) {
+		happy_meal_bb_write(hp, tregs, reg, value);
+		return;
+	}
 
 	/* Would you like fries with that? */
 	hme_write32(hp, tregs + TCVR_FRAME,
@@ -2920,7 +2924,8 @@ static int is_quattro_p(struct pci_dev *pdev)
 	struct list_head *tmp;
 	int n_hmes;
 
-	if (busdev->vendor != PCI_VENDOR_ID_DEC ||
+	if (busdev == NULL ||
+	    busdev->vendor != PCI_VENDOR_ID_DEC ||
 	    busdev->device != PCI_DEVICE_ID_DEC_21153)
 		return 0;
 
@@ -3085,7 +3090,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 		printk(KERN_ERR "happymeal(PCI): Cannot find proper PCI device base address.\n");
 		goto err_out_clear_quattro;
 	}
-	if (pci_request_regions(pdev, dev->name)) {
+	if (pci_request_regions(pdev, DRV_NAME)) {
 		printk(KERN_ERR "happymeal(PCI): Cannot obtain PCI resources, "
 		       "aborting.\n");
 		goto err_out_clear_quattro;

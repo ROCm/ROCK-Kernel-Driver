@@ -16,7 +16,7 @@
 #include "status_w.h"
 
 
-void fadd__()
+void fadd__(void)
 {
   /* fadd st,st(i) */
   int i = FPU_rm;
@@ -25,7 +25,7 @@ void fadd__()
 }
 
 
-void fmul__()
+void fmul__(void)
 {
   /* fmul st,st(i) */
   int i = FPU_rm;
@@ -35,7 +35,7 @@ void fmul__()
 
 
 
-void fsub__()
+void fsub__(void)
 {
   /* fsub st,st(i) */
   clear_C1();
@@ -43,7 +43,7 @@ void fsub__()
 }
 
 
-void fsubr_()
+void fsubr_(void)
 {
   /* fsubr st,st(i) */
   clear_C1();
@@ -51,7 +51,7 @@ void fsubr_()
 }
 
 
-void fdiv__()
+void fdiv__(void)
 {
   /* fdiv st,st(i) */
   clear_C1();
@@ -59,7 +59,7 @@ void fdiv__()
 }
 
 
-void fdivr_()
+void fdivr_(void)
 {
   /* fdivr st,st(i) */
   clear_C1();
@@ -68,7 +68,7 @@ void fdivr_()
 
 
 
-void fadd_i()
+void fadd_i(void)
 {
   /* fadd st(i),st */
   int i = FPU_rm;
@@ -77,7 +77,7 @@ void fadd_i()
 }
 
 
-void fmul_i()
+void fmul_i(void)
 {
   /* fmul st(i),st */
   clear_C1();
@@ -85,7 +85,7 @@ void fmul_i()
 }
 
 
-void fsubri()
+void fsubri(void)
 {
   /* fsubr st(i),st */
   clear_C1();
@@ -93,7 +93,7 @@ void fsubri()
 }
 
 
-void fsub_i()
+void fsub_i(void)
 {
   /* fsub st(i),st */
   clear_C1();
@@ -101,7 +101,7 @@ void fsub_i()
 }
 
 
-void fdivri()
+void fdivri(void)
 {
   /* fdivr st(i),st */
   clear_C1();
@@ -109,7 +109,7 @@ void fdivri()
 }
 
 
-void fdiv_i()
+void fdiv_i(void)
 {
   /* fdiv st(i),st */
   clear_C1();
@@ -118,7 +118,7 @@ void fdiv_i()
 
 
 
-void faddp_()
+void faddp_(void)
 {
   /* faddp st(i),st */
   int i = FPU_rm;
@@ -128,7 +128,7 @@ void faddp_()
 }
 
 
-void fmulp_()
+void fmulp_(void)
 {
   /* fmulp st(i),st */
   clear_C1();
@@ -138,7 +138,7 @@ void fmulp_()
 
 
 
-void fsubrp()
+void fsubrp(void)
 {
   /* fsubrp st(i),st */
   clear_C1();
@@ -147,7 +147,7 @@ void fsubrp()
 }
 
 
-void fsubp_()
+void fsubp_(void)
 {
   /* fsubp st(i),st */
   clear_C1();
@@ -156,7 +156,7 @@ void fsubp_()
 }
 
 
-void fdivrp()
+void fdivrp(void)
 {
   /* fdivrp st(i),st */
   clear_C1();
@@ -165,7 +165,7 @@ void fdivrp()
 }
 
 
-void fdivp_()
+void fdivp_(void)
 {
   /* fdivp st(i),st */
   clear_C1();

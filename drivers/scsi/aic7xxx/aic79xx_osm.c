@@ -2581,8 +2581,18 @@ ahd_linux_dv_thread(void *data)
 	 * Complete thread creation.
 	 */
 	lock_kernel();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,60)
+	/*
+	 * Don't care about any signals.
+	 */
+	siginitsetinv(&current->blocked, 0);
+
+	daemonize();
+	sprintf(current->comm, "ahd_dv_%d", ahd->unit);
+#else
 	daemonize("ahd_dv_%d", ahd->unit);
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_FREEZE;
+#endif
 	unlock_kernel();
 
 	while (1) {

@@ -1,13 +1,13 @@
 config SECURITY_SELINUX
 	bool "NSA SELinux Support"
-	depends on SECURITY
+	depends on SECURITY && NET
 	default n
 	help
 	  This selects NSA Security-Enhanced Linux (SELinux).
 	  You will also need a policy configuration and a labeled filesystem.
 	  You can obtain the policy compiler (checkpolicy), the utility for
 	  labeling filesystems (setfiles), and an example policy configuration
-	  from http://www.nsa.gov/selinux.
+	  from <http://www.nsa.gov/selinux/>.
 	  If you are unsure how to answer this question, answer N.
 
 config SECURITY_SELINUX_BOOTPARAM
@@ -21,6 +21,21 @@ config SECURITY_SELINUX_BOOTPARAM
 	  command line.  The purpose of this option is to allow a single
 	  kernel image to be distributed with SELinux built in, but not
 	  necessarily enabled.
+
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_SELINUX_DISABLE
+	bool "NSA SELinux runtime disable"
+	depends on SECURITY_SELINUX
+	default n
+	help
+	  This option enables writing to a selinuxfs node 'disable', which
+	  allows SELinux to be disabled at runtime prior to the policy load.
+	  SELinux will then remain disabled until the next boot.
+	  This option is similar to the selinux=0 boot parameter, but is to
+	  support runtime disabling of SELinux, e.g. from /sbin/init, for
+	  portability across platforms where boot parameters are difficult
+	  to employ.
 
 	  If you are unsure how to answer this question, answer N.
 

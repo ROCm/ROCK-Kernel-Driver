@@ -113,7 +113,7 @@ typedef struct {
 #define	addressPXD(pxd)\
 	( ((s64)((pxd)->addr1)) << 32 | __le32_to_cpu((pxd)->addr2))
 
-#define	MAXTREEHEIGHT		10
+#define MAXTREEHEIGHT 8
 /* pxd list */
 struct pxdlist {
 	s16 maxnpxd;

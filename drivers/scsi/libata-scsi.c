@@ -27,11 +27,12 @@
 #include <linux/spinlock.h>
 #include <scsi/scsi.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #include "libata.h"
 
+typedef unsigned int (*ata_xlat_func_t)(struct ata_queued_cmd *qc, u8 *scsicmd);
 static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 			      struct scsi_cmnd *cmd,
 			      void (*done)(struct scsi_cmnd *));
@@ -45,8 +46,8 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
  *	@geom: location to which geometry will be output
  *
  *	Generic bios head/sector/cylinder calculator
- *	used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
- *	mapping. Some situations may arise where the disk is not 
+ *	used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS)
+ *	mapping. Some situations may arise where the disk is not
  *	bootable if this is not used.
  *
  *	LOCKING:
@@ -56,7 +57,7 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
  *	Zero.
  */
 int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
-		       sector_t capacity, int geom[]) 
+		       sector_t capacity, int geom[])
 {
 	geom[0] = 255;
 	geom[1] = 63;
@@ -166,6 +167,7 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 {
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
+
 	blk_queue_max_phys_segments(sdev->request_queue, LIBATA_MAX_PRD);
 
 	if (sdev->id < ATA_MAX_DEVICES) {
@@ -175,14 +177,16 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 		ap = (struct ata_port *) &sdev->host->hostdata[0];
 		dev = &ap->device[sdev->id];
 
-		if (dev->flags & ATA_DFLAG_LBA48) {
-			sdev->host->max_sectors = 1024;
-			blk_queue_max_sectors(sdev->request_queue, 1024);
-			printk(KERN_INFO "ata%u: dev %u max request 512KB (lba48)\n",
-			       ap->id, sdev->id);
-		} else
-			printk(KERN_INFO "ata%u: dev %u max request 124KB\n",
-			       ap->id, sdev->id);
+		/* TODO: 1024 is an arbitrary number, not the
+		 * hardware maximum.  This should be increased to
+		 * 65534 when Jens Axboe's patch for dynamically
+		 * determining max_sectors is merged.
+		 */
+		if ((dev->flags & ATA_DFLAG_LBA48) &&
+		    ((dev->flags & ATA_DFLAG_LOCK_SECTORS) == 0)) {
+			sdev->host->max_sectors = 2048;
+			blk_queue_max_sectors(sdev->request_queue, 2048);
+		}
 	}
 
 	return 0;	/* scsi layer doesn't check return value, sigh */
@@ -331,12 +335,31 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	return 1;
 }
 
+static int ata_scsi_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
+{
+	struct scsi_cmnd *cmd = qc->scsicmd;
+
+	if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ))) {
+		if (is_atapi_taskfile(&qc->tf))
+			cmd->result = SAM_STAT_CHECK_CONDITION;
+		else
+			ata_to_sense_error(qc);
+	} else {
+		cmd->result = SAM_STAT_GOOD;
+	}
+
+	qc->scsidone(cmd);
+
+	return 0;
+}
+
 /**
  *	ata_scsi_translate - Translate then issue SCSI command to ATA device
  *	@ap: ATA port to which the command is addressed
  *	@dev: ATA device to which the command is addressed
  *	@cmd: SCSI command to execute
  *	@done: SCSI command completion function
+ *	@xlat_func: Actor which translates @cmd to an ATA taskfile
  *
  *	Our ->queuecommand() function has decided that the SCSI
  *	command issued can be directly translated into an ATA
@@ -351,26 +374,39 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 			      struct scsi_cmnd *cmd,
-			      void (*done)(struct scsi_cmnd *))
+			      void (*done)(struct scsi_cmnd *),
+			      ata_xlat_func_t xlat_func)
 {
 	struct ata_queued_cmd *qc;
 	u8 *scsicmd = cmd->cmnd;
 
 	VPRINTK("ENTER\n");
 
-	if (unlikely(cmd->request_bufflen < 1)) {
-		printk(KERN_WARNING "ata%u(%u): empty request buffer\n",
-		       ap->id, dev->devno);
-		goto err_out;
-	}
-
 	qc = ata_scsi_qc_new(ap, dev, cmd, done);
 	if (!qc)
 		return;
 
-	qc->flags |= ATA_QCFLAG_SG;	/* data is present; dma-map it */
+	/* data is present; dma-map it */
+	if (cmd->sc_data_direction == SCSI_DATA_READ ||
+	    cmd->sc_data_direction == SCSI_DATA_WRITE) {
+		if (unlikely(cmd->request_bufflen < 1)) {
+			printk(KERN_WARNING "ata%u(%u): WARNING: zero len r/w req\n",
+			       ap->id, dev->devno);
+			goto err_out;
+		}
 
-	if (ata_scsi_rw_xlat(qc, scsicmd))
+		if (cmd->use_sg)
+			ata_sg_init(qc, cmd->request_buffer, cmd->use_sg);
+		else
+			ata_sg_init_one(qc, cmd->request_buffer,
+					cmd->request_bufflen);
+
+		qc->pci_dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
+	}
+
+	qc->complete_fn = ata_scsi_qc_complete;
+
+	if (xlat_func(qc, scsicmd))
 		goto err_out;
 
 	/* select device, send command to hardware */
@@ -491,7 +527,9 @@ void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
 unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 			       unsigned int buflen)
 {
-	const u8 hdr[] = {
+	struct ata_device *dev = args->dev;
+
+	u8 hdr[] = {
 		TYPE_DISK,
 		0,
 		0x5,	/* claim SPC-3 version compatibility */
@@ -499,14 +537,20 @@ unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 		96 - 4
 	};
 
+	/* set scsi removeable (RMB) bit per ata bit */
+	if (ata_id_removeable(dev))
+		hdr[1] |= (1 << 7);
+
 	VPRINTK("ENTER\n");
 
 	memcpy(rbuf, hdr, sizeof(hdr));
 
 	if (buflen > 36) {
-		memcpy(&rbuf[8], args->dev->vendor, 8);
-		memcpy(&rbuf[16], args->dev->product, 16);
-		memcpy(&rbuf[32], DRV_VERSION, 4);
+		memcpy(&rbuf[8], "ATA     ", 8);
+		ata_dev_id_string(dev, &rbuf[16], ATA_ID_PROD_OFS, 16);
+		ata_dev_id_string(dev, &rbuf[32], ATA_ID_FW_REV_OFS, 4);
+		if (rbuf[32] == 0 || rbuf[32] == ' ')
+			memcpy(&rbuf[32], "n/a ", 4);
 	}
 
 	if (buflen > 63) {
@@ -680,9 +724,17 @@ static void ata_msense_push(u8 **ptr_io, const u8 *last,
 static unsigned int ata_msense_caching(struct ata_device *dev, u8 **ptr_io,
 				       const u8 *last)
 {
-	u8 page[7] = { 0xf, 0, 0x10, 0, 0x8, 0xa, 0 };
-	if (dev->flags & ATA_DFLAG_WCACHE)
-		page[6] = 0x4;
+	u8 page[] = {
+		0x8,				/* page code */
+		0x12,				/* page length */
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	/* 10 zeroes */
+		0, 0, 0, 0, 0, 0, 0, 0		/* 8 zeroes */
+	};
+
+	if (ata_id_wcache_enabled(dev))
+		page[2] |= (1 << 2);	/* write cache enable */
+	if (!ata_id_rahead_enabled(dev))
+		page[12] |= (1 << 5);	/* disable read ahead */
 
 	ata_msense_push(ptr_io, last, page, sizeof(page));
 	return sizeof(page);
@@ -703,6 +755,31 @@ static unsigned int ata_msense_caching(struct ata_device *dev, u8 **ptr_io,
 static unsigned int ata_msense_ctl_mode(u8 **ptr_io, const u8 *last)
 {
 	const u8 page[] = {0xa, 0xa, 2, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 30};
+
+	ata_msense_push(ptr_io, last, page, sizeof(page));
+	return sizeof(page);
+}
+
+/**
+ *	ata_msense_rw_recovery - Simulate MODE SENSE r/w error recovery page
+ *	@dev: Device associated with this MODE SENSE command
+ *	@ptr_io: (input/output) Location to store more output data
+ *	@last: End of output data buffer
+ *
+ *	Generate a generic MODE SENSE r/w error recovery page.
+ *
+ *	LOCKING:
+ *	None.
+ */
+
+static unsigned int ata_msense_rw_recovery(u8 **ptr_io, const u8 *last)
+{
+	const u8 page[] = {
+		0x1,			  /* page code */
+		0xa,			  /* page length */
+		(1 << 7) | (1 << 6),	  /* note auto r/w reallocation */
+		0, 0, 0, 0, 0, 0, 0, 0, 0 /* 9 zeroes */
+	};
 
 	ata_msense_push(ptr_io, last, page, sizeof(page));
 	return sizeof(page);
@@ -747,6 +824,10 @@ unsigned int ata_scsiop_mode_sense(struct ata_scsi_args *args, u8 *rbuf,
 	last = rbuf + buflen - 1;
 
 	switch(scsicmd[2] & 0x3f) {
+	case 0x01:		/* r/w error recovery */
+		output_len += ata_msense_rw_recovery(&p, last);
+		break;
+
 	case 0x08:		/* caching */
 		output_len += ata_msense_caching(dev, &p, last);
 		break;
@@ -757,6 +838,7 @@ unsigned int ata_scsiop_mode_sense(struct ata_scsi_args *args, u8 *rbuf,
 		}
 
 	case 0x3f:		/* all pages */
+		output_len += ata_msense_rw_recovery(&p, last);
 		output_len += ata_msense_caching(dev, &p, last);
 		output_len += ata_msense_ctl_mode(&p, last);
 		break;
@@ -797,20 +879,23 @@ unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
 
 	VPRINTK("ENTER\n");
 
-	n_sectors--;		/* one off */
+	n_sectors--;		/* ATA TotalUserSectors - 1 */
 
 	tmp = n_sectors;	/* note: truncates, if lba48 */
 	if (args->cmd->cmnd[0] == READ_CAPACITY) {
+		/* sector count, 32-bit */
 		rbuf[0] = tmp >> (8 * 3);
 		rbuf[1] = tmp >> (8 * 2);
 		rbuf[2] = tmp >> (8 * 1);
 		rbuf[3] = tmp;
 
+		/* sector size */
 		tmp = ATA_SECT_SIZE;
 		rbuf[6] = tmp >> 8;
 		rbuf[7] = tmp;
 
 	} else {
+		/* sector count, 64-bit */
 		rbuf[2] = n_sectors >> (8 * 7);
 		rbuf[3] = n_sectors >> (8 * 6);
 		rbuf[4] = n_sectors >> (8 * 5);
@@ -820,6 +905,7 @@ unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
 		rbuf[8] = tmp >> (8 * 1);
 		rbuf[9] = tmp;
 
+		/* sector size */
 		tmp = ATA_SECT_SIZE;
 		rbuf[12] = tmp >> 8;
 		rbuf[13] = tmp;
@@ -879,56 +965,20 @@ void ata_scsi_badcmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *), u8
 }
 
 /**
- *	atapi_scsi_queuecmd - Send CDB to ATAPI device
- *	@ap: Port to which ATAPI device is attached.
- *	@dev: Target device for CDB.
- *	@cmd: SCSI command being sent to device.
- *	@done: SCSI command completion function.
- *
- *	Sends CDB to ATAPI device.  If the Linux SCSI layer sends a
- *	non-data command, then this function handles the command
- *	directly, via polling.  Otherwise, the bmdma engine is started.
+ *	atapi_xlat - Initialize PACKET taskfile
+ *	@qc: command structure to be initialized
+ *	@scsicmd: SCSI CDB associated with this PACKET command
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Zero on success, non-zero on failure.
  */
 
-static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
-			       struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
+static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 {
-	struct ata_queued_cmd *qc;
-	u8 *scsicmd = cmd->cmnd, status;
-	unsigned int doing_dma = 0;
-
-	VPRINTK("ENTER, drv_stat = 0x%x\n", ata_chk_status(ap));
-
-	if (cmd->sc_data_direction == SCSI_DATA_UNKNOWN) {
-		DPRINTK("unknown data, scsicmd 0x%x\n", scsicmd[0]);
-		ata_bad_cdb(cmd, done);
-		return;
-	}
-
-	switch(scsicmd[0]) {
-	case READ_6:
-	case WRITE_6:
-	case MODE_SELECT:
-	case MODE_SENSE:
-		DPRINTK("read6/write6/modesel/modesense trap\n");
-		ata_bad_scsiop(cmd, done);
-		return;
-
-	default:
-		/* do nothing */
-		break;
-	}
-
-	qc = ata_scsi_qc_new(ap, dev, cmd, done);
-	if (!qc) {
-		printk(KERN_ERR "ata%u: command queue empty\n", ap->id);
-		return;
-	}
-
-	qc->flags |= ATA_QCFLAG_ATAPI;
+	struct scsi_cmnd *cmd = qc->scsicmd;
 
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
@@ -938,52 +988,30 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 
 	qc->tf.command = ATA_CMD_PACKET;
 
-	/* set up SG table */
-	if (cmd->sc_data_direction == SCSI_DATA_NONE) {
-		ap->active_tag = qc->tag;
-		qc->flags |= ATA_QCFLAG_ACTIVE | ATA_QCFLAG_POLL;
+	/* no data - interrupt-driven */
+	if (cmd->sc_data_direction == SCSI_DATA_NONE)
 		qc->tf.protocol = ATA_PROT_ATAPI;
 
-		ata_dev_select(ap, dev->devno, 1, 0);
+	/* PIO data xfer - polling */
+	else if ((qc->flags & ATA_QCFLAG_DMA) == 0) {
+		ata_qc_set_polling(qc);
+		qc->tf.protocol = ATA_PROT_ATAPI;
+		qc->tf.lbam = (8 * 1024) & 0xff;
+		qc->tf.lbah = (8 * 1024) >> 8;
 
-		DPRINTK("direction: none\n");
-		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
-		ata_tf_to_host_nolock(ap, &qc->tf);
+	/* DMA data xfer - interrupt-driven */
 	} else {
-		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
-		qc->tf.feature = ATAPI_PKT_DMA;
 		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
+		qc->tf.feature |= ATAPI_PKT_DMA;
 
-		doing_dma = 1;
-
-		/* select device, send command to hardware */
-		if (ata_qc_issue(qc))
-			goto err_out;
+#ifdef ATAPI_ENABLE_DMADIR
+		/* some SATA bridges need us to indicate data xfer direction */
+		if (cmd->sc_data_direction != SCSI_DATA_WRITE)
+			qc->tf.feature |= ATAPI_DMADIR;
+#endif
 	}
 
-	status = ata_busy_wait(ap, ATA_BUSY, 1000);
-	if (status & ATA_BUSY) {
-		ata_thread_wake(ap, THR_PACKET);
-		return;
-	}
-	if ((status & ATA_DRQ) == 0)
-		goto err_out;
-
-	/* FIXME: mmio-ize */
-	DPRINTK("writing cdb\n");
-	outsl(ap->ioaddr.data_addr, scsicmd, ap->host->max_cmd_len / 4);
-
-	if (!doing_dma)
-		ata_thread_wake(ap, THR_PACKET);
-
-	VPRINTK("EXIT\n");
-	return;
-
-err_out:
-	if (!doing_dma)
-		ata_irq_on(ap);	/* re-enable interrupts */
-	ata_bad_cdb(cmd, done);
-	DPRINTK("EXIT - badcmd\n");
+	return 0;
 }
 
 /**
@@ -1030,17 +1058,17 @@ ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
 }
 
 /**
- *	ata_scsi_xlat_possible - check if SCSI to ATA translation is possible
+ *	ata_get_xlat_func - check if SCSI to ATA translation is possible
  *	@cmd: SCSI command opcode to consider
  *
  *	Look up the SCSI command given, and determine whether the
  *	SCSI command is to be translated or simulated.
  *
  *	RETURNS:
- *	Non-zero if possible, zero if not.
+ *	Pointer to translation function if possible, %NULL if not.
  */
 
-static inline int ata_scsi_xlat_possible(u8 cmd)
+static inline ata_xlat_func_t ata_get_xlat_func(u8 cmd)
 {
 	switch (cmd) {
 	case READ_6:
@@ -1050,10 +1078,10 @@ static inline int ata_scsi_xlat_possible(u8 cmd)
 	case WRITE_6:
 	case WRITE_10:
 	case WRITE_16:
-		return 1;
+		return ata_scsi_rw_xlat;
 	}
 
-	return 0;
+	return NULL;
 }
 
 /**
@@ -1115,12 +1143,14 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 	}
 
 	if (dev->class == ATA_DEV_ATA) {
-		if (ata_scsi_xlat_possible(cmd->cmnd[0]))
-			ata_scsi_translate(ap, dev, cmd, done);
+		ata_xlat_func_t xlat_func = ata_get_xlat_func(cmd->cmnd[0]);
+
+		if (xlat_func)
+			ata_scsi_translate(ap, dev, cmd, done, xlat_func);
 		else
 			ata_scsi_simulate(ap, dev, cmd, done);
 	} else
-		atapi_scsi_queuecmd(ap, dev, cmd, done);
+		ata_scsi_translate(ap, dev, cmd, done, atapi_xlat);
 
 out_unlock:
 	return 0;
@@ -1153,7 +1183,12 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 	args.done = done;
 
 	switch(scsicmd[0]) {
-		case TEST_UNIT_READY:		/* FIXME: correct? */
+		/* no-op's, complete with success */
+		case SYNCHRONIZE_CACHE:		/* FIXME: temporary */
+		case REZERO_UNIT:
+		case SEEK_6:
+		case SEEK_10:
+		case TEST_UNIT_READY:
 		case FORMAT_UNIT:		/* FIXME: correct? */
 		case SEND_DIAGNOSTIC:		/* FIXME: correct? */
 			ata_scsi_rbuf_fill(&args, ata_scsiop_noop);

@@ -281,6 +281,7 @@ retry:
 		return ERR_PTR(err);
 	}
 	s->s_type = type;
+	strlcpy(s->s_id, type->name, sizeof(s->s_id));
 	list_add(&s->s_list, super_blocks.prev);
 	list_add(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
@@ -316,7 +317,6 @@ void sync_supers(void)
 {
 	struct super_block * sb;
 restart:
-	cond_resched();
 	spin_lock(&sb_lock);
 	sb = sb_entry(super_blocks.next);
 	while (sb != sb_entry(&super_blocks))
@@ -569,14 +569,19 @@ static spinlock_t unnamed_dev_lock = SPIN_LOCK_UNLOCKED;/* protects the above */
 int set_anon_super(struct super_block *s, void *data)
 {
 	int dev;
+	int error;
 
-	spin_lock(&unnamed_dev_lock);
-	if (idr_pre_get(&unnamed_dev_idr, GFP_ATOMIC) == 0) {
-		spin_unlock(&unnamed_dev_lock);
+ retry:
+	if (idr_pre_get(&unnamed_dev_idr, GFP_ATOMIC) == 0)
 		return -ENOMEM;
-	}
-	dev = idr_get_new(&unnamed_dev_idr, NULL);
+	spin_lock(&unnamed_dev_lock);
+	error = idr_get_new(&unnamed_dev_idr, NULL, &dev);
 	spin_unlock(&unnamed_dev_lock);
+	if (error == -EAGAIN)
+		/* We raced and lost with another CPU. */
+		goto retry;
+	else if (error)
+		return -EAGAIN;
 
 	if ((dev & MAX_ID_MASK) == (1 << MINORBITS)) {
 		spin_lock(&unnamed_dev_lock);
@@ -788,6 +793,7 @@ do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = sb->s_root;
 	mnt->mnt_parent = mnt;
+	mnt->mnt_namespace = current->namespace;
 	up_write(&sb->s_umount);
 	put_filesystem(type);
 	return mnt;
@@ -804,7 +810,7 @@ out:
 	return (struct vfsmount *)sb;
 }
 
-EXPORT_SYMBOL(do_kern_mount);
+EXPORT_SYMBOL_GPL(do_kern_mount);
 
 struct vfsmount *kern_mount(struct file_system_type *type)
 {

@@ -43,10 +43,10 @@ static const char ID_sccs[] = "@(#)fplustm.c	1.32 99/02/23 (C) SK " ;
 /*
  * prototypes for static function
  */
-static void build_claim_beacon() ;
-static int init_mac() ;
-static void rtm_init() ;
-static void smt_split_up_fifo() ;
+static void build_claim_beacon(struct s_smc *smc, u_long t_request);
+static int init_mac(struct s_smc *smc, int all);
+static void rtm_init(struct s_smc *smc);
+static void smt_split_up_fifo(struct s_smc *smc);
 
 #if (!defined(NO_SMT_PANIC) || defined(DEBUG))
 static	char write_mdr_warning [] = "E350 write_mdr() FM_SNPPND is set\n";
@@ -107,8 +107,7 @@ static int mac_beacon_imsk2u = FM_SOTRBEC | FM_SMYBEC | FM_SBEC |
 			FM_SLOCLM | FM_SHICLM | FM_SMYCLM | FM_SCLM ;
 
 
-static u_long mac_get_tneg(smc)
-struct s_smc *smc ;
+static u_long mac_get_tneg(struct s_smc *smc)
 {
 	u_long	tneg ;
 
@@ -117,8 +116,7 @@ struct s_smc *smc ;
 		0xffe00000L)) ;
 }
 
-void mac_update_counter(smc)
-struct s_smc *smc ;
+void mac_update_counter(struct s_smc *smc)
 {
 	smc->mib.m[MAC0].fddiMACFrame_Ct =
 		(smc->mib.m[MAC0].fddiMACFrame_Ct & 0xffff0000L)
@@ -143,20 +141,17 @@ struct s_smc *smc ;
 /*
  * write long value into buffer memory over memory data register (MDR),
  */
-void	write_mdr(smc,val)
-struct s_smc *smc ;
-u_long val;
+static void write_mdr(struct s_smc *smc, u_long val)
 {
 	CHECK_NPP() ;
 	MDRW(val) ;
 }
 
+#if 0
 /*
  * read long value from buffer memory over memory data register (MDR),
  */
-u_long read_mdr(smc,addr)
-struct s_smc *smc ;
-unsigned int addr;
+static u_long read_mdr(struct s_smc *smc, unsigned int addr)
 {
 	long p ;
 	CHECK_NPP() ;
@@ -170,11 +165,12 @@ unsigned int addr;
 	p += (u_long)inpw(FM_A(FM_MDRL)) ;
 	return(p) ;
 }
+#endif
+
 /*
  * clear buffer memory
  */
-static void init_ram(smc)
-struct s_smc *smc ;
+static void init_ram(struct s_smc *smc)
 {
 	u_short i ;
 
@@ -193,8 +189,7 @@ struct s_smc *smc ;
 /*
  * set receive FIFO pointer
  */
-static void set_recvptr(smc)
-struct s_smc *smc ;
+static void set_recvptr(struct s_smc *smc)
 {
 	/*
 	 * initialize the pointer for receive queue 1
@@ -224,8 +219,7 @@ struct s_smc *smc ;
 /*
  * set transmit FIFO pointer
  */
-static void set_txptr(smc)
-struct s_smc *smc ;
+static void set_txptr(struct s_smc *smc)
 {
 	outpw(FM_A(FM_CMDREG2),FM_IRSTQ) ;	/* reset transmit queues */
 
@@ -257,8 +251,7 @@ struct s_smc *smc ;
 /*
  * init memory buffer management registers
  */
-static void init_rbc(smc)
-struct s_smc *smc ;
+static void init_rbc(struct s_smc *smc)
 {
 	u_short	rbc_ram_addr ;
 
@@ -279,8 +272,7 @@ struct s_smc *smc ;
 /*
  * init rx pointer
  */
-static void init_rx(smc)
-struct s_smc *smc ;
+static void init_rx(struct s_smc *smc)
 {
 	struct s_smt_rx_queue	*queue ;
 
@@ -302,9 +294,7 @@ struct s_smc *smc ;
 /*
  * set the TSYNC register of the FORMAC to regulate synchronous transmission
  */
-void set_formac_tsync(smc,sync_bw)
-struct s_smc *smc ;
-long sync_bw ;
+void set_formac_tsync(struct s_smc *smc, long sync_bw)
 {
 	outpw(FM_A(FM_TSYNC),(unsigned int) (((-sync_bw) >> 5) & 0xffff) ) ;
 }
@@ -312,8 +302,7 @@ long sync_bw ;
 /*
  * init all tx data structures
  */
-static void init_tx(smc)
-struct s_smc *smc ;
+static void init_tx(struct s_smc *smc)
 {
 	struct s_smt_tx_queue	*queue ;
 
@@ -339,8 +328,7 @@ struct s_smc *smc ;
 	llc_recover_tx(smc) ;
 }
 
-static void mac_counter_init(smc)
-struct s_smc *smc ;
+static void mac_counter_init(struct s_smc *smc)
 {
 	int i ;
 	u_long *ec ;
@@ -363,8 +351,7 @@ struct s_smc *smc ;
 /*
  * set FORMAC address, and t_request
  */
-static	void set_formac_addr(smc)
-struct s_smc *smc ;
+static	void set_formac_addr(struct s_smc *smc)
 {
 	long	t_requ = smc->mib.m[MAC0].fddiMACT_Req ;
 
@@ -390,9 +377,7 @@ struct s_smc *smc ;
 	outpw(FM_A(FM_TREQ0),(unsigned)t_requ) ;
 }
 
-static void set_int(p,l)
-char *p;
-int l;
+static void set_int(char *p, int l)
 {
 	p[0] = (char)(l >> 24) ;
 	p[1] = (char)(l >> 16) ;
@@ -408,12 +393,12 @@ int l;
  * else
  *	append 'end of chain' pointer
  */
-static void copy_tx_mac(smc,td,mac,off,len)
-struct s_smc *smc ;
-u_long td;		/* transmit descriptor */
-struct fddi_mac *mac;	/* mac frame pointer */
-unsigned off;		/* start address within buffer memory */
-int len ;		/* lenght of the frame including the FC */
+static void copy_tx_mac(struct s_smc *smc, u_long td, struct fddi_mac *mac,
+			unsigned off, int len)
+/* u_long td;		 transmit descriptor */
+/* struct fddi_mac *mac; mac frame pointer */
+/* unsigned off;	 start address within buffer memory */
+/* int len ;		 lenght of the frame including the FC */
 {
 	int	i ;
 	u_int	*p ;
@@ -457,8 +442,7 @@ int len ;		/* lenght of the frame including the FC */
 
 	END_MANUAL_ENTRY
  */
-static void directed_beacon(smc)
-struct s_smc *smc ;
+static void directed_beacon(struct s_smc *smc)
 {
 	SK_LOC_DECL(u_int,a[2]) ;
 
@@ -487,9 +471,7 @@ struct s_smc *smc ;
 		special frame packets end with a pointer to their own
 		descriptor, and the MORE bit is set in the descriptor
 */
-static void build_claim_beacon(smc,t_request)
-struct s_smc *smc ;
-u_long t_request;
+static void build_claim_beacon(struct s_smc *smc, u_long t_request)
 {
 	u_int	td ;
 	int	len ;
@@ -550,8 +532,7 @@ u_long t_request;
 	outpw(FM_A(FM_RPXSF),0) ;
 }
 
-void formac_rcv_restart(smc)
-struct s_smc *smc ;
+static void formac_rcv_restart(struct s_smc *smc)
 {
 	/* enable receive function */
 	SETMASK(FM_A(FM_MDREG1),smc->hw.fp.rx_mode,FM_ADDRX) ;
@@ -559,15 +540,13 @@ struct s_smc *smc ;
 	outpw(FM_A(FM_CMDREG1),FM_ICLLR) ;	/* clear receive lock */
 }
 
-void formac_tx_restart(smc)
-struct s_smc *smc ;
+void formac_tx_restart(struct s_smc *smc)
 {
 	outpw(FM_A(FM_CMDREG1),FM_ICLLS) ;	/* clear s-frame lock */
 	outpw(FM_A(FM_CMDREG1),FM_ICLLA0) ;	/* clear a-frame lock */
 }
 
-static void enable_formac(smc)
-struct s_smc *smc ;
+static void enable_formac(struct s_smc *smc)
 {
 	/* set formac IMSK : 0 enables irq */
 	outpw(FM_A(FM_IMSK1U),~mac_imsk1u) ;
@@ -607,9 +586,8 @@ Note	After any ring operational change the transmit complete
 
 	END_MANUAL_ENTRY
  */
-void enable_tx_irq(smc, queue)
-struct s_smc *smc ;
-u_short	queue ;		/* 0 = synchronous queue, 1 = asynchronous queue 0 */
+void enable_tx_irq(struct s_smc *smc, u_short queue)
+/* u_short queue; 0 = synchronous queue, 1 = asynchronous queue 0 */
 {
 	u_short	imask ;
 
@@ -643,9 +621,8 @@ Note	The operating system dependent module should disable
 
 	END_MANUAL_ENTRY
  */
-void disable_tx_irq(smc, queue)
-struct s_smc *smc ;
-u_short	queue ;		/* 0 = synchronous queue, 1 = asynchronous queue 0 */
+void disable_tx_irq(struct s_smc *smc, u_short queue)
+/* u_short queue; 0 = synchronous queue, 1 = asynchronous queue 0 */
 {
 	u_short	imask ;
 
@@ -660,8 +637,7 @@ u_short	queue ;		/* 0 = synchronous queue, 1 = asynchronous queue 0 */
 }
 #endif
 
-static void disable_formac(smc)
-struct s_smc *smc ;
+static void disable_formac(struct s_smc *smc)
 {
 	/* clear formac IMSK : 1 disables irq */
 	outpw(FM_A(FM_IMSK1U),MW) ;
@@ -673,9 +649,7 @@ struct s_smc *smc ;
 }
 
 
-static void mac_ring_up(smc,up)
-struct s_smc *smc ;
-int up;
+static void mac_ring_up(struct s_smc *smc, int up)
 {
 	if (up) {
 		formac_rcv_restart(smc) ;	/* enable receive function */
@@ -702,10 +676,7 @@ int up;
  * mac2_irq:	status bits for the receive queue 1, and ring status
  * 		ring status indication bits
  */
-void mac2_irq(smc,code_s2u,code_s2l)
-struct s_smc *smc ;
-u_short code_s2u ;
-u_short code_s2l ;
+void mac2_irq(struct s_smc *smc, u_short code_s2u, u_short code_s2l)
 {
 	u_short	change_s2l ;
 	u_short	change_s2u ;
@@ -831,10 +802,7 @@ mac2_end:
 /*
  * mac3_irq:	receive queue 2 bits and address detection bits
  */
-void mac3_irq(smc,code_s3u,code_s3l)
-struct s_smc *smc ;
-u_short code_s3u ;
-u_short code_s3l ;
+void mac3_irq(struct s_smc *smc, u_short code_s3u, u_short code_s3l)
 {
 	UNUSED(code_s3l) ;
 
@@ -857,8 +825,7 @@ u_short code_s3l ;
 /*
  * take formac offline
  */
-static void formac_offline(smc)
-struct s_smc *smc ;
+static void formac_offline(struct s_smc *smc)
 {
 	outpw(FM_A(FM_CMDREG2),FM_IACTR) ;/* abort current transmit activity */
 
@@ -876,8 +843,7 @@ struct s_smc *smc ;
 /*
  * bring formac online
  */
-static void formac_online(smc)
-struct s_smc *smc ;
+static void formac_online(struct s_smc *smc)
 {
 	enable_formac(smc) ;
 	SETMASK(FM_A(FM_MDREG1),FM_MONLINE | FM_SELRA | MDR1INIT |
@@ -887,8 +853,7 @@ struct s_smc *smc ;
 /*
  * FORMAC+ full init. (tx, rx, timer, counter, claim & beacon)
  */
-int init_fplus(smc)
-struct s_smc *smc ;
+int init_fplus(struct s_smc *smc)
 {
 	smc->hw.fp.nsa_mode = FM_MRNNSAFNMA ;
 	smc->hw.fp.rx_mode = FM_MDAMA ;
@@ -926,9 +891,7 @@ struct s_smc *smc ;
 	/* enable_formac(smc) ; */
 }
 
-static int init_mac(smc,all)
-struct s_smc *smc ;
-int all ;
+static int init_mac(struct s_smc *smc, int all)
 {
 	u_short	t_max,x ;
 	u_long	time=0 ;
@@ -1033,9 +996,7 @@ int all ;
 /*
  * called by CFM
  */
-void config_mux(smc,mux)
-struct s_smc *smc ;
-int mux;
+void config_mux(struct s_smc *smc, int mux)
 {
 	plc_config_mux(smc,mux) ;
 
@@ -1049,8 +1010,7 @@ int mux;
  * the interrupt must not be permanently enabled
  * RMT calls this function periodically (timer driven polling)
  */
-void sm_mac_check_beacon_claim(smc)
-struct s_smc *smc ;
+void sm_mac_check_beacon_claim(struct s_smc *smc)
 {
 	/* set formac IMSK : 0 enables irq */
 	outpw(FM_A(FM_IMSK2U),~(mac_imsk2u | mac_beacon_imsk2u)) ;
@@ -1061,32 +1021,9 @@ struct s_smc *smc ;
 
 /*-------------------------- interface functions ----------------------------*/
 /*
- * control ODL output
- */
-void sm_pm_control(smc,mode)
-struct s_smc *smc ;
-int mode;
-{
-	SK_UNUSED(smc) ;
-
-	/*
-	 * if PCM logic has set LS_REQUEST = Transmit QUIET Line State
-	 *	/FOTOFF signal turn activ -> ODL disable
-	 */
-	switch(mode) {
-	case PM_TRANSMIT_DISABLE :
-		break ;
-	case PM_TRANSMIT_ENABLE :
-		break ;
-	}
-}
-
-/*
  * control MAC layer	(called by RMT)
  */
-void sm_ma_control(smc,mode)
-struct s_smc *smc ;
-int mode;
+void sm_ma_control(struct s_smc *smc, int mode)
 {
 	switch(mode) {
 	case MA_OFFLINE :
@@ -1110,8 +1047,7 @@ int mode;
 	}
 }
 
-int sm_mac_get_tx_state(smc)
-struct s_smc *smc ;
+int sm_mac_get_tx_state(struct s_smc *smc)
 {
 	return((inpw(FM_A(FM_STMCHN))>>4)&7) ;
 }
@@ -1120,12 +1056,10 @@ struct s_smc *smc ;
  * multicast functions
  */
 
-static struct s_fpmc	*mac_get_mc_table(smc,user,own,del,can)
-struct s_smc *smc ;
-struct fddi_addr *user ;
-struct fddi_addr *own ;
-int del ;
-int can ;
+static struct s_fpmc* mac_get_mc_table(struct s_smc *smc,
+				       struct fddi_addr *user,
+				       struct fddi_addr *own,
+				       int del, int can)
 {
 	struct s_fpmc	*tb ;
 	struct s_fpmc	*slot ;
@@ -1141,7 +1075,7 @@ int can ;
 		for (i = 0 ; i < 6 ; i++, p++)
 			*p = canonical[*p] ;
 	}
-	slot = 0 ;
+	slot = NULL;
 	for (i = 0, tb = smc->hw.fp.mc.table ; i < FPMAX_MULTICAST ; i++, tb++){
 		if (!tb->n) {		/* not used */
 			if (!del && !slot)	/* if !del save first free */
@@ -1166,8 +1100,7 @@ Function	DOWNCALL	(SMT, fplustm.c)
 
 	END_MANUAL_ENTRY()
  */
-void mac_clear_multicast(smc)
-struct s_smc *smc ;
+void mac_clear_multicast(struct s_smc *smc)
 {
 	struct s_fpmc	*tb ;
 	int i ;
@@ -1198,9 +1131,7 @@ Returns	0: always success
 
 	END_MANUAL_ENTRY()
  */
-int mac_set_func_addr(smc,f_addr)
-struct s_smc *smc ;
-u_long f_addr ;
+int mac_set_func_addr(struct s_smc *smc, u_long f_addr)
 {
 	smc->hw.fp.func_addr = f_addr ;
 	return(0) ;
@@ -1235,10 +1166,7 @@ Note	After a 'driver reset' or a 'station set address' all
 
 	END_MANUAL_ENTRY()
  */
-int mac_add_multicast(smc,addr,can)
-struct s_smc *smc ;
-struct fddi_addr *addr ;
-int can ;
+int mac_add_multicast(struct s_smc *smc, struct fddi_addr *addr, int can)
 {
 	SK_LOC_DECL(struct fddi_addr,own) ;
 	struct s_fpmc	*tb ;
@@ -1292,10 +1220,7 @@ Para	addr	pointer to a multicast address
 
 	END_MANUAL_ENTRY()
  */
-void mac_del_multicast(smc,addr,can)
-struct s_smc *smc ;
-struct fddi_addr *addr ;
-int can ;
+void mac_del_multicast(struct s_smc *smc, struct fddi_addr *addr, int can)
 {
 	SK_LOC_DECL(struct fddi_addr,own) ;
 	struct s_fpmc	*tb ;
@@ -1341,8 +1266,7 @@ Function	DOWNCALL	(SMT, fplustm.c)
 
 	END_MANUAL_ENTRY()
  */
-void mac_update_multicast(smc)
-struct s_smc *smc ;
+void mac_update_multicast(struct s_smc *smc)
 {
 	struct s_fpmc	*tb ;
 	u_char	*fu ;
@@ -1418,9 +1342,7 @@ Note	The selected receive modes will be lost after 'driver reset'
 
 	END_MANUAL_ENTRY
  */
-void mac_set_rx_mode(smc,mode)
-struct s_smc *smc ;
-int mode ;
+void mac_set_rx_mode(struct s_smc *smc, int mode)
 {
 	switch (mode) {
 	case RX_ENABLE_ALLMULTI :
@@ -1476,8 +1398,7 @@ int mode ;
 
 	END_MANUAL_ENTRY
  */
-void rtm_irq(smc)
-struct s_smc *smc ;
+void rtm_irq(struct s_smc *smc)
 {
 	outpw(ADDR(B2_RTM_CRTL),TIM_CL_IRQ) ;		/* clear IRQ */
 	if (inpw(ADDR(B2_RTM_CRTL)) & TIM_RES_TOK) {
@@ -1490,15 +1411,13 @@ struct s_smc *smc ;
 	outpw(ADDR(B2_RTM_CRTL),TIM_START) ;	/* enable RTM monitoring */
 }
 
-static void rtm_init(smc)
-struct s_smc *smc ;
+static void rtm_init(struct s_smc *smc)
 {
 	outpd(ADDR(B2_RTM_INI),0) ;		/* timer = 0 */
 	outpw(ADDR(B2_RTM_CRTL),TIM_START) ;	/* enable IRQ */
 }
 
-void rtm_set_timer(smc)
-struct s_smc *smc ;
+void rtm_set_timer(struct s_smc *smc)
 {
 	/*
 	 * MIB timer and hardware timer have the same resolution of 80nS
@@ -1508,8 +1427,7 @@ struct s_smc *smc ;
 	outpd(ADDR(B2_RTM_INI),smc->mib.a[PATH0].fddiPATHT_Rmode) ;
 }
 
-static void smt_split_up_fifo(smc)
-struct s_smc *smc ;
+static void smt_split_up_fifo(struct s_smc *smc)
 {
 
 /*
@@ -1629,8 +1547,7 @@ struct s_smc *smc ;
 		smc->hw.fp.fifo.tx_a0_start, smc->hw.fp.fifo.rx2_fifo_start) ;
 }
 
-void formac_reinit_tx(smc)
-struct s_smc *smc ;
+void formac_reinit_tx(struct s_smc *smc)
 {
 	/*
 	 * Split up the FIFO and reinitialize the MAC if synchronous
@@ -1641,5 +1558,4 @@ struct s_smc *smc ;
 		(void)init_mac(smc,0) ;
 	}
 }
-
 

@@ -180,7 +180,9 @@ nfs_async_unlink(struct dentry *dentry)
 	task->tk_action = nfs_async_unlink_init;
 	task->tk_release = nfs_async_unlink_release;
 
+	spin_lock(&dentry->d_lock);
 	dentry->d_flags |= DCACHE_NFSFS_RENAMED;
+	spin_unlock(&dentry->d_lock);
 	data->cred = rpcauth_lookupcred(clnt->cl_auth, 0);
 
 	rpc_sleep_on(&nfs_delete_queue, task, NULL, NULL);
@@ -210,7 +212,9 @@ nfs_complete_unlink(struct dentry *dentry)
 		return;
 	data->count++;
 	nfs_copy_dname(dentry, data);
+	spin_lock(&dentry->d_lock);
 	dentry->d_flags &= ~DCACHE_NFSFS_RENAMED;
+	spin_unlock(&dentry->d_lock);
 	if (data->task.tk_rpcwait == &nfs_delete_queue)
 		rpc_wake_up_task(&data->task);
 	nfs_put_unlinkdata(data);

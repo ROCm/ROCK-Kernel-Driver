@@ -15,6 +15,8 @@
 #ifndef act2000_h
 #define act2000_h
 
+#include <linux/compiler.h>
+
 #define ACT2000_IOCTL_SETPORT    1
 #define ACT2000_IOCTL_GETPORT    2
 #define ACT2000_IOCTL_SETIRQ     3
@@ -46,7 +48,7 @@ typedef struct act2000_cdef {
 /* Struct for downloading firmware */
 typedef struct act2000_ddef {
         int length;             /* Length of code */
-        char *buffer;           /* Ptr. to code   */
+        char __user *buffer;    /* Ptr. to code   */
 } act2000_ddef;
 
 typedef struct act2000_fwid {

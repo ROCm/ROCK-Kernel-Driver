@@ -307,7 +307,7 @@ char *snd_kmalloc_strdup(const char *string, int flags)
  *
  * Returns zero if successful, or non-zero on failure.
  */
-int copy_to_user_fromio(void *dst, unsigned long src, size_t count)
+int copy_to_user_fromio(void __user *dst, unsigned long src, size_t count)
 {
 #if defined(__i386__) || defined(CONFIG_SPARC32)
 	return copy_to_user(dst, (const void*)src, count) ? -EFAULT : 0;
@@ -338,7 +338,7 @@ int copy_to_user_fromio(void *dst, unsigned long src, size_t count)
  *
  * Returns zero if successful, or non-zero on failure.
  */
-int copy_from_user_toio(unsigned long dst, const void *src, size_t count)
+int copy_from_user_toio(unsigned long dst, const void __user *src, size_t count)
 {
 #if defined(__i386__) || defined(CONFIG_SPARC32)
 	return copy_from_user((void*)dst, src, count) ? -EFAULT : 0;

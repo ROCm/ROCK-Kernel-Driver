@@ -86,8 +86,15 @@ int register_vio_slot(struct device_node *dn)
 	}
 	slot->dev_type = VIO_DEV;
 	slot->dev.vio_dev = vio_find_node(dn);
-	if (!slot->dev.vio_dev)
-		slot->dev.vio_dev = vio_register_device(dn);
+	if (slot->dev.vio_dev) {
+		/*
+		 * rpaphp is the only owner of vio devices and
+		 * does not need extra reference taken by
+		 * vio_find_node
+		 */
+		put_device(&slot->dev.vio_dev->dev);
+	} else
+		slot->dev.vio_dev = vio_register_device_node(dn);
 	if (slot->dev.vio_dev)
 		slot->state = CONFIGURED;
 	else
@@ -108,7 +115,7 @@ int rpaphp_enable_vio_slot(struct slot *slot)
 {
 	int retval = 0;
 
-	if ((slot->dev.vio_dev = vio_register_device(slot->dn))) {
+	if ((slot->dev.vio_dev = vio_register_device_node(slot->dn))) {
 		info("%s: VIO adapter %s in slot[%s] has been configured\n",
 			__FUNCTION__, slot->dn->name, slot->name);
 		slot->state = CONFIGURED;

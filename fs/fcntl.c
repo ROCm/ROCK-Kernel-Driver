@@ -7,7 +7,6 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/file.h>
 #include <linux/dnotify.h>
 #include <linux/smp_lock.h>
@@ -151,15 +150,10 @@ static int dupfd(struct file *file, unsigned int start)
 
 asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 {
-	int err;
-	struct file * file = NULL;
+	int err = -EBADF;
+	struct file * file, *tofree;
 	struct files_struct * files = current->files;
 
-	FSHOOK_BEGIN(dup2, err, .oldfd = oldfd, .newfd = newfd)
-
-	struct file * tofree;
-
-	err = -EBADF;
 	spin_lock(&files->file_lock);
 	if (!(file = fcheck(oldfd)))
 		goto out_unlock;
@@ -197,9 +191,6 @@ asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 		filp_close(tofree, files);
 	err = newfd;
 out:
-
-	FSHOOK_END(dup2, err)
-
 	return err;
 out_unlock:
 	spin_unlock(&files->file_lock);
@@ -213,22 +204,15 @@ out_fput:
 
 asmlinkage long sys_dup(unsigned int fildes)
 {
-	int ret;
-
-	FSHOOK_BEGIN(dup, ret, .fd = fildes)
-
+	int ret = -EBADF;
 	struct file * file = fget(fildes);
-	ret = -EBADF;
 
 	if (file)
 		ret = dupfd(file, 0);
-
-	FSHOOK_END(dup, ret)
-
 	return ret;
 }
 
-#define SETFL_MASK (O_APPEND | O_NONBLOCK | O_NDELAY | FASYNC | O_DIRECT)
+#define SETFL_MASK (O_APPEND | O_NONBLOCK | O_NDELAY | FASYNC | O_DIRECT | O_NOATIME)
 
 static int setfl(int fd, struct file * filp, unsigned long arg)
 {
@@ -238,6 +222,11 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 	/* O_APPEND cannot be cleared if the file is marked as append-only */
 	if (!(arg & O_APPEND) && IS_APPEND(inode))
 		return -EPERM;
+
+	/* O_NOATIME can only be set by the owner or superuser */
+	if ((arg & O_NOATIME) && !(filp->f_flags & O_NOATIME))
+		if (current->fsuid != inode->i_uid && !capable(CAP_FOWNER))
+			return -EPERM;
 
 	/* required for strict SunOS emulation */
 	if (O_NONBLOCK != O_NDELAY)
@@ -380,24 +369,22 @@ static long do_fcntl(int fd, unsigned int cmd,
 asmlinkage long sys_fcntl(int fd, unsigned int cmd, unsigned long arg)
 {	
 	struct file *filp;
-	long err;
+	long err = -EBADF;
 
-	FSHOOK_BEGIN(fcntl, err, .fd = fd, .cmd = cmd, .arg = arg)
-
-	err = -EBADF;
 	filp = fget(fd);
 	if (!filp)
 		goto out;
 
 	err = security_file_fcntl(filp, cmd, arg);
-	if (!err)
-		err = do_fcntl(fd, cmd, arg, filp);
+	if (err) {
+		fput(filp);
+		return err;
+	}
+
+	err = do_fcntl(fd, cmd, arg, filp);
 
  	fput(filp);
 out:
-
-	FSHOOK_END(fcntl, err)
-
 	return err;
 }
 
@@ -407,16 +394,19 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 	struct file * filp;
 	long err;
 
-	FSHOOK_BEGIN(fcntl, err, .fd = fd, .cmd = cmd, .arg = arg)
-
 	err = -EBADF;
 	filp = fget(fd);
 	if (!filp)
 		goto out;
 
 	err = security_file_fcntl(filp, cmd, arg);
-
-	if (!err) switch (cmd) {
+	if (err) {
+		fput(filp);
+		return err;
+	}
+	err = -EBADF;
+	
+	switch (cmd) {
 		case F_GETLK64:
 			err = fcntl_getlk64(filp, (struct flock64 __user *) arg);
 			break;
@@ -428,12 +418,8 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 			err = do_fcntl(fd, cmd, arg, filp);
 			break;
 	}
-
 	fput(filp);
 out:
-
-	FSHOOK_END(fcntl, err)
-
 	return err;
 }
 #endif
@@ -646,15 +632,12 @@ void kill_fasync(struct fasync_struct **fp, int sig, int band)
 		read_unlock(&fasync_lock);
 	}
 }
-
 EXPORT_SYMBOL(kill_fasync);
 
 static int __init fasync_init(void)
 {
 	fasync_cache = kmem_cache_create("fasync_cache",
-		sizeof(struct fasync_struct), 0, 0, NULL, NULL);
-	if (!fasync_cache)
-		panic("cannot create fasync slab cache");
+		sizeof(struct fasync_struct), 0, SLAB_PANIC, NULL, NULL);
 	return 0;
 }
 

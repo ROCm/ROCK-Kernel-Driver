@@ -14,17 +14,7 @@
 
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
-
-struct callvectors {
-	int	(*open) (char*, int, int);
-	int	(*close) (int);
-	int	(*read) (int, void*, int);
-	int	(*write) (int, void*, int);
-	off_t	(*lseek) (int, off_t, int);
-	int	(*printf) (const char*, ...);
-	void	(*cacheflush) (void);
-	char*	(*gets) (char*);
-};
+#include <asm/pmon.h>
 
 struct callvectors* debug_vectors;
 

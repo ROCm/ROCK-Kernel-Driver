@@ -645,7 +645,7 @@ static int i2ob_evt(void *dummy)
 			 */
 			case I2O_EVT_IND_BSA_VOLUME_LOAD:
 			{
-				i2ob_install_device(dev->i2odev->controller, 
+				i2ob_install_device(dev->i2odev->controller,
 					dev->i2odev, unit);
 				add_disk(dev->gd);
 				break;
@@ -691,9 +691,9 @@ static int i2ob_evt(void *dummy)
 	  			if(i2ob_query_device(dev, 0x0004, 0, &size, 8) !=0 )
 					i2ob_query_device(dev, 0x0000, 4, &size, 8);
 
-				spin_lock_irqsave(dev->req_queue->queue_lock, flags);	
+				spin_lock_irqsave(dev->req_queue->queue_lock, flags);
 				set_capacity(dev->gd, size>>9);
-				spin_unlock_irqrestore(dev->req_queue->queue_lock, flags);	
+				spin_unlock_irqrestore(dev->req_queue->queue_lock, flags);
 				break;
 			}
 
@@ -861,6 +861,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct i2ob_device *dev = disk->private_data;
+	void __user *argp = (void __user *)arg;
 
 	/* Anyone capable of this syscall can do *real bad* things */
 
@@ -873,13 +874,13 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 			i2o_block_biosparam(get_capacity(disk), 
 					&g.cylinders, &g.heads, &g.sectors);
 			g.start = get_start_sect(inode->i_bdev);
-			return copy_to_user((void *)arg,&g, sizeof(g))?-EFAULT:0;
+			return copy_to_user(argp, &g, sizeof(g))?-EFAULT:0;
 		}
 		
 		case BLKI2OGRSTRAT:
-			return put_user(dev->rcache, (int *)arg);
+			return put_user(dev->rcache, (int __user *)argp);
 		case BLKI2OGWSTRAT:
-			return put_user(dev->wcache, (int *)arg);
+			return put_user(dev->wcache, (int __user *)argp);
 		case BLKI2OSRSTRAT:
 			if(arg<0||arg>CACHE_SMARTFETCH)
 				return -EINVAL;
@@ -1128,11 +1129,11 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 
 	if(segments > 16)
 		segments = 16;
-				
+
 	dev->power = power;	/* Save power state */
 	dev->flags = flags;	/* Keep the type info */
 		
-	blk_queue_max_sectors(q, 96);	/* 256 might be nicer but many controllers 
+	blk_queue_max_sectors(q, 96);	/* 256 might be nicer but many controllers
 						   explode on 65536 or higher */
 	blk_queue_max_phys_segments(q, segments);
 	blk_queue_max_hw_segments(q, segments);

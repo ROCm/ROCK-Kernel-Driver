@@ -40,6 +40,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
 #include <asm/iommu.h>
+#include <asm/rtas.h>
 
 #include "open_pic.h"
 #include "pci.h"
@@ -62,7 +63,7 @@ extern unsigned long pci_probe_only;
 
 static int rtas_read_config(struct device_node *dn, int where, int size, u32 *val)
 {
-	unsigned long returnval = ~0L;
+	int returnval = -1;
 	unsigned long buid, addr;
 	int ret;
 
@@ -72,7 +73,8 @@ static int rtas_read_config(struct device_node *dn, int where, int size, u32 *va
 	addr = (dn->busno << 16) | (dn->devfn << 8) | where;
 	buid = dn->phb->buid;
 	if (buid) {
-		ret = rtas_call(ibm_read_pci_config, 4, 2, &returnval, addr, buid >> 32, buid & 0xffffffff, size);
+		ret = rtas_call(ibm_read_pci_config, 4, 2, &returnval,
+				addr, buid >> 32, buid & 0xffffffff, size);
 	} else {
 		ret = rtas_call(read_pci_config, 2, 2, &returnval, addr, size);
 	}
@@ -282,10 +284,10 @@ static void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 				isa_dn = of_find_node_by_type(NULL, "isa");
 				if (isa_dn) {
 					isa_io_base = pci_io_base;
-					of_node_put(isa_dn);
 					pci_process_ISA_OF_ranges(isa_dn,
 						hose->io_base_phys,
 						hose->io_base_virt);
+					of_node_put(isa_dn);
                                         /* Allow all IO */
                                         io_page_mask = -1;
 				}
@@ -372,13 +374,13 @@ unsigned long __init get_phb_buid (struct device_node *phb)
 
 	/* PHB's will always be children of the root node,
 	 * or so it is promised by the current firmware. */
-	if (phb->parent == NULL) 
+	if (phb->parent == NULL)
 		return 0;
-	if (phb->parent->parent) 
+	if (phb->parent->parent)
 		return 0;
 
 	buid_vals = (unsigned int *) get_property(phb, "reg", &len);
-	if (buid_vals == NULL) 
+	if (buid_vals == NULL)
 		return 0;
 
 	addr_cells = prom_n_addr_cells(phb);

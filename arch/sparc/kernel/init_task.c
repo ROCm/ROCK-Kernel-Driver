@@ -2,6 +2,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/init_task.h>
+#include <linux/mqueue.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -22,6 +23,6 @@ EXPORT_SYMBOL(init_task);
  * in etrap.S which assumes it.
  */
 union thread_union init_thread_union
-	__attribute__((section (".text")))
+	__attribute__((section (".text,#alloc")))
 	__attribute__((aligned (THREAD_SIZE)))
 	= { INIT_THREAD_INFO(init_task) };

@@ -27,10 +27,11 @@
  * Abstract: Linux Driver entry module for Adaptec RAID Array Controller
  */
 
-#define AAC_DRIVER_VERSION		"1.1.2-lk1"
+#define AAC_DRIVER_VERSION		"1.1.2-lk2"
 #define AAC_DRIVER_BUILD_DATE		__DATE__
 #define AAC_DRIVERNAME			"aacraid"
 
+#include <linux/compat.h>
 #include <linux/blkdev.h>
 #include <linux/completion.h>
 #include <linux/init.h>
@@ -41,6 +42,8 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/syscalls.h>
+#include <linux/ioctl32.h>
 #include <asm/semaphore.h>
 
 #include <scsi/scsi.h>
@@ -167,6 +170,28 @@ static struct aac_driver_ident aac_drivers[] = {
 	{ aac_rx_init, "aacraid",  "ADAPTEC ", "ASR-2020SA      ", 1 }, /* ASR-2020SA      (ZCR PCI-X SATA) */
 	{ aac_rx_init, "aacraid",  "ADAPTEC ", "ASR-2025SA      ", 1 }, /* ASR-2025SA      (ZCR DIMM SATA) */
 };
+
+#ifdef CONFIG_COMPAT
+/* 
+ * Promote 32 bit apps that call get_next_adapter_fib_ioctl to 64 bit version 
+ */
+static int aac_get_next_adapter_fib_ioctl(unsigned int fd, unsigned int cmd, 
+		unsigned long arg, struct file *file)
+{
+	struct fib_ioctl __user *f;
+
+	f = compat_alloc_user_space(sizeof(*f));
+	if (!access_ok(VERIFY_WRITE, f, sizeof(*f)))
+		return -EFAULT;
+
+	clear_user(f, sizeof(*f));
+	if (copy_in_user(f, (void __user *)arg, sizeof(struct fib_ioctl) - sizeof(u32)))
+		return -EFAULT;
+
+	return sys_ioctl(fd, cmd, (unsigned long)f);
+}
+#endif
+
 
 /**
  *	aac_queuecommand	-	queue a SCSI command
@@ -330,7 +355,7 @@ static int aac_slave_configure(struct scsi_device *sdev)
 	return 0;
 }
 
-static int aac_ioctl(struct scsi_device *sdev, int cmd, void * arg)
+static int aac_ioctl(struct scsi_device *sdev, int cmd, void __user * arg)
 {
 	struct aac_dev *dev = (struct aac_dev *)sdev->host->hostdata;
 	return aac_do_ioctl(dev, cmd, arg);
@@ -355,13 +380,15 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 	struct Scsi_Host * host = dev->host;
 	struct scsi_cmnd * command;
 	int count;
+	struct aac_dev * aac;
 	unsigned long flags;
 
 	printk(KERN_ERR "%s: Host adapter reset request. SCSI hang ?\n", 
 					AAC_DRIVERNAME);
 
 
-	if (aac_adapter_check_health((struct aac_dev *)host->hostdata)) {
+	aac = (struct aac_dev *)host->hostdata;
+	if (aac_adapter_check_health(aac)) {
 		printk(KERN_ERR "%s: Host adapter appears dead\n", 
 				AAC_DRIVERNAME);
 		return -ENODEV;
@@ -371,15 +398,22 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 	 * target (block maximum 60 seconds).
 	 */
 	for (count = 60; count; --count) {
+		int active = 0;
 		__shost_for_each_device(dev, host) {
 			spin_lock_irqsave(&dev->list_lock, flags);
 			list_for_each_entry(command, &dev->cmd_list, list) {
 				if (command->serial_number) {
-					spin_unlock_irqrestore(&dev->list_lock, flags);
-					return SUCCESS;
+					active++;
+					break;
 				}
 			}
 			spin_unlock_irqrestore(&dev->list_lock, flags);
+
+			/*
+			 * We can exit If all the commands are complete
+			 */
+			if (active == 0)
+				return SUCCESS;
 		}
 		spin_unlock_irq(host->host_lock);
 		scsi_sleep(HZ);
@@ -428,7 +462,7 @@ static int aac_cfg_open(struct inode *inode, struct file *file)
 static int aac_cfg_ioctl(struct inode *inode,  struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
-	return aac_do_ioctl(file->private_data, cmd, (void *)arg);
+	return aac_do_ioctl(file->private_data, cmd, (void __user *)arg);
 }
 
 static struct file_operations aac_cfg_fops = {
@@ -452,7 +486,11 @@ static struct scsi_host_template aac_driver_template = {
 	.this_id        		= 16,
 	.sg_tablesize   		= 16,
 	.max_sectors    		= 128,
+#if (AAC_NUM_IO_FIB > 256)
+	.cmd_per_lun			= 256,
+#else		
 	.cmd_per_lun    		= AAC_NUM_IO_FIB, 
+#endif	
 	.use_clustering			= ENABLE_CLUSTERING,
 };
 
@@ -512,7 +550,7 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	for (container = 0; container < MAXIMUM_NUM_CONTAINERS; container++)
 		fsa_dev_ptr->devname[container][0] = '\0';
 
-	if ((*aac_drivers[index].init)(aac , shost->unique_id))
+	if ((*aac_drivers[index].init)(aac))
 		goto out_free_fibs;
 
 	/*
@@ -543,7 +581,7 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	 * dmb - we may need to move the setting of these parms somewhere else once
 	 * we get a fib that can report the actual numbers
 	 */
-	shost->max_id = AAC_MAX_TARGET;
+	shost->max_id = MAXIMUM_NUM_CONTAINERS;
 	shost->max_lun = AAC_MAX_LUN;
 
 	error = scsi_add_host(shost, &pdev->dev);
@@ -634,12 +672,39 @@ static int __init aac_init(void)
 		printk(KERN_WARNING
 		       "aacraid: unable to register \"aac\" device.\n");
 	}
+#ifdef CONFIG_COMPAT
+	register_ioctl32_conversion(FSACTL_MINIPORT_REV_CHECK, NULL);
+	register_ioctl32_conversion(FSACTL_SENDFIB, NULL);
+	register_ioctl32_conversion(FSACTL_OPEN_GET_ADAPTER_FIB, NULL);
+	register_ioctl32_conversion(FSACTL_GET_NEXT_ADAPTER_FIB, 
+		aac_get_next_adapter_fib_ioctl);
+	register_ioctl32_conversion(FSACTL_CLOSE_GET_ADAPTER_FIB, NULL);
+	register_ioctl32_conversion(FSACTL_SEND_RAW_SRB, NULL);
+	register_ioctl32_conversion(FSACTL_GET_PCI_INFO, NULL);
+	register_ioctl32_conversion(FSACTL_QUERY_DISK, NULL);
+	register_ioctl32_conversion(FSACTL_DELETE_DISK, NULL);
+	register_ioctl32_conversion(FSACTL_FORCE_DELETE_DISK, NULL);
+	register_ioctl32_conversion(FSACTL_GET_CONTAINERS, NULL);
+#endif
 
 	return 0;
 }
 
 static void __exit aac_exit(void)
 {
+#ifdef CONFIG_COMPAT
+	unregister_ioctl32_conversion(FSACTL_MINIPORT_REV_CHECK);
+	unregister_ioctl32_conversion(FSACTL_SENDFIB);
+	unregister_ioctl32_conversion(FSACTL_OPEN_GET_ADAPTER_FIB);
+	unregister_ioctl32_conversion(FSACTL_GET_NEXT_ADAPTER_FIB);
+	unregister_ioctl32_conversion(FSACTL_CLOSE_GET_ADAPTER_FIB);
+	unregister_ioctl32_conversion(FSACTL_SEND_RAW_SRB);
+	unregister_ioctl32_conversion(FSACTL_GET_PCI_INFO);
+	unregister_ioctl32_conversion(FSACTL_QUERY_DISK);
+	unregister_ioctl32_conversion(FSACTL_DELETE_DISK);
+	unregister_ioctl32_conversion(FSACTL_FORCE_DELETE_DISK);
+	unregister_ioctl32_conversion(FSACTL_GET_CONTAINERS);
+#endif
 	unregister_chrdev(aac_cfg_major, "aac");
 	pci_unregister_driver(&aac_pci_driver);
 }

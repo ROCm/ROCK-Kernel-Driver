@@ -265,8 +265,8 @@ SYMBOL_NAME_LABEL(sys_call_table)
 	.long SYMBOL_NAME(sys_io_getevents)
 	.long SYMBOL_NAME(sys_io_submit)
 	.long SYMBOL_NAME(sys_io_cancel)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* 250 */ /* sys_alloc_hugepages */
-	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_freec_hugepages */
+	.long SYMBOL_NAME(sys_fadvise64)	/* 250 */
+	.long SYMBOL_NAME(sys_ni_syscall)
 	.long SYMBOL_NAME(sys_exit_group)
 	.long SYMBOL_NAME(sys_lookup_dcookie)
 	.long SYMBOL_NAME(sys_epoll_create)
@@ -287,36 +287,39 @@ SYMBOL_NAME_LABEL(sys_call_table)
 	.long SYMBOL_NAME(sys_fstatfs64)	
 	.long SYMBOL_NAME(sys_tgkill)		/* 270 */
 	.long SYMBOL_NAME(sys_utimes)
+ 	.long SYMBOL_NAME(sys_fadvise64_64)
+	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_vserver */
 
 	.rept NR_syscalls-(.-SYMBOL_NAME(sys_call_table))/4
 		.long SYMBOL_NAME(sys_ni_syscall)
 	.endr
 
+	.macro	call_sp addr
+	mov.l	#SYMBOL_NAME(\addr),er6
+	bra	SYMBOL_NAME(syscall_trampoline):8
+	.endm
+
 SYMBOL_NAME_LABEL(sys_clone)	
-	mov.l	#SYMBOL_NAME(h8300_clone),er0
-	jmp	@SYMBOL_NAME(syscall_trampoline)
+	call_sp	h8300_clone
 	
 SYMBOL_NAME_LABEL(sys_sigsuspend)
-	mov.l	#SYMBOL_NAME(do_sigsuspend),er0
-	jmp	@SYMBOL_NAME(syscall_trampoline)
+	call_sp	do_sigsuspend
 
 SYMBOL_NAME_LABEL(sys_rt_sigsuspend)
-	mov.l	#SYMBOL_NAME(do_rt_sigsuspend),er0
-	jmp	@SYMBOL_NAME(syscall_trampoline)
+	call_sp	do_rt_sigsuspend
 
 SYMBOL_NAME_LABEL(sys_sigreturn)
-	mov.l	#SYMBOL_NAME(do_sigreturn),er0
-	jmp	@SYMBOL_NAME(syscall_trampoline)
+	call_sp	do_sigreturn
 
 SYMBOL_NAME_LABEL(sys_rt_sigreturn)
-	mov.l	#SYMBOL_NAME(do_rt_sigreturn),er0
-	jmp	@SYMBOL_NAME(syscall_trampoline)
+	call_sp	do_rt_sigreturn
 
 SYMBOL_NAME_LABEL(sys_fork)
-	mov.l	#SYMBOL_NAME(h8300_fork),er0
-	jmp	@SYMBOL_NAME(syscall_trampoline)
+	call_sp	h8300_fork
 
 SYMBOL_NAME_LABEL(sys_vfork)
-	mov.l	#SYMBOL_NAME(h8300_vfork),er0
-	jmp	@SYMBOL_NAME(syscall_trampoline)
+	call_sp	h8300_vfork
 
+SYMBOL_NAME_LABEL(syscall_trampoline)
+	mov.l	sp,er0
+	jmp	@er6

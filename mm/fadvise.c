@@ -10,12 +10,13 @@
 #include <linux/kernel.h>
 #include <linux/file.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 #include <linux/fadvise.h>
+
+#include <asm/unistd.h>
 
 /*
  * POSIX_FADV_WILLNEED could set PG_Referenced, and POSIX_FADV_NOREUSE could
@@ -26,22 +27,25 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 	struct file *file = fget(fd);
 	struct address_space *mapping;
 	struct backing_dev_info *bdi;
+	loff_t endbyte;
 	pgoff_t start_index;
 	pgoff_t end_index;
+	unsigned long nrpages;
 	int ret = 0;
 
-	FSHOOK_BEGIN(fadvise, ret, .fd = fd, .offset = offset, .len = len, .advice = advice)
-
-	if (!file) {
-		ret = -EBADF;
-		goto out_no_put;
-	}
+	if (!file)
+		return -EBADF;
 
 	mapping = file->f_mapping;
 	if (!mapping || len < 0) {
 		ret = -EINVAL;
 		goto out;
 	}
+
+	/* Careful about overflows. Len == 0 means "as much as possible" */
+	endbyte = offset + len;
+	if (!len || endbyte < len)
+		endbyte = -1;
 
 	bdi = mapping->backing_dev_info;
 
@@ -61,33 +65,46 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 			ret = -EINVAL;
 			break;
 		}
+
+		/* First and last PARTIAL page! */
+		start_index = offset >> PAGE_CACHE_SHIFT;
+		end_index = (endbyte-1) >> PAGE_CACHE_SHIFT;
+
+		/* Careful about overflow on the "+1" */
+		nrpages = end_index - start_index + 1;
+		if (!nrpages)
+			nrpages = ~0UL;
+		
 		ret = force_page_cache_readahead(mapping, file,
-				offset >> PAGE_CACHE_SHIFT,
-				max_sane_readahead(len >> PAGE_CACHE_SHIFT));
+				start_index,
+				max_sane_readahead(nrpages));
 		if (ret > 0)
 			ret = 0;
 		break;
 	case POSIX_FADV_DONTNEED:
 		if (!bdi_write_congested(mapping->backing_dev_info))
 			filemap_flush(mapping);
-		start_index = (offset + PAGE_CACHE_SIZE-1) >> PAGE_CACHE_SHIFT;
-		end_index = ((offset + len) >> PAGE_CACHE_SHIFT) - 1;
-		invalidate_mapping_pages(mapping, start_index, end_index);
+
+		/* First and last FULL page! */
+		start_index = (offset + (PAGE_CACHE_SIZE-1)) >> PAGE_CACHE_SHIFT;
+		end_index = (endbyte >> PAGE_CACHE_SHIFT);
+
+		if (end_index > start_index)
+			invalidate_mapping_pages(mapping, start_index, end_index-1);
 		break;
 	default:
 		ret = -EINVAL;
 	}
 out:
 	fput(file);
-
-out_no_put:
-	FSHOOK_END(fadvise, ret)
-
 	return ret;
 }
+
+#ifdef __ARCH_WANT_SYS_FADVISE64
 
 asmlinkage long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 {
 	return sys_fadvise64_64(fd, offset, len, advice);
 }
 
+#endif

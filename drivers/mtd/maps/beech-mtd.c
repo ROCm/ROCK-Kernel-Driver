@@ -1,5 +1,5 @@
 /*
- * $Id: beech-mtd.c,v 1.7 2003/05/21 12:45:18 dwmw2 Exp $
+ * $Id: beech-mtd.c,v 1.8 2004/07/12 21:59:43 dwmw2 Exp $
  * 
  * drivers/mtd/maps/beech-mtd.c MTD mappings and partition tables for 
  *                              IBM 405LP Beech boards.
@@ -51,7 +51,7 @@
 static struct map_info beech_mtd_map = {
 	.name =		NAME,
 	.size =		SIZE,
-	.buswidth =	BUSWIDTH,
+	.bankwidth =	BUSWIDTH,
 	.phys =		PADDR
 };
 

@@ -22,18 +22,14 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- *  $Id: l2cap.h,v 1.1.1.1 2002/03/08 21:03:15 maxk Exp $
- */
-
 #ifndef __L2CAP_H
 #define __L2CAP_H
 
 /* L2CAP defaults */
-#define L2CAP_DEFAULT_MTU 	672
+#define L2CAP_DEFAULT_MTU	672
 #define L2CAP_DEFAULT_FLUSH_TO	0xFFFF
 
-#define L2CAP_CONN_TIMEOUT 	(HZ * 40)
+#define L2CAP_CONN_TIMEOUT	(HZ * 40)
 
 /* L2CAP socket address */
 struct sockaddr_l2 {
@@ -180,6 +176,14 @@ struct l2cap_info_rsp {
 	__u8        data[0];
 } __attribute__ ((packed));
 
+/* info type */
+#define L2CAP_IT_CL_MTU     0x0001
+#define L2CAP_IT_FEAT_MASK  0x0002
+
+/* info result */
+#define L2CAP_IR_SUCCESS    0x0000
+#define L2CAP_IR_NOTSUPP    0x0001
+
 /* ----- L2CAP connections ----- */
 struct l2cap_chan_list {
 	struct sock	*head;
@@ -190,10 +194,10 @@ struct l2cap_chan_list {
 struct l2cap_conn {
 	struct hci_conn	*hcon;
 
-	bdaddr_t 	*dst;
-	bdaddr_t 	*src;
+	bdaddr_t	*dst;
+	bdaddr_t	*src;
 	
-	unsigned int    mtu;
+	unsigned int	mtu;
 
 	spinlock_t	lock;
 	
@@ -227,9 +231,9 @@ struct l2cap_pinfo {
 
 	__u16		sport;
 
-	struct l2cap_conn 	*conn;
-	struct sock 		*next_c;
-	struct sock 		*prev_c;
+	struct l2cap_conn	*conn;
+	struct sock		*next_c;
+	struct sock		*prev_c;
 };
 
 #define L2CAP_CONF_REQ_SENT    0x01

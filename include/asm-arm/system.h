@@ -42,6 +42,28 @@
 #define CR_XP	(1 << 23)	/* Extended page tables			*/
 #define CR_VE	(1 << 24)	/* Vectored interrupts			*/
 
+#define CPUID_ID	0
+#define CPUID_CACHETYPE	1
+#define CPUID_TCM	2
+#define CPUID_TLBTYPE	3
+
+#define read_cpuid(reg)							\
+	({								\
+		unsigned int __val;					\
+		asm("mrc%? p15, 0, %0, c0, c0, " __stringify(reg)	\
+		    : "=r" (__val));					\
+		__val;							\
+	})
+
+/*
+ * This is used to ensure the compiler did actually allocate the register we
+ * asked it for some inline assembly sequences.  Apparently we can't trust
+ * the compiler from one version to another so a bit of paranoia won't hurt.
+ * This string is meant to be concatenated with the inline asm string and
+ * will cause compilation to stop on mismatch.
+ */
+#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+
 #ifndef __ASSEMBLY__
 
 #include <linux/kernel.h>
@@ -115,22 +137,48 @@ extern unsigned int user_debug;
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
 
-#define prepare_to_switch()    do { } while(0)
+#ifdef CONFIG_SMP
+/*
+ * Define our own context switch locking.  This allows us to enable
+ * interrupts over the context switch, otherwise we end up with high
+ * interrupt latency.  The real problem area is switch_mm() which may
+ * do a full cache flush.
+ */
+#define prepare_arch_switch(rq,next)					\
+do {									\
+	spin_lock(&(next)->switch_lock);				\
+	spin_unlock_irq(&(rq)->lock);					\
+} while (0)
+
+#define finish_arch_switch(rq,prev)					\
+	spin_unlock(&(prev)->switch_lock)
+
+#define task_running(rq,p)						\
+	((rq)->curr == (p) || spin_is_locked(&(p)->switch_lock))
+#else
+/*
+ * Our UP-case is more simple, but we assume knowledge of how
+ * spin_unlock_irq() and friends are implemented.  This avoids
+ * us needlessly decrementing and incrementing the preempt count.
+ */
+#define prepare_arch_switch(rq,next)	local_irq_enable()
+#define finish_arch_switch(rq,prev)	spin_unlock(&(rq)->lock)
+#define task_running(rq,p)		((rq)->curr == (p))
+#endif
 
 /*
  * switch_to(prev, next) should switch from task `prev' to `next'
- * `prev' will never be the same as `next'.
- * The `mb' is to tell GCC not to cache `current' across this call.
+ * `prev' will never be the same as `next'.  schedule() itself
+ * contains the memory barrier to tell GCC not to cache `current'.
  */
 struct thread_info;
 struct task_struct;
 extern struct task_struct *__switch_to(struct task_struct *, struct thread_info *, struct thread_info *);
 
-#define switch_to(prev,next,last)						\
-	do {									\
-		last = __switch_to(prev,prev->thread_info,next->thread_info);	\
-		mb();								\
-	} while (0)
+#define switch_to(prev,next,last)					\
+do {									\
+	last = __switch_to(prev,prev->thread_info,next->thread_info);	\
+} while (0)
 
 /*
  * CPU interrupt mask handling.

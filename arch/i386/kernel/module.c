@@ -32,7 +32,7 @@ void *module_alloc(unsigned long size)
 {
 	if (size == 0)
 		return NULL;
-	return vmalloc(size);
+	return vmalloc_exec(size);
 }
 
 

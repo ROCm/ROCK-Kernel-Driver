@@ -189,3 +189,5 @@ Code	Seq#	Include File		Comments
 					<mailto:michael.klein@puffin.lb.shuttle.de>
 0xDD	00-3F	ZFCP device driver	see drivers/s390/scsi/
 					<mailto:aherrman@de.ibm.com>
+0xF3	00-3F	video/sisfb.h		sisfb (in development)
+					<mailto:thomas@winischhofer.net>

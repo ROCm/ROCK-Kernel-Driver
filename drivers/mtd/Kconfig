@@ -1,4 +1,4 @@
-# $Id: Kconfig,v 1.3 2003/05/28 11:02:23 dwmw2 Exp $
+# $Id: Kconfig,v 1.5 2004/06/04 15:59:32 gleixner Exp $
 
 menu "Memory Technology Devices (MTD)"
 
@@ -68,9 +68,23 @@ config MTD_REDBOOT_PARTS
 	  SA1100 map driver (CONFIG_MTD_SA1100) has an option for this, for 
 	  example.
 
+config MTD_REDBOOT_PARTS_UNALLOCATED
+	bool "  Include unallocated flash regions"
+	depends on MTD_REDBOOT_PARTS
+	help
+	  If you need to register each unallocated flash region as a MTD
+	  'partition', enable this option.
+
+config MTD_REDBOOT_PARTS_READONLY
+	bool "  Force read-only for RedBoot system images"
+	depends on MTD_REDBOOT_PARTS
+	help
+	  If you need to force read-only for 'RedBoot', 'RedBoot Config' and
+	  'FIS directory' images, enable this option.
+
 config MTD_CMDLINE_PARTS
-	tristate "Command line partition table parsing"
-	depends on MTD_PARTITIONS
+	bool "Command line partition table parsing"
+	depends on MTD_PARTITIONS = "y"
 	---help---
 	  Allow generic configuration of the MTD paritition tables via the kernel
 	  command line. Multiple flash resources are supported for hardware where

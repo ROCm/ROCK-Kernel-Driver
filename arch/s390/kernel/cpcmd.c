@@ -13,8 +13,6 @@
 #include <linux/spinlock.h>
 #include <asm/cpcmd.h>
 #include <asm/system.h>
-#include <linux/slab.h>
-#include <asm/errno.h>
 
 static spinlock_t cpcmd_lock = SPIN_LOCK_UNLOCKED;
 static char cpcmd_buf[128];
@@ -79,57 +77,3 @@ void cpcmd(char *cmd, char *response, int rlen)
 	spin_unlock_irqrestore(&cpcmd_lock, flags);
 }
 
-/* improved cpcmd for cpint module */
-int cpint_cpcmd(CPCmd_Dev *devExt)
-{
-    const int mask = 0x60000000L;
-    int rspSize = -EOPNOTSUPP;
-    int cc = -1;
-
-    if (!MACHINE_IS_VM)
-	goto out;
-
-    while (cc != 0)
-    {
-        asm volatile("LRA   2,0(%3)\t/* Get cmd address */\n\t"
-		      "LR    4,%4\t/* Get length of command */\n\t"
-		      "O     4,%7\t/* Set flags */\n\t"
-		      "LRA   3,0(%5)\t/* Get response address */\n\t"
-		      "LR    5,%6\t/* Get response length */\n\t"
-		      "AHI   5,-1\t/* Leave room for eol */\n\t"
-#ifdef __s390x__
-		      "SAM31\t\t/* Get into 31 bit mode */\n\t"
-#endif
-		      ".long 0x83240008\t/* Issue command */\n\t"
-#ifdef __s390x__
-		      "SAM64\t\t/* Return to 64 bit mode */\n\t"
-#endif
-		      "IPM   %1\t\t/* Get CC */\n\t"
-		      "SRL   %1,28\t/* Shuffle down */\n\t"
-#ifdef __s390x__
-		      "LGFR  %0,4\t/* Keep return code */\n\t"
-#else
-		      "LR    %0,4\t/* Keep return code */\n\t"
-#endif
-		      "LR    %2,5\t/* Get response length */\n\t"
-		      : "=d" (devExt->rc), "=d" (cc), "=d" (rspSize)
-		      : "a" (devExt->cmd), "d" (devExt->count),
-		        "a" (devExt->data), "d" (devExt->size),
-		        "m" (mask)
-		      : "cc", "2", "3", "4", "5");
-	if (cc != 0) {
-	    if (rspSize <= 65536) {
-		devExt->size += rspSize + 1;
-		devExt->data = kmalloc(devExt->size, GFP_DMA);
-		if (devExt->data) {
-		    memset(devExt->data, 0, devExt->size);
-		    continue;
-		}
-	    }
-	    return -ENOMEM;
-	}
-    }
-    devExt->size = rspSize;
-out:
-    return rspSize;
-}

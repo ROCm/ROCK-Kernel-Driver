@@ -5,16 +5,19 @@ Thanks to John Levon, Dave Hansen, et al. for help writing this.
 
 <test> is the thing you're trying to measure.
 Make sure you have the correct System.map / vmlinux referenced!
-IMHO it's easier to use "make install" for linux and hack /sbin/installkernel
-to copy config files, system.map, vmlinux to /boot.
+
+It is probably easiest to use "make install" for linux and hack
+/sbin/installkernel to copy vmlinux to /boot, in addition to vmlinuz,
+config, System.map, which are usually installed by default.
 
 Readprofile
 -----------
-You need a fixed readprofile command for 2.5 ... either get hold of
-a current version from:
+A recent readprofile command is needed for 2.6, such as found in util-linux
+2.12a, which can be downloaded from:
+
 http://www.kernel.org/pub/linux/utils/util-linux/
-or get readprofile binary fixed for 2.5 / akpm's 2.5 patch from 
-ftp://ftp.kernel.org/pub/linux/kernel/people/mbligh/tools/readprofile/
+
+Most distributions will ship it already.
 
 Add "profile=2" to the kernel command line.
 
@@ -24,25 +27,26 @@ dump output	readprofile -m /boot/System.map > captured_profile
 
 Oprofile
 --------
-get source (I use 0.5) from http://oprofile.sourceforge.net/
-add "idle=poll" to the kernel command line 
+Get the source (I use 0.8) from http://oprofile.sourceforge.net/
+and add "idle=poll" to the kernel command line
 Configure with CONFIG_PROFILING=y and CONFIG_OPROFILE=y & reboot on new kernel
 ./configure --with-kernel-support
 make install
 
-One time setup (pick appropriate one for your CPU):
-P3		opcontrol --setup --vmlinux=/boot/vmlinux \
-		--ctr0-event=CPU_CLK_UNHALTED --ctr0-count=100000
-Athlon/x86-64	opcontrol --setup --vmlinux=/boot/vmlinux \
-		--ctr0-event=RETIRED_INSNS --ctr0-count=100000
-P4		opcontrol --setup --vmlinux=/boot/vmlinux \
-		--ctr0-event=GLOBAL_POWER_EVENTS \
-		--ctr0-unit-mask=1 --ctr0-count=100000
+For superior results, be sure to enable the local APIC. If opreport sees
+a 0Hz CPU, APIC was not on. Be aware that idle=poll may mean a performance
+penalty.
 
-start daemon	opcontrol --start-daemon
+One time setup:
+		opcontrol --setup --vmlinux=/boot/vmlinux
+
 clear		opcontrol --reset
 start		opcontrol --start
 		<test>
 stop		opcontrol --stop
-dump output	oprofpp -dl -i /boot/vmlinux  >  output_file
+dump output	opreport >  output_file
+
+To only report on the kernel, run opreport /boot/vmlinux > output_file
+
+A reset is needed to clear old statistics, which survive a reboot.
 

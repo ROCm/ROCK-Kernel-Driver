@@ -1,1 +1,0 @@
-#define LUSTRE_KERNEL_VERSION 36

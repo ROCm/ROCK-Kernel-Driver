@@ -448,6 +448,10 @@ static int hgafb_blank(int blank_mode, struct fb_info *info)
 	return 0;
 }
 
+/*
+ * Accel functions
+ */
+#ifdef CONFIG_FB_HGA_ACCEL
 static void hgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	u_int rows, y;
@@ -510,6 +514,11 @@ static void hgafb_imageblit(struct fb_info *info, const struct fb_image *image)
 		*dest = d;
 	}
 }
+#else /* !CONFIG_FB_HGA_ACCEL */
+#define hgafb_fillrect cfb_fillrect
+#define hgafb_copyarea cfb_copyarea
+#define hgafb_imageblit cfb_imageblit
+#endif /* CONFIG_FB_HGA_ACCEL */
 
 
 static struct fb_ops hgafb_ops = {
@@ -519,9 +528,9 @@ static struct fb_ops hgafb_ops = {
 	.fb_setcolreg	= hgafb_setcolreg,
 	.fb_pan_display	= hgafb_pan_display,
 	.fb_blank	= hgafb_blank,
-	.fb_fillrect	= cfb_fillrect, //hgafb_fillrect,
-	.fb_copyarea	= cfb_copyarea,	//hgafb_copyarea,
-	.fb_imageblit	= cfb_imageblit,//hgafb_imageblit,
+	.fb_fillrect	= hgafb_fillrect,
+	.fb_copyarea	= hgafb_copyarea,
+	.fb_imageblit	= hgafb_imageblit,
 };
 		
 /* ------------------------------------------------------------------------- *

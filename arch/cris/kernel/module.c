@@ -75,8 +75,6 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 		sym = (Elf32_Sym *)sechdrs[symindex].sh_addr
 			+ ELF32_R_SYM(rel[i].r_info);
 
-                /* TODO: This is probably not correct */
-                printk("Beware: untested code in module.c!\n");
                 /* We add the value into the location given */
                 *location += sym->st_value;
 	}
@@ -89,9 +87,26 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 		       unsigned int relsec,
 		       struct module *me)
 {
-	printk(KERN_ERR "module %s: ADD RELOCATION unsupported\n",
-	       me->name);
-	return -ENOEXEC;
+  	unsigned int i;
+	Elf32_Rela *rela = (void *)sechdrs[relsec].sh_addr;
+
+	DEBUGP ("Applying relocate section %u to %u\n", relsec,
+		sechdrs[relsec].sh_info);
+
+	for (i = 0; i < sechdrs[relsec].sh_size / sizeof (*rela); i++) {
+		/* This is where to make the change */
+		uint32_t *loc
+			= ((void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
+			   + rela[i].r_offset);
+		/* This is the symbol it is referring to.  Note that all
+		   undefined symbols have been resolved.  */
+		Elf32_Sym *sym
+			= ((Elf32_Sym *)sechdrs[symindex].sh_addr
+			   + ELF32_R_SYM (rela[i].r_info));
+		*loc = sym->st_value + rela[i].r_addend;
+	}
+
+	return 0;
 }
 
 int module_finalize(const Elf_Ehdr *hdr,

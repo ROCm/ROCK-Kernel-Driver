@@ -63,18 +63,4 @@ extern int cifsERROR;
 #define cifserror(format,arg...)
 #endif		/* _CIFS_DEBUG */
 
-/*
- *	statistics
- *	----------
- */
-#ifdef	_CIFS_STATISTICS
-#define	INCREMENT(x)	((x)++)
-#define	DECREMENT(x)	((x)--)
-#define	HIGHWATERMARK(x,y)	x = MAX((x), (y))
-#else
-#define	INCREMENT(x)
-#define	DECREMENT(x)
-#define	HIGHWATERMARK(x,y)
-#endif				/* _CIFS_STATISTICS */
-
 #endif				/* _H_CIFS_DEBUG */

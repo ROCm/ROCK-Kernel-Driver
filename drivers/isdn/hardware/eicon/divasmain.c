@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.54 2004/04/02 18:59:22 armin Exp $
+/* $Id: divasmain.c,v 1.55.4.1 2004/05/21 12:15:00 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -41,7 +41,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.54 $";
+static char *main_revision = "$Revision: 1.55.4.1 $";
 
 static int major;
 
@@ -70,9 +70,7 @@ extern void divasfunc_exit(void);
 
 typedef struct _diva_os_thread_dpc {
 	struct tasklet_struct divas_task;
-	struct work_struct trap_script_task;
 	diva_os_soft_isr_t *psoft_isr;
-	int card_failed;
 } diva_os_thread_dpc_t;
 
 /* --------------------------------------------------------------------------
@@ -159,7 +157,7 @@ MODULE_DEVICE_TABLE(pci, divas_pci_tbl);
 
 static int divas_init_one(struct pci_dev *pdev,
 			  const struct pci_device_id *ent);
-static void divas_remove_one(struct pci_dev *pdev);
+static void __devexit divas_remove_one(struct pci_dev *pdev);
 
 static struct pci_driver diva_pci_driver = {
 	.name     = "divas",
@@ -203,54 +201,6 @@ void divas_get_version(char *p)
 	strcpy(tmprev, main_revision);
 	sprintf(p, "%s: %s(%s) %s(%s) major=%d\n", DRIVERLNAME, DRIVERRELEASE_DIVAS,
 		getrev(tmprev), diva_xdi_common_code_build, DIVA_BUILD, major);
-}
-
-/* --------------------------------------------------------------------------
-    Nonify user mode helper about card failure
-   -------------------------------------------------------------------------- */
-#define TRAP_PROG  "/usr/sbin/divas_trap.rc"
-
-static void diva_adapter_trapped(void *context)
-{
-	diva_os_thread_dpc_t *pdpc = (diva_os_thread_dpc_t *) context;
-
-	if (pdpc && pdpc->card_failed) {
-		char *envp[] = { "HOME=/",
-			"TERM=linux",
-			"PATH=/usr/sbin:/sbin:/bin:/usr/bin", 0
-		};
-		char *argv[] = { TRAP_PROG, "trap", 0, 0 };
-		char adapter[8];
-		int ret;
-
-		sprintf(adapter, "%d", pdpc->card_failed - 1);
-		pdpc->card_failed = 0;
-		argv[2] = &adapter[0];
-
-		ret = call_usermodehelper(argv[0], argv, envp, 0);
-
-		if (ret) {
-			printk(KERN_ERR
-			       "%s: couldn't start trap script, errno %d\n",
-			       DRIVERLNAME, ret);
-		}
-	}
-}
-
-/*
- * run the trap script
- */
-void diva_run_trap_script(PISDN_ADAPTER IoAdapter, dword ANum)
-{
-	diva_os_soft_isr_t *psoft_isr = &IoAdapter->isr_soft_isr;
-	diva_os_thread_dpc_t *context =
-	    (diva_os_thread_dpc_t *) psoft_isr->object;
-
-	if (context && !context->card_failed) {
-		printk(KERN_ERR "%s: adapter %d trapped !\n", DRIVERLNAME, ANum + 1);
-		context->card_failed = ANum + 1;
-		schedule_work(&context->trap_script_task);
-	}
 }
 
 /* --------------------------------------------------------------------------
@@ -574,7 +524,6 @@ int diva_os_initialize_soft_isr(diva_os_soft_isr_t * psoft_isr,
 	psoft_isr->callback = callback;
 	psoft_isr->callback_context = callback_context;
 	pdpc->psoft_isr = psoft_isr;
-	INIT_WORK(&pdpc->trap_script_task, diva_adapter_trapped, pdpc);
 	tasklet_init(&pdpc->divas_task, diva_os_dpc_proc, (unsigned long)pdpc);
 
 	return (0);
@@ -607,7 +556,7 @@ void diva_os_remove_soft_isr(diva_os_soft_isr_t * psoft_isr)
 		tasklet_kill(&pdpc->divas_task);
 		flush_scheduled_work();
 		mem = psoft_isr->object;
-		psoft_isr->object = 0;
+		psoft_isr->object = NULL;
 		diva_os_free(0, mem);
 	}
 }
@@ -616,7 +565,7 @@ void diva_os_remove_soft_isr(diva_os_soft_isr_t * psoft_isr)
  * kernel/user space copy functions
  */
 static int
-xdi_copy_to_user(void *os_handle, void *dst, const void *src, int length)
+xdi_copy_to_user(void *os_handle, void __user *dst, const void *src, int length)
 {
 	if (copy_to_user(dst, src, length)) {
 		return (-EFAULT);
@@ -625,7 +574,7 @@ xdi_copy_to_user(void *os_handle, void *dst, const void *src, int length)
 }
 
 static int
-xdi_copy_from_user(void *os_handle, void *dst, const void *src, int length)
+xdi_copy_from_user(void *os_handle, void *dst, const void __user *src, int length)
 {
 	if (copy_from_user(dst, src, length)) {
 		return (-EFAULT);
@@ -649,7 +598,7 @@ static int divas_release(struct inode *inode, struct file *file)
 	return (0);
 }
 
-static ssize_t divas_write(struct file *file, const char *buf,
+static ssize_t divas_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t * ppos)
 {
 	int ret = -EINVAL;
@@ -680,7 +629,7 @@ static ssize_t divas_write(struct file *file, const char *buf,
 	return (ret);
 }
 
-static ssize_t divas_read(struct file *file, char *buf,
+static ssize_t divas_read(struct file *file, char __user *buf,
 			  size_t count, loff_t * ppos)
 {
 	int ret = -EINVAL;
@@ -754,7 +703,7 @@ static int DIVA_INIT_FUNCTION divas_register_chrdev(void)
 static int __devinit divas_init_one(struct pci_dev *pdev,
 				    const struct pci_device_id *ent)
 {
-	void *pdiva = 0;
+	void *pdiva = NULL;
 	u8 pci_latency;
 	u8 new_latency = 32;
 

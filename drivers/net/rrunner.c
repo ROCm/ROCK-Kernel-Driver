@@ -197,7 +197,8 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 	 * Don't access any register before this point!
 	 */
 #ifdef __BIG_ENDIAN
-	writel(readl(&regs->HostCtrl) | NO_SWAP, &regs->HostCtrl);
+	writel(readl(&rrpriv->regs->HostCtrl) | NO_SWAP,
+		&rrpriv->regs->HostCtrl);
 #endif
 	/*
 	 * Need to add a case for little-endian 64-bit hosts here.
@@ -633,7 +634,7 @@ static int rr_init1(struct net_device *dev)
 	for (i = 0; i < TX_RING_ENTRIES; i++) {
 		rrpriv->tx_ring[i].size = 0;
 		set_rraddr(&rrpriv->tx_ring[i].addr, 0);
-		rrpriv->tx_skbuff[i] = 0;
+		rrpriv->tx_skbuff[i] = NULL;
 	}
 	rrpriv->info->tx_ctrl.entry_size = sizeof(struct tx_desc);
 	rrpriv->info->tx_ctrl.entries = TX_RING_ENTRIES;
@@ -743,7 +744,7 @@ static int rr_init1(struct net_device *dev)
 			rrpriv->rx_ring[i].size = 0;
 			set_rraddr(&rrpriv->rx_ring[i].addr, 0);
 			dev_kfree_skb(skb);
-			rrpriv->rx_skbuff[i] = 0;
+			rrpriv->rx_skbuff[i] = NULL;
 		}
 	}
 	return ecode;
@@ -1335,10 +1336,10 @@ static void rr_dump(struct net_device *dev)
 	if (rrpriv->tx_skbuff[cons]){
 		len = min_t(int, 0x80, rrpriv->tx_skbuff[cons]->len);
 		printk("skbuff for cons %i is valid - dumping data (0x%x bytes - skbuff len 0x%x)\n", cons, len, rrpriv->tx_skbuff[cons]->len);
-		printk("mode 0x%x, size 0x%x,\n phys %08x, skbuff-addr %08lx, truesize 0x%x\n",
+		printk("mode 0x%x, size 0x%x,\n phys %08Lx, skbuff-addr %08lx, truesize 0x%x\n",
 		       rrpriv->tx_ring[cons].mode,
 		       rrpriv->tx_ring[cons].size,
-		       rrpriv->tx_ring[cons].addr.addrlo,
+		       (unsigned long long) rrpriv->tx_ring[cons].addr.addrlo,
 		       (unsigned long)rrpriv->tx_skbuff[cons]->data,
 		       (unsigned int)rrpriv->tx_skbuff[cons]->truesize);
 		for (i = 0; i < len; i++){
@@ -1351,10 +1352,10 @@ static void rr_dump(struct net_device *dev)
 
 	printk("dumping TX ring info:\n");
 	for (i = 0; i < TX_RING_ENTRIES; i++)
-		printk("mode 0x%x, size 0x%x, phys-addr %08x\n",
+		printk("mode 0x%x, size 0x%x, phys-addr %08Lx\n",
 		       rrpriv->tx_ring[i].mode,
 		       rrpriv->tx_ring[i].size,
-		       rrpriv->tx_ring[i].addr.addrlo);
+		       (unsigned long long) rrpriv->tx_ring[i].addr.addrlo);
 
 }
 
@@ -1715,7 +1716,7 @@ static int rr_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return error;
 		
 	case SIOCRRID:
-		return put_user(0x52523032, (int *)(&rq->ifr_data[0]));
+		return put_user(0x52523032, (int __user *)rq->ifr_data);
 	default:
 		return error;
 	}

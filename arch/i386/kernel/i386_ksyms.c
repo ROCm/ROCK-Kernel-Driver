@@ -16,7 +16,6 @@
 #include <linux/tty.h>
 #include <linux/highmem.h>
 #include <linux/time.h>
-#include <linux/nmi.h>
 
 #include <asm/semaphore.h>
 #include <asm/processor.h>
@@ -30,11 +29,9 @@
 #include <asm/mmx.h>
 #include <asm/desc.h>
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/nmi.h>
 #include <asm/ist.h>
-#include <asm/e820.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;
@@ -175,23 +172,14 @@ EXPORT_SYMBOL(rtc_lock);
 
 EXPORT_SYMBOL_GPL(set_nmi_callback);
 EXPORT_SYMBOL_GPL(unset_nmi_callback);
- 
-#undef memcpy
-#undef memset
+
 #undef memcmp
-extern void * memset(void *,int,__kernel_size_t);
-extern void * memcpy(void *,const void *,__kernel_size_t);
 extern int memcmp(const void *,const void *,__kernel_size_t);
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL_NOVERS(memcmp);
 
 #ifdef CONFIG_HAVE_DEC_LOCK
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #endif
-
-extern int is_sony_vaio_laptop;
-EXPORT_SYMBOL(is_sony_vaio_laptop);
 
 EXPORT_SYMBOL(__PAGE_KERNEL);
 
@@ -208,24 +196,3 @@ EXPORT_SYMBOL(ist_info);
 #endif
 
 EXPORT_SYMBOL(csum_partial);
-
-#ifdef CONFIG_X86_GENERICARCH
-EXPORT_SYMBOL(genapic);
-#endif
-
-#ifdef CONFIG_CRASH_DUMP_MODULE
-#ifdef CONFIG_SMP
-extern irq_desc_t irq_desc[NR_IRQS];
-extern unsigned long irq_affinity[NR_IRQS];
-extern void stop_this_cpu(void *);
-EXPORT_SYMBOL(irq_desc);
-EXPORT_SYMBOL(irq_affinity);
-EXPORT_SYMBOL(stop_this_cpu);
-EXPORT_SYMBOL(dump_send_ipi);
-#endif
-extern int pfn_is_ram(unsigned long);
-EXPORT_SYMBOL(pfn_is_ram);
-#ifdef ARCH_HAS_NMI_WATCHDOG
-EXPORT_SYMBOL(touch_nmi_watchdog);
-#endif
-#endif

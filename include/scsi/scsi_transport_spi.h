@@ -35,7 +35,9 @@ struct spi_transport_attrs {
 	unsigned int rd_strm:1;	/* Read streaming enabled */
 	unsigned int rti:1;	/* Retain Training Information */
 	unsigned int pcomp_en:1;/* Precompensation enabled */
+	/* Private Fields */
 	unsigned int dv_pending:1; /* Internal flag */
+	struct semaphore dv_sem; /* semaphore to serialise dv */
 };
 
 /* accessor functions */

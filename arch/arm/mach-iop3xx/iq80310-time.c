@@ -21,7 +21,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/mach-types.h>
 #include <asm/mach/irq.h>
 
 static void iq80310_write_timer (u_long val)

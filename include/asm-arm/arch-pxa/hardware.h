@@ -13,18 +13,6 @@
 #ifndef __ASM_ARCH_HARDWARE_H
 #define __ASM_ARCH_HARDWARE_H
 
-#include <asm/mach-types.h>
-
-
-/*
- * These are statically mapped PCMCIA IO space for designs using it as a
- * generic IO bus, typically with ISA parts, hardwired IDE interfaces, etc.
- * The actual PCMCIA code is mapping required IO region at run time.
- */
-#define PCMCIA_IO_0_BASE	0xf6000000
-#define PCMCIA_IO_1_BASE	0xf7000000
-
-
 /*
  * We requires absolute addresses.
  */
@@ -38,15 +26,21 @@
 #define UNCACHED_ADDR		UNCACHED_PHYS_0
 
 /*
- * Intel PXA internal I/O mappings:
+ * Intel PXA2xx internal register mapping:
  *
- * 0x40000000 - 0x41ffffff <--> 0xf8000000 - 0xf9ffffff
- * 0x44000000 - 0x45ffffff <--> 0xfa000000 - 0xfbffffff
- * 0x48000000 - 0x49ffffff <--> 0xfc000000 - 0xfdffffff
+ * 0x40000000 - 0x41ffffff <--> 0xf2000000 - 0xf3ffffff
+ * 0x44000000 - 0x45ffffff <--> 0xf4000000 - 0xf5ffffff
+ * 0x48000000 - 0x49ffffff <--> 0xf6000000 - 0xf7ffffff
+ * 0x4c000000 - 0x4dffffff <--> 0xf8000000 - 0xf9ffffff
+ * 0x50000000 - 0x51ffffff <--> 0xfa000000 - 0xfbffffff
+ * 0x54000000 - 0x55ffffff <--> 0xfc000000 - 0xfdffffff
+ * 0x58000000 - 0x59ffffff <--> 0xfe000000 - 0xffffffff
+ *
+ * Note that not all PXA2xx chips implement all those addresses, and the
+ * kernel only maps the minimum needed range of this mapping.
  */
-
-#define io_p2v(x)	( ((x) | 0xbe000000) ^ (~((x) >> 1) & 0x06000000) )
-#define io_v2p( x )	( ((x) & 0x41ffffff) ^ ( ((x) & 0x06000000) << 1) )
+#define io_p2v(x) (0xf2000000 + ((x) & 0x01ffffff) + (((x) & 0x1c000000) >> 1))
+#define io_v2p(x) (0x3c000000 + ((x) & 0x01ffffff) + (((x) & 0x0e000000) << 1))
 
 #ifndef __ASSEMBLY__
 
@@ -89,18 +83,16 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 extern void pxa_gpio_mode( int gpio_mode );
 
 /*
- * return current lclk frequency in units of 10kHz
+ * Routine to enable or disable CKEN
  */
-extern unsigned int get_lclk_frequency_10khz(void);
-
-#endif
-
+extern void pxa_set_cken(int clock, int enable);
 
 /*
- * Implementation specifics
+ * return current memory and LCD clock frequency in units of 10kHz
  */
+extern unsigned int get_memclk_frequency_10khz(void);
+extern unsigned int get_lcdclk_frequency_10khz(void);
 
-#include "lubbock.h"
-#include "idp.h"
+#endif
 
 #endif  /* _ASM_ARCH_HARDWARE_H */

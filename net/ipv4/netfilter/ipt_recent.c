@@ -175,7 +175,7 @@ static int ip_recent_get_info(char *buffer, char **start, off_t offset, int leng
  * clear         -- Flush table, remove all entries
  */
 
-static int ip_recent_ctrl(struct file *file, const char *input, unsigned long size, void *data)
+static int ip_recent_ctrl(struct file *file, const char __user *input, unsigned long size, void *data)
 {
 	static const u_int32_t max[4] = { 0xffffffff, 0xffffff, 0xffff, 0xff };
 	u_int32_t val;

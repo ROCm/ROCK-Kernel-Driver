@@ -82,7 +82,7 @@ static int sib(int mod, unsigned long *fpu_eip)
 
   RE_ENTRANT_CHECK_OFF;
   FPU_code_verify_area(1);
-  FPU_get_user(base, (u_char *) (*fpu_eip));   /* The SIB byte */
+  FPU_get_user(base, (u_char __user *) (*fpu_eip));   /* The SIB byte */
   RE_ENTRANT_CHECK_ON;
   (*fpu_eip)++;
   ss = base >> 6;
@@ -112,7 +112,7 @@ static int sib(int mod, unsigned long *fpu_eip)
       long displacement;
       RE_ENTRANT_CHECK_OFF;
       FPU_code_verify_area(1);
-      FPU_get_user(displacement, (signed char *) (*fpu_eip));
+      FPU_get_user(displacement, (signed char __user *) (*fpu_eip));
       offset += displacement;
       RE_ENTRANT_CHECK_ON;
       (*fpu_eip)++;
@@ -123,7 +123,7 @@ static int sib(int mod, unsigned long *fpu_eip)
       long displacement;
       RE_ENTRANT_CHECK_OFF;
       FPU_code_verify_area(4);
-      FPU_get_user(displacement, (long *) (*fpu_eip));
+      FPU_get_user(displacement, (long __user *) (*fpu_eip));
       offset += displacement;
       RE_ENTRANT_CHECK_ON;
       (*fpu_eip) += 4;
@@ -241,7 +241,7 @@ static long pm_address(u_char FPU_modrm, u_char segment,
 
 */
 
-void *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
+void __user *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
 		  struct address *addr,
 		  fpu_addr_modes addr_modes)
 {
@@ -277,24 +277,24 @@ void *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
 	      /* Special case: disp32 */
 	      RE_ENTRANT_CHECK_OFF;
 	      FPU_code_verify_area(4);
-	      FPU_get_user(address, (unsigned long *) (*fpu_eip));
+	      FPU_get_user(address, (unsigned long __user *) (*fpu_eip));
 	      (*fpu_eip) += 4;
 	      RE_ENTRANT_CHECK_ON;
 	      addr->offset = address;
-	      return (void *) address;
+	      return (void __user *) address;
 	    }
 	  else
 	    {
 	      address = *cpu_reg_ptr;  /* Just return the contents
 					  of the cpu register */
 	      addr->offset = address;
-	      return (void *) address;
+	      return (void __user *) address;
 	    }
 	case 1:
 	  /* 8 bit signed displacement */
 	  RE_ENTRANT_CHECK_OFF;
 	  FPU_code_verify_area(1);
-	  FPU_get_user(address, (signed char *) (*fpu_eip));
+	  FPU_get_user(address, (signed char __user *) (*fpu_eip));
 	  RE_ENTRANT_CHECK_ON;
 	  (*fpu_eip)++;
 	  break;
@@ -302,7 +302,7 @@ void *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
 	  /* 32 bit displacement */
 	  RE_ENTRANT_CHECK_OFF;
 	  FPU_code_verify_area(4);
-	  FPU_get_user(address, (long *) (*fpu_eip));
+	  FPU_get_user(address, (long __user *) (*fpu_eip));
 	  (*fpu_eip) += 4;
 	  RE_ENTRANT_CHECK_ON;
 	  break;
@@ -331,11 +331,11 @@ void *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
       EXCEPTION(EX_INTERNAL|0x133);
     }
 
-  return (void *)address;
+  return (void __user *)address;
 }
 
 
-void *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
+void __user *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
 		     struct address *addr,
 		     fpu_addr_modes addr_modes)
 {
@@ -363,7 +363,7 @@ void *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
 	  /* Special case: disp16 */
 	  RE_ENTRANT_CHECK_OFF;
 	  FPU_code_verify_area(2);
-	  FPU_get_user(address, (unsigned short *) (*fpu_eip));
+	  FPU_get_user(address, (unsigned short __user *) (*fpu_eip));
 	  (*fpu_eip) += 2;
 	  RE_ENTRANT_CHECK_ON;
 	  goto add_segment;
@@ -373,7 +373,7 @@ void *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
       /* 8 bit signed displacement */
       RE_ENTRANT_CHECK_OFF;
       FPU_code_verify_area(1);
-      FPU_get_user(address, (signed char *) (*fpu_eip));
+      FPU_get_user(address, (signed char __user *) (*fpu_eip));
       RE_ENTRANT_CHECK_ON;
       (*fpu_eip)++;
       break;
@@ -381,7 +381,7 @@ void *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
       /* 16 bit displacement */
       RE_ENTRANT_CHECK_OFF;
       FPU_code_verify_area(2);
-      FPU_get_user(address, (unsigned short *) (*fpu_eip));
+      FPU_get_user(address, (unsigned short __user *) (*fpu_eip));
       (*fpu_eip) += 2;
       RE_ENTRANT_CHECK_ON;
       break;
@@ -445,5 +445,5 @@ void *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
       EXCEPTION(EX_INTERNAL|0x131);
     }
 
-  return (void *)address ;
+  return (void __user *)address ;
 }

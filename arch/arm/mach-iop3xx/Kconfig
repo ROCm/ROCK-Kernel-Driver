@@ -1,10 +1,10 @@
+if ARCH_IOP3XX
 
 menu "IOP3xx Implementation Options"
 
 choice
 	prompt "IOP3xx System Type"
 	default ARCH_IQ80310
-	depends on ARCH_IOP3XX
 
 config ARCH_IQ80310
 	bool "IQ80310"
@@ -36,19 +36,20 @@ comment "IOP3xx Chipset Features"
 
 config IOP3XX_AAU
 	bool "Support Intel IOP3xx Application Accelerator Unit (EXPERIMENTAL)"
-	depends on ARCH_IOP3XX && EXPERIMENTAL
+	depends on EXPERIMENTAL
 
 config IOP3XX_DMA
 	bool "Support Intel IOP3xx DMA (EXPERIMENTAL)"
-	depends on ARCH_IOP3XX && EXPERIMENTAL
+	depends on EXPERIMENTAL
 
 config IOP3XX_MU
 	bool "Support Intel IOP3xx Messaging Unit (EXPERIMENTAL)"
-	depends on ARCH_IOP3XX && EXPERIMENTAL
+	depends on EXPERIMENTAL
 
 config IOP3XX_PMON
 	bool "Support Intel IOP3xx Performance Monitor (EXPERIMENTAL)"
-	depends on ARCH_IOP3XX && EXPERIMENTAL
+	depends on EXPERIMENTAL
 
 endmenu
 
+endif

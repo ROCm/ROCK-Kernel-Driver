@@ -144,14 +144,14 @@ static int pty_write(struct tty_struct * tty, int from_user,
 			buf   += n; 
 			c     += n;
 			count -= n;
-			to->ldisc.receive_buf(to, temp_buffer, 0, n);
+			to->ldisc.receive_buf(to, temp_buffer, NULL, n);
 		}
 		up(&tty->flip.pty_sem);
 	} else {
 		c = to->ldisc.receive_room(to);
 		if (c > count)
 			c = count;
-		to->ldisc.receive_buf(to, buf, 0, c);
+		to->ldisc.receive_buf(to, buf, NULL, c);
 	}
 	
 	return c;
@@ -211,7 +211,7 @@ static int pty_chars_in_buffer(struct tty_struct *tty)
  * one we got after it is open, with an ioctl.
  */
 #ifdef CONFIG_UNIX98_PTYS
-static int pty_get_device_number(struct tty_struct *tty, unsigned int *value)
+static int pty_get_device_number(struct tty_struct *tty, unsigned __user *value)
 {
 	unsigned int result = tty->index;
 	return put_user(result, value);
@@ -219,7 +219,7 @@ static int pty_get_device_number(struct tty_struct *tty, unsigned int *value)
 #endif
 
 /* Set the lock flag on a pty */
-static int pty_set_lock(struct tty_struct *tty, int * arg)
+static int pty_set_lock(struct tty_struct *tty, int __user * arg)
 {
 	int val;
 	if (get_user(val,arg))
@@ -241,7 +241,7 @@ static int pty_bsd_ioctl(struct tty_struct *tty, struct file *file,
 	}
 	switch(cmd) {
 	case TIOCSPTLCK: /* Set PT Lock (disallow slave open) */
-		return pty_set_lock(tty, (int *) arg);
+		return pty_set_lock(tty, (int __user *) arg);
 	}
 	return -ENOIOCTLCMD;
 }
@@ -257,9 +257,9 @@ static int pty_unix98_ioctl(struct tty_struct *tty, struct file *file,
 	}
 	switch(cmd) {
 	case TIOCSPTLCK: /* Set PT Lock (disallow slave open) */
-		return pty_set_lock(tty, (int *)arg);
+		return pty_set_lock(tty, (int __user *)arg);
 	case TIOCGPTN: /* Get PT Number */
-		return pty_get_device_number(tty, (unsigned int *)arg);
+		return pty_get_device_number(tty, (unsigned int __user *)arg);
 	}
 
 	return -ENOIOCTLCMD;

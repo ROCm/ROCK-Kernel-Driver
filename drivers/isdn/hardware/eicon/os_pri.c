@@ -283,7 +283,7 @@ static int diva_pri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 		    && a->resources.pci.addr[bar]) {
 			divasa_unmap_pci_bar(a->resources.pci.addr[bar]);
 			a->resources.pci.bar[bar] = 0;
-			a->resources.pci.addr[bar] = 0;
+			a->resources.pci.addr[bar] = NULL;
 		}
 	}
 
@@ -294,7 +294,7 @@ static int diva_pri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 	diva_os_cancel_soft_isr(&a->xdi_adapter.req_soft_isr);
 
 	diva_os_remove_soft_isr(&a->xdi_adapter.req_soft_isr);
-	a->xdi_adapter.isr_soft_isr.object = 0;
+	a->xdi_adapter.isr_soft_isr.object = NULL;
 
 	diva_os_destroy_spin_lock(&a->xdi_adapter.isr_spin_lock, "rm");
 	diva_os_destroy_spin_lock(&a->xdi_adapter.data_spin_lock, "rm");
@@ -304,7 +304,7 @@ static int diva_pri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 	 */
 	if (a->xdi_adapter.e_tbl) {
 		diva_os_free(0, a->xdi_adapter.e_tbl);
-		a->xdi_adapter.e_tbl = 0;
+		a->xdi_adapter.e_tbl = NULL;
 	}
 	a->xdi_adapter.Channels = 0;
 	a->xdi_adapter.e_max = 0;
@@ -316,7 +316,7 @@ static int diva_pri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 	diva_free_dma_map(a->resources.pci.hdev,
 			  (struct _diva_dma_map_entry *) a->xdi_adapter.
 			  dma_map);
-	a->xdi_adapter.dma_map = 0;
+	a->xdi_adapter.dma_map = NULL;
 
 
 	/*
@@ -576,7 +576,7 @@ static int diva_pri_stop_adapter(diva_os_xdi_adapter_t * a)
 
 	if (a->clear_interrupts_proc) {
 		diva_pri_clear_interrupts(a);
-		a->clear_interrupts_proc = 0;
+		a->clear_interrupts_proc = NULL;
 		DBG_ERR(("A: A(%d) no final interrupt from PRI adapter",
 			 IoAdapter->ANum))
 	}

@@ -11,6 +11,7 @@
 #include <linux/err.h>
 #include <linux/unistd.h>
 #include <linux/file.h>
+#include <linux/module.h>
 #include <asm/semaphore.h>
 
 struct kthread_create_info
@@ -41,7 +42,7 @@ int kthread_should_stop(void)
 {
 	return (kthread_stop_info.k == current);
 }
-
+EXPORT_SYMBOL(kthread_should_stop);
 
 static void kthread_exit_files(void)
 {
@@ -64,7 +65,6 @@ static int kthread(void *_create)
 	void *data;
 	sigset_t blocked;
 	int ret = -EINTR;
-	cpumask_t mask = CPU_MASK_ALL;
 
 	kthread_exit_files();
 
@@ -78,7 +78,7 @@ static int kthread(void *_create)
 	flush_signals(current);
 
 	/* By default we can run anywhere, unlike keventd. */
-	set_cpus_allowed(current, mask);
+	set_cpus_allowed(current, CPU_MASK_ALL);
 
 	/* OK, tell user we're spawned, wait for stop or wakeup */
 	__set_current_state(TASK_INTERRUPTIBLE);
@@ -144,6 +144,7 @@ struct task_struct *kthread_create(int (*threadfn)(void *data),
 
 	return create.result;
 }
+EXPORT_SYMBOL(kthread_create);
 
 void kthread_bind(struct task_struct *k, unsigned int cpu)
 {
@@ -153,6 +154,7 @@ void kthread_bind(struct task_struct *k, unsigned int cpu)
 	set_task_cpu(k, cpu);
 	k->cpus_allowed = cpumask_of_cpu(cpu);
 }
+EXPORT_SYMBOL(kthread_bind);
 
 int kthread_stop(struct task_struct *k)
 {
@@ -180,3 +182,4 @@ int kthread_stop(struct task_struct *k)
 
 	return ret;
 }
+EXPORT_SYMBOL(kthread_stop);

@@ -98,14 +98,6 @@ struct bfusb_scb {
 static void bfusb_tx_complete(struct urb *urb, struct pt_regs *regs);
 static void bfusb_rx_complete(struct urb *urb, struct pt_regs *regs);
 
-static inline void bfusb_wait_for_urb(struct urb *urb)
-{
-	while (atomic_read(&urb->count) > 1) {
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout((5 * HZ + 999) / 1000);
-	}
-}
-
 static struct urb *bfusb_get_completed(struct bfusb *bfusb)
 {
 	struct sk_buff *skb;
@@ -132,7 +124,6 @@ static void bfusb_unlink_urbs(struct bfusb *bfusb)
 	while ((skb = skb_dequeue(&bfusb->pending_q))) {
 		urb = ((struct bfusb_scb *) skb->cb)->urb;
 		usb_unlink_urb(urb);
-		bfusb_wait_for_urb(urb);
 		skb_queue_tail(&bfusb->completed_q, skb);
 	}
 
@@ -594,6 +585,8 @@ static int bfusb_load_firmware(struct bfusb *bfusb, unsigned char *firmware, int
 		return -EBUSY;
 	}
 
+	bfusb->udev->toggle[0] = bfusb->udev->toggle[1] = 0;
+
 	buf = kmalloc(BFUSB_MAX_BLOCK_SIZE + 3, GFP_ATOMIC);
 	if (!buf) {
 		BT_ERR("Can't allocate memory chunk for firmware");
@@ -633,6 +626,8 @@ static int bfusb_load_firmware(struct bfusb *bfusb, unsigned char *firmware, int
 		goto error;
 	}
 
+	bfusb->udev->toggle[0] = bfusb->udev->toggle[1] = 0;
+
 	BT_INFO("BlueFRITZ! USB device ready");
 
 	kfree(buf);
@@ -661,11 +656,11 @@ static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	BT_DBG("intf %p id %p", intf, id);
 
 	/* Check number of endpoints */
-	if (intf->altsetting[0].desc.bNumEndpoints < 2)
+	if (intf->cur_altsetting->desc.bNumEndpoints < 2)
 		return -EIO;
 
-	bulk_out_ep = &intf->altsetting[0].endpoint[0];
-	bulk_in_ep  = &intf->altsetting[0].endpoint[1];
+	bulk_out_ep = &intf->cur_altsetting->endpoint[0];
+	bulk_in_ep  = &intf->cur_altsetting->endpoint[1];
 
 	if (!bulk_out_ep || !bulk_in_ep) {
 		BT_ERR("Bulk endpoints not found");

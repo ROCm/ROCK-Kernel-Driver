@@ -13,7 +13,7 @@ extern void	arp_init(void);
 extern int	arp_rcv(struct sk_buff *skb, struct net_device *dev,
 			struct packet_type *pt);
 extern int	arp_find(unsigned char *haddr, struct sk_buff *skb);
-extern int	arp_ioctl(unsigned int cmd, void *arg);
+extern int	arp_ioctl(unsigned int cmd, void __user *arg);
 extern void     arp_send(int type, int ptype, u32 dest_ip, 
 			 struct net_device *dev, u32 src_ip, 
 			 unsigned char *dest_hw, unsigned char *src_hw, unsigned char *th);

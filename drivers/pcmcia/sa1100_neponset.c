@@ -42,7 +42,7 @@
  */
 
 static int
-neponset_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
+neponset_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
 {
 	unsigned int ncr_mask, ncr_set, pa_dwr_mask, pa_dwr_set;
 	int ret;
@@ -106,7 +106,7 @@ neponset_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_
 	return 0;
 }
 
-static void neponset_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void neponset_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
 	if (skt->nr == 0)
 		NCR_0 &= ~(NCR_A0VPP | NCR_A1VPP);

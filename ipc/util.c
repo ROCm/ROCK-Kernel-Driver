@@ -25,7 +25,7 @@
 #include <linux/rcupdate.h>
 #include <linux/workqueue.h>
 
-#if defined(CONFIG_SYSVIPC)
+#include <asm/unistd.h>
 
 #include "util.h"
 
@@ -333,25 +333,40 @@ void* ipc_rcu_alloc(int size)
  * Since RCU callback function is called in bh,
  * we need to defer the vfree to schedule_work
  */
-static void ipc_schedule_free(void* arg)
+static void ipc_schedule_free(struct rcu_head *head)
 {
-	struct ipc_rcu_vmalloc *free = arg;
+	struct ipc_rcu_vmalloc *free =
+		container_of(head, struct ipc_rcu_vmalloc, rcu);
 
 	INIT_WORK(&free->work, vfree, free);
 	schedule_work(&free->work);
 }
+
+/**
+ *	ipc_immediate_free	- free ipc + rcu space
+ *
+ *	Free from the RCU callback context
+ *
+ */
+static void ipc_immediate_free(struct rcu_head *head)
+{
+	struct ipc_rcu_kmalloc *free =
+		container_of(head, struct ipc_rcu_kmalloc, rcu);
+	kfree(free);
+}
+
+
 
 void ipc_rcu_free(void* ptr, int size)
 {
 	if (rcu_use_vmalloc(size)) {
 		struct ipc_rcu_vmalloc *free;
 		free = ptr - sizeof(*free);
-		call_rcu(&free->rcu, ipc_schedule_free, free);
+		call_rcu(&free->rcu, ipc_schedule_free);
 	} else {
 		struct ipc_rcu_kmalloc *free;
 		free = ptr - sizeof(*free);
-		/* kfree takes a "const void *" so gcc warns.  So we cast. */
-		call_rcu(&free->rcu, (void (*)(void *))kfree, free);
+		call_rcu(&free->rcu, ipc_immediate_free);
 	}
 
 }
@@ -509,7 +524,8 @@ int ipc_checkid(struct ipc_ids* ids, struct kern_ipc_perm* ipcp, int uid)
 	return 0;
 }
 
-#if !defined(__ia64__) && !defined(__x86_64__) && !defined(__hppa__)
+#ifdef __ARCH_WANT_IPC_PARSE_VERSION
+
 
 /**
  *	ipc_parse_version	-	IPC call version
@@ -530,21 +546,4 @@ int ipc_parse_version (int *cmd)
 	}
 }
 
-#endif /* __ia64__ */
-
-#else
-/*
- * Dummy functions when SYSV IPC isn't configured
- */
-
-int copy_semundo(unsigned long clone_flags, struct task_struct *tsk)
-{
-	return 0;
-}
-
-void exit_sem(struct task_struct *tsk)
-{
-	return;
-}
-
-#endif /* CONFIG_SYSVIPC */
+#endif /* __ARCH_WANT_IPC_PARSE_VERSION */

@@ -114,10 +114,16 @@ extern struct ia64_boot_param {
  */
 /* For spinlocks etc */
 
-/* clearing psr.i is implicitly serialized (visible by next insn) */
-/* setting psr.i requires data serialization */
+/*
+ * - clearing psr.i is implicitly serialized (visible by next insn)
+ * - setting psr.i requires data serialization
+ * - we need a stop-bit before reading PSR because we sometimes
+ *   write a floating-point register right before reading the PSR
+ *   and that writes to PSR.mfl
+ */
 #define __local_irq_save(x)			\
 do {						\
+	ia64_stop();				\
 	(x) = ia64_getreg(_IA64_REG_PSR);	\
 	ia64_stop();				\
 	ia64_rsm(IA64_PSR_I);			\
@@ -165,8 +171,8 @@ do {								\
 # define local_irq_restore(x)	__local_irq_restore(x)
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
-#define local_irq_enable()	({ ia64_ssm(IA64_PSR_I); ia64_srlz_d(); })
-#define local_save_flags(flags)	((flags) = ia64_getreg(_IA64_REG_PSR))
+#define local_irq_enable()	({ ia64_stop(); ia64_ssm(IA64_PSR_I); ia64_srlz_d(); })
+#define local_save_flags(flags)	({ ia64_stop(); (flags) = ia64_getreg(_IA64_REG_PSR); })
 
 #define irqs_disabled()				\
 ({						\
@@ -233,8 +239,7 @@ extern void ia64_load_extra (struct task_struct *task);
  * the latest fph state from another CPU.  In other words: eager save, lazy restore.
  */
 # define switch_to(prev,next,last) do {						\
-	if (ia64_psr(ia64_task_regs(prev))->mfh 				\
-		&& ia64_is_local_fpu_owner(prev)) {				\
+	if (ia64_psr(ia64_task_regs(prev))->mfh && ia64_is_local_fpu_owner(prev)) {				\
 		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
 		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
 		__ia64_save_fpu((prev)->thread.fph);				\

@@ -445,22 +445,18 @@ xfs_iget(
 retry:
 	XFS_STATS_INC(xs_ig_attempts);
 
-	if ((inode = VFS_GET_INODE(XFS_MTOVFS(mp), ino, 0))) {
+	if ((inode = iget_locked(XFS_MTOVFS(mp)->vfs_super, ino))) {
 		bhv_desc_t	*bdp;
 		xfs_inode_t	*ip;
 		int		newnode;
 
 		vp = LINVFS_GET_VP(inode);
-#ifdef MS_NOBKL
-		inode->i_flags |= MS_NOBKL;	/* no BKL for permission() */
-#endif
 		if (inode->i_state & I_NEW) {
 inode_allocate:
 			vn_initialize(inode);
 			error = xfs_iget_core(vp, mp, tp, ino,
 						lock_flags, ipp, bno);
 			if (error) {
-				remove_inode_hash(inode);
 				make_bad_inode(inode);
 				if (inode->i_state & I_NEW)
 					unlock_new_inode(inode);
@@ -475,11 +471,6 @@ inode_allocate:
 				vn_wait(vp);
 				iput(inode);
 				goto retry;
-			}
-
-			if (is_bad_inode(inode)) {
-				iput(inode);
-				return EIO;
 			}
 
 			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
@@ -587,7 +578,6 @@ xfs_iput_new(xfs_inode_t	*ip,
 
 	/* We shouldn't get here without this being true, but just in case */
 	if (inode->i_state & I_NEW) {
-		remove_inode_hash(inode);
 		make_bad_inode(inode);
 		unlock_new_inode(inode);
 	}

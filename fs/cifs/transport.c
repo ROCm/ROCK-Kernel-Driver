@@ -122,8 +122,7 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	int rc = 0;
 	int i = 0;
 	struct msghdr smb_msg;
-	struct iovec iov;
-	mm_segment_t temp_fs;
+	struct kvec iov;
 
 	if(ssocket == NULL)
 		return -ENOTSOCK; /* BB eventually add reconnect code here */
@@ -132,8 +131,6 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 
 	smb_msg.msg_name = sin;
 	smb_msg.msg_namelen = sizeof (struct sockaddr);
-	smb_msg.msg_iov = &iov;
-	smb_msg.msg_iovlen = 1;
 	smb_msg.msg_control = NULL;
 	smb_msg.msg_controllen = 0;
 	smb_msg.msg_flags = MSG_DONTWAIT + MSG_NOSIGNAL; /* BB add more flags?*/
@@ -147,10 +144,8 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	cFYI(1, ("Sending smb of length %d ", smb_buf_length));
 	dump_smb(smb_buffer, smb_buf_length + 4);
 
-	temp_fs = get_fs();	/* we must turn off socket api parm checking */
-	set_fs(get_ds());
 	while(iov.iov_len > 0) {
-		rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
+		rc = kernel_sendmsg(ssocket, &smb_msg, &iov, 1, smb_buf_length + 4);
 		if ((rc == -ENOSPC) || (rc == -EAGAIN)) {
 			i++;
 			if(i > 60) {
@@ -169,7 +164,6 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 		iov.iov_base += rc;
 		iov.iov_len -= rc;
 	}
-	set_fs(temp_fs);
 
 	if (rc < 0) {
 		cERROR(1,("Error %d sending data on socket to server.", rc));
@@ -202,25 +196,36 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	/* Ensure that we do not send more than 50 overlapping requests 
 	   to the same server. We may make this configurable later or
 	   use ses->maxReq */
+	if(long_op == -1) {
+		/* oplock breaks must not be held up */
+		atomic_inc(&ses->server->inFlight);
+	} else {
+		spin_lock(&GlobalMid_Lock); 
+		while(1) {        
+			if(atomic_read(&ses->server->inFlight) >= CIFS_MAX_REQ){
+				spin_unlock(&GlobalMid_Lock);
+				wait_event(ses->server->request_q,
+					atomic_read(&ses->server->inFlight)
+					 < CIFS_MAX_REQ);
+				spin_lock(&GlobalMid_Lock);
+			} else {
+				if(ses->server->tcpStatus == CifsExiting) {
+					spin_unlock(&GlobalMid_Lock);
+					return -ENOENT;
+				}
 
-	spin_lock(&GlobalMid_Lock); 
-	while(1) {        
-		if(atomic_read(&ses->server->inFlight) >= 50) {
-			spin_unlock(&GlobalMid_Lock);         
-			wait_event(ses->server->request_q,atomic_read(&ses->server->inFlight) < 50);
-			spin_lock(&GlobalMid_Lock); 
-		} else {
-			/* can not count locking commands against the total since
+			/* can not count locking commands against total since
 			   they are allowed to block on server */
-			if(long_op < 3) {
-				/* update # of requests on the wire to this server */
-				atomic_inc(&ses->server->inFlight); 
+					
+				if(long_op < 3) {
+				/* update # of requests on the wire to server */
+					atomic_inc(&ses->server->inFlight);
+				}
+				spin_unlock(&GlobalMid_Lock);
+				break;
 			}
-			spin_unlock(&GlobalMid_Lock); 
-			break;
 		}
 	}
-
 	/* make sure that we sign in the same order that we send on this socket 
 	   and avoid races inside tcp sendmsg code that could cause corruption
 	   of smb data */

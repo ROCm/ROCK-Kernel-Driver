@@ -8,8 +8,10 @@
  *
  * February 2000: Modified by James Morris to have 1 queue per protocol.
  * 15-Mar-2000:   Added NF_REPEAT --RR.
+ * 08-May-2003:	  Internal logging interface added by Jozsef Kadlecsik.
  */
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/netfilter.h>
 #include <net/protocol.h>
 #include <linux/init.h>
@@ -25,8 +27,6 @@
 #include <linux/icmp.h>
 #include <net/sock.h>
 #include <net/route.h>
-#include <net/xfrm.h>
-#include <net/ip.h>
 #include <linux/ip.h>
 
 /* In this code, we can be waiting indefinitely for userspace to
@@ -286,7 +286,7 @@ void nf_debug_ip_finish_output2(struct sk_buff *skb)
 
 /* Call get/setsockopt() */
 static int nf_sockopt(struct sock *sk, int pf, int val, 
-		      char *opt, int *len, int get)
+		      char __user *opt, int *len, int get)
 {
 	struct list_head *i;
 	struct nf_sockopt_ops *ops;
@@ -329,13 +329,13 @@ static int nf_sockopt(struct sock *sk, int pf, int val,
 	return ret;
 }
 
-int nf_setsockopt(struct sock *sk, int pf, int val, char *opt,
+int nf_setsockopt(struct sock *sk, int pf, int val, char __user *opt,
 		  int len)
 {
 	return nf_sockopt(sk, pf, val, opt, &len, 0);
 }
 
-int nf_getsockopt(struct sock *sk, int pf, int val, char *opt, int *len)
+int nf_getsockopt(struct sock *sk, int pf, int val, char __user *opt, int *len)
 {
 	return nf_sockopt(sk, pf, val, opt, len, 1);
 }
@@ -504,14 +504,6 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 	unsigned int verdict;
 	int ret = 0;
 
-	if (skb->ip_summed == CHECKSUM_HW) {
-		if (outdev == NULL) {
-			skb->ip_summed = CHECKSUM_NONE;
-		} else {
-			skb_checksum_help(skb);
-		}
-	}
-
 	/* We may already have this, but read-locks nest anyway */
 	rcu_read_lock();
 
@@ -638,6 +630,7 @@ int ip_route_me_harder(struct sk_buff **pskb)
 #ifdef CONFIG_IP_ROUTE_FWMARK
 		fl.nl_u.ip4_u.fwmark = (*pskb)->nfmark;
 #endif
+		fl.proto = iph->protocol;
 		if (ip_route_output_key(&rt, &fl) != 0)
 			return -1;
 
@@ -664,20 +657,6 @@ int ip_route_me_harder(struct sk_buff **pskb)
 	if ((*pskb)->dst->error)
 		return -1;
 
-#ifdef CONFIG_XFRM
-	if (!(IPCB(*pskb)->flags & IPSKB_XFRM_TRANSFORMED)) {
-		struct xfrm_policy_afinfo *afinfo;
-
-		afinfo = xfrm_policy_get_afinfo(AF_INET);
-		if (afinfo != NULL) {
-			afinfo->decode_session(*pskb, &fl);
-			xfrm_policy_put_afinfo(afinfo);
-			if (xfrm_lookup(&(*pskb)->dst, &fl, (*pskb)->sk, 0) != 0)
-				return -1;
-		}
-	}
-#endif
-
 	/* Change in oif may mean change in hh_len. */
 	hh_len = (*pskb)->dst->dev->hard_header_len;
 	if (skb_headroom(*pskb) < hh_len) {
@@ -694,71 +673,6 @@ int ip_route_me_harder(struct sk_buff **pskb)
 
 	return 0;
 }
-
-#ifdef CONFIG_XFRM
-inline int nf_rcv_postxfrm_nonlocal(struct sk_buff *skb)
-{
-	skb->sp->decap_done = 1;
-	dst_release(skb->dst);
-	skb->dst = NULL;
-	nf_reset(skb);
-	return netif_rx(skb);
-}
-
-int nf_rcv_postxfrm_local(struct sk_buff *skb)
-{
-	__skb_push(skb, skb->data - skb->nh.raw);
-	/* Fix header len and checksum if last xfrm was transport mode */
-	if (!skb->sp->x[skb->sp->len - 1].xvec->props.mode) {
-		skb->nh.iph->tot_len = htons(skb->len);
-		ip_send_check(skb->nh.iph);
-	}
-	return nf_rcv_postxfrm_nonlocal(skb);
-}
-
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-#include <linux/netfilter_ipv4/ip_conntrack.h>
-#include <linux/netfilter_ipv4/ip_nat.h>
-
-void nf_nat_decode_session4(struct sk_buff *skb, struct flowi *fl)
-{
-	struct ip_conntrack *ct;
-	struct ip_conntrack_tuple *t;
-	struct ip_nat_info_manip *m;
-	unsigned int i;
-
-	if (skb->nfct == NULL)
-		return;
-	ct = (struct ip_conntrack *)skb->nfct->master;
-
-	for (i = 0; i < ct->nat.info.num_manips; i++) {
-		m = &ct->nat.info.manips[i];
-		t = &ct->tuplehash[m->direction].tuple;
-
-		switch (m->hooknum) {
-		case NF_IP_PRE_ROUTING:
-			if (m->maniptype != IP_NAT_MANIP_DST)
-				break;
-			fl->fl4_dst = t->dst.ip;
-			if (t->dst.protonum == IPPROTO_TCP ||
-			    t->dst.protonum == IPPROTO_UDP)
-				fl->fl_ip_dport = t->dst.u.tcp.port;
-			break;
-#ifdef CONFIG_IP_NF_NAT_LOCAL
-		case NF_IP_LOCAL_IN:
-			if (m->maniptype != IP_NAT_MANIP_SRC)
-				break;
-			fl->fl4_src = t->src.ip;
-			if (t->dst.protonum == IPPROTO_TCP ||
-			    t->dst.protonum == IPPROTO_UDP)
-				fl->fl_ip_sport = t->src.u.tcp.port;
-			break;
-#endif
-		}
-	}
-}
-#endif /* CONFIG_IP_NF_NAT_NEEDED */
-#endif
 
 int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 {
@@ -821,15 +735,78 @@ pull_skb:
 EXPORT_SYMBOL(skb_ip_make_writable);
 #endif /*CONFIG_INET*/
 
+/* Internal logging interface, which relies on the real 
+   LOG target modules */
+
+#define NF_LOG_PREFIXLEN		128
+
+static nf_logfn *nf_logging[NPROTO]; /* = NULL */
+static int reported = 0;
+static spinlock_t nf_log_lock = SPIN_LOCK_UNLOCKED;
+
+int nf_log_register(int pf, nf_logfn *logfn)
+{
+	int ret = -EBUSY;
+
+	/* Any setup of logging members must be done before
+	 * substituting pointer. */
+	smp_wmb();
+	spin_lock(&nf_log_lock);
+	if (!nf_logging[pf]) {
+		nf_logging[pf] = logfn;
+		ret = 0;
+	}
+	spin_unlock(&nf_log_lock);
+	return ret;
+}		
+
+void nf_log_unregister(int pf, nf_logfn *logfn)
+{
+	spin_lock(&nf_log_lock);
+	if (nf_logging[pf] == logfn)
+		nf_logging[pf] = NULL;
+	spin_unlock(&nf_log_lock);
+
+	/* Give time to concurrent readers. */
+	synchronize_net();
+}		
+
+void nf_log_packet(int pf,
+		   unsigned int hooknum,
+		   const struct sk_buff *skb,
+		   const struct net_device *in,
+		   const struct net_device *out,
+		   const char *fmt, ...)
+{
+	va_list args;
+	char prefix[NF_LOG_PREFIXLEN];
+	nf_logfn *logfn;
+	
+	rcu_read_lock();
+	logfn = nf_logging[pf];
+	if (logfn) {
+		va_start(args, fmt);
+		vsnprintf(prefix, sizeof(prefix), fmt, args);
+		va_end(args);
+		/* We must read logging before nf_logfn[pf] */
+		smp_read_barrier_depends();
+		logfn(hooknum, skb, in, out, prefix);
+	} else if (!reported) {
+		printk(KERN_WARNING "nf_log_packet: can\'t log yet, "
+		       "no backend logging module loaded in!\n");
+		reported++;
+	}
+	rcu_read_unlock();
+}
+EXPORT_SYMBOL(nf_log_register);
+EXPORT_SYMBOL(nf_log_unregister);
+EXPORT_SYMBOL(nf_log_packet);
 
 /* This does not belong here, but ipt_REJECT needs it if connection
    tracking in use: without this, connection may not be in hash table,
    and hence manufactured ICMP or RST packets will not be associated
    with it. */
 void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-void (*ip6_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-#endif
 
 void __init netfilter_init(void)
 {
@@ -842,9 +819,6 @@ void __init netfilter_init(void)
 }
 
 EXPORT_SYMBOL(ip_ct_attach);
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-EXPORT_SYMBOL(ip6_ct_attach);
-#endif
 EXPORT_SYMBOL(ip_route_me_harder);
 EXPORT_SYMBOL(nf_getsockopt);
 EXPORT_SYMBOL(nf_hook_slow);
@@ -857,4 +831,3 @@ EXPORT_SYMBOL(nf_setsockopt);
 EXPORT_SYMBOL(nf_unregister_hook);
 EXPORT_SYMBOL(nf_unregister_queue_handler);
 EXPORT_SYMBOL(nf_unregister_sockopt);
-EXPORT_SYMBOL(nf_rcv_postxfrm_local);

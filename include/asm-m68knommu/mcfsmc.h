@@ -21,6 +21,18 @@
 
 #undef	outb
 #undef	inb
+#undef	outw
+#undef	outwd
+#undef	inw	
+#undef	outl
+#undef	inl
+
+#undef	outsb
+#undef	outsw
+#undef	outsl
+#undef	insb
+#undef	insw
+#undef	insl
 
 /*
  *	Re-defines for ColdFire environment... The SMC part is

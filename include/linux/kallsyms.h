@@ -7,6 +7,8 @@
 
 #include <linux/config.h>
 
+#define KSYM_NAME_LEN 127
+
 #ifdef CONFIG_KALLSYMS
 /* Lookup the address for a symbol. Returns 0 if not found. */
 unsigned long kallsyms_lookup_name(const char *name);

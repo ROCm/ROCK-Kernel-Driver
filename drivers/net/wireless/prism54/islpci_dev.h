@@ -1,8 +1,9 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_dev.h,v 1.53 2004/02/28 03:06:07 mcgrof Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc. 
  *  Copyright (C) 2003 Herbert Valerio Riedel <hvr@gnu.org>
  *  Copyright (C) 2003 Luis R. Rodriguez <mcgrof@ruslug.rutgers.edu>
+ *  Copyright (C) 2003 Aurelien Alleaume <slts@free.fr>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,21 +26,8 @@
 #include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
+#include <net/iw_handler.h>
 #include <linux/list.h>
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-# include <linux/workqueue.h>
-#else
-# include <linux/tqueue.h>
-# define work_struct tq_struct
-# define INIT_WORK INIT_TQUEUE
-# define schedule_work schedule_task
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,23)
-#define free_netdev(x) kfree(x) 
-#define pci_name(x) x->slot_name 
-#endif
 
 #include "isl_38xx.h"
 #include "isl_oid.h"
@@ -109,6 +97,10 @@ typedef struct {
 	 */
 	struct iw_statistics local_iwstatistics;
 	struct iw_statistics iwstatistics;
+
+	struct iw_spy_data spy_data; /* iwspy support */
+
+	int monitor_type; /* ARPHRD_IEEE80211 or ARPHRD_IEEE80211_PRISM */
 
 	struct islpci_acl acl;
 
@@ -181,12 +173,15 @@ typedef struct {
 	islpci_state_t state;
 	int state_off;		/* enumeration of off-state, if 0 then
 				 * we're not in any off-state */
-	
+
 	/* WPA stuff */
 	int wpa; /* WPA mode enabled */
 	struct list_head bss_wpa_list;
 	int num_bss_wpa;
 	struct semaphore wpa_sem;
+
+	struct work_struct reset_task;
+	int reset_task_pending;
 } islpci_private;
 
 static inline islpci_state_t
@@ -200,12 +195,6 @@ islpci_get_state(islpci_private *priv)
 islpci_state_t islpci_set_state(islpci_private *priv, islpci_state_t new_state);
 
 #define ISLPCI_TX_TIMEOUT               (2*HZ)
-
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,75))
-# define irqreturn_t void
-# define IRQ_HANDLED
-# define IRQ_NONE
-#endif
 
 irqreturn_t islpci_interrupt(int, void *, struct pt_regs *);
 
@@ -221,8 +210,6 @@ islpci_trigger(islpci_private *priv)
 
 struct net_device_stats *islpci_statistics(struct net_device *);
 
-int prism54_bring_down(islpci_private *);
-int islpci_alloc_memory(islpci_private *);
 int islpci_free_memory(islpci_private *);
 struct net_device *islpci_setup(struct pci_dev *);
 #endif				/* _ISLPCI_DEV_H */

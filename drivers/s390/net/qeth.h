@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.98.2.12 $"
+#define VERSION_QETH_H 		"$Revision: 1.111 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -38,7 +38,7 @@
 
 /**
  * Debug Facility stuff
- */ 
+ */
 #define QETH_DBF_SETUP_NAME "qeth_setup"
 #define QETH_DBF_SETUP_LEN 8
 #define QETH_DBF_SETUP_INDEX 3
@@ -136,7 +136,7 @@ static inline void
 qeth_hex_dump(unsigned char *buf, size_t len)
 {
 	size_t i;
-	
+
 	for (i = 0; i < len; i++) {
 		if (i && !(i % 16))
 			printk("\n");
@@ -250,7 +250,7 @@ qeth_is_ipa_enabled(struct qeth_ipa_info *ipa, enum qeth_ipa_funcs func)
 	 (prot==QETH_PROT_IPV6)? qeth_is_supported6(c,f):qeth_is_supported(c,f)
 #define qeth_is_ipafunc_enabled(c,prot,f) \
 	 (prot==QETH_PROT_IPV6)? qeth_is_enabled6(c,f):qeth_is_enabled(c,f)
-	
+
 
 #define QETH_IDX_FUNC_LEVEL_OSAE_ENA_IPAT 0x0101
 #define QETH_IDX_FUNC_LEVEL_OSAE_DIS_IPAT 0x0101
@@ -274,14 +274,14 @@ qeth_is_ipa_enabled(struct qeth_ipa_info *ipa, enum qeth_ipa_funcs func)
 
 /**
  * some more defs
- */ 
-#define IF_NAME_LEN	 	16	
+ */
+#define IF_NAME_LEN	 	16
 #define QETH_TX_TIMEOUT		100 * HZ
 #define QETH_HEADER_SIZE	32
 #define MAX_PORTNO 		15
 #define QETH_FAKE_LL_LEN 	ETH_HLEN
 #define QETH_FAKE_LL_V6_ADDR_POS 24
-	
+
 /*IPv6 address autoconfiguration stuff*/
 #define UNIQUE_ID_IF_CREATE_ADDR_FAILED 0xfffe
 #define UNIQUE_ID_NOT_BY_CARD 		0x10000
@@ -301,15 +301,15 @@ qeth_is_ipa_enabled(struct qeth_ipa_info *ipa, enum qeth_ipa_funcs func)
 /* buffers we have to be behind before we get a PCI */
 #define QETH_PCI_THRESHOLD_A(card) ((card)->qdio.in_buf_pool.buf_count+1)
 /*enqueued free buffers left before we get a PCI*/
-#define QETH_PCI_THRESHOLD_B(card) 0 
+#define QETH_PCI_THRESHOLD_B(card) 0
 /*not used unless the microcode gets patched*/
-#define QETH_PCI_TIMER_VALUE(card) 3 
+#define QETH_PCI_TIMER_VALUE(card) 3
 
 #define QETH_MIN_INPUT_THRESHOLD 1
 #define QETH_MAX_INPUT_THRESHOLD 500
 #define QETH_MIN_OUTPUT_THRESHOLD 1
 #define QETH_MAX_OUTPUT_THRESHOLD 300
-	
+
 /* priority queing */
 #define QETH_PRIOQ_DEFAULT QETH_NO_PRIO_QUEUEING
 #define QETH_DEFAULT_QUEUE    2
@@ -392,7 +392,7 @@ struct qeth_buffer_pool_entry {
 	struct list_head list;
 	struct list_head init_list;
 	void *elements[QDIO_MAX_ELEMENTS_PER_BUFFER];
-};	
+};
 
 struct qeth_qdio_buffer_pool {
 	struct list_head entry_list;
@@ -409,7 +409,7 @@ struct qeth_qdio_buffer {
 struct qeth_qdio_q {
 	struct qdio_buffer qdio_bufs[QDIO_MAX_BUFFERS_PER_Q];
 	struct qeth_qdio_buffer bufs[QDIO_MAX_BUFFERS_PER_Q];
-	/* 
+	/*
 	 * buf_to_init means "buffer must be initialized by driver and must
 	 * be made available for hardware" -> state is set to EMPTY
 	 */
@@ -481,7 +481,7 @@ enum qeth_send_errors {
 /**
  * buffer stuff for read channel
  */
-#define QETH_CMD_BUFFER_NO	8	
+#define QETH_CMD_BUFFER_NO	8
 
 /**
  *  channel state machine
@@ -506,7 +506,7 @@ enum qeth_card_states {
 
 /**
  * Protocol versions
- */ 
+ */
 enum qeth_prot_versions {
 	QETH_PROT_SNA  = 0x0001,
 	QETH_PROT_IPV4 = 0x0004,
@@ -525,8 +525,8 @@ enum qeth_cmd_buffer_state {
 	BUF_STATE_PROCESSED,
 };
 /**
- * IP address and multicast list 
- */ 
+ * IP address and multicast list
+ */
 struct qeth_ipaddr {
 	struct list_head entry;
 	enum qeth_ip_types type;
@@ -575,7 +575,7 @@ struct qeth_cmd_buffer {
 
 /**
  * definition of a qeth channel, used for read and write
- */ 
+ */
 struct qeth_channel {
 	enum qeth_channel_states state;
 	struct ccw1 ccw;
@@ -592,7 +592,7 @@ struct qeth_channel {
 
 /**
  *  OSA card related definitions
- */ 
+ */
 struct qeth_token {
 	__u32 issuer_rm_w;
 	__u32 issuer_rm_r;
@@ -617,7 +617,7 @@ struct qeth_reply {
 	struct list_head list;
 	wait_queue_head_t wait_q;
 	int (*callback)(struct qeth_card *,struct qeth_reply *,unsigned long);
- 	u32 seqno;	
+ 	u32 seqno;
 	unsigned long offset;
 	int received;
 	int rc;
@@ -680,22 +680,22 @@ struct qeth_card {
 	enum qeth_card_states state;
 	int lan_online;
 	spinlock_t lock;
-/*hardware and sysfs stuff*/	
+/*hardware and sysfs stuff*/
 	struct ccwgroup_device *gdev;
 	struct qeth_channel read;
 	struct qeth_channel write;
 	struct qeth_channel data;
-	
+
 	struct net_device *dev;
 	struct net_device_stats stats;
-	
-	struct qeth_card_info info; 
+
+	struct qeth_card_info info;
 	struct qeth_token token;
 	struct qeth_seqno seqno;
 	struct qeth_card_options options;
-	
+
 	wait_queue_head_t wait_q;
-#ifdef CONFIG_QETH_VLAN	 
+#ifdef CONFIG_QETH_VLAN
 	spinlock_t vlanlock;
 	struct vlan_group *vlangrp;
 #endif
@@ -704,7 +704,7 @@ struct qeth_card {
 	volatile unsigned long thread_start_mask;
 	volatile unsigned long thread_allowed_mask;
 	volatile unsigned long thread_running_mask;
-	spinlock_t ip_lock;	
+	spinlock_t ip_lock;
 	struct list_head ip_list;
 	struct list_head ip_tbd_list;
 	struct qeth_ipato ipato;
@@ -779,7 +779,7 @@ qeth_get_netdev_flags(int cardtype)
 #ifdef CONFIG_QETH_IPV6
 	default:
 		return 0;
-#else 
+#else
 	default:
 		return IFF_NOARP;
 #endif
@@ -857,7 +857,7 @@ qeth_mtu_is_valid(struct qeth_card * card, int mtu)
 	case QETH_CARD_TYPE_OSAE:
 		return ((mtu >= 576) && (mtu <= 61440));
 	case QETH_CARD_TYPE_IQD:
-		return ((mtu >= 576) && 
+		return ((mtu >= 576) &&
 			(mtu <= card->info.max_mtu + 4096 - 32));
 	case QETH_CARD_TYPE_UNKNOWN:
 	default:
@@ -883,7 +883,7 @@ qeth_get_arphdr_type(int cardtype, int linktype)
 	}
 }
 
-#ifdef CONFIG_QETH_PERF_STATS 
+#ifdef CONFIG_QETH_PERF_STATS
 inline static int
 qeth_get_micros(void)
 {

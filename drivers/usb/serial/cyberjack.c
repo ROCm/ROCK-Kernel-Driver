@@ -35,16 +35,11 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
+#include "usb-serial.h"
 
 #define CYBERJACK_LOCAL_BUF_SIZE 32
 
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
-#include "usb-serial.h"
+static int debug;
 
 /*
  * Version Information
@@ -109,7 +104,7 @@ struct cyberjack_private {
 	short		rdtodo;		/* Bytes still to read */
 	unsigned char	wrbuf[5*64];	/* Buffer for collecting data to write */
 	short		wrfilled;	/* Overall data size we already got */
-	short		wrsent;		/* Data akready sent */
+	short		wrsent;		/* Data already sent */
 };
 
 /* do some startup allocations not currently performed by usb_serial_probe() */
@@ -155,15 +150,10 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 	unsigned long flags;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	dbg("%s - usb_clear_halt", __FUNCTION__ );
 	usb_clear_halt(port->serial->dev, port->write_urb->pipe);
-	usb_clear_halt(port->serial->dev, port->read_urb->pipe);
-	usb_clear_halt(port->serial->dev, port->interrupt_in_urb->pipe);
 
 	/* force low_latency on so that our tty_push actually forces
 	 * the data through, otherwise it is scheduled, and with high
@@ -215,7 +205,6 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 	unsigned long flags;
 	int result;
 	int wrexpected;
-	unsigned char localbuf[CYBERJACK_LOCAL_BUF_SIZE];	/* Buffer for collecting data to write */
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	dbg("%s - from_user %d", __FUNCTION__, from_user);
@@ -232,30 +221,24 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 
 	spin_lock_irqsave(&priv->lock, flags);
 
-	if( (count+priv->wrfilled)>sizeof(priv->wrbuf) ||
-		(count>sizeof(localbuf)) ) {
-		/* To much data  for buffer. Reset buffer. */
+	if( (count+priv->wrfilled)>sizeof(priv->wrbuf) ) {
+		/* To much data for buffer. Reset buffer. */
 		priv->wrfilled=0;
 		spin_unlock_irqrestore(&priv->lock, flags);
 		return (0);
 	}
 
-	spin_unlock_irqrestore(&priv->lock, flags);
-
 	/* Copy data */
 	if (from_user) {
-		if (copy_from_user(localbuf, buf, count)) {
+		if (copy_from_user(priv->wrbuf+priv->wrfilled, buf, count)) {
+			spin_unlock_irqrestore(&priv->lock, flags);
 			return -EFAULT;
 		}
 	} else {
-		memcpy (localbuf, buf, count);
+		memcpy (priv->wrbuf+priv->wrfilled, buf, count);
 	}  
 
-	spin_lock_irqsave(&priv->lock, flags);
-
-	memcpy (priv->wrbuf+priv->wrfilled, localbuf, count);
-
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count,
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count,
 		priv->wrbuf+priv->wrfilled);
 	priv->wrfilled += count;
 
@@ -321,12 +304,8 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
-	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 	int result;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -334,11 +313,7 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 	if (urb->status)
 		return;
 
-	serial = port->serial;
-	if (serial_paranoia_check (serial, __FUNCTION__))
-		return;
-
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	/* React only to interrupts signaling a bulk_in transfer */
 	if( (urb->actual_length==4) && (data[0]==0x01) ) {
@@ -386,7 +361,6 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	short todo;
@@ -395,18 +369,11 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
-
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 	if (urb->status) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
 		return;
 	}
-
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
 	if (urb->actual_length) {
@@ -447,15 +414,9 @@ static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
-
 	if (urb->status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 		return;
@@ -483,11 +444,11 @@ static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs
 		priv->wrsent+=length;
 
 		/* set up our urb */
-		usb_fill_bulk_urb(port->write_urb, serial->dev, 
-			      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
+		usb_fill_bulk_urb(port->write_urb, port->serial->dev, 
+			      usb_sndbulkpipe(port->serial->dev, port->bulk_out_endpointAddress),
 			      port->write_urb->transfer_buffer, length,
-			      ((serial->type->write_bulk_callback) ? 
-			       serial->type->write_bulk_callback : 
+			      ((port->serial->type->write_bulk_callback) ? 
+			       port->serial->type->write_bulk_callback : 
 			       cyberjack_write_bulk_callback), 
 			      port);
 
@@ -552,6 +513,5 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
-

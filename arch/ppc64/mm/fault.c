@@ -45,7 +45,7 @@ static int store_updates_sp(struct pt_regs *regs)
 {
 	unsigned int inst;
 
-	if (get_user(inst, (unsigned int *)regs->nip))
+	if (get_user(inst, (unsigned int __user *)regs->nip))
 		return 0;
 	/* check for 1 in the rA field */
 	if (((inst >> 16) & 0x1f) != 1)
@@ -80,37 +80,69 @@ static int store_updates_sp(struct pt_regs *regs)
  *  - DSISR for a non-SLB data access fault,
  *  - SRR1 & 0x08000000 for a non-SLB instruction access fault
  *  - 0 any SLB fault.
+ * The return value is 0 if the fault was handled, or the signal
+ * number if this is a kernel fault that can't be handled here.
  */
-void do_page_fault(struct pt_regs *regs, unsigned long address,
-		   unsigned long error_code)
+int do_page_fault(struct pt_regs *regs, unsigned long address,
+		  unsigned long error_code)
 {
 	struct vm_area_struct * vma;
 	struct mm_struct *mm = current->mm;
 	siginfo_t info;
 	unsigned long code = SEGV_MAPERR;
 	unsigned long is_write = error_code & 0x02000000;
+	unsigned long trap = TRAP(regs);
 
-	if (regs->trap == 0x300 || regs->trap == 0x380) {
+	BUG_ON((trap == 0x380) || (trap == 0x480));
+
+	if (trap == 0x300) {
 		if (debugger_fault_handler(regs))
-			return;
+			return 0;
 	}
 
 	/* On a kernel SLB miss we can only check for a valid exception entry */
-	if (!user_mode(regs) && (regs->trap == 0x380)) {
-		bad_page_fault(regs, address, SIGSEGV);
-		return;
-	}
+	if (!user_mode(regs) && (address >= TASK_SIZE))
+		return SIGSEGV;
 
 	if (error_code & 0x00400000) {
 		if (debugger_dabr_match(regs))
-			return;
+			return 0;
 	}
 
 	if (in_atomic() || mm == NULL) {
-		bad_page_fault(regs, address, SIGSEGV);
-		return;
+		if (!user_mode(regs))
+			return SIGSEGV;
+		/* in_atomic() in user mode is really bad,
+		   as is current->mm == NULL. */
+		printk(KERN_EMERG "Page fault in user mode with"
+		       "in_atomic() = %d mm = %p\n", in_atomic(), mm);
+		printk(KERN_EMERG "NIP = %lx  MSR = %lx\n",
+		       regs->nip, regs->msr);
+		die("Weird page fault", regs, SIGSEGV);
 	}
-	down_read(&mm->mmap_sem);
+
+	/* When running in the kernel we expect faults to occur only to
+	 * addresses in user space.  All other faults represent errors in the
+	 * kernel and should generate an OOPS.  Unfortunatly, in the case of an
+	 * erroneous fault occuring in a code path which already holds mmap_sem
+	 * we will deadlock attempting to validate the fault against the
+	 * address space.  Luckily the kernel only validly references user
+	 * space from well defined areas of code, which are listed in the
+	 * exceptions table.
+	 *
+	 * As the vast majority of faults will be valid we will only perform
+	 * the source reference check when there is a possibilty of a deadlock.
+	 * Attempt to lock the address space, if we cannot we then validate the
+	 * source.  If this is invalid we can skip the address space check,
+	 * thus avoiding the deadlock.
+	 */
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		if (!user_mode(regs) && !search_exception_tables(regs->nip))
+			goto bad_area_nosemaphore;
+
+		down_read(&mm->mmap_sem);
+	}
+
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -195,23 +227,23 @@ good_area:
 	}
 
 	up_read(&mm->mmap_sem);
-	return;
+	return 0;
 
 bad_area:
 	up_read(&mm->mmap_sem);
 
+bad_area_nosemaphore:
 	/* User mode accesses cause a SIGSEGV */
 	if (user_mode(regs)) {
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		info.si_code = code;
-		info.si_addr = (void *) address;
+		info.si_addr = (void __user *) address;
 		force_sig_info(SIGSEGV, &info, current);
-		return;
+		return 0;
 	}
 
-	bad_page_fault(regs, address, SIGSEGV);
-	return;
+	return SIGSEGV;
 
 /*
  * We ran out of memory, or some other thing happened to us that made
@@ -227,18 +259,19 @@ out_of_memory:
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
-	bad_page_fault(regs, address, SIGKILL);
-	return;
+	return SIGKILL;
 
 do_sigbus:
 	up_read(&mm->mmap_sem);
-	info.si_signo = SIGBUS;
-	info.si_errno = 0;
-	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *)address;
-	force_sig_info (SIGBUS, &info, current);
-	if (!user_mode(regs))
-		bad_page_fault(regs, address, SIGBUS);
+	if (user_mode(regs)) {
+		info.si_signo = SIGBUS;
+		info.si_errno = 0;
+		info.si_code = BUS_ADRERR;
+		info.si_addr = (void __user *)address;
+		force_sig_info(SIGBUS, &info, current);
+		return 0;
+	}
+	return SIGBUS;
 }
 
 /*

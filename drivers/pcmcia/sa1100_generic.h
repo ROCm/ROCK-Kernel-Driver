@@ -1,4 +1,5 @@
-#include "sa11xx_core.h"
+#include "soc_common.h"
+#include "sa11xx_base.h"
 
 /*
  * Declaration for all machine specific init/exit functions.

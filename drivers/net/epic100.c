@@ -66,12 +66,15 @@
 	LK1.1.14 (Kryzsztof Halasa):
 	* fix spurious bad initializations
 	* pound phy a la SMSC's app note on the subject
+	
+	AC1.1.14ac
+	* fix power up/down for ethtool that broke in 1.11
 
 */
 
 #define DRV_NAME        "epic100"
-#define DRV_VERSION     "1.11+LK1.1.14"
-#define DRV_RELDATE     "Aug 4, 2002"
+#define DRV_VERSION     "1.11+LK1.1.14+AC1.1.14"
+#define DRV_RELDATE     "June 2, 2004"
 
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
@@ -112,12 +115,6 @@ static int rx_copybreak;
 /* Initial threshold, increased on underflow, rounded down to 4 byte units. */
 #define TX_FIFO_THRESH 256
 #define RX_FIFO_THRESH 1		/* 0-3, 0==32, 64,96, or 3==128 bytes  */
-
-#if !defined(__OPTIMIZE__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -940,7 +937,7 @@ static void epic_init_ring(struct net_device *dev)
 		ep->rx_ring[i].buflength = cpu_to_le32(ep->rx_buf_sz);
 		ep->rx_ring[i].next = ep->rx_ring_dma + 
 				      (i+1)*sizeof(struct epic_rx_desc);
-		ep->rx_skbuff[i] = 0;
+		ep->rx_skbuff[i] = NULL;
 	}
 	/* Mark the last entry as wrapping the ring. */
 	ep->rx_ring[i-1].next = ep->rx_ring_dma;
@@ -962,7 +959,7 @@ static void epic_init_ring(struct net_device *dev)
 	/* The Tx buffer descriptor is filled in as needed, but we
 	   do need to clear the ownership bit. */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		ep->tx_skbuff[i] = 0;
+		ep->tx_skbuff[i] = NULL;
 		ep->tx_ring[i].txstatus = 0x0000;
 		ep->tx_ring[i].next = ep->tx_ring_dma + 
 			(i+1)*sizeof(struct epic_tx_desc);
@@ -1096,7 +1093,7 @@ static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *r
 				pci_unmap_single(ep->pci_dev, ep->tx_ring[entry].bufaddr, 
 						 skb->len, PCI_DMA_TODEVICE);
 				dev_kfree_skb_irq(skb);
-				ep->tx_skbuff[entry] = 0;
+				ep->tx_skbuff[entry] = NULL;
 			}
 
 #ifndef final_version
@@ -1215,13 +1212,8 @@ static int epic_rx(struct net_device *dev)
 							    ep->rx_ring[entry].bufaddr,
 							    ep->rx_buf_sz,
 							    PCI_DMA_FROMDEVICE);
-#if 1 /* HAS_IP_COPYSUM */
 				eth_copy_and_sum(skb, ep->rx_skbuff[entry]->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len), ep->rx_skbuff[entry]->tail,
-					   pkt_len);
-#endif
 				pci_dma_sync_single_for_device(ep->pci_dev,
 							       ep->rx_ring[entry].bufaddr,
 							       ep->rx_buf_sz,
@@ -1282,7 +1274,7 @@ static int epic_close(struct net_device *dev)
 	/* Free all the skbuffs in the Rx queue. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		skb = ep->rx_skbuff[i];
-		ep->rx_skbuff[i] = 0;
+		ep->rx_skbuff[i] = NULL;
 		ep->rx_ring[i].rxstatus = 0;		/* Not owned by Epic chip. */
 		ep->rx_ring[i].buflength = 0;
 		if (skb) {
@@ -1294,7 +1286,7 @@ static int epic_close(struct net_device *dev)
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		skb = ep->tx_skbuff[i];
-		ep->tx_skbuff[i] = 0;
+		ep->tx_skbuff[i] = NULL;
 		if (!skb)
 			continue;
 		pci_unmap_single(ep->pci_dev, ep->tx_ring[i].bufaddr, 
@@ -1424,6 +1416,27 @@ static void netdev_set_msglevel(struct net_device *dev, u32 value)
 	debug = value;
 }
 
+static int ethtool_begin(struct net_device *dev)
+{
+	unsigned long ioaddr = dev->base_addr;
+	/* power-up, if interface is down */
+	if (! netif_running(dev)) {
+		outl(0x0200, ioaddr + GENCTL);
+		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
+	}
+	return 0;
+}
+
+static void ethtool_complete(struct net_device *dev)
+{
+	unsigned long ioaddr = dev->base_addr;
+	/* power-down, if interface is down */
+	if (! netif_running(dev)) {
+		outl(0x0008, ioaddr + GENCTL);
+		outl((inl(ioaddr + NVCTL) & ~0x483C) | 0x0000, ioaddr + NVCTL);
+	}
+}
+
 static struct ethtool_ops netdev_ethtool_ops = {
 	.get_drvinfo		= netdev_get_drvinfo,
 	.get_settings		= netdev_get_settings,
@@ -1434,13 +1447,15 @@ static struct ethtool_ops netdev_ethtool_ops = {
 	.set_msglevel		= netdev_set_msglevel,
 	.get_sg			= ethtool_op_get_sg,
 	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.begin			= ethtool_begin,
+	.complete		= ethtool_complete
 };
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct epic_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	int rc;
 
 	/* power-up, if interface is down */

@@ -1,7 +1,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 
-/* Don't do any NUMA setup on Opteron right now. They seem to be 
+/* Don't do any NUMA setup on Opteron right now. They seem to be
    better off with flat scheduling. This is just for SMT. */
 
 #ifdef CONFIG_SCHED_SMT

@@ -122,12 +122,6 @@ static inline void pmd_free(pmd_t *pmd)
 
 #endif
 
-/*
- * Used for the b0rked handling of kernel pagetables on the 64-bit kernel.
- */
-extern pte_t kptbl[(PAGE_SIZE << PGD_ORDER)/sizeof(pte_t)];
-extern pmd_t kpmdtbl[PTRS_PER_PMD];
-
 #define check_pgt_cache()	do { } while (0)
 
 #endif /* _ASM_PGALLOC_H */

@@ -166,78 +166,11 @@ void inet_sock_destruct(struct sock *sk)
 #endif
 }
 
-void inet_sock_release(struct sock *sk)
-{
-	if (sk->sk_prot->destroy)
-		sk->sk_prot->destroy(sk);
-
-	/* Observation: when inet_sock_release is called, processes have
-	 * no access to socket. But net still has.
-	 * Step one, detach it from networking:
-	 *
-	 * A. Remove from hash tables.
-	 */
-
-	sk->sk_prot->unhash(sk);
-
-	/* In this point socket cannot receive new packets,
-	 * but it is possible that some packets are in flight
-	 * because some CPU runs receiver and did hash table lookup
-	 * before we unhashed socket. They will achieve receive queue
-	 * and will be purged by socket destructor.
-	 *
-	 * Also we still have packets pending on receive
-	 * queue and probably, our own packets waiting in device queues.
-	 * sock_destroy will drain receive queue, but transmitted
-	 * packets will delay socket destruction until the last reference
-	 * will be released.
-	 */
-
-	sock_orphan(sk);
-
-	xfrm_sk_free_policy(sk);
-
-#ifdef INET_REFCNT_DEBUG
-	if (atomic_read(&sk->sk_refcnt) != 1)
-		printk(KERN_DEBUG "Destruction inet %p delayed, c=%d\n",
-		       sk, atomic_read(&sk->sk_refcnt));
-#endif
-	sock_put(sk);
-}
-
-
 /*
  *	The routines beyond this point handle the behaviour of an AF_INET
  *	socket object. Mostly it punts to the subprotocols of IP to do
  *	the work.
  */
-
-/*
- *	Set socket options on an inet socket.
- */
-int inet_setsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int optlen)
-{
-	struct sock *sk = sock->sk;
-
-	return sk->sk_prot->setsockopt(sk, level, optname, optval, optlen);
-}
-
-/*
- *	Get a socket option on an AF_INET socket.
- *
- *	FIX: POSIX 1003.1g is very ambiguous here. It states that
- *	asynchronous errors should be reported by getsockopt. We assume
- *	this means if you specify SO_ERROR (otherwise whats the point of it).
- */
-
-int inet_getsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int *optlen)
-{
-	struct sock *sk = sock->sk;
-
-	return sk->sk_prot->getsockopt(sk, level, optname, optval, optlen);
-}
 
 /*
  *	Automatically bind an unbound socket.
@@ -422,7 +355,7 @@ static int inet_create(struct socket *sock, int protocol)
 	if (sk->sk_prot->init) {
 		err = sk->sk_prot->init(sk);
 		if (err)
-			inet_sock_release(sk);
+			sk_common_release(sk);
 	}
 out:
 	return err;
@@ -729,22 +662,6 @@ int inet_getname(struct socket *sock, struct sockaddr *uaddr,
 	return 0;
 }
 
-
-int inet_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
-		 size_t size, int flags)
-{
-	struct sock *sk = sock->sk;
-	int addr_len = 0;
-	int err;
-
-	err = sk->sk_prot->recvmsg(iocb, sk, msg, size, flags & MSG_DONTWAIT,
-				   flags & ~MSG_DONTWAIT, &addr_len);
-	if (err >= 0)
-		msg->msg_namelen = addr_len;
-	return err;
-}
-
-
 int inet_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 		 size_t size)
 {
@@ -843,17 +760,17 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 		case SIOCGSTAMP:
-			err = sock_get_timestamp(sk, (struct timeval *)arg);
+			err = sock_get_timestamp(sk, (struct timeval __user *)arg);
 			break;
 		case SIOCADDRT:
 		case SIOCDELRT:
 		case SIOCRTMSG:
-			err = ip_rt_ioctl(cmd, (void *)arg);
+			err = ip_rt_ioctl(cmd, (void __user *)arg);
 			break;
 		case SIOCDARP:
 		case SIOCGARP:
 		case SIOCSARP:
-			err = arp_ioctl(cmd, (void *)arg);
+			err = arp_ioctl(cmd, (void __user *)arg);
 			break;
 		case SIOCGIFADDR:
 		case SIOCSIFADDR:
@@ -866,13 +783,13 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCSIFPFLAGS:
 		case SIOCGIFPFLAGS:
 		case SIOCSIFFLAGS:
-			err = devinet_ioctl(cmd, (void *)arg);
+			err = devinet_ioctl(cmd, (void __user *)arg);
 			break;
 		default:
 			if (!sk->sk_prot->ioctl ||
 			    (err = sk->sk_prot->ioctl(sk, cmd, arg)) ==
 			    					-ENOIOCTLCMD)
-				err = dev_ioctl(cmd, (void *)arg);
+				err = dev_ioctl(cmd, (void __user *)arg);
 			break;
 	}
 	return err;
@@ -891,10 +808,10 @@ struct proto_ops inet_stream_ops = {
 	.ioctl =	inet_ioctl,
 	.listen =	inet_listen,
 	.shutdown =	inet_shutdown,
-	.setsockopt =	inet_setsockopt,
-	.getsockopt =	inet_getsockopt,
+	.setsockopt =	sock_common_setsockopt,
+	.getsockopt =	sock_common_getsockopt,
 	.sendmsg =	inet_sendmsg,
-	.recvmsg =	inet_recvmsg,
+	.recvmsg =	sock_common_recvmsg,
 	.mmap =		sock_no_mmap,
 	.sendpage =	tcp_sendpage
 };
@@ -912,10 +829,10 @@ struct proto_ops inet_dgram_ops = {
 	.ioctl =	inet_ioctl,
 	.listen =	sock_no_listen,
 	.shutdown =	inet_shutdown,
-	.setsockopt =	inet_setsockopt,
-	.getsockopt =	inet_getsockopt,
+	.setsockopt =	sock_common_setsockopt,
+	.getsockopt =	sock_common_getsockopt,
 	.sendmsg =	inet_sendmsg,
-	.recvmsg =	inet_recvmsg,
+	.recvmsg =	sock_common_recvmsg,
 	.mmap =		sock_no_mmap,
 	.sendpage =	inet_sendpage,
 };
@@ -978,7 +895,7 @@ void inet_register_protosw(struct inet_protosw *p)
 
 	spin_lock_bh(&inetsw_lock);
 
-	if (p->type > SOCK_MAX)
+	if (p->type >= SOCK_MAX)
 		goto out_illegal;
 
 	/* If we are trying to override a permanent protocol, bail. */
@@ -1041,24 +958,24 @@ void inet_unregister_protosw(struct inet_protosw *p)
 }
 
 #ifdef CONFIG_IP_MULTICAST
-static struct inet_protocol igmp_protocol = {
+static struct net_protocol igmp_protocol = {
 	.handler =	igmp_rcv,
 };
 #endif
 
-static struct inet_protocol tcp_protocol = {
+static struct net_protocol tcp_protocol = {
 	.handler =	tcp_v4_rcv,
 	.err_handler =	tcp_v4_err,
 	.no_policy =	1,
 };
 
-static struct inet_protocol udp_protocol = {
+static struct net_protocol udp_protocol = {
 	.handler =	udp_rcv,
 	.err_handler =	udp_err,
 	.no_policy =	1,
 };
 
-static struct inet_protocol icmp_protocol = {
+static struct net_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
 };
 
@@ -1066,8 +983,8 @@ static int __init init_ipv4_mibs(void)
 {
 	net_statistics[0] = alloc_percpu(struct linux_mib);
 	net_statistics[1] = alloc_percpu(struct linux_mib);
-	ip_statistics[0] = alloc_percpu(struct ip_mib);
-	ip_statistics[1] = alloc_percpu(struct ip_mib);
+	ip_statistics[0] = alloc_percpu(struct ipstats_mib);
+	ip_statistics[1] = alloc_percpu(struct ipstats_mib);
 	icmp_statistics[0] = alloc_percpu(struct icmp_mib);
 	icmp_statistics[1] = alloc_percpu(struct icmp_mib);
 	tcp_statistics[0] = alloc_percpu(struct tcp_mib);
@@ -1101,13 +1018,13 @@ static int __init inet_init(void)
 
 	tcp_sk_cachep = kmem_cache_create("tcp_sock",
 					  sizeof(struct tcp_sock), 0,
-					  SLAB_HWCACHE_ALIGN, 0, 0);
+					  SLAB_HWCACHE_ALIGN, NULL, NULL);
 	udp_sk_cachep = kmem_cache_create("udp_sock",
 					  sizeof(struct udp_sock), 0,
-					  SLAB_HWCACHE_ALIGN, 0, 0);
+					  SLAB_HWCACHE_ALIGN, NULL, NULL);
 	raw4_sk_cachep = kmem_cache_create("raw4_sock",
 					   sizeof(struct raw_sock), 0,
-					   SLAB_HWCACHE_ALIGN, 0, 0);
+					   SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!tcp_sk_cachep || !udp_sk_cachep || !raw4_sk_cachep)
 		printk(KERN_CRIT
 		       "inet_init: Can't create protocol sock SLAB caches!\n");
@@ -1242,17 +1159,13 @@ EXPORT_SYMBOL(inet_dgram_connect);
 EXPORT_SYMBOL(inet_dgram_ops);
 EXPORT_SYMBOL(inet_family_ops);
 EXPORT_SYMBOL(inet_getname);
-EXPORT_SYMBOL(inet_getsockopt);
 EXPORT_SYMBOL(inet_ioctl);
 EXPORT_SYMBOL(inet_listen);
-EXPORT_SYMBOL(inet_recvmsg);
 EXPORT_SYMBOL(inet_register_protosw);
 EXPORT_SYMBOL(inet_release);
 EXPORT_SYMBOL(inet_sendmsg);
-EXPORT_SYMBOL(inet_setsockopt);
 EXPORT_SYMBOL(inet_shutdown);
 EXPORT_SYMBOL(inet_sock_destruct);
-EXPORT_SYMBOL(inet_sock_release);
 EXPORT_SYMBOL(inet_stream_connect);
 EXPORT_SYMBOL(inet_stream_ops);
 EXPORT_SYMBOL(inet_unregister_protosw);

@@ -202,7 +202,7 @@ void skb_free_datagram(struct sock *sk, struct sk_buff *skb)
 /*
  *	Copy a datagram to a linear buffer.
  */
-int skb_copy_datagram(const struct sk_buff *skb, int offset, char *to, int size)
+int skb_copy_datagram(const struct sk_buff *skb, int offset, char __user *to, int size)
 {
 	struct iovec iov = {
 		.iov_base = to,
@@ -297,7 +297,7 @@ fault:
 }
 
 int skb_copy_and_csum_datagram(const struct sk_buff *skb, int offset,
-			       u8 *to, int len, unsigned int *csump)
+			       u8 __user *to, int len, unsigned int *csump)
 {
 	int start = skb_headlen(skb);
 	int pos = 0;

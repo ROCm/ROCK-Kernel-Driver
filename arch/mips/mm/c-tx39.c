@@ -69,6 +69,9 @@ static void tx39h_dma_cache_wback_inv(unsigned long addr, unsigned long size)
 	unsigned long end, a;
 	unsigned long dc_lsize = current_cpu_data.dcache.linesz;
 
+	/* Catch bad driver code */
+	BUG_ON(size == 0);
+
 	iob();
 	a = addr & ~(dc_lsize - 1);
 	end = (addr + size - 1) & ~(dc_lsize - 1);

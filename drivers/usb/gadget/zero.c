@@ -130,6 +130,9 @@ struct zero_dev {
 	 */
 	u8			config;
 	struct usb_ep		*in_ep, *out_ep;
+
+	/* autoresume timer */
+	struct timer_list	resume;
 };
 
 #define xprintk(d,level,fmt,args...) \
@@ -167,6 +170,12 @@ module_param (buflen, uint, S_IRUGO|S_IWUSR);
 module_param (qlen, uint, S_IRUGO|S_IWUSR);
 module_param (pattern, uint, S_IRUGO|S_IWUSR);
 
+/*
+ * if it's nonzero, autoresume says how many seconds to wait
+ * before trying to wake up the host after suspend.
+ */
+static unsigned autoresume = 0;
+module_param (autoresume, uint, 0);
 
 /*
  * Normally the "loopback" configuration is second (index 1) so
@@ -185,8 +194,13 @@ module_param (loopdefault, bool, S_IRUGO|S_IWUSR);
  * DO NOT REUSE THESE IDs with a protocol-incompatible driver!!  Ever!!
  * Instead:  allocate your own, using normal USB-IF procedures.
  */
+#ifndef	CONFIG_USB_ZERO_HNPTEST
 #define DRIVER_VENDOR_NUM	0x0525		/* NetChip */
 #define DRIVER_PRODUCT_NUM	0xa4a0		/* Linux-USB "Gadget Zero" */
+#else
+#define DRIVER_VENDOR_NUM	0x1a0a		/* OTG test device IDs */
+#define DRIVER_PRODUCT_NUM	0xbadd
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -224,7 +238,7 @@ device_desc = {
 	.bNumConfigurations =	2,
 };
 
-static const struct usb_config_descriptor
+static struct usb_config_descriptor
 source_sink_config = {
 	.bLength =		sizeof source_sink_config,
 	.bDescriptorType =	USB_DT_CONFIG,
@@ -237,7 +251,7 @@ source_sink_config = {
 	.bMaxPower =		1,	/* self-powered */
 };
 
-static const struct usb_config_descriptor
+static struct usb_config_descriptor
 loopback_config = {
 	.bLength =		sizeof loopback_config,
 	.bDescriptorType =	USB_DT_CONFIG,
@@ -248,6 +262,14 @@ loopback_config = {
 	.iConfiguration =	STRING_LOOPBACK,
 	.bmAttributes =		USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
 	.bMaxPower =		1,	/* self-powered */
+};
+
+static struct usb_otg_descriptor
+otg_descriptor = {
+	.bLength =		sizeof otg_descriptor,
+	.bDescriptorType =	USB_DT_OTG,
+
+	.bmAttributes =		USB_OTG_SRP,
 };
 
 /* one interface in each configuration */
@@ -293,17 +315,19 @@ fs_sink_desc = {
 };
 
 static const struct usb_descriptor_header *fs_source_sink_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &source_sink_intf,
 	(struct usb_descriptor_header *) &fs_sink_desc,
 	(struct usb_descriptor_header *) &fs_source_desc,
-	0,
+	NULL,
 };
 
 static const struct usb_descriptor_header *fs_loopback_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &loopback_intf,
 	(struct usb_descriptor_header *) &fs_sink_desc,
 	(struct usb_descriptor_header *) &fs_source_desc,
-	0,
+	NULL,
 };
 
 #ifdef	CONFIG_USB_GADGET_DUALSPEED
@@ -347,17 +371,19 @@ dev_qualifier = {
 };
 
 static const struct usb_descriptor_header *hs_source_sink_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &source_sink_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
-	0,
+	NULL,
 };
 
 static const struct usb_descriptor_header *hs_loopback_function [] = {
+	(struct usb_descriptor_header *) &otg_descriptor,
 	(struct usb_descriptor_header *) &loopback_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
-	0,
+	NULL,
 };
 
 /* maxpacket and other transfer characteristics vary by speed. */
@@ -435,6 +461,10 @@ config_buf (struct usb_gadget *gadget,
 			? fs_source_sink_function
 			: fs_loopback_function;
 
+	/* for now, don't advertise srp-only devices */
+	if (!gadget->is_otg)
+		function++;
+
 	len = usb_gadget_config_buf (is_source_sink
 					? &source_sink_config
 					: &loopback_config,
@@ -459,7 +489,7 @@ alloc_ep_req (struct usb_ep *ep, unsigned length)
 				&req->dma, GFP_ATOMIC);
 		if (!req->buf) {
 			usb_ep_free_request (ep, req);
-			req = 0;
+			req = NULL;
 		}
 	}
 	return req;
@@ -476,7 +506,7 @@ static void free_ep_req (struct usb_ep *ep, struct usb_request *req)
 
 /* optionally require specific source/sink data patterns  */
 
-static inline int
+static int
 check_read_data (
 	struct zero_dev		*dev,
 	struct usb_ep		*ep,
@@ -510,7 +540,7 @@ check_read_data (
 	return 0;
 }
 
-static inline void
+static void
 reinit_write_data (
 	struct zero_dev		*dev,
 	struct usb_ep		*ep,
@@ -590,7 +620,7 @@ source_sink_start_ep (struct usb_ep *ep, int gfp_flags)
 
 	req = alloc_ep_req (ep, buflen);
 	if (!req)
-		return 0;
+		return NULL;
 
 	memset (req->buf, 0, req->length);
 	req->complete = source_sink_complete;
@@ -604,7 +634,7 @@ source_sink_start_ep (struct usb_ep *ep, int gfp_flags)
 
 		ERROR (dev, "start %s --> %d\n", ep->name, status);
 		free_ep_req (ep, req);
-		req = 0;
+		req = NULL;
 	}
 
 	return req;
@@ -795,13 +825,14 @@ static void zero_reset_config (struct zero_dev *dev)
 	 */
 	if (dev->in_ep) {
 		usb_ep_disable (dev->in_ep);
-		dev->in_ep = 0;
+		dev->in_ep = NULL;
 	}
 	if (dev->out_ep) {
 		usb_ep_disable (dev->out_ep);
-		dev->out_ep = 0;
+		dev->out_ep = NULL;
 	}
 	dev->config = 0;
+	del_timer (&dev->resume);
 }
 
 /* change our operational config.  this code must agree with the code
@@ -893,6 +924,7 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	/* usually this stores reply data in the pre-allocated ep0 buffer,
 	 * but config change events will reconfigure hardware.
 	 */
+	req->zero = 0;
 	switch (ctrl->bRequest) {
 
 	case USB_REQ_GET_DESCRIPTOR:
@@ -942,6 +974,12 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	case USB_REQ_SET_CONFIGURATION:
 		if (ctrl->bRequestType != 0)
 			goto unknown;
+		if (gadget->a_hnp_support)
+			DBG (dev, "HNP available\n");
+		else if (gadget->a_alt_hnp_support)
+			DBG (dev, "HNP needs a different root port\n");
+		else
+			VDBG (dev, "HNP inactive\n");
 		spin_lock (&dev->lock);
 		value = zero_set_config (dev, ctrl->wValue, GFP_ATOMIC);
 		spin_unlock (&dev->lock);
@@ -1028,6 +1066,8 @@ unknown:
 	/* respond with data transfer before status phase? */
 	if (value >= 0) {
 		req->length = value;
+		req->zero = value < ctrl->wLength
+				&& (value % gadget->ep0->maxpacket) == 0;
 		value = usb_ep_queue (gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0) {
 			DBG (dev, "ep_queue --> %d\n", value);
@@ -1060,6 +1100,21 @@ zero_disconnect (struct usb_gadget *gadget)
 	 */
 }
 
+static void
+zero_autoresume (unsigned long _dev)
+{
+	struct zero_dev	*dev = (struct zero_dev *) _dev;
+	int		status;
+
+	/* normally the host would be woken up for something
+	 * more significant than just a timer firing...
+	 */
+	if (dev->gadget->speed != USB_SPEED_UNKNOWN) {
+		status = usb_gadget_wakeup (dev->gadget);
+		DBG (dev, "wakeup --> %d\n", status);
+	}
+}
+
 /*-------------------------------------------------------------------------*/
 
 static void
@@ -1072,8 +1127,9 @@ zero_unbind (struct usb_gadget *gadget)
 	/* we've already been disconnected ... no i/o is active */
 	if (dev->req)
 		free_ep_req (gadget->ep0, dev->req);
+	del_timer_sync (&dev->resume);
 	kfree (dev);
-	set_gadget_data (gadget, 0);
+	set_gadget_data (gadget, NULL);
 }
 
 static int
@@ -1174,7 +1230,21 @@ autoconf_fail:
 	hs_sink_desc.bEndpointAddress = fs_sink_desc.bEndpointAddress;
 #endif
 
+	if (gadget->is_otg) {
+		otg_descriptor.bmAttributes |= USB_OTG_HNP,
+		source_sink_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+		loopback_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+	}
+
 	usb_gadget_set_selfpowered (gadget);
+
+	init_timer (&dev->resume);
+	dev->resume.function = zero_autoresume;
+	dev->resume.data = (unsigned long) dev;
+	if (autoresume) {
+		source_sink_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+		loopback_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+	}
 
 	gadget->ep0->driver_data = dev;
 
@@ -1195,6 +1265,33 @@ enomem:
 
 /*-------------------------------------------------------------------------*/
 
+static void
+zero_suspend (struct usb_gadget *gadget)
+{
+	struct zero_dev		*dev = get_gadget_data (gadget);
+
+	if (gadget->speed == USB_SPEED_UNKNOWN)
+		return;
+
+	if (autoresume) {
+		mod_timer (&dev->resume, jiffies + (HZ * autoresume));
+		DBG (dev, "suspend, wakeup in %d seconds\n", autoresume);
+	} else
+		DBG (dev, "suspend\n");
+}
+
+static void
+zero_resume (struct usb_gadget *gadget)
+{
+	struct zero_dev		*dev = get_gadget_data (gadget);
+
+	DBG (dev, "resume\n");
+	del_timer (&dev->resume);
+}
+
+
+/*-------------------------------------------------------------------------*/
+
 static struct usb_gadget_driver zero_driver = {
 #ifdef CONFIG_USB_GADGET_DUALSPEED
 	.speed		= USB_SPEED_HIGH,
@@ -1207,6 +1304,9 @@ static struct usb_gadget_driver zero_driver = {
 
 	.setup		= zero_setup,
 	.disconnect	= zero_disconnect,
+
+	.suspend	= zero_suspend,
+	.resume		= zero_resume,
 
 	.driver 	= {
 		.name		= (char *) shortname,

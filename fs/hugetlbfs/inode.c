@@ -32,10 +32,6 @@
 /* some random number */
 #define HUGETLBFS_MAGIC	0x958458f6
 
-int sysctl_overcommit_hugepages;  /* no overcommit by default */
-
-void huge_pagevec_release(struct pagevec *pvec);
-
 static struct super_operations hugetlbfs_ops;
 static struct address_space_operations hugetlbfs_aops;
 struct file_operations hugetlbfs_file_operations;
@@ -47,41 +43,17 @@ static struct backing_dev_info hugetlbfs_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-unsigned long 
-huge_pages_needed(struct address_space *mapping, struct vm_area_struct *vma,
-		  unsigned long start, unsigned long end)
-{ 
-	int i;
-	struct pagevec pvec;
-	unsigned long hugepages = (end - start) >> HPAGE_SHIFT; 
-	pgoff_t next = vma->vm_pgoff + ((start - vma->vm_start)>>PAGE_SHIFT);
-	pgoff_t endpg = next + ((end - start) >> PAGE_SHIFT);
-
-	pagevec_init(&pvec, 0);
-	while (next < endpg) { 
-		if (!pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE))
-			break;
-		for (i = 0; i < pagevec_count(&pvec); i++) { 
-			struct page *page = pvec.pages[i];
-			if (page->index > next)
-				next = page->index;
-			if (page->index >= endpg) 
-				break;
-			next++;			
-			hugepages--; 
-		}
-		huge_pagevec_release(&pvec);
-	}
-	return hugepages << HPAGE_SHIFT; 
-} 
+int sysctl_hugetlb_shm_group;
 
 static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct address_space *mapping = inode->i_mapping;
-	unsigned long bytes;
 	loff_t len, vma_len;
 	int ret;
+
+	if (vma->vm_pgoff & (HPAGE_SIZE / PAGE_SIZE - 1))
+		return -EINVAL;
 
 	if (vma->vm_start & ~HPAGE_MASK)
 		return -EINVAL;
@@ -92,15 +64,9 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	if (vma->vm_end - vma->vm_start < HPAGE_SIZE)
 		return -EINVAL;
 
-	down(&inode->i_sem);
-
-	bytes = huge_pages_needed(mapping, vma, vma->vm_start, vma->vm_end);
-	ret = -ENOMEM;
-	if (!sysctl_overcommit_hugepages && !is_hugepage_mem_enough(bytes))
-		goto out;
-	    
 	vma_len = (loff_t)(vma->vm_end - vma->vm_start);
 
+	down(&inode->i_sem);
 	file_accessed(file);
 	vma->vm_flags |= VM_HUGETLB | VM_RESERVED;
 	vma->vm_ops = &hugetlb_vm_ops;
@@ -108,7 +74,6 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	len = vma_len +	((loff_t)vma->vm_pgoff << PAGE_SHIFT);
 	if (ret == 0 && inode->i_size < len)
 		inode->i_size = len;
- out:
 	up(&inode->i_sem);
 
 	return ret;
@@ -182,7 +147,7 @@ void huge_pagevec_release(struct pagevec *pvec)
 	int i;
 
 	for (i = 0; i < pagevec_count(pvec); ++i)
-		huge_page_release(pvec->pages[i]);
+		put_page(pvec->pages[i]);
 
 	pagevec_reinit(pvec);
 }
@@ -192,7 +157,7 @@ void truncate_huge_page(struct page *page)
 	clear_page_dirty(page);
 	ClearPageUptodate(page);
 	remove_from_page_cache(page);
-	huge_page_release(page);
+	put_page(page);
 }
 
 void truncate_hugepages(struct address_space *mapping, loff_t lstart)
@@ -304,48 +269,31 @@ static void hugetlbfs_drop_inode(struct inode *inode)
  * h_pgoff is in HPAGE_SIZE units.
  * vma->vm_pgoff is in PAGE_SIZE units.
  */
-static void
+static inline void
 hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 {
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
 	struct prio_tree_iter iter;
 
-	vma = __vma_prio_tree_first(root, &iter, h_pgoff, ULONG_MAX);
-	while (vma) {
+	while ((vma = vma_prio_tree_next(vma, root, &iter,
+					h_pgoff, ULONG_MAX)) != NULL) {
 		unsigned long h_vm_pgoff;
 		unsigned long v_length;
-		unsigned long h_length;
 		unsigned long v_offset;
 
-		h_vm_pgoff = vma->vm_pgoff << (HPAGE_SHIFT - PAGE_SHIFT);
-		v_length = vma->vm_end - vma->vm_start;
-		h_length = v_length >> HPAGE_SHIFT;
+		h_vm_pgoff = vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT);
 		v_offset = (h_pgoff - h_vm_pgoff) << HPAGE_SHIFT;
-
 		/*
 		 * Is this VMA fully outside the truncation point?
 		 */
-		if (h_vm_pgoff >= h_pgoff) {
-			zap_hugepage_range(vma, vma->vm_start, v_length);
-			goto next;
-		}
+		if (h_vm_pgoff >= h_pgoff)
+			v_offset = 0;
 
-		/*
-		 * Is this VMA fully inside the truncaton point?
-		 */
-		if (h_vm_pgoff + (v_length >> HPAGE_SHIFT) <= h_pgoff)
-			  goto next;
+		v_length = vma->vm_end - vma->vm_start;
 
-		/*
-		 * The VMA straddles the truncation point.  v_offset is the
-		 * offset (in bytes) into the VMA where the point lies.
-		 */
 		zap_hugepage_range(vma,
 				vma->vm_start + v_offset,
 				v_length - v_offset);
-
-	next:
-		vma = __vma_prio_tree_next(vma, root, &iter, h_pgoff, ULONG_MAX);
 	}
 }
 
@@ -364,14 +312,10 @@ static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 	pgoff = offset >> HPAGE_SHIFT;
 
 	inode->i_size = offset;
-	down(&mapping->i_shared_sem);
-	/* Protect against page fault */
-	atomic_inc(&mapping->truncate_count);
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
+	spin_lock(&mapping->i_mmap_lock);
+	if (!prio_tree_empty(&mapping->i_mmap))
 		hugetlb_vmtruncate_list(&mapping->i_mmap, pgoff);
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared)))
-		hugetlb_vmtruncate_list(&mapping->i_mmap_shared, pgoff);
-	up(&mapping->i_shared_sem);
+	spin_unlock(&mapping->i_mmap_lock);
 	truncate_hugepages(mapping, offset);
 	return 0;
 }
@@ -388,9 +332,6 @@ static int hugetlbfs_setattr(struct dentry *dentry, struct iattr *attr)
 	if (error)
 		goto out;
 
-	error = security_inode_setattr(dentry, attr);
-	if (error)
-		goto out;
 	if (ia_valid & ATTR_SIZE) {
 		error = -EINVAL;
 		if (!(attr->ia_size & ~HPAGE_MASK))
@@ -564,8 +505,9 @@ static kmem_cache_t *hugetlbfs_inode_cachep;
 
 static struct inode *hugetlbfs_alloc_inode(struct super_block *sb)
 {
-	struct hugetlbfs_inode_info *p = kmem_cache_alloc(hugetlbfs_inode_cachep,
-							  SLAB_KERNEL);
+	struct hugetlbfs_inode_info *p;
+
+	p = kmem_cache_alloc(hugetlbfs_inode_cachep, SLAB_KERNEL);
 	if (!p)
 		return NULL;
 	return &p->vfs_inode;
@@ -573,7 +515,7 @@ static struct inode *hugetlbfs_alloc_inode(struct super_block *sb)
 
 static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 {
-	struct hugetlbfs_inode_info *ei = (struct hugetlbfs_inode_info *) foo;
+	struct hugetlbfs_inode_info *ei = (struct hugetlbfs_inode_info *)foo;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR)
@@ -582,7 +524,7 @@ static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 
 static void hugetlbfs_destroy_inode(struct inode *inode)
 {
-	mpol_free_shared_policy(&HUGETLBFS_I(inode)->policy);  
+	mpol_free_shared_policy(&HUGETLBFS_I(inode)->policy);
 	kmem_cache_free(hugetlbfs_inode_cachep, HUGETLBFS_I(inode));
 }
 
@@ -651,7 +593,7 @@ hugetlbfs_parse_options(char *options, struct hugetlbfs_config *pconfig)
 			unsigned long long size = memparse(value, &rest);
 			if (*rest == '%') {
 				size <<= HPAGE_SHIFT;
-				size *= htlbpage_max;
+				size *= max_huge_pages;
 				do_div(size, 100);
 				rest++;
 			}
@@ -776,6 +718,12 @@ static unsigned long hugetlbfs_counter(void)
 	return ret;
 }
 
+static int can_do_hugetlb_shm(void)
+{
+	return likely(capable(CAP_IPC_LOCK) ||
+			in_group_p(sysctl_hugetlb_shm_group));
+}
+
 struct file *hugetlb_zero_setup(size_t size)
 {
 	int error;
@@ -785,7 +733,7 @@ struct file *hugetlb_zero_setup(size_t size)
 	struct qstr quick_string;
 	char buf[16];
 
-	if (!can_do_mlock())
+	if (!can_do_hugetlb_shm())
 		return ERR_PTR(-EPERM);
 
 	if (!is_hugepage_mem_enough(size))
@@ -834,9 +782,9 @@ static int __init init_hugetlbfs_fs(void)
 	struct vfsmount *vfsmount;
 
 	hugetlbfs_inode_cachep = kmem_cache_create("hugetlbfs_inode_cache",
-				     sizeof(struct hugetlbfs_inode_info),
-				     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
-				     init_once, NULL);
+					sizeof(struct hugetlbfs_inode_info),
+					0, SLAB_RECLAIM_ACCOUNT,
+					init_once, NULL);
 	if (hugetlbfs_inode_cachep == NULL)
 		return -ENOMEM;
 
@@ -855,7 +803,7 @@ static int __init init_hugetlbfs_fs(void)
 
  out:
 	if (error)
-		kmem_cache_destroy(hugetlbfs_inode_cachep);		
+		kmem_cache_destroy(hugetlbfs_inode_cachep);
 	return error;
 }
 

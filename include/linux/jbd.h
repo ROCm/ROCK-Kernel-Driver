@@ -42,6 +42,11 @@
  */
 #undef JBD_PARANOID_IOFAIL
 
+/*
+ * The default maximum commit age, in seconds.
+ */
+#define JBD_DEFAULT_MAX_COMMIT_AGE 5
+
 #ifdef CONFIG_JBD_DEBUG
 /*
  * Define JBD_EXPENSIVE_CHECKING to enable more expensive internal
@@ -300,6 +305,10 @@ BUFFER_FNS(JBD, jbd)
 BUFFER_FNS(JWrite, jwrite)
 BUFFER_FNS(JBDDirty, jbddirty)
 TAS_BUFFER_FNS(JBDDirty, jbddirty)
+BUFFER_FNS(Revoked, revoked)
+TAS_BUFFER_FNS(Revoked, revoked)
+BUFFER_FNS(RevokeValid, revokevalid)
+TAS_BUFFER_FNS(RevokeValid, revokevalid)
 BUFFER_FNS(Freed, freed)
 
 static inline struct buffer_head *jh2bh(struct journal_head *jh)
@@ -831,7 +840,6 @@ struct journal_s
 #define JFS_ACK_ERR	0x004	/* The errno in the sb has been acked */
 #define JFS_FLUSHED	0x008	/* The journal superblock has been flushed */
 #define JFS_LOADED	0x010	/* The journal superblock has been loaded */
-#define JFS_BARRIER	0x020	/* Use IDE barriers */
 
 /* 
  * Function declarations for the journaling transaction and buffer
@@ -998,6 +1006,7 @@ int __log_space_left(journal_t *); /* Called with journal locked */
 int log_start_commit(journal_t *journal, tid_t tid);
 int __log_start_commit(journal_t *journal, tid_t tid);
 int journal_start_commit(journal_t *journal, tid_t *tid);
+int journal_force_commit_nested(journal_t *journal);
 int log_wait_commit(journal_t *journal, tid_t tid);
 int log_do_checkpoint(journal_t *journal);
 
@@ -1008,10 +1017,10 @@ extern int	cleanup_journal_tail(journal_t *);
 /* Debugging code only: */
 
 #define jbd_ENOSYS() \
-do {								      \
-	printk (KERN_ERR "JBD unimplemented function " __FUNCTION__); \
-	current->state = TASK_UNINTERRUPTIBLE;			      \
-	schedule();						      \
+do {								           \
+	printk (KERN_ERR "JBD unimplemented function %s\n", __FUNCTION__); \
+	current->state = TASK_UNINTERRUPTIBLE;			           \
+	schedule();						           \
 } while (1)
 
 /*

@@ -32,6 +32,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
@@ -105,7 +106,7 @@ static struct i2c_driver w83l785ts_driver = {
  */
 
 struct w83l785ts_data {
-	
+	struct i2c_client client;
 	struct semaphore update_lock;
 	char valid; /* zero until following fields are valid */
 	unsigned long last_updated; /* in jiffies */
@@ -136,8 +137,8 @@ static ssize_t show_temp_over(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_over));
 }
 
-static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL)
-static DEVICE_ATTR(temp1_max, S_IRUGO, show_temp_over, NULL)
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL);
+static DEVICE_ATTR(temp1_max, S_IRUGO, show_temp_over, NULL);
 
 /*
  * Real code
@@ -145,7 +146,7 @@ static DEVICE_ATTR(temp1_max, S_IRUGO, show_temp_over, NULL)
 
 static int w83l785ts_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, w83l785ts_detect);
 }
@@ -164,18 +165,16 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		goto exit;
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +  
-		sizeof(struct w83l785ts_data), GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct w83l785ts_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-	       sizeof(struct w83l785ts_data));
+	memset(data, 0, sizeof(struct w83l785ts_data));
 
 
-	/* The W83L785TS-specific data is placed right after the common I2C
-	 * client data. */
-	data = (struct w83l785ts_data *) (new_client + 1);
+	/* The common I2C client data is placed right before the
+	 * W83L785TS-specific data. */
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -255,7 +254,7 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 exit_free:
-	kfree(new_client);
+	kfree(data);
 exit:
 	return err;
 }
@@ -270,7 +269,7 @@ static int w83l785ts_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 
@@ -286,7 +285,7 @@ static u8 w83l785ts_read_value(struct i2c_client *client, u8 reg, u8 defval)
 		if (value >= 0)
 			return value;
 		dev_dbg(&client->dev, "Read failed, will retry in %d.\n", i);
-		i2c_delay(i);
+		msleep(i);
 	}
 
 	dev_err(&client->dev, "Couldn't read value from register. "

@@ -75,7 +75,7 @@ static int ad1980_probe(struct ac97_codec *codec, struct ac97_driver *driver)
 
 	/* Switch the inputs/outputs over (from Dell code) */
 	control = codec->codec_read(codec, AC97_AD_MISC);
-	codec->codec_write(codec, AC97_AD_MISC, control | 0x0420);
+	codec->codec_write(codec, AC97_AD_MISC, control | 0x4420);
 	
 	/* We could refuse the device since we dont need to hang around,
 	   but we will claim it */

@@ -33,7 +33,7 @@ static unsigned int longrun_low_freq, longrun_high_freq;
  * Reads the current LongRun policy by access to MSR_TMTA_LONGRUN_FLAGS
  * and MSR_TMTA_LONGRUN_CTRL
  */
-static void longrun_get_policy(struct cpufreq_policy *policy)
+static void __init longrun_get_policy(struct cpufreq_policy *policy)
 {
 	u32 msr_lo, msr_hi;
 
@@ -46,18 +46,23 @@ static void longrun_get_policy(struct cpufreq_policy *policy)
 	rdmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
 	msr_lo &= 0x0000007F;
 	msr_hi &= 0x0000007F;
-
-	policy->min = longrun_low_freq + msr_lo * 
-		((longrun_high_freq - longrun_low_freq) / 100);
-	policy->max = longrun_low_freq + msr_hi * 
-		((longrun_high_freq - longrun_low_freq) / 100);
+	
+	if ( longrun_high_freq <= longrun_low_freq ) {
+		/* Assume degenerate Longrun table */
+		policy->min = policy->max = longrun_high_freq;
+	} else {
+		policy->min = longrun_low_freq + msr_lo * 
+			((longrun_high_freq - longrun_low_freq) / 100);
+		policy->max = longrun_low_freq + msr_hi * 
+			((longrun_high_freq - longrun_low_freq) / 100);
+	}
 	policy->cpu = 0;
 }
 
 
 /**
  * longrun_set_policy - sets a new CPUFreq policy
- * @policy - new policy
+ * @policy: new policy
  *
  * Sets a new CPUFreq policy on LongRun-capable processors. This function
  * has to be called with cpufreq_driver locked.
@@ -70,10 +75,15 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
 	if (!policy)
 		return -EINVAL;
 
-	pctg_lo = (policy->min - longrun_low_freq) / 
-		((longrun_high_freq - longrun_low_freq) / 100);
-	pctg_hi = (policy->max - longrun_low_freq) / 
-		((longrun_high_freq - longrun_low_freq) / 100);
+	if ( longrun_high_freq <= longrun_low_freq ) {
+		/* Assume degenerate Longrun table */
+		pctg_lo = pctg_hi = 100;
+	} else {
+		pctg_lo = (policy->min - longrun_low_freq) / 
+			((longrun_high_freq - longrun_low_freq) / 100);
+		pctg_hi = (policy->max - longrun_low_freq) / 
+			((longrun_high_freq - longrun_low_freq) / 100);
+	}
 
 	if (pctg_hi > 100)
 		pctg_hi = 100;
@@ -106,6 +116,7 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
 
 /**
  * longrun_verify_poliy - verifies a new CPUFreq policy
+ * @policy: the policy to verify
  *
  * Validates a new CPUFreq policy. This function has to be called with 
  * cpufreq_driver locked.
@@ -127,9 +138,22 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static unsigned int longrun_get(unsigned int cpu)
+{
+	u32 eax, ebx, ecx, edx;
+
+	if (cpu)
+		return 0;
+
+	cpuid(0x80860007, &eax, &ebx, &ecx, &edx);
+
+	return (eax * 1000);
+}
 
 /**
  * longrun_determine_freqs - determines the lowest and highest possible core frequency
+ * @low_freq: an int to put the lowest frequency into
+ * @high_freq: an int to put the highest frequency into
  *
  * Determines the lowest and highest possible core frequencies on this CPU.
  * This is necessary to calculate the performance percentage according to
@@ -142,6 +166,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 	u32 msr_lo, msr_hi;
 	u32 save_lo, save_hi;
 	u32 eax, ebx, ecx, edx;
+	u32 try_hi;
 	struct cpuinfo_x86 *c = cpu_data;
 
 	if (!low_freq || !high_freq)
@@ -184,12 +209,14 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 	 * upper limit to make the calculation more accurate.
 	 */
 	cpuid(0x80860007, &eax, &ebx, &ecx, &edx);
-	if (ecx > 90) {
-		/* set to 0 to 80 perf_pctg */
+	/* try decreasing in 10% steps, some processors react only
+	 * on some barrier values */
+	for (try_hi = 80; try_hi > 0 && ecx > 90; try_hi -=10) {
+		/* set to 0 to try_hi perf_pctg */
 		msr_lo &= 0xFFFFFF80;
 		msr_hi &= 0xFFFFFF80;
 		msr_lo |= 0;
-		msr_hi |= 80;
+		msr_hi |= try_hi;
 		wrmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
 
 		/* read out current core MHz and current perf_pctg */
@@ -244,8 +271,10 @@ static int __init longrun_cpu_init(struct cpufreq_policy *policy)
 
 
 static struct cpufreq_driver longrun_driver = {
+	.flags		= CPUFREQ_CONST_LOOPS,
 	.verify 	= longrun_verify_policy,
 	.setpolicy 	= longrun_set_policy,
+	.get		= longrun_get,
 	.init		= longrun_cpu_init,
 	.name		= "longrun",
 	.owner		= THIS_MODULE,

@@ -137,13 +137,13 @@ __inline__ void flush_dcache_page_impl(struct page *page)
 #endif
 
 #if (L1DCACHE_SIZE > PAGE_SIZE)
-	__flush_dcache_page(page->virtual,
+	__flush_dcache_page(page_address(page),
 			    ((tlb_type == spitfire) &&
 			     page_mapping(page) != NULL));
 #else
 	if (page_mapping(page) != NULL &&
 	    tlb_type == spitfire)
-		__flush_icache_page(__pa(page->virtual));
+		__flush_icache_page(__pa(page_address(page)));
 #endif
 }
 
@@ -152,9 +152,9 @@ __inline__ void flush_dcache_page_impl(struct page *page)
 #define dcache_dirty_cpu(page) \
 	(((page)->flags >> 24) & (NR_CPUS - 1UL))
 
-static __inline__ void set_dcache_dirty(struct page *page)
+static __inline__ void set_dcache_dirty(struct page *page, int this_cpu)
 {
-	unsigned long mask = smp_processor_id();
+	unsigned long mask = this_cpu;
 	unsigned long non_cpu_bits = ~((NR_CPUS - 1UL) << 24UL);
 	mask = (mask << 24) | (1UL << PG_dcache_dirty);
 	__asm__ __volatile__("1:\n\t"
@@ -206,16 +206,19 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t p
 	    (page = pfn_to_page(pfn), page_mapping(page)) &&
 	    ((pg_flags = page->flags) & (1UL << PG_dcache_dirty))) {
 		int cpu = ((pg_flags >> 24) & (NR_CPUS - 1UL));
+		int this_cpu = get_cpu();
 
 		/* This is just to optimize away some function calls
 		 * in the SMP case.
 		 */
-		if (cpu == smp_processor_id())
+		if (cpu == this_cpu)
 			flush_dcache_page_impl(page);
 		else
 			smp_flush_dcache_page_impl(page, cpu);
 
 		clear_dcache_dirty_cpu(page, cpu);
+
+		put_cpu();
 	}
 	if (get_thread_fault_code())
 		__update_mmu_cache(vma->vm_mm->context & TAG_CONTEXT_BITS,
@@ -227,17 +230,15 @@ void flush_dcache_page(struct page *page)
 	struct address_space *mapping = page_mapping(page);
 	int dirty = test_bit(PG_dcache_dirty, &page->flags);
 	int dirty_cpu = dcache_dirty_cpu(page);
+	int this_cpu = get_cpu();
 
-	if (mapping &&
-	    prio_tree_empty(&mapping->i_mmap) &&
-	    prio_tree_empty(&mapping->i_mmap_shared) &&
-	    list_empty(&mapping->i_mmap_nonlinear)) {
+	if (mapping && !mapping_mapped(mapping)) {
 		if (dirty) {
-			if (dirty_cpu == smp_processor_id())
-				return;
+			if (dirty_cpu == this_cpu)
+				goto out;
 			smp_flush_dcache_page_impl(page, dirty_cpu);
 		}
-		set_dcache_dirty(page);
+		set_dcache_dirty(page, this_cpu);
 	} else {
 		/* We could delay the flush for the !page_mapping
 		 * case too.  But that case is for exec env/arg
@@ -246,6 +247,9 @@ void flush_dcache_page(struct page *page)
 		 */
 		flush_dcache_page_impl(page);
 	}
+
+out:
+	put_cpu();
 }
 
 /* When shared+writable mmaps of files go away, we lose all dirty
@@ -340,11 +344,21 @@ void flush_icache_range(unsigned long start, unsigned long end)
 	}
 }
 
+unsigned long page_to_pfn(struct page *page)
+{
+	return (unsigned long) ((page - mem_map) + pfn_base);
+}
+
+struct page *pfn_to_page(unsigned long pfn)
+{
+	return (mem_map + (pfn - pfn_base));
+}
+
 void show_mem(void)
 {
 	printk("Mem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6dkB\n",
+	printk("Free swap:       %6ldkB\n",
 	       nr_swap_pages << (PAGE_SHIFT-10));
 	printk("%ld pages of RAM\n", num_physpages);
 	printk("%d free pages\n", nr_free_pages());
@@ -1526,8 +1540,10 @@ void __init paging_init(void)
 	/* Now can init the kernel/bad page tables. */
 	pgd_set(&swapper_pg_dir[0], swapper_pmd_dir + (shift / sizeof(pgd_t)));
 	
-	sparc64_vpte_patchme1[0] |= (pgd_val(init_mm.pgd[0]) >> 10);
-	sparc64_vpte_patchme2[0] |= (pgd_val(init_mm.pgd[0]) & 0x3ff);
+	sparc64_vpte_patchme1[0] |=
+		(((unsigned long)pgd_val(init_mm.pgd[0])) >> 10);
+	sparc64_vpte_patchme2[0] |=
+		(((unsigned long)pgd_val(init_mm.pgd[0])) & 0x3ff);
 	flushi((long)&sparc64_vpte_patchme1[0]);
 	
 	/* Setup bootmem... */
@@ -1583,7 +1599,7 @@ void __init paging_init(void)
  * prom_set_traptable() call, and OBP is allocating a scratchpad
  * for saving client program register state etc.
  */
-void __init sort_memlist(struct linux_mlist_p1275 *thislist)
+static void __init sort_memlist(struct linux_mlist_p1275 *thislist)
 {
 	int swapi = 0;
 	int i, mitr;

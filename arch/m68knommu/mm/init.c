@@ -72,7 +72,7 @@ void show_mem(void)
     int free = 0, total = 0, reserved = 0, shared = 0;
     int cached = 0;
 
-    printk("\nMem-info:\n");
+    printk(KERN_INFO "\nMem-info:\n");
     show_free_areas();
     i = max_mapnr;
     while (i-- > 0) {
@@ -86,11 +86,11 @@ void show_mem(void)
 	else
 	    shared += page_count(mem_map+i) - 1;
     }
-    printk("%d pages of RAM\n",total);
-    printk("%d free pages\n",free);
-    printk("%d reserved pages\n",reserved);
-    printk("%d pages shared\n",shared);
-    printk("%d pages swap cached\n",cached);
+    printk(KERN_INFO "%d pages of RAM\n",total);
+    printk(KERN_INFO "%d free pages\n",free);
+    printk(KERN_INFO "%d reserved pages\n",reserved);
+    printk(KERN_INFO "%d pages shared\n",shared);
+    printk(KERN_INFO "%d pages swap cached\n",cached);
 }
 
 extern unsigned long memory_start;
@@ -114,7 +114,7 @@ void paging_init(void)
 	unsigned long end_mem   = memory_end & PAGE_MASK;
 
 #ifdef DEBUG
-	printk ("start_mem is %#lx\nvirtual_end is %#lx\n",
+	printk (KERN_DEBUG "start_mem is %#lx\nvirtual_end is %#lx\n",
 		start_mem, end_mem);
 #endif
 
@@ -133,9 +133,9 @@ void paging_init(void)
 	set_fs (USER_DS);
 
 #ifdef DEBUG
-	printk ("before free_area_init\n");
+	printk (KERN_DEBUG "before free_area_init\n");
 
-	printk ("free_area_init -> start_mem is %#lx\nvirtual_end is %#lx\n",
+	printk (KERN_DEBUG "free_area_init -> start_mem is %#lx\nvirtual_end is %#lx\n",
 		start_mem, end_mem);
 #endif
 
@@ -162,7 +162,7 @@ void mem_init(void)
 	unsigned long end_mem   = memory_end; /* DAVIDM - this must not include kernel stack at top */
 
 #ifdef DEBUG
-	printk("Mem_init: start=%lx, end=%lx\n", start_mem, end_mem);
+	printk(KERN_DEBUG "Mem_init: start=%lx, end=%lx\n", start_mem, end_mem);
 #endif
 
 	end_mem &= PAGE_MASK;
@@ -179,7 +179,7 @@ void mem_init(void)
 	initk = (&__init_begin - &__init_end) >> 10;
 
 	tmp = nr_free_pages() << PAGE_SHIFT;
-	printk("Memory available: %luk/%luk RAM, %luk/%luk ROM (%dk kernel code, %dk data)\n",
+	printk(KERN_INFO "Memory available: %luk/%luk RAM, %luk/%luk ROM (%dk kernel code, %dk data)\n",
 	       tmp >> 10,
 	       len >> 10,
 	       (rom_length > 0) ? ((rom_length >> 10) - codek) : 0,
@@ -201,7 +201,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 		totalram_pages++;
 		pages++;
 	}
-	printk ("Freeing initrd memory: %dk freed\n", pages);
+	printk (KERN_NOTICE "Freeing initrd memory: %dk freed\n", pages);
 }
 #endif
 
@@ -223,7 +223,7 @@ free_initmem()
 		free_page(addr);
 		totalram_pages++;
 	}
-	printk("Freeing unused kernel memory: %ldk freed (0x%x - 0x%x)\n",
+	printk(KERN_NOTICE "Freeing unused kernel memory: %ldk freed (0x%x - 0x%x)\n",
 			(addr - PAGE_ALIGN((long) &__init_begin)) >> 10,
 			(int)(PAGE_ALIGN((unsigned long)(&__init_begin))),
 			(int)(addr - PAGE_SIZE));

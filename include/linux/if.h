@@ -21,6 +21,7 @@
 
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
+#include <linux/compiler.h>		/* for "__user" et al           */
 
 #define	IFNAMSIZ	16
 #include <linux/hdlc/ioctl.h>
@@ -62,6 +63,7 @@
 #define IF_IFACE_T1	0x1003		/* T1 telco serial interface	*/
 #define IF_IFACE_E1	0x1004		/* E1 telco serial interface	*/
 #define IF_IFACE_SYNC_SERIAL 0x1005	/* can't be set by software	*/
+#define IF_IFACE_X21D   0x1006          /* X.21 Dual Clocking (FarSite) */
 
 /* For definitions see hdlc.h */
 #define IF_PROTO_HDLC	0x2000		/* raw HDLC protocol		*/
@@ -76,6 +78,7 @@
 #define IF_PROTO_FR_DEL_ETH_PVC 0x2009	/*  Delete FR Ethernet-bridged PVC */
 #define IF_PROTO_FR_PVC	0x200A		/* for reading PVC status	*/
 #define IF_PROTO_FR_ETH_PVC 0x200B
+#define IF_PROTO_RAW    0x200C          /* RAW Socket                   */
 
 
 /*
@@ -105,15 +108,15 @@ struct if_settings
 	unsigned int size;	/* Size of the data allocated by the caller */
 	union {
 		/* {atm/eth/dsl}_settings anyone ? */
-		raw_hdlc_proto		*raw_hdlc;
-		cisco_proto		*cisco;
-		fr_proto		*fr;
-		fr_proto_pvc		*fr_pvc;
-		fr_proto_pvc_info	*fr_pvc_info;
+		raw_hdlc_proto		__user *raw_hdlc;
+		cisco_proto		__user *cisco;
+		fr_proto		__user *fr;
+		fr_proto_pvc		__user *fr_pvc;
+		fr_proto_pvc_info	__user *fr_pvc_info;
 
 		/* interface settings */
-		sync_serial_settings	*sync;
-		te1_settings		*te1;
+		sync_serial_settings	__user *sync;
+		te1_settings		__user *te1;
 	} ifs_ifsu;
 };
 
@@ -144,7 +147,7 @@ struct ifreq
 		struct  ifmap ifru_map;
 		char	ifru_slave[IFNAMSIZ];	/* Just fits the size */
 		char	ifru_newname[IFNAMSIZ];
-		char *	ifru_data;
+		void __user *	ifru_data;
 		struct	if_settings ifru_settings;
 	} ifr_ifru;
 };
@@ -179,8 +182,8 @@ struct ifconf
 	int	ifc_len;			/* size of buffer	*/
 	union 
 	{
-		char *			ifcu_buf;
-		struct	ifreq 		*ifcu_req;
+		char __user *ifcu_buf;
+		struct ifreq __user *ifcu_req;
 	} ifc_ifcu;
 };
 #define	ifc_buf	ifc_ifcu.ifcu_buf		/* buffer address	*/

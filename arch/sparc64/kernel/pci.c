@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/sched.h>
@@ -799,6 +800,7 @@ int pci_domain_nr(struct pci_bus *pbus)
 
 	return ret;
 }
+EXPORT_SYMBOL(pci_domain_nr);
 
 int pci_name_bus(char *name, struct pci_bus *bus)
 {

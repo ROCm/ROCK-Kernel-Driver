@@ -14,21 +14,11 @@
 #include <linux/delay.h>	/* for mdelay() */
 #include <linux/interrupt.h>	/* for in_interrupt() */
 #include <linux/list.h>		/* for struct list_head */
+#include <linux/kref.h>		/* for struct kref */
 #include <linux/device.h>	/* for struct device */
 #include <linux/fs.h>		/* for struct file_operations */
 #include <linux/completion.h>	/* for struct completion */
 #include <linux/sched.h>	/* for current && schedule_timeout */
-
-
-static __inline__ void wait_ms(unsigned int ms)
-{
-	if(!in_interrupt()) {
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(1 + ms * HZ / 1000);
-	}
-	else
-		mdelay(ms);
-}
 
 struct usb_device;
 struct usb_driver;
@@ -147,11 +137,42 @@ void usb_put_intf(struct usb_interface *intf);
 #define USB_MAXINTERFACES	32
 
 /**
+ * struct usb_interface_cache - long-term representation of a device interface
+ * @num_altsetting: number of altsettings defined.
+ * @ref: reference counter.
+ * @altsetting: variable-length array of interface structures, one for
+ *	each alternate setting that may be selected.  Each one includes a
+ *	set of endpoint configurations.  They will be in no particular order.
+ *
+ * These structures persist for the lifetime of a usb_device, unlike
+ * struct usb_interface (which persists only as long as its configuration
+ * is installed).  The altsetting arrays can be accessed through these
+ * structures at any time, permitting comparison of configurations and
+ * providing support for the /proc/bus/usb/devices pseudo-file.
+ */
+struct usb_interface_cache {
+	unsigned num_altsetting;	/* number of alternate settings */
+	struct kref ref;		/* reference counter */
+
+	/* variable-length array of alternate settings for this interface,
+	 * stored in no particular order */
+	struct usb_host_interface altsetting[0];
+};
+#define	ref_to_usb_interface_cache(r) \
+		container_of(r, struct usb_interface_cache, ref)
+#define	altsetting_to_usb_interface_cache(a) \
+		container_of(a, struct usb_interface_cache, altsetting[0])
+
+/**
  * struct usb_host_config - representation of a device's configuration
  * @desc: the device's configuration descriptor.
- * @interface: array of usb_interface structures, one for each interface
- *	in the configuration.  The number of interfaces is stored in
- *	desc.bNumInterfaces.
+ * @interface: array of pointers to usb_interface structures, one for each
+ *	interface in the configuration.  The number of interfaces is stored
+ *	in desc.bNumInterfaces.  These pointers are valid only while the
+ *	the configuration is active.
+ * @intf_cache: array of pointers to usb_interface_cache structures, one
+ *	for each interface in the configuration.  These structures exist
+ *	for the entire life of the device.
  * @extra: pointer to buffer containing all extra descriptors associated
  *	with this configuration (those preceding the first interface
  *	descriptor).
@@ -185,6 +206,10 @@ struct usb_host_config {
 	 * stored in no particular order */
 	struct usb_interface *interface[USB_MAXINTERFACES];
 
+	/* Interface information available even when this is not the
+	 * active configuration */
+	struct usb_interface_cache *intf_cache[USB_MAXINTERFACES];
+
 	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
 };
@@ -216,6 +241,9 @@ struct usb_bus {
 	struct device *controller;	/* host/master side hardware */
 	int busnum;			/* Bus number (in order of reg) */
 	char *bus_name;			/* stable id (PCI slot_name etc) */
+	u8 otg_port;			/* 0, or number of OTG/HNP port */
+	unsigned is_b_host:1;		/* true during some HNP roleswitches */
+	unsigned b_hnp_enable:1;	/* OTG: did A-Host enable HNP? */
 
 	int devnum_next;		/* Next open device number in round-robin allocation */
 
@@ -301,9 +329,6 @@ struct usb_device {
 
 	int maxchild;			/* Number of ports if hub */
 	struct usb_device *children[USB_MAXCHILDREN];
-	char *static_vendor;
-	char *static_product;
-	char *static_serial;
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
@@ -312,6 +337,7 @@ extern void usb_put_dev(struct usb_device *dev);
 
 /* mostly for devices emulating SCSI over USB */
 extern int usb_reset_device(struct usb_device *dev);
+extern int __usb_reset_device(struct usb_device *dev);
 
 extern struct usb_device *usb_find_device(u16 vendor_id, u16 product_id);
 
@@ -332,7 +358,7 @@ extern int usb_driver_claim_interface(struct usb_driver *driver,
  * may need to explicitly claim that lock.
  *
  */
-static int inline usb_interface_claimed(struct usb_interface *iface) {
+static inline int usb_interface_claimed(struct usb_interface *iface) {
 	return (iface->dev.driver != NULL);
 }
 
@@ -634,7 +660,7 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * calling usb_alloc_urb() and freed with a call to usb_free_urb().
  * Initialization may be done using various usb_fill_*_urb() functions.  URBs
  * are submitted using usb_submit_urb(), and pending requests may be canceled
- * using usb_unlink_urb().
+ * using usb_unlink_urb() or usb_kill_urb().
  *
  * Data Transfer Buffers:
  *
@@ -661,7 +687,9 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * All URBs submitted must initialize dev, pipe,
  * transfer_flags (may be zero), complete, timeout (may be zero).
  * The URB_ASYNC_UNLINK transfer flag affects later invocations of
- * the usb_unlink_urb() routine.
+ * the usb_unlink_urb() routine.  Note: Failure to set URB_ASYNC_UNLINK
+ * with usb_unlink_urb() is deprecated.  For synchronous unlinks use
+ * usb_kill_urb() instead.
  *
  * All URBs must also initialize 
  * transfer_buffer and transfer_buffer_length.  They may provide the
@@ -679,7 +707,7 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * URB_NO_SETUP_DMA_MAP indicate which buffers have already been mapped.
  * URB_NO_SETUP_DMA_MAP is ignored for non-control URBs.
  *
- * Interrupt UBS must provide an interval, saying how often (in milliseconds
+ * Interrupt URBs must provide an interval, saying how often (in milliseconds
  * or, for highspeed devices, 125 microsecond units)
  * to poll for transfers.  After the URB has been submitted, the interval
  * field reflects how the transfer was actually scheduled.
@@ -734,11 +762,13 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
 struct urb
 {
 	/* private, usb core and host controller only fields in the urb */
+	struct kref kref;		/* reference count of the URB */
 	spinlock_t lock;		/* lock for the URB */
-	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
 	int bandwidth;			/* bandwidth for INT/ISO request */
+	atomic_t use_count;		/* concurrent submissions counter */
+	u8 reject;			/* submissions will fail */
 
 	/* public, documented fields in the urb that can be used by drivers */
 	struct usb_device *dev; 	/* (in) pointer to associated device */
@@ -874,6 +904,7 @@ extern void usb_free_urb(struct urb *urb);
 extern struct urb *usb_get_urb(struct urb *urb);
 extern int usb_submit_urb(struct urb *urb, int mem_flags);
 extern int usb_unlink_urb(struct urb *urb);
+extern void usb_kill_urb(struct urb *urb);
 
 #define HAVE_USB_BUFFERS
 void *usb_buffer_alloc (struct usb_device *dev, size_t size,
@@ -907,6 +938,11 @@ extern int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 extern int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	void *data, int len, int *actual_length,
 	int timeout);
+
+/* selective suspend/resume */
+extern int usb_suspend_device(struct usb_device *dev, u32 state);
+extern int usb_resume_device(struct usb_device *dev);
+
 
 /* wrappers around usb_control_msg() for the most common standard requests */
 extern int usb_get_descriptor(struct usb_device *dev, unsigned char desctype,

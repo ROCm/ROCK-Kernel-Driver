@@ -2,9 +2,11 @@
  * Flash memory access on Hynix GMS30C7201/HMS30C7202 based 
  * evaluation boards
  * 
+ * $Id: h720x-flash.c,v 1.9 2004/07/14 17:45:40 dwmw2 Exp $
+ *
  * (C) 2002 Jungjun Kim <jungjun.kim@hynix.com>
  *     2003 Thomas Gleixner <tglx@linutronix.de>	
-*/
+ */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -24,7 +26,7 @@ static struct mtd_info *mymtd;
 
 static struct map_info h720x_map = {
 	.name =		"H720X",
-	.buswidth =	4,
+	.bankwidth =	4,
 	.size =		FLASH_SIZE,
 	.phys =		FLASH_PHYS,
 };
@@ -80,13 +82,13 @@ int __init h720x_mtd_init(void)
 
 	simple_map_init(&h720x_map);
 
-	// Probe for flash buswidth 4
+	// Probe for flash bankwidth 4
 	printk (KERN_INFO "H720x-MTD probing 32bit FLASH\n");
 	mymtd = do_map_probe("cfi_probe", &h720x_map);
 	if (!mymtd) {
 		printk (KERN_INFO "H720x-MTD probing 16bit FLASH\n");
-	    // Probe for buswidth 2
-	    h720x_map.buswidth = 2;
+	    // Probe for bankwidth 2
+	    h720x_map.bankwidth = 2;
 	    mymtd = do_map_probe("cfi_probe", &h720x_map);
 	}
 	    

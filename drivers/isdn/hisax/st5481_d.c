@@ -381,8 +381,8 @@ static void usb_d_out_complete(struct urb *urb, struct pt_regs *regs)
 	buf_nr = get_buf_nr(d_out->urb, urb);
 	test_and_clear_bit(buf_nr, &d_out->busy);
 
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
+	if (unlikely(urb->status < 0)) {
+		if (urb->status != -ENOENT && urb->status != -ESHUTDOWN) {
 			WARN("urb status %d",urb->status);
 			if (d_out->busy == 0) {
 				st5481_usb_pipe_reset(adapter, EP_D_OUT | USB_DIR_OUT, fifo_reseted, adapter);
@@ -623,7 +623,7 @@ static void ph_connect(struct st5481_adapter *adapter)
 	st5481_usb_device_ctrl_msg(adapter, FFMSK_D, 0xfc, NULL, NULL);
 	st5481_in_mode(d_in, L1_MODE_HDLC);
 
-#if LOOPBACK
+#ifdef LOOPBACK
 	// Turn loopback on (data sent on B and D looped back)
 	st5481_usb_device_ctrl_msg(cs, LBB, 0x04, NULL, NULL);
 #endif
@@ -649,16 +649,21 @@ static void ph_disconnect(struct st5481_adapter *adapter)
 	st5481_usb_device_ctrl_msg(adapter, GPIO_OUT, adapter->leds, NULL, NULL);
 }
 
-static int __devinit st5481_setup_d_out(struct st5481_adapter *adapter)
+static int st5481_setup_d_out(struct st5481_adapter *adapter)
 {
 	struct usb_device *dev = adapter->usb_dev;
-	struct usb_host_interface *altsetting;
+	struct usb_interface *intf;
+	struct usb_host_interface *altsetting = NULL;
 	struct usb_host_endpoint *endpoint;
 	struct st5481_d_out *d_out = &adapter->d_out;
 
 	DBG(2,"");
 
-	altsetting = &(dev->config->interface[0]->altsetting[3]);
+	intf = usb_ifnum_to_if(dev, 0);
+	if (intf)
+		altsetting = usb_altnum_to_altsetting(intf, 3);
+	if (!altsetting)
+		return -ENXIO;
 
 	// Allocate URBs and buffers for the D channel out
 	endpoint = &altsetting->endpoint[EP_D_OUT-1];
@@ -682,7 +687,7 @@ static void st5481_release_d_out(struct st5481_adapter *adapter)
 	st5481_release_isocpipes(d_out->urb);
 }
 
-int __devinit st5481_setup_d(struct st5481_adapter *adapter)
+int st5481_setup_d(struct st5481_adapter *adapter)
 {
 	int retval;
 

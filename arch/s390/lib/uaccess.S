@@ -154,46 +154,57 @@ __clear_user_asm:
         .align 4
         .text
         .globl __strncpy_from_user_asm
-	# %r2 = dst, %r3 = src, %r4 = count
+	# %r2 = count, %r3 = dst, %r4 = src
 __strncpy_from_user_asm:
 	lhi	%r0,0
-	lhi	%r1,1
-	lhi	%r5,0
-0:	mvcp	0(%r1,%r2),0(%r3),%r0
-	tm	0(%r2),0xff
-	jz	1f
-	la	%r2,1(%r2)
-	la	%r3,1(%r3)
-	ahi	%r5,1
-	clr	%r5,%r4
-	jl	0b
-1:	lr	%r2,%r5
+	lr	%r1,%r4
+	la	%r4,0(%r4)	# clear high order bit from %r4
+	la	%r2,0(%r2,%r4)	# %r2 points to first byte after string
+	sacf	256
+0:	srst	%r2,%r1
+	jo	0b
+	sacf	0
+	lr	%r1,%r2
+	jh	1f		# \0 found in string ?
+	ahi	%r1,1		# include \0 in copy
+1:	slr	%r1,%r4		# %r1 = copy length (without \0)
+	slr	%r2,%r4		# %r2 = return length (including \0)
+2:	mvcp	0(%r1,%r3),0(%r4),%r0
+	jnz	3f
 	br	%r14
-2:	lhi	%r2,-EFAULT
+3:	la	%r3,256(%r3)
+	la	%r4,256(%r4)
+	ahi	%r1,-256
+	mvcp	0(%r1,%r3),0(%r4),%r0
+	jnz	3b
 	br	%r14
-        .section __ex_table,"a"
-	.long	0b,2b
+4:	sacf	0
+	lhi	%r2,-EFAULT
+	br	%r14
+	.section __ex_table,"a"
+	.long	0b,4b
 	.previous
 
         .align 4
         .text
         .globl __strnlen_user_asm
-	# %r2 = src, %r3 = count
+	# %r2 = count, %r3 = src
 __strnlen_user_asm:
 	lhi	%r0,0
-	lhi	%r1,1
-	lhi	%r5,0
-0:	mvcp	24(%r1,%r15),0(%r2),%r0
-	ahi	%r5,1
-	tm	24(%r15),0xff
-	jz	1f
-	la	%r2,1(%r2)
-	clr	%r5,%r3
-	jl	0b
-1:	lr	%r2,%r5
+	lr	%r1,%r3
+	la	%r3,0(%r3)	# clear high order bit from %r4
+	la	%r2,0(%r2,%r3)	# %r2 points to first byte after string
+	sacf	256
+0:	srst	%r2,%r1
+	jo	0b
+	sacf	0
+	jh	1f		# \0 found in string ?
+	ahi	%r2,1		# strnlen_user result includes the \0
+1:	slr	%r2,%r3
 	br	%r14
-2:	lhi	%r2,-EFAULT
+2:	sacf	0
+	lhi	%r2,-EFAULT
 	br	%r14
-        .section __ex_table,"a"
+	.section __ex_table,"a"
 	.long	0b,2b
 	.previous

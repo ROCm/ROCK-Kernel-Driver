@@ -410,14 +410,14 @@ serial21285_console_write(struct console *co, const char *s,
 	int i;
 
 	for (i = 0; i < count; i++) {
+		while (*CSR_UARTFLG & 0x20)
+			barrier();
+		*CSR_UARTDR = s[i];
 		if (s[i] == '\n') {
 			while (*CSR_UARTFLG & 0x20)
 				barrier();
 			*CSR_UARTDR = '\r';
 		}
-		while (*CSR_UARTFLG & 0x20)
-			barrier();
-		*CSR_UARTDR = s[i];
 	}
 }
 

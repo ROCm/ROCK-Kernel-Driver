@@ -294,20 +294,72 @@ static int leo_blank(int blank, struct fb_info *info)
 }
 
 static struct sbus_mmap_map leo_mmap_map[] = {
-	{ LEO_SS0_MAP,		LEO_OFF_SS0,		0x800000	},
-	{ LEO_LC_SS0_USR_MAP,	LEO_OFF_LC_SS0_USR,	0x1000		},
-	{ LEO_LD_SS0_MAP,	LEO_OFF_LD_SS0,		0x1000		},
-	{ LEO_LX_CURSOR_MAP,	LEO_OFF_LX_CURSOR,	0x1000		},
-	{ LEO_SS1_MAP,		LEO_OFF_SS1,		0x800000	},
-	{ LEO_LC_SS1_USR_MAP,	LEO_OFF_LC_SS1_USR,	0x1000		},
-	{ LEO_LD_SS1_MAP,	LEO_OFF_LD_SS1,		0x1000		},
-	{ LEO_UNK_MAP,		LEO_OFF_UNK,		0x1000		},
-	{ LEO_LX_KRN_MAP,	LEO_OFF_LX_KRN,		0x1000		},
-	{ LEO_LC_SS0_KRN_MAP,	LEO_OFF_LC_SS0_KRN,	0x1000		},
-	{ LEO_LC_SS1_KRN_MAP,	LEO_OFF_LC_SS1_KRN,	0x1000		},
-	{ LEO_LD_GBL_MAP,	LEO_OFF_LD_GBL,		0x1000		},
-	{ LEO_UNK2_MAP,		LEO_OFF_UNK2,		0x100000	},
-	{ 0,			0,			0	  	}
+	{
+		.voff	= LEO_SS0_MAP,
+		.poff	= LEO_OFF_SS0,
+		.size	= 0x800000
+	},
+	{
+		.voff	= LEO_LC_SS0_USR_MAP,
+		.poff	= LEO_OFF_LC_SS0_USR,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_LD_SS0_MAP,
+		.poff	= LEO_OFF_LD_SS0,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_LX_CURSOR_MAP,
+		.poff	= LEO_OFF_LX_CURSOR,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_SS1_MAP,
+		.poff	= LEO_OFF_SS1,
+		.size	= 0x800000
+	},
+	{
+		.voff	= LEO_LC_SS1_USR_MAP,
+		.poff	= LEO_OFF_LC_SS1_USR,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_LD_SS1_MAP,
+		.poff	= LEO_OFF_LD_SS1,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_UNK_MAP,
+		.poff	= LEO_OFF_UNK,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_LX_KRN_MAP,
+		.poff	= LEO_OFF_LX_KRN,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_LC_SS0_KRN_MAP,
+		.poff	= LEO_OFF_LC_SS0_KRN,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_LC_SS1_KRN_MAP,
+		.poff	= LEO_OFF_LC_SS1_KRN,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_LD_GBL_MAP,
+		.poff	= LEO_OFF_LD_GBL,
+		.size	= 0x1000
+	},
+	{
+		.voff	= LEO_UNK2_MAP,
+		.poff	= LEO_OFF_UNK2,
+		.size	= 0x100000
+	},
+	{ .size = 0 }
 };
 
 static int leo_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)

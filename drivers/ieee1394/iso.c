@@ -274,7 +274,7 @@ int hpsb_iso_recv_start(struct hpsb_iso *iso, int cycle, int tag_mask, int sync)
 		cycle %= 8000;
 
 	isoctl_args[0] = cycle;
-	
+
 	if (tag_mask < 0)
 		/* match all tags */
 		tag_mask = 0xF;
@@ -358,7 +358,7 @@ int hpsb_iso_xmit_queue_packet(struct hpsb_iso *iso, u32 offset, u16 len, u8 tag
 		}
 	}
 
-out:	
+out:
 	spin_unlock_irqrestore(&iso->lock, flags);
 	return rv;
 }

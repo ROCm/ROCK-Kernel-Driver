@@ -55,7 +55,6 @@ __u32 reiserfs_get_unused_objectid (struct reiserfs_transaction_handle *th)
     __u32 * map = objectid_map (s, rs);
     __u32 unused_objectid;
 
-    BUG_ON (!th->t_trans_id);
 
     check_objectid_map (s, map);
 
@@ -100,7 +99,6 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
     __u32 * map = objectid_map (s, rs);
     int i = 0;
 
-    BUG_ON (!th->t_trans_id);
     //return;
     check_objectid_map (s, map);
 
@@ -161,7 +159,7 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
 	i += 2;
     }
 
-    reiserfs_warning (s, "vs-15011: reiserfs_release_objectid: tried to free free object id (%lu)", 
+    reiserfs_warning (s, "vs-15011: reiserfs_release_objectid: tried to free free object id (%lu)",
 		      ( long unsigned ) objectid_to_release);
 }
 

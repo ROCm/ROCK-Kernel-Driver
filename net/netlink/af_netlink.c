@@ -176,7 +176,7 @@ found:
 	return sk;
 }
 
-extern struct proto_ops netlink_ops;
+static struct proto_ops netlink_ops;
 
 static int netlink_insert(struct sock *sk, u32 pid)
 {
@@ -365,6 +365,7 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 	struct sockaddr_nl *nladdr=(struct sockaddr_nl*)addr;
 
 	if (addr->sa_family == AF_UNSPEC) {
+		sk->sk_state	= NETLINK_UNCONNECTED;
 		nlk->dst_pid	= 0;
 		nlk->dst_groups = 0;
 		return 0;
@@ -380,11 +381,12 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 		err = netlink_autobind(sock);
 
 	if (err == 0) {
+		sk->sk_state	= NETLINK_CONNECTED;
 		nlk->dst_pid 	= nladdr->nl_pid;
 		nlk->dst_groups = nladdr->nl_groups;
 	}
 
-	return 0;
+	return err;
 }
 
 static int netlink_getname(struct socket *sock, struct sockaddr *addr, int *addr_len, int peer)
@@ -415,38 +417,67 @@ static void netlink_overrun(struct sock *sk)
 	}
 }
 
-int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock)
+struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid)
 {
-	struct sock *sk;
-	struct netlink_opt *nlk;
-	int len = skb->len;
 	int protocol = ssk->sk_protocol;
-	long timeo;
-        DECLARE_WAITQUEUE(wait, current);
+	struct sock *sock;
+	struct netlink_opt *nlk;
 
-	timeo = sock_sndtimeo(ssk, nonblock);
-
-retry:
-	sk = netlink_lookup(protocol, pid);
-	if (sk == NULL)
-		goto no_dst;
-	nlk = nlk_sk(sk);
+	sock = netlink_lookup(protocol, pid);
+	if (!sock)
+		return ERR_PTR(-ECONNREFUSED);
 
 	/* Don't bother queuing skb if kernel socket has no input function */
-        if (nlk->pid == 0 && !nlk->data_ready)
-        	goto no_dst;
+	nlk = nlk_sk(sock);
+	if ((nlk->pid == 0 && !nlk->data_ready) ||
+	    (sock->sk_state == NETLINK_CONNECTED &&
+	     nlk->dst_pid != nlk_sk(ssk)->pid)) {
+		sock_put(sock);
+		return ERR_PTR(-ECONNREFUSED);
+	}
+	return sock;
+}
+
+struct sock *netlink_getsockbyfilp(struct file *filp)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct socket *socket;
+	struct sock *sock;
+
+	if (!inode->i_sock || !(socket = SOCKET_I(inode)))
+		return ERR_PTR(-ENOTSOCK);
+
+	sock = socket->sk;
+	if (sock->sk_family != AF_NETLINK)
+		return ERR_PTR(-EINVAL);
+
+	sock_hold(sock);
+	return sock;
+}
+
+/*
+ * Attach a skb to a netlink socket.
+ * The caller must hold a reference to the destination socket. On error, the
+ * reference is dropped. The skb is not send to the destination, just all
+ * all error checks are performed and memory in the queue is reserved.
+ * Return values:
+ * < 0: error. skb freed, reference to sock dropped.
+ * 0: continue
+ * 1: repeat lookup - reference dropped while waiting for socket memory.
+ */
+int netlink_attachskb(struct sock *sk, struct sk_buff *skb, int nonblock, long timeo)
+{
+	struct netlink_opt *nlk;
+
+	nlk = nlk_sk(sk);
 
 #ifdef NL_EMULATE_DEV
-	if (nlk->handler) {
-		skb_orphan(skb);
-		len = nlk->handler(protocol, skb);
-		sock_put(sk);
-		return len;
-	}
+	if (nlk->handler)
+		return 0;
 #endif
-
 	if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf ||
 	    test_bit(0, &nlk->state)) {
+		DECLARE_WAITQUEUE(wait, current);
 		if (!timeo) {
 			if (!nlk->pid)
 				netlink_overrun(sk);
@@ -471,19 +502,60 @@ retry:
 			kfree_skb(skb);
 			return sock_intr_errno(timeo);
 		}
-		goto retry;
+		return 1;
 	}
-
 	skb_orphan(skb);
 	skb_set_owner_r(skb, sk);
+	return 0;
+}
+
+int netlink_sendskb(struct sock *sk, struct sk_buff *skb, int protocol)
+{
+	struct netlink_opt *nlk;
+	int len = skb->len;
+
+	nlk = nlk_sk(sk);
+#ifdef NL_EMULATE_DEV
+	if (nlk->handler) {
+		skb_orphan(skb);
+		len = nlk->handler(protocol, skb);
+		sock_put(sk);
+		return len;
+	}
+#endif
+
 	skb_queue_tail(&sk->sk_receive_queue, skb);
 	sk->sk_data_ready(sk, len);
 	sock_put(sk);
 	return len;
+}
 
-no_dst:
+void netlink_detachskb(struct sock *sk, struct sk_buff *skb)
+{
 	kfree_skb(skb);
-	return -ECONNREFUSED;
+	sock_put(sk);
+}
+
+int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock)
+{
+	struct sock *sk;
+	int err;
+	long timeo;
+
+	timeo = sock_sndtimeo(ssk, nonblock);
+retry:
+	sk = netlink_getsockbypid(ssk, pid);
+	if (IS_ERR(sk)) {
+		kfree_skb(skb);
+		return PTR_ERR(sk);
+	}
+	err = netlink_attachskb(sk, skb, nonblock, timeo);
+	if (err == 1)
+		goto retry;
+	if (err)
+		return err;
+
+	return netlink_sendskb(sk, skb, ssk->sk_protocol);
 }
 
 static __inline__ int netlink_broadcast_deliver(struct sock *sk, struct sk_buff *skb)
@@ -660,14 +732,14 @@ static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	   to corresponding kernel module.   --ANK (980802)
 	 */
 
-	err = security_netlink_send(skb);
-	if (err) {
+	err = -EFAULT;
+	if (memcpy_fromiovec(skb_put(skb,len), msg->msg_iov, len)) {
 		kfree_skb(skb);
 		goto out;
 	}
 
-	err = -EFAULT;
-	if (memcpy_fromiovec(skb_put(skb,len), msg->msg_iov, len)) {
+	err = security_netlink_send(sk, skb);
+	if (err) {
 		kfree_skb(skb);
 		goto out;
 	}
@@ -741,7 +813,7 @@ out:
 	return err ? : copied;
 }
 
-void netlink_data_ready(struct sock *sk, int len)
+static void netlink_data_ready(struct sock *sk, int len)
 {
 	struct netlink_opt *nlk = nlk_sk(sk);
 
@@ -765,10 +837,8 @@ netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len))
 	if (unit<0 || unit>=MAX_LINKS)
 		return NULL;
 
-	if (!(sock = sock_alloc())) 
+	if (sock_create_lite(PF_NETLINK, SOCK_DGRAM, unit, &sock))
 		return NULL;
-
-	sock->type = SOCK_RAW;
 
 	if (netlink_create(sock, unit) < 0) {
 		sock_release(sock);
@@ -1058,7 +1128,7 @@ static int netlink_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-struct seq_operations netlink_seq_ops = {
+static struct seq_operations netlink_seq_ops = {
 	.start  = netlink_seq_start,
 	.next   = netlink_seq_next,
 	.stop   = netlink_seq_stop,
@@ -1091,7 +1161,7 @@ int netlink_unregister_notifier(struct notifier_block *nb)
 	return notifier_chain_unregister(&netlink_chain, nb);
 }
                 
-struct proto_ops netlink_ops = {
+static struct proto_ops netlink_ops = {
 	.family =	PF_NETLINK,
 	.owner =	THIS_MODULE,
 	.release =	netlink_release,
@@ -1112,7 +1182,7 @@ struct proto_ops netlink_ops = {
 	.sendpage =	sock_no_sendpage,
 };
 
-struct net_proto_family netlink_family_ops = {
+static struct net_proto_family netlink_family_ops = {
 	.family = PF_NETLINK,
 	.create = netlink_create,
 	.owner	= THIS_MODULE,	/* for consistency 8) */

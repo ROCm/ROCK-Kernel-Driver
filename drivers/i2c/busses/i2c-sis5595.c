@@ -58,6 +58,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -239,7 +240,7 @@ static int sis5595_transaction(struct i2c_adapter *adap)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		i2c_delay(1);
+		msleep(1);
 		temp = sis5595_read(SMB_STS_LO);
 	} while (!(temp & 0x40) && (timeout++ < MAX_TIMEOUT));
 
@@ -360,7 +361,7 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter sis5595_adapter = {
 	.owner		= THIS_MODULE,
-	.class          = I2C_ADAP_CLASS_SMBUS,
+	.class          = I2C_CLASS_HWMON,
 	.name		= "unset",
 	.algo		= &smbus_algorithm,
 };

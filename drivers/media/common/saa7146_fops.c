@@ -10,14 +10,14 @@ int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit)
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
 
-	if (fh->resources & bit)
+	if (fh->resources & bit) {
+		DEB_D(("already allocated! want: 0x%02x, cur:0x%02x\n",bit,vv->resources));
 		/* have it already allocated */
 		return 1;
+	}
 
 	/* is it free? */
-	DEB_D(("getting lock...\n"));
 	down(&dev->lock);
-	DEB_D(("got lock\n"));
 	if (vv->resources & bit) {
 		DEB_D(("locked! vv->resources:0x%02x, we want:0x%02x\n",vv->resources,bit));
 		/* no, someone else uses it */
@@ -27,7 +27,7 @@ int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit)
 	/* it's free, grab it */
 	fh->resources  |= bit;
 	vv->resources |= bit;
-	DEB_D(("res: get %d\n",bit));
+	DEB_D(("res: get 0x%02x, cur:0x%02x\n",bit,vv->resources));
 	up(&dev->lock);
 	return 1;
 }
@@ -51,12 +51,10 @@ void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits)
 	if ((fh->resources & bits) != bits)
 		BUG();
 
-	DEB_D(("getting lock...\n"));
 	down(&dev->lock);
-	DEB_D(("got lock\n"));
 	fh->resources  &= ~bits;
 	vv->resources &= ~bits;
-	DEB_D(("res: put %d\n",bits));
+	DEB_D(("res: put 0x%02x, cur:0x%02x\n",bits,vv->resources));
 	up(&dev->lock);
 }
 
@@ -85,7 +83,7 @@ int saa7146_buffer_queue(struct saa7146_dev *dev,
 			 struct saa7146_dmaqueue *q,
 			 struct saa7146_buf *buf)
 {
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	DEB_EE(("dev:%p, dmaq:%p, buf:%p\n", dev, q, buf));
@@ -111,7 +109,7 @@ void saa7146_buffer_finish(struct saa7146_dev *dev,
 			   struct saa7146_dmaqueue *q,
 			   int state)
 {
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	if( NULL == q->curr ) {
@@ -147,7 +145,7 @@ void saa7146_buffer_next(struct saa7146_dev *dev,
 
 	DEB_INT(("dev:%p, dmaq:%p, vbi:%d\n", dev, q, vbi));
 
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	if (!list_empty(&q->queue)) {
@@ -398,7 +396,7 @@ static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
 	return 0;
 }
 
-static ssize_t fops_read(struct file *file, char *data, size_t count, loff_t *ppos)
+static ssize_t fops_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct saa7146_fh *fh = file->private_data;
 

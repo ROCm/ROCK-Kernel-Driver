@@ -22,7 +22,7 @@ extern void __bad_udelay(void);
  * lookup table, really, as the multiplications take much too long with
  * short delays.  This is a "reasonable" implementation, though (and the
  * first constant multiplications gets optimized away if the delay is
- * a constant)  
+ * a constant)
  */
 static inline void __const_udelay(unsigned long xloops)
 {

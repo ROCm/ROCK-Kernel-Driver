@@ -142,6 +142,7 @@ struct net_proto_family {
 };
 
 struct iovec;
+struct kvec;
 
 extern int	     sock_wake_async(struct socket *sk, int how, int band);
 extern int	     sock_register(struct net_proto_family *fam);
@@ -149,6 +150,10 @@ extern int	     sock_unregister(int family);
 extern struct socket *sock_alloc(void);
 extern int	     sock_create(int family, int type, int proto,
 				 struct socket **res);
+extern int	     sock_create_kern(int family, int type, int proto,
+				      struct socket **res);
+extern int	     sock_create_lite(int family, int type, int proto,
+				      struct socket **res); 
 extern void	     sock_release(struct socket *sock);
 extern int   	     sock_sendmsg(struct socket *sock, struct msghdr *msg,
 				  size_t len);
@@ -164,6 +169,12 @@ extern struct socket *sockfd_lookup(int fd, int *err);
 extern int	     net_ratelimit(void);
 extern unsigned long net_random(void);
 extern void	     net_srandom(unsigned long);
+
+extern int   	     kernel_sendmsg(struct socket *sock, struct msghdr *msg,
+				    struct kvec *vec, size_t num, size_t len);
+extern int   	     kernel_recvmsg(struct socket *sock, struct msghdr *msg,
+				    struct kvec *vec, size_t num,
+				    size_t len, int flags);
 
 #ifndef CONFIG_SMP
 #define SOCKOPS_WRAPPED(name) name
@@ -213,9 +224,9 @@ SOCKCALL_WRAP(name, ioctl, (struct socket *sock, unsigned int cmd, \
 SOCKCALL_WRAP(name, listen, (struct socket *sock, int len), (sock, len)) \
 SOCKCALL_WRAP(name, shutdown, (struct socket *sock, int flags), (sock, flags)) \
 SOCKCALL_WRAP(name, setsockopt, (struct socket *sock, int level, int optname, \
-			 char *optval, int optlen), (sock, level, optname, optval, optlen)) \
+			 char __user *optval, int optlen), (sock, level, optname, optval, optlen)) \
 SOCKCALL_WRAP(name, getsockopt, (struct socket *sock, int level, int optname, \
-			 char *optval, int *optlen), (sock, level, optname, optval, optlen)) \
+			 char __user *optval, int __user *optlen), (sock, level, optname, optval, optlen)) \
 SOCKCALL_WRAP(name, sendmsg, (struct kiocb *iocb, struct socket *sock, struct msghdr *m, size_t len), \
 	      (iocb, sock, m, len)) \
 SOCKCALL_WRAP(name, recvmsg, (struct kiocb *iocb, struct socket *sock, struct msghdr *m, size_t len, int flags), \

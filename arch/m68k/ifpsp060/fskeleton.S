@@ -5,10 +5,10 @@
 |Production Release P1.00 -- October 10, 1994
 |
 |M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
-| 
+|
 |THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 |To the maximum extent permitted by applicable law,
-|MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+|MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 |INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 |and any warranty against infringement with regard to the SOFTWARE
 |(INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -68,7 +68,7 @@ _060_fpsp_done:
 | _060_real_ovfl():
 |
 | This is the exit point for the 060FPSP when an enabled overflow exception
-| is present. The routine below should point to the operating system handler 
+| is present. The routine below should point to the operating system handler
 | for enabled overflow conditions. The exception stack frame is an overflow
 | stack frame. The FP state frame holds the EXCEPTIONAL OPERAND.
 |
@@ -87,7 +87,7 @@ _060_real_ovfl:
 | _060_real_unfl():
 |
 | This is the exit point for the 060FPSP when an enabled underflow exception
-| is present. The routine below should point to the operating system handler 
+| is present. The routine below should point to the operating system handler
 | for enabled underflow conditions. The exception stack frame is an underflow
 | stack frame. The FP state frame holds the EXCEPTIONAL OPERAND.
 |
@@ -105,7 +105,7 @@ _060_real_unfl:
 | _060_real_operr():
 |
 | This is the exit point for the 060FPSP when an enabled operand error exception
-| is present. The routine below should point to the operating system handler 
+| is present. The routine below should point to the operating system handler
 | for enabled operand error exceptions. The exception stack frame is an operand error
 | stack frame. The FP state frame holds the source operand of the faulting
 | instruction.
@@ -124,7 +124,7 @@ _060_real_operr:
 | _060_real_snan():
 |
 | This is the exit point for the 060FPSP when an enabled signalling NaN exception
-| is present. The routine below should point to the operating system handler 
+| is present. The routine below should point to the operating system handler
 | for enabled signalling NaN exceptions. The exception stack frame is a signalling NaN
 | stack frame. The FP state frame holds the source operand of the faulting
 | instruction.
@@ -143,7 +143,7 @@ _060_real_snan:
 | _060_real_dz():
 |
 | This is the exit point for the 060FPSP when an enabled divide-by-zero exception
-| is present. The routine below should point to the operating system handler 
+| is present. The routine below should point to the operating system handler
 | for enabled divide-by-zero exceptions. The exception stack frame is a divide-by-zero
 | stack frame. The FP state frame holds the source operand of the faulting
 | instruction.
@@ -162,7 +162,7 @@ _060_real_dz:
 | _060_real_inex():
 |
 | This is the exit point for the 060FPSP when an enabled inexact exception
-| is present. The routine below should point to the operating system handler 
+| is present. The routine below should point to the operating system handler
 | for enabled inexact exceptions. The exception stack frame is an inexact
 | stack frame. The FP state frame holds the source operand of the faulting
 | instruction.
@@ -181,12 +181,12 @@ _060_real_inex:
 | _060_real_bsun():
 |
 | This is the exit point for the 060FPSP when an enabled bsun exception
-| is present. The routine below should point to the operating system handler 
+| is present. The routine below should point to the operating system handler
 | for enabled bsun exceptions. The exception stack frame is a bsun
 | stack frame.
 |
 | The sample routine below clears the exception status bit, clears the NaN
-| bit in the FPSR, and does an "rte". The instruction that caused the 
+| bit in the FPSR, and does an "rte". The instruction that caused the
 | bsun will now be re-executed but with the NaN FPSR bit cleared.
 |
 	.global		_060_real_bsun
@@ -202,13 +202,13 @@ _060_real_bsun:
 |
 | _060_real_fline():
 |
-| This is the exit point for the 060FPSP when an F-Line Illegal exception is 
+| This is the exit point for the 060FPSP when an F-Line Illegal exception is
 | encountered. Three different types of exceptions can enter the F-Line exception
 | vector number 11: FP Unimplemented Instructions, FP implemented instructions when
 | the FPU is disabled, and F-Line Illegal instructions. The 060FPSP module
 | _fpsp_fline() distinguishes between the three and acts appropriately. F-Line
 | Illegals branch here.
-| 
+|
 	.global		_060_real_fline
 _060_real_fline:
 	bral		trap	| jump to trap handler
@@ -216,7 +216,7 @@ _060_real_fline:
 |
 | _060_real_fpu_disabled():
 |
-| This is the exit point for the 060FPSP when an FPU disabled exception is 
+| This is the exit point for the 060FPSP when an FPU disabled exception is
 | encountered. Three different types of exceptions can enter the F-Line exception
 | vector number 11: FP Unimplemented Instructions, FP implemented instructions when
 | the FPU is disabled, and F-Line Illegal instructions. The 060FPSP module

@@ -2,6 +2,11 @@
  * Common framework for low-level network console, dump, and debugger code
  *
  * Sep 8 2003  Matt Mackall <mpm@selenic.com>
+ *
+ * based on the netconsole code from:
+ *
+ * Copyright (C) 2001  Ingo Molnar <mingo@redhat.com>
+ * Copyright (C) 2002  Red Hat, Inc.
  */
 
 #include <linux/smp_lock.h>
@@ -163,21 +168,15 @@ repeat:
 	spin_lock(&np->dev->xmit_lock);
 	np->dev->xmit_lock_owner = smp_processor_id();
 
-	if (netif_queue_stopped(np->dev)) {
-		np->dev->xmit_lock_owner = -1;
-		spin_unlock(&np->dev->xmit_lock);
-
-		netpoll_poll(np);
-		goto repeat;
-	}
-
 	status = np->dev->hard_start_xmit(skb, np->dev);
 	np->dev->xmit_lock_owner = -1;
 	spin_unlock(&np->dev->xmit_lock);
 
 	/* transmit busy */
-	if(status)
+	if(status) {
+		netpoll_poll(np);
 		goto repeat;
+	}
 }
 
 void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
@@ -231,29 +230,28 @@ void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 
 static void arp_reply(struct sk_buff *skb)
 {
-	struct in_device *in_dev = (struct in_device *) skb->dev->ip_ptr;
 	struct arphdr *arp;
-	unsigned char *arp_ptr, *sha, *tha;
+	unsigned char *arp_ptr;
 	int size, type = ARPOP_REPLY, ptype = ETH_P_ARP;
 	u32 sip, tip;
 	struct sk_buff *send_skb;
 	unsigned long flags;
 	struct list_head *p;
-	struct netpoll *np = 0;
+	struct netpoll *np = NULL;
 
 	spin_lock_irqsave(&rx_list_lock, flags);
 	list_for_each(p, &rx_list) {
 		np = list_entry(p, struct netpoll, rx_list);
 		if ( np->dev == skb->dev )
 			break;
-		np = 0;
+		np = NULL;
 	}
 	spin_unlock_irqrestore(&rx_list_lock, flags);
 
 	if (!np) return;
 
 	/* No arp on this interface */
-	if (!in_dev || skb->dev->flags & IFF_NOARP)
+	if (skb->dev->flags & IFF_NOARP)
 		return;
 
 	if (!pskb_may_pull(skb, (sizeof(struct arphdr) +
@@ -270,20 +268,14 @@ static void arp_reply(struct sk_buff *skb)
 	    arp->ar_op != htons(ARPOP_REQUEST))
 		return;
 
-	arp_ptr= (unsigned char *)(arp+1);
-	sha = arp_ptr;
-	arp_ptr += skb->dev->addr_len;
+	arp_ptr = (unsigned char *)(arp+1) + skb->dev->addr_len;
 	memcpy(&sip, arp_ptr, 4);
-	arp_ptr += 4;
-	tha = arp_ptr;
-	arp_ptr += skb->dev->addr_len;
+	arp_ptr += 4 + skb->dev->addr_len;
 	memcpy(&tip, arp_ptr, 4);
 
 	/* Should we ignore arp? */
-	if (tip != in_dev->ifa_list->ifa_address ||
-	    LOOPBACK(tip) || MULTICAST(tip))
+	if (tip != htonl(np->local_ip) || LOOPBACK(tip) || MULTICAST(tip))
 		return;
-
 
 	size = sizeof(struct arphdr) + 2 * (skb->dev->addr_len + 4);
 	send_skb = find_skb(np, size + LL_RESERVED_SPACE(np->dev),
@@ -325,7 +317,7 @@ static void arp_reply(struct sk_buff *skb)
 	arp_ptr += np->dev->addr_len;
 	memcpy(arp_ptr, &tip, 4);
 	arp_ptr += 4;
-	memcpy(arp_ptr, np->local_mac, np->dev->addr_len);
+	memcpy(arp_ptr, np->remote_mac, np->dev->addr_len);
 	arp_ptr += np->dev->addr_len;
 	memcpy(arp_ptr, &sip, 4);
 
@@ -419,7 +411,7 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 		if ((delim = strchr(cur, '@')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->local_port=simple_strtol(cur, 0, 10);
+		np->local_port=simple_strtol(cur, NULL, 10);
 		cur=delim;
 	}
 	cur++;
@@ -454,7 +446,7 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 		if ((delim = strchr(cur, '@')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_port=simple_strtol(cur, 0, 10);
+		np->remote_port=simple_strtol(cur, NULL, 10);
 		cur=delim;
 	}
 	cur++;
@@ -476,29 +468,29 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[0]=simple_strtol(cur, 0, 16);
+		np->remote_mac[0]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[1]=simple_strtol(cur, 0, 16);
+		np->remote_mac[1]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[2]=simple_strtol(cur, 0, 16);
+		np->remote_mac[2]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[3]=simple_strtol(cur, 0, 16);
+		np->remote_mac[3]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
 		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
 		*delim=0;
-		np->remote_mac[4]=simple_strtol(cur, 0, 16);
+		np->remote_mac[4]=simple_strtol(cur, NULL, 16);
 		cur=delim+1;
-		np->remote_mac[5]=simple_strtol(cur, 0, 16);
+		np->remote_mac[5]=simple_strtol(cur, NULL, 16);
 	}
 
 	printk(KERN_INFO "%s: remote ethernet address "
@@ -628,10 +620,10 @@ void netpoll_cleanup(struct netpoll *np)
 	}
 
 	dev_put(np->dev);
-	np->dev = 0;
+	np->dev = NULL;
 }
 
-int netpoll_trap()
+int netpoll_trap(void)
 {
 	return trapped;
 }

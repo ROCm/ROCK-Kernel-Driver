@@ -89,7 +89,7 @@ process_line(struct conf_writedata *cnf)
 /* write conf file -> boot or send cfg line to card */
 /****************************************************/
 static ssize_t
-hysdn_conf_write(struct file *file, const char *buf, size_t count, loff_t * off)
+hysdn_conf_write(struct file *file, const char __user *buf, size_t count, loff_t * off)
 {
 	struct conf_writedata *cnf;
 	int i;
@@ -209,29 +209,31 @@ hysdn_conf_write(struct file *file, const char *buf, size_t count, loff_t * off)
 /* read conf file -> output card info data */
 /*******************************************/
 static ssize_t
-hysdn_conf_read(struct file *file, char *buf, size_t count, loff_t * off)
+hysdn_conf_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 {
-	loff_t pos = *off;
 	char *cp;
 	int i;
 
 	if (off != &file->f_pos)	/* fs error check */
 		return -ESPIPE;
 
-	if (!(cp = file->private_data))
-		return (-EFAULT);	/* should never happen */
-	i = strlen(cp);	/* get total string length */
-	if (pos >= 0 && pos < i) {
-		/* still bytes to transfer */
-		cp += pos;	/* point to desired data offset */
-		i -= pos;	/* remaining length */
-		if (i > count)
-			i = count;	/* limit length to transfer */
-		if (copy_to_user(buf, cp, i))
-			return (-EFAULT);	/* copy error */
-		*off = pos + i;	/* adjust offset */
+	if (file->f_mode & FMODE_READ) {
+		if (!(cp = file->private_data))
+			return (-EFAULT);	/* should never happen */
+		i = strlen(cp);	/* get total string length */
+		if (*off < i) {
+			/* still bytes to transfer */
+			cp += *off;	/* point to desired data offset */
+			i -= *off;	/* remaining length */
+			if (i > count)
+				i = count;	/* limit length to transfer */
+			if (copy_to_user(buf, cp, i))
+				return (-EFAULT);	/* copy error */
+			*off += i;	/* adjust offset */
+		} else
+			return (0);
 	} else
-		return 0;
+		return (-EPERM);	/* no permission to read */
 
 	return (i);
 }				/* hysdn_conf_read */

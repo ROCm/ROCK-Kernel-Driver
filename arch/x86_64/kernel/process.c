@@ -256,10 +256,11 @@ void exit_thread(void)
 {
 	struct task_struct *me = current;
 	if (me->thread.io_bitmap_ptr) { 
+		struct tss_struct *tss = init_tss + get_cpu();
 		kfree(me->thread.io_bitmap_ptr); 
 		me->thread.io_bitmap_ptr = NULL;
-		(init_tss + smp_processor_id())->io_bitmap_base = 
-			INVALID_IO_BITMAP_OFFSET;
+		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+		put_cpu();
 	}
 }
 
@@ -520,7 +521,8 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
  * sys_execve() executes a new program.
  */
 asmlinkage 
-long sys_execve(char *name, char **argv,char **envp, struct pt_regs regs)
+long sys_execve(char __user *name, char __user * __user *argv,
+		char __user * __user *envp, struct pt_regs regs)
 {
 	long error;
 	char * filename;
@@ -549,7 +551,7 @@ asmlinkage long sys_fork(struct pt_regs regs)
 	return do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
 }
 
-asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *parent_tid, void *child_tid, struct pt_regs regs)
+asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void __user *parent_tid, void __user *child_tid, struct pt_regs regs)
 {
 	if (!newsp)
 		newsp = regs.rsp;
@@ -573,14 +575,6 @@ asmlinkage long sys_vfork(struct pt_regs regs)
 		    NULL, NULL);
 }
 
-/*
- * These bracket the sleeping functions..
- */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long stack;
@@ -597,14 +591,12 @@ unsigned long get_wchan(struct task_struct *p)
 		if (fp < (unsigned long)stack || fp > (unsigned long)stack+THREAD_SIZE)
 			return 0; 
 		rip = *(u64 *)(fp+8); 
-		if (rip < first_sched || rip >= last_sched)
+		if (!in_sched_functions(rip))
 			return rip; 
 		fp = *(u64 *)fp; 
 	} while (count++ < 16); 
 	return 0;
 }
-#undef last_sched
-#undef first_sched
 
 long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 { 
@@ -673,7 +665,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			rdmsrl(MSR_FS_BASE, base);
 		} else
 			base = task->thread.fs;
-		ret = put_user(base, (unsigned long *)addr); 
+		ret = put_user(base, (unsigned long __user *)addr); 
 		break; 
 	}
 	case ARCH_GET_GS: { 
@@ -684,7 +676,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			rdmsrl(MSR_KERNEL_GS_BASE, base);
 		} else
 			base = task->thread.gs;
-		ret = put_user(base, (unsigned long *)addr); 
+		ret = put_user(base, (unsigned long __user *)addr); 
 		break;
 	}
 

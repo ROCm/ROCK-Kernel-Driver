@@ -11,6 +11,7 @@
 #include <linux/console.h>
 #include <linux/vt_kern.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 /*
  *  Dummy console driver
@@ -58,6 +59,7 @@ static int dummycon_dummy(void)
  */
 
 const struct consw dummy_con = {
+    .owner =		THIS_MODULE,
     .con_startup =	dummycon_startup,
     .con_init =		dummycon_init,
     .con_deinit =	DUMMY,
@@ -69,7 +71,10 @@ const struct consw dummy_con = {
     .con_bmove =	DUMMY,
     .con_switch =	DUMMY,
     .con_blank =	DUMMY,
-    .con_font_op =	DUMMY,
+    .con_font_set =	DUMMY,
+    .con_font_get =	DUMMY,
+    .con_font_default =	DUMMY,
+    .con_font_copy =	DUMMY,
     .con_set_palette =	DUMMY,
     .con_scrolldelta =	DUMMY,
 };

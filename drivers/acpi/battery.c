@@ -582,7 +582,7 @@ end:
 static int
 acpi_battery_write_alarm (
 	struct file		*file,
-	const char		*buffer,
+	const char		__user *buffer,
 	unsigned long		count,
 	void			*data)
 {

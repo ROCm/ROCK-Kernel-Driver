@@ -265,6 +265,17 @@ e1000_set_mac_type(struct e1000_hw *hw)
         return -E1000_ERR_MAC_TYPE;
     }
 
+    switch(hw->mac_type) {
+    case e1000_82541:
+    case e1000_82547:
+    case e1000_82541_rev_2:
+    case e1000_82547_rev_2:
+        hw->asf_firmware_present = TRUE;
+        break;
+    default:
+        break;
+    }
+
     return E1000_SUCCESS;
 }
 
@@ -395,7 +406,7 @@ e1000_reset_hw(struct e1000_hw *hw)
         case e1000_82543:
         case e1000_82544:
             /* Wait for reset to complete */
-            usec_delay(10);
+            udelay(10);
             ctrl_ext = E1000_READ_REG(hw, CTRL_EXT);
             ctrl_ext |= E1000_CTRL_EXT_EE_RST;
             E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
@@ -909,6 +920,12 @@ e1000_setup_copper_link(struct e1000_hw *hw)
     if(ret_val)
         return ret_val;
 
+    if(hw->mac_type == e1000_82545_rev_3) {
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
+        phy_data |= 0x00000008;
+        ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, phy_data);
+    }
+
     if(hw->mac_type <= e1000_82543 ||
        hw->mac_type == e1000_82541 || hw->mac_type == e1000_82547 ||
        hw->mac_type == e1000_82541_rev_2 || hw->mac_type == e1000_82547_rev_2)
@@ -1229,7 +1246,7 @@ e1000_setup_copper_link(struct e1000_hw *hw)
             DEBUGOUT("Valid link established!!!\n");
             return E1000_SUCCESS;
         }
-        usec_delay(10);
+        udelay(10);
     }
 
     DEBUGOUT("Unable to establish link!!!\n");
@@ -1495,7 +1512,7 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
     if(ret_val)
         return ret_val;
 
-    usec_delay(1);
+    udelay(1);
 
     /* The wait_autoneg_complete flag may be a little misleading here.
      * Since we are forcing speed and duplex, Auto-Neg is not enabled.
@@ -1960,7 +1977,7 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
 int32_t
 e1000_check_for_link(struct e1000_hw *hw)
 {
-    uint32_t rxcw;
+    uint32_t rxcw = 0;
     uint32_t ctrl;
     uint32_t status;
     uint32_t rctl;
@@ -1970,16 +1987,23 @@ e1000_check_for_link(struct e1000_hw *hw)
 
     DEBUGFUNC("e1000_check_for_link");
 
+    ctrl = E1000_READ_REG(hw, CTRL);
+    status = E1000_READ_REG(hw, STATUS);
+
     /* On adapters with a MAC newer than 82544, SW Defineable pin 1 will be
      * set when the optics detect a signal. On older adapters, it will be
      * cleared when there is a signal.  This applies to fiber media only.
      */
-    if(hw->media_type == e1000_media_type_fiber)
-        signal = (hw->mac_type > e1000_82544) ? E1000_CTRL_SWDPIN1 : 0;
+    if((hw->media_type == e1000_media_type_fiber) ||
+       (hw->media_type == e1000_media_type_internal_serdes)) {
+        rxcw = E1000_READ_REG(hw, RXCW);
 
-    ctrl = E1000_READ_REG(hw, CTRL);
-    status = E1000_READ_REG(hw, STATUS);
-    rxcw = E1000_READ_REG(hw, RXCW);
+        if(hw->media_type == e1000_media_type_fiber) {
+            signal = (hw->mac_type > e1000_82544) ? E1000_CTRL_SWDPIN1 : 0;
+            if(status & E1000_STATUS_LU)
+                hw->get_link_status = FALSE;
+        }
+    }
 
     /* If we have a copper PHY then we only want to go out to the PHY
      * registers to see if Auto-Neg has completed and/or if our link
@@ -2092,8 +2116,8 @@ e1000_check_for_link(struct e1000_hw *hw)
      * in. The autoneg_failed flag does this.
      */
     else if((((hw->media_type == e1000_media_type_fiber) &&
-            ((ctrl & E1000_CTRL_SWDPIN1) == signal)) ||
-            (hw->media_type == e1000_media_type_internal_serdes)) &&
+              ((ctrl & E1000_CTRL_SWDPIN1) == signal)) ||
+             (hw->media_type == e1000_media_type_internal_serdes)) &&
             (!(status & E1000_STATUS_LU)) &&
             (!(rxcw & E1000_RXCW_C))) {
         if(hw->autoneg_failed == 0) {
@@ -2124,8 +2148,7 @@ e1000_check_for_link(struct e1000_hw *hw)
      */
     else if(((hw->media_type == e1000_media_type_fiber) ||
              (hw->media_type == e1000_media_type_internal_serdes)) &&
-              (ctrl & E1000_CTRL_SLU) &&
-              (rxcw & E1000_RXCW_C)) {
+            (ctrl & E1000_CTRL_SLU) && (rxcw & E1000_RXCW_C)) {
         DEBUGOUT("RXing /C/, enable AutoNeg and stop forcing link.\r\n");
         E1000_WRITE_REG(hw, TXCW, hw->txcw);
         E1000_WRITE_REG(hw, CTRL, (ctrl & ~E1000_CTRL_SLU));
@@ -2138,7 +2161,7 @@ e1000_check_for_link(struct e1000_hw *hw)
     else if((hw->media_type == e1000_media_type_internal_serdes) &&
             !(E1000_TXCW_ANE & E1000_READ_REG(hw, TXCW))) {
         /* SYNCH bit and IV bit are sticky. */
-        usec_delay(10);
+        udelay(10);
         if(E1000_RXCW_SYNCH & E1000_READ_REG(hw, RXCW)) {
             if(!(rxcw & E1000_RXCW_IV)) {
                 hw->serdes_link_down = FALSE;
@@ -2273,7 +2296,7 @@ e1000_raise_mdi_clk(struct e1000_hw *hw,
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl | E1000_CTRL_MDC));
     E1000_WRITE_FLUSH(hw);
-    usec_delay(10);
+    udelay(10);
 }
 
 /******************************************************************************
@@ -2291,7 +2314,7 @@ e1000_lower_mdi_clk(struct e1000_hw *hw,
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl & ~E1000_CTRL_MDC));
     E1000_WRITE_FLUSH(hw);
-    usec_delay(10);
+    udelay(10);
 }
 
 /******************************************************************************
@@ -2335,7 +2358,7 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
         E1000_WRITE_REG(hw, CTRL, ctrl);
         E1000_WRITE_FLUSH(hw);
 
-        usec_delay(10);
+        udelay(10);
 
         e1000_raise_mdi_clk(hw, &ctrl);
         e1000_lower_mdi_clk(hw, &ctrl);
@@ -2454,7 +2477,7 @@ e1000_read_phy_reg_ex(struct e1000_hw *hw,
 
         /* Poll the ready bit to see if the MDI read completed */
         for(i = 0; i < 64; i++) {
-            usec_delay(50);
+            udelay(50);
             mdic = E1000_READ_REG(hw, MDIC);
             if(mdic & E1000_MDIC_READY) break;
         }
@@ -2559,7 +2582,7 @@ e1000_write_phy_reg_ex(struct e1000_hw *hw,
 
         /* Poll the ready bit to see if the MDI read completed */
         for(i = 0; i < 640; i++) {
-            usec_delay(5);
+            udelay(5);
             mdic = E1000_READ_REG(hw, MDIC);
             if(mdic & E1000_MDIC_READY) break;
         }
@@ -2631,7 +2654,7 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
         E1000_WRITE_FLUSH(hw);
     }
-    usec_delay(150);
+    udelay(150);
 
     if((hw->mac_type == e1000_82541) || (hw->mac_type == e1000_82547)) {
         /* Configure activity LED after PHY reset */
@@ -2667,7 +2690,7 @@ e1000_phy_reset(struct e1000_hw *hw)
         if(ret_val)
             return ret_val;
 
-        usec_delay(1);
+        udelay(1);
     } else e1000_phy_hw_reset(hw);
 
     if(hw->phy_type == e1000_phy_igp)
@@ -2696,7 +2719,7 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
         return ret_val;
 
     hw->phy_id = (uint32_t) (phy_id_high << 16);
-    usec_delay(20);
+    udelay(20);
     ret_val = e1000_read_phy_reg(hw, PHY_ID2, &phy_id_low);
     if(ret_val)
         return ret_val;
@@ -3096,7 +3119,7 @@ e1000_raise_ee_clk(struct e1000_hw *hw,
     *eecd = *eecd | E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(hw->eeprom.delay_usec);
+    udelay(hw->eeprom.delay_usec);
 }
 
 /******************************************************************************
@@ -3115,7 +3138,7 @@ e1000_lower_ee_clk(struct e1000_hw *hw,
     *eecd = *eecd & ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(hw->eeprom.delay_usec);
+    udelay(hw->eeprom.delay_usec);
 }
 
 /******************************************************************************
@@ -3159,7 +3182,7 @@ e1000_shift_out_ee_bits(struct e1000_hw *hw,
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
 
-        usec_delay(eeprom->delay_usec);
+        udelay(eeprom->delay_usec);
 
         e1000_raise_ee_clk(hw, &eecd);
         e1000_lower_ee_clk(hw, &eecd);
@@ -3240,7 +3263,7 @@ e1000_acquire_eeprom(struct e1000_hw *hw)
         while((!(eecd & E1000_EECD_GNT)) &&
               (i < E1000_EEPROM_GRANT_ATTEMPTS)) {
             i++;
-            usec_delay(5);
+            udelay(5);
             eecd = E1000_READ_REG(hw, EECD);
         }
         if(!(eecd & E1000_EECD_GNT)) {
@@ -3265,7 +3288,7 @@ e1000_acquire_eeprom(struct e1000_hw *hw)
         /* Clear SK and CS */
         eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
         E1000_WRITE_REG(hw, EECD, eecd);
-        usec_delay(1);
+        udelay(1);
     }
 
     return E1000_SUCCESS;
@@ -3288,35 +3311,35 @@ e1000_standby_eeprom(struct e1000_hw *hw)
         eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(eeprom->delay_usec);
+        udelay(eeprom->delay_usec);
 
         /* Clock high */
         eecd |= E1000_EECD_SK;
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(eeprom->delay_usec);
+        udelay(eeprom->delay_usec);
 
         /* Select EEPROM */
         eecd |= E1000_EECD_CS;
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(eeprom->delay_usec);
+        udelay(eeprom->delay_usec);
 
         /* Clock low */
         eecd &= ~E1000_EECD_SK;
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(eeprom->delay_usec);
+        udelay(eeprom->delay_usec);
     } else if(eeprom->type == e1000_eeprom_spi) {
         /* Toggle CS to flush commands */
         eecd |= E1000_EECD_CS;
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(eeprom->delay_usec);
+        udelay(eeprom->delay_usec);
         eecd &= ~E1000_EECD_CS;
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(eeprom->delay_usec);
+        udelay(eeprom->delay_usec);
     }
 }
 
@@ -3340,7 +3363,7 @@ e1000_release_eeprom(struct e1000_hw *hw)
 
         E1000_WRITE_REG(hw, EECD, eecd);
 
-        usec_delay(hw->eeprom.delay_usec);
+        udelay(hw->eeprom.delay_usec);
     } else if(hw->eeprom.type == e1000_eeprom_microwire) {
         /* cleanup eeprom */
 
@@ -3353,13 +3376,13 @@ e1000_release_eeprom(struct e1000_hw *hw)
         eecd |= E1000_EECD_SK;
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(hw->eeprom.delay_usec);
+        udelay(hw->eeprom.delay_usec);
 
         /* Falling edge of clock */
         eecd &= ~E1000_EECD_SK;
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
-        usec_delay(hw->eeprom.delay_usec);
+        udelay(hw->eeprom.delay_usec);
     }
 
     /* Stop requesting EEPROM access */
@@ -3395,7 +3418,7 @@ e1000_spi_eeprom_ready(struct e1000_hw *hw)
         if (!(spi_stat_reg & EEPROM_STATUS_RDY_SPI))
             break;
 
-        usec_delay(5);
+        udelay(5);
         retry_count += 5;
 
         e1000_standby_eeprom(hw);
@@ -3730,7 +3753,7 @@ e1000_write_eeprom_microwire(struct e1000_hw *hw,
         for(i = 0; i < 200; i++) {
             eecd = E1000_READ_REG(hw, EECD);
             if(eecd & E1000_EECD_DO) break;
-            usec_delay(50);
+            udelay(50);
         }
         if(i == 200) {
             DEBUGOUT("EEPROM Write did not complete\n");
@@ -4930,7 +4953,7 @@ e1000_config_dsp_after_link_change(struct e1000_hw *hw,
                     return ret_val;
 
                 for(i = 0; i < ffe_idle_err_timeout; i++) {
-                    usec_delay(1000);
+                    udelay(1000);
                     ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS,
                                                  &phy_data);
                     if(ret_val)
@@ -5177,3 +5200,27 @@ e1000_set_vco_speed(struct e1000_hw *hw)
     return E1000_SUCCESS;
 }
 
+/******************************************************************************
+ * Verifies the hardware needs to allow ARPs to be processed by the host
+ *
+ * hw - Struct containing variables accessed by shared code
+ *
+ * returns: - TRUE/FALSE
+ *
+ *****************************************************************************/
+uint32_t
+e1000_enable_mng_pass_thru(struct e1000_hw *hw)
+{
+    uint32_t manc;
+
+    if (hw->asf_firmware_present) {
+        manc = E1000_READ_REG(hw, MANC);
+
+        if (!(manc & E1000_MANC_RCV_TCO_EN) ||
+            !(manc & E1000_MANC_EN_MAC_ADDR_FILTER))
+            return FALSE;
+        if ((manc & E1000_MANC_SMBUS_EN) && !(manc & E1000_MANC_ASF_EN))
+            return TRUE;
+    }
+    return FALSE;
+}

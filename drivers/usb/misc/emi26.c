@@ -194,7 +194,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 
 	/* return 1 to fail the driver inialization
 	 * and give real driver change to load */
-	return 1;
+	err = 1;
 
 wraperr:
 	kfree(buf);
@@ -226,7 +226,7 @@ static void emi26_disconnect(struct usb_interface *intf)
 {
 }
 
-struct usb_driver emi26_driver = {
+static struct usb_driver emi26_driver = {
 	.owner		= THIS_MODULE,
 	.name		= "emi26 - firmware loader",
 	.probe		= emi26_probe,

@@ -539,10 +539,10 @@ struct hppa_dma_ops pcx_dma_ops = {
 	.unmap_single =		pa11_dma_unmap_single,
 	.map_sg =		pa11_dma_map_sg,
 	.unmap_sg =		pa11_dma_unmap_sg,
-	.dma_sync_single_cpu =	pa11_dma_sync_single_cpu,
-	.dma_sync_single_device = pa11_dma_sync_single_device,
-	.dma_sync_sg_cpu =	pa11_dma_sync_sg_cpu,
-	.dma_sync_sg_device =	pa11_dma_sync_sg_device,
+	.dma_sync_single_for_cpu =	pa11_dma_sync_single_for_cpu,
+	.dma_sync_single_for_device =	pa11_dma_sync_single_for_device,
+	.dma_sync_sg_for_cpu =		pa11_dma_sync_sg_for_cpu,
+	.dma_sync_sg_for_device =	pa11_dma_sync_sg_for_device,
 };
 
 

@@ -101,7 +101,7 @@ typedef struct osd_cmd_s {
         int x1;
         int y1;
         int color;
-        void *data;
+        void __user *data;
 } osd_cmd_t;
 
 

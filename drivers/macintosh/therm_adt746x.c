@@ -246,8 +246,7 @@ static int monitor_task(void *arg)
 
 	while(monitor_running)
 	{
-		set_task_state(current, TASK_UNINTERRUPTIBLE);
-		schedule_timeout(2*HZ);
+		msleep(2000);
 
 		/* Check status */
 		/* local   : chip */

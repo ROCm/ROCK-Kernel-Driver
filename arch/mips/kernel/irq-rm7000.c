@@ -21,12 +21,12 @@ static int irq_base;
 
 static inline void unmask_rm7k_irq(unsigned int irq)
 {
-	set_c0_intcontrol(1 << (irq - irq_base));
+	set_c0_intcontrol(0x100 << (irq - irq_base));
 }
 
 static inline void mask_rm7k_irq(unsigned int irq)
 {
-	clear_c0_intcontrol(1 << (irq - irq_base));
+	clear_c0_intcontrol(0x100 << (irq - irq_base));
 }
 
 static inline void rm7k_cpu_irq_enable(unsigned int irq)
@@ -84,6 +84,8 @@ static hw_irq_controller rm7k_irq_controller = {
 void __init rm7k_cpu_irq_init(int base)
 {
 	int i;
+
+	clear_c0_intcontrol(0x00000f00);		/* Mask all */
 
 	for (i = base; i < base + 4; i++) {
 		irq_desc[i].status = IRQ_DISABLED;

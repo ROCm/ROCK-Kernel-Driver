@@ -840,7 +840,6 @@ end_os_mca_restore:
 //EndStub//////////////////////////////////////////////////////////////////////
 
 
-#ifndef	CONFIG_KDB
 // ok, the issue here is that we need to save state information so
 // it can be useable by the kernel debugger and show regs routines.
 // In order to do this, our best bet is save the current state (plus
@@ -917,64 +916,6 @@ return_from_init:
 	br.sptk return_from_init
 END(ia64_monarch_init_handler)
 
-#else	/* CONFIG_KDB */
-// The standard ia64_monarch_init_handler is breaking on 2.4.20.  As a
-// temporary (?) WAR, use the same type of code as the slave init handler when
-// kdb is installed.  INIT monarch has a dedicated stack with no lock, and uses
-// the same C code as the slave handler.
-
-GLOBAL_ENTRY(ia64_monarch_init_handler)
-	movl r3=ia64_init_monarch_stack		// monarch stack (virtual)
-	;;
-	DATA_VA_TO_PA(r3)			// monarch stack (physical)
-	mov r13=IA64_KR(CURRENT)		// current (physical)
-	cover
-	;;
-	invala
-	dep r13=-1,r13,61,3			// current (virtual)
-	dep r1=-1,r1,61,3			// convert gp to virtual
-	;;
-	mov r4=r3				// copy monarch stack (physical)
-	;;
-	mov ar.rsc=0
-	dep r4=-1,r4,61,3			// monarch stack (virtual)
-	;;
-	addl r2=IA64_RBS_OFFSET,r3		// base of rbs (physical)
-	;;
-	addl r12=KERNEL_STACK_SIZE-16,r3		// scratch pad at top of stack (physical)
-	dep r2=-1,r2,61,3			// base of rbs (virtual)
-	;;
-	dep r12=-1,r12,61,3			// top of stack (virtual)
-	mov ar.bspstore=r2
-	;;
-	mov ar.rsc=3
-
-// We need to switch to Virtual mode before hitting the C functions.
-	movl	r2=IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN
-	mov	r3=psr				// get the current psr, minimum enabled at this point
-	;;
-	or	r2=r2,r3
-	;;
-	movl	r3=2f
-	;;
-	mov	cr.iip=r3			// short return to set the appropriate bits
-	mov	cr.ipsr=r2			// need to do an rfi to set appropriate bits
-	;;
-	rfi
-	;;
-
-2:
-	alloc r14=ar.pfs,0,0,1,0
-	;;
-	mov out0=r11				// pass INIT reason to C code
-	;;
-	br.call.sptk.many rp=ia64_init_slave_handler
-	;;
-3:
-	br.sptk 3b
-END(ia64_monarch_init_handler)
-#endif	/* CONFIG_KDB */
-
 //
 // SAL to OS entry point for INIT on the slave processor
 // This has been defined for registration purposes with SAL
@@ -982,90 +923,5 @@ END(ia64_monarch_init_handler)
 //
 
 GLOBAL_ENTRY(ia64_slave_init_handler)
-#ifdef	CONFIG_KDB
-//
-// When we get here, the following registers have been
-// set by the SAL for our use
-//
-//		1. GR1 = OS INIT GP (physical)
-//		2. GR8 = PAL_PROC physical address
-//		3. GR9 = SAL_PROC physical address
-//		4. GR10 = SAL GP (physical)
-//		5. GR11 = Init Reason
-//			0 = Received INIT for event other than crash dump switch
-//			1 = Received INIT signal on this processor during machine check rendezvous
-//			2 = Received INIT due to CrashDump switch assertion
-//		6. GR12 = Return address to location within SAL_INIT procedure
-//
-// KDB never returns from INIT interrupts, so we do not save any state.  INIT
-// slave handlers in KDB use a single shared stack to save space.  The first 8
-// bytes of that stack are a lock to single thread slave events through the
-// stack.  The lock is released in kdba_mca_init_handler2() after saving the
-// state of the interrupted code and just prior to entering kdb(), at which
-// point the shared stack is available for reuse.
-//
-	.global ia64_init_slave_stack
-	movl r3=ia64_init_slave_stack		// slave stack (virtual)
-	;;
-	DATA_VA_TO_PA(r3)			// slave stack (physical)
-	mov r13=IA64_KR(CURRENT)		// current (physical)
-	cover
-	;;
-	invala
-	dep r13=-1,r13,61,3			// current (virtual)
-	dep r1=-1,r1,61,3			// convert gp to virtual
-	;;
-	mov r4=r3				// copy slave stack (physical)
-	;;
-	mov ar.rsc=0
-	dep r4=-1,r4,61,3			// slave stack (virtual)
-1:						// lock the slave stack
-	mov ar.ccv=0
-	ld8 r2=[r3]
-	;;
-	cmp.ne p15,p0=r2,r0
-(p15)   br 1b
-	;;
-	cmpxchg8.acq r2=[r3],r13,ar.ccv
-	;;
-	cmp.ne p15,p0=r2,r0
-(p15)   br 1b
-	;;
-	addl r2=IA64_RBS_OFFSET,r3		// base of rbs (physical)
-	;;
-	addl r12=KERNEL_STACK_SIZE-16,r3		// scratch pad at top of stack (physical)
-	dep r2=-1,r2,61,3			// base of rbs (virtual)
-	;;
-	dep r12=-1,r12,61,3			// top of stack (virtual)
-	mov ar.bspstore=r2
-	;;
-	mov ar.rsc=3
-
-// We need to switch to Virtual mode before hitting the C functions.
-	movl	r2=IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN
-	mov	r3=psr				// get the current psr, minimum enabled at this point
-	;;
-	or	r2=r2,r3
-	;;
-	movl	r3=2f
-	;;
-	mov	cr.iip=r3			// short return to set the appropriate bits
-	mov	cr.ipsr=r2			// need to do an rfi to set appropriate bits
-	;;
-	rfi
-	;;
-
-2:
-	alloc r14=ar.pfs,0,0,1,0
-	;;
-	mov out0=r11				// pass INIT reason to C code
-	;;
-	br.call.sptk.many rp=ia64_init_slave_handler
-	;;
-	mov ar.rsc=0				// back to lazy mode if we ever return
-	;;
-	st8 [r4]=r0				// drop shared stack on return
-#endif	/* CONFIG_KDB */
-
 1:	br.sptk 1b
 END(ia64_slave_init_handler)

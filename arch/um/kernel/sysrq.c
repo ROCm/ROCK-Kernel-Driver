@@ -23,7 +23,7 @@ void show_trace(unsigned long * stack)
         i = 1;
         while (((long) stack & (THREAD_SIZE-1)) != 0) {
                 addr = *stack++;
-		if (kernel_text_address(addr)) {
+		if (__kernel_text_address(addr)) {
 			if (i && ((i % 6) == 0))
 				printk("\n   ");
 			printk("[<%08lx>] ", addr);
@@ -42,26 +42,7 @@ void dump_stack(void)
 
 	show_trace(&stack);
 }
-
 EXPORT_SYMBOL(dump_stack);
-
-void show_trace_task(struct task_struct *tsk)
-{
-	unsigned long esp = PT_REGS_SP(&tsk->thread.regs);
-
-	/* User space on another CPU? */
-	if ((esp ^ (unsigned long)tsk) & (PAGE_MASK<<1))
-		return;
-	show_trace((unsigned long *)esp);
-}
-
-void show_stack(struct task_struct *task, unsigned long *sp)
-{
-	if(task)
-		show_trace_task(task);
-	else
-		show_trace(sp);
-}
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

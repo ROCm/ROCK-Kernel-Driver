@@ -38,15 +38,15 @@ struct powernow_k8_data {
 
 
 /* processor's cpuid instruction support */
-#define CPUID_PROCESSOR_SIGNATURE             1	/* function 1 */
-#define CPUID_XFAM                   0x0ff00000	/* extended family */
-#define CPUID_XFAM_K8                0
-#define CPUID_XMOD                   0x000f0000	/* extended model */
-#define CPUID_XMOD_REV_E             0x00020000
-#define CPUID_USE_XFAM_XMOD          0x00000f00
-#define CPUID_GET_MAX_CAPABILITIES   0x80000000
-#define CPUID_FREQ_VOLT_CAPABILITIES 0x80000007
-#define P_STATE_TRANSITION_CAPABLE            6
+#define CPUID_PROCESSOR_SIGNATURE	1	/* function 1 */
+#define CPUID_XFAM			0x0ff00000	/* extended family */
+#define CPUID_XFAM_K8			0
+#define CPUID_XMOD			0x000f0000	/* extended model */
+#define CPUID_XMOD_REV_E		0x00020000
+#define CPUID_USE_XFAM_XMOD		0x00000f00
+#define CPUID_GET_MAX_CAPABILITIES	0x80000000
+#define CPUID_FREQ_VOLT_CAPABILITIES	0x80000007
+#define P_STATE_TRANSITION_CAPABLE	6
 
 /* Model Specific Registers for p-state transitions. MSRs are 64-bit. For     */
 /* writes (wrmsr - opcode 0f 30), the register number is placed in ecx, and   */
@@ -179,4 +179,3 @@ static int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvi
 static int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid);
 
 static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index);
-

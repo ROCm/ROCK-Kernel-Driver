@@ -78,9 +78,6 @@
 
 #define RAW3270_MAXDEVS	256
 
-int raw3270_init(void);
-void raw3270_exit(void);
-
 /* For TUBGETMOD and TUBSETMOD. Should include. */
 struct raw3270_iocb {
 	short model;
@@ -189,6 +186,10 @@ raw3270_put_view(struct raw3270_view *view)
 
 struct raw3270 *raw3270_setup_console(struct ccw_device *cdev);
 void raw3270_wait_cons_dev(struct raw3270 *);
+
+/* Notifier for device addition/removal */
+int raw3270_register_notifier(void (*notifier)(int, int));
+void raw3270_unregister_notifier(void (*notifier)(int, int));
 
 /*
  * Little memory allocator for string objects. 

@@ -175,7 +175,7 @@ int do_mathemu(struct pt_regs *regs, struct task_struct *fpt)
 #ifdef DEBUG_MATHEMU
 		printk("precise trap at %08lx\n", regs->pc);
 #endif
-		if (!get_user(insn, (u32 *)regs->pc)) {
+		if (!get_user(insn, (u32 __user *) regs->pc)) {
 			retcode = do_one_mathemu(insn, &fpt->thread.fsr, fpt->thread.float_regs);
 			if (retcode) {
 				/* in this case we need to fix up PC & nPC */
@@ -193,7 +193,7 @@ int do_mathemu(struct pt_regs *regs, struct task_struct *fpt)
 			break;
 	}
 	/* Now empty the queue and clear the queue_not_empty flag */
-	if(retcode)
+	if (retcode)
 		fpt->thread.fsr &= ~(0x3000 | FSR_CEXC_MASK);
 	else
 		fpt->thread.fsr &= ~0x3000;
@@ -219,18 +219,18 @@ static inline int record_exception(unsigned long *pfsr, int eflag)
 	would_trap = (fsr & ((long)eflag << FSR_TEM_SHIFT)) != 0UL;
 
 	/* If trapping, we only want to signal one bit. */
-	if(would_trap != 0) {
+	if (would_trap != 0) {
 		eflag &= ((fsr & FSR_TEM_MASK) >> FSR_TEM_SHIFT);
-		if((eflag & (eflag - 1)) != 0) {
-			if(eflag & FP_EX_INVALID)
+		if ((eflag & (eflag - 1)) != 0) {
+			if (eflag & FP_EX_INVALID)
 				eflag = FP_EX_INVALID;
-			else if(eflag & FP_EX_OVERFLOW)
+			else if (eflag & FP_EX_OVERFLOW)
 				eflag = FP_EX_OVERFLOW;
-			else if(eflag & FP_EX_UNDERFLOW)
+			else if (eflag & FP_EX_UNDERFLOW)
 				eflag = FP_EX_UNDERFLOW;
-			else if(eflag & FP_EX_DIVZERO)
+			else if (eflag & FP_EX_DIVZERO)
 				eflag = FP_EX_DIVZERO;
-			else if(eflag & FP_EX_INEXACT)
+			else if (eflag & FP_EX_INEXACT)
 				eflag = FP_EX_INEXACT;
 		}
 	}
@@ -250,11 +250,11 @@ static inline int record_exception(unsigned long *pfsr, int eflag)
 	 *    CEXC just generated is OR'd into the
 	 *    existing value of AEXC.
 	 */
-	if(would_trap == 0)
+	if (would_trap == 0)
 		fsr |= ((long)eflag << FSR_AEXC_SHIFT);
 
 	/* If trapping, indicate fault trap type IEEE. */
-	if(would_trap != 0)
+	if (would_trap != 0)
 		fsr |= (1UL << 14);
 
 	*pfsr = fsr;
@@ -515,7 +515,7 @@ static int do_one_mathemu(u32 insn, unsigned long *pfsr, unsigned long *fregs)
 		case 7: FP_PACK_QP (rd, QR); break;
 		}
 	}
-	if(_fex == 0)
+	if (_fex == 0)
 		return 1;				/* success! */
 	return record_exception(pfsr, _fex);
 }

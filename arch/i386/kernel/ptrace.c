@@ -174,7 +174,7 @@ ptrace_get_thread_area(struct task_struct *child,
 	((desc)->a & 0x0ffff) | \
 	 ((desc)->b & 0xf0000) )
 
-#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_32BIT(desc)		(((desc)->b >> 22) & 1)
 #define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
 #define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
 #define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
@@ -230,18 +230,12 @@ ptrace_set_thread_area(struct task_struct *child,
 	return 0;
 }
 
-extern int modify_ldt(struct task_struct *task, int func, void *ptr, 
-		      unsigned long bytecount);
-
-extern struct mm_struct *proc_mm_get_mm(int fd);
-
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
 	struct user * dummy = NULL;
 	int i, ret;
-
-	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
+	unsigned long __user *datap = (unsigned long __user *)data;
 
 	lock_kernel();
 	ret = -EPERM;
@@ -290,7 +284,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if (copied != sizeof(tmp))
 			break;
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp, datap);
 		break;
 	}
 
@@ -312,7 +306,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			addr = addr >> 2;
 			tmp = child->thread.debugreg[addr];
 		}
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp, datap);
 		break;
 	}
 
@@ -358,65 +352,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 			  addr -= (long) &dummy->u_debugreg;
 			  addr = addr >> 2;
-
-			  if (addr == 7 && (enable_debugreg(child->thread.debugreg[addr], data)) < 0) {
-				  ret = -EBUSY;
-				  break;
-			  }
 			  child->thread.debugreg[addr] = data;
 			  ret = 0;
 		  }
 		  break;
 
-#ifdef CONFIG_PROC_MM
-	/* uml skas stuff */
-	case PTRACE_FAULTINFO: {
-		struct ptrace_faultinfo fault;
-
-		fault = ((struct ptrace_faultinfo) 
-			{ .is_write	= child->thread.error_code,
-			  .addr		= child->thread.cr2 });
-		ret = copy_to_user((unsigned long *) data, &fault, 
-				   sizeof(fault));
-		if(ret)
-			break;
-		break;
-	}
-	case PTRACE_SIGPENDING:
-		ret = copy_to_user((unsigned long *) data, 
-				   &child->pending.signal,
-				   sizeof(child->pending.signal));
-		break;
-
-	case PTRACE_LDT: {
-		struct ptrace_ldt ldt;
-
-		if(copy_from_user(&ldt, (unsigned long *) data, 
-				  sizeof(ldt))){
-			ret = -EIO;
-			break;
-		}
-		ret = modify_ldt(child, ldt.func, ldt.ptr, ldt.bytecount);
-		break;
-	}
-
-	case PTRACE_SWITCH_MM: {
-		struct mm_struct *old = child->mm;
-		struct mm_struct *new = proc_mm_get_mm(data);
-
-		if(IS_ERR(new)){
-			ret = PTR_ERR(new);
-			break;
-		}
-
-		atomic_inc(&new->mm_users);
-		child->mm = new;
-		child->active_mm = new;
-		mmput(old);
-		ret=0;
-		break;
-	}
-#endif
 	case PTRACE_SYSCALL: /* continue and stop at next (return from) syscall */
 	case PTRACE_CONT: { /* restart after signal. */
 		long tmp;
@@ -484,13 +424,13 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
-	  	if (!access_ok(VERIFY_WRITE, (unsigned *)data, FRAME_SIZE*sizeof(long))) {
+	  	if (!access_ok(VERIFY_WRITE, datap, FRAME_SIZE*sizeof(long))) {
 			ret = -EIO;
 			break;
 		}
 		for ( i = 0; i < FRAME_SIZE*sizeof(long); i += sizeof(long) ) {
-			__put_user(getreg(child, i),(unsigned long *) data);
-			data += sizeof(long);
+			__put_user(getreg(child, i), datap);
+			datap++;
 		}
 		ret = 0;
 		break;
@@ -498,21 +438,21 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 	case PTRACE_SETREGS: { /* Set all gp regs in the child. */
 		unsigned long tmp;
-	  	if (!access_ok(VERIFY_READ, (unsigned *)data, FRAME_SIZE*sizeof(long))) {
+	  	if (!access_ok(VERIFY_READ, datap, FRAME_SIZE*sizeof(long))) {
 			ret = -EIO;
 			break;
 		}
 		for ( i = 0; i < FRAME_SIZE*sizeof(long); i += sizeof(long) ) {
-			__get_user(tmp, (unsigned long *) data);
+			__get_user(tmp, datap);
 			putreg(child, i, tmp);
-			data += sizeof(long);
+			datap++;
 		}
 		ret = 0;
 		break;
 	}
 
 	case PTRACE_GETFPREGS: { /* Get the child FPU state. */
-		if (!access_ok(VERIFY_WRITE, (unsigned *)data,
+		if (!access_ok(VERIFY_WRITE, datap,
 			       sizeof(struct user_i387_struct))) {
 			ret = -EIO;
 			break;
@@ -525,7 +465,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	}
 
 	case PTRACE_SETFPREGS: { /* Set the child FPU state. */
-		if (!access_ok(VERIFY_READ, (unsigned *)data,
+		if (!access_ok(VERIFY_READ, datap,
 			       sizeof(struct user_i387_struct))) {
 			ret = -EIO;
 			break;
@@ -537,7 +477,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	}
 
 	case PTRACE_GETFPXREGS: { /* Get the child extended FPU state. */
-		if (!access_ok(VERIFY_WRITE, (unsigned *)data,
+		if (!access_ok(VERIFY_WRITE, datap,
 			       sizeof(struct user_fxsr_struct))) {
 			ret = -EIO;
 			break;
@@ -549,7 +489,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	}
 
 	case PTRACE_SETFPXREGS: { /* Set the child extended FPU state. */
-		if (!access_ok(VERIFY_READ, (unsigned *)data,
+		if (!access_ok(VERIFY_READ, datap,
 			       sizeof(struct user_fxsr_struct))) {
 			ret = -EIO;
 			break;
@@ -560,13 +500,13 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	}
 
 	case PTRACE_GET_THREAD_AREA:
-		ret = ptrace_get_thread_area(child,
-					     addr, (struct user_desc __user *) data);
+		ret = ptrace_get_thread_area(child, addr,
+					(struct user_desc __user *) data);
 		break;
 
 	case PTRACE_SET_THREAD_AREA:
-		ret = ptrace_set_thread_area(child,
-					     addr, (struct user_desc __user *) data);
+		ret = ptrace_set_thread_area(child, addr,
+					(struct user_desc __user *) data);
 		break;
 
 	default:
@@ -577,7 +517,7 @@ out_tsk:
 	put_task_struct(child);
 out:
 	unlock_kernel();
-	return audit_result(ret);
+	return ret;
 }
 
 /* notification of system call entry/exit
@@ -586,6 +526,15 @@ out:
 __attribute__((regparm(3)))
 void do_syscall_trace(struct pt_regs *regs, int entryexit)
 {
+	if (unlikely(current->audit_context)) {
+		if (!entryexit)
+			audit_syscall_entry(current, regs->orig_eax,
+					    regs->ebx, regs->ecx,
+					    regs->edx, regs->esi);
+		else
+			audit_syscall_exit(current, regs->eax);
+	}
+
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return;
 	if (!(current->ptrace & PT_PTRACED))

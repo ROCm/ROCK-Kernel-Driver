@@ -319,13 +319,13 @@ aic7xxx_proc_info ( struct Scsi_Host *HBAptr, char *buffer, char **start, off_t 
         aic_dev->r_total+aic_dev->w_total, aic_dev->r_total, aic_dev->w_total);
     size += sprintf(BLS, "%s\n", HDRB);
     size += sprintf(BLS, "   Reads:");
-    for (i = 0; i < NUMBER(aic_dev->r_bins); i++)
+    for (i = 0; i < ARRAY_SIZE(aic_dev->r_bins); i++)
     {
       size += sprintf(BLS, " %10ld", aic_dev->r_bins[i]);
     }
     size += sprintf(BLS, "\n");
     size += sprintf(BLS, "  Writes:");
-    for (i = 0; i < NUMBER(aic_dev->w_bins); i++)
+    for (i = 0; i < ARRAY_SIZE(aic_dev->w_bins); i++)
     {
       size += sprintf(BLS, " %10ld", aic_dev->w_bins[i]);
     }
@@ -347,7 +347,7 @@ aic7xxx_proc_info ( struct Scsi_Host *HBAptr, char *buffer, char **start, off_t 
   else
   {
     *start = buffer;
-    length = MIN(length, size - offset);
+    length = min_t(int, length, size - offset);
     memcpy(buffer, &aic7xxx_buffer[offset], length);
   }
 

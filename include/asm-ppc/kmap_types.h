@@ -16,6 +16,7 @@ enum km_type {
 	KM_IRQ1,
 	KM_SOFTIRQ0,
 	KM_SOFTIRQ1,
+	KM_PPC_SYNC_PAGE,
 	KM_TYPE_NR
 };
 

@@ -315,7 +315,7 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 	}
 
 	/* Write this node to the flash.  */
-	if ((res = jffs_write_node(c, new_node, &raw_inode, f->name, 0, recoverable, f)) < 0) {
+	if ((res = jffs_write_node(c, new_node, &raw_inode, f->name, NULL, recoverable, f)) < 0) {
 		D(printk("jffs_notify_change(): The write failed!\n"));
 		jffs_free_node(new_node);
 		D3(printk (KERN_NOTICE "n_c(): up biglock\n"));
@@ -323,7 +323,7 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 		goto out;
 	}
 
-	jffs_insert_node(c, f, &raw_inode, 0, new_node);
+	jffs_insert_node(c, f, &raw_inode, NULL, new_node);
 
 	mark_inode_dirty(inode);
 	D3(printk (KERN_NOTICE "n_c(): up biglock\n"));
@@ -879,14 +879,14 @@ jffs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 	/* Write the new node to the flash.  */
 	if ((result = jffs_write_node(c, node, &raw_inode,
-				      dentry->d_name.name, 0, 0, NULL)) < 0) {
+				     dentry->d_name.name, NULL, 0, NULL)) < 0) {
 		D(printk("jffs_mkdir(): jffs_write_node() failed.\n"));
 		jffs_free_node(node);
 		goto jffs_mkdir_end;
 	}
 
 	/* Insert the new node into the file system.  */
-	if ((result = jffs_insert_node(c, 0, &raw_inode, dentry->d_name.name,
+	if ((result = jffs_insert_node(c, NULL, &raw_inode, dentry->d_name.name,
 				       node)) < 0) {
 		goto jffs_mkdir_end;
 	}
@@ -959,7 +959,7 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 	struct jffs_file *dir_f; /* The file-to-remove's parent.  */
 	struct jffs_file *del_f; /* The file to remove.  */
 	struct jffs_node *del_node;
-	struct inode *inode = 0;
+	struct inode *inode = NULL;
 	int result = 0;
 
 	D1({
@@ -1041,7 +1041,7 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 	raw_inode.deleted = 1;
 
 	/* Write the new node to the flash memory.  */
-	if (jffs_write_node(c, del_node, &raw_inode, 0, 0, 1, del_f) < 0) {
+	if (jffs_write_node(c, del_node, &raw_inode, NULL, NULL, 1, del_f) < 0) {
 		jffs_free_node(del_node);
 		result = -EIO;
 		goto jffs_remove_end;
@@ -1049,7 +1049,7 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 
 	/* Update the file.  This operation will make the file disappear
 	   from the in-memory file system structures.  */
-	jffs_insert_node(c, del_f, &raw_inode, 0, del_node);
+	jffs_insert_node(c, del_f, &raw_inode, NULL, del_node);
 
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(dir);
@@ -1070,7 +1070,7 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	struct jffs_raw_inode raw_inode;
 	struct jffs_file *dir_f;
-	struct jffs_node *node = 0;
+	struct jffs_node *node = NULL;
 	struct jffs_control *c;
 	struct inode *inode;
 	int result = 0;
@@ -1127,7 +1127,7 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	}
 
 	/* Insert the new node into the file system.  */
-	if ((err = jffs_insert_node(c, 0, &raw_inode, dentry->d_name.name,
+	if ((err = jffs_insert_node(c, NULL, &raw_inode, dentry->d_name.name,
 				    node)) < 0) {
 		result = err;
 		goto jffs_mknod_end;
@@ -1237,7 +1237,7 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	}
 
 	/* Insert the new node into the file system.  */
-	if ((err = jffs_insert_node(c, 0, &raw_inode, dentry->d_name.name,
+	if ((err = jffs_insert_node(c, NULL, &raw_inode, dentry->d_name.name,
 				    node)) < 0) {
 		goto jffs_symlink_end;
 	}
@@ -1333,14 +1333,14 @@ jffs_create(struct inode *dir, struct dentry *dentry, int mode,
 
 	/* Write the new node to the flash.  */
 	if ((err = jffs_write_node(c, node, &raw_inode,
-				   dentry->d_name.name, 0, 0, NULL)) < 0) {
+				   dentry->d_name.name, NULL, 0, NULL)) < 0) {
 		D(printk("jffs_create(): jffs_write_node() failed.\n"));
 		jffs_free_node(node);
 		goto jffs_create_end;
 	}
 
 	/* Insert the new node into the file system.  */
-	if ((err = jffs_insert_node(c, 0, &raw_inode, dentry->d_name.name,
+	if ((err = jffs_insert_node(c, NULL, &raw_inode, dentry->d_name.name,
 				    node)) < 0) {
 		goto jffs_create_end;
 	}
@@ -1501,7 +1501,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		pos += err;
 
 		/* Insert the new node into the file system.  */
-		if ((err = jffs_insert_node(c, f, &raw_inode, 0, node)) < 0) {
+		if ((err = jffs_insert_node(c, f, &raw_inode, NULL, node)) < 0) {
 			goto out;
 		}
 
@@ -1582,7 +1582,7 @@ jffs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			struct jffs_fmcontrol *fmc = c->fmc;
 			printk("Flash status -- ");
 			if (!access_ok(VERIFY_WRITE,
-				       (struct jffs_flash_status *)arg,
+				       (struct jffs_flash_status __user *)arg,
 				       sizeof(struct jffs_flash_status))) {
 				D(printk("jffs_ioctl(): Bad arg in "
 					 "JFFS_GET_STATUS ioctl!\n"));
@@ -1598,7 +1598,7 @@ jffs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			       "begin: %d, end: %d\n",
 			       fst.size, fst.used, fst.dirty,
 			       fst.begin, fst.end);
-			if (copy_to_user((struct jffs_flash_status *)arg,
+			if (copy_to_user((struct jffs_flash_status __user *)arg,
 					 &fst,
 					 sizeof(struct jffs_flash_status))) {
 				ret = -EFAULT;
@@ -1750,7 +1750,7 @@ jffs_delete_inode(struct inode *inode)
 	lock_kernel();
 	inode->i_size = 0;
 	inode->i_blocks = 0;
-	inode->u.generic_ip = 0;
+	inode->u.generic_ip = NULL;
 	clear_inode(inode);
 	if (inode->i_nlink == 0) {
 		c = (struct jffs_control *) inode->i_sb->s_fs_info;
@@ -1771,6 +1771,12 @@ jffs_write_super(struct super_block *sb)
 	unlock_kernel();
 }
 
+static int jffs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 static struct super_operations jffs_ops =
 {
 	.read_inode	= jffs_read_inode,
@@ -1778,6 +1784,7 @@ static struct super_operations jffs_ops =
 	.put_super	= jffs_put_super,
 	.write_super	= jffs_write_super,
 	.statfs		= jffs_statfs,
+	.remount_fs	= jffs_remount,
 };
 
 static struct super_block *jffs_get_sb(struct file_system_type *fs_type,

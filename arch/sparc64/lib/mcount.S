@@ -30,8 +30,9 @@ ovstack:
 #endif
 	.text
 	.align 32
-	.globl mcount
+	.globl mcount, _mcount
 mcount:
+_mcount:
 #ifdef CONFIG_STACK_DEBUG
 	/*
 	 * Check whether %sp is dangerously low.

@@ -232,8 +232,8 @@ unsigned long qnx4_block_map( struct inode *inode, long iblock )
 	int ix;
 	long offset, i_xblk;
 	unsigned long block = 0;
-	struct buffer_head *bh = 0;
-	struct qnx4_xblk *xblk = 0;
+	struct buffer_head *bh = NULL;
+	struct qnx4_xblk *xblk = NULL;
 	struct qnx4_inode_entry *qnx4_inode = qnx4_raw_inode(inode);
 	qnx4_nxtnt_t nxtnt = le16_to_cpu(qnx4_inode->di_num_xtnts);
 
@@ -269,7 +269,7 @@ unsigned long qnx4_block_map( struct inode *inode, long iblock )
 				i_xblk = le32_to_cpu(xblk->xblk_next_xblk);
 				ix = 0;
 				brelse( bh );
-				bh = 0;
+				bh = NULL;
 			}
 		}
 		if ( bh )

@@ -22,6 +22,8 @@ LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
 endif
 
+CHECK		:= $(CHECK) -m64 -D__powerpc__=1
+
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
@@ -29,7 +31,6 @@ CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
 
 ifeq ($(CONFIG_POWER4_ONLY),y)
 	CFLAGS += $(call check_gcc,-mcpu=power4,)
-	CFLAGS += -msoft-float
 else
 	CFLAGS += $(call check_gcc,-mtune=power4,)
 endif
@@ -44,11 +45,6 @@ libs-y				+= arch/ppc64/lib/
 core-y				+= arch/ppc64/kernel/
 core-y				+= arch/ppc64/mm/
 core-$(CONFIG_XMON)		+= arch/ppc64/xmon/
-ifeq ($(CONFIG_KDB),y)
-  # Use ifeq for now because kdb subdirs are not in bk yet
-  # Otherwise make mrproper will die because it also cleans core-n
-  core-y			+= arch/ppc64/kdb/
-endif
 drivers-$(CONFIG_OPROFILE)	+= arch/ppc64/oprofile/
 
 boot := arch/ppc64/boot
@@ -84,4 +80,4 @@ define archhelp
   echo  '		   (arch/$(ARCH)/boot/zImage.initrd)'
 endef
 
-MRPROPER_FILES += include/asm-ppc64/offsets.h
+CLEAN_FILES += include/asm-ppc64/offsets.h

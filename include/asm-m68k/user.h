@@ -51,7 +51,7 @@ struct user_regs_struct {
 	short __fill;
 };
 
-	
+
 /* When the kernel dumps core, it starts by dumping the user struct -
    this will be used by gdb to figure out where the data and stack segments
    are within the file, and what virtual addresses to use. */
@@ -72,7 +72,7 @@ struct user{
 				   This is actually the bottom of the stack,
 				   the top of the stack is always found in the
 				   esp register.  */
-  long int signal;     		/* Signal that caused the core dump. */
+  long int signal;		/* Signal that caused the core dump. */
   int reserved;			/* No longer used */
   struct user_regs_struct *u_ar0;
 				/* Used by gdb to help find the values for */

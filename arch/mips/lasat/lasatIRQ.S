@@ -24,12 +24,13 @@
 
 	.text
 	.set	noreorder
-	.set	noat
 	.align	5
-	NESTED(mipsIRQ, PT_SIZE, sp)
+	NESTED(lasatIRQ, PT_SIZE, sp)
+	.set	noat
 	SAVE_ALL
 	CLI
 	.set	at
+	.set	noreorder
 
 	mfc0	s0, CP0_CAUSE		# get irq mask
 
@@ -39,9 +40,9 @@
 	 andi	a0, s0, CAUSEF_IP2	# delay slot, check hw0 interrupt
 
 	/* Wheee, a timer interrupt. */
-	move	a0, sp
-	jal	lasat_timer_interrupt
-	 nop
+	li	a0, 7
+	jal	ll_timer_interrupt
+	 move	a1, sp
 
 	j	ret_from_irq
 	 nop
@@ -65,4 +66,4 @@
 
 	j	ret_from_irq
 	 nop
-	END(mipsIRQ)
+	END(lasatIRQ)

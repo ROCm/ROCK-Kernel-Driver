@@ -32,7 +32,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 #include <asm/dma.h>
 #include <asm/fixmap.h>
 #include <asm/e820.h>
@@ -123,6 +122,13 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	}
 }
 
+static inline int is_kernel_text(unsigned long addr)
+{
+	if (addr >= (unsigned long)_stext && addr <= (unsigned long)__init_end)
+		return 1;
+	return 0;
+}
+
 /*
  * This maps the physical memory to kernel virtual address space, a total 
  * of max_low_pfn pages, by creating page tables starting from address 
@@ -145,18 +151,29 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 		if (pfn >= max_low_pfn)
 			continue;
 		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {
+			unsigned int address = pfn * PAGE_SIZE + PAGE_OFFSET;
+
 			/* Map with big pages if possible, otherwise create normal page tables. */
 			if (cpu_has_pse) {
-				set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE));
+				unsigned int address2 = (pfn + PTRS_PER_PTE - 1) * PAGE_SIZE + PAGE_OFFSET + PAGE_SIZE-1;
+
+				if (is_kernel_text(address) || is_kernel_text(address2))
+					set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE_EXEC));
+				else
+					set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE));
 				pfn += PTRS_PER_PTE;
 			} else {
 				pte = one_page_table_init(pmd);
 
-				for (pte_ofs = 0; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++)
-					set_pte(pte, pfn_pte(pfn, PAGE_KERNEL));
+				for (pte_ofs = 0; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++) {
+						if (is_kernel_text(address))
+							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
+						else
+							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL));
+				}
 			}
 		}
-	}	
+	}
 }
 
 static inline int page_kills_ppro(unsigned long pagenr)
@@ -205,13 +222,6 @@ static inline int page_is_ram(unsigned long pagenr)
 	}
 	return 0;
 }
-
-/* To enable modules to check if a page is in RAM */
-int pfn_is_ram(unsigned long pfn)
-{
-	return (page_is_ram(pfn));
-}
-
 
 #ifdef CONFIG_HIGHMEM
 pte_t *kmap_pte;
@@ -280,7 +290,8 @@ extern void set_highmem_pages_init(int);
 #define set_highmem_pages_init(bad_ppro) do { } while (0)
 #endif /* CONFIG_HIGHMEM */
 
-unsigned long __PAGE_KERNEL = _PAGE_KERNEL;
+unsigned long long __PAGE_KERNEL = _PAGE_KERNEL;
+unsigned long long __PAGE_KERNEL_EXEC = _PAGE_KERNEL_EXEC;
 
 #ifndef CONFIG_DISCONTIGMEM
 #define remap_numa_kva() do {} while (0)
@@ -309,6 +320,7 @@ static void __init pagetable_init (void)
 	if (cpu_has_pge) {
 		set_in_cr4(X86_CR4_PGE);
 		__PAGE_KERNEL |= _PAGE_GLOBAL;
+		__PAGE_KERNEL_EXEC |= _PAGE_GLOBAL;
 	}
 
 	kernel_physical_mapping_init(pgd_base);
@@ -335,16 +347,30 @@ static void __init pagetable_init (void)
 #endif
 }
 
+#if defined(CONFIG_PM_DISK) || defined(CONFIG_SOFTWARE_SUSPEND)
+/*
+ * Swap suspend & friends need this for resume because things like the intel-agp
+ * driver might have split up a kernel 4MB mapping.
+ */
+char __nosavedata swsusp_pg_dir[PAGE_SIZE]
+	__attribute__ ((aligned (PAGE_SIZE)));
+
+static inline void save_pg_dir(void)
+{
+	memcpy(swsusp_pg_dir, swapper_pg_dir, PAGE_SIZE);
+}
+#else
+static inline void save_pg_dir(void)
+{
+}
+#endif
+
 void zap_low_mappings (void)
 {
 	int i;
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
-	{
-		extern char swsusp_pg_dir[PAGE_SIZE];
-		memcpy(swsusp_pg_dir, swapper_pg_dir, PAGE_SIZE);
-	}
-#endif
+	save_pg_dir();
+
 	/*
 	 * Zap initial low-memory mappings.
 	 *
@@ -385,6 +411,79 @@ void __init zone_sizes_init(void)
 extern void zone_sizes_init(void);
 #endif /* !CONFIG_DISCONTIGMEM */
 
+static int disable_nx __initdata = 0;
+u64 __supported_pte_mask = ~_PAGE_NX;
+
+/*
+ * noexec = on|off
+ *
+ * Control non executable mappings.
+ *
+ * on      Enable
+ * off     Disable
+ */
+static int __init noexec_setup(char *str)
+{
+	if (!strncmp(str, "on",2) && cpu_has_nx) {
+		__supported_pte_mask |= _PAGE_NX;
+		disable_nx = 0;
+	} else if (!strncmp(str,"off",3)) {
+		disable_nx = 1;
+		__supported_pte_mask &= ~_PAGE_NX;
+	}
+	return 1;
+}
+
+__setup("noexec=", noexec_setup);
+
+#ifdef CONFIG_X86_PAE
+int nx_enabled = 0;
+
+static void __init set_nx(void)
+{
+	unsigned int v[4], l, h;
+
+	if (cpu_has_pae && (cpuid_eax(0x80000000) > 0x80000001)) {
+		cpuid(0x80000001, &v[0], &v[1], &v[2], &v[3]);
+		if ((v[3] & (1 << 20)) && !disable_nx) {
+			rdmsr(MSR_EFER, l, h);
+			l |= EFER_NX;
+			wrmsr(MSR_EFER, l, h);
+			nx_enabled = 1;
+			__supported_pte_mask |= _PAGE_NX;
+		}
+	}
+}
+
+/*
+ * Enables/disables executability of a given kernel page and
+ * returns the previous setting.
+ */
+int __init set_kernel_exec(unsigned long vaddr, int enable)
+{
+	pte_t *pte;
+	int ret = 1;
+
+	if (!nx_enabled)
+		goto out;
+
+	pte = lookup_address(vaddr);
+	BUG_ON(!pte);
+
+	if (!pte_exec_kernel(*pte))
+		ret = 0;
+
+	if (enable)
+		pte->pte_high &= ~(1 << (_PAGE_BIT_NX - 32));
+	else
+		pte->pte_high |= 1 << (_PAGE_BIT_NX - 32);
+	__flush_tlb_all();
+out:
+	return ret;
+}
+
+#endif
+
 /*
  * paging_init() sets up the page tables - note that the first 8MB are
  * already mapped by head.S.
@@ -394,6 +493,12 @@ extern void zone_sizes_init(void);
  */
 void __init paging_init(void)
 {
+#ifdef CONFIG_X86_PAE
+	set_nx();
+	if (nx_enabled)
+		printk("NX (Execute Disable) protection: active\n");
+#endif
+
 	pagetable_init();
 
 	load_cr3(swapper_pg_dir);
@@ -537,20 +642,30 @@ void __init mem_init(void)
 #endif
 }
 
-#ifdef CONFIG_X86_PAE
-struct kmem_cache_s *pae_pgd_cachep;
+kmem_cache_t *pgd_cache;
+kmem_cache_t *pmd_cache;
 
 void __init pgtable_cache_init(void)
 {
-        /*
-         * PAE pgds must be 16-byte aligned:
-         */
-        pae_pgd_cachep = kmem_cache_create("pae_pgd", 32, 0,
-                SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
-        if (!pae_pgd_cachep)
-                panic("init_pae(): Cannot alloc pae_pgd SLAB cache");
+	if (PTRS_PER_PMD > 1) {
+		pmd_cache = kmem_cache_create("pmd",
+					PTRS_PER_PMD*sizeof(pmd_t),
+					PTRS_PER_PMD*sizeof(pmd_t),
+					0,
+					pmd_ctor,
+					NULL);
+		if (!pmd_cache)
+			panic("pgtable_cache_init(): cannot create pmd cache");
+	}
+	pgd_cache = kmem_cache_create("pgd",
+				PTRS_PER_PGD*sizeof(pgd_t),
+				PTRS_PER_PGD*sizeof(pgd_t),
+				0,
+				pgd_ctor,
+				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
+	if (!pgd_cache)
+		panic("pgtable_cache_init(): Cannot create pgd cache");
 }
-#endif
 
 /*
  * This function cannot be __init, since exceptions don't work in that

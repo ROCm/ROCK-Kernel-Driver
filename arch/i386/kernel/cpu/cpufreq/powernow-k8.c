@@ -39,7 +39,7 @@
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.09d"
+#define VERSION "version 1.00.09b"
 #include "powernow-k8.h"
 
 /* serialize freq changes  */
@@ -553,7 +553,7 @@ static int fill_powernow_table(struct powernow_k8_data *data, struct pst_s *pst,
 		printk(KERN_ERR PFX "no p states to transition\n");
 		return -ENODEV;
 	}
-                                                                                                    
+
 	if (check_pst_table(data, pst, maxvid))
 		return -EINVAL;
 
@@ -733,24 +733,24 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 			continue;
 		}
 
-		/* verify only 1 entry from the lo frequency table */
-		if (fid < HI_FID_TABLE_BOTTOM) {
-			if (cntlofreq) {
-				/* if both entries are the same, ignore this
-				 * one... 
-				 */
-				if ((powernow_table[i].frequency != powernow_table[cntlofreq].frequency) ||
-				    (powernow_table[i].index != powernow_table[cntlofreq].index)) {
-					printk(KERN_ERR PFX "Too many lo freq table entries\n");
-					goto err_out;
-				}
-
-				dprintk(KERN_INFO PFX "double low frequency table entry, ignoring it.\n");
-				powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
-			} else
-				cntlofreq = i;
+ 		if (fid < HI_FID_TABLE_BOTTOM) {
+ 			if (cntlofreq) {
+ 				/* if both entries are the same, ignore this
+ 				 * one... 
+ 				 */
+ 				if ((powernow_table[i].frequency != powernow_table[cntlofreq].frequency) ||
+ 				    (powernow_table[i].index != powernow_table[cntlofreq].index)) {
+ 					printk(KERN_ERR PFX "Too many lo freq table entries\n");
+ 					goto err_out_mem;
+ 				}
+				
+ 				dprintk(KERN_INFO PFX "double low frequency table entry, ignoring it.\n");
+ 				powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+ 				continue;
+ 			} else
+ 				cntlofreq = i;
 		}
-                                                                                                            
+
 		if (powernow_table[i].frequency != (data->acpi_data.states[i].core_frequency * 1000)) {
 			printk(KERN_INFO PFX "invalid freq entries %u kHz vs. %u kHz\n",
 				powernow_table[i].frequency,
@@ -769,12 +769,16 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 	print_basics(data);
 	powernow_k8_acpi_pst_values(data, 0);
 	return 0;
+
+err_out_mem:
+	kfree(powernow_table);
+
 err_out:
 	acpi_processor_unregister_performance(&data->acpi_data, data->cpu);
 
 	/* data->acpi_data.state_count informs us at ->exit() whether ACPI was used */
 	data->acpi_data.state_count = 0;
-                                                                                                            
+
 	return -ENODEV;
 }
 
@@ -788,7 +792,7 @@ static void powernow_k8_cpu_exit_acpi(struct powernow_k8_data *data)
 static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data) { return -ENODEV; }
 static void powernow_k8_cpu_exit_acpi(struct powernow_k8_data *data) { return; }
 static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index) { return; }
-#endif /* CONFIG_ACPI_PROCESSOR */
+#endif /* CONFIG_X86_POWERNOW_K8_ACPI */
 
 /* Take a frequency, and issue the fid/vid transition command */
 static int transition_frequency(struct powernow_k8_data *data, unsigned int index)
@@ -1037,6 +1041,32 @@ static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
 	return 0;
 }
 
+static unsigned int powernowk8_get (unsigned int cpu)
+{
+	struct powernow_k8_data *data = powernow_data[cpu];
+	cpumask_t oldmask = current->cpus_allowed;
+	unsigned int khz = 0;
+
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	if (smp_processor_id() != cpu) {
+		printk(KERN_ERR PFX "limiting to CPU %d failed in powernowk8_get\n", cpu);
+		set_cpus_allowed(current, oldmask);
+		return 0;
+	}
+	preempt_disable();
+
+	if (query_current_values_with_pending_wait(data))
+		goto out;
+
+	khz = find_khz_freq_from_fid(data->currfid);
+
+ out:
+	preempt_enable_no_resched();
+	set_cpus_allowed(current, oldmask);
+
+	return khz;
+}
+
 static struct freq_attr* powernow_k8_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
@@ -1047,6 +1077,7 @@ static struct cpufreq_driver cpufreq_amd64_driver = {
 	.target = powernowk8_target,
 	.init = powernowk8_cpu_init,
 	.exit = powernowk8_cpu_exit,
+	.get = powernowk8_get,
 	.name = "powernow-k8",
 	.owner = THIS_MODULE,
 	.attr = powernow_k8_attr,
@@ -1087,4 +1118,3 @@ MODULE_LICENSE("GPL");
 
 late_initcall(powernowk8_init);
 module_exit(powernowk8_exit);
-

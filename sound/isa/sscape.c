@@ -455,7 +455,7 @@ static int host_startup_ack(struct soundscape *s, unsigned timeout)
  * Upload a byte-stream into the SoundScape using DMA channel A.
  */
 static int upload_dma_data(struct soundscape *s,
-                           const unsigned char *data,
+                           const unsigned char __user *data,
                            size_t size)
 {
 	unsigned long flags;
@@ -569,7 +569,7 @@ static int upload_dma_data(struct soundscape *s,
  *       However, we have already verified its memory
  *       addresses by the time we get here.
  */
-static int sscape_upload_bootblock(struct soundscape *sscape, struct sscape_bootblock *bb)
+static int sscape_upload_bootblock(struct soundscape *sscape, struct sscape_bootblock __user *bb)
 {
 	unsigned long flags;
 	int data = 0;
@@ -604,10 +604,10 @@ static int sscape_upload_bootblock(struct soundscape *sscape, struct sscape_boot
  * SPACE, and save ourselves from copying it at all.
  */
 static int sscape_upload_microcode(struct soundscape *sscape,
-                                   const struct sscape_microcode *mc)
+                                   const struct sscape_microcode __user *mc)
 {
 	unsigned long flags;
-	char *code;
+	char __user *code;
 	int err, ret;
 
 	/*
@@ -683,7 +683,7 @@ static int sscape_hw_ioctl(snd_hwdep_t * hw, struct file *file,
 	switch (cmd) {
 	case SND_SSCAPE_LOAD_BOOTB:
 		{
-			register struct sscape_bootblock *bb = (struct sscape_bootblock *) arg;
+			register struct sscape_bootblock __user *bb = (struct sscape_bootblock __user *) arg;
 
 			/*
 			 * We are going to have to copy this data into a special
@@ -705,7 +705,7 @@ static int sscape_hw_ioctl(snd_hwdep_t * hw, struct file *file,
 
 	case SND_SSCAPE_LOAD_MCODE:
 		{
-			register const struct sscape_microcode *mc = (const struct sscape_microcode *) arg;
+			register const struct sscape_microcode __user *mc = (const struct sscape_microcode __user *) arg;
 
 			err = sscape_upload_microcode(sscape, mc);
 		}

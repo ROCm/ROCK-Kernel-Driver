@@ -15,8 +15,6 @@
 #include "pci.h"
 
 
-int broken_hp_bios_irq9;
-
 extern struct pci_raw_ops pci_direct_conf1;
 
 static int pci_visws_enable_irq(struct pci_dev *dev) { return 0; }

@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.26 2004/02/06 14:14:14 kkojima Exp $
+/* $Id: process.c,v 1.28 2004/05/05 16:54:23 lethal Exp $
  *
  *  linux/arch/sh/kernel/process.c
  *
@@ -25,6 +25,11 @@
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/elf.h>
+#if defined(CONFIG_SH_HS7751RVOIP)
+#include <asm/hs7751rvoip/hs7751rvoip.h>
+#elif defined(CONFIG_SH_RTS7751R2D)
+#include <asm/rts7751r2d/rts7751r2d.h>
+#endif
 
 static int hlt_counter=0;
 
@@ -50,8 +55,14 @@ void default_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
-		while (!need_resched())
-			cpu_relax();
+		if (hlt_counter) {
+			while (1)
+				if (need_resched())
+					break;
+		} else {
+			while (!need_resched())
+				cpu_sleep();
+		}
 
 		schedule();
 	}
@@ -73,14 +84,30 @@ EXPORT_SYMBOL(machine_restart);
 
 void machine_halt(void)
 {
+#if defined(CONFIG_SH_HS7751RVOIP)
+	unsigned short value;
+
+	value = ctrl_inw(PA_OUTPORTR);
+	ctrl_outw((value & 0xffdf), PA_OUTPORTR);
+#elif defined(CONFIG_SH_RTS7751R2D)
+	ctrl_outw(0x0001, PA_POWOFF);
+#endif
 	while (1)
-		cpu_relax();
+		cpu_sleep();
 }
 
 EXPORT_SYMBOL(machine_halt);
 
 void machine_power_off(void)
 {
+#if defined(CONFIG_SH_HS7751RVOIP)
+	unsigned short value;
+
+	value = ctrl_inw(PA_OUTPORTR);
+	ctrl_outw((value & 0xffdf), PA_OUTPORTR);
+#elif defined(CONFIG_SH_RTS7751R2D)
+	ctrl_outw(0x0001, PA_POWOFF);
+#endif
 }
 
 EXPORT_SYMBOL(machine_power_off);
@@ -461,14 +488,6 @@ out:
 	return error;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long schedule_frame;
@@ -481,7 +500,7 @@ unsigned long get_wchan(struct task_struct *p)
 	 * The same comment as on the Alpha applies here, too ...
 	 */
 	pc = thread_saved_pc(p);
-	if (pc >= (unsigned long) interruptible_sleep_on && pc < (unsigned long) add_timer) {
+	if (in_sched_functions(pc)) {
 		schedule_frame = ((unsigned long *)(long)p->thread.sp)[1];
 		return (unsigned long)((unsigned long *)schedule_frame)[1];
 	}

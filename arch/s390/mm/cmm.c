@@ -407,6 +407,14 @@ struct ctl_table_header *cmm_sysctl_header;
 static int
 cmm_init (void)
 {
+	int rc;
+
+	/* Prevent logical cpu 0 from being set offline. */
+	rc = smp_get_cpu(cpumask_of_cpu(0));
+	if (rc) {
+		printk(KERN_ERR "CMM: unable to reserve cpu 0\n");
+		return rc;
+	}
 #ifdef CONFIG_CMM_PROC
 	cmm_sysctl_header = register_sysctl_table(cmm_dir_table, 1);
 #endif
@@ -430,6 +438,8 @@ cmm_exit(void)
 #ifdef CONFIG_CMM_IUCV
 	smsg_unregister_callback(SMSG_PREFIX, cmm_smsg_target);
 #endif
+	/* Allow logical cpu 0 to be set offline again. */
+	smp_put_cpu(0);
 }
 
 module_init(cmm_init);

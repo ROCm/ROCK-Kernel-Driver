@@ -20,6 +20,7 @@
 #include <linux/security.h>
 #include <linux/pagemap.h>
 #include <linux/cdev.h>
+#include <linux/bootmem.h>
 
 /*
  * This is needed for the following functions:
@@ -89,7 +90,7 @@ spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
  * from its final dispose_list, the struct super_block they refer to
  * (for inode->i_sb->s_op) may already have been freed and reused.
  */
-static DECLARE_MUTEX(iprune_sem);
+DECLARE_MUTEX(iprune_sem);
 
 /*
  * Statistics gathering..
@@ -126,7 +127,9 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_blocks = 0;
 		inode->i_bytes = 0;
 		inode->i_generation = 0;
+#ifdef CONFIG_QUOTA
 		memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
+#endif
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
 		inode->i_cdev = NULL;
@@ -147,8 +150,20 @@ static struct inode *alloc_inode(struct super_block *sb)
 		mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
 		mapping->assoc_mapping = NULL;
 		mapping->backing_dev_info = &default_backing_dev_info;
-		if (sb->s_bdev)
-			mapping->backing_dev_info = sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
+
+		/*
+		 * If the block_device provides a backing_dev_info for client
+		 * inodes then use that.  Otherwise the inode share the bdev's
+		 * backing_dev_info.
+		 */
+		if (sb->s_bdev) {
+			struct backing_dev_info *bdi;
+
+			bdi = sb->s_bdev->bd_inode_backing_dev_info;
+			if (!bdi)
+				bdi = sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
+			mapping->backing_dev_info = bdi;
+		}
 		memset(&inode->u, 0, sizeof(inode->u));
 		inode->i_mapping = mapping;
 	}
@@ -182,12 +197,11 @@ void inode_init_once(struct inode *inode)
 	init_rwsem(&inode->i_alloc_sem);
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
 	spin_lock_init(&inode->i_data.tree_lock);
-	init_MUTEX(&inode->i_data.i_shared_sem);
+	spin_lock_init(&inode->i_data.i_mmap_lock);
 	atomic_set(&inode->i_data.truncate_count, 0);
 	INIT_LIST_HEAD(&inode->i_data.private_list);
 	spin_lock_init(&inode->i_data.private_lock);
 	INIT_PRIO_TREE_ROOT(&inode->i_data.i_mmap);
-	INIT_PRIO_TREE_ROOT(&inode->i_data.i_mmap_shared);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap_nonlinear);
 	spin_lock_init(&inode->i_lock);
 	i_size_ordered_init(inode);
@@ -214,14 +228,11 @@ void __iget(struct inode * inode)
 		return;
 	}
 	atomic_inc(&inode->i_count);
-	if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
-		list_del(&inode->i_list);
-		list_add(&inode->i_list, &inode_in_use);
-	}
+	if (!(inode->i_state & (I_DIRTY|I_LOCK)))
+		list_move(&inode->i_list, &inode_in_use);
 	inodes_stat.nr_unused--;
 }
 
-EXPORT_SYMBOL(__iget);
 /**
  * clear_inode - clear an inode
  * @inode: inode to clear
@@ -303,8 +314,7 @@ static int invalidate_list(struct list_head *head, struct super_block * sb, stru
 		invalidate_inode_buffers(inode);
 		if (!atomic_read(&inode->i_count)) {
 			hlist_del_init(&inode->i_hash);
-			list_del(&inode->i_list);
-			list_add(&inode->i_list, dispose);
+			list_move(&inode->i_list, dispose);
 			inode->i_state |= I_FREEING;
 			count++;
 			continue;
@@ -478,7 +488,7 @@ static int shrink_icache_memory(int nr, unsigned int gfp_mask)
 		if (gfp_mask & __GFP_FS)
 			prune_icache(nr);
 	}
-	return inodes_stat.nr_unused;
+	return (inodes_stat.nr_unused / 100) * sysctl_vfs_cache_pressure;
 }
 
 static void __wait_on_freeing_inode(struct inode *inode);
@@ -1017,10 +1027,8 @@ static void generic_forget_inode(struct inode *inode)
 	struct super_block *sb = inode->i_sb;
 
 	if (!hlist_unhashed(&inode->i_hash)) {
-		if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
-			list_del(&inode->i_list);
-			list_add(&inode->i_list, &inode_unused);
-		}
+		if (!(inode->i_state & (I_DIRTY|I_LOCK)))
+			list_move(&inode->i_list, &inode_unused);
 		inodes_stat.nr_unused++;
 		spin_unlock(&inode_lock);
 		if (!sb || (sb->s_flags & MS_ACTIVE))
@@ -1227,26 +1235,26 @@ void remove_dquot_ref(struct super_block *sb, int type, struct list_head *tofree
 	if (!sb->dq_op)
 		return;	/* nothing to do */
 	spin_lock(&inode_lock);	/* This lock is for inodes code */
-	/* We don't have to lock against quota code - test IS_QUOTAINIT is just for speedup... */
- 
+
+	/* We hold dqptr_sem so we are safe against the quota code */
 	list_for_each(act_head, &inode_in_use) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (inode->i_sb == sb && IS_QUOTAINIT(inode))
+		if (inode->i_sb == sb && !IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	list_for_each(act_head, &inode_unused) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (inode->i_sb == sb && IS_QUOTAINIT(inode))
+		if (inode->i_sb == sb && !IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	list_for_each(act_head, &sb->s_dirty) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (IS_QUOTAINIT(inode))
+		if (!IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	list_for_each(act_head, &sb->s_io) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (IS_QUOTAINIT(inode))
+		if (!IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	spin_unlock(&inode_lock);
@@ -1338,62 +1346,34 @@ __setup("ihash_entries=", set_ihash_entries);
 /*
  * Initialize the waitqueues and inode hash table.
  */
+void __init inode_init_early(void)
+{
+	int loop;
+
+	inode_hashtable =
+		alloc_large_system_hash("Inode-cache",
+					sizeof(struct hlist_head),
+					ihash_entries,
+					14,
+					0,
+					&i_hash_shift,
+					&i_hash_mask);
+
+	for (loop = 0; loop < (1 << i_hash_shift); loop++)
+		INIT_HLIST_HEAD(&inode_hashtable[loop]);
+}
+
 void __init inode_init(unsigned long mempages)
 {
-	struct hlist_head *head;
-	unsigned long order;
-	unsigned int nr_hash;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(i_wait_queue_heads); i++)
 		init_waitqueue_head(&i_wait_queue_heads[i].wqh);
 
-	if (!ihash_entries)
-		ihash_entries = PAGE_SHIFT < 14 ?
-				mempages >> (14 - PAGE_SHIFT) :
-				mempages << (PAGE_SHIFT - 14);
-
-	ihash_entries *= sizeof(struct hlist_head);
-	for (order = 0; ((1UL << order) << PAGE_SHIFT) < ihash_entries; order++)
-		;
-
-	do {
-		unsigned long tmp;
-
-		nr_hash = (1UL << order) * PAGE_SIZE /
-			sizeof(struct hlist_head);
-		i_hash_mask = (nr_hash - 1);
-
-		tmp = nr_hash;
-		i_hash_shift = 0;
-		while ((tmp >>= 1UL) != 0UL)
-			i_hash_shift++;
-
-		inode_hashtable = (struct hlist_head *)
-			__get_free_pages(GFP_ATOMIC, order);
-	} while (inode_hashtable == NULL && --order >= 0);
-
-	printk("Inode-cache hash table entries: %d (order: %ld, %ld bytes)\n",
-			nr_hash, order, (PAGE_SIZE << order));
-
-	if (!inode_hashtable)
-		panic("Failed to allocate inode hash table\n");
-
-	head = inode_hashtable;
-	i = nr_hash;
-	do {
-		INIT_HLIST_HEAD(head);
-		head++;
-		i--;
-	} while (i);
-
 	/* inode slab cache */
 	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
-					 0, SLAB_HWCACHE_ALIGN, init_once,
-					 NULL);
-	if (!inode_cachep)
-		panic("cannot create inode slab cache");
-
+				0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, init_once,
+				NULL);
 	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
 }
 
@@ -1414,5 +1394,4 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n",
 		       mode);
 }
-
 EXPORT_SYMBOL(init_special_inode);

@@ -112,9 +112,6 @@ struct nr_node {
  *	nr_node & nr_neigh lists, refcounting and locking
  *********************************************************************/
 
-extern struct hlist_head nr_node_list;
-extern struct hlist_head nr_neigh_list;
-
 #define nr_node_hold(__nr_node) \
 	atomic_inc(&((__nr_node)->refcount))
 
@@ -206,7 +203,7 @@ extern void nr_check_iframes_acked(struct sock *, unsigned short);
 extern void nr_rt_device_down(struct net_device *);
 extern struct net_device *nr_dev_first(void);
 extern struct net_device *nr_dev_get(ax25_address *);
-extern int  nr_rt_ioctl(unsigned int, void *);
+extern int  nr_rt_ioctl(unsigned int, void __user *);
 extern void nr_link_failed(ax25_cb *, int);
 extern int  nr_route_frame(struct sk_buff *, ax25_cb *);
 extern struct file_operations nr_nodes_fops;

@@ -24,7 +24,7 @@
 static int snd_opl3_open_seq_oss(snd_seq_oss_arg_t *arg, void *closure);
 static int snd_opl3_close_seq_oss(snd_seq_oss_arg_t *arg);
 static int snd_opl3_ioctl_seq_oss(snd_seq_oss_arg_t *arg, unsigned int cmd, unsigned long ioarg);
-static int snd_opl3_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format, const char *buf, int offs, int count);
+static int snd_opl3_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format, const char __user *buf, int offs, int count);
 static int snd_opl3_reset_seq_oss(snd_seq_oss_arg_t *arg);
 
 /* */
@@ -207,7 +207,7 @@ static int snd_opl3_close_seq_oss(snd_seq_oss_arg_t *arg)
 #define SBFM_MAXINSTR	256
 
 static int snd_opl3_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format,
-				       const char *buf, int offs, int count)
+				       const char __user *buf, int offs, int count)
 {
 	opl3_t *opl3;
 	int err = -EINVAL;

@@ -25,8 +25,8 @@ extern unsigned int cinst;
 
 extern int get_card_from_id(int);
 extern int indicate_status(int, int,ulong, char*);
-extern void *memcpy_toshmem(int, void *, const void *, size_t);
-extern void *memcpy_fromshmem(int, void *, const void *, size_t);
+extern void memcpy_toshmem(int, void *, const void *, size_t);
+extern void memcpy_fromshmem(int, void *, const void *, size_t);
 extern int sendmessage(int, unsigned int, unsigned int, unsigned int,
                 unsigned int, unsigned int, unsigned int, unsigned int *);
 

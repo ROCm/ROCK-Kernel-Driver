@@ -10,6 +10,7 @@
 
 #include <linux/delay.h>
 #include <linux/irq.h>
+#include <linux/dmi.h>
 #include <linux/device.h>
 #include <linux/suspend.h>
 #include <acpi/acpi_bus.h>
@@ -29,6 +30,8 @@ static u32 acpi_suspend_states[] = {
 	[PM_SUSPEND_MEM]	= ACPI_STATE_S3,
 	[PM_SUSPEND_DISK]	= ACPI_STATE_S4,
 };
+
+static int init_8259A_after_S1;
 
 /**
  *	acpi_pm_prepare - Do preliminary suspend work.
@@ -138,7 +141,7 @@ static int acpi_pm_finish(u32 state)
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((acpi_physical_address) 0);
 
-	if (dmi_broken & BROKEN_INIT_AFTER_S1) {
+	if (init_8259A_after_S1) {
 		printk("Broken toshiba laptop -> kicking interrupts\n");
 		init_8259A(0);
 	}
@@ -159,16 +162,38 @@ int acpi_suspend(u32 acpi_state)
 	return -EINVAL;
 }
 
-
 static struct pm_ops acpi_pm_ops = {
 	.prepare	= acpi_pm_prepare,
 	.enter		= acpi_pm_enter,
 	.finish		= acpi_pm_finish,
 };
 
+
+/*
+ * Toshiba fails to preserve interrupts over S1, reinitialization
+ * of 8259 is needed after S1 resume.
+ */
+static int __init init_ints_after_s1(struct dmi_system_id *d)
+{
+	printk(KERN_WARNING "%s with broken S1 detected.\n", d->ident);
+	init_8259A_after_S1 = 1;
+	return 0;
+}
+
+static struct dmi_system_id __initdata acpisleep_dmi_table[] = {
+	{
+		.callback = init_ints_after_s1,
+		.ident = "Toshiba Satellite 4030cdt",
+		.matches = { DMI_MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"), },
+	},
+	{ },
+};
+
 static int __init acpi_sleep_init(void)
 {
 	int			i = 0;
+
+	dmi_check_system(acpisleep_dmi_table);
 
 	if (acpi_disabled)
 		return 0;

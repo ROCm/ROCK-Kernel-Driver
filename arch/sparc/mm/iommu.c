@@ -25,6 +25,7 @@
 #include <asm/tlbflush.h>
 #include <asm/bitext.h>
 #include <asm/iommu.h>
+#include <asm/dma.h>
 
 /*
  * This can be sized dynamically, but we will do this

@@ -4,7 +4,7 @@
 
 obj-$(CONFIG_SECURITY_SELINUX) := selinux.o ss/
 
-selinux-y := avc.o hooks.o selinuxfs.o netlink.o
+selinux-y := avc.o hooks.o selinuxfs.o netlink.o nlmsgtab.o
 
 selinux-$(CONFIG_SECURITY_NETWORK) += netif.o
 

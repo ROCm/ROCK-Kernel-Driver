@@ -90,7 +90,7 @@ int snd_seq_dump_var_event(const snd_seq_event_t *event, snd_seq_dump_func_t fun
 
 	if (event->data.ext.len & SNDRV_SEQ_EXT_USRPTR) {
 		char buf[32];
-		char *curptr = event->data.ext.ptr;
+		char __user *curptr = event->data.ext.ptr;
 		while (len > 0) {
 			int size = sizeof(buf);
 			if (len < size)

@@ -168,6 +168,8 @@ static struct pnp_card_device_id snd_opl3sa2_pnpids[] = {
 	{ .id = "YMH0030", .devs = { { "YMH0021" } } },
 	/* Yamaha OPL3-SA2 */
 	{ .id = "YMH0800", .devs = { { "YMH0021" } } },
+	/* Yamaha OPL3-SA2 */
+	{ .id = "YMH0801", .devs = { { "YMH0021" } } },
 	/* NeoMagic MagicWave 3DX */
 	{ .id = "NMX2200", .devs = { { "YMH2210" } } },
 	/* --- */

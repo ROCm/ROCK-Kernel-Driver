@@ -32,11 +32,18 @@
 				   termination then *2 for unicode versions */
 #define MAX_PASSWORD_SIZE 16
 
+#define CIFS_MIN_RCV_POOL 4
+
 /*
  * MAX_REQ is the maximum number of requests that WE will send
- * on one NetBIOS handle concurently.
+ * on one socket concurently. It also matches the most common
+ * value of max multiplex returned by servers.  We may 
+ * eventually want to use the negotiated value (in case
+ * future servers can handle more) when we are more confident that
+ * we will not have problems oveloading the socket with pending
+ * write data.
  */
-#define MAX_REQ (10)
+#define CIFS_MAX_REQ 50 
 
 #define SERVER_NAME_LENGTH 15
 #define SERVER_NAME_LEN_WITH_NULL     (SERVER_NAME_LENGTH + 1)
@@ -197,6 +204,21 @@ struct cifsTconInfo {
 	__u16 Flags;		/* optional support bits */
 	enum statusEnum tidStatus;
 	atomic_t useCount;	/* how many mounts (explicit or implicit) to this share */
+#ifdef CONFIG_CIFS_STATS
+	atomic_t num_smbs_sent;
+	atomic_t num_writes;
+	atomic_t num_reads;
+	atomic_t num_oplock_brks;
+	atomic_t num_opens;
+	atomic_t num_deletes;
+	atomic_t num_mkdirs;
+	atomic_t num_rmdirs;
+	atomic_t num_renames;
+	atomic_t num_t2renames;
+	__u64    bytes_read;
+	__u64    bytes_written;
+	spinlock_t stat_lock;
+#endif
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
 	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* ok if file system name truncated */
 	FILE_SYSTEM_UNIX_INFO fsUnixInfo;
@@ -296,13 +318,6 @@ struct oplock_q_entry {
 #define   MID_RESPONSE_RECEIVED 4
 #define   MID_RETRY_NEEDED      8 /* session closed while this request out */
 
-struct servers_not_supported { /* @z4a */
-	struct servers_not_supported *next1;  /* @z4a */
-	char server_Name[SERVER_NAME_LEN_WITH_NULL]; /* @z4a */
-	/* Server Names in SMB protocol are 15 chars + X'20'  */
-	/*   in 16th byte...                      @z4a        */
-};
-
 /*
  *****************************************************************
  * All constants go here
@@ -378,7 +393,7 @@ GLOBAL_EXTERN char Local_System_Name[15];
  */
 GLOBAL_EXTERN atomic_t sesInfoAllocCount;
 GLOBAL_EXTERN atomic_t tconInfoAllocCount;
-
+GLOBAL_EXTERN atomic_t tcpSesAllocCount;
 GLOBAL_EXTERN atomic_t tcpSesReconnectCount;
 GLOBAL_EXTERN atomic_t tconInfoReconnectCount;
 
@@ -399,5 +414,4 @@ GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent
 GLOBAL_EXTERN unsigned int ntlmv2_support;  /* better optional password hash */
 GLOBAL_EXTERN unsigned int sign_CIFS_PDUs;  /* enable smb packet signing */
 GLOBAL_EXTERN unsigned int linuxExtEnabled;  /* enable Linux/Unix CIFS extensions */
-
 

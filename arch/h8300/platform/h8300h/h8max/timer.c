@@ -25,12 +25,19 @@
 
 #define CMFA 6
 
+#define CMIEA 0x40
+#define CCLR_CMA 0x08
+#define CLK_DIV8192 0x03
+
+#define H8300_TIMER_FREQ CONFIG_CPU_CLOCK*1000/8192 /* Timer input freq. */
+
 void __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
-	ctrl_outb(H8300_TIMER_COUNT_DATA,TCORA2);
-	ctrl_outb(0x00,_8TCSR2);
-	request_irq(40,timer_int,0,"timer",0);
-	ctrl_outb(0x40|0x08|0x03,_8TCR2);
+	/* setup 8bit timer ch2 */
+	ctrl_outb(H8300_TIMER_FREQ / HZ, TCORA2);      /* set interval */
+	ctrl_outb(0x00, _8TCSR2);                      /* no output */
+	request_irq(40, timer_int, 0, "timer", 0);
+	ctrl_outb(CMIEA|CCLR_CMA|CLK_DIV8192, _8TCR2); /* start count */
 }
 
 void platform_timer_eoi(void)

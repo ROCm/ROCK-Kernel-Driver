@@ -36,7 +36,7 @@
 #include <asm/irq.h>
 #include <asm/byteorder.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "qlogicisp.h"
 
 /* Configuration section *****************************************************/
@@ -1202,7 +1202,7 @@ int isp1020_abort(Scsi_Cmnd *Cmnd)
 }
 
 
-int isp1020_reset(Scsi_Cmnd *Cmnd)
+int isp1020_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
 {
 	u_short param[6];
 	struct Scsi_Host *host;
@@ -1985,8 +1985,6 @@ static Scsi_Host_Template driver_template = {
 	.release		= isp1020_release,
 	.info			= isp1020_info,	
 	.queuecommand		= isp1020_queuecommand,
-	.eh_abort_handler	= isp1020_abort,
-	.eh_bus_reset_handler	= isp1020_reset,
 	.bios_param		= isp1020_biosparam,
 	.can_queue		= QLOGICISP_REQ_QUEUE_LEN,
 	.this_id		= -1,

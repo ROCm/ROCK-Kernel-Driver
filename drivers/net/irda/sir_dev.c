@@ -74,7 +74,7 @@ int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len)
 	while (dev->tx_buff.len > 0) {			/* wait until tx idle */
 		spin_unlock_irqrestore(&dev->tx_lock, flags);
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(MSECS_TO_JIFFIES(10));
+		schedule_timeout(msecs_to_jiffies(10));
 		spin_lock_irqsave(&dev->tx_lock, flags);
 	}
 
@@ -163,10 +163,8 @@ void sirdev_write_complete(struct sir_dev *dev)
 			}
 			dev->tx_buff.len = 0;
 		}
-		if (dev->tx_buff.len > 0) {
-			spin_unlock_irqrestore(&dev->tx_lock, flags);
-			return;
-		}
+		if (dev->tx_buff.len > 0)
+			goto done;	/* more data to send later */
 	}
 
 	if (unlikely(dev->raw_tx != 0)) {
@@ -179,7 +177,7 @@ void sirdev_write_complete(struct sir_dev *dev)
 
 		IRDA_DEBUG(3, "%s(), raw-tx done\n", __FUNCTION__);
 		dev->raw_tx = 0;
-		return;
+		goto done;	/* no post-frame handling in raw mode */
 	}
 
 	/* we have finished now sending this skb.
@@ -224,6 +222,7 @@ void sirdev_write_complete(struct sir_dev *dev)
 		netif_wake_queue(dev->netdev);
 	}
 
+done:
 	spin_unlock_irqrestore(&dev->tx_lock, flags);
 }
 
@@ -240,7 +239,8 @@ int sirdev_receive(struct sir_dev *dev, const unsigned char *cp, size_t count)
 	}
 
 	if (!dev->irlap) {
-		WARNING("%s - too early: %p / %d!\n", __FUNCTION__, cp, count);
+		WARNING("%s - too early: %p / %zd!\n",
+			__FUNCTION__, cp, count);
 		return -1;
 	}
 
@@ -250,7 +250,7 @@ int sirdev_receive(struct sir_dev *dev, const unsigned char *cp, size_t count)
 		 */
 		irda_device_set_media_busy(dev->netdev, TRUE);
 		dev->stats.rx_dropped++;
-		IRDA_DEBUG(0, "%s; rx-drop: %d\n", __FUNCTION__, count);
+		IRDA_DEBUG(0, "%s; rx-drop: %zd\n", __FUNCTION__, count);
 		return 0;
 	}
 

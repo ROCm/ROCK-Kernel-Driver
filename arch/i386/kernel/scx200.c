@@ -12,7 +12,6 @@
 #include <linux/pci.h>
 
 #include <linux/scx200.h>
-#include <linux/scx200.h>
 
 #define NAME "scx200"
 
@@ -86,7 +85,10 @@ int __init scx200_init(void)
 
 	if ((bridge = pci_find_device(PCI_VENDOR_ID_NS, 
 				      PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-				      NULL)) == NULL)
+				      NULL)) == NULL
+	    && (bridge = pci_find_device(PCI_VENDOR_ID_NS,
+					 PCI_DEVICE_ID_NS_SC1100_BRIDGE,
+					 NULL)) == NULL)
 		return -ENODEV;
 
 	base = pci_resource_start(bridge, 0);

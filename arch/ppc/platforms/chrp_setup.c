@@ -232,7 +232,6 @@ chrp_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = Root_SDA2; /* sda2 (sda1 is for the kernel) */
-	ROOT_DEV = Root_SDA3; /* sda3 (sda1 is for the kernel) */
 
 	/* Lookup PCI host bridges */
 	chrp_find_bridges();
@@ -408,6 +407,9 @@ void __init chrp_init_IRQ(void)
 	OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
 
 	openpic_init(NUM_8259_INTERRUPTS);
+	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			       i8259_irq);
 
 	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;

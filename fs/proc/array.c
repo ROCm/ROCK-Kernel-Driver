@@ -307,7 +307,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
  	pid_t ppid, pgid = -1, sid = -1;
 	int num_threads = 0;
 	struct mm_struct *mm;
-	char pname[sizeof(task->comm)];
+	unsigned long long start_time;
 
 	state = *get_task_state(task);
 	vsize = eip = esp = 0;
@@ -315,7 +315,6 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	mm = task->mm;
 	if(mm)
 		mm = mmgrab(mm);
-	memcpy(pname, task->comm, sizeof(pname));
 	task_unlock(task);
 	if (mm) {
 		down_read(&mm->mmap_sem);
@@ -354,11 +353,15 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	read_lock(&tasklist_lock);
 	ppid = task->pid ? task->real_parent->pid : 0;
 	read_unlock(&tasklist_lock);
+
+	/* Temporary variable needed for gcc-2.96 */
+	start_time = jiffies_64_to_clock_t(task->start_time - INITIAL_JIFFIES);
+
 	res = sprintf(buffer,"%d (%s) %c %d %d %d %d %d %lu %lu \
 %lu %lu %lu %lu %lu %ld %ld %ld %ld %d %ld %llu %lu %ld %lu %lu %lu %lu %lu \
 %lu %lu %lu %lu %lu %lu %lu %lu %d %d %lu %lu\n",
 		task->pid,
-		pname,
+		task->comm,
 		state,
 		ppid,
 		pgid,
@@ -378,8 +381,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		nice,
 		num_threads,
 		jiffies_to_clock_t(task->it_real_value),
-		(unsigned long long)
-		    jiffies_64_to_clock_t(task->start_time - INITIAL_JIFFIES),
+		start_time,
 		vsize,
 		mm ? mm->rss : 0, /* you might want to shift this left 3 */
 		task->rlim[RLIMIT_RSS].rlim_cur,
@@ -425,21 +427,3 @@ int proc_pid_statm(struct task_struct *task, char *buffer)
 	return sprintf(buffer,"%d %d %d %d %d %d %d\n",
 		       size, resident, shared, text, lib, data, 0);
 }
-
-
-int proc_pid_delay(struct task_struct *task, char * buffer)
-{
-	int res;
-
-	res  = sprintf(buffer,"%lu %lu %lu %lu %lu %lu %lu\n",
-		       get_delay(task,runs),
-		       get_delay(task,runcpu_total),
-		       get_delay(task,waitcpu_total),
-		       get_delay(task,num_iowaits),
-		       get_delay(task,iowait_total),
-		       get_delay(task,num_memwaits),
-		       get_delay(task,mem_iowait_total)
-		);
-	return res;
-}
-

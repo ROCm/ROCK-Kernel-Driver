@@ -16,6 +16,7 @@ obj-$(CONFIG_SH_STANDARD_BIOS)	+= sh_bios.o
 obj-$(CONFIG_SH_KGDB)		+= kgdb_stub.o kgdb_jmp.o
 obj-$(CONFIG_SH_CPU_FREQ)	+= cpufreq.o
 obj-$(CONFIG_MODULES)		+= module.o
+obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 
 USE_STANDARD_AS_RULE := true
 

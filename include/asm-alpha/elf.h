@@ -1,6 +1,11 @@
 #ifndef __ASM_ALPHA_ELF_H
 #define __ASM_ALPHA_ELF_H
 
+/* Special values for the st_other field in the symbol table.  */
+
+#define STO_ALPHA_NOPV		0x80
+#define STO_ALPHA_STD_GPLOAD	0x88
+
 /*
  * Alpha ELF relocation types
  */

@@ -126,7 +126,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 #define switch_to(prev, next, last) do {						\
 	SWITCH_ENTER(prev);								\
 	SWITCH_DO_LAZY_FPU(next);							\
-	next->active_mm->cpu_vm_mask |= (1 << smp_processor_id());			\
+	cpu_set(smp_processor_id(), next->active_mm->cpu_vm_mask);			\
 	__asm__ __volatile__(								\
 	"sethi	%%hi(here - 0x8), %%o7\n\t"						\
 	"mov	%%g6, %%g3\n\t"								\

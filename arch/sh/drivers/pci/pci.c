@@ -25,7 +25,7 @@ static int __init pcibios_init(void)
 
 #ifdef CONFIG_PCI_AUTO
 	/* assign resources */
-	busno=0;
+	busno = 0;
 	for (p = board_pci_channels; p->pci_ops != NULL; p++) {
 		busno = pciauto_assign_resources(busno, p) + 1;
 	}

@@ -20,8 +20,6 @@
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
 #include <linux/interrupt.h>
-#include <linux/dump.h>
-#include <linux/module.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
@@ -67,13 +65,6 @@ static inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	 */
 	cfg = __prepare_ICR(shortcut, vector);
 
-	 if (vector == DUMP_VECTOR) {
- 		 /*
- 		  * Setup DUMP IPI to be delivered as an NMI
- 		  */
- 		 cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
-	 }
-
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
 	 */
@@ -103,7 +94,7 @@ void send_IPI_self(int vector)
 
 static inline void send_IPI_mask(cpumask_t cpumask, int vector)
 {
-	unsigned long mask = cpus_coerce(cpumask);
+	unsigned long mask = cpus_addr(cpumask)[0];
 	unsigned long cfg;
 	unsigned long flags;
 
@@ -126,13 +117,6 @@ static inline void send_IPI_mask(cpumask_t cpumask, int vector)
 	 */
 	cfg = __prepare_ICR(0, vector);
 	
-	 if (vector == DUMP_VECTOR) {
- 		 /*
- 		  * Setup DUMP IPI to be delivered as an NMI
- 		  */
- 		 cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
-	 }
-
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
 	 */
@@ -359,19 +343,12 @@ static void do_flush_tlb_all(void* info)
 
 void flush_tlb_all(void)
 {
-	on_each_cpu(do_flush_tlb_all, 0, 1, 1);
+	on_each_cpu(do_flush_tlb_all, NULL, 1, 1);
 }
 
 void smp_kdb_stop(void)
 {
 	send_IPI_allbutself(KDB_VECTOR);
-}
-
-
-/* void dump_send_ipi(int (*dump_ipi_handler)(struct pt_regs *)); */
-void dump_send_ipi(void)
-{
-	send_IPI_allbutself(DUMP_VECTOR);
 }
 
 /*
@@ -427,6 +404,9 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	if (!cpus)
 		return 0;
 
+	/* Can deadlock when called with interrupts disabled */
+	WARN_ON(irqs_disabled());
+
 	data.func = func;
 	data.info = info;
 	atomic_set(&data.started, 0);
@@ -450,18 +430,6 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	spin_unlock(&call_lock);
 
 	return 0;
-}
-
-void stop_this_cpu(void* dummy)
-{
-	/*
-	 * Remove this CPU:
-	 */
-	cpu_clear(smp_processor_id(), cpu_online_map);
-	local_irq_disable();
-	disable_local_APIC();
-	for (;;) 
-		asm("hlt"); 
 }
 
 void smp_stop_cpu(void)

@@ -48,7 +48,6 @@ struct dst_entry
 #define DST_NOXFRM		2
 #define DST_NOPOLICY		4
 #define DST_NOHASH		8
-#define DST_FRAGHDR		16
 	unsigned long		lastuse;
 	unsigned long		expires;
 
@@ -68,7 +67,7 @@ struct dst_entry
 	struct xfrm_state	*xfrm;
 
 	int			(*input)(struct sk_buff*);
-	int			(*output)(struct sk_buff*);
+	int			(*output)(struct sk_buff**);
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	__u32			tclassid;
@@ -90,6 +89,7 @@ struct dst_ops
 	int			(*gc)(void);
 	struct dst_entry *	(*check)(struct dst_entry *, __u32 cookie);
 	void			(*destroy)(struct dst_entry *);
+	void			(*ifdown)(struct dst_entry *, int how);
 	struct dst_entry *	(*negative_advice)(struct dst_entry *);
 	void			(*link_failure)(struct sk_buff *);
 	void			(*update_pmtu)(struct dst_entry *dst, u32 mtu);
@@ -142,15 +142,16 @@ struct dst_entry * dst_clone(struct dst_entry * dst)
 	return dst;
 }
 
+extern const char dst_underflow_bug_msg[];
+
 static inline
 void dst_release(struct dst_entry * dst)
 {
 	if (dst) {
-		if (atomic_read(&dst->__refcnt) < 1) {
-			printk("BUG: dst underflow %d: %p\n",
-			       atomic_read(&dst->__refcnt),
-			       current_text_addr());
-		}
+		if (atomic_read(&dst->__refcnt) < 1)
+			printk(dst_underflow_bug_msg, 
+			       atomic_read(&dst->__refcnt), 
+			       dst, current_text_addr());
 		atomic_dec(&dst->__refcnt);
 	}
 }
@@ -181,6 +182,12 @@ static inline void dst_free(struct dst_entry * dst)
 			return;
 	}
 	__dst_free(dst);
+}
+
+static inline void dst_rcu_free(struct rcu_head *head)
+{
+	struct dst_entry *dst = container_of(head, struct dst_entry, rcu_head);
+	dst_free(dst);
 }
 
 static inline void dst_confirm(struct dst_entry *dst)
@@ -220,7 +227,7 @@ static inline int dst_output(struct sk_buff *skb)
 	int err;
 
 	for (;;) {
-		err = skb->dst->output(skb);
+		err = skb->dst->output(&skb);
 
 		if (likely(err == 0))
 			return err;

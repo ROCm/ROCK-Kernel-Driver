@@ -332,8 +332,8 @@ int insert_resource(struct resource *parent, struct resource *new)
 		if (next->sibling->start > new->end)
 			break;
 
-	/* existing resource overlaps end of new resource */
-	if (next->end > new->end) {
+	/* existing resource includes new resource */
+	if (next->end >= new->end) {
 		parent = next;
 		result = 0;
 		goto begin;

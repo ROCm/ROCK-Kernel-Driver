@@ -162,10 +162,6 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos);
 static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char *buf,
 				    size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_msg_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_msg_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos);
 
 struct file_operations ppc_rtas_poweron_operations = {
 	.read =		ppc_rtas_poweron_read,
@@ -192,10 +188,6 @@ struct file_operations ppc_rtas_tone_volume_operations = {
 
 static struct file_operations ppc_rtas_rmo_buf_ops = {
 	.read =		ppc_rtas_rmo_buf_read,
-};
-struct file_operations ppc_rtas_msg_operations = {
-	.read =		ppc_rtas_msg_read,
-	.write =	ppc_rtas_msg_write
 };
 
 int ppc_rtas_find_all_sensors (void);
@@ -245,10 +237,6 @@ static int __init proc_rtas_init(void)
 	if (entry)
 		entry->proc_fops = &ppc_rtas_rmo_buf_ops;
 
-	entry = create_proc_entry("ppc64/rtas/rtasmsgs", S_IRUSR, NULL);
-	if (entry)
-		entry->proc_fops = &ppc_rtas_msg_operations;
-
 	return 0;
 }
 
@@ -294,24 +282,22 @@ static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
 {
 	char stkbuf[40];  /* its small, its on stack */
 	int n, sn;
-	loff_t pos = *ppos;
-	
 	if (power_on_time == 0)
 		n = scnprintf(stkbuf,sizeof(stkbuf),"Power on time not set\n");
 	else
 		n = scnprintf(stkbuf,sizeof(stkbuf),"%lu\n",power_on_time);
 
 	sn = strlen (stkbuf) +1;
-	if (pos != (unsigned int)pos || pos >= sn)
+	if (*ppos >= sn)
 		return 0;
-	if (n > sn - pos)
-		n = sn - pos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + pos, n)) {
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
 		return -EFAULT;
 	}
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -343,7 +329,6 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 {
 	int sn, n = 0;
 	char *tmpbuf;
-	loff_t pos = *ppos;
 
 	if (progress_led == NULL) return 0;
 
@@ -355,20 +340,20 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 	n = sprintf (tmpbuf, "%s\n", progress_led);
 
 	sn = strlen (tmpbuf) +1;
-	if (pos != (unsigned int)pos || pos >= sn) {
+	if (*ppos >= sn) {
 		kfree (tmpbuf);
 		return 0;
 	}
-	if (n > sn - pos)
-		n = sn - pos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, tmpbuf + pos, n)) {
+	if (copy_to_user (buf, tmpbuf + (*ppos), n)) {
 		kfree (tmpbuf);
 		return -EFAULT;
 	}
 	kfree (tmpbuf);
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -409,14 +394,10 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	unsigned int year, mon, day, hour, min, sec;
-	unsigned long *ret = kmalloc(4*8, GFP_KERNEL);
+	int ret[8];
 	int n, sn, error;
 	char stkbuf[40];  /* its small, its on stack */
-	loff_t pos = *ppos;
 
-	if(ret == NULL)
-		return -ENOMEM;
-		
 	error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
 	
 	year = ret[0]; mon  = ret[1]; day  = ret[2];
@@ -430,19 +411,18 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 		n = scnprintf (stkbuf, sizeof(stkbuf), "%lu\n",
 				mktime(year, mon, day, hour, min, sec));
 	}
-	kfree(ret);
 
 	sn = strlen (stkbuf) +1;
-	if (pos != (unsigned int)pos || pos >= sn)
+	if (*ppos >= sn)
 		return 0;
-	if (n > sn - pos)
-		n = sn - pos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + pos, n)) {
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
 		return -EFAULT;
 	}
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -453,7 +433,6 @@ static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
 		int count, int *eof, void *data)
 {
 	int i,j,n;
-	unsigned long ret;
 	int state, error;
 	char *buffer;
 	int get_sensor_state = rtas_token("get-sensor-state");
@@ -483,11 +462,10 @@ static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
 		/* A sensor may have multiple instances */
 		while (j >= 0) {
 
-			error =	rtas_call(get_sensor_state, 2, 2, &ret, 
+			error =	rtas_call(get_sensor_state, 2, 2, &state, 
 				  	  sensors.sensor[i].token, 
 				  	  sensors.sensor[i].quant - j);
 
-			state = (int) ret;
 			n += ppc_rtas_process_sensor(sensors.sensor[i], state, 
 					     	     error, buffer+n );
 			n += sprintf (buffer+n, "\n");
@@ -560,7 +538,7 @@ char * ppc_rtas_process_error(int error)
 		case SENSOR_BUSY:
 			return "(busy)";
 		case SENSOR_NOT_EXIST:
-			return "(non existant)";
+			return "(non existent)";
 		case SENSOR_DR_ENTITY:
 			return "(dr entity removed)";
 		default:
@@ -717,7 +695,7 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 			}
 			break;
 		default:
-			n += sprintf(buf+n,  "Unkown sensor (type %d), ignoring it\n",
+			n += sprintf(buf+n,  "Unknown sensor (type %d), ignoring it\n",
 					s.token);
 			unknown = 1;
 			have_strings = 1;
@@ -853,8 +831,7 @@ static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
 	char *dest;
 	int error;
 
-	if (39 < count)
-		count = 39;
+	if (39 < count) count = 39;
 	if (copy_from_user (stkbuf, buf, count)) {
 		return -EFAULT;
 	}
@@ -879,21 +856,20 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 {
 	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
-	loff_t pos = *ppos;
 
 	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
 
 	sn = strlen (stkbuf) +1;
-	if (pos != (unsigned int)pos || pos >= sn)
+	if (*ppos >= sn)
 		return 0;
-	if (n > sn - pos)
-		n = sn - pos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + pos, n)) {
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
 		return -EFAULT;
 	}
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 /* ****************************************************************** */
@@ -934,21 +910,20 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 {
 	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
-	loff_t pos = *ppos;
 
 	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
 
 	sn = strlen (stkbuf) +1;
-	if (pos != (unsigned int)pos || pos >= sn)
+	if (*ppos >= sn)
 		return 0;
-	if (n > sn - pos)
-		n = sn - pos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
 	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
 		return -EFAULT;
 	}
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -965,60 +940,14 @@ static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char __user *buf,
 	if (n > count)
 		n = count;
 
-	if (*ppos != 0)
+	if (ppos && *ppos != 0)
 		return 0;
 
 	if (copy_to_user(buf, kbuf, n))
 		return -EFAULT;
 
-	*ppos = n;
+	if (ppos)
+		*ppos = n;
 	
 	return n;
 }
-
-/* ****************************************************************** */
-
-static ssize_t ppc_rtas_msg_write(struct file * file, const char * buf,
-		size_t count, loff_t *ppos)
-{
-	char stkbuf[40];  /* its small, its on stack */
-	char *dest;
-
-	if (39 < count) count = 39;
-	if (copy_from_user (stkbuf, buf, count)) {
-		return -EFAULT;
-	}
-	stkbuf[count] = 0;
-	print_rtasmsgs = simple_strtoul(stkbuf, &dest, 10);
-	if (*dest != '\0' && *dest != '\n') {
-		printk("ppc_rtas_msg_write: Invalid message setting\n");
-		return count;
-	}
-	
-	printk(KERN_INFO "RTAS: %s rtas messsage output to /var/log/messages\n",
-		(print_rtasmsgs ? "Enabling" : "Disabling"));
-	return count;
-}
-
-static ssize_t ppc_rtas_msg_read(struct file * file, char * buf,
-		size_t count, loff_t *ppos)
-{
-	int n, sn;
-	char stkbuf[40];  /* its small, its on stack */
-
-	n = scnprintf(stkbuf, 40, "%d\n", print_rtasmsgs);
-
-	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
-		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
-	if (n > count)
-		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
-		return -EFAULT;
-	}
-	*ppos += n;
-	return n;
-}
-

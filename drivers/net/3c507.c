@@ -373,7 +373,7 @@ static int __init el16_probe1(struct net_device *dev, int ioaddr)
 		init_ID_done = 1;
 	}
 
-	if (!request_region(ioaddr, EL16_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, EL16_IO_EXTENT, DRV_NAME))
 		return -ENODEV;
 
 	if ((inb(ioaddr) != '*') || (inb(ioaddr + 1) != '3') || 
@@ -392,7 +392,7 @@ static int __init el16_probe1(struct net_device *dev, int ioaddr)
 
 	irq = inb(ioaddr + IRQ_CONFIG) & 0x0f;
 
-	irqval = request_irq(irq, &el16_interrupt, 0, dev->name, dev);
+	irqval = request_irq(irq, &el16_interrupt, 0, DRV_NAME, dev);
 	if (irqval) {
 		printk ("unable to get IRQ %d (irqval=%d).\n", irq, irqval);
 		retval = -EAGAIN;

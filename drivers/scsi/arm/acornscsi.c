@@ -150,7 +150,7 @@
 #include <asm/ecard.h>
 
 #include "../scsi.h"
-#include "../hosts.h"
+#include <scsi/scsi_host.h>
 #include "acornscsi.h"
 #include "msgqueue.h"
 #include "scsi.h"

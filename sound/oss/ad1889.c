@@ -338,7 +338,7 @@ int ad1889_read_proc (char *page, char **start, off_t off,
 		{ "AC97_3D_CONTROL", 0x100 + AC97_3D_CONTROL, 16 },
 		{ "AC97_MODEM_RATE", 0x100 + AC97_MODEM_RATE, 16 },
 		{ "AC97_POWER_CONTROL", 0x100 + AC97_POWER_CONTROL, 16 },
-		{ 0 }
+		{ NULL }
 	};
 
 	if (dev == NULL)
@@ -437,13 +437,13 @@ XXX
 
 /************************* /dev/dsp interfaces ************************* */
 
-static ssize_t ad1889_read(struct file *file, char *buffer, size_t count,
+static ssize_t ad1889_read(struct file *file, char __user *buffer, size_t count,
 	loff_t *ppos)
 {
 	return 0;
 }
 
-static ssize_t ad1889_write(struct file *file, const char *buffer, size_t count,
+static ssize_t ad1889_write(struct file *file, const char __user *buffer, size_t count,
 	loff_t *ppos)
 {
 	ad1889_dev_t *dev = (ad1889_dev_t *)file->private_data;
@@ -617,11 +617,12 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	ad1889_dev_t *dev = (ad1889_dev_t *)file->private_data;
 	struct dmabuf *dmabuf;
 	audio_buf_info abinfo;
+	int __user *p = (int __user *)arg;
 
 	switch (cmd)
 	{
 	case OSS_GETVERSION:
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 
 	case SNDCTL_DSP_RESET:
 		break;
@@ -631,7 +632,7 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 	case SNDCTL_DSP_SPEED:
 		/* set sampling rate */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val > 5400 && val < 48000)
 		{
@@ -643,7 +644,7 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case SNDCTL_DSP_STEREO: /* undocumented? */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			val = AD1889_READW(ad1889_dev, AD_DSWSMC);
@@ -667,13 +668,13 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case SNDCTL_DSP_GETBLKSIZE:
-		return put_user(DMA_SIZE, (int *)arg);
+		return put_user(DMA_SIZE, p);
 
 	case SNDCTL_DSP_GETFMTS:
-		return put_user(AFMT_S16_LE|AFMT_U8, (int *)arg);
+		return put_user(AFMT_S16_LE|AFMT_U8, p);
 
 	case SNDCTL_DSP_SETFMT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		if (file->f_mode & FMODE_READ) 
@@ -682,7 +683,7 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (file->f_mode & FMODE_WRITE) 
 			ad1889_set_wav_fmt(dev, val);
 
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
 	case SNDCTL_DSP_CHANNELS:
 		break;
@@ -696,7 +697,7 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 	case SNDCTL_DSP_SETFRAGMENT:
 		/* not supported; uses fixed fragment sizes */
-		return put_user(DMA_SIZE, (int *)arg);
+		return put_user(DMA_SIZE, p);
 
 	case SNDCTL_DSP_GETOSPACE:
 	case SNDCTL_DSP_GETISPACE:
@@ -709,13 +710,13 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		abinfo.fragstotal = 1;
 		abinfo.fragsize = DMA_SIZE;
 		abinfo.bytes = DMA_SIZE;
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(p, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 	case SNDCTL_DSP_NONBLOCK:
 		file->f_flags |= O_NONBLOCK;
 		return 0;
 
 	case SNDCTL_DSP_GETCAPS:
-		return put_user(0, (int *)arg);
+		return put_user(0, p);
 
 	case SNDCTL_DSP_GETTRIGGER:
 	case SNDCTL_DSP_SETTRIGGER:
@@ -732,7 +733,7 @@ static int ad1889_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		break;
 
 	case SOUND_PCM_READ_RATE:
-		return put_user(AD1889_READW(ad1889_dev, AD_DSWAS), (int *)arg);
+		return put_user(AD1889_READW(ad1889_dev, AD_DSWAS), p);
 
 	case SOUND_PCM_READ_CHANNELS:
 	case SOUND_PCM_READ_BITS:
@@ -850,7 +851,7 @@ static int ad1889_ac97_init(ad1889_dev_t *dev, int id)
 	}
 
 	eid = ad1889_codec_read(ac97, AC97_EXTENDED_ID);
-	if (eid == 0xffffff) {
+	if (eid == 0xffff) {
 		printk(KERN_WARNING DEVNAME ": no codec attached?\n");
 		goto out_free;
 	}
@@ -1016,7 +1017,7 @@ static int __devinit ad1889_probe(struct pci_dev *pcidev, const struct pci_devic
 	if ((err = ad1889_ac97_init(dev, 0)) != 0)
 		goto err_free_dsp;
 
-	if (((proc_root = proc_mkdir("driver/ad1889", 0)) == NULL) ||
+	if (((proc_root = proc_mkdir("driver/ad1889", NULL)) == NULL) ||
 	    create_proc_read_entry("ac97", S_IFREG|S_IRUGO, proc_root, ac97_read_proc, dev->ac97_codec) == NULL ||
 	    create_proc_read_entry("info", S_IFREG|S_IRUGO, proc_root, ad1889_read_proc, dev) == NULL) 
 		goto err_free_dsp;
@@ -1037,7 +1038,7 @@ err_free_irq:
 
 err_free_mem:
 	ad1889_free_dev(dev);
-	pci_set_drvdata(pcidev, 0);
+	pci_set_drvdata(pcidev, NULL);
 
 	return -ENODEV;
 }

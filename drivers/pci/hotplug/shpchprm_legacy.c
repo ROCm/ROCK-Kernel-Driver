@@ -55,11 +55,6 @@ int shpchprm_print_pirt()
 	return 0;
 }
 
-void * shpchprm_get_slot(struct slot *slot)
-{
-	return NULL;
-}
-
 int shpchprm_get_physical_slot_number(struct controller *ctrl, u32 *sun, u8 busnum, u8 devnum)
 {
 	int	offset = devnum - ctrl->slot_device_offset;

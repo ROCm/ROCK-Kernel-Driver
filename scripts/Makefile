@@ -5,31 +5,11 @@
 # docproc: 	 Preprocess .tmpl file in order to generate .sgml docs
 # conmakehash:	 Create arrays for initializing the kernel console tables
 
-host-progs	:= conmakehash kallsyms modpost mk_elfconfig pnmtologo bin2c
-always		:= $(host-progs) empty.o
-
-modpost-objs	:= modpost.o file2alias.o sumversion.o
-
-# CONFIG_KDB needed by kallsyms for kdb
-ifdef CONFIG_KALLSYMS
-ifdef CONFIG_KDB
-HOSTCFLAGS_kallsyms.o := -D CONFIG_KDB
-endif
-endif
+host-progs	:= conmakehash kallsyms pnmtologo bin2c
+always		:= $(host-progs)
 
 subdir-$(CONFIG_MODVERSIONS)	+= genksyms
+subdir-y	+= mod
 
 # Let clean descend into subdirs
-subdir-	+= basic lxdialog kconfig
-
-# dependencies on generated files need to be listed explicitly
-
-$(obj)/modpost.o $(obj)/file2alias.o $(obj)/sumversion.o: $(obj)/elfconfig.h
-
-quiet_cmd_elfconfig = MKELF   $@
-      cmd_elfconfig = $(obj)/mk_elfconfig $(ARCH) < $< > $@
-
-$(obj)/elfconfig.h: $(obj)/empty.o $(obj)/mk_elfconfig FORCE
-	$(call if_changed,elfconfig)
-
-targets += elfconfig.h
+subdir-	+= basic lxdialog kconfig package

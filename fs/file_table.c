@@ -198,7 +198,7 @@ struct file fastcall *fget(unsigned int fd)
 	struct files_struct *files = current->files;
 
 	spin_lock(&files->file_lock);
-	file = fcheck(fd);
+	file = fcheck_files(files, fd);
 	if (file)
 		get_file(file);
 	spin_unlock(&files->file_lock);
@@ -221,10 +221,10 @@ struct file fastcall *fget_light(unsigned int fd, int *fput_needed)
 
 	*fput_needed = 0;
 	if (likely((atomic_read(&files->count) == 1))) {
-		file = fcheck(fd);
+		file = fcheck_files(files, fd);
 	} else {
 		spin_lock(&files->file_lock);
-		file = fcheck(fd);
+		file = fcheck_files(files, fd);
 		if (file) {
 			get_file(file);
 			*fput_needed = 1;

@@ -298,6 +298,7 @@ void __init iSeries_init_early(void)
 		initrd_start = (unsigned long)__va(naca->xRamDisk);
 		initrd_end = initrd_start + naca->xRamDiskSize * PAGE_SIZE;
 		initrd_below_start_ok = 1;	// ramdisk in kernel space
+		ROOT_DEV = Root_RAM0;
 		if (((rd_size * 1024) / PAGE_SIZE) < naca->xRamDiskSize)
 			rd_size = (naca->xRamDiskSize * PAGE_SIZE) / 1024;
 	} else
@@ -570,7 +571,7 @@ static void __init build_iSeries_Memory_Map(void)
 static void __init setup_iSeries_cache_sizes(void)
 {
 	unsigned int i, n;
-	unsigned int procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+	unsigned int procIx = get_paca()->lppaca.xDynHvPhysicalProcIndex;
 
 	systemcfg->iCacheL1Size =
 		xIoHriProcessorVpd[procIx].xInstCacheSize * 1024;
@@ -664,7 +665,7 @@ extern unsigned long ppc_tb_freq;
 void __init iSeries_setup_arch(void)
 {
 	void *eventStack;
-	unsigned procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+	unsigned procIx = get_paca()->lppaca.xDynHvPhysicalProcIndex;
 
 	/* Add an eye catcher and the systemcfg layout version number */
 	strcpy(systemcfg->eye_catcher, "SYSTEMCFG:PPC64");

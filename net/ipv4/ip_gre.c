@@ -1228,7 +1228,7 @@ int __init ipgre_fb_tunnel_init(struct net_device *dev)
 }
 
 
-static struct inet_protocol ipgre_protocol = {
+static struct net_protocol ipgre_protocol = {
 	.handler	=	ipgre_rcv,
 	.err_handler	=	ipgre_err,
 };

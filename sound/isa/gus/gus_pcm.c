@@ -346,7 +346,7 @@ static int snd_gf1_pcm_poke_block(snd_gus_card_t *gus, unsigned char *buf,
 static int snd_gf1_pcm_playback_copy(snd_pcm_substream_t *substream,
 				     int voice,
 				     snd_pcm_uframes_t pos,
-				     void *src,
+				     void __user *src,
 				     snd_pcm_uframes_t count)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;

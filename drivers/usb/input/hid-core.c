@@ -807,7 +807,11 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 	unsigned size = field->report_size;
 	__s32 min = field->logical_minimum;
 	__s32 max = field->logical_maximum;
-	__s32 value[count]; /* WARNING: gcc specific */
+	__s32 *value;
+
+	value = kmalloc(sizeof(__s32)*count, GFP_ATOMIC);
+	if (!value)
+		return;
 
 	for (n = 0; n < count; n++) {
 
@@ -817,7 +821,7 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 			if (!(field->flags & HID_MAIN_ITEM_VARIABLE) /* Ignore report if ErrorRollOver */
 			    && value[n] >= min && value[n] <= max
 			    && field->usage[value[n] - min].hid == HID_UP_KEYBOARD + 1)
-				return;
+				goto exit;
 	}
 
 	for (n = 0; n < count; n++) {
@@ -847,6 +851,8 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 	}
 
 	memcpy(field->value, value, count * sizeof(__s32));
+exit:
+	kfree(value);
 }
 
 static int hid_input_report(int type, struct urb *urb, struct pt_regs *regs)
@@ -958,7 +964,7 @@ static void hid_output_field(struct hid_field *field, __u8 *data)
  * Create a report.
  */
 
-void hid_output_report(struct hid_report *report, __u8 *data)
+static void hid_output_report(struct hid_report *report, __u8 *data)
 {
 	unsigned n;
 
@@ -1038,7 +1044,8 @@ int hid_find_report_by_usage(struct hid_device *hid, __u32 wanted_usage, struct 
 	return -1;
 }
 
-int hid_find_field_in_report(struct hid_report *report, __u32 wanted_usage, struct hid_field **field)
+#if 0
+static int hid_find_field_in_report(struct hid_report *report, __u32 wanted_usage, struct hid_field **field)
 {
 	int i, j;
 
@@ -1051,6 +1058,7 @@ int hid_find_field_in_report(struct hid_report *report, __u32 wanted_usage, stru
 
 	return -1;
 }
+#endif
 
 static int hid_submit_out(struct hid_device *hid)
 {
@@ -1322,12 +1330,14 @@ void hid_init_reports(struct hid_device *hid)
 	}
 
 	err = 0;
-	while ((ret = hid_wait_io(hid))) {
+	ret = hid_wait_io(hid);
+	while (ret) {
 		err |= ret;
 		if (test_bit(HID_CTRL_RUNNING, &hid->iofl))
 			usb_unlink_urb(hid->urbctrl);
 		if (test_bit(HID_OUT_RUNNING, &hid->iofl))
 			usb_unlink_urb(hid->urbout);
+		ret = hid_wait_io(hid);
 	}
 
 	if (err)
@@ -1357,7 +1367,13 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_KBGEAR_JAMSTUDIO  0x1001
 
 #define USB_VENDOR_ID_AIPTEK		0x08ca
-#define USB_DEVICE_ID_AIPTEK_6000	0x0020
+#define USB_DEVICE_ID_AIPTEK_01		0x0001
+#define USB_DEVICE_ID_AIPTEK_10		0x0010
+#define USB_DEVICE_ID_AIPTEK_20		0x0020
+#define USB_DEVICE_ID_AIPTEK_21		0x0021
+#define USB_DEVICE_ID_AIPTEK_22		0x0022
+#define USB_DEVICE_ID_AIPTEK_23		0x0023
+#define USB_DEVICE_ID_AIPTEK_24		0x0024
 
 #define USB_VENDOR_ID_GRIFFIN		0x077d
 #define USB_DEVICE_ID_POWERMATE		0x0410
@@ -1412,13 +1428,30 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_CHIC		0x05fe
 #define USB_DEVICE_ID_CHIC_GAMEPAD	0x0014
 
-struct hid_blacklist {
+#define USB_VENDOR_ID_GLAB		0x06c2
+#define USB_DEVICE_ID_4_PHIDGETSERVO_30	0x0038
+#define USB_DEVICE_ID_1_PHIDGETSERVO_30	0x0039
+#define USB_DEVICE_ID_8_8_8_IF_KIT	0x0045
+#define USB_DEVICE_ID_0_0_4_IF_KIT	0x0040
+#define USB_DEVICE_ID_0_8_8_IF_KIT	0x0053
+
+#define USB_VENDOR_ID_WISEGROUP		0x0925
+#define USB_DEVICE_ID_1_PHIDGETSERVO_20	0x8101
+#define USB_DEVICE_ID_4_PHIDGETSERVO_20	0x8104
+
+static struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
 	unsigned quirks;
 } hid_blacklist[] = {
 
-	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_6000, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_01, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_10, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_20, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_21, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_22, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_23, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_AIPTEK, USB_DEVICE_ID_AIPTEK_24, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_BERKSHIRE, USB_DEVICE_ID_BERKSHIRE_PCWD, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ESSENTIAL_REALITY, USB_DEVICE_ID_ESSENTIAL_REALITY_P5, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_KBGEAR, USB_DEVICE_ID_KBGEAR_JAMSTUDIO, HID_QUIRK_IGNORE },
@@ -1459,6 +1492,15 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 7, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_VOLITO, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_PTU, HID_QUIRK_IGNORE },
+
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_4_PHIDGETSERVO_30, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_1_PHIDGETSERVO_30, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_8_8_8_IF_KIT, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_0_0_4_IF_KIT, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_0_8_8_IF_KIT, HID_QUIRK_IGNORE },
+
+	{ USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_4_PHIDGETSERVO_20, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_1_PHIDGETSERVO_20, HID_QUIRK_IGNORE },
 
 	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_UC100KM, HID_QUIRK_NOGET },
 	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_CS124U, HID_QUIRK_NOGET },
@@ -1767,7 +1809,7 @@ MODULE_DEVICE_TABLE (usb, hid_usb_ids);
 
 static struct usb_driver hid_driver = {
 	.owner =	THIS_MODULE,
-	.name =		"hid",
+	.name =		"usbhid",
 	.probe =	hid_probe,
 	.disconnect =	hid_disconnect,
 	.id_table =	hid_usb_ids,

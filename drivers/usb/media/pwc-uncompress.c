@@ -1,4 +1,4 @@
-/* Linux driver for Philips webcam 
+/* Linux driver for Philips webcam
    Decompression frontend.
    (C) 1999-2003 Nemosoft Unv. (webcam@smcc.demon.nl)
 
@@ -21,7 +21,9 @@
    themselves. It also has a decompressor wrapper function.
 */
 
+#include <asm/current.h>
 #include <asm/types.h>
+// #include <linux/sched.h>
 
 #include "pwc.h"
 #include "pwc-uncompress.h"
@@ -81,7 +83,6 @@ int pwc_decompress(struct pwc_device *pdev)
 	u16 *src;
 	u16 *dsty, *dstu, *dstv;
 
-	
 	if (pdev == NULL)
 		return -EFAULT;
 #if defined(__KERNEL__) && defined(PWC_MAGIC)
@@ -97,16 +98,24 @@ int pwc_decompress(struct pwc_device *pdev)
 	image = pdev->image_ptr[pdev->fill_image];
 	if (!image)
 		return -EFAULT;
-	
+
 	yuv = fbuf->data + pdev->frame_header_size;  /* Skip header */
-	if (pdev->vbandlength == 0) { 
+
+	/* Raw format; that's easy... */
+	if (pdev->vpalette == VIDEO_PALETTE_RAW)
+	{
+		memcpy(image, yuv, pdev->frame_size);
+		return 0;
+	}
+
+	if (pdev->vbandlength == 0) {
 		/* Uncompressed mode. We copy the data into the output buffer,
 		   using the viewport size (which may be larger than the image
 		   size). Unfortunately we have to do a bit of byte stuffing
 		   to get the desired output format/size.
 		 */
-			/* 
-			 * We do some byte shuffling here to go from the 
+			/*
+			 * We do some byte shuffling here to go from the
 			 * native format to YUV420P.
 			 */
 			src = (u16 *)yuv;
@@ -140,15 +149,21 @@ int pwc_decompress(struct pwc_device *pdev)
 					dstu += (stride >> 1);
 			}
 	}
-	else { 
-		/* Compressed; the decompressor routines will write the data 
+	else {
+		/* Compressed; the decompressor routines will write the data
 		   in planar format immediately.
 		 */
+		int flags;
+                
+                flags = PWCX_FLAG_PLANAR;
+                if (pdev->vsize == PSZ_VGA && pdev->vframes == 5 && pdev->vsnapshot)
+                	flags |= PWCX_FLAG_BAYER;
+
 		if (pdev->decompressor)
 			pdev->decompressor->decompress(
 				&pdev->image, &pdev->view, &pdev->offset,
 				yuv, image,
-				1,
+				flags,
 				pdev->decompress_data, pdev->vbandlength);
 		else
 			return -ENXIO; /* No such device or address: missing decompressor */

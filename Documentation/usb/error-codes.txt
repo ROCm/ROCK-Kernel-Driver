@@ -47,6 +47,8 @@ USB-specific:
 -ESHUTDOWN	The host controller has been disabled due to some
 		problem that could not be worked around.
 
+-EPERM		Submission failed because urb->reject was set.
+
 
 **************************************************************************
 *                   Error codes returned by in urb->status               *

@@ -36,7 +36,6 @@
 #include <linux/skbuff.h>
 #include <linux/init.h>
 #include <linux/security.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -57,12 +56,10 @@ DECLARE_MUTEX(rtnl_sem);
 void rtnl_lock(void)
 {
 	rtnl_shlock();
-	rtnl_exlock();
 }
  
 void rtnl_unlock(void)
 {
-	rtnl_exunlock();
 	rtnl_shunlock();
 
 	netdev_run_todo();
@@ -94,7 +91,8 @@ static const int rtm_min[(RTM_MAX+1-RTM_BASE)/4] =
 	NLMSG_LENGTH(sizeof(struct rtmsg)),
 	NLMSG_LENGTH(sizeof(struct tcmsg)),
 	NLMSG_LENGTH(sizeof(struct tcmsg)),
-	NLMSG_LENGTH(sizeof(struct tcmsg))
+	NLMSG_LENGTH(sizeof(struct tcmsg)),
+	NLMSG_LENGTH(sizeof(struct tcamsg))
 };
 
 static const int rta_max[(RTM_MAX+1-RTM_BASE)/4] =
@@ -106,7 +104,8 @@ static const int rta_max[(RTM_MAX+1-RTM_BASE)/4] =
 	RTA_MAX,
 	TCA_MAX,
 	TCA_MAX,
-	TCA_MAX
+	TCA_MAX,
+	TCAA_MAX
 };
 
 void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const void *data)
@@ -192,9 +191,7 @@ static int rtnetlink_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 			dev->qdisc_sleeping->ops->id);
 	if (dev->master)
 		RTA_PUT(skb, IFLA_MASTER, sizeof(int), &dev->master->ifindex);
-	/* Don't call get_stats when the device is in low power state */
-	if (dev->get_stats && 
-	    (!dev->class_dev.dev || !dev->class_dev.dev->power_state)) { 
+	if (dev->get_stats) {
 		unsigned long *stats = (unsigned long*)dev->get_stats(dev);
 		if (stats) {
 			struct rtattr  *a;
@@ -283,7 +280,7 @@ out:
 	return err;
 }
 
-int rtnetlink_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
+static int rtnetlink_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	int idx;
 	int s_idx = cb->family;
@@ -338,7 +335,6 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 	struct rtnetlink_link *link_tab;
 	struct rtattr	*rta[RTATTR_MAX];
 
-	int exclusive = 0;
 	int sz_idx, kind;
 	int min_len;
 	int family;
@@ -405,14 +401,6 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 		return -1;
 	}
 
-	if (kind != 2) {
-		if (rtnl_exlock_nowait()) {
-			*errp = 0;
-			return -1;
-		}
-		exclusive = 1;
-	}
-
 	memset(&rta, 0, sizeof(rta));
 
 	min_len = rtm_min[sz_idx];
@@ -440,14 +428,10 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 		goto err_inval;
 	err = link->doit(skb, nlh, (void *)&rta);
 
-	if (exclusive)
-		rtnl_exunlock();
 	*errp = err;
 	return err;
 
 err_inval:
-	if (exclusive)
-		rtnl_exunlock();
 	*errp = -EINVAL;
 	return -1;
 }
@@ -471,7 +455,6 @@ static inline int rtnetlink_rcv_skb(struct sk_buff *skb)
 		rlen = NLMSG_ALIGN(nlh->nlmsg_len);
 		if (rlen > skb->len)
 			rlen = skb->len;
-		err = 0;
 		if (rtnetlink_rcv_msg(skb, nlh, &err)) {
 			/* Not error, but we must interrupt processing here:
 			 *   Note, that in this case we do not pull message
@@ -482,11 +465,6 @@ static inline int rtnetlink_rcv_skb(struct sk_buff *skb)
 			netlink_ack(skb, nlh, err);
 		} else if (nlh->nlmsg_flags&NLM_F_ACK)
 			netlink_ack(skb, nlh, 0);
-
-#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
-		audit_netlink_msg(skb, err);
-#endif
-
 		skb_pull(skb, rlen);
 	}
 
@@ -562,7 +540,7 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 	return NOTIFY_DONE;
 }
 
-struct notifier_block rtnetlink_dev_notifier = {
+static struct notifier_block rtnetlink_dev_notifier = {
 	.notifier_call	= rtnetlink_event,
 };
 

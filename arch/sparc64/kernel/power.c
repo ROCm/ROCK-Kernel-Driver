@@ -20,6 +20,12 @@
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
 
+/*
+ * sysctl - toggle power-off restriction for serial console 
+ * systems in machine_power_off()
+ */
+int scons_pwroff = 1; 
+
 #ifdef CONFIG_PCI
 static unsigned long power_reg = 0UL;
 
@@ -44,7 +50,7 @@ static void (*poweroff_method)(void) = machine_alt_power_off;
 
 void machine_power_off(void)
 {
-	if (!serial_console) {
+	if (!serial_console || scons_pwroff) {
 #ifdef CONFIG_PCI
 		if (power_reg != 0UL) {
 			/* Both register bits seem to have the
@@ -128,7 +134,7 @@ found:
 	printk("power: Control reg at %016lx ... ", power_reg);
 	poweroff_method = machine_halt;  /* able to use the standard halt */
 	if (has_button_interrupt(edev)) {
-		if (kernel_thread(powerd, 0, CLONE_FS) < 0) {
+		if (kernel_thread(powerd, NULL, CLONE_FS) < 0) {
 			printk("Failed to start power daemon.\n");
 			return;
 		}

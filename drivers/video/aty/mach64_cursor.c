@@ -182,7 +182,7 @@ struct aty_cursor *__init aty_init_cursor(struct fb_info *info)
 
 	cursor = kmalloc(sizeof(struct aty_cursor), GFP_ATOMIC);
 	if (!cursor)
-		return 0;
+		return NULL;
 	memset(cursor, 0, sizeof(*cursor));
 
 	info->fix.smem_len -= PAGE_SIZE;

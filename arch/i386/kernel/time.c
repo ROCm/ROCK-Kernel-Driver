@@ -87,10 +87,6 @@ EXPORT_SYMBOL(i8253_lock);
 
 struct timer_opts *cur_timer = &timer_none;
 
-#ifdef CONFIG_VSYSCALL_GTOD
-extern int vgettimeofday_enable;
-#endif
-
 /*
  * This version of gettimeofday has microsecond resolution
  * and better than microsecond precision on fast x86 machines with TSC.
@@ -213,7 +209,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_IO_APIC
-	if (timer_ack && nr_ioapics) {
+	if (timer_ack) {
 		/*
 		 * Subtle, when I/O APICs are used we have to ack timer IRQ
 		 * manually to reset the IRR bit for do_slow_gettimeoffset().
@@ -396,14 +392,6 @@ void __init time_init(void)
 
 	cur_timer = select_timer();
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
-
-	/* set vsyscall to use selected time source */
-#ifdef CONFIG_VSYSCALL_GTOD
-	if (vgettimeofday_enable) {
-		printk(KERN_INFO "Enabling gettimeofday vsyscall\n");
-		vsyscall_set_timesource(cur_timer->name);
-	}
-#endif
 
 	time_init_hook();
 }

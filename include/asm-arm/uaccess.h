@@ -13,8 +13,9 @@
  */
 #include <linux/sched.h>
 #include <asm/errno.h>
-#include <asm/arch/memory.h>
+#include <asm/memory.h>
 #include <asm/domain.h>
+#include <asm/system.h>
 
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
@@ -67,6 +68,7 @@ static inline void set_fs (mm_segment_t fs)
 /* We use 33-bit arithmetic here... */
 #define __range_ok(addr,size) ({ \
 	unsigned long flag, sum; \
+	__chk_user_ptr(addr);	\
 	__asm__("adds %1, %2, %3; sbcccs %1, %1, %0; movcc %0, #0" \
 		: "=&r" (flag), "=&r" (sum) \
 		: "r" (addr), "Ir" (size), "0" (current_thread_info()->addr_limit) \
@@ -75,7 +77,7 @@ static inline void set_fs (mm_segment_t fs)
 
 #define access_ok(type,addr,size)	(__range_ok(addr,size) == 0)
 
-static inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void __user *addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
@@ -107,14 +109,16 @@ extern int __get_user_8(void *);
 extern int __get_user_bad(void);
 
 #define __get_user_x(__r1,__p,__e,__s,__i...)				\
-	   __asm__ __volatile__ ("bl	__get_user_" #__s		\
+	   __asm__ __volatile__ (					\
+		__asmeq("%0", "r0") __asmeq("%1", "r1")			\
+		"bl	__get_user_" #__s				\
 		: "=&r" (__e), "=r" (__r1)				\
 		: "0" (__p)						\
 		: __i, "cc")
 
 #define get_user(x,p)							\
 	({								\
-		const register typeof(*(p)) *__p asm("r0") = (p);	\
+		const register typeof(*(p)) __user *__p asm("r0") = (p);\
 		register typeof(*(p)) __r1 asm("r1");			\
 		register int __e asm("r0");				\
 		switch (sizeof(*(__p))) {				\
@@ -153,6 +157,7 @@ extern int __get_user_bad(void);
 do {									\
 	unsigned long __gu_addr = (unsigned long)(ptr);			\
 	unsigned long __gu_val;						\
+	__chk_user_ptr(ptr);						\
 	switch (sizeof(*(ptr))) {					\
 	case 1:	__get_user_asm_byte(__gu_val,__gu_addr,err);	break;	\
 	case 2:	__get_user_asm_half(__gu_val,__gu_addr,err);	break;	\
@@ -223,7 +228,9 @@ extern int __put_user_8(void *, unsigned long long);
 extern int __put_user_bad(void);
 
 #define __put_user_x(__r1,__p,__e,__s)					\
-	   __asm__ __volatile__ ("bl	__put_user_" #__s		\
+	   __asm__ __volatile__ (					\
+		__asmeq("%0", "r0") __asmeq("%2", "r1")			\
+		"bl	__put_user_" #__s				\
 		: "=&r" (__e)						\
 		: "0" (__p), "r" (__r1)					\
 		: "ip", "lr", "cc")
@@ -231,7 +238,7 @@ extern int __put_user_bad(void);
 #define put_user(x,p)							\
 	({								\
 		const register typeof(*(p)) __r1 asm("r1") = (x);	\
-		const register typeof(*(p)) *__p asm("r0") = (p);	\
+		const register typeof(*(p)) __user *__p asm("r0") = (p);\
 		register int __e asm("r0");				\
 		switch (sizeof(*(__p))) {				\
 		case 1:							\
@@ -268,6 +275,7 @@ extern int __put_user_bad(void);
 do {									\
 	unsigned long __pu_addr = (unsigned long)(ptr);			\
 	__typeof__(*(ptr)) __pu_val = (x);				\
+	__chk_user_ptr(ptr);						\
 	switch (sizeof(*(ptr))) {					\
 	case 1: __put_user_asm_byte(__pu_val,__pu_addr,err);	break;	\
 	case 2: __put_user_asm_half(__pu_val,__pu_addr,err);	break;	\
@@ -354,13 +362,13 @@ do {									\
 	: "r" (x), "i" (-EFAULT)				\
 	: "cc")
 
-extern unsigned long __arch_copy_from_user(void *to, const void *from, unsigned long n);
-extern unsigned long __arch_copy_to_user(void *to, const void *from, unsigned long n);
-extern unsigned long __arch_clear_user(void *addr, unsigned long n);
-extern unsigned long __arch_strncpy_from_user(char *to, const char *from, unsigned long count);
-extern unsigned long __arch_strnlen_user(const char *s, long n);
+extern unsigned long __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
+extern unsigned long __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
+extern unsigned long __arch_clear_user(void __user *addr, unsigned long n);
+extern unsigned long __arch_strncpy_from_user(char *to, const char __user *from, unsigned long count);
+extern unsigned long __arch_strnlen_user(const char __user *s, long n);
 
-static __inline__ unsigned long copy_from_user(void *to, const void *from, unsigned long n)
+static inline unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (access_ok(VERIFY_READ, from, n))
 		n = __arch_copy_from_user(to, from, n);
@@ -369,36 +377,36 @@ static __inline__ unsigned long copy_from_user(void *to, const void *from, unsig
 	return n;
 }
 
-static __inline__ unsigned long __copy_from_user(void *to, const void *from, unsigned long n)
+static inline unsigned long __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	return __arch_copy_from_user(to, from, n);
 }
 
-static __inline__ unsigned long copy_to_user(void *to, const void *from, unsigned long n)
+static inline unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __arch_copy_to_user(to, from, n);
 	return n;
 }
 
-static __inline__ unsigned long __copy_to_user(void *to, const void *from, unsigned long n)
+static inline unsigned long __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	return __arch_copy_to_user(to, from, n);
 }
 
-static __inline__ unsigned long clear_user (void *to, unsigned long n)
+static inline unsigned long clear_user (void __user *to, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __arch_clear_user(to, n);
 	return n;
 }
 
-static __inline__ unsigned long __clear_user (void *to, unsigned long n)
+static inline unsigned long __clear_user (void __user *to, unsigned long n)
 {
 	return __arch_clear_user(to, n);
 }
 
-static __inline__ long strncpy_from_user (char *dst, const char *src, long count)
+static inline long strncpy_from_user (char *dst, const char __user *src, long count)
 {
 	long res = -EFAULT;
 	if (access_ok(VERIFY_READ, src, 1))
@@ -406,14 +414,14 @@ static __inline__ long strncpy_from_user (char *dst, const char *src, long count
 	return res;
 }
 
-static __inline__ long __strncpy_from_user (char *dst, const char *src, long count)
+static inline long __strncpy_from_user (char *dst, const char __user *src, long count)
 {
 	return __arch_strncpy_from_user(dst, src, count);
 }
 
 #define strlen_user(s)	strnlen_user(s, ~0UL >> 1)
 
-static inline long strnlen_user(const char *s, long n)
+static inline long strnlen_user(const char __user *s, long n)
 {
 	unsigned long res = 0;
 

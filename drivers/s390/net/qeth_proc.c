@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.5.2.4 $)
+ * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.10 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to procfs.
@@ -21,7 +21,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_PROC_C = "$Revision: 1.5.2.4 $";
+const char *VERSION_QETH_PROC_C = "$Revision: 1.10 $";
 
 /***** /proc/qeth *****/
 #define QETH_PROCFILE_NAME "qeth"
@@ -34,7 +34,7 @@ qeth_procfile_seq_start(struct seq_file *s, loff_t *offset)
 	int i = 0;
 
 	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
-	
+
 	if (*offset == 0)
 		return SEQ_START_TOKEN;
 
@@ -42,7 +42,7 @@ qeth_procfile_seq_start(struct seq_file *s, loff_t *offset)
 	list_for_each(next_card, &qeth_ccwgroup_driver.driver.devices)
 		if (++i == *offset)
 			return next_card;
-	
+
 	return NULL;
 }
 
@@ -57,7 +57,7 @@ qeth_procfile_seq_next(struct seq_file *s, void *it, loff_t *offset)
 {
 	struct list_head *next_card = NULL;
 	struct list_head *current_card;
-	
+
 	if (it == SEQ_START_TOKEN) {
 		next_card = qeth_ccwgroup_driver.driver.devices.next;
 		if (next_card->next == next_card) /* list empty */
@@ -70,7 +70,7 @@ qeth_procfile_seq_next(struct seq_file *s, void *it, loff_t *offset)
 		next_card = current_card->next;
 		(*offset)++;
 	}
-	
+
 	return next_card;
 }
 
@@ -88,7 +88,7 @@ qeth_get_router_str(struct qeth_card *card, int ipv)
 		return "n/a";
 #endif /* CONFIG_QETH_IPV6 */
 	}
-	
+
 	if (routing_type == PRIMARY_ROUTER)
 		return "pri";
 	else if (routing_type == SECONDARY_ROUTER)
@@ -117,7 +117,7 @@ qeth_procfile_seq_show(struct seq_file *s, void *it)
 	struct device *device;
 	struct qeth_card *card;
 	char tmp[12]; /* for qeth_get_prioq_str */
-	
+
 	if (it == SEQ_START_TOKEN){
 		seq_printf(s, "devices                    CHPID interface  "
 		              "cardtype       port chksum prio-q'ing rtr4 "
@@ -128,7 +128,7 @@ qeth_procfile_seq_show(struct seq_file *s, void *it)
 	} else {
 		device = list_entry(it, struct device, driver_list);
 		card = device->driver_data;
-		seq_printf(s, "%s/%s/%s x%02X   %-10s %-14s %-4i ", 
+		seq_printf(s, "%s/%s/%s x%02X   %-10s %-14s %-4i ",
 				CARD_RDEV_ID(card),
 				CARD_WDEV_ID(card),
 				CARD_DDEV_ID(card),
@@ -137,7 +137,7 @@ qeth_procfile_seq_show(struct seq_file *s, void *it)
 				qeth_get_cardname_short(card),
 				card->info.portno);
 		if (card->lan_online)
-			seq_printf(s, "%-6s %-10s %-4s %-4s %-5s %-5i\n", 
+			seq_printf(s, "%-6s %-10s %-4s %-4s %-5s %-5i\n",
 					qeth_get_checksum_str(card),
 					qeth_get_prioq_str(card, tmp),
 					qeth_get_router_str(card, 4),
@@ -182,7 +182,7 @@ qeth_perf_procfile_seq_start(struct seq_file *s, loff_t *offset)
 {
 	struct list_head *next_card = NULL;
 	int i = 0;
-	
+
 	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
 	/* get card at pos *offset */
 	list_for_each(next_card, &qeth_ccwgroup_driver.driver.devices){
@@ -203,7 +203,7 @@ static void *
 qeth_perf_procfile_seq_next(struct seq_file *s, void *it, loff_t *offset)
 {
 	struct list_head *current_card = (struct list_head *)it;
-	
+
 	if (current_card->next == &qeth_ccwgroup_driver.driver.devices)
 		return NULL; /* end of list reached */
 	(*offset)++;
@@ -215,7 +215,7 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 {
 	struct device *device;
 	struct qeth_card *card;
-	
+
 	device = list_entry(it, struct device, driver_list);
 	card = device->driver_data;
 	seq_printf(s, "For card with devnos %s/%s/%s (%s):\n",
@@ -313,7 +313,7 @@ qeth_ipato_procfile_seq_start(struct seq_file *s, loff_t *offset)
 {
 	struct list_head *next_card = NULL;
 	int i = 0;
-	
+
 	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
 	/* TODO: finish this */
 	/*
@@ -340,7 +340,7 @@ static void *
 qeth_ipato_procfile_seq_next(struct seq_file *s, void *it, loff_t *offset)
 {
 	struct list_head *current_card = (struct list_head *)it;
-	
+
 	/* TODO: finish this */
 	/*
 	 * maybe SEQ_SATRT_TOKEN can be returned for offset 0
@@ -358,7 +358,7 @@ qeth_ipato_procfile_seq_show(struct seq_file *s, void *it)
 {
 	struct device *device;
 	struct qeth_card *card;
-	
+
 	/* TODO: finish this */
 	/*
 	 * maybe SEQ_SATRT_TOKEN can be returned for offset 0
@@ -438,13 +438,13 @@ static void
 qeth_create_sysfs_entries(void)
 {
 	struct device *dev;
-	
+
 	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
-	
+
 	list_for_each_entry(dev, &qeth_ccwgroup_driver.driver.devices,
 			driver_list)
 		qeth_create_device_attributes(dev);
-	
+
 	up_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
 }
 
@@ -452,13 +452,13 @@ static void
 qeth_remove_sysfs_entries(void)
 {
 	struct device *dev;
-	
+
 	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
-	
+
 	list_for_each_entry(dev, &qeth_ccwgroup_driver.driver.devices,
 			driver_list)
 		qeth_remove_device_attributes(dev);
-	
+
 	up_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
 }
 

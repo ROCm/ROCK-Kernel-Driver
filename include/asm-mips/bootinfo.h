@@ -12,6 +12,7 @@
 #define _ASM_BOOTINFO_H
 
 #include <linux/types.h>
+#include <asm/setup.h>
 
 /*
  * The MACH_GROUP_ IDs are the equivalent to PCI vendor IDs; the remaining
@@ -173,6 +174,7 @@
 #define  MACH_DB1500		5       /* Au1500-based eval board */
 #define  MACH_XXS1500		6       /* Au1500-based eval board */
 #define  MACH_MTX1		7       /* 4G MTX-1 Au1500-based board */
+#define  MACH_PB1550		8       /* Au1550-based eval board */
 
 /*
  * Valid machtype for group NEC_VR41XX
@@ -199,8 +201,8 @@
  * Valid machtype for group LASAT
  */
 #define MACH_GROUP_LASAT       21
-#define  MACH_LASAT_100		1	/* Masquerade II/SP100/SP50/SP25 */
-#define  MACH_LASAT_200		2	/* Masquerade PRO/SP200 */
+#define  MACH_LASAT_100		0	/* Masquerade II/SP100/SP50/SP25 */
+#define  MACH_LASAT_200		1	/* Masquerade PRO/SP200 */
 
 /*
  * Valid machtype for group TITAN
@@ -208,7 +210,7 @@
 #define MACH_GROUP_TITAN       22	/* PMC-Sierra Titan		*/
 #define  MACH_TITAN_YOSEMITE	1	/* PMC-Sierra Yosemite		*/
 
-#define CL_SIZE			(256)
+#define CL_SIZE			COMMAND_LINE_SIZE
 
 const char *get_system_type(void);
 

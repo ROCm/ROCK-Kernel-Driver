@@ -30,7 +30,7 @@ static struct proc_dir_entry *dasd_devices_entry = NULL;
 static struct proc_dir_entry *dasd_statistics_entry = NULL;
 
 static inline char *
-dasd_get_user_string(const char *user_buf, size_t user_len)
+dasd_get_user_string(const char __user *user_buf, size_t user_len)
 {
 	char *buffer;
 
@@ -239,7 +239,7 @@ dasd_statistics_read(char *page, char **start, off_t off,
 }
 
 static int
-dasd_statistics_write(struct file *file, const char *user_buf,
+dasd_statistics_write(struct file *file, const char __user *user_buf,
 		      unsigned long user_len, void *data)
 {
 #ifdef CONFIG_DASD_PROFILE

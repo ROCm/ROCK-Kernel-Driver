@@ -52,8 +52,7 @@ Return	smt_error_word	These bits are supported:
 
 	END_MANUAL_ENTRY()
  */
-u_long smt_get_error_word(smc)
-struct s_smc *smc ;
+u_long smt_get_error_word(struct s_smc *smc)
 {
 	u_long	st;
 
@@ -92,8 +91,7 @@ Return	smt_event_word	always 0
 
 	END_MANUAL_ENTRY()
  */
-u_long smt_get_event_word(smc)
-struct s_smc *smc ;
+u_long smt_get_event_word(struct s_smc *smc)
 {
 	return (u_long) 0;
 }
@@ -111,8 +109,7 @@ Return	smt_port_event_word	always 0
 
 	END_MANUAL_ENTRY()
  */
-u_long smt_get_port_event_word(smc)
-struct s_smc *smc ;
+u_long smt_get_port_event_word(struct s_smc *smc)
 {
 	return (u_long) 0;
 }
@@ -135,10 +132,7 @@ Return	len	used len of the error log field
 
 	END_MANUAL_ENTRY()
  */
-int smt_read_errorlog(smc,p,len)
-struct s_smc *smc ;
-char _far *p ;
-int len ;
+int smt_read_errorlog(struct s_smc *smc, char _far *p, int len)
 {
 	int			i ;
 	int			st ;
@@ -207,3 +201,4 @@ int len ;
 		er->ucode_version_level = 0x0101 ;
 	return(len) ;
 }
+

@@ -238,6 +238,34 @@ acpi_cpufreq_verify (
 }
 
 
+static unsigned long
+acpi_cpufreq_guess_freq (
+	struct cpufreq_acpi_io	*data,
+	unsigned int		cpu)
+{
+	if (cpu_khz) {
+		/* search the closest match to cpu_khz */
+		unsigned int i;
+		unsigned long freq;
+		unsigned long freqn = data->acpi_data.states[0].core_frequency * 1000;
+
+		for (i=0; i < (data->acpi_data.state_count - 1); i++) {
+			freq = freqn;
+			freqn = data->acpi_data.states[i+1].core_frequency * 1000;
+			if ((2 * cpu_khz) > (freqn + freq)) {
+				data->acpi_data.state = i;
+				return (freq);
+			}
+		}
+		data->acpi_data.state = data->acpi_data.state_count - 1;
+		return (freqn);
+	} else
+		/* assume CPU is at P0... */
+		data->acpi_data.state = 0;
+		return data->acpi_data.states[0].core_frequency * 1000;
+	
+}
+
 static int
 acpi_cpufreq_cpu_init (
 	struct cpufreq_policy   *policy)
@@ -290,11 +318,8 @@ acpi_cpufreq_cpu_init (
 	}
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
-	/* 
-	 * The current speed is unknown and not detectable by ACPI... argh! Assume 
-	 * it's P0, it will be set to this value later during initialization.
-	 */
-	policy->cur = data->acpi_data.states[0].core_frequency * 1000;
+	/* The current speed is unknown and not detectable by ACPI...  */
+	policy->cur = acpi_cpufreq_guess_freq(data, policy->cpu);
 
 	/* table init */
 	for (i=0; i<=data->acpi_data.state_count; i++)
@@ -306,7 +331,7 @@ acpi_cpufreq_cpu_init (
 			data->freq_table[i].frequency = CPUFREQ_TABLE_END;
 	}
 
-	result = cpufreq_frequency_table_cpuinfo(policy, &data->freq_table[0]);
+	result = cpufreq_frequency_table_cpuinfo(policy, data->freq_table);
 	if (result) {
 		goto err_freqfree;
 	}
@@ -321,6 +346,7 @@ acpi_cpufreq_cpu_init (
 			(u32) data->acpi_data.states[i].power,
 			(u32) data->acpi_data.states[i].transition_latency);
 
+	cpufreq_frequency_table_get_attr(data->freq_table, policy->cpu);
 	return_VALUE(result);
 
  err_freqfree:
@@ -345,6 +371,7 @@ acpi_cpufreq_cpu_exit (
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_cpu_exit");
 
 	if (data) {
+		cpufreq_frequency_table_put_attr(policy->cpu);
 		acpi_io_data[policy->cpu] = NULL;
 		acpi_processor_unregister_performance(&data->acpi_data, policy->cpu);
 		kfree(data);
@@ -354,6 +381,11 @@ acpi_cpufreq_cpu_exit (
 }
 
 
+static struct freq_attr* acpi_cpufreq_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
+
 static struct cpufreq_driver acpi_cpufreq_driver = {
 	.verify 	= acpi_cpufreq_verify,
 	.target 	= acpi_cpufreq_target,
@@ -361,6 +393,7 @@ static struct cpufreq_driver acpi_cpufreq_driver = {
 	.exit		= acpi_cpufreq_cpu_exit,
 	.name		= "acpi-cpufreq",
 	.owner		= THIS_MODULE,
+	.attr           = acpi_cpufreq_attr,
 };
 
 

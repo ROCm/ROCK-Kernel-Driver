@@ -24,7 +24,6 @@
 #include <linux/reboot.h>
 #include <linux/sysrq.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 #include <asm/voyager.h>
 #include <asm/vic.h>
 #include <linux/pm.h>

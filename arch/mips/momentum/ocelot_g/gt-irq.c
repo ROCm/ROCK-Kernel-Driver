@@ -17,8 +17,8 @@
 #include <asm/ptrace.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
+#include <asm/gt64240.h>
 #include <asm/io.h>
-#include "gt64240.h"
 
 unsigned long bus_clock;
 
@@ -108,29 +108,29 @@ int disable_galileo_irq(int int_cause, int bit_num)
  * we keep this particular structure in the function.
  */
 
-static void gt64240_p0int_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t gt64240_p0int_irq(int irq, void *dev, struct pt_regs *regs)
 {
 	uint32_t irq_src, irq_src_mask;
 	int handled;
 
 	/* get the low interrupt cause register */
-	GT_READ(LOW_INTERRUPT_CAUSE_REGISTER, &irq_src);
+	irq_src = MV_READ(LOW_INTERRUPT_CAUSE_REGISTER);
 
 	/* get the mask register for this pin */
-	GT_READ(PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW, &irq_src_mask);
+	irq_src_mask = MV_READ(PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW);
 
 	/* mask off only the interrupts we're interested in */
 	irq_src = irq_src & irq_src_mask;
 
-	handled = 0;
+	handled = IRQ_NONE;
 
 	/* Check for timer interrupt */
 	if (irq_src & 0x00000100) {
-		handled = 1;
+		handled = IRQ_HANDLED;
 		irq_src &= ~0x00000100;
 
 		/* Clear any pending cause bits */
-		GT_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
+		MV_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
 
 		/* handle the timer call */
 		do_timer(regs);
@@ -141,90 +141,8 @@ static void gt64240_p0int_irq(int irq, void *dev_id, struct pt_regs *regs)
 		       "UNKNOWN P0_INT# interrupt received, irq_src=0x%x\n",
 		       irq_src);
 	}
-}
 
-/*
- * Interrupt handler for interrupts coming from the Galileo chip.
- * It could be built in ethernet ports etc...
- */
-static void gt64240_irq(int irq, void *dev_id, struct pt_regs *regs)
-{
-	unsigned int irq_src, int_high_src, irq_src_mask,
-	    int_high_src_mask;
-	int handled;
-
-#if 0
-	GT_READ(GT_INTRCAUSE_OFS, &irq_src);
-	GT_READ(GT_INTRMASK_OFS, &irq_src_mask);
-	GT_READ(GT_HINTRCAUSE_OFS, &int_high_src);
-	GT_READ(GT_HINTRMASK_OFS, &int_high_src_mask);
-#endif
-	irq_src = irq_src & irq_src_mask;
-	int_high_src = int_high_src & int_high_src_mask;
-
-	handled = 0;
-
-	/* Execute all interrupt handlers */
-	/* Check for timer interrupt */
-	if (irq_src & 0x00000800) {
-		handled = 1;
-		irq_src &= ~0x00000800;
-		//    RESET_REG_BITS (INTERRUPT_CAUSE_REGISTER,BIT8);
-		do_timer(regs);
-	}
-
-	if (irq_src) {
-		printk(KERN_INFO
-		       "Other Galileo interrupt received irq_src %x\n",
-		       irq_src);
-#if CURRENTLY_UNUSED
-		for (count = 0; count < MAX_CAUSE_REG_WIDTH; count++) {
-			if (irq_src & (1 << count)) {
-				if (irq_handlers[INT_CAUSE_MAIN][count].
-				    routine) {
-					queue_task(&irq_handlers
-						   [INT_CAUSE_MAIN][count],
-						   &tq_immediate);
-					mark_bh(IMMEDIATE_BH);
-					handled = 1;
-				}
-			}
-		}
-#endif				/*  UNUSED  */
-	}
-#if 0
-	GT_WRITE(GT_INTRCAUSE_OFS, 0);
-	GT_WRITE(GT_HINTRCAUSE_OFS, 0);
-#endif
-
-#undef GALILEO_I2O
-#ifdef GALILEO_I2O
-	/*
-	 * Future I2O support.  We currently attach I2O interrupt handlers to
-	 * the Galileo interrupt (int 4) and handle them in do_IRQ.
-	 */
-	if (isInBoundDoorBellInterruptSet()) {
-		printk(KERN_INFO "I2O doorbell interrupt received.\n");
-		handled = 1;
-	}
-
-	if (isInBoundPostQueueInterruptSet()) {
-		printk(KERN_INFO "I2O Queue interrupt received.\n");
-		handled = 1;
-	}
-
-	/*
-	 * This normally would be outside of the ifdef, but since we're
-	 * handling I2O outside of this handler, this printk shows up every
-	 * time we get a valid I2O interrupt.  So turn this off for now.
-	 */
-	if (handled == 0) {
-		if (counter < 50) {
-			printk("Spurious Galileo interrupt...\n");
-			counter++;
-		}
-	}
-#endif
+	return handled;
 }
 
 /*
@@ -242,10 +160,10 @@ void gt64240_time_init(void)
 	static struct irqaction timer;
 
 	/* Stop the timer -- we'll use timer #0 */
-	GT_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x0);
+	MV_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x0);
 
 	/* Load timer value for 100 Hz */
-	GT_WRITE(TIMER_COUNTER0, bus_clock / 100);
+	MV_WRITE(TIMER_COUNTER0, bus_clock / 100);
 
 	/*
 	 * Create the IRQ structure entry for the timer.  Since we're too early
@@ -263,16 +181,16 @@ void gt64240_time_init(void)
 	enable_irq(6);
 
 	/* Clear any pending cause bits */
-	GT_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
+	MV_WRITE(TIMER_COUNTER_0_3_INTERRUPT_CAUSE, 0x0);
 
 	/* Enable the interrupt for timer 0 */
-	GT_WRITE(TIMER_COUNTER_0_3_INTERRUPT_MASK, 0x1);
+	MV_WRITE(TIMER_COUNTER_0_3_INTERRUPT_MASK, 0x1);
 
 	/* Enable the timer interrupt for GT-64240 pin P0_INT# */
-	GT_WRITE (PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW, 0x100);
+	MV_WRITE (PCI_0INTERRUPT_CAUSE_MASK_REGISTER_LOW, 0x100);
 
 	/* Configure and start the timer */
-	GT_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x3);
+	MV_WRITE(TIMER_COUNTER_0_3_CONTROL, 0x3);
 }
 
 void gt64240_irq_init(void)

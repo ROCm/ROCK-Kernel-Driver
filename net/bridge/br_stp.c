@@ -13,11 +13,15 @@
  *	2 of the License, or (at your option) any later version.
  */
 #include <linux/kernel.h>
-#include <linux/if_bridge.h>
 #include <linux/smp_lock.h>
-#include <asm/uaccess.h>
+
 #include "br_private.h"
 #include "br_private_stp.h"
+
+/* since time values in bpdu are in jiffies and then scaled (1/256)
+ * before sending, make sure that is at least one.
+ */
+#define MESSAGE_AGE_INCR	((HZ < 256) ? 1 : (HZ/256))
 
 static const char *br_port_state_names[] = {
 	[BR_STATE_DISABLED] = "disabled", 
@@ -36,7 +40,7 @@ void br_log_state(const struct net_bridge_port *p)
 }
 
 /* called under bridge lock */
-struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
+struct net_bridge_port *br_get_port(struct net_bridge *br, u16 port_no)
 {
 	struct net_bridge_port *p;
 
@@ -50,7 +54,7 @@ struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
 
 /* called under bridge lock */
 static int br_should_become_root_port(const struct net_bridge_port *p, 
-				      int root_port)
+				      u16 root_port)
 {
 	struct net_bridge *br;
 	struct net_bridge_port *rp;
@@ -103,9 +107,7 @@ static int br_should_become_root_port(const struct net_bridge_port *p,
 static void br_root_selection(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
-	int root_port;
-
-	root_port = 0;
+	u16 root_port = 0;
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (br_should_become_root_port(p, root_port))
@@ -160,24 +162,25 @@ void br_transmit_config(struct net_bridge_port *p)
 	bpdu.root_path_cost = br->root_path_cost;
 	bpdu.bridge_id = br->bridge_id;
 	bpdu.port_id = p->port_id;
-	bpdu.message_age = 0;
-	if (!br_is_root_bridge(br)) {
+	if (br_is_root_bridge(br))
+		bpdu.message_age = 0;
+	else {
 		struct net_bridge_port *root
 			= br_get_port(br, br->root_port);
-		bpdu.max_age = root->message_age_timer.expires - jiffies;
-
-		if (bpdu.max_age <= 0) bpdu.max_age = 1;
+		bpdu.message_age = br->max_age
+			- (root->message_age_timer.expires - jiffies)
+			+ MESSAGE_AGE_INCR;
 	}
 	bpdu.max_age = br->max_age;
 	bpdu.hello_time = br->hello_time;
 	bpdu.forward_delay = br->forward_delay;
 
-	br_send_config_bpdu(p, &bpdu);
-
-	p->topology_change_ack = 0;
-	p->config_pending = 0;
-	
-	mod_timer(&p->hold_timer, jiffies + BR_HOLD_TIME);
+	if (bpdu.message_age < br->max_age) {
+		br_send_config_bpdu(p, &bpdu);
+		p->topology_change_ack = 0;
+		p->config_pending = 0;
+		mod_timer(&p->hold_timer, jiffies + BR_HOLD_TIME);
+	}
 }
 
 /* called under bridge lock */
@@ -296,7 +299,7 @@ void br_topology_change_detection(struct net_bridge *br)
 	int isroot = br_is_root_bridge(br);
 
 	pr_info("%s: topology change detected, %s\n", br->dev->name,
-		isroot ? "propgating" : "sending tcn bpdu");
+		isroot ? "propagating" : "sending tcn bpdu");
 
 	if (isroot) {
 		br->topology_change = 1;

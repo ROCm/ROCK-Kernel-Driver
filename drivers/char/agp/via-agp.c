@@ -162,23 +162,9 @@ static void via_tlbflush_agp3(struct agp_memory *mem)
 }
 
 
-static struct aper_size_info_16 via_generic_agp3_sizes[11] =
-{
-	{ 4,     1024,  0, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2|1<<1|1<<0 },
-	{ 8,     2048,  1, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2|1<<1},
-	{ 16,    4096,  2, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2},
-	{ 32,    8192,  3, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3},
-	{ 64,   16384,  4, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4},
-	{ 128,  32768,  5, 1<<11|1<<10|1<<9|1<<8|1<<5},
-	{ 256,  65536,  6, 1<<11|1<<10|1<<9|1<<8},
-	{ 512,  131072, 7, 1<<11|1<<10|1<<9},
-	{ 1024, 262144, 8, 1<<11|1<<10},
-	{ 2048, 524288, 9, 1<<11}	/* 2GB <- Max supported */
-};
-
 struct agp_bridge_driver via_agp3_driver = {
 	.owner			= THIS_MODULE,
-	.aperture_sizes		= via_generic_agp3_sizes,
+	.aperture_sizes		= agp3_generic_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 10,
 	.configure		= via_configure_agp3,
@@ -362,6 +348,21 @@ static struct agp_device_ids via_agp_device_ids[] __devinitdata =
 		.device_id	= PCI_DEVICE_ID_VIA_PX8X0_0,
 		.chipset_name	= "PM800/PN800/PM880/PN880",
 	},
+	/* KT880 */
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_3269_0,
+		.chipset_name	= "KT880",
+	},
+	/* KTxxx/Px8xx */
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_83_87XX_1,
+		.chipset_name	= "VT83xx/VT87xx/KTxxx/Px8xx",
+	},
+	/* P4M800 */
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_3296_0,
+		.chipset_name	= "P4M800",
+	},
 
 	{ }, /* dummy final entry, always present */
 };
@@ -448,6 +449,7 @@ static struct pci_device_id agp_via_pci_table[] = {
 	.subvendor	= PCI_ANY_ID,			\
 	.subdevice	= PCI_ANY_ID,			\
 	}
+	ID(PCI_DEVICE_ID_VIA_82C597_0),
 	ID(PCI_DEVICE_ID_VIA_82C598_0),
 	ID(PCI_DEVICE_ID_VIA_8501_0),
 	ID(PCI_DEVICE_ID_VIA_8601_0),
@@ -470,7 +472,10 @@ static struct pci_device_id agp_via_pci_table[] = {
 	ID(PCI_DEVICE_ID_VIA_8378_0),
 	ID(PCI_DEVICE_ID_VIA_PT880),
 	ID(PCI_DEVICE_ID_VIA_8783_0),
-	ID(PCI_DEVICE_ID_VIA_PX8X0_0),	
+	ID(PCI_DEVICE_ID_VIA_PX8X0_0),
+	ID(PCI_DEVICE_ID_VIA_3269_0),
+	ID(PCI_DEVICE_ID_VIA_83_87XX_1),
+	ID(PCI_DEVICE_ID_VIA_3296_0),
 	{ }
 };
 

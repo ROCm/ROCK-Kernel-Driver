@@ -3,7 +3,7 @@ comment "Supported Frontend Modules"
 
 config DVB_TWINHAN_DST
 	tristate "TWINHAN DST based DVB-S frontend (QPSK)"
-	depends on DVB_CORE
+	depends on DVB_CORE && DVB_BT8XX
 	help
 	  Used in such cards as the VP-1020/1030, Twinhan DST,
 	  VVmer TV@SAT. Say Y when you want to support frontends 

@@ -206,10 +206,11 @@ struct reiserfs_journal {
   int j_cnode_used ;	      /* number of cnodes on the used list */
   int j_cnode_free ;          /* number of cnodes on the free list */
 
-  unsigned int j_trans_max ;           /* max number of blocks in a transaction.  */
-  unsigned int j_max_batch ;           /* max number of blocks to batch into a trans */
-  unsigned int j_max_commit_age ;      /* in seconds, how old can an async commit be */
-  unsigned int j_max_trans_age ;       /* in seconds, how old can a transaction be */  
+  unsigned int s_journal_trans_max ;           /* max number of blocks in a transaction.  */
+  unsigned int s_journal_max_batch ;           /* max number of blocks to batch into a trans */
+  unsigned int s_journal_max_commit_age ;      /* in seconds, how old can an async commit be */
+  unsigned int s_journal_default_max_commit_age ; /* the default for the max commit age */
+  unsigned int s_journal_max_trans_age ;       /* in seconds, how old can a transaction be */  
 
   struct reiserfs_journal_cnode *j_cnode_free_list ;
   struct reiserfs_journal_cnode *j_cnode_free_orig ; /* orig pointer returned from vmalloc */
@@ -241,24 +242,13 @@ struct reiserfs_journal {
   struct reiserfs_journal_cnode *j_list_hash_table[JOURNAL_HASH_SIZE] ; /* hash table for all the real buffer heads in all 
   										the transactions */
   struct list_head j_prealloc_list;     /* list of inodes which have preallocated blocks */
-  int j_persistent_trans;
   unsigned long j_max_trans_size ;
   unsigned long j_max_batch_size ;
-
-  int j_debug_trigger;
-  int j_errno;
 
   /* when flushing ordered buffers, throttle new ordered writers */
   struct work_struct j_work;
   atomic_t j_async_throttle;
 };
-
-enum journal_state_bits {
-    J_WRITERS_BLOCKED = 1,   /* set when new writers not allowed */
-    J_WRITERS_QUEUED,        /* set when log is full due to too many writers */
-    J_ABORTED,               /* set when log is aborted */
-};
-
 
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */
 
@@ -409,20 +399,7 @@ struct reiserfs_sb_info
     struct dentry *xattr_root; /* root of /.reiserfs_priv/.xa */
     struct rw_semaphore xattr_dir_sem;
 
-    int j_errno;
-    int j_debug_trigger;
-
 };
-
-#define reiserfs_debug_trigger(s) (SB_JOURNAL(s)->j_debug_trigger)
-
-void reiserfs_setup_journal_error_path (struct super_block *sb,
-                                        unsigned long error_id);
-void reiserfs_clear_journal_error_path (struct super_block *sb,
-                                        unsigned long error_id);
-int reiserfs_check_journal_error (struct super_block *sb);
-int reiserfs_check_journal_error_source (struct super_block *sb,
-                                         unsigned long error_id);
 
 /* Definitions of reiserfs on-disk properties: */
 #define REISERFS_3_5 0
@@ -467,13 +444,6 @@ enum reiserfs_mount_options {
     REISERFS_XATTRS,
     REISERFS_XATTRS_USER,
     REISERFS_POSIXACL,
-    REISERFS_BARRIER_NONE,
-    REISERFS_BARRIER_FLUSH,
-
-    /* Actions on error */
-    REISERFS_ERROR_PANIC,
-    REISERFS_ERROR_RO,
-    REISERFS_ERROR_CONTINUE,
 
     REISERFS_TEST1,
     REISERFS_TEST2,
@@ -503,12 +473,6 @@ enum reiserfs_mount_options {
 #define reiserfs_xattrs_user(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_XATTRS_USER))
 #define reiserfs_posixacl(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_POSIXACL))
 #define reiserfs_xattrs_optional(s) (reiserfs_xattrs_user(s) || reiserfs_posixacl(s))
-#define reiserfs_barrier_none(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_BARRIER_NONE))
-#define reiserfs_barrier_flush(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_BARRIER_FLUSH))
-
-#define reiserfs_error_panic(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ERROR_PANIC))
-#define reiserfs_error_ro(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ERROR_RO))
-#define reiserfs_error_continue(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ERROR_CONTINUE))
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;
@@ -526,18 +490,18 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 
 #define SB_DISK_JOURNAL_HEAD(s) (SB_JOURNAL(s)->j_header_bh->)
 
+#define SB_JOURNAL_TRANS_MAX(s)      (SB_JOURNAL(s)->s_journal_trans_max)
+#define SB_JOURNAL_MAX_BATCH(s)      (SB_JOURNAL(s)->s_journal_max_batch)
+#define SB_JOURNAL_MAX_COMMIT_AGE(s) (SB_JOURNAL(s)->s_journal_max_commit_age)
+#define SB_JOURNAL_DEFAULT_MAX_COMMIT_AGE(s) (SB_JOURNAL(s)->s_journal_default_max_commit_age)
+#define SB_JOURNAL_MAX_TRANS_AGE(s)  (SB_JOURNAL(s)->s_journal_max_trans_age)
+
 /* A safe version of the "bdevname", which returns the "s_id" field of
  * a superblock or else "Null superblock" if the super block is NULL.
  */
 static inline char *reiserfs_bdevname(struct super_block *s)
 {
         return (s == NULL) ? "Null superblock" : s -> s_id;
-}
-
-#define reiserfs_is_journal_aborted(journal) (unlikely (__reiserfs_is_journal_aborted (journal)))
-static inline int __reiserfs_is_journal_aborted (struct reiserfs_journal *journal)
-{
-    return test_bit (J_ABORTED, &journal->j_state);
 }
 
 #endif	/* _LINUX_REISER_FS_SB */

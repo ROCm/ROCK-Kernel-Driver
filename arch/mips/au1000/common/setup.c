@@ -56,7 +56,7 @@ extern void (*board_time_init)(void);
 extern void au1x_time_init(void);
 extern void (*board_timer_setup)(struct irqaction *irq);
 extern void au1x_timer_setup(struct irqaction *irq);
-#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_SOC_AU1500)
+#if defined(CONFIG_64BIT_PHYS_ADDR) && (defined(CONFIG_SOC_AU1500) || defined(CONFIG_SOC_AU1550))
 extern phys_t (*fixup_bigphys_addr)(phys_t phys_addr, phys_t size);
 static phys_t au1500_fixup_bigphys_addr(phys_t phys_addr, phys_t size);
 #endif
@@ -65,12 +65,36 @@ extern void au1xxx_timer_setup(struct irqaction *irq);
 
 static int __init au1x00_setup(void)
 {
+	struct	cpu_spec *sp;
 	char *argptr;
+	unsigned long prid, cpupll, bclk = 1;
 
-	/* Various early Au1000 Errata corrected by this */
-	set_c0_config(1<<19); /* Config[OD] */
+	set_cpuspec();
+	sp = cur_cpu_spec[0];
 
 	board_setup();  /* board specific setup */
+
+	prid = read_c0_prid();
+	cpupll = (au_readl(0xB1900060) & 0x3F) * 12;
+	printk("(PRId %08X) @ %dMHZ\n", prid, cpupll);
+
+	bclk = sp->cpu_bclk;
+	if (bclk)
+	{
+		/* Enable BCLK switching */
+		bclk = au_readl(0xB190003C);
+		au_writel(bclk | 0x60, 0xB190003C);
+		printk("BCLK switching enabled!\n");
+	}
+
+	if (sp->cpu_od) {
+		/* Various early Au1000 Errata corrected by this */
+		set_c0_config(1<<19); /* Set Config[OD] */
+	}
+	else {
+		/* Clear to obtain best system bus performance */
+		clear_c0_config(1<<19); /* Clear Config[OD] */
+ 	}
 
 	argptr = prom_getcmdline();
 
@@ -122,7 +146,7 @@ static int __init au1x00_setup(void)
 	_machine_power_off = au1000_power_off;
 	board_time_init = au1xxx_time_init;
 	board_timer_setup = au1xxx_timer_setup;
-#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_SOC_AU1500)
+#if defined(CONFIG_64BIT_PHYS_ADDR) && (defined(CONFIG_SOC_AU1500) || defined(CONFIG_SOC_AU1550))
 	fixup_bigphys_addr = au1500_fixup_bigphys_addr;
 #endif
 
@@ -173,7 +197,7 @@ static int __init au1x00_setup(void)
 
 early_initcall(au1x00_setup);
 
-#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_SOC_AU1500)
+#if defined(CONFIG_64BIT_PHYS_ADDR) && (defined(CONFIG_SOC_AU1500) || defined(CONFIG_SOC_AU1550))
 /* This routine should be valid for all Au1500 based boards */
 static phys_t au1500_fixup_bigphys_addr(phys_t phys_addr, phys_t size)
 {

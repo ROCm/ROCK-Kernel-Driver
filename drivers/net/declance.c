@@ -786,7 +786,7 @@ static int lance_open(struct net_device *dev)
 
 	/* Associate IRQ with lance_interrupt */
 	if (request_irq(dev->irq, &lance_interrupt, 0, "lance", dev)) {
-		printk("lance: Can't get IRQ %d\n", dev->irq);
+		printk("%s: Can't get IRQ %d\n", dev->name, dev->irq);
 		return -EAGAIN;
 	}
 	if (lp->dma_irq >= 0) {
@@ -795,7 +795,8 @@ static int lance_open(struct net_device *dev)
 		if (request_irq(lp->dma_irq, &lance_dma_merr_int, 0,
 				"lance error", dev)) {
 			free_irq(dev->irq, dev);
-			printk("lance: Can't get DMA IRQ %d\n", lp->dma_irq);
+			printk("%s: Can't get DMA IRQ %d\n", dev->name,
+				lp->dma_irq);
 			return -EAGAIN;
 		}
 
@@ -877,8 +878,8 @@ static void lance_tx_timeout(struct net_device *dev)
 	volatile struct lance_regs *ll = lp->ll;
 
 	printk(KERN_ERR "%s: transmit timed out, status %04x, reset\n",
-			       dev->name, ll->rdp);
-			lance_reset(dev);
+		dev->name, ll->rdp);
+	lance_reset(dev);
 	netif_wake_queue(dev);
 }
 
@@ -1025,6 +1026,8 @@ static void lance_set_multicast_retry(unsigned long _opaque)
 static int __init dec_lance_init(const int type, const int slot)
 {
 	static unsigned version_printed;
+	static const char fmt[] = "declance%d";
+	char name[10];
 	struct net_device *dev;
 	struct lance_private *lp;
 	volatile struct lance_regs *ll;
@@ -1039,10 +1042,22 @@ static int __init dec_lance_init(const int type, const int slot)
 	if (dec_lance_debug && version_printed++ == 0)
 		printk(version);
 
+	i = 0;
+	dev = root_lance_dev;
+	while (dev) {
+		i++;
+		lp = (struct lance_private *)dev->priv;
+		dev = lp->next;
+	}
+	snprintf(name, sizeof(name), fmt, i);
+
 	dev = alloc_etherdev(sizeof(struct lance_private));
-	if (!dev)
-		return -ENOMEM;
-	SET_MODULE_OWNER(dev);
+	if (!dev) {
+		printk(KERN_ERR "%s: Unable to allocate etherdev, aborting.\n",
+			name);
+		ret = -ENOMEM;
+		goto err_out;
+	}
 
 	/*
 	 * alloc_etherdev ensures the data structures used by the LANCE
@@ -1160,9 +1175,10 @@ static int __init dec_lance_init(const int type, const int slot)
 		break;
 
 	default:
-		printk("declance_init called with unknown type\n");
+		printk(KERN_ERR "%s: declance_init called with unknown type\n",
+			name);
 		ret = -ENODEV;
-		goto err_out;
+		goto err_out_free_dev;
 	}
 
 	ll = (struct lance_regs *) dev->base_addr;
@@ -1172,19 +1188,21 @@ static int __init dec_lance_init(const int type, const int slot)
 	/* First, check for test pattern */
 	if (esar[0x60] != 0xff && esar[0x64] != 0x00 &&
 	    esar[0x68] != 0x55 && esar[0x6c] != 0xaa) {
-		printk("Ethernet station address prom not found!\n");
+		printk(KERN_ERR
+			"%s: Ethernet station address prom not found!\n",
+			name);
 		ret = -ENODEV;
-		goto err_out;
+		goto err_out_free_dev;
 	}
 	/* Check the prom contents */
 	for (i = 0; i < 8; i++) {
 		if (esar[i * 4] != esar[0x3c - i * 4] &&
 		    esar[i * 4] != esar[0x40 + i * 4] &&
 		    esar[0x3c - i * 4] != esar[0x40 + i * 4]) {
-			printk("Something is wrong with the ethernet "
-			       "station address prom!\n");
+			printk(KERN_ERR "%s: Something is wrong with the "
+				"ethernet station address prom!\n", name);
 			ret = -ENODEV;
-			goto err_out;
+			goto err_out_free_dev;
 		}
 	}
 
@@ -1194,13 +1212,13 @@ static int __init dec_lance_init(const int type, const int slot)
 	 */
 	switch (type) {
 	case ASIC_LANCE:
-		printk("%s: IOASIC onboard LANCE, addr = ", dev->name);
+		printk("%s: IOASIC onboard LANCE, addr = ", name);
 		break;
 	case PMAD_LANCE:
-		printk("%s: PMAD-AA, addr = ", dev->name);
+		printk("%s: PMAD-AA, addr = ", name);
 		break;
 	case PMAX_LANCE:
-		printk("%s: PMAX onboard LANCE, addr = ", dev->name);
+		printk("%s: PMAX onboard LANCE, addr = ", name);
 		break;
 	}
 	for (i = 0; i < 6; i++) {
@@ -1236,15 +1254,24 @@ static int __init dec_lance_init(const int type, const int slot)
 	init_timer(&lp->multicast_timer);
 	lp->multicast_timer.data = (unsigned long) dev;
 	lp->multicast_timer.function = &lance_set_multicast_retry;
+
 	ret = register_netdev(dev);
-	if (ret)
-		goto err_out;
+	if (ret) {
+		printk(KERN_ERR
+			"%s: Unable to register netdev, aborting.\n", name);
+		goto err_out_free_dev;
+	}
+
 	lp->next = root_lance_dev;
 	root_lance_dev = dev;
+
+	printk("%s: registered as %s.\n", name, dev->name);
 	return 0;
 
+err_out_free_dev:
+	kfree(dev);
+
 err_out:
-	free_netdev(dev);
 	return ret;
 }
 

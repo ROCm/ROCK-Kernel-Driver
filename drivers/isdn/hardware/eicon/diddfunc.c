@@ -66,7 +66,7 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
 			req.didd_notify.info.callback = (void *)didd_callback;
-			req.didd_notify.info.context = 0;
+			req.didd_notify.info.context = NULL;
 			_DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff)
 				return (0);

@@ -85,7 +85,8 @@ ENTRY(interrupt_table)
 	.long	do_IRQ	!      rovi
 	.long	do_IRQ			
 	.long	do_IRQ			/* 5E0 */
-#if  defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if  defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709) || \
+     defined(CONFIG_CPU_SUBTYPE_SH7300) || defined(CONFIG_CPU_SUBTYPE_SH7705)
 	.long	do_IRQ	! 32 IRQ  irq0	/* 600 */
 	.long	do_IRQ	! 33      irq1
 	.long	do_IRQ	! 34      irq2
@@ -115,10 +116,84 @@ ENTRY(interrupt_table)
 	.long	do_IRQ	! 58      bri2
 	.long	do_IRQ	! 59      txi2
 	.long	do_IRQ	! 60 ADC  adi	/* 980 */
-#if defined(CONFIG_CPU_SUBTYPE_SH7707)
+#if defined(CONFIG_CPU_SUBTYPE_SH7705)
+	.long	exception_none	! 61	/* 9A0 */
+	.long	exception_none	! 62
+	.long	exception_none	! 63
+	.long	exception_none	! 64	/* A00 */
+	.long	do_IRQ	! 65 USB  usi0
+	.long	do_IRQ	! 66      usi1
+	.long	exception_none	! 67
+	.long	exception_none	! 68
+	.long	exception_none	! 69
+	.long	exception_none	! 70
+	.long	exception_none	! 71
+	.long	exception_none	! 72	/* B00 */
+	.long	exception_none	! 73
+	.long	exception_none	! 74
+	.long	exception_none	! 75
+	.long	exception_none	! 76
+	.long	exception_none	! 77
+	.long	exception_none	! 78
+	.long	exception_none	! 79
+	.long	do_IRQ	! 80 TPU0 tpi0	/* C00 */
+	.long	do_IRQ	! 81 TPU1 tpi1
+	.long	exception_none	! 82
+	.long	exception_none	! 83
+	.long	do_IRQ	! 84 TPU2 tpi2
+	.long	do_IRQ	! 85 TPU3 tpi3	/* CA0 */
+#endif
+#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7300)
 	.long   do_IRQ	! 61 LCDC lcdi	/* 9A0 */
 	.long   do_IRQ	! 62 PCC  pcc0i
 	.long   do_IRQ	! 63      pcc1i	/* 9E0 */
+#endif
+#if defined(CONFIG_CPU_SUBTYPE_SH7300)
+	.long   do_IRQ	! 64
+	.long   do_IRQ	! 65
+	.long   do_IRQ	! 66
+	.long   do_IRQ	! 67
+	.long   do_IRQ	! 68
+	.long   do_IRQ	! 69
+	.long   do_IRQ	! 70
+	.long   do_IRQ	! 71
+	.long   do_IRQ	! 72
+	.long   do_IRQ	! 73
+	.long   do_IRQ	! 74
+	.long   do_IRQ	! 75
+	.long   do_IRQ	! 76
+	.long   do_IRQ	! 77
+	.long   do_IRQ	! 78
+	.long   do_IRQ	! 79
+	.long   do_IRQ	! 80 SCIF0(SH7300)
+	.long   do_IRQ	! 81
+	.long   do_IRQ	! 82
+	.long   do_IRQ	! 83
+	.long   do_IRQ	! 84
+	.long   do_IRQ	! 85
+	.long   do_IRQ	! 86
+	.long   do_IRQ	! 87
+	.long   do_IRQ	! 88
+	.long   do_IRQ	! 89
+	.long   do_IRQ	! 90
+	.long   do_IRQ	! 91
+	.long   do_IRQ	! 92
+	.long   do_IRQ	! 93
+	.long   do_IRQ	! 94
+	.long   do_IRQ	! 95
+	.long   do_IRQ	! 96
+	.long   do_IRQ	! 97
+	.long   do_IRQ	! 98
+	.long   do_IRQ	! 99
+	.long   do_IRQ	! 100
+	.long   do_IRQ	! 101
+	.long   do_IRQ	! 102
+	.long   do_IRQ	! 103
+	.long   do_IRQ	! 104
+	.long   do_IRQ	! 105
+	.long   do_IRQ	! 106
+	.long   do_IRQ	! 107
+	.long   do_IRQ	! 108
 #endif
 #endif
 

@@ -331,6 +331,21 @@ static void dec_count(struct io *io, unsigned int region, int error)
 	}
 }
 
+/* FIXME Move this to bio.h? */
+static void zero_fill_bio(struct bio *bio)
+{
+	unsigned long flags;
+	struct bio_vec *bv;
+	int i;
+
+	bio_for_each_segment(bv, bio, i) {
+		char *data = bvec_kmap_irq(bv, &flags);
+		memset(data, 0, bv->bv_len);
+		flush_dcache_page(bv->bv_page);
+		bvec_kunmap_irq(data, &flags);
+	}
+}
+
 static int endio(struct bio *bio, unsigned int done, int error)
 {
 	struct io *io = (struct io *) bio->bi_private;
@@ -339,8 +354,9 @@ static int endio(struct bio *bio, unsigned int done, int error)
 	if (bio->bi_size)
 		return 1;
 
-	/* FIXME: kcopyd needs pages zeroing on read failure ???
-	 * sounds like kcopyd is broken */
+	if (error && bio_data_dir(bio) == READ)
+		zero_fill_bio(bio);
+
 	dec_count(io, bio_get_region(bio), error);
 	bio_put(bio);
 
@@ -369,7 +385,7 @@ struct dpages {
 /*
  * Functions for getting the pages from a list.
  */
-void list_get_page(struct dpages *dp,
+static void list_get_page(struct dpages *dp,
 		  struct page **p, unsigned long *len, unsigned *offset)
 {
 	unsigned o = dp->context_u;
@@ -380,14 +396,14 @@ void list_get_page(struct dpages *dp,
 	*offset = o;
 }
 
-void list_next_page(struct dpages *dp)
+static void list_next_page(struct dpages *dp)
 {
 	struct page_list *pl = (struct page_list *) dp->context_ptr;
 	dp->context_ptr = pl->next;
 	dp->context_u = 0;
 }
 
-void list_dp_init(struct dpages *dp, struct page_list *pl, unsigned offset)
+static void list_dp_init(struct dpages *dp, struct page_list *pl, unsigned offset)
 {
 	dp->get_page = list_get_page;
 	dp->next_page = list_next_page;
@@ -398,7 +414,7 @@ void list_dp_init(struct dpages *dp, struct page_list *pl, unsigned offset)
 /*
  * Functions for getting the pages from a bvec.
  */
-void bvec_get_page(struct dpages *dp,
+static void bvec_get_page(struct dpages *dp,
 		  struct page **p, unsigned long *len, unsigned *offset)
 {
 	struct bio_vec *bvec = (struct bio_vec *) dp->context_ptr;
@@ -407,20 +423,20 @@ void bvec_get_page(struct dpages *dp,
 	*offset = bvec->bv_offset;
 }
 
-void bvec_next_page(struct dpages *dp)
+static void bvec_next_page(struct dpages *dp)
 {
 	struct bio_vec *bvec = (struct bio_vec *) dp->context_ptr;
 	dp->context_ptr = bvec + 1;
 }
 
-void bvec_dp_init(struct dpages *dp, struct bio_vec *bvec)
+static void bvec_dp_init(struct dpages *dp, struct bio_vec *bvec)
 {
 	dp->get_page = bvec_get_page;
 	dp->next_page = bvec_next_page;
 	dp->context_ptr = bvec;
 }
 
-void vm_get_page(struct dpages *dp,
+static void vm_get_page(struct dpages *dp,
 		 struct page **p, unsigned long *len, unsigned *offset)
 {
 	*p = vmalloc_to_page(dp->context_ptr);
@@ -428,13 +444,13 @@ void vm_get_page(struct dpages *dp,
 	*len = PAGE_SIZE - dp->context_u;
 }
 
-void vm_next_page(struct dpages *dp)
+static void vm_next_page(struct dpages *dp)
 {
 	dp->context_ptr += PAGE_SIZE - dp->context_u;
 	dp->context_u = 0;
 }
 
-void vm_dp_init(struct dpages *dp, void *data)
+static void vm_dp_init(struct dpages *dp, void *data)
 {
 	dp->get_page = vm_get_page;
 	dp->next_page = vm_next_page;
@@ -516,12 +532,15 @@ static void dispatch_io(int rw, unsigned int num_regions,
 	dec_count(io, 0, 0);
 }
 
-int sync_io(unsigned int num_regions, struct io_region *where,
+static int sync_io(unsigned int num_regions, struct io_region *where,
 	    int rw, struct dpages *dp, unsigned long *error_bits)
 {
 	struct io io;
 
-	BUG_ON(num_regions > 1 && rw != WRITE);
+	if (num_regions > 1 && rw != WRITE) {
+		WARN_ON(1);
+		return -EIO;
+	}
 
 	io.error = 0;
 	atomic_set(&io.count, 1); /* see dispatch_io() */
@@ -546,11 +565,18 @@ int sync_io(unsigned int num_regions, struct io_region *where,
 	return io.error ? -EIO : 0;
 }
 
-int async_io(unsigned int num_regions, struct io_region *where, int rw,
+static int async_io(unsigned int num_regions, struct io_region *where, int rw,
 	     struct dpages *dp, io_notify_fn fn, void *context)
 {
-	struct io *io = mempool_alloc(_io_pool, GFP_NOIO);
+	struct io *io;
 
+	if (num_regions > 1 && rw != WRITE) {
+		WARN_ON(1);
+		fn(1, context);
+		return -EIO;
+	}
+
+	io = mempool_alloc(_io_pool, GFP_NOIO);
 	io->error = 0;
 	atomic_set(&io->count, 1); /* see dispatch_io() */
 	io->sleeper = NULL;
@@ -615,6 +641,7 @@ EXPORT_SYMBOL(dm_io_get);
 EXPORT_SYMBOL(dm_io_put);
 EXPORT_SYMBOL(dm_io_sync);
 EXPORT_SYMBOL(dm_io_async);
+EXPORT_SYMBOL(dm_io_sync_bvec);
 EXPORT_SYMBOL(dm_io_async_bvec);
 EXPORT_SYMBOL(dm_io_sync_vm);
 EXPORT_SYMBOL(dm_io_async_vm);

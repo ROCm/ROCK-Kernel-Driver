@@ -1081,7 +1081,7 @@ int __init ibmphp_hpc_start_poll_thread (void)
 
 	debug ("%s - Entry\n", __FUNCTION__);
 
-	tid_poll = kernel_thread (hpc_poll_thread, 0, 0);
+	tid_poll = kernel_thread (hpc_poll_thread, NULL, 0);
 	if (tid_poll < 0) {
 		err ("%s - Error, thread not started\n", __FUNCTION__);
 		rc = -1;

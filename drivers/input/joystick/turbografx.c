@@ -14,18 +14,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -65,7 +65,7 @@ __obsolete_setup("tgfx_3=");
 
 #define TGFX_TRIGGER		0x08
 #define TGFX_UP			0x10
-#define TGFX_DOWN		0x20	
+#define TGFX_DOWN		0x20
 #define TGFX_LEFT		0x40
 #define TGFX_RIGHT		0x80
 
@@ -126,7 +126,7 @@ static int tgfx_open(struct input_dev *dev)
         if (!tgfx->used++) {
 		parport_claim(tgfx->pd);
 		parport_write_control(tgfx->pd->port, 0x04);
-                mod_timer(&tgfx->timer, jiffies + TGFX_REFRESH_TIME); 
+                mod_timer(&tgfx->timer, jiffies + TGFX_REFRESH_TIME);
 	}
         return 0;
 }
@@ -173,7 +173,7 @@ static struct tgfx __init *tgfx_probe(int *config, int nargs)
 	memset(tgfx, 0, sizeof(struct tgfx));
 
 	tgfx->pd = parport_register_device(pp, "turbografx", NULL, NULL, NULL, PARPORT_DEV_EXCL, NULL);
-		
+
 	parport_put_port(pp);
 
 	if (!tgfx->pd) {
@@ -210,7 +210,7 @@ static struct tgfx __init *tgfx_probe(int *config, int nargs)
 			tgfx->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 
 			for (j = 0; j < config[i+1]; j++)
-				set_bit(tgfx_buttons[j], tgfx->dev[i].keybit); 
+				set_bit(tgfx_buttons[j], tgfx->dev[i].keybit);
 
 			tgfx->dev[i].absmin[ABS_X] = -1; tgfx->dev[i].absmax[ABS_X] = 1;
 			tgfx->dev[i].absmin[ABS_Y] = -1; tgfx->dev[i].absmax[ABS_Y] = 1;
@@ -225,7 +225,7 @@ static struct tgfx __init *tgfx_probe(int *config, int nargs)
 		kfree(tgfx);
 		return NULL;
         }
-		
+
 	return tgfx;
 }
 
@@ -245,7 +245,7 @@ void __exit tgfx_exit(void)
 {
 	int i, j;
 
-	for (i = 0; i < 3; i++) 
+	for (i = 0; i < 3; i++)
 		if (tgfx_base[i]) {
 			for (j = 0; j < 7; j++)
 				if (tgfx_base[i]->sticks & (1 << j))

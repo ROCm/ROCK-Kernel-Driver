@@ -1487,7 +1487,7 @@ struct iw_statistics *wl3501_get_wireless_stats(struct net_device *dev)
 	return wstats;
 }
 
-static inline int wl3501_ethtool_ioctl(struct net_device *dev, void *uaddr)
+static inline int wl3501_ethtool_ioctl(struct net_device *dev, void __user *uaddr)
 {
 	u32 ethcmd;
 	int rc = -EFAULT;
@@ -1532,7 +1532,7 @@ static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (netif_device_present(dev)) {
 		rc = -EOPNOTSUPP;
 		if (cmd == SIOCETHTOOL)
-			rc = wl3501_ethtool_ioctl(dev, (void *)rq->ifr_data);
+			rc = wl3501_ethtool_ioctl(dev, rq->ifr_data);
 	}
 	return rc;
 }

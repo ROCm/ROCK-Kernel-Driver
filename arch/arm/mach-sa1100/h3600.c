@@ -286,6 +286,7 @@ MACHINE_START(H3100, "Compaq iPAQ H3100")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(h3100_map_io)
 	INITIRQ(sa1100_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END
 
 #endif /* CONFIG_SA1100_H3100 */
@@ -400,6 +401,7 @@ MACHINE_START(H3600, "Compaq iPAQ H3600")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(h3600_map_io)
 	INITIRQ(sa1100_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END
 
 #endif /* CONFIG_SA1100_H3600 */
@@ -481,7 +483,7 @@ static void h3800_control_egpio(enum ipaq_egpio_type x, int setp)
 	case IPAQ_EGPIO_CODEC_NRESET:
 	case IPAQ_EGPIO_AUDIO_ON:
 	case IPAQ_EGPIO_QMUTE:
-		printk(__FUNCTION__ ": error - should not be called\n");
+		printk("%s: error - should not be called\n", __FUNCTION__);
 		break;
 	case IPAQ_EGPIO_OPT_NVRAM_ON:
 		SET_ASIC2(GPIO2_OPT_ON_NVRAM);
@@ -523,7 +525,7 @@ static int h3800_pm_callback(int req)
 	static u16 asic2_data;
 	int result = 0;
 
-	printk(__FUNCTION__ " %d\n", req);
+	printk("%s %d\n", __FUNCTION__, req);
 
 	switch (req) {
 	case PM_RESUME:
@@ -551,7 +553,7 @@ static int h3800_pm_callback(int req)
 		asic2_data = H3800_ASIC2_GPIOPIOD;
 		break;
 	default:
-		printk(__FUNCTION__ ": unrecognized PM callback\n");
+		printk("%s: unrecognized PM callback\n", __FUNCTION__);
 		break;
 	}
 	return result;
@@ -591,7 +593,7 @@ static void h3800_IRQ_demux(unsigned int irq, struct irqdesc *desc, struct pt_re
 {
 	int i;
 
-	if (0) printk(__FUNCTION__ ": interrupt received\n");
+	if (0) printk("%s: interrupt received\n", __FUNCTION__);
 
 	desc->chip->ack(irq);
 
@@ -601,21 +603,21 @@ static void h3800_IRQ_demux(unsigned int irq, struct irqdesc *desc, struct pt_re
 
 		/* KPIO */
 		irq = H3800_ASIC2_KPIINTFLAG;
-		if (0) printk(__FUNCTION__" KPIO 0x%08X\n", irq);
+		if (0) printk("%s KPIO 0x%08X\n", __FUNCTION__, irq);
 		for (j = 0; j < H3800_KPIO_IRQ_COUNT; j++)
 			if (irq & kpio_irq_mask[j])
 				do_edge_IRQ(H3800_KPIO_IRQ_COUNT + j, irq_desc + H3800_KPIO_IRQ_COUNT + j, regs);
 
 		/* GPIO2 */
 		irq = H3800_ASIC2_GPIINTFLAG;
-		if (0) printk(__FUNCTION__" GPIO 0x%08X\n", irq);
+		if (0) printk("%s GPIO 0x%08X\n", __FUNCTION__, irq);
 		for (j = 0; j < H3800_GPIO_IRQ_COUNT; j++)
 			if (irq & gpio_irq_mask[j])
 				do_edge_IRQ(H3800_GPIO_IRQ_COUNT + j, irq_desc + H3800_GPIO_IRQ_COUNT + j , regs);
 	}
 
 	if (i >= MAX_ASIC_ISR_LOOPS)
-		printk(__FUNCTION__ ": interrupt processing overrun\n");
+		printk("%s: interrupt processing overrun\n", __FUNCTION__);
 
 	/* For level-based interrupts */
 	desc->chip->unmask(irq);
@@ -783,6 +785,7 @@ MACHINE_START(H3800, "Compaq iPAQ H3800")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(h3800_map_io)
 	INITIRQ(h3800_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END
 
 #endif /* CONFIG_SA1100_H3800 */

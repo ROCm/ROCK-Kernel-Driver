@@ -51,6 +51,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
+#include <asm/mach-types.h>
 #include <asm/unaligned.h>
 #include <asm/hardware.h>
 
@@ -1405,7 +1406,7 @@ static void udc_disable(struct pxa2xx_udc *dev)
 
 #ifdef	CONFIG_ARCH_PXA
         /* Disable clock for USB device */
-        CKEN &= ~CKEN11_USB;
+	pxa_set_cken(CKEN11_USB, 0);
 #endif
 
 	ep0_idle (dev);
@@ -1451,7 +1452,7 @@ static void udc_enable (struct pxa2xx_udc *dev)
 
 #ifdef	CONFIG_ARCH_PXA
         /* Enable clock for USB device */
-        CKEN |= CKEN11_USB;
+	pxa_set_cken(CKEN11_USB, 1);
 #endif
 
 	/* try to clear these bits before we enable the udc */
@@ -2538,7 +2539,7 @@ static int __exit pxa2xx_udc_remove(struct device *_dev)
 /*-------------------------------------------------------------------------*/
 
 static struct device_driver udc_driver = {
-	.name		= (char *) driver_name,
+	.name		= "pxa2xx-udc",
 	.bus		= &platform_bus_type,
 	.probe		= pxa2xx_udc_probe,
 	.remove		= __exit_p(pxa2xx_udc_remove),

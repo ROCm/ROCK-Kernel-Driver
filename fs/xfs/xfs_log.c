@@ -122,9 +122,7 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
-#ifdef XFSDEBUG
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
-#endif
 STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
 STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
@@ -815,7 +813,7 @@ xfs_log_need_covered(xfs_mount_t *mp)
 	xlog_t		*log = mp->m_log;
 	vfs_t		*vfsp = XFS_MTOVFS(mp);
 
-	if (mp->m_frozen || XFS_FORCED_SHUTDOWN(mp) ||
+	if (vfsp->vfs_super->s_frozen || XFS_FORCED_SHUTDOWN(mp) ||
 	    (vfsp->vfs_flag & VFS_RDONLY))
 		return 0;
 
@@ -3245,7 +3243,7 @@ xlog_verify_dest_ptr(xlog_t     *log,
 }	/* xlog_verify_dest_ptr */
 
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /* check split LR write */
 STATIC void
 xlog_verify_disk_cycle_no(xlog_t	 *log,

@@ -51,8 +51,6 @@ extern cpumask_t phys_cpu_present_map;
 extern cpumask_t cpu_online_map;
 #define cpu_possible_map	phys_cpu_present_map
 
-#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
-
 extern cpumask_t cpu_callout_map;
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)
@@ -91,12 +89,6 @@ extern void prom_init_secondary(void);
 extern void prom_prepare_cpus(unsigned int max_cpus);
 
 /*
- * Do whatever setup needs to be done for SMP at the board level.  Return
- * the number of cpus in the system, including this one
- */
-extern int prom_setup_smp(void);
-
-/*
  * Last chance for the board code to finish SMP initialization before
  * the CPU is "online".
  */
@@ -116,6 +108,8 @@ static inline void smp_send_reschedule(int cpu)
 {
 	core_send_ipi(cpu, SMP_RESCHEDULE_YOURSELF);
 }
+
+extern asmlinkage void smp_call_function_interrupt(void);
 
 #endif /* CONFIG_SMP */
 

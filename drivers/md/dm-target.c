@@ -7,6 +7,7 @@
 #include "dm.h"
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/kmod.h>
 #include <linux/bio.h>
 #include <linux/slab.h>
@@ -181,7 +182,7 @@ static struct target_type error_target = {
 	.map  = io_err_map,
 };
 
-int dm_target_init(void)
+int __init dm_target_init(void)
 {
 	return dm_register_target(&error_target);
 }

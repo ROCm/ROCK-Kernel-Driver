@@ -50,7 +50,7 @@ static struct resource sun4c_intr_eb = { "sun4c_intr" };
  *
  * so don't go making it static, like I tried. sigh.
  */
-unsigned char *interrupt_enable = 0;
+unsigned char *interrupt_enable = NULL;
 
 static int sun4c_pil_map[] = { 0, 1, 2, 3, 5, 7, 8, 9 };
 

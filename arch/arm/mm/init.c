@@ -8,24 +8,15 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
-#include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/string.h>
-#include <linux/types.h>
 #include <linux/ptrace.h>
-#include <linux/mman.h>
-#include <linux/mm.h>
 #include <linux/swap.h>
-#include <linux/smp.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/initrd.h>
 
-#include <asm/segment.h>
 #include <asm/mach-types.h>
-#include <asm/pgalloc.h>
-#include <asm/dma.h>
 #include <asm/hardware.h>
 #include <asm/setup.h>
 #include <asm/tlb.h>
@@ -67,7 +58,7 @@ void show_mem(void)
 
 	printk("Mem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+	printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 
 	for (node = 0; node < numnodes; node++) {
 		struct page *page, *end;
@@ -86,7 +77,7 @@ void show_mem(void)
 			else if (!page_count(page))
 				free++;
 			else
-				shared += atomic_read(&page->count) - 1;
+				shared += page_count(page) - 1;
 			page++;
 		} while (page < end);
 	}
@@ -234,6 +225,8 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 		bootmem_pages += np[i].bootmap_pages;
 	}
 
+	high_memory = __va(memend_pfn << PAGE_SHIFT);
+
 	/*
 	 * This doesn't seem to be used by the Linux memory
 	 * manager any more.  If we can get rid of it, we
@@ -241,7 +234,6 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 	 */
 	max_low_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
 	max_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
-	mi->end = memend_pfn << PAGE_SHIFT;
 
 	return bootmem_pages;
 }
@@ -289,6 +281,7 @@ static int __init check_initrd(struct meminfo *mi)
 static __init void reserve_node_zero(unsigned int bootmap_pfn, unsigned int bootmap_pages)
 {
 	pg_data_t *pgdat = NODE_DATA(0);
+	unsigned long res_size = 0;
 
 	/*
 	 * Register the kernel text and data with bootmem.
@@ -312,31 +305,32 @@ static __init void reserve_node_zero(unsigned int bootmap_pfn, unsigned int boot
 			     bootmap_pages << PAGE_SHIFT);
 
 	/*
-	 * Hmm... This should go elsewhere, but we really really
-	 * need to stop things allocating the low memory; we need
-	 * a better implementation of GFP_DMA which does not assume
-	 * that DMA-able memory starts at zero.
+	 * Hmm... This should go elsewhere, but we really really need to
+	 * stop things allocating the low memory; ideally we need a better
+	 * implementation of GFP_DMA which does not assume that DMA-able
+	 * memory starts at zero.
 	 */
-	if (machine_is_integrator())
-		reserve_bootmem_node(pgdat, 0, __pa(swapper_pg_dir));
+	if (machine_is_integrator() || machine_is_cintegrator())
+		res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
+
 	/*
-	 * These should likewise go elsewhere.  They pre-reserve
-	 * the screen memory region at the start of main system
-	 * memory.
+	 * These should likewise go elsewhere.  They pre-reserve the
+	 * screen memory region at the start of main system memory.
 	 */
-	if (machine_is_archimedes() || machine_is_a5k())
-		reserve_bootmem_node(pgdat, 0x02000000, 0x00080000);
 	if (machine_is_edb7211())
-		reserve_bootmem_node(pgdat, 0xc0000000, 0x00020000);
+		res_size = 0x00020000;
 	if (machine_is_p720t())
-		reserve_bootmem_node(pgdat, PHYS_OFFSET, 0x00014000);
+		res_size = 0x00014000;
+
 #ifdef CONFIG_SA1111
 	/*
-	 * Because of the SA1111 DMA bug, we want to preserve
-	 * our precious DMA-able memory...
+	 * Because of the SA1111 DMA bug, we want to preserve our
+	 * precious DMA-able memory...
 	 */
-	reserve_bootmem_node(pgdat, PHYS_OFFSET, __pa(swapper_pg_dir)-PHYS_OFFSET);
+	res_size = __pa(swapper_pg_dir) - PHYS_OFFSET;
 #endif
+	if (res_size)
+		reserve_bootmem_node(pgdat, PHYS_OFFSET, res_size);
 }
 
 /*
@@ -508,7 +502,7 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 		 */
 		arch_adjust_zones(node, zone_size, zhole_size);
 
-		free_area_init_node(node, pgdat, 0, zone_size,
+		free_area_init_node(node, pgdat, NULL, zone_size,
 				bdata->node_boot_start >> PAGE_SHIFT, zhole_size);
 	}
 
@@ -555,7 +549,6 @@ void __init mem_init(void)
 	datapages = &_end - &_etext;
 	initpages = &__init_end - &__init_begin;
 
-	high_memory = (void *)__va(meminfo.end);
 #ifndef CONFIG_DISCONTIGMEM
 	max_mapnr   = virt_to_page(high_memory) - mem_map;
 #endif
@@ -610,7 +603,7 @@ void __init mem_init(void)
 
 void free_initmem(void)
 {
-	if (!machine_is_integrator()) {
+	if (!machine_is_integrator() && !machine_is_cintegrator()) {
 		free_area((unsigned long)(&__init_begin),
 			  (unsigned long)(&__init_end),
 			  "init");

@@ -40,12 +40,6 @@ struct svc_stat		nfsd_svcstats = {
 	.program	= &nfsd_program,
 };
 
-#ifdef CONFIG_NFSD_ACL
-struct svc_stat	nfsd_acl_svcstats = {
-	.program	= &nfsd_acl_program,
-};
-#endif
-
 static int nfsd_proc_show(struct seq_file *seq, void *v)
 {
 	int i;

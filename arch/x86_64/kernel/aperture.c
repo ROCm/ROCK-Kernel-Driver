@@ -27,7 +27,6 @@
 int iommu_aperture;
 int iommu_aperture_disabled __initdata = 0;
 int iommu_aperture_allowed __initdata = 0;
-int fix_agp_aperture __initdata = 1;
 
 int fallback_aper_order __initdata = 1; /* 64MB */
 int fallback_aper_force __initdata = 0; 
@@ -242,8 +241,13 @@ void __init iommu_hole_init(void)
 		/* Got the aperture from the AGP bridge */
 	} else if ((!no_iommu && end_pfn >= 0xffffffff>>PAGE_SHIFT) ||
 		   force_iommu ||
-		   (valid_agp && fix_agp_aperture) || 
+		   valid_agp || 
 		   fallback_aper_force) { 
+		/* When there is a AGP bridge in the system assume the
+		   user wants to use the AGP driver too and needs an
+		   aperture.  However this case (AGP but no good
+		   aperture) should only happen with a more broken than
+		   usual BIOS, because it would even break Windows. */
 
 	printk("Your BIOS doesn't leave a aperture memory hole\n");
 	printk("Please enable the IOMMU option in the BIOS setup\n"); 

@@ -479,7 +479,7 @@ static int arcnet_header(struct sk_buff *skb, struct net_device *dev,
 		*(uint16_t *) skb_push(skb, 2) = type;
 		if (skb->nh.raw - skb->mac.raw != 2)
 			BUGMSG(D_NORMAL, "arcnet_header: Yikes!  diff (%d) is not 2!\n",
-			       skb->nh.raw - skb->mac.raw);
+			       (int)(skb->nh.raw - skb->mac.raw));
 		return -2;	/* return error -- can't transmit yet! */
 	}
 	/* otherwise, we can just add the header as usual. */
@@ -514,7 +514,7 @@ static int arcnet_rebuild_header(struct sk_buff *skb)
 	if (skb->nh.raw - skb->mac.raw != 2) {
 		BUGMSG(D_NORMAL,
 		     "rebuild_header: shouldn't be here! (hdrsize=%d)\n",
-		       skb->nh.raw - skb->mac.raw);
+		     (int)(skb->nh.raw - skb->mac.raw));
 		return 0;
 	}
 	type = *(uint16_t *) skb_pull(skb, 2);

@@ -188,9 +188,9 @@ static void cleanup_adapter(diva_um_idi_adapter_t * a)
    ------------------------------------------------------------------------ */
 static void cleanup_entity(divas_um_idi_entity_t * e)
 {
-	e->os_ref = 0;
+	e->os_ref = NULL;
 	e->status = 0;
-	e->adapter = 0;
+	e->adapter = NULL;
 	e->e.Id = 0;
 	e->rc_count = 0;
 
@@ -218,20 +218,20 @@ void *divas_um_idi_create_entity(dword adapter_nr, void *file)
 		     diva_os_malloc(0, diva_os_get_context_size()))) {
 			DBG_LOG(("E(%08x) no memory for os context", e));
 			diva_os_free(0, e);
-			return (0);
+			return NULL;
 		}
 		memset(e->os_context, 0x00, diva_os_get_context_size());
 
 		if ((diva_data_q_init(&e->data, 2048 + 512, 16))) {
 			diva_os_free(0, e->os_context);
 			diva_os_free(0, e);
-			return (0);
+			return NULL;
 		}
 		if ((diva_data_q_init(&e->rc, sizeof(diva_um_idi_ind_hdr_t), 2))) {
 			diva_data_q_finit(&e->data);
 			diva_os_free(0, e->os_context);
 			diva_os_free(0, e);
-			return (0);
+			return NULL;
 		}
 
 		diva_os_enter_spin_lock(&adapter_lock, &old_irql, "create_entity");
@@ -250,7 +250,7 @@ void *divas_um_idi_create_entity(dword adapter_nr, void *file)
 			diva_os_free(0, e->os_context);
 			diva_os_free(0, e);
 
-			return (0);
+			return NULL;
 		}
 
 		e->os_ref = file;	/* link to os handle */
@@ -608,9 +608,9 @@ static int process_idi_request(divas_um_idi_entity_t * e,
 			e->e.IndCh = 0;
 			e->e.XNum = 0;
 			e->e.RNum = 0;
-			e->e.callback = 0;
-			e->e.X = 0;
-			e->e.R = 0;
+			e->e.callback = NULL;
+			e->e.X = NULL;
+			e->e.R = NULL;
 			write_return_code(e, ASSIGN_RC | OUT_OF_RESOURCES);
 			return (-2);
 		} else {
@@ -631,7 +631,7 @@ static int process_idi_rc(divas_um_idi_entity_t * e, byte rc)
 		if (rc != ASSIGN_OK) {
 			DBG_ERR(("A: A(%d) E(%08x) ASSIGN failed",
 				 e->adapter->adapter_nr, e));
-			e->e.callback = 0;
+			e->e.callback = NULL;
 			e->e.Id = 0;
 			e->e.Req = 0;
 			e->e.ReqCh = 0;
@@ -639,8 +639,8 @@ static int process_idi_rc(divas_um_idi_entity_t * e, byte rc)
 			e->e.RcCh = 0;
 			e->e.Ind = 0;
 			e->e.IndCh = 0;
-			e->e.X = 0;
-			e->e.R = 0;
+			e->e.X = NULL;
+			e->e.R = NULL;
 			e->e.XNum = 0;
 			e->e.RNum = 0;
 		}
@@ -651,7 +651,7 @@ static int process_idi_rc(divas_um_idi_entity_t * e, byte rc)
 		return (0);	/* let us do it in the driver */
 	}
 	if ((e->e.Req == REMOVE) && (!e->e.Id)) {	/* REMOVE COMPLETE */
-		e->e.callback = 0;
+		e->e.callback = NULL;
 		e->e.Id = 0;
 		e->e.Req = 0;
 		e->e.ReqCh = 0;
@@ -659,8 +659,8 @@ static int process_idi_rc(divas_um_idi_entity_t * e, byte rc)
 		e->e.RcCh = 0;
 		e->e.Ind = 0;
 		e->e.IndCh = 0;
-		e->e.X = 0;
-		e->e.R = 0;
+		e->e.X = NULL;
+		e->e.R = NULL;
 		e->e.XNum = 0;
 		e->e.RNum = 0;
 		e->rc_count = 0;

@@ -55,6 +55,23 @@ typedef struct {
 	"jmp 1b\n" \
 	LOCK_SECTION_END
 
+#define spin_lock_string_flags \
+	"\n1:\t" \
+	"lock ; decb %0\n\t" \
+	"js 2f\n\t" \
+	LOCK_SECTION_START("") \
+	"2:\t" \
+	"testl $0x200, %1\n\t" \
+	"jz 3f\n\t" \
+	"sti\n\t" \
+	"3:\t" \
+	"rep;nop\n\t" \
+	"cmpb $0, %0\n\t" \
+	"jle 3b\n\t" \
+	"cli\n\t" \
+	"jmp 1b\n" \
+	LOCK_SECTION_END
+
 /*
  * This works. Despite all the confusion.
  * (except on PPro SMP or if we are using OOSTORE)
@@ -125,6 +142,20 @@ here:
 		:"=m" (lock->lock) : : "memory");
 }
 
+static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
+{
+#ifdef CONFIG_DEBUG_SPINLOCK
+	__label__ here;
+here:
+	if (unlikely(lock->magic != SPINLOCK_MAGIC)) {
+		printk("eip: %p\n", &&here);
+		BUG();
+	}
+#endif
+	__asm__ __volatile__(
+		spin_lock_string_flags
+		:"=m" (lock->lock) : "r" (flags) : "memory");
+}
 
 /*
  * Read-write spinlocks, allowing multiple readers

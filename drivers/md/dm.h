@@ -31,8 +31,6 @@
 
 #define SECTOR_SHIFT 9
 
-extern struct block_device_operations dm_blk_dops;
-
 /*
  * List of devices that a metadevice uses and should open/close.
  */
@@ -115,7 +113,6 @@ void dm_table_suspend_targets(struct dm_table *t);
 void dm_table_resume_targets(struct dm_table *t);
 int dm_table_any_congested(struct dm_table *t, int bdi_bits);
 void dm_table_unplug_all(struct dm_table *t);
-int dm_table_flush_all(struct dm_table *t);
 
 /*-----------------------------------------------------------------
  * A registry of target types.
@@ -179,9 +176,6 @@ void dm_linear_exit(void);
 
 int dm_stripe_init(void);
 void dm_stripe_exit(void);
-
-int kcopyd_init(void);
-void kcopyd_exit(void);
 
 void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size);
 

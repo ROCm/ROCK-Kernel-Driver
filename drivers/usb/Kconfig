@@ -7,7 +7,7 @@ menu "USB support"
 # ARM SA1111 chips have a non-PCI based "OHCI-compatible" USB host interface.
 config USB
 	tristate "Support for Host-side USB"
-	depends on PCI || SA1111 || ARCH_OMAP1510 || ARCH_OMAP1610
+	depends on PCI || SA1111 || ARCH_OMAP1510 || ARCH_OMAP1610 || ARCH_LH7A404
 	---help---
 	  Universal Serial Bus (USB) is a specification for a serial bus
 	  subsystem which offers higher speeds and more features than the

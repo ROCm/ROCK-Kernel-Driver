@@ -119,7 +119,7 @@ static void usb_b_out(struct st5481_bcs *bcs,int buf_nr)
 
 	DBG_ISO_PACKET(0x200,urb);
 
-	SUBMIT_URB(urb, GFP_KERNEL);
+	SUBMIT_URB(urb, GFP_NOIO);
 }
 
 /*
@@ -171,8 +171,8 @@ static void usb_b_out_complete(struct urb *urb, struct pt_regs *regs)
 	buf_nr = get_buf_nr(b_out->urb, urb);
 	test_and_clear_bit(buf_nr, &b_out->busy);
 
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
+	if (unlikely(urb->status < 0)) {
+		if (urb->status != -ENOENT && urb->status != -ESHUTDOWN) {
 			WARN("urb status %d",urb->status);
 			if (b_out->busy == 0) {
 				st5481_usb_pipe_reset(adapter, (bcs->channel+1)*2 | USB_DIR_OUT, NULL, NULL);
@@ -257,13 +257,18 @@ static void st5481B_mode(struct st5481_bcs *bcs, int mode)
 static int st5481_setup_b_out(struct st5481_bcs *bcs)
 {
 	struct usb_device *dev = bcs->adapter->usb_dev;
-	struct usb_host_interface *altsetting;
+	struct usb_interface *intf;
+	struct usb_host_interface *altsetting = NULL;
 	struct usb_host_endpoint *endpoint;
   	struct st5481_b_out *b_out = &bcs->b_out;
 
 	DBG(4,"");
 
-	altsetting = &(dev->config->interface[0]->altsetting[3]);
+	intf = usb_ifnum_to_if(dev, 0);
+	if (intf)
+		altsetting = usb_altnum_to_altsetting(intf, 3);
+	if (!altsetting)
+		return -ENXIO;
 
 	// Allocate URBs and buffers for the B channel out
 	endpoint = &altsetting->endpoint[EP_B1_OUT - 1 + bcs->channel * 2];

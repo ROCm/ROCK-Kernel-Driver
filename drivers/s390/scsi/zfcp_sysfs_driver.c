@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_DRIVER_C_REVISION "$Revision: 1.13.2.2 $"
+#define ZFCP_SYSFS_DRIVER_C_REVISION "$Revision: 1.14 $"
 
 #include "zfcp_ext.h"
 

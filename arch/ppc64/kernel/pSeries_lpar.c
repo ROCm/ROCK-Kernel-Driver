@@ -249,21 +249,6 @@ static unsigned char udbg_getcLP(void)
 	}
 }
 
-static int dummy_getc_poll(void)
-{
-	return -1;
-}
-                                                                                
-static unsigned char dummy_getc(void)
-{
-	return 0;
-}
-                                                                                
-static void dummy_putc(unsigned char c)
-{
-	return;
-}
-
 /* returns 0 if couldn't find or use /chosen/stdout as console */
 static int find_udbg_vterm(void)
 {
@@ -284,7 +269,7 @@ static int find_udbg_vterm(void)
 	}
 
 	/* now we have the stdout node; figure out what type of device it is. */
-	name = (char *)get_property(stdout_node, "name", 0);
+	name = (char *)get_property(stdout_node, "name", NULL);
 	if (!name) {
 		printk(KERN_WARNING "stdout node missing 'name' property!\n");
 		goto out;
@@ -292,7 +277,7 @@ static int find_udbg_vterm(void)
 
 	if (strncmp(name, "vty", 3) == 0) {
 		if (device_is_compatible(stdout_node, "hvterm1")) {
-			termno = (u32 *)get_property(stdout_node, "reg", 0);
+			termno = (u32 *)get_property(stdout_node, "reg", NULL);
 			if (termno) {
 				vtermno = termno[0];
 				ppc_md.udbg_putc = udbg_putcLP;
@@ -316,12 +301,6 @@ static int find_udbg_vterm(void)
 
 out:
 	of_node_put(stdout_node);
-
-	if (!found) {
-		ppc_md.udbg_putc = dummy_putc;
-		ppc_md.udbg_getc = dummy_getc;
-		ppc_md.udbg_getc_poll = dummy_getc_poll;
-	}
 	return found;
 }
 

@@ -39,7 +39,6 @@
 int shpchprm_init(enum php_ctlr_type ct);
 void shpchprm_cleanup(void);
 int shpchprm_print_pirt(void);
-void *shpchprm_get_slot(struct slot *slot);
 int shpchprm_find_available_resources(struct controller *ctrl);
 int shpchprm_set_hpp(struct controller *ctrl, struct pci_func *func, u8 card_type);
 void shpchprm_enable_card(struct controller *ctrl, struct pci_func *func, u8 card_type);

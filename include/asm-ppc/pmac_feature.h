@@ -273,6 +273,12 @@ static inline long pmac_call_feature(int selector, struct device_node* node,
  */
 #define PMAC_FTR_ENABLE_MPIC		PMAC_FTR_DEF(19)
 
+/* PMAC_FTR_AACK_DELAY_ENABLE	(NULL, int enable, 0)
+ *
+ * Enable/disable the AACK delay on the northbridge for systems using DFS
+ */
+#define PMAC_FTR_AACK_DELAY_ENABLE     	PMAC_FTR_DEF(20)
+
 
 /* Don't use those directly, they are for the sake of pmac_setup.c */
 extern long pmac_do_feature_call(unsigned int selector, ...);

@@ -147,7 +147,7 @@ extern void cb_pic_init_irqs (void);
 #define CB_UART_REG_GAP 	0x10
 #define CB_UART_CLOCK   	0x16000000
 
-/* CompactFlash setting see also asm/ide.h, asm/hdreg.h.  */
+/* CompactFlash setting */
 #define CB_CF_BASE     		0x0FE0C000
 #define CB_CF_CCR_ADDR 		(CB_CF_BASE+0x200)
 #define CB_CF_CCR      		(*(volatile u8 *)CB_CF_CCR_ADDR)

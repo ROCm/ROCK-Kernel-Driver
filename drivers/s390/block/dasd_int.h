@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.56.2.4 $
+ * $Revision: 1.60 $
  */
 
 #ifndef DASD_INT_H
@@ -15,7 +15,7 @@
 #ifdef __KERNEL__
 
 /* erp debugging in dasd.c and dasd_3990_erp.c */
-/* #define ERP_DEBUG */
+#define ERP_DEBUG
 
 
 /* we keep old device allocation scheme; IOW, minors are still in 0..255 */

@@ -59,10 +59,10 @@ struct cpuinfo_x86 {
 	char	x86_model_id[64];
 	int 	x86_cache_size;  /* in KB - valid for CPUS which support this
 				    call  */
+	int 	x86_cache_alignment;	/* In bytes */
 	int	fdiv_bug;
 	int	f00f_bug;
 	int	coma_bug;
-	int	x86_cache_alignment;
 	unsigned long loops_per_jiffy;
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
@@ -259,14 +259,8 @@ static inline void clear_in_cr4 (unsigned long mask)
 
 /*
  * Bus types (default is ISA, but people can check others with these..)
- * pc98 indicates PC98 systems (CBUS)
  */
 extern int MCA_bus;
-#ifdef CONFIG_X86_PC9800
-#define pc98 1
-#else
-#define pc98 0
-#endif
 
 static inline void __monitor(const void *eax, unsigned long ecx,
 		unsigned long edx)
@@ -300,13 +294,12 @@ extern unsigned int mca_pentium_flag;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(current->map_base)
-#define __TASK_UNMAPPED_BASE PAGE_ALIGN(TASK_SIZE/3)
+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
 /*
- * Size of io_bitmap, covering ports 0 to 0x3ff.
+ * Size of io_bitmap.
  */
-#define IO_BITMAP_BITS  1024
+#define IO_BITMAP_BITS  65536
 #define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
@@ -334,7 +327,7 @@ struct i387_fxsave_struct {
 	long	foo;
 	long	fos;
 	long	mxcsr;
-	long	reserved;
+	long	mxcsr_mask;
 	long	st_space[32];	/* 8*16 bytes for each FP-reg = 128 bytes */
 	long	xmm_space[32];	/* 8*16 bytes for each XMM-reg = 128 bytes */
 	long	padding[56];
@@ -398,12 +391,14 @@ struct tss_struct {
 	/*
 	 * pads the TSS to be cacheline-aligned (size is 0x100)
 	 */
-	unsigned long __cacheline_filler[5];
+	unsigned long __cacheline_filler[37];
 	/*
 	 * .. and then another 0x100 bytes for emergency kernel stack
 	 */
 	unsigned long stack[64];
 } __attribute__((packed));
+
+#define ARCH_MIN_TASKALIGN	16
 
 struct thread_struct {
 /* cached TLS descriptors. */
@@ -475,8 +470,6 @@ static inline void load_esp0(struct tss_struct *tss, struct thread_struct *threa
 /* Forward declaration, a strange C thing */
 struct task_struct;
 struct mm_struct;
-
-int mm_copy_segments(struct mm_struct *old_mm, struct mm_struct *mm);
 
 /* Free all resources held by a thread. */
 extern void release_thread(struct task_struct *);
@@ -649,6 +642,8 @@ extern inline void prefetchw(const void *x)
 #define spin_lock_prefetch(x)	prefetchw(x)
 
 extern void select_idle_routine(const struct cpuinfo_x86 *c);
+
+#define cache_line_size() (boot_cpu_data.x86_cache_alignment)
 
 #ifdef CONFIG_SCHED_SMT
 #define ARCH_HAS_SCHED_DOMAIN

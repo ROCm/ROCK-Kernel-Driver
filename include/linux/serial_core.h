@@ -16,8 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- *  $Id: serial_core.h,v 1.49 2002/07/20 18:06:32 rmk Exp $
  */
 
 /*
@@ -38,7 +36,8 @@
 #define PORT_16850	12
 #define PORT_RSA	13
 #define PORT_NS16550A	14
-#define PORT_MAX_8250	14	/* max port ID */
+#define PORT_XSCALE	15
+#define PORT_MAX_8250	15	/* max port ID */
 
 /*
  * ARM specific type numbers.  These are not currently guaranteed
@@ -60,14 +59,6 @@
 /* NEC v850.  */
 #define PORT_V850E_UART	40
 
-/* NEC PC-9800 */
-#define PORT_8251_PC98	41
-#define PORT_19K_PC98	42
-#define PORT_FIFO_PC98	43
-#define PORT_VFAST_PC98	44
-#define PORT_PC9861	45
-#define PORT_PC9801_101	46
-
 /* DZ */
 #define PORT_DZ		47
 
@@ -83,8 +74,20 @@
 #define PORT_SCIF	53
 #define PORT_IRDA	54
 
-/* IBM icom */
-#define PORT_ICOM	55
+/* Samsung S3C2410 SoC and derivatives thereof */
+#define PORT_S3C2410    55
+
+/* SGI IP22 aka Indy / Challenge S / Indigo 2 */
+#define PORT_IP22ZILOG	56
+
+/* Sharp LH7a40x -- an ARM9 SoC series */
+#define PORT_LH7A40X	57
+
+/* PPC CPM type number */
+#define PORT_CPM        58
+
+/* MPC52xx type numbers */
+#define PORT_MPC52xx	59
 
 #ifdef __KERNEL__
 
@@ -186,7 +189,6 @@ struct uart_port {
 
 	unsigned int		flags;
 
-#define UPF_HUP_NOTIFY		(1 << 0)
 #define UPF_FOURPORT		(1 << 1)
 #define UPF_SAK			(1 << 2)
 #define UPF_SPD_MASK		(0x1030)
@@ -206,7 +208,6 @@ struct uart_port {
 #define UPF_CONS_FLOW		(1 << 23)
 #define UPF_SHARE_IRQ		(1 << 24)
 #define UPF_BOOT_AUTOCONF	(1 << 28)
-#define UPF_RESOURCES		(1 << 30)
 #define UPF_IOREMAP		(1 << 31)
 
 #define UPF_CHANGE_MASK		(0x17fff)

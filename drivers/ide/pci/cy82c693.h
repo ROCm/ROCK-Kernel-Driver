@@ -70,23 +70,13 @@ static void init_iops_cy82c693(ide_hwif_t *);
 
 static ide_pci_device_t cy82c693_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_CONTAQ,
-		.device		= PCI_DEVICE_ID_CONTAQ_82C693,
 		.name		= "CY82C693",
 		.init_chipset	= init_chipset_cy82c693,
 		.init_iops	= init_iops_cy82c693,
 		.init_hwif	= init_hwif_cy82c693,
-		.init_dma	= NULL,
 		.channels	= 1,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

@@ -436,48 +436,57 @@ _GLOBAL(__copy_tofrom_user)
 73:	stwu	r9,4(r6)
 	bdnz	72b
 
-58:	srwi.	r0,r5,LG_CACHELINE_BYTES /* # complete cachelines */
-	clrlwi	r5,r5,32-LG_CACHELINE_BYTES
-	li	r11,4
-	beq	63f
-
-#if !defined(CONFIG_8xx)
-	/* Here we decide how far ahead to prefetch the source */
-#if MAX_COPY_PREFETCH > 1
-	/* Heuristically, for large transfers we prefetch
-	   MAX_COPY_PREFETCH cachelines ahead.  For small transfers
-	   we prefetch 1 cacheline ahead. */
-	cmpwi	r0,MAX_COPY_PREFETCH
-	li	r7,1
-	li	r3,4
-	ble	111f
-	li	r7,MAX_COPY_PREFETCH
-111:	mtctr	r7
-112:	dcbt	r3,r4
-	addi	r3,r3,CACHELINE_BYTES
-	bdnz	112b
-#else /* MAX_COPY_PREFETCH == 1 */
-	li	r3,CACHELINE_BYTES + 4
-	dcbt	r11,r4
-#endif /* MAX_COPY_PREFETCH */
-#endif /* CONFIG_8xx */
-
-	mtctr	r0
-53:
-#if !defined(CONFIG_8xx)
-	dcbt	r3,r4
-54:	dcbz	r11,r6
-#endif
-/* had to move these to keep extable in order */
 	.section __ex_table,"a"
 	.align	2
 	.long	70b,100f
 	.long	71b,101f
 	.long	72b,102f
 	.long	73b,103f
-#if !defined(CONFIG_8xx)
+	.text
+
+58:	srwi.	r0,r5,LG_CACHELINE_BYTES /* # complete cachelines */
+	clrlwi	r5,r5,32-LG_CACHELINE_BYTES
+	li	r11,4
+	beq	63f
+
+#ifdef CONFIG_8xx
+	/* Don't use prefetch on 8xx */
+	mtctr	r0
+53:	COPY_16_BYTES_WITHEX(0)
+	bdnz	53b
+
+#else /* not CONFIG_8xx */
+	/* Here we decide how far ahead to prefetch the source */
+	li	r3,4
+	cmpwi	r0,1
+	li	r7,0
+	ble	114f
+	li	r7,1
+#if MAX_COPY_PREFETCH > 1
+	/* Heuristically, for large transfers we prefetch
+	   MAX_COPY_PREFETCH cachelines ahead.  For small transfers
+	   we prefetch 1 cacheline ahead. */
+	cmpwi	r0,MAX_COPY_PREFETCH
+	ble	112f
+	li	r7,MAX_COPY_PREFETCH
+112:	mtctr	r7
+111:	dcbt	r3,r4
+	addi	r3,r3,CACHELINE_BYTES
+	bdnz	111b
+#else
+	dcbt	r3,r4
+	addi	r3,r3,CACHELINE_BYTES
+#endif /* MAX_COPY_PREFETCH > 1 */
+
+114:	subf	r8,r7,r0
+	mr	r0,r7
+	mtctr	r8
+
+53:	dcbt	r3,r4
+54:	dcbz	r11,r6
+	.section __ex_table,"a"
+	.align	2
 	.long	54b,105f
-#endif
 	.text
 /* the main body of the cacheline loop */
 	COPY_16_BYTES_WITHEX(0)
@@ -495,6 +504,11 @@ _GLOBAL(__copy_tofrom_user)
 #endif
 #endif
 	bdnz	53b
+	cmpwi	r0,0
+	li	r3,4
+	li	r7,0
+	bne	114b
+#endif /* CONFIG_8xx */
 
 63:	srwi.	r0,r5,2
 	mtctr	r0

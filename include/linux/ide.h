@@ -20,7 +20,6 @@
 #include <linux/pci.h>
 #include <asm/byteorder.h>
 #include <asm/system.h>
-#include <asm/hdreg.h>
 #include <asm/io.h>
 #include <asm/semaphore.h>
 
@@ -216,8 +215,6 @@ typedef unsigned char	byte;	/* used everywhere */
 #define SECTOR_SIZE	512
 #define SECTOR_WORDS	(SECTOR_SIZE / 4)	/* number of 32bit words per sector */
 #define IDE_LARGE_SEEK(b1,b2,t)	(((b1) > (b2) + (t)) || ((b2) > (b1) + (t)))
-#define IDE_MIN(a,b)	((a)<(b) ? (a):(b))
-#define IDE_MAX(a,b)	((a)>(b) ? (a):(b))
 
 /*
  * Timeouts for various operations:
@@ -258,7 +255,7 @@ typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 		ide_pdc4030,	ide_rz1000,	ide_trm290,
 		ide_cmd646,	ide_cy82c693,	ide_4drives,
 		ide_pmac,	ide_etrax100,	ide_acorn,
-		ide_pc9800,	ide_forced
+		ide_forced
 } hwif_chipset_t;
 
 /*
@@ -294,7 +291,62 @@ void ide_setup_ports(	hw_regs_t *hw,
 #endif
 			int irq);
 
+static inline void ide_std_init_ports(hw_regs_t *hw,
+				      unsigned long io_addr,
+				      unsigned long ctl_addr)
+{
+	unsigned int i;
+
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
+		hw->io_ports[i] = io_addr++;
+
+	hw->io_ports[IDE_CONTROL_OFFSET] = ctl_addr;
+}
+
 #include <asm/ide.h>
+
+/* needed on alpha, x86/x86_64, ia64, mips, ppc32 and sh */
+#ifndef IDE_ARCH_OBSOLETE_DEFAULTS
+# define ide_default_io_base(index)	(0)
+# define ide_default_irq(base)		(0)
+# define ide_init_default_irq(base)	(0)
+#endif
+
+/*
+ * ide_init_hwif_ports() is OBSOLETE and will be removed in 2.7 series.
+ * New ports shouldn't define IDE_ARCH_OBSOLETE_INIT in <asm/ide.h>.
+ */
+#ifdef IDE_ARCH_OBSOLETE_INIT
+static inline void ide_init_hwif_ports(hw_regs_t *hw,
+				       unsigned long io_addr,
+				       unsigned long ctl_addr,
+				       int *irq)
+{
+	if (!ctl_addr)
+		ide_std_init_ports(hw, io_addr, ide_default_io_ctl(io_addr));
+	else
+		ide_std_init_ports(hw, io_addr, ctl_addr);
+
+	if (irq)
+		*irq = 0;
+
+	hw->io_ports[IDE_IRQ_OFFSET] = 0;
+
+#ifdef CONFIG_PPC32
+	if (ppc_ide_md.ide_init_hwif)
+		ppc_ide_md.ide_init_hwif(hw, io_addr, ctl_addr, irq);
+#endif
+}
+#else
+static inline void ide_init_hwif_ports(hw_regs_t *hw,
+				       unsigned long io_addr,
+				       unsigned long ctl_addr,
+				       int *irq)
+{
+	if (io_addr || ctl_addr)
+		printk(KERN_WARNING "%s: must not be called\n", __FUNCTION__);
+}
+#endif /* IDE_ARCH_OBSOLETE_INIT */
 
 /* Currently only m68k, apus and m8xx need it */
 #ifndef IDE_ARCH_ACK_INTR
@@ -638,7 +690,6 @@ typedef union {
 typedef enum {
 	ide_stopped,	/* no drive operation was started */
 	ide_started,	/* a drive operation was started, handler was set */
-	ide_released,	/* as ide_started, but bus also released */
 } ide_startstop_t;
 
 struct ide_driver_s;
@@ -672,7 +723,6 @@ typedef struct ide_drive_s {
 	u8	keep_settings;		/* restore settings after drive reset */
 	u8	autodma;		/* device can safely use dma on host */
 	u8	using_dma;		/* disk is using dma for read/write */
-	u8	using_tcq;		/* disk is using queueing */
 	u8	retry_pio;		/* retrying dma capable host in pio */
 	u8	state;			/* retry state */
 	u8	waiting_for_dma;	/* dma currently in progress */
@@ -699,6 +749,7 @@ typedef struct ide_drive_s {
 	unsigned remap_0_to_1	: 1;	/* 0=noremap, 1=remap 0->1 (for EZDrive) */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */
+	unsigned stroke		: 1;	/* from:  hdx=stroke */
 	unsigned addressing;		/*      : 3;
 					 *  0=28-bit
 					 *  1=48-bit
@@ -729,8 +780,6 @@ typedef struct ide_drive_s {
 	u8	sect;		/* "real" sectors per track */
 	u8	bios_head;	/* BIOS/fdisk/LILO number of heads */
 	u8	bios_sect;	/* BIOS/fdisk/LILO sectors per track */
-	u8	queue_depth;	/* max queue depth */
-	u8	doing_barrier;	/* state, 1=currently doing flush */
 
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
@@ -784,30 +833,14 @@ typedef struct ide_dma_ops_s {
 #define ide_rq_offset(rq) \
 	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
 
-/*
- * taskfiles really should use hard_cur_sectors as well!
- */
-#define task_rq_offset(rq) \
-	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
-
 static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 {
-	/*
-	 * fs request
-	 */
-	if (rq->bio)
-		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-
-	/*
-	 * task request
-	 */
-	return rq->buffer + task_rq_offset(rq);
+	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
 }
 
 static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
 {
-	if (rq->bio)
-		bio_kunmap_irq(buffer, flags);
+	bio_kunmap_irq(buffer, flags);
 }
 #endif /* !CONFIG_IDE_TASKFILE_IO */
 
@@ -1044,7 +1077,6 @@ typedef struct ide_settings_s {
 
 extern struct semaphore ide_setting_sem;
 extern int ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
-extern void ide_remove_setting(ide_drive_t *drive, char *name);
 extern ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
 extern int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
 extern int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);
@@ -1065,7 +1097,6 @@ extern struct proc_dir_entry *proc_ide_root;
 
 extern void proc_ide_create(void);
 extern void proc_ide_destroy(void);
-extern void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 extern void destroy_proc_ide_drives(ide_hwif_t *);
 extern void create_proc_ide_interfaces(void);
 extern void ide_add_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *, void *);
@@ -1262,11 +1293,6 @@ extern ide_startstop_t ide_do_reset (ide_drive_t *);
 extern void ide_init_drive_cmd (struct request *rq);
 
 /*
- * this function returns error location sector offset in case of a write error
- */
-extern u64 ide_get_error_location(ide_drive_t *, char *);
-
-/*
  * "action" parameter type for ide_do_drive_cmd() below.
  */
 typedef enum {
@@ -1312,6 +1338,8 @@ extern int ide_do_drive_cmd(ide_drive_t *, struct request *, ide_action_t);
  * (ide_drive_t *drive, u8 stat, u8 err)
  */
 extern void ide_end_drive_cmd(ide_drive_t *, u8, u8);
+
+extern void try_to_flush_leftover_data(ide_drive_t *);
 
 /*
  * Issue ATA command and wait for completion.
@@ -1371,42 +1399,32 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
-#ifdef CONFIG_IDE_TASKFILE_IO
-
 #define IDE_PIO_IN	0
 #define IDE_PIO_OUT	1
 
-static inline void task_sectors(ide_drive_t *drive, struct request *rq,
-				unsigned nsect, int rw)
+static inline void __task_sectors(ide_drive_t *drive, char *buf,
+				  unsigned nsect, unsigned rw)
 {
-	unsigned long flags;
-	unsigned int bio_rq;
-	char *buf;
-
-	/*
-	 * bio_rq flag is needed because we can call
-	 * rq_unmap_buffer() with rq->cbio == NULL
-	 */
-	bio_rq = rq->cbio ? 1 : 0;
-
-	if (bio_rq)
-		buf = rq_map_buffer(rq, &flags);	/* fs request */
-	else
-		buf = rq->buffer + blk_rq_offset(rq);	/* task request */
-
 	/*
 	 * IRQ can happen instantly after reading/writing
 	 * last sector of the datablock.
 	 */
-	process_that_request_first(rq, nsect);
-
 	if (rw == IDE_PIO_OUT)
 		taskfile_output_data(drive, buf, nsect * SECTOR_WORDS);
 	else
 		taskfile_input_data(drive, buf, nsect * SECTOR_WORDS);
+}
 
-	if (bio_rq)
-		rq_unmap_buffer(buf, &flags);
+#ifdef CONFIG_IDE_TASKFILE_IO
+static inline void task_bio_sectors(ide_drive_t *drive, struct request *rq,
+				    unsigned nsect, unsigned rw)
+{
+	unsigned long flags;
+	char *buf = rq_map_buffer(rq, &flags);
+
+	process_that_request_first(rq, nsect);
+	__task_sectors(drive, buf, nsect, rw);
+	rq_unmap_buffer(buf, &flags);
 }
 #endif /* CONFIG_IDE_TASKFILE_IO */
 
@@ -1440,7 +1458,6 @@ int ide_taskfile_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_cmd_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_task_ioctl(ide_drive_t *, unsigned int, unsigned long);
 
-extern void ide_delay_50ms(void);
 extern int system_bus_clock(void);
 
 extern u8 ide_auto_reduce_xfer(ide_drive_t *);
@@ -1473,9 +1490,6 @@ extern void ide_timer_expiry(unsigned long);
 extern irqreturn_t ide_intr(int irq, void *dev_id, struct pt_regs *regs);
 extern void do_ide_request(request_queue_t *);
 extern void ide_init_subdrivers(void);
-
-extern void ide_pin_hwgroup(ide_drive_t *);
-extern void ide_unpin_hwgroup(ide_drive_t *);
 
 extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
@@ -1512,7 +1526,6 @@ int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 #define NODMA 0
 #define NOAUTODMA 1
 #define AUTODMA 2
-#define EOL 255
 
 typedef struct ide_pci_enablebit_s {
 	u8	reg;	/* byte pci reg holding the enable-bit */
@@ -1520,9 +1533,15 @@ typedef struct ide_pci_enablebit_s {
 	u8	val;	/* value of masked reg when "enabled" */
 } ide_pci_enablebit_t;
 
+enum {
+	/* Uses ISA control ports not PCI ones. */
+	IDEPCI_FLAG_ISA_PORTS		= (1 << 0),
+
+	IDEPCI_FLAG_FORCE_MASTER	= (1 << 1),
+	IDEPCI_FLAG_FORCE_PDC		= (1 << 2),
+};
+
 typedef struct ide_pci_device_s {
-	u16			vendor;
-	u16			device;
 	char			*name;
 	void			(*init_setup)(struct pci_dev *, struct ide_pci_device_s *);
 	void			(*init_setup_dma)(struct pci_dev *, struct ide_pci_device_s *, ide_hwif_t *);
@@ -1536,7 +1555,7 @@ typedef struct ide_pci_device_s {
 	u8			bootable;
 	unsigned int		extra;
 	struct ide_pci_device_s	*next;
-	u8			isa_ports; 	/* Uses ISA control ports not PCI ones */
+	u8			flags;
 } ide_pci_device_t;
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
@@ -1574,14 +1593,6 @@ extern int __ide_dma_verbose(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-extern int __ide_dma_queued_on(ide_drive_t *drive);
-extern int __ide_dma_queued_off(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
-#endif
 
 #else
 static inline int __ide_dma_off(ide_drive_t *drive) { return 0; }
@@ -1651,35 +1662,6 @@ extern struct semaphore ide_cfg_sem;
 
 #define local_irq_set(flags)	do { local_save_flags((flags)); local_irq_enable(); } while (0)
 
-#define IDE_MAX_TAG	32
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-static inline int ata_pending_commands(ide_drive_t *drive)
-{
-	if (drive->using_tcq)
-		return blk_queue_tag_depth(drive->queue);
-
-	return 0;
-}
-
-static inline int ata_can_queue(ide_drive_t *drive)
-{
-	if (drive->using_tcq)
-		return blk_queue_tag_queue(drive->queue);
-
-	return 1;
-}
-#else
-#define ata_pending_commands(drive)	(0)
-#define ata_can_queue(drive)		(1)
-#endif
-
 extern struct bus_type ide_bus_type;
-
-/* check if CACHE FLUSH (EXT) command is supported (bits defined in ATA-6) */
-#define ide_id_has_flush_cache(id)	((id)->cfs_enable_2 & 0x3000)
-
-/* some Maxtor disks have bit 13 defined incorrectly so check bit 10 too */
-#define ide_id_has_flush_cache_ext(id)	\
-	(((id)->cfs_enable_2 & 0x2400) == 0x2400)
 
 #endif /* _IDE_H */

@@ -25,7 +25,7 @@ typedef struct {
 	unsigned char	(*getchar)(void);	/* Get char from input device */ 
 	void		(*putchar)(char);	/* Put char to output device */
 	int		(*mayget)(void);	/* Maybe get char, or -1 */
-	int		(*mayput)(void);	/* Maybe put char, or -1 */
+	int		(*mayput)(int);		/* Maybe put char, or -1 */
 	unsigned char	*echo;			/* Should getchar echo? */
 	unsigned char	*insource;		/* Input source selector */
 	unsigned char	*outsink;		/* Output sink selector */

@@ -3,7 +3,7 @@
  * Copyright (C) 2001 Mark Langsdorf (mark.langsdorf@amd.com)
  *	based on sc520cdp.c by Sysgo Real-Time Solutions GmbH
  *
- * $Id: netsc520.c,v 1.9 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: netsc520.c,v 1.10 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -84,7 +84,7 @@ static struct mtd_partition partition_info[]={
 static struct map_info netsc520_map = {
 	.name = "netsc520 Flash Bank",
 	.size = WINDOW_SIZE,
-	.buswidth = 4,
+	.bankwidth = 4,
 	.phys = WINDOW_ADDR,
 };
 

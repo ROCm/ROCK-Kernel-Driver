@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -304,33 +304,33 @@ set EXC_D2,		EXC_DREGS+(2*4)
 set EXC_D1,		EXC_DREGS+(1*4)
 set EXC_D0,		EXC_DREGS+(0*4)
 
-set EXC_FP0, 		EXC_FPREGS+(0*12)	# offset of saved fp0
-set EXC_FP1, 		EXC_FPREGS+(1*12)	# offset of saved fp1
-set EXC_FP2, 		EXC_FPREGS+(2*12)	# offset of saved fp2 (not used)
+set EXC_FP0,		EXC_FPREGS+(0*12)	# offset of saved fp0
+set EXC_FP1,		EXC_FPREGS+(1*12)	# offset of saved fp1
+set EXC_FP2,		EXC_FPREGS+(2*12)	# offset of saved fp2 (not used)
 
-set FP_SCR1, 		LV+80			# fp scratch 1
-set FP_SCR1_EX, 	FP_SCR1+0
+set FP_SCR1,		LV+80			# fp scratch 1
+set FP_SCR1_EX,		FP_SCR1+0
 set FP_SCR1_SGN,	FP_SCR1+2
-set FP_SCR1_HI, 	FP_SCR1+4
-set FP_SCR1_LO, 	FP_SCR1+8
+set FP_SCR1_HI,		FP_SCR1+4
+set FP_SCR1_LO,		FP_SCR1+8
 
-set FP_SCR0, 		LV+68			# fp scratch 0
-set FP_SCR0_EX, 	FP_SCR0+0
+set FP_SCR0,		LV+68			# fp scratch 0
+set FP_SCR0_EX,		FP_SCR0+0
 set FP_SCR0_SGN,	FP_SCR0+2
-set FP_SCR0_HI, 	FP_SCR0+4
-set FP_SCR0_LO, 	FP_SCR0+8
+set FP_SCR0_HI,		FP_SCR0+4
+set FP_SCR0_LO,		FP_SCR0+8
 
-set FP_DST, 		LV+56			# fp destination operand
-set FP_DST_EX, 		FP_DST+0
+set FP_DST,		LV+56			# fp destination operand
+set FP_DST_EX,		FP_DST+0
 set FP_DST_SGN,		FP_DST+2
-set FP_DST_HI, 		FP_DST+4
-set FP_DST_LO, 		FP_DST+8
+set FP_DST_HI,		FP_DST+4
+set FP_DST_LO,		FP_DST+8
 
-set FP_SRC, 		LV+44			# fp source operand
-set FP_SRC_EX, 		FP_SRC+0
+set FP_SRC,		LV+44			# fp source operand
+set FP_SRC_EX,		FP_SRC+0
 set FP_SRC_SGN,		FP_SRC+2
-set FP_SRC_HI, 		FP_SRC+4
-set FP_SRC_LO, 		FP_SRC+8
+set FP_SRC_HI,		FP_SRC+4
+set FP_SRC_LO,		FP_SRC+8
 
 set USER_FPIAR,		LV+40			# FP instr address register
 
@@ -354,7 +354,7 @@ set EXC_TEMP2,		LV+24			# temporary space
 set EXC_TEMP,		LV+16			# temporary space
 
 set DTAG,		LV+15			# destination operand type
-set STAG, 		LV+14			# source operand type
+set STAG,		LV+14			# source operand type
 
 set SPCOND_FLG,		LV+10			# flag: special case (see below)
 
@@ -369,17 +369,17 @@ set EXC_OPWORD,		LV+0			# saved operation word
 # Helpful macros
 
 set FTEMP,		0			# offsets within an
-set FTEMP_EX, 		0			# extended precision
+set FTEMP_EX,		0			# extended precision
 set FTEMP_SGN,		2			# value saved in memory.
-set FTEMP_HI, 		4
-set FTEMP_LO, 		8
+set FTEMP_HI,		4
+set FTEMP_LO,		8
 set FTEMP_GRS,		12
 
 set LOCAL,		0			# offsets within an
-set LOCAL_EX, 		0			# extended precision 
+set LOCAL_EX,		0			# extended precision
 set LOCAL_SGN,		2			# value saved in memory.
-set LOCAL_HI, 		4
-set LOCAL_LO, 		8
+set LOCAL_HI,		4
+set LOCAL_LO,		8
 set LOCAL_GRS,		12
 
 set DST,		0			# offsets within an
@@ -469,17 +469,17 @@ set ainex_mask,		0x00000008		# accrued inexact
 ######################################
 set dzinf_mask,		inf_mask+dz_mask+adz_mask
 set opnan_mask,		nan_mask+operr_mask+aiop_mask
-set nzi_mask,		0x01ffffff 		#clears N, Z, and I
+set nzi_mask,		0x01ffffff		#clears N, Z, and I
 set unfinx_mask,	unfl_mask+inex2_mask+aunfl_mask+ainex_mask
 set unf2inx_mask,	unfl_mask+inex2_mask+ainex_mask
 set ovfinx_mask,	ovfl_mask+inex2_mask+aovfl_mask+ainex_mask
 set inx1a_mask,		inex1_mask+ainex_mask
 set inx2a_mask,		inex2_mask+ainex_mask
-set snaniop_mask, 	nan_mask+snan_mask+aiop_mask
+set snaniop_mask,	nan_mask+snan_mask+aiop_mask
 set snaniop2_mask,	snan_mask+aiop_mask
 set naniop_mask,	nan_mask+aiop_mask
 set neginf_mask,	neg_mask+inf_mask
-set infaiop_mask, 	inf_mask+aiop_mask
+set infaiop_mask,	inf_mask+aiop_mask
 set negz_mask,		neg_mask+z_mask
 set opaop_mask,		operr_mask+aiop_mask
 set unfl_inx_mask,	unfl_mask+aunfl_mask+ainex_mask
@@ -508,8 +508,8 @@ set rp_mode,		0x3			# round-to-plus-infinity
 set mantissalen,	64			# length of mantissa in bits
 
 set BYTE,		1			# len(byte) == 1 byte
-set WORD, 		2			# len(word) == 2 bytes
-set LONG, 		4			# len(longword) == 2 bytes
+set WORD,		2			# len(word) == 2 bytes
+set LONG,		4			# len(longword) == 2 bytes
 
 set BSUN_VEC,		0xc0			# bsun    vector offset
 set INEX_VEC,		0xc4			# inexact vector offset
@@ -4903,7 +4903,7 @@ _L23_6x:
 #	d0 = round precision,mode					#
 #									#
 # OUTPUT ************************************************************** #
-#	fp0 = sin(X) or cos(X) 						#
+#	fp0 = sin(X) or cos(X)						#
 #									#
 #    For ssincos(X):							#
 #	fp0 = sin(X)							#
@@ -4911,7 +4911,7 @@ _L23_6x:
 #									#
 # ACCURACY and MONOTONICITY ******************************************* #
 #	The returned result is within 1 ulp in 64 significant bit, i.e.	#
-#	within 0.5001 ulp to 53 bits if the result is subsequently 	#
+#	within 0.5001 ulp to 53 bits if the result is subsequently	#
 #	rounded to double precision. The result is provably monotonic	#
 #	in double precision.						#
 #									#
@@ -4928,8 +4928,8 @@ _L23_6x:
 #									#
 #	4. If k is even, go to 6.					#
 #									#
-#	5. (k is odd) Set j := (k-1)/2, sgn := (-1)**j. 		#
-#		Return sgn*cos(r) where cos(r) is approximated by an 	#
+#	5. (k is odd) Set j := (k-1)/2, sgn := (-1)**j.			#
+#		Return sgn*cos(r) where cos(r) is approximated by an	#
 #		even polynomial in r, 1 + r*r*(B1+s*(B2+ ... + s*B8)),	#
 #		s = r*r.						#
 #		Exit.							#
@@ -4941,10 +4941,10 @@ _L23_6x:
 #									#
 #	7. If |X| > 1, go to 9.						#
 #									#
-#	8. (|X|<2**(-40)) If SIN is invoked, return X; 			#
+#	8. (|X|<2**(-40)) If SIN is invoked, return X;			#
 #		otherwise return 1.					#
 #									#
-#	9. Overwrite X by X := X rem 2Pi. Now that |X| <= Pi, 		#
+#	9. Overwrite X by X := X rem 2Pi. Now that |X| <= Pi,		#
 #		go back to 3.						#
 #									#
 #	SINCOS:								#
@@ -4959,19 +4959,19 @@ _L23_6x:
 #		j1 exclusive or with the l.s.b. of k.			#
 #		sgn1 := (-1)**j1, sgn2 := (-1)**j2.			#
 #		SIN(X) = sgn1 * cos(r) and COS(X) = sgn2*sin(r) where	#
-#		sin(r) and cos(r) are computed as odd and even 		#
+#		sin(r) and cos(r) are computed as odd and even		#
 #		polynomials in r, respectively. Exit			#
 #									#
 #	5. (k is even) Set j1 := k/2, sgn1 := (-1)**j1.			#
 #		SIN(X) = sgn1 * sin(r) and COS(X) = sgn1*cos(r) where	#
-#		sin(r) and cos(r) are computed as odd and even 		#
+#		sin(r) and cos(r) are computed as odd and even		#
 #		polynomials in r, respectively. Exit			#
 #									#
 #	6. If |X| > 1, go to 8.						#
 #									#
 #	7. (|X|<2**(-40)) SIN(X) = X and COS(X) = 1. Exit.		#
 #									#
-#	8. Overwrite X by X := X rem 2Pi. Now that |X| <= Pi, 		#
+#	8. Overwrite X by X := X rem 2Pi. Now that |X| <= Pi,		#
 #		go back to 2.						#
 #									#
 #########################################################################
@@ -5046,9 +5046,9 @@ SOK1:
 #--THE ARGUMENT REDUCTION IS DONE BY TABLE LOOK UP.
 SINMAIN:
 	fmov.x		%fp0,%fp1
-	fmul.d		TWOBYPI(%pc),%fp1 	# X*2/PI
+	fmul.d		TWOBYPI(%pc),%fp1	# X*2/PI
 
-	lea		PITBL+0x200(%pc),%a1 	# TABLE OF N*PI/2, N = -32,...,32
+	lea		PITBL+0x200(%pc),%a1	# TABLE OF N*PI/2, N = -32,...,32
 
 	fmov.l		%fp1,INT(%a6)		# CONVERT TO INTEGER
 
@@ -5058,8 +5058,8 @@ SINMAIN:
 
 # A1 IS THE ADDRESS OF N*PIBY2
 # ...WHICH IS IN TWO PIECES Y1 & Y2
-	fsub.x		(%a1)+,%fp0 		# X-Y1
-	fsub.s		(%a1),%fp0 		# fp0 = R = (X-Y1)-Y2
+	fsub.x		(%a1)+,%fp0		# X-Y1
+	fsub.s		(%a1),%fp0		# fp0 = R = (X-Y1)-Y2
 
 SINCONT:
 #--continuation from REDUCEX
@@ -5213,7 +5213,7 @@ SINTINY:
 COSTINY:
 	fmov.s		&0x3F800000,%fp0	# fp0 = 1.0
 	fmov.l		%d0,%fpcr		# restore users round mode,prec
-	fadd.s 		&0x80800000,%fp0	# last inst - possible exception set
+	fadd.s		&0x80800000,%fp0	# last inst - possible exception set
 	bra		t_pinx2
 
 ################################################
@@ -5645,7 +5645,7 @@ SRESTORE:
 #									#
 #	7. (|X|<2**(-40)) Tan(X) = X. Exit.				#
 #									#
-#	8. Overwrite X by X := X rem 2Pi. Now that |X| <= Pi, go back 	#
+#	8. Overwrite X by X := X rem 2Pi. Now that |X| <= Pi, go back	#
 #		to 2.							#
 #									#
 #########################################################################
@@ -6048,27 +6048,27 @@ RESTORE:
 #	The returned result is within 2 ulps in	64 significant bit,	#
 #	i.e. within 0.5001 ulp to 53 bits if the result is subsequently	#
 #	rounded to double precision. The result is provably monotonic	#
-#	in double precision. 						#
+#	in double precision.						#
 #									#
 # ALGORITHM *********************************************************** #
 #	Step 1. If |X| >= 16 or |X| < 1/16, go to Step 5.		#
 #									#
-#	Step 2. Let X = sgn * 2**k * 1.xxxxxxxx...x. 			#
+#	Step 2. Let X = sgn * 2**k * 1.xxxxxxxx...x.			#
 #		Note that k = -4, -3,..., or 3.				#
-#		Define F = sgn * 2**k * 1.xxxx1, i.e. the first 5 	#
+#		Define F = sgn * 2**k * 1.xxxx1, i.e. the first 5	#
 #		significant bits of X with a bit-1 attached at the 6-th	#
 #		bit position. Define u to be u = (X-F) / (1 + X*F).	#
 #									#
 #	Step 3. Approximate arctan(u) by a polynomial poly.		#
 #									#
-#	Step 4. Return arctan(F) + poly, arctan(F) is fetched from a 	#
+#	Step 4. Return arctan(F) + poly, arctan(F) is fetched from a	#
 #		table of values calculated beforehand. Exit.		#
 #									#
 #	Step 5. If |X| >= 16, go to Step 7.				#
 #									#
 #	Step 6. Approximate arctan(X) by an odd polynomial in X. Exit.	#
 #									#
-#	Step 7. Define X' = -1/X. Approximate arctan(X') by an odd 	#
+#	Step 7. Define X' = -1/X. Approximate arctan(X') by an odd	#
 #		polynomial in X'.					#
 #		Arctan(X) = sign(X)*Pi/2 + arctan(X'). Exit.		#
 #									#
@@ -6334,7 +6334,7 @@ ATANMAIN:
 	fmul.x		%fp2,%fp1		# A1*U*V*(A2+V*(A3+V))
 	fadd.x		%fp1,%fp0		# ATAN(U), FP1 RELEASED
 
-	fmovm.x 	(%sp)+,&0x20		# restore fp2
+	fmovm.x		(%sp)+,&0x20		# restore fp2
 
 	fmov.l		%d0,%fpcr		# restore users rnd mode,prec
 	fadd.x		ATANF(%a6),%fp0		# ATAN(X)
@@ -6491,7 +6491,7 @@ satand:
 #	a0 = pointer to extended precision input			#
 #	d0 = round precision,mode					#
 #									#
-# OUTPUT **************************************************************	# 
+# OUTPUT **************************************************************	#
 #	fp0 = arcsin(X)							#
 #									#
 # ACCURACY and MONOTONICITY *******************************************	#
@@ -6531,7 +6531,7 @@ sasin:
 
 # This catch is added here for the '060 QSP. Originally, the call to
 # satan() would handle this case by causing the exception which would
-# not be caught until gen_except(). Now, with the exceptions being 
+# not be caught until gen_except(). Now, with the exceptions being
 # detected inside of satan(), the exception would have been handled there
 # instead of inside sasin() as expected.
 	cmp.l		%d1,&0x3FD78000
@@ -6680,7 +6680,7 @@ sacosd:
 
 #########################################################################
 # setox():    computes the exponential for a normalized input		#
-# setoxd():   computes the exponential for a denormalized input		# 
+# setoxd():   computes the exponential for a denormalized input		#
 # setoxm1():  computes the exponential minus 1 for a normalized input	#
 # setoxm1d(): computes the exponential minus 1 for a denormalized input	#
 #									#
@@ -6692,9 +6692,9 @@ sacosd:
 #	fp0 = exp(X) or exp(X)-1					#
 #									#
 # ACCURACY and MONOTONICITY ******************************************* #
-#	The returned result is within 0.85 ulps in 64 significant bit, 	#
+#	The returned result is within 0.85 ulps in 64 significant bit,	#
 #	i.e. within 0.5001 ulp to 53 bits if the result is subsequently #
-#	rounded to double precision. The result is provably monotonic 	#
+#	rounded to double precision. The result is provably monotonic	#
 #	in double precision.						#
 #									#
 # ALGORITHM and IMPLEMENTATION **************************************** #
@@ -6718,14 +6718,14 @@ sacosd:
 #	Notes:	The usual case should take the branches 1.1 -> 1.3 -> 2.#
 #		To avoid the use of floating-point comparisons, a	#
 #		compact representation of |X| is used. This format is a	#
-#		32-bit integer, the upper (more significant) 16 bits 	#
-#		are the sign and biased exponent field of |X|; the 	#
+#		32-bit integer, the upper (more significant) 16 bits	#
+#		are the sign and biased exponent field of |X|; the	#
 #		lower 16 bits are the 16 most significant fraction	#
 #		(including the explicit bit) bits of |X|. Consequently,	#
 #		the comparisons in Steps 1.1 and 1.3 can be performed	#
 #		by integer comparison. Note also that the constant	#
 #		16380 log(2) used in Step 1.3 is also in the compact	#
-#		form. Thus taking the branch to Step 2 guarantees 	#
+#		form. Thus taking the branch to Step 2 guarantees	#
 #		|X| < 16380 log(2). There is no harm to have a small	#
 #		number of cases where |X| is less than,	but close to,	#
 #		16380 log(2) and the branch to Step 9 is taken.		#
@@ -6737,7 +6737,7 @@ sacosd:
 #		2.3	Calculate	J = N mod 64; so J = 0,1,2,..., #
 #			or 63.						#
 #		2.4	Calculate	M = (N - J)/64; so N = 64M + J.	#
-#		2.5	Calculate the address of the stored value of 	#
+#		2.5	Calculate the address of the stored value of	#
 #			2^(J/64).					#
 #		2.6	Create the value Scale = 2^M.			#
 #	Notes:	The calculation in 2.2 is really performed by		#
@@ -6746,26 +6746,26 @@ sacosd:
 #		where							#
 #			constant := single-precision( 64/log 2 ).	#
 #									#
-#		Using a single-precision constant avoids memory 	#
+#		Using a single-precision constant avoids memory		#
 #		access. Another effect of using a single-precision	#
-#		"constant" is that the calculated value Z is 		#
+#		"constant" is that the calculated value Z is		#
 #									#
 #			Z = X*(64/log2)*(1+eps), |eps| <= 2^(-24).	#
 #									#
 #		This error has to be considered later in Steps 3 and 4.	#
 #									#
 #	Step 3.	Calculate X - N*log2/64.				#
-#		3.1	R := X + N*L1, 					#
+#		3.1	R := X + N*L1,					#
 #				where L1 := single-precision(-log2/64).	#
-#		3.2	R := R + N*L2, 					#
+#		3.2	R := R + N*L2,					#
 #				L2 := extended-precision(-log2/64 - L1).#
-#	Notes:	a) The way L1 and L2 are chosen ensures L1+L2 		#
+#	Notes:	a) The way L1 and L2 are chosen ensures L1+L2		#
 #		approximate the value -log2/64 to 88 bits of accuracy.	#
 #		b) N*L1 is exact because N is no longer than 22 bits	#
 #		and L1 is no longer than 24 bits.			#
-#		c) The calculation X+N*L1 is also exact due to 		#
+#		c) The calculation X+N*L1 is also exact due to		#
 #		cancellation. Thus, R is practically X+N(L1+L2) to full	#
-#		64 bits. 						#
+#		64 bits.						#
 #		d) It is important to estimate how large can |R| be	#
 #		after Step 3.2.						#
 #									#
@@ -6783,11 +6783,11 @@ sacosd:
 #									#
 #	Step 4.	Approximate exp(R)-1 by a polynomial			#
 #		p = R + R*R*(A1 + R*(A2 + R*(A3 + R*(A4 + R*A5))))	#
-#	Notes:	a) In order to reduce memory access, the coefficients 	#
+#	Notes:	a) In order to reduce memory access, the coefficients	#
 #		are made as "short" as possible: A1 (which is 1/2), A4	#
 #		and A5 are single precision; A2 and A3 are double	#
-#		precision. 						#
-#		b) Even with the restrictions above, 			#
+#		precision.						#
+#		b) Even with the restrictions above,			#
 #		   |p - (exp(R)-1)| < 2^(-68.8) for all |R| <= 0.0062.	#
 #		Note that 0.0062 is slightly bigger than 0.57 log2/64.	#
 #		c) To fully utilize the pipeline, p is separated into	#
@@ -6801,11 +6801,11 @@ sacosd:
 #		where T and t are the stored values for 2^(J/64).	#
 #	Notes:	2^(J/64) is stored as T and t where T+t approximates	#
 #		2^(J/64) to roughly 85 bits; T is in extended precision	#
-#		and t is in single precision. Note also that T is 	#
-#		rounded to 62 bits so that the last two bits of T are 	#
-#		zero. The reason for such a special form is that T-1, 	#
+#		and t is in single precision. Note also that T is	#
+#		rounded to 62 bits so that the last two bits of T are	#
+#		zero. The reason for such a special form is that T-1,	#
 #		T-2, and T-8 will all be exact --- a property that will	#
-#		give much more accurate computation of the function 	#
+#		give much more accurate computation of the function	#
 #		EXPM1.							#
 #									#
 #	Step 6.	Reconstruction of exp(X)				#
@@ -6821,11 +6821,11 @@ sacosd:
 #			X = (M1+M)log2 + Jlog2/64 + R, |M1+M| >= 16380.	#
 #		Hence, exp(X) may overflow or underflow or neither.	#
 #		When that is the case, AdjScale = 2^(M1) where M1 is	#
-#		approximately M. Thus 6.2 will never cause 		#
+#		approximately M. Thus 6.2 will never cause		#
 #		over/underflow. Possible exception in 6.4 is overflow	#
 #		or underflow. The inexact exception is not generated in	#
 #		6.4. Although one can argue that the inexact flag	#
-#		should always be raised, to simulate that exception 	#
+#		should always be raised, to simulate that exception	#
 #		cost to much than the flag is worth in practical uses.	#
 #									#
 #	Step 7.	Return 1 + X.						#
@@ -6838,7 +6838,7 @@ sacosd:
 #		in Step 7.1 to avoid unnecessary trapping. (Although	#
 #		the FMOVEM may not seem relevant since X is normalized,	#
 #		the precaution will be useful in the library version of	#
-#		this code where the separate entry for denormalized 	#
+#		this code where the separate entry for denormalized	#
 #		inputs will be done away with.)				#
 #									#
 #	Step 8.	Handle exp(X) where |X| >= 16380log2.			#
@@ -6846,9 +6846,9 @@ sacosd:
 #		(mimic 2.2 - 2.6)					#
 #		8.2	N := round-to-integer( X * 64/log2 )		#
 #		8.3	Calculate J = N mod 64, J = 0,1,...,63		#
-#		8.4	K := (N-J)/64, M1 := truncate(K/2), M = K-M1, 	#
+#		8.4	K := (N-J)/64, M1 := truncate(K/2), M = K-M1,	#
 #			AdjFlag := 1.					#
-#		8.5	Calculate the address of the stored value 	#
+#		8.5	Calculate the address of the stored value	#
 #			2^(J/64).					#
 #		8.6	Create the values Scale = 2^M, AdjScale = 2^M1.	#
 #		8.7	Go to Step 3.					#
@@ -6885,8 +6885,8 @@ sacosd:
 #		1.4	Go to Step 10.					#
 #	Notes:	The usual case should take the branches 1.1 -> 1.3 -> 2.#
 #		However, it is conceivable |X| can be small very often	#
-#		because EXPM1 is intended to evaluate exp(X)-1 		#
-#		accurately when |X| is small. For further details on 	#
+#		because EXPM1 is intended to evaluate exp(X)-1		#
+#		accurately when |X| is small. For further details on	#
 #		the comparisons, see the notes on Step 1 of setox.	#
 #									#
 #	Step 2.	Calculate N = round-to-nearest-int( X * 64/log2 ).	#
@@ -6894,16 +6894,16 @@ sacosd:
 #		2.2	Calculate	J = N mod 64; so J = 0,1,2,..., #
 #			or 63.						#
 #		2.3	Calculate	M = (N - J)/64; so N = 64M + J.	#
-#		2.4	Calculate the address of the stored value of 	#
+#		2.4	Calculate the address of the stored value of	#
 #			2^(J/64).					#
-#		2.5	Create the values Sc = 2^M and 			#
+#		2.5	Create the values Sc = 2^M and			#
 #			OnebySc := -2^(-M).				#
 #	Notes:	See the notes on Step 2 of setox.			#
 #									#
 #	Step 3.	Calculate X - N*log2/64.				#
-#		3.1	R := X + N*L1, 					#
+#		3.1	R := X + N*L1,					#
 #				where L1 := single-precision(-log2/64).	#
-#		3.2	R := R + N*L2, 					#
+#		3.2	R := R + N*L2,					#
 #				L2 := extended-precision(-log2/64 - L1).#
 #	Notes:	Applying the analysis of Step 3 of setox in this case	#
 #		shows that |R| <= 0.0055 (note that |X| <= 70 log2 in	#
@@ -6911,10 +6911,10 @@ sacosd:
 #									#
 #	Step 4.	Approximate exp(R)-1 by a polynomial			#
 #			p = R+R*R*(A1+R*(A2+R*(A3+R*(A4+R*(A5+R*A6)))))	#
-#	Notes:	a) In order to reduce memory access, the coefficients 	#
-#		are made as "short" as possible: A1 (which is 1/2), A5 	#
-#		and A6 are single precision; A2, A3 and A4 are double 	#
-#		precision. 						#
+#	Notes:	a) In order to reduce memory access, the coefficients	#
+#		are made as "short" as possible: A1 (which is 1/2), A5	#
+#		and A6 are single precision; A2, A3 and A4 are double	#
+#		precision.						#
 #		b) Even with the restriction above,			#
 #			|p - (exp(R)-1)| <	|R| * 2^(-72.7)		#
 #		for all |R| <= 0.0055.					#
@@ -6929,9 +6929,9 @@ sacosd:
 #		where T and t are the stored values for 2^(J/64).	#
 #	Notes:	2^(J/64) is stored as T and t where T+t approximates	#
 #		2^(J/64) to roughly 85 bits; T is in extended precision	#
-#		and t is in single precision. Note also that T is 	#
-#		rounded to 62 bits so that the last two bits of T are 	#
-#		zero. The reason for such a special form is that T-1, 	#
+#		and t is in single precision. Note also that T is	#
+#		rounded to 62 bits so that the last two bits of T are	#
+#		zero. The reason for such a special form is that T-1,	#
 #		T-2, and T-8 will all be exact --- a property that will	#
 #		be exploited in Step 6 below. The total relative error	#
 #		in p is no bigger than 2^(-67.7) compared to the final	#
@@ -6946,7 +6946,7 @@ sacosd:
 #		6.5	ans := (T + OnebySc) + (p + t).			#
 #		6.6	Restore user FPCR.				#
 #		6.7	Return ans := Sc * ans. Exit.			#
-#	Notes:	The various arrangements of the expressions give 	#
+#	Notes:	The various arrangements of the expressions give	#
 #		accurate evaluations.					#
 #									#
 #	Step 7.	exp(X)-1 for |X| < 1/4.					#
@@ -6962,8 +6962,8 @@ sacosd:
 #		 Return ans := ans*2^(140). Exit			#
 #	Notes:	The idea is to return "X - tiny" under the user		#
 #		precision and rounding modes. To avoid unnecessary	#
-#		inefficiency, we stay away from denormalized numbers 	#
-#		the best we can. For |X| >= 2^(-16312), the 		#
+#		inefficiency, we stay away from denormalized numbers	#
+#		the best we can. For |X| >= 2^(-16312), the		#
 #		straightforward 8.2 generates the inexact exception as	#
 #		the case warrants.					#
 #									#
@@ -6971,13 +6971,13 @@ sacosd:
 #			p = X + X*X*(B1 + X*(B2 + ... + X*B12))		#
 #	Notes:	a) In order to reduce memory access, the coefficients	#
 #		are made as "short" as possible: B1 (which is 1/2), B9	#
-#		to B12 are single precision; B3 to B8 are double 	#
+#		to B12 are single precision; B3 to B8 are double	#
 #		precision; and B2 is double extended.			#
 #		b) Even with the restriction above,			#
 #			|p - (exp(X)-1)| < |X| 2^(-70.6)		#
 #		for all |X| <= 0.251.					#
 #		Note that 0.251 is slightly bigger than 1/4.		#
-#		c) To fully preserve accuracy, the polynomial is 	#
+#		c) To fully preserve accuracy, the polynomial is	#
 #		computed as						#
 #			X + ( S*B1 +	Q ) where S = X*X and		#
 #			Q	=	X*S*(B2 + X*(B3 + ... + X*B12))	#
@@ -6987,11 +6987,11 @@ sacosd:
 #				[ S*S*(B3 + S*(B5 + ... + S*B11)) ]	#
 #									#
 #	Step 10. Calculate exp(X)-1 for |X| >= 70 log 2.		#
-#		10.1 If X >= 70log2 , exp(X) - 1 = exp(X) for all 	#
+#		10.1 If X >= 70log2 , exp(X) - 1 = exp(X) for all	#
 #		practical purposes. Therefore, go to Step 1 of setox.	#
 #		10.2 If X <= -70log2, exp(X) - 1 = -1 for all practical	#
-#		purposes. 						#
-#		ans := -1 						#
+#		purposes.						#
+#		ans := -1						#
 #		Restore user FPCR					#
 #		Return ans := ans + 2^(-126). Exit.			#
 #	Notes:	10.2 will always create an inexact and return -1 + tiny	#
@@ -7496,10 +7496,10 @@ setoxm1d:
 # sgetexp():  returns the exponent portion of the input argument.	#
 #	      The exponent bias is removed and the exponent value is	#
 #	      returned as an extended precision number in fp0.		#
-# sgetexpd(): handles denormalized numbers. 				#
+# sgetexpd(): handles denormalized numbers.				#
 #									#
-# sgetman():  extracts the mantissa of the input argument. The 		#
-#	      mantissa is converted to an extended precision number w/ 	#
+# sgetman():  extracts the mantissa of the input argument. The		#
+#	      mantissa is converted to an extended precision number w/	#
 #	      an exponent of $3fff and is returned in fp0. The range of #
 #	      the result is [1.0 - 2.0).				#
 # sgetmand(): handles denormalized numbers.				#
@@ -7573,9 +7573,9 @@ sgetmand:
 #	fp0 = cosh(X)							#
 #									#
 # ACCURACY and MONOTONICITY *******************************************	#
-#	The returned result is within 3 ulps in 64 significant bit, 	#
+#	The returned result is within 3 ulps in 64 significant bit,	#
 #	i.e. within 0.5001 ulp to 53 bits if the result is subsequently	#
-#	rounded to double precision. The result is provably monotonic 	#
+#	rounded to double precision. The result is provably monotonic	#
 #	in double precision.						#
 #									#
 # ALGORITHM ***********************************************************	#
@@ -7592,7 +7592,7 @@ sgetmand:
 #									#
 #	4. (16380 log2 < |X| <= 16480 log2)				#
 #		cosh(X) = sign(X) * exp(|X|)/2.				#
-#		However, invoking exp(|X|) may cause premature 		#
+#		However, invoking exp(|X|) may cause premature		#
 #		overflow. Thus, we calculate sinh(X) as follows:	#
 #		Y	:= |X|						#
 #		Fact	:=	2**(16380)				#
@@ -7687,7 +7687,7 @@ scoshd:
 #	fp0 = sinh(X)							#
 #									#
 # ACCURACY and MONOTONICITY *******************************************	#
-#	The returned result is within 3 ulps in 64 significant bit, 	#
+#	The returned result is within 3 ulps in 64 significant bit,	#
 #	i.e. within 0.5001 ulp to 53 bits if the result is subsequently #
 #	rounded to double precision. The result is provably monotonic	#
 #	in double precision.						#
@@ -7805,7 +7805,7 @@ ssinhd:
 #	fp0 = tanh(X)							#
 #									#
 # ACCURACY and MONOTONICITY *******************************************	#
-#	The returned result is within 3 ulps in 64 significant bit, 	#
+#	The returned result is within 3 ulps in 64 significant bit,	#
 #	i.e. within 0.5001 ulp to 53 bits if the result is subsequently #
 #	rounded to double precision. The result is provably monotonic	#
 #	in double precision.						#
@@ -7971,51 +7971,51 @@ stanhd:
 #	fp0 = log(X) or log(1+X)					#
 #									#
 # ACCURACY and MONOTONICITY *******************************************	#
-#	The returned result is within 2 ulps in 64 significant bit, 	#
+#	The returned result is within 2 ulps in 64 significant bit,	#
 #	i.e. within 0.5001 ulp to 53 bits if the result is subsequently	#
 #	rounded to double precision. The result is provably monotonic	#
 #	in double precision.						#
 #									#
 # ALGORITHM ***********************************************************	#
 #	LOGN:								#
-#	Step 1. If |X-1| < 1/16, approximate log(X) by an odd 		#
-#		polynomial in u, where u = 2(X-1)/(X+1). Otherwise, 	#
+#	Step 1. If |X-1| < 1/16, approximate log(X) by an odd		#
+#		polynomial in u, where u = 2(X-1)/(X+1). Otherwise,	#
 #		move on to Step 2.					#
 #									#
 #	Step 2. X = 2**k * Y where 1 <= Y < 2. Define F to be the first	#
-#		seven significant bits of Y plus 2**(-7), i.e. 		#
-#		F = 1.xxxxxx1 in base 2 where the six "x" match those 	#
+#		seven significant bits of Y plus 2**(-7), i.e.		#
+#		F = 1.xxxxxx1 in base 2 where the six "x" match those	#
 #		of Y. Note that |Y-F| <= 2**(-7).			#
 #									#
-#	Step 3. Define u = (Y-F)/F. Approximate log(1+u) by a 		#
+#	Step 3. Define u = (Y-F)/F. Approximate log(1+u) by a		#
 #		polynomial in u, log(1+u) = poly.			#
 #									#
-#	Step 4. Reconstruct 						#
+#	Step 4. Reconstruct						#
 #		log(X) = log( 2**k * Y ) = k*log(2) + log(F) + log(1+u)	#
 #		by k*log(2) + (log(F) + poly). The values of log(F) are	#
 #		calculated beforehand and stored in the program.	#
 #									#
 #	lognp1:								#
-#	Step 1: If |X| < 1/16, approximate log(1+X) by an odd 		#
+#	Step 1: If |X| < 1/16, approximate log(1+X) by an odd		#
 #		polynomial in u where u = 2X/(2+X). Otherwise, move on	#
 #		to Step 2.						#
 #									#
 #	Step 2: Let 1+X = 2**k * Y, where 1 <= Y < 2. Define F as done	#
-#		in Step 2 of the algorithm for LOGN and compute 	#
-#		log(1+X) as k*log(2) + log(F) + poly where poly 	#
-#		approximates log(1+u), u = (Y-F)/F. 			#
+#		in Step 2 of the algorithm for LOGN and compute		#
+#		log(1+X) as k*log(2) + log(F) + poly where poly		#
+#		approximates log(1+u), u = (Y-F)/F.			#
 #									#
 #	Implementation Notes:						#
-#	Note 1. There are 64 different possible values for F, thus 64 	#
+#	Note 1. There are 64 different possible values for F, thus 64	#
 #		log(F)'s need to be tabulated. Moreover, the values of	#
 #		1/F are also tabulated so that the division in (Y-F)/F	#
 #		can be performed by a multiplication.			#
 #									#
-#	Note 2. In Step 2 of lognp1, in order to preserved accuracy, 	#
-#		the value Y-F has to be calculated carefully when 	#
-#		1/2 <= X < 3/2. 					#
+#	Note 2. In Step 2 of lognp1, in order to preserved accuracy,	#
+#		the value Y-F has to be calculated carefully when	#
+#		1/2 <= X < 3/2.						#
 #									#
-#	Note 3. To fully exploit the pipeline, polynomials are usually 	#
+#	Note 3. To fully exploit the pipeline, polynomials are usually	#
 #		separated into two parts evaluated independently before	#
 #		being added up.						#
 #									#
@@ -8228,9 +8228,9 @@ LOGBGN:
 	cmp.l		%d1,&0			# CHECK IF X IS NEGATIVE
 	blt.w		LOGNEG			# LOG OF NEGATIVE ARGUMENT IS INVALID
 # X IS POSITIVE, CHECK IF X IS NEAR 1
-	cmp.l		%d1,&0x3ffef07d 	# IS X < 15/16?
+	cmp.l		%d1,&0x3ffef07d		# IS X < 15/16?
 	blt.b		LOGMAIN			# YES
-	cmp.l		%d1,&0x3fff8841 	# IS X > 17/16?
+	cmp.l		%d1,&0x3fff8841		# IS X > 17/16?
 	ble.w		LOGNEAR1		# NO
 
 LOGMAIN:
@@ -8243,7 +8243,7 @@ LOGMAIN:
 #--NOTE THAT U = (Y-F)/F IS VERY SMALL AND THUS APPROXIMATING
 #--LOG(1+U) CAN BE VERY EFFICIENT.
 #--ALSO NOTE THAT THE VALUE 1/F IS STORED IN A TABLE SO THAT NO
-#--DIVISION IS NEEDED TO CALCULATE (Y-F)/F. 
+#--DIVISION IS NEEDED TO CALCULATE (Y-F)/F.
 
 #--GET K, Y, F, AND ADDRESS OF 1/F.
 	asr.l		&8,%d1
@@ -8458,10 +8458,10 @@ LP1REAL:
 	mov.l		X(%a6),%d1
 	cmp.l		%d1,&0
 	ble.w		LP1NEG0			# LOG OF ZERO OR -VE
-	cmp.l		%d1,&0x3ffe8000 	# IS BOUNDS [1/2,3/2]?
+	cmp.l		%d1,&0x3ffe8000		# IS BOUNDS [1/2,3/2]?
 	blt.w		LOGMAIN
 	cmp.l		%d1,&0x3fffc000
-	bgt.w		LOGMAIN 
+	bgt.w		LOGMAIN
 #--IF 1+Z > 3/2 OR 1+Z < 1/2, THEN X, WHICH IS ROUNDING 1+Z,
 #--CONTAINS AT LEAST 63 BITS OF INFORMATION OF Z. IN THAT CASE,
 #--SIMPLY INVOKE LOG(X) FOR LOG(1+Z).
@@ -8562,7 +8562,7 @@ slognp1d:
 #	a0 = pointer to extended precision input			#
 #	d0 = round precision,mode					#
 #									#
-# OUTPUT **************************************************************	# 
+# OUTPUT **************************************************************	#
 #	fp0 = arctanh(X)						#
 #									#
 # ACCURACY and MONOTONICITY *******************************************	#
@@ -8677,7 +8677,7 @@ satanhd:
 #            2.1 Restore the user FPCR					#
 #            2.2 Return ans := Y * INV_L10.				#
 #									#
-#       slog10: 							#
+#       slog10:								#
 #									#
 #       Step 0. If X < 0, create a NaN and raise the invalid operation	#
 #               flag. Otherwise, save FPCR in D1; set FpCR to default.	#
@@ -8820,7 +8820,7 @@ slog2d:
 #	fp0 = 2**X or 10**X						#
 #									#
 # ACCURACY and MONOTONICITY *******************************************	#
-#	The returned result is within 2 ulps in 64 significant bit, 	#
+#	The returned result is within 2 ulps in 64 significant bit,	#
 #	i.e. within 0.5001 ulp to 53 bits if the result is subsequently	#
 #	rounded to double precision. The result is provably monotonic	#
 #	in double precision.						#
@@ -8851,7 +8851,7 @@ slog2d:
 #									#
 #	4. Define r as							#
 #		r := ((X - N*L1)-N*L2) * L10				#
-#		where L1, L2 are the leading and trailing parts of 	#
+#		where L1, L2 are the leading and trailing parts of	#
 #		log_10(2)/64 and L10 is the natural log of 10. Then	#
 #		10**X = 2**(M') * 2**(M) * 2**(j/64) * exp(r).		#
 #		Go to expr to compute that expression.			#
@@ -8872,7 +8872,7 @@ slog2d:
 #		Exit.							#
 #									#
 #	ExpBig								#
-#	1. Generate overflow by Huge * Huge if X > 0; otherwise, 	#
+#	1. Generate overflow by Huge * Huge if X > 0; otherwise,	#
 #	        generate underflow by Tiny * Tiny.			#
 #									#
 #	ExpSm								#
@@ -9203,7 +9203,7 @@ stentoxd:
 
 #########################################################################
 # sscale(): computes the destination operand scaled by the source	#
-#	    operand. If the absoulute value of the source operand is 	#
+#	    operand. If the absoulute value of the source operand is	#
 #	    >= 2^14, an overflow or underflow is returned.		#
 #									#
 # INPUT *************************************************************** #
@@ -9265,7 +9265,7 @@ sok_dnrm:
 	bge.b		sok_norm2		# thank goodness no
 
 # the multiply factor that we're trying to create should be a denorm
-# for the multiply to work. therefore, we're going to actually do a 
+# for the multiply to work. therefore, we're going to actually do a
 # multiply with a denorm which will cause an unimplemented data type
 # exception to be put into the machine which will be caught and corrected
 # later. we don't do this with the DENORMs above because this method
@@ -9280,7 +9280,7 @@ sok_dnrm:
 	clr.l		-(%sp)			# insert zero low mantissa
 	mov.l		%d1,-(%sp)		# insert new high mantissa
 	clr.l		-(%sp)			# make zero exponent
-	bra.b		sok_norm_cont	
+	bra.b		sok_norm_cont
 sok_dnrm_32:
 	subi.b		&0x20,%d0		# get shift count
 	lsr.l		%d0,%d1			# make low mantissa longword
@@ -9288,7 +9288,7 @@ sok_dnrm_32:
 	clr.l		-(%sp)			# insert zero high mantissa
 	clr.l		-(%sp)			# make zero exponent
 	bra.b		sok_norm_cont
-	
+
 # the src will force the dst to a DENORM value or worse. so, let's
 # create an fp multiply that will create the result.
 sok_norm:
@@ -9346,7 +9346,7 @@ ssmall_done:
 #	a1 = pointer to extended precision input Y			#
 #	d0 = round precision,mode					#
 #									#
-# 	The input operands X and Y can be either normalized or 		#
+#	The input operands X and Y can be either normalized or		#
 #	denormalized.							#
 #									#
 # OUTPUT ************************************************************** #
@@ -9355,7 +9355,7 @@ ssmall_done:
 # ALGORITHM *********************************************************** #
 #									#
 #       Step 1.  Save and strip signs of X and Y: signX := sign(X),	#
-#                signY := sign(Y), X := |X|, Y := |Y|, 			#
+#                signY := sign(Y), X := |X|, Y := |Y|,			#
 #                signQ := signX EOR signY. Record whether MOD or REM	#
 #                is requested.						#
 #									#
@@ -9375,7 +9375,7 @@ ssmall_done:
 #									#
 #       Step 4.  At this point, R = X - QY = MOD(X,Y). Set		#
 #                Last_Subtract := false (used in Step 7 below). If	#
-#                MOD is requested, go to Step 6. 			#
+#                MOD is requested, go to Step 6.			#
 #									#
 #       Step 5.  R = MOD(X,Y), but REM(X,Y) is requested.		#
 #            5.1 If R < Y/2, then R = MOD(X,Y) = REM(X,Y). Go to	#
@@ -9701,8 +9701,8 @@ Restore:
 	mov.b		&FMUL_OP,%d1		# last inst is MUL
 	fmul.x		Scale(%pc),%fp0		# may cause underflow
 	bra		t_catch2
-# the '040 package did this apparently to see if the dst operand for the 
-# preceding fmul was a denorm. but, it better not have been since the 
+# the '040 package did this apparently to see if the dst operand for the
+# preceding fmul was a denorm. but, it better not have been since the
 # algorithm just got done playing with fp0 and expected no exceptions
 # as a result. trust me...
 #	bra		t_avoid_unsupp		# check for denorm as a
@@ -9716,7 +9716,7 @@ Finish:
 Rem_is_0:
 #..R = 2^(-j)X - Q Y = Y, thus R = 0 and quotient = 2^j (Q+1)
 	addq.l		&1,%d3
-	cmp.l		%d0,&8			# D0 is j 
+	cmp.l		%d0,&8			# D0 is j
 	bge.b		Q_Big
 
 	lsl.l		%d0,%d3
@@ -9746,7 +9746,7 @@ Tie_Case:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	tag(): return the optype of the input ext fp number		#
+#	tag(): return the optype of the input ext fp number		#
 #									#
 #	This routine is used by the 060FPLSP.				#
 #									#
@@ -9755,13 +9755,13 @@ Tie_Case:
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	d0 = value of type tag						#
-# 		one of: NORM, INF, QNAN, SNAN, DENORM, ZERO		#
+#		one of: NORM, INF, QNAN, SNAN, DENORM, ZERO		#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Simply test the exponent, j-bit, and mantissa values to 	#
+#	Simply test the exponent, j-bit, and mantissa values to		#
 # determine the type of operand.					#
 #	If it's an unnormalized zero, alter the operand and force it	#
 # to be a normal zero.							#
@@ -9829,15 +9829,15 @@ qnan:	long		0x7fff0000, 0xffffffff, 0xffffffff
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand.		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default DZ result.					#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Transcendental emulation for the 060FPLSP has detected that 	#
+#	Transcendental emulation for the 060FPLSP has detected that	#
 # a DZ exception should occur for the instruction. If DZ is disabled,	#
 # return the default result.						#
-# 	If DZ is enabled, the dst operand should be returned unscathed	#
+#	If DZ is enabled, the dst operand should be returned unscathed	#
 # in fp0 while fp1 is used to create a DZ exception so that the		#
 # operating system can log that such an event occurred.			#
 #									#
@@ -9898,7 +9898,7 @@ dz_pinf_ena:
 #									#
 # INPUT ***************************************************************	#
 #	fp1 = source operand						#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default result						#
 #	fp1 = unchanged							#
@@ -9927,7 +9927,7 @@ t_operr:
 # but use fp2 instead. return the dst operand unscathed in fp0.
 operr_ena:
 	fmovm.x		EXC_FP0(%a6),&0x80	# return fp0 unscathed
-	fmov.l		USER_FPCR(%a6),%fpcr	
+	fmov.l		USER_FPCR(%a6),%fpcr
 	fmovm.x		&0x04,-(%sp)		# save fp2
 	fmov.s		&0x7f800000,%fp2	# load +INF
 	fmul.s		&0x00000000,%fp2	# +INF x 0
@@ -9956,7 +9956,7 @@ mns_tiny:
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default underflow result					#
 #									#
@@ -10003,8 +10003,8 @@ unf_pos:
 #		  (monadic)						#
 #	t_ovfl2(): Handle 060FPLSP overflow exception during		#
 #	           emulation. result always positive. (dyadic)		#
-#	t_ovfl_sc(): Handle 060FPLSP overflow exception during 		#
-#	             emulation for "fscale". 				#
+#	t_ovfl_sc(): Handle 060FPLSP overflow exception during		#
+#	             emulation for "fscale".				#
 #									#
 #	This routine is used by the 060FPLSP package.			#
 #									#
@@ -10013,7 +10013,7 @@ unf_pos:
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default underflow result					#
 #									#
@@ -10113,12 +10113,12 @@ t_ovfl2:
 #									#
 # INPUT ***************************************************************	#
 #	fp0 = default underflow or overflow result			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default result						#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	If an overflow or underflow occurred during the last 		#
+#	If an overflow or underflow occurred during the last		#
 # instruction of transcendental 060FPLSP emulation, then it has already	#
 # occurred and has been logged. Now we need to see if an inexact	#
 # exception should occur.						#
@@ -10147,16 +10147,16 @@ t_catch:
 #									#
 # INPUT ***************************************************************	#
 #	fp0 = default result						#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default result						#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	The last instruction of transcendental emulation for the 	#
+#	The last instruction of transcendental emulation for the	#
 # 060FPLSP should be inexact. So, if inexact is enabled, then we create	#
 # the event here by adding a large and very small number together	#
 # so that the operating system can log the event.			#
-# 	Must check, too, if the result was zero, in which case we just	#
+#	Must check, too, if the result was zero, in which case we just	#
 # set the FPSR bits and return.						#
 #									#
 #########################################################################
@@ -10178,7 +10178,7 @@ t_minx2:
 inx2_work:
 	btst		&inex2_bit,FPCR_ENABLE(%a6) # is inexact enabled?
 	bne.b		inx2_work_ena		# yes
-	rts	
+	rts
 inx2_work_ena:
 	fmov.l		USER_FPCR(%a6),%fpcr	# insert user's exceptions
 	fmov.s		&0x3f800000,%fp1	# load +1
@@ -10202,7 +10202,7 @@ inx2_zero:
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision input operand		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default result						#
 #									#
@@ -10235,7 +10235,7 @@ t_resdnrm:
 
 #
 # sto_cos:
-# 	This is used by fsincos library emulation. The correct
+#	This is used by fsincos library emulation. The correct
 # values are already in fp0 and fp1 so we do nothing here.
 #
 	global		sto_cos
@@ -10485,7 +10485,7 @@ ld_mzero:
 #########################################################################
 	global		dst_zero
 dst_zero:
-	tst.b		DST_EX(%a1) 		# get sign of dst operand
+	tst.b		DST_EX(%a1)		# get sign of dst operand
 	bmi.b		ld_mzero		# if neg, load neg zero
 	bra.b		ld_pzero		# load positive zero
 
@@ -10494,7 +10494,7 @@ dst_zero:
 #########################################################################
 	global		src_inf
 src_inf:
-	tst.b		SRC_EX(%a0) 		# get sign of src operand
+	tst.b		SRC_EX(%a0)		# get sign of src operand
 	bmi.b		ld_minf			# if negative branch
 
 #
@@ -10520,7 +10520,7 @@ ld_minf:
 #########################################################################
 	global		dst_inf
 dst_inf:
-	tst.b		DST_EX(%a1) 		# get sign of dst operand
+	tst.b		DST_EX(%a1)		# get sign of dst operand
 	bmi.b		ld_minf			# if negative branch
 	bra.b		ld_pinf
 
@@ -10562,7 +10562,7 @@ setoxm1i:
 #########################################################################
 	global		src_one
 src_one:
-	tst.b		SRC_EX(%a0) 		# check sign of source
+	tst.b		SRC_EX(%a0)		# check sign of source
 	bmi.b		ld_mone
 
 #
@@ -10591,7 +10591,7 @@ mpiby2:	long		0xbfff0000, 0xc90fdaa2, 0x2168c235
 #################################################################
 	global		spi_2
 spi_2:
-	tst.b		SRC_EX(%a0) 		# check sign of source
+	tst.b		SRC_EX(%a0)		# check sign of source
 	bmi.b		ld_mpi2
 
 #
@@ -10618,7 +10618,7 @@ ld_mpi2:
 
 #
 # ssincosz(): When the src operand is ZERO, store a one in the
-# 	      cosine register and return a ZERO in fp0 w/ the same sign
+#	      cosine register and return a ZERO in fp0 w/ the same sign
 #	      as the src operand.
 #
 	global		ssincosz
@@ -10646,7 +10646,7 @@ ssincosi:
 
 #
 # ssincosqnan(): When the src operand is a QNAN, store the QNAN in the cosine
-# 		 register and branch to the src QNAN routine.
+#		 register and branch to the src QNAN routine.
 #
 	global		ssincosqnan
 ssincosqnan:
@@ -10827,7 +10827,7 @@ sop_sqnan:
 #	a0 = pointer fp extended precision operand to normalize		#
 #									#
 # OUTPUT ************************************************************** #
-# 	d0 = number of bit positions the mantissa was shifted		#
+#	d0 = number of bit positions the mantissa was shifted		#
 #	a0 = the input operand's mantissa is normalized; the exponent	#
 #	     is unchanged.						#
 #									#
@@ -10854,7 +10854,7 @@ norm_hi:
 	mov.l		%d1, FTEMP_LO(%a0)	# store new lo(man)
 
 	mov.l		%d2, %d0		# return shift amount
-	
+
 	mov.l		(%sp)+, %d3		# restore temp regs
 	mov.l		(%sp)+, %d2
 
@@ -10869,7 +10869,7 @@ norm_lo:
 	clr.l		FTEMP_LO(%a0)		# lo(man) is now zero
 
 	mov.l		%d2, %d0		# return shift amount
-	
+
 	mov.l		(%sp)+, %d3		# restore temp regs
 	mov.l		(%sp)+, %d2
 
@@ -10974,7 +10974,7 @@ unnorm_nrm_zero_lrg:
 # whole mantissa is zero so this UNNORM is actually a zero
 #
 unnorm_zero:
-	and.w		&0x8000, FTEMP_EX(%a0) 	# force exponent to zero
+	and.w		&0x8000, FTEMP_EX(%a0)	# force exponent to zero
 
 	mov.b		&ZERO, %d0		# fix optype tag
 	rts

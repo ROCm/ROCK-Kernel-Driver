@@ -44,8 +44,9 @@
 #include <asm/sections.h>
 #include <asm/btext.h>
 #include <asm/nvram.h>
+#include <asm/setup.h>
 #include <asm/system.h>
-#include <asm/lmb.h>
+#include <asm/rtas.h>
 
 extern unsigned long klimit;
 /* extern void *stab; */
@@ -83,7 +84,6 @@ unsigned long decr_overclock_proc0_set = 0;
 
 int powersave_nap;
 
-char saved_command_line[COMMAND_LINE_SIZE];
 unsigned char aux_device_present;
 
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
@@ -166,7 +166,11 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
 #if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
-	unsigned int ret, i;
+	int ret, i;
+#endif
+
+#ifdef CONFIG_XMON_DEFAULT
+	xmon_init();
 #endif
 
 #ifdef CONFIG_PPC_ISERIES
@@ -210,7 +214,6 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	else
 		initrd_start = initrd_end = 0;
 #endif /* CONFIG_BLK_DEV_INITRD */
-	ROOT_DEV = Root_SDA3;
 
 #ifdef CONFIG_BOOTX_TEXT
 	map_boot_text();
@@ -231,12 +234,11 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_SMP
 		/* Start secondary threads on SMT systems */
 		for (i = 0; i < NR_CPUS; i++) {
-			if(cpu_available(i)  && !cpu_possible(i)) {
+			if (cpu_available(i) && !cpu_possible(i)) {
 				printk("%16.16x : starting thread\n", i);
-				rtas_call(rtas_token("start-cpu"), 3, 1, 
-					  (void *)&ret,
+				rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
 					  get_hard_smp_processor_id(i), 
-					  *((unsigned long *)pseries_secondary_smp_init),
+					  (u32)*((unsigned long *)pseries_secondary_smp_init),
 					  i);
 				cpu_set(i, cpu_possible_map);
 				systemcfg->processorCount++;
@@ -252,6 +254,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		pmac_init(r3, r4, r5, r6, r7);
 	}
 #endif /* CONFIG_PPC_PMAC */
+
+#if defined(CONFIG_HOTPLUG_CPU) &&  !defined(CONFIG_PPC_PMAC)
+	rtas_stop_self_args.token = rtas_token("stop-self");
+#endif /* CONFIG_HOTPLUG_CPU && !CONFIG_PPC_PMAC */
 
 	/* Finish initializing the hash table (do the dynamic
 	 * patching for the fast-path hashtable.S code)
@@ -491,73 +497,32 @@ static int __init set_preferred_console(void)
 	if (strcmp(name, "serial") == 0) {
 		int i;
 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
- 		char *compat = (char *)get_property(prom_stdout, "compatible", NULL);
- 
- 		if (compat && (strcmp(compat, "hvterm-protocol") == 0)) {
- 			/* Host Virtual Serial Interface */
-			int offset;
-			switch (reg[0]) {
-				case 0x30000000:
+		if (i > 8) {
+			switch (reg[1]) {
+				case 0x3f8:
 					offset = 0;
 					break;
-				case 0x30000001:
+				case 0x2f8:
 					offset = 1;
 					break;
-				default:
-					return -ENODEV;
-			}
-			return add_preferred_console("hvsi", offset, NULL);
-		} else {
-			if (i > 8) {
-				int offset;
-				switch (reg[1]) {
-					case 0x3f8:
-						offset = 0;
-						break;
-					case 0x2f8:
-						offset = 1;
-						break;
-					case 0x898:
-						offset = 2;
-						break;
-					case 0x890:
-						offset = 3;
-						break;
-					default:
-						/* We dont recognise the serial port */
-						return -ENODEV;
-				}
- 
-				return add_preferred_console("ttyS", offset, NULL);
-			}
-		}
-	} else if (strcmp(name, "vty") == 0) {
-		u32 *reg = (u32 *)get_property(prom_stdout, "reg", NULL);
-		char *compat = (char *)get_property(prom_stdout, "compatible", NULL);
-
-		if (reg && compat && (strcmp(compat, "hvterm-protocol") == 0)) {
-			/* Host Virtual Serial Interface */
-			int offset;
-			switch (reg[0]) {
-				case 0x30000000:
-					offset = 0;
+				case 0x898:
+					offset = 2;
 					break;
-				case 0x30000001:
-					offset = 1;
+				case 0x890:
+					offset = 3;
 					break;
 				default:
+					/* We dont recognise the serial port */
 					return -ENODEV;
 			}
-			return add_preferred_console("hvsi", offset, NULL);
-		} else {
-			/* pSeries LPAR virtual console */
-			return add_preferred_console("hvc", 0, NULL);
 		}
-	}
+	} else if (strcmp(name, "vty") == 0)
+		/* pSeries LPAR virtual console */
+		return add_preferred_console("hvc", 0, NULL);
 	else if (strcmp(name, "ch-a") == 0)
-			offset = 0;
+		offset = 0;
 	else if (strcmp(name, "ch-b") == 0)
-			offset = 1;
+		offset = 1;
 	else
 		return -ENODEV;
 
@@ -625,9 +590,7 @@ static void __init irqstack_early_init(void)
 	}
 }
 #else
-static void __init irqstack_early_init(void)
-{
-}
+#define irqstack_early_init()
 #endif
 
 /*
@@ -645,11 +608,10 @@ void __init setup_arch(char **cmdline_p)
 	ppc64_boot_msg(0x12, "Setup Arch");
 
 #ifdef CONFIG_XMON
-	if (strstr(cmd_line, "xmon=on") || strstr(cmd_line, "xmon=early")) {
+	if (strstr(cmd_line, "xmon")) {
 		/* ensure xmon is enabled */
-		xmon_become_debugger();
-		if (strstr(cmd_line, "xmon=early"))
-			debugger(0);
+		xmon_init();
+		debugger(0);
 	}
 #endif /* CONFIG_XMON */
 
@@ -664,9 +626,6 @@ void __init setup_arch(char **cmdline_p)
 	/* reboot on panic */
 	panic_timeout = 180;
 
-	/* default to panic on oops or EEH error */
-	panic_on_oops = 1;
-
 	if (ppc_md.panic)
 		notifier_chain_register(&panic_notifier_list, &ppc64_panic_block);
 
@@ -676,7 +635,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = klimit;
 	
 	/* Save unparsed command line copy for /proc/cmdline */
-	strlcpy(saved_command_line, cmd_line, sizeof(saved_command_line));
+	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
 	irqstack_early_init();
@@ -744,7 +703,7 @@ int set_spread_lpevents( char * str )
 	unsigned long val = simple_strtoul( str, NULL, 0 );
 	if ( ( val > 0 ) && ( val <= NR_CPUS ) ) {
 		for ( i=1; i<val; ++i )
-			paca[i].lpQueuePtr = paca[0].lpQueuePtr;
+			paca[i].lpqueue_ptr = paca[0].lpqueue_ptr;
 		printk("lpevent processing spread over %ld processors\n", val);
 	}
 	else

@@ -273,7 +273,7 @@ static int zol_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOCGAUDIO:
 		{
 			struct video_audio *v = arg;
-			memset(&v, 0, sizeof(*v));
+			memset(v, 0, sizeof(*v));
 			v->flags |= VIDEO_AUDIO_MUTABLE | VIDEO_AUDIO_VOLUME;
 			v->mode |= zol_is_stereo(zol)
 				? VIDEO_SOUND_STEREO : VIDEO_SOUND_MONO;

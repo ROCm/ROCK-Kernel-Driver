@@ -2,7 +2,7 @@
 #define _ASM_M68k_SIGCONTEXT_H
 
 struct sigcontext {
-	unsigned long  sc_mask; 	/* old sigmask */
+	unsigned long  sc_mask;		/* old sigmask */
 	unsigned long  sc_usp;		/* old user stack pointer */
 	unsigned long  sc_d0;
 	unsigned long  sc_d1;

@@ -44,9 +44,9 @@ obj-$(CONFIG_PPC_RTAS)		+= rtas-proc.o
 obj-$(CONFIG_SCANLOG)		+= scanlog.o
 obj-$(CONFIG_VIOPATH)		+= viopath.o
 obj-$(CONFIG_LPARCFG)		+= lparcfg.o
-obj-$(CONFIG_PPC_VPURR)		+= vpurr.o
 obj-$(CONFIG_HVC_CONSOLE)	+= hvconsole.o
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
+obj-$(CONFIG_HVCS)		+= hvcserver.o
 
 obj-$(CONFIG_PPC_PMAC)		+= pmac_setup.o pmac_feature.o pmac_pci.o \
 				   pmac_time.o pmac_nvram.o pmac_low_i2c.o \

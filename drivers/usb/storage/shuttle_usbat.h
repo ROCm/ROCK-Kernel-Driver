@@ -52,27 +52,7 @@
 #define USBAT_UIO_OE0		0x10 // I/O 0 set=output/clr=input
 #define USBAT_UIO_ADPRST	0x01 // Reset SCM chip
 
-/* USBAT-specific commands */
-
-extern int usbat_read(struct us_data *us, unsigned char access,
-	unsigned char reg, unsigned char *content);
-extern int usbat_write(struct us_data *us, unsigned char access,
-	unsigned char reg, unsigned char content);
-extern int usbat_read_block(struct us_data *us, unsigned char access,
-	unsigned char reg, unsigned char *content, unsigned short len,
-	int use_sg);
-extern int usbat_write_block(struct us_data *us, unsigned char access,
-	unsigned char reg, unsigned char *content, unsigned short len,
-	int use_sg, int minutes);
-extern int usbat_multiple_write(struct us_data *us, unsigned char access,
-	unsigned char *registers, unsigned char *data_out,
-	unsigned short num_registers);
-extern int usbat_read_user_io(struct us_data *us, unsigned char *data_flags);
-extern int usbat_write_user_io(struct us_data *us,
-	unsigned char enable_flags, unsigned char data_flags);
-
 /* HP 8200e stuff */
-
 extern int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us);
 extern int init_8200e(struct us_data *us);
 

@@ -8,7 +8,7 @@
  * of the GNU General Public License, incorporated herein by reference.
  *
  * For changes and modifications please read
- * ../../../Documentation/isdn/HiSax.cert
+ * Documentation/isdn/HiSax.cert
  *
  * based on the teles driver from Jan den Ouden
  *
@@ -618,10 +618,10 @@ struct IsdnCardState *hisax_get_card(int cardnr)
 	return NULL;
 }
 
-int HiSax_readstatus(u_char * buf, int len, int user, int id, int channel)
+int HiSax_readstatus(u_char __user *buf, int len, int id, int channel)
 {
 	int count, cnt;
-	u_char *p = buf;
+	u_char __user *p = buf;
 	struct IsdnCardState *cs = hisax_findcard(id);
 
 	if (cs) {
@@ -633,10 +633,7 @@ int HiSax_readstatus(u_char * buf, int len, int user, int id, int channel)
 		count = cs->status_end - cs->status_read + 1;
 		if (count >= len)
 			count = len;
-		if (user)
-			copy_to_user(p, cs->status_read, count);
-		else
-			memcpy(p, cs->status_read, count);
+		copy_to_user(p, cs->status_read, count);
 		cs->status_read += count;
 		if (cs->status_read > cs->status_end)
 			cs->status_read = cs->status_buf;
@@ -647,10 +644,7 @@ int HiSax_readstatus(u_char * buf, int len, int user, int id, int channel)
 				cnt = HISAX_STATUS_BUFSIZE;
 			else
 				cnt = count;
-			if (user)
-				copy_to_user(p, cs->status_read, cnt);
-			else
-				memcpy(p, cs->status_read, cnt);
+			copy_to_user(p, cs->status_read, cnt);
 			p += cnt;
 			cs->status_read += cnt % HISAX_STATUS_BUFSIZE;
 			count -= cnt;
@@ -1586,7 +1580,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cards[i].protocol = protocol;
 	sprintf(id, "%s%d", name, i);
 	nrcards++;
-	retval = checkcard(i, id, 0, hisax_d_if->owner);
+	retval = checkcard(i, id, NULL, hisax_d_if->owner);
 	if (retval == 0) { // yuck
 		cards[i].typ = 0;
 		nrcards--;
@@ -1884,6 +1878,7 @@ static void EChannel_proc_rcv(struct hisax_d_if *d_if)
 	}
 }
 
+#ifdef CONFIG_PCI
 #include <linux/pci.h>
 
 static struct pci_device_id hisax_pci_tbl[] __initdata = {
@@ -1952,6 +1947,7 @@ static struct pci_device_id hisax_pci_tbl[] __initdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, hisax_pci_tbl);
+#endif /* CONFIG_PCI */
 
 module_init(HiSax_init);
 module_exit(HiSax_exit);

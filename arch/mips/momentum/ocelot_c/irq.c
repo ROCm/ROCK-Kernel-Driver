@@ -44,21 +44,21 @@
 #include <asm/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
-#include <asm/irq.h>
+#include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
+#include <asm/mv64340.h>
 #include <asm/system.h>
 
 extern asmlinkage void ocelot_handle_int(void);
-extern void mv64340_irq_init(void);
 extern void uart_irq_init(void);
 extern void cpci_irq_init(void);
 
 static struct irqaction cascade_fpga = {
-	no_action, SA_INTERRUPT, 0, "cascade via FPGA", NULL, NULL
+	no_action, SA_INTERRUPT, CPU_MASK_NONE, "cascade via FPGA", NULL, NULL
 };
 
 static struct irqaction cascade_mv64340 = {
-	no_action, SA_INTERRUPT, 0, "cascade via MV64340", NULL, NULL
+	no_action, SA_INTERRUPT, CPU_MASK_NONE, "cascade via MV64340", NULL, NULL
 };
 
 void __init init_IRQ(void)
@@ -79,7 +79,7 @@ void __init init_IRQ(void)
 	setup_irq(5, &cascade_fpga);
 	setup_irq(6, &cascade_mv64340);
 
-	mv64340_irq_init();
+	mv64340_irq_init(16);
 	uart_irq_init();
 	cpci_irq_init();
 

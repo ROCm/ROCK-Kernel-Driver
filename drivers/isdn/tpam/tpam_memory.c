@@ -30,7 +30,7 @@ void copy_to_pam_dword(tpam_card *card, const void *addr, u32 val) {
 	       card->bar0 + TPAM_PAGE_REGISTER);
 
 	/* write the value */
-	writel(val, card->bar0 + (((u32)addr) & TPAM_PAGE_SIZE));
+	writel(val, card->bar0 + (((unsigned long)addr) & TPAM_PAGE_SIZE));
 }
 
 /*
@@ -125,7 +125,7 @@ void copy_from_pam(tpam_card *card, void *to, const void *from, u32 n) {
  *
  * Return: 0 if OK, <0 if error.
  */
-int copy_from_pam_to_user(tpam_card *card, void *to, const void *from, u32 n) {
+int copy_from_pam_to_user(tpam_card *card, void __user *to, const void *from, u32 n) {
 	void *page;
 	u32 count;
 
@@ -171,7 +171,7 @@ int copy_from_pam_to_user(tpam_card *card, void *to, const void *from, u32 n) {
  *
  * Return: 0 if OK, <0 if error.
  */
-int copy_from_user_to_pam(tpam_card *card, void *to, const void *from, u32 n) {
+int copy_from_user_to_pam(tpam_card *card, void *to, const void __user *from, u32 n) {
 	void *page;
 	u32 count;
 

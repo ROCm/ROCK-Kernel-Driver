@@ -2011,7 +2011,7 @@ static char *rme9652_channel_buffer_location(rme9652_t *rme9652,
 }
 
 static int snd_rme9652_playback_copy(snd_pcm_substream_t *substream, int channel,
-				     snd_pcm_uframes_t pos, void *src, snd_pcm_uframes_t count)
+				     snd_pcm_uframes_t pos, void __user *src, snd_pcm_uframes_t count)
 {
 	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
 	char *channel_buf;
@@ -2028,7 +2028,7 @@ static int snd_rme9652_playback_copy(snd_pcm_substream_t *substream, int channel
 }
 
 static int snd_rme9652_capture_copy(snd_pcm_substream_t *substream, int channel,
-				    snd_pcm_uframes_t pos, void *dst, snd_pcm_uframes_t count)
+				    snd_pcm_uframes_t pos, void __user *dst, snd_pcm_uframes_t count)
 {
 	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
 	char *channel_buf;
@@ -2263,10 +2263,10 @@ static int snd_rme9652_prepare(snd_pcm_substream_t *substream)
 	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
 	int result = 0;
 
-	spin_lock_irq(&rme9652->lock);
+	spin_lock(&rme9652->lock);
 	if (!rme9652->running)
 		rme9652_reset_hw_pointer(rme9652);
-	spin_unlock_irq(&rme9652->lock);
+	spin_unlock(&rme9652->lock);
 	return result;
 }
 

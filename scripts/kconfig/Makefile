@@ -2,8 +2,7 @@
 # Kernel configuration targets
 # These targets are used from top-level makefile
 
-.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig \
-	cloneconfig
+.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig
 
 xconfig: $(obj)/qconf
 	$< arch/$(ARCH)/Kconfig
@@ -24,16 +23,6 @@ oldconfig: $(obj)/conf
 silentoldconfig: $(obj)/conf
 	$< -s arch/$(ARCH)/Kconfig
 
-check_CONFIG_IKCONFIG_PROC:
-	$(Q)if ! [ -f /proc/config.gz ]; then				\
-	    echo "Running kernel compiled without CONFIG_IKCONFIG_PROC"; \
-	    false;							\
-	fi
-
-_cloneconfig: check_CONFIG_IKCONFIG_PROC
-	$(Q)gzip -cd /proc/config.gz > $(objtree)/.config
-cloneconfig: _cloneconfig oldconfig
-
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
 
 randconfig: $(obj)/conf
@@ -48,20 +37,15 @@ allnoconfig: $(obj)/conf
 allmodconfig: $(obj)/conf
 	$< -m arch/$(ARCH)/Kconfig
 
-_defconfig: check_CONFIG_IKCONFIG_PROC
-	$(Q)eval "$$(gzip -cd /proc/config.gz)";			\
-	config=$(srctree)/arch/$(ARCH)/defconfig.$$CONFIG_CFGNAME;	\
-	if ! [ -e $$config ]; then					\
-	    echo "Config file $$config not found";			\
-	    false;							\
-	fi;								\
-	cp $$config $(objtree)/.config
-defconfig: _defconfig oldconfig
+defconfig: $(obj)/conf
+	$< -d arch/$(ARCH)/Kconfig
+
+%_defconfig: $(obj)/conf
+	$(Q)$< -D arch/$(ARCH)/configs/$@ arch/$(ARCH)/Kconfig
 
 # Help text used by make help
 help:
 	@echo  '  oldconfig	  - Update current config utilising a line-oriented program'
-	@echo  '  cloneconfig     - Update current config to the contents of /proc/config.gz'
 	@echo  '  menuconfig	  - Update current config utilising a menu based program'
 	@echo  '  xconfig	  - Update current config utilising a QT based front-end'
 	@echo  '  gconfig	  - Update current config utilising a GTK based front-end'

@@ -21,7 +21,7 @@ static void do_poweroff(void *dummy)
 		pm_power_off();
 }
 
-static DECLARE_WORK(poweroff_work, do_poweroff, 0);
+static DECLARE_WORK(poweroff_work, do_poweroff, NULL);
 
 static void handle_poweroff(int key, struct pt_regs *pt_regs,
 				struct tty_struct *tty)

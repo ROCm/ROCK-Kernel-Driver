@@ -234,7 +234,7 @@ typedef struct lmc_st1f_control {
   int command;
   int address;
   int value;
-  char *data;
+  char __user *data;
 } lmc_t1f_control;
 
 enum lmc_xilinx_c {
@@ -246,7 +246,7 @@ enum lmc_xilinx_c {
 struct lmc_xilinx_control {
     enum lmc_xilinx_c command;
     int len;
-    char *data;
+    char __user *data;
 };
 
 /* ------------------ end T1 defs ------------------- */

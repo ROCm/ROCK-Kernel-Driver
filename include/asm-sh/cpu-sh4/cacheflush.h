@@ -30,6 +30,10 @@ extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 			      unsigned long end);
 extern void flush_cache_page(struct vm_area_struct *vma, unsigned long addr);
 extern void flush_dcache_page(struct page *pg);
+
+#define flush_dcache_mmap_lock(mapping)		do { } while (0)
+#define flush_dcache_mmap_unlock(mapping)	do { } while (0)
+
 extern void flush_icache_range(unsigned long start, unsigned long end);
 extern void flush_cache_sigtramp(unsigned long addr);
 extern void flush_icache_user_range(struct vm_area_struct *vma,

@@ -40,7 +40,6 @@
 #define NEXTHDR_ICMP		58	/* ICMP for IPv6. */
 #define NEXTHDR_NONE		59	/* No next header */
 #define NEXTHDR_DEST		60	/* Destination options header. */
-#define NEXTHDR_MH		0xd2	/* Mobility header */
 
 #define NEXTHDR_MAX		255
 
@@ -91,20 +90,6 @@
 #define IPV6_ADDR_SCOPE_GLOBAL		0x0e
 
 /*
- * 	Addr scopes
- */
-#ifdef __KERNEL__
-#define IPV6_ADDR_MC_SCOPE(a)   \
-        ((a)->s6_addr[1] & 0x0f)        /* XXX nonstandard */
-#define __IPV6_ADDR_SCOPE_INVALID	-1
-#endif
-#define IPV6_ADDR_SCOPE_NODELOCAL       0x01
-#define IPV6_ADDR_SCOPE_LINKLOCAL       0x02
-#define IPV6_ADDR_SCOPE_SITELOCAL       0x05
-#define IPV6_ADDR_SCOPE_ORGLOCAL        0x08
-#define IPV6_ADDR_SCOPE_GLOBAL          0x0e
-
-/*
  *	fragmentation header
  */
 
@@ -126,7 +111,7 @@ extern int sysctl_ipv6_bindv6only;
 extern int sysctl_mld_max_msf;
 
 /* MIBs */
-DECLARE_SNMP_STAT(struct ipv6_mib, ipv6_statistics);
+DECLARE_SNMP_STAT(struct ipstats_mib, ipv6_statistics);
 #define IP6_INC_STATS(field)		SNMP_INC_STATS(ipv6_statistics, field)
 #define IP6_INC_STATS_BH(field)		SNMP_INC_STATS_BH(ipv6_statistics, field)
 #define IP6_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(ipv6_statistics, field)
@@ -193,12 +178,9 @@ struct ipv6_txoptions
 	__u16			opt_flen;	/* after fragment hdr */
 	__u16			opt_nflen;	/* before fragment hdr */
 
-	__u8			mipv6_flags;	/* flags set by MIPv6 */
-
 	struct ipv6_opt_hdr	*hopopt;
 	struct ipv6_opt_hdr	*dst0opt;
-	struct ipv6_rt_hdr	*srcrt;	/* Routing Header Type 0 */
-	struct ipv6_rt_hdr	*srcrt2; /* Routing Header Type 2 */
+	struct ipv6_rt_hdr	*srcrt;	/* Routing Header */
 	struct ipv6_opt_hdr	*auth;
 	struct ipv6_opt_hdr	*dst1opt;
 
@@ -233,7 +215,7 @@ extern struct ipv6_txoptions	*fl6_merge_options(struct ipv6_txoptions * opt_spac
 						   struct ip6_flowlabel * fl,
 						   struct ipv6_txoptions * fopt);
 extern void			fl6_free_socklist(struct sock *sk);
-extern int			ipv6_flowlabel_opt(struct sock *sk, char *optval, int optlen);
+extern int			ipv6_flowlabel_opt(struct sock *sk, char __user *optval, int optlen);
 extern void			ip6_flowlabel_init(void);
 extern void			ip6_flowlabel_cleanup(void);
 
@@ -267,28 +249,12 @@ typedef int		(*inet_getfrag_t) (const void *data,
 					   char *,
 					   unsigned int, unsigned int);
 
-/*
- *	Address manipulation functions
- */
-extern int		__ipv6_addr_type(const struct in6_addr *addr);
-static inline		int ipv6_addr_type(const struct in6_addr *addr)
-{
-	return __ipv6_addr_type(addr) & 0xffff;
-}
+
+extern int		ipv6_addr_type(const struct in6_addr *addr);
 
 static inline int ipv6_addr_scope(const struct in6_addr *addr)
 {
-	return __ipv6_addr_type(addr) & IPV6_ADDR_SCOPE_MASK;
-}
-
-static inline int __ipv6_addr_src_scope(int type)
-{
-	return type == IPV6_ADDR_ANY ? __IPV6_ADDR_SCOPE_INVALID : type>>16;
-}
-
-static inline int ipv6_addr_src_scope(const struct in6_addr *addr)
-{
-	return __ipv6_addr_src_scope(__ipv6_addr_type(addr));
+	return ipv6_addr_type(addr) & IPV6_ADDR_SCOPE_MASK;
 }
 
 static inline int ipv6_addr_cmp(const struct in6_addr *a1, const struct in6_addr *a2)
@@ -334,22 +300,6 @@ static inline int ipv6_addr_any(const struct in6_addr *a)
 {
 	return ((a->s6_addr32[0] | a->s6_addr32[1] | 
 		 a->s6_addr32[2] | a->s6_addr32[3] ) == 0); 
-}
-
-static inline int ipv6_prefix_cmp(const struct in6_addr *p1,
-				  const struct in6_addr *p2, int plen)
-{
-	int b = plen&0x7;
-	int o = plen>>3;
-	int res = 0;
-
-	if (o > 0) 
-		res = memcmp(&p1->s6_addr[0], &p2->s6_addr[0], o);
-	if (res == 0 && b > 0) {
-		__u8 m = (0xff00 >> b) & 0xff;
-		res = (p1->s6_addr[o] & m) - (p2->s6_addr[o] & m);  
-	}
-	return res;
 }
 
 /*
@@ -405,8 +355,7 @@ extern int			ip6_dst_lookup(struct sock *sk,
  *	skb processing functions
  */
 
-extern int			ip6_output(struct sk_buff *skb);
-extern int			ip6_output2(struct sk_buff *skb);
+extern int			ip6_output(struct sk_buff **pskb);
 extern int			ip6_forward(struct sk_buff *skb);
 extern int			ip6_input(struct sk_buff *skb);
 extern int			ip6_mc_input(struct sk_buff *skb);
@@ -445,15 +394,20 @@ extern struct ipv6_txoptions *	ipv6_invert_rthdr(struct sock *sk,
  */
 
 extern int			ipv6_setsockopt(struct sock *sk, int level, 
-						int optname, char *optval, 
+						int optname,
+						char __user *optval, 
 						int optlen);
 extern int			ipv6_getsockopt(struct sock *sk, int level, 
-						int optname, char *optval, 
-						int *optlen);
+						int optname,
+						char __user *optval, 
+						int __user *optlen);
 
 extern void			ipv6_packet_init(void);
 
 extern void			ipv6_packet_cleanup(void);
+
+extern int			ip6_datagram_connect(struct sock *sk, 
+						     struct sockaddr *addr, int addr_len);
 
 extern int 			ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len);
 extern void			ipv6_icmp_error(struct sock *sk, struct sk_buff *skb, int err, u16 port,

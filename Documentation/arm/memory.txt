@@ -1,7 +1,7 @@
 		Kernel Memory Layout on ARM Linux
 
 		Russell King <rmk@arm.linux.org.uk>
-			April 27, 2003 (2.5.68)
+			May 21, 2004 (2.6.6)
 
 This document describes the virtual memory layout which the Linux
 kernel uses for ARM processors.  It indicates which regions are
@@ -29,32 +29,30 @@ ffff0000	ffff0fff	CPU vector page.
 				CPU supports vector relocation (control
 				register V bit.)
 
-ffe00000	fffeffff	Free for platform use, not recommended.
+ffc00000	fffeffff	DMA memory mapping region.  Memory returned
+				by the dma_alloc_xxx functions will be
+				dynamically mapped here.
 
-ffc00000	ffdfffff	2MB consistent memory mapping.
-				Memory returned by the consistent_alloc
-				low level function will be dynamically
-				mapped here.
+ff000000	ffbfffff	Reserved for future expansion of DMA
+				mapping region.
 
-ff000000	ffbfffff	Free for platform use, not recommended.
+VMALLOC_END	feffffff	Free for platform use, recommended.
 
-VMALLOC_END	ff000000	Free for platform use, recommended.
-
-VMALLOC_START	VMALLOC_END	vmalloc() / ioremap() space.
+VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
 				Memory returned by vmalloc/ioremap will
 				be dynamically placed in this region.
 				VMALLOC_START may be based upon the value
 				of the high_memory variable.
 
-PAGE_OFFSET	high_memory	Kernel direct-mapped RAM region.
+PAGE_OFFSET	high_memory-1	Kernel direct-mapped RAM region.
 				This maps the platforms RAM, and typically
 				maps all platform RAM in a 1:1 relationship.
 
-TASK_SIZE	PAGE_OFFSET	Kernel module space
+TASK_SIZE	PAGE_OFFSET-1	Kernel module space
 				Kernel modules inserted via insmod are
 				placed here using dynamic mappings.
 
-00001000	TASK_SIZE	User space mappings
+00001000	TASK_SIZE-1	User space mappings
 				Per-thread mappings are placed here via
 				the mmap() system call.
 

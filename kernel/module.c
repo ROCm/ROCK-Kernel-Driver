@@ -34,11 +34,8 @@
 #include <linux/vermagic.h>
 #include <linux/notifier.h>
 #include <linux/stop_machine.h>
-#include <linux/audit.h>
-#include <linux/trigevent_hooks.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
-#include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
 
 #if 0
@@ -54,23 +51,6 @@
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
-#define symbol_is(literal, string)				\
-	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
-
-/* Allow unsupported modules switch. */ 
-#ifdef UNSUPPORTED_MODULES
-int unsupported = UNSUPPORTED_MODULES;
-#else
-int unsupported = 2;  /* don't warn when loading unsupported modules. */
-#endif
-
-static int __init unsupported_setup(char *str)
-{
-	get_option(&str, &unsupported);
-	return 1;
-}
-__setup("unsupported=", unsupported_setup);
-
 /* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 
@@ -80,8 +60,6 @@ static LIST_HEAD(modules);
 
 static DECLARE_MUTEX(notify_mutex);
 static struct notifier_block * module_notify_list;
-static DECLARE_MUTEX(rmmod_notify_mutex);
-static struct notifier_block * rmmodule_notify_list;
 
 int register_module_notifier(struct notifier_block * nb)
 {
@@ -102,26 +80,6 @@ int unregister_module_notifier(struct notifier_block * nb)
 	return err;
 }
 EXPORT_SYMBOL(unregister_module_notifier);
-
-int register_rmmodule_notifier(struct notifier_block * nb)
-{
-	int err;
-	down(&rmmod_notify_mutex);
-	err = notifier_chain_register(&rmmodule_notify_list, nb);
-	up(&rmmod_notify_mutex);
-	return err;
-}
-EXPORT_SYMBOL(register_rmmodule_notifier);
-
-int unregister_rmmodule_notifier(struct notifier_block * nb)
-{
-	int err;
-	down(&rmmod_notify_mutex);
-	err = notifier_chain_unregister(&rmmodule_notify_list, nb);
-	up(&rmmod_notify_mutex);
-	return err;
-}
-EXPORT_SYMBOL(unregister_rmmodule_notifier);
 
 /* We require a truly strong try_module_get() */
 static inline int strong_try_module_get(struct module *mod)
@@ -255,19 +213,6 @@ static struct module *find_module(const char *name)
 	}
 	return NULL;
 }
-
-struct module *get_module(const char *name)
-{
-	struct module *mod;
-
-	if (down_interruptible(&module_mutex) != 0)
-		return NULL;
-
-	mod = find_module(name);
-	up(&module_mutex);
-	return mod;
-}
-EXPORT_SYMBOL(get_module);
 
 #ifdef CONFIG_SMP
 /* Number of blocks used and allocated. */
@@ -429,6 +374,22 @@ static inline void percpu_modcopy(void *pcpudst, const void *src,
 	BUG_ON(size != 0);
 }
 #endif /* CONFIG_SMP */
+
+static int add_attribute(struct module *mod, struct kernel_param *kp)
+{
+	struct module_attribute *a;
+	int retval;
+
+	a = &mod->mkobj->attr[mod->mkobj->num_attributes];
+	a->attr.name = (char *)kp->name;
+	a->attr.owner = mod;
+	a->attr.mode = kp->perm;
+	a->param = kp;
+	retval = sysfs_create_file(&mod->mkobj->kobj, &a->attr);
+	if (!retval)
+		mod->mkobj->num_attributes++;
+	return retval;
+}
 
 #ifdef CONFIG_MODULE_UNLOAD
 /* Init the unload section of the module. */
@@ -597,16 +558,14 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 	int ret, forced = 0;
 
 	if (!capable(CAP_SYS_MODULE))
-		return audit_intercept(AUDIT_delete_module, NULL, flags), audit_result(-EPERM);
+		return -EPERM;
 
 	if (strncpy_from_user(name, name_user, MODULE_NAME_LEN-1) < 0)
 		return -EFAULT;
 	name[MODULE_NAME_LEN-1] = '\0';
 
-	audit_intercept(AUDIT_delete_module, name, flags);
-
 	if (down_interruptible(&module_mutex) != 0)
-		return audit_result(-EINTR);
+		return -EINTR;
 
 	mod = find_module(name);
 	if (!mod) {
@@ -658,7 +617,7 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 
  out:
 	up(&module_mutex);
-	return audit_result(ret);
+	return ret;
 }
 
 static void print_unload_info(struct seq_file *m, struct module *mod)
@@ -716,6 +675,23 @@ void symbol_put_addr(void *addr)
 }
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
+static int refcnt_get_fn(char *buffer, struct kernel_param *kp)
+{
+	struct module *mod = container_of(kp, struct module, refcnt_param);
+
+	/* sysfs holds one reference. */
+	return sprintf(buffer, "%u", module_refcount(mod)-1);
+}
+
+static inline int sysfs_unload_setup(struct module *mod)
+{
+	mod->refcnt_param.name = "refcnt";
+	mod->refcnt_param.perm = 0444;
+	mod->refcnt_param.get = refcnt_get_fn;
+
+	return add_attribute(mod, &mod->refcnt_param);
+}
+
 #else /* !CONFIG_MODULE_UNLOAD */
 static void print_unload_info(struct seq_file *m, struct module *mod)
 {
@@ -737,12 +713,15 @@ static inline void module_unload_init(struct module *mod)
 }
 
 asmlinkage long
-sys_delete_module(const char *name_user, unsigned int flags)
+sys_delete_module(const char __user *name_user, unsigned int flags)
 {
-	audit_intercept(AUDIT_delete_module, NULL, flags);
-	return audit_result(-ENOSYS);
+	return -ENOSYS;
 }
 
+static inline int sysfs_unload_setup(struct module *mod)
+{
+	return 0;
+}
 #endif /* CONFIG_MODULE_UNLOAD */
 
 #ifdef CONFIG_OBSOLETE_MODPARM
@@ -998,18 +977,224 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 	return ret;
 }
 
+
+/*
+ * /sys/module/foo/sections stuff
+ * J. Corbet <corbet@lwn.net>
+ */
+#ifdef CONFIG_KALLSYMS
+static void module_sect_attrs_release(struct kobject *kobj)
+{
+	kfree(container_of(kobj, struct module_sections, kobj));
+}
+
+static ssize_t module_sect_show(struct kobject *kobj, struct attribute *attr,
+		char *buf)
+{
+	struct module_sect_attr *sattr =
+		container_of(attr, struct module_sect_attr, attr);
+	return sprintf(buf, "0x%lx\n", sattr->address);
+}
+
+static struct sysfs_ops module_sect_ops = {
+	.show = module_sect_show,
+};
+
+static struct kobj_type module_sect_ktype = {
+	.sysfs_ops = &module_sect_ops,
+	.release =   module_sect_attrs_release,
+};
+
+static void add_sect_attrs(struct module *mod, unsigned int nsect,
+		char *secstrings, Elf_Shdr *sechdrs)
+{
+	unsigned int nloaded = 0, i;
+	struct module_sect_attr *sattr;
+	
+	if (!mod->mkobj)
+		return;
+	
+	/* Count loaded sections and allocate structures */
+	for (i = 0; i < nsect; i++)
+		if (sechdrs[i].sh_flags & SHF_ALLOC)
+			nloaded++;
+	mod->sect_attrs = kmalloc(sizeof(struct module_sections) +
+			nloaded*sizeof(mod->sect_attrs->attrs[0]), GFP_KERNEL);
+	if (! mod->sect_attrs)
+		return;
+
+	/* sections entry setup */
+	memset(mod->sect_attrs, 0, sizeof(struct module_sections));
+	if (kobject_set_name(&mod->sect_attrs->kobj, "sections"))
+		goto out;
+	mod->sect_attrs->kobj.parent = &mod->mkobj->kobj;
+	mod->sect_attrs->kobj.ktype = &module_sect_ktype;
+	if (kobject_register(&mod->sect_attrs->kobj))
+		goto out;
+
+	/* And the section attributes. */
+	sattr = &mod->sect_attrs->attrs[0];
+	for (i = 0; i < nsect; i++) {
+		if (! (sechdrs[i].sh_flags & SHF_ALLOC))
+			continue;
+		sattr->address = sechdrs[i].sh_addr;
+		strlcpy(sattr->name, secstrings + sechdrs[i].sh_name,
+				MODULE_SECT_NAME_LEN);
+		sattr->attr.name = sattr->name;
+		sattr->attr.owner = mod;
+		sattr->attr.mode = S_IRUGO;
+		(void) sysfs_create_file(&mod->sect_attrs->kobj, &sattr->attr);
+		sattr++;
+	}
+	return;
+  out:
+	kfree(mod->sect_attrs);
+	mod->sect_attrs = NULL;
+}
+
+static void remove_sect_attrs(struct module *mod)
+{
+	if (mod->sect_attrs) {
+		kobject_unregister(&mod->sect_attrs->kobj);
+		mod->sect_attrs = NULL;
+	}
+}
+
+
+#else
+static inline void add_sect_attrs(struct module *mod, unsigned int nsect,
+		char *sectstrings, Elf_Shdr *sechdrs)
+{
+}
+
+static inline void remove_sect_attrs(struct module *mod)
+{
+}
+#endif /* CONFIG_KALLSYMS */
+
+
+
+
+#define to_module_attr(n) container_of(n, struct module_attribute, attr);
+
+static ssize_t module_attr_show(struct kobject *kobj,
+				struct attribute *attr,
+				char *buf)
+{
+	int count;
+	struct module_attribute *attribute = to_module_attr(attr);
+
+	if (!attribute->param->get)
+		return -EPERM;
+
+	count = attribute->param->get(buf, attribute->param);
+	if (count > 0) {
+		strcat(buf, "\n");
+		++count;
+	}
+	return count;
+}
+
+/* sysfs always hands a nul-terminated string in buf.  We rely on that. */
+static ssize_t module_attr_store(struct kobject *kobj,
+				 struct attribute *attr,
+				 const char *buf, size_t len)
+{
+	int err;
+	struct module_attribute *attribute = to_module_attr(attr);
+
+	if (!attribute->param->set)
+		return -EPERM;
+
+	err = attribute->param->set(buf, attribute->param);
+	if (!err)
+		return len;
+	return err;
+}
+
+static struct sysfs_ops module_sysfs_ops = {
+	.show = module_attr_show,
+	.store = module_attr_store,
+};
+
+static void module_kobj_release(struct kobject *kobj)
+{
+	kfree(container_of(kobj, struct module_kobject, kobj));
+}
+
+static struct kobj_type module_ktype = {
+	.sysfs_ops =	&module_sysfs_ops,
+	.release =	&module_kobj_release,
+};
+static decl_subsys(module, &module_ktype, NULL);
+
+static int mod_sysfs_setup(struct module *mod,
+			   struct kernel_param *kparam,
+			   unsigned int num_params)
+{
+	unsigned int i;
+	int err;
+
+	/* We overallocate: not every param is in sysfs, and maybe no refcnt */
+	mod->mkobj = kmalloc(sizeof(*mod->mkobj)
+			     + sizeof(mod->mkobj->attr[0]) * (num_params+1),
+			     GFP_KERNEL);
+	if (!mod->mkobj)
+		return -ENOMEM;
+
+	memset(&mod->mkobj->kobj, 0, sizeof(mod->mkobj->kobj));
+	err = kobject_set_name(&mod->mkobj->kobj, mod->name);
+	if (err)
+		goto out;
+	kobj_set_kset_s(mod->mkobj, module_subsys);
+	err = kobject_register(&mod->mkobj->kobj);
+	if (err)
+		goto out;
+
+	mod->mkobj->num_attributes = 0;
+
+	for (i = 0; i < num_params; i++) {
+		if (kparam[i].perm) {
+			err = add_attribute(mod, &kparam[i]);
+			if (err)
+				goto out_unreg;
+		}
+	}
+	err = sysfs_unload_setup(mod);
+	if (err)
+		goto out_unreg;
+	return 0;
+
+out_unreg:
+	for (i = 0; i < mod->mkobj->num_attributes; i++)
+		sysfs_remove_file(&mod->mkobj->kobj,&mod->mkobj->attr[i].attr);
+	/* Calls module_kobj_release */
+	kobject_unregister(&mod->mkobj->kobj);
+	return err;
+out:
+	kfree(mod->mkobj);
+	return err;
+}
+
+static void mod_kobject_remove(struct module *mod)
+{
+	unsigned int i;
+	for (i = 0; i < mod->mkobj->num_attributes; i++)
+		sysfs_remove_file(&mod->mkobj->kobj,&mod->mkobj->attr[i].attr);
+	/* Calls module_kobj_release */
+	kobject_unregister(&mod->mkobj->kobj);
+}
+
 /* Free a module, remove from lists, etc (must hold module mutex). */
 static void free_module(struct module *mod)
 {
-	TRIG_EVENT(free_module_hook, mod);
-	down(&rmmod_notify_mutex);
-	notifier_call_chain(&rmmodule_notify_list, MODULE_STATE_GOING, mod);
-	up(&rmmod_notify_mutex);
-
 	/* Delete from various lists */
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
 	spin_unlock_irq(&modlist_lock);
+
+	remove_sect_attrs(mod);
+	mod_kobject_remove(mod);
 
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
@@ -1190,7 +1375,7 @@ static void set_license(struct module *mod, const char *license)
 		license = "unspecified";
 
 	mod->license_gplok = license_is_gpl_compatible(license);
-	if (!mod->license_gplok) {
+	if (!mod->license_gplok && !(tainted & TAINT_PROPRIETARY_MODULE)) {
 		printk(KERN_WARNING "%s: module license '%s' taints kernel.\n",
 		       mod->name, license);
 		tainted |= TAINT_PROPRIETARY_MODULE;
@@ -1324,7 +1509,7 @@ static struct module *load_module(void __user *umod,
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
-	char *secstrings, *args, *modmagic, *strtab = NULL, *supported;
+	char *secstrings, *args, *modmagic, *strtab = NULL;
 	unsigned int i, symindex = 0, strindex = 0, setupindex, exindex,
 		exportindex, modindex, obsparmindex, infoindex, gplindex,
 		crcindex, gplcrcindex, versindex, pcpuindex;
@@ -1437,29 +1622,6 @@ static struct module *load_module(void __user *umod,
 		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
-	}
-
-	supported = get_modinfo(sechdrs, infoindex, "supported");
-	if (supported) {
-		if (!strcmp(supported, "external"))
-			tainted |= TAINT_EXTERNAL_SUPPORT;
-		else if (strcmp(supported, "yes"))
-			supported = NULL;
-	}
-	if (!supported) {
-		if (unsupported == 0) {
-			printk(KERN_WARNING "%s: unsupported module, refusing "
-			       "to load. To override, echo "
-			       "1 > /proc/sys/kernel/unsupported\n",
-			       mod->name);
-			err = -ENOEXEC;
-			goto free_hdr;
-		}
-		tainted |= TAINT_NO_SUPPORT;
-		if (unsupported == 1) {
-			printk(KERN_WARNING "%s: unsupported module, tainting "
-			       "kernel.\n", mod->name);
-		}
 	}
 
 	/* Now copy in args */
@@ -1638,8 +1800,14 @@ static struct module *load_module(void __user *umod,
 				 / sizeof(struct kernel_param),
 				 NULL);
 	}
+	err = mod_sysfs_setup(mod, 
+			      (struct kernel_param *)
+			      sechdrs[setupindex].sh_addr,
+			      sechdrs[setupindex].sh_size
+			      / sizeof(struct kernel_param));
 	if (err < 0)
 		goto arch_cleanup;
+	add_sect_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 
 	/* Get rid of temporary copy */
 	vfree(hdr);
@@ -1679,21 +1847,19 @@ sys_init_module(void __user *umod,
 	struct module *mod;
 	int ret;
 
-	audit_intercept(AUDIT_init_module, umod, len, uargs);
-
 	/* Must have permission */
 	if (!capable(CAP_SYS_MODULE))
-		return audit_result(-EPERM);
+		return -EPERM;
 
 	/* Only one module load at a time, please */
 	if (down_interruptible(&module_mutex) != 0)
-		return audit_result(-EINTR);
+		return -EINTR;
 
 	/* Do all the hard work */
 	mod = load_module(umod, len, uargs);
 	if (IS_ERR(mod)) {
 		up(&module_mutex);
-		return audit_result(PTR_ERR(mod));
+		return PTR_ERR(mod);
 	}
 
 	/* Flush the instruction cache, since we've played with text */
@@ -1717,7 +1883,6 @@ sys_init_module(void __user *umod,
 	notifier_call_chain(&module_notify_list, MODULE_STATE_COMING, mod);
 	up(&notify_mutex);
 
-	TRIG_EVENT(module_init_hook, mod);
 	/* Start the module */
 	ret = mod->init();
 	if (ret < 0) {
@@ -1725,21 +1890,16 @@ sys_init_module(void __user *umod,
                    buggy refcounters. */
 		mod->state = MODULE_STATE_GOING;
 		synchronize_kernel();
-		if (mod->unsafe) {
+		if (mod->unsafe)
 			printk(KERN_ERR "%s: module is now stuck!\n",
 			       mod->name);
-			down(&rmmod_notify_mutex);
-			notifier_call_chain(&rmmodule_notify_list, MODULE_STATE_GOING, mod);
-			up(&rmmod_notify_mutex);
-		}
 		else {
 			module_put(mod);
 			down(&module_mutex);
 			free_module(mod);
 			up(&module_mutex);
 		}
-		TRIG_EVENT(module_init_failed_hook, mod);
-		return audit_result(ret);
+		return ret;
 	}
 
 	/* Now it's a first class citizen! */
@@ -1753,7 +1913,7 @@ sys_init_module(void __user *umod,
 	mod->init_text_size = 0;
 	up(&module_mutex);
 
-	return audit_result(0);
+	return 0;
 }
 
 static inline int within(unsigned long addr, void *start, unsigned long size)
@@ -1965,7 +2125,7 @@ const struct exception_table_entry *search_module_extables(unsigned long addr)
 }
 
 /* Is this a valid kernel address?  We don't grab the lock: we are oopsing. */
-struct module *module_text_address(unsigned long addr)
+struct module *__module_text_address(unsigned long addr)
 {
 	struct module *mod;
 
@@ -1976,12 +2136,37 @@ struct module *module_text_address(unsigned long addr)
 	return NULL;
 }
 
+struct module *module_text_address(unsigned long addr)
+{
+	struct module *mod;
+	unsigned long flags;
+
+	spin_lock_irqsave(&modlist_lock, flags);
+	mod = __module_text_address(addr);
+	spin_unlock_irqrestore(&modlist_lock, flags);
+
+	return mod;
+}
+
+/* Don't grab lock, we're oopsing. */
+void print_modules(void)
+{
+	struct module *mod;
+
+	printk("Modules linked in:");
+	list_for_each_entry(mod, &modules, list)
+		printk(" %s", mod->name);
+	printk("\n");
+}
+
 #ifdef CONFIG_MODVERSIONS
 /* Generate the signature for struct module here, too, for modversions. */
 void struct_module(struct module *mod) { return; }
 EXPORT_SYMBOL(struct_module);
 #endif
 
-#ifdef	CONFIG_KDB
-struct list_head *kdb_modules = &modules;	/* kdb needs the list of modules */
-#endif	/* CONFIG_KDB */
+static int __init modules_init(void)
+{
+	return subsystem_register(&module_subsys);
+}
+__initcall(modules_init);

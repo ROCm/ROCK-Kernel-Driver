@@ -33,7 +33,7 @@
  * Fix: mdc800 used sleep_on and slept with io_lock held.
  * Converted sleep_on to waitqueues with schedule_timeout and made io_lock
  * a semaphore from a spinlock.
- * by Oliver Neukum <520047054719-0001@t-online.de>
+ * by Oliver Neukum <oliver@neukum.name>
  * (02/12/2001)
  * 
  * Identify version on module load.
@@ -41,7 +41,7 @@
  *
  * version 0.7.5
  * Fixed potential SMP races with Spinlocks.
- * Thanks to Oliver Neukum <oliver.neukum@lrz.uni-muenchen.de> who 
+ * Thanks to Oliver Neukum <oliver@neukum.name> who 
  * noticed the race conditions.
  * (30/10/2000)
  *
@@ -190,7 +190,7 @@ static struct usb_endpoint_descriptor mdc800_ed [4] =
 
 
 /* The Variable used by the driver */
-static struct mdc800_data* mdc800=0;
+static struct mdc800_data* mdc800;
 
 
 /***************************************************************************
@@ -312,14 +312,17 @@ static void mdc800_usb_irq (struct urb *urb, struct pt_regs *res)
 static int mdc800_usb_waitForIRQ (int mode, int msec)
 {
         DECLARE_WAITQUEUE(wait, current);
+	long timeout;
 
 	mdc800->camera_request_ready=1+mode;
 
 	add_wait_queue(&mdc800->irq_wait, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
-	if (!mdc800->irq_woken)
+	timeout = msec*HZ/1000;
+	while (!mdc800->irq_woken && timeout)
 	{
-		schedule_timeout (msec*HZ/1000);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		timeout = schedule_timeout (timeout);
 	}
         remove_wait_queue(&mdc800->irq_wait, &wait);
 	set_current_state(TASK_RUNNING);
@@ -544,7 +547,7 @@ static void mdc800_usb_disconnect (struct usb_interface *intf)
 		usb_unlink_urb (mdc800->write_urb);
 		usb_unlink_urb (mdc800->download_urb);
 
-		mdc800->dev=0;
+		mdc800->dev = NULL;
 		usb_set_intfdata(intf, NULL);
 	}
 	info ("Mustek MDC800 disconnected from USB.");
@@ -664,10 +667,11 @@ static int mdc800_device_release (struct inode* inode, struct file *file)
 /*
  * The Device read callback Function
  */
-static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, loff_t *pos)
+static ssize_t mdc800_device_read (struct file *file, char __user *buf, size_t len, loff_t *pos)
 {
 	size_t left=len, sts=len; /* single transfer size */
-	char* ptr=buf;
+	char __user *ptr = buf;
+	long timeout;
 	DECLARE_WAITQUEUE(wait, current);
 
 	down (&mdc800->io_lock);
@@ -715,10 +719,11 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
 					return len-left;
 				}
 				add_wait_queue(&mdc800->download_wait, &wait);
-				set_current_state(TASK_INTERRUPTIBLE);
-				if (!mdc800->downloaded)
+				timeout = TO_DOWNLOAD_GET_READY*HZ/1000;
+				while (!mdc800->downloaded && timeout)
 				{
-					schedule_timeout (TO_DOWNLOAD_GET_READY*HZ/1000);
+					set_current_state(TASK_UNINTERRUPTIBLE);
+					timeout = schedule_timeout (timeout);
 				}
 				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&mdc800->download_wait, &wait);
@@ -762,7 +767,7 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
  * After this the driver initiates the request for the answer or
  * just waits until the camera becomes ready.
  */
-static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t len, loff_t *pos)
+static ssize_t mdc800_device_write (struct file *file, const char __user *buf, size_t len, loff_t *pos)
 {
 	size_t i=0;
 	DECLARE_WAITQUEUE(wait, current);
@@ -819,6 +824,7 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 		if (mdc800->in_count == 8)
 		{
 			int answersize;
+			long timeout;
 
 			if (mdc800_usb_waitForIRQ (0,TO_GET_READY))
 			{
@@ -839,10 +845,11 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 				return -EIO;
 			}
 			add_wait_queue(&mdc800->write_wait, &wait);
-			set_current_state(TASK_INTERRUPTIBLE);
-			if (!mdc800->written)
+			timeout = TO_WRITE_GET_READY*HZ/1000;
+			while (!mdc800->written && timeout)
 			{
-				schedule_timeout (TO_WRITE_GET_READY*HZ/1000);
+				set_current_state(TASK_UNINTERRUPTIBLE);
+				timeout = schedule_timeout (timeout);
 			}
                         set_current_state(TASK_RUNNING);
 			remove_wait_queue(&mdc800->write_wait, &wait);
@@ -964,9 +971,7 @@ static struct usb_driver mdc800_usb_driver =
 	Init and Cleanup this driver (Main Functions)
 *************************************************************************/
 
-#define try(A)           if ((A) == 0) goto cleanup_on_fail;
-#define try_free_mem(A)  if (A != 0) { kfree (A); A=0; }
-#define try_free_urb(A)  if (A != 0) { usb_free_urb (A); A=0; }
+#define try(A)           if (!(A)) goto cleanup_on_fail;
 
 static int __init usb_mdc800_init (void)
 {
@@ -975,7 +980,7 @@ static int __init usb_mdc800_init (void)
 	try (mdc800=kmalloc (sizeof (struct mdc800_data), GFP_KERNEL));
 
 	memset(mdc800, 0, sizeof(struct mdc800_data));
-	mdc800->dev=0;
+	mdc800->dev = NULL;
 	mdc800->open=0;
 	mdc800->state=NOT_CONNECTED;
 	init_MUTEX (&mdc800->io_lock);
@@ -1013,17 +1018,17 @@ cleanup_on_fail:
 	{
 		err ("can't alloc memory!");
 
-		try_free_mem (mdc800->download_urb_buffer);
-		try_free_mem (mdc800->write_urb_buffer);
-		try_free_mem (mdc800->irq_urb_buffer);
+		kfree(mdc800->download_urb_buffer);
+		kfree(mdc800->write_urb_buffer);
+		kfree(mdc800->irq_urb_buffer);
 
-		try_free_urb (mdc800->write_urb);
-		try_free_urb (mdc800->download_urb);
-		try_free_urb (mdc800->irq_urb);
+		usb_free_urb(mdc800->write_urb);
+		usb_free_urb(mdc800->download_urb);
+		usb_free_urb(mdc800->irq_urb);
 
 		kfree (mdc800);
 	}
-	mdc800=0;
+	mdc800 = NULL;
 	return retval;
 }
 
@@ -1041,7 +1046,7 @@ static void __exit usb_mdc800_cleanup (void)
 	kfree (mdc800->download_urb_buffer);
 
 	kfree (mdc800);
-	mdc800=0;
+	mdc800 = NULL;
 }
 
 module_init (usb_mdc800_init);

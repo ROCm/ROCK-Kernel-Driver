@@ -943,7 +943,10 @@ void sb_setmixer(sb_devc * devc, unsigned int port, unsigned int value)
 {
 	unsigned long flags;
 
-	if (devc->model == MDL_ESS) return ess_setmixer (devc, port, value);
+	if (devc->model == MDL_ESS) {
+		ess_setmixer (devc, port, value);
+		return;
+	}
 
 	spin_lock_irqsave(&devc->lock, flags);
 
@@ -1203,7 +1206,7 @@ int probe_sbmpu(struct address_info *hw_config, struct module *owner)
 	if (last_devc == NULL)
 		return 0;
 
-	last_devc = 0;
+	last_devc = NULL;
 
 	if (hw_config->io_base <= 0)
 	{

@@ -1,5 +1,5 @@
 /*
- * $Id: cu3088.c,v 1.33.12.1 2004/06/16 14:35:38 pavlic Exp $
+ * $Id: cu3088.c,v 1.34 2004/06/15 13:16:27 pavlic Exp $
  *
  * CTC / LCS ccw_device driver
  *

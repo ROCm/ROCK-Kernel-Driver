@@ -12,15 +12,12 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
-#include <linux/module.h>
 
 #include <asm/page.h>
 #include <asm/sal.h>
 #include <asm/pal.h>
 
 spinlock_t sal_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
-EXPORT_SYMBOL(sal_lock);
-
 unsigned long sal_platform_features;
 
 unsigned short sal_revision;
@@ -41,8 +38,6 @@ default_handler (void)
 }
 
 ia64_sal_handler ia64_sal = (ia64_sal_handler) default_handler;
-EXPORT_SYMBOL(ia64_sal);
-
 ia64_sal_desc_ptc_t *ia64_ptc_domain_info;
 
 const char *
@@ -127,10 +122,23 @@ sal_desc_entry_point (void *p)
 static void __init
 set_smp_redirect (int flag)
 {
+#ifndef CONFIG_HOTPLUG_CPU
 	if (no_int_routing)
 		smp_int_redirect &= ~flag;
 	else
 		smp_int_redirect |= flag;
+#else
+	/*
+	 * For CPU Hotplug we dont want to do any chipset supported
+	 * interrupt redirection. The reason is this would require that
+	 * All interrupts be stopped and hard bind the irq to a cpu.
+	 * Later when the interrupt is fired we need to set the redir hint
+	 * on again in the vector. This is combersome for something that the
+	 * user mode irq balancer will solve anyways.
+	 */
+	no_int_routing=1;
+	smp_int_redirect &= ~flag;
+#endif
 }
 #else
 #define set_smp_redirect(flag)	do { } while (0)
@@ -180,6 +188,27 @@ sal_desc_ap_wakeup (void *p)
 		break;
 	}
 }
+
+static void __init
+chk_nointroute_opt(void)
+{
+	char *cp;
+	extern char saved_command_line[];
+
+	for (cp = saved_command_line; *cp; ) {
+		if (memcmp(cp, "nointroute", 10) == 0) {
+			no_int_routing = 1;
+			printk ("no_int_routing on\n");
+			break;
+		} else {
+			while (*cp != ' ' && *cp)
+				++cp;
+			while (*cp == ' ')
+				++cp;
+		}
+	}
+}
+
 #else
 static void __init sal_desc_ap_wakeup(void *p) { }
 #endif
@@ -199,6 +228,9 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		printk(KERN_ERR "bad signature in system table!");
 
 	check_versions(systab);
+#ifdef CONFIG_SMP
+	chk_nointroute_opt();
+#endif
 
 	/* revisions are coded in BCD, so %x does the job for us */
 	printk(KERN_INFO "SAL %x.%x: %.32s %.32s%sversion %x.%x\n",

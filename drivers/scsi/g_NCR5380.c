@@ -107,7 +107,7 @@
 #include <linux/sched.h>
 #include <linux/blkdev.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "g_NCR5380.h"
 #include "NCR5380.h"
 #include <linux/stat.h>
@@ -355,7 +355,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 		if (!(overrides[current_override].NCR5380_map_name))
 			continue;
 
-		ports = 0;
+		ports = NULL;
 		switch (overrides[current_override].board) {
 		case BOARD_NCR5380:
 			flags = FLAG_NO_PSEUDO_DMA;

@@ -208,7 +208,13 @@ extern int ecard_readchunk (struct in_chunk_dir *cd, struct expansion_card *ec, 
 /*
  * Obtain the address of a card
  */
-extern unsigned int ecard_address (struct expansion_card *ec, card_type_t card_type, card_speed_t speed);
+extern __deprecated unsigned int ecard_address (struct expansion_card *ec, card_type_t card_type, card_speed_t speed);
+
+/*
+ * Request and release ecard resources
+ */
+extern int ecard_request_resources(struct expansion_card *ec);
+extern void ecard_release_resources(struct expansion_card *ec);
 
 #ifdef ECARD_C
 /* Definitions internal to ecard.c - for it's use only!!
@@ -235,11 +241,11 @@ struct ex_ecid {
 
 	unsigned char	r_country;
 
-	unsigned char	r_irqmask;
-	unsigned char	r_irqoff[3];
-
 	unsigned char	r_fiqmask;
 	unsigned char	r_fiqoff[3];
+
+	unsigned char	r_irqmask;
+	unsigned char	r_irqoff[3];
 };
 
 /*

@@ -823,7 +823,7 @@ int cs46xx_dsp_proc_init (snd_card_t * card, cs46xx_t *chip)
 		entry->private_data = chip;
 		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
 		entry->c.text.read_size = 512;
-		entry->c.text.read = cs46xx_dsp_proc_task_tree_read;;
+		entry->c.text.read = cs46xx_dsp_proc_task_tree_read;
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;
@@ -836,7 +836,7 @@ int cs46xx_dsp_proc_init (snd_card_t * card, cs46xx_t *chip)
 		entry->private_data = chip;
 		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
 		entry->c.text.read_size = 1024;
-		entry->c.text.read = cs46xx_dsp_proc_scb_read;;
+		entry->c.text.read = cs46xx_dsp_proc_scb_read;
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;

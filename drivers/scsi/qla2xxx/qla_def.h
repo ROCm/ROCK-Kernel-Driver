@@ -178,14 +178,6 @@
 #define WRT_REG_BYTE(addr, data)	writeb(data,addr)
 #define WRT_REG_WORD(addr, data)	writew(data,addr)
 #define WRT_REG_DWORD(addr, data)	writel(data,addr)
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-/*
- * The ISP2312 v2 chip cannot access the FLASH/GPIO registers via MMIO in an
- * 133Mhz slot.
- */
-#define RD_REG_WORD_IOMEM(addr)		(inw((unsigned long)addr))
-#define WRT_REG_WORD_IOMEM(addr, data)	(outw(data,(unsigned long)addr))
-#endif
 
 /*
  * Fibre Channel device definitions.
@@ -1704,14 +1696,6 @@ typedef struct fc_port {
 	uint8_t mp_byte;		/* multi-path byte (not used) */
     	uint8_t cur_path;		/* current path id */
 
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-	int16_t cfg_id;			/* index into cfg device table */
-	uint16_t notify_type;
-	int (*fo_combine)(void *, uint16_t, struct fc_port *, uint16_t);
-	int (*fo_detect)(void);
-	int (*fo_notify)(void);
-	int (*fo_select)(void);
-#endif
 	lun_bit_mask_t lun_mask;
 } fc_port_t;
 
@@ -1770,11 +1754,6 @@ typedef struct fc_lun {
 
 	uint8_t max_path_retries;
 	uint32_t flags;
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-	void *mplun;	
-	void *mpbuf;	/* ptr to buffer use by multi-path driver */
-	int mplen;
-#endif
 } fc_lun_t;
 
 #define	FLF_VISIBLE_LUN		BIT_0
@@ -2365,26 +2344,6 @@ typedef struct scsi_qla_host {
 #define BINZERO		"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 	char		*model_desc;
 
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-/* following are new and needed for IOCTL support */
-	struct hba_ioctl *ioctl;
-
-	void        *ioctl_mem;
-	dma_addr_t  ioctl_mem_phys;
-	uint32_t    ioctl_mem_size;
-
-	struct scsi_cmnd *ioctl_err_cmd;
-
-	/* PCI expansion ROM image information. */
-	unsigned long	code_types;
-#define ROM_CODE_TYPE_BIOS	0
-#define ROM_CODE_TYPE_FCODE	1
-#define ROM_CODE_TYPE_EFI	3
-
-	uint8_t		bios_revision[2];
-	uint8_t		efi_revision[2];
-	uint8_t		fcode_revision[16];
-#endif
 	uint8_t     node_name[WWN_SIZE];
 	uint8_t     nvram_version; 
 	uint32_t    isp_abort_cnt;
@@ -2474,9 +2433,6 @@ struct _qla2x00stats  {
  */
 #define FLASH_IMAGE_SIZE	131072
 
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-#include "qla_foln.h"
-#endif
 #include "qla_gbl.h"
 #include "qla_dbg.h"
 #include "qla_inline.h"

@@ -759,7 +759,7 @@ io_error:
 	// certain level
 	if (!is_tree_node (p_s_bh, expected_level)) {
 	    reiserfs_warning (p_s_sb, "vs-5150: search_by_key: "
-			      "invalid format found in block %ld. Fsck?", 
+			      "invalid format found in block %ld. Fsck?",
 			      p_s_bh->b_blocknr);
 	    pathrelse (p_s_search_path);
 	    return IO_ERROR;
@@ -1036,8 +1036,6 @@ static char  prepare_for_delete_or_cut(
     struct item_head    * p_le_ih = PATH_PITEM_HEAD(p_s_path);
     struct buffer_head  * p_s_bh = PATH_PLAST_BUFFER(p_s_path);
 
-    BUG_ON (!th->t_trans_id);
-
     /* Stat_data item. */
     if ( is_statdata_le_ih (p_le_ih) ) {
 
@@ -1224,9 +1222,6 @@ static void init_tb_struct(
     struct path         * p_s_path,
     int                   n_size
     ) {
-
-    BUG_ON (!th->t_trans_id);
-
     memset (p_s_tb,'\0',sizeof(struct tree_balance));
     p_s_tb->transaction_handle = th ;
     p_s_tb->tb_sb = p_s_sb;
@@ -1295,8 +1290,6 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
     int			n_iter = 0;
 #endif
 
-    BUG_ON (!th->t_trans_id);
-
     init_tb_struct(th, &s_del_balance, p_s_sb, p_s_path, 0/*size is unknown*/);
 
     while ( 1 ) {
@@ -1313,7 +1306,7 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 	copy_item_head(&s_ih, PATH_PITEM_HEAD(p_s_path));
 	s_del_balance.insert_size[0] = n_del_size;
 
-	n_ret_value = fix_nodes(M_DELETE, &s_del_balance, NULL, 0);
+	n_ret_value = fix_nodes(M_DELETE, &s_del_balance, NULL, NULL);
 	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 
@@ -1426,8 +1419,6 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
     struct cpu_key cpu_key;
     int retval;
     int quota_cut_bytes = 0;
-
-    BUG_ON (!th->t_trans_id);
     
     le_key2cpu_key (&cpu_key, key);
     
@@ -1455,14 +1446,14 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	}
 	quota_cut_bytes = ih_item_len(PATH_PITEM_HEAD(&path)) ;
 
-	retval = fix_nodes (M_DELETE, &tb, NULL, 0);
+	retval = fix_nodes (M_DELETE, &tb, NULL, NULL);
 	if (retval == REPEAT_SEARCH) {
 	    PROC_INFO_INC( th -> t_super, delete_solid_item_restarted );
 	    continue;
 	}
 
 	if (retval == CARRY_ON) {
-	    do_balance (&tb, 0, 0, M_DELETE);
+	    do_balance (&tb, NULL, NULL, M_DELETE);
 	    if (inode) {	/* Should we count quota for item? (we don't count quotas for save-links) */
 #ifdef REISERQUOTA_DEBUG
 		reiserfs_debug (th->t_super, "reiserquota delete_solid_item(): freeing %u id=%u type=%c", quota_cut_bytes, inode->i_uid, key2type(key));
@@ -1483,16 +1474,12 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 }
 
 
-int reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode * inode)
+void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode * inode)
 {
-    int err;
     inode->i_size = 0;
-    BUG_ON (!th->t_trans_id);
 
     /* for directory this deletes item containing "." and ".." */
-    err = reiserfs_do_truncate (th, inode, NULL, 0/*no timestamp updates*/);
-    if (err)
-        return err;
+    reiserfs_do_truncate (th, inode, NULL, 0/*no timestamp updates*/);
     
 #if defined( USE_INODE_GENERATION_COUNTER )
     if( !old_format_only ( th -> t_super ) )
@@ -1506,8 +1493,6 @@ int reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode
 /* USE_INODE_GENERATION_COUNTER */
 #endif
     reiserfs_delete_solid_item (th, inode, INODE_PKEY (inode));
-
-    return err;
 }
 
 static void
@@ -1557,7 +1542,6 @@ static int maybe_indirect_to_direct (struct reiserfs_transaction_handle *th,
     struct super_block * p_s_sb = p_s_inode->i_sb;
     int n_block_size = p_s_sb->s_blocksize;
     int cut_bytes;
-    BUG_ON (!th->t_trans_id);
 
     if (n_new_file_size != p_s_inode->i_size)
 	BUG ();
@@ -1590,7 +1574,6 @@ static void indirect_to_direct_roll_back (struct reiserfs_transaction_handle *th
     struct cpu_key tail_key;
     int tail_len;
     int removed;
-    BUG_ON (!th->t_trans_id);
 
     make_cpu_key (&tail_key, inode, inode->i_size + 1, TYPE_DIRECT, 4);// !!!!
     tail_key.key_length = 4;
@@ -1604,7 +1587,7 @@ static void indirect_to_direct_roll_back (struct reiserfs_transaction_handle *th
 	        "vs-5616: appended bytes found");
 	PATH_LAST_POSITION (path) --;
 	
-	removed = reiserfs_delete_item (th, path, &tail_key, inode, 0/*unbh not needed*/);
+	removed = reiserfs_delete_item (th, path, &tail_key, inode, NULL/*unbh not needed*/);
 	RFALSE( removed <= 0 || removed > tail_len,
 	        "vs-5617: there was tail %d bytes, removed item length %d bytes",
                 tail_len, removed);
@@ -1640,8 +1623,6 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     int retval2 = -1;
     int quota_cut_bytes;
     loff_t tail_pos = 0;
-
-    BUG_ON (!th->t_trans_id);
     
     init_tb_struct(th, &s_cut_balance, p_s_inode->i_sb, p_s_path, n_cut_size);
 
@@ -1696,7 +1677,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 
 	s_cut_balance.insert_size[0] = n_cut_size;
 	
-	n_ret_value = fix_nodes(c_mode, &s_cut_balance, NULL, 0);
+	n_ret_value = fix_nodes(c_mode, &s_cut_balance, NULL, NULL);
       	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 	
@@ -1741,7 +1722,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     */
     p_le_ih = PATH_PITEM_HEAD (s_cut_balance.tb_path);
     if (!S_ISLNK (p_s_inode->i_mode) && is_direct_le_ih(p_le_ih)) {
-        if (c_mode == M_DELETE && 
+        if (c_mode == M_DELETE &&
 	   (le_ih_k_offset (p_le_ih) & (p_s_sb->s_blocksize - 1)) == 1 ) {
 	    // FIXME: this is to keep 3.5 happy
 	    REISERFS_I(p_s_inode)->i_first_direct_byte = U32_MAX;
@@ -1794,7 +1775,6 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 
 static void truncate_directory (struct reiserfs_transaction_handle *th, struct inode * inode)
 {
-    BUG_ON (!th->t_trans_id);
     if (inode->i_nlink)
 	reiserfs_warning (inode->i_sb,
 			  "vs-5655: truncate_directory: link count != 0");
@@ -1812,7 +1792,7 @@ static void truncate_directory (struct reiserfs_transaction_handle *th, struct i
 
 /* Truncate file to the new size. Note, this must be called with a transaction
    already started */
-int reiserfs_do_truncate (struct reiserfs_transaction_handle *th, 
+void reiserfs_do_truncate (struct reiserfs_transaction_handle *th, 
 			   struct  inode * p_s_inode, /* ->i_size contains new
                                                          size */
 			   struct page *page, /* up to date for last block */
@@ -1828,16 +1808,14 @@ int reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	n_new_file_size;/* New file size. */
     int                   n_deleted;      /* Number of deleted or truncated bytes. */
     int retval;
-    int err = 0;
 
-    BUG_ON (!th->t_trans_id);
     if ( ! (S_ISREG(p_s_inode->i_mode) || S_ISDIR(p_s_inode->i_mode) || S_ISLNK(p_s_inode->i_mode)) )
-	return 0;
+	return;
 
     if (S_ISDIR(p_s_inode->i_mode)) {
 	// deletion of directory - no need to update timestamps
 	truncate_directory (th, p_s_inode);
-	return 0;
+	return;
     }
 
     /* Get new file size. */
@@ -1850,15 +1828,13 @@ int reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
     if (retval == IO_ERROR) {
 	reiserfs_warning (p_s_inode->i_sb, "vs-5657: reiserfs_do_truncate: "
 			  "i/o failure occurred trying to truncate %K", &s_item_key);
-        err = -EIO;
-        goto out;
+	return;
     }
     if (retval == POSITION_FOUND || retval == FILE_NOT_FOUND) {
+	pathrelse (&s_search_path);
 	reiserfs_warning (p_s_inode->i_sb, "PAP-5660: reiserfs_do_truncate: "
 			  "wrong result %d of search for %K", retval, &s_item_key);
-        
-        err = -EIO;
-        goto out;
+	return;
     }
 
     s_search_path.pos_in_item --;
@@ -1896,7 +1872,7 @@ int reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	if (n_deleted < 0) {
 	    reiserfs_warning (p_s_inode->i_sb, "vs-5665: reiserfs_do_truncate: reiserfs_cut_from_item failed");
 	    reiserfs_check_path(&s_search_path) ;
-	    return 0;
+	    return;
 	}
 
 	RFALSE( n_deleted > n_file_size,
@@ -1926,13 +1902,8 @@ int reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	  } 
 	  reiserfs_update_sd(th, p_s_inode) ;
 
-	  err = journal_end(th, p_s_inode->i_sb, orig_len_alloc) ;
-          if (err)
-            goto out;
-	  err = journal_begin (th, p_s_inode->i_sb,
-                               JOURNAL_PER_BALANCE_CNT * 6);
-          if (err)
-            goto out;
+	  journal_end(th, p_s_inode->i_sb, orig_len_alloc) ;
+	  journal_begin(th, p_s_inode->i_sb, JOURNAL_PER_BALANCE_CNT * 6) ;
 	  reiserfs_update_inode_transaction(p_s_inode) ;
 	}
     } while ( n_file_size > ROUND_UP (n_new_file_size) &&
@@ -1949,9 +1920,7 @@ update_and_out:
     }
     reiserfs_update_sd (th, p_s_inode);
 
-out:
     pathrelse(&s_search_path) ;
-    return err;
 }
 
 
@@ -1966,7 +1935,7 @@ static void check_research_for_paste (struct path * path,
 	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_last_bh (path)->b_size) !=
 	    cpu_key_k_offset (p_s_key) ||
 	    op_bytes_number (found_ih, get_last_bh (path)->b_size) != pos_in_item (path))
-	    reiserfs_panic (0, "PAP-5720: check_research_for_paste: "
+	    reiserfs_panic (NULL, "PAP-5720: check_research_for_paste: "
 			    "found direct item %h or position (%d) does not match to key %K",
 			    found_ih, pos_in_item (path), p_s_key);
     }
@@ -1974,7 +1943,7 @@ static void check_research_for_paste (struct path * path,
 	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_last_bh (path)->b_size) != cpu_key_k_offset (p_s_key) || 
 	    I_UNFM_NUM (found_ih) != pos_in_item (path) ||
 	    get_ih_free_space (found_ih) != 0)
-	    reiserfs_panic (0, "PAP-5730: check_research_for_paste: "
+	    reiserfs_panic (NULL, "PAP-5730: check_research_for_paste: "
 			    "found indirect item (%h) or position (%d) does not match to key (%K)",
 			    found_ih, pos_in_item (path), p_s_key);
     }
@@ -1993,8 +1962,6 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
     struct tree_balance s_paste_balance;
     int                 retval;
     int			fs_gen;
-
-    BUG_ON (!th->t_trans_id);
 
     fs_gen = get_generation(inode->i_sb) ;
 
@@ -2068,8 +2035,6 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
     int fs_gen = 0 ;
     int quota_bytes = 0 ;
 
-    BUG_ON (!th->t_trans_id);
-
     if (inode) {      /* Do we count quotas for item? */
 	fs_gen = get_generation(inode->i_sb);
 	quota_bytes = ih_item_len(p_s_ih);
@@ -2115,7 +2080,7 @@ search_again:
 	    goto error_out; 
 	}
     }
- 
+
     /* make balancing after all resources will be collected at a time */ 
     if ( retval == CARRY_ON ) {
 	do_balance (&s_ins_balance, p_s_ih, p_c_body, M_INSERT);

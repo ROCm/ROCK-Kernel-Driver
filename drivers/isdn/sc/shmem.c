@@ -30,19 +30,18 @@ extern int cinst;
 /*
  *
  */
-void *memcpy_toshmem(int card, void *dest, const void *src, size_t n)
+void memcpy_toshmem(int card, void *dest, const void *src, size_t n)
 {
 	unsigned long flags;
-	void *ret;
 	unsigned char ch;
 
 	if(!IS_VALID_CARD(card)) {
 		pr_debug("Invalid param: %d is not a valid card id\n", card);
-		return NULL;
+		return;
 	}
 
 	if(n > SRAM_PAGESIZE) {
-		return NULL;
+		return;
 	}
 
 	/*
@@ -57,7 +56,7 @@ void *memcpy_toshmem(int card, void *dest, const void *src, size_t n)
 
 	outb(((sc_adapter[card]->shmem_magic + ch * SRAM_PAGESIZE) >> 14) | 0x80,
 		sc_adapter[card]->ioport[sc_adapter[card]->shmem_pgport]);
-	ret = memcpy_toio(sc_adapter[card]->rambase +
+	memcpy_toio(sc_adapter[card]->rambase +
 		((unsigned long) dest % 0x4000), src, n);
 	spin_unlock_irqrestore(&sc_adapter[card]->lock, flags);
 	pr_debug("%s: set page to %#x\n",sc_adapter[card]->devicename,
@@ -66,26 +65,23 @@ void *memcpy_toshmem(int card, void *dest, const void *src, size_t n)
 		sc_adapter[card]->devicename, n,
 		(unsigned long) src,
 		sc_adapter[card]->rambase + ((unsigned long) dest %0x4000));
-
-	return ret;
 }
 
 /*
  * Reverse of above
  */
-void *memcpy_fromshmem(int card, void *dest, const void *src, size_t n)
+void memcpy_fromshmem(int card, void *dest, const void *src, size_t n)
 {
 	unsigned long flags;
-	void *ret;
 	unsigned char ch;
 
 	if(!IS_VALID_CARD(card)) {
 		pr_debug("Invalid param: %d is not a valid card id\n", card);
-		return NULL;
+		return;
 	}
 
 	if(n > SRAM_PAGESIZE) {
-		return NULL;
+		return;
 	}
 
 	/*
@@ -102,7 +98,7 @@ void *memcpy_fromshmem(int card, void *dest, const void *src, size_t n)
 
 	outb(((sc_adapter[card]->shmem_magic + ch * SRAM_PAGESIZE) >> 14) | 0x80,
 		sc_adapter[card]->ioport[sc_adapter[card]->shmem_pgport]);
-	ret = memcpy_fromio(dest,(void *)(sc_adapter[card]->rambase +
+	memcpy_fromio(dest,(void *)(sc_adapter[card]->rambase +
 		((unsigned long) src % 0x4000)), n);
 	spin_unlock_irqrestore(&sc_adapter[card]->lock, flags);
 	pr_debug("%s: set page to %#x\n",sc_adapter[card]->devicename,
@@ -110,23 +106,20 @@ void *memcpy_fromshmem(int card, void *dest, const void *src, size_t n)
 /*	pr_debug("%s: copying %d bytes from %#x to %#x\n",
 		sc_adapter[card]->devicename, n,
 		sc_adapter[card]->rambase + ((unsigned long) src %0x4000), (unsigned long) dest); */
-
-	return ret;
 }
 
-void *memset_shmem(int card, void *dest, int c, size_t n)
+void memset_shmem(int card, void *dest, int c, size_t n)
 {
 	unsigned long flags;
 	unsigned char ch;
-	void *ret;
 
 	if(!IS_VALID_CARD(card)) {
 		pr_debug("Invalid param: %d is not a valid card id\n", card);
-		return NULL;
+		return;
 	}
 
 	if(n > SRAM_PAGESIZE) {
-		return NULL;
+		return;
 	}
 
 	/*
@@ -142,11 +135,9 @@ void *memset_shmem(int card, void *dest, int c, size_t n)
 
 	outb(((sc_adapter[card]->shmem_magic + ch * SRAM_PAGESIZE) >> 14) | 0x80,
 		sc_adapter[card]->ioport[sc_adapter[card]->shmem_pgport]);
-	ret = memset_io(sc_adapter[card]->rambase +
+	memset_io(sc_adapter[card]->rambase +
 		((unsigned long) dest % 0x4000), c, n);
 	pr_debug("%s: set page to %#x\n",sc_adapter[card]->devicename,
 		((sc_adapter[card]->shmem_magic + ch * SRAM_PAGESIZE)>>14)|0x80);
 	spin_unlock_irqrestore(&sc_adapter[card]->lock, flags);
-
-	return ret;
 }

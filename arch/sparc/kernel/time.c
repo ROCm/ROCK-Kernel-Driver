@@ -54,7 +54,7 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 enum sparc_clock_type sp_clock_typ;
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 unsigned long mstk48t02_regs = 0UL;
-static struct mostek48t08 *mstk48t08_regs = 0;
+static struct mostek48t08 *mstk48t08_regs = NULL;
 static int set_rtc_mmss(unsigned long);
 static int sbus_do_settimeofday(struct timespec *tv);
 
@@ -251,9 +251,9 @@ static __inline__ void sun4_clock_probe(void)
 		sp_clock_typ = MSTK48T02;
 		r.start = sun4_clock_physaddr;
 		mstk48t02_regs = sbus_ioremap(&r, 0,
-				       sizeof(struct mostek48t02), 0);
-		mstk48t08_regs = 0;  /* To catch weirdness */
-		intersil_clock = 0;  /* just in case */
+				       sizeof(struct mostek48t02), NULL);
+		mstk48t08_regs = NULL;  /* To catch weirdness */
+		intersil_clock = NULL;  /* just in case */
 
 		/* Kick start the clock if it is completely stopped. */
 		if (mostek_read(mstk48t02_regs + MOSTEK_SEC) & MSTK_STOP)
@@ -266,7 +266,7 @@ static __inline__ void sun4_clock_probe(void)
 		intersil_clock = (struct intersil *) 
 		    sbus_ioremap(&r, 0, sizeof(*intersil_clock), "intersil");
 		mstk48t02_regs = 0;  /* just be sure */
-		mstk48t08_regs = 0;  /* ditto */
+		mstk48t08_regs = NULL;  /* ditto */
 		/* initialise the clock */
 
 		intersil_intr(intersil_clock,INTERSIL_INT_100HZ);
@@ -340,7 +340,7 @@ static __inline__ void clock_probe(void)
 		r.start = clk_reg[0].phys_addr;
 		mstk48t02_regs = sbus_ioremap(&r, 0,
 		    sizeof(struct mostek48t02), "mk48t02");
-		mstk48t08_regs = 0;  /* To catch weirdness */
+		mstk48t08_regs = NULL;  /* To catch weirdness */
 	} else if (strcmp(model, "mk48t08") == 0) {
 		sp_clock_typ = MSTK48T08;
 		if(prom_getproperty(node, "reg", (char *) clk_reg,

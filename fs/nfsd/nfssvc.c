@@ -49,9 +49,6 @@
 #define	SIG_NOCLEAN	SIGHUP
 
 extern struct svc_program	nfsd_program;
-#ifdef CONFIG_NFSD_ACL
-extern struct svc_program	nfsd_acl_program;
-#endif
 static void			nfsd(struct svc_rqst *rqstp);
 struct timeval			nfssvc_boot;
 static struct svc_serv 		*nfsd_serv;
@@ -372,29 +369,8 @@ static struct svc_version *	nfsd_version[] = {
 #endif
 };
 
-#ifdef CONFIG_NFSD_ACL
-extern struct svc_version nfsd_acl_version3;
-
-static struct svc_version *	nfsd_acl_version[] = {
-	[3] = &nfsd_acl_version3,
-};
-
-#define NFSD_ACL_NRVERS		(sizeof(nfsd_acl_version)/sizeof(nfsd_acl_version[0]))
-struct svc_program		nfsd_acl_program = {
-	.pg_prog		= NFS3_ACL_PROGRAM,
-	.pg_nvers		= NFSD_ACL_NRVERS,
-	.pg_vers		= nfsd_acl_version,
-	.pg_name		= "nfsd",
-	.pg_stats		= &nfsd_acl_svcstats,
-};
-# define nfsd_acl_program_p &nfsd_acl_program
-#else
-# define nfsd_acl_program_p NULL
-#endif
-
 #define NFSD_NRVERS		(sizeof(nfsd_version)/sizeof(nfsd_version[0]))
 struct svc_program		nfsd_program = {
-	.pg_next		= nfsd_acl_program_p,
 	.pg_prog		= NFS_PROGRAM,		/* program number */
 	.pg_nvers		= NFSD_NRVERS,		/* nr of entries in nfsd_version */
 	.pg_vers		= nfsd_version,		/* version table */

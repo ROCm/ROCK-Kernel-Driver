@@ -17,6 +17,18 @@ config I2C_ALI1535
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-ali1535.
 
+config I2C_ALI1563
+	tristate "ALI 1563"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the SMB
+	  Host controller on Acer Labs Inc. (ALI) M1563 South Bridges.  The SMB
+	  controller is part of the 7101 device, which is an ACPI-compliant
+	  Power Management Unit (PMU).
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-ali1563.
+
 config I2C_ALI15X3
 	tristate "ALI 15x3"
 	depends on I2C && PCI && EXPERIMENTAL
@@ -83,6 +95,8 @@ config I2C_I801
 	    82801CA/CAM
 	    82801DB
 	    82801EB
+	    6300ESB
+	    ICH6
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-i801.
@@ -104,8 +118,14 @@ config I2C_I810
 	  will be called i2c-i810.
 
 config I2C_IBM_IIC
-	tristate "IBM IIC I2C"
+	tristate "IBM PPC 4xx on-chip I2C interface"
 	depends on IBM_OCP && I2C
+	help
+	  Say Y here if you want to use IIC peripheral found on 
+	  embedded IBM PPC 4xx based systems. 
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-ibm_iic.
 
 config I2C_IOP3XX
 	tristate "Intel XScale IOP3xx on-chip I2C interface"
@@ -133,16 +153,16 @@ config I2C_ITE
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-ite.
 
-config I2C_IXP42X
-	tristate "IXP42x GPIO-Based I2C Interface"
-	depends on I2C && ARCH_IXP425
+config I2C_IXP4XX
+	tristate "IXP4xx GPIO-Based I2C Interface"
+	depends on I2C && ARCH_IXP4XX
 	select I2C_ALGOBIT
 	help
-	  Say Y here if you have an Intel IXP42x(420,421,422,425) based 
+	  Say Y here if you have an Intel IXP4xx(420,421,422,425) based 
 	  system and are using GPIO lines for an I2C bus.
 
 	  This support is also available as a module. If so, the module
-	  will be called i2c-ixp42x.
+	  will be called i2c-ixp4xx.
 
 config I2C_KEYWEST
 	tristate "Powermac Keywest I2C interface"

@@ -46,8 +46,13 @@ int sysfs_create(struct dentry * dentry, int mode, int (*init)(struct inode *))
 	struct inode * inode = NULL;
 	if (dentry) {
 		if (!dentry->d_inode) {
-			if ((inode = sysfs_new_inode(mode)))
+			if ((inode = sysfs_new_inode(mode))) {
+				if (dentry->d_parent && dentry->d_parent->d_inode) {
+					struct inode *p_inode = dentry->d_parent->d_inode;
+					p_inode->i_mtime = p_inode->i_ctime = CURRENT_TIME;
+				}
 				goto Proceed;
+			}
 			else 
 				error = -ENOMEM;
 		} else
@@ -97,7 +102,7 @@ void sysfs_hash_and_remove(struct dentry * dir, const char * name)
 				 atomic_read(&victim->d_count));
 
 			d_drop(victim);
-			/* release the target kobject in case of
+			/* release the target kobject in case of 
 			 * a symlink
 			 */
 			if (S_ISLNK(victim->d_inode->i_mode))

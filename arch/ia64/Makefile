@@ -13,9 +13,7 @@ READELF := $(CROSS_COMPILE)readelf
 
 export AWK
 
-ifndef CONFIG_DEBUG_INFO
-OBJCOPYFLAGS	:= --strip-debug
-endif
+OBJCOPYFLAGS	:= --strip-all
 LDFLAGS_vmlinux	:= -static
 LDFLAGS_MODULE	+= -T $(srctree)/arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
@@ -45,7 +43,8 @@ endif
 
 ifeq ($(GCC_VERSION),3)
  ifeq ($(GCC_MINOR_VERSION),4)
-	cflags-$(CONFIG_ITANIUM)	+= -mtune=merced
+# Workaround Itanium 1 bugs in gcc 3.4.
+#	cflags-$(CONFIG_ITANIUM)	+= -mtune=merced
 	cflags-$(CONFIG_MCKINLEY)	+= -mtune=mckinley
  endif
 endif
@@ -63,7 +62,6 @@ core-$(CONFIG_IA64_GENERIC) 	+= arch/ia64/dig/
 core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_SGI_SN2)	+= arch/ia64/sn/
 
-drivers-$(CONFIG_KDB)		+= arch/$(ARCH)/kdb/
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
@@ -87,8 +85,7 @@ unwcheck: vmlinux
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-CLEAN_FILES += include/asm-ia64/.offsets.h.stamp vmlinux.gz bootloader
-MRPROPER_FILES += include/asm-ia64/offsets.h
+CLEAN_FILES += include/asm-ia64/.offsets.h.stamp include/asm-ia64/offsets.h vmlinux.gz bootloader
 
 prepare: include/asm-ia64/offsets.h
 

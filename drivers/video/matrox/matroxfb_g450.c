@@ -591,11 +591,11 @@ void matroxfb_g450_connect(WPMINFO2) {
 	if (ACCESS_FBINFO(devflags.g450dac)) {
 		down_write(&ACCESS_FBINFO(altout.lock));
 		tvo_fill_defaults(PMINFO2);
-		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_CRTC1;
+		ACCESS_FBINFO(outputs[1]).src = ACCESS_FBINFO(outputs[1]).default_src;
 		ACCESS_FBINFO(outputs[1]).data = MINFO;
 		ACCESS_FBINFO(outputs[1]).output = &matroxfb_g450_altout;
 		ACCESS_FBINFO(outputs[1]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
-		ACCESS_FBINFO(outputs[2]).src = MATROXFB_SRC_CRTC1;
+		ACCESS_FBINFO(outputs[2]).src = ACCESS_FBINFO(outputs[2]).default_src;
 		ACCESS_FBINFO(outputs[2]).data = MINFO;
 		ACCESS_FBINFO(outputs[2]).output = &matroxfb_g450_dvi;
 		ACCESS_FBINFO(outputs[2]).mode = MATROXFB_OUTPUT_MODE_MONITOR;

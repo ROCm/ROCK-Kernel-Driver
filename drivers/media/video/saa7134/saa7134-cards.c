@@ -509,24 +509,14 @@ struct saa7134_board saa7134_boards[] = {
                         .vmux = 1,
                         .amux = TV,
                         .tv   = 1,
-#if 0 /* untested */
                 },{
                         .name = name_comp1,
                         .vmux = 4,
                         .amux = LINE2,
                 },{
-                        .name = name_comp2,
-                        .vmux = 2,
-                        .amux = LINE2,
-                },{
                         .name = name_svideo,
                         .vmux = 6,
                         .amux = LINE2,
-                },{
-                        .name = "S-Video2",
-                        .vmux = 7,
-                        .amux = LINE2,
-#endif
                 }},
                 .radio = {
                         .name = name_radio,
@@ -1011,6 +1001,30 @@ struct saa7134_board saa7134_boards[] = {
   			.amux = LINE1,
   		}},
           },
+	[SAA7134_BOARD_ITEMS_MTV005] = {
+		/* Norman Jonas <normanjonas@arcor.de> */
+		.name           = "Items MuchTV Plus / IT-005",
+		.audio_clock    = 0x00187de7,
+		.tuner_type     = TUNER_PHILIPS_PAL,
+		.inputs         = {{
+			.name = name_tv,
+			.vmux = 3,
+			.amux = TV,
+			.tv   = 1,
+		},{
+			.name   = name_comp1,
+			.vmux   = 1,
+			.amux   = LINE1,
+		},{
+			.name = name_svideo,
+			.vmux = 8,
+			.amux = LINE1,
+		}},
+		.radio = {
+			.name = name_radio,
+			.amux = LINE2,
+		},
+	},
 };
 const unsigned int saa7134_bcount = ARRAY_SIZE(saa7134_boards);
 
@@ -1314,6 +1328,9 @@ int saa7134_board_init(struct saa7134_dev *dev)
 	case SAA7134_BOARD_CINERGY600:
 	case SAA7134_BOARD_ECS_TVP3XP:
 	case SAA7134_BOARD_ECS_TVP3XP_4CB5:
+		dev->has_remote = 1;
+		break;
+	case SAA7134_BOARD_AVACSSMARTTV:
 		dev->has_remote = 1;
 		break;
 	}

@@ -39,7 +39,7 @@ $(obj)/addinitrd: $(obj)/addinitrd.c
 archhelp:
 	@echo	'* vmlinux.ecoff	- ECOFF boot image'
 
-CLEAN_FILES += addinitrd \
+clean-files += addinitrd \
 	       elf2ecoff \
 	       vmlinux.ecoff \
 	       vmlinux.srec \

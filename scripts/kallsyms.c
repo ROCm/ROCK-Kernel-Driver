@@ -5,13 +5,13 @@
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
- * Usage: nm -n vmlinux | scripts/kallsyms > symbols.S
- * If CONFIG_KDB is defined, generate all symbols for kdb.
+ * Usage: nm -n vmlinux | scripts/kallsyms [--all-symbols] > symbols.S
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 struct sym_entry {
 	unsigned long long addr;
@@ -22,17 +22,13 @@ struct sym_entry {
 
 static struct sym_entry *table;
 static int size, cnt;
-static unsigned long long _stext, _etext, _sinittext, _einittext, __per_cpu_end;
-#ifdef CONFIG_KDB
-#define kdb 1
-#else
-#define kdb 0
-#endif
+static unsigned long long _stext, _etext, _sinittext, _einittext;
+static int all_symbols = 0;
 
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: kallsyms < in.map > out.S\n");
+	fprintf(stderr, "Usage: kallsyms [--all-symbols] < in.map > out.S\n");
 	exit(1);
 }
 
@@ -50,6 +46,19 @@ read_symbol(FILE *in, struct sym_entry *s)
 		}
 		return -1;
 	}
+
+	/* Ignore most absolute/undefined (?) symbols. */
+	if (strcmp(str, "_stext") == 0)
+		_stext = s->addr;
+	else if (strcmp(str, "_etext") == 0)
+		_etext = s->addr;
+	else if (strcmp(str, "_sinittext") == 0)
+		_sinittext = s->addr;
+	else if (strcmp(str, "_einittext") == 0)
+		_einittext = s->addr;
+	else if (toupper(s->type) == 'A' || toupper(s->type) == 'U')
+		return -1;
+
 	s->sym = strdup(str);
 	return 0;
 }
@@ -57,18 +66,27 @@ read_symbol(FILE *in, struct sym_entry *s)
 static int
 symbol_valid(struct sym_entry *s)
 {
-	if ((s->addr < _stext || (kdb && s->addr > __per_cpu_end) || (!kdb && s->addr > _etext))
-	    && (s->addr < _sinittext || s->addr > _einittext))
+	if (!all_symbols) {
+		if ((s->addr < _stext || s->addr > _etext)
+		    && (s->addr < _sinittext || s->addr > _einittext))
+			return 0;
+	}
+
+	/* Exclude symbols which vary between passes.  Passes 1 and 2 must have
+	 * identical symbol lists.  The kallsyms_* symbols below are only added
+	 * after pass 1, they would be included in pass 2 when --all-symbols is
+	 * specified so exclude them to get a stable symbol list.
+	 */
+	if (strstr(s->sym, "_compiled.") ||
+	    strcmp(s->sym, "kallsyms_addresses") == 0 ||
+	    strcmp(s->sym, "kallsyms_num_syms") == 0 ||
+	    strcmp(s->sym, "kallsyms_names") == 0)
 		return 0;
 
-	if (strstr(s->sym, "_compiled."))
+	/* Exclude linker generated symbols which vary between passes */
+	if (strcmp(s->sym, "_SDA_BASE_") == 0 ||	/* ppc */
+	    strcmp(s->sym, "_SDA2_BASE_") == 0)		/* ppc */
 		return 0;
-	if (kdb) {
-		if (strcmp(s->sym, "kallsyms_addresses") == 0 ||
-		    strcmp(s->sym, "kallsyms_num_syms") == 0 ||
-		    strcmp(s->sym, "kallsyms_names") == 0)
-		return 0;
-	}
 
 	return 1;
 }
@@ -76,8 +94,6 @@ symbol_valid(struct sym_entry *s)
 static void
 read_map(FILE *in)
 {
-	int i;
-
 	while (!feof(in)) {
 		if (cnt >= size) {
 			size += 10000;
@@ -90,24 +106,11 @@ read_map(FILE *in)
 		if (read_symbol(in, &table[cnt]) == 0)
 			cnt++;
 	}
-	for (i = 0; i < cnt; i++) {
-		if (strcmp(table[i].sym, "_stext") == 0)
-			_stext = table[i].addr;
-		if (strcmp(table[i].sym, "_etext") == 0)
-			_etext = table[i].addr;
-		if (strcmp(table[i].sym, "_sinittext") == 0)
-			_sinittext = table[i].addr;
-		if (strcmp(table[i].sym, "_einittext") == 0)
-			_einittext = table[i].addr;
-		if (kdb && strcmp(table[i].sym, "__per_cpu_end") == 0)
-			__per_cpu_end = table[i].addr;
-	}
 }
 
 static void
 write_src(void)
 {
-	unsigned long long last_addr;
 	int i, valid = 0;
 	char *prev;
 
@@ -125,16 +128,12 @@ write_src(void)
 	printf(".globl kallsyms_addresses\n");
 	printf("\tALGN\n");
 	printf("kallsyms_addresses:\n");
-	for (i = 0, last_addr = 0; i < cnt; i++) {
+	for (i = 0; i < cnt; i++) {
 		if (!symbol_valid(&table[i]))
-			continue;
-		
-		if (table[i].addr == last_addr && !kdb)
 			continue;
 
 		printf("\tPTR\t%#llx\n", table[i].addr);
 		valid++;
-		last_addr = table[i].addr;
 	}
 	printf("\n");
 
@@ -148,20 +147,16 @@ write_src(void)
 	printf("\tALGN\n");
 	printf("kallsyms_names:\n");
 	prev = ""; 
-	for (i = 0, last_addr = 0; i < cnt; i++) {
+	for (i = 0; i < cnt; i++) {
 		int k;
 
 		if (!symbol_valid(&table[i]))
-			continue;
-		
-		if (table[i].addr == last_addr && !kdb)
 			continue;
 
 		for (k = 0; table[i].sym[k] && table[i].sym[k] == prev[k]; ++k)
 			; 
 
 		printf("\t.byte 0x%02x\n\t.asciz\t\"%s\"\n", k, table[i].sym + k);
-		last_addr = table[i].addr;
 		prev = table[i].sym;
 	}
 	printf("\n");
@@ -170,7 +165,9 @@ write_src(void)
 int
 main(int argc, char **argv)
 {
-	if (argc != 1)
+	if (argc == 2 && strcmp(argv[1], "--all-symbols") == 0)
+		all_symbols = 1;
+	else if (argc != 1)
 		usage();
 
 	read_map(stdin);

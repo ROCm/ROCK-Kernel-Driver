@@ -1990,6 +1990,8 @@ static void es1968_update_hw_volume(unsigned long private_data)
 			if ((val & 0xff00) < 0x1f00)
 				val += 0x0100;
 		}
+		if (val == 0x1f1f)
+			val |= 0x8000;
 		snd_ac97_write_cache(chip->ac97, AC97_MASTER, val);
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->master_volume->id);
@@ -2426,6 +2428,7 @@ static int es1968_suspend(snd_card_t *card, unsigned int state)
 	snd_pcm_suspend_all(chip->pcm);
 	snd_ac97_suspend(chip->ac97);
 	snd_es1968_bob_stop(chip);
+	snd_es1968_set_acpi(chip, ACPI_D3);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2463,8 +2466,11 @@ static int es1968_resume(snd_card_t *card, unsigned int state)
 
 static int snd_es1968_free(es1968_t *chip)
 {
-	if (chip->res_io_port)
-		snd_es1968_reset(chip);
+	if (chip->res_io_port) {
+		synchronize_irq(chip->irq);
+		outw(1, chip->io_port + 0x04); /* clear WP interrupts */
+		outw(0, chip->io_port + ESM_PORT_HOST_IRQ); /* disable IRQ */
+	}
 
 #ifdef SUPPORT_JOYSTICK
 	if (chip->res_joystick) {
@@ -2498,6 +2504,7 @@ struct ess_device_list {
 };
 
 static struct ess_device_list pm_whitelist[] __devinitdata = {
+	{ TYPE_MAESTRO2E, 0x0e11 },	/* Compaq Armada */
 	{ TYPE_MAESTRO2E, 0x1028 },
 	{ TYPE_MAESTRO2E, 0x103c },
 	{ TYPE_MAESTRO2E, 0x1179 },

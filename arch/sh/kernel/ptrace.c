@@ -1,4 +1,4 @@
-/* $Id: ptrace.c,v 1.14 2003/11/28 23:05:43 kkojima Exp $
+/* $Id: ptrace.c,v 1.15 2004/05/07 05:32:05 sugioka Exp $
  *
  * linux/arch/sh/kernel/ptrace.c
  *
@@ -255,13 +255,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = ptrace_detach(child, data);
 		break;
 
-	case PTRACE_SETOPTIONS:
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		ret = 0;
-		break;
 #ifdef CONFIG_SH_DSP
 	case PTRACE_GETDSPREGS: {
 		unsigned long dp;

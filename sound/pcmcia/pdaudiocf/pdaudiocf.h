@@ -140,7 +140,7 @@ int snd_pdacf_suspend(snd_card_t *card, unsigned int state);
 int snd_pdacf_resume(snd_card_t *card, unsigned int state);
 #endif
 int snd_pdacf_pcm_new(pdacf_t *chip);
-void pdacf_interrupt(int irq, void *dev, struct pt_regs *regs);
+irqreturn_t pdacf_interrupt(int irq, void *dev, struct pt_regs *regs);
 void pdacf_tasklet(unsigned long private_data);
 void pdacf_reinit(pdacf_t *chip, int resume);
 

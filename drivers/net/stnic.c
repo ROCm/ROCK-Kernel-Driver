@@ -28,6 +28,8 @@
 
 #include "8390.h"
 
+#define DRV_NAME "stnic"
+
 #define byte	unsigned char
 #define half	unsigned short
 #define word	unsigned int
@@ -130,7 +132,7 @@ static int __init stnic_probe(void)
 
   /* Snarf the interrupt now.  There's no point in waiting since we cannot
      share and the board will usually be enabled. */
-  err = request_irq (dev->irq, ei_interrupt, 0, dev->name, dev);
+  err = request_irq (dev->irq, ei_interrupt, 0, DRV_NAME, dev);
   if (err)  {
       printk (KERN_EMERG " unable to get IRQ %d.\n", dev->irq);
       free_netdev(dev);

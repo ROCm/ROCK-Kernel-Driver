@@ -29,7 +29,7 @@
  * Service routines are added via hp300_request_irq() and removed
  * via hp300_free_irq(). The device driver should set IRQ_FLG_FAST
  * if it needs to be serviced early (eg FIFOless UARTs); this will
- * cause it to be added at the front of the queue rather than 
+ * cause it to be added at the front of the queue rather than
  * the back.
  * Currently IRQ_FLG_SLOW and flags=0 are treated identically; if
  * we needed three levels of priority we could distinguish them
@@ -37,7 +37,7 @@
  */
 
 /* we start with no entries in any list */
-static irq_node_t *hp300_irq_list[HP300_NUM_IRQS] = { [0 ... HP300_NUM_IRQS-1] = NULL };
+static irq_node_t *hp300_irq_list[HP300_NUM_IRQS];
 
 static spinlock_t irqlist_lock;
 
@@ -52,14 +52,19 @@ static irqreturn_t hp300_int_handler(int irq, void *dev_id, struct pt_regs *fp)
                 t->handler(irq, t->dev_id, fp);
         /* We could put in some accounting routines, checks for stray interrupts,
          * etc, in here. Note that currently we can't tell whether or not
-         * a handler handles the interrupt, though. 
+         * a handler handles the interrupt, though.
          */
 	return IRQ_HANDLED;
 }
 
 irqreturn_t (*hp300_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	hp300_int_handler, hp300_int_handler, hp300_int_handler, hp300_int_handler,
-	hp300_int_handler, hp300_int_handler, hp300_int_handler, NULL
+	[0] = hp300_int_handler,
+	[1] = hp300_int_handler,
+	[2] = hp300_int_handler,
+	[3] = hp300_int_handler,
+	[4] = hp300_int_handler,
+	[5] = hp300_int_handler,
+	[6] = hp300_int_handler,
 };
 
 /* dev_id had better be unique to each handler because it's the only way we have
@@ -75,7 +80,7 @@ int hp300_request_irq(unsigned int irq,
                       unsigned long flags, const char *devname, void *dev_id)
 {
         irq_node_t *t, *n = new_irq_node();
-        
+
         if (!n)                                   /* oops, no free nodes */
                 return -ENOMEM;
 
@@ -112,7 +117,7 @@ void hp300_free_irq(unsigned int irq, void *dev_id)
         unsigned long flags;
 
         spin_lock_irqsave(&irqlist_lock, flags);
-        
+
         t = hp300_irq_list[irq];
         if (!t)                                   /* no handlers at all for that IRQ */
         {
@@ -120,7 +125,7 @@ void hp300_free_irq(unsigned int irq, void *dev_id)
                 spin_unlock_irqrestore(&irqlist_lock, flags);
 		return;
         }
-        
+
         if (t->dev_id == dev_id)
         {                                         /* removing first handler on chain */
                 t->flags = IRQ_FLG_STD;           /* we probably don't really need these */
@@ -131,9 +136,9 @@ void hp300_free_irq(unsigned int irq, void *dev_id)
 		spin_unlock_irqrestore(&irqlist_lock, flags);
 		return;
         }
-        
+
         /* OK, must be removing from middle of the chain */
-        
+
         for (t = hp300_irq_list[irq]; t->next && t->next->dev_id != dev_id; t = t->next)
                 /* do nothing */;
         if (!t->next)
@@ -148,7 +153,7 @@ void hp300_free_irq(unsigned int irq, void *dev_id)
 	t->next->devname = NULL;
 	t->next->handler = NULL;
         t->next = t->next->next;
-        
+
 	spin_unlock_irqrestore(&irqlist_lock, flags);
 }
 

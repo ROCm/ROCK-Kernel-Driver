@@ -128,7 +128,7 @@ pcibios_fixup_resources(struct pci_dev *dev)
 		struct resource *res = dev->resource + i;
 		if (!res->flags)
 			continue;
-		if (!res->start || res->end == 0xffffffff) {
+		if (res->end == 0xffffffff) {
 			DBG("PCI:%s Resource %d [%08lx-%08lx] is unassigned\n",
 			    pci_name(dev), i, res->start, res->end);
 			res->end -= res->start;
@@ -347,6 +347,8 @@ pci_relocate_bridge_resource(struct pci_bus *bus, int i)
 		return -1;
 	}
 	res = bus->resource[i];
+	if (res == NULL)
+		return -1;
 	pr = NULL;
 	for (j = 0; j < 4; j++) {
 		struct resource *r = parent->resource[j];
@@ -659,21 +661,21 @@ make_one_node_map(struct device_node* node, u8 pci_bus)
 		return;
 	bus_range = (int *) get_property(node, "bus-range", &len);
 	if (bus_range == NULL || len < 2 * sizeof(int)) {
-		printk(KERN_WARNING "Can't get bus-range for %s\n",
-		       node->full_name);
-		return;
-	}
-	pci_to_OF_bus_map[pci_bus] = bus_range[0];
+		printk(KERN_WARNING "Can't get bus-range for %s, "
+		       "assuming it starts at 0\n", node->full_name);
+		pci_to_OF_bus_map[pci_bus] = 0;
+	} else
+		pci_to_OF_bus_map[pci_bus] = bus_range[0];
 
 	for (node=node->child; node != 0;node = node->sibling) {
 		struct pci_dev* dev;
 		unsigned int *class_code, *reg;
 	
-		class_code = (unsigned int *) get_property(node, "class-code", 0);
+		class_code = (unsigned int *) get_property(node, "class-code", NULL);
 		if (!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS))
 			continue;
-		reg = (unsigned int *)get_property(node, "reg", 0);
+		reg = (unsigned int *)get_property(node, "reg", NULL);
 		if (!reg)
 			continue;
 		dev = pci_find_slot(pci_bus, ((reg[0] >> 8) & 0xff));
@@ -710,7 +712,7 @@ pcibios_make_OF_bus_map(void)
 			continue;
 		make_one_node_map(node, hose->first_busno);
 	}
-	of_prop_map = get_property(find_path_device("/"), "pci-OF-bus-map", 0);
+	of_prop_map = get_property(find_path_device("/"), "pci-OF-bus-map", NULL);
 	if (of_prop_map)
 		memcpy(of_prop_map, pci_to_OF_bus_map, pci_bus_count);
 #ifdef DEBUG
@@ -741,7 +743,7 @@ scan_OF_pci_childs(struct device_node* node, pci_OF_scan_iterator filter, void* 
 		 * a fake root for all functions of a multi-function device,
 		 * we go down them as well.
 		 */
-		class_code = (unsigned int *) get_property(node, "class-code", 0);
+		class_code = (unsigned int *) get_property(node, "class-code", NULL);
 		if ((!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS)) &&
 			strcmp(node->name, "multifunc-device"))
@@ -759,7 +761,7 @@ scan_OF_pci_childs_iterator(struct device_node* node, void* data)
 	unsigned int *reg;
 	u8* fdata = (u8*)data;
 	
-	reg = (unsigned int *) get_property(node, "reg", 0);
+	reg = (unsigned int *) get_property(node, "reg", NULL);
 	if (reg && ((reg[0] >> 8) & 0xff) == fdata[1]
 		&& ((reg[0] >> 16) & 0xff) == fdata[0])
 		return 1;
@@ -872,7 +874,7 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 	if (!scan_OF_pci_childs(((struct device_node*)hose->arch_data)->child,
 			find_OF_pci_device_filter, (void *)node))
 		return -ENODEV;
-	reg = (unsigned int *) get_property(node, "reg", 0);
+	reg = (unsigned int *) get_property(node, "reg", NULL);
 	if (!reg)
 		return -ENODEV;
 	*bus = (reg[0] >> 16) & 0xff;
@@ -1073,6 +1075,8 @@ do_update_p2p_io_resource(struct pci_bus *bus, int enable_vga)
 	u16 w;
 	struct resource res;
 
+	if (bus->resource[0] == NULL)
+		return;
  	res = *(bus->resource[0]);
 
 	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->slot_name);
@@ -1168,7 +1172,8 @@ do_fixup_p2p_level(struct pci_bus *bus)
 	int has_vga = 0;
 
 	for (parent_io=0; parent_io<4; parent_io++)
-		if (bus->resource[parent_io]->flags & IORESOURCE_IO)
+		if (bus->resource[parent_io]
+		    && bus->resource[parent_io]->flags & IORESOURCE_IO)
 			break;
 	if (parent_io >= 4)
 		return;

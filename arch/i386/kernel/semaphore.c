@@ -15,6 +15,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/err.h>
+#include <linux/init.h>
 #include <asm/semaphore.h>
 
 /*
@@ -53,7 +54,7 @@ asmlinkage void __up(struct semaphore *sem)
 	wake_up(&sem->wait);
 }
 
-asmlinkage void __down(struct semaphore * sem)
+asmlinkage void __sched __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -90,7 +91,7 @@ asmlinkage void __down(struct semaphore * sem)
 	tsk->state = TASK_RUNNING;
 }
 
-asmlinkage int __down_interruptible(struct semaphore * sem)
+asmlinkage int __sched __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -187,7 +188,7 @@ asmlinkage int __down_trylock(struct semaphore * sem)
  * value..
  */
 asm(
-".text\n"
+".section .sched.text\n"
 ".align 4\n"
 ".globl __down_failed\n"
 "__down_failed:\n\t"
@@ -210,7 +211,7 @@ asm(
 );
 
 asm(
-".text\n"
+".section .sched.text\n"
 ".align 4\n"
 ".globl __down_failed_interruptible\n"
 "__down_failed_interruptible:\n\t"
@@ -231,7 +232,7 @@ asm(
 );
 
 asm(
-".text\n"
+".section .sched.text\n"
 ".align 4\n"
 ".globl __down_failed_trylock\n"
 "__down_failed_trylock:\n\t"
@@ -252,7 +253,7 @@ asm(
 );
 
 asm(
-".text\n"
+".section .sched.text\n"
 ".align 4\n"
 ".globl __up_wakeup\n"
 "__up_wakeup:\n\t"
@@ -271,7 +272,7 @@ asm(
  */
 #if defined(CONFIG_SMP)
 asm(
-".text\n"
+".section .sched.text\n"
 ".align	4\n"
 ".globl	__write_lock_failed\n"
 "__write_lock_failed:\n\t"
@@ -285,7 +286,7 @@ asm(
 );
 
 asm(
-".text\n"
+".section .sched.text\n"
 ".align	4\n"
 ".globl	__read_lock_failed\n"
 "__read_lock_failed:\n\t"

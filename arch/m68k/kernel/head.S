@@ -19,7 +19,7 @@
 ** ++ Bjoern & Roman: ATARI-68040 support for the Medusa
 ** 95/11/18 Richard Hirst: Added MVME166 support
 ** 96/04/26 Guenther Kelleter: fixed identity mapping for Falcon with
-** 			      Magnum- and FX-alternate ram
+**			      Magnum- and FX-alternate ram
 ** 98/04/25 Phil Blundell: added HP300 support
 ** 1998/08/30 David Kilzer: Added support for font_desc structures
 **            for linux-2.1.115
@@ -67,7 +67,7 @@
  * for the kernel.
  *	There are new subroutines and data structures to make MMU
  * support cleaner and easier to understand.
- * 	First, you will find a routine call "mmu_map" which maps
+ *	First, you will find a routine call "mmu_map" which maps
  * a logical to a physical region for some length given a cache
  * type on behalf of the caller.  This routine makes writing the
  * actual per-machine specific code very simple.
@@ -299,7 +299,7 @@
  * For the head.S console, there are three supported fonts, 6x11, 8x16 and 8x8.
  * The 8x8 font is harder to read but fits more on the screen.
  */
-#define FONT_8x8 	/* default */
+#define FONT_8x8	/* default */
 /* #define FONT_8x16 */	/* 2nd choice */
 /* #define FONT_6x11 */	/* 3rd choice */
 

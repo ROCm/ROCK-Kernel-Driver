@@ -911,7 +911,7 @@ struct gem_rxd {
 	  (GP)->tx_old - (GP)->tx_new - 1)
 
 #define RX_OFFSET          2
-#define RX_BUF_ALLOC_SIZE(gp)	((gp)->dev->mtu + 46 + RX_OFFSET + 64)
+#define RX_BUF_ALLOC_SIZE(gp)	((gp)->rx_buf_sz + 28 + RX_OFFSET + 64)
 
 #define RX_COPY_THRESHOLD  256
 
@@ -979,6 +979,7 @@ struct gem {
 	int			rx_fifo_sz;
 	int			rx_pause_off;
 	int			rx_pause_on;
+	int			rx_buf_sz;
 	int			mii_phy_addr;
 
 	u32			mac_rx_cfg;

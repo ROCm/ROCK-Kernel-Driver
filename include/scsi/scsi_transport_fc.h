@@ -20,6 +20,8 @@
 #ifndef SCSI_TRANSPORT_FC_H
 #define SCSI_TRANSPORT_FC_H
 
+#include <linux/config.h>
+
 struct scsi_transport_template;
 
 struct fc_transport_attrs {
@@ -33,6 +35,22 @@ struct fc_transport_attrs {
 #define fc_node_name(x)	(((struct fc_transport_attrs *)&(x)->transport_data)->node_name)
 #define fc_port_name(x)	(((struct fc_transport_attrs *)&(x)->transport_data)->port_name)
 
-extern struct scsi_transport_template fc_transport_template;
+/* The functions by which the transport class and the driver communicate */
+struct fc_function_template {
+	void 	(*get_port_id)(struct scsi_device *);
+	void	(*get_node_name)(struct scsi_device *);
+	void	(*get_port_name)(struct scsi_device *);
+	/* The driver sets these to tell the transport class it
+	 * wants the attributes displayed in sysfs.  If the show_ flag
+	 * is not set, the attribute will be private to the transport
+	 * class */
+	unsigned long	show_port_id:1;
+	unsigned long	show_node_name:1;
+	unsigned long	show_port_name:1;
+	/* Private Attributes */
+};
+
+struct scsi_transport_template *fc_attach_transport(struct fc_function_template *);
+void fc_release_transport(struct scsi_transport_template *);
 
 #endif /* SCSI_TRANSPORT_FC_H */

@@ -44,7 +44,7 @@ int acpi_found_madt;
 int apic_version [MAX_APICS];
 unsigned char mp_bus_id_to_type [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
 int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
-cpumask_t mp_bus_to_cpumask [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = CPU_MASK_ALL };
+cpumask_t pci_bus_to_cpumask [256] = { [0 ... 255] = CPU_MASK_ALL };
 
 int mp_current_pci_id = 0;
 /* I/O APIC entries */
@@ -572,10 +572,10 @@ void __init get_smp_config (void)
 
 static int __init smp_scan_config (unsigned long base, unsigned long length)
 {
-	static int printed;
 	extern void __bad_mpf_size(void); 
 	unsigned int *bp = phys_to_virt(base);
 	struct intel_mp_floating *mpf;
+	static int printed __initdata; 
 
 	Dprintk("Scan SMP from %p for %ld bytes.\n", bp,length);
 	if (sizeof(*mpf) != 16)
@@ -599,7 +599,7 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 		bp += 4;
 		length -= 16;
 	}
-	if (!printed) {
+	if (!printed) {		
 		printk(KERN_INFO "No mptable found.\n");
 		printed = 1;
 	}
@@ -716,7 +716,7 @@ struct mp_ioapic_routing {
 } mp_ioapic_routing[MAX_IO_APICS];
 
 
-static int __init mp_find_ioapic (
+static int mp_find_ioapic (
 	int			gsi)
 {
 	int			i = 0;
@@ -820,9 +820,9 @@ void __init mp_override_legacy_irq (
 		(intsrc.mpc_irqflag >> 2) & 3, intsrc.mpc_srcbus, 
 		intsrc.mpc_srcbusirq, intsrc.mpc_dstapic, intsrc.mpc_dstirq);
 
-		mp_irqs[mp_irq_entries] = intsrc;
-		if (++mp_irq_entries == MAX_IRQ_SOURCES)
-			panic("Max # of irq sources exceeded!\n");
+	mp_irqs[mp_irq_entries] = intsrc;
+	if (++mp_irq_entries == MAX_IRQ_SOURCES)
+		panic("Max # of irq sources exceeded!\n");
 
 	return;
 }
@@ -859,15 +859,22 @@ void __init mp_config_acpi_legacy_irqs (void)
 	for (i = 0; i < 16; i++) {
 		int idx;
 
-		for (idx = 0; idx < mp_irq_entries; idx++)
-			if (mp_irqs[idx].mpc_srcbus == MP_ISA_BUS &&
-				(mp_irqs[idx].mpc_srcbusirq == i ||
-				mp_irqs[idx].mpc_dstirq == i))
-					break;
+		for (idx = 0; idx < mp_irq_entries; idx++) {
+			struct mpc_config_intsrc *irq = mp_irqs + idx;
+
+			/* Do we already have a mapping for this ISA IRQ? */
+			if (irq->mpc_srcbus == MP_ISA_BUS && irq->mpc_srcbusirq == i)
+				break;
+
+			/* Do we already have a mapping for this IOAPIC pin */
+			if ((irq->mpc_dstapic == intsrc.mpc_dstapic) &&
+				(irq->mpc_dstirq == i))
+				break;
+		}
 
 		if (idx != mp_irq_entries) {
 			printk(KERN_DEBUG "ACPI: IRQ%d used by override.\n", i);
-			continue;			 /* IRQ already used */
+			continue;			/* IRQ already used */
 		}
 
 		intsrc.mpc_irqtype = mp_INT;
@@ -888,88 +895,54 @@ void __init mp_config_acpi_legacy_irqs (void)
 	return;
 }
 
-
-extern FADT_DESCRIPTOR acpi_fadt;
-
-#ifdef CONFIG_ACPI_PCI
-
-void __init mp_parse_prt (void)
+void mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 {
-	struct list_head	*node = NULL;
-	struct acpi_prt_entry	*entry = NULL;
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
-	int			gsi = 0;
 	int			idx, bit = 0;
-	int			edge_level = 0;
-	int			active_high_low = 0;
 
-	/*
-	 * Parsing through the PCI Interrupt Routing Table (PRT) and program
-	 * routing for all static (IOAPIC-direct) entries.
-	 */
-	list_for_each(node, &acpi_prt.entries) {
-		entry = list_entry(node, struct acpi_prt_entry, node);
+	if (acpi_irq_model != ACPI_IRQ_MODEL_IOAPIC)
+		return;
 
-		/* Need to get gsi for dynamic entry */
-		if (entry->link.handle) {
-			gsi = acpi_pci_link_get_irq(entry->link.handle, entry->link.index, &edge_level, &active_high_low);
-			if (!gsi)
-				continue;
-		} else {
-			/* Hardwired GSI. Assume PCI standard settings */
-			gsi = entry->link.index;
-			edge_level = 1;
-			active_high_low = 1;
-		}
+#ifdef CONFIG_ACPI_BUS
+	/* Don't set up the ACPI SCI because it's already set up */
+	if (acpi_fadt.sci_int == gsi)
+		return;
+#endif
 
-		/* Don't set up the ACPI SCI because it's already set up */
-		if (acpi_fadt.sci_int == gsi)
-			continue;
-
-		ioapic = mp_find_ioapic(gsi);
-		if (ioapic < 0)
-			continue;
-		ioapic_pin = gsi - mp_ioapic_routing[ioapic].gsi_start;
-
-		/* 
-		 * Avoid pin reprogramming.  PRTs typically include entries  
-		 * with redundant pin->gsi mappings (but unique PCI devices);
-		 * we only only program the IOAPIC on the first.
-		 */
-		bit = ioapic_pin % 32;
-		idx = (ioapic_pin < 32) ? 0 : (ioapic_pin / 32);
-		if (idx > 3) {
-			printk(KERN_ERR "Invalid reference to IOAPIC pin "
-				"%d-%d\n", mp_ioapic_routing[ioapic].apic_id, 
-				ioapic_pin);
-			continue;
-		}
-		if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
-			Dprintk(KERN_DEBUG "Pin %d-%d already programmed\n",
-				mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
-			acpi_gsi_to_irq(gsi, &entry->irq);
-			continue;
-		}
-
-		mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
-		if (!io_apic_set_pci_routing(ioapic, ioapic_pin, gsi, edge_level, active_high_low)) {
-			acpi_gsi_to_irq(gsi, &entry->irq);
- 		}
-		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d -> IRQ %d\n",
-			entry->id.segment, entry->id.bus,
-			entry->id.device, ('A' + entry->pin), 
-			mp_ioapic_routing[ioapic].apic_id, ioapic_pin,
-			entry->irq);
+	ioapic = mp_find_ioapic(gsi);
+	if (ioapic < 0) {
+		printk(KERN_WARNING "No IOAPIC for GSI %u\n", gsi);
+		return;
 	}
-	
-	print_IO_APIC();
 
-	return;
+	ioapic_pin = gsi - mp_ioapic_routing[ioapic].gsi_start;
+
+	/* 
+	 * Avoid pin reprogramming.  PRTs typically include entries  
+	 * with redundant pin->gsi mappings (but unique PCI devices);
+	 * we only program the IOAPIC on the first.
+	 */
+	bit = ioapic_pin % 32;
+	idx = (ioapic_pin < 32) ? 0 : (ioapic_pin / 32);
+	if (idx > 3) {
+		printk(KERN_ERR "Invalid reference to IOAPIC pin "
+			"%d-%d\n", mp_ioapic_routing[ioapic].apic_id, 
+			ioapic_pin);
+		return;
+	}
+	if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
+		Dprintk(KERN_DEBUG "Pin %d-%d already programmed\n",
+			mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
+		return;
+	}
+
+	mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
+
+	io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
+		edge_level == ACPI_EDGE_SENSITIVE ? 0 : 1,
+		active_high_low == ACPI_ACTIVE_HIGH ? 0 : 1);
 }
 
-#endif /*CONFIG_ACPI_PCI*/
-
 #endif /*CONFIG_X86_IO_APIC*/
-
 #endif /*CONFIG_ACPI_BOOT*/

@@ -44,7 +44,8 @@ __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
 
 static inline void __set_tss_desc(unsigned int cpu, unsigned int entry, void *addr)
 {
-	_set_tssldt_desc(&cpu_gdt_table[cpu][entry], (int)addr, 235, 0x89);
+	_set_tssldt_desc(&cpu_gdt_table[cpu][entry], (int)addr,
+		offsetof(struct tss_struct, __cacheline_filler) - 1, 0x89);
 }
 
 #define set_tss_desc(cpu,addr) __set_tss_desc(cpu, GDT_ENTRY_TSS, addr)

@@ -67,7 +67,7 @@
 #include <asm/uaccess.h>
 #include <asm/wbflush.h>
 #include <asm/bootinfo.h>
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 #include <asm/dec/interrupts.h>
 #include <asm/dec/machtype.h>
 #include <asm/dec/tc.h>
@@ -111,7 +111,7 @@ struct zs_parms {
 
 static struct zs_parms *zs_parms;
 
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 static struct zs_parms ds_parms = {
 	scc0 : SCC0,
 	scc1 : SCC1,
@@ -132,7 +132,7 @@ static struct zs_parms baget_parms = {
 };
 #endif
 
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 #define DS_BUS_PRESENT (IOASIC)
 #else
 #define DS_BUS_PRESENT 0
@@ -1689,7 +1689,7 @@ static void __init probe_sccs(void)
 	 * system_base for this case :-(. HK
 	 */
 	switch(mips_machtype) {
-#ifdef CONFIG_DECSTATION
+#ifdef CONFIG_MACH_DECSTATION
 	case MACH_DS5000_2X0:
 		system_base = 0xbf800000;
 		n_chips = 2;
@@ -1988,7 +1988,8 @@ unsigned int register_zs_hook(unsigned int channel, struct zs_hook *hook)
 	struct dec_serial *info = &zs_soft[channel];
 
 	if (info->hook) {
-		printk(__FUNCTION__": line %d has already a hook registered\n", channel);
+		printk("%s: line %d has already a hook registered\n",
+		       __FUNCTION__, channel);
 
 		return 0;
 	} else {
@@ -2015,8 +2016,8 @@ unsigned int unregister_zs_hook(unsigned int channel)
                 info->hook = NULL;
                 return 1;
         } else {
-                printk(__FUNCTION__": trying to unregister hook on line %d,"
-                       " but none is registered\n", channel);
+                printk("%s: trying to unregister hook on line %d,"
+                       " but none is registered\n", __FUNCTION__, channel);
                 return 0;
         }
 }

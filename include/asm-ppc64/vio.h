@@ -14,6 +14,7 @@
 #ifndef _ASM_VIO_H
 #define _ASM_VIO_H
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/device.h>
@@ -43,16 +44,16 @@ struct iommu_table;
 
 int vio_register_driver(struct vio_driver *drv);
 void vio_unregister_driver(struct vio_driver *drv);
-const struct vio_device_id * vio_match_device(const struct vio_device_id *ids, 
-						const struct vio_dev *dev);
 
-struct vio_dev * __devinit vio_register_device(struct device_node *node_vdev);
+#ifdef CONFIG_PPC_PSERIES
+struct vio_dev * __devinit vio_register_device_node(
+		struct device_node *node_vdev);
+#endif
 void __devinit vio_unregister_device(struct vio_dev *dev);
 struct vio_dev *vio_find_node(struct device_node *vnode);
 
 const void * vio_get_attribute(struct vio_dev *vdev, void* which, int* length);
 int vio_get_irq(struct vio_dev *dev);
-struct iommu_table * vio_build_iommu_table(struct vio_dev *dev);
 int vio_enable_interrupts(struct vio_dev *dev);
 int vio_disable_interrupts(struct vio_dev *dev);
 
@@ -110,9 +111,9 @@ static inline struct vio_driver *to_vio_driver(struct device_driver *drv)
  * The vio_dev structure is used to describe virtual I/O devices.
  */
 struct vio_dev {
-	struct device_node *archdata;   /* Open Firmware node */
-	void *driver_data;              /* data private to the driver */
 	struct iommu_table *iommu_table;     /* vio_map_* uses this */
+	char *name;
+	char *type;
 	uint32_t unit_address;	
 	unsigned int irq;
 

@@ -57,6 +57,8 @@ static const char version[] =
 #include <asm/io.h>
 #include <asm/dma.h>
 
+#define DRV_NAME "fmv18x"
+
 static unsigned fmv18x_probe_list[] __initdata = {
 	0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x300, 0x340, 0
 };
@@ -192,7 +194,7 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 	   That means we have to be careful with the register values we probe for.
 	   */
 
-	if (!request_region(ioaddr, FMV18X_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, FMV18X_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	dev->irq = irq;
@@ -224,7 +226,7 @@ static int __init fmv18x_probe1(struct net_device *dev, short ioaddr)
 	}
 
 	/* Snarf the interrupt vector now. */
-	retval = request_irq(dev->irq, &net_interrupt, 0, dev->name, dev);
+	retval = request_irq(dev->irq, &net_interrupt, 0, DRV_NAME, dev);
 	if (retval) {
 		printk ("FMV-18x found at %#3x, but it's unusable due to a conflict on"
 				"IRQ %d.\n", ioaddr, dev->irq);

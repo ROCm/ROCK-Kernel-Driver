@@ -1058,6 +1058,7 @@ int swim3_init(void)
 		disk->fops = &floppy_fops;
 		disk->private_data = &floppy_states[i];
 		disk->queue = swim3_queue;
+		disk->flags |= GENHD_FL_REMOVABLE;
 		sprintf(disk->disk_name, "fd%d", i);
 		sprintf(disk->devfs_name, "floppy/%d", i);
 		set_capacity(disk, 2880);
@@ -1145,3 +1146,7 @@ static int swim3_add_device(struct device_node *swim)
 }
 
 module_init(swim3_init)
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Paul Mackerras");
+MODULE_ALIAS_BLOCKDEV_MAJOR(FLOPPY_MAJOR);

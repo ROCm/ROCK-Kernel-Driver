@@ -141,7 +141,6 @@ static dev_link_t *dev_list;
 
 typedef struct com20020_dev_t {
     struct net_device       *dev;
-    int dev_configured;
     dev_node_t          node;
 } com20020_dev_t;
 
@@ -263,6 +262,19 @@ static void com20020_detach(dev_link_t *link)
 
     dev = info->dev;
 
+    if (link->dev) {
+	DEBUG(1,"unregister...\n");
+
+	unregister_netdev(dev);
+	    
+	/*
+	 * this is necessary because we register our IRQ separately
+	 * from card services.
+	 */
+	if (dev->irq)
+	    free_irq(dev->irq, dev);
+    }
+
     if (link->state & DEV_CONFIG)
         com20020_release(link);
 
@@ -277,24 +289,6 @@ static void com20020_detach(dev_link_t *link)
 	dev = info->dev;
 	if (dev)
 	{
-	    if (info->dev_configured)
-	    {
-		DEBUG(1,"unregister...\n");
-
-		if (netif_running(dev))
-		    dev->stop(dev);
-
-		unregister_netdev(dev);
-	    
-		/*
-		 * this is necessary because we register our IRQ separately
-		 * from card services.
-		 */
-		if (dev->irq)
-		    free_irq(dev->irq, dev);
-		/* ...but I/O ports are done automatically by card services */
-	    }
-	    
 	    DEBUG(1,"kfree...\n");
 	    free_netdev(dev);
 	}
@@ -398,17 +392,18 @@ static void com20020_config(dev_link_t *link)
     lp->card_name = "PCMCIA COM20020";
     lp->card_flags = ARC_CAN_10MBIT; /* pretend all of them can 10Mbit */
 
+    link->dev = &info->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
     i = com20020_found(dev, 0);	/* calls register_netdev */
     
     if (i != 0) {
 	DEBUG(1,KERN_NOTICE "com20020_cs: com20020_found() failed\n");
+	link->dev = NULL;
 	goto failed;
     }
 
-    info->dev_configured = 1;
     strcpy(info->node.dev_name, dev->name);
-    link->dev = &info->node;
-    link->state &= ~DEV_CONFIG_PENDING;
 
     DEBUG(1,KERN_INFO "%s: port %#3lx, irq %d\n",
            dev->name, dev->base_addr, dev->irq);
@@ -464,10 +459,8 @@ static int com20020_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
         link->state &= ~DEV_PRESENT;
-        if (link->state & DEV_CONFIG) {
+        if (link->state & DEV_CONFIG)
             netif_device_detach(dev);
-            link->state |= DEV_RELEASE_PENDING;
-        }
         break;
     case CS_EVENT_CARD_INSERTION:
         link->state |= DEV_PRESENT;

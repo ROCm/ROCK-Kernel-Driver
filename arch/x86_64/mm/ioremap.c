@@ -132,13 +132,13 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
 	if (phys_addr < virt_to_phys(high_memory)) {
+#ifndef CONFIG_DISCONTIGMEM
 		char *t_addr, *t_end;
+ 		struct page *page;
 
 		t_addr = __va(phys_addr);
 		t_end = t_addr + (size - 1);
 	   
-#ifndef CONFIG_DISCONTIGMEM	 
- 		struct page *page;
 		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
 			if(!PageReserved(page))
 				return NULL;
@@ -158,6 +158,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	area = get_vm_area(size, VM_IOREMAP);
 	if (!area)
 		return NULL;
+	area->phys_addr = phys_addr;
 	addr = area->addr;
 	if (remap_area_pages((unsigned long) addr, phys_addr, size, flags)) {
 		vunmap(addr);

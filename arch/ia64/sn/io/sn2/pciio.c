@@ -289,8 +289,6 @@ pciio_dma_addr(vertex_hdl_t dev,	/* translate for this device */
 
     return res;				/* pciio_dmamap_addr succeeded */
 }
-EXPORT_SYMBOL(pciio_dma_addr);
-
 
 void
 pciio_dmamap_drain(pciio_dmamap_t map)
@@ -560,7 +558,6 @@ pciio_config_get(vertex_hdl_t	dev,
     }
     return value;
 }
-EXPORT_SYMBOL(pciio_config_get);
 
 /*
  * Change value of configuration register

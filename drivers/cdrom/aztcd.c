@@ -129,7 +129,7 @@
                 Werner Zimmermann, August 8, 1995
         V1.70   Multisession support now is completed, but there is still not 
                 enough testing done. If you can test it, please contact me. For
-                details please read /usr/src/linux/Documentation/cdrom/aztcd
+                details please read Documentation/cdrom/aztcd
                 Werner Zimmermann, August 19, 1995
         V1.80   Modification to suit the new kernel boot procedure introduced
                 with kernel 1.3.33. Will definitely not work with older kernels.
@@ -374,6 +374,7 @@ static void op_ok(void)
 }
 
 /* Wait for PA_OK = drive answers with AFL_PA_OK after receiving parameters*/
+#if 0
 # define PA_OK pa_ok()
 static void pa_ok(void)
 {
@@ -387,6 +388,7 @@ static void pa_ok(void)
 		}
 	} while (aztIndatum != AFL_PA_OK);
 }
+#endif
 
 /* Wait for STEN=Low = handshake signal 'AFL_.._OK available or command executed*/
 # define STEN_LOW  sten_low()
@@ -871,7 +873,7 @@ static int aztUpdateToc(void)
 /* Read the table of contents header, i.e. no. of tracks and start of first 
  * track
  */
-static int aztGetDiskInfo()
+static int aztGetDiskInfo(void)
 {
 	int limit;
 	unsigned char test;
@@ -1165,6 +1167,7 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	struct azt_Toc *tocPtr;
 	struct cdrom_subchnl subchnl;
 	struct cdrom_volctrl volctrl;
+	void __user *argp = (void __user *)arg;
 
 #ifdef AZT_DEBUG
 	printk("aztcd: starting aztcd_ioctl - Command:%x   Time: %li\n",
@@ -1228,8 +1231,7 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 #ifdef AZT_DEBUG
 			printk("aztcd ioctl MULTISESSION\n");
 #endif
-			if (copy_from_user
-			    (&ms, (void *) arg,
+			if (copy_from_user(&ms, argp,
 			     sizeof(struct cdrom_multisession)))
 				return -EFAULT;
 			if (ms.addr_format == CDROM_MSF) {
@@ -1246,8 +1248,7 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 			else
 				return -EINVAL;
 			ms.xa_flag = DiskInfo.xa;
-			if (copy_to_user
-			    ((void *) arg, &ms,
+			if (copy_to_user(argp, &ms,
 			     sizeof(struct cdrom_multisession)))
 				return -EFAULT;
 #ifdef AZT_DEBUG
@@ -1270,7 +1271,7 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 			return 0;
 		}
 	case CDROMPLAYTRKIND:	/* Play a track.  This currently ignores index. */
-		if (copy_from_user(&ti, (void *) arg, sizeof ti))
+		if (copy_from_user(&ti, argp, sizeof ti))
 			return -EFAULT;
 		if (ti.cdti_trk0 < DiskInfo.first
 		    || ti.cdti_trk0 > DiskInfo.last
@@ -1301,7 +1302,7 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		  aztAudioStatus = CDROM_AUDIO_NO_STATUS;
 		}
 */
-		if (copy_from_user(&msf, (void *) arg, sizeof msf))
+		if (copy_from_user(&msf, argp, sizeof msf))
 			return -EFAULT;
 		/* convert to bcd */
 		azt_bin2bcd(&msf.cdmsf_min0);
@@ -1333,11 +1334,11 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	case CDROMREADTOCHDR:	/* Read the table of contents header */
 		tocHdr.cdth_trk0 = DiskInfo.first;
 		tocHdr.cdth_trk1 = DiskInfo.last;
-		if (copy_to_user((void *) arg, &tocHdr, sizeof tocHdr))
+		if (copy_to_user(argp, &tocHdr, sizeof tocHdr))
 			return -EFAULT;
 		break;
 	case CDROMREADTOCENTRY:	/* Read an entry in the table of contents */
-		if (copy_from_user(&entry, (void *) arg, sizeof entry))
+		if (copy_from_user(&entry, argp, sizeof entry))
 			return -EFAULT;
 		if ((!aztTocUpToDate) || aztDiskChanged)
 			aztUpdateToc();
@@ -1363,12 +1364,12 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		} else {
 			return -EINVAL;
 		}
-		if (copy_to_user((void *) arg, &entry, sizeof entry))
+		if (copy_to_user(argp, &entry, sizeof entry))
 			return -EFAULT;
 		break;
 	case CDROMSUBCHNL:	/* Get subchannel info */
 		if (copy_from_user
-		    (&subchnl, (void *) arg, sizeof(struct cdrom_subchnl)))
+		    (&subchnl, argp, sizeof(struct cdrom_subchnl)))
 			return -EFAULT;
 		if (aztGetQChannelInfo(&qInfo) < 0) {
 #ifdef AZT_DEBUG
@@ -1403,16 +1404,14 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 			subchnl.cdsc_reladdr.msf.frame =
 			    azt_bcd2bin(qInfo.trackTime.frame);
 		}
-		if (copy_to_user
-		    ((void *) arg, &subchnl, sizeof(struct cdrom_subchnl)))
+		if (copy_to_user(argp, &subchnl, sizeof(struct cdrom_subchnl)))
 			return -EFAULT;
 		break;
 	case CDROMVOLCTRL:	/* Volume control 
 				   * With my Aztech CD268-01A volume control does not work, I can only
 				   turn the channels on (any value !=0) or off (value==0). Maybe it
 				   works better with your drive */
-		if (copy_from_user
-		    (&volctrl, (char *) arg, sizeof(volctrl)))
+		if (copy_from_user(&volctrl, argp, sizeof(volctrl)))
 			return -EFAULT;
 		azt_Play.start.min = 0x21;
 		azt_Play.start.sec = 0x84;
@@ -1455,7 +1454,7 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	case CDROMREADCOOKED:	/*read data in mode 1 (2048 Bytes) */
 	case CDROMREADRAW:	/*read data in mode 2 (2336 Bytes) */
 		{
-			if (copy_from_user(&msf, (void *) arg, sizeof msf))
+			if (copy_from_user(&msf, argp, sizeof msf))
 				return -EFAULT;
 			/* convert to bcd */
 			azt_bin2bcd(&msf.cdmsf_min0);
@@ -1474,16 +1473,11 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 				if (DiskInfo.xa) {
 					return -1;	/*XA Disks can't be read raw */
 				} else {
-					if (sendAztCmd
-					    (ACMD_PLAY_READ_RAW,
-					     &azt_Play))
+					if (sendAztCmd(ACMD_PLAY_READ_RAW, &azt_Play))
 						return -1;
 					DTEN_LOW;
-					insb(DATA_PORT, buf,
-					     CD_FRAMESIZE_RAW);
-					if (copy_to_user
-					    ((void *) arg, &buf,
-					     CD_FRAMESIZE_RAW))
+					insb(DATA_PORT, buf, CD_FRAMESIZE_RAW);
+					if (copy_to_user(argp, &buf, CD_FRAMESIZE_RAW))
 						return -EFAULT;
 				}
 			} else
@@ -1492,14 +1486,13 @@ static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 					return -1;
 				DTEN_LOW;
 				insb(DATA_PORT, buf, CD_FRAMESIZE);
-				if (copy_to_user
-				    ((void *) arg, &buf, CD_FRAMESIZE))
+				if (copy_to_user(argp, &buf, CD_FRAMESIZE))
 					return -EFAULT;
 				}
 		}
 		break;
 	case CDROMSEEK:	/*seek msf address */
-		if (copy_from_user(&msf, (void *) arg, sizeof msf))
+		if (copy_from_user(&msf, argp, sizeof msf))
 			return -EFAULT;
 		/* convert to bcd */
 		azt_bin2bcd(&msf.cdmsf_min0);

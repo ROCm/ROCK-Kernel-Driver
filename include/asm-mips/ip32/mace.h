@@ -342,7 +342,7 @@ struct mace_isa {
 	struct mace_serial serial2;
 	char _pad4[0x8000 - sizeof(struct mace_serial)];
 
-	mace32_t rtc[0x10000/8];
+	volatile unsigned char rtc[0x10000];
 };
 
 struct sgi_mace {

@@ -147,7 +147,7 @@ static void iommu_buses_init_lpar(struct list_head *bus_list)
 		bus = pci_bus_b(ln);
 		busdn = PCI_GET_DN(bus);
 
-		dma_window = (unsigned int *)get_property(busdn, "ibm,dma-window", 0);
+		dma_window = (unsigned int *)get_property(busdn, "ibm,dma-window", NULL);
 		if (dma_window) {
 			/* Bussubno hasn't been copied yet.
 			 * Do it now because iommu_table_setparms_lpar needs it.
@@ -211,7 +211,6 @@ static void iommu_table_setparms(struct pci_controller *phb,
 	tbl->it_index = 0;
 	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize = 16;
-	tbl->it_type = TCE_PCI;
 }
 
 /*
@@ -232,7 +231,7 @@ static void iommu_table_setparms_lpar(struct pci_controller *phb,
 {
 	unsigned int *dma_window;
 
-	dma_window = (unsigned int *)get_property(dn, "ibm,dma-window", 0);
+	dma_window = (unsigned int *)get_property(dn, "ibm,dma-window", NULL);
 
 	if (!dma_window)
 		panic("iommu_table_setparms_lpar: device %s has no"
@@ -247,7 +246,6 @@ static void iommu_table_setparms_lpar(struct pci_controller *phb,
 	tbl->it_index  = dma_window[0];
 	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize  = 16;
-	tbl->it_type = TCE_PCI;
 }
 
 

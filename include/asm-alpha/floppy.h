@@ -108,10 +108,11 @@ static int FDC2 = -1;
  * on that platform... ;-}
  */
 
-#define CROSS_64KB(a,s)						\
-({ unsigned long __s64 = (unsigned long)(a);			\
-   unsigned long __e64 = __s64 + (unsigned long)(s) - 1;	\
-   (__s64 ^ __e64) & ~0xfffful; })
+static inline unsigned long CROSS_64KB(void *a, unsigned long s)
+{
+	unsigned long p = (unsigned long)a;
+	return ((p + s - 1) ^ p) & ~0xffffUL;
+}
 
 #define EXTRA_FLOPPY_PARAMS
 

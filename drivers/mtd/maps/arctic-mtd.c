@@ -1,5 +1,5 @@
 /*
- * $Id: arctic-mtd.c,v 1.10 2003/06/02 16:37:59 trini Exp $
+ * $Id: arctic-mtd.c,v 1.11 2004/07/12 21:59:43 dwmw2 Exp $
  * 
  * drivers/mtd/maps/arctic-mtd.c MTD mappings and partition tables for 
  *                              IBM 405LP Arctic boards.
@@ -72,7 +72,7 @@
 static struct map_info arctic_mtd_map = {
 	.name		= NAME,
 	.size		= SIZE,
-	.buswidth	= BUSWIDTH,
+	.bankwidth	= BUSWIDTH,
 	.phys		= PADDR,
 };
 

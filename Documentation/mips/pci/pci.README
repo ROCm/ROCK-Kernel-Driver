@@ -15,13 +15,6 @@ is doing its own pcibios thing and it has become a big
 mess.  This generic pci code is meant to clean up the mips
 pci mess and make it easier to add pci support to new boards.
 
-arch/mips/kernel/pci_auto.c has the pci bus enumeration code.
-This code scans the pci bus(es) and assigns all of the resources.
-Thus, you don't need the boot code to that, and many boot codes
-don't do it correctly anyway.  To enable the pci_auto code, add
-
-define_bool CONFIG_PCI_AUTO y 
-
 inside the define for your board in arch/mips/config.in. 
 For example, the Galileo EV96100 board  looks like this:
 
@@ -29,7 +22,6 @@ if [ "$CONFIG_MIPS_EV96100" = "y" ]; then
 	define_bool CONFIG_PCI y
 	define_bool CONFIG_MIPS_GT96100 y
 	define_bool CONFIG_NEW_PCI y
-	define_bool CONFIG_PCI_AUTO y
 	define_bool CONFIG_SWAP_IO_SPACE y
 fi 
 
@@ -41,11 +33,6 @@ define_bool CONFIG_NEW_PCI y
  
 inside the define for your board. Again, the EV96100 example above
 show NEW_PCI turned on.
-
-Note that you can enable CONFIG_NEW_PCI code without enabling 
-CONFIG_PCI_AUTO. But you can't do the opposite because the pci_auto
-routines are called from pcibios_init(), which is part of the 
-CONFIG_NEW_PCI code.
 
 
 Now you need to add your files to hook in your pci configuration

@@ -43,7 +43,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 			info->cursor.image.fg_color = cursor->image.fg_color;
 		} else {
 			if (cursor->image.cmap.len)
-				fb_copy_cmap(&cursor->image.cmap, &info->cursor.image.cmap, 0);
+				fb_copy_cmap(&cursor->image.cmap, &info->cursor.image.cmap);
 		}
 		info->cursor.image.depth = cursor->image.depth;
 	}	
@@ -73,7 +73,12 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	} else 
 		memcpy(src, cursor->image.data, dsize);
 	
-	fb_move_buf_aligned(info, &info->sprite, dst, d_pitch, src, s_pitch, info->cursor.image.height);
+	if (info->sprite.outbuf)
+		fb_iomove_buf_aligned(info, &info->sprite, dst, d_pitch, src,
+				  s_pitch, info->cursor.image.height);
+	else
+		fb_sysmove_buf_aligned(info, &info->sprite, dst, d_pitch, src,
+				   s_pitch, info->cursor.image.height);
 	info->cursor.image.data = dst;
 	
 	info->fbops->fb_imageblit(info, &info->cursor.image);

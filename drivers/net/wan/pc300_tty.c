@@ -264,7 +264,7 @@ void cpc_tty_init(pc300dev_t *pc300dev)
 	INIT_WORK(&cpc_tty->tty_tx_work, cpc_tty_tx_work, (void *)cpc_tty);
 	INIT_WORK(&cpc_tty->tty_rx_work, cpc_tty_rx_work, (void *)port);
 	
-	cpc_tty->buf_rx.first = cpc_tty->buf_rx.last = 0;
+	cpc_tty->buf_rx.first = cpc_tty->buf_rx.last = NULL;
 
 	pc300dev->cpc_tty = (void *)cpc_tty; 
 	
@@ -878,7 +878,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 				cpc_tty_trace(pc300dev, new->data,rx_len, 'R'); 
 			} 
 			new->size = rx_len;
-			new->next = 0;
+			new->next = NULL;
 			if (cpc_tty->buf_rx.first == 0) {
 				cpc_tty->buf_rx.first = new;
 				cpc_tty->buf_rx.last = new;

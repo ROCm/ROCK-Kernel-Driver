@@ -57,10 +57,10 @@ void __init mach_early_init (void)
 	AS85EP1_ASC    = 0;
 	AS85EP1_LBS    = 0x00A9;
 
-	AS85EP1_PORT_PMC(6)  = 0xFF; /* A20-25, A0,A1 有効 */
-	AS85EP1_PORT_PMC(7)  = 0x0E; /* CS1,2,3       有効 */
-	AS85EP1_PORT_PMC(9)  = 0xFF; /* D16-23        有効 */
-	AS85EP1_PORT_PMC(10) = 0xFF; /* D24-31        有効 */
+	AS85EP1_PORT_PMC(6)  = 0xFF; /* valid A0,A1,A20-A25 */
+	AS85EP1_PORT_PMC(7)  = 0x0E; /* valid CS1-CS3       */
+	AS85EP1_PORT_PMC(9)  = 0xFF; /* valid D16-D23       */
+	AS85EP1_PORT_PMC(10) = 0xFF; /* valid D24-D31       */
 
 	AS85EP1_RFS(1) = 0x800c;
 	AS85EP1_RFS(3) = 0x800c;
@@ -76,7 +76,7 @@ void __init mach_early_init (void)
 	   write to address (N - 0x10).  We avoid this (effectively) by
 	   writing in 16-byte chunks backwards from the end.  */
 
-	AS85EP1_IRAMM = 0x3;	/* 内蔵命令RAMは「write-mode」になります */
+	AS85EP1_IRAMM = 0x3;	/* "write-mode" for the internal instruction memory */
 
 	src = (u32 *)(((u32)&_intv_copy_src_end - 1) & ~0xF);
 	dst = (u32 *)&_intv_copy_dst_start
@@ -88,7 +88,7 @@ void __init mach_early_init (void)
 		src -= 4;
 	} while (src > (u32 *)&_intv_copy_src_start);
 
-	AS85EP1_IRAMM = 0x0;	/* 内蔵命令RAMは「read-mode」になります */
+	AS85EP1_IRAMM = 0x0;	/* "read-mode" for the internal instruction memory */
 #endif /* !CONFIG_ROM_KERNEL */
 
 	v850e_intc_disable_irqs ();

@@ -1465,6 +1465,8 @@ static int fsg_setup(struct usb_gadget *gadget,
 	/* Respond with data/status or defer until later? */
 	if (rc >= 0 && rc != DELAYED_STATUS) {
 		fsg->ep0req->length = rc;
+		fsg->ep0req->zero = rc < ctrl->wLength
+				&& (rc % gadget->ep0->maxpacket) == 0;
 		fsg->ep0req_name = (ctrl->bRequestType & USB_DIR_IN ?
 				"ep0-in" : "ep0-out");
 		rc = ep0_queue(fsg);
@@ -2054,7 +2056,7 @@ static int do_request_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 	buf[0] = 0x80 | 0x70;			// Valid, current error
 	buf[2] = SK(sd);
 	put_be32(&buf[3], sdinfo);		// Sense information
-	buf[7] = 18 - 7;			// Additional sense length
+	buf[7] = 18 - 8;			// Additional sense length
 	buf[12] = ASC(sd);
 	buf[13] = ASCQ(sd);
 	return 18;
@@ -2501,7 +2503,7 @@ static int send_status(struct fsg_dev *fsg)
 		/* Store and send the Bulk-only CSW */
 		csw->Signature = __constant_cpu_to_le32(USB_BULK_CS_SIG);
 		csw->Tag = fsg->tag;
-		csw->Residue = fsg->residue;
+		csw->Residue = cpu_to_le32(fsg->residue);
 		csw->Status = status;
 
 		bh->inreq->length = USB_BULK_CS_WRAP_LEN;
@@ -2947,7 +2949,7 @@ static int received_cbw(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 		fsg->data_dir = DATA_DIR_TO_HOST;
 	else
 		fsg->data_dir = DATA_DIR_FROM_HOST;
-	fsg->data_size = cbw->DataTransferLength;
+	fsg->data_size = le32_to_cpu(cbw->DataTransferLength);
 	if (fsg->data_size == 0)
 		fsg->data_dir = DATA_DIR_NONE;
 	fsg->lun = cbw->Lun;
@@ -3671,7 +3673,7 @@ static void fsg_unbind(struct usb_gadget *gadget)
 		usb_ep_free_request(fsg->ep0, req);
 	}
 
-	set_gadget_data(gadget, 0);
+	set_gadget_data(gadget, NULL);
 }
 
 
@@ -3834,6 +3836,7 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	}
 
 	/* Find all the endpoints we will use */
+	usb_ep_autoconfig_reset(gadget);
 	ep = usb_ep_autoconfig(gadget, &fs_bulk_in_desc);
 	if (!ep)
 		goto autoconf_fail;

@@ -10,14 +10,16 @@ enum dma_data_direction {
 	DMA_NONE = 3,
 };
 
-#define DMA_64BIT_MASK 0xffffffffffffffffULL
-#define DMA_32BIT_MASK 0x00000000ffffffffULL
+#define DMA_64BIT_MASK	0xffffffffffffffffULL
+#define DMA_32BIT_MASK	0x00000000ffffffffULL
 
 #include <asm/dma-mapping.h>
 
 /* Backwards compat, remove in 2.7.x */
 #define dma_sync_single		dma_sync_single_for_cpu
 #define dma_sync_sg		dma_sync_sg_for_cpu
+
+extern u64 dma_get_required_mask(struct device *dev);
 
 #endif
 

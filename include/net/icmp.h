@@ -37,18 +37,6 @@ DECLARE_SNMP_STAT(struct icmp_mib, icmp_statistics);
 #define ICMP_INC_STATS(field)		SNMP_INC_STATS(icmp_statistics, field)
 #define ICMP_INC_STATS_BH(field)	SNMP_INC_STATS_BH(icmp_statistics, field)
 #define ICMP_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(icmp_statistics, field)
-#define ICMP_INC_STATS_FIELD(offt)					\
-	(*((unsigned long *) ((void *)					\
-			     per_cpu_ptr(icmp_statistics[!in_softirq()],\
-					 smp_processor_id()) + offt)))++
-#define ICMP_INC_STATS_BH_FIELD(offt)					\
-	(*((unsigned long *) ((void *)					\
-			     per_cpu_ptr(icmp_statistics[0],		\
-					 smp_processor_id()) + offt)))++
-#define ICMP_INC_STATS_USER_FIELD(offt)					\
-	(*((unsigned long *) ((void *)					\
-			     per_cpu_ptr(icmp_statistics[1],		\
-					 smp_processor_id()) + offt)))++
 
 extern void	icmp_send(struct sk_buff *skb_in,  int type, int code, u32 info);
 extern int	icmp_rcv(struct sk_buff *skb);

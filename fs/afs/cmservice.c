@@ -307,10 +307,8 @@ int afscm_start(void)
 		if (ret < 0)
 			goto kill;
 
-#ifdef AFS_AUTOMOUNT_SUPPORT
 		afs_kafstimod_add_timer(&afs_mntpt_expiry_timer,
 					afs_mntpt_expiry_timeout * HZ);
-#endif
 	}
 
 	afscm_usage++;
@@ -392,9 +390,7 @@ void afscm_stop(void)
 		}
 		spin_unlock(&kafscmd_attention_lock);
 
-#ifdef AFS_AUTOMOUNT_SUPPORT
 		afs_kafstimod_del_timer(&afs_mntpt_expiry_timer);
-#endif
 	}
 
 	up_write(&afscm_sem);

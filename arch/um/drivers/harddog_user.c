@@ -27,10 +27,10 @@ static void pre_exec(void *d)
 	dup2(data->stdin, 0);
 	dup2(data->stdout, 1);
 	dup2(data->stdout, 2);
-	os_close_file(data->stdin);
-	os_close_file(data->stdout);
-	os_close_file(data->close_me[0]);
-	os_close_file(data->close_me[1]);
+	close(data->stdin);
+	close(data->stdout);
+	close(data->close_me[0]);
+	close(data->close_me[1]);
 }
 
 int start_watchdog(int *in_fd_ret, int *out_fd_ret, char *sock)
@@ -44,15 +44,15 @@ int start_watchdog(int *in_fd_ret, int *out_fd_ret, char *sock)
 	char **args = NULL;
 
 	err = os_pipe(in_fds, 1, 0);
-	if(err < 0){
-		printk("harddog_open - os_pipe failed, err = %d\n", -err);
-		goto out;
+	if(err){
+		printk("harddog_open - os_pipe failed, errno = %d\n", -err);
+		return(err);
 	}
 
 	err = os_pipe(out_fds, 1, 0);
-	if(err < 0){
-		printk("harddog_open - os_pipe failed, err = %d\n", -err);
-		goto out_close_in;
+	if(err){
+		printk("harddog_open - os_pipe failed, errno = %d\n", -err);
+		return(err);
 	}
 
 	data.stdin = out_fds[0];
@@ -72,47 +72,42 @@ int start_watchdog(int *in_fd_ret, int *out_fd_ret, char *sock)
 
 	pid = run_helper(pre_exec, &data, args, NULL);
 
-	os_close_file(out_fds[0]);
-	os_close_file(in_fds[1]);
+	close(out_fds[0]);
+	close(in_fds[1]);
 
 	if(pid < 0){
 		err = -pid;
-		printk("harddog_open - run_helper failed, errno = %d\n", -err);
-		goto out_close_out;
+		printk("harddog_open - run_helper failed, errno = %d\n", err);
+		goto out;
 	}
 
-	n = os_read_file(in_fds[0], &c, sizeof(c));
+	n = read(in_fds[0], &c, sizeof(c));
 	if(n == 0){
 		printk("harddog_open - EOF on watchdog pipe\n");
 		helper_wait(pid);
 		err = -EIO;
-		goto out_close_out;
+		goto out;
 	}
 	else if(n < 0){
 		printk("harddog_open - read of watchdog pipe failed, "
-		       "err = %d\n", -n);
+		       "errno = %d\n", errno);
 		helper_wait(pid);
-		err = n;
-		goto out_close_out;
+		err = -errno;
+		goto out;
 	}
 	*in_fd_ret = in_fds[0];
 	*out_fd_ret = out_fds[1];
 	return(0);
-
- out_close_in:
-	os_close_file(in_fds[0]);
-	os_close_file(in_fds[1]);
- out_close_out:
-	os_close_file(out_fds[0]);
-	os_close_file(out_fds[1]);
  out:
+	close(out_fds[1]);
+	close(in_fds[0]);
 	return(err);
 }
 
 void stop_watchdog(int in_fd, int out_fd)
 {
-	os_close_file(in_fd);
-	os_close_file(out_fd);
+	close(in_fd);
+	close(out_fd);
 }
 
 int ping_watchdog(int fd)
@@ -120,12 +115,11 @@ int ping_watchdog(int fd)
 	int n;
 	char c = '\n';
 
-	n = os_write_file(fd, &c, sizeof(c));
-	if(n != sizeof(c)){
-		printk("ping_watchdog - write failed, err = %d\n", -n);
-		if(n < 0) 
-			return(n);
-		return(-EIO);
+	n = write(fd, &c, sizeof(c));
+	if(n < sizeof(c)){
+		printk("ping_watchdog - write failed, errno = %d\n",
+		       errno);
+		return(-errno);
 	}
 	return 1;
 

@@ -181,6 +181,23 @@ H8300_GEN_TEST_BITOP(test_and_change_bit,"bnot")
 #define find_first_zero_bit(addr, size) \
 	find_next_zero_bit((addr), (size), 0)
 
+static __inline__ unsigned long __ffs(unsigned long word)
+{
+	unsigned long result;
+
+	result = -1;
+	__asm__("1:\n\t"
+		"shlr.l %2\n\t"
+		"adds #1,%0\n\t"
+		"bcc 1b"
+		: "=r" (result)
+		: "0"(result),"r"(word));
+	return result;
+}
+
+#define ffs(x) generic_ffs(x)
+#define fls(x) generic_fls(x)
+
 static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
 {
 	unsigned long *p = (unsigned long *)(((unsigned long)addr + (offset >> 3)) & ~3);
@@ -217,22 +234,44 @@ found_middle:
 	return result + ffz(tmp);
 }
 
-static __inline__ unsigned long __ffs(unsigned long word)
+static __inline__ unsigned long find_next_bit(const unsigned long *addr,
+	unsigned long size, unsigned long offset)
 {
-	unsigned long result;
+	unsigned long *p = (unsigned long *)(((unsigned long)addr + (offset >> 3)) & ~3);
+	unsigned int result = offset & ~31UL;
+	unsigned int tmp;
 
-	result = -1;
-	__asm__("1:\n\t"
-		"shlr.l %2\n\t"
-		"adds #1,%0\n\t"
-		"bcc 1b"
-		: "=r" (result)
-		: "0"(result),"r"(word));
-	return result;
+	if (offset >= size)
+		return size;
+	size -= result;
+	offset &= 31UL;
+	if (offset) {
+		tmp = *(p++);
+		tmp &= ~0UL << offset;
+		if (size < 32)
+			goto found_first;
+		if (tmp)
+			goto found_middle;
+		size -= 32;
+		result += 32;
+	}
+	while (size >= 32) {
+		if ((tmp = *p++) != 0)
+			goto found_middle;
+		result += 32;
+		size -= 32;
+	}
+	if (!size)
+		return result;
+	tmp = *p;
+
+found_first:
+	tmp &= ~0UL >> (32 - size);
+	if (tmp == 0UL)
+		return result + size;
+found_middle:
+	return result + __ffs(tmp);
 }
-
-#define ffs(x) generic_ffs(x)
-#define fls(x) generic_fls(x)
 
 /*
  * Every architecture must define this function. It's the fastest

@@ -133,7 +133,7 @@ struct mpt_lan_priv {
 	u32 total_received;
 	struct net_device_stats stats;	/* Per device statistics */
 
-	struct mpt_work_struct post_buckets_task;
+	struct work_struct post_buckets_task;
 	unsigned long post_buckets_active;
 };
 
@@ -502,7 +502,7 @@ mpt_lan_reset(struct net_device *dev)
 	LANResetRequest_t *pResetReq;
 	struct mpt_lan_priv *priv = netdev_priv(dev);
 
-	mf = mpt_get_msg_frame(LanCtx, priv->mpt_dev->id);
+	mf = mpt_get_msg_frame(LanCtx, priv->mpt_dev);
 
 	if (mf == NULL) {
 /*		dlprintk((KERN_ERR MYNAM "/reset: Evil funkiness abounds! "
@@ -520,7 +520,7 @@ mpt_lan_reset(struct net_device *dev)
 	pResetReq->MsgFlags	= 0;
 	pResetReq->Reserved2	= 0;
 
-	mpt_put_msg_frame(LanCtx, priv->mpt_dev->id, mf);
+	mpt_put_msg_frame(LanCtx, priv->mpt_dev, mf);
 
 	return 0;
 }
@@ -754,7 +754,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 		return 1;
 	}
 
-	mf = mpt_get_msg_frame(LanCtx, mpt_dev->id);
+	mf = mpt_get_msg_frame(LanCtx, mpt_dev);
 	if (mf == NULL) {
 		netif_stop_queue(dev);
 		spin_unlock_irqrestore(&priv->txfidx_lock, flags);
@@ -859,7 +859,7 @@ mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 	else
 		pSimple->Address.High = 0;
 
-	mpt_put_msg_frame (LanCtx, mpt_dev->id, mf);
+	mpt_put_msg_frame (LanCtx, mpt_dev, mf);
 	dev->trans_start = jiffies;
 
 	dioprintk((KERN_INFO MYNAM ": %s/%s: Sending packet. FlagsLength = %08x.\n",
@@ -880,18 +880,9 @@ mpt_lan_wake_post_buckets_task(struct net_device *dev, int priority)
 	
 	if (test_and_set_bit(0, &priv->post_buckets_active) == 0) {
 		if (priority) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
 			schedule_work(&priv->post_buckets_task);
-#else
-			queue_task(&priv->post_buckets_task, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
-#endif
 		} else {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
 			schedule_delayed_work(&priv->post_buckets_task, 1);
-#else
-			queue_task(&priv->post_buckets_task, &tq_timer);
-#endif
 			dioprintk((KERN_INFO MYNAM ": post_buckets queued on "
 				   "timer.\n"));
 		}
@@ -1253,7 +1244,7 @@ mpt_lan_post_receive_buckets(void *dev_id)
 			(MPT_LAN_TRANSACTION32_SIZE + sizeof(SGESimple64_t));
 
 	while (buckets) {
-		mf = mpt_get_msg_frame(LanCtx, mpt_dev->id);
+		mf = mpt_get_msg_frame(LanCtx, mpt_dev);
 		if (mf == NULL) {
 			printk (KERN_ERR "%s: Unable to alloc request frame\n",
 				__FUNCTION__);
@@ -1343,7 +1334,7 @@ mpt_lan_post_receive_buckets(void *dev_id)
 		if (pSimple == NULL) {
 /**/			printk (KERN_WARNING MYNAM "/%s: No buckets posted\n",
 /**/				__FUNCTION__);
-			mpt_free_msg_frame(LanCtx, mpt_dev->id, mf);
+			mpt_free_msg_frame(LanCtx, mpt_dev, mf);
 			goto out;
 		}
 
@@ -1357,7 +1348,7 @@ mpt_lan_post_receive_buckets(void *dev_id)
  *	printk ("\n");
  */
 
-		mpt_put_msg_frame(LanCtx, mpt_dev->id, mf);
+		mpt_put_msg_frame(LanCtx, mpt_dev, mf);
 
 		priv->total_posted += i;
 		buckets -= i;
@@ -1391,8 +1382,8 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 	priv->mpt_dev = mpt_dev;
 	priv->pnum = pnum;
 
-	memset(&priv->post_buckets_task, 0, sizeof(struct mpt_work_struct));
-	MPT_INIT_WORK(&priv->post_buckets_task, mpt_lan_post_receive_buckets, dev);
+	memset(&priv->post_buckets_task, 0, sizeof(struct work_struct));
+	INIT_WORK(&priv->post_buckets_task, mpt_lan_post_receive_buckets, dev);
 	priv->post_buckets_active = 0;
 
 	dlprintk((KERN_INFO MYNAM "@%d: bucketlen = %d\n",
@@ -1498,7 +1489,7 @@ static int __init mpt_lan_init (void)
 		mpt_landev[j] = NULL;
 	}
 
-	for (p = mpt_adapter_find_first(); p; p = mpt_adapter_find_next(p)) {
+	list_for_each_entry(p, &ioc_list, list) {
 		for (i = 0; i < p->facts.NumberOfPorts; i++) {
 			printk (KERN_INFO MYNAM ": %s: PortNum=%x, ProtocolFlags=%02Xh (%c%c%c%c)\n",
 					p->name,
@@ -1566,10 +1557,6 @@ static void __exit mpt_lan_exit(void)
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,59)
-MODULE_PARM(tx_max_out_p, "i");
-MODULE_PARM(max_buckets_out, "i"); // Debug stuff. FIXME!
-#endif
 
 module_init(mpt_lan_init);
 module_exit(mpt_lan_exit);

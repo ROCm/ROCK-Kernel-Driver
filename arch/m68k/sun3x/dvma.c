@@ -1,11 +1,11 @@
 /*
  * Virtual DMA allocation
  *
- * (C) 1999 Thomas Bogendoerfer (tsbogend@alpha.franken.de) 
+ * (C) 1999 Thomas Bogendoerfer (tsbogend@alpha.franken.de)
  *
- * 11/26/2000 -- disabled the existing code because it didn't work for 
- * me in 2.4.  Replaced with a significantly more primitive version 
- * similar to the sun3 code.  the old functionality was probably more 
+ * 11/26/2000 -- disabled the existing code because it didn't work for
+ * me in 2.4.  Replaced with a significantly more primitive version
+ * similar to the sun3 code.  the old functionality was probably more
  * desirable, but....   -- Sam Creasey (sammy@oh.verio.com)
  *
  */
@@ -42,8 +42,8 @@
 static volatile unsigned long *iommu_pte = (unsigned long *)SUN3X_IOMMU;
 
 
-#define dvma_entry_paddr(index) 	(iommu_pte[index] & IOMMU_ADDR_MASK)
-#define dvma_entry_vaddr(index,paddr) 	((index << DVMA_PAGE_SHIFT) |  \
+#define dvma_entry_paddr(index)		(iommu_pte[index] & IOMMU_ADDR_MASK)
+#define dvma_entry_vaddr(index,paddr)	((index << DVMA_PAGE_SHIFT) |  \
 					 (paddr & (DVMA_PAGE_SIZE-1)))
 #if 0
 #define dvma_entry_set(index,addr)	(iommu_pte[index] =            \
@@ -80,7 +80,7 @@ void dvma_print (unsigned long dvma_addr)
 
 /* create a virtual mapping for a page assigned within the IOMMU
    so that the cpu can reach it easily */
-inline int dvma_map_cpu(unsigned long kaddr, 
+inline int dvma_map_cpu(unsigned long kaddr,
 			       unsigned long vaddr, int len)
 {
 	pgd_t *pgd;
@@ -97,7 +97,7 @@ inline int dvma_map_cpu(unsigned long kaddr,
 	       kaddr, vaddr);
 #endif
 	pgd = pgd_offset_k(vaddr);
-	
+
 	do {
 		pmd_t *pmd;
 		unsigned long end2;
@@ -107,7 +107,7 @@ inline int dvma_map_cpu(unsigned long kaddr,
 			goto out;
 		}
 
-		if((end & PGDIR_MASK) > (vaddr & PGDIR_MASK)) 
+		if((end & PGDIR_MASK) > (vaddr & PGDIR_MASK))
 			end2 = (vaddr + (PGDIR_SIZE-1)) & PGDIR_MASK;
 		else
 			end2 = end;
@@ -121,7 +121,7 @@ inline int dvma_map_cpu(unsigned long kaddr,
 				goto out;
 			}
 
-			if((end2 & PMD_MASK) > (vaddr & PMD_MASK)) 
+			if((end2 & PMD_MASK) > (vaddr & PMD_MASK))
 				end3 = (vaddr + (PMD_SIZE-1)) & PMD_MASK;
 			else
 				end3 = end2;
@@ -131,17 +131,17 @@ inline int dvma_map_cpu(unsigned long kaddr,
 				printk("mapping %08lx phys to %08lx\n",
 				       __pa(kaddr), vaddr);
 #endif
-				set_pte(pte, pfn_pte(virt_to_pfn(kaddr), 
+				set_pte(pte, pfn_pte(virt_to_pfn(kaddr),
 						     PAGE_KERNEL));
 				pte++;
 				kaddr += PAGE_SIZE;
 				vaddr += PAGE_SIZE;
 			} while(vaddr < end3);
-			
+
 		} while(vaddr < end2);
 
 	} while(vaddr < end);
-	
+
 	flush_tlb_all();
 
  out:
@@ -150,13 +150,13 @@ inline int dvma_map_cpu(unsigned long kaddr,
 
 
 inline int dvma_map_iommu(unsigned long kaddr, unsigned long baddr,
-				 int len) 
+				 int len)
 {
 	unsigned long end, index;
 
 	index = baddr >> DVMA_PAGE_SHIFT;
 	end = ((baddr+len) >> DVMA_PAGE_SHIFT);
-	
+
 	if(len & ~DVMA_PAGE_MASK)
 		end++;
 
@@ -169,12 +169,12 @@ inline int dvma_map_iommu(unsigned long kaddr, unsigned long baddr,
 
 		iommu_pte[index] |= IOMMU_FULL_BLOCK;
 //		dvma_entry_inc(index);
-		
+
 		kaddr += DVMA_PAGE_SIZE;
 	}
 
-#ifdef DEBUG	
-	for(index = (baddr >> DVMA_PAGE_SHIFT); index < end; index++) 
+#ifdef DEBUG
+	for(index = (baddr >> DVMA_PAGE_SHIFT); index < end; index++)
 		dvma_print(index << DVMA_PAGE_SHIFT);
 #endif
 	return 0;
@@ -185,17 +185,17 @@ void dvma_unmap_iommu(unsigned long baddr, int len)
 {
 
 	int index, end;
-	
-	
+
+
 	index = baddr >> DVMA_PAGE_SHIFT;
 	end = (DVMA_PAGE_ALIGN(baddr+len) >> DVMA_PAGE_SHIFT);
-	
+
 	for(; index < end ; index++) {
 #ifdef DEBUG
 		printk("freeing bus mapping %08x\n", index << DVMA_PAGE_SHIFT);
 #endif
 #if 0
-		if(!dvma_entry_use(index)) 
+		if(!dvma_entry_use(index))
 			printk("dvma_unmap freeing unused entry %04x\n",
 			       index);
 		else

@@ -56,6 +56,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/time.h>
 #include <linux/init.h>
+#include <linux/profile.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -107,16 +108,22 @@ static inline int tb_delta(unsigned *jiffy_stamp) {
 	return delta;
 }
 
-extern unsigned long prof_cpu_mask;
-extern unsigned int * prof_buffer;
-extern unsigned long prof_len;
-extern unsigned long prof_shift;
 extern char _stext;
 
-static inline void ppc_do_profile (unsigned long nip)
+static inline void ppc_do_profile (struct pt_regs *regs)
 {
+	unsigned long nip;
+	extern unsigned long prof_cpu_mask;
+
+	profile_hook(regs);
+
+	if (user_mode(regs))
+		return;
+
 	if (!prof_buffer)
 		return;
+
+	nip = instruction_pointer(regs);
 
 	/*
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
@@ -156,8 +163,9 @@ void timer_interrupt(struct pt_regs * regs)
 
 	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0) {
 		jiffy_stamp += tb_ticks_per_jiffy;
-		if (!user_mode(regs))
-			ppc_do_profile(instruction_pointer(regs));
+		
+		ppc_do_profile(regs);
+
 	  	if (smp_processor_id())
 			continue;
 

@@ -48,7 +48,6 @@
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/profile.h>
-#include <linux/audit.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -57,6 +56,7 @@
 #include <asm/cache.h>
 #include <asm/machdep.h>
 #ifdef CONFIG_PPC_ISERIES
+#include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvCallXm.h>
 #endif
 #include <asm/uaccess.h>
@@ -67,7 +67,7 @@
 
 void smp_local_timer_interrupt(struct pt_regs *);
 
-u64 jiffies_64 = INITIAL_JIFFIES;
+u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
 EXPORT_SYMBOL(jiffies_64);
 
@@ -98,10 +98,8 @@ unsigned long tb_to_ns_shift;
 struct gettimeofday_struct do_gtod;
 
 extern unsigned long wall_jiffies;
-extern unsigned long lpEvent_count;
+extern unsigned long lpevent_count;
 extern int smp_tb_synchronized;
-
-extern struct timezone sys_tz;
 
 void ppc_adjtimex(void);
 
@@ -235,8 +233,6 @@ static void iSeries_tb_recal(void)
 				do_gtod.tb_ticks_per_sec = tb_ticks_per_sec;
 				tb_to_xs = divres.result_low;
 				do_gtod.varp->tb_to_xs = tb_to_xs;
-				systemcfg->tb_ticks_per_sec = tb_ticks_per_sec;
-				systemcfg->tb_to_xs = tb_to_xs;
 			}
 			else {
 				printk( "Titan recalibrate: FAILED (difference > 4 percent)\n"
@@ -261,7 +257,7 @@ static void iSeries_tb_recal(void)
  * call will not be needed)
  */
 
-unsigned long tb_last_stamp=0;
+unsigned long tb_last_stamp __cacheline_aligned_in_smp;
 
 /*
  * timer_interrupt - gets called when the decrementer overflows,
@@ -280,7 +276,7 @@ int timer_interrupt(struct pt_regs * regs)
 	ppc64_do_profile(regs);
 #endif
 
-	lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+	lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
 
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
 
@@ -307,9 +303,9 @@ int timer_interrupt(struct pt_regs * regs)
 
 #ifdef CONFIG_PPC_ISERIES
 	{
-		struct ItLpQueue *lpq = lpaca->lpQueuePtr;
+		struct ItLpQueue *lpq = lpaca->lpqueue_ptr;
 		if (lpq && ItLpQueue_isLpIntPending(lpq))
-			lpEvent_count += ItLpQueue_process(lpq, regs);
+			lpevent_count += ItLpQueue_process(lpq, regs);
 	}
 #endif
 
@@ -412,7 +408,6 @@ int do_settimeofday(struct timespec *tv)
 	new_xsec += new_sec * XSEC_PER_SEC;
 	if ( new_xsec > delta_xsec ) {
 		do_gtod.varp->stamp_xsec = new_xsec - delta_xsec;
-		systemcfg->stamp_xsec = new_xsec - delta_xsec;
 	}
 	else {
 		/* This is only for the case where the user is setting the time
@@ -421,12 +416,7 @@ int do_settimeofday(struct timespec *tv)
 		 * the time to Jan 5, 1970 */
 		do_gtod.varp->stamp_xsec = new_xsec;
 		do_gtod.tb_orig_stamp = tb_last_stamp;
-		systemcfg->stamp_xsec = new_xsec;
-		systemcfg->tb_orig_stamp = tb_last_stamp;
 	}
-
-	systemcfg->tz_minuteswest = sys_tz.tz_minuteswest;
-	systemcfg->tz_dsttime = sys_tz.tz_dsttime;
 
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 	clock_was_set();
@@ -441,13 +431,13 @@ EXPORT_SYMBOL(do_settimeofday);
  * fields itself.  This way, the fields which are used for 
  * do_settimeofday get updated too.
  */
-long ppc64_sys32_stime(int* tptr)
+long ppc64_sys32_stime(int __user * tptr)
 {
 	int value;
 	struct timespec myTimeval;
 
 	if (!capable(CAP_SYS_TIME))
-		return audit_intercept(AUDIT_settimeofday, NULL, NULL), audit_result(-EPERM);
+		return -EPERM;
 
 	if (get_user(value, tptr))
 		return -EFAULT;
@@ -455,10 +445,9 @@ long ppc64_sys32_stime(int* tptr)
 	myTimeval.tv_sec = value;
 	myTimeval.tv_nsec = 0;
 
-	audit_intercept(AUDIT_settimeofday, &myTimeval, NULL);
 	do_settimeofday(&myTimeval);
 
-	return audit_result(0);
+	return 0;
 }
 
 /*
@@ -467,13 +456,13 @@ long ppc64_sys32_stime(int* tptr)
  * fields itself.  This way, the fields which are used for 
  * do_settimeofday get updated too.
  */
-long ppc64_sys_stime(long* tptr)
+long ppc64_sys_stime(long __user * tptr)
 {
 	long value;
 	struct timespec myTimeval;
 
 	if (!capable(CAP_SYS_TIME))
-		return audit_intercept(AUDIT_settimeofday, NULL, NULL), audit_result(-EPERM);
+		return -EPERM;
 
 	if (get_user(value, tptr))
 		return -EFAULT;
@@ -481,10 +470,9 @@ long ppc64_sys_stime(long* tptr)
 	myTimeval.tv_sec = value;
 	myTimeval.tv_nsec = 0;
 
-	audit_intercept(AUDIT_settimeofday, &myTimeval, NULL);
 	do_settimeofday(&myTimeval);
 
-	return audit_result(0);
+	return 0;
 }
 
 void __init time_init(void)
@@ -532,11 +520,6 @@ void __init time_init(void)
 	do_gtod.tb_ticks_per_sec = tb_ticks_per_sec;
 	do_gtod.varp->tb_to_xs = tb_to_xs;
 	do_gtod.tb_to_us = tb_to_us;
-	systemcfg->tb_orig_stamp = tb_last_stamp;
-	systemcfg->tb_update_count = 0;
-	systemcfg->tb_ticks_per_sec = tb_ticks_per_sec;
-	systemcfg->stamp_xsec = xtime.tv_sec * XSEC_PER_SEC;
-	systemcfg->tb_to_xs = tb_to_xs;
 
 	xtime_sync_interval = tb_ticks_per_sec - (tb_ticks_per_sec/8);
 	next_xtime_sync_tb = tb_last_stamp + xtime_sync_interval;
@@ -671,22 +654,6 @@ void ppc_adjtimex(void)
 	mb();
 	do_gtod.varp = temp_varp;
 	do_gtod.var_idx = temp_idx;
-
-	/*
-	 * tb_update_count is used to allow the problem state gettimeofday code
-	 * to assure itself that it sees a consistent view of the tb_to_xs and
-	 * stamp_xsec variables.  It reads the tb_update_count, then reads
-	 * tb_to_xs and stamp_xsec and then reads tb_update_count again.  If
-	 * the two values of tb_update_count match and are even then the
-	 * tb_to_xs and stamp_xsec values are consistent.  If not, then it
-	 * loops back and reads them again until this criteria is met.
-	 */
-	++(systemcfg->tb_update_count);
-	wmb();
-	systemcfg->tb_to_xs = new_tb_to_xs;
-	systemcfg->stamp_xsec = new_stamp_xsec;
-	wmb();
-	++(systemcfg->tb_update_count);
 
 	write_sequnlock_irqrestore( &xtime_lock, flags );
 

@@ -38,6 +38,7 @@
 #include <asm/sections.h>
 #include <asm/nvram.h>
 #include <asm/xmon.h>
+#include <asm/ocp.h>
 
 #if defined CONFIG_KGDB
 #include <asm/kgdb.h>
@@ -54,7 +55,6 @@ extern void ppc6xx_idle(void);
 extern void power4_idle(void);
 
 extern boot_infos_t *boot_infos;
-char saved_command_line[COMMAND_LINE_SIZE];
 unsigned char aux_device_present;
 struct ide_machdep_calls ppc_ide_md;
 char *sysmap;
@@ -496,7 +496,6 @@ static int __init set_preferred_console(void)
 	if (!name)
 		return -ENODEV;
 
-#if CONFIG_SERIAL_8250_CONSOLE
 	if (strcmp(name, "serial") == 0) {
 		int i;
 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
@@ -518,20 +517,14 @@ static int __init set_preferred_console(void)
 					/* We dont recognise the serial port */
 					return -ENODEV;
 			}
-			return add_preferred_console("ttyS", offset, NULL);
 		}
-	}
-#endif
-#ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
-	if (strcmp(name, "ch-a") == 0)
+	} else if (strcmp(name, "ch-a") == 0)
 		offset = 0;
 	else if (strcmp(name, "ch-b") == 0)
-			offset = 1;
-		else
-			return -ENODEV;
+		offset = 1;
+	else
+		return -ENODEV;
 	return add_preferred_console("ttyS", offset, NULL);
-#endif
-	return -ENODEV;
 }
 console_initcall(set_preferred_console);
 #endif /* CONFIG_SERIAL_CORE_CONSOLE */
@@ -599,6 +592,10 @@ void __init
 machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	     unsigned long r6, unsigned long r7)
 {
+#ifdef CONFIG_CMDLINE
+	strlcpy(cmd_line, CONFIG_CMDLINE, sizeof(cmd_line));
+#endif /* CONFIG_CMDLINE */
+
 #ifdef CONFIG_6xx
 	ppc_md.power_save = ppc6xx_idle;
 #endif
@@ -625,7 +622,7 @@ int __init ppc_setup_l2cr(char *str)
 }
 __setup("l2cr=", ppc_setup_l2cr);
 
-#ifdef CONFIG_NVRAM
+#ifdef CONFIG_GENERIC_NVRAM
 
 /* Generic nvram hooks used by drivers/char/gen_nvram.c */
 unsigned char nvram_read_byte(int addr)
@@ -696,7 +693,7 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XMON
 	xmon_map_scc();
 	if (strstr(cmd_line, "xmon"))
-		xmon(0);
+		xmon(NULL);
 #endif /* CONFIG_XMON */
 	if ( ppc_md.progress ) ppc_md.progress("setup_arch: enter", 0x3eab);
 
@@ -734,12 +731,18 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = (unsigned long) klimit;
 
 	/* Save unparsed command line copy for /proc/cmdline */
-	strlcpy(saved_command_line, cmd_line, sizeof(saved_command_line));
+	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
 	*cmdline_p = cmd_line;
 
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
 	if ( ppc_md.progress ) ppc_md.progress("setup_arch: bootmem", 0x3eab);
+
+#ifdef CONFIG_PPC_OCP
+	/* Initialize OCP device list */
+	ocp_early_init();
+	if ( ppc_md.progress ) ppc_md.progress("ocp: exit", 0x3eab);
+#endif
 
 	ppc_md.setup_arch();
 	if ( ppc_md.progress ) ppc_md.progress("arch: exit", 0x3eab);

@@ -15,7 +15,7 @@
 */
 
 	.text
-	.org	__kernel_vsyscall+64
+	.org	__kernel_vsyscall+32
 	.globl __kernel_sigreturn
 	.type __kernel_sigreturn,@function
 __kernel_sigreturn:

@@ -307,6 +307,7 @@ int32_t e1000_led_off(struct e1000_hw *hw);
 /* Adaptive IFS Functions */
 
 /* Everything else */
+uint32_t e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 void e1000_clear_hw_cntrs(struct e1000_hw *hw);
 void e1000_reset_adaptive(struct e1000_hw *hw);
 void e1000_update_adaptive(struct e1000_hw *hw);
@@ -983,6 +984,7 @@ struct e1000_hw {
     e1000_ms_type master_slave;
     e1000_ms_type original_master_slave;
     e1000_ffe_config ffe_config_state;
+    uint32_t asf_firmware_present;
     unsigned long io_base;
     uint32_t phy_id;
     uint32_t phy_revision;
@@ -2019,7 +2021,7 @@ struct e1000_hw {
 #define IGP01E1000_PSSR_MDIX_SHIFT             0x000B /* shift right 11 */
 
 /* IGP01E1000 Specific Port Control Register - R/W */
-#define IGP01E1000_PSCR_TP_LOOPBACK            0x0001
+#define IGP01E1000_PSCR_TP_LOOPBACK            0x0010
 #define IGP01E1000_PSCR_CORRECT_NC_SCMBLR      0x0200
 #define IGP01E1000_PSCR_TEN_CRS_SELECT         0x0400
 #define IGP01E1000_PSCR_FLIP_CHIP              0x0800
@@ -2029,16 +2031,18 @@ struct e1000_hw {
 /* IGP01E1000 Specific Port Link Health Register */
 #define IGP01E1000_PLHR_SS_DOWNGRADE           0x8000
 #define IGP01E1000_PLHR_GIG_SCRAMBLER_ERROR    0x4000
+#define IGP01E1000_PLHR_MASTER_FAULT           0x2000
+#define IGP01E1000_PLHR_MASTER_RESOLUTION      0x1000
 #define IGP01E1000_PLHR_GIG_REM_RCVR_NOK       0x0800 /* LH */
 #define IGP01E1000_PLHR_IDLE_ERROR_CNT_OFLOW   0x0400 /* LH */
 #define IGP01E1000_PLHR_DATA_ERR_1             0x0200 /* LH */
 #define IGP01E1000_PLHR_DATA_ERR_0             0x0100
-#define IGP01E1000_PLHR_AUTONEG_FAULT          0x0010
-#define IGP01E1000_PLHR_AUTONEG_ACTIVE         0x0008
-#define IGP01E1000_PLHR_VALID_CHANNEL_D        0x0004
-#define IGP01E1000_PLHR_VALID_CHANNEL_C        0x0002
-#define IGP01E1000_PLHR_VALID_CHANNEL_B        0x0001
-#define IGP01E1000_PLHR_VALID_CHANNEL_A        0x0000
+#define IGP01E1000_PLHR_AUTONEG_FAULT          0x0040
+#define IGP01E1000_PLHR_AUTONEG_ACTIVE         0x0010
+#define IGP01E1000_PLHR_VALID_CHANNEL_D        0x0008
+#define IGP01E1000_PLHR_VALID_CHANNEL_C        0x0004
+#define IGP01E1000_PLHR_VALID_CHANNEL_B        0x0002
+#define IGP01E1000_PLHR_VALID_CHANNEL_A        0x0001
 
 /* IGP01E1000 Channel Quality Register */
 #define IGP01E1000_MSE_CHANNEL_D        0x000F

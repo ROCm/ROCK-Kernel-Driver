@@ -76,7 +76,6 @@ extern void rs_nvram_write_val(int addr,
 extern void ibm_prep_init(void);
 
 extern void prep_find_bridges(void);
-extern char saved_command_line[];
 
 int _prep_type;
 
@@ -134,6 +133,7 @@ EXPORT_SYMBOL(ppc_cs4232_dma2);
 #define PREP_IBM_CAROLINA_IDE_0	0xf0
 #define PREP_IBM_CAROLINA_IDE_1	0xf1
 #define PREP_IBM_CAROLINA_IDE_2	0xf2
+#define PREP_IBM_CAROLINA_IDE_3	0xf3
 /* 7248-43P */
 #define PREP_IBM_CAROLINA_SCSI_0	0xf4
 #define PREP_IBM_CAROLINA_SCSI_1	0xf5
@@ -323,7 +323,7 @@ prep_carolina_cpuinfo(struct seq_file *m)
 		/* L2 size */
 		if ((l2_reg & 0x60) == 0)
 			seq_printf(m, "256KiB");
-		else if ((l2_reg & 0x60) == 1)
+		else if ((l2_reg & 0x60) == 0x20)
 			seq_printf(m, "512KiB");
 		else
 			seq_printf(m, "unknown size");
@@ -725,6 +725,7 @@ prep_setup_arch(void)
 			case PREP_IBM_CAROLINA_IDE_0:
 			case PREP_IBM_CAROLINA_IDE_1:
 			case PREP_IBM_CAROLINA_IDE_2:
+			case PREP_IBM_CAROLINA_IDE_3:
 				is_ide = 1;
 			case PREP_IBM_CAROLINA_SCSI_0:
 			case PREP_IBM_CAROLINA_SCSI_1:
@@ -771,7 +772,6 @@ prep_setup_arch(void)
 #else
 			ROOT_DEV = Root_SDA2;
 #endif
-		ROOT_DEV = Root_SDA3;
 		break;
 	}
 
@@ -855,13 +855,17 @@ prep_init_IRQ(void)
 	int i;
 	unsigned int pci_viddid, pci_did;
 
-	if (OpenPIC_Addr != NULL)
+	if (OpenPIC_Addr != NULL) {
 		openpic_init(NUM_8259_INTERRUPTS);
+		/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
+		openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+				       i8259_irq);
+	}
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
 	/* If we have a Raven PCI bridge or a Hawk PCI bridge / Memory
 	 * controller, we poll (as they have a different int-ack address). */
-	early_read_config_dword(0, 0, 0, PCI_VENDOR_ID, &pci_viddid);
+	early_read_config_dword(NULL, 0, 0, PCI_VENDOR_ID, &pci_viddid);
 	pci_did = (pci_viddid & 0xffff0000) >> 16;
 	if (((pci_viddid & 0xffff) == PCI_VENDOR_ID_MOTOROLA)
 			&& ((pci_did == PCI_DEVICE_ID_MOTOROLA_RAVEN)

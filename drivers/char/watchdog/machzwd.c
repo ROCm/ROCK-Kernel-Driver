@@ -151,7 +151,7 @@ static unsigned long next_heartbeat = 0;
 #ifndef ZF_DEBUG
 #	define dprintk(format, args...)
 #else
-#	define dprintk(format, args...) printk(KERN_DEBUG PFX; ":" __FUNCTION__ ":%d: " format, __LINE__ , ## args)
+#	define dprintk(format, args...) printk(KERN_DEBUG PFX ":%s:%d: " format, __FUNCTION__, __LINE__ , ## args)
 #endif
 
 
@@ -302,7 +302,7 @@ static void zf_ping(unsigned long data)
 	}
 }
 
-static ssize_t zf_write(struct file *file, const char *buf, size_t count,
+static ssize_t zf_write(struct file *file, const char __user *buf, size_t count,
 								loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
@@ -352,15 +352,16 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	switch(cmd){
 		case WDIOC_GETSUPPORT:
-			if (copy_to_user((struct watchdog_info *)arg,
-					 &zf_info, sizeof(zf_info)))
+			if (copy_to_user(argp, &zf_info, sizeof(zf_info)))
 				return -EFAULT;
 			break;
 
 		case WDIOC_GETSTATUS:
-			return put_user(0, (int *) arg);
+			return put_user(0, p);
 
 		case WDIOC_KEEPALIVE:
 			zf_ping(0);

@@ -489,7 +489,7 @@ static __inline__ int inet_abc_len(u32 addr)
 }
 
 
-int devinet_ioctl(unsigned int cmd, void *arg)
+int devinet_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct ifreq ifr;
 	struct sockaddr_in sin_orig;
@@ -699,6 +699,20 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 			inet_del_ifa(in_dev, ifap, 0);
 			ifa->ifa_mask = sin->sin_addr.s_addr;
 			ifa->ifa_prefixlen = inet_mask_len(ifa->ifa_mask);
+
+			/* See if current broadcast address matches
+			 * with current netmask, then recalculate
+			 * the broadcast address. Otherwise it's a
+			 * funny address, so don't touch it since
+			 * the user seems to know what (s)he's doing...
+			 */
+			if ((dev->flags & IFF_BROADCAST) &&
+			    (ifa->ifa_prefixlen < 31) &&
+			    (ifa->ifa_broadcast ==
+			     (ifa->ifa_local|~ifa->ifa_mask))) {
+				ifa->ifa_broadcast = (ifa->ifa_local |
+						      ~sin->sin_addr.s_addr);
+			}
 			inet_insert_ifa(ifa);
 		}
 		break;
@@ -713,7 +727,7 @@ rarok:
 	goto out;
 }
 
-static int inet_gifconf(struct net_device *dev, char *buf, int len)
+static int inet_gifconf(struct net_device *dev, char __user *buf, int len)
 {
 	struct in_device *in_dev = __in_dev_get(dev);
 	struct in_ifaddr *ifa;
@@ -993,19 +1007,12 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 		devinet_sysctl_register(in_dev, &in_dev->cnf);
 #endif
 		break;
-	case NETDEV_REBOOT:
-		if (dev->flags & IFF_DYNAMIC ) { 
-			for_primary_ifa(in_dev) {
-				notifier_call_chain(&inetaddr_chain, NETDEV_REBOOT, ifa); 
-			} endfor_ifa(in_dev); 
-		}
-		break;
 	}
 out:
 	return NOTIFY_DONE;
 }
 
-struct notifier_block ip_netdev_notifier = {
+static struct notifier_block ip_netdev_notifier = {
 	.notifier_call =inetdev_event,
 };
 
@@ -1143,7 +1150,7 @@ void inet_forward_change(void)
 }
 
 static int devinet_sysctl_forward(ctl_table *ctl, int write,
-				  struct file* filp, void *buffer,
+				  struct file* filp, void __user *buffer,
 				  size_t *lenp)
 {
 	int *valp = ctl->data;
@@ -1161,7 +1168,7 @@ static int devinet_sysctl_forward(ctl_table *ctl, int write,
 }
 
 int ipv4_doint_and_flush(ctl_table *ctl, int write,
-			 struct file* filp, void *buffer,
+			 struct file* filp, void __user *buffer,
 			 size_t *lenp)
 {
 	int *valp = ctl->data;
@@ -1174,9 +1181,9 @@ int ipv4_doint_and_flush(ctl_table *ctl, int write,
 	return ret;
 }
 
-int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
-				  void *oldval, size_t *oldlenp,
-				  void *newval, size_t newlen, 
+int ipv4_doint_and_flush_strategy(ctl_table *table, int __user *name, int nlen,
+				  void __user *oldval, size_t __user *oldlenp,
+				  void __user *newval, size_t newlen, 
 				  void **context)
 {
 	int *valp = table->data;
@@ -1188,7 +1195,7 @@ int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
 	if (newlen != sizeof(int))
 		return -EINVAL;
 
-	if (get_user(new, (int *)newval))
+	if (get_user(new, (int __user *)newval))
 		return -EFAULT;
 
 	if (new == *valp)

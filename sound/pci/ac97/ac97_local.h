@@ -22,10 +22,11 @@
  *
  */
 
+#define AC97_SINGLE_VALUE(reg,shift,mask,invert) ((reg) | ((shift) << 8) | ((mask) << 16) | ((invert) << 24))
 #define AC97_SINGLE(xname, reg, shift, mask, invert) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_ac97_info_single, \
   .get = snd_ac97_get_single, .put = snd_ac97_put_single, \
-  .private_value = (reg) | ((shift) << 8) | ((mask) << 16) | ((invert) << 24) }
+  .private_value =  AC97_SINGLE_VALUE(reg, shift, mask, invert) }
 
 /* ac97_codec.c */
 extern const char *snd_ac97_stereo_enhancements[];

@@ -28,14 +28,13 @@
     
 */  
 
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
-#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/delay.h>
+#include <linux/syscalls.h>
 
 #include "dvb_frontend.h"
 #include "dvb_functions.h"
@@ -56,6 +55,8 @@ static int debug = 0;
 #define SP8870_FIRMWARE_OFFSET 0x0A
 
 
+static int errno;
+
 static struct dvb_frontend_info tdlb7_info = {
 	.name			= "Alps TDLB7",
 	.type			= FE_OFDM,
@@ -74,12 +75,7 @@ static struct dvb_frontend_info tdlb7_info = {
 static int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
 {
         u8 buf [] = { reg >> 8, reg & 0xff, data >> 8, data & 0xff };
-	struct i2c_msg msg = {
-		.addr = 0x71,
-		.flags = 0,
-		.buf = buf,
-		.len =  4
-	};
+	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf = buf, .len = 4 };
 	int err;
 
         if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
@@ -96,20 +92,8 @@ static u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 	int ret;
 	u8 b0 [] = { reg >> 8 , reg & 0xff };
 	u8 b1 [] = { 0, 0 };
-	struct i2c_msg msg [] = {
-		{
-			.addr 	= 0x71,
-			.flags	= 0,
-			.buf	= b0,
-			.len	= 2
-		},
-		{
-			.addr	= 0x71,
-			.flags	= I2C_M_RD,
-			.buf	= b1,
-			.len	= 2
-		}
-	};
+	struct i2c_msg msg [] = { { .addr = 0x71, .flags = 0, .buf = b0, .len = 2 },
+			   { .addr = 0x71, .flags = I2C_M_RD, .buf = b1, .len = 2 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -125,12 +109,7 @@ static u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 static int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = {
-		.addr	= 0x60,
-		.flags	= 0,
-		.buf	= data,
-		.len	=4
-	};
+        struct i2c_msg msg = { .addr = 0x60, .flags = 0, .buf = data, .len = 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -658,9 +637,6 @@ static int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         case FE_SET_FRONTEND:
 		return sp8870_set_frontend(i2c, (struct dvb_frontend_parameters*) arg);
 
-	case FE_RESET:
-		return -EOPNOTSUPP;
-
 	case FE_GET_FRONTEND:			 // FIXME: read known values back from Hardware...
 		return -EOPNOTSUPP;
 
@@ -675,6 +651,15 @@ static int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		}
 		break;
 
+	case FE_GET_TUNE_SETTINGS:
+	{
+	        struct dvb_frontend_tune_settings* fesettings = (struct dvb_frontend_tune_settings*) arg;
+	        fesettings->min_delay_ms = 150;
+	        fesettings->step_size = 166667;
+	        fesettings->max_drift = 166667*2;
+	        return 0;
+	}	    
+	    
 	default:
 		return -EOPNOTSUPP;
         };
@@ -687,21 +672,8 @@ static int tdlb7_attach (struct dvb_i2c_bus *i2c, void **data)
 {
         u8 b0 [] = { 0x02 , 0x00 };
         u8 b1 [] = { 0, 0 };
-        struct i2c_msg msg [] =
-			{
-				{
-					.addr = 0x71,
-					.flags = 0,
-					.buf = b0,
-					.len = 2
-				},
-				{
-					.addr = 0x71,
-					.flags = I2C_M_RD,
-					.buf = b1,
-					.len = 2
-				}
-			};
+        struct i2c_msg msg [] = { { .addr = 0x71, .flags = 0, .buf = b0, .len = 2 },
+                                  { .addr = 0x71, .flags = I2C_M_RD, .buf = b1, .len = 2 } };
 
 	dprintk ("%s\n", __FUNCTION__);
 

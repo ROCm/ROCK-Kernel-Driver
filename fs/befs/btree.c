@@ -372,12 +372,12 @@ befs_find_key(struct super_block *sb, befs_btree_node * node,
 		thiskey = befs_bt_get_key(sb, node, mid, &keylen);
 		eq = befs_compare_strings(thiskey, keylen, findkey,
 					  findkey_len);
-		*value = fs64_to_cpu(sb, valarray[mid]);
 
 		if (eq == 0) {
 			befs_debug(sb, "<--- befs_find_key() found %s at %d",
 				   thiskey, mid);
 
+			*value = fs64_to_cpu(sb, valarray[mid]);
 			return BEFS_BT_MATCH;
 		}
 		if (eq > 0)
@@ -387,6 +387,8 @@ befs_find_key(struct super_block *sb, befs_btree_node * node,
 	}
 	if (eq < 0)
 		*value = fs64_to_cpu(sb, valarray[mid + 1]);
+	else
+		*value = fs64_to_cpu(sb, valarray[mid]);
 	befs_debug(sb, "<--- befs_find_key() found %s at %d", thiskey, mid);
 	return BEFS_BT_PARMATCH;
 }

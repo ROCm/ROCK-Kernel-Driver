@@ -1,5 +1,5 @@
 /*
- * $Id: mtdcore.c,v 1.39 2003/05/21 15:15:03 dwmw2 Exp $
+ * $Id: mtdcore.c,v 1.42 2004/07/13 10:21:13 dwmw2 Exp $
  *
  * Core registration and callback routines for MTD
  * drivers and users.
@@ -59,7 +59,6 @@ int add_mtd_device(struct mtd_info *mtd)
 			mtd_table[i] = mtd;
 			mtd->index = i;
 			mtd->usecount = 0;
-			init_MUTEX(&mtd->mutex);
 
 			DEBUG(0, "mtd: Giving out device %d to %s\n",i, mtd->name);
 			/* No need to get a refcount on the module containing
@@ -233,7 +232,7 @@ void put_mtd_device(struct mtd_info *mtd)
  *			dont implement their own
  */
 
-int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
+int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
 		       unsigned long count, loff_t to, size_t *retlen)
 {
 	unsigned long i;
@@ -263,7 +262,7 @@ int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
  *		       implement their own
  */
 
-int default_mtd_readv(struct mtd_info *mtd, struct iovec *vecs,
+int default_mtd_readv(struct mtd_info *mtd, struct kvec *vecs,
 		      unsigned long count, loff_t from, size_t *retlen)
 {
 	unsigned long i;
@@ -335,10 +334,7 @@ static int mtd_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 /* Support for /proc/mtd */
 
 #ifdef CONFIG_PROC_FS
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 static struct proc_dir_entry *proc_mtd;
-#endif
 
 static inline int mtd_proc_info (char *buf, int i)
 {
@@ -351,13 +347,8 @@ static inline int mtd_proc_info (char *buf, int i)
 		       this->erasesize, this->name);
 }
 
-static int mtd_read_proc ( char *page, char **start, off_t off,int count
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-                       ,int *eof, void *data_unused
-#else
-                        ,int unused
-#endif
-			)
+static int mtd_read_proc (char *page, char **start, off_t off, int count,
+			  int *eof, void *data_unused)
 {
 	int len, l, i;
         off_t   begin = 0;
@@ -377,9 +368,7 @@ static int mtd_read_proc ( char *page, char **start, off_t off,int count
                 }
         }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
         *eof = 1;
-#endif
 
 done:
 	up(&mtd_table_mutex);
@@ -389,18 +378,6 @@ done:
         return ((count < begin+len-off) ? count : begin+len-off);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,0)
-struct proc_dir_entry mtd_proc_entry = {
-        0,                 /* low_ino: the inode -- dynamic */
-        3, "mtd",     /* len of name and name */
-        S_IFREG | S_IRUGO, /* mode */
-        1, 0, 0,           /* nlinks, owner, group */
-        0, NULL,           /* size - unused; operations -- use default */
-        &mtd_read_proc,   /* function used to read data */
-        /* nothing more */
-    };
-#endif
-
 #endif /* CONFIG_PROC_FS */
 
 /*====================================================================*/
@@ -409,16 +386,8 @@ struct proc_dir_entry mtd_proc_entry = {
 int __init init_mtd(void)
 {
 #ifdef CONFIG_PROC_FS
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-	if ((proc_mtd = create_proc_entry( "mtd", 0, 0 )))
-	  proc_mtd->read_proc = mtd_read_proc;
-#else
-        proc_register_dynamic(&proc_root,&mtd_proc_entry);
-#endif
-#endif
-
-#if LINUX_VERSION_CODE < 0x20212
-	init_mtd_devices();
+	if ((proc_mtd = create_proc_entry( "mtd", 0, NULL )))
+		proc_mtd->read_proc = mtd_read_proc;
 #endif
 
 #ifdef CONFIG_PM
@@ -437,12 +406,8 @@ static void __exit cleanup_mtd(void)
 #endif
 
 #ifdef CONFIG_PROC_FS
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
         if (proc_mtd)
-          remove_proc_entry( "mtd", 0);
-#else
-        proc_unregister(&proc_root,mtd_proc_entry.low_ino);
-#endif
+		remove_proc_entry( "mtd", NULL);
 #endif
 }
 

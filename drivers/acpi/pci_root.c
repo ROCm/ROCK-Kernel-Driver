@@ -125,10 +125,9 @@ get_root_bridge_busnr_callback (struct acpi_resource *resource, void *data)
 		return AE_OK;
 
 	acpi_resource_to_address64(resource, &address);
-	if (address.producer_consumer == ACPI_PRODUCER && address.address_length > 0) {
-		if (address.resource_type == ACPI_BUS_NUMBER_RANGE)
-			*busnr = address.min_address_range;
-	}
+	if ((address.address_length > 0) && 
+	   (address.resource_type == ACPI_BUS_NUMBER_RANGE))
+		*busnr = address.min_address_range;
 
 	return AE_OK;
 }
@@ -222,27 +221,26 @@ acpi_pci_root_add (
 		goto end;
 	}
 
-  	list_for_each_entry(tmp, &acpi_pci_roots, node) {
-  		if ((tmp->id.segment == root->id.segment)
- 				&& (tmp->id.bus == root->id.bus)) {
- 			int bus = 0;
- 			acpi_status status;
- 
-  			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
-  				"Wrong _BBN value, please reboot and using option 'pci=noacpi'\n"));
- 		
- 			status = try_get_root_bridge_busnr(root->handle, &bus);
- 			if (ACPI_FAILURE(status))
- 				break;
- 			if (bus != root->id.bus) {
- 				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
- 					"Ok, use bus number from _CRS\n"));
- 				root->id.bus = bus;
- 			}
- 			break;
- 		}
-  	}
+	/* Some systems have wrong _BBN */
+	list_for_each_entry(tmp, &acpi_pci_roots, node) {
+		if ((tmp->id.segment == root->id.segment)
+				&& (tmp->id.bus == root->id.bus)) {
+			int bus = 0;
+			acpi_status status;
 
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+				"Wrong _BBN value, please reboot and using option 'pci=noacpi'\n"));
+
+			status = try_get_root_bridge_busnr(root->handle, &bus);
+			if (ACPI_FAILURE(status))
+				break;
+			if (bus != root->id.bus) {
+				printk(KERN_INFO PREFIX "PCI _CRS %d overrides _BBN 0\n", bus);
+				root->id.bus = bus;
+			}
+			break;
+		}
+	}
 	/*
 	 * Device & Function
 	 * -----------------

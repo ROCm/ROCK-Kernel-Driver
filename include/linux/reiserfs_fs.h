@@ -81,7 +81,7 @@ void reiserfs_warning (struct super_block *s, const char * fmt, ...);
 /** always check a condition and panic if it's false. */
 #define RASSERT( cond, format, args... )					\
 if( !( cond ) ) 								\
-  reiserfs_panic( 0, "reiserfs[%i]: assertion " #cond " failed at "	\
+  reiserfs_panic( NULL, "reiserfs[%i]: assertion " #cond " failed at "	\
 		  __FILE__ ":%i:%s: " format "\n",		\
 		  in_interrupt() ? -1 : current -> pid, __LINE__ , __FUNCTION__ , ##args )
 
@@ -630,8 +630,8 @@ static inline loff_t le_ih_k_type (const struct item_head * ih)
 static inline void set_le_key_k_offset (int version, struct key * key, loff_t offset)
 {
     (version == KEY_FORMAT_3_5) ?
-        (key->u.k_offset_v1.k_offset = cpu_to_le32 (offset)) : /* jdm check */
-	(set_offset_v2_k_offset( &(key->u.k_offset_v2), offset ));
+        (void)(key->u.k_offset_v1.k_offset = cpu_to_le32 (offset)) : /* jdm check */
+	(void)(set_offset_v2_k_offset( &(key->u.k_offset_v2), offset ));
 }
 
 
@@ -644,8 +644,8 @@ static inline void set_le_ih_k_offset (struct item_head * ih, loff_t offset)
 static inline void set_le_key_k_type (int version, struct key * key, int type)
 {
     (version == KEY_FORMAT_3_5) ?
-        (key->u.k_offset_v1.k_uniqueness = cpu_to_le32(type2uniqueness(type))):
-	(set_offset_v2_k_type( &(key->u.k_offset_v2), type ));
+        (void)(key->u.k_offset_v1.k_uniqueness = cpu_to_le32(type2uniqueness(type))):
+	(void)(set_offset_v2_k_type( &(key->u.k_offset_v2), type ));
 }
 static inline void set_le_ih_k_type (struct item_head * ih, int type)
 {
@@ -1711,38 +1711,23 @@ struct reiserfs_journal_header {
 #define journal_bread(s, block) __bread(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 
 enum reiserfs_bh_state_bits {
-    BH_JDirty = BH_PrivateStart, /* buffer is in current transaction */
+    BH_JDirty = BH_PrivateStart,
     BH_JDirty_wait,
-    BH_JNew,                     /* disk block was taken off free list before
-                                  * being in a finished transaction, or
-                                  * written to disk. Can be reused immed. */
-    BH_JPrepared,               
+    BH_JNew,
+    BH_JPrepared,
     BH_JRestore_dirty,
     BH_JTest, // debugging only will go away
 };
-
-BUFFER_FNS(JDirty, journaled);
-TAS_BUFFER_FNS(JDirty, journaled);
-BUFFER_FNS(JDirty_wait, journal_dirty);
-TAS_BUFFER_FNS(JDirty_wait, journal_dirty);
-BUFFER_FNS(JNew, journal_new);
-TAS_BUFFER_FNS(JNew, journal_new);
-BUFFER_FNS(JPrepared, journal_prepared);
-TAS_BUFFER_FNS(JPrepared, journal_prepared);
-BUFFER_FNS(JRestore_dirty, journal_restore_dirty);
-TAS_BUFFER_FNS(JRestore_dirty, journal_restore_dirty);
-BUFFER_FNS(JTest, journal_test);
-TAS_BUFFER_FNS(JTest, journal_test);
 
 /*
 ** transaction handle which is passed around for all journal calls
 */
 struct reiserfs_transaction_handle {
-  struct super_block *t_super ; /* super for this FS when journal_begin was 
-				   called. saves calls to reiserfs_get_super 
+  struct super_block *t_super ; /* super for this FS when journal_begin was
+				   called. saves calls to reiserfs_get_super
 				   also used by nested transactions to make
 				   sure they are nesting on the right FS
-				   _must_ be first in the handle 
+				   _must_ be first in the handle
 				*/
   int t_refcount;
   int t_blocks_logged ;         /* number of blocks this writer has logged */
@@ -1751,8 +1736,6 @@ struct reiserfs_transaction_handle {
   void *t_handle_save ;		/* save existing current->journal_info */
   int displace_new_blocks:1;	/* if new block allocation occurres, that block
 				   should be displaced from others */
-  int t_aborted : 1;            /* If this handle has been aborted */
-  struct list_head t_list;
 } ;
 
 /* used to keep track of ordered and tail writes, attached to the buffer
@@ -1794,8 +1777,7 @@ int reiserfs_end_persistent_transaction(struct reiserfs_transaction_handle *);
 int reiserfs_commit_page(struct inode *inode, struct page *page,
 		unsigned from, unsigned to);
 int reiserfs_flush_old_commits(struct super_block *);
-int reiserfs_commit_for_inode(struct inode *) ;
-int  reiserfs_inode_needs_commit(struct inode *) ;
+void reiserfs_commit_for_inode(struct inode *) ;
 void reiserfs_update_inode_transaction(struct inode *) ;
 void reiserfs_wait_on_write_block(struct super_block *s) ;
 void reiserfs_block_writes(struct reiserfs_transaction_handle *th) ;
@@ -1812,14 +1794,41 @@ int journal_mark_freed(struct reiserfs_transaction_handle *, struct super_block 
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
 int reiserfs_in_journal(struct super_block *p_s_sb, int bmap_nr, int bit_nr, int searchall, b_blocknr_t *next) ;
 int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
-int journal_join_abort(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
-void reiserfs_journal_abort (struct super_block *sb, int errno);
-void reiserfs_abort (struct super_block *sb, int errno, const char *fmt, ...);
+
+int buffer_journaled(const struct buffer_head *bh) ;
+int mark_buffer_journal_new(struct buffer_head *bh) ;
 int reiserfs_allocate_list_bitmaps(struct super_block *s, struct reiserfs_list_bitmap *, int) ;
+
+				/* why is this kerplunked right here? */
+static inline int reiserfs_buffer_prepared(const struct buffer_head *bh) {
+  if (bh && test_bit(BH_JPrepared, &bh->b_state))
+    return 1 ;
+  else
+    return 0 ;
+}
+
+/* buffer was journaled, waiting to get to disk */
+static inline int buffer_journal_dirty(const struct buffer_head *bh) {
+  if (bh)
+    return test_bit(BH_JDirty_wait, &bh->b_state) ;
+  else
+    return 0 ;
+}
+static inline int mark_buffer_notjournal_dirty(struct buffer_head *bh) {
+  if (bh)
+    clear_bit(BH_JDirty_wait, &bh->b_state) ;
+  return 0 ;
+}
+static inline int mark_buffer_notjournal_new(struct buffer_head *bh) {
+  if (bh) {
+    clear_bit(BH_JNew, &bh->b_state) ;
+  }
+  return 0 ;
+}
 
 void add_save_link (struct reiserfs_transaction_handle * th,
 					struct inode * inode, int truncate);
-int remove_save_link (struct inode * inode, int truncate);
+void remove_save_link (struct inode * inode, int truncate);
 
 /* objectid.c */
 __u32 reiserfs_get_unused_objectid (struct reiserfs_transaction_handle *th);
@@ -1915,8 +1924,8 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 
 void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 				 struct inode *inode, struct key * key);
-int reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode * p_s_inode);
-int reiserfs_do_truncate (struct reiserfs_transaction_handle *th, 
+void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode * p_s_inode);
+void reiserfs_do_truncate (struct reiserfs_transaction_handle *th, 
 			   struct  inode * p_s_inode, struct page *, 
 			   int update_timestamps);
 
@@ -1930,7 +1939,7 @@ int reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 void padd_item (char * item, int total_length, int length);
 
 /* inode.c */
-int restart_transaction(struct reiserfs_transaction_handle *th, struct inode *inode, struct path *path);
+void restart_transaction(struct reiserfs_transaction_handle *th, struct inode *inode, struct path *path);
 void reiserfs_read_locked_inode(struct inode * inode, struct reiserfs_iget_args *args) ;
 int reiserfs_find_actor(struct inode * inode, void *p) ;
 int reiserfs_init_locked_inode(struct inode * inode, void *p) ;
@@ -1945,7 +1954,7 @@ int reiserfs_encode_fh( struct dentry *dentry, __u32 *data, int *lenp,
 						int connectable );
 
 int reiserfs_prepare_write(struct file *, struct page *, unsigned, unsigned) ;
-int reiserfs_truncate_file(struct inode *, int update_timestamps) ;
+void reiserfs_truncate_file(struct inode *, int update_timestamps) ;
 void make_cpu_key (struct cpu_key * cpu_key, struct inode * inode, loff_t offset,
 		   int type, int key_length);
 void make_le_item_head (struct item_head * ih, const struct cpu_key * key, 
@@ -2045,8 +2054,17 @@ extern struct address_space_operations reiserfs_address_space_operations ;
 void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s);
 void reiserfs_kfree (const void * vp, size_t size, struct super_block * s);
 #else
-#define reiserfs_kmalloc(x, y, z) kmalloc(x, y)
-#define reiserfs_kfree(x, y, z) kfree(x)
+static inline void *reiserfs_kmalloc(size_t size, int flags,
+					struct super_block *s)
+{
+	return kmalloc(size, flags);
+}
+
+static inline void reiserfs_kfree(const void *vp, size_t size,
+					struct super_block *s)
+{
+	kfree(vp);
+}
 #endif
 
 int fix_nodes (int n_op_mode, struct tree_balance * p_s_tb, 
@@ -2145,7 +2163,7 @@ typedef struct __reiserfs_blocknr_hint reiserfs_blocknr_hint_t;
 int reiserfs_parse_alloc_options (struct super_block *, char *);
 void reiserfs_init_alloc_options (struct super_block *s);
 
-/* 
+/*
  * given a directory, this will tell you what packing locality
  * to use for a new object underneat it.  The locality is returned
  * in disk byte order (le).

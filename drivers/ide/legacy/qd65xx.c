@@ -262,7 +262,7 @@ static void qd6580_tune_drive (ide_drive_t *drive, u8 pio)
 
 	if (drive->id && !qd_find_disk_type(drive, &active_time, &recovery_time)) {
 		pio = ide_get_best_pio_mode(drive, pio, 255, &d);
-		pio = IDE_MIN(pio,4);
+		pio = min_t(u8, pio, 4);
 
 		switch (pio) {
 			case 0: break;

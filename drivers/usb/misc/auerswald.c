@@ -2,7 +2,7 @@
 /*
  *      auerswald.c  --  Auerswald PBX/System Telephone usb driver.
  *
- *      Copyright (C) 2001  Wolfgang Mües (wolfgang@iksw-muees.de)
+ *      Copyright (C) 2001  Wolfgang MÃ¼es (wolfgang@iksw-muees.de)
  *
  *      Very much code of this driver is borrowed from dabusb.c (Deti Fliegl)
  *      and from the USB Skeleton driver (Greg Kroah-Hartman). Thank you.
@@ -50,7 +50,7 @@ do {			\
 /*-------------------------------------------------------------------*/
 /* Version Information */
 #define DRIVER_VERSION "0.9.11"
-#define DRIVER_AUTHOR  "Wolfgang Mües <wolfgang@iksw-muees.de>"
+#define DRIVER_AUTHOR  "Wolfgang MÃ¼es <wolfgang@iksw-muees.de>"
 #define DRIVER_DESC    "Auerswald PBX/System Telephone usb driver"
 
 /*-------------------------------------------------------------------*/
@@ -699,7 +699,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 	dr->wLength = cpu_to_le16 (size);
 
 	usb_fill_control_urb (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
-		          auerchain_blocking_completion,0);
+		          auerchain_blocking_completion, NULL);
 	ret = auerchain_start_wait_urb (acp, urb, timeout, &length);
 
 	usb_free_urb (urb);
@@ -1452,6 +1452,8 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
         audevinfo_t devinfo;
         pauerswald_t cp = NULL;
 	unsigned int u;
+	unsigned int __user *user_arg = (unsigned int __user *)arg;
+
         dbg ("ioctl");
 
 	/* get the mutexes */
@@ -1483,14 +1485,14 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 		u   = ccp->auerdev
 		   && (ccp->scontext.id != AUH_UNASSIGNED)
 		   && !list_empty (&cp->bufctl.free_buff_list);
-	        ret = put_user (u, (unsigned int *) arg);
+	        ret = put_user (u, user_arg);
 		break;
 
 	/* return != 0 if connected to a service channel */
 	case IOCTL_AU_CONNECT:
 		dbg ("IOCTL_AU_CONNECT");
 		u = (ccp->scontext.id != AUH_UNASSIGNED);
-	        ret = put_user (u, (unsigned int *) arg);
+	        ret = put_user (u, user_arg);
 		break;
 
 	/* return != 0 if Receive Data available */
@@ -1511,14 +1513,14 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 				u = 1;
 			}
 		}
-	        ret = put_user (u, (unsigned int *) arg);
+	        ret = put_user (u, user_arg);
 		break;
 
 	/* return the max. buffer length for the device */
 	case IOCTL_AU_BUFLEN:
 		dbg ("IOCTL_AU_BUFLEN");
 		u = cp->maxControlLength;
-	        ret = put_user (u, (unsigned int *) arg);
+	        ret = put_user (u, user_arg);
 		break;
 
 	/* requesting a service channel */
@@ -1527,7 +1529,7 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
                 /* requesting a service means: release the previous one first */
 		auerswald_removeservice (cp, &ccp->scontext);
 		/* get the channel number */
-		ret = get_user (u, (unsigned int *) arg);
+		ret = get_user (u, user_arg);
 		if (ret) {
 			break;
 		}
@@ -1564,7 +1566,7 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
         case IOCTL_AU_SLEN:
 		dbg ("IOCTL_AU_SLEN");
 		u = AUSI_DLEN;
-	        ret = put_user (u, (unsigned int *) arg);
+	        ret = put_user (u, user_arg);
 		break;
 
 	default:
@@ -1591,7 +1593,7 @@ static ssize_t auerchar_read (struct file *file, char __user *buf, size_t count,
 	/* Error checking */
 	if (!ccp)
 		return -EIO;
-	if (ppos != &file->f_pos)
+	if (*ppos)
  		return -ESPIPE;
         if (count == 0)
 		return 0;
@@ -1723,8 +1725,8 @@ static ssize_t auerchar_write (struct file *file, const char __user *buf, size_t
 	/* Error checking */
 	if (!ccp)
 		return -EIO;
-	if (ppos != &file->f_pos)
- 		return -ESPIPE;
+        if (*ppos)
+		return -ESPIPE;
         if (len == 0)
                 return 0;
 

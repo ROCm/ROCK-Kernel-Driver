@@ -34,9 +34,6 @@
 #include "jfs_imap.h"
 #include "jfs_acl.h"
 #include "jfs_debug.h"
-#ifdef CONFIG_JFS_DMAPI
-#include "jfs_dmapi.h"
-#endif
 
 MODULE_DESCRIPTION("The Journaled Filesystem (JFS)");
 MODULE_AUTHOR("Steve Best/Dave Kleikamp/Barry Arndt, IBM");
@@ -84,6 +81,8 @@ extern void jfs_write_inode(struct inode *inode, int wait);
 
 extern struct dentry *jfs_get_parent(struct dentry *dentry);
 extern int jfs_extendfs(struct super_block *, s64, int);
+
+extern struct dentry_operations jfs_ci_dentry_operations;
 
 #ifdef PROC_FS_JFS		/* see jfs_debug.h */
 extern void jfs_proc_init(void);
@@ -144,10 +143,13 @@ static void jfs_destroy_inode(struct inode *inode)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 
+	spin_lock_irq(&ji->ag_lock);
 	if (ji->active_ag != -1) {
 		struct bmap *bmap = JFS_SBI(inode->i_sb)->bmap;
 		atomic_dec(&bmap->db_active[ji->active_ag]);
+		ji->active_ag = -1;
 	}
+	spin_unlock_irq(&ji->ag_lock);
 
 #ifdef CONFIG_JFS_POSIX_ACL
 	if (ji->i_acl != JFS_ACL_NOT_CACHED) {
@@ -159,14 +161,6 @@ static void jfs_destroy_inode(struct inode *inode)
 		ji->i_default_acl = JFS_ACL_NOT_CACHED;
 	}
 #endif
-
-#ifdef CONFIG_JFS_DMAPI	
-	/* Clean up any DMAPI managed regions */
-	if (ji->dmrgns) {
-		kfree(ji->dmrgns);
-		ji->dmrgns = NULL;
-	}
-#endif	
 
 	kmem_cache_free(jfs_inode_cachep, ji);
 }
@@ -209,19 +203,6 @@ static void jfs_put_super(struct super_block *sb)
 	int rc;
 
 	jfs_info("In jfs_put_super");
-
-#ifdef CONFIG_JFS_DMAPI
-	/* if being forcibly unmounted, preunmount event already sent */
-	if ((sbi->flag & JFS_DMI) && !(sbi->mntflag & JFS_UNMOUNT_FORCE)) {
-		rc = jfs_dm_preunmount(sb);
-		if (rc) {
-			jfs_err("jfs_dm_preunmount aborted with return code %d",
-				rc);
-			return;
-		}
-	}
-#endif	
-
 	rc = jfs_umount(sb);
 	if (rc)
 		jfs_err("jfs_umount failed with return code %d", rc);
@@ -229,20 +210,12 @@ static void jfs_put_super(struct super_block *sb)
 		unload_nls(sbi->nls_tab);
 	sbi->nls_tab = NULL;
 
-#ifdef CONFIG_JFS_DMAPI
-	if (sbi->flag & JFS_DMI)
-		jfs_dm_unmount(sb, rc);
-#endif	
-
 	kfree(sbi);
 }
 
 enum {
 	Opt_integrity, Opt_nointegrity, Opt_iocharset, Opt_resize,
 	Opt_resize_nosize, Opt_errors, Opt_ignore, Opt_err,
-#ifdef CONFIG_JFS_DMAPI	
-	Opt_dmapi, Opt_mtpt,
-#endif	
 };
 
 static match_table_t tokens = {
@@ -252,11 +225,6 @@ static match_table_t tokens = {
 	{Opt_resize, "resize=%u"},
 	{Opt_resize_nosize, "resize"},
 	{Opt_errors, "errors=%s"},
-#ifdef CONFIG_JFS_DMAPI	
-	{Opt_dmapi, "dmapi"},
-	{Opt_dmapi, "xdsm"},
-	{Opt_mtpt, "mtpt=%s"},
-#endif	
 	{Opt_ignore, "noquota"},
 	{Opt_ignore, "quota"},
 	{Opt_ignore, "usrquota"},
@@ -275,10 +243,6 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 
 	if (!options)
 		return 1;
-	
-#ifdef CONFIG_JFS_DMAPI
-	*sbi->dm_mtpt = '\0';
-#endif	
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		substring_t args[MAX_OPT_ARGS];
@@ -347,28 +311,12 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 			}
 			break;
 		}
-#ifdef CONFIG_JFS_DMAPI
-		case Opt_dmapi:
-			*flag |= JFS_DMI;
-			break;
-		case Opt_mtpt:
-			strncpy(sbi->dm_mtpt, args[0].from, JFS_NAME_MAX+1);
-			break;
-#endif		
 		default:
 			printk("jfs: Unrecognized mount option \"%s\" "
 					" or missing value\n", p);
 			goto cleanup;
 		}
 	}
-
-#ifdef CONFIG_JFS_DMAPI
-	if ((*flag & JFS_DMI) && (*sbi->dm_mtpt == '\0')) {
-		printk(KERN_ERR
-		       "JFS: DMAPI option needs the mount point options as well\n");
-		goto cleanup;
-	}
-#endif		
 
 	if (nls_map) {
 		/* Discard old (if remount) */
@@ -405,62 +353,12 @@ static int jfs_remount(struct super_block *sb, int *flags, char *data)
 	}
 
 	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
-#ifdef CONFIG_JFS_DMAPI
-		if (flag & JFS_DMI) {
-			/* simulate unmount/mount so DM app gets change to R/W */
-			rc = jfs_dm_preunmount(sb);
-			if (rc) {
-				jfs_err("jfs_umount aborted with return code %d",
-					rc);
-				return rc;
-			}
-			jfs_dm_unmount(sb, rc);
-		}
-#endif		
-		
 		JFS_SBI(sb)->flag = flag;
-		rc = jfs_mount_rw(sb, 1);
-
-#ifdef CONFIG_JFS_DMAPI
-		if ((flag & JFS_DMI) && !rc) {
-			rc = jfs_dm_mount(sb);
-			if (rc) {
-				jfs_err("dm app aborts mount w/return code = %d",
-					rc);
-				return rc;
-			}
-		}
-#endif	
+		return jfs_mount_rw(sb, 1);
 	}
 	if ((!(sb->s_flags & MS_RDONLY)) && (*flags & MS_RDONLY)) {
-#ifdef CONFIG_JFS_DMAPI
-		if (flag & JFS_DMI) {
-			/*
-			 * simulate unmount/mount so DM app gets change to R/O
-			 */
-			rc = jfs_dm_preunmount(sb);
-			if (rc) {
-				jfs_err("jfs_umount aborted with return code %d",
-					rc);
-				return rc;
-			}
-			jfs_dm_unmount(sb, rc);
-		}
-#endif		
-		
 		rc = jfs_umount_rw(sb);
 		JFS_SBI(sb)->flag = flag;
-
-#ifdef CONFIG_JFS_DMAPI
-		if ((flag & JFS_DMI) && !rc) {
-			rc = jfs_dm_mount(sb);
-			if (rc) {
-				jfs_err("dm app aborts mount w/return code = %d",
-					rc);
-				return rc;
-			}
-		}
-#endif	
 		return rc;
 	}
 	if ((JFS_SBI(sb)->flag & JFS_NOINTEGRITY) != (flag & JFS_NOINTEGRITY))
@@ -529,7 +427,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto out_kfree;
 	}
 	if (sb->s_flags & MS_RDONLY)
-		sbi->log = 0;
+		sbi->log = NULL;
 	else {
 		rc = jfs_mount_rw(sb, 0);
 		if (rc) {
@@ -550,6 +448,9 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sb->s_root)
 		goto out_no_root;
 
+	if (sbi->mntflag & JFS_OS2)
+		sb->s_root->d_op = &jfs_ci_dentry_operations;
+
 	/* logical blocks are represented by 40 bits in pxd_t, etc. */
 	sb->s_maxbytes = ((u64) sb->s_blocksize) << 40;
 #if BITS_PER_LONG == 32
@@ -559,16 +460,6 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_maxbytes = min(((u64) PAGE_CACHE_SIZE << 32) - 1, sb->s_maxbytes);
 #endif
-
-#ifdef CONFIG_JFS_DMAPI
-	if (sbi->flag & JFS_DMI) {
-		rc = jfs_dm_mount(sb);
-		if (rc) {
-			jfs_err("dm app aborts mount w/return code = %d", rc);
-			goto out_no_root;
-		}
-	}
-#endif	
 
 	return 0;
 
@@ -646,9 +537,6 @@ static struct super_operations jfs_super_operations = {
 	.unlockfs       = jfs_unlockfs,
 	.statfs		= jfs_statfs,
 	.remount_fs	= jfs_remount,
-#ifdef CONFIG_JFS_DMAPI
-	.umount_begin	= jfs_dm_umount_begin,
-#endif	
 };
 
 static struct export_operations jfs_export_operations = {
@@ -679,6 +567,7 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 		init_rwsem(&jfs_ip->rdwrlock);
 		init_MUTEX(&jfs_ip->commit_sem);
 		init_rwsem(&jfs_ip->xattr_sem);
+		spin_lock_init(&jfs_ip->ag_lock);
 		jfs_ip->active_ag = -1;
 #ifdef CONFIG_JFS_POSIX_ACL
 		jfs_ip->i_acl = JFS_ACL_NOT_CACHED;
@@ -720,7 +609,7 @@ static int __init init_jfs_fs(void)
 	/*
 	 * I/O completion thread (endio)
 	 */
-	jfsIOthread = kernel_thread(jfsIOWait, 0, CLONE_KERNEL);
+	jfsIOthread = kernel_thread(jfsIOWait, NULL, CLONE_KERNEL);
 	if (jfsIOthread < 0) {
 		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsIOthread);
 		goto end_txmngr;
@@ -733,7 +622,7 @@ static int __init init_jfs_fs(void)
 		commit_threads = MAX_COMMIT_THREADS;
 
 	for (i = 0; i < commit_threads; i++) {
-		jfsCommitThread[i] = kernel_thread(jfs_lazycommit, 0,
+		jfsCommitThread[i] = kernel_thread(jfs_lazycommit, NULL,
 						   CLONE_KERNEL);
 		if (jfsCommitThread[i] < 0) {
 			jfs_err("init_jfs_fs: fork failed w/rc = %d",
@@ -745,7 +634,7 @@ static int __init init_jfs_fs(void)
 		wait_for_completion(&jfsIOwait);
 	}
 
-	jfsSyncThread = kernel_thread(jfs_sync, 0, CLONE_KERNEL);
+	jfsSyncThread = kernel_thread(jfs_sync, NULL, CLONE_KERNEL);
 	if (jfsSyncThread < 0) {
 		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsSyncThread);
 		goto kill_committask;
@@ -755,14 +644,6 @@ static int __init init_jfs_fs(void)
 #ifdef PROC_FS_JFS
 	jfs_proc_init();
 #endif
-
-#ifdef CONFIG_JFS_DMAPI
-	rc = dmapi_init();
-	if (rc) {
-		jfs_err("init_jfs_fs: dmapi_init failed w/rc = %d", rc);
-		goto kill_committask;
-	}
-#endif	
 
 	return register_filesystem(&jfs_fs_type);
 
@@ -802,9 +683,6 @@ static void __exit exit_jfs_fs(void)
 #ifdef PROC_FS_JFS
 	jfs_proc_clean();
 #endif
-#ifdef CONFIG_JFS_DMAPI
-	dmapi_uninit();
-#endif	
 	unregister_filesystem(&jfs_fs_type);
 	kmem_cache_destroy(jfs_inode_cachep);
 }

@@ -84,7 +84,7 @@ typedef struct {
 } device_info_t;
 
 /* global graphics card info structure (one per card) */
-static device_info_t deviceInfo = { 0 };
+static device_info_t deviceInfo;
 
 static char *mode_option __initdata = NULL;
 static int nopan __initdata = 0;
@@ -97,7 +97,6 @@ static int nomtrr __initdata = 0;
 static int kyrofb_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static void kyrofb_remove(struct pci_dev *pdev);
 
-#ifndef MODULE
 static struct fb_videomode kyro_modedb[] __initdata = {
 	{
 		/* 640x350 @ 85Hz */
@@ -306,7 +305,6 @@ enum {
 	VMODE_1920_1440_60,
 	VMODE_1920_1440_75,
 };
-#endif
 
 /* Accessors */
 int kyro_dev_video_mode_set(struct fb_info *info)
@@ -592,11 +590,11 @@ static int kyrofb_ioctl(struct inode *inode, struct file *file,
 {
 	overlay_create ol_create;
 	overlay_viewport_set ol_viewport_set;
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
 	case KYRO_IOCTL_OVERLAY_CREATE:
-		copy_from_user((void *) &ol_create, (void *) arg,
-			       sizeof(overlay_create));
+		copy_from_user(&ol_create, argp, sizeof(overlay_create));
 
 		if (kyro_dev_overlay_create(ol_create.ulWidth,
 					    ol_create.ulHeight, 0) < 0) {
@@ -606,7 +604,7 @@ static int kyrofb_ioctl(struct inode *inode, struct file *file,
 		}
 		break;
 	case KYRO_IOCTL_OVERLAY_VIEWPORT_SET:
-		copy_from_user((void *) &ol_viewport_set, (void *) arg,
+		copy_from_user(&ol_viewport_set, argp,
 			       sizeof(overlay_viewport_set));
 
 		if (kyro_dev_overlay_viewport_set(ol_viewport_set.xOrgin,
@@ -627,13 +625,13 @@ static int kyrofb_ioctl(struct inode *inode, struct file *file,
 		}
 		break;
 	case KYRO_IOCTL_UVSTRIDE:
-		copy_to_user((void *)arg, (void *)&deviceInfo.ulOverlayUVStride, sizeof(unsigned long));
+		copy_to_user(argp, &deviceInfo.ulOverlayUVStride, sizeof(unsigned long));
 		break;
 	case KYRO_IOCTL_STRIDE:
-		copy_to_user((void *)arg, (void *)&deviceInfo.ulOverlayStride, sizeof(unsigned long));
+		copy_to_user(argp, &deviceInfo.ulOverlayStride, sizeof(unsigned long));
 		break;
 	case KYRO_IOCTL_OVERLAY_OFFSET:
-		copy_to_user((void *)arg, (void *)&deviceInfo.ulOverlayOffset, sizeof(unsigned long));
+		copy_to_user(argp, &deviceInfo.ulOverlayOffset, sizeof(unsigned long));
 		break;
 	}
 
@@ -722,10 +720,8 @@ static int __devinit kyrofb_probe(struct pci_dev *pdev,
 	deviceInfo.ulOverlayOffset = 0;
 
 	/* This should give a reasonable default video mode */
-#ifndef MODULE
 	if (!fb_find_mode(&info->var, info, mode_option, kyro_modedb,
 			  NUM_TOTAL_MODES, &kyro_modedb[VMODE_1024_768_75], 32))
-#endif
 		info->var = kyro_var;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
@@ -737,7 +733,7 @@ static int __devinit kyrofb_probe(struct pci_dev *pdev,
 			       info->var.bits_per_pixel);
 	size *= info->var.yres_virtual;
 
-	memset_io((unsigned long)info->screen_base, 0, size);
+	fb_memset(info->screen_base, 0, size);
 
 	if (register_framebuffer(info) < 0)
 		goto out_unmap;

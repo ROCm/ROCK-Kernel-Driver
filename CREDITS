@@ -289,6 +289,15 @@ S: Via Delle Palme, 9
 S: Terni 05100
 S: Italy
 
+N: Krzysztof Benedyczak
+E: golbi@mat.uni.torun.pl
+W: http://www.mat.uni.torun.pl/~golbi
+D: POSIX message queues fs (with M. Wronski)
+S: ul. Podmiejska 52
+S: Radunica
+S: 83-000 Pruszcz Gdanski
+S: Poland
+
 N: Randolph Bentson
 E: bentson@grieg.seaslug.org
 W: http://www.aa.net/~bentson/
@@ -821,10 +830,10 @@ S: Boulder, CO 80302
 S: USA
 
 N: Thomas Dunbar
-E: tdunbar@vtaix.cc.vt.edu
+E: tdunbar@vt.edu
 D: TeX & METAFONT hacking/maintenance
-S: Dean, Graduate School
-S: Virginia Tech
+S: Virginia Tech Computing Center
+S: 1700 Pratt Drive
 S: Blacksburg, Virginia 24061
 S: USA
 
@@ -1051,6 +1060,12 @@ S: USA
 N: Jeff Garzik
 E: jgarzik@pobox.com
 
+N: Kumar Gala
+E: kumar.gala@freescale.com
+D: Embedded PowerPC 6xx/7xx/74xx/82xx/85xx support
+S: Austin, Texas 78729
+S: USA
+
 N: Jacques Gelinas
 E: jacques@solucorp.qc.ca
 D: Author of the Umsdos file system
@@ -1074,6 +1089,10 @@ N: Jan-Benedict Glaw
 E: jbglaw@lug-owl.de
 D: SRM environment driver (for Alpha systems)
 P: 1024D/8399E1BB 250D 3BCF 7127 0D8C A444  A961 1DBD 5E75 8399 E1BB
+
+N: Thomas Gleixner
+E: tglx@linutronix.de
+D: NAND flash hardware support, JFFS2 on NAND flash
 
 N: Richard E. Gooch
 E: rgooch@atnf.csiro.au
@@ -1275,8 +1294,8 @@ P: 1024D/77D4FC9B F5C5 1C20 1DFC DEC3 3107  54A4 2332 ADFC 77D4 FC9B
 D: National Language Support
 D: Linux Internationalization Project
 D: German Localization for Linux and GNU software
-S: Helenenstrasse 18
-S: 65183 Wiesbaden
+S: Kriemhildring 12a
+S: 65795 Hattersheim am Main
 S: Germany
 
 N: Christoph Hellwig
@@ -1299,11 +1318,10 @@ S: USA
 
 N: Benjamin Herrenschmidt
 E: benh@kernel.crashing.org
-E: benh@mipsys.com
-D: Various parts of PPC & PowerMac
-S: 122, boulevard Baille
-S: 13005 Marseille
-S: France
+D: Various parts of PPC/PPC64 & PowerMac
+S: 312/107 Canberra Avenue
+S: Griffith, ACT 2603 
+S: Australia
 
 N: Sebastian Hetze
 E: she@lunetix.de
@@ -1391,6 +1409,7 @@ W: http://www.holtmann.org
 D: Maintainer of the Linux Bluetooth Subsystem
 D: Author and maintainer of the various Bluetooth HCI drivers
 D: Author and maintainer of the CAPI message transport protocol driver
+D: Author and maintainer of the Bluetooth HID protocol driver
 D: Various other Bluetooth related patches, cleanups and fixes
 S: Germany
 
@@ -1935,11 +1954,17 @@ S: 8786 Niwot Road
 S: Niwot, Colorado 80503
 S: USA
 
+N: Pete Popov
+E: pete_popov@yahoo.com
+D: Linux/MIPS AMD/Alchemy Port and mips hacking and debugging
+S: San Jose, CA 95134
+S: USA
+
 N: Robert M. Love
 E: rml@tech9.net
-E: rml@ufl.edu
+E: rml@novell.com
 D: misc. kernel hacking and debugging
-S: Gainesville, Florida 32608
+S: Cambridge, MA 02139
 S: USA
 
 N: Martin von Löwis
@@ -2253,12 +2278,12 @@ S: USA
 N: Eberhard Moenkeberg
 E: emoenke@gwdg.de
 D: CDROM driver "sbpcd" (Matsushita/Panasonic/Soundblaster)
-S: Reinholdstrasse 14
-S: D-37083 Goettingen
+S: Ruhstrathoehe 2 b.
+S: D-37085 Goettingen
 S: Germany
 
 N: Thomas Molina
-E: tmolina@cox.net
+E: tmolina@cablespeed.com
 D: bug fixes, documentation, minor hackery
 
 N: James Morris
@@ -2557,6 +2582,14 @@ P: 1024D/EDBB6147 7B36 0E07 04BC 11DC A7A0  D3F7 7185 9E7A EDBB 6147
 D: sonypi, meye drivers, mct_u232 usb serial hacks
 S: Paris, France
 
+N: Matt Porter
+E: mporter@kernel.crashing.org
+D: Motorola PowerPC PReP support
+D: cPCI PowerPC support
+D: Embedded PowerPC 4xx/6xx/7xx/74xx support
+S: Chandler, Arizona 85249
+S: USA
+
 N: Frederic Potter 
 E: fpotter@cirpack.com
 D: Some PCI kernel support
@@ -2674,7 +2707,9 @@ S: Finland
 
 N: Luca Risolia
 E: luca.risolia@studio.unibo.it
+P: 1024D/FCE635A4 88E8 F32F 7244 68BA 3958  5D40 99DA 5D2A FCE6 35A4
 D: V4L driver for W996[87]CF JPEG USB Dual Mode Camera Chips
+D: V4L2 driver for SN9C10[12] PC Camera Controllers
 S: Via Liberta' 41/A
 S: Osio Sotto, 24046, Bergamo
 S: Italy
@@ -3095,12 +3130,13 @@ S: Beaverton, Oregon 97005
 S: USA
 
 N: Marcelo W. Tosatti
-E: marcelo@conectiva.com.br
-W: http://bazar.conectiva.com.br/~marcelo/
-D: Miscellaneous kernel hacker (mostly VM/MM work)
-S: Conectiva S.A.
-S: R. Tocantins, 89 - Cristo Rei
-S: 80050-430 - Curitiba - Paraná
+E: marcelo.tosatti@cyclades.com
+D: Miscellaneous kernel hacker
+D: v2.4 kernel maintainer
+D: Current pc300/cyclades maintainer
+S: Cyclades Corporation
+S: Av Cristovao Colombo, 462. Floresta.
+S: Porto Alegre
 S: Brazil
 
 N: Stefan Traby
@@ -3485,6 +3521,14 @@ S: 12725 SW Millikan Way, Suite 400
 S: Beaverton, OR 97005
 S: USA
 
+N: Michal Wronski
+E: wrona@mat.uni.torun.pl
+W: http://www.mat.uni.torun.pl/~wrona
+D: POSIX message queues fs (with K. Benedyczak)
+S: ul. Teczowa 23/12
+S: 80-680 Gdansk-Sobieszewo
+S: Poland
+
 N: Frank Xia
 E: qx@math.columbia.edu
 D: Xiafs filesystem [defunct]
@@ -3574,6 +3618,14 @@ W: http://www.misterjones.org
 D: MD driver
 D: EISA/sysfs subsystem
 S: France
+
+N: Luiz Fernando N. Capitulino
+E: lcapitulino@terra.com.br
+E: lcapitulino@prefeitura.sp.gov.br
+W: http://www.telecentros.sp.gov.br
+D: Little fixes and a lot of janitorial work
+S: E-GOV Telecentros SP
+S: Brazil
 
 # Don't add your name here, unless you really _are_ after Marc
 # alphabetically. Leonard used to be very proud of being the 

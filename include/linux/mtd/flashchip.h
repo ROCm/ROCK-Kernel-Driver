@@ -6,7 +6,7 @@
  *
  * (C) 2000 Red Hat. GPLd.
  *
- * $Id: flashchip.h,v 1.9 2003/04/30 11:15:22 dwmw2 Exp $
+ * $Id: flashchip.h,v 1.14 2004/06/15 16:44:59 nico Exp $
  *
  */
 
@@ -43,7 +43,8 @@ typedef enum {
 
 
 /* NOTE: confusingly, this can be used to refer to more than one chip at a time, 
-   if they're interleaved. */
+   if they're interleaved.  This can even refer to individual partitions on
+   the same physical chip when present. */
 
 struct flchip {
 	unsigned long start; /* Offset within the map */
@@ -61,6 +62,7 @@ struct flchip {
 
 	int write_suspended:1;
 	int erase_suspended:1;
+	unsigned long in_progress_block_addr;
 
 	spinlock_t *mutex;
 	spinlock_t _spinlock; /* We do it like this because sometimes they'll be shared. */
@@ -69,8 +71,17 @@ struct flchip {
 	int word_write_time;
 	int buffer_write_time;
 	int erase_time;
+
+	void *priv;
 };
 
+/* This is used to handle contention on write/erase operations
+   between partitions of the same physical chip. */
+struct flchip_shared {
+	spinlock_t lock;
+	struct flchip *writing;
+	struct flchip *erasing;
+};
 
 
 #endif /* __MTD_FLASHCHIP_H__ */

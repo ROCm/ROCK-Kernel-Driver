@@ -6,6 +6,8 @@
 #include <linux/linkage.h>
 #include <linux/config.h>
 
+struct vm_area_struct;
+
 /*
  * GFP bitmasks..
  */
@@ -34,7 +36,7 @@
 #define __GFP_NOFAIL	0x800	/* Retry for ever.  Cannot fail */
 #define __GFP_NORETRY	0x1000	/* Do not retry.  Might fail */
 #define __GFP_NO_GROW	0x2000	/* Slab internal usage */
-#define __GFP_NO_COMP	0x4000	/* Return non compound pages if order > 0 */
+#define __GFP_COMP	0x4000	/* Add compound page metadata */
 
 #define __GFP_BITS_SHIFT 16	/* Room for 16 __GFP_FOO bits */
 #define __GFP_BITS_MASK ((1 << __GFP_BITS_SHIFT) - 1)
@@ -42,7 +44,7 @@
 /* if you forget to add the bitmask here kernel will crash, period */
 #define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
 			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
-			__GFP_NOFAIL|__GFP_NORETRY|__GFP_NO_GROW|__GFP_NO_COMP)
+			__GFP_NOFAIL|__GFP_NORETRY|__GFP_NO_GROW|__GFP_COMP)
 
 #define GFP_ATOMIC	(__GFP_HIGH)
 #define GFP_NOIO	(__GFP_WAIT)
@@ -71,41 +73,36 @@
  * For the normal case of non-DISCONTIGMEM systems the NODE_DATA() gets
  * optimized to &contig_page_data at compile-time.
  */
+extern struct page *
+FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
 
-#ifndef HAVE_ARCH_FREE_PAGE
-static inline void arch_free_page(struct page *page, int order) { }
-#endif
-
-extern struct page * FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
-static inline struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int order)
+static inline struct page *alloc_pages_node(int nid, unsigned int gfp_mask,
+						unsigned int order)
 {
 	if (unlikely(order >= MAX_ORDER))
 		return NULL;
 
-	return __alloc_pages(gfp_mask, order, NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
+	return __alloc_pages(gfp_mask, order,
+		NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
 }
 
-extern struct page *alloc_pages_current(unsigned gfp_mask, unsigned order);
-struct vm_area_struct;
-
 #ifdef CONFIG_NUMA
-static inline struct page * alloc_pages(unsigned int gfp_mask, unsigned int order)
+extern struct page *alloc_pages_current(unsigned gfp_mask, unsigned order);
+
+static inline struct page *
+alloc_pages(unsigned int gfp_mask, unsigned int order)
 {
 	if (unlikely(order >= MAX_ORDER))
 		return NULL;
 
 	return alloc_pages_current(gfp_mask, order);
 }
-extern struct page *__alloc_page_vma(unsigned gfp_mask, struct vm_area_struct *vma, 
-				   unsigned long off);
-
-extern struct page *alloc_page_vma(unsigned gfp_mask, struct vm_area_struct *vma, 
-				   unsigned long addr);
+extern struct page *alloc_page_vma(unsigned gfp_mask,
+			struct vm_area_struct *vma, unsigned long addr);
 #else
 #define alloc_pages(gfp_mask, order) \
 		alloc_pages_node(numa_node_id(), gfp_mask, order)
 #define alloc_page_vma(gfp_mask, vma, addr) alloc_pages(gfp_mask, 0)
-#define __alloc_page_vma(gfp_mask, vma, addr) alloc_pages(gfp_mask, 0)
 #endif
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
 

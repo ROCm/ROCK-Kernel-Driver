@@ -303,7 +303,7 @@ reiserfs_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 
             if (acl == NULL)
                 *p_acl = ERR_PTR (-ENODATA);
-            else 
+            else
                 *p_acl = posix_acl_dup (acl);
         }
 
@@ -372,7 +372,7 @@ reiserfs_inherit_default_acl (struct inode *dir, struct dentry *dentry, struct i
             /* If we need an ACL.. */
             if (need_acl > 0) {
                 err = reiserfs_set_acl (inode, ACL_TYPE_ACCESS, acl_copy);
-                if (err) 
+                if (err)
                     goto cleanup_copy;
             }
         }

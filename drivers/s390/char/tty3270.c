@@ -35,6 +35,7 @@
 #define TTY3270_STRING_PAGES 5
 
 struct tty_driver *tty3270_driver;
+static int tty3270_max_index;
 
 struct raw3270_fn tty3270_fn;
 
@@ -836,6 +837,22 @@ tty3270_free(struct raw3270_view *view)
 	tty3270_free_view((struct tty3270 *) view);
 }
 
+/*
+ * Delayed freeing of tty3270 views.
+ */
+static void
+tty3270_del_views(void)
+{
+	struct tty3270 *tp;
+	int i;
+
+	for (i = 0; i < tty3270_max_index; i++) {
+		tp = (struct tty3270 *) raw3270_find_view(&tty3270_fn, i);
+		if (!IS_ERR(tp))
+			raw3270_del_view(&tp->view);
+	}
+}
+
 struct raw3270_fn tty3270_fn = {
 	.activate = tty3270_activate,
 	.deactivate = tty3270_deactivate,
@@ -867,6 +884,12 @@ tty3270_open(struct tty_struct *tty, struct file * filp)
 		tp->inattr = TF_INPUT;
 		return 0;
 	}
+	if (tty3270_max_index < tty->index + 1)
+		tty3270_max_index = tty->index + 1;
+
+	/* Quick exit if there is no device for tty->index. */
+	if (PTR_ERR(tp) == -ENODEV)
+		return -ENODEV;
 
 	/* Allocate tty3270 structure on first open. */
 	tp = tty3270_alloc_view();
@@ -1778,9 +1801,6 @@ tty3270_init(void)
 	struct tty_driver *driver;
 	int ret;
 
-	ret = raw3270_init();
-	if (ret)
-		return ret;
 	driver = alloc_tty_driver(256);
 	if (!driver)
 		return -ENOMEM;
@@ -1807,6 +1827,14 @@ tty3270_init(void)
 		return ret;
 	}
 	tty3270_driver = driver;
+	ret = raw3270_register_notifier(tty3270_notifier);
+	if (ret) {
+		printk(KERN_ERR "tty3270 notifier registration failed "
+		       "with %d\n", ret);
+		put_tty_driver(driver);
+		return ret;
+
+	}
 	return 0;
 }
 
@@ -1815,10 +1843,11 @@ tty3270_exit(void)
 {
 	struct tty_driver *driver;
 
+	raw3270_unregister_notifier(tty3270_notifier);
 	driver = tty3270_driver;
 	tty3270_driver = 0;
 	tty_unregister_driver(driver);
-	raw3270_exit();
+	tty3270_del_views();
 }
 
 MODULE_LICENSE("GPL");

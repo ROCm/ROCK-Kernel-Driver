@@ -4,13 +4,13 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/security.h>
-#include <linux/trigevent_hooks.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
@@ -20,6 +20,7 @@ static int file_ioctl(struct file *filp,unsigned int cmd,unsigned long arg)
 	int error;
 	int block;
 	struct inode * inode = filp->f_dentry->d_inode;
+	int __user *p = (int __user *)arg;
 
 	switch (cmd) {
 		case FIBMAP:
@@ -31,18 +32,18 @@ static int file_ioctl(struct file *filp,unsigned int cmd,unsigned long arg)
 				return -EINVAL;
 			if (!capable(CAP_SYS_RAWIO))
 				return -EPERM;
-			if ((error = get_user(block, (int *) arg)) != 0)
+			if ((error = get_user(block, p)) != 0)
 				return error;
 
 			res = mapping->a_ops->bmap(mapping, block);
-			return put_user(res, (int *) arg);
+			return put_user(res, p);
 		}
 		case FIGETBSZ:
 			if (inode->i_sb == NULL)
 				return -EBADF;
-			return put_user(inode->i_sb->s_blocksize, (int *) arg);
+			return put_user(inode->i_sb->s_blocksize, p);
 		case FIONREAD:
-			return put_user(i_size_read(inode) - filp->f_pos, (int *) arg);
+			return put_user(i_size_read(inode) - filp->f_pos, p);
 	}
 	if (filp->f_op && filp->f_op->ioctl)
 		return filp->f_op->ioctl(inode, filp, cmd, arg);
@@ -54,11 +55,8 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {	
 	struct file * filp;
 	unsigned int flag;
-	int on, error;
+	int on, error = -EBADF;
 
-	FSHOOK_BEGIN(ioctl, error, .fd = fd, .cmd = cmd, .arg.value = arg)
-
-	error = -EBADF;
 	filp = fget(fd);
 	if (!filp)
 		goto out;
@@ -69,7 +67,6 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
                 goto out;
         }
 
-	TRIG_EVENT(ioctl_hook, fd, cmd);
 	lock_kernel();
 	switch (cmd) {
 		case FIOCLEX:
@@ -136,8 +133,13 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	fput(filp);
 
 out:
-
-	FSHOOK_END(ioctl, error)
-
 	return error;
 }
+
+/*
+ * Platforms implementing 32 bit compatibility ioctl handlers in
+ * modules need this exported
+ */
+#ifdef CONFIG_COMPAT
+EXPORT_SYMBOL(sys_ioctl);
+#endif

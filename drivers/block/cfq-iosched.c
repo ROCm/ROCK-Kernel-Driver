@@ -196,7 +196,7 @@ __cfq_add_crq_rb(struct cfq_queue *cfqq, struct cfq_rq *crq)
 	}
 
 	rb_link_node(&crq->rb_node, parent, p);
-	return 0;
+	return NULL;
 }
 
 static void

@@ -448,6 +448,27 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
   __syscall_return(type,__res);						\
 }
 
+#ifdef __KERNEL__
+#define __ARCH_WANT_IPC_PARSE_VERSION
+#define __ARCH_WANT_OLD_READDIR
+#define __ARCH_WANT_STAT64
+#define __ARCH_WANT_SYS_ALARM
+#define __ARCH_WANT_SYS_GETHOSTNAME
+#define __ARCH_WANT_SYS_PAUSE
+#define __ARCH_WANT_SYS_TIME
+#define __ARCH_WANT_SYS_UTIME
+#define __ARCH_WANT_SYS_SOCKETCALL
+#define __ARCH_WANT_SYS_FADVISE64
+#define __ARCH_WANT_SYS_GETPGRP
+#define __ARCH_WANT_SYS_LLSEEK
+#define __ARCH_WANT_SYS_NICE
+#define __ARCH_WANT_SYS_OLD_GETRLIMIT
+#define __ARCH_WANT_SYS_OLDUMOUNT
+#define __ARCH_WANT_SYS_SIGPENDING
+#define __ARCH_WANT_SYS_SIGPROCMASK
+#define __ARCH_WANT_SYS_RT_SIGACTION
+#endif
+
 #ifdef __KERNEL_SYSCALLS__
 
 #include <linux/compiler.h>
@@ -499,6 +520,8 @@ static inline pid_t waitpid(pid_t pid, int *wait_stat, int options)
 	return sys_wait4((int)pid, wait_stat, options, NULL);
 }
 
+extern long execve(const char *file, char **argv, char **envp);
+
 struct pt_regs;
 asmlinkage int sys_execve(char *filenamei, char **argv, char **envp,
 			struct pt_regs *regs);
@@ -513,12 +536,6 @@ asmlinkage long sys_rt_sigaction(int sig,
 				const struct sigaction __user *act,
 				struct sigaction __user *oact,
 				size_t sigsetsize);
-
-/*
- * The following two can't be eliminated yet - they rely on
- * specific conditions.
- */
-static inline _syscall3(int,execve,const char *,file,char **,argv,char **,envp);
 
 #endif
 

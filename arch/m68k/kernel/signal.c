@@ -54,22 +54,21 @@
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs);
 
 const int frame_extra_sizes[16] = {
-  0,
-  -1, /* sizeof(((struct frame *)0)->un.fmt1), */
-  sizeof(((struct frame *)0)->un.fmt2),
-  sizeof(((struct frame *)0)->un.fmt3),
-  sizeof(((struct frame *)0)->un.fmt4),
-  -1, /* sizeof(((struct frame *)0)->un.fmt5), */
-  -1, /* sizeof(((struct frame *)0)->un.fmt6), */
-  sizeof(((struct frame *)0)->un.fmt7),
-  -1, /* sizeof(((struct frame *)0)->un.fmt8), */
-  sizeof(((struct frame *)0)->un.fmt9),
-  sizeof(((struct frame *)0)->un.fmta),
-  sizeof(((struct frame *)0)->un.fmtb),
-  -1, /* sizeof(((struct frame *)0)->un.fmtc), */
-  -1, /* sizeof(((struct frame *)0)->un.fmtd), */
-  -1, /* sizeof(((struct frame *)0)->un.fmte), */
-  -1, /* sizeof(((struct frame *)0)->un.fmtf), */
+  [1]	= -1, /* sizeof(((struct frame *)0)->un.fmt1), */
+  [2]	= sizeof(((struct frame *)0)->un.fmt2),
+  [3]	= sizeof(((struct frame *)0)->un.fmt3),
+  [4]	= sizeof(((struct frame *)0)->un.fmt4),
+  [5]	= -1, /* sizeof(((struct frame *)0)->un.fmt5), */
+  [6]	= -1, /* sizeof(((struct frame *)0)->un.fmt6), */
+  [7]	= sizeof(((struct frame *)0)->un.fmt7),
+  [8]	= -1, /* sizeof(((struct frame *)0)->un.fmt8), */
+  [9]	= sizeof(((struct frame *)0)->un.fmt9),
+  [10]	= sizeof(((struct frame *)0)->un.fmta),
+  [11]	= sizeof(((struct frame *)0)->un.fmtb),
+  [12]	= -1, /* sizeof(((struct frame *)0)->un.fmtc), */
+  [13]	= -1, /* sizeof(((struct frame *)0)->un.fmtd), */
+  [14]	= -1, /* sizeof(((struct frame *)0)->un.fmte), */
+  [15]	= -1, /* sizeof(((struct frame *)0)->un.fmtf), */
 };
 
 /*
@@ -122,7 +121,7 @@ do_rt_sigsuspend(struct pt_regs *regs)
 	}
 }
 
-asmlinkage int 
+asmlinkage int
 sys_sigaction(int sig, const struct old_sigaction *act,
 	      struct old_sigaction *oact)
 {
@@ -191,7 +190,7 @@ struct rt_sigframe
 };
 
 
-static unsigned char fpu_version = 0;	/* version number of fpu, set by setup_frame */
+static unsigned char fpu_version;	/* version number of fpu, set by setup_frame */
 
 static inline int restore_fpu_state(struct sigcontext *sc)
 {
@@ -229,8 +228,8 @@ static inline int restore_fpu_state(struct sigcontext *sc)
 		goto out;
 
 	    __asm__ volatile (".chip 68k/68881\n\t"
-			      "fmovemx %0,%/fp0-%/fp1\n\t"
-			      "fmoveml %1,%/fpcr/%/fpsr/%/fpiar\n\t"
+			      "fmovemx %0,%%fp0-%%fp1\n\t"
+			      "fmoveml %1,%%fpcr/%%fpsr/%%fpiar\n\t"
 			      ".chip 68k"
 			      : /* no outputs */
 			      : "m" (*sc->sc_fpregs), "m" (*sc->sc_fpcntl));
@@ -259,7 +258,7 @@ static inline int rt_restore_fpu_state(struct ucontext *uc)
 	if (FPU_IS_EMU) {
 		/* restore fpu control register */
 		if (__copy_from_user(current->thread.fpcntl,
-				&uc->uc_mcontext.fpregs.f_pcr, 12))
+				uc->uc_mcontext.fpregs.f_fpcntl, 12))
 			goto out;
 		/* restore all other fpu register */
 		if (__copy_from_user(current->thread.fp,
@@ -299,12 +298,12 @@ static inline int rt_restore_fpu_state(struct ucontext *uc)
 				     sizeof(fpregs)))
 			goto out;
 		__asm__ volatile (".chip 68k/68881\n\t"
-				  "fmovemx %0,%/fp0-%/fp7\n\t"
-				  "fmoveml %1,%/fpcr/%/fpsr/%/fpiar\n\t"
+				  "fmovemx %0,%%fp0-%%fp7\n\t"
+				  "fmoveml %1,%%fpcr/%%fpsr/%%fpiar\n\t"
 				  ".chip 68k"
 				  : /* no outputs */
 				  : "m" (*fpregs.f_fpregs),
-				    "m" (fpregs.f_pcr));
+				    "m" (*fpregs.f_fpcntl));
 	}
 	if (context_size &&
 	    __copy_from_user(fpstate + 4, (long *)&uc->uc_fpstate + 1,
@@ -330,7 +329,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *usc, void *fp,
 	/* get previous context */
 	if (copy_from_user(&context, usc, sizeof(context)))
 		goto badframe;
-	
+
 	/* restore passed registers */
 	regs->d1 = context.sc_d1;
 	regs->a0 = context.sc_a0;
@@ -350,7 +349,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *usc, void *fp,
 		/*
 		 * user process trying to return with weird frame format
 		 */
-#if DEBUG
+#ifdef DEBUG
 		printk("user process returning with weird frame format\n");
 #endif
 		goto badframe;
@@ -451,7 +450,7 @@ rt_restore_ucontext(struct pt_regs *regs, struct switch_stack *sw,
 		/*
 		 * user process trying to return with weird frame format
 		 */
-#if DEBUG
+#ifdef DEBUG
 		printk("user process returning with weird frame format\n");
 #endif
 		goto badframe;
@@ -522,7 +521,7 @@ asmlinkage int do_sigreturn(unsigned long __unused)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	current->blocked = set;
 	recalc_sigpending();
-	
+
 	if (restore_sigcontext(regs, &frame->sc, frame + 1, &d0))
 		goto badframe;
 	return d0;
@@ -549,7 +548,7 @@ asmlinkage int do_rt_sigreturn(unsigned long __unused)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	current->blocked = set;
 	recalc_sigpending();
-	
+
 	if (rt_restore_ucontext(regs, sw, &frame->uc, &d0))
 		goto badframe;
 	return d0;
@@ -587,12 +586,12 @@ static inline void save_fpu_state(struct sigcontext *sc, struct pt_regs *regs)
 				sc->sc_fpstate[0x38] |= 1 << 3;
 		}
 		__asm__ volatile (".chip 68k/68881\n\t"
-				  "fmovemx %/fp0-%/fp1,%0\n\t"
-				  "fmoveml %/fpcr/%/fpsr/%/fpiar,%1\n\t"
+				  "fmovemx %%fp0-%%fp1,%0\n\t"
+				  "fmoveml %%fpcr/%%fpsr/%%fpiar,%1\n\t"
 				  ".chip 68k"
-				  : /* no outputs */
-				  : "m" (*sc->sc_fpregs),
-				    "m" (*sc->sc_fpcntl)
+				  : "=m" (*sc->sc_fpregs),
+				    "=m" (*sc->sc_fpcntl)
+				  : /* no inputs */
 				  : "memory");
 	}
 }
@@ -605,7 +604,7 @@ static inline int rt_save_fpu_state(struct ucontext *uc, struct pt_regs *regs)
 
 	if (FPU_IS_EMU) {
 		/* save fpu control register */
-		err |= copy_to_user(&uc->uc_mcontext.fpregs.f_pcr,
+		err |= copy_to_user(uc->uc_mcontext.fpregs.f_fpcntl,
 				current->thread.fpcntl, 12);
 		/* save all other fpu register */
 		err |= copy_to_user(uc->uc_mcontext.fpregs.f_fpregs,
@@ -632,12 +631,12 @@ static inline int rt_save_fpu_state(struct ucontext *uc, struct pt_regs *regs)
 				fpstate[0x38] |= 1 << 3;
 		}
 		__asm__ volatile (".chip 68k/68881\n\t"
-				  "fmovemx %/fp0-%/fp7,%0\n\t"
-				  "fmoveml %/fpcr/%/fpsr/%/fpiar,%1\n\t"
+				  "fmovemx %%fp0-%%fp7,%0\n\t"
+				  "fmoveml %%fpcr/%%fpsr/%%fpiar,%1\n\t"
 				  ".chip 68k"
-				  : /* no outputs */
-				  : "m" (*fpregs.f_fpregs),
-				    "m" (fpregs.f_pcr)
+				  : "=m" (*fpregs.f_fpregs),
+				    "=m" (*fpregs.f_fpcntl)
+				  : /* no inputs */
 				  : "memory");
 		err |= copy_to_user(&uc->uc_mcontext.fpregs, &fpregs,
 				    sizeof(fpregs));
@@ -830,7 +829,7 @@ adjust_stack:
 	if (regs->stkadj) {
 		struct pt_regs *tregs =
 			(struct pt_regs *)((ulong)regs + regs->stkadj);
-#if DEBUG
+#ifdef DEBUG
 		printk("Performing stackadjust=%04x\n", regs->stkadj);
 #endif
 		/* This must be copied with decreasing addresses to
@@ -913,7 +912,7 @@ adjust_stack:
 	if (regs->stkadj) {
 		struct pt_regs *tregs =
 			(struct pt_regs *)((ulong)regs + regs->stkadj);
-#if DEBUG
+#ifdef DEBUG
 		printk("Performing stackadjust=%04x\n", regs->stkadj);
 #endif
 		/* This must be copied with decreasing addresses to
@@ -1092,7 +1091,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
 				sighand = current->parent->sighand;
-				if (sighand && !(sighand->action[SIGCHLD-1].sa.sa_flags 
+				if (sighand && !(sighand->action[SIGCHLD-1].sa.sa_flags
 					     & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();

@@ -37,6 +37,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME "hp-plus"
+
 /* A zero-terminated list of I/O addresses to be probed. */
 static unsigned int hpplus_portlist[] __initdata =
 {0x200, 0x240, 0x280, 0x2C0, 0x300, 0x320, 0x340, 0};
@@ -142,6 +144,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr - NIC_OFFSET, HP_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init hp_plus_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -166,6 +169,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 /* Do the interesting part of the probe at a single address. */
 static int __init hpp_probe1(struct net_device *dev, int ioaddr)
@@ -176,7 +180,7 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 	int mem_start;
 	static unsigned version_printed;
 
-	if (!request_region(ioaddr, HP_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, HP_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	/* Check for the HP+ signature, 50 48 0x 53. */

@@ -12,4 +12,5 @@ obj-$(CONFIG_SH_DREAMCAST)		+= ops-dreamcast.o fixups-dreamcast.o \
 					   dma-dreamcast.o
 obj-$(CONFIG_SH_SECUREEDGE5410)		+= ops-snapgear.o
 obj-$(CONFIG_SH_BIGSUR)			+= ops-bigsur.o
+obj-$(CONFIG_SH_RTS7751R2D)		+= ops-rts7751r2d.o fixups-rts7751r2d.o
 

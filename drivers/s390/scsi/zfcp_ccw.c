@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.52.2.2 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.55 $"
 
 #include "zfcp_ext.h"
 
@@ -158,7 +158,7 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 	retval = zfcp_adapter_debug_register(adapter);
 	if (retval)
 		goto out;
-	retval = zfcp_erp_thread_setup(adapter); 
+	retval = zfcp_erp_thread_setup(adapter);
 	if (retval) {
 		ZFCP_LOG_INFO("error: start of error recovery thread for "
 			      "adapter %s failed\n",

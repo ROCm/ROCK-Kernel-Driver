@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.23.2.1 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.24 $"
 
 //#define QDIO_DBF_LIKE_HELL
 

@@ -68,13 +68,8 @@ MODULE_PARM(isapnp_verbose, "i");
 MODULE_PARM_DESC(isapnp_verbose, "ISA Plug & Play verbose mode");
 MODULE_LICENSE("GPL");
 
-#ifdef CONFIG_X86_PC9800
-#define _PIDXR		0x259
-#define _PNPWRP		0xa59
-#else
 #define _PIDXR		0x279
 #define _PNPWRP		0xa79
-#endif
 
 /* short tags */
 #define _STAG_PNPVERNO		0x01
@@ -1077,11 +1072,6 @@ int __init isapnp_init(void)
 	struct pnp_card *card;
 	struct pnp_dev *dev;
 
-#if defined(CONFIG_PPC_MULTIPLATFORM)
-#include <asm/processor.h>
-	if(_machine == _MACH_Pmac)
-		isapnp_disable = 1;
-#endif
 	if (isapnp_disable) {
 		isapnp_detected = 0;
 		printk(KERN_INFO "isapnp: ISA Plug & Play support disabled\n");

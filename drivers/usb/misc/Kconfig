@@ -133,6 +133,18 @@ config USB_SPEEDTOUCH
 	  To compile this driver as a module, choose M here: the
 	  module will be called speedtch.
 
+config USB_PHIDGETSERVO
+	tristate "USB PhidgetServo support"
+	depends on USB
+	help
+	  Say Y here if you want to connect an 1 or 4 Motor PhidgetServo 
+	  servo controller version 2.0 or 3.0.
+
+	  Phidgets Inc. has a web page at <http://www.phidgets.com/>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called phidgetservo.
+
 config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"
 	depends on USB && USB_DEVICEFS && EXPERIMENTAL

@@ -69,6 +69,13 @@ config CARDBUS
 	depends on YENTA
 	default y if YENTA
 
+config PD6729
+	tristate "Cirrus PD6729 compatible bridge support"
+	depends on PCMCIA && PCI
+	help
+	  This provides support for the Cirrus PD6729 PCI-to-PCMCIA bridge
+	  device, found in some older laptops and PCMCIA card readers.
+
 config I82092
 	tristate "i82092 compatible bridge support"
 	depends on PCMCIA && PCI
@@ -119,6 +126,13 @@ config PCMCIA_SA1111
 	  StrongARM(R)/Xscale(R) embedded machines.
 
 	  This driver is also available as a module called sa1111_cs.
+
+config PCMCIA_PXA2XX
+	tristate "PXA2xx support"
+	depends on ARM && ARCH_PXA && PCMCIA
+	help
+	  Say Y here to include support for the PXA2xx PCMCIA controller
+
 
 config PCMCIA_PROBE
 	bool

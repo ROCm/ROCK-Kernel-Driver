@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.52 2003/10/09 00:38:38 dwmw2 Exp $
+ * $Id: build.c,v 1.55 2003/10/28 17:02:44 dwmw2 Exp $
  *
  */
 
@@ -16,8 +16,7 @@
 #include <linux/slab.h>
 #include "nodelist.h"
 
-int jffs2_build_inode_pass1(struct jffs2_sb_info *, struct jffs2_inode_cache *);
-int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *, struct jffs2_inode_cache *);
+static void jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *, struct jffs2_inode_cache *, struct jffs2_full_dirent **);
 
 static inline struct jffs2_inode_cache *
 first_inode_chain(int *i, struct jffs2_sb_info *c)
@@ -44,6 +43,41 @@ next_inode(int *i, struct jffs2_inode_cache *ic, struct jffs2_sb_info *c)
 	     ic;					\
 	     ic = next_inode(&i, ic, (c)))
 
+
+static inline void jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2_inode_cache *ic)
+{
+	struct jffs2_full_dirent *fd;
+
+	D1(printk(KERN_DEBUG "jffs2_build_inode building directory inode #%u\n", ic->ino));
+
+	/* For each child, increase nlink */
+	for(fd = ic->scan_dents; fd; fd = fd->next) {
+		struct jffs2_inode_cache *child_ic;
+		if (!fd->ino)
+			continue;
+
+		/* XXX: Can get high latency here with huge directories */
+
+		child_ic = jffs2_get_ino_cache(c, fd->ino);
+		if (!child_ic) {
+			printk(KERN_NOTICE "Eep. Child \"%s\" (ino #%u) of dir ino #%u doesn't exist!\n",
+				  fd->name, fd->ino, ic->ino);
+			continue;
+		}
+
+		if (child_ic->nlink++ && fd->type == DT_DIR) {
+			printk(KERN_NOTICE "Child dir \"%s\" (ino #%u) of dir ino #%u appears to be a hard link\n", fd->name, fd->ino, ic->ino);
+			if (fd->ino == 1 && ic->ino == 1) {
+				printk(KERN_NOTICE "This is mostly harmless, and probably caused by creating a JFFS2 image\n");
+				printk(KERN_NOTICE "using a buggy version of mkfs.jffs2. Use at least v1.17.\n");
+			}
+			/* What do we do about it? */
+		}
+		D1(printk(KERN_DEBUG "Increased nlink for child \"%s\" (ino #%u)\n", fd->name, fd->ino));
+		/* Can't free them. We might need them in pass 2 */
+	}
+}
+
 /* Scan plan:
  - Scan physical nodes. Build map of inodes/dirents. Allocate inocaches as we go
  - Scan directory tree from top down, setting nlink in inocaches
@@ -54,6 +88,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	int ret;
 	int i;
 	struct jffs2_inode_cache *ic;
+	struct jffs2_full_dirent *dead_fds = NULL;
 
 	/* First, scan the medium and build all the inode caches with
 	   lists of physical nodes */
@@ -71,47 +106,51 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	/* Now scan the directory tree, increasing nlink according to every dirent found. */
 	for_each_inode(i, c, ic) {
 		D1(printk(KERN_DEBUG "Pass 1: ino #%u\n", ic->ino));
-		ret = jffs2_build_inode_pass1(c, ic);
-		if (ret) {
-			D1(printk(KERN_WARNING "Eep. jffs2_build_inode_pass1 for ino %d returned %d\n", ic->ino, ret));
-			return ret;
+
+		D1(BUG_ON(ic->ino > c->highest_ino));
+
+		if (ic->scan_dents) {
+			jffs2_build_inode_pass1(c, ic);
+			cond_resched();
 		}
-		cond_resched();
 	}
 	D1(printk(KERN_DEBUG "Pass 1 complete\n"));
-	D1(jffs2_dump_block_lists(c));
 
 	/* Next, scan for inodes with nlink == 0 and remove them. If
 	   they were directories, then decrement the nlink of their
 	   children too, and repeat the scan. As that's going to be
 	   a fairly uncommon occurrence, it's not so evil to do it this
 	   way. Recursion bad. */
-	do { 
-		D1(printk(KERN_DEBUG "Pass 2 (re)starting\n"));
-		ret = 0;
-		for_each_inode(i, c, ic) {
-			D1(printk(KERN_DEBUG "Pass 2: ino #%u, nlink %d, ic %p, nodes %p\n", ic->ino, ic->nlink, ic, ic->nodes));
-			if (ic->nlink)
-				continue;
+	D1(printk(KERN_DEBUG "Pass 2 starting\n"));
+
+	for_each_inode(i, c, ic) {
+		D1(printk(KERN_DEBUG "Pass 2: ino #%u, nlink %d, ic %p, nodes %p\n", ic->ino, ic->nlink, ic, ic->nodes));
+		if (ic->nlink)
+			continue;
 			
-			/* XXX: Can get high latency here. Move the cond_resched() from the end of the loop? */
-
-			ret = jffs2_build_remove_unlinked_inode(c, ic);
-			if (ret)
-				break;
-		/* -EAGAIN means the inode's nlink was zero, so we deleted it,
-		   and furthermore that it had children and their nlink has now
-		   gone to zero too. So we have to restart the scan. */
-		} 
-		D1(jffs2_dump_block_lists(c));
-
+		jffs2_build_remove_unlinked_inode(c, ic, &dead_fds);
 		cond_resched();
-	
-	} while(ret == -EAGAIN);
+	} 
+
+	D1(printk(KERN_DEBUG "Pass 2a starting\n"));
+
+	while (dead_fds) {
+		struct jffs2_inode_cache *ic;
+		struct jffs2_full_dirent *fd = dead_fds;
+
+		dead_fds = fd->next;
+
+		ic = jffs2_get_ino_cache(c, fd->ino);
+		D1(printk(KERN_DEBUG "Removing dead_fd ino #%u (\"%s\"), ic at %p\n", fd->ino, fd->name, ic));
+
+		if (ic)
+			jffs2_build_remove_unlinked_inode(c, ic, &dead_fds);
+		jffs2_free_full_dirent(fd);
+	}
 
 	D1(printk(KERN_DEBUG "Pass 2 complete\n"));
 	
-	/* Finally, we can scan again and free the dirent nodes and scan_info structs */
+	/* Finally, we can scan again and free the dirent structs */
 	for_each_inode(i, c, ic) {
 		struct jffs2_full_dirent *fd;
 		D1(printk(KERN_DEBUG "Pass 3: ino #%u, ic %p, nodes %p\n", ic->ino, ic, ic->nodes));
@@ -133,49 +172,10 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	return ret;
 }
 
-int jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2_inode_cache *ic)
-{
-	struct jffs2_full_dirent *fd;
-
-	D1(printk(KERN_DEBUG "jffs2_build_inode building inode #%u\n", ic->ino));
-
-	if (ic->ino > c->highest_ino)
-		c->highest_ino = ic->ino;
-
-	/* For each child, increase nlink */
-	for(fd=ic->scan_dents; fd; fd = fd->next) {
-		struct jffs2_inode_cache *child_ic;
-		if (!fd->ino)
-			continue;
-		
-		/* XXX: Can get high latency here with huge directories */
-
-		child_ic = jffs2_get_ino_cache(c, fd->ino);
-		if (!child_ic) {
-			printk(KERN_NOTICE "Eep. Child \"%s\" (ino #%u) of dir ino #%u doesn't exist!\n",
-				  fd->name, fd->ino, ic->ino);
-			continue;
-		}
-
-		if (child_ic->nlink++ && fd->type == DT_DIR) {
-			printk(KERN_NOTICE "Child dir \"%s\" (ino #%u) of dir ino #%u appears to be a hard link\n", fd->name, fd->ino, ic->ino);
-			if (fd->ino == 1 && ic->ino == 1) {
-				printk(KERN_NOTICE "This is mostly harmless, and probably caused by creating a JFFS2 image\n");
-				printk(KERN_NOTICE "using a buggy version of mkfs.jffs2. Use at least v1.17.\n");
-			}
-			/* What do we do about it? */
-		}
-		D1(printk(KERN_DEBUG "Increased nlink for child \"%s\" (ino #%u)\n", fd->name, fd->ino));
-		/* Can't free them. We might need them in pass 2 */
-	}
-	return 0;
-}
-
-int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inode_cache *ic)
+static void jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inode_cache *ic, struct jffs2_full_dirent **dead_fds)
 {
 	struct jffs2_raw_node_ref *raw;
 	struct jffs2_full_dirent *fd;
-	int ret = 0;
 
 	D1(printk(KERN_DEBUG "JFFS2: Removing ino #%u with nlink == zero.\n", ic->ino));
 	
@@ -214,18 +214,29 @@ int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inod
 				jffs2_free_full_dirent(fd);
 				continue;
 			}
-			jffs2_free_full_dirent(fd);
+
+			/* Reduce nlink of the child. If it's now zero, stick it on the 
+			   dead_fds list to be cleaned up later. Else just free the fd */
+
 			child_ic->nlink--;
+			
+			if (!child_ic->nlink) {
+				D1(printk(KERN_DEBUG "Inode #%u (\"%s\") has now got zero nlink. Adding to dead_fds list.\n",
+					  fd->ino, fd->name));
+				fd->next = *dead_fds;
+				*dead_fds = fd;
+			} else {
+				D1(printk(KERN_DEBUG "Inode #%u (\"%s\") has now got nlink %d. Ignoring.\n",
+					  fd->ino, fd->name, child_ic->nlink));
+				jffs2_free_full_dirent(fd);
+			}
 		}
-		ret = -EAGAIN;
 	}
 
 	/*
 	   We don't delete the inocache from the hash list and free it yet. 
 	   The erase code will do that, when all the nodes are completely gone.
 	*/
-
-	return ret;
 }
 
 static void jffs2_calc_trigger_levels(struct jffs2_sb_info *c)

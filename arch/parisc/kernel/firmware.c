@@ -10,6 +10,7 @@
  * Copyright 1999 SuSE GmbH Nuernberg (Philipp Rumpf, prumpf@tux.org)
  * Copyright 1999 The Puffin Group, (Alex deVries, David Kennedy)
  * Copyright 2003 Grant Grundler <grundler parisc-linux org>
+ * Copyright 2003,2004 Ryan Bradetich <rbrad@parisc-linux.org>
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -71,6 +72,15 @@ static spinlock_t pdc_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long pdc_result[32] __attribute__ ((aligned (8)));
 static unsigned long pdc_result2[32] __attribute__ ((aligned (8)));
 
+#ifdef __LP64__
+#define WIDE_FIRMWARE 0x1
+#define NARROW_FIRMWARE 0x2
+
+/* Firmware needs to be initially set to narrow to determine the 
+ * actual firmware width. */
+int parisc_narrow_firmware = 1;
+#endif
+
 /* on all currently-supported platforms, IODC I/O calls are always
  * 32-bit calls, and MEM_PDC calls are always the same width as the OS.
  * This means Cxxx boxes can't run wide kernels right now. -PB
@@ -87,11 +97,11 @@ long real64_call(unsigned long function, ...);
 #endif
 long real32_call(unsigned long function, ...);
 
-#if defined(__LP64__) && ! defined(CONFIG_PDC_NARROW)
-#define MEM_PDC (unsigned long)(PAGE0->mem_pdc_hi) << 32 | PAGE0->mem_pdc
-#   define mem_pdc_call(args...) real64_call(MEM_PDC, args)
+#ifdef __LP64__
+#   define MEM_PDC (unsigned long)(PAGE0->mem_pdc_hi) << 32 | PAGE0->mem_pdc
+#   define mem_pdc_call(args...) unlikely(parisc_narrow_firmware) ? real32_call(MEM_PDC, args) : real64_call(MEM_PDC, args)
 #else
-#define MEM_PDC (unsigned long)PAGE0->mem_pdc
+#   define MEM_PDC (unsigned long)PAGE0->mem_pdc
 #   define mem_pdc_call(args...) real32_call(MEM_PDC, args)
 #endif
 
@@ -105,12 +115,14 @@ long real32_call(unsigned long function, ...);
  */
 static unsigned long f_extend(unsigned long address)
 {
-#ifdef CONFIG_PDC_NARROW
-	if((address & 0xff000000) == 0xf0000000)
-		return 0xf0f0f0f000000000 | (u32)address;
+#ifdef __LP64__
+	if(unlikely(parisc_narrow_firmware)) {
+		if((address & 0xff000000) == 0xf0000000)
+			return 0xf0f0f0f000000000 | (u32)address;
 
-	if((address & 0xf0000000) == 0xf0000000)
-		return 0xffffffff00000000 | (u32)address;
+		if((address & 0xf0000000) == 0xf0000000)
+			return 0xffffffff00000000 | (u32)address;
+	}
 #endif
 	return address;
 }
@@ -125,11 +137,34 @@ static unsigned long f_extend(unsigned long address)
  */
 static void convert_to_wide(unsigned long *addr)
 {
-#ifdef CONFIG_PDC_NARROW
+#ifdef __LP64__
 	int i;
-	unsigned *p = (unsigned int *)addr;
-	for(i = 31; i >= 0; --i)
-		addr[i] = p[i];
+	unsigned int *p = (unsigned int *)addr;
+
+	if(unlikely(parisc_narrow_firmware)) {
+		for(i = 31; i >= 0; --i)
+			addr[i] = p[i];
+	}
+#endif
+}
+
+/**
+ * set_firmware_width - Determine if the firmware is wide or narrow.
+ * 
+ * This function must be called before any pdc_* function that uses the convert_to_wide
+ * function.
+ */
+void __init set_firmware_width(void)
+{
+#ifdef __LP64__
+	int retval;
+
+        spin_lock_irq(&pdc_lock);
+	retval = mem_pdc_call(PDC_MODEL, PDC_MODEL_CAPABILITIES, __pa(pdc_result), 0);
+	convert_to_wide(pdc_result);
+	if(pdc_result[0] != NARROW_FIRMWARE)
+		parisc_narrow_firmware = 0;
+        spin_unlock_irq(&pdc_lock);
 #endif
 }
 
@@ -582,6 +617,7 @@ int pdc_get_initiator(struct hardware_path *hwpath, unsigned char *scsi_id,
 		case 10:  *period = 1000; break;
 		case 20:  *period = 500; break;
 		case 40:  *period = 250; break;
+		case 80:  *period = 125; break;
 		default: /* Do nothing */ break;
 	}
 

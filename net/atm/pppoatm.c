@@ -257,10 +257,10 @@ static int pppoatm_devppp_ioctl(struct ppp_channel *chan, unsigned int cmd,
 {
 	switch (cmd) {
 	case PPPIOCGFLAGS:
-		return put_user(chan_to_pvcc(chan)->flags, (int *) arg)
+		return put_user(chan_to_pvcc(chan)->flags, (int __user *) arg)
 		    ? -EFAULT : 0;
 	case PPPIOCSFLAGS:
-		return get_user(chan_to_pvcc(chan)->flags, (int *) arg)
+		return get_user(chan_to_pvcc(chan)->flags, (int __user *) arg)
 		    ? -EFAULT : 0;
 	}
 	return -ENOTTY;
@@ -271,7 +271,7 @@ static /*const*/ struct ppp_channel_ops pppoatm_ops = {
 	.ioctl = pppoatm_devppp_ioctl,
 };
 
-static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, unsigned long arg)
+static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, void __user *arg)
 {
 	struct atm_backend_ppp be;
 	struct pppoatm_vcc *pvcc;
@@ -281,7 +281,7 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, unsigned long arg)
 	 * prototypical one used to initialize them
 	 */
 	static const DECLARE_TASKLET(tasklet_proto, pppoatm_wakeup_sender, 0);
-	if (copy_from_user(&be, (void *) arg, sizeof be))
+	if (copy_from_user(&be, arg, sizeof be))
 		return -EFAULT;
 	if (be.encaps != PPPOATM_ENCAPS_AUTODETECT &&
 	    be.encaps != PPPOATM_ENCAPS_VC && be.encaps != PPPOATM_ENCAPS_LLC)
@@ -307,7 +307,7 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, unsigned long arg)
 	atmvcc->user_back = pvcc;
 	atmvcc->push = pppoatm_push;
 	atmvcc->pop = pppoatm_pop;
-	(void) try_module_get(THIS_MODULE);
+	__module_get(THIS_MODULE);
 	return 0;
 }
 
@@ -319,26 +319,27 @@ static int pppoatm_ioctl(struct socket *sock, unsigned int cmd,
 	unsigned long arg)
 {
 	struct atm_vcc *atmvcc = ATM_SD(sock);
+	void __user *argp = (void __user *)arg;
 
 	if (cmd != ATM_SETBACKEND && atmvcc->push != pppoatm_push)
 		return -ENOIOCTLCMD;
 	switch (cmd) {
 	case ATM_SETBACKEND: {
 		atm_backend_t b;
-		if (get_user(b, (atm_backend_t *) arg))
+		if (get_user(b, (atm_backend_t __user *) argp))
 			return -EFAULT;
 		if (b != ATM_BACKEND_PPP)
 			return -ENOIOCTLCMD;
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		return pppoatm_assign_vcc(atmvcc, arg);
+		return pppoatm_assign_vcc(atmvcc, argp);
 		}
 	case PPPIOCGCHAN:
 		return put_user(ppp_channel_index(&atmvcc_to_pvcc(atmvcc)->
-		    chan), (int *) arg) ? -EFAULT : 0;
+		    chan), (int __user *) argp) ? -EFAULT : 0;
 	case PPPIOCGUNIT:
 		return put_user(ppp_unit_number(&atmvcc_to_pvcc(atmvcc)->
-		    chan), (int *) arg) ? -EFAULT : 0;
+		    chan), (int __user *) argp) ? -EFAULT : 0;
 	}
 	return -ENOIOCTLCMD;
 }

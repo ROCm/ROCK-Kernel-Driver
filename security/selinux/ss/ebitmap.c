@@ -17,7 +17,7 @@ int ebitmap_or(struct ebitmap *dst, struct ebitmap *e1, struct ebitmap *e2)
 
 	n1 = e1->node;
 	n2 = e2->node;
-	prev = 0;
+	prev = NULL;
 	while (n1 || n2) {
 		new = kmalloc(sizeof(*new), GFP_ATOMIC);
 		if (!new) {
@@ -40,7 +40,7 @@ int ebitmap_or(struct ebitmap *dst, struct ebitmap *e1, struct ebitmap *e2)
 			n2 = n2->next;
 		}
 
-		new->next = 0;
+		new->next = NULL;
 		if (prev)
 			prev->next = new;
 		else
@@ -80,7 +80,7 @@ int ebitmap_cpy(struct ebitmap *dst, struct ebitmap *src)
 
 	ebitmap_init(dst);
 	n = src->node;
-	prev = 0;
+	prev = NULL;
 	while (n) {
 		new = kmalloc(sizeof(*new), GFP_ATOMIC);
 		if (!new) {
@@ -90,7 +90,7 @@ int ebitmap_cpy(struct ebitmap *dst, struct ebitmap *src)
 		memset(new, 0, sizeof(*new));
 		new->startbit = n->startbit;
 		new->map = n->map;
-		new->next = 0;
+		new->next = NULL;
 		if (prev)
 			prev->next = new;
 		else
@@ -155,7 +155,7 @@ int ebitmap_set_bit(struct ebitmap *e, unsigned long bit, int value)
 {
 	struct ebitmap_node *n, *prev, *new;
 
-	prev = 0;
+	prev = NULL;
 	n = e->node;
 	while (n && n->startbit <= bit) {
 		if ((n->startbit + MAPSIZE) > bit) {
@@ -231,7 +231,7 @@ void ebitmap_destroy(struct ebitmap *e)
 	}
 
 	e->highbit = 0;
-	e->node = 0;
+	e->node = NULL;
 	return;
 }
 

@@ -25,6 +25,12 @@
 		.macro	writeb, rb
 		str	\rb, [r3, #0x160]
 		.endm
+#elif defined(CONFIG_DEBUG_ICEDCC)
+		.macro	loadsp, rb
+		.endm
+		.macro writeb, rb
+		mcr	p14, 0, \rb, c0, c1, 0
+		.endm
 #elif defined(CONFIG_FOOTBRIDGE)
 		.macro	loadsp,	rb
 		mov	\rb, #0x7c000000
@@ -66,6 +72,33 @@
 		.endm
 		.macro	writeb, rb
 		str	\rb, [r3, #0x14]	@ UTDR
+		.endm
+#elif defined(CONFIG_ARCH_IXP4XX)
+		.macro	loadsp, rb
+		mov	\rb, #0xc8000000
+		.endm
+		.macro	writeb, rb
+		str	\rb, [r3, #0]
+#elif defined(CONFIG_ARCH_LH7A40X)
+		.macro	loadsp, rb
+		ldr	\rb, =0x80000700	@ UART2 UARTBASE
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3, #0]
+		.endm
+#elif defined(CONFIG_ARCH_OMAP)
+		.macro  loadsp, rb
+		mov	\rb, #0xff000000	@ physical base address
+		add	\rb, \rb, #0x00fb0000
+#if defined(CONFIG_OMAP_LL_DEBUG_UART2) || defined(CONFIG_OMAP_LL_DEBUG_UART3)
+		add	\rb, \rb, #0x00000800
+#endif
+#ifdef CONFIG_OMAP_LL_DEBUG_UART3
+		add	\rb, \rb, #0x00009000
+#endif
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3]
 		.endm
 #else
 #error no serial architecture defined
@@ -163,7 +196,7 @@ not_angel:
 		ldmia	r0, {r1, r2, r3, r4, r5, r6, ip, sp}
 		subs	r0, r0, r1		@ calculate the delta offset
 
-						@ if delta is zero, we're
+						@ if delta is zero, we are
 		beq	not_relocated		@ running at the address we
 						@ were linked at.
 
@@ -291,7 +324,7 @@ wont_overwrite:	mov	r0, r4
 LC0:		.word	LC0			@ r1
 		.word	__bss_start		@ r2
 		.word	_end			@ r3
-		.word	_load_addr		@ r4
+		.word	zreladdr		@ r4
 		.word	_start			@ r5
 		.word	_got_start		@ r6
 		.word	_got_end		@ ip

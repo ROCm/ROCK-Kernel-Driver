@@ -33,10 +33,6 @@
 #include <linux/if_ether.h>
 #include <asm/byteorder.h>
 
-#define		HFA384x_PORTTYPE_IBSS			((uint16_t)3)
-#define		HFA384x_WEPFLAGS_DISABLE_TXCRYPT	(0x10)
-#define		HFA384x_WEPFLAGS_DISABLE_RXCRYPT	(0x80)
-
 /*
  * Limits and constants
  */
@@ -151,38 +147,6 @@
 #define 	HERMES_CMD_MONITOR		(0x0038)
 #define		HERMES_MONITOR_ENABLE		(0x000b)
 #define		HERMES_MONITOR_DISABLE		(0x000f)
-
-/*
- * Configuration RIDs
- */
-
-#define		HERMES_RID_CNF_PORTTYPE		(0xfc00)
-#define		HERMES_RID_CNF_CHANNEL		(0xfc03)
-#define		HERMES_RID_CNF_PRISM2_WEP_ON	(0xfc28)
-
-/*-- Status Fields --*/
-#define		HERMES_RXSTATUS_MSGTYPE		(0xE000)
-#define		HERMES_RXSTATUS_MACPORT		(0x0700)
-#define		HERMES_RXSTATUS_UNDECR		(0x0002)
-#define		HERMES_RXSTATUS_FCSERR		(0x0001)
-
-/*--------------------------------------------------------------------
-Communication Frames: Test/Get/Set Field Values for Receive Frames
---------------------------------------------------------------------*/
-#define		HERMES_RXSTATUS_MSGTYPE_GET(value)	(((value) & HERMES_RXSTATUS_MSGTYPE) >> 13)
-#define		HERMES_RXSTATUS_MSGTYPE_SET(value)	((value) << 13)
-#define		HERMES_RXSTATUS_MACPORT_GET(value)	(((value) & HERMES_RXSTATUS_MACPORT) >> 8)
-#define		HERMES_RXSTATUS_MACPORT_SET(value)	((value) << 8)
-#define		HERMES_RXSTATUS_ISUNDECR(value)	((value) & HERMES_RXSTATUS_UNDECR)
-#define		HERMES_RXSTATUS_ISFCSERR(value)	((value) & HERMES_RXSTATUS_FCSERR)
-
-/*--------------------------------------------------------------------
-Communication Frames: Field Masks for Receive Frames
---------------------------------------------------------------------*/
-/*-- Offsets --------*/
-#define		HERMES_RX_DATA_LEN_OFF		(44)
-#define		HERMES_RX_80211HDR_OFF		(14)
-#define		HERMES_RX_DATA_OFF			(60)
 
 /*
  * Frame structures and constants
@@ -322,7 +286,6 @@ typedef struct hermes {
 #define HERMES_32BIT_REGSPACING	1
 
 	u16 inten; /* Which interrupts should be enabled? */
- 	uint8_t		port_enabled[HERMES_NUMPORTS_MAX];
 
 #ifdef HERMES_DEBUG_BUFFER
 	struct hermes_debug_entry dbuf[HERMES_DEBUG_BUFSIZE];
@@ -378,14 +341,12 @@ static inline void hermes_set_irqmask(hermes_t *hw, u16 events)
 
 static inline int hermes_enable_port(hermes_t *hw, int port)
 {
-        hw->port_enabled[port] = 1;
 	return hermes_docmd_wait(hw, HERMES_CMD_ENABLE | (port << 8),
 				 0, NULL);
 }
 
 static inline int hermes_disable_port(hermes_t *hw, int port)
 {
-        hw->port_enabled[port] = 0;
 	return hermes_docmd_wait(hw, HERMES_CMD_DISABLE | (port << 8), 
 				 0, NULL);
 }
@@ -423,7 +384,7 @@ static inline void hermes_read_words(struct hermes *hw, int off, void *buf, unsi
 
 static inline void hermes_write_words(struct hermes *hw, int off, const void *buf, unsigned count)
 {
-	off = off << hw->reg_spacing;;
+	off = off << hw->reg_spacing;
 
 	if (hw->io_space) {
 		outsw(hw->iobase + off, buf, count);
@@ -445,7 +406,7 @@ static inline void hermes_clear_words(struct hermes *hw, int off, unsigned count
 {
 	unsigned i;
 
-	off = off << hw->reg_spacing;;
+	off = off << hw->reg_spacing;
 
 	if (hw->io_space) {
 		for (i = 0; i < count; i++)

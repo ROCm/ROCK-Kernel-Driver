@@ -25,16 +25,9 @@
 #ifndef IRLAN_ETH_H
 #define IRLAN_ETH_H
 
-void  irlan_eth_setup(struct net_device *dev);
-int  irlan_eth_open(struct net_device *dev);
-int  irlan_eth_close(struct net_device *dev);
+struct net_device *alloc_irlandev(const char *name);
 int  irlan_eth_receive(void *instance, void *sap, struct sk_buff *skb);
-int  irlan_eth_xmit(struct sk_buff *skb, struct net_device *dev);
 
 void irlan_eth_flow_indication( void *instance, void *sap, LOCAL_FLOW flow);
 void irlan_eth_send_gratuitous_arp(struct net_device *dev);
-
-void irlan_eth_set_multicast_list( struct net_device *dev);
-struct net_device_stats *irlan_eth_get_stats(struct net_device *dev);
-
 #endif

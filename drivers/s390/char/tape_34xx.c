@@ -893,7 +893,7 @@ tape_34xx_ioctl(struct tape_device *device, unsigned int cmd, unsigned long arg)
 	if (cmd == TAPE390_DISPLAY) {
 		struct display_struct disp;
 
-		if (copy_from_user(&disp, (char *) arg, sizeof(disp)) != 0)
+		if (copy_from_user(&disp, (char __user *) arg, sizeof(disp)) != 0)
 			return -EFAULT;
 
 		return tape_std_display(device, &disp);
@@ -1357,7 +1357,7 @@ tape_34xx_init (void)
 	debug_set_level(TAPE_DBF_AREA, 6);
 #endif
 
-	DBF_EVENT(3, "34xx init: $Revision: 1.20.2.1 $\n");
+	DBF_EVENT(3, "34xx init: $Revision: 1.21 $\n");
 	/* Register driver for 3480/3490 tapes. */
 	rc = ccw_driver_register(&tape_34xx_driver);
 	if (rc)
@@ -1378,7 +1378,7 @@ tape_34xx_exit(void)
 MODULE_DEVICE_TABLE(ccw, tape_34xx_ids);
 MODULE_AUTHOR("(C) 2001-2002 IBM Deutschland Entwicklung GmbH");
 MODULE_DESCRIPTION("Linux on zSeries channel attached 3480 tape "
-		   "device driver ($Revision: 1.20.2.1 $)");
+		   "device driver ($Revision: 1.21 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_34xx_init);

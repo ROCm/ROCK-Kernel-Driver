@@ -4,7 +4,8 @@ net-3-driver for the SKNET MCA-based cards
 This is an extension to the Linux operating system, and is covered by the
 same GNU General Public License that covers that work.
 
-Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de, aarnold@elsa.de)
+Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de,
+                                 alfred.arnold@lancom.de)
 
 This driver is based both on the 3C523 driver and the SK_G16 driver.
 
@@ -997,13 +998,13 @@ static void skmca_set_multicast_list(struct net_device *dev)
 		block.Mode &= ~LANCE_INIT_PROM;
 
 	if (dev->flags & IFF_ALLMULTI) {	/* get all multicasts */
-		memset(block.LAdrF, 8, 0xff);
+		memset(block.LAdrF, 0xff, sizeof(block.LAdrF));
 	} else {		/* get selected/no multicasts */
 
 		struct dev_mc_list *mptr;
 		int code;
 
-		memset(block.LAdrF, 8, 0x00);
+		memset(block.LAdrF, 0, sizeof(block.LAdrF));
 		for (mptr = dev->mc_list; mptr != NULL; mptr = mptr->next) {
 			code = GetHash(mptr->dmi_addr);
 			block.LAdrF[(code >> 3) & 7] |= 1 << (code & 7);

@@ -38,6 +38,7 @@
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
 #include <asm/sections.h>
+#include <asm/setup.h>
 #include <asm/system.h>
 
 struct cpuinfo_mips cpu_data[NR_CPUS];
@@ -71,7 +72,6 @@ EXPORT_SYMBOL(mips_machgroup);
 struct boot_mem_map boot_mem_map;
 
 static char command_line[CL_SIZE];
-       char saved_command_line[CL_SIZE];
        char arcs_cmdline[CL_SIZE]=CONFIG_CMDLINE;
 
 /*
@@ -453,14 +453,18 @@ static void __init do_earlyinitcalls(void)
 
 void __init setup_arch(char **cmdline_p)
 {
+	unsigned int status;
+
 	cpu_probe();
 	prom_init();
 	cpu_report();
 
 #ifdef CONFIG_MIPS32
 	/* Disable coprocessors and set FPU for 16/32 FPR register model */
-	clear_c0_status(ST0_CU1|ST0_CU2|ST0_CU3|ST0_KX|ST0_SX|ST0_FR);
-	set_c0_status(ST0_CU0);
+	status = read_c0_status();
+	status &= ~(ST0_CU1|ST0_CU2|ST0_CU3|ST0_KX|ST0_SX|ST0_FR);
+	status |= ST0_CU0;
+	write_c0_status(status);
 #endif
 #ifdef CONFIG_MIPS64
 	/*
@@ -468,8 +472,10 @@ void __init setup_arch(char **cmdline_p)
 	 * Maybe because the kernel is in ckseg0 and not xkphys? Clear it
 	 * anyway ...
 	 */
-	clear_c0_status(ST0_BEV|ST0_TS|ST0_CU1|ST0_CU2|ST0_CU3);
-	set_c0_status(ST0_CU0|ST0_KX|ST0_SX|ST0_FR);
+	status = read_c0_status();
+	status &= ~(ST0_BEV|ST0_TS|ST0_CU1|ST0_CU2|ST0_CU3);
+	status |= (ST0_CU0|ST0_KX|ST0_SX|ST0_FR);
+	write_c0_status(status);
 #endif
 
 #if defined(CONFIG_VT)
@@ -484,7 +490,7 @@ void __init setup_arch(char **cmdline_p)
 	do_earlyinitcalls();
 
 	strlcpy(command_line, arcs_cmdline, sizeof(command_line));
-	strlcpy(saved_command_line, command_line, sizeof(saved_command_line));
+	strlcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
 
 	*cmdline_p = command_line;
 

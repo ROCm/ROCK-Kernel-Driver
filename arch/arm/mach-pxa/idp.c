@@ -27,6 +27,8 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
+#include <asm/arch/idp.h>
+
 #include "generic.h"
 
 #ifndef PXA_IDP_REV02
@@ -113,8 +115,9 @@ static void __init idp_map_io(void)
 
 MACHINE_START(PXA_IDP, "Accelent Xscale IDP")
 	MAINTAINER("Accelent Systems Inc.")
-	BOOT_MEM(0xa0000000, 0x40000000, 0xfc000000)
+	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(idp_map_io)
 	INITIRQ(idp_init_irq)
+	INITTIME(pxa_init_time)
 	INIT_MACHINE(idp_init)
 MACHINE_END

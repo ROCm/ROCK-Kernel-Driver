@@ -30,7 +30,7 @@
 #include "init.h"
 #include "2_5compat.h"
 
-#define MAX_TTYS (16)
+#define MAX_TTYS (8)
 
 /* Referenced only by tty_driver below - presumably it's locked correctly
  * by the tty driver.
@@ -83,8 +83,7 @@ static int con_remove(char *str);
 
 static struct line_driver driver = {
 	.name 			= "UML console",
-	.device_name 		= "tty",
-	.devfs_name 		= "vc/",
+	.devfs_name 		= "vc/%d",
 	.major 			= TTY_MAJOR,
 	.minor_start 		= 0,
 	.type 		 	= TTY_DRIVER_TYPE_CONSOLE,
@@ -160,15 +159,6 @@ static int chars_in_buffer(struct tty_struct *tty)
 
 static int con_init_done = 0;
 
-static struct tty_operations console_ops = {
-	.open 	 		= con_open,
-	.close 	 		= con_close,
-	.write 	 		= con_write,
-	.chars_in_buffer 	= chars_in_buffer,
-	.set_termios 		= set_termios,
-	.write_room		= line_write_room,
-};
-
 int stdio_init(void)
 {
 	char *new_title;
@@ -176,8 +166,7 @@ int stdio_init(void)
 	printk(KERN_INFO "Initializing stdio console driver\n");
 
 	console_driver = line_register_devfs(&console_lines, &driver,
-					     &console_ops, vts,
-					     sizeof(vts)/sizeof(vts[0]));
+				&console_ops, vts, sizeof(vts)/sizeof(vts[0]));
 
 	lines_init(vts, sizeof(vts)/sizeof(vts[0]));
 
@@ -189,19 +178,24 @@ int stdio_init(void)
 	return(0);
 }
 
-late_initcall(stdio_init);
+__initcall(stdio_init);
 
 static void console_write(struct console *console, const char *string, 
 			  unsigned len)
 {
-	struct line *line = &vts[console->index];
-
-	if(con_init_done)
-		down(&line->sem);
-	console_write_chan(&line->chan_list, string, len);
-	if(con_init_done)
-		up(&line->sem);
+	if(con_init_done) down(&vts[console->index].sem);
+	console_write_chan(&vts[console->index].chan_list, string, len);
+	if(con_init_done) up(&vts[console->index].sem);
 }
+
+static struct tty_operations console_ops = {
+	.open 	 		= con_open,
+	.close 	 		= con_close,
+	.write 	 		= con_write,
+	.chars_in_buffer 	= chars_in_buffer,
+	.set_termios 		= set_termios,
+	.write_room		= line_write_room,
+};
 
 static struct tty_driver *console_device(struct console *c, int *index)
 {
@@ -214,28 +208,22 @@ static int console_setup(struct console *co, char *options)
 	return(0);
 }
 
-static struct console stdiocons = {
-	name:		"tty",
-	write:		console_write,
-	device:		console_device,
-	setup:		console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
-};
+static struct console stdiocons = INIT_CONSOLE("tty", console_write, 
+					       console_device, console_setup,
+					       CON_PRINTBUFFER);
 
-static int __init stdio_console_init(void)
+static void __init stdio_console_init(void)
 {
 	INIT_LIST_HEAD(&vts[0].chan_list);
 	list_add(&init_console_chan.list, &vts[0].chan_list);
 	register_console(&stdiocons);
-	return(0);
 }
-
 console_initcall(stdio_console_init);
 
 static int console_chan_setup(char *str)
 {
-	return(line_setup(vts, sizeof(vts)/sizeof(vts[0]), str, 1));
+	line_setup(vts, sizeof(vts)/sizeof(vts[0]), str, 1);
+	return(1);
 }
 
 __setup("con", console_chan_setup);

@@ -48,6 +48,7 @@
 #include <linux/netdevice.h>
 #include <linux/suspend.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/usb.h>
 #include <linux/crc32.h>
 #include <net/irda/irda.h>
@@ -208,7 +209,7 @@ static int write_reg(struct stir_cb *stir, __u16 reg, __u8 value)
 			       REQ_WRITE_SINGLE,
 			       USB_DIR_OUT|USB_TYPE_VENDOR|USB_RECIP_DEVICE,
 			       value, reg, NULL, 0,
-			       MSECS_TO_JIFFIES(CTRL_TIMEOUT));
+			       msecs_to_jiffies(CTRL_TIMEOUT));
 }
 
 /* Send control message to read multiple registers */
@@ -221,7 +222,7 @@ static inline int read_reg(struct stir_cb *stir, __u16 reg,
 			       REQ_READ_REG,
 			       USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			       0, reg, data, count,
-			       MSECS_TO_JIFFIES(CTRL_TIMEOUT));
+			       msecs_to_jiffies(CTRL_TIMEOUT));
 }
 
 static inline int isfir(u32 speed)
@@ -652,7 +653,7 @@ static int fifo_txwait(struct stir_cb *stir, int space)
 			return 0;
 
 		/* estimate transfer time for remaining chars */
-		wait_ms((count * 8000) / stir->speed);
+		msleep((count * 8000) / stir->speed);
 	}
 			
 	err = write_reg(stir, REG_FIFOCTL, FIFOCTL_CLR);
@@ -745,7 +746,7 @@ static void stir_send(struct stir_cb *stir, struct sk_buff *skb)
 
 	if (usb_bulk_msg(stir->usbdev, usb_sndbulkpipe(stir->usbdev, 1),
 			 stir->io_buf, wraplen,
-			 NULL, MSECS_TO_JIFFIES(TRANSMIT_TIMEOUT))) 
+			 NULL, msecs_to_jiffies(TRANSMIT_TIMEOUT)))
 		stir->stats.tx_errors++;
 }
 
@@ -774,7 +775,7 @@ static int stir_transmit_thread(void *arg)
 
 			write_reg(stir, REG_CTRL1, CTRL1_TXPWD|CTRL1_RXPWD);
 
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 			if (change_speed(stir, stir->speed))
 				break;
@@ -810,7 +811,7 @@ static int stir_transmit_thread(void *arg)
 					info("%s: receive usb submit failed",
 					     stir->netdev->name);
 				stir->receiving = 0;
-				wait_ms(10);
+				msleep(10);
 				continue;
 			}
 		}

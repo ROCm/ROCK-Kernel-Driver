@@ -39,6 +39,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME	"ac3200"
+
 /* Offsets from the base address. */
 #define AC_NIC_BASE	0x00
 #define AC_SA_PROM	0x16			/* The station address PROM. */
@@ -130,6 +132,7 @@ static void cleanup_card(struct net_device *dev)
 		iounmap((void *)dev->mem_start);
 }
 
+#ifndef MODULE
 struct net_device * __init ac3200_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -154,12 +157,13 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init ac_probe1(int ioaddr, struct net_device *dev)
 {
 	int i, retval;
 
-	if (!request_region(ioaddr, AC_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, AC_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	if (inb_p(ioaddr + AC_ID_PORT) == 0xff) {
@@ -203,7 +207,7 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 		printk(", assigning");
 	}
 
-	retval = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev);
+	retval = request_irq(dev->irq, ei_interrupt, 0, DRV_NAME, dev);
 	if (retval) {
 		printk (" nothing! Unable to get IRQ %d.\n", dev->irq);
 		goto out1;

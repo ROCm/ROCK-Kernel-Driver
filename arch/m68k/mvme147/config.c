@@ -69,7 +69,7 @@ int mvme147_parse_bootinfo(const struct bi_record *bi)
 		return 1;
 }
 
-void mvme147_reset()
+void mvme147_reset(void)
 {
 	printk ("\r\n\nCalled mvme147_reset\r\n");
 	m147_pcc->watchdog = 0x0a;	/* Clear timer */
@@ -120,8 +120,8 @@ void __init config_mvme147(void)
 
 static irqreturn_t mvme147_timer_int (int irq, void *dev_id, struct pt_regs *fp)
 {
-	m147_pcc->t1_int_cntrl = PCC_TIMER_INT_CLR;  
-	m147_pcc->t1_int_cntrl = PCC_INT_ENAB|PCC_LEVEL_TIMER1;   
+	m147_pcc->t1_int_cntrl = PCC_TIMER_INT_CLR;
+	m147_pcc->t1_int_cntrl = PCC_INT_ENAB|PCC_LEVEL_TIMER1;
 	return tick_handler(irq, dev_id, fp);
 }
 
@@ -129,16 +129,16 @@ static irqreturn_t mvme147_timer_int (int irq, void *dev_id, struct pt_regs *fp)
 void mvme147_sched_init (irqreturn_t (*timer_routine)(int, void *, struct pt_regs *))
 {
 	tick_handler = timer_routine;
-	request_irq (PCC_IRQ_TIMER1, mvme147_timer_int, 
+	request_irq (PCC_IRQ_TIMER1, mvme147_timer_int,
 		IRQ_FLG_REPLACE, "timer 1", NULL);
-	
+
 	/* Init the clock with a value */
 	/* our clock goes off every 6.25us */
 	m147_pcc->t1_preload = PCC_TIMER_PRELOAD;
-	m147_pcc->t1_cntrl = 0x0;   	/* clear timer */
-	m147_pcc->t1_cntrl = 0x3; 	/* start timer */
+	m147_pcc->t1_cntrl = 0x0;	/* clear timer */
+	m147_pcc->t1_cntrl = 0x3;	/* start timer */
 	m147_pcc->t1_int_cntrl = PCC_TIMER_INT_CLR;  /* clear pending ints */
-	m147_pcc->t1_int_cntrl = PCC_INT_ENAB|PCC_LEVEL_TIMER1;   
+	m147_pcc->t1_int_cntrl = PCC_INT_ENAB|PCC_LEVEL_TIMER1;
 }
 
 /* This is always executed with interrupts disabled.  */

@@ -1614,6 +1614,7 @@ out:
 	return err;
 }
 
+#ifndef MODULE
 struct net_device * __init elplus_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(elp_device));
@@ -1632,7 +1633,7 @@ struct net_device * __init elplus_probe(int unit)
 	return dev;
 }
 
-#ifdef MODULE
+#else
 static struct net_device *dev_3c505[ELP_MAX_CARDS];
 static int io[ELP_MAX_CARDS];
 static int irq[ELP_MAX_CARDS];

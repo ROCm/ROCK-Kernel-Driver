@@ -1914,8 +1914,8 @@ typedef struct DAC960_V1_UserCommand
   unsigned char ControllerNumber;
   DAC960_V1_CommandMailbox_T CommandMailbox;
   int DataTransferLength;
-  void *DataTransferBuffer;
-  DAC960_V1_DCDB_T *DCDB;
+  void __user *DataTransferBuffer;
+  DAC960_V1_DCDB_T __user *DCDB;
 }
 DAC960_V1_UserCommand_T;
 
@@ -1948,8 +1948,8 @@ typedef struct DAC960_V2_UserCommand
   DAC960_V2_CommandMailbox_T CommandMailbox;
   int DataTransferLength;
   int RequestSenseLength;
-  void *DataTransferBuffer;
-  void *RequestSenseBuffer;
+  void __user *DataTransferBuffer;
+  void __user *RequestSenseBuffer;
 }
 DAC960_V2_UserCommand_T;
 
@@ -1980,7 +1980,7 @@ DAC960_V2_KernelCommand_T;
 typedef struct DAC960_V2_GetHealthStatus
 {
   unsigned char ControllerNumber;
-  DAC960_V2_HealthStatusBuffer_T *HealthStatusBuffer;
+  DAC960_V2_HealthStatusBuffer_T __user *HealthStatusBuffer;
 }
 DAC960_V2_GetHealthStatus_T;
 

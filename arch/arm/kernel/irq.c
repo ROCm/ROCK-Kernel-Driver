@@ -47,7 +47,7 @@
 #define MAX_IRQ_CNT	100000
 
 static volatile unsigned long irq_err_count;
-static spinlock_t irq_controller_lock;
+static spinlock_t irq_controller_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(irq_pending);
 
 struct irqdesc irq_desc[NR_IRQS];
@@ -103,6 +103,7 @@ void disable_irq(unsigned int irq)
 	list_del_init(&desc->pend);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(disable_irq);
 
 /**
  *	enable_irq - enable interrupt handling on an irq
@@ -142,6 +143,7 @@ void enable_irq(unsigned int irq)
 	}
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(enable_irq);
 
 /*
  * Enable wake on selected irq
@@ -156,6 +158,7 @@ void enable_irq_wake(unsigned int irq)
 		desc->chip->wake(irq, 1);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(enable_irq_wake);
 
 void disable_irq_wake(unsigned int irq)
 {
@@ -167,6 +170,7 @@ void disable_irq_wake(unsigned int irq)
 		desc->chip->wake(irq, 0);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
+EXPORT_SYMBOL(disable_irq_wake);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
@@ -443,7 +447,7 @@ static void do_pending_irqs(struct pt_regs *regs)
  * come via this function.  Instead, they should provide their
  * own 'handler'
  */
-asmlinkage void asm_do_IRQ(int irq, struct pt_regs *regs)
+asmlinkage void asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
 	struct irqdesc *desc = irq_desc + irq;
 
@@ -541,6 +545,7 @@ int set_irq_type(unsigned int irq, unsigned int type)
 
 	return ret;
 }
+EXPORT_SYMBOL(set_irq_type);
 
 void set_irq_flags(unsigned int irq, unsigned int iflags)
 {
@@ -669,7 +674,7 @@ int request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_
 
 	action->handler = handler;
 	action->flags = irq_flags;
-	action->mask = 0;
+	cpus_clear(action->mask);
 	action->name = devname;
 	action->next = NULL;
 	action->dev_id = dev_id;
@@ -798,6 +803,7 @@ unsigned int probe_irq_mask(unsigned long irqs)
 
 	return mask;
 }
+EXPORT_SYMBOL(probe_irq_mask);
 
 /*
  * Possible return values:

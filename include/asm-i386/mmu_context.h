@@ -29,11 +29,6 @@ static inline void switch_mm(struct mm_struct *prev,
 {
 	int cpu = smp_processor_id();
 
-	/* uml skas patch -- kraxel */
-#ifdef CONFIG_SMP
-	prev = cpu_tlbstate[cpu].active_mm;
-#endif
-
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
 		cpu_clear(cpu, prev->cpu_vm_mask);

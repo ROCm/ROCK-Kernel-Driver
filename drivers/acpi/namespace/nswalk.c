@@ -183,7 +183,7 @@ acpi_ns_walk_namespace (
 	/* Null child means "get first node" */
 
 	parent_node = start_node;
-	child_node  = 0;
+	child_node  = NULL;
 	child_type  = ACPI_TYPE_ANY;
 	level       = 1;
 
@@ -258,14 +258,14 @@ acpi_ns_walk_namespace (
 			 * maximum depth has been reached.
 			 */
 			if ((level < max_depth) && (status != AE_CTRL_DEPTH)) {
-				if (acpi_ns_get_next_node (ACPI_TYPE_ANY, child_node, 0)) {
+				if (acpi_ns_get_next_node (ACPI_TYPE_ANY, child_node, NULL)) {
 					/*
 					 * There is at least one child of this
 					 * node, visit the onde
 					 */
 					level++;
 					parent_node   = child_node;
-					child_node    = 0;
+					child_node    = NULL;
 				}
 			}
 		}

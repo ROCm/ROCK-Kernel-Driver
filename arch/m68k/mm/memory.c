@@ -29,8 +29,8 @@
 typedef struct list_head ptable_desc;
 static LIST_HEAD(ptable_list);
 
-#define PD_PTABLE(page) ((ptable_desc *)&(virt_to_page(page)->list))
-#define PD_PAGE(ptable) (list_entry(ptable, struct page, list))
+#define PD_PTABLE(page) ((ptable_desc *)&(virt_to_page(page)->lru))
+#define PD_PAGE(ptable) (list_entry(ptable, struct page, lru))
 #define PD_MARKBITS(dp) (*(unsigned char *)&PD_PAGE(dp)->index)
 
 #define PTABLE_SIZE (PTRS_PER_PMD * sizeof(pmd_t))
@@ -54,7 +54,7 @@ void __init init_pointer_table(unsigned long ptable)
 
 	/* unreserve the page so it's possible to free that page */
 	PD_PAGE(dp)->flags &= ~(1 << PG_reserved);
-	atomic_set(&PD_PAGE(dp)->count, 1);
+	set_page_count(PD_PAGE(dp), 1);
 
 	return;
 }
@@ -129,7 +129,7 @@ int free_pointer_table (pmd_t *ptable)
 	return 0;
 }
 
-#if DEBUG_INVALID_PTOV
+#ifdef DEBUG_INVALID_PTOV
 int mm_inv_cnt = 5;
 #endif
 
@@ -179,7 +179,7 @@ unsigned long mm_ptov (unsigned long paddr)
 		voff += m68k_memory[i].size;
 	} while (++i < m68k_num_memory);
 
-#if DEBUG_INVALID_PTOV
+#ifdef DEBUG_INVALID_PTOV
 	if (mm_inv_cnt > 0) {
 		mm_inv_cnt--;
 		printk("Invalid use of phys_to_virt(0x%lx) at 0x%p!\n",
@@ -298,7 +298,7 @@ void cache_clear (unsigned long paddr, int len)
 		      : "d0");
 #ifdef CONFIG_M68K_L2_CACHE
     if(mach_l2_flush)
-    	mach_l2_flush(0);
+	mach_l2_flush(0);
 #endif
 }
 
@@ -350,7 +350,7 @@ void cache_push (unsigned long paddr, int len)
 		      : "d0");
 #ifdef CONFIG_M68K_L2_CACHE
     if(mach_l2_flush)
-    	mach_l2_flush(1);
+	mach_l2_flush(1);
 #endif
 }
 
@@ -387,7 +387,7 @@ static unsigned long virt_to_phys_slow(unsigned long vaddr)
 		unsigned long mmusr;
 
 		set_fs(get_ds());
-		
+
 		asm volatile (".chip 68040\n\t"
 			      "ptestr (%1)\n\t"
 			      "movec %%mmusr, %0\n\t"

@@ -28,7 +28,7 @@ static int get_free_idx(void)
  * Set a given TLS descriptor:
  * When you want addresses > 32bit use arch_prctl() 
  */
-int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info)
+int do_set_thread_area(struct thread_struct *t, struct user_desc __user *u_info)
 {
 	struct user_desc info;
 	struct n_desc_struct *desc;
@@ -75,7 +75,7 @@ int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info)
 	return 0;
 }
 
-asmlinkage long sys32_set_thread_area(struct user_desc *u_info)
+asmlinkage long sys32_set_thread_area(struct user_desc __user *u_info)
 { 
 	return do_set_thread_area(&current->thread, u_info); 
 } 
@@ -94,7 +94,7 @@ asmlinkage long sys32_set_thread_area(struct user_desc *u_info)
 	((desc)->a & 0x0ffff) | \
 	 ((desc)->b & 0xf0000) )
 	
-#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_32BIT(desc)		(((desc)->b >> 22) & 1)
 #define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
 #define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
 #define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
@@ -102,7 +102,7 @@ asmlinkage long sys32_set_thread_area(struct user_desc *u_info)
 #define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
 #define GET_LONGMODE(desc)	(((desc)->b >> 21) & 1)
 
-int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info)
+int do_get_thread_area(struct thread_struct *t, struct user_desc __user *u_info)
 {
 	struct user_desc info;
 	struct n_desc_struct *desc;
@@ -132,7 +132,7 @@ int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info)
 	return 0;
 }
 
-asmlinkage long sys32_get_thread_area(struct user_desc *u_info)
+asmlinkage long sys32_get_thread_area(struct user_desc __user *u_info)
 {
 	return do_get_thread_area(&current->thread, u_info);
 } 
@@ -141,10 +141,11 @@ asmlinkage long sys32_get_thread_area(struct user_desc *u_info)
 int ia32_child_tls(struct task_struct *p, struct pt_regs *childregs)
 {
 	struct n_desc_struct *desc;
-	struct user_desc info, *cp;
+	struct user_desc info;
+	struct user_desc __user *cp;
 	int idx;
 	
-	cp = (void *)childregs->rsi;
+	cp = (void __user *)childregs->rsi;
 	if (copy_from_user(&info, cp, sizeof(info)))
 		return -EFAULT;
 	if (LDT_empty(&info))

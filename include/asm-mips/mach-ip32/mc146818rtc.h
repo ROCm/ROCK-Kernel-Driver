@@ -19,13 +19,17 @@
 
 static unsigned char CMOS_READ(unsigned long addr)
 {
-	return readb(mace->isa.rtc + addr);
+	return mace->isa.rtc[addr << 8];
 }
 
 static inline void CMOS_WRITE(unsigned char data, unsigned long addr)
 {
-	writeb(data, mace->isa.rtc + addr);
+	mace->isa.rtc[addr << 8] = data;
 }
+
+/* FIXME: Do it right. For now just assume that noone lives in 20th century
+ * and no O2 user in 22th century ;-) */
+#define mc146818_decode_year(year) ((year) + 2000)
 
 #define RTC_ALWAYS_BCD	0
 

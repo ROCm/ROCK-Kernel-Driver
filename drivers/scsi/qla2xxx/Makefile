@@ -1,10 +1,7 @@
-EXTRA_CFLAGS += -Idrivers/scsi -DUNIQUE_FW_NAME
+EXTRA_CFLAGS += -DUNIQUE_FW_NAME
 
 qla2xxx-y := qla_os.o qla_init.o qla_mbx.o qla_iocb.o qla_isr.o qla_gs.o \
 		qla_dbg.o qla_sup.o qla_rscn.o
-
-qla2xxx-$(CONFIG_SCSI_QLA2XXX_FAILOVER) += qla_xioct.o qla_inioct.o \
-	qla_fo.o qla_foln.o qla_cfg.o qla_cfgln.o
 
 qla2100-y := ql2100.o ql2100_fw.o
 qla2200-y := ql2200.o ql2200_fw.o

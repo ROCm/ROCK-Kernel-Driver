@@ -57,7 +57,7 @@ endif
 cflags-y			:= -I $(TOPDIR)/include/asm/gcc
 cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe
 cflags-y			+= $(call check_gcc, -finline-limit=100000,)
-LDFLAGS_vmlinux			+= -G 0 -static # -N
+LDFLAGS_vmlinux			+= -G 0 -static -n
 MODFLAGS			+= -mlong-calls
 
 cflags-$(CONFIG_SB1XXX_CORELIS)	+= -mno-sched-prolog -fno-omit-frame-pointer
@@ -108,8 +108,13 @@ while :; do \
 	gas_abi=; gas_opt=; gas_cpu=; gas_isa=; \
 	break; \
 done; \
-if test x$(gcc-abi) != x$(gas-abi); then \
+if test "$(gcc-abi)" != "$(gas-abi)"; then \
 	gas_abi="-Wa,-$(gas-abi) -Wa,-mgp$(gcc-abi)"; \
+fi; \
+if test "$$gcc_opt" = -march= && test -n "$$gcc_abi"; then \
+	$(CC) $$gcc_abi $$gcc_opt$$gcc_cpu -S -o /dev/null \
+		-xc /dev/null > /dev/null 2>&1 && \
+		gcc_isa=; \
 fi; \
 echo $$gcc_abi $$gcc_opt$$gcc_cpu $$gcc_isa $$gas_abi $$gas_opt$$gas_cpu $$gas_isa)
 
@@ -236,6 +241,13 @@ load-$(CONFIG_MIPS_PB1100)	+= 0x80100000
 libs-$(CONFIG_MIPS_PB1500)	+= arch/mips/au1000/pb1500/
 cflags-$(CONFIG_MIPS_PB1500)	+= -Iinclude/asm-mips/mach-pb1x00
 load-$(CONFIG_MIPS_PB1500)	+= 0x80100000
+
+#
+# AMD Alchemy Pb1550 eval board
+#
+libs-$(CONFIG_MIPS_PB1550)	+= arch/mips/au1000/pb1550/
+cflags-$(CONFIG_MIPS_PB1550)	+= -Iinclude/asm-mips/mach-pb1x00
+load-$(CONFIG_MIPS_PB1550)	+= 0x80100000
 
 #
 # AMD Alchemy Db1000 eval board
@@ -394,14 +406,22 @@ core-$(CONFIG_MOMENCO_OCELOT_C)	+= arch/mips/momentum/ocelot_c/
 load-$(CONFIG_MOMENCO_OCELOT_C)	+= 0x80100000
 
 #
+# PMC-Sierra Yosemite
+#
+core-$(CONFIG_PMC_YOSEMITE)	+= arch/mips/pmc-sierra/yosemite/
+cflags-$(CONFIG_PMC_YOSEMITE)	+= -Iinclude/asm-mips/mach-yosemite
+load-$(CONFIG_PMC_YOSEMITE)	+= 0x80100000
+
+#
 # Momentum Jaguar ATX
 #
 core-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= arch/mips/momentum/jaguar_atx/
-ifdef CONFIG_JAGUAR_DMALOW
-load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0x88000000
-else
+cflags-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= -Iinclude/asm-mips/mach-ja
+#ifdef CONFIG_JAGUAR_DMALOW
+#load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0x88000000
+#else
 load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0x80100000
-endif
+#endif
 
 #
 # NEC DDB
@@ -442,12 +462,6 @@ load-$(CONFIG_NEC_OSPREY)	+= 0x80002000
 #
 core-$(CONFIG_MACH_VR41XX)	+= arch/mips/vr41xx/common/
 cflags-$(CONFIG_MACH_VR41XX)	+= -Iinclude/asm-mips/mach-vr41xx
-
-#
-# NEC Eagle/Hawk (VR4122/VR4131) board
-#
-core-$(CONFIG_NEC_EAGLE)	+= arch/mips/vr41xx/nec-eagle/
-load-$(CONFIG_NEC_EAGLE)	+= 0x80000000
 
 #
 # ZAO Networks Capcella (VR4131)
@@ -523,7 +537,7 @@ endif
 #
 # SGI-IP32 (O2)
 #
-# Set the load address to >= 0x????????? if you want to leave space for symmon,
+# Set the load address to >= 80069000 if you want to leave space for symmon,
 # 0x80002000 for production kernels.  Note that the value must be aligned to
 # a multiple of the kernel stack size or the handling of the current variable
 # will break so for 64-bit kernels we have to raise the start address by 8kb.
@@ -646,8 +660,6 @@ libs-$(CONFIG_MIPS32)	+= arch/mips/lib-32/
 libs-$(CONFIG_MIPS64)	+= arch/mips/lib-64/
 
 core-y			+= arch/mips/kernel/ arch/mips/mm/ arch/mips/math-emu/
-core-$(CONFIG_MIPS32)	+= arch/mips/mm-32/
-core-$(CONFIG_MIPS64)	+= arch/mips/mm-64/
 
 ifdef CONFIG_BAGET_MIPS
 
@@ -673,7 +685,7 @@ vmlinux.64: vmlinux
 		--change-addresses=0xa800000080000000 $< $@
 endif
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/mips/boot $(1)
+makeboot =$(Q)$(MAKE) $(build)=arch/mips/boot $(1)
 
 ifdef CONFIG_SGI_IP27
 all:	vmlinux.64
@@ -695,9 +707,9 @@ CLEAN_FILES += vmlinux.ecoff \
 	       vmlinux.rm200
 
 archclean:
-	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/boot
-	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/baget
-	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/lasat
+	@$(MAKE) $(clean)=arch/mips/boot
+	@$(MAKE) $(clean)=arch/mips/baget
+	@$(MAKE) $(clean)=arch/mips/lasat
 
 # Generate <asm/offset.h 
 #

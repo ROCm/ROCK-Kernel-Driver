@@ -214,14 +214,13 @@ static void
 m8xx_restart(char *cmd)
 {
 	__volatile__ unsigned char dummy;
-	uint	msr;
 
 	cli();
 	((immap_t *)IMAP_ADDR)->im_clkrst.car_plprcr |= 0x00000080;
 
 	/* Clear the ME bit in MSR to cause checkstop on machine check
 	*/
-	mtmsr(mfmsr(msr) & ~0x1000);
+	mtmsr(mfmsr() & ~0x1000);
 
 	dummy = ((immap_t *)IMAP_ADDR)->im_clkrst.res[0];
 	printk("Restart failed\n");
@@ -248,8 +247,8 @@ m8xx_show_percpuinfo(struct seq_file *m, int i)
 
 	bp = (bd_t *)__res;
 
-	seq_printf(m, "clock\t\t: %dMHz\n"
-		   "bus clock\t: %dMHz\n",
+	seq_printf(m, "clock\t\t: %ldMHz\n"
+		   "bus clock\t: %ldMHz\n",
 		   bp->bi_intfreq / 1000000,
 		   bp->bi_busfreq / 1000000);
 

@@ -205,7 +205,7 @@ acpi_pci_link_check_current (
 			 * particularly those those w/ _STA disabled
 			 */
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"Blank IRQ resource\n"));
+				"Blank IRQ resource\n")); 
 			return AE_OK;
 		}
 		*irq = p->interrupts[0];
@@ -259,16 +259,16 @@ acpi_pci_link_get_current (
 	/* in practice, status disabled is meaningless, ignore it */
 	if (acpi_strict) {
 		/* Query _STA, set link->device->status */
-	result = acpi_bus_get_status(link->device);
-	if (result) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unable to read status\n"));
-		goto end;
-	}
+		result = acpi_bus_get_status(link->device);
+		if (result) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unable to read status\n"));
+			goto end;
+		}
 
-	if (!link->device->status.enabled) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Link disabled\n"));
-		return_VALUE(0);
-	}
+		if (!link->device->status.enabled) {
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Link disabled\n"));
+			return_VALUE(0);
+		}
 	}
 
 	/* 
@@ -308,30 +308,11 @@ acpi_pci_link_set (
 		struct acpi_resource	end;
 	}                       resource;
 	struct acpi_buffer	buffer = {sizeof(resource)+1, &resource};
-	int			i = 0;
-	int			valid = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_link_set");
 
 	if (!link || !irq)
 		return_VALUE(-EINVAL);
-
-	/* We don't check irqs the first time around */
-	if (link->irq.setonboot) {
-		/* See if we're already at the target IRQ. */
-		if (irq == link->irq.active)
-			return_VALUE(0);
-
-		/* Make sure the target IRQ in the list of possible IRQs. */
-		for (i=0; i<link->irq.possible_count; i++) {
-			if (irq == link->irq.possible[i])
-				valid = 1;
-		}
-		if (!valid) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Target IRQ %d invalid\n", irq));
-			return_VALUE(-EINVAL);
-		}
-	}
 
 	memset(&resource, 0, sizeof(resource));
 
@@ -397,7 +378,7 @@ acpi_pci_link_set (
 	if (result) {
 		return_VALUE(result);
 	}
-   
+
 	/*
 	 * Is current setting not what we set?
 	 * set link->irq.active
@@ -412,7 +393,7 @@ acpi_pci_link_set (
 			acpi_device_name(link->device),
 			acpi_device_bid(link->device),
 			link->irq.active, irq);
-			link->irq.active = irq;
+		link->irq.active = irq;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Set IRQ %d\n", link->irq.active));
@@ -487,13 +468,13 @@ static int __initdata acpi_irq_penalty[ACPI_MAX_IRQS] = {
 };
 
 int
-acpi_pci_link_check (void)
+acpi_irq_penalty_init(void)
 {
 	struct list_head	*node = NULL;
 	struct acpi_pci_link    *link = NULL;
 	int			i = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_pci_link_check");
+	ACPI_FUNCTION_TRACE("acpi_irq_penalty_init");
 
 	/*
 	 * Update penalties to facilitate IRQ balancing.
@@ -703,6 +684,9 @@ acpi_pci_link_add (
 	acpi_link.count++;
 
 end:
+	/* disable all links -- to be activated on use */
+	acpi_ut_evaluate_object(link->handle, "_DIS", 0, NULL);
+
 	if (result)
 		kfree(link);
 

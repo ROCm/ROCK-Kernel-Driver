@@ -82,7 +82,7 @@ void emu10k1_waveout_close(struct emu10k1_wavedevice *);
 void emu10k1_waveout_start(struct emu10k1_wavedevice *);
 void emu10k1_waveout_stop(struct emu10k1_wavedevice *);
 void emu10k1_waveout_getxfersize(struct woinst*, u32 *);
-void emu10k1_waveout_xferdata(struct woinst*, u8*, u32 *);
+void emu10k1_waveout_xferdata(struct woinst*, u8 __user *, u32 *);
 void emu10k1_waveout_fillsilence(struct woinst*);
 int emu10k1_waveout_setformat(struct emu10k1_wavedevice*, struct wave_format*);
 void emu10k1_waveout_update(struct woinst*);

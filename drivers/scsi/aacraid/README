@@ -10,20 +10,22 @@ the original).
 
 Supported Cards/Chipsets
 -------------------------
+	AAR-2410SA SATA
+	Adaptec 2120S
+	Adaptec 2200S
+	Adaptec 2230S
+	Adaptec 3230S
+	Adaptec 3240S
+	Adaptec 5400S
+	ASR-2020S PCI-X
 	Dell PERC 2 Quad Channel
 	Dell PERC 2/Si
 	Dell PERC 3/Si
 	Dell PERC 3/Di
+	Dell CERC 2
 	HP NetRAID-4M
-	ADAPTEC 2120S
-	ADAPTEC 2200S
-	ADAPTEC 5400S
 	Legend S220
 	Legend S230
-	Adaptec 3230S
-	Adaptec 3240S
-	ASR-2020S PCI-X
-	AAR-2410SA SATA
 
 People
 -------------------------
@@ -46,7 +48,7 @@ Adaptec Unix OEM Product Group
 
 Mailing List
 -------------------------
-linux-aacraid-devel@dell.com (Interested parties troll here)
+linux-scsi@vger.kernel.org (Interested parties troll here)
 http://mbserver.adaptec.com/ (Currently more Community Support than Devel Support)
 Also note this is very different to Brian's original driver
 so don't expect him to support it.

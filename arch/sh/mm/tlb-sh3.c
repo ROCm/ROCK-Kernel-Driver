@@ -72,7 +72,7 @@ void __flush_tlb_page(unsigned long asid, unsigned long page)
 	addr = MMU_TLB_ADDRESS_ARRAY | (page & 0x1F000);
 	data = (page & 0xfffe0000) | asid; /* VALID bit is off */
 	
-	if (test_bit(CPU_HAS_MMU_PAGE_ASSOC, &(cpu_data->flags))) {
+	if ((cpu_data->flags & CPU_HAS_MMU_PAGE_ASSOC)) {
 		addr |= MMU_PAGE_ASSOC_BIT;
 		ways = 1;	/* we already know the way .. */
 	}

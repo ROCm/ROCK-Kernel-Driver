@@ -5,7 +5,7 @@
  *
  *  Copyright (C)  2001, 2004 IBM Corporation
  *  Author(s): Robert Burroughs (burrough@us.ibm.com)
- *             Eric Rossman (edrossma@us.ibm.com)
+ *	       Eric Rossman (edrossma@us.ibm.com)
  *
  *  Hotplug & misc device support: Jochen Roehrig (roehrig@de.ibm.com)
  *
@@ -16,7 +16,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -24,15 +24,15 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <asm/uaccess.h>	
+#include <asm/uaccess.h>
 #include <linux/compiler.h>
-#include <linux/delay.h>	
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include "z90crypt.h"
 #include "z90common.h"
 
-#define VERSION_Z90HARDWARE_C "$Revision: 1.19.2.2 $"
+#define VERSION_Z90HARDWARE_C "$Revision: 1.19 $"
 
 char z90chardware_version[] __initdata =
 	"z90hardware.o (" VERSION_Z90HARDWARE_C "/"
@@ -73,7 +73,7 @@ struct cca_public_sec {
 	unsigned char  reserved[2];
 	unsigned short exponent_len;
 	unsigned short modulus_bit_len;
-	unsigned short modulus_byte_len;    
+	unsigned short modulus_byte_len;
 	unsigned char  exponent[3];
 };
 
@@ -136,7 +136,7 @@ struct ap_status_word {
 #define AP_RESPONSE_CHECKSTOPPED	0x04
 #define AP_RESPONSE_BUSY		0x05
 #define AP_RESPONSE_Q_FULL		0x10
-#define AP_RESPONSE_NO_PENDING_REPLY	0x10   
+#define AP_RESPONSE_NO_PENDING_REPLY	0x10
 #define AP_RESPONSE_INDEX_TOO_BIG	0x11
 #define AP_RESPONSE_NO_FIRST_PART	0x13
 #define AP_RESPONSE_MESSAGE_TOO_BIG	0x15
@@ -147,9 +147,9 @@ struct ap_status_word {
 
 struct type4_hdr {
 	unsigned char  reserved1;
-	unsigned char  msg_type_code;	
+	unsigned char  msg_type_code;
 	unsigned short msg_len;
-	unsigned char  request_code;	
+	unsigned char  request_code;
 	unsigned char  msg_fmt;
 	unsigned short reserved2;
 };
@@ -218,64 +218,97 @@ struct type84_hdr {
 #define TYPE84_RSP_CODE 0x84
 
 struct type6_hdr {
-	unsigned char reserved1;	
-	unsigned char type;		
-	unsigned char reserved2[2];	
-	unsigned char right[4];		
-	unsigned char reserved3[2];	
-	unsigned char reserved4[2];	
-	unsigned char apfs[4];		
-	unsigned int  offset1;		
-	unsigned int  offset2;		
-	unsigned int  offset3;		
-	unsigned int  offset4;		
-	unsigned char agent_id[16];	
-	unsigned char rqid[2];		
-	unsigned char reserved5[2];	
-	unsigned char function_code[2];	
-	unsigned char reserved6[2];	
-	unsigned int  ToCardLen1;	
-	unsigned int  ToCardLen2;	
-	unsigned int  ToCardLen3;	
-	unsigned int  ToCardLen4;	
-	unsigned int  FromCardLen1;	
-	unsigned int  FromCardLen2;	
-	unsigned int  FromCardLen3;	
-	unsigned int  FromCardLen4;	
+	unsigned char reserved1;
+	unsigned char type;
+	unsigned char reserved2[2];
+	unsigned char right[4];
+	unsigned char reserved3[2];
+	unsigned char reserved4[2];
+	unsigned char pfs[4];
+	unsigned int  offset1;
+	unsigned int  offset2;
+	unsigned int  offset3;
+	unsigned int  offset4;
+	unsigned char agent_id[16];
+	unsigned char rqid[2];
+	unsigned char reserved5[2];
+	unsigned char function_code[2];
+	unsigned char reserved6[2];
+	unsigned int  ToCardLen1;
+	unsigned int  ToCardLen2;
+	unsigned int  ToCardLen3;
+	unsigned int  ToCardLen4;
+	unsigned int  FromCardLen1;
+	unsigned int  FromCardLen2;
+	unsigned int  FromCardLen3;
+	unsigned int  FromCardLen4;
 };
 
 struct CPRB {
-	unsigned char cprb_len[2];	
-	unsigned char cprb_ver_id;	
-	unsigned char pad_000;		
-	unsigned char srpi_rtcode[4];	
-	unsigned char srpi_verb;	
-	unsigned char flags;		
-	unsigned char func_id[2];	
-	unsigned char checkpoint_flag;	
-	unsigned char resv2;		
-	unsigned char req_parml[2];	
-	unsigned char req_parmp[4];	
-	unsigned char req_datal[4];	
-	unsigned char req_datap[4];	
-	unsigned char rpl_parml[2];	
-	unsigned char pad_001[2];	
-	unsigned char rpl_parmp[4];	
-	unsigned char rpl_datal[4];	
-	unsigned char rpl_datap[4];	
-	unsigned char ccp_rscode[2];	
-	unsigned char ccp_rtcode[2];	
-	unsigned char repd_parml[2];	
-	unsigned char mac_data_len[2];	
-	unsigned char repd_datal[4];	
-	unsigned char req_pc[2];	
-	unsigned char res_origin[8];	
-	unsigned char mac_value[8];	
-	unsigned char logon_id[8];	
-	unsigned char usage_domain[2];	
-	unsigned char resv3[18];	
-	unsigned char svr_namel[2];	
-	unsigned char svr_name[8];	
+	unsigned char cprb_len[2];
+	unsigned char cprb_ver_id;
+	unsigned char pad_000;
+	unsigned char srpi_rtcode[4];
+	unsigned char srpi_verb;
+	unsigned char flags;
+	unsigned char func_id[2];
+	unsigned char checkpoint_flag;
+	unsigned char resv2;
+	unsigned char req_parml[2];
+	unsigned char req_parmp[4];
+	unsigned char req_datal[4];
+	unsigned char req_datap[4];
+	unsigned char rpl_parml[2];
+	unsigned char pad_001[2];
+	unsigned char rpl_parmp[4];
+	unsigned char rpl_datal[4];
+	unsigned char rpl_datap[4];
+	unsigned char ccp_rscode[2];
+	unsigned char ccp_rtcode[2];
+	unsigned char repd_parml[2];
+	unsigned char mac_data_len[2];
+	unsigned char repd_datal[4];
+	unsigned char req_pc[2];
+	unsigned char res_origin[8];
+	unsigned char mac_value[8];
+	unsigned char logon_id[8];
+	unsigned char usage_domain[2];
+	unsigned char resv3[18];
+	unsigned char svr_namel[2];
+	unsigned char svr_name[8];
+};
+
+struct CPRBX {
+	unsigned short cprb_len;
+	unsigned char  cprb_ver_id;
+	unsigned char  pad_000[3];
+	unsigned char  func_id[2];
+	unsigned char  cprb_flags[4];
+	unsigned int   req_parml;
+	unsigned int   req_datal;
+	unsigned int   rpl_msgbl;
+	unsigned int   rpld_parml;
+	unsigned int   rpl_datal;
+	unsigned int   rpld_datal;
+	unsigned int   req_extbl;
+	unsigned char  pad_001[4];
+	unsigned int   rpld_extbl;
+	unsigned char  req_parmb[16];
+	unsigned char  req_datab[16];
+	unsigned char  rpl_parmb[16];
+	unsigned char  rpl_datab[16];
+	unsigned char  req_extb[16];
+	unsigned char  rpl_extb[16];
+	unsigned short ccp_rtcode;
+	unsigned short ccp_rscode;
+	unsigned int   mac_data_len;
+	unsigned char  logon_id[8];
+	unsigned char  mac_value[8];
+	unsigned char  mac_content_flgs;
+	unsigned char  pad_002;
+	unsigned short domain;
+	unsigned char  pad_003[12];
+	unsigned char  pad_004[36];
 };
 
 struct type6_msg {
@@ -295,11 +328,11 @@ struct request_msg_ext {
 };
 
 struct type82_hdr {
-	unsigned char reserved1;	
-	unsigned char type;		
-	unsigned char reserved2[2];	
-	unsigned char reply_code;	
-	unsigned char reserved3[3];	
+	unsigned char reserved1;
+	unsigned char type;
+	unsigned char reserved2[2];
+	unsigned char reply_code;
+	unsigned char reserved3[3];
 };
 
 #define TYPE82_RSP_CODE 0x82
@@ -308,13 +341,13 @@ struct type82_hdr {
 #define REPLY_ERROR_PREEMPT_FAILURE  0x12
 #define REPLY_ERROR_CHECKPT_FAILURE  0x14
 #define REPLY_ERROR_MESSAGE_TYPE     0x20
-#define REPLY_ERROR_INVALID_COMM_CD  0x21  
+#define REPLY_ERROR_INVALID_COMM_CD  0x21
 #define REPLY_ERROR_INVALID_MSG_LEN  0x23
-#define REPLY_ERROR_RESERVD_FIELD    0x24  
+#define REPLY_ERROR_RESERVD_FIELD    0x24
 #define REPLY_ERROR_FORMAT_FIELD     0x29
-#define REPLY_ERROR_INVALID_COMMAND  0x30  
+#define REPLY_ERROR_INVALID_COMMAND  0x30
 #define REPLY_ERROR_MALFORMED_MSG    0x40
-#define REPLY_ERROR_RESERVED_FIELD   0x50  
+#define REPLY_ERROR_RESERVED_FIELD   0x50
 #define REPLY_ERROR_WORD_ALIGNMENT   0x60
 #define REPLY_ERROR_MESSAGE_LENGTH   0x80
 #define REPLY_ERROR_OPERAND_INVALID  0x82
@@ -325,12 +358,12 @@ struct type82_hdr {
 #define REPLY_ERROR_ZERO_BUFFER_LEN  0xB0
 
 struct type86_hdr {
-	unsigned char reserved1;	
-	unsigned char type;		
-	unsigned char format;		
-	unsigned char reserved2;	
-	unsigned char reply_code;	
-	unsigned char reserved3[3];	
+	unsigned char reserved1;
+	unsigned char type;
+	unsigned char format;
+	unsigned char reserved2;
+	unsigned char reply_code;
+	unsigned char reserved3[3];
 };
 
 #define TYPE86_RSP_CODE 0x86
@@ -338,16 +371,16 @@ struct type86_hdr {
 
 struct type86_fmt2_msg {
 	struct type86_hdr hdr;
-	unsigned char	  reserved[4];	
-	unsigned char	  apfs[4];	
-	unsigned int	  count1;	
-	unsigned int	  offset1;	
-	unsigned int	  count2;	
-	unsigned int	  offset2;	
-	unsigned int	  count3;	
-	unsigned int	  offset3;	
-	unsigned int	  count4;	
-	unsigned int	  offset4;	
+	unsigned char	  reserved[4];
+	unsigned char	  apfs[4];
+	unsigned int	  count1;
+	unsigned int	  offset1;
+	unsigned int	  count2;
+	unsigned int	  offset2;
+	unsigned int	  count3;
+	unsigned int	  offset3;
+	unsigned int	  ount4;
+	unsigned int	  offset4;
 };
 
 static struct type6_hdr static_type6_hdr = {
@@ -368,11 +401,11 @@ static struct type6_hdr static_type6_hdr = {
 	{0x00,0x00},
 	{0x50,0x44},
 	{0x00,0x00},
-	0x00000000,	
 	0x00000000,
 	0x00000000,
 	0x00000000,
-	0x00000000,	
+	0x00000000,
+	0x00000000,
 	0x00000000,
 	0x00000000,
 	0x00000000
@@ -396,11 +429,11 @@ static struct type6_hdr static_type6_hdrX = {
 	{0x00,0x00},
 	{0x50,0x44},
 	{0x00,0x00},
-	0x00000000,	
 	0x00000000,
 	0x00000000,
 	0x00000000,
-	0x00000000,	
+	0x00000000,
+	0x00000000,
 	0x00000000,
 	0x00000000,
 	0x00000000
@@ -416,11 +449,11 @@ static struct CPRB static_cprb = {
 	{0x54,0x32},
 	0x01,
 	0x00,
-	{0x00,0x00},	
+	{0x00,0x00},
 	{0x00,0x00,0x00,0x00},
 	{0x00,0x00,0x00,0x00},
 	{0x00,0x00,0x00,0x00},
-	{0x00,0x00},	
+	{0x00,0x00},
 	{0x00,0x00},
 	{0x00,0x00,0x00,0x00},
 	{0x00,0x00,0x00,0x00},
@@ -434,7 +467,7 @@ static struct CPRB static_cprb = {
 	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
 	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
 	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-	{0x00,0x00},	
+	{0x00,0x00},
 	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 	 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 	 0x00,0x00},
@@ -449,14 +482,14 @@ struct function_and_rules_block {
 };
 
 static struct function_and_rules_block static_pkd_function_and_rules = {
-	{0x50,0x44},			   
-	{0x0A,0x00},			   
+	{0x50,0x44},
+	{0x0A,0x00},
 	{'P','K','C','S','-','1','.','2'}
 };
 
 static struct function_and_rules_block static_pke_function_and_rules = {
-	{0x50,0x4B},			   
-	{0x0A,0x00},			   
+	{0x50,0x4B},
+	{0x0A,0x00},
 	{'P','K','C','S','-','1','.','2'}
 };
 
@@ -467,8 +500,8 @@ struct T6_keyBlock_hdr {
 };
 
 static struct T6_keyBlock_hdr static_T6_keyBlock_hdr = {
-	{0x89,0x01},	   
-	{0x87,0x01},	   
+	{0x89,0x01},
+	{0x87,0x01},
 	{0x00}
 };
 
@@ -514,14 +547,14 @@ static struct CPRBX static_cprbx = {
 };
 
 static struct function_and_rules_block static_pkd_function_and_rulesX = {
-	{0x50,0x44},	
-	{0x00,0x0A},	
+	{0x50,0x44},
+	{0x00,0x0A},
 	{'P','K','C','S','-','1','.','2'}
 };
 
 static struct function_and_rules_block static_pke_function_and_rulesX = {
-	{0x50,0x4B},	
-	{0x00,0x0A},	
+	{0x50,0x4B},
+	{0x00,0x0A},
 	{'Z','E','R','O','-','P','A','D'}
 };
 
@@ -629,18 +662,18 @@ static struct cca_public_key static_public_key = {
 	{
 		0x1E,
 		0x00,
-		0x0000,			
+		0x0000,
 		{0x00,0x00,0x00,0x00}
 	},
 
 	{
 		0x04,
 		0x00,
-		0x0000,			
+		0x0000,
 		{0x00,0x00},
-		0x0000,			
-		0x0000,			
-		0x0000,			
+		0x0000,
+		0x0000,
+		0x0000,
 		{0x01,0x00,0x01}
 	}
 };
@@ -659,7 +692,7 @@ static struct cca_public_sec static_cca_pub_sec = {
 	0x000f,
 	{0x00,0x00},
 	0x0003,
-	0x0000,	      
+	0x0000,
 	0x0000,
 	{0x01,0x00,0x01}
 };
@@ -668,14 +701,16 @@ static struct cca_public_sec static_cca_pub_sec = {
 
 #define FIXED_TYPE6_CR_LENX 0x000001E3
 
+#ifndef MAX_RESPONSE_SIZE
 #define MAX_RESPONSE_SIZE 0x00000710
 
 #define MAX_RESPONSEX_SIZE 0x0000077C
+#endif
 
-#define RESPONSE_CPRB_SIZE  0x000006B8 
-#define RESPONSE_CPRBX_SIZE 0x00000724 
+#define RESPONSE_CPRB_SIZE  0x000006B8
+#define RESPONSE_CPRBX_SIZE 0x00000724
 
-#define CALLER_HEADER 12	
+#define CALLER_HEADER 12
 
 static unsigned char static_PKE_function_code[2] = {0x50, 0x4B};
 
@@ -686,23 +721,23 @@ testq(int q_nr, int *q_depth, int *dev_type, struct ap_status_word *stat)
 
 	asm volatile
 #ifdef __s390x__
-	("	llgfr	0,%4		\n"	
-	 "	slgr	1,1		\n"	
-	 "	lgr	2,1		\n"	
-	 "0:	.long	0xb2af0000	\n"	
-	 "1:	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	iihh	%0,0		\n"	
-	 "	iihl	%0,0		\n"	
-	 "	lgr	%1,1		\n"	
+	("	llgfr	0,%4		\n"
+	 "	slgr	1,1		\n"
+	 "	lgr	2,1		\n"
+	 "0:	.long	0xb2af0000	\n"
+	 "1:	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	iihh	%0,0		\n"
+	 "	iihl	%0,0		\n"
+	 "	lgr	%1,1		\n"
 	 "	lgr	%3,2		\n"
-	 "	srl	%3,24		\n"	
+	 "	srl	%3,24		\n"
 	 "	sll	2,24		\n"
 	 "	srl	2,24		\n"
-	 "	lgr	%2,2		\n"	
-	 "2:				\n"	
+	 "	lgr	%2,2		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi	%0,%h5		\n"
 	 "	jg	2b		\n"
 	 ".previous			\n"
@@ -715,21 +750,21 @@ testq(int q_nr, int *q_depth, int *dev_type, struct ap_status_word *stat)
 	 :"d" (q_nr), "K" (DEV_TSQ_EXCEPTION)
 	 :"cc","0","1","2","memory");
 #else
-	("	lr	0,%4		\n"	
-	 "	slr	1,1		\n"	
-	 "	lr	2,1		\n"	
-	 "0:	.long	0xb2af0000	\n"	
-	 "1:	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	lr	%1,1		\n"	
+	("	lr	0,%4		\n"
+	 "	slr	1,1		\n"
+	 "	lr	2,1		\n"
+	 "0:	.long	0xb2af0000	\n"
+	 "1:	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	lr	%1,1		\n"
 	 "	lr	%3,2		\n"
-	 "	srl	%3,24		\n"	
+	 "	srl	%3,24		\n"
 	 "	sll	2,24		\n"
 	 "	srl	2,24		\n"
-	 "	lr	%2,2		\n"	
-	 "2:				\n"	
+	 "	lr	%2,2		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi	%0,%h5		\n"
 	 "	bras	1,4f		\n"
 	 "	.long	2b		\n"
@@ -756,21 +791,21 @@ resetq(int q_nr, struct ap_status_word *stat_p)
 
 	asm volatile
 #ifdef __s390x__
-	("	llgfr	0,%2		\n"	
-	 "	lghi	1,1		\n"	
-	 "	sll	1,24		\n"	
-	 "	or	0,1		\n"	
-	 "	slgr	1,1		\n"	
-	 "	lgr	2,1		\n"	
-	 "0:	.long	0xb2af0000	\n"	
-	 "1:	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	iihh	%0,0		\n"	
-	 "	iihl	%0,0		\n"	
-	 "	lgr	%1,1		\n"	
-	 "2:				\n"	
+	("	llgfr	0,%2		\n"
+	 "	lghi	1,1		\n"
+	 "	sll	1,24		\n"
+	 "	or	0,1		\n"
+	 "	slgr	1,1		\n"
+	 "	lgr	2,1		\n"
+	 "0:	.long	0xb2af0000	\n"
+	 "1:	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	iihh	%0,0		\n"
+	 "	iihl	%0,0		\n"
+	 "	lgr	%1,1		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi	%0,%h3		\n"
 	 "	jg	2b		\n"
 	 ".previous			\n"
@@ -783,19 +818,19 @@ resetq(int q_nr, struct ap_status_word *stat_p)
 	 :"d" (q_nr), "K" (DEV_RSQ_EXCEPTION)
 	 :"cc","0","1","2","memory");
 #else
-	("	lr	0,%2		\n"	
-	 "	lhi	1,1		\n"	
-	 "	sll	1,24		\n"	
-	 "	or	0,1		\n"	
-	 "	slr	1,1		\n"	
-	 "	lr	2,1		\n"	
-	 "0:	.long	0xb2af0000	\n"	
-	 "1:	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	lr	%1,1		\n"	
-	 "2:				\n"	
+	("	lr	0,%2		\n"
+	 "	lhi	1,1		\n"
+	 "	sll	1,24		\n"
+	 "	or	0,1		\n"
+	 "	slr	1,1		\n"
+	 "	lr	2,1		\n"
+	 "0:	.long	0xb2af0000	\n"
+	 "1:	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	lr	%1,1		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi	%0,%h3		\n"
 	 "	bras	1,4f		\n"
 	 "	.long	2b		\n"
@@ -822,27 +857,27 @@ sen(int msg_len, unsigned char *msg_ext, struct ap_status_word *stat)
 
 	asm volatile
 #ifdef __s390x__
-	("	lgr	6,%3		\n"	
-	 "	llgfr	7,%2		\n"	
-	 "	llgt	0,0(6)		\n"	
-	 "	lghi	1,64		\n"	
-	 "	sll	1,24		\n"	
-	 "	or	0,1		\n"	
-	 "	la	6,4(6)		\n"	
-	 "	llgt	2,0(6)		\n"	
-	 "	llgt	3,4(6)		\n"	
-	 "	la	6,8(6)		\n"	
-	 "	slr	1,1		\n"	
-	 "0:	.long	0xb2ad0026	\n"	
-	 "1:	brc	2,0b		\n"	
-	 "	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	iihh	%0,0		\n"	
-	 "	iihl	%0,0		\n"	
-	 "	lgr	%1,1		\n"	
-	 "2:				\n"	
+	("	lgr	6,%3		\n"
+	 "	llgfr	7,%2		\n"
+	 "	llgt	0,0(6)		\n"
+	 "	lghi	1,64		\n"
+	 "	sll	1,24		\n"
+	 "	or	0,1		\n"
+	 "	la	6,4(6)		\n"
+	 "	llgt	2,0(6)		\n"
+	 "	llgt	3,4(6)		\n"
+	 "	la	6,8(6)		\n"
+	 "	slr	1,1		\n"
+	 "0:	.long	0xb2ad0026	\n"
+	 "1:	brc	2,0b		\n"
+	 "	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	iihh	%0,0		\n"
+	 "	iihl	%0,0		\n"
+	 "	lgr	%1,1		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi	%0,%h4		\n"
 	 "	jg	2b		\n"
 	 ".previous			\n"
@@ -855,25 +890,25 @@ sen(int msg_len, unsigned char *msg_ext, struct ap_status_word *stat)
 	 :"d" (msg_len),"a" (msg_ext), "K" (DEV_SEN_EXCEPTION)
 	 :"cc","0","1","2","3","6","7","memory");
 #else
-	("	lr	6,%3		\n"	
-	 "	lr	7,%2		\n"	
-	 "	l	0,0(6)		\n"	
-	 "	lhi	1,64		\n"	
-	 "	sll	1,24		\n"	
-	 "	or	0,1		\n"	
-	 "	la	6,4(6)		\n"	
-	 "	l	2,0(6)		\n"	
-	 "	l	3,4(6)		\n"	
-	 "	la	6,8(6)		\n"	
-	 "	slr	1,1		\n"	
-	 "0:	.long	0xb2ad0026	\n"	
-	 "1:	brc	2,0b		\n"	
-	 "	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	lr	%1,1		\n"	
-	 "2:				\n"	
+	("	lr	6,%3		\n"
+	 "	lr	7,%2		\n"
+	 "	l	0,0(6)		\n"
+	 "	lhi	1,64		\n"
+	 "	sll	1,24		\n"
+	 "	or	0,1		\n"
+	 "	la	6,4(6)		\n"
+	 "	l	2,0(6)		\n"
+	 "	l	3,4(6)		\n"
+	 "	la	6,8(6)		\n"
+	 "	slr	1,1		\n"
+	 "0:	.long	0xb2ad0026	\n"
+	 "1:	brc	2,0b		\n"
+	 "	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	lr	%1,1		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi	%0,%h4		\n"
 	 "	bras	1,4f		\n"
 	 "	.long	2b		\n"
@@ -901,30 +936,30 @@ rec(int q_nr, int buff_l, unsigned char *rsp, unsigned char *id,
 
 	asm volatile
 #ifdef __s390x__
-	("	llgfr	0,%2		\n"	
-	 "	lgr	3,%4		\n"	
-	 "	lgr	6,%3		\n"	
-	 "	llgfr	7,%5		\n"	
-	 "	lghi	1,128		\n"	
-	 "	sll	1,24		\n"	
-	 "	or	0,1		\n"	
-	 "	slgr	1,1		\n"	
-	 "	lgr	2,1		\n"	
-	 "	lgr	4,1		\n"	
-	 "	lgr	5,1		\n"	
-	 "0:	.long	0xb2ae0046	\n"	
-	 "1:	brc	2,0b		\n"	
-	 "	brc	4,0b		\n"	
-	 "	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	iihh	%0,0		\n"	
-	 "	iihl	%0,0		\n"	
-	 "	lgr	%1,1		\n"	
-	 "	st	4,0(3)		\n"	
-	 "	st	5,4(3)		\n"	
-	 "2:				\n"	
+	("	llgfr	0,%2		\n"
+	 "	lgr	3,%4		\n"
+	 "	lgr	6,%3		\n"
+	 "	llgfr	7,%5		\n"
+	 "	lghi	1,128		\n"
+	 "	sll	1,24		\n"
+	 "	or	0,1		\n"
+	 "	slgr	1,1		\n"
+	 "	lgr	2,1		\n"
+	 "	lgr	4,1		\n"
+	 "	lgr	5,1		\n"
+	 "0:	.long	0xb2ae0046	\n"
+	 "1:	brc	2,0b		\n"
+	 "	brc	4,0b		\n"
+	 "	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	iihh	%0,0		\n"
+	 "	iihl	%0,0		\n"
+	 "	lgr	%1,1		\n"
+	 "	st	4,0(3)		\n"
+	 "	st	5,4(3)		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi   %0,%h6		\n"
 	 "	jg    2b		\n"
 	 ".previous			\n"
@@ -937,28 +972,28 @@ rec(int q_nr, int buff_l, unsigned char *rsp, unsigned char *id,
 	 :"d" (q_nr), "d" (rsp), "d" (id), "d" (buff_l), "K" (DEV_REC_EXCEPTION)
 	 :"cc","0","1","2","3","4","5","6","7","memory");
 #else
-	("	lr	0,%2		\n"	
-	 "	lr	3,%4		\n"	
-	 "	lr	6,%3		\n"	
-	 "	lr	7,%5		\n"	
-	 "	lhi	1,128		\n"	
-	 "	sll	1,24		\n"	
-	 "	or	0,1		\n"	
-	 "	slr	1,1		\n"	
-	 "	lr	2,1		\n"	
-	 "	lr	4,1		\n"	
-	 "	lr	5,1		\n"	
-	 "0:	.long	0xb2ae0046	\n"	
-	 "1:	brc	2,0b		\n"	
-	 "	brc	4,0b		\n"	
-	 "	ipm	%0		\n"	
-	 "	srl	%0,28		\n"	
-	 "	lr	%1,1		\n"	
-	 "	st	4,0(3)		\n"	
-	 "	st	5,4(3)		\n"	
-	 "2:				\n"	
+	("	lr	0,%2		\n"
+	 "	lr	3,%4		\n"
+	 "	lr	6,%3		\n"
+	 "	lr	7,%5		\n"
+	 "	lhi	1,128		\n"
+	 "	sll	1,24		\n"
+	 "	or	0,1		\n"
+	 "	slr	1,1		\n"
+	 "	lr	2,1		\n"
+	 "	lr	4,1		\n"
+	 "	lr	5,1		\n"
+	 "0:	.long	0xb2ae0046	\n"
+	 "1:	brc	2,0b		\n"
+	 "	brc	4,0b		\n"
+	 "	ipm	%0		\n"
+	 "	srl	%0,28		\n"
+	 "	lr	%1,1		\n"
+	 "	st	4,0(3)		\n"
+	 "	st	5,4(3)		\n"
+	 "2:				\n"
 	 ".section .fixup,\"ax\"	\n"
-	 "3:				\n"	
+	 "3:				\n"
 	 "	lhi   %0,%h6		\n"
 	 "	bras  1,4f		\n"
 	 "	.long 2b		\n"
@@ -1135,11 +1170,18 @@ reset_device(int deviceNr, int cdx, int resetNr)
 			switch (stat_word.response_code) {
 			case AP_RESPONSE_NORMAL:
 				stat = DEV_ONLINE;
-				if (stat_word.q_stat_flags & AP_Q_STATUS_EMPTY)
+				if (stat_word.q_stat_flags &
+				    AP_Q_STATUS_EMPTY)
 					break_out = 1;
 				break;
 			case AP_RESPONSE_Q_NOT_AVAIL:
+				stat = DEV_GONE;
+				break_out = 1;
+				break;
 			case AP_RESPONSE_DECONFIGURED:
+				stat = DEV_GONE;
+				break_out = 1;
+				break;
 			case AP_RESPONSE_CHECKSTOPPED:
 				stat = DEV_GONE;
 				break_out = 1;
@@ -1209,7 +1251,7 @@ send_to_AP(int dev_nr, int cdx, int msg_len, unsigned char *msg_ext)
 	       msg_ext[0], msg_ext[1], msg_ext[2], msg_ext[3],
 	       msg_ext[4], msg_ext[5], msg_ext[6], msg_ext[7],
 	       msg_ext[8], msg_ext[9], msg_ext[10], msg_ext[11]);
-	print_buffer(msg_ext+CALLER_HEADER, msg_len);
+	print_buffer(msg_ext+12, msg_len);
 #endif
 
 	ccode = sen(msg_len, msg_ext, &stat_word);
@@ -1247,8 +1289,8 @@ send_to_AP(int dev_nr, int cdx, int msg_len, unsigned char *msg_ext)
 }
 
 enum devstat
-receive_from_AP(int dev_nr, int cdx, int resplen, unsigned char *resp,
-		unsigned char *psmid)
+receive_from_AP(int dev_nr, int cdx, int resplen,
+		unsigned char *resp, unsigned char *psmid)
 {
 	int ccode;
 	struct ap_status_word stat_word;
@@ -1308,7 +1350,7 @@ pad_msg(unsigned char *buffer, int  totalLength, int msgLength)
 	for (pad_len = 0; pad_len < (totalLength - msgLength); pad_len++)
 		if (buffer[pad_len] != 0x00)
 			break;
-	pad_len -= 3; 
+	pad_len -= 3;
 	if (pad_len < 8)
 		return SEN_PAD_ERROR;
 
@@ -1501,7 +1543,6 @@ ICAMEX_msg_to_type6MEX_de_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	struct type6_hdr *tp6Hdr_p;
 	struct CPRB *cprb_p;
 	struct cca_private_ext_ME *key_p;
-	static int deprecated_msg_count = 0;
 
 	mod_len = icaMsg_p->inputdatalength;
 	tmp_size = FIXED_TYPE6_ME_LEN + mod_len;
@@ -1530,7 +1571,7 @@ ICAMEX_msg_to_type6MEX_de_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 
 	temp += sizeof(struct function_and_rules_block);
 	vud_len = 2 + icaMsg_p->inputdatalength;
-	itoLe2(&vud_len, temp); 
+	itoLe2(&vud_len, temp);
 
 	temp += 2;
 	if (copy_from_user(temp, icaMsg_p->inputdata, mod_len))
@@ -1552,19 +1593,13 @@ ICAMEX_msg_to_type6MEX_de_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 		return SEN_USER_ERROR;
 
 	if (is_common_public_key(temp, mod_len)) {
-		if (deprecated_msg_count < 20) {
-			PRINTK("Common public key used for modex decrypt\n");
-			deprecated_msg_count++;
-			if (deprecated_msg_count == 20)
-				PRINTK("No longer issuing messages about common"
-				       " public key for modex decrypt.\n");
-		}
+		PRINTK("Common public key used for modex decrypt\n");
 		return SEN_NOT_AVAIL;
 	}
 
 	temp = key_p->pvtMESec.modulus + sizeof(key_p->pvtMESec.modulus)
 	       - mod_len;
-	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len))
+	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len) != 0)
 		return SEN_RELEASED;
 	if (is_empty(temp, mod_len))
 		return SEN_USER_ERROR;
@@ -1634,7 +1669,7 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 		return SEN_RELEASED;
 	if (is_empty(temp, mod_len))
 		return SEN_USER_ERROR;
-	if ((temp[0] != 0x00) || (temp[1] != 0x02))
+	if (temp[0] != 0x00 || temp[1] != 0x02)
 		return SEN_NOT_AVAIL;
 	for (i = 2; i < mod_len; i++)
 		if (temp[i] == 0x00)
@@ -1662,7 +1697,7 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	key_p->pubSec.modulus_bit_len = 8 * mod_len;
 	key_p->pubSec.modulus_byte_len = mod_len;
 	key_p->pubSec.exponent_len = exp_len;
-	key_p->pubSec.section_length = CALLER_HEADER + mod_len + exp_len;
+	key_p->pubSec.section_length = 12 + mod_len + exp_len;
 	key_len = key_p->pubSec.section_length + sizeof(struct cca_token_hdr);
 	key_p->pubHdr.token_length = key_len;
 	key_len += 4;
@@ -1698,7 +1733,7 @@ ICACRT_msg_to_type6CRT_msg(struct ica_rsa_modexpo_crt *icaMsg_p, int cdx,
 	tmp_size = FIXED_TYPE6_CR_LEN + keyPartsLen + mod_len;
 	total_CPRB_len = tmp_size -  sizeof(struct type6_hdr);
 	parmBlock_l = total_CPRB_len - sizeof(struct CPRB);
-	vud_len = 2 + mod_len;	   
+	vud_len = 2 + mod_len;
 	tmp_size = 4*((tmp_size + 3)/4) + CALLER_HEADER;
 
 	memset(z90cMsg_p, 0, tmp_size);
@@ -1858,7 +1893,7 @@ ICAMEX_msg_to_type6MEX_msgX(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	key_p->pubSec.modulus_bit_len = 8 * mod_len;
 	key_p->pubSec.modulus_byte_len = mod_len;
 	key_p->pubSec.exponent_len = exp_len;
-	key_p->pubSec.section_length = CALLER_HEADER + mod_len + exp_len;
+	key_p->pubSec.section_length = 12 + mod_len + exp_len;
 	key_len = key_p->pubSec.section_length + sizeof(struct cca_token_hdr);
 	key_p->pubHdr.token_length = key_len;
 	key_len += 4;
@@ -2044,7 +2079,7 @@ convert_response(unsigned char *response, unsigned char *buffer,
 	switch (t82h_p->type) {
 	case TYPE82_RSP_CODE:
 		reply_code = t82h_p->reply_code;
-		rv = 4; 
+		rv = 4;
 		src_p = (unsigned char *)t82h_p;
 		PRINTK("Hardware error: Type 82 Message Header: "
 		       "%02x%02x%02x%02x%02x%02x%02x%02x\n",
@@ -2080,10 +2115,10 @@ convert_response(unsigned char *response, unsigned char *buffer,
 				rv = 8;
 			}
 			src_p = (unsigned char *)cprb_p + sizeof(struct CPRB);
-			src_p += 4; 
+			src_p += 4;
 			le2toI(src_p, &src_l);
-			src_l -= 2;	
-			src_p += 2;	
+			src_l -= 2;
+			src_p += 2;
 		} else {
 			service_rc = (int)cprbx_p->ccp_rtcode;
 			if (service_rc != 0) {
@@ -2097,10 +2132,10 @@ convert_response(unsigned char *response, unsigned char *buffer,
 			}
 			src_p = (unsigned char *)
 				cprbx_p + sizeof(struct CPRBX);
-			src_p += 4; 
+			src_p += 4;
 			src_l = (int)(*((short *) src_p));
-			src_l -= 2;	
-			src_p += 2;	
+			src_l -= 2;
+			src_p += 2;
 		}
 		break;
 	default:

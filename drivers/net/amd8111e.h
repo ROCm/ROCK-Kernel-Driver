@@ -606,7 +606,7 @@ typedef enum {
 /* ipg parameters */
 #define DEFAULT_IPG			0x60
 #define IFS1_DELTA			36
-#define	IPG_CONVERGE_JIFFIES	(HZ / 2)
+#define	IPG_CONVERGE_JIFFIES (HZ/2)
 #define	IPG_STABLE_TIME	5
 #define	MIN_IPG	96
 #define	MAX_IPG	255
@@ -790,6 +790,7 @@ struct amd8111e_priv{
 #endif	
 	char opened;
 	struct net_device_stats stats;
+	unsigned int drv_rx_errors;
 	struct dev_mc_list* mc_list;
 	struct amd8111e_coalesce_conf coal_conf;
 

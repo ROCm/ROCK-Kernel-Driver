@@ -55,7 +55,7 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
 			continue;
 
 		cpu_buf = &cpu_buffer[i]; 
-		snprintf(buf, 6, "cpu%d", i);
+		snprintf(buf, 10, "cpu%d", i);
 		cpudir = oprofilefs_mkdir(sb, dir, buf);
  
 		/* Strictly speaking access to these ulongs is racy,

@@ -31,6 +31,7 @@
 #define PALM_M130_ID			0x0050
 #define PALM_TUNGSTEN_T_ID		0x0060
 #define PALM_TUNGSTEN_Z_ID		0x0031
+#define PALM_ZIRE31_ID			0x0061
 #define PALM_ZIRE_ID			0x0070
 #define PALM_M100_ID			0x0080
 
@@ -53,6 +54,9 @@
 
 #define ACEECA_VENDOR_ID		0x4766
 #define ACEECA_MEZ1000_ID		0x0001
+
+#define KYOCERA_VENDOR_ID		0x0C88
+#define KYOCERA_7135_ID			0x0021 
 
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)

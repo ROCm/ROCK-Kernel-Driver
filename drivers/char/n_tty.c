@@ -62,17 +62,12 @@
 
 static inline unsigned char *alloc_buf(void)
 {
-	unsigned char *p;
 	int prio = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 
-	if (PAGE_SIZE != N_TTY_BUF_SIZE) {
-		p = kmalloc(N_TTY_BUF_SIZE, prio);
-		if (p)
-			memset(p, 0, N_TTY_BUF_SIZE);
-	} else
-		p = (unsigned char *)get_zeroed_page(prio);
-
-	return p;
+	if (PAGE_SIZE != N_TTY_BUF_SIZE)
+		return kmalloc(N_TTY_BUF_SIZE, prio);
+	else
+		return (unsigned char *)__get_free_page(prio);
 }
 
 static inline void free_buf(unsigned char *buf)
@@ -249,7 +244,7 @@ static int opost(unsigned char c, struct tty_struct *tty)
  * things.
  */
 static ssize_t opost_block(struct tty_struct * tty,
-		       const unsigned char * inbuf, unsigned int nr)
+		       const unsigned char __user * inbuf, unsigned int nr)
 {
 	char	buf[80];
 	int	space;
@@ -903,7 +898,7 @@ static void n_tty_close(struct tty_struct *tty)
 	n_tty_flush_buffer(tty);
 	if (tty->read_buf) {
 		free_buf(tty->read_buf);
-		tty->read_buf = 0;
+		tty->read_buf = NULL;
 	}
 }
 
@@ -920,7 +915,7 @@ static int n_tty_open(struct tty_struct *tty)
 	memset(tty->read_buf, 0, N_TTY_BUF_SIZE);
 	reset_buffer_flags(tty);
 	tty->column = 0;
-	n_tty_set_termios(tty, 0);
+	n_tty_set_termios(tty, NULL);
 	tty->minimum_to_wake = 1;
 	tty->closing = 0;
 	return 0;
@@ -946,7 +941,7 @@ static inline int input_available_p(struct tty_struct *tty, int amt)
  * the buffer to head pointer.
  */
 static inline int copy_from_read_buf(struct tty_struct *tty,
-				      unsigned char **b,
+				      unsigned char __user **b,
 				      size_t *nr)
 
 {
@@ -976,9 +971,9 @@ static inline int copy_from_read_buf(struct tty_struct *tty,
 extern ssize_t redirected_tty_write(struct file *,const char *,size_t,loff_t *);
 
 static ssize_t read_chan(struct tty_struct *tty, struct file *file,
-			 unsigned char *buf, size_t nr)
+			 unsigned char __user *buf, size_t nr)
 {
-	unsigned char *b = buf;
+	unsigned char __user *b = buf;
 	DECLARE_WAITQUEUE(wait, current);
 	int c;
 	int minimum, time;
@@ -993,16 +988,6 @@ do_it_again:
 		printk("n_tty_read_chan: called with read_buf == NULL?!?\n");
 		return -EIO;
 	}
-
-#ifdef CONFIG_BOOTSPLASH
-        if (file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,0) ||
-            file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,1) ||
-            file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,0) ||
-            file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,1)) {
-                extern int splash_verbose(void);
-                (void)splash_verbose();
-        }               
-#endif
 
 	/* Job control check -- must be done at start and after
 	   every sleep (POSIX.1 7.1.1.4). */
@@ -1193,9 +1178,9 @@ do_it_again:
 }
 
 static ssize_t write_chan(struct tty_struct * tty, struct file * file,
-			  const unsigned char * buf, size_t nr)
+			  const unsigned char __user * buf, size_t nr)
 {
-	const unsigned char *b = buf;
+	const unsigned char __user *b = buf;
 	DECLARE_WAITQUEUE(wait, current);
 	int c;
 	ssize_t retval = 0;

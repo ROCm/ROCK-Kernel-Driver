@@ -24,7 +24,8 @@
  * Stack layout for the system_call stack entry.
  * The first few entries are identical to the user_regs_struct.
  */
-SP_PTREGS    =  STACK_FRAME_OVERHEAD 
+SP_PTREGS    =  STACK_FRAME_OVERHEAD
+SP_ARGS      =  STACK_FRAME_OVERHEAD + __PT_ARGS
 SP_PSW       =  STACK_FRAME_OVERHEAD + __PT_PSW
 SP_R0        =  STACK_FRAME_OVERHEAD + __PT_GPRS
 SP_R1        =  STACK_FRAME_OVERHEAD + __PT_GPRS + 8
@@ -47,7 +48,8 @@ SP_ILC       =  STACK_FRAME_OVERHEAD + __PT_ILC
 SP_TRAP      =  STACK_FRAME_OVERHEAD + __PT_TRAP
 SP_SIZE      =  STACK_FRAME_OVERHEAD + __PT_SIZE
 
-_TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | _TIF_RESTART_SVC)
+_TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | \
+		 _TIF_RESTART_SVC | _TIF_SINGLE_STEP )
 _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 
 #define BASED(name) name-system_call(%r13)
@@ -170,12 +172,14 @@ system_call:
 sysc_do_svc:
 	lg	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
         slag    %r7,%r7,2         # *4 and test for svc 0
-	jnz	sysc_do_restart
+	jnz	sysc_nr_ok
 	# svc 0: system call number in %r1
 	cl	%r1,BASED(.Lnr_syscalls)
-	jnl	sysc_do_restart
+	jnl	sysc_nr_ok
 	lgfr	%r7,%r1           # clear high word in r1
 	slag    %r7,%r7,2         # svc 0: system call number in %r1
+sysc_nr_ok:
+	mvc	SP_ARGS(8,%r15),SP_R7(%r15)
 sysc_do_restart:
 	larl    %r10,sys_call_table
 #ifdef CONFIG_S390_SUPPORT
@@ -184,9 +188,9 @@ sysc_do_restart:
 	larl    %r10,sys_call_table_emu  # use 31 bit emulation system calls
 sysc_noemu:
 #endif
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         lgf     %r8,0(%r7,%r10)   # load address of system call routine
-        jo      sysc_tracesys
+        jnz     sysc_tracesys
         basr    %r14,%r8          # call sys_xxxx
         stg     %r2,SP_R2(%r15)   # store return value (change R2 on stack)
                                   # ATTENTION: check sys_execve_glue before
@@ -208,7 +212,6 @@ sysc_work_loop:
 	jz	sysc_leave        # there is no work to do
 #
 # One of the work bits is on. Find out which one.
-# Checked are: _TIF_SIGPENDING and _TIF_NEED_RESCHED
 #
 sysc_work:
 	tm	__TI_flags+7(%r9),_TIF_NEED_RESCHED
@@ -217,6 +220,8 @@ sysc_work:
 	jo	sysc_sigpending
 	tm	__TI_flags+7(%r9),_TIF_RESTART_SVC
 	jo	sysc_restart
+	tm	__TI_flags+7(%r9),_TIF_SINGLE_STEP
+	jo	sysc_singlestep
 	j	sysc_leave
 
 #
@@ -230,6 +235,7 @@ sysc_reschedule:
 # _TIF_SIGPENDING is set, call do_signal
 #
 sysc_sigpending:     
+	ni	__TI_flags+7(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
         la      %r2,SP_PTREGS(%r15) # load pt_regs
         sgr     %r3,%r3           # clear *oldset
 	brasl	%r14,do_signal    # call do_signal
@@ -248,6 +254,18 @@ sysc_restart:
 	lmg	%r2,%r6,SP_R2(%r15)    # load svc arguments
 	j	sysc_do_restart        # restart svc
 
+#
+# _TIF_SINGLE_STEP is set, call do_single_step
+#
+sysc_singlestep:
+	ni	__TI_flags+7(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
+	lhi	%r0,__LC_PGM_OLD_PSW
+	sth	%r0,SP_TRAP(%r15)	# set trap indication to pgm check
+	la	%r2,SP_PTREGS(%r15)	# address of register-save area
+	larl	%r14,sysc_return	# load adr. of system return
+	jg	do_single_step		# branch to do_sigtrap
+
+
 __critical_end:
 
 #
@@ -255,6 +273,8 @@ __critical_end:
 # special linkage: %r12 contains the return address for trace_svc
 #
 sysc_tracesys:
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,0
 	srl	%r7,2
 	stg     %r7,SP_R2(%r15)
         brasl   %r14,syscall_trace
@@ -270,8 +290,10 @@ sysc_tracego:
         basr    %r14,%r8            # call sys_xxx
         stg     %r2,SP_R2(%r15)     # store return value
 sysc_tracenogo:
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
-        jno     sysc_return
+	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
+        jz      sysc_return
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,1
 	larl	%r14,sysc_return    # return point is sysc_return
 	jg	syscall_trace
 
@@ -432,6 +454,7 @@ pgm_check_handler:
 	lgf     %r3,__LC_PGM_ILC	 # load program interruption code
 	lghi	%r8,0x7f
 	ngr	%r8,%r3
+pgm_do_call:
         sll     %r8,3
         larl    %r1,pgm_check_table
         lg      %r1,0(%r8,%r1)		 # load address of handler routine
@@ -462,90 +485,27 @@ pgm_per_std:
 	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
 	mvc	__THREAD_per+__PER_address(8,%r1),__LC_PER_ADDRESS
 	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
-	lghi    %r4,0x7f
+	oi	__TI_flags+7(%r9),_TIF_SINGLE_STEP # set TIF_SINGLE_STEP
 	lgf     %r3,__LC_PGM_ILC	 # load program interruption code
-        nr      %r4,%r3			 # clear per-event-bit and ilc
-        je      pgm_per_only		 # only per of per+check ?
-        sll     %r4,3
-        larl    %r1,pgm_check_table
-        lg      %r1,0(%r4,%r1)		 # load address of handler routine
-        la      %r2,SP_PTREGS(%r15)	 # address of register-save area
-        basr    %r14,%r1		 # branch to interrupt-handler
-pgm_per_only:
-        la      %r2,SP_PTREGS(15)	 # address of register-save area
-        larl    %r14,sysc_return	 # load adr. of system return
-        jg      do_debugger_trap
+	lghi	%r8,0x7f
+	ngr	%r8,%r3			 # clear per-event-bit and ilc
+	je	sysc_return
+	j	pgm_do_call
 
 #
 # it was a single stepped SVC that is causing all the trouble
 #
 pgm_svcper:
 	SAVE_ALL __LC_SVC_OLD_PSW,__LC_SAVE_AREA,1
+	llgh    %r7,__LC_SVC_INT_CODE	# get svc number from lowcore
 	lg	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
-	llgh    %r7,__LC_SVC_INT_CODE # get svc number from lowcore
 	lg	%r1,__TI_task(%r9)
 	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
 	mvc	__THREAD_per+__PER_address(8,%r1),__LC_PER_ADDRESS
 	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
-	stosm   48(%r15),0x03     # reenable interrupts
-	slag	%r7,%r7,2         # *4 and test for svc 0
-	jnz	pgm_svcstd
-	# svc 0: system call number in %r1
-	lghi	%r0,NR_syscalls
-	clr	%r1,%r0
-	slag	%r7,%r1,2
-pgm_svcstd:
-	larl    %r10,sys_call_table
-#ifdef CONFIG_S390_SUPPORT
-        tm      SP_PSW+3(%r15),0x01  # are we running in 31 bit mode ?
-        jo      pgm_svcper_noemu
-	larl    %r10,sys_call_table_emu # use 31 bit emulation system calls
-pgm_svcper_noemu:
-#endif
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
-        lgf     %r8,0(%r7,%r10)   # load address of system call routine
-        jo      pgm_tracesys
-        basr    %r14,%r8          # call sys_xxxx
-        stg     %r2,SP_R2(%r15)   # store return value (change R2 on stack)
-                                  # ATTENTION: check sys_execve_glue before
-                                  # changing anything here !!
-
-pgm_svcret:
-	tm	__TI_flags+7(%r9),_TIF_SIGPENDING
-	jno	pgm_svcper_nosig
-        la      %r2,SP_PTREGS(%r15) # load pt_regs
-        sgr     %r3,%r3             # clear *oldset
-	brasl	%r14,do_signal
-	
-pgm_svcper_nosig:
-	lhi     %r0,__LC_PGM_OLD_PSW     # set trap indication back to pgm_chk
-	st      %r0,SP_TRAP(%r15)
-        la      %r2,SP_PTREGS(15) # address of register-save area
-        larl    %r14,sysc_return  # load adr. of system return
-        jg      do_debugger_trap
-#
-# call trace before and after sys_call
-#
-pgm_tracesys:
-	srlg	%r7,%r7,2
-	stg	%r7,SP_R2(%r15)
-        brasl   %r14,syscall_trace
-	lghi	%r0,NR_syscalls
-	clg	%r0,SP_R2(%r15)
-	jnh	pgm_svc_nogo
-	lg      %r7,SP_R2(%r15)
-	sllg    %r7,%r7,2           # strace wants to change the syscall
-	lgf	%r8,0(%r7,%r10)
-pgm_svc_go:
-	lmg     %r3,%r6,SP_R3(%r15)
-	lg      %r2,SP_ORIG_R2(%r15)
-        basr    %r14,%r8            # call sys_xxx
-        stg     %r2,SP_R2(%r15)     # store return value
-pgm_svc_nogo:
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
-        jno     pgm_svcret
-	larl	%r14,pgm_svcret     # return point is sysc_return
-	jg	syscall_trace
+	oi	__TI_flags+7(%r9),_TIF_SINGLE_STEP # set TIF_SINGLE_STEP
+	stosm	48(%r15),0x03		# reenable interrupts
+	j	sysc_do_svc
 
 /*
  * IO interrupt handler routine

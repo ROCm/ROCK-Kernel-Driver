@@ -49,7 +49,6 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
 #include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/pagemap.h>
@@ -68,29 +67,22 @@
 #ifdef NETIF_F_TSO
 #include <net/checksum.h>
 #endif
-#ifdef SIOCGMIIPHY
+#include <linux/workqueue.h>
 #include <linux/mii.h>
-#endif
-#ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
-#endif
-#ifdef NETIF_F_HW_VLAN_TX
 #include <linux/if_vlan.h>
-#endif
+#include <linux/moduleparam.h>
 
 #define BAR_0		0
 #define BAR_1		1
 #define BAR_5		5
-#define PCI_DMA_64BIT	0xffffffffffffffffULL
-#define PCI_DMA_32BIT	0x00000000ffffffffULL
 
-#include "kcompat.h"
 
 struct e1000_adapter;
 
 #include "e1000_hw.h"
 
-#if DBG
+#ifdef DBG
 #define E1000_DBG(args...) printk(KERN_DEBUG "e1000: " args)
 #else
 #define E1000_DBG(args...)
@@ -198,14 +190,13 @@ struct e1000_adapter {
 	struct timer_list tx_fifo_stall_timer;
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
-#ifdef NETIF_F_HW_VLAN_TX
 	struct vlan_group *vlgrp;
-#endif
 	uint32_t bd_number;
 	uint32_t rx_buffer_len;
 	uint32_t part_num;
 	uint32_t wol;
 	uint32_t smartspeed;
+	uint32_t en_mng_pt;
 	uint16_t link_speed;
 	uint16_t link_duplex;
 	spinlock_t stats_lock;
@@ -213,10 +204,8 @@ struct e1000_adapter {
 	struct work_struct tx_timeout_task;
     	uint8_t fc_autoneg;
 
-#ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;
 	unsigned long led_status;
-#endif
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;
@@ -258,24 +247,10 @@ struct e1000_adapter {
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
 
-#ifdef ETHTOOL_TEST
 	uint32_t test_icr;
 	struct e1000_desc_ring test_tx_ring;
 	struct e1000_desc_ring test_rx_ring;
-#endif
 
-#ifdef E1000_COUNT_ICR
-	uint64_t icr_txdw;
-	uint64_t icr_txqe;
-	uint64_t icr_lsc;
-	uint64_t icr_rxseq;
-	uint64_t icr_rxdmt;
-	uint64_t icr_rxo;
-	uint64_t icr_rxt;
-	uint64_t icr_mdac;
-	uint64_t icr_rxcfg;
-	uint64_t icr_gpi;
-#endif
 
 	uint32_t pci_state[16];
 	int msg_enable;

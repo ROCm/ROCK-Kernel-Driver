@@ -437,13 +437,13 @@ struct sctp_af {
 	int		(*setsockopt)	(struct sock *sk,
 					 int level,
 					 int optname,
-					 char *optval,
+					 char __user *optval,
 					 int optlen);
 	int		(*getsockopt)	(struct sock *sk,
 					 int level,
 					 int optname,
-					 char *optval,
-					 int *optlen);
+					 char __user *optval,
+					 int __user *optlen);
 	struct dst_entry *(*get_dst)	(struct sctp_association *asoc,
 					 union sctp_addr *daddr,
 					 union sctp_addr *saddr);

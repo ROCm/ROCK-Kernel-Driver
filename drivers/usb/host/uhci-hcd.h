@@ -80,7 +80,7 @@
 #define CAN_SCHEDULE_FRAMES	1000	/* how far future frames can be scheduled */
 
 struct uhci_frame_list {
-	__u32 frame[UHCI_NUMFRAMES];
+	u32 frame[UHCI_NUMFRAMES];
 
 	void *frame_cpu[UHCI_NUMFRAMES];
 
@@ -105,8 +105,8 @@ struct urb_priv;
  */
 struct uhci_qh {
 	/* Hardware fields */
-	__u32 link;			/* Next queue */
-	__u32 element;			/* Queue element pointer */
+	u32 link;			/* Next queue */
+	u32 element;			/* Queue element pointer */
 
 	/* Software fields */
 	dma_addr_t dma_handle;
@@ -185,10 +185,10 @@ struct uhci_qh {
  */
 struct uhci_td {
 	/* Hardware fields */
-	__u32 link;
-	__u32 status;
-	__u32 token;
-	__u32 buffer;
+	u32 link;
+	u32 status;
+	u32 token;
+	u32 buffer;
 
 	/* Software fields */
 	dma_addr_t dma_handle;
@@ -357,12 +357,15 @@ struct uhci_hcd {
 
 	/* List of QH's that are done, but waiting to be unlinked (race) */
 	struct list_head qh_remove_list;	/* P: uhci->schedule_lock */
+	unsigned int qh_remove_age;		/* Age in frames */
 
 	/* List of TD's that are done, but waiting to be freed (race) */
 	struct list_head td_remove_list;	/* P: uhci->schedule_lock */
+	unsigned int td_remove_age;		/* Age in frames */
 
 	/* List of asynchronously unlinked URB's */
 	struct list_head urb_remove_list;	/* P: uhci->schedule_lock */
+	unsigned int urb_remove_age;		/* Age in frames */
 
 	/* List of URB's awaiting completion callback */
 	struct list_head complete_list;		/* P: uhci->schedule_lock */
@@ -370,6 +373,8 @@ struct uhci_hcd {
 	int rh_numports;
 
 	struct timer_list stall_timer;
+
+	wait_queue_head_t waitqh;		/* endpoint_disable waiters */
 };
 
 struct urb_priv {

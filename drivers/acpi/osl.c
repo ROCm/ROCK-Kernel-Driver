@@ -232,32 +232,11 @@ acpi_status
 acpi_os_table_override (struct acpi_table_header *existing_table,
 			struct acpi_table_header **new_table)
 {
- #ifdef CONFIG_ACPI_INITRD
-	extern char* dsdt_start;
- #endif
-         if (!existing_table || !new_table)
-                 return AE_BAD_PARAMETER;
-  
-  #ifdef CONFIG_ACPI_INITRD
-	if(memcmp(existing_table, "DSDT", 4)){
-		*new_table = NULL;
-		return AE_OK;
-	}
-	// dsdt_start has been kmalloced in /init/initram.c
-	// where should it be freed ?!? 
-	if (dsdt_start != NULL){
-	 	printk(KERN_INFO "new dsdt found and will be loaded!\n");
-		*new_table = (struct acpi_table_header*)dsdt_start;
-		return AE_OK;
-	 }
-	 else{
-                *new_table = NULL;
-		return AE_OK;
-	 }
- #else
-         *new_table = NULL;
- #endif
-         return AE_OK;
+	if (!existing_table || !new_table)
+		return AE_BAD_PARAMETER;
+
+	*new_table = NULL;
+	return AE_OK;
 }
 
 static irqreturn_t

@@ -137,7 +137,7 @@ static int __init usb_console_setup(struct console *co, char *options)
 
 	/* grab the first serial port that happens to be connected */
 	serial = usb_serial_get_by_index(0);
-	if (serial_paranoia_check (serial, __FUNCTION__)) {
+	if (serial == NULL) {
 		/* no device is connected yet, sorry :( */
 		err ("No USB device connected to ttyUSB0");
 		return -ENODEV;
@@ -199,11 +199,12 @@ static void usb_console_write(struct console *co, const char *buf, unsigned coun
 {
 	static struct usbcons_info *info = &usbcons_info;
 	struct usb_serial_port *port = info->port;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
+	struct usb_serial *serial;
 	int retval = -ENODEV;
 
-	if (!serial || !port)
+	if (!port)
 		return;
+	serial = port->serial;
 
 	if (count == 0)
 		return;

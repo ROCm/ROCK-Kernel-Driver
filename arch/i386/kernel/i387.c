@@ -24,6 +24,22 @@
 #define HAVE_HWFP 1
 #endif
 
+unsigned long mxcsr_feature_mask = 0xffffffff;
+
+void mxcsr_feature_mask_init(void)
+{
+	unsigned long mask = 0;
+	clts();
+	if (cpu_has_fxsr) {
+		memset(&current->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
+		asm volatile("fxsave %0" : : "m" (current->thread.i387.fxsave)); 
+		mask = current->thread.i387.fxsave.mxcsr_mask;
+		if (mask == 0) mask = 0x0000ffbf;
+	} 
+	mxcsr_feature_mask &= mask;
+	stts();
+}
+
 /*
  * The _current_ task is using the FPU for the first time
  * so initialize it and set the mxcsr to its default
@@ -204,13 +220,6 @@ void set_fpu_twd( struct task_struct *tsk, unsigned short twd )
 	}
 }
 
-void set_fpu_mxcsr( struct task_struct *tsk, unsigned short mxcsr )
-{
-	if ( cpu_has_xmm ) {
-		tsk->thread.i387.fxsave.mxcsr = (mxcsr & 0xffbf);
-	}
-}
-
 /*
  * FXSR floating point environment conversions.
  */
@@ -237,7 +246,7 @@ static int convert_fxsr_to_user( struct _fpstate __user *buf,
 	to = &buf->_st[0];
 	from = (struct _fpxreg *) &fxsave->st_space[0];
 	for ( i = 0 ; i < 8 ; i++, to++, from++ ) {
-		unsigned long *t = (unsigned long *)to;
+		unsigned long __user *t = (unsigned long __user *)to;
 		unsigned long *f = (unsigned long *)from;
 
 		if (__put_user(*f, t) ||
@@ -272,7 +281,7 @@ static int convert_fxsr_from_user( struct i387_fxsave_struct *fxsave,
 	from = &buf->_st[0];
 	for ( i = 0 ; i < 8 ; i++, to++, from++ ) {
 		unsigned long *t = (unsigned long *)to;
-		unsigned long *f = (unsigned long *)from;
+		unsigned long __user *f = (unsigned long __user *)from;
 
 		if (__get_user(*t, f) ||
 				__get_user(*(t + 1), f + 1) ||
@@ -355,8 +364,8 @@ static int restore_i387_fxsave( struct _fpstate __user *buf )
 	clear_fpu( tsk );
 	err = __copy_from_user( &tsk->thread.i387.fxsave, &buf->_fxsr_env[0],
 				sizeof(struct i387_fxsave_struct) );
-	/* mxcsr bit 6 and 31-16 must be zero for security reasons */
-	tsk->thread.i387.fxsave.mxcsr &= 0xffbf;
+	/* mxcsr reserved bits must be masked to zero for security reasons */
+	tsk->thread.i387.fxsave.mxcsr &= mxcsr_feature_mask;
 	return err ? 1 : convert_fxsr_from_user( &tsk->thread.i387.fxsave, buf );
 }
 
@@ -457,8 +466,8 @@ int set_fpxregs( struct task_struct *tsk, struct user_fxsr_struct __user *buf )
 		if (__copy_from_user( &tsk->thread.i387.fxsave, buf,
 				  sizeof(struct user_fxsr_struct) ))
 			ret = -EFAULT;
-		/* mxcsr bit 6 and 31-16 must be zero for security reasons */
-		tsk->thread.i387.fxsave.mxcsr &= 0xffbf;
+		/* mxcsr reserved bits must be masked to zero for security reasons */
+		tsk->thread.i387.fxsave.mxcsr &= mxcsr_feature_mask;
 	} else {
 		ret = -EIO;
 	}

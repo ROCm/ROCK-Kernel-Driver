@@ -1,3 +1,6 @@
+#define VMLINUX_SYMBOL(_sym_) _##_sym_
+#include <asm-generic/vmlinux.lds.h>
+#include <asm/thread_info.h>
 #include <linux/config.h>
 
 #ifdef CONFIG_H8300H_GENERIC
@@ -82,6 +85,7 @@ SECTIONS
 #endif
 	__stext = . ;
         	*(.text)
+	SCHED_TEXT
 	. = ALIGN(0x4) ;
 		*(.exit.text)
 		*(.text.*)
@@ -99,6 +103,21 @@ SECTIONS
         ___start___ksymtab = .;  /* Kernel symbol table          */
 		 *(__ksymtab)
 	___stop___ksymtab = .;
+
+	___start___ksymtab_gpl = .;	/* Kernel symbol table: GPL-only symbols */
+
+	*(__ksymtab_gpl)
+	___stop___ksymtab_gpl = .;
+
+	___start___kcrctab = .;	/* Kernel symbol table: Normal symbols */
+	*(__kcrctab)
+	___stop___kcrctab = .;
+
+	___start___kcrctab_gpl = .;	/* Kernel symbol table: GPL-only symbols */
+	*(__kcrctab_gpl)
+	___stop___kcrctab_gpl = .;
+
+	*(__ksymtab_strings)	/* Kernel symbol table: strings */
 
 	. = ALIGN(0x4) ;
 	__etext = . ;

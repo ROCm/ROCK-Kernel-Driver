@@ -8,8 +8,6 @@
 #ifndef _SPARC_ESP_H
 #define _SPARC_ESP_H
 
-#include <linux/config.h>
-
 /* For dvma controller register definitions. */
 #include <asm/dma.h>
 
@@ -74,6 +72,8 @@ struct esp_device {
   unsigned wide:1;
   unsigned disconnect:1;
 };
+
+struct scsi_cmnd;
 
 /* We get one of these for each ESP probed. */
 struct esp {
@@ -181,9 +181,9 @@ struct esp {
 	int			bursts;		/* Burst sizes our DVMA supports */
 
 	/* Our command queues, only one cmd lives in the current_SC queue. */
-	Scsi_Cmnd		*issue_SC;	/* Commands to be issued */
-	Scsi_Cmnd		*current_SC;	/* Who is currently working the bus */
-	Scsi_Cmnd		*disconnected_SC;/* Commands disconnected from the bus */
+	struct scsi_cmnd	*issue_SC;	/* Commands to be issued */
+	struct scsi_cmnd	*current_SC;	/* Who is currently working the bus */
+	struct scsi_cmnd	*disconnected_SC;/* Commands disconnected from the bus */
 
 	/* Message goo */
 	u8			cur_msgout[16];

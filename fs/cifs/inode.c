@@ -35,17 +35,14 @@ extern int is_size_safe_to_change(struct cifsInodeInfo *);
 int
 cifs_get_inode_info_unix(struct inode **pinode,
 			 const unsigned char *search_path,
-			 struct super_block *sb)
+			 struct super_block *sb,int xid)
 {
-	int xid;
 	int rc = 0;
 	FILE_UNIX_BASIC_INFO findData;
 	struct cifsTconInfo *pTcon;
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	char *tmp_path;
-
-	xid = GetXid();
 
 	pTcon = cifs_sb->tcon;
 	cFYI(1, (" Getting info on %s ", search_path));
@@ -62,7 +59,6 @@ cifs_get_inode_info_unix(struct inode **pinode,
 				    strnlen(search_path, MAX_PATHCONF) + 1,
 				    GFP_KERNEL);
 			if (tmp_path == NULL) {
-				FreeXid(xid);
 				return -ENOMEM;
 			}
         /* have to skip first of the double backslash of UNC name */
@@ -75,7 +71,6 @@ cifs_get_inode_info_unix(struct inode **pinode,
 
 			/* BB fix up inode etc. */
 		} else if (rc) {
-			FreeXid(xid);
 			return rc;
 		}
 
@@ -85,12 +80,12 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
-			if(*pinode == NULL)
+			if(*pinode == NULL) 
 				return -ENOMEM;
 			insert_inode_hash(*pinode);
 		}
+			
 		inode = *pinode;
-
 		cifsInfo = CIFS_I(inode);
 
 		cFYI(1, (" Old time %ld ", cifsInfo->time));
@@ -115,8 +110,12 @@ cifs_get_inode_info_unix(struct inode **pinode,
 			inode->i_mode |= S_IFDIR;
 		} else if (findData.Type == UNIX_CHARDEV) {
 			inode->i_mode |= S_IFCHR;
+			inode->i_rdev = MKDEV(le64_to_cpu(findData.DevMajor),
+				le64_to_cpu(findData.DevMinor) & MINORMASK);
 		} else if (findData.Type == UNIX_BLOCKDEV) {
 			inode->i_mode |= S_IFBLK;
+			inode->i_rdev = MKDEV(le64_to_cpu(findData.DevMajor),
+				le64_to_cpu(findData.DevMinor) & MINORMASK);
 		} else if (findData.Type == UNIX_FIFO) {
 			inode->i_mode |= S_IFIFO;
 		} else if (findData.Type == UNIX_SOCKET) {
@@ -175,15 +174,13 @@ cifs_get_inode_info_unix(struct inode **pinode,
 					   inode->i_rdev);
 		}
 	}
-	FreeXid(xid);
 	return rc;
 }
 
 int
 cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path, 
-		FILE_ALL_INFO * pfindData, struct super_block *sb)
+		FILE_ALL_INFO * pfindData, struct super_block *sb, int xid)
 {
-	int xid;
 	int rc = 0;
 	struct cifsTconInfo *pTcon;
 	struct inode *inode;
@@ -191,15 +188,12 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 	char *tmp_path;
 	char *buf = NULL;
 
-	xid = GetXid();
-
 	pTcon = cifs_sb->tcon;
 	cFYI(1,("Getting info on %s ", search_path));
 
 	if((pfindData == NULL) && (*pinode != NULL)) {
 		if(CIFS_I(*pinode)->clientCanCacheRead) {
 			cFYI(1,("No need to revalidate inode sizes on cached file "));
-			FreeXid(xid);
 			return rc;
 		}
 	}
@@ -224,7 +218,6 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			if (tmp_path == NULL) {
 				if(buf)
 					kfree(buf);
-				FreeXid(xid);
 				return -ENOMEM;
 			}
 
@@ -238,7 +231,6 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		} else if (rc) {
 			if(buf)
 				kfree(buf);
-			FreeXid(xid);
 			return rc;
 		}
 	} else {
@@ -251,7 +243,6 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 				return -ENOMEM;
 			insert_inode_hash(*pinode);
 		}
-
 		inode = *pinode;
 		cifsInfo = CIFS_I(inode);
 		pfindData->Attributes = le32_to_cpu(pfindData->Attributes);
@@ -338,22 +329,23 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 	}
 	if(buf)
 	    kfree(buf);
-	FreeXid(xid);
 	return rc;
 }
 
 void
 cifs_read_inode(struct inode *inode)
 {				/* gets root inode */
-
+	int xid;
 	struct cifs_sb_info *cifs_sb;
 
 	cifs_sb = CIFS_SB(inode->i_sb);
-
+	xid = GetXid();
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
-		cifs_get_inode_info_unix(&inode, "", inode->i_sb);
+		cifs_get_inode_info_unix(&inode, "", inode->i_sb,xid);
 	else
-		cifs_get_inode_info(&inode, "", NULL, inode->i_sb);
+		cifs_get_inode_info(&inode, "", NULL, inode->i_sb,xid);
+	/* can not call macro FreeXid here since in a void func */
+	_FreeXid(xid);
 }
 
 int
@@ -374,7 +366,11 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+/* Unlink can be called from rename so we can not grab
+	the sem here since we deadlock otherwise */
+/*	down(&direntry->d_sb->s_vfs_rename_sem);*/
 	full_path = build_path_from_dentry(direntry);
+/*	up(&direntry->d_sb->s_vfs_rename_sem);*/
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -475,21 +471,29 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 		inode->i_nlink++;
 		if (pTcon->ses->capabilities & CAP_UNIX)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
-						      inode->i_sb);
+						      inode->i_sb,xid);
 		else
 			rc = cifs_get_inode_info(&newinode, full_path,NULL,
-						 inode->i_sb);
+						 inode->i_sb,xid);
 
 		direntry->d_op = &cifs_dentry_ops;
 		d_instantiate(direntry, newinode);
 		if(direntry->d_inode)
 			direntry->d_inode->i_nlink = 2;
-		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
-			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
-				(__u64)-1,  
-				(__u64)-1,
-				0 /* dev_t */,
-				cifs_sb->local_nls);
+		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
+				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+						(__u64)current->euid,  
+						(__u64)current->egid,
+						0 /* dev_t */,
+						cifs_sb->local_nls);
+			} else {
+				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+						(__u64)-1,  
+						(__u64)-1,
+						0 /* dev_t */,
+						cifs_sb->local_nls);
+			}
 		else { /* BB to be implemented via Windows secrty descriptors*/
 		/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
 		}
@@ -667,6 +671,8 @@ cifs_revalidate(struct dentry *direntry)
 
 	cifs_sb = CIFS_SB(direntry->d_sb);
 
+	/* can not safely grab the rename sem here if
+	rename calls revalidate since that would deadlock */
 	full_path = build_path_from_dentry(direntry);
 	if(full_path == NULL) {
 		FreeXid(xid);
@@ -698,7 +704,7 @@ cifs_revalidate(struct dentry *direntry)
 
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
 		rc = cifs_get_inode_info_unix(&direntry->d_inode, full_path,
-					 direntry->d_sb);
+					 direntry->d_sb,xid);
 		if(rc) {
 			cFYI(1,("error on getting revalidate info %d",rc));
 /*			if(rc != -ENOENT)
@@ -706,7 +712,7 @@ cifs_revalidate(struct dentry *direntry)
 		}
 	} else {
 		rc = cifs_get_inode_info(&direntry->d_inode, full_path, NULL,
-				    direntry->d_sb);
+				    direntry->d_sb,xid);
 		if(rc) {
 			cFYI(1,("error on getting revalidate info %d",rc));
 /*			if(rc != -ENOENT)

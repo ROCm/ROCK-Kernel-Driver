@@ -110,6 +110,7 @@ typedef struct sb_devc {
 	/* Mixer fields */
 	   int *levels;
 	   mixer_tab *iomap;
+	   size_t iomap_sz; /* number or records in the iomap table */
 	   int mixer_caps, recmask, outmask, supported_devices;
 	   int supported_rec_devices, supported_out_devices;
 	   int my_mixerdev;

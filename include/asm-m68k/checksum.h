@@ -115,7 +115,7 @@ ip_compute_csum(unsigned char * buff, int len)
 #define _HAVE_ARCH_IPV6_CSUM
 static __inline__ unsigned short int
 csum_ipv6_magic(struct in6_addr *saddr, struct in6_addr *daddr,
-		__u32 len, unsigned short proto, unsigned int sum) 
+		__u32 len, unsigned short proto, unsigned int sum)
 {
 	register unsigned long tmp;
 	__asm__("addl %2@,%0\n\t"

@@ -5,7 +5,7 @@
  *
  *  Copyright (C)  2001, 2004 IBM Corporation
  *  Author(s): Robert Burroughs (burrough@us.ibm.com)
- *             Eric Rossman (edrossma@us.ibm.com)
+ *	       Eric Rossman (edrossma@us.ibm.com)
  *
  *  Hotplug & misc device support: Jochen Roehrig (roehrig@de.ibm.com)
  *
@@ -16,7 +16,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -29,7 +29,7 @@
 
 #include <linux/ioctl.h>
 
-#define VERSION_Z90CRYPT_H "$Revision: 1.2.2.1 $"
+#define VERSION_Z90CRYPT_H "$Revision: 1.2 $"
 
 #define z90crypt_VERSION 1
 #define z90crypt_RELEASE 3	// 2 = PCIXCC, 3 = rewrite for coding standards
@@ -93,16 +93,16 @@ struct ica_rsa_modexpo_crt {
  *     This takes an ica_rsa_modexpo struct as its arg.
  *
  *     NOTE: please refer to the comments preceding this structure
- *           for the implementation details for the contents of the
- *           block
+ *	     for the implementation details for the contents of the
+ *	     block
  *
  *   ICARSACRT
  *     Perform an RSA operation using a Chinese-Remainder Theorem key
  *     This takes an ica_rsa_modexpo_crt struct as its arg.
  *
  *     NOTE: please refer to the comments preceding this structure
- *           for the implementation details for the contents of the
- *           block
+ *	     for the implementation details for the contents of the
+ *	     block
  *
  *   Z90STAT_TOTALCOUNT
  *     Return an integer count of all device types together.
@@ -133,10 +133,10 @@ struct ica_rsa_modexpo_crt {
  *   Z90STAT_STATUS_MASK
  *     Return an 64 element array of unsigned chars for the status of
  *     all devices.
- *       0x01: PCICA
- *       0x02: PCICC
- *       0x03: PCIXCC
- *       0x0d: device is disabled via the proc filesystem
+ *	 0x01: PCICA
+ *	 0x02: PCICC
+ *	 0x03: PCIXCC
+ *	 0x0d: device is disabled via the proc filesystem
  *
  *   Z90STAT_QDEPTH_MASK
  *     Return an 64 element array of unsigned chars for the queue
@@ -152,18 +152,18 @@ struct ica_rsa_modexpo_crt {
  *     This takes an ica_z90_status struct as its arg.
  *
  *     NOTE: this ioctl() is deprecated, and has been replaced with
- *           single ioctl()s for each type of status being requested
+ *	     single ioctl()s for each type of status being requested
  *
  *   Z90QUIESCE (not recommended)
  *     Quiesce the driver.  This is intended to stop all new
- *     requests from being processed.  Its use is NOT recommended,
+ *     requests from being processed.  Its use is not recommended,
  *     except in circumstances where there is no other way to stop
  *     callers from accessing the driver.  Its original use was to
  *     allow the driver to be "drained" of work in preparation for
  *     a system shutdown.
  *
  *     NOTE: once issued, this ban on new work cannot be undone
- *           except by unloading and reloading the driver.
+ *	     except by unloading and reloading the driver.
  */
 
 /**
@@ -172,7 +172,7 @@ struct ica_rsa_modexpo_crt {
 #define ICARSAMODEXPO	_IOC(_IOC_READ|_IOC_WRITE, Z90_IOCTL_MAGIC, 0x05, 0)
 #define ICARSACRT	_IOC(_IOC_READ|_IOC_WRITE, Z90_IOCTL_MAGIC, 0x06, 0)
 
-/* DEPRECATED status calls (bound for removal at some point) */
+/* DEPRECATED status call (bound for removal SOON) */
 #define ICAZ90STATUS	_IOR(Z90_IOCTL_MAGIC, 0x10, struct ica_z90_status)
 
 /* unrelated to ICA callers */
@@ -199,9 +199,8 @@ struct ica_rsa_modexpo_crt {
 #define ERELEASED 131	// user released while ioctl pending
 #define EQUIESCE  132	// z90crypt quiescing (no more work allowed)
 #define ETIMEOUT  133	// request timed out
-#define EUNKNOWN  134	// some unrecognized error occured (retry may succeed)
-#define EGETBUFF  135	// Error getting buffer or hardware lacks capability
-			// (retry in software)
+#define EUNKNOWN  134	// some unrecognized error occured
+#define EGETBUFF  135	// Error getting buffer
 
 /**
  * DEPRECATED STRUCTURES
@@ -223,7 +222,7 @@ struct ica_z90_status {
 	int pendingqWaitCount;
 	int totalOpenCount;
 	int cryptoDomain;
-	// status: 0=not there, 1=PCICA, 2=PCICC, 3=PCIXCC
+	// status: 0=not there. 1=PCICA. 2=PCICC. 3=PCIXCC
 	unsigned char status[MASK_LENGTH];
 	// qdepth: # work elements waiting for each device
 	unsigned char qdepth[MASK_LENGTH];

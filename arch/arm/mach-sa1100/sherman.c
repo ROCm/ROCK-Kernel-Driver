@@ -27,4 +27,5 @@ MACHINE_START(SHERMAN, "Blazie Engineering Sherman")
         BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
         MAPIO(sherman_map_io)
 	INITIRQ(sa1100_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END

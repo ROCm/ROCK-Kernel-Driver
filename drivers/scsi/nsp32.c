@@ -38,14 +38,13 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
-#include <linux/interrupt.h>
 
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi.h>
 
@@ -859,7 +858,7 @@ static int nsp32_reselection(Scsi_Cmnd *SCpnt, unsigned char newlun)
 	 * or current nexus is not existed, unexpected
 	 * reselection is occurred. Send reject message.
 	 */
-	if (newid >= NUMBER(data->lunt) || newlun >= NUMBER(data->lunt[0])) {
+	if (newid >= ARRAY_SIZE(data->lunt) || newlun >= ARRAY_SIZE(data->lunt[0])) {
 		nsp32_msg(KERN_WARNING, "unknown id/lun");
 		return FALSE;
 	} else if(data->lunt[newid][newlun].SCpnt == NULL) {
@@ -1568,7 +1567,7 @@ static int nsp32_proc_info(
 
 
 	SPRINTF("SDTR status\n");
-	for(id = 0; id < NUMBER(data->target); id++) {
+	for (id = 0; id < ARRAY_SIZE(data->target); id++) {
 
                 SPRINTF("id %d: ", id);
 
@@ -1605,12 +1604,12 @@ static int nsp32_proc_info(
 	thislength = pos - (buffer + offset);
 
 	if(thislength < 0) {
-		*start = 0;
+		*start = NULL;
                 return 0;
         }
 
 
-	thislength = MIN(thislength, length);
+	thislength = min(thislength, length);
 	*start = buffer + offset;
 
 	return thislength;
@@ -2753,17 +2752,17 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	case CLOCK_4:
 		/* If data->clock is CLOCK_4, then select 40M sync table. */
 		data->synct   = nsp32_sync_table_40M;
-		data->syncnum = NUMBER(nsp32_sync_table_40M);
+		data->syncnum = ARRAY_SIZE(nsp32_sync_table_40M);
 		break;
 	case CLOCK_2:
 		/* If data->clock is CLOCK_2, then select 20M sync table. */
 		data->synct   = nsp32_sync_table_20M;
-		data->syncnum = NUMBER(nsp32_sync_table_20M);
+		data->syncnum = ARRAY_SIZE(nsp32_sync_table_20M);
 		break;
 	case PCICLK:
 		/* If data->clock is PCICLK, then select pci sync table. */
 		data->synct   = nsp32_sync_table_pci;
-		data->syncnum = NUMBER(nsp32_sync_table_pci);
+		data->syncnum = ARRAY_SIZE(nsp32_sync_table_pci);
 		break;
 	default:
 		nsp32_msg(KERN_WARNING,
@@ -2771,7 +2770,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 		/* Use default value CLOCK_4 */
 		data->clock   = CLOCK_4;
 		data->synct   = nsp32_sync_table_40M;
-		data->syncnum = NUMBER(nsp32_sync_table_40M);
+		data->syncnum = ARRAY_SIZE(nsp32_sync_table_40M);
 	}
 
 	/*
@@ -2805,9 +2804,9 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 		goto free_autoparam;
 	}
 
-	for (i = 0; i < NUMBER(data->lunt); i++) {
-		for (j = 0; j < NUMBER(data->lunt[0]); j++) {
-			int offset = i * NUMBER(data->lunt[0]) + j;
+	for (i = 0; i < ARRAY_SIZE(data->lunt); i++) {
+		for (j = 0; j < ARRAY_SIZE(data->lunt[0]); j++) {
+			int offset = i * ARRAY_SIZE(data->lunt[0]) + j;
 			nsp32_lunt tmp = {
 				.SCpnt       = NULL,
 				.save_datp   = 0,
@@ -2825,7 +2824,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	/*
 	 * setup target
 	 */
-	for (i = 0; i < NUMBER(data->target); i++) {
+	for (i = 0; i < ARRAY_SIZE(data->target); i++) {
 		nsp32_target *target = &(data->target[i]);
 
 		target->limit_entry  = 0;
@@ -3021,7 +3020,7 @@ static void nsp32_do_bus_reset(nsp32_hw_data *data)
 	 * fall back to asynchronous transfer mode
 	 * initialize SDTR negotiation flag
 	 */
-	for (i = 0; i < NUMBER(data->target); i++) {
+	for (i = 0; i < ARRAY_SIZE(data->target); i++) {
 		nsp32_target *target = &data->target[i];
 
 		target->sync_flag = 0;
@@ -3343,6 +3342,48 @@ static int nsp32_prom_read(nsp32_hw_data *data, int romaddr)
 	return val;
 }
 
+static inline void nsp32_prom_set(nsp32_hw_data *data, int bit, int val)
+{
+	int base = data->BaseAddress;
+	int tmp;
+
+	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL);
+
+	if (val == 0) {
+		tmp &= ~bit;
+	} else {
+		tmp |=  bit;
+	}
+
+	nsp32_index_write1(base, SERIAL_ROM_CTL, tmp);
+
+	udelay(10);
+}
+
+static inline int nsp32_prom_get(nsp32_hw_data *data, int bit)
+{
+	int base = data->BaseAddress;
+	int tmp, ret;
+
+	if (bit != SDA) {
+		nsp32_msg(KERN_ERR, "return value is not appropriate");
+		return 0;
+	}
+
+
+	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL) & bit;
+
+	if (tmp == 0) {
+		ret = 0;
+	} else {
+		ret = 1;
+	}
+
+	udelay(10);
+
+	return ret;
+}
+
 static void nsp32_prom_start (nsp32_hw_data *data)
 {
 	/* start condition */
@@ -3386,48 +3427,6 @@ static int nsp32_prom_read_bit(nsp32_hw_data *data)
 	nsp32_prom_set(data, ENA, 1);	/* output mode */
 
 	return val;
-}
-
-static inline void nsp32_prom_set(nsp32_hw_data *data, int bit, int val)
-{
-	int base = data->BaseAddress;
-	int tmp;
-
-	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL);
-
-	if (val == 0) {
-		tmp &= ~bit;
-	} else {
-		tmp |=  bit;
-	}
-
-	nsp32_index_write1(base, SERIAL_ROM_CTL, tmp);
-
-	udelay(10);
-}
-
-static inline int nsp32_prom_get(nsp32_hw_data *data, int bit)
-{
-	int base = data->BaseAddress;
-	int tmp, ret;
-
-	if (bit != SDA) {
-		nsp32_msg(KERN_ERR, "return value is not appropriate");
-		return 0;
-	}
-
-
-	tmp = nsp32_index_read1(base, SERIAL_ROM_CTL) & bit;
-
-	if (tmp == 0) {
-		ret = 0;
-	} else {
-		ret = 1;
-	}
-
-	udelay(10);
-
-	return ret;
 }
 
 

@@ -52,6 +52,7 @@
 #define ELF_NGREG	48	/* includes nip, msr, lr, etc. */
 #define ELF_NFPREG	33	/* includes fpscr */
 #define ELF_NVRREG	33	/* includes vscr */
+#define ELF_NEVRREG	34	/* includes acc (as 2) */
 
 /*
  * These are used to set parameters in the core dumps.
@@ -73,6 +74,8 @@ typedef __vector128 elf_vrreg_t;
 typedef elf_vrreg_t elf_vrregset_t[ELF_NVRREG];
 
 #ifdef __KERNEL__
+
+struct task_struct;
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.

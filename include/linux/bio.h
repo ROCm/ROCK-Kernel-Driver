@@ -25,6 +25,15 @@
 
 /* Platforms may set this to teach the BIO layer about IOMMU hardware. */
 #include <asm/io.h>
+
+#if defined(BIO_VMERGE_MAX_SIZE) && defined(BIO_VMERGE_BOUNDARY)
+#define BIOVEC_VIRT_START_SIZE(x) (bvec_to_phys(x) & (BIO_VMERGE_BOUNDARY - 1))
+#define BIOVEC_VIRT_OVERSIZE(x)	((x) > BIO_VMERGE_MAX_SIZE)
+#else
+#define BIOVEC_VIRT_START_SIZE(x)	0
+#define BIOVEC_VIRT_OVERSIZE(x)		0
+#endif
+
 #ifndef BIO_VMERGE_BOUNDARY
 #define BIO_VMERGE_BOUNDARY	0
 #endif
@@ -81,6 +90,15 @@ struct bio {
 	unsigned short		bi_hw_segments;
 
 	unsigned int		bi_size;	/* residual I/O count */
+
+	/*
+	 * To keep track of the max hw size, we account for the
+	 * sizes of the first and last virtually mergeable segments
+	 * in this bio
+	 */
+	unsigned int		bi_hw_front_size;
+	unsigned int		bi_hw_back_size;
+
 	unsigned int		bi_max_vecs;	/* max bvl_vecs we can hold */
 
 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
@@ -102,8 +120,7 @@ struct bio {
 #define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
 #define BIO_BOUNCED	5	/* bio is a bounce bio */
-#define BIO_EOPNOTSUPP	6	/* not supported */
-#define BIO_USER_MAPPED 7	/* contains user pages */
+#define BIO_USER_MAPPED 6	/* contains user pages */
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
 /*
@@ -143,9 +160,7 @@ struct bio {
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
 #define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_RW_BARRIER))
 #define bio_sync(bio)		((bio)->bi_rw & (1 << BIO_RW_SYNC))
-#define bio_failfast(bio)	((bio)->bi_rw & (1 << BIO_RW_FAILFAST))
-#define bio_rw_ahead(bio)	((bio)->bi_rw & (1 << BIO_RW_AHEAD))
- 
+
 /*
  * will die
  */

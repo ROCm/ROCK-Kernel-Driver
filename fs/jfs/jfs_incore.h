@@ -25,11 +25,6 @@
 #include "jfs_types.h"
 #include "jfs_xtree.h"
 #include "jfs_dtree.h"
-#include "jfs_filsys.h"
-#ifdef CONFIG_JFS_DMAPI
-#include "dmapi/dmapi.h"		/* for dm_region_t */
-#include "dmapi/dmapi_jfs.h"		/* for dm_attrs_t */
-#endif
 
 /*
  * JFS magic number
@@ -58,6 +53,7 @@ struct jfs_inode_info {
 	lid_t	blid;		/* lid of pseudo buffer?	*/
 	lid_t	atlhead;	/* anonymous tlock list head	*/
 	lid_t	atltail;	/* anonymous tlock list tail	*/
+	spinlock_t ag_lock;	/* protects active_ag		*/
 	struct list_head anon_inode_list; /* inodes having anonymous txns */
 	/*
 	 * rdwrlock serializes xtree between reads & writes and synchronizes
@@ -98,12 +94,6 @@ struct jfs_inode_info {
 			unchar _inline_ea[128];	/* 128: inline extended attr */
 		} link;
 	} u;
-#ifdef CONFIG_JFS_DMAPI 
-	/* DMAPI necessities */
-	dm_attrs_t dmattrs;	/* DMAPI attributes (da_dmevmask persistent) */
-	int	dmnumrgns;	/* DMAPI number regions */ 
-	dm_region_t *dmrgns;	/* DMAPI regions (persistent) */
-#endif	
 	u32 dev;	/* will die when we get wide dev_t */
 	struct inode	vfs_inode;
 };
@@ -143,14 +133,14 @@ enum cflags {
  * JFS-private superblock information.
  */
 struct jfs_sb_info {
-	struct super_block *sb;         /* Point back to vfs super block */
+	struct super_block *sb;		/* Point back to vfs super block */
 	unsigned long	mntflag;	/* aggregate attributes	*/
 	struct inode	*ipbmap;	/* block map inode		*/
 	struct inode	*ipaimap;	/* aggregate inode map inode	*/
 	struct inode	*ipaimap2;	/* secondary aimap inode	*/
 	struct inode	*ipimap;	/* aggregate inode map inode	*/
 	struct jfs_log	*log;		/* log			*/
-	struct list_head log_list;      /* volumes associated with a journal */
+	struct list_head log_list;	/* volumes associated with a journal */
 	short		bsize;		/* logical block size	*/
 	short		l2bsize;	/* log2 logical block size	*/
 	short		nbperpage;	/* blocks per page		*/
@@ -178,13 +168,6 @@ struct jfs_sb_info {
 	uint		state;		/* mount/recovery state	*/
 	unsigned long	flag;		/* mount time flags */
 	uint		p_state;	/* state prior to going no integrity */
-
-#ifdef CONFIG_JFS_DMAPI	
-        u64		dm_fsid; 	/* 8: FS ID = hash of original uuid */
-	uint		dm_evmask;	/* 4: DMAPI event mask */
-	struct inode 	*dm_root;	/* 4: root inode */
-	char		dm_mtpt[JFS_NAME_MAX+1];	/* 256: mount point */
-#endif	
 };
 
 /* jfs_sb_info commit_state */

@@ -79,7 +79,7 @@
 #include  <linux/interrupt.h>
 
 #include  <asm/io.h>
-#include  "hosts.h"
+#include  <scsi/scsi_host.h>
 /* batteries not included :-) */
 
 /*
@@ -139,6 +139,6 @@ static char *IMM_MODE_STRING[] =
 #define w_ctr(x,y)      outb(y, (x)+2)
 #endif
 
-static int imm_engine(imm_struct *, Scsi_Cmnd *);
+static int imm_engine(imm_struct *, struct scsi_cmnd *);
 
 #endif				/* _IMM_H */

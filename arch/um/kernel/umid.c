@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -32,19 +33,18 @@ static char *uml_dir = UML_DIR;
 static int umid_is_random = 1;
 static int umid_inited = 0;
 
-static int make_umid(int (*printer)(const char *fmt, ...));
+static int make_umid(void);
 
-static int __init set_umid(char *name, int is_random, 
-			   int (*printer)(const char *fmt, ...))
+static int __init set_umid(char *name, int is_random)
 {
 	if(umid_inited){
-		(*printer)("Unique machine name can't be set twice\n");
+		printk("Unique machine name can't be set twice\n");
 		return(-1);
 	}
 
 	if(strlen(name) > UMID_LEN - 1)
-		(*printer)("Unique machine name is being truncated to %s "
-			   "characters\n", UMID_LEN);
+		printk("Unique machine name is being truncated to %s "
+		       "characters\n", UMID_LEN);
 	strlcpy(umid, name, sizeof(umid));
 
 	umid_is_random = is_random;
@@ -54,7 +54,7 @@ static int __init set_umid(char *name, int is_random,
 
 static int __init set_umid_arg(char *name, int *add)
 {
-	return(set_umid(name, 0, printf));
+	return(set_umid(name, 0));
 }
 
 __uml_setup("umid=", set_umid_arg,
@@ -67,7 +67,7 @@ int __init umid_file_name(char *name, char *buf, int len)
 {
 	int n;
 
-	if(!umid_inited && make_umid(printk)) return(-1);
+	if(!umid_inited && make_umid()) return(-1);
 
 	n = strlen(uml_dir) + strlen(umid) + strlen(name) + 1;
 	if(n > len){
@@ -85,23 +85,22 @@ static int __init create_pid_file(void)
 {
 	char file[strlen(uml_dir) + UMID_LEN + sizeof("/pid\0")];
 	char pid[sizeof("nnnnn\0")];
-	int fd, n;
+	int fd;
 
 	if(umid_file_name("pid", file, sizeof(file))) return 0;
 
 	fd = os_open_file(file, of_create(of_excl(of_rdwr(OPENFLAGS()))), 
 			  0644);
 	if(fd < 0){
-		printf("Open of machine pid file \"%s\" failed: %s\n",
-		       file, strerror(-fd));
+		printk("Open of machine pid file \"%s\" failed - "
+		       "errno = %d\n", file, -fd);
 		return 0;
 	}
 
 	sprintf(pid, "%d\n", os_getpid());
-	n = os_write_file(fd, pid, strlen(pid));
-	if(n != strlen(pid))
-		printf("Write of pid file failed - err = %d\n", -n);
-	os_close_file(fd);
+	if(write(fd, pid, strlen(pid)) != strlen(pid))
+		printk("Write of pid file failed - errno = %d\n", errno);
+	close(fd);
 	return 0;
 }
 
@@ -112,8 +111,7 @@ static int actually_do_remove(char *dir)
 	int len;
 	char file[256];
 
-	directory = opendir(dir);
-	if(directory == NULL){
+	if((directory = opendir(dir)) == NULL){
 		printk("actually_do_remove : couldn't open directory '%s', "
 		       "errno = %d\n", dir, errno);
 		return(1);
@@ -162,24 +160,22 @@ int not_dead_yet(char *dir)
 {
 	char file[strlen(uml_dir) + UMID_LEN + sizeof("/pid\0")];
 	char pid[sizeof("nnnnn\0")], *end;
-	int dead, fd, p, n;
+	int dead, fd, p;
 
 	sprintf(file, "%s/pid", dir);
 	dead = 0;
-	fd = os_open_file(file, of_read(OPENFLAGS()), 0);
-	if(fd < 0){
+	if((fd = os_open_file(file, of_read(OPENFLAGS()), 0)) < 0){
 		if(fd != -ENOENT){
 			printk("not_dead_yet : couldn't open pid file '%s', "
-			       "err = %d\n", file, -fd);
+			       "errno = %d\n", file, -fd);
 			return(1);
 		}
 		dead = 1;
 	}
 	if(fd > 0){
-		n = os_read_file(fd, pid, sizeof(pid));
-		if(n < 0){
+		if(read(fd, pid, sizeof(pid)) < 0){
 			printk("not_dead_yet : couldn't read pid file '%s', "
-			       "err = %d\n", file, -n);
+			       "errno = %d\n", file, errno);
 			return(1);
 		}
 		p = strtoul(pid, &end, 0);
@@ -201,7 +197,7 @@ static int __init set_uml_dir(char *name, int *add)
 	if((strlen(name) > 0) && (name[strlen(name) - 1] != '/')){
 		uml_dir = malloc(strlen(name) + 1);
 		if(uml_dir == NULL){
-			printf("Failed to malloc uml_dir - error = %d\n",
+			printk("Failed to malloc uml_dir - error = %d\n",
 			       errno);
 			uml_dir = name;
 			return(0);
@@ -221,7 +217,7 @@ static int __init make_uml_dir(void)
 		char *home = getenv("HOME");
 
 		if(home == NULL){
-			printf("make_uml_dir : no value in environment for "
+			printk("make_uml_dir : no value in environment for "
 			       "$HOME\n");
 			exit(1);
 		}
@@ -236,59 +232,57 @@ static int __init make_uml_dir(void)
 		dir[len + 1] = '\0';
 	}
 
-	uml_dir = malloc(strlen(dir) + 1);
-	if(uml_dir == NULL){
+	if((uml_dir = malloc(strlen(dir) + 1)) == NULL){
 		printf("make_uml_dir : malloc failed, errno = %d\n", errno);
 		exit(1);
 	}
 	strcpy(uml_dir, dir);
 	
 	if((mkdir(uml_dir, 0777) < 0) && (errno != EEXIST)){
-	        printf("Failed to mkdir %s: %s\n", uml_dir, strerror(errno));
+	        printk("Failed to mkdir %s - errno = %i\n", uml_dir, errno);
 		return(-1);
 	}
 	return 0;
 }
 
-static int __init make_umid(int (*printer)(const char *fmt, ...))
+static int __init make_umid(void)
 {
 	int fd, err;
 	char tmp[strlen(uml_dir) + UMID_LEN + 1];
 
 	strlcpy(tmp, uml_dir, sizeof(tmp));
 
-	if(!umid_inited){
+	if(*umid == 0){
 		strcat(tmp, "XXXXXX");
 		fd = mkstemp(tmp);
 		if(fd < 0){
-			(*printer)("make_umid - mkstemp(%s) failed: %s\n",
-				   tmp,strerror(errno));
+			printk("make_umid - mkstemp failed, errno = %d\n",
+			       errno);
 			return(1);
 		}
 
-		os_close_file(fd);
+		close(fd);
 		/* There's a nice tiny little race between this unlink and
 		 * the mkdir below.  It'd be nice if there were a mkstemp
 		 * for directories.
 		 */
 		unlink(tmp);
-		set_umid(&tmp[strlen(uml_dir)], 1, printer);
+		set_umid(&tmp[strlen(uml_dir)], 1);
 	}
 	
 	sprintf(tmp, "%s%s", uml_dir, umid);
 
-	err = mkdir(tmp, 0777);
-	if(err < 0){
+	if((err = mkdir(tmp, 0777)) < 0){
 		if(errno == EEXIST){
 			if(not_dead_yet(tmp)){
-				(*printer)("umid '%s' is in use\n", umid);
+				printk("umid '%s' is in use\n", umid);
 				return(-1);
 			}
 			err = mkdir(tmp, 0777);
 		}
 	}
 	if(err < 0){
-		(*printer)("Failed to create %s - errno = %d\n", umid, errno);
+		printk("Failed to create %s - errno = %d\n", umid, errno);
 		return(-1);
 	}
 
@@ -300,14 +294,9 @@ __uml_setup("uml_dir=", set_uml_dir,
 "    The location to place the pid and umid files.\n\n"
 );
 
-static int __init make_umid_setup(void)
-{
-	/* one function with the ordering we need ... */
-	make_uml_dir();
-	make_umid(printf);
-	return create_pid_file();
-}
-__uml_postsetup(make_umid_setup);
+__uml_postsetup(make_uml_dir);
+__uml_postsetup(make_umid);
+__uml_postsetup(create_pid_file);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

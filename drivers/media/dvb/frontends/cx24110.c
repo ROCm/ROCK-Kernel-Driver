@@ -59,8 +59,7 @@ static struct dvb_frontend_info cx24110_info = {
 	.caps = FE_CAN_INVERSION_AUTO |
 		FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-		FE_CAN_QPSK |
-		FE_CAN_CLEAN_SETUP
+		FE_CAN_QPSK | FE_CAN_RECOVER
 };
 /* fixme: are these values correct? especially ..._tolerance and caps */
 
@@ -620,11 +619,6 @@ static int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		break;
         case FE_INIT:
 		return cx24110_init (i2c);
-
-	case FE_RESET:
-/* no idea what to do for this call */
-/* fixme (medium): fill me in */
-		break;
 
 	case FE_SET_TONE:
 		return cx24110_writereg(i2c,0x76,(cx24110_readreg(i2c,0x76)&~0x10)|((((fe_sec_tone_mode_t) arg)==SEC_TONE_ON)?0x10:0));

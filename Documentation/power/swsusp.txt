@@ -12,6 +12,9 @@ From kernel/suspend.c:
  *				...you'd better find out how to get along
  *				   without your data.
  *
+ * If you change kernel command line between suspend and resume...
+ *			        ...prepare for nasty fsck or worse.
+ *
  * (*) pm interface support is needed to make it safe.
 
 You need to append resume=/dev/your_swap_partition to kernel command
@@ -123,10 +126,106 @@ server is not hotplug capable. What do you do? Suspend to disk,
 replace ethernet card, resume. If you are fast your users will not
 even see broken connections.
 
-Any other idea you might have tell me!
 
-Contacting the author
-If you have any question or any patch that solves the above or detected
-problems please contact me at seasons@falcon.sch.bme.hu. I might delay
-answering, sorry about that.
+Q: Maybe I'm missing something, but why don't the regular I/O paths work?
 
+A: We do use the regular I/O paths. However we cannot restore the data
+to its original location as we load it. That would create an
+inconsistent kernel state which would certainly result in an oops.
+Instead, we load the image into unused memory and then atomically copy
+it back to it original location. This implies, of course, a maximum
+image size of half the amount of memory.
+
+There are two solutions to this:
+
+* require half of memory to be free during suspend. That way you can
+read "new" data onto free spots, then cli and copy
+
+* assume we had special "polling" ide driver that only uses memory
+between 0-640KB. That way, I'd have to make sure that 0-640KB is free
+during suspending, but otherwise it would work...
+
+suspend2 shares this fundamental limitation, but does not include user
+data and disk caches into "used memory" by saving them in
+advance. That means that the limitation goes away in practice.
+
+Q: Does linux support ACPI S4?
+
+A: No.
+
+When swsusp was created, ACPI was not too widespread, so we tried to
+avoid using ACPI-specific stuff. ACPI also is/was notoriously
+buggy. These days swsusp works on APM-only i386 machines and even
+without any power managment at all. Some versions also work on PPC.
+
+That means that machine does not enter S4 on suspend-to-disk, but
+simply enters S5. That has few advantages, you can for example boot
+windows on next boot, and return to your Linux session later. You
+could even have few different Linuxes on your box (not sharing any
+partitions), and switch between them.
+
+It also has disadvantages. On HP nx5000, if you unplug power cord
+while machine is suspended-to-disk, Linux will fail to notice that.
+
+Q: My machine doesn't work with ACPI. How can I use swsusp than ?
+
+A: Do a reboot() syscall with right parameters. Warning: glibc gets in
+its way, so check with strace:
+
+reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, 0xd000fce2)
+
+(Thanks to Peter Osterlund:)
+
+#include <unistd.h>
+#include <syscall.h>
+
+#define LINUX_REBOOT_MAGIC1     0xfee1dead
+#define LINUX_REBOOT_MAGIC2     672274793
+#define LINUX_REBOOT_CMD_SW_SUSPEND     0xD000FCE2
+
+int main()
+{
+    syscall(SYS_reboot, LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2,
+            LINUX_REBOOT_CMD_SW_SUSPEND, 0);
+    return 0;
+}
+
+Q: What is 'suspend2'?
+
+A: suspend2 is 'Software Suspend 2', a forked implementation of
+suspend-to-disk which is available as separate patches for 2.4 and 2.6
+kernels from swsusp.sourceforge.net. It includes support for SMP, 4GB
+highmem and preemption. It also has a extensible architecture that
+allows for arbitrary transformations on the image (compression,
+encryption) and arbitrary backends for writing the image (eg to swap
+or an NFS share[Work In Progress]). Questions regarding suspend2
+should be sent to the mailing list available through the suspend2
+website, and not to the Linux Kernel Mailing List. We are working
+toward merging suspend2 into the mainline kernel.
+
+Q: Kernel thread must voluntarily freeze itself (call 'refrigerator'). But
+I found some kernel threads don't do it, and they don't freeze, and
+so the system can't sleep. Is this a known behavior?
+
+A: All such kernel threads need to be fixed, one by one. Select place
+where it is safe to be frozen (no kernel semaphores should be held at
+that point and it must be safe to sleep there), and add:
+
+            if (current->flags & PF_FREEZE)
+                    refrigerator(PF_FREEZE);
+
+Q: What is the difference between between "platform", "shutdown" and
+"firmware" in /sys/power/disk?
+
+A:
+
+shutdown: save state in linux, then tell bios to powerdown
+
+platform: save state in linux, then tell bios to powerdown and blink
+          "suspended led"
+
+firmware: tell bios to save state itself [needs BIOS-specific suspend
+	  partition, and has very little to do with swsusp]
+
+"platform" is actually right thing to do, but "shutdown" is most
+reliable.

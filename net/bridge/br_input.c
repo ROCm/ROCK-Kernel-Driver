@@ -16,11 +16,10 @@
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <linux/if_bridge.h>
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
 
-unsigned char bridge_ula[6] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
+const unsigned char bridge_ula[6] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
 
 static int br_pass_frame_up_finish(struct sk_buff *skb)
 {
@@ -84,19 +83,17 @@ int br_handle_frame_finish(struct sk_buff *skb)
 		goto out;
 	}
 
-	dst = br_fdb_get(br, dest);
+	dst = __br_fdb_get(br, dest);
 	if (dst != NULL && dst->is_local) {
 		if (!passedup)
 			br_pass_frame_up(br, skb);
 		else
 			kfree_skb(skb);
-		br_fdb_put(dst);
 		goto out;
 	}
 
 	if (dst != NULL) {
 		br_forward(dst->dst, skb);
-		br_fdb_put(dst);
 		goto out;
 	}
 

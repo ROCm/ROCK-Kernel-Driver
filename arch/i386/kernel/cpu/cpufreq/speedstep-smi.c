@@ -36,6 +36,8 @@ static int		smi_port	= 0;
 static int		smi_cmd		= 0;
 static unsigned int	smi_sig		= 0;
 
+/* info about the processor */
+static unsigned int	speedstep_processor = 0;
 
 /* 
  *   There are only two frequency states for each processor. Values
@@ -90,10 +92,12 @@ static int speedstep_smi_ownership (void)
 
 /**
  * speedstep_smi_get_freqs - get SpeedStep preferred & current freq.
+ * @low: the low frequency value is placed here
+ * @high: the high frequency value is placed here
+ *
  * Only available on later SpeedStep-enabled systems, returns false results or
  * even hangs [cf. bugme.osdl.org # 1422] on earlier systems. Empirical testing
  * shows that the latter occurs if !(ist_info.event & 0xFFFF).
- *
  */
 static int speedstep_smi_get_freqs (unsigned int *low, unsigned int *high)
 {
@@ -135,7 +139,7 @@ static int speedstep_get_state (void)
 		: "a" (command), "b" (function), "c" (0), "d" (smi_port), "S" (0)
 	);
 
-	return state;
+	return (state & 1);
 }
 
 /**
@@ -143,27 +147,15 @@ static int speedstep_get_state (void)
  * @state: new processor frequency state (SPEEDSTEP_LOW or SPEEDSTEP_HIGH)
  *
  */
-static void speedstep_set_state (unsigned int state, unsigned int notify)
+static void speedstep_set_state (unsigned int state)
 {
-	unsigned int old_state, result = 0, command, new_state;
+	unsigned int result = 0, command, new_state;
 	unsigned long flags;
-	struct cpufreq_freqs freqs;
 	unsigned int function=SET_SPEEDSTEP_STATE;
 	unsigned int retry = 0;
 
 	if (state > 0x1)
 		return;
-
-	old_state = speedstep_get_state();
-	freqs.old = speedstep_freqs[old_state].frequency;
-	freqs.new = speedstep_freqs[state].frequency;
-	freqs.cpu = 0; /* speedstep.c is UP only driver */
-
-	if (old_state == state)
-		return;
-
-	if (notify)
-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	/* Disable IRQs */
 	local_irq_save(flags);
@@ -193,9 +185,6 @@ static void speedstep_set_state (unsigned int state, unsigned int notify)
 		printk(KERN_ERR "cpufreq: change failed with new_state %u and result %u\n", new_state, result);
 	}
 
-	if (notify)
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-
 	return;
 }
 
@@ -212,11 +201,21 @@ static int speedstep_target (struct cpufreq_policy *policy,
 			unsigned int target_freq, unsigned int relation)
 {
 	unsigned int newstate = 0;
+	struct cpufreq_freqs freqs;
 
 	if (cpufreq_frequency_table_target(policy, &speedstep_freqs[0], target_freq, relation, &newstate))
 		return -EINVAL;
 
-	speedstep_set_state(newstate, 1);
+	freqs.old = speedstep_freqs[speedstep_get_state()].frequency;
+	freqs.new = speedstep_freqs[newstate].frequency;
+	freqs.cpu = 0; /* speedstep.c is UP only driver */
+
+	if (freqs.old == freqs.new)
+		return 0;
+
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	speedstep_set_state(newstate);
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
 	return 0;
 }
@@ -224,7 +223,7 @@ static int speedstep_target (struct cpufreq_policy *policy,
 
 /**
  * speedstep_verify - verifies a new CPUFreq policy
- * @freq: new policy
+ * @policy: new policy
  *
  * Limit must be within speedstep_low_freq and speedstep_high_freq, with
  * at least one border included.
@@ -255,9 +254,10 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 				&speedstep_freqs[SPEEDSTEP_HIGH].frequency);
 	if (result) {
 		/* fall back to speedstep_lib.c dection mechanism: try both states out */
-		unsigned int speedstep_processor = speedstep_detect_processor();
-
 		dprintk(KERN_INFO PFX "could not detect low and high frequencies by SMI call.\n");
+		if (!speedstep_processor)
+			speedstep_processor = speedstep_detect_processor();
+
 		if (!speedstep_processor)
 			return -ENODEV;
 
@@ -295,11 +295,21 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	return 0;
 }
 
-
 static int speedstep_cpu_exit(struct cpufreq_policy *policy)
 {
 	cpufreq_frequency_table_put_attr(policy->cpu);
 	return 0;
+}
+
+static unsigned int speedstep_get(unsigned int cpu)
+{
+	if (cpu)
+		return -ENODEV;
+	if (!speedstep_processor)
+		speedstep_processor = speedstep_detect_processor();
+	if (!speedstep_processor)
+		return 0;
+	return speedstep_get_processor_frequency(speedstep_processor);
 }
 
 
@@ -324,6 +334,7 @@ static struct cpufreq_driver speedstep_driver = {
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
 	.exit		= speedstep_cpu_exit,
+	.get		= speedstep_get,
 	.resume		= speedstep_resume,
 	.owner		= THIS_MODULE,
 	.attr		= speedstep_attr,

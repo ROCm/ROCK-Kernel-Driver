@@ -457,6 +457,10 @@
 #define mSEC_25                         (mSEC_1 * 25)
 #define SEC_1                           (mSEC_1 * 1000)
 
+#ifndef __ASSEMBLY__
+extern void integrator_time_init(unsigned long, unsigned int);
+#endif
+
 #define INTEGRATOR_CSR_BASE             0x10000000
 #define INTEGRATOR_CSR_SIZE             0x10000000
 

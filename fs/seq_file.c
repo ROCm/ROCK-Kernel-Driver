@@ -37,7 +37,6 @@ int seq_open(struct file *file, struct seq_operations *op)
 	file->private_data = p;
 	return 0;
 }
-
 EXPORT_SYMBOL(seq_open);
 
 /**
@@ -146,7 +145,6 @@ Efault:
 	err = -EFAULT;
 	goto Done;
 }
-
 EXPORT_SYMBOL(seq_read);
 
 static int traverse(struct seq_file *m, loff_t offset)
@@ -232,7 +230,6 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 	up(&m->sem);
 	return retval;
 }
-
 EXPORT_SYMBOL(seq_lseek);
 
 /**
@@ -250,7 +247,6 @@ int seq_release(struct inode *inode, struct file *file)
 	kfree(m);
 	return 0;
 }
-
 EXPORT_SYMBOL(seq_release);
 
 /**
@@ -287,7 +283,6 @@ int seq_escape(struct seq_file *m, const char *s, const char *esc)
 	m->count = p - m->buf;
         return 0;
 }
-
 EXPORT_SYMBOL(seq_escape);
 
 int seq_printf(struct seq_file *m, const char *f, ...)
@@ -307,7 +302,6 @@ int seq_printf(struct seq_file *m, const char *f, ...)
 	m->count = m->size;
 	return -1;
 }
-
 EXPORT_SYMBOL(seq_printf);
 
 int seq_path(struct seq_file *m,
@@ -340,7 +334,6 @@ int seq_path(struct seq_file *m,
 	m->count = m->size;
 	return -1;
 }
-
 EXPORT_SYMBOL(seq_path);
 
 static void *single_start(struct seq_file *p, loff_t *pos)
@@ -377,7 +370,6 @@ int single_open(struct file *file, int (*show)(struct seq_file *, void *),
 	}
 	return res;
 }
-
 EXPORT_SYMBOL(single_open);
 
 int single_release(struct inode *inode, struct file *file)
@@ -387,7 +379,6 @@ int single_release(struct inode *inode, struct file *file)
 	kfree(op);
 	return res;
 }
-
 EXPORT_SYMBOL(single_release);
 
 int seq_release_private(struct inode *inode, struct file *file)
@@ -398,5 +389,27 @@ int seq_release_private(struct inode *inode, struct file *file)
 	seq->private = NULL;
 	return seq_release(inode, file);
 }
-
 EXPORT_SYMBOL(seq_release_private);
+
+int seq_putc(struct seq_file *m, char c)
+{
+	if (m->count < m->size) {
+		m->buf[m->count++] = c;
+		return 0;
+	}
+	return -1;
+}
+EXPORT_SYMBOL(seq_putc);
+
+int seq_puts(struct seq_file *m, const char *s)
+{
+	int len = strlen(s);
+	if (m->count + len < m->size) {
+		memcpy(m->buf + m->count, s, len);
+		m->count += len;
+		return 0;
+	}
+	m->count = m->size;
+	return -1;
+}
+EXPORT_SYMBOL(seq_puts);

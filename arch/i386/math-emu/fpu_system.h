@@ -80,7 +80,7 @@
 /* A simpler test than verify_area() can probably be done for
    FPU_code_verify_area() because the only possible error is to step
    past the upper boundary of a legal code area. */
-#define	FPU_code_verify_area(z) FPU_verify_area(VERIFY_READ,(void *)FPU_EIP,z)
+#define	FPU_code_verify_area(z) FPU_verify_area(VERIFY_READ,(void __user *)FPU_EIP,z)
 #endif
 
 #define FPU_get_user(x,y)       get_user((x),(y))

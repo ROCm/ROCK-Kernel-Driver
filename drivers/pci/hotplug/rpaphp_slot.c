@@ -27,20 +27,21 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/pci.h>
+#include <asm/rtas.h>
 #include "rpaphp.h"
 
 static ssize_t removable_read_file (struct hotplug_slot *php_slot, char *buf)
 {
-        u8 value;
-        int retval = -ENOENT;
+	u8 value;
+	int retval = -ENOENT;
 	struct slot *slot = (struct slot *)php_slot->private;
 
 	if (!slot)
 		return retval;
 
-        value = slot->removable;
-        retval = sprintf (buf, "%d\n", value);
-        return retval;
+	value = slot->removable;
+	retval = sprintf (buf, "%d\n", value);
+	return retval;
 }
 
 static struct hotplug_slot_attribute hotplug_slot_attr_removable = {
@@ -53,7 +54,7 @@ static void rpaphp_sysfs_add_attr_removable (struct hotplug_slot *slot)
 	sysfs_create_file(&slot->kobj, &hotplug_slot_attr_removable.attr);
 }
 
-void rpaphp_sysfs_remove_attr_removable (struct hotplug_slot *slot)
+static void rpaphp_sysfs_remove_attr_removable (struct hotplug_slot *slot)
 {
 	sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_removable.attr);
 }
@@ -82,7 +83,7 @@ static void rpaphp_sysfs_add_attr_location (struct hotplug_slot *slot)
 	sysfs_create_file(&slot->kobj, &hotplug_slot_attr_location.attr);
 }
 
-void rpaphp_sysfs_remove_attr_location (struct hotplug_slot *slot)
+static void rpaphp_sysfs_remove_attr_location (struct hotplug_slot *slot)
 {
 	sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_location.attr);
 }
@@ -98,15 +99,16 @@ static void rpaphp_release_slot(struct hotplug_slot *hotplug_slot)
 void dealloc_slot_struct(struct slot *slot)
 {
 	struct list_head *ln, *n;
-	
+
 	if (slot->dev_type == PCI_DEV) {
 		list_for_each_safe (ln, n, &slot->dev.pci_funcs) {
 			struct rpaphp_pci_func *func;
-		
+
 			func = list_entry(ln, struct rpaphp_pci_func, sibling);
 			kfree(func);
 		}
 	}
+
 	kfree(slot->hotplug_slot->info);
 	kfree(slot->hotplug_slot->name);
 	kfree(slot->hotplug_slot);
@@ -163,15 +165,39 @@ error_nomem:
 
 static int is_registered(struct slot *slot)
 {
-	struct list_head        *tmp, *n;
 	struct slot             *tmp_slot;
 
-	list_for_each_safe(tmp, n, &rpaphp_slot_head) {
-		tmp_slot = list_entry(tmp, struct slot, rpaphp_slot_list);
+	list_for_each_entry(tmp_slot, &rpaphp_slot_head, rpaphp_slot_list) {
 		if (!strcmp(tmp_slot->name, slot->name))
 			return 1;
 	}	
 	return 0;
+}
+
+int deregister_slot(struct slot *slot)
+{
+	int retval = 0;
+	struct hotplug_slot *php_slot = slot->hotplug_slot;
+
+	 dbg("%s - Entry: deregistering slot=%s\n",
+		__FUNCTION__, slot->name);
+
+	list_del(&slot->rpaphp_slot_list);
+	
+	/* remove "phy_location" file */
+	rpaphp_sysfs_remove_attr_location(php_slot);
+
+	/* remove "phy_removable" file */
+	rpaphp_sysfs_remove_attr_removable(php_slot);
+
+	retval = pci_hp_deregister(php_slot);
+	if (retval)
+		err("Problem unregistering a slot %s\n", slot->name);
+	else
+		num_slots--;
+
+	dbg("%s - Exit: rc[%d]\n", __FUNCTION__, retval);
+	return retval;
 }
 
 int register_slot(struct slot *slot)
@@ -185,7 +211,7 @@ int register_slot(struct slot *slot)
 	if (is_registered(slot)) { /* should't be here */
 		err("register_slot: slot[%s] is already registered\n", slot->name);
 		rpaphp_release_slot(slot->hotplug_slot);
-		return (1);
+		return 1;
 	}	
 	retval = pci_hp_register(slot->hotplug_slot);
 	if (retval) {
@@ -221,7 +247,7 @@ int rpaphp_get_power_status(struct slot *slot, u8 * value)
 	int rc = 0;
 	
 	if (slot->type == EMBEDDED) {
-		printk("%s set to POWER_ON for EMBEDDED slot %s\n",
+		dbg("%s set to POWER_ON for EMBEDDED slot %s\n",
 			__FUNCTION__, slot->location);
 		*value = POWER_ON;
 	}

@@ -490,7 +490,8 @@ sclp_vt220_write(struct tty_struct *tty, int from_user,
 	while (count > 0) {
 		length = count < SCLP_VT220_BUF_SIZE ?
 			 count : SCLP_VT220_BUF_SIZE;
-		length -= copy_from_user(tty->driver_data, buf, length);
+		length -= copy_from_user(tty->driver_data,
+				(const unsigned char __user *)buf, length);
 		if (length == 0) {
 			if (!ret)
 				return -EFAULT;

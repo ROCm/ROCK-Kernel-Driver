@@ -1,6 +1,6 @@
 /*
  * eth1394.c -- Ethernet driver for Linux IEEE-1394 Subsystem
- * 
+ *
  * Copyright (C) 2001-2003 Ben Collins <bcollins@debian.org>
  *               2000 Bonin Franck <boninf@free.fr>
  *               2003 Steve Kinneberg <kinnebergsteve@acmsystems.com>
@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1198 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1224 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -191,7 +191,7 @@ static int ether1394_tx(struct sk_buff *skb, struct net_device *dev);
 static void ether1394_iso(struct hpsb_iso *iso);
 
 static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
-static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr);
+static int ether1394_ethtool_ioctl(struct net_device *dev, void __user *useraddr);
 
 static int ether1394_write(struct hpsb_host *host, int srcid, int destid,
 			   quadlet_t *data, u64 addr, size_t len, u16 flags);
@@ -290,6 +290,20 @@ static int ether1394_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
+static inline void purge_partial_datagram(struct list_head *old)
+{
+	struct partial_datagram *pd = list_entry(old, struct partial_datagram, list);
+	struct list_head *lh, *n;
+
+	list_for_each_safe(lh, n, &pd->frag_info) {
+		struct fragment_info *fi = list_entry(lh, struct fragment_info, list);
+		list_del(lh);
+		kfree(fi);
+	}
+	list_del(old);
+	kfree_skb(pd->skb);
+	kfree(pd);
+}
 
 /******************************************
  * 1394 bus activity functions
@@ -431,9 +445,12 @@ static int eth1394_update(struct unit_directory *ud)
 		if (!node)
 			return -ENOMEM;
 
-
 		node_info = kmalloc(sizeof(struct eth1394_node_info),
 				    in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+		if (!node_info) {
+			kfree(node);
+			return -ENOMEM;
+                }
 
 		spin_lock_init(&node_info->pdg.lock);
 		INIT_LIST_HEAD(&node_info->pdg.list);
@@ -652,7 +669,7 @@ out:
 static void ether1394_remove_host (struct hpsb_host *host)
 {
 	struct eth1394_host_info *hi;
-	
+
 	hi = hpsb_get_hostinfo(&eth1394_highlevel, host);
 	if (hi != NULL) {
 		struct eth1394_priv *priv = (struct eth1394_priv *)hi->dev->priv;
@@ -660,7 +677,7 @@ static void ether1394_remove_host (struct hpsb_host *host)
 		hpsb_unregister_addrspace(&eth1394_highlevel, host,
 					  priv->local_fifo);
 
-		if (priv->iso != NULL) 
+		if (priv->iso != NULL)
 			hpsb_iso_shutdown(priv->iso);
 
 		if (hi->dev) {
@@ -740,7 +757,7 @@ static int ether1394_header(struct sk_buff *skb, struct net_device *dev,
 		memcpy(eth->h_dest,daddr,dev->addr_len);
 		return dev->hard_header_len;
 	}
-	
+
 	return -dev->hard_header_len;
 
 }
@@ -763,10 +780,10 @@ static int ether1394_rebuild_header(struct sk_buff *skb)
 #ifdef CONFIG_INET
 	case __constant_htons(ETH_P_IP):
  		return arp_find((unsigned char*)&eth->h_dest, skb);
-#endif	
+#endif
 	default:
 		ETH1394_PRINT(KERN_DEBUG, dev->name,
-			      "unable to resolve type %04x addresses.\n", 
+			      "unable to resolve type %04x addresses.\n",
 			      eth->h_proto);
 		break;
 	}
@@ -795,7 +812,7 @@ static int ether1394_header_cache(struct neighbour *neigh, struct hh_cache *hh)
 
 	eth->h_proto = type;
 	memcpy(eth->h_dest, neigh->ha, dev->addr_len);
-	
+
 	hh->hh_len = ETH1394_HLEN;
 	return 0;
 }
@@ -1008,7 +1025,7 @@ static inline int new_fragment(struct list_head *frag_info, int offset, int len)
 	}
 
 	new = kmalloc(sizeof(struct fragment_info), GFP_ATOMIC);
-	if (!new) 
+	if (!new)
 		return -ENOMEM;
 
 	new->offset = offset;
@@ -1076,21 +1093,6 @@ static inline int update_partial_datagram(struct list_head *pdgl, struct list_he
 	list_add(lh, pdgl);
 
 	return 0;
-}
-
-static inline void purge_partial_datagram(struct list_head *old)
-{
-	struct partial_datagram *pd = list_entry(old, struct partial_datagram, list);
-	struct list_head *lh, *n;
-
-	list_for_each_safe(lh, n, &pd->frag_info) {
-		struct fragment_info *fi = list_entry(lh, struct fragment_info, list);
-		list_del(lh);
-		kfree(fi);
-	}
-	list_del(old);
-	kfree_skb(pd->skb);
-	kfree(pd);
 }
 
 static inline int is_datagram_complete(struct list_head *lh, int dg_size)
@@ -1190,7 +1192,7 @@ static int ether1394_data_handler(struct net_device *dev, int srcid, int destid,
 				purge_partial_datagram(pdgl->prev);
 				pdg->sz--;
 			}
-            
+
 			retval = new_partial_datagram(dev, pdgl, dgl, dg_size,
 						      buf + hdr_len, fg_off,
 						      fg_len);
@@ -1372,7 +1374,7 @@ static void ether1394_iso(struct hpsb_iso *iso)
  * arphdr) is the same format as the ip1394 header, so they overlap.  The rest
  * needs to be munged a bit.  The remainder of the arphdr is formatted based
  * on hwaddr len and ipaddr len.  We know what they'll be, so it's easy to
- * judge.  
+ * judge.
  *
  * Now that the EUI is used for the hardware address all we need to do to make
  * this work for 1394 is to insert 2 quadlets that contain max_rec size,
@@ -1450,7 +1452,7 @@ static inline unsigned int ether1394_encapsulate(struct sk_buff *skb,
 		hdr->common.lf = ETH1394_HDR_LF_IF;
 		hdr->sf.fg_off = 0;
 		break;
-		
+
 	default:
 		hdr->sf.fg_off += adj_max_payload;
 		bufhdr = (union eth1394_hdr *)skb_pull(skb, adj_max_payload);
@@ -1497,7 +1499,7 @@ static inline int ether1394_prep_write_packet(struct hpsb_packet *p,
 		ETH1394_PRINT_G(KERN_ERR, "No more tlabels left while sending "
 				"to node " NODE_BUS_FMT "\n", NODE_BUS_ARGS(host, node));
 		return -1;
-	}		
+	}
 	p->header[0] = (p->node_id << 16) | (p->tlabel << 10)
 		| (1 << 8) | (TCODE_WRITEB << 4);
 
@@ -1582,7 +1584,7 @@ static inline void ether1394_dg_complete(struct packet_task *ptask, int fail)
 	struct net_device *dev = skb->dev;
 	struct eth1394_priv *priv = dev->priv;
         unsigned long flags;
-		
+
 	/* Statistics */
 	spin_lock_irqsave(&priv->lock, flags);
 	if (fail) {
@@ -1770,7 +1772,7 @@ static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd
 {
 	switch(cmd) {
 		case SIOCETHTOOL:
-			return ether1394_ethtool_ioctl(dev, (void *) ifr->ifr_data);
+			return ether1394_ethtool_ioctl(dev, ifr->ifr_data);
 
 		case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		case SIOCGMIIREG:		/* Read MII PHY register. */
@@ -1782,18 +1784,18 @@ static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd
 	return 0;
 }
 
-static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int ether1394_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 
-	if (get_user(ethcmd, (u32 *)useraddr))
+	if (get_user(ethcmd, (u32 __user *)useraddr))
 		return -EFAULT;
 
 	switch (ethcmd) {
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1198 $");
+			strcpy (info.version, "$Rev: 1224 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

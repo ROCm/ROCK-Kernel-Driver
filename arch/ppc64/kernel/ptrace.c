@@ -55,8 +55,6 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	struct task_struct *child;
 	int ret = -EPERM;
 
-	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
-
 	lock_kernel();
 	if (request == PTRACE_TRACEME) {
 		/* are we already being traced? */
@@ -103,7 +101,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if (copied != sizeof(tmp))
 			break;
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp,(unsigned long __user *) data);
 		break;
 	}
 
@@ -121,11 +119,10 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			tmp = get_reg(child, (int)index);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 			tmp = ((unsigned long *)child->thread.fpr)[index - PT_FPR0];
 		}
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp,(unsigned long __user *) data);
 		break;
 	}
 
@@ -154,8 +151,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			ret = put_reg(child, index, data);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 			((unsigned long *)child->thread.fpr)[index - PT_FPR0] = data;
 			ret = 0;
 		}
@@ -215,7 +211,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	case PPC_PTRACE_GETREGS: { /* Get GPRs 0 - 31. */
 		int i;
 		unsigned long *reg = &((unsigned long *)child->thread.regs)[0];
-		unsigned long *tmp = (unsigned long *)addr;
+		unsigned long __user *tmp = (unsigned long __user *)addr;
 
 		for (i = 0; i < 32; i++) {
 			ret = put_user(*reg, tmp);
@@ -230,7 +226,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	case PPC_PTRACE_SETREGS: { /* Set GPRs 0 - 31. */
 		int i;
 		unsigned long *reg = &((unsigned long *)child->thread.regs)[0];
-		unsigned long *tmp = (unsigned long *)addr;
+		unsigned long __user *tmp = (unsigned long __user *)addr;
 
 		for (i = 0; i < 32; i++) {
 			ret = get_user(*reg, tmp);
@@ -245,10 +241,9 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	case PPC_PTRACE_GETFPREGS: { /* Get FPRs 0 - 31. */
 		int i;
 		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
-		unsigned long *tmp = (unsigned long *)addr;
+		unsigned long __user *tmp = (unsigned long __user *)addr;
 
-		if (child->thread.regs->msr & MSR_FP)
-			giveup_fpu(child);
+		flush_fp_to_thread(child);
 
 		for (i = 0; i < 32; i++) {
 			ret = put_user(*reg, tmp);
@@ -263,10 +258,9 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	case PPC_PTRACE_SETFPREGS: { /* Get FPRs 0 - 31. */
 		int i;
 		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
-		unsigned long *tmp = (unsigned long *)addr;
+		unsigned long __user *tmp = (unsigned long __user *)addr;
 
-		if (child->thread.regs->msr & MSR_FP)
-			giveup_fpu(child);
+		flush_fp_to_thread(child);
 
 		for (i = 0; i < 32; i++) {
 			ret = get_user(*reg, tmp);
@@ -286,15 +280,11 @@ out_tsk:
 	put_task_struct(child);
 out:
 	unlock_kernel();
-	return audit_result(ret);
+	return ret;
 }
 
-void do_syscall_trace(void)
+static void do_syscall_trace(void)
 {
-	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-		return;
-	if (!(current->ptrace & PT_PTRACED))
-		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
 	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
@@ -309,4 +299,26 @@ void do_syscall_trace(void)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
+}
+
+void do_syscall_trace_enter(struct pt_regs *regs)
+{
+	if (unlikely(current->audit_context))
+		audit_syscall_entry(current, regs->gpr[0],
+				    regs->gpr[3], regs->gpr[4],
+				    regs->gpr[5], regs->gpr[6]);
+
+	if (test_thread_flag(TIF_SYSCALL_TRACE)
+	    && (current->ptrace & PT_PTRACED))
+		do_syscall_trace();
+}
+
+void do_syscall_trace_leave(void)
+{
+	if (unlikely(current->audit_context))
+		audit_syscall_exit(current, 0);	/* FIXME: pass pt_regs */
+
+	if (test_thread_flag(TIF_SYSCALL_TRACE)
+	    && (current->ptrace & PT_PTRACED))
+		do_syscall_trace();
 }

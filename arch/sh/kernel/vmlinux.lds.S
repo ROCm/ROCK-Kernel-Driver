@@ -22,6 +22,7 @@ SECTIONS
 	} = 0
   .text : {
 	*(.text)
+	SCHED_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x0009
@@ -37,6 +38,14 @@ SECTIONS
 
   .data : {			/* Data */
 	*(.data)
+
+ 	 /* Align the initial ramdisk image (INITRD) on page boundaries. */
+ 	 . = ALIGN(4096);
+ 	 __rd_start = .;
+ 	 *(.initrd)
+ 	 . = ALIGN(4096);
+ 	 __rd_end = .;
+
 	CONSTRUCTORS
 	}
 

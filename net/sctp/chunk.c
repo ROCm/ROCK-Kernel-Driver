@@ -186,7 +186,7 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	if (sinfo->sinfo_timetolive) {
 		/* sinfo_timetolive is in milliseconds */
 		msg->expires_at = jiffies +
-				    MSECS_TO_JIFFIES(sinfo->sinfo_timetolive);
+				    msecs_to_jiffies(sinfo->sinfo_timetolive);
 		msg->can_abandon = 1;
 		SCTP_DEBUG_PRINTK("%s: msg:%p expires_at: %ld jiffies:%ld\n",
 				  __FUNCTION__, msg, msg->expires_at, jiffies);
@@ -215,7 +215,7 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	offset = 0;
 
 	if ((whole > 1) || (whole && over))
-		SCTP_INC_STATS_USER(SctpFragUsrMsgs);
+		SCTP_INC_STATS_USER(SCTP_MIB_FRAGUSRMSGS);
 
 	/* Create chunks for all the full sized DATA chunks. */
 	for (i=0, len=first_len; i < whole; i++) {

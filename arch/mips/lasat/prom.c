@@ -46,6 +46,8 @@ void (* prom_display)(const char *string, int pos, int clear) =
 		null_prom_display;
 void (* prom_monitor)(void) = null_prom_monitor;
 
+unsigned int lasat_ndelay_divider;
+
 #define PROM_PRINTFBUF_SIZE 256
 static char prom_printfbuf[PROM_PRINTFBUF_SIZE];
 
@@ -98,10 +100,15 @@ void __init prom_init(void)
 
 	setup_prom_vectors();
 
-	if (current_cpu_data.cputype == CPU_R5000)
+	if (current_cpu_data.cputype == CPU_R5000) {
+	        prom_printf("LASAT 200 board\n");
 		mips_machtype = MACH_LASAT_200;
-	else
+                lasat_ndelay_divider = LASAT_200_DIVIDER;
+        } else {
+	        prom_printf("LASAT 100 board\n");
 		mips_machtype = MACH_LASAT_100;
+                lasat_ndelay_divider = LASAT_100_DIVIDER;
+        }
 
 	at93c = &at93c_defs[mips_machtype];
 

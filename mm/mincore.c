@@ -14,7 +14,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 
 /*
  * Later we can get more picky about what "in core" means precisely.
@@ -124,7 +123,7 @@ asmlinkage long sys_mincore(unsigned long start, size_t len,
 		goto out;
 
 	error = -EFAULT;
-	if (!access_ok(VERIFY_WRITE, (unsigned long) vec, len >> PAGE_SHIFT))
+	if (!access_ok(VERIFY_WRITE, vec, len >> PAGE_SHIFT))
 		goto out;
 
 	error = 0;

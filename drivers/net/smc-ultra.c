@@ -72,6 +72,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME "smc-ultra"
+
 /* A zero-terminated list of I/O addresses to be probed. */
 static unsigned int ultra_portlist[] __initdata =
 {0x200, 0x220, 0x240, 0x280, 0x300, 0x340, 0x380, 0};
@@ -178,6 +180,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr - ULTRA_NIC_OFFSET, ULTRA_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init ultra_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -202,6 +205,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init ultra_probe1(struct net_device *dev, int ioaddr)
 {
@@ -215,7 +219,7 @@ static int __init ultra_probe1(struct net_device *dev, int ioaddr)
 	unsigned char idreg = inb(ioaddr + 7);
 	unsigned char reg4 = inb(ioaddr + 4) & 0x7f;
 
-	if (!request_region(ioaddr, ULTRA_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, ULTRA_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	/* Check the ID nibble. */

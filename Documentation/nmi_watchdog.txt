@@ -58,6 +58,9 @@ NOTE: starting with 2.4.2-ac18 the NMI-oopser is disabled by default,
 you have to enable it with a boot time parameter.  Prior to 2.4.2-ac18
 the NMI-oopser is enabled unconditionally on x86 SMP boxes.
 
+On x86-64 the NMI oopser is on by default. On 64bit Intel CPUs
+it uses IO-APIC by default and on AMD it uses local APIC.
+
 [ feel free to send bug reports, suggestions and patches to
   Ingo Molnar <mingo@redhat.com> or the Linux SMP mailing
   list at <linux-smp@vger.kernel.org> ]

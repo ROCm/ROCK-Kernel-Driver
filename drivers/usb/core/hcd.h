@@ -74,6 +74,8 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	 */
 	struct hc_driver	*driver;	/* hw-specific hooks */
 	unsigned		saw_irq : 1;
+	unsigned		can_wakeup:1;	/* hw supports wakeup? */
+	unsigned		remote_wakeup:1;/* sw should use wakeup? */
 	int			irq;		/* irq allocated */
 	void			*regs;		/* device memory/io */
 
@@ -94,7 +96,7 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 #	define	USB_STATE_RUNNING	(__ACTIVE)
 #	define	USB_STATE_QUIESCING	(__SUSPEND|__TRANSIENT|__ACTIVE)
 #	define	USB_STATE_RESUMING	(__SUSPEND|__TRANSIENT)
-#	define	USB_STATE_SUSPENDED	(__SUSPEND)
+#	define	HCD_STATE_SUSPENDED	(__SUSPEND)
 
 #define	HCD_IS_RUNNING(state) ((state) & __ACTIVE)
 #define	HCD_IS_SUSPENDED(state) ((state) & __SUSPEND)
@@ -140,7 +142,7 @@ struct usb_operations {
 	int (*deallocate)(struct usb_device *);
 	int (*get_frame_number) (struct usb_device *usb_dev);
 	int (*submit_urb) (struct urb *urb, int mem_flags);
-	int (*unlink_urb) (struct urb *urb);
+	int (*unlink_urb) (struct urb *urb, int status);
 
 	/* allocate dma-consistent buffer for URB_DMA_NOMAPPING */
 	void *(*buffer_alloc)(struct usb_bus *bus, size_t size,
@@ -150,6 +152,10 @@ struct usb_operations {
 			void *addr, dma_addr_t dma);
 
 	void (*disable)(struct usb_device *udev, int bEndpointAddress);
+
+	/* global suspend/resume of bus */
+	int (*hub_suspend)(struct usb_bus *);
+	int (*hub_resume)(struct usb_bus *);
 };
 
 /* each driver provides one of these, and hardware init support */
@@ -171,6 +177,9 @@ struct hc_driver {
 	int	(*reset) (struct usb_hcd *hcd);
 	int	(*start) (struct usb_hcd *hcd);
 
+	/* NOTE:  these suspend/resume calls relate to the HC as
+	 * a whole, not just the root hub; they're for bus glue.
+	 */
 	/* called after all devices were suspended */
 	int	(*suspend) (struct usb_hcd *hcd, u32 state);
 
@@ -201,11 +210,13 @@ struct hc_driver {
 	int		(*hub_control) (struct usb_hcd *hcd,
 				u16 typeReq, u16 wValue, u16 wIndex,
 				char *buf, u16 wLength);
+	int		(*hub_suspend)(struct usb_hcd *);
+	int		(*hub_resume)(struct usb_hcd *);
 };
 
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs);
 extern void usb_bus_init (struct usb_bus *bus);
-extern void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb);
+extern int usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb);
 
 #ifdef CONFIG_PCI
 struct pci_dev;
@@ -241,17 +252,10 @@ extern void usb_hc_died (struct usb_hcd *hcd);
 extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
 					struct usb_bus *, unsigned port);
 extern int usb_new_device(struct usb_device *dev);
-extern void usb_choose_address(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
 
-/* exported to hub driver ONLY to support usb_reset_device () */
 extern int usb_get_configuration(struct usb_device *dev);
 extern void usb_destroy_configuration(struct usb_device *dev);
-extern int usb_set_address(struct usb_device *dev);
-
-/* use these only before the device's address has been set */
-#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30))
-#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | USB_DIR_IN)
 
 /*-------------------------------------------------------------------------*/
 
@@ -327,7 +331,7 @@ extern int usb_check_bandwidth (struct usb_device *dev, struct urb *urb);
 #define HS_USECS(bytes) NS_TO_US ( ((55 * 8 * 2083)/1000) \
 	+ ((2083UL * (3167 + BitTime (bytes)))/1000) \
 	+ USB2_HOST_DELAY)
-#define HS_USECS_ISO(bytes) NS_TO_US ( ((long)(38 * 8 * 2.083)) \
+#define HS_USECS_ISO(bytes) NS_TO_US ( ((38 * 8 * 2083)/1000) \
 	+ ((2083UL * (3167 + BitTime (bytes)))/1000) \
 	+ USB2_HOST_DELAY)
 
@@ -344,11 +348,18 @@ extern void usb_deregister_bus (struct usb_bus *);
 extern int usb_register_root_hub (struct usb_device *usb_dev,
 		struct device *parent_dev);
 
-/* for portability to 2.4, hcds should call this */
-static inline int hcd_register_root (struct usb_hcd *hcd)
+static inline int hcd_register_root (struct usb_device *usb_dev,
+		struct usb_hcd *hcd)
 {
-	return usb_register_root_hub (
-		hcd_to_bus (hcd)->root_hub, hcd->self.controller);
+	/* hcd->driver->start() reported can_wakeup, probably with
+	 * assistance from board's boot firmware.
+	 * NOTE:  normal devices won't enable wakeup by default.
+	 */
+	if (hcd->can_wakeup)
+		dev_dbg (hcd->self.controller, "supports USB remote wakeup\n");
+	hcd->remote_wakeup = hcd->can_wakeup;
+
+	return usb_register_root_hub (usb_dev, hcd->self.controller);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -357,6 +368,7 @@ static inline int hcd_register_root (struct usb_hcd *hcd)
 
 extern struct list_head usb_bus_list;
 extern struct semaphore usb_bus_list_lock;
+extern wait_queue_head_t usb_kill_urb_queue;
 
 extern struct usb_bus *usb_bus_get (struct usb_bus *bus);
 extern void usb_bus_put (struct usb_bus *bus);

@@ -45,6 +45,8 @@ static const char *version =
 
 #include "8390.h"
 
+#define DRV_NAME "ne3210"
+
 static int ne3210_open(struct net_device *dev);
 static int ne3210_close(struct net_device *dev);
 
@@ -111,13 +113,13 @@ static int __init ne3210_eisa_probe (struct device *device)
 	device->driver_data = dev;
 	ioaddr = edev->base_addr;
 
-	if (!request_region(ioaddr, NE3210_IO_EXTENT, dev->name)) {
+	if (!request_region(ioaddr, NE3210_IO_EXTENT, DRV_NAME)) {
 		retval = -EBUSY;
 		goto out;
 	}
 
 	if (!request_region(ioaddr + NE3210_CFG1,
-			    NE3210_CFG_EXTENT, dev->name)) {
+			    NE3210_CFG_EXTENT, DRV_NAME)) {
 		retval = -EBUSY;
 		goto out1;
 	}
@@ -140,7 +142,7 @@ static int __init ne3210_eisa_probe (struct device *device)
 	dev->irq = irq_map[(inb(ioaddr + NE3210_CFG2) >> 3) & 0x07];
 	printk(".\nne3210.c: using IRQ %d, ", dev->irq);
 
-	retval = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev);
+	retval = request_irq(dev->irq, ei_interrupt, 0, DRV_NAME, dev);
 	if (retval) {
 		printk (" unable to get IRQ %d.\n", dev->irq);
 		goto out2;
@@ -163,7 +165,7 @@ static int __init ne3210_eisa_probe (struct device *device)
 		}
 	}
 	
-	if (!request_mem_region (phys_mem, NE3210_STOP_PG*0x100, dev->name)) {
+	if (!request_mem_region (phys_mem, NE3210_STOP_PG*0x100, DRV_NAME)) {
 		printk ("ne3210.c: Unable to request shared memory at physical address %#lx\n",
 			phys_mem);
 		goto out3;

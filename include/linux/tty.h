@@ -35,7 +35,6 @@
 #define NR_UNIX98_PTY_DEFAULT	4096      /* Default maximum for Unix98 ptys */
 #define NR_UNIX98_PTY_MAX	(1 << MINORBITS) /* Absolute limit */
 #define NR_LDISCS		16
-#define MAX_PREFERRED_PTY	256			/* we prefer to allocate ptys beneath this number */
 
 /*
  * These are set up by the setup-routine at boot-time:
@@ -98,7 +97,6 @@ extern struct screen_info screen_info;
 
 #define VIDEO_TYPE_PICA_S3	0x30	/* ACER PICA-61 local S3 video	*/
 #define VIDEO_TYPE_MIPS_G364	0x31    /* MIPS Magnum 4000 G364 video  */
-#define VIDEO_TYPE_SNI_RM	0x32    /* SNI RM200 PCI video          */
 #define VIDEO_TYPE_SGI          0x33    /* Various SGI graphics hardware */
 
 #define VIDEO_TYPE_TGAC		0x40	/* DEC TGA */
@@ -363,6 +361,9 @@ extern void disassociate_ctty(int priv);
 extern void tty_flip_buffer_push(struct tty_struct *tty);
 extern int tty_get_baud_rate(struct tty_struct *tty);
 extern int tty_termios_baud_rate(struct termios *termios);
+
+struct semaphore;
+extern struct semaphore tty_sem;
 
 /* n_tty.c */
 extern struct tty_ldisc tty_ldisc_N_TTY;

@@ -32,10 +32,10 @@ typedef struct {
  * carefully coded to touch only those registers that spin_lock() marks "clobbered".
  */
 
-#define IA64_SPINLOCK_CLOBBERS "ar.ccv", "ar.pfs", "p14", "r28", "r29", "r30", "b6", "memory"
+#define IA64_SPINLOCK_CLOBBERS "ar.ccv", "ar.pfs", "p14", "p15", "r27", "r28", "r29", "r30", "b6", "memory"
 
 static inline void
-_raw_spin_lock (spinlock_t *lock)
+_raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
 {
 	register volatile unsigned int *ptr asm ("r31") = &lock->lock;
 
@@ -50,9 +50,10 @@ _raw_spin_lock (spinlock_t *lock)
 		      "cmpxchg4.acq r30 = [%1], r30, ar.ccv\n\t"
 		      "movl r29 = ia64_spinlock_contention_pre3_4;;\n\t"
 		      "cmp4.ne p14, p0 = r30, r0\n\t"
-		      "mov b6 = r29;;\n"
+		      "mov b6 = r29;;\n\t"
+		      "mov r27=%2\n\t"
 		      "(p14) br.cond.spnt.many b6"
-		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+		      : "=r"(ptr) : "r"(ptr), "r" (flags) : IA64_SPINLOCK_CLOBBERS);
 # else
 	asm volatile ("{\n\t"
 		      "  mov ar.ccv = r0\n\t"
@@ -60,33 +61,38 @@ _raw_spin_lock (spinlock_t *lock)
 		      "  mov r30 = 1;;\n\t"
 		      "}\n\t"
 		      "cmpxchg4.acq r30 = [%1], r30, ar.ccv;;\n\t"
-		      "cmp4.ne p14, p0 = r30, r0\n"
+		      "cmp4.ne p14, p0 = r30, r0\n\t"
+		      "mov r27=%2\n\t"
 		      "(p14) brl.cond.spnt.many ia64_spinlock_contention_pre3_4;;"
-		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+		      : "=r"(ptr) : "r"(ptr), "r" (flags) : IA64_SPINLOCK_CLOBBERS);
 # endif /* CONFIG_MCKINLEY */
 #else
 # ifdef CONFIG_ITANIUM
 	/* don't use brl on Itanium... */
 	/* mis-declare, so we get the entry-point, not it's function descriptor: */
 	asm volatile ("mov r30 = 1\n\t"
+		      "mov r27=%2\n\t"
 		      "mov ar.ccv = r0;;\n\t"
 		      "cmpxchg4.acq r30 = [%0], r30, ar.ccv\n\t"
 		      "movl r29 = ia64_spinlock_contention;;\n\t"
 		      "cmp4.ne p14, p0 = r30, r0\n\t"
-		      "mov b6 = r29;;\n"
+		      "mov b6 = r29;;\n\t"
 		      "(p14) br.call.spnt.many b6 = b6"
-		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+		      : "=r"(ptr) : "r"(ptr), "r" (flags) : IA64_SPINLOCK_CLOBBERS);
 # else
 	asm volatile ("mov r30 = 1\n\t"
+		      "mov r27=%2\n\t"
 		      "mov ar.ccv = r0;;\n\t"
 		      "cmpxchg4.acq r30 = [%0], r30, ar.ccv;;\n\t"
 		      "cmp4.ne p14, p0 = r30, r0\n\t"
 		      "(p14) brl.call.spnt.many b6=ia64_spinlock_contention;;"
-		      : "=r"(ptr) : "r"(ptr) : IA64_SPINLOCK_CLOBBERS);
+		      : "=r"(ptr) : "r"(ptr), "r" (flags) : IA64_SPINLOCK_CLOBBERS);
 # endif /* CONFIG_MCKINLEY */
 #endif
 }
+#define _raw_spin_lock(lock) _raw_spin_lock_flags(lock, 0)
 #else /* !ASM_SUPPORTED */
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 # define _raw_spin_lock(x)								\
 do {											\
 	__u32 *ia64_spinlock_ptr = (__u32 *) (x);					\

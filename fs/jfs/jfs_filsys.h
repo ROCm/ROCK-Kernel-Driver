@@ -81,10 +81,6 @@
 #define JFS_DIR_INDEX		0x00200000	/* Persistant index for */
 						/* directory entries    */
 
-/* DMAPI enablement */
-#define JFS_DMI			0x01000000	/* FS has DMI enabled */
-#define JFS_UNMOUNT_FORCE	0x02000000	/* FS being forcibly unmount'd */
-
 
 /*
  *	buffer cache configuration

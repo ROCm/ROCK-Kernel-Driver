@@ -32,14 +32,10 @@
 #define TRUE 1
 #endif
 
-extern int map_cifs_error(int error_class, int error_code,
-			  int status_codes_negotiated);
-
 extern struct address_space_operations cifs_addr_ops;
 
 /* Functions related to super block operations */
 extern struct super_operations cifs_super_ops;
-extern void cifs_put_inode(struct inode *);
 extern void cifs_read_inode(struct inode *);
 extern void cifs_delete_inode(struct inode *);
 /* extern void cifs_write_inode(struct inode *); *//* BB not needed yet */
@@ -85,7 +81,7 @@ extern struct dentry_operations cifs_dentry_ops;
 
 /* Functions related to symlinks */
 extern int cifs_follow_link(struct dentry *direntry, struct nameidata *nd);
-extern int cifs_readlink(struct dentry *direntry, char *buffer, int buflen);
+extern int cifs_readlink(struct dentry *direntry, char __user *buffer, int buflen);
 extern int cifs_symlink(struct inode *inode, struct dentry *direntry,
 			const char *symname);
 extern int	cifs_removexattr(struct dentry *, const char *);
@@ -93,5 +89,5 @@ extern int 	cifs_setxattr(struct dentry *, const char *, const void *,
 			 size_t, int);
 extern ssize_t	cifs_getxattr(struct dentry *, const char *, void *, size_t);
 extern ssize_t	cifs_listxattr(struct dentry *, char *, size_t);
-#define CIFS_VERSION   "1.18"
+#define CIFS_VERSION   "1.20"
 #endif				/* _CIFSFS_H */

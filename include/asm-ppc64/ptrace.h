@@ -71,6 +71,18 @@ struct pt_regs32 {
 #define instruction_pointer(regs) ((regs)->nip)
 #define user_mode(regs) ((((regs)->msr) >> MSR_PR_LG) & 0x1)
 
+#define force_successful_syscall_return()   \
+		(current_thread_info()->syscall_noerror = 1)
+
+/*
+ * We use the least-significant bit of the trap field to indicate
+ * whether we have saved the full set of registers, or only a
+ * partial set.  A 1 there means the partial set.
+ */
+#define FULL_REGS(regs)		(((regs)->trap & 1) == 0)
+#define TRAP(regs)		((regs)->trap & ~0xF)
+#define CHECK_FULL_REGS(regs)	BUG_ON(regs->trap & 1)
+
 /*
  * Offsets used by 'ptrace' system call interface.
  */

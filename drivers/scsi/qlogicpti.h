@@ -6,8 +6,6 @@
 #ifndef _QLOGICPTI_H
 #define _QLOGICPTI_H
 
-#include <linux/config.h>
-
 /* Qlogic/SBUS controller registers. */
 #define SBUS_CFG1	0x006UL
 #define SBUS_CTRL	0x008UL
@@ -332,6 +330,8 @@ struct pti_queue_entry {
 	char __opaque[QUEUE_ENTRY_LEN];
 };
 
+struct scsi_cmnd;
+
 /* Software state for the driver. */
 struct qlogicpti {
 	/* These are the hot elements in the cache, so they come first. */
@@ -352,7 +352,7 @@ struct qlogicpti {
 	 * Ex000 sparc64 machines with >4GB of ram we just keep track of the
 	 * scsi command pointers here.  This is essentially what Matt Jacob does. -DaveM
 	 */
-	Scsi_Cmnd                *cmd_slots[QLOGICPTI_REQ_QUEUE_LEN + 1];
+	struct scsi_cmnd         *cmd_slots[QLOGICPTI_REQ_QUEUE_LEN + 1];
 
 	/* The rest of the elements are unimportant for performance. */
 	struct qlogicpti         *next;

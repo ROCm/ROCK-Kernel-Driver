@@ -557,18 +557,24 @@ static int rh_unlink_urb (struct urb * urb)
 static int rh_connect_rh (hci_t * hci)
 {
 	struct usb_device *usb_dev;
+	int retval;
 
 	hci->rh.devnum = 0;
 	usb_dev = usb_alloc_dev (NULL, hci->bus, 0);
 	if (!usb_dev)
 		return -ENOMEM;
 
-	hci->bus->root_hub = usb_dev;
 	usb_dev->devnum = 1;
 	usb_dev->bus->devnum_next = usb_dev->devnum + 1;
 	set_bit (usb_dev->devnum, usb_dev->bus->devmap.devicemap);
 
-	if (usb_new_device (usb_dev) != 0) {
+	down (&usb_bus_list_lock);
+	hci->bus->root_hub = usb_dev;
+	retval = usb_new_device (usb_dev);
+	if (retval != 0)
+		hci->bus->root_hub = NULL;
+	up (&usb_bus_list_lock);
+	if (retval != 0) {
 		usb_put_dev (usb_dev);
 		return -ENODEV;
 	}

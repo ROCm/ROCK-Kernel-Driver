@@ -1,4 +1,4 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_hotplug.c,v 1.56 2004/02/26 23:33:02 mcgrof Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc.
  *  Copyright (C) 2003 Herbert Valerio Riedel <hvr@gnu.org>
@@ -24,94 +24,128 @@
 #include <linux/delay.h>
 #include <linux/init.h> /* For __init, __exit */
 
+#include "prismcompat.h"
 #include "islpci_dev.h"
 #include "islpci_mgt.h"		/* for pc_debug */
 #include "isl_oid.h"
 
 #define DRV_NAME	"prism54"
-#define DRV_VERSION	"1.1"
+#define DRV_VERSION	"1.2"
 
 MODULE_AUTHOR("[Intersil] R.Bastings and W.Termorshuizen, The prism54.org Development Team <prism54-devel@prism54.org>");
 MODULE_DESCRIPTION("The Prism54 802.11 Wireless LAN adapter");
 MODULE_LICENSE("GPL");
 
+static int	init_pcitm = 0;
+module_param(init_pcitm, int, 0);
+
 /* In this order: vendor, device, subvendor, subdevice, class, class_mask,
  * driver_data 
- * Note: for driver_data we put the device's name 
  * If you have an update for this please contact prism54-devel@prism54.org 
  * The latest list can be found at http://prism54.org/supported_cards.php */
 static const struct pci_device_id prism54_id_tbl[] = {
+	/* 3COM 3CRWE154G72 Wireless LAN adapter */
 	{
 	 PCIVENDOR_3COM, PCIDEVICE_3COM6001,
 	 PCIVENDOR_3COM, PCIDEVICE_3COM6001,
-	 0, 0,
-	 (unsigned long) "3COM 3CRWE154G72 Wireless LAN adapter"},
+	 0, 0, 0
+	},
+
+	/* D-Link Air Plus Xtreme G A1 - DWL-g650 A1 */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_DLINK, 0x3202UL, 
-	 0, 0,
-	 (unsigned long) "D-Link Air Plus Xtreme G A1 - DWL-g650 A1"},
+	 0, 0, 0
+	},
+
+	/* I-O Data WN-G54/CB - WN-G54/CB */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_IODATA, 0xd019UL, 
-	 0, 0,
-	 (unsigned long) "I-O Data WN-G54/CB - WN-G54/CB"},
+	 0, 0, 0
+	},
+
+	/* Netgear WG511 */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_NETGEAR, 0x4800UL,
-	 0, 0,
-	 (unsigned long) "Netgear WG511"},
+	 0, 0, 0
+	},
+
+	/* Tekram Technology clones, Allnet, Netcomm, Zyxel */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_I4, 0x0020UL,
-	 0, 0,
-	 (unsigned long) "PLANEX GW-DS54G"},
+	 PCIVENDOR_TTL, 0x1605UL,
+	 0, 0, 0
+	},
+
+	/* SMC2802W */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_SMC, 0x2802UL,
-	 0, 0,
-	 (unsigned long) "EZ Connect g 2.4GHz 54 Mbps Wireless PCI Card - SMC2802W"},
+	 0, 0, 0
+	},
+
+	/* SMC2835W */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_SMC, 0x2835UL,
-	 0, 0,
-	 (unsigned long) "EZ Connect g 2.4GHz 54 Mbps Wireless Cardbus Adapter - SMC2835W"},
+	 0, 0, 0
+	},
+
+	/* Corega CG-WLCB54GT */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_INTERSIL, 0x0000UL, /* This was probably a bogus reading... */
-	 0, 0,
-	 (unsigned long) "SparkLAN WL-850F"},
+	 PCIVENDOR_ATI, 0xc104UL,
+	 0, 0, 0
+	},
+
+	/* I4 Z-Com XG-600 */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_I4, 0x0014UL,
-	 0, 0,
-	 (unsigned long) "I4 Z-Com XG-600"},
+	 0, 0, 0
+	},
+
+	/* I4 Z-Com XG-900  and clones Macer, Ovislink, Planex, Peabird, */
+	/* Sitecom, Xterasys */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_I4, 0x0020UL,
-	 0, 0,
-	 (unsigned long) "I4 Z-Com XG-900/PLANEX GW-DS54G"},
+	 0, 0, 0
+	},
+
+	/* SMC 2802W V2 */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_ACCTON, 0xee03UL,
-	 0, 0,
-	 (unsigned long) "SMC 2802Wv2"},
+	 0, 0, 0
+	},
+
+	/* SMC 2835W V2 */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCIVENDOR_SMC, 0xa835UL,
-	 0, 0,
-	 (unsigned long) "SMC 2835Wv2"},
+	 0, 0, 0
+	},
+
+	/* Intersil PRISM Indigo Wireless LAN adapter */
 	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3877,
 	 PCI_ANY_ID, PCI_ANY_ID,
-	 0, 0,
-	 (unsigned long) "Intersil PRISM Indigo Wireless LAN adapter"},
-	{ /* Default */
+	 0, 0, 0
+	},
+
+	/* Intersil PRISM Duette/Prism GT Wireless LAN adapter */
+	/* Default */
+	{
 	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
 	 PCI_ANY_ID, PCI_ANY_ID,
-	 0, 0,
-	 (unsigned long) "Intersil PRISM Duette/Prism GT Wireless LAN adapter"},
-	{0,}
+	 0, 0, 0
+	},
+
+	/* End of list */
+	{0,0,0,0,0,0,0}
 };
 
 /* register the device with the Hotplug facilities of the kernel */
@@ -137,11 +171,15 @@ prism54_get_card_model(struct net_device *ndev)
 {
 	islpci_private	*priv;
 	char		*modelp;
+	int		notwork = 0;
 
 	priv = netdev_priv(ndev);
 	switch (priv->pdev->subsystem_device) {
 	case PCIDEVICE_ISL3877:
 		modelp = "PRISM Indigo";
+		break;
+	case PCIDEVICE_ISL3886:
+		modelp = "PRISM Javelin / Xbow";
 		break;
 	case PCIDEVICE_3COM6001:
 		modelp = "3COM 3CRWE154G72";
@@ -160,12 +198,20 @@ prism54_get_card_model(struct net_device *ndev)
 		break;
 	case 0xee03UL:
 		modelp = "SMC2802W V2";
+		notwork = 1;
 		break;
 	case 0x2835UL:
 		modelp = "SMC2835W";
 		break;
 	case 0xa835UL:
 		modelp = "SMC2835W V2";
+		notwork = 1;
+		break;
+	case 0xc104UL:
+		modelp = "CG-WLCB54GT";
+		break;
+	case 0x1605UL:
+		modelp = "Tekram Technology clone";
 		break;
 	/* Let's leave this one out for now since it seems bogus/wrong 
 	 * Even if the manufacturer did use 0x0000UL it may not be correct
@@ -176,10 +222,10 @@ prism54_get_card_model(struct net_device *ndev)
 
 	/* We have two reported for the one below :( */
 	case 0x0014UL:
-		modelp = "XG-600";
+		modelp = "I4 Z-Com XG-600 and clones";
 		break;
 	case 0x0020UL:
-		modelp = "XG-900/GW-DS54G";
+		modelp = "I4 Z-Com XG-900 and clones";
 		break;
 /* Default it */
 /*
@@ -192,6 +238,10 @@ prism54_get_card_model(struct net_device *ndev)
 	}
 	printk(KERN_DEBUG "%s: %s driver detected card model: %s\n",
 			ndev->name, DRV_NAME, modelp);
+	if ( notwork ) {
+		printk(KERN_DEBUG "%s: %s Warning - This may not work\n",
+			ndev->name, DRV_NAME);
+	}
 	return;
 }
 
@@ -245,9 +295,14 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 *
 	 * 	Writing zero to both these two registers will disable both timeouts and
 	 * 	*can* solve problems caused by devices that are slow to respond.
+	 *	Make this configurable - MSW
 	 */
-	pci_write_config_byte(pdev, 0x40, 0);
-	pci_write_config_byte(pdev, 0x41, 0);
+	if ( init_pcitm >= 0 ) {
+		pci_write_config_byte(pdev, 0x40, (u8)init_pcitm);
+		pci_write_config_byte(pdev, 0x41, (u8)init_pcitm);
+	} else {
+		printk(KERN_INFO "PCI TRDY/RETRY unchanged\n");
+	}
 
 	/* request the pci device I/O regions */
 	rvalue = pci_request_regions(pdev, DRV_NAME);
@@ -268,6 +323,9 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* enable PCI bus-mastering */
 	DEBUG(SHOW_TRACING, "%s: pci_set_master(pdev)\n", DRV_NAME);
 	pci_set_master(pdev);
+
+	/* enable MWI */
+	pci_set_mwi(pdev);
 
 	/* setup the network device interface and its structure */
 	if (!(ndev = islpci_setup(pdev))) {
@@ -304,9 +362,9 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
       do_unregister_netdev:
 	unregister_netdev(ndev);
 	islpci_free_memory(priv);
-	pci_set_drvdata(pdev, 0);
+	pci_set_drvdata(pdev, NULL);
 	free_netdev(ndev);
-	priv = 0;
+	priv = NULL;
       do_pci_release_regions:
 	pci_release_regions(pdev);
       do_pci_disable_device:
@@ -322,7 +380,7 @@ void
 prism54_remove(struct pci_dev *pdev)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : NULL;
 	BUG_ON(!priv);
 
 	if (!__in_cleanup_module) {
@@ -350,9 +408,9 @@ prism54_remove(struct pci_dev *pdev)
 	/* free the PCI memory and unmap the remapped page */
 	islpci_free_memory(priv);
 
-	pci_set_drvdata(pdev, 0);
+	pci_set_drvdata(pdev, NULL);
 	free_netdev(ndev);
-	priv = 0;
+	priv = NULL;
 
 	pci_release_regions(pdev);
 
@@ -363,7 +421,7 @@ int
 prism54_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : NULL;
 	BUG_ON(!priv);
 
 	printk(KERN_NOTICE "%s: got suspend request (state %d)\n",
@@ -388,7 +446,7 @@ int
 prism54_resume(struct pci_dev *pdev)
 {
 	struct net_device *ndev = pci_get_drvdata(pdev);
-	islpci_private *priv = ndev ? netdev_priv(ndev) : 0;
+	islpci_private *priv = ndev ? netdev_priv(ndev) : NULL;
 	BUG_ON(!priv);
 
 	printk(KERN_NOTICE "%s: got resume request\n", ndev->name);

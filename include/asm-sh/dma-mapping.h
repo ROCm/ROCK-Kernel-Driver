@@ -44,6 +44,8 @@ static inline void *dma_alloc_coherent(struct device *dev, size_t size,
 	if (dev && dev->bus == &pci_bus_type)
 		return __pci_alloc_consistent(NULL, size, dma_handle);
 #endif
+	if (sh_mv.mv_consistent_alloc)
+		return sh_mv.mv_consistent_alloc(dev, size, dma_handle, flag);
 
 	return consistent_alloc(flag, size, dma_handle);
 }
@@ -60,6 +62,11 @@ static inline void dma_free_coherent(struct device *dev, size_t size,
 		return;
 	}
 #endif
+
+	if (sh_mv.mv_consistent_free) {
+		sh_mv.mv_consistent_free(dev, size, vaddr, dma_handle);
+		return;
+	}
 
 	consistent_free(vaddr, size);
 }
@@ -152,6 +159,26 @@ static inline void dma_sync_sg(struct device *dev, struct scatterlist *sg,
 	}
 }
 
+static inline void dma_sync_single_for_cpu(struct device *dev,
+					   dma_addr_t dma_handle, size_t size,
+					   enum dma_data_direction dir)
+	__attribute__ ((alias("dma_sync_single")));
+
+static inline void dma_sync_single_for_device(struct device *dev,
+					   dma_addr_t dma_handle, size_t size,
+					   enum dma_data_direction dir)
+	__attribute__ ((alias("dma_sync_single")));
+
+static inline void dma_sync_sg_for_cpu(struct device *dev,
+				       struct scatterlist *sg, int nelems,
+				       enum dma_data_direction dir)
+	__attribute__ ((alias("dma_sync_sg")));
+
+static inline void dma_sync_sg_for_device(struct device *dev,
+				       struct scatterlist *sg, int nelems,
+				       enum dma_data_direction dir)
+	__attribute__ ((alias("dma_sync_sg")));
+
 static inline int dma_get_cache_alignment(void)
 {
 	/*
@@ -159,6 +186,11 @@ static inline int dma_get_cache_alignment(void)
 	 * L1_CACHE_BYTES wraps to this, so this is always safe.
 	 */
 	return L1_CACHE_BYTES;
+}
+
+static inline int dma_mapping_error(dma_addr_t dma_addr)
+{
+	return dma_addr == 0;
 }
 
 #endif /* __ASM_SH_DMA_MAPPING_H */

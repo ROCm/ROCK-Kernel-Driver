@@ -58,22 +58,16 @@ int setup_arg_pages32(struct linux_binprm *bprm, int executable_stack)
 		return -ENOMEM;
 	}
 
+	memset(mpnt, 0, sizeof(*mpnt));
+
 	down_write(&mm->mmap_sem);
 	{
- 		mpol_set_vma_default(mpnt);
 		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = STACK_TOP;
 		/* executable stack setting would be applied here */
 		mpnt->vm_page_prot = PAGE_COPY;
 		mpnt->vm_flags = VM_STACK_FLAGS;
-		mpnt->vm_ops = NULL;
-		mpnt->vm_pgoff = mpnt->vm_start >> PAGE_SHIFT;
-		mpnt->vm_file = NULL;
-		INIT_VMA_SHARED(mpnt);
-		/* insert_vm_struct takes care of anon_vma_node */
-		mpnt->anon_vma = NULL;
-		mpnt->vm_private_data = (void *) 0;
 		insert_vm_struct(mm, mpnt);
 		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	} 
@@ -82,7 +76,7 @@ int setup_arg_pages32(struct linux_binprm *bprm, int executable_stack)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current,page,stack_base,PAGE_COPY, mpnt);
+			install_arg_page(mpnt, page, stack_base);
 		}
 		stack_base += PAGE_SIZE;
 	}

@@ -27,20 +27,20 @@ static void sysrq_handle_xmon(int key, struct pt_regs *pt_regs,
 			      struct tty_struct *tty) 
 {
 	/* ensure xmon is enabled */
-	xmon_become_debugger();
+	xmon_init();
 	debugger(pt_regs);
 }
 
 static struct sysrq_key_op sysrq_xmon_op = 
 {
 	.handler =	sysrq_handle_xmon,
-	.help_msg =	"Anton",
+	.help_msg =	"Xmon",
 	.action_msg =	"Entering xmon\n",
 };
 
 static int __init setup_xmon_sysrq(void)
 {
-	__sysrq_put_key_op('a', &sysrq_xmon_op);
+	__sysrq_put_key_op('x', &sysrq_xmon_op);
 	return 0;
 }
 __initcall(setup_xmon_sysrq);

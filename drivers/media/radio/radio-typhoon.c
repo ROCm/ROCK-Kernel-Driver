@@ -326,7 +326,6 @@ static int __init typhoon_init(void)
 		return -EINVAL;
 	}
 	typhoon_unit.iobase = io;
-	init_MUTEX(&typhoon_unit.lock);
 
 	if (mutefreq < 87000 || mutefreq > 108500) {
 		printk(KERN_ERR "radio-typhoon: You must set a frequency (in kHz) used when muting the card,\n");
@@ -337,6 +336,7 @@ static int __init typhoon_init(void)
 #endif /* MODULE */
 
 	printk(KERN_INFO BANNER);
+	init_MUTEX(&typhoon_unit.lock);
 	io = typhoon_unit.iobase;
 	if (!request_region(io, 8, "typhoon")) {
 		printk(KERN_ERR "radio-typhoon: port 0x%x already in use\n",

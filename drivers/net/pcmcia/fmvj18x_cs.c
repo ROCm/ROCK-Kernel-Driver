@@ -332,6 +332,9 @@ static void fmvj18x_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
+    if (link->dev)
+	unregister_netdev(dev);
+
     if (link->state & DEV_CONFIG)
 	fmvj18x_release(link);
 
@@ -341,8 +344,6 @@ static void fmvj18x_detach(dev_link_t *link)
     
     /* Unlink device structure, free pieces */
     *linkp = link->next;
-    if (link->dev)
-	unregister_netdev(dev);
     free_netdev(dev);
 } /* fmvj18x_detach */
 
@@ -510,10 +511,6 @@ static void fmvj18x_config(dev_link_t *link)
     CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
-    if (register_netdev(dev) != 0) {
-	printk(KERN_NOTICE "fmvj18x_cs: register_netdev() failed\n");
-	goto failed;
-    }
 
     if (link->io.BasePort2 != 0)
 	fmvj18x_setup_mfc(link);
@@ -575,7 +572,6 @@ static void fmvj18x_config(dev_link_t *link)
 	/* Read MACID from Buggy CIS */
 	if (fmvj18x_get_hwinfo(link, tuple.TupleData) == -1) {
 	    printk(KERN_NOTICE "fmvj18x_cs: unable to read hardware net address.\n");
-	    unregister_netdev(dev);
 	    goto failed;
 	}
 	for (i = 0 ; i < 6; i++) {
@@ -592,10 +588,18 @@ static void fmvj18x_config(dev_link_t *link)
 	break;
     }
 
-    strcpy(lp->node.dev_name, dev->name);
-    link->dev = &lp->node;
-
     lp->cardtype = cardtype;
+    link->dev = &lp->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
+    if (register_netdev(dev) != 0) {
+	printk(KERN_NOTICE "fmvj18x_cs: register_netdev() failed\n");
+	link->dev = NULL;
+	goto failed;
+    }
+
+    strcpy(lp->node.dev_name, dev->name);
+
     /* print current configuration */
     printk(KERN_INFO "%s: %s, sram %s, port %#3lx, irq %d, hw_addr ", 
 	   dev->name, card_name, sram_config == 0 ? "4K TX*2" : "8K TX*2", 
@@ -603,7 +607,6 @@ static void fmvj18x_config(dev_link_t *link)
     for (i = 0; i < 6; i++)
 	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
 
-    link->state &= ~DEV_CONFIG_PENDING;
     return;
     
 cs_failed:
@@ -739,10 +742,8 @@ static int fmvj18x_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 	    netif_device_detach(dev);
-	    fmvj18x_release(link);
-	}
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;

@@ -67,4 +67,12 @@ extern void * __init __alloc_bootmem_node (pg_data_t *pgdat, unsigned long size,
 	__alloc_bootmem_node((pgdat), (x), PAGE_SIZE, 0)
 #endif /* !CONFIG_HAVE_ARCH_BOOTMEM_NODE */
 
+extern void *__init alloc_large_system_hash(const char *tablename,
+					    unsigned long bucketsize,
+					    unsigned long numentries,
+					    int scale,
+					    int consider_highmem,
+					    unsigned int *_hash_shift,
+					    unsigned int *_hash_mask);
+
 #endif /* _LINUX_BOOTMEM_H */

@@ -1,4 +1,4 @@
-/* $Id: jffs2_fs_i.h,v 1.15 2002/11/12 09:42:49 dwmw2 Exp $ */
+/* $Id: jffs2_fs_i.h,v 1.16 2003/01/09 14:03:21 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_I
 #define _JFFS2_FS_I
@@ -36,8 +36,10 @@ struct jffs2_inode_info {
 
 	uint16_t flags;
 	uint8_t usercompr;
+#if !defined (__ECOS)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 	struct inode vfs_inode;
+#endif
 #endif
 };
 

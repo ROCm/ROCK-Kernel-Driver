@@ -55,7 +55,9 @@
 #include <linux/if_arp.h>	/* For ARPHRD_ETHER */
 #include <linux/ip.h>
 #include <linux/tcp.h>
+#include <linux/percpu.h>
 
+static DEFINE_PER_CPU(struct net_device_stats, loopback_stats);
 
 #define LOOPBACK_OVERHEAD (128 + MAX_HEADER + 16 + 16)
 
@@ -123,7 +125,7 @@ static void emulate_large_send_offload(struct sk_buff *skb)
  */
 static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_device_stats *stats = dev->priv;
+	struct net_device_stats *lb_stats;
 
 	skb_orphan(skb);
 
@@ -142,12 +144,13 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	dev->last_rx = jiffies;
-	if (likely(stats)) {
-		stats->rx_bytes+=skb->len;
-		stats->tx_bytes+=skb->len;
-		stats->rx_packets++;
-		stats->tx_packets++;
-	}
+
+	lb_stats = &per_cpu(loopback_stats, get_cpu());
+	lb_stats->rx_bytes += skb->len;
+	lb_stats->tx_bytes += skb->len;
+	lb_stats->rx_packets++;
+	lb_stats->tx_packets++;
+	put_cpu();
 
 	netif_rx(skb);
 
@@ -156,7 +159,28 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *get_stats(struct net_device *dev)
 {
-	return (struct net_device_stats *)dev->priv;
+	struct net_device_stats *stats = dev->priv;
+	int i;
+
+	if (!stats) {
+		return NULL;
+	}
+
+	memset(stats, 0, sizeof(struct net_device_stats));
+
+	for (i=0; i < NR_CPUS; i++) {
+		struct net_device_stats *lb_stats;
+
+		if (!cpu_possible(i)) 
+			continue;
+		lb_stats = &per_cpu(loopback_stats, i);
+		stats->rx_bytes   += lb_stats->rx_bytes;
+		stats->tx_bytes   += lb_stats->tx_bytes;
+		stats->rx_packets += lb_stats->rx_packets;
+		stats->tx_packets += lb_stats->tx_packets;
+	}
+				
+	return stats;
 }
 
 struct net_device loopback_dev = {
@@ -173,7 +197,8 @@ struct net_device loopback_dev = {
 	.rebuild_header		= eth_rebuild_header,
 	.flags			= IFF_LOOPBACK,
 	.features 		= NETIF_F_SG|NETIF_F_FRAGLIST
-				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA,
+				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA
+				  |NETIF_F_LLTX,
 };
 
 /* Setup and register the of the LOOPBACK device. */

@@ -49,7 +49,7 @@
 
 /* Module and version information */
 #define WATCHDOG_VERSION "1.00"
-#define WATCHDOG_DATE "13/03/2004"
+#define WATCHDOG_DATE "12 Jun 2004"
 #define WATCHDOG_DRIVER_NAME "PCI-PC Watchdog"
 #define WATCHDOG_NAME "pcwd_pci"
 #define PFX WATCHDOG_NAME ": "
@@ -73,7 +73,7 @@
 #define WD_PCI_TTRP             0x04	/* Temperature Trip status */
 
 /* according to documentation max. time to process a command for the pci
-   watchdog card is 100 ms, so we give it 150 ms to do it's job */
+ * watchdog card is 100 ms, so we give it 150 ms to do it's job */
 #define PCI_COMMAND_TIMEOUT	150
 
 /* Watchdog's internal commands */
@@ -258,7 +258,7 @@ static int pcipcwd_get_temperature(int *temperature)
  *	/dev/watchdog handling
  */
 
-static ssize_t pcipcwd_write(struct file *file, const char *data,
+static ssize_t pcipcwd_write(struct file *file, const char __user *data,
 			      size_t len, loff_t *ppos)
 {
 	/* Can't seek (pwrite) on this device  */
@@ -293,6 +293,8 @@ static ssize_t pcipcwd_write(struct file *file, const char *data,
 static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident = {
 		.options =		WDIOF_OVERHEAT |
 					WDIOF_CARDRESET |
@@ -305,7 +307,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 		case WDIOC_GETSUPPORT:
-			return copy_to_user((struct watchdog_info *) arg, &ident,
+			return copy_to_user(argp, &ident,
 				sizeof (ident)) ? -EFAULT : 0;
 
 		case WDIOC_GETSTATUS:
@@ -314,11 +316,11 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 
 			pcipcwd_get_status(&status);
 
-			return put_user(status, (int *) arg);
+			return put_user(status, p);
 		}
 
 		case WDIOC_GETBOOTSTATUS:
-			return put_user(pcipcwd_private.boot_status, (int *) arg);
+			return put_user(pcipcwd_private.boot_status, p);
 
 		case WDIOC_GETTEMP:
 		{
@@ -327,7 +329,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 			if (pcipcwd_get_temperature(&temperature))
 				return -EFAULT;
 
-			return put_user(temperature, (int *) arg);
+			return put_user(temperature, p);
 		}
 
 		case WDIOC_KEEPALIVE:
@@ -338,7 +340,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 		{
 			int new_options, retval = -EINVAL;
 
-			if (get_user (new_options, (int *) arg))
+			if (get_user (new_options, p))
 				return -EFAULT;
 
 			if (new_options & WDIOS_DISABLECARD) {
@@ -363,7 +365,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 		{
 			int new_heartbeat;
 
-			if (get_user(new_heartbeat, (int *) arg))
+			if (get_user(new_heartbeat, p))
 				return -EFAULT;
 
 			if (pcipcwd_set_heartbeat(new_heartbeat))
@@ -374,7 +376,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 		}
 
 		case WDIOC_GETTIMEOUT:
-			return put_user(heartbeat, (int *)arg);
+			return put_user(heartbeat, p);
 
 		default:
 			return -ENOIOCTLCMD;
@@ -404,8 +406,8 @@ static int pcipcwd_release(struct inode *inode, struct file *file)
 		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
 		pcipcwd_keepalive();
 	}
-	clear_bit(0, &is_active);
 	expect_release = 0;
+	clear_bit(0, &is_active);
 	return 0;
 }
 
@@ -413,7 +415,7 @@ static int pcipcwd_release(struct inode *inode, struct file *file)
  *	/dev/temperature handling
  */
 
-static ssize_t pcipcwd_temp_read(struct file *file, char *data,
+static ssize_t pcipcwd_temp_read(struct file *file, char __user *data,
 				size_t len, loff_t *ppos)
 {
 	int temperature;
@@ -585,14 +587,11 @@ static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 		printk(KERN_INFO PFX "No previous trip detected - Cold boot or reset\n");
 
 	/* Check that the heartbeat value is within it's range ; if not reset to the default */
-	if (heartbeat < 1 || heartbeat > 0xFFFF) {
-		heartbeat = WATCHDOG_HEARTBEAT;
+	if (pcipcwd_set_heartbeat(heartbeat)) {
+		pcipcwd_set_heartbeat(WATCHDOG_HEARTBEAT);
 		printk(KERN_INFO PFX "heartbeat value must be 0<heartbeat<65536, using %d\n",
-			heartbeat);
+			WATCHDOG_HEARTBEAT);
 	}
-
-	/* Calculate the watchdog's heartbeat */
-	pcipcwd_set_heartbeat(heartbeat);
 
 	ret = register_reboot_notifier(&pcipcwd_notifier);
 	if (ret != 0) {
@@ -601,20 +600,20 @@ static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 		goto err_out_release_region;
 	}
 
-	ret = misc_register(&pcipcwd_miscdev);
-	if (ret != 0) {
-		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
-			WATCHDOG_MINOR, ret);
-		goto err_out_unregister_reboot;
-	}
-
 	if (pcipcwd_private.supports_temp) {
 		ret = misc_register(&pcipcwd_temp_miscdev);
 		if (ret != 0) {
 			printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
 				TEMP_MINOR, ret);
-			goto err_out_misc_deregister;
+			goto err_out_unregister_reboot;
 		}
+	}
+
+	ret = misc_register(&pcipcwd_miscdev);
+	if (ret != 0) {
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			WATCHDOG_MINOR, ret);
+		goto err_out_misc_deregister;
 	}
 
 	printk(KERN_INFO PFX "initialized. heartbeat=%d sec (nowayout=%d)\n",
@@ -623,7 +622,8 @@ static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 	return 0;
 
 err_out_misc_deregister:
-	misc_deregister(&pcipcwd_miscdev);
+	if (pcipcwd_private.supports_temp)
+		misc_deregister(&pcipcwd_temp_miscdev);
 err_out_unregister_reboot:
 	unregister_reboot_notifier(&pcipcwd_notifier);
 err_out_release_region:
@@ -640,9 +640,9 @@ static void __devexit pcipcwd_card_exit(struct pci_dev *pdev)
 		pcipcwd_stop();
 
 	/* Deregister */
+	misc_deregister(&pcipcwd_miscdev);
 	if (pcipcwd_private.supports_temp)
 		misc_deregister(&pcipcwd_temp_miscdev);
-	misc_deregister(&pcipcwd_miscdev);
 	unregister_reboot_notifier(&pcipcwd_notifier);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);

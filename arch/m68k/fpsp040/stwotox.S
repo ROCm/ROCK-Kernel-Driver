@@ -76,8 +76,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |STWOTOX	idnt	2,1 | Motorola 040 Floating Point Software Package
@@ -222,17 +222,17 @@ TWOOK1:
 	cmpil		#0x400D80C0,%d0		| ...|X| > 16480?
 	bles		TWOMAIN
 	bra		EXPBORS
-	
+
 
 TWOMAIN:
 |--USUAL CASE, 2^(-70) <= |X| <= 16480
 
 	fmovex		%fp0,%fp1
 	fmuls		#0x42800000,%fp1  | ...64 * X
-	
+
 	fmovel		%fp1,N(%a6)		| ...N = ROUND-TO-INT(64 X)
 	movel		%d2,-(%sp)
-	lea		EXPTBL,%a1 	| ...LOAD ADDRESS OF TABLE OF 2^(J/64)
+	lea		EXPTBL,%a1	| ...LOAD ADDRESS OF TABLE OF 2^(J/64)
 	fmovel		N(%a6),%fp1		| ...N --> FLOATING FMT
 	movel		N(%a6),%d0
 	movel		%d0,%d2
@@ -244,7 +244,7 @@ TWOMAIN:
 	asrl		#1,%d0		| ...D0 IS M
 	subl		%d0,%d2		| ...d2 IS M', N = 64(M+M') + J
 	addil		#0x3FFF,%d2
-	movew		%d2,ADJFACT(%a6) 	| ...ADJFACT IS 2^(M')
+	movew		%d2,ADJFACT(%a6)	| ...ADJFACT IS 2^(M')
 	movel		(%sp)+,%d2
 |--SUMMARY: a1 IS ADDRESS FOR THE LEADING PORTION OF 2^(J/64),
 |--D0 IS M WHERE N = 64(M+M') + J. NOTE THAT |M| <= 16140 BY DESIGN.
@@ -258,13 +258,13 @@ TWOMAIN:
 	movew		(%a1)+,FACT2(%a6)
 	clrw		FACT2+2(%a6)
 
-	fsubx		%fp1,%fp0	 	| ...X - (1/64)*INT(64 X)
+	fsubx		%fp1,%fp0		| ...X - (1/64)*INT(64 X)
 
 	movew		(%a1)+,FACT2HI(%a6)
 	clrw		FACT2HI+2(%a6)
 	clrl		FACT2LOW(%a6)
 	addw		%d0,FACT1(%a6)
-	
+
 	fmulx		LOG2,%fp0	| ...FP0 IS R
 	addw		%d0,FACT2(%a6)
 
@@ -332,10 +332,10 @@ TENMAIN:
 
 	fmovex		%fp0,%fp1
 	fmuld		L2TEN64,%fp1	| ...X*64*LOG10/LOG2
-	
+
 	fmovel		%fp1,N(%a6)		| ...N=INT(X*64*LOG10/LOG2)
 	movel		%d2,-(%sp)
-	lea		EXPTBL,%a1 	| ...LOAD ADDRESS OF TABLE OF 2^(J/64)
+	lea		EXPTBL,%a1	| ...LOAD ADDRESS OF TABLE OF 2^(J/64)
 	fmovel		N(%a6),%fp1		| ...N --> FLOATING FMT
 	movel		N(%a6),%d0
 	movel		%d0,%d2
@@ -347,7 +347,7 @@ TENMAIN:
 	asrl		#1,%d0		| ...D0 IS M
 	subl		%d0,%d2		| ...d2 IS M', N = 64(M+M') + J
 	addil		#0x3FFF,%d2
-	movew		%d2,ADJFACT(%a6) 	| ...ADJFACT IS 2^(M')
+	movew		%d2,ADJFACT(%a6)	| ...ADJFACT IS 2^(M')
 	movel		(%sp)+,%d2
 
 |--SUMMARY: a1 IS ADDRESS FOR THE LEADING PORTION OF 2^(J/64),
@@ -375,7 +375,7 @@ TENMAIN:
 	clrl		FACT2LOW(%a6)
 
 	fmulx		LOG10,%fp0	| ...FP0 IS R
-	
+
 	addw		%d0,FACT1(%a6)
 	addw		%d0,FACT2(%a6)
 
@@ -405,9 +405,9 @@ expr:
 
 	fmulx		%fp1,%fp2		| ...FP2 IS S*(A1+S*(A3+S*A5))
 	faddx		%fp3,%fp0		| ...FP0 IS R+R*S*(A2+S*A4)
-	
+
 	faddx		%fp2,%fp0		| ...FP0 IS EXP(R) - 1
-	
+
 
 |--FINAL RECONSTRUCTION PROCESS
 |--EXP(X) = 2^M*2^(J/64) + 2^M*2^(J/64)*(EXP(R)-1)  -  (1 OR 0)

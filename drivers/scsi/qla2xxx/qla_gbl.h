@@ -69,9 +69,6 @@ extern int ql2xplogiabsentdevice;
 extern int ql2xenablezio;
 extern int ql2xintrdelaytimer;
 extern int ql2xloginretrycount;
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-extern int ql2xioctltimeout;
-#endif
 
 extern int ConfigRequired;
 
@@ -79,12 +76,6 @@ extern int Bind;
 extern int ql2xsuspendcount;
 #if defined(MODULE)
 extern char *ql2xopts;
-#endif
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-extern struct list_head qla_hostlist;
-extern rwlock_t qla_hostlist_lock;
-
-extern int qla2x00_wait_for_hba_online(scsi_qla_host_t *);
 #endif
 
 extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
@@ -265,20 +256,6 @@ extern void qla2x00_lock_nvram_access(scsi_qla_host_t *);
 extern void qla2x00_unlock_nvram_access(scsi_qla_host_t *);
 extern uint16_t qla2x00_get_nvram_word(scsi_qla_host_t *, uint32_t);
 extern void qla2x00_write_nvram_word(scsi_qla_host_t *, uint32_t, uint16_t);
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-extern void qla2x00_flash_enable(scsi_qla_host_t *);
-extern void qla2x00_flash_disable(scsi_qla_host_t *);
-extern uint8_t qla2x00_read_flash_byte(scsi_qla_host_t *, uint32_t);
-extern void qla2x00_get_flash_manufacturer(scsi_qla_host_t *, uint8_t *,
-    uint8_t *);
-extern uint16_t qla2x00_get_flash_version(scsi_qla_host_t *);
-extern uint16_t qla2x00_get_flash_image(scsi_qla_host_t *, uint8_t *);
-extern uint16_t qla2x00_set_flash_image(scsi_qla_host_t *, uint8_t *, uint32_t,
-    uint32_t);
-extern uint16_t
-qla2x00_update_or_read_flash(scsi_qla_host_t *, uint8_t *, uint32_t, uint32_t,
-    uint8_t);
-#endif
 /*
  * Global Function Prototypes in qla_dbg.c source file.
  */
@@ -314,19 +291,8 @@ extern void qla2x00_cancel_io_descriptors(scsi_qla_host_t *);
 /*
  * Global Function Prototypes in qla_xioctl.c source file.
  */
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
-extern int qla2x00_ioctl(struct scsi_device *, int , void *);
-extern int qla2x00_ioctl_init(void);
-extern int qla2x00_ioctl_exit(void);
-extern void qla2x00_enqueue_aen(scsi_qla_host_t *, uint16_t, void *);
-extern int qla2x00_alloc_ioctl_mem(scsi_qla_host_t *);
-extern void qla2x00_free_ioctl_mem(scsi_qla_host_t *);
-extern int qla2x00_get_ioctl_scrap_mem(scsi_qla_host_t *, void **, uint32_t);
-extern void qla2x00_free_ioctl_scrap_mem(scsi_qla_host_t *);
-#else
 #define qla2x00_enqueue_aen(ha, cmd, mode)	do { } while (0)
 #define qla2x00_alloc_ioctl_mem(ha)		(0)
 #define qla2x00_free_ioctl_mem(ha)		do { } while (0)
-#endif
 
 #endif /* _QLA_GBL_H */

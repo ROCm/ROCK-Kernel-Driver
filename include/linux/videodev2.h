@@ -207,6 +207,9 @@ struct v4l2_pix_format
 #define V4L2_PIX_FMT_YYUV    v4l2_fourcc('Y','Y','U','V') /* 16  YUV 4:2:2     */
 #define V4L2_PIX_FMT_HI240   v4l2_fourcc('H','I','2','4') /*  8  8-bit color   */
 
+/* see http://www.siliconimaging.com/RGB%20Bayer.htm */
+#define V4L2_PIX_FMT_SBGGR8  v4l2_fourcc('B','A','8','1') /*  8  BGBG.. GRGR.. */
+
 /* compressed formats */
 #define V4L2_PIX_FMT_MJPEG    v4l2_fourcc('M','J','P','G') /* Motion-JPEG   */
 #define V4L2_PIX_FMT_JPEG     v4l2_fourcc('J','P','E','G') /* JFIF JPEG     */
@@ -383,8 +386,8 @@ struct v4l2_buffer
 		unsigned long   userptr;
 	} m;
 	__u32			length;
-
-	__u32			reserved[2];
+	__u32			input;
+	__u32			reserved;
 };
 
 /*  Flags for 'flags' field */
@@ -395,6 +398,7 @@ struct v4l2_buffer
 #define V4L2_BUF_FLAG_PFRAME	0x0010	/* Image is a P-frame */
 #define V4L2_BUF_FLAG_BFRAME	0x0020	/* Image is a B-frame */
 #define V4L2_BUF_FLAG_TIMECODE	0x0100	/* timecode field is valid */
+#define V4L2_BUF_FLAG_INPUT     0x0200  /* input field is valid */
 
 /*
  *	O V E R L A Y   P R E V I E W
@@ -429,9 +433,9 @@ struct v4l2_window
 	struct v4l2_rect        w;
 	enum v4l2_field  	field;
 	__u32			chromakey;
-	struct v4l2_clip	*clips;
+	struct v4l2_clip	__user *clips;
 	__u32			clipcount;
-	void			*bitmap;
+	void			__user *bitmap;
 };
 
 
@@ -872,7 +876,7 @@ struct v4l2_streamparm
 #define VIDIOC_S_MODULATOR	_IOW  ('V', 55, struct v4l2_modulator)
 #define VIDIOC_G_FREQUENCY	_IOWR ('V', 56, struct v4l2_frequency)
 #define VIDIOC_S_FREQUENCY	_IOW  ('V', 57, struct v4l2_frequency)
-#define VIDIOC_CROPCAP		_IOR  ('V', 58, struct v4l2_cropcap)
+#define VIDIOC_CROPCAP		_IOWR ('V', 58, struct v4l2_cropcap)
 #define VIDIOC_G_CROP		_IOWR ('V', 59, struct v4l2_crop)
 #define VIDIOC_S_CROP		_IOW  ('V', 60, struct v4l2_crop)
 #define VIDIOC_G_JPEGCOMP	_IOR  ('V', 61, struct v4l2_jpegcompression)
@@ -890,6 +894,7 @@ struct v4l2_streamparm
 #define VIDIOC_S_CTRL_OLD      	_IOW  ('V', 28, struct v4l2_control)
 #define VIDIOC_G_AUDIO_OLD     	_IOWR ('V', 33, struct v4l2_audio)
 #define VIDIOC_G_AUDOUT_OLD    	_IOWR ('V', 49, struct v4l2_audioout)
+#define VIDIOC_CROPCAP_OLD     	_IOR  ('V', 58, struct v4l2_cropcap)
 
 #define BASE_VIDIOC_PRIVATE	192		/* 192-255 are private */
 

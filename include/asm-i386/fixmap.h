@@ -18,7 +18,6 @@
 #include <asm/acpi.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
-#include <asm/vsyscall-gtod.h>
 #ifdef CONFIG_HIGHMEM
 #include <linux/threads.h>
 #include <asm/kmap_types.h>
@@ -45,17 +44,6 @@
 enum fixed_addresses {
 	FIX_HOLE,
 	FIX_VSYSCALL,
-#ifdef CONFIG_VSYSCALL_GTOD
-#ifndef CONFIG_X86_4G
-	FIX_VSYSCALL_GTOD_PAD,
-#endif /* !CONFIG_X86_4G */
-	FIX_VSYSCALL_GTOD_LAST_PAGE,
-	FIX_VSYSCALL_GTOD_FIRST_PAGE = FIX_VSYSCALL_GTOD_LAST_PAGE
-					+ VSYSCALL_GTOD_NUMPAGES - 1,
-#ifdef CONFIG_X86_4G
-	FIX_VSYSCALL_GTOD_4GALIGN,
-#endif /* CONFIG_X86_4G */
-#endif /* CONFIG_VSYSCALL_GTOD */
 #ifdef CONFIG_X86_LOCAL_APIC
 	FIX_APIC_BASE,	/* local (CPU) APIC) -- required for SMP or not */
 #endif

@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
 #include <sys/mman.h> 
@@ -33,7 +34,6 @@
 #define COMMAND_LINE_SIZE _POSIX_ARG_MAX
 
 /* Changed in linux_main and setup_arch, which run before SMP is started */
-char saved_command_line[COMMAND_LINE_SIZE] = { 0 };
 char command_line[COMMAND_LINE_SIZE] = { 0 };
 
 void add_arg(char *cmd_line, char *arg)
@@ -81,8 +81,7 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 	int status, ret;
 
 	while(1){
-		ret = waitpid(pid, &status, WUNTRACED);
-		if((ret < 0) ||
+		if(((ret = waitpid(pid, &status, WUNTRACED)) < 0) ||
 		   !WIFSTOPPED(status) || (WSTOPSIG(status) != sig)){
 			if(ret < 0){
 				if(errno == EINTR) continue;
@@ -119,6 +118,17 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 	}
 }
 
+int clone_and_wait(int (*fn)(void *), void *arg, void *sp, int flags)
+{
+	int pid;
+
+	pid = clone(fn, sp, flags, arg);
+ 	if(pid < 0) return(-1);
+	wait_for_stop(pid, SIGSTOP, PTRACE_CONT, NULL);
+	ptrace(PTRACE_CONT, pid, 0, 0);
+	return(pid);
+}
+
 int raw(int fd, int complain)
 {
 	struct termios tt;
@@ -140,18 +150,6 @@ void setup_machinename(char *machine_out)
 
 	uname(&host);
 	strcpy(machine_out, host.machine);
-	/*
-	 * Pretend to be a i586 machine.
-	 *
-	 * This is a temporary workaround for several problems
-	 * triggered by the fact that the current 2.6 uml kernel
-	 * lacks a few system calls required for TLS/NPTL support,
-	 * whereas glibc expects these syscalls being present
-	 * unconditionally when the kernel version is 2.6.x.
-	 *
-	 */
-	if (0 == strcmp(machine_out,"i686"))
-		strcpy(machine_out,"i586");
 }
 
 char host_info[(_UTSNAME_LENGTH + 1) * 4 + _UTSNAME_NODENAME_LENGTH + 1];

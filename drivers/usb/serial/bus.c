@@ -14,13 +14,6 @@
 #include <linux/tty.h>
 #include <linux/module.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
 
 static int usb_serial_device_match (struct device *dev, struct device_driver *drv)
@@ -78,8 +71,8 @@ static int usb_serial_device_probe (struct device *dev)
 	minor = port->number;
 	tty_register_device (usb_serial_tty_driver, minor, dev);
 	dev_info(&port->serial->dev->dev, 
-		 "%s converter now attached to ttyUSB%d (or usb/tts/%d for devfs)\n",
-		 driver->name, minor, minor);
+		 "%s converter now attached to ttyUSB%d\n",
+		 driver->name, minor);
 
 exit:
 	return retval;

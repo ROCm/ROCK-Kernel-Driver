@@ -26,6 +26,7 @@
 #define O_DIRECT	0x8000	/* direct disk access hint */
 #define O_DIRECTORY	0x10000	/* must be a directory */
 #define O_NOFOLLOW	0x20000	/* don't follow links */
+#define O_NOATIME	0x40000
 
 #define O_NDELAY	O_NONBLOCK
 

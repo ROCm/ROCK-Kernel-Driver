@@ -103,6 +103,7 @@ struct jfs_superblock {
 	char s_uuid[16];	/* 16: 128-bit uuid for volume */
 	char s_label[16];	/* 16: volume label */
 	char s_loguuid[16];	/* 16: 128-bit uuid for log device */
+
 };
 
 extern int readSuper(struct super_block *, struct buffer_head **);

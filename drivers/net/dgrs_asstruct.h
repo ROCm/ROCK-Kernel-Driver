@@ -4,7 +4,7 @@
  *	$Id: asstruct.h,v 1.1.1.1 1994/10/23 05:08:32 rick Exp $
  */
 
-#if ASSEMBLER
+#ifdef ASSEMBLER
 
 #	define MO(t,a)		(a)
 #	define VMO(t,a)		(a)

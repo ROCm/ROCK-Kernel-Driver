@@ -552,7 +552,7 @@ InstructionTLBMiss:
 	rlwimi	r3,r3,32-1,31,31	/* _PAGE_USER -> PP lsb */
 	ori	r1,r1,0xe14		/* clear out reserved bits and M */
 	andc	r1,r3,r1		/* PP = user? (rw&dirty? 2: 3): 0 */
-	mtspr	RPA,r1
+	mtspr	SPRN_RPA,r1
 	mfspr	r3,IMISS
 	tlbli	r3
 	mfspr	r3,SRR1		/* Need to restore CR0 */
@@ -626,7 +626,7 @@ DataLoadTLBMiss:
 	rlwimi	r3,r3,32-1,31,31	/* _PAGE_USER -> PP lsb */
 	ori	r1,r1,0xe14		/* clear out reserved bits and M */
 	andc	r1,r3,r1		/* PP = user? (rw&dirty? 2: 3): 0 */
-	mtspr	RPA,r1
+	mtspr	SPRN_RPA,r1
 	mfspr	r3,DMISS
 	tlbld	r3
 	mfspr	r3,SRR1		/* Need to restore CR0 */
@@ -694,7 +694,7 @@ DataStoreTLBMiss:
 	rlwimi	r3,r3,32-1,30,30	/* _PAGE_USER -> PP msb */
 	li	r1,0xe15		/* clear out reserved bits and M */
 	andc	r1,r3,r1		/* PP = user? 2: 0 */
-	mtspr	RPA,r1
+	mtspr	SPRN_RPA,r1
 	mfspr	r3,DMISS
 	tlbld	r3
 	mfspr	r3,SRR1		/* Need to restore CR0 */

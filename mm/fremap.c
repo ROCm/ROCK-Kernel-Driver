@@ -12,7 +12,7 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/swapops.h>
-#include <linux/objrmap.h>
+#include <linux/rmap.h>
 #include <linux/module.h>
 
 #include <asm/mmu_context.h>
@@ -49,12 +49,14 @@ static inline void zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
- * Install a page to a given virtual memory address, release any
+ * Install a file page to a given virtual memory address, release any
  * previously existing mapping.
  */
 int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long addr, struct page *page, pgprot_t prot)
 {
+	struct inode *inode;
+	pgoff_t size;
 	int err = -ENOMEM;
 	pte_t *pte;
 	pgd_t *pgd;
@@ -63,6 +65,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
+
 	pmd = pmd_alloc(mm, pgd, addr);
 	if (!pmd)
 		goto err_unlock;
@@ -71,12 +74,22 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pte)
 		goto err_unlock;
 
+	/*
+	 * This page may have been truncated. Tell the
+	 * caller about it.
+	 */
+	err = -EINVAL;
+	inode = vma->vm_file->f_mapping->host;
+	size = (i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	if (!page->mapping || page->index >= size)
+		goto err_unlock;
+
 	zap_pte(mm, vma, addr, pte);
 
 	mm->rss++;
 	flush_icache_page(vma, page);
 	set_pte(pte, mk_pte(page, prot));
-	page_add_rmap(page, vma, addr, 0);
+	page_add_file_rmap(page);
 	pte_val = *pte;
 	pte_unmap(pte);
 	update_mmu_cache(vma, addr, pte_val);
@@ -104,6 +117,7 @@ int install_file_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
+
 	pmd = pmd_alloc(mm, pgd, addr);
 	if (!pmd)
 		goto err_unlock;
@@ -150,16 +164,11 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 {
 	struct mm_struct *mm = current->mm;
 	struct address_space *mapping;
-	unsigned long linear_pgoff;
 	unsigned long end = start + size;
 	struct vm_area_struct *vma;
-	int err;
+	int err = -EINVAL;
 	int has_write_lock = 0;
 
-	err = -EPERM;
-	if (!can_do_mlock())
-		return err;
-	err = -EINVAL;
 	if (__prot)
 		return err;
 	/*
@@ -186,17 +195,20 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 	/*
 	 * Make sure the vma is shared, that it supports prefaulting,
 	 * and that the remapped range is valid and fully within
-	 * the single existing vma:
+	 * the single existing vma.  vm_private_data is used as a
+	 * swapout cursor in a VM_NONLINEAR vma (unless VM_RESERVED
+	 * or VM_LOCKED, but VM_LOCKED could be revoked later on).
 	 */
 	if (vma && (vma->vm_flags & VM_SHARED) &&
+		(!vma->vm_private_data ||
+			(vma->vm_flags & (VM_NONLINEAR|VM_RESERVED))) &&
 		vma->vm_ops && vma->vm_ops->populate &&
 			end > start && start >= vma->vm_start &&
 				end <= vma->vm_end) {
 
-		linear_pgoff = vma->vm_pgoff;
-		linear_pgoff +=  ((start - vma->vm_start) >> PAGE_SHIFT);
 		/* Must set VM_NONLINEAR before any pages are populated. */
-		if (unlikely(pgoff != linear_pgoff && !(vma->vm_flags & VM_NONLINEAR))) {
+		if (pgoff != linear_page_index(vma, start) &&
+		    !(vma->vm_flags & VM_NONLINEAR)) {
 			if (!has_write_lock) {
 				up_read(&mm->mmap_sem);
 				down_write(&mm->mmap_sem);
@@ -204,13 +216,15 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 				goto retry;
 			}
 			mapping = vma->vm_file->f_mapping;
-			down(&mapping->i_shared_sem);
+			spin_lock(&mapping->i_mmap_lock);
+			flush_dcache_mmap_lock(mapping);
 			vma->vm_flags |= VM_NONLINEAR;
-			__vma_prio_tree_remove(&mapping->i_mmap_shared, vma);
-			INIT_VMA_SHARED_LIST(vma);
+			vma_prio_tree_remove(vma, &mapping->i_mmap);
+			vma_prio_tree_init(vma);
 			list_add_tail(&vma->shared.vm_set.list,
 					&mapping->i_mmap_nonlinear);
-			up(&mapping->i_shared_sem);
+			flush_dcache_mmap_unlock(mapping);
+			spin_unlock(&mapping->i_mmap_lock);
 		}
 
 		err = vma->vm_ops->populate(vma, start, size,

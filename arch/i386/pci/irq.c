@@ -12,16 +12,19 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/dmi.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/io_apic.h>
+#include <asm/hw_irq.h>
 
 #include "pci.h"
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100
 
-int broken_hp_bios_irq9;
+static int broken_hp_bios_irq9;
+static int acer_tm360_irqrouting;
 
 static struct irq_routing_table *pirq_table;
 
@@ -452,15 +455,12 @@ static int pirq_bios_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
 
 static __init int intel_router_probe(struct irq_router *r, struct pci_dev *router, u16 device)
 {
-#if 0 /* Let's see what chip this is supposed to be ... */
-	/* We must not touch 440GX even if we have tables. 440GX has
-	   different IRQ routing weirdness */
+	/* 440GX has a proprietary PIRQ router -- don't use it */
 	if (	pci_find_device(PCI_VENDOR_ID_INTEL,
 				PCI_DEVICE_ID_INTEL_82443GX_0, NULL) ||
 		pci_find_device(PCI_VENDOR_ID_INTEL,
 				PCI_DEVICE_ID_INTEL_82443GX_2, NULL))
 		return 0;
-#endif
 
 	switch(device)
 	{
@@ -478,8 +478,9 @@ static __init int intel_router_probe(struct irq_router *r, struct pci_dev *route
 		case PCI_DEVICE_ID_INTEL_82801DB_0:
 		case PCI_DEVICE_ID_INTEL_82801E_0:
 		case PCI_DEVICE_ID_INTEL_82801EB_0:
-		case PCI_DEVICE_ID_INTEL_ESB_0:
+		case PCI_DEVICE_ID_INTEL_ESB_1:
 		case PCI_DEVICE_ID_INTEL_ICH6_0:
+		case PCI_DEVICE_ID_INTEL_ICH6_1:
 			r->name = "PIIX/ICH";
 			r->get = pirq_piix_get;
 			r->set = pirq_piix_set;
@@ -542,8 +543,6 @@ static __init int sis_router_probe(struct irq_router *r, struct pci_dev *router,
 	r->name = "SIS";
 	r->get = pirq_sis_get;
 	r->set = pirq_sis_set;
-	DBG("PCI: Detecting SiS router at %02x:%02x\n",
-	    rt->rtr_bus, rt->rtr_devfn);
 	return 1;
 }
 
@@ -590,12 +589,13 @@ static __init int ali_router_probe(struct irq_router *r, struct pci_dev *router,
 {
 	switch(device)
 	{
-		case PCI_DEVICE_ID_AL_M1533:
+	case PCI_DEVICE_ID_AL_M1533:
+	case PCI_DEVICE_ID_AL_M1563:
+		printk("PCI: Using ALI IRQ Router\n");
 			r->name = "ALI";
 			r->get = pirq_ali_get;
 			r->set = pirq_ali_set;
 			return 1;
-		/* Should add 156x some day */
 	}
 	return 0;
 }
@@ -747,6 +747,14 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		r->set(pirq_router_dev, dev, pirq, 11);
 	}
 
+	/* same for Acer Travelmate 360, but with CB and irq 11 -> 10 */
+	if (acer_tm360_irqrouting && dev->irq == 11 && dev->vendor == PCI_VENDOR_ID_O2) {
+		pirq = 0x68;
+		mask = 0x400;
+		dev->irq = r->get(pirq_router_dev, dev, pirq);
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+	}
+
 	/*
 	 * Find the best IRQ to assign: use the one
 	 * reported by the device if possible.
@@ -809,7 +817,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		    	if ( dev2->irq && dev2->irq != irq && \
 			(!(pci_probe & PCI_USE_PIRQ_MASK) || \
 			((1 << dev2->irq) & mask)) ) {
-#ifndef CONFIG_PCI_USE_VECTOR
+#ifndef CONFIG_PCI_MSI
 		    		printk(KERN_INFO "IRQ routing conflict for %s, have irq %d, want irq %d\n",
 				       pci_name(dev2), dev2->irq, irq);
 #endif
@@ -895,12 +903,62 @@ static void __init pcibios_fixup_irqs(void)
 	}
 }
 
+/*
+ * Work around broken HP Pavilion Notebooks which assign USB to
+ * IRQ 9 even though it is actually wired to IRQ 11
+ */
+static int __init fix_broken_hp_bios_irq9(struct dmi_system_id *d)
+{
+	if (!broken_hp_bios_irq9) {
+		broken_hp_bios_irq9 = 1;
+		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n", d->ident);
+	}
+	return 0;
+}
+
+/*
+ * Work around broken Acer TravelMate 360 Notebooks which assign
+ * Cardbus to IRQ 11 even though it is actually wired to IRQ 10
+ */
+static int __init fix_acer_tm360_irqrouting(struct dmi_system_id *d)
+{
+	if (!acer_tm360_irqrouting) {
+		acer_tm360_irqrouting = 1;
+		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n", d->ident);
+	}
+	return 0;
+}
+
+static struct dmi_system_id __initdata pciirq_dmi_table[] = {
+	{
+		.callback = fix_broken_hp_bios_irq9,
+		.ident = "HP Pavilion N5400 Series Laptop",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
+			DMI_MATCH(DMI_BIOS_VERSION, "GE.M1.03"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "HP Pavilion Notebook Model GE"),
+			DMI_MATCH(DMI_BOARD_VERSION, "OmniBook N32N-736"),
+		},
+	},
+	{
+		.callback = fix_acer_tm360_irqrouting,
+		.ident = "Acer TravelMate 36x Laptop",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 360"),
+		},
+	},
+	{ }
+};
+
 static int __init pcibios_irq_init(void)
 {
 	DBG("PCI: IRQ init\n");
 
-	if (pcibios_enable_irq)
+	if (pcibios_enable_irq || raw_pci_ops == NULL)
 		return 0;
+
+	dmi_check_system(pciirq_dmi_table);
 
 	pirq_table = pirq_find_routing_table();
 
@@ -976,7 +1034,7 @@ int pirq_enable_irq(struct pci_dev *dev)
 				}
 				dev = temp_dev;
 				if (irq >= 0) {
-#ifdef CONFIG_PCI_USE_VECTOR
+#ifdef CONFIG_PCI_MSI
 					if (!platform_legacy_irq(irq))
 						irq = IO_APIC_VECTOR(irq);
 #endif
@@ -1002,6 +1060,36 @@ int pirq_enable_irq(struct pci_dev *dev)
 	/* VIA bridges use interrupt line for apic/pci steering across
 	   the V-Link */
 	else if (interrupt_line_quirk)
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq & 15);
 	return 0;
+}
+
+int pci_vector_resources(int last, int nr_released)
+{
+	int count = nr_released;
+
+	int next = last;
+	int offset = (last % 8);
+
+	while (next < FIRST_SYSTEM_VECTOR) {
+		next += 8;
+#ifdef CONFIG_X86_64
+		if (next == IA32_SYSCALL_VECTOR)
+			continue;
+#else
+		if (next == SYSCALL_VECTOR)
+			continue;
+#endif
+		count++;
+		if (next >= FIRST_SYSTEM_VECTOR) {
+			if (offset%8) {
+				next = FIRST_DEVICE_VECTOR + offset;
+				offset++;
+				continue;
+			}
+			count--;
+		}
+	}
+
+	return count;
 }

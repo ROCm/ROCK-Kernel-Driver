@@ -131,7 +131,7 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_ioapic *p =
 			(struct acpi_table_ioapic*) header;
-		printk(KERN_INFO PREFIX "IOAPIC (id[0x%02x] address[0x%08x] global_irq_base[0x%x])\n",
+		printk(KERN_INFO PREFIX "IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
 			p->id, p->address, p->global_irq_base);
 	}
 		break;
@@ -185,8 +185,8 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_iosapic *p =
 			(struct acpi_table_iosapic*) header;
-		printk(KERN_INFO PREFIX "IOSAPIC (id[0x%x] global_irq_base[0x%x] address[%p])\n",
-			p->id, p->global_irq_base, (void *) (unsigned long) p->address);
+		printk(KERN_INFO PREFIX "IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
+			p->id, (void *) (unsigned long) p->address, p->global_irq_base);
 	}
 		break;
 
@@ -286,7 +286,7 @@ acpi_get_table_header_early (
 			*header = (void *) __acpi_map_table(fadt->V1_dsdt,
 					sizeof(struct acpi_table_header));
 		} else
-			*header = 0;
+			*header = NULL;
 
 		if (!*header) {
 			printk(KERN_WARNING PREFIX "Unable to map DSDT\n");

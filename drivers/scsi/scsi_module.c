@@ -12,7 +12,7 @@
 #include <linux/module.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 
 static int __init init_this_scsi_driver(void)

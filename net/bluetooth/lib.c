@@ -22,11 +22,10 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- * Bluetooth kernel library.
- *
- * $Id: lib.c,v 1.1 2002/03/08 21:06:59 maxk Exp $
- */
+/* Bluetooth kernel library. */
+
+#include <linux/config.h>
+#include <linux/module.h>
 
 #include <linux/kernel.h>
 #include <linux/stddef.h>
@@ -58,6 +57,7 @@ void bt_dump(char *pref, __u8 *buf, int count)
 	if (line[0])
 		printk(KERN_INFO "%s:%s\n", pref, line);
 }
+EXPORT_SYMBOL(bt_dump);
 
 void baswap(bdaddr_t *dst, bdaddr_t *src)
 {
@@ -68,6 +68,7 @@ void baswap(bdaddr_t *dst, bdaddr_t *src)
 	for (i = 0; i < 6; i++)
 		d[i] = s[5 - i];
 }
+EXPORT_SYMBOL(baswap);
 
 char *batostr(bdaddr_t *ba)
 {
@@ -76,11 +77,12 @@ char *batostr(bdaddr_t *ba)
 
 	i ^= 1;
 	sprintf(str[i], "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
-	        ba->b[0], ba->b[1], ba->b[2],
+		ba->b[0], ba->b[1], ba->b[2],
 		ba->b[3], ba->b[4], ba->b[5]);
 
 	return str[i];
 }
+EXPORT_SYMBOL(batostr);
 
 /* Bluetooth error codes to Unix errno mapping */
 int bt_err(__u16 code)
@@ -173,3 +175,4 @@ int bt_err(__u16 code)
 		return ENOSYS;
 	}
 }
+EXPORT_SYMBOL(bt_err);

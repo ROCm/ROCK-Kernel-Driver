@@ -85,16 +85,17 @@ _GLOBAL(local_irq_restore)
 	cmpw	0,r3,r5
 	beqlr
 	/* are we enabling interrupts? */
-	cmpi	0,r3,0
+	cmpdi	0,r3,0
 	stb	r3,PACAPROCENABLED(r13)
 	beqlr
 	/* Check pending interrupts */
 	/*   A decrementer, IPI or PMC interrupt may have occurred
 	 *   while we were in the hypervisor (which enables) */
-	CHECKANYINT(r4,r5)
+	ld	r4,PACALPPACA+LPPACAANYINT(r13)
+	cmpdi	r4,0
 	beqlr
 
-	/* 
+	/*
 	 * Handle pending interrupts in interrupt context
 	 */
 	li	r0,0x5555
@@ -340,6 +341,8 @@ _GLOBAL(_insb)
 	eieio
 	stbu	r5,1(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsb)
@@ -349,8 +352,8 @@ _GLOBAL(_outsb)
 	blelr-
 00:	lbzu	r5,1(r4)
 	stb	r5,0(r3)
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(_insw)
@@ -362,6 +365,8 @@ _GLOBAL(_insw)
 	eieio
 	sthu	r5,2(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsw)
@@ -370,9 +375,9 @@ _GLOBAL(_outsw)
 	subi	r4,r4,2
 	blelr-
 00:	lhzu	r5,2(r4)
-	eieio
 	sthbrx	r5,0,r3	
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(_insl)
@@ -384,6 +389,8 @@ _GLOBAL(_insl)
 	eieio
 	stwu	r5,4(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsl)
@@ -393,8 +400,8 @@ _GLOBAL(_outsl)
 	blelr-
 00:	lwzu	r5,4(r4)
 	stwbrx	r5,0,r3
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 /* _GLOBAL(ide_insw) now in drivers/ide/ide-iops.c */
@@ -407,6 +414,8 @@ _GLOBAL(_insw_ns)
 	eieio
 	sthu	r5,2(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 /* _GLOBAL(ide_outsw) now in drivers/ide/ide-iops.c */
@@ -417,8 +426,8 @@ _GLOBAL(_outsw_ns)
 	blelr-
 00:	lhzu	r5,2(r4)
 	sth	r5,0(r3)
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(_insl_ns)
@@ -430,6 +439,8 @@ _GLOBAL(_insl_ns)
 	eieio
 	stwu	r5,4(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsl_ns)
@@ -439,8 +450,8 @@ _GLOBAL(_outsl_ns)
 	blelr-
 00:	lwzu	r5,4(r4)
 	stw	r5,0(r3)
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(abs)
@@ -598,7 +609,7 @@ _GLOBAL(kernel_thread)
 _GLOBAL(sys_call_table32)
 	.llong .sys_restart_syscall	/* 0 */
 	.llong .sys_exit
-	.llong .sys_fork
+	.llong .ppc_fork
 	.llong .sys_read
 	.llong .sys_write
 	.llong .sys32_open		/* 5 */
@@ -668,7 +679,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_ssetmask
 	.llong .sys_setreuid	        /* 70 */
 	.llong .sys_setregid
-	.llong .sys32_sigsuspend
+	.llong .ppc32_sigsuspend
 	.llong .compat_sys_sigpending
 	.llong .sys32_sethostname
 	.llong .compat_sys_setrlimit	        /* 75 */
@@ -716,7 +727,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_ipc
 	.llong .sys_fsync
 	.llong .ppc32_sigreturn
-	.llong .sys_clone		/* 120 */
+	.llong .ppc_clone		/* 120 */
 	.llong .sys32_setdomainname
 	.llong .ppc64_newuname
 	.llong .sys_ni_syscall		/* old modify_ldt syscall */
@@ -741,8 +752,8 @@ _GLOBAL(sys_call_table32)
 	.llong .ppc32_select
 	.llong .sys_flock
 	.llong .sys_msync
-	.llong .sys32_readv		/* 145 */
-	.llong .sys32_writev
+	.llong .compat_sys_readv	/* 145 */
+	.llong .compat_sys_writev
 	.llong .sys32_getsid
 	.llong .sys_fdatasync
 	.llong .sys32_sysctl
@@ -764,7 +775,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_getresuid	        /* 165 */
 	.llong .sys_ni_syscall		/* old query_module syscall */
 	.llong .sys_poll
-	.llong .sys32_nfsservctl
+	.llong .compat_sys_nfsservctl
 	.llong .sys_setresgid
 	.llong .sys_getresgid	        /* 170 */
 	.llong .sys32_prctl
@@ -774,7 +785,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_rt_sigpending     /* 175 */
 	.llong .sys32_rt_sigtimedwait
 	.llong .sys32_rt_sigqueueinfo
-	.llong .sys32_rt_sigsuspend
+	.llong .ppc32_rt_sigsuspend
 	.llong .sys32_pread64
 	.llong .sys32_pwrite64	        /* 180 */
 	.llong .sys_chown
@@ -785,7 +796,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_sendfile
 	.llong .sys_ni_syscall		/* reserved for streams1 */
 	.llong .sys_ni_syscall		/* reserved for streams2 */
-	.llong .sys_vfork
+	.llong .ppc_vfork
 	.llong .compat_sys_getrlimit	        /* 190 */
 	.llong .sys32_readahead
 	.llong .sys32_mmap2
@@ -858,26 +869,19 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
 	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
 	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
-#if 0
 	.llong .compat_sys_mq_open
 	.llong .sys_mq_unlink
 	.llong .compat_sys_mq_timedsend
 	.llong .compat_sys_mq_timedreceive /* 265 */
 	.llong .compat_sys_mq_notify
 	.llong .compat_sys_mq_getsetattr
-#else
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-#endif
+	.llong .sys_ni_syscall		/* 268 reserved for sys_kexec_load */
+
 	.balign 8
 _GLOBAL(sys_call_table)
 	.llong .sys_restart_syscall	/* 0 */
 	.llong .sys_exit
-	.llong .sys_fork
+	.llong .ppc_fork
 	.llong .sys_read
 	.llong .sys_write
 	.llong .sys_open		/* 5 */
@@ -995,7 +999,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ipc
 	.llong .sys_fsync
 	.llong .sys_ni_syscall
-	.llong .sys_clone		/* 120 */
+	.llong .ppc_clone		/* 120 */
 	.llong .sys_setdomainname
 	.llong .ppc64_newuname
 	.llong .sys_ni_syscall		/* old modify_ldt syscall */
@@ -1053,7 +1057,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_rt_sigpending	/* 175 */
 	.llong .sys_rt_sigtimedwait
 	.llong .sys_rt_sigqueueinfo
-	.llong .sys_rt_sigsuspend
+	.llong .ppc64_rt_sigsuspend
 	.llong .sys_pread64
 	.llong .sys_pwrite64	        /* 180 */
 	.llong .sys_chown
@@ -1064,7 +1068,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_sendfile64
 	.llong .sys_ni_syscall		/* reserved for streams1 */
 	.llong .sys_ni_syscall		/* reserved for streams2 */
-	.llong .sys_vfork
+	.llong .ppc_vfork
 	.llong .sys_getrlimit	        /* 190 */
 	.llong .sys_readahead
 	.llong .sys_ni_syscall		/* 32bit only mmap2 */
@@ -1137,18 +1141,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
 	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
 	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
-#if 0
 	.llong .sys_mq_open
 	.llong .sys_mq_unlink
 	.llong .sys_mq_timedsend
 	.llong .sys_mq_timedreceive	/* 265 */
 	.llong .sys_mq_notify
 	.llong .sys_mq_getsetattr
-#else
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-#endif
+	.llong .sys_ni_syscall		/* 268 reserved for sys_kexec_load */

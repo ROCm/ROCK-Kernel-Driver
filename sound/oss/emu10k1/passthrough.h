@@ -90,7 +90,7 @@ struct pt_data
 #define USE_PT_METHOD2  (card->is_audigy)
 #define USE_PT_METHOD1	!USE_PT_METHOD2
 
-ssize_t emu10k1_pt_write(struct file *file, const char *buf, size_t count);
+ssize_t emu10k1_pt_write(struct file *file, const char __user *buf, size_t count);
 
 int emu10k1_pt_setup(struct emu10k1_wavedevice *wave_dev);
 void emu10k1_pt_stop(struct emu10k1_card *card);

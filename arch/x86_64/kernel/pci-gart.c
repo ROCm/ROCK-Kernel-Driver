@@ -30,7 +30,6 @@
 #include <asm/proto.h>
 #include <asm/cacheflush.h>
 #include <asm/kdebug.h>
-#include <asm/proto.h>
 
 #ifdef CONFIG_PREEMPT
 #define preempt_atomic() in_atomic()
@@ -41,7 +40,7 @@
 dma_addr_t bad_dma_address;
 
 unsigned long iommu_bus_base;	/* GART remapping area (physical) */
-unsigned long iommu_size; 	/* size of remapping area bytes */
+static unsigned long iommu_size; 	/* size of remapping area bytes */
 static unsigned long iommu_pages;	/* .. and in pages */
 
 u32 *iommu_gatt_base; 		/* Remapping table */
@@ -70,6 +69,8 @@ int iommu_fullflush = 1;
 /* Allocation bitmap for the remapping area */ 
 static spinlock_t iommu_bitmap_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
+
+static u32 gart_unmapped_entry; 
 
 #define GPTE_VALID    1
 #define GPTE_COHERENT 2
@@ -148,8 +149,6 @@ static void free_iommu(unsigned long offset, int size)
 static void flush_gart(struct pci_dev *dev)
 { 
 	unsigned long flags;
-	int bus = dev ? dev->bus->number : -1;
-	cpumask_const_t bus_cpumask = pcibus_to_cpumask(bus);
 	int flushed = 0;
 	int i;
 
@@ -158,8 +157,6 @@ static void flush_gart(struct pci_dev *dev)
 		for (i = 0; i < MAX_NB; i++) {
 			u32 w;
 			if (!northbridges[i]) 
-				continue;
-			if (bus >= 0 && !(cpu_isset_const(i, bus_cpumask)))
 				continue;
 			pci_write_config_dword(northbridges[i], 0x9c, 
 					       northbridge_flush_word[i] | 1); 
@@ -170,7 +167,7 @@ static void flush_gart(struct pci_dev *dev)
 			flushed++;
 		} 
 		if (!flushed) 
-			printk("nothing to flush? %d\n", bus);
+			printk("nothing to flush?\n");
 		need_flush = 0;
 	} 
 	spin_unlock_irqrestore(&iommu_bitmap_lock, flags);
@@ -195,7 +192,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	/* Kludge to make it bug-to-bug compatible with i386. i386
 	   uses the normal dma_mask for alloc_consistent. */
 	if (hwdev)
-		dma_mask &= hwdev->dma_mask;
+	dma_mask &= hwdev->dma_mask;
 
  again:
 	memory = (void *)__get_free_pages(gfp, get_order(size));
@@ -256,7 +253,7 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 #define SET_LEAK(x) if (iommu_leak_tab) \
 			iommu_leak_tab[x] = __builtin_return_address(0);
 #define CLEAR_LEAK(x) if (iommu_leak_tab) \
-			iommu_leak_tab[x] = 0;
+			iommu_leak_tab[x] = NULL;
 
 /* Debugging aid for drivers that don't free their IOMMU tables */
 static void **iommu_leak_tab; 
@@ -480,6 +477,11 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 	unsigned long pages = 0;
 	int need = 0, nextneed;
 
+#ifdef CONFIG_SWIOTLB
+	if (swiotlb)
+		return swiotlb_map_sg(&dev->dev,sg,nents,dir);
+#endif
+
 	BUG_ON(dir == PCI_DMA_NONE);
 	if (nents == 0) 
 		return 0;
@@ -563,7 +565,7 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 	iommu_page = (dma_addr - iommu_bus_base)>>PAGE_SHIFT;	
 	npages = to_pages(dma_addr, size);
 	for (i = 0; i < npages; i++) { 
-		iommu_gatt_base[iommu_page + i] = 0; 
+		iommu_gatt_base[iommu_page + i] = gart_unmapped_entry; 
 		CLEAR_LEAK(iommu_page + i);
 	}
 	free_iommu(iommu_page, npages);
@@ -618,6 +620,7 @@ EXPORT_SYMBOL(pci_dma_supported);
 EXPORT_SYMBOL(no_iommu);
 EXPORT_SYMBOL(force_iommu); 
 EXPORT_SYMBOL(bad_dma_address);
+EXPORT_SYMBOL(iommu_merge);
 
 static __init unsigned long check_iommu_size(unsigned long aper, u64 aper_size)
 { 
@@ -729,7 +732,8 @@ static int __init pci_iommu_init(void)
 	unsigned long aper_size;
 	unsigned long iommu_start;
 	struct pci_dev *dev;
-		
+	unsigned long scratch;
+	long i;
 
 #ifndef CONFIG_AGP_AMD64
 	no_agp = 1; 
@@ -766,7 +770,7 @@ static int __init pci_iommu_init(void)
 			return -1;
 		}
 	} 
-	
+
 	aper_size = info.aper_size * 1024 * 1024;	
 	iommu_size = check_iommu_size(info.aper_base, aper_size); 
 	iommu_pages = iommu_size >> PAGE_SHIFT; 
@@ -815,6 +819,19 @@ static int __init pci_iommu_init(void)
 	 */
 	clear_kernel_mapping((unsigned long)__va(iommu_bus_base), iommu_size);
 
+	/* 
+	 * Try to workaround a bug (thanks to BenH) 
+	 * Set unmapped entries to a scratch page instead of 0. 
+	 * Any prefetches that hit unmapped entries won't get an bus abort
+	 * then.
+	 */
+	scratch = get_zeroed_page(GFP_KERNEL); 
+	if (!scratch) 
+		panic("Cannot allocate iommu scratch page");
+	gart_unmapped_entry = GPTE_ENCODE(__pa(scratch));
+	for (i = EMERGENCY_PAGES; i < iommu_pages; i++) 
+		iommu_gatt_base[i] = gart_unmapped_entry;
+
 	for_all_nb(dev) {
 		u32 flag; 
 		int cpu = PCI_SLOT(dev->devfn) - 24;
@@ -834,7 +851,7 @@ static int __init pci_iommu_init(void)
 fs_initcall(pci_iommu_init);
 
 /* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]][,merge]
-         [,forcesac][,fullflush][,nomerge][,noaperture]
+         [,forcesac][,fullflush][,nomerge]
    size  set size of iommu (in bytes) 
    noagp don't initialize the AGP driver and use full aperture.
    off   don't use the IOMMU
@@ -849,7 +866,6 @@ fs_initcall(pci_iommu_init);
    nofullflush Don't use IOMMU fullflush
    allowed  overwrite iommu off workarounds for specific chipsets.
    soft	 Use software bounce buffering (default for Intel machines)
-   noaperture Don't touch the aperture for AGP.
 */
 __init int iommu_setup(char *opt) 
 { 
@@ -864,7 +880,7 @@ __init int iommu_setup(char *opt)
 	    if (!memcmp(p,"force", 5)) {
 		    force_iommu = 1;
 		    iommu_aperture_allowed = 1;
-	    } 
+	    }
 	    if (!memcmp(p,"allowed",7))
 		    iommu_aperture_allowed = 1;
 	    if (!memcmp(p,"noforce", 7)) { 
@@ -874,7 +890,7 @@ __init int iommu_setup(char *opt)
 	    if (!memcmp(p, "memaper", 7)) { 
 		    fallback_aper_force = 1; 
 		    p += 7; 
-		    if (*p == '=' && (p++, get_option(&p, &arg)))
+		    if (*p == '=' && get_option(&p, &arg))
 			    fallback_aper_order = arg;
 	    } 
 	    if (!memcmp(p, "panic", 5))
@@ -895,10 +911,6 @@ __init int iommu_setup(char *opt)
 		    iommu_fullflush = 0;
 	    if (!memcmp(p, "soft", 4))
 		    swiotlb = 1;
-	    if (!memcmp(p, "noaperture", 10)) { 
-		    extern int fix_agp_aperture;
-		    fix_agp_aperture = 0;
-	    }
 #ifdef CONFIG_IOMMU_LEAK
 	    if (!memcmp(p,"leak", 4)) { 
 		    leak_trace = 1;

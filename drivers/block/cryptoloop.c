@@ -93,8 +93,8 @@ cryptoloop_transfer_ecb(struct loop_device *lo, int cmd,
 			int size, sector_t IV)
 {
 	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
-	struct scatterlist sg_out = { 0, };
-	struct scatterlist sg_in = { 0, };
+	struct scatterlist sg_out = { NULL, };
+	struct scatterlist sg_in = { NULL, };
 
 	encdec_ecb_t encdecfunc;
 	struct page *in_page, *out_page;
@@ -147,8 +147,8 @@ cryptoloop_transfer_cbc(struct loop_device *lo, int cmd,
 			int size, sector_t IV)
 {
 	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
-	struct scatterlist sg_out = { 0, };
-	struct scatterlist sg_in = { 0, };
+	struct scatterlist sg_out = { NULL, };
+	struct scatterlist sg_in = { NULL, };
 
 	encdec_cbc_t encdecfunc;
 	struct page *in_page, *out_page;

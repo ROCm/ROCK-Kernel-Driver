@@ -62,12 +62,12 @@ modprobe sb io=0x220 irq=5 dma=1 dma16=3
 
 	Or, take the hard way:
 
-insmod souncore
-insmod sound
-insmod uart401
-insmod sb io=0x220 irq=5 dma=1 dma16=3
+modprobe soundcore
+modprobe sound
+modprobe uart401
+modprobe sb io=0x220 irq=5 dma=1 dma16=3
 # do you need MIDI?
-insmod opl3=0x388
+modprobe opl3=0x388
 
 	Just in case, the kernel sound support should be:
 

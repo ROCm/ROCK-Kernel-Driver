@@ -29,6 +29,31 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 static inline void flush_tlb_page(struct vm_area_struct *vma,
 				unsigned long vmaddr)
 	{ _tlbie(vmaddr); }
+static inline void flush_tlb_page_nohash(struct vm_area_struct *vma,
+					 unsigned long vmaddr)
+	{ _tlbie(vmaddr); }
+static inline void flush_tlb_range(struct vm_area_struct *vma,
+				unsigned long start, unsigned long end)
+	{ __tlbia(); }
+static inline void flush_tlb_kernel_range(unsigned long start,
+				unsigned long end)
+	{ __tlbia(); }
+
+#elif defined(CONFIG_FSL_BOOKE)
+
+/* TODO: determine if flush_tlb_range & flush_tlb_kernel_range
+ * are best implemented as tlbia vs specific tlbie's */
+
+#define __tlbia()	_tlbia()
+
+static inline void flush_tlb_mm(struct mm_struct *mm)
+	{ __tlbia(); }
+static inline void flush_tlb_page(struct vm_area_struct *vma,
+				unsigned long vmaddr)
+	{ _tlbie(vmaddr); }
+static inline void flush_tlb_page_nohash(struct vm_area_struct *vma,
+					 unsigned long vmaddr)
+	{ _tlbie(vmaddr); }
 static inline void flush_tlb_range(struct vm_area_struct *vma,
 				unsigned long start, unsigned long end)
 	{ __tlbia(); }
@@ -44,6 +69,9 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 static inline void flush_tlb_page(struct vm_area_struct *vma,
 				unsigned long vmaddr)
 	{ _tlbie(vmaddr); }
+static inline void flush_tlb_page_nohash(struct vm_area_struct *vma,
+					 unsigned long vmaddr)
+	{ _tlbie(vmaddr); }
 static inline void flush_tlb_range(struct mm_struct *mm,
 				unsigned long start, unsigned long end)
 	{ __tlbia(); }
@@ -56,6 +84,7 @@ struct mm_struct;
 struct vm_area_struct;
 extern void flush_tlb_mm(struct mm_struct *mm);
 extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
+extern void flush_tlb_page_nohash(struct vm_area_struct *vma, unsigned long addr);
 extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			    unsigned long end);
 extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);

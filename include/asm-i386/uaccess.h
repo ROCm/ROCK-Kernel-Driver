@@ -43,7 +43,7 @@ extern struct movsl_mask {
 } ____cacheline_aligned_in_smp movsl_mask;
 #endif
 
-#define __addr_ok(addr) ((unsigned long)(addr) < (current_thread_info()->addr_limit.seg))
+#define __addr_ok(addr) ((unsigned long __force)(addr) < (current_thread_info()->addr_limit.seg))
 
 /*
  * Test whether a block of memory is a valid user space address.
@@ -56,6 +56,7 @@ extern struct movsl_mask {
  */
 #define __range_ok(addr,size) ({ \
 	unsigned long flag,sum; \
+	__chk_user_ptr(addr); \
 	asm("addl %3,%1 ; sbbl %0,%0; cmpl %1,%4; sbbl $0,%0" \
 		:"=&r" (flag), "=r" (sum) \
 		:"1" (addr),"g" ((int)(size)),"g" (current_thread_info()->addr_limit.seg)); \
@@ -170,6 +171,7 @@ extern void __get_user_4(void);
  */
 #define get_user(x,ptr)							\
 ({	int __ret_gu,__val_gu;						\
+	__chk_user_ptr(ptr);						\
 	switch(sizeof (*(ptr))) {					\
 	case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;		\
 	case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;		\
@@ -259,7 +261,7 @@ extern void __put_user_bad(void);
 #define __put_user_check(x,ptr,size)					\
 ({									\
 	long __pu_err = -EFAULT;					\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	__typeof__(*(ptr)) __user *__pu_addr = (ptr);			\
 	might_sleep();						\
 	if (access_ok(VERIFY_WRITE,__pu_addr,size))			\
 		__put_user_size((x),__pu_addr,(size),__pu_err,-EFAULT);	\
@@ -288,6 +290,7 @@ extern void __put_user_bad(void);
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
+	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	case 1: __put_user_asm(x,ptr,retval,"b","b","iq",errret);break;	\
 	case 2: __put_user_asm(x,ptr,retval,"w","w","ir",errret);break; \
@@ -346,6 +349,7 @@ extern long __get_user_bad(void);
 #define __get_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
+	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	case 1: __get_user_asm(x,ptr,retval,"b","b","=q",errret);break;	\
 	case 2: __get_user_asm(x,ptr,retval,"w","w","=r",errret);break;	\
@@ -403,13 +407,13 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 
 		switch (n) {
 		case 1:
-			__put_user_size(*(u8 *)from, (u8 *)to, 1, ret, 1);
+			__put_user_size(*(u8 *)from, (u8 __user *)to, 1, ret, 1);
 			return ret;
 		case 2:
-			__put_user_size(*(u16 *)from, (u16 *)to, 2, ret, 2);
+			__put_user_size(*(u16 *)from, (u16 __user *)to, 2, ret, 2);
 			return ret;
 		case 4:
-			__put_user_size(*(u32 *)from, (u32 *)to, 4, ret, 4);
+			__put_user_size(*(u32 *)from, (u32 __user *)to, 4, ret, 4);
 			return ret;
 		}
 	}
@@ -454,55 +458,9 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 	return __copy_from_user_ll(to, from, n);
 }
 
-/**
- * copy_to_user: - Copy a block of data into user space.
- * @to:   Destination address, in user space.
- * @from: Source address, in kernel space.
- * @n:    Number of bytes to copy.
- *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from kernel space to user space.
- *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
- */
-static inline unsigned long
-copy_to_user(void __user *to, const void *from, unsigned long n)
-{
-	might_sleep();
-	if (access_ok(VERIFY_WRITE, to, n))
-		n = __copy_to_user(to, from, n);
-	return n;
-}
-
-/**
- * copy_from_user: - Copy a block of data from user space.
- * @to:   Destination address, in kernel space.
- * @from: Source address, in user space.
- * @n:    Number of bytes to copy.
- *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from user space to kernel space.
- *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
- *
- * If some data could not be copied, this function will pad the copied
- * data to the requested size using zero bytes.
- */
-static inline unsigned long
-copy_from_user(void *to, const void __user *from, unsigned long n)
-{
-	might_sleep();
-	if (access_ok(VERIFY_READ, from, n))
-		n = __copy_from_user(to, from, n);
-	else
-		memset(to, 0, n);
-	return n;
-}
-
+unsigned long copy_to_user(void __user *to, const void *from, unsigned long n);
+unsigned long copy_from_user(void *to,
+			const void __user *from, unsigned long n);
 long strncpy_from_user(char *dst, const char __user *src, long count);
 long __strncpy_from_user(char *dst, const char __user *src, long count);
 

@@ -33,9 +33,6 @@ VERSION 1.2	<2002/11/30>
 	- Copy mc_filter setup code from 8139cp
 	  (includes an optimization, and avoids set_bit use)
 
-		<2003/11/30>
-
-	- Add new rtl8169_{suspend/resume}() support
 */
 
 #include <linux/module.h>
@@ -44,9 +41,9 @@ VERSION 1.2	<2002/11/30>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
 #include <linux/ethtool.h>
-#include <linux/dma-mapping.h>
 #include <linux/crc32.h>
 #include <linux/init.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 
@@ -719,7 +716,7 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 		goto err_out_disable;
 	}
 
-	rc = pci_request_regions(pdev, dev->name);
+	rc = pci_request_regions(pdev, MODULENAME);
 	if (rc) {
 		printk(KERN_ERR PFX "%s: Could not request regions.\n", pdev->slot_name);
 		goto err_out_disable;
@@ -1159,7 +1156,7 @@ rtl8169_hw_start(struct net_device *dev)
 
 static inline void rtl8169_make_unusable_by_asic(struct RxDesc *desc)
 {
-	desc->addr = 0x0badbadbadbadbad;
+	desc->addr = 0x0badbadbadbadbadull;
 	desc->status &= ~cpu_to_le32(OWNbit | RsvdMask);
 }
 
@@ -1385,7 +1382,7 @@ static void
 rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 		     void *ioaddr)
 {
-	unsigned long dirty_tx, tx_left = 0;
+	unsigned long dirty_tx, tx_left;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
@@ -1397,8 +1394,10 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	while (tx_left > 0) {
 		int entry = dirty_tx % NUM_TX_DESC;
 		struct sk_buff *skb = tp->Tx_skbuff[entry];
-		u32 status = le32_to_cpu(tp->TxDescArray[entry].status);
+		u32 status;
 
+		rmb();
+		status = le32_to_cpu(tp->TxDescArray[entry].status);
 		if (status & OWNbit)
 			break;
 
@@ -1409,6 +1408,7 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 		rtl8169_unmap_tx_skb(tp->pci_dev, tp->Tx_skbuff + entry,
 				     tp->TxDescArray + entry);
 		dev_kfree_skb_irq(skb);
+		tp->Tx_skbuff[entry] = NULL;
 		dirty_tx++;
 		tx_left--;
 	}
@@ -1458,11 +1458,13 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 	while (rx_left > 0) {
 		int entry = cur_rx % NUM_RX_DESC;
-		u32 status = le32_to_cpu(tp->RxDescArray[entry].status);
+		u32 status;
+
+		rmb();
+		status = le32_to_cpu(tp->RxDescArray[entry].status);
 
 		if (status & OWNbit)
 			break;
-
 		if (status & RxRES) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
 			tp->stats.rx_errors++;
@@ -1499,7 +1501,7 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 			tp->stats.rx_packets++;
 		}
 		
-		cur_rx++;
+		cur_rx++; 
 		rx_left--;
 	}
 

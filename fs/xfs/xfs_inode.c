@@ -854,6 +854,34 @@ xfs_xlate_dinode_core(
 	INT_XLATE(buf_core->di_gen, mem_core->di_gen, dir, arch);
 }
 
+uint
+xfs_dic2xflags(
+	xfs_dinode_core_t	*dic,
+	xfs_arch_t		arch)
+{
+	__uint16_t		di_flags;
+	uint			flags = 0;
+
+	di_flags = INT_GET(dic->di_flags, arch);
+	if (di_flags & XFS_DIFLAG_REALTIME)
+		flags |= XFS_XFLAG_REALTIME;
+	if (di_flags & XFS_DIFLAG_PREALLOC)
+		flags |= XFS_XFLAG_PREALLOC;
+	if (di_flags & XFS_DIFLAG_IMMUTABLE)
+		flags |= XFS_XFLAG_IMMUTABLE;
+	if (di_flags & XFS_DIFLAG_APPEND)
+		flags |= XFS_XFLAG_APPEND;
+	if (di_flags & XFS_DIFLAG_SYNC)
+		flags |= XFS_XFLAG_SYNC;
+	if (di_flags & XFS_DIFLAG_NOATIME)
+		flags |= XFS_XFLAG_NOATIME;
+	if (di_flags & XFS_DIFLAG_NODUMP)
+		flags |= XFS_XFLAG_NODUMP;
+	if (XFS_CFORK_Q_ARCH(dic, arch))
+		flags |= XFS_XFLAG_HASATTR;
+	return flags;
+}
+
 /*
  * Given a mount structure and an inode number, return a pointer
  * to a newly allocated in-core inode coresponding to the given
@@ -1112,8 +1140,7 @@ xfs_ialloc(
 	 * Call the space management code to pick
 	 * the on-disk inode to be allocated.
 	 */
-	ASSERT(pip != NULL);
-	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode, okalloc,
+	error = xfs_dialloc(tp, pip->i_ino, mode, okalloc,
 			    ialloc_context, call_again, &ino);
 	if (error != 0) {
 		return error;
@@ -3667,12 +3694,6 @@ xfs_iaccess(
 	int		error;
 	mode_t		orgmode = mode;
 	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
-
-	/*
-	 * Verify that the MAC policy allows the requested access.
-	 */
-	if ((error = _MAC_XFS_IACCESS(ip, mode, cr)))
-		return XFS_ERROR(error);
 
 	if (mode & S_IWUSR) {
 		umode_t		imode = inode->i_mode;

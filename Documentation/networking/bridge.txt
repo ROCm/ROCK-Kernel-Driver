@@ -1,11 +1,8 @@
-In order to use the ethernet bridging functionality you'll need the
-userspace tools available at http://www.math.leidenuniv.nl/~buytenh/bridge.
-The tarball available there contains extensive documentation, but if you
-still have questions, don't hesitate to post to the mailing list (more info
-at http://www.math.leidenuniv.nl/mailman/listinfo/bridge). You can also
-mail me at buytenh@gnu.org.
+In order to use the Ethernet bridging functionality, you'll need the
+userspace tools. These programs and documentation are available
+at http://bridge.sourceforge.net.  The download page is
+http://prdownloads.sourceforge.net/bridge.
 
+If you still have questions, don't hesitate to post to the mailing list 
+(more info http://lists.osdl.org/mailman/listinfo/bridge).
 
-
-Lennert Buytenhek
-<buytenh@gnu.org>

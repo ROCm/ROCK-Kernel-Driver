@@ -19,8 +19,6 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
-#include <linux/fshooks.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -43,25 +41,14 @@ asmlinkage int sys_pipe(unsigned long __user * fildes)
 }
 
 /* common code for old and new mmaps */
-long do_mmap2(struct mm_struct *mm,
+static inline long do_mmap2(
 	unsigned long addr, unsigned long len,
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	int error;
-
-	FSHOOK_BEGIN(mmap,
-		error,
-		.paddr = &addr,
-		.length = len,
-		.prot = prot,
-		.flags = flags,
-		.fd = fd,
-		.offset = (loff_t)pgoff << PAGE_SHIFT)
-
+	int error = -EBADF;
 	struct file * file = NULL;
 
-	error = -EBADF;
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
@@ -69,15 +56,13 @@ long do_mmap2(struct mm_struct *mm,
 			goto out;
 	}
 
-	down_write(&mm->mmap_sem);
-	addr = error = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
-	up_write(&mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
+	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	up_write(&current->mm->mmap_sem);
 
 	if (file)
 		fput(file);
 out:
-	FSHOOK_END(mmap, !IS_ERR((void *)error) ? 0 : error)
-
 	return error;
 }
 
@@ -85,7 +70,7 @@ asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	return do_mmap2(current->mm, addr, len, prot, flags, fd, pgoff);
+	return do_mmap2(addr, len, prot, flags, fd, pgoff);
 }
 
 /*
@@ -116,7 +101,7 @@ asmlinkage int old_mmap(struct mmap_arg_struct __user *arg)
 	if (a.offset & ~PAGE_MASK)
 		goto out;
 
-	err = do_mmap2(current->mm, a.addr, a.len, a.prot, a.flags, a.fd, a.offset >> PAGE_SHIFT);
+	err = do_mmap2(a.addr, a.len, a.prot, a.flags, a.fd, a.offset >> PAGE_SHIFT);
 out:
 	return err;
 }
@@ -150,7 +135,6 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 
 	version = call >> 16; /* hack for backward compatibility */
 	call &= 0xffff;
-	TRIG_EVENT(ipc_call_hook, call, first);
 
 	switch (call) {
 	case SEMOP:
@@ -165,7 +149,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		union semun fourth;
 		if (!ptr)
 			return -EINVAL;
-		if (get_user(fourth.__pad, (void * __user *) ptr))
+		if (get_user(fourth.__pad, (void __user * __user *) ptr))
 			return -EFAULT;
 		return sys_semctl (first, second, third, fourth);
 	}

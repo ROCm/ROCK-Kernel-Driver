@@ -70,11 +70,7 @@ typedef u16 u16_le;
 /*
  * MACRO
  */
-#define NUMBER(arr) ((int) (sizeof(arr) / sizeof(arr[0])))
 #define BIT(x)      (1UL << (x))
-#ifndef MIN
-# define MIN(a,b)   ((a) > (b) ? (b) : (a))
-#endif
 
 /*
  * BASIC Definitions

@@ -102,17 +102,17 @@ static const char * const rmt_events[] = {
 /*
  * function declarations
  */
-static void rmt_fsm() ;
-static void start_rmt_timer0() ;
-static void start_rmt_timer1() ;
-static void start_rmt_timer2() ;
-static void stop_rmt_timer0() ;
-static void stop_rmt_timer1() ;
-static void stop_rmt_timer2() ;
-static void rmt_dup_actions() ;
-static void rmt_reinsert_actions() ;
-static void rmt_leave_actions() ;
-static void rmt_new_dup_actions() ;
+static void rmt_fsm(struct s_smc *smc, int cmd);
+static void start_rmt_timer0(struct s_smc *smc, u_long value, int event);
+static void start_rmt_timer1(struct s_smc *smc, u_long value, int event);
+static void start_rmt_timer2(struct s_smc *smc, u_long value, int event);
+static void stop_rmt_timer0(struct s_smc *smc);
+static void stop_rmt_timer1(struct s_smc *smc);
+static void stop_rmt_timer2(struct s_smc *smc);
+static void rmt_dup_actions(struct s_smc *smc);
+static void rmt_reinsert_actions(struct s_smc *smc);
+static void rmt_leave_actions(struct s_smc *smc);
+static void rmt_new_dup_actions(struct s_smc *smc);
 
 #ifndef SUPERNET_3
 extern void restart_trt_for_dbcn() ;
@@ -122,8 +122,7 @@ extern void restart_trt_for_dbcn() ;
 	init RMT state machine
 	clear all RMT vars and flags
 */
-void rmt_init(smc)
-struct s_smc *smc ;
+void rmt_init(struct s_smc *smc)
 {
 	smc->mib.m[MAC0].fddiMACRMTState = ACTIONS(RM0_ISOLATED) ;
 	smc->r.dup_addr_test = DA_NONE ;
@@ -145,9 +144,7 @@ struct s_smc *smc ;
 		process event
 	until SM is stable
 */
-void rmt(smc,event)
-struct s_smc *smc ;
-int event ;
+void rmt(struct s_smc *smc, int event)
 {
 	int	state ;
 
@@ -166,9 +163,7 @@ int event ;
 /*
 	process RMT event
 */
-static void rmt_fsm(smc,cmd)
-struct s_smc *smc ;
-int cmd ;
+static void rmt_fsm(struct s_smc *smc, int cmd)
 {
 	/*
 	 * RM00-RM70 : from all states
@@ -535,8 +530,7 @@ int cmd ;
  * (jd) RMT duplicate address actions
  * leave the ring or reinsert just as configured
  */
-static void rmt_dup_actions(smc)
-struct s_smc *smc ;
+static void rmt_dup_actions(struct s_smc *smc)
 {
 	if (smc->r.jm_flag) {
 	}
@@ -555,8 +549,7 @@ struct s_smc *smc ;
 /*
  * Reconnect to the Ring
  */
-static void rmt_reinsert_actions(smc)
-struct s_smc *smc ;
+static void rmt_reinsert_actions(struct s_smc *smc)
 {
 	queue_event(smc,EVENT_ECM,EC_DISCONNECT) ;
 	queue_event(smc,EVENT_ECM,EC_CONNECT) ;
@@ -565,8 +558,7 @@ struct s_smc *smc ;
 /*
  * duplicate address detected
  */
-static void rmt_new_dup_actions(smc)
-struct s_smc *smc ;
+static void rmt_new_dup_actions(struct s_smc *smc)
 {
 	smc->r.da_flag = TRUE ;
 	smc->r.bn_flag = FALSE ;
@@ -591,8 +583,7 @@ struct s_smc *smc ;
 /*
  * leave the ring
  */
-static void rmt_leave_actions(smc)
-struct s_smc *smc ;
+static void rmt_leave_actions(struct s_smc *smc)
 {
 	queue_event(smc,EVENT_ECM,EC_DISCONNECT) ;
 	/*
@@ -605,10 +596,7 @@ struct s_smc *smc ;
  * SMT timer interface
  *	start RMT timer 0
  */
-static void start_rmt_timer0(smc,value,event)
-struct s_smc *smc ;
-u_long value ;
-int event ;
+static void start_rmt_timer0(struct s_smc *smc, u_long value, int event)
 {
 	smc->r.timer0_exp = FALSE ;		/* clear timer event flag */
 	smt_timer_start(smc,&smc->r.rmt_timer0,value,EV_TOKEN(EVENT_RMT,event));
@@ -618,10 +606,7 @@ int event ;
  * SMT timer interface
  *	start RMT timer 1
  */
-static void start_rmt_timer1(smc,value,event)
-struct s_smc *smc ;
-u_long value ;
-int event ;
+static void start_rmt_timer1(struct s_smc *smc, u_long value, int event)
 {
 	smc->r.timer1_exp = FALSE ;	/* clear timer event flag */
 	smt_timer_start(smc,&smc->r.rmt_timer1,value,EV_TOKEN(EVENT_RMT,event));
@@ -631,10 +616,7 @@ int event ;
  * SMT timer interface
  *	start RMT timer 2
  */
-static void start_rmt_timer2(smc,value,event)
-struct s_smc *smc ;
-u_long value ;
-int event ;
+static void start_rmt_timer2(struct s_smc *smc, u_long value, int event)
 {
 	smc->r.timer2_exp = FALSE ;		/* clear timer event flag */
 	smt_timer_start(smc,&smc->r.rmt_timer2,value,EV_TOKEN(EVENT_RMT,event));
@@ -644,8 +626,7 @@ int event ;
  * SMT timer interface
  *	stop RMT timer 0
  */
-static void stop_rmt_timer0(smc)
-struct s_smc *smc ;
+static void stop_rmt_timer0(struct s_smc *smc)
 {
 	if (smc->r.rmt_timer0.tm_active)
 		smt_timer_stop(smc,&smc->r.rmt_timer0) ;
@@ -655,8 +636,7 @@ struct s_smc *smc ;
  * SMT timer interface
  *	stop RMT timer 1
  */
-static void stop_rmt_timer1(smc)
-struct s_smc *smc ;
+static void stop_rmt_timer1(struct s_smc *smc)
 {
 	if (smc->r.rmt_timer1.tm_active)
 		smt_timer_stop(smc,&smc->r.rmt_timer1) ;
@@ -666,9 +646,9 @@ struct s_smc *smc ;
  * SMT timer interface
  *	stop RMT timer 2
  */
-static void stop_rmt_timer2(smc)
-struct s_smc *smc ;
+static void stop_rmt_timer2(struct s_smc *smc)
 {
 	if (smc->r.rmt_timer2.tm_active)
 		smt_timer_stop(smc,&smc->r.rmt_timer2) ;
 }
+

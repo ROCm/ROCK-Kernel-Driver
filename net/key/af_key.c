@@ -1059,7 +1059,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		struct sadb_address *addr = ext_hdrs[SADB_EXT_ADDRESS_PROXY-1];
 
 		/* Nobody uses this, but we try. */
-		pfkey_sadb_addr2xfrm_addr(addr, &x->sel.saddr);
+		x->sel.family = pfkey_sadb_addr2xfrm_addr(addr, &x->sel.saddr);
 		x->sel.prefixlen_s = addr->sadb_address_prefixlen;
 	}
 
@@ -1074,6 +1074,15 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		natt = x->encap;
 		n_type = ext_hdrs[SADB_X_EXT_NAT_T_TYPE-1];
 		natt->encap_type = n_type->sadb_x_nat_t_type_type;
+
+		switch (natt->encap_type) {
+		case UDP_ENCAP_ESPINUDP:
+		case UDP_ENCAP_ESPINUDP_NON_IKE:
+			break;
+		default:
+			err = -ENOPROTOOPT;
+			goto out;
+		}
 
 		if (ext_hdrs[SADB_X_EXT_NAT_T_SPORT-1]) {
 			struct sadb_x_nat_t_port* n_port =
@@ -1173,10 +1182,10 @@ static int pfkey_getspi(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 			min_spi = range->sadb_spirange_min;
 			max_spi = range->sadb_spirange_max;
 		} else {
-			min_spi = htonl(0x100);
-			max_spi = htonl(0x0fffffff);
+			min_spi = 0x100;
+			max_spi = 0x0fffffff;
 		}
-		xfrm_alloc_spi(x, min_spi, max_spi);
+		xfrm_alloc_spi(x, htonl(min_spi), htonl(max_spi));
 		if (x->id.spi)
 			resp_skb = pfkey_xfrm_state2msg(x, 0, 3);
 	}
@@ -1976,7 +1985,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	memset(&sel, 0, sizeof(sel));
 
 	sa = ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
-	pfkey_sadb_addr2xfrm_addr(sa, &sel.saddr);
+	sel.family = pfkey_sadb_addr2xfrm_addr(sa, &sel.saddr);
 	sel.prefixlen_s = sa->sadb_address_prefixlen;
 	sel.proto = pfkey_proto_to_xfrm(sa->sadb_address_proto);
 	sel.sport = ((struct sockaddr_in *)(sa+1))->sin_port;
@@ -2638,7 +2647,7 @@ static int pfkey_send_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, 
 	addr->sadb_address_len = 
 		(sizeof(struct sadb_address)+sockaddr_size)/
 			sizeof(uint64_t);
-	addr->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
+	addr->sadb_address_exttype = SADB_EXT_ADDRESS_DST;
 	addr->sadb_address_proto = 0;
 	addr->sadb_address_reserved = 0;
 	if (x->props.family == AF_INET) {
@@ -2848,7 +2857,7 @@ static struct xfrm_mgr pfkeyv2_mgr =
 static void __exit ipsec_pfkey_exit(void)
 {
 	xfrm_unregister_km(&pfkeyv2_mgr);
-	remove_proc_entry("net/pfkey", 0);
+	remove_proc_entry("net/pfkey", NULL);
 	sock_unregister(PF_KEY);
 }
 
@@ -2856,7 +2865,7 @@ static int __init ipsec_pfkey_init(void)
 {
 	sock_register(&pfkey_family_ops);
 #ifdef CONFIG_PROC_FS
-	create_proc_read_entry("net/pfkey", 0, 0, pfkey_read_proc, NULL);
+	create_proc_read_entry("net/pfkey", 0, NULL, pfkey_read_proc, NULL);
 #endif
 	xfrm_register_km(&pfkeyv2_mgr);
 	return 0;

@@ -81,7 +81,7 @@ static int snd_mixer_oss_release(struct inode *inode, struct file *file)
 }
 
 static int snd_mixer_oss_info(snd_mixer_oss_file_t *fmixer,
-			      mixer_info *_info)
+			      mixer_info __user *_info)
 {
 	snd_card_t *card = fmixer->card;
 	snd_mixer_oss_t *mixer = fmixer->mixer;
@@ -97,7 +97,7 @@ static int snd_mixer_oss_info(snd_mixer_oss_file_t *fmixer,
 }
 
 static int snd_mixer_oss_info_obsolete(snd_mixer_oss_file_t *fmixer,
-				       _old_mixer_info *_info)
+				       _old_mixer_info __user *_info)
 {
 	snd_card_t *card = fmixer->card;
 	snd_mixer_oss_t *mixer = fmixer->mixer;
@@ -293,65 +293,67 @@ static int snd_mixer_oss_set_volume(snd_mixer_oss_file_t *fmixer,
 
 static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	int tmp;
 
 	snd_assert(fmixer != NULL, return -ENXIO);
 	if (((cmd >> 8) & 0xff) == 'M') {
 		switch (cmd) {
 		case SOUND_MIXER_INFO:
-			return snd_mixer_oss_info(fmixer, (mixer_info *)arg);
+			return snd_mixer_oss_info(fmixer, argp);
 		case SOUND_OLD_MIXER_INFO:
- 			return snd_mixer_oss_info_obsolete(fmixer, (_old_mixer_info *)arg);
+ 			return snd_mixer_oss_info_obsolete(fmixer, argp);
 		case SOUND_MIXER_WRITE_RECSRC:
-			if (get_user(tmp, (int *)arg))
+			if (get_user(tmp, p))
 				return -EFAULT;
 			tmp = snd_mixer_oss_set_recsrc(fmixer, tmp);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, p);
 		case OSS_GETVERSION:
-			return put_user(SNDRV_OSS_VERSION, (int *) arg);
+			return put_user(SNDRV_OSS_VERSION, p);
 		case OSS_ALSAEMULVER:
-			return put_user(1, (int *) arg);
+			return put_user(1, p);
 		case SOUND_MIXER_READ_DEVMASK:
 			tmp = snd_mixer_oss_devmask(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, p);
 		case SOUND_MIXER_READ_STEREODEVS:
 			tmp = snd_mixer_oss_stereodevs(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, p);
 		case SOUND_MIXER_READ_RECMASK:
 			tmp = snd_mixer_oss_recmask(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, p);
 		case SOUND_MIXER_READ_CAPS:
 			tmp = snd_mixer_oss_caps(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, p);
 		case SOUND_MIXER_READ_RECSRC:
 			tmp = snd_mixer_oss_get_recsrc(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg);
+			return put_user(tmp, p);
 		}
 	}
 	if (cmd & SIOC_IN) {
-		if (get_user(tmp, (int *)arg))
+		if (get_user(tmp, p))
 			return -EFAULT;
 		tmp = snd_mixer_oss_set_volume(fmixer, cmd & 0xff, tmp);
 		if (tmp < 0)
 			return tmp;
-		return put_user(tmp, (int *)arg);
+		return put_user(tmp, p);
 	} else if (cmd & SIOC_OUT) {
 		tmp = snd_mixer_oss_get_volume(fmixer, cmd & 0xff);
 		if (tmp < 0)
 			return tmp;
-		return put_user(tmp, (int *)arg);
+		return put_user(tmp, p);
 	}
 	return -ENXIO;
 }

@@ -252,8 +252,8 @@ struct CUSTOM {
 #define DMAF_ALL		(0x01FF)
 
 struct CIA {
-    unsigned char pra; 		char pad0[0xff];
-    unsigned char prb; 		char pad1[0xff];
+    unsigned char pra;		char pad0[0xff];
+    unsigned char prb;		char pad1[0xff];
     unsigned char ddra;		char pad2[0xff];
     unsigned char ddrb;		char pad3[0xff];
     unsigned char talo;		char pad4[0xff];
@@ -263,10 +263,10 @@ struct CIA {
     unsigned char todlo;	char pad8[0xff];
     unsigned char todmid;	char pad9[0xff];
     unsigned char todhi;	char pada[0x1ff];
-    unsigned char sdr; 		char padb[0xff];
-    unsigned char icr; 		char padc[0xff];
-    unsigned char cra; 		char padd[0xff];
-    unsigned char crb; 		char pade[0xff];
+    unsigned char sdr;		char padb[0xff];
+    unsigned char icr;		char padc[0xff];
+    unsigned char cra;		char padd[0xff];
+    unsigned char crb;		char pade[0xff];
 };
 
 #define zTwoBase (0x80000000)
@@ -319,7 +319,7 @@ struct tod3000 {
   unsigned int  :28, year2:4;	/* lower digit */
   unsigned int  :28, year1:4;	/* upper digit */
   unsigned int  :28, cntrl1:4;	/* control-byte 1 */
-  unsigned int  :28, cntrl2:4;	/* control-byte 2 */  
+  unsigned int  :28, cntrl2:4;	/* control-byte 2 */
   unsigned int  :28, cntrl3:4;	/* control-byte 3 */
 };
 #define TOD3000_CNTRL1_HOLD	0
@@ -341,7 +341,7 @@ struct tod2000 {
   unsigned int  :28, year1:4;	/* upper digit */
   unsigned int  :28, weekday:4;
   unsigned int  :28, cntrl1:4;	/* control-byte 1 */
-  unsigned int  :28, cntrl2:4;	/* control-byte 2 */  
+  unsigned int  :28, cntrl2:4;	/* control-byte 2 */
   unsigned int  :28, cntrl3:4;	/* control-byte 3 */
 };
 

@@ -129,8 +129,14 @@ struct dm_target_spec {
 	int32_t status;		/* used when reading from kernel only */
 
 	/*
-	 * Offset in bytes (from the start of this struct) to
-	 * next target_spec.
+	 * Location of the next dm_target_spec.
+	 * - When specifying targets on a DM_TABLE_LOAD command, this value is
+	 *   the number of bytes from the start of the "current" dm_target_spec
+	 *   to the start of the "next" dm_target_spec.
+	 * - When retrieving targets on a DM_TABLE_STATUS command, this value
+	 *   is the number of bytes from the start of the first dm_target_spec
+	 *   (that follows the dm_ioctl struct) to the start of the "next"
+	 *   dm_target_spec.
 	 */
 	uint32_t next;
 

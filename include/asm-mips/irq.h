@@ -31,4 +31,7 @@ extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
 
 extern void init_generic_irq(void);
 
+struct irqaction;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif /* _ASM_IRQ_H */

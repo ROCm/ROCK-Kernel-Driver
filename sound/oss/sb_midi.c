@@ -118,7 +118,7 @@ static int sb_midi_end_read(int dev)
 	return 0;
 }
 
-static int sb_midi_ioctl(int dev, unsigned cmd, caddr_t arg)
+static int sb_midi_ioctl(int dev, unsigned cmd, void __user *arg)
 {
         return -EINVAL;
 }

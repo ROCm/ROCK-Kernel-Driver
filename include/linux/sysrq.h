@@ -30,13 +30,7 @@ struct sysrq_key_op {
  */
 
 void handle_sysrq(int, struct pt_regs *, struct tty_struct *);
-
-/* 
- * Nonlocking version of handle sysrq, used by sysrq handlers that need to
- * call sysrq handlers
- */
-
-void __handle_sysrq_nolock(int, struct pt_regs *, struct tty_struct *);
+void __handle_sysrq(int, struct pt_regs *, struct tty_struct *);
 
 /*
  * Sysrq registration manipulation functions

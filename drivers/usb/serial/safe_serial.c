@@ -72,18 +72,14 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
+#include "usb-serial.h"
 
 
-#ifndef CONFIG_USB_SERIAL_DEBUG
-#define CONFIG_USB_SERIAL_DEBUG 0
-#endif
 #ifndef CONFIG_USB_SAFE_PADDED
 #define CONFIG_USB_SAFE_PADDED 0
 #endif
 
-static int debug = CONFIG_USB_SERIAL_DEBUG;
-#include "usb-serial.h"		// must follow the declaration of debug
-
+static int debug;
 static int safe = 1;
 static int padded = CONFIG_USB_SAFE_PADDED;
 
@@ -102,19 +98,20 @@ MODULE_LICENSE("GPL");
 #if ! defined(CONFIG_USBD_SAFE_SERIAL_VENDOR)
 static __u16 vendor;		// no default
 static __u16 product;		// no default
-MODULE_PARM (vendor, "i");
-MODULE_PARM (product, "i");
-MODULE_PARM_DESC (vendor, "User specified USB idVendor (required)");
-MODULE_PARM_DESC (product, "User specified USB idProduct (required)");
+module_param(vendor, ushort, 0);
+MODULE_PARM_DESC(vendor, "User specified USB idVendor (required)");
+module_param(product, ushort, 0);
+MODULE_PARM_DESC(product, "User specified USB idProduct (required)");
 #endif
 
-MODULE_PARM (debug, "i");
-MODULE_PARM (safe, "i");
-MODULE_PARM (padded, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM_DESC (debug, "Debug enabled or not");
-MODULE_PARM_DESC (safe, "Turn Safe Encapsulation On/Off");
-MODULE_PARM_DESC (padded, "Pad to full wMaxPacketSize On/Off");
+module_param(safe, bool, 0);
+MODULE_PARM_DESC(safe, "Turn Safe Encapsulation On/Off");
+
+module_param(padded, bool, 0);
+MODULE_PARM_DESC(padded, "Pad to full wMaxPacketSize On/Off");
 
 #define CDC_DEVICE_CLASS                        0x02
 
@@ -211,18 +208,12 @@ static __u16 __inline__ fcs_compute10 (unsigned char *sp, int len, __u16 fcs)
 static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	unsigned char *data = urb->transfer_buffer;
 	unsigned char length = urb->actual_length;
 	int i;
 	int result;
 
 	dbg ("%s", __FUNCTION__);
-
-	if (!serial) {
-		dbg ("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg ("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -272,8 +263,8 @@ static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	}
 
 	/* Continue trying to always read  */
-	usb_fill_bulk_urb (urb, serial->dev,
-		       usb_rcvbulkpipe (serial->dev, port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb (urb, port->serial->dev,
+		       usb_rcvbulkpipe (port->serial->dev, port->bulk_in_endpointAddress),
 		       urb->transfer_buffer, urb->transfer_buffer_length,
 		       safe_read_bulk_callback, port);
 
@@ -284,7 +275,6 @@ static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 static int safe_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
 {
-	struct usb_serial *serial = port->serial;
 	unsigned char *data;
 	int result;
 	int i;
@@ -353,7 +343,7 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 		port->write_urb->transfer_buffer_length = count;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, port->write_urb->transfer_buffer);
 #ifdef ECHO_TX
 	{
 		int i;
@@ -367,7 +357,7 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 		printk ("\n");
 	}
 #endif
-	port->write_urb->dev = serial->dev;
+	port->write_urb->dev = port->serial->dev;
 	if ((result = usb_submit_urb (port->write_urb, GFP_KERNEL))) {
 		err ("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 		return 0;
@@ -395,7 +385,7 @@ static int safe_write_room (struct usb_serial_port *port)
 
 static int safe_startup (struct usb_serial *serial)
 {
-	switch (serial->interface->altsetting->desc.bInterfaceProtocol) {
+	switch (serial->interface->cur_altsetting->desc.bInterfaceProtocol) {
 	case LINEO_SAFESERIAL_CRC:
 		break;
 	case LINEO_SAFESERIAL_CRC_PADDED:

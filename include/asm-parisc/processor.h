@@ -52,11 +52,11 @@
 #ifndef __ASSEMBLY__
 
 /*
-** Data detected about CPUs at boot time which is the same for all CPU's.
-** HP boxes are SMP - ie identical processors.
-**
-** FIXME: some CPU rev info may be processor specific...
-*/
+ * Data detected about CPUs at boot time which is the same for all CPU's.
+ * HP boxes are SMP - ie identical processors.
+ *
+ * FIXME: some CPU rev info may be processor specific...
+ */
 struct system_cpuinfo_parisc {
 	unsigned int	cpu_count;
 	unsigned int	cpu_hz;
@@ -77,9 +77,7 @@ struct system_cpuinfo_parisc {
 };
 
 
-/*
-** Per CPU data structure - ie varies per CPU.
-*/
+/* Per CPU data structure - ie varies per CPU.  */
 struct cpuinfo_parisc {
 	unsigned long it_value;     /* Interval Timer at last timer Intr */
 	unsigned long it_delta;     /* Interval delta (tic_10ms / HZ * 100) */
@@ -115,6 +113,8 @@ extern struct cpuinfo_parisc cpu_data[NR_CPUS];
 typedef struct {
 	int seg;  
 } mm_segment_t;
+
+#define ARCH_MIN_TASKALIGN	8
 
 struct thread_struct {
 	struct pt_regs regs;
@@ -309,22 +309,31 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
 extern void map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm);
 
-static inline unsigned long get_wchan(struct task_struct *p)
-{
-	return 0xdeadbeef; /* XXX */
-}
+extern unsigned long get_wchan(struct task_struct *p);
 
 #define KSTK_EIP(tsk)	((tsk)->thread.regs.iaoq[0])
 #define KSTK_ESP(tsk)	((tsk)->thread.regs.gr[30])
 
-#ifdef  CONFIG_PA20
+
+/*
+ * PA 2.0 defines data prefetch instructions on page 6-11 of the Kane book.
+ * In addition, many implementations do hardware prefetching of both
+ * instructions and data.
+ *
+ * PA7300LC (page 14-4 of the ERS) also implements prefetching by a load
+ * to gr0 but not in a way that Linux can use.  If the load would cause an
+ * interruption (eg due to prefetching 0), it is suppressed on PA2.0
+ * processors, but not on 7300LC.
+ */
+#ifdef  CONFIG_PREFETCH
 #define ARCH_HAS_PREFETCH
+#define ARCH_HAS_PREFETCHW
+
 extern inline void prefetch(const void *addr)
 {
 	__asm__("ldw 0(%0), %%r0" : : "r" (addr));
 }
 
-#define ARCH_HAS_PREFETCHW
 extern inline void prefetchw(const void *addr)
 {
 	__asm__("ldd 0(%0), %%r0" : : "r" (addr));

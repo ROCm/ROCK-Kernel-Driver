@@ -23,6 +23,9 @@ Index
 ============
 Copyright (C) 2002-2004 by Luca Risolia <luca.risolia@studio.unibo.it>
 
+Winbond is a trademark of Winbond Electronics Corporation.
+This driver is not sponsored or developed by Winbond.
+
 
 2. License
 ==========
@@ -44,8 +47,8 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 3. Overview
 ===========
 This driver supports the video streaming capabilities of the devices mounting
-Winbond W9967CF and Winbond W9968CF JPEG USB Dual Mode Camera Chips, when they
-are being commanded by USB. OV681 based cameras should be supported as well.
+Winbond W9967CF and Winbond W9968CF JPEG USB Dual Mode Camera Chips. OV681
+based cameras should be supported as well.
 
 The driver is divided into two modules: the basic one, "w9968cf", is needed for
 the supported devices to work; the second one, "w9968cf-vpp", is an optional
@@ -58,7 +61,8 @@ Please keep in mind that official kernels do NOT include the second module for
 performance purposes. However it is always recommended to download and install
 the latest and complete release of the driver, replacing the existing one, if
 present: it will be still even possible not to load the "w9968cf-vpp" module at
-all, if you ever want to.
+all, if you ever want to. Another important missing feature of the version in
+the official Linux 2.4 kernels is the writeable /proc filesystem interface.
 
 The latest and full-featured version of the W996[87]CF driver can be found at:
 http://go.lamarinapunto.com/ . Please refer to the documentation included in
@@ -68,38 +72,37 @@ Up to 32 cameras can be handled at the same time. They can be connected and
 disconnected from the host many times without turning off the computer, if
 your system supports the hotplug facility.
 
-To change the default settings for each camera, many paramaters can be passed
+To change the default settings for each camera, many parameters can be passed
 through command line when the module is loaded into memory.
 
-The driver relies on the Video4Linux, USB and I2C core modules of the official
-Linux kernels. It has been designed to run properly on SMP systems as well.
-At the moment, an additional module, "ovcamchip", is mandatory; it provides
-support for some OmniVision CMOS sensors connected to the W996[87]CF chips.
-
-The "ovcamchip" module is part of the OV511 driver, version 2.27, which can be
-downloaded from internet:
-http://alpha.dyndns.org/ov511/
-To know how to compile it, read the documentation included in the OV511 
-package.
+The driver relies on the Video4Linux, USB and I2C core modules. It has been
+designed to run properly on SMP systems as well. An additional module,
+"ovcamchip", is mandatory; it provides support for some OmniVision image
+sensors connected to the W996[87]CF chips; if found in the system, the module
+will be automatically loaded by default (provided that the kernel has been
+compiled with the automatic module loading option).
 
 
 4. Supported devices
 ====================
 At the moment, known W996[87]CF and OV681 based devices are:
-- Aroma Digi Pen ADG-5000 Refurbished
-- AVerTV USB
-- Creative Labs Video Blaster WebCam Go
-- Creative Labs Video Blaster WebCam Go Plus
-- Die Lebon LDC-D35A Digital Kamera
-- Ezonics EZ-802 EZMega Cam
-- OPCOM Digi Pen VGA Dual Mode Pen Camera
+- Aroma Digi Pen VGA Dual Mode ADG-5000 (unknown image sensor)
+- AVerMedia AVerTV USB (SAA7111A, Philips FI1216Mk2 tuner, PT2313L audio chip)
+- Creative Labs Video Blaster WebCam Go (OmniVision OV7610 sensor)
+- Creative Labs Video Blaster WebCam Go Plus (OmniVision OV7620 sensor)
+- Lebon LDC-035A (unknown image sensor)
+- Ezonics EZ-802 EZMega Cam (OmniVision OV8610C sensor)
+- OmniVision OV8610-EDE (OmniVision OV8610 sensor)
+- OPCOM Digi Pen VGA Dual Mode Pen Camera (unknown image sensor)
+- Pretec Digi Pen-II (OmniVision OV7620 sensor)
+- Pretec DigiPen-480 (OmniVision OV8610 sensor)
 
 If you know any other W996[87]CF or OV681 based cameras, please contact me.
 
 The list above does NOT imply that all those devices work with this driver: up
-until now only webcams that have a CMOS sensor supported by the "ovcamchip"
+until now only webcams that have an image sensor supported by the "ovcamchip"
 module work. 
-For a list of supported CMOS sensors, please visit the author's homepage on
+For a list of supported image sensors, please visit the author's homepage on
 this module: http://alpha.dyndns.org/ov511/
 
 Possible external microcontrollers of those webcams are not supported: this
@@ -112,8 +115,10 @@ additional testing and full support, would be much appreciated.
 
 5. Module dependencies
 ======================
-For it to work properly, the driver needs kernel support for Video4Linux, 
-USB and I2C, and a third-party module for the CMOS sensor.
+For it to work properly, the driver needs kernel support for Video4Linux, USB
+and I2C, and the "ovcamchip" module for the image sensor. Make sure you are not
+actually using any external "ovcamchip" module, given that the W996[87]CF 
+driver depends on the version of the module present in the official kernels.
 
 The following options of the kernel configuration file must be enabled and
 corresponding modules must be compiled:
@@ -128,6 +133,10 @@ corresponding modules must be compiled:
 
 The I2C core module can be compiled statically in the kernel as well.
 
+	# OmniVision Camera Chip support
+	#
+	CONFIG_VIDEO_OVCAMCHIP=m
+
 	# USB support
 	#
 	CONFIG_USB=m
@@ -141,18 +150,11 @@ below is necessary:
 	CONFIG_USB_UHCI_HCD=m
 	CONFIG_USB_OHCI_HCD=m
 
-Also, make sure "Enforce bandwidth allocation" is NOT enabled.
-
 And finally:
 
 	# USB Multimedia devices
 	#
 	CONFIG_USB_W9968CF=m
-
-The last module we need is "ovcamchip.o". To obtain it, you have to download
-the OV511 package, version 2.27 - don't use other versions - and compile it
-according to its documentation. 
-The package is available at http://alpha.dyndns.org/ov511/ .
 
 
 6. Module loading
@@ -164,11 +166,10 @@ Loading can be done this way, from root:
 
 	[root@localhost home]# modprobe usbcore
 	[root@localhost home]# modprobe i2c-core
-	[root@localhost ov511-x.xx]# insmod ./ovcamchip.ko
 	[root@localhost home]# modprobe w9968cf
 
-At this point the devices should be recognized: "dmesg" can be used to analyze
-kernel messages:
+At this point the pertinent devices should be recognized: "dmesg" can be used
+to analyze kernel messages:
 
 	[user@localhost home]$ dmesg
 
@@ -180,9 +181,22 @@ explanation about them and which syntax to use, it is recommended to run the
 	[root@locahost home]# modinfo w9968cf
 
 
-7. Module paramaters
+7. Module parameters
 ====================
-Module paramaters are listed below:
+Module parameters are listed below:
+-------------------------------------------------------------------------------
+Name:            ovmod_load
+Type:            bool
+Syntax:          <0|1>
+Description:     Automatic 'ovcamchip' module loading: 0 disabled, 1 enabled.
+                 If enabled, 'insmod' searches for the required 'ovcamchip'
+                 module in the system, according to its configuration, and
+                 loads that module automatically. This action is performed as
+                 once soon as the 'w9968cf' module is loaded into memory.
+Default:         1
+Note:            The kernel must be compiled with the CONFIG_KMOD option
+                 enabled for the 'ovcamchip' module to be loaded and for
+                 this parameter to be present.
 -------------------------------------------------------------------------------
 Name:           vppmod_load
 Type:           bool
@@ -191,10 +205,14 @@ Description:    Automatic 'w9968cf-vpp' module loading: 0 disabled, 1 enabled.
                 If enabled, every time an application attempts to open a
                 camera, 'insmod' searches for the video post-processing module
                 in the system and loads it automatically (if present).
-                The 'w9968cf-vpp' module adds extra image manipulation 
+                The optional 'w9968cf-vpp' module adds extra image manipulation
                 capabilities to the 'w9968cf' module,like software up-scaling,
-                colour conversions and video decoding.
+                colour conversions and video decompression for very high frame
+                rates.
 Default:        1
+Note:           The kernel must be compiled with the CONFIG_KMOD option
+                enabled for the 'w9968cf-vpp' module to be loaded and for
+                this parameter to be present.
 -------------------------------------------------------------------------------
 Name:           simcams 
 Type:           int 
@@ -237,7 +255,7 @@ Syntax:         <0|1[,...]>
 Description:    Hardware double buffering: 0 disabled, 1 enabled.
                 It should be enabled if you want smooth video output: if you
                 obtain out of sync. video, disable it, or try to
-                decrease the 'clockdiv' module paramater value.
+                decrease the 'clockdiv' module parameter value.
 Default:        1 for every device.
 -------------------------------------------------------------------------------
 Name:           clamping
@@ -252,7 +270,7 @@ Syntax:         <0|1|2[,...]>
 Description:    Video filter type.
                 0 none, 1 (1-2-1) 3-tap filter, 2 (2-3-6-3-2) 5-tap filter.
                 The filter is used to reduce noise and aliasing artifacts
-                produced by the CCD or CMOS sensor.
+                produced by the CCD or CMOS image sensor.
 Default:        0 for every device.
 -------------------------------------------------------------------------------
 Name:           largeview
@@ -269,7 +287,7 @@ Description:    Software scaling (for non-compressed video only):
                 Disable it if you have a slow CPU or you don't have enough
                 memory.
 Default:        0 for every device.
-Note:           If 'w9968cf-vpp' is not loaded, this paramater is set to 0.
+Note:           If 'w9968cf-vpp' is not present, this parameter is set to 0.
 -------------------------------------------------------------------------------
 Name:           decompression
 Type:           int array (min = 0, max = 32)
@@ -284,8 +302,8 @@ Description:    Software video decompression:
                 YUV420P/YUV420 in any resolutions where width and height are
                 multiples of 16.
 Default:        2 for every device.
-Note:           If 'w9968cf-vpp' is not loaded, forcing decompression is not
-                allowed; in this case this paramater is set to 2.
+Note:           If 'w9968cf-vpp' is not present, forcing decompression is not
+                allowed; in this case this parameter is set to 2.
 -------------------------------------------------------------------------------
 Name:           force_palette
 Type:           int array (min = 0, max = 32)
@@ -304,9 +322,9 @@ Description:    Force picture palette.
                  3 = RGB565  16 bpp - Software conversion from UYVY
                  4 = RGB24   24 bpp - Software conversion from UYVY
                  5 = RGB32   32 bpp - Software conversion from UYVY
-                When not 0, this paramater will override 'decompression'.
+                When not 0, this parameter will override 'decompression'.
 Default:        0 for every device. Initial palette is 9 (UYVY).
-Note:           If 'w9968cf-vpp' is not loaded, this paramater is set to 9.
+Note:           If 'w9968cf-vpp' is not present, this parameter is set to 9.
 -------------------------------------------------------------------------------
 Name:           force_rgb
 Type:           bool array (min = 0, max = 32)
@@ -320,14 +338,14 @@ Default:        0 for every device.
 Name:           autobright
 Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]>
-Description:    CMOS sensor automatically changes brightness:
+Description:    Image sensor automatically changes brightness:
                 0 = no, 1 = yes
 Default:        0 for every device.
 -------------------------------------------------------------------------------
 Name:           autoexp
 Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]>
-Description:    CMOS sensor automatically changes exposure:
+Description:    Image sensor automatically changes exposure:
                 0 = no, 1 = yes
 Default:        1 for every device.
 -------------------------------------------------------------------------------
@@ -354,7 +372,7 @@ Syntax:         <-1|n[,...]>
 Description:    Force pixel clock divisor to a specific value (for experts):
                 n may vary from 0 to 127.
                 -1 for automatic value.
-                See also the 'double_buffer' module paramater.
+                See also the 'double_buffer' module parameter.
 Default:        -1 for every device.
 -------------------------------------------------------------------------------
 Name:           backlight
@@ -374,7 +392,7 @@ Default:        0 for every device.
 Name:           monochrome
 Type:           bool array (min = 0, max = 32)
 Syntax:         <0|1[,...]> 
-Description:    The CMOS sensor is monochrome:
+Description:    The image sensor is monochrome:
                 0 = no, 1 = yes
 Default:        0 for every device.
 -------------------------------------------------------------------------------
@@ -420,7 +438,7 @@ Description:    Debugging information level, from 0 to 6:
                 4 = warnings
                 5 = called functions
                 6 = function internals
-                Level 5 and 6 are useful for testing only, when just one
+                Level 5 and 6 are useful for testing only, when only one
                 device is used.
 Default:        2
 -------------------------------------------------------------------------------
@@ -449,7 +467,7 @@ The development would not have proceed much further without having looked at
 the source code of other drivers and without the help of several persons; in
 particular:
 
-- the I2C interface to kernel and high-level CMOS sensor control routines have
+- the I2C interface to kernel and high-level image sensor control routines have
   been taken from the OV511 driver by Mark McClelland;
 
 - memory management code has been copied from the bttv driver by Ralph Metzler,

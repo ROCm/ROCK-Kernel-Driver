@@ -19,6 +19,7 @@ struct io_event;
 struct iovec;
 struct itimerspec;
 struct itimerval;
+struct kexec_segment;
 struct linux_dirent;
 struct linux_dirent64;
 struct list_head;
@@ -48,6 +49,7 @@ struct timex;
 struct timezone;
 struct tms;
 struct utimbuf;
+struct mq_attr;
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -153,15 +155,18 @@ asmlinkage long sys_shutdown(int, int);
 asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd,
 				void __user *arg);
 asmlinkage long sys_restart_syscall(void);
+asmlinkage long sys_kexec_load(void *entry, unsigned long nr_segments,
+			struct kexec_segment *segments, unsigned long flags);
 
 asmlinkage long sys_exit(int error_code);
 asmlinkage void sys_exit_group(int error_code);
-asmlinkage long sys_wait4(pid_t pid, unsigned int *stat_addr,
+asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
 				int options, struct rusage __user *ru);
 asmlinkage long sys_waitpid(pid_t pid, unsigned int __user *stat_addr, int options);
 asmlinkage long sys_set_tid_address(int __user *tidptr);
 asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,
-			struct timespec __user *utime, u32 __user *uaddr2);
+			struct timespec __user *utime, u32 __user *uaddr2,
+			int val3);
 
 asmlinkage long sys_init_module(void __user *umod, unsigned long len,
 				const char __user *uargs);
@@ -252,7 +257,7 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len,
 asmlinkage unsigned long sys_mremap(unsigned long addr,
 				unsigned long old_len, unsigned long new_len,
 				unsigned long flags, unsigned long new_addr);
-long sys_remap_file_pages(unsigned long start, unsigned long size,
+asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 			unsigned long prot, unsigned long pgoff,
 			unsigned long flags);
 asmlinkage long sys_msync(unsigned long start, size_t len, int flags);
@@ -377,7 +382,7 @@ asmlinkage long sys_fchdir(unsigned int fd);
 asmlinkage long sys_rmdir(const char __user *pathname);
 asmlinkage long sys_lookup_dcookie(u64 cookie64, char __user *buf, size_t len);
 asmlinkage long sys_quotactl(unsigned int cmd, const char __user *special,
-				qid_t id, caddr_t addr);
+				qid_t id, void __user *addr);
 asmlinkage long sys_getdents(unsigned int fd,
 				struct linux_dirent __user *dirent,
 				unsigned int count);
@@ -449,6 +454,13 @@ asmlinkage long sys_shmat(int shmid, char __user *shmaddr,
 asmlinkage long sys_shmget(key_t key, size_t size, int flag);
 asmlinkage long sys_shmdt(char __user *shmaddr);
 asmlinkage long sys_shmctl(int shmid, int cmd, struct shmid_ds __user *buf);
+
+asmlinkage long sys_mq_open(const char __user *name, int oflag, mode_t mode, struct mq_attr __user *attr);
+asmlinkage long sys_mq_unlink(const char __user *name);
+asmlinkage long sys_mq_timedsend(mqd_t mqdes, const char __user *msg_ptr, size_t msg_len, unsigned int msg_prio, const struct timespec __user *abs_timeout);
+asmlinkage ssize_t sys_mq_timedreceive(mqd_t mqdes, char __user *msg_ptr, size_t msg_len, unsigned int __user *msg_prio, const struct timespec __user *abs_timeout);
+asmlinkage long sys_mq_notify(mqd_t mqdes, const struct sigevent __user *notification);
+asmlinkage long sys_mq_getsetattr(mqd_t mqdes, const struct mq_attr __user *mqstat, struct mq_attr __user *omqstat);
 
 asmlinkage long sys_pciconfig_iobase(long which, unsigned long bus, unsigned long devfn);
 asmlinkage long sys_pciconfig_read(unsigned long bus, unsigned long dfn,

@@ -44,15 +44,11 @@ struct e100_serial {
 	volatile u32		*ofirstadr;   /* adr to R_DMA_CHx_FIRST */
 	volatile u8		*ocmdadr;     /* adr to R_DMA_CHx_CMD */
 	const volatile u8	*ostatusadr;  /* adr to R_DMA_CHx_STATUS */
-	volatile u32		*ohwswadr;    /* adr to R_DMA_CHx_HWSW */
-	volatile u32		*odescradr;   /* adr to R_DMA_CHx_DESCR */
 
 	/* Input registers */
 	volatile u8		*iclrintradr; /* adr to R_DMA_CHx_CLR_INTR */
 	volatile u32		*ifirstadr;   /* adr to R_DMA_CHx_FIRST */
 	volatile u8		*icmdadr;     /* adr to R_DMA_CHx_CMD */
-	const volatile u8	*istatusadr;  /* adr to R_DMA_CHx_STATUS */
-	volatile u32		*ihwswadr;    /* adr to R_DMA_CHx_HWSW */
 	volatile u32		*idescradr;   /* adr to R_DMA_CHx_DESCR */
 
 	int			flags;	/* defined in tty.h */
@@ -60,14 +56,17 @@ struct e100_serial {
 	u8			rx_ctrl; /* shadow for R_SERIALx_REC_CTRL */
 	u8			tx_ctrl; /* shadow for R_SERIALx_TR_CTRL */
 	u8			iseteop; /* bit number for R_SET_EOP for the input dma */
-
 	int			enabled; /* Set to 1 if the port is enabled in HW config */
-  
+
+	u8		dma_out_enabled:1; /* Set to 1 if DMA should be used */
+	u8		dma_in_enabled:1;  /* Set to 1 if DMA should be used */
+
 	/* end of fields defined in rs_table[] in .c-file */
-
-	int			uses_dma; /* Set to 1 if DMA should be used */
-	unsigned char           forced_eop; /* a fifo eop has been forced */
-
+	u8		uses_dma_in;  /* Set to 1 if DMA is used */
+	u8		uses_dma_out; /* Set to 1 if DMA is used */
+	u8		forced_eop;   /* a fifo eop has been forced */
+	int			baud_base;     /* For special baudrates */
+	int			custom_divisor; /* For special baudrates */
 	struct etrax_dma_descr	tr_descr;
 	struct etrax_dma_descr	rec_descr[SERIAL_RECV_DESCRIPTORS];
 	int			cur_rec_descr;
@@ -95,6 +94,8 @@ struct e100_serial {
 
 	struct work_struct	work;
 	struct async_icount	icount;   /* error-statistics etc.*/
+	struct termios		normal_termios;
+	struct termios		callout_termios;
 #ifdef DECLARE_WAITQUEUE
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
@@ -104,6 +105,7 @@ struct e100_serial {
 #endif  
 
 	unsigned long		char_time_usec;       /* The time for 1 char, in usecs */
+	unsigned long		flush_time_usec;      /* How often we should flush */
 	unsigned long		last_tx_active_usec;  /* Last tx usec in the jiffies */
 	unsigned long		last_tx_active;       /* Last tx time in jiffies */
 	unsigned long		last_rx_active_usec;  /* Last rx usec in the jiffies */

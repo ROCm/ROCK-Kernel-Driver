@@ -40,7 +40,7 @@ config FB
 
 config FB_CIRRUS
 	tristate "Cirrus Logic support"
-	depends on FB && (AMIGA || PCI) && BROKEN
+	depends on FB && (ZORRO || PCI)
 	---help---
 	  This enables support for Cirrus Logic GD542x/543x based boards on
 	  Amiga: SD64, Piccolo, Picasso II/II+, Picasso IV, or EGS Spectrum.
@@ -55,7 +55,7 @@ config FB_CIRRUS
 
 config FB_PM2
 	tristate "Permedia2 support"
-	depends on FB && (AMIGA || PCI)
+	depends on FB && ((AMIGA && BROKEN) || PCI)
 	help
 	  This is the frame buffer device driver for the Permedia2 AGP frame
 	  buffer card from ASK, aka `Graphic Blaster Exxtreme'.  There is a
@@ -93,7 +93,7 @@ config FB_SA1100
 
 config FB_CYBER2000
 	tristate "CyberPro 2000/2010/5000 support"
-	depends on FB && PCI
+	depends on FB && PCI && (BROKEN || !SPARC64)
 	help
 	  This enables support for the Integraphics CyberPro 20x0 and 5000
 	  VGA chips used in the Rebel.com Netwinder and other machines.
@@ -225,6 +225,10 @@ config FB_CT65550
 	  This is the frame buffer device driver for the Chips & Technologies
 	  65550 graphics chip in PowerBooks.
 
+config FB_ASILIANT
+	bool "Chips 69000 display support"
+	depends on FB && PCI
+
 config FB_IMSTT
 	bool "IMS Twin Turbo display support"
 	depends on FB && PCI
@@ -234,7 +238,7 @@ config FB_IMSTT
 
 config FB_S3TRIO
 	bool "S3 Trio display support"
-	depends on FB && PPC
+	depends on FB && PPC && BROKEN
 	help
 	  If you have a S3 Trio say Y. Say N for S3 Virge.
 
@@ -308,6 +312,14 @@ config FB_HGA
 	  As this card technology is 15 years old, most people will answer N
 	  here.
 
+config FB_HGA_ACCEL
+	bool "Hercules mono Acceleration functions (EXPERIMENTAL)"
+	depends on FB_HGA && EXPERIMENTAL
+	---help---
+	This will compile the Hercules mono graphics with
+	acceleration functions.
+
+
 config VIDEO_SELECT
 	bool
 	depends on FB && X86
@@ -318,6 +330,21 @@ config FB_SGIVW
 	depends on FB && X86_VISWS
 	help
 	  SGI Visual Workstation support for framebuffer graphics.
+
+config FB_GBE
+	bool "SGI Graphics Backend frame buffer support"
+	depends on FB && (SGI_IP32 || X86_VISWS)
+ 	help
+	  This is the frame buffer device driver for SGI Graphics Backend.
+	  This chip is used in SGI O2 and Visual Workstation 320/540.
+
+config FB_GBE_MEM
+	int "Video memory size in MB"
+	depends on FB_GBE
+	default 8
+	help
+	  This is the amount of memory reserved for the framebuffer,
+	  which can be any value between 1MB and 8MB.
 
 config BUS_I2C
 	bool
@@ -397,6 +424,8 @@ config E1355_FB_BASE
 config FB_RIVA
 	tristate "nVidia Riva support"
 	depends on FB && PCI
+	select I2C_ALGOBIT if FB_RIVA_I2C
+	select I2C if FB_RIVA_I2C
 	help
 	  This driver supports graphics boards with the nVidia Riva/Geforce
 	  chips.
@@ -404,6 +433,27 @@ config FB_RIVA
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called rivafb.
+
+config FB_RIVA_I2C
+       bool "Enable DDC Support"
+       depends on FB_RIVA
+       help
+	  This enables I2C support for nVidia Chipsets.  This is used
+	  only for getting EDID information from the attached display
+	  allowing for robust video mode handling and switching.
+
+	  Because fbdev-2.6 requires that drivers must be able to
+	  independently validate video mode parameters, you should say Y
+	  here.
+
+config FB_RIVA_DEBUG
+	bool "Lots of debug output from Riva(nVidia) driver"
+	depends on FB_RIVA
+	default n
+	help
+	  Say Y here if you want the Riva driver to output all sorts
+	  of debugging informations to provide to the maintainer when
+	  something goes wrong.
 
 config FB_I810
 	tristate "Intel 810/815 support (EXPERIMENTAL)"
@@ -743,6 +793,14 @@ config FB_3DFX
 	  To compile this driver as a module, choose M here: the
 	  module will be called tdfxfb.
 
+config FB_3DFX_ACCEL
+	bool "3Dfx Banshee/Voodoo3 Acceleration functions (EXPERIMENTAL)"
+	depends on FB_3DFX && EXPERIMENTAL
+	---help---
+	This will compile the 3Dfx Banshee/Voodoo3 frame buffer device
+	with acceleration functions.
+
+
 config FB_VOODOO1
 	tristate "3Dfx Voodoo Graphics (sst1) support"
 	depends on FB && PCI
@@ -771,6 +829,14 @@ config FB_TRIDENT
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tridentfb.
+
+config FB_TRIDENT_ACCEL
+	bool "Trident Acceleration functions (EXPERIMENTAL)"
+	depends on FB_TRIDENT && EXPERIMENTAL
+	---help---
+	This will compile the Trident frame buffer device with
+	acceleration functions.
+
 
 config FB_PM3
 	tristate "Permedia3 support"
@@ -880,6 +946,37 @@ config FB_68328
 	  Say Y here if you want to support the built-in frame buffer of
 	  the Motorola 68328 CPU family.
 
+config FB_PXA
+	tristate "PXA LCD framebuffer support"
+	depends on FB && ARCH_PXA
+	---help---
+	  Frame buffer driver for the built-in LCD controller in the Intel
+	  PXA2x0 processor.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted and removed from the running kernel whenever you want). The
+	  module will be called vfb. If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  If unsure, say N.
+
+config FB_PXA_PARAMETERS
+	bool "PXA LCD command line parameters"
+	default n
+	depends on FB_PXA
+	---help---
+	  Enable the use of kernel command line or module parameters
+	  to configure the physical properties of the LCD panel when
+	  using the PXA LCD driver.
+
+	  This option allows you to override the panel parameters
+	  supplied by the platform in order to support multiple
+	  different models of flatpanel. If you will only be using a
+	  single model of flatpanel then you can safely leave this
+	  option disabled.
+
+	  Documentation/fb/pxafb.txt describes the available parameters.
+
 config FB_VIRTUAL
 	tristate "Virtual Frame Buffer support (ONLY FOR TESTING!)"
 	depends on FB
@@ -903,10 +1000,6 @@ endif
 
 if FB || SGI_NEWPORT_CONSOLE
 	source "drivers/video/logo/Kconfig"
-endif
-
-if FB
-	source "drivers/video/bootsplash/Kconfig"
 endif
 
 endmenu

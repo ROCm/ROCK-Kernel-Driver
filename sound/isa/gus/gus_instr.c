@@ -29,7 +29,7 @@
  */
 
 int snd_gus_iwffff_put_sample(void *private_data, iwffff_wave_t *wave,
-			      char *data, long len, int atomic)
+			      char __user *data, long len, int atomic)
 {
 	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return -ENXIO);
 	snd_gf1_mem_block_t *block;
@@ -59,7 +59,7 @@ int snd_gus_iwffff_put_sample(void *private_data, iwffff_wave_t *wave,
 }
 
 int snd_gus_iwffff_get_sample(void *private_data, iwffff_wave_t *wave,
-			      char *data, long len, int atomic)
+			      char __user *data, long len, int atomic)
 {
 	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return -ENXIO);
 
@@ -82,7 +82,7 @@ int snd_gus_iwffff_remove_sample(void *private_data, iwffff_wave_t *wave,
  */
 
 int snd_gus_gf1_put_sample(void *private_data, gf1_wave_t *wave,
-			   char *data, long len, int atomic)
+			   char __user *data, long len, int atomic)
 {
 	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return -ENXIO);
 	snd_gf1_mem_block_t *block;
@@ -110,7 +110,7 @@ int snd_gus_gf1_put_sample(void *private_data, gf1_wave_t *wave,
 }
 
 int snd_gus_gf1_get_sample(void *private_data, gf1_wave_t *wave,
-			   char *data, long len, int atomic)
+			   char __user *data, long len, int atomic)
 {
 	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return -ENXIO);
 
@@ -130,7 +130,7 @@ int snd_gus_gf1_remove_sample(void *private_data, gf1_wave_t *wave,
  */
 
 int snd_gus_simple_put_sample(void *private_data, simple_instrument_t *instr,
-			      char *data, long len, int atomic)
+			      char __user *data, long len, int atomic)
 {
 	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return -ENXIO);
 	snd_gf1_mem_block_t *block;
@@ -157,7 +157,7 @@ int snd_gus_simple_put_sample(void *private_data, simple_instrument_t *instr,
 }
 
 int snd_gus_simple_get_sample(void *private_data, simple_instrument_t *instr,
-			      char *data, long len, int atomic)
+			      char __user *data, long len, int atomic)
 {
 	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return -ENXIO);
 

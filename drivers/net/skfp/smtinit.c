@@ -27,7 +27,7 @@
 static const char ID_sccs[] = "@(#)smtinit.c	1.15 97/05/06 (C) SK " ;
 #endif
 
-extern void init_fddi_driver() ;
+void init_fddi_driver(struct s_smc *smc, u_char *mac_addr);
 
 /* define global debug variable */
 #if defined(DEBUG) && !defined(DEBUG_BRD)
@@ -48,8 +48,7 @@ struct smt_debug debug;
  * Can not be called in smt_reset_defaults, because it is not sure that
  * the OEM ID is already defined.
  */
-static void set_oem_spec_val(smc)
-struct s_smc *smc ;
+static void set_oem_spec_val(struct s_smc *smc)
 {
 	struct fddi_mib *mib ;
 
@@ -66,9 +65,8 @@ struct s_smc *smc ;
 /*
  * Init SMT
  */
-int init_smt(smc,mac_addr)
-struct s_smc *smc ;
-u_char *mac_addr ;		/* canonical address or NULL */
+int init_smt(struct s_smc *smc, u_char *mac_addr)
+/* u_char *mac_addr;	canonical address or NULL */
 {
 	int	p ;
 
@@ -124,3 +122,4 @@ u_char *mac_addr ;		/* canonical address or NULL */
 
 	return(0) ;
 }
+

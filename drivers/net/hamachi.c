@@ -207,10 +207,8 @@ KERN_INFO "   Further modifications by Keith Underwood <keithu@parl.clemson.edu>
 /* Condensed bus+endian portability operations. */
 #if ADDRLEN == 64
 #define cpu_to_leXX(addr)	cpu_to_le64(addr)
-#define desc_to_virt(addr) bus_to_virt(le64_to_cpu(addr))
 #else 
 #define cpu_to_leXX(addr)	cpu_to_le32(addr)
-#define desc_to_virt(addr) bus_to_virt(le32_to_cpu(addr))
 #endif   
 
 
@@ -1019,7 +1017,7 @@ static inline int hamachi_tx(struct net_device *dev)
 				hmp->tx_ring[entry].addr, skb->len, 
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			hmp->tx_skbuff[entry] = 0;
+			hmp->tx_skbuff[entry] = NULL;
 		}
 		hmp->tx_ring[entry].status_n_length = 0;
 		if (entry >= TX_RING_SIZE-1) 
@@ -1107,7 +1105,7 @@ static void hamachi_tx_timeout(struct net_device *dev)
 			pci_unmap_single(hmp->pci_dev, hmp->tx_ring[i].addr, 
 				skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			hmp->tx_skbuff[i] = 0;
+			hmp->tx_skbuff[i] = NULL;
 		}
 	}
 
@@ -1129,7 +1127,7 @@ static void hamachi_tx_timeout(struct net_device *dev)
 			pci_unmap_single(hmp->pci_dev, hmp->rx_ring[i].addr, 
 				hmp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(skb);
-			hmp->rx_skbuff[i] = 0;
+			hmp->rx_skbuff[i] = NULL;
 		}
 	}
 	/* Fill in the Rx buffers.  Handle allocation failure gracefully. */
@@ -1191,7 +1189,7 @@ static void hamachi_init_ring(struct net_device *dev)
 	/* Initialize all Rx descriptors. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		hmp->rx_ring[i].status_n_length = 0;
-		hmp->rx_skbuff[i] = 0;
+		hmp->rx_skbuff[i] = NULL;
 	}
 	/* Fill in the Rx buffers.  Handle allocation failure gracefully. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
@@ -1211,7 +1209,7 @@ static void hamachi_init_ring(struct net_device *dev)
 	hmp->rx_ring[RX_RING_SIZE-1].status_n_length |= cpu_to_le32(DescEndRing);
 
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		hmp->tx_skbuff[i] = 0;
+		hmp->tx_skbuff[i] = NULL;
 		hmp->tx_ring[i].status_n_length = 0;
 	}
 	/* Mark the last entry of the ring */
@@ -1423,7 +1421,7 @@ static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs
 							skb->len,
 							PCI_DMA_TODEVICE);
 						dev_kfree_skb_irq(skb);
-						hmp->tx_skbuff[entry] = 0;
+						hmp->tx_skbuff[entry] = NULL;
 					}
 					hmp->tx_ring[entry].status_n_length = 0;
 					if (entry >= TX_RING_SIZE-1)  
@@ -1502,7 +1500,7 @@ static int hamachi_rx(struct net_device *dev)
 					    desc->addr,
 					    hmp->rx_buf_sz,
 					    PCI_DMA_FROMDEVICE);
-		buf_addr = desc_to_virt(desc->addr);
+		buf_addr = (u8 *) hmp->rx_skbuff[entry]->tail;
 		frame_status = le32_to_cpu(get_unaligned((s32*)&(buf_addr[data_size - 12])));
 		if (hamachi_debug > 4)
 			printk(KERN_DEBUG "  hamachi_rx() status was %8.8x.\n",
@@ -1793,7 +1791,7 @@ static int hamachi_close(struct net_device *dev)
 				hmp->rx_ring[i].addr, hmp->rx_buf_sz, 
 				PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(skb);
-			hmp->rx_skbuff[i] = 0;
+			hmp->rx_skbuff[i] = NULL;
 		}
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
@@ -1803,7 +1801,7 @@ static int hamachi_close(struct net_device *dev)
 				hmp->tx_ring[i].addr, skb->len, 
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			hmp->tx_skbuff[i] = 0;
+			hmp->tx_skbuff[i] = NULL;
 		}
 	}
 
@@ -1869,7 +1867,7 @@ static void set_rx_mode(struct net_device *dev)
 	}
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct hamachi_private *np = dev->priv;
 	u32 ethcmd;
@@ -1937,17 +1935,17 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct hamachi_private *np = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	int rc;
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
 	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
 
 	else if (cmd == (SIOCDEVPRIVATE+3)) { /* set rx,tx intr params */
-		u32 *d = (u32 *)&rq->ifr_data;
+		u32 *d = (u32 *)&rq->ifr_ifru;
 		/* Should add this check here or an ordinary user can do nasty
 		 * things. -KDU
 		 *

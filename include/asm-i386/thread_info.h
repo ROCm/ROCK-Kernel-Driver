@@ -9,6 +9,9 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
+#include <asm/page.h>
+
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #endif
@@ -29,31 +32,33 @@ struct thread_info {
 	__u32			cpu;		/* current CPU */
 	__s32			preempt_count; /* 0 => preemptable, <0 => BUG */
 
+
 	mm_segment_t		addr_limit;	/* thread address space:
 					 	   0-0xBFFFFFFF for user-thead
 						   0-0xFFFFFFFF for kernel-thread
 						*/
 	struct restart_block    restart_block;
 
+	unsigned long           previous_esp;   /* ESP of the previous stack in case
+						   of nested (IRQ) stacks
+						*/
 	__u8			supervisor_stack[0];
 };
 
 #else /* !__ASSEMBLY__ */
 
-/* offsets into the thread_info struct for assembly code access */
-#define TI_TASK		0x00000000
-#define TI_EXEC_DOMAIN	0x00000004
-#define TI_FLAGS	0x00000008
-#define TI_STATUS	0x0000000C
-#define TI_CPU		0x00000010
-#define TI_PRE_COUNT	0x00000014
-#define TI_ADDR_LIMIT	0x00000018
-#define TI_RESTART_BLOCK 0x000001C
+#include <asm/asm_offsets.h>
 
 #endif
 
 #define PREEMPT_ACTIVE		0x4000000
+#ifdef CONFIG_4KSTACKS
+#define THREAD_SIZE            (4096)
+#else
+#define THREAD_SIZE		(8192)
+#endif
 
+#define STACK_WARN             (THREAD_SIZE/8)
 /*
  * macros/functions for gaining access to the thread information structure
  *
@@ -77,13 +82,20 @@ struct thread_info {
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
 
-#define THREAD_SIZE (2*PAGE_SIZE)
 
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)
 {
 	struct thread_info *ti;
 	__asm__("andl %%esp,%0; ":"=r" (ti) : "0" (~(THREAD_SIZE - 1)));
+	return ti;
+}
+
+/* how to get the current stack pointer from C */
+static inline unsigned long current_stack_pointer(void)
+{
+	unsigned long ti;
+	__asm__("movl %%esp,%0; ":"=r" (ti) : );
 	return ti;
 }
 
@@ -108,8 +120,6 @@ static inline struct thread_info *current_thread_info(void)
 
 #else /* !__ASSEMBLY__ */
 
-#define THREAD_SIZE	8192
-
 /* how to get the thread information struct from ASM */
 #define GET_THREAD_INFO(reg) \
 	movl $-THREAD_SIZE, reg; \
@@ -133,6 +143,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_NEED_RESCHED	3	/* rescheduling necessary */
 #define TIF_SINGLESTEP		4	/* restore singlestep on return to user mode */
 #define TIF_IRET		5	/* return with iret */
+#define TIF_SYSCALL_AUDIT	7	/* syscall auditing active */
 #define TIF_POLLING_NRFLAG	16	/* true if poll_idle() is polling TIF_NEED_RESCHED */
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
@@ -141,9 +152,12 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_NEED_RESCHED	(1<<TIF_NEED_RESCHED)
 #define _TIF_SINGLESTEP		(1<<TIF_SINGLESTEP)
 #define _TIF_IRET		(1<<TIF_IRET)
+#define _TIF_SYSCALL_AUDIT	(1<<TIF_SYSCALL_AUDIT)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
 
-#define _TIF_WORK_MASK		0x0000FFFE	/* work to do on interrupt/exception return */
+/* work to do on interrupt/exception return */
+#define _TIF_WORK_MASK \
+  (0x0000FFFF & ~(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT))
 #define _TIF_ALLWORK_MASK	0x0000FFFF	/* work to do on any return to u-space */
 
 /*

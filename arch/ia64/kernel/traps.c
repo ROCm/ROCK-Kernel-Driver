@@ -13,10 +13,7 @@
 #include <linux/sched.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-#include <linux/kprobes.h>
+#include <linux/module.h>       /* for EXPORT_SYMBOL */
 
 #include <asm/fpswa.h>
 #include <asm/hardirq.h>
@@ -24,35 +21,11 @@
 #include <asm/intrinsics.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
-#include <asm/nmi.h>
-#include <linux/dump.h>
-
-/*
- * fp_emulate() needs to be able to access and update all floating point registers.  Those
- * saved in pt_regs can be accessed through that structure, but those not saved, will be
- * accessed directly.  To make this work, we need to ensure that the compiler does not end
- * up using a preserved floating point register on its own.  The following achieves this
- * by declaring preserved registers that are not marked as "fixed" as global register
- * variables.
- */
-#ifdef ASM_SUPPORTED
-register double f2 asm ("f2"); register double f3 asm ("f3");
-register double f4 asm ("f4"); register double f5 asm ("f5");
-
-register long f16 asm ("f16"); register long f17 asm ("f17");
-register long f18 asm ("f18"); register long f19 asm ("f19");
-register long f20 asm ("f20"); register long f21 asm ("f21");
-register long f22 asm ("f22"); register long f23 asm ("f23");
-
-register double f24 asm ("f24"); register double f25 asm ("f25");
-register double f26 asm ("f26"); register double f27 asm ("f27");
-register double f28 asm ("f28"); register double f29 asm ("f29");
-register double f30 asm ("f30"); register double f31 asm ("f31");
-#endif
 
 extern spinlock_t timerlist_lock;
 
 fpswa_interface_t *fpswa_interface;
+EXPORT_SYMBOL(fpswa_interface);
 
 void __init
 trap_init (void)
@@ -116,16 +89,12 @@ die (const char *str, struct pt_regs *regs, long err)
 		printk("%s[%d]: %s %ld [%d]\n",
 			current->comm, current->pid, str, err, ++die_counter);
 		show_regs(regs);
-		dump((char *)str, regs);
   	} else
 		printk(KERN_ERR "Recursive die() failure, output suppressed\n");
 
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
   	do_exit(SIGSEGV);
 }
 
@@ -142,8 +111,6 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 	siginfo_t siginfo;
 	int sig, code;
 
-	if (kprobe_handler(regs, break_num))
-		return;
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
 	siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 	siginfo.si_imm = break_num;
@@ -211,14 +178,6 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (break_num < 0x80000) {
 			sig = SIGILL; code = __ILL_BREAK;
 		} else {
-#ifdef	CONFIG_KDB
-			if (break_num == KDB_BREAK_ENTER &&
-			    kdb(KDB_REASON_ENTER, break_num, regs))
-				return;		/* kdb handled it */
-			if (break_num == KDB_BREAK_BREAK &&
-			    kdb(KDB_REASON_BREAK, break_num, regs))
-				return;		/* kdb handled it */
-#endif	/* CONFIG_KDB */
 			sig = SIGTRAP; code = TRAP_BRKPT;
 		}
 	}
@@ -408,8 +367,6 @@ ia64_illegal_op_fault (unsigned long ec, unsigned long arg1, unsigned long arg2,
 	struct siginfo si;
 	char buf[128];
 
-	if (kprobe_running() && kprobe_fault_handler(regs, ILL_ILLOPC))
-		return rv;
 #ifdef CONFIG_IA64_BRL_EMU
 	{
 		extern struct illegal_op_return ia64_emulate_brl (struct pt_regs *, unsigned long);
@@ -453,8 +410,6 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
 
-	if (post_kprobe_handler(regs, vector)) 
-		return;
 	if ((isr & IA64_ISR_NA) && ((isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH)) {
 		/*
 		 * This fault was due to lfetch.fault, set "ed" bit in the psr to cancel
@@ -567,10 +522,6 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
 		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
-#ifdef	CONFIG_KDB
-		if (!user_mode(regs) && kdb(KDB_REASON_DEBUG, vector, regs))
-			return;	/* kdb handled this */
-#endif	/* CONFIG_KDB */
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_addr  = (void *) ifa;

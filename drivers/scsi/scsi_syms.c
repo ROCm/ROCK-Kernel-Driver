@@ -5,24 +5,15 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
-#include <linux/sched.h>
-#include <linux/timer.h>
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/ioport.h>
-#include <linux/kernel.h>
-#include <linux/blkdev.h>
-#include <linux/fs.h>
-
-#include <asm/system.h>
-#include <asm/irq.h>
-#include <asm/dma.h>
-
+#include <scsi/scsi.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
+#include <scsi/scsi_request.h>
 #include <scsi/scsicam.h>
-#include "scsi.h"
 
 #include "scsi_logging.h"
 
@@ -46,15 +37,14 @@ EXPORT_SYMBOL(scsicam_bios_param);
 EXPORT_SYMBOL(scsi_partsize);
 EXPORT_SYMBOL(scsi_bios_ptable);
 EXPORT_SYMBOL(scsi_ioctl);
-EXPORT_SYMBOL(print_command);
-EXPORT_SYMBOL(print_sense);
-EXPORT_SYMBOL(print_req_sense);
-EXPORT_SYMBOL(print_msg);
-EXPORT_SYMBOL(print_status);
+EXPORT_SYMBOL(scsi_print_command);
+EXPORT_SYMBOL(__scsi_print_command);
+EXPORT_SYMBOL(scsi_print_sense);
+EXPORT_SYMBOL(scsi_print_req_sense);
+EXPORT_SYMBOL(scsi_print_msg);
+EXPORT_SYMBOL(scsi_print_status);
 EXPORT_SYMBOL(scsi_sense_key_string);
 EXPORT_SYMBOL(scsi_extd_sense_format);
-EXPORT_SYMBOL(kernel_scsi_ioctl);
-EXPORT_SYMBOL(print_Scsi_Cmnd);
 EXPORT_SYMBOL(scsi_block_when_processing_errors);
 EXPORT_SYMBOL(scsi_ioctl_send_command);
 EXPORT_SYMBOL(scsi_set_medium_removal);

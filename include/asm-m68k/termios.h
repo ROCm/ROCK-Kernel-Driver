@@ -3,7 +3,7 @@
 
 #include <asm/termbits.h>
 #include <asm/ioctls.h>
- 
+
 struct winsize {
 	unsigned short ws_row;
 	unsigned short ws_col;

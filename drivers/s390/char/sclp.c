@@ -494,11 +494,12 @@ static struct sclp_register sclp_state_change_event = {
 static void
 do_load_quiesce_psw(void * __unused)
 {
+	static atomic_t cpuid = ATOMIC_INIT(-1);
 	psw_t quiesce_psw;
-	unsigned long status;
+	__u32 status;
 	int i;
 
-	if (smp_processor_id() != 0)
+	if (atomic_compare_and_swap(-1, smp_processor_id(), &cpuid))
 		signal_processor(smp_processor_id(), sigp_stop);
 	/* Wait for all other cpus to enter stopped state */
 	i = 1;
@@ -511,7 +512,7 @@ do_load_quiesce_psw(void * __unused)
 		case sigp_order_code_accepted:
 		case sigp_status_stored:
 			/* Check for stopped and check stop state */
-			if (test_bit(6, &status) || test_bit(4, &status))
+			if (status & 0x50)
 				i++;
 			break;
 		case sigp_busy:

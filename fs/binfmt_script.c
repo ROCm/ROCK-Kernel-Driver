@@ -50,7 +50,7 @@ static int load_script(struct linux_binprm *bprm,struct pt_regs *regs)
 	if (*cp == '\0') 
 		return -ENOEXEC; /* No interpreter name found */
 	i_name = cp;
-	i_arg = 0;
+	i_arg = NULL;
 	for ( ; *cp && (*cp != ' ') && (*cp != '\t'); cp++)
 		/* nothing */ ;
 	while ((*cp == ' ') || (*cp == '\t'))
@@ -111,6 +111,6 @@ static void __exit exit_script_binfmt(void)
 	unregister_binfmt(&script_format);
 }
 
-module_init(init_script_binfmt)
-module_exit(exit_script_binfmt)
+core_initcall(init_script_binfmt);
+module_exit(exit_script_binfmt);
 MODULE_LICENSE("GPL");

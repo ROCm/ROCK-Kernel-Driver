@@ -31,7 +31,8 @@
 #include <asm/iSeries/LparData.h>
 #include <asm/hvcall.h>
 #include <asm/cputable.h>
-#include "vpurr.h"
+#include <asm/rtas.h>
+#include <asm/system.h>
 
 #define MODULE_VERS "1.3"
 #define MODULE_NAME "lparcfg"
@@ -41,7 +42,7 @@
 /* find a better place for this function... */
 void log_plpar_hcall_return(unsigned long rc,char * tag)
 {
-	if (rc==0) /* success, return */
+	if (rc ==0 ) /* success, return */
 		return;
 /* check for null tag ? */
 	if (rc == H_Hardware)
@@ -65,20 +66,18 @@ static struct proc_dir_entry *proc_ppc64_lparcfg;
 
 #define lparcfg_write NULL
 
-extern unsigned char e2a(unsigned char);
-
 /* 
  * Methods used to fetch LPAR data when running on an iSeries platform.
  */
-static int lparcfg_data(struct seq_file *m,void *v)
+static int lparcfg_data(struct seq_file *m, void *v)
 {
-	unsigned long pool_id, lp_index; 
+	unsigned long pool_id, lp_index;
 	int shared, entitled_capacity, max_entitled_capacity;
 	int processors, max_processors;
 	struct paca_struct *lpaca = get_paca();
 
-	shared = (int)(lpaca->xLpPacaPtr->xSharedProc);
-	seq_printf(m, "serial_number=%c%c%c%c%c%c%c\n", 
+	shared = (int)(lpaca->lppaca_ptr->xSharedProc);
+	seq_printf(m, "serial_number=%c%c%c%c%c%c%c\n",
 		      e2a(xItExtVpdPanel.mfgID[2]),
 		      e2a(xItExtVpdPanel.mfgID[3]),
 		      e2a(xItExtVpdPanel.systemSerial[1]),
@@ -94,19 +93,19 @@ static int lparcfg_data(struct seq_file *m,void *v)
 		      e2a(xItExtVpdPanel.machineType[3])); 
 
 	lp_index = HvLpConfig_getLpIndex(); 
-	seq_printf(m, "partition_id=%d\n", (int)lp_index); 
+	seq_printf(m, "partition_id=%d\n", (int)lp_index);
 
-	seq_printf(m, "system_active_processors=%d\n", 
+	seq_printf(m, "system_active_processors=%d\n",
 		      (int)HvLpConfig_getSystemPhysicalProcessors()); 
 
-	seq_printf(m, "system_potential_processors=%d\n", 
+	seq_printf(m, "system_potential_processors=%d\n",
 		      (int)HvLpConfig_getSystemPhysicalProcessors()); 
 
 	processors = (int)HvLpConfig_getPhysicalProcessors(); 
-	seq_printf(m, "partition_active_processors=%d\n", processors);  
+	seq_printf(m, "partition_active_processors=%d\n", processors);
 
 	max_processors = (int)HvLpConfig_getMaxPhysicalProcessors(); 
-	seq_printf(m, "partition_potential_processors=%d\n", max_processors);  
+	seq_printf(m, "partition_potential_processors=%d\n", max_processors);
 
 	if(shared) {
 		entitled_capacity = HvLpConfig_getSharedProcUnits(); 
@@ -117,13 +116,14 @@ static int lparcfg_data(struct seq_file *m,void *v)
 	}
 	seq_printf(m, "partition_entitled_capacity=%d\n", entitled_capacity);
 
-	seq_printf(m, "partition_max_entitled_capacity=%d\n", 
+	seq_printf(m, "partition_max_entitled_capacity=%d\n",
 		      max_entitled_capacity);
 
 	if(shared) {
 		pool_id = HvLpConfig_getSharedPoolIndex(); 
-		seq_printf(m, "pool=%d\n", (int)pool_id); 
-		seq_printf(m, "pool_capacity=%d\n", (int)(HvLpConfig_getNumProcsInSharedPool(pool_id)*100)); 
+		seq_printf(m, "pool=%d\n", (int)pool_id);
+		seq_printf(m, "pool_capacity=%d\n",
+		    (int)(HvLpConfig_getNumProcsInSharedPool(pool_id)*100));
 	}
 
 	seq_printf(m, "shared_processor_mode=%d\n", shared);
@@ -157,43 +157,35 @@ static int lparcfg_data(struct seq_file *m,void *v)
  *              XXXX - Active processors in Physical Processor Pool.
  *                  XXXX  - Processors active on platform. 
  */
-static unsigned int h_get_ppp(unsigned long *entitled,unsigned long  *unallocated,unsigned long *aggregation,unsigned long *resource)
+static unsigned int h_get_ppp(unsigned long *entitled,
+		unsigned long  *unallocated, unsigned long *aggregation,
+		unsigned long *resource)
 {
 	unsigned long rc;
 	rc = plpar_hcall_4out(H_GET_PPP,0,0,0,0,entitled,unallocated,aggregation,resource);
 
-	log_plpar_hcall_return(rc,"H_GET_PPP");
+	log_plpar_hcall_return(rc, "H_GET_PPP");
 
 	return rc;
 }
 
-static void h_pic(unsigned long *pool_idle_time,unsigned long *num_procs)
+static void h_pic(unsigned long *pool_idle_time, unsigned long *num_procs)
 {
 	unsigned long rc;
 	unsigned long dummy;
-	rc = plpar_hcall(H_PIC,0,0,0,0,pool_idle_time,num_procs,&dummy);
+	rc = plpar_hcall(H_PIC, 0, 0, 0, 0, pool_idle_time, num_procs, &dummy);
 
-	log_plpar_hcall_return(rc,"H_PIC");
+	log_plpar_hcall_return(rc, "H_PIC");
 }
 
 static unsigned long get_purr(void);
-/* get sum of purr across all processors.  if PPC_VPURR is not enabled, return zero. */
-/* this utilizes the existing functionality from vpurr.c */
+/* ToDo:  get sum of purr across all processors.  The purr collection code
+ * is coming, but at this time is still problematic, so for now this
+ * function will return 0.
+ */
 static unsigned long get_purr()
 {
 	unsigned long sum_purr=0;
-#ifdef CONFIG_PPC_VPURR	
-	int cpu;
-	struct cpu_util_store * cus;
-
-	for_each_online_cpu(cpu){
-		cus =   &per_cpu (cpu_util_sampler, cpu);
-		sum_purr += cus->current_purr;
-#ifdef PURR_DEBUG
-	printk(KERN_INFO "get_purr for cpu (%x) has value (%lx) \n",cpu,cus->current_purr);
-#endif
-                }
-#endif
 	return sum_purr;
 }
 
@@ -202,37 +194,36 @@ static unsigned long get_purr()
 
 /*
  * parse_system_parameter_string()
- * Retrieve the potential_processors, max_entitled_capacity and friends 
+ * Retrieve the potential_processors, max_entitled_capacity and friends
  * through the get-system-parameter rtas call.  Replace keyword strings as
  * necessary.
  */
 static void parse_system_parameter_string(struct seq_file *m)
 {
-	long call_status;
-	unsigned long ret[2];
+	int call_status;
 
 	char * local_buffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
 	if (!local_buffer) {
-		printk(KERN_ERR "%s %s kmalloc failure at line %d \n",__FILE__,__FUNCTION__,__LINE__);
+		printk(KERN_ERR "%s %s kmalloc failure at line %d \n",
+		       __FILE__, __FUNCTION__, __LINE__);
 		return;
 	}
 
 	spin_lock(&rtas_data_buf_lock);
-	memset(rtas_data_buf, 0, SPLPAR_MAXLENGTH); 
+	memset(rtas_data_buf, 0, SPLPAR_MAXLENGTH);
 	call_status = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
 				NULL,
 				SPLPAR_CHARACTERISTICS_TOKEN,
-				__pa(rtas_data_buf),
-				SPLPAR_MAXLENGTH,
-				(void *)&ret);
-	memcpy(local_buffer,rtas_data_buf, SPLPAR_MAXLENGTH);
+				__pa(rtas_data_buf));
+	memcpy(local_buffer, rtas_data_buf, SPLPAR_MAXLENGTH);
 	spin_unlock(&rtas_data_buf_lock);
 
-	if (call_status!=0) {
-		printk(KERN_INFO "%s %s Error calling get-system-parameter (0x%lx)\n",__FILE__,__FUNCTION__,call_status);
+	if (call_status != 0) {
+		printk(KERN_INFO "%s %s Error calling get-system-parameter (0x%x)\n",
+		       __FILE__, __FUNCTION__, call_status);
 	} else {
 		int splpar_strlen;
-		int idx,w_idx;
+		int idx, w_idx;
 		char * workbuffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
 		if (!workbuffer) {
 			printk(KERN_ERR "%s %s kmalloc failure at line %d \n",__FILE__,__FUNCTION__,__LINE__);
@@ -242,57 +233,60 @@ static void parse_system_parameter_string(struct seq_file *m)
 #ifdef LPARCFG_DEBUG
 		printk(KERN_INFO "success calling get-system-parameter \n");
 #endif
-		splpar_strlen=local_buffer[0]*16+local_buffer[1];
-		local_buffer+=2; /* step over strlen value */
+		splpar_strlen = local_buffer[0] * 16 + local_buffer[1];
+		local_buffer += 2; /* step over strlen value */
 
 		memset(workbuffer, 0, SPLPAR_MAXLENGTH);
-		w_idx=0; idx=0;
-		while ((*local_buffer) && (idx<splpar_strlen)) {
-			workbuffer[w_idx++]=local_buffer[idx++];
-			if ((local_buffer[idx]==',')||(local_buffer[idx]=='\0')) {
-				workbuffer[w_idx]='\0';
-				if (w_idx) /* avoid the empty string */
-				{
-					seq_printf(m, "%s\n",workbuffer);
+		w_idx = 0;
+		idx = 0;
+		while ((*local_buffer) && (idx < splpar_strlen)) {
+			workbuffer[w_idx++] = local_buffer[idx++];
+			if ((local_buffer[idx] == ',')
+			    || (local_buffer[idx] == '\0')) {
+				workbuffer[w_idx] = '\0';
+				if (w_idx) {
+					/* avoid the empty string */
+					seq_printf(m, "%s\n", workbuffer);
 				}
 				memset(workbuffer, 0, SPLPAR_MAXLENGTH);
-				idx++; /* skip the comma */
-				w_idx=0;
-			} else if (local_buffer[idx]=='=') {
+				idx++;	/* skip the comma */
+				w_idx = 0;
+			} else if (local_buffer[idx] == '=') {
 				/* code here to replace workbuffer contents
 				 with different keyword strings */
-				if (0==strcmp(workbuffer,"MaxEntCap")) {
-					strcpy(workbuffer,"partition_max_entitled_capacity\0");
-					w_idx=strlen(workbuffer);
+				if (0 == strcmp(workbuffer,"MaxEntCap")) {
+					strcpy(workbuffer, "partition_max_entitled_capacity");
+					w_idx = strlen(workbuffer);
 				}
-				if (0==strcmp(workbuffer,"MaxPlatProcs")) {
-					strcpy(workbuffer,"system_potential_processors\0");
-					w_idx=strlen(workbuffer);
+				if (0 == strcmp(workbuffer,"MaxPlatProcs")) {
+					strcpy(workbuffer, "system_potential_processors");
+					w_idx = strlen(workbuffer);
 				}
 			}
 		}
 		kfree(workbuffer);
-		local_buffer-=2; /* back up over strlen value */
+		local_buffer -= 2;	/* back up over strlen value */
 	}
 	kfree(local_buffer);
-	return;
 }
 
 static int lparcfg_count_active_processors(void);
 
-static int lparcfg_count_active_processors()
+/* Return the number of processors in the system.
+ * This function reads through the device tree and counts
+ * the virtual processors, this does not include threads.
+ */
+static int lparcfg_count_active_processors(void)
 {
 	struct device_node *cpus_dn = NULL;
-	int count=0;
-	for (cpus_dn = of_find_node_by_type(NULL, "cpu");
-		cpus_dn;
-		cpus_dn = of_find_node_by_type(cpus_dn, "cpu")) {
+	int count = 0;
+
+	while ((cpus_dn = of_find_node_by_type(cpus_dn, "cpu"))) {
 #ifdef LPARCFG_DEBUG
 		printk(KERN_ERR "cpus_dn %p \n",cpus_dn);
 #endif
 		count++;
-		}
-	of_node_put(cpus_dn);
+	}
 	return count;
 }
 
@@ -310,41 +304,45 @@ static int lparcfg_data(struct seq_file *m, void *v)
 	if (rootdn) {
 		model = get_property(rootdn, "model", NULL);
 		system_id = get_property(rootdn, "system-id", NULL);
-		lp_index_ptr = (unsigned int *)get_property(rootdn, "ibm,partition-no", NULL);
-		if (lp_index_ptr) lp_index = *lp_index_ptr;
+		lp_index_ptr = (unsigned int *)
+			get_property(rootdn, "ibm,partition-no", NULL);
+		if (lp_index_ptr)
+			lp_index = *lp_index_ptr;
 	}
 
 
-	seq_printf(m,"%s %s \n",MODULE_NAME,MODULE_VERS);
+	seq_printf(m, "%s %s \n", MODULE_NAME, MODULE_VERS);
 
-	seq_printf(m,"serial_number=%s\n", system_id); 
+	seq_printf(m, "serial_number=%s\n", system_id);
 
-	seq_printf(m,"system_type=%s\n", model); 
+	seq_printf(m, "system_type=%s\n", model);
 
-	seq_printf(m,"partition_id=%d\n", (int)lp_index); 
+	seq_printf(m, "partition_id=%d\n", (int)lp_index);
 
 	rtas_node = find_path_device("/rtas");
 	lrdrp = (int *)get_property(rtas_node, "ibm,lrdr-capacity", NULL);
 
 	if (lrdrp == NULL) {
-		system_active_processors = systemcfg->processorCount; 
+		system_active_processors = systemcfg->processorCount;
 	} else {
 		system_active_processors = *(lrdrp + 4);
-	} 
+	}
 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		unsigned long h_entitled,h_unallocated,h_aggregation,h_resource;
-		unsigned long pool_idle_time,pool_procs;
+		unsigned long h_entitled, h_unallocated;
+		unsigned long h_aggregation, h_resource;
+		unsigned long pool_idle_time, pool_procs;
 		unsigned long purr;
 
-		h_get_ppp(&h_entitled,&h_unallocated,&h_aggregation,&h_resource);
+		h_get_ppp(&h_entitled, &h_unallocated, &h_aggregation,
+			  &h_resource);
 
 		seq_printf(m, "R4=0x%lx\n", h_entitled);
 		seq_printf(m, "R5=0x%lx\n", h_unallocated);
 		seq_printf(m, "R6=0x%lx\n", h_aggregation);
 		seq_printf(m, "R7=0x%lx\n", h_resource);
 
-		h_pic(&pool_idle_time,&pool_procs);
+		h_pic(&pool_idle_time, &pool_procs);
 
 		purr = get_purr();
 
@@ -360,7 +358,7 @@ static int lparcfg_data(struct seq_file *m, void *v)
 		seq_printf(m, "group=%ld\n",
 			      (h_aggregation >> 2*8) & 0xffff);
 
-		seq_printf(m, "system_active_processors=%ld\n", 
+		seq_printf(m, "system_active_processors=%ld\n",
 			      (h_resource >> 0*8) & 0xffff);
 
 		seq_printf(m, "pool_capacity=%ld\n",
@@ -408,7 +406,7 @@ static int lparcfg_data(struct seq_file *m, void *v)
 			system_active_processors);
 
 	seq_printf(m, "shared_processor_mode=%d\n",
-			paca[0].xLpPaca.xSharedProc);
+			paca[0].lppaca.xSharedProc);
 
 	return 0;
 }

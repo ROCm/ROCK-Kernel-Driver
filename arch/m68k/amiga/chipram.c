@@ -42,7 +42,7 @@ void __init amiga_chip_init(void)
     chipavail = amiga_chip_size;
 }
 
-    
+
 void *amiga_chip_alloc(unsigned long size, const char *name)
 {
     struct resource *res;

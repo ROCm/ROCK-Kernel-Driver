@@ -131,7 +131,7 @@ static inline unsigned int sectors_to_pages(unsigned int sectors)
 static int alloc_area(struct pstore *ps)
 {
 	int r = -ENOMEM;
-	size_t len, nr_pages;
+	size_t len;
 
 	len = ps->chunk_size << SECTOR_SHIFT;
 
@@ -143,15 +143,11 @@ static int alloc_area(struct pstore *ps)
 	if (!ps->area)
 		return r;
 
-	nr_pages = sectors_to_pages(ps->chunk_size);
 	return 0;
 }
 
 static void free_area(struct pstore *ps)
 {
-	size_t nr_pages;
-
-	nr_pages = sectors_to_pages(ps->chunk_size);
 	vfree(ps->area);
 }
 
@@ -573,8 +569,8 @@ int dm_create_persistent(struct exception_store *store, uint32_t chunk_size)
       bad:
 	dm_io_put(sectors_to_pages(chunk_size));
 	if (ps) {
-		if (ps->callbacks)
-			vfree(ps->callbacks);
+		if (ps->area)
+			free_area(ps);
 
 		kfree(ps);
 	}
@@ -588,17 +584,17 @@ struct transient_c {
 	sector_t next_free;
 };
 
-void transient_destroy(struct exception_store *store)
+static void transient_destroy(struct exception_store *store)
 {
 	kfree(store->context);
 }
 
-int transient_read_metadata(struct exception_store *store)
+static int transient_read_metadata(struct exception_store *store)
 {
 	return 0;
 }
 
-int transient_prepare(struct exception_store *store, struct exception *e)
+static int transient_prepare(struct exception_store *store, struct exception *e)
 {
 	struct transient_c *tc = (struct transient_c *) store->context;
 	sector_t size = get_dev_size(store->snap->cow->bdev);
@@ -612,7 +608,7 @@ int transient_prepare(struct exception_store *store, struct exception *e)
 	return 0;
 }
 
-void transient_commit(struct exception_store *store,
+static void transient_commit(struct exception_store *store,
 		      struct exception *e,
 		      void (*callback) (void *, int success),
 		      void *callback_context)

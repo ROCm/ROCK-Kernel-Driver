@@ -112,8 +112,8 @@ System utilities
 Architectural changes
 ---------------------
 
-DevFS is now in the kernel.  See Documentation/filesystems/devfs/* in
-the kernel source tree for all the gory details.
+DevFS has been obsoleted in favour of udev
+(http://www.kernel.org/pub/linux/utils/kernel/hotplug/)
 
 32-bit UID support is now in place.  Have fun!
 
@@ -400,8 +400,3 @@ NFS-Utils
 o  <http://nfs.sourceforge.net/>
 
 
-Suggestions and corrections
-===========================
-
-Please feel free to submit changes, corrections, gripes, flames,
-money, etc. to me <chris.ricker@genetics.utah.edu>.  Happy Linuxing!

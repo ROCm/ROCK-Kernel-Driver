@@ -14,8 +14,6 @@
 #include <linux/mm.h>
 #include <linux/mmzone.h>
 #include <linux/module.h>
-#include <linux/cpu.h>
-#include <linux/notifier.h>
 #include <asm/lmb.h>
 #include <asm/machdep.h>
 #include <asm/abs_addr.h>
@@ -42,8 +40,6 @@ struct pglist_data node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 static unsigned long node0_io_hole_size;
 
-static int numa_disabled;
-
 EXPORT_SYMBOL(node_data);
 EXPORT_SYMBOL(numa_cpu_lookup_table);
 EXPORT_SYMBOL(numa_memory_lookup_table);
@@ -60,24 +56,7 @@ static inline void map_cpu_to_node(int cpu, int node)
 	}
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-static void unmap_cpu_from_node(unsigned long cpu)
-{
-	int node = numa_cpu_lookup_table[cpu];
-
-	dbg("removing cpu %lu from node %d\n", cpu, node);
-
-	if (cpu_isset(cpu, numa_cpumask_lookup_table[node])) {
-		cpu_clear(cpu, numa_cpumask_lookup_table[node]);
-		nr_cpus_in_node[node]--;
-	} else {
-		printk(KERN_ERR "WARNING: cpu %lu not found in node %d\n",
-		       cpu, node);
-	}
-}
-#endif /* CONFIG_HOTPLUG_CPU */
-
-static struct device_node * __devinit find_cpu_node(unsigned int cpu)
+static struct device_node * __init find_cpu_node(unsigned int cpu)
 {
 	unsigned int hw_cpuid = get_hard_smp_processor_id(cpu);
 	struct device_node *cpu_node = NULL;
@@ -89,11 +68,9 @@ static struct device_node * __devinit find_cpu_node(unsigned int cpu)
 		interrupt_server = (unsigned int *)get_property(cpu_node,
 					"ibm,ppc-interrupt-server#s", &len);
 
-		len = len / sizeof(u32);
-
 		if (interrupt_server && (len > 0)) {
 			while (len--) {
-				if (interrupt_server[len] == hw_cpuid)
+				if (interrupt_server[len-1] == hw_cpuid)
 					return cpu_node;
 			}
 		} else {
@@ -112,7 +89,7 @@ static int *of_get_associativity(struct device_node *dev)
  {
 	unsigned int *result;
 	int len;
-	
+
 	result = (unsigned int *)get_property(dev, "ibm,associativity", &len);
 
 	if (len <= 0)
@@ -125,7 +102,7 @@ static int of_node_numa_domain(struct device_node *device, int depth)
 {
 	int numa_domain;
 	unsigned int *tmp;
-	
+
 	tmp = of_get_associativity(device);
 	if (tmp && (tmp[0] >= depth)) {
 		numa_domain = tmp[depth];
@@ -138,12 +115,12 @@ static int of_node_numa_domain(struct device_node *device, int depth)
 }
 
 /*
- * In theory, the "ibm,associativity" property may contain multiple 
- * associativity lists because a resource may be multiply connected 
+ * In theory, the "ibm,associativity" property may contain multiple
+ * associativity lists because a resource may be multiply connected
  * into the machine.  This resource then has different associativity
  * characteristics relative to its multiple connections.  We ignore
  * this for now.  We also assume that all cpu and memory sets have
- * their distances represented at a common level.  This won't be 
+ * their distances represented at a common level.  This won't be
  * true for heirarchical NUMA.
  *
  * In any case the ibm,associativity-reference-points should give
@@ -165,14 +142,14 @@ static int find_min_common_depth(void)
 				__FUNCTION__);
 		return -1;
 	}
-	
+
 	/*
-	 * this property is 2 32-bit integers, each representing a level of 
-	 * depth in the associativity nodes.  The first is for an SMP 
-	 * configuration (should be all 0's) and the second is for a normal 
+	 * this property is 2 32-bit integers, each representing a level of
+	 * depth in the associativity nodes.  The first is for an SMP
+	 * configuration (should be all 0's) and the second is for a normal
 	 * NUMA configuration.
 	 */
-	ref_points = (unsigned int *)get_property(rtas_root, 
+	ref_points = (unsigned int *)get_property(rtas_root,
 			"ibm,associativity-reference-points", &len);
 
 	if ((len >= 1) && ref_points) {
@@ -201,87 +178,9 @@ static unsigned long read_cell_ul(struct device_node *device, unsigned int **buf
 	return result;
 }
 
-/*
- * Figure out to which domain a cpu belongs and stick it there.
- * Return the id of the domain used.
- */
-static int numa_setup_cpu(unsigned long lcpu, int depth)
-{
-	int numa_domain;
-	struct device_node *cpu;
-
-	cpu = find_cpu_node(lcpu);
-
-	if (cpu) {
-		int *tmp, len;
-
-		tmp = (int *)get_property(cpu, "ibm,associativity",
-					  &len);
-		if (tmp && (len >= depth)) {
-			numa_domain = tmp[depth];
-
-		} else {
-			printk(KERN_ERR "WARNING: no NUMA "
-			       "information for cpu %ld\n", lcpu);
-			numa_domain = 0;
-		}
-
-		if (numa_domain >= MAX_NUMNODES) {
-			/*
-			 * POWER4 LPAR uses 0xffff as invalid node,
-			 * dont warn in this case.
-			 */
-			if (numa_domain != 0xffff)
-				printk(KERN_ERR "WARNING: cpu %ld "
-				       "maps to invalid NUMA node %d\n",
-				       lcpu, numa_domain);
-			numa_domain = 0;
-		}
-	} else {
-		printk(KERN_ERR "WARNING: no NUMA information for "
-		       "cpu %ld\n", lcpu);
-		numa_domain = 0;
-	}
-
-	/* This can be moved to callers if all domains are onlined at
-	 * boot.
-	 */
-	node_set_online(numa_domain);
-
-	map_cpu_to_node(lcpu, numa_domain);
-
-	of_node_put(cpu);
-
-	return numa_domain;
-}
-
-#ifdef CONFIG_HOTPLUG_CPU
-
-static int cpu_numa_callback(struct notifier_block *nfb,
-			     unsigned long action,
-			     void *hcpu)
-{
-	unsigned long lcpu = (unsigned long)hcpu;
-
-	if (action == CPU_UP_PREPARE) {
-		int depth = find_min_common_depth();
-
-		if (depth == -1 || numa_disabled)
-			map_cpu_to_node(lcpu, 0);
-		else
-			numa_setup_cpu(lcpu, depth);
-
-	} else if (action == CPU_DEAD || action == CPU_UP_CANCELED)
-		unmap_cpu_from_node((unsigned long)hcpu);
-
-	return NOTIFY_OK;
-}
-
-
-#endif /* CONFIG_HOTPLUG_CPU */
-
 static int __init parse_numa_properties(void)
 {
+	struct device_node *cpu = NULL;
 	struct device_node *memory = NULL;
 	int depth;
 	int max_domain = 0;
@@ -290,7 +189,6 @@ static int __init parse_numa_properties(void)
 
 	if (strstr(saved_command_line, "numa=off")) {
 		printk(KERN_WARNING "NUMA disabled by user\n");
-		numa_disabled = 1;
 		return -1;
 	}
 
@@ -305,12 +203,39 @@ static int __init parse_numa_properties(void)
 	printk(KERN_INFO "NUMA associativity depth for CPU/Memory: %d\n", depth);
 	if (depth < 0)
 		return depth;
-	
+
 	for_each_cpu(i) {
-		int numa_domain = numa_setup_cpu(i, depth);
+		int numa_domain;
+
+		cpu = find_cpu_node(i);
+
+		if (cpu) {
+			numa_domain = of_node_numa_domain(cpu, depth);
+			of_node_put(cpu);
+
+			if (numa_domain >= MAX_NUMNODES) {
+				/*
+			 	 * POWER4 LPAR uses 0xffff as invalid node,
+				 * dont warn in this case.
+			 	 */
+				if (numa_domain != 0xffff)
+					printk(KERN_ERR "WARNING: cpu %ld "
+					       "maps to invalid NUMA node %d\n",
+					       i, numa_domain);
+				numa_domain = 0;
+			}
+		} else {
+			printk(KERN_ERR "WARNING: no NUMA information for "
+			       "cpu %ld\n", i);
+			numa_domain = 0;
+		}
+
+		node_set_online(numa_domain);
 
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
+
+		map_cpu_to_node(i, numa_domain);
 	}
 
 	memory = NULL;
@@ -351,8 +276,10 @@ new_range:
 			max_domain = numa_domain;
 
 		/* 
-		 * Coalesce memory regions. We dont handle holes within
-		 * NUMA nodes.
+		 * For backwards compatibility, OF splits the first node
+		 * into two regions (the first being 0-4GB). Check for
+		 * this simple case and complain if there is a gap in
+		 * memory
 		 */
 		if (node_data[numa_domain].node_spanned_pages) {
 			unsigned long shouldstart =
@@ -409,7 +336,7 @@ static void __init setup_nonnuma(void)
 			numa_memory_lookup_table[i] = ARRAY_INITIALISER;
 	}
 
-	for_each_cpu(i)
+	for (i = 0; i < NR_CPUS; i++)
 		map_cpu_to_node(i, 0);
 
 	node_set_online(0);
@@ -429,15 +356,10 @@ void __init do_init_bootmem(void)
 
 	min_low_pfn = 0;
 	max_low_pfn = lmb_end_of_DRAM() >> PAGE_SHIFT;
+	max_pfn = max_low_pfn;
 
 	if (parse_numa_properties())
 		setup_nonnuma();
-
-	/*
-	 * This must run before the sched domains notifier in
-	 * arch/ppc64/kernel/smp.c.
-	 */
-	hotcpu_notifier(cpu_numa_callback, 1);
 
 	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long start_paddr, end_paddr;

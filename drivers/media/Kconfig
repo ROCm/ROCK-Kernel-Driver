@@ -18,7 +18,7 @@ config VIDEO_DEV
 	  and applications for most video capture functions already exist.
 
 	  Documentation for the original API is included in the file
-	  Documentation/video4linux/API.html.  Documentation for V4L2 is
+	  <file:Documentation/video4linux/API.html>.  Documentation for V4L2 is
 	  available on the web at <http://bytesex.org/v4l/>.
 
 	  To compile this driver as a module, choose M here: the

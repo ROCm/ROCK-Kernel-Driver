@@ -1095,7 +1095,7 @@ static int sdla_open(struct net_device *dev)
 	return(0);
 }
 
-static int sdla_config(struct net_device *dev, struct frad_conf *conf, int get)
+static int sdla_config(struct net_device *dev, struct frad_conf __user *conf, int get)
 {
 	struct frad_local *flp;
 	struct conf_data  data;
@@ -1193,7 +1193,7 @@ static int sdla_config(struct net_device *dev, struct frad_conf *conf, int get)
 	return(0);
 }
 
-static int sdla_xfer(struct net_device *dev, struct sdla_mem *info, int read)
+static int sdla_xfer(struct net_device *dev, struct sdla_mem __user *info, int read)
 {
 	struct sdla_mem mem;
 	char	*temp;
@@ -1271,7 +1271,7 @@ static int sdla_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	{
 		case FRAD_GET_CONF:
 		case FRAD_SET_CONF:
-			return(sdla_config(dev, (struct frad_conf *)ifr->ifr_data, cmd == FRAD_GET_CONF));
+			return(sdla_config(dev, ifr->ifr_data, cmd == FRAD_GET_CONF));
 
 		case SDLA_IDENTIFY:
 			ifr->ifr_flags = flp->type;
@@ -1306,7 +1306,7 @@ NOTE:  This is rather a useless action right now, as the
 
 		case SDLA_WRITEMEM:
 		case SDLA_READMEM:
-			return(sdla_xfer(dev, (struct sdla_mem *)ifr->ifr_data, cmd == SDLA_READMEM));
+			return(sdla_xfer(dev, ifr->ifr_data, cmd == SDLA_READMEM));
 
 		case SDLA_START:
 			sdla_start(dev);

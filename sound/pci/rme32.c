@@ -298,7 +298,7 @@ static int snd_rme32_playback_silence(snd_pcm_substream_t * substream, int chann
 
 static int snd_rme32_playback_copy(snd_pcm_substream_t * substream, int channel,	/* not used (interleaved data) */
 				   snd_pcm_uframes_t pos,
-				   void *src, snd_pcm_uframes_t count)
+				   void __user *src, snd_pcm_uframes_t count)
 {
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	count <<= rme32->playback_frlog;
@@ -311,7 +311,7 @@ static int snd_rme32_playback_copy(snd_pcm_substream_t * substream, int channel,
 
 static int snd_rme32_capture_copy(snd_pcm_substream_t * substream, int channel,	/* not used (interleaved data) */
 				  snd_pcm_uframes_t pos,
-				  void *dst, snd_pcm_uframes_t count)
+				  void __user *dst, snd_pcm_uframes_t count)
 {
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	count <<= rme32->capture_frlog;

@@ -9,7 +9,6 @@
  *	published by the Free Software Foundation; either version 2 of
  *	the License, or (at your option) any later version.
  */
-#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/wait.h>
@@ -108,8 +107,9 @@ struct ttusb {
 
 	int insync;
 
-	u16 cc;			/* MuxCounter - will increment on EVERY MUX PACKET */
+	int cc;			/* MuxCounter - will increment on EVERY MUX PACKET */
 	/* (including stuffing. yes. really.) */
+
 
 	u8 last_result[32];
 
@@ -575,7 +575,7 @@ static void ttusb_process_muxpack(struct ttusb *ttusb, const u8 * muxpack,
 
 	cc = (muxpack[len - 4] << 8) | muxpack[len - 3];
 	cc &= 0x7FFF;
-	if (cc != ttusb->cc)
+	if ((cc != ttusb->cc) && (ttusb->cc != -1))
 		printk("%s: cc discontinuity (%d frames missing)\n",
 		       __FUNCTION__, (cc - ttusb->cc) & 0x7FFF);
 	ttusb->cc = (cc + 1) & 0x7FFF;
@@ -787,7 +787,7 @@ static void ttusb_iso_irq(struct urb *urb, struct pt_regs *ptregs)
 			ttusb_process_frame(ttusb, data, len);
 		}
 	}
-	usb_submit_urb(urb, GFP_ATOMIC);
+	usb_submit_urb(urb, GFP_KERNEL);
 }
 
 static void ttusb_free_iso_urbs(struct ttusb *ttusb)
@@ -852,6 +852,7 @@ static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 		return 0;
 	}
 
+	ttusb->cc = -1;
 	ttusb->insync = 0;
 	ttusb->mux_state = 0;
 
@@ -864,6 +865,7 @@ static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 		urb->complete = ttusb_iso_irq;
 		urb->pipe = ttusb->isoc_in_pipe;
 		urb->transfer_flags = URB_ISO_ASAP;
+		urb->interval = 1;
 		urb->number_of_packets = FRAMES_PER_ISO_BUF;
 		urb->transfer_buffer_length =
 		    ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF;
@@ -1113,8 +1115,7 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	up(&ttusb->sem);
 
-	dvb_register_adapter(&ttusb->adapter,
-			     "Technotrend/Hauppauge Nova-USB");
+	dvb_register_adapter(&ttusb->adapter, "Technotrend/Hauppauge Nova-USB", THIS_MODULE);
 
 	dvb_register_i2c_bus(ttusb_i2c_xfer, ttusb, ttusb->adapter, 0);
 	dvb_add_frontend_ioctls(ttusb->adapter, ttusb_lnb_ioctl, NULL,
@@ -1124,7 +1125,7 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	ttusb->dvb_demux.dmx.capabilities =
 	    DMX_TS_FILTERING | DMX_SECTION_FILTERING;
-	ttusb->dvb_demux.priv = 0;
+	ttusb->dvb_demux.priv = NULL;
 #ifdef TTUSB_HWSECTIONS
 	ttusb->dvb_demux.filternum = TTUSB_MAXFILTER;
 #else
@@ -1133,7 +1134,7 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	ttusb->dvb_demux.feednum = TTUSB_MAXCHANNEL;
 	ttusb->dvb_demux.start_feed = ttusb_start_feed;
 	ttusb->dvb_demux.stop_feed = ttusb_stop_feed;
-	ttusb->dvb_demux.write_to_decoder = 0;
+	ttusb->dvb_demux.write_to_decoder = NULL;
 
 	if ((result = dvb_dmx_init(&ttusb->dvb_demux)) < 0) {
 		printk("ttusb_dvb: dvb_dmx_init failed (errno = %d)\n",
@@ -1181,9 +1182,6 @@ static void ttusb_disconnect(struct usb_interface *intf)
 
 	ttusb_stop_iso_xfer(ttusb);
 
-#if 0
-	devfs_remove(TTUSB_BUDGET_NAME);
-#endif
 	ttusb->dvb_demux.dmx.close(&ttusb->dvb_demux.dmx);
 	dvb_net_release(&ttusb->dvbnet);
 	dvb_dmxdev_release(&ttusb->dmxdev);

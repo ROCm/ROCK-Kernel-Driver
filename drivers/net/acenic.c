@@ -85,6 +85,8 @@
 #include <asm/uaccess.h>
 
 
+#define DRV_NAME "acenic"
+
 #undef INDEX_DEBUG
 
 #ifdef CONFIG_ACENIC_OMIT_TIGON_I
@@ -367,9 +369,9 @@ MODULE_DEVICE_TABLE(pci, acenic_pci_tbl);
  */
 #define ACE_MINI_SIZE		100
 
-#define ACE_MINI_BUFSIZE	(ACE_MINI_SIZE + 2 + 16)
-#define ACE_STD_BUFSIZE		(ACE_STD_MTU + ETH_HLEN + 2+4+16)
-#define ACE_JUMBO_BUFSIZE	(ACE_JUMBO_MTU + ETH_HLEN + 2+4+16)
+#define ACE_MINI_BUFSIZE	ACE_MINI_SIZE
+#define ACE_STD_BUFSIZE		(ACE_STD_MTU + ETH_HLEN + 4)
+#define ACE_JUMBO_BUFSIZE	(ACE_JUMBO_MTU + ETH_HLEN + 4)
 
 /*
  * There seems to be a magic difference in the effect between 995 and 996
@@ -443,6 +445,16 @@ static char version[] __initdata =
   "acenic.c: v0.92 08/05/2002  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
+static int ace_get_settings(struct net_device *, struct ethtool_cmd *);
+static int ace_set_settings(struct net_device *, struct ethtool_cmd *);
+static void ace_get_drvinfo(struct net_device *, struct ethtool_drvinfo *);
+
+static struct ethtool_ops ace_ethtool_ops = {
+	.get_settings = ace_get_settings,
+	.set_settings = ace_set_settings,
+	.get_drvinfo = ace_get_drvinfo,
+};
+
 static int __devinit acenic_probe_one(struct pci_dev *pdev,
 		const struct pci_device_id *id)
 {
@@ -480,7 +492,7 @@ static int __devinit acenic_probe_one(struct pci_dev *pdev,
 	dev->hard_start_xmit = &ace_start_xmit;
 	dev->get_stats = &ace_get_stats;
 	dev->set_multicast_list = &ace_set_multicast_list;
-	dev->do_ioctl = &ace_ioctl;
+	SET_ETHTOOL_OPS(dev, &ace_ethtool_ops);
 	dev->set_mac_address = &ace_set_mac_addr;
 	dev->change_mtu = &ace_change_mtu;
 
@@ -666,7 +678,7 @@ static void __devexit acenic_remove_one(struct pci_dev *pdev)
 			ringp = &ap->skb->rx_std_skbuff[i];
 			mapping = pci_unmap_addr(ringp, mapping);
 			pci_unmap_page(ap->pdev, mapping,
-				       ACE_STD_BUFSIZE - (2 + 16),
+				       ACE_STD_BUFSIZE,
 				       PCI_DMA_FROMDEVICE);
 
 			ap->rx_std_ring[i].size = 0;
@@ -686,7 +698,7 @@ static void __devexit acenic_remove_one(struct pci_dev *pdev)
 				ringp = &ap->skb->rx_mini_skbuff[i];
 				mapping = pci_unmap_addr(ringp,mapping);
 				pci_unmap_page(ap->pdev, mapping,
-					       ACE_MINI_BUFSIZE - (2 + 16),
+					       ACE_MINI_BUFSIZE,
 					       PCI_DMA_FROMDEVICE);
 
 				ap->rx_mini_ring[i].size = 0;
@@ -705,7 +717,7 @@ static void __devexit acenic_remove_one(struct pci_dev *pdev)
 			ringp = &ap->skb->rx_jumbo_skbuff[i];
 			mapping = pci_unmap_addr(ringp, mapping);
 			pci_unmap_page(ap->pdev, mapping,
-				       ACE_JUMBO_BUFSIZE - (2 + 16),
+				       ACE_JUMBO_BUFSIZE,
 				       PCI_DMA_FROMDEVICE);
 
 			ap->rx_jumbo_ring[i].size = 0;
@@ -1195,10 +1207,10 @@ static int __init ace_init(struct net_device *dev)
 	}
 
 	ecode = request_irq(pdev->irq, ace_interrupt, SA_SHIRQ,
-			    dev->name, dev);
+			    DRV_NAME, dev);
 	if (ecode) {
 		printk(KERN_WARNING "%s: Requested IRQ %d is busy\n",
-		       dev->name, pdev->irq);
+		       DRV_NAME, pdev->irq);
 		goto init_error;
 	} else
 		dev->irq = pdev->irq;
@@ -1245,7 +1257,7 @@ static int __init ace_init(struct net_device *dev)
 	set_aceaddr(&info->stats2_ptr, (dma_addr_t) tmp_ptr);
 
 	set_aceaddr(&info->rx_std_ctrl.rngptr, ap->rx_ring_base_dma);
-	info->rx_std_ctrl.max_len = ACE_STD_MTU + ETH_HLEN + 4;
+	info->rx_std_ctrl.max_len = ACE_STD_BUFSIZE;
 	info->rx_std_ctrl.flags =
 	  RCB_FLG_TCP_UDP_SUM | RCB_FLG_NO_PSEUDO_HDR | ACE_RCB_VLAN_FLAG;
 
@@ -1622,7 +1634,7 @@ static void ace_tasklet(unsigned long dev)
 	cur_size = atomic_read(&ap->cur_rx_bufs);
 	if ((cur_size < RX_LOW_STD_THRES) &&
 	    !test_and_set_bit(0, &ap->std_refill_busy)) {
-#if DEBUG
+#ifdef DEBUG
 		printk("refilling buffers (current %i)\n", cur_size);
 #endif
 		ace_load_std_rx_ring(ap, RX_RING_SIZE - cur_size);
@@ -1632,7 +1644,7 @@ static void ace_tasklet(unsigned long dev)
 		cur_size = atomic_read(&ap->cur_mini_bufs);
 		if ((cur_size < RX_LOW_MINI_THRES) &&
 		    !test_and_set_bit(0, &ap->mini_refill_busy)) {
-#if DEBUG
+#ifdef DEBUG
 			printk("refilling mini buffers (current %i)\n",
 			       cur_size);
 #endif
@@ -1643,7 +1655,7 @@ static void ace_tasklet(unsigned long dev)
 	cur_size = atomic_read(&ap->cur_jumbo_bufs);
 	if (ap->jumbo && (cur_size < RX_LOW_JUMBO_THRES) &&
 	    !test_and_set_bit(0, &ap->jumbo_refill_busy)) {
-#if DEBUG
+#ifdef DEBUG
 		printk("refilling jumbo buffers (current %i)\n", cur_size);
 #endif
 		ace_load_jumbo_rx_ring(ap, RX_JUMBO_SIZE - cur_size);
@@ -1688,17 +1700,14 @@ static void ace_load_std_rx_ring(struct ace_private *ap, int nr_bufs)
 		struct rx_desc *rd;
 		dma_addr_t mapping;
 
-		skb = alloc_skb(ACE_STD_BUFSIZE, GFP_ATOMIC);
+		skb = alloc_skb(ACE_STD_BUFSIZE + NET_IP_ALIGN, GFP_ATOMIC);
 		if (!skb)
 			break;
 
-		/*
-		 * Make sure IP header starts on a fresh cache line.
-		 */
-		skb_reserve(skb, 2 + 16);
+		skb_reserve(skb, NET_IP_ALIGN);
 		mapping = pci_map_page(ap->pdev, virt_to_page(skb->data),
 				       offset_in_page(skb->data),
-				       ACE_STD_BUFSIZE - (2 + 16),
+				       ACE_STD_BUFSIZE,
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_std_skbuff[idx].skb = skb;
 		pci_unmap_addr_set(&ap->skb->rx_std_skbuff[idx],
@@ -1706,7 +1715,7 @@ static void ace_load_std_rx_ring(struct ace_private *ap, int nr_bufs)
 
 		rd = &ap->rx_std_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
-		rd->size = ACE_STD_MTU + ETH_HLEN + 4;
+		rd->size = ACE_STD_BUFSIZE;
 		rd->idx = idx;
 		idx = (idx + 1) % RX_STD_RING_ENTRIES;
 	}
@@ -1754,17 +1763,14 @@ static void ace_load_mini_rx_ring(struct ace_private *ap, int nr_bufs)
 		struct rx_desc *rd;
 		dma_addr_t mapping;
 
-		skb = alloc_skb(ACE_MINI_BUFSIZE, GFP_ATOMIC);
+		skb = alloc_skb(ACE_MINI_BUFSIZE + NET_IP_ALIGN, GFP_ATOMIC);
 		if (!skb)
 			break;
 
-		/*
-		 * Make sure the IP header ends up on a fresh cache line
-		 */
-		skb_reserve(skb, 2 + 16);
+		skb_reserve(skb, NET_IP_ALIGN);
 		mapping = pci_map_page(ap->pdev, virt_to_page(skb->data),
 				       offset_in_page(skb->data),
-				       ACE_MINI_BUFSIZE - (2 + 16),
+				       ACE_MINI_BUFSIZE,
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_mini_skbuff[idx].skb = skb;
 		pci_unmap_addr_set(&ap->skb->rx_mini_skbuff[idx],
@@ -1772,7 +1778,7 @@ static void ace_load_mini_rx_ring(struct ace_private *ap, int nr_bufs)
 
 		rd = &ap->rx_mini_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
-		rd->size = ACE_MINI_SIZE;
+		rd->size = ACE_MINI_BUFSIZE;
 		rd->idx = idx;
 		idx = (idx + 1) % RX_MINI_RING_ENTRIES;
 	}
@@ -1815,17 +1821,14 @@ static void ace_load_jumbo_rx_ring(struct ace_private *ap, int nr_bufs)
 		struct rx_desc *rd;
 		dma_addr_t mapping;
 
-		skb = alloc_skb(ACE_JUMBO_BUFSIZE, GFP_ATOMIC);
+		skb = alloc_skb(ACE_JUMBO_BUFSIZE + NET_IP_ALIGN, GFP_ATOMIC);
 		if (!skb)
 			break;
 
-		/*
-		 * Make sure the IP header ends up on a fresh cache line
-		 */
-		skb_reserve(skb, 2 + 16);
+		skb_reserve(skb, NET_IP_ALIGN);
 		mapping = pci_map_page(ap->pdev, virt_to_page(skb->data),
 				       offset_in_page(skb->data),
-				       ACE_JUMBO_BUFSIZE - (2 + 16),
+				       ACE_JUMBO_BUFSIZE,
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_jumbo_skbuff[idx].skb = skb;
 		pci_unmap_addr_set(&ap->skb->rx_jumbo_skbuff[idx],
@@ -1833,7 +1836,7 @@ static void ace_load_jumbo_rx_ring(struct ace_private *ap, int nr_bufs)
 
 		rd = &ap->rx_jumbo_ring[idx];
 		set_aceaddr(&rd->addr, mapping);
-		rd->size = ACE_JUMBO_MTU + ETH_HLEN + 4;
+		rd->size = ACE_JUMBO_BUFSIZE;
 		rd->idx = idx;
 		idx = (idx + 1) % RX_JUMBO_RING_ENTRIES;
 	}
@@ -1995,6 +1998,11 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 		int bd_flags, desc_type, mapsize;
 		u16 csum;
 
+
+		/* make sure the rx descriptor isn't read before rxretprd */
+		if (idx == rxretcsm) 
+			rmb();
+
 		retdesc = &ap->rx_return_ring[idx];
 		skbidx = retdesc->idx;
 		bd_flags = retdesc->flags;
@@ -2010,19 +2018,19 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 			 */
 		case 0:
 			rip = &ap->skb->rx_std_skbuff[skbidx];
-			mapsize = ACE_STD_BUFSIZE - (2 + 16);
+			mapsize = ACE_STD_BUFSIZE;
 			rxdesc = &ap->rx_std_ring[skbidx];
 			std_count++;
 			break;
 		case BD_FLG_JUMBO:
 			rip = &ap->skb->rx_jumbo_skbuff[skbidx];
-			mapsize = ACE_JUMBO_BUFSIZE - (2 + 16);
+			mapsize = ACE_JUMBO_BUFSIZE;
 			rxdesc = &ap->rx_jumbo_ring[skbidx];
 			atomic_dec(&ap->cur_jumbo_bufs);
 			break;
 		case BD_FLG_MINI:
 			rip = &ap->skb->rx_mini_skbuff[skbidx];
-			mapsize = ACE_MINI_BUFSIZE - (2 + 16);
+			mapsize = ACE_MINI_BUFSIZE;
 			rxdesc = &ap->rx_mini_ring[skbidx];
 			mini_count++; 
 			break;
@@ -2243,7 +2251,7 @@ static irqreturn_t ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 		if (cur_size < RX_LOW_STD_THRES) {
 			if ((cur_size < RX_PANIC_STD_THRES) &&
 			    !test_and_set_bit(0, &ap->std_refill_busy)) {
-#if DEBUG
+#ifdef DEBUG
 				printk("low on std buffers %i\n", cur_size);
 #endif
 				ace_load_std_rx_ring(ap,
@@ -2258,7 +2266,7 @@ static irqreturn_t ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 				if ((cur_size < RX_PANIC_MINI_THRES) &&
 				    !test_and_set_bit(0,
 						      &ap->mini_refill_busy)) {
-#if DEBUG
+#ifdef DEBUG
 					printk("low on mini buffers %i\n",
 					       cur_size);
 #endif
@@ -2274,7 +2282,7 @@ static irqreturn_t ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 				if ((cur_size < RX_PANIC_JUMBO_THRES) &&
 				    !test_and_set_bit(0,
 						      &ap->jumbo_refill_busy)){
-#if DEBUG
+#ifdef DEBUG
 					printk("low on jumbo buffers %i\n",
 					       cur_size);
 #endif
@@ -2688,146 +2696,136 @@ static int ace_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-
-static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static int ace_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
 	struct ace_private *ap = dev->priv;
 	struct ace_regs *regs = ap->regs;
-#ifdef SIOCETHTOOL
-	struct ethtool_cmd ecmd;
-	u32 link, speed;
+	u32 link;
 
-	if (cmd != SIOCETHTOOL)
-		return -EOPNOTSUPP;
-	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof(ecmd)))
-		return -EFAULT;
-	switch (ecmd.cmd) {
-	case ETHTOOL_GSET:
-		ecmd.supported =
-			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
-			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
-			 SUPPORTED_1000baseT_Half | SUPPORTED_1000baseT_Full |
-			 SUPPORTED_Autoneg | SUPPORTED_FIBRE);
+	memset(ecmd, 0, sizeof(struct ethtool_cmd));
+	ecmd->supported =
+		(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
+		 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
+		 SUPPORTED_1000baseT_Half | SUPPORTED_1000baseT_Full |
+		 SUPPORTED_Autoneg | SUPPORTED_FIBRE);
 
-		ecmd.port = PORT_FIBRE;
-		ecmd.transceiver = XCVR_INTERNAL;
-		ecmd.phy_address = 0;
+	ecmd->port = PORT_FIBRE;
+	ecmd->transceiver = XCVR_INTERNAL;
 
-		link = readl(&regs->GigLnkState);
-		if (link & LNK_1000MB)
-			ecmd.speed = SPEED_1000;
-		else {
-			link = readl(&regs->FastLnkState);
-			if (link & LNK_100MB)
-				ecmd.speed = SPEED_100;
-			else if (link & LNK_100MB)
-				ecmd.speed = SPEED_10;
-			else
-				ecmd.speed = 0;
-		}
-		if (link & LNK_FULL_DUPLEX)
-			ecmd.duplex = DUPLEX_FULL;
+	link = readl(&regs->GigLnkState);
+	if (link & LNK_1000MB)
+		ecmd->speed = SPEED_1000;
+	else {
+		link = readl(&regs->FastLnkState);
+		if (link & LNK_100MB)
+			ecmd->speed = SPEED_100;
+		else if (link & LNK_10MB)
+			ecmd->speed = SPEED_10;
 		else
-			ecmd.duplex = DUPLEX_HALF;
+			ecmd->speed = 0;
+	}
+	if (link & LNK_FULL_DUPLEX)
+		ecmd->duplex = DUPLEX_FULL;
+	else
+		ecmd->duplex = DUPLEX_HALF;
 
-		if (link & LNK_NEGOTIATE)
-			ecmd.autoneg = AUTONEG_ENABLE;
-		else
-			ecmd.autoneg = AUTONEG_DISABLE;
+	if (link & LNK_NEGOTIATE)
+		ecmd->autoneg = AUTONEG_ENABLE;
+	else
+		ecmd->autoneg = AUTONEG_DISABLE;
 
 #if 0
-		/*
-		 * Current struct ethtool_cmd is insufficient
-		 */
-		ecmd.trace = readl(&regs->TuneTrace);
+	/*
+	 * Current struct ethtool_cmd is insufficient
+	 */
+	ecmd->trace = readl(&regs->TuneTrace);
 
-		ecmd.txcoal = readl(&regs->TuneTxCoalTicks);
-		ecmd.rxcoal = readl(&regs->TuneRxCoalTicks);
+	ecmd->txcoal = readl(&regs->TuneTxCoalTicks);
+	ecmd->rxcoal = readl(&regs->TuneRxCoalTicks);
 #endif
-		ecmd.maxtxpkt = readl(&regs->TuneMaxTxDesc);
-		ecmd.maxrxpkt = readl(&regs->TuneMaxRxDesc);
+	ecmd->maxtxpkt = readl(&regs->TuneMaxTxDesc);
+	ecmd->maxrxpkt = readl(&regs->TuneMaxRxDesc);
 
-		if(copy_to_user(ifr->ifr_data, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-
-	case ETHTOOL_SSET:
-		link = readl(&regs->GigLnkState);
-		if (link & LNK_1000MB)
-			speed = SPEED_1000;
-		else {
-			link = readl(&regs->FastLnkState);
-			if (link & LNK_100MB)
-				speed = SPEED_100;
-			else if (link & LNK_100MB)
-				speed = SPEED_10;
-			else
-				speed = SPEED_100;
-		}
-
-		link = LNK_ENABLE | LNK_1000MB | LNK_100MB | LNK_10MB |
-			LNK_RX_FLOW_CTL_Y | LNK_NEG_FCTL;
-		if (!ACE_IS_TIGON_I(ap))
-			link |= LNK_TX_FLOW_CTL_Y;
-		if (ecmd.autoneg == AUTONEG_ENABLE)
-			link |= LNK_NEGOTIATE;
-		if (ecmd.speed != speed) {
-			link &= ~(LNK_1000MB | LNK_100MB | LNK_10MB);
-			switch (speed) {
-			case SPEED_1000:
-				link |= LNK_1000MB;
-				break;
-			case SPEED_100:
-				link |= LNK_100MB;
-				break;
-			case SPEED_10:
-				link |= LNK_10MB;
-				break;
-			}
-		}
-		if (ecmd.duplex == DUPLEX_FULL)
-			link |= LNK_FULL_DUPLEX;
-
-		if (link != ap->link) {
-			struct cmd cmd;
-			printk(KERN_INFO "%s: Renegotiating link state\n",
-			       dev->name);
-
-			ap->link = link;
-			writel(link, &regs->TuneLink);
-			if (!ACE_IS_TIGON_I(ap))
-				writel(link, &regs->TuneFastLink);
-			wmb();
-
-			cmd.evt = C_LNK_NEGOTIATION;
-			cmd.code = 0;
-			cmd.idx = 0;
-			ace_issue_cmd(regs, &cmd);
-		}
-		return 0;
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "acenic", sizeof(info.driver) - 1);
-		sprintf(info.fw_version, "%i.%i.%i", 
-			 tigonFwReleaseMajor, tigonFwReleaseMinor,
-			 tigonFwReleaseFix);
-		strncpy(info.version, version, sizeof(info.version) - 1);
-		if (ap && ap->pdev)
-			strcpy(info.bus_info, pci_name(ap->pdev));
-		if (copy_to_user(ifr->ifr_data, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	default:
-		break;
-	}
-	
-#endif
-
-	return -EOPNOTSUPP;
+	return 0;
 }
 
+static int ace_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct ace_private *ap = dev->priv;
+	struct ace_regs *regs = ap->regs;
+	u32 link, speed;
+
+	link = readl(&regs->GigLnkState);
+	if (link & LNK_1000MB)
+		speed = SPEED_1000;
+	else {
+		link = readl(&regs->FastLnkState);
+		if (link & LNK_100MB)
+			speed = SPEED_100;
+		else if (link & LNK_10MB)
+			speed = SPEED_10;
+		else
+			speed = SPEED_100;
+	}
+
+	link = LNK_ENABLE | LNK_1000MB | LNK_100MB | LNK_10MB |
+		LNK_RX_FLOW_CTL_Y | LNK_NEG_FCTL;
+	if (!ACE_IS_TIGON_I(ap))
+		link |= LNK_TX_FLOW_CTL_Y;
+	if (ecmd->autoneg == AUTONEG_ENABLE)
+		link |= LNK_NEGOTIATE;
+	if (ecmd->speed != speed) {
+		link &= ~(LNK_1000MB | LNK_100MB | LNK_10MB);
+		switch (speed) {
+		case SPEED_1000:
+			link |= LNK_1000MB;
+			break;
+		case SPEED_100:
+			link |= LNK_100MB;
+			break;
+		case SPEED_10:
+			link |= LNK_10MB;
+			break;
+		}
+	}
+
+	if (ecmd->duplex == DUPLEX_FULL)
+		link |= LNK_FULL_DUPLEX;
+
+	if (link != ap->link) {
+		struct cmd cmd;
+		printk(KERN_INFO "%s: Renegotiating link state\n",
+		       dev->name);
+
+		ap->link = link;
+		writel(link, &regs->TuneLink);
+		if (!ACE_IS_TIGON_I(ap))
+			writel(link, &regs->TuneFastLink);
+		wmb();
+
+		cmd.evt = C_LNK_NEGOTIATION;
+		cmd.code = 0;
+		cmd.idx = 0;
+		ace_issue_cmd(regs, &cmd);
+	}
+	return 0;
+}
+
+static void ace_get_drvinfo(struct net_device *dev, 
+			    struct ethtool_drvinfo *info)
+{
+	struct ace_private *ap = dev->priv;
+
+	strlcpy(info->driver, "acenic", sizeof(info->driver));
+	snprintf(info->version, sizeof(info->version), "%i.%i.%i", 
+		tigonFwReleaseMajor, tigonFwReleaseMinor,
+		tigonFwReleaseFix);
+
+	if (ap->pdev)
+		strlcpy(info->bus_info, pci_name(ap->pdev), 
+			sizeof(info->bus_info));
+
+}
 
 /*
  * Set the hardware MAC address.

@@ -37,7 +37,7 @@
  * Where n_in is the number of input parameters and
  *       n_out is the number of output parameters
  *
- * If the "string" is invalid on this system, RTAS_UNKOWN_SERVICE
+ * If the "string" is invalid on this system, RTAS_UNKNOWN_SERVICE
  * will be returned as a token.  rtas_call() does look for this
  * token and error out gracefully so rtas_call(rtas_token("str"), ...)
  * may be safely used for one-shot calls to RTAS.
@@ -51,18 +51,17 @@ struct rtas_args {
 	u32 nargs;
 	u32 nret; 
 	rtas_arg_t args[16];
-#if 0
-	spinlock_t lock;
-#endif
 	rtas_arg_t *rets;     /* Pointer to return values in args[]. */
 };  
+
+extern struct rtas_args rtas_stop_self_args;
 
 struct rtas_t {
 	unsigned long entry;		/* physical address pointer */
 	unsigned long base;		/* physical address pointer */
 	unsigned long size;
 	spinlock_t lock;
-
+	struct rtas_args args;
 	struct device_node *dev;	/* virtual address pointer */
 };
 
@@ -166,11 +165,9 @@ extern struct flash_block_list_header rtas_firmware_flash_list;
 
 extern struct rtas_t rtas;
 
-extern int print_rtasmsgs;
-
-extern void enter_rtas(struct rtas_args *);
+extern void enter_rtas(unsigned long);
 extern int rtas_token(const char *service);
-extern long rtas_call(int token, int, int, unsigned long *, ...);
+extern int rtas_call(int token, int, int, int *, ...);
 extern void call_rtas_display_status(char);
 extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);

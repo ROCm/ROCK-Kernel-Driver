@@ -78,7 +78,8 @@ struct address_space_operations affs_symlink_aops = {
 };
 
 struct inode_operations affs_symlink_inode_operations = {
-	.readlink	= page_readlink,
-	.follow_link	= page_follow_link,
+	.readlink	= generic_readlink,
+	.follow_link	= page_follow_link_light,
+	.put_link	= page_put_link,
 	.setattr	= affs_notify_change,
 };

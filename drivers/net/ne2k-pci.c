@@ -69,8 +69,6 @@ KERN_INFO "  http://www.scyld.com/network/ne2k-pci.html\n";
 #if defined(__powerpc__)
 #define inl_le(addr)  le32_to_cpu(inl(addr))
 #define inw_le(addr)  le16_to_cpu(inw(addr))
-#define insl insl_ns
-#define outsl outsl_ns
 #endif
 
 #define PFX DRV_NAME ": "
@@ -134,7 +132,7 @@ static struct {
 	{"Holtek HT80232", ONLY_16BIT_IO | HOLTEK_FDX},
 	{"Holtek HT80229", ONLY_32BIT_IO | HOLTEK_FDX | STOP_PG_0x60 },
 	{"Winbond W89C940(misprogrammed)", 0},
-	{0,}
+	{NULL,}
 };
 
 

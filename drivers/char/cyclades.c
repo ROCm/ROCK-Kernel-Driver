@@ -676,24 +676,8 @@ static char rcsid[] =
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 
-#define cy_put_user	put_user
-
 static void cy_throttle (struct tty_struct *tty);
 static void cy_send_xchar (struct tty_struct *tty, char ch);
-
-static unsigned long 
-cy_get_user(unsigned long *addr)
-{
-	unsigned long result = 0;
-	int error = get_user (result, addr);
-	if (error)
-		printk ("cyclades: cy_get_user: error == %d\n", error);
-	return result;
-}
-
-#ifndef MIN
-#define MIN(a,b)        ((a) < (b) ? (a) : (b))
-#endif
 
 #define IS_CYC_Z(card) ((card).num_chips == -1)
 
@@ -708,7 +692,7 @@ cy_get_user(unsigned long *addr)
 			((card).base_addr+ID_ADDRESS))->signature)))
 
 #ifndef SERIAL_XMIT_SIZE
-#define	SERIAL_XMIT_SIZE	(MIN(PAGE_SIZE, 4096))
+#define	SERIAL_XMIT_SIZE	(min(PAGE_SIZE, 4096))
 #endif
 #define WAKEUP_CHARS		256
 
@@ -737,7 +721,7 @@ static unsigned char *cy_isa_addresses[] = {
         (unsigned char *) 0xDA000,
         (unsigned char *) 0xDC000,
         (unsigned char *) 0xDE000,
-        0,0,0,0,0,0,0,0
+        NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
 };
 #define NR_ISA_ADDRS (sizeof(cy_isa_addresses)/sizeof(unsigned char*))
 
@@ -2252,7 +2236,7 @@ shutdown(struct cyclades_port * info)
 	    if (info->xmit_buf){
 		unsigned char * temp;
 		temp = info->xmit_buf;
-		info->xmit_buf = 0;
+		info->xmit_buf = NULL;
 		free_page((unsigned long) temp);
 	    }
 	    cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
@@ -2304,7 +2288,7 @@ shutdown(struct cyclades_port * info)
 	    if (info->xmit_buf){
 		unsigned char * temp;
 		temp = info->xmit_buf;
-		info->xmit_buf = 0;
+		info->xmit_buf = NULL;
 		free_page((unsigned long) temp);
 	    }
 	    
@@ -2680,7 +2664,7 @@ cy_wait_until_sent(struct tty_struct *tty, int timeout)
   unsigned char *base_addr;
   int card,chip,channel,index;
   unsigned long orig_jiffies;
-  signed long char_time;
+  int char_time;
 	
     if (serial_paranoia_check(info, tty->name, "cy_wait_until_sent"))
 	return;
@@ -2705,7 +2689,7 @@ cy_wait_until_sent(struct tty_struct *tty, int timeout)
     if (timeout < 0)
 	timeout = 0;
     if (timeout)
-	char_time = MIN(char_time, timeout);
+	char_time = min(char_time, timeout);
     /*
      * If the transmitter hasn't cleared in twice the approximate
      * amount of time to send the entire FIFO, it probably won't
@@ -2872,7 +2856,7 @@ cy_close(struct tty_struct *tty, struct file *filp)
 
     tty->closing = 0;
     info->event = 0;
-    info->tty = 0;
+    info->tty = NULL;
     if (info->blocked_open) {
 	CY_UNLOCK(info, flags);
         if (info->close_delay) {
@@ -2932,8 +2916,8 @@ cy_write(struct tty_struct * tty, int from_user,
 	while (1) {
 	    int c1;
 	    
-	    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				SERIAL_XMIT_SIZE - info->xmit_head));
+	    c = min(count, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
+				(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
 	    if (c <= 0)
 		break;
 
@@ -2945,8 +2929,8 @@ cy_write(struct tty_struct * tty, int from_user,
 		break;
 	    }
 	    CY_LOCK(info, flags);
-	    c1 = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-			SERIAL_XMIT_SIZE - info->xmit_head));
+	    c1 = min(c, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
+			(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
 			
 	    if (c1 < c)
 	    	c = c1;
@@ -2962,8 +2946,8 @@ cy_write(struct tty_struct * tty, int from_user,
     } else {
 	CY_LOCK(info, flags);
 	while (1) {
-	    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1, 
-			SERIAL_XMIT_SIZE - info->xmit_head));
+	    c = min(count, min((int)(SERIAL_XMIT_SIZE - info->xmit_cnt - 1),
+			(int)(SERIAL_XMIT_SIZE - info->xmit_head)));
 	        
 	    if (c <= 0)
 		break;
@@ -3550,7 +3534,7 @@ set_line_char(struct cyclades_port * info)
 
 static int
 get_serial_info(struct cyclades_port * info,
-                           struct serial_struct * retinfo)
+                           struct serial_struct __user * retinfo)
 {
   struct serial_struct tmp;
   struct cyclades_card *cinfo = &cy_card[info->card];
@@ -3573,7 +3557,7 @@ get_serial_info(struct cyclades_port * info,
 
 static int
 set_serial_info(struct cyclades_port * info,
-                           struct serial_struct * new_info)
+                           struct serial_struct __user * new_info)
 {
   struct serial_struct new_serial;
   struct cyclades_port old_info;
@@ -3627,7 +3611,7 @@ check_and_exit:
  *	    transmit holding register is empty.  This functionality
  *	    allows an RS485 driver to be written in user space.
  */
-static int get_lsr_info(struct cyclades_port *info, unsigned int *value)
+static int get_lsr_info(struct cyclades_port *info, unsigned int __user *value)
 {
     int card, chip, channel, index;
     unsigned char status;
@@ -3652,7 +3636,7 @@ static int get_lsr_info(struct cyclades_port *info, unsigned int *value)
 	/* Not supported yet */
 	return -EINVAL;
     }
-    return cy_put_user(result, (unsigned long *) value);
+    return put_user(result, (unsigned long __user *) value);
 }
 
 static int
@@ -3930,7 +3914,7 @@ cy_break(struct tty_struct *tty, int break_state)
 } /* cy_break */
 
 static int
-get_mon_info(struct cyclades_port * info, struct cyclades_monitor * mon)
+get_mon_info(struct cyclades_port * info, struct cyclades_monitor __user * mon)
 {
 
     if(copy_to_user(mon, &info->mon, sizeof(struct cyclades_monitor)))
@@ -3975,7 +3959,7 @@ set_threshold(struct cyclades_port * info, unsigned long value)
 
 
 static int
-get_threshold(struct cyclades_port * info, unsigned long *value)
+get_threshold(struct cyclades_port * info, unsigned long __user *value)
 {
   unsigned char *base_addr;
   int card,channel,chip,index;
@@ -3992,7 +3976,7 @@ get_threshold(struct cyclades_port * info, unsigned long *value)
 		       + (cy_chip_offset[chip]<<index));
 
 	tmp = cy_readb(base_addr+(CyCOR3<<index)) & CyREC_FIFO;
-	return cy_put_user(tmp,value);
+	return put_user(tmp,value);
     } else {
 	// Nothing to do!
 	return 0;
@@ -4009,9 +3993,9 @@ set_default_threshold(struct cyclades_port * info, unsigned long value)
 
 
 static int
-get_default_threshold(struct cyclades_port * info, unsigned long *value)
+get_default_threshold(struct cyclades_port * info, unsigned long __user *value)
 {
-    return cy_put_user(info->default_threshold,value);
+    return put_user(info->default_threshold,value);
 }/* get_default_threshold */
 
 
@@ -4043,7 +4027,7 @@ set_timeout(struct cyclades_port * info, unsigned long value)
 
 
 static int
-get_timeout(struct cyclades_port * info, unsigned long *value)
+get_timeout(struct cyclades_port * info, unsigned long __user *value)
 {
   unsigned char *base_addr;
   int card,channel,chip,index;
@@ -4060,7 +4044,7 @@ get_timeout(struct cyclades_port * info, unsigned long *value)
 		       + (cy_chip_offset[chip]<<index));
 
 	tmp = cy_readb(base_addr+(CyRTPR<<index));
-	return cy_put_user(tmp,value);
+	return put_user(tmp,value);
     } else {
 	// Nothing to do!
 	return 0;
@@ -4077,9 +4061,9 @@ set_default_timeout(struct cyclades_port * info, unsigned long value)
 
 
 static int
-get_default_timeout(struct cyclades_port * info, unsigned long *value)
+get_default_timeout(struct cyclades_port * info, unsigned long __user *value)
 {
-    return cy_put_user(info->default_timeout,value);
+    return put_user(info->default_timeout,value);
 }/* get_default_timeout */
 
 /*
@@ -4093,9 +4077,10 @@ cy_ioctl(struct tty_struct *tty, struct file * file,
 {
   struct cyclades_port * info = (struct cyclades_port *)tty->driver_data;
   struct cyclades_icount cprev, cnow;		/* kernel counter temps */
-  struct serial_icounter_struct *p_cuser;	/* user space */
+  struct serial_icounter_struct __user *p_cuser;	/* user space */
   int ret_val = 0;
   unsigned long flags;
+  void __user *argp = (void __user *)arg;
 
     if (serial_paranoia_check(info, tty->name, "cy_ioctl"))
 	return -ENODEV;
@@ -4107,31 +4092,31 @@ cy_ioctl(struct tty_struct *tty, struct file * file,
 
     switch (cmd) {
         case CYGETMON:
-            ret_val = get_mon_info(info, (struct cyclades_monitor *)arg);
+            ret_val = get_mon_info(info, argp);
             break;
         case CYGETTHRESH:
-            ret_val = get_threshold(info, (unsigned long *)arg);
+            ret_val = get_threshold(info, argp);
             break;
         case CYSETTHRESH:
-            ret_val = set_threshold(info, (unsigned long)arg);
+            ret_val = set_threshold(info, arg);
             break;
         case CYGETDEFTHRESH:
-            ret_val = get_default_threshold(info, (unsigned long *)arg);
+            ret_val = get_default_threshold(info, argp);
             break;
         case CYSETDEFTHRESH:
-            ret_val = set_default_threshold(info, (unsigned long)arg);
+            ret_val = set_default_threshold(info, arg);
             break;
         case CYGETTIMEOUT:
-            ret_val = get_timeout(info, (unsigned long *)arg);
+            ret_val = get_timeout(info, argp);
             break;
         case CYSETTIMEOUT:
-            ret_val = set_timeout(info, (unsigned long)arg);
+            ret_val = set_timeout(info, arg);
             break;
         case CYGETDEFTIMEOUT:
-            ret_val = get_default_timeout(info, (unsigned long *)arg);
+            ret_val = get_default_timeout(info, argp);
             break;
         case CYSETDEFTIMEOUT:
-            ret_val = set_default_timeout(info, (unsigned long)arg);
+            ret_val = set_default_timeout(info, arg);
             break;
 	case CYSETRFLOW:
     	    info->rflow = (int)arg;
@@ -4148,7 +4133,7 @@ cy_ioctl(struct tty_struct *tty, struct file * file,
 	    ret_val = info->rtsdtr_inv;
 	    break;
 	case CYGETCARDINFO:
-            if (copy_to_user((void *)arg, (void *)&cy_card[info->card], 
+            if (copy_to_user(argp, &cy_card[info->card], 
 			sizeof (struct cyclades_card))) {
 		ret_val = -EFAULT;
 		break;
@@ -4175,13 +4160,13 @@ cy_ioctl(struct tty_struct *tty, struct file * file,
 	    ret_val = info->closing_wait / (HZ/100);
 	    break;
         case TIOCGSERIAL:
-            ret_val = get_serial_info(info, (struct serial_struct *) arg);
+            ret_val = get_serial_info(info, argp);
             break;
         case TIOCSSERIAL:
-            ret_val = set_serial_info(info, (struct serial_struct *) arg);
+            ret_val = set_serial_info(info, argp);
             break;
 	case TIOCSERGETLSR: /* Get line status register */
-	    ret_val = get_lsr_info(info, (unsigned int *) arg);
+	    ret_val = get_lsr_info(info, argp);
 	    break;
 	/*
 	 * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change 
@@ -4229,7 +4214,7 @@ cy_ioctl(struct tty_struct *tty, struct file * file,
 	    CY_LOCK(info, flags);
 	    cnow = info->icount;
 	    CY_UNLOCK(info, flags);
-	    p_cuser = (struct serial_icounter_struct *) arg;
+	    p_cuser = argp;
 	    ret_val = put_user(cnow.cts, &p_cuser->cts);
 	    if (ret_val) return ret_val;
 	    ret_val = put_user(cnow.dsr, &p_cuser->dsr);
@@ -4598,7 +4583,7 @@ cy_hangup(struct tty_struct *tty)
 #ifdef CY_DEBUG_COUNT
     printk("cyc:cy_hangup (%d): setting count to 0\n", current->pid);
 #endif
-    info->tty = 0;
+    info->tty = NULL;
     info->flags &= ~ASYNC_NORMAL_ACTIVE;
     wake_up_interruptible(&info->open_wait);
 } /* cy_hangup */
@@ -5486,7 +5471,7 @@ cy_init(void)
                     info->line = port;
 		    info->chip_rev = 0;
                     info->flags = STD_COM_FLAGS;
-                    info->tty = 0;
+                    info->tty = NULL;
 		    if (mailbox == ZO_V1)
 			info->xmit_fifo_size = CYZ_FIFO_SIZE;
 		    else
@@ -5548,7 +5533,7 @@ cy_init(void)
                     info->card = board;
                     info->line = port;
                     info->flags = STD_COM_FLAGS;
-                    info->tty = 0;
+                    info->tty = NULL;
                     info->xmit_fifo_size = CyMAX_CHAR_FIFO;
                     info->cor1 = CyPARITY_NONE|Cy_1_STOP|Cy_8_BITS;
                     info->cor2 = CyETC;
@@ -5648,8 +5633,10 @@ cy_cleanup_module(void)
 #endif /* CONFIG_CYZ_INTR */
 	    )
 		free_irq(cy_card[i].irq, &cy_card[i]);
+#ifdef CONFIG_PCI
 		if (cy_card[i].pdev)
 			pci_release_regions(cy_card[i].pdev);
+#endif
         }
     }
     if (tmp_buf) {

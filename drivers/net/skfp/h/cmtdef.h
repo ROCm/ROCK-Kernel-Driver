@@ -418,7 +418,6 @@ struct s_pcon {
 	void	*pc_p ;
 } ;
 
-
 /*
  * link error monitor
  */
@@ -443,7 +442,6 @@ struct lem_counter {
 } ;
 
 #define NUMBITS	10
-
 
 #ifdef	AMDPLC
 
@@ -480,216 +478,180 @@ struct s_plc {
  * function prototypes
  */
 #include "h/mbuf.h"	/* Type definitions for MBUFs */
-void hwt_restart(                       /* hwt.c */
-#ifdef ANSIC
-        struct s_smc *smc
-#endif
-	) ;
+#include "h/smtstate.h"	/* struct smt_state */
 
-SMbuf *smt_build_frame(                 /* smt.c */
-#ifdef ANSIC
-        struct s_smc *smc,
-        int class,
-        int type,
-        int length
-#endif
-	) ;
-
-SMbuf *smt_get_mbuf(                     /* drvsr.c */
-#ifdef ANSIC
-        struct s_smc *smc
-#endif
-	) ;
-
-void *sm_to_para(                       /* smt.c */
-#ifdef ANSIC
-	struct s_smc *smc,
-        struct smt_header *sm,
-        int para
-#endif
-	) ;
+void hwt_restart(struct s_smc *smc);	/* hwt.c */
+SMbuf *smt_build_frame(struct s_smc *smc, int class, int type,
+		       int length);	/* smt.c */
+SMbuf *smt_get_mbuf(struct s_smc *smc);	/* drvsr.c */
+void *sm_to_para(struct s_smc *smc, struct smt_header *sm,
+		 int para);		/* smt.c */
 
 #ifndef SK_UNUSED
 #define SK_UNUSED(var)		(void)(var)
 #endif
 
-void queue_event() ;
-void ecm() ;
-void ecm_init() ;
-void rmt() ;
-void rmt_init() ;
-void pcm() ;
-void pcm_init() ;
-void cfm() ;
-void cfm_init() ;
-void smt_timer_start() ;
-void smt_timer_stop() ;
-void pcm_status_state() ;
-void plc_config_mux() ;
-void sm_lem_evaluate() ;
-void smt_clear_una_dna() ;
-void mac_status_para() ;
-void mac_update_counter() ;
-void sm_pm_ls_latch() ;
-void sm_ma_control() ;
-void sm_mac_check_beacon_claim() ;
-void config_mux() ;
-void smt_agent_init() ;
-void smt_timer_init() ;
-void smt_received_pack() ;
-void smt_add_para() ;
-void smt_swap_para() ;
-void ev_init() ;
-void hwt_init() ;
-u_long hwt_read() ;
-void hwt_stop() ;
-void hwt_start() ;
-void smt_send_mbuf() ;
-void smt_free_mbuf() ;
-void sm_pm_bypass_req() ;
-void rmt_indication() ;
-void cfm_state_change() ;
-void rx_indication() ;
-void tx_indication() ;
-#ifndef NO_SMT_PANIC
-void smt_panic() ;
-#else
-#ifdef	DEBUG
-void smt_panic() ;
+void queue_event(struct s_smc *smc, int class, int event);
+void ecm(struct s_smc *smc, int event);
+void ecm_init(struct s_smc *smc);
+void rmt(struct s_smc *smc, int event);
+void rmt_init(struct s_smc *smc);
+void pcm(struct s_smc *smc, const int np, int event);
+void pcm_init(struct s_smc *smc);
+void cfm(struct s_smc *smc, int event);
+void cfm_init(struct s_smc *smc);
+void smt_timer_start(struct s_smc *smc, struct smt_timer *timer, u_long time,
+		     u_long token);
+void smt_timer_stop(struct s_smc *smc, struct smt_timer *timer);
+void pcm_status_state(struct s_smc *smc, int np, int *type, int *state,
+		      int *remote, int *mac);
+void plc_config_mux(struct s_smc *smc, int mux);
+void sm_lem_evaluate(struct s_smc *smc);
+void smt_clear_una_dna(struct s_smc *smc);
+void mac_update_counter(struct s_smc *smc);
+void sm_pm_ls_latch(struct s_smc *smc, int phy, int on_off);
+void sm_ma_control(struct s_smc *smc, int mode);
+void sm_mac_check_beacon_claim(struct s_smc *smc);
+void config_mux(struct s_smc *smc, int mux);
+void smt_agent_init(struct s_smc *smc);
+void smt_timer_init(struct s_smc *smc);
+void smt_received_pack(struct s_smc *smc, SMbuf *mb, int fs);
+void smt_add_para(struct s_smc *smc, struct s_pcon *pcon, u_short para,
+		  int index, int local);
+void smt_swap_para(struct smt_header *sm, int len, int direction);
+void ev_init(struct s_smc *smc);
+void hwt_init(struct s_smc *smc);
+u_long hwt_read(struct s_smc *smc);
+void hwt_stop(struct s_smc *smc);
+void hwt_start(struct s_smc *smc, u_long time);
+void smt_send_mbuf(struct s_smc *smc, SMbuf *mb, int fc);
+void smt_free_mbuf(struct s_smc *smc, SMbuf *mb);
+void sm_pm_bypass_req(struct s_smc *smc, int mode);
+void rmt_indication(struct s_smc *smc, int i);
+void cfm_state_change(struct s_smc *smc, int c_state);
+
+#if defined(DEBUG) || !defined(NO_SMT_PANIC)
+void smt_panic(struct s_smc *smc, char *text);
 #else
 #define	smt_panic(smc,text)
-#endif	/* DEBUG */
-#endif	/* NO_SMT_PANIC */
-void smt_stat_counter() ;
-void smt_timer_poll() ;
-u_long smt_get_time() ;
-u_long smt_get_tid() ;
-void smt_timer_done() ;
-void smt_set_defaults() ;
-void smt_fixup_mib() ;
-void smt_reset_defaults() ;
-void smt_agent_task() ;
-void smt_please_reconnect() ;
-int smt_check_para() ;
-void driver_get_bia() ;
-#ifdef	SUPERNET_3
-void drv_reset_indication() ;
+#endif /* DEBUG || !NO_SMT_PANIC */
+
+void smt_stat_counter(struct s_smc *smc, int stat);
+void smt_timer_poll(struct s_smc *smc);
+u_long smt_get_time(void);
+u_long smt_get_tid(struct s_smc *smc);
+void smt_timer_done(struct s_smc *smc);
+void smt_set_defaults(struct s_smc *smc);
+void smt_fixup_mib(struct s_smc *smc);
+void smt_reset_defaults(struct s_smc *smc, int level);
+void smt_agent_task(struct s_smc *smc);
+void smt_please_reconnect(struct s_smc *smc, int reconn_time);
+int smt_check_para(struct s_smc *smc, struct smt_header *sm,
+		   const u_short list[]);
+void driver_get_bia(struct s_smc *smc, struct fddi_addr *bia_addr);
+
+#ifdef SUPERNET_3
+void drv_reset_indication(struct s_smc *smc);
 #endif	/* SUPERNET_3 */
-void smt_start_watchdog() ;
 
-void smt_event() ;
-void pcm_event() ;
-void rmt_event() ;
-void cfm_event() ;
-void timer_event() ;
-void ev_dispatcher() ;
+void smt_start_watchdog(struct s_smc *smc);
+void smt_event(struct s_smc *smc, int event);
+void timer_event(struct s_smc *smc, u_long token);
+void ev_dispatcher(struct s_smc *smc);
+void pcm_get_state(struct s_smc *smc, struct smt_state *state);
+void ecm_state_change(struct s_smc *smc, int e_state);
+int sm_pm_bypass_present(struct s_smc *smc);
+void pcm_state_change(struct s_smc *smc, int plc, int p_state);
+void rmt_state_change(struct s_smc *smc, int r_state);
+int sm_pm_get_ls(struct s_smc *smc, int phy);
+int pcm_get_s_port(struct s_smc *smc);
+int pcm_rooted_station(struct s_smc *smc);
+int cfm_get_mac_input(struct s_smc *smc);
+int cfm_get_mac_output(struct s_smc *smc);
+int port_to_mib(struct s_smc *smc, int p);
+int cem_build_path(struct s_smc *smc, char *to, int path_index);
+int sm_mac_get_tx_state(struct s_smc *smc);
+char *get_pcmstate(struct s_smc *smc, int np);
+int smt_action(struct s_smc *smc, int class, int code, int index);
+u_short smt_online(struct s_smc *smc, int on);
+void smt_force_irq(struct s_smc *smc);
+void smt_pmf_received_pack(struct s_smc *smc, SMbuf *mb, int local);
+void smt_send_frame(struct s_smc *smc, SMbuf *mb, int fc, int local);
+void smt_set_timestamp(struct s_smc *smc, u_char *p);
+void mac_set_rx_mode(struct s_smc *smc,	int mode);
+int mac_add_multicast(struct s_smc *smc, struct fddi_addr *addr, int can);
+int mac_set_func_addr(struct s_smc *smc, u_long f_addr);
+void mac_del_multicast(struct s_smc *smc, struct fddi_addr *addr, int can);
+void mac_update_multicast(struct s_smc *smc);
+void mac_clear_multicast(struct s_smc *smc);
+void set_formac_tsync(struct s_smc *smc, long sync_bw);
+void formac_reinit_tx(struct s_smc *smc);
+void formac_tx_restart(struct s_smc *smc);
+void process_receive(struct s_smc *smc);
+void init_driver_fplus(struct s_smc *smc);
+void rtm_irq(struct s_smc *smc);
+void rtm_set_timer(struct s_smc *smc);
+void ring_status_indication(struct s_smc *smc, u_long status);
+void llc_recover_tx(struct s_smc *smc);
+void llc_restart_tx(struct s_smc *smc);
+void plc_clear_irq(struct s_smc *smc, int p);
+void plc_irq(struct s_smc *smc,	int np,	unsigned int cmd);
+int smt_set_mac_opvalues(struct s_smc *smc);
 
-void smt_get_state() ;
-void ecm_get_state() ;
-void pcm_get_state() ;
-void rmt_get_state() ;
-
-void ecm_state_change() ;
-int sm_pm_bypass_present() ;
-void pcm_state_change() ;
-void rmt_state_change() ;
-int sm_pm_get_ls() ;
-int pcm_get_s_port() ;
-int pcm_rooted_station() ;
-int cfm_get_mac_input() ;
-int cfm_get_mac_output() ;
-int port_to_mib() ;
-int cem_build_path() ;
-int sm_mac_get_tx_state() ;
-int is_individual() ;
-int is_my_addr() ;
-int is_broadcast() ;
-int is_equal() ;
-char *get_pcmstate() ;
-
-int smt_action() ;
-u_short smt_online() ;
-void smt_force_irq() ;
-void smt_pmf_received_pack() ;
-void smt_send_frame() ;
-void smt_set_timestamp() ;
-void mac_set_rx_mode() ;
-int mac_add_multicast() ;
-int mac_set_func_addr() ;
-void mac_del_multicast() ;
-void mac_update_multicast() ;
-void mac_clear_multicast() ;
-void mac_rx_directed_beacon() ;
-void set_formac_tsync() ;
-void formac_reinit_tx() ;
-void formac_tx_restart() ;
-void process_receive() ;
-void init_driver_fplus() ;
-
-void rtm_irq() ;
-void rtm_set_timer() ;
-void ring_status_indication() ;
-void llc_recover_tx() ;
-void llc_restart_tx() ;
-void plc_clear_irq() ;
-void plc_irq() ;
-int smt_set_mac_opvalues() ;
-#ifdef	TAG_MODE
-void mac_drv_pci_fix() ;
-void mac_do_pci_fix() ;
-void mac_drv_clear_tx_queue() ;
-void mac_drv_repair_descr() ;
-u_long hwt_quick_read() ;
-void hwt_wait_time() ;
+#ifdef TAG_MODE
+void mac_drv_pci_fix(struct s_smc *smc, u_long fix_value);
+void mac_do_pci_fix(struct s_smc *smc);
+void mac_drv_clear_tx_queue(struct s_smc *smc);
+void mac_drv_repair_descr(struct s_smc *smc);
+u_long hwt_quick_read(struct s_smc *smc);
+void hwt_wait_time(struct s_smc *smc, u_long start, long duration);
 #endif
 
 #ifdef SMT_PNMI
-#ifdef ANSIC
-int pnmi_init (struct s_smc* smc);
-int pnmi_process_ndis_id (struct s_smc* smc, u_long ndis_oid, void* buf,
-		int len, int* BytesAccessed, int* BytesNeeded, u_char action);
-#else
-int pnmi_init ();
-int pnmi_process_ndis_id ();
-#endif
+int pnmi_init(struct s_smc* smc);
+int pnmi_process_ndis_id(struct s_smc *smc, u_long ndis_oid, void *buf, int len,
+			 int *BytesAccessed, int *BytesNeeded, u_char action);
 #endif
 
 #ifdef	SBA
 #ifndef _H2INC
-void sba() ;
+void sba();
 #endif
-void sba_raf_received_pack() ;
-void sba_timer_poll() ;
-void smt_init_sba() ;
-#endif
-#ifdef	ESS
-int ess_raf_received_pack() ;
-void ess_timer_poll() ;
-void ess_para_change() ;
+void sba_raf_received_pack();
+void sba_timer_poll();
+void smt_init_sba();
 #endif
 
-#ifdef	BOOT
-#define smt_srf_event(a,b,c,d)
-#define smt_init_evc(a)
+#ifdef	ESS
+int ess_raf_received_pack(struct s_smc *smc, SMbuf *mb, struct smt_header *sm,
+			  int fs);
+void ess_timer_poll(struct s_smc *smc);
+void ess_para_change(struct s_smc *smc);
+#endif
+
+#ifndef	BOOT
+void smt_init_evc(struct s_smc *smc);
+void smt_srf_event(struct s_smc *smc, int code, int index, int cond);
 #else
-void smt_init_evc() ;
-void smt_srf_event() ;
+#define smt_init_evc(smc)
+#define smt_srf_event(smc,code,index,cond)
 #endif
 
 #ifndef SMT_REAL_TOKEN_CT
-void smt_emulate_token_ct();
+void smt_emulate_token_ct(struct s_smc *smc, int mac_index);
 #endif
 
 #if defined(DEBUG) && !defined(BOOT)
-void dump_smt() ;
+void dump_smt(struct s_smc *smc, struct smt_header *sm, char *text);
 #else
 #define	dump_smt(smc,sm,text)
 #endif
 
 #ifdef	DEBUG
-char	*addr_to_string() ;
-void	dump_hex() ;
+char* addr_to_string(struct fddi_addr *addr);
+void dump_hex(char *p, int len);
 #endif
+
 #endif	/* PROTOTYP_INC */
 
 /* PNMI default defines */

@@ -36,7 +36,7 @@
 #include <asm/uaccess.h>
 
 /*
- *	We have a single directory with 8 nodes in it.
+ *	We have a single directory with 9 nodes in it.
  */
 enum {
 	NFSD_Root = 1,
@@ -50,6 +50,7 @@ enum {
 	NFSD_List,
 	NFSD_Fh,
 	NFSD_Threads,
+	NFSD_Leasetime,
 };
 
 /*
@@ -64,6 +65,7 @@ static ssize_t write_getfd(struct file *file, char *buf, size_t size);
 static ssize_t write_getfs(struct file *file, char *buf, size_t size);
 static ssize_t write_filehandle(struct file *file, char *buf, size_t size);
 static ssize_t write_threads(struct file *file, char *buf, size_t size);
+static ssize_t write_leasetime(struct file *file, char *buf, size_t size);
 
 static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Svc] = write_svc,
@@ -75,6 +77,7 @@ static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[NFSD_Getfs] = write_getfs,
 	[NFSD_Fh] = write_filehandle,
 	[NFSD_Threads] = write_threads,
+	[NFSD_Leasetime] = write_leasetime,
 };
 
 /* an argresp is stored in an allocated page and holds the 
@@ -91,7 +94,7 @@ struct argresp {
  * possibly a read which collects the result - which is stored in a 
  * file-local buffer.
  */
-static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t *pos)
+static ssize_t TA_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
 {
 	ino_t ino =  file->f_dentry->d_inode->i_ino;
 	struct argresp *ar;
@@ -130,7 +133,7 @@ static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t 
 }
 
 
-static ssize_t TA_read(struct file *file, char *buf, size_t size, loff_t *pos)
+static ssize_t TA_read(struct file *file, char __user *buf, size_t size, loff_t *pos)
 {
 	struct argresp *ar;
 	ssize_t rv = 0;
@@ -393,6 +396,29 @@ static ssize_t write_threads(struct file *file, char *buf, size_t size)
 	return strlen(buf);
 }
 
+extern time_t nfs4_leasetime(void);
+
+static ssize_t write_leasetime(struct file *file, char *buf, size_t size)
+{
+	/* if size > 10 seconds, call
+	 * nfs4_reset_lease() then write out the new lease (seconds) as reply
+	 */
+	char *mesg = buf;
+	int rv;
+
+	if (size > 0) {
+		int lease;
+		rv = get_int(&mesg, &lease);
+		if (rv)
+			return rv;
+		if (lease < 10 || lease > 3600)
+			return -EINVAL;
+		nfs4_reset_lease(lease);
+	}
+	sprintf(buf, "%ld\n", nfs4_lease_time());
+	return strlen(buf);
+}
+
 /*----------------------------------------------------------------------------*/
 /*
  *	populating the filesystem.
@@ -411,6 +437,9 @@ static int nfsd_fill_super(struct super_block * sb, void * data, int silent)
 		[NFSD_List] = {"exports", &exports_operations, S_IRUGO},
 		[NFSD_Fh] = {"filehandle", &transaction_ops, S_IWUSR|S_IRUSR},
 		[NFSD_Threads] = {"threads", &transaction_ops, S_IWUSR|S_IRUSR},
+#ifdef CONFIG_NFSD_V4
+		[NFSD_Leasetime] = {"nfsv4leasetime", &transaction_ops, S_IWUSR|S_IRUSR},
+#endif
 		/* last one */ {""}
 	};
 	return simple_fill_super(sb, 0x6e667364, nfsd_files);
@@ -441,7 +470,7 @@ static int __init init_nfsd(void)
 #ifdef CONFIG_NFSD_V4
 	nfsd_idmap_init();      /* Name to ID mapping */
 #endif /* CONFIG_NFSD_V4 */
-	if (proc_mkdir("fs/nfs", 0)) {
+	if (proc_mkdir("fs/nfs", NULL)) {
 		struct proc_dir_entry *entry;
 		entry = create_proc_entry("fs/nfs/exports", 0, NULL);
 		if (entry)

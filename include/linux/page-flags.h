@@ -69,13 +69,14 @@
 #define PG_private		12	/* Has something at ->private */
 #define PG_writeback		13	/* Page is under writeback */
 #define PG_nosave		14	/* Used for system suspend/resume */
-#define PG_maplock		15	/* lock bit for ->as.anon_vma and ->mapcount */
+#define PG_maplock		15	/* Lock bit for rmap to ptes */
 
-#define PG_swapcache		16	/* SwapCache page */
+#define PG_swapcache		16	/* Swap page: swp_entry_t in private */
 #define PG_mappedtodisk		17	/* Has blocks allocated on-disk */
 #define PG_reclaim		18	/* To be reclaimed asap */
 #define PG_compound		19	/* Part of a compound page */
-#define PG_anon			20	/* Anonymous page */
+
+#define PG_anon			20	/* Anonymous: anon_vma in mapping */
 
 
 /*
@@ -138,6 +139,10 @@ DECLARE_PER_CPU(struct page_state, page_states);
 
 extern void get_page_state(struct page_state *ret);
 extern void get_full_page_state(struct page_state *ret);
+extern unsigned long __read_page_state(unsigned offset);
+
+#define read_page_state(member) \
+	__read_page_state(offsetof(struct page_state, member))
 
 #define mod_page_state(member, delta)					\
 	do {								\
@@ -296,7 +301,7 @@ extern void get_full_page_state(struct page_state *ret);
 #define SetPageSwapCache(page)	set_bit(PG_swapcache, &(page)->flags)
 #define ClearPageSwapCache(page) clear_bit(PG_swapcache, &(page)->flags)
 #else
-#define PageSwapCache(page) 0
+#define PageSwapCache(page)	0
 #endif
 
 struct page;	/* forward declaration */

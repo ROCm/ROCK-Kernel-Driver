@@ -43,7 +43,7 @@ MODULE_CLASSES("{sound}");
 
 int volume_boost = 8;
 
-module_param(volume_boost, int, 0444);
+module_param(volume_boost, int, 0644);
 MODULE_PARM_DESC(volume_boost, "Additional volume for OPL4 wavetable sounds.");
 MODULE_PARM_SYNTAX(volume_boost, "default:8");
 

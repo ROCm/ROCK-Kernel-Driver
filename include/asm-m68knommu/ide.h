@@ -139,28 +139,7 @@ static IDE_INLINE void ide_init_hwif_ports(
 	}
 }
 
-
-/*
- * This registers the standard ports for this architecture with the IDE
- * driver.
- */
-static IDE_INLINE void ide_init_default_hwifs(void)
-{
-	hw_regs_t hw;
-	ide_ioreg_t base;
-	int index;
-
-	for (index = 0; index < MAX_HWIFS; index++) {
-		base = ide_default_io_base(index);
-		if (!base)
-			continue;
-		memset(&hw, 0, sizeof(hw));
-		ide_init_hwif_ports(&hw, base, 0, NULL);
-		hw.irq = ide_default_irq(base);
-		ide_register_hw(&hw, NULL);
-	}
-}
-
+#define ide_init_default_irq(base)	ide_default_irq(base)
 
 static IDE_INLINE int
 ide_request_irq(

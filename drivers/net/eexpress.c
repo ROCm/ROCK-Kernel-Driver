@@ -230,7 +230,7 @@ static unsigned short start_code[] = {
 /* maps irq number to EtherExpress magic value */
 static char irqrmap[] = { 0,0,1,2,3,4,0,0,0,1,5,6,0,0,0,0 };
 
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 /* mapping of the first four bits of the second POS register */
 static unsigned short mca_iomap[] = {
 	0x270, 0x260, 0x250, 0x240, 0x230, 0x220, 0x210, 0x200,
@@ -345,7 +345,7 @@ static int __init do_express_probe(struct net_device *dev)
 
 	dev->if_port = 0xff; /* not set */
 
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	if (MCA_bus) {
 		int slot = 0;
 
@@ -423,6 +423,7 @@ static int __init do_express_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
+#ifndef MODULE
 struct net_device * __init express_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
@@ -443,6 +444,7 @@ struct net_device * __init express_probe(int unit)
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 /*
  * open and initialize the adapter, ready for use

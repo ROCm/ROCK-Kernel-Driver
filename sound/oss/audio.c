@@ -38,7 +38,7 @@
 #define NEUTRAL16	0x00
 
 
-int             dma_ioctl(int dev, unsigned int cmd, caddr_t arg);
+int             dma_ioctl(int dev, unsigned int cmd, void __user *arg);
 
 static int set_format(int dev, int fmt)
 {
@@ -219,7 +219,7 @@ static void translate_bytes(const unsigned char *table, unsigned char *buff, int
 		buff[i] = table[buff[i]];
 }
 
-int audio_write(int dev, struct file *file, const char *buf, int count)
+int audio_write(int dev, struct file *file, const char __user *buf, int count)
 {
 	int c, p, l, buf_size, used, returned;
 	int err;
@@ -300,7 +300,7 @@ int audio_write(int dev, struct file *file, const char *buf, int count)
 	return count;
 }
 
-int audio_read(int dev, struct file *file, char *buf, int count)
+int audio_read(int dev, struct file *file, char __user *buf, int count)
 {
 	int             c, p, l;
 	char           *dmabuf;
@@ -365,11 +365,12 @@ int audio_read(int dev, struct file *file, char *buf, int count)
 	return count - c;
 }
 
-int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
+int audio_ioctl(int dev, struct file *file, unsigned int cmd, void __user *arg)
 {
 	int val, count;
 	unsigned long flags;
 	struct dma_buffparms *dmap;
+	int __user *p = arg;
 
 	dev = dev >> 4;
 
@@ -399,7 +400,7 @@ int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 				return 0;
 			audio_devs[dev]->dmap_out->flags |= DMA_POST | DMA_DIRTY;
 			sync_output(dev);
-			dma_ioctl(dev, SNDCTL_DSP_POST, (caddr_t) 0);
+			dma_ioctl(dev, SNDCTL_DSP_POST, NULL);
 			return 0;
 
 		case SNDCTL_DSP_RESET:
@@ -412,7 +413,7 @@ int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 			break;
 	
 		case SNDCTL_DSP_SETFMT:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			val = set_format(dev, val);
 			break;
@@ -449,7 +450,7 @@ int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 				break;
 			
 		case SOUND_PCM_WRITE_RATE:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			val = audio_devs[dev]->d->set_speed(dev, val);
 			break;
@@ -459,7 +460,7 @@ int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 			break;
 			
 		case SNDCTL_DSP_STEREO:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			if (val > 1 || val < 0)
 				return -EINVAL;
@@ -467,7 +468,7 @@ int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 			break;
 
 		case SOUND_PCM_WRITE_CHANNELS:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			val = audio_devs[dev]->d->set_channels(dev, val);
 			break;
@@ -486,7 +487,7 @@ int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 			return (audio_devs[dev]->flags & DMA_DUPLEX) ? 0 : -EIO;
 
 		case SNDCTL_DSP_PROFILE:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			if (audio_devs[dev]->open_mode & OPEN_WRITE)
 				audio_devs[dev]->dmap_out->applic_profile = val;
@@ -522,7 +523,7 @@ int audio_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 		default:
 			return dma_ioctl(dev, cmd, arg);
 	}
-	return put_user(val, (int *)arg);
+	return put_user(val, p);
 }
 
 void audio_init_devices(void)
@@ -734,7 +735,7 @@ static int dma_set_fragment(int dev, struct dma_buffparms *dmap, int fact)
 	return bytes | ((count - 1) << 16);
 }
 
-int dma_ioctl(int dev, unsigned int cmd, caddr_t arg)
+int dma_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	struct dma_buffparms *dmap_out = audio_devs[dev]->dmap_out;
 	struct dma_buffparms *dmap_in = audio_devs[dev]->dmap_in;
@@ -748,7 +749,7 @@ int dma_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	{
 		case SNDCTL_DSP_SUBDIVIDE:
 			ret = 0;
-			if (get_user(fact, (int *)arg))
+			if (get_user(fact, (int __user *)arg))
 				return -EFAULT;
 			if (audio_devs[dev]->open_mode & OPEN_WRITE)
 				ret = dma_subdivide(dev, dmap_out, fact);
@@ -816,7 +817,7 @@ int dma_ioctl(int dev, unsigned int cmd, caddr_t arg)
 			return 0;
 
 		case SNDCTL_DSP_SETTRIGGER:
-			if (get_user(bits, (int *)arg))
+			if (get_user(bits, (int __user *)arg))
 				return -EFAULT;
 			bits &= audio_devs[dev]->open_mode;
 			if (audio_devs[dev]->d->trigger == NULL)
@@ -957,7 +958,7 @@ int dma_ioctl(int dev, unsigned int cmd, caddr_t arg)
 
 		case SNDCTL_DSP_SETFRAGMENT:
 			ret = 0;
-			if (get_user(fact, (int *)arg))
+			if (get_user(fact, (int __user *)arg))
 				return -EFAULT;
 			if (audio_devs[dev]->open_mode & OPEN_WRITE)
 				ret = dma_set_fragment(dev, dmap_out, fact);
@@ -978,5 +979,5 @@ int dma_ioctl(int dev, unsigned int cmd, caddr_t arg)
 				return -EINVAL;
 			return audio_devs[dev]->d->ioctl(dev, cmd, arg);
 	}
-	return put_user(ret, (int *)arg);
+	return put_user(ret, (int __user *)arg);
 }

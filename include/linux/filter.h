@@ -5,6 +5,8 @@
 #ifndef __LINUX_FILTER_H__
 #define __LINUX_FILTER_H__
 
+#include <linux/compiler.h>
+
 /*
  * Current version of the filter code architecture.
  */
@@ -27,7 +29,7 @@ struct sock_filter	/* Filter block */
 struct sock_fprog	/* Required for SO_ATTACH_FILTER. */
 {
 	unsigned short		len;	/* Number of filter blocks */
-	struct sock_filter	*filter;
+	struct sock_filter __user *filter;
 };
 
 #ifdef __KERNEL__

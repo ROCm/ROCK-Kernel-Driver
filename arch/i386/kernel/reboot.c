@@ -3,16 +3,13 @@
  */
 
 #include <linux/mm.h>
-#include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/efi.h>
+#include <linux/dmi.h>
 #include <asm/uaccess.h>
 #include <asm/apic.h>
 #include "mach_reboot.h"
@@ -71,6 +68,83 @@ static int __init reboot_setup(char *str)
 
 __setup("reboot=", reboot_setup);
 
+/*
+ * Reboot options and system auto-detection code provided by
+ * Dell Inc. so their systems "just work". :-)
+ */
+
+/*
+ * Some machines require the "reboot=b"  commandline option, this quirk makes that automatic.
+ */
+static int __init set_bios_reboot(struct dmi_system_id *d)
+{
+	if (!reboot_thru_bios) {
+		reboot_thru_bios = 1;
+		printk(KERN_INFO "%s series board detected. Selecting BIOS-method for reboots.\n", d->ident);
+	}
+	return 0;
+}
+
+/*
+ * Some machines require the "reboot=s"  commandline option, this quirk makes that automatic.
+ */
+static int __init set_smp_reboot(struct dmi_system_id *d)
+{
+#ifdef CONFIG_SMP
+	if (!reboot_smp) {
+		reboot_smp = 1;
+		printk(KERN_INFO "%s series board detected. Selecting SMP-method for reboots.\n", d->ident);
+	}
+#endif
+	return 0;
+}
+
+/*
+ * Some machines require the "reboot=b,s"  commandline option, this quirk makes that automatic.
+ */
+static int __init set_smp_bios_reboot(struct dmi_system_id *d)
+{
+	set_smp_reboot(d);
+	set_bios_reboot(d);
+	return 0;
+}
+
+static struct dmi_system_id __initdata reboot_dmi_table[] = {
+	{	/* Handle problems with rebooting on Dell 1300's */
+		.callback = set_smp_bios_reboot,
+		.ident = "Dell PowerEdge 1300",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/"),
+		},
+	},
+	{	/* Handle problems with rebooting on Dell 300's */
+		.callback = set_bios_reboot,
+		.ident = "Dell PowerEdge 300",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 300/"),
+		},
+	},
+	{	/* Handle problems with rebooting on Dell 2400's */
+		.callback = set_bios_reboot,
+		.ident = "Dell PowerEdge 2400",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 2400"),
+		},
+	},
+	{ }
+};
+
+static int reboot_init(void)
+{
+	dmi_check_system(reboot_dmi_table);
+	return 0;
+}
+
+core_initcall(reboot_init);
+
 /* The following code and data reboots the machine by switching to real
    mode and jumping to the BIOS reset entry point, as if the CPU has
    really been reset.  The previous version asked the keyboard
@@ -92,8 +166,8 @@ static struct
 	unsigned long long * base __attribute__ ((packed));
 }
 real_mode_gdt = { sizeof (real_mode_gdt_entries) - 1, real_mode_gdt_entries },
-real_mode_idt = { 0x3ff, 0 },
-no_idt = { 0, 0 };
+real_mode_idt = { 0x3ff, NULL },
+no_idt = { 0, NULL };
 
 
 /* This is 16-bit protected mode code to disable paging and the cache,
@@ -256,14 +330,6 @@ void machine_restart(char * __unused)
 	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
 	 * other OSs see a clean IRQ state.
 	 */
-#ifdef	CONFIG_KDB
-	/*
-	 * If this restart is occuring while kdb is running (e.g. reboot
-	 * command), the other CPU's are already stopped.  Don't try to
-	 * stop them yet again.
-	 */
-	if (!KDB_IS_RUNNING())
-#endif	/* CONFIG_KDB */
 	smp_send_stop();
 #elif defined(CONFIG_X86_LOCAL_APIC)
 	if (cpu_has_apic) {
@@ -278,7 +344,7 @@ void machine_restart(char * __unused)
 
 	if (!reboot_thru_bios) {
 		if (efi_enabled) {
-			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, 0);
+			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, NULL);
 			__asm__ __volatile__("lidt %0": :"m" (no_idt));
 			__asm__ __volatile__("int3");
 		}
@@ -292,7 +358,7 @@ void machine_restart(char * __unused)
 		}
 	}
 	if (efi_enabled)
-		efi.reset_system(EFI_RESET_WARM, EFI_SUCCESS, 0, 0);
+		efi.reset_system(EFI_RESET_WARM, EFI_SUCCESS, 0, NULL);
 
 	machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
 }
@@ -308,7 +374,7 @@ EXPORT_SYMBOL(machine_halt);
 void machine_power_off(void)
 {
 	if (efi_enabled)
-		efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, 0);
+		efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, NULL);
 	if (pm_power_off)
 		pm_power_off();
 }

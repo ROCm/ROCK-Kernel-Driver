@@ -28,6 +28,7 @@
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
 #include <net/checksum.h>
+#include <net/ip.h>
 #include <linux/stddef.h>
 #include <linux/sysctl.h>
 #include <linux/slab.h>
@@ -67,6 +68,7 @@ int ip_conntrack_max;
 static atomic_t ip_conntrack_count = ATOMIC_INIT(0);
 struct list_head *ip_conntrack_hash;
 static kmem_cache_t *ip_conntrack_cachep;
+struct ip_conntrack ip_conntrack_untracked;
 
 extern struct ip_conntrack_protocol ip_conntrack_generic_protocol;
 
@@ -172,12 +174,11 @@ static void
 destroy_expect(struct ip_conntrack_expect *exp)
 {
 	DEBUGP("destroy_expect(%p) use=%d\n", exp, atomic_read(&exp->use));
-	IP_NF_ASSERT(atomic_read(&exp->use));
+	IP_NF_ASSERT(atomic_read(&exp->use) == 0);
 	IP_NF_ASSERT(!timer_pending(&exp->timeout));
 
 	kfree(exp);
 }
-
 
 inline void ip_conntrack_expect_put(struct ip_conntrack_expect *exp)
 {
@@ -323,8 +324,9 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		ip_conntrack_destroyed(ct);
 
 	WRITE_LOCK(&ip_conntrack_lock);
-	/* Delete us from our own list to prevent corruption later */
-	list_del(&ct->sibling_list);
+	/* Make sure don't leave any orphaned expectations lying around */
+	if (ct->expecting)
+		remove_expectations(ct, 1);
 
 	/* Delete our master expectation */
 	if (ct->master) {
@@ -713,13 +715,9 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		DEBUGP("conntrack: expectation arrives ct=%p exp=%p\n",
 			conntrack, expected);
 		/* Welcome, Mr. Bond.  We've been expecting you... */
-		IP_NF_ASSERT(master_ct(conntrack));
 		__set_bit(IPS_EXPECTED_BIT, &conntrack->status);
 		conntrack->master = expected;
 		expected->sibling = conntrack;
-#if CONFIG_IP_NF_CONNTRACK_MARK
-		conntrack->mark = expected->expectant->mark;
-#endif
 		LIST_DELETE(&ip_conntrack_expect_list, expected);
 		expected->expectant->expecting--;
 		nf_conntrack_get(&master_ct(conntrack)->infos[0]);
@@ -797,6 +795,15 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	int set_reply;
 	int ret;
 
+	/* Never happen */
+	if ((*pskb)->nh.iph->frag_off & htons(IP_OFFSET)) {
+		if (net_ratelimit()) {
+		printk(KERN_ERR "ip_conntrack_in: Frag of proto %u (hook=%u)\n",
+		       (*pskb)->nh.iph->protocol, hooknum);
+		}
+		return NF_DROP;
+	}
+
 	/* FIXME: Do this right please. --RR */
 	(*pskb)->nfcache |= NFC_UNKNOWN;
 
@@ -815,17 +822,9 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 	}
 #endif
 
-	/* Previously seen (loopback)?  Ignore.  Do this before
-           fragment check. */
+	/* Previously seen (loopback or untracked)?  Ignore. */
 	if ((*pskb)->nfct)
 		return NF_ACCEPT;
-
-	/* Gather fragments. */
-	if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
-		*pskb = ip_ct_gather_frags(*pskb);
-		if (!*pskb)
-			return NF_STOLEN;
-	}
 
 	proto = ip_ct_find_proto((*pskb)->nh.iph->protocol);
 
@@ -920,11 +919,54 @@ static void expectation_timed_out(unsigned long ul_expect)
 	WRITE_UNLOCK(&ip_conntrack_lock);
 }
 
-/* Add a related connection. */
-int ip_conntrack_expect_related(struct ip_conntrack *related_to,
-				struct ip_conntrack_expect *expect)
+struct ip_conntrack_expect *
+ip_conntrack_expect_alloc(void)
 {
-	struct ip_conntrack_expect *old, *new;
+	struct ip_conntrack_expect *new;
+	
+	new = (struct ip_conntrack_expect *)
+		kmalloc(sizeof(struct ip_conntrack_expect), GFP_ATOMIC);
+	if (!new) {
+		DEBUGP("expect_related: OOM allocating expect\n");
+		return NULL;
+	}
+
+	/* tuple_cmp compares whole union, we have to initialized cleanly */
+	memset(new, 0, sizeof(struct ip_conntrack_expect));
+
+	return new;
+}
+
+static void
+ip_conntrack_expect_insert(struct ip_conntrack_expect *new,
+			   struct ip_conntrack *related_to)
+{
+	DEBUGP("new expectation %p of conntrack %p\n", new, related_to);
+	new->expectant = related_to;
+	new->sibling = NULL;
+	atomic_set(&new->use, 1);
+
+	/* add to expected list for this connection */
+	list_add_tail(&new->expected_list, &related_to->sibling_list);
+	/* add to global list of expectations */
+	list_prepend(&ip_conntrack_expect_list, &new->list);
+	/* add and start timer if required */
+	if (related_to->helper->timeout) {
+		init_timer(&new->timeout);
+		new->timeout.data = (unsigned long)new;
+		new->timeout.function = expectation_timed_out;
+		new->timeout.expires = jiffies +
+					related_to->helper->timeout * HZ;
+		add_timer(&new->timeout);
+	}
+	related_to->expecting++;
+}
+
+/* Add a related connection. */
+int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
+				struct ip_conntrack *related_to)
+{
+	struct ip_conntrack_expect *old;
 	int ret = 0;
 
 	WRITE_LOCK(&ip_conntrack_lock);
@@ -946,7 +988,7 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 		if (related_to->helper->timeout) {
 			if (!del_timer(&old->timeout)) {
 				/* expectation is dying. Fall through */
-				old = NULL;
+				goto out;
 			} else {
 				old->timeout.expires = jiffies + 
 					related_to->helper->timeout * HZ;
@@ -954,13 +996,12 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 			}
 		}
 
-		if (old) {
-			WRITE_UNLOCK(&ip_conntrack_lock);
-			return -EEXIST;
-		}
+		WRITE_UNLOCK(&ip_conntrack_lock);
+		kfree(expect);
+		return -EEXIST;
+
 	} else if (related_to->helper->max_expected && 
 		   related_to->expecting >= related_to->helper->max_expected) {
-		struct list_head *cur_item;
 		/* old == NULL */
 		if (!(related_to->helper->flags & 
 		      IP_CT_HELPER_F_REUSE_EXPECT)) {
@@ -974,6 +1015,7 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 				       related_to->helper->name,
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
+			kfree(expect);
 			return -EPERM;
 		}
 		DEBUGP("ip_conntrack: max number of expected "
@@ -985,21 +1027,14 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 		       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
  
 		/* choose the the oldest expectation to evict */
-		list_for_each(cur_item, &related_to->sibling_list) { 
-			struct ip_conntrack_expect *cur;
-
-			cur = list_entry(cur_item, 
-					 struct ip_conntrack_expect,
-					 expected_list);
-			if (cur->sibling == NULL) {
-				old = cur;
+		list_for_each_entry(old, &related_to->sibling_list, 
+		                                      expected_list)
+			if (old->sibling == NULL)
 				break;
-			}
-		}
 
-		/* (!old) cannot happen, since related_to->expecting is the
-		 * number of unconfirmed expects */
-		IP_NF_ASSERT(old);
+		/* We cannot fail since related_to->expecting is the number
+		 * of unconfirmed expectations */
+		IP_NF_ASSERT(old && old->sibling == NULL);
 
 		/* newnat14 does not reuse the real allocated memory
 		 * structures but rather unexpects the old and
@@ -1013,37 +1048,12 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 			     &expect->mask)) {
 		WRITE_UNLOCK(&ip_conntrack_lock);
 		DEBUGP("expect_related: busy!\n");
+
+		kfree(expect);
 		return -EBUSY;
 	}
-	
-	new = (struct ip_conntrack_expect *) 
-	      kmalloc(sizeof(struct ip_conntrack_expect), GFP_ATOMIC);
-	if (!new) {
-		WRITE_UNLOCK(&ip_conntrack_lock);
-		DEBUGP("expect_relaed: OOM allocating expect\n");
-		return -ENOMEM;
-	}
-	
-	DEBUGP("new expectation %p of conntrack %p\n", new, related_to);
-	memcpy(new, expect, sizeof(*expect));
-	new->expectant = related_to;
-	new->sibling = NULL;
-	atomic_set(&new->use, 1);
-	
-	/* add to expected list for this connection */	
-	list_add(&new->expected_list, &related_to->sibling_list);
-	/* add to global list of expectations */
-	list_prepend(&ip_conntrack_expect_list, &new->list);
-	/* add and start timer if required */
-	if (related_to->helper->timeout) {
-		init_timer(&new->timeout);
-		new->timeout.data = (unsigned long)new;
-		new->timeout.function = expectation_timed_out;
-		new->timeout.expires = jiffies + 
-					related_to->helper->timeout * HZ;
-		add_timer(&new->timeout);
-	}
-	related_to->expecting++;
+
+out:	ip_conntrack_expect_insert(expect, related_to);
 
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
@@ -1108,10 +1118,8 @@ int ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
 	DUMP_TUPLE(newreply);
 
 	conntrack->tuplehash[IP_CT_DIR_REPLY].tuple = *newreply;
-	if (!conntrack->master)
-		conntrack->helper = LIST_FIND(&helpers, helper_cmp,
-					      struct ip_conntrack_helper *,
-					      newreply);
+	if (!conntrack->master && list_empty(&conntrack->sibling_list))
+		conntrack->helper = ip_ct_find_helper(newreply);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
 	return 1;
@@ -1161,18 +1169,18 @@ void ip_ct_refresh(struct ip_conntrack *ct, unsigned long extra_jiffies)
 {
 	IP_NF_ASSERT(ct->timeout.data == (unsigned long)ct);
 
-	WRITE_LOCK(&ip_conntrack_lock);
 	/* If not in hash table, timer will not be active yet */
 	if (!is_confirmed(ct))
 		ct->timeout.expires = extra_jiffies;
 	else {
+		WRITE_LOCK(&ip_conntrack_lock);
 		/* Need del_timer for race avoidance (may already be dying). */
 		if (del_timer(&ct->timeout)) {
 			ct->timeout.expires = jiffies + extra_jiffies;
 			add_timer(&ct->timeout);
 		}
+		WRITE_UNLOCK(&ip_conntrack_lock);
 	}
-	WRITE_UNLOCK(&ip_conntrack_lock);
 }
 
 /* Returns new sk_buff, or NULL */
@@ -1281,7 +1289,7 @@ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
 /* Reversing the socket's dst/src point of view gives us the reply
    mapping. */
 static int
-getorigdst(struct sock *sk, int optval, void *user, int *len)
+getorigdst(struct sock *sk, int optval, void __user *user, int *len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ip_conntrack_tuple_hash *h;
@@ -1425,6 +1433,18 @@ int __init ip_conntrack_init(void)
 
 	/* For use by ipt_REJECT */
 	ip_ct_attach = ip_conntrack_attach;
+
+	/* Set up fake conntrack:
+	    - to never be deleted, not in any hashes */
+	atomic_set(&ip_conntrack_untracked.ct_general.use, 1);
+	/*  - and look it like as a confirmed connection */
+	set_bit(IPS_CONFIRMED_BIT, &ip_conntrack_untracked.status);
+	/*  - and prepare the ctinfo field for REJECT & NAT. */
+	ip_conntrack_untracked.infos[IP_CT_NEW].master =
+	ip_conntrack_untracked.infos[IP_CT_RELATED].master =
+	ip_conntrack_untracked.infos[IP_CT_RELATED + IP_CT_IS_REPLY].master = 
+			&ip_conntrack_untracked.ct_general;
+
 	return ret;
 
 err_free_hash:

@@ -581,6 +581,23 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 
 #define __copy_in_user(to, from, n)	__copy_from_user(to, from, n)
 
+#define copy_in_user(to,from,n)						\
+({									\
+	void *__cu_to;							\
+	const void *__cu_from;						\
+	long __cu_len;							\
+									\
+	might_sleep();							\
+	__cu_to = (to);							\
+	__cu_from = (from);						\
+	__cu_len = (n);							\
+	if (likely(access_ok(VERIFY_READ, __cu_from, __cu_len) &&	\
+	           access_ok(VERIFY_WRITE, __cu_to, __cu_len)))		\
+		__cu_len = __invoke_copy_from_user(__cu_to, __cu_from,	\
+		                                   __cu_len);		\
+	__cu_len;							\
+})
+
 /*
  * __clear_user: - Zero a block of memory in user space, with less checking.
  * @to:   Destination address, in user space.

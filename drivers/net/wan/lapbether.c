@@ -392,6 +392,8 @@ static void lapbeth_free_device(struct lapbethdev *lapbeth)
 
 /*
  *	Handle device status changes.
+ *
+ * Called from notifier with RTNL held.
  */
 static int lapbeth_device_event(struct notifier_block *this,
 				unsigned long event, void *ptr)
@@ -402,7 +404,6 @@ static int lapbeth_device_event(struct notifier_block *this,
 	if (!dev_is_ethdev(dev))
 		return NOTIFY_DONE;
 
-	rcu_read_lock();
 	switch (event) {
 	case NETDEV_UP:
 		/* New ethernet device -> new LAPB interface	 */
@@ -422,7 +423,6 @@ static int lapbeth_device_event(struct notifier_block *this,
 			lapbeth_free_device(lapbeth);
 		break;
 	}
-	rcu_read_unlock();
 
 	return NOTIFY_DONE;
 }

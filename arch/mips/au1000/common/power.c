@@ -320,7 +320,7 @@ static int pm_do_freq(ctl_table * ctl, int write, struct file *file,
 	unsigned long val, pll;
 #define TMPBUFLEN 64
 #define MAX_CPU_FREQ 396
-	char buf[8], *p;
+	char buf[TMPBUFLEN], *p;
 	unsigned long flags, intc0_mask, intc1_mask;
 	unsigned long old_baud_base, old_cpu_freq, baud_rate, old_clk,
 	    old_refresh;
@@ -358,7 +358,7 @@ static int pm_do_freq(ctl_table * ctl, int write, struct file *file,
 		old_cpu_freq = get_au1x00_speed();
 
 		new_cpu_freq = pll * 12 * 1000000;
-		new_baud_base = (new_cpu_freq / 4) / 16;
+	        new_baud_base =  (new_cpu_freq / (2 * ((int)(au_readl(SYS_POWERCTRL)&0x03) + 2) * 16));
 		set_au1x00_speed(new_cpu_freq);
 		set_au1x00_uart_baud_base(new_baud_base);
 

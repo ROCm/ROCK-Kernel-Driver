@@ -293,7 +293,7 @@ lo_read_actor(read_descriptor_t *desc, struct page *page,
 	      unsigned long offset, unsigned long size)
 {
 	unsigned long count = desc->count;
-	struct lo_read_data *p = (struct lo_read_data*)desc->buf;
+	struct lo_read_data *p = desc->arg.data;
 	struct loop_device *lo = p->lo;
 	sector_t IV;
 
@@ -308,7 +308,9 @@ lo_read_actor(read_descriptor_t *desc, struct page *page,
 		       page->index);
 		desc->error = -EINVAL;
 	}
-	
+
+	flush_dcache_page(p->page);
+
 	desc->count = count - size;
 	desc->written += size;
 	p->offset += size;
@@ -398,17 +400,6 @@ static struct bio *loop_get_bio(struct loop_device *lo)
 	return bio;
 }
 
-/*
- * kick off io on the underlying address space
- */
-static void loop_unplug(request_queue_t *q)
-{
-	struct loop_device *lo = q->queuedata;
-
-	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
-	blk_run_address_space(lo->lo_backing_file->f_mapping);
-}
-
 static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 {
 	struct loop_device *lo = q->queuedata;
@@ -443,6 +434,17 @@ out:
 inactive:
 	spin_unlock_irq(&lo->lo_lock);
 	goto out;
+}
+
+/*
+ * kick off io on the underlying address space
+ */
+static void loop_unplug(request_queue_t *q)
+{
+	struct loop_device *lo = q->queuedata;
+
+	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
+	blk_run_address_space(lo->lo_backing_file->f_mapping);
 }
 
 struct switch_request {
@@ -483,7 +485,7 @@ static int loop_thread(void *data)
 	 * hence, it mustn't be stopped at all
 	 * because it could be indirectly used during suspension
 	 */
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_NOFREEZE;
 
 	set_user_nice(current, -20);
 
@@ -949,7 +951,7 @@ loop_info64_to_old(const struct loop_info64 *info64, struct loop_info *info)
 }
 
 static int
-loop_set_status_old(struct loop_device *lo, const struct loop_info *arg)
+loop_set_status_old(struct loop_device *lo, const struct loop_info __user *arg)
 {
 	struct loop_info info;
 	struct loop_info64 info64;
@@ -961,7 +963,7 @@ loop_set_status_old(struct loop_device *lo, const struct loop_info *arg)
 }
 
 static int
-loop_set_status64(struct loop_device *lo, const struct loop_info64 *arg)
+loop_set_status64(struct loop_device *lo, const struct loop_info64 __user *arg)
 {
 	struct loop_info64 info64;
 
@@ -971,7 +973,7 @@ loop_set_status64(struct loop_device *lo, const struct loop_info64 *arg)
 }
 
 static int
-loop_get_status_old(struct loop_device *lo, struct loop_info *arg) {
+loop_get_status_old(struct loop_device *lo, struct loop_info __user *arg) {
 	struct loop_info info;
 	struct loop_info64 info64;
 	int err = 0;
@@ -989,7 +991,7 @@ loop_get_status_old(struct loop_device *lo, struct loop_info *arg) {
 }
 
 static int
-loop_get_status64(struct loop_device *lo, struct loop_info64 *arg) {
+loop_get_status64(struct loop_device *lo, struct loop_info64 __user *arg) {
 	struct loop_info64 info64;
 	int err = 0;
 
@@ -1021,16 +1023,16 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 		err = loop_clr_fd(lo, inode->i_bdev);
 		break;
 	case LOOP_SET_STATUS:
-		err = loop_set_status_old(lo, (struct loop_info *) arg);
+		err = loop_set_status_old(lo, (struct loop_info __user *) arg);
 		break;
 	case LOOP_GET_STATUS:
-		err = loop_get_status_old(lo, (struct loop_info *) arg);
+		err = loop_get_status_old(lo, (struct loop_info __user *) arg);
 		break;
 	case LOOP_SET_STATUS64:
-		err = loop_set_status64(lo, (struct loop_info64 *) arg);
+		err = loop_set_status64(lo, (struct loop_info64 __user *) arg);
 		break;
 	case LOOP_GET_STATUS64:
-		err = loop_get_status64(lo, (struct loop_info64 *) arg);
+		err = loop_get_status64(lo, (struct loop_info64 __user *) arg);
 		break;
 	default:
 		err = lo->ioctl ? lo->ioctl(lo, cmd, arg) : -EINVAL;

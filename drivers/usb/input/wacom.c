@@ -527,7 +527,7 @@ exit:
 		     __FUNCTION__, retval);
 }
 
-struct wacom_features wacom_features[] = {
+static struct wacom_features wacom_features[] = {
 	{ "Wacom Penpartner",    7,   5040,  3780,  255, 32, 0, wacom_penpartner_irq },
         { "Wacom Graphire",      8,  10206,  7422,  511, 32, 1, wacom_graphire_irq },
 	{ "Wacom Graphire2 4x5", 8,  10206,  7422,  511, 32, 1, wacom_graphire_irq },
@@ -556,7 +556,7 @@ struct wacom_features wacom_features[] = {
  	{ }
 };
 
-struct usb_device_id wacom_ids[] = {
+static struct usb_device_id wacom_ids[] = {
 	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x00) },
 	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x10) },
 	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x11) },

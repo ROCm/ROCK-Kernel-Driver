@@ -13,6 +13,7 @@ SECTIONS
   /* Read-only sections, merged into text segment: */
   .text : {
 	*(.text .text.*)
+	SCHED_TEXT
 	*(.fixup)
 	. = ALIGN(4096);
 	_etext = .;
@@ -83,10 +84,6 @@ SECTIONS
 	*(.con_initcall.init)
 	__con_initcall_end = .;
 	}
-
-  __kdb_initcall_start = .;
-  .kdb_initcall.init : { *(.kdb_initcall.init) }
-  __kdb_initcall_end = .;
 
   SECURITY_INIT
 

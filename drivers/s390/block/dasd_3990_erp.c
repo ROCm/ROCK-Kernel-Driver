@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.29.2.4 $
+ * $Revision: 1.33 $
  */
 
 #include <linux/timer.h>
@@ -443,10 +443,10 @@ dasd_3990_erp_action_4(struct dasd_ccw_req * erp, char *sense)
 	/* interrupt (this enables easier enqueing of the cqr)	    */
 	if (erp->function != dasd_3990_erp_action_4) {
 
-		DEV_MESSAGE(KERN_INFO, device, 
+		DEV_MESSAGE(KERN_INFO, device,
 			    "dasd_3990_erp_action_4: first time retry"
 			    "%s", " ");
-		
+
 		erp->retries = 256;
 		erp->function = dasd_3990_erp_action_4;
 

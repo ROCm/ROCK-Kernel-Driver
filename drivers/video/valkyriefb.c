@@ -118,9 +118,7 @@ static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 static int valkyriefb_blank(int blank_mode, struct fb_info *info);
 
 static int read_valkyrie_sense(struct fb_info_valkyrie *p);
-static inline int valkyrie_vram_reqd(int video_mode, int color_mode);
 static void set_valkyrie_clock(unsigned char *params);
-static inline int valkyrie_par_to_var(struct fb_par_valkyrie *par, struct fb_var_screeninfo *var);
 static int valkyrie_var_to_par(struct fb_var_screeninfo *var,
 	struct fb_par_valkyrie *par, const struct fb_info *fb_info);
 
@@ -169,6 +167,12 @@ static int valkyriefb_set_par(struct fb_info *info)
 	out_8(&valkyrie_regs->mode.r, init->mode);
 
 	return 0;
+}
+
+static inline int valkyrie_par_to_var(struct fb_par_valkyrie *par,
+				      struct fb_var_screeninfo *var)
+{
+	return mac_vmode_to_var(par->vmode, par->cmode, var);
 }
 
 static int
@@ -252,7 +256,7 @@ static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	return 0;
 }
 
-static int valkyrie_vram_reqd(int video_mode, int color_mode)
+static inline int valkyrie_vram_reqd(int video_mode, int color_mode)
 {
 	int pitch;
 	struct valkyrie_regvals *init = valkyrie_reg_init[video_mode-1];
@@ -502,11 +506,6 @@ static int valkyrie_var_to_par(struct fb_var_screeninfo *var,
 	par->vyres = par->yres;
 
 	return 0;
-}
-
-static int valkyrie_par_to_var(struct fb_par_valkyrie *par, struct fb_var_screeninfo *var)
-{
-	return mac_vmode_to_var(par->vmode, par->cmode, var);
 }
 
 static void valkyrie_init_fix(struct fb_fix_screeninfo *fix, struct fb_info_valkyrie *p)

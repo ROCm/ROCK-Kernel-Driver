@@ -1531,6 +1531,7 @@ ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 
 	/* Still equal.  Sort by BIOS address, ioport, or bus/slot/func. */
 	switch (rvalue) {
+#ifdef CONFIG_PCI
 	case AHC_PCI:
 	{
 		char primary_channel;
@@ -1563,6 +1564,7 @@ ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 			value = 1;
 		break;
 	}
+#endif
 	case AHC_EISA:
 		if ((rahc->flags & AHC_BIOS_ENABLED) != 0) {
 			value = rahc->platform_data->bios_address
@@ -2283,8 +2285,18 @@ ahc_linux_dv_thread(void *data)
 	 * Complete thread creation.
 	 */
 	lock_kernel();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	/*
+	 * Don't care about any signals.
+	 */
+	siginitsetinv(&current->blocked, 0);
+
+	daemonize();
+	sprintf(current->comm, "ahc_dv_%d", ahc->unit);
+#else
 	daemonize("ahc_dv_%d", ahc->unit);
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_FREEZE;
+#endif
 	unlock_kernel();
 
 	while (1) {
@@ -3957,11 +3969,10 @@ ahc_linux_alloc_device(struct ahc_softc *ahc,
 }
 
 static void
-ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
+__ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 {
 	struct ahc_linux_target *targ;
 
-	del_timer_sync(&dev->timer);
 	targ = dev->target;
 	targ->devices[dev->lun] = NULL;
 	free(dev, M_DEVBUF);
@@ -3969,6 +3980,13 @@ ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 	if (targ->refcount == 0
 	 && (targ->flags & AHC_DV_REQUIRED) == 0)
 		ahc_linux_free_target(ahc, targ);
+}
+
+static void
+ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
+{
+	del_timer_sync(&dev->timer);
+	__ahc_linux_free_device(ahc, dev);
 }
 
 void
@@ -4681,7 +4699,7 @@ ahc_linux_dev_timed_unfreeze(u_long arg)
 		ahc_linux_run_device_queue(ahc, dev);
 	if (TAILQ_EMPTY(&dev->busyq)
 	 && dev->active == 0)
-		ahc_linux_free_device(ahc, dev);
+		__ahc_linux_free_device(ahc, dev);
 	ahc_unlock(ahc, &s);
 }
 

@@ -69,6 +69,8 @@ struct pt_regs {
 
 extern void show_regs(struct pt_regs *);
 
+extern asmlinkage void do_syscall_trace(struct pt_regs *regs, int entryexit);
+
 #endif
 
 #endif /* _ASM_PTRACE_H */

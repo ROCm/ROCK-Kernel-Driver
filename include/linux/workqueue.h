@@ -7,6 +7,7 @@
 
 #include <linux/timer.h>
 #include <linux/linkage.h>
+#include <linux/bitops.h>
 
 struct workqueue_struct;
 
@@ -75,8 +76,12 @@ extern void init_workqueues(void);
  */
 static inline int cancel_delayed_work(struct work_struct *work)
 {
-	return del_timer_sync(&work->timer);
+	int ret;
+
+	ret = del_timer_sync(&work->timer);
+	if (ret)
+		clear_bit(0, &work->pending);
+	return ret;
 }
 
 #endif
-

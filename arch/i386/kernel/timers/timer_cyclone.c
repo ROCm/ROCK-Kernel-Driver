@@ -22,24 +22,18 @@
 extern spinlock_t i8253_lock;
 
 /* Number of usecs that the last interrupt was delayed */
-int cyclone_delay_at_last_interrupt;
-
-/* FIXMAP flag  */
-#ifdef CONFIG_VSYSCALL_GTOD
-#define PAGE_CYCLONE PAGE_KERNEL_VSYSCALL_NOCACHE
-#else
-#define PAGE_CYCLONE PAGE_KERNEL_NOCACHE
-#endif
+static int delay_at_last_interrupt;
 
 #define CYCLONE_CBAR_ADDR 0xFEB00CD0
 #define CYCLONE_PMCC_OFFSET 0x51A0
 #define CYCLONE_MPMC_OFFSET 0x51D0
 #define CYCLONE_MPCS_OFFSET 0x51A8
+#define CYCLONE_TIMER_FREQ 100000000
 #define CYCLONE_TIMER_MASK (((u64)1<<40)-1) /* 40 bit mask */
 int use_cyclone = 0;
 
-u32* volatile cyclone_timer;	/* Cyclone MPMC0 register */
-u32 last_cyclone_low;
+static u32* volatile cyclone_timer;	/* Cyclone MPMC0 register */
+static u32 last_cyclone_low;
 static u32 last_cyclone_high;
 static unsigned long long monotonic_base;
 static seqlock_t monotonic_lock = SEQLOCK_UNLOCKED;
@@ -64,7 +58,7 @@ static void mark_offset_cyclone(void)
 	spin_lock(&i8253_lock);
 	read_cyclone_counter(last_cyclone_low,last_cyclone_high);
 
-	/* read values for cyclone_delay_at_last_interrupt */
+	/* read values for delay_at_last_interrupt */
 	outb_p(0x00, 0x43);     /* latch the count ASAP */
 
 	count = inb_p(0x40);    /* read the latched count */
@@ -85,7 +79,7 @@ static void mark_offset_cyclone(void)
 	/* lost tick compensation */
 	delta = last_cyclone_low - delta;	
 	delta /= (CYCLONE_TIMER_FREQ/1000000);
-	delta += cyclone_delay_at_last_interrupt;
+	delta += delay_at_last_interrupt;
 	lost = delta/(1000000/HZ);
 	delay = delta%(1000000/HZ);
 	if (lost >= 2)
@@ -96,16 +90,16 @@ static void mark_offset_cyclone(void)
 	monotonic_base += (this_offset - last_offset) & CYCLONE_TIMER_MASK;
 	write_sequnlock(&monotonic_lock);
 
-	/* calculate cyclone_delay_at_last_interrupt */
+	/* calculate delay_at_last_interrupt */
 	count = ((LATCH-1) - count) * TICK_SIZE;
-	cyclone_delay_at_last_interrupt = (count + LATCH/2) / LATCH;
+	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
 
 
 	/* catch corner case where tick rollover occured 
 	 * between cyclone and pit reads (as noted when 
 	 * usec delta is > 90% # of usecs/tick)
 	 */
-	if (lost && abs(delay - cyclone_delay_at_last_interrupt) > (900000/HZ))
+	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
 		jiffies_64++;
 }
 
@@ -114,7 +108,7 @@ static unsigned long get_offset_cyclone(void)
 	u32 offset;
 
 	if(!cyclone_timer)
-		return cyclone_delay_at_last_interrupt;
+		return delay_at_last_interrupt;
 
 	/* Read the cyclone timer */
 	offset = cyclone_timer[0];
@@ -127,7 +121,7 @@ static unsigned long get_offset_cyclone(void)
 	offset = offset/(CYCLONE_TIMER_FREQ/1000000);
 
 	/* our adjusted time offset in microseconds */
-	return cyclone_delay_at_last_interrupt + offset;
+	return delay_at_last_interrupt + offset;
 }
 
 static unsigned long long monotonic_clock_cyclone(void)
@@ -211,7 +205,7 @@ static int __init init_cyclone(char* override)
 	/* map in cyclone_timer */
 	pageaddr = (base + CYCLONE_MPMC_OFFSET)&PAGE_MASK;
 	offset = (base + CYCLONE_MPMC_OFFSET)&(~PAGE_MASK);
-	__set_fixmap(FIX_CYCLONE_TIMER, pageaddr, PAGE_CYCLONE);
+	set_fixmap_nocache(FIX_CYCLONE_TIMER, pageaddr);
 	cyclone_timer = (u32*)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
 	if(!cyclone_timer){
 		printk(KERN_ERR "Summit chipset: Could not find valid MPMC register.\n");

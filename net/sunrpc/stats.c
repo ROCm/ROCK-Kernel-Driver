@@ -169,7 +169,7 @@ rpc_proc_exit(void)
 	dprintk("RPC: unregistering /proc/net/rpc\n");
 	if (proc_net_rpc) {
 		proc_net_rpc = NULL;
-		remove_proc_entry("net/rpc", 0);
+		remove_proc_entry("net/rpc", NULL);
 	}
 }
 

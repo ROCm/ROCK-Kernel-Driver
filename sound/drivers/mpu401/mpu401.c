@@ -52,9 +52,6 @@ static int acpipnp[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 1 };
 #endif
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* MPU-401 port number */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* MPU-401 IRQ */
-#ifdef CONFIG_X86_PC9800
-static int pc98ii[SNDRV_CARDS];				/* PC98-II dauther board */
-#endif
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -77,11 +74,6 @@ MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for MPU-401 device.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
-#ifdef CONFIG_X86_PC9800
-module_param_array(pc98ii, bool, boot_devs, 0444);
-MODULE_PARM_DESC(pc98ii, "Roland MPU-PC98II support.");
-MODULE_PARM_SYNTAX(pc98ii, SNDRV_BOOLEAN_FALSE_DESC);
-#endif
 
 #ifndef CONFIG_ACPI_BUS
 struct acpi_device;
@@ -188,9 +180,6 @@ static int __devinit snd_card_mpu401_probe(int dev, struct acpi_device *device)
 	}
 #endif
 	if (snd_mpu401_uart_new(card, 0,
-#ifdef CONFIG_X86_PC9800
-				pc98ii[dev] ? MPU401_HW_PC98II :
-#endif
 				MPU401_HW_MPU401,
 				port[dev], 0,
 				irq[dev], irq[dev] >= 0 ? SA_INTERRUPT : 0, NULL) < 0) {

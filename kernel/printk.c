@@ -30,7 +30,6 @@
 #include <linux/smp.h>
 #include <linux/security.h>
 #include <linux/bootmem.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 
@@ -110,13 +109,6 @@ struct console_cmdline
 
 static struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
 static int preferred_console = -1;
-
-#ifdef CONFIG_EVLOG
-extern int evl_kbufread(char *, size_t);
-#ifdef CONFIG_EVLOG_FWPRINTK
-extern int evl_fwd_printk(const char *fmt, va_list args, const char *msg);
-#endif
-#endif
 
 /* Flag: console code may call schedule() */
 static int console_may_schedule;
@@ -249,7 +241,6 @@ __setup("log_buf_len=", log_buf_len_setup);
  *	8 -- Set level of messages printed to console
  *	9 -- Return number of unread characters in the log buffer
  *     10 -- Return size of the log buffer
- *	20 -- Read from event logging buffer 
  */
 int do_syslog(int type, char __user * buf, int len)
 {
@@ -258,11 +249,9 @@ int do_syslog(int type, char __user * buf, int len)
 	char c;
 	int error = 0;
 
-	audit_intercept(AUDIT_syslog, type, buf, len);
-
 	error = security_syslog(type);
 	if (error)
-		return audit_result(error);
+		return error;
 
 	switch (type) {
 	case 0:		/* Close log */
@@ -374,38 +363,13 @@ int do_syslog(int type, char __user * buf, int len)
 	case 10:	/* Size of the log buffer */
 		error = log_buf_len;
 		break;
-	case 20:
-#ifdef CONFIG_EVLOG
-		error = verify_area(VERIFY_WRITE, buf, len);
-		if (error) {
-			goto out;
-		}
-		error = evl_kbufread(buf, len);
-#else
-		error = -EIO;
-#endif
-		break;
 	default:
 		error = -EINVAL;
 		break;
 	}
 out:
-	return audit_result(error);
+	return error;
 }
-
-#ifdef	CONFIG_KDB
-/* kdb dmesg command needs access to the syslog buffer.  do_syslog() uses locks
- * so it cannot be used during debugging.  Just tell kdb where the start and
- * end of the physical and logical logs are.  This is equivalent to do_syslog(3).
- */
-void kdb_syslog_data(char *syslog_data[4])
-{
-	syslog_data[0] = log_buf;
-	syslog_data[1] = log_buf + __LOG_BUF_LEN;
-	syslog_data[2] = log_buf + log_end - (logged_chars < __LOG_BUF_LEN ? logged_chars : __LOG_BUF_LEN);
-	syslog_data[3] = log_buf + log_end;
-}
-#endif	/* CONFIG_KDB */
 
 asmlinkage long sys_syslog(int type, char __user * buf, int len)
 {
@@ -442,12 +406,6 @@ static void _call_console_drivers(unsigned long start,
 			__call_console_drivers(start, end);
 		}
 	}
-#ifdef CONFIG_IA64_EARLY_PRINTK
-	if (!console_drivers) {
-		void early_printk (const char *str, size_t len);
-		early_printk(&LOG_BUF(start), end - start);
-	}
-#endif
 }
 
 /*
@@ -514,6 +472,27 @@ static void emit_log_char(char c)
 }
 
 /*
+ * Zap console related locks when oopsing. Only zap at most once
+ * every 10 seconds, to leave time for slow consoles to print a
+ * full oops.
+ */
+static void zap_locks(void)
+{
+	static unsigned long oops_timestamp;
+
+	if (time_after_eq(jiffies, oops_timestamp) &&
+			!time_after(jiffies, oops_timestamp + 30*HZ))
+		return;
+
+	oops_timestamp = jiffies;
+
+	/* If a crash is occurring, make sure we can't deadlock */
+	spin_lock_init(&logbuf_lock);
+	/* And make sure that we print immediately */
+	init_MUTEX(&console_sem);
+}
+
+/*
  * This is printk.  It can be called from any context.  We want it to work.
  * 
  * We try to grab the console_sem.  If we succeed, it's easy - we log the output and
@@ -535,12 +514,8 @@ asmlinkage int printk(const char *fmt, ...)
 	static char printk_buf[1024];
 	static int log_level_unknown = 1;
 
-	if (oops_in_progress) {
-		/* If a crash is occurring, make sure we can't deadlock */
-		spin_lock_init(&logbuf_lock);
-		/* And make sure that we print immediately */
-		init_MUTEX(&console_sem);
-	}
+	if (unlikely(oops_in_progress))
+		zap_locks();
 
 	/* This stops the holder of console_sem just where we want him */
 	spin_lock_irqsave(&logbuf_lock, flags);
@@ -548,9 +523,6 @@ asmlinkage int printk(const char *fmt, ...)
 	/* Emit the output into the temporary buffer */
 	va_start(args, fmt);
 	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
-#ifdef CONFIG_EVLOG_FWPRINTK
-	(void) evl_fwd_printk(fmt, args, printk_buf);
-#endif
 	va_end(args);
 
 	/*
@@ -712,6 +684,47 @@ void console_unblank(void)
 EXPORT_SYMBOL(console_unblank);
 
 /*
+ * Return the console tty driver structure and its associated index
+ */
+struct tty_driver *console_device(int *index)
+{
+	struct console *c;
+	struct tty_driver *driver = NULL;
+
+	acquire_console_sem();
+	for (c = console_drivers; c != NULL; c = c->next) {
+		if (!c->device)
+			continue;
+		driver = c->device(c, index);
+		if (driver)
+			break;
+	}
+	release_console_sem();
+	return driver;
+}
+
+/*
+ * Prevent further output on the passed console device so that (for example)
+ * serial drivers can disable console output before suspending a port, and can
+ * re-enable output afterwards.
+ */
+void console_stop(struct console *console)
+{
+	acquire_console_sem();
+	console->flags &= ~CON_ENABLED;
+	release_console_sem();
+}
+EXPORT_SYMBOL(console_stop);
+
+void console_start(struct console *console)
+{
+	acquire_console_sem();
+	console->flags |= CON_ENABLED;
+	release_console_sem();
+}
+EXPORT_SYMBOL(console_start);
+
+/*
  * The console driver calls this routine during kernel initialization
  * to register the console printing procedure with printk() and to
  * print any messages that were printed by the kernel before the
@@ -780,11 +793,7 @@ void register_console(struct console * console)
 		 * for us.
 		 */
 		spin_lock_irqsave(&logbuf_lock, flags);
-#ifdef CONFIG_IA64_EARLY_PRINTK
-		con_start = log_end;
-#else
 		con_start = log_start;
-#endif
 		spin_unlock_irqrestore(&logbuf_lock, flags);
 	}
 	release_console_sem();
@@ -886,120 +895,3 @@ int printk_ratelimit(void)
 				printk_ratelimit_burst);
 }
 EXPORT_SYMBOL(printk_ratelimit);
-
-#ifdef CONFIG_IA64_EARLY_PRINTK
-
-#include <asm/io.h>
-
-# ifdef CONFIG_IA64_EARLY_PRINTK_VGA
-
-
-#define VGABASE		((char *)0xc0000000000b8000)
-#define VGALINES	24
-#define VGACOLS		80
-
-static int current_ypos = VGALINES, current_xpos = 0;
-
-static void
-early_printk_vga (const char *str, size_t len)
-{
-	char c;
-	int  i, k, j;
-
-	while (len-- > 0) {
-		c = *str++;
-		if (current_ypos >= VGALINES) {
-			/* scroll 1 line up */
-			for (k = 1, j = 0; k < VGALINES; k++, j++) {
-				for (i = 0; i < VGACOLS; i++) {
-					writew(readw(VGABASE + 2*(VGACOLS*k + i)),
-					       VGABASE + 2*(VGACOLS*j + i));
-				}
-			}
-			for (i = 0; i < VGACOLS; i++) {
-				writew(0x720, VGABASE + 2*(VGACOLS*j + i));
-			}
-			current_ypos = VGALINES-1;
-		}
-		if (c == '\n') {
-			current_xpos = 0;
-			current_ypos++;
-		} else if (c != '\r')  {
-			writew(((0x7 << 8) | (unsigned short) c),
-			       VGABASE + 2*(VGACOLS*current_ypos + current_xpos++));
-			if (current_xpos >= VGACOLS) {
-				current_xpos = 0;
-				current_ypos++;
-			}
-		}
-	}
-}
-
-# endif /* CONFIG_IA64_EARLY_PRINTK_VGA */
-
-# ifdef CONFIG_IA64_EARLY_PRINTK_UART
-
-#include <linux/serial_reg.h>
-#include <asm/system.h>
-
-static void early_printk_uart(const char *str, size_t len)
-{
-	static char *uart = NULL;
-	unsigned long uart_base;
-	char c;
-
-	if (!uart) {
-		uart_base = 0;
-#  ifdef CONFIG_SERIAL_8250_HCDP
-		{
-			extern unsigned long hcdp_early_uart(void);
-			uart_base = hcdp_early_uart();
-		}
-#  endif
-#  if CONFIG_IA64_EARLY_PRINTK_UART_BASE
-		if (!uart_base)
-			uart_base = CONFIG_IA64_EARLY_PRINTK_UART_BASE;
-#  endif
-		if (!uart_base)
-			return;
-
-		uart = ioremap(uart_base, 64);
-		if (!uart)
-			return;
-	}
-
-	while (len-- > 0) {
-		c = *str++;
-		if (c == '\n') {
-			while ((readb(uart + UART_LSR) & UART_LSR_TEMT) == 0)
-				cpu_relax(); /* spin */
-			writeb('\r', uart + UART_TX);
-		}
-
-		while ((readb(uart + UART_LSR) & UART_LSR_TEMT) == 0)
-			cpu_relax(); /* spin */
-
-		writeb(c, uart + UART_TX);
-	}
-}
-
-# endif /* CONFIG_IA64_EARLY_PRINTK_UART */
-
-#ifdef CONFIG_IA64_EARLY_PRINTK_SGI_SN
-extern int early_printk_sn_sal(const char *str, int len);
-#endif
-
-void early_printk(const char *str, size_t len)
-{
-#ifdef CONFIG_IA64_EARLY_PRINTK_UART
-	early_printk_uart(str, len);
-#endif
-#ifdef CONFIG_IA64_EARLY_PRINTK_VGA
-	early_printk_vga(str, len);
-#endif
-#ifdef CONFIG_IA64_EARLY_PRINTK_SGI_SN
- 	early_printk_sn_sal(str, len);
-#endif
-}
-
-#endif /* CONFIG_IA64_EARLY_PRINTK */

@@ -4,8 +4,6 @@
 	- information on the 3Com EtherLink Plus (3c505) driver.
 6pack.txt
 	- info on the 6pack protocol, an alternative to KISS for AX.25
-8139too.txt
-	- info on the 8139too driver for RTL-8139 based network cards.
 Configurable
 	- info on some of the configurable network parameters
 DLINK.txt
@@ -111,8 +109,6 @@ tlan.txt
 	- ThunderLAN (Compaq Netelligent 10/100, Olicom OC-2xxx) driver info.
 tms380tr.txt
 	- SysKonnect Token Ring ISA/PCI adapter driver info.
-tulip.txt
-	- info on using DEC 21040/21041/21140 based PCI Ethernet cards.
 tuntap.txt
 	- TUN/TAP device driver, allowing user space Rx/Tx of packets.
 vortex.txt

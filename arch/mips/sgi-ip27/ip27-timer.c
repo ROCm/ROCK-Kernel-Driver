@@ -45,7 +45,7 @@ static long last_rtc_update;		/* Last time the rtc clock got updated */
 
 extern volatile unsigned long wall_jiffies;
 
-
+#if 0
 static int set_rtc_mmss(unsigned long nowtime)
 {
 	int retval = 0;
@@ -88,6 +88,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	return retval;
 }
+#endif
 
 void ip27_rt_timer_interrupt(struct pt_regs *regs)
 {

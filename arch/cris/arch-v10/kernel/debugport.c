@@ -12,6 +12,15 @@
  *    init_etrax_debug()
  *
  * $Log: debugport.c,v $
+ * Revision 1.14  2004/05/17 13:11:29  starvik
+ * Disable DMA until real serial driver is up
+ *
+ * Revision 1.13  2004/05/14 07:58:01  starvik
+ * Merge of changes from 2.4
+ *
+ * Revision 1.12  2003/09/11 07:29:49  starvik
+ * Merge of Linux 2.6.0-test5
+ *
  * Revision 1.11  2003/07/07 09:53:36  starvik
  * Revert all the 2.5.74 merge changes to make the console work again
  *
@@ -59,7 +68,7 @@
 #include <linux/init.h>
 #include <linux/major.h>
 #include <linux/delay.h>
-
+#include <linux/tty.h>
 #include <asm/system.h>
 #include <asm/arch/svinto.h>
 #include <asm/io.h>             /* Get SIMCOUT. */
@@ -124,22 +133,28 @@
 
 #define MIN_SIZE 32 /* Size that triggers the FIFO to flush characters to interface */
 
-/* Write a string of count length to the console (debug port) using DMA, polled
- * for completion. Interrupts are disabled during the whole process. Some
- * caution needs to be taken to not interfere with ttyS business on this port.
- */
+static struct tty_driver *serial_driver;
+
+typedef int (*debugport_write_function)(int i, const char *buf, unsigned int len);
+
+debugport_write_function debug_write_function = NULL;
+
+static void
+console_write_direct(struct console *co, const char *buf, unsigned int len)
+{
+	int i;
+	/* Send data */
+	for (i = 0; i < len; i++) {
+		/* Wait until transmitter is ready and send.*/
+		while(!(*DEBUG_READ & IO_MASK(R_SERIAL0_READ, tr_ready)));
+                *DEBUG_WRITE = buf[i];
+	}
+}
 
 static void 
 console_write(struct console *co, const char *buf, unsigned int len)
 {
-
-	static struct etrax_dma_descr descr;
-	static struct etrax_dma_descr descr2;
-	static char tmp_buf[MIN_SIZE];
-	static int tmp_size = 0;
-
-	unsigned long flags; 
-	
+	unsigned long flags;
 #ifdef CONFIG_ETRAX_DEBUG_PORT_NULL
         /* no debug printout at all */
         return;
@@ -150,86 +165,18 @@ console_write(struct console *co, const char *buf, unsigned int len)
 	SIMCOUT(buf,len);
 	return;
 #endif
-	
-	local_save_flags(flags);
-	local_irq_disable();
 
 #ifdef CONFIG_ETRAX_KGDB
 	/* kgdb needs to output debug info using the gdb protocol */
 	putDebugString(buf, len);
-	local_irq_restore(flags);
 	return;
 #endif
 
-	/* To make this work together with the real serial port driver
-	 * we have to make sure that everything is flushed when we leave
-	 * here. The following steps are made to assure this:
-	 * 1. Wait until DMA stops, FIFO is empty and serial port pipeline empty.
-	 * 2. Write at least half the FIFO to trigger flush to serial port.
-	 * 3. Wait until DMA stops, FIFO is empty and serial port pipeline empty.
-         */
-
-	/* Do we have enough characters to make the DMA/FIFO happy? */
-	if (tmp_size + len < MIN_SIZE)
-	{
-		int size = min((int)(MIN_SIZE - tmp_size),(int)len);
-		memcpy(&tmp_buf[tmp_size], buf, size);
-		tmp_size += size;
-		len -= size;
-        
-		/* Pad with space if complete line */
-		if (tmp_buf[tmp_size-1] == '\n')
-		{
-			memset(&tmp_buf[tmp_size-1], ' ', MIN_SIZE - tmp_size);
-			tmp_buf[MIN_SIZE - 1] = '\n';
-			tmp_size = MIN_SIZE;
-			len = 0;
-		}
-		else
-		{
-                  /* Wait for more characters */
-			local_irq_restore(flags);
+	local_irq_save(flags);
+	if (debug_write_function)
+		if (debug_write_function(co->index, buf, len))
 			return;
-		}
-	}
-
-	/* make sure the transmitter is enabled. 
-	 * NOTE: this overrides any setting done in ttySx, to 8N1, no auto-CTS.
-	 * in the future, move the tr/rec_ctrl shadows from etrax100ser.c to
-	 * shadows.c and use it here as well...
-	 */
-
-	*DEBUG_TR_CTRL = 0x40;
-	while(*DEBUG_OCMD & 7); /* Until DMA is not running */
-	while(*DEBUG_STATUS & 0x7f); /* wait until output FIFO is empty as well */
-	udelay(200); /* Wait for last two characters to leave the serial transmitter */
-
-	if (tmp_size)
-	{
-		descr.ctrl = len ?  0 : d_eop | d_wait | d_eol;
-		descr.sw_len = tmp_size;
-		descr.buf = virt_to_phys(tmp_buf);
-		descr.next = virt_to_phys(&descr2);
-		descr2.ctrl = d_eop | d_wait | d_eol;
-		descr2.sw_len = len;
-		descr2.buf = virt_to_phys((char*)buf);
-	}
-	else
-	{
-		descr.ctrl = d_eop | d_wait | d_eol;
-		descr.sw_len = len;
-		descr.buf = virt_to_phys((char*)buf);
-	}
-
-	*DEBUG_FIRST = virt_to_phys(&descr); /* write to R_DMAx_FIRST */
-	*DEBUG_OCMD = 1;       /* dma command start -> R_DMAx_CMD */
-
-	/* wait until the output dma channel is ready again */
-	while(*DEBUG_OCMD & 7);
-	while(*DEBUG_STATUS & 0x7f);
-	udelay(200);
-
-	tmp_size = 0;
+	console_write_direct(co, buf, len);
 	local_irq_restore(flags);
 }
 
@@ -279,10 +226,11 @@ enableDebugIRQ(void)
 	*DEBUG_REC_CTRL = IO_STATE(R_SERIAL0_REC_CTRL, rec_enable, enable);
 }
 
-static kdev_t 
-console_device(struct console *c)
+static struct tty_driver*
+console_device(struct console *c, int *index)
 {
-         return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return serial_driver;
 }
 
 static int __init 
@@ -311,5 +259,33 @@ static struct console sercons = {
 void __init 
 init_etrax_debug(void)
 {
+#if CONFIG_ETRAX_DEBUG_PORT_NULL
+	return;
+#endif
+
+#if DEBUG_PORT_IDX == 0
+	genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma6);
+	genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma6, unused);
+#elif DEBUG_PORT_IDX == 1
+	genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma8);
+	genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma8, usb);
+#elif DEBUG_PORT_IDX == 2
+	genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma2);
+	genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma2, par0);
+#elif DEBUG_PORT_IDX == 3
+	genconfig_shadow &=  ~IO_MASK(R_GEN_CONFIG, dma4);
+	genconfig_shadow |= IO_STATE(R_GEN_CONFIG, dma4, par1);
+#endif
+	*R_GEN_CONFIG = genconfig_shadow;
+
 	register_console(&sercons);
+}
+
+int __init
+init_console(void)
+{
+	serial_driver = alloc_tty_driver(1);
+	if (!serial_driver)
+		return -ENOMEM;
+	return 0;
 }

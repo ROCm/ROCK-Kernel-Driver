@@ -73,7 +73,7 @@ static struct s_ptab {
 	{ "SBACOMMAND",16,	0 } ,
 	{ "SBAAVAILABLE",17,	1,	0,	100	} ,
 #endif
-	{ 0 }
+	{ NULL }
 } ;
 
 /* Define maximum string size for values and keybuffer */
@@ -82,8 +82,9 @@ static struct s_ptab {
 /*
  * local function declarations
  */
-static u_long parse_num() ;
-static int parse_word() ;
+static u_long parse_num(int type, char _far *value, char *v, u_long mn,
+			u_long mx, int scale);
+static int parse_word(char *buf, char _far *text);
 
 #ifdef SIM
 #define DB_MAIN(a,b,c)	printf(a,b,c)
@@ -117,11 +118,8 @@ static int parse_word() ;
  *
  * END_MANUAL_ENTRY()
  */
-int smt_parse_arg(smc,keyword,type,value)
-struct s_smc *smc ;
-char _far *keyword ;
-int type ;
-char _far *value ;
+int smt_parse_arg(struct s_smc *smc, char _far *keyword, int type,
+		  char _far *value)
 {
 	char		keybuf[MAX_VAL+1];
 	char		valbuf[MAX_VAL+1];
@@ -287,9 +285,7 @@ char _far *value ;
 	return(0) ;
 }
 
-static int parse_word(buf,text)
-char *buf ;
-char _far *text ;
+static int parse_word(char *buf, char _far *text)
 {
 	char		c ;
 	char 		*p ;
@@ -364,13 +360,8 @@ char _far *text ;
 	return(0) ;
 }
 
-static u_long parse_num(type,value,v,mn,mx,scale)
-int type ;
-char _far *value ;
-char *v ;
-u_long mn ;
-u_long mx ;
-int scale ;
+static u_long parse_num(int type, char _far *value, char *v, u_long mn,
+			u_long mx, int scale)
 {
 	u_long	x = 0 ;
 	char	c ;
@@ -473,3 +464,4 @@ main()
 	exit(0) ;
 }
 #endif
+

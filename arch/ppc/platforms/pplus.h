@@ -64,14 +64,4 @@
 
 #define PPLUS_VGA_MEM_BASE		0xf0000000U
 
-extern int pplus_init(struct pci_controller *hose,
-	       unsigned int ppc_reg_base, unsigned long processor_pci_mem_start,
-	       unsigned long processor_pci_mem_end,
-	       unsigned long processor_pci_io_start,
-	       unsigned long processor_pci_io_end,
-	       unsigned long processor_mpic_base);
-
-extern unsigned long pplus_get_mem_size(unsigned int smc_base);
-extern int pplus_mpic_init(unsigned int pci_mem_offset);
-
-#endif				/* __PPC_PPLUS_H */
+#endif	/* __PPC_PPLUS_H */

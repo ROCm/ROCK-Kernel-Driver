@@ -178,7 +178,7 @@ struct tulip_chip_table tulip_tbl[] = {
 
   /* COMET */
   { "ADMtek Comet", 256, 0x0001abef,
-	MC_HASH_ONLY | COMET_MAC_ADDR, comet_timer },
+	HAS_MII | MC_HASH_ONLY | COMET_MAC_ADDR, comet_timer },
 
   /* COMPEX9881 */
   { "Compex 9881 PMAC", 128, 0x0001ebef,
@@ -226,8 +226,9 @@ static struct pci_device_id tulip_pci_tbl[] = {
 	{ 0x1113, 0x1216, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1113, 0x1217, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MX98715 },
 	{ 0x1113, 0x9511, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
-	{ 0x14f1, 0x1803, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CONEXANT },
+	{ 0x1186, 0x1541, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1186, 0x1561, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
+	{ 0x14f1, 0x1803, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CONEXANT },
 	{ 0x1626, 0x8410, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1737, 0xAB09, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1737, 0xAB08, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
@@ -308,8 +309,8 @@ static void tulip_up(struct net_device *dev)
 	tp->dirty_rx = tp->dirty_tx = 0;
 
 	if (tp->flags & MC_HASH_ONLY) {
-		u32 addr_low = cpu_to_le32(get_unaligned((u32 *)dev->dev_addr));
-		u32 addr_high = cpu_to_le32(get_unaligned((u16 *)(dev->dev_addr+4)));
+		u32 addr_low = le32_to_cpu(get_unaligned((u32 *)dev->dev_addr));
+		u32 addr_high = le16_to_cpu(get_unaligned((u16 *)(dev->dev_addr+4)));
 		if (tp->chip_id == AX88140) {
 			outl(0, ioaddr + CSR13);
 			outl(addr_low,  ioaddr + CSR14);
@@ -452,7 +453,7 @@ media_picked:
 		tulip_select_media(dev, 1);
 
 	/* Start the chip's Tx to process setup frame. */
-	(void)tulip_stop_rxtx(tp);
+	tulip_stop_rxtx(tp);
 	barrier();
 	udelay(5);
 	outl(tp->csr6 | TxOn, ioaddr + CSR6);
@@ -738,8 +739,7 @@ static void tulip_down (struct net_device *dev)
 	outl (0x00000000, ioaddr + CSR7);
 
 	/* Stop the Tx and Rx processes. */
-	if (tulip_stop_rxtx(tp))
-		printk (KERN_DEBUG "%s: tulip_down(): tulip_stop_rxtx() failed\n", dev->name);
+	tulip_stop_rxtx(tp);
 
 	/* prepare receive buffers */
 	tulip_refill_rx(dev);
@@ -830,7 +830,7 @@ static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 }
 
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct tulip_private *np = netdev_priv(dev);
 	u32 ethcmd;
@@ -859,14 +859,14 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	const unsigned int phy_idx = 0;
 	int phy = tp->phys[phy_idx] & 0x1f;
 	unsigned int regnum = data->reg_num;
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		if (tp->mii_cnt)
@@ -1246,6 +1246,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	long ioaddr;
 	static int board_idx = -1;
 	int chip_idx = ent->driver_data;
+	const char *chip_name = tulip_tbl[chip_idx].chip_name;
 	unsigned int eeprom_missing = 0;
 	unsigned int force_csr0 = 0;
 
@@ -1410,9 +1411,26 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 #endif
 
 	/* Stop the chip's Tx and Rx processes. */
-	(void)tulip_stop_rxtx(tp);
+	tulip_stop_rxtx(tp);
 
 	pci_set_master(pdev);
+
+#ifdef CONFIG_GSC
+	if (pdev->subsystem_vendor == PCI_VENDOR_ID_HP) {
+		switch (pdev->subsystem_device) {
+		default:
+			break;
+		case 0x1061:
+		case 0x1062:
+		case 0x1063:
+		case 0x1098:
+		case 0x1099:
+		case 0x10EE:
+			tp->flags |= HAS_SWAPPED_SEEPROM | NEEDS_FAKE_MEDIA_TABLE;
+			chip_name = "GSC DS21140 Tulip";
+		}
+	}
+#endif
 
 	/* Clear the missed-packet counter. */
 	inl(ioaddr + CSR8);
@@ -1435,18 +1453,20 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		}
 	} else if (chip_idx == COMET) {
 		/* No need to read the EEPROM. */
-		put_unaligned(inl(ioaddr + 0xA4), (u32 *)dev->dev_addr);
-		put_unaligned(inl(ioaddr + 0xA8), (u16 *)(dev->dev_addr + 4));
+		put_unaligned(cpu_to_le32(inl(ioaddr + 0xA4)), (u32 *)dev->dev_addr);
+		put_unaligned(cpu_to_le16(inl(ioaddr + 0xA8)), (u16 *)(dev->dev_addr + 4));
 		for (i = 0; i < 6; i ++)
 			sum += dev->dev_addr[i];
 	} else {
 		/* A serial EEPROM interface, we read now and sort it out later. */
 		int sa_offset = 0;
-		int ee_addr_size = tulip_read_eeprom(ioaddr, 0xff, 8) & 0x40000 ? 8 : 6;
+		int ee_addr_size = tulip_read_eeprom(dev, 0xff, 8) & 0x40000 ? 8 : 6;
 
-		for (i = 0; i < sizeof(tp->eeprom)/2; i++)
-			((u16 *)ee_data)[i] =
-				le16_to_cpu(tulip_read_eeprom(ioaddr, i, ee_addr_size));
+		for (i = 0; i < sizeof(tp->eeprom); i+=2) {
+			u16 data = tulip_read_eeprom(dev, i/2, ee_addr_size);
+			ee_data[i] = data & 0xff;
+			ee_data[i + 1] = data >> 8;
+		}
 
 		/* DEC now has a specification (see Notes) but early board makers
 		   just put the address in the first EEPROM locations. */
@@ -1489,25 +1509,26 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
                        tp->flags &= ~HAS_MEDIA_TABLE;
                }
 #endif
-#ifdef __hppa__
-		/* 3x5 HSC (J3514A) has a broken srom */
-		if(ee_data[0] == 0x61 && ee_data[1] == 0x10) {
+#ifdef CONFIG_GSC
+		/* Check to see if we have a broken srom */
+		if (ee_data[0] == 0x61 && ee_data[1] == 0x10) {
 			/* pci_vendor_id and subsystem_id are swapped */
 			ee_data[0] = ee_data[2];
 			ee_data[1] = ee_data[3];
 			ee_data[2] = 0x61;
 			ee_data[3] = 0x10;
 
-			/* srom need to be byte-swaped and shifted up 1 word.  
-			 * This shift needs to happen at the end of the MAC
-			 * first because of the 2 byte overlap.
+			/* HSC-PCI boards need to be byte-swaped and shifted
+			 * up 1 word.  This shift needs to happen at the end
+			 * of the MAC first because of the 2 byte overlap.
 			 */
-			for(i = 4; i >= 0; i -= 2) {
+			for (i = 4; i >= 0; i -= 2) {
 				ee_data[17 + i + 3] = ee_data[17 + i];
 				ee_data[16 + i + 5] = ee_data[16 + i];
 			}
 		}
 #endif
+
 		for (i = 0; i < 6; i ++) {
 			dev->dev_addr[i] = ee_data[i + sa_offset];
 			sum += ee_data[i + sa_offset];
@@ -1628,7 +1649,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		goto err_out_free_ring;
 
 	printk(KERN_INFO "%s: %s rev %d at %#3lx,",
-	       dev->name, tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
+	       dev->name, chip_name, chip_rev, ioaddr);
 	pci_set_drvdata(pdev, dev);
 
 	if (eeprom_missing)
@@ -1762,10 +1783,6 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 		return;
 
 	tp = netdev_priv(dev);
-
-	/* shoot NIC in the head before deallocating descriptors */
-	pci_disable_device(tp->pdev);
-
 	unregister_netdev(dev);
 	pci_free_consistent (pdev,
 			     sizeof (struct tulip_rx_desc) * RX_RING_SIZE +

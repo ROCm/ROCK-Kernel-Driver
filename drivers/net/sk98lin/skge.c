@@ -1927,6 +1927,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	*/
 	if (BytesSend < C_LEN_ETHERNET_MINSIZE) {
 		if ((pMessage = skb_padto(pMessage, C_LEN_ETHERNET_MINSIZE)) == NULL) {
+			spin_unlock_irqrestore(&pTxPort->TxDesRingLock, Flags);
 			return 0;
 		}
 		pMessage->len = C_LEN_ETHERNET_MINSIZE;

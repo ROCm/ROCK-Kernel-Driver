@@ -220,7 +220,7 @@ int vlan_proc_rem_dev(struct net_device *vlandev)
 	}
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": dev: %p\n", vlandev);
+	printk(VLAN_DBG "%s: dev: %p\n", __FUNCTION__, vlandev);
 #endif
 
 	/** NOTE:  This will consume the memory pointed to by dent, it seems. */

@@ -52,7 +52,7 @@ static const char *version =
 			       others + includes if_fcdevice.h */
 
 #include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include <scsi/scsi_host.h>
 #include "../../fc4/fcp.h"
 
 #include <asm/system.h>

@@ -1269,7 +1269,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static int au1000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	u16 *data = (u16 *)&rq->ifr_data;
+	u16 *data = (u16 *)&rq->ifr_ifru;
 
 	/* fixme */
 	switch(cmd) { 

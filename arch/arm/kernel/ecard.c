@@ -45,7 +45,6 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 #include <asm/mach/irq.h>
 #include <asm/tlbflush.h>
@@ -842,7 +841,7 @@ static void __init ecard_init_resources(struct expansion_card *ec)
 	} else
 #endif
 
-	for (i = 0; i < ECARD_RES_IOCSYNC - ECARD_RES_IOCSLOW; i++) {
+	for (i = 0; i <= ECARD_RES_IOCSYNC - ECARD_RES_IOCSLOW; i++) {
 		ec_set_resource(ec, i + ECARD_RES_IOCSLOW,
 				base + (slot << 14) + (i << 19),
 				PODSLOT_IOC_SIZE, IORESOURCE_MEM);
@@ -907,6 +906,42 @@ static ssize_t ecard_show_device(struct device *dev, char *buf)
 }
 
 static DEVICE_ATTR(device, S_IRUGO, ecard_show_device, NULL);
+
+
+int ecard_request_resources(struct expansion_card *ec)
+{
+	int i, err = 0;
+
+	for (i = 0; i < ECARD_NUM_RESOURCES; i++) {
+		if (ecard_resource_end(ec, i) &&
+		    !request_mem_region(ecard_resource_start(ec, i),
+					ecard_resource_len(ec, i),
+					ec->dev.driver->name)) {
+			err = -EBUSY;
+			break;
+		}
+	}
+
+	if (err) {
+		while (i--)
+			if (ecard_resource_end(ec, i))
+				release_mem_region(ecard_resource_start(ec, i),
+						   ecard_resource_len(ec, i));
+	}
+	return err;
+}
+EXPORT_SYMBOL(ecard_request_resources);
+
+void ecard_release_resources(struct expansion_card *ec)
+{
+	int i;
+
+	for (i = 0; i < ECARD_NUM_RESOURCES; i++)
+		if (ecard_resource_end(ec, i))
+			release_mem_region(ecard_resource_start(ec, i),
+					   ecard_resource_len(ec, i));
+}
+EXPORT_SYMBOL(ecard_release_resources);
 
 /*
  * Probe for an expansion card.

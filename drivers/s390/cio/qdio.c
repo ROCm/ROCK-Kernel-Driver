@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.79.2.2 $"
+#define VERSION_QDIO_C "$Revision: 1.83 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -1990,77 +1990,36 @@ out:
 static unsigned int
 tiqdio_check_chsc_availability(void)
 {
-	int result;
 	char dbf_text[15];
 
-	struct {
-		struct chsc_header request;
-		u32 reserved1;
-		u32 reserved2;
-		u32 reserved3;
-		struct chsc_header response;
-		u32 reserved4;
-		u32 general_char[510];
-		u32 chsc_char[518];
-	} *scsc_area;
-		
-	scsc_area = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
-	if (!scsc_area) {
-	        QDIO_PRINT_WARN("Was not able to determine available" \
-				"CHSCs due to no memory.\n");
-		return -ENOMEM;
-	}
+	if (!css_characteristics_avail)
+		return -EIO;
 
-	scsc_area->request = (struct chsc_header) {
-		.length = 0x0010,
-		.code   = 0x0010,
-	};
-
-	result=chsc(scsc_area);
-	if (result) {
-		QDIO_PRINT_WARN("Was not able to determine " \
-				"available CHSCs, cc=%i.\n",
-				result);
-		result=-EIO;
-		goto exit;
-	}
-
-	if (scsc_area->response.code != 1) {
-		QDIO_PRINT_WARN("Was not able to determine " \
-				"available CHSCs.\n");
-		result=-EIO;
-		goto exit;
-	}
 	/* Check for bit 41. */
-	if ((scsc_area->general_char[1] & 0x00400000) != 0x00400000) {
+	if (!css_general_characteristics.aif) {
 		QDIO_PRINT_WARN("Adapter interruption facility not " \
 				"installed.\n");
-		result=-ENOENT;
-		goto exit;
+		return -ENOENT;
 	}
 	/* Check for bits 107 and 108. */
-	if ((scsc_area->chsc_char[3] & 0x00180000) != 0x00180000) {
+	if (!css_chsc_characteristics.scssc ||
+	    !css_chsc_characteristics.scsscf) {
 		QDIO_PRINT_WARN("Set Chan Subsys. Char. & Fast-CHSCs " \
 				"not available.\n");
-		result=-ENOENT;
-		goto exit;
+		return -ENOENT;
 	}
 
 	/* Check for OSA/FCP thin interrupts (bit 67). */
-	hydra_thinints = ((scsc_area->general_char[2] & 0x10000000)
-		== 0x10000000);
+	hydra_thinints = css_general_characteristics.aif_osa;
 	sprintf(dbf_text,"hydrati%1x", hydra_thinints);
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
 
 	/* Check for aif time delay disablement fac (bit 56). If installed,
 	 * omit svs even under lpar (good point by rick again) */
-	omit_svs = ((scsc_area->general_char[1] & 0x00000080)
-		== 0x00000080);
+	omit_svs = css_general_characteristics.aif_tdd;
 	sprintf(dbf_text,"omitsvs%1x", omit_svs);
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
-exit:
-	free_page ((unsigned long) scsc_area);
-	return result;
+	return 0;
 }
 
 

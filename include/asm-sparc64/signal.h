@@ -6,6 +6,7 @@
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
+#include <linux/config.h>
 #include <linux/personality.h>
 #include <linux/types.h>
 #include <linux/compat.h>
@@ -186,9 +187,14 @@ struct sigstack {
 
 /* Type of a signal handler.  */
 #ifdef __KERNEL__
-typedef void (*__sighandler_t)(int, struct sigcontext *);
+typedef void __signalfn_t(int);
+typedef __signalfn_t __user *__sighandler_t;
+
+typedef void __restorefn_t(void);
+typedef __restorefn_t __user *__sigrestore_t;
 #else
 typedef void (*__sighandler_t)(int);
+typedef void (*__sigrestore_t)(void);
 #endif
 
 #define SIG_DFL	((__sighandler_t)0)	/* default signal handling */
@@ -198,21 +204,24 @@ typedef void (*__sighandler_t)(int);
 struct __new_sigaction {
 	__sighandler_t		sa_handler;
 	unsigned long		sa_flags;
-	void 			(*sa_restorer)(void);     /* not used by Linux/SPARC yet */
+	__sigrestore_t 		sa_restorer;  /* not used by Linux/SPARC yet */
 	__new_sigset_t		sa_mask;
 };
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_COMPAT
 struct __new_sigaction32 {
 	unsigned		sa_handler;
 	unsigned int    	sa_flags;
 	unsigned		sa_restorer;     /* not used by Linux/SPARC yet */
 	compat_sigset_t 	sa_mask;
 };
+#endif
 
 struct k_sigaction {
 	struct __new_sigaction 	sa;
-	void			*ka_restorer;
+	void __user		*ka_restorer;
 };
 #endif
 
@@ -224,6 +233,8 @@ struct __old_sigaction {
 };
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_COMPAT
 struct __old_sigaction32 {
 	unsigned		sa_handler;
 	compat_old_sigset_t  	sa_mask;
@@ -232,18 +243,23 @@ struct __old_sigaction32 {
 };
 #endif
 
+#endif
+
 typedef struct sigaltstack {
-	void			*ss_sp;
+	void			__user *ss_sp;
 	int			ss_flags;
 	size_t			ss_size;
 } stack_t;
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_COMPAT
 typedef struct sigaltstack32 {
 	u32			ss_sp;
 	int			ss_flags;
 	compat_size_t		ss_size;
 } stack_t32;
+#endif
 
 struct signal_deliver_cookie {
 	int restart_syscall;
@@ -252,8 +268,6 @@ struct signal_deliver_cookie {
 
 struct pt_regs;
 extern void ptrace_signal_deliver(struct pt_regs *regs, void *cookie);
-
-#define HAVE_ARCH_SYS_PAUSE
 
 #endif /* !(__KERNEL__) */
 

@@ -7,8 +7,6 @@
 #include <asm/page.h>
 #include <asm/io.h>
 
-typedef pte_t *pte_addr_t;
-
 #define pgd_present(pgd)     (1)       /* pages are always present on NO_MM */
 #define pgd_none(pgd)		(0)
 #define pgd_bad(pgd)		(0)

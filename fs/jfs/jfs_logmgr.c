@@ -2321,7 +2321,7 @@ int jfsIOWait(void *arg)
 		DECLARE_WAITQUEUE(wq, current);
 
 		spin_lock_irq(&log_redrive_lock);
-		while ((bp = log_redrive_list)) {
+		while ((bp = log_redrive_list) != 0) {
 			log_redrive_list = bp->l_redrive_next;
 			bp->l_redrive_next = NULL;
 			spin_unlock_irq(&log_redrive_lock);
@@ -2330,7 +2330,7 @@ int jfsIOWait(void *arg)
 		}
 		if (current->flags & PF_FREEZE) {
 			spin_unlock_irq(&log_redrive_lock);
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 		} else {
 			add_wait_queue(&jfs_IO_thread_wait, &wq);
 			set_current_state(TASK_INTERRUPTIBLE);

@@ -205,7 +205,7 @@ __deadline_add_drq_rb(struct deadline_data *dd, struct deadline_rq *drq)
 	}
 
 	rb_link_node(&drq->rb_node, parent, p);
-	return 0;
+	return NULL;
 }
 
 static void

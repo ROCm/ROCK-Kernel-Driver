@@ -19,9 +19,6 @@
 #ifdef CONFIG_IP_MULTICAST
 #include <net/arp.h>
 #endif
-#ifdef CONFIG_VIRT_TIMER
-#include <asm/timer.h>
-#endif
 
 /*
  * memory management
@@ -45,25 +42,6 @@ EXPORT_SYMBOL(__down);
 EXPORT_SYMBOL(__down_interruptible);
 
 /*
- * string functions
- */
-EXPORT_SYMBOL_NOVERS(memcmp);
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(memscan);
-EXPORT_SYMBOL_NOVERS(strlen);
-EXPORT_SYMBOL_NOVERS(strchr);
-EXPORT_SYMBOL_NOVERS(strcmp);
-EXPORT_SYMBOL_NOVERS(strncat);
-EXPORT_SYMBOL_NOVERS(strncmp);
-EXPORT_SYMBOL_NOVERS(strncpy);
-EXPORT_SYMBOL_NOVERS(strnlen);
-EXPORT_SYMBOL_NOVERS(strrchr);
-EXPORT_SYMBOL_NOVERS(strstr);
-EXPORT_SYMBOL_NOVERS(strpbrk);
-EXPORT_SYMBOL_NOVERS(strcpy);
-
-/*
  * binfmt_elf loader 
  */
 extern int dump_fpu (struct pt_regs * regs, s390_fp_regs *fpregs);
@@ -73,27 +51,15 @@ EXPORT_SYMBOL(overflowgid);
 EXPORT_SYMBOL(empty_zero_page);
 
 /*
- * virtual CPU timer
- */
-#ifdef CONFIG_VIRT_TIMER
-EXPORT_SYMBOL(init_virt_timer);
-EXPORT_SYMBOL(add_virt_timer);
-EXPORT_SYMBOL(add_virt_timer_periodic);
-EXPORT_SYMBOL(mod_virt_timer);
-EXPORT_SYMBOL(del_virt_timer);
-#endif
-
-/*
  * misc.
  */
 EXPORT_SYMBOL(machine_flags);
 EXPORT_SYMBOL(__udelay);
 EXPORT_SYMBOL(kernel_thread);
-EXPORT_SYMBOL(cpint_cpcmd);
 EXPORT_SYMBOL(csum_fold);
 EXPORT_SYMBOL(console_mode);
-EXPORT_SYMBOL(console_device);
+EXPORT_SYMBOL(console_devno);
+EXPORT_SYMBOL(console_irq);
 EXPORT_SYMBOL_NOVERS(do_call_softirq);
 EXPORT_SYMBOL(sys_wait4);
 EXPORT_SYMBOL(cpcmd);
-EXPORT_SYMBOL(sys_ioctl);

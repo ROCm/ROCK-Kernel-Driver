@@ -16,8 +16,6 @@
 #include <asm-m68k/bootinfo.h>
 #else
 
-#define CMD_LINE_SIZE 512
-
 struct bi_record {
 	unsigned long tag;		/* tag ID */
 	unsigned long size;		/* size of record (in bytes) */

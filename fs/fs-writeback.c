@@ -75,6 +75,24 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	if ((inode->i_state & flags) == flags)
 		return;
 
+	if (unlikely(block_dump)) {
+		struct dentry *dentry = NULL;
+		const char *name = "?";
+
+		if (!list_empty(&inode->i_dentry)) {
+			dentry = list_entry(inode->i_dentry.next,
+					    struct dentry, d_alias);
+			if (dentry && dentry->d_name.name)
+				name = (const char *) dentry->d_name.name;
+		}
+
+		if (inode->i_ino || strcmp(inode->i_sb->s_id, "bdev"))
+			printk(KERN_DEBUG
+			       "%s(%d): dirtied inode %lu (%s) on %s\n",
+			       current->comm, current->pid, inode->i_ino,
+			       name, inode->i_sb->s_id);
+	}
+
 	spin_lock(&inode_lock);
 	if ((inode->i_state & flags) != flags) {
 		const int was_dirty = inode->i_state & I_DIRTY;
@@ -147,12 +165,6 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	inode->i_state |= I_LOCK;
 	inode->i_state &= ~I_DIRTY;
 
-	/*
-	 * smp_rmb(); note: if you remove write_lock below, you must add this.
-	 * mark_inode_dirty doesn't take spinlock, make sure that inode is not
-	 * read speculatively by this cpu before &= ~I_DIRTY  -- mikulas
-	 */
-
 	spin_unlock(&inode_lock);
 
 	ret = do_writepages(mapping, wbc);
@@ -170,19 +182,51 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	spin_lock(&inode_lock);
 	inode->i_state &= ~I_LOCK;
 	if (!(inode->i_state & I_FREEING)) {
-		if (mapping_tagged(mapping, PAGECACHE_TAG_DIRTY)) {
-			/* Redirtied */
-			inode->i_state |= I_DIRTY_PAGES;
-			inode->dirtied_when = jiffies;
-			list_move(&inode->i_list, &sb->s_dirty);
+		if (!(inode->i_state & I_DIRTY) &&
+		    mapping_tagged(mapping, PAGECACHE_TAG_DIRTY)) {
+			/*
+			 * We didn't write back all the pages.  nfs_writepages()
+			 * sometimes bales out without doing anything. Redirty
+			 * the inode.  It is still on sb->s_io.
+			 */
+			if (wbc->for_kupdate) {
+				/*
+				 * For the kupdate function we leave the inode
+				 * at the head of sb_dirty so it will get more
+				 * writeout as soon as the queue becomes
+				 * uncongested.
+				 */
+				inode->i_state |= I_DIRTY_PAGES;
+				list_move_tail(&inode->i_list, &sb->s_dirty);
+			} else {
+				/*
+				 * Otherwise fully redirty the inode so that
+				 * other inodes on this superblock will get some
+				 * writeout.  Otherwise heavy writing to one
+				 * file would indefinitely suspend writeout of
+				 * all the other files.
+				 */
+				inode->i_state |= I_DIRTY_PAGES;
+				inode->dirtied_when = jiffies;
+				list_move(&inode->i_list, &sb->s_dirty);
+			}
 		} else if (inode->i_state & I_DIRTY) {
-			/* Redirtied */
-			inode->dirtied_when = jiffies;
+			/*
+			 * Someone redirtied the inode while were writing back
+			 * the pages.
+			 */
 			list_move(&inode->i_list, &sb->s_dirty);
 		} else if (atomic_read(&inode->i_count)) {
+			/*
+			 * The inode is clean, inuse
+			 */
 			list_move(&inode->i_list, &inode_in_use);
 		} else {
+			/*
+			 * The inode is clean, unused
+			 */
 			list_move(&inode->i_list, &inode_unused);
+			inodes_stat.nr_unused++;
 		}
 	}
 	wake_up_inode(inode);
@@ -268,11 +312,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 				list_move(&inode->i_list, &sb->s_dirty);
 				continue;
 			}
-			/*
-			 * Assume that all inodes on this superblock are memory
-			 * backed.  Skip the superblock.
-			 */
-			break;
 		}
 
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {
@@ -322,7 +361,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		}
 		spin_unlock(&inode_lock);
 		iput(inode);
-		cond_resched();
 		spin_lock(&inode_lock);
 		if (wbc->nr_to_write <= 0)
 			break;
@@ -363,9 +401,10 @@ restart:
 			/* we're making our own get_super here */
 			sb->s_count++;
 			spin_unlock(&sb_lock);
-			/* if we can't get the readlock, there's no sense in
-			 * waiting around, most of the time the FS is going
-			 * to be unmounted by the time it is released
+			/*
+			 * If we can't get the readlock, there's no sense in
+			 * waiting around, most of the time the FS is going to
+			 * be unmounted by the time it is released.
 			 */
 			if (down_read_trylock(&sb->s_umount)) {
 				if (sb->s_root)
@@ -381,7 +420,6 @@ restart:
 	}
 	spin_unlock(&sb_lock);
 	spin_unlock(&inode_lock);
-	cond_resched();
 }
 
 /*
@@ -397,18 +435,15 @@ restart:
  */
 void sync_inodes_sb(struct super_block *sb, int wait)
 {
-	struct page_state ps;
 	struct writeback_control wbc = {
-		.bdi		= NULL,
 		.sync_mode	= wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
-		.older_than_this = NULL,
-		.nr_to_write	= 0,
 	};
+	unsigned long nr_dirty = read_page_state(nr_dirty);
+	unsigned long nr_unstable = read_page_state(nr_unstable);
 
-	get_page_state(&ps);
-	wbc.nr_to_write = ps.nr_dirty + ps.nr_unstable +
+	wbc.nr_to_write = nr_dirty + nr_unstable +
 			(inodes_stat.nr_inodes - inodes_stat.nr_unused) +
-			ps.nr_dirty + ps.nr_unstable;
+			nr_dirty + nr_unstable;
 	wbc.nr_to_write += wbc.nr_to_write / 2;		/* Bit more for luck */
 	spin_lock(&inode_lock);
 	sync_sb_inodes(sb, &wbc);

@@ -91,7 +91,7 @@ Boston, MA 02111-1307, USA.  */
 	.proc
 	.globl	SYM (__udivsi3)
 SYM (__udivsi3):
-#ifndef __mcf5200__
+#if !(defined(__mcf5200__) || defined(__mcoldfire__))
 	movel	d2, sp@-
 	movel	sp@(12), d1	/* d1 = divisor */
 	movel	sp@(8), d0	/* d0 = dividend */
@@ -136,7 +136,7 @@ L5:	subql	IMM (1), d0	/* adjust quotient */
 L6:	movel	sp@+, d2
 	rts
 
-#else /* __mcf5200__ */
+#else /* __mcf5200__ || __mcoldfire__ */
 
 /* Coldfire implementation of non-restoring division algorithm from
    Hennessy & Patterson, Appendix A. */
@@ -158,5 +158,5 @@ L2:	subql	IMM (1),d4
 	moveml	sp@,d2-d4	| restore data registers
 	unlk	a6		| and return
 	rts
-#endif /* __mcf5200__ */
+#endif /* __mcf5200__ || __mcoldfire__ */
 

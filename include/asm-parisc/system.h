@@ -145,6 +145,19 @@ static inline void set_eiem(unsigned long val)
 	__ret; \
 })
 
+/* Because kmalloc only guarantees 8-byte alignment for kmalloc'd data,
+   and GCC only guarantees 8-byte alignment for stack locals, we can't
+   be assured of 16-byte alignment for atomic lock data even if we
+   specify "__attribute ((aligned(16)))" in the type declaration.  So,
+   we use a struct containing an array of four ints for the atomic lock
+   type and dynamically select the 16-byte aligned int from the array
+   for the semaphore.  */
+#define __PA_LDCW_ALIGNMENT 16
+#define __ldcw_align(a) ({ \
+  unsigned long __ret = (unsigned long) a;                     		\
+  __ret = (__ret + __PA_LDCW_ALIGNMENT - 1) & ~(__PA_LDCW_ALIGNMENT - 1); \
+  (volatile unsigned int *) __ret;                                      \
+})
 
 #ifdef CONFIG_SMP
 /*
@@ -152,8 +165,13 @@ static inline void set_eiem(unsigned long val)
  */
 
 typedef struct {
-	volatile unsigned int __attribute__((aligned(16))) lock;
+	volatile unsigned int lock[4];
 } spinlock_t;
+
+#define __lock_aligned __attribute__((__section__(".data.lock_aligned")))
+
 #endif
+
+#define KERNEL_START (0x10100000 - 0x1000)
 
 #endif

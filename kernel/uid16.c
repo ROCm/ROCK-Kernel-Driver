@@ -14,7 +14,6 @@
 #include <linux/highuid.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
-#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 
@@ -40,7 +39,7 @@ asmlinkage long sys_setregid16(old_gid_t rgid, old_gid_t egid)
 
 asmlinkage long sys_setgid16(old_gid_t gid)
 {
-	return sys_setgid((gid_t)gid);
+	return sys_setgid(low2highgid(gid));
 }
 
 asmlinkage long sys_setreuid16(old_uid_t ruid, old_uid_t euid)
@@ -50,7 +49,7 @@ asmlinkage long sys_setreuid16(old_uid_t ruid, old_uid_t euid)
 
 asmlinkage long sys_setuid16(old_uid_t uid)
 {
-	return sys_setuid((uid_t)uid);
+	return sys_setuid(low2highuid(uid));
 }
 
 asmlinkage long sys_setresuid16(old_uid_t ruid, old_uid_t euid, old_uid_t suid)
@@ -89,12 +88,12 @@ asmlinkage long sys_getresgid16(old_gid_t __user *rgid, old_gid_t __user *egid, 
 
 asmlinkage long sys_setfsuid16(old_uid_t uid)
 {
-	return sys_setfsuid((uid_t)uid);
+	return sys_setfsuid(low2highuid(uid));
 }
 
 asmlinkage long sys_setfsgid16(old_gid_t gid)
 {
-	return sys_setfsgid((gid_t)gid);
+	return sys_setfsgid(low2highgid(gid));
 }
 
 static int groups16_to_user(old_gid_t __user *grouplist,
@@ -104,7 +103,7 @@ static int groups16_to_user(old_gid_t __user *grouplist,
 	old_gid_t group;
 
 	for (i = 0; i < group_info->ngroups; i++) {
-		group = (old_gid_t)GROUP_AT(group_info, i);
+		group = high2lowgid(GROUP_AT(group_info, i));
 		if (put_user(group, grouplist+i))
 			return -EFAULT;
 	}
@@ -121,7 +120,7 @@ static int groups16_from_user(struct group_info *group_info,
 	for (i = 0; i < group_info->ngroups; i++) {
 		if (get_user(group, grouplist+i))
 			return  -EFAULT;
-		GROUP_AT(group_info, i) = (gid_t)group;
+		GROUP_AT(group_info, i) = low2highgid(group);
 	}
 
 	return 0;
@@ -157,23 +156,20 @@ asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t __user *grouplist)
 	int retval;
 
 	if (!capable(CAP_SETGID))
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EPERM);
+		return -EPERM;
 	if ((unsigned)gidsetsize > NGROUPS_MAX)
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EINVAL);
+		return -EINVAL;
 
 	group_info = groups_alloc(gidsetsize);
 	if (!group_info)
-		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-ENOMEM);
+		return -ENOMEM;
 	retval = groups16_from_user(group_info, grouplist);
 	if (retval) {
 		put_group_info(group_info);
-		audit_intercept(AUDIT_setgroups, NULL);
-		return audit_result(retval);
+		return retval;
 	}
 
-	audit_intercept(AUDIT_setgroups, group_info);
-
-	(void)audit_result(retval = set_current_groups(group_info));
+	retval = set_current_groups(group_info);
 	put_group_info(group_info);
 
 	return retval;

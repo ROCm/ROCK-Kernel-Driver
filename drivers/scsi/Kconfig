@@ -137,24 +137,6 @@ config CHR_DEV_SG
 
 	  If unsure, say N.
 
-config CHR_DEV_SCH
-	tristate "SCSI media changer support"
-	depends on SCSI
-	---help---
-	  This is a driver for SCSI media changers.  Most common devices are
-	  tape libraries and MOD/CDROM jukeboxes.  *Real* jukeboxes, you
-	  don't need this for those tiny 6-slot cdrom changers.  Media
-	  changers are listed as "Type: Medium Changer" in /proc/scsi/scsi.
-	  If you have such hardware and want to use it with linux, say Y
-	  here.  Check <file:Documentation/scsi-changer.txt> for details.
-	
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>. The module will be called ch.o.
-	  If unsure, say N.
-	
-
 comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
 	depends on SCSI
 
@@ -245,7 +227,7 @@ config SCSI_DECSII
 	depends on DECSTATION && SCSI
 
 config BLK_DEV_3W_XXXX_RAID
-	tristate "3ware Hardware ATA-RAID support"
+	tristate "3ware 5/6/7/8xxx ATA-RAID support"
 	depends on PCI && SCSI
 	help
 	  3ware is the only hardware ATA-Raid product in Linux to date.
@@ -256,6 +238,17 @@ config BLK_DEV_3W_XXXX_RAID
 
 	  Please read the comments at the top of
 	  <file:drivers/scsi/3w-xxxx.c>.
+
+config SCSI_3W_9XXX
+	tristate "3ware 9xxx SATA-RAID support"
+	depends on PCI && SCSI
+	help
+	  This driver supports the 9000 series 3ware SATA-RAID cards.
+
+	  <http://www.amcc.com>
+
+	  Please read the comments at the top of
+	  <file:drivers/scsi/3w-9xxx.c>.
 
 config SCSI_7000FASST
 	tristate "7000FASST SCSI support"
@@ -370,7 +363,7 @@ source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O
 	tristate "Adaptec I2O RAID support "
-	depends on !64BIT && SCSI && BROKEN
+	depends on !64BIT && SCSI && PCI
 	help
 	  This driver supports all of Adaptec's I2O based RAID controllers as 
 	  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
@@ -381,7 +374,7 @@ config SCSI_DPT_I2O
 
 config SCSI_ADVANSYS
 	tristate "AdvanSys SCSI support"
-	depends on (ISA || EISA || PCI) && SCSI
+	depends on (ISA || EISA || PCI) && SCSI && BROKEN
 	help
 	  This is a driver for all SCSI host adapters manufactured by
 	  AdvanSys. It is documented in the kernel source in
@@ -402,7 +395,15 @@ config SCSI_IN2000
 	  To compile this driver as a module, choose M here: the
 	  module will be called in2000.
 
-source "drivers/scsi/megaraid/Kconfig.megaraid"
+config SCSI_MEGARAID
+	tristate "AMI MegaRAID support"
+	depends on PCI && SCSI
+	help
+	  This driver supports the AMI MegaRAID 418, 428, 438, 466, 762, 490
+	  and 467 SCSI host adapters.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called megaraid.
 
 config SCSI_SATA
 	bool "Serial ATA (SATA) support"
@@ -432,11 +433,27 @@ config SCSI_ATA_PIIX
 
 	  If unsure, say N.
 
-config SCSI_SATA_PROMISE
-	tristate "Promise SATA support"
+config SCSI_SATA_NV
+	tristate "NVIDIA SATA support"
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
-	  This option enables support for Promise Serial ATA.
+	  This option enables support for NVIDIA Serial ATA.
+
+	  If unsure, say N.
+
+config SCSI_SATA_PROMISE
+	tristate "Promise SATA TX2/TX4 support"
+	depends on SCSI_SATA && PCI
+	help
+	  This option enables support for Promise Serial ATA TX2/TX4.
+
+	  If unsure, say N.
+
+config SCSI_SATA_SX4
+	tristate "Promise SATA SX4 support"
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	help
+	  This option enables support for Promise Serial ATA SX4.
 
 	  If unsure, say N.
 
@@ -474,15 +491,13 @@ config SCSI_SATA_VITESSE
 
 config SCSI_BUSLOGIC
 	tristate "BusLogic SCSI support"
-	depends on (PCI || ISA || MCA) && SCSI
+	depends on (PCI || ISA || MCA) && SCSI && (BROKEN || !SPARC64)
 	---help---
 	  This is support for BusLogic MultiMaster and FlashPoint SCSI Host
 	  Adapters. Consult the SCSI-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>, and the files
 	  <file:Documentation/scsi/BusLogic.txt> and
-	  <file:Documentation/scsi/FlashPoint.txt> for more information. If this
-	  driver does not work correctly without modification, please contact
-	  the author, Leonard N. Zubkoff, by email to lnz@dandelion.com.
+	  <file:Documentation/scsi/FlashPoint.txt> for more information.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called BusLogic.
@@ -496,9 +511,15 @@ config SCSI_OMIT_FLASHPOINT
 	  substantial, so users of MultiMaster Host Adapters may wish to omit
 	  it.
 
+#
+# This is marked broken because it uses over 4kB of stack in
+# just two routines:
+#     2076  CpqTsProcessIMQEntry
+#     2052  PeekIMQEntry
+#
 config SCSI_CPQFCTS
 	tristate "Compaq Fibre Channel 64-bit/66Mhz HBA support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  Say Y here to compile in support for the Compaq StorageWorks Fibre
 	  Channel 64-bit/66Mhz Host Bus Adapter.
@@ -526,7 +547,7 @@ config SCSI_DTC3280
 
 config SCSI_EATA
 	tristate "EATA ISA/EISA/PCI (DPT and generic EATA/DMA-compliant boards) support"
-	depends on (ISA || EISA || PCI) && SCSI
+	depends on (ISA || EISA || PCI) && SCSI && (BROKEN || !SPARC64)
 	---help---
 	  This driver supports all EATA/DMA-compliant SCSI host adapters.  DPT
 	  ISA and all EISA I/O addresses are probed looking for the "EATA"
@@ -607,7 +628,7 @@ config SCSI_FUTURE_DOMAIN
 
 config SCSI_FD_MCS
 	tristate "Future Domain MCS-600/700 SCSI support"
-	depends on MCA && SCSI
+	depends on MCA_LEGACY && SCSI
 	---help---
 	  This is support for Future Domain MCS 600/700 MCA SCSI adapters.
 	  Some PS/2 computers are equipped with IBM Fast SCSI Adapter/A which
@@ -620,7 +641,7 @@ config SCSI_FD_MCS
 
 config SCSI_GDTH
 	tristate "Intel/ICP (former GDT SCSI Disk Array) RAID Controller support"
-	depends on (ISA || EISA || PCI) && SCSI
+	depends on (ISA || EISA || PCI) && SCSI && (BROKEN || !SPARC64)
 	---help---
 	  Formerly called GDT SCSI Disk Array Controller Support.
 
@@ -678,7 +699,7 @@ config SCSI_GENERIC_NCR53C400
 
 config SCSI_IBMMCA
 	tristate "IBMMCA SCSI support"
-	depends on MCA && SCSI
+	depends on MCA_LEGACY && SCSI
 	---help---
 	  This is support for the IBM SCSI adapter found in many of the PS/2
 	  series computers.  These machines have an MCA bus, so you need to
@@ -758,23 +779,6 @@ config SCSI_IPS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ips.
-
-config SCSI_IBMVSCSI
-	tristate "IBM Virtual SCSI support"
-	depends on PPC_PSERIES || PPC_ISERIES
-	help
-	  This is the IBM Virtual SCSI Client
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called ibmvscsic.
-
-config SCSI_IBMVSCSIS
-	tristate "IBM Virtual SCSI Server support"
-	depends on PPC_PSERIES
-	help
-	  This is the IBM Virtual SCSI Server
-	  To compile this driver as a module, choose M here: the
-	  module will be called ibmvscsis.
 
 config SCSI_INITIO
 	tristate "Initio 9100U(W) support"
@@ -932,6 +936,7 @@ config 53C700_LE_ON_BE
 config SCSI_SYM53C8XX_2
 	tristate "SYM53C8XX Version 2 SCSI support"
 	depends on PCI && SCSI
+	select SCSI_SPI_ATTRS
 	---help---
 	  This driver supports the whole NCR53C8XX/SYM53C8XX family of
 	  PCI-SCSI controllers.  It also supports the subset of LSI53C10XX
@@ -993,13 +998,6 @@ config SCSI_SYM53C8XX_IOMAPPED
 	  If you say Y here, the driver will use port IO to access
 	  the card.  This is significantly slower then using memory
 	  mapped IO.  Most people should answer N.
-
-config SCSI_LPFC
-	tristate "Emulex LightPulse Fibre Channel Support"
-	depends on PCI && SCSI && (PPC_PSERIES || PPC_ISERIES || IA64 || X86)
-	help
-          This lpfcdd driver supports the Emulex LightPulse
-          Family of Fibre Channel PCI host adapters.
 
 config SCSI_IPR
 	tristate "IBM Power Linux RAID adapter support"
@@ -1147,7 +1145,7 @@ config SCSI_NCR53C8XX_NO_DISCONNECT
 
 config SCSI_MCA_53C9X
 	tristate "NCR MCA 53C9x SCSI support"
-	depends on MCA && SCSI && BROKEN_ON_SMP
+	depends on MCA_LEGACY && SCSI && BROKEN_ON_SMP
 	help
 	  Some MicroChannel machines, notably the NCR 35xx line, use a SCSI
 	  controller based on the NCR 53C94.  This driver will allow use of
@@ -1735,31 +1733,20 @@ config SCSI_SUNESP
 	  To compile this driver as a module, choose M here: the
 	  module will be called esp.
 
-config SCSI_PC980155
-	tristate "NEC PC-9801-55 SCSI support"
-	depends on X86_PC9800 && SCSI
-	help
-	  If you have the NEC PC-9801-55 SCSI interface card or compatibles
-	  for NEC PC-9801/PC-9821, say Y.
-
-config WD33C93_PIO
-	bool
-	depends on SCSI_PC980155
-	default y
-
 #      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
 
 config ZFCP
 	tristate "FCP host bus adapter driver for IBM eServer zSeries"
 	depends on ARCH_S390 && SCSI
+	select SCSI_FC_ATTRS
 	help
-          If you want to access SCSI devices attached to your IBM eServer 
+          If you want to access SCSI devices attached to your IBM eServer
           zSeries by means of Fibre Channel interfaces say Y.
           For details please refer to the documentation provided by IBM at
           <http://oss.software.ibm.com/developerworks/opensource/linux390>
 
-          This driver is also available as a module. This module will be 
-          called zfcp. If you want to compile it as a module, say M here 
+          This driver is also available as a module. This module will be
+          called zfcp. If you want to compile it as a module, say M here
           and read Documentation/modules.txt.
 
 endmenu

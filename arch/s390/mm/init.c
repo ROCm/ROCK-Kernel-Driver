@@ -60,7 +60,7 @@ void show_mem(void)
 
         printk("Mem-info:\n");
         show_free_areas();
-        printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+        printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
         i = max_mapnr;
         while (i-- > 0) {
                 total++;

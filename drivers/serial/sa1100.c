@@ -740,16 +740,16 @@ sa1100_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++) {
+		do {
+			status = UART_GET_UTSR1(sport);
+		} while (!(status & UTSR1_TNF));
+		UART_PUT_CHAR(sport, s[i]);
 		if (s[i] == '\n') {
 			do {
 				status = UART_GET_UTSR1(sport);
 			} while (!(status & UTSR1_TNF));
 			UART_PUT_CHAR(sport, '\r');
 		}
-		do {
-			status = UART_GET_UTSR1(sport);
-		} while (!(status & UTSR1_TNF));
-		UART_PUT_CHAR(sport, s[i]);
 	}
 
 	/*
@@ -894,6 +894,7 @@ static int sa1100_serial_probe(struct device *_dev)
 			if (sa1100_ports[i].port.mapbase != res->start)
 				continue;
 
+			sa1100_ports[i].port.dev = _dev;
 			uart_add_one_port(&sa1100_reg, &sa1100_ports[i].port);
 			dev_set_drvdata(_dev, &sa1100_ports[i]);
 			break;

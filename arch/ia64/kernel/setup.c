@@ -47,6 +47,7 @@
 #include <asm/sal.h>
 #include <asm/sections.h>
 #include <asm/serial.h>
+#include <asm/setup.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
@@ -65,7 +66,6 @@ DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
 DEFINE_PER_CPU(unsigned long, ia64_phys_stacked_size_p8);
 unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
-EXPORT_SYMBOL(ia64_boot_param);
 struct screen_info screen_info;
 
 unsigned long ia64_max_cacheline_size;
@@ -88,10 +88,6 @@ unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I
  */
 unsigned long ia64_max_iommu_merge_mask = ~0UL;
 EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
-
-#define COMMAND_LINE_SIZE	512
-
-char saved_command_line[COMMAND_LINE_SIZE]; /* used in proc filesystem */
 
 /*
  * We use a special marker for the end of memory and it uses the extra (+1) slot
@@ -281,6 +277,29 @@ setup_serial_legacy (void)
 }
 #endif
 
+/**
+ * early_console_setup - setup debugging console
+ *
+ * Consoles started here require little enough setup that we can start using
+ * them very early in the boot process, either right after the machine
+ * vector initialization, or even before if the drivers can detect their hw.
+ *
+ * Returns non-zero if a console couldn't be setup.
+ */
+static inline int __init
+early_console_setup (void)
+{
+#ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
+	{
+		extern int sn_serial_console_early_setup(void);
+		if(!sn_serial_console_early_setup())
+			return 0;
+	}
+#endif
+
+	return -1;
+}
+
 void __init
 setup_arch (char **cmdline_p)
 {
@@ -289,13 +308,19 @@ setup_arch (char **cmdline_p)
 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
-	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
+	strlcpy(saved_command_line, *cmdline_p, COMMAND_LINE_SIZE);
 
 	efi_init();
 	io_port_init();
 
 #ifdef CONFIG_IA64_GENERIC
 	machvec_init(acpi_get_sysname());
+#endif
+
+#ifdef CONFIG_SMP
+	/* If we register an early console, allow CPU 0 to printk */
+	if (!early_console_setup())
+		cpu_set(smp_processor_id(), cpu_online_map);
 #endif
 
 #ifdef CONFIG_ACPI_BOOT
@@ -324,34 +349,30 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init();
 #endif
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-#ifdef CONFIG_SERIAL_8250_HCDP
-	if (efi.hcdp) {
-		void setup_serial_hcdp(void *);
-		setup_serial_hcdp(efi.hcdp);
-	}
+#ifdef CONFIG_EFI_PCDP
+	efi_setup_pcdp_console(*cmdline_p);
 #endif
-	{
-		extern unsigned char acpi_legacy_devices;
-		if (!efi.hcdp && !ia64_platform_is("sn2"))
-			setup_serial_legacy();
-	}
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	if (!efi.hcdp)
+		setup_serial_legacy();
 #endif
 
 #ifdef CONFIG_VT
+	if (!conswitchp) {
 # if defined(CONFIG_DUMMY_CONSOLE)
-	conswitchp = &dummy_con;
+		conswitchp = &dummy_con;
 # endif
 # if defined(CONFIG_VGA_CONSOLE)
-	/*
-	 * Non-legacy systems may route legacy VGA MMIO range to system
-	 * memory.  vga_con probes the MMIO hole, so memory looks like
-	 * a VGA device to it.  The EFI memory map can tell us if it's
-	 * memory so we can avoid this problem.
-	 */
-	if (efi_mem_type(0xA0000) != EFI_CONVENTIONAL_MEMORY)
-		conswitchp = &vga_con;
+		/*
+		 * Non-legacy systems may route legacy VGA MMIO range to system
+		 * memory.  vga_con probes the MMIO hole, so memory looks like
+		 * a VGA device to it.  The EFI memory map can tell us if it's
+		 * memory so we can avoid this problem.
+		 */
+		if (efi_mem_type(0xA0000) != EFI_CONVENTIONAL_MEMORY)
+			conswitchp = &vga_con;
 # endif
+	}
 #endif
 
 	/* enable IA-64 Machine Check Abort Handling */
@@ -569,7 +590,7 @@ get_max_cacheline_size (void)
 void
 cpu_init (void)
 {
-	extern void __init ia64_mmu_init (void *);
+	extern void __devinit ia64_mmu_init (void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
@@ -628,6 +649,9 @@ cpu_init (void)
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_cpu_init();
 #endif
+
+	/* Clear ITC to eliminiate sched_clock() overflows in human time.  */
+	ia64_set_itc(0);
 
 	/* disable all local interrupt sources: */
 	ia64_set_itv(1 << 16);

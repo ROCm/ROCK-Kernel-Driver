@@ -4,6 +4,7 @@
 #include <linux/smp.h>
 #include <asm/semaphore.h>
 #include <asm/processor.h>
+#include <asm/i387.h>
 #include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/mmu_context.h>
@@ -148,7 +149,7 @@ void __init get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 			    (cpu_devs[i]->c_ident[1] && 
 			     !strcmp(v,cpu_devs[i]->c_ident[1]))) {
 				c->x86_vendor = i;
-				if (!early) 
+				if (!early)
 					this_cpu = cpu_devs[i];
 				break;
 			}
@@ -193,12 +194,14 @@ int __init have_cpuid_p(void)
 	return flag_is_changeable_p(X86_EFLAGS_ID);
 }
 
-/* Do minimum CPU detection early. 
+/* Do minimum CPU detection early.
    Fields really needed: vendor, cpuid_level, family, model, mask, cache alignment.
    The others are not touched to avoid unwanted side effects. */
-void __init early_cpu_detect(void) 
-{ 
+void __init early_cpu_detect(void)
+{
 	struct cpuinfo_x86 *c = &boot_cpu_data;
+
+	c->x86_cache_alignment = 32;
 
 	if (!have_cpuid_p())
 		return;
@@ -208,12 +211,10 @@ void __init early_cpu_detect(void)
 	      (int *)&c->x86_vendor_id[0],
 	      (int *)&c->x86_vendor_id[8],
 	      (int *)&c->x86_vendor_id[4]);
-	
+
 	get_cpu_vendor(c, 1);
 
 	c->x86 = 4;
-	c->x86_cache_alignment = 32;
-
 	if (c->cpuid_level >= 0x00000001) {
 		u32 junk, tfms, cap0, misc;
 		cpuid(0x00000001, &tfms, &misc, &junk, &cap0);
@@ -222,14 +223,14 @@ void __init early_cpu_detect(void)
 		if (c->x86 == 0xf) {
 			c->x86 += (tfms >> 20) & 0xff;
 			c->x86_model += ((tfms >> 16) & 0xF) << 4;
-		} 
+		}
 		c->x86_mask = tfms & 15;
-		if (cap0 & (1<<19)) 
+		if (cap0 & (1<<19))
 			c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
 	}
 
-	early_intel_workaround(c); 
-} 
+	early_intel_workaround(c);
+}
 
 void __init generic_identify(struct cpuinfo_x86 * c)
 {
@@ -328,7 +329,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	generic_identify(c);
 
-	printk(KERN_DEBUG "CPU:     After generic identify, caps: %08lx %08lx %08lx %08lx\n",
+	printk(KERN_DEBUG "CPU: After generic identify, caps: %08lx %08lx %08lx %08lx\n",
 		c->x86_capability[0],
 		c->x86_capability[1],
 		c->x86_capability[2],
@@ -337,7 +338,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	if (this_cpu->c_identify) {
 		this_cpu->c_identify(c);
 
-	printk(KERN_DEBUG "CPU:     After vendor identify, caps: %08lx %08lx %08lx %08lx\n",
+	printk(KERN_DEBUG "CPU: After vendor identify, caps:  %08lx %08lx %08lx %08lx\n",
 		c->x86_capability[0],
 		c->x86_capability[1],
 		c->x86_capability[2],
@@ -392,7 +393,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* Now the feature flags better reflect actual CPU features! */
 
-	printk(KERN_DEBUG "CPU:     After all inits, caps: %08lx %08lx %08lx %08lx\n",
+	printk(KERN_DEBUG "CPU: After all inits, caps:        %08lx %08lx %08lx %08lx\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -575,5 +576,5 @@ void __init cpu_init (void)
 	 */
 	current_thread_info()->status = 0;
 	current->used_math = 0;
-	stts();
+	mxcsr_feature_mask_init();
 }

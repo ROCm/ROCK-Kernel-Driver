@@ -35,6 +35,8 @@
  *    Added support for: C102, CI-132, CI-134, CP-132, CP-114, CT-114 cards
  *                        by Damian Wrobel <dwrobel@ertel.com.pl>
  *
+ *    Added support for serial card CP104
+ *			  by James Nelson Provident Solutions <linux-info@provident-solutions.com>
  */
 
 #include <linux/config.h>
@@ -116,6 +118,9 @@
 #ifndef PCI_DEVICE_ID_C104
 #define PCI_DEVICE_ID_C104	0x1040
 #endif
+#ifndef PCI_DEVICE_ID_CP104
+#define PCI_DEVICE_ID_CP104	0x1041
+#endif
 #ifndef PCI_DEVICE_ID_CP132
 #define PCI_DEVICE_ID_CP132	0x1320
 #endif
@@ -139,6 +144,7 @@ enum {
 	MXSER_BOARD_CI104J,
 	MXSER_BOARD_C168_PCI,
 	MXSER_BOARD_C104_PCI,
+	MXSER_BOARD_CP104_PCI,
 	MXSER_BOARD_C102_ISA,
 	MXSER_BOARD_CI132,
 	MXSER_BOARD_CI134,
@@ -154,6 +160,7 @@ static char *mxser_brdname[] =
 	"CI-104J series",
 	"C168H/PCI series",
 	"C104H/PCI series",
+	"CP104/PCI series",
 	"C102 series",
 	"CI-132 series",
 	"CI-134 series",
@@ -168,6 +175,7 @@ static int mxser_numports[] =
 	4,
 	4,
 	8,
+	4,
 	4,
 	2,
 	2,
@@ -190,11 +198,14 @@ static int mxser_numports[] =
 #define         MOXA_GET_CUMAJOR      (MOXA + 64)
 #define         MOXA_GETMSTATUS       (MOXA + 65)
 
+#ifdef CONFIG_PCI
 static struct pci_device_id mxser_pcibrds[] = {
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C168, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
 	  MXSER_BOARD_C168_PCI },
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C104, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
 	  MXSER_BOARD_C104_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP104, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+	  MXSER_BOARD_CP104_PCI },
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP132, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 	  MXSER_BOARD_CP132_PCI },
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP114, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
@@ -204,6 +215,7 @@ static struct pci_device_id mxser_pcibrds[] = {
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, mxser_pcibrds);
+#endif /* CONFIG_PCI */
 
 static int ioaddr[MXSER_BOARDS];
 static int ttymajor = MXSERMAJOR;
@@ -320,7 +332,6 @@ struct mxser_hwconf mxsercfg[MXSER_BOARDS];
 
 static void mxser_getcfg(int board, struct mxser_hwconf *hwconf);
 static int mxser_get_ISA_conf(int, struct mxser_hwconf *);
-static int mxser_get_PCI_conf(struct pci_dev *, int, struct mxser_hwconf *);
 static void mxser_do_softint(void *);
 static int mxser_open(struct tty_struct *, struct file *);
 static void mxser_close(struct tty_struct *, struct file *);
@@ -346,9 +357,9 @@ static int mxser_block_til_ready(struct tty_struct *, struct file *, struct mxse
 static int mxser_startup(struct mxser_struct *);
 static void mxser_shutdown(struct mxser_struct *);
 static int mxser_change_speed(struct mxser_struct *, struct termios *old_termios);
-static int mxser_get_serial_info(struct mxser_struct *, struct serial_struct *);
-static int mxser_set_serial_info(struct mxser_struct *, struct serial_struct *);
-static int mxser_get_lsr_info(struct mxser_struct *, unsigned int *);
+static int mxser_get_serial_info(struct mxser_struct *, struct serial_struct __user *);
+static int mxser_set_serial_info(struct mxser_struct *, struct serial_struct __user *);
+static int mxser_get_lsr_info(struct mxser_struct *, unsigned int __user *);
 static void mxser_send_break(struct mxser_struct *, int);
 static int mxser_tiocmget(struct tty_struct *, struct file *);
 static int mxser_tiocmset(struct tty_struct *, struct file *, unsigned int, unsigned int);
@@ -451,6 +462,7 @@ static void mxser_getcfg(int board, struct mxser_hwconf *hwconf)
 	mxsercfg[board] = *hwconf;
 }
 
+#ifdef CONFIG_PCI
 static int mxser_get_PCI_conf(struct pci_dev *pdev, int board_type, struct mxser_hwconf *hwconf)
 {
 	int i;
@@ -475,6 +487,7 @@ static int mxser_get_PCI_conf(struct pci_dev *pdev, int board_type, struct mxser
 	}
 	return (0);
 }
+#endif /* CONFIG_PCI */
 
 static struct tty_operations mxser_ops = {
 	.open = mxser_open,
@@ -604,7 +617,6 @@ static int __init mxser_module_init(void)
 	{
 		struct pci_dev *pdev = NULL;
 		int n = (sizeof(mxser_pcibrds) / sizeof(mxser_pcibrds[0])) - 1;
-		int index = 0;
 		for (b = 0; b < n; b++) {
 			while ((pdev = pci_find_device(mxser_pcibrds[b].vendor, mxser_pcibrds[b].device, pdev)))
 			{
@@ -809,7 +821,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
 	info->event = 0;
-	info->tty = 0;
+	info->tty = NULL;
 	if (info->blocked_open) {
 		if (info->close_delay) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -976,8 +988,9 @@ static int mxser_ioctl(struct tty_struct *tty, struct file *file,
 	struct mxser_struct *info = (struct mxser_struct *) tty->driver_data;
 	int retval;
 	struct async_icount cprev, cnow;	/* kernel counter temps */
-	struct serial_icounter_struct *p_cuser;		/* user space */
+	struct serial_icounter_struct __user *p_cuser;
 	unsigned long templ;
+	void __user *argp = (void __user *)arg;
 
 	if (PORTNO(tty) == MXSER_PORTS)
 		return (mxser_ioctl_special(cmd, arg));
@@ -1003,20 +1016,20 @@ static int mxser_ioctl(struct tty_struct *tty, struct file *file,
 		mxser_send_break(info, arg ? arg * (HZ / 10) : HZ / 4);
 		return (0);
 	case TIOCGSOFTCAR:
-		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long *) arg);
+		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long __user *)argp);
 	case TIOCSSOFTCAR:
-		if(get_user(templ, (unsigned long *) arg))
+		if(get_user(templ, (unsigned long __user *) arg))
 			return -EFAULT;
 		arg = templ;
 		tty->termios->c_cflag = ((tty->termios->c_cflag & ~CLOCAL) |
 					 (arg ? CLOCAL : 0));
 		return (0);
 	case TIOCGSERIAL:
-		return (mxser_get_serial_info(info, (struct serial_struct *) arg));
+		return mxser_get_serial_info(info, argp);
 	case TIOCSSERIAL:
-		return (mxser_set_serial_info(info, (struct serial_struct *) arg));
+		return mxser_set_serial_info(info, argp);
 	case TIOCSERGETLSR:	/* Get line status register */
-		return (mxser_get_lsr_info(info, (unsigned int *) arg));
+		return mxser_get_lsr_info(info, argp);
 		/*
 		 * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change
 		 * - mask passed in arg for lines of interest
@@ -1060,7 +1073,7 @@ static int mxser_ioctl(struct tty_struct *tty, struct file *file,
 		cli();
 		cnow = info->icount;
 		restore_flags(flags);
-		p_cuser = (struct serial_icounter_struct *) arg;
+		p_cuser = argp;
 		if(put_user(cnow.cts, &p_cuser->cts))
 			return -EFAULT;
 		if(put_user(cnow.dsr, &p_cuser->dsr))
@@ -1069,7 +1082,7 @@ static int mxser_ioctl(struct tty_struct *tty, struct file *file,
 			return -EFAULT;
 		return put_user(cnow.dcd, &p_cuser->dcd);
 	case MOXA_HighSpeedOn:
-		return put_user(info->baud_base != 115200 ? 1 : 0, (int *) arg);
+		return put_user(info->baud_base != 115200 ? 1 : 0, (int __user *)argp);
 	default:
 		return (-ENOIOCTLCMD);
 	}
@@ -1079,21 +1092,22 @@ static int mxser_ioctl(struct tty_struct *tty, struct file *file,
 static int mxser_ioctl_special(unsigned int cmd, unsigned long arg)
 {
 	int i, result, status;
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
 	case MOXA_GET_CONF:
-		if(copy_to_user((struct mxser_hwconf *) arg, mxsercfg,
+		if(copy_to_user(argp, mxsercfg,
 			     sizeof(struct mxser_hwconf) * 4))
 			     	return -EFAULT;
 		return 0;
 	case MOXA_GET_MAJOR:
-		if(copy_to_user((int *) arg, &ttymajor, sizeof(int)))
+		if(copy_to_user(argp, &ttymajor, sizeof(int)))
 			return -EFAULT;
 		return 0;
 
 	case MOXA_GET_CUMAJOR:
 		result = 0;
-		if(copy_to_user((int *) arg, &result, sizeof(int)))
+		if(copy_to_user(argp, &result, sizeof(int)))
 			return -EFAULT;
 		return 0;
 
@@ -1103,9 +1117,9 @@ static int mxser_ioctl_special(unsigned int cmd, unsigned long arg)
 			if (mxvar_table[i].base)
 				result |= (1 << i);
 		}
-		return put_user(result, (unsigned long *) arg);
+		return put_user(result, (unsigned long __user *) argp);
 	case MOXA_GETDATACOUNT:
-		if(copy_to_user((struct mxser_log *) arg, &mxvar_log, sizeof(mxvar_log)))
+		if (copy_to_user(argp, &mxvar_log, sizeof(mxvar_log)))
 			return -EFAULT;
 		return (0);
 	case MOXA_GETMSTATUS:
@@ -1139,7 +1153,7 @@ static int mxser_ioctl_special(unsigned int cmd, unsigned long arg)
 			else
 				GMStatus[i].cts = 0;
 		}
-		if(copy_to_user((struct mxser_mstatus *) arg, GMStatus,
+		if(copy_to_user(argp, GMStatus,
 			     sizeof(struct mxser_mstatus) * MXSER_PORTS))
 			return -EFAULT;
 		return 0;
@@ -1289,7 +1303,7 @@ void mxser_hangup(struct tty_struct *tty)
 	info->event = 0;
 	info->count = 0;
 	info->flags &= ~ASYNC_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 	wake_up_interruptible(&info->open_wait);
 }
 
@@ -1305,7 +1319,7 @@ static irqreturn_t mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int pass_counter = 0;
 	int handled = 0;
 
-	port = 0;
+	port = NULL;
 	for (i = 0; i < MXSER_BOARDS; i++) {
 		if (dev_id == &(mxvar_table[i * MXSER_PORTS_PER_BOARD])) {
 			port = dev_id;
@@ -1653,7 +1667,7 @@ static int mxser_startup(struct mxser_struct *info)
 	/*
 	 * and set the speed of the serial port
 	 */
-	mxser_change_speed(info, 0);
+	mxser_change_speed(info, NULL);
 
 	info->flags |= ASYNC_INITIALIZED;
 	restore_flags(flags);
@@ -1685,7 +1699,7 @@ static void mxser_shutdown(struct mxser_struct *info)
 	 */
 	if (info->xmit_buf) {
 		free_page((unsigned long) info->xmit_buf);
-		info->xmit_buf = 0;
+		info->xmit_buf = NULL;
 	}
 	info->IER = 0;
 	outb(0x00, info->base + UART_IER);	/* disable all intrs */
@@ -2036,7 +2050,7 @@ static int mxser_change_speed(struct mxser_struct *info,
  * ------------------------------------------------------------
  */
 static int mxser_get_serial_info(struct mxser_struct *info,
-				 struct serial_struct *retinfo)
+				 struct serial_struct __user *retinfo)
 {
 	struct serial_struct tmp;
 
@@ -2057,7 +2071,7 @@ static int mxser_get_serial_info(struct mxser_struct *info,
 }
 
 static int mxser_set_serial_info(struct mxser_struct *info,
-				 struct serial_struct *new_info)
+				 struct serial_struct __user *new_info)
 {
 	struct serial_struct new_serial;
 	unsigned int flags;
@@ -2098,7 +2112,7 @@ static int mxser_set_serial_info(struct mxser_struct *info,
 
 	if (info->flags & ASYNC_INITIALIZED) {
 		if (flags != (info->flags & ASYNC_SPD_MASK)) {
-			mxser_change_speed(info, 0);
+			mxser_change_speed(info, NULL);
 		}
 	} else
 		retval = mxser_startup(info);
@@ -2115,7 +2129,7 @@ static int mxser_set_serial_info(struct mxser_struct *info,
  *          transmit holding register is empty.  This functionality
  *          allows an RS485 driver to be written in user space.
  */
-static int mxser_get_lsr_info(struct mxser_struct *info, unsigned int *value)
+static int mxser_get_lsr_info(struct mxser_struct *info, unsigned int __user *value)
 {
 	unsigned char status;
 	unsigned int result;
@@ -2150,7 +2164,6 @@ static int mxser_tiocmget(struct tty_struct *tty, struct file *file)
 {
 	struct mxser_struct *info = (struct mxser_struct *) tty->driver_data;
 	unsigned char control, status;
-	unsigned int result;
 	unsigned long flags;
 
 	if (PORTNO(tty) == MXSER_PORTS)
@@ -2177,7 +2190,6 @@ static int mxser_tiocmset(struct tty_struct *tty, struct file *file,
 			  unsigned int set, unsigned int clear)
 {
 	struct mxser_struct *info = (struct mxser_struct *) tty->driver_data;
-	unsigned int arg;
 	unsigned long flags;
 
 	if (PORTNO(tty) == MXSER_PORTS)

@@ -42,7 +42,7 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
  * its lock, b) when a concurrent invalidate_inode_pages got there first and
  * c) when tmpfs swizzles a page between a tmpfs inode and swapper_space.
  */
-void
+static void
 truncate_complete_page(struct address_space *mapping, struct page *page)
 {
 	if (page->mapping != mapping)
@@ -57,7 +57,7 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
 	remove_from_page_cache(page);
 	page_cache_release(page);	/* pagecache ref */
 }
-EXPORT_SYMBOL_GPL(truncate_complete_page);
+
 /*
  * This is for invalidate_inode_pages().  That function can be called at
  * any time, and is not supposed to throw away dirty pages.  But pages can
@@ -243,6 +243,10 @@ EXPORT_SYMBOL(invalidate_inode_pages);
  * where the page is seen to be mapped into process pagetables.  In that case,
  * the page is marked clean but is left attached to its address_space.
  *
+ * The page is also marked not uptodate so that a subsequent pagefault will
+ * perform I/O to bringthe page's contents back into sync with its backing
+ * store.
+ *
  * FIXME: invalidate_inode_pages2() is probably trivially livelockable.
  */
 void invalidate_inode_pages2(struct address_space *mapping)
@@ -261,10 +265,11 @@ void invalidate_inode_pages2(struct address_space *mapping)
 				wait_on_page_writeback(page);
 				next = page->index + 1;
 				if (page_mapped(page)) {
-					ClearPageUptodate(page);
 					clear_page_dirty(page);
-				} else
+					ClearPageUptodate(page);
+				} else {
 					invalidate_complete_page(mapping, page);
+				}
 			}
 			unlock_page(page);
 		}

@@ -467,10 +467,10 @@ int dsp3780I_Run(DSP_3780I_CONFIG_SETTINGS * pSettings)
 }
 
 
-int dsp3780I_ReadDStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_ReadDStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                         unsigned uCount, unsigned long ulDSPAddr)
 {
-	unsigned short *pusBuffer = pvBuffer;
+	unsigned short __user *pusBuffer = pvBuffer;
 	unsigned short val;
 
 
@@ -508,10 +508,10 @@ int dsp3780I_ReadDStore(unsigned short usDspBaseIO, void *pvBuffer,
 }
 
 int dsp3780I_ReadAndClearDStore(unsigned short usDspBaseIO,
-                                void *pvBuffer, unsigned uCount,
+                                void __user *pvBuffer, unsigned uCount,
                                 unsigned long ulDSPAddr)
 {
-	unsigned short *pusBuffer = pvBuffer;
+	unsigned short __user *pusBuffer = pvBuffer;
 	unsigned short val;
 
 
@@ -549,10 +549,10 @@ int dsp3780I_ReadAndClearDStore(unsigned short usDspBaseIO,
 }
 
 
-int dsp3780I_WriteDStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_WriteDStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                          unsigned uCount, unsigned long ulDSPAddr)
 {
-	unsigned short *pusBuffer = pvBuffer;
+	unsigned short __user *pusBuffer = pvBuffer;
 
 
 	PRINTK_5(TRACE_3780I,
@@ -590,10 +590,10 @@ int dsp3780I_WriteDStore(unsigned short usDspBaseIO, void *pvBuffer,
 }
 
 
-int dsp3780I_ReadIStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_ReadIStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                         unsigned uCount, unsigned long ulDSPAddr)
 {
-	unsigned short *pusBuffer = pvBuffer;
+	unsigned short __user *pusBuffer = pvBuffer;
 
 	PRINTK_5(TRACE_3780I,
 		"3780i::dsp3780I_ReadIStore entry usDspBaseIO %x, pusBuffer %p, uCount %x, ulDSPAddr %lx\n",
@@ -637,10 +637,10 @@ int dsp3780I_ReadIStore(unsigned short usDspBaseIO, void *pvBuffer,
 }
 
 
-int dsp3780I_WriteIStore(unsigned short usDspBaseIO, void *pvBuffer,
+int dsp3780I_WriteIStore(unsigned short usDspBaseIO, void __user *pvBuffer,
                          unsigned uCount, unsigned long ulDSPAddr)
 {
-	unsigned short *pusBuffer = pvBuffer;
+	unsigned short __user *pusBuffer = pvBuffer;
 
 	PRINTK_5(TRACE_3780I,
 		"3780i::dsp3780I_WriteIStore entry usDspBaseIO %x, pusBuffer %p, uCount %x, ulDSPAddr %lx\n",

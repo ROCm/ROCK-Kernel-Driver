@@ -374,7 +374,7 @@ struct x25_neigh *x25_get_neigh(struct net_device *dev)
 /*
  *	Handle the ioctls that control the subscription functions.
  */
-int x25_subscr_ioctl(unsigned int cmd, void *arg)
+int x25_subscr_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct x25_subscrip_struct x25_subscr;
 	struct x25_neigh *nb;

@@ -16,11 +16,9 @@
 #ifndef _LINUX_EXT2_FS_SB
 #define _LINUX_EXT2_FS_SB
 
-#ifndef EXT_INCLUDE
-#define EXT_INCLUDE
 #include <linux/blockgroup_lock.h>
 #include <linux/percpu_counter.h>
-#endif
+
 /*
  * second extended-fs super-block data in memory
  */

@@ -52,7 +52,7 @@ extern inline int waking_non_zero_interruptible(struct semaphore *sem,
 		dec(&sem->waking);
 		ret = 1;
 	} else if (signal_pending(tsk)) {
-		count_inc(&sem->count);
+		inc(&sem->count);
 		ret = -EINTR;
 	}
 	local_irq_restore(flags);
@@ -67,7 +67,7 @@ extern inline int waking_non_zero_trylock(struct semaphore *sem)
 	local_save_flags(flags);
 	local_irq_disable();
 	if (read(&sem->waking) <= 0)
-		count_inc(&sem->count);
+		inc(&sem->count);
 	else {
 		dec(&sem->waking);
 		ret = 0;

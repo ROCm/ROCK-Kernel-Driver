@@ -282,8 +282,8 @@ int __init detect_pdc4030(ide_hwif_t *hwif)
 	hwif->OUTB(0xF3, IDE_SECTOR_REG);
 	hwif->OUTB(0x14, IDE_SELECT_REG);
 	hwif->OUTB(PROMISE_EXTENDED_COMMAND, IDE_COMMAND_REG);
-	
-	ide_delay_50ms();
+
+	msleep(50);
 
 	if (hwif->INB(IDE_ERROR_REG) == 'P' &&
 	    hwif->INB(IDE_NSECTOR_REG) == 'T' &&
@@ -355,7 +355,7 @@ read_next:
 #endif /* DEBUG_READ */
 
 #ifdef CONFIG_IDE_TASKFILE_IO
-	task_sectors(drive, rq, nsect, IDE_PIO_IN);
+	task_bio_sectors(drive, rq, nsect, IDE_PIO_IN);
 
 	/* FIXME: can we check status after transfer on pdc4030? */
 	/* Complete previously submitted bios. */
@@ -478,7 +478,7 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int msect)
 		if (nsect > msect)
 			nsect = msect;
 
-		task_sectors(drive, rq, nsect, IDE_PIO_OUT);
+		task_bio_sectors(drive, rq, nsect, IDE_PIO_OUT);
 
 		if (!rq->nr_sectors)
 			msect = 0;
@@ -755,18 +755,6 @@ static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, 
 #endif
 
 	BUG_ON(rq->nr_sectors > 127);
-
-	if (!blk_fs_request(rq)) {
-		blk_dump_rq_flags(rq, "promise_rw_disk - bad command");
-		DRIVER(drive)->end_request(drive, 0, 0);
-		return ide_stopped;
-	}
-
-#ifdef DEBUG
-	printk(KERN_DEBUG "%s: %sing: LBAsect=%lu, sectors=%lu\n",
-			  drive->name, rq_data_dir(rq) ? "writ" : "read",
-			  block, rq->nr_sectors);
-#endif
 
 #ifndef CONFIG_IDE_TASKFILE_IO
 	if (IDE_CONTROL_REG)

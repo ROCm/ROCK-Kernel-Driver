@@ -26,8 +26,10 @@
 #define	ERRC	0xff001050
 #define	SESR	0xff001060
 #define	SEAR	0xff001070
+#define	SIOC1	0xff001090
 #define	PGCHP	0xff001100
 #define	GPDIR	0xff001130
+#define	GPOUT	0xff001150
 #define	ATAS	0xff001160
 #define	AVDG	0xff001170
 #define	MCCR	0xff001200

@@ -574,7 +574,7 @@ static void usb_mixer_elem_free(snd_kcontrol_t *kctl)
 {
 	if (kctl->private_data) {
 		snd_magic_kfree((void *)kctl->private_data);
-		kctl->private_data = 0;
+		kctl->private_data = NULL;
 	}
 }
 
@@ -1318,7 +1318,7 @@ static void usb_mixer_selector_elem_free(snd_kcontrol_t *kctl)
 		usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kctl->private_data,);
 		num_ins = cval->max;
 		snd_magic_kfree(cval);
-		kctl->private_data = 0;
+		kctl->private_data = NULL;
 	}
 	if (kctl->private_value) {
 		char **itemlist = (char **)kctl->private_value;

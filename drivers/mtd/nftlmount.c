@@ -4,7 +4,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: nftlmount.c,v 1.34 2003/05/21 10:54:10 dwmw2 Exp $
+ * $Id: nftlmount.c,v 1.36 2004/06/28 13:52:55 dbrown Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 
 #define SECTORSIZE 512
 
-char nftlmountrev[]="$Revision: 1.34 $";
+char nftlmountrev[]="$Revision: 1.36 $";
 
 /* find_boot_record: Find the NFTL Media Header and its Spare copy which contains the
  *	various device information of the NFTL partition and Bad Unit Table. Update
@@ -50,6 +50,10 @@ static int find_boot_record(struct NFTLrecord *nftl)
 
         /* Assume logical EraseSize == physical erasesize for starting the scan. 
 	   We'll sort it out later if we find a MediaHeader which says otherwise */
+	/* Actually, we won't.  The new DiskOnChip driver has already scanned
+	   the MediaHeader and adjusted the virtual erasesize it presents in
+	   the mtd device accordingly.  We could even get rid of
+	   nftl->EraseSize if there were any point in doing so. */
 	nftl->EraseSize = nftl->mbd.mtd->erasesize;
         nftl->nb_blocks = nftl->mbd.mtd->size / nftl->EraseSize;
 
@@ -62,7 +66,10 @@ static int find_boot_record(struct NFTLrecord *nftl)
 
 		/* Check for ANAND header first. Then can whinge if it's found but later
 		   checks fail */
-		if ((ret = MTD_READ(nftl->mbd.mtd, block * nftl->EraseSize, SECTORSIZE, &retlen, buf))) {
+		ret = MTD_READ(nftl->mbd.mtd, block * nftl->EraseSize, SECTORSIZE, &retlen, buf);
+		/* We ignore ret in case the ECC of the MediaHeader is invalid
+		   (which is apparently acceptable) */
+		if (retlen != SECTORSIZE) {
 			static int warncount = 5;
 
 			if (warncount) {
@@ -104,7 +111,7 @@ static int find_boot_record(struct NFTLrecord *nftl)
 
 		/* Finally reread to check ECC */
 		if ((ret = MTD_READECC(nftl->mbd.mtd, block * nftl->EraseSize, SECTORSIZE,
-				&retlen, buf, (char *)&oob, NAND_ECC_DISKONCHIP) < 0)) {
+				&retlen, buf, (char *)&oob, NULL) < 0)) {
 			printk(KERN_NOTICE "ANAND header found at 0x%x in mtd%d, but ECC read failed (err %d)\n",
 			       block * nftl->EraseSize, nftl->mbd.mtd->index, ret);
 			continue;
@@ -149,6 +156,10 @@ static int find_boot_record(struct NFTLrecord *nftl)
 		memcpy(mh, buf, sizeof(struct NFTLMediaHeader));
 
 		/* Do some sanity checks on it */
+#if 0
+The new DiskOnChip driver scans the MediaHeader itself, and presents a virtual
+erasesize based on UnitSizeFactor.  So the erasesize we read from the mtd
+device is already correct.
 		if (mh->UnitSizeFactor == 0) {
 			printk(KERN_NOTICE "NFTL: UnitSizeFactor 0x00 detected. This violates the spec but we think we know what it means...\n");
 		} else if (mh->UnitSizeFactor < 0xfc) {
@@ -161,6 +172,7 @@ static int find_boot_record(struct NFTLrecord *nftl)
 			nftl->EraseSize = nftl->mbd.mtd->erasesize << (0xff - mh->UnitSizeFactor);
 			nftl->nb_blocks = nftl->mbd.mtd->size / nftl->EraseSize;
 		}
+#endif
 		nftl->nb_boot_blocks = le16_to_cpu(mh->FirstPhysicalEUN);
 		if ((nftl->nb_boot_blocks + 2) >= nftl->nb_blocks) {
 			printk(KERN_NOTICE "NFTL Media Header sanity check failed:\n");
@@ -213,11 +225,13 @@ static int find_boot_record(struct NFTLrecord *nftl)
 
 		/* read the Bad Erase Unit Table and modify ReplUnitTable[] accordingly */
 		for (i = 0; i < nftl->nb_blocks; i++) {
+#if 0
+The new DiskOnChip driver already scanned the bad block table.  Just query it.
 			if ((i & (SECTORSIZE - 1)) == 0) {
 				/* read one sector for every SECTORSIZE of blocks */
 				if ((ret = MTD_READECC(nftl->mbd.mtd, block * nftl->EraseSize +
 						       i + SECTORSIZE, SECTORSIZE, &retlen, buf,
-						       (char *)&oob, NAND_ECC_DISKONCHIP)) < 0) {
+						       (char *)&oob, NULL)) < 0) {
 					printk(KERN_NOTICE "Read of bad sector table failed (err %d)\n",
 					       ret);
 					kfree(nftl->ReplUnitTable);
@@ -227,6 +241,9 @@ static int find_boot_record(struct NFTLrecord *nftl)
 			}
 			/* mark the Bad Erase Unit as RESERVED in ReplUnitTable */
 			if (buf[i & (SECTORSIZE - 1)] != 0xff)
+				nftl->ReplUnitTable[i] = BLOCK_RESERVED;
+#endif
+			if (nftl->mbd.mtd->block_isbad(nftl->mbd.mtd, i * nftl->EraseSize))
 				nftl->ReplUnitTable[i] = BLOCK_RESERVED;
 		}
 		
@@ -253,21 +270,16 @@ static int check_free_sectors(struct NFTLrecord *nftl, unsigned int address, int
 			      int check_oob)
 {
 	int i, retlen;
-	u8 buf[SECTORSIZE];
+	u8 buf[SECTORSIZE + nftl->mbd.mtd->oobsize];
 
 	for (i = 0; i < len; i += SECTORSIZE) {
-		/* we want to read the sector without ECC check here since a free
-		   sector does not have ECC syndrome on it yet */
-		if (MTD_READ(nftl->mbd.mtd, address, SECTORSIZE, &retlen, buf) < 0)
+		if (MTD_READECC(nftl->mbd.mtd, address, SECTORSIZE, &retlen, buf, &buf[SECTORSIZE], &nftl->oobinfo) < 0)
 			return -1;
 		if (memcmpb(buf, 0xff, SECTORSIZE) != 0)
 			return -1;
 
 		if (check_oob) {
-			if (MTD_READOOB(nftl->mbd.mtd, address, nftl->mbd.mtd->oobsize,
-					&retlen, buf) < 0)
-				return -1;
-			if (memcmpb(buf, 0xff, nftl->mbd.mtd->oobsize) != 0)
+			if (memcmpb(buf + SECTORSIZE, 0xff, nftl->mbd.mtd->oobsize) != 0)
 				return -1;
 		}
 		address += SECTORSIZE;
@@ -282,7 +294,6 @@ static int check_free_sectors(struct NFTLrecord *nftl, unsigned int address, int
  * Return: 0 when succeed, -1 on error.
  *
  *  ToDo: 1. Is it neceressary to check_free_sector after erasing ?? 
- *        2. UnitSizeFactor != 0xFF
  */
 int NFTL_formatblock(struct NFTLrecord *nftl, int block)
 {
@@ -312,11 +323,10 @@ int NFTL_formatblock(struct NFTLrecord *nftl, int block)
 	MTD_ERASE(nftl->mbd.mtd, instr);
 
 	if (instr->state == MTD_ERASE_FAILED) {
-		/* could not format, FixMe: We should update the BadUnitTable 
-		   both in memory and on disk */
 		printk("Error while formatting block %d\n", block);
-		return -1;
-	} else {
+		goto fail;
+	}
+
 		/* increase and write Wear-Leveling info */
 		nb_erases = le32_to_cpu(uci.WearInfo);
 		nb_erases++;
@@ -329,14 +339,18 @@ int NFTL_formatblock(struct NFTLrecord *nftl, int block)
 		 * FixMe:  is this check really necessary ? since we have check the
 		 *         return code after the erase operation. */
 		if (check_free_sectors(nftl, instr->addr, nftl->EraseSize, 1) != 0)
-			return -1;
+			goto fail;
 
 		uci.WearInfo = le32_to_cpu(nb_erases);
 		if (MTD_WRITEOOB(nftl->mbd.mtd, block * nftl->EraseSize + SECTORSIZE + 8, 8,
 				 &retlen, (char *)&uci) < 0)
-			return -1;
+			goto fail;
 		return 0;
-	}
+fail:
+	/* could not format, update the bad block table (caller is responsible
+	   for setting the ReplUnitTable to BLOCK_RESERVED on failure) */
+	nftl->mbd.mtd->block_markbad(nftl->mbd.mtd, instr->addr);
+	return -1;
 }
 
 /* check_sectors_in_chain: Check that each sector of a Virtual Unit Chain is correct.
@@ -441,8 +455,7 @@ static void format_chain(struct NFTLrecord *nftl, unsigned int first_block)
 
 		printk("Formatting block %d\n", block);
 		if (NFTL_formatblock(nftl, block) < 0) {
-			/* cannot format !!!! Mark it as Bad Unit,
-			   FixMe: update the BadUnitTable on disk */
+			/* cannot format !!!! Mark it as Bad Unit */
 			nftl->ReplUnitTable[block] = BLOCK_RESERVED;
 		} else {
 			nftl->ReplUnitTable[block] = BLOCK_FREE;

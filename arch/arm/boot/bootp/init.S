@@ -20,11 +20,8 @@
 		.type	_start, #function
 		.globl	_start
 
-_start:		adr	r12, kernel_start	@ offset of kernel zImage
-		ldr	r4, [r12, #0x2c]	@ length of zImage
-		adr	r13, data
-		add	r4, r4, r12		@ end of zImage, start of initrd
-		ldmia	r13!, {r5-r6}		@ r5 = dest, r6 = length
+_start:		adr	r13, data
+		ldmia	r13!, {r4-r6}		@ r5 = dest, r6 = length
 		bl	move			@ move the initrd
 
 /*
@@ -45,7 +42,7 @@ _start:		adr	r12, kernel_start	@ offset of kernel zImage
  */
 		movne	r10, #0			@ terminator
 		movne	r4, #2			@ Size of this entry (2 words)
-		stmneia	r8, {r4, r5, r10}	@ Size, ATAG_CORE, terminator
+		stmneia	r9, {r4, r5, r10}	@ Size, ATAG_CORE, terminator
 
 /*
  * find the end of the tag list, and then add an INITRD tag on the end.
@@ -59,7 +56,7 @@ taglist:	ldr	r10, [r9, #0]		@ tag length
 
 		mov	r5, #4			@ Size of initrd tag (4 words)
 		stmia	r9, {r5, r6, r7, r8, r10}
-		mov	pc, r12			@ call kernel
+		b	kernel_start		@ call kernel
 
 /*
  * Move the block of memory length r6 from address r4 to address r5
@@ -75,16 +72,13 @@ move:		ldmia	r4!, {r7 - r10}		@ move 32-bytes at a time
 		.size	_start, . - _start
 
 		.type	data,#object
-data:		.word	initrd_addr		@ destination initrd address
-		.word	initrd_len		@ initrd size
+data:		.word	initrd_start		@ source initrd address
+		.word	initrd_phys		@ destination initrd address
+		.word	initrd_size		@ initrd size
 
-		.word	0x54410001		@ r4 = ATAG_CORE
-		.word	0x54420005		@ r5 = ATAG_INITRD2
-		.word	initrd_addr		@ r6
-		.word	initrd_len		@ r7
-		.word	params			@ r8
-		.size	data, . - _data
-
-		.type	initrd_start,#object
-
-kernel_start:
+		.word	0x54410001		@ r5 = ATAG_CORE
+		.word	0x54420005		@ r6 = ATAG_INITRD2
+		.word	initrd_phys		@ r7
+		.word	initrd_size		@ r8
+		.word	params_phys		@ r9
+		.size	data, . - data

@@ -75,6 +75,10 @@ static inline struct file * fcheck_files(struct files_struct *files, unsigned in
 #define fcheck(fd)	fcheck_files(current->files, fd)
 
 extern void FASTCALL(fd_install(unsigned int fd, struct file * file));
+
+struct task_struct;
+
+struct files_struct *get_files_struct(struct task_struct *);
 void FASTCALL(put_files_struct(struct files_struct *fs));
 
 #endif /* __LINUX_FILE_H */

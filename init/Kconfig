@@ -41,15 +41,6 @@ config CLEAN_COMPILE
 
 	  If unsure, say Y
 
-config STANDALONE
-	bool "Select only drivers that don't need compile-time external firmware" if EXPERIMENTAL
-	default y
-	help
-	  Select this option if you don't have magic firmware for drivers that
-	  need it.
-
-	  If unsure, say Y.
-
 config BROKEN
 	bool
 	depends on !CLEAN_COMPILE
@@ -77,19 +68,37 @@ config SWAP
 
 config SYSVIPC
 	bool "System V IPC"
+	depends on MMU
 	---help---
 	  Inter Process Communication is a suite of library functions and
 	  system calls which let processes (running programs) synchronize and
 	  exchange information. It is generally considered to be a good thing,
 	  and some programs won't run unless you say Y here. In particular, if
 	  you want to run the DOS emulator dosemu under Linux (read the
-	  DOSEMU-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>), you'll need to say Y
-	  here.
+	  DOSEMU-HOWTO, available from <http://www.tldp.org/docs.html#howto>),
+	  you'll need to say Y here.
 
 	  You can find documentation about IPC with "info ipc" and also in
 	  section 6.4 of the Linux Programmer's Guide, available from
-	  <http://www.tldp.org/docs.html#guide>.
+	  <http://www.tldp.org/guides.html>.
+
+config POSIX_MQUEUE
+	bool "POSIX Message Queues"
+	depends on NET && EXPERIMENTAL
+	---help---
+	  POSIX variant of message queues is a part of IPC. In POSIX message
+	  queues every message has a priority which decides about succession
+	  of receiving it by a process. If you want to compile and run
+	  programs written e.g. for Solaris with use of its POSIX message
+	  queues (functions mq_*) say Y here. To use this feature you will
+	  also need mqueue library, available from
+	  <http://www.mat.uni.torun.pl/~wrona/posix_ipc/>
+
+	  POSIX message queues are visible as a filesystem called 'mqueue'
+	  and can be mounted somewhere if you want to do filesystem
+	  operations on message queues.
+
+	  If unsure, say Y.
 
 config BSD_PROCESS_ACCT
 	bool "BSD Process Accounting"
@@ -103,6 +112,18 @@ config BSD_PROCESS_ACCT
 	  list is in the struct acct in <file:include/linux/acct.h>).  It is
 	  up to the user level program to do useful things with this
 	  information.  This is generally a good idea, so say Y.
+
+config BSD_PROCESS_ACCT_V3
+	bool "BSD Process Accounting version 3 file format"
+	depends on BSD_PROCESS_ACCT
+	default n
+	help
+	  If you say Y here, the process accounting information is written
+	  in a new file format that also logs the process IDs of each
+	  process and it's parent. Note that this file format is incompatible
+	  with previous v0/v1/v2 file formats, so you will need updated tools
+	  for processing it. A preliminary version of these tools is available
+	  at <http://http://www.de.kernel.org/pub/linux/utils/acct/>.
 
 config SYSCTL
 	bool "Sysctl support"
@@ -119,6 +140,26 @@ config SYSCTL
 	  As it is generally a good thing, you should say Y here unless
 	  building a kernel for install/rescue disks or your system is very
 	  limited in memory.
+
+config AUDIT
+	bool "Auditing support"
+	default y if SECURITY_SELINUX
+	default n
+	help
+	  Enable auditing infrastructure that can be used with another
+	  kernel subsystem, such as SELinux (which requires this for
+	  logging of avc messages output).  Does not do system-call
+	  auditing without CONFIG_AUDITSYSCALL.
+
+config AUDITSYSCALL
+	bool "Enable system-call auditing support"
+	depends on AUDIT && (X86 || PPC64 || ARCH_S390 || IA64)
+	default y if SECURITY_SELINUX
+	default n
+	help
+	  Enable low-overhead system-call auditing infrastructure that
+	  can be used independently or with another kernel subsystem,
+	  such as SELinux.
 
 config LOG_BUF_SHIFT
 	int "Kernel log buffer size (16 => 64KB, 17 => 128KB)" if DEBUG_KERNEL
@@ -156,162 +197,33 @@ config HOTPLUG
 	  agent" (/sbin/hotplug) to load modules and set up software needed
 	  to use devices as you hotplug them.
 
-config EVLOG
-	bool "Event logging support"
-	---help---
-	  This enables support for event logging based upon the draft
-	  POSIX 1003.25 standard.  Enabling this feature does not
-	  affect the operation of the klog/syslog package in any way.
-	  In order to fully utilize this feature, user must also install
-	  the companion evlog package in user-space.
-
-	  For more information see http://evlog.sourceforge.net
-
-	  If you don't know what to do here, say N.
-
-config EVLOG_FWPRINTK
-	bool "Forward printk messages to event log"
-	depends on EVLOG
-	help
-	  This option forwards printk log messages to the event log.
-	  Printk messages are still logged to /var/log/messages.
-
-	  If you don't know what to do here, say N.
-
 config IKCONFIG
 	bool "Kernel .config support"
 	---help---
 	  This option enables the complete Linux kernel ".config" file
-	  contents, information on compiler used to build the kernel,
-	  kernel running when this kernel was built and kernel version
-	  from Makefile to be saved in the kernel. It provides documentation
+	  contents to be saved in the kernel. It provides documentation
 	  of which kernel options are used in a running kernel or in an
 	  on-disk kernel.  This information can be extracted from the kernel
 	  image file with the script scripts/extract-ikconfig and used as
 	  input to rebuild the current kernel or to build another kernel.
 	  It can also be extracted from a running kernel by reading
-	  /proc/config.gz and /proc/config_built_with, if enabled (below).
-	  /proc/config.gz will list the configuration that was used
-	  to build the kernel and /proc/config_built_with will list
-	  information on the compiler and host machine that was used to
-	  build the kernel.
+	  /proc/config.gz if enabled (below).
 
 config IKCONFIG_PROC
 	bool "Enable access to .config through /proc/config.gz"
 	depends on IKCONFIG && PROC_FS
 	---help---
-	  This option enables access to kernel configuration file and build
-	  information through /proc/config.gz.
+	  This option enables access to the kernel configuration file
+	  through /proc/config.gz.
 
 
 menuconfig EMBEDDED
-	bool "Remove kernel features (for embedded systems)"
+	bool "Configure standard kernel features (for small systems)"
 	help
-	  This option allows certain base kernel features to be removed from
-	  the build.  This is for specialized environments which can tolerate
-	  a "non-standard" kernel.  Only use this if you really know what you
-	  are doing.
-
-menu "Class Based Kernel Resource Management"
-
-config CKRM
-	bool "Class Based Kernel Resource Management Core"
-	depends on EXPERIMENTAL
-	help
-	  Class-based Kernel Resource Management is a framework for controlling
-	  and monitoring resource allocation of user-defined groups of tasks or
-	  incoming socket connections. For more information, please visit
-	  http://ckrm.sf.net. 
-
-	  If you say Y here, enable the Resource Class File System and atleast
-	  one of the resource controllers below. Say N if you are unsure. 
-
-config RCFS_FS
-       tristate "Resource Class File System (User API)"
-       depends on CKRM
-       help
-	  RCFS is the filesystem API for CKRM. This separate configuration 
-	  option is provided only for debugging and will eventually disappear 
-	  since rcfs will be automounted whenever CKRM is configured. 
-
-          Say N if unsure, Y if you've enabled CKRM, M to debug rcfs 
-	  initialization.
-
-config CKRM_TYPE_TASKCLASS
-	bool "Class Manager for Task Groups"
-	depends on CKRM
-	help
-	  TASKCLASS provides the extensions for CKRM to track task classes
-	  This is the base to enable task class based resource control for
-	  cpu, memory and disk I/O.
-	
-	  Say N if unsure 
-
-config CKRM_RES_NUMTASKS
-	tristate "Number of Tasks Resource Manager"
-	depends on CKRM_TYPE_TASKCLASS
-	default m
-	help
-	  Provides a Resource Controller for CKRM that allows limiting no of
-	  tasks a task class can have.
-	
-	  Say N if unsure, Y to use the feature.
-
-config CKRM_TYPE_SOCKETCLASS
-	bool "Class Manager for socket groups"
-	depends on CKRM
-	help
-	  SOCKET provides the extensions for CKRM to track per socket
-	  classes.  This is the base to enable socket based resource 
-	  control for inbound connection control, bandwidth control etc.
-	
-	  Say N if unsure.  
-
-config CKRM_RES_LISTENAQ
-	tristate "Multiple Accept Queues Resource Manager"
-	depends on CKRM_TYPE_SOCKETCLASS && ACCEPT_QUEUES
-	default m
-	help
-	  Provides a  resource controller for CKRM to prioritize inbound
-	  connection requests. See inbound control description for
-	  "IP: TCP Multiple accept queues support". If you choose that
-	  option choose this option to control the queue weights.
- 
-	  If unsure, say N.
-
-config CKRM_RBCE
-	tristate "Vanilla Rule-based Classification Engine (RBCE)"
-	depends on CKRM && RCFS_FS
-	default m
-	help
-	  Provides an optional module to support creation of rules for automatic
-	  classification of kernel objects. Rules are created/deleted/modified 
-          through an rcfs interface. RBCE is not required for CKRM. 
- 
-	  If unsure, say N.
-
-config CKRM_CRBCE
-	tristate "Enhanced Rule-based Classification Engine (RBCE)"
-	depends on CKRM && RCFS_FS && RELAYFS_FS && DELAY_ACCT
-	default m
-	help
-	  Provides an optional module to support creation of rules for automatic
-	  classification of kernel objects, just like RBCE above. In addition,
-	  CRBCE provides per-process delay data (requires DELAY_ACCT configured)
-	  enabled) and makes information on significant kernel events available
-	  to userspace tools through relayfs (requires RELAYFS_FS configured). 
-	
-	  If unsure, say N.
-
-endmenu
-
-config DELAY_ACCT
-	bool "Enable delay accounting (EXPERIMENTAL)"
-	help
-	  In addition to counting frequency the total delay in ns is also
-	  recorded. CPU delays are specified as cpu-wait and cpu-run. 
-	  I/O delays are recorded for memory and regular I/O.
-	  Information is accessible through /proc/<pid>/delay.
+	  This option allows certain base kernel options and settings
+          to be disabled or tweaked. This is for specialized
+          environments which can tolerate a "non-standard" kernel.
+          Only use this if you really know what you are doing.
 
 config KALLSYMS
 	 bool "Load all symbols for debugging/kksymoops" if EMBEDDED
@@ -320,6 +232,28 @@ config KALLSYMS
 	   Say Y here to let the kernel print out symbolic crash information and
 	   symbolic stack backtraces. This increases the size of the kernel
 	   somewhat, as all symbols have to be loaded into the kernel image.
+
+config KALLSYMS_ALL
+	bool "Include all symbols in kallsyms"
+	depends on DEBUG_KERNEL && KALLSYMS
+	help
+	   Normally kallsyms only contains the symbols of functions, for nicer
+	   OOPS messages.  Some debuggers can use kallsyms for other
+	   symbols too: say Y here to include all symbols, and you
+	   don't care about adding 300k to the size of your kernel.
+
+	   Say N.
+
+config KALLSYMS_EXTRA_PASS
+	bool "Do an extra kallsyms pass"
+	depends on KALLSYMS
+	help
+	   If kallsyms is not working correctly, the build will fail with
+	   inconsistent kallsyms data.  If that occurs, log a bug report and
+	   turn on KALLSYMS_EXTRA_PASS which should result in a stable build.
+	   Always say N here unless you find a bug in kallsyms, which must be
+	   reported.  KALLSYMS_EXTRA_PASS is only a temporary workaround while
+	   you wait for kallsyms to be fixed.
 
 config FUTEX
 	bool "Enable futex support" if EMBEDDED
@@ -430,9 +364,7 @@ config KMOD
 config STOP_MACHINE
 	bool
 	default y
-	depends on SMP || HOTPLUG_CPU
+	depends on (SMP && MODULE_UNLOAD) || HOTPLUG_CPU
 	help
 	  Need stop_machine() primitive.
-
-
 endmenu

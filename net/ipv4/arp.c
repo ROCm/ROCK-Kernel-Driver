@@ -426,7 +426,7 @@ static int arp_filter(__u32 sip, __u32 tip, struct net_device *dev)
 	if (ip_route_output_key(&rt, &fl) < 0) 
 		return 1;
 	if (rt->u.dst.dev != dev) { 
-		NET_INC_STATS_BH(ArpFilter);
+		NET_INC_STATS_BH(LINUX_MIB_ARPFILTER);
 		flag = 1;
 	} 
 	ip_rt_put(rt); 
@@ -891,15 +891,14 @@ int arp_process(struct sk_buff *skb)
 
 	if (n) {
 		int state = NUD_REACHABLE;
-		int override = 0;
+		int override;
 
 		/* If several different ARP replies follows back-to-back,
 		   use the FIRST one. It is possible, if several proxy
 		   agents are active. Taking the first reply prevents
 		   arp trashing and chooses the fastest router.
 		 */
-		if (jiffies - n->updated >= n->parms->locktime)
-			override = 1;
+		override = time_after(jiffies, n->updated + n->parms->locktime);
 
 		/* Broadcast replies and request packets
 		   do not assert neighbour reachability.
@@ -1104,7 +1103,7 @@ int arp_req_delete(struct arpreq *r, struct net_device * dev)
  *	Handle an ARP layer I/O control request.
  */
 
-int arp_ioctl(unsigned int cmd, void *arg)
+int arp_ioctl(unsigned int cmd, void __user *arg)
 {
 	int err;
 	struct arpreq r;

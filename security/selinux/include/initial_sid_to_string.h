@@ -28,5 +28,6 @@ static char *initial_sid_to_string[] =
     "kmod",
     "policy",
     "scmp_packet",
+    "devnull",
 };
 

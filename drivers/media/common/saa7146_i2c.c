@@ -400,7 +400,7 @@ static struct i2c_algorithm saa7146_algo = {
 	.functionality	= saa7146_i2c_func,
 };
 
-int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, u32 bitrate)
+int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, unsigned int class, u32 bitrate)
 {
 	DEB_EE(("bitrate: 0x%08x\n",bitrate));
 	
@@ -417,16 +417,13 @@ int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c
 		i2c_adapter->data = dev;
 #else
 		i2c_set_adapdata(i2c_adapter,dev);
+		i2c_adapter->class = class;
 #endif
 		i2c_adapter->algo	   = &saa7146_algo;
 		i2c_adapter->algo_data     = NULL;
 		i2c_adapter->id 	   = I2C_ALGO_SAA7146;
 		i2c_adapter->timeout = SAA7146_I2C_TIMEOUT;
 		i2c_adapter->retries = SAA7146_I2C_RETRIES;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#else
-		i2c_adapter->class = I2C_ADAP_CLASS_TV_ANALOG;
-#endif
 	}
 	
 	return 0;

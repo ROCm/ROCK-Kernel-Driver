@@ -65,35 +65,31 @@ flush_user_icache_range(unsigned long start, unsigned long end)
 #endif
 }
 
-static inline int mapping_mapped(struct address_space *mapping)
-{
-	return	!prio_tree_empty(&mapping->i_mmap) ||
-		!prio_tree_empty(&mapping->i_mmap_shared) ||
-		!list_empty(&mapping->i_mmap_nonlinear);
-}
-
 extern void __flush_dcache_page(struct page *page);
 
 static inline void flush_dcache_page(struct page *page)
 {
-	if (page_mapping(page) && !mapping_mapped(page->mapping)) {
+	struct address_space *mapping = page_mapping(page);
+
+	if (mapping && !mapping_mapped(mapping)) {
 		set_bit(PG_dcache_dirty, &page->flags);
 	} else {
 		__flush_dcache_page(page);
 	}
 }
 
+#define flush_dcache_mmap_lock(mapping) \
+	spin_lock_irq(&(mapping)->tree_lock)
+#define flush_dcache_mmap_unlock(mapping) \
+	spin_unlock_irq(&(mapping)->tree_lock)
+
 #define flush_icache_page(vma,page)	do { flush_kernel_dcache_page(page_address(page)); flush_kernel_icache_page(page_address(page)); } while (0)
 
 #define flush_icache_range(s,e)		do { flush_kernel_dcache_range_asm(s,e); flush_kernel_icache_range_asm(s,e); } while (0)
 
-#define flush_icache_user_range(vma, page, addr, len) do { \
-        flush_user_dcache_range(addr, addr + len); \
-	flush_user_icache_range(addr, addr + len); } while (0)
-
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
 do { memcpy(dst, src, len); \
-     flush_icache_user_range(vma, page, vaddr, len); \
+     flush_kernel_dcache_range_asm((unsigned long)dst, (unsigned long)dst + len); \
 } while (0)
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
 	memcpy(dst, src, len)
@@ -117,27 +113,85 @@ static inline void flush_cache_range(struct vm_area_struct *vma,
 	}
 }
 
+/* Simple function to work out if we have an existing address translation
+ * for a user space vma. */
+static inline int translation_exists(struct vm_area_struct *vma,
+				     unsigned long addr)
+{
+	pgd_t *pgd = pgd_offset(vma->vm_mm, addr);
+	pmd_t *pmd;
+	pte_t *pte;
+
+	if(pgd_none(*pgd))
+		return 0;
+
+	pmd = pmd_offset(pgd, addr);
+	if(pmd_none(*pmd) || pmd_bad(*pmd))
+		return 0;
+
+	pte = pte_offset_map(pmd, addr);
+
+	/* The PA flush mappings show up as pte_none, but they're
+	 * valid none the less */
+	if(pte_none(*pte) && ((pte_val(*pte) & _PAGE_FLUSH) == 0))
+		return 0;
+	return 1;
+}
+
+
+/* Private function to flush a page from the cache of a non-current
+ * process.  cr25 contains the Page Directory of the current user
+ * process; we're going to hijack both it and the user space %sr3 to
+ * temporarily make the non-current process current.  We have to do
+ * this because cache flushing may cause a non-access tlb miss which
+ * the handlers have to fill in from the pgd of the non-current
+ * process. */
+static inline void
+flush_user_cache_page_non_current(struct vm_area_struct *vma,
+				  unsigned long vmaddr)
+{
+	/* save the current process space and pgd */
+	unsigned long space = mfsp(3), pgd = mfctl(25);
+
+	/* we don't mind taking interrups since they may not
+	 * do anything with user space, but we can't
+	 * be preempted here */
+	preempt_disable();
+
+	/* make us current */
+	mtctl(__pa(vma->vm_mm->pgd), 25);
+	mtsp(vma->vm_mm->context, 3);
+
+	flush_user_dcache_page(vmaddr);
+	if(vma->vm_flags & VM_EXEC)
+		flush_user_icache_page(vmaddr);
+
+	/* put the old current process back */
+	mtsp(space, 3);
+	mtctl(pgd, 25);
+	preempt_enable();
+}
+
+static inline void
+__flush_cache_page(struct vm_area_struct *vma, unsigned long vmaddr)
+{
+	if (likely(vma->vm_mm->context == mfsp(3))) {
+		flush_user_dcache_page(vmaddr);
+		if (vma->vm_flags & VM_EXEC)
+			flush_user_icache_page(vmaddr);
+	} else {
+		flush_user_cache_page_non_current(vma, vmaddr);
+	}
+}
+
 static inline void
 flush_cache_page(struct vm_area_struct *vma, unsigned long vmaddr)
 {
-	int sr3;
+	BUG_ON(!vma->vm_mm->context);
 
-	if (!vma->vm_mm->context) {
-		BUG();
-		return;
-	}
+	if(likely(translation_exists(vma, vmaddr)))
+		__flush_cache_page(vma, vmaddr);
 
-	sr3 = mfsp(3);
-	if (vma->vm_mm->context == sr3) {
-		flush_user_dcache_range(vmaddr,vmaddr + PAGE_SIZE);
-		if (vma->vm_flags & VM_EXEC)
-			flush_user_icache_range(vmaddr,vmaddr + PAGE_SIZE);
-	} else {
-		if (vma->vm_flags & VM_EXEC)
-			flush_cache_all();
-		else
-			flush_data_cache();
-	}
 }
 #endif
 

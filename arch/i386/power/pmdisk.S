@@ -21,7 +21,7 @@ ENTRY(pmdisk_arch_suspend)
 	jmp .L1449
 	.p2align 4,,7
 .L1450:
-	movl $swapper_pg_dir-__PAGE_OFFSET,%ecx
+	movl $swsusp_pg_dir-__PAGE_OFFSET,%ecx
 	movl %ecx,%cr3
 
 	movl	pm_pagedir_nosave,%ebx

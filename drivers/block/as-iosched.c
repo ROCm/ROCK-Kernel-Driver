@@ -43,7 +43,7 @@
  * read_batch_expire describes how long we will allow a stream of reads to
  * persist before looking to see whether it is time to switch over to writes.
  */
-#define default_read_batch_expire (HZ / 4)
+#define default_read_batch_expire (HZ / 2)
 
 /*
  * write_batch_expire describes how long we want a stream of writes to run for.
@@ -51,7 +51,7 @@
  * See, the problem is: we can send a lot of writes to disk cache / TCQ in
  * a short amount of time...
  */
-#define default_write_batch_expire (HZ / 16)
+#define default_write_batch_expire (HZ / 8)
 
 /*
  * max time we may wait to anticipate a read (default around 6ms)
@@ -914,7 +914,7 @@ static void as_update_arq(struct as_data *ad, struct as_rq *arq)
 /*
  * Gathers timings and resizes the write batch automatically
  */
-void update_write_batch(struct as_data *ad)
+static void update_write_batch(struct as_data *ad)
 {
 	unsigned long batch = ad->batch_expire[REQ_ASYNC];
 	long write_time;
@@ -2065,7 +2065,7 @@ static struct sysfs_ops as_sysfs_ops = {
 	.store	= as_attr_store,
 };
 
-struct kobj_type as_ktype = {
+static struct kobj_type as_ktype = {
 	.sysfs_ops	= &as_sysfs_ops,
 	.default_attrs	= default_attrs,
 };

@@ -220,7 +220,8 @@ static int c101_close(struct net_device *dev)
 static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	const size_t size = sizeof(sync_serial_settings);
-	sync_serial_settings new_line, *line = ifr->ifr_settings.ifs_ifsu.sync;
+	sync_serial_settings new_line;
+	sync_serial_settings __user *line = ifr->ifr_settings.ifs_ifsu.sync;
 	port_t *port = dev_to_port(dev);
 
 #ifdef DEBUG_RINGS
@@ -378,8 +379,6 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 		c101_destroy_card(card);
 		return result;
 	}
-
-	/* XXX: are we OK with having that done when card is already up? */
 
 	sca_init_sync_port(card); /* Set up C101 memory */
 	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD), dev);

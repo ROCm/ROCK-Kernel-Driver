@@ -176,7 +176,7 @@
 #include <scsi/sg.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "ips.h"
 
 #include <linux/module.h>
@@ -277,7 +277,6 @@ static Scsi_Host_Template ips_driver_template = {
 	.use_clustering		= ENABLE_CLUSTERING,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	.use_new_eh_code	= 1,
-	.vary_io		= 1,
 #endif
 };
 
@@ -4012,7 +4011,7 @@ ips_send_cmd(ips_ha_t * ha, ips_scb_t * scb)
 			scb->cmd.logical_info.reserved2 = 0;
 			scb->cmd.logical_info.reserved3 = 0;
 			scb->data_len = sizeof (IPS_LD_INFO);
-            scb->data_busaddr = ha->logical_drive_info_dma_addr;
+			scb->data_busaddr = ha->logical_drive_info_dma_addr;
 			scb->flags = 0;
 			scb->cmd.logical_info.buffer_addr = scb->data_busaddr;
 			ret = IPS_SUCCESS;
@@ -4338,7 +4337,7 @@ ips_online(ips_ha_t * ha, ips_scb_t * scb)
 
 	if ((scb->basic_status & IPS_GSC_STATUS_MASK) > 1) {
 		memset(ha->logical_drive_info, 0, sizeof (IPS_LD_INFO));
-        return (0);
+		return (0);
 	}
 
 	if (ha->logical_drive_info->drive_info[scb->target_id].state !=
@@ -4577,7 +4576,7 @@ ips_free(ips_ha_t * ha)
 		if (ha->logical_drive_info) {
 			pci_free_consistent(ha->pcidev,
 					    sizeof (IPS_LD_INFO),
-                        ha->logical_drive_info,
+					    ha->logical_drive_info,
 					    ha->logical_drive_info_dma_addr);
 			ha->logical_drive_info = NULL;
 		}
@@ -4771,7 +4770,7 @@ ips_getscb(ips_ha_t * ha)
 	}
 
 	ha->scb_freelist = scb->q_next;
-    scb->flags = 0;
+	scb->flags = 0;
 	scb->q_next = NULL;
 
 	ips_init_scb(ha, scb);
@@ -6829,7 +6828,7 @@ ips_version_check(ips_ha_t * ha, int intr)
 
 	METHOD_TRACE("ips_version_check", 1);
 
-    VersionInfo = ( IPS_VERSION_DATA * ) ha->ioctl_data;
+	VersionInfo = ( IPS_VERSION_DATA * ) ha->ioctl_data;
 
 	memset(FirmwareVersion, 0, IPS_COMPAT_ID_LENGTH + 1);
 	memset(BiosVersion, 0, IPS_COMPAT_ID_LENGTH + 1);
@@ -6841,7 +6840,7 @@ ips_version_check(ips_ha_t * ha, int intr)
 	rc = IPS_FAILURE;
 	if (ha->subsys->param[4] & IPS_GET_VERSION_SUPPORT) {	/* If Versioning is Supported */
 		/* Get the Version Info with a Get Version Command */
-        memset( VersionInfo, 0, sizeof (IPS_VERSION_DATA));
+		memset( VersionInfo, 0, sizeof (IPS_VERSION_DATA));
 		rc = ips_get_version_info(ha, ha->ioctl_busaddr, intr);
 		if (rc == IPS_SUCCESS)
 			memcpy(FirmwareVersion, VersionInfo->compatibilityId,

@@ -37,15 +37,6 @@ enum nfs3_createmode {
 	NFS3_CREATE_EXCLUSIVE = 2
 };
 
-/* Flags for the getacl/setacl mode */
-#define NFS3_ACL		0x0001
-#define NFS3_ACLCNT		0x0002
-#define NFS3_DFACL		0x0004
-#define NFS3_DFACLCNT		0x0008
-
-/* Flag for Default ACL entries */
-#define NFS3_ACL_DEFAULT	0x1000
-
 /* NFSv3 file system properties */
 #define NFS3_FSF_LINK		0x0001
 #define NFS3_FSF_SYMLINK	0x0002
@@ -96,10 +87,6 @@ struct nfs3_fh {
 #define NFS3PROC_FSINFO		19
 #define NFS3PROC_PATHCONF	20
 #define NFS3PROC_COMMIT		21
-
-#define NFS3_ACL_PROGRAM	100227
-#define NFS3PROC_GETACL		1
-#define NFS3PROC_SETACL		2
 
 #define NFS_MNT3_PROGRAM	100005
 #define NFS_MNT3_VERSION	3

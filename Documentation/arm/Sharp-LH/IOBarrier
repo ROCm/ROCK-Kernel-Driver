@@ -1,0 +1,32 @@
+README on the IOBARRIER for CardEngine IO
+=========================================
+
+Due to an unfortunate oversight when the Card Engines were designed,
+the signals that control access to some peripherals, most notably the
+SMC91C9111 ethernet controller, are not properly handled.
+
+The symptom is that back to back IO with the peripheral returns
+unreliable data.  With the SMC chip, you'll see errors about the bank
+register being 'screwed'.
+
+The cause is that the AEN signal to the SMC chip does not transition
+for every memory access.  It is driven through the CPLD from the CS7
+line of the CPU's static memory controller which is optimized to
+eliminate unnecessary transitions.  Yet, the SMC requires a transition
+for every access.  The Sharp website has more information on the
+effect of this power conservation feature on peripheral interfacing.
+
+The solution is to follow every access to the SMC chip with an access
+to another memory region that will force the CPU to release the chip
+select line.  Note that it is important to guarantee that the access
+will force the CPU off-chip.  We map a page of SDRAM as if it were an
+uncacheable IO device and read from it after every SMC IO operation.
+
+  SMC IO
+  BARRIER IO
+
+You might be tempted to believe that we must access another device
+attached to the static memory controller, but the empirical evidence
+indicates that this is not so.  Mapping 0x00000000 (flash) and
+0xc0000000 (SDRAM) appear to have the same effect.  Using SDRAM seems
+to be faster.

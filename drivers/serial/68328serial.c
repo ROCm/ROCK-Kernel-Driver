@@ -4,7 +4,7 @@
  * Copyright (C) 1998       Kenneth Albanowski <kjahds@kjahds.com>
  * Copyright (C) 1998, 1999 D. Jeff Dionne     <jeff@uclinux.org>
  * Copyright (C) 1999       Vladimir Gurevich  <vgurevic@cisco.com>
- * Copyright (C) 2002       David McCullough   <davidm@snapgear.com>
+ * Copyright (C) 2002-2003  David McCullough   <davidm@snapgear.com>
  * Copyright (C) 2002       Greg Ungerer       <gerg@snapgear.com>
  *
  * VZ Support/Fixes             Evan Stawnyczy <e@lineo.ca>
@@ -67,12 +67,12 @@
 #endif
 
 static struct m68k_serial m68k_soft[NR_PORTS];
-struct m86k_serial *IRQ_ports[NR_IRQS];
+struct m68k_serial *IRQ_ports[NR_IRQS];
 
 static unsigned int uart_irqs[NR_PORTS] = UART_IRQ_DEFNS;
 
 /* multiple ports are contiguous in memory */
-m68328_uart *uart_addr = USTCNT_ADDR;
+m68328_uart *uart_addr = (m68328_uart *)USTCNT_ADDR;
 
 struct tty_struct m68k_ttys;
 struct m68k_serial *m68k_consinfo = 0;
@@ -400,7 +400,7 @@ clear_and_return:
 /*
  * This is the serial driver's generic interrupt routine
  */
-void rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+irqreturn_t rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct m68k_serial * info;
 	m68328_uart *uart;
@@ -409,7 +409,7 @@ void rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	info = IRQ_ports[irq];
 	if(!info)
-	    return;
+	    return IRQ_NONE;
 
 	uart = &uart_addr[info->line];
 	rx = uart->urx.w;
@@ -422,7 +422,7 @@ void rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 #else
 	receive_chars(info, regs, rx);		
 #endif
-	return;
+	return IRQ_HANDLED;
 }
 
 static void do_softint(void *private)
@@ -777,7 +777,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	save_flags(flags);
 	while (1) {
 		cli();		
-		c = min(count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+		c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 				   SERIAL_XMIT_SIZE - info->xmit_head));
 		if (c <= 0)
 			break;
@@ -785,7 +785,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		if (from_user) {
 			down(&tmp_buf_sem);
 			copy_from_user(tmp_buf, buf, c);
-			c = min(c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 				       SERIAL_XMIT_SIZE - info->xmit_head));
 			memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
 			up(&tmp_buf_sem);
@@ -1056,11 +1056,10 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 			send_break(info, arg ? arg*(HZ/10) : HZ/4);
 			return 0;
 		case TIOCGSOFTCAR:
-			error = verify_area(VERIFY_WRITE, (void *) arg,sizeof(long));
+			error = put_user(C_CLOCAL(tty) ? 1 : 0,
+				    (unsigned long *) arg);
 			if (error)
 				return error;
-			put_user(C_CLOCAL(tty) ? 1 : 0,
-				    (unsigned long *) arg);
 			return 0;
 		case TIOCSSOFTCAR:
 			get_user(arg, (unsigned long *) arg);

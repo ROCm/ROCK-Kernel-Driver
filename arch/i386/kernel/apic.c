@@ -26,13 +26,11 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
-#include <asm/pgalloc.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 #include <asm/hpet.h>
@@ -40,8 +38,6 @@
 #include <mach_apic.h>
 
 #include "io_ports.h"
-
-extern int enable_local_apic;
 
 static void apic_pm_activate(void);
 
@@ -82,6 +78,17 @@ void enable_NMI_through_LVT0 (void * dummy)
 	if (!APIC_INTEGRATED(ver))		/* 82489DX */
 		v |= APIC_LVT_LEVEL_TRIGGER;
 	apic_write_around(APIC_LVT0, v);
+}
+
+int get_physical_broadcast(void)
+{
+	unsigned int lvr, version;
+	lvr = apic_read(APIC_LVR);
+	version = GET_APIC_VERSION(lvr);
+	if (version >= 0x14)
+		return 0xff;
+	else
+		return 0xf;
 }
 
 int get_maxlvt(void)
@@ -191,9 +198,6 @@ void disconnect_bsp_APIC(void)
 void disable_local_APIC(void)
 {
 	unsigned long value;
-
-	if (enable_local_apic < 0) 
-		return;
 
 	clear_local_APIC();
 
@@ -614,14 +618,9 @@ static void apic_pm_activate(void) { }
 /*
  * Knob to control our willingness to enable the local APIC.
  */
-/* For SuSE don't enable APIC by default on UP kernels */ 
-#ifndef CONFIG_SMP
-int enable_local_apic = -1; /* -1=force-disable, +1=force-enable */
-#else
-int enable_local_apic = 0;
-#endif
+int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
 
-int __init lapic_disable(char *str)
+static int __init lapic_disable(char *str)
 {
 	enable_local_apic = -1;
 	clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
@@ -629,25 +628,12 @@ int __init lapic_disable(char *str)
 }
 __setup("nolapic", lapic_disable);
 
-int __init lapic_enable(char *str)
+static int __init lapic_enable(char *str)
 {
 	enable_local_apic = 1;
 	return 0;
 }
 __setup("lapic", lapic_enable);
-
-int __init apic_enable(char *str)
-{
-	printk("apic_enable\n");
-	
-#ifdef CONFIG_X86_IO_APIC
-	extern int skip_ioapic_setup;
-	skip_ioapic_setup = 0;
-#endif
-	enable_local_apic = 1;
-	return 0;
-}
-__setup("apic", apic_enable); 
 
 static int __init detect_init_APIC (void)
 {
@@ -1075,7 +1061,6 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 		}
 
 #ifdef CONFIG_SMP
-		TRIG_EVENT(timer_hook, regs);
 		update_process_times(user_mode(regs));
 #endif
 	}

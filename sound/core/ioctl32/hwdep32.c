@@ -37,16 +37,16 @@ struct sndrv_hwdep_dsp_image32 {
 static int _snd_ioctl32_hwdep_dsp_image(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	struct sndrv_hwdep_dsp_image data;
-	struct sndrv_hwdep_dsp_image data32;
+	struct sndrv_hwdep_dsp_image32 data32;
 	mm_segment_t oldseg;
 	int err;
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+	if (copy_from_user(&data32, (void __user *)arg, sizeof(data32)))
 		return -EFAULT;
 	memset(&data, 0, sizeof(data));
 	data.index = data32.index;
 	memcpy(data.name, data32.name, sizeof(data.name));
-	data.image = A(data32.image);
+	data.image = compat_ptr(data32.image);
 	data.length = data32.length;
 	data.driver_data = data32.driver_data;
 	oldseg = get_fs();

@@ -85,9 +85,9 @@ static wait_queue_head_t dtlk_process_list;
 static struct timer_list dtlk_timer;
 
 /* prototypes for file_operations struct */
-static ssize_t dtlk_read(struct file *, char *,
+static ssize_t dtlk_read(struct file *, char __user *,
 			 size_t nbytes, loff_t * ppos);
-static ssize_t dtlk_write(struct file *, const char *,
+static ssize_t dtlk_write(struct file *, const char __user *,
 			  size_t nbytes, loff_t * ppos);
 static unsigned int dtlk_poll(struct file *, poll_table *);
 static int dtlk_open(struct inode *, struct file *);
@@ -121,7 +121,7 @@ static char dtlk_write_tts(char);
  */
 static void dtlk_timer_tick(unsigned long data);
 
-static ssize_t dtlk_read(struct file *file, char *buf,
+static ssize_t dtlk_read(struct file *file, char __user *buf,
 			 size_t count, loff_t * ppos)
 {
 	unsigned int minor = iminor(file->f_dentry->d_inode);
@@ -158,7 +158,7 @@ static ssize_t dtlk_read(struct file *file, char *buf,
 	return -EAGAIN;
 }
 
-static ssize_t dtlk_write(struct file *file, const char *buf,
+static ssize_t dtlk_write(struct file *file, const char __user *buf,
 			  size_t count, loff_t * ppos)
 {
 	int i = 0, retries = 0, ch;
@@ -277,6 +277,7 @@ static int dtlk_ioctl(struct inode *inode,
 		      unsigned int cmd,
 		      unsigned long arg)
 {
+	char __user *argp = (char __user *)arg;
 	struct dtlk_settings *sp;
 	char portval;
 	TRACE_TEXT(" dtlk_ioctl");
@@ -285,14 +286,13 @@ static int dtlk_ioctl(struct inode *inode,
 
 	case DTLK_INTERROGATE:
 		sp = dtlk_interrogate();
-		if (copy_to_user((char *) arg, (char *) sp,
-				   sizeof(struct dtlk_settings)))
+		if (copy_to_user(argp, sp, sizeof(struct dtlk_settings)))
 			return -EINVAL;
 		return 0;
 
 	case DTLK_STATUS:
 		portval = inb_p(dtlk_port_tts);
-		return put_user(portval, (char *) arg);
+		return put_user(portval, argp);
 
 	default:
 		return -EINVAL;

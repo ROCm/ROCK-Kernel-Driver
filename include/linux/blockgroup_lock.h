@@ -1,10 +1,10 @@
+#ifndef _LINUX_BLOCKGROUP_LOCK_H
+#define _LINUX_BLOCKGROUP_LOCK_H
 /*
  * Per-blockgroup locking for ext2 and ext3.
  *
  * Simple hashed spinlocking.
  */
-#ifndef _LINUX_BLOCKGROUP_LOCK_H
-#define _LINUX_BLOCKGROUP_LOCK_H
 
 #include <linux/config.h>
 #include <linux/spinlock.h>

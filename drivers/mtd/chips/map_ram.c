@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple RAM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_ram.c,v 1.17 2003/05/28 12:51:49 dwmw2 Exp $
+ * $Id: map_ram.c,v 1.19 2004/07/12 21:58:44 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -104,10 +104,15 @@ static int mapram_erase (struct mtd_info *mtd, struct erase_info *instr)
 	/* Yeah, it's inefficient. Who cares? It's faster than a _real_
 	   flash erase. */
 	struct map_info *map = (struct map_info *)mtd->priv;
+	map_word allff;
 	unsigned long i;
 
-	for (i=0; i<instr->len; i++)
-		map_write8(map, 0xFF, instr->addr + i);
+	allff = map_word_ff(map);
+
+	for (i=0; i<instr->len; i += map_bankwidth(map))
+		map_write(map, allff, instr->addr + i);
+
+	instr->state = MTD_ERASE_DONE;
 
 	if (instr->callback)
 		instr->callback(instr);

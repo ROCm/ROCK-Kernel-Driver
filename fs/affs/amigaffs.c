@@ -201,7 +201,7 @@ affs_remove_link(struct dentry *dentry)
 			goto done;
 	}
 
-	while ((ino = be32_to_cpu(AFFS_TAIL(sb, bh)->link_chain))) {
+	while ((ino = be32_to_cpu(AFFS_TAIL(sb, bh)->link_chain)) != 0) {
 		if (ino == link_ino) {
 			ino = AFFS_TAIL(sb, link_bh)->link_chain;
 			AFFS_TAIL(sb, bh)->link_chain = ino;
@@ -458,7 +458,6 @@ affs_error(struct super_block *sb, const char *function, const char *fmt, ...)
 	if (!(sb->s_flags & MS_RDONLY))
 		printk(KERN_WARNING "AFFS: Remounting filesystem read-only\n");
 	sb->s_flags |= MS_RDONLY;
-	AFFS_SB(sb)->s_flags |= SF_READONLY;	/* Don't allow to remount rw */
 }
 
 void

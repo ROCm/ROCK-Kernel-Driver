@@ -1099,38 +1099,15 @@ __FUNCTION__, __LINE__, ioa_cfg
 /*
  * Error logging macros
  */
-#ifdef CONFIG_EVLOG
-#include <linux/evlog.h>
-#define ipr_printk(level, fmt, ...) \
-    do { \
-       printk(level IPR_NAME ": " fmt, ##__VA_ARGS__); \
-       evl_printk(IPR_NAME, 0, (level[1]-'0'), IPR_NAME ": " fmt, ##__VA_ARGS__);\
-    } while (0)
-#else
-#define ipr_printk(level, fmt, ...) \
-       printk(level IPR_NAME ": " fmt, ##__VA_ARGS__)
-#endif
+#define ipr_err(...) printk(KERN_ERR IPR_NAME ": "__VA_ARGS__)
+#define ipr_info(...) printk(KERN_INFO IPR_NAME ": "__VA_ARGS__)
+#define ipr_crit(...) printk(KERN_CRIT IPR_NAME ": "__VA_ARGS__)
+#define ipr_warn(...) printk(KERN_WARNING IPR_NAME": "__VA_ARGS__)
+#define ipr_dbg(...) IPR_DBG_CMD(printk(KERN_INFO IPR_NAME ": "__VA_ARGS__))
 
-#define ipr_err(...) ipr_printk(KERN_ERR , ##__VA_ARGS__)
-#define ipr_info(...) ipr_printk(KERN_INFO , ##__VA_ARGS__)
-#define ipr_crit(...) ipr_printk(KERN_CRIT , ##__VA_ARGS__)
-#define ipr_warn(...) ipr_printk(KERN_WARN , ##__VA_ARGS__)
-#define ipr_dbg(...) IPR_DBG_CMD(ipr_printk(KERN_INFO , ##__VA_ARGS__))
-
-#ifdef CONFIG_EVLOG
-#define ipr_sdev_printk(level, sdev, fmt, ...) \
-    do { \
-       printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, sdev->host->host_no, \
-               sdev->channel, sdev->id, sdev->lun, ##__VA_ARGS__); \
-       evl_printk(IPR_NAME, 0, (level[1]-'0'), IPR_NAME ": %d:%d:%d:%d: " fmt, \
-               sdev->host->host_no, \
-               sdev->channel, sdev->id, sdev->lun, ##__VA_ARGS__); \
-    } while (0)
-#else
 #define ipr_sdev_printk(level, sdev, fmt, ...) \
 	printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, sdev->host->host_no, \
 		sdev->channel, sdev->id, sdev->lun, ##__VA_ARGS__)
-#endif
 
 #define ipr_sdev_err(sdev, fmt, ...) \
 	ipr_sdev_printk(KERN_ERR, sdev, fmt, ##__VA_ARGS__)
@@ -1141,20 +1118,9 @@ __FUNCTION__, __LINE__, ioa_cfg
 #define ipr_sdev_dbg(sdev, fmt, ...) \
 	IPR_DBG_CMD(ipr_sdev_printk(KERN_INFO, sdev, fmt, ##__VA_ARGS__))
 
-#ifdef CONFIG_EVLOG
-#define ipr_res_printk(level, ioa_cfg, res, fmt, ...) \
-    do { \
-       printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, ioa_cfg->host->host_no, \
-               res.bus, res.target, res.lun, ##__VA_ARGS__); \
-       evl_printk(IPR_NAME, 0, (level[1]-'0'), IPR_NAME ": %d:%d:%d:%d: " fmt, \
-               ioa_cfg->host->host_no, \
-               res.bus, res.target, res.lun, ##__VA_ARGS__); \
-    } while (0)
-#else
 #define ipr_res_printk(level, ioa_cfg, res, fmt, ...) \
 	printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, ioa_cfg->host->host_no, \
 		res.bus, res.target, res.lun, ##__VA_ARGS__)
-#endif
 
 #define ipr_res_err(ioa_cfg, res, fmt, ...) \
 	ipr_res_printk(KERN_ERR, ioa_cfg, res, fmt, ##__VA_ARGS__)

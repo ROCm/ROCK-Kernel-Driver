@@ -61,6 +61,8 @@ static const char *version = "smc-ultra32.c: 06/97 v1.00\n";
 
 #include "8390.h"
 
+#define DRV_NAME "smc-ultra32"
+
 static int ultra32_probe1(struct net_device *dev, int ioaddr);
 static int ultra32_open(struct net_device *dev);
 static void ultra32_reset_8390(struct net_device *dev);
@@ -163,7 +165,7 @@ static int __init ultra32_probe1(struct net_device *dev, int ioaddr)
 	unsigned char reg4;
 	const char *ifmap[] = {"UTP No Link", "", "UTP/AUI", "UTP/BNC"};
 
-	if (!request_region(ioaddr, ULTRA32_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, ULTRA32_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	if (inb(ioaddr + ULTRA32_IDPORT) == 0xff ||

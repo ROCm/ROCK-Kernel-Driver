@@ -288,11 +288,10 @@ static void __init init_hwif_it8172 (ide_hwif_t *hwif)
 
 static int __devinit it8172_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &it8172_chipsets[id->driver_data];
         if ((!(PCI_FUNC(dev->devfn) & 1) ||
             (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
                 return 1; /* IT8172 is more than only a IDE controller */
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &it8172_chipsets[id->driver_data]);
 	return 0;
 }
 

@@ -33,6 +33,7 @@
 #include <linux/crc32.h>
 #include <linux/random.h>
 #include <linux/workqueue.h>
+#include <linux/if_vlan.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -742,7 +743,7 @@ static void gem_rx(struct gem *gp)
 				       PCI_DMA_FROMDEVICE);
 			gp->rx_skbs[entry] = new_skb;
 			new_skb->dev = gp->dev;
-			skb_put(new_skb, (ETH_FRAME_LEN + RX_OFFSET));
+			skb_put(new_skb, (gp->rx_buf_sz + RX_OFFSET));
 			rxd->buffer = cpu_to_le64(pci_map_page(gp->pdev,
 							       virt_to_page(new_skb->data),
 							       offset_in_page(new_skb->data),
@@ -1482,6 +1483,9 @@ static void gem_init_rings(struct gem *gp)
 
 	gem_clean_rings(gp);
 
+	gp->rx_buf_sz = max(dev->mtu + ETH_HLEN + VLAN_HLEN,
+			    (unsigned)VLAN_ETH_FRAME_LEN);
+
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct sk_buff *skb;
 		struct gem_rxd *rxd = &gb->rxd[i];
@@ -1495,7 +1499,7 @@ static void gem_init_rings(struct gem *gp)
 
 		gp->rx_skbs[i] = skb;
 		skb->dev = dev;
-		skb_put(skb, (ETH_FRAME_LEN + RX_OFFSET));
+		skb_put(skb, (gp->rx_buf_sz + RX_OFFSET));
 		dma_addr = pci_map_page(gp->pdev,
 					virt_to_page(skb->data),
 					offset_in_page(skb->data),
@@ -1750,7 +1754,7 @@ static void gem_init_mac(struct gem *gp)
 	writel(0x40, gp->regs + MAC_MINFSZ);
 
 	/* Ethernet payload + header + FCS + optional VLAN tag. */
-	writel(0x20000000 | (gp->dev->mtu + ETH_HLEN + 4 + 4), gp->regs + MAC_MAXFSZ);
+	writel(0x20000000 | (gp->rx_buf_sz + 4), gp->regs + MAC_MAXFSZ);
 
 	writel(0x07, gp->regs + MAC_PASIZE);
 	writel(0x04, gp->regs + MAC_JAMSIZE);
@@ -1827,7 +1831,7 @@ static void gem_init_pause_thresholds(struct gem *gp)
 	if (gp->rx_fifo_sz <= (2 * 1024)) {
 		gp->rx_pause_off = gp->rx_pause_on = gp->rx_fifo_sz;
 	} else {
-		int max_frame = (gp->dev->mtu + ETH_HLEN + 4 + 4 + 64) & ~63;
+		int max_frame = (gp->rx_buf_sz + 4 + 64) & ~63;
 		int off = (gp->rx_fifo_sz - (max_frame * 2));
 		int on = off - max_frame;
 
@@ -2020,8 +2024,7 @@ static void gem_stop_phy(struct gem *gp)
 	/* Let the chip settle down a bit, it seems that helps
 	 * for sleep mode on some models
 	 */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/100);
+	msleep(10);
 
 	/* Make sure we aren't polling PHY status change. We
 	 * don't currently use that feature though
@@ -2039,8 +2042,7 @@ static void gem_stop_phy(struct gem *gp)
 		 * dont wait a bit here, looks like the chip takes
 		 * some time to really shut down
 		 */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		msleep(10);
 	}
 
 	writel(0, gp->regs + MAC_TXCFG);
@@ -2510,7 +2512,7 @@ static struct ethtool_ops gem_ethtool_ops = {
 static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct gem *gp = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
+	struct mii_ioctl_data *data = if_mii(ifr);
 	int rc = -EOPNOTSUPP;
 	
 	/* Hold the PM semaphore while doing ioctl's or we may collide
@@ -2717,7 +2719,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 
 	gp = dev->priv;
 
-	err = pci_request_regions(pdev, dev->name);
+	err = pci_request_regions(pdev, DRV_NAME);
 	if (err) {
 		printk(KERN_ERR PFX "Cannot obtain PCI resources, "
 		       "aborting.\n");

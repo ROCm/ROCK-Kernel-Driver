@@ -33,7 +33,7 @@ struct svc_cacherep {
 	u32			c_vers;
 	unsigned long		c_timestamp;
 	union {
-		struct iovec	u_vec;
+		struct kvec	u_vec;
 		u32		u_status;
 	}			c_u;
 };

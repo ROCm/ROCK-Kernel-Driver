@@ -146,6 +146,10 @@ pmipal	Use the protected mode interface for palette changes.
 
 mtrr	setup memory type range registers for the vesafb framebuffer.
 
+vram:n	remap 'n' MiB of video RAM. If 0 or not specified, remap memory
+	according to video mode. (2.5.66 patch/idea by Antonino Daplas
+	reversed to give override possibility (allocate more fb memory
+	than the kernel would) to 2.4 by tmb@iki.fi)
 
 Have fun!
 

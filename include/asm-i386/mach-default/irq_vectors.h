@@ -29,7 +29,6 @@
 #define FIRST_EXTERNAL_VECTOR	0x20
 
 #define SYSCALL_VECTOR		0x80
-#define KDBENTER_VECTOR		0x81
 
 /*
  * Vectors 0x20-0x2f are used for ISA interrupts.
@@ -49,8 +48,6 @@
 #define INVALIDATE_TLB_VECTOR	0xfd
 #define RESCHEDULE_VECTOR	0xfc
 #define CALL_FUNCTION_VECTOR	0xfb
-#define DUMP_VECTOR		0xfa
-#define KDB_VECTOR		0xf9
 
 #define THERMAL_APIC_VECTOR	0xf0
 /*
@@ -87,22 +84,7 @@
  */
 #define NR_VECTORS 256
 
-#ifdef CONFIG_PCI_USE_VECTOR
-#define NR_IRQS FIRST_SYSTEM_VECTOR
-#define NR_IRQ_VECTORS NR_IRQS
-#else
-#ifdef CONFIG_X86_IO_APIC
-#define NR_IRQS 224
-# if (224 >= 32 * NR_CPUS)
-# define NR_IRQ_VECTORS NR_IRQS
-# else
-# define NR_IRQ_VECTORS (32 * NR_CPUS)
-# endif
-#else
-#define NR_IRQS 16
-#define NR_IRQ_VECTORS NR_IRQS
-#endif
-#endif
+#include "irq_vectors_limits.h"
 
 #define FPU_IRQ			13
 

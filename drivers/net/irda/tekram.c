@@ -113,7 +113,7 @@ static int tekram_change_speed(struct irda_task *task)
 
 	if (self->speed_task && self->speed_task != task) {
 		IRDA_DEBUG(0, "%s(), busy!\n", __FUNCTION__ );
-		return MSECS_TO_JIFFIES(10);
+		return msecs_to_jiffies(10);
 	} else
 		self->speed_task = task;
 
@@ -150,7 +150,7 @@ static int tekram_change_speed(struct irda_task *task)
 			irda_task_next_state(task, IRDA_TASK_CHILD_WAIT);
 
 			/* Give reset 1 sec to finish */
-			ret = MSECS_TO_JIFFIES(1000);
+			ret = msecs_to_jiffies(1000);
 		} else
 			irda_task_next_state(task, IRDA_TASK_CHILD_DONE);
 		break;
@@ -171,7 +171,7 @@ static int tekram_change_speed(struct irda_task *task)
 		irda_task_next_state(task, IRDA_TASK_WAIT);
 
 		/* Wait at least 100 ms */
-		ret = MSECS_TO_JIFFIES(150);
+		ret = msecs_to_jiffies(150);
 		break;
 	case IRDA_TASK_WAIT:
 		/* Set DTR, Set RTS */
@@ -214,7 +214,7 @@ int tekram_reset(struct irda_task *task)
 
 	if (self->reset_task && self->reset_task != task) {
 		IRDA_DEBUG(0, "%s(), busy!\n", __FUNCTION__ );
-		return MSECS_TO_JIFFIES(10);
+		return msecs_to_jiffies(10);
 	} else
 		self->reset_task = task;
 	
@@ -227,7 +227,7 @@ int tekram_reset(struct irda_task *task)
 		irda_task_next_state(task, IRDA_TASK_WAIT1);
 
 		/* Sleep 50 ms */
-		ret = MSECS_TO_JIFFIES(50);
+		ret = msecs_to_jiffies(50);
 		break;
 	case IRDA_TASK_WAIT1:
 		/* Clear DTR, Set RTS */
@@ -236,7 +236,7 @@ int tekram_reset(struct irda_task *task)
 		irda_task_next_state(task, IRDA_TASK_WAIT2);
 		
 		/* Should sleep 1 ms */
-		ret = MSECS_TO_JIFFIES(1);
+		ret = msecs_to_jiffies(1);
 		break;
 	case IRDA_TASK_WAIT2:
 		/* Set DTR, Set RTS */

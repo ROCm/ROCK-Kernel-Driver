@@ -102,8 +102,8 @@ static int diva_ctl_read_proc(char *page, char **start, off_t off,
 void diva_os_set_controller_struct(struct capi_ctr *ctrl)
 {
 	ctrl->driver_name = DRIVERLNAME;
-	ctrl->load_firmware = 0;
-	ctrl->reset_ctr = 0;
+	ctrl->load_firmware = NULL;
+	ctrl->reset_ctr = NULL;
 	ctrl->ctr_read_proc = diva_ctl_read_proc;
 	ctrl->owner = THIS_MODULE;
 }

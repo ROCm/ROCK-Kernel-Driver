@@ -5,6 +5,8 @@
 #include <linux/config.h>
 #include <linux/init.h>
 
+#include <asm/setup.h>
+
 #ifdef CONFIG_APUS
 #include <asm-m68k/machdep.h>
 #endif
@@ -106,7 +108,6 @@ struct machdep_calls {
 };
 
 extern struct machdep_calls ppc_md;
-#define COMMAND_LINE_SIZE 512
 extern char cmd_line[COMMAND_LINE_SIZE];
 
 extern void setup_pci_ptrs(void);

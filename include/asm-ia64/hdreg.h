@@ -4,6 +4,8 @@
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */
 
+#warning this file is obsolete, please do not use it
+
 #ifndef __ASM_IA64_HDREG_H
 #define __ASM_IA64_HDREG_H
 

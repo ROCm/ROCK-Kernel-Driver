@@ -69,8 +69,8 @@ void synchronize_user_stack(void)
 		unsigned long sp = tp->rwbuf_stkptrs[window];
 
 		/* Ok, let it rip. */
-		if(copy_to_user((char *) sp, &tp->reg_window[window],
-				sizeof(struct reg_window)))
+		if (copy_to_user((char __user *) sp, &tp->reg_window[window],
+				 sizeof(struct reg_window)))
 			continue;
 
 		shift_window_buffer(window, tp->w_saved - 1, tp);
@@ -117,8 +117,9 @@ void try_to_clear_window_buffer(struct pt_regs *regs, int who)
 	for(window = 0; window < tp->w_saved; window++) {
 		unsigned long sp = tp->rwbuf_stkptrs[window];
 
-		if((sp & 7) ||
-		   copy_to_user((char *) sp, &tp->reg_window[window], sizeof(struct reg_window)))
+		if ((sp & 7) ||
+		    copy_to_user((char __user *) sp, &tp->reg_window[window],
+				 sizeof(struct reg_window)))
 			do_exit(SIGILL);
 	}
 	tp->w_saved = 0;

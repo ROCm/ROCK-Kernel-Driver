@@ -36,7 +36,7 @@
 #include <sys/types.h>
 #endif
 
-#ifdef __arm__
+#if defined(__arm__) || defined(__mips__)
 typedef u_int   ioaddr_t;
 #else
 typedef u_short	ioaddr_t;

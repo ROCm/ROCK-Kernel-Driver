@@ -762,12 +762,12 @@ ncp_do_readdir(struct file *filp, void *dirent, filldir_t filldir,
 int ncp_conn_logged_in(struct super_block *sb)
 {
 	struct ncp_server* server = NCP_SBP(sb);
-	struct nw_info_struct i;
 	int result;
 
 	if (ncp_single_volume(server)) {
 		int len;
 		struct dentry* dent;
+		__u32 volNumber, dirEntNum, DosDirNum;
 		__u8 __name[NCP_MAXPATHLEN + 1];
 
 		len = sizeof(__name);
@@ -776,7 +776,7 @@ int ncp_conn_logged_in(struct super_block *sb)
 		if (result)
 			goto out;
 		result = -ENOENT;
-		if (ncp_lookup_volume(server, __name, &i)) {
+		if (ncp_get_volume_root(server, __name, &volNumber, &dirEntNum, &DosDirNum)) {
 			PPRINTK("ncp_conn_logged_in: %s not found\n",
 				server->m.mounted_vol);
 			goto out;
@@ -785,9 +785,9 @@ int ncp_conn_logged_in(struct super_block *sb)
 		if (dent) {
 			struct inode* ino = dent->d_inode;
 			if (ino) {
-				NCP_FINFO(ino)->volNumber = i.volNumber;
-				NCP_FINFO(ino)->dirEntNum = i.dirEntNum;
-				NCP_FINFO(ino)->DosDirNum = i.DosDirNum;
+				NCP_FINFO(ino)->volNumber = volNumber;
+				NCP_FINFO(ino)->dirEntNum = dirEntNum;
+				NCP_FINFO(ino)->DosDirNum = DosDirNum;
 			} else {
 				DPRINTK("ncpfs: sb->s_root->d_inode == NULL!\n");
 			}

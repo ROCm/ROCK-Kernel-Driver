@@ -21,8 +21,9 @@
  * RM7000 version 1.0 interprets all hints as Pref_Load; version 2.0 implements
  * Pref_PrepareForStore also.
  *
- * RM9000 is MIPS IV but implements prefetching like MIPS32/MIPS64;
- * it's Pref_WriteBackInvalidate is a nop.
+ * RM9000 is MIPS IV but implements prefetching like MIPS32/MIPS64; it's
+ * Pref_WriteBackInvalidate is a nop and Pref_PrepareForStore is broken in
+ * current versions due to erratum G105.
  *
  * VR7701 only implements the Load prefetch.
  *

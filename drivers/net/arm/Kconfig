@@ -44,4 +44,3 @@ config ARM_ETHER00
 	  will generate a suitable hw address based on the board serial
 	  number (MTD support is required for this). Otherwise you will
 	  need to set a suitable hw address using ifconfig.
-

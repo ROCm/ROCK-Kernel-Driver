@@ -2,6 +2,10 @@
  * Copyright (C) 2002 Sistina Software (UK) Limited.
  *
  * This file is released under the GPL.
+ *
+ * Kcopyd provides a simple interface for copying an area of one
+ * block-device to one or more other block-devices, with an asynchronous
+ * completion notification.
  */
 
 #include <asm/atomic.h>
@@ -19,9 +23,6 @@
 #include <linux/workqueue.h>
 
 #include "kcopyd.h"
-
-/* FIXME: this is only needed for the DMERR macros */
-#include "dm.h"
 
 static struct workqueue_struct *_kcopyd_wq;
 static struct work_struct _kcopyd_work;
@@ -58,13 +59,11 @@ static struct page_list *alloc_pl(void)
 		return NULL;
 	}
 
-	SetPageLocked(pl->page);
 	return pl;
 }
 
 static void free_pl(struct page_list *pl)
 {
-	ClearPageLocked(pl->page);
 	__free_page(pl->page);
 	kfree(pl);
 }
@@ -85,7 +84,7 @@ static int kcopyd_get_pages(struct kcopyd_client *kc,
 		;
 
 	kc->pages = pl->next;
-	pl->next = 0;
+	pl->next = NULL;
 
 	spin_unlock(&kc->lock);
 
@@ -220,10 +219,6 @@ static LIST_HEAD(_pages_jobs);
 
 static int jobs_init(void)
 {
-	INIT_LIST_HEAD(&_complete_jobs);
-	INIT_LIST_HEAD(&_io_jobs);
-	INIT_LIST_HEAD(&_pages_jobs);
-
 	_job_cache = kmem_cache_create("kcopyd-jobs",
 				       sizeof(struct kcopyd_job),
 				       __alignof__(struct kcopyd_job),
@@ -249,6 +244,8 @@ static void jobs_exit(void)
 
 	mempool_destroy(_job_pool);
 	kmem_cache_destroy(_job_cache);
+	_job_pool = NULL;
+	_job_cache = NULL;
 }
 
 /*
@@ -476,7 +473,7 @@ static void segment_complete(int read_err,
 		int i;
 		struct kcopyd_job *sub_job = mempool_alloc(_job_pool, GFP_NOIO);
 
-		memcpy(sub_job, job, sizeof(*job));
+		*sub_job = *job;
 		sub_job->source.sector += progress;
 		sub_job->source.count = count;
 
@@ -536,7 +533,7 @@ int kcopyd_copy(struct kcopyd_client *kc, struct io_region *from,
 	job->write_err = 0;
 	job->rw = READ;
 
-	memcpy(&job->source, from, sizeof(*from));
+	job->source = *from;
 
 	job->num_dests = num_dests;
 	memcpy(&job->dests, dests, sizeof(*dests) * num_dests);
@@ -576,12 +573,11 @@ int kcopyd_cancel(struct kcopyd_job *job, int block)
 static DECLARE_MUTEX(_client_lock);
 static LIST_HEAD(_clients);
 
-static int client_add(struct kcopyd_client *kc)
+static void client_add(struct kcopyd_client *kc)
 {
 	down(&_client_lock);
 	list_add(&kc->list, &_clients);
 	up(&_client_lock);
-	return 0;
 }
 
 static void client_del(struct kcopyd_client *kc)
@@ -591,14 +587,67 @@ static void client_del(struct kcopyd_client *kc)
 	up(&_client_lock);
 }
 
+static DECLARE_MUTEX(kcopyd_init_lock);
+static int kcopyd_clients = 0;
+
+static int kcopyd_init(void)
+{
+	int r;
+
+	down(&kcopyd_init_lock);
+
+	if (kcopyd_clients) {
+		/* Already initialized. */
+		kcopyd_clients++;
+		up(&kcopyd_init_lock);
+		return 0;
+	}
+
+	r = jobs_init();
+	if (r) {
+		up(&kcopyd_init_lock);
+		return r;
+	}
+
+	_kcopyd_wq = create_singlethread_workqueue("kcopyd");
+	if (!_kcopyd_wq) {
+		jobs_exit();
+		up(&kcopyd_init_lock);
+		return -ENOMEM;
+	}
+
+	kcopyd_clients++;
+	INIT_WORK(&_kcopyd_work, do_work, NULL);
+	up(&kcopyd_init_lock);
+	return 0;
+}
+
+static void kcopyd_exit(void)
+{
+	down(&kcopyd_init_lock);
+	kcopyd_clients--;
+	if (!kcopyd_clients) {
+		jobs_exit();
+		destroy_workqueue(_kcopyd_wq);
+		_kcopyd_wq = NULL;
+	}
+	up(&kcopyd_init_lock);
+}
+
 int kcopyd_client_create(unsigned int nr_pages, struct kcopyd_client **result)
 {
 	int r = 0;
 	struct kcopyd_client *kc;
 
+	r = kcopyd_init();
+	if (r)
+		return r;
+
 	kc = kmalloc(sizeof(*kc), GFP_KERNEL);
-	if (!kc)
+	if (!kc) {
+		kcopyd_exit();
 		return -ENOMEM;
+	}
 
 	kc->lock = SPIN_LOCK_UNLOCKED;
 	kc->pages = NULL;
@@ -606,6 +655,7 @@ int kcopyd_client_create(unsigned int nr_pages, struct kcopyd_client **result)
 	r = client_alloc_pages(kc, nr_pages);
 	if (r) {
 		kfree(kc);
+		kcopyd_exit();
 		return r;
 	}
 
@@ -613,17 +663,11 @@ int kcopyd_client_create(unsigned int nr_pages, struct kcopyd_client **result)
 	if (r) {
 		client_free_pages(kc);
 		kfree(kc);
+		kcopyd_exit();
 		return r;
 	}
 
-	r = client_add(kc);
-	if (r) {
-		dm_io_put(nr_pages);
-		client_free_pages(kc);
-		kfree(kc);
-		return r;
-	}
-
+	client_add(kc);
 	*result = kc;
 	return 0;
 }
@@ -634,31 +678,7 @@ void kcopyd_client_destroy(struct kcopyd_client *kc)
 	client_free_pages(kc);
 	client_del(kc);
 	kfree(kc);
-}
-
-
-int __init kcopyd_init(void)
-{
-	int r;
-
-	r = jobs_init();
-	if (r)
-		return r;
-
-	_kcopyd_wq = create_singlethread_workqueue("kcopyd");
-	if (!_kcopyd_wq) {
-		jobs_exit();
-		return -ENOMEM;
-	}
-
-	INIT_WORK(&_kcopyd_work, do_work, NULL);
-	return 0;
-}
-
-void kcopyd_exit(void)
-{
-	jobs_exit();
-	destroy_workqueue(_kcopyd_wq);
+	kcopyd_exit();
 }
 
 EXPORT_SYMBOL(kcopyd_client_create);

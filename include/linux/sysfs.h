@@ -18,6 +18,33 @@ struct attribute {
 	mode_t			mode;
 };
 
+struct attribute_group {
+	char			* name;
+	struct attribute	** attrs;
+};
+
+
+
+/**
+ * Use these macros to make defining attributes easier. See include/linux/device.h
+ * for examples..
+ */
+
+#define __ATTR(_name,_mode,_show,_store) { \
+	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
+	.show	= _show,					\
+	.store	= _store,					\
+}
+
+#define __ATTR_RO(_name) { \
+	.attr	= { .name = __stringify(_name), .mode = 0444, .owner = THIS_MODULE },	\
+	.show	= _name##_show,	\
+}
+
+#define __ATTR_NULL { .attr = { .name = NULL } }
+
+#define attr_name(_attr) (_attr).attr.name
+
 struct bin_attribute {
 	struct attribute	attr;
 	size_t			size;
@@ -25,13 +52,12 @@ struct bin_attribute {
 	ssize_t (*write)(struct kobject *, char *, loff_t, size_t);
 };
 
-int sysfs_create_bin_file(struct kobject * kobj, struct bin_attribute * attr);
-int sysfs_remove_bin_file(struct kobject * kobj, struct bin_attribute * attr);
-
 struct sysfs_ops {
 	ssize_t	(*show)(struct kobject *, struct attribute *,char *);
 	ssize_t	(*store)(struct kobject *,struct attribute *,const char *, size_t);
 };
+
+#ifdef CONFIG_SYSFS
 
 extern int
 sysfs_create_dir(struct kobject *);
@@ -57,13 +83,75 @@ sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name);
 extern void
 sysfs_remove_link(struct kobject *, char * name);
 
-
-struct attribute_group {
-	char			* name;
-	struct attribute	** attrs;
-};
+int sysfs_create_bin_file(struct kobject * kobj, struct bin_attribute * attr);
+int sysfs_remove_bin_file(struct kobject * kobj, struct bin_attribute * attr);
 
 int sysfs_create_group(struct kobject *, const struct attribute_group *);
 void sysfs_remove_group(struct kobject *, const struct attribute_group *);
+
+#else /* CONFIG_SYSFS */
+
+static inline int sysfs_create_dir(struct kobject * k)
+{
+	return 0;
+}
+
+static inline void sysfs_remove_dir(struct kobject * k)
+{
+	;
+}
+
+static inline int sysfs_rename_dir(struct kobject * k, const char *new_name)
+{
+	return 0;
+}
+
+static inline int sysfs_create_file(struct kobject * k, const struct attribute * a)
+{
+	return 0;
+}
+
+static inline int sysfs_update_file(struct kobject * k, const struct attribute * a)
+{
+	return 0;
+}
+
+static inline void sysfs_remove_file(struct kobject * k, const struct attribute * a)
+{
+	;
+}
+
+static inline int sysfs_create_link(struct kobject * k, struct kobject * t, char * n)
+{
+	return 0;
+}
+
+static inline void sysfs_remove_link(struct kobject * k, char * name)
+{
+	;
+}
+
+
+static inline int sysfs_create_bin_file(struct kobject * k, struct bin_attribute * a)
+{
+	return 0;
+}
+
+static inline int sysfs_remove_bin_file(struct kobject * k, struct bin_attribute * a)
+{
+	return 0;
+}
+
+static inline int sysfs_create_group(struct kobject * k, const struct attribute_group *g)
+{
+	return 0;
+}
+
+static inline void sysfs_remove_group(struct kobject * k, const struct attribute_group * g)
+{
+	;
+}
+
+#endif /* CONFIG_SYSFS */
 
 #endif /* _SYSFS_H_ */

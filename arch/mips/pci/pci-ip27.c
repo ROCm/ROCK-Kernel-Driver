@@ -34,12 +34,6 @@
 static struct bridge_controller bridges[MAX_PCI_BUSSES];
 
 /*
- * No locking needed until PCI initialization is done parallely.
- */
-int irqstore[MAX_PCI_BUSSES][MAX_DEVICES_PER_PCIBUS];
-int lastirq = BASE_PCI_IRQ;
-
-/*
  * Translate from irq to software PCI bus number and PCI slot.
  */
 struct bridge_controller *irq_to_bridge[MAX_PCI_BUSSES * MAX_DEVICES_PER_PCIBUS];
@@ -274,25 +268,23 @@ int __init bridge_probe(nasid_t nasid, int widget_id, int masterwid)
 int __devinit pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	struct bridge_controller *bc = BRIDGE_CONTROLLER(dev->bus);
-	int busno = dev->bus->number;
+	int irq;
 
-	if ((busno >= MAX_PCI_BUSSES)
-	    || (pin != 1)
-	    || (slot >= MAX_DEVICES_PER_PCIBUS))
-		panic("Increase supported PCI busses %d,%d,%d",
-		      dev->bus->number, slot, pin);
+	irq = allocate_irqno();
 
 	/*
-	 * Already assigned? Then return previously assigned value ...
+	 * Argh...  This API doesn't handle with errors at all ...
 	 */
-	if (irqstore[busno][slot])
-		return irqstore[busno][slot];
+	if (irq == -1) {
+		printk(KERN_ERR "Can't allocate interrupt for PCI device %s\n",
+		       pci_name(dev));
+		return -1;
+	}
 
-	irq_to_bridge[lastirq] = bc;
-	irq_to_slot[lastirq] = slot;
-	irqstore[busno][slot] = lastirq;
+	irq_to_bridge[irq] = bc;
+	irq_to_slot[irq] = slot;
 
-	return lastirq++;
+	return irq;
 }
 
 /*

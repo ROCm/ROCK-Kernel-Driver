@@ -218,7 +218,10 @@ setup_745x_specifics:
 
 	/* All of the bits we have to set.....
 	 */
-	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_BTIC | HID0_LRSTK
+	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_LRSTK
+BEGIN_FTR_SECTION
+	ori	r11,r11,HID0_BTIC
+END_FTR_SECTION_IFCLR(CPU_FTR_NO_BTIC)
 BEGIN_FTR_SECTION
 	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
 END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)

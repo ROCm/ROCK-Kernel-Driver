@@ -1650,7 +1650,6 @@ static void rs_360_close(struct tty_struct *tty, struct file * filp)
 	
 	if (tty_hung_up_p(filp)) {
 		DBG_CNT("before DEC-hung");
-		MOD_DEC_USE_COUNT;
 		local_irq_restore(flags);
 		return;
 	}
@@ -1677,7 +1676,6 @@ static void rs_360_close(struct tty_struct *tty, struct file * filp)
 	}
 	if (state->count) {
 		DBG_CNT("before DEC-2");
-		MOD_DEC_USE_COUNT;
 		local_irq_restore(flags);
 		return;
 	}
@@ -1732,7 +1730,6 @@ static void rs_360_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
-	MOD_DEC_USE_COUNT;
 	local_irq_restore(flags);
 }
 
@@ -1993,14 +1990,12 @@ static int rs_360_open(struct tty_struct *tty, struct file * filp)
 	if (retval)
 		return retval;
 
-	MOD_INC_USE_COUNT;
 	retval = block_til_ready(tty, filp, info);
 	if (retval) {
 #ifdef SERIAL_DEBUG_OPEN
 		printk("rs_open returning after block_til_ready with %d\n",
 		       retval);
 #endif
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
@@ -2193,22 +2188,6 @@ static void my_console_write(int idx, const char *s,
 	 * buffer, but we would just wait longer between accesses......
 	 */
 	for (i = 0; i < count; i++, s++) {
-		/* if a LF, also do CR... */
-		if (*s == 10) {
-			while (bdp->status & BD_SC_READY);
-			/* cp = __va(bdp->buf); */
-			cp = bdp->buf;
-			*cp = 13;
-			bdp->length = 1;
-			bdp->status |= BD_SC_READY;
-
-			if (bdp->status & BD_SC_WRAP) {
-				bdp = bdbase;
-			}
-			else {
-				bdp++;
-			}
-		}
 		/* Wait for transmitter fifo to empty.
 		 * Ready indicates output is ready, and xmt is doing
 		 * that, not that it is ready for us to send.
@@ -2228,6 +2207,22 @@ static void my_console_write(int idx, const char *s,
 		else
 			bdp++;
 
+		/* if a LF, also do CR... */
+		if (*s == 10) {
+			while (bdp->status & BD_SC_READY);
+			/* cp = __va(bdp->buf); */
+			cp = bdp->buf;
+			*cp = 13;
+			bdp->length = 1;
+			bdp->status |= BD_SC_READY;
+
+			if (bdp->status & BD_SC_WRAP) {
+				bdp = bdbase;
+			}
+			else {
+				bdp++;
+			}
+		}
 	}
 
 	/*
@@ -2476,6 +2471,7 @@ long console_360_init(long kmem_start, long kmem_end)
 static	int	baud_idx;
 
 static struct tty_operations rs_360_ops = {
+	.owner = THIS_MODULE,
 	.open = rs_360_open,
 	.close = rs_360_close,
 	.write = rs_360_write,

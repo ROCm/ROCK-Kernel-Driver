@@ -1221,7 +1221,7 @@ static int radeon_read_OF (struct radeonfb_info *rinfo)
 
 	dp = pci_device_to_OF_node(rinfo->pdev);
 
-	xtal = (unsigned int *) get_property(dp, "ATY,RefCLK", 0);
+	xtal = (unsigned int *) get_property(dp, "ATY,RefCLK", NULL);
 
 	rinfo->pll.ref_clk = *xtal / 10;
 
@@ -1544,7 +1544,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 					break;
 			}
 
-			rc = get_user(value, (__u32*)arg);
+			rc = get_user(value, (__u32 __user *)arg);
 
 			if (rc)
 				return rc;
@@ -1598,7 +1598,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 			if (CRTC_CRT_ON & tmp)
 				value |= 0x02;
 
-			return put_user(value, (__u32*)arg);
+			return put_user(value, (__u32 __user *)arg);
 		default:
 			return -EINVAL;
 	}
@@ -2252,7 +2252,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 	info->pseudo_palette = rinfo->pseudo_palette;
         info->flags = FBINFO_FLAG_DEFAULT;
         info->fbops = &radeonfb_ops;
-        info->display_fg = NULL;
         info->screen_base = (char *)rinfo->fb_base;
 
 	/* Fill fix common fields */

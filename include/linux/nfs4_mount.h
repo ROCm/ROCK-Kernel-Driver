@@ -20,7 +20,7 @@
 
 struct nfs_string {
 	unsigned int len;
-	const char* data;
+	const char __user * data;
 };
 
 struct nfs4_mount_data {
@@ -45,14 +45,14 @@ struct nfs4_mount_data {
 	struct nfs_string hostname;		/* 1 */
 	/* Server IP address */
 	unsigned int host_addrlen;		/* 1 */
-	struct sockaddr* host_addr;		/* 1 */
+	struct sockaddr __user * host_addr;	/* 1 */
 
 	/* Transport protocol to use */
 	int proto;				/* 1 */
 
 	/* Pseudo-flavours to use for authentication. See RFC2623 */
 	int auth_flavourlen;			/* 1 */
-	int *auth_flavours;			/* 1 */
+	int __user *auth_flavours;		/* 1 */
 };
 
 /* bits in the flags field */

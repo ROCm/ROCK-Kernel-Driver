@@ -107,19 +107,11 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-	#define DEBUG
-#else
-	static int debug;
-	#undef DEBUG
-#endif
-
 #include <linux/usb.h>
-
 #include "usb-serial.h"
 #include "keyspan.h"
+
+static int debug;
 
 /*
  * Version Information
@@ -133,9 +125,6 @@
 
 	/* Per device and per port private data */
 struct keyspan_serial_private {
-	/* number of active ports */
-	atomic_t	active_count;
-
 	const struct keyspan_device_details	*device_details;
 
 	struct urb	*instat_urb;
@@ -1144,13 +1133,9 @@ static inline void stop_urb(struct urb *urb)
 static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 {
 	int			i;
-	struct usb_serial	*serial;
+	struct usb_serial	*serial = port->serial;
 	struct keyspan_serial_private 	*s_priv;
 	struct keyspan_port_private 	*p_priv;
-
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
 
 	dbg("%s", __FUNCTION__);
 	s_priv = usb_get_serial_data(serial);
@@ -1182,7 +1167,7 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 			stop_urb(p_priv->out_urbs[i]);
 		}
 	}
-	port->tty = 0;
+	port->tty = NULL;
 }
 
 
@@ -2369,6 +2354,6 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 

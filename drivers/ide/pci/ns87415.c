@@ -25,8 +25,6 @@
 
 #include <asm/io.h>
 
-#include "ns87415.h"
-
 static unsigned int ns87415_count = 0, ns87415_control[MAX_HWIFS] = { 0 };
 
 /*
@@ -217,12 +215,17 @@ static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
+static ide_pci_device_t ns87415_chipset __devinitdata = {
+	.name		= "NS87415",
+	.init_hwif	= init_hwif_ns87415,
+	.channels	= 2,
+	.autodma	= AUTODMA,
+	.bootable	= ON_BOARD,
+};
+
 static int __devinit ns87415_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &ns87415_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &ns87415_chipset);
 	return 0;
 }
 

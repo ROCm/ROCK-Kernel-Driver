@@ -101,16 +101,13 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 {
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
 	int n = 0;
-#ifdef CONFIG_PPC_STD_MMU
+#if defined(CONFIG_PPC_STD_MMU) && !defined(CONFIG_PPC64BRIDGE)
 	unsigned int kptes = 0, uptes = 0;
 	PTE *ptr;
 #endif /* CONFIG_PPC_STD_MMU */
 	char buffer[512];
-	loff_t pos = *ppos;
 
-	/* FIXME - needs seek/pos locking */
-	
-	if (pos < 0)
+	if (count < 0)
 		return -EINVAL;
 
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
@@ -138,6 +135,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		goto return_string;
 	}
 
+#ifndef CONFIG_PPC64BRIDGE
 	for (ptr = Hash; ptr < Hash_end; ptr++) {
 		unsigned int mctx, vsid;
 
@@ -151,6 +149,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		else
 			uptes++;
 	}
+#endif
 
 	n += sprintf( buffer + n,
 		      "PTE Hash Table Information\n"
@@ -158,16 +157,20 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		      "Buckets\t\t: %lu\n"
  		      "Address\t\t: %08lx\n"
 		      "Entries\t\t: %lu\n"
+#ifndef CONFIG_PPC64BRIDGE
 		      "User ptes\t: %u\n"
 		      "Kernel ptes\t: %u\n"
-		      "Percent full\t: %lu%%\n",
-                      (unsigned long)(Hash_size>>10),
+		      "Percent full\t: %lu%%\n"
+#endif
+                      , (unsigned long)(Hash_size>>10),
 		      (Hash_size/(sizeof(PTE)*8)),
 		      (unsigned long)Hash,
-		      Hash_size/sizeof(PTE),
-                      uptes,
+		      Hash_size/sizeof(PTE)
+#ifndef CONFIG_PPC64BRIDGE
+                      , uptes,
 		      kptes,
 		      ((kptes+uptes)*100) / (Hash_size/sizeof(PTE))
+#endif
 		);
 
 	n += sprintf( buffer + n,
@@ -185,15 +188,15 @@ return_string:
 		      "Non-error misses: %lu\n"
 		      "Error misses\t: %lu\n",
 		      pte_misses, pte_errors);
-	if (pos >= strlen(buffer))
+	if (*ppos >= strlen(buffer))
 		return 0;
-	if (n > strlen(buffer) - pos)
-		n = strlen(buffer) - pos;
+	if (n > strlen(buffer) - *ppos)
+		n = strlen(buffer) - *ppos;
 	if (n > count)
 		n = count;
-	if (copy_to_user(buf, buffer + pos, n))
+	if (copy_to_user(buf, buffer + *ppos, n))
 		return -EFAULT;
-	*ppos = pos + n;
+	*ppos += n;
 	return n;
 }
 
@@ -336,17 +339,13 @@ ppc_htab_lseek(struct file * file, loff_t offset, int orig)
     lock_kernel();
     switch (orig) {
     case 0:
+	file->f_pos = offset;
+	ret = file->f_pos;
 	break;
     case 1:
-	offset += file->f_pos;
-    default:
-	goto error;
+	file->f_pos += offset;
+	ret = file->f_pos;
     }
-    if (offset >= 0) {
-	file->f_pos = offset;
-	ret = offset;
-    }
-error:
     unlock_kernel();
     return ret;
 }
@@ -449,15 +448,15 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 	}
 
 	if (!write && !first && left) {
-		if(put_user('\n', (char *) buffer))
+		if(put_user('\n', (char __user *) buffer))
 			return -EFAULT;
 		left--, buffer++;
 	}
 	if (write) {
-		p = (char *) buffer;
+		char __user *s = (char __user *) buffer;
 		while (left) {
 			char c;
-			if(get_user(c, p++))
+			if(get_user(c, s++))
 				return -EFAULT;
 			if (!isspace(c))
 				break;

@@ -45,12 +45,3 @@ config SCSI_QLA6322
         select SCSI_FC_ATTRS
 	---help---
 	This driver supports the QLogic 6322 (ISP6322) host adapter family.
-
-config SCSI_QLA2XXX_FAILOVER
-	bool "QLogic ISP2xxx Driver-level Failover support"
-	depends on SCSI_QLA2XXX
-	---help---
-	Compile the driver with failover support.  Please review the driver
-	documentation for further information on supported hosts and storage
-	types.
-

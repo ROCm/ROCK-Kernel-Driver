@@ -28,20 +28,20 @@ static struct pcmcia_irqs irqs[] = {
  *
  * Called by sa1100_pcmcia_driver_init on startup.
  */
-static int flexanet_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int flexanet_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	skt->irq = skt->nr ? IRQ_GPIO_CF2_IRQ : IRQ_GPIO_CF1_IRQ;
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 
 /*
  * Socket shutdown
  */
-static void flexanet_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void flexanet_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 
@@ -52,7 +52,7 @@ static void flexanet_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
  *
  */
 static void
-flexanet_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
+flexanet_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			     struct pcmcia_state *state)
 {
 	unsigned long levels = GPLR; /* Sense the GPIOs, asynchronously */
@@ -85,7 +85,7 @@ flexanet_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
  *
  */
 static int
-flexanet_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+flexanet_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 				 const socket_state_t *state)
 {
 	unsigned long value, flags, mask;
@@ -133,14 +133,14 @@ flexanet_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void flexanet_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void flexanet_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void flexanet_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void flexanet_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 /*

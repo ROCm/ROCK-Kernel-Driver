@@ -41,6 +41,8 @@ static __inline__ void apic_wait_icr_idle(void)
 	do { } while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY );
 }
 
+int get_physical_broadcast(void);
+
 #ifdef CONFIG_X86_GOOD_APIC
 # define FORCE_READ_AROUND_WRITE 0
 # define apic_read_around(x)
@@ -81,8 +83,8 @@ extern void smp_local_timer_interrupt (struct pt_regs * regs);
 extern void setup_boot_APIC_clock (void);
 extern void setup_secondary_APIC_clock (void);
 extern void setup_apic_nmi_watchdog (void);
-extern void disable_lapic_nmi_watchdog(void);
-extern void enable_lapic_nmi_watchdog(void);
+extern int reserve_lapic_nmi(void);
+extern void release_lapic_nmi(void);
 extern void disable_timer_nmi_watchdog(void);
 extern void enable_timer_nmi_watchdog(void);
 extern void nmi_watchdog_tick (struct pt_regs * regs);

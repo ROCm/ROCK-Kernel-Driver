@@ -54,25 +54,25 @@ static inline void maybe_flush_windows(unsigned int rs1, unsigned int rs2,
 	}
 }
 
-#define fetch_reg(reg, regs) ({							\
-	struct reg_window *win;							\
-	register unsigned long ret;						\
-										\
-	if (!(reg)) ret = 0;							\
-	else if((reg) < 16) {							\
-		ret = regs->u_regs[(reg)];					\
-	} else {								\
-		/* Ho hum, the slightly complicated case. */			\
-		win = (struct reg_window *)regs->u_regs[UREG_FP];		\
-		if (get_user (ret, &win->locals[(reg) - 16])) return -1;	\
-	}									\
-	ret;									\
+#define fetch_reg(reg, regs) ({						\
+	struct reg_window __user *win;					\
+	register unsigned long ret;					\
+									\
+	if (!(reg)) ret = 0;						\
+	else if ((reg) < 16) {						\
+		ret = regs->u_regs[(reg)];				\
+	} else {							\
+		/* Ho hum, the slightly complicated case. */		\
+		win = (struct reg_window __user *)regs->u_regs[UREG_FP];\
+		if (get_user (ret, &win->locals[(reg) - 16])) return -1;\
+	}								\
+	ret;								\
 })
 
 static inline int
 store_reg(unsigned int result, unsigned int reg, struct pt_regs *regs)
 {
-	struct reg_window *win;
+	struct reg_window __user *win;
 
 	if (!reg)
 		return 0;
@@ -81,7 +81,7 @@ store_reg(unsigned int result, unsigned int reg, struct pt_regs *regs)
 		return 0;
 	} else {
 		/* need to use put_user() in this case: */
-		win = (struct reg_window *)regs->u_regs[UREG_FP];
+		win = (struct reg_window __user *) regs->u_regs[UREG_FP];
 		return (put_user(result, &win->locals[reg - 16]));
 	}
 }
@@ -89,23 +89,30 @@ store_reg(unsigned int result, unsigned int reg, struct pt_regs *regs)
 extern void handle_hw_divzero (struct pt_regs *regs, unsigned long pc,
 			       unsigned long npc, unsigned long psr);
 
-/* Should return 0 if mul/div emulation succeeded and SIGILL should not be issued */
+/* Should return 0 if mul/div emulation succeeded and SIGILL should
+ * not be issued.
+ */
 int do_user_muldiv(struct pt_regs *regs, unsigned long pc)
 {
 	unsigned int insn;
 	int inst;
 	unsigned int rs1, rs2, rdv;
 
-	if (!pc) return -1; /* This happens to often, I think */
-	if (get_user (insn, (unsigned int *)pc)) return -1;
-	if ((insn & 0xc1400000) != 0x80400000) return -1;
+	if (!pc)
+		return -1; /* This happens to often, I think */
+	if (get_user (insn, (unsigned int __user *)pc))
+		return -1;
+	if ((insn & 0xc1400000) != 0x80400000)
+		return -1;
 	inst = ((insn >> 19) & 0xf);
-	if ((inst & 0xe) != 10 && (inst & 0xe) != 14) return -1;
+	if ((inst & 0xe) != 10 && (inst & 0xe) != 14)
+		return -1;
+
 	/* Now we know we have to do something with umul, smul, udiv or sdiv */
 	rs1 = (insn >> 14) & 0x1f;
 	rs2 = insn & 0x1f;
 	rdv = (insn >> 25) & 0x1f;
-	if(has_imm13(insn)) {
+	if (has_imm13(insn)) {
 		maybe_flush_windows(rs1, 0, rdv);
 		rs2 = sign_extend_imm13(insn);
 	} else {

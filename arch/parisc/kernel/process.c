@@ -44,6 +44,7 @@
 #include <linux/sched.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
+#include <linux/kallsyms.h>
 
 #include <asm/io.h>
 #include <asm/offsets.h>
@@ -51,6 +52,7 @@
 #include <asm/pdc_chassis.h>
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
+#include <asm/unwind.h>
 
 int hlt_counter;
 
@@ -367,4 +369,29 @@ asmlinkage int sys_execve(struct pt_regs *regs)
 out:
 
 	return error;
+}
+
+unsigned long 
+get_wchan(struct task_struct *p)
+{
+	struct unwind_frame_info info;
+	unsigned long ip;
+	int count = 0;
+	/*
+	 * These bracket the sleeping functions..
+	 */
+#	define first_sched	((unsigned long) scheduling_functions_start_here)
+#	define last_sched	((unsigned long) scheduling_functions_end_here)
+
+	unwind_frame_init_from_blocked_task(&info, p);
+	do {
+		if (unwind_once(&info) < 0)
+			return 0;
+		ip = info.ip;
+		if (ip < first_sched || ip >= last_sched)
+			return ip;
+	} while (count++ < 16);
+	return 0;
+#	undef first_sched
+#	undef last_sched
 }

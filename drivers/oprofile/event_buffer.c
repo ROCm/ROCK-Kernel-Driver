@@ -142,7 +142,7 @@ int event_buffer_release(struct inode * inode, struct file * file)
 }
 
 
-ssize_t event_buffer_read(struct file * file, char * buf, size_t count, loff_t * offset)
+ssize_t event_buffer_read(struct file * file, char __user * buf, size_t count, loff_t * offset)
 {
 	int retval = -EINVAL;
 	size_t const max = buffer_size * sizeof(unsigned long);

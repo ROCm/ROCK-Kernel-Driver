@@ -4,6 +4,7 @@ menu "Passive cards"
 
 config ISDN_DRV_HISAX
 	tristate "HiSax SiemensChipSet driver support"
+	select CRC_CCITT
 	---help---
 	  This is a driver supporting the Siemens chipset on various
 	  ISDN-cards (like AVM A1, Elsa ISDN cards, Teles S0-16.0, Teles
@@ -109,7 +110,7 @@ config HISAX_16_3
 
 config HISAX_TELESPCI
 	bool "Teles PCI"
-	depends on PCI
+	depends on PCI && (BROKEN || !(SPARC64 || PPC))
 	help
 	  This enables HiSax support for the Teles PCI.
 	  See <file:Documentation/isdn/README.HiSax> on how to configure it.
@@ -236,7 +237,7 @@ config HISAX_MIC
 
 config HISAX_NETJET
 	bool "NETjet card"
-	depends on PCI
+	depends on PCI && (BROKEN || !(SPARC64 || PPC))
 	help
 	  This enables HiSax support for the NetJet from Traverse
 	  Technologies.
@@ -247,7 +248,7 @@ config HISAX_NETJET
 
 config HISAX_NETJET_U
 	bool "NETspider U card"
-	depends on PCI
+	depends on PCI && (BROKEN || !(SPARC64 || PPC))
 	help
 	  This enables HiSax support for the Netspider U interface ISDN card
 	  from Traverse Technologies.
@@ -315,7 +316,7 @@ config HISAX_GAZEL
 
 config HISAX_HFC_PCI
 	bool "HFC PCI-Bus cards"
-	depends on PCI
+	depends on PCI && (BROKEN || !(SPARC64 || PPC))
 	help
 	  This enables HiSax support for the HFC-S PCI 2BDS0 based cards.
 
@@ -342,7 +343,7 @@ config HISAX_HFC_SX
 
 config HISAX_ENTERNOW_PCI
 	bool "Formula-n enter:now PCI card"
-	depends on PCI
+	depends on PCI && (BROKEN || !(SPARC64 || PPC))
 	help
 	  This enables HiSax support for the Formula-n enter:now PCI
 	  ISDN card.
@@ -399,6 +400,7 @@ comment "HiSax sub driver modules"
 config HISAX_ST5481
 	tristate "ST5481 USB ISDN modem (EXPERIMENTAL)"
 	depends on USB && EXPERIMENTAL
+	select CRC_CCITT
 	help
 	  This enables the driver for ST5481 based USB ISDN adapters,
 	  e.g. the BeWan Gazel 128 USB
@@ -411,7 +413,7 @@ config HISAX_HFCUSB
 
 config HISAX_FRITZ_PCIPNP
 	tristate "AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on PCI && EXPERIMENTAL
 	help
 	  This enables the driver for the AVM Fritz!Card PCI,
 	  Fritz!Card PCI v2 and Fritz!Card PnP.

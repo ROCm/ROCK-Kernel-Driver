@@ -47,7 +47,7 @@
 #include <asm/io.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "aha1542.h"
 
 #define SCSI_BUF_PA(address)	isa_virt_to_bus(address)
@@ -545,7 +545,7 @@ static void aha1542_intr_handle(struct Scsi_Host *shost, void *dev_id, struct pt
 		my_done = SCtmp->scsi_done;
 		if (SCtmp->host_scribble) {
 			kfree(SCtmp->host_scribble);
-			SCtmp->host_scribble = 0;
+			SCtmp->host_scribble = NULL;
 		}
 		/* Fetch the sense data, and tuck it away, in the required slot.  The
 		   Adaptec automatically fetches it, and there is no guarantee that
@@ -1069,7 +1069,7 @@ static int __init aha1542_detect(Scsi_Host_Template * tpnt)
 	/*
 	 *	Find MicroChannel cards (AHA1640)
 	 */
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	if(MCA_bus) {
 		int slot = 0;
 		int pos = 0;

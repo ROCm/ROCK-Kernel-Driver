@@ -500,14 +500,6 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
-	if(!dev_priv->fb) {
-		DRM_ERROR( "failed to find framebuffer!\n" );
-		/* Assign dev_private so we can do cleanup. */
-		dev->dev_private = (void *)dev_priv;
-		mga_do_cleanup_dma( dev );
-		return DRM_ERR(EINVAL);
-	}
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
 	if(!dev_priv->mmio) {
 		DRM_ERROR( "failed to find mmio region!\n" );
@@ -639,12 +631,12 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 {
 	DRM_DEBUG( "\n" );
 
-#if _HAVE_DMA_IRQ
+#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
-	if ( dev->irq ) DRM(irq_uninstall)(dev);
+	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
 #endif
 
 	if ( dev->dev_private ) {
@@ -676,7 +668,7 @@ int mga_dma_init( DRM_IOCTL_ARGS )
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
-	DRM_COPY_FROM_USER_IOCTL( init, (drm_mga_init_t *)data, sizeof(init) );
+	DRM_COPY_FROM_USER_IOCTL( init, (drm_mga_init_t __user *)data, sizeof(init) );
 
 	switch ( init.func ) {
 	case MGA_INIT_DMA:
@@ -701,7 +693,7 @@ int mga_dma_flush( DRM_IOCTL_ARGS )
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
-	DRM_COPY_FROM_USER_IOCTL( lock, (drm_lock_t *)data, sizeof(lock) );
+	DRM_COPY_FROM_USER_IOCTL( lock, (drm_lock_t __user *)data, sizeof(lock) );
 
 	DRM_DEBUG( "%s%s%s\n",
 		   (lock.flags & _DRM_LOCK_FLUSH) ?	"flush, " : "",
@@ -772,12 +764,13 @@ int mga_dma_buffers( DRM_IOCTL_ARGS )
 	DRM_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
+	drm_dma_t __user *argp = (void __user *)data;
 	drm_dma_t d;
 	int ret = 0;
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
-	DRM_COPY_FROM_USER_IOCTL( d, (drm_dma_t *)data, sizeof(d) );
+	DRM_COPY_FROM_USER_IOCTL( d, argp, sizeof(d) );
 
 	/* Please don't send us buffers.
 	 */
@@ -803,7 +796,7 @@ int mga_dma_buffers( DRM_IOCTL_ARGS )
 		ret = mga_dma_get_buffers( filp, dev, &d );
 	}
 
-	DRM_COPY_TO_USER_IOCTL( (drm_dma_t *)data, d, sizeof(d) );
+	DRM_COPY_TO_USER_IOCTL( argp, d, sizeof(d) );
 
 	return ret;
 }

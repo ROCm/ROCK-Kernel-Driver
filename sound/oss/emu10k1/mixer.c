@@ -188,6 +188,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 	u32 size, page;
 	int addr, size_reg, i, ret;
 	unsigned int id, ch;
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
 
@@ -197,7 +198,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 		if (ctl == NULL)
 			return -ENOMEM;
 
-		if (copy_from_user(ctl, (void *) arg, sizeof(struct mixer_private_ioctl))) {
+		if (copy_from_user(ctl, argp, sizeof(struct mixer_private_ioctl))) {
 			kfree(ctl);
 			return -EFAULT;
 		}
@@ -228,7 +229,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 		case CMD_READFN0:
 			ctl->val[2] = emu10k1_readfn0(card, ctl->val[0]);
 
-			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
+			if (copy_to_user(argp, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 
 			break;
@@ -244,7 +245,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 			ctl->val[2] = sblive_readptr(card, ctl->val[0], ctl->val[1]);
 
-			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
+			if (copy_to_user(argp, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 
 			break;
@@ -282,7 +283,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 		case CMD_GETRECSRC:
 			ctl->val[0] = card->wavein.recsrc;
 			ctl->val[1] = card->wavein.fxwc;
-			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
+			if (copy_to_user(argp, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 
 			break;
@@ -297,7 +298,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 			ctl->val[4] = card->waveout.send_routing[2];
 			ctl->val[5] = card->waveout.send_dcba[2];
 
-			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
+			if (copy_to_user(argp, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 
 			break;
@@ -320,7 +321,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 		
 		case CMD_GETPATCH:
 			if (ctl->val[0] == 0) {
-				if (copy_to_user((void *) arg, &card->mgr.rpatch, sizeof(struct dsp_rpatch)))
+				if (copy_to_user(argp, &card->mgr.rpatch, sizeof(struct dsp_rpatch)))
                                 	ret = -EFAULT;
 			} else {
 				if ((ctl->val[0] - 1) / PATCHES_PER_PAGE >= card->mgr.current_pages) {
@@ -328,7 +329,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 					break;
 				}
 
-				if (copy_to_user((void *) arg, PATCH(&card->mgr, ctl->val[0] - 1), sizeof(struct dsp_patch)))
+				if (copy_to_user(argp, PATCH(&card->mgr, ctl->val[0] - 1), sizeof(struct dsp_patch)))
 					ret = -EFAULT;
 			}
 
@@ -342,7 +343,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 				break;
 			}
 
-			if (copy_to_user((void *) arg, &card->mgr.gpr[id], sizeof(struct dsp_gpr)))
+			if (copy_to_user(argp, &card->mgr.gpr[id], sizeof(struct dsp_gpr)))
 				ret = -EFAULT;
 
 			break;
@@ -351,7 +352,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 			addr = emu10k1_find_control_gpr(&card->mgr, (char *) ctl->val, &((char *) ctl->val)[PATCH_NAME_SIZE]);
 			ctl->val[0] = sblive_readptr(card, addr, 0);
 
-			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
+			if (copy_to_user(argp, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 
 			break;
@@ -430,7 +431,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 			ctl->val[2] = card->mgr.ctrl_gpr[id][ch];
 
-			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
+			if (copy_to_user(argp, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 
 			break;
@@ -496,7 +497,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 			if (card->is_audigy)
 				ctl->val[4]=emu10k1_readfn0(card, 0x18);
 
-			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
+			if (copy_to_user(argp, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 			break;
 
@@ -517,7 +518,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 	case SOUND_MIXER_PRIVATE4:
 
-		if (copy_from_user(&size, (void *) arg, sizeof(size)))
+		if (copy_from_user(&size, argp, sizeof(size)))
 			return -EFAULT;
 
 		DPD(2, "External tram size %#x\n", size);
@@ -581,7 +582,7 @@ static int emu10k1_dsp_mixer(struct emu10k1_card *card, unsigned int oss_mixer, 
 
 	card->ac97->modcnt++;
 
-	if (get_user(val, (int *)arg))
+	if (get_user(val, (int __user *)arg))
 		return -EFAULT;
 
 	/* cleanse input a little */
@@ -634,7 +635,7 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 				
 			info.modify_counter = card->ac97->modcnt;
 
-			if (copy_to_user((void *)arg, &info, sizeof(info)))
+			if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 				return -EFAULT;
 
 			return 0;

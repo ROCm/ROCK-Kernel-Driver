@@ -4,7 +4,8 @@ net-3-driver for the IBM LAN Adapter/A
 This is an extension to the Linux operating system, and is covered by the
 same GNU General Public License that covers that work.
 
-Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de, aarnold@elsa.de)
+Copyright 1999 by Alfred Arnold (alfred@ccac.rwth-aachen.de,
+                                 alfred.arnold@lancom.de)
 
 This driver is based both on the SK_MCA driver, which is itself based on the
 SK_G16 and 3C523 driver.
@@ -96,6 +97,8 @@ History:
 #include "ibmlana.h"
 
 #undef DEBUG
+
+#define DRV_NAME "ibmlana"
 
 /* ------------------------------------------------------------------------
  * global static data - not more since we can handle multiple boards and
@@ -951,8 +954,8 @@ static int ibmlana_probe(struct net_device *dev)
 	printk(KERN_INFO "%s: IBM LAN Adapter/A found in slot %d\n", dev->name, slot + 1);
 
 	/* try to obtain I/O range */
-	if (!request_region(iobase, IBM_LANA_IORANGE, dev->name)) {
-		printk(KERN_ERR "%s: cannot allocate I/O range at %#x!\n", dev->name, iobase);
+	if (!request_region(iobase, IBM_LANA_IORANGE, DRV_NAME)) {
+		printk(KERN_ERR "%s: cannot allocate I/O range at %#x!\n", DRV_NAME, iobase);
 		startslot = slot + 1;
 		return -EBUSY;
 	}

@@ -162,7 +162,7 @@ open_xa_dir (const struct inode *inode, int flags)
         dput (xaroot);
         return xadir;
     }
-    
+
     if (!xadir->d_inode) {
         int err;
         if (flags == 0 || flags & XATTR_CREATE) {
@@ -270,7 +270,7 @@ open_xa_file (const struct inode *inode, const char *name, int flags)
  * would be a big performance hit to the non-xattr case, so I've copied
  * the whole thing for now. --clm
  *
- * the big difference is that I go backwards through the directory, 
+ * the big difference is that I go backwards through the directory,
  * and don't mess with f->f_pos, but the idea is the same.  Do some
  * action on each and every entry in the directory.
  *
@@ -330,7 +330,7 @@ research:
 	    break;
         }
 	copy_item_head(&tmp_ih, ih);
-		
+
 	/* we must have found item, that is item of this directory, */
 	RFALSE( COMP_SHORT_KEYS (&(ih->ih_key), &pos_key),
 		"vs-9000: found item %h does not match to dir we readdir %K",
@@ -361,7 +361,7 @@ research:
 	}
 
         /* Ignore the .reiserfs_priv entry */
-        if (reiserfs_xattrs (inode->i_sb) && 
+        if (reiserfs_xattrs (inode->i_sb) &&
             !old_format_only(inode->i_sb) &&
             deh_objectid (deh) == le32_to_cpu (INODE_PKEY(REISERFS_SB(inode->i_sb)->priv_root->d_inode)->k_objectid))
           continue;
@@ -395,7 +395,7 @@ research:
 	 */
 	pathrelse (&path_to_entry);
 
-	if (filldir (dirent, local_buf, d_reclen, d_off, d_ino, 
+	if (filldir (dirent, local_buf, d_reclen, d_off, d_ino,
 		     DT_UNKNOWN) < 0) {
 	    if (local_buf != small_buf) {
 		reiserfs_kfree(local_buf, d_reclen, inode->i_sb) ;
@@ -412,7 +412,7 @@ end:
     return 0;
 }
 
-/* 
+/*
  * this could be done with dedicated readdir ops for the xattr files,
  * but I want to get something working asap
  * this is stolen from vfs_readdir
@@ -451,7 +451,7 @@ reiserfs_put_page(struct page *page)
 static struct page *
 reiserfs_get_page(struct inode *dir, unsigned long n)
 {
-        struct address_space *mapping = dir->i_mapping; 
+        struct address_space *mapping = dir->i_mapping;
         struct page *page;
         /* We can deadlock if we try to free dentries,
            and an unlink/rmdir has just occured - GFP_NOFS avoids this */
@@ -644,7 +644,7 @@ reiserfs_xattr_get (const struct inode *inode, const char *name, void *buffer,
         err = -ERANGE;
         goto out_dput;
     }
-    
+
     while (file_pos < isize) {
         size_t chunk;
         char *data;
@@ -768,7 +768,7 @@ out:
 /* The following are side effects of other operations that aren't explicitly
  * modifying extended attributes. This includes operations such as permissions
  * or ownership changes, object deletions, etc. */
- 
+
 static int
 reiserfs_delete_xattrs_filler (void *buf, const char *name, int namelen,
                                loff_t offset, ino_t ino, unsigned int d_type)
@@ -789,7 +789,7 @@ reiserfs_delete_xattrs (struct inode *inode)
 
     /* Skip out, an xattr has no xattrs associated with it */
     if (is_reiserfs_priv_object (inode) ||
-        get_inode_sd_version (inode) == STAT_DATA_V1 || 
+        get_inode_sd_version (inode) == STAT_DATA_V1 ||
         !reiserfs_xattrs(inode->i_sb))
     {
         return 0;
@@ -883,7 +883,7 @@ reiserfs_chown_xattrs (struct inode *inode, struct iattr *attrs)
 
     /* Skip out, an xattr has no xattrs associated with it */
     if (is_reiserfs_priv_object (inode) ||
-        get_inode_sd_version (inode) == STAT_DATA_V1 || 
+        get_inode_sd_version (inode) == STAT_DATA_V1 ||
         !reiserfs_xattrs(inode->i_sb))
     {
         return 0;
@@ -948,7 +948,7 @@ reiserfs_getxattr (struct dentry *dentry, const char *name, void *buffer,
     if (!xah || !reiserfs_xattrs(dentry->d_sb) ||
         get_inode_sd_version (dentry->d_inode) == STAT_DATA_V1)
         return -EOPNOTSUPP;
-    
+
     reiserfs_read_lock_xattr_i (dentry->d_inode);
     reiserfs_read_lock_xattrs (dentry->d_sb);
     err = xah->get (dentry->d_inode, name, buffer, size);
@@ -1006,7 +1006,6 @@ reiserfs_removexattr (struct dentry *dentry, const char *name)
 {
     int err;
     struct reiserfs_xattr_handler *xah = find_xattr_handler_prefix (name);
-    int lock;
 
     if (!xah || !reiserfs_xattrs(dentry->d_sb) ||
         get_inode_sd_version (dentry->d_inode) == STAT_DATA_V1)
@@ -1293,7 +1292,7 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
 
             if (dentry && dentry->d_inode)
                 reiserfs_warning (s, "Created %s on %s - reserved for "
-                                  "xattr storage.", PRIVROOT_NAME, 
+                                  "xattr storage.", PRIVROOT_NAME,
                                   reiserfs_bdevname (inode->i_sb));
         } else if (!dentry->d_inode) {
             dput (dentry);

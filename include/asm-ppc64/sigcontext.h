@@ -7,7 +7,7 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-
+#include <linux/compiler.h>
 #include <asm/ptrace.h>
 #include <asm/elf.h>
 
@@ -18,7 +18,7 @@ struct sigcontext {
 	int		_pad0;
 	unsigned long	handler;
 	unsigned long	oldmask;
-	struct pt_regs	*regs;
+	struct pt_regs	__user *regs;
 	elf_gregset_t	gp_regs;
 	elf_fpregset_t	fp_regs;
 /*
@@ -40,7 +40,7 @@ struct sigcontext {
  * The entry with index 33 contains the vrsave as the first word (offset 0) 
  * within the quadword.
  */
-	elf_vrreg_t	*v_regs;
+	elf_vrreg_t	__user *v_regs;
 	long		vmx_reserve[ELF_NVRREG+ELF_NVRREG+1];
 };
 

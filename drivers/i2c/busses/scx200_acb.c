@@ -25,7 +25,6 @@
 */
 
 #include <linux/config.h>
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -44,7 +43,7 @@ MODULE_DESCRIPTION("NatSemi SCx200 ACCESS.bus Driver");
 MODULE_LICENSE("GPL");
 
 #define MAX_DEVICES 4
-static int base[MAX_DEVICES] = { 0x840 };
+static int base[MAX_DEVICES] = { 0x820, 0x840 };
 MODULE_PARM(base, "1-4i");
 MODULE_PARM_DESC(base, "Base addresses for the ACCESS.bus controllers");
 
@@ -459,6 +458,7 @@ static int  __init scx200_acb_create(int base, int index)
 	adapter->owner = THIS_MODULE;
 	adapter->id = I2C_ALGO_SMBUS;
 	adapter->algo = &scx200_acb_algorithm;
+	adapter->class = I2C_CLASS_HWMON;
 
 	init_MUTEX(&iface->sem);
 
@@ -511,7 +511,10 @@ static int __init scx200_acb_init(void)
 	/* Verify that this really is a SCx200 processor */
 	if (pci_find_device(PCI_VENDOR_ID_NS,
 			    PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-			    NULL) == NULL)
+			    NULL) == NULL
+	    && pci_find_device(PCI_VENDOR_ID_NS,
+			       PCI_DEVICE_ID_NS_SC1100_BRIDGE,
+			       NULL) == NULL)
 		return -ENODEV;
 
 	rc = -ENXIO;

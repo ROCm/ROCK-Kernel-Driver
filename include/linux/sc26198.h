@@ -3,7 +3,7 @@
 /*
  *	sc26198.h  -- SC26198 UART hardware info.
  *
- *	Copyright (C) 1995-1998  Stallion Technologies (support@stallion.oz.au).
+ *	Copyright (C) 1995-1998  Stallion Technologies
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by

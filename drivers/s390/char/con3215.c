@@ -1002,7 +1002,8 @@ tty3215_write(struct tty_struct * tty, int from_user,
 	ret = 0;
 	while (count > 0) {
 		length = count < 80 ? count : 80;
-		length -= copy_from_user(raw->ubuffer, buf, length);
+		length -= copy_from_user(raw->ubuffer,
+				(const unsigned char __user *)buf, length);
 		if (length == 0) {
 			if (!ret)
 				ret = -EFAULT;

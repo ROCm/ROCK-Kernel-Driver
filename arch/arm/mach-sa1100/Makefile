@@ -3,7 +3,7 @@
 #
 
 # Common support
-obj-y := generic.o irq.o dma.o
+obj-y := generic.o irq.o dma.o time.o
 obj-m :=
 obj-n :=
 obj-  :=
@@ -28,6 +28,8 @@ led-$(CONFIG_SA1100_BRUTUS)		+= leds-brutus.o
 
 obj-$(CONFIG_SA1100_CERF)		+= cerf.o
 led-$(CONFIG_SA1100_CERF)		+= leds-cerf.o
+
+obj-$(CONFIG_SA1100_COLLIE)		+= collie.o
 
 obj-$(CONFIG_SA1100_EMPEG)		+= empeg.o
 

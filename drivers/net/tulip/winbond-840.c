@@ -111,15 +111,6 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
-#ifndef __KERNEL__
-#define __KERNEL__
-#endif
-#if !defined(__OPTIMIZE__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
-
 /* Include files, designed to support most kernel versions 2.0.0 and later. */
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -260,7 +251,7 @@ static struct pci_id_info pci_id_tbl[] = {
 	 W840_FLAGS, 128, CanHaveMII | HasBrokenTx},
 	{"Compex RL100-ATX", { 0x201111F6, 0xffffffff,},
 	 W840_FLAGS, 128, CanHaveMII | HasBrokenTx},
-	{0,},						/* 0 terminated list. */
+	{NULL,},					/* 0 terminated list. */
 };
 
 /* This driver was written to use PCI memory space, however some x86 systems
@@ -860,7 +851,7 @@ static void init_rxtx_rings(struct net_device *dev)
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		np->rx_ring[i].length = np->rx_buf_sz;
 		np->rx_ring[i].status = 0;
-		np->rx_skbuff[i] = 0;
+		np->rx_skbuff[i] = NULL;
 	}
 	/* Mark the last entry as wrapping the ring. */
 	np->rx_ring[i-1].length |= DescEndRing;
@@ -884,7 +875,7 @@ static void init_rxtx_rings(struct net_device *dev)
 
 	/* Initialize the Tx descriptors */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		np->tx_skbuff[i] = 0;
+		np->tx_skbuff[i] = NULL;
 		np->tx_ring[i].status = 0;
 	}
 	np->tx_full = 0;
@@ -909,7 +900,7 @@ static void free_rxtx_rings(struct netdev_private* np)
 						PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(np->rx_skbuff[i]);
 		}
-		np->rx_skbuff[i] = 0;
+		np->rx_skbuff[i] = NULL;
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		if (np->tx_skbuff[i]) {
@@ -919,7 +910,7 @@ static void free_rxtx_rings(struct netdev_private* np)
 						PCI_DMA_TODEVICE);
 			dev_kfree_skb(np->tx_skbuff[i]);
 		}
-		np->tx_skbuff[i] = 0;
+		np->tx_skbuff[i] = NULL;
 	}
 }
 
@@ -1154,7 +1145,7 @@ static void netdev_tx_done(struct net_device *dev)
 					PCI_DMA_TODEVICE);
 		np->tx_q_bytes -= np->tx_skbuff[entry]->len;
 		dev_kfree_skb_irq(np->tx_skbuff[entry]);
-		np->tx_skbuff[entry] = 0;
+		np->tx_skbuff[entry] = NULL;
 	}
 	if (np->tx_full &&
 		np->cur_tx - np->dirty_tx < TX_QUEUE_LEN_RESTART &&
@@ -1292,14 +1283,8 @@ static int netdev_rx(struct net_device *dev)
 				pci_dma_sync_single_for_cpu(np->pci_dev,np->rx_addr[entry],
 							    np->rx_skbuff[entry]->len,
 							    PCI_DMA_FROMDEVICE);
-				/* Call copy + cksum if available. */
-#if HAS_IP_COPYSUM
 				eth_copy_and_sum(skb, np->rx_skbuff[entry]->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len), np->rx_skbuff[entry]->tail,
-					   pkt_len);
-#endif
 				pci_dma_sync_single_for_device(np->pci_dev,np->rx_addr[entry],
 							       np->rx_skbuff[entry]->len,
 							       PCI_DMA_FROMDEVICE);
@@ -1526,8 +1511,8 @@ static struct ethtool_ops netdev_ethtool_ops = {
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
-	struct netdev_private *np = dev->priv;
+	struct mii_ioctl_data *data = if_mii(rq);
+	struct netdev_private *np = netdev_priv(dev);
 
 	switch(cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
@@ -1733,10 +1718,7 @@ static struct pci_driver w840_driver = {
 
 static int __init w840_init(void)
 {
-/* when a module, this is printed whether or not devices are found in probe */
-#ifdef MODULE
 	printk(version);
-#endif
 	return pci_module_init(&w840_driver);
 }
 

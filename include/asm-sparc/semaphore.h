@@ -13,12 +13,12 @@ struct semaphore {
 	atomic24_t count;
 	int sleepers;
 	wait_queue_head_t wait;
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	long __magic;
 #endif
 };
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 # define __SEM_DEBUG_INIT(name) \
 		, (long)&(name).__magic
 #else
@@ -43,7 +43,7 @@ static inline void sema_init (struct semaphore *sem, int val)
 	atomic24_set(&sem->count, val);
 	sem->sleepers = 0;
 	init_waitqueue_head(&sem->wait);
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	sem->__magic = (long)&sem->__magic;
 #endif
 }
@@ -68,7 +68,7 @@ static inline void down(struct semaphore * sem)
 	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 	might_sleep();
@@ -105,7 +105,7 @@ static inline int down_interruptible(struct semaphore * sem)
 	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 	might_sleep();
@@ -145,7 +145,7 @@ static inline int down_trylock(struct semaphore * sem)
 	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
@@ -184,7 +184,7 @@ static inline void up(struct semaphore * sem)
 	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 

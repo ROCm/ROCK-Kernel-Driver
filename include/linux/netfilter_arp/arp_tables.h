@@ -16,7 +16,7 @@
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
 #endif
-
+#include <linux/compiler.h>
 #include <linux/netfilter_arp.h>
 
 #define ARPT_FUNCTION_MAXNAMELEN 30
@@ -205,7 +205,7 @@ struct arpt_replace
 	/* Number of counters (must be equal to current number of entries). */
 	unsigned int num_counters;
 	/* The old entries' counters. */
-	struct arpt_counters *counters;
+	struct arpt_counters __user *counters;
 
 	/* The entries (hang off end: not really an array). */
 	struct arpt_entry entries[0];

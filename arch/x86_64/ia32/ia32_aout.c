@@ -216,18 +216,19 @@ end_coredump:
  * memory and creates the pointer tables from them, and puts their
  * addresses on the "stack", returning the new stack pointer value.
  */
-static u32 * create_aout_tables(char * p, struct linux_binprm * bprm)
+static u32 __user *create_aout_tables(char __user *p, struct linux_binprm *bprm)
 {
-	u32 *argv, *envp;
-	u32 * sp;
+	u32 __user *argv;
+	u32 __user *envp;
+	u32 __user *sp;
 	int argc = bprm->argc;
 	int envc = bprm->envc;
 
-	sp = (u32 *) ((-(unsigned long)sizeof(u32)) & (unsigned long) p);
+	sp = (u32 __user *) ((-(unsigned long)sizeof(u32)) & (unsigned long) p);
 	sp -= envc+1;
-	envp = (u32 *) sp;
+	envp = sp;
 	sp -= argc+1;
-	argv = (u32 *) sp;
+	argv = sp;
 	put_user((unsigned long) envp,--sp);
 	put_user((unsigned long) argv,--sp);
 	put_user(argc,--sp);
@@ -403,7 +404,7 @@ beyond_if:
 	}
 
 	current->mm->start_stack =
-		(unsigned long) create_aout_tables((char *) bprm->p, bprm);
+		(unsigned long)create_aout_tables((char __user *)bprm->p, bprm);
 	/* start thread */
 	asm volatile("movl %0,%%fs" :: "r" (0)); \
 	asm volatile("movl %0,%%es; movl %0,%%ds": :"r" (__USER32_DS));

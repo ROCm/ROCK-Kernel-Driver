@@ -561,7 +561,7 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 		tty->ldisc.flush_buffer(tty);
 
 	tty->closing = 0;
-	self->tty = 0;
+	self->tty = NULL;
 
 	if (self->blocked_open) {
 		if (self->close_delay) {
@@ -721,8 +721,10 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 		kbuf = kmalloc(count, GFP_KERNEL);
 		if (kbuf == NULL)
 			return -ENOMEM;
-		if (copy_from_user(kbuf, ubuf, count))
+		if (copy_from_user(kbuf, ubuf, count)) {
+			kfree(kbuf);
 			return -EFAULT;
+		}
 	} else
 		/* The buffer is already in kernel space */
 		kbuf = (unsigned char *) ubuf;
@@ -779,6 +781,8 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 					    self->max_header_size);
 			if (!skb) {
 				spin_unlock_irqrestore(&self->spinlock, flags);
+	                        if (from_user)
+		                        kfree(kbuf);
 				return -ENOBUFS;
 			}
 			skb_reserve(skb, self->max_header_size);
@@ -873,7 +877,7 @@ static void ircomm_tty_wait_until_sent(struct tty_struct *tty, int timeout)
 	orig_jiffies = jiffies;
 
 	/* Set poll time to 200 ms */
-	poll_time = IRDA_MIN(timeout, MSECS_TO_JIFFIES(200));
+	poll_time = IRDA_MIN(timeout, msecs_to_jiffies(200));
 
 	spin_lock_irqsave(&self->spinlock, flags);
 	while (self->tx_skb && self->tx_skb->len) {
@@ -1041,7 +1045,7 @@ static void ircomm_tty_hangup(struct tty_struct *tty)
 	/* I guess we need to lock here - Jean II */
 	spin_lock_irqsave(&self->spinlock, flags);
 	self->flags &= ~ASYNC_NORMAL_ACTIVE;
-	self->tty = 0;
+	self->tty = NULL;
 	self->open_count = 0;
 	spin_unlock_irqrestore(&self->spinlock, flags);
 

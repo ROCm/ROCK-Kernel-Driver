@@ -136,8 +136,6 @@ copy_siginfo (siginfo_t *to, siginfo_t *from)
 		memcpy(to, from, 4*sizeof(int) + sizeof(from->_sifields._sigchld));
 }
 
-extern int copy_siginfo_from_user(siginfo_t *to, siginfo_t *from);
-
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_IA64_SIGINFO_H */

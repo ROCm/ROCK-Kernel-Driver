@@ -315,7 +315,7 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 unsigned long last_jiffies = -HZ;
 
 void
-isdn_net_autohup()
+isdn_net_autohup(void)
 {
 	isdn_net_dev *p = dev->netdev;
 	int anymore;
@@ -396,8 +396,8 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 	if (p) {
 		isdn_net_local *lp = p->local;
 #ifdef CONFIG_ISDN_X25
-		struct concap_proto *cprot = lp -> netdev -> cprot;
-		struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
+		struct concap_proto *cprot = lp->netdev->cprot;
+		struct concap_proto_ops *pops = cprot ? cprot->pops : NULL;
 #endif
 		switch (cmd) {
 			case ISDN_STAT_BSENT:
@@ -617,7 +617,7 @@ isdn_net_dial(void)
 						s = "dial suppressed: isdn system stopped";
 					else
 						s = "dial suppressed: dialmode `off'";
-					isdn_net_unreachable(&p->dev, 0, s);
+					isdn_net_unreachable(&p->dev, NULL, s);
 					isdn_net_hangup(&p->dev);
 					break;
 				}
@@ -645,7 +645,7 @@ isdn_net_dial(void)
 						if (time_after(jiffies, lp->dialstarted + lp->dialtimeout)) {
 							lp->dialwait_timer = jiffies + lp->dialwait;
 							lp->dialstarted = 0;
-							isdn_net_unreachable(&p->dev, 0, "dial: timed out");
+							isdn_net_unreachable(&p->dev, NULL, "dial: timed out");
 							isdn_net_hangup(&p->dev);
 							break;
 						}
@@ -675,7 +675,7 @@ isdn_net_dial(void)
 							if (lp->dialtimeout == 0) {
 								lp->dialwait_timer = jiffies + lp->dialwait;
 								lp->dialstarted = 0;
-								isdn_net_unreachable(&p->dev, 0, "dial: tried all numbers dialmax times");
+								isdn_net_unreachable(&p->dev, NULL, "dial: tried all numbers dialmax times");
 							}
 							isdn_net_hangup(&p->dev);
 							break;
@@ -827,8 +827,8 @@ isdn_net_hangup(struct net_device *d)
 	isdn_net_local *lp = (isdn_net_local *) d->priv;
 	isdn_ctrl cmd;
 #ifdef CONFIG_ISDN_X25
-	struct concap_proto *cprot = lp -> netdev -> cprot;
-	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
+	struct concap_proto *cprot = lp->netdev->cprot;
+	struct concap_proto_ops *pops = cprot ? cprot->pops : NULL;
 #endif
 
 	if (lp->flags & ISDN_NET_CONNECTED) {
@@ -863,8 +863,6 @@ isdn_net_hangup(struct net_device *d)
 		isdn_all_eaz(lp->isdn_device, lp->isdn_channel);
 	}
 	isdn_net_unbind_channel(lp);
-	if (!lp->master) /* never send this event to an slave device */
-		netdev_event(d, NETDEV_REBOOT);
 }
 
 typedef struct {
@@ -1418,11 +1416,10 @@ isdn_net_ciscohdlck_alloc_skb(isdn_net_local *lp, int len)
 	struct sk_buff *skb;
 
 	skb = alloc_skb(hl + len, GFP_ATOMIC);
-	if (!skb) {
+	if (skb)
+		skb_reserve(skb, hl);
+	else 
 		printk("isdn out of mem at %s:%d!\n", __FILE__, __LINE__);
-		return 0;
-	}
-	skb_reserve(skb, hl);
 	return skb;
 }
 
@@ -1435,7 +1432,7 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	unsigned long expires = 0;
 	int tmp = 0;
 	int period = lp->cisco_keepalive_period;
-	char debserint = lp->cisco_debserint;
+	s8 debserint = lp->cisco_debserint;
 	int rc = 0;
 
 	if (lp->p_encap != ISDN_NET_ENCAP_CISCOHDLCK)
@@ -1445,15 +1442,14 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		/* get/set keepalive period */
 		case SIOCGKEEPPERIOD:
 			len = (unsigned long)sizeof(lp->cisco_keepalive_period);
-			if (copy_to_user((char *)ifr->ifr_ifru.ifru_data,
-				(int *)&lp->cisco_keepalive_period, len))
+			if (copy_to_user(ifr->ifr_data,
+				&lp->cisco_keepalive_period, len))
 				rc = -EFAULT;
 			break;
 		case SIOCSKEEPPERIOD:
 			tmp = lp->cisco_keepalive_period;
 			len = (unsigned long)sizeof(lp->cisco_keepalive_period);
-			if (copy_from_user((int *)&period,
-				(char *)ifr->ifr_ifru.ifru_data, len))
+			if (copy_from_user(&period, ifr->ifr_data, len))
 				rc = -EFAULT;
 			if ((period > 0) && (period <= 32767))
 				lp->cisco_keepalive_period = period;
@@ -1472,14 +1468,14 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		/* get/set debugging */
 		case SIOCGDEBSERINT:
 			len = (unsigned long)sizeof(lp->cisco_debserint);
-			if (copy_to_user((char *)ifr->ifr_ifru.ifru_data,
-				(char *)&lp->cisco_debserint, len))
+			if (copy_to_user(ifr->ifr_data,
+				&lp->cisco_debserint, len))
 				rc = -EFAULT;
 			break;
 		case SIOCSDEBSERINT:
 			len = (unsigned long)sizeof(lp->cisco_debserint);
-			if (copy_from_user((char *)&debserint,
-				(char *)ifr->ifr_ifru.ifru_data, len))
+			if (copy_from_user(&debserint,
+				ifr->ifr_data, len))
 				rc = -EFAULT;
 			if ((debserint >= 0) && (debserint <= 64))
 				lp->cisco_debserint = debserint;
@@ -2185,7 +2181,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			    *my_eaz == 'b' || *my_eaz == 'B')
                                 my_eaz++; /* skip to allow a match */
                         else
-                                my_eaz = 0; /* force non match */
+                                my_eaz = NULL; /* force non match */
                 } else { /* it's a DATA call, check if we allow it */
                         if (*my_eaz == 'b' || *my_eaz == 'B')
                                 my_eaz++; /* skip to allow a match */
@@ -2970,7 +2966,7 @@ isdn_net_addphone(isdn_net_ioctl_phone * phone)
  * This might sleep and must be called with the isdn semaphore down.
  */
 int
-isdn_net_getphones(isdn_net_ioctl_phone * phone, char *phones)
+isdn_net_getphones(isdn_net_ioctl_phone * phone, char __user *phones)
 {
 	isdn_net_dev *p = isdn_net_findif(phone->name);
 	int inout = phone->outgoing & 1;
@@ -3003,7 +2999,7 @@ isdn_net_getphones(isdn_net_ioctl_phone * phone, char *phones)
  * to user space.
  */
 int
-isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone *peer)
+isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone __user *peer)
 {
 	isdn_net_dev *p = isdn_net_findif(phone->name);
 	int ch, dv, idx;

@@ -72,9 +72,6 @@ choice
 	prompt "ARM system type"
 	default ARCH_RPC
 
-config ARCH_ADIFCC
-	bool "ADIFCC-based"
-
 config ARCH_CLPS7500
 	bool "Cirrus-CL-PS7500FE"
 
@@ -83,9 +80,6 @@ config ARCH_CLPS711X
 
 config ARCH_CO285
 	bool "Co-EBSA285"
-
-config ARCH_PXA
-	bool "PXA250/210-based"
 
 config ARCH_EBSA110
 	bool "EBSA-110"
@@ -111,6 +105,9 @@ config ARCH_INTEGRATOR
 config ARCH_IOP3XX
 	bool "IOP3xx-based"
 
+config ARCH_IXP4XX
+	bool "IXP4xx-based"
+
 config ARCH_L7200
 	bool "LinkUp-L7200"
 	help
@@ -123,6 +120,9 @@ config ARCH_L7200
 	  If you have any questions or comments about the Linux kernel port
 	  to this board, send e-mail to sjhill@cotw.com.
 
+config ARCH_PXA
+	bool "PXA2xx-based"
+
 config ARCH_RPC
 	bool "RiscPC"
 	help
@@ -132,8 +132,31 @@ config ARCH_RPC
 config ARCH_SA1100
 	bool "SA1100-based"
 
+config ARCH_S3C2410
+	bool "Samsung S3C2410"
+	help
+	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
+	  BAST (http://www.simtec.co.uk/products/EB110ITX/), the IPAQ 1940 or
+	  the Samsung SMDK2410 development board (and derviatives).
+
 config ARCH_SHARK
 	bool "Shark"
+
+config ARCH_LH7A40X
+	bool "Sharp LH7A40X"
+	help
+	  Say Y here for systems based on one of the Sharp LH7A40X
+	  System on a Chip processors.  These CPUs include an ARM922T
+	  core with a wide array of integrated devices for
+	  hand-held and low-power applications.
+
+config ARCH_OMAP
+	bool "TI OMAP"
+
+config ARCH_VERSATILE_PB
+	bool "Versatile PB"
+	help
+	  This enables support for ARM Ltd Versatile PB board.
 
 endchoice
 
@@ -147,14 +170,27 @@ source "arch/arm/mach-integrator/Kconfig"
 
 source "arch/arm/mach-iop3xx/Kconfig"
 
+source "arch/arm/mach-ixp4xx/Kconfig"
+
 source "arch/arm/mach-pxa/Kconfig"
 
 source "arch/arm/mach-sa1100/Kconfig"
+
+source "arch/arm/mach-omap/Kconfig"
+
+source "arch/arm/mach-s3c2410/Kconfig"
+
+source "arch/arm/mach-lh7a40x/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN
 	bool
 	depends on ARCH_RPC
+	default y
+
+config TIMER_ACORN
+	bool
+	depends on ARCH_ACORN || ARCH_CLPS7500
 	default y
 
 #####################################################################
@@ -186,10 +222,20 @@ config SA1111
 	depends on ASSABET_NEPONSET || SA1100_ADSBITSY || SA1100_BADGE4 || SA1100_CONSUS || SA1100_GRAPHICSMASTER || SA1100_JORNADA720 || ARCH_LUBBOCK || SA1100_PFS168 || SA1100_PT_SYSTEM3 || SA1100_XP860
 	default y
 
+config SHARP_LOCOMO
+	bool
+	depends on SA1100_COLLIE
+	default y
+
 config FORCE_MAX_ZONEORDER
 	int
 	depends on SA1111
 	default "9"
+
+config DMABOUNCE
+	bool
+	depends on SA1111 || ARCH_IXP4XX
+	default y
 
 source arch/arm/mm/Kconfig
 
@@ -207,10 +253,10 @@ menu "General setup"
 # Select various configuration options depending on the machine type
 config DISCONTIGMEM
 	bool
-	depends on ARCH_EDB7211 || ARCH_SA1100
+	depends on ARCH_EDB7211 || ARCH_SA1100 || (ARCH_LH7A40X && !LH7A40X_SROMLL)
 	default y
 	help
-	  Say Y to upport efficient handling of discontiguous physical memory,
+	  Say Y to support efficient handling of discontiguous physical memory,
 	  for architectures which are either NUMA (Non-Uniform Memory Access)
 	  or have huge holes in the physical address space for other reasons.
 	  See <file:Documentation/vm/numa> for more.
@@ -218,7 +264,7 @@ config DISCONTIGMEM
 # Now handle the bus types
 config PCI
 	bool "PCI support" if ARCH_INTEGRATOR_AP
-	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX
+	default y if ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -231,11 +277,6 @@ config PCI
 	  doesn't.
 
 # Select the host bridge type
-config PCI_HOST_PLX90X0
-	bool
-	depends on PCI && ARCH_FTVPCI
-	default y
-
 config PCI_HOST_VIA82C505
 	bool
 	depends on PCI && ARCH_SHARK
@@ -248,7 +289,7 @@ config ICST525
 
 config ARM_AMBA
 	bool
-	depends on ARCH_INTEGRATOR
+	depends on ARCH_INTEGRATOR || ARCH_VERSATILE_PB
 	default y
 
 config ISA
@@ -269,7 +310,7 @@ config ISA_DMA
 
 config FIQ
 	bool
-	depends on ARCH_ACORN || ARCH_L7200
+	depends on ARCH_ACORN || ARCH_L7200 || ARCH_LH7A400
 	default y
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
@@ -329,7 +370,7 @@ config CPU_FREQ_INTEGRATOR
 	help
 	  This enables the CPUfreq driver for ARM Integrator CPUs.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say Y.
 
@@ -381,6 +422,17 @@ config FPE_FASTFPE
 	  for scientific calculations, but you have to check this for yourself.
 	  If you do not feel you need a faster FP emulation you should better
 	  choose NWFPE.
+
+config VFP
+	bool "VFP-format floating point maths"
+	help
+	  Say Y to include VFP support code in the kernel. This is needed
+	  if your hardware includes a VFP unit.
+
+	  Please see <file:Documentation/arm/VFP/release-notes.txt> for
+	  release notes and additional status information.
+
+	  Say N if your target does not have VFP hardware.
 
 source "fs/Kconfig.binfmt"
 
@@ -500,7 +552,7 @@ config CMDLINE
 
 config LEDS
 	bool "Timer and CPU usage LEDs"
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB
 	help
 	  If you say Y here, the LEDs on your machine will be used
 	  to provide useful information about your current system status.
@@ -513,8 +565,8 @@ config LEDS
 	  system, but the driver will do nothing.
 
 config LEDS_TIMER
-	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T)
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T
+	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || MACH_MAINSTONE || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE_PB)
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB
 	default y if ARCH_EBSA110
 	help
 	  If you say Y here, one of the system LEDs (the green one on the
@@ -529,7 +581,7 @@ config LEDS_TIMER
 
 config LEDS_CPU
 	bool "CPU usage LED"
-	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T)
+	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE_PB)
 	help
 	  If you say Y here, the red LED will be used to give a good real
 	  time indication of CPU usage, by lighting whenever the idle task
@@ -542,7 +594,7 @@ config LEDS_CPU
 config ALIGNMENT_TRAP
 	bool
 	depends on CPU_32
-	default y
+	default y if !ARCH_EBSA110
 	help
 	  ARM processors can not fetch/store information which is not
 	  naturally aligned on the bus, i.e., a 4 byte fetch must start at an
@@ -570,7 +622,9 @@ source "drivers/acorn/block/Kconfig"
 
 source "net/Kconfig"
 
+if ARCH_CLPS7500 || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_L7200 || ARCH_LH7A40X || ARCH_PXA || ARCH_RPC || ARCH_S3C2410 || ARCH_SA1100 || ARCH_SHARK || FOOTBRIDGE
 source "drivers/ide/Kconfig"
+endif
 
 source "drivers/scsi/Kconfig"
 
@@ -719,6 +773,18 @@ config DEBUG_LL
 	  in the kernel.  This is helpful if you are debugging code that
 	  executes before the console is initialized.
 
+config DEBUG_ICEDCC
+	bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+	depends on DEBUG_LL
+	help
+	  Say Y here if you want the debug print routines to direct their
+	  output to the EmbeddedICE macrocell's DCC channel using
+	  co-processor 14. This is known to work on the ARM9 style ICE
+	  channel.
+
+	  It does include a timeout to ensure that the system does not
+	  totally freeze when there is nothing connected to read.
+
 config DEBUG_DC21285_PORT
 	bool "Kernel low-level debugging messages via footbridge serial port"
 	depends on DEBUG_LL && FOOTBRIDGE
@@ -736,6 +802,23 @@ config DEBUG_CLPS711X_UART2
 	  output to the second serial port on these devices.  Saying N will
 	  cause the debug messages to appear on the first serial port.
 
+config DEBUG_S3C2410_PORT
+	depends on DEBUG_LL && ARCH_S3C2410
+	bool "Kernel low-level debugging messages via S3C2410 UART"
+	help
+	  Say Y here if you want debug print routines to go to one of the
+	  S3C2410 internal UARTs. The chosen UART must have been configured
+	  before it is used.
+
+config DEBUG_S3C2410_UART
+	depends on DEBUG_LL && ARCH_S3C2410
+	int "S3C2410 UART to use for low-level debug"
+	default "0"
+	help
+	  Choice for UART for kernel low-level using S3C2410 UARTS,
+	  should be between zero and two. The port must have been
+	  initalised by the boot-loader before use.
+
 endmenu
 
 source "security/Kconfig"
@@ -743,6 +826,4 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-
-source "rpmify/Kconfig"
 

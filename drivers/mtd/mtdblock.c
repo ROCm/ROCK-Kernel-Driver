@@ -1,7 +1,7 @@
 /* 
  * Direct MTD block device access
  *
- * $Id: mtdblock.c,v 1.63 2003/06/23 12:00:08 dwmw2 Exp $
+ * $Id: mtdblock.c,v 1.64 2003/10/04 17:14:14 dwmw2 Exp $
  *
  * (C) 2000-2003 Nicolas Pitre <nico@cam.org>
  * (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>
@@ -275,7 +275,7 @@ static int mtdblock_open(struct mtd_blktrans_dev *mbd)
 	
 	/* OK, it's not open. Create cache info for it */
 	mtdblk = kmalloc(sizeof(struct mtdblk_dev), GFP_KERNEL);
-	if (!mtdblks)
+	if (!mtdblk)
 		return -ENOMEM;
 
 	memset(mtdblk, 0, sizeof(*mtdblk));

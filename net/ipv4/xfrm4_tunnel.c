@@ -6,82 +6,18 @@
 #include <linux/skbuff.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
-#include <net/icmp.h>
-#include <net/inet_ecn.h>
+#include <net/protocol.h>
 
-int xfrm4_tunnel_check_size(struct sk_buff *skb)
+static int ipip_output(struct sk_buff **pskb)
 {
-	int mtu, ret = 0;
-	struct dst_entry *dst;
-	struct iphdr *iph = skb->nh.iph;
-
-	if (IPCB(skb)->flags & IPSKB_XFRM_TUNNEL_SIZE)
-		goto out;
-
-	IPCB(skb)->flags |= IPSKB_XFRM_TUNNEL_SIZE;
+	struct sk_buff *skb = *pskb;
+	struct iphdr *iph;
 	
-	if (!(iph->frag_off & htons(IP_DF)))
-		goto out;
-
-	dst = skb->dst;
-	mtu = dst_pmtu(dst) - dst->header_len - dst->trailer_len;
-	if (skb->len > mtu) {
-		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED, htonl(mtu));
-		ret = -EMSGSIZE;
-	}
-out:
-	return ret;
-}
-
-static int ipip_output(struct sk_buff *skb)
-{
-	struct dst_entry *dst = skb->dst;
-	struct xfrm_state *x = dst->xfrm;
-	struct iphdr *iph, *top_iph;
-	int tos, err;
-
-	if ((err = xfrm4_tunnel_check_size(skb)) != 0)
-		goto error_nolock;
-		
 	iph = skb->nh.iph;
+	iph->tot_len = htons(skb->len);
+	ip_send_check(iph);
 
-	spin_lock_bh(&x->lock);
-
-	tos = iph->tos;
-
-	top_iph = (struct iphdr *) skb_push(skb, x->props.header_len);
-	top_iph->ihl = 5;
-	top_iph->version = 4;
-	top_iph->tos = INET_ECN_encapsulate(tos, iph->tos);
-	top_iph->tot_len = htons(skb->len);
-	top_iph->frag_off = iph->frag_off & ~htons(IP_MF|IP_OFFSET);
-	if (!(iph->frag_off & htons(IP_DF)))
-		__ip_select_ident(top_iph, dst, 0);
-	top_iph->ttl = iph->ttl;
-	top_iph->protocol = IPPROTO_IPIP;
-	top_iph->check = 0;
-	top_iph->saddr = x->props.saddr.a4;
-	top_iph->daddr = x->id.daddr.a4;
-	memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-	ip_send_check(top_iph);
-
-	skb->nh.raw = skb->data;
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++;
-
-	spin_unlock_bh(&x->lock);
-
-	if ((skb->dst = dst_pop(dst)) == NULL) {
-		kfree_skb(skb);
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
-	return NET_XMIT_BYPASS;
-
-error_nolock:
-	kfree_skb(skb);
-	return err;
+	return 0;
 }
 
 static int ipip_xfrm_rcv(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
@@ -167,11 +103,10 @@ static struct xfrm_type ipip_type = {
 	.output		= ipip_output
 };
 
-static struct inet_protocol ipip_protocol = {
+static struct net_protocol ipip_protocol = {
 	.handler	=	ipip_rcv,
 	.err_handler	=	ipip_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init ipip_init(void)

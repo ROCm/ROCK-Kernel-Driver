@@ -32,7 +32,7 @@ ENTRY(ia32_execve)
 END(ia32_execve)
 
 ENTRY(ia32_clone)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
 	alloc r16=ar.pfs,5,2,6,0
 	DO_SAVE_SWITCH_STACK
 	mov loc0=rp
@@ -110,7 +110,9 @@ GLOBAL_ENTRY(ia32_ret_from_clone)
 	ld4 r2=[r2]
 	;;
 	mov r8=0
-	tbit.nz p6,p0=r2,TIF_SYSCALL_TRACE
+	and r2=_TIF_SYSCALL_TRACEAUDIT,r2
+	;;
+	cmp.ne p6,p0=r2,r0
 (p6)	br.cond.spnt .ia32_strace_check_retval
 	;;					// prevent RAW on r8
 END(ia32_ret_from_clone)
@@ -142,7 +144,7 @@ GLOBAL_ENTRY(ia32_trace_syscall)
 	adds r2=IA64_PT_REGS_R8_OFFSET+16,sp
 	;;
 	st8 [r2]=r3				// initialize return code to -ENOSYS
-	br.call.sptk.few rp=syscall_trace	// give parent a chance to catch syscall args
+	br.call.sptk.few rp=syscall_trace_enter	// give parent a chance to catch syscall args
 .ret2:	// Need to reload arguments (they may be changed by the tracing process)
 	adds r2=IA64_PT_REGS_R1_OFFSET+16,sp	// r2 = &pt_regs.r1
 	adds r3=IA64_PT_REGS_R13_OFFSET+16,sp	// r3 = &pt_regs.r13
@@ -170,7 +172,7 @@ GLOBAL_ENTRY(ia32_trace_syscall)
 	adds r2=IA64_PT_REGS_R8_OFFSET+16,sp	// r2 = &pt_regs.r8
 	;;
 	st8.spill [r2]=r8			// store return value in slot for r8
-	br.call.sptk.few rp=syscall_trace	// give parent a chance to catch return value
+	br.call.sptk.few rp=syscall_trace_leave	// give parent a chance to catch return value
 .ret4:	alloc r2=ar.pfs,0,0,0,0			// drop the syscall argument frame
 	br.cond.sptk.many ia64_leave_kernel
 END(ia32_trace_syscall)
@@ -349,12 +351,12 @@ ia32_syscall_table:
 	data8 sys_setfsuid	/* 16-bit version */
 	data8 sys_setfsgid	/* 16-bit version */
 	data8 sys_llseek	  /* 140 */
-	data8 sys32_getdents
-	data8 sys32_select
+	data8 compat_sys_getdents
+	data8 compat_sys_select
 	data8 sys_flock
 	data8 sys32_msync
-	data8 sys32_readv	  /* 145 */
-	data8 sys32_writev
+	data8 compat_sys_readv	  /* 145 */
+	data8 compat_sys_writev
 	data8 sys_getsid
 	data8 sys_fdatasync
 	data8 sys32_sysctl
@@ -428,7 +430,7 @@ ia32_syscall_table:
 	data8 sys_pivot_root
 	data8 sys_mincore
 	data8 sys_madvise
-	data8 sys_getdents64	  /* 220 */
+	data8 compat_sys_getdents64	  /* 220 */
 	data8 compat_sys_fcntl64
 	data8 sys_ni_syscall		/* reserved for TUX */
 	data8 sys_ni_syscall		/* reserved for Security */
@@ -476,13 +478,21 @@ ia32_syscall_table:
  	data8 compat_clock_gettime /* 265 */
  	data8 compat_clock_getres
  	data8 compat_clock_nanosleep
-	data8 sys_statfs64
-	data8 sys_fstatfs64
+	data8 compat_statfs64
+	data8 compat_fstatfs64
  	data8 sys_tgkill	/* 270 */
  	data8 compat_sys_utimes
  	data8 sys32_fadvise64_64
  	data8 sys_ni_syscall
   	data8 sys_ni_syscall
+ 	data8 sys_ni_syscall	/* 275 */
+  	data8 sys_ni_syscall
+  	data8 compat_sys_mq_open
+  	data8 sys_mq_unlink
+  	data8 compat_sys_mq_timedsend
+  	data8 compat_sys_mq_timedreceive	/* 280 */
+  	data8 compat_sys_mq_notify
+  	data8 compat_sys_mq_getsetattr
 
 	// guard against failures to increase IA32_NR_syscalls
 	.org ia32_syscall_table + 8*IA32_NR_syscalls

@@ -21,8 +21,6 @@
 #include <asm/irq.h>
 #include <asm/hardware.h>
 
-#include <asm/mach-types.h>
-
 extern void xs80200_irq_mask(unsigned int);
 extern void xs80200_irq_unmask(unsigned int);
 extern void xs80200_init_irq(void);

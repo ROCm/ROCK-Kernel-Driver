@@ -133,10 +133,10 @@ fp_getsource:
 	| decode addressing mode for source
 	fp_decode_addr_mode
 
-	.long 	fp_data, fp_ill
-	.long 	fp_indirect, fp_postinc
-	.long 	fp_predecr, fp_disp16
-	.long 	fp_extmode0, fp_extmode1
+	.long	fp_data, fp_ill
+	.long	fp_indirect, fp_postinc
+	.long	fp_predecr, fp_disp16
+	.long	fp_extmode0, fp_extmode1
 
 	| addressing mode: data register direct
 fp_data:

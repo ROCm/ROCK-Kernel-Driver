@@ -260,7 +260,7 @@ int ircomm_tty_tiocmset(struct tty_struct *tty, struct file *file,
  *
  */
 static int ircomm_tty_get_serial_info(struct ircomm_tty_cb *self,
-				      struct serial_struct *retinfo)
+				      struct serial_struct __user *retinfo)
 {
 	struct serial_struct info;
    
@@ -297,7 +297,7 @@ static int ircomm_tty_get_serial_info(struct ircomm_tty_cb *self,
  *
  */
 static int ircomm_tty_set_serial_info(struct ircomm_tty_cb *self,
-				      struct serial_struct *new_info)
+				      struct serial_struct __user *new_info)
 {
 #if 0
 	struct serial_struct new_serial;
@@ -388,10 +388,10 @@ int ircomm_tty_ioctl(struct tty_struct *tty, struct file *file,
 
 	switch (cmd) {
 	case TIOCGSERIAL:
-		ret = ircomm_tty_get_serial_info(self, (struct serial_struct *) arg);
+		ret = ircomm_tty_get_serial_info(self, (struct serial_struct __user *) arg);
 		break;
 	case TIOCSSERIAL:
-		ret = ircomm_tty_set_serial_info(self, (struct serial_struct *) arg);
+		ret = ircomm_tty_set_serial_info(self, (struct serial_struct __user *) arg);
 		break;
 	case TIOCMIWAIT:
 		IRDA_DEBUG(0, "(), TIOCMIWAIT, not impl!\n");
@@ -403,7 +403,7 @@ int ircomm_tty_ioctl(struct tty_struct *tty, struct file *file,
 		save_flags(flags); cli();
 		cnow = driver->icount;
 		restore_flags(flags);
-		p_cuser = (struct serial_icounter_struct *) arg;
+		p_cuser = (struct serial_icounter_struct __user *) arg;
 		if (put_user(cnow.cts, &p_cuser->cts) ||
 		    put_user(cnow.dsr, &p_cuser->dsr) ||
 		    put_user(cnow.rng, &p_cuser->rng) ||

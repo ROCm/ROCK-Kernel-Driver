@@ -35,27 +35,8 @@ ssize_t seq_read(struct file *, char __user *, size_t, loff_t *);
 loff_t seq_lseek(struct file *, loff_t, int);
 int seq_release(struct inode *, struct file *);
 int seq_escape(struct seq_file *, const char *, const char *);
-
-static inline int seq_putc(struct seq_file *m, char c)
-{
-	if (m->count < m->size) {
-		m->buf[m->count++] = c;
-		return 0;
-	}
-	return -1;
-}
-
-static inline int seq_puts(struct seq_file *m, const char *s)
-{
-	int len = strlen(s);
-	if (m->count + len < m->size) {
-		memcpy(m->buf + m->count, s, len);
-		m->count += len;
-		return 0;
-	}
-	m->count = m->size;
-	return -1;
-}
+int seq_putc(struct seq_file *m, char c);
+int seq_puts(struct seq_file *m, const char *s);
 
 int seq_printf(struct seq_file *, const char *, ...)
 	__attribute__ ((format (printf,2,3)));

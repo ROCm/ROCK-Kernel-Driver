@@ -12,12 +12,13 @@
 
 #ifdef __KERNEL__
 
+#include <asm/fpstate.h>
+
 #ifndef __ASSEMBLY__
 
 struct task_struct;
 struct exec_domain;
 
-#include <asm/fpstate.h>
 #include <asm/ptrace.h>
 #include <asm/types.h>
 #include <asm/domain.h>
@@ -40,7 +41,7 @@ struct cpu_context_save {
 
 /*
  * low level task data that entry.S needs immediate access to.
- * We assume cpu_context follows immedately after cpu_domain.
+ * __switch_to() assumes cpu_context follows immediately after cpu_domain.
  */
 struct thread_info {
 	unsigned long		flags;		/* low level flags */
@@ -53,7 +54,8 @@ struct thread_info {
 	struct cpu_context_save	cpu_context;	/* cpu context */
 	__u8			used_cp[16];	/* thread used copro */
 	union fp_state		fpstate;
-	struct restart_block    restart_block;
+	union vfp_state		vfpstate;
+	struct restart_block	restart_block;
 };
 
 #define INIT_THREAD_INFO(tsk)						\
@@ -108,8 +110,9 @@ extern void free_thread_info(struct thread_info *);
 #define TI_CPU		20
 #define TI_CPU_DOMAIN	24
 #define TI_CPU_SAVE	28
-#define TI_USED_MATH	76
-#define TI_FPSTATE	(TI_USED_MATH+16)
+#define TI_USED_CP	76
+#define TI_FPSTATE	(TI_USED_CP+16)
+#define TI_VFPSTATE	(TI_FPSTATE+FP_SIZE*4)
 
 #endif
 

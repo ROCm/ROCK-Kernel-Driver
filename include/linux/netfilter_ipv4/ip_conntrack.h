@@ -103,7 +103,7 @@ union ip_conntrack_nat_help {
 #include <linux/types.h>
 #include <linux/skbuff.h>
 
-#ifdef CONFIG_NF_DEBUG
+#ifdef CONFIG_NETFILTER_DEBUG
 #define IP_NF_ASSERT(x)							\
 do {									\
 	if (!(x))							\
@@ -207,10 +207,6 @@ struct ip_conntrack
 	} nat;
 #endif /* CONFIG_IP_NF_NAT_NEEDED */
 
-#if defined(CONFIG_IP_NF_CONNTRACK_MARK)
-	unsigned long mark;
-#endif
-
 };
 
 /* get master conntrack via master expectation */
@@ -255,6 +251,9 @@ extern void ip_ct_refresh(struct ip_conntrack *ct,
 /* These are for NAT.  Icky. */
 /* Call me when a conntrack is destroyed. */
 extern void (*ip_conntrack_destroyed)(struct ip_conntrack *conntrack);
+
+/* Fake conntrack entry for untracked connections */
+extern struct ip_conntrack ip_conntrack_untracked;
 
 /* Returns new sk_buff, or NULL */
 struct sk_buff *

@@ -204,6 +204,9 @@ __s64 _m64_popcnt(__s64 a);
 #define ia64_srlz_d		__dsrlz
 #define ia64_srlz_i		__isrlz
 
+#define ia64_dv_serialize_data()
+#define ia64_dv_serialize_instruction()
+
 #define ia64_st1_rel		__st1_rel
 #define ia64_st2_rel		__st2_rel
 #define ia64_st4_rel		__st4_rel

@@ -3,7 +3,7 @@
 /*
  *	cd1400.h  -- cd1400 UART hardware info.
  *
- *	Copyright (C) 1996-1998  Stallion Technologies (support@stallion.oz.au).
+ *	Copyright (C) 1996-1998  Stallion Technologies
  *	Copyright (C) 1994-1996  Greg Ungerer.
  *
  *	This program is free software; you can redistribute it and/or modify

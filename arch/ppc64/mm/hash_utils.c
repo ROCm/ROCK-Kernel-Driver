@@ -316,7 +316,6 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 		ret = __hash_page(ea, access, vsid, ptep, trap, local);
 	}
 
-
 	return ret;
 }
 

@@ -124,7 +124,7 @@ void __init setup_node_zones(int nodeid)
 	start_pfn = node_start_pfn(nodeid);
 	end_pfn = node_end_pfn(nodeid);
 
-	Dprintk(KERN_INFO "setting up node %d %lx-%lx\n", nodeid, start_pfn, end_pfn); 
+	Dprintk(KERN_INFO "setting up node %d %lx-%lx\n", nodeid, start_pfn, end_pfn);
 	
 	/* All nodes > 0 have a zero length zone DMA */ 
 	dma_end_pfn = __pa(MAX_DMA_ADDRESS) >> PAGE_SHIFT; 
@@ -182,7 +182,7 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	numnodes = 1;
 	for (i = 0; i < NR_CPUS; i++)
 		cpu_to_node[i] = 0;
-	node_to_cpumask[0] = 1;
+	node_to_cpumask[0] = cpumask_of_cpu(0);
 	setup_node_bootmem(0, start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT);
 }
 

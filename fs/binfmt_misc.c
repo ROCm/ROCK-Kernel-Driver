@@ -39,6 +39,8 @@ static int enabled = 1;
 
 enum {Enabled, Magic};
 #define MISC_FMT_PRESERVE_ARGV0 (1<<31)
+#define MISC_FMT_OPEN_BINARY (1<<30)
+#define MISC_FMT_CREDENTIALS (1<<29)
 
 typedef struct {
 	struct list_head list;
@@ -52,7 +54,7 @@ typedef struct {
 	struct dentry *dentry;
 } Node;
 
-static rwlock_t entries_lock __attribute__((unused)) = RW_LOCK_UNLOCKED;
+static rwlock_t entries_lock = RW_LOCK_UNLOCKED;
 static struct vfsmount *bm_mnt;
 static int entry_count;
 
@@ -102,10 +104,12 @@ static Node *check_file(struct linux_binprm *bprm)
 static int load_misc_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 {
 	Node *fmt;
-	struct file * file;
+	struct file * interp_file = NULL;
 	char iname[BINPRM_BUF_SIZE];
 	char *iname_addr = iname;
 	int retval;
+	int fd_binary = -1;
+	struct files_struct *files = NULL;
 
 	retval = -ENOEXEC;
 	if (!enabled)
@@ -120,33 +124,102 @@ static int load_misc_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	if (!fmt)
 		goto _ret;
 
-	allow_write_access(bprm->file);
-	fput(bprm->file);
-	bprm->file = NULL;
-
-	/* Build args for interpreter */
 	if (!(fmt->flags & MISC_FMT_PRESERVE_ARGV0)) {
 		remove_arg_zero(bprm);
 	}
-	retval = copy_strings_kernel(1, &bprm->interp, bprm);
-	if (retval < 0) goto _ret; 
+
+	if (fmt->flags & MISC_FMT_OPEN_BINARY) {
+
+		files = current->files;
+		retval = unshare_files();
+		if (retval < 0)
+			goto _ret;
+		if (files == current->files) {
+			put_files_struct(files);
+			files = NULL;
+		}
+		/* if the binary should be opened on behalf of the
+		 * interpreter than keep it open and assign descriptor
+		 * to it */
+ 		fd_binary = get_unused_fd();
+ 		if (fd_binary < 0) {
+ 			retval = fd_binary;
+ 			goto _unshare;
+ 		}
+ 		fd_install(fd_binary, bprm->file);
+
+		/* if the binary is not readable than enforce mm->dumpable=0
+		   regardless of the interpreter's permissions */
+		if (permission(bprm->file->f_dentry->d_inode, MAY_READ, NULL))
+			bprm->interp_flags |= BINPRM_FLAGS_ENFORCE_NONDUMP;
+
+		allow_write_access(bprm->file);
+		bprm->file = NULL;
+
+		/* mark the bprm that fd should be passed to interp */
+		bprm->interp_flags |= BINPRM_FLAGS_EXECFD;
+		bprm->interp_data = fd_binary;
+
+ 	} else {
+ 		allow_write_access(bprm->file);
+ 		fput(bprm->file);
+ 		bprm->file = NULL;
+ 	}
+	/* make argv[1] be the path to the binary */
+	retval = copy_strings_kernel (1, &bprm->interp, bprm);
+	if (retval < 0)
+		goto _error;
 	bprm->argc++;
-	retval = copy_strings_kernel(1, &iname_addr, bprm);
-	if (retval < 0) goto _ret; 
-	bprm->argc++;
+
+	/* add the interp as argv[0] */
+	retval = copy_strings_kernel (1, &iname_addr, bprm);
+	if (retval < 0)
+		goto _error;
+	bprm->argc ++;
+
 	bprm->interp = iname;	/* for binfmt_script */
 
-	file = open_exec(iname);
-	retval = PTR_ERR(file);
-	if (IS_ERR(file))
-		goto _ret;
-	bprm->file = file;
+	interp_file = open_exec (iname);
+	retval = PTR_ERR (interp_file);
+	if (IS_ERR (interp_file))
+		goto _error;
 
-	retval = prepare_binprm(bprm);
-	if (retval >= 0)
-		retval = search_binary_handler(bprm, regs);
+	bprm->file = interp_file;
+	if (fmt->flags & MISC_FMT_CREDENTIALS) {
+		/*
+		 * No need to call prepare_binprm(), it's already been
+		 * done.  bprm->buf is stale, update from interp_file.
+		 */
+		memset(bprm->buf, 0, BINPRM_BUF_SIZE);
+		retval = kernel_read(bprm->file, 0, bprm->buf, BINPRM_BUF_SIZE);
+	} else
+		retval = prepare_binprm (bprm);
+
+	if (retval < 0)
+		goto _error;
+
+	retval = search_binary_handler (bprm, regs);
+	if (retval < 0)
+		goto _error;
+
+	if (files) {
+		steal_locks(files);
+		put_files_struct(files);
+		files = NULL;
+	}
 _ret:
 	return retval;
+_error:
+	if (fd_binary > 0)
+		sys_close(fd_binary);
+	bprm->interp_flags = 0;
+	bprm->interp_data = 0;
+_unshare:
+	if (files) {
+		put_files_struct(current->files);
+		current->files = files;
+	}
+	goto _ret;
 }
 
 /* Command parsers */
@@ -191,12 +264,42 @@ static int unquote(char *from)
 	return p - from;
 }
 
+static inline char * check_special_flags (char * sfs, Node * e)
+{
+	char * p = sfs;
+	int cont = 1;
+
+	/* special flags */
+	while (cont) {
+		switch (*p) {
+			case 'P':
+				p++;
+				e->flags |= MISC_FMT_PRESERVE_ARGV0;
+				break;
+			case 'O':
+				p++;
+				e->flags |= MISC_FMT_OPEN_BINARY;
+				break;
+			case 'C':
+				p++;
+				/* this flags also implies the
+				   open-binary flag */
+				e->flags |= (MISC_FMT_CREDENTIALS |
+						MISC_FMT_OPEN_BINARY);
+				break;
+			default:
+				cont = 0;
+		}
+	}
+
+	return p;
+}
 /*
  * This registers a new binary format, it recognises the syntax
- * ':name:type:offset:magic:mask:interpreter:'
+ * ':name:type:offset:magic:mask:interpreter:flags'
  * where the ':' is the IFS, that can be chosen with the first char
  */
-static Node *create_entry(const char *buffer, size_t count)
+static Node *create_entry(const char __user *buffer, size_t count)
 {
 	Node *e;
 	int memsize, err;
@@ -293,10 +396,8 @@ static Node *create_entry(const char *buffer, size_t count)
 	if (!e->interpreter[0])
 		goto Einval;
 
-	if (*p == 'P') {
-		p++;
-		e->flags |= MISC_FMT_PRESERVE_ARGV0;
-	}
+
+	p = check_special_flags (p, e);
 
 	if (*p == '\n')
 		p++;
@@ -319,7 +420,7 @@ Einval:
  * Set status of entry/binfmt_misc:
  * '1' enables, '0' disables and '-1' clears entry/binfmt_misc
  */
-static int parse_command(const char *buffer, size_t count)
+static int parse_command(const char __user *buffer, size_t count)
 {
 	char s[4];
 
@@ -346,6 +447,7 @@ static void entry_status(Node *e, char *page)
 {
 	char *dp;
 	char *status = "disabled";
+	const char * flags = "flags: ";
 
 	if (test_bit(Enabled, &e->flags))
 		status = "enabled";
@@ -357,6 +459,22 @@ static void entry_status(Node *e, char *page)
 
 	sprintf(page, "%s\ninterpreter %s\n", status, e->interpreter);
 	dp = page + strlen(page);
+
+	/* print the special flags */
+	sprintf (dp, "%s", flags);
+	dp += strlen (flags);
+	if (e->flags & MISC_FMT_PRESERVE_ARGV0) {
+		*dp ++ = 'P';
+	}
+	if (e->flags & MISC_FMT_OPEN_BINARY) {
+		*dp ++ = 'O';
+	}
+	if (e->flags & MISC_FMT_CREDENTIALS) {
+		*dp ++ = 'C';
+	}
+	*dp ++ = '\n';
+
+
 	if (!test_bit(Magic, &e->flags)) {
 		sprintf(dp, "extension .%s\n", e->magic);
 	} else {
@@ -424,7 +542,7 @@ static void kill_node(Node *e)
 /* /<entry> */
 
 static ssize_t
-bm_entry_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
+bm_entry_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 {
 	Node *e = file->f_dentry->d_inode->u.generic_ip;
 	loff_t pos = *ppos;
@@ -456,7 +574,7 @@ out:
 	return res;
 }
 
-static ssize_t bm_entry_write(struct file *file, const char *buffer,
+static ssize_t bm_entry_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *ppos)
 {
 	struct dentry *root;
@@ -488,7 +606,7 @@ static struct file_operations bm_entry_operations = {
 
 /* /register */
 
-static ssize_t bm_register_write(struct file *file, const char *buffer,
+static ssize_t bm_register_write(struct file *file, const char __user *buffer,
 			       size_t count, loff_t *ppos)
 {
 	Node *e;
@@ -556,7 +674,7 @@ static struct file_operations bm_register_operations = {
 /* /status */
 
 static ssize_t
-bm_status_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
+bm_status_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	char *s = enabled ? "enabled" : "disabled";
 	int len = strlen(s);
@@ -574,7 +692,7 @@ bm_status_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 	return nbytes;
 }
 
-static ssize_t bm_status_write(struct file * file, const char * buffer,
+static ssize_t bm_status_write(struct file * file, const char __user * buffer,
 		size_t count, loff_t *ppos)
 {
 	int res = parse_command(buffer, count);
@@ -656,6 +774,6 @@ static void __exit exit_misc_binfmt(void)
 	unregister_filesystem(&bm_fs_type);
 }
 
-module_init(init_misc_binfmt);
+core_initcall(init_misc_binfmt);
 module_exit(exit_misc_binfmt);
 MODULE_LICENSE("GPL");

@@ -395,7 +395,7 @@ static int dio_bio_complete(struct dio *dio, struct bio *bio)
 		for (page_no = 0; page_no < bio->bi_vcnt; page_no++) {
 			struct page *page = bvec[page_no].bv_page;
 
-			if (dio->rw == READ)
+			if (dio->rw == READ && !PageCompound(page))
 				set_page_dirty_lock(page);
 			page_cache_release(page);
 		}
@@ -446,12 +446,15 @@ static int dio_bio_reap(struct dio *dio)
 		while (dio->bio_list) {
 			unsigned long flags;
 			struct bio *bio;
+			int ret2;
 
 			spin_lock_irqsave(&dio->bio_lock, flags);
 			bio = dio->bio_list;
 			dio->bio_list = bio->bi_private;
 			spin_unlock_irqrestore(&dio->bio_lock, flags);
-			ret = dio_bio_complete(dio, bio);
+			ret2 = dio_bio_complete(dio, bio);
+			if (ret == 0)
+				ret = ret2;
 		}
 		dio->reap_counter = 0;
 	}
@@ -912,7 +915,6 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	ssize_t ret = 0;
 	ssize_t ret2;
 	size_t bytes;
-	int enotblk = 0;
 
 	dio->bio = NULL;
 	dio->inode = inode;
@@ -994,7 +996,6 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 		 * be handled by buffered I/O when we return
 		 */
 		ret = 0;
-		enotblk = 1;
 	}
 	/*
 	 * There may be some unwritten disk at the end of a part-written
@@ -1062,24 +1063,29 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 			kfree(dio);
 		}
 	} else {
+		ssize_t transferred = 0;
+
 		finished_one_bio(dio);
 		ret2 = dio_await_completion(dio);
 		if (ret == 0)
 			ret = ret2;
 		if (ret == 0)
 			ret = dio->page_errors;
-		if (ret == 0 && dio->result) {
+		if (dio->result) {
 			loff_t i_size = i_size_read(inode);
 
-			ret = dio->result;
+			transferred = dio->result;
 			/*
 			 * Adjust the return value if the read crossed a
 			 * non-block-aligned EOF.
 			 */
-			if (rw == READ && (offset + ret > i_size))
-				ret = i_size - offset;
+			if (rw == READ && (offset + transferred > i_size))
+				transferred = i_size - offset;
 		}
-		dio_complete(dio, offset, ret);
+		dio_complete(dio, offset, transferred);
+		if (ret == 0)
+			ret = transferred;
+
 		/* We could have also come here on an AIO file extend */
 		if (!is_sync_kiocb(iocb) && rw == WRITE &&
 		    ret >= 0 && dio->result == dio->size)
@@ -1090,8 +1096,6 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 			aio_complete(iocb, ret, 0);
 		kfree(dio);
 	}
-	if (enotblk && ret > 0)
-		ret = 0;
 	return ret;
 }
 

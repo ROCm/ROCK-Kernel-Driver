@@ -14,7 +14,7 @@ extern struct list_head atm_devs;
 extern spinlock_t atm_dev_lock;
 
 
-int atm_dev_ioctl(unsigned int cmd, unsigned long arg);
+int atm_dev_ioctl(unsigned int cmd, void __user *arg);
 
 
 #ifdef CONFIG_PROC_FS

@@ -25,11 +25,9 @@ struct prefix_info {
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8			onlink : 1,
 			 	autoconf : 1,
-				router_address : 1,
-				reserved : 5;
+				reserved : 6;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-	__u8			reserved : 5,
-				router_address : 1,
+	__u8			reserved : 6,
 				autoconf : 1,
 				onlink : 1;
 #else
@@ -54,9 +52,9 @@ struct prefix_info {
 extern void			addrconf_init(void);
 extern void			addrconf_cleanup(void);
 
-extern int			addrconf_add_ifaddr(void *arg);
-extern int			addrconf_del_ifaddr(void *arg);
-extern int			addrconf_set_dstaddr(void *arg);
+extern int			addrconf_add_ifaddr(void __user *arg);
+extern int			addrconf_del_ifaddr(void __user *arg);
+extern int			addrconf_set_dstaddr(void __user *arg);
 
 extern int			ipv6_chk_addr(struct in6_addr *addr,
 					      struct net_device *dev,
@@ -69,9 +67,9 @@ extern int			ipv6_get_saddr(struct dst_entry *dst,
 					       struct in6_addr *saddr);
 extern int			ipv6_dev_get_saddr(struct net_device *dev, 
 					       struct in6_addr *daddr,
-					       struct in6_addr *saddr);
+					       struct in6_addr *saddr,
+					       int onlink);
 extern int			ipv6_get_lladdr(struct net_device *dev, struct in6_addr *);
-extern int                      ipv6_generate_eui64(u8 *eui, struct net_device *dev);
 extern int			ipv6_rcv_saddr_equal(const struct sock *sk, 
 						      const struct sock *sk2);
 extern void			addrconf_join_solict(struct net_device *dev,
@@ -82,10 +80,6 @@ extern void			addrconf_leave_solict(struct net_device *dev,
 /*
  *	multicast prototypes (mcast.c)
  */
-
-extern int register_multicast6_notifier(struct notifier_block *nb);
-extern int unregister_multicast6_notifier(struct notifier_block *nb);
-
 extern int ipv6_sock_mc_join(struct sock *sk, int ifindex, 
 		  struct in6_addr *addr);
 extern int ipv6_sock_mc_drop(struct sock *sk, int ifindex, 
@@ -101,7 +95,6 @@ extern void ipv6_mc_down(struct inet6_dev *idev);
 extern void ipv6_mc_init_dev(struct inet6_dev *idev);
 extern void ipv6_mc_destroy_dev(struct inet6_dev *idev);
 extern void addrconf_dad_failure(struct inet6_ifaddr *ifp);
-extern void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 
 extern int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
 		struct in6_addr *src_addr);
@@ -167,8 +160,8 @@ static inline void in6_ifa_put(struct inet6_ifaddr *ifp)
 		inet6_ifa_finish_destroy(ifp);
 }
 
-#define __in6_ifa_put(idev)  atomic_dec(&(idev)->refcnt)
-#define in6_ifa_hold(idev)   atomic_inc(&(idev)->refcnt)
+#define __in6_ifa_put(ifp)	atomic_dec(&(ifp)->refcnt)
+#define in6_ifa_hold(ifp)	atomic_inc(&(ifp)->refcnt)
 
 
 extern void			addrconf_forwarding_on(void);
@@ -185,8 +178,8 @@ static __inline__ u8 ipv6_addr_hash(const struct in6_addr *addr)
 	 * This will include the IEEE address token on links that support it.
 	 */
 
-	word = addr->s6_addr[2] ^ addr->s6_addr32[3];
-	word  ^= (word>>16);
+	word = addr->s6_addr32[2] ^ addr->s6_addr32[3];
+	word ^= (word >> 16);
 	word ^= (word >> 8);
 
 	return ((word ^ (word >> 4)) & 0x0f);

@@ -61,13 +61,11 @@ void new_thread_handler(int sig)
 	thread_wait(&current->thread.mode.skas.switch_buf, 
 		    current->thread.mode.skas.fork_buf);
 
-	if(current->thread.prev_sched != NULL)
-		schedule_tail(current->thread.prev_sched);
+#ifdef CONFIG_SMP
+	schedule_tail(NULL);
+#endif
 	current->thread.prev_sched = NULL;
 
-	/* The return value is 1 if the kernel thread execs a process,
-	 * 0 if it just exits
-	 */
 	n = run_kernel_thread(fn, arg, &current->thread.exec_buf);
 	if(n == 1)
 		userspace(&current->thread.regs.regs);
@@ -95,11 +93,11 @@ void fork_handler(int sig)
 		    current->thread.mode.skas.fork_buf);
   	
 	force_flush_all();
-	if(current->thread.prev_sched == NULL)
-		panic("blech");
-	
+#ifdef CONFIG_SMP
 	schedule_tail(current->thread.prev_sched);
+#endif
 	current->thread.prev_sched = NULL;
+	unblock_signals();
 
 	userspace(&current->thread.regs.regs);
 }
@@ -138,7 +136,7 @@ int copy_thread_skas(int nr, unsigned long clone_flags, unsigned long sp,
 
 void init_idle_skas(void)
 {
-	cpu_tasks[current_thread->cpu].pid = os_getpid();
+	cpu_tasks[current->thread_info->cpu].pid = os_getpid();
 	default_idle();
 }
 
@@ -162,11 +160,11 @@ static int start_kernel_proc(void *unused)
 
 int start_uml_skas(void)
 {
-	start_userspace(0);
+	start_userspace();
 	capture_signal_stack();
-	uml_idle_timer();
 
 	init_new_thread_signals(1);
+	idle_timer();
 
 	init_task.thread.request.u.thread.proc = start_kernel_proc;
 	init_task.thread.request.u.thread.arg = NULL;
@@ -177,14 +175,12 @@ int start_uml_skas(void)
 
 int external_pid_skas(struct task_struct *task)
 {
-#warning Need to look up userspace_pid by cpu	
-	return(userspace_pid[0]);
+	return(userspace_pid);
 }
 
 int thread_pid_skas(struct task_struct *task)
 {
-#warning Need to look up userspace_pid by cpu	
-	return(userspace_pid[0]);
+	return(userspace_pid);
 }
 
 /*

@@ -32,7 +32,6 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/ipcomp.h>
@@ -49,7 +48,6 @@ static int ipcomp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, s
 {
 	int err = 0;
 	u8 nexthdr = 0;
-	u8 *prevhdr;
 	int hdr_len = skb->h.raw - skb->nh.raw;
 	unsigned char *tmp_hdr = NULL;
 	struct ipv6hdr *iph;
@@ -106,8 +104,6 @@ static int ipcomp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, s
 	iph = skb->nh.ipv6h;
 	iph->payload_len = htons(skb->len);
 	
-	ip6_find_1stfragopt(skb, &prevhdr);
-	*prevhdr = nexthdr;
 out:
 	if (tmp_hdr)
 		kfree(tmp_hdr);
@@ -118,68 +114,35 @@ error_out:
 	return err;
 }
 
-static int ipcomp6_output(struct sk_buff *skb)
+static int ipcomp6_output(struct sk_buff **pskb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
+	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x = dst->xfrm;
-	struct ipv6hdr *tmp_iph = NULL, *iph, *top_iph;
-	int hdr_len = 0;
+	struct ipv6hdr *top_iph;
+	int hdr_len;
 	struct ipv6_comp_hdr *ipch;
 	struct ipcomp_data *ipcd = x->data;
-	u8 *prevhdr;
-	u8 nexthdr = 0;
 	int plen, dlen;
 	u8 *start, *scratch = ipcd->scratch;
 
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
-		err = -EINVAL;
-		goto error_nolock;
-	}
-
-	spin_lock_bh(&x->lock);
-
-	err = xfrm_check_output(x, skb, AF_INET6);
-	if (err)
-		goto error;
-
-	if (x->props.mode) {
-		hdr_len = sizeof(struct ipv6hdr);
-		nexthdr = IPPROTO_IPV6;
-		iph = skb->nh.ipv6h;
-		top_iph = (struct ipv6hdr *)skb_push(skb, sizeof(struct ipv6hdr));
-		top_iph->version = 6;
-		top_iph->priority = iph->priority;
-		top_iph->flow_lbl[0] = iph->flow_lbl[0];
-		top_iph->flow_lbl[1] = iph->flow_lbl[1];
-		top_iph->flow_lbl[2] = iph->flow_lbl[2];
-		top_iph->nexthdr = IPPROTO_IPV6; /* initial */
-		top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
-		top_iph->hop_limit = iph->hop_limit;
-		memcpy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr, sizeof(struct in6_addr));
-		memcpy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr, sizeof(struct in6_addr));
-		skb->nh.raw = skb->data; /* == top_iph */
-		skb->h.raw = skb->nh.raw + hdr_len;
-	} else {
-		hdr_len = ip6_find_1stfragopt(skb, &prevhdr);
-		nexthdr = *prevhdr;
-	}
+	hdr_len = (*pskb)->h.raw - (*pskb)->data;
 
 	/* check whether datagram len is larger than threshold */
-	if ((skb->len - hdr_len) < ipcd->threshold) {
+	if (((*pskb)->len - hdr_len) < ipcd->threshold) {
 		goto out_ok;
 	}
 
-	if ((skb_is_nonlinear(skb) || skb_cloned(skb)) &&
-		skb_linearize(skb, GFP_ATOMIC) != 0) {
+	if ((skb_is_nonlinear(*pskb) || skb_cloned(*pskb)) &&
+		skb_linearize(*pskb, GFP_ATOMIC) != 0) {
 		err = -ENOMEM;
 		goto error;
 	}
 
 	/* compression */
-	plen = skb->len - hdr_len;
+	plen = (*pskb)->len - hdr_len;
 	dlen = IPCOMP_SCRATCH_SIZE;
-	start = skb->data + hdr_len;
+	start = (*pskb)->h.raw;
 
 	err = crypto_comp_compress(ipcd->tfm, start, plen, scratch, &dlen);
 	if (err) {
@@ -188,51 +151,25 @@ static int ipcomp6_output(struct sk_buff *skb)
 	if ((dlen + sizeof(struct ipv6_comp_hdr)) >= plen) {
 		goto out_ok;
 	}
-	memcpy(start, scratch, dlen);
-	pskb_trim(skb, hdr_len+dlen);
+	memcpy(start + sizeof(struct ip_comp_hdr), scratch, dlen);
+	pskb_trim(*pskb, hdr_len + dlen + sizeof(struct ip_comp_hdr));
 
 	/* insert ipcomp header and replace datagram */
-	tmp_iph = kmalloc(hdr_len, GFP_ATOMIC);
-	if (!tmp_iph) {
-		err = -ENOMEM;
-		goto error;
-	}
-	memcpy(tmp_iph, skb->nh.raw, hdr_len);
-	top_iph = (struct ipv6hdr*)skb_push(skb, sizeof(struct ipv6_comp_hdr));
-	memcpy(top_iph, tmp_iph, hdr_len);
-	kfree(tmp_iph);
+	top_iph = (struct ipv6hdr *)(*pskb)->data;
 
-	if (x->props.mode && (x->props.flags & XFRM_STATE_NOECN))
-		IP6_ECN_clear(top_iph);
-	top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
-	skb->nh.raw = skb->data; /* top_iph */
-	ip6_find_1stfragopt(skb, &prevhdr); 
-	*prevhdr = IPPROTO_COMP;
+	top_iph->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
 
-	ipch = (struct ipv6_comp_hdr *)((unsigned char *)top_iph + hdr_len);
-	ipch->nexthdr = nexthdr;
+	ipch = (struct ipv6_comp_hdr *)start;
+	ipch->nexthdr = *(*pskb)->nh.raw;
 	ipch->flags = 0;
 	ipch->cpi = htons((u16 )ntohl(x->id.spi));
+	*(*pskb)->nh.raw = IPPROTO_COMP;
 
-	skb->h.raw = (unsigned char*)ipch;
 out_ok:
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++;
-	spin_unlock_bh(&x->lock);
+	err = 0;
 
-	if ((skb->dst = dst_pop(dst)) == NULL) {
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	err = NET_XMIT_BYPASS;
-
-out_exit:
-	return err;
 error:
-	spin_unlock_bh(&x->lock);
-error_nolock:
-	kfree_skb(skb);
-	goto out_exit;
+	return err;
 }
 
 static void ipcomp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
@@ -243,7 +180,7 @@ static void ipcomp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	struct ipv6_comp_hdr *ipcomph = (struct ipv6_comp_hdr*)(skb->data+offset);
 	struct xfrm_state *x;
 
-	if (type != ICMPV6_DEST_UNREACH || type != ICMPV6_PKT_TOOBIG)
+	if (type != ICMPV6_DEST_UNREACH && type != ICMPV6_PKT_TOOBIG)
 		return;
 
 	spi = ntohl(ntohs(ipcomph->cpi));
@@ -255,6 +192,66 @@ static void ipcomp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			"%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
 			spi, NIP6(iph->daddr));
 	xfrm_state_put(x);
+}
+
+static struct xfrm_state *ipcomp6_tunnel_create(struct xfrm_state *x)
+{
+	struct xfrm_state *t = NULL;
+
+	t = xfrm_state_alloc();
+	if (!t)
+		goto out;
+
+	t->id.proto = IPPROTO_IPV6;
+	t->id.spi = xfrm6_tunnel_alloc_spi((xfrm_address_t *)&x->props.saddr);
+	memcpy(t->id.daddr.a6, x->id.daddr.a6, sizeof(struct in6_addr));
+	memcpy(&t->sel, &x->sel, sizeof(t->sel));
+	t->props.family = AF_INET6;
+	t->props.mode = 1;
+	memcpy(t->props.saddr.a6, x->props.saddr.a6, sizeof(struct in6_addr));
+
+	t->type = xfrm_get_type(IPPROTO_IPV6, t->props.family);
+	if (t->type == NULL)
+		goto error;
+
+	if (t->type->init_state(t, NULL))
+		goto error;
+
+	t->km.state = XFRM_STATE_VALID;
+	atomic_set(&t->tunnel_users, 1);
+
+out:
+	return t;
+
+error:
+	xfrm_state_put(t);
+	goto out;
+}
+
+static int ipcomp6_tunnel_attach(struct xfrm_state *x)
+{
+	int err = 0;
+	struct xfrm_state *t = NULL;
+	u32 spi;
+
+	spi = xfrm6_tunnel_spi_lookup((xfrm_address_t *)&x->props.saddr);
+	if (spi)
+		t = xfrm_state_lookup((xfrm_address_t *)&x->id.daddr,
+					      spi, IPPROTO_IPV6, AF_INET6);
+	if (!t) {
+		t = ipcomp6_tunnel_create(x);
+		if (!t) {
+			err = -EINVAL;
+			goto out;
+		}
+		xfrm_state_insert(t);
+		xfrm_state_hold(t);
+	}
+	x->tunnel = t;
+	atomic_inc(&t->tunnel_users);
+
+out:
+	return err;
 }
 
 static void ipcomp6_free_data(struct ipcomp_data *ipcd)
@@ -270,8 +267,11 @@ static void ipcomp6_destroy(struct xfrm_state *x)
 	struct ipcomp_data *ipcd = x->data;
 	if (!ipcd)
 		return;
+	xfrm_state_delete_tunnel(x);
 	ipcomp6_free_data(ipcd);
 	kfree(ipcd);
+
+	xfrm6_tunnel_free_spi((xfrm_address_t *)&x->props.saddr);
 }
 
 static int ipcomp6_init_state(struct xfrm_state *x, void *args)
@@ -290,7 +290,7 @@ static int ipcomp6_init_state(struct xfrm_state *x, void *args)
 		goto error;
 
 	memset(ipcd, 0, sizeof(*ipcd));
-	x->props.header_len = sizeof(struct ipv6_comp_hdr);
+	x->props.header_len = 0;
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct ipv6hdr);
 	
@@ -301,6 +301,12 @@ static int ipcomp6_init_state(struct xfrm_state *x, void *args)
 	ipcd->tfm = crypto_alloc_tfm(x->calg->alg_name, 0);
 	if (!ipcd->tfm)
 		goto error;
+
+	if (x->props.mode) {
+		err = ipcomp6_tunnel_attach(x);
+		if (err)
+			goto error;
+	}
 
 	calg_desc = xfrm_calg_get_byname(x->calg->alg_name);
 	BUG_ON(!calg_desc);

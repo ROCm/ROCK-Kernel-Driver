@@ -7,7 +7,7 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=-p -X
+LDFLAGS_vmlinux	:=-p --no-undefined -X
 LDFLAGS_BLOB	:=--format binary
 AFLAGS_vmlinux.lds.o = -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
@@ -47,6 +47,7 @@ tune-$(CONFIG_CPU_ARM710)	:=-mtune=arm710
 tune-$(CONFIG_CPU_ARM720T)	:=-mtune=arm7tdmi
 tune-$(CONFIG_CPU_ARM920T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_ARM922T)	:=-mtune=arm9tdmi
+tune-$(CONFIG_CPU_ARM925T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_ARM926T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
@@ -57,13 +58,14 @@ tune-$(CONFIG_CPU_V6)		:=-mtune=strongarm
 CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
 
+CHECK		:= $(CHECK) -D__arm__=1
+
 #Default value
 DATAADDR	:= .
 
 head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
 textaddr-y	:= 0xC0008000
 
- machine-$(CONFIG_ARCH_ARCA5K)	   := arc
  machine-$(CONFIG_ARCH_RPC)	   := rpc
  machine-$(CONFIG_ARCH_EBSA110)	   := ebsa110
  machine-$(CONFIG_ARCH_CLPS7500)   := clps7500
@@ -73,9 +75,6 @@ textaddr-y	:= 0xC0008000
 textaddr-$(CONFIG_ARCH_CO285)	   := 0x60008000
  machine-$(CONFIG_ARCH_CO285)	   := footbridge
   incdir-$(CONFIG_ARCH_CO285)	   := ebsa285
- machine-$(CONFIG_ARCH_FTVPCI)	   := ftvpci
-  incdir-$(CONFIG_ARCH_FTVPCI)	   := nexuspci
- machine-$(CONFIG_ARCH_TBOX)	   := tbox
  machine-$(CONFIG_ARCH_SHARK)	   := shark
  machine-$(CONFIG_ARCH_SA1100)	   := sa1100
 ifeq ($(CONFIG_ARCH_SA1100),y)
@@ -90,13 +89,24 @@ textaddr-$(CONFIG_ARCH_CLPS711X)   := 0xc0028000
  machine-$(CONFIG_ARCH_CLPS711X)   := clps711x
 textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_IOP3XX)	   := iop3xx
- machine-$(CONFIG_ARCH_ADIFCC)	   := adifcc
+ machine-$(CONFIG_ARCH_IXP4XX)	   := ixp4xx
+ machine-$(CONFIG_ARCH_OMAP)	   := omap
+ machine-$(CONFIG_ARCH_S3C2410)	   := s3c2410
+ machine-$(CONFIG_ARCH_LH7A40X)	   := lh7a40x
+ machine-$(CONFIG_ARCH_VERSATILE_PB) := versatile
+
+ifeq ($(CONFIG_ARCH_EBSA110),y)
+# This is what happens if you forget the IOCS16 line.
+# PCMCIA cards stop working.
+CFLAGS_3c589_cs.o :=-DISA_SIXTEEN_BIT_PERIPHERAL
+export CFLAGS_3c589_cs.o
+endif
 
 TEXTADDR := $(textaddr-y)
 ifeq ($(incdir-y),)
 incdir-y := $(machine-y)
 endif
-INCDIR   := $(incdir-y)
+INCDIR   := arch-$(incdir-y)
   
 export	TEXTADDR GZFLAGS
 
@@ -113,6 +123,7 @@ core-y				+= arch/arm/mach-$(machine-y)/
 endif
 core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
 core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
+core-$(CONFIG_VFP)		+= arch/arm/vfp/
 
 drivers-$(CONFIG_OPROFILE)      += arch/arm/oprofile/
 drivers-$(CONFIG_ARCH_CLPS7500)	+= drivers/acorn/char/
@@ -130,8 +141,13 @@ boot := arch/arm/boot
 #	last, otherwise make uses the target directory mtime.
 
 include/asm-arm/.arch: $(wildcard include/config/arch/*.h) include/config/MARKER
-	@echo '  SYMLINK include/asm-arm/arch -> include/asm-arm/arch-$(INCDIR)'
-	@ln -fsn arch-$(INCDIR) include/asm-arm/arch
+	@echo '  SYMLINK include/asm-arm/arch -> include/asm-arm/$(INCDIR)'
+ifneq ($(KBUILD_SRC),)
+	$(Q)mkdir -p include/asm-arm
+	$(Q)ln -fsn $(srctree)/include/asm-arm/$(INCDIR) include/asm-arm/arch
+else
+	$(Q)ln -fsn $(INCDIR) include/asm-arm/arch
+endif
 	@touch $@
 
 prepare: maketools include/asm-arm/.arch
@@ -141,8 +157,7 @@ maketools: include/asm-arm/constants.h include/linux/version.h FORCE
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
 # Convert bzImage to zImage
-bzImage: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
+bzImage: zImage
 
 zImage Image bootpImage uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
@@ -157,12 +172,9 @@ CLEAN_FILES += include/asm-arm/constants.h* include/asm-arm/mach-types.h \
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-# My testing targets (that short circuit a few dependencies)
-zImg:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
-Img:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/Image
+# My testing targets (bypasses dependencies)
 bp:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/bootpImage
-i:;	$(Q)$(MAKE) $(build)=$(boot) install
-zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
+i zi:;	$(Q)$(MAKE) $(build)=$(boot) $@
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/asm-arm/.arch
@@ -174,6 +186,7 @@ define archhelp
   echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
   echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+  echo  '                  (supply initrd image via make variable INITRD=<path>)'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'
   echo  '                  Install using (your) ~/bin/installkernel or'

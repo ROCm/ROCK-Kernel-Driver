@@ -5,7 +5,7 @@
  * Copyright (C) 2001-2002 Jan-Benedict Glaw <jbglaw@lug-owl.de>
  *
  * This driver is at all a modified version of Erik Mouw's
- * ./linux/Documentation/DocBook/procfs_example.c, so: thank
+ * Documentation/DocBook/procfs_example.c, so: thank
  * you, Erik! He can be reached via email at
  * <J.A.K.Mouw@its.tudelft.nl>. It is based on an idea
  * provided by DEC^WCompaq^WIntel's "Jumpstart" CD. They
@@ -132,7 +132,7 @@ srm_env_read(char *page, char **start, off_t off, int count, int *eof,
 
 
 static int
-srm_env_write(struct file *file, const char *buffer, unsigned long count,
+srm_env_write(struct file *file, const char __user *buffer, unsigned long count,
 		void *data)
 {
 	int res;

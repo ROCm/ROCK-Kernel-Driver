@@ -24,56 +24,58 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle)
 	if (!page)
 		return NULL;
 
-	ret = (void *)P2SEGADDR(page_to_bus(page));
+	ret = page_address(page);
+	*handle = virt_to_phys(ret);
 
 	/*
 	 * We must flush the cache before we pass it on to the device
 	 */
 	dma_cache_wback_inv(ret, size);
 
-	*handle = (unsigned long)ret;
-
+	page = virt_to_page(ret);
 	free = page + (size >> PAGE_SHIFT);
 	end  = page + (1 << order);
 
-	do {
+	while (++page < end) {
 		set_page_count(page, 1);
-		page++;
-	} while (size -= PAGE_SIZE);
 
-	/*
-	 * Free any unused pages
-	 */
-	while (page < end) {
-		set_page_count(page, 1);
-		__free_page(page);
-		page++;
+		/* Free any unused pages */
+		if (page >= free) {
+			__free_page(page);
+		}
 	}
 
-	return ret;
+	return P2SEGADDR(ret);
 }
 
 void consistent_free(void *vaddr, size_t size)
 {
 	unsigned long addr = P1SEGADDR((unsigned long)vaddr);
+	struct page *page=virt_to_page(addr);
+	int num_pages=(size+PAGE_SIZE-1) >> PAGE_SHIFT;
+	int i;
 
-	free_pages(addr, get_order(size));
+	for(i=0;i<num_pages;i++) {
+		__free_page((page+i));
+	}
 }
 
 void consistent_sync(void *vaddr, size_t size, int direction)
 {
+	void * p1addr = (void*) P1SEGADDR((unsigned long)vaddr);
+
 	switch (direction) {
 	case DMA_FROM_DEVICE:		/* invalidate only */
-		dma_cache_inv(vaddr, size);
+		dma_cache_inv(p1addr, size);
 		break;
 	case DMA_TO_DEVICE:		/* writeback only */
-		dma_cache_wback(vaddr, size);
+		dma_cache_wback(p1addr, size);
 		break;
 	case DMA_BIDIRECTIONAL:		/* writeback and invalidate */
-		dma_cache_wback_inv(vaddr, size);
+		dma_cache_wback_inv(p1addr, size);
 		break;
 	default:
 		BUG();
 	}
 }
-
+EXPORT_SYMBOL(consistent_sync);

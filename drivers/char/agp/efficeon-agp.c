@@ -302,13 +302,6 @@ static int efficeon_remove_memory(struct agp_memory * mem, off_t pg_start, int t
 	return 0;
 }
 
-/* GATT entry: (physical address | 1) */
-static unsigned long efficeon_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-
-	return addr | agp_bridge->driver->masks[0].mask;
-}
 
 struct agp_bridge_driver efficeon_driver = {
 	.owner			= THIS_MODULE,
@@ -319,7 +312,7 @@ struct agp_bridge_driver efficeon_driver = {
 	.fetch_size		= efficeon_fetch_size,
 	.cleanup		= efficeon_cleanup,
 	.tlb_flush		= efficeon_tlbflush,
-	.mask_memory		= efficeon_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
 	.masks			= efficeon_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,

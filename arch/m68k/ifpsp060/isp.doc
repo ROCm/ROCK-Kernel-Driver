@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -77,7 +77,7 @@ Release file structure:
 	-----------------
 	|		| - 8 bytes per entry
    (2)  | Entry Point   | - user does a "bra" or "jmp" to this address
-	|               | 
+	|               |
 	-----------------
 	|		| - code section
    (3)  ~		~
@@ -87,14 +87,14 @@ Release file structure:
 
 The first section of this module is the "Call-out" section. This section
 is NOT INCLUDED in isp.sa (an example "Call-out" section is provided at
-the end of the file iskeleton.s). The purpose of this section is to allow 
-the ISP routines to reference external functions that must be provided 
-by the host operating system. This section MUST be exactly 128 bytes in 
+the end of the file iskeleton.s). The purpose of this section is to allow
+the ISP routines to reference external functions that must be provided
+by the host operating system. This section MUST be exactly 128 bytes in
 size. There are 32 fields, each 4 bytes in size. Each field corresponds
 to a function required by the ISP (these functions and their location are
 listed in "68060ISP call-outs" below). Each field entry should contain
 the address of the corresponding function RELATIVE to the starting address
-of the "call-out" section. The "Call-out" section must sit adjacent to the 
+of the "call-out" section. The "Call-out" section must sit adjacent to the
 isp.sa image in memory.
 
 The second section, the "Entry-point" section, is used by external routines
@@ -112,7 +112,7 @@ similar to:
 	bra	_060ISP_TOP+128+0
 
 (_060ISP_TOP is the starting address of the "Call-out" section; the "Call-out"
-section is 128 bytes long; and the Unimplemented Integer ISP handler entry 
+section is 128 bytes long; and the Unimplemented Integer ISP handler entry
 point is located 0 bytes from the top of the "Entry-point" section.)
 
 The third section is the code section. After entering through an "Entry-point",
@@ -177,7 +177,7 @@ address) take the Unimplemented Integer Instruction exception. When the
 _060_isp_unimp() entry point of the ISP.
 
 After the 060ISP decodes the instruction type and fetches the appropriate
-data registers, and BEFORE the actual emulated transfers occur, the 
+data registers, and BEFORE the actual emulated transfers occur, the
 package calls either the "Call-out" _060_real_cas() or _060_real_cas2().
 If the emulation code provided by the 060ISP is sufficient for the
 host system (see isp.s source code), then these "Call-out"s should be

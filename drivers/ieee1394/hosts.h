@@ -66,7 +66,7 @@ struct hpsb_host {
 	struct class_device class_dev;
 
 	int update_config_rom;
-	struct timer_list delayed_reset;
+	struct work_struct delayed_reset;
 
 	unsigned int config_roms;
 
@@ -166,7 +166,7 @@ struct hpsb_host_driver {
          * called.  Return 0 on success, negative errno on failure.
          * NOTE: The function must be callable in interrupt context.
          */
-        int (*transmit_packet) (struct hpsb_host *host, 
+        int (*transmit_packet) (struct hpsb_host *host,
                                 struct hpsb_packet *packet);
 
         /* This function requests miscellanous services from the driver, see

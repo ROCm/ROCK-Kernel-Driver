@@ -444,6 +444,10 @@ struct _snd_intel8x0 {
 	struct snd_dma_buffer bdbars;
 	u32 int_sta_reg;		/* interrupt status register */
 	u32 int_sta_mask;		/* interrupt status mask */
+
+#ifdef CONFIG_PM
+	u32 pci_state[64 / sizeof(u32)];
+#endif
 };
 
 static struct pci_device_id snd_intel8x0_ids[] = {
@@ -771,11 +775,14 @@ static void fill_nocache(void *buf, int size, int nocache)
 static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 {
 	unsigned long port = ichdev->reg_offset;
-	int civ, i, step;
+	int status, civ, i, step;
 	int ack = 0;
 
+	status = igetbyte(chip, port + ichdev->roff_sr);
 	civ = igetbyte(chip, port + ICH_REG_OFF_CIV);
-	if (civ == ichdev->civ) {
+	if (!(status & ICH_BCIS)) {
+		step = 0;
+	} else if (civ == ichdev->civ) {
 		// snd_printd("civ same %d\n", civ);
 		step = 1;
 		ichdev->civ++;
@@ -809,7 +816,8 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 		snd_pcm_period_elapsed(ichdev->substream);
 		spin_lock(&chip->reg_lock);
 	}
-	iputbyte(chip, port + ichdev->roff_sr, ICH_FIFOE | ICH_BCIS | ICH_LVBCI);
+	iputbyte(chip, port + ichdev->roff_sr,
+		 status & (ICH_FIFOE | ICH_BCIS | ICH_LVBCI));
 }
 
 static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -2208,6 +2216,7 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 	for (i = 0; i < 3; i++)
 		if (chip->ac97[i])
 			snd_ac97_suspend(chip->ac97[i]);
+	pci_save_state(chip->pci, chip->pci_state);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2217,6 +2226,7 @@ static int intel8x0_resume(snd_card_t *card, unsigned int state)
 	intel8x0_t *chip = snd_magic_cast(intel8x0_t, card->pm_private_data, return -EINVAL);
 	int i;
 
+	pci_restore_state(chip->pci, chip->pci_state);
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
 	snd_intel8x0_chip_init(chip, 0);
@@ -2607,7 +2617,7 @@ static struct shortname_table {
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },
-	{ 0, 0 },
+	{ 0, NULL },
 };
 
 static int __devinit snd_intel8x0_probe(struct pci_dev *pci,

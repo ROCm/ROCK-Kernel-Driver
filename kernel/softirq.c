@@ -15,7 +15,6 @@
 #include <linux/percpu.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/irq.h>
 /*
@@ -89,10 +88,8 @@ restart:
 	h = softirq_vec;
 
 	do {
-		if (pending & 1) {
-			TRIG_EVENT(softirq_hook, (h - softirq_vec));
+		if (pending & 1)
 			h->action(h);
-		}
 		h++;
 		pending >>= 1;
 	} while (pending);
@@ -240,7 +237,6 @@ static void tasklet_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
-				TRIG_EVENT(tasklet_action_hook, (unsigned long) (t->func));
 				t->func(t->data);
 				tasklet_unlock(t);
 				continue;
@@ -274,7 +270,6 @@ static void tasklet_hi_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
-				TRIG_EVENT(tasklet_hi_action_hook, (unsigned long) (t->func));
 				t->func(t->data);
 				tasklet_unlock(t);
 				continue;
@@ -328,7 +323,7 @@ void __init softirq_init(void)
 static int ksoftirqd(void * __bind_cpu)
 {
 	set_user_nice(current, 19);
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_NOFREEZE;
 
 	set_current_state(TASK_INTERRUPTIBLE);
 

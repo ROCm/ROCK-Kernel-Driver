@@ -70,12 +70,12 @@ int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * nam
 	if (!IS_ERR(d)) {
 		error = sysfs_create(d, S_IFLNK|S_IRWXUGO, init_symlink);
 		if (!error)
-			/*
-			 * associate the link dentry with the target kobject
+			/* 
+			 * associate the link dentry with the target kobject 
 			 */
 			d->d_fsdata = kobject_get(target);
 		dput(d);
-	} else
+	} else 
 		error = PTR_ERR(d);
 	up(&dentry->d_inode->i_sem);
 	return error;
@@ -133,7 +133,7 @@ static int sysfs_getlink(struct dentry *dentry, char * path)
 	down_read(&sysfs_rename_sem);
 	error = sysfs_get_target_path(kobj, target_kobj, path);
 	up_read(&sysfs_rename_sem);
-
+	
 	kobject_put(kobj);
 	kobject_put(target_kobj);
 	return error;
@@ -165,7 +165,7 @@ int sysfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	if (!page)
 		return -ENOMEM;
 
-	error = sysfs_getlink(dentry, (char *) page);
+	error = sysfs_getlink(dentry, (char *) page); 
 	if (!error)
 	        error = vfs_follow_link(nd, (char *) page);
 

@@ -231,9 +231,7 @@ void __init collect_boot_cpu_data(void)
 	boot_cpu_data.hversion =  boot_cpu_data.pdc.model.hversion;
 	boot_cpu_data.sversion =  boot_cpu_data.pdc.model.sversion;
 
-	boot_cpu_data.cpu_type =
-			parisc_get_cpu_type(boot_cpu_data.hversion);
-
+	boot_cpu_data.cpu_type = parisc_get_cpu_type(boot_cpu_data.hversion);
 	boot_cpu_data.cpu_name = cpu_name_version[boot_cpu_data.cpu_type][0];
 	boot_cpu_data.family_name = cpu_name_version[boot_cpu_data.cpu_type][1];
 }
@@ -276,6 +274,7 @@ int __init init_per_cpu(int cpunum)
 	int ret;
 	struct pdc_coproc_cfg coproc_cfg;
 
+	set_firmware_width();
 	ret = pdc_coproc_cfg(&coproc_cfg);
 
 	if(ret >= 0 && coproc_cfg.ccr_functional) {

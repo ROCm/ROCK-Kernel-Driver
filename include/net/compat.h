@@ -29,9 +29,9 @@ struct compat_cmsghdr {
 
 extern int get_compat_msghdr(struct msghdr *, struct compat_msghdr __user *);
 extern int verify_compat_iovec(struct msghdr *, struct iovec *, char *, int);
-extern asmlinkage long compat_sys_sendmsg(int,struct compat_msghdr *,unsigned);
-extern asmlinkage long compat_sys_recvmsg(int,struct compat_msghdr *,unsigned);
-extern asmlinkage long compat_sys_getsockopt(int, int, int, char *, int *);
+extern asmlinkage long compat_sys_sendmsg(int,struct compat_msghdr __user *,unsigned);
+extern asmlinkage long compat_sys_recvmsg(int,struct compat_msghdr __user *,unsigned);
+extern asmlinkage long compat_sys_getsockopt(int, int, int, char __user *, int __user *);
 extern int put_cmsg_compat(struct msghdr*, int, int, int, void *);
 extern int cmsghdr_from_user_compat_to_kern(struct msghdr *, unsigned char *,
 		int);

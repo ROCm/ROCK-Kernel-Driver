@@ -122,9 +122,9 @@ static int m68k_floppy_init(void)
 {
   use_virtual_dma =1;
   can_use_virtual_dma = 1;
- 
-  
-  if (MACH_IS_Q40)  
+
+
+  if (MACH_IS_Q40)
 	  return 0x3f0;
   else if(MACH_IS_SUN3X)
 	  return sun3xflop_init();
@@ -192,7 +192,7 @@ asmlinkage irqreturn_t floppy_hardint(int irq, void *dev_id,
 #undef TRACE_FLPY_INT
 #define NO_FLOPPY_ASSEMBLER
 
-#ifdef TRACE_FLPY_INT 
+#ifdef TRACE_FLPY_INT
 	static int calls=0;
 	static int bytes=0;
 	static int dma_wait=0;
@@ -214,10 +214,10 @@ asmlinkage irqreturn_t floppy_hardint(int irq, void *dev_id,
 		/* serve 1st byte fast: */
 
 		st=1;
-		for(lcount=virtual_dma_count, lptr=virtual_dma_addr; 
+		for(lcount=virtual_dma_count, lptr=virtual_dma_addr;
 		    lcount; lcount--, lptr++) {
 			st=inb(virtual_dma_port+4) & 0xa0 ;
-			if(st != 0xa0) 
+			if(st != 0xa0)
 				break;
 			if(virtual_dma_mode)
 				outb_p(*lptr, virtual_dma_port+5);
@@ -239,7 +239,7 @@ asmlinkage irqreturn_t floppy_hardint(int irq, void *dev_id,
 		virtual_dma_residue += virtual_dma_count;
 		virtual_dma_count=0;
 #ifdef TRACE_FLPY_INT
-		printk("count=%x, residue=%x calls=%d bytes=%d dma_wait=%d\n", 
+		printk("count=%x, residue=%x calls=%d bytes=%d dma_wait=%d\n",
 		       virtual_dma_count, virtual_dma_residue, calls, bytes,
 		       dma_wait);
 		calls = 0;

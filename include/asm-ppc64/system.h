@@ -70,7 +70,6 @@ extern int (*__debugger_sstep)(struct pt_regs *regs);
 extern int (*__debugger_iabr_match)(struct pt_regs *regs);
 extern int (*__debugger_dabr_match)(struct pt_regs *regs);
 extern int (*__debugger_fault_handler)(struct pt_regs *regs);
-extern int *__debugger_on;
 
 #define DEBUGGER_BOILERPLATE(__NAME) \
 static inline int __NAME(struct pt_regs *regs) \
@@ -80,7 +79,7 @@ static inline int __NAME(struct pt_regs *regs) \
 	return 0; \
 }
 
-extern int debugger(struct pt_regs *regs);
+DEBUGGER_BOILERPLATE(debugger)
 DEBUGGER_BOILERPLATE(debugger_ipi)
 DEBUGGER_BOILERPLATE(debugger_bpt)
 DEBUGGER_BOILERPLATE(debugger_sstep)
@@ -88,9 +87,9 @@ DEBUGGER_BOILERPLATE(debugger_iabr_match)
 DEBUGGER_BOILERPLATE(debugger_dabr_match)
 DEBUGGER_BOILERPLATE(debugger_fault_handler)
 
+#ifdef CONFIG_XMON
 extern void xmon_init(void);
-extern void xmon_become_debugger(void);
-extern int xmon_enabled;
+#endif
 
 #else
 static inline int debugger(struct pt_regs *regs) { return 0; }
@@ -112,6 +111,7 @@ extern void flush_instruction_cache(void);
 extern int _get_PVR(void);
 extern void giveup_fpu(struct task_struct *);
 extern void disable_kernel_fp(void);
+extern void flush_fp_to_thread(struct task_struct *);
 extern void enable_kernel_fp(void);
 extern void giveup_altivec(struct task_struct *);
 extern void disable_kernel_altivec(void);
@@ -119,7 +119,17 @@ extern void enable_kernel_altivec(void);
 extern int emulate_altivec(struct pt_regs *);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
-extern int abs(int);
+
+#ifdef CONFIG_ALTIVEC
+extern void flush_altivec_to_thread(struct task_struct *);
+#else
+static inline void flush_altivec_to_thread(struct task_struct *t)
+{
+}
+#endif
+
+/* EBCDIC -> ASCII conversion for [0-9A-Z] on iSeries */
+extern unsigned char e2a(unsigned char);
 
 extern struct task_struct *__switch_to(struct task_struct *,
 				       struct task_struct *);
@@ -278,6 +288,15 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
      (__typeof__(*(ptr))) __cmpxchg((ptr), (unsigned long)_o_,		 \
 				    (unsigned long)_n_, sizeof(*(ptr))); \
   })
+
+/*
+ * We handle most unaligned accesses in hardware. On the other hand 
+ * unaligned DMA can be very expensive on some ppc64 IO chips (it does
+ * powers of 2 writes until it reaches sufficient alignment).
+ *
+ * Based on this we disable the IP header alignment in network drivers.
+ */
+#define NET_IP_ALIGN   0
 
 #endif /* __KERNEL__ */
 #endif

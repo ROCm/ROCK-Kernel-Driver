@@ -47,7 +47,7 @@ struct ti_lynx {
 
         enum { clear, have_intr, have_aux_buf, have_pcl_mem,
                have_1394_buffers, have_iomappings, is_host } state;
-        
+
         /* remapped memory spaces */
         void *registers;
         void *local_rom;
@@ -66,9 +66,9 @@ struct ti_lynx {
 #endif
 
         /*
-         * use local RAM of LOCALRAM_SIZE bytes for PCLs, which allows for 
+         * use local RAM of LOCALRAM_SIZE bytes for PCLs, which allows for
          * LOCALRAM_SIZE * 8 PCLs (each sized 128 bytes);
-         * the following is an allocation bitmap 
+         * the following is an allocation bitmap
          */
         u8 pcl_bmap[LOCALRAM_SIZE / 1024];
 
@@ -167,7 +167,7 @@ static inline void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 #define SERIAL_EEPROM_CONTROL             0x44
 
 #define PCI_INT_STATUS                    0x48
-#define PCI_INT_ENABLE                    0x4c               
+#define PCI_INT_ENABLE                    0x4c
 /* status and enable have identical bit numbers */
 #define PCI_INT_INT_PEND                  (1<<31)
 #define PCI_INT_FORCED_INT                (1<<30)
@@ -199,7 +199,7 @@ static inline void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 #define LBUS_ADDR_SEL_RAM                 (0x0<<16)
 #define LBUS_ADDR_SEL_ROM                 (0x1<<16)
 #define LBUS_ADDR_SEL_AUX                 (0x2<<16)
-#define LBUS_ADDR_SEL_ZV                  (0x3<<16)       
+#define LBUS_ADDR_SEL_ZV                  (0x3<<16)
 
 #define GPIO_CTRL_A                       0xb8
 #define GPIO_CTRL_B                       0xbc
@@ -208,14 +208,14 @@ static inline void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 #define DMA_BREG(base, chan)              (base + chan * 0x20)
 #define DMA_SREG(base, chan)              (base + chan * 0x10)
 
-#define DMA0_PREV_PCL                     0x100               
+#define DMA0_PREV_PCL                     0x100
 #define DMA1_PREV_PCL                     0x120
 #define DMA2_PREV_PCL                     0x140
 #define DMA3_PREV_PCL                     0x160
 #define DMA4_PREV_PCL                     0x180
 #define DMA_PREV_PCL(chan)                (DMA_BREG(DMA0_PREV_PCL, chan))
 
-#define DMA0_CURRENT_PCL                  0x104            
+#define DMA0_CURRENT_PCL                  0x104
 #define DMA1_CURRENT_PCL                  0x124
 #define DMA2_CURRENT_PCL                  0x144
 #define DMA3_CURRENT_PCL                  0x164
@@ -237,14 +237,14 @@ static inline void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 #define DMA_CHAN_STAT_SPECIALACK          (1<<14)
 
 
-#define DMA0_CHAN_CTRL                    0x110              
+#define DMA0_CHAN_CTRL                    0x110
 #define DMA1_CHAN_CTRL                    0x130
 #define DMA2_CHAN_CTRL                    0x150
 #define DMA3_CHAN_CTRL                    0x170
 #define DMA4_CHAN_CTRL                    0x190
 #define DMA_CHAN_CTRL(chan)               (DMA_BREG(DMA0_CHAN_CTRL, chan))
 /* CHAN_CTRL registers share bits */
-#define DMA_CHAN_CTRL_ENABLE              (1<<31)      
+#define DMA_CHAN_CTRL_ENABLE              (1<<31)
 #define DMA_CHAN_CTRL_BUSY                (1<<30)
 #define DMA_CHAN_CTRL_LINK                (1<<29)
 
@@ -353,7 +353,7 @@ static inline void reg_clear_bits(const struct ti_lynx *lynx, int offset,
 #define LINK_INT_GRF_OVERFLOW             (1<<5)
 #define LINK_INT_ITF_UNDERFLOW            (1<<4)
 #define LINK_INT_ATF_UNDERFLOW            (1<<3)
-#define LINK_INT_ISOARB_FAILED            (1<<0) 
+#define LINK_INT_ISOARB_FAILED            (1<<0)
 
 /* PHY specifics */
 #define PHY_VENDORID_TI                 0x800028

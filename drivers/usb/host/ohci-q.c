@@ -22,6 +22,7 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 		}
 	}
 
+	list_del (&urb_priv->pending);
 	kfree (urb_priv);
 }
 
@@ -169,9 +170,12 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 {	 
 	int	branch;
 
+	if (ohci->hcd.state == USB_STATE_QUIESCING)
+		return -EAGAIN;
+
 	ed->state = ED_OPER;
-	ed->ed_prev = 0;
-	ed->ed_next = 0;
+	ed->ed_prev = NULL;
+	ed->ed_next = NULL;
 	ed->hwNextED = 0;
 	wmb ();
 
@@ -317,7 +321,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_CLE;
 				writel (ohci->hc_control, &ohci->regs->control);
-				// a readl() later syncs CLE with the HC
+				// a ohci_readl() later syncs CLE with the HC
 			} else
 				writel (le32_to_cpup (&ed->hwNextED),
 					&ohci->regs->ed_controlhead);
@@ -329,7 +333,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		if (ohci->ed_controltail == ed) {
 			ohci->ed_controltail = ed->ed_prev;
 			if (ohci->ed_controltail)
-				ohci->ed_controltail->ed_next = 0;
+				ohci->ed_controltail->ed_next = NULL;
 		} else if (ed->ed_next) {
 			ed->ed_next->ed_prev = ed->ed_prev;
 		}
@@ -341,7 +345,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_BLE;
 				writel (ohci->hc_control, &ohci->regs->control);
-				// a readl() later syncs BLE with the HC
+				// a ohci_readl() later syncs BLE with the HC
 			} else
 				writel (le32_to_cpup (&ed->hwNextED),
 					&ohci->regs->ed_bulkhead);
@@ -353,7 +357,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		if (ohci->ed_bulktail == ed) {
 			ohci->ed_bulktail = ed->ed_prev;
 			if (ohci->ed_bulktail)
-				ohci->ed_bulktail->ed_next = 0;
+				ohci->ed_bulktail->ed_next = NULL;
 		} else if (ed->ed_next) {
 			ed->ed_next->ed_prev = ed->ed_prev;
 		}
@@ -408,7 +412,7 @@ static struct ed *ed_get (
  		if (!td) {
 			/* out of memory */
 			ed_free (ohci, ed);
-			ed = 0;
+			ed = NULL;
 			goto done;
 		}
 		ed->dummy = td;
@@ -419,7 +423,7 @@ static struct ed *ed_get (
 	}
 
 	/* NOTE: only ep0 currently needs this "re"init logic, during
-	 * enumeration (after set_address, or if ep0 maxpacket >8).
+	 * enumeration (after set_address).
 	 */
   	if (ed->state == ED_IDLE) {
 		u32	info;
@@ -470,14 +474,14 @@ static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 
 	/* rm_list is just singly linked, for simplicity */
 	ed->ed_next = ohci->ed_rm_list;
-	ed->ed_prev = 0;
+	ed->ed_prev = NULL;
 	ohci->ed_rm_list = ed;
 
 	/* enable SOF interrupt */
 	writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
 	writel (OHCI_INTR_SF, &ohci->regs->intrenable);
 	// flush those writes, and get latest HCCA contents
-	(void) readl (&ohci->regs->control);
+	(void) ohci_readl (&ohci->regs->control);
 
 	/* SF interrupt might get delayed; record the frame counter value that
 	 * indicates when the HC isn't looking at it, so concurrent unlinks
@@ -593,6 +597,7 @@ static void td_submit_urb (
 	}
 
 	urb_priv->td_cnt = 0;
+	list_add (&urb_priv->pending, &ohci->pending);
 
 	if (data_len)
 		data = urb->transfer_dma;
@@ -865,9 +870,6 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 	u32		td_dma;
 	struct td	*td_rev = NULL;
 	struct td	*td = NULL;
-  	unsigned long	flags;
-
-  	spin_lock_irqsave (&ohci->lock, flags);
 
 	td_dma = le32_to_cpup (&ohci->hcca->done_head);
 	ohci->hcca->done_head = 0;
@@ -899,7 +901,6 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 		td_rev = td;
 		td_dma = le32_to_cpup (&td->hwNextTD);
 	}	
-	spin_unlock_irqrestore (&ohci->lock, flags);
 	return td_rev;
 }
 
@@ -923,7 +924,7 @@ rescan_all:
 		/* only take off EDs that the HC isn't using, accounting for
 		 * frame counter wraps and EDs with partially retired TDs
 		 */
-		if (likely (HCD_IS_RUNNING(ohci->hcd.state))) {
+		if (likely (regs && HCD_IS_RUNNING(ohci->hcd.state))) {
 			if (tick_before (tick, ed->tick)) {
 skip_ed:
 				last = &ed->ed_next;
@@ -949,7 +950,7 @@ skip_ed:
 		 * entries (which we'd ignore), but paranoia won't hurt.
 		 */
 		*last = ed->ed_next;
-		ed->ed_next = 0;
+		ed->ed_next = NULL;
 		modified = 0;
 
 		/* unlink urbs as requested, but rescan the list after
@@ -1013,7 +1014,9 @@ rescan_this:
    	}
 
 	/* maybe reenable control and bulk lists */ 
-	if (HCD_IS_RUNNING(ohci->hcd.state) && !ohci->ed_rm_list) {
+	if (HCD_IS_RUNNING(ohci->hcd.state)
+			&& ohci->hcd.state != USB_STATE_QUIESCING
+			&& !ohci->ed_rm_list) {
 		u32	command = 0, control = 0;
 
 		if (ohci->ed_controltail) {
@@ -1053,11 +1056,10 @@ rescan_this:
  * scanning the (re-reversed) donelist as this does.
  */
 static void
-dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
+dl_done_list (struct ohci_hcd *ohci, struct pt_regs *regs)
 {
-	unsigned long	flags;
+	struct td	*td = dl_reverse_done_list (ohci);
 
-  	spin_lock_irqsave (&ohci->lock, flags);
   	while (td) {
 		struct td	*td_next = td->next_dl_td;
 		struct urb	*urb = td->urb;
@@ -1098,5 +1100,4 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 
     		td = td_next;
   	}  
-	spin_unlock_irqrestore (&ohci->lock, flags);
 }

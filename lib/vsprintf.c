@@ -40,11 +40,14 @@ unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base)
 		if (*cp == '0') {
 			base = 8;
 			cp++;
-			if ((*cp == 'x') && isxdigit(cp[1])) {
+			if ((toupper(*cp) == 'X') && isxdigit(cp[1])) {
 				cp++;
 				base = 16;
 			}
 		}
+	} else if (base == 16) {
+		if (cp[0] == '0' && toupper(cp[1]) == 'X')
+			cp += 2;
 	}
 	while (isxdigit(*cp) &&
 	       (value = isdigit(*cp) ? *cp-'0' : toupper(*cp)-'A'+10) < base) {
@@ -88,11 +91,14 @@ unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base)
 		if (*cp == '0') {
 			base = 8;
 			cp++;
-			if ((*cp == 'x') && isxdigit(cp[1])) {
+			if ((toupper(*cp) == 'X') && isxdigit(cp[1])) {
 				cp++;
 				base = 16;
 			}
 		}
+	} else if (base == 16) {
+		if (cp[0] == '0' && toupper(cp[1]) == 'X')
+			cp += 2;
 	}
 	while (isxdigit(*cp) && (value = isdigit(*cp) ? *cp-'0' : (islower(*cp)
 	    ? toupper(*cp) : *cp)-'A'+10) < base) {
@@ -148,7 +154,7 @@ static char * number(char * buf, char * end, unsigned long long num, int base, i
 	if (type & LEFT)
 		type &= ~ZEROPAD;
 	if (base < 2 || base > 36)
-		return 0;
+		return NULL;
 	c = (type & ZEROPAD) ? '0' : ' ';
 	sign = 0;
 	if (type & SIGN) {

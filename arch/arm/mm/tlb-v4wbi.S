@@ -10,7 +10,7 @@
  *  ARM architecture version 4 and version 5 TLB handling functions.
  *  These assume a split I/D TLBs, with a write buffer.
  *
- *  Processors: ARM920 ARM922 ARM926 XScale
+ *  Processors: ARM920 ARM922 ARM925 ARM926 XScale
  */
 #include <linux/linkage.h>
 #include <linux/init.h>

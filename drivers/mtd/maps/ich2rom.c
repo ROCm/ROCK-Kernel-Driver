@@ -109,7 +109,7 @@ static struct ich2rom_map_info ich2rom_map = {
 		 * needs to use a different method.
 		 */
 	},
-	.mtd = 0,
+	.mtd = NULL,
 	.window_addr = 0,
 };
 
@@ -205,7 +205,7 @@ static int __devinit ich2rom_init_one (struct pci_dev *pdev,
 
 	/* FIXME select the firmware hub and enable a window to it. */
 
-	info->mtd = 0;
+	info->mtd = NULL;
 	info->map.map_priv_1 = 	info->window_addr;
 
 	map_size = ICH2_FWH_REGION_SIZE;
@@ -245,7 +245,7 @@ static void __devexit ich2rom_remove_one (struct pci_dev *pdev)
 
 	del_mtd_device(info->mtd);
 	map_destroy(info->mtd);
-	info->mtd = 0;
+	info->mtd = NULL;
 	info->map.map_priv_1 = 0;
 
 	iounmap((void *)(info->window_addr));
@@ -286,9 +286,9 @@ int __init init_ich2rom(void)
 {
 	struct pci_dev *pdev;
 	struct pci_device_id *id;
-	pdev = 0;
+	pdev = NULL;
 	for(id = ich2rom_pci_tbl; id->vendor; id++) {
-		pdev = pci_find_device(id->vendor, id->device, 0);
+		pdev = pci_find_device(id->vendor, id->device, NULL);
 		if (pdev) {
 			break;
 		}

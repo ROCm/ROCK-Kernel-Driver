@@ -43,16 +43,11 @@
 #include <linux/proc_fs.h>
 #include <linux/ptrace.h>
 #include <linux/mount.h>
-#include <linux/fshooks.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
-#include <linux/objrmap.h>
-#include <linux/ckrm.h>
-#include <linux/audit.h>
-#include <linux/trigevent_hooks.h>
+#include <linux/rmap.h>
 
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 
 #ifdef CONFIG_KMOD
@@ -126,27 +121,20 @@ asmlinkage long sys_uselib(const char __user * library)
 	struct nameidata nd;
 	int error;
 
-	intent_init(&nd.intent, IT_OPEN);
-
-	nd.intent.it_flags = FMODE_READ;
-	FSHOOK_BEGIN_USER_WALK_IT(open,
-		error,
-		library,
-		LOOKUP_FOLLOW|LOOKUP_OPEN,
-		nd,
-		filename,
-		.flags = O_RDONLY)
-
-	if (!S_ISREG(nd.dentry->d_inode->i_mode))
-		error = -EINVAL;
-	else
-		error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC, &nd);
-	if (error) {
-		path_release(&nd);
+	nd.intent.open.flags = FMODE_READ;
+	error = __user_walk(library, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
+	if (error)
 		goto out;
-	}
 
-	file = dentry_open_it(nd.dentry, nd.mnt, O_RDONLY, &nd.intent);
+	error = -EINVAL;
+	if (!S_ISREG(nd.dentry->d_inode->i_mode))
+		goto exit;
+
+	error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC, &nd);
+	if (error)
+		goto exit;
+
+	file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto out;
@@ -172,10 +160,10 @@ asmlinkage long sys_uselib(const char __user * library)
 	}
 	fput(file);
 out:
-
-	FSHOOK_END_USER_WALK(open, error, filename)
-
   	return error;
+exit:
+	path_release(&nd);
+	goto out;
 }
 
 /*
@@ -304,51 +292,48 @@ EXPORT_SYMBOL(copy_strings_kernel);
  * This routine is used to map in a page into an address space: needed by
  * execve() for the initial stack and environment pages.
  *
- * tsk->mmap_sem is held for writing.
+ * vma->vm_mm->mmap_sem is held for writing.
  */
-void put_dirty_page(struct task_struct *tsk, struct page *page,
-		    unsigned long address, pgprot_t prot,
-		    struct vm_area_struct *vma)
+void install_arg_page(struct vm_area_struct *vma,
+			struct page *page, unsigned long address)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	pgd_t * pgd;
 	pmd_t * pmd;
 	pte_t * pte;
 
-	if (page_count(page) != 1)
-		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n",
-				page, address);
-
 	if (unlikely(anon_vma_prepare(vma)))
 		goto out_sig;
 
-	pgd = pgd_offset(tsk->mm, address);
-	spin_lock(&tsk->mm->page_table_lock);
-	pmd = pmd_alloc(tsk->mm, pgd, address);
+	flush_dcache_page(page);
+	pgd = pgd_offset(mm, address);
+
+	spin_lock(&mm->page_table_lock);
+	pmd = pmd_alloc(mm, pgd, address);
 	if (!pmd)
 		goto out;
-	pte = pte_alloc_map(tsk->mm, pmd, address);
+	pte = pte_alloc_map(mm, pmd, address);
 	if (!pte)
 		goto out;
 	if (!pte_none(*pte)) {
 		pte_unmap(pte);
 		goto out;
 	}
+	mm->rss++;
 	lru_cache_add_active(page);
-	flush_dcache_page(page);
-	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, prot))));
-	page_add_rmap(page, vma, address, 1);
+	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(
+					page, vma->vm_page_prot))));
+	page_add_anon_rmap(page, vma, address);
 	pte_unmap(pte);
-	tsk->mm->rss++;
-	spin_unlock(&tsk->mm->page_table_lock);
+	spin_unlock(&mm->page_table_lock);
 
 	/* no need for flush_tlb */
 	return;
 out:
-	spin_unlock(&tsk->mm->page_table_lock);
+	spin_unlock(&mm->page_table_lock);
 out_sig:
 	__free_page(page);
-	force_sig(SIGKILL, tsk);
-	return;
+	force_sig(SIGKILL, current);
 }
 
 int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
@@ -423,9 +408,10 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		return -ENOMEM;
 	}
 
+	memset(mpnt, 0, sizeof(*mpnt));
+
 	down_write(&mm->mmap_sem);
 	{
- 		mpol_set_vma_default(mpnt);
 		mpnt->vm_mm = mm;
 #ifdef CONFIG_STACK_GROWSUP
 		mpnt->vm_start = stack_base;
@@ -444,14 +430,8 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 			mpnt->vm_flags = VM_STACK_FLAGS & ~VM_EXEC;
 		else
 			mpnt->vm_flags = VM_STACK_FLAGS;
+		mpnt->vm_flags |= mm->def_flags;
 		mpnt->vm_page_prot = protection_map[mpnt->vm_flags & 0x7];
-		mpnt->vm_ops = NULL;
-		mpnt->vm_pgoff = mpnt->vm_start >> PAGE_SHIFT;
-		mpnt->vm_file = NULL;
-		INIT_VMA_SHARED(mpnt);
-		/* insert_vm_struct takes care of anon_vma_node */
-		mpnt->anon_vma = NULL;
-		mpnt->vm_private_data = (void *) 0;
 		insert_vm_struct(mm, mpnt);
 		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	}
@@ -460,8 +440,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current, page, stack_base,
-					mpnt->vm_page_prot, mpnt);
+			install_arg_page(mpnt, page, stack_base);
 		}
 		stack_base += PAGE_SIZE;
 	}
@@ -495,11 +474,8 @@ struct file *open_exec(const char *name)
 	int err;
 	struct file *file;
 
-	FSHOOK_BEGIN(open, err, .filename = name, .flags = O_RDONLY)
-
-	intent_init(&nd.intent, IT_OPEN);
-	nd.intent.it_flags = FMODE_READ;
-	err = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	nd.intent.open.flags = FMODE_READ;
+	err = path_lookup(name, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
 	file = ERR_PTR(err);
 
 	if (!err) {
@@ -512,7 +488,7 @@ struct file *open_exec(const char *name)
 				err = -EACCES;
 			file = ERR_PTR(err);
 			if (!err) {
-				file = dentry_open_it(nd.dentry, nd.mnt, O_RDONLY, &nd.intent);
+				file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);
 				if (!IS_ERR(file)) {
 					err = deny_write_access(file);
 					if (err) {
@@ -520,16 +496,13 @@ struct file *open_exec(const char *name)
 						file = ERR_PTR(err);
 					}
 				}
-				goto out;
+out:
+				return file;
 			}
 		}
 		path_release(&nd);
 	}
-out:
-
-	FSHOOK_END(open, err, file = ERR_PTR(err))
-
-	return file;
+	goto out;
 }
 
 EXPORT_SYMBOL(open_exec);
@@ -866,7 +839,8 @@ int flush_old_exec(struct linux_binprm * bprm)
 	flush_thread();
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
-	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL))
+	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL) ||
+	    (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP))
 		current->mm->dumpable = 0;
 
 	/* An exec changes our domain. We are no longer part of the thread
@@ -887,15 +861,6 @@ out:
 }
 
 EXPORT_SYMBOL(flush_old_exec);
-
-/*
- * We mustn't allow tracing of suid binaries, unless
- * the tracer has the capability to trace anything..
- */
-static inline int must_not_trace_exec(struct task_struct * p)
-{
-	return (p->ptrace & PT_PTRACED) && !(p->ptrace & PT_PTRACE_CAP);
-}
 
 /* 
  * Fill the binprm structure from the inode. 
@@ -922,8 +887,10 @@ int prepare_binprm(struct linux_binprm *bprm)
 
 	if(!(bprm->file->f_vfsmnt->mnt_flags & MNT_NOSUID)) {
 		/* Set-uid? */
-		if (mode & S_ISUID)
+		if (mode & S_ISUID) {
+			current->personality &= ~PER_CLEAR_ON_SETID;
 			bprm->e_uid = inode->i_uid;
+		}
 
 		/* Set-gid? */
 		/*
@@ -931,8 +898,10 @@ int prepare_binprm(struct linux_binprm *bprm)
 		 * is a candidate for mandatory locking, not a setgid
 		 * executable.
 		 */
-		if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP))
+		if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
+			current->personality &= ~PER_CLEAR_ON_SETID;
 			bprm->e_gid = inode->i_gid;
+		}
 	}
 
 	/* fill in binprm security blob */
@@ -946,44 +915,30 @@ int prepare_binprm(struct linux_binprm *bprm)
 
 EXPORT_SYMBOL(prepare_binprm);
 
-/*
- * This function is used to produce the new IDs and capabilities
- * from the old ones and the file's capabilities.
- *
- * The formula used for evolving capabilities is:
- *
- *       pI' = pI
- * (***) pP' = (fP & X) | (fI & pI)
- *       pE' = pP' & fE          [NB. fE is 0 or ~0]
- *
- * I=Inheritable, P=Permitted, E=Effective // p=process, f=file
- * ' indicates post-exec(), and X is the global 'cap_bset'.
- *
- */
+static inline int unsafe_exec(struct task_struct *p)
+{
+	int unsafe = 0;
+	if (p->ptrace & PT_PTRACED) {
+		if (p->ptrace & PT_PTRACE_CAP)
+			unsafe |= LSM_UNSAFE_PTRACE_CAP;
+		else
+			unsafe |= LSM_UNSAFE_PTRACE;
+	}
+	if (atomic_read(&p->fs->count) > 1 ||
+	    atomic_read(&p->files->count) > 1 ||
+	    atomic_read(&p->sighand->count) > 1)
+		unsafe |= LSM_UNSAFE_SHARE;
+
+	return unsafe;
+}
 
 void compute_creds(struct linux_binprm *bprm)
 {
+	int unsafe;
 	task_lock(current);
-	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
-                current->mm->dumpable = 0;
-		
-		if (must_not_trace_exec(current)
-		    || atomic_read(&current->fs->count) > 1
-		    || atomic_read(&current->files->count) > 1
-		    || atomic_read(&current->sighand->count) > 1) {
-			if(!capable(CAP_SETUID)) {
-				bprm->e_uid = current->uid;
-				bprm->e_gid = current->gid;
-			}
-		}
-	}
-
-        current->suid = current->euid = current->fsuid = bprm->e_uid;
-        current->sgid = current->egid = current->fsgid = bprm->e_gid;
-
+	unsafe = unsafe_exec(current);
+	security_bprm_apply_creds(bprm, unsafe);
 	task_unlock(current);
-
-	security_bprm_compute_creds(bprm);
 }
 
 EXPORT_SYMBOL(compute_creds);
@@ -1044,7 +999,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			return retval;
 
 		/* Remember if the application is TASO.  */
-		bprm->sh_bang = eh->ah.entry < 0x100000000;
+		bprm->sh_bang = eh->ah.entry < 0x100000000UL;
 
 		bprm->file = file;
 		bprm->loader = loader;
@@ -1124,16 +1079,13 @@ int do_execve(char * filename,
 	int retval;
 	int i;
 
-	sched_balance_exec();
-
 	file = open_exec(filename);
-
-	/* don't do this prior to open_exec, as that will invoke an FS hook */
-	audit_intercept(AUDIT_execve, filename, argv, envp);
 
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
-		return audit_result(retval);
+		return retval;
+
+	sched_balance_exec();
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
@@ -1141,6 +1093,8 @@ int do_execve(char * filename,
 	bprm.file = file;
 	bprm.filename = filename;
 	bprm.interp = filename;
+	bprm.interp_flags = 0;
+	bprm.interp_data = 0;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
@@ -1185,16 +1139,11 @@ int do_execve(char * filename,
 
 	retval = search_binary_handler(&bprm,regs);
 	if (retval >= 0) {
-		TRIG_EVENT(exec_hook, file->f_dentry->d_name.len,
-			file->f_dentry->d_name.name, regs);
-
 		free_arg_pages(&bprm);
-
-		ckrm_cb_exec(filename);
 
 		/* execve success */
 		security_bprm_free(&bprm);
-		return audit_result(retval);
+		return retval;
 	}
 
 out:
@@ -1217,7 +1166,7 @@ out_file:
 		allow_write_access(bprm.file);
 		fput(bprm.file);
 	}
-	return audit_result(retval);
+	return retval;
 }
 
 EXPORT_SYMBOL(do_execve);
@@ -1442,7 +1391,7 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 		goto close_fail;
 	if (!file->f_op->write)
 		goto close_fail;
-	if (do_truncate(file->f_dentry, 0, 0) != 0)
+	if (do_truncate(file->f_dentry, 0) != 0)
 		goto close_fail;
 
 	retval = binfmt->core_dump(signr, regs, file);
@@ -1456,4 +1405,3 @@ fail:
 	unlock_kernel();
 	return retval;
 }
-EXPORT_SYMBOL(do_coredump);

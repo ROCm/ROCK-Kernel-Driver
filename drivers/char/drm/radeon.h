@@ -51,7 +51,7 @@
 #define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		9
+#define DRIVER_MINOR		11
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:
@@ -81,6 +81,11 @@
  *       Add 'GET' queries for starting additional clients on different VT's.
  * 1.9 - Add DRM_IOCTL_RADEON_CP_RESUME ioctl.
  *       Add texture rectangle support for r100.
+ * 1.10- Add SETPARAM ioctl; first parameter to set is FB_LOCATION, which
+ *       clients use to tell the DRM where they think the framebuffer is 
+ *       located in the card's address space
+ * 1.11- Add packet R200_EMIT_RB3D_BLENDCOLOR to support GL_EXT_blend_color
+ *       and GL_EXT_blend_[func|equation]_separate on r200
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \
@@ -106,10 +111,21 @@
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_ALLOC)]      = { radeon_mem_alloc,   1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_FREE)]       = { radeon_mem_free,    1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_INIT_HEAP)]  = { radeon_mem_init_heap, 1, 1 }, \
- [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_EMIT)]   = { radeon_irq_emit, 1, 0 }, \
- [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_WAIT)]   = { radeon_irq_wait, 1, 0 },
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_EMIT)]   = { radeon_irq_emit,    1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_WAIT)]   = { radeon_irq_wait,    1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_SETPARAM)]   = { radeon_cp_setparam, 1, 0 }, \
 
+#define DRIVER_FILE_FIELDS						\
+	int64_t radeon_fb_delta;					\
 
+#define DRIVER_OPEN_HELPER( filp_priv, dev )				\
+do {									\
+	drm_radeon_private_t *dev_priv = dev->dev_private;		\
+	if ( dev_priv )							\
+		filp_priv->radeon_fb_delta = dev_priv->fb_location;	\
+	else								\
+		filp_priv->radeon_fb_delta = 0;				\
+} while( 0 )
 
 /* When a client dies:
  *    - Check for and clean up flipped page state
@@ -125,7 +141,7 @@ do {									\
 			radeon_do_cleanup_pageflip( dev );		\
 		}							\
 		radeon_mem_release( filp, dev_priv->gart_heap );	\
-                radeon_mem_release( filp, dev_priv->fb_heap );		\
+		radeon_mem_release( filp, dev_priv->fb_heap );		\
 	}								\
 } while (0)
 
@@ -142,7 +158,7 @@ do {						\
 /* DMA customization:
  */
 #define __HAVE_DMA		1
-#define __HAVE_DMA_IRQ		1
+#define __HAVE_IRQ		1
 #define __HAVE_VBL_IRQ		1
 #define __HAVE_SHARED_IRQ       1
 

@@ -1429,7 +1429,7 @@ static int zatm_change_qos(struct atm_vcc *vcc,struct atm_qos *qos,int flags)
 }
 
 
-static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
+static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 {
 	struct zatm_dev *zatm_dev;
 	unsigned long flags;
@@ -1445,7 +1445,7 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 				int pool;
 
 				if (get_user(pool,
-				    &((struct zatm_pool_req *) arg)->pool_num))
+				    &((struct zatm_pool_req __user *) arg)->pool_num))
 					return -EFAULT;
 				if (pool < 0 || pool > ZATM_LAST_POOL)
 					return -EINVAL;
@@ -1457,7 +1457,7 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 				}
 				spin_unlock_irqrestore(&zatm_dev->lock, flags);
 				return copy_to_user(
-				    &((struct zatm_pool_req *) arg)->info,
+				    &((struct zatm_pool_req __user *) arg)->info,
 				    &info,sizeof(info)) ? -EFAULT : 0;
 			}
 		case ZATM_SETPOOL:
@@ -1467,12 +1467,12 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 
 				if (!capable(CAP_NET_ADMIN)) return -EPERM;
 				if (get_user(pool,
-				    &((struct zatm_pool_req *) arg)->pool_num))
+				    &((struct zatm_pool_req __user *) arg)->pool_num))
 					return -EFAULT;
 				if (pool < 0 || pool > ZATM_LAST_POOL)
 					return -EINVAL;
 				if (copy_from_user(&info,
-				    &((struct zatm_pool_req *) arg)->info,
+				    &((struct zatm_pool_req __user *) arg)->info,
 				    sizeof(info))) return -EFAULT;
 				if (!info.low_water)
 					info.low_water = zatm_dev->
@@ -1504,14 +1504,14 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 
 
 static int zatm_getsockopt(struct atm_vcc *vcc,int level,int optname,
-    void *optval,int optlen)
+    void __user *optval,int optlen)
 {
 	return -EINVAL;
 }
 
 
 static int zatm_setsockopt(struct atm_vcc *vcc,int level,int optname,
-    void *optval,int optlen)
+    void __user *optval,int optlen)
 {
 	return -EINVAL;
 }

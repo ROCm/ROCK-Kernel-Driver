@@ -27,7 +27,6 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
-#include <linux/dump.h>
 #include <linux/moduleparam.h>
 
 #include <asm/system.h>
@@ -116,7 +115,7 @@ unsigned long *in_exception_stack(int cpu, unsigned long stack)
 		if (stack >= init_tss[cpu].ist[k]  && stack <= end) 
 			return (unsigned long *)end;
 	}
-	return 0;
+	return NULL;
 } 
 
 /*
@@ -141,7 +140,7 @@ void show_trace(unsigned long *stack)
 	if (estack_end) { 
 		while (stack < estack_end) { 
 			addr = *stack++; 
-			if (kernel_text_address(addr)) {  
+			if (__kernel_text_address(addr)) {
 				i += printk_address(addr);
 				i += printk(" "); 
 				if (i > 50) {
@@ -170,7 +169,7 @@ void show_trace(unsigned long *stack)
 			 * down the cause of the crash will be able to figure
 			 * out the call path that was taken.
 			 */
-			 if (kernel_text_address(addr)) {  
+			 if (__kernel_text_address(addr)) {
 				 i += printk_address(addr);
 				 i += printk(" "); 
 				 if (i > 50) { 
@@ -186,7 +185,7 @@ void show_trace(unsigned long *stack)
 
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
 		addr = *stack++;
-		if (kernel_text_address(addr)) { 	 
+		if (__kernel_text_address(addr)) {
 			i += printk_address(addr);
 			i += printk(" "); 
 			if (i > 50) { 
@@ -196,16 +195,6 @@ void show_trace(unsigned long *stack)
 		}
 	}
 	printk("\n");
-}
-
-void show_trace_task(struct task_struct *tsk)
-{
-	unsigned long rsp = tsk->thread.rsp;
-
-	/* User space on another CPU? */
-	if ((rsp ^ (unsigned long)tsk->thread_info) & (PAGE_MASK<<1))
-		return;
-	show_trace((unsigned long *)rsp);
 }
 
 void show_stack(struct task_struct *tsk, unsigned long * rsp)
@@ -313,7 +302,7 @@ void handle_BUG(struct pt_regs *regs)
 	if (__get_user(tmp, f.filename))
 		f.filename = "unmapped filename"; 
 	printk("----------- [cut here ] --------- [please bite here ] ---------\n");
-	printk(KERN_ALERT "Kernel BUG at %.50s:%d\n", f.filename, f.line); 	
+	printk(KERN_ALERT "Kernel BUG at %.50s:%d\n", f.filename, f.line);
 } 
 
 void out_of_line_bug(void)
@@ -366,9 +355,8 @@ void __die(const char * str, struct pt_regs * regs, long err)
 		printk("\n");
 	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	show_registers(regs);
-	dump((char *)str, regs); 
 	/* Executive summary in case the oops scrolled away */
-	printk(KERN_ALERT "RIP "); 
+	printk(KERN_ALERT "RIP ");
 	printk_address(regs->rip); 
 	printk(" RSP <%016lx>\n", regs->rsp); 
 }
@@ -460,7 +448,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_signo = signr; \
 	info.si_errno = 0; \
 	info.si_code = sicode; \
-	info.si_addr = (void *)siaddr; \
+	info.si_addr = (void __user *)siaddr; \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
 		return; \
 	do_trap(trapnr, signr, str, regs, error_code, &info); \
@@ -674,7 +662,7 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 	if ((regs->cs & 3) == 0) 
 		goto clear_dr7; 
 
-	info.si_addr = (void *)regs->rip;
+	info.si_addr = (void __user *)regs->rip;
 	force_sig_info(SIGTRAP, &info, tsk);	
 clear_dr7:
 	asm volatile("movq %0,%%db7"::"r"(0UL));
@@ -698,7 +686,7 @@ clear_TF:
  * the correct behaviour even in the presence of the asynchronous
  * IRQ13 behaviour
  */
-void math_error(void *rip)
+void math_error(void __user *rip)
 {
 	struct task_struct * task;
 	siginfo_t info;
@@ -755,7 +743,7 @@ void math_error(void *rip)
 asmlinkage void do_coprocessor_error(struct pt_regs * regs)
 {
 	conditional_sti(regs);
-	math_error((void *)regs->rip);
+	math_error((void __user *)regs->rip);
 }
 
 asmlinkage void bad_intr(void)
@@ -763,7 +751,7 @@ asmlinkage void bad_intr(void)
 	printk("bad interrupt"); 
 }
 
-static inline void simd_math_error(void *rip)
+static inline void simd_math_error(void __user *rip)
 {
 	struct task_struct * task;
 	siginfo_t info;
@@ -814,7 +802,7 @@ static inline void simd_math_error(void *rip)
 asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs)
 {
 	conditional_sti(regs);
-		simd_math_error((void *)regs->rip);
+		simd_math_error((void __user *)regs->rip);
 }
 
 asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs)

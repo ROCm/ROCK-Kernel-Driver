@@ -1,4 +1,4 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_mgt.h,v 1.22 2004/01/30 16:24:00 ajfa Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc.
  *  Copyright (C) 2003 Luis R. Rodriguez <mcgrof@ruslug.rutgers.edu>
@@ -24,15 +24,6 @@
 #include <linux/wireless.h>
 #include <linux/skbuff.h>
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-# include <linux/workqueue.h>
-#else
-# include <linux/tqueue.h>
-# define work_struct tq_struct
-# define INIT_WORK INIT_TQUEUE
-# define schedule_work schedule_task
-#endif
-
 /*
  *  Function definitions
  */
@@ -43,7 +34,7 @@
 #define TRACE(devname)   K_DEBUG(SHOW_TRACING, VERBOSE, "%s:  -> " __FUNCTION__ "()\n", devname)
 
 extern int pc_debug;
-static const int init_wds = 0;	/* help compiler optimize away dead code */
+#define init_wds 0	/* help compiler optimize away dead code */
 
 
 /* General driver definitions */
@@ -55,8 +46,11 @@ static const int init_wds = 0;	/* help compiler optimize away dead code */
 #define PCIVENDOR_NETGEAR			0x1385UL
 #define PCIVENDOR_SMC				0x10b8UL
 #define PCIVENDOR_ACCTON			0x1113UL
+#define PCIVENDOR_ATI				0x1259UL
+#define PCIVENDOR_TTL				0x16a5UL
 
 #define PCIDEVICE_ISL3877                       0x3877UL
+#define PCIDEVICE_ISL3886                       0x3886UL
 #define PCIDEVICE_ISL3890                       0x3890UL
 #define	PCIDEVICE_3COM6001			0x6001UL
 #define PCIDEVICE_LATENCY_TIMER_MIN 		0x40

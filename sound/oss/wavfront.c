@@ -114,7 +114,7 @@
 #define OSS_SUPPORT_LEVEL          0x1  /* just /dev/sequencer for now */
 
 #if    OSS_SUPPORT_LEVEL & OSS_SUPPORT_SEQ
-static int (*midi_load_patch) (int devno, int format, const char *addr,
+static int (*midi_load_patch) (int devno, int format, const char __user *addr,
 			       int offs, int count, int pmgr_flag) = NULL;
 #endif /* OSS_SUPPORT_SEQ */
 
@@ -312,7 +312,7 @@ static struct {
 	{ 0x0E, "Bad MIDI channel number" },
 	{ 0x10, "Download Record Error" },
 	{ 0x80, "Success" },
-	{ 0x0, 0x0 }
+	{ 0 }
 };
 
 #define NEEDS_ACK 1
@@ -493,7 +493,7 @@ wavefront_cmd (int cmd, unsigned char *rbuf, unsigned char *wbuf)
 
 	if (cmd == WFC_DOWNLOAD_MULTISAMPLE) {
 		wfcmd->write_cnt = (unsigned int) rbuf;
-		rbuf = 0;
+		rbuf = NULL;
 	}
 
 	DPRINT (WF_DEBUG_CMD, "0x%x [%s] (%d,%d,%d)\n",
@@ -745,7 +745,7 @@ wavefront_delete_sample (int sample_num)
 	wbuf[0] = sample_num & 0x7f;
 	wbuf[1] = sample_num >> 7;
 
-	if ((x = wavefront_cmd (WFC_DELETE_SAMPLE, 0, wbuf)) == 0) {
+	if ((x = wavefront_cmd (WFC_DELETE_SAMPLE, NULL, wbuf)) == 0) {
 		dev.sample_status[sample_num] = WF_ST_EMPTY;
 	}
 
@@ -934,7 +934,7 @@ wavefront_send_patch (wavefront_patch_info *header)
 	bptr = munge_int32 (header->number, buf, 2);
 	munge_buf ((unsigned char *)&header->hdr.p, bptr, WF_PATCH_BYTES);
     
-	if (wavefront_cmd (WFC_DOWNLOAD_PATCH, 0, buf)) {
+	if (wavefront_cmd (WFC_DOWNLOAD_PATCH, NULL, buf)) {
 		printk (KERN_ERR LOGNAME "download patch failed\n");
 		return -(EIO);
 	}
@@ -972,7 +972,7 @@ wavefront_send_program (wavefront_patch_info *header)
 	buf[0] = header->number;
 	munge_buf ((unsigned char *)&header->hdr.pr, &buf[1], WF_PROGRAM_BYTES);
     
-	if (wavefront_cmd (WFC_DOWNLOAD_PROGRAM, 0, buf)) {
+	if (wavefront_cmd (WFC_DOWNLOAD_PROGRAM, NULL, buf)) {
 		printk (KERN_WARNING LOGNAME "download patch failed\n");	
 		return -(EIO);
 	}
@@ -986,7 +986,7 @@ wavefront_freemem (void)
 {
 	char rbuf[8];
 
-	if (wavefront_cmd (WFC_REPORT_FREE_MEMORY, rbuf, 0)) {
+	if (wavefront_cmd (WFC_REPORT_FREE_MEMORY, rbuf, NULL)) {
 		printk (KERN_WARNING LOGNAME "can't get memory stats.\n");
 		return -1;
 	} else {
@@ -996,7 +996,7 @@ wavefront_freemem (void)
 
 static int
 wavefront_send_sample (wavefront_patch_info *header,
-		       UINT16 *dataptr,
+		       UINT16 __user *dataptr,
 		       int data_is_unsigned)
 
 {
@@ -1011,7 +1011,7 @@ wavefront_send_sample (wavefront_patch_info *header,
 
 	UINT16 sample_short;
 	UINT32 length;
-	UINT16 *data_end = 0;
+	UINT16 __user *data_end = NULL;
 	unsigned int i;
 	const int max_blksize = 4096/2;
 	unsigned int written;
@@ -1024,11 +1024,11 @@ wavefront_send_sample (wavefront_patch_info *header,
 	int initial_skip = 0;
 
 	DPRINT (WF_DEBUG_LOAD_PATCH, "sample %sdownload for slot %d, "
-				      "type %d, %d bytes from 0x%x\n",
+				      "type %d, %d bytes from %p\n",
 				      header->size ? "" : "header ", 
 				      header->number, header->subkey,
 				      header->size,
-				      (int) header->dataptr);
+				      header->dataptr);
 
 	if (header->number == WAVEFRONT_FIND_FREE_SAMPLE_SLOT) {
 		int x;
@@ -1188,7 +1188,7 @@ wavefront_send_sample (wavefront_patch_info *header,
 
 	if (wavefront_cmd (header->size ?
 			   WFC_DOWNLOAD_SAMPLE : WFC_DOWNLOAD_SAMPLE_HEADER,
-			   0, sample_hdr)) {
+			   NULL, sample_hdr)) {
 		printk (KERN_WARNING LOGNAME "sample %sdownload refused.\n",
 			header->size ? "" : "header ");
 		return -(EIO);
@@ -1214,7 +1214,7 @@ wavefront_send_sample (wavefront_patch_info *header,
 			blocksize = ((length-written+7)&~0x7);
 		}
 
-		if (wavefront_cmd (WFC_DOWNLOAD_BLOCK, 0, 0)) {
+		if (wavefront_cmd (WFC_DOWNLOAD_BLOCK, NULL, NULL)) {
 			printk (KERN_WARNING LOGNAME "download block "
 				"request refused.\n");
 			return -(EIO);
@@ -1321,7 +1321,7 @@ wavefront_send_alias (wavefront_patch_info *header)
 	munge_int32 (header->hdr.a.FrequencyBias, &alias_hdr[20], 3);
 	munge_int32 (*(&header->hdr.a.FrequencyBias+1), &alias_hdr[23], 2);
 
-	if (wavefront_cmd (WFC_DOWNLOAD_SAMPLE_ALIAS, 0, alias_hdr)) {
+	if (wavefront_cmd (WFC_DOWNLOAD_SAMPLE_ALIAS, NULL, alias_hdr)) {
 		printk (KERN_ERR LOGNAME "download alias failed.\n");
 		return -(EIO);
 	}
@@ -1445,7 +1445,7 @@ wavefront_send_drum (wavefront_patch_info *header)
 		munge_int32 (((unsigned char *)drum)[i], &drumbuf[1+(i*2)], 2);
 	}
 
-	if (wavefront_cmd (WFC_DOWNLOAD_EDRUM_PROGRAM, 0, drumbuf)) {
+	if (wavefront_cmd (WFC_DOWNLOAD_EDRUM_PROGRAM, NULL, drumbuf)) {
 		printk (KERN_ERR LOGNAME "download drum failed.\n");
 		return -(EIO);
 	}
@@ -1512,7 +1512,7 @@ log2_2048(int n)
 }
 
 static int
-wavefront_load_gus_patch (int devno, int format, const char *addr,
+wavefront_load_gus_patch (int devno, int format, const char __user *addr,
 			  int offs, int count, int pmgr_flag)
 {
 	struct patch_info guspatch;
@@ -1636,7 +1636,7 @@ wavefront_load_gus_patch (int devno, int format, const char *addr,
 	/* Now ship it down */
 
 	wavefront_send_sample (&samp, 
-			       (unsigned short *) &(addr)[sizeof_patch],
+			       (unsigned short __user *) &(addr)[sizeof_patch],
 			       (guspatch.mode & WAVE_UNSIGNED) ? 1:0);
 	wavefront_send_patch (&pat);
 	wavefront_send_program (&prog);
@@ -1656,7 +1656,7 @@ wavefront_load_gus_patch (int devno, int format, const char *addr,
 }
 
 static int
-wavefront_load_patch (const char *addr)
+wavefront_load_patch (const char __user *addr)
 
 
 {
@@ -1680,7 +1680,7 @@ wavefront_load_patch (const char *addr)
 	case WF_ST_SAMPLE:  /* sample or sample_header, based on patch->size */
 
 		if (copy_from_user((unsigned char *) &header.hdr.s,
-				   (unsigned char *) header.hdrptr,
+				   (unsigned char __user *) header.hdrptr,
 				   sizeof (wavefront_sample)))
 			return -EFAULT;
 
@@ -1688,8 +1688,7 @@ wavefront_load_patch (const char *addr)
 
 	case WF_ST_MULTISAMPLE:
 
-		if (copy_from_user((unsigned char *) &header.hdr.s,
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.s, header.hdrptr,
 				   sizeof(wavefront_multisample)))
 			return -EFAULT;
 
@@ -1698,32 +1697,28 @@ wavefront_load_patch (const char *addr)
 
 	case WF_ST_ALIAS:
 
-		if (copy_from_user((unsigned char *) &header.hdr.a,
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.a, header.hdrptr,
 				   sizeof (wavefront_alias)))
 			return -EFAULT;
 
 		return wavefront_send_alias (&header);
 
 	case WF_ST_DRUM:
-		if (copy_from_user((unsigned char *) &header.hdr.d, 
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.d, header.hdrptr,
 				   sizeof (wavefront_drum)))
 			return -EFAULT;
 
 		return wavefront_send_drum (&header);
 
 	case WF_ST_PATCH:
-		if (copy_from_user((unsigned char *) &header.hdr.p, 
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.p, header.hdrptr,
 				   sizeof (wavefront_patch)))
 			return -EFAULT;
 
 		return wavefront_send_patch (&header);
 
 	case WF_ST_PROGRAM:
-		if (copy_from_user((unsigned char *) &header.hdr.pr, 
-				   (unsigned char *) header.hdrptr,
+		if (copy_from_user(&header.hdr.pr, header.hdrptr,
 				   sizeof (wavefront_program)))
 			return -EFAULT;
 
@@ -1940,18 +1935,18 @@ wavefront_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 
 	case WFCTL_WFCMD:
-		if (copy_from_user(&wc, (void *) arg, sizeof (wc)))
+		if (copy_from_user(&wc, (void __user *) arg, sizeof (wc)))
 			return -EFAULT;
 		
 		if ((err = wavefront_synth_control (cmd, &wc)) == 0) {
-			if (copy_to_user ((void *) arg, &wc, sizeof (wc)))
+			if (copy_to_user ((void __user *) arg, &wc, sizeof (wc)))
 				return -EFAULT;
 		}
 
 		return err;
 		
 	case WFCTL_LOAD_SPP:
-		return wavefront_load_patch ((const char *) arg);
+		return wavefront_load_patch ((const char __user *) arg);
 		
 	default:
 		printk (KERN_WARNING LOGNAME "invalid ioctl %#x\n", cmd);
@@ -1998,7 +1993,7 @@ wavefront_oss_close (int devno)
 }
 
 static int
-wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
+wavefront_oss_ioctl (int devno, unsigned int cmd, void __user * arg)
 
 {
 	wavefront_control wc;
@@ -2006,8 +2001,7 @@ wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
 
 	switch (cmd) {
 	case SNDCTL_SYNTH_INFO:
-		if(copy_to_user(&((char *) arg)[0], &wavefront_info,
-			sizeof (wavefront_info)))
+		if(copy_to_user(arg, &wavefront_info, sizeof (wavefront_info)))
 			return -EFAULT;
 		return 0;
 
@@ -2043,7 +2037,7 @@ wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
 }
 
 int
-wavefront_oss_load_patch (int devno, int format, const char *addr,
+wavefront_oss_load_patch (int devno, int format, const char __user *addr,
 			  int offs, int count, int pmgr_flag)
 {
 
@@ -2495,7 +2489,6 @@ static int __init detect_wavefront (int irq, int io_base)
 #include <linux/slab.h>
 #include <asm/uaccess.h>
 
-static int errno; 
 
 static int
 wavefront_download_firmware (char *path)
@@ -2745,7 +2738,7 @@ static int __init wavefront_do_reset (int atboot)
 
 	voices[0] = 32;
 
-	if (wavefront_cmd (WFC_SET_NVOICES, 0, voices)) {
+	if (wavefront_cmd (WFC_SET_NVOICES, NULL, voices)) {
 		printk (KERN_WARNING LOGNAME
 			"cannot set number of voices to 32.\n");
 		goto gone_bad;
@@ -3004,7 +2997,7 @@ wffx_ioctl (wavefront_fx_info *r)
 				return -(EINVAL);
 			}
 			if (copy_from_user(page_data,
-					   (unsigned char *)r->data[3],
+					   (unsigned char __user *)r->data[3],
 					   r->data[2]))
 				return -EFAULT;
 			pd = page_data;

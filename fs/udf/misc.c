@@ -34,7 +34,7 @@
 #include "udf_i.h"
 #include "udf_sb.h"
 
-extern struct buffer_head *
+struct buffer_head *
 udf_tgetblk(struct super_block *sb, int block)
 {
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_VARCONV))
@@ -43,7 +43,7 @@ udf_tgetblk(struct super_block *sb, int block)
 		return sb_getblk(sb, block);
 }
 
-extern struct buffer_head *
+struct buffer_head *
 udf_tread(struct super_block *sb, int block)
 {
 	if (UDF_QUERY_FLAG(sb, UDF_FLAG_VARCONV))
@@ -52,7 +52,7 @@ udf_tread(struct super_block *sb, int block)
 		return sb_bread(sb, block);
 }
 
-extern struct genericFormat *
+struct genericFormat *
 udf_add_extendedattr(struct inode * inode, uint32_t size, uint32_t type,
 	uint8_t loc)
 {
@@ -157,7 +157,7 @@ udf_add_extendedattr(struct inode * inode, uint32_t size, uint32_t type,
 	return NULL;
 }
 
-extern struct genericFormat *
+struct genericFormat *
 udf_get_extendedattr(struct inode *inode, uint32_t type, uint8_t subtype)
 {
 	struct genericFormat *gaf;
@@ -207,7 +207,7 @@ udf_get_extendedattr(struct inode *inode, uint32_t type, uint8_t subtype)
  *	July 1, 1997 - Andrew E. Mileski
  *	Written, tested, and released.
  */
-extern struct buffer_head *
+struct buffer_head *
 udf_read_tagged(struct super_block *sb, uint32_t block, uint32_t location, uint16_t *ident)
 {
 	tag *tag_p;
@@ -272,7 +272,7 @@ error_out:
 	return NULL;
 }
 
-extern struct buffer_head *
+struct buffer_head *
 udf_read_ptagged(struct super_block *sb, lb_addr loc, uint32_t offset, uint16_t *ident)
 {
 	return udf_read_tagged(sb, udf_get_lb_pblock(sb, loc, offset),

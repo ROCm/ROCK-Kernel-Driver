@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2001
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -147,7 +147,7 @@ static inline void BT_STACK_DUMP(struct btstack *btstack)
 	printk("btstack dump:\n");
 	for (i = 0; i < MAXTREEHEIGHT; i++)
 		printk(KERN_ERR "bn = %Lx, index = %d\n",
-		       btstack->stack[i].bn,
+		       (long long)btstack->stack[i].bn,
 		       btstack->stack[i].index);
 }
 

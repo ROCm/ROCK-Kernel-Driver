@@ -120,23 +120,6 @@ mem_pieces_print(struct mem_pieces *mp)
 	printk("\n");
 }
 
-#if defined(CONFIG_APUS) || defined(CONFIG_PPC_OF)
-/*
- * Add some memory to an array of pieces
- */
-void __init
-mem_pieces_append(struct mem_pieces *mp, unsigned int start, unsigned int size)
-{
-	struct reg_property *rp;
-
-	if (mp->n_regions >= MEM_PIECES_MAX)
-		return;
-	rp = &mp->regions[mp->n_regions++];
-	rp->address = start;
-	rp->size = size;
-}
-#endif /* CONFIG_APUS || CONFIG_PPC_OF */
-
 void __init
 mem_pieces_sort(struct mem_pieces *mp)
 {

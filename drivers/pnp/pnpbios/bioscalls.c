@@ -11,15 +11,15 @@
 #include <linux/pnpbios.h>
 #include <linux/device.h>
 #include <linux/pnp.h>
-#include <asm/page.h>
-#include <asm/system.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
-#include <asm/desc.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/completion.h>
 #include <linux/spinlock.h>
+
+#include <asm/page.h>
+#include <asm/desc.h>
 #include <asm/system.h>
 #include <asm/byteorder.h>
 
@@ -260,7 +260,7 @@ static int __pnp_bios_dev_node_info(struct pnp_dev_node_info *data)
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_NUM_SYS_DEV_NODES, 0, PNP_TS1, 2, PNP_TS1, PNP_DS, 0, 0,
-			       data, sizeof(struct pnp_dev_node_info), 0, 0);
+			       data, sizeof(struct pnp_dev_node_info), NULL, 0);
 	data->no_nodes &= 0xff;
 	return status;
 }
@@ -323,7 +323,7 @@ static int __pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *
 	if ( !boot && pnpbios_dont_use_current_config )
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_SET_SYS_DEV_NODE, nodenum, 0, PNP_TS1, boot ? 2 : 1, PNP_DS, 0, 0,
-			       data, 65536, 0, 0);
+			       data, 65536, NULL, 0);
 	return status;
 }
 
@@ -353,7 +353,7 @@ static int pnp_bios_get_event(u16 *event)
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_EVENT, 0, PNP_TS1, PNP_DS, 0, 0 ,0 ,0,
-			       event, sizeof(u16), 0, 0);
+			       event, sizeof(u16), NULL, 0);
 	return status;
 }
 #endif
@@ -381,7 +381,7 @@ int pnp_bios_dock_station_info(struct pnp_docking_station_info *data)
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_DOCKING_STATION_INFORMATION, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0,
-			       data, sizeof(struct pnp_docking_station_info), 0, 0);
+			       data, sizeof(struct pnp_docking_station_info), NULL, 0);
 	return status;
 }
 
@@ -411,7 +411,7 @@ static int __pnp_bios_get_stat_res(char *info)
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_STATIC_ALLOCED_RES_INFO, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0,
-			       info, 65536, 0, 0);
+			       info, 65536, NULL, 0);
 	return status;
 }
 
@@ -448,7 +448,7 @@ static int __pnp_bios_isapnp_config(struct pnp_isa_config_struc *data)
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_PNP_ISA_CONFIG_STRUC, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0,
-			       data, sizeof(struct pnp_isa_config_struc), 0, 0);
+			       data, sizeof(struct pnp_isa_config_struc), NULL, 0);
 	return status;
 }
 
@@ -470,7 +470,7 @@ static int __pnp_bios_escd_info(struct escd_info_struc *data)
 	if (!pnp_bios_present())
 		return ESCD_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_ESCD_INFO, 0, PNP_TS1, 2, PNP_TS1, 4, PNP_TS1, PNP_DS,
-			       data, sizeof(struct escd_info_struc), 0, 0);
+			       data, sizeof(struct escd_info_struc), NULL, 0);
 	return status;
 }
 

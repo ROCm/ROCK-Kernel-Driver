@@ -1,5 +1,5 @@
-#ifndef __ASM_SH_DAC_H
-#define __ASM_SH_DAC_H
+#ifndef __ASM_CPU_SH3_DAC_H
+#define __ASM_CPU_SH3_DAC_H
 
 /*
  * Copyright (C) 2003  Andriy Skulysh
@@ -38,5 +38,4 @@ static __inline__ void sh_dac_output(u8 value, int channel)
 	else ctrl_outb(value,DADR0);
 }
 
-#endif /* __ASM_SH_DAC_H */
-
+#endif /* __ASM_CPU_SH3_DAC_H */

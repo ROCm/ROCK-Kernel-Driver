@@ -57,7 +57,8 @@
 #define BIT_31	0x80000000
 
 #if MEMORY_MAPPED_IO
-#define RD_REG_WORD(addr)		readw(addr)
+#define RD_REG_WORD(addr)		readw_relaxed(addr)
+#define RD_REG_WORD_dmasync(addr)	readw(addr)
 #define WRT_REG_WORD(addr, data)	writew(data, addr)
 #else				/* MEMORY_MAPPED_IO */
 #define RD_REG_WORD(addr)		inw((unsigned long)addr)

@@ -259,15 +259,7 @@
 #include <linux/ioctl.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
-
 #include "io_edgeport.h"
 #include "io_ionsp.h"		/* info for the iosp messages */
 #include "io_16654.h"		/* 16654 UART defines */
@@ -299,19 +291,13 @@
 #define IMAGE_VERSION_NAME	OperationalCodeImageVersion_GEN2
 #include "io_fw_down2.h"	/* Define array OperationalCodeImage[] */
 
-
 #define MAX_NAME_LEN		64
-
 
 #define CHASE_TIMEOUT		(5*HZ)		/* 5 seconds */
 #define OPEN_TIMEOUT		(5*HZ)		/* 5 seconds */
 #define COMMAND_TIMEOUT		(5*HZ)		/* 5 seconds */
 
-#ifndef SERIAL_MAGIC
-	#define SERIAL_MAGIC	0x6702
-#endif
-#define PORT_MAGIC		0x7301
-
+static int debug;
 
 /* receive port state */
 enum RXSTATE {
@@ -776,10 +762,6 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (serial_paranoia_check (edge_serial->serial, __FUNCTION__)) {
-		return;
-	}
-
 	switch (urb->status) {
 	case 0:
 		/* success */
@@ -797,7 +779,7 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 
 	// process this interrupt-read even if there are no ports open
 	if (length) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, length, data);
+		usb_serial_debug_data(debug, &edge_serial->serial->dev->dev, __FUNCTION__, length, data);
 
 		if (length > 1) {
 			bytes_avail = data[0] | (data[1] << 8);
@@ -825,19 +807,17 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 			txCredits = data[position] | (data[position+1] << 8);
 			if (txCredits) {
 				port = edge_serial->serial->port[portNumber];
-				if (port_paranoia_check (port, __FUNCTION__) == 0) {
-					edge_port = usb_get_serial_port_data(port);
-					if (edge_port->open) {
-						edge_port->txCredits += txCredits;
-						dbg("%s - txcredits for port%d = %d", __FUNCTION__, portNumber, edge_port->txCredits);
+				edge_port = usb_get_serial_port_data(port);
+				if (edge_port->open) {
+					edge_port->txCredits += txCredits;
+					dbg("%s - txcredits for port%d = %d", __FUNCTION__, portNumber, edge_port->txCredits);
 
-						/* tell the tty driver that something has changed */
-						if (edge_port->port->tty)
-							wake_up_interruptible(&edge_port->port->tty->write_wait);
+					/* tell the tty driver that something has changed */
+					if (edge_port->port->tty)
+						wake_up_interruptible(&edge_port->port->tty->write_wait);
 
-						// Since we have more credit, check if more data can be sent
-						send_more_port_data(edge_serial, edge_port);
-					}
+					// Since we have more credit, check if more data can be sent
+					send_more_port_data(edge_serial, edge_port);
 				}
 			}
 			position += 2;
@@ -867,10 +847,6 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (serial_paranoia_check (edge_serial->serial, __FUNCTION__)) {
-		return;
-	}
-
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
 		return;
@@ -879,7 +855,7 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 	if (urb->actual_length) {
 		raw_data_length = urb->actual_length;
 
-		usb_serial_debug_data (__FILE__, __FUNCTION__, raw_data_length, data);
+		usb_serial_debug_data(debug, &edge_serial->serial->dev->dev, __FUNCTION__, raw_data_length, data);
 
 		/* decrement our rxBytes available by the number that we just got */
 		edge_serial->rxBytesAvail -= raw_data_length;
@@ -915,10 +891,6 @@ static void edge_bulk_out_data_callback (struct urb *urb, struct pt_regs *regs)
 	struct tty_struct *tty;
 
 	dbg("%s", __FUNCTION__);
-
-	if (port_paranoia_check (edge_port->port, __FUNCTION__)) {
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
@@ -969,10 +941,6 @@ static void edge_bulk_out_cmd_callback (struct urb *urb, struct pt_regs *regs)
 	/* Free the command urb */
 	usb_free_urb (urb);
 
-	if (port_paranoia_check (edge_port->port, __FUNCTION__)) {
-		return;
-	}
-
 	if (status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, status);
 		return;
@@ -1009,9 +977,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	int response;
 	int timeout;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (edge_port == NULL)
@@ -1240,55 +1205,45 @@ static void block_until_tx_empty (struct edgeport_port *edge_port)
  *****************************************************************************/
 static void edge_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
 	struct edgeport_serial *edge_serial;
 	struct edgeport_port *edge_port;
 	int status;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
-	edge_serial = usb_get_serial_data(serial);
+	edge_serial = usb_get_serial_data(port->serial);
 	edge_port = usb_get_serial_port_data(port);
 	if ((edge_serial == NULL) || (edge_port == NULL))
 		return;
 	
-	if (serial->dev) {
-		// block until tx is empty
-		block_until_tx_empty(edge_port);
+	// block until tx is empty
+	block_until_tx_empty(edge_port);
 
-		edge_port->closePending = TRUE;
+	edge_port->closePending = TRUE;
 
-		/* flush and chase */
-		edge_port->chaseResponsePending = TRUE;
+	/* flush and chase */
+	edge_port->chaseResponsePending = TRUE;
 
-		dbg("%s - Sending IOSP_CMD_CHASE_PORT", __FUNCTION__);
-		status = send_iosp_ext_cmd (edge_port, IOSP_CMD_CHASE_PORT, 0);
-		if (status == 0) {
-			// block until chase finished
-			block_until_chase_response(edge_port);
-		} else {
-			edge_port->chaseResponsePending = FALSE;
-		}
+	dbg("%s - Sending IOSP_CMD_CHASE_PORT", __FUNCTION__);
+	status = send_iosp_ext_cmd (edge_port, IOSP_CMD_CHASE_PORT, 0);
+	if (status == 0) {
+		// block until chase finished
+		block_until_chase_response(edge_port);
+	} else {
+		edge_port->chaseResponsePending = FALSE;
+	}
 
-		/* close the port */
-		dbg("%s - Sending IOSP_CMD_CLOSE_PORT", __FUNCTION__);
-		send_iosp_ext_cmd (edge_port, IOSP_CMD_CLOSE_PORT, 0);
+	/* close the port */
+	dbg("%s - Sending IOSP_CMD_CLOSE_PORT", __FUNCTION__);
+	send_iosp_ext_cmd (edge_port, IOSP_CMD_CLOSE_PORT, 0);
 
-		//port->close = TRUE;
-		edge_port->closePending = FALSE;
-		edge_port->open = FALSE;
-		edge_port->openPending = FALSE;
+	//port->close = TRUE;
+	edge_port->closePending = FALSE;
+	edge_port->open = FALSE;
+	edge_port->openPending = FALSE;
 
-		if (edge_port->write_urb) {
-			usb_unlink_urb (edge_port->write_urb);
-		}
+	if (edge_port->write_urb) {
+		usb_unlink_urb (edge_port->write_urb);
 	}
 
 	if (edge_port->write_urb) {
@@ -1358,7 +1313,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	} else {
 		memcpy(&fifo->fifo[fifo->head], data, firsthalf);
 	}  
-	usb_serial_debug_data (__FILE__, __FUNCTION__, firsthalf, &fifo->fifo[fifo->head]);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, firsthalf, &fifo->fifo[fifo->head]);
 
 	// update the index and size
 	fifo->head  += firsthalf;
@@ -1379,7 +1334,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 		} else {
 			memcpy(&fifo->fifo[fifo->head], &data[firsthalf], secondhalf);
 		}
-		usb_serial_debug_data (__FILE__, __FUNCTION__, secondhalf, &fifo->fifo[fifo->head]);
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, secondhalf, &fifo->fifo[fifo->head]);
 		// update the index and size
 		fifo->count += secondhalf;
 		fifo->head  += secondhalf;
@@ -1455,7 +1410,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	count = fifo->count;
 	buffer = kmalloc (count+2, GFP_ATOMIC);
 	if (buffer == NULL) {
-		dev_err(&edge_serial->serial->dev->dev, "%s - no more kernel memory...\n", __FUNCTION__);
+		dev_err(&edge_port->port->dev, "%s - no more kernel memory...\n", __FUNCTION__);
 		edge_port->write_in_progress = FALSE;
 		return;
 	}
@@ -1479,9 +1434,8 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 		fifo->count -= secondhalf;
 	}
 
-	if (count) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, count, &buffer[2]);
-	}
+	if (count)
+		usb_serial_debug_data(debug, &edge_port->port->dev, __FUNCTION__, count, &buffer[2]);
 
 	/* fill up the urb with all of our data and submit it */
 	usb_fill_bulk_urb (urb, edge_serial->serial->dev, 
@@ -1736,7 +1690,7 @@ static void edge_set_termios (struct usb_serial_port *port, struct termios *old_
  * 	    transmit holding register is empty.  This functionality
  * 	    allows an RS485 driver to be written in user space. 
  *****************************************************************************/
-static int get_lsr_info(struct edgeport_port *edge_port, unsigned int *value)
+static int get_lsr_info(struct edgeport_port *edge_port, unsigned int __user *value)
 {
 	unsigned int result = 0;
 
@@ -1751,7 +1705,7 @@ static int get_lsr_info(struct edgeport_port *edge_port, unsigned int *value)
 	return 0;
 }
 
-static int get_number_bytes_avail(struct edgeport_port *edge_port, unsigned int *value)
+static int get_number_bytes_avail(struct edgeport_port *edge_port, unsigned int __user *value)
 {
 	unsigned int result = 0;
 	struct tty_struct *tty = edge_port->port->tty;
@@ -1821,7 +1775,7 @@ static int edge_tiocmget(struct usb_serial_port *port, struct file *file)
 	return result;
 }
 
-static int get_serial_info(struct edgeport_port *edge_port, struct serial_struct * retinfo)
+static int get_serial_info(struct edgeport_port *edge_port, struct serial_struct __user *retinfo)
 {
 	struct serial_struct tmp;
 
@@ -1842,7 +1796,6 @@ static int get_serial_info(struct edgeport_port *edge_port, struct serial_struct
 //	tmp.custom_divisor	= state->custom_divisor;
 //	tmp.hub6		= state->hub6;
 //	tmp.io_type		= state->io_type;
-
 
 	if (copy_to_user(retinfo, &tmp, sizeof(*retinfo)))
 		return -EFAULT;
@@ -1869,17 +1822,17 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 		// return number of bytes available
 		case TIOCINQ:
 			dbg("%s (%d) TIOCINQ", __FUNCTION__,  port->number);
-			return get_number_bytes_avail(edge_port, (unsigned int *) arg);
+			return get_number_bytes_avail(edge_port, (unsigned int __user *) arg);
 			break;
 
 		case TIOCSERGETLSR:
 			dbg("%s (%d) TIOCSERGETLSR", __FUNCTION__,  port->number);
-			return get_lsr_info(edge_port, (unsigned int *) arg);
+			return get_lsr_info(edge_port, (unsigned int __user *) arg);
 			return 0;
 
 		case TIOCGSERIAL:
 			dbg("%s (%d) TIOCGSERIAL", __FUNCTION__,  port->number);
-			return get_serial_info(edge_port, (struct serial_struct *) arg);
+			return get_serial_info(edge_port, (struct serial_struct __user *) arg);
 
 		case TIOCSSERIAL:
 			dbg("%s (%d) TIOCSSERIAL", __FUNCTION__,  port->number);
@@ -1924,7 +1877,7 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 			icount.buf_overrun = cnow.buf_overrun;
 
 			dbg("%s (%d) TIOCGICOUNT RX=%d, TX=%d", __FUNCTION__,  port->number, icount.rx, icount.tx );
-			if (copy_to_user((void *)arg, &icount, sizeof(icount)))
+			if (copy_to_user((void __user *)arg, &icount, sizeof(icount)))
 				return -EFAULT;
 			return 0;
 	}
@@ -2071,24 +2024,22 @@ static int process_rcvd_data (struct edgeport_serial *edge_serial, unsigned char
 				/* spit this data back into the tty driver if this port is open */
 				if (rxLen) {
 					port = edge_serial->serial->port[edge_serial->rxPort];
-					if (port_paranoia_check (port, __FUNCTION__) == 0) {
-        					edge_port = usb_get_serial_port_data(port);
-						if (edge_port->open) {
-							tty = edge_port->port->tty;
-							if (tty) {
-								dbg("%s - Sending %d bytes to TTY for port %d", __FUNCTION__, rxLen, edge_serial->rxPort);
-								for (i = 0; i < rxLen ; ++i) {
-									/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
-									if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
-										tty_flip_buffer_push(tty);
-									}
-									/* this doesn't actually push the data through unless tty->low_latency is set */
-									tty_insert_flip_char(tty, buffer[i], 0);
+					edge_port = usb_get_serial_port_data(port);
+					if (edge_port->open) {
+						tty = edge_port->port->tty;
+						if (tty) {
+							dbg("%s - Sending %d bytes to TTY for port %d", __FUNCTION__, rxLen, edge_serial->rxPort);
+							for (i = 0; i < rxLen ; ++i) {
+								/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
+								if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
+									tty_flip_buffer_push(tty);
 								}
-								tty_flip_buffer_push(tty);
+								/* this doesn't actually push the data through unless tty->low_latency is set */
+								tty_insert_flip_char(tty, buffer[i], 0);
 							}
-							edge_port->icount.rx += rxLen;
+							tty_flip_buffer_push(tty);
 						}
+						edge_port->icount.rx += rxLen;
 					}
 					buffer += rxLen;
 				}
@@ -2124,9 +2075,6 @@ static void process_rcvd_status (struct edgeport_serial *edge_serial, __u8 byte2
 
 	/* switch the port pointer to the one being currently talked about */
 	port = edge_serial->serial->port[edge_serial->rxPort];
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		return;
-	}
         edge_port = usb_get_serial_port_data(port);
 	if (edge_port == NULL) {
 		dev_err(&edge_serial->serial->dev->dev, "%s - edge_port == NULL for port %d\n", __FUNCTION__, edge_serial->rxPort);
@@ -2480,7 +2428,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	struct urb *urb;
 	int timeout;
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
+	usb_serial_debug_data(debug, &edge_port->port->dev, __FUNCTION__, length, buffer);
 
 	/* Allocate our next urb */
 	urb = usb_alloc_urb (0, GFP_ATOMIC);
@@ -3111,6 +3059,5 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
-

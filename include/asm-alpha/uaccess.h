@@ -29,7 +29,6 @@
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
-
 /*
  * Is a address valid? This does a straightforward calculation rather
  * than tests.
@@ -43,10 +42,13 @@
 #define __access_ok(addr,size,segment) \
 	(((segment).seg & (addr | size | (addr+size))) == 0)
 
-#define access_ok(type,addr,size) \
-	__access_ok(((unsigned long)(addr)),(size),get_fs())
+#define access_ok(type,addr,size)				\
+({								\
+	__chk_user_ptr(addr);					\
+	__access_ok(((unsigned long)(addr)),(size),get_fs());	\
+})
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+extern inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -90,6 +92,7 @@ extern void __get_user_unknown(void);
 #define __get_user_nocheck(x,ptr,size)				\
 ({								\
 	long __gu_err = 0, __gu_val;				\
+	__chk_user_ptr(ptr);					\
 	switch (size) {						\
 	  case 1: __get_user_8(ptr); break;			\
 	  case 2: __get_user_16(ptr); break;			\
@@ -101,22 +104,23 @@ extern void __get_user_unknown(void);
 	__gu_err;						\
 })
 
-#define __get_user_check(x,ptr,size,segment)			\
-({								\
-	long __gu_err = -EFAULT, __gu_val = 0;			\
-	const __typeof__(*(ptr)) *__gu_addr = (ptr);		\
-	if (__access_ok((long)__gu_addr,size,segment)) {	\
-		__gu_err = 0;					\
-		switch (size) {					\
-		  case 1: __get_user_8(__gu_addr); break;	\
-		  case 2: __get_user_16(__gu_addr); break;	\
-		  case 4: __get_user_32(__gu_addr); break;	\
-		  case 8: __get_user_64(__gu_addr); break;	\
-		  default: __get_user_unknown(); break;		\
-		}						\
-	}							\
-	(x) = (__typeof__(*(ptr))) __gu_val;			\
-	__gu_err;						\
+#define __get_user_check(x,ptr,size,segment)				\
+({									\
+	long __gu_err = -EFAULT, __gu_val = 0;				\
+	const __typeof__(*(ptr)) __user *__gu_addr = (ptr);		\
+	__chk_user_ptr(ptr);						\
+	if (__access_ok((unsigned long)__gu_addr,size,segment)) {	\
+		__gu_err = 0;						\
+		switch (size) {						\
+		  case 1: __get_user_8(__gu_addr); break;		\
+		  case 2: __get_user_16(__gu_addr); break;		\
+		  case 4: __get_user_32(__gu_addr); break;		\
+		  case 8: __get_user_64(__gu_addr); break;		\
+		  default: __get_user_unknown(); break;			\
+		}							\
+	}								\
+	(x) = (__typeof__(*(ptr))) __gu_val;				\
+	__gu_err;							\
 })
 
 struct __large_struct { unsigned long buf[100]; };
@@ -204,6 +208,7 @@ extern void __put_user_unknown(void);
 #define __put_user_nocheck(x,ptr,size)				\
 ({								\
 	long __pu_err = 0;					\
+	__chk_user_ptr(ptr);					\
 	switch (size) {						\
 	  case 1: __put_user_8(x,ptr); break;			\
 	  case 2: __put_user_16(x,ptr); break;			\
@@ -214,21 +219,22 @@ extern void __put_user_unknown(void);
 	__pu_err;						\
 })
 
-#define __put_user_check(x,ptr,size,segment)			\
-({								\
-	long __pu_err = -EFAULT;				\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);			\
-	if (__access_ok((long)__pu_addr,size,segment)) {	\
-		__pu_err = 0;					\
-		switch (size) {					\
-		  case 1: __put_user_8(x,__pu_addr); break;	\
-		  case 2: __put_user_16(x,__pu_addr); break;	\
-		  case 4: __put_user_32(x,__pu_addr); break;	\
-		  case 8: __put_user_64(x,__pu_addr); break;	\
-		  default: __put_user_unknown(); break;		\
-		}						\
-	}							\
-	__pu_err;						\
+#define __put_user_check(x,ptr,size,segment)				\
+({									\
+	long __pu_err = -EFAULT;					\
+	__typeof__(*(ptr)) __user *__pu_addr = (ptr);			\
+	__chk_user_ptr(ptr);						\
+	if (__access_ok((unsigned long)__pu_addr,size,segment)) {	\
+		__pu_err = 0;						\
+		switch (size) {						\
+		  case 1: __put_user_8(x,__pu_addr); break;		\
+		  case 2: __put_user_16(x,__pu_addr); break;		\
+		  case 4: __put_user_32(x,__pu_addr); break;		\
+		  case 8: __put_user_64(x,__pu_addr); break;		\
+		  default: __put_user_unknown(); break;			\
+		}							\
+	}								\
+	__pu_err;							\
 })
 
 /*
@@ -371,34 +377,42 @@ __copy_tofrom_user_nocheck(void *to, const void *from, long len)
 }
 
 extern inline long
-__copy_tofrom_user(void *to, const void *from, long len, const void *validate)
+__copy_tofrom_user(void *to, const void *from, long len, const void __user *validate)
 {
-	if (__access_ok((long)validate, len, get_fs()))
+	if (__access_ok((unsigned long)validate, len, get_fs()))
 		len = __copy_tofrom_user_nocheck(to, from, len);
 	return len;
 }
 
-#define __copy_to_user(to,from,n)   __copy_tofrom_user_nocheck((to),(from),(n))
-#define __copy_from_user(to,from,n) __copy_tofrom_user_nocheck((to),(from),(n))
+#define __copy_to_user(to,from,n)					\
+({									\
+	__chk_user_ptr(to);						\
+	__copy_tofrom_user_nocheck((__force void *)(to),(from),(n));	\
+})
+#define __copy_from_user(to,from,n)					\
+({									\
+	__chk_user_ptr(from);						\
+	__copy_tofrom_user_nocheck((to),(__force void *)(from),(n));	\
+})
 
 extern inline long
-copy_to_user(void *to, const void *from, long n)
+copy_to_user(void __user *to, const void *from, long n)
 {
-	return __copy_tofrom_user(to, from, n, to);
+	return __copy_tofrom_user((__force void *)to, from, n, to);
 }
 
 extern inline long
-copy_from_user(void *to, const void *from, long n)
+copy_from_user(void *to, const void __user *from, long n)
 {
-	return __copy_tofrom_user(to, from, n, from);
+	return __copy_tofrom_user(to, (__force void *)from, n, from);
 }
 
 extern void __do_clear_user(void);
 
 extern inline long
-__clear_user(void *to, long len)
+__clear_user(void __user *to, long len)
 {
-	register void * __cl_to __asm__("$6") = to;
+	register void __user * __cl_to __asm__("$6") = to;
 	register long __cl_len __asm__("$0") = len;
 	__asm__ __volatile__(
 		__module_call(28, 2, __do_clear_user)
@@ -410,9 +424,9 @@ __clear_user(void *to, long len)
 }
 
 extern inline long
-clear_user(void *to, long len)
+clear_user(void __user *to, long len)
 {
-	if (__access_ok((long)to, len, get_fs()))
+	if (__access_ok((unsigned long)to, len, get_fs()))
 		len = __clear_user(to, len);
 	return len;
 }
@@ -423,30 +437,30 @@ clear_user(void *to, long len)
 /* Returns: -EFAULT if exception before terminator, N if the entire
    buffer filled, else strlen.  */
 
-extern long __strncpy_from_user(char *__to, const char *__from, long __to_len);
+extern long __strncpy_from_user(char *__to, const char __user *__from, long __to_len);
 
 extern inline long
-strncpy_from_user(char *to, const char *from, long n)
+strncpy_from_user(char *to, const char __user *from, long n)
 {
 	long ret = -EFAULT;
-	if (__access_ok((long)from, 0, get_fs()))
+	if (__access_ok((unsigned long)from, 0, get_fs()))
 		ret = __strncpy_from_user(to, from, n);
 	return ret;
 }
 
 /* Returns: 0 if bad, string length+1 (memory size) of string if ok */
-extern long __strlen_user(const char *);
+extern long __strlen_user(const char __user *);
 
-extern inline long strlen_user(const char *str)
+extern inline long strlen_user(const char __user *str)
 {
 	return access_ok(VERIFY_READ,str,0) ? __strlen_user(str) : 0;
 }
 
 /* Returns: 0 if exception before NUL or reaching the supplied limit (N),
  * a value greater than N if the limit would be exceeded, else strlen.  */
-extern long __strnlen_user(const char *, long);
+extern long __strnlen_user(const char __user *, long);
 
-extern inline long strnlen_user(const char *str, long n)
+extern inline long strnlen_user(const char __user *str, long n)
 {
 	return access_ok(VERIFY_READ,str,0) ? __strnlen_user(str, n) : 0;
 }

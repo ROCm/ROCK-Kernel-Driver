@@ -119,8 +119,8 @@ common_shutdown_1(void *generic_ptr)
 
 #ifdef CONFIG_SMP
 	/* Wait for the secondaries to halt. */
-	clear_bit(boot_cpuid, &cpu_present_mask);
-	while (cpu_present_mask)
+	cpu_clear(boot_cpuid, cpu_possible_map);
+	while (cpus_weight(cpu_possible_map))
 		barrier();
 #endif
 
@@ -189,7 +189,7 @@ EXPORT_SYMBOL(machine_power_off);
 void
 show_regs(struct pt_regs *regs)
 {
-	dik_show_regs(regs, 0);
+	dik_show_regs(regs, NULL);
 }
 
 /*
@@ -239,8 +239,9 @@ release_thread(struct task_struct *dead_task)
  * with parameters (SIGCHLD, 0).
  */
 int
-alpha_clone(unsigned long clone_flags, unsigned long usp, int *parent_tid,
-	    int *child_tid, unsigned long tls_value, struct pt_regs *regs)
+alpha_clone(unsigned long clone_flags, unsigned long usp,
+	    int __user *parent_tid, int __user *child_tid,
+	    unsigned long tls_value, struct pt_regs *regs)
 {
 	if (!usp)
 		usp = rdusp();
@@ -455,18 +456,10 @@ dump_elf_task_fp(elf_fpreg_t *dest, struct task_struct *task)
 
 /*
  * sys_execve() executes a new program.
- *
- * This works due to the alpha calling sequence: the first 6 args
- * are gotten from registers, while the rest is on the stack, so
- * we get a0-a5 for free, and then magically find "struct pt_regs"
- * on the stack for us..
- *
- * Don't do this at home.
  */
 asmlinkage int
-sys_execve(char *ufilename, char **argv, char **envp,
-	   unsigned long a3, unsigned long a4, unsigned long a5,
-	   struct pt_regs regs)
+do_sys_execve(char __user *ufilename, char __user * __user *argv,
+	      char __user * __user *envp, struct pt_regs *regs)
 {
 	int error;
 	char *filename;
@@ -475,7 +468,7 @@ sys_execve(char *ufilename, char **argv, char **envp,
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
-	error = do_execve(filename, argv, envp, &regs);
+	error = do_execve(filename, argv, envp, regs);
 	putname(filename);
 out:
 	return error;
@@ -510,14 +503,6 @@ thread_saved_pc(task_t *t)
 	return 0;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long
 get_wchan(struct task_struct *p)
 {
@@ -536,7 +521,7 @@ get_wchan(struct task_struct *p)
 	 */
 
 	pc = thread_saved_pc(p);
-	if (pc >= first_sched && pc < last_sched) {
+	if (in_sched_functions(pc)) {
 		schedule_frame = ((unsigned long *)p->thread_info->pcb.ksp)[6];
 		return ((unsigned long *)schedule_frame)[12];
 	}

@@ -1328,7 +1328,7 @@ static int snd_korg1212_silence(korg1212_t *korg1212, int pos, int count, int of
 	return 0;
 }
 
-static int snd_korg1212_copy_to(korg1212_t *korg1212, void *dst, int pos, int count, int offset, int size)
+static int snd_korg1212_copy_to(korg1212_t *korg1212, void __user *dst, int pos, int count, int offset, int size)
 {
 	KorgAudioFrame * src =  korg1212->recordDataBufsPtr[0].bufferData + pos;
 	int i, rc;
@@ -1346,7 +1346,7 @@ static int snd_korg1212_copy_to(korg1212_t *korg1212, void *dst, int pos, int co
 			return -EFAULT;
 		}
 #endif
-		rc = copy_to_user((void*) dst + offset, src, size);
+		rc = copy_to_user(dst + offset, src, size);
 		if (rc) {
 #if K1212_DEBUG_LEVEL > 0
 			K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_copy_to USER EFAULT src=%p dst=%p iter=%d\n", src, dst, i);
@@ -1360,7 +1360,7 @@ static int snd_korg1212_copy_to(korg1212_t *korg1212, void *dst, int pos, int co
 	return 0;
 }
 
-static int snd_korg1212_copy_from(korg1212_t *korg1212, void *src, int pos, int count, int offset, int size)
+static int snd_korg1212_copy_from(korg1212_t *korg1212, void __user *src, int pos, int count, int offset, int size)
 {
 	KorgAudioFrame * dst =  korg1212->playDataBufsPtr[0].bufferData + pos;
 	int i, rc;
@@ -1671,7 +1671,7 @@ static snd_pcm_uframes_t snd_korg1212_capture_pointer(snd_pcm_substream_t *subst
 static int snd_korg1212_playback_copy(snd_pcm_substream_t *substream,
                         int channel, /* not used (interleaved data) */
                         snd_pcm_uframes_t pos,
-                        void *src,
+                        void __user *src,
                         snd_pcm_uframes_t count)
 {
         korg1212_t *korg1212 = _snd_pcm_substream_chip(substream);
@@ -1701,7 +1701,7 @@ static int snd_korg1212_playback_silence(snd_pcm_substream_t *substream,
 static int snd_korg1212_capture_copy(snd_pcm_substream_t *substream,
                         int channel, /* not used (interleaved data) */
                         snd_pcm_uframes_t pos,
-                        void *dst,
+                        void __user *dst,
                         snd_pcm_uframes_t count)
 {
         korg1212_t *korg1212 = _snd_pcm_substream_chip(substream);

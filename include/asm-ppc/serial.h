@@ -30,6 +30,8 @@
 #include <platforms/spruce.h>
 #elif defined(CONFIG_4xx)
 #include <asm/ibm4xx.h>
+#elif defined(CONFIG_85xx)
+#include <asm/mpc85xx.h>
 #else
 
 /*

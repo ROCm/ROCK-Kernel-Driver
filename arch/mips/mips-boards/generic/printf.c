@@ -59,7 +59,7 @@ static inline void serial_out(int offset, int value)
 	outb(value, PORT(offset));
 }
 
-int putPromChar(char c)
+int prom_putchar(char c)
 {
 	while ((serial_in(UART_LSR) & UART_LSR_THRE) == 0)
 		;
@@ -69,7 +69,7 @@ int putPromChar(char c)
 	return 1;
 }
 
-char getPromChar(void)
+char prom_getchar(void)
 {
 	while (!(serial_in(UART_LSR) & UART_LSR_DR))
 		;
@@ -77,33 +77,3 @@ char getPromChar(void)
 	return serial_in(UART_RX);
 }
 
-static spinlock_t con_lock = SPIN_LOCK_UNLOCKED;
-
-static char buf[1024];
-
-void __init prom_printf(char *fmt, ...)
-{
-	va_list args;
-	int l;
-	char *p, *buf_end;
-	long flags;
-
-	spin_lock_irqsave(con_lock, flags);
-
-	va_start(args, fmt);
-	l = vsprintf(buf, fmt, args); /* hopefully i < sizeof(buf) */
-	va_end(args);
-
-	buf_end = buf + l;
-
-	for (p = buf; p < buf_end; p++) {
-		/* Crude cr/nl handling is better than none */
-		if (*p == '\n')
-			putPromChar('\r');
-		putPromChar(*p);
-	}
-	/* wait for output to drain */
-	while ((serial_in(UART_LSR) & UART_LSR_TEMT) == 0)
-		;
-	spin_unlock_irqrestore(con_lock, flags);
-}

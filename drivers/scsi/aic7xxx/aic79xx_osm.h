@@ -68,7 +68,7 @@
 /* Core SCSI definitions */
 #define AIC_LIB_PREFIX ahd
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 /* Name space conflict with BSD queue macros */
 #ifdef LIST_HEAD
@@ -788,7 +788,7 @@ ahd_done_unlock(struct ahd_softc *ahd, unsigned long *flags)
 }
 
 static __inline void
-ahd_list_lockinit()
+ahd_list_lockinit(void)
 {
 	spin_lock_init(&ahd_list_spinlock);
 }

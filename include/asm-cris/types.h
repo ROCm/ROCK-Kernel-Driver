@@ -50,6 +50,9 @@ typedef unsigned long long u64;
 /* Dma addresses are 32-bits wide, just like our other addresses.  */
  
 typedef u32 dma_addr_t;
+typedef u32 dma64_addr_t;
+
+typedef unsigned int kmem_bufctl_t;
 
 #endif /* __ASSEMBLY__ */
 

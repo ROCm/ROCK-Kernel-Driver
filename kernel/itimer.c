@@ -10,7 +10,6 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/time.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 
@@ -69,7 +68,6 @@ void it_real_fn(unsigned long __data)
 	struct task_struct * p = (struct task_struct *) __data;
 	unsigned long interval;
 
-	TRIG_EVENT(timer_expired_hook, p);
 	send_group_sig_info(SIGALRM, SEND_SIG_PRIV, p);
 	interval = p->it_real_incr;
 	if (interval) {
@@ -89,7 +87,6 @@ int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue)
 	j = timeval_to_jiffies(&value->it_value);
 	if (ovalue && (k = do_getitimer(which, ovalue)) < 0)
 		return k;
-	TRIG_EVENT(setitimer_hook, which, i, j);
 	switch (which) {
 		case ITIMER_REAL:
 			del_timer_sync(&current->real_timer);
@@ -137,7 +134,7 @@ asmlinkage long sys_setitimer(int which,
 	} else
 		memset((char *) &set_buffer, 0, sizeof(set_buffer));
 
-	error = do_setitimer(which, &set_buffer, ovalue ? &get_buffer : 0);
+	error = do_setitimer(which, &set_buffer, ovalue ? &get_buffer : NULL);
 	if (error || !ovalue)
 		return error;
 

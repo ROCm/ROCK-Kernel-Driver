@@ -44,10 +44,18 @@
 #define	RTM_DELTFILTER	(RTM_BASE+29)
 #define	RTM_GETTFILTER	(RTM_BASE+30)
 
+#define RTM_NEWACTION   (RTM_BASE+32)
+#define RTM_DELACTION   (RTM_BASE+33)
+#define RTM_GETACTION   (RTM_BASE+34)
+
 #define RTM_NEWPREFIX	(RTM_BASE+36)
 #define RTM_GETPREFIX	(RTM_BASE+38)
 
-#define	RTM_MAX		(RTM_BASE+39)
+#define	RTM_GETMULTICAST (RTM_BASE+42)
+
+#define	RTM_GETANYCAST	(RTM_BASE+46)
+
+#define	RTM_MAX		(RTM_BASE+47)
 
 /* 
    Generic structure for encapsulation of optional route information.
@@ -65,7 +73,8 @@ struct rtattr
 
 #define RTA_ALIGNTO	4
 #define RTA_ALIGN(len) ( ((len)+RTA_ALIGNTO-1) & ~(RTA_ALIGNTO-1) )
-#define RTA_OK(rta,len) ((len) > 0 && (rta)->rta_len >= sizeof(struct rtattr) && \
+#define RTA_OK(rta,len) ((len) >= (int)sizeof(struct rtattr) && \
+			 (rta)->rta_len >= sizeof(struct rtattr) && \
 			 (rta)->rta_len <= (len))
 #define RTA_NEXT(rta,attrlen)	((attrlen) -= RTA_ALIGN((rta)->rta_len), \
 				 (struct rtattr*)(((char*)(rta)) + RTA_ALIGN((rta)->rta_len)))
@@ -114,9 +123,10 @@ enum
 	RTN_THROW,		/* Not in this table		*/
 	RTN_NAT,		/* Translate this address	*/
 	RTN_XRESOLVE,		/* Use external resolver	*/
+	__RTN_MAX
 };
 
-#define RTN_MAX RTN_XRESOLVE
+#define RTN_MAX (__RTN_MAX - 1)
 
 
 /* rtm_protocol */
@@ -179,9 +189,10 @@ enum rt_class_t
 /* User defined values */
 	RT_TABLE_DEFAULT=253,
 	RT_TABLE_MAIN=254,
-	RT_TABLE_LOCAL=255
+	RT_TABLE_LOCAL=255,
+	__RT_TABLE_MAX
 };
-#define RT_TABLE_MAX RT_TABLE_LOCAL
+#define RT_TABLE_MAX (__RT_TABLE_MAX - 1)
 
 
 
@@ -203,9 +214,10 @@ enum rtattr_type_t
 	RTA_FLOW,
 	RTA_CACHEINFO,
 	RTA_SESSION,
+	__RTA_MAX
 };
 
-#define RTA_MAX RTA_SESSION
+#define RTA_MAX (__RTA_MAX - 1)
 
 #define RTM_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct rtmsg))))
 #define RTM_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct rtmsg))
@@ -290,9 +302,10 @@ enum
 #define RTAX_INITCWND RTAX_INITCWND
 	RTAX_FEATURES,
 #define RTAX_FEATURES RTAX_FEATURES
+	__RTAX_MAX
 };
 
-#define RTAX_MAX RTAX_FEATURES
+#define RTAX_MAX (__RTAX_MAX - 1)
 
 #define RTAX_FEATURE_ECN	0x00000001
 #define RTAX_FEATURE_SACK	0x00000002
@@ -340,18 +353,18 @@ enum
 	IFA_LABEL,
 	IFA_BROADCAST,
 	IFA_ANYCAST,
-	IFA_CACHEINFO,	
-	IFA_HOMEAGENT
+	IFA_CACHEINFO,
+	IFA_MULTICAST,
+	__IFA_MAX
 };
 
-#define IFA_MAX IFA_HOMEAGENT
+#define IFA_MAX (__IFA_MAX - 1)
 
 /* ifa_flags */
 
 #define IFA_F_SECONDARY		0x01
 #define IFA_F_TEMPORARY		IFA_F_SECONDARY
 
-#define IFA_F_HOMEADDR		0x10
 #define IFA_F_DEPRECATED	0x20
 #define IFA_F_TENTATIVE		0x40
 #define IFA_F_PERMANENT		0x80
@@ -396,10 +409,11 @@ enum
 	NDA_UNSPEC,
 	NDA_DST,
 	NDA_LLADDR,
-	NDA_CACHEINFO
+	NDA_CACHEINFO,
+	__NDA_MAX
 };
 
-#define NDA_MAX NDA_CACHEINFO
+#define NDA_MAX (__NDA_MAX - 1)
 
 #define NDA_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct ndmsg))))
 #define NDA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct ndmsg))
@@ -482,9 +496,10 @@ enum
 	PREFIX_UNSPEC,
 	PREFIX_ADDRESS,
 	PREFIX_CACHEINFO,
+	__PREFIX_MAX
 };
 
-#define PREFIX_MAX	PREFIX_CACHEINFO
+#define PREFIX_MAX	(__PREFIX_MAX - 1)
 
 struct prefix_cacheinfo
 {
@@ -546,10 +561,11 @@ enum
 #define IFLA_WIRELESS IFLA_WIRELESS
 	IFLA_PROTINFO,		/* Protocol specific information for a link */
 #define IFLA_PROTINFO IFLA_PROTINFO
+	__IFLA_MAX
 };
 
 
-#define IFLA_MAX IFLA_PROTINFO
+#define IFLA_MAX (__IFLA_MAX - 1)
 
 #define IFLA_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct ifinfomsg))))
 #define IFLA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct ifinfomsg))
@@ -592,7 +608,10 @@ enum
 	IFLA_INET6_STATS,	/* statistics			*/
 	IFLA_INET6_MCAST,	/* MC things. What of them?	*/
 	IFLA_INET6_CACHEINFO,	/* time values and max reasm size */
+	__IFLA_INET6_MAX
 };
+
+#define IFLA_INET6_MAX	(__IFLA_INET6_MAX - 1)
 
 struct ifla_cacheinfo
 {
@@ -601,8 +620,6 @@ struct ifla_cacheinfo
 	__u32	reachable_time;
 	__u32	retrans_time;
 };
-
-#define IFLA_INET6_MAX	IFLA_INET6_CACHEINFO
 
 /*****************************************************************
  *		Traffic control messages.
@@ -627,9 +644,11 @@ enum
 	TCA_STATS,
 	TCA_XSTATS,
 	TCA_RATE,
+	TCA_FCNT,
+	__TCA_MAX
 };
 
-#define TCA_MAX TCA_RATE
+#define TCA_MAX (__TCA_MAX - 1)
 
 #define TCA_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct tcmsg))))
 #define TCA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct tcmsg))
@@ -659,6 +678,18 @@ enum
 #define RTMGRP_DECnet_ROUTE     0x4000
 
 #define RTMGRP_IPV6_PREFIX	0x20000
+
+/* TC action piece */
+struct tcamsg
+{
+	unsigned char	tca_family;
+	unsigned char	tca__pad1;
+	unsigned short	tca__pad2;
+};
+#define TA_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct tcamsg))))
+#define TA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct tcamsg))
+#define TCA_ACT_TAB 1 /* attr type must be >=1 */	
+#define TCAA_MAX 1
 
 /* End of information exported to user level */
 
@@ -714,10 +745,6 @@ __rta_reserve(struct sk_buff *skb, int attrtype, int attrlen)
 extern void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change);
 
 extern struct semaphore rtnl_sem;
-
-#define rtnl_exlock()		do { } while(0)
-#define rtnl_exunlock()		do { } while(0)
-#define rtnl_exlock_nowait()	(0)
 
 #define rtnl_shlock()		down(&rtnl_sem)
 #define rtnl_shlock_nowait()	down_trylock(&rtnl_sem)

@@ -1,4 +1,5 @@
 /* $XFree86$ */
+/* $XdotOrg$ */
 /*
  * Global definitions for init.c and init301.c
  *
@@ -31,13 +32,10 @@
  * * 2) Redistributions in binary form must reproduce the above copyright
  * *    notice, this list of conditions and the following disclaimer in the
  * *    documentation and/or other materials provided with the distribution.
- * * 3) All advertising materials mentioning features or use of this software
- * *    must display the following acknowledgement: "This product includes
- * *    software developed by Thomas Winischhofer, Vienna, Austria."
- * * 4) The name of the author may not be used to endorse or promote products
+ * * 3) The name of the author may not be used to endorse or promote products
  * *    derived from this software without specific prior written permission.
  * *
- * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESSED OR
  * * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -72,6 +70,8 @@
 #define IS_SIS650740660         (IS_SIS650 || IS_SIS740 || IS_SIS661741660760)
 #define IS_SIS550650740660      (IS_SIS550 || IS_SIS650740660)
 
+#define SISGETROMW(x)		(ROMAddr[(x)] | (ROMAddr[(x)+1] << 8))
+
 /* SiS_VBType */
 #define VB_SIS301	      	0x0001
 #define VB_SIS301B        	0x0002
@@ -85,6 +85,8 @@
 #define VB_SIS301B302B          (VB_SIS301B|VB_SIS301C|VB_SIS302B)
 #define VB_SIS301LV302LV        (VB_SIS301LV|VB_SIS302LV|VB_SIS302ELV)
 #define VB_SISVB		(VB_SIS301 | VB_SIS301BLV302BLV)
+#define VB_SISTMDS		(VB_SIS301 | VB_SIS301B302B)
+#define VB_SISLVDS		VB_SIS301LV302LV
 
 /* VBInfo */
 #define SetSimuScanMode         0x0001   /* CR 30 */
@@ -137,6 +139,7 @@
 #define CRT2Mode                0x0800
 #define HalfDCLK                0x1000
 #define NoSupportSimuTV         0x2000
+#define NoSupportLCDScale	0x4000 /* TMDS: No scaling possible (no matter what panel) */
 #define DoubleScanMode          0x8000
 
 /* Infoflag */
@@ -145,7 +148,7 @@
 #define SupportCHTV 		0x0800
 #define Support64048060Hz       0x0800  /* Special for 640x480 LCD */
 #define SupportHiVision         0x0010
-#define SupportYPbPr            0x1000  /* TODO */
+#define SupportYPbPr750p        0x1000
 #define SupportLCD              0x0020
 #define SupportRAMDAC2          0x0040	/* All           (<= 100Mhz) */
 #define SupportRAMDAC2_135      0x0100  /* All except DH (<= 135Mhz) */
@@ -174,19 +177,22 @@
 #define TVSetPALM		0x0004
 #define TVSetPALN		0x0008
 #define TVSetCHOverScan		0x0010
-#define TVSetYPbPr525i		0x0020
-#define TVSetYPbPr525p		0x0040
-#define TVSetYPbPr750p		0x0080
-#define TVSetHiVision		0x0100  /* = 1080i, software-wise identical */
-#define TVSetTVSimuMode		0x0800
-#define TVRPLLDIV2XO		0x1000
-#define TVSetNTSC1024		0x2000
+#define TVSetYPbPr525i		0x0020 /* new 0x10 */
+#define TVSetYPbPr525p		0x0040 /* new 0x20 */
+#define TVSetYPbPr750p		0x0080 /* new 0x40 */
+#define TVSetHiVision		0x0100 /* new 0x80; = 1080i, software-wise identical */
+#define TVSetTVSimuMode		0x0200 /* new 0x200, prev. 0x800 */
+#define TVRPLLDIV2XO		0x0400 /* prev 0x1000 */
+#define TVSetNTSC1024		0x0800 /* new 0x100, prev. 0x2000 */
+#define TVAspect43		0x2000
+#define TVAspect169		0x4000
+#define TVAspect43LB		0x8000
 
-/* YPbPr flag (>=315, <661) */
-#define YPbPr525p               0x0001	/* 525p */
-#define YPbPr750p               0x0002	/* 750p */
-#define YPbPr525i               0x0004	/* 525p */
-#define YPbPrHiVision           0x0008	/* HiVision or 1080i (bridge type dependent) */
+/* YPbPr flag (>=315, <661; converted to TVMode) */
+#define YPbPr525p               0x0001
+#define YPbPr750p               0x0002
+#define YPbPr525i               0x0004
+#define YPbPrHiVision           0x0008
 #define YPbPrModeMask           (YPbPr750p | YPbPr525p | YPbPr525i | YPbPrHiVision)
 
 /* SysFlags (to identify special versions) */
@@ -198,6 +204,7 @@
 #define SF_IsM661		0x0020
 #define SF_IsM741		0x0040
 #define SF_IsM760		0x0080
+#define SF_760LFB		0x8000  /* 760: We have LFB */
 
 /* CR32 (Newer 630, and 315 series)
 
@@ -269,7 +276,7 @@
 #define LCDRGB18Bit           0x0001
 #define LCDNonExpanding       0x0010
 #define LCDSync               0x0020
-#define LCDPass11             0x0100
+#define LCDPass11             0x0100   /* 0: center screen, 1: Pass 1:1 data */
 #define LCDDualLink	      0x0200
 
 #define DontExpandLCD	      LCDNonExpanding
@@ -305,7 +312,7 @@
 #define EnablePALMN             0x40   /* Romflag: 1 = Allow PALM/PALN */
 
 /* CR39 (650 only) */
-#define LCDPass1_1		0x01   /* LVDS only; set by driver to pass 1:1 data to LVDS output  */
+#define LCDPass1_1		0x01   /* 0: center screen, 1: pass 1:1 data output  */
 #define Enable302LV_DualLink    0x04   /* 302LV only; enable dual link */
 
 /* CR39 (661 and later)
@@ -348,7 +355,7 @@
 #define Panel300_1024x600       0x06
 #define Panel300_1152x768       0x07
 #define Panel300_1280x768       0x0a
-#define Panel300_320x480        0x0e 	/* fstn - TW: This is fake, can be any */
+#define Panel300_320x480        0x0e 	/* fstn - This is fake, can be any */
 #define Panel300_Custom		0x0f
 #define Panel300_Barco1366      0x10
 
@@ -368,8 +375,24 @@
 #define Panel310_320x480        0x0e    /* fstn - TW: This is fake, can be any */
 #define Panel310_Custom		0x0f
 
+#define Panel661_800x600        0x01
+#define Panel661_1024x768       0x02
+#define Panel661_1280x1024      0x03
+#define Panel661_640x480        0x04
+#define Panel661_1024x600       0x05
+#define Panel661_1152x864       0x06
+#define Panel661_1280x960       0x07
+#define Panel661_1152x768       0x08
+#define Panel661_1400x1050      0x09
+#define Panel661_1280x768       0x0a
+#define Panel661_1600x1200      0x0b
+#define Panel661_1280x800       0x0c
+#define Panel661_1680x1050      0x0d
+#define Panel661_1280x720       0x0e
+#define Panel661_Custom		0x0f
+
 #define Panel_800x600           0x01	/* Unified values */
-#define Panel_1024x768          0x02
+#define Panel_1024x768          0x02    /* MUST match BIOS values from 0-e */
 #define Panel_1280x1024         0x03
 #define Panel_640x480           0x04
 #define Panel_1024x600          0x05
@@ -377,16 +400,19 @@
 #define Panel_1280x960          0x07
 #define Panel_1152x768          0x08	/* LVDS only */
 #define Panel_1400x1050         0x09
-#define Panel_1280x768          0x0a    /* LVDS only */
+#define Panel_1280x768          0x0a    /* 30xB/C and LVDS only (BIOS: all) */
 #define Panel_1600x1200         0x0b
-#define Panel_640x480_2		0x0c
-#define Panel_640x480_3		0x0d
-#define Panel_320x480           0x0e    /* fstn - TW: This is fake, can be any */
-#define Panel_Custom		0x0f
-#define Panel_Barco1366         0x10
-#define Panel_848x480		0x11
-#define Panel_1280x800		0x12    /* 661etc: 0x0c */
-#define Panel_1680x1050         0x13    /* 661etc: 0x0d */
+#define Panel_1280x800		0x0c    /* 661etc  */
+#define Panel_1680x1050         0x0d    /* 661etc  */
+#define Panel_1280x720		0x0e    /* 661etc  */
+#define Panel_Custom		0x0f	/* MUST BE 0x0f (for DVI DDC detection */
+#define Panel_320x480           0x10    /* SiS 550 fstn - TW: This is fake, can be any */
+#define Panel_Barco1366         0x11
+#define Panel_848x480		0x12
+#define Panel_640x480_2		0x13    /* SiS 550 */
+#define Panel_640x480_3		0x14    /* SiS 550 */
+#define Panel_1280x768_2        0x15	/* 30xLV */
+#define Panel_1280x768_3        0x16    /* 30xLV */
 
 /* Index in ModeResInfo table */
 #define SIS_RI_320x200    0
@@ -411,13 +437,17 @@
 #define SIS_RI_856x480   19
 #define SIS_RI_1280x768  20
 #define SIS_RI_1400x1050 21
-#define SIS_RI_1152x864  22  /* Up to this SiS conforming */
+#define SIS_RI_1152x864  22  /* Up to here SiS conforming */
 #define SIS_RI_848x480   23
 #define SIS_RI_1360x768  24
 #define SIS_RI_1024x600  25
 #define SIS_RI_1152x768  26
 #define SIS_RI_768x576   27
 #define SIS_RI_1360x1024 28
+#define SIS_RI_1680x1050 29
+#define SIS_RI_1280x800  30
+#define SIS_RI_1920x1080 31
+#define SIS_RI_960x540   32
 
 /* CR5F */
 #define IsM650                  0x80
@@ -445,14 +475,32 @@
 #define VCLK108_3_300           0x42   /* Index in VCLKData table (300) */
 #define VCLK100_300             0x43   /* Index in VCLKData table (300) */
 #define VCLK34_300              0x3d   /* Index in VCLKData table (300) */
+#define VCLK_CUSTOM_300		0x46
 #define VCLK65_315              0x0b   /* Index in (VB)VCLKData table (315) */
 #define VCLK108_2_315           0x19   /* Index in (VB)VCLKData table (315) */
 #define VCLK81_315		0x5b   /* Index in (VB)VCLKData table (315) */
-#define VCLK162_315             0x21   /* Index in (VB)VCLKData table (315) */
+#define VCLK162_315             0x5e   /* Index in (VB)VCLKData table (315) */
 #define VCLK108_3_315           0x45   /* Index in VBVCLKData table (315) */
 #define VCLK100_315             0x46   /* Index in VBVCLKData table (315) */
-#define VCLK34_315              0x55   /* Index in VBVCLKData table (315) */
+#define VCLK34_315              0x55
 #define VCLK68_315		0x0d
+#define VCLK69_315		0x5c   /* deprecated ! Index in VBVCLKData table (315) */
+#define VCLK83_315		0x5c   /* Index in VBVCLKData table (315) */
+#define VCLK121_315		0x5d   /* Index in VBVCLKData table (315) */
+#define VCLK_1280x720		0x5f
+#define VCLK_1280x768_2		0x60
+#define VCLK_1280x768_3		0x61
+#define VCLK_CUSTOM_315		0x62
+#define VCLK_1280x720_2		0x63
+#define VCLK_720x480		0x67
+#define VCLK_720x576		0x68
+#define VCLK_768x576		0x68
+#define VCLK_848x480		0x65
+#define VCLK_856x480		0x66
+#define VCLK_800x480		0x65
+#define VCLK_1024x576		0x51
+#define VCLK_1152x864		0x64
+#define VCLK_1360x768		0x58
 
 #define TVCLKBASE_300		0x21   /* Indices on TV clocks in VCLKData table (300) */
 #define TVCLKBASE_315	        0x3a   /* Indices on TV clocks in (VB)VCLKData table (315) */
@@ -462,7 +510,7 @@
 #define HiTVVCLK                0x03   /* Index relative to TVCLKBASE */
 #define HiTVSimuVCLK            0x04   /* Index relative to TVCLKBASE */
 #define HiTVTextVCLK            0x05   /* Index relative to TVCLKBASE */
-#define YPbPr750pVCLK		0x0f   /* NOT relative to TVCLKBASE ! */
+#define YPbPr750pVCLK		0x25   /* Index relative to TVCLKBASE; was 0x0f NOT relative */
 
 /* ------------------------------ */
 
@@ -563,7 +611,7 @@
 
 /*
   =============================================================
-   			  for 315 series
+   		  for 315 series (old data layout)
   =============================================================
 */
 #define SoftDRAMType        0x80

@@ -19,6 +19,7 @@
 #include <linux/mm.h>
 #include <linux/tty.h>
 #include <linux/console.h>
+#include <linux/interrupt.h>
 #include <asm/current.h>
 
 #include <asm/setup.h>
@@ -29,7 +30,7 @@
 #include <asm/MC68328.h>
 
 
-void BSP_sched_init(void (*timer_routine)(int, void *, struct pt_regs *))
+void BSP_sched_init(irqreturn_t (*timer_routine)(int, void *, struct pt_regs *))
 {
 
 #ifdef CONFIG_XCOPILOT_BUGS
@@ -100,20 +101,18 @@ int BSP_set_clock_mmss (unsigned long nowtime)
 void BSP_reset (void)
 {
   local_irq_disable();
-  asm volatile ("
-    moveal #0x10c00000, %a0;
-    moveb #0, 0xFFFFF300;
-    moveal 0(%a0), %sp;
-    moveal 4(%a0), %a0;
-    jmp (%a0);
-    ");
+  asm volatile ("moveal #0x10c00000, %a0;\n\t"
+		"moveb #0, 0xFFFFF300;\n\t"
+		"moveal 0(%a0), %sp;\n\t"
+		"moveal 4(%a0), %a0;\n\t"
+		"jmp (%a0);");
 }
 
 void config_BSP(char *command, int len)
 {
-  printk("\n68328 support D. Jeff Dionne <jeff@uclinux.org>\n");
-  printk("68328 support Kenneth Albanowski <kjahds@kjshds.com>\n");
-  printk("68328/Pilot support Bernhard Kuhn <kuhn@lpr.e-technik.tu-muenchen.de>\n");
+  printk(KERN_INFO "\n68328 support D. Jeff Dionne <jeff@uclinux.org>\n");
+  printk(KERN_INFO "68328 support Kenneth Albanowski <kjahds@kjshds.com>\n");
+  printk(KERN_INFO "68328/Pilot support Bernhard Kuhn <kuhn@lpr.e-technik.tu-muenchen.de>\n");
 
   mach_sched_init      = BSP_sched_init;
   mach_tick            = BSP_tick;
@@ -122,4 +121,5 @@ void config_BSP(char *command, int len)
   mach_hwclk           = NULL;
   mach_set_clock_mmss  = NULL;
   mach_reset           = BSP_reset;
+  *command = '\0';
 }

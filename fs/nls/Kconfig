@@ -332,6 +332,14 @@ config NLS_CODEPAGE_1251
 	  say Y here if you want to include the DOS codepage for Russian and
 	  Bulgarian and Belarusian.
 
+config NLS_ASCII
+	tristate "ASCII (United States)"
+	depends on NLS
+	help
+	  An ASCII NLS module is needed if you want to override the
+	  DEFAULT NLS with this very basic charset and don't want any
+	  non-ASCII characters to be translated.
+
 config NLS_ISO8859_1
 	tristate "NLS ISO 8859-1  (Latin 1; Western European Languages)"
 	depends on NLS

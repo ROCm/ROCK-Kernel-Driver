@@ -8,6 +8,7 @@ struct sigcontext {
 	unsigned long  sc_er1;
 	unsigned long  sc_er2;
 	unsigned long  sc_er3;
+	unsigned long  sc_er5;
 	unsigned short sc_ccr;
 	unsigned long  sc_pc;
 };

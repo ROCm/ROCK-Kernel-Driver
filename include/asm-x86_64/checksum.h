@@ -139,9 +139,9 @@ extern unsigned long csum_partial_copy_generic(const char *src, const char *dst,
 					       int *src_err_ptr, int *dst_err_ptr);
 
 
-extern unsigned int csum_partial_copy_from_user(const char *src, char *dst, 
+extern unsigned int csum_partial_copy_from_user(const char __user *src, char *dst, 
 				       int len, unsigned int isum, int *errp);
-extern unsigned int csum_partial_copy_to_user(const char *src, char *dst, 
+extern unsigned int csum_partial_copy_to_user(const char *src, char __user *dst, 
 				      int len, unsigned int isum, int *errp);
 extern unsigned int csum_partial_copy_nocheck(const char *src, char *dst, int len, 
 					      unsigned int sum);

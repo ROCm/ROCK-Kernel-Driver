@@ -32,7 +32,7 @@ static struct pcmcia_irqs irqs[] = {
  *
  *
  ******************************************************/
-static int trizeps_pcmcia_init(struct sa1100_pcmcia_socket *skt)
+static int trizeps_pcmcia_init(struct soc_pcmcia_socket *skt)
 {
 	skt->irq = TRIZEPS_IRQ_PCMCIA_IRQ0;
 
@@ -43,18 +43,18 @@ static int trizeps_pcmcia_init(struct sa1100_pcmcia_socket *skt)
 	GPDR &= ~((GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_CD0))
 		    | (GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_IRQ0)));
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 /**
  *
  *
  ******************************************************/
-static void trizeps_pcmcia_shutdown(struct sa1100_pcmcia_socket *skt)
+static void trizeps_pcmcia_shutdown(struct soc_pcmcia_socket *skt)
 {
 	printk(">>>>>PCMCIA TRIZEPS shutdown\n");
 
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 
 	/* Disable CF bus: */
 	TRIZEPS_BCR_set(TRIZEPS_BCR1, TRIZEPS_nPCM_ENA_REG);
@@ -64,7 +64,7 @@ static void trizeps_pcmcia_shutdown(struct sa1100_pcmcia_socket *skt)
  *
  ******************************************************/
 static void
-trizeps_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
+trizeps_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			    struct pcmcia_state *state_array)
 {
 	unsigned long levels = GPLR;
@@ -83,7 +83,7 @@ trizeps_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
  *
  ******************************************************/
 static int
-trizeps_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+trizeps_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 				const socket_state_t *state)
 {
 	unsigned long flags;
@@ -129,14 +129,14 @@ trizeps_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void trizeps_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void trizeps_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void trizeps_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void trizeps_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 /**

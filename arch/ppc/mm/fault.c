@@ -51,11 +51,6 @@ unsigned long pte_misses;	/* updated by do_page_fault() */
 unsigned long pte_errors;	/* updated by do_page_fault() */
 unsigned int probingmem;
 
-extern void die_if_kernel(char *, struct pt_regs *, long);
-void bad_page_fault(struct pt_regs *, unsigned long, int sig);
-int do_page_fault(struct pt_regs *, unsigned long, unsigned long);
-extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
-
 /*
  * Check whether the instruction at regs->nip is a store using
  * an update addressing form which will update r1.
@@ -64,7 +59,7 @@ static int store_updates_sp(struct pt_regs *regs)
 {
 	unsigned int inst;
 
-	if (get_user(inst, (unsigned int *)regs->nip))
+	if (get_user(inst, (unsigned int __user *)regs->nip))
 		return 0;
 	/* check for 1 in the rA field */
 	if (((inst >> 16) & 0x1f) != 1)
@@ -104,7 +99,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	struct mm_struct *mm = current->mm;
 	siginfo_t info;
 	int code = SEGV_MAPERR;
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_4xx) || defined (CONFIG_BOOKE)
 	int is_write = error_code & ESR_DST;
 #else
 	int is_write = 0;
@@ -119,25 +114,24 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 		error_code &= 0x48200000;
 	else
 		is_write = error_code & 0x02000000;
-#endif /* CONFIG_4xx */
+#endif /* CONFIG_4xx || CONFIG_BOOKE */
 
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_fault_handler && TRAP(regs) == 0x300) {
 		debugger_fault_handler(regs);
 		return 0;
 	}
-#if !defined(CONFIG_4xx)
+#if !(defined(CONFIG_4xx) || defined(CONFIG_BOOKE))
 	if (error_code & 0x00400000) {
 		/* DABR match */
 		if (debugger_dabr_match(regs))
 			return 0;
 	}
-#endif /* !CONFIG_4xx */
+#endif /* !(CONFIG_4xx || CONFIG_BOOKE)*/
 #endif /* CONFIG_XMON || CONFIG_KGDB */
 
-	if (in_atomic() || mm == NULL) {
+	if (in_atomic() || mm == NULL)
 		return SIGSEGV;
-	}
 
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
@@ -206,8 +200,8 @@ good_area:
 	if (is_write) {
 		if (!(vma->vm_flags & VM_WRITE))
 			goto bad_area;
-#if defined(CONFIG_4xx)
-	/* an exec  - 4xx allows for per-page execute permission */
+#if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
+	/* an exec  - 4xx/Book-E allows for per-page execute permission */
 	} else if (TRAP(regs) == 0x400) {
 		pte_t *ptep;
 
@@ -220,15 +214,14 @@ good_area:
 			goto bad_area;
 #endif
 
-		/* Since 4xx supports per-page execute permission,
+		/* Since 4xx/Book-E supports per-page execute permission,
 		 * we lazily flush dcache to icache. */
 		ptep = NULL;
 		if (get_pteptr(mm, address, &ptep) && pte_present(*ptep)) {
 			struct page *page = pte_page(*ptep);
 
 			if (! test_bit(PG_arch_1, &page->flags)) {
-				unsigned long phys = page_to_pfn(page) << PAGE_SHIFT;
-				__flush_dcache_icache_phys(phys);
+				flush_dcache_icache_page(page);
 				set_bit(PG_arch_1, &page->flags);
 			}
 			pte_update(ptep, 0, _PAGE_HWEXEC);
@@ -288,7 +281,7 @@ bad_area:
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		info.si_code = code;
-		info.si_addr = (void *) address;
+		info.si_addr = (void __user *) address;
 		force_sig_info(SIGSEGV, &info, current);
 		return 0;
 	}
@@ -316,12 +309,10 @@ do_sigbus:
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *)address;
+	info.si_addr = (void __user *)address;
 	force_sig_info (SIGBUS, &info, current);
-	if (!user_mode(regs)) {
+	if (!user_mode(regs))
 		return SIGBUS;
-	}
-
 	return 0;
 }
 
@@ -333,7 +324,6 @@ do_sigbus:
 void
 bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 {
-	extern void die(const char *,struct pt_regs *,long);
 	const struct exception_table_entry *entry;
 
 	/* Are we prepared to handle this fault?  */
@@ -360,7 +350,6 @@ pte_t *va_to_pte(unsigned long address)
 	pgd_t *dir;
 	pmd_t *pmd;
 	pte_t *pte;
-	struct mm_struct *mm;
 
 	if (address < TASK_SIZE)
 		return NULL;

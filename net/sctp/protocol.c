@@ -101,7 +101,7 @@ __init int sctp_proc_init(void)
 {
 	if (!proc_net_sctp) {
 		struct proc_dir_entry *ent;
-		ent = proc_mkdir("net/sctp", 0);
+		ent = proc_mkdir("net/sctp", NULL);
 		if (ent) {
 			ent->owner = THIS_MODULE;
 			proc_net_sctp = ent;
@@ -134,7 +134,7 @@ void sctp_proc_exit(void)
 
 	if (proc_net_sctp) {
 		proc_net_sctp = NULL;
-		remove_proc_entry("net/sctp", 0);
+		remove_proc_entry("net/sctp", NULL);
 	}
 }
 
@@ -603,7 +603,7 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 #endif
 
 	if (newsk->sk_prot->init(newsk)) {
-		inet_sock_release(newsk);
+		sk_common_release(newsk);
 		newsk = NULL;
 	}
 
@@ -653,8 +653,8 @@ int sctp_ctl_sock_init(void)
 	else
 		family = PF_INET;
 
-	err = sock_create(family, SOCK_SEQPACKET, IPPROTO_SCTP,
-			  &sctp_ctl_socket);
+	err = sock_create_kern(family, SOCK_SEQPACKET, IPPROTO_SCTP,
+			       &sctp_ctl_socket);
 	if (err < 0) {
 		printk(KERN_ERR
 		       "SCTP: Failed to create the SCTP control socket.\n");
@@ -808,7 +808,7 @@ static inline int sctp_v4_xmit(struct sk_buff *skb,
 			  NIPQUAD(((struct rtable *)skb->dst)->rt_src),
 			  NIPQUAD(((struct rtable *)skb->dst)->rt_dst));
 
-	SCTP_INC_STATS(SctpOutSCTPPacks);
+	SCTP_INC_STATS(SCTP_MIB_OUTSCTPPACKS);
 	return ip_queue_xmit(skb, ipfragok);
 }
 
@@ -846,10 +846,10 @@ struct proto_ops inet_seqpacket_ops = {
 	.ioctl       = inet_ioctl,
 	.listen      = sctp_inet_listen,
 	.shutdown    = inet_shutdown,     /* Looks harmless.  */
-	.setsockopt  = inet_setsockopt,   /* IP_SOL IP_OPTION is a problem. */
-	.getsockopt  = inet_getsockopt,
+	.setsockopt  = sock_common_setsockopt,   /* IP_SOL IP_OPTION is a problem. */
+	.getsockopt  = sock_common_getsockopt,
 	.sendmsg     = inet_sendmsg,
-	.recvmsg     = inet_recvmsg,
+	.recvmsg     = sock_common_recvmsg,
 	.mmap        = sock_no_mmap,
 	.sendpage    = sock_no_sendpage,
 };
@@ -875,7 +875,7 @@ static struct inet_protosw sctp_stream_protosw = {
 };
 
 /* Register with IP layer.  */
-static struct inet_protocol sctp_protocol = {
+static struct net_protocol sctp_protocol = {
 	.handler     = sctp_rcv,
 	.err_handler = sctp_v4_err,
 	.no_policy   = 1,

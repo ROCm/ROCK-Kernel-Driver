@@ -29,7 +29,6 @@
 #include "ldm.h"
 #include "mac.h"
 #include "msdos.h"
-#include "nec98.h"
 #include "osf.h"
 #include "sgi.h"
 #include "sun.h"
@@ -138,25 +137,14 @@ const char *bdevname(struct block_device *bdev, char *buf)
 EXPORT_SYMBOL(bdevname);
 
 /*
- * NOTE: this cannot be called from interrupt context.
- *
- * But in interrupt context you should really have a struct
- * block_device anyway and use bdevname() above.
+ * There's very little reason to use this, you should really
+ * have a struct block_device just about everywhere and use
+ * bdevname() instead.
  */
 const char *__bdevname(dev_t dev, char *buffer)
 {
-	struct gendisk *disk;
-	int part;
-
-	disk = get_gendisk(dev, &part);
-	if (disk) {
-		buffer = disk_name(disk, part, buffer);
-		put_disk(disk);
-	} else {
-		snprintf(buffer, BDEVNAME_SIZE, "unknown-block(%u,%u)",
+	scnprintf(buffer, BDEVNAME_SIZE, "unknown-block(%u,%u)",
 				MAJOR(dev), MINOR(dev));
-	}
-
 	return buffer;
 }
 
@@ -298,8 +286,6 @@ void delete_partition(struct gendisk *disk, int part)
 	kobject_unregister(&p->kobj);
 }
 
-EXPORT_SYMBOL(delete_partition);
-
 void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 {
 	struct hd_struct *p;
@@ -369,6 +355,9 @@ void register_disk(struct gendisk *disk)
 		return;
 
 	bdev = bdget_disk(disk, 0);
+	if (!bdev)
+		return;
+
 	if (blkdev_get(bdev, FMODE_READ, 0) < 0)
 		return;
 	state = check_partition(disk, bdev);
@@ -406,7 +395,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	if (disk->fops->revalidate_disk)
 		disk->fops->revalidate_disk(disk);
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
-		return res;
+		return -EIO;
 	for (p = 1; p < state->limit; p++) {
 		sector_t size = state->parts[p].size;
 		sector_t from = state->parts[p].from;
@@ -419,7 +408,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 #endif
 	}
 	kfree(state);
-	return res;
+	return 0;
 }
 
 unsigned char *read_dev_sector(struct block_device *bdev, sector_t n, Sector *p)

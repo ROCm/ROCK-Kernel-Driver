@@ -186,12 +186,12 @@ ISARVersion(struct IsdnCardState *cs, char *s)
 }
 
 int
-isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
+isar_load_firmware(struct IsdnCardState *cs, u_char __user *buf)
 {
 	int ret, size, cnt, debug;
 	u_char len, nom, noc;
 	u_short sadr, left, *sp;
-	u_char *p = buf;
+	u_char __user *p = buf;
 	u_char *msg, *tmpmsg, *mp, tmp[64];
 	u_long flags;
 	struct isar_reg *ireg = cs->bcs[0].hw.isar.reg;
@@ -1856,7 +1856,7 @@ isar_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 						ISDN_FEATURE_L2_FAX |
 						ISDN_FEATURE_L3_FCLASS1;
 					memcpy(&adr, ic->parm.num, sizeof(ulong));
-					if (isar_load_firmware(cs, (u_char *)adr))
+					if (isar_load_firmware(cs, (u_char __user *)adr))
 						return(1);
 					else 
 						ll_run(cs, features);

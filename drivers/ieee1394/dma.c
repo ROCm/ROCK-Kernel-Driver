@@ -96,7 +96,7 @@ int dma_region_alloc(struct dma_region *dma, unsigned long n_bytes, struct pci_d
 	/* fill scatter/gather list with pages */
 	for (i = 0; i < dma->n_pages; i++) {
 		unsigned long va = (unsigned long) dma->kvirt + (i << PAGE_SHIFT);
-			
+
 		dma->sglist[i].page = vmalloc_to_page((void *)va);
 		dma->sglist[i].length = PAGE_SIZE;
 	}

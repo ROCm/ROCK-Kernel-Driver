@@ -519,9 +519,11 @@ static int sbpro_audio_prepare_for_output(int dev, int bsize, int bcount)
 			sb_dsp_command(devc, 0xa0 | bits);	/* Mono output */
 		else
 			sb_dsp_command(devc, 0xa8 | bits);	/* Stereo output */
+		spin_unlock_irqrestore(&devc->lock, flags);
 	}
 	else
 	{
+		spin_unlock_irqrestore(&devc->lock, flags);
 		tmp = sb_getmixer(devc, 0x0e);
 		if (devc->channels == 1)
 			tmp &= ~0x02;
@@ -529,7 +531,6 @@ static int sbpro_audio_prepare_for_output(int dev, int bsize, int bcount)
 			tmp |= 0x02;
 		sb_setmixer(devc, 0x0e, tmp);
 	}
-	spin_unlock_irqrestore(&devc->lock, flags);
 	devc->trigger_bits = 0;
 	return 0;
 }
@@ -836,7 +837,7 @@ static signed short *lbuf16 = (signed short *)lbuf8;
 static void
 sb16_copy_from_user(int dev,
 		char *localbuf, int localoffs,
-		const char *userbuf, int useroffs,
+		const char __user *userbuf, int useroffs,
 		int max_in, int max_out,
 		int *used, int *returned,
 		int len)

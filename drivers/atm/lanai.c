@@ -1743,7 +1743,7 @@ static void run_service(struct lanai_dev *lanai)
 		read_lock(&vcc_sklist_lock);
 		vci_bitfield_iterate(lanai, lanai->transmit_ready,
 		    iter_transmit);
-		CLEAR_BITMAP(&lanai->transmit_ready, NUM_VCI);
+		bitmap_zero(lanai->transmit_ready, NUM_VCI);
 		read_unlock(&vcc_sklist_lock);
 	}
 }
@@ -2158,8 +2158,8 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 	/* Basic device fields */
 	lanai->number = atmdev->number;
 	lanai->num_vci = NUM_VCI;
-	CLEAR_BITMAP(&lanai->backlog_vccs, NUM_VCI);
-	CLEAR_BITMAP(&lanai->transmit_ready, NUM_VCI);
+	bitmap_zero(lanai->backlog_vccs, NUM_VCI);
+	bitmap_zero(lanai->transmit_ready, NUM_VCI);
 	lanai->naal0 = 0;
 #ifdef USE_POWERDOWN
 	lanai->nbound = 0;
@@ -2435,7 +2435,7 @@ static int lanai_open(struct atm_vcc *atmvcc)
 #if 0
 /* ioctl operations for card */
 /* NOTE: these are all DEBUGGING ONLY currently */
-static int lanai_ioctl(struct atm_dev *atmdev, unsigned int cmd, void *arg)
+static int lanai_ioctl(struct atm_dev *atmdev, unsigned int cmd, void __user *arg)
 {
 	int result = 0;
 	struct lanai_dev *lanai = (struct lanai_dev *) atmdev->dev_data;
@@ -2702,7 +2702,7 @@ static int __devinit lanai_init_one(struct pci_dev *pci,
 		return -ENOMEM;
 	}
 
-	atmdev = atm_dev_register(DEV_LABEL, &ops, -1, 0);
+	atmdev = atm_dev_register(DEV_LABEL, &ops, -1, NULL);
 	if (atmdev == NULL) {
 		printk(KERN_ERR DEV_LABEL
 		    ": couldn't register atm device!\n");

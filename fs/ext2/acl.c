@@ -161,7 +161,7 @@ ext2_get_acl(struct inode *inode, int type)
 	int retval;
 
 	if (!test_opt(inode->i_sb, POSIX_ACL))
-		return 0;
+		return NULL;
 
 	switch(type) {
 		case ACL_TYPE_ACCESS:
@@ -255,6 +255,8 @@ ext2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 			return -EINVAL;
 	}
  	if (acl) {
+		if (acl->a_count > EXT2_ACL_MAX_ENTRIES)
+			return -EINVAL;
 		value = ext2_acl_to_disk(acl, &size);
 		if (IS_ERR(value))
 			return (int)PTR_ERR(value);

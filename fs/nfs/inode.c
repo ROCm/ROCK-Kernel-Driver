@@ -104,21 +104,6 @@ struct rpc_program		nfs_program = {
 	.pipe_dir_name		= "/nfs",
 };
 
-#ifdef CONFIG_NFS_ACL
-static struct rpc_stat		nfsacl_rpcstat = { &nfsacl_program };
-static struct rpc_version *	nfsacl_version[] = {
-	[3]			= &nfsacl_version3,
-};
-
-struct rpc_program		nfsacl_program = {
-	.name =			"nfsacl",
-	.number =		NFS3_ACL_PROGRAM,
-	.nrvers =		sizeof(nfsacl_version) / sizeof(nfsacl_version[0]),
-	.version =		nfsacl_version,
-	.stats =		&nfsacl_rpcstat,
-};
-#endif  /* CONFIG_NFS_ACL */
-
 static inline unsigned long
 nfs_fattr_to_ino_t(struct nfs_fattr *fattr)
 {
@@ -175,10 +160,6 @@ nfs_put_super(struct super_block *sb)
 
 	if (server->client != NULL)
 		rpc_shutdown_client(server->client);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client != NULL)
-		rpc_shutdown_client(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
 	if (server->client_sys != NULL)
 		rpc_shutdown_client(server->client_sys);
 
@@ -200,10 +181,6 @@ nfs_umount_begin(struct super_block *sb)
 	/* -EIO all pending I/O */
 	if ((rpc = server->client) != NULL)
 		rpc_killall_tasks(rpc);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client != NULL)
-		rpc_killall_tasks(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
 }
 
 
@@ -260,7 +237,7 @@ nfs_get_root(struct super_block *sb, struct nfs_fh *rootfh, struct nfs_fsinfo *f
 
 	error = server->rpc_ops->getroot(server, rootfh, fsinfo);
 	if (error < 0) {
-		printk(KERN_NOTICE "nfs_get_root: getattr error = %d\n", -error);
+		dprintk("nfs_get_root: getattr error = %d\n", -error);
 		return ERR_PTR(error);
 	}
 
@@ -277,7 +254,7 @@ static int
 nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 {
 	struct nfs_server	*server;
-	struct inode		*root_inode = NULL;
+	struct inode		*root_inode;
 	struct nfs_fattr	fattr;
 	struct nfs_fsinfo	fsinfo = {
 					.fattr = &fattr,
@@ -285,6 +262,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	struct nfs_pathconf pathinfo = {
 			.fattr = &fattr,
 	};
+	int no_root_error = 0;
 
 	/* We probably want something more informative here */
 	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", MAJOR(sb->s_dev), MINOR(sb->s_dev));
@@ -295,12 +273,15 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 
 	root_inode = nfs_get_root(sb, &server->fh, &fsinfo);
 	/* Did getting the root inode fail? */
-	if (IS_ERR(root_inode))
+	if (IS_ERR(root_inode)) {
+		no_root_error = PTR_ERR(root_inode);
 		goto out_no_root;
+	}
 	sb->s_root = d_alloc_root(root_inode);
-	if (!sb->s_root)
+	if (!sb->s_root) {
+		no_root_error = -ENOMEM;
 		goto out_no_root;
-
+	}
 	sb->s_root->d_op = server->rpc_ops->dentry_ops;
 
 	/* Get some general file system info */
@@ -309,9 +290,17 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->namelen = pathinfo.max_namelen;
 	/* Work out a lot of parameters */
 	if (server->rsize == 0)
-		server->rsize = nfs_block_size(fsinfo.rtpref <= PAGE_SIZE ?fsinfo.rtpref:PAGE_SIZE, NULL);
+		server->rsize = nfs_block_size(fsinfo.rtpref, NULL);
 	if (server->wsize == 0)
-		server->wsize = nfs_block_size(fsinfo.wtpref <= PAGE_SIZE ?fsinfo.wtpref:PAGE_SIZE, NULL);
+		server->wsize = nfs_block_size(fsinfo.wtpref, NULL);
+	if (sb->s_blocksize == 0) {
+		if (fsinfo.wtmult == 0) {
+			sb->s_blocksize = 512;
+			sb->s_blocksize_bits = 9;
+		} else
+			sb->s_blocksize = nfs_block_bits(fsinfo.wtmult,
+							 &sb->s_blocksize_bits);
+	}
 
 	if (fsinfo.rtmax >= 512 && server->rsize > fsinfo.rtmax)
 		server->rsize = nfs_block_size(fsinfo.rtmax, NULL);
@@ -329,10 +318,6 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->wpages = NFS_WRITE_MAXIOV;
                 server->wsize = server->wpages << PAGE_CACHE_SHIFT;
 	}
-
-	if (sb->s_blocksize == 0)
-		sb->s_blocksize = nfs_block_bits(server->wsize,
-							 &sb->s_blocksize_bits);
 
 	server->dtsize = nfs_block_size(fsinfo.dtpref, NULL);
 	if (server->dtsize > PAGE_CACHE_SIZE)
@@ -356,19 +341,17 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	return 0;
 	/* Yargs. It didn't work out. */
 out_no_root:
-	printk("nfs_read_super: get root inode failed\n");
-	if (root_inode && !IS_ERR(root_inode))
+	dprintk("nfs_sb_init: get root inode failed: errno %d\n", -no_root_error);
+	if (!IS_ERR(root_inode))
 		iput(root_inode);
-	return -EINVAL;
+	return no_root_error;
 }
 
 /*
  * Create an RPC client handle.
  */
 static struct rpc_clnt *
-__nfs_create_client(struct nfs_server *server,
-		    const struct nfs_mount_data *data,
-		    struct rpc_program *program)
+nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
 {
 	struct rpc_timeout	timeparms;
 	struct rpc_xprt		*xprt = NULL;
@@ -393,7 +376,7 @@ __nfs_create_client(struct nfs_server *server,
 		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
 		return (struct rpc_clnt *)xprt;
 	}
-	clnt = rpc_create_client(xprt, server->hostname, program,
+	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
 				 server->rpc_ops->version, data->pseudoflavor);
 	if (IS_ERR(clnt)) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
@@ -410,12 +393,6 @@ __nfs_create_client(struct nfs_server *server,
 out_fail:
 	xprt_destroy(xprt);
 	return clnt;
-}
-
-static struct rpc_clnt *
-nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
-{
-	return __nfs_create_client(server, data, &nfs_program);
 }
 
 /*
@@ -479,18 +456,8 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 
 	/* Create RPC client handles */
 	server->client = nfs_create_client(server, data);
-	if (server->client == NULL)
+	if (IS_ERR(server->client))
 		goto out_fail;
-#ifdef CONFIG_NFS_ACL
-	if (server->flags & NFS_MOUNT_VER3) {
-		server->acl_client = __nfs_create_client(server, data,
-							 &nfsacl_program);
-		if (server->acl_client == NULL)
-			goto out_shutdown;
-		/* Initially assume the nfsacl program is supported */
-		server->flags |= NFSACL;
-	}
-#endif  /* CONFIG_NFS_ACL */
 	/* RFC 2623, sec 2.3.2 */
 	if (authflavor != RPC_AUTH_UNIX) {
 		server->client_sys = rpc_clone_client(server->client);
@@ -531,10 +498,6 @@ out_noinit:
 out_shutdown:
 	if (server->client)
 		rpc_shutdown_client(server->client);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client)
-		rpc_shutdown_client(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
 	if (server->client_sys)
 		rpc_shutdown_client(server->client_sys);
 out_fail:
@@ -600,7 +563,6 @@ static int nfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 		{ NFS_MOUNT_NOAC, ",noac", "" },
 		{ NFS_MOUNT_NONLM, ",nolock", ",lock" },
 		{ NFS_MOUNT_BROKEN_SUID, ",broken_suid", "" },
-		{ NFS_MOUNT_NOACL, ",noacl", "" },
 		{ 0, NULL, NULL }
 	};
 	struct proc_nfs_info *nfs_infop;
@@ -702,17 +664,6 @@ nfs_init_locked(struct inode *inode, void *opaque)
 /* Don't use READDIRPLUS on directories that we believe are too large */
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
 
-#ifdef CONFIG_NFS_ACL
-static struct inode_operations nfs_special_inode_operations = {
-	.getattr =	nfs_getattr,
-	.setattr =	nfs_setattr,
-	.listxattr =	nfs_listxattr,
-	.getxattr =	nfs_getxattr,
-	.setxattr =	nfs_setxattr,
-	.removexattr =	nfs_removexattr,
-};
-#endif  /* CONFIG_NFS_ACL */
-
 /*
  * This is our front-end to iget that looks up inodes by file handle
  * instead of inode number.
@@ -766,12 +717,8 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 				NFS_FLAGS(inode) |= NFS_INO_ADVISE_RDPLUS;
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
-		else {
-#ifdef CONFIG_NFS_ACL
-			inode->i_op = &nfs_special_inode_operations;
-#endif  /* CONFIG_NFS_ACL */
+		else
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
-		}
 
 		nfsi->read_cache_jiffies = fattr->timestamp;
 		inode->i_atime = fattr->atime;
@@ -1388,9 +1335,8 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 		memset(root->data+root->size, 0, sizeof(root->data)-root->size);
 
 	if (data->version != NFS_MOUNT_VERSION) {
-		if (data->version < 3)
-			printk("nfs warning: mount version %d is older "
-			       "than 3\n", data->version);
+		printk("nfs warning: mount version %s than kernel\n",
+			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
 		if (data->version < 2)
 			data->namlen = 0;
 		if (data->version < 3)
@@ -1604,15 +1550,16 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		err = PTR_ERR(clnt);
 		goto out_remove_list;
 	}
+
+	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
+	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
+	server->client    = clnt;
+
 	err = -ENOMEM;
 	if (server->nfs4_state->cl_idmap == NULL) {
 		printk(KERN_WARNING "NFS: failed to create idmapper.\n");
 		goto out_shutdown;
 	}
-
-	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
-	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
-	server->client    = clnt;
 
 	if (clnt->cl_auth->au_flavor != authflavour) {
 		if (rpcauth_create(authflavour, clnt) == NULL) {

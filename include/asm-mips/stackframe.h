@@ -102,17 +102,6 @@
 		.endm
 #endif
 
-#ifdef CONFIG_PREEMPT
-		.macro	bump_lock_count
-		lw	t0, TI_PRE_COUNT($28)
-		addiu	t0, t0, 1
-		sw	t0, TI_PRE_COUNT($28)
-		.endm
-#else
-		.macro	bump_lock_count
-		.endm
-#endif
-
 		.macro	SAVE_SOME
 		.set	push
 		.set	reorder
@@ -149,7 +138,6 @@
 		LONG_S	$31, PT_R31(sp)
 		ori	$28, sp, _THREAD_MASK
 		xori	$28, _THREAD_MASK
-		bump_lock_count
 		.set	pop
 		.endm
 
@@ -314,6 +302,7 @@
 		or	t0, t1
 		xori	t0, 0x1f
 		mtc0	t0, CP0_STATUS
+		irq_disable_hazard
 		.endm
 
 /*
@@ -326,6 +315,7 @@
 		or	t0, t1
 		xori	t0, 0x1e
 		mtc0	t0, CP0_STATUS
+		irq_enable_hazard
 		.endm
 
 /*
@@ -338,6 +328,7 @@
 		or	t0, t1
 		xori	t0, 0x1e
 		mtc0	t0, CP0_STATUS
+		irq_disable_hazard
 		.endm
 
 #endif /* _ASM_STACKFRAME_H */

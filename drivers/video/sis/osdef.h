@@ -1,4 +1,5 @@
 /* $XFree86$ */
+/* $XdotOrg$ */
 /*
  * OS depending defines
  *
@@ -31,13 +32,10 @@
  * * 2) Redistributions in binary form must reproduce the above copyright
  * *    notice, this list of conditions and the following disclaimer in the
  * *    documentation and/or other materials provided with the distribution.
- * * 3) All advertising materials mentioning features or use of this software
- * *    must display the following acknowledgement: "This product includes
- * *    software developed by Thomas Winischhofer, Vienna, Austria."
- * * 4) The name of the author may not be used to endorse or promote products
+ * * 3) The name of the author may not be used to endorse or promote products
  * *    derived from this software without specific prior written permission.
  * *
- * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESSED OR
  * * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -54,14 +52,39 @@
  */
 
 /* The choices are: */
-
 #define LINUX_KERNEL	   /* Kernel framebuffer */
 /* #define LINUX_XF86 */   /* XFree86 */
 
+#ifdef OutPortByte
+#undef OutPortByte
+#endif
+
+#ifdef OutPortWord
+#undef OutPortWord
+#endif
+
+#ifdef OutPortLong
+#undef OutPortLong
+#endif
+
+#ifdef InPortByte
+#undef InPortByte
+#endif
+
+#ifdef InPortWord
+#undef InPortWord
+#endif
+
+#ifdef InPortLong
+#undef InPortLong
+#endif
+
 /**********************************************************************/
-#ifdef LINUX_KERNEL  /* -------------------------- */
+/*  LINUX KERNEL                                                      */
+/**********************************************************************/
+
+#ifdef LINUX_KERNEL
 #include <linux/config.h>
-#include <linux/version.h>
 
 #ifdef CONFIG_FB_SIS_300
 #define SIS300
@@ -71,78 +94,35 @@
 #define SIS315H
 #endif
 
-#if 1
-#define SISFBACCEL	/* Include 2D acceleration */
+#if !defined(SIS300) && !defined(SIS315H)
+#warning Neither CONFIG_FB_SIS_300 nor CONFIG_FB_SIS_315 is set
+#warning sisfb will not work!
 #endif
 
+#define OutPortByte(p,v) outb((u8)(v),(SISIOADDRESS)(p))
+#define OutPortWord(p,v) outw((u16)(v),(SISIOADDRESS)(p))
+#define OutPortLong(p,v) outl((u32)(v),(SISIOADDRESS)(p))
+#define InPortByte(p)    inb((SISIOADDRESS)(p))
+#define InPortWord(p)    inw((SISIOADDRESS)(p))
+#define InPortLong(p)    inl((SISIOADDRESS)(p))
+#define SiS_SetMemory(MemoryAddress,MemorySize,value) memset_io(MemoryAddress, value, MemorySize)
 #endif
 
-#ifdef LINUX_XF86 /* ----------------------------- */
+/**********************************************************************/
+/*  XFree86, X.org                                                    */
+/**********************************************************************/
+
+#ifdef LINUX_XF86
 #define SIS300
 #define SIS315H
-#endif
 
-/**********************************************************************/
-#ifdef LINUX_XF86
+#define OutPortByte(p,v) outb((IOADDRESS)(p),(CARD8)(v))
+#define OutPortWord(p,v) outw((IOADDRESS)(p),(CARD16)(v))
+#define OutPortLong(p,v) outl((IOADDRESS)(p),(CARD32)(v))
+#define InPortByte(p)    inb((IOADDRESS)(p))
+#define InPortWord(p)    inw((IOADDRESS)(p))
+#define InPortLong(p)    inl((IOADDRESS)(p))
 #define SiS_SetMemory(MemoryAddress,MemorySize,value) memset(MemoryAddress, value, MemorySize)
-#define SiS_MemoryCopy(Destination,Soruce,Length) memcpy(Destination,Soruce,Length)
-#endif
-
-#ifdef LINUX_KERNEL
-#define SiS_SetMemory(MemoryAddress,MemorySize,value) memset(MemoryAddress, value, MemorySize)
-#define SiS_MemoryCopy(Destination,Soruce,Length) memcpy(Destination,Soruce,Length)
-#endif
-
-/**********************************************************************/
-
-#ifdef OutPortByte
-#undef OutPortByte
-#endif /* OutPortByte */
-
-#ifdef OutPortWord
-#undef OutPortWord
-#endif /* OutPortWord */
-
-#ifdef OutPortLong
-#undef OutPortLong
-#endif /* OutPortLong */
-
-#ifdef InPortByte
-#undef InPortByte
-#endif /* InPortByte */
-
-#ifdef InPortWord
-#undef InPortWord
-#endif /* InPortWord */
-
-#ifdef InPortLong
-#undef InPortLong
-#endif /* InPortLong */
-
-/**********************************************************************/
-/*  LINUX XF86                                                        */
-/**********************************************************************/
-
-#ifdef LINUX_XF86
-#define OutPortByte(p,v) outb((CARD16)(p),(CARD8)(v))
-#define OutPortWord(p,v) outw((CARD16)(p),(CARD16)(v))
-#define OutPortLong(p,v) outl((CARD16)(p),(CARD32)(v))
-#define InPortByte(p)    inb((CARD16)(p))
-#define InPortWord(p)    inw((CARD16)(p))
-#define InPortLong(p)    inl((CARD16)(p))
-#endif
-
-/**********************************************************************/
-/*  LINUX KERNEL                                                      */
-/**********************************************************************/
-
-#ifdef LINUX_KERNEL
-#define OutPortByte(p,v) outb((u8)(v),(u16)(p))
-#define OutPortWord(p,v) outw((u16)(v),(u16)(p))
-#define OutPortLong(p,v) outl((u32)(v),(u16)(p))
-#define InPortByte(p)    inb((u16)(p))
-#define InPortWord(p)    inw((u16)(p))
-#define InPortLong(p)    inl((u16)(p))
 #endif
 
 

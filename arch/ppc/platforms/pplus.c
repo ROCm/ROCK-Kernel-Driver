@@ -48,8 +48,6 @@
 
 TODC_ALLOC();
 
-extern char saved_command_line[];
-
 extern void pplus_setup_hose(void);
 extern void pplus_set_VIA_IDE_native(void);
 
@@ -513,7 +511,7 @@ void __init pplus_find_bridges(void)
 	hose->mem_space.start = PPLUS_PCI_MEM_START;
 	hose->mem_space.end = PPLUS_PCI_MEM_END - HAWK_MPIC_SIZE;
 
-	if (pplus_init(hose, PPLUS_HAWK_PPC_REG_BASE, PPLUS_PROC_PCI_MEM_START,
+	if (hawk_init(hose, PPLUS_HAWK_PPC_REG_BASE, PPLUS_PROC_PCI_MEM_START,
 				PPLUS_PROC_PCI_MEM_END - HAWK_MPIC_SIZE,
 				PPLUS_PROC_PCI_IO_START, PPLUS_PROC_PCI_IO_END,
 				PPLUS_PROC_PCI_MEM_END - HAWK_MPIC_SIZE + 1)
@@ -672,6 +670,8 @@ static void __init pplus_init_IRQ(void)
 
 		openpic_set_sources(0, 16, OpenPIC_Addr + 0x10000);
 		openpic_init(NUM_8259_INTERRUPTS);
+		openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+					i8259_irq);
 		ppc_md.get_irq = openpic_get_irq;
 	}
 
@@ -816,7 +816,7 @@ static unsigned long __init pplus_find_end_of_memory(void)
 	dump_dbats();
 #endif
 
-	total = pplus_get_mem_size(PPLUS_HAWK_SMC_BASE);
+	total = hawk_get_mem_size(PPLUS_HAWK_SMC_BASE);
 	return (total);
 }
 

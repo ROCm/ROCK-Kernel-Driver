@@ -472,7 +472,9 @@ static int svwks_config_drive_xfer_rate (ide_drive_t *drive)
 				int dma = config_chipset_for_dma(drive);
 				if ((id->field_valid & 2) && !dma)
 					goto try_dma_modes;
-			}
+			} else
+				/* UDMA disabled by mask, try other DMA modes */
+				goto try_dma_modes;
 		} else if (id->field_valid & 2) {
 try_dma_modes:
 			if ((id->dma_mword & hwif->mwdma_mask) ||
@@ -775,8 +777,8 @@ static void __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
 		d->autodma = AUTODMA;
 #endif
 
-	d->channels = (((d->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE) ||
-			(d->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2)) &&
+	d->channels = ((dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE ||
+			dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2) &&
 		       (!(PCI_FUNC(dev->devfn) & 1))) ? 1 : 2;
 
 	ide_setup_pci_device(dev, d);
@@ -796,8 +798,6 @@ static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device
 {
 	ide_pci_device_t *d = &serverworks_chipsets[id->driver_data];
 
-	if (dev->device != d->device)
-		BUG();
 	d->init_setup(dev, d);
 	return 0;
 }

@@ -74,7 +74,7 @@ static int __init lk201_reset(struct dec_serial *info)
 
 	for (i = 0; i < sizeof(lk201_reset_string); i++)
 		if (info->hook->poll_tx_char(info, lk201_reset_string[i])) {
-			printk(__FUNCTION__" transmit timeout\n");
+			printk("%s transmit timeout\n", __FUNCTION__);
 			return -EIO;
 		}
 	return 0;

@@ -35,7 +35,7 @@
  */
 static inline ssize_t
 irnet_ctrl_write(irnet_socket *	ap,
-		 const char *	buf,
+		 const char __user *buf,
 		 size_t		count)
 {
   char		command[IRNET_MAX_COMMAND];
@@ -254,7 +254,7 @@ irnet_read_discovery_log(irnet_socket *	ap,
 static inline ssize_t
 irnet_ctrl_read(irnet_socket *	ap,
 		struct file *	file,
-		char *		buf,
+		char __user *	buf,
 		size_t		count)
 {
   DECLARE_WAITQUEUE(wait, current);
@@ -529,7 +529,7 @@ dev_irnet_close(struct inode *	inode,
  */
 static ssize_t
 dev_irnet_write(struct file *	file,
-		const char *	buf,
+		const char __user *buf,
 		size_t		count,
 		loff_t *	ppos)
 {
@@ -553,7 +553,7 @@ dev_irnet_write(struct file *	file,
  */
 static ssize_t
 dev_irnet_read(struct file *	file,
-	       char *		buf,
+	       char __user *	buf,
 	       size_t		count,
 	       loff_t *		ppos)
 {
@@ -610,6 +610,7 @@ dev_irnet_ioctl(struct inode *	inode,
   irnet_socket *	ap = (struct irnet_socket *) file->private_data;
   int			err;
   int			val;
+  void __user *argp = (void __user *)arg;
 
   DENTER(FS_TRACE, "(file=0x%p, ap=0x%p, cmd=0x%X)\n",
 	 file, ap, cmd);
@@ -626,7 +627,7 @@ dev_irnet_ioctl(struct inode *	inode,
     {
       /* Set discipline (should be N_SYNC_PPP or N_TTY) */
     case TIOCSETD:
-      if(get_user(val, (int *) arg))
+      if(get_user(val, (int __user *)argp))
 	break;
       if((val == N_SYNC_PPP) || (val == N_PPP))
 	{
@@ -665,7 +666,7 @@ dev_irnet_ioctl(struct inode *	inode,
     case PPPIOCGCHAN:
       if(!ap->ppp_open)
 	break;
-      if(put_user(ppp_channel_index(&ap->chan), (int *) arg))
+      if(put_user(ppp_channel_index(&ap->chan), (int __user *)argp))
 	break;
       DEBUG(FS_INFO, "Query channel.\n");
       err = 0;
@@ -673,7 +674,7 @@ dev_irnet_ioctl(struct inode *	inode,
     case PPPIOCGUNIT:
       if(!ap->ppp_open)
 	break;
-      if(put_user(ppp_unit_number(&ap->chan), (int *) arg))
+      if(put_user(ppp_unit_number(&ap->chan), (int __user *)argp))
 	break;
       DEBUG(FS_INFO, "Query unit number.\n");
       err = 0;
@@ -703,14 +704,14 @@ dev_irnet_ioctl(struct inode *	inode,
       /* Get termios */
     case TCGETS:
       DEBUG(FS_INFO, "Get termios.\n");
-      if(kernel_termios_to_user_termios((struct termios *)arg, &ap->termios))
+      if(kernel_termios_to_user_termios((struct termios __user *)argp, &ap->termios))
 	break;
       err = 0;
       break;
       /* Set termios */
     case TCSETSF:
       DEBUG(FS_INFO, "Set termios.\n");
-      if(user_termios_to_kernel_termios(&ap->termios, (struct termios *) arg))
+      if(user_termios_to_kernel_termios(&ap->termios, (struct termios __user *)argp))
 	break;
       err = 0;
       break;
@@ -743,7 +744,7 @@ dev_irnet_ioctl(struct inode *	inode,
     case FIONREAD:
       DEBUG(FS_INFO, "FIONREAD\n");
       val = 0;
-      if(put_user(val, (int *) arg))
+      if(put_user(val, (int __user *)argp))
 	break;
       err = 0;
       break;
@@ -950,6 +951,7 @@ ppp_irnet_ioctl(struct ppp_channel *	chan,
   int			err;
   int			val;
   u32			accm[8];
+  void __user *argp = (void __user *)arg;
 
   DENTER(PPP_TRACE, "(channel=0x%p, ap=0x%p, cmd=0x%X)\n",
 	 chan, ap, cmd);
@@ -963,12 +965,12 @@ ppp_irnet_ioctl(struct ppp_channel *	chan,
       /* PPP flags */
     case PPPIOCGFLAGS:
       val = ap->flags | ap->rbits;
-      if(put_user(val, (int *) arg))
+      if(put_user(val, (int __user *) argp))
 	break;
       err = 0;
       break;
     case PPPIOCSFLAGS:
-      if(get_user(val, (int *) arg))
+      if(get_user(val, (int __user *) argp))
 	break;
       ap->flags = val & ~SC_RCV_BITS;
       ap->rbits = val & SC_RCV_BITS;
@@ -977,32 +979,32 @@ ppp_irnet_ioctl(struct ppp_channel *	chan,
 
       /* Async map stuff - all dummy to please pppd */
     case PPPIOCGASYNCMAP:
-      if(put_user(ap->xaccm[0], (u32 *) arg))
+      if(put_user(ap->xaccm[0], (u32 __user *) argp))
 	break;
       err = 0;
       break;
     case PPPIOCSASYNCMAP:
-      if(get_user(ap->xaccm[0], (u32 *) arg))
+      if(get_user(ap->xaccm[0], (u32 __user *) argp))
 	break;
       err = 0;
       break;
     case PPPIOCGRASYNCMAP:
-      if(put_user(ap->raccm, (u32 *) arg))
+      if(put_user(ap->raccm, (u32 __user *) argp))
 	break;
       err = 0;
       break;
     case PPPIOCSRASYNCMAP:
-      if(get_user(ap->raccm, (u32 *) arg))
+      if(get_user(ap->raccm, (u32 __user *) argp))
 	break;
       err = 0;
       break;
     case PPPIOCGXASYNCMAP:
-      if(copy_to_user((void *) arg, ap->xaccm, sizeof(ap->xaccm)))
+      if(copy_to_user(argp, ap->xaccm, sizeof(ap->xaccm)))
 	break;
       err = 0;
       break;
     case PPPIOCSXASYNCMAP:
-      if(copy_from_user(accm, (void *) arg, sizeof(accm)))
+      if(copy_from_user(accm, argp, sizeof(accm)))
 	break;
       accm[2] &= ~0x40000000U;		/* can't escape 0x5e */
       accm[3] |= 0x60000000U;		/* must escape 0x7d, 0x7e */
@@ -1012,12 +1014,12 @@ ppp_irnet_ioctl(struct ppp_channel *	chan,
 
       /* Max PPP frame size */
     case PPPIOCGMRU:
-      if(put_user(ap->mru, (int *) arg))
+      if(put_user(ap->mru, (int __user *) argp))
 	break;
       err = 0;
       break;
     case PPPIOCSMRU:
-      if(get_user(val, (int *) arg))
+      if(get_user(val, (int __user *) argp))
 	break;
       if(val < PPP_MRU)
 	val = PPP_MRU;
@@ -1097,7 +1099,7 @@ void __exit
 irnet_cleanup(void)
 {
   irda_irnet_cleanup();
-  return ppp_irnet_cleanup();
+  ppp_irnet_cleanup();
 }
 
 /*------------------------------------------------------------------*/

@@ -116,6 +116,7 @@ static struct mii_chip_info {
 #define	HOME 	0x0001
 #define LAN	0x0002
 #define MIX	0x0003
+#define UNKNOWN	0x0
 } mii_chip_table[] = {
 	{ "SiS 900 Internal MII PHY", 		0x001d, 0x8000, LAN },
 	{ "SiS 7014 Physical Layer Solution", 	0x0016, 0xf830, LAN },
@@ -125,7 +126,7 @@ static struct mii_chip_info {
 	{ "NS 83851 PHY",			0x2000, 0x5C20, MIX },
 	{ "Realtek RTL8201 PHY",		0x0000, 0x8200, LAN },
 	{ "VIA 6103 PHY",			0x0101, 0x8f20, LAN },
-	{0,},
+	{NULL,},
 };
 
 struct mii_phy {
@@ -260,9 +261,13 @@ static int __devinit sis630e_get_mac_addr(struct pci_dev * pci_dev, struct net_d
 	u8 reg;
 	int i;
 
-	if ((isa_bridge = pci_find_device(0x1039, 0x0008, isa_bridge)) == NULL) {
-		printk("%s: Can not find ISA bridge\n", net_dev->name);
-		return 0;
+	isa_bridge = pci_find_device(PCI_VENDOR_ID_SI, 0x0008, isa_bridge);
+	if (!isa_bridge) {
+		isa_bridge = pci_find_device(PCI_VENDOR_ID_SI, 0x0018, isa_bridge);
+		if (!isa_bridge) {
+			printk("%s: Can not find ISA bridge\n", net_dev->name);
+			return 0;
+		}
 	}
 	pci_read_config_byte(isa_bridge, 0x48, &reg);
 	pci_write_config_byte(isa_bridge, 0x48, reg | 0x40);
@@ -573,9 +578,11 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 				break;
 			}
 			
-		if( !mii_chip_table[i].phy_id1 )
+		if( !mii_chip_table[i].phy_id1 ) {
 			printk(KERN_INFO "%s: Unknown PHY transceiver found at address %d.\n",
-			       net_dev->name, phy_addr);			
+			       net_dev->name, phy_addr);
+			mii_phy->phy_types = UNKNOWN;
+		}
 	}
 	
 	if (sis_priv->mii == NULL) {
@@ -640,15 +647,15 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 static u16 sis900_default_phy(struct net_device * net_dev)
 {
 	struct sis900_private * sis_priv = net_dev->priv;
- 	struct mii_phy *phy = NULL, *phy_home = NULL, *default_phy = NULL;
+ 	struct mii_phy *phy = NULL, *phy_home = NULL, *default_phy = NULL, *phy_lan = NULL;
 	u16 status;
 
         for( phy=sis_priv->first_mii; phy; phy=phy->next ){
 		status = mdio_read(net_dev, phy->phy_addr, MII_STATUS);
 		status = mdio_read(net_dev, phy->phy_addr, MII_STATUS);
 
-		/* Link ON & Not select deafalut PHY */
-		 if ( (status & MII_STAT_LINK) && !(default_phy) )
+		/* Link ON & Not select default PHY & not ghost PHY */
+		 if ( (status & MII_STAT_LINK) && !default_phy && (phy->phy_types != UNKNOWN) )
 		 	default_phy = phy;
 		 else{
 			status = mdio_read(net_dev, phy->phy_addr, MII_CONTROL);
@@ -656,12 +663,16 @@ static u16 sis900_default_phy(struct net_device * net_dev)
 				status | MII_CNTL_AUTO | MII_CNTL_ISOLATE);
 			if( phy->phy_types == HOME )
 				phy_home = phy;
+			else if (phy->phy_types == LAN)
+				phy_lan = phy;
 		 }
 	}
 
-	if( (!default_phy) && phy_home )
+	if( !default_phy && phy_home )
 		default_phy = phy_home;
-	else if(!default_phy)
+	else if( !default_phy && phy_lan )
+		default_phy = phy_lan;
+	else if ( !default_phy )
 		default_phy = sis_priv->first_mii;
 
 	if( sis_priv->mii != default_phy ){
@@ -1441,7 +1452,7 @@ static void sis900_tx_timeout(struct net_device *net_dev)
 				sis_priv->tx_ring[i].bufptr, skb->len,
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq(skb);
-			sis_priv->tx_skbuff[i] = 0;
+			sis_priv->tx_skbuff[i] = NULL;
 			sis_priv->tx_ring[i].cmdsts = 0;
 			sis_priv->tx_ring[i].bufptr = 0;
 			sis_priv->stats.tx_dropped++;
@@ -1836,7 +1847,7 @@ sis900_close(struct net_device *net_dev)
 				sis_priv->rx_ring[i].bufptr,
 				RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(skb);
-			sis_priv->rx_skbuff[i] = 0;
+			sis_priv->rx_skbuff[i] = NULL;
 		}
 	}
 	for (i = 0; i < NUM_TX_DESC; i++) {
@@ -1846,7 +1857,7 @@ sis900_close(struct net_device *net_dev)
 				sis_priv->tx_ring[i].bufptr, skb->len,
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			sis_priv->tx_skbuff[i] = 0;
+			sis_priv->tx_skbuff[i] = NULL;
 		}
 	}
 
@@ -1889,7 +1900,7 @@ static struct ethtool_ops sis900_ethtool_ops = {
 static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 {
 	struct sis900_private *sis_priv = net_dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
@@ -2195,6 +2206,7 @@ static int sis900_suspend(struct pci_dev *pci_dev, u32 state)
 		return 0;
 
 	netif_stop_queue(net_dev);
+	netif_device_detach(net_dev);
 
 	/* Stop the chip's Tx and Rx Status Machine */
 	outl(RxDIS | TxDIS | inl(ioaddr + cr), ioaddr + cr);

@@ -478,11 +478,6 @@ static int ipip_rcv(struct sk_buff *skb)
 
 	read_lock(&ipip_lock);
 	if ((tunnel = ipip_tunnel_lookup(iph->saddr, iph->daddr)) != NULL) {
-		/* IPIP packets decapsulated by IPsec missed netfilter hooks */
-		if (nf_xfrm_local_done(skb, NULL)) {
-			nf_rcv_postxfrm_local(skb);
-			return 0;
-		}
 		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 			read_unlock(&ipip_lock);
 			kfree_skb(skb);

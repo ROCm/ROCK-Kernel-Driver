@@ -118,19 +118,13 @@ sys_ptrace(long request, long pid, long addr, long data)
 		/* Read the word at location address in the USER area. */
 		case PTRACE_PEEKUSR: {
 			unsigned long tmp;
-			
+
 			ret = -EIO;
-			if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
+			if ((addr & 3) || addr < 0 || addr > PT_MAX << 2)
 				break;
-			
-			tmp = 0;  /* Default return condition */
-			ret = -EIO;
-			
-			if (addr < sizeof(struct pt_regs)) {
-				tmp = get_reg(child, addr >> 2);
-				ret = put_user(tmp, (unsigned long *)data);
-			}
-			
+
+			tmp = get_reg(child, addr >> 2);
+			ret = put_user(tmp, (unsigned long *)data);
 			break;
 		}
 		
@@ -148,28 +142,21 @@ sys_ptrace(long request, long pid, long addr, long data)
  		/* Write the word at location address in the USER area. */
 		case PTRACE_POKEUSR:
 			ret = -EIO;
-			
-			if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
+			if ((addr & 3) || addr < 0 || addr > PT_MAX << 2)
 				break;
 
-			if (addr < sizeof(struct pt_regs)) {
-				addr >>= 2;
+			addr >>= 2;
 
-				if (addr == PT_DCCR) {
-					/*
-					 * Don't allow the tracing process to
-					 * change stuff like interrupt enable,
-					 * kernel/user bit, etc.
-					 */
-					data &= DCCR_MASK;
-					data |= get_reg(child, PT_DCCR) & ~DCCR_MASK;
-				}
-				
-				if (put_reg(child, addr, data))
-					break;
-				
-				ret = 0;
+			if (addr == PT_DCCR) {
+				/* don't allow the tracing process to change stuff like
+				 * interrupt enable, kernel/user bit, dma enables etc.
+				 */
+				data &= DCCR_MASK;
+				data |= get_reg(child, PT_DCCR) & ~DCCR_MASK;
 			}
+			if (put_reg(child, addr, data))
+				break;
+			ret = 0;
 			break;
 
 		case PTRACE_SYSCALL:
@@ -237,7 +224,7 @@ sys_ptrace(long request, long pid, long addr, long data)
 				
 				if (put_user(tmp, (unsigned long *) data)) {
 					ret = -EFAULT;
-					break;
+					goto out_tsk;
 				}
 				
 				data += sizeof(long);
@@ -255,7 +242,7 @@ sys_ptrace(long request, long pid, long addr, long data)
 			for (i = 0; i <= PT_MAX; i++) {
 				if (get_user(tmp, (unsigned long *) data)) {
 					ret = -EFAULT;
-					break;
+					goto out_tsk;
 				}
 				
 				if (i == PT_DCCR) {
@@ -290,12 +277,10 @@ void do_syscall_trace(void)
 	if (!(current->ptrace & PT_PTRACED))
 		return;
 	
-	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-					? 0x80 : 0);
-	
-	current->state = TASK_STOPPED;
-	notify_parent(current, SIGCHLD);
-	schedule();
+	/* the 0x80 provides a way for the tracing parent to distinguish
+	   between a syscall stop and SIGTRAP delivery */
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+				 ? 0x80 : 0));
 	
 	/*
 	 * This isn't the same as continuing with a signal, but it will do for

@@ -11,7 +11,7 @@
 #include "of1275.h"
 
 int
-ofstdio(ihandle *stdin, ihandle *stdout, ihandle *stderr, phandle *chosen_handle)
+ofstdio(ihandle *stdin, ihandle *stdout, ihandle *stderr)
 {
     ihandle in, out;
     phandle chosen;
@@ -26,7 +26,6 @@ ofstdio(ihandle *stdin, ihandle *stdout, ihandle *stderr, phandle *chosen_handle
     *stdin  = in;
     *stdout = out;
     *stderr = out;
-    *chosen_handle = chosen;
     return 0;
 err:
     return -1;

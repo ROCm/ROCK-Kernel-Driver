@@ -93,6 +93,7 @@
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/device.h>
 
 #undef COSA_SLOW_IO	/* for testing purposes only */
 #undef REALLY_SLOW_IO
@@ -233,6 +234,9 @@ static int dma[MAX_CARDS+1];
 /* IRQ can be safely autoprobed */
 static int irq[MAX_CARDS+1] = { -1, -1, -1, -1, -1, -1, 0, };
 
+/* for class stuff*/
+static struct class_simple *cosa_class;
+
 #ifdef MODULE
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM_DESC(io, "The I/O bases of the COSA or SRP cards");
@@ -297,9 +301,9 @@ static char *chrdev_setup_rx(struct channel_data *channel, int size);
 static int chrdev_rx_done(struct channel_data *channel);
 static int chrdev_tx_done(struct channel_data *channel, int size);
 static ssize_t cosa_read(struct file *file,
-	char *buf, size_t count, loff_t *ppos);
+	char __user *buf, size_t count, loff_t *ppos);
 static ssize_t cosa_write(struct file *file,
-	const char *buf, size_t count, loff_t *ppos);
+	const char __user *buf, size_t count, loff_t *ppos);
 static unsigned int cosa_poll(struct file *file, poll_table *poll);
 static int cosa_open(struct inode *inode, struct file *file);
 static int cosa_release(struct inode *inode, struct file *file);
@@ -326,13 +330,13 @@ static struct file_operations cosa_fops = {
 /* Ioctls */
 static int cosa_start(struct cosa_data *cosa, int address);
 static int cosa_reset(struct cosa_data *cosa);
-static int cosa_download(struct cosa_data *cosa, unsigned long a);
-static int cosa_readmem(struct cosa_data *cosa, unsigned long a);
+static int cosa_download(struct cosa_data *cosa, void __user *a);
+static int cosa_readmem(struct cosa_data *cosa, void __user *a);
 
 /* COSA/SRP ROM monitor */
-static int download(struct cosa_data *cosa, const char *data, int addr, int len);
+static int download(struct cosa_data *cosa, const char __user *data, int addr, int len);
 static int startmicrocode(struct cosa_data *cosa, int address);
-static int readmem(struct cosa_data *cosa, char *data, int addr, int len);
+static int readmem(struct cosa_data *cosa, char __user *data, int addr, int len);
 static int cosa_reset_and_read_id(struct cosa_data *cosa, char *id);
 
 /* Auxilliary functions */
@@ -359,7 +363,7 @@ static void debug_status_out(struct cosa_data *cosa, int status);
 
 static int __init cosa_init(void)
 {
-	int i;
+	int i, err = 0;
 
 	printk(KERN_INFO "cosa v1.08 (c) 1997-2000 Jan Kasprzak <kas@fi.muni.cz>\n");
 #ifdef CONFIG_SMP
@@ -369,12 +373,14 @@ static int __init cosa_init(void)
 		if (register_chrdev(cosa_major, "cosa", &cosa_fops)) {
 			printk(KERN_WARNING "cosa: unable to get major %d\n",
 				cosa_major);
-			return -EIO;
+			err = -EIO;
+			goto out;
 		}
 	} else {
 		if (!(cosa_major=register_chrdev(0, "cosa", &cosa_fops))) {
 			printk(KERN_WARNING "cosa: unable to register chardev\n");
-			return -EIO;
+			err = -EIO;
+			goto out;
 		}
 	}
 	for (i=0; i<MAX_CARDS; i++)
@@ -384,15 +390,33 @@ static int __init cosa_init(void)
 	if (!nr_cards) {
 		printk(KERN_WARNING "cosa: no devices found.\n");
 		unregister_chrdev(cosa_major, "cosa");
-		return -ENODEV;
+		err = -ENODEV;
+		goto out;
 	}
 	devfs_mk_dir("cosa");
+	cosa_class = class_simple_create(THIS_MODULE, "cosa");
+	if (IS_ERR(cosa_class)) {
+		err = PTR_ERR(cosa_class);
+		goto out_chrdev;
+	}
 	for (i=0; i<nr_cards; i++) {
-		devfs_mk_cdev(MKDEV(cosa_major, i),
+		class_simple_device_add(cosa_class, MKDEV(cosa_major, i),
+				NULL, "cosa%d", i);
+		err = devfs_mk_cdev(MKDEV(cosa_major, i),
 				S_IFCHR|S_IRUSR|S_IWUSR,
 				"cosa/%d", i);
+		if (err) {
+			class_simple_device_remove(MKDEV(cosa_major, i));
+			goto out_chrdev;		
+		}
 	}
-	return 0;
+	err = 0;
+	goto out;
+	
+out_chrdev:
+	unregister_chrdev(cosa_major, "cosa");
+out:
+	return err;
 }
 module_init(cosa_init);
 
@@ -402,8 +426,11 @@ static void __exit cosa_exit(void)
 	int i;
 	printk(KERN_INFO "Unloading the cosa module\n");
 
-	for (i=0; i<nr_cards; i++)
+	for (i=0; i<nr_cards; i++) {
+		class_simple_device_remove(MKDEV(cosa_major, i));
 		devfs_remove("cosa/%d", i);
+	}
+	class_simple_destroy(cosa_class);
 	devfs_remove("cosa");
 	for (cosa=cosa_cards; nr_cards--; cosa++) {
 		/* Clean up the per-channel data */
@@ -702,7 +729,7 @@ static void cosa_sppp_timeout(struct net_device *dev)
 	cosa_kick(chan->cosa);
 	if (chan->tx_skb) {
 		dev_kfree_skb(chan->tx_skb);
-		chan->tx_skb = 0;
+		chan->tx_skb = NULL;
 	}
 	netif_wake_queue(dev);
 }
@@ -718,11 +745,11 @@ static int cosa_sppp_close(struct net_device *d)
 	spin_lock_irqsave(&chan->cosa->lock, flags);
 	if (chan->rx_skb) {
 		kfree_skb(chan->rx_skb);
-		chan->rx_skb = 0;
+		chan->rx_skb = NULL;
 	}
 	if (chan->tx_skb) {
 		kfree_skb(chan->tx_skb);
-		chan->tx_skb = 0;
+		chan->tx_skb = NULL;
 	}
 	chan->usage=0;
 	chan->cosa->usage--;
@@ -764,7 +791,7 @@ static int sppp_rx_done(struct channel_data *chan)
 	chan->stats.rx_packets++;
 	chan->stats.rx_bytes += chan->cosa->rxsize;
 	netif_rx(chan->rx_skb);
-	chan->rx_skb = 0;
+	chan->rx_skb = NULL;
 	chan->pppdev.dev->last_rx = jiffies;
 	return 0;
 }
@@ -780,7 +807,7 @@ static int sppp_tx_done(struct channel_data *chan, int size)
 		return 1;
 	}
 	dev_kfree_skb_irq(chan->tx_skb);
-	chan->tx_skb = 0;
+	chan->tx_skb = NULL;
 	chan->stats.tx_packets++;
 	chan->stats.tx_bytes += size;
 	netif_wake_queue(chan->pppdev.dev);
@@ -803,7 +830,7 @@ static void chardev_channel_init(struct channel_data *chan)
 }
 
 static ssize_t cosa_read(struct file *file,
-	char *buf, size_t count, loff_t *ppos)
+	char __user *buf, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
@@ -878,7 +905,7 @@ static int chrdev_rx_done(struct channel_data *chan)
 
 
 static ssize_t cosa_write(struct file *file,
-	const char *buf, size_t count, loff_t *ppos)
+	const char __user *buf, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct channel_data *chan = file->private_data;
@@ -1039,7 +1066,7 @@ static inline int cosa_reset(struct cosa_data *cosa)
 }
 
 /* High-level function to download data into COSA memory. Calls download() */
-static inline int cosa_download(struct cosa_data *cosa, unsigned long arg)
+static inline int cosa_download(struct cosa_data *cosa, void __user *arg)
 {
 	struct cosa_download d;
 	int i;
@@ -1053,7 +1080,7 @@ static inline int cosa_download(struct cosa_data *cosa, unsigned long arg)
 		return -EPERM;
 	}
 	
-	if (copy_from_user(&d, (void __user *) arg, sizeof(d)))
+	if (copy_from_user(&d, arg, sizeof(d)))
 		return -EFAULT;
 
 	if (d.addr < 0 || d.addr > COSA_MAX_FIRMWARE_SIZE)
@@ -1078,7 +1105,7 @@ static inline int cosa_download(struct cosa_data *cosa, unsigned long arg)
 }
 
 /* High-level function to read COSA memory. Calls readmem() */
-static inline int cosa_readmem(struct cosa_data *cosa, unsigned long arg)
+static inline int cosa_readmem(struct cosa_data *cosa, void __user *arg)
 {
 	struct cosa_download d;
 	int i;
@@ -1093,7 +1120,7 @@ static inline int cosa_readmem(struct cosa_data *cosa, unsigned long arg)
 		return -EPERM;
 	}
 
-	if (copy_from_user(&d, (void __user *) arg, sizeof(d)))
+	if (copy_from_user(&d, arg, sizeof(d)))
 		return -EFAULT;
 
 	/* If something fails, force the user to reset the card */
@@ -1140,7 +1167,7 @@ static inline int cosa_start(struct cosa_data *cosa, int address)
 }
 		
 /* Buffer of size at least COSA_MAX_ID_STRING is expected */
-static inline int cosa_getidstr(struct cosa_data *cosa, char *string)
+static inline int cosa_getidstr(struct cosa_data *cosa, char __user *string)
 {
 	int l = strlen(cosa->id_string)+1;
 	if (copy_to_user(string, cosa->id_string, l))
@@ -1149,7 +1176,7 @@ static inline int cosa_getidstr(struct cosa_data *cosa, char *string)
 }
 
 /* Buffer of size at least COSA_MAX_ID_STRING is expected */
-static inline int cosa_gettype(struct cosa_data *cosa, char *string)
+static inline int cosa_gettype(struct cosa_data *cosa, char __user *string)
 {
 	int l = strlen(cosa->type)+1;
 	if (copy_to_user(string, cosa->type, l))
@@ -1160,6 +1187,7 @@ static inline int cosa_gettype(struct cosa_data *cosa, char *string)
 static int cosa_ioctl_common(struct cosa_data *cosa,
 	struct channel_data *channel, unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
 	switch(cmd) {
 	case COSAIORSET:	/* Reset the device */
 		if (!capable(CAP_NET_ADMIN))
@@ -1173,15 +1201,15 @@ static int cosa_ioctl_common(struct cosa_data *cosa,
 		if (!capable(CAP_SYS_RAWIO))
 			return -EACCES;
 		
-		return cosa_download(cosa, arg);
+		return cosa_download(cosa, argp);
 	case COSAIORMEM:
 		if (!capable(CAP_SYS_RAWIO))
 			return -EACCES;
-		return cosa_readmem(cosa, arg);
+		return cosa_readmem(cosa, argp);
 	case COSAIORTYPE:
-		return cosa_gettype(cosa, (char *)arg);
+		return cosa_gettype(cosa, argp);
 	case COSAIORIDSTR:
-		return cosa_getidstr(cosa, (char *)arg);
+		return cosa_getidstr(cosa, argp);
 	case COSAIONRCARDS:
 		return nr_cards;
 	case COSAIONRCHANS:
@@ -1407,7 +1435,7 @@ static int cosa_dma_able(struct channel_data *chan, char *buf, int len)
  * by a single space. Monitor has to reply with a space. Now the download
  * begins. After the download monitor replies with "\r\n." (CR LF dot).
  */
-static int download(struct cosa_data *cosa, const char *microcode, int length, int address)
+static int download(struct cosa_data *cosa, const char __user *microcode, int length, int address)
 {
 	int i;
 
@@ -1481,7 +1509,7 @@ static int startmicrocode(struct cosa_data *cosa, int address)
  * This routine is not needed during the normal operation and serves
  * for debugging purposes only.
  */
-static int readmem(struct cosa_data *cosa, char *microcode, int length, int address)
+static int readmem(struct cosa_data *cosa, char __user *microcode, int length, int address)
 {
 	if (put_wait_data(cosa, 'r') == -1) return -1;
 	if ((get_wait_data(cosa)) != 'r') return -2;

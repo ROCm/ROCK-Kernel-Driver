@@ -20,9 +20,9 @@
 #define to_class_dev(obj) container_of(obj,struct class_device,kobj)
 #define to_net_dev(class) container_of(class, struct net_device, class_dev)
 
-static const char *fmt_hex = "%#x\n";
-static const char *fmt_dec = "%d\n";
-static const char *fmt_ulong = "%lu\n";
+static const char fmt_hex[] = "%#x\n";
+static const char fmt_dec[] = "%d\n";
+static const char fmt_ulong[] = "%lu\n";
 
 static inline int dev_isalive(const struct net_device *dev) 
 {
@@ -356,7 +356,7 @@ static int netdev_hotplug(struct class_device *cd, char **envp,
 	if ((size <= 0) || (i >= num_envp))
 		return -ENOMEM;
 
-	envp[i] = 0;
+	envp[i] = NULL;
 	return 0;
 }
 #endif
@@ -414,7 +414,7 @@ int netdev_register_sysfs(struct net_device *net)
 	if ((ret = class_device_register(class_dev)))
 		goto out;
 
-	for (i = 0; (attr = net_class_attributes[i]); i++) {
+	for (i = 0; (attr = net_class_attributes[i]) != NULL; i++) {
 		if ((ret = class_device_create_file(class_dev, attr)))
 		    goto out_unreg;
 	}

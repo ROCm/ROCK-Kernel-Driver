@@ -238,10 +238,13 @@ void agp_put_bridge(struct agp_bridge_data *bridge)
 }
 EXPORT_SYMBOL(agp_put_bridge);
 
- 
+
 int agp_add_bridge(struct agp_bridge_data *bridge)
 {
 	int error;
+
+	if (agp_off)
+		return -ENODEV;
 
 	if (!bridge->dev) {
 		printk (KERN_DEBUG PFX "Erk, registering with no pci_dev!\n");
@@ -308,9 +311,9 @@ EXPORT_SYMBOL(agp_try_unsupported_boot);
 
 static int __init agp_init(void)
 {
-	if (!agp_off) 
-	printk(KERN_INFO "Linux agpgart interface v%d.%d (c) Dave Jones\n",
-	       AGPGART_VERSION_MAJOR, AGPGART_VERSION_MINOR);
+	if (!agp_off)
+		printk(KERN_INFO "Linux agpgart interface v%d.%d (c) Dave Jones\n",
+			AGPGART_VERSION_MAJOR, AGPGART_VERSION_MINOR);
 	return 0;
 }
 
@@ -325,7 +328,7 @@ static __init int agp_setup(char *s)
 		agp_off = 1;
 	if (!strcmp(s,"try_unsupported"))
 		agp_try_unsupported_boot = 1;
-	return 1;	
+	return 1;
 }
 __setup("agp=", agp_setup);
 #endif

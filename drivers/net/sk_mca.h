@@ -100,7 +100,7 @@ typedef struct {
 #define CSR3_ALE_HIGH      0	/* Bit 1 = 0 -> ALE asserted high    */
 #define CSR3_ALE_LOW       2	/* Bit 1 = 1 -> ALE asserted low     */
 #define CSR3_BSWAP_OFF     0	/* Bit 2 = 0 -> no byte swap         */
-#define CSR3_BSWAP_ON      0	/* Bit 2 = 1 -> byte swap            */
+#define CSR3_BSWAP_ON      4	/* Bit 2 = 1 -> byte swap            */
 
 /* LANCE structures */
 

@@ -14,10 +14,7 @@
 #define BEFS_VERSION "0.9.3"
 
 
-/* Sector_t makes this sillyness obsolete */
 typedef u64 befs_blocknr_t;
-typedef u32 vfs_blocknr_t;
-
 /*
  * BeFS in memory structures
  */

@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -27,7 +27,7 @@ No licenses are granted by implication, estoppel or otherwise under any patents
 or trademarks of Motorola, Inc.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # litop.s:
-# 	This file is appended to the top of the 060FPLSP package
+#	This file is appended to the top of the 060FPLSP package
 # and contains the entry points into the package. The user, in
 # effect, branches to one of the branch table entries located here.
 #
@@ -64,7 +64,7 @@ or trademarks of Motorola, Inc.
 #	_060LSP__idivs64_(): Emulate 64-bit signed div instruction.	#
 #									#
 #	This is the library version which is accessed as a subroutine	#
-# 	and therefore does not work exactly like the 680X0 div{s,u}.l	#
+#	and therefore does not work exactly like the 680X0 div{s,u}.l	#
 #	64-bit divide instruction.					#
 #									#
 # XREF ****************************************************************	#
@@ -75,17 +75,17 @@ or trademarks of Motorola, Inc.
 #	0x8(sp)  = hi(dividend)						#
 #	0xc(sp)  = lo(dividend)						#
 #	0x10(sp) = pointer to location to place quotient/remainder	#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	0x10(sp) = points to location of remainder/quotient.		#
 #		   remainder is in first longword, quotient is in 2nd.	#
 #									#
 # ALGORITHM ***********************************************************	#
-#	If the operands are signed, make them unsigned and save the 	#
+#	If the operands are signed, make them unsigned and save the	#
 # sign info for later. Separate out special cases like divide-by-zero	#
 # or 32-bit divides if possible. Else, use a special math algorithm	#
 # to calculate the result.						#
-#	Restore sign info if signed instruction. Set the condition 	#
+#	Restore sign info if signed instruction. Set the condition	#
 # codes before performing the final "rts". If the divisor was equal to	#
 # zero, then perform a divide-by-zero using a 16-bit implemented	#
 # divide instruction. This way, the operating system can record that	#
@@ -135,8 +135,8 @@ ldiv64_cont:
 
 	beq.w		ldiv64eq0		# divisor is = 0!!!
 
-	mov.l		0xc(%a6), %d5 		# get dividend hi
-	mov.l		0x10(%a6), %d6 		# get dividend lo
+	mov.l		0xc(%a6), %d5		# get dividend hi
+	mov.l		0x10(%a6), %d6		# get dividend lo
 
 # separate signed and unsigned divide
 	tst.b		POSNEG(%a6)		# signed or unsigned?
@@ -161,7 +161,7 @@ ldsgndividend:
 	negx.l		%d5
 
 # extract some special cases:
-# 	- is (dividend == 0) ?
+#	- is (dividend == 0) ?
 #	- is (hi(dividend) == 0 && (divisor <= lo(dividend))) ? (32-bit div)
 ldspecialcases:
 	tst.l		%d5			# is (hi(dividend) == 0)
@@ -170,7 +170,7 @@ ldspecialcases:
 	tst.l		%d6			# is (lo(dividend) == 0), too
 	beq.w		lddone			# yes, so (dividend == 0)
 
-	cmp.l	 	%d7,%d6			# is (divisor <= lo(dividend))
+	cmp.l		%d7,%d6			# is (divisor <= lo(dividend))
 	bls.b		ld32bitdivide		# yes, so use 32 bit divide
 
 	exg		%d5,%d6			# q = 0, r = dividend
@@ -183,7 +183,7 @@ ld32bitdivide:
 
 ldnormaldivide:
 # last special case:
-# 	- is hi(dividend) >= divisor ? if yes, then overflow
+#	- is hi(dividend) >= divisor ? if yes, then overflow
 	cmp.l		%d7,%d5
 	bls.b		lddovf			# answer won't fit in 32 bits
 
@@ -196,7 +196,7 @@ ldivfinish:
 	beq.b		lddone			# divu has no processing!!!
 
 # it was a divs.l, so ccode setting is a little more complicated...
-	tst.b		NDIVIDEND(%a6)		# remainder has same sign 
+	tst.b		NDIVIDEND(%a6)		# remainder has same sign
 	beq.b		ldcc			# as dividend.
 	neg.l		%d5			# sgn(rem) = sgn(dividend)
 ldcc:
@@ -240,8 +240,8 @@ ldexit:
 
 # the result should be the unchanged dividend
 lddovf:
-	mov.l		0xc(%a6), %d5 		# get dividend hi
-	mov.l		0x10(%a6), %d6 		# get dividend lo
+	mov.l		0xc(%a6), %d5		# get dividend hi
+	mov.l		0x10(%a6), %d6		# get dividend lo
 
 	andi.w		&0x1c,DIV64_CC(%a6)
 	ori.w		&0x02,DIV64_CC(%a6)	# set 'V' ccode bit
@@ -271,8 +271,8 @@ ldiv64eq0:
 # For this implementation b=2**16, and the target is U1U2U3U4/V1V2,	#
 # where U,V are words of the quadword dividend and longword divisor,	#
 # and U1, V1 are the most significant words.				#
-# 									#
-# The most sig. longword of the 64 bit dividend must be in %d5, least 	#
+#									#
+# The most sig. longword of the 64 bit dividend must be in %d5, least	#
 # in %d6. The divisor must be in the variable ddivisor, and the		#
 # signed/unsigned flag ddusign must be set (0=unsigned,1=signed).	#
 # The quotient is returned in %d6, remainder in %d5, unless the		#
@@ -292,7 +292,7 @@ ldclassical:
 # dividing the divisor word into each dividend word. In this case,
 # the first two quotient words must be zero, or overflow would occur.
 # Since we already checked this case above, we can treat the most significant
-# longword of the dividend as (0) remainder (see Knuth) and merely complete 
+# longword of the dividend as (0) remainder (see Knuth) and merely complete
 # the last two divisions to get a quotient longword and word remainder:
 
 	clr.l		%d1
@@ -328,12 +328,12 @@ lddknuth:
 	clr.b		DDSECOND(%a6)		# clear flag for quotient digits
 	clr.l		%d1			# %d1 will hold trial quotient
 lddnchk:
-	btst		&31, %d7		# must we normalize? first word of 
+	btst		&31, %d7		# must we normalize? first word of
 	bne.b		lddnormalized		# divisor (V1) must be >= 65536/2
 	addq.l		&0x1, DDNORMAL(%a6)	# count normalization shifts
 	lsl.l		&0x1, %d7		# shift the divisor
 	lsl.l		&0x1, %d6		# shift u4,u3 with overflow to u2
-	roxl.l		&0x1, %d5		# shift u1,u2 
+	roxl.l		&0x1, %d5		# shift u1,u2
 	bra.w		lddnchk
 lddnormalized:
 
@@ -343,12 +343,12 @@ lddnormalized:
 	mov.l		%d5, %d2		# dividend mslw
 	swap		%d2
 	swap		%d3
-	cmp.w	 	%d2, %d3		# V1 = U1 ?
+	cmp.w		%d2, %d3		# V1 = U1 ?
 	bne.b		lddqcalc1
 	mov.w		&0xffff, %d1		# use max trial quotient word
 	bra.b		lddadj0
 lddqcalc1:
-	mov.l		%d5, %d1		
+	mov.l		%d5, %d1
 
 	divu.w		%d3, %d1		# use quotient of mslw/msw
 
@@ -379,7 +379,7 @@ lddadj1: mov.l		%d7, %d3
 
 #	add.l		%d6, %d4		# (U1U2 - V1q) + U3
 
-	cmp.l	 	%d2, %d4
+	cmp.l		%d2, %d4
 	bls.b		lddadjd1		# is V2q > (U1U2-V1q) + U3 ?
 	subq.l		&0x1, %d1		# yes, decrement and recheck
 	bra.b		lddadj1
@@ -416,7 +416,7 @@ ldd2nd:
 	tst.b		DDSECOND(%a6)	# both q words done?
 	bne.b		lddremain
 # first quotient digit now correct. store digit and shift the
-# (subtracted) dividend 
+# (subtracted) dividend
 	mov.w		%d1, DDQUOTIENT(%a6)
 	clr.l		%d1
 	swap		%d5
@@ -427,7 +427,7 @@ ldd2nd:
 	bra.w		lddnormalized
 lddremain:
 # add 2nd word to quotient, get the remainder.
-	mov.w 		%d1, DDQUOTIENT+2(%a6)
+	mov.w		%d1, DDQUOTIENT+2(%a6)
 # shift down one word/digit to renormalize remainder.
 	mov.w		%d5, %d6
 	swap		%d6
@@ -441,7 +441,7 @@ lddnlp:
 	dbf		%d7, lddnlp
 lddrn:
 	mov.l		%d6, %d5		# remainder
-	mov.l		DDQUOTIENT(%a6), %d6 	# quotient
+	mov.l		DDQUOTIENT(%a6), %d6	# quotient
 
 	rts
 ldmm2:
@@ -471,7 +471,7 @@ ldmm2:
 	clr.w		%d2			# lsw of two mixed products used,
 	swap		%d5			# now use msws of longwords
 	swap		%d2
-	add.l		%d2, %d5				
+	add.l		%d2, %d5
 	add.l		%d3, %d5	# %d5 now ms 32 bits of final product
 	rts
 
@@ -491,7 +491,7 @@ ldmm2:
 #	0x4(sp) = multiplier						#
 #	0x8(sp) = multiplicand						#
 #	0xc(sp) = pointer to location to place 64-bit result		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	0xc(sp) = points to location of 64-bit result			#
 #									#
@@ -524,9 +524,9 @@ _060LSP__imulu64_:
 
 #########################################################################
 #	63			   32				0	#
-# 	----------------------------					#
-# 	| hi(mplier) * hi(mplicand)|					#
-# 	----------------------------					#
+#	----------------------------					#
+#	| hi(mplier) * hi(mplicand)|					#
+#	----------------------------					#
 #		     -----------------------------			#
 #		     | hi(mplier) * lo(mplicand) |			#
 #		     -----------------------------			#
@@ -589,7 +589,7 @@ mulu64_ddone:
 # the values at the location pointed to by a0.
 # use movm here to not disturb the condition codes.
 mulu64_end:
-	exg		%d1,%d0		
+	exg		%d1,%d0
 	movm.l		&0x0003,([0x10,%a6])		# save result
 
 # EPILOGUE BEGIN ########################################################
@@ -643,16 +643,16 @@ _060LSP__imuls64_:
 # the result sign is the exclusive or of the operand sign bits.
 muls64_chk_md_sgn:
 	tst.l		%d1			# is multiplicand negative?
-	bge.b		muls64_alg		# no	
+	bge.b		muls64_alg		# no
 	neg.l		%d1			# make multiplicand positive
 
 	eori.b		&0x1,%d5		# calculate correct sign
 
 #########################################################################
 #	63			   32				0	#
-# 	----------------------------					#
-# 	| hi(mplier) * hi(mplicand)|					#
-# 	----------------------------					#
+#	----------------------------					#
+#	| hi(mplier) * hi(mplicand)|					#
+#	----------------------------					#
 #		     -----------------------------			#
 #		     | hi(mplier) * lo(mplicand) |			#
 #		     -----------------------------			#
@@ -726,7 +726,7 @@ muls64_ddone:
 # the values at the location pointed to by a0.
 # use movm here to not disturb the condition codes.
 muls64_end:
-	exg		%d1,%d0		
+	exg		%d1,%d0
 	movm.l		&0x0003,([0x10,%a6])	# save result at (a0)
 
 # EPILOGUE BEGIN ########################################################
@@ -769,12 +769,12 @@ muls64_zero:
 # INPUT ***************************************************************	#
 #	0x4(sp) = Rn							#
 #	0x8(sp) = pointer to boundary pair				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	cc = condition codes are set correctly				#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	In the interest of simplicity, all operands are converted to	#
+#	In the interest of simplicity, all operands are converted to	#
 # longword size whether the operation is byte, word, or long. The	#
 # bounds are sign extended accordingly. If Rn is a data regsiter, Rn is #
 # also sign extended. If Rn is an address register, it need not be sign #
@@ -785,7 +785,7 @@ muls64_zero:
 
 set	CMP2_CC,	-4
 
-	global 		_060LSP__cmp2_Ab_
+	global		_060LSP__cmp2_Ab_
 _060LSP__cmp2_Ab_:
 
 # PROLOGUE BEGIN ########################################################
@@ -795,7 +795,7 @@ _060LSP__cmp2_Ab_:
 # PROLOGUE END ##########################################################
 
 	mov.w		%cc,CMP2_CC(%a6)
-	mov.l		0x8(%a6), %d2 		# get regval
+	mov.l		0x8(%a6), %d2		# get regval
 
 	mov.b		([0xc,%a6],0x0),%d0
 	mov.b		([0xc,%a6],0x1),%d1
@@ -804,7 +804,7 @@ _060LSP__cmp2_Ab_:
 	extb.l		%d1			# sign extend hi bnd
 	bra.w		l_cmp2_cmp		# go do the compare emulation
 
-	global 		_060LSP__cmp2_Aw_
+	global		_060LSP__cmp2_Aw_
 _060LSP__cmp2_Aw_:
 
 # PROLOGUE BEGIN ########################################################
@@ -814,7 +814,7 @@ _060LSP__cmp2_Aw_:
 # PROLOGUE END ##########################################################
 
 	mov.w		%cc,CMP2_CC(%a6)
-	mov.l		0x8(%a6), %d2 		# get regval
+	mov.l		0x8(%a6), %d2		# get regval
 
 	mov.w		([0xc,%a6],0x0),%d0
 	mov.w		([0xc,%a6],0x2),%d1
@@ -823,7 +823,7 @@ _060LSP__cmp2_Aw_:
 	ext.l		%d1			# sign extend hi bnd
 	bra.w		l_cmp2_cmp		# go do the compare emulation
 
-	global 		_060LSP__cmp2_Al_
+	global		_060LSP__cmp2_Al_
 _060LSP__cmp2_Al_:
 
 # PROLOGUE BEGIN ########################################################
@@ -833,13 +833,13 @@ _060LSP__cmp2_Al_:
 # PROLOGUE END ##########################################################
 
 	mov.w		%cc,CMP2_CC(%a6)
-	mov.l		0x8(%a6), %d2 		# get regval
+	mov.l		0x8(%a6), %d2		# get regval
 
 	mov.l		([0xc,%a6],0x0),%d0
 	mov.l		([0xc,%a6],0x4),%d1
 	bra.w		l_cmp2_cmp		# go do the compare emulation
 
-	global 		_060LSP__cmp2_Db_
+	global		_060LSP__cmp2_Db_
 _060LSP__cmp2_Db_:
 
 # PROLOGUE BEGIN ########################################################
@@ -849,7 +849,7 @@ _060LSP__cmp2_Db_:
 # PROLOGUE END ##########################################################
 
 	mov.w		%cc,CMP2_CC(%a6)
-	mov.l		0x8(%a6), %d2 		# get regval
+	mov.l		0x8(%a6), %d2		# get regval
 
 	mov.b		([0xc,%a6],0x0),%d0
 	mov.b		([0xc,%a6],0x1),%d1
@@ -862,7 +862,7 @@ _060LSP__cmp2_Db_:
 	extb.l		%d2			# sign extend data byte
 	bra.w		l_cmp2_cmp		# go do the compare emulation
 
-	global 		_060LSP__cmp2_Dw_
+	global		_060LSP__cmp2_Dw_
 _060LSP__cmp2_Dw_:
 
 # PROLOGUE BEGIN ########################################################
@@ -872,7 +872,7 @@ _060LSP__cmp2_Dw_:
 # PROLOGUE END ##########################################################
 
 	mov.w		%cc,CMP2_CC(%a6)
-	mov.l		0x8(%a6), %d2 		# get regval
+	mov.l		0x8(%a6), %d2		# get regval
 
 	mov.w		([0xc,%a6],0x0),%d0
 	mov.w		([0xc,%a6],0x2),%d1
@@ -885,7 +885,7 @@ _060LSP__cmp2_Dw_:
 	ext.l		%d2			# sign extend data word
 	bra.w		l_cmp2_cmp		# go emulate compare
 
-	global 		_060LSP__cmp2_Dl_
+	global		_060LSP__cmp2_Dl_
 _060LSP__cmp2_Dl_:
 
 # PROLOGUE BEGIN ########################################################
@@ -895,14 +895,14 @@ _060LSP__cmp2_Dl_:
 # PROLOGUE END ##########################################################
 
 	mov.w		%cc,CMP2_CC(%a6)
-	mov.l		0x8(%a6), %d2 		# get regval
+	mov.l		0x8(%a6), %d2		# get regval
 
 	mov.l		([0xc,%a6],0x0),%d0
 	mov.l		([0xc,%a6],0x4),%d1
 
 #
 # To set the ccodes correctly:
-# 	(1) save 'Z' bit from (Rn - lo)
+#	(1) save 'Z' bit from (Rn - lo)
 #	(2) save 'Z' and 'N' bits from ((hi - lo) - (Rn - hi))
 #	(3) keep 'X', 'N', and 'V' from before instruction
 #	(4) combine ccodes
@@ -912,7 +912,7 @@ l_cmp2_cmp:
 	mov.w		%cc, %d3		# fetch resulting ccodes
 	andi.b		&0x4, %d3		# keep 'Z' bit
 	sub.l		%d0, %d1		# (hi - lo)
-	cmp.l	 	%d1,%d2			# ((hi - lo) - (Rn - hi))
+	cmp.l		%d1,%d2			# ((hi - lo) - (Rn - hi))
 
 	mov.w		%cc, %d4		# fetch resulting ccodes
 	or.b		%d4, %d3		# combine w/ earlier ccodes

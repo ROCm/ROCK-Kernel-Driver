@@ -294,7 +294,7 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 		    ipv6_only_sock(s)					||
 		    (s->sk_bound_dev_if && s->sk_bound_dev_if != dif))
 			continue;
-		if (!ip_mc_sf_allow(sk, loc_addr, rmt_addr, dif))
+		if (!ip_mc_sf_allow(s, loc_addr, rmt_addr, dif))
 			continue;
 		goto found;
   	}
@@ -327,7 +327,7 @@ void udp_err(struct sk_buff *skb, u32 info)
 
 	sk = udp_v4_lookup(iph->daddr, uh->dest, iph->saddr, uh->source, skb->dev->ifindex);
 	if (sk == NULL) {
-		ICMP_INC_STATS_BH(IcmpInErrors);
+		ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
     	  	return;	/* No socket for error */
 	}
 
@@ -654,7 +654,7 @@ out:
 	if (free)
 		kfree(ipc.opt);
 	if (!err) {
-		UDP_INC_STATS_USER(UdpOutDatagrams);
+		UDP_INC_STATS_USER(UDP_MIB_OUTDATAGRAMS);
 		return len;
 	}
 	return err;
@@ -725,7 +725,7 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		case SIOCINQ:
@@ -745,7 +745,7 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 				amount = skb->len - sizeof(struct udphdr);
 			}
 			spin_unlock_irq(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		default:
@@ -828,7 +828,10 @@ try_again:
   	}
 	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
+
 	err = copied;
+	if (flags & MSG_TRUNC)
+		err = skb->len - sizeof(struct udphdr);
   
 out_free:
   	skb_free_datagram(sk, skb);
@@ -836,7 +839,7 @@ out:
   	return err;
 
 csum_copy_err:
-	UDP_INC_STATS_BH(UdpInErrors);
+	UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 
 	/* Clear queue. */
 	if (flags&MSG_PEEK) {
@@ -858,54 +861,6 @@ csum_copy_err:
 	goto try_again;
 }
 
-int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
-{
-	struct inet_opt *inet = inet_sk(sk);
-	struct sockaddr_in *usin = (struct sockaddr_in *) uaddr;
-	struct rtable *rt;
-	u32 saddr;
-	int oif;
-	int err;
-
-	
-	if (addr_len < sizeof(*usin)) 
-	  	return -EINVAL;
-
-	if (usin->sin_family != AF_INET) 
-	  	return -EAFNOSUPPORT;
-
-	sk_dst_reset(sk);
-
-	oif = sk->sk_bound_dev_if;
-	saddr = inet->saddr;
-	if (MULTICAST(usin->sin_addr.s_addr)) {
-		if (!oif)
-			oif = inet->mc_index;
-		if (!saddr)
-			saddr = inet->mc_addr;
-	}
-	err = ip_route_connect(&rt, usin->sin_addr.s_addr, saddr,
-			       RT_CONN_FLAGS(sk), oif,
-			       IPPROTO_UDP,
-			       inet->sport, usin->sin_port, sk);
-	if (err)
-		return err;
-	if ((rt->rt_flags & RTCF_BROADCAST) && !sock_flag(sk, SOCK_BROADCAST)) {
-		ip_rt_put(rt);
-		return -EACCES;
-	}
-  	if (!inet->saddr)
-	  	inet->saddr = rt->rt_src;	/* Update source address */
-	if (!inet->rcv_saddr)
-		inet->rcv_saddr = rt->rt_src;
-	inet->daddr = rt->rt_dst;
-	inet->dport = usin->sin_port;
-	sk->sk_state = TCP_ESTABLISHED;
-	inet->id = jiffies;
-
-	sk_dst_set(sk, &rt->u.dst);
-	return(0);
-}
 
 int udp_disconnect(struct sock *sk, int flags)
 {
@@ -931,7 +886,7 @@ int udp_disconnect(struct sock *sk, int flags)
 
 static void udp_close(struct sock *sk, long timeout)
 {
-	inet_sock_release(sk);
+	sk_common_release(sk);
 }
 
 /* return:
@@ -964,6 +919,7 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 	len = skb->tail - udpdata;
 
 	switch (encap_type) {
+	default:
 	case UDP_ENCAP_ESPINUDP:
 		/* Check if this is a keepalive packet.  If so, eat it. */
 		if (len == 1 && udpdata[0] == 0xff) {
@@ -974,35 +930,7 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 		} else
 			/* Must be an IKE packet.. pass it through */
 			return 1;
-
-	decaps:
-		/* At this point we are sure that this is an ESPinUDP packet,
-		 * so we need to remove 'len' bytes from the packet (the UDP
-		 * header and optional ESP marker bytes) and then modify the
-		 * protocol to ESP, and then call into the transform receiver.
-		 */
-
-		/* Now we can update and verify the packet length... */
-		iph = skb->nh.iph;
-		iphlen = iph->ihl << 2;
-		iph->tot_len = htons(ntohs(iph->tot_len) - len);
-		if (skb->len < iphlen + len) {
-			/* packet is too small!?! */
-			return 0;
-		}
-
-		/* pull the data buffer up to the ESP header and set the
-		 * transport header to point to ESP.  Keep UDP on the stack
-		 * for later.
-		 */
-		skb->h.raw = skb_pull(skb, len);
-
-		/* modify the protocol (it's ESP!) */
-		iph->protocol = IPPROTO_ESP;
-
-		/* and let the caller know to send this into the ESP processor... */
-		return -1;
-
+		break;
 	case UDP_ENCAP_ESPINUDP_NON_IKE:
 		/* Check if this is a keepalive packet.  If so, eat it. */
 		if (len == 1 && udpdata[0] == 0xff) {
@@ -1012,17 +940,38 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 			
 			/* ESP Packet with Non-IKE marker */
 			len = sizeof(struct udphdr) + 2 * sizeof(u32);
-			goto decaps;
 		} else
 			/* Must be an IKE packet.. pass it through */
 			return 1;
-
-	default:
-		if (net_ratelimit())
-			printk(KERN_INFO "udp_encap_rcv(): Unhandled UDP encap type: %u\n",
-			       encap_type);
-		return 1;
+		break;
 	}
+
+	/* At this point we are sure that this is an ESPinUDP packet,
+	 * so we need to remove 'len' bytes from the packet (the UDP
+	 * header and optional ESP marker bytes) and then modify the
+	 * protocol to ESP, and then call into the transform receiver.
+	 */
+
+	/* Now we can update and verify the packet length... */
+	iph = skb->nh.iph;
+	iphlen = iph->ihl << 2;
+	iph->tot_len = htons(ntohs(iph->tot_len) - len);
+	if (skb->len < iphlen + len) {
+		/* packet is too small!?! */
+		return 0;
+	}
+
+	/* pull the data buffer up to the ESP header and set the
+	 * transport header to point to ESP.  Keep UDP on the stack
+	 * for later.
+	 */
+	skb->h.raw = skb_pull(skb, len);
+
+	/* modify the protocol (it's ESP!) */
+	iph->protocol = IPPROTO_ESP;
+
+	/* and let the caller know to send this into the ESP processor... */
+	return -1;
 #endif
 }
 
@@ -1045,7 +994,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		kfree_skb(skb);
 		return -1;
 	}
-	nf_reset(skb);
 
 	if (up->encap_type) {
 		/*
@@ -1068,7 +1016,7 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		if (ret < 0) {
 			/* process the ESP packet */
 			ret = xfrm4_rcv_encap(skb, up->encap_type);
-			UDP_INC_STATS_BH(UdpInDatagrams);
+			UDP_INC_STATS_BH(UDP_MIB_INDATAGRAMS);
 			return -ret;
 		}
 		/* FALLTHROUGH -- it's a UDP Packet */
@@ -1076,7 +1024,7 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 
 	if (sk->sk_filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if (__udp_checksum_complete(skb)) {
-			UDP_INC_STATS_BH(UdpInErrors);
+			UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 			kfree_skb(skb);
 			return -1;
 		}
@@ -1084,11 +1032,11 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	}
 
 	if (sock_queue_rcv_skb(sk,skb)<0) {
-		UDP_INC_STATS_BH(UdpInErrors);
+		UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 		kfree_skb(skb);
 		return -1;
 	}
-	UDP_INC_STATS_BH(UdpInDatagrams);
+	UDP_INC_STATS_BH(UDP_MIB_INDATAGRAMS);
 	return 0;
 }
 
@@ -1211,13 +1159,12 @@ int udp_rcv(struct sk_buff *skb)
 
 	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto drop;
-	nf_reset(skb);
 
 	/* No socket. Drop packet silently, if checksum is wrong */
 	if (udp_checksum_complete(skb))
 		goto csum_error;
 
-	UDP_INC_STATS_BH(UdpNoPorts);
+	UDP_INC_STATS_BH(UDP_MIB_NOPORTS);
 	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
 
 	/*
@@ -1237,7 +1184,7 @@ short_packet:
 			NIPQUAD(daddr),
 			ntohs(uh->dest)));
 no_header:
-	UDP_INC_STATS_BH(UdpInErrors);
+	UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 	kfree_skb(skb);
 	return(0);
 
@@ -1254,7 +1201,7 @@ csum_error:
 			ntohs(uh->dest),
 			ulen));
 drop:
-	UDP_INC_STATS_BH(UdpInErrors);
+	UDP_INC_STATS_BH(UDP_MIB_INERRORS);
 	kfree_skb(skb);
 	return(0);
 }
@@ -1271,7 +1218,7 @@ static int udp_destroy_sock(struct sock *sk)
  *	Socket option code for UDP
  */
 static int udp_setsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int optlen)
+			  char __user *optval, int optlen)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int val;
@@ -1283,7 +1230,7 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 	if(optlen<sizeof(int))
 		return -EINVAL;
 
-	if (get_user(val, (int *)optval))
+	if (get_user(val, (int __user *)optval))
 		return -EFAULT;
 
 	switch(optname) {
@@ -1299,7 +1246,16 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 		
 	case UDP_ENCAP:
-		up->encap_type = val;
+		switch (val) {
+		case 0:
+		case UDP_ENCAP_ESPINUDP:
+		case UDP_ENCAP_ESPINUDP_NON_IKE:
+			up->encap_type = val;
+			break;
+		default:
+			err = -ENOPROTOOPT;
+			break;
+		}
 		break;
 
 	default:
@@ -1311,7 +1267,7 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int udp_getsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int *optlen)
+			  char __user *optval, int __user *optlen)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int val, len;
@@ -1351,7 +1307,7 @@ static int udp_getsockopt(struct sock *sk, int level, int optname,
 struct proto udp_prot = {
  	.name =		"UDP",
 	.close =	udp_close,
-	.connect =	udp_connect,
+	.connect =	ip4_datagram_connect,
 	.disconnect =	udp_disconnect,
 	.ioctl =	udp_ioctl,
 	.destroy =	udp_destroy_sock,
@@ -1552,7 +1508,6 @@ void udp4_proc_exit(void)
 }
 #endif /* CONFIG_PROC_FS */
 
-EXPORT_SYMBOL(udp_connect);
 EXPORT_SYMBOL(udp_disconnect);
 EXPORT_SYMBOL(udp_hash);
 EXPORT_SYMBOL(udp_hash_lock);

@@ -38,10 +38,10 @@ static const char ID_sccs[] = "@(#)srf.c	1.18 97/08/04 (C) SK " ;
 /*
  * function declarations
  */
-static void clear_all_rep() ;
-static void clear_reported() ;
-static void smt_send_srf() ;
-static struct s_srf_evc *smt_get_evc() ;
+static void clear_all_rep(struct s_smc *smc);
+static void clear_reported(struct s_smc *smc);
+static void smt_send_srf(struct s_smc *smc);
+static struct s_srf_evc *smt_get_evc(struct s_smc *smc, int code, int index);
 
 #define MAX_EVCS	(sizeof(smc->evcs)/sizeof(smc->evcs[0]))
 
@@ -69,8 +69,7 @@ static const struct evc_init evc_inits[] = {
 
 #define MAX_INIT_EVC	(sizeof(evc_inits)/sizeof(evc_inits[0]))
 
-void smt_init_evc(smc)
-struct s_smc *smc ;
+void smt_init_evc(struct s_smc *smc)
 {
 	struct s_srf_evc	*evc ;
 	const struct evc_init 	*init ;
@@ -159,10 +158,7 @@ struct s_smc *smc ;
 	smc->srf.sr_state = SR0_WAIT ;
 }
 
-static struct s_srf_evc *smt_get_evc(smc,code,index)
-struct s_smc *smc ;
-int code ;
-int index ;
+static struct s_srf_evc *smt_get_evc(struct s_smc *smc, int code, int index)
 {
 	int			i ;
 	struct s_srf_evc	*evc ;
@@ -171,7 +167,7 @@ int index ;
 		if (evc->evc_code == code && evc->evc_index == index)
 			return(evc) ;
 	}
-	return(0) ;
+	return NULL;
 }
 
 #define THRESHOLD_2	(2*TICKS_PER_SECOND)
@@ -188,11 +184,7 @@ static const char * const srf_names[] = {
 } ;
 #endif
 
-void smt_srf_event(smc,code,index,cond)
-struct s_smc *smc ;
-int code ;
-int index ;
-int cond ;
+void smt_srf_event(struct s_smc *smc, int code, int index, int cond)
 {
 	struct s_srf_evc	*evc ;
 	int			cond_asserted = 0 ;
@@ -340,8 +332,7 @@ int cond ;
 	}
 }
 
-static void clear_all_rep(smc)
-struct s_smc *smc ;
+static void clear_all_rep(struct s_smc *smc)
 {
 	struct s_srf_evc	*evc ;
 	int			i ;
@@ -354,8 +345,7 @@ struct s_smc *smc ;
 	smc->srf.any_report = FALSE ;
 }
 
-static void clear_reported(smc)
-struct s_smc *smc ;
+static void clear_reported(struct s_smc *smc)
 {
 	struct s_srf_evc	*evc ;
 	int			i ;
@@ -375,13 +365,10 @@ struct s_smc *smc ;
 	}
 }
 
-extern SMbuf *smt_build_frame() ;
-
 /*
  * build and send SMT SRF frame
  */
-static void smt_send_srf(smc)
-struct s_smc *smc ;
+static void smt_send_srf(struct s_smc *smc)
 {
 
 	struct smt_header	*smt ;
@@ -439,3 +426,4 @@ struct s_smc *smc ;
 
 #endif	/* no BOOT */
 #endif	/* no SLIM_SMT */
+

@@ -497,7 +497,7 @@ static void __init sun4c_probe_mmu(void)
 	patch_kernel_fault_handler();
 }
 
-volatile unsigned long *sun4c_memerr_reg = 0;
+volatile unsigned long *sun4c_memerr_reg = NULL;
 
 void __init sun4c_probe_memerr_reg(void)
 {
@@ -599,13 +599,13 @@ static void __init sun4c_init_mmu_entry_pool(void)
 
 	for (i=0; i < SUN4C_MAX_SEGMAPS; i++) {
 		mmu_entry_pool[i].pseg = i;
-		mmu_entry_pool[i].next = 0;
-		mmu_entry_pool[i].prev = 0;
+		mmu_entry_pool[i].next = NULL;
+		mmu_entry_pool[i].prev = NULL;
 		mmu_entry_pool[i].vaddr = 0;
 		mmu_entry_pool[i].locked = 0;
 		mmu_entry_pool[i].ctx = 0;
-		mmu_entry_pool[i].lru_next = 0;
-		mmu_entry_pool[i].lru_prev = 0;
+		mmu_entry_pool[i].lru_next = NULL;
+		mmu_entry_pool[i].lru_prev = NULL;
 	}
 	mmu_entry_pool[invalid_segment].locked = 1;
 }
@@ -1170,7 +1170,7 @@ abend:
 	local_irq_restore(flags);
 	printk("DMA vaddr=0x%p size=%08lx\n", vaddr, size);
 	panic("Out of iobuffer table");
-	return 0;
+	return NULL;
 }
 
 static void sun4c_unlockarea(char *vaddr, unsigned long size)
@@ -1863,6 +1863,23 @@ pte_t *sun4c_pte_offset_kernel(pmd_t * dir, unsigned long address)
 			((address >> PAGE_SHIFT) & (SUN4C_PTRS_PER_PTE - 1));
 }
 
+static unsigned long sun4c_swp_type(swp_entry_t entry)
+{
+	return (entry.val & SUN4C_SWP_TYPE_MASK);
+}
+
+static unsigned long sun4c_swp_offset(swp_entry_t entry)
+{
+	return (entry.val >> SUN4C_SWP_OFF_SHIFT) & SUN4C_SWP_OFF_MASK;
+}
+
+static swp_entry_t sun4c_swp_entry(unsigned long type, unsigned long offset)
+{
+	return (swp_entry_t) {
+		  (offset & SUN4C_SWP_OFF_MASK) << SUN4C_SWP_OFF_SHIFT
+		| (type & SUN4C_SWP_TYPE_MASK) };
+}
+
 static void sun4c_free_pte_slow(pte_t *pte)
 {
 	free_page((unsigned long)pte);
@@ -2120,14 +2137,10 @@ void __init ld_mmu_sun4c(void)
 	printk("Loading sun4c MMU routines\n");
 
 	/* First the constants */
-	BTFIXUPSET_SIMM13(pmd_shift, SUN4C_PMD_SHIFT);
-	BTFIXUPSET_SETHI(pmd_size, SUN4C_PMD_SIZE);
-	BTFIXUPSET_SETHI(pmd_mask, SUN4C_PMD_MASK);
 	BTFIXUPSET_SIMM13(pgdir_shift, SUN4C_PGDIR_SHIFT);
 	BTFIXUPSET_SETHI(pgdir_size, SUN4C_PGDIR_SIZE);
 	BTFIXUPSET_SETHI(pgdir_mask, SUN4C_PGDIR_MASK);
 
-	BTFIXUPSET_SIMM13(ptrs_per_pte, SUN4C_PTRS_PER_PTE);
 	BTFIXUPSET_SIMM13(ptrs_per_pmd, SUN4C_PTRS_PER_PMD);
 	BTFIXUPSET_SIMM13(ptrs_per_pgd, SUN4C_PTRS_PER_PGD);
 	BTFIXUPSET_SIMM13(user_ptrs_per_pgd, KERNBASE / SUN4C_PGDIR_SIZE);
@@ -2241,6 +2254,10 @@ void __init ld_mmu_sun4c(void)
 
 	BTFIXUPSET_CALL(sparc_mapiorange, sun4c_mapiorange, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(sparc_unmapiorange, sun4c_unmapiorange, BTFIXUPCALL_NORM);
+
+	BTFIXUPSET_CALL(__swp_type, sun4c_swp_type, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(__swp_offset, sun4c_swp_offset, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(__swp_entry, sun4c_swp_entry, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_CALL(alloc_thread_info, sun4c_alloc_thread_info, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_thread_info, sun4c_free_thread_info, BTFIXUPCALL_NORM);

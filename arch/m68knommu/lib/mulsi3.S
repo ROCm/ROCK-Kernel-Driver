@@ -95,7 +95,7 @@ SYM (__mulsi3):
 	muluw	sp@(10), d0	/* x0*y1 */
 	movew	sp@(6), d1	/* x1 -> d1 */
 	muluw	sp@(8), d1	/* x1*y0 */
-#ifndef __mcf5200__
+#if !(defined(__mcf5200__) || defined(__mcoldfire__))
 	addw	d1, d0
 #else
 	addl	d1, d0

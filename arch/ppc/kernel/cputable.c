@@ -34,7 +34,8 @@ extern void __setup_cpu_8xx(unsigned long offset, int cpu_nr, struct cpu_spec* s
 extern void __setup_cpu_generic(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 
 #define CLASSIC_PPC (!defined(CONFIG_8xx) && !defined(CONFIG_4xx) && \
-		     !defined(CONFIG_POWER3) && !defined(CONFIG_POWER4))
+		     !defined(CONFIG_POWER3) && !defined(CONFIG_POWER4) && \
+		     !defined(CONFIG_BOOKE))
 
 /* This table only contains "desktop" CPUs, it need to be filled with embedded
  * ones as well...
@@ -53,10 +54,20 @@ extern void __setup_cpu_generic(unsigned long offset, int cpu_nr, struct cpu_spe
 #define PPC_FEATURE_ALTIVEC_COMP       	0
 #endif
 
+/* We need to mark all pages as being coherent if we're SMP or we
+ * have a 754x and an MPC107 host bridge.
+ */
+#if defined(CONFIG_SMP) || defined(CONFIG_MPC10X_BRIDGE)
+#define CPU_FTR_COMMON                  CPU_FTR_NEED_COHERENT
+#else
+#define CPU_FTR_COMMON                  0
+#endif
+
 struct cpu_spec	cpu_specs[] = {
 #if CLASSIC_PPC
     { 	/* 601 */
 	0xffff0000, 0x00010000, "601",
+	CPU_FTR_COMMON |
 	CPU_FTR_601 | CPU_FTR_HPTE_TABLE,
 	COMMON_PPC | PPC_FEATURE_601_INSTR | PPC_FEATURE_UNIFIED_CACHE,
 	32, 32,
@@ -64,6 +75,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 603 */
     	0xffff0000, 0x00030000, "603",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
     	CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -72,6 +84,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 603e */
     	0xffff0000, 0x00060000, "603e",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
     	CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -80,6 +93,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 603ev */
     	0xffff0000, 0x00070000, "603ev",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
     	CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -88,6 +102,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 604 */
     	0xffff0000, 0x00040000, "604",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_604_PERF_MON |
 	CPU_FTR_HPTE_TABLE,
 	COMMON_PPC,
@@ -96,6 +111,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 604e */
     	0xfffff000, 0x00090000, "604e",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_604_PERF_MON |
 	CPU_FTR_HPTE_TABLE,
 	COMMON_PPC,
@@ -104,6 +120,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 604r */
     	0xffff0000, 0x00090000, "604r",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_604_PERF_MON |
 	CPU_FTR_HPTE_TABLE,
 	COMMON_PPC,
@@ -112,6 +129,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 604ev */
     	0xffff0000, 0x000a0000, "604ev",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_604_PERF_MON |
 	CPU_FTR_HPTE_TABLE,
 	COMMON_PPC,
@@ -120,6 +138,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 740/750 (0x4202, don't support TAU ?) */
     	0xffffffff, 0x00084202, "740/750",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -128,6 +147,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 745/755 */
     	0xfffff000, 0x00083000, "745/755",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -136,6 +156,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 750CX (80100 and 8010x?) */
     	0xfffffff0, 0x00080100, "750CX",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -144,6 +165,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 750CX (82201 and 82202) */
     	0xfffffff0, 0x00082200, "750CX",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -152,6 +174,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 750CXe (82214) */
     	0xfffffff0, 0x00082210, "750CXe",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -160,6 +183,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 750FX rev 1.x */
     	0xffffff00, 0x70000100, "750FX",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP |
 	CPU_FTR_DUAL_PLL_750FX | CPU_FTR_NO_DPM,
@@ -169,6 +193,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 750FX rev 2.0 must disable HID0[DPM] */
     	0xffffffff, 0x70000200, "750FX",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP |
 	CPU_FTR_NO_DPM,
@@ -178,6 +203,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 750FX (All revs except 2.0) */
     	0xffff0000, 0x70000000, "750FX",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP |
 	CPU_FTR_DUAL_PLL_750FX | CPU_FTR_HAS_HIGH_BATS,
@@ -185,9 +211,18 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_750fx
     },
-
+    {	/* 750GX */
+    	0xffff0000, 0x70020000, "750GX",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP |
+	CPU_FTR_DUAL_PLL_750FX | CPU_FTR_HAS_HIGH_BATS,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_750fx
+    },
     {	/* 740/750 (L2CR bit need fixup for 740) */
     	0xffff0000, 0x00080000, "740/750",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP,
 	COMMON_PPC,
@@ -196,6 +231,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 7400 rev 1.1 ? (no TAU) */
     	0xffffffff, 0x000c1101, "7400 (1.1)",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_HPTE_TABLE |
 	CPU_FTR_CAN_NAP,
@@ -205,6 +241,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 7400 */
     	0xffff0000, 0x000c0000, "7400",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_ALTIVEC_COMP | CPU_FTR_HPTE_TABLE |
 	CPU_FTR_CAN_NAP,
@@ -214,6 +251,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 7410 */
     	0xffff0000, 0x800c0000, "7410",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_ALTIVEC_COMP | CPU_FTR_HPTE_TABLE |
 	CPU_FTR_CAN_NAP,
@@ -223,90 +261,132 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* 7450 2.0 - no doze/nap */
     	0xffffffff, 0x80000200, "7450",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
-	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450,
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NEED_COHERENT,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
     {	/* 7450 2.1 */
     	0xffffffff, 0x80000201, "7450",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
-	CPU_FTR_L3_DISABLE_NAP,
+	CPU_FTR_L3_DISABLE_NAP | CPU_FTR_NEED_COHERENT,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
     {	/* 7450 2.3 and newer */
     	0xffff0000, 0x80000000, "7450",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
-	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR,
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
+	CPU_FTR_NEED_COHERENT,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
     {	/* 7455 rev 1.x */
     	0xffffff00, 0x80010100, "7455",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
-	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_HAS_HIGH_BATS,
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_HAS_HIGH_BATS |
+	CPU_FTR_NEED_COHERENT,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
     {	/* 7455 rev 2.0 */
     	0xffffffff, 0x80010200, "7455",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
-	CPU_FTR_L3_DISABLE_NAP | CPU_FTR_HAS_HIGH_BATS,
+	CPU_FTR_L3_DISABLE_NAP | CPU_FTR_NEED_COHERENT | CPU_FTR_HAS_HIGH_BATS,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
     {	/* 7455 others */
     	0xffff0000, 0x80010000, "7455",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
-	CPU_FTR_HAS_HIGH_BATS,
+	CPU_FTR_HAS_HIGH_BATS | CPU_FTR_NEED_COHERENT,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
-    {	/* 7457 */
-    	0xffff0000, 0x80020000, "7457",
+    {	/* 7447/7457 Rev 1.0 */
+    	0xffffffff, 0x80020100, "7447/7457",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
-	CPU_FTR_HAS_HIGH_BATS,
+	CPU_FTR_HAS_HIGH_BATS | CPU_FTR_NEED_COHERENT | CPU_FTR_NO_BTIC,
+	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
+	32, 32,
+	__setup_cpu_745x
+    },
+    {	/* 7447/7457 Rev 1.1 */
+    	0xffffffff, 0x80020101, "7447/7457",
+	CPU_FTR_COMMON |
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
+	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
+	CPU_FTR_HAS_HIGH_BATS | CPU_FTR_NEED_COHERENT | CPU_FTR_NO_BTIC,
+	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
+	32, 32,
+	__setup_cpu_745x
+    },
+    {	/* 7447/7457 Rev 1.2 and later */
+    	0xffff0000, 0x80020000, "7447/7457",
+	CPU_FTR_COMMON |
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
+	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
+	CPU_FTR_HAS_HIGH_BATS | CPU_FTR_NEED_COHERENT,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
     {	/* 7447A */
     	0xffff0000, 0x80030000, "7447A",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP |
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
-	CPU_FTR_HAS_HIGH_BATS,
+	CPU_FTR_HAS_HIGH_BATS | CPU_FTR_NEED_COHERENT,
 	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
 	32, 32,
 	__setup_cpu_745x
     },
     {	/* 82xx (8240, 8245, 8260 are all 603e cores) */
 	0x7fff0000, 0x00810000, "82xx",
+	CPU_FTR_COMMON |
 	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_603
+    },
+    {	/* All G2_LE (603e core, plus some) have the same pvr */
+	0x7fff0000, 0x00820000, "G2_LE",
+	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_CAN_NAP | CPU_FTR_HAS_HIGH_BATS,
 	COMMON_PPC,
 	32, 32,
 	__setup_cpu_603
     },
     {	/* default match, we assume split I/D cache & TB (non-601)... */
     	0x00000000, 0x00000000, "(generic PPC)",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
 	COMMON_PPC,
 	32, 32,
@@ -316,6 +396,7 @@ struct cpu_spec	cpu_specs[] = {
 #ifdef CONFIG_PPC64BRIDGE
     {	/* Power3 */
     	0xffff0000, 0x00400000, "Power3 (630)",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
     	COMMON_PPC | PPC_FEATURE_64,
 	128, 128,
@@ -323,6 +404,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* Power3+ */
     	0xffff0000, 0x00410000, "Power3 (630+)",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
     	COMMON_PPC | PPC_FEATURE_64,
 	128, 128,
@@ -330,6 +412,7 @@ struct cpu_spec	cpu_specs[] = {
     },
 	{	/* I-star */
 		0xffff0000, 0x00360000, "I-star",
+		CPU_FTR_COMMON |
 		CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
 		COMMON_PPC | PPC_FEATURE_64,
 		128, 128,
@@ -337,6 +420,7 @@ struct cpu_spec	cpu_specs[] = {
 	},
 	{	/* S-star */
 		0xffff0000, 0x00370000, "S-star",
+		CPU_FTR_COMMON |
 		CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
 		COMMON_PPC | PPC_FEATURE_64,
 		128, 128,
@@ -346,6 +430,7 @@ struct cpu_spec	cpu_specs[] = {
 #ifdef CONFIG_POWER4
     {	/* Power4 */
     	0xffff0000, 0x00350000, "Power4",
+	CPU_FTR_COMMON |
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
     	COMMON_PPC | PPC_FEATURE_64,
 	128, 128,
@@ -353,6 +438,7 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* PPC970 */
 	0xffff0000, 0x00390000, "PPC970",
+	CPU_FTR_COMMON |
 	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
 	CPU_FTR_ALTIVEC_COMP | CPU_FTR_CAN_NAP,
 	COMMON_PPC | PPC_FEATURE_64 | PPC_FEATURE_ALTIVEC_COMP,
@@ -493,18 +579,28 @@ struct cpu_spec	cpu_specs[] = {
         32, 32,
         0, /*__setup_cpu_440 */
     },
-    { /* 440GX Rev. B1 (2.1) */
-        0xf0000fff, 0x50000852, "440GX Rev. B1 (2.1)",
+    { /* 440GX Rev. C */
+        0xf0000fff, 0x50000892, "440GX Rev. C",
         CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
         PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
         32, 32,
         0, /*__setup_cpu_440 */
     },
 #endif /* CONFIG_44x */
+#ifdef CONFIG_E500
+    { /* e500 */
+        0xffff0000, 0x80200000, "e500",
+	/* xxx - galak: add CPU_FTR_CAN_DOZE */
+        CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+        PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
+        32, 32,
+        0, /*__setup_cpu_e500 */
+    },
+#endif
 #if !CLASSIC_PPC
     {	/* default match */
     	0x00000000, 0x00000000, "(generic PPC)",
-    	0,
+	CPU_FTR_COMMON,
     	PPC_FEATURE_32,
 	32, 32,
 	0,

@@ -39,8 +39,8 @@ static int nfs_file_open(struct inode *, struct file *);
 static int nfs_file_release(struct inode *, struct file *);
 static int  nfs_file_mmap(struct file *, struct vm_area_struct *);
 static ssize_t nfs_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void *);
-static ssize_t nfs_file_read(struct kiocb *, char *, size_t, loff_t);
-static ssize_t nfs_file_write(struct kiocb *, const char *, size_t, loff_t);
+static ssize_t nfs_file_read(struct kiocb *, char __user *, size_t, loff_t);
+static ssize_t nfs_file_write(struct kiocb *, const char __user *, size_t, loff_t);
 static int  nfs_file_flush(struct file *);
 static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
 
@@ -64,10 +64,6 @@ struct inode_operations nfs_file_inode_operations = {
 	.permission	= nfs_permission,
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
-	.listxattr	= nfs_listxattr,
-	.getxattr	= nfs_getxattr,
-	.setxattr	= nfs_setxattr,
-	.removexattr	= nfs_removexattr,
 };
 
 /* Hack for future NFS swap support */
@@ -152,11 +148,16 @@ nfs_file_flush(struct file *file)
 }
 
 static ssize_t
-nfs_file_read(struct kiocb *iocb, char * buf, size_t count, loff_t pos)
+nfs_file_read(struct kiocb *iocb, char __user * buf, size_t count, loff_t pos)
 {
 	struct dentry * dentry = iocb->ki_filp->f_dentry;
 	struct inode * inode = dentry->d_inode;
 	ssize_t result;
+
+#ifdef CONFIG_NFS_DIRECTIO
+	if (iocb->ki_filp->f_flags & O_DIRECT)
+		return nfs_file_direct_read(iocb, buf, count, pos);
+#endif
 
 	dfprintk(VFS, "nfs: read(%s/%s, %lu@%lu)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
@@ -266,11 +267,16 @@ struct address_space_operations nfs_file_aops = {
  * Write to a file (through the page cache).
  */
 static ssize_t
-nfs_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
+nfs_file_write(struct kiocb *iocb, const char __user *buf, size_t count, loff_t pos)
 {
 	struct dentry * dentry = iocb->ki_filp->f_dentry;
 	struct inode * inode = dentry->d_inode;
 	ssize_t result;
+
+#ifdef CONFIG_NFS_DIRECTIO
+	if (iocb->ki_filp->f_flags & O_DIRECT)
+		return nfs_file_direct_write(iocb, buf, count, pos);
+#endif
 
 	dfprintk(VFS, "nfs: write(%s/%s(%ld), %lu@%lu)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,

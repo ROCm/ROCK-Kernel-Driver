@@ -6,7 +6,9 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001plus.c,v 1.5 2003/06/11 09:45:19 dwmw2 Exp $
+ * $Id: doc2001plus.c,v 1.8 2004/04/04 12:36:45 gleixner Exp $
+ *
+ * Released under GPL
  */
 
 #include <linux/kernel.h>
@@ -21,6 +23,7 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/bitops.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
@@ -183,24 +186,35 @@ static int DoC_SelectFloor(unsigned long docptr, int floor)
  *  | Data 0    | ECC 0 |Flags0 |Flags1 | Data 1       |ECC 1    | OOB 1 + 2 |
  *  +-----------+-------+-------+-------+--------------+---------+-----------+
  */
+/* FIXME: This lives in INFTL not here. Other users of flash devices
+   may not want it */
 static unsigned int DoC_GetDataOffset(struct mtd_info *mtd, loff_t *from)
 {
-	unsigned int ofs = *from & 0x3ff;
-	unsigned int cmd;
+	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
 
-	if (ofs < 512) {
-		cmd = NAND_CMD_READ0;
-		ofs &= 0x1ff;
-	} else if (ofs < 1014) {
-		cmd = NAND_CMD_READ1;
-		ofs = (ofs & 0x1ff) + 10;
+	if (this->interleave) {
+		unsigned int ofs = *from & 0x3ff;
+		unsigned int cmd;
+
+		if (ofs < 512) {
+			cmd = NAND_CMD_READ0;
+			ofs &= 0x1ff;
+		} else if (ofs < 1014) {
+			cmd = NAND_CMD_READ1;
+			ofs = (ofs & 0x1ff) + 10;
+		} else {
+			cmd = NAND_CMD_READOOB;
+			ofs = ofs - 1014;
+		}
+
+		*from = (*from & ~0x3ff) | ofs;
+		return cmd;
 	} else {
-		cmd = NAND_CMD_READOOB;
-		ofs = ofs - 1014;
+		/* No interleave */
+		if ((*from) & 0x100)
+			return NAND_CMD_READ1;
+		return NAND_CMD_READ0;
 	}
-
-	*from = (*from & ~0x3ff) | ofs;
-	return cmd;
 }
 
 static unsigned int DoC_GetECCOffset(struct mtd_info *mtd, loff_t *from)
@@ -294,10 +308,12 @@ static int DoC_IdentChip(struct DiskOnChip *doc, int floor, int chip)
 	dummy = ReadDOC(docptr, Mplus_ReadPipeInit);
 
 	mfr = ReadDOC(docptr, Mil_CDSN_IO);
-	dummy = ReadDOC(docptr, Mil_CDSN_IO); /* 2 way interleave */
+	if (doc->interleave)
+		dummy = ReadDOC(docptr, Mil_CDSN_IO); /* 2 way interleave */
 
 	id  = ReadDOC(docptr, Mil_CDSN_IO);
-	dummy = ReadDOC(docptr, Mil_CDSN_IO); /* 2 way interleave */
+	if (doc->interleave)
+		dummy = ReadDOC(docptr, Mil_CDSN_IO); /* 2 way interleave */
 
 	dummy = ReadDOC(docptr, Mplus_LastDataRead);
 	dummy = ReadDOC(docptr, Mplus_LastDataRead);
@@ -321,10 +337,7 @@ static int DoC_IdentChip(struct DiskOnChip *doc, int floor, int chip)
 			       nand_manuf_ids[j].name, nand_flash_ids[i].name);
 			doc->mfr = mfr;
 			doc->id = id;
-			doc->interleave = 0;
-			if (doc->ChipID == DOC_ChipID_DocMilPlus32)
-				doc->interleave = 1;
-			doc->chipshift = nand_flash_ids[i].chipshift;
+			doc->chipshift = ffs((nand_flash_ids[i].chipsize << 20)) - 1;
 			doc->erasesize = nand_flash_ids[i].erasesize << doc->interleave;
 			break;
 		}
@@ -345,6 +358,21 @@ static void DoC_ScanChips(struct DiskOnChip *this)
 	this->numchips = 0;
 	this->mfr = 0;
 	this->id = 0;
+
+	/* Work out the intended interleave setting */
+	this->interleave = 0;
+	if (this->ChipID == DOC_ChipID_DocMilPlus32)
+		this->interleave = 1;
+
+	/* Check the ASIC agrees */
+	if ( (this->interleave << 2) != 
+	     (ReadDOC(this->virtadr, Mplus_Configuration) & 4)) {
+		u_char conf = ReadDOC(this->virtadr, Mplus_Configuration);
+		printk(KERN_NOTICE "Setting DiskOnChip Millennium Plus interleave to %s\n",
+		       this->interleave?"on (16-bit)":"off (8-bit)");
+		conf ^= 4;
+		WriteDOC(this->virtadr, conf, Mplus_Configuration);
+	}
 
 	/* For each floor, find the number of valid chips it contains */
 	for (floor = 0,ret = 1; floor < MAX_FLOORS_MPLUS; floor++) {
@@ -739,7 +767,7 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 		return -EINVAL;
 
 	/* Determine position of OOB flags, before or after data */
-	before = to & 0x200;
+	before = (this->interleave && (to & 0x200));
 
 	DoC_CheckASIC(docptr);
 
@@ -886,7 +914,10 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 		/* Figure out which region we are accessing... */
 		fofs = ofs;
 		base = ofs & 0xf;
-		if (base < 6) {
+		if (!this->interleave) {
+			DoC_Command(docptr, NAND_CMD_READOOB, 0);
+			size = 16 - base;
+		} else if (base < 6) {
 			DoC_Command(docptr, DoC_GetECCOffset(mtd, &fofs), 0);
 			size = 6 - base;
 		} else if (base < 8) {
@@ -963,7 +994,10 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 		/* Figure out which region we are accessing... */
 		fofs = ofs;
 		base = ofs & 0x0f;
-		if (base < 6) {
+		if (!this->interleave) {
+			WriteDOC(NAND_CMD_READOOB, docptr, Mplus_FlashCmd);
+			size = 16 - base;
+		} else if (base < 6) {
 			WriteDOC(DoC_GetECCOffset(mtd, &fofs), docptr, Mplus_FlashCmd);
 			size = 6 - base;
 		} else if (base < 8) {

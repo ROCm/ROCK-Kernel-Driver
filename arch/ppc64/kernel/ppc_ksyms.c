@@ -47,10 +47,7 @@
 
 extern int do_signal(sigset_t *, struct pt_regs *);
 
-int abs(int);
-
 EXPORT_SYMBOL(do_signal);
-EXPORT_SYMBOL(sys_ioctl);
 
 EXPORT_SYMBOL(isa_io_base);
 EXPORT_SYMBOL(pci_io_base);
@@ -158,23 +155,10 @@ EXPORT_SYMBOL_NOVERS(memscan);
 EXPORT_SYMBOL_NOVERS(memcmp);
 EXPORT_SYMBOL_NOVERS(memchr);
 
-EXPORT_SYMBOL(abs);
-
 EXPORT_SYMBOL(timer_interrupt);
 EXPORT_SYMBOL(irq_desc);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
-
-#ifdef CONFIG_CRASH_DUMP_MODULE
-extern int dump_page_is_ram(unsigned long);
-EXPORT_SYMBOL(dump_page_is_ram);
-#ifdef CONFIG_SMP
-EXPORT_SYMBOL(irq_affinity);
-extern void stop_this_cpu(void *);
-EXPORT_SYMBOL(stop_this_cpu);
-EXPORT_SYMBOL(dump_send_ipi);
-#endif
-#endif
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
 EXPORT_SYMBOL(paca);

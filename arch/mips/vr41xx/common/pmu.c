@@ -1,7 +1,7 @@
 /*
  *  pmu.c, Power Management Unit routines for NEC VR4100 series.
  *
- *  Copyright (C) 2003  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  Copyright (C) 2003-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -68,9 +68,13 @@ static void vr41xx_power_off(void)
 	while (1) ;
 }
 
-void __init vr41xx_pmu_init(void)
+static int __init vr41xx_pmu_init(void)
 {
 	_machine_restart = vr41xx_restart;
 	_machine_halt = vr41xx_halt;
 	_machine_power_off = vr41xx_power_off;
+
+	return 0;
 }
+
+early_initcall(vr41xx_pmu_init);

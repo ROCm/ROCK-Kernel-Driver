@@ -206,7 +206,7 @@ extern int ac97_get_mixer_scaled (struct ac97_hwint *dev, int oss_channel);
 
 /* Default ioctl. */
 extern int ac97_mixer_ioctl (struct ac97_hwint *dev, unsigned int cmd,
-			     caddr_t arg);
+			     void __user * arg);
 
 /* Do a complete reset on the AC97 mixer, restoring all mixer registers to
    the current values.  Normally used after an APM resume event.  */

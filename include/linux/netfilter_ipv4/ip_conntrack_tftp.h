@@ -9,5 +9,8 @@ struct tftphdr {
 
 #define TFTP_OPCODE_READ	1
 #define TFTP_OPCODE_WRITE	2
+#define TFTP_OPCODE_DATA	3
+#define TFTP_OPCODE_ACK		4
+#define TFTP_OPCODE_ERROR	5
 
 #endif /* _IP_CT_TFTP */

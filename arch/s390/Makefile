@@ -50,6 +50,9 @@ libs-y		+= arch/$(ARCH)/lib/
 drivers-y	+= drivers/s390/
 drivers-$(CONFIG_MATHEMU) += arch/$(ARCH)/math-emu/
 
+# must be linked after kernel
+drivers-$(CONFIG_OPROFILE)	+= arch/s390/oprofile/
+
 boot		:= arch/$(ARCH)/boot
 
 all: image
@@ -71,7 +74,7 @@ arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
-MRPROPER_FILES += include/asm-$(ARCH)/offsets.h
+CLEAN_FILES += include/asm-$(ARCH)/offsets.h
 
 # Don't use tabs in echo arguments
 define archhelp

@@ -75,7 +75,7 @@ static void complain_about_jumpering(const char *whom,
 }
 
 static int
-badge4_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
+badge4_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
 {
 	int ret;
 

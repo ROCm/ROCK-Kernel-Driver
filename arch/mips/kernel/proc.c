@@ -117,7 +117,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	              cpu_has_watch ? "yes" : "no");
 
 	sprintf(fmt, "VCE%%c exceptions\t\t: %s\n",
-	        cpu_has_vce ? "%d" : "not available");
+	        cpu_has_vce ? "%u" : "not available");
 	seq_printf(m, fmt, 'D', vced_count);
 	seq_printf(m, fmt, 'I', vcei_count);
 

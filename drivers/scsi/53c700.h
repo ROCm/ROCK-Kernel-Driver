@@ -9,8 +9,10 @@
 #define _53C700_H
 
 #include <linux/interrupt.h>
-
 #include <asm/io.h>
+
+#include <scsi/scsi_device.h>
+
 
 #if defined(CONFIG_53C700_MEM_MAPPED) && defined(CONFIG_53C700_IO_MAPPED)
 #define CONFIG_53C700_BOTH_MAPPED
@@ -57,7 +59,8 @@
 struct NCR_700_Host_Parameters;
 
 /* These are the externally used routines */
-struct Scsi_Host *NCR_700_detect(Scsi_Host_Template *, struct NCR_700_Host_Parameters *);
+struct Scsi_Host *NCR_700_detect(struct scsi_host_template *,
+		struct NCR_700_Host_Parameters *);
 int NCR_700_release(struct Scsi_Host *host);
 irqreturn_t NCR_700_intr(int, void *, struct pt_regs *);
 
@@ -102,7 +105,7 @@ struct NCR_700_SG_List {
 #define NCR_700_DEV_PRINT_SYNC_NEGOTIATION (1<<19)
 
 static inline void
-NCR_700_set_depth(Scsi_Device *SDp, __u8 depth)
+NCR_700_set_depth(struct scsi_device *SDp, __u8 depth)
 {
 	long l = (long)SDp->hostdata;
 
@@ -111,27 +114,27 @@ NCR_700_set_depth(Scsi_Device *SDp, __u8 depth)
 	SDp->hostdata = (void *)l;
 }
 static inline __u8
-NCR_700_get_depth(Scsi_Device *SDp)
+NCR_700_get_depth(struct scsi_device *SDp)
 {
 	return ((((unsigned long)SDp->hostdata) & 0xff00)>>8);
 }
 static inline int
-NCR_700_is_flag_set(Scsi_Device *SDp, __u32 flag)
+NCR_700_is_flag_set(struct scsi_device *SDp, __u32 flag)
 {
 	return (((unsigned long)SDp->hostdata) & flag) == flag;
 }
 static inline int
-NCR_700_is_flag_clear(Scsi_Device *SDp, __u32 flag)
+NCR_700_is_flag_clear(struct scsi_device *SDp, __u32 flag)
 {
 	return (((unsigned long)SDp->hostdata) & flag) == 0;
 }
 static inline void
-NCR_700_set_flag(Scsi_Device *SDp, __u32 flag)
+NCR_700_set_flag(struct scsi_device *SDp, __u32 flag)
 {
 	SDp->hostdata = (void *)((long)SDp->hostdata | (flag & 0xffff0000));
 }
 static inline void
-NCR_700_clear_flag(Scsi_Device *SDp, __u32 flag)
+NCR_700_clear_flag(struct scsi_device *SDp, __u32 flag)
 {
 	SDp->hostdata = (void *)((long)SDp->hostdata & ~(flag & 0xffff0000));
 }
@@ -147,7 +150,7 @@ struct NCR_700_command_slot {
 	__u8	state;
 	int	tag;
 	__u32	resume_offset;
-	Scsi_Cmnd	*cmnd;
+	struct scsi_cmnd *cmnd;
 	/* The pci_mapped address of the actual command in cmnd */
 	dma_addr_t	pCmd;
 	__u32		temp;
@@ -185,7 +188,7 @@ struct NCR_700_Host_Parameters {
 	__u32	pScript;		/* physical mem addr of script */
 
 	enum NCR_700_Host_State state; /* protected by state lock */
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 	/* Note: pScript contains the single consistent block of
 	 * memory.  All the msgin, msgout and status are allocated in
 	 * this memory too (at separate cache lines).  TOTAL_MEM_SIZE

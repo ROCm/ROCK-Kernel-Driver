@@ -37,7 +37,7 @@ static int populate_dir(struct kobject * kobj)
 	int i;
 	
 	if (t && t->default_attrs) {
-		for (i = 0; (attr = t->default_attrs[i]); i++) {
+		for (i = 0; (attr = t->default_attrs[i]) != NULL; i++) {
 			if ((error = sysfs_create_file(kobj,attr)))
 				break;
 		}
@@ -145,7 +145,7 @@ static void kset_hotplug(const char *action, struct kset *kset,
 
 	argv [0] = hotplug_path;
 	argv [1] = name;
-	argv [2] = 0;
+	argv [2] = NULL;
 
 	/* minimal command environment */
 	envp [i++] = "HOME=/";
@@ -537,7 +537,8 @@ void kset_unregister(struct kset * k)
  *	@name:	object's name.
  *
  *	Lock kset via @kset->subsys, and iterate over @kset->list,
- *	looking for a matching kobject. Return object if found.
+ *	looking for a matching kobject. If matching object is found
+ *	take a reference and return the object.
  */
 
 struct kobject * kset_find_obj(struct kset * kset, const char * name)
@@ -548,8 +549,8 @@ struct kobject * kset_find_obj(struct kset * kset, const char * name)
 	down_read(&kset->subsys->rwsem);
 	list_for_each(entry,&kset->list) {
 		struct kobject * k = to_kobj(entry);
-		if (kobject_name(k) && (!strcmp(kobject_name(k),name))) {
-			ret = k;
+		if (kobject_name(k) && !strcmp(kobject_name(k),name)) {
+			ret = kobject_get(k);
 			break;
 		}
 	}

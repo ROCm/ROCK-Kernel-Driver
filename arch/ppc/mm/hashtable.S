@@ -346,9 +346,9 @@ _GLOBAL(create_hpte)
 	rlwimi	r5,r5,32-2,31,31	/* _PAGE_USER -> PP lsb */
 	ori	r8,r8,0xe14		/* clear out reserved bits and M */
 	andc	r8,r5,r8		/* PP = user? (rw&dirty? 2: 3): 0 */
-#ifdef CONFIG_SMP
+BEGIN_FTR_SECTION
 	ori	r8,r8,_PAGE_COHERENT	/* set M (coherence required) */
-#endif
+END_FTR_SECTION_IFSET(CPU_FTR_NEED_COHERENT)
 
 	/* Construct the high word of the PPC-style PTE (r5) */
 #ifndef CONFIG_PPC64BRIDGE

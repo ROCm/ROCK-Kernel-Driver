@@ -87,12 +87,6 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 /* Size of an pre-allocated Rx buffer: <Ethernet MTU> + slack.*/
 #define PKT_BUF_SZ		1536
 
-#if !defined(__OPTIMIZE__)  ||  !defined(__KERNEL__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
-
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
@@ -120,7 +114,6 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/rtnetlink.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
-#include <linux/mii.h>
 
 /* enable PIO instead of MMIO, if CONFIG_EEPRO100_PIO is selected */
 #ifdef CONFIG_EEPRO100_PIO
@@ -1028,7 +1021,7 @@ speedo_open(struct net_device *dev)
 	/* Set up the Tx queue early.. */
 	sp->cur_tx = 0;
 	sp->dirty_tx = 0;
-	sp->last_cmd = 0;
+	sp->last_cmd = NULL;
 	sp->tx_full = 0;
 	sp->in_interrupt = 0;
 
@@ -1362,7 +1355,7 @@ static void speedo_purge_tx(struct net_device *dev)
 					le32_to_cpu(sp->tx_ring[entry].tx_buf_addr0),
 					sp->tx_skbuff[entry]->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq(sp->tx_skbuff[entry]);
-			sp->tx_skbuff[entry] = 0;
+			sp->tx_skbuff[entry] = NULL;
 		}
 		sp->dirty_tx++;
 	}
@@ -1566,7 +1559,7 @@ static void speedo_tx_buffer_gc(struct net_device *dev)
 					le32_to_cpu(sp->tx_ring[entry].tx_buf_addr0),
 					sp->tx_skbuff[entry]->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq(sp->tx_skbuff[entry]);
-			sp->tx_skbuff[entry] = 0;
+			sp->tx_skbuff[entry] = NULL;
 		}
 		dirty_tx++;
 	}
@@ -1939,7 +1932,7 @@ speedo_close(struct net_device *dev)
     /* Free all the skbuffs in the Rx and Tx queues. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct sk_buff *skb = sp->rx_skbuff[i];
-		sp->rx_skbuff[i] = 0;
+		sp->rx_skbuff[i] = NULL;
 		/* Clear the Rx descriptors. */
 		if (skb) {
 			pci_unmap_single(sp->pdev,
@@ -1951,7 +1944,7 @@ speedo_close(struct net_device *dev)
 
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		struct sk_buff *skb = sp->tx_skbuff[i];
-		sp->tx_skbuff[i] = 0;
+		sp->tx_skbuff[i] = NULL;
 		/* Clear the Tx descriptors. */
 		if (skb) {
 			pci_unmap_single(sp->pdev,
@@ -2018,7 +2011,7 @@ speedo_get_stats(struct net_device *dev)
 	return &sp->stats;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 	struct speedo_private *sp = netdev_priv(dev);
@@ -2097,7 +2090,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct speedo_private *sp = netdev_priv(dev);
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	int phy = sp->phy[0] & 0x1f;
 	int saved_acpi;
 	int t;
@@ -2130,7 +2123,7 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		pci_set_power_state(sp->pdev, saved_acpi);
 		return 0;
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -2181,7 +2174,7 @@ static void set_rx_mode(struct net_device *dev)
 		last_cmd = sp->last_cmd;
 		sp->last_cmd = (struct descriptor *)&sp->tx_ring[entry];
 
-		sp->tx_skbuff[entry] = 0;			/* Redundant. */
+		sp->tx_skbuff[entry] = NULL;			/* Redundant. */
 		sp->tx_ring[entry].status = cpu_to_le32(CmdSuspend | CmdConfigure);
 		sp->tx_ring[entry].link =
 			cpu_to_le32(TX_RING_ELEM_DMA(sp, (entry + 1) % TX_RING_SIZE));
@@ -2224,7 +2217,7 @@ static void set_rx_mode(struct net_device *dev)
 		last_cmd = sp->last_cmd;
 		sp->last_cmd = (struct descriptor *)&sp->tx_ring[entry];
 
-		sp->tx_skbuff[entry] = 0;
+		sp->tx_skbuff[entry] = NULL;
 		sp->tx_ring[entry].status = cpu_to_le32(CmdSuspend | CmdMulticastList);
 		sp->tx_ring[entry].link =
 			cpu_to_le32(TX_RING_ELEM_DMA(sp, (entry + 1) % TX_RING_SIZE));
@@ -2305,7 +2298,7 @@ static void set_rx_mode(struct net_device *dev)
 		sp->last_cmd = mc_setup_frm;
 
 		/* Change the command to a NoOp, pointing to the CmdMulti command. */
-		sp->tx_skbuff[entry] = 0;
+		sp->tx_skbuff[entry] = NULL;
 		sp->tx_ring[entry].status = cpu_to_le32(CmdNOp);
 		sp->tx_ring[entry].link = cpu_to_le32(mc_blk->frame_dma);
 

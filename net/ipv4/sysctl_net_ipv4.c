@@ -62,7 +62,7 @@ extern ctl_table ipv4_route_table[];
 
 static
 int ipv4_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
-			void *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp)
 {
 	int val = ipv4_devconf.forwarding;
 	int ret;
@@ -75,9 +75,10 @@ int ipv4_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
 	return ret;
 }
 
-static int ipv4_sysctl_forward_strategy(ctl_table *table, int *name, int nlen,
-			 void *oldval, size_t *oldlenp,
-			 void *newval, size_t newlen, 
+static int ipv4_sysctl_forward_strategy(ctl_table *table,
+			 int __user *name, int nlen,
+			 void __user *oldval, size_t __user *oldlenp,
+			 void __user *newval, size_t newlen, 
 			 void **context)
 {
 	int *valp = table->data;
@@ -89,7 +90,7 @@ static int ipv4_sysctl_forward_strategy(ctl_table *table, int *name, int nlen,
 	if (newlen != sizeof(int))
 		return -EINVAL;
 
-	if (get_user(new, (int *)newval))
+	if (get_user(new, (int __user *)newval))
 		return -EFAULT;
 
 	if (new == *valp)
@@ -594,9 +595,89 @@ ctl_table ipv4_table[] = {
 		.strategy	= &sysctl_jiffies
 	},
 	{
+		.ctl_name	= NET_TCP_NO_METRICS_SAVE,
+		.procname	= "tcp_no_metrics_save",
+		.data		= &sysctl_tcp_nometrics_save,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
 		.ctl_name	= NET_TCP_WESTWOOD, 
 		.procname	= "tcp_westwood",
 		.data		= &sysctl_tcp_westwood,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_VEGAS,
+		.procname	= "tcp_vegas_cong_avoid",
+		.data		= &sysctl_tcp_vegas_cong_avoid,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_VEGAS_ALPHA,
+		.procname	= "tcp_vegas_alpha",
+		.data		= &sysctl_tcp_vegas_alpha,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_VEGAS_BETA,
+		.procname	= "tcp_vegas_beta",
+		.data		= &sysctl_tcp_vegas_beta,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_VEGAS_GAMMA,
+		.procname	= "tcp_vegas_gamma",
+		.data		= &sysctl_tcp_vegas_gamma,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_BIC,
+		.procname	= "tcp_bic",
+		.data		= &sysctl_tcp_bic,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_BIC_FAST_CONVERGENCE,
+		.procname	= "tcp_bic_fast_convergence",
+		.data		= &sysctl_tcp_bic_fast_convergence,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_BIC_LOW_WINDOW,
+		.procname	= "tcp_bic_low_window",
+		.data		= &sysctl_tcp_bic_low_window,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_DEFAULT_WIN_SCALE,
+		.procname	= "tcp_default_win_scale",
+		.data		= &sysctl_tcp_default_win_scale,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_TCP_MODERATE_RCVBUF,
+		.procname	= "tcp_moderate_rcvbuf",
+		.data		= &sysctl_tcp_moderate_rcvbuf,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,

@@ -56,24 +56,24 @@
 #define SCHIZO_STRBUF_CTRL_ENAB    0x0000000000000001UL /* Streaming Buffer Enable */
 
 /* IOMMU control register. */
-#define SCHIZO_IOMMU_CTRL_RESV     0xfffffffff9000000 /* Reserved                      */
-#define SCHIZO_IOMMU_CTRL_XLTESTAT 0x0000000006000000 /* Translation Error Status      */
-#define SCHIZO_IOMMU_CTRL_XLTEERR  0x0000000001000000 /* Translation Error encountered */
-#define SCHIZO_IOMMU_CTRL_LCKEN    0x0000000000800000 /* Enable translation locking    */
-#define SCHIZO_IOMMU_CTRL_LCKPTR   0x0000000000780000 /* Translation lock pointer      */
-#define SCHIZO_IOMMU_CTRL_TSBSZ    0x0000000000070000 /* TSB Size                      */
-#define SCHIZO_IOMMU_TSBSZ_1K      0x0000000000000000 /* TSB Table 1024 8-byte entries */
-#define SCHIZO_IOMMU_TSBSZ_2K      0x0000000000010000 /* TSB Table 2048 8-byte entries */
-#define SCHIZO_IOMMU_TSBSZ_4K      0x0000000000020000 /* TSB Table 4096 8-byte entries */
-#define SCHIZO_IOMMU_TSBSZ_8K      0x0000000000030000 /* TSB Table 8192 8-byte entries */
-#define SCHIZO_IOMMU_TSBSZ_16K     0x0000000000040000 /* TSB Table 16k 8-byte entries  */
-#define SCHIZO_IOMMU_TSBSZ_32K     0x0000000000050000 /* TSB Table 32k 8-byte entries  */
-#define SCHIZO_IOMMU_TSBSZ_64K     0x0000000000060000 /* TSB Table 64k 8-byte entries  */
-#define SCHIZO_IOMMU_TSBSZ_128K    0x0000000000070000 /* TSB Table 128k 8-byte entries */
-#define SCHIZO_IOMMU_CTRL_RESV2    0x000000000000fff8 /* Reserved                      */
-#define SCHIZO_IOMMU_CTRL_TBWSZ    0x0000000000000004 /* Assumed page size, 0=8k 1=64k */
-#define SCHIZO_IOMMU_CTRL_DENAB    0x0000000000000002 /* Diagnostic mode enable        */
-#define SCHIZO_IOMMU_CTRL_ENAB     0x0000000000000001 /* IOMMU Enable                  */
+#define SCHIZO_IOMMU_CTRL_RESV     0xfffffffff9000000UL /* Reserved                      */
+#define SCHIZO_IOMMU_CTRL_XLTESTAT 0x0000000006000000UL /* Translation Error Status      */
+#define SCHIZO_IOMMU_CTRL_XLTEERR  0x0000000001000000UL /* Translation Error encountered */
+#define SCHIZO_IOMMU_CTRL_LCKEN    0x0000000000800000UL /* Enable translation locking    */
+#define SCHIZO_IOMMU_CTRL_LCKPTR   0x0000000000780000UL /* Translation lock pointer      */
+#define SCHIZO_IOMMU_CTRL_TSBSZ    0x0000000000070000UL /* TSB Size                      */
+#define SCHIZO_IOMMU_TSBSZ_1K      0x0000000000000000UL /* TSB Table 1024 8-byte entries */
+#define SCHIZO_IOMMU_TSBSZ_2K      0x0000000000010000UL /* TSB Table 2048 8-byte entries */
+#define SCHIZO_IOMMU_TSBSZ_4K      0x0000000000020000UL /* TSB Table 4096 8-byte entries */
+#define SCHIZO_IOMMU_TSBSZ_8K      0x0000000000030000UL /* TSB Table 8192 8-byte entries */
+#define SCHIZO_IOMMU_TSBSZ_16K     0x0000000000040000UL /* TSB Table 16k 8-byte entries  */
+#define SCHIZO_IOMMU_TSBSZ_32K     0x0000000000050000UL /* TSB Table 32k 8-byte entries  */
+#define SCHIZO_IOMMU_TSBSZ_64K     0x0000000000060000UL /* TSB Table 64k 8-byte entries  */
+#define SCHIZO_IOMMU_TSBSZ_128K    0x0000000000070000UL /* TSB Table 128k 8-byte entries */
+#define SCHIZO_IOMMU_CTRL_RESV2    0x000000000000fff8UL /* Reserved                      */
+#define SCHIZO_IOMMU_CTRL_TBWSZ    0x0000000000000004UL /* Assumed page size, 0=8k 1=64k */
+#define SCHIZO_IOMMU_CTRL_DENAB    0x0000000000000002UL /* Diagnostic mode enable        */
+#define SCHIZO_IOMMU_CTRL_ENAB     0x0000000000000001UL /* IOMMU Enable                  */
 
 /* Schizo config space address format is nearly identical to
  * that of PSYCHO:
@@ -1111,9 +1111,9 @@ static irqreturn_t schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *
 
 /* Nearly identical to PSYCHO equivalents... */
 #define SCHIZO_ECC_CTRL		0x10020UL
-#define  SCHIZO_ECCCTRL_EE	 0x8000000000000000 /* Enable ECC Checking */
-#define  SCHIZO_ECCCTRL_UE	 0x4000000000000000 /* Enable UE Interrupts */
-#define  SCHIZO_ECCCTRL_CE	 0x2000000000000000 /* Enable CE INterrupts */
+#define  SCHIZO_ECCCTRL_EE	 0x8000000000000000UL /* Enable ECC Checking */
+#define  SCHIZO_ECCCTRL_UE	 0x4000000000000000UL /* Enable UE Interrupts */
+#define  SCHIZO_ECCCTRL_CE	 0x2000000000000000UL /* Enable CE INterrupts */
 
 #define SCHIZO_SAFARI_ERRCTRL	0x10008UL
 #define  SCHIZO_SAFERRCTRL_EN	 0x8000000000000000UL

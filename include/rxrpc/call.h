@@ -204,7 +204,7 @@ extern int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t si
 
 extern int rxrpc_call_write_data(struct rxrpc_call *call,
 				 size_t sioc,
-				 struct iovec siov[],
+				 struct kvec *siov,
 				 uint8_t rxhdr_flags,
 				 int alloc_flags,
 				 int dup_data,

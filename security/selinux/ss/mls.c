@@ -290,7 +290,7 @@ int mls_context_to_sid(char oldc,
 		if (rc)
 			goto out;
 	}
-	*scontext = p;
+	*scontext = ++p;
 	rc = 0;
 out:
 	return rc;
@@ -654,7 +654,7 @@ int cat_destroy(void *key, void *datum, void *p)
 
 int sens_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct level_datum *levdatum;
 	int rc;
 	u32 *buf, len;
@@ -707,7 +707,7 @@ bad:
 
 int cat_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct cat_datum *catdatum;
 	int rc;
 	u32 *buf, len;

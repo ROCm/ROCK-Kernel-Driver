@@ -11,6 +11,9 @@
 #define NETLINK_NFLOG 	5
 #endif
 
+#define ULOG_DEFAULT_NLGROUP	1
+#define ULOG_DEFAULT_QTHRESHOLD	1
+
 #define ULOG_MAC_LEN	80
 #define ULOG_PREFIX_LEN	32
 

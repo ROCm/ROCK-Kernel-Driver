@@ -21,7 +21,7 @@ typedef struct {
 
 
 struct pcc_regs {
-   volatile u_long 	dma_tadr;
+   volatile u_long	dma_tadr;
    volatile u_long	dma_dadr;
    volatile u_long	dma_bcr;
    volatile u_long	dma_hr;

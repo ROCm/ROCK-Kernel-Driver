@@ -299,6 +299,9 @@ static void dmfe_set_filter_mode(struct DEVICE *);
 static struct ethtool_ops netdev_ethtool_ops;
 static u16 read_srom_word(long ,int);
 static irqreturn_t dmfe_interrupt(int , void *, struct pt_regs *);
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void poll_dmfe (struct net_device *dev);
+#endif
 static void dmfe_descriptor_init(struct dmfe_board_info *, unsigned long);
 static void allocate_rx_buffer(struct dmfe_board_info *);
 static void update_cr6(u32, unsigned long);
@@ -417,6 +420,9 @@ static int __devinit dmfe_init_one (struct pci_dev *pdev,
 	dev->stop = &dmfe_stop;
 	dev->get_stats = &dmfe_get_stats;
 	dev->set_multicast_list = &dmfe_set_filter_mode;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &poll_dmfe;
+#endif
 	dev->ethtool_ops = &netdev_ethtool_ops;
 	spin_lock_init(&db->lock);
 
@@ -790,6 +796,23 @@ static irqreturn_t dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling 'interrupt' - used by things like netconsole to send skbs
+ * without having to re-enable interrupts. It's not called while
+ * the interrupt routine is executing.
+ */
+
+static void poll_dmfe (struct net_device *dev)
+{
+	/* disable_irq here is not very nice, but with the lockless
+	   interrupt handler we have no other choice. */
+	disable_irq(dev->irq);
+	dmfe_interrupt (dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 /*
  *	Free TX resource after TX complete
@@ -1948,7 +1971,6 @@ static struct pci_device_id dmfe_pci_tbl[] = {
 	{ 0x1282, 0x9102, PCI_ANY_ID, PCI_ANY_ID, 0, 0, PCI_DM9102_ID },
 	{ 0x1282, 0x9100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, PCI_DM9100_ID },
 	{ 0x1282, 0x9009, PCI_ANY_ID, PCI_ANY_ID, 0, 0, PCI_DM9009_ID },
-	{ 0x10B9, 0x5261, PCI_ANY_ID, PCI_ANY_ID, 0, 0, PCI_DM9102_ID },
 	{ 0, }
 };
 MODULE_DEVICE_TABLE(pci, dmfe_pci_tbl);

@@ -44,5 +44,9 @@ void disable_irq_wake(unsigned int irq);
 void enable_irq_wake(unsigned int irq);
 int setup_irq(unsigned int, struct irqaction *);
 
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif
 

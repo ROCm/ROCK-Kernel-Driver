@@ -1809,7 +1809,6 @@ int __init virgefb_init(void)
 
 	/* TODO: This driver cannot be unloaded yet */
 
-	MOD_INC_USE_COUNT;
 	DPRINTK("EXIT\n");
 	return 0;
 }
@@ -2063,14 +2062,6 @@ MODULE_LICENSE("GPL");
 int init_module(void)
 {
 	return virgefb_init();
-}
-
-void cleanup_module(void)
-{
-	/* Not reached because the usecount will never be
-	   decremented to zero */
-	unregister_framebuffer(&fb_info);
-	/* TODO: clean up ... */
 }
 #endif /* MODULE */
 

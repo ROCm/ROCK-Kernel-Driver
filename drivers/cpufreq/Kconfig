@@ -6,7 +6,7 @@ config CPU_FREQ_PROC_INTF
 	  CPUFreq. Please note that it is recommended to use the sysfs
 	  interface instead (which is built automatically). 
 	  
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 	  
 	  If in doubt, say N.
 
@@ -65,7 +65,7 @@ config CPU_FREQ_GOV_USERSPACE
           be able to set the CPU dynamically, like on LART 
 	  <http://www.lart.tudelft.nl/>
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say Y.
 
@@ -79,6 +79,6 @@ config CPU_FREQ_24_API
 	  the same functionality as long as "userspace" is the
 	  selected governor for the specified CPU.
 	
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.

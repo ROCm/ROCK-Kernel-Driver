@@ -233,16 +233,23 @@
 #define HUB6_SERIAL_PORT_DFNS
 #endif
 
-#ifdef CONFIG_MCA
-#define MCA_SERIAL_PORT_DFNS			\
-	{ 0, BASE_BAUD, 0x3220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x3228, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x4220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x4228, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x5220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x5228, 3, STD_COM_FLAGS },
+#ifdef CONFIG_MOMENCO_JAGUAR_ATX
+/* Ordinary NS16552 duart with a 20MHz crystal.  */
+#define JAGUAR_ATX_UART_CLK	20000000
+#define JAGUAR_ATX_BASE_BAUD	(JAGUAR_ATX_UART_CLK / 16)
+
+#define JAGUAR_ATX_SERIAL1_IRQ	6
+#define JAGUAR_ATX_SERIAL1_BASE	0xfd000023L
+
+#define _JAGUAR_ATX_SERIAL_INIT(int, base)				\
+	{ baud_base: JAGUAR_ATX_BASE_BAUD, irq: int,			\
+	  flags: (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST),		\
+	  iomem_base: (u8 *) base, iomem_reg_shift: 2,			\
+	  io_type: SERIAL_IO_MEM }
+#define MOMENCO_JAGUAR_ATX_SERIAL_PORT_DEFNS				\
+	_JAGUAR_ATX_SERIAL_INIT(JAGUAR_ATX_SERIAL1_IRQ, JAGUAR_ATX_SERIAL1_BASE)
 #else
-#define MCA_SERIAL_PORT_DFNS
+#define MOMENCO_JAGUAR_ATX_SERIAL_PORT_DEFNS
 #endif
 
 #ifdef CONFIG_MOMENCO_OCELOT
@@ -308,24 +315,6 @@
 #define MOMENCO_OCELOT_C_SERIAL_PORT_DEFNS
 #endif
 
-#ifdef CONFIG_TITAN_SERIAL
-/* 16552 20 MHz crystal */
-#define TITAN_SERIAL_BASE_BAUD	( 20000000 / 16 )
-#define	TITAN_SERIAL_IRQ	XXX
-#define	TITAN_SERIAL_BASE	0xffffffff
-
-#define	_TITAN_SERIAL_INIT(int, base)					\
-	{ baud_base: TITAN_SERIAL_BASE_BAUD, irq: int,			\
-	  flags: STD_COM_FLAGS,	iomem_base: (u8 *) base,		\
-	  iomem_reg_shift: 2, io_type: SERIAL_IO_MEM			\
-	}
-
-#define TITAN_SERIAL_PORT_DEFNS						\
-	_TITAN_SERIAL_INIT(TITAN_SERIAL_IRQ, TITAN_SERIAL_BASE)
-#else
-#define TITAN_SERIAL_PORT_DEFNS
-#endif
-
 #ifdef CONFIG_DDB5477
 #include <asm/ddb5xxx/ddb5477.h>
 #define DDB5477_SERIAL_PORT_DEFNS                                       \
@@ -364,7 +353,6 @@
 	MOMENCO_OCELOT_G_SERIAL_PORT_DEFNS		\
 	MOMENCO_OCELOT_C_SERIAL_PORT_DEFNS		\
 	MOMENCO_OCELOT_SERIAL_PORT_DEFNS		\
-	TITAN_SERIAL_PORT_DEFNS				\
 	TXX927_SERIAL_PORT_DEFNS                        \
 	AU1000_SERIAL_PORT_DEFNS
 

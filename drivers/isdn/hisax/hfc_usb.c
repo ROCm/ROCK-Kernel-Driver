@@ -133,7 +133,7 @@ static const char *hfcusb_revision = "4.0";
 /**********/
 /* macros */
 /**********/
-#define write_usb(a,b,c) usb_control_msg((a)->dev,(a)->ctrl_out_pipe,0,0x40,(c),(b),0,0,HFC_CTRL_TIMEOUT)
+#define write_usb(a,b,c) usb_control_msg((a)->dev,(a)->ctrl_out_pipe,0,0x40,(c),(b),NULL,0,HFC_CTRL_TIMEOUT)
 #define read_usb(a,b,c) usb_control_msg((a)->dev,(a)->ctrl_in_pipe,1,0xC0,0,(b),(c),1,HFC_CTRL_TIMEOUT)
 
 /*************************************************/
@@ -262,7 +262,7 @@ static void ctrl_start_transfer(hfcusb_data * hfc)
 		hfc->ctrl_urb->transfer_buffer_length = 0;
 		hfc->ctrl_write.wIndex = hfc->ctrl_buff[hfc->ctrl_out_idx].hfc_reg;
 		hfc->ctrl_write.wValue = hfc->ctrl_buff[hfc->ctrl_out_idx].reg_val;
-		err = usb_submit_urb(hfc->ctrl_urb, GFP_KERNEL);	/* start transfer */
+		err = usb_submit_urb(hfc->ctrl_urb, GFP_ATOMIC);	/* start transfer */
 		printk(KERN_DEBUG "ctrl_start_transfer: submit %d\n", err);
 	}
 }				/* ctrl_start_transfer */
@@ -353,7 +353,7 @@ vendor_data vdata[]=
 	{0x8e3, 0x0301, "Olitec USB RNIS",              LED_SCHEME1,  LED_NORMAL,   {2,0,1,4}},           /* Olitec TA  */
 	{0x675, 0x1688, "DrayTec USB ISDN TA",          LED_SCHEME1,  LED_NORMAL,   {4,0,2,1}},           /* Draytec TA */
 	{0x7fa, 0x0846, "Bewan Modem RNIS USB",         LED_SCHEME1,  LED_INVERTED, {8,0x40,0x20,0x10}},  /* Bewan TA   */
-	{0,0,0}			   // EOL element
+	{0}			   // EOL element
 };
 										
 /***************************************************/
@@ -754,7 +754,7 @@ static void tx_iso_complete(struct urb *urb, struct pt_regs *regs)
 			}
         }
 
-		errcode = usb_submit_urb(urb, GFP_KERNEL);
+		errcode = usb_submit_urb(urb, GFP_ATOMIC);
 		if(errcode < 0)
 		{
 			printk(KERN_INFO "HFC-USB: error submitting ISO URB: %i \n",  errcode);
@@ -821,7 +821,7 @@ static void rx_iso_complete(struct urb *urb, struct pt_regs *regs)
 		fill_isoc_urb(urb, fifo->hfc->dev, fifo->pipe,context_iso_urb->buffer, num_isoc_packets,
 			fifo->usb_packet_maxlen, fifo->intervall, rx_iso_complete, urb->context);
 
-		errcode = usb_submit_urb(urb, GFP_KERNEL);
+		errcode = usb_submit_urb(urb, GFP_ATOMIC);
 		if(errcode < 0)
 		{
 			printk(KERN_INFO "HFC-USB: error submitting ISO URB: %i \n",  errcode);
@@ -1345,7 +1345,7 @@ char *conf_str[]=
 /*************************************************/
 /* function called to probe a new plugged device */
 /*************************************************/
-static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
+static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev= interface_to_usbdev(intf);
 	hfcusb_data *context;

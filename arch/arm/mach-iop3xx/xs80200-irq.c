@@ -17,8 +17,6 @@
 #include <asm/irq.h>
 #include <asm/hardware.h>
 
-#include <asm/mach-types.h>
-
 static void xs80200_irq_mask (unsigned int irq)
 {
 	unsigned long intctl;

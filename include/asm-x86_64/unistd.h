@@ -532,14 +532,30 @@ __SYSCALL(__NR_tgkill, sys_tgkill)
 __SYSCALL(__NR_utimes, sys_utimes)
 #define __NR_vserver		236
 __SYSCALL(__NR_vserver, sys_ni_syscall)
-#define __NR_mbind 237
+#define __NR_vserver		236
+__SYSCALL(__NR_vserver, sys_ni_syscall)
+#define __NR_mbind 		237
 __SYSCALL(__NR_mbind, sys_mbind)
-#define __NR_set_mempolicy 238
+#define __NR_set_mempolicy 	238
 __SYSCALL(__NR_set_mempolicy, sys_set_mempolicy)
-#define __NR_get_mempolicy 239
+#define __NR_get_mempolicy 	239
 __SYSCALL(__NR_get_mempolicy, sys_get_mempolicy)
+#define __NR_mq_open 		240
+__SYSCALL(__NR_mq_open, sys_mq_open)
+#define __NR_mq_unlink 		241
+__SYSCALL(__NR_mq_unlink, sys_mq_unlink)
+#define __NR_mq_timedsend 	242
+__SYSCALL(__NR_mq_timedsend, sys_mq_timedsend)
+#define __NR_mq_timedreceive	243
+__SYSCALL(__NR_mq_timedreceive, sys_mq_timedreceive)
+#define __NR_mq_notify 		244
+__SYSCALL(__NR_mq_notify, sys_mq_notify)
+#define __NR_mq_getsetattr 	245
+__SYSCALL(__NR_mq_getsetattr, sys_mq_getsetattr)
+#define __NR_kexec_load 	246
+__SYSCALL(__NR_kexec_load, sys_ni_syscall)
 
-#define __NR_syscall_max __NR_get_mempolicy
+#define __NR_syscall_max __NR_kexec_load
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */
@@ -554,6 +570,29 @@ do { \
 	} \
 	return (type) (res); \
 } while (0)
+
+#ifdef __KERNEL__
+#define __ARCH_WANT_OLD_READDIR
+#define __ARCH_WANT_OLD_STAT
+#define __ARCH_WANT_SYS_ALARM
+#define __ARCH_WANT_SYS_GETHOSTNAME
+#define __ARCH_WANT_SYS_PAUSE
+#define __ARCH_WANT_SYS_SGETMASK
+#define __ARCH_WANT_SYS_SIGNAL
+#define __ARCH_WANT_SYS_TIME
+#define __ARCH_WANT_SYS_UTIME
+#define __ARCH_WANT_SYS_WAITPID
+#define __ARCH_WANT_SYS_SOCKETCALL
+#define __ARCH_WANT_SYS_FADVISE64
+#define __ARCH_WANT_SYS_GETPGRP
+#define __ARCH_WANT_SYS_LLSEEK
+#define __ARCH_WANT_SYS_NICE
+#define __ARCH_WANT_SYS_OLD_GETRLIMIT
+#define __ARCH_WANT_SYS_OLDUMOUNT
+#define __ARCH_WANT_SYS_SIGPENDING
+#define __ARCH_WANT_SYS_SIGPROCMASK
+#define __ARCH_WANT_SYS_RT_SIGACTION
+#endif
 
 #ifndef __KERNEL_SYSCALLS__
 
@@ -717,7 +756,7 @@ asmlinkage long sys_pipe(int *fildes);
 
 #endif /* __KERNEL_SYSCALLS__ */
 
-#ifndef __ASSEMBLY__
+#if !defined(__ASSEMBLY__) && defined(__KERNEL__)
 
 #include <linux/linkage.h>
 #include <linux/compiler.h>

@@ -336,14 +336,14 @@ static void awe_modwheel_change(int voice, int value);
 /* sequencer interface */
 static int awe_open(int dev, int mode);
 static void awe_close(int dev);
-static int awe_ioctl(int dev, unsigned int cmd, caddr_t arg);
+static int awe_ioctl(int dev, unsigned int cmd, void __user * arg);
 static int awe_kill_note(int dev, int voice, int note, int velocity);
 static int awe_start_note(int dev, int v, int note_num, int volume);
 static int awe_set_instr(int dev, int voice, int instr_no);
 static int awe_set_instr_2(int dev, int voice, int instr_no);
 static void awe_reset(int dev);
 static void awe_hw_control(int dev, unsigned char *event);
-static int awe_load_patch(int dev, int format, const char *addr,
+static int awe_load_patch(int dev, int format, const char __user *addr,
 			  int offs, int count, int pmgr_flag);
 static void awe_aftertouch(int dev, int voice, int pressure);
 static void awe_controller(int dev, int voice, int ctrl_num, int value);
@@ -374,21 +374,21 @@ static void awe_alloc_one_voice(int voice, int note, int velocity);
 static int awe_clear_voice(void);
 
 /* load / remove patches */
-static int awe_open_patch(awe_patch_info *patch, const char *addr, int count);
-static int awe_close_patch(awe_patch_info *patch, const char *addr, int count);
-static int awe_unload_patch(awe_patch_info *patch, const char *addr, int count);
-static int awe_load_info(awe_patch_info *patch, const char *addr, int count);
-static int awe_remove_info(awe_patch_info *patch, const char *addr, int count);
-static int awe_load_data(awe_patch_info *patch, const char *addr, int count);
-static int awe_replace_data(awe_patch_info *patch, const char *addr, int count);
-static int awe_load_map(awe_patch_info *patch, const char *addr, int count);
+static int awe_open_patch(awe_patch_info *patch, const char __user *addr, int count);
+static int awe_close_patch(awe_patch_info *patch, const char __user *addr, int count);
+static int awe_unload_patch(awe_patch_info *patch, const char __user *addr, int count);
+static int awe_load_info(awe_patch_info *patch, const char __user *addr, int count);
+static int awe_remove_info(awe_patch_info *patch, const char __user *addr, int count);
+static int awe_load_data(awe_patch_info *patch, const char __user *addr, int count);
+static int awe_replace_data(awe_patch_info *patch, const char __user *addr, int count);
+static int awe_load_map(awe_patch_info *patch, const char __user *addr, int count);
 #ifdef AWE_HAS_GUS_COMPATIBILITY
-static int awe_load_guspatch(const char *addr, int offs, int size, int pmgr_flag);
+static int awe_load_guspatch(const char __user *addr, int offs, int size, int pmgr_flag);
 #endif
-/*static int awe_probe_info(awe_patch_info *patch, const char *addr, int count);*/
-static int awe_probe_data(awe_patch_info *patch, const char *addr, int count);
+/*static int awe_probe_info(awe_patch_info *patch, const char __user *addr, int count);*/
+static int awe_probe_data(awe_patch_info *patch, const char __user *addr, int count);
 static sf_list *check_patch_opened(int type, char *name);
-static int awe_write_wave_data(const char *addr, int offset, awe_sample_list *sp, int channels);
+static int awe_write_wave_data(const char __user *addr, int offset, awe_sample_list *sp, int channels);
 static int awe_create_sf(int type, char *name);
 static void awe_free_sf(sf_list *sf);
 static void add_sf_info(sf_list *sf, awe_voice_list *rec);
@@ -422,10 +422,10 @@ static void awe_close_dram(void);
 static int awe_detect_base(int addr);
 static int awe_detect(void);
 static void awe_check_dram(void);
-static int awe_load_chorus_fx(awe_patch_info *patch, const char *addr, int count);
+static int awe_load_chorus_fx(awe_patch_info *patch, const char __user *addr, int count);
 static void awe_set_chorus_mode(int mode);
 static void awe_update_chorus_mode(void);
-static int awe_load_reverb_fx(awe_patch_info *patch, const char *addr, int count);
+static int awe_load_reverb_fx(awe_patch_info *patch, const char __user *addr, int count);
 static void awe_set_reverb_mode(int mode);
 static void awe_update_reverb_mode(void);
 static void awe_equalizer(int bass, int treble);
@@ -1865,7 +1865,7 @@ awe_init_ctrl_parms(int init_all)
 /* sequencer I/O control:
  */
 static int
-awe_ioctl(int dev, unsigned int cmd, caddr_t arg)
+awe_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	switch (cmd) {
 	case SNDCTL_SYNTH_INFO:
@@ -1873,7 +1873,7 @@ awe_ioctl(int dev, unsigned int cmd, caddr_t arg)
 			awe_info.nr_voices = awe_max_voices;
 		else
 			awe_info.nr_voices = AWE_MAX_CHANNELS;
-		if (copy_to_user((char*)arg, &awe_info, sizeof(awe_info)))
+		if (copy_to_user(arg, &awe_info, sizeof(awe_info)))
 			return -EFAULT;
 		return 0;
 		break;
@@ -2656,7 +2656,7 @@ awe_bender(int dev, int voice, int value)
  */
 
 static int
-awe_load_patch(int dev, int format, const char *addr,
+awe_load_patch(int dev, int format, const char __user *addr,
 	       int offs, int count, int pmgr_flag)
 {
 	awe_patch_info patch;
@@ -2865,7 +2865,7 @@ awe_free_sf(sf_list *sf)
 
 /* open patch; create sf list and set opened flag */
 static int
-awe_open_patch(awe_patch_info *patch, const char *addr, int count)
+awe_open_patch(awe_patch_info *patch, const char __user *addr, int count)
 {
 	awe_open_parm parm;
 	int shared;
@@ -2913,7 +2913,7 @@ check_patch_opened(int type, char *name)
 
 /* close the patch; if no voice is loaded, remove the patch */
 static int
-awe_close_patch(awe_patch_info *patch, const char *addr, int count)
+awe_close_patch(awe_patch_info *patch, const char __user *addr, int count)
 {
 	if (patch_opened && sftail) {
 		/* if no voice is loaded, release the current patch */
@@ -2929,7 +2929,7 @@ awe_close_patch(awe_patch_info *patch, const char *addr, int count)
 
 /* remove the latest patch */
 static int
-awe_unload_patch(awe_patch_info *patch, const char *addr, int count)
+awe_unload_patch(awe_patch_info *patch, const char __user *addr, int count)
 {
 	if (current_sf_id > 0 && current_sf_id > locked_sf_id) {
 		awe_reset(0);
@@ -2968,7 +2968,7 @@ alloc_new_sample(void)
 
 /* load voice map */
 static int
-awe_load_map(awe_patch_info *patch, const char *addr, int count)
+awe_load_map(awe_patch_info *patch, const char __user *addr, int count)
 {
 	awe_voice_map map;
 	awe_voice_list *rec, *p;
@@ -3019,7 +3019,7 @@ awe_load_map(awe_patch_info *patch, const char *addr, int count)
 #if 0
 /* probe preset in the current list -- nothing to be loaded */
 static int
-awe_probe_info(awe_patch_info *patch, const char *addr, int count)
+awe_probe_info(awe_patch_info *patch, const char __user *addr, int count)
 {
 #ifdef AWE_ALLOW_SAMPLE_SHARING
 	awe_voice_map map;
@@ -3054,7 +3054,7 @@ awe_probe_info(awe_patch_info *patch, const char *addr, int count)
 
 /* probe sample in the current list -- nothing to be loaded */
 static int
-awe_probe_data(awe_patch_info *patch, const char *addr, int count)
+awe_probe_data(awe_patch_info *patch, const char __user *addr, int count)
 {
 #ifdef AWE_ALLOW_SAMPLE_SHARING
 	if (! patch_opened)
@@ -3100,7 +3100,7 @@ remove_info(sf_list *sf, int bank, int instr)
 
 /* load voice information data */
 static int
-awe_load_info(awe_patch_info *patch, const char *addr, int count)
+awe_load_info(awe_patch_info *patch, const char __user *addr, int count)
 {
 	int offset;
 	awe_voice_rec_hdr hdr;
@@ -3188,7 +3188,7 @@ awe_load_info(awe_patch_info *patch, const char *addr, int count)
 
 /* remove instrument layers */
 static int
-awe_remove_info(awe_patch_info *patch, const char *addr, int count)
+awe_remove_info(awe_patch_info *patch, const char __user *addr, int count)
 {
 	unsigned char bank, instr;
 	sf_list *sf;
@@ -3208,7 +3208,7 @@ awe_remove_info(awe_patch_info *patch, const char *addr, int count)
 
 /* load wave sample data */
 static int
-awe_load_data(awe_patch_info *patch, const char *addr, int count)
+awe_load_data(awe_patch_info *patch, const char __user *addr, int count)
 {
 	int offset, size;
 	int rc;
@@ -3260,7 +3260,7 @@ awe_load_data(awe_patch_info *patch, const char *addr, int count)
 
 /* replace wave sample data */
 static int
-awe_replace_data(awe_patch_info *patch, const char *addr, int count)
+awe_replace_data(awe_patch_info *patch, const char __user *addr, int count)
 {
 	int offset;
 	int size;
@@ -3322,13 +3322,13 @@ awe_replace_data(awe_patch_info *patch, const char *addr, int count)
 
 /*----------------------------------------------------------------*/
 
-static const char *readbuf_addr;
+static const char __user *readbuf_addr;
 static int readbuf_offs;
 static int readbuf_flags;
 
 /* initialize read buffer */
 static int
-readbuf_init(const char *addr, int offset, awe_sample_info *sp)
+readbuf_init(const char __user *addr, int offset, awe_sample_info *sp)
 {
 	readbuf_addr = addr;
 	readbuf_offs = offset;
@@ -3344,10 +3344,10 @@ readbuf_word(int pos)
 	/* read from user buffer */
 	if (readbuf_flags & AWE_SAMPLE_8BITS) {
 		unsigned char cc;
-		get_user(cc, (unsigned char*)(readbuf_addr + readbuf_offs + pos));
+		get_user(cc, (unsigned char __user *)(readbuf_addr + readbuf_offs + pos));
 		c = (unsigned short)cc << 8; /* convert 8bit -> 16bit */
 	} else {
-		get_user(c, (unsigned short*)(readbuf_addr + readbuf_offs + pos * 2));
+		get_user(c, (unsigned short __user *)(readbuf_addr + readbuf_offs + pos * 2));
 	}
 	if (readbuf_flags & AWE_SAMPLE_UNSIGNED)
 		c ^= 0x8000; /* unsigned -> signed */
@@ -3365,7 +3365,7 @@ readbuf_word(int pos)
 
 /* loading onto memory - return the actual written size */
 static int 
-awe_write_wave_data(const char *addr, int offset, awe_sample_list *list, int channels)
+awe_write_wave_data(const char __user *addr, int offset, awe_sample_list *list, int channels)
 {
 	int i, truesize, dram_offset;
 	awe_sample_info *sp = &list->v;
@@ -3481,7 +3481,7 @@ calc_gus_envelope_time(int rate, int start, int end)
 
 /* load GUS patch */
 static int
-awe_load_guspatch(const char *addr, int offs, int size, int pmgr_flag)
+awe_load_guspatch(const char __user *addr, int offs, int size, int pmgr_flag)
 {
 	struct patch_info patch;
 	awe_voice_info *rec;
@@ -4112,7 +4112,7 @@ awe_setup_voice(int dev, int voice, int chn)
  * AWE32 mixer device control
  */
 
-static int awe_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg);
+static int awe_mixer_ioctl(int dev, unsigned int cmd, void __user *arg);
 
 static int my_mixerdev = -1;
 
@@ -4137,14 +4137,14 @@ static void __exit unload_mixer(void)
 }
 
 static int
-awe_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
+awe_mixer_ioctl(int dev, unsigned int cmd, void __user * arg)
 {
 	int i, level, value;
 
 	if (((cmd >> 8) & 0xff) != 'M')
 		return -EINVAL;
 
-	if (get_user(level, (int *)arg))
+	if (get_user(level, (int __user *)arg))
 		return -EFAULT;
 	level = ((level & 0xff) + (level >> 8)) / 2;
 	DEBUG(0,printk("AWEMix: cmd=%x val=%d\n", cmd & 0xff, level));
@@ -4201,7 +4201,7 @@ awe_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		level = 0;
 		break;
 	}
-	if (put_user(level, (int *)arg))
+	if (put_user(level, (int __user *)arg))
 		return -EFAULT;
 	return level;
 }
@@ -4662,7 +4662,7 @@ static awe_chorus_fx_rec chorus_parm[AWE_CHORUS_NUMBERS] = {
 };
 
 static int
-awe_load_chorus_fx(awe_patch_info *patch, const char *addr, int count)
+awe_load_chorus_fx(awe_patch_info *patch, const char __user *addr, int count)
 {
 	if (patch->optarg < AWE_CHORUS_PREDEFINED || patch->optarg >= AWE_CHORUS_NUMBERS) {
 		printk(KERN_WARNING "AWE32 Error: invalid chorus mode %d for uploading\n", patch->optarg);
@@ -4770,7 +4770,7 @@ static struct ReverbCmdPair {
 };
 
 static int
-awe_load_reverb_fx(awe_patch_info *patch, const char *addr, int count)
+awe_load_reverb_fx(awe_patch_info *patch, const char __user *addr, int count)
 {
 	if (patch->optarg < AWE_REVERB_PREDEFINED || patch->optarg >= AWE_REVERB_NUMBERS) {
 		printk(KERN_WARNING "AWE32 Error: invalid reverb mode %d for uploading\n", patch->optarg);
@@ -4915,7 +4915,7 @@ typedef struct {
 
 static int awe_midi_open(int dev, int mode, void (*input)(int,unsigned char), void (*output)(int));
 static void awe_midi_close(int dev);
-static int awe_midi_ioctl(int dev, unsigned cmd, caddr_t arg);
+static int awe_midi_ioctl(int dev, unsigned cmd, void __user * arg);
 static int awe_midi_outputc(int dev, unsigned char midi_byte);
 
 static void init_midi_status(MidiStatus *st);
@@ -5055,7 +5055,7 @@ awe_midi_close (int dev)
 
 
 static int
-awe_midi_ioctl (int dev, unsigned cmd, caddr_t arg)
+awe_midi_ioctl (int dev, unsigned cmd, void __user *arg)
 {
 	return -EPERM;
 }

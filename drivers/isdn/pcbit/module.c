@@ -25,11 +25,11 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
 
-static int mem[MAX_PCBIT_CARDS] = {0, };
-static int irq[MAX_PCBIT_CARDS] = {0, };
+static int mem[MAX_PCBIT_CARDS];
+static int irq[MAX_PCBIT_CARDS];
 
 static int num_boards;
-struct pcbit_dev * dev_pcbit[MAX_PCBIT_CARDS] = {0, };
+struct pcbit_dev * dev_pcbit[MAX_PCBIT_CARDS];
 
 extern void pcbit_terminate(int board);
 extern int pcbit_init_dev(int board, int mem_base, int irq);

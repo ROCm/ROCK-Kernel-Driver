@@ -82,8 +82,6 @@
  *		  with BSD names.
  */
 
-#undef unix	/* KBUILD_MODNAME */
-
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -676,7 +674,6 @@ static struct sock *unix_find_other(struct sockaddr_un *sunname, int len,
 	int err = 0;
 	
 	if (sunname->sun_path[0]) {
-		intent_init(&nd.intent, IT_LOOKUP);
 		err = path_lookup(sunname->sun_path, LOOKUP_FOLLOW, &nd);
 		if (err)
 			goto fail;
@@ -1832,7 +1829,7 @@ static int unix_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	{
 		case SIOCOUTQ:
 			amount = atomic_read(&sk->sk_wmem_alloc);
-			err = put_user(amount, (int *)arg);
+			err = put_user(amount, (int __user *)arg);
 			break;
 		case SIOCINQ:
 		{
@@ -1847,12 +1844,12 @@ static int unix_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			if (skb)
 				amount=skb->len;
 			spin_unlock(&sk->sk_receive_queue.lock);
-			err = put_user(amount, (int *)arg);
+			err = put_user(amount, (int __user *)arg);
 			break;
 		}
 
 		default:
-			err = dev_ioctl(cmd, (void *)arg);
+			err = dev_ioctl(cmd, (void __user *)arg);
 			break;
 	}
 	return err;
@@ -2037,7 +2034,7 @@ static int __init af_unix_init(void)
         /* allocate our sock slab cache */
         unix_sk_cachep = kmem_cache_create("unix_sock",
 					   sizeof(struct unix_sock), 0,
-					   SLAB_HWCACHE_ALIGN, 0, 0);
+					   SLAB_HWCACHE_ALIGN, NULL, NULL);
         if (!unix_sk_cachep)
                 printk(KERN_CRIT
                         "af_unix_init: Cannot create unix_sock SLAB cache!\n");

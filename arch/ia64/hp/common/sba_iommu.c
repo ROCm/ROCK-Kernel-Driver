@@ -469,10 +469,6 @@ sba_search_bitmap(struct ioc *ioc, unsigned long bits_wanted)
 	ASSERT(((unsigned long) ioc->res_hint & (sizeof(unsigned long) - 1UL)) == 0);
 	ASSERT(res_ptr < res_end);
 
-	/* Do power of 2 allocations to avoid AR2305 */
-	if (ioc->func_id != ZX1_IOC_ID)
-		bits_wanted = 1 << get_order(bits_wanted << PAGE_SHIFT);
-
 	if (likely(bits_wanted == 1)) {
 		unsigned int bitshiftcnt;
 		for(; res_ptr < res_end ; res_ptr++) {
@@ -678,10 +674,6 @@ sba_free_range(struct ioc *ioc, dma_addr_t iova, size_t size)
 	unsigned long *res_ptr = (unsigned long *) &((ioc)->res_map[ridx & ~RESMAP_IDX_MASK]);
 	int bits_not_wanted = size >> iovp_shift;
 	unsigned long m;
-
-	/* Do power of 2 allocations to avoid AR2305 */
-	if (ioc->func_id != ZX1_IOC_ID)
-		bits_not_wanted = 1 << get_order(bits_not_wanted << PAGE_SHIFT);
 
 	for (; bits_not_wanted > 0 ; res_ptr++) {
 		

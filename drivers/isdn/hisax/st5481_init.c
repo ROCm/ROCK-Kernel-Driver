@@ -58,8 +58,8 @@ static LIST_HEAD(adapter_list);
  * This function will be called when the adapter is plugged
  * into the USB bus.
  */
-static int __devinit probe_st5481(struct usb_interface *intf,
-				     const struct usb_device_id *id)
+static int probe_st5481(struct usb_interface *intf,
+			const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct st5481_adapter *adapter;

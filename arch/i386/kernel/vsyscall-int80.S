@@ -1,6 +1,3 @@
-#include <linux/config.h>
-#include <asm/unistd.h>
-#include <asm/vsyscall-gtod.h>
 /*
  * Code for the vsyscall page.  This version uses the old int $0x80 method.
  *
@@ -15,30 +12,8 @@
 	.type __kernel_vsyscall,@function
 __kernel_vsyscall:
 .LSTART_vsyscall:
-#ifdef CONFIG_VSYSCALL_GTOD
-	cmp $__NR_gettimeofday, %eax
-	je .Lvgettimeofday
-.Lvgettimeofday_disabled:
-#endif /* CONFIG_VSYSCALL_GTOD */
 	int $0x80
 	ret
-
-#ifdef CONFIG_VSYSCALL_GTOD
-/* vsyscall-gettimeofday code */
-.Lvgettimeofday:
-	pushl %edx
-	pushl %ecx
-	pushl %ebx
-	call VSYSCALL_GTOD_START
-	popl %ebx
-	popl %ecx
-	popl %edx
-	/* don't take the slow path if vgettimeofday is disabled */
-	cmpl $__NR_gettimeofday, %eax
-	je .Lvgettimeofday_disabled
-	ret
-#endif /* CONFIG_VSYSCALL_GTOD */
-
 .LEND_vsyscall:
 	.size __kernel_vsyscall,.-.LSTART_vsyscall
 	.previous

@@ -329,7 +329,7 @@ static void __init init_tags( void )
     for( target = 0; target < 8; ++target ) {
 	for( lun = 0; lun < 8; ++lun ) {
 	    ta = &TagAlloc[target][lun];
-	    CLEAR_BITMAP( ta->allocated, MAX_TAGS );
+	    bitmap_zero(ta->allocated, MAX_TAGS);
 	    ta->nr_allocated = 0;
 	    /* At the beginning, assume the maximum queue size we could
 	     * support (MAX_TAGS). This value will be decreased if the target
@@ -438,7 +438,7 @@ static void free_all_tags( void )
     for( target = 0; target < 8; ++target ) {
 	for( lun = 0; lun < 8; ++lun ) {
 	    ta = &TagAlloc[target][lun];
-	    CLEAR_BITMAP( ta->allocated, MAX_TAGS );
+	    bitmap_zero(ta->allocated, MAX_TAGS);
 	    ta->nr_allocated = 0;
 	}
     }

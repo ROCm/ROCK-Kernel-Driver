@@ -198,4 +198,5 @@ MACHINE_START(GRAPHICSCLIENT, "ADS GraphicsClient")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	MAPIO(graphicsclient_map_io)
 	INITIRQ(graphicsclient_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END

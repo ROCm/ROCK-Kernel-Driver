@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.32.2.1 $"
+#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.33 $"
 
 #include "zfcp_ext.h"
 

@@ -38,6 +38,8 @@ static char *symtab_name[SYM_NUM] = {
 };
 #endif
 
+int policydb_loaded_version;
+
 static unsigned int symtab_sizes[SYM_NUM] = {
 	2,
 	32,
@@ -71,6 +73,11 @@ static struct policydb_compat_info policydb_compat[] = {
 		.sym_num        = SYM_NUM,
 		.ocon_num       = OCON_NUM,
 	},
+	{
+		.version        = POLICYDB_VERSION_NLCLASS,
+		.sym_num        = SYM_NUM,
+		.ocon_num       = OCON_NUM,
+	},
 };
 
 static struct policydb_compat_info *policydb_lookup_compat(int version)
@@ -92,7 +99,7 @@ static struct policydb_compat_info *policydb_lookup_compat(int version)
  */
 int roles_init(struct policydb *p)
 {
-	char *key = 0;
+	char *key = NULL;
 	int rc;
 	struct role_datum *role;
 
@@ -395,7 +402,7 @@ static int common_destroy(void *key, void *datum, void *p)
 
 	kfree(key);
 	comdatum = datum;
-	hashtab_map(comdatum->permissions.table, perm_destroy, 0);
+	hashtab_map(comdatum->permissions.table, perm_destroy, NULL);
 	hashtab_destroy(comdatum->permissions.table);
 	kfree(datum);
 	return 0;
@@ -409,7 +416,7 @@ static int class_destroy(void *key, void *datum, void *p)
 
 	kfree(key);
 	cladatum = datum;
-	hashtab_map(cladatum->permissions.table, perm_destroy, 0);
+	hashtab_map(cladatum->permissions.table, perm_destroy, NULL);
 	hashtab_destroy(cladatum->permissions.table);
 	constraint = cladatum->constraints;
 	while (constraint) {
@@ -491,7 +498,7 @@ void policydb_destroy(struct policydb *p)
 	int i;
 
 	for (i = 0; i < SYM_NUM; i++) {
-		hashtab_map(p->symtab[i].table, destroy_f[i], 0);
+		hashtab_map(p->symtab[i].table, destroy_f[i], NULL);
 		hashtab_destroy(p->symtab[i].table);
 	}
 
@@ -662,7 +669,7 @@ out:
 
 static int perm_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct perm_datum *perdatum;
 	int rc;
 	u32 *buf, len;
@@ -711,7 +718,7 @@ bad:
 
 static int common_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct common_datum *comdatum;
 	u32 *buf, len, nel;
 	int i, rc;
@@ -769,7 +776,7 @@ bad:
 
 static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct class_datum *cladatum;
 	struct constraint_node *c, *lc;
 	struct constraint_expr *e, *le;
@@ -936,7 +943,7 @@ bad:
 
 static int role_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct role_datum *role;
 	int rc;
 	u32 *buf, len;
@@ -1001,7 +1008,7 @@ bad:
 
 static int type_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct type_datum *typdatum;
 	int rc;
 	u32 *buf, len;
@@ -1048,7 +1055,7 @@ bad:
 
 static int user_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct user_datum *usrdatum;
 	int rc;
 	u32 *buf, len;
@@ -1125,7 +1132,7 @@ int policydb_read(struct policydb *p, void *fp)
 	struct role_trans *tr, *ltr;
 	struct ocontext *l, *c, *newc;
 	struct genfs *genfs_p, *genfs, *newgenfs;
-	int i, j, rc, r_policyvers;
+	int i, j, rc, r_policyvers = 0;
 	u32 *buf, len, len2, config, nprim, nel, nel2;
 	char *policydb_str;
 	struct policydb_compat_info *info;
@@ -1156,7 +1163,7 @@ int policydb_read(struct policydb *p, void *fp)
 	len = buf[1];
 	if (len != strlen(POLICYDB_STRING)) {
 		printk(KERN_ERR "security:  policydb string length %d does not "
-		       "match expected length %Zd\n",
+		       "match expected length %Zu\n",
 		       len, strlen(POLICYDB_STRING));
 		goto bad;
 	}
@@ -1546,6 +1553,7 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto bad;
 out:
+	policydb_loaded_version = r_policyvers;
 	return rc;
 bad_newc:
 	ocontext_destroy(newc,OCON_FSUSE);

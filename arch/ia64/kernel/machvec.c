@@ -1,6 +1,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
+#include <asm/machvec.h>
 #include <asm/system.h>
 
 #ifdef CONFIG_IA64_GENERIC
@@ -8,7 +9,6 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 
-#include <asm/machvec.h>
 #include <asm/page.h>
 
 struct ia64_machine_vector ia64_mv;
@@ -42,12 +42,6 @@ machvec_init (const char *name)
 }
 
 #endif /* CONFIG_IA64_GENERIC */
-
-void
-machvec_noop (void)
-{
-}
-EXPORT_SYMBOL(machvec_noop);
 
 void
 machvec_setup (char **arg)

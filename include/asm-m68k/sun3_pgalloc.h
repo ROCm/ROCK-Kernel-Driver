@@ -1,5 +1,5 @@
 /* sun3_pgalloc.h --
- * reorganization around 2.3.39, routines moved from sun3_pgtable.h 
+ * reorganization around 2.3.39, routines moved from sun3_pgtable.h
  *
  *
  * 02/27/2002 -- Modified to support "highpte" implementation in 2.5.5 (Sam)
@@ -31,31 +31,28 @@ static inline void pte_free(struct page *page)
         __free_page(page);
 }
 
-static inline void __pte_free_tlb(struct mmu_gather *tlb, struct page *page)
-{
-	tlb_remove_page(tlb, page);
-}
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
-static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, 
+static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 					  unsigned long address)
 {
 	unsigned long page = __get_free_page(GFP_KERNEL|__GFP_REPEAT);
 
 	if (!page)
 		return NULL;
-		
+
 	memset((void *)page, 0, PAGE_SIZE);
 	return (pte_t *) (page);
 }
 
-static inline struct page *pte_alloc_one(struct mm_struct *mm, 
+static inline struct page *pte_alloc_one(struct mm_struct *mm,
 					 unsigned long address)
 {
         struct page *page = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
 
 	if (page == NULL)
 		return NULL;
-		
+
 	clear_highpage(page);
 	return page;
 

@@ -3,7 +3,7 @@ config BT_CMTP
 	depends on BT && BT_L2CAP && ISDN_CAPI
 	help
 	  CMTP (CAPI Message Transport Protocol) is a transport layer
-	  for CAPI messages. CMTP is required for the Bluetooth Common
+	  for CAPI messages.  CMTP is required for the Bluetooth Common
 	  ISDN Access Profile.
 
 	  Say Y here to compile CMTP support into the kernel or say M to

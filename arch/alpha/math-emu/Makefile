@@ -4,6 +4,6 @@
 
 EXTRA_CFLAGS := -w
 
-obj-$(CONFIG_MATHEMU) += math.o mod_qrnnd.o
+obj-$(CONFIG_MATHEMU) += math-emu.o
 
-mod_qrnnd-y += qrnnd.o
+math-emu-objs := math.o qrnnd.o

@@ -35,12 +35,6 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
-#ifdef CONFIG_X86_IO_APIC
-#include <asm/mpspec.h>
-#endif
-#ifdef CONFIG_IOSAPIC
-# include <asm/iosapic.h>
-#endif
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 
@@ -49,10 +43,6 @@
 ACPI_MODULE_NAME		("pci_irq")
 
 struct acpi_prt_list		acpi_prt;
-
-#ifdef CONFIG_X86
-extern void eisa_set_level_irq(unsigned int irq);
-#endif
 
 
 /* --------------------------------------------------------------------------
@@ -237,12 +227,18 @@ acpi_pci_irq_add_prt (
                           PCI Interrupt Routing Support
    -------------------------------------------------------------------------- */
 
-int
-acpi_pci_irq_lookup (struct pci_bus *bus, int device, int pin)
+static int
+acpi_pci_irq_lookup (
+	struct pci_bus		*bus,
+	int			device,
+	int			pin,
+	int			*edge_level,
+	int			*active_high_low)
 {
 	struct acpi_prt_entry	*entry = NULL;
 	int segment = pci_domain_nr(bus);
 	int bus_nr = bus->number;
+	int irq;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_lookup");
 
@@ -255,28 +251,30 @@ acpi_pci_irq_lookup (struct pci_bus *bus, int device, int pin)
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "PRT entry not found\n"));
 		return_VALUE(0);
 	}
-
-	if (!entry->irq && entry->link.handle) {
-		entry->irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index, NULL, NULL);
-		if (!entry->irq) {
+	
+	if (entry->link.handle) {
+		irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index, edge_level, active_high_low);
+		if (!irq) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid IRQ link routing entry\n"));
 			return_VALUE(0);
 		}
-	}
-	else if (!entry->irq) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Invalid static routing entry (IRQ 0)\n"));
-		return_VALUE(0);
+	} else {
+		irq = entry->link.index;
+		*edge_level = ACPI_LEVEL_SENSITIVE;
+		*active_high_low = ACPI_ACTIVE_LOW;
 	}
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found IRQ %d\n", entry->irq));
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found IRQ %d\n", irq));
 
-	return_VALUE(entry->irq);
+	return_VALUE(irq);
 }
 
 static int
 acpi_pci_irq_derive (
 	struct pci_dev		*dev,
-	int			pin)
+	int			pin,
+	int			*edge_level,
+	int			*active_high_low)
 {
 	struct pci_dev		*bridge = dev;
 	int			irq = 0;
@@ -308,8 +306,8 @@ acpi_pci_irq_derive (
 			pin = bridge_pin;
 		}
 
-		irq = acpi_pci_irq_lookup(bridge->bus,
-				PCI_SLOT(bridge->devfn), pin);
+		irq = acpi_pci_irq_lookup(bridge->bus, PCI_SLOT(bridge->devfn),
+			pin, edge_level, active_high_low);
 	}
 
 	if (!irq) {
@@ -330,6 +328,8 @@ acpi_pci_irq_enable (
 {
 	int			irq = 0;
 	u8			pin = 0;
+	int			edge_level = ACPI_LEVEL_SENSITIVE;
+	int			active_high_low = ACPI_ACTIVE_LOW;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_enable");
 
@@ -352,21 +352,22 @@ acpi_pci_irq_enable (
 	 * First we check the PCI IRQ routing table (PRT) for an IRQ.  PRT
 	 * values override any BIOS-assigned IRQs set during boot.
 	 */
- 	irq = acpi_pci_irq_lookup(dev->bus, PCI_SLOT(dev->devfn), pin);
+ 	irq = acpi_pci_irq_lookup(dev->bus, PCI_SLOT(dev->devfn), pin, &edge_level, &active_high_low);
 
 	/*
 	 * If no PRT entry was found, we'll try to derive an IRQ from the
 	 * device's parent bridge.
 	 */
 	if (!irq)
- 		irq = acpi_pci_irq_derive(dev, pin);
+ 		irq = acpi_pci_irq_derive(dev, pin, &edge_level, &active_high_low);
  
 	/*
 	 * No IRQ known to the ACPI subsystem - maybe the BIOS / 
 	 * driver reported one, then use it. Exit in any case.
 	 */
 	if (!irq) {
-		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s", ('A' + pin), pci_name(dev));
+		printk(KERN_WARNING PREFIX "PCI interrupt %s[%c]: no GSI",
+			pci_name(dev), ('A' + pin));
 		/* Interrupt Line values above 0xF are forbidden */
 		if (dev->irq && (dev->irq <= 0xF)) {
 			printk(" - using IRQ %d\n", dev->irq);
@@ -378,62 +379,14 @@ acpi_pci_irq_enable (
 		}
  	}
 
-	dev->irq = irq;
+	dev->irq = acpi_register_gsi(irq, edge_level, active_high_low);
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s using IRQ %d\n", pci_name(dev), dev->irq));
-
-	/* 
-	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
-	 */
-#ifdef CONFIG_X86
-	{
-		static u16 irq_mask;
-		if ((dev->irq < 16) &&  !((1 << dev->irq) & irq_mask)) {
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Setting IRQ %d as level-triggered\n", dev->irq));
-			irq_mask |= (1 << dev->irq);
-			eisa_set_level_irq(dev->irq);
-		}
-	}
-#endif
-#ifdef CONFIG_IOSAPIC
-	if (acpi_irq_model == ACPI_IRQ_MODEL_IOSAPIC)
-		iosapic_enable_intr(dev->irq);
-#endif
+	printk(KERN_INFO PREFIX "PCI interrupt %s[%c] -> GSI %u "
+		"(%s, %s) -> IRQ %d\n",
+		pci_name(dev), 'A' + pin, irq,
+		(edge_level == ACPI_LEVEL_SENSITIVE) ? "level" : "edge",
+		(active_high_low == ACPI_ACTIVE_LOW) ? "low" : "high",
+		dev->irq);
 
 	return_VALUE(dev->irq);
-}
-
-
-int __init
-acpi_pci_irq_init (void)
-{
-	struct pci_dev          *dev = NULL;
-
-	ACPI_FUNCTION_TRACE("acpi_pci_irq_init");
-
-	if (!acpi_prt.count) {
-		printk(KERN_WARNING PREFIX "ACPI tables contain no PCI IRQ "
-			"routing entries\n");
-		return_VALUE(-ENODEV);
-	}
-
-	/* Make sure all link devices have a valid IRQ. */
-	if (acpi_pci_link_check()) {
-		return_VALUE(-ENODEV);
-	}
-
-#ifdef CONFIG_X86_IO_APIC
-	/* Program IOAPICs using data from PRT entries. */
-	if (acpi_irq_model == ACPI_IRQ_MODEL_IOAPIC)
-		mp_parse_prt();
-#endif
-#ifdef CONFIG_IOSAPIC
-	if (acpi_irq_model == ACPI_IRQ_MODEL_IOSAPIC)
-		iosapic_parse_prt();
-#endif
-
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
-		acpi_pci_irq_enable(dev);
-
-	return_VALUE(0);
 }

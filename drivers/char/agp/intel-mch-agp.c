@@ -167,7 +167,7 @@ static int intel_i830_create_gatt_table(void)
 	size = agp_bridge->current_size;
 	page_order = size->page_order;
 	num_entries = size->num_entries;
-	agp_bridge->gatt_table_real = 0;
+	agp_bridge->gatt_table_real = NULL;
 
 	pci_read_config_dword(intel_i830_private.i830_dev,I810_MMADDR,&temp);
 	temp &= 0xfff80000;
@@ -487,11 +487,13 @@ static int __devinit agp_intelmch_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
+	struct resource *r;
 	char *name = "(unknown)";
 	u8 cap_ptr = 0;
-	struct resource *r;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	if (!cap_ptr) 
+		return -ENODEV;
 
 	bridge = agp_alloc_bridge();
 	if (!bridge)

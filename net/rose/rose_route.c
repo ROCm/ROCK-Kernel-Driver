@@ -206,7 +206,6 @@ static void rose_remove_node(struct rose_node *rose_node)
 {
 	struct rose_node *s;
 
-	spin_lock_bh(&rose_node_list_lock);
 	if ((s = rose_node_list) == rose_node) {
 		rose_node_list = rose_node->next;
 		kfree(rose_node);
@@ -710,7 +709,7 @@ out:
 /*
  *	Handle the ioctls that control the routing functions.
  */
-int rose_rt_ioctl(unsigned int cmd, void *arg)
+int rose_rt_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct rose_route_struct rose_route;
 	struct net_device *dev;

@@ -214,6 +214,7 @@ void cache_register(struct cache_detail *cd)
 	cd->entries = 0;
 	atomic_set(&cd->readers, 0);
 	cd->last_close = 0;
+	cd->last_warn = -1;
 	list_add(&cd->others, &cache_list);
 	spin_unlock(&cache_list_lock);
 
@@ -574,7 +575,7 @@ struct cache_reader {
 };
 
 static ssize_t
-cache_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+cache_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct cache_reader *rp = filp->private_data;
 	struct cache_request *rq;
@@ -652,12 +653,13 @@ cache_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	return err ? err :  count;
 }
 
+static char write_buf[8192]; /* protected by queue_io_sem */
+
 static ssize_t
-cache_write(struct file *filp, const char *buf, size_t count,
+cache_write(struct file *filp, const char __user *buf, size_t count,
 	    loff_t *ppos)
 {
 	int err;
-	char *page;
 	struct cache_detail *cd = PDE(filp->f_dentry->d_inode)->data;
 
 	if (ppos != &filp->f_pos)
@@ -665,31 +667,22 @@ cache_write(struct file *filp, const char *buf, size_t count,
 
 	if (count == 0)
 		return 0;
-	if (count > PAGE_SIZE)
+	if (count >= sizeof(write_buf))
 		return -EINVAL;
 
 	down(&queue_io_sem);
 
-	page = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (page == NULL) {
+	if (copy_from_user(write_buf, buf, count)) {
 		up(&queue_io_sem);
-		return -ENOMEM;
-	}
-
-	if (copy_from_user(page, buf, count)) {
-		up(&queue_io_sem);
-		kfree(page);
 		return -EFAULT;
 	}
-	if (count < PAGE_SIZE)
-		page[count] = '\0';
+	write_buf[count] = '\0';
 	if (cd->cache_parse)
-		err = cd->cache_parse(cd, page, count);
+		err = cd->cache_parse(cd, write_buf, count);
 	else
 		err = -EINVAL;
 
 	up(&queue_io_sem);
-	kfree(page);
 	return err ? err : count;
 }
 
@@ -750,7 +743,7 @@ cache_ioctl(struct inode *ino, struct file *filp,
 		}
 	spin_unlock(&queue_lock);
 
-	return put_user(len, (int *)arg);
+	return put_user(len, (int __user *)arg);
 }
 
 static int
@@ -913,7 +906,14 @@ void qword_addhex(char **bpp, int *lp, char *buf, int blen)
 	*lp = len;
 }
 
-			
+void warn_no_listener(struct cache_detail *detail)
+{
+	if (detail->last_warn != detail->last_close) {
+		detail->last_warn = detail->last_close;
+		if (detail->warn_no_listener)
+			detail->warn_no_listener(detail);
+	}
+}
 
 /*
  * register an upcall request to user-space.
@@ -931,9 +931,10 @@ static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h)
 		return -EINVAL;
 
 	if (atomic_read(&detail->readers) == 0 &&
-	    detail->last_close < get_seconds() - 60)
-		/* nobody is listening */
-		return -EINVAL;
+	    detail->last_close < get_seconds() - 30) {
+			warn_no_listener(detail);
+			return -EINVAL;
+	}
 
 	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!buf)
@@ -1165,28 +1166,28 @@ static struct file_operations content_file_operations = {
 	.release	= content_release,
 };
 
-static ssize_t read_flush(struct file *file, char *buf,
+static ssize_t read_flush(struct file *file, char __user *buf,
 			    size_t count, loff_t *ppos)
 {
 	struct cache_detail *cd = PDE(file->f_dentry->d_inode)->data;
 	char tbuf[20];
-	loff_t p = *ppos;
+	unsigned long p = *ppos;
 	int len;
 
-	len = sprintf(tbuf, "%lu\n", cd->flush_time);
-	if (p < 0 || p >= len)
+	sprintf(tbuf, "%lu\n", cd->flush_time);
+	len = strlen(tbuf);
+	if (p >= len)
 		return 0;
-
 	len -= p;
 	if (len > count) len = count;
 	if (copy_to_user(buf, (void*)(tbuf+p), len))
 		len = -EFAULT;
 	else
-		*ppos = p + len;
+		*ppos += len;
 	return len;
 }
 
-static ssize_t write_flush(struct file * file, const char * buf,
+static ssize_t write_flush(struct file * file, const char __user * buf,
 			     size_t count, loff_t *ppos)
 {
 	struct cache_detail *cd = PDE(file->f_dentry->d_inode)->data;
@@ -1206,7 +1207,7 @@ static ssize_t write_flush(struct file * file, const char * buf,
 	cd->nextcheck = get_seconds();
 	cache_flush();
 
-	*ppos = count;
+	*ppos += count;
 	return count;
 }
 

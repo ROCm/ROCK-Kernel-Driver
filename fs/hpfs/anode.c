@@ -113,7 +113,7 @@ secno hpfs_add_sector_to_btree(struct super_block *s, secno node, int fnod, unsi
 			brelse(bh);
 			return -1;
 		}
-		se = node;
+		se = !fnod ? node : (node + 16384) & ~16383;
 	}	
 	if (!(se = hpfs_alloc_sector(s, se, 1, fsecno*ALLOC_M>ALLOC_FWD_MAX ? ALLOC_FWD_MAX : fsecno*ALLOC_M<ALLOC_FWD_MIN ? ALLOC_FWD_MIN : fsecno*ALLOC_M, 1))) {
 		brelse(bh);
@@ -192,7 +192,6 @@ secno hpfs_add_sector_to_btree(struct super_block *s, secno node, int fnod, unsi
 		}
 		up = up != node ? anode->up : -1;
 		btree->u.internal[btree->n_used_nodes - 1].file_secno = /*fs*/-1;
-		if (up == -1) anode->up = ra;
 		mark_buffer_dirty(bh);
 		brelse(bh);
 		a = na;

@@ -26,15 +26,11 @@
 #include <linux/proc_fs.h>
 #include <linux/shmem_fs.h>
 #include <linux/security.h>
-#include <linux/audit.h>
-#include <linux/trigevent_hooks.h>
 #include <asm/uaccess.h>
 
 #include "util.h"
 
 #define shm_flags	shm_perm.mode
-
-int shm_use_hugepages;
 
 static struct file_operations shm_file_operations;
 static struct vm_operations_struct shm_vm_ops;
@@ -64,7 +60,7 @@ void __init shm_init (void)
 {
 	ipc_init_ids(&shm_ids, 1);
 #ifdef CONFIG_PROC_FS
-	create_proc_read_entry("sysvipc/shm", 0, 0, sysvipc_shm_read_proc, NULL);
+	create_proc_read_entry("sysvipc/shm", 0, NULL, sysvipc_shm_read_proc, NULL);
 #endif
 }
 
@@ -167,34 +163,11 @@ static struct vm_operations_struct shm_vm_ops = {
 	.open	= shm_open,	/* callback for a new vm-area open */
 	.close	= shm_close,	/* callback for when the vm-area is released */
 	.nopage	= shmem_nopage,
+#ifdef CONFIG_NUMA
 	.set_policy = shmem_set_policy,
 	.get_policy = shmem_get_policy,
-};
-
-#ifdef CONFIG_HUGETLBFS
-static int shm_with_hugepages(int shmflag, size_t size)
-{
-	/* flag specified explicitly */
-	if (shmflag & SHM_HUGETLB)
-		return 1;
-	/* Are we disabled? */
-	if (!shm_use_hugepages)
-		return 0;
-	/* Must be HPAGE aligned */
-	if (size & ~HPAGE_MASK)
-		return 0;
-	/* Do we have enough free huge pages? */
-	if (!is_hugepage_mem_enough(size))
-		return 0;
-	
-	return 1;
-}
-#else
-static inline int shm_with_hugepages(int shmflag, size_t size)
-{
-	return 0;
-}
 #endif
+};
 
 static int newseg (key_t key, int shmflg, size_t size)
 {
@@ -225,10 +198,9 @@ static int newseg (key_t key, int shmflg, size_t size)
 		return error;
 	}
 
-	if (shm_with_hugepages(shmflg, size)) {
-		shmflg |= SHM_HUGETLB;
+	if (shmflg & SHM_HUGETLB)
 		file = hugetlb_zero_setup(size);
-	} else {
+	else {
 		sprintf (name, "SYSV%08x", key);
 		file = shmem_file_setup(name, size, VM_ACCOUNT);
 	}
@@ -271,8 +243,6 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 	struct shmid_kernel *shp;
 	int err, id = 0;
 
-	audit_intercept(AUDIT_shmget, key, size, shmflg);
-
 	down(&shm_ids.sem);
 	if (key == IPC_PRIVATE) {
 		err = newseg(key, shmflg, size);
@@ -301,8 +271,7 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 	}
 	up(&shm_ids.sem);
 
-	TRIG_EVENT(ipc_shm_create_hook, err, shmflg);
-	return audit_result(err);
+	return err;
 }
 
 static inline unsigned long copy_shmid_to_user(void __user *buf, struct shmid64_ds *in, int version)
@@ -432,8 +401,6 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 	struct shmid_kernel *shp;
 	int err, version;
 
-	audit_intercept(AUDIT_shmctl, shmid, cmd, buf);
-
 	if (cmd < 0 || shmid < 0) {
 		err = -EINVAL;
 		goto out;
@@ -448,7 +415,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 
 		err = security_shm_shmctl(NULL, cmd);
 		if (err)
-			return audit_result(err);
+			return err;
 
 		memset(&shminfo,0,sizeof(shminfo));
 		shminfo.shmmni = shminfo.shmseg = shm_ctlmni;
@@ -457,7 +424,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 
 		shminfo.shmmin = SHMMIN;
 		if(copy_shminfo_to_user (buf, &shminfo, version))
-			return audit_result(-EFAULT);
+			return -EFAULT;
 		/* reading a integer is always atomic */
 		err= shm_ids.max_id;
 		if(err<0)
@@ -470,7 +437,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 
 		err = security_shm_shmctl(NULL, cmd);
 		if (err)
-			return audit_result(err);
+			return err;
 
 		memset(&shm_info,0,sizeof(shm_info));
 		down(&shm_ids.sem);
@@ -540,7 +507,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 /* Allow superuser to lock segment in memory */
 /* Should the pages be faulted in here or leave it to user? */
 /* need to determine interaction with current->swappable */
-		if (!can_do_mlock()) {
+		if (!capable(CAP_IPC_LOCK)) {
 			err = -EPERM;
 			goto out;
 		}
@@ -619,7 +586,6 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 			err = -EFAULT;
 			goto out;
 		}
-
 		down(&shm_ids.sem);
 		shp = shm_lock(shmid);
 		err=-EINVAL;
@@ -661,7 +627,7 @@ out_up:
 out_unlock:
 	shm_unlock(shp);
 out:
-	return audit_result(err);
+	return err;
 }
 
 /*
@@ -684,25 +650,23 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	int acc_mode;
 	void *user_addr;
 
-	audit_intercept(AUDIT_shmat, shmid, shmaddr, shmflg);
-
 	if (shmid < 0) {
 		err = -EINVAL;
 		goto out;
 	} else if ((addr = (ulong)shmaddr)) {
 		if (addr & (SHMLBA-1)) {
- 			if (shmflg & SHM_RND)
+			if (shmflg & SHM_RND)
 				addr &= ~(SHMLBA-1);	   /* round down */
 			else
 #ifndef __ARCH_FORCE_SHMLBA
 				if (addr & ~PAGE_MASK)
 #endif
-					return audit_result(-EINVAL);
+					return -EINVAL;
 		}
 		flags = MAP_SHARED | MAP_FIXED;
 	} else {
 		if ((shmflg & SHM_REMAP))
-			return audit_result(-EINVAL);
+			return -EINVAL;
 
 		flags = MAP_SHARED;
 	}
@@ -740,7 +704,7 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	err = security_shm_shmat(shp, shmaddr, shmflg);
 	if (err) {
 		shm_unlock(shp);
-		return audit_result(err);
+		return err;
 	}
 		
 	file = shp->shm_file;
@@ -783,7 +747,7 @@ invalid:
 	if (IS_ERR(user_addr))
 		err = PTR_ERR(user_addr);
 out:
-	return audit_result(err);
+	return err;
 }
 
 /*
@@ -797,8 +761,6 @@ asmlinkage long sys_shmdt(char __user *shmaddr)
 	unsigned long addr = (unsigned long)shmaddr;
 	loff_t size = 0;
 	int retval = -EINVAL;
-
-	audit_intercept(AUDIT_shmdt, shmaddr);
 
 	down_write(&mm->mmap_sem);
 
@@ -868,7 +830,7 @@ asmlinkage long sys_shmdt(char __user *shmaddr)
 	}
 
 	up_write(&mm->mmap_sem);
-	return audit_result(retval);
+	return retval;
 }
 
 #ifdef CONFIG_PROC_FS

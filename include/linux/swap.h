@@ -148,7 +148,7 @@ struct swap_list_t {
 #define vm_swap_full() (nr_swap_pages*2 < total_swap_pages)
 
 /* linux/mm/oom_kill.c */
-extern void out_of_memory(void);
+extern void out_of_memory(int gfp_mask);
 
 /* linux/mm/memory.c */
 extern void swapin_readahead(swp_entry_t, unsigned long, struct vm_area_struct *);
@@ -156,7 +156,7 @@ extern void swapin_readahead(swp_entry_t, unsigned long, struct vm_area_struct *
 /* linux/mm/page_alloc.c */
 extern unsigned long totalram_pages;
 extern unsigned long totalhigh_pages;
-extern int nr_swap_pages;	/* XXX: shouldn't this be ulong? --hch */
+extern long nr_swap_pages;
 extern unsigned int nr_free_pages(void);
 extern unsigned int nr_free_pages_pgdat(pg_data_t *pgdat);
 extern unsigned int nr_free_buffer_pages(void);
@@ -181,6 +181,8 @@ extern int vm_swappiness;
 extern int shmem_unuse(swp_entry_t entry, struct page *page);
 #endif /* CONFIG_MMU */
 
+extern void swap_unplug_io_fn(struct backing_dev_info *, struct page *);
+
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */
 extern int swap_readpage(struct file *, struct page *);
@@ -200,11 +202,11 @@ extern int move_from_swap_cache(struct page *, unsigned long,
 extern void free_page_and_swap_cache(struct page *);
 extern void free_pages_and_swap_cache(struct page **, int);
 extern struct page * lookup_swap_cache(swp_entry_t);
-extern struct page * read_swap_cache_async(swp_entry_t, struct vm_area_struct *vma, 
+extern struct page * read_swap_cache_async(swp_entry_t, struct vm_area_struct *vma,
 					   unsigned long addr);
 
 /* linux/mm/swapfile.c */
-extern int total_swap_pages;
+extern long total_swap_pages;
 extern unsigned int nr_swapfiles;
 extern struct swap_info_struct swap_info[];
 extern void si_swapinfo(struct sysinfo *);
@@ -218,7 +220,6 @@ extern struct swap_info_struct *get_swap_info_struct(unsigned);
 extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
 struct backing_dev_info;
-extern void swap_unplug_io_fn(struct backing_dev_info *, struct page * page);
 
 extern struct swap_list_t swap_list;
 extern spinlock_t swaplock;

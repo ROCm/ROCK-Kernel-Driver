@@ -86,7 +86,7 @@ static int pppox_ioctl(struct socket* sock, unsigned int cmd,
 
 		rc = -EINVAL;
 		index = ppp_channel_index(&po->chan);
-		if (put_user(index , (int *) arg))
+		if (put_user(index , (int __user *) arg))
 			break;
 
 		rc = 0;

@@ -30,12 +30,7 @@
 #include <linux/string.h>
 #include <linux/bitops.h>
 
-/*
- * Radix tree node definition.
- *
- * RADIX_TREE_MAP_SHIFT must be >= log2(BITS_PER_LONG).  Otherwise the tags
- * array will have zero size and the set_tag() arithmetic will go wrong.
- */
+
 #ifdef __KERNEL__
 #define RADIX_TREE_MAP_SHIFT	6
 #else
@@ -493,7 +488,7 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
 			index &= ~((1UL << shift) - 1);
 			index += 1UL << shift;
 			if (index == 0)
-				goto out;	/* wraparound */
+				goto out;	/* 32-bit wraparound */
 		}
 		if (i == RADIX_TREE_MAP_SIZE)
 			goto out;
@@ -583,7 +578,7 @@ __lookup_tag(struct radix_tree_root *root, void **results, unsigned long index,
 			index &= ~((1UL << shift) - 1);
 			index += 1UL << shift;
 			if (index == 0)
-				goto out;	/* wraparound */
+				goto out;	/* 32-bit wraparound */
 		}
 		if (i == RADIX_TREE_MAP_SIZE)
 			goto out;
@@ -804,9 +799,7 @@ void __init radix_tree_init(void)
 {
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
 			sizeof(struct radix_tree_node), 0,
-			0, radix_tree_node_ctor, NULL);
-	if (!radix_tree_node_cachep)
-		panic ("Failed to create radix_tree_node cache\n");
+			SLAB_PANIC, radix_tree_node_ctor, NULL);
 	radix_tree_init_maxindex();
 	hotcpu_notifier(radix_tree_callback, 0);
 }

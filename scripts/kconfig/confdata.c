@@ -19,10 +19,10 @@ const char conf_defname[] = "arch/$ARCH/defconfig";
 
 const char *conf_confnames[] = {
 	".config",
-	conf_defname,
 	"/lib/modules/$UNAME_RELEASE/.config",
 	"/etc/kernel-config",
 	"/boot/config-$UNAME_RELEASE",
+	conf_defname,
 	NULL,
 };
 

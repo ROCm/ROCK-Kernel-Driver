@@ -32,7 +32,7 @@ struct hpsb_packet {
          * pending  = sent, waiting for response
          * complete = processing completed, successful or not
          */
-        enum { 
+        enum {
                 hpsb_unused, hpsb_queued, hpsb_pending, hpsb_complete
         } __attribute__((packed)) state;
 
@@ -101,8 +101,6 @@ void hpsb_free_packet(struct hpsb_packet *packet);
  *
  * Use the functions, not the variable.
  */
-#include <asm/atomic.h>
-
 static inline unsigned int get_hpsb_generation(struct hpsb_host *host)
 {
         return atomic_read(&host->generation);
@@ -147,7 +145,7 @@ int hpsb_bus_reset(struct hpsb_host *host);
  */
 void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid);
 
-/* 
+/*
  * Notify completion of SelfID stage to the core and report new physical ID
  * and whether host is root now.
  */

@@ -22,7 +22,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: integrator-flash.c,v 1.15 2004/02/27 22:37:39 rmk Exp $
+   $Id: integrator-flash.c,v 1.16 2004/07/12 21:59:44 dwmw2 Exp $
 
 ======================================================================*/
 
@@ -108,7 +108,7 @@ static int armflash_probe(struct device *_dev)
 	 * look for CFI based flash parts fitted to this board
 	 */
 	info->map.size		= size;
-	info->map.buswidth	= plat->width;
+	info->map.bankwidth	= plat->width;
 	info->map.phys		= res->start;
 	info->map.virt		= (unsigned long) base;
 	info->map.name		= dev->dev.bus_id;

@@ -1721,7 +1721,7 @@ int __init cyber2000fb_init(void)
 	err = cyberpro_vl_probe();
 	if (!err) {
 		ret = 0;
-		MOD_INC_USE_COUNT;
+		__module_get(THIS_MODULE);
 	}
 #endif
 #ifdef CONFIG_PCI

@@ -28,17 +28,14 @@ void cx8800_vbi_fmt(struct cx8800_dev *dev, struct v4l2_format *f)
 	f->fmt.vbi.count[0] = VBI_LINE_COUNT;
 	f->fmt.vbi.count[1] = VBI_LINE_COUNT;
 
-	switch (dev->tvnorm->id) {
-	case V4L2_STD_NTSC_M:
-	case V4L2_STD_NTSC_M_JP:
+	if (dev->tvnorm->id & V4L2_STD_525_60) {
+		/* ntsc */
 		f->fmt.vbi.sampling_rate = 28636363;
 		f->fmt.vbi.start[0] = 10 -1;
 		f->fmt.vbi.start[1] = 273 -1;
-		break;
-	case V4L2_STD_PAL_BG:
-	case V4L2_STD_PAL_DK:
-	case V4L2_STD_PAL_I:
-	case V4L2_STD_SECAM:
+
+	} else if (V4L2_STD_625_50) {
+		/* pal */
 		f->fmt.vbi.sampling_rate = 35468950;
 		f->fmt.vbi.start[0] = 7 -1;
 		f->fmt.vbi.start[1] = 319 -1;
@@ -64,10 +61,10 @@ int cx8800_start_vbi_dma(struct cx8800_dev    *dev,
 	/* enable irqs */
 	cx_set(MO_PCI_INTMSK, 0x00fc01);
 	cx_set(MO_VID_INTMSK, 0x0f0088);
-	
+
 	/* enable capture */
 	cx_set(VID_CAPTURE_CONTROL,0x18);
-	
+
 	/* start dma */
 	cx_set(MO_DEV_CNTRL2, (1<<5));
 	cx_set(MO_VID_DMACNTRL, 0x88);
@@ -80,7 +77,7 @@ int cx8800_restart_vbi_queue(struct cx8800_dev    *dev,
 {
 	struct cx88_buffer *buf;
 	struct list_head *item;
-	
+
 	if (list_empty(&q->active))
 		return 0;
 
@@ -104,7 +101,7 @@ void cx8800_vbi_timeout(unsigned long data)
 	unsigned long flags;
 
 	cx88_sram_channel_dump(dev, &cx88_sram_channels[SRAM_CH24]);
-	
+
 	cx_clear(MO_VID_DMACNTRL, 0x88);
 	cx_clear(VID_CAPTURE_CONTROL, 0x18);
 
@@ -161,7 +158,7 @@ vbi_prepare(struct file *file, struct videobuf_buffer *vb,
 		cx88_risc_buffer(dev->pci, &buf->risc,
 				 buf->vb.dma.sglist,
 				 0, buf->vb.width * buf->vb.height,
-				 buf->vb.width, 0, 
+				 buf->vb.width, 0,
 				 buf->vb.height);
 	}
 	buf->vb.state = STATE_PREPARED;

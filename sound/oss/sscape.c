@@ -171,13 +171,18 @@ static unsigned char sscape_read(struct sscape_info *devc, int reg)
 	return val;
 }
 
+static void __sscape_write(int reg, int data)
+{
+	outb(reg, PORT(ODIE_ADDR));
+	outb(data, PORT(ODIE_DATA));
+}
+
 static void sscape_write(struct sscape_info *devc, int reg, int data)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&devc->lock,flags);
-	outb(reg, PORT(ODIE_ADDR));
-	outb(data, PORT(ODIE_DATA));
+	__sscape_write(reg, data);
 	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
@@ -386,7 +391,7 @@ static void sscape_coproc_close(void *dev_info, int sub_device)
 	spin_lock_irqsave(&devc->lock,flags);
 	if (devc->dma_allocated)
 	{
-		sscape_write(devc, GA_DMAA_REG, 0x20);	/* DMA channel disabled */
+		__sscape_write(GA_DMAA_REG, 0x20);	/* DMA channel disabled */
 		devc->dma_allocated = 0;
 	}
 	spin_unlock_irqrestore(&devc->lock,flags);
@@ -555,7 +560,7 @@ static int download_boot_block(void *dev_info, copr_buffer * buf)
 	return 0;
 }
 
-static int sscape_coproc_ioctl(void *dev_info, unsigned int cmd, caddr_t arg, int local)
+static int sscape_coproc_ioctl(void *dev_info, unsigned int cmd, void __user *arg, int local)
 {
 	copr_buffer *buf;
 	int err;

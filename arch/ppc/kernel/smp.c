@@ -211,6 +211,8 @@ int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
            bitmask. --RR */
 	if (num_online_cpus() <= 1)
 		return 0;
+	/* Can deadlock when called with interrupts disabled */
+	WARN_ON(irqs_disabled());
 	return __smp_call_function(func, info, wait, MSG_ALL_BUT_SELF);
 }
 

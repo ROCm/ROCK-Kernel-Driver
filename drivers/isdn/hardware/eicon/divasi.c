@@ -71,9 +71,9 @@ static char *getrev(const char *revision)
 /*
  *  LOCALS
  */
-static ssize_t um_idi_read(struct file *file, char *buf, size_t count,
+static ssize_t um_idi_read(struct file *file, char __user *buf, size_t count,
 			   loff_t * offset);
-static ssize_t um_idi_write(struct file *file, const char *buf,
+static ssize_t um_idi_write(struct file *file, const char __user *buf,
 			    size_t count, loff_t * offset);
 static unsigned int um_idi_poll(struct file *file, poll_table * wait);
 static int um_idi_open(struct inode *inode, struct file *file);
@@ -231,7 +231,7 @@ divas_um_idi_copy_to_user(void *os_handle, void *dst, const void *src,
 }
 
 static ssize_t
-um_idi_read(struct file *file, char *buf, size_t count, loff_t * offset)
+um_idi_read(struct file *file, char __user *buf, size_t count, loff_t * offset)
 {
 	diva_um_idi_os_context_t *p_os;
 	int ret = -EINVAL;
@@ -312,7 +312,7 @@ static int um_idi_open_adapter(struct file *file, int adapter_nr)
 }
 
 static ssize_t
-um_idi_write(struct file *file, const char *buf, size_t count,
+um_idi_write(struct file *file, const char __user *buf, size_t count,
 	     loff_t * offset)
 {
 	diva_um_idi_os_context_t *p_os;

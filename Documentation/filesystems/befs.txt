@@ -17,8 +17,8 @@ Or the GNU website: <http://www.gnu.org/licenses/licenses.html>
 
 AUTHOR
 =====
-Current maintainer: Will Dyson <will_dyson@pobox.com>
-Has been working on the code since Aug 13, 2001. See the changelog for
+The largest part of the code written by Will Dyson <will_dyson@pobox.com>
+He has been working on the code since Aug 13, 2001. See the changelog for
 details.
 
 Original Author: Makoto Kato <m_kato@ga2.so-net.ne.jp>
@@ -26,6 +26,8 @@ His orriginal code can still be found at:
 <http://hp.vector.co.jp/authors/VA008030/bfs/>
 Does anyone know of a more current email address for Makoto? He doesn't
 respond to the address given above...
+
+Current maintainer: Sergey S. Kostyliov <rathamahata@php4.ru>
 
 WHAT IS THIS DRIVER?
 ==================

@@ -36,7 +36,7 @@ static __u8 root_hub_hub_des[] =
 static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	unsigned int io_addr = uhci->io_addr;
+	unsigned long io_addr = uhci->io_addr;
 	int i;
 
 	*buf = 0;
@@ -69,7 +69,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	int status, retval = 0, len = 0;
-	unsigned int port_addr = uhci->io_addr + USBPORTSC1 + 2 * (wIndex-1);
+	unsigned long port_addr = uhci->io_addr + USBPORTSC1 + 2 * (wIndex-1);
 	__u16 wPortChange, wPortStatus;
 
 	switch (typeReq) {

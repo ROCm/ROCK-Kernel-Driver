@@ -40,6 +40,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/time.h>
+#include <asm/rtas.h>
 
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/mf.h>
@@ -206,7 +207,7 @@ static int __init rtc_init(void)
 		return retval;
 
 #ifdef CONFIG_PROC_FS
-	if(create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL) == NULL)
+	if (create_proc_read_entry ("driver/rtc", 0, NULL, rtc_read_proc, NULL) == NULL)
 		misc_deregister(&rtc_dev);
 		return -ENOMEM;
 #endif
@@ -346,13 +347,13 @@ void iSeries_get_boot_time(struct rtc_time *tm)
 #define RTAS_CLOCK_BUSY (-2)
 void pSeries_get_boot_time(struct rtc_time *rtc_tm)
 {
-	unsigned long ret[8];
+	int ret[8];
 	int error, wait_time;
 	unsigned long max_wait_tb;
 
 	max_wait_tb = __get_tb() + tb_ticks_per_usec * 1000 * MAX_RTC_WAIT;
 	do {
-		error = rtas_call(rtas_token("get-time-of-day"), 0, 8, (void *)&ret);
+		error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
 		if (error == RTAS_CLOCK_BUSY || rtas_is_extended_busy(error)) {
 			wait_time = rtas_extended_busy_delay_time(error);
 			/* This is boot time so we spin. */
@@ -381,13 +382,13 @@ void pSeries_get_boot_time(struct rtc_time *rtc_tm)
  */
 void pSeries_get_rtc_time(struct rtc_time *rtc_tm)
 {
-        unsigned long ret[8];
+        int ret[8];
 	int error, wait_time;
 	unsigned long max_wait_tb;
 
 	max_wait_tb = __get_tb() + tb_ticks_per_usec * 1000 * MAX_RTC_WAIT;
 	do {
-		error = rtas_call(rtas_token("get-time-of-day"), 0, 8, (void *)&ret);
+		error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
 		if (error == RTAS_CLOCK_BUSY || rtas_is_extended_busy(error)) {
 			if (in_interrupt()) {
 				printk(KERN_WARNING "error: reading clock would delay interrupt\n");

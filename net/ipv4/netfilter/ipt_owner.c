@@ -184,7 +184,15 @@ checkentry(const char *tablename,
 		       IPT_ALIGN(sizeof(struct ipt_owner_info)));
 		return 0;
 	}
-
+#ifdef CONFIG_SMP
+	/* files->file_lock can not be used in a BH */
+	if (((struct ipt_owner_info *)matchinfo)->match
+	    & (IPT_OWNER_PID|IPT_OWNER_SID|IPT_OWNER_COMM)) {
+		printk("ipt_owner: pid, sid and command matching is broken "
+		       "on SMP.\n");
+		return 0;
+	}
+#endif
 	return 1;
 }
 

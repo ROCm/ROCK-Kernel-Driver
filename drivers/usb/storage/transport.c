@@ -137,7 +137,7 @@ static int usb_stor_msg_common(struct us_data *us, int timeout)
 	int status;
 
 	/* don't submit URBs during abort/disconnect processing */
-	if (us->flags & DONT_SUBMIT)
+	if (us->flags & ABORTING_OR_DISCONNECTING)
 		return -EIO;
 
 	/* set up data structures for the wakeup system */
@@ -172,7 +172,7 @@ static int usb_stor_msg_common(struct us_data *us, int timeout)
 	set_bit(US_FLIDX_URB_ACTIVE, &us->flags);
 
 	/* did an abort/disconnect occur during the submission? */
-	if (us->flags & DONT_SUBMIT) {
+	if (us->flags & ABORTING_OR_DISCONNECTING) {
 
 		/* cancel the URB, if it hasn't been cancelled already */
 		if (test_and_clear_bit(US_FLIDX_URB_ACTIVE, &us->flags)) {
@@ -440,7 +440,7 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 	int result;
 
 	/* don't submit s-g requests during abort/disconnect processing */
-	if (us->flags & DONT_SUBMIT)
+	if (us->flags & ABORTING_OR_DISCONNECTING)
 		return USB_STOR_XFER_ERROR;
 
 	/* initialize the scatter-gather request block */
@@ -458,7 +458,7 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 	set_bit(US_FLIDX_SG_ACTIVE, &us->flags);
 
 	/* did an abort/disconnect occur during the submission? */
-	if (us->flags & DONT_SUBMIT) {
+	if (us->flags & ABORTING_OR_DISCONNECTING) {
 
 		/* cancel the request, if it hasn't been cancelled already */
 		if (test_and_clear_bit(US_FLIDX_SG_ACTIVE, &us->flags)) {
@@ -708,18 +708,20 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 			srb->sense_buffer[0] = 0x0;
 		}
 	}
+
+	/* Did we transfer less than the minimum amount required? */
+	if (srb->result == SAM_STAT_GOOD &&
+			srb->request_bufflen - srb->resid < srb->underflow)
+		srb->result = (DID_ERROR << 16) | (SUGGEST_RETRY << 24);
+
 	return;
 
 	/* abort processing: the bulk-only transport requires a reset
 	 * following an abort */
-	Handle_Abort:
+  Handle_Abort:
 	srb->result = DID_ABORT << 16;
-	if (us->protocol == US_PR_BULK) {
-
-		/* permit the reset transfer to take place */
-		clear_bit(US_FLIDX_ABORTING, &us->flags);
+	if (us->protocol == US_PR_BULK)
 		us->transport_reset(us);
-	}
 }
 
 /* Stop the current URB transfer */
@@ -919,8 +921,22 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	if (result == 1)
 		return us->iobuf[0];
 
-	/* return the default -- no LUNs */
-	return 0;
+	/* 
+	 * Some devices (i.e. Iomega Zip100) need this -- apparently
+	 * the bulk pipes get STALLed when the GetMaxLUN request is
+	 * processed.   This is, in theory, harmless to all other devices
+	 * (regardless of if they stall or not).
+	 */
+	if (result == -EPIPE) {
+		usb_stor_clear_halt(us, us->recv_bulk_pipe);
+		usb_stor_clear_halt(us, us->send_bulk_pipe);
+		/* return the default -- no LUNs */
+		return 0;
+	}
+
+	/* An answer or a STALL are the only valid responses.  If we get
+	 * something else, return an indication of error */
+	return -1;
 }
 
 int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
@@ -1079,34 +1095,39 @@ static int usb_stor_reset_common(struct us_data *us,
 {
 	int result;
 	int result2;
+	int rc = FAILED;
 
-	/* Let the SCSI layer know we are doing a reset */
+	/* Let the SCSI layer know we are doing a reset, set the
+	 * RESETTING bit, and clear the ABORTING bit so that the reset
+	 * may proceed.
+	 */
+	scsi_lock(us->host);
 	usb_stor_report_device_reset(us);
+	set_bit(US_FLIDX_RESETTING, &us->flags);
+	clear_bit(US_FLIDX_ABORTING, &us->flags);
+	scsi_unlock(us->host);
 
 	/* A 20-second timeout may seem rather long, but a LaCie
-	 *  StudioDrive USB2 device takes 16+ seconds to get going
-	 *  following a powerup or USB attach event. */
-
+	 * StudioDrive USB2 device takes 16+ seconds to get going
+	 * following a powerup or USB attach event.
+	 */
 	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 			request, requesttype, value, index, data, size,
 			20*HZ);
 	if (result < 0) {
 		US_DEBUGP("Soft reset failed: %d\n", result);
-		return FAILED;
+		goto Done;
 	}
 
-	/* long wait for reset, so unlock to allow disconnects */
-	up(&us->dev_semaphore);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ*6);
-	down(&us->dev_semaphore);
+ 	/* Give the device some time to recover from the reset,
+ 	 * but don't delay disconnect processing. */
+ 	wait_event_interruptible_timeout(us->dev_reset_wait,
+ 			test_bit(US_FLIDX_DISCONNECTING, &us->flags),
+ 			HZ*6);
 	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
 		US_DEBUGP("Reset interrupted by disconnect\n");
-		return FAILED;
+		goto Done;
 	}
-
-	/* permit the clear-halt transfers to take place */
-	clear_bit(US_FLIDX_ABORTING, &us->flags);
 
 	US_DEBUGP("Soft reset: clearing bulk-in endpoint halt\n");
 	result = usb_stor_clear_halt(us, us->recv_bulk_pipe);
@@ -1117,10 +1138,14 @@ static int usb_stor_reset_common(struct us_data *us,
 	/* return a result code based on the result of the control message */
 	if (result < 0 || result2 < 0) {
 		US_DEBUGP("Soft reset failed\n");
-		return FAILED;
+		goto Done;
 	}
 	US_DEBUGP("Soft reset done\n");
-	return SUCCESS;
+	rc = SUCCESS;
+
+  Done:
+	clear_bit(US_FLIDX_RESETTING, &us->flags);
+	return rc;
 }
 
 /* This issues a CB[I] Reset to the device in question

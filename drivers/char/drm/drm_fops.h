@@ -72,6 +72,8 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	priv->authenticated = capable(CAP_SYS_ADMIN);
 	priv->lock_count    = 0;
 
+	DRIVER_OPEN_HELPER( priv, dev );
+
 	down(&dev->struct_sem);
 	if (!dev->file_last) {
 		priv->next	= NULL;
@@ -139,7 +141,7 @@ unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 
 #if !__HAVE_DRIVER_FOPS_READ
 /** No-op. */
-ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
+ssize_t DRM(read)(struct file *filp, char __user *buf, size_t count, loff_t *off)
 {
 	return 0;
 }

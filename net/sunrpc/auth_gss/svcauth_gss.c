@@ -333,6 +333,7 @@ rsc_init(struct rsc *new, struct rsc *tmp)
 	new->handle.data = tmp->handle.data;
 	tmp->handle.data = NULL;
 	new->mechctx = NULL;
+	new->cred.cr_group_info = NULL;
 }
 
 static inline void
@@ -389,11 +390,13 @@ static int rsc_parse(struct cache_detail *cd,
 		/* number of additional gid's */
 		if (get_int(&mesg, &N))
 			goto out;
+		status = -ENOMEM;
 		rsci.cred.cr_group_info = groups_alloc(N);
 		if (rsci.cred.cr_group_info == NULL)
 			goto out;
 
 		/* gid's */
+		status = -EINVAL;
 		for (i=0; i<N; i++) {
 			gid_t gid;
 			if (get_int(&mesg, &gid))
@@ -451,8 +454,11 @@ gss_svc_searchbyctx(struct xdr_netobj *handle)
 	struct rsc rsci;
 	struct rsc *found;
 
-	rsci.handle = *handle;
+	memset(&rsci, 0, sizeof(rsci));
+	if (dup_to_netobj(&rsci.handle, handle->data, handle->len))
+		return NULL;
 	found = rsc_lookup(&rsci, 0);
+	rsc_free(&rsci);
 	if (!found)
 		return NULL;
 	if (cache_check(&rsc_cache, &found->h, NULL))
@@ -497,7 +503,7 @@ static inline u32 round_up_to_quad(u32 i)
 }
 
 static inline int
-svc_safe_getnetobj(struct iovec *argv, struct xdr_netobj *o)
+svc_safe_getnetobj(struct kvec *argv, struct xdr_netobj *o)
 {
 	int l;
 
@@ -514,7 +520,7 @@ svc_safe_getnetobj(struct iovec *argv, struct xdr_netobj *o)
 }
 
 static inline int
-svc_safe_putnetobj(struct iovec *resv, struct xdr_netobj *o)
+svc_safe_putnetobj(struct kvec *resv, struct xdr_netobj *o)
 {
 	u32 *p;
 
@@ -542,8 +548,8 @@ gss_verify_header(struct svc_rqst *rqstp, struct rsc *rsci,
 	struct xdr_buf		rpchdr;
 	struct xdr_netobj	checksum;
 	u32			flavor = 0;
-	struct iovec		*argv = &rqstp->rq_arg.head[0];
-	struct iovec		iov;
+	struct kvec		*argv = &rqstp->rq_arg.head[0];
+	struct kvec		iov;
 
 	/* data to compute the checksum over: */
 	iov.iov_base = rpcstart;
@@ -568,14 +574,14 @@ gss_verify_header(struct svc_rqst *rqstp, struct rsc *rsci,
 	}
 
 	if (gc->gc_seq > MAXSEQ) {
-		dprintk("svcauth_gss: discarding request with large"
-			" sequence number %d\n", gc->gc_seq);
+		dprintk("RPC:      svcauth_gss: discarding request with large sequence number %d\n",
+				gc->gc_seq);
 		*authp = rpcsec_gsserr_ctxproblem;
 		return SVC_DENIED;
 	}
 	if (!gss_check_seq_num(rsci, gc->gc_seq)) {
-		dprintk("svcauth_gss: discarding request with old"
-				" sequence number %d\n", gc->gc_seq);
+		dprintk("RPC:      svcauth_gss: discarding request with old sequence number %d\n",
+				gc->gc_seq);
 		return SVC_DROP;
 	}
 	return SVC_OK;
@@ -589,7 +595,7 @@ gss_write_verf(struct svc_rqst *rqstp, struct gss_ctx *ctx_id, u32 seq)
 	struct xdr_buf		verf_data;
 	struct xdr_netobj	mic;
 	u32			*p;
-	struct iovec		iov;
+	struct kvec		iov;
 
 	svc_putu32(rqstp->rq_res.head, htonl(RPC_AUTH_GSS));
 	xdr_seq = htonl(seq);
@@ -615,19 +621,15 @@ struct gss_domain {
 	u32			pseudoflavor;
 };
 
-/* XXX this should be done in gss_pseudoflavors, and shouldn't be hardcoded: */
 static struct auth_domain *
 find_gss_auth_domain(struct gss_ctx *ctx, u32 svc)
 {
-	switch(gss_get_pseudoflavor(ctx, 0, svc)) {
-		case RPC_AUTH_GSS_KRB5:
-			return auth_domain_find("gss/krb5");
-		case RPC_AUTH_GSS_KRB5I:
-			return auth_domain_find("gss/krb5i");
-		case RPC_AUTH_GSS_KRB5P:
-			return auth_domain_find("gss/krb5p");
-	}
-	return NULL;
+	char *name;
+
+	name = gss_service_to_auth_domain_name(ctx->mech_type, svc);
+	if (!name)
+		return NULL;
+	return auth_domain_find(name);
 }
 
 int
@@ -635,19 +637,17 @@ svcauth_gss_register_pseudoflavor(u32 pseudoflavor, char * name)
 {
 	struct gss_domain	*new;
 	struct auth_domain	*test;
-	static char		*prefix = "gss/";
-	int			stat = -1;
+	int			stat = -ENOMEM;
 
 	new = kmalloc(sizeof(*new), GFP_KERNEL);
 	if (!new)
 		goto out;
 	cache_init(&new->h.h);
 	atomic_inc(&new->h.h.refcnt);
-	new->h.name = kmalloc(strlen(name) + strlen(prefix) + 1, GFP_KERNEL);
+	new->h.name = kmalloc(strlen(name) + 1, GFP_KERNEL);
 	if (!new->h.name)
 		goto out_free_dom;
-	strcpy(new->h.name, prefix);
-	strcat(new->h.name, name);
+	strcpy(new->h.name, name);
 	new->h.flavour = RPC_AUTH_GSS;
 	new->pseudoflavor = pseudoflavor;
 	new->h.h.expiry_time = NEVER;
@@ -668,6 +668,70 @@ out:
 	return stat;
 }
 
+EXPORT_SYMBOL(svcauth_gss_register_pseudoflavor);
+
+static inline int
+read_u32_from_xdr_buf(struct xdr_buf *buf, int base, u32 *obj)
+{
+	u32     raw;
+	int     status;
+
+	status = read_bytes_from_xdr_buf(buf, base, &raw, sizeof(*obj));
+	if (status)
+		return status;
+	*obj = ntohl(raw);
+	return 0;
+}
+
+/* It would be nice if this bit of code could be shared with the client.
+ * Obstacles:
+ *	The client shouldn't malloc(), would have to pass in own memory.
+ *	The server uses base of head iovec as read pointer, while the
+ *	client uses separate pointer. */
+static int
+unwrap_integ_data(struct xdr_buf *buf, u32 seq, struct gss_ctx *ctx)
+{
+	int stat = -EINVAL;
+	u32 integ_len, maj_stat;
+	struct xdr_netobj mic;
+	struct xdr_buf integ_buf;
+
+	integ_len = ntohl(svc_getu32(&buf->head[0]));
+	if (integ_len & 3)
+		goto out;
+	if (integ_len > buf->len)
+		goto out;
+	if (xdr_buf_subsegment(buf, &integ_buf, 0, integ_len))
+		BUG();
+	/* copy out mic... */
+	if (read_u32_from_xdr_buf(buf, integ_len, &mic.len))
+		BUG();
+	if (mic.len > RPC_MAX_AUTH_SIZE)
+		goto out;
+	mic.data = kmalloc(mic.len, GFP_KERNEL);
+	if (!mic.data)
+		goto out;
+	if (read_bytes_from_xdr_buf(buf, integ_len + 4, mic.data, mic.len))
+		goto out;
+	maj_stat = gss_verify_mic(ctx, &integ_buf, &mic, NULL);
+	if (maj_stat != GSS_S_COMPLETE)
+		goto out;
+	if (ntohl(svc_getu32(&buf->head[0])) != seq)
+		goto out;
+	stat = 0;
+out:
+	return stat;
+}
+
+struct gss_svc_data {
+	/* decoded gss client cred: */
+	struct rpc_gss_wire_cred	clcred;
+	/* pointer to the beginning of the procedure-specific results,
+	 * which may be encrypted/checksummed in svcauth_gss_release: */
+	u32				*body_start;
+	struct rsc			*rsci;
+};
+
 /*
  * Accept an rpcsec packet.
  * If context establishment, punt to user space
@@ -679,8 +743,8 @@ out:
 static int
 svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct iovec	*argv = &rqstp->rq_arg.head[0];
-	struct iovec	*resv = &rqstp->rq_res.head[0];
+	struct kvec	*argv = &rqstp->rq_arg.head[0];
+	struct kvec	*resv = &rqstp->rq_res.head[0];
 	u32		crlen;
 	struct xdr_netobj tmpobj;
 	struct gss_svc_data *svcdata = rqstp->rq_auth_data;
@@ -691,7 +755,7 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 	u32		*reject_stat = resv->iov_base + resv->iov_len;
 	int		ret;
 
-	dprintk("RPC: svcauth_gss: argv->iov_len = %zd\n",argv->iov_len);
+	dprintk("RPC:      svcauth_gss: argv->iov_len = %zd\n",argv->iov_len);
 
 	*authp = rpc_autherr_badcred;
 	if (!svcdata)
@@ -699,6 +763,8 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 	if (!svcdata)
 		goto auth_err;
 	rqstp->rq_auth_data = svcdata;
+	svcdata->body_start = NULL;
+	svcdata->rsci = NULL;
 	gc = &svcdata->clcred;
 
 	/* start of rpc packet is 7 u32's back from here:
@@ -752,9 +818,6 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 		break;
 	case RPC_GSS_PROC_DATA:
 	case RPC_GSS_PROC_DESTROY:
-		/* integrity and privacy unsupported: */
-		if (gc->gc_svc != RPC_GSS_SVC_NONE)
-			goto auth_err;
 		*authp = rpcsec_gsserr_credproblem;
 		rsci = gss_svc_searchbyctx(&gc->gc_ctx);
 		if (!rsci)
@@ -840,10 +903,28 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 		*authp = rpcsec_gsserr_ctxproblem;
 		if (gss_write_verf(rqstp, rsci->mechctx, gc->gc_seq))
 			goto auth_err;
-		/* For use when wrapping: */
-		svcdata->body_start = resv->iov_base + 1;
 		rqstp->rq_cred = rsci->cred;
 		get_group_info(rsci->cred.cr_group_info);
+		*authp = rpc_autherr_badcred;
+		switch (gc->gc_svc) {
+		case RPC_GSS_SVC_NONE:
+			break;
+		case RPC_GSS_SVC_INTEGRITY:
+			if (unwrap_integ_data(&rqstp->rq_arg,
+					gc->gc_seq, rsci->mechctx))
+				goto auth_err;
+			svcdata->rsci = rsci;
+			cache_get(&rsci->h);
+			/* placeholders for length and seq. number: */
+			svcdata->body_start = resv->iov_base + resv->iov_len;
+			svc_putu32(resv, 0);
+			svc_putu32(resv, 0);
+			break;
+		case RPC_GSS_SVC_PRIVACY:
+			/* currently unsupported */
+		default:
+			goto auth_err;
+		}
 		ret = SVC_OK;
 		goto out;
 	}
@@ -866,14 +947,95 @@ out:
 static int
 svcauth_gss_release(struct svc_rqst *rqstp)
 {
+	struct gss_svc_data *gsd = (struct gss_svc_data *)rqstp->rq_auth_data;
+	struct rpc_gss_wire_cred *gc = &gsd->clcred;
+	struct xdr_buf *resbuf = &rqstp->rq_res;
+	struct xdr_buf integ_buf;
+	struct xdr_netobj mic;
+	struct kvec *resv;
+	u32 *p;
+	int integ_offset, integ_len;
+	int stat = -EINVAL;
+
+	if (gc->gc_proc != RPC_GSS_PROC_DATA)
+		goto out;
+	/* Release can be called twice, but we only wrap once. */
+	if (gsd->body_start == 0)
+		goto out;
+	/* normally not set till svc_send, but we need it here: */
+	resbuf->len = resbuf->head[0].iov_len
+		+ resbuf->page_len + resbuf->tail[0].iov_len;
+	switch (gc->gc_svc) {
+	case RPC_GSS_SVC_NONE:
+		break;
+	case RPC_GSS_SVC_INTEGRITY:
+		p = gsd->body_start;
+		gsd->body_start = NULL;
+		/* move accept_stat to right place: */
+		memcpy(p, p + 2, 4);
+		/* don't wrap in failure case: */
+		/* Note: counting on not getting here if call was not even
+		 * accepted! */
+		if (*p != rpc_success) {
+			resbuf->head[0].iov_len -= 2 * 4;
+			goto out;
+		}
+		p++;
+		integ_offset = (u8 *)(p + 1) - (u8 *)resbuf->head[0].iov_base;
+		integ_len = resbuf->len - integ_offset;
+		BUG_ON(integ_len % 4);
+		*p++ = htonl(integ_len);
+		*p++ = htonl(gc->gc_seq);
+		if (xdr_buf_subsegment(resbuf, &integ_buf, integ_offset,
+					integ_len))
+			BUG();
+		if (resbuf->page_len == 0
+			&& resbuf->tail[0].iov_len + RPC_MAX_AUTH_SIZE
+				< PAGE_SIZE) {
+			BUG_ON(resbuf->tail[0].iov_len);
+			/* Use head for everything */
+			resv = &resbuf->head[0];
+		} else if (resbuf->tail[0].iov_base == NULL) {
+			/* copied from nfsd4_encode_read */
+			svc_take_page(rqstp);
+			resbuf->tail[0].iov_base = page_address(rqstp
+					->rq_respages[rqstp->rq_resused-1]);
+			rqstp->rq_restailpage = rqstp->rq_resused-1;
+			resbuf->tail[0].iov_len = 0;
+			resv = &resbuf->tail[0];
+		} else {
+			resv = &resbuf->tail[0];
+		}
+		mic.data = (u8 *)resv->iov_base + resv->iov_len + 4;
+		if (gss_get_mic(gsd->rsci->mechctx, 0, &integ_buf, &mic))
+			goto out_err;
+		svc_putu32(resv, htonl(mic.len));
+		memset(mic.data + mic.len, 0,
+				round_up_to_quad(mic.len) - mic.len);
+		resv->iov_len += XDR_QUADLEN(mic.len) << 2;
+		/* not strictly required: */
+		resbuf->len += XDR_QUADLEN(mic.len) << 2;
+		BUG_ON(resv->iov_len > PAGE_SIZE);
+		break;
+	case RPC_GSS_SVC_PRIVACY:
+	default:
+		goto out_err;
+	}
+
+out:
+	stat = 0;
+out_err:
 	if (rqstp->rq_client)
 		auth_domain_put(rqstp->rq_client);
 	rqstp->rq_client = NULL;
 	if (rqstp->rq_cred.cr_group_info)
 		put_group_info(rqstp->rq_cred.cr_group_info);
 	rqstp->rq_cred.cr_group_info = NULL;
+	if (gsd->rsci)
+		rsc_put(&gsd->rsci->h, &rsc_cache);
+	gsd->rsci = NULL;
 
-	return 0;
+	return stat;
 }
 
 static void
@@ -887,6 +1049,7 @@ svcauth_gss_domain_release(struct auth_domain *dom)
 
 struct auth_ops svcauthops_gss = {
 	.name		= "rpcsec_gss",
+	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_GSS,
 	.accept		= svcauth_gss_accept,
 	.release	= svcauth_gss_release,
@@ -896,10 +1059,12 @@ struct auth_ops svcauthops_gss = {
 int
 gss_svc_init(void)
 {
-	cache_register(&rsc_cache);
-	cache_register(&rsi_cache);
-	svc_auth_register(RPC_AUTH_GSS, &svcauthops_gss);
-	return 0;
+	int rv = svc_auth_register(RPC_AUTH_GSS, &svcauthops_gss);
+	if (rv == 0) {
+		cache_register(&rsc_cache);
+		cache_register(&rsi_cache);
+	}
+	return rv;
 }
 
 void
@@ -907,4 +1072,5 @@ gss_svc_shutdown(void)
 {
 	cache_unregister(&rsc_cache);
 	cache_unregister(&rsi_cache);
+	svc_auth_unregister(RPC_AUTH_GSS);
 }

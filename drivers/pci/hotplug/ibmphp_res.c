@@ -45,7 +45,6 @@ static void fix_resources (struct bus_node *);
 static struct bus_node *find_bus_wprev (u8, struct bus_node **, u8);
 
 static LIST_HEAD(gbuses);
-LIST_HEAD(ibmphp_res_head);
 
 static struct bus_node * __init alloc_error_bus (struct ebda_pci_rsrc * curr, u8 busno, int flag)
 {

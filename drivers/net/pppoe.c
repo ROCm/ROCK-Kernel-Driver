@@ -79,6 +79,8 @@
 #define PPPOE_HASH_BITS 4
 #define PPPOE_HASH_SIZE (1<<PPPOE_HASH_BITS)
 
+static struct ppp_channel_ops pppoe_chan_ops;
+
 static int pppoe_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg);
 static int pppoe_xmit(struct ppp_channel *chan, struct sk_buff *skb);
 static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb);
@@ -86,6 +88,7 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb);
 static struct proto_ops pppoe_ops;
 static rwlock_t pppoe_hash_lock = RW_LOCK_UNLOCKED;
 
+static struct ppp_channel_ops pppoe_chan_ops;
 
 static inline int cmp_2_addr(struct pppoe_addr *a, struct pppoe_addr *b)
 {
@@ -691,7 +694,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		if (put_user(po->pppoe_dev->mtu -
 			     sizeof(struct pppoe_hdr) -
 			     PPP_HDRLEN,
-			     (int *) arg))
+			     (int __user *) arg))
 			break;
 		err = 0;
 		break;
@@ -702,7 +705,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 			break;
 
 		err = -EFAULT;
-		if (get_user(val,(int *) arg))
+		if (get_user(val,(int __user *) arg))
 			break;
 
 		if (val < (po->pppoe_dev->mtu
@@ -715,7 +718,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 
 	case PPPIOCSFLAGS:
 		err = -EFAULT;
-		if (get_user(val, (int *) arg))
+		if (get_user(val, (int __user *) arg))
 			break;
 		err = 0;
 		break;
@@ -736,7 +739,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		   PPPoE address to which frames are forwarded to */
 		err = -EFAULT;
 		if (copy_from_user(&po->pppoe_relay,
-				   (void*)arg,
+				   (void __user *)arg,
 				   sizeof(struct sockaddr_pppox)))
 			break;
 

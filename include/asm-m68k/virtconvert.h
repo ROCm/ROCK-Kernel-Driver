@@ -8,6 +8,7 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <asm/setup.h>
 #include <asm/page.h>
 
@@ -31,7 +32,7 @@ static inline unsigned long mm_ptov(unsigned long paddr)
 {
 	return (unsigned long)__va(paddr);
 }
-#endif 
+#endif
 
 #ifdef CONFIG_SINGLE_MEMORY_CHUNK
 static inline unsigned long virt_to_phys(void *vaddr)

@@ -81,6 +81,7 @@ struct qdisc_estimator
 {
 	struct qdisc_estimator	*next;
 	struct tc_stats		*stats;
+	spinlock_t		*stats_lock;
 	unsigned		interval;
 	int			ewma_log;
 	u64			last_bytes;
@@ -112,7 +113,7 @@ static void est_timer(unsigned long arg)
 		u32 npackets;
 		u32 rate;
 
-		spin_lock(st->lock);
+		spin_lock(e->stats_lock);
 		nbytes = st->bytes;
 		npackets = st->packets;
 		rate = (nbytes - e->last_bytes)<<(7 - idx);
@@ -124,14 +125,14 @@ static void est_timer(unsigned long arg)
 		e->last_packets = npackets;
 		e->avpps += ((long)rate - (long)e->avpps) >> e->ewma_log;
 		e->stats->pps = (e->avpps+0x1FF)>>10;
-		spin_unlock(st->lock);
+		spin_unlock(e->stats_lock);
 	}
 
 	mod_timer(&elist[idx].timer, jiffies + ((HZ/4)<<idx));
 	read_unlock(&est_lock);
 }
 
-int qdisc_new_estimator(struct tc_stats *stats, struct rtattr *opt)
+int qdisc_new_estimator(struct tc_stats *stats, spinlock_t *stats_lock, struct rtattr *opt)
 {
 	struct qdisc_estimator *est;
 	struct tc_estimator *parm = RTA_DATA(opt);
@@ -149,6 +150,7 @@ int qdisc_new_estimator(struct tc_stats *stats, struct rtattr *opt)
 	memset(est, 0, sizeof(*est));
 	est->interval = parm->interval + 2;
 	est->stats = stats;
+	est->stats_lock = stats_lock;
 	est->ewma_log = parm->ewma_log;
 	est->last_bytes = stats->bytes;
 	est->avbps = stats->bps<<5;

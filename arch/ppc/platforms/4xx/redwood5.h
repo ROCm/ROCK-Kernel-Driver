@@ -34,6 +34,7 @@ typedef struct board_info {
 
 
 #define SMC91111_BASE_ADDR	0xf2000300
+#define SMC91111_REG_SIZE	16
 #define SMC91111_IRQ		28
 
 #ifdef MAX_HWIFS

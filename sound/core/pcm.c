@@ -55,7 +55,7 @@ static int snd_pcm_control_ioctl(snd_card_t * card,
 		{
 			int device;
 
-			if (get_user(device, (int *)arg))
+			if (get_user(device, (int __user *)arg))
 				return -EFAULT;
 			device = device < 0 ? 0 : device + 1;
 			while (device < SNDRV_PCM_DEVICES) {
@@ -65,18 +65,19 @@ static int snd_pcm_control_ioctl(snd_card_t * card,
 			}
 			if (device == SNDRV_PCM_DEVICES)
 				device = -1;
-			if (put_user(device, (int *)arg))
+			if (put_user(device, (int __user *)arg))
 				return -EFAULT;
 			return 0;
 		}
 	case SNDRV_CTL_IOCTL_PCM_INFO:
 		{
-			snd_pcm_info_t *info = (snd_pcm_info_t *)arg;
+			snd_pcm_info_t __user *info;
 			unsigned int device, subdevice;
 			snd_pcm_stream_t stream;
 			snd_pcm_t *pcm;
 			snd_pcm_str_t *pstr;
 			snd_pcm_substream_t *substream;
+			info = (snd_pcm_info_t __user *)arg;
 			if (get_user(device, &info->device))
 				return -EFAULT;
 			if (device >= SNDRV_PCM_DEVICES)
@@ -106,7 +107,7 @@ static int snd_pcm_control_ioctl(snd_card_t * card,
 		{
 			int val;
 			
-			if (get_user(val, (int *)arg))
+			if (get_user(val, (int __user *)arg))
 				return -EFAULT;
 			control->prefer_pcm_subdevice = val;
 			return 0;
@@ -201,37 +202,37 @@ char *snd_pcm_tstamp_mode_names[] = {
 
 const char *snd_pcm_stream_name(snd_pcm_stream_t stream)
 {
-	snd_assert(stream <= SNDRV_PCM_STREAM_LAST, return 0);
+	snd_assert(stream <= SNDRV_PCM_STREAM_LAST, return NULL);
 	return snd_pcm_stream_names[stream];
 }
 
 const char *snd_pcm_access_name(snd_pcm_access_t access)
 {
-	snd_assert(access <= SNDRV_PCM_ACCESS_LAST, return 0);
+	snd_assert(access <= SNDRV_PCM_ACCESS_LAST, return NULL);
 	return snd_pcm_access_names[access];
 }
 
 const char *snd_pcm_format_name(snd_pcm_format_t format)
 {
-	snd_assert(format <= SNDRV_PCM_FORMAT_LAST, return 0);
+	snd_assert(format <= SNDRV_PCM_FORMAT_LAST, return NULL);
 	return snd_pcm_format_names[format];
 }
 
 const char *snd_pcm_subformat_name(snd_pcm_subformat_t subformat)
 {
-	snd_assert(subformat <= SNDRV_PCM_SUBFORMAT_LAST, return 0);
+	snd_assert(subformat <= SNDRV_PCM_SUBFORMAT_LAST, return NULL);
 	return snd_pcm_subformat_names[subformat];
 }
 
 const char *snd_pcm_tstamp_mode_name(snd_pcm_tstamp_t mode)
 {
-	snd_assert(mode <= SNDRV_PCM_TSTAMP_LAST, return 0);
+	snd_assert(mode <= SNDRV_PCM_TSTAMP_LAST, return NULL);
 	return snd_pcm_tstamp_mode_names[mode];
 }
 
 const char *snd_pcm_state_name(snd_pcm_state_t state)
 {
-	snd_assert(state <= SNDRV_PCM_STATE_LAST, return 0);
+	snd_assert(state <= SNDRV_PCM_STATE_LAST, return NULL);
 	return snd_pcm_state_names[state];
 }
 

@@ -1347,7 +1347,7 @@ static int ip_vs_zero_all(void)
 
 static int
 proc_do_defense_mode(ctl_table *table, int write, struct file * filp,
-		     void *buffer, size_t *lenp)
+		     void __user *buffer, size_t *lenp)
 {
 	int *valp = table->data;
 	int val = *valp;
@@ -1370,7 +1370,7 @@ proc_do_defense_mode(ctl_table *table, int write, struct file * filp,
 
 static int
 proc_do_sync_threshold(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp)
+		       void __user *buffer, size_t *lenp)
 {
 	int *valp = table->data;
 	int val[2];
@@ -1912,7 +1912,7 @@ static unsigned char set_arglen[SET_CMDID(IP_VS_SO_SET_MAX)+1] = {
 };
 
 static int
-do_ip_vs_set_ctl(struct sock *sk, int cmd, void *user, unsigned int len)
+do_ip_vs_set_ctl(struct sock *sk, int cmd, void __user *user, unsigned int len)
 {
 	int ret;
 	unsigned char arg[MAX_ARG_LEN];

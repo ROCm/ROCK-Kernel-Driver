@@ -239,7 +239,7 @@ static void recycle_iov_buf(ns_dev *card, struct sk_buff *iovb);
 static void dequeue_sm_buf(ns_dev *card, struct sk_buff *sb);
 static void dequeue_lg_buf(ns_dev *card, struct sk_buff *lb);
 static int ns_proc_read(struct atm_dev *dev, loff_t *pos, char *page);
-static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg);
+static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void __user *arg);
 static void which_list(ns_dev *card, struct sk_buff *skb);
 static void ns_poll(unsigned long arg);
 static int ns_parse_mac(char *mac, unsigned char *esi);
@@ -757,7 +757,7 @@ static int __devinit ns_init_card(int i, struct pci_dev *pcidev)
    for (j = 0; j < NUM_HB; j++)
    {
       struct sk_buff *hb;
-      hb = alloc_skb(NS_HBUFSIZE, GFP_KERNEL);
+      hb = __dev_alloc_skb(NS_HBUFSIZE, GFP_KERNEL);
       if (hb == NULL)
       {
          printk("nicstar%d: can't allocate %dth of %d huge buffers.\n",
@@ -777,7 +777,7 @@ static int __devinit ns_init_card(int i, struct pci_dev *pcidev)
    for (j = 0; j < NUM_LB; j++)
    {
       struct sk_buff *lb;
-      lb = alloc_skb(NS_LGSKBSIZE, GFP_KERNEL);
+      lb = __dev_alloc_skb(NS_LGSKBSIZE, GFP_KERNEL);
       if (lb == NULL)
       {
          printk("nicstar%d: can't allocate %dth of %d large buffers.\n",
@@ -813,7 +813,7 @@ static int __devinit ns_init_card(int i, struct pci_dev *pcidev)
    for (j = 0; j < NUM_SB; j++)
    {
       struct sk_buff *sb;
-      sb = alloc_skb(NS_SMSKBSIZE, GFP_KERNEL);
+      sb = __dev_alloc_skb(NS_SMSKBSIZE, GFP_KERNEL);
       if (sb == NULL)
       {
          printk("nicstar%d: can't allocate %dth of %d small buffers.\n",
@@ -1315,7 +1315,7 @@ static irqreturn_t ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
              card->index);
       for (i = 0; i < card->sbnr.min; i++)
       {
-         sb = alloc_skb(NS_SMSKBSIZE, GFP_ATOMIC);
+         sb = dev_alloc_skb(NS_SMSKBSIZE);
          if (sb == NULL)
          {
             writel(readl(card->membase + CFG) & ~NS_CFG_EFBIE, card->membase + CFG);
@@ -1341,7 +1341,7 @@ static irqreturn_t ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
              card->index);
       for (i = 0; i < card->lbnr.min; i++)
       {
-         lb = alloc_skb(NS_LGSKBSIZE, GFP_ATOMIC);
+         lb = dev_alloc_skb(NS_LGSKBSIZE);
          if (lb == NULL)
          {
             writel(readl(card->membase + CFG) & ~NS_CFG_EFBIE, card->membase + CFG);
@@ -2178,7 +2178,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
       cell = skb->data;
       for (i = ns_rsqe_cellcount(rsqe); i; i--)
       {
-         if ((sb = alloc_skb(NS_SMSKBSIZE, GFP_ATOMIC)) == NULL)
+         if ((sb = dev_alloc_skb(NS_SMSKBSIZE)) == NULL)
          {
             printk("nicstar%d: Can't allocate buffers for aal0.\n",
                    card->index);
@@ -2410,7 +2410,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
          if (hb == NULL)		/* No buffers in the queue */
          {
 
-            hb = alloc_skb(NS_HBUFSIZE, GFP_ATOMIC);
+            hb = dev_alloc_skb(NS_HBUFSIZE);
             if (hb == NULL)
             {
                printk("nicstar%d: Out of huge buffers.\n", card->index);
@@ -2424,7 +2424,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             else if (card->hbpool.count < card->hbnr.min)
 	    {
                struct sk_buff *new_hb;
-               if ((new_hb = alloc_skb(NS_HBUFSIZE, GFP_ATOMIC)) != NULL)
+               if ((new_hb = dev_alloc_skb(NS_HBUFSIZE)) != NULL)
                {
                   skb_queue_tail(&card->hbpool.queue, new_hb);
                   card->hbpool.count++;
@@ -2435,14 +2435,14 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
          if (--card->hbpool.count < card->hbnr.min)
          {
             struct sk_buff *new_hb;
-            if ((new_hb = alloc_skb(NS_HBUFSIZE, GFP_ATOMIC)) != NULL)
+            if ((new_hb = dev_alloc_skb(NS_HBUFSIZE)) != NULL)
             {
                skb_queue_tail(&card->hbpool.queue, new_hb);
                card->hbpool.count++;
             }
             if (card->hbpool.count < card->hbnr.min)
 	    {
-               if ((new_hb = alloc_skb(NS_HBUFSIZE, GFP_ATOMIC)) != NULL)
+               if ((new_hb = dev_alloc_skb(NS_HBUFSIZE)) != NULL)
                {
                   skb_queue_tail(&card->hbpool.queue, new_hb);
                   card->hbpool.count++;
@@ -2524,7 +2524,7 @@ static void ns_sb_destructor(struct sk_buff *sb)
 
    do
    {
-      sb = alloc_skb(NS_SMSKBSIZE, GFP_KERNEL);
+      sb = __dev_alloc_skb(NS_SMSKBSIZE, GFP_KERNEL);
       if (sb == NULL)
          break;
       skb_queue_tail(&card->sbpool.queue, sb);
@@ -2547,7 +2547,7 @@ static void ns_lb_destructor(struct sk_buff *lb)
 
    do
    {
-      lb = alloc_skb(NS_LGSKBSIZE, GFP_KERNEL);
+      lb = __dev_alloc_skb(NS_LGSKBSIZE, GFP_KERNEL);
       if (lb == NULL)
          break;
       skb_queue_tail(&card->lbpool.queue, lb);
@@ -2566,7 +2566,7 @@ static void ns_hb_destructor(struct sk_buff *hb)
 
    while (card->hbpool.count < card->hbnr.init)
    {
-      hb = alloc_skb(NS_HBUFSIZE, GFP_KERNEL);
+      hb = __dev_alloc_skb(NS_HBUFSIZE, GFP_KERNEL);
       if (hb == NULL)
          break;
       skb_queue_tail(&card->hbpool.queue, hb);
@@ -2638,7 +2638,7 @@ static void dequeue_sm_buf(ns_dev *card, struct sk_buff *sb)
    if (card->sbfqc < card->sbnr.init)
    {
       struct sk_buff *new_sb;
-      if ((new_sb = alloc_skb(NS_SMSKBSIZE, GFP_ATOMIC)) != NULL)
+      if ((new_sb = dev_alloc_skb(NS_SMSKBSIZE)) != NULL)
       {
          skb_queue_tail(&card->sbpool.queue, new_sb);
          skb_reserve(new_sb, NS_AAL0_HEADER);
@@ -2650,7 +2650,7 @@ static void dequeue_sm_buf(ns_dev *card, struct sk_buff *sb)
 #endif /* NS_USE_DESTRUCTORS */
    {
       struct sk_buff *new_sb;
-      if ((new_sb = alloc_skb(NS_SMSKBSIZE, GFP_ATOMIC)) != NULL)
+      if ((new_sb = dev_alloc_skb(NS_SMSKBSIZE)) != NULL)
       {
          skb_queue_tail(&card->sbpool.queue, new_sb);
          skb_reserve(new_sb, NS_AAL0_HEADER);
@@ -2671,7 +2671,7 @@ static void dequeue_lg_buf(ns_dev *card, struct sk_buff *lb)
    if (card->lbfqc < card->lbnr.init)
    {
       struct sk_buff *new_lb;
-      if ((new_lb = alloc_skb(NS_LGSKBSIZE, GFP_ATOMIC)) != NULL)
+      if ((new_lb = dev_alloc_skb(NS_LGSKBSIZE)) != NULL)
       {
          skb_queue_tail(&card->lbpool.queue, new_lb);
          skb_reserve(new_lb, NS_SMBUFSIZE);
@@ -2683,7 +2683,7 @@ static void dequeue_lg_buf(ns_dev *card, struct sk_buff *lb)
 #endif /* NS_USE_DESTRUCTORS */
    {
       struct sk_buff *new_lb;
-      if ((new_lb = alloc_skb(NS_LGSKBSIZE, GFP_ATOMIC)) != NULL)
+      if ((new_lb = dev_alloc_skb(NS_LGSKBSIZE)) != NULL)
       {
          skb_queue_tail(&card->lbpool.queue, new_lb);
          skb_reserve(new_lb, NS_SMBUFSIZE);
@@ -2765,7 +2765,7 @@ static int ns_proc_read(struct atm_dev *dev, loff_t *pos, char *page)
 
 
 
-static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
+static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void __user *arg)
 {
    ns_dev *card;
    pool_levels pl;
@@ -2776,7 +2776,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
    switch (cmd)
    {
       case NS_GETPSTAT:
-         if (get_user(pl.buftype, &((pool_levels *) arg)->buftype))
+         if (get_user(pl.buftype, &((pool_levels __user *) arg)->buftype))
 	    return -EFAULT;
          switch (pl.buftype)
 	 {
@@ -2812,7 +2812,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 	       return -ENOIOCTLCMD;
 
 	 }
-         if (!copy_to_user((pool_levels *) arg, &pl, sizeof(pl)))
+         if (!copy_to_user((pool_levels __user *) arg, &pl, sizeof(pl)))
 	    return (sizeof(pl));
 	 else
 	    return -EFAULT;
@@ -2820,7 +2820,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
       case NS_SETBUFLEV:
          if (!capable(CAP_NET_ADMIN))
 	    return -EPERM;
-         if (copy_from_user(&pl, (pool_levels *) arg, sizeof(pl)))
+         if (copy_from_user(&pl, (pool_levels __user *) arg, sizeof(pl)))
 	    return -EFAULT;
 	 if (pl.level.min >= pl.level.init || pl.level.init >= pl.level.max)
 	    return -EINVAL;
@@ -2877,7 +2877,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 	       {
                   struct sk_buff *sb;
 
-                  sb = alloc_skb(NS_SMSKBSIZE, GFP_KERNEL);
+                  sb = __dev_alloc_skb(NS_SMSKBSIZE, GFP_KERNEL);
                   if (sb == NULL)
                      return -ENOMEM;
                   skb_queue_tail(&card->sbpool.queue, sb);
@@ -2891,7 +2891,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 	       {
                   struct sk_buff *lb;
 
-                  lb = alloc_skb(NS_LGSKBSIZE, GFP_KERNEL);
+                  lb = __dev_alloc_skb(NS_LGSKBSIZE, GFP_KERNEL);
                   if (lb == NULL)
                      return -ENOMEM;
                   skb_queue_tail(&card->lbpool.queue, lb);
@@ -2920,7 +2920,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
                {
                   struct sk_buff *hb;
 
-                  hb = alloc_skb(NS_HBUFSIZE, GFP_KERNEL);
+                  hb = __dev_alloc_skb(NS_HBUFSIZE, GFP_KERNEL);
                   if (hb == NULL)
                      return -ENOMEM;
                   ns_grab_int_lock(card, flags);

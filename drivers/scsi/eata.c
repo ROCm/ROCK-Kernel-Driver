@@ -495,7 +495,7 @@
 #include <linux/spinlock.h>
 #include <scsi/scsicam.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
 

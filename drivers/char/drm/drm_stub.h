@@ -209,8 +209,8 @@ int DRM(stub_register)(const char *name, struct file_operations *fops,
 		ret2 = DRM(stub_info).info_register(name, fops, dev);
 		if (ret2) {
 			if (!ret1) {
-			unregister_chrdev(DRM_MAJOR, "drm");
-			class_simple_destroy(drm_class);
+				unregister_chrdev(DRM_MAJOR, "drm");
+				class_simple_destroy(drm_class);
 			}
 			if (!i)
 				inter_module_unregister("drm");

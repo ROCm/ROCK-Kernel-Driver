@@ -95,7 +95,7 @@ typedef struct _snd_pcm_ops {
 	int (*trigger)(snd_pcm_substream_t * substream, int cmd);
 	snd_pcm_uframes_t (*pointer)(snd_pcm_substream_t * substream);
 	int (*copy)(snd_pcm_substream_t *substream, int channel, snd_pcm_uframes_t pos,
-		    void *buf, snd_pcm_uframes_t count);
+		    void __user *buf, snd_pcm_uframes_t count);
 	int (*silence)(snd_pcm_substream_t *substream, int channel, 
 		       snd_pcm_uframes_t pos, snd_pcm_uframes_t count);
 	struct page *(*page)(snd_pcm_substream_t *substream, unsigned long offset);
@@ -479,7 +479,7 @@ int snd_pcm_notify(snd_pcm_notify_t *notify, int nfree);
 extern rwlock_t snd_pcm_link_rwlock;
 
 int snd_pcm_info(snd_pcm_substream_t * substream, snd_pcm_info_t *info);
-int snd_pcm_info_user(snd_pcm_substream_t * substream, snd_pcm_info_t *info);
+int snd_pcm_info_user(snd_pcm_substream_t * substream, snd_pcm_info_t __user *info);
 int snd_pcm_status(snd_pcm_substream_t * substream, snd_pcm_status_t *status);
 int snd_pcm_prepare(snd_pcm_substream_t *substream);
 int snd_pcm_start(snd_pcm_substream_t *substream);
@@ -881,13 +881,14 @@ void snd_pcm_tick_set(snd_pcm_substream_t *substream, unsigned long ticks);
 void snd_pcm_tick_elapsed(snd_pcm_substream_t *substream);
 void snd_pcm_period_elapsed(snd_pcm_substream_t *substream);
 snd_pcm_sframes_t snd_pcm_lib_write(snd_pcm_substream_t *substream,
-				    const void *buf, snd_pcm_uframes_t frames);
+				    const void __user *buf,
+				    snd_pcm_uframes_t frames);
 snd_pcm_sframes_t snd_pcm_lib_read(snd_pcm_substream_t *substream,
-				   void *buf, snd_pcm_uframes_t frames);
+				   void __user *buf, snd_pcm_uframes_t frames);
 snd_pcm_sframes_t snd_pcm_lib_writev(snd_pcm_substream_t *substream,
-				     void **bufs, snd_pcm_uframes_t frames);
+				     void __user **bufs, snd_pcm_uframes_t frames);
 snd_pcm_sframes_t snd_pcm_lib_readv(snd_pcm_substream_t *substream,
-				    void **bufs, snd_pcm_uframes_t frames);
+				    void __user **bufs, snd_pcm_uframes_t frames);
 
 int snd_pcm_limit_hw_rates(snd_pcm_runtime_t *runtime);
 

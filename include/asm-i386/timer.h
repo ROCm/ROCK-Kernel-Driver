@@ -4,11 +4,16 @@
 /**
  * struct timer_ops - used to define a timer source
  *
+ * @name: name of the timer.
  * @init: Probes and initializes the timer. Takes clock= override 
- *  string as an argument. Returns 0 on success, anything else on failure.
- * @mark_offset: called by the timer interrupt
- * @get_offset: called by gettimeofday().  Returns the number of ms since the
- *	last timer intruupt.
+ *        string as an argument. Returns 0 on success, anything else
+ *        on failure.
+ * @mark_offset: called by the timer interrupt.
+ * @get_offset:  called by gettimeofday(). Returns the number of microseconds
+ *               since the last timer interupt.
+ * @monotonic_clock: returns the number of nanoseconds since the init of the
+ *                   timer.
+ * @delay: delays this many clock cycles.
  */
 struct timer_opts{
 	char* name;
@@ -20,7 +25,6 @@ struct timer_opts{
 };
 
 #define TICK_SIZE (tick_nsec / 1000)
-#define CYCLONE_TIMER_FREQ 100000000
 
 extern struct timer_opts* select_timer(void);
 extern void clock_fallback(void);

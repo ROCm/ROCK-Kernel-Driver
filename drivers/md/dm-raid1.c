@@ -103,7 +103,7 @@ struct region {
 	struct list_head list;
 
 	atomic_t pending;
-	struct bio *delayed_bios;
+	struct bio_list delayed_bios;
 };
 
 /*
@@ -187,13 +187,11 @@ static int rh_init(struct region_hash *rh, struct mirror_set *ms,
 static void rh_exit(struct region_hash *rh)
 {
 	unsigned int h;
-	struct region *reg;
-	struct list_head *tmp, *tmp2;
+	struct region *reg, *nreg;
 
 	BUG_ON(!list_empty(&rh->quiesced_regions));
 	for (h = 0; h < rh->nr_buckets; h++) {
-		list_for_each_safe (tmp, tmp2, rh->buckets + h) {
-			reg = list_entry(tmp, struct region, hash_list);
+		list_for_each_entry_safe(reg, nreg, rh->buckets + h, hash_list) {
 			BUG_ON(atomic_read(&reg->pending));
 			mempool_free(reg, rh->region_pool);
 		}
@@ -244,7 +242,7 @@ static struct region *__rh_alloc(struct region_hash *rh, region_t region)
 	INIT_LIST_HEAD(&nreg->list);
 
 	atomic_set(&nreg->pending, 0);
-	nreg->delayed_bios = NULL;
+	bio_list_init(&nreg->delayed_bios);
 	write_lock_irq(&rh->hash_lock);
 
 	reg = __rh_lookup(rh, region);
@@ -310,14 +308,12 @@ static inline int rh_in_sync(struct region_hash *rh,
 	return state == RH_CLEAN || state == RH_DIRTY;
 }
 
-static void dispatch_bios(struct mirror_set *ms, struct bio *bio)
+static void dispatch_bios(struct mirror_set *ms, struct bio_list *bio_list)
 {
-	struct bio *nbio;
+	struct bio *bio;
 
-	while (bio) {
-		nbio = bio->bi_next;
+	while ((bio = bio_list_pop(bio_list))) {
 		queue_bio(ms, bio, WRITE);
-		bio = nbio;
 	}
 }
 
@@ -361,10 +357,13 @@ static void rh_update_states(struct region_hash *rh)
 	list_for_each_entry_safe (reg, next, &recovered, list) {
 		rh->log->type->clear_region(rh->log, reg->key);
 		rh->log->type->complete_resync_work(rh->log, reg->key, 1);
-		dispatch_bios(rh->ms, reg->delayed_bios);
+		dispatch_bios(rh->ms, &reg->delayed_bios);
 		up(&rh->recovery_count);
 		mempool_free(reg, rh->region_pool);
 	}
+
+	if (!list_empty(&recovered))
+		rh->log->type->flush(rh->log);
 
 	list_for_each_entry_safe (reg, next, &clean, list)
 		mempool_free(reg, rh->region_pool);
@@ -513,8 +512,7 @@ static void rh_delay(struct region_hash *rh, struct bio *bio)
 
 	read_lock(&rh->hash_lock);
 	reg = __rh_find(rh, bio_to_region(rh, bio));
-	bio->bi_next = reg->delayed_bios;
-	reg->delayed_bios = bio;
+	bio_list_add(&reg->delayed_bios, bio);
 	read_unlock(&rh->hash_lock);
 }
 
@@ -596,8 +594,6 @@ static void recovery_complete(int read_err, unsigned int write_err,
 {
 	struct region *reg = (struct region *) context;
 
-	/* FIXME: we need to flush the log */
-
 	/* FIXME: better error handling */
 	rh_recovery_end(reg, read_err || write_err);
 }
@@ -606,7 +602,7 @@ static int recover(struct mirror_set *ms, struct region *reg)
 {
 	int r;
 	unsigned int i;
-	struct io_region from, to[ms->nr_mirrors - 1], *dest;
+	struct io_region from, to[KCOPYD_MAX_REGIONS], *dest;
 	struct mirror *m;
 	unsigned long flags = 0;
 
@@ -761,7 +757,7 @@ static void write_callback(unsigned long error, void *context)
 static void do_write(struct mirror_set *ms, struct bio *bio)
 {
 	unsigned int i;
-	struct io_region io[ms->nr_mirrors];
+	struct io_region io[KCOPYD_MAX_REGIONS+1];
 	struct mirror *m;
 
 	for (i = 0; i < ms->nr_mirrors; i++) {
@@ -849,9 +845,9 @@ static void do_mirror(struct mirror_set *ms)
 	struct bio_list reads, writes;
 
 	spin_lock(&ms->lock);
-	memcpy(&reads, &ms->reads, sizeof(reads));
+	reads = ms->reads;
+	writes = ms->writes;
 	bio_list_init(&ms->reads);
-	memcpy(&writes, &ms->writes, sizeof(writes));
 	bio_list_init(&ms->writes);
 	spin_unlock(&ms->lock);
 
@@ -859,7 +855,6 @@ static void do_mirror(struct mirror_set *ms)
 	do_recovery(ms);
 	do_reads(ms, &reads);
 	do_writes(ms, &writes);
-	dm_table_unplug_all(ms->ti->table);
 }
 
 static void do_work(void *ignored)
@@ -1033,7 +1028,7 @@ static int mirror_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	argc -= args_used;
 
 	if (!argc || sscanf(argv[0], "%u", &nr_mirrors) != 1 ||
-	    nr_mirrors < 2) {
+	    nr_mirrors < 2 || nr_mirrors > KCOPYD_MAX_REGIONS + 1) {
 		ti->error = "dm-mirror: Invalid number of mirrors";
 		dm_destroy_dirty_log(dl);
 		return -EINVAL;
@@ -1190,32 +1185,32 @@ static int mirror_status(struct dm_target *ti, status_type_t type,
 	unsigned int m, sz = 0;
 	struct mirror_set *ms = (struct mirror_set *) ti->private;
 
+#define EMIT(x...) sz += ((sz >= maxlen) ? \
+			  0 : scnprintf(result + sz, maxlen - sz, x))
+
 	switch (type) {
 	case STATUSTYPE_INFO:
-		sz += scnprintf(result + sz, maxlen - sz, "%d ", ms->nr_mirrors);
+		EMIT("%d ", ms->nr_mirrors);
 
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			sz += scnprintf(result + sz, maxlen - sz, "%s ", buffer);
+			EMIT("%s ", buffer);
 		}
 
-		sz += scnprintf(result + sz, maxlen - sz,
-			       SECTOR_FORMAT "/" SECTOR_FORMAT,
-			       ms->rh.log->type->get_sync_count(ms->rh.log),
-			       ms->nr_regions);
+		EMIT(SECTOR_FORMAT "/" SECTOR_FORMAT,
+		     ms->rh.log->type->get_sync_count(ms->rh.log),
+		     ms->nr_regions);
 		break;
 
 	case STATUSTYPE_TABLE:
-		sz += scnprintf(result + sz, maxlen - sz,
-			       "%s 1 " SECTOR_FORMAT " %d ",
-			       ms->rh.log->type->name, ms->rh.region_size,
-			       ms->nr_mirrors);
+		EMIT("%s 1 " SECTOR_FORMAT " %d ",
+		     ms->rh.log->type->name, ms->rh.region_size,
+		     ms->nr_mirrors);
 
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			sz += scnprintf(result + sz, maxlen - sz,
-				       "%s " SECTOR_FORMAT " ",
-				       buffer, ms->mirror[m].offset);
+			EMIT("%s " SECTOR_FORMAT " ",
+			     buffer, ms->mirror[m].offset);
 		}
 	}
 

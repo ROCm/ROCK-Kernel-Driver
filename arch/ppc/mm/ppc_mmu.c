@@ -137,10 +137,10 @@ void __init setbat(int index, unsigned long virt, unsigned long phys,
 	int wimgxpp;
 	union ubat *bat = BATS[index];
 
-#ifdef CONFIG_SMP
-	if ((flags & _PAGE_NO_CACHE) == 0)
+	if (((flags & _PAGE_NO_CACHE) == 0) &&
+	    (cur_cpu_spec[0]->cpu_features & CPU_FTR_NEED_COHERENT))
 		flags |= _PAGE_COHERENT;
-#endif
+
 	bl = (size >> 17) - 1;
 	if (PVR_VER(mfspr(PVR)) != 1) {
 		/* 603, 604, etc. */

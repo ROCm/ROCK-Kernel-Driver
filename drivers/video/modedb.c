@@ -391,7 +391,7 @@ static int my_atoi(const char *name)
 }
 
 /**
- *	__fb_try_mode - test a video mode
+ *	fb_try_mode - test a video mode
  *	@var: frame buffer user defined part of display
  *	@info: frame buffer info structure
  *	@mode: frame buffer video mode structure
@@ -403,10 +403,10 @@ static int my_atoi(const char *name)
  *
  */
 
-int __fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
+int fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
 		  const struct fb_videomode *mode, unsigned int bpp)
 {
-    int err = 1;
+    int err = 0;
 
     DPRINTK("Trying mode %s %dx%d-%d@%d\n", mode->name ? mode->name : "noname",
 	    mode->xres, mode->yres, bpp, mode->refresh);
@@ -430,9 +430,8 @@ int __fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
     if (info->fbops->fb_check_var)
     	err = info->fbops->fb_check_var(var, info);
     var->activate &= ~FB_ACTIVATE_TEST;
-    return !err;
+    return err;
 }
-
 
 /**
  *	fb_find_mode - finds a valid video mode
@@ -491,6 +490,7 @@ int fb_find_mode(struct fb_var_screeninfo *var,
 	int res_specified = 0, bpp_specified = 0, refresh_specified = 0;
 	unsigned int xres = 0, yres = 0, bpp = default_bpp, refresh = 0;
 	int yres_specified = 0;
+	u32 best = -1, diff = -1;
 
 	for (i = namelen-1; i >= 0; i--) {
 	    switch (name[i]) {
@@ -530,24 +530,40 @@ int fb_find_mode(struct fb_var_screeninfo *var,
 	}
 done:
 	for (i = refresh_specified; i >= 0; i--) {
-	    DPRINTK("Trying specified video mode%s\n",
-		    i ? "" : " (ignoring refresh rate)");
+	    DPRINTK("Trying specified video mode%s %ix%i\n",
+		    i ? "" : " (ignoring refresh rate)", xres, yres);
 	    for (j = 0; j < dbsize; j++)
 		if ((name_matches(db[j], name, namelen) ||
 		     (res_specified && res_matches(db[j], xres, yres))) &&
 		    (!i || db[j].refresh == refresh) &&
-		    __fb_try_mode(var, info, &db[j], bpp))
+		    !fb_try_mode(var, info, &db[j], bpp))
 		    return 2-i;
+	}
+	DPRINTK("Trying best-fit modes\n");
+	for (i = 0; i < dbsize; i++) {
+	    if (xres <= db[i].xres && yres <= db[i].yres) {
+		DPRINTK("Trying %ix%i\n", db[i].xres, db[i].yres);
+		if (!fb_try_mode(var, info, &db[i], bpp)) {
+		    if (diff > (db[i].xres - xres) + (db[i].yres - yres)) {
+			diff = (db[i].xres - xres) + (db[i].yres - yres);
+			best = i;
+		    }
+		}
+	    }
+	}
+	if (best != -1) {
+	    fb_try_mode(var, info, &db[best], bpp);
+	    return 5;
 	}
     }
 
     DPRINTK("Trying default video mode\n");
-    if (__fb_try_mode(var, info, default_mode, default_bpp))
+    if (!fb_try_mode(var, info, default_mode, default_bpp))
 	return 3;
 
     DPRINTK("Trying all modes\n");
     for (i = 0; i < dbsize; i++)
-	if (__fb_try_mode(var, info, &db[i], default_bpp))
+	if (!fb_try_mode(var, info, &db[i], default_bpp))
 	    return 4;
 
     DPRINTK("No valid mode found\n");

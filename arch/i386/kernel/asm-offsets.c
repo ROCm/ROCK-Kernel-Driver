@@ -6,30 +6,60 @@
 
 #include <linux/sched.h>
 #include <linux/signal.h>
+#include <linux/personality.h>
 #include <asm/ucontext.h>
 #include "sigframe.h"
 #include <asm/fixmap.h>
+#include <asm/processor.h>
+#include <asm/thread_info.h>
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
 
 #define BLANK() asm volatile("\n->" : : )
 
+#define OFFSET(sym, str, mem) \
+	DEFINE(sym, offsetof(struct str, mem));
+
 void foo(void)
 {
-	DEFINE(SIGCONTEXT_eax, offsetof (struct sigcontext, eax));
-	DEFINE(SIGCONTEXT_ebx, offsetof (struct sigcontext, ebx));
-	DEFINE(SIGCONTEXT_ecx, offsetof (struct sigcontext, ecx));
-	DEFINE(SIGCONTEXT_edx, offsetof (struct sigcontext, edx));
-	DEFINE(SIGCONTEXT_esi, offsetof (struct sigcontext, esi));
-	DEFINE(SIGCONTEXT_edi, offsetof (struct sigcontext, edi));
-	DEFINE(SIGCONTEXT_ebp, offsetof (struct sigcontext, ebp));
-	DEFINE(SIGCONTEXT_esp, offsetof (struct sigcontext, esp));
-	DEFINE(SIGCONTEXT_eip, offsetof (struct sigcontext, eip));
+	OFFSET(SIGCONTEXT_eax, sigcontext, eax);
+	OFFSET(SIGCONTEXT_ebx, sigcontext, ebx);
+	OFFSET(SIGCONTEXT_ecx, sigcontext, ecx);
+	OFFSET(SIGCONTEXT_edx, sigcontext, edx);
+	OFFSET(SIGCONTEXT_esi, sigcontext, esi);
+	OFFSET(SIGCONTEXT_edi, sigcontext, edi);
+	OFFSET(SIGCONTEXT_ebp, sigcontext, ebp);
+	OFFSET(SIGCONTEXT_esp, sigcontext, esp);
+	OFFSET(SIGCONTEXT_eip, sigcontext, eip);
 	BLANK();
 
-	DEFINE(RT_SIGFRAME_sigcontext,
-	       offsetof (struct rt_sigframe, uc.uc_mcontext));
+	OFFSET(CPUINFO_x86, cpuinfo_x86, x86);
+	OFFSET(CPUINFO_x86_vendor, cpuinfo_x86, x86_vendor);
+	OFFSET(CPUINFO_x86_model, cpuinfo_x86, x86_model);
+	OFFSET(CPUINFO_x86_mask, cpuinfo_x86, x86_mask);
+	OFFSET(CPUINFO_hard_math, cpuinfo_x86, hard_math);
+	OFFSET(CPUINFO_cpuid_level, cpuinfo_x86, cpuid_level);
+	OFFSET(CPUINFO_x86_capability, cpuinfo_x86, x86_capability);
+	OFFSET(CPUINFO_x86_vendor_id, cpuinfo_x86, x86_vendor_id);
+	BLANK();
+
+	OFFSET(TI_task, thread_info, task);
+	OFFSET(TI_exec_domain, thread_info, exec_domain);
+	OFFSET(TI_flags, thread_info, flags);
+	OFFSET(TI_status, thread_info, status);
+	OFFSET(TI_cpu, thread_info, cpu);
+	OFFSET(TI_preempt_count, thread_info, preempt_count);
+	OFFSET(TI_addr_limit, thread_info, addr_limit);
+	OFFSET(TI_restart_block, thread_info, restart_block);
+	BLANK();
+
+	OFFSET(EXEC_DOMAIN_handler, exec_domain, handler);
+	OFFSET(RT_SIGFRAME_sigcontext, rt_sigframe, uc.uc_mcontext);
+
+	/* Offset from the sysenter stack to tss.esp0 */
+	DEFINE(TSS_sysenter_esp0, offsetof(struct tss_struct, esp0) -
+		 sizeof(struct tss_struct));
 
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
 }

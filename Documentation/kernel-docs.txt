@@ -694,7 +694,7 @@
        produced during the week. Published every Thursday.
        
      * Name: "Kernel Traffic"
-       URL: http://kt.zork.net/kernel-traffic/
+       URL: http://www.kerneltraffic.org/kernel-traffic/
        Keywords: linux-kernel mailing list, weekly kernel news.
        Description: Weekly newsletter covering the most relevant
        discussions of the linux-kernel mailing list.

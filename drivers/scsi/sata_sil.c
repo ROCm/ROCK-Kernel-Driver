@@ -1,5 +1,9 @@
 /*
- *  ata_sil.c - Silicon Image SATA
+ *  sata_sil.c - Silicon Image SATA
+ *
+ *  Maintained by:  Jeff Garzik <jgarzik@pobox.com>
+ *  		    Please ALWAYS copy linux-ide@vger.kernel.org
+ *		    on emails.
  *
  *  Copyright 2003 Red Hat, Inc.
  *  Copyright 2003 Benjamin Herrenschmidt <benh@kernel.crashing.org>
@@ -30,7 +34,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sil"
@@ -82,6 +86,7 @@ struct sil_drivelist {
 	{ "ST360015AS",		SIL_QUIRK_MOD15WRITE },
 	{ "ST380023AS",		SIL_QUIRK_MOD15WRITE },
 	{ "ST3120023AS",	SIL_QUIRK_MOD15WRITE },
+	{ "ST3160023AS",	SIL_QUIRK_MOD15WRITE },
 	{ "ST340014ASL",	SIL_QUIRK_MOD15WRITE },
 	{ "ST360014ASL",	SIL_QUIRK_MOD15WRITE },
 	{ "ST380011ASL",	SIL_QUIRK_MOD15WRITE },
@@ -125,10 +130,13 @@ static struct ata_port_operations sil_ops = {
 	.exec_command		= ata_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
 	.post_set_mode		= sil_post_set_mode,
+	.bmdma_setup            = ata_bmdma_setup_mmio,
 	.bmdma_start            = ata_bmdma_start_mmio,
-	.fill_sg		= ata_fill_sg,
+	.qc_prep		= ata_qc_prep,
+	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
 	.irq_handler		= ata_interrupt,
+	.irq_clear		= ata_bmdma_irq_clear,
 	.scr_read		= sil_scr_read,
 	.scr_write		= sil_scr_write,
 	.port_start		= ata_port_start,
@@ -262,7 +270,7 @@ static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val)
  *
  *	20040111 - Seagate drives affected by the Mod15Write bug are blacklisted
  *	The Maxtor quirk is in the blacklist, but I'm keeping the original
- *	pessimistic fix for the following reasons:
+ *	pessimistic fix for the following reasons...
  *	- There seems to be less info on it, only one device gleaned off the
  *	Windows	driver, maybe only one is affected.  More info would be greatly
  *	appreciated.
@@ -271,8 +279,14 @@ static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val)
 static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 {
 	unsigned int n, quirks = 0;
-	const char *s = &dev->product[0];
-	unsigned int len = strnlen(s, sizeof(dev->product));
+	unsigned char model_num[40];
+	const char *s;
+	unsigned int len;
+
+	ata_dev_id_string(dev, model_num, ATA_ID_PROD_OFS,
+			  sizeof(model_num));
+	s = &model_num[0];
+	len = strnlen(s, sizeof(model_num));
 
 	/* ATAPI specifies that empty space is blank-filled; remove blanks */
 	while ((len > 0) && (s[len - 1] == ' '))
@@ -291,6 +305,7 @@ static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 		       ap->id, dev->devno);
 		ap->host->max_sectors = 15;
 		ap->host->hostt->max_sectors = 15;
+		dev->flags |= ATA_DFLAG_LOCK_SECTORS;
 		return;
 	}
 
@@ -326,7 +341,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
-		return rc;
+		goto err_out;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
@@ -411,6 +426,8 @@ err_out_free_ent:
 	kfree(probe_ent);
 err_out_regions:
 	pci_release_regions(pdev);
+err_out:
+	pci_disable_device(pdev);
 	return rc;
 }
 

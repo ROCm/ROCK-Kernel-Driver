@@ -318,8 +318,9 @@ struct ohci_regs {
 /* hcd-private per-urb state */
 typedef struct urb_priv {
 	struct ed		*ed;
-	__u16			length;		// # tds in this request
-	__u16			td_cnt;		// tds already serviced
+	u16			length;		// # tds in this request
+	u16			td_cnt;		// tds already serviced
+	struct list_head	pending;
 	struct td		*td [0];	// all TDs in this request
 
 } urb_priv_t;
@@ -364,12 +365,17 @@ struct ohci_hcd {
 	struct dma_pool		*td_cache;
 	struct dma_pool		*ed_cache;
 	struct td		*td_hash [TD_HASH_SIZE];
+	struct list_head	pending;
 
 	/*
 	 * driver state
 	 */
 	int			load [NUM_INTS];
 	u32 			hc_control;	/* copy of hc control reg */
+	unsigned long		next_statechange;	/* suspend/resume */
+	u32			fminterval;		/* saved register */
+
+	struct work_struct	rh_resume;
 
 	unsigned long		flags;		/* for HC bugs */
 #define	OHCI_QUIRK_AMD756	0x01			/* erratum #4 */
@@ -383,6 +389,24 @@ struct ohci_hcd {
 };
 
 #define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)
+
+/*-------------------------------------------------------------------------*/
+
+static inline void disable (struct ohci_hcd *ohci)
+{
+	ohci->hcd.state = USB_STATE_HALT;
+}
+
+#define	FI			0x2edf		/* 12000 bits per frame (-1) */
+#define	DEFAULT_FMINTERVAL 	((((6 * (FI - 210)) / 7) << 16) | FI)
+#define LSTHRESH		0x628		/* lowspeed bit threshold */
+
+static inline void periodic_reinit (struct ohci_hcd *ohci)
+{
+	writel (ohci->fminterval, &ohci->regs->fminterval);
+	writel (((9 * FI) / 10) & 0x3fff, &ohci->regs->periodicstart);
+	writel (LSTHRESH, &ohci->regs->lsthresh);
+}
 
 /*-------------------------------------------------------------------------*/
 
@@ -405,3 +429,22 @@ struct ohci_hcd {
 #	define ohci_vdbg(ohci, fmt, args...) do { } while (0)
 #endif
 
+#ifdef CONFIG_ARCH_LH7A404
+	/* Marc Singer: at the time this code was written, the LH7A404
+	 * had a problem reading the USB host registers.  This
+	 * implementation of the ohci_readl function performs the read
+	 * twice as a work-around.
+	 */
+static inline unsigned int ohci_readl (void* regs)
+{
+	*(volatile unsigned int*) regs;
+	return *(volatile unsigned int*) regs;
+}
+#else
+	/* Standard version of ohci_readl uses standard, platform
+	 * specific implementation. */
+static inline unsigned int ohci_readl (void* regs)
+{
+	return readl (regs);
+}
+#endif

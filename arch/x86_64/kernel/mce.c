@@ -24,9 +24,9 @@
 #define MISC_MCELOG_MINOR 227
 #define NR_BANKS 5
 
-static int mce_disabled;
+static int mce_disabled __initdata;
 /* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic,
-   3: never panic or exit (for testing only) */ 
+   3: never panic or exit (for testing only) */
 static int tolerant = 1;
 static int banks;
 static unsigned long bank[NR_BANKS] = { [0 ... NR_BANKS-1] = ~0UL };
@@ -143,6 +143,10 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		return;
 	if (!(m.mcgstatus & MCG_STATUS_RIPV))
 		kill_it = 1;
+	if (regs) {
+		m.rip = regs->rip;
+		m.cs = regs->cs;
+	}
 	
 	rdtscll(mcestart);
 	mb();
@@ -150,24 +154,29 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	for (i = 0; i < banks; i++) {
 		if (!bank[i])
 			continue;
-
-		if (regs) {
-			m.rip = regs->rip;
-			m.cs = regs->cs;
-		}
-				
+		
 		m.misc = 0; 
 		m.addr = 0;
 
 		rdmsrl(MSR_IA32_MC0_STATUS + i*4, m.status);
 		if ((m.status & MCI_STATUS_VAL) == 0)
 			continue;
-		/* Should be implied by the banks check above, but 
+		/* Should be implied by the banks check above, but
 		   check it anyways */
 		if ((m.status & MCI_STATUS_EN) == 0)
 			continue;
 
-		/* In theory _OVER could be a nowayout too, but 
+		/* Did this bank cause the exception? */
+		/* Assume that the bank with uncorrectable errors did it,
+		   and that there is only a single one. */
+		if (m.status & MCI_STATUS_UC) {
+			panicm = m;
+		} else {
+			m.rip = 0;
+			m.cs = 0;
+		}
+
+		/* In theory _OVER could be a nowayout too, but
 		   assume any overflowed errors were no fatal. */
 		nowayout |= !!(m.status & MCI_STATUS_PCC);
 		kill_it |= !!(m.status & MCI_STATUS_UC);
@@ -179,17 +188,6 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 			rdmsrl(MSR_IA32_MC0_ADDR + i*4, m.addr);
 
 		rdtscll(m.tsc);
-
-		/* Did this bank cause the exception? */ 
-		/* Assume that the bank with uncorrectable errors did it,
-		   and that there is only a single one. */
-		if (m.status & MCI_STATUS_UC) { 
-			panicm = m; 
-		} else {
-			m.rip = 0;
-			m.cs = 0;
-		}
-
 		wrmsrl(MSR_IA32_MC0_STATUS + i*4, 0);
 		mce_log(&m);
 	}
@@ -199,7 +197,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	if (!regs)
 		return;
 	if (nowayout)
-		mce_panic("Machine check", &panicm, mcestart);
+		mce_panic("Machine check", &m, mcestart);
 	if (kill_it) {
 		int user_space = 0;
 
@@ -219,7 +217,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 
 		/* do_exit takes an awful lot of locks and has as slight risk 
 		   of deadlocking. If you don't want that don't set tolerant >= 2 */
-		if (tolerant < 3) 
+		if (tolerant < 3)
 			do_exit(SIGBUS);
 	}
 }
@@ -326,12 +324,12 @@ static void collect_tscs(void *data)
 	rdtscll(cpu_tsc[smp_processor_id()]);
 } 
 
-static ssize_t mce_read(struct file *filp, char *ubuf, size_t usize, loff_t *off)
+static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize, loff_t *off)
 {
 	unsigned long cpu_tsc[NR_CPUS];
 	static DECLARE_MUTEX(mce_read_sem);
 	unsigned next;
-	char *buf = ubuf;
+	char __user *buf = ubuf;
 	int i, err;
 
 	down(&mce_read_sem); 
@@ -377,19 +375,20 @@ static ssize_t mce_read(struct file *filp, char *ubuf, size_t usize, loff_t *off
 
 static int mce_ioctl(struct inode *i, struct file *f,unsigned int cmd, unsigned long arg)
 {
+	int __user *p = (int __user *)arg;
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM; 
 	switch (cmd) {
 	case MCE_GET_RECORD_LEN: 
-		return put_user(sizeof(struct mce), (int *)arg);
+		return put_user(sizeof(struct mce), p);
 	case MCE_GET_LOG_LEN:
-		return put_user(MCE_LOG_LEN, (int *)arg);		
+		return put_user(MCE_LOG_LEN, p);		
 	case MCE_GETCLEAR_FLAGS: {
 		unsigned flags;
 		do { 
 			flags = mcelog.flags;
 		} while (cmpxchg(&mcelog.flags, flags, 0) != flags); 
-		return put_user(flags, (int *)arg); 
+		return put_user(flags, p); 
 	}
 	default:
 		return -ENOTTY; 

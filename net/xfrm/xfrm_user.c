@@ -78,6 +78,15 @@ static int verify_encap_tmpl(struct rtattr **xfrma)
 	if ((rt->rta_len - sizeof(*rt)) < sizeof(*encap))
 		return -EINVAL;
 
+	encap = RTA_DATA(rt);
+	switch (encap->encap_type) {
+	case UDP_ENCAP_ESPINUDP:
+	case UDP_ENCAP_ESPINUDP_NON_IKE:
+		break;
+	default:
+		return -ENOPROTOOPT;
+	}
+
 	return 0;
 }
 
@@ -257,6 +266,8 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	err = verify_newsa_info(p, (struct rtattr **) xfrma);
 	if (err)
 		return err;
+
+	xfrm_probe_algs();
 
 	x = xfrm_state_construct(p, (struct rtattr **) xfrma, &err);
 	if (!x)
@@ -679,7 +690,6 @@ static int copy_to_user_tmpl(struct xfrm_policy *xp, struct sk_buff *skb)
 		up->reqid = kp->reqid;
 		up->mode = kp->mode;
 		up->share = kp->share;
-		up->family = xp->family;
 		up->optional = kp->optional;
 		up->aalgos = kp->aalgos;
 		up->ealgos = kp->ealgos;
@@ -806,6 +816,20 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	return err;
 }
 
+static int xfrm_flush_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
+{
+	struct xfrm_usersa_flush *p = NLMSG_DATA(nlh);
+
+	xfrm_state_flush(p->proto);
+	return 0;
+}
+
+static int xfrm_flush_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
+{
+	xfrm_policy_flush();
+	return 0;
+}
+
 static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_usersa_info)),	/* NEW SA */
 	NLMSG_LENGTH(sizeof(struct xfrm_usersa_id)),	/* DEL SA */
@@ -818,6 +842,9 @@ static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_user_expire)),	/* EXPIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)),/* UPD POLICY */
 	NLMSG_LENGTH(sizeof(struct xfrm_usersa_info)),	/* UPD SA */
+	NLMSG_LENGTH(sizeof(struct xfrm_user_polexpire)), /* POLEXPIRE */
+	NLMSG_LENGTH(sizeof(struct xfrm_usersa_flush)),	/* FLUSH SA */
+	NLMSG_LENGTH(0),				/* FLUSH POLICY */
 };
 
 static struct xfrm_link {
@@ -841,6 +868,9 @@ static struct xfrm_link {
 	{},
 	{	.doit	=	xfrm_add_policy 	},
 	{	.doit	=	xfrm_add_sa, 		},
+	{},
+	{	.doit	=	xfrm_flush_sa		},
+	{	.doit	=	xfrm_flush_policy	},
 };
 
 static int xfrm_done(struct netlink_callback *cb)

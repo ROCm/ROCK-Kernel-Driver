@@ -349,10 +349,10 @@ static int sst_calc_pll(const int freq, int *freq_out, struct pll_timing *t)
 		if (m >= 128)
 			break;
 		fout = (DAC_FREF * (m + 2)) / ((1 << p) * (n + 2));
-		if ((ABS(fout - freq) < best_err) && (m > 0)) {
+		if ((abs(fout - freq) < best_err) && (m > 0)) {
 			best_n = n;
 			best_m = m;
-			best_err = ABS(fout - freq);
+			best_err = abs(fout - freq);
 			/* we get the lowest m , allowing 0.5% error in freq*/
 			if (200*best_err < freq) break;
 		}
@@ -790,7 +790,7 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
 		
 	/* fills lfb with #arg pixels */
 	case _IOW('F', 0xdc, u32):	/* 0x46dc */
-		if (copy_from_user(&val, (void *)arg, sizeof(val)))
+		if (copy_from_user(&val, (void __user *)arg, sizeof(val)))
 			return -EFAULT;
 		if (val > info->fix.smem_len)
 			val = info->fix.smem_len;
@@ -801,7 +801,7 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
 		
 	/* change VGA pass_through mode */
 	case _IOW('F', 0xdd, u32):	/* 0x46dd */
-		if (copy_from_user(&val, (void *)arg, sizeof(val)))
+		if (copy_from_user(&val, (void __user *)arg, sizeof(val)))
 			return -EFAULT;
 		pci_read_config_dword(sst_dev, PCI_INIT_ENABLE, &tmp);
 		pci_write_config_dword(sst_dev, PCI_INIT_ENABLE,

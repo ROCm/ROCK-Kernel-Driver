@@ -253,21 +253,19 @@ xfs_contig_bits(uint *map, uint	size, uint start_bit)
 	start_bit &= (NBWORD - 1);
 	if (start_bit) {
 		tmp = *p++;
-		/* set to one first offset bits */
+		/* set to one first offset bits prior to start */
 		tmp |= (~0U >> (NBWORD-start_bit));
-		ASSERT(size >= NBWORD);
 		if (tmp != ~0U)
 			goto found;
 		result += NBWORD;
 		size -= NBWORD;
 	}
-	while (size >= NBWORD) {
+	while (size) {
 		if ((tmp = *p++) != ~0U)
 			goto found;
 		result += NBWORD;
 		size -= NBWORD;
 	}
-	ASSERT(!size);
 	return result - start_bit;
 found:
 	return result + ffz(tmp) - start_bit;
@@ -295,25 +293,20 @@ int xfs_next_bit(uint *map, uint size, uint start_bit)
 	start_bit &= (NBWORD - 1);
 	if (start_bit) {
 		tmp = *p++;
-		/* set to zero first offset bits */
+		/* set to zero first offset bits prior to start */
 		tmp &= (~0U << start_bit);
-		if (size < NBWORD)
-			goto found_first;
 		if (tmp != 0U)
-			goto found_middle;
-		size -= NBWORD;
+			goto found;
 		result += NBWORD;
+		size -= NBWORD;
 	}
-	while (size >= NBWORD) {
+	while (size) {
 		if ((tmp = *p++) != 0U)
-			goto found_middle;
+			goto found;
 		result += NBWORD;
 		size -= NBWORD;
 	}
-	if (!size)
-		return -1;
-	tmp = *p;
-found_first:
-found_middle:
+	return -1;
+found:
 	return result + ffs(tmp) - 1;
 }

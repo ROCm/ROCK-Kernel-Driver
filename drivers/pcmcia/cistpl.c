@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/major.h>
@@ -78,19 +79,21 @@ static const u_int exponent[] = {
 
 /* Parameters that can be set with 'insmod' */
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0444)
 
 INT_MODULE_PARM(cis_width,	0);		/* 16-bit CIS? */
 
 void release_cis_mem(struct pcmcia_socket *s)
 {
-    if (s->cis_mem.sys_start != 0) {
+    if (s->cis_mem.flags & MAP_ACTIVE) {
 	s->cis_mem.flags &= ~MAP_ACTIVE;
 	s->ops->set_mem_map(s, &s->cis_mem);
-	if (!(s->features & SS_CAP_STATIC_MAP))
-	    release_mem_region(s->cis_mem.sys_start, s->map_size);
+	if (s->cis_mem.res) {
+	    release_resource(s->cis_mem.res);
+	    kfree(s->cis_mem.res);
+	    s->cis_mem.res = NULL;
+	}
 	iounmap(s->cis_virt);
-	s->cis_mem.sys_start = 0;
 	s->cis_virt = NULL;
     }
 }
@@ -104,17 +107,16 @@ static unsigned char *
 set_cis_map(struct pcmcia_socket *s, unsigned int card_offset, unsigned int flags)
 {
     pccard_mem_map *mem = &s->cis_mem;
-    if (!(s->features & SS_CAP_STATIC_MAP) &&
-	mem->sys_start == 0) {
-	validate_mem(s);
-	mem->sys_start = 0;
-	if (find_mem_region(&mem->sys_start, s->map_size,
-			    s->map_size, 0, "card services", s)) {
+    if (!(s->features & SS_CAP_STATIC_MAP) && mem->res == NULL) {
+	mem->res = find_mem_region(0, s->map_size, s->map_size, 0,
+				   "card services", s);
+	if (mem->res == NULL) {
 	    printk(KERN_NOTICE "cs: unable to map card memory!\n");
 	    return NULL;
 	}
-	mem->sys_stop = mem->sys_start+s->map_size-1;
-	s->cis_virt = ioremap(mem->sys_start, s->map_size);
+	mem->sys_start = mem->res->start;
+	mem->sys_stop = mem->res->end;
+	s->cis_virt = ioremap(mem->res->start, s->map_size);
     }
     mem->card_start = card_offset;
     mem->flags = flags;

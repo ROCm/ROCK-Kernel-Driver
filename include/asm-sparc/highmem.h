@@ -24,7 +24,7 @@
 #include <asm/fixmap.h>
 #include <asm/vaddrs.h>
 #include <asm/kmap_types.h>
-#include <asm/pgtsrmmu.h>
+#include <asm/pgtable.h>
 
 /* declarations for highmem.c */
 extern unsigned long highstart_pfn, highend_pfn;
@@ -43,7 +43,7 @@ extern void kmap_init(void) __init;
  */
 #define LAST_PKMAP 1024
 #define PKMAP_SIZE (LAST_PKMAP << PAGE_SHIFT)
-#define PKMAP_BASE SRMMU_PMD_ALIGN_SOFT(SRMMU_NOCACHE_VADDR + (SRMMU_MAX_NOCACHE_PAGES << PAGE_SHIFT))
+#define PKMAP_BASE PMD_ALIGN(SRMMU_NOCACHE_VADDR + (SRMMU_MAX_NOCACHE_PAGES << PAGE_SHIFT))
 
 #define LAST_PKMAP_MASK (LAST_PKMAP - 1)
 #define PKMAP_NR(virt)  ((virt - PKMAP_BASE) >> PAGE_SHIFT)

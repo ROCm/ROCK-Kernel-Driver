@@ -379,7 +379,7 @@ bttv_set_dma(struct bttv *btv, int override, int irqflags)
 	btv->cap_ctl = 0;
 	if (NULL != btv->curr.top)      btv->cap_ctl |= 0x02;
 	if (NULL != btv->curr.bottom)   btv->cap_ctl |= 0x01;
-	if (NULL != btv->curr.vbi)      btv->cap_ctl |= 0x0c;
+	if (NULL != btv->cvbi)          btv->cap_ctl |= 0x0c;
 
 	capctl  = 0;
 	capctl |= (btv->cap_ctl & 0x03) ? 0x03 : 0x00;  /* capture  */
@@ -389,9 +389,9 @@ bttv_set_dma(struct bttv *btv, int override, int irqflags)
 	d2printk(KERN_DEBUG
 		 "bttv%d: capctl=%x irq=%d top=%08Lx/%08Lx even=%08Lx/%08Lx\n",
 		 btv->c.nr,capctl,irqflags,
-		 btv->curr.vbi     ? (unsigned long long)btv->curr.vbi->top.dma        : 0,
+		 btv->cvbi         ? (unsigned long long)btv->cvbi->top.dma            : 0,
 		 btv->curr.top     ? (unsigned long long)btv->curr.top->top.dma        : 0,
-		 btv->curr.vbi     ? (unsigned long long)btv->curr.vbi->bottom.dma     : 0,
+		 btv->cvbi         ? (unsigned long long)btv->cvbi->bottom.dma         : 0,
 		 btv->curr.bottom  ? (unsigned long long)btv->curr.bottom->bottom.dma  : 0);
 	
 	cmd = BT848_RISC_JUMP;
@@ -399,6 +399,8 @@ bttv_set_dma(struct bttv *btv, int override, int irqflags)
 		cmd |= BT848_RISC_IRQ;
 		cmd |= (irqflags  & 0x0f) << 16;
 		cmd |= (~irqflags & 0x0f) << 20;
+	}
+	if (irqflags || btv->cvbi) {
 		mod_timer(&btv->timeout, jiffies+BTTV_TIMEOUT);
 	} else {
 		del_timer(&btv->timeout);
@@ -501,20 +503,26 @@ bttv_dma_free(struct bttv *btv, struct bttv_buffer *buf)
 }
 
 int
-bttv_buffer_set_activate(struct bttv *btv,
-			 struct bttv_buffer_set *set)
+bttv_buffer_activate_vbi(struct bttv *btv,
+			 struct bttv_buffer *vbi)
 {
 	/* vbi capture */
-	if (set->vbi) {
-		set->vbi->vb.state = STATE_ACTIVE;
-		list_del(&set->vbi->vb.queue);
-		bttv_risc_hook(btv, RISC_SLOT_O_VBI, &set->vbi->top,    0);
-		bttv_risc_hook(btv, RISC_SLOT_E_VBI, &set->vbi->bottom, 0);
+	if (vbi) {
+		vbi->vb.state = STATE_ACTIVE;
+		list_del(&vbi->vb.queue);
+		bttv_risc_hook(btv, RISC_SLOT_O_VBI, &vbi->top,    0);
+		bttv_risc_hook(btv, RISC_SLOT_E_VBI, &vbi->bottom, 4);
 	} else {
 		bttv_risc_hook(btv, RISC_SLOT_O_VBI, NULL, 0);
 		bttv_risc_hook(btv, RISC_SLOT_E_VBI, NULL, 0);
 	}
+	return 0;
+}
 
+int
+bttv_buffer_activate_video(struct bttv *btv,
+			   struct bttv_buffer_set *set)
+{
 	/* video capture */
 	if (NULL != set->top  &&  NULL != set->bottom) {
 		if (set->top == set->bottom) {

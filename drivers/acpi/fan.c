@@ -114,7 +114,7 @@ end:
 static int
 acpi_fan_write_state (
 	struct file		*file,
-	const char		*buffer,
+	const char		__user *buffer,
 	unsigned long		count,
 	void			*data)
 {

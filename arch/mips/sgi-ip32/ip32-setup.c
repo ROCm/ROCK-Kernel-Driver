@@ -9,21 +9,27 @@
  * Copyright (C) 2002, 03 Ilya A. Volynets
  */
 #include <linux/config.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
-#include <linux/param.h>
-#include <linux/init.h>
 #include <linux/console.h>
+#include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/mc146818rtc.h>
+#include <linux/param.h>
+#include <linux/sched.h>
 
-#include <asm/time.h>
-#include <asm/mipsregs.h>
 #include <asm/bootinfo.h>
+#include <asm/mc146818-time.h>
+#include <asm/mipsregs.h>
 #include <asm/mmu_context.h>
 #include <asm/sgialib.h>
+#include <asm/time.h>
 #include <asm/traps.h>
 #include <asm/io.h>
+#include <asm/ip32/crime.h>
 #include <asm/ip32/mace.h>
 #include <asm/ip32/ip32_ints.h>
+
+extern void ip32_be_init(void);
+extern void crime_init(void);
 
 #ifdef CONFIG_SGI_O2MACE_ETH
 /*
@@ -56,27 +62,49 @@ static inline void str2eaddr(unsigned char *ea, unsigned char *str)
 }
 #endif
 
-extern void ip32_time_init(void);
-extern void ip32_be_init(void);
-extern void __init ip32_timer_setup (struct irqaction *irq);
-extern void __init crime_init (void);
-
 #ifdef CONFIG_SERIAL_8250
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
-extern int __init early_serial_setup(struct uart_port *port);
+extern int early_serial_setup(struct uart_port *port);
 
 #define STD_COM_FLAGS (ASYNC_SKIP_TEST)
 #define BASE_BAUD (1843200 / 16)
 
 #endif /* CONFIG_SERIAL_8250 */
 
+/* An arbitrary time; this can be decreased if reliability looks good */
+#define WAIT_MS 10
+
+void __init ip32_time_init(void)
+{
+	printk(KERN_INFO "Calibrating system timer... ");
+	write_c0_count(0);
+	crime_write(0, CRIME_TIMER);
+	while (crime_read(CRIME_TIMER) < CRIME_MASTER_FREQ * WAIT_MS / 1000) ;
+	mips_hpt_frequency = read_c0_count() * 1000 / WAIT_MS;
+	printk("%d MHz CPU detected\n", mips_hpt_frequency * 2 / 1000000);
+}
+
+void __init ip32_timer_setup(struct irqaction *irq)
+{
+	irq->handler = no_action;
+	setup_irq(IP32_R4K_TIMER_IRQ, irq);
+}
+
 static int __init ip32_setup(void)
 {
 	set_io_port_base((unsigned long) ioremap(MACEPCI_LOW_IO, 0x2000000));
 
 	crime_init();
+
+	board_be_init = ip32_be_init;
+
+	rtc_get_time = mc146818_get_cmos_time;
+	rtc_set_mmss = mc146818_set_rtc_mmss;
+
+	board_time_init = ip32_time_init;
+	board_timer_setup = ip32_timer_setup;
 
 #ifdef CONFIG_SERIAL_8250
  	{
@@ -128,10 +156,6 @@ static int __init ip32_setup(void)
 		}
 	}
 #endif
-
-	board_be_init = ip32_be_init;
-	board_time_init = ip32_time_init;
-	board_timer_setup = ip32_timer_setup;
 
 	return 0;
 }

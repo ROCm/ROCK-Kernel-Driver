@@ -341,6 +341,7 @@ static int num_ewrks3s;
     mdelay(1);\
 }
 
+#ifndef MODULE
 struct net_device * __init ewrk3_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct ewrk3_private));
@@ -364,6 +365,7 @@ out:
 	return ERR_PTR(err);
 	
 }
+#endif
 
 static int __init ewrk3_probe1(struct net_device *dev, u_long iobase, int irq)
 {
@@ -1269,7 +1271,7 @@ static int __init isa_probe(struct net_device *dev, u_long ioaddr)
 	for (; (i < maxSlots) && (dev != NULL);
 	     iobase += EWRK3_IOP_INC, i++)
 	{
-		if (request_region(iobase, EWRK3_TOTAL_SIZE, dev->name)) {
+		if (request_region(iobase, EWRK3_TOTAL_SIZE, DRV_NAME)) {
 			if (DevicePresent(iobase) == 0) {
 				int irq = dev->irq;
 				ret = ewrk3_hw_init(dev, iobase);
@@ -1310,7 +1312,7 @@ static int __init eisa_probe(struct net_device *dev, u_long ioaddr)
 
 	for (i = 1; (i < maxSlots) && (dev != NULL); i++, iobase += EISA_SLOT_INC) {
 		if (EISA_signature(name, EISA_ID) == 0) {
-			if (request_region(iobase, EWRK3_TOTAL_SIZE, dev->name) &&
+			if (request_region(iobase, EWRK3_TOTAL_SIZE, DRV_NAME) &&
 			    DevicePresent(iobase) == 0) {
 				int irq = dev->irq;
 				ret = ewrk3_hw_init(dev, iobase);
@@ -1518,13 +1520,13 @@ static int __init EISA_signature(char *name, s32 eisa_id)
 	return status;		/* return the device name string */
 }
 
-static int ewrk3_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int ewrk3_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
 	u_long iobase = dev->base_addr;
 	u32 ethcmd;
 
-	if (get_user(ethcmd, (u32 *)useraddr))
+	if (get_user(ethcmd, (u32 __user *)useraddr))
 		return -EFAULT;
 
 	switch (ethcmd) {
@@ -1707,7 +1709,7 @@ static int ewrk3_ethtool_ioctl(struct net_device *dev, void *useraddr)
 static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
-	struct ewrk3_ioctl *ioc = (struct ewrk3_ioctl *) &rq->ifr_data;
+	struct ewrk3_ioctl *ioc = (struct ewrk3_ioctl *) &rq->ifr_ifru;
 	u_long iobase = dev->base_addr;
 	int i, j, status = 0;
 	u_char csr;
@@ -1721,7 +1723,7 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	/* ethtool IOCTLs are handled elsewhere */
 	if (cmd == SIOCETHTOOL)
-		return ewrk3_ethtool_ioctl(dev, (void *)rq->ifr_data);
+		return ewrk3_ethtool_ioctl(dev, rq->ifr_data);
 
 	/* Other than ethtool, all we handle are private IOCTLs */
 	if (cmd != EWRK3IOCTL)

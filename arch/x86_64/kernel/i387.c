@@ -24,6 +24,20 @@
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 
+unsigned int mxcsr_feature_mask = 0xffffffff;
+
+void mxcsr_feature_mask_init(void)
+{
+	unsigned int mask;
+	clts();
+	memset(&current->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
+	asm volatile("fxsave %0" : : "m" (current->thread.i387.fxsave));
+	mask = current->thread.i387.fxsave.mxcsr_mask;
+	if (mask == 0) mask = 0x0000ffbf;
+	mxcsr_feature_mask &= mask;
+	stts();
+}
+
 /*
  * Called at bootup to set up the initial FPU state that is later cloned
  * into all processes.
@@ -40,8 +54,8 @@ void __init fpu_init(void)
 
 	write_cr0(oldcr0 & ~((1UL<<3)|(1UL<<2))); /* clear TS and EM */
 
+	mxcsr_feature_mask_init();
 	/* clean state in init */
-	stts();
 	current_thread_info()->status = 0;
 	current->used_math = 0;
 }
@@ -63,7 +77,7 @@ void init_fpu(struct task_struct *child)
  * Signal frame handlers.
  */
 
-int save_i387(struct _fpstate *buf)
+int save_i387(struct _fpstate __user *buf)
 {
 	struct task_struct *tsk = current;
 	int err = 0;
@@ -81,7 +95,7 @@ int save_i387(struct _fpstate *buf)
 		return 0;
 	tsk->used_math = 0; /* trigger finit */ 
 	if (tsk->thread_info->status & TS_USEDFPU) {
-		err = save_i387_checking((struct i387_fxsave_struct *)buf);
+		err = save_i387_checking((struct i387_fxsave_struct __user *)buf);
 		if (err) return err;
 		stts();
 		} else {
@@ -96,14 +110,14 @@ int save_i387(struct _fpstate *buf)
  * ptrace request handlers.
  */
 
-int get_fpregs(struct user_i387_struct *buf, struct task_struct *tsk)
+int get_fpregs(struct user_i387_struct __user *buf, struct task_struct *tsk)
 {
 	init_fpu(tsk);
-	return __copy_to_user((void *)buf, &tsk->thread.i387.fxsave,
+	return __copy_to_user(buf, &tsk->thread.i387.fxsave,
 			       sizeof(struct user_i387_struct)) ? -EFAULT : 0;
 }
 
-int set_fpregs(struct task_struct *tsk, struct user_i387_struct *buf)
+int set_fpregs(struct task_struct *tsk, struct user_i387_struct __user *buf)
 {
 	if (__copy_from_user(&tsk->thread.i387.fxsave, buf, 
 			     sizeof(struct user_i387_struct)))

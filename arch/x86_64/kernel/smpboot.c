@@ -824,7 +824,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (apicid == boot_cpu_id || (apicid == BAD_APICID))
 			continue;
 
-		if (!cpu_isset(apicid, phys_cpu_present_map))
+		if (!physid_isset(apicid, phys_cpu_present_map))
 			continue;
 		if ((max_cpus >= 0) && (max_cpus <= cpucount+1))
 			continue;
@@ -902,7 +902,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	       "WARNING: %d siblings found for CPU%d, should be %d\n", 
 			       siblings, cpu, smp_num_siblings);
 			smp_num_siblings = siblings;
-		}
+		}       
 	}
 
 	Dprintk("Boot done.\n");

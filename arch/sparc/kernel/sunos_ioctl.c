@@ -41,18 +41,19 @@ asmlinkage int sunos_ioctl (int fd, unsigned long cmd, unsigned long arg)
 		goto out;
 
 	/* First handle an easy compat. case for tty ldisc. */
-	if(cmd == TIOCSETD) {
-		int *p, ntty = N_TTY, tmp;
+	if (cmd == TIOCSETD) {
+		int __user *p;
+		int ntty = N_TTY, tmp;
 		mm_segment_t oldfs;
 
-		p = (int *) arg;
+		p = (int __user *) arg;
 		ret = -EFAULT;
-		if(get_user(tmp, p))
+		if (get_user(tmp, p))
 			goto out;
-		if(tmp == 2) {
+		if (tmp == 2) {
 			oldfs = get_fs();
 			set_fs(KERNEL_DS);
-			ret = sys_ioctl(fd, cmd, (int) &ntty);
+			ret = sys_ioctl(fd, cmd, (unsigned long) &ntty);
 			set_fs(oldfs);
 			ret = (ret == -EINVAL ? -EOPNOTSUPP : ret);
 			goto out;
@@ -60,7 +61,7 @@ asmlinkage int sunos_ioctl (int fd, unsigned long cmd, unsigned long arg)
 	}
 
 	/* Binary compatibility is good American knowhow fuckin' up. */
-	if(cmd == TIOCNOTTY) {
+	if (cmd == TIOCNOTTY) {
 		ret = sys_setsid();
 		goto out;
 	}
@@ -176,39 +177,39 @@ asmlinkage int sunos_ioctl (int fd, unsigned long cmd, unsigned long arg)
 		goto out;
 	/* Non posix grp */
 	case _IOW('t', 118, int): {
-		int oldval, newval, *ptr;
+		int oldval, newval, __user *ptr;
 
 		cmd = TIOCSPGRP;
-		ptr = (int *) arg;
+		ptr = (int __user *) arg;
 		ret = -EFAULT;
-		if(get_user(oldval, ptr))
+		if (get_user(oldval, ptr))
 			goto out;
 		ret = sys_ioctl(fd, cmd, arg);
 		__get_user(newval, ptr);
-		if(newval == -1) {
+		if (newval == -1) {
 			__put_user(oldval, ptr);
 			ret = -EIO;
 		}
-		if(ret == -ENOTTY)
+		if (ret == -ENOTTY)
 			ret = -EIO;
 		goto out;
 	}
 
 	case _IOR('t', 119, int): {
-		int oldval, newval, *ptr;
+		int oldval, newval, __user *ptr;
 
 		cmd = TIOCGPGRP;
-		ptr = (int *) arg;
+		ptr = (int __user *) arg;
 		ret = -EFAULT;
-		if(get_user(oldval, ptr))
+		if (get_user(oldval, ptr))
 			goto out;
 		ret = sys_ioctl(fd, cmd, arg);
 		__get_user(newval, ptr);
-		if(newval == -1) {
+		if (newval == -1) {
 			__put_user(oldval, ptr);
 			ret = -EIO;
 		}
-		if(ret == -ENOTTY)
+		if (ret == -ENOTTY)
 			ret = -EIO;
 		goto out;
 	}

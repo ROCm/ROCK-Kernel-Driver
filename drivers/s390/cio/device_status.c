@@ -35,7 +35,7 @@ ccw_device_msg_control_check(struct ccw_device *cdev, struct irb *irb)
 		return;
 		
 	CIO_MSG_EVENT(0, "Channel-Check or Interface-Control-Check "
-		      "received\n"
+		      "received"
 		      " ... device %04X on subchannel %04X, dev_stat "
 		      ": %02X sch_stat : %02X\n",
 		      cdev->private->devno, cdev->private->irq,

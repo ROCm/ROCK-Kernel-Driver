@@ -217,7 +217,7 @@ static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
 	return (pmd_t *)__pgd_page(*dir) + ((address >> PMD_SHIFT) & (PTRS_PER_PMD-1));
 }
 
-/* Find an entry in the third-level page table.. */ 
+/* Find an entry in the third-level page table.. */
 static inline pte_t *pte_offset_kernel(pmd_t *pmdp, unsigned long address)
 {
 	return (pte_t *)__pmd_page(*pmdp) + ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1));

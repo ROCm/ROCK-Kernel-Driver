@@ -1,6 +1,6 @@
 /*
  * lec.c: Lan Emulation driver 
- * Marko Kiiskila carnil@cs.tut.fi
+ * Marko Kiiskila mkiiskila@yahoo.com
  *
  */
 
@@ -71,9 +71,9 @@ static int lec_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int lec_close(struct net_device *dev);
 static struct net_device_stats *lec_get_stats(struct net_device *dev);
 static void lec_init(struct net_device *dev);
-static inline struct lec_arp_table* lec_arp_find(struct lec_priv *priv,
+static struct lec_arp_table* lec_arp_find(struct lec_priv *priv,
                                                      unsigned char *mac_addr);
-static inline int lec_arp_remove(struct lec_priv *priv,
+static int lec_arp_remove(struct lec_priv *priv,
 				     struct lec_arp_table *to_remove);
 /* LANE2 functions */
 static void lane2_associate_ind (struct net_device *dev, u8 *mac_address,
@@ -567,7 +567,7 @@ lec_atm_close(struct atm_vcc *vcc)
         if (skb_peek(&vcc->sk->sk_receive_queue))
 		printk("%s lec_atm_close: closing with messages pending\n",
                        dev->name);
-        while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue))) {
+        while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue)) != NULL) {
                 atm_return(vcc, skb->truesize);
 		dev_kfree_skb(skb);
         }
@@ -774,7 +774,7 @@ lec_pop(struct atm_vcc *vcc, struct sk_buff *skb)
 }
 
 int 
-lec_vcc_attach(struct atm_vcc *vcc, void *arg)
+lec_vcc_attach(struct atm_vcc *vcc, void __user *arg)
 {
 	struct lec_vcc_priv *vpriv;
         int bytes_left;
@@ -1161,7 +1161,7 @@ static int lane_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			err = lec_mcast_attach(vcc, (int) arg);
 			break;
 		case ATMLEC_DATA:
-			err = lec_vcc_attach(vcc, (void *) arg);
+			err = lec_vcc_attach(vcc, (void __user *) arg);
 			break;
 	}
 
@@ -1468,7 +1468,7 @@ lec_arp_add(struct lec_priv *priv, struct lec_arp_table *to_add)
 /*
  * Remove entry from lec_arp_table
  */
-static inline int 
+static int 
 lec_arp_remove(struct lec_priv *priv,
                struct lec_arp_table *to_remove)
 {
@@ -1755,7 +1755,7 @@ lec_arp_destroy(struct lec_priv *priv)
 /* 
  * Find entry by mac_address
  */
-static inline struct lec_arp_table*
+static struct lec_arp_table*
 lec_arp_find(struct lec_priv *priv,
              unsigned char *mac_addr)
 {
@@ -1940,7 +1940,7 @@ lec_arp_check_expire(unsigned long data)
                                            priv->path_switching_delay)) {
 			                        struct sk_buff *skb;
 
- 				                while ((skb = skb_dequeue(&entry->tx_wait)))
+ 				                while ((skb = skb_dequeue(&entry->tx_wait)) != NULL)
 					                lec_send(entry->vcc, skb, entry->priv);
                                                 entry->last_used = jiffies;
                                                 entry->status = 
@@ -2337,7 +2337,7 @@ lec_flush_complete(struct lec_priv *priv, unsigned long tran_id)
                             entry->status == ESI_FLUSH_PENDING) {
 			        struct sk_buff *skb;
 
- 				while ((skb = skb_dequeue(&entry->tx_wait)))
+ 				while ((skb = skb_dequeue(&entry->tx_wait)) != NULL)
 					lec_send(entry->vcc, skb, entry->priv);
                                 entry->status = ESI_FORWARD_DIRECT;
                                 DPRINTK("LEC_ARP: Flushed\n");

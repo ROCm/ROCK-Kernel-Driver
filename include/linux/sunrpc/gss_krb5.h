@@ -115,7 +115,7 @@ enum seal_alg {
 #define ENCTYPE_UNKNOWN         0x01ff
 
 s32
-krb5_make_checksum(s32 cksumtype, char *header, struct xdr_buf *body,
+make_checksum(s32 cksumtype, char *header, int hdrlen, struct xdr_buf *body,
 		   struct xdr_netobj *cksum);
 
 u32

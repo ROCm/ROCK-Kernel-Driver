@@ -259,7 +259,8 @@ write_out_data:
 			if (!inverted_lock(journal, bh))
 				goto write_out_data;
 			__journal_unfile_buffer(jh);
-			__journal_file_buffer(jh, jh->b_transaction, BJ_Locked);
+			__journal_file_buffer(jh, commit_transaction,
+						BJ_Locked);
 			jbd_unlock_bh_state(bh);
 			if (need_resched()) {
 				spin_unlock(&journal->j_list_lock);
@@ -284,7 +285,6 @@ write_out_data:
 				if (!inverted_lock(journal, bh))
 					goto write_out_data;
 				__journal_unfile_buffer(jh);
-				jh->b_transaction = NULL;
 				jbd_unlock_bh_state(bh);
 				journal_remove_journal_head(bh);
 				put_bh(bh);
@@ -326,7 +326,6 @@ write_out_data:
 		}
 		if (buffer_jbd(bh) && jh->b_jlist == BJ_Locked) {
 			__journal_unfile_buffer(jh);
-			jh->b_transaction = NULL;
 			jbd_unlock_bh_state(bh);
 			journal_remove_journal_head(bh);
 			put_bh(bh);
@@ -363,7 +362,7 @@ write_out_data:
 	 */
 	commit_transaction->t_state = T_COMMIT;
 
-	descriptor = 0;
+	descriptor = NULL;
 	bufs = 0;
 	while (commit_transaction->t_buffers) {
 
@@ -556,13 +555,6 @@ wait_for_iobuf:
 		journal_unfile_buffer(journal, jh);
 
 		/*
-		 * akpm: don't put back a buffer_head with stale pointers
-		 * dangling around.
-		 */
-		J_ASSERT_JH(jh, jh->b_transaction != NULL);
-		jh->b_transaction = NULL;
-
-		/*
 		 * ->t_iobuf_list should contain only dummy buffer_heads
 		 * which were created by journal_write_metadata_buffer().
 		 */
@@ -614,7 +606,6 @@ wait_for_iobuf:
 		BUFFER_TRACE(bh, "ph5: control buffer writeout done: unfile");
 		clear_buffer_jwrite(bh);
 		journal_unfile_buffer(journal, jh);
-		jh->b_transaction = NULL;
 		journal_put_journal_head(jh);
 		__brelse(bh);		/* One for getblk */
 		/* AKPM: bforget here */
@@ -648,30 +639,10 @@ wait_for_iobuf:
 	JBUFFER_TRACE(descriptor, "write commit block");
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
-		int ret;
 
 		set_buffer_dirty(bh);
-		if (journal->j_flags & JFS_BARRIER)
-			set_buffer_ordered(bh);
-		ret = sync_dirty_buffer(bh);
-		if (ret == -EOPNOTSUPP && (journal->j_flags & JFS_BARRIER)) {
-			char b[BDEVNAME_SIZE];
-
-			printk(KERN_WARNING
-				"JBD: barrier-based sync failed on %s - "
-				"disabling barriers\n",
-				bdevname(journal->j_dev, b));
-			spin_lock(&journal->j_state_lock);
-			journal->j_flags &= ~JFS_BARRIER;
-			spin_unlock(&journal->j_state_lock);
-
-			/* And try again, without the barrier */
-			clear_buffer_ordered(bh);
-			set_buffer_uptodate(bh);
-			set_buffer_dirty(bh);
-			ret = sync_dirty_buffer(bh);
-		}
-		if (unlikely(ret == -EIO))
+		sync_dirty_buffer(bh);
+		if (unlikely(!buffer_uptodate(bh)))
 			err = -EIO;
 		put_bh(bh);		/* One for getblk() */
 		journal_put_journal_head(descriptor);
@@ -788,7 +759,6 @@ skip_commit: /* The journal should be unlocked by now. */
 			J_ASSERT_BH(bh, !buffer_dirty(bh));
 			J_ASSERT_JH(jh, jh->b_next_transaction == NULL);
 			__journal_unfile_buffer(jh);
-			jh->b_transaction = 0;
 			jbd_unlock_bh_state(bh);
 			journal_remove_journal_head(bh);  /* needs a brelse */
 			release_buffer_page(bh);

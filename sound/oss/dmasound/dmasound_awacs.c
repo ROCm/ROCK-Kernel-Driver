@@ -1,10 +1,10 @@
 /*
- *  linux/drivers/sound/dmasound/dmasound_awacs.c
+ *  linux/sound/oss/dmasound/dmasound_awacs.c
  *
  *  PowerMac `AWACS' and `Burgundy' DMA Sound Driver
  *  with some limited support for DACA & Tumbler
  *
- *  See linux/drivers/sound/dmasound/dmasound_core.c for copyright and
+ *  See linux/sound/oss/dmasound/dmasound_core.c for copyright and
  *  history prior to 2001/01/26.
  *
  *	26/01/2001 ed 0.1 Iain Sandoe
@@ -326,12 +326,12 @@ extern int daca_leave_sleep(void);
 #undef IOCTL_OUT
 
 #define IOCTL_IN(arg, ret)	\
-	rc = get_user(ret, (int *)(arg)); \
+	rc = get_user(ret, (int __user *)(arg)); \
 	if (rc) break;
 #define IOCTL_OUT(arg, ret)	\
-	ioctl_return2((int *)(arg), ret)
+	ioctl_return2((int __user *)(arg), ret)
 
-static inline int ioctl_return2(int *addr, int value)
+static inline int ioctl_return2(int __user *addr, int value)
 {
 	return value < 0 ? value : put_user(value, addr);
 }
@@ -457,11 +457,11 @@ tas_dmasound_init(void)
 			&gpio_headphone_detect_pol);
 
 	write_audio_gpio(gpio_audio_reset, gpio_audio_reset_pol);
-	wait_ms(100);
+	msleep(100);
 	write_audio_gpio(gpio_audio_reset, !gpio_audio_reset_pol);
-	wait_ms(100);
+	msleep(100);
   	if (gpio_headphone_irq) {
-		if (request_irq(gpio_headphone_irq,headphone_intr,0,"Headphone detect",0) < 0) {
+		if (request_irq(gpio_headphone_irq,headphone_intr,0,"Headphone detect",NULL) < 0) {
     			printk(KERN_ERR "tumbler: Can't request headphone interrupt\n");
     			gpio_headphone_irq = 0;
     		} else {
@@ -470,7 +470,7 @@ tas_dmasound_init(void)
 			val = pmac_call_feature(PMAC_FTR_READ_GPIO, NULL, gpio_headphone_detect, 0);
 			pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, gpio_headphone_detect, val | 0x80);
 			/* Trigger it */
-  			headphone_intr(0,0,0);
+  			headphone_intr(0,NULL,NULL);
   		}
   	}
   	if (!gpio_headphone_irq) {
@@ -487,7 +487,7 @@ static int
 tas_dmasound_cleanup(void)
 {
 	if (gpio_headphone_irq)
-		free_irq(gpio_headphone_irq, 0);
+		free_irq(gpio_headphone_irq, NULL);
 	return 0;
 }
 
@@ -514,6 +514,7 @@ tas_set_frame_rate(void)
 static int
 tas_mixer_ioctl(u_int cmd, u_long arg)
 {
+	int __user *argp = (int __user *)arg;
 	int data;
 	int rc;
 
@@ -524,16 +525,16 @@ tas_mixer_ioctl(u_int cmd, u_long arg)
 
         if ((cmd & ~0xff) == MIXER_WRITE(0) &&
             tas_supported_mixers() & (1<<(cmd & 0xff))) {
-		rc = get_user(data, (int *)(arg));
+		rc = get_user(data, argp);
                 if (rc<0) return rc;
 		tas_set_mixer_level(cmd & 0xff, data);
 		tas_get_mixer_level(cmd & 0xff, &data);
-		return ioctl_return2((int *)(arg), data);
+		return ioctl_return2(argp, data);
         }
         if ((cmd & ~0xff) == MIXER_READ(0) &&
             tas_supported_mixers() & (1<<(cmd & 0xff))) {
 		tas_get_mixer_level(cmd & 0xff, &data);
-		return ioctl_return2((int *)(arg), data);
+		return ioctl_return2(argp, data);
         }
 
 	switch(cmd) {
@@ -627,10 +628,10 @@ static void PMacFree(void *ptr, unsigned int size)
 static int __init PMacIrqInit(void)
 {
 	if (awacs)
-		if (request_irq(awacs_irq, pmac_awacs_intr, 0, "Built-in Sound misc", 0))
+		if (request_irq(awacs_irq, pmac_awacs_intr, 0, "Built-in Sound misc", NULL))
 			return 0;
-	if (request_irq(awacs_tx_irq, pmac_awacs_tx_intr, 0, "Built-in Sound out", 0)
-	    || request_irq(awacs_rx_irq, pmac_awacs_rx_intr, 0, "Built-in Sound in", 0))
+	if (request_irq(awacs_tx_irq, pmac_awacs_tx_intr, 0, "Built-in Sound out", NULL)
+	    || request_irq(awacs_rx_irq, pmac_awacs_rx_intr, 0, "Built-in Sound in", NULL))
 		return 0;
 	return 1;
 }
@@ -653,12 +654,12 @@ static void PMacIrqCleanup(void)
 	    machine_is_compatible("PowerBook3,2")) && awacs) {
 		awacs_reg[1] |= MASK_PAROUT0 | MASK_PAROUT1;
 		awacs_write(MASK_ADDR1 | awacs_reg[1]);
-		wait_ms(200);
+		msleep(200);
 	}
 	if (awacs)
-		free_irq(awacs_irq, 0);
-	free_irq(awacs_tx_irq, 0);
-	free_irq(awacs_rx_irq, 0);
+		free_irq(awacs_irq, NULL);
+	free_irq(awacs_tx_irq, NULL);
+	free_irq(awacs_rx_irq, NULL);
 	
 	if (awacs)
 		iounmap((void *)awacs);
@@ -775,10 +776,10 @@ awacs_recalibrate(void)
 	/* Sorry for the horrible delays... I hope to get that improved
 	 * by making the whole PM process asynchronous in a future version
 	 */
-	wait_ms(750);
+	msleep(750);
 	awacs_reg[1] |= MASK_CMUTE | MASK_AMUTE;
 	awacs_write(awacs_reg[1] | MASK_RECALIBRATE | MASK_ADDR1);
-	wait_ms(1000);
+	msleep(1000);
 	awacs_write(awacs_reg[1] | MASK_ADDR1);
 }
 
@@ -1405,9 +1406,9 @@ load_awacs(void)
 
 	if (awacs_revision == AWACS_SCREAMER) {
 		awacs_write(awacs_reg[5] + MASK_ADDR5);
-		wait_ms(100);
+		msleep(100);
 		awacs_write(awacs_reg[6] + MASK_ADDR6);
-		wait_ms(2);
+		msleep(2);
 		awacs_write(awacs_reg[1] + MASK_ADDR1);
 		awacs_write(awacs_reg[7] + MASK_ADDR7);
 	}
@@ -1479,7 +1480,7 @@ static int awacs_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		    machine_is_compatible("PowerBook3,2")) && awacs) {
 			awacs_reg[1] |= MASK_PAROUT0 | MASK_PAROUT1;
 			awacs_write(MASK_ADDR1 | awacs_reg[1]);
-			wait_ms(200);
+			msleep(200);
 		}
 		break;
 	case PBOOK_WAKE:
@@ -1487,12 +1488,12 @@ static int awacs_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		pmac_call_feature(PMAC_FTR_SOUND_CHIP_ENABLE, awacs_node, 0, 1);
 		if ((machine_is_compatible("PowerBook3,1") ||
 		    machine_is_compatible("PowerBook3,2")) && awacs) {
-			wait_ms(100);
+			msleep(100);
 			awacs_reg[1] &= ~(MASK_PAROUT0 | MASK_PAROUT1);
 			awacs_write(MASK_ADDR1 | awacs_reg[1]);
-			wait_ms(300);
+			msleep(300);
 		} else
-			wait_ms(1000);
+			msleep(1000);
  		/* restore settings */
 		switch (awacs_revision) {
 			case AWACS_TUMBLER:
@@ -1500,14 +1501,14 @@ static int awacs_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				write_audio_gpio(gpio_headphone_mute, gpio_headphone_mute_pol);
 				write_audio_gpio(gpio_amp_mute, gpio_amp_mute_pol);
 				write_audio_gpio(gpio_audio_reset, gpio_audio_reset_pol);
-				wait_ms(100);
+				msleep(100);
 				write_audio_gpio(gpio_audio_reset, !gpio_audio_reset_pol);
-				wait_ms(150);
+				msleep(150);
 				tas_leave_sleep(); /* Stub for now */
-				headphone_intr(0,0,0);
+				headphone_intr(0,NULL,NULL);
 				break;
 			case AWACS_DACA:
-				wait_ms(10); /* Check this !!! */
+				msleep(10); /* Check this !!! */
 				daca_leave_sleep();
 				break ;		/* dont know how yet */
 			case AWACS_BURGUNDY:
@@ -2432,7 +2433,7 @@ static void PMacAbortRead(void)
 	 * release the memory.
 	 */
 
-	wait_ms(100) ; /* give it a (small) chance to act */
+	msleep(100) ; /* give it a (small) chance to act */
 
 	/* apply the sledgehammer approach - just stop it now */
 
@@ -2969,7 +2970,7 @@ printk("dmasound_pmac: Awacs/Screamer Codec Mfct: %d Rev %d\n", mfg, rev);
 
 		sound_device_id = 0;
 		/* device ID appears post g3 b&w */
-		prop = (unsigned int *)get_property(info, "device-id", 0);
+		prop = (unsigned int *)get_property(info, "device-id", NULL);
 		if (prop != 0)
 			sound_device_id = *prop;
 
@@ -3080,7 +3081,7 @@ printk("dmasound_pmac: Awacs/Screamer Codec Mfct: %d Rev %d\n", mfg, rev);
 
 	} else if (is_pbook_g3) {
 		struct device_node* mio;
-		macio_base = 0;
+		macio_base = NULL;
 		for (mio = io->parent; mio; mio = mio->parent) {
 			if (strcmp(mio->name, "mac-io") == 0
 			    && mio->n_addrs > 0) {

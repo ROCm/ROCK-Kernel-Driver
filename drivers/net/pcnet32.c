@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30e"
-#define DRV_RELDATE	"06.10.2004"
+#define DRV_VERSION	"1.30i"
+#define DRV_RELDATE	"06.28.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -46,6 +46,7 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/moduleparam.h>
 
 #include <asm/bitops.h>
 #include <asm/dma.h>
@@ -137,6 +138,7 @@ static const char pcnet32_gstrings_test[][ETH_GSTRING_LEN] = {
 #define MAX_UNITS 8	/* More are supported, limit only on options */
 static int options[MAX_UNITS];
 static int full_duplex[MAX_UNITS];
+static int homepna[MAX_UNITS];
 
 /*
  *				Theory of Operation
@@ -245,6 +247,15 @@ static int full_duplex[MAX_UNITS];
  * v1.30b  24 May 2004 Don Fry fix bogus tx carrier errors with 79c973,
  *	   assisted by Bruce Penrod <bmpenrod@endruntechnologies.com>.
  * v1.30c  25 May 2004 Don Fry added netif_wake_queue after pcnet32_restart.
+ * v1.30d  01 Jun 2004 Don Fry discard oversize rx packets.
+ * v1.30e  11 Jun 2004 Don Fry recover after fifo error and rx hang.
+ * v1.30f  16 Jun 2004 Don Fry cleanup IRQ to allow 0 and 1 for PCI,
+ * 	   expanding on suggestions from Ralf Baechle <ralf@linux-mips.org>,
+ * 	   and Brian Murphy <brian@murphy.dk>.
+ * v1.30g  22 Jun 2004 Patrick Simmons <psimmons@flash.net> added option
+ *	   homepna for selecting HomePNA mode for PCNet/Home 79C978.
+ * v1.30h  24 Jun 2004 Don Fry correctly select auto, speed, duplex in bcr32.
+ * v1.30i  28 Jun 2004 Don Fry change to use module_param.
  */
 
 
@@ -360,7 +371,7 @@ struct pcnet32_private {
 
 static void pcnet32_probe_vlbus(void);
 static int  pcnet32_probe_pci(struct pci_dev *, const struct pci_device_id *);
-static int  pcnet32_probe1(unsigned long, unsigned int, int, struct pci_dev *);
+static int  pcnet32_probe1(unsigned long, int, struct pci_dev *);
 static int  pcnet32_open(struct net_device *);
 static int  pcnet32_init_ring(struct net_device *);
 static int  pcnet32_start_xmit(struct sk_buff *, struct net_device *);
@@ -958,7 +969,7 @@ pcnet32_probe_vlbus(void)
 	if (request_region(ioaddr, PCNET32_TOTAL_SIZE, "pcnet32_probe_vlbus")) {
 	    /* check if there is really a pcnet chip on that ioaddr */
 	    if ((inb(ioaddr + 14) == 0x57) && (inb(ioaddr + 15) == 0x57)) {
-		pcnet32_probe1(ioaddr, 0, 0, NULL);
+		pcnet32_probe1(ioaddr, 0, NULL);
 	    } else {
 		release_region(ioaddr, PCNET32_TOTAL_SIZE);
 	    }
@@ -999,7 +1010,7 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return -EBUSY;
     }
 
-    return pcnet32_probe1(ioaddr, pdev->irq, 1, pdev);
+    return pcnet32_probe1(ioaddr, 1, pdev);
 }
 
 
@@ -1008,8 +1019,7 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
  *  pdev will be NULL when called from pcnet32_probe_vlbus.
  */
 static int __devinit
-pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
-		struct pci_dev *pdev)
+pcnet32_probe1(unsigned long ioaddr, int shared, struct pci_dev *pdev)
 {
     struct pcnet32_private *lp;
     dma_addr_t lp_dma_addr;
@@ -1019,6 +1029,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     char *chipname;
     struct net_device *dev;
     struct pcnet32_access *a = NULL;
+    u8 promaddr[6];
     int ret = -ENODEV;
 
     /* reset the chip */
@@ -1079,15 +1090,17 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	fdx = 1;
 	/*
 	 * This is based on specs published at www.amd.com.  This section
-	 * assumes that a card with a 79C978 wants to go into 1Mb HomePNA
-	 * mode.  The 79C978 can also go into standard ethernet, and there
-	 * probably should be some sort of module option to select the
-	 * mode by which the card should operate
+	 * assumes that a card with a 79C978 wants to go into standard
+	 * ethernet mode.  The 79C978 can also go into 1Mb HomePNA mode,
+	 * and the module option homepna=1 can select this instead.
 	 */
-	/* switch to home wiring mode */
 	media = a->read_bcr(ioaddr, 49);
+	media &= ~3;		/* default to 10Mb ethernet */
+	if (cards_found < MAX_UNITS && homepna[cards_found])
+	    media |= 1; 	/* switch to home wiring mode */
 	if (pcnet32_debug & NETIF_MSG_PROBE)
-	    printk(KERN_DEBUG PFX "media reset to %#x.\n",  media);
+	    printk(KERN_DEBUG PFX "media set to %sMbit mode.\n", 
+		    (media & 1) ? "1" : "10");
 	a->write_bcr(ioaddr, 49, media);
 	break;
     case 0x2627:
@@ -1131,12 +1144,40 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     if (pcnet32_debug & NETIF_MSG_PROBE)
 	printk(KERN_INFO PFX "%s at %#3lx,", chipname, ioaddr);
 
-    /* In early chips, the Physical Address Registers CSR12-14 are undefined.
-     * Later chips initialize the CSR12-14 from the EEPROM.
-     * Either way, we use the PROM values.
+    /* In most chips, after a chip reset, the ethernet address is read from the
+     * station address PROM at the base address and programmed into the
+     * "Physical Address Registers" CSR12-14.
+     * As a precautionary measure, we read the PROM values and complain if
+     * they disagree with the CSRs.  Either way, we use the CSR values, and
+     * double check that they are valid.
      */
+    for (i = 0; i < 3; i++) {
+	unsigned int val;
+	val = a->read_csr(ioaddr, i+12) & 0x0ffff;
+	/* There may be endianness issues here. */
+	dev->dev_addr[2*i] = val & 0x0ff;
+	dev->dev_addr[2*i+1] = (val >> 8) & 0x0ff;
+    }
+
+    /* read PROM address and compare with CSR address */
     for (i = 0; i < 6; i++)
-	dev->dev_addr[i] = inb(ioaddr + i);
+	promaddr[i] = inb(ioaddr + i);
+
+    if (memcmp(promaddr, dev->dev_addr, 6)
+	|| !is_valid_ether_addr(dev->dev_addr)) {
+#ifndef __powerpc__
+	if (is_valid_ether_addr(promaddr)) {
+#else
+	if (!is_valid_ether_addr(dev->dev_addr)
+	    && is_valid_ether_addr(promaddr)) {
+#endif
+	    if (pcnet32_debug & NETIF_MSG_PROBE) {
+		printk(" warning: CSR address invalid,\n");
+		printk(KERN_INFO "    using instead PROM address of");
+	    }
+	    memcpy(dev->dev_addr, promaddr, 6);
+	}
+    }
 
     /* if the ethernet address is not valid, force to 00:00:00:00:00:00 */
     if (!is_valid_ether_addr(dev->dev_addr))
@@ -1241,11 +1282,8 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     a->write_csr(ioaddr, 2, (lp->dma_addr + offsetof(struct pcnet32_private,
 		    init_block)) >> 16);
 
-    if (irq_line) {
-	dev->irq = irq_line;
-    }
-
-    if (dev->irq >= 2) {
+    if (pdev) {		/* use the IRQ provided by PCI */
+	dev->irq = pdev->irq;
 	if (pcnet32_debug & NETIF_MSG_PROBE)
 	    printk(" assigned IRQ %d.\n", dev->irq);
     } else {
@@ -1333,8 +1371,7 @@ pcnet32_open(struct net_device *dev)
     int rc;
     unsigned long flags;
 
-    if (dev->irq == 0 ||
-	request_irq(dev->irq, &pcnet32_interrupt,
+    if (request_irq(dev->irq, &pcnet32_interrupt,
 		    lp->shared_irq ? SA_SHIRQ : 0, dev->name, (void *)dev)) {
 	return -EAGAIN;
     }
@@ -1550,7 +1587,7 @@ pcnet32_init_ring(struct net_device *dev)
 		    PKT_BUF_SZ-2, PCI_DMA_FROMDEVICE);
 	lp->rx_ring[i].base = (u32)le32_to_cpu(lp->rx_dma_addr[i]);
 	lp->rx_ring[i].buf_length = le16_to_cpu(2-PKT_BUF_SZ);
-	wmb();
+	wmb();	/* Make sure owner changes after all others are visible */
 	lp->rx_ring[i].status = le16_to_cpu(0x8000);
     }
     /* The Tx buffer address is filled in as needed, but we do need to clear
@@ -1569,10 +1606,14 @@ pcnet32_init_ring(struct net_device *dev)
 	    offsetof(struct pcnet32_private, rx_ring));
     lp->init_block.tx_ring = (u32)le32_to_cpu(lp->dma_addr +
 	    offsetof(struct pcnet32_private, tx_ring));
-    wmb(); /* Make sure all changes are visible */
+    wmb();	/* Make sure all changes are visible */
     return 0;
 }
 
+/* the pcnet32 has been issued a stop or reset.  Wait for the stop bit
+ * then flush the pending transmit operations, re-initialize the ring,
+ * and tell the chip to initialize.
+ */
 static void
 pcnet32_restart(struct net_device *dev, unsigned int csr0_bits)
 {
@@ -1583,7 +1624,7 @@ pcnet32_restart(struct net_device *dev, unsigned int csr0_bits)
     /* wait for stop */
     for (i=0; i<100; i++)
 	if (lp->a.read_csr(ioaddr, 0) & 0x0004)
-	    break;
+	   break;
 
     if (i >= 100 && netif_msg_drv(lp))
 	printk(KERN_ERR "%s: pcnet32_restart timed out waiting for stop.\n",
@@ -1798,7 +1839,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		    pci_unmap_single(lp->pci_dev, lp->tx_dma_addr[entry],
 			lp->tx_skbuff[entry]->len, PCI_DMA_TODEVICE);
 		    dev_kfree_skb_irq(lp->tx_skbuff[entry]);
-		    lp->tx_skbuff[entry] = 0;
+		    lp->tx_skbuff[entry] = NULL;
 		    lp->tx_dma_addr[entry] = 0;
 		}
 		dirty_tx++;
@@ -1847,19 +1888,15 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	}
 
 	if (must_restart) {
-	    /* stop the chip to clear the error condition, then restart */
-	    lp->a.reset (ioaddr);
-
-	    /* switch pcnet32 to 32bit mode */
-	    lp->a.write_bcr (ioaddr, 20, 2);
-	    lp->a.write_csr (ioaddr, 4, 0x0915);
-
+	    /* reset the chip to clear the error condition, then restart */
+	    lp->a.reset(ioaddr);
+	    lp->a.write_csr(ioaddr, 4, 0x0915);
 	    pcnet32_restart(dev, 0x0002);
 	    netif_wake_queue(dev);
 	}
     }
 
-    /* Clear any other interrupt, and set interrupt enable. */
+    /* Set interrupt enable. */
     lp->a.write_csr (ioaddr, 0, 0x0040);
     lp->a.write_rap (ioaddr,rap);
 
@@ -1902,6 +1939,7 @@ pcnet32_rx(struct net_device *dev)
 	    short pkt_len = (le32_to_cpu(lp->rx_ring[entry].msg_length) & 0xfff)-4;
 	    struct sk_buff *skb;
 
+	    /* Discard oversize frames. */
 	    if (unlikely(pkt_len > PKT_BUF_SZ - 2)) {
 		if (netif_msg_drv(lp))
 		    printk(KERN_ERR "%s: Impossible packet size %d!\n",
@@ -2170,14 +2208,13 @@ static void mdio_write(struct net_device *dev, int phy_id, int reg_num, int val)
 static int pcnet32_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
     struct pcnet32_private *lp = dev->priv;
-    struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
     int rc;
     unsigned long flags;
 
     /* SIOC[GS]MIIxxx ioctls */
     if (lp->mii) {
 	spin_lock_irqsave(&lp->lock, flags);
-	rc = generic_mii_ioctl(&lp->mii_if, data, cmd, NULL);
+	rc = generic_mii_ioctl(&lp->mii_if, if_mii(rq), cmd, NULL);
 	spin_unlock_irqrestore(&lp->lock, flags);
     } else {
 	rc = -EOPNOTSUPP;
@@ -2223,31 +2260,35 @@ static struct pci_driver pcnet32_driver = {
     .id_table	= pcnet32_pci_tbl,
 };
 
-MODULE_PARM(debug, "i");
+/* An additional parameter that may be passed in... */
+static int debug = -1;
+static int tx_start_pt = -1;
+static int pcnet32_have_pci;
+static int num_params;
+
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, DRV_NAME " debug level");
-MODULE_PARM(max_interrupt_work, "i");
+module_param(max_interrupt_work, int, 0);
 MODULE_PARM_DESC(max_interrupt_work, DRV_NAME " maximum events handled per interrupt");
-MODULE_PARM(rx_copybreak, "i");
+module_param(rx_copybreak, int, 0);
 MODULE_PARM_DESC(rx_copybreak, DRV_NAME " copy breakpoint for copy-only-tiny-frames");
-MODULE_PARM(tx_start_pt, "i");
+module_param(tx_start_pt, int, 0);
 MODULE_PARM_DESC(tx_start_pt, DRV_NAME " transmit start point (0-3)");
-MODULE_PARM(pcnet32vlb, "i");
+module_param(pcnet32vlb, int, 0);
 MODULE_PARM_DESC(pcnet32vlb, DRV_NAME " Vesa local bus (VLB) support (0/1)");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
+module_param_array(options, int, num_params, 0);
 MODULE_PARM_DESC(options, DRV_NAME " initial option setting(s) (0-15)");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+module_param_array(full_duplex, int, num_params, 0);
 MODULE_PARM_DESC(full_duplex, DRV_NAME " full duplex setting(s) (1)");
+/* Module Parameter for HomePNA cards added by Patrick Simmons, 2004 */
+module_param_array(homepna, int, num_params, 0);
+MODULE_PARM_DESC(homepna, DRV_NAME " mode for 79C978 cards (1 for HomePNA, 0 for Ethernet, default Ethernet");
 
 MODULE_AUTHOR("Thomas Bogendoerfer");
 MODULE_DESCRIPTION("Driver for PCnet32 and PCnetPCI based ethercards");
 MODULE_LICENSE("GPL");
 
 #define PCNET32_MSG_DEFAULT (NETIF_MSG_DRV | NETIF_MSG_PROBE | NETIF_MSG_LINK)
-
-/* An additional parameter that may be passed in... */
-static int debug = -1;
-static int tx_start_pt = -1;
-static int pcnet32_have_pci;
 
 static int __init pcnet32_init_module(void)
 {

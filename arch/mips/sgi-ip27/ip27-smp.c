@@ -32,7 +32,7 @@ static void alloc_cpupda(cpuid_t cpu, int cpunum)
 	nasid_t nasid = COMPACT_TO_NASID_NODEID(node);
 
 	cputonasid(cpunum) = nasid;
-	cputocnode(cpunum) = node;
+	cpu_data[cpunum].p_nodeid = node;
 	cputoslice(cpunum) = get_cpu_slice(cpu);
 }
 
@@ -223,5 +223,5 @@ void core_send_ipi(int destid, unsigned int action)
 	 * part of the address space.  Then set the interrupt bit associated
 	 * with the CPU we want to send the interrupt to.
 	 */
-	REMOTE_HUB_SEND_INTR(COMPACT_TO_NASID_NODEID(cputocnode(destid)), irq);
+	REMOTE_HUB_SEND_INTR(COMPACT_TO_NASID_NODEID(cpu_to_node(destid)), irq);
 }

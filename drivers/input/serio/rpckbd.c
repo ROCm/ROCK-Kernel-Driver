@@ -98,7 +98,7 @@ static int rpckbd_open(struct serio *port)
 static void rpckbd_close(struct serio *port)
 {
 	free_irq(IRQ_KEYBOARDRX, port);
-	free_irq(IRQ_KEYBOARDTX, port);	
+	free_irq(IRQ_KEYBOARDTX, port);
 }
 
 static struct serio rpckbd_port =

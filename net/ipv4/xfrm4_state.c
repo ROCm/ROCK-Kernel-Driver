@@ -11,7 +11,7 @@
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
 
-extern struct xfrm_state_afinfo xfrm4_state_afinfo;
+static struct xfrm_state_afinfo xfrm4_state_afinfo;
 
 static void
 __xfrm4_init_tempsel(struct xfrm_state *x, struct flowi *fl,
@@ -74,18 +74,13 @@ __xfrm4_find_acq(u8 mode, u32 reqid, u8 proto,
 		    proto == x->id.proto &&
 		    saddr->a4 == x->props.saddr.a4 &&
 		    reqid == x->props.reqid &&
-		    x->km.state == XFRM_STATE_ACQ) {
-			    if (!x0)
-				    x0 = x;
-			    if (x->id.spi)
-				    continue;
+		    x->km.state == XFRM_STATE_ACQ &&
+		    !x->id.spi) {
 			    x0 = x;
 			    break;
 		    }
 	}
-	if (x0) {
-		xfrm_state_hold(x0);
-	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
+	if (!x0 && create && (x0 = xfrm_state_alloc()) != NULL) {
 		x0->sel.daddr.a4 = daddr->a4;
 		x0->sel.saddr.a4 = saddr->a4;
 		x0->sel.prefixlen_d = 32;
@@ -100,11 +95,14 @@ __xfrm4_find_acq(u8 mode, u32 reqid, u8 proto,
 		x0->props.family = AF_INET;
 		x0->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
 		xfrm_state_hold(x0);
-		mod_timer(&x0->timer, jiffies + XFRM_ACQ_EXPIRES*HZ);
+		x0->timer.expires = jiffies + XFRM_ACQ_EXPIRES*HZ;
+		add_timer(&x0->timer);
 		xfrm_state_hold(x0);
 		list_add_tail(&x0->bydst, xfrm4_state_afinfo.state_bydst+h);
 		wake_up(&km_waitq);
 	}
+	if (x0)
+		xfrm_state_hold(x0);
 	return x0;
 }
 

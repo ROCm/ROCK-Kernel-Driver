@@ -62,7 +62,7 @@ int		Level)		/* Init Level */
 {
 	switch (Level) {
 	case SK_INIT_DATA:
-		pAC->Tim.StQueue = 0;
+		pAC->Tim.StQueue = NULL;
 		break;
 	case SK_INIT_IO:
 		SkHwtInit(pAC, Ioc);
@@ -145,7 +145,7 @@ SK_EVPARA	Para)		/* Event Parameter for this timer */
 	if (!pAC->Tim.StQueue) {
 		/* First Timer to be started */
 		pAC->Tim.StQueue = pTimer;
-		pTimer->TmNext = 0;
+		pTimer->TmNext = NULL;
 		pTimer->TmDelta = Time;
 		
 		SkHwtStart(pAC, Ioc, Time);
@@ -228,7 +228,7 @@ int		Restart)	/* Do we need to restart the Hardware timer ? */
 			Done = 1;
 		}
 	}
-	*ppLast = 0;
+	*ppLast = NULL;
 	/*
 	 * pTm points to the first Timer that did not run out.
 	 * StQueue points to the first Timer that run out.

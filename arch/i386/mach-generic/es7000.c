@@ -1,4 +1,4 @@
-/* 
+/*
  * APIC driver for the Unisys ES7000 chipset.
  */
 #define APIC_DEFINITION 1
@@ -20,9 +20,9 @@
 #include <asm/mach-es7000/mach_wakecpu.h>
 
 static __init int probe_es7000(void)
-{ 
+{
 	/* probed later in mptable/ACPI hooks */
 	return 0;
-} 
+}
 
-struct genapic apic_es7000 = APIC_INIT("es7000", probe_es7000); 
+struct genapic apic_es7000 = APIC_INIT("es7000", probe_es7000);

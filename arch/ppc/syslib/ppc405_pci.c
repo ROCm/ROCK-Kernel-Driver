@@ -57,14 +57,6 @@ ppc405_pcibios_fixup_resources(struct pci_dev *dev)
 		    )
 		    ) {
 
-			DBG(KERN_ERR "PCI: 0x%lx <= resource[%d] <= 0x%lx"
-			    ", bus 0x%x dev 0x%2.2x.%1.1x,\n"
-			    KERN_ERR "  %s\n"
-			    KERN_ERR "  fixup will be attempted later\n",
-			    min_host_addr, i, max_host_addr,
-			    dev->bus->number, PCI_SLOT(dev->devfn),
-			    PCI_FUNC(dev->devfn), dev->slot.name);
-
 			/* force pcibios_assign_resources() to assign a new address */
 			res->end -= res->start;
 			res->start = 0;

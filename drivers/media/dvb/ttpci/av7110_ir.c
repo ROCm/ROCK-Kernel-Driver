@@ -138,7 +138,7 @@ static void input_repeat_key(unsigned long data)
 }
 
 
-static int av7110_ir_write_proc (struct file *file, const char *buffer,
+static int av7110_ir_write_proc (struct file *file, const char __user *buffer,
 	                  unsigned long count, void *data)
 {
 	char *page;

@@ -6,7 +6,7 @@
 #ifndef __EST8260_PLATFORM
 #define __EST8260_PLATFORM
 
-#define IMAP_ADDR		((uint)0xf0000000)
+#define CPM_MAP_ADDR		((uint)0xf0000000)
 
 #define BOOTROM_RESTART_ADDR	((uint)0xff000104)
 

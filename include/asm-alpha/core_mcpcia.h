@@ -167,7 +167,7 @@
 
 /* Hack!  Only words for bus 0.  */
 
-#if !MCPCIA_ONE_HAE_WINDOW
+#ifndef MCPCIA_ONE_HAE_WINDOW
 #define MCPCIA_HAE_ADDRESS	MCPCIA_HAE_MEM(4)
 #endif
 #define MCPCIA_IACK_SC		_MCPCIA_IACK_SC(4)
@@ -351,7 +351,7 @@ __EXTERN_INLINE u8 mcpcia_readb(unsigned long in_addr)
 	unsigned long hose = in_addr & ~0xffffffffUL;
 	unsigned long result, work;
 
-#if !MCPCIA_ONE_HAE_WINDOW
+#ifndef MCPCIA_ONE_HAE_WINDOW
 	unsigned long msb;
 	msb = addr & ~MCPCIA_MEM_MASK;
 	set_hae(msb);
@@ -370,7 +370,7 @@ __EXTERN_INLINE u16 mcpcia_readw(unsigned long in_addr)
 	unsigned long hose = in_addr & ~0xffffffffUL;
 	unsigned long result, work;
 
-#if !MCPCIA_ONE_HAE_WINDOW
+#ifndef MCPCIA_ONE_HAE_WINDOW
 	unsigned long msb;
 	msb = addr & ~MCPCIA_MEM_MASK;
 	set_hae(msb);
@@ -389,7 +389,7 @@ __EXTERN_INLINE void mcpcia_writeb(u8 b, unsigned long in_addr)
 	unsigned long hose = in_addr & ~0xffffffffUL;
 	unsigned long w;
 
-#if !MCPCIA_ONE_HAE_WINDOW
+#ifndef MCPCIA_ONE_HAE_WINDOW
 	unsigned long msb;
 	msb = addr & ~MCPCIA_MEM_MASK;
 	set_hae(msb);
@@ -407,7 +407,7 @@ __EXTERN_INLINE void mcpcia_writew(u16 b, unsigned long in_addr)
 	unsigned long hose = in_addr & ~0xffffffffUL;
 	unsigned long w;
 
-#if !MCPCIA_ONE_HAE_WINDOW
+#ifndef MCPCIA_ONE_HAE_WINDOW
 	unsigned long msb;
 	msb = addr & ~MCPCIA_MEM_MASK;
 	set_hae(msb);

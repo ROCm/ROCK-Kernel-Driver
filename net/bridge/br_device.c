@@ -15,25 +15,9 @@
 
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
-#include <linux/if_bridge.h>
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
-
-static int br_dev_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	unsigned long args[4];
-	unsigned long *data;
-
-	if (cmd != SIOCDEVPRIVATE)
-		return -EOPNOTSUPP;
-
-	data = (unsigned long *)rq->ifr_data;
-	if (copy_from_user(args, data, 4*sizeof(unsigned long)))
-		return -EFAULT;
-
-	return br_ioctl(dev->priv, args[0], args[1], args[2], args[3]);
-}
 
 static struct net_device_stats *br_dev_get_stats(struct net_device *dev)
 {
@@ -44,43 +28,28 @@ static struct net_device_stats *br_dev_get_stats(struct net_device *dev)
 	return &br->statistics;
 }
 
-static int __br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
+int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_bridge *br;
-	unsigned char *dest;
+	struct net_bridge *br = netdev_priv(dev);
+	const unsigned char *dest = skb->data;
 	struct net_bridge_fdb_entry *dst;
 
-	br = dev->priv;
 	br->statistics.tx_packets++;
 	br->statistics.tx_bytes += skb->len;
 
-	dest = skb->mac.raw = skb->data;
+	skb->mac.raw = skb->data;
 	skb_pull(skb, ETH_HLEN);
 
-	if (dest[0] & 1) {
-		br_flood_deliver(br, skb, 0);
-		return 0;
-	}
-
-	if ((dst = br_fdb_get(br, dest)) != NULL) {
-		br_deliver(dst->dst, skb);
-		br_fdb_put(dst);
-		return 0;
-	}
-
-	br_flood_deliver(br, skb, 0);
-	return 0;
-}
-
-int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
-{
-	int ret;
-
 	rcu_read_lock();
-	ret = __br_dev_xmit(skb, dev);
-	rcu_read_unlock();
+	if (dest[0] & 1) 
+		br_flood_deliver(br, skb, 0);
+	else if ((dst = __br_fdb_get(br, dest)) != NULL)
+		br_deliver(dst->dst, skb);
+	else
+		br_flood_deliver(br, skb, 0);
 
-	return ret;
+	rcu_read_unlock();
+	return 0;
 }
 
 static int br_dev_open(struct net_device *dev)
@@ -105,6 +74,15 @@ static int br_dev_stop(struct net_device *dev)
 	return 0;
 }
 
+static int br_change_mtu(struct net_device *dev, int new_mtu)
+{
+	if ((new_mtu < 68) || new_mtu > br_min_mtu(dev->priv))
+		return -EINVAL;
+
+	dev->mtu = new_mtu;
+	return 0;
+}
+
 static int br_dev_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
 {
 	return -1;
@@ -116,11 +94,12 @@ void br_dev_setup(struct net_device *dev)
 
 	ether_setup(dev);
 
-	dev->do_ioctl = br_dev_do_ioctl;
+	dev->do_ioctl = br_dev_ioctl;
 	dev->get_stats = br_dev_get_stats;
 	dev->hard_start_xmit = br_dev_xmit;
 	dev->open = br_dev_open;
 	dev->set_multicast_list = br_dev_set_multicast_list;
+	dev->change_mtu = br_change_mtu;
 	dev->destructor = free_netdev;
 	SET_MODULE_OWNER(dev);
 	dev->stop = br_dev_stop;

@@ -28,24 +28,19 @@ void __delay(unsigned long loops)
 	cur_timer->delay(loops);
 }
 
-/* In order to support cpu frequencies > 4Ghz, 
- * we need to insure loops_per_jiffy * HZ fits in 32 bits.
- * Thus we multiply xloops up by 4 and divide HZ down by four.
- */
-#define SCALE_FACTOR 4 
 inline void __const_udelay(unsigned long xloops)
 {
 	int d0;
-	xloops *= SCALE_FACTOR;
+	xloops *= 4;
 	__asm__("mull %0"
 		:"=d" (xloops), "=&a" (d0)
-		:"1" (xloops),"0" ((HZ/SCALE_FACTOR)*current_cpu_data.loops_per_jiffy));
-	__delay(xloops?xloops:1);
+		:"1" (xloops),"0" (current_cpu_data.loops_per_jiffy * (HZ/4)));
+        __delay(++xloops);
 }
 
 void __udelay(unsigned long usecs)
 {
-	__const_udelay(usecs * 0x000010c7);  /* 2**32 / 1000000 */
+	__const_udelay(usecs * 0x000010c7);  /* 2**32 / 1000000 (rounded up) */
 }
 
 void __ndelay(unsigned long nsecs)

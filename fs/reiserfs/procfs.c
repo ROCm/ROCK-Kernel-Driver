@@ -399,7 +399,7 @@ static int show_journal(struct seq_file *m, struct super_block *sb)
                         DJP( jp_journal_trans_max ),
                         DJP( jp_journal_magic ),
                         DJP( jp_journal_max_batch ),
-                        SB_JOURNAL(sb)->j_max_commit_age,
+                        SB_JOURNAL_MAX_COMMIT_AGE(sb),
                         DJP( jp_journal_max_trans_age ),
 
 			JF( j_1st_reserved_block ),			
@@ -437,77 +437,6 @@ static int show_journal(struct seq_file *m, struct super_block *sb)
 			SFPJ( prepare_retry )
 		);
 	return 0;
-}
-
-static int reiserfs_journal_abort_proc_read (char *buffer, char **start,
-					     off_t offset, int count,
-					     int *eof, void *data)
-{
-	int len = 0;
-	struct super_block *sb = get_super ((struct block_device *)data);
-
-	if (!sb)
-		return -ENOENT;
-
-	len += sprintf (&buffer[len], "%d", reiserfs_debug_trigger (sb));
-
-	drop_super (sb);
-
-	if (offset > len) {
-		*start = buffer;
-		*eof = 1;
-		return 0;
-	}
-
-	*start = buffer + offset;
-	if ( (len -= offset) > count)
-		return count;
-	*eof = 1;
-
-	return len;
-}
-
-static int reiserfs_journal_abort_proc_write (struct file *file,
-					      const char *buffer,
-					      unsigned long count, void *data)
-{
-	char buf[32];
-	int len = 0;
-	int v1;
-	struct super_block *sb = get_super ((struct block_device *)data);
-
-	if (!sb)
-		return -ENOENT;
-
-	if (count > ARRAY_SIZE (buf) - 1)
-		count = ARRAY_SIZE (buf) - 1;
-
-	if (copy_from_user (buf, buffer, count))
-		return -EFAULT;
-
-	buf[ARRAY_SIZE (buf) - 1] = '\0';
-	len = sscanf (buf, "%d", &v1);
-	if (len >= 1) {
-		reiserfs_warning (sb, "Changing debug trigger from %d to %d",
-				  reiserfs_debug_trigger(sb), v1);
-		reiserfs_debug_trigger(sb) = v1;
-        }
-
-	drop_super (sb);
-	return count;
-}
-
-
-static void add_journal_abort (struct super_block *sb, const char *name)
-{
-	struct proc_dir_entry *de;
-
-	de = create_proc_entry (name, 0, REISERFS_SB(sb)->procdir);
-	if (de) {
-		de->read_proc = reiserfs_journal_abort_proc_read;
-		de->write_proc = reiserfs_journal_abort_proc_write;
-		de->data = (void *)sb->s_bdev;
-	}
 }
 
 /* iterator */
@@ -617,7 +546,6 @@ int reiserfs_proc_info_init( struct super_block *sb )
 		add_file(sb, "on-disk-super", show_on_disk_super);
 		add_file(sb, "oidmap", show_oidmap);
 		add_file(sb, "journal", show_journal);
-		add_journal_abort(sb, "journal-abort");
 		return 0;
 	}
 	reiserfs_warning(sb, "reiserfs: cannot create /proc/%s/%s",
@@ -629,7 +557,6 @@ int reiserfs_proc_info_done( struct super_block *sb )
 {
 	struct proc_dir_entry *de = REISERFS_SB(sb)->procdir;
 	if (de) {
-		remove_proc_entry("journal-abort", de);
 		remove_proc_entry("journal", de);
 		remove_proc_entry("oidmap", de);
 		remove_proc_entry("on-disk-super", de);
@@ -664,7 +591,7 @@ void reiserfs_proc_unregister_global( const char *name )
 int reiserfs_proc_info_global_init( void )
 {
 	if( proc_info_root == NULL ) {
-		proc_info_root = proc_mkdir( proc_info_root_name, 0 );
+		proc_info_root = proc_mkdir(proc_info_root_name, NULL);
 		if( proc_info_root ) {
 			proc_info_root -> owner = THIS_MODULE;
 		} else {
@@ -681,7 +608,7 @@ int reiserfs_proc_info_global_done( void )
 {
 	if ( proc_info_root != NULL ) {
 		proc_info_root = NULL;
-		remove_proc_entry( proc_info_root_name, 0 );
+		remove_proc_entry(proc_info_root_name, NULL);
 	}
 	return 0;
 }

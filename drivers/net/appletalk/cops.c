@@ -524,7 +524,7 @@ static void cops_reset(struct net_device *dev, int sleep)
 static void cops_load (struct net_device *dev)
 {
         struct ifreq ifr;
-        struct ltfirmware *ltf= (struct ltfirmware *)&ifr.ifr_data;
+        struct ltfirmware *ltf= (struct ltfirmware *)&ifr.ifr_ifru;
         struct cops_local *lp = netdev_priv(dev);
         int ioaddr=dev->base_addr;
 	int length, i = 0;

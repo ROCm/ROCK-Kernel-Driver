@@ -109,14 +109,14 @@ static int _snd_ioctl32_ctl_elem_list(unsigned int fd, unsigned int cmd, unsigne
 	mm_segment_t oldseg;
 	int err;
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+	if (copy_from_user(&data32, (void __user *)arg, sizeof(data32)))
 		return -EFAULT;
 	memset(&data, 0, sizeof(data));
 	data.offset = data32.offset;
 	data.space = data32.space;
 	data.used = data32.used;
 	data.count = data32.count;
-	data.pids = A(data32.pids);
+	data.pids = compat_ptr(data32.pids);
 	oldseg = get_fs();
 	set_fs(KERNEL_DS);
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
@@ -129,7 +129,7 @@ static int _snd_ioctl32_ctl_elem_list(unsigned int fd, unsigned int cmd, unsigne
 	data32.used = data.used;
 	data32.count = data.count;
 	//data.pids = data.pids;
-	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
+	if (copy_to_user((void __user *)arg, &data32, sizeof(data32)))
 		return -EFAULT;
 	return 0;
 }
@@ -175,7 +175,7 @@ static int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigne
 	int err;
 	mm_segment_t oldseg;
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+	if (copy_from_user(&data32, (void __user *)arg, sizeof(data32)))
 		return -EFAULT;
 	memset(&data, 0, sizeof(data));
 	data.id = data32.id;
@@ -216,7 +216,7 @@ static int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigne
 	default:
 		break;
 	}
-	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
+	if (copy_to_user((void __user *)arg, &data32, sizeof(data32)))
 		return -EFAULT;
 	return 0;
 }
@@ -291,7 +291,7 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 		goto __end;
 	}
 
-	if (copy_from_user(data32, (void*)arg, sizeof(*data32))) {
+	if (copy_from_user(data32, (void __user *)arg, sizeof(*data32))) {
 		err = -EFAULT;
 		goto __end;
 	}
@@ -299,7 +299,7 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 	data->id = data32->id;
 	data->indirect = data32->indirect;
 	if (data->indirect) /* FIXME: this is not correct for long arrays */
-		data->value.integer.value_ptr = (void*)TO_PTR(data32->value.integer.value_ptr);
+		data->value.integer.value_ptr = compat_ptr(data32->value.integer.value_ptr);
 	type = get_ctl_type(file, &data->id);
 	if (type < 0) {
 		err = type;
@@ -367,7 +367,7 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 		}
 	}
 	err = 0;
-	if (copy_to_user((void*)arg, data32, sizeof(*data32)))
+	if (copy_to_user((void __user *)arg, data32, sizeof(*data32)))
 		err = -EFAULT;
       __end:
       	if (data32)

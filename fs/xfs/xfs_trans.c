@@ -131,7 +131,9 @@ xfs_trans_alloc(
 	xfs_mount_t	*mp,
 	uint		type)
 {
-	xfs_check_frozen(mp, NULL, XFS_FREEZE_TRANS);
+	vfs_check_frozen(XFS_MTOVFS(mp)->vfs_super, SB_FREEZE_TRANS);
+	atomic_inc(&mp->m_active_trans);
+
 	return (_xfs_trans_alloc(mp, type));
 
 }
@@ -1254,10 +1256,6 @@ xfs_trans_chunk_committed(
 		lip = lidp->lid_item;
 		if (aborted)
 			lip->li_flags |= XFS_LI_ABORTED;
-
-		if (lidp->lid_flags & XFS_LID_SYNC_UNLOCK) {
-			IOP_UNLOCK(lip);
-		}
 
 		/*
 		 * Send in the ABORTED flag to the COMMITTED routine

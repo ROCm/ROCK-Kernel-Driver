@@ -29,7 +29,7 @@
 
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "NCR53C9x.h"
 
 #include <linux/zorro.h>

@@ -24,15 +24,6 @@
 #include "kcopyd.h"
 
 /*
- * FIXME: Remove this before release.
- */
-#if 0
-#define DMDEBUG DMWARN
-#else
-#define DMDEBUG(x...)
-#endif
-
-/*
  * The percentage increment we will wake up users at
  */
 #define WAKE_UP_PERCENT 5
@@ -44,7 +35,6 @@
 
 /*
  * Each snapshot reserves this many pages for io
- * FIXME: calculate this
  */
 #define SNAPSHOT_PAGES 256
 
@@ -236,9 +226,6 @@ static void exit_exception_table(struct exception_table *et, kmem_cache_t *mem)
 	vfree(et->table);
 }
 
-/*
- * FIXME: check how this hash fn is performing.
- */
 static inline uint32_t exception_hash(struct exception_table *et, chunk_t chunk)
 {
 	return chunk & et->hash_mask;
@@ -321,6 +308,7 @@ static int calc_max_buckets(void)
 	/* use a fixed size of 2MB */
 	unsigned long mem = 2 * 1024 * 1024;
 	mem /= sizeof(struct list_head);
+
 	return mem;
 }
 
@@ -434,7 +422,6 @@ static int snapshot_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		goto bad2;
 	}
 
-	/* FIXME: get cow length */
 	r = dm_get_device(ti, cow_path, 0, 0,
 			  FMODE_READ | FMODE_WRITE, &s->cow);
 	if (r) {
@@ -450,7 +437,6 @@ static int snapshot_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	chunk_size = round_up(chunk_size, PAGE_SIZE >> 9);
 
 	/* Validate the chunk size against the device block size */
-	/* FIXME: check this, also ugly */
 	blocksize = s->cow->bdev->bd_disk->queue->hardsect_size;
 	if (chunk_size % (blocksize >> 9)) {
 		ti->error = "Chunk size is not a multiple of device blocksize";
@@ -564,11 +550,9 @@ static void flush_bios(struct bio *bio)
 {
 	struct bio *n;
 
-	DMDEBUG("begin flush");
 	while (bio) {
 		n = bio->bi_next;
 		bio->bi_next = NULL;
-		DMDEBUG("flushing %p", bio);
 		generic_make_request(bio);
 		bio = n;
 	}
@@ -601,33 +585,12 @@ static struct bio *__flush_bios(struct pending_exception *pe)
 
 	list_del(&pe->siblings);
 
-	/* FIXME: I think there's a race on SMP machines here, add spin lock */
+	/* This is fine as long as kcopyd is single-threaded. If kcopyd
+	 * becomes multi-threaded, we'll need some locking here.
+	 */
 	bio_list_merge(&sibling->origin_bios, &pe->origin_bios);
 
 	return NULL;
-}
-
-static void check_free_space(struct dm_snapshot *s)
-{
-#if 0
-	sector_t numerator, denominator;
-	double n, d;
-	unsigned pc;
-
-	if (!s->store.fraction_full)
-		return;
-
-	s->store.fraction_full(&s->store, &numerator, &denominator);
-	n = (double) numerator;
-	d = (double) denominator;
-
-	pc = (int) (n / d);
-
-	if (pc >= s->last_percent + WAKE_UP_PERCENT) {
-		dm_table_event(s->table);
-		s->last_percent = pc - pc % WAKE_UP_PERCENT;
-	}
-#endif
 }
 
 static void pending_complete(struct pending_exception *pe, int success)
@@ -649,7 +612,7 @@ static void pending_complete(struct pending_exception *pe, int success)
 			error_bios(bio_list_get(&pe->snapshot_bios));
 			goto out;
 		}
-		memcpy(e, &pe->e, sizeof(*e));
+		*e = pe->e;
 
 		/*
 		 * Add a proper exception, and remove the
@@ -664,11 +627,6 @@ static void pending_complete(struct pending_exception *pe, int success)
 		up_write(&s->lock);
 
 		flush_bios(bio_list_get(&pe->snapshot_bios));
-		DMDEBUG("Exception completed successfully.");
-
-		/* Notify any interested parties */
-		//check_free_space(s);
-
 	} else {
 		/* Read/write error - snapshot is unusable */
 		down_write(&s->lock);
@@ -683,7 +641,6 @@ static void pending_complete(struct pending_exception *pe, int success)
 		error_bios(bio_list_get(&pe->snapshot_bios));
 
 		dm_table_event(s->table);
-		DMDEBUG("Exception failed.");
 	}
 
  out:
@@ -738,7 +695,6 @@ static inline void start_copy(struct pending_exception *pe)
 	dest.count = src.count;
 
 	/* Hand over to kcopyd */
-	DMDEBUG("starting exception copy");
 	kcopyd_copy(s->kcopyd_client,
 		    &src, 1, &dest, 0, copy_callback, pe);
 }
@@ -888,7 +844,7 @@ static int snapshot_map(struct dm_target *ti, struct bio *bio,
 	return r;
 }
 
-void snapshot_resume(struct dm_target *ti)
+static void snapshot_resume(struct dm_target *ti)
 {
 	struct dm_snapshot *s = (struct dm_snapshot *) ti->private;
 
@@ -1039,7 +995,7 @@ static int __origin_write(struct list_head *snapshots, struct bio *bio)
 /*
  * Called on a write from the origin driver.
  */
-int do_origin(struct dm_dev *origin, struct bio *bio)
+static int do_origin(struct dm_dev *origin, struct bio *bio)
 {
 	struct origin *o;
 	int r = 1;

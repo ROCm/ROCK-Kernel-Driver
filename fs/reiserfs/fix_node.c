@@ -509,6 +509,10 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
 
 	// s2bytes
 	snum012[4] = op_unit_num (&vn->vn_vi[split_item_num]) - snum012[4] - bytes_to_r - bytes_to_l - bytes_to_S1new;
+
+	if (vn->vn_vi[split_item_num].vi_index != TYPE_DIRENTRY)
+	    reiserfs_warning (tb->tb_sb, "vs-8115: get_num_ver: not "
+			      "directory item");
     }
 
     /* now we know S2bytes, calculate S1bytes */
@@ -816,7 +820,7 @@ static int  get_empty_nodes(
     RFALSE (p_s_tb->FEB[p_s_tb->cur_blknum],
 	    "PAP-8141: busy slot for new buffer");
 
-    set_buffer_journal_new (p_s_new_bh);
+    mark_buffer_journal_new(p_s_new_bh) ;
     p_s_tb->FEB[p_s_tb->cur_blknum++] = p_s_new_bh;
   }
 
@@ -2108,7 +2112,7 @@ static void tb_buffer_sanity_check (struct super_block * p_s_sb,
 {;}
 #endif
 
-static int clear_all_dirty_bits(struct super_block *s, 
+static int clear_all_dirty_bits(struct super_block *s,
                                  struct buffer_head *bh) {
   return reiserfs_prepare_for_journal(s, bh, 0) ;
 }
@@ -2139,7 +2143,7 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 					    p_s_tb->tb_path->path_length - i);
 		}
 #endif
-		if (!clear_all_dirty_bits(p_s_tb->tb_sb, 
+		if (!clear_all_dirty_bits(p_s_tb->tb_sb,
 				     PATH_OFFSET_PBUFFER (p_s_tb->tb_path, i)))
 		{
 		    locked = PATH_OFFSET_PBUFFER (p_s_tb->tb_path, i);
@@ -2159,7 +2163,7 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 
 		if ( !locked && p_s_tb->FL[i] ) {
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->FL[i], "FL", i);
-		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FL[i])) 
+		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FL[i]))
 			locked = p_s_tb->FL[i];
 		}
 
@@ -2441,12 +2445,12 @@ int fix_nodes (int n_op_mode,
 		reiserfs_restore_prepared_buffer(p_s_tb->tb_sb, p_s_tb->CFR[i]);
 	    }
 
-	    brelse (p_s_tb->L[i]);p_s_tb->L[i] = 0;
-	    brelse (p_s_tb->R[i]);p_s_tb->R[i] = 0;
-	    brelse (p_s_tb->FL[i]);p_s_tb->FL[i] = 0;
-	    brelse (p_s_tb->FR[i]);p_s_tb->FR[i] = 0;
-	    brelse (p_s_tb->CFL[i]);p_s_tb->CFL[i] = 0;
-	    brelse (p_s_tb->CFR[i]);p_s_tb->CFR[i] = 0;
+	    brelse (p_s_tb->L[i]);p_s_tb->L[i] = NULL;
+	    brelse (p_s_tb->R[i]);p_s_tb->R[i] = NULL;
+	    brelse (p_s_tb->FL[i]);p_s_tb->FL[i] = NULL;
+	    brelse (p_s_tb->FR[i]);p_s_tb->FR[i] = NULL;
+	    brelse (p_s_tb->CFL[i]);p_s_tb->CFL[i] = NULL;
+	    brelse (p_s_tb->CFR[i]);p_s_tb->CFR[i] = NULL;
 	}
 
 	if (wait_tb_buffers_run) {

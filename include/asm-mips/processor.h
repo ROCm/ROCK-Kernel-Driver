@@ -18,11 +18,11 @@
 #include <asm/cachectl.h>
 #include <asm/cpu.h>
 #include <asm/mipsregs.h>
+#include <asm/prefetch.h>
 #include <asm/system.h>
 
 #ifdef CONFIG_SGI_IP27
 #include <asm/sn/types.h>
-#include <asm/sn/intr_public.h>
 #endif
 
 /*
@@ -53,7 +53,6 @@ struct cpuinfo_mips {
 	cnodeid_t	p_nodeid;	/* my node ID in compact-id-space */
 	nasid_t		p_nasid;	/* my node ID in numa-as-id-space */
 	unsigned char	p_slice;	/* Physical position on node board */
-	struct hub_intmasks_s p_intmasks; /* SN0 per-CPU interrupt masks */
 #endif
 #if 0
 	unsigned long		loops_per_sec;
@@ -77,6 +76,7 @@ struct cpuinfo_mips {
 	struct cache_desc	dcache;	/* Primary D or combined I/D cache */
 	struct cache_desc	scache;	/* Secondary cache */
 	struct cache_desc	tcache;	/* Tertiary/split secondary cache */
+	void 			*data;	/* Additional data */
 } __attribute__((aligned(SMP_CACHE_BYTES)));
 
 extern struct cpuinfo_mips cpu_data[];
@@ -137,9 +137,9 @@ extern unsigned int vced_count, vcei_count;
 #endif
 
 /*
- * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
+ * Size of io_bitmap in longwords.
  */
-#define IO_BITMAP_SIZE	32
+#define IO_BITMAP_SIZE	2048
 
 #define NUM_FPU_REGS	32
 
@@ -174,6 +174,8 @@ union mips_fpu_union {
 typedef struct {
 	unsigned long seg;
 } mm_segment_t;
+
+#define ARCH_MIN_TASKALIGN	8
 
 /*
  * If you change thread_struct remember to change the #defines below too!
@@ -278,13 +280,20 @@ unsigned long get_wchan(struct task_struct *p);
  */
 #define return_address() ({__asm__ __volatile__("":::"$31");__builtin_return_address(0);})
 
-/*
- * For now.  The 32-bit cycle counter is screwed up so solving this nicely takes a little
- * brainwork ...
- */
-static inline unsigned long long sched_clock(void)
+#ifdef CONFIG_CPU_HAS_PREFETCH
+
+#define ARCH_HAS_PREFETCH
+
+extern inline void prefetch(const void *addr)
 {
-	return 0ULL;
+	__asm__ __volatile__(
+	"	.set	mips4		\n"
+	"	pref	%0, (%1)	\n"
+	"	.set	mips0		\n"
+	:
+	: "i" (Pref_Load), "r" (addr));
 }
+
+#endif
 
 #endif /* _ASM_PROCESSOR_H */

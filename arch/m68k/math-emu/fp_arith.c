@@ -458,7 +458,7 @@ static void fp_roundint(struct fp_ext *dest, int mode)
 		return;
 
 	/* infinities and zeroes */
-	if (IS_INF(dest) || IS_ZERO(dest)) 
+	if (IS_INF(dest) || IS_ZERO(dest))
 		return;
 
 	/* first truncate the lower bits */

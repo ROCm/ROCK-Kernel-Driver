@@ -32,26 +32,13 @@ comment "CPUFreq processor drivers"
        depends on CPU_FREQ
 
 config X86_POWERNOW_K8
-	tristate "AMD Opteron/Athlon64 PowerNow! using PST"
+	tristate "AMD Opteron/Athlon64 PowerNow!"
 	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
-	  This version uses the PST tables.
 
 	  For details, take a look at <file:Documentation/cpu-freq/>. 
 
 	  If in doubt, say N.
-
-config X86_POWERNOW_K8_ACPI
-	bool "AMD Opteron/Athlon64 PowerNow! using ACPI"
-	depends on CPU_FREQ && EXPERIMENTAL && ACPI && X86_POWERNOW_K8
-	help
-	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
-	  This version uses information from ACPI.
-
-	  For details, take a look at linux/Documentation/cpu-freq. 
-
-	  If in doubt, say N.
-
 
 endmenu

@@ -46,7 +46,7 @@ struct vers_iter {
 static struct list_head _name_buckets[NUM_BUCKETS];
 static struct list_head _uuid_buckets[NUM_BUCKETS];
 
-void dm_hash_remove_all(void);
+static void dm_hash_remove_all(void);
 
 /*
  * Guards access to both hash tables.
@@ -61,7 +61,7 @@ static void init_buckets(struct list_head *buckets)
 		INIT_LIST_HEAD(buckets + i);
 }
 
-int dm_hash_init(void)
+static int dm_hash_init(void)
 {
 	init_buckets(_name_buckets);
 	init_buckets(_uuid_buckets);
@@ -69,7 +69,7 @@ int dm_hash_init(void)
 	return 0;
 }
 
-void dm_hash_exit(void)
+static void dm_hash_exit(void)
 {
 	dm_hash_remove_all();
 	devfs_remove(DM_DIR);
@@ -118,6 +118,17 @@ static struct hash_cell *__get_uuid_cell(const char *str)
 	return NULL;
 }
 
+/*-----------------------------------------------------------------
+ * Inserting, removing and renaming a device.
+ *---------------------------------------------------------------*/
+static inline char *kstrdup(const char *str)
+{
+	char *r = kmalloc(strlen(str) + 1, GFP_KERNEL);
+	if (r)
+		strcpy(r, str);
+	return r;
+}
+
 static struct hash_cell *alloc_cell(const char *name, const char *uuid,
 				    struct mapped_device *md)
 {
@@ -127,7 +138,7 @@ static struct hash_cell *alloc_cell(const char *name, const char *uuid,
 	if (!hc)
 		return NULL;
 
-	hc->name = kstrdup(name, GFP_KERNEL);
+	hc->name = kstrdup(name);
 	if (!hc->name) {
 		kfree(hc);
 		return NULL;
@@ -137,7 +148,7 @@ static struct hash_cell *alloc_cell(const char *name, const char *uuid,
 		hc->uuid = NULL;
 
 	else {
-		hc->uuid = kstrdup(uuid, GFP_KERNEL);
+		hc->uuid = kstrdup(uuid);
 		if (!hc->uuid) {
 			kfree(hc->name);
 			kfree(hc);
@@ -184,7 +195,7 @@ static int unregister_with_devfs(struct hash_cell *hc)
  * The kdev_t and uuid of a device can never change once it is
  * initially inserted.
  */
-int dm_hash_insert(const char *name, const char *uuid, struct mapped_device *md)
+static int dm_hash_insert(const char *name, const char *uuid, struct mapped_device *md)
 {
 	struct hash_cell *cell;
 
@@ -223,7 +234,7 @@ int dm_hash_insert(const char *name, const char *uuid, struct mapped_device *md)
 	return -EBUSY;
 }
 
-void __hash_remove(struct hash_cell *hc)
+static void __hash_remove(struct hash_cell *hc)
 {
 	/* remove from the dev hash */
 	list_del(&hc->uuid_list);
@@ -235,7 +246,7 @@ void __hash_remove(struct hash_cell *hc)
 	free_cell(hc);
 }
 
-void dm_hash_remove_all(void)
+static void dm_hash_remove_all(void)
 {
 	int i;
 	struct hash_cell *hc;
@@ -251,7 +262,7 @@ void dm_hash_remove_all(void)
 	up_write(&_hash_lock);
 }
 
-int dm_hash_rename(const char *old, const char *new)
+static int dm_hash_rename(const char *old, const char *new)
 {
 	char *new_name, *old_name;
 	struct hash_cell *hc;
@@ -259,7 +270,7 @@ int dm_hash_rename(const char *old, const char *new)
 	/*
 	 * duplicate new.
 	 */
-	new_name = kstrdup(new, GFP_KERNEL);
+	new_name = kstrdup(new);
 	if (!new_name)
 		return -ENOMEM;
 
@@ -406,9 +417,9 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 	return 0;
 }
 
-static void list_version_get_needed(struct target_type *tt, void *param)
+static void list_version_get_needed(struct target_type *tt, void *needed_param)
 {
-    int *needed = param;
+    size_t *needed = needed_param;
 
     *needed += strlen(tt->name);
     *needed += sizeof(tt->version);
@@ -1122,7 +1133,7 @@ static ioctl_fn lookup_ioctl(unsigned int cmd)
  * As well as checking the version compatibility this always
  * copies the kernel interface version out.
  */
-static int check_version(unsigned int cmd, struct dm_ioctl *user)
+static int check_version(unsigned int cmd, struct dm_ioctl __user *user)
 {
 	uint32_t version[3];
 	int r = 0;
@@ -1157,7 +1168,7 @@ static void free_params(struct dm_ioctl *param)
 	vfree(param);
 }
 
-static int copy_params(struct dm_ioctl *user, struct dm_ioctl **param)
+static int copy_params(struct dm_ioctl __user *user, struct dm_ioctl **param)
 {
 	struct dm_ioctl tmp, *dmi;
 
@@ -1214,7 +1225,7 @@ static int ctl_ioctl(struct inode *inode, struct file *file,
 	int r = 0;
 	unsigned int cmd;
 	struct dm_ioctl *param;
-	struct dm_ioctl *user = (struct dm_ioctl *) u;
+	struct dm_ioctl __user *user = (struct dm_ioctl __user *) u;
 	ioctl_fn fn = NULL;
 	size_t param_size;
 

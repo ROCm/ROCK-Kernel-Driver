@@ -166,7 +166,7 @@ static int iforce_upload_effect(struct input_dev *dev, struct ff_effect *effect)
 	else {
 		/* We want to update an effect */
 		if (!CHECK_OWNERSHIP(effect->id, iforce)) return -EACCES;
-		
+
 		/* Parameter type cannot be updated */
 		if (effect->type != iforce->core_effects[effect->id].effect.type)
 			return -EINVAL;
@@ -273,7 +273,7 @@ static int iforce_flush(struct input_dev *dev, struct file *file)
 
 		if (test_bit(FF_CORE_IS_USED, iforce->core_effects[i].flags) &&
 			current->pid == iforce->core_effects[i].owner) {
-			
+
 			/* Stop effect */
 			input_report_ff(dev, i, 0);
 

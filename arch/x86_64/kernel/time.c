@@ -27,6 +27,7 @@
 #include <linux/sysdev.h>
 #include <linux/bcd.h>
 #include <linux/kallsyms.h>
+#include <asm/8253pit.h>
 #include <asm/pgtable.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
@@ -54,7 +55,7 @@ static int nohpet __initdata = 0;
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
 unsigned long hpet_tick;				/* HPET clocks / interrupt */
-unsigned long vxtime_hz = 1193182;
+unsigned long vxtime_hz = PIT_TICK_RATE;
 int report_lost_ticks;				/* command line option */
 unsigned long long monotonic_base;
 
@@ -296,8 +297,8 @@ EXPORT_SYMBOL(monotonic_clock);
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	static unsigned long rtc_update = 0;
-	unsigned long tsc;
-	int delay, offset = 0, lost = 0;
+	unsigned long tsc, lost = 0;
+	int delay, offset = 0;
 
 /*
  * Here we are in the timer irq handler. We have irqs locally disabled (so we
@@ -353,7 +354,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				(((long) offset << 32) / vxtime.tsc_quot) - 1;
 	}
 
-	if (lost > 0) {
+	if (lost) {
 		if (report_lost_ticks) {
 			printk(KERN_WARNING "time.c: Lost %ld timer "
 			       "tick(s)! ", lost);
@@ -531,7 +532,8 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		cpu_khz_ref = cpu_khz;
 	}
         if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
-            (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
+            (val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
+	    (val == CPUFREQ_RESUMECHANGE)) {
                 *lpj =
 		cpufreq_scale(loops_per_jiffy_ref, ref_freq, freq->new);
 
@@ -600,8 +602,8 @@ static unsigned int __init pit_calibrate_tsc(void)
 	outb((inb(0x61) & ~0x02) | 0x01, 0x61);
 
 	outb(0xb0, 0x43);
-	outb((1193182 / (1000 / 50)) & 0xff, 0x42);
-	outb((1193182 / (1000 / 50)) >> 8, 0x42);
+	outb((PIT_TICK_RATE / (1000 / 50)) & 0xff, 0x42);
+	outb((PIT_TICK_RATE / (1000 / 50)) >> 8, 0x42);
 	rdtscll(start);
 	sync_core();
 	while ((inb(0x61) & 0x20) == 0);
@@ -687,7 +689,7 @@ int __init time_setup(char *str)
 }
 
 static struct irqaction irq0 = {
-	timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL
+	timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer", NULL, NULL
 };
 
 extern void __init config_acpi_tables(void);

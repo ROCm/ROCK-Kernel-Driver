@@ -26,6 +26,7 @@ obj-$(CONFIG_NLS_CODEPAGE_949)	+= nls_cp949.o
 obj-$(CONFIG_NLS_CODEPAGE_950)	+= nls_cp950.o
 obj-$(CONFIG_NLS_CODEPAGE_1250) += nls_cp1250.o
 obj-$(CONFIG_NLS_CODEPAGE_1251)	+= nls_cp1251.o
+obj-$(CONFIG_NLS_ASCII)		+= nls_ascii.o
 obj-$(CONFIG_NLS_ISO8859_1)	+= nls_iso8859-1.o
 obj-$(CONFIG_NLS_ISO8859_2)	+= nls_iso8859-2.o
 obj-$(CONFIG_NLS_ISO8859_3)	+= nls_iso8859-3.o

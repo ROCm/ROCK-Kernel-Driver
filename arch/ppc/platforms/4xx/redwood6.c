@@ -12,6 +12,8 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
+#include <linux/device.h>
+#include <linux/ioport.h>
 #include <asm/io.h>
 #include <asm/ppc4xx_pic.h>
 #include <linux/delay.h>
@@ -56,6 +58,36 @@ static u_char redwood6_IRQ_initsenses[] __initdata = {
 	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 30: Ext Int 5 */
 	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 31: Ext Int 6 */
 };
+
+static struct resource smc91x_resources[] = {
+	[0] = {
+		.start	= SMC91111_BASE_ADDR,
+		.end	= SMC91111_BASE_ADDR + SMC91111_REG_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= SMC91111_IRQ,
+		.end	= SMC91111_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device smc91x_device = {
+	.name		= "smc91x",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(smc91x_resources),
+	.resource	= smc91x_resources,
+};
+
+static struct platform_device *redwood6_devs[] __initdata = {
+	&smc91x_device,
+};
+
+static int __init
+redwood6_platform_add_devices(void)
+{
+	return platform_add_devices(redwood6_devs, ARRAY_SIZE(redwood6_devs));
+}
 
 
 void __init
@@ -119,6 +151,8 @@ redwood6_setup_arch(void)
 	printk(KERN_INFO "IBM Redwood6 (STBx25XX) Platform\n");
 	printk(KERN_INFO
 	       "Port by MontaVista Software, Inc. (source@mvista.com)\n");
+
+	device_initcall(redwood6_platform_add_devices);
 }
 
 void __init

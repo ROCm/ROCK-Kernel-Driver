@@ -107,11 +107,9 @@ extern struct cachefs_netfs afs_cache_netfs;
  */
 extern struct inode_operations afs_mntpt_inode_operations;
 extern struct file_operations afs_mntpt_file_operations;
-#ifdef AFS_AUTOMOUNT_SUPPORT
 extern struct afs_timer afs_mntpt_expiry_timer;
 extern struct afs_timer_ops afs_mntpt_expiry_timer_ops;
 extern unsigned long afs_mntpt_expiry_timeout;
-#endif
 
 extern int afs_mntpt_check_symlink(struct afs_vnode *vnode);
 

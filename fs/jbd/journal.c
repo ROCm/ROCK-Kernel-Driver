@@ -71,9 +71,9 @@ EXPORT_SYMBOL(journal_abort);
 EXPORT_SYMBOL(journal_errno);
 EXPORT_SYMBOL(journal_ack_err);
 EXPORT_SYMBOL(journal_clear_err);
-EXPORT_SYMBOL(log_start_commit);
 EXPORT_SYMBOL(log_wait_commit);
 EXPORT_SYMBOL(journal_start_commit);
+EXPORT_SYMBOL(journal_force_commit_nested);
 EXPORT_SYMBOL(journal_wipe);
 EXPORT_SYMBOL(journal_blocks_per_page);
 EXPORT_SYMBOL(journal_invalidatepage);
@@ -173,7 +173,7 @@ loop:
 		 */
 		jbd_debug(1, "Now suspending kjournald\n");
 		spin_unlock(&journal->j_state_lock);
-		refrigerator(PF_IOTHREAD);
+		refrigerator(PF_FREEZE);
 		spin_lock(&journal->j_state_lock);
 	} else {
 		/*
@@ -454,7 +454,6 @@ int __log_start_commit(journal_t *journal, tid_t target)
 	}
 	return 0;
 }
-EXPORT_SYMBOL(__log_start_commit);
 
 int log_start_commit(journal_t *journal, tid_t tid)
 {
@@ -464,6 +463,39 @@ int log_start_commit(journal_t *journal, tid_t tid)
 	ret = __log_start_commit(journal, tid);
 	spin_unlock(&journal->j_state_lock);
 	return ret;
+}
+
+/*
+ * Force and wait upon a commit if the calling process is not within
+ * transaction.  This is used for forcing out undo-protected data which contains
+ * bitmaps, when the fs is running out of space.
+ *
+ * We can only force the running transaction if we don't have an active handle;
+ * otherwise, we will deadlock.
+ *
+ * Returns true if a transaction was started.
+ */
+int journal_force_commit_nested(journal_t *journal)
+{
+	transaction_t *transaction = NULL;
+	tid_t tid;
+
+	spin_lock(&journal->j_state_lock);
+	if (journal->j_running_transaction && !current->journal_info) {
+		transaction = journal->j_running_transaction;
+		__log_start_commit(journal, transaction->t_tid);
+	} else if (journal->j_committing_transaction)
+		transaction = journal->j_committing_transaction;
+
+	if (!transaction) {
+		spin_unlock(&journal->j_state_lock);
+		return 0;	/* Nothing to retry */
+	}
+
+	tid = transaction->t_tid;
+	spin_unlock(&journal->j_state_lock);
+	log_wait_commit(journal, tid);
+	return 1;
 }
 
 /*
@@ -644,7 +676,7 @@ static journal_t * journal_init_common (void)
 	spin_lock_init(&journal->j_list_lock);
 	spin_lock_init(&journal->j_state_lock);
 
-	journal->j_commit_interval = (HZ * 5);
+	journal->j_commit_interval = (HZ * JBD_DEFAULT_MAX_COMMIT_AGE);
 
 	/* The journal is marked for error until we succeed with recovery! */
 	journal->j_flags = JFS_ABORT;
@@ -1585,7 +1617,7 @@ static void journal_destroy_journal_head_cache(void)
 {
 	J_ASSERT(journal_head_cache != NULL);
 	kmem_cache_destroy(journal_head_cache);
-	journal_head_cache = 0;
+	journal_head_cache = NULL;
 }
 
 /*

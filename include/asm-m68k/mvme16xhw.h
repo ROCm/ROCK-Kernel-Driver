@@ -65,7 +65,7 @@ typedef struct {
 #define MVME_SCC_PCLK	10000000
 
 #define MVME162_IRQ_TYPE_PRIO	0
-                
+
 #define MVME167_IRQ_PRN		0x54
 #define MVME16x_IRQ_I596	0x57
 #define MVME16x_IRQ_SCSI	0x55

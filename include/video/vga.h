@@ -26,8 +26,15 @@
 /*
  * FIXME
  * Ugh, we don't have PCI space, so map readb() and friends to use Zorro space
- * for MMIO accesses. This should make clgenfb work again on Amiga
+ * for MMIO accesses. This should make cirrusfb work again on Amiga
  */
+#undef inb_p
+#undef inw_p
+#undef outb_p
+#undef outw
+#undef readb
+#undef writeb
+#undef writew
 #define inb_p(port)	0
 #define inw_p(port)	0
 #define outb_p(port, val)	do { } while (0)

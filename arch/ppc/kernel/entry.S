@@ -36,7 +36,7 @@
 #undef SHOW_SYSCALLS_TASK
 
 /*
- * MSR_KERNEL is > 0x10000 on 4xx since it include MSR_CE.
+ * MSR_KERNEL is > 0x10000 on 4xx/Book-E since it include MSR_CE.
  */
 #if MSR_KERNEL >= 0x10000
 #define LOAD_MSR_KERNEL(r, x)	lis r,(x)@h; ori r,r,(x)@l
@@ -44,13 +44,41 @@
 #define LOAD_MSR_KERNEL(r, x)	li r,(x)
 #endif
 
-#ifdef CONFIG_4xx
+#ifdef CONFIG_BOOKE
+#define	COR	r8	/* Critical Offset Register (COR) */
+#define BOOKE_LOAD_COR	lis COR,crit_save@ha
+#define BOOKE_REST_COR	mfspr COR,SPRG2
+#define BOOKE_SAVE_COR	mtspr SPRG2,COR
+#else
+#define COR	0
+#define BOOKE_LOAD_COR
+#define BOOKE_REST_COR
+#define BOOKE_SAVE_COR
+#endif
+
+#ifdef CONFIG_BOOKE
+	.globl	mcheck_transfer_to_handler
+mcheck_transfer_to_handler:
+	mtspr	SPRG6W,r8
+	lis	r8,mcheck_save@ha
+	lwz	r0,mcheck_r10@l(r8)
+	stw	r0,GPR10(r11)
+	lwz	r0,mcheck_r11@l(r8)
+	stw	r0,GPR11(r11)
+	mfspr	r8,SPRG6R
+	b	transfer_to_handler_full
+#endif
+
+#if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
 	.globl	crit_transfer_to_handler
 crit_transfer_to_handler:
-	lwz	r0,crit_r10@l(0)
+	BOOKE_SAVE_COR
+	BOOKE_LOAD_COR
+	lwz	r0,crit_r10@l(COR)
 	stw	r0,GPR10(r11)
-	lwz	r0,crit_r11@l(0)
+	lwz	r0,crit_r11@l(COR)
 	stw	r0,GPR11(r11)
+	BOOKE_REST_COR
 	/* fall through */
 #endif
 
@@ -82,7 +110,7 @@ transfer_to_handler:
 	beq	2f			/* if from user, fix up THREAD.regs */
 	addi	r11,r1,STACK_FRAME_OVERHEAD
 	stw	r11,PT_REGS(r12)
-#ifdef CONFIG_4xx
+#if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
 	lwz	r12,PTRACE-THREAD(r12)
 	andi.	r12,r12,PT_PTRACED
 	beq+	3f
@@ -213,11 +241,11 @@ ret_from_syscall:
 	andi.	r0,r9,(_TIF_SYSCALL_TRACE|_TIF_SIGPENDING|_TIF_NEED_RESCHED)
 	bne-	syscall_exit_work
 syscall_exit_cont:
-#ifdef CONFIG_4xx
+#if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
 	/* If the process has its own DBCR0 value, load it up */
 	lwz	r0,PTRACE(r2)
 	andi.	r0,r0,PT_PTRACED
-	bnel-	load_4xx_dbcr0
+	bnel-	load_dbcr0
 #endif
 	stwcx.	r0,0,r1			/* to clear the reservation */
 	lwz	r4,_LINK(r1)
@@ -482,7 +510,12 @@ BEGIN_FTR_SECTION
 	stw	r12,THREAD+THREAD_VRSAVE(r2)
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif /* CONFIG_ALTIVEC */
-	and.	r0,r0,r11	/* FP or altivec enabled? */
+#ifdef CONFIG_SPE
+	oris	r0,r0,MSR_SPE@h	 /* Disable SPE */
+	mfspr	r12,SPRN_SPEFSCR /* save spefscr register value */
+	stw	r12,THREAD+THREAD_SPEFSCR(r2)
+#endif /* CONFIG_SPE */
+	and.	r0,r0,r11	/* FP or altivec or SPE enabled? */
 	beq+	1f
 	andc	r11,r11,r0
 	MTMSRD(r11)
@@ -515,6 +548,10 @@ BEGIN_FTR_SECTION
 	mtspr	SPRN_VRSAVE,r0		/* if G4, restore VRSAVE reg */
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif /* CONFIG_ALTIVEC */
+#ifdef CONFIG_SPE
+	lwz	r0,THREAD+THREAD_SPEFSCR(r2)
+	mtspr	SPRN_SPEFSCR,r0		/* restore SPEFSCR reg */
+#endif /* CONFIG_SPE */
 
 	lwz	r0,_CCR(r1)
 	mtcrf	0xFF,r0
@@ -561,11 +598,11 @@ user_exc_return:		/* r10 contains MSR_KERNEL here */
 	bne	do_work
 
 restore_user:
-#ifdef CONFIG_4xx
+#if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
 	/* Check whether this process has its own DBCR0 value */
 	lwz	r0,PTRACE(r2)
 	andi.	r0,r0,PT_PTRACED
-	bnel-	load_4xx_dbcr0
+	bnel-	load_dbcr0
 #endif
 
 #ifdef CONFIG_PREEMPT
@@ -617,7 +654,7 @@ restore:
 	PPC405_ERR77(0,r1)
 	stwcx.	r0,0,r1			/* to clear the reservation */
 
-#ifndef CONFIG_4xx
+#if !(defined(CONFIG_4xx) || defined(CONFIG_BOOKE))
 	lwz	r9,_MSR(r1)
 	andi.	r10,r9,MSR_RI		/* check if this exception occurred */
 	beql	nonrecoverable		/* at a bad place (MSR:RI = 0) */
@@ -653,9 +690,9 @@ exc_exit_restart_end:
 	SYNC
 	RFI
 
-#else /* CONFIG_4xx */
+#else /* !(CONFIG_4xx || CONFIG_BOOKE) */
 	/*
-	 * This is a bit different on 4xx because 4xx doesn't have
+	 * This is a bit different on 4xx/Book-E because it doesn't have
 	 * the RI bit in the MSR.
 	 * The TLB miss handler checks if we have interrupted
 	 * the exception exit path and restarts it if so
@@ -692,6 +729,9 @@ exc_exit_restart_end:
  * give the wrong answer).
  * We have to restore various SPRs that may have been in use at the
  * time of the critical interrupt.
+ *
+ * Note that SPRG6 is used for machine check on CONFIG_BOOKE parts and
+ * thus not saved in the critical handler
  */
 	.globl	ret_from_crit_exc
 ret_from_crit_exc:
@@ -718,12 +758,14 @@ ret_from_crit_exc:
 	mtlr	r11
 	lwz	r10,_CCR(r1)
 	mtcrf	0xff,r10
+#ifdef CONFIG_40x
 	/* avoid any possible TLB misses here by turning off MSR.DR, we
 	 * assume the instructions here are mapped by a pinned TLB entry */
 	li	r10,MSR_IR
 	mtmsr	r10
 	isync
 	tophys(r1, r1)
+#endif
 	lwz	r9,_DEAR(r1)
 	lwz	r10,_ESR(r1)
 	mtspr	SPRN_DEAR,r9
@@ -734,36 +776,109 @@ ret_from_crit_exc:
 	mtspr	CSRR1,r12
 	lwz	r9,GPR9(r1)
 	lwz	r12,GPR12(r1)
-	lwz	r10,crit_sprg0@l(0)
+	BOOKE_SAVE_COR
+	BOOKE_LOAD_COR
+	lwz	r10,crit_sprg0@l(COR)
 	mtspr	SPRN_SPRG0,r10
-	lwz	r10,crit_sprg1@l(0)
+	lwz	r10,crit_sprg1@l(COR)
 	mtspr	SPRN_SPRG1,r10
-	lwz	r10,crit_sprg4@l(0)
+	lwz	r10,crit_sprg4@l(COR)
 	mtspr	SPRN_SPRG4,r10
-	lwz	r10,crit_sprg5@l(0)
+	lwz	r10,crit_sprg5@l(COR)
 	mtspr	SPRN_SPRG5,r10
-	lwz	r10,crit_sprg6@l(0)
+#ifdef CONFIG_40x
+	lwz	r10,crit_sprg6@l(COR)
 	mtspr	SPRN_SPRG6,r10
-	lwz	r10,crit_sprg7@l(0)
+#endif
+	lwz	r10,crit_sprg7@l(COR)
 	mtspr	SPRN_SPRG7,r10
-	lwz	r10,crit_srr0@l(0)
+	lwz	r10,crit_srr0@l(COR)
 	mtspr	SRR0,r10
-	lwz	r10,crit_srr1@l(0)
+	lwz	r10,crit_srr1@l(COR)
 	mtspr	SRR1,r10
-	lwz	r10,crit_pid@l(0)
+	lwz	r10,crit_pid@l(COR)
 	mtspr	SPRN_PID,r10
 	lwz	r10,GPR10(r1)
 	lwz	r11,GPR11(r1)
 	lwz	r1,GPR1(r1)
+	BOOKE_REST_COR
 	PPC405_ERR77_SYNC
 	rfci
 	b	.		/* prevent prefetch past rfci */
+
+#ifdef CONFIG_BOOKE
+/*
+ * Return from a machine check interrupt, similar to a critical
+ * interrupt.
+ */
+	.globl	ret_from_mcheck_exc
+ret_from_mcheck_exc:
+	REST_NVGPRS(r1)
+	lwz	r3,_MSR(r1)
+	andi.	r3,r3,MSR_PR
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
+	bne	user_exc_return
+
+	lwz	r0,GPR0(r1)
+	lwz	r2,GPR2(r1)
+	REST_4GPRS(3, r1)
+	REST_2GPRS(7, r1)
+
+	lwz	r10,_XER(r1)
+	lwz	r11,_CTR(r1)
+	mtspr	XER,r10
+	mtctr	r11
+
+	stwcx.	r0,0,r1			/* to clear the reservation */
+
+	lwz	r11,_LINK(r1)
+	mtlr	r11
+	lwz	r10,_CCR(r1)
+	mtcrf	0xff,r10
+	lwz	r9,_DEAR(r1)
+	lwz	r10,_ESR(r1)
+	mtspr	SPRN_DEAR,r9
+	mtspr	SPRN_ESR,r10
+	lwz	r11,_NIP(r1)
+	lwz	r12,_MSR(r1)
+	mtspr	MCSRR0,r11
+	mtspr	MCSRR1,r12
+	lwz	r9,GPR9(r1)
+	lwz	r12,GPR12(r1)
+	mtspr	SPRG6W,r8
+	lis	r8,mcheck_save@ha
+	lwz	r10,mcheck_sprg0@l(r8)
+	mtspr	SPRN_SPRG0,r10
+	lwz	r10,mcheck_sprg1@l(r8)
+	mtspr	SPRN_SPRG1,r10
+	lwz	r10,mcheck_sprg4@l(r8)
+	mtspr	SPRN_SPRG4,r10
+	lwz	r10,mcheck_sprg5@l(r8)
+	mtspr	SPRN_SPRG5,r10
+	lwz	r10,mcheck_sprg7@l(r8)
+	mtspr	SPRN_SPRG7,r10
+	lwz	r10,mcheck_srr0@l(r8)
+	mtspr	SRR0,r10
+	lwz	r10,mcheck_srr1@l(r8)
+	mtspr	SRR1,r10
+	lwz	r10,mcheck_csrr0@l(r8)
+	mtspr	CSRR0,r10
+	lwz	r10,mcheck_csrr1@l(r8)
+	mtspr	CSRR1,r10
+	lwz	r10,mcheck_pid@l(r8)
+	mtspr	SPRN_PID,r10
+	lwz	r10,GPR10(r1)
+	lwz	r11,GPR11(r1)
+	lwz	r1,GPR1(r1)
+	mfspr	r8,SPRG6R
+	RFMCI
+#endif /* CONFIG_BOOKE */
 
 /*
  * Load the DBCR0 value for a task that is being ptraced,
  * having first saved away the global DBCR0.
  */
-load_4xx_dbcr0:
+load_dbcr0:
 	mfmsr	r0		/* first disable debug exceptions */
 	rlwinm	r0,r0,0,~MSR_DE
 	mtmsr	r0
@@ -782,7 +897,7 @@ load_4xx_dbcr0:
 	blr
 
 	.comm	global_dbcr0,8
-#endif /* CONFIG_4xx */
+#endif /* !(CONFIG_4xx || CONFIG_BOOKE) */
 
 do_work:			/* r10 contains MSR_KERNEL here */
 	andi.	r0,r9,_TIF_NEED_RESCHED

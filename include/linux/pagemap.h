@@ -8,6 +8,7 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/highmem.h>
+#include <linux/compiler.h>
 #include <asm/uaccess.h>
 #include <linux/gfp.h>
 
@@ -136,64 +137,34 @@ static inline void pagecache_acct(int count)
 
 static inline unsigned long get_page_cache_size(void)
 {
-	int val = atomic_read(&nr_pagecache);
-
-	/* 
-	 * Since we have a per cpu count that spills into the global count,
-	 * the global count can be up to nr_cpus * PAGECACHE_ACCT_THRESHOLD
-	 * different to the actual count.
-	 *
-	 * While an approximation here is OK, we need to be careful to never
-	 * return a negative value.
-	 */
-	if (unlikely(val < 0))
-		return 0;
-
-	return val;
+	int ret = atomic_read(&nr_pagecache);
+	if (unlikely(ret < 0))
+		ret = 0;
+	return ret;
 }
 
-static inline void ___add_to_page_cache(struct page *page,
-		struct address_space *mapping, unsigned long index)
+static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
+					unsigned long address)
 {
-	extern struct address_space swapper_space;
-
-	if (likely(mapping != &swapper_space)) {
-		BUG_ON(PageAnon(page));
-		page->mapping = mapping;
-		page->index = index;
-	} else {
-		SetPageSwapCache(page);
-		page->private = index;
-	}
-
-	mapping->nrpages++;
-	pagecache_acct(1);
+	pgoff_t pgoff = (address - vma->vm_start) >> PAGE_SHIFT;
+	pgoff += vma->vm_pgoff;
+	return pgoff >> (PAGE_CACHE_SHIFT - PAGE_SHIFT);
 }
 
 extern void FASTCALL(__lock_page(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
 
-
-extern int FASTCALL(__lock_page_wq(struct page *page, wait_queue_t *wait));
-static inline int lock_page_wq(struct page *page, wait_queue_t *wait)
-{
-	if (TestSetPageLocked(page))
-		return __lock_page_wq(page, wait);
-	else
-		return 0;
-}
-
 static inline void lock_page(struct page *page)
 {
-	lock_page_wq(page, NULL);
+	if (TestSetPageLocked(page))
+		__lock_page(page);
 }
 	
 /*
  * This is exported only for wait_on_page_locked/wait_on_page_writeback.
  * Never use this directly!
  */
-extern int FASTCALL(wait_on_page_bit_wq(struct page *page, int bit_nr,
-	wait_queue_t *wait));
+extern void FASTCALL(wait_on_page_bit(struct page *page, int bit_nr));
 
 /* 
  * Wait for a page to be unlocked.
@@ -202,33 +173,19 @@ extern int FASTCALL(wait_on_page_bit_wq(struct page *page, int bit_nr,
  * ie with increased "page->count" so that the page won't
  * go away during the wait..
  */
-static inline int wait_on_page_locked_wq(struct page *page, wait_queue_t *wait)
-{
-	if (PageLocked(page))
-		return wait_on_page_bit_wq(page, PG_locked, wait);
-	return 0;
-}
-
-static inline int wait_on_page_writeback_wq(struct page *page,
-						wait_queue_t *wait)
-{
-	if (PageWriteback(page))
-		return wait_on_page_bit_wq(page, PG_writeback, wait);
-	return 0;
-}
-
 static inline void wait_on_page_locked(struct page *page)
 {
-	wait_on_page_locked_wq(page, NULL);
+	if (PageLocked(page))
+		wait_on_page_bit(page, PG_locked);
 }
 
 /* 
  * Wait for a page to complete writeback
  */
-
 static inline void wait_on_page_writeback(struct page *page)
 {
-	wait_on_page_writeback_wq(page, NULL);
+	if (PageWriteback(page))
+		wait_on_page_bit(page, PG_writeback);
 }
 
 extern void end_page_writeback(struct page *page);
@@ -267,13 +224,13 @@ static inline void fault_in_pages_readable(const char __user *uaddr, int size)
 	volatile char c;
 	int ret;
 
-	ret = __get_user(c, (char *)uaddr);
+	ret = __get_user(c, uaddr);
 	if (ret == 0) {
 		const char __user *end = uaddr + size - 1;
 
 		if (((unsigned long)uaddr & PAGE_MASK) !=
 				((unsigned long)end & PAGE_MASK))
-		 	__get_user(c, (char *)end);
+		 	__get_user(c, end);
 	}
 }
 

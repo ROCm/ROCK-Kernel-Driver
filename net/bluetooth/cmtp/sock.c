@@ -71,6 +71,7 @@ static int cmtp_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 	struct cmtp_connlist_req cl;
 	struct cmtp_conninfo ci;
 	struct socket *nsock;
+	void __user *argp = (void __user *)arg;
 	int err;
 
 	BT_DBG("cmd %x arg %lx", cmd, arg);
@@ -80,7 +81,7 @@ static int cmtp_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
 
-		if (copy_from_user(&ca, (void *) arg, sizeof(ca)))
+		if (copy_from_user(&ca, argp, sizeof(ca)))
 			return -EFAULT;
 
 		nsock = sockfd_lookup(ca.sock, &err);
@@ -94,7 +95,7 @@ static int cmtp_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 
 		err = cmtp_add_connection(&ca, nsock);
 		if (!err) {
-			if (copy_to_user((void *) arg, &ca, sizeof(ca)))
+			if (copy_to_user(argp, &ca, sizeof(ca)))
 				err = -EFAULT;
 		} else
 			fput(nsock->file);
@@ -105,30 +106,30 @@ static int cmtp_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 		if (!capable(CAP_NET_ADMIN))
 			return -EACCES;
 
-		if (copy_from_user(&cd, (void *) arg, sizeof(cd)))
+		if (copy_from_user(&cd, argp, sizeof(cd)))
 			return -EFAULT;
 
 		return cmtp_del_connection(&cd);
 
 	case CMTPGETCONNLIST:
-		if (copy_from_user(&cl, (void *) arg, sizeof(cl)))
+		if (copy_from_user(&cl, argp, sizeof(cl)))
 			return -EFAULT;
 
 		if (cl.cnum <= 0)
 			return -EINVAL;
 
 		err = cmtp_get_connlist(&cl);
-		if (!err && copy_to_user((void *) arg, &cl, sizeof(cl)))
+		if (!err && copy_to_user(argp, &cl, sizeof(cl)))
 			return -EFAULT;
 
 		return err;
 
 	case CMTPGETCONNINFO:
-		if (copy_from_user(&ci, (void *) arg, sizeof(ci)))
+		if (copy_from_user(&ci, argp, sizeof(ci)))
 			return -EFAULT;
 
 		err = cmtp_get_conninfo(&ci);
-		if (!err && copy_to_user((void *) arg, &ci, sizeof(ci)))
+		if (!err && copy_to_user(argp, &ci, sizeof(ci)))
 			return -EFAULT;
 
 		return err;

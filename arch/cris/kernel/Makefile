@@ -1,14 +1,14 @@
-# $Id: Makefile,v 1.8 2003/04/09 05:20:47 starvik Exp $
+# $Id: Makefile,v 1.10 2004/05/14 10:18:12 starvik Exp $
 #
 # Makefile for the linux kernel.
 #
 
-extra-y := vmlinux.lds.s
+extra-y	:= vmlinux.lds.s
 
 obj-y   := process.o traps.o irq.o ptrace.o setup.o \
 	   time.o sys_cris.o semaphore.o
 
-obj-$(CONFIG_MODULES)    += ksyms.o
+obj-$(CONFIG_MODULES)    += crisksyms.o
 obj-$(CONFIG_MODULES)	 += module.o
 
 clean:

@@ -506,9 +506,11 @@ static int __init perf_init(void)
 		perf_processor_interface = ONYX_INTF;
 	} else if (boot_cpu_data.cpu_type == pcxw ||
 		 boot_cpu_data.cpu_type == pcxw_ ||
-		 boot_cpu_data.cpu_type == pcxw2) {
+		 boot_cpu_data.cpu_type == pcxw2 ||
+		 boot_cpu_data.cpu_type == mako) {
 		perf_processor_interface = CUDA_INTF;
-		if (boot_cpu_data.cpu_type == pcxw2) 
+		if (boot_cpu_data.cpu_type == pcxw2 ||
+		    boot_cpu_data.cpu_type == mako) 
 			bitmask_array = perf_bitmasks_piranha;
 	} else {
 		perf_processor_interface = UNKNOWN_INTF;

@@ -85,6 +85,7 @@ struct rpaphp_pci_func {
  * struct slot - slot information for each *physical* slot
  */
 struct slot {
+	struct list_head rpaphp_slot_list;
 	int state;
 	u32 index;
 	u32 type;
@@ -92,6 +93,7 @@ struct slot {
 	char *name;
 	char *location;
 	u8 removable;
+	u8 dev_type;		/* VIO or PCI */
 	struct device_node *dn;	/* slot's device_node in OFDT */
 				/* dn has phb info */
 	struct pci_dev *bridge;	/* slot's pci_dev in pci_devices */
@@ -99,9 +101,7 @@ struct slot {
 		struct list_head pci_funcs; /* pci_devs in PCI slot */ 
 		struct vio_dev *vio_dev; /* vio_dev in VIO slot */
 	} dev;
-	u8 dev_type;		/* VIO or PCI */
 	struct hotplug_slot *hotplug_slot;
-	struct list_head rpaphp_slot_list;
 };
 
 extern struct hotplug_slot_ops rpaphp_hotplug_slot_ops;
@@ -141,9 +141,8 @@ extern int rpaphp_enable_vio_slot(struct slot *slot);
 extern void dealloc_slot_struct(struct slot *slot);
 extern struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_name, int power_domain);
 extern int register_slot(struct slot *slot);
+extern int deregister_slot(struct slot *slot);
 extern int rpaphp_get_power_status(struct slot *slot, u8 * value);
 extern int rpaphp_set_attention_status(struct slot *slot, u8 status);
-extern void rpaphp_sysfs_remove_attr_location(struct hotplug_slot *slot);
-extern void rpaphp_sysfs_remove_attr_removable(struct hotplug_slot *slot);
 	
 #endif				/* _PPC64PHP_H */

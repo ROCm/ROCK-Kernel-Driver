@@ -123,6 +123,9 @@ tconInfoAlloc(void)
 		ret_buf->tidStatus = CifsNew;
 		INIT_LIST_HEAD(&ret_buf->openFileList);
 		init_MUTEX(&ret_buf->tconSem);
+#ifdef CONFIG_CIFS_STATS
+		ret_buf->stat_lock = SPIN_LOCK_UNLOCKED;
+#endif
 		write_unlock(&GlobalSMBSeslock);
 	}
 	return ret_buf;
@@ -147,7 +150,7 @@ tconInfoFree(struct cifsTconInfo *buf_to_free)
 struct smb_hdr *
 cifs_buf_get(void)
 {
-	struct smb_hdr *ret_buf = 0;
+	struct smb_hdr *ret_buf = NULL;
 
 /* We could use negotiated size instead of max_msgsize - 
    but it may be more efficient to always alloc same size 
@@ -392,6 +395,9 @@ is_valid_oplock_break(struct smb_hdr *buf)
 	list_for_each(tmp, &GlobalTreeConnectionList) {
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
 		if (tcon->tid == buf->Tid) {
+#ifdef CONFIG_CIFS_STATS
+			atomic_inc(&tcon->num_oplock_brks);
+#endif
 			list_for_each(tmp1,&tcon->openFileList){
 				netfile = list_entry(tmp1,struct cifsFileInfo,tlist);
 				if(pSMB->Fid == netfile->netfid) {

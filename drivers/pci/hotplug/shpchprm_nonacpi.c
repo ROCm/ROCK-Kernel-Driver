@@ -51,11 +51,6 @@ int shpchprm_print_pirt(void)
 	return 0;
 }
 
-void * shpchprm_get_slot(struct slot *slot)
-{
-	return NULL;
-}
-
 int shpchprm_get_physical_slot_number(struct controller *ctrl, u32 *sun, u8 busnum, u8 devnum)
 {
 	int	offset = devnum - ctrl->slot_device_offset;
@@ -213,7 +208,7 @@ static int configure_existing_function(
 
 static int bind_pci_resources_to_slots ( struct controller *ctrl)
 {
-	struct pci_func *func;
+	struct pci_func *func, new_func;
 	int busn = ctrl->slot_bus;
 	int devn, funn;
 	u32	vid;
@@ -231,11 +226,19 @@ static int bind_pci_resources_to_slots ( struct controller *ctrl)
 
 			if (vid != 0xFFFFFFFF) {
 				func = shpchp_slot_find(busn, devn, funn);
-				if (!func)
-					continue;
-				configure_existing_function(ctrl, func);
+				if (!func) {
+					memset(&new_func, 0, sizeof(struct pci_func));
+					new_func.bus = busn;
+					new_func.device = devn;
+					new_func.function = funn;
+					new_func.is_a_board = 1;
+					configure_existing_function(ctrl, &new_func);
+					phprm_dump_func_res(&new_func);
+				} else {
+					configure_existing_function(ctrl, func);
+					phprm_dump_func_res(func);
+				}
 				dbg("aCCF:existing PCI 0x%x Func ResourceDump\n", ctrl->bus);
-				phprm_dump_func_res(func);
 			}
 		}
 	}

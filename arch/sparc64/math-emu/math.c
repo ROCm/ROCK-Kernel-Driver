@@ -185,7 +185,7 @@ int do_mathemu(struct pt_regs *regs, struct fpustate *f)
 		die_if_kernel("unfinished/unimplemented FPop from kernel", regs);
 	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
-	if (get_user(insn, (u32 *)pc) != -EFAULT) {
+	if (get_user(insn, (u32 __user *) pc) != -EFAULT) {
 		if ((insn & 0xc1f80000) == 0x81a00000) /* FPOP1 */ {
 			switch ((insn >> 5) & 0x1ff) {
 			/* QUAD - ftt == 3 */
@@ -298,14 +298,14 @@ int do_mathemu(struct pt_regs *regs, struct fpustate *f)
 				else if (freg < 16)
 					XR = regs->u_regs[freg];
 				else if (test_thread_flag(TIF_32BIT)) {
-					struct reg_window32 *win32;
+					struct reg_window32 __user *win32;
 					flushw_user ();
-					win32 = (struct reg_window32 *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
+					win32 = (struct reg_window32 __user *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
 					get_user(XR, &win32->locals[freg - 16]);
 				} else {
-					struct reg_window *win;
+					struct reg_window __user *win;
 					flushw_user ();
-					win = (struct reg_window *)(regs->u_regs[UREG_FP] + STACK_BIAS);
+					win = (struct reg_window __user *)(regs->u_regs[UREG_FP] + STACK_BIAS);
 					get_user(XR, &win->locals[freg - 16]);
 				}
 				IR = 0;

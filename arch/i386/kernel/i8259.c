@@ -317,19 +317,14 @@ void init_8259A(int auto_eoi)
  * be shot.
  */
  
-/*
- * =PC9800NOTE= In NEC PC-9800, we use irq8 instead of irq13!
- */
 
 static irqreturn_t math_error_irq(int cpl, void *dev_id, struct pt_regs *regs)
 {
-	extern void math_error(void *);
-#ifndef CONFIG_X86_PC9800
+	extern void math_error(void __user *);
 	outb(0,0xF0);
-#endif
 	if (ignore_fpu_irq || !boot_cpu_data.hard_math)
 		return IRQ_NONE;
-	math_error((void *)regs->eip);
+	math_error((void __user *)regs->eip);
 	return IRQ_HANDLED;
 }
 
@@ -337,7 +332,7 @@ static irqreturn_t math_error_irq(int cpl, void *dev_id, struct pt_regs *regs)
  * New motherboards sometimes make IRQ 13 be a PCI interrupt,
  * so allow interrupt sharing.
  */
-static struct irqaction fpu_irq = { math_error_irq, 0, 0, "fpu", NULL, NULL };
+static struct irqaction fpu_irq = { math_error_irq, 0, CPU_MASK_NONE, "fpu", NULL, NULL };
 
 void __init init_ISA_irqs (void)
 {
@@ -350,7 +345,7 @@ void __init init_ISA_irqs (void)
 
 	for (i = 0; i < NR_IRQS; i++) {
 		irq_desc[i].status = IRQ_DISABLED;
-		irq_desc[i].action = 0;
+		irq_desc[i].action = NULL;
 		irq_desc[i].depth = 1;
 
 		if (i < 16) {
@@ -423,10 +418,6 @@ void __init init_IRQ(void)
 		int vector = FIRST_EXTERNAL_VECTOR + i;
 		if (i >= NR_IRQS)
 			break;
-#ifdef	CONFIG_KDB
-		if (vector == KDBENTER_VECTOR)
-			continue;
-#endif
 		if (vector != SYSCALL_VECTOR) 
 			set_intr_gate(vector, interrupt[i]);
 	}
@@ -448,4 +439,6 @@ void __init init_IRQ(void)
 	 */
 	if (boot_cpu_data.hard_math && !cpu_has_fpu)
 		setup_irq(FPU_IRQ, &fpu_irq);
+
+	irq_ctx_init(smp_processor_id());
 }

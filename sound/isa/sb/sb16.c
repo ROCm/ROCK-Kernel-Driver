@@ -248,6 +248,8 @@ static struct pnp_card_device_id snd_sb16_pnpids[] = {
 	{ .id = "CTLXXXX" , .devs = { { "CTL0044" }, { "CTL0023" } } },
 	{ .id = "CTLXXXX" , .devs = { { "CTL0045" }, { "CTL0022" } } },
 #endif /* SNDRV_SBAWE */
+	/* Sound Blaster 16 PnP (Virtual PC 2004)*/
+	{ .id = "tBA03b0", .devs = { { "PNPb003" } } },
 	{ .id = "", }
 };
 

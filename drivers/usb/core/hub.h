@@ -187,9 +187,8 @@ extern void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe);
 
 struct usb_hub {
 	struct usb_interface	*intf;		/* the "real" device */
+	struct usb_device	*hdev;
 	struct urb		*urb;		/* for interrupt polling pipe */
-	struct completion	*urb_complete;	/* wait for urb to end */
-	unsigned int		urb_active:1;
 
 	/* buffer for urb ... 1 bit each for hub and children, rounded up */
 	char			(*buffer)[(USB_MAXCHILDREN + 1 + 7) / 8];
@@ -202,16 +201,33 @@ struct usb_hub {
 	int			error;		/* last reported error */
 	int			nerrors;	/* track consecutive errors */
 
-	struct list_head	hub_list;	/* all hubs */
 	struct list_head	event_list;	/* hubs w/data or errs ready */
+	unsigned long		event_bits[1];	/* status change bitmask */
+	unsigned long		change_bits[1];	/* ports with logical connect
+							status change */
+#if USB_MAXCHILDREN > 31 /* 8*sizeof(unsigned long) - 1 */
+#error event_bits[] is too short!
+#endif
 
 	struct usb_hub_descriptor *descriptor;	/* class descriptor */
-	struct semaphore	khubd_sem;
 	struct usb_tt		tt;		/* Transaction Translator */
+
+	u8			power_budget;	/* in 2mA units; or zero */
 
 	unsigned		has_indicators:1;
 	enum hub_led_mode	indicator[USB_MAXCHILDREN];
 	struct work_struct	leds;
 };
+
+/* use this for low-powered root hubs */
+static inline void
+hub_set_power_budget (struct usb_device *hubdev, unsigned mA)
+{
+	struct usb_hub	*hub;
+
+	hub = (struct usb_hub *)
+		usb_get_intfdata (hubdev->actconfig->interface[0]);
+	hub->power_budget = min(mA,(unsigned)500)/2;
+}
 
 #endif /* __LINUX_HUB_H */

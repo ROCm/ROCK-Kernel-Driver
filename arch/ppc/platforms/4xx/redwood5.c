@@ -14,14 +14,44 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
+#include <linux/device.h>
+#include <linux/ioport.h>
 #include <asm/io.h>
 #include <asm/machdep.h>
+
+static struct resource smc91x_resources[] = {
+	[0] = {
+		.start	= SMC91111_BASE_ADDR,
+		.end	= SMC91111_BASE_ADDR + SMC91111_REG_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= SMC91111_IRQ,
+		.end	= SMC91111_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device smc91x_device = {
+	.name		= "smc91x",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(smc91x_resources),
+	.resource	= smc91x_resources,
+};
+
+static struct platform_device *redwood5_devs[] __initdata = {
+	&smc91x_device,
+};
+
+static int __init
+redwood5_platform_add_devices(void)
+{
+	return platform_add_devices(redwood5_devs, ARRAY_SIZE(redwood5_devs));
+}
 
 void __init
 redwood5_setup_arch(void)
 {
-	bd_t *bip = &__res;
-
 	ppc4xx_setup_arch();
 
 #ifdef CONFIG_DEBUG_BRINGUP
@@ -46,7 +76,7 @@ redwood5_setup_arch(void)
 
 	printk("\n");
 #endif
-
+	device_initcall(redwood5_platform_add_devices);
 }
 
 void __init

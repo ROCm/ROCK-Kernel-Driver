@@ -771,7 +771,7 @@ static int pd_ioctl(struct inode *inode, struct file *file,
 	 unsigned int cmd, unsigned long arg)
 {
 	struct pd_unit *disk = inode->i_bdev->bd_disk->private_data;
-	struct hd_geometry *geo = (struct hd_geometry *) arg;
+	struct hd_geometry __user *geo = (struct hd_geometry __user *) arg;
 	struct hd_geometry g;
 
 	switch (cmd) {

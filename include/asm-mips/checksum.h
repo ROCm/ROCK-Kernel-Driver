@@ -41,7 +41,8 @@ unsigned int csum_partial_copy_from_user(const char *src, char *dst, int len,
  * Copy and checksum to user
  */
 #define HAVE_CSUM_COPY_USER
-static inline unsigned int csum_and_copy_to_user (const char *src, char *dst,
+static inline unsigned int csum_and_copy_to_user (const char *src, 
+						  char __user *dst,
 						  int len, int sum,
 						  int *err_ptr)
 {
@@ -120,10 +121,6 @@ static inline unsigned short ip_fast_csum(unsigned char *iph, unsigned int ihl)
 	return csum_fold(csum);
 }
 
-/*
- * computes the checksum of the TCP/UDP pseudo-header
- * returns a 16-bit checksum, already complemented
- */
 static inline unsigned int csum_tcpudp_nofold(unsigned long saddr,
 	unsigned long daddr, unsigned short len, unsigned short proto,
 	unsigned int sum)

@@ -1456,21 +1456,10 @@ static void cs_mksound(unsigned int hz, unsigned int ticks)
 	restore_flags(flags);
 }
 
-static void CS_open(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void CS_release(void)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static MACHINE mach_cs4218 = {
+	.owner =	THIS_MODULE,
 	.name =		"HIOX CS4218",
 	.name2 =	"Built-in Sound",
-	.open =		CS_open,
-	.release =	CS_release,
 	.dma_alloc =	CS_Alloc,
 	.dma_free =	CS_Free,
 	.irqinit =	CS_IrqInit,
@@ -2474,7 +2463,7 @@ static long long sound_lseek(struct file *file, long long offset, int orig)
 int __init tdm8xx_sound_init(void)
 {
 	int i, has_sound;
-	uint			dp_addr;
+	uint			dp_offset;
 	volatile uint		*sirp;
 	volatile cbd_t		*bdp;
 	volatile cpm8xx_t	*cp;
@@ -2536,14 +2525,14 @@ int __init tdm8xx_sound_init(void)
 	/* We need to allocate a transmit and receive buffer
 	 * descriptors from dual port ram.
 	 */
-	dp_addr = m8xx_cpm_dpalloc(sizeof(cbd_t) * numReadBufs);
+	dp_addr = cpm_dpalloc(sizeof(cbd_t) * numReadBufs, 8);
 
 	/* Set the physical address of the host memory
 	 * buffers in the buffer descriptors, and the
 	 * virtual address for us to work with.
 	 */
 	bdp = (cbd_t *)&cp->cp_dpmem[dp_addr];
-	up->smc_rbase = dp_addr;
+	up->smc_rbase = dp_offset;
 	rx_cur = rx_base = (cbd_t *)bdp;
 
 	for (i=0; i<(numReadBufs-1); i++) {
@@ -2558,10 +2547,10 @@ int __init tdm8xx_sound_init(void)
 
 	/* Now, do the same for the transmit buffers.
 	*/
-	dp_addr = m8xx_cpm_dpalloc(sizeof(cbd_t) * numBufs);
+	dp_offset = cpm_dpalloc(sizeof(cbd_t) * numBufs, 8);
 
 	bdp = (cbd_t *)&cp->cp_dpmem[dp_addr];
-	up->smc_tbase = dp_addr;
+	up->smc_tbase = dp_offset;
 	tx_cur = tx_base = (cbd_t *)bdp;
 
 	for (i=0; i<(numBufs-1); i++) {

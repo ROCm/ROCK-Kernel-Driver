@@ -12,7 +12,9 @@
 #include <linux/device.h>
 
 /* get the platform specific defines */
+#ifdef CONFIG_MCA
 #include <asm/mca.h>
+#endif
 
 /* The detection of MCA bus is done in the real mode (using BIOS).
  * The information is exported to the protected code, where this
@@ -144,7 +146,7 @@ static inline void mca_do_proc_init(void)
 {
 }
 
-static inline void mca_set_adapter_procfn(int slot, MCA_ProcFn *fn, void* dev)
+static inline void mca_set_adapter_procfn(int slot, MCA_ProcFn fn, void* dev)
 {
 }
 #endif

@@ -8,7 +8,7 @@
  *			to controllines	(due to change in nand.c)
  *			page_cache added
  *
- * $Id: spia.c,v 1.19 2003/04/20 07:24:40 gleixner Exp $
+ * $Id: spia.c,v 1.21 2003/07/11 15:12:29 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,6 +20,8 @@
  *   a 64Mibit (8MiB x 8 bits) NAND flash device.
  */
 
+#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/mtd/mtd.h>
@@ -35,14 +37,14 @@ static struct mtd_info *spia_mtd = NULL;
 /*
  * Values specific to the SPIA board (used with EP7212 processor)
  */
-#define SPIA_IO_ADDR	= 0xd0000000	/* Start of EP7212 IO address space */
-#define SPIA_FIO_ADDR	= 0xf0000000	/* Address where flash is mapped */
-#define SPIA_PEDR	= 0x0080	/*
+#define SPIA_IO_BASE	0xd0000000	/* Start of EP7212 IO address space */
+#define SPIA_FIO_BASE	0xf0000000	/* Address where flash is mapped */
+#define SPIA_PEDR	0x0080		/*
 					 * IO offset to Port E data register
 					 * where the CLE, ALE and NCE pins
 					 * are wired to.
 					 */
-#define SPIA_PEDDR	= 0x00c0	/*
+#define SPIA_PEDDR	0x00c0		/*
 					 * IO offset to Port E data direction
 					 * register so we can control the IO
 					 * lines.
@@ -61,11 +63,6 @@ MODULE_PARM(spia_io_base, "i");
 MODULE_PARM(spia_fio_base, "i");
 MODULE_PARM(spia_pedr, "i");
 MODULE_PARM(spia_peddr, "i");
-
-__setup("spia_io_base=",spia_io_base);
-__setup("spia_fio_base=",spia_fio_base);
-__setup("spia_pedr=",spia_pedr);
-__setup("spia_peddr=",spia_peddr);
 
 /*
  * Define partitions for flash device
@@ -88,7 +85,7 @@ const static struct mtd_partition partition_info[] = {
 /* 
  *	hardware specific access to control-lines
 */
-void spia_hwcontrol(int cmd){
+static void spia_hwcontrol(struct mtd_info *mtd, int cmd){
 
     switch(cmd){
 
@@ -143,7 +140,7 @@ int __init spia_init (void)
 	this->chip_delay = 15;		
 
 	/* Scan to find existence of the device */
-	if (nand_scan (spia_mtd)) {
+	if (nand_scan (spia_mtd, 1)) {
 		kfree (spia_mtd);
 		return -ENXIO;
 	}

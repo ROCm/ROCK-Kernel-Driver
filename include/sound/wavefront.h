@@ -554,8 +554,8 @@ typedef struct wf_patch_info {
 				  WF_{GET,SET}_CHANNEL above.
 
 			       */
-    wavefront_any *hdrptr;      /* user-space ptr to hdr bytes */
-    u16 *dataptr;            /* actual sample data */
+    wavefront_any __user *hdrptr;      /* user-space ptr to hdr bytes */
+    u16 __user *dataptr;            /* actual sample data */
 
     wavefront_any hdr;          /* kernel-space copy of hdr bytes */         
 } wavefront_patch_info;

@@ -1296,7 +1296,7 @@ done:
 
 static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	sync_serial_settings *line = ifr->ifr_settings.ifs_ifsu.sync;
+	sync_serial_settings __user *line = ifr->ifr_settings.ifs_ifsu.sync;
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	const size_t size = sizeof(dpriv->settings);
 	int ret = 0;

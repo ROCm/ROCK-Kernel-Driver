@@ -44,14 +44,12 @@ static char irc_buffer[65536];
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("IRC (DCC) connection tracking helper");
 MODULE_LICENSE("GPL");
-#ifdef MODULE_PARM
 MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
 MODULE_PARM(max_dcc_channels, "i");
 MODULE_PARM_DESC(max_dcc_channels, "max number of expected DCC channels per IRC session");
 MODULE_PARM(dcc_timeout, "i");
 MODULE_PARM_DESC(dcc_timeout, "timeout on for unestablished DCC channels");
-#endif
 
 static char *dccprotos[] = { "SEND ", "CHAT ", "MOVE ", "TSEND ", "SCHAT " };
 #define MINMATCHLEN	5
@@ -60,8 +58,8 @@ DECLARE_LOCK(ip_irc_lock);
 struct module *ip_conntrack_irc = THIS_MODULE;
 
 #if 0
-#define DEBUGP(format, args...) printk(KERN_DEBUG __FILE__ ":" __FUNCTION__ \
-					":" format, ## args)
+#define DEBUGP(format, args...) printk(KERN_DEBUG "%s:%s:" format, \
+                                       __FILE__, __FUNCTION__ , ## args)
 #else
 #define DEBUGP(format, args...)
 #endif
@@ -106,8 +104,8 @@ static int help(struct sk_buff *skb,
 	struct tcphdr tcph;
 	char *data, *data_limit;
 	int dir = CTINFO2DIR(ctinfo);
-	struct ip_conntrack_expect expect, *exp = &expect;
-	struct ip_ct_irc_expect *exp_irc_info = &exp->help.exp_irc_info;
+	struct ip_conntrack_expect *exp;
+	struct ip_ct_irc_expect *exp_irc_info = NULL;
 
 	u_int32_t dcc_ip;
 	u_int16_t dcc_port;
@@ -190,8 +188,12 @@ static int help(struct sk_buff *skb,
 
 				continue;
 			}
-			
-			memset(&expect, 0, sizeof(expect));
+
+			exp = ip_conntrack_expect_alloc();
+			if (exp == NULL)
+				goto out;
+
+			exp_irc_info = &exp->help.exp_irc_info;
 
 			/* save position of address in dcc string,
 			 * necessary for NAT */
@@ -218,7 +220,7 @@ static int help(struct sk_buff *skb,
 				NIPQUAD(exp->tuple.dst.ip),
 				ntohs(exp->tuple.dst.u.tcp.port));
 
-			ip_conntrack_expect_related(ct, &expect);
+			ip_conntrack_expect_related(exp, ct);
 
 			goto out;
 		} /* for .. NUM_DCCPROTO */

@@ -60,7 +60,7 @@ static int pvc_connect(struct socket *sock,struct sockaddr *sockaddr,
 }
 
 static int pvc_setsockopt(struct socket *sock, int level, int optname,
-			  char *optval, int optlen)
+			  char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	int error;
@@ -73,7 +73,7 @@ static int pvc_setsockopt(struct socket *sock, int level, int optname,
 
 
 static int pvc_getsockopt(struct socket *sock, int level, int optname,
-		          char *optval, int *optlen)
+		          char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	int error;

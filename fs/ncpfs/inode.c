@@ -85,6 +85,12 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "ncp_inode_cache: not all structures were freed\n");
 }
 
+static int ncp_remount(struct super_block *sb, int *flags, char* data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 static struct super_operations ncp_sops =
 {
 	.alloc_inode	= ncp_alloc_inode,
@@ -93,6 +99,7 @@ static struct super_operations ncp_sops =
 	.delete_inode	= ncp_delete_inode,
 	.put_super	= ncp_put_super,
 	.statfs		= ncp_statfs,
+	.remount_fs	= ncp_remount,
 };
 
 extern struct dentry_operations ncp_root_dentry_operations;

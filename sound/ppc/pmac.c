@@ -688,7 +688,7 @@ static void snd_pmac_dbdma_reset(pmac_t *chip)
 static irqreturn_t
 snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
 	snd_pmac_pcm_update(chip, &chip->playback);
 	return IRQ_HANDLED;
 }
@@ -697,7 +697,7 @@ snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
 	snd_pmac_pcm_update(chip, &chip->capture);
 	return IRQ_HANDLED;
 }
@@ -706,7 +706,7 @@ snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
 	int ctrl = in_le32(&chip->awacs->control);
 
 	/*printk("pmac: control interrupt.. 0x%x\n", ctrl);*/
@@ -896,7 +896,7 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		sound = sound->next;
 	if (! sound)
 		return -ENODEV;
-	prop = (unsigned int *) get_property(sound, "sub-frame", 0);
+	prop = (unsigned int *) get_property(sound, "sub-frame", NULL);
 	if (prop && *prop < 16)
 		chip->subframe = *prop;
 	/* This should be verified on older screamers */
@@ -931,7 +931,14 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		chip->freq_table = tumbler_freqs;
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
-	prop = (unsigned int *)get_property(sound, "device-id", 0);
+	if (device_is_compatible(sound, "AOAKeylargo")) {
+		/* Seems to support the stock AWACS frequencies, but has
+		   a snapper mixer */
+		chip->model = PMAC_SNAPPER;
+		// chip->can_byte_swap = 0; /* FIXME: check this */
+		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
+	}
+	prop = (unsigned int *)get_property(sound, "device-id", NULL);
 	if (prop)
 		chip->device_id = *prop;
 	chip->has_iic = (find_devices("perch") != NULL);

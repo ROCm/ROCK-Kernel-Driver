@@ -40,7 +40,7 @@ SYMBOL_NAME_LABEL(_start)
 
 	/* Peripheral Setup */
 	
-#if defined(CONFIG_BLK_DEV_BLKMEM)
+#if defined(CONFIG_MTD_UCLINUX)
 	/* move romfs image */
 	jsr	@__move_romfs	
 #endif

@@ -51,6 +51,8 @@
 #include "8390.h"
 #include "smc-mca.h"
 
+#define DRV_NAME "smc-mca"
+
 static int ultramca_open(struct net_device *dev);
 static void ultramca_reset_8390(struct net_device *dev);
 static void ultramca_get_8390_hdr(struct net_device *dev,
@@ -265,7 +267,7 @@ int __init ultramca_probe(struct device *gen_dev)
 		goto err_unclaim;
 	}
 
-	if (!request_region(ioaddr, ULTRA_IO_EXTENT, dev->name)) {
+	if (!request_region(ioaddr, ULTRA_IO_EXTENT, DRV_NAME)) {
 		rc = -ENODEV;
 		goto err_unclaim;
 	}

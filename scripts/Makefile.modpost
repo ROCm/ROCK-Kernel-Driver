@@ -41,7 +41,7 @@ include scripts/Makefile.lib
 symverfile := $(objtree)/Module.symvers
 
 # Step 1), find all modules listed in $(MODVERDIR)/
-__modules := $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod))
+__modules := $(sort $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod)))
 modules   := $(patsubst %.o,%.ko, $(wildcard $(__modules:.ko=.o)))
 
 _modpost: $(modules)
@@ -50,10 +50,8 @@ _modpost: $(modules)
 # Step 2), invoke modpost
 #  Includes step 3,4
 quiet_cmd_modpost = MODPOST
-      cmd_modpost = scripts/modpost \
+      cmd_modpost = scripts/mod/modpost \
 	$(if $(KBUILD_EXTMOD),-i,-o) $(symverfile) \
-	-s $(firstword $(wildcard $(dir $(MODVERDIR))/Module.supported \
-				  $(objtree)/Module.supported /dev/null)) \
 	$(filter-out FORCE,$^)
 
 .PHONY: __modpost

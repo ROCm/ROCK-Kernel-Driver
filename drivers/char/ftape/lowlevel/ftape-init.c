@@ -55,7 +55,7 @@ char ft_rev[] __initdata = "$Revision: 1.8 $";
 char ft_dat[] __initdata = "$Date: 1997/11/06 00:38:08 $";
 
 
-#ifndef CONFIG_FT_NO_TRACE_AT_ALL
+#if defined(MODULE) && !defined(CONFIG_FT_NO_TRACE_AT_ALL)
 static int ft_tracing = -1;
 #endif
 
@@ -90,7 +90,7 @@ KERN_INFO "Compiled for Linux version %s\n", UTS_RELEASE);
 	TRACE(ft_t_info, "ftape_init @ 0x%p", ftape_init);
 	/*  Allocate the DMA buffers. They are deallocated at cleanup() time.
 	 */
-#if TESTING
+#ifdef TESTING
 #ifdef MODULE
 	while (ftape_set_nr_buffers(CONFIG_FT_NR_BUFFERS) < 0) {
 		ftape_sleep(FT_SECOND/20);

@@ -27,9 +27,6 @@
 #include "jfs_extent.h"
 #include "jfs_unicode.h"
 #include "jfs_debug.h"
-#ifdef CONFIG_JFS_DMAPI
-#include "jfs_dmapi.h"
-#endif
 
 
 extern struct inode_operations jfs_dir_inode_operations;
@@ -132,11 +129,6 @@ void jfs_delete_inode(struct inode *inode)
 {
 	jfs_info("In jfs_delete_inode, inode = 0x%p", inode);
 
-#ifdef CONFIG_JFS_DMAPI
-	if (DM_EVENT_ENABLED(inode, DM_EVENT_DESTROY))
-		JFS_SEND_DESTROY(inode, DM_RIGHT_NULL);
-#endif
-	
 	if (test_cflag(COMMIT_Freewmap, inode))
 		freeZeroLink(inode);
 
@@ -164,7 +156,8 @@ void jfs_dirty_inode(struct inode *inode)
 	set_cflag(COMMIT_Dirty, inode);
 }
 
-int jfs_get_blocks(struct inode *ip, sector_t lblock, unsigned long max_blocks,
+static int
+jfs_get_blocks(struct inode *ip, sector_t lblock, unsigned long max_blocks,
 			struct buffer_head *bh_result, int create)
 {
 	s64 lblock64 = lblock;

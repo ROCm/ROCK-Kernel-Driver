@@ -11,7 +11,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/fshooks.h>
 #include <linux/mount.h>
 #include <linux/pipe_fs_i.h>
 #include <linux/uio.h>
@@ -34,21 +33,15 @@
  */
 
 /* Drop the inode semaphore and wait for a pipe event, atomically */
-int pipe_wait(struct inode * inode)
+void pipe_wait(struct inode * inode)
 {
-	DEFINE_WAIT(local_wait);
-	wait_queue_t *wait = &local_wait;
+	DEFINE_WAIT(wait);
 
-	if (current->io_wait)
-		wait = current->io_wait;
-	prepare_to_wait(PIPE_WAIT(*inode), wait, TASK_INTERRUPTIBLE);
-	if (!is_sync_wait(wait))
-		return -EIOCBRETRY;
+	prepare_to_wait(PIPE_WAIT(*inode), &wait, TASK_INTERRUPTIBLE);
 	up(PIPE_SEM(*inode));
 	schedule();
-	finish_wait(PIPE_WAIT(*inode), wait);
+	finish_wait(PIPE_WAIT(*inode), &wait);
 	down(PIPE_SEM(*inode));
-	return 0;
 }
 
 static inline int
@@ -88,11 +81,11 @@ pipe_iov_copy_to_user(struct iovec *iov, const void *from, unsigned long len)
 		iov->iov_base += copy;
 		iov->iov_len -= copy;
 	}
-	return 0; 
+	return 0;
 }
 
 static ssize_t
-pipe_aio_readv(struct file *filp, const struct iovec *_iov,
+pipe_readv(struct file *filp, const struct iovec *_iov,
 	   unsigned long nr_segs, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
@@ -100,7 +93,6 @@ pipe_aio_readv(struct file *filp, const struct iovec *_iov,
 	ssize_t ret;
 	struct iovec *iov = (struct iovec *)_iov;
 	size_t total_len;
-	ssize_t retry;
 
 	/* pread is not allowed on pipes. */
 	if (unlikely(ppos != &filp->f_pos))
@@ -164,12 +156,7 @@ pipe_aio_readv(struct file *filp, const struct iovec *_iov,
 			wake_up_interruptible_sync(PIPE_WAIT(*inode));
  			kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 		}
-		retry = pipe_wait(inode);
-		if (retry == -EIOCBRETRY) {
-			if (!ret)
-				ret = retry;
-			break;
-		}
+		pipe_wait(inode);
 	}
 	up(PIPE_SEM(*inode));
 	/* Signal writers asynchronously that there is more room.  */
@@ -186,15 +173,11 @@ static ssize_t
 pipe_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct iovec iov = { .iov_base = buf, .iov_len = count };
-	ssize_t ret;
-	ret = pipe_aio_readv(filp, &iov, 1, ppos);
-	if (ret == -EIOCBRETRY)
-		BUG();
-	return ret;
+	return pipe_readv(filp, &iov, 1, ppos);
 }
 
 static ssize_t
-pipe_aio_writev(struct file *filp, const struct iovec *_iov,
+pipe_writev(struct file *filp, const struct iovec *_iov,
 	    unsigned long nr_segs, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
@@ -203,7 +186,6 @@ pipe_aio_writev(struct file *filp, const struct iovec *_iov,
 	int do_wakeup;
 	struct iovec *iov = (struct iovec *)_iov;
 	size_t total_len;
-	int retry;
 
 	/* pwrite is not allowed on pipes. */
 	if (unlikely(ppos != &filp->f_pos))
@@ -272,12 +254,7 @@ pipe_aio_writev(struct file *filp, const struct iovec *_iov,
 			do_wakeup = 0;
 		}
 		PIPE_WAITING_WRITERS(*inode)++;
-		retry = pipe_wait(inode);
-		if (retry == -EIOCBRETRY) {
-			if (!ret)
-				ret = retry;
-			break;
-		}
+		pipe_wait(inode);
 		PIPE_WAITING_WRITERS(*inode)--;
 	}
 	up(PIPE_SEM(*inode));
@@ -295,41 +272,7 @@ pipe_write(struct file *filp, const char __user *buf,
 	   size_t count, loff_t *ppos)
 {
 	struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = count };
-	return pipe_aio_writev(filp, &iov, 1, ppos);
-}
-
-static int
-pipe_aio_cancel(struct kiocb *iocb, struct io_event *evt)
-{
-	struct inode *inode = iocb->ki_filp->f_dentry->d_inode;
-	evt->obj = (u64)(unsigned long)iocb->ki_user_obj;
-	evt->data = iocb->ki_user_data;
-	evt->res = iocb->ki_nbytes - iocb->ki_left;
-	if (evt->res == 0)
-		evt->res = -EINTR;
-	evt->res2 = 0;
-	wake_up_interruptible(PIPE_WAIT(*inode));
-	aio_put_req(iocb);
-	return 0;
-}
-
-static ssize_t
-pipe_aio_write(struct kiocb *iocb, const char __user *buf,
-			       size_t count, loff_t pos)
-{
-	struct file *file = iocb->ki_filp;
-	struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = count };
-	iocb->ki_cancel = pipe_aio_cancel;
-	return pipe_aio_writev(file, &iov, 1, &file->f_pos);
-}
-
-static ssize_t
-pipe_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos)
-{
-	struct file *file = iocb->ki_filp;
-	struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = count };
-	iocb->ki_cancel = pipe_aio_cancel;
-	return pipe_aio_readv(file, &iov, 1, &file->f_pos);
+	return pipe_writev(filp, &iov, 1, ppos);
 }
 
 static ssize_t
@@ -524,8 +467,7 @@ pipe_rdwr_open(struct inode *inode, struct file *filp)
 struct file_operations read_fifo_fops = {
 	.llseek		= no_llseek,
 	.read		= pipe_read,
-	.readv		= pipe_aio_readv,
-	.aio_read	= pipe_aio_read,
+	.readv		= pipe_readv,
 	.write		= bad_pipe_w,
 	.poll		= fifo_poll,
 	.ioctl		= pipe_ioctl,
@@ -538,8 +480,7 @@ struct file_operations write_fifo_fops = {
 	.llseek		= no_llseek,
 	.read		= bad_pipe_r,
 	.write		= pipe_write,
-	.writev		= pipe_aio_writev,
-	.aio_write	= pipe_aio_write,
+	.writev		= pipe_writev,
 	.poll		= fifo_poll,
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_write_open,
@@ -550,11 +491,9 @@ struct file_operations write_fifo_fops = {
 struct file_operations rdwr_fifo_fops = {
 	.llseek		= no_llseek,
 	.read		= pipe_read,
-	.readv		= pipe_aio_readv,
+	.readv		= pipe_readv,
 	.write		= pipe_write,
-	.writev		= pipe_aio_writev,
-	.aio_write	= pipe_aio_write,
-	.aio_read	= pipe_aio_read,
+	.writev		= pipe_writev,
 	.poll		= fifo_poll,
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_rdwr_open,
@@ -565,8 +504,7 @@ struct file_operations rdwr_fifo_fops = {
 struct file_operations read_pipe_fops = {
 	.llseek		= no_llseek,
 	.read		= pipe_read,
-	.aio_read	= pipe_aio_read,
-	.readv		= pipe_aio_readv,
+	.readv		= pipe_readv,
 	.write		= bad_pipe_w,
 	.poll		= pipe_poll,
 	.ioctl		= pipe_ioctl,
@@ -579,8 +517,7 @@ struct file_operations write_pipe_fops = {
 	.llseek		= no_llseek,
 	.read		= bad_pipe_r,
 	.write		= pipe_write,
-	.writev		= pipe_aio_writev,
-	.aio_write	= pipe_aio_write,
+	.writev		= pipe_writev,
 	.poll		= pipe_poll,
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_write_open,
@@ -591,11 +528,9 @@ struct file_operations write_pipe_fops = {
 struct file_operations rdwr_pipe_fops = {
 	.llseek		= no_llseek,
 	.read		= pipe_read,
-	.readv		= pipe_aio_readv,
-	.aio_read	= pipe_aio_read,
-	.aio_write	= pipe_aio_write,
+	.readv		= pipe_readv,
 	.write		= pipe_write,
-	.writev		= pipe_aio_writev,
+	.writev		= pipe_writev,
 	.poll		= pipe_poll,
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_rdwr_open,
@@ -672,15 +607,12 @@ fail_inode:
 
 int do_pipe(int *fd)
 {
-	int error;
-
-	FSHOOK_BEGIN(pipe, error, .fds = fd)
-
 	struct qstr this;
 	char name[32];
 	struct dentry *dentry;
 	struct inode * inode;
 	struct file *f1, *f2;
+	int error;
 	int i,j;
 
 	error = -ENFILE;
@@ -737,8 +669,7 @@ int do_pipe(int *fd)
 	fd_install(j, f2);
 	fd[0] = i;
 	fd[1] = j;
-	error = 0;
-	goto no_files;
+	return 0;
 
 close_f12_inode_i_j:
 	put_unused_fd(j);
@@ -754,8 +685,6 @@ close_f12:
 close_f1:
 	put_filp(f1);
 no_files:
-	FSHOOK_END(pipe, error)
-
 	return error;	
 }
 

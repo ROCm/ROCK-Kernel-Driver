@@ -180,16 +180,22 @@ int write_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
 int copy_memory(memory_handle_t handle, copy_op_t *req);
 
 /* In rsrc_mgr */
-void validate_mem(struct pcmcia_socket *s);
-int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
+void pcmcia_validate_mem(struct pcmcia_socket *s);
+struct resource *find_io_region(unsigned long base, int num, unsigned long align,
 		   char *name, struct pcmcia_socket *s);
-int find_mem_region(u_long *base, u_long num, u_long align,
+int adjust_io_region(struct resource *res, unsigned long r_start,
+		     unsigned long r_end, struct pcmcia_socket *s);
+struct resource *find_mem_region(u_long base, u_long num, u_long align,
 		    int low, char *name, struct pcmcia_socket *s);
 int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);
 void release_resource_db(void);
 
+/* In socket_sysfs.c */
+extern struct class_interface pccard_sysfs_interface;
+
+/* In cs.c */
 extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
 

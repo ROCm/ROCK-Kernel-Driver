@@ -293,8 +293,8 @@ static void diva_remove_adapter_callback (dword handle) {
  diva_os_spin_lock_magic_t irql;
  if (handle && ((--handle) < DIVA_DIDD_MAX_NOTIFICATIONS)) {
   diva_os_enter_spin_lock (&didd_spin, &irql, "didd_nfy_rm");
-  NotificationTable[handle].callback = 0;
-  NotificationTable[handle].context  = 0;
+  NotificationTable[handle].callback = NULL;
+  NotificationTable[handle].context  = NULL;
   diva_os_leave_spin_lock (&didd_spin, &irql, "didd_nfy_rm");
   DBG_TRC(("Remove adapter notification[%d]", (int)(handle+1)))
   return;

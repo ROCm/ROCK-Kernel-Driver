@@ -215,7 +215,7 @@ smb_updatepage(struct file *file, struct page *page, unsigned long offset,
 }
 
 static ssize_t
-smb_file_read(struct file * file, char * buf, size_t count, loff_t *ppos)
+smb_file_read(struct file * file, char __user * buf, size_t count, loff_t *ppos)
 {
 	struct dentry * dentry = file->f_dentry;
 	ssize_t	status;
@@ -261,7 +261,7 @@ out:
 
 static ssize_t
 smb_file_sendfile(struct file *file, loff_t *ppos,
-		  size_t count, read_actor_t actor, void __user *target)
+		  size_t count, read_actor_t actor, void *target)
 {
 	struct dentry *dentry = file->f_dentry;
 	ssize_t status;
@@ -271,7 +271,7 @@ smb_file_sendfile(struct file *file, loff_t *ppos,
 
 	status = smb_revalidate_inode(dentry);
 	if (status) {
-		PARANOIA("%s/%s validation failed, error=%zd\n",
+		PARANOIA("%s/%s validation failed, error=%Zd\n",
 			 DENTRY_PATH(dentry), status);
 		goto out;
 	}
@@ -318,7 +318,7 @@ struct address_space_operations smb_file_aops = {
  * Write to a file (through the page cache).
  */
 static ssize_t
-smb_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+smb_file_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct dentry * dentry = file->f_dentry;
 	ssize_t	result;

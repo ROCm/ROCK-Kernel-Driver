@@ -424,7 +424,12 @@ void free_initmem(void)
  * a hole of 4kB between each vmalloced area for the same reason.
  */
 
-#define MAP_START 0x4000 /* Leave room for gateway page expansion */
+ /* Leave room for gateway page expansion */
+#if KERNEL_MAP_START < GATEWAY_PAGE_SIZE
+#error KERNEL_MAP_START is in gateway reserved region
+#endif
+#define MAP_START (KERNEL_MAP_START)
+
 #define VM_MAP_OFFSET  (32*1024)
 #define SET_MAP_OFFSET(x) ((void *)(((unsigned long)(x) + VM_MAP_OFFSET) \
 				     & ~(VM_MAP_OFFSET-1)))
@@ -479,7 +484,8 @@ void show_mem(void)
 
 	printk(KERN_INFO "Mem-info:\n");
 	show_free_areas();
-	printk(KERN_INFO "Free swap:	 %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+	printk(KERN_INFO "Free swap:	 %6ldkB\n",
+				nr_swap_pages<<(PAGE_SHIFT-10));
 	i = max_mapnr;
 	while (i-- > 0) {
 		total++;
@@ -545,7 +551,7 @@ static void __init map_pages(unsigned long start_vaddr, unsigned long start_padd
 		 */
 
 		if (!pmd) {
-			pmd = (pmd_t *) alloc_bootmem_low_pages_node(NODE_DATA(0),PAGE_SIZE);
+			pmd = (pmd_t *) alloc_bootmem_low_pages_node(NODE_DATA(0),PAGE_SIZE << PMD_ORDER);
 			pmd = (pmd_t *) __pa(pmd);
 		}
 

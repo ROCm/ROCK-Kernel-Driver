@@ -118,31 +118,6 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	if (!size || last_addr < phys_addr)
 		return NULL;
 
-#if 0
-	/* TODO: Here we can put checks for driver-writer abuse...  */
-
-	/*
-	 * Don't remap the low PCI/ISA area, it's always mapped..
-	 */
-	if (phys_addr >= 0xA0000 && last_addr < 0x100000)
-		return phys_to_virt(phys_addr);
-
-	/*
-	 * Don't allow anybody to remap normal RAM that we're using..
-	 */
-	if (phys_addr < virt_to_phys(high_memory)) {
-		char *t_addr, *t_end;
-		struct page *page;
-
-		t_addr = __va(phys_addr);
-		t_end = t_addr + (size - 1);
-	   
-		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
-			if(!PageReserved(page))
-				return NULL;
-	}
-#endif
-
 	/*
 	 * Mappings have to be page-aligned
 	 */

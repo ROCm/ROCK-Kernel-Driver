@@ -77,7 +77,7 @@ enum sis900_interrupt_enable_reigster_bits {
 	IE = 0x00000001
 };
 
-/* maximum dma burst fro transmission and receive*/
+/* maximum dma burst for transmission and receive */
 #define MAX_DMA_RANGE	7	/* actually 0 means MAXIMUM !! */
 #define TxMXDMA_shift   	20
 #define RxMXDMA_shift    20
@@ -86,7 +86,7 @@ enum sis900_tx_rx_dma{
 	DMA_BURST_512 = 0,	DMA_BURST_64 = 5
 };
 
-/* transmit FIFO threshholds */
+/* transmit FIFO thresholds */
 #define TX_FILL_THRESH   16	/* 1/4 FIFO size */
 #define TxFILLT_shift   	8
 #define TxDRNT_shift    	0
@@ -140,7 +140,7 @@ enum sis96x_eeprom_command {
 	EEREQ = 0x00000400, EEDONE = 0x00000200, EEGNT = 0x00000100
 };
 
-/* Manamgement Data I/O (mdio) frame */
+/* Management Data I/O (mdio) frame */
 #define MIIread         0x6000
 #define MIIwrite        0x5002
 #define MIIpmdShift     7

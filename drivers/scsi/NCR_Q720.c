@@ -16,16 +16,14 @@
 #include <asm/io.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "ncr53c8xx.h"
 
 #include "NCR_Q720.h"
 
-static ncr_chip q720_chip __initdata = {
-	.device_id =	PSEUDO_720_ID,
+static struct ncr_chip q720_chip __initdata = {
 	.revision_id =	0x0f,
-	.name =		"720",
 	.burst_max =	3,
 	.offset_max =	8,
 	.nr_divisor =	4,
@@ -50,7 +48,7 @@ struct NCR_Q720_private {
 	struct Scsi_Host	*hosts[4];
 };
 
-Scsi_Host_Template NCR_Q720_tpnt = {
+struct scsi_host_template NCR_Q720_tpnt = {
 	.module			= THIS_MODULE,
 	.proc_name		= "NCR_Q720",
 };

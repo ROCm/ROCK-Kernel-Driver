@@ -44,8 +44,6 @@
 
 /*
  *  CPU type and hardware bug flags. Kept separately for each CPU.
- *  Members of this structure are referenced in head.S, so think twice
- *  before touching them. [mj]
  */
 
 struct cpuinfo_x86 {
@@ -168,26 +166,21 @@ static inline void clear_in_cr4 (unsigned long mask)
 /*
  * User space process size: 512GB - 1GB (default).
  */
-#define TASK_SIZE	(0x0000007fc0000000)
+#define TASK_SIZE	(0x0000007fc0000000UL)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
- *
- * /proc/pid/unmap_base is only supported for 32bit processes without
- * 3GB personality for now.
  */
 #define IA32_PAGE_OFFSET ((current->personality & ADDR_LIMIT_3GB) ? 0xc0000000 : 0xFFFFe000)
-#define __TASK_UNMAPPED_BASE (PAGE_ALIGN(0xffffe000 / 3))
-#define TASK_UNMAPPED_32 ((current->personality & ADDR_LIMIT_3GB) ? \
-	PAGE_ALIGN(0xc0000000 / 3) : PAGE_ALIGN(current->map_base))
+#define TASK_UNMAPPED_32 PAGE_ALIGN(IA32_PAGE_OFFSET/3)
 #define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
 	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
 
 /*
- * Size of io_bitmap, covering ports 0 to 0x3ff.
+ * Size of io_bitmap.
  */
-#define IO_BITMAP_BITS  1024
+#define IO_BITMAP_BITS  65536
 #define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
@@ -234,6 +227,8 @@ struct tss_struct {
 	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
 } __attribute__((packed)) ____cacheline_aligned;
 
+#define ARCH_MIN_TASKALIGN	16
+
 struct thread_struct {
 	unsigned long	rsp0;
 	unsigned long	rsp;
@@ -251,14 +246,14 @@ struct thread_struct {
 /* fault info */
 	unsigned long	cr2, trap_no, error_code;
 /* floating point info */
-	union i387_union	i387;
+	union i387_union	i387  __attribute__((aligned(16)));
 /* IO permissions. the bitmap could be moved into the GDT, that would make
    switch faster for a limited number of ioperm using tasks. -AK */
 	int		ioperm;
 	unsigned long	*io_bitmap_ptr;
 /* cached TLS descriptors. */
 	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
-};
+} __attribute__((aligned(16)));
 
 #define INIT_THREAD  {}
 

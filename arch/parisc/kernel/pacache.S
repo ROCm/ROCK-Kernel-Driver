@@ -350,10 +350,6 @@ copy_user_page_asm:
 
 	.procend
 
-#if (TMPALIAS_MAP_START >= 0x80000000UL)
-Warning TMPALIAS_MAP_START changed. If > 2 Gb, code in pacache.S is bogus
-#endif
-
 /*
  * NOTE: Code in clear_user_page has a hard coded dependency on the
  *       maximum alias boundary being 4 Mb. We've been assured by the
@@ -490,6 +486,9 @@ clear_user_page_asm:
 
 	ldil    L%(TMPALIAS_MAP_START),%r28
 #ifdef __LP64__
+#if (TMPALIAS_MAP_START >= 0x80000000)
+	depdi	0,31,32,%r28	/* clear any sign extension */
+#endif
 	extrd,u %r26,56,32,%r26 /* convert phys addr to tlb insert format */
 	depd    %r25,63,22,%r28 /* Form aliased virtual address 'to' */
 	depdi   0,63,12,%r28    /* Clear any offset bits */
@@ -574,6 +573,95 @@ flush_kernel_dcache_page:
 	.exit
 
 	.procend
+	
+	.export flush_user_dcache_page
+
+flush_user_dcache_page:
+	.proc
+	.callinfo NO_CALLS
+	.entry
+
+	ldil    L%dcache_stride,%r1
+	ldw     R%dcache_stride(%r1),%r23
+
+#ifdef __LP64__
+	depdi,z 1,63-PAGE_SHIFT,1,%r25
+#else
+	depwi,z 1,31-PAGE_SHIFT,1,%r25
+#endif
+	add     %r26,%r25,%r25
+	sub     %r25,%r23,%r25
+
+
+1:      fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	fdc,m   %r23(%sr3,%r26)
+	CMPB<<  %r26,%r25,1b
+	fdc,m   %r23(%sr3,%r26)
+
+	sync
+	bv      %r0(%r2)
+	nop
+	.exit
+
+	.procend
+
+	.export flush_user_icache_page
+
+flush_user_icache_page:
+	.proc
+	.callinfo NO_CALLS
+	.entry
+
+	ldil    L%dcache_stride,%r1
+	ldw     R%dcache_stride(%r1),%r23
+
+#ifdef __LP64__
+	depdi,z 1,63-PAGE_SHIFT,1,%r25
+#else
+	depwi,z 1,31-PAGE_SHIFT,1,%r25
+#endif
+	add     %r26,%r25,%r25
+	sub     %r25,%r23,%r25
+
+
+1:      fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	fic,m   %r23(%sr3,%r26)
+	CMPB<<  %r26,%r25,1b
+	fic,m   %r23(%sr3,%r26)
+
+	sync
+	bv      %r0(%r2)
+	nop
+	.exit
+
+	.procend
+
 
 	.export purge_kernel_dcache_page
 

@@ -31,7 +31,9 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 			return -EAGAIN;
 	}
 
-	spin_lock(&mm->page_table_lock);
+	/*
+	 * vm_flags is protected by the mmap_sem held in write mode.
+	 */
 	VM_ClearReadHint(vma);
 
 	switch (behavior) {
@@ -44,7 +46,6 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 	default:
 		break;
 	}
-	spin_unlock(&mm->page_table_lock);
 
 	return 0;
 }
@@ -95,7 +96,14 @@ static long madvise_dontneed(struct vm_area_struct * vma,
 	if (vma->vm_flags & VM_LOCKED)
 		return -EINVAL;
 
-	zap_page_range(vma, start, end - start);
+	if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
+		struct zap_details details = {
+			.nonlinear_vma = vma,
+			.last_index = ULONG_MAX,
+		};
+		zap_page_range(vma, start, end - start, &details);
+	} else
+		zap_page_range(vma, start, end - start, NULL);
 	return 0;
 }
 
@@ -161,18 +169,24 @@ static long madvise_vma(struct vm_area_struct * vma, unsigned long start,
  *  -EBADF  - map exists, but area maps something that isn't a file.
  *  -EAGAIN - a kernel resource was temporarily unavailable.
  */
-asmlinkage long sys_madvise(unsigned long start, size_t len, int behavior)
+asmlinkage long sys_madvise(unsigned long start, size_t len_in, int behavior)
 {
 	unsigned long end;
 	struct vm_area_struct * vma;
 	int unmapped_error = 0;
 	int error = -EINVAL;
+	size_t len;
 
 	down_write(&current->mm->mmap_sem);
 
 	if (start & ~PAGE_MASK)
 		goto out;
-	len = (len + ~PAGE_MASK) & PAGE_MASK;
+	len = (len_in + ~PAGE_MASK) & PAGE_MASK;
+
+	/* Check to see whether len was rounded up from small -ve to zero */
+	if (len_in && !len)
+		goto out;
+
 	end = start + len;
 	if (end < start)
 		goto out;

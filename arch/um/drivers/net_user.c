@@ -26,7 +26,8 @@ int tap_open_common(void *dev, char *gate_addr)
 	if(gate_addr == NULL) return(0);
 	if(sscanf(gate_addr, "%d.%d.%d.%d", &tap_addr[0], 
 		  &tap_addr[1], &tap_addr[2], &tap_addr[3]) != 4){
-		printk("Invalid tap IP address - '%s'\n", gate_addr);
+		printk("Invalid tap IP address - '%s'\n", 
+		       gate_addr);
 		return(-EINVAL);
 	}
 	return(0);
@@ -59,18 +60,18 @@ void read_output(int fd, char *output, int len)
 	}
 		
 	*output = '\0';
-	n = os_read_file(fd, &remain, sizeof(remain));
-	if(n != sizeof(remain)){
-		printk("read_output - read of length failed, err = %d\n", -n);
+	if(read(fd, &remain, sizeof(remain)) != sizeof(remain)){
+		printk("read_output - read of length failed, errno = %d\n",
+		       errno);
 		return;
 	}
 
 	while(remain != 0){
 		n = (remain < len) ? remain : len;
-		actual = os_read_file(fd, output, n);
+		actual = read(fd, output, n);
 		if(actual != n){
 			printk("read_output - read of data failed, "
-			       "err = %d\n", -actual);
+			       "errno = %d\n", errno);
 			return;
 		}
 		remain -= actual;
@@ -82,12 +83,13 @@ int net_read(int fd, void *buf, int len)
 {
 	int n;
 
-	n = os_read_file(fd,  buf,  len);
+	while(((n = read(fd,  buf,  len)) < 0) && (errno == EINTR)) ;
 
-	if(n == -EAGAIN) 
-		return(0);
-	else if(n == 0) 
-		return(-ENOTCONN);
+	if(n < 0){
+		if(errno == EAGAIN) return(0);
+		return(-errno);
+	}
+	else if(n == 0) return(-ENOTCONN);
 	return(n);
 }
 
@@ -110,13 +112,13 @@ int net_write(int fd, void *buf, int len)
 {
 	int n;
 
-	n = os_write_file(fd, buf, len);
-
-	if(n == -EAGAIN) 
-		return(0);
-	else if(n == 0) 
-		return(-ENOTCONN);
-	return(n);
+	while(((n = write(fd, buf, len)) < 0) && (errno == EINTR)) ;
+	if(n < 0){
+		if(errno == EAGAIN) return(0);
+		return(-errno);
+	}
+	else if(n == 0) return(-ENOTCONN);
+	return(n);	
 }
 
 int net_send(int fd, void *buf, int len)
@@ -155,7 +157,7 @@ static void change_pre_exec(void *arg)
 {
 	struct change_pre_exec_data *data = arg;
 
-	os_close_file(data->close_me);
+	close(data->close_me);
 	dup2(data->stdout, 1);
 }
 
@@ -165,15 +167,15 @@ static int change_tramp(char **argv, char *output, int output_len)
 	struct change_pre_exec_data pe_data;
 
 	err = os_pipe(fds, 1, 0);
-	if(err < 0){
-		printk("change_tramp - pipe failed, err = %d\n", -err);
+	if(err){
+		printk("change_tramp - pipe failed, errno = %d\n", -err);
 		return(err);
 	}
 	pe_data.close_me = fds[0];
 	pe_data.stdout = fds[1];
 	pid = run_helper(change_pre_exec, &pe_data, argv, NULL);
 
-	os_close_file(fds[1]);
+	close(fds[1]);
 	read_output(fds[0], output, output_len);
 	waitpid(pid, NULL, 0);	
 	return(pid);

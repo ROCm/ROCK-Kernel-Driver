@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.105.2.3 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.114 $"
 
 #include "zfcp_ext.h"
 
@@ -40,7 +40,6 @@ static char *device;
 
 /* written against the module interface */
 static int __init  zfcp_module_init(void);
-static void __exit zfcp_module_exit(void);
 
 int zfcp_reboot_handler(struct notifier_block *, unsigned long, void *);
 
@@ -81,7 +80,6 @@ static struct miscdevice zfcp_cfdc_misc = {
 
 /* declare driver module init/cleanup functions */
 module_init(zfcp_module_init);
-module_exit(zfcp_module_exit);
 
 MODULE_AUTHOR("Heiko Carstens <heiko.carstens@de.ibm.com>, "
 	      "Martin Peschke <mpeschke@de.ibm.com>, "
@@ -312,6 +310,10 @@ zfcp_module_init(void)
 	/* initialize adapters to be removed list head */
 	INIT_LIST_HEAD(&zfcp_data.adapter_remove_lh);
 
+	zfcp_transport_template = fc_attach_transport(&zfcp_transport_functions);
+	if (!zfcp_transport_template)
+		return -ENODEV;
+
 #ifdef CONFIG_S390_SUPPORT
 	retval = register_ioctl32_conversion(zfcp_ioctl_trans.cmd,
 					     zfcp_ioctl_trans.handler);
@@ -365,17 +367,6 @@ zfcp_module_init(void)
 
  out:
 	return retval;
-}
-
-static void __exit
-zfcp_module_exit(void)
-{
-	unregister_reboot_notifier(&zfcp_data.reboot_notifier);
-	zfcp_ccw_unregister();
-	misc_deregister(&zfcp_cfdc_misc);
-#ifdef CONFIG_S390_SUPPORT
-	unregister_ioctl32_conversion(zfcp_ioctl_trans.cmd);
-#endif
 }
 
 /*
@@ -829,7 +820,7 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 	/* setup for sysfs registration */
 	snprintf(unit->sysfs_device.bus_id, BUS_ID_SIZE, "0x%016llx", fcp_lun);
 	unit->sysfs_device.parent = &port->sysfs_device;
-	unit->sysfs_device.release = (void (*)(struct device *))kfree;
+	unit->sysfs_device.release = zfcp_sysfs_unit_release;
 	dev_set_drvdata(&unit->sysfs_device, unit);
 
 	/* mark unit unusable as long as sysfs registration is not complete */
@@ -942,7 +933,7 @@ zfcp_allocate_low_mem_buffers(struct zfcp_adapter *adapter)
 
 	adapter->pool.data_status_read =
 		mempool_create(ZFCP_POOL_STATUS_READ_NR,
-			       zfcp_mempool_alloc, zfcp_mempool_free, 
+			       zfcp_mempool_alloc, zfcp_mempool_free,
 			       (void *) sizeof(struct fsf_status_read_buffer));
 
 	if (NULL == adapter->pool.data_status_read)
@@ -1194,7 +1185,7 @@ zfcp_adapter_dequeue(struct zfcp_adapter *adapter)
 	if (retval) {
 		ZFCP_LOG_NORMAL("bug: adapter %s (%p) still in use, "
 				"%i requests outstanding\n",
-				zfcp_get_busid_by_adapter(adapter), adapter, 
+				zfcp_get_busid_by_adapter(adapter), adapter,
 				atomic_read(&adapter->fsf_reqs_active));
 		retval = -EBUSY;
 		goto out;
@@ -1281,7 +1272,7 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status)
 		snprintf(port->sysfs_device.bus_id,
 			 BUS_ID_SIZE, "0x%016llx", wwpn);
 	port->sysfs_device.parent = &adapter->ccw_device->dev;
-	port->sysfs_device.release = (void (*)(struct device *))kfree;
+	port->sysfs_device.release = zfcp_sysfs_port_release;
 	dev_set_drvdata(&port->sysfs_device, port);
 
 	/* mark port unusable as long as sysfs registration is not complete */

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.72.2.4 $
+ *   $Revision: 1.80 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -19,10 +19,14 @@
 #include "cio.h"
 #include "cio_debug.h"
 #include "ioasm.h"
+#include "chsc.h"
 
 unsigned int highest_subchannel;
 int need_rescan = 0;
 int css_init_done = 0;
+
+struct pgid global_pgid;
+int css_characteristics_avail = 0;
 
 struct device css_bus_device = {
 	.bus_id = "css0",
@@ -366,9 +370,26 @@ css_process_crw(int irq)
 	return ret;
 }
 
+static void __init
+css_generate_pgid(void)
+{
+	/* Let's build our path group ID here. */
+	if (css_characteristics_avail && css_general_characteristics.mcss)
+		global_pgid.cpu_addr = 0x8000;
+	else {
+#ifdef CONFIG_SMP
+		global_pgid.cpu_addr = hard_smp_processor_id();
+#else
+		global_pgid.cpu_addr = 0;
+#endif
+	}
+	global_pgid.cpu_id = ((cpuid_t *) __LC_CPUID)->ident;
+	global_pgid.cpu_model = ((cpuid_t *) __LC_CPUID)->machine;
+	global_pgid.tod_high = (__u32) (get_clock() >> 32);
+}
+
 /*
- * some of the initialization has already been done from init_IRQ(),
- * here we do the rest now that the driver core is running.
+ * Now that the driver core is running, we can setup our channel subsystem.
  * The struct subchannel's are created during probing (except for the
  * static console subchannel).
  */
@@ -376,6 +397,11 @@ static int __init
 init_channel_subsystem (void)
 {
 	int ret, irq;
+
+	if (chsc_determine_css_characteristics() == 0)
+		css_characteristics_avail = 1;
+
+	css_generate_pgid();
 
 	if ((ret = bus_register(&css_bus_type)))
 		goto out;
@@ -531,3 +557,4 @@ MODULE_LICENSE("GPL");
 EXPORT_SYMBOL(css_bus_type);
 EXPORT_SYMBOL(s390_root_dev_register);
 EXPORT_SYMBOL(s390_root_dev_unregister);
+EXPORT_SYMBOL_GPL(css_characteristics_avail);

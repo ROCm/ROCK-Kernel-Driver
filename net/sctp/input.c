@@ -90,7 +90,7 @@ static inline int sctp_rcv_checksum(struct sk_buff *skb)
 
 	if (val != cmp) {
 		/* CRC failure, dump it. */
-		SCTP_INC_STATS_BH(SctpChecksumErrors);
+		SCTP_INC_STATS_BH(SCTP_MIB_CHECKSUMERRORS);
 		return -1;
 	}
 	return 0;
@@ -117,7 +117,7 @@ int sctp_rcv(struct sk_buff *skb)
 	if (skb->pkt_type!=PACKET_HOST)
 		goto discard_it;
 
-	SCTP_INC_STATS_BH(SctpInSCTPPacks);
+	SCTP_INC_STATS_BH(SCTP_MIB_INSCTPPACKS);
 
 	sh = (struct sctphdr *) skb->h.raw;
 
@@ -166,7 +166,7 @@ int sctp_rcv(struct sk_buff *skb)
 	if (!asoc) {
 		ep = __sctp_rcv_lookup_endpoint(&dest);
 		if (sctp_rcv_ootb(skb)) {
-			SCTP_INC_STATS_BH(SctpOutOfBlues);
+			SCTP_INC_STATS_BH(SCTP_MIB_OUTOFBLUES);
 			goto discard_release;
 		}
 	}
@@ -327,7 +327,7 @@ struct sock *sctp_err_lookup(int family, struct sk_buff *skb,
 
 	if (asoc) {
 		if (ntohl(sctphdr->vtag) != asoc->c.peer_vtag) {
-			ICMP_INC_STATS_BH(IcmpInErrors);
+			ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 			goto out;
 		}
 		sk = asoc->base.sk;
@@ -340,7 +340,7 @@ struct sock *sctp_err_lookup(int family, struct sk_buff *skb,
 	 * servers this needs to be solved differently.
 	 */
 	if (sock_owned_by_user(sk))
-		NET_INC_STATS_BH(LockDroppedIcmps);
+		NET_INC_STATS_BH(LINUX_MIB_LOCKDROPPEDICMPS);
 
 	*epp = ep;
 	*app = asoc;
@@ -398,7 +398,7 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 	int err;
 
 	if (skb->len < ((iph->ihl << 2) + 8)) {
-		ICMP_INC_STATS_BH(IcmpInErrors);
+		ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 		return;
 	}
 
@@ -412,7 +412,7 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 	skb->nh.raw = saveip;
 	skb->h.raw = savesctp;
 	if (!sk) {
-		ICMP_INC_STATS_BH(IcmpInErrors);
+		ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 		return;
 	}
 	/* Warning:  The sock lock is held.  Remember to call

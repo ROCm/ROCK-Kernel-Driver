@@ -334,7 +334,7 @@ static char *modem_names[] __devinitdata = {
 	"MODEM", "Modem", "modem", "FAX", "Fax", "fax",
 	"56K", "56k", "K56", "33.6", "28.8", "14.4",
 	"33,600", "28,800", "14,400", "33.600", "28.800", "14.400",
-	"33600", "28800", "14400", "V.90", "V.34", "V.32", 0
+	"33600", "28800", "14400", "V.90", "V.34", "V.32", NULL
 };
 
 static int __devinit check_name(char *name)
@@ -361,9 +361,6 @@ static int __devinit check_resources(struct pnp_option *option)
 			    ((port->min == 0x2f8) ||
 			     (port->min == 0x3f8) ||
 			     (port->min == 0x2e8) ||
-#ifdef CONFIG_X86_PC9800
-			     (port->min == 0x8b0) ||
-#endif
 			     (port->min == 0x3e8)))
 				return 1;
 	}
@@ -416,7 +413,7 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 	       serial_req.port, serial_req.irq, serial_req.io_type);
 #endif
 
-	serial_req.flags = UPF_SKIP_TEST | UPF_AUTOPROBE  | UPF_RESOURCES;
+	serial_req.flags = UPF_SKIP_TEST | UPF_AUTOPROBE;
 	serial_req.baud_base = 115200;
 	line = register_serial(&serial_req);
 
@@ -437,7 +434,7 @@ static struct pnp_driver serial_pnp_driver = {
 	.name		= "serial",
 	.id_table	= pnp_dev_table,
 	.probe		= serial_pnp_probe,
-	.remove		= serial_pnp_remove,
+	.remove		= __devexit_p(serial_pnp_remove),
 };
 
 static int __init serial8250_pnp_init(void)

@@ -161,6 +161,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, NETCARD_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init netcard_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
@@ -185,6 +186,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 /*
  * This is the real probe routine. Linux has a history of friendly device

@@ -643,7 +643,7 @@ badreq:
 	case LCP_TERM_REQ:
 		sppp_clear_timeout (sp);
 		/* Send Terminate-Ack packet. */
-		sppp_cp_send (sp, PPP_LCP, LCP_TERM_ACK, h->ident, 0, 0);
+		sppp_cp_send (sp, PPP_LCP, LCP_TERM_ACK, h->ident, 0, NULL);
 		/* Go to closed state. */
 		sp->lcp.state = LCP_STATE_CLOSED;
 		sp->ipcp.state = IPCP_STATE_CLOSED;
@@ -1262,7 +1262,7 @@ static void sppp_ipcp_input (struct sppp *sp, struct sk_buff *skb)
 		} else {
 			/* Send Configure-Ack packet. */
 			sppp_cp_send (sp, PPP_IPCP, IPCP_CONF_ACK, h->ident,
-				0, 0);
+				0, NULL);
 			/* Change the state. */
 			if (sp->ipcp.state == IPCP_STATE_ACK_RCVD)
 				sp->ipcp.state = IPCP_STATE_OPENED;
@@ -1297,7 +1297,7 @@ static void sppp_ipcp_input (struct sppp *sp, struct sk_buff *skb)
 		break;
 	case IPCP_TERM_REQ:
 		/* Send Terminate-Ack packet. */
-		sppp_cp_send (sp, PPP_IPCP, IPCP_TERM_ACK, h->ident, 0, 0);
+		sppp_cp_send (sp, PPP_IPCP, IPCP_TERM_ACK, h->ident, 0, NULL);
 		/* Go to closed state. */
 		sp->ipcp.state = IPCP_STATE_CLOSED;
 		/* Initiate renegotiation. */
@@ -1332,7 +1332,7 @@ static void sppp_lcp_open (struct sppp *sp)
 static void sppp_ipcp_open (struct sppp *sp)
 {
 	sp->ipcp.confid = ++sp->pp_seq;
-	sppp_cp_send (sp, PPP_IPCP, IPCP_CONF_REQ, sp->ipcp.confid, 0, 0);
+	sppp_cp_send (sp, PPP_IPCP, IPCP_CONF_REQ, sp->ipcp.confid, 0, NULL);
 	sppp_set_timeout (sp, 2);
 }
 

@@ -26,6 +26,7 @@
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/sched.h>
+#include <linux/audit.h>
 #include <asm/semaphore.h>
 #include "flask.h"
 #include "avc.h"
@@ -39,6 +40,7 @@
 #include "mls.h"
 
 extern void selnl_notify_policyload(u32 seqno);
+extern int policydb_loaded_version;
 
 static rwlock_t policy_rwlock = RW_LOCK_UNLOCKED;
 #define POLICY_RDLOCK read_lock(&policy_rwlock)
@@ -202,6 +204,17 @@ static int context_struct_compute_av(struct context *scontext,
 	struct avtab_datum *avdatum;
 	struct class_datum *tclass_datum;
 
+	/*
+	 * Remap extended Netlink classes for old policy versions.
+	 * Do this here rather than socket_type_to_security_class()
+	 * in case a newer policy version is loaded, allowing sockets
+	 * to remain in the correct class.
+	 */
+	if (policydb_loaded_version < POLICYDB_VERSION_NLCLASS)
+		if (tclass >= SECCLASS_NETLINK_ROUTE_SOCKET &&
+		    tclass <= SECCLASS_NETLINK_DNRT_SOCKET)
+			tclass = SECCLASS_NETLINK_SOCKET;
+
 	if (!tclass || tclass > policydb.p_classes.nprim) {
 		printk(KERN_ERR "security_compute_av:  unrecognized class %d\n",
 		       tclass);
@@ -295,7 +308,7 @@ int security_compute_av(u32 ssid,
 			u32 requested,
 			struct av_decision *avd)
 {
-	struct context *scontext = 0, *tcontext = 0;
+	struct context *scontext = NULL, *tcontext = NULL;
 	int rc = 0;
 
 	if (!ss_initialized) {
@@ -342,7 +355,7 @@ int context_struct_to_string(struct context *context, char **scontext, u32 *scon
 {
 	char *scontextp;
 
-	*scontext = 0;
+	*scontext = NULL;
 	*scontext_len = 0;
 
 	/* Compute the size of the context. */
@@ -399,7 +412,7 @@ int security_sid_to_context(u32 sid, char **scontext, u32 *scontext_len)
 			char *scontextp;
 
 			*scontext_len = strlen(initial_sid_to_string[sid]) + 1;
-			scontextp = kmalloc(*scontext_len,GFP_KERNEL);
+			scontextp = kmalloc(*scontext_len,GFP_ATOMIC);
 			strcpy(scontextp, initial_sid_to_string[sid]);
 			*scontext = scontextp;
 			goto out;
@@ -455,9 +468,7 @@ int security_context_to_sid(char *scontext, u32 scontext_len, u32 *sid)
 				goto out;
 			}
 		}
-		printk(KERN_ERR "security_context_to_sid: called before "
-		       "initial load_policy on unknown context %s\n", scontext);
-		rc = -EINVAL;
+		*sid = SECINITSID_KERNEL;
 		goto out;
 	}
 	*sid = SECSID_NULL;
@@ -533,6 +544,11 @@ int security_context_to_sid(char *scontext, u32 scontext_len, u32 *sid)
 	if (rc)
 		goto out_unlock;
 
+	if ((p - scontext2) < scontext_len) {
+		rc = -EINVAL;
+		goto out_unlock;
+	}
+
 	/* Check the validity of the new context. */
 	if (!policydb_context_isvalid(&policydb, &context)) {
 		rc = -EINVAL;
@@ -548,32 +564,34 @@ out:
 	return rc;
 }
 
-static inline int compute_sid_handle_invalid_context(
+static int compute_sid_handle_invalid_context(
 	struct context *scontext,
 	struct context *tcontext,
 	u16 tclass,
 	struct context *newcontext)
 {
-	int rc = 0;
+	char *s = NULL, *t = NULL, *n = NULL;
+	u32 slen, tlen, nlen;
 
-	if (selinux_enforcing) {
-		rc = -EACCES;
-	} else {
-		char *s, *t, *n;
-		u32 slen, tlen, nlen;
-
-		context_struct_to_string(scontext, &s, &slen);
-		context_struct_to_string(tcontext, &t, &tlen);
-		context_struct_to_string(newcontext, &n, &nlen);
-		printk(KERN_ERR "security_compute_sid:  invalid context %s", n);
-		printk(" for scontext=%s", s);
-		printk(" tcontext=%s", t);
-		printk(" tclass=%s\n", policydb.p_class_val_to_name[tclass-1]);
-		kfree(s);
-		kfree(t);
-		kfree(n);
-	}
-	return rc;
+	if (context_struct_to_string(scontext, &s, &slen) < 0)
+		goto out;
+	if (context_struct_to_string(tcontext, &t, &tlen) < 0)
+		goto out;
+	if (context_struct_to_string(newcontext, &n, &nlen) < 0)
+		goto out;
+	audit_log(current->audit_context,
+		  "security_compute_sid:  invalid context %s"
+		  " for scontext=%s"
+		  " tcontext=%s"
+		  " tclass=%s",
+		  n, s, t, policydb.p_class_val_to_name[tclass-1]);
+out:
+	kfree(s);
+	kfree(t);
+	kfree(n);
+	if (!selinux_enforcing)
+		return 0;
+	return -EACCES;
 }
 
 static int security_compute_sid(u32 ssid,
@@ -582,8 +600,8 @@ static int security_compute_sid(u32 ssid,
 				u32 specified,
 				u32 *out_sid)
 {
-	struct context *scontext = 0, *tcontext = 0, newcontext;
-	struct role_trans *roletr = 0;
+	struct context *scontext = NULL, *tcontext = NULL, newcontext;
+	struct role_trans *roletr = NULL;
 	struct avtab_key avkey;
 	struct avtab_datum *avdatum;
 	struct avtab_node *node;
@@ -1340,8 +1358,6 @@ int security_get_user_sids(u32 fromsid,
 			if (!ebitmap_get_bit(&role->types, j))
 				continue;
 			usercon.type = j+1;
-			if (usercon.type == fromcon->type)
-				continue;
 			mls_for_user_ranges(user,usercon) {
 				rc = context_struct_compute_av(fromcon, &usercon,
 							       SECCLASS_PROCESS,

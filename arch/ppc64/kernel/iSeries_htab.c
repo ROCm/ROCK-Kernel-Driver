@@ -18,17 +18,6 @@
 #include <asm/abs_addr.h>
 #include <linux/spinlock.h>
 
-#if 0
-#include <linux/spinlock.h>
-#include <linux/bitops.h>
-#include <linux/threads.h>
-#include <linux/smp.h>
-
-#include <asm/tlbflush.h>
-#include <asm/tlb.h>
-#include <asm/cputable.h>
-#endif
-
 static spinlock_t iSeries_hlocks[64] __cacheline_aligned_in_smp = { [0 ... 63] = SPIN_LOCK_UNLOCKED};
 
 /*

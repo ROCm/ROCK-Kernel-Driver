@@ -317,7 +317,7 @@ struct eata_ccb {	      /* Send Command Packet structure	    */
     __u8 rw_latency;
     __u8 retries;
     __u8 status;	      /* status of this queueslot		*/
-    Scsi_Cmnd *cmd;	      /* address of cmd				*/
+    struct scsi_cmnd *cmd;    /* address of cmd				*/
     struct eata_sg_list *sg_list;
 };
 

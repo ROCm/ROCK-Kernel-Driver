@@ -288,16 +288,26 @@
 #define __NR_clock_nanosleep		(__NR_Linux + 265)
 #define __NR_tgkill			(__NR_Linux + 266)
 #define __NR_utimes			(__NR_Linux + 267)
+#define __NR_mbind			(__NR_Linux + 268)
+#define __NR_get_mempolicy		(__NR_Linux + 269)
+#define __NR_set_mempolicy		(__NR_Linux + 270)
+#define __NR_mq_open			(__NR_Linux + 271)
+#define __NR_mq_unlink			(__NR_Linux + 272)
+#define __NR_mq_timedsend		(__NR_Linux + 273)
+#define __NR_mq_timedreceive		(__NR_Linux + 274)
+#define __NR_mq_notify			(__NR_Linux + 275)
+#define __NR_mq_getsetattr		(__NR_Linux + 276)
+#define __NR_vserver			(__NR_Linux + 277)
 
 /*
  * Offset of the last Linux o32 flavoured syscall
  */
-#define __NR_Linux_syscalls		267
+#define __NR_Linux_syscalls		277
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
 
 #define __NR_O32_Linux			4000
-#define __NR_O32_Linux_syscalls		267
+#define __NR_O32_Linux_syscalls		277
 
 #if _MIPS_SIM == _MIPS_SIM_ABI64
 
@@ -532,16 +542,26 @@
 #define __NR_clock_nanosleep		(__NR_Linux + 224)
 #define __NR_tgkill			(__NR_Linux + 225)
 #define __NR_utimes			(__NR_Linux + 226)
+#define __NR_mbind			(__NR_Linux + 227)
+#define __NR_get_mempolicy		(__NR_Linux + 228)
+#define __NR_set_mempolicy		(__NR_Linux + 229)
+#define __NR_mq_open			(__NR_Linux + 230)
+#define __NR_mq_unlink			(__NR_Linux + 231)
+#define __NR_mq_timedsend		(__NR_Linux + 232)
+#define __NR_mq_timedreceive		(__NR_Linux + 233)
+#define __NR_mq_notify			(__NR_Linux + 234)
+#define __NR_mq_getsetattr		(__NR_Linux + 235)
+#define __NR_vserver			(__NR_Linux + 236)
 
 /*
  * Offset of the last Linux flavoured syscall
  */
-#define __NR_Linux_syscalls		226
+#define __NR_Linux_syscalls		236
 
 #endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
 
 #define __NR_64_Linux			5000
-#define __NR_64_Linux_syscalls		226
+#define __NR_64_Linux_syscalls		236
 
 #if _MIPS_SIM == _MIPS_SIM_NABI32
 
@@ -780,16 +800,26 @@
 #define __NR_clock_nanosleep		(__NR_Linux + 228)
 #define __NR_tgkill			(__NR_Linux + 229)
 #define __NR_utimes			(__NR_Linux + 230)
+#define __NR_mbind			(__NR_Linux + 231)
+#define __NR_get_mempolicy		(__NR_Linux + 232)
+#define __NR_set_mempolicy		(__NR_Linux + 233)
+#define __NR_mq_open			(__NR_Linux + 234)
+#define __NR_mq_unlink			(__NR_Linux + 235)
+#define __NR_mq_timedsend		(__NR_Linux + 236)
+#define __NR_mq_timedreceive		(__NR_Linux + 237)
+#define __NR_mq_notify			(__NR_Linux + 238)
+#define __NR_mq_getsetattr		(__NR_Linux + 239)
+#define __NR_vserver			(__NR_Linux + 240)
 
 /*
  * Offset of the last N32 flavoured syscall
  */
-#define __NR_Linux_syscalls		230
+#define __NR_Linux_syscalls		240
 
 #endif /* _MIPS_SIM == _MIPS_SIM_NABI32 */
 
 #define __NR_N32_Linux			6000
-#define __NR_N32_Linux_syscalls		230
+#define __NR_N32_Linux_syscalls		240
 
 #ifndef __ASSEMBLY__
 
@@ -917,7 +947,7 @@ type name(atype a, btype b, ctype c, dtype d) \
 	return -1; \
 }
 
-#if (_MIPS_SIM == _MIPS_SIM_ABIN32)
+#if (_MIPS_SIM == _MIPS_SIM_ABI32)
 
 /*
  * Using those means your brain needs more than an oil change ;-)
@@ -985,9 +1015,9 @@ type name(atype a, btype b, ctype c, dtype d, etype e, ftype f) \
 	return -1; \
 }
 
-#endif /* (_MIPS_SIM == _MIPS_SIM_ABIN32) */
+#endif /* (_MIPS_SIM == _MIPS_SIM_ABI32) */
 
-#if (_MIPS_SIM == _MIPS_SIM_NABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
+#if (_MIPS_SIM == _MIPS_SIM_NABI32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
 
 #define _syscall5(type,name,atype,a,btype,b,ctype,c,dtype,d,etype,e) \
 type name (atype a,btype b,ctype c,dtype d,etype e) \
@@ -1043,12 +1073,38 @@ type name (atype a,btype b,ctype c,dtype d,etype e,ftype f) \
 	return -1; \
 }
 
-#endif /* (_MIPS_SIM == _MIPS_SIM_NABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64) */
+#endif /* (_MIPS_SIM == _MIPS_SIM_NABI32) || (_MIPS_SIM == _MIPS_SIM_ABI64) */
+
+#ifdef __KERNEL__
+#define __ARCH_WANT_IPC_PARSE_VERSION
+#define __ARCH_WANT_OLD_READDIR
+#define __ARCH_WANT_SYS_ALARM
+#define __ARCH_WANT_SYS_GETHOSTNAME
+#define __ARCH_WANT_SYS_PAUSE
+#define __ARCH_WANT_SYS_SGETMASK
+#define __ARCH_WANT_SYS_TIME
+#define __ARCH_WANT_SYS_UTIME
+#define __ARCH_WANT_SYS_WAITPID
+#define __ARCH_WANT_SYS_SOCKETCALL
+#define __ARCH_WANT_SYS_FADVISE64
+#define __ARCH_WANT_SYS_GETPGRP
+#define __ARCH_WANT_SYS_LLSEEK
+#define __ARCH_WANT_SYS_NICE
+#define __ARCH_WANT_SYS_OLD_GETRLIMIT
+#define __ARCH_WANT_SYS_OLDUMOUNT
+#define __ARCH_WANT_SYS_SIGPENDING
+#define __ARCH_WANT_SYS_SIGPROCMASK
+#define __ARCH_WANT_SYS_RT_SIGACTION
+# ifndef __mips64
+#  define __ARCH_WANT_STAT64
+# endif
+#endif
 
 #ifdef __KERNEL_SYSCALLS__
 
 #include <linux/compiler.h>
 #include <linux/types.h>
+#include <linux/linkage.h>
 #include <asm/ptrace.h>
 #include <asm/sim.h>
 

@@ -64,7 +64,7 @@ static __inline__ int irq_canonicalize(int irq)
  * All interrupt handling is actually machine specific so it is better
  * to use function pointers, as used by the Sparc port, and select the
  * interrupt handling functions when initializing the kernel. This way
- * we save some unnecessary overhead at run-time. 
+ * we save some unnecessary overhead at run-time.
  *                                                      01/11/97 - Jes
  */
 
@@ -123,5 +123,9 @@ extern volatile unsigned int num_spurious;
  * This function returns a new irq_node_t
  */
 extern irq_node_t *new_irq_node(void);
+
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
 
 #endif /* _M68K_IRQ_H_ */

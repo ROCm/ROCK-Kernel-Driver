@@ -55,7 +55,7 @@
 ENTRY(buserr)
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
-	movel	%sp,%sp@- 		| stack frame pointer argument
+	movel	%sp,%sp@-		| stack frame pointer argument
 	bsrl	buserr_c
 	addql	#4,%sp
 	jra	ret_from_exception
@@ -63,7 +63,7 @@ ENTRY(buserr)
 ENTRY(trap)
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
-	movel	%sp,%sp@- 		| stack frame pointer argument
+	movel	%sp,%sp@-		| stack frame pointer argument
 	bsrl	trap_c
 	addql	#4,%sp
 	jra	ret_from_exception
@@ -99,18 +99,18 @@ do_trace:
 	jbsr	syscall_trace
 
 ret_from_signal:
-	RESTORE_SWITCH_STACK 
+	RESTORE_SWITCH_STACK
 	addql	#4,%sp
-/* on 68040 complete pending writebacks if any */	
+/* on 68040 complete pending writebacks if any */
 #ifdef CONFIG_M68040
-	bfextu	%sp@(PT_VECTOR){#0,#4},%d0  
+	bfextu	%sp@(PT_VECTOR){#0,#4},%d0
 	subql	#7,%d0				| bus error frame ?
 	jbne	1f
 	movel	%sp,%sp@-
 	jbsr	berr_040cleanup
 	addql	#4,%sp
-1:	
-#endif	
+1:
+#endif
 	jra	ret_from_exception
 
 ENTRY(system_call)
@@ -229,18 +229,18 @@ inthandler:
 	bfextu %sp@(PT_VECTOR){#4,#10},%d0
 
 	movel	%sp,%sp@-
-	movel	%d0,%sp@- 		|  put vector # on stack
+	movel	%d0,%sp@-		|  put vector # on stack
 #if defined(MACH_Q40_ONLY) && defined(CONFIG_BLK_DEV_FD)
 	btstb	#4,0xff000000		| Q40 floppy needs very special treatment ...
 	jbeq	1f
-	btstb	#3,0xff000004		
+	btstb	#3,0xff000004
 	jbeq	1f
 	jbsr	floppy_hardint
 	jbra	3f
 1:
-#endif		
+#endif
 	jbsr	process_int		|  process the IRQ
-3:     	addql	#8,%sp			|  pop parameters off stack
+3:	addql	#8,%sp			|  pop parameters off stack
 
 ret_from_interrupt:
 	subqb	#1,%curptr@(TASK_INFO+TINFO_PREEMPT+2)
@@ -266,7 +266,7 @@ bad_interrupt:
 	rte
 
 ENTRY(sys_fork)
-	SAVE_SWITCH_STACK	
+	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
 	jbsr	m68k_fork
 	addql	#4,%sp
@@ -282,7 +282,7 @@ ENTRY(sys_clone)
 	rts
 
 ENTRY(sys_vfork)
-	SAVE_SWITCH_STACK	
+	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
 	jbsr	m68k_vfork
 	addql	#4,%sp
@@ -397,7 +397,7 @@ resume:
 #if !defined(CPU_M68060_ONLY)
 1:	tstb	%a1@(TASK_THREAD+THREAD_FPSTATE)
 	jeq	3f
-#endif	
+#endif
 2:	fmovemx	%a1@(TASK_THREAD+THREAD_FPREG),%fp0-%fp7
 	fmoveml	%a1@(TASK_THREAD+THREAD_FPCNTL),%fpcr/%fpsr/%fpiar
 3:	frestore %a1@(TASK_THREAD+THREAD_FPSTATE)
@@ -554,7 +554,7 @@ sys_call_table:
 	.long sys_adjtimex
 	.long sys_mprotect	/* 125 */
 	.long sys_sigprocmask
-	.long sys_ni_syscall		/* old "create_module" */ 
+	.long sys_ni_syscall		/* old "create_module" */
 	.long sys_init_module
 	.long sys_delete_module
 	.long sys_ni_syscall	/* 130 - old "get_kernel_syms" */

@@ -18,6 +18,25 @@
 #define CODE
 #include "compat_ioctl.c"
   
+#ifndef TIOCGDEV
+#define TIOCGDEV       _IOR('T',0x32, unsigned int)
+#endif
+static int tiocgdev(unsigned fd, unsigned cmd,  unsigned int __user *ptr) 
+{ 
+
+	struct file *file = fget(fd);
+	struct tty_struct *real_tty;
+
+	if (!file)
+		return -EBADF;
+	if (file->f_op->ioctl != tty_ioctl)
+		return -EINVAL; 
+	real_tty = (struct tty_struct *)file->private_data;
+	if (!real_tty) 	
+		return -EINVAL; 
+	return put_user(new_encode_dev(tty_devnum(real_tty)), ptr); 
+} 
+
 #define RTC_IRQP_READ32	_IOR('p', 0x0b, unsigned int)	 /* Read IRQ rate   */
 #define RTC_IRQP_SET32	_IOW('p', 0x0c, unsigned int)	 /* Set IRQ rate    */
 #define RTC_EPOCH_READ32	_IOR('p', 0x0d, unsigned)	 /* Read epoch      */
@@ -35,7 +54,7 @@ static int rtc32_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
 		ret = sys_ioctl(fd, RTC_IRQP_READ, (unsigned long)&val); 
 		set_fs(oldfs); 
 		if (!ret)
-			ret = put_user(val, (unsigned int*) arg); 
+			ret = put_user(val, (unsigned int __user *) arg); 
 		return ret; 
 
 	case RTC_IRQP_SET32: 
@@ -47,7 +66,7 @@ static int rtc32_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
 		ret = sys_ioctl(fd, RTC_EPOCH_READ, (unsigned long) &val); 
 		set_fs(oldfs); 
 		if (!ret)
-			ret = put_user(val, (unsigned int*) arg); 
+			ret = put_user(val, (unsigned int __user *) arg); 
 		return ret; 
 
 	case RTC_EPOCH_SET32:
@@ -94,7 +113,7 @@ static int mtrr_ioctl32(unsigned int fd, unsigned int cmd, unsigned long arg)
 	struct mtrr_gentry g;
 	struct mtrr_sentry s;
 	int get = 0, err = 0; 
-	struct mtrr_gentry32 *g32 = (struct mtrr_gentry32 *)arg; 
+	struct mtrr_gentry32 __user *g32 = (struct mtrr_gentry32 __user *)arg; 
 	mm_segment_t oldfs = get_fs(); 
 
 	switch (cmd) { 
@@ -120,7 +139,7 @@ static int mtrr_ioctl32(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 		arg = (unsigned long)&g; 
 	} else { 
-		struct mtrr_sentry32 *s32 = (struct mtrr_sentry32 *)arg;
+		struct mtrr_sentry32 __user *s32 = (struct mtrr_sentry32 __user *)arg;
 		err = get_user(s.base, &s32->base);
 		err |= get_user(s.size, &s32->size);
 		err |= get_user(s.type, &s32->type);
@@ -172,6 +191,7 @@ COMPATIBLE_IOCTL(RTC_WKALM_RD)
 COMPATIBLE_IOCTL(FIOQSIZE)
 
 /* And these ioctls need translation */
+HANDLE_IOCTL(TIOCGDEV, tiocgdev)
 /* realtime device */
 HANDLE_IOCTL(RTC_IRQP_READ,  rtc32_ioctl)
 HANDLE_IOCTL(RTC_IRQP_READ32,rtc32_ioctl)

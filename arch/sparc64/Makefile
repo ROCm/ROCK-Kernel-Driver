@@ -8,9 +8,11 @@
 # Copyright (C) 1998 Jakub Jelinek (jj@ultra.linux.cz)
 #
 
+CHECK		:= $(CHECK) -D__sparc__=1 -D__sparc_v9__=1
+
 AFLAGS_vmlinux.lds.o += -Usparc
 
-CC		:= $(shell if gcc -m64 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo gcc; else echo sparc64-linux-gcc; fi )
+CC		:= $(shell if $(CC) -m64 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo $(CC); else echo sparc64-linux-gcc; fi )
 
 NEW_GCC := $(shell if $(CC) -m64 -mcmodel=medlow -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo y; else echo n; fi; )
 NEW_GAS := $(shell if $(LD) -V 2>&1 | grep 'elf64_sparc' > /dev/null; then echo y; else echo n; fi)
@@ -52,7 +54,6 @@ ifeq ($(INLINE_LIMIT),y)
 endif
 
 ifeq ($(CONFIG_MCOUNT),y)
-  CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS))
   CFLAGS := $(CFLAGS) -pg
 endif
 

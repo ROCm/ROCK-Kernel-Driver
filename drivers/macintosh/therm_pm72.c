@@ -146,13 +146,6 @@ static struct i2c_driver therm_pm72_driver =
 	.detach_adapter	= therm_pm72_detach,
 };
 
-
-static inline void wait_ms(unsigned int ms)
-{
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(1 + (ms * HZ + 999) / 1000);
-}
-
 /*
  * Utility function to create an i2c_client structure and
  * attach it to one of u3 adapters
@@ -251,7 +244,7 @@ static int read_smon_adc(struct cpu_pid_state *state, int chan)
 		if (rc <= 0)
 			goto error;
 		/* Wait for convertion */
-		wait_ms(1);
+		msleep(1);
 		/* Switch to data register */
 		buf[0] = 4;
 		rc = i2c_master_send(state->monitor, buf, 1);
@@ -269,7 +262,7 @@ static int read_smon_adc(struct cpu_pid_state *state, int chan)
 			printk(KERN_ERR "therm_pm72: Error reading ADC !\n");
 			return -1;
 		}
-		wait_ms(10);
+		msleep(10);
 	}
 }
 
@@ -283,7 +276,7 @@ static int fan_read_reg(int reg, unsigned char *buf, int nb)
 		nw = i2c_master_send(fcu, buf, 1);
 		if (nw > 0 || (nw < 0 && nw != -EIO) || tries >= 100)
 			break;
-		wait_ms(10);
+		msleep(10);
 		++tries;
 	}
 	if (nw <= 0) {
@@ -295,7 +288,7 @@ static int fan_read_reg(int reg, unsigned char *buf, int nb)
 		nr = i2c_master_recv(fcu, buf, nb);
 		if (nr > 0 || (nr < 0 && nr != ENODEV) || tries >= 100)
 			break;
-		wait_ms(10);
+		msleep(10);
 		++tries;
 	}
 	if (nr <= 0)
@@ -316,12 +309,26 @@ static int fan_write_reg(int reg, const unsigned char *ptr, int nb)
 		nw = i2c_master_send(fcu, buf, nb);
 		if (nw > 0 || (nw < 0 && nw != EIO) || tries >= 100)
 			break;
-		wait_ms(10);
+		msleep(10);
 		++tries;
 	}
 	if (nw < 0)
 		printk(KERN_ERR "Failure writing to FCU: %d", nw);
 	return nw;
+}
+
+static int start_fcu(void)
+{
+	unsigned char buf = 0xff;
+	int rc;
+
+	rc = fan_write_reg(0xe, &buf, 1);
+	if (rc < 0)
+		return -EIO;
+	rc = fan_write_reg(0x2e, &buf, 1);
+	if (rc < 0)
+		return -EIO;
+	return 0;
 }
 
 static int set_rpm_fan(int fan, int rpm)
@@ -1018,6 +1025,12 @@ static int main_control_loop(void *x)
 
 	down(&driver_lock);
 
+	if (start_fcu() < 0) {
+		printk(KERN_ERR "kfand: failed to start FCU\n");
+		up(&driver_lock);
+		goto out;
+	}
+
 	/* Set the PCI fan once for now */
 	set_pwm_fan(SLOTS_FAN_PWM_ID, SLOTS_FAN_DEFAULT_PWM);
 
@@ -1064,6 +1077,7 @@ static int main_control_loop(void *x)
 			schedule_timeout(HZ - elapsed);
 	}
 
+ out:
 	DBG("main_control_loop ended\n");
 
 	ctrl_task = 0;

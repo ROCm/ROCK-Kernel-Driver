@@ -102,7 +102,6 @@
 #include <linux/wireless.h>
 #include <linux/list.h>
 #include <linux/pci.h>
-#include <linux/wireless.h>
 #include <linux/fcntl.h>
 
 #include <asm/uaccess.h>
@@ -278,9 +277,6 @@ static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct orinoco_private *priv = dev->priv;
 
-	if (! dev)
-		BUG();
-
 	unregister_netdev(dev);
 
         if (dev->irq)
@@ -388,7 +384,7 @@ static int __init orinoco_pci_init(void)
 	return pci_module_init(&orinoco_pci_driver);
 }
 
-extern void __exit orinoco_pci_exit(void)
+void __exit orinoco_pci_exit(void)
 {
 	pci_unregister_driver(&orinoco_pci_driver);
 }

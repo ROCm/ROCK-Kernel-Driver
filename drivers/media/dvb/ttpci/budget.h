@@ -46,9 +46,14 @@ struct budget {
         int                     fe_synced; 
         struct semaphore        pid_mutex;
 
+	int                     ci_present;
+        int                     video_port;
+
         u8 tsf;
         u32 ttbp;
         int feeding;
+
+	spinlock_t feedlock;
 
         struct dvb_adapter       *dvb_adapter;
 	void			 *priv;
@@ -73,13 +78,17 @@ static struct saa7146_pci_extension_data x_var = { \
 #define BUDGET_TT_HW_DISEQC	   1
 #define BUDGET_KNC1		   2
 #define BUDGET_PATCH		   3
+#define BUDGET_FS_ACTIVY	   4
 
+#define BUDGET_VIDEO_PORTA         0
+#define BUDGET_VIDEO_PORTB         1
 
 extern int ttpci_budget_init (struct budget *budget,
 			      struct saa7146_dev* dev,
 			      struct saa7146_pci_extension_data *info);
 extern int ttpci_budget_deinit (struct budget *budget);
 extern void ttpci_budget_irq10_handler (struct saa7146_dev* dev, u32 *isr);
+extern void ttpci_budget_set_video_port(struct saa7146_dev* dev, int video_port);
 
 #endif
 

@@ -47,8 +47,6 @@ extern void smp_local_timer_interrupt(struct pt_regs *);
 
 #define smp_processor_id() (current_thread_info()->cpu)
 
-#define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
-
 extern int __cpu_up(unsigned int cpu);
 
 extern int smp_hw_index[];

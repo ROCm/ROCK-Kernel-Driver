@@ -64,13 +64,6 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/workqueue.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>	/* for switch state wrappers */
-#include "entry.h"		/* for pNonSys */
-#define p5		5	/* from unwind.c, needed for pNonSys */
-#include <linux/delay.h>
-#endif	/* CONFIG_KDB */
 
 #include <asm/delay.h>
 #include <asm/machvec.h>
@@ -88,40 +81,6 @@
 #else
 # define IA64_MCA_DEBUG(fmt...)
 #endif
-
-#ifdef	CONFIG_KDB
-static void kdba_mca_init(int, pal_processor_state_info_t *psp, int);
-static irqreturn_t ia64_mca_rendez_int_handler(int, void *, struct pt_regs *);
-/* Warning: usage of kdba_mca_trace assumes that ia64 atomic inc/dec are lock
- * free.  If atomic operations ever use spinlocks on ia64 then, sooner or later,
- * this will deadlock on an MCA or INIT event (not irq safe).
- *
- * If you want kdb procedure traces at all times, not just during MCA/INIT
- * handling, then use kdb to set kdba_mca_trace to 1, 'mm4 kdba_mca_trace 1' or
- * patch this code to set kdba_mca_trace = ATOMIC_INIT(1).
- * To disable kdb MCA tracing, 'mm4 no_kdba_mca_trace 1' or patch this code
- * to set no_kdba_mca_trace = 1.
- */
-static atomic_t kdba_mca_trace;
-static int no_kdba_mca_trace;
-#define INC_KDBA_MCA_TRACE() (void)(atomic_inc(&kdba_mca_trace))
-#define DEC_KDBA_MCA_TRACE() (void)(atomic_dec(&kdba_mca_trace))
-#define KDBA_MCA_TRACE_TEST()						\
-	(!no_kdba_mca_trace && atomic_read(&kdba_mca_trace))
-#define KDBA_MCA_TRACE()						\
-	if (KDBA_MCA_TRACE_TEST())					\
-		kdb_printf("KDBA_MCA_TRACE: %s: cpu %d itc %ld\n",	\
-			__FUNCTION__,					\
-			smp_processor_id(),				\
-			ia64_get_itc())
-extern int kdb_wait_for_cpus_secs;
-#else/* !CONFIG_KDB */
-#define real_ia64_mca_rendez_int_handler ia64_mca_rendez_int_handler
-#define INC_KDBA_MCA_TRACE() do {} while(0)
-#define DEC_KDBA_MCA_TRACE() do {} while(0)
-#define KDBA_MCA_TRACE_TEST() 0
-#define KDBA_MCA_TRACE() do {} while(0)
-#endif/* CONFIG_KDB */
 
 typedef struct ia64_fptr {
 	unsigned long fp;
@@ -149,6 +108,7 @@ struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 #define MAX_CPE_POLL_INTERVAL (15*60*HZ) /* 15 minutes */
 #define MIN_CPE_POLL_INTERVAL (2*60*HZ)  /* 2 minutes */
 #define CMC_POLL_INTERVAL     (1*60*HZ)  /* 1 minute */
+#define CPE_HISTORY_LENGTH    5
 #define CMC_HISTORY_LENGTH    5
 
 static struct timer_list cpe_poll_timer;
@@ -285,9 +245,10 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	u8 *buffer;
 	u64 size;
 	int irq_safe = sal_info_type != SAL_INFO_TYPE_MCA && sal_info_type != SAL_INFO_TYPE_INIT;
+#ifdef IA64_MCA_DEBUG_INFO
 	static const char * const rec_name[] = { "MCA", "INIT", "CMC", "CPE" };
+#endif
 
-	KDBA_MCA_TRACE();
 	size = ia64_log_get(sal_info_type, &buffer, irq_safe);
 	if (!size)
 		return;
@@ -295,7 +256,7 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	salinfo_log_wakeup(sal_info_type, buffer, size, irq_safe);
 
 	if (irq_safe)
-		printk(KERN_INFO "CPU %d: SAL log contains %s error record\n",
+		IA64_MCA_DEBUG("CPU %d: SAL log contains %s error record\n",
 			smp_processor_id(),
 			sal_info_type < ARRAY_SIZE(rec_name) ? rec_name[sal_info_type] : "UNKNOWN");
 
@@ -309,22 +270,67 @@ ia64_mca_log_sal_error_record(int sal_info_type)
  */
 #ifndef PLATFORM_MCA_HANDLERS
 
+#ifdef CONFIG_ACPI
+
+static int cpe_vector = -1;
+
 static irqreturn_t
 ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
-	KDBA_MCA_TRACE();
-	IA64_MCA_DEBUG("%s: received interrupt. CPU:%d vector = %#x\n",
-		       __FUNCTION__, smp_processor_id(), cpe_irq);
+	static unsigned long	cpe_history[CPE_HISTORY_LENGTH];
+	static int		index;
+	static spinlock_t	cpe_history_lock = SPIN_LOCK_UNLOCKED;
+
+	IA64_MCA_DEBUG("%s: received interrupt vector = %#x on CPU %d\n",
+		       __FUNCTION__, cpe_irq, smp_processor_id());
 
 	/* SAL spec states this should run w/ interrupts enabled */
 	local_irq_enable();
 
-	/* Get the CMC error record and log it */
+	/* Get the CPE error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE);
+
+	spin_lock(&cpe_history_lock);
+	if (!cpe_poll_enabled && cpe_vector >= 0) {
+
+		int i, count = 1; /* we know 1 happened now */
+		unsigned long now = jiffies;
+
+		for (i = 0; i < CPE_HISTORY_LENGTH; i++) {
+			if (now - cpe_history[i] <= HZ)
+				count++;
+		}
+
+		IA64_MCA_DEBUG(KERN_INFO "CPE threshold %d/%d\n", count, CPE_HISTORY_LENGTH);
+		if (count >= CPE_HISTORY_LENGTH) {
+
+			cpe_poll_enabled = 1;
+			spin_unlock(&cpe_history_lock);
+			disable_irq_nosync(local_vector_to_irq(IA64_CPE_VECTOR));
+
+			/*
+			 * Corrected errors will still be corrected, but
+			 * make sure there's a log somewhere that indicates
+			 * something is generating more than we can handle.
+			 */
+			printk(KERN_WARNING "WARNING: Switching to polling CPE handler; error records may be lost\n");
+
+			mod_timer(&cpe_poll_timer, jiffies + MIN_CPE_POLL_INTERVAL);
+
+			/* lock already released, get out now */
+			return IRQ_HANDLED;
+		} else {
+			cpe_history[index++] = now;
+			if (index == CPE_HISTORY_LENGTH)
+				index = 0;
+		}
+	}
+	spin_unlock(&cpe_history_lock);
 	return IRQ_HANDLED;
 }
 
-#ifndef	CONFIG_KDB	/* WAR for broken init monarch handler */
+#endif /* CONFIG_ACPI */
+
 static void
 show_min_state (pal_min_state_area_t *minstate)
 {
@@ -469,7 +475,6 @@ init_handler_platform (pal_min_state_area_t *ms,
 {
 	struct unw_frame_info info;
 
-	KDBA_MCA_TRACE();
 	/* if a kernel debugger is available call it here else just dump the registers */
 
 	/*
@@ -486,11 +491,6 @@ init_handler_platform (pal_min_state_area_t *ms,
 	fetch_min_state(ms, pt, sw);
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
-
-#ifdef	CONFIG_KDB
-	printk("\nINIT dump complete.  Entering kdb, reboot if no response.\n");
-	return;
-#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_SMP
 	/* read_trylock() would be handy... */
@@ -515,7 +515,6 @@ init_handler_platform (pal_min_state_area_t *ms,
 	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
 }
-#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_ACPI
 /*
@@ -599,7 +598,7 @@ ia64_mca_cmc_vector_disable (void *dummy)
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 1; /* Mask/disable interrupt */
-	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("%s: CPU %d corrected "
 		       "machine check vector %#x disabled.\n",
@@ -626,7 +625,7 @@ ia64_mca_cmc_vector_enable (void *dummy)
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 0; /* Unmask/enable interrupt */
-	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("%s: CPU %d corrected "
 		       "machine check vector %#x enabled.\n",
@@ -674,7 +673,6 @@ ia64_mca_wakeup_ipi_wait(void)
 	int	irr_bit = (IA64_MCA_WAKEUP_VECTOR & 0x3f);
 	u64	irr = 0;
 
-	KDBA_MCA_TRACE();
 	do {
 		switch(irr_num) {
 		      case 0:
@@ -722,7 +720,6 @@ static void
 ia64_mca_wakeup_all(void)
 {
 	int cpu;
-	KDBA_MCA_TRACE();
 
 	/* Clear the Rendez checkin flag for all cpus */
 	for(cpu = 0; cpu < NR_CPUS; cpu++) {
@@ -745,13 +742,11 @@ ia64_mca_wakeup_all(void)
  *  Outputs :   None
  */
 static irqreturn_t
-real_ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
+ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 {
 	unsigned long flags;
 	int cpu = smp_processor_id();
 
-	INC_KDBA_MCA_TRACE();
-	KDBA_MCA_TRACE();
 	/* Mask all interrupts */
 	local_irq_save(flags);
 
@@ -769,7 +764,6 @@ real_ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptre
 
 	/* Enable all interrupts */
 	local_irq_restore(flags);
-	DEC_KDBA_MCA_TRACE();
 	return IRQ_HANDLED;
 }
 
@@ -791,7 +785,6 @@ real_ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptre
 static irqreturn_t
 ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 {
-	KDBA_MCA_TRACE();
 	return IRQ_HANDLED;
 }
 
@@ -812,7 +805,6 @@ ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 static void
 ia64_return_to_sal_check(int recover)
 {
-	KDBA_MCA_TRACE();
 
 	/* Copy over some relevant stuff from the sal_to_os_mca_handoff
 	 * so that it can be used at the time of os_mca_to_sal_handoff
@@ -858,15 +850,9 @@ ia64_mca_ucmc_handler(void)
 	pal_processor_state_info_t *psp = (pal_processor_state_info_t *)
 		&ia64_sal_to_os_handoff_state.proc_state_param;
 	int recover = psp->tc && !(psp->cc || psp->bc || psp->rc || psp->uc);
-	INC_KDBA_MCA_TRACE();
-	KDBA_MCA_TRACE();
 
 	/* Get the MCA error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
-
-#ifdef	CONFIG_KDB
-	kdba_mca_init(SAL_INFO_TYPE_MCA, psp, recover);
-#endif	/* CONFIG_KDB */
 
 	/*
 	 *  Wakeup all the processors which are spinning in the rendezvous
@@ -876,7 +862,6 @@ ia64_mca_ucmc_handler(void)
 
 	/* Return to SAL */
 	ia64_return_to_sal_check(recover);
-	DEC_KDBA_MCA_TRACE();
 }
 
 static DECLARE_WORK(cmc_disable_work, ia64_mca_cmc_vector_disable_keventd, NULL);
@@ -966,7 +951,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
  * 	handled
  */
 static irqreturn_t
-ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
+ia64_mca_cmc_int_caller(int cmc_irq, void *arg, struct pt_regs *ptregs)
 {
 	static int start_count = -1;
 	unsigned int cpuid;
@@ -977,7 +962,7 @@ ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 	if (start_count == -1)
 		start_count = IA64_LOG_COUNT(SAL_INFO_TYPE_CMC);
 
-	ia64_mca_cmc_int_handler(cpe_irq, arg, ptregs);
+	ia64_mca_cmc_int_handler(cmc_irq, arg, ptregs);
 
 	for (++cpuid ; cpuid < NR_CPUS && !cpu_online(cpuid) ; cpuid++);
 
@@ -1032,11 +1017,13 @@ ia64_mca_cmc_poll (unsigned long dummy)
  * Outputs
  * 	handled
  */
+#ifdef CONFIG_ACPI
+
 static irqreturn_t
 ia64_mca_cpe_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
 	static int start_count = -1;
-	static int poll_time = MAX_CPE_POLL_INTERVAL;
+	static int poll_time = MIN_CPE_POLL_INTERVAL;
 	unsigned int cpuid;
 
 	cpuid = smp_processor_id();
@@ -1054,19 +1041,29 @@ ia64_mca_cpe_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 	} else {
 		/*
 		 * If a log was recorded, increase our polling frequency,
-		 * otherwise, backoff.
+		 * otherwise, backoff or return to interrupt mode.
 		 */
 		if (start_count != IA64_LOG_COUNT(SAL_INFO_TYPE_CPE)) {
 			poll_time = max(MIN_CPE_POLL_INTERVAL, poll_time / 2);
-		} else {
+		} else if (cpe_vector < 0) {
 			poll_time = min(MAX_CPE_POLL_INTERVAL, poll_time * 2);
+		} else {
+			poll_time = MIN_CPE_POLL_INTERVAL;
+
+			printk(KERN_WARNING "Returning to interrupt driven CPE handler\n");
+			enable_irq(local_vector_to_irq(IA64_CPE_VECTOR));
+			cpe_poll_enabled = 0;
 		}
+
+		if (cpe_poll_enabled)
+			mod_timer(&cpe_poll_timer, jiffies + poll_time);
 		start_count = -1;
-		mod_timer(&cpe_poll_timer, jiffies + poll_time);
 	}
 
 	return IRQ_HANDLED;
 }
+
+#endif /* CONFIG_ACPI */
 
 /*
  *  ia64_mca_cpe_poll
@@ -1085,7 +1082,6 @@ ia64_mca_cpe_poll (unsigned long dummy)
 	platform_send_ipi(first_cpu(cpu_online_map), IA64_CPEP_VECTOR, IA64_IPI_DM_INT, 0);
 }
 
-#ifndef	CONFIG_KDB	/* WAR for broken init monarch handler */
 /*
  * C portion of the OS INIT handler
  *
@@ -1102,8 +1098,6 @@ void
 ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
 	pal_min_state_area_t *ms;
-	INC_KDBA_MCA_TRACE();
-	KDBA_MCA_TRACE();
 
 	oops_in_progress = 1;	/* avoid deadlock in printk, but it makes recovery dodgy */
 
@@ -1118,17 +1112,7 @@ ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 	ms = (pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state | (6ul<<61));
 
 	init_handler_platform(ms, pt, sw);	/* call platform specific routines */
-
-#ifdef	CONFIG_KDB
-	{
-		u8 *buffer;
-		ia64_log_get(SAL_INFO_TYPE_INIT, &buffer, 0);
-		kdba_mca_init(SAL_INFO_TYPE_INIT, NULL, 0);
-	}
-	DEC_KDBA_MCA_TRACE();
-#endif	/* CONFIG_KDB */
 }
-#endif	/* CONFIG_KDB */
 
 static int __init
 ia64_mca_disable_cpe_polling(char *str)
@@ -1207,9 +1191,6 @@ ia64_mca_init(void)
 	s64 rc;
 	struct ia64_sal_retval isrv;
 	u64 timeout = IA64_MCA_RENDEZ_TIMEOUT;	/* platform specific */
-	u64 mca_flags = SAL_MC_PARAM_RZ_ALWAYS;	/* platform specific */
-	if (ia64_platform_is("sn2"))
-		mca_flags |= 0x8;		/* SGI prom specific */
 
 	IA64_MCA_DEBUG("%s: begin\n", __FUNCTION__);
 
@@ -1227,7 +1208,7 @@ ia64_mca_init(void)
 					      SAL_MC_PARAM_MECHANISM_INT,
 					      IA64_MCA_RENDEZ_VECTOR,
 					      timeout,
-					      mca_flags);
+					      SAL_MC_PARAM_RZ_ALWAYS);
 		rc = isrv.status;
 		if (rc == 0)
 			break;
@@ -1235,12 +1216,6 @@ ia64_mca_init(void)
 			printk(KERN_INFO "Increasing MCA rendezvous timeout from "
 				"%ld to %ld milliseconds\n", timeout, isrv.v0);
 			timeout = isrv.v0;
-#ifdef CONFIG_KDB
-			/* kdb must wait long enough for the MCA timeout to trip
-			 * and process.  The MCA timeout is in milliseconds.
-			 */
-			kdb_wait_for_cpus_secs = max(kdb_wait_for_cpus_secs, (int)(timeout/1000) + 10);
-#endif
 			continue;
 		}
 		printk(KERN_ERR "Failed to register rendezvous interrupt "
@@ -1327,21 +1302,23 @@ ia64_mca_init(void)
 	register_percpu_irq(IA64_MCA_WAKEUP_VECTOR, &mca_wkup_irqaction);
 
 #ifdef CONFIG_ACPI
-	/* Setup the CPE interrupt vector */
+	/* Setup the CPEI/P vector and handler */
 	{
 		irq_desc_t *desc;
 		unsigned int irq;
-		int cpev = acpi_request_vector(ACPI_INTERRUPT_CPEI);
 
-		if (cpev >= 0) {
+		cpe_vector = acpi_request_vector(ACPI_INTERRUPT_CPEI);
+
+		if (cpe_vector >= 0) {
 			for (irq = 0; irq < NR_IRQS; ++irq)
-				if (irq_to_vector(irq) == cpev) {
+				if (irq_to_vector(irq) == cpe_vector) {
 					desc = irq_descp(irq);
 					desc->status |= IRQ_PER_CPU;
 					setup_irq(irq, &mca_cpe_irqaction);
 				}
-			ia64_mca_register_cpev(cpev);
+			ia64_mca_register_cpev(cpe_vector);
 		}
+		register_percpu_irq(IA64_CPEP_VECTOR, &mca_cpep_irqaction);
 	}
 #endif
 
@@ -1381,9 +1358,10 @@ ia64_mca_late_init(void)
 
 #ifdef CONFIG_ACPI
 	/* If platform doesn't support CPEI, get the timer going. */
-	if (acpi_request_vector(ACPI_INTERRUPT_CPEI) < 0 && cpe_poll_enabled) {
-		register_percpu_irq(IA64_CPEP_VECTOR, &mca_cpep_irqaction);
+	if (cpe_vector < 0 && cpe_poll_enabled) {
 		ia64_mca_cpe_poll(0UL);
+	} else {
+		cpe_poll_enabled = 0;
 	}
 #endif
 
@@ -1391,409 +1369,3 @@ ia64_mca_late_init(void)
 }
 
 device_initcall(ia64_mca_late_init);
-
-#ifdef	CONFIG_KDB
-
-/* This bit is tricky.  The main MCA handler (but not the MCA rendezvous
- * handler) has its own stack and bspstore, it does not use the current task
- * area.  The monarch INIT handler has its own stack but uses the current
- * bspstore.  The slave INIT handlers share a dedicated stack but use the
- * current bspstore, single threading through the shared stack.
- *
- * For all of the MCA and INIT handlers, r13 points to the current task.  r12 is
- * not pointing to the current stack, except in the MCA rendezvous handler.
- * bspstore may or may not be pointing to the current task.
- *
- * MCA main has no pt_regs or switch_stack, INIT monarch has regs but no
- * switch_stack, INIT slave has neither pt_regs nor switch_stack.  Testing has
- * shown that the pt_regs passed to the INIT monarch handler is no good, so we
- * ignore it and always synthesize pt_regs from the SAL error record.
- *
- * The unwind code expects r13, r12 and bspstore to be in the same area, with
- * the top of stack containing switch_stack and pt_regs.  bspstore in
- * switch_stack must be pointing at the saved registers in the current task's
- * register save area.  In addition the unwind data for the return address given
- * in switch_stack.b0 must be sensible in order to start the unwind process.
- * Neither MCA nor INIT handlers in mca_asm.S define any unwind data.  Even if
- * they did define unwind data, it would lead back into SAL/PAL which is
- * guaranteed to have no unwind data.
- *
- * The solution is to synthesize some pt_regs and switch_stack structures, put
- * them on the current task's stack and tell kdb to use that state information.
- * switch_stack is fudged to point to the bspstore at the time of failure, it
- * also has a return address of ia64_leave_kernel which has the correct unwind
- * context to start the backtrace process.  Unwind then sees a "normal"
- * interrupt structure for MCA main, INIT monarch and INIT slave.
- *
- * MCA rendezvous is already a normal interrupt so it needs no special
- * processing to get pt_regs and switch_stack.  However SAL requires the MCA
- * rendezvous handler to call back into SAL where it will spin until the MCA
- * handler releases the other cpus.  If the rendezvous code called kdb (which
- * also spins) then it would trip the rendezvous timeout and SAL would hit the
- * cpu with an INIT interrupt, not nice.  The solution is to put a wrapper
- * around the rendezvous function, the wrapper saves the process state before
- * diving into SAL.  The cpu will appear to be dead (not in kdb) but backtrace
- * data will still be available.
- *
- * It's all smoke and mirrors, you know ...
- */
-
-/* Stack shared amongst INIT slave handlers */
-
-struct {
-	volatile struct task_struct *lock;
-	u64 stack[KERNEL_STACK_SIZE/8 - 1];
-} ia64_init_slave_stack __attribute__((aligned(16)));
-
-struct {
-	u64 stack[KERNEL_STACK_SIZE/8];
-} ia64_init_monarch_stack __attribute__((aligned(16)));
-
-/* Structures and functions to wrap MCA handlers */
-
-KDBA_SW_INTERRUPT_WRAPPER3(ia64_mca_rendez_int_handler, INC_KDBA_MCA_TRACE(), DEC_KDBA_MCA_TRACE());
-
-struct kdba_mca_init_data {
-	struct pt_regs *regs;
-	u64 r12;
-	u64 bspstore;
-};
-
-/* If we are running on the shared init slave stack we just save the process
- * data and sequence number, release the shared stack and spin.
- */
-
-static void
-kdba_release_init_slave_stack(struct pt_regs *regs)
-{
-	KDBA_MCA_TRACE();
-	if (ia64_init_slave_stack.lock == current) {
-		kdb_save_running(regs);
-		if (!KDB_IS_RUNNING())
-			kdb_printf("%s: INIT slave tripped on cpu %d when not in kdb, should never happen\n",
-				__FUNCTION__, smp_processor_id());
-		__asm__ __volatile__ ("mov ar.rsc=0;;" ::: "memory");
-		ia64_init_slave_stack.lock = NULL;
-		while(1) {};
-	}
-	KDBA_MCA_TRACE();
-}
-
-/* Called via kdba_mca_init() -> unw_init_running() -> kdba_mca_init_handler() ->
- * kdba_mca_init_handler2().  At this point pt_regs and switch_stack have been
- * built but they are on the interrupt handler's stack, not on current.  Copy
- * them across to current and adjust b0, bspstore, etc. to suit.  Update
- * kdb_running_process to point to the copies.  Finally we can enter kdb.
- *
- * Assumption: unw_init_running() does DO_SAVE_SWITCH_STACK which calls
- *             save_switch_stack() which does flushrs.  Therefore all registers
- *             prior to br.call save_switch_stack have been written to backing
- *             store.
- *
- * data->bspstore must contain ar.bsp at the time of MCA/INIT.
- */
-
-static void
-kdba_mca_init_handler2(struct kdba_mca_init_data *data)
-{
-	struct kdb_running_process *krp = kdb_running_process + smp_processor_id();
-	struct switch_stack *prev_sw = krp->arch.sw;
-	extern char ia64_leave_kernel[];	/* Need asm address, not function descriptor */
-	KDBA_MCA_TRACE();
-	data->r12 -= sizeof(*(krp->regs));
-	krp->regs = (struct pt_regs *)(data->r12+16);
-	memcpy(krp->regs, data->regs, sizeof(*(krp->regs)));
-	data->r12 -= sizeof(*(krp->arch.sw));
-	krp->arch.sw = (struct switch_stack *)(data->r12+16);
-	memcpy(krp->arch.sw, prev_sw, sizeof(*(krp->arch.sw)));
-	krp->arch.sw->b0 = (unsigned long)ia64_leave_kernel;
-	krp->arch.sw->ar_bspstore = data->bspstore;
-	krp->arch.sw->ar_pfs = 0;
-	krp->arch.sw->pr = krp->regs->pr;
-	kdba_release_init_slave_stack(krp->regs);
-	kdb_save_running(krp->regs);	/*temp*/
-	if (!KDB_IS_RUNNING())		/*temp*/
-		kdb(KDB_REASON_CALL_PRESET, 0, krp->regs);
-	while(1) {};
-}
-
-KDBA_UNWIND_HANDLER(kdba_mca_init_handler, struct kdba_mca_init_data, 0,
-	kdba_mca_init_handler2(data));
-
-/* The MCA handler does not use backing store in the process stack, it uses its
- * own backing store, ia64_mca_bspstore.  How many registers are saved in the
- * process stack and how many in ia64_mca_bspstore is timing dependent, RSE
- * runs asynchronously. The unwind code requires that all registers be in the
- * process stack, so copy any registers from ia64_mca_bspstore to the process
- * stack.
- *
- * Registers from ar.bspstore through ar.bsp+sof at the time of the MCA are
- * really in ia64_mca_bspstore, copy them back to the process stack.  The copy
- * must be done register by register because the process stack and
- * ia64_mca_bspstore have different alignments, which means that the saved RNAT
- * data occurs at different places.
- * 
- * FIXME: The code assumes that all registers are valid and sets 0 RNaT words
- * when copying back to the original stack.
- */
-
-static void
-kdba_mca_bspstore_fixup(const sal_processor_static_info_t *s)
-{
-	u64 *old_bspstore, *old_bsp;
-	u64 *new_bspstore, *new_bsp;
-	u64 new_bsp_pa, ia64_mca_bspstore_pa;
-	u64 sof, slots;
-
-	asm volatile (";;flushrs;; mov %0=ar.bsp;;" : "=r"(new_bsp));
-
-        /* WAR for inconsistent V->P->V mappings in mca_asm.S for non-identity
-         * mapped kernels.  We can end up with a virtual address in ar.bspstore
-         * that is not the same as ia64_mca_bspstore but it still points to the
-         * same physical page as ia64_mca_bspstore.  Check the physical address
-         * instead of the virtual one.
-         */
-
-	new_bsp_pa = ia64_tpa((u64)new_bsp);
-	ia64_mca_bspstore_pa = ia64_tpa((u64)&ia64_mca_bspstore[0]);
-        if (new_bsp_pa < ia64_mca_bspstore_pa ||
-            new_bsp_pa >= ia64_mca_bspstore_pa + sizeof(ia64_mca_bspstore)) {
-		kdb_printf("%s: MCA is not using ia64_mca_bspstore, no fixup done [0x%p]\n",
-			__FUNCTION__, new_bsp);
-                return;
-        }
-
-        old_bspstore = (u64 *)(s->ar[18]);
-        old_bsp = (u64 *)(s->ar[17]);
-        sof = s->ar[64] & 0x7f;         /* from ar.pfs at time of MCA */
-        slots = ia64_rse_num_regs(old_bspstore, old_bsp) + sof;
-        new_bspstore = ia64_mca_bspstore;
-        new_bsp = ia64_rse_skip_regs(new_bspstore, slots);
-	
-	if (KDBA_MCA_TRACE_TEST())
-		kdb_printf("KDBA_MCA_TRACE: %s: old_bspstore 0x%p old_bsp 0x%p "
-			   "sof %ld new_bspstore 0x%p new_bsp 0x%p slots %ld %ld\n",
-			__FUNCTION__, old_bspstore, old_bsp,
-			sof, new_bspstore, new_bsp, slots,
-			ia64_rse_num_regs(new_bspstore, new_bsp));
-
-	while (old_bspstore < old_bsp && new_bspstore < new_bsp) {
-		if (ia64_rse_is_rnat_slot(new_bspstore)) {
-			++new_bspstore;
-			continue;
-		}
-		if (ia64_rse_is_rnat_slot(old_bspstore)) {
-			*old_bspstore++ = 0;	/* assume that all registers are valid */
-			continue;
-		}
-		*old_bspstore++ = *new_bspstore++;
-	}
-	if (ia64_rse_is_rnat_slot(old_bspstore))
-		*old_bspstore++ = 0;
-}
-
-static void
-kdba_mca_init(int sal_info_type, pal_processor_state_info_t *psp, int recover)
-{
-	struct pt_regs regs;
-	sal_processor_static_info_t *s;
-	pal_min_state_area_t *m;
-	struct kdba_mca_init_data data;
-	ia64_err_rec_t *plog_ptr;
-	int monarch = ia64_init_slave_stack.lock != current;
-	INC_KDBA_MCA_TRACE();
-	KDBA_MCA_TRACE();
-
-	if (recover)
-		return;
-	if (KDB_STATE(KDB_CONTROL)) {
-		kdb_printf("MCA/INIT received while in kdb, cannot reenter\n");
-		return;
-	}
-
-	KDB_FLAG_SET(CATASTROPHIC);	/* KDB does not continue after MCA/INIT events */
-	KDB_FLAG_SET(NOIPI);		/* do not send IPI for MCA/INIT events */
-	plog_ptr = (ia64_err_rec_t *)IA64_LOG_CURR_BUFFER(sal_info_type);
-	if (plog_ptr)
-		s = SAL_LPI_PSI_INFO(&plog_ptr->proc_err);
-	else
-		s = NULL;
-
-	/* Synthesize a struct pt_regs for the state at the time the error occurred */
-	memset(&regs, 0, sizeof(regs));
-	if (!s ||
-	    !s->valid.minstate ||
-	    !s->valid.br ||
-	    !s->valid.cr ||
-	    !s->valid.ar ||
-	    !s->valid.rr ||
-	    !s->valid.fr) {
-		/* Use printk to get the text in dmesg */
-		printk("%s: not enough data in pal_min_state_area for kdb backtrace, cpu %d\n",
-				__FUNCTION__, smp_processor_id());
-		return;
-	}
-
-	m = &(s->min_state_area);
-	regs.cr_ipsr = m->pmsa_ipsr;
-	regs.cr_iip = m->pmsa_iip;
-	if (!regs.cr_iip) {
-		printk("%s: cr_iip is 0, using xip instead, it may be wrong\n", __FUNCTION__);
-		regs.cr_iip = m->pmsa_xip;
-	}
-	regs.cr_ifs = m->pmsa_ifs;
-
-	regs.ar_unat = m->pmsa_nat_bits;
-	regs.ar_pfs = s->ar[64];
-	regs.ar_rsc = m->pmsa_rsc;
-	if (ia64_psr(&regs)->cpl) {
-		regs.ar_rnat = s->ar[19];
-		regs.ar_bspstore = s->ar[18];
-	}
-
-	/* unwind.c::unw_unwind() does special processing for interrupt frames.
-	 * It checks if the pNonSys predicate is set, if the predicate is clear
-	 * then unw_unwind() does _not_ adjust bsp over pt_regs.  Not that this
-	 * is documented, of course.
-	 *
-	 * pNonSys is normally set by minstate.h::SAVE_MIN.  The MCA handler
-	 * does not use SAVE_MIN; the INIT monarch handler uses SAVE_MIN but
-	 * experience has shown that the pt_regs is useless, it reflects the
-	 * call from SAL to ia64_monarch_init_handler, not the registers at the
-	 * time INIT was received.
-	 *
-	 * Not only do we have to synthesize our own pt_regs for MCA and INIT,
-	 * we must set the pNonSys predicate ourselves, otherwise unwind gets
-	 * intermittent errors :(
-	 */
-	regs.pr = m->pmsa_pr | (1UL << pNonSys);
-	regs.b0 = m->pmsa_br0;
-
-	regs.b6 = s->br[6];
-	regs.b7 = s->br[7];
-
-	regs.r1 = m->pmsa_gr[1-1];
-	regs.r2 = m->pmsa_gr[2-1];
-	regs.r3 = m->pmsa_gr[3-1];
-	regs.r8 = m->pmsa_gr[8-1];
-	regs.r9 = m->pmsa_gr[9-1];
-	regs.r10 = m->pmsa_gr[10-1];
-	regs.r11 = m->pmsa_gr[11-1];
-	regs.r12 = m->pmsa_gr[12-1];
-	regs.r13 = m->pmsa_gr[13-1];
-	regs.r14 = m->pmsa_gr[14-1];
-	regs.r15 = m->pmsa_gr[15-1];
-	regs.r16 = m->pmsa_bank1_gr[16-16];
-	regs.r17 = m->pmsa_bank1_gr[17-16];
-	regs.r18 = m->pmsa_bank1_gr[18-16];
-	regs.r19 = m->pmsa_bank1_gr[19-16];
-	regs.r20 = m->pmsa_bank1_gr[20-16];
-	regs.r21 = m->pmsa_bank1_gr[21-16];
-	regs.r22 = m->pmsa_bank1_gr[22-16];
-	regs.r23 = m->pmsa_bank1_gr[23-16];
-	regs.r24 = m->pmsa_bank1_gr[24-16];
-	regs.r25 = m->pmsa_bank1_gr[25-16];
-	regs.r26 = m->pmsa_bank1_gr[26-16];
-	regs.r27 = m->pmsa_bank1_gr[27-16];
-	regs.r28 = m->pmsa_bank1_gr[28-16];
-	regs.r29 = m->pmsa_bank1_gr[29-16];
-	regs.r30 = m->pmsa_bank1_gr[30-16];
-	regs.r31 = m->pmsa_bank1_gr[31-16];
-
-	regs.ar_csd = s->ar[25];
-	regs.ar_ssd = s->ar[26];
-	regs.ar_ccv = s->ar[32];
-	regs.ar_fpsr = s->ar[40];
-
-	regs.f6 = s->fr[6];
-	regs.f7 = s->fr[7];
-	regs.f8 = s->fr[8];
-	regs.f9 = s->fr[9];
-	regs.f10 = s->fr[10];
-	regs.f11 = s->fr[11];
-
-	if (ia64_psr(&regs)->cpl) {
-		printk("%s: MCA/INIT in user space, regs %p\n", __FUNCTION__, &regs);
-		/* monarch must get to kdb, even if it was interrupted in user space */
-		if (!monarch) {
-			kdba_release_init_slave_stack(NULL);
-			return;
-		}
-	}
-
-	/* FIXME: bsp and bspstore appear to be physical for TLB errors,
-	 * confirm this.  Make them virtual.
-	 */
-	if (psp && psp->tc) {
-		if (KDBA_MCA_TRACE_TEST())
-			kdb_printf("KDBA_MCA_TRACE: %s: psp->tc set, s %p old ar[17] 0x%lx ar[18] 0x%lx\n",
-				__FUNCTION__, s, s->ar[17], s->ar[18]);
-		s->ar[17] |= 0xe000000000000000;
-		s->ar[18] |= 0xe000000000000000;
-		if (KDBA_MCA_TRACE_TEST())
-			kdb_printf("KDBA_MCA_TRACE: new ar[17] 0x%lx ar[18] 0x%lx\n",
-				s->ar[17], s->ar[18]);
-	}
-
-	/* Set up the data required by kdba_mca_init_handler2() */
-	data.regs = &regs;
-	data.r12 = regs.r12;
-	data.bspstore = s->ar[17];
-	if (sal_info_type == SAL_INFO_TYPE_MCA)
-		kdba_mca_bspstore_fixup(s);
-	unw_init_running(kdba_mca_init_handler, &data);
-
-	/* FIXME: bsp and bspstore appear to be physical for TLB errors,
-	 * confirm this.  Make them physical again.
-	 */
-	if (psp && psp->tc) {
-		if (KDBA_MCA_TRACE_TEST())
-			kdb_printf("KDBA_MCA_TRACE: %s: psp->tc set, s %p old ar[17] 0x%lx ar[18] 0x%lx\n",
-				__FUNCTION__, s, s->ar[17], s->ar[18]);
-		s->ar[17] ^= 0xe000000000000000;
-		s->ar[18] ^= 0xe000000000000000;
-		if (KDBA_MCA_TRACE_TEST())
-			kdb_printf("KDBA_MCA_TRACE: new ar[17] 0x%lx ar[18] 0x%lx\n",
-				s->ar[17], s->ar[18]);
-	}
-
-	DEC_KDBA_MCA_TRACE();
-}
-
-/*
- * C portion of the OS INIT slave handler
- *
- * Called from ia64_slave_init_handler
- *
- * Inputs: INIT flag (GR11 from SAL to ia64_slave_init_handler).
- *
- * Never returns:
- *
- */
-void
-ia64_init_slave_handler (unsigned long init_flag)
-{
-	static int first_slave = 1;
-	int monarch = ia64_init_slave_stack.lock != current;
-	u8 *buffer;
-
-	oops_in_progress = 1;	/* avoid deadlock in printk, but it makes recovery dodgy */
-
-	KDBA_MCA_TRACE();
-	if (monarch) {
-		kdb_printf("INIT monarch handler on cpu %d\n", smp_processor_id());
-	}
-	else if (first_slave) {
-			first_slave = 0;
-			udelay(3000000);	/* wait for monarch to get ready */
-	}
-	KDBA_MCA_TRACE();
-
-	ia64_log_get(SAL_INFO_TYPE_INIT, &buffer, 0);
-	kdba_mca_init(SAL_INFO_TYPE_INIT, NULL, 0);
-	kdb_printf("%s: cpu %d spinning here\n", __FUNCTION__, smp_processor_id());
-	kdba_release_init_slave_stack(NULL);
-	while(1) {};
-}
-
-#endif	/* !CONFIG_KDB */

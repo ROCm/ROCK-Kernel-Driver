@@ -18,12 +18,11 @@ config DVB
 	  Please report problems regarding this driver to the LinuxDVB 
 	  mailing list.
 
-	  You might want add the following lines to your /etc/modprobe.conf:
+	  You might want add the following lines to your /etc/modules.conf:
 	  	
 	  	alias char-major-250 dvb
 	  	alias dvb dvb-ttpci
-	  	install dvb-ttpci /sbin/modprobe --first-time -i dvb-ttpci && \
-			/sbin/modprobe -a alps_bsru6 alps_bsrv2 \
+	  	below dvb-ttpci alps_bsru6 alps_bsrv2 \
 	  			grundig_29504-401 grundig_29504-491 \
 	  			ves1820
 

@@ -997,7 +997,7 @@ read_subcode(void)
  * (not BCD), so all the conversions are done.
  */
 static int
-sony_get_subchnl_info(long arg)
+sony_get_subchnl_info(void __user *arg)
 {
 	struct cdrom_subchnl schi;
 
@@ -1009,7 +1009,7 @@ sony_get_subchnl_info(long arg)
 	if (!sony_toc_read) {
 		return -EIO;
 	}
-	if (copy_from_user(&schi, (char *)arg, sizeof schi))
+	if (copy_from_user(&schi, arg, sizeof schi))
 		return -EFAULT;
 
 	switch (sony_audio_status) {
@@ -1025,7 +1025,7 @@ sony_get_subchnl_info(long arg)
 
 	case CDROM_AUDIO_NO_STATUS:
 		schi.cdsc_audiostatus = sony_audio_status;
-		if (copy_to_user((char *)arg, &schi, sizeof schi))
+		if (copy_to_user(arg, &schi, sizeof schi))
 			return -EFAULT;
 		return 0;
 		break;
@@ -1053,7 +1053,7 @@ sony_get_subchnl_info(long arg)
 		schi.cdsc_absaddr.lba = msf_to_log(last_sony_subcode->abs_msf);
 		schi.cdsc_reladdr.lba = msf_to_log(last_sony_subcode->rel_msf);
 	}
-	return copy_to_user((char *)arg, &schi, sizeof schi) ? -EFAULT : 0;
+	return copy_to_user(arg, &schi, sizeof schi) ? -EFAULT : 0;
 }
 
 
@@ -1070,6 +1070,7 @@ cdu_ioctl(struct inode *inode,
 	Byte cmd_buff[10], params[10];
 	int  i;
 	int  dsc_status;
+	void __user *argp = (void __user *)arg;
 
 	if (check_drive_status() != 0)
 		return -EIO;
@@ -1152,7 +1153,7 @@ cdu_ioctl(struct inode *inode,
 		break;
 
 	case CDROMPLAYMSF:			/* Play starting at the given MSF address. */
-		if (copy_from_user(params, (void *)arg, 6))
+		if (copy_from_user(params, argp, 6))
 			return -EFAULT;
 		spin_up_drive(status);
 		set_drive_mode(SONY535_AUDIO_DRIVE_MODE, status);
@@ -1184,13 +1185,12 @@ cdu_ioctl(struct inode *inode,
 
 	case CDROMREADTOCHDR:		/* Read the table of contents header */
 		{
-			struct cdrom_tochdr *hdr;
+			struct cdrom_tochdr __user *hdr = argp;
 			struct cdrom_tochdr loc_hdr;
 
 			sony_get_toc();
 			if (!sony_toc_read)
 				return -EIO;
-			hdr = (struct cdrom_tochdr *)arg;
 			loc_hdr.cdth_trk0 = bcd_to_int(sony_toc->first_track_num);
 			loc_hdr.cdth_trk1 = bcd_to_int(sony_toc->last_track_num);
 			if (copy_to_user(hdr, &loc_hdr, sizeof *hdr))
@@ -1201,7 +1201,7 @@ cdu_ioctl(struct inode *inode,
 
 	case CDROMREADTOCENTRY:	/* Read a given table of contents entry */
 		{
-			struct cdrom_tocentry *entry;
+			struct cdrom_tocentry __user *entry = argp;
 			struct cdrom_tocentry loc_entry;
 			int  track_idx;
 			Byte *msf_val = NULL;
@@ -1210,7 +1210,6 @@ cdu_ioctl(struct inode *inode,
 			if (!sony_toc_read) {
 				return -EIO;
 			}
-			entry = (struct cdrom_tocentry *)arg;
 
 			if (copy_from_user(&loc_entry, entry, sizeof loc_entry))
 				return -EFAULT;
@@ -1252,7 +1251,7 @@ cdu_ioctl(struct inode *inode,
 			if (!sony_toc_read)
 				return -EIO;
 
-			if (copy_from_user(&ti, (char *)arg, sizeof ti))
+			if (copy_from_user(&ti, argp, sizeof ti))
 				return -EFAULT;
 			if ((ti.cdti_trk0 < sony_toc->first_track_num)
 				|| (sony_toc->last_track_num < ti.cdti_trk0)
@@ -1314,14 +1313,13 @@ cdu_ioctl(struct inode *inode,
 		}
 
 	case CDROMSUBCHNL:			/* Get subchannel info */
-		return sony_get_subchnl_info(arg);
+		return sony_get_subchnl_info(argp);
 
 	case CDROMVOLCTRL:			/* Volume control.  What volume does this change, anyway? */
 		{
 			struct cdrom_volctrl volctrl;
 
-			if (copy_from_user(&volctrl, (char *)arg,
-					   sizeof volctrl))
+			if (copy_from_user(&volctrl, argp, sizeof volctrl))
 				return -EFAULT;
 			cmd_buff[0] = SONY535_SET_VOLUME;
 			cmd_buff[1] = volctrl.channel0;

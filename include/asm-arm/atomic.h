@@ -44,7 +44,7 @@ static inline void atomic_set(atomic_t *v, int i)
 	: "cc");
 }
 
-static inline void atomic_add(int i, volatile atomic_t *v)
+static inline void atomic_add(int i, atomic_t *v)
 {
 	unsigned long tmp, tmp2;
 
@@ -59,7 +59,25 @@ static inline void atomic_add(int i, volatile atomic_t *v)
 	: "cc");
 }
 
-static inline void atomic_sub(int i, volatile atomic_t *v)
+static inline int atomic_add_return(int i, atomic_t *v)
+{
+	unsigned long tmp;
+	int result;
+
+	__asm__ __volatile__("@ atomic_add_return\n"
+"1:	ldrex	%0, [%2]\n"
+"	add	%0, %0, %3\n"
+"	strex	%1, %0, [%2]\n"
+"	teq	%1, #0\n"
+"	bne	1b"
+	: "=&r" (result), "=&r" (tmp)
+	: "r" (&v->counter), "Ir" (i)
+	: "cc");
+
+	return result;
+}
+
+static inline void atomic_sub(int i, atomic_t *v)
 {
 	unsigned long tmp, tmp2;
 
@@ -74,43 +92,22 @@ static inline void atomic_sub(int i, volatile atomic_t *v)
 	: "cc");
 }
 
-#define atomic_inc(v)	atomic_add(1, v)
-#define atomic_dec(v)	atomic_sub(1, v)
-
-static inline int atomic_dec_and_test(volatile atomic_t *v)
+static inline int atomic_sub_return(int i, atomic_t *v)
 {
 	unsigned long tmp;
 	int result;
 
-	__asm__ __volatile__("@ atomic_dec_and_test\n"
+	__asm__ __volatile__("@ atomic_sub_return\n"
 "1:	ldrex	%0, [%2]\n"
-"	sub	%0, %0, #1\n"
+"	sub	%0, %0, %3\n"
 "	strex	%1, %0, [%2]\n"
 "	teq	%1, #0\n"
 "	bne	1b"
-	: "=&r" (result), "=r" (tmp)
-	: "r" (&v->counter)
-	: "cc");
-
-	return result == 0;
-}
-
-static inline int atomic_add_negative(int i, volatile atomic_t *v)
-{
-	unsigned long tmp;
-	int result;
-
-	__asm__ __volatile__("@ atomic_add_negative\n"
-"1:	ldrex	%0, [%2]\n"
-"	add	%0, %0, %3\n"
-"	strex	%1, %0, [%2]\n"
-"	teq	%1, #0\n"
-"	bne	1b"
-	: "=&r" (result), "=r" (tmp)
+	: "=&r" (result), "=&r" (tmp)
 	: "r" (&v->counter), "Ir" (i)
 	: "cc");
 
-	return result < 0;
+	return result;
 }
 
 static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
@@ -138,7 +135,7 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
-static inline void atomic_add(int i, volatile atomic_t *v)
+static inline void atomic_add(int i, atomic_t *v)
 {
 	unsigned long flags;
 
@@ -147,47 +144,7 @@ static inline void atomic_add(int i, volatile atomic_t *v)
 	local_irq_restore(flags);
 }
 
-static inline void atomic_sub(int i, volatile atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	v->counter -= i;
-	local_irq_restore(flags);
-}
-
-static inline void atomic_inc(volatile atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	v->counter += 1;
-	local_irq_restore(flags);
-}
-
-static inline void atomic_dec(volatile atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	v->counter -= 1;
-	local_irq_restore(flags);
-}
-
-static inline int atomic_dec_and_test(volatile atomic_t *v)
-{
-	unsigned long flags;
-	int val;
-
-	local_irq_save(flags);
-	val = v->counter;
-	v->counter = val -= 1;
-	local_irq_restore(flags);
-
-	return val == 0;
-}
-
-static inline int atomic_add_negative(int i, volatile atomic_t *v)
+static inline int atomic_add_return(int i, atomic_t *v)
 {
 	unsigned long flags;
 	int val;
@@ -197,7 +154,29 @@ static inline int atomic_add_negative(int i, volatile atomic_t *v)
 	v->counter = val += i;
 	local_irq_restore(flags);
 
-	return val < 0;
+	return val;
+}
+
+static inline void atomic_sub(int i, atomic_t *v)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	v->counter -= i;
+	local_irq_restore(flags);
+}
+
+static inline int atomic_sub_return(int i, atomic_t *v)
+{
+	unsigned long flags;
+	int val;
+
+	local_irq_save(flags);
+	val = v->counter;
+	v->counter = val -= i;
+	local_irq_restore(flags);
+
+	return val;
 }
 
 static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
@@ -210,6 +189,14 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 }
 
 #endif /* __LINUX_ARM_ARCH__ */
+
+#define atomic_inc(v)		atomic_add(1, v)
+#define atomic_dec(v)		atomic_sub(1, v)
+
+#define atomic_inc_and_test(v)	(atomic_add_return(1, v) == 0)
+#define atomic_dec_and_test(v)	(atomic_sub_return(1, v) == 0)
+
+#define atomic_add_negative(i,v) (atomic_add_return(i, v) < 0)
 
 /* Atomic operations are already serializing on ARM */
 #define smp_mb__before_atomic_dec()	barrier()

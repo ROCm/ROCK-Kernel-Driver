@@ -75,7 +75,6 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h> 
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/cpufreq.h>
@@ -125,7 +124,7 @@ static int stock_freq;
 
 /* PCI bus clock - defaults to 30.000 if cpu_khz is not available */
 static int pci_busclk = 0;
-MODULE_PARM(pci_busclk, "i");
+module_param (pci_busclk, int, 0444);
 
 /* maximum duration for which the cpu may be suspended
  * (32us * MAX_DURATION). If no parameter is given, this defaults
@@ -134,7 +133,7 @@ MODULE_PARM(pci_busclk, "i");
  * is suspended -- processing power is just 0.39% of what it used to be,
  * though. 781.25 kHz(!) for a 200 MHz processor -- wow. */
 static int max_duration = 255;
-MODULE_PARM(max_duration, "i");
+module_param (max_duration, int, 0444);
 
 /* For the default policy, we want at least some processing power
  * - let's say 5%. (min = maxfreq / POLICY_MIN_DIV)
@@ -215,7 +214,7 @@ static __init struct pci_dev *gx_detect_chipset(void)
  *
  * Finds out at which efficient frequency the Cyrix MediaGX/NatSemi Geode CPU runs.
  */
-static int gx_get_cpuspeed(void)
+static unsigned int gx_get_cpuspeed(unsigned int cpu)
 {
 	if ((gx_params->pci_suscfg & SUSMOD) == 0) 
 		return stock_freq;
@@ -271,7 +270,7 @@ static void gx_set_cpuspeed(unsigned int khz)
 
 
 	freqs.cpu = 0;
-	freqs.old = gx_get_cpuspeed();
+	freqs.old = gx_get_cpuspeed(0);
 
 	new_khz = gx_validate_speed(khz, &gx_params->on_duration, &gx_params->off_duration);
 
@@ -405,7 +404,7 @@ static int cpufreq_gx_target(struct cpufreq_policy *policy,
 
 static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
 {
-	int maxfreq, curfreq;
+	unsigned int maxfreq, curfreq;
 
 	if (!policy || policy->cpu != 0)
 		return -ENODEV;
@@ -419,7 +418,7 @@ static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
 		maxfreq = 30000 * gx_freq_mult[getCx86(CX86_DIR1) & 0x0f];
 	}
 	stock_freq = maxfreq;
-	curfreq = gx_get_cpuspeed();
+	curfreq = gx_get_cpuspeed(0);
 
 	dprintk("cpu max frequency is %d.\n", maxfreq);
 	dprintk("cpu current frequency is %dkHz.\n",curfreq);
@@ -446,6 +445,7 @@ static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
  *   MediaGX/Geode GX initialize cpufreq driver
  */
 static struct cpufreq_driver gx_suspmod_driver = {
+	.get		= gx_get_cpuspeed,
 	.verify		= cpufreq_gx_verify,
 	.target		= cpufreq_gx_target,
 	.init		= cpufreq_gx_cpu_init,

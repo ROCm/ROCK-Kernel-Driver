@@ -20,7 +20,7 @@
  */
 
 
-#define	DEBUG 1			/* data to help fault diagnosis */
+// #define	DEBUG 			/* data to help fault diagnosis */
 // #define	VERBOSE		/* extra debug messages (success too) */
 
 #include <linux/init.h>
@@ -44,7 +44,8 @@
  * The gadgetfs API maps each endpoint to a file descriptor so that you
  * can use standard synchronous read/write calls for I/O.  There's some
  * O_NONBLOCK and O_ASYNC/FASYNC style i/o support.  Example usermode
- * drivers show how this works in practice.
+ * drivers show how this works in practice.  You can also use AIO to
+ * eliminate I/O gaps between requests, to help when streaming data.
  *
  * Key parts that must be USB-specific are protocols defining how the
  * read/write operations relate to the hardware state machines.  There
@@ -70,7 +71,7 @@
  */
 
 #define	DRIVER_DESC	"USB Gadget filesystem"
-#define	DRIVER_VERSION	"20 Aug 2003"
+#define	DRIVER_VERSION	"18 Nov 2003"
 
 static const char driver_desc [] = DRIVER_DESC;
 static const char shortname [] = "gadgetfs";
@@ -170,7 +171,7 @@ static struct dev_data *dev_new (void)
 
 	dev = kmalloc (sizeof *dev, GFP_KERNEL);
 	if (!dev)
-		return 0;
+		return NULL;
 	memset (dev, 0, sizeof *dev);
 	dev->state = STATE_DEV_DISABLED;
 	atomic_set (&dev->count, 1);
@@ -250,6 +251,10 @@ static void put_ep (struct ep_data *data)
 
 #ifdef	CONFIG_USB_GADGET_GOKU
 #define CHIP			"goku_udc"
+#endif
+
+#ifdef	CONFIG_USB_GADGET_OMAP
+#define CHIP			"omap_udc"
 #endif
 
 #ifdef	CONFIG_USB_GADGET_SA1100
@@ -539,6 +544,177 @@ static int ep_ioctl (struct inode *inode, struct file *fd,
 	return status;
 }
 
+/*----------------------------------------------------------------------*/
+
+/* ASYNCHRONOUS ENDPOINT I/O OPERATIONS (bulk/intr/iso) */
+
+struct kiocb_priv {
+	struct usb_request	*req;
+	struct ep_data		*epdata;
+	void			*buf;
+	char __user		*ubuf;
+	unsigned		actual;
+};
+
+static int ep_aio_cancel(struct kiocb *iocb, struct io_event *e)
+{
+	struct kiocb_priv	*priv = (void *) &iocb->private;
+	struct ep_data		*epdata;
+	int			value;
+
+	local_irq_disable();
+	epdata = priv->epdata;
+	// spin_lock(&epdata->dev->lock);
+	kiocbSetCancelled(iocb);
+	if (likely(epdata && epdata->ep && priv->req))
+		value = usb_ep_dequeue (epdata->ep, priv->req);
+	else
+		value = -EINVAL;
+	// spin_unlock(&epdata->dev->lock);
+	local_irq_enable();
+
+	aio_put_req(iocb);
+	return value;
+}
+
+static long ep_aio_read_retry(struct kiocb *iocb)
+{
+	struct kiocb_priv	*priv = (void *) &iocb->private;
+	int			status = priv->actual;
+
+	/* we "retry" to get the right mm context for this: */
+	status = copy_to_user(priv->ubuf, priv->buf, priv->actual);
+	if (unlikely(0 != status))
+		status = -EFAULT;
+	else
+		status = priv->actual;
+	kfree(priv->buf);
+	aio_put_req(iocb);
+	return status;
+}
+
+static void ep_aio_complete(struct usb_ep *ep, struct usb_request *req)
+{
+	struct kiocb		*iocb = req->context;
+	struct kiocb_priv	*priv = (void *) &iocb->private;
+	struct ep_data		*epdata = priv->epdata;
+
+	/* lock against disconnect (and ideally, cancel) */
+	spin_lock(&epdata->dev->lock);
+	priv->req = NULL;
+	priv->epdata = NULL;
+	if (NULL == iocb->ki_retry
+			|| unlikely(0 == req->actual)
+			|| unlikely(kiocbIsCancelled(iocb))) {
+		kfree(req->buf);
+		/* aio_complete() reports bytes-transferred _and_ faults */
+		if (unlikely(kiocbIsCancelled(iocb)))
+			aio_put_req(iocb);
+		else
+			aio_complete(iocb,
+				req->actual ? req->actual : req->status,
+				req->status);
+	} else {
+		/* retry() won't report both; so we hide some faults */
+		if (unlikely(0 != req->status))
+			DBG(epdata->dev, "%s fault %d len %d\n",
+				ep->name, req->status, req->actual);
+
+		priv->buf = req->buf;
+		priv->actual = req->actual;
+		kick_iocb(iocb);
+	}
+	spin_unlock(&epdata->dev->lock);
+
+	usb_ep_free_request(ep, req);
+	put_ep(epdata);
+}
+
+static ssize_t
+ep_aio_rwtail(struct kiocb *iocb, char *buf, size_t len, struct ep_data *epdata)
+{
+	struct kiocb_priv	*priv = (void *) &iocb->private;
+	struct usb_request	*req;
+	ssize_t			value;
+
+	value = get_ready_ep(iocb->ki_filp->f_flags, epdata);
+	if (unlikely(value < 0)) {
+		kfree(buf);
+		return value;
+	}
+
+	iocb->ki_cancel = ep_aio_cancel;
+	get_ep(epdata);
+	priv->epdata = epdata;
+	priv->actual = 0;
+
+	/* each kiocb is coupled to one usb_request, but we can't
+	 * allocate or submit those if the host disconnected.
+	 */
+	spin_lock_irq(&epdata->dev->lock);
+	if (likely(epdata->ep)) {
+		req = usb_ep_alloc_request(epdata->ep, GFP_ATOMIC);
+		if (likely(req)) {
+			priv->req = req;
+			req->buf = buf;
+			req->length = len;
+			req->complete = ep_aio_complete;
+			req->context = iocb;
+			value = usb_ep_queue(epdata->ep, req, GFP_ATOMIC);
+			if (unlikely(0 != value))
+				usb_ep_free_request(epdata->ep, req);
+		} else
+			value = -EAGAIN;
+	} else
+		value = -ENODEV;
+	spin_unlock_irq(&epdata->dev->lock);
+
+	up(&epdata->lock);
+
+	if (unlikely(value))
+		put_ep(epdata);
+	else
+		value = -EIOCBQUEUED;
+	return value;
+}
+
+static ssize_t
+ep_aio_read(struct kiocb *iocb, char __user *ubuf, size_t len, loff_t o)
+{
+	struct kiocb_priv	*priv = (void *) &iocb->private;
+	struct ep_data		*epdata = iocb->ki_filp->private_data;
+	char			*buf;
+
+	if (unlikely(epdata->desc.bEndpointAddress & USB_DIR_IN))
+		return -EINVAL;
+	buf = kmalloc(len, GFP_KERNEL);
+	if (unlikely(!buf))
+		return -ENOMEM;
+	iocb->ki_retry = ep_aio_read_retry;
+	priv->ubuf = ubuf;
+	return ep_aio_rwtail(iocb, buf, len, epdata);
+}
+
+static ssize_t
+ep_aio_write(struct kiocb *iocb, const char __user *ubuf, size_t len, loff_t o)
+{
+	struct ep_data		*epdata = iocb->ki_filp->private_data;
+	char			*buf;
+
+	if (unlikely(!(epdata->desc.bEndpointAddress & USB_DIR_IN)))
+		return -EINVAL;
+	buf = kmalloc(len, GFP_KERNEL);
+	if (unlikely(!buf))
+		return -ENOMEM;
+	if (unlikely(copy_from_user(buf, ubuf, len) != 0)) {
+		kfree(buf);
+		return -EFAULT;
+	}
+	return ep_aio_rwtail(iocb, buf, len, epdata);
+}
+
+/*----------------------------------------------------------------------*/
+
 /* used after endpoint configuration */
 static struct file_operations ep_io_operations = {
 	.owner =	THIS_MODULE,
@@ -547,8 +723,8 @@ static struct file_operations ep_io_operations = {
 	.ioctl =	ep_ioctl,
 	.release =	ep_release,
 
-	// .aio_read =	ep_aio_read,
-	// .aio_write =	ep_aio_write,
+	.aio_read =	ep_aio_read,
+	.aio_write =	ep_aio_write,
 };
 
 /* ENDPOINT INITIALIZATION
@@ -565,7 +741,7 @@ static struct file_operations ep_io_operations = {
  * speed descriptor, then optional high speed descriptor.
  */
 static ssize_t
-ep_config (struct file *fd, const char *buf, size_t len, loff_t *ptr)
+ep_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 {
 	struct ep_data		*data = fd->private_data;
 	struct usb_ep		*ep;
@@ -772,7 +948,7 @@ static int setup_req (struct usb_ep *ep, struct usb_request *req, u16 len)
 }
 
 static ssize_t
-ep0_read (struct file *fd, char *buf, size_t len, loff_t *ptr)
+ep0_read (struct file *fd, char __user *buf, size_t len, loff_t *ptr)
 {
 	struct dev_data			*dev = fd->private_data;
 	ssize_t				retval;
@@ -953,7 +1129,7 @@ next_event (struct dev_data *dev, enum usb_gadgetfs_event_type type)
 }
 
 static ssize_t
-ep0_write (struct file *fd, const char *buf, size_t len, loff_t *ptr)
+ep0_write (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 {
 	struct dev_data		*dev = fd->private_data;
 	ssize_t			retval = -ESRCH;
@@ -1032,7 +1208,7 @@ dev_release (struct inode *inode, struct file *fd)
 
 	fasync_helper (-1, fd, 0, &dev->fasync);
 	kfree (dev->buf);
-	dev->buf = 0;
+	dev->buf = NULL;
 	put_dev (dev);
 
 	/* other endpoints were all decoupled from this device */
@@ -1184,7 +1360,7 @@ gadgetfs_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 
 	req->buf = dev->rbuf;
 	req->dma = DMA_ADDR_INVALID;
-	req->context = 0;
+	req->context = NULL;
 	value = -EOPNOTSUPP;
 	switch (ctrl->bRequest) {
 
@@ -1320,6 +1496,8 @@ delegate:
 	/* proceed with data transfer and status phases? */
 	if (value >= 0 && dev->state != STATE_SETUP) {
 		req->length = value;
+		req->zero = value < ctrl->wLength
+				&& (value % gadget->ep0->maxpacket) == 0;
 		value = usb_ep_queue (gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0) {
 			DBG (dev, "ep_queue --> %d\n", value);
@@ -1350,7 +1528,7 @@ restart:
 		ep = list_entry (entry, struct ep_data, epfiles);
 		list_del_init (&ep->epfiles);
 		dentry = ep->dentry;
-		ep->dentry = 0;
+		ep->dentry = NULL;
 		parent = dentry->d_parent->d_inode;
 
 		/* break link to controller */
@@ -1358,7 +1536,7 @@ restart:
 			(void) usb_ep_disable (ep->ep);
 		ep->state = STATE_EP_UNBOUND;
 		usb_ep_free_request (ep->ep, ep->req);
-		ep->ep = 0;
+		ep->ep = NULL;
 		wake_up (&ep->wait);
 		put_ep (ep);
 
@@ -1438,8 +1616,8 @@ gadgetfs_unbind (struct usb_gadget *gadget)
 	spin_unlock_irq (&dev->lock);
 
 	destroy_ep_files (dev);
-	gadget->ep0->driver_data = 0;
-	set_gadget_data (gadget, 0);
+	gadget->ep0->driver_data = NULL;
+	set_gadget_data (gadget, NULL);
 
 	/* we've already been disconnected ... no i/o is active */
 	if (dev->req)
@@ -1472,7 +1650,7 @@ gadgetfs_bind (struct usb_gadget *gadget)
 	dev->req = usb_ep_alloc_request (gadget->ep0, GFP_KERNEL);
 	if (!dev->req)
 		goto enomem;
-	dev->req->context = 0;
+	dev->req->context = NULL;
 	dev->req->complete = epio_complete;
 
 	if (activate_ep_files (dev) < 0)
@@ -1589,7 +1767,7 @@ static int is_valid_config (struct usb_config_descriptor *config)
 }
 
 static ssize_t
-dev_config (struct file *fd, const char *buf, size_t len, loff_t *ptr)
+dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 {
 	struct dev_data		*dev = fd->private_data;
 	ssize_t			value = len, length = len;
@@ -1661,7 +1839,7 @@ dev_config (struct file *fd, const char *buf, size_t len, loff_t *ptr)
 	value = usb_gadget_register_driver (&gadgetfs_driver);
 	if (value != 0) {
 		kfree (dev->buf);
-		dev->buf = 0;
+		dev->buf = NULL;
 	} else {
 		/* at this point "good" hardware has for the first time
 		 * let the USB the host see us.  alternatively, if users
@@ -1681,7 +1859,7 @@ fail:
 	spin_unlock_irq (&dev->lock);
 	pr_debug ("%s: %s fail %Zd, %p\n", shortname, __FUNCTION__, value, dev);
 	kfree (dev->buf);
-	dev->buf = 0;
+	dev->buf = NULL;
 	return value;
 }
 
@@ -1770,13 +1948,13 @@ gadgetfs_create_file (struct super_block *sb, char const *name,
 	qname.hash = full_name_hash (qname.name, qname.len);
 	dentry = d_alloc (sb->s_root, &qname);
 	if (!dentry)
-		return 0;
+		return NULL;
 
 	inode = gadgetfs_make_inode (sb, data, fops,
 			S_IFREG | (default_perm & S_IRWXUGO));
 	if (!inode) {
 		dput(dentry);
-		return 0;
+		return NULL;
 	}
 	d_add (dentry, inode);
 	*dentry_p = dentry;
@@ -1806,7 +1984,7 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 
 	/* root inode */
 	inode = gadgetfs_make_inode (sb,
-			0, &simple_dir_operations,
+			NULL, &simple_dir_operations,
 			S_IFDIR | S_IRUGO | S_IXUGO);
 	if (!inode)
 		return -ENOMEM;
@@ -1853,7 +2031,7 @@ gadgetfs_kill_sb (struct super_block *sb)
 	kill_litter_super (sb);
 	if (the_device) {
 		put_dev (the_device);
-		the_device = 0;
+		the_device = NULL;
 	}
 }
 

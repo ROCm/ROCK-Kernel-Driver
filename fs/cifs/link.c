@@ -188,10 +188,10 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 	if (rc == 0) {
 		if (pTcon->ses->capabilities & CAP_UNIX)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
-						      inode->i_sb);
+						      inode->i_sb,xid);
 		else
 			rc = cifs_get_inode_info(&newinode, full_path, NULL,
-						 inode->i_sb);
+						 inode->i_sb,xid);
 
 		if (rc != 0) {
 			cFYI(1,
@@ -210,7 +210,7 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 }
 
 int
-cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
+cifs_readlink(struct dentry *direntry, char __user *pBuffer, int buflen)
 {
 	struct inode *inode = direntry->d_inode;
 	int rc = -EACCES;
@@ -229,7 +229,13 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	xid = GetXid();
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
+
+/* BB would it be safe against deadlock to grab this sem 
+      even though rename itself grabs the sem and calls lookup? */
+/*       down(&inode->i_sb->s_vfs_rename_sem);*/
 	full_path = build_path_from_dentry(direntry);
+/*       up(&inode->i_sb->s_vfs_rename_sem);*/
+
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;

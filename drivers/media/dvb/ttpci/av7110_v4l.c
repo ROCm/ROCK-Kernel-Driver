@@ -177,16 +177,17 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 	struct av7110 *av7110 = (struct av7110*)dev->ext_priv;
 	u16 adswitch;
 	u8 band = 0;
-	int source, sync;
-	struct saa7146_fh *ov_fh = NULL;
-	int restart_overlay = 0;
+	int source, sync, err;
 
 	DEB_EE(("av7110: %p\n", av7110));
 
-	if (vv->ov_data != NULL) {
-		ov_fh = vv->ov_data->fh;
-		saa7146_stop_preview(ov_fh);
-		restart_overlay = 1;
+	if ((vv->video_status & STATUS_OVERLAY) != 0) {
+		vv->ov_suspend = vv->video_fh;
+		err = saa7146_stop_preview(vv->video_fh); /* side effect: video_status is now 0, video_fh is NULL */
+		if (err != 0) {
+			DEB_D(("warning: suspending video failed\n"));
+			vv->ov_suspend = NULL;
+		}
 	}
 
 	if (0 != av7110->current_input) {
@@ -195,7 +196,7 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 		source = SAA7146_HPS_SOURCE_PORT_B;
 		sync = SAA7146_HPS_SYNC_PORT_B;
 		memcpy(standard, analog_standard, sizeof(struct saa7146_standard) * 2);
-		DEB_S(("av7110: switching to analog TV\n"));
+		printk("av7110: switching to analog TV\n");
 		msp_writereg(av7110, MSP_WR_DSP, 0x0008, 0x0000); // loudspeaker source
 		msp_writereg(av7110, MSP_WR_DSP, 0x0009, 0x0000); // headphone source
 		msp_writereg(av7110, MSP_WR_DSP, 0x000a, 0x0000); // SCART 1 source
@@ -208,7 +209,7 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 		source = SAA7146_HPS_SOURCE_PORT_A;
 		sync = SAA7146_HPS_SYNC_PORT_A;
 		memcpy(standard, dvb_standard, sizeof(struct saa7146_standard) * 2);
-		DEB_S(("av7110: switching DVB mode\n"));
+		printk("av7110: switching DVB mode\n");
 		msp_writereg(av7110, MSP_WR_DSP, 0x0008, 0x0220); // loudspeaker source
 		msp_writereg(av7110, MSP_WR_DSP, 0x0009, 0x0220); // headphone source
 		msp_writereg(av7110, MSP_WR_DSP, 0x000a, 0x0220); // SCART 1 source
@@ -225,8 +226,10 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 		printk("setting band in demodulator failed.\n");
 	saa7146_set_hps_source_and_sync(dev, source, sync);
 
-	if (restart_overlay)
-		saa7146_start_preview(ov_fh);
+	if (vv->ov_suspend != NULL) {
+		saa7146_start_preview(vv->ov_suspend);
+		vv->ov_suspend = NULL;
+	}
 
 	return 0;
 }
@@ -263,10 +266,10 @@ int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 
 		// FIXME: standard / stereo detection is still broken
 		msp_readreg(av7110, MSP_RD_DEM, 0x007e, &stereo_det);
-		DEB_S(("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det));
+printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 
 		msp_readreg(av7110, MSP_RD_DSP, 0x0018, &stereo_det);
-		DEB_S(("VIDIOC_G_TUNER: msp3400 stereo detection: 0x%04x\n", stereo_det));
+		printk("VIDIOC_G_TUNER: msp3400 stereo detection: 0x%04x\n", stereo_det);
 		stereo = (s8)(stereo_det >> 8);
 		if (stereo > 0x10) {
 			/* stereo */
@@ -624,13 +627,13 @@ int av7110_exit_v4l(struct av7110 *av7110)
 static struct saa7146_standard standard[] = {
 	{
 		.name	= "PAL",	.id		= V4L2_STD_PAL_BG,
-		.v_offset	= 0x15,	.v_field	= 288,		.v_calc	= 576,
-		.h_offset	= 0x4a,	.h_pixels	= 708,		.h_calc	= 709,
+		.v_offset	= 0x15,	.v_field	= 288,
+		.h_offset	= 0x48,	.h_pixels	= 708,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}, {
 		.name	= "NTSC",	.id		= V4L2_STD_NTSC,
-		.v_offset	= 0x10,	.v_field	= 244,		.v_calc	= 480,
-		.h_offset	= 0x40,	.h_pixels	= 708,		.h_calc	= 709,
+		.v_offset	= 0x10,	.v_field	= 244,
+		.h_offset	= 0x40,	.h_pixels	= 708,
 		.v_max_out	= 480,	.h_max_out	= 640,
 	}
 };
@@ -638,13 +641,13 @@ static struct saa7146_standard standard[] = {
 static struct saa7146_standard analog_standard[] = {
 	{
 		.name	= "PAL",	.id		= V4L2_STD_PAL_BG,
-		.v_offset	= 0x1b,	.v_field	= 288,		.v_calc	= 576,
-		.h_offset	= 0x08,	.h_pixels	= 708,		.h_calc	= 709,
+		.v_offset	= 0x1b,	.v_field	= 288,
+		.h_offset	= 0x08,	.h_pixels	= 708,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}, {
 		.name	= "NTSC",	.id		= V4L2_STD_NTSC,
-		.v_offset	= 0x10,	.v_field	= 244,		.v_calc	= 480,
-		.h_offset	= 0x40,	.h_pixels	= 708,		.h_calc	= 709,
+		.v_offset	= 0x10,	.v_field	= 244,
+		.h_offset	= 0x40,	.h_pixels	= 708,
 		.v_max_out	= 480,	.h_max_out	= 640,
 	}
 };
@@ -652,13 +655,13 @@ static struct saa7146_standard analog_standard[] = {
 static struct saa7146_standard dvb_standard[] = {
 	{
 		.name	= "PAL",	.id		= V4L2_STD_PAL_BG,
-		.v_offset	= 0x14,	.v_field	= 288,		.v_calc	= 576,
-		.h_offset	= 0x4a,	.h_pixels	= 708,		.h_calc	= 709,
+		.v_offset	= 0x14,	.v_field	= 288,
+		.h_offset	= 0x48,	.h_pixels	= 708,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}, {
 		.name	= "NTSC",	.id		= V4L2_STD_NTSC,
-		.v_offset	= 0x10,	.v_field	= 244,		.v_calc	= 480,
-		.h_offset	= 0x40,	.h_pixels	= 708,		.h_calc	= 709,
+		.v_offset	= 0x10,	.v_field	= 244,
+		.h_offset	= 0x40,	.h_pixels	= 708,
 		.v_max_out	= 480,	.h_max_out	= 640,
 	}
 };

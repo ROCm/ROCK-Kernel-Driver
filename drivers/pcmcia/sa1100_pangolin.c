@@ -26,7 +26,7 @@ static struct pcmcia_irqs irqs[] = {
 	{ PANGOLIN_SOCK, IRQ_PCMCIA_CD, "PCMCIA CD" },
 };
 
-static int pangolin_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int pangolin_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 	int res;
 
@@ -37,12 +37,12 @@ static int pangolin_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 
 	skt->irq = IRQ_PCMCIA_IRQ;
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void pangolin_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void pangolin_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 
 #ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
 	/* Disable PCMCIA bus: */
@@ -51,7 +51,7 @@ static void pangolin_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 }
 
 static void
-pangolin_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
+pangolin_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			     struct pcmcia_state *state)
 {
 	unsigned long levels = GPLR;
@@ -66,7 +66,7 @@ pangolin_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
 }
 
 static int
-pangolin_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+pangolin_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 				 const socket_state_t *state)
 {
 	unsigned long value, flags;
@@ -115,14 +115,14 @@ pangolin_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void pangolin_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void pangolin_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void pangolin_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void pangolin_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 static struct pcmcia_low_level pangolin_pcmcia_ops = { 

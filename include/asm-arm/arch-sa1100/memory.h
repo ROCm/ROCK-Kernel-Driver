@@ -8,38 +8,35 @@
 #define __ASM_ARCH_MEMORY_H
 
 #include <linux/config.h>
-
-/*
- * Task size: 3GB
- */
-#define TASK_SIZE	(0xbf000000UL)
-#define TASK_SIZE_26	(0x04000000UL)
-
-/*
- * This decides where the kernel will search for a free chunk of vm
- * space during mmap's.
- */
-#define TASK_UNMAPPED_BASE (0x40000000)
-
-/*
- * Page offset: 3GB
- */
-#define PAGE_OFFSET	(0xc0000000UL)
+#include <asm/sizes.h>
 
 /*
  * Physical DRAM offset is 0xc0000000 on the SA1100
  */
 #define PHYS_OFFSET	(0xc0000000UL)
 
-/*
- * We take advantage of the fact that physical and virtual address can be the
- * same.  The NUMA code is handling the large holes that might exist between
- * all memory banks.
- */
-#define __virt_to_phys__is_a_macro
-#define __phys_to_virt__is_a_macro
-#define __virt_to_phys(x)	(x)
-#define __phys_to_virt(x)	(x)
+#ifndef __ASSEMBLY__
+
+#ifdef CONFIG_SA1111
+static inline void
+__arch_adjust_zones(int node, unsigned long *size, unsigned long *holes)
+{
+	unsigned int sz = SZ_1M >> PAGE_SHIFT;
+
+	if (node != 0)
+		sz = 0;
+
+	size[1] = size[0] - sz;
+	size[0] = sz;
+}
+
+#define arch_adjust_zones(node, size, holes) \
+	__arch_adjust_zones(node, size, holes)
+
+#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_1M - 1)
+
+#endif
+#endif
 
 /*
  * Virtual view <-> DMA view memory address translations
@@ -50,8 +47,6 @@
  *
  * On the SA1100, bus addresses are equivalent to physical addresses.
  */
-#define __virt_to_bus__is_a_macro
-#define __bus_to_virt__is_a_macro
 #define __virt_to_bus(x)	 __virt_to_phys(x)
 #define __bus_to_virt(x)	 __phys_to_virt(x)
 

@@ -118,23 +118,23 @@ static struct fb_ops dn_fb_ops = {
 };
 
 struct fb_var_screeninfo dnfb_var __devinitdata = {
-	.xres		1280,
-	.yres		1024,
-	.xres_virtual	2048,
-	.yres_virtual	1024,
-	.bits_per_pixel	1,
-	.height		-1,
-	.width		-1,
-	.vmode		FB_VMODE_NONINTERLACED,
+	.xres		= 1280,
+	.yres		= 1024,
+	.xres_virtual	= 2048,
+	.yres_virtual	= 1024,
+	.bits_per_pixel	= 1,
+	.height		= -1,
+	.width		= -1,
+	.vmode		= FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo dnfb_fix __devinitdata = {
-	.id		"Apollo Mono",
-	.smem_start	(FRAME_BUFFER_START + IO_BASE),
-	.smem_len	FRAME_BUFFER_LEN,
-	.type		FB_TYPE_PACKED_PIXELS,
-	.visual		FB_VISUAL_MONO10,
-	.line_length	256,
+	.id		= "Apollo Mono",
+	.smem_start	= (FRAME_BUFFER_START + IO_BASE),
+	.smem_len	= FRAME_BUFFER_LEN,
+	.type		= FB_TYPE_PACKED_PIXELS,
+	.visual		= FB_VISUAL_MONO10,
+	.line_length	= 256,
 };
 
 static int dnfb_blank(int blank, struct fb_info *info)

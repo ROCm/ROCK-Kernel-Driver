@@ -31,9 +31,13 @@ static struct usb_hcd *ohci_hcd_alloc (void)
 	if (ohci != 0) {
 		memset (ohci, 0, sizeof (struct ohci_hcd));
 		ohci->hcd.product_desc = "OHCI Host Controller";
+		ohci->next_statechange = jiffies;
+		spin_lock_init (&ohci->lock);
+		INIT_LIST_HEAD (&ohci->pending);
+		INIT_WORK (&ohci->rh_resume, ohci_rh_resume, &ohci->hcd);
 		return &ohci->hcd;
 	}
-	return 0;
+	return NULL;
 }
 
 static void ohci_hcd_free (struct usb_hcd *hcd)
@@ -66,11 +70,11 @@ static void ohci_mem_cleanup (struct ohci_hcd *ohci)
 {
 	if (ohci->td_cache) {
 		dma_pool_destroy (ohci->td_cache);
-		ohci->td_cache = 0;
+		ohci->td_cache = NULL;
 	}
 	if (ohci->ed_cache) {
 		dma_pool_destroy (ohci->ed_cache);
-		ohci->ed_cache = 0;
+		ohci->ed_cache = NULL;
 	}
 }
 

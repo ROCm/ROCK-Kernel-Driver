@@ -25,9 +25,9 @@
 #else
 #define THREAD_SIZE PAGE_SIZE
 #endif
- 
+
 #ifndef __ASSEMBLY__
- 
+
 #define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
 #define free_user_page(page, addr)	free_page(addr)
 
@@ -52,15 +52,13 @@ static inline void copy_page(void *to, void *from)
 
 static inline void clear_page(void *page)
 {
-	unsigned long data, tmp;
-	void *sp = page;
+	unsigned long tmp;
+	unsigned long *sp = page;
 
-	data = 0;
-
-	*((unsigned long *)(page))++ = 0;
-	*((unsigned long *)(page))++ = 0;
-	*((unsigned long *)(page))++ = 0;
-	*((unsigned long *)(page))++ = 0;
+	*sp++ = 0;
+	*sp++ = 0;
+	*sp++ = 0;
+	*sp++ = 0;
 
 	__asm__ __volatile__("1:\t"
 			     ".chip 68040\n\t"
@@ -69,8 +67,8 @@ static inline void clear_page(void *page)
 			     "subqw  #8,%2\n\t"
 			     "subqw  #8,%2\n\t"
 			     "dbra   %1,1b\n\t"
-			     : "=a" (page), "=d" (tmp)
-			     : "a" (sp), "0" (page),
+			     : "=a" (sp), "=d" (tmp)
+			     : "a" (page), "0" (sp),
 			       "1" ((PAGE_SIZE - 16) / 16 - 1));
 }
 
@@ -80,7 +78,7 @@ static inline void clear_page(void *page)
 #endif
 
 #define clear_user_page(addr, vaddr, page)	\
-	do { 	clear_page(addr);		\
+	do {	clear_page(addr);		\
 		flush_dcache_page(page);	\
 	} while (0)
 #define copy_user_page(to, from, vaddr, page)	\

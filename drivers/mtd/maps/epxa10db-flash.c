@@ -5,7 +5,7 @@
  *  Copyright (C) 2001 Altera Corporation
  *  Copyright (C) 2001 Red Hat, Inc.
  *
- * $Id: epxa10db-flash.c,v 1.10 2003/05/21 12:45:18 dwmw2 Exp $ 
+ * $Id: epxa10db-flash.c,v 1.11 2004/07/12 21:59:44 dwmw2 Exp $ 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ static int epxa_default_partitions(struct mtd_info *master, struct mtd_partition
 static struct map_info epxa_map = {
 	.name =		"EPXA flash",
 	.size =		FLASH_SIZE,
-	.buswidth =	2,
+	.bankwidth =	2,
 	.phys =		FLASH_START,
 };
 

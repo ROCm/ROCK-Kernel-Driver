@@ -67,7 +67,7 @@ config GSCD
 
 config SBPCD
 	tristate "Matsushita/Panasonic/Creative, Longshine, TEAC CDROM support"
-	depends on CD_NO_IDESCSI && BROKEN
+	depends on CD_NO_IDESCSI && BROKEN_ON_SMP
 	---help---
 	  This driver supports most of the drives which use the Panasonic or
 	  Sound Blaster interface.  Please read the file
@@ -149,7 +149,6 @@ config MCD_BASE
 config MCDX
 	tristate "Mitsumi [XA/MultiSession] CDROM support"
 	depends on CD_NO_IDESCSI
-	depends on BROKEN
 	---help---
 	  Use this driver if you want to be able to read XA or MultiSession
 	  CDs (PhotoCDs) as well as ordinary CDs with your Mitsumi LU-005,

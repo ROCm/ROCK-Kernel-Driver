@@ -47,7 +47,7 @@ typedef __u32 SectorMap;
  */
 typedef struct NewSectorMap {          
 	__u8 bytes[3];
-} SectorCount __attribute__((packed));
+} SectorCount;
 
 
 /*

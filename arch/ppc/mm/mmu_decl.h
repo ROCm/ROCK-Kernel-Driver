@@ -27,6 +27,9 @@ extern int map_page(unsigned long va, phys_addr_t pa, int flags);
 extern void setbat(int index, unsigned long virt, unsigned long phys,
 		   unsigned int size, int flags);
 extern void reserve_phys_mem(unsigned long start, unsigned long size);
+extern void settlbcam(int index, unsigned long virt, phys_addr_t phys,
+		      unsigned int size, int flags, unsigned int pid);
+extern void invalidate_tlbcam_entry(int index);
 
 extern int __map_without_bats;
 extern unsigned long ioremap_base;
@@ -52,6 +55,12 @@ extern unsigned long Hash_size, Hash_mask;
 #define flush_HPTE(X, va, pg)	_tlbie(va)
 extern void MMU_init_hw(void);
 extern unsigned long mmu_mapin_ram(void);
+
+#elif defined(CONFIG_FSL_BOOKE)
+#define flush_HPTE(X, va, pg)	_tlbie(va)
+extern void MMU_init_hw(void);
+extern unsigned long mmu_mapin_ram(void);
+extern void adjust_total_lowmem(void);
 
 #else
 /* anything except 4xx or 8xx */

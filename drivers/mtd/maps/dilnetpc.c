@@ -14,7 +14,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: dilnetpc.c,v 1.12 2003/05/21 12:45:18 dwmw2 Exp $
+ * $Id: dilnetpc.c,v 1.13 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * The DIL/Net PC is a tiny embedded PC board made by SSV Embedded Systems
  * featuring the AMD Elan SC410 processor. There are two variants of this
@@ -252,7 +252,7 @@ static void adnp_set_vpp(struct map_info *not_used, int on)
 static struct map_info dnpc_map = {
 	.name = "ADNP Flash Bank",
 	.size = ADNP_WINDOW_SIZE,
-	.buswidth = 1,
+	.bankwidth = 1,
 	.set_vpp = adnp_set_vpp,
 	.phys = WINDOW_ADDR
 };

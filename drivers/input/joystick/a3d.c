@@ -39,8 +39,8 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("FP-Gaming Assasin 3D joystick driver");
 MODULE_LICENSE("GPL");
 
-#define A3D_MAX_START		400	/* 400 us */ 
-#define A3D_MAX_STROBE		60	/* 40 us */ 
+#define A3D_MAX_START		400	/* 400 us */
+#define A3D_MAX_STROBE		60	/* 40 us */
 #define A3D_DELAY_READ		3	/* 3 ms */
 #define A3D_MAX_LENGTH		40	/* 40*3 bits */
 #define A3D_REFRESH_TIME	HZ/50	/* 20 ms */
@@ -125,7 +125,7 @@ static void a3d_read(struct a3d *a3d, unsigned char *data)
 
 			input_report_rel(dev, REL_X, ((data[5] << 6) | (data[6] << 3) | data[ 7]) - ((data[5] & 4) << 7));
 			input_report_rel(dev, REL_Y, ((data[8] << 6) | (data[9] << 3) | data[10]) - ((data[8] & 4) << 7));
-			
+
 			input_report_key(dev, BTN_RIGHT,  data[2] & 1);
 			input_report_key(dev, BTN_LEFT,   data[3] & 2);
 			input_report_key(dev, BTN_MIDDLE, data[3] & 4);
@@ -201,7 +201,7 @@ int a3d_adc_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 	int i;
 	for (i = 0; i < 4; i++)
 		axes[i] = (a3d->axes[i] < 254) ? a3d->axes[i] : -1;
-	*buttons = a3d->buttons; 
+	*buttons = a3d->buttons;
 	return 0;
 }
 
@@ -216,7 +216,7 @@ int a3d_adc_open(struct gameport *gameport, int mode)
 	if (mode != GAMEPORT_MODE_COOKED)
 		return -1;
 	if (!a3d->used++)
-		mod_timer(&a3d->timer, jiffies + A3D_REFRESH_TIME);	
+		mod_timer(&a3d->timer, jiffies + A3D_REFRESH_TIME);
 	return 0;
 }
 
@@ -239,7 +239,7 @@ static int a3d_open(struct input_dev *dev)
 {
 	struct a3d *a3d = dev->private;
 	if (!a3d->used++)
-		mod_timer(&a3d->timer, jiffies + A3D_REFRESH_TIME);	
+		mod_timer(&a3d->timer, jiffies + A3D_REFRESH_TIME);
 	return 0;
 }
 
@@ -340,7 +340,7 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 		a3d->adc.open = a3d_adc_open;
 		a3d->adc.close = a3d_adc_close;
 		a3d->adc.cooked_read = a3d_adc_cooked_read;
-		a3d->adc.fuzz = 1; 
+		a3d->adc.fuzz = 1;
 
 		a3d->adc.name = a3d_names[a3d->mode];
 		a3d->adc.phys = a3d->adcphys;

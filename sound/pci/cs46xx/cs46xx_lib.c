@@ -2866,7 +2866,7 @@ void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
  */
 
 static long snd_cs46xx_io_read(snd_info_entry_t *entry, void *file_private_data,
-			       struct file *file, char *buf, long count)
+			       struct file *file, char __user *buf, long count)
 {
 	long size;
 	snd_cs46xx_region_t *region = (snd_cs46xx_region_t *)entry->private_data;

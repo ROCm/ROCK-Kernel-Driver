@@ -7,7 +7,7 @@
 /*
  * This file contains the default values for the opereation of the
  * Linux VM subsystem. Fine-tuning documentation can be found in
- * linux/Documentation/sysctl/vm.txt.
+ * Documentation/sysctl/vm.txt.
  * Started 18.12.91
  * Swap aging added 23.2.95, Stephen Tweedie.
  * Buffermem limits added 12.3.98, Rik van Riel.
@@ -33,6 +33,26 @@
 
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
+
+#ifdef CONFIG_HUGETLB_PAGE
+
+void put_page(struct page *page)
+{
+	if (unlikely(PageCompound(page))) {
+		page = (struct page *)page->private;
+		if (put_page_testzero(page)) {
+			void (*dtor)(struct page *page);
+
+			dtor = (void (*)(struct page *))page[1].mapping;
+			(*dtor)(page);
+		}
+		return;
+	}
+	if (!PageReserved(page) && put_page_testzero(page))
+		__page_cache_release(page);
+}
+EXPORT_SYMBOL(put_page);
+#endif
 
 /*
  * Writeback is about to end against a page which has been marked for immediate
@@ -463,6 +483,3 @@ void __init swap_setup(void)
 	 */
 	hotcpu_notifier(cpu_swap_callback, 0);
 }
-
-EXPORT_SYMBOL(swapper_space);
-EXPORT_SYMBOL(delete_from_swap_cache);

@@ -34,7 +34,7 @@ unsigned long end_pfn_map;
  */
 unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
 
-extern struct resource code_resource, data_resource, vram_resource;
+extern struct resource code_resource, data_resource;
 
 /* Check for some hardcoded bad areas that early boot is not allowed to touch */ 
 static inline int bad_addr(unsigned long *addrp, unsigned long size)

@@ -195,7 +195,7 @@ out:
 #define	DVDBG(a)	\
 	printk(KERN_DEBUG "divert_ioctl() line %d %s\n", __LINE__, (a))
 
-int divert_ioctl(unsigned int cmd, struct divert_cf *arg)
+int divert_ioctl(unsigned int cmd, struct divert_cf __user *arg)
 {
 	struct divert_cf	div_cf;
 	struct divert_blk	*div_blk;

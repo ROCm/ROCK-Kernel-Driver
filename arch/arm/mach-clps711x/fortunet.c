@@ -33,8 +33,18 @@
 
 extern void clps711x_map_io(void);
 extern void clps711x_init_irq(void);
+extern void clps711x_init_time(void);
 
-struct meminfo memmap = { 1, 0xC1000000, {{0xC0000000,0x01000000,0}}};
+struct meminfo memmap = {
+	.nr_banks	= 1,
+	.bank		= {
+		{
+			.start	= 0xC0000000,
+			.size	= 0x01000000,
+			.node	= 0
+		},
+	},
+};
 
 typedef struct tag_IMAGE_PARAMS
 {
@@ -53,9 +63,8 @@ static void __init
 fortunet_fixup(struct machine_desc *desc, struct tag *tags,
 		 char **cmdline, struct meminfo *mi)
 {
-	IMAGE_PARAMS *ip;
-	ip = (IMAGE_PARAMS *)__phys_to_virt(IMAGE_PARAMS_PHYS);
-	*cmdline = (char *)__phys_to_virt(ip->command_line);
+	IMAGE_PARAMS *ip = phys_to_virt(IMAGE_PARAMS_PHYS);
+	*cmdline = phys_to_virt(ip->command_line);
 #ifdef CONFIG_BLK_DEV_INITRD
 	if(ip->ramdisk_ok)
 	{
@@ -64,7 +73,6 @@ fortunet_fixup(struct machine_desc *desc, struct tag *tags,
 	}
 #endif
 	memmap.bank[0].size = ip->ram_size;
-	memmap.end = ip->ram_size+0xC0000000;
 	*mi = memmap;
 }
 
@@ -75,4 +83,5 @@ MACHINE_START(FORTUNET, "ARM-FortuNet")
 	FIXUP(fortunet_fixup)
 	MAPIO(clps711x_map_io)
 	INITIRQ(clps711x_init_irq)
+	INITTIME(clps711x_init_time)
 MACHINE_END

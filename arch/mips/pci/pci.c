@@ -231,7 +231,7 @@ static void __init pcibios_fixup_device_resources(struct pci_dev *dev,
 {
 	/* Update device resources.  */
 	struct pci_controller *hose = (struct pci_controller *)bus->sysdata;
-	unsigned long offset;
+	unsigned long offset = 0;
 	int i;
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -2149,8 +2149,8 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		/*
 		 * If the "remote" value is in the cache, remove it.
 		 */
-		/* bp = incore(mp->m_dev, dblkno, blkcnt, 1); */
-		bp = xfs_incore(mp->m_ddev_targp, dblkno, blkcnt, 1);
+		bp = xfs_incore(mp->m_ddev_targp, dblkno, blkcnt,
+				XFS_INCORE_TRYLOCK);
 		if (bp) {
 			XFS_BUF_STALE(bp);
 			XFS_BUF_UNDELAYWRITE(bp);

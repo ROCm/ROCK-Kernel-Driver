@@ -3,7 +3,7 @@
  * 
  * (C) 2000 Nicolas Pitre <nico@cam.org>
  * 
- * $Id: sa1100-flash.c,v 1.36 2003/05/29 08:59:35 dwmw2 Exp $
+ * $Id: sa1100-flash.c,v 1.39 2004/07/12 21:59:44 dwmw2 Exp $
  */
 
 #include <linux/config.h>
@@ -935,7 +935,7 @@ static int __init sa1100_setup_mtd(struct sa_info *sa, int nr, struct mtd_info *
 		sa[i].map->virt = (unsigned long)sa[i].vbase;
 		sa[i].map->phys = sa[i].base;
 		sa[i].map->set_vpp = sa[i].set_vpp;
-		sa[i].map->buswidth = sa[i].width;
+		sa[i].map->bankwidth = sa[i].width;
 		sa[i].map->size = sa[i].size;
 
 		simple_map_init(sa[i].map);
@@ -1066,7 +1066,7 @@ static void __init sa1100_probe_one_cs(unsigned int msc, unsigned long phys)
 		return;
 	}
 
-	sa1100_probe_map.buswidth = msc & MSC_RBW ? 2 : 4;
+	sa1100_probe_map.bankwidth = msc & MSC_RBW ? 2 : 4;
 	sa1100_probe_map.size = SZ_1M;
 	sa1100_probe_map.phys = phys;
 	sa1100_probe_map.virt = (unsigned long)ioremap(phys, SZ_1M);
@@ -1253,7 +1253,7 @@ static int __init sa1100_locate_flash(void)
 		return nr;
 
 	/*
-	 * Retrieve the buswidth from the MSC registers.
+	 * Retrieve the bankwidth from the MSC registers.
 	 * We currently only implement CS0 and CS1 here.
 	 */
 	for (i = 0; i < nr; i++) {

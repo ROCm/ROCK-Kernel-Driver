@@ -401,12 +401,12 @@ gemini_set_rtc_time( unsigned long now )
 	to_tm( now, &tm );
 
 	reg = gemini_rtc_read(M48T35_RTC_CONTROL);
-#if DEBUG_RTC
+#ifdef DEBUG_RTC
 	printk("set rtc: reg = %x\n", reg);
 #endif
 
 	gemini_rtc_write((reg|M48T35_RTC_SET), M48T35_RTC_CONTROL);
-#if DEBUG_RTC
+#ifdef DEBUG_RTC
 	printk("set rtc: tm vals - sec=%x, min=%x, hour=%x, mon=%x, mday=%x, year=%x\n",
 	       tm.tm_sec, tm.tm_min, tm.tm_hour, tm.tm_mon, tm.tm_mday, tm.tm_year);
 #endif

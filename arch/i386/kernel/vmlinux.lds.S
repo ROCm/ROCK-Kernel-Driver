@@ -4,12 +4,11 @@
 
 #include <asm-generic/vmlinux.lds.h>
 #include <asm/thread_info.h>
-#include <linux/config.h>
-#include <asm/vsyscall-gtod.h>
 
 OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
 OUTPUT_ARCH(i386)
 ENTRY(startup_32)
+jiffies = jiffies_64;
 SECTIONS
 {
   . = 0xC0000000 + 0x100000;
@@ -17,6 +16,7 @@ SECTIONS
   _text = .;			/* Text and read-only data */
   .text : {
 	*(.text)
+	SCHED_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x9090
@@ -49,79 +49,6 @@ SECTIONS
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
   _edata = .;			/* End of data section */
-
-/* VSYSCALL_GTOD data */
-#ifdef CONFIG_VSYSCALL_GTOD
-
-	/* vsyscall entry */
-   . = ALIGN(64);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
-
-  .vsyscall_0 VSYSCALL_GTOD_START: AT ((LOADADDR(.data.cacheline_aligned) + SIZEOF(.data.cacheline_aligned) + 4095) & ~(4095)) { *(.vsyscall_0) }
-  __vsyscall_0 = LOADADDR(.vsyscall_0);
-
-
-	/* generic gtod variables */
-  . = ALIGN(64);
-  .vsyscall_timesource : AT ((LOADADDR(.vsyscall_0) + SIZEOF(.vsyscall_0) + 63) & ~(63)) { *(.vsyscall_timesource) }
-  vsyscall_timesource = LOADADDR(.vsyscall_timesource);
-
-    . = ALIGN(16);
-  .xtime_lock : AT ((LOADADDR(.vsyscall_timesource) + SIZEOF(.vsyscall_timesource) + 15) & ~(15)) { *(.xtime_lock) }
-  xtime_lock = LOADADDR(.xtime_lock);
-
-  . = ALIGN(16);
-  .xtime : AT ((LOADADDR(.xtime_lock) + SIZEOF(.xtime_lock) + 15) & ~(15)) { *(.xtime) }
-  xtime = LOADADDR(.xtime);
-
-  . = ALIGN(16);
-  .jiffies : AT ((LOADADDR(.xtime) + SIZEOF(.xtime) + 15) & ~(15)) { *(.jiffies) }
-  jiffies = LOADADDR(.jiffies);
-
-  . = ALIGN(16);
-  .wall_jiffies : AT ((LOADADDR(.jiffies) + SIZEOF(.jiffies) + 15) & ~(15)) { *(.wall_jiffies) }
-  wall_jiffies = LOADADDR(.wall_jiffies);
-
-  .sys_tz : AT (LOADADDR(.wall_jiffies) + SIZEOF(.wall_jiffies)) { *(.sys_tz) }
-  sys_tz = LOADADDR(.sys_tz);
-
-	/* NTP variables */
-  .tickadj : AT (LOADADDR(.sys_tz) + SIZEOF(.sys_tz)) { *(.tickadj) }
-  tickadj = LOADADDR(.tickadj);
-
-  .time_adjust : AT (LOADADDR(.tickadj) + SIZEOF(.tickadj)) { *(.time_adjust) }
-  time_adjust = LOADADDR(.time_adjust);
-
-	/* TSC variables*/
-  .last_tsc_low : AT (LOADADDR(.time_adjust) + SIZEOF(.time_adjust)) { *(.last_tsc_low) }
-  last_tsc_low = LOADADDR(.last_tsc_low);
-
-  .tsc_delay_at_last_interrupt : AT (LOADADDR(.last_tsc_low) + SIZEOF(.last_tsc_low)) { *(.tsc_delay_at_last_interrupt) }
-  tsc_delay_at_last_interrupt = LOADADDR(.tsc_delay_at_last_interrupt);
-
-  .fast_gettimeoffset_quotient : AT (LOADADDR(.tsc_delay_at_last_interrupt) + SIZEOF(.tsc_delay_at_last_interrupt)) { *(.fast_gettimeoffset_quotient) }
-  fast_gettimeoffset_quotient = LOADADDR(.fast_gettimeoffset_quotient);
-
-
-	/*cyclone values*/
-  .cyclone_timer : AT (LOADADDR(.fast_gettimeoffset_quotient) + SIZEOF(.fast_gettimeoffset_quotient))  { *(.cyclone_timer) }
-  cyclone_timer = LOADADDR(.cyclone_timer);
-
-  .last_cyclone_low : AT (LOADADDR(.cyclone_timer) + SIZEOF(.cyclone_timer)) { *(.last_cyclone_low) }
-  last_cyclone_low = LOADADDR(.last_cyclone_low);
-
-  .cyclone_delay_at_last_interrupt : AT (LOADADDR(.last_cyclone_low) + SIZEOF(.last_cyclone_low)) { *(.cyclone_delay_at_last_interrupt) }
-  cyclone_delay_at_last_interrupt = LOADADDR(.cyclone_delay_at_last_interrupt);
-
-
-  .vsyscall_1 ADDR(.vsyscall_0) + 1024: AT (LOADADDR(.vsyscall_0) + 1024) { *(.vsyscall_1) }
-  . = LOADADDR(.vsyscall_0) + 4096;
-
-  jiffies_64 = jiffies;
-#else
-  jiffies = jiffies_64;
-#endif
-/* END of VSYSCALL_GTOD data*/
 
   . = ALIGN(THREAD_SIZE);	/* init_task */
   .data.init_task : { *(.data.init_task) }
@@ -156,9 +83,6 @@ SECTIONS
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
-  __kdb_initcall_start = .;
-  .kdb_initcall.init : { *(.kdb_initcall.init) }
-  __kdb_initcall_end = .;
   SECURITY_INIT
   . = ALIGN(4);
   __alt_instructions = .;
@@ -182,7 +106,10 @@ SECTIONS
   /* freed after init ends here */
 	
   __bss_start = .;		/* BSS */
-  .bss : { *(.bss) }
+  .bss : {
+	*(.bss.page_aligned)
+	*(.bss)
+  }
   . = ALIGN(4);
   __bss_stop = .; 
 

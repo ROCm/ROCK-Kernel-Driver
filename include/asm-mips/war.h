@@ -169,6 +169,14 @@
 #endif
 
 /*
+ * On the RM9000 there is a problem which makes the CreateDirtyExclusive
+ * cache operation unusable on SMP systems.
+ */
+#if defined(CONFIG_MOMENCO_JAGUAR_ATX) || defined(CONFIG_PMC_YOSEMITE)
+#define  RM9000_CDEX_SMP_WAR		1
+#endif
+
+/*
  * Workarounds default to off
  */
 #ifndef R4600_V1_INDEX_ICACHEOP_WAR
@@ -197,6 +205,9 @@
 #endif
 #ifndef TX49XX_ICACHE_INDEX_INV_WAR
 #define TX49XX_ICACHE_INDEX_INV_WAR	0
+#endif
+#ifndef RM9000_CDEX_SMP_WAR
+#define RM9000_CDEX_SMP_WAR		0
 #endif
 
 #endif /* _ASM_WAR_H */

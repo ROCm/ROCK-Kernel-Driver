@@ -96,7 +96,8 @@ ep_matches (
 				/* for now, avoid PXA "interrupt-in";
 				 * it's documented as never using DATA1.
 				 */
-				if (gadget_is_pxa (gadget))
+				if (gadget_is_pxa (gadget)
+						&& 'i' == tmp [1])
 					return 0;
 				break;
 			case USB_ENDPOINT_XFER_BULK:
@@ -191,7 +192,7 @@ find_ep (struct usb_gadget *gadget, const char *name)
 		if (0 == strcmp (ep->name, name))
 			return ep;
 	}
-	return 0;
+	return NULL;
 }
 
 /**
@@ -279,7 +280,7 @@ struct usb_ep * __init usb_ep_autoconfig (
 	}
 
 	/* Fail */
-	return 0;
+	return NULL;
 }
 
 /**
@@ -296,7 +297,7 @@ void __init usb_ep_autoconfig_reset (struct usb_gadget *gadget)
 	struct usb_ep	*ep;
 
 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
-		ep->driver_data = 0;
+		ep->driver_data = NULL;
 	}
 #ifdef	MANY_ENDPOINTS
 	in_epnum = 0;

@@ -12,7 +12,7 @@ struct sscape_bootblock
 
 struct sscape_microcode
 {
-  unsigned char *code;
+  unsigned char __user *code;
 };
 
 #define SND_SSCAPE_LOAD_BOOTB  _IOWR('P', 100, struct sscape_bootblock)

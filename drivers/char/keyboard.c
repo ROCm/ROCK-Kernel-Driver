@@ -40,9 +40,6 @@
 #include <linux/vt_kern.h>
 #include <linux/sysrq.h>
 #include <linux/input.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 static void kbd_disconnect(struct input_handle *handle);
 extern void ctrl_alt_del(void);
@@ -55,13 +52,12 @@ extern void ctrl_alt_del(void);
 
 /*
  * Some laptops take the 789uiojklm,. keys as number pad when NumLock is on.
- * This seems a good reason to start with NumLock off. On PC9800 and HIL keyboards 
+ * This seems a good reason to start with NumLock off. On HIL keyboards
  * of PARISC machines however there is no NumLock key and everyone expects the keypad 
  * to be used for numbers.
  */
 
-#if defined(CONFIG_X86_PC9800) || \
-    defined(CONFIG_PARISC) && (defined(CONFIG_KEYBOARD_HIL) || defined(CONFIG_KEYBOARD_HIL_OLD))
+#if defined(CONFIG_PARISC) && (defined(CONFIG_KEYBOARD_HIL) || defined(CONFIG_KEYBOARD_HIL_OLD))
 #define KBD_DEFLEDS (1 << VC_NUMLOCK)
 #else
 #define KBD_DEFLEDS 0
@@ -943,7 +939,7 @@ void kbd_refresh_leds(struct input_handle *handle)
 	tasklet_enable(&keyboard_tasklet);
 }
 
-#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64) || defined(CONFIG_PARISC) || defined(CONFIG_SH_MPC1211)
+#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64) || defined(CONFIG_PARISC) || defined(CONFIG_SUPERH)
 
 static unsigned short x86_keycodes[256] =
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
@@ -1062,21 +1058,6 @@ void kbd_keycode(unsigned int keycode, int down, struct pt_regs *regs)
 			if (keycode < BTN_MISC)
 				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
 
-#ifdef	CONFIG_KDB
-	if (down && !rep && (keycode == KEY_PAUSE) && kdb_on) {
-		kdb(KDB_REASON_KEYBOARD, 0, regs);
-		return;
-	}
-#endif	/* CONFIG_KDB */
-
-#ifdef CONFIG_BOOTSPLASH
-	/* This code has to be redone for some non-x86 platforms */
-	if (down == 1 && (keycode == 0x3c || keycode == 0x01)) {	/* F2 and ESC on PC keyboard */
-		extern int splash_verbose(void);
-		if (splash_verbose())
-			return;
-	}
-#endif
 #ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
 	if (keycode == KEY_SYSRQ && (sysrq_down || (down == 1 && sysrq_alt))) {
 		sysrq_down = down;

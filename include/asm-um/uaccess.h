@@ -6,8 +6,6 @@
 #ifndef __UM_UACCESS_H
 #define __UM_UACCESS_H
 
-#include "linux/sched.h"
-
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
 

@@ -251,14 +251,6 @@ static inline void openpic2_set_sense(u_int irq, int sense)
 				 (sense ? OPENPIC_SENSE_LEVEL : 0));
 }
 
-#if 0	/* not used */
-static int openpic2_get_sense(u_int irq)
-{
-	return openpic2_readfield(&GET_ISU(irq).Vector_Priority,
-				  OPENPIC_SENSE_LEVEL) != 0;
-}
-#endif
-
 static void openpic2_end_irq(unsigned int irq_nr)
 {
 	openpic2_eoi();

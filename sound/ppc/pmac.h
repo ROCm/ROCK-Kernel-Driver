@@ -179,6 +179,7 @@ int snd_pmac_awacs_init(pmac_t *chip);
 int snd_pmac_burgundy_init(pmac_t *chip);
 int snd_pmac_daca_init(pmac_t *chip);
 int snd_pmac_tumbler_init(pmac_t *chip);
+int snd_pmac_tumbler_post_init(void);
 
 /* i2c functions */
 typedef struct snd_pmac_keywest {

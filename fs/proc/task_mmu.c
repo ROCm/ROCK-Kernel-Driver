@@ -65,7 +65,7 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 				*shared += pages;
 			continue;
 		}
-		if (vma->vm_flags & VM_SHARED || !vma_shared_empty(vma))
+		if (vma->vm_file)
 			*shared += pages;
 		if (vma->vm_flags & VM_EXECUTABLE)
 			*text += pages;

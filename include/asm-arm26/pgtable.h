@@ -290,8 +290,6 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 #define io_remap_page_range(vma,from,phys,size,prot) \
 		remap_page_range(vma,from,phys,size,prot)
 
-typedef pte_t *pte_addr_t;
-
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASMARM_PGTABLE_H */

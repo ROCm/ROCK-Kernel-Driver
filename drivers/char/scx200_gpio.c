@@ -26,7 +26,7 @@ static int major = 0;		/* default to dynamic major */
 MODULE_PARM(major, "i");
 MODULE_PARM_DESC(major, "Major device number");
 
-static ssize_t scx200_gpio_write(struct file *file, const char *data, 
+static ssize_t scx200_gpio_write(struct file *file, const char __user *data, 
 				 size_t len, loff_t *ppos)
 {
 	unsigned m = iminor(file->f_dentry->d_inode);
@@ -77,7 +77,7 @@ static ssize_t scx200_gpio_write(struct file *file, const char *data,
 	return len;
 }
 
-static ssize_t scx200_gpio_read(struct file *file, char *buf,
+static ssize_t scx200_gpio_read(struct file *file, char __user *buf,
 				size_t len, loff_t *ppos)
 {
 	unsigned m = iminor(file->f_dentry->d_inode);

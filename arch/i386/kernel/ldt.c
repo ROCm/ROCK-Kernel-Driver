@@ -54,14 +54,14 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 	pc->size = mincount;
 	wmb();
 
-	if (reload && (&current->active_mm->context == pc)) {
+	if (reload) {
 #ifdef CONFIG_SMP
 		cpumask_t mask;
 		preempt_disable();
 		load_LDT(pc);
 		mask = cpumask_of_cpu(smp_processor_id());
 		if (!cpus_equal(current->mm->cpu_vm_mask, mask))
-			smp_call_function(flush_ldt, 0, 1, 1);
+			smp_call_function(flush_ldt, NULL, 1, 1);
 		preempt_enable();
 #else
 		load_LDT(pc);
@@ -105,20 +105,6 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	return retval;
 }
 
-int mm_copy_segments(struct mm_struct *old_mm, struct mm_struct *mm)
-{
-	int retval = 0;
-
-	init_MUTEX(&mm->context.sem);
-	mm->context.size = 0;
-	if (old_mm && old_mm->context.size > 0) {
-		down(&old_mm->context.sem);
-		retval = copy_ldt(&mm->context, &old_mm->context);
-		up(&old_mm->context.sem);
-	}
-	return retval;
-}
-
 /*
  * No need to lock the MM as we are the last user
  */
@@ -135,11 +121,11 @@ void destroy_context(struct mm_struct *mm)
 	}
 }
 
-static int read_ldt(struct task_struct *task, void __user * ptr, unsigned long bytecount)
+static int read_ldt(void __user * ptr, unsigned long bytecount)
 {
 	int err;
 	unsigned long size;
-	struct mm_struct * mm = task->mm;
+	struct mm_struct * mm = current->mm;
 
 	if (!mm->context.size)
 		return 0;
@@ -183,9 +169,9 @@ static int read_default_ldt(void __user * ptr, unsigned long bytecount)
 	return err;
 }
 
-static int write_ldt(struct task_struct *task, void __user * ptr, unsigned long bytecount, int oldmode)
+static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 {
-	struct mm_struct * mm = task->mm;
+	struct mm_struct * mm = current->mm;
 	__u32 entry_1, entry_2, *lp;
 	int error;
 	struct user_desc ldt_info;
@@ -209,7 +195,7 @@ static int write_ldt(struct task_struct *task, void __user * ptr, unsigned long 
 
 	down(&mm->context.sem);
 	if (ldt_info.entry_number >= mm->context.size) {
-		error = alloc_ldt(&mm->context, ldt_info.entry_number+1, 1);
+		error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
 		if (error < 0)
 			goto out_unlock;
 	}
@@ -242,29 +228,23 @@ out:
 	return error;
 }
 
-int modify_ldt(struct task_struct *task, int func, void __user *ptr, unsigned long bytecount)
+asmlinkage int sys_modify_ldt(int func, void __user *ptr, unsigned long bytecount)
 {
 	int ret = -ENOSYS;
 
 	switch (func) {
 	case 0:
-		ret = read_ldt(task, ptr, bytecount);
+		ret = read_ldt(ptr, bytecount);
 		break;
 	case 1:
-		ret = write_ldt(task, ptr, bytecount, 1);
+		ret = write_ldt(ptr, bytecount, 1);
 		break;
 	case 2:
 		ret = read_default_ldt(ptr, bytecount);
 		break;
 	case 0x11:
-		ret = write_ldt(task, ptr, bytecount, 0);
+		ret = write_ldt(ptr, bytecount, 0);
 		break;
 	}
 	return ret;
 }
-
-asmlinkage int sys_modify_ldt(int func, void *ptr, unsigned long bytecount)
-{
-	return(modify_ldt(current, func, ptr, bytecount));
-}
-

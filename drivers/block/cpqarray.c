@@ -418,7 +418,8 @@ static int cpqarray_register_ctlr( int i, struct pci_dev *pdev)
 	}
 	hba[i]->access.set_intr_mask(hba[i], 0);
 	if (request_irq(hba[i]->intr, do_ida_intr,
-		SA_INTERRUPT|SA_SHIRQ, hba[i]->devname, hba[i]))
+		SA_INTERRUPT|SA_SHIRQ|SA_SAMPLE_RANDOM,
+		hba[i]->devname, hba[i]))
 	{
 		printk(KERN_ERR "cpqarray: Unable to get irq %d for %s\n",
 				hba[i]->intr, hba[i]->devname);
@@ -1156,8 +1157,8 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 	ctlr_info_t *host = get_host(inode->i_bdev->bd_disk);
 	int error;
 	int diskinfo[4];
-	struct hd_geometry *geo = (struct hd_geometry *)arg;
-	ida_ioctl_t *io = (ida_ioctl_t*)arg;
+	struct hd_geometry __user *geo = (struct hd_geometry __user *)arg;
+	ida_ioctl_t __user *io = (ida_ioctl_t __user *)arg;
 	ida_ioctl_t *my_io;
 
 	switch(cmd) {
@@ -1201,7 +1202,7 @@ out_passthru:
 		return error;
 	case IDAGETCTLRSIG:
 		if (!arg) return -EINVAL;
-		put_user(host->ctlr_sig, (int*)arg);
+		put_user(host->ctlr_sig, (int __user *)arg);
 		return 0;
 	case IDAREVALIDATEVOLS:
 		if (iminor(inode) != 0)
@@ -1209,7 +1210,7 @@ out_passthru:
 		return revalidate_allvol(host);
 	case IDADRIVERVERSION:
 		if (!arg) return -EINVAL;
-		put_user(DRIVER_VERSION, (unsigned long*)arg);
+		put_user(DRIVER_VERSION, (unsigned long __user *)arg);
 		return 0;
 	case IDAGETPCIINFO:
 	{
@@ -1220,7 +1221,7 @@ out_passthru:
 		pciinfo.bus = host->pci_dev->bus->number;
 		pciinfo.dev_fn = host->pci_dev->devfn;
 		pciinfo.board_id = host->board_id;
-		if(copy_to_user((void *) arg, &pciinfo,  
+		if(copy_to_user((void __user *) arg, &pciinfo,  
 			sizeof( ida_pci_info_struct)))
 				return -EFAULT;
 		return(0);
@@ -1271,7 +1272,7 @@ static int ida_ctlr_ioctl(ctlr_info_t *h, int dsk, ida_ioctl_t *io)
 			cmd_free(h, c, 0); 
 			return(error);
 		}
-		if (copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size)) {
+		if (copy_from_user(p, io->sg[0].addr, io->sg[0].size)) {
 			kfree(p);
 			cmd_free(h, c, 0); 
 			return -EFAULT;
@@ -1312,7 +1313,7 @@ static int ida_ctlr_ioctl(ctlr_info_t *h, int dsk, ida_ioctl_t *io)
                         cmd_free(h, c, 0);
                         return(error);
                 }
-		if (copy_from_user(p, (void*)io->sg[0].addr, io->sg[0].size)) {
+		if (copy_from_user(p, io->sg[0].addr, io->sg[0].size)) {
 			kfree(p);
                         cmd_free(h, c, 0);
 			return -EFAULT;
@@ -1353,7 +1354,7 @@ static int ida_ctlr_ioctl(ctlr_info_t *h, int dsk, ida_ioctl_t *io)
 	case DIAG_PASS_THRU:
 	case SENSE_CONTROLLER_PERFORMANCE:
 	case READ_FLASH_ROM:
-		if (copy_to_user((void*)io->sg[0].addr, p, io->sg[0].size)) {
+		if (copy_to_user(io->sg[0].addr, p, io->sg[0].size)) {
 			kfree(p);
 			return -EFAULT;
 		}

@@ -17,11 +17,11 @@ BOOT_TARGETS	= zImage zImage.initrd znetboot znetboot.initrd
 
 bootdir-y			:= simple
 bootdir-$(CONFIG_PPC_OF)	+= openfirmware
-subdir-y			:= lib/ common/ images/
-subdir-$(CONFIG_PPC_OF)		+= of1275/
+subdir-y			:= lib common images
+subdir-$(CONFIG_PPC_OF)		+= of1275
 
 # for cleaning
-subdir-				+= simple/ openfirmware/
+subdir-				+= simple openfirmware
 
 host-progs := $(addprefix utils/, addnote mknote hack-coff mkprep mkbugboot mktree)
 

@@ -190,7 +190,7 @@ We'll say that the horizontal scanrate is about 31 kHz:
     1/(32.141E-6 s) = 31.113E3 Hz
 
 A full screen counts 480 (yres) lines, but we have to consider the vertical
-retrace too (e.g. 49 `pixels'). So a full screen will take
+retrace too (e.g. 49 `lines'). So a full screen will take
 
     (480+49)*32.141E-6 s = 17.002E-3 s
 

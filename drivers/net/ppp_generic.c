@@ -129,8 +129,9 @@ struct ppp {
 #endif /* CONFIG_PPP_MULTILINK */
 	struct net_device_stats stats;	/* statistics */
 #ifdef CONFIG_PPP_FILTER
-	struct sock_fprog pass_filter;	/* filter for packets to pass */
-	struct sock_fprog active_filter;/* filter for pkts to reset idle */
+	struct sock_filter *pass_filter;	/* filter for packets to pass */
+	struct sock_filter *active_filter;/* filter for pkts to reset idle */
+	unsigned pass_len, active_len;
 #endif /* CONFIG_PPP_FILTER */
 };
 
@@ -370,7 +371,7 @@ static int ppp_release(struct inode *inode, struct file *file)
 	struct ppp *ppp;
 
 	if (pf != 0) {
-		file->private_data = 0;
+		file->private_data = NULL;
 		if (pf->kind == INTERFACE) {
 			ppp = PF_TO_PPP(pf);
 			if (file == ppp->owner)
@@ -396,7 +397,7 @@ static ssize_t ppp_read(struct file *file, char __user *buf,
 	struct ppp_file *pf = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 	ssize_t ret;
-	struct sk_buff *skb = 0;
+	struct sk_buff *skb = NULL;
 
 	ret = count;
 
@@ -493,6 +494,45 @@ static unsigned int ppp_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
+#ifdef CONFIG_PPP_FILTER
+static int get_filter(void __user *arg, struct sock_filter **p)
+{
+	struct sock_fprog uprog;
+	struct sock_filter *code = NULL;
+	int len, err;
+
+	if (copy_from_user(&uprog, arg, sizeof(uprog)))
+		return -EFAULT;
+
+	if (uprog.len > BPF_MAXINSNS)
+		return -EINVAL;
+
+	if (!uprog.len) {
+		*p = NULL;
+		return 0;
+	}
+
+	len = uprog.len * sizeof(struct sock_filter);
+	code = kmalloc(len, GFP_KERNEL);
+	if (code == NULL)
+		return -ENOMEM;
+
+	if (copy_from_user(code, uprog.filter, len)) {
+		kfree(code);
+		return -EFAULT;
+	}
+
+	err = sk_chk_filter(code, uprog.len);
+	if (err) {
+		kfree(code);
+		return err;
+	}
+
+	*p = code;
+	return uprog.len;
+}
+#endif /* CONFIG_PPP_FILTER */
+
 static int ppp_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
@@ -503,6 +543,8 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 	struct npioctl npi;
 	int unit, cflags;
 	struct slcompress *vj;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 	if (pf == 0)
 		return ppp_unattached_ioctl(pf, file, cmd, arg);
@@ -540,7 +582,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 
 		switch (cmd) {
 		case PPPIOCCONNECT:
-			if (get_user(unit, (int *) arg))
+			if (get_user(unit, p))
 				break;
 			err = ppp_connect_channel(pch, unit);
 			break;
@@ -569,14 +611,14 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 	ppp = PF_TO_PPP(pf);
 	switch (cmd) {
 	case PPPIOCSMRU:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			break;
 		ppp->mru = val;
 		err = 0;
 		break;
 
 	case PPPIOCSFLAGS:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			break;
 		ppp_lock(ppp);
 		cflags = ppp->flags & ~val;
@@ -589,7 +631,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 
 	case PPPIOCGFLAGS:
 		val = ppp->flags | ppp->xstate | ppp->rstate;
-		if (put_user(val, (int *) arg))
+		if (put_user(val, p))
 			break;
 		err = 0;
 		break;
@@ -599,20 +641,20 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case PPPIOCGUNIT:
-		if (put_user(ppp->file.index, (int *) arg))
+		if (put_user(ppp->file.index, p))
 			break;
 		err = 0;
 		break;
 
 	case PPPIOCSDEBUG:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			break;
 		ppp->debug = val;
 		err = 0;
 		break;
 
 	case PPPIOCGDEBUG:
-		if (put_user(ppp->debug, (int *) arg))
+		if (put_user(ppp->debug, p))
 			break;
 		err = 0;
 		break;
@@ -620,13 +662,13 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 	case PPPIOCGIDLE:
 		idle.xmit_idle = (jiffies - ppp->last_xmit) / HZ;
 		idle.recv_idle = (jiffies - ppp->last_recv) / HZ;
-		if (copy_to_user((void __user *) arg, &idle, sizeof(idle)))
+		if (copy_to_user(argp, &idle, sizeof(idle)))
 			break;
 		err = 0;
 		break;
 
 	case PPPIOCSMAXCID:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			break;
 		val2 = 15;
 		if ((val >> 16) != 0) {
@@ -649,7 +691,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 
 	case PPPIOCGNPMODE:
 	case PPPIOCSNPMODE:
-		if (copy_from_user(&npi, (void __user *) arg, sizeof(npi)))
+		if (copy_from_user(&npi, argp, sizeof(npi)))
 			break;
 		err = proto_to_npindex(npi.protocol);
 		if (err < 0)
@@ -658,7 +700,7 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 		if (cmd == PPPIOCGNPMODE) {
 			err = -EFAULT;
 			npi.mode = ppp->npmode[i];
-			if (copy_to_user((void __user *) arg, &npi, sizeof(npi)))
+			if (copy_to_user(argp, &npi, sizeof(npi)))
 				break;
 		} else {
 			ppp->npmode[i] = npi.mode;
@@ -670,49 +712,38 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 
 #ifdef CONFIG_PPP_FILTER
 	case PPPIOCSPASS:
+	{
+		struct sock_filter *code;
+		err = get_filter(argp, &code);
+		if (err >= 0) {
+			ppp_lock(ppp);
+			kfree(ppp->pass_filter);
+			ppp->pass_filter = code;
+			ppp->pass_len = err;
+			ppp_unlock(ppp);
+			err = 0;
+		}
+		break;
+	}
 	case PPPIOCSACTIVE:
 	{
-		struct sock_fprog uprog, *filtp;
-		struct sock_filter *code = NULL;
-		int len;
-
-		if (copy_from_user(&uprog, (void __user *) arg, sizeof(uprog)))
-			break;
-		err = -EINVAL;
-		if (uprog.len > BPF_MAXINSNS)
-			break;
-		err = -ENOMEM;
-		if (uprog.len > 0) {
-			len = uprog.len * sizeof(struct sock_filter);
-			code = kmalloc(len, GFP_KERNEL);
-			if (code == NULL)
-				break;
-			err = -EFAULT;
-			if (copy_from_user(code, (void __user *) uprog.filter, len)) {
-				kfree(code);
-				break;
-			}
-			err = sk_chk_filter(code, uprog.len);
-			if (err) {
-				kfree(code);
-				break;
-			}
+		struct sock_filter *code;
+		err = get_filter(argp, &code);
+		if (err >= 0) {
+			ppp_lock(ppp);
+			kfree(ppp->active_filter);
+			ppp->active_filter = code;
+			ppp->active_len = err;
+			ppp_unlock(ppp);
+			err = 0;
 		}
-		filtp = (cmd == PPPIOCSPASS)? &ppp->pass_filter: &ppp->active_filter;
-		ppp_lock(ppp);
-		if (filtp->filter)
-			kfree(filtp->filter);
-		filtp->filter = code;
-		filtp->len = uprog.len;
-		ppp_unlock(ppp);
-		err = 0;
 		break;
 	}
 #endif /* CONFIG_PPP_FILTER */
 
 #ifdef CONFIG_PPP_MULTILINK
 	case PPPIOCSMRRU:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			break;
 		ppp_recv_lock(ppp);
 		ppp->mrru = val;
@@ -734,11 +765,12 @@ static int ppp_unattached_ioctl(struct ppp_file *pf, struct file *file,
 	int unit, err = -EFAULT;
 	struct ppp *ppp;
 	struct channel *chan;
+	int __user *p = (int __user *)arg;
 
 	switch (cmd) {
 	case PPPIOCNEWUNIT:
 		/* Create a new ppp unit */
-		if (get_user(unit, (int *) arg))
+		if (get_user(unit, p))
 			break;
 		ppp = ppp_create_interface(unit, &err);
 		if (ppp == 0)
@@ -746,14 +778,14 @@ static int ppp_unattached_ioctl(struct ppp_file *pf, struct file *file,
 		file->private_data = &ppp->file;
 		ppp->owner = file;
 		err = -EFAULT;
-		if (put_user(ppp->file.index, (int *) arg))
+		if (put_user(ppp->file.index, p))
 			break;
 		err = 0;
 		break;
 
 	case PPPIOCATTACH:
 		/* Attach to an existing ppp unit */
-		if (get_user(unit, (int *) arg))
+		if (get_user(unit, p))
 			break;
 		down(&all_ppp_sem);
 		err = -ENXIO;
@@ -767,7 +799,7 @@ static int ppp_unattached_ioctl(struct ppp_file *pf, struct file *file,
 		break;
 
 	case PPPIOCATTCHAN:
-		if (get_user(unit, (int *) arg))
+		if (get_user(unit, p))
 			break;
 		spin_lock_bh(&all_channels_lock);
 		err = -ENXIO;
@@ -991,49 +1023,33 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 
 	if (proto < 0x8000) {
 #ifdef CONFIG_PPP_FILTER
-		/* the DLT_LINUX_SLL filter instructions are constructed assuming
-		 * a 16 byte faked ethernet header on each packet first word
-		 * is the direction flag the last contain the ethernet protocol
-		 */
-		if (ppp->pass_filter.filter || ppp->active_filter.filter) {
-			int npi = proto_to_npindex(proto);
+		/* check if we should pass this packet */
+		/* the filter instructions are constructed assuming
+		   a four-byte PPP header on each packet */
+		{
+			u_int16_t *p = (u_int16_t *) skb_push(skb, 2);
 
-			if (npi < 0) /* we only filter defined protocols */
-				goto no_filter;
-			
-			/* we only have a 2 byte header yet so we need 14 bytes more headroom
-			 * to avoid underrun abort filtering if here is no room
-			 */
-			if (unlikely(skb_headroom(skb) < 14)) {
-				printk(KERN_WARNING "ppp filters (out) not running - need %d byte more headroom\n",
-					14 - skb_headroom(skb));
-				goto no_filter;
-			}
-			/* we set the ethernet protocol in the header */
-			*(u_int16_t *)skb->data = htons(npindex_to_ethertype[npi]);
-			*(u_int16_t *)skb_push(skb, 14) = htons(4); /* indicate outbound in DLT_LINUX_SLL */
-			/* check if we should pass this packet */
-			if (ppp->pass_filter.filter &&
-			    sk_run_filter(skb, ppp->pass_filter.filter, ppp->pass_filter.len) == 0) {
-				if (ppp->debug & 1)
-					printk(KERN_DEBUG "PPP: outbound frame not passed\n");
-				kfree_skb(skb);
-				return;
-			}
-			/* if this packet passes the active filter, record the time */
-			if (!(ppp->active_filter.filter &&
-			    sk_run_filter(skb, ppp->active_filter.filter, ppp->active_filter.len) == 0))
-				ppp->last_xmit = jiffies;
-			skb_pull(skb, 14);
-			*(u_int16_t *)skb->data = htons(proto); /* rewrite PPP protocol value */
+			*p = htons(4); /* indicate outbound in DLT_LINUX_SLL */;
 		}
-	}
-no_filter:
+		if (ppp->pass_filter
+		    && sk_run_filter(skb, ppp->pass_filter,
+				     ppp->pass_len) == 0) {
+			if (ppp->debug & 1)
+				printk(KERN_DEBUG "PPP: outbound frame not passed\n");
+			kfree_skb(skb);
+			return;
+		}
+		/* if this packet passes the active filter, record the time */
+		if (!(ppp->active_filter
+		      && sk_run_filter(skb, ppp->active_filter,
+				       ppp->active_len) == 0))
+			ppp->last_xmit = jiffies;
+		skb_pull(skb, 2);
 #else
 		/* for data packets, record the time */
 		ppp->last_xmit = jiffies;
-	}
 #endif /* CONFIG_PPP_FILTER */
+	}
 
 	++ppp->stats.tx_packets;
 	ppp->stats.tx_bytes += skb->len - 2;
@@ -1082,15 +1098,8 @@ no_filter:
 	/* try to do packet compression */
 	if ((ppp->xstate & SC_COMP_RUN) && ppp->xc_state != 0
 	    && proto != PPP_LCP && proto != PPP_CCP) {
-                int new_skb_size = ppp->dev->mtu + ppp->dev->hard_header_len;
-                int compressor_skb_size = ppp->dev->mtu + PPP_HDRLEN;
-
-                if (ppp->xcomp->compress_proto == CI_MPPE) {
-                        /* CCP [must have] reduced MTU by MPPE_PAD. */
-                        new_skb_size += MPPE_PAD;
-                        compressor_skb_size += MPPE_PAD;
-                }
-                new_skb = alloc_skb(new_skb_size, GFP_ATOMIC);
+		new_skb = alloc_skb(ppp->dev->mtu + ppp->dev->hard_header_len,
+				    GFP_ATOMIC);
 		if (new_skb == 0) {
 			printk(KERN_ERR "PPP: no memory (comp pkt)\n");
 			goto drop;
@@ -1102,27 +1111,15 @@ no_filter:
 		/* compressor still expects A/C bytes in hdr */
 		len = ppp->xcomp->compress(ppp->xc_state, skb->data - 2,
 					   new_skb->data, skb->len + 2,
-                                           compressor_skb_size);
+					   ppp->dev->mtu + PPP_HDRLEN);
 		if (len > 0 && (ppp->flags & SC_CCP_UP)) {
 			kfree_skb(skb);
 			skb = new_skb;
 			skb_put(skb, len);
 			skb_pull(skb, 2);	/* pull off A/C bytes */
-                } else if (len == 0) {
+		} else {
 			/* didn't compress, or CCP not up yet */
 			kfree_skb(new_skb);
-                } else {
-                        /*
-                         * (len < 0)
-                         * MPPE requires that we do not send unencrypted
-                         * frames.  The compressor will return -1 if we
-                         * should drop the frame.  We cannot simply test
-                         * the compress_proto because MPPE and MPPC share
-                         * the same number.
-                         */
-                        printk(KERN_ERR "ppp: compressor dropped pkt\n");
-                        kfree_skb(new_skb);
-                        goto drop;
 		}
 	}
 
@@ -1164,7 +1161,7 @@ ppp_push(struct ppp *ppp)
 	list = &ppp->channels;
 	if (list_empty(list)) {
 		/* nowhere to send the packet, just drop it */
-		ppp->xmit_pending = 0;
+		ppp->xmit_pending = NULL;
 		kfree_skb(skb);
 		return;
 	}
@@ -1177,11 +1174,11 @@ ppp_push(struct ppp *ppp)
 		spin_lock_bh(&pch->downl);
 		if (pch->chan) {
 			if (pch->chan->ops->start_xmit(pch->chan, skb))
-				ppp->xmit_pending = 0;
+				ppp->xmit_pending = NULL;
 		} else {
 			/* channel got unregistered */
 			kfree_skb(skb);
-			ppp->xmit_pending = 0;
+			ppp->xmit_pending = NULL;
 		}
 		spin_unlock_bh(&pch->downl);
 		return;
@@ -1194,7 +1191,7 @@ ppp_push(struct ppp *ppp)
 		return;
 #endif /* CONFIG_PPP_MULTILINK */
 
-	ppp->xmit_pending = 0;
+	ppp->xmit_pending = NULL;
 	kfree_skb(skb);
 }
 
@@ -1573,37 +1570,27 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* network protocol frame - give it to the kernel */
 
 #ifdef CONFIG_PPP_FILTER
-		/* the DLT_LINUX_SLL filter instructions are constructed assuming
-		 * a 16 byte faked ethernet header on each packet first word
-		 * is the direction flag the last contain the ethernet protocol
-		 */
-		if (ppp->pass_filter.filter || ppp->active_filter.filter) {
-			/* we only have a 2 byte header yet so we need 14 bytes more headroom
-			 * to avoid underrun abort filtering if here is no room
-			 */
-			if (unlikely(skb_headroom(skb) < 14)) {
-				printk(KERN_WARNING "ppp filters (in) not running - need %d byte more headroom\n",
-					14 - skb_headroom(skb));
-				goto no_filter;
-			}
-			/* we set the ethernet protocol in the header */
-			*(u_int16_t *)skb->data = htons(npindex_to_ethertype[npi]);
-			*(u_int16_t *)skb_push(skb, 14) = 0; /* indicate inbound in DLT_LINUX_SLL */
-			/* check if we should pass this packet */
-			if (ppp->pass_filter.filter &&
-			    sk_run_filter(skb, ppp->pass_filter.filter, ppp->pass_filter.len) == 0) {
-				if (ppp->debug & 1)
-					printk(KERN_DEBUG "PPP: inbound frame not passed\n");
-				kfree_skb(skb);
-				return;
-			}
-			if (!(ppp->active_filter.filter &&
-			    sk_run_filter(skb, ppp->active_filter.filter, ppp->active_filter.len) == 0))
-				ppp->last_recv = jiffies;
-			skb_pull(skb, 14);
-			/* we do not need to restore the old protocol value it is pulled next step */
+		/* check if the packet passes the pass and active filters */
+		/* the filter instructions are constructed assuming
+		   a four-byte PPP header on each packet */
+		{
+			u_int16_t *p = (u_int16_t *) skb_push(skb, 2);
+
+			*p = 0; /* indicate inbound in DLT_LINUX_SLL */
 		}
-no_filter:
+		if (ppp->pass_filter
+		    && sk_run_filter(skb, ppp->pass_filter,
+				     ppp->pass_len) == 0) {
+			if (ppp->debug & 1)
+				printk(KERN_DEBUG "PPP: inbound frame not passed\n");
+			kfree_skb(skb);
+			return;
+		}
+		if (!(ppp->active_filter
+		      && sk_run_filter(skb, ppp->active_filter,
+				       ppp->active_len) == 0))
+			ppp->last_recv = jiffies;
+		skb_pull(skb, 2);
 #else
 		ppp->last_recv = jiffies;
 #endif /* CONFIG_PPP_FILTER */
@@ -1641,7 +1628,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 		goto err;
 
 	if (proto == PPP_COMP) {
-		ns = dev_alloc_skb(ppp->mru + 128 + PPP_HDRLEN);
+		ns = dev_alloc_skb(ppp->mru + PPP_HDRLEN);
 		if (ns == 0) {
 			printk(KERN_ERR "ppp_decompress_frame: no memory\n");
 			goto err;
@@ -1989,7 +1976,7 @@ ppp_unregister_channel(struct ppp_channel *chan)
 
 	if (pch == 0)
 		return;		/* should never happen */
-	chan->ppp = 0;
+	chan->ppp = NULL;
 
 	/*
 	 * This ensures that we have returned from any calls into the
@@ -1997,7 +1984,7 @@ ppp_unregister_channel(struct ppp_channel *chan)
 	 */
 	down_write(&pch->chan_sem);
 	spin_lock_bh(&pch->downl);
-	pch->chan = 0;
+	pch->chan = NULL;
 	spin_unlock_bh(&pch->downl);
 	up_write(&pch->chan_sem);
 	ppp_disconnect_channel(pch);
@@ -2200,11 +2187,11 @@ ppp_ccp_closed(struct ppp *ppp)
 	ppp->xstate = 0;
 	xcomp = ppp->xcomp;
 	xstate = ppp->xc_state;
-	ppp->xc_state = 0;
+	ppp->xc_state = NULL;
 	ppp->rstate = 0;
 	rcomp = ppp->rcomp;
 	rstate = ppp->rc_state;
-	ppp->rc_state = 0;
+	ppp->rc_state = NULL;
 	ppp_unlock(ppp);
 
 	if (xstate) {
@@ -2237,7 +2224,7 @@ find_comp_entry(int proto)
 		if (ce->comp->compress_proto == proto)
 			return ce;
 	}
-	return 0;
+	return NULL;
 }
 
 /* Register a compressor */
@@ -2282,7 +2269,7 @@ static struct compressor *
 find_compressor(int type)
 {
 	struct compressor_entry *ce;
-	struct compressor *cp = 0;
+	struct compressor *cp = NULL;
 
 	spin_lock(&compressor_list_lock);
 	ce = find_comp_entry(type);
@@ -2426,7 +2413,7 @@ static void ppp_shutdown_interface(struct ppp *ppp)
 	down(&all_ppp_sem);
 	ppp_lock(ppp);
 	dev = ppp->dev;
-	ppp->dev = 0;
+	ppp->dev = NULL;
 	ppp_unlock(ppp);
 	/* This will call dev_close() for us. */
 	if (dev) {
@@ -2460,7 +2447,7 @@ static void ppp_destroy_interface(struct ppp *ppp)
 	ppp_ccp_closed(ppp);
 	if (ppp->vj) {
 		slhc_free(ppp->vj);
-		ppp->vj = 0;
+		ppp->vj = NULL;
 	}
 	skb_queue_purge(&ppp->file.xq);
 	skb_queue_purge(&ppp->file.rq);
@@ -2468,13 +2455,13 @@ static void ppp_destroy_interface(struct ppp *ppp)
 	skb_queue_purge(&ppp->mrq);
 #endif /* CONFIG_PPP_MULTILINK */
 #ifdef CONFIG_PPP_FILTER
-	if (ppp->pass_filter.filter) {
-		kfree(ppp->pass_filter.filter);
-		ppp->pass_filter.filter = NULL;
+	if (ppp->pass_filter) {
+		kfree(ppp->pass_filter);
+		ppp->pass_filter = NULL;
 	}
-	if (ppp->active_filter.filter) {
-		kfree(ppp->active_filter.filter);
-		ppp->active_filter.filter = 0;
+	if (ppp->active_filter) {
+		kfree(ppp->active_filter);
+		ppp->active_filter = NULL;
 	}
 #endif /* CONFIG_PPP_FILTER */
 
@@ -2520,7 +2507,7 @@ ppp_find_channel(int unit)
 		if (pch->file.index == unit)
 			return pch;
 	}
-	return 0;
+	return NULL;
 }
 
 /*

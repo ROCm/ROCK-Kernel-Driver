@@ -1,13 +1,21 @@
-
-/* Linux driver for Disk-On-Chip 2000       */
-/* (c) 1999 Machine Vision Holdings, Inc.   */
-/* Author: David Woodhouse <dwmw2@mvhi.com> */
-/* $Id: doc2000.h,v 1.17 2003/06/12 01:20:46 gerg Exp $ */
+/* 
+ * Linux driver for Disk-On-Chip devices
+ *
+ * Copyright (C) 1999 Machine Vision Holdings, Inc.   
+ * Copyright (C) 2001-2003 David Woodhouse <dwmw2@infradead.org>
+ * Copyright (C) 2002-2003 Greg Ungerer <gerg@snapgear.com>
+ * Copyright (C) 2002-2003 SnapGear Inc
+ *
+ * $Id: doc2000.h,v 1.22 2003/11/05 10:51:36 dwmw2 Exp $ 
+ *
+ * Released under GPL
+ */
 
 #ifndef __MTD_DOC2000_H__
 #define __MTD_DOC2000_H__
 
 #include <linux/mtd/mtd.h>
+#include <asm/semaphore.h>
 
 #define DoC_Sig1 0
 #define DoC_Sig2 1
@@ -73,12 +81,12 @@
  * Others use readb/writeb 
  */
 #if defined(__arm__)
-#define ReadDOC_(adr, reg)      ((unsigned char)(*(__u32 *)(((unsigned long)adr)+((reg)<<2))))
-#define WriteDOC_(d, adr, reg)  do{ *(__u32 *)(((unsigned long)adr)+((reg)<<2)) = (__u32)d; wmb();} while(0)
+#define ReadDOC_(adr, reg)      ((unsigned char)(*(volatile __u32 *)(((unsigned long)adr)+((reg)<<2))))
+#define WriteDOC_(d, adr, reg)  do{ *(volatile __u32 *)(((unsigned long)adr)+((reg)<<2)) = (__u32)d; wmb();} while(0)
 #define DOC_IOREMAP_LEN 0x8000
 #elif defined(__ppc__)
-#define ReadDOC_(adr, reg)      ((unsigned char)(*(__u16 *)(((unsigned long)adr)+((reg)<<1))))
-#define WriteDOC_(d, adr, reg)  do{ *(__u16 *)(((unsigned long)adr)+((reg)<<1)) = (__u16)d; wmb();} while(0)
+#define ReadDOC_(adr, reg)      ((unsigned char)(*(volatile __u16 *)(((unsigned long)adr)+((reg)<<1))))
+#define WriteDOC_(d, adr, reg)  do{ *(volatile __u16 *)(((unsigned long)adr)+((reg)<<1)) = (__u16)d; wmb();} while(0)
 #define DOC_IOREMAP_LEN 0x4000
 #else
 #define ReadDOC_(adr, reg)      readb(((unsigned long)adr) + (reg))
@@ -106,6 +114,7 @@
 #define DOC_MODE_MDWREN 	0x04
 
 #define DOC_ChipID_Doc2k 	0x20
+#define DOC_ChipID_Doc2kTSOP 	0x21	/* internal number for MTD */
 #define DOC_ChipID_DocMil 	0x30
 #define DOC_ChipID_DocMilPlus32	0x40
 #define DOC_ChipID_DocMilPlus16	0x41
@@ -147,10 +156,10 @@ struct Nand {
 #define MAX_FLOORS 4
 #define MAX_CHIPS 4
 
-#define MAX_FLOORS_MIL 4
+#define MAX_FLOORS_MIL 1
 #define MAX_CHIPS_MIL 1
 
-#define MAX_FLOORS_MPLUS 1
+#define MAX_FLOORS_MPLUS 2
 #define MAX_CHIPS_MPLUS 1
 
 #define ADDR_COLUMN 1
@@ -161,7 +170,7 @@ struct DiskOnChip {
 	unsigned long physadr;
 	unsigned long virtadr;
 	unsigned long totlen;
-	char ChipID; /* Type of DiskOnChip */
+	unsigned char ChipID; /* Type of DiskOnChip */
 	int ioreg;
 	
 	unsigned long mfr; /* Flash IDs - only one type of flash per device */

@@ -1,164 +1,151 @@
 /*
- * FILE NAME
- *	arch/mips/vr41xx/common/pciu.h
+ *  pci-vr41xx.h, Include file for PCI Control Unit of the NEC VR4100 series.
  *
- * BRIEF MODULE DESCRIPTION
- *	Include file for PCI Control Unit of the NEC VR4100 series.
+ *  Copyright (C) 2002  MontaVista Software Inc.
+ *    Author: Yoichi Yuasa <yyuasa@mvista.com or source@mvista.com>
+ *  Copyright (C) 2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
- * Author: Yoichi Yuasa
- *         yyuasa@mvista.com or source@mvista.com
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
  *
- * Copyright 2002 MontaVista Software Inc.
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
  *
- *  This program is free software; you can redistribute it and/or modify it
- *  under the terms of the GNU General Public License as published by the
- *  Free Software Foundation; either version 2 of the License, or (at your
- *  option) any later version.
- *
- *  THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
- *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- *  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
- *  TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
- *  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  675 Mass Ave, Cambridge, MA 02139, USA.
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#ifndef __PCI_VR41XX_H
+#define __PCI_VR41XX_H
+
+#define PCIMMAW1REG		KSEG1ADDR(0x0f000c00)
+#define PCIMMAW2REG		KSEG1ADDR(0x0f000c04)
+#define PCITAW1REG		KSEG1ADDR(0x0f000c08)
+#define PCITAW2REG		KSEG1ADDR(0x0f000c0c)
+#define PCIMIOAWREG		KSEG1ADDR(0x0f000c10)
+ #define IBA(addr)		((addr) & 0xff000000U)
+ #define MASTER_MSK(mask)	(((mask) >> 11) & 0x000fe000U)
+ #define PCIA(addr)		(((addr) >> 24) & 0x000000ffU)
+ #define TARGET_MSK(mask)	(((mask) >> 8) & 0x000fe000U)
+ #define ITA(addr)		(((addr) >> 24) & 0x000000ffU)
+ #define PCIIA(addr)		(((addr) >> 24) & 0x000000ffU)
+ #define WINEN			0x1000U
+#define PCICONFDREG		KSEG1ADDR(0x0f000c14)
+#define PCICONFAREG		KSEG1ADDR(0x0f000c18)
+#define PCIMAILREG		KSEG1ADDR(0x0f000c1c)
+#define BUSERRADREG		KSEG1ADDR(0x0f000c24)
+ #define EA(reg)		((reg) &0xfffffffc)
+
+#define INTCNTSTAREG		KSEG1ADDR(0x0f000c28)
+ #define MABTCLR		0x80000000U
+ #define TRDYCLR		0x40000000U
+ #define PARCLR			0x20000000U
+ #define MBCLR			0x10000000U
+ #define SERRCLR		0x08000000U
+ #define RTYCLR			0x04000000U
+ #define MABCLR			0x02000000U
+ #define TABCLR			0x01000000U
+ /* RFU */
+ #define MABTMSK		0x00008000U
+ #define TRDYMSK		0x00004000U
+ #define PARMSK			0x00002000U
+ #define MBMSK			0x00001000U
+ #define SERRMSK		0x00000800U
+ #define RTYMSK			0x00000400U
+ #define MABMSK			0x00000200U
+ #define TABMSK			0x00000100U
+ #define IBAMABT		0x00000080U
+ #define TRDYRCH		0x00000040U
+ #define PAR			0x00000020U
+ #define MB			0x00000010U
+ #define PCISERR		0x00000008U
+ #define RTYRCH			0x00000004U
+ #define MABORT			0x00000002U
+ #define TABORT			0x00000001U
+
+#define PCIEXACCREG		KSEG1ADDR(0x0f000c2c)
+ #define UNLOCK			0x2U
+ #define EAREQ			0x1U
+#define PCIRECONTREG		KSEG1ADDR(0x0f000c30)
+ #define RTRYCNT(reg)		((reg) & 0x000000ffU)
+#define PCIENREG		KSEG1ADDR(0x0f000c34)
+ #define CONFIG_DONE		0x4U
+#define PCICLKSELREG		KSEG1ADDR(0x0f000c38)
+ #define EQUAL_VTCLOCK		0x2U
+ #define HALF_VTCLOCK		0x0U
+ #define ONE_THIRD_VTCLOCK	0x3U
+ #define QUARTER_VTCLOCK	0x1U
+#define PCITRDYVREG		KSEG1ADDR(0x0f000c3c)
+ #define TRDYV(val)		((uint32_t)(val) & 0xffU)
+#define PCICLKRUNREG		KSEG1ADDR(0x0f000c60)
+
+#define VENDORIDREG		KSEG1ADDR(0x0f000d00)
+#define DEVICEIDREG		KSEG1ADDR(0x0f000d00)
+#define COMMANDREG		KSEG1ADDR(0x0f000d04)
+#define STATUSREG		KSEG1ADDR(0x0f000d04)
+#define REVIDREG		KSEG1ADDR(0x0f000d08)
+#define CLASSREG		KSEG1ADDR(0x0f000d08)
+#define CACHELSREG		KSEG1ADDR(0x0f000d0c)
+#define LATTIMEREG		KSEG1ADDR(0x0f000d0c)
+ #define MLTIM(val)		(((uint32_t)(val) << 7) & 0xff00U)
+#define MAILBAREG		KSEG1ADDR(0x0f000d10)
+#define PCIMBA1REG		KSEG1ADDR(0x0f000d14)
+#define PCIMBA2REG		KSEG1ADDR(0x0f000d18)
+ #define MBADD(base)		((base) & 0xfffff800U)
+ #define PMBA(base)		((base) & 0xffe00000U)
+ #define PREF			0x8U
+ #define PREF_APPROVAL		0x8U
+ #define PREF_DISAPPROVAL	0x0U
+ #define TYPE			0x6U
+ #define TYPE_32BITSPACE	0x0U
+ #define MSI			0x1U
+ #define MSI_MEMORY		0x0U
+#define INTLINEREG		KSEG1ADDR(0x0f000d3c)
+#define INTPINREG		KSEG1ADDR(0x0f000d3c)
+#define RETVALREG		KSEG1ADDR(0x0f000d40)
+#define PCIAPCNTREG		KSEG1ADDR(0x0f000d40)
+ #define TKYGNT			0x04000000U
+ #define TKYGNT_ENABLE		0x04000000U
+ #define TKYGNT_DISABLE		0x00000000U
+ #define PAPC			0x03000000U
+ #define PAPC_ALTERNATE_B	0x02000000U
+ #define PAPC_ALTERNATE_0	0x01000000U
+ #define PAPC_FAIR		0x00000000U
+ #define RTYVAL(val)		(((uint32_t)(val) << 7) & 0xff00U)
+ #define RTYVAL_MASK		0xff00U
+
+#define PCI_CLOCK_MAX		33333333U
+
 /*
- * Changes:
- *  MontaVista Software Inc. <yyuasa@mvista.com> or <source@mvista.com>
- *  - New creation, NEC VR4122 and VR4131 are supported.
+ * Default setup
  */
-#ifndef __VR41XX_PCIU_H
-#define __VR41XX_PCIU_H
+#define PCI_MASTER_MEM1_BUS_BASE_ADDRESS	0x10000000U
+#define PCI_MASTER_MEM1_ADDRESS_MASK		0x7c000000U
+#define PCI_MASTER_MEM1_PCI_BASE_ADDRESS	0x10000000U
 
-#include <linux/config.h>
-#include <asm/addrspace.h>
+#define PCI_TARGET_MEM1_ADDRESS_MASK		0x08000000U
+#define PCI_TARGET_MEM1_BUS_BASE_ADDRESS	0x00000000U
 
-#define BIT(x)	(1 << (x))
+#define PCI_MASTER_IO_BUS_BASE_ADDRESS		0x16000000U
+#define PCI_MASTER_IO_ADDRESS_MASK		0x7e000000U
+#define PCI_MASTER_IO_PCI_BASE_ADDRESS		0x00000000U
 
-#define PCIMMAW1REG			KSEG1ADDR(0x0f000c00)
-#define PCIMMAW2REG			KSEG1ADDR(0x0f000c04)
-#define PCITAW1REG			KSEG1ADDR(0x0f000c08)
-#define PCITAW2REG			KSEG1ADDR(0x0f000c0c)
-#define PCIMIOAWREG			KSEG1ADDR(0x0f000c10)
-#define INTERNAL_BUS_BASE_ADDRESS	0xff000000
-#define ADDRESS_MASK			0x000fe000
-#define PCI_ACCESS_ENABLE		BIT(12)
-#define PCI_ADDRESS_SETTING		0x000000ff
+#define PCI_MAILBOX_BASE_ADDRESS		0x00000000U
 
-#define PCICONFDREG			KSEG1ADDR(0x0f000c14)
-#define PCICONFAREG			KSEG1ADDR(0x0f000c18)
-#define PCIMAILREG			KSEG1ADDR(0x0f000c1c)
+#define PCI_TARGET_WINDOW1_BASE_ADDRESS		0x00000000U
 
-#define BUSERRADREG			KSEG1ADDR(0x0f000c24)
-#define ERROR_ADDRESS			0xfffffffc
+#define IO_PORT_BASE		KSEG1ADDR(PCI_MASTER_IO_BUS_BASE_ADDRESS)
+#define IO_PORT_RESOURCE_START	PCI_MASTER_IO_PCI_BASE_ADDRESS
+#define IO_PORT_RESOURCE_END	(~PCI_MASTER_IO_ADDRESS_MASK & PCI_MASTER_ADDRESS_MASK)
 
-#define INTCNTSTAREG			KSEG1ADDR(0x0f000c28)
-#define MABTCLR				BIT(31)
-#define TRDYCLR				BIT(30)
-#define PARCLR				BIT(29)
-#define MBCLR				BIT(28)
-#define SERRCLR				BIT(27)
+#define PCI_IO_RESOURCE_START	0x01000000UL
+#define PCI_IO_RESOURCE_END	0x01ffffffUL
 
-#define PCIEXACCREG			KSEG1ADDR(0x0f000c2c)
-#define UNLOCK				BIT(1)
-#define EAREQ				BIT(0)
+#define PCI_MEM_RESOURCE_START	0x11000000UL
+#define PCI_MEM_RESOURCE_END	0x13ffffffUL
 
-#define PCIRECONTREG			KSEG1ADDR(0x0f000c30)
-#define RTRYCNT				0x000000ff
-
-#define PCIENREG			KSEG1ADDR(0x0f000c34)
-#define CONFIG_DONE			BIT(2)
-
-#define PCICLKSELREG			KSEG1ADDR(0x0f000c38)
-#define EQUAL_VTCLOCK			0x00000002
-#define HALF_VTCLOCK			0x00000000
-#define QUARTER_VTCLOCK			0x00000001
-
-#define PCITRDYVREG			KSEG1ADDR(0x0f000c3c)
-
-#define PCICLKRUNREG			KSEG1ADDR(0x0f000c60)
-
-#define PCIU_CONFIGREGS_BASE		KSEG1ADDR(0x0f000d00)
-#define VENDORIDREG			KSEG1ADDR(0x0f000d00)
-#define DEVICEIDREG			KSEG1ADDR(0x0f000d00)
-#define COMMANDREG			KSEG1ADDR(0x0f000d04)
-#define STATUSREG			KSEG1ADDR(0x0f000d04)
-#define REVIDREG			KSEG1ADDR(0x0f000d08)
-#define CLASSREG			KSEG1ADDR(0x0f000d08)
-#define CACHELSREG			KSEG1ADDR(0x0f000d0c)
-#define LATTIMEREG			KSEG1ADDR(0x0f000d0c)
-#define MAILBAREG			KSEG1ADDR(0x0f000d10)
-#define PCIMBA1REG			KSEG1ADDR(0x0f000d14)
-#define PCIMBA2REG			KSEG1ADDR(0x0f000d18)
-#define INTLINEREG			KSEG1ADDR(0x0f000d3c)
-#define INTPINREG			KSEG1ADDR(0x0f000d3c)
-#define RETVALREG			KSEG1ADDR(0x0f000d40)
-#define PCIAPCNTREG			KSEG1ADDR(0x0f000d40)
-
-#define MPCIINTREG			KSEG1ADDR(0x0f0000b2)
-
-#define MAX_PCI_CLOCK			33333333
-
-static inline int pciu_read_config_byte(int where, u8 * val)
-{
-	u32 data;
-
-	data = readl(PCIU_CONFIGREGS_BASE + where);
-	*val = (u8) (data >> ((where & 3) << 3));
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static inline int pciu_read_config_word(int where, u16 * val)
-{
-	u32 data;
-
-	if (where & 1)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	data = readl(PCIU_CONFIGREGS_BASE + where);
-	*val = (u16) (data >> ((where & 2) << 3));
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static inline int pciu_read_config_dword(int where, u32 * val)
-{
-	if (where & 3)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	*val = readl(PCIU_CONFIGREGS_BASE + where);
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static inline int pciu_write_config_byte(int where, u8 val)
-{
-	writel(val, PCIU_CONFIGREGS_BASE + where);
-
-	return 0;
-}
-
-static inline int pciu_write_config_word(int where, u16 val)
-{
-	writel(val, PCIU_CONFIGREGS_BASE + where);
-
-	return 0;
-}
-
-static inline int pciu_write_config_dword(int where, u32 val)
-{
-	writel(val, PCIU_CONFIGREGS_BASE + where);
-
-	return 0;
-}
-
-#endif				/* __VR41XX_PCIU_H */
+#endif /* __PCI_VR41XX_H */

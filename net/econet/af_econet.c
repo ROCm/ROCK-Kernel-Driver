@@ -201,6 +201,7 @@ static int econet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	return 0;
 }
 
+#if defined(CONFIG_ECONET_AUNUDP) || defined(CONFIG_ECONET_NATIVE)
 /*
  *	Queue a transmit result for the user to be told about.
  */
@@ -227,6 +228,7 @@ static void tx_result(struct sock *sk, unsigned long cookie, int result)
 	if (sock_queue_rcv_skb(sk, skb) < 0)
 		kfree_skb(skb);
 }
+#endif
 
 #ifdef CONFIG_ECONET_NATIVE
 /*
@@ -255,10 +257,9 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	struct ec_addr addr;
 	int err;
 	unsigned char port, cb;
+#if defined(CONFIG_ECONET_AUNUDP) || defined(CONFIG_ECONET_NATIVE)
 	struct sk_buff *skb;
 	struct ec_cb *eb;
-#ifdef CONFIG_ECONET_NATIVE
-	unsigned short proto = 0;
 #endif
 #ifdef CONFIG_ECONET_AUNUDP
 	struct msghdr udpmsg;
@@ -316,6 +317,8 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	{
 		/* Real hardware Econet.  We're not worthy etc. */
 #ifdef CONFIG_ECONET_NATIVE
+		unsigned short proto = 0;
+
 		dev_hold(dev);
 		
 		skb = sock_alloc_send_skb(sk, len+LL_RESERVED_SPACE(dev), 
@@ -418,10 +421,18 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	/* tack our header on the front of the iovec */
 	size = sizeof(struct aunhdr);
+	/*
+	 * XXX: that is b0rken.  We can't mix userland and kernel pointers
+	 * in iovec, since on a lot of platforms copy_from_user() will
+	 * *not* work with the kernel and userland ones at the same time,
+	 * regardless of what we do with set_fs().  And we are talking about
+	 * econet-over-ethernet here, so "it's only ARM anyway" doesn't
+	 * apply.  Any suggestions on fixing that code?		-- AV
+	 */
 	iov[0].iov_base = (void *)&ah;
 	iov[0].iov_len = size;
 	for (i = 0; i < msg->msg_iovlen; i++) {
-		void *base = msg->msg_iov[i].iov_base;
+		void __user *base = msg->msg_iov[i].iov_base;
 		size_t len = msg->msg_iov[i].iov_len;
 		/* Check it now since we switch to KERNEL_DS later. */
 		if ((err = verify_area(VERIFY_READ, base, len)) < 0)
@@ -589,7 +600,7 @@ out:
  *	Handle Econet specific ioctls
  */
 
-static int ec_dev_ioctl(struct socket *sock, unsigned int cmd, void *arg)
+static int ec_dev_ioctl(struct socket *sock, unsigned int cmd, void __user *arg)
 {
 	struct ifreq ifr;
 	struct ec_device *edev;
@@ -662,18 +673,19 @@ static int ec_dev_ioctl(struct socket *sock, unsigned int cmd, void *arg)
 static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
+	void __user *argp = (void __user *)arg;
 
 	switch(cmd) {
 		case SIOCGSTAMP:
-			return sock_get_timestamp(sk,(struct timeval *)arg);
+			return sock_get_timestamp(sk, argp);
 
 		case SIOCSIFADDR:
 		case SIOCGIFADDR:
-			return ec_dev_ioctl(sock, cmd, (void *)arg);
+			return ec_dev_ioctl(sock, cmd, argp);
 			break;
 
 		default:
-			return dev_ioctl(cmd,(void *) arg);
+			return dev_ioctl(cmd, argp);
 	}
 	/*NOTREACHED*/
 	return 0;
@@ -709,6 +721,7 @@ static struct proto_ops SOCKOPS_WRAPPED(econet_ops) = {
 #include <linux/smp_lock.h>
 SOCKOPS_WRAP(econet, PF_ECONET);
 
+#if defined(CONFIG_ECONET_AUNUDP) || defined(CONFIG_ECONET_NATIVE)
 /*
  *	Find the listening socket, if any, for the given data.
  */
@@ -752,47 +765,31 @@ static int ec_queue_packet(struct sock *sk, struct sk_buff *skb,
 
 	return sock_queue_rcv_skb(sk, skb);
 }
+#endif
 
 #ifdef CONFIG_ECONET_AUNUDP
-
 /*
  *	Send an AUN protocol response. 
  */
 
 static void aun_send_response(__u32 addr, unsigned long seq, int code, int cb)
 {
-	struct sockaddr_in sin;
-	struct iovec iov;
-	struct aunhdr ah;
+	struct sockaddr_in sin = {
+		.sin_family = AF_INET,
+		.sin_port = htons(AUN_PORT),
+		.sin_addr = {.s_addr = addr}
+	};
+	struct aunhdr ah = {.code = code, .cb = cb, .handle = seq};
+	struct kvec iov = {.iov_base = (void *)&ah, .iov_len = sizeof(ah)};
 	struct msghdr udpmsg;
-	int err;
-	mm_segment_t oldfs;
 	
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(AUN_PORT);
-	sin.sin_addr.s_addr = addr;
-
-	ah.code = code;
-	ah.pad = 0;
-	ah.port = 0;
-	ah.cb = cb;
-	ah.handle = seq;
-
-	iov.iov_base = (void *)&ah;
-	iov.iov_len = sizeof(ah);
-
 	udpmsg.msg_name = (void *)&sin;
 	udpmsg.msg_namelen = sizeof(sin);
-	udpmsg.msg_iov = &iov;
-	udpmsg.msg_iovlen = 1;
 	udpmsg.msg_control = NULL;
 	udpmsg.msg_controllen = 0;
 	udpmsg.msg_flags=0;
 
-	oldfs = get_fs(); set_fs(KERNEL_DS);
-	err = sock_sendmsg(udpsock, &udpmsg, sizeof(ah));
-	set_fs(oldfs);
+	kernel_sendmsg(udpsock, &udpmsg, &iov, 1, sizeof(ah));
 }
 
 
@@ -976,7 +973,7 @@ static int __init aun_udp_initialise(void)
 
 	/* We can count ourselves lucky Acorn machines are too dim to
 	   speak IPv6. :-) */
-	if ((error = sock_create(PF_INET, SOCK_DGRAM, 0, &udpsock)) < 0)
+	if ((error = sock_create_kern(PF_INET, SOCK_DGRAM, 0, &udpsock)) < 0)
 	{
 		printk("AUN: socket error %d\n", -error);
 		return error;
@@ -1078,7 +1075,7 @@ static int econet_notifier(struct notifier_block *this, unsigned long msg, void 
 		if (edev)
 		{
 			if (net2dev_map[0] == dev)
-				net2dev_map[0] = 0;
+				net2dev_map[0] = NULL;
 			net2dev_map[edev->net] = NULL;
 			kfree(edev);
 			dev->ec_ptr = NULL;

@@ -248,7 +248,7 @@ extern unsigned long m68k_fputype;
 extern unsigned long m68k_mmutype;		/* Not really used yet */
 #ifdef CONFIG_VME
 extern unsigned long vme_brdtype;
-#endif 
+#endif
 
     /*
      *  m68k_is040or060 is != 0 for a '040 or higher;
@@ -357,6 +357,7 @@ extern int m68k_is040or060;
 
 #define NUM_MEMINFO	4
 #define CL_SIZE		256
+#define COMMAND_LINE_SIZE	CL_SIZE
 
 #ifndef __ASSEMBLY__
 extern int m68k_num_memory;		/* # of memory blocks found (and used) */

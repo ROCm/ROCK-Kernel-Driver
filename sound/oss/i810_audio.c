@@ -99,54 +99,14 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 
-#ifndef PCI_DEVICE_ID_INTEL_82801
-#define PCI_DEVICE_ID_INTEL_82801	0x2415
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_82901
-#define PCI_DEVICE_ID_INTEL_82901	0x2425
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH2
-#define PCI_DEVICE_ID_INTEL_ICH2	0x2445
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH3
-#define PCI_DEVICE_ID_INTEL_ICH3	0x2485
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH4
-#define PCI_DEVICE_ID_INTEL_ICH4	0x24c5
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH5
-#define PCI_DEVICE_ID_INTEL_ICH5	0x24d5
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ICH6_3
-#define PCI_DEVICE_ID_INTEL_ICH6_3	0x266e
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_440MX
-#define PCI_DEVICE_ID_INTEL_440MX	0x7195
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_ESB_5
-#define PCI_DEVICE_ID_INTEL_ESB_5	0x25a6
-#endif
-#ifndef PCI_DEVICE_ID_SI_7012
-#define PCI_DEVICE_ID_SI_7012		0x7012
-#endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP1_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP1_AUDIO	0x01b1
-#endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO	0x006a
-#endif
-#ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
-#define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
-#endif
-#ifndef PCI_DEVICE_ID_AMD_768_AUDIO
-#define PCI_DEVICE_ID_AMD_768_AUDIO	0x7445
-#endif
-#ifndef PCI_DEVICE_ID_AMD_8111_AC97
-#define PCI_DEVICE_ID_AMD_8111_AC97	0x746d
-#endif
+#define DRIVER_VERSION "1.01"
+
+#define MODULOP2(a, b) ((a) & ((b) - 1))
+#define MASKP2(a, b) ((a) & ~((b) - 1))
 
 static int ftsodell;
 static int strict_clocking;
@@ -209,6 +169,7 @@ struct i810_channel
 
 #define ENUM_ENGINE(PRE,DIG) 									\
 enum {												\
+	PRE##_BASE =	0x##DIG##0,		/* Base Address */				\
 	PRE##_BDBAR =	0x##DIG##0,		/* Buffer Descriptor list Base Address */	\
 	PRE##_CIV =	0x##DIG##4,		/* Current Index Value */			\
 	PRE##_LVI =	0x##DIG##5,		/* Last Valid Index */				\
@@ -255,8 +216,6 @@ enum {
 #define INT_NI		(1<<1)
 #define INT_GPI		(1<<0)
 #define INT_MASK (INT_SEC|INT_PRI|INT_MC|INT_PO|INT_PI|INT_MO|INT_NI|INT_GPI)
-
-#define DRIVER_VERSION "0.24"
 
 /* magic numbers to protect our data structures */
 #define I810_CARD_MAGIC		0x5072696E /* "Prin" */
@@ -323,19 +282,19 @@ static struct {
 };
 
 static struct pci_device_id i810_pci_tbl [] = {
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AA_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, ICH82801AA},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82901,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, ICH82901AB},
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_440MX,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTEL440MX},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH2,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_4,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH2},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH3,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH3},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH4,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH4},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH5,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801EB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH5},
 	{PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_7012,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, SI7012},
@@ -345,13 +304,13 @@ static struct pci_device_id i810_pci_tbl [] = {
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, NVIDIA_NFORCE},
 	{PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, NVIDIA_NFORCE},
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_768_AUDIO,
+	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7445,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD768},
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_AC97,
+	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_AUDIO,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD8111},
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ESB_5,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH4},
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH6_3,
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_ICH6_18,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, INTELICH4},
 
 	{0,}
@@ -491,8 +450,38 @@ struct i810_card {
 /* extract register offset from codec struct */
 #define IO_REG_OFF(codec) (((struct i810_card *) codec->private_data)->ac97_id_map[codec->id])
 
+#define I810_IOREAD(size, type, card, off)				\
+({									\
+	type val;							\
+	if (card->use_mmio)						\
+		val=read##size(card->iobase_mmio+off);			\
+	else								\
+		val=in##size(card->iobase+off);				\
+	val;								\
+})
+
+#define I810_IOREADL(card, off)		I810_IOREAD(l, u32, card, off)
+#define I810_IOREADW(card, off)		I810_IOREAD(w, u16, card, off)
+#define I810_IOREADB(card, off)		I810_IOREAD(b, u8,  card, off)
+
+#define I810_IOWRITE(size, val, card, off)				\
+({									\
+	if (card->use_mmio)						\
+		write##size(val, card->iobase_mmio+off);		\
+	else								\
+		out##size(val, card->iobase+off);			\
+})
+
+#define I810_IOWRITEL(val, card, off)	I810_IOWRITE(l, val, card, off)
+#define I810_IOWRITEW(val, card, off)	I810_IOWRITE(w, val, card, off)
+#define I810_IOWRITEB(val, card, off)	I810_IOWRITE(b, val, card, off)
+
+#define GET_CIV(card, port) MODULOP2(I810_IOREADB((card), (port) + OFF_CIV), SG_LEN)
+#define GET_LVI(card, port) MODULOP2(I810_IOREADB((card), (port) + OFF_LVI), SG_LEN)
+
 /* set LVI from CIV */
-#define CIV_TO_LVI(port, off) outb((inb(port+OFF_CIV)+off) & 31, port+OFF_LVI)
+#define CIV_TO_LVI(card, port, off) \
+	I810_IOWRITEB(MODULOP2(GET_CIV((card), (port)) + (off), SG_LEN), (card), (port) + OFF_LVI)
 
 static struct i810_card *devs = NULL;
 
@@ -751,9 +740,9 @@ static inline unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 		return 0;
 
 	if (rec)
-		port = state->card->iobase + dmabuf->read_channel->port;
+		port = dmabuf->read_channel->port;
 	else
-		port = state->card->iobase + dmabuf->write_channel->port;
+		port = dmabuf->write_channel->port;
 
 	if(state->card->pci_id == PCI_DEVICE_ID_SI_7012) {
 		port_picb = port + OFF_SR;
@@ -762,8 +751,8 @@ static inline unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 		port_picb = port + OFF_PICB;
 
 	do {
-		civ = inb(port+OFF_CIV) & 31;
-		offset = inw(port_picb);
+		civ = GET_CIV(state->card, port);
+		offset = I810_IOREADW(state->card, port_picb);
 		/* Must have a delay here! */ 
 		if(offset == 0)
 			udelay(1);
@@ -782,7 +771,7 @@ static inline unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 		 * that we won't have to worry about the chip still being
 		 * out of sync with reality ;-)
 		 */
-	} while (civ != (inb(port+OFF_CIV) & 31) || offset != inw(port_picb));
+	} while (civ != GET_CIV(state->card, port) || offset != I810_IOREADW(state->card, port_picb));
 		 
 	return (((civ + 1) * dmabuf->fragsize - (bytes * offset))
 		% dmabuf->dmasize);
@@ -795,15 +784,15 @@ static inline void __stop_adc(struct i810_state *state)
 	struct i810_card *card = state->card;
 
 	dmabuf->enable &= ~ADC_RUNNING;
-	outb(0, card->iobase + PI_CR);
+	I810_IOWRITEB(0, card, PI_CR);
 	// wait for the card to acknowledge shutdown
-	while( inb(card->iobase + PI_CR) != 0 ) ;
+	while( I810_IOREADB(card, PI_CR) != 0 ) ;
 	// now clear any latent interrupt bits (like the halt bit)
 	if(card->pci_id == PCI_DEVICE_ID_SI_7012)
-		outb( inb(card->iobase + PI_PICB), card->iobase + PI_PICB );
+		I810_IOWRITEB( I810_IOREADB(card, PI_PICB), card, PI_PICB );
 	else
-		outb( inb(card->iobase + PI_SR), card->iobase + PI_SR );
-	outl( inl(card->iobase + GLOB_STA) & INT_PI, card->iobase + GLOB_STA);
+		I810_IOWRITEB( I810_IOREADB(card, PI_SR), card, PI_SR );
+	I810_IOWRITEL( I810_IOREADL(card, GLOB_STA) & INT_PI, card, GLOB_STA);
 }
 
 static void stop_adc(struct i810_state *state)
@@ -824,7 +813,7 @@ static inline void __start_adc(struct i810_state *state)
 	    (dmabuf->trigger & PCM_ENABLE_INPUT)) {
 		dmabuf->enable |= ADC_RUNNING;
 		// Interrupt enable, LVI enable, DMA enable
-		outb(0x10 | 0x04 | 0x01, state->card->iobase + PI_CR);
+		I810_IOWRITEB(0x10 | 0x04 | 0x01, state->card, PI_CR);
 	}
 }
 
@@ -845,15 +834,15 @@ static inline void __stop_dac(struct i810_state *state)
 	struct i810_card *card = state->card;
 
 	dmabuf->enable &= ~DAC_RUNNING;
-	outb(0, card->iobase + PO_CR);
+	I810_IOWRITEB(0, card, PO_CR);
 	// wait for the card to acknowledge shutdown
-	while( inb(card->iobase + PO_CR) != 0 ) ;
+	while( I810_IOREADB(card, PO_CR) != 0 ) ;
 	// now clear any latent interrupt bits (like the halt bit)
 	if(card->pci_id == PCI_DEVICE_ID_SI_7012)
-		outb( inb(card->iobase + PO_PICB), card->iobase + PO_PICB );
+		I810_IOWRITEB( I810_IOREADB(card, PO_PICB), card, PO_PICB );
 	else
-		outb( inb(card->iobase + PO_SR), card->iobase + PO_SR );
-	outl( inl(card->iobase + GLOB_STA) & INT_PO, card->iobase + GLOB_STA);
+		I810_IOWRITEB( I810_IOREADB(card, PO_SR), card, PO_SR );
+	I810_IOWRITEL( I810_IOREADL(card, GLOB_STA) & INT_PO, card, GLOB_STA);
 }
 
 static void stop_dac(struct i810_state *state)
@@ -874,7 +863,7 @@ static inline void __start_dac(struct i810_state *state)
 	    (dmabuf->trigger & PCM_ENABLE_OUTPUT)) {
 		dmabuf->enable |= DAC_RUNNING;
 		// Interrupt enable, LVI enable, DMA enable
-		outb(0x10 | 0x04 | 0x01, state->card->iobase + PO_CR);
+		I810_IOWRITEB(0x10 | 0x04 | 0x01, state->card, PO_CR);
 	}
 }
 static void start_dac(struct i810_state *state)
@@ -992,6 +981,7 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 	dmabuf->numfrag = SG_LEN;
 	dmabuf->fragsize = dmabuf->dmasize/dmabuf->numfrag;
 	dmabuf->fragsamples = dmabuf->fragsize >> 1;
+	dmabuf->fragshift = ffs(dmabuf->fragsize) - 1;
 	dmabuf->userfragsize = dmabuf->ossfragsize;
 	dmabuf->userfrags = dmabuf->dmasize/dmabuf->ossfragsize;
 
@@ -999,16 +989,12 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 
 	if(dmabuf->ossmaxfrags == 4) {
 		fragint = 8;
-		dmabuf->fragshift = 2;
 	} else if (dmabuf->ossmaxfrags == 8) {
 		fragint = 4;
-		dmabuf->fragshift = 3;
 	} else if (dmabuf->ossmaxfrags == 16) {
 		fragint = 2;
-		dmabuf->fragshift = 4;
 	} else {
 		fragint = 1;
-		dmabuf->fragshift = 5;
 	}
 	/*
 	 *	Now set up the ring 
@@ -1040,12 +1026,12 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 			sg++;
 		}
 		spin_lock_irqsave(&state->card->lock, flags);
-		outb(2, state->card->iobase+c->port+OFF_CR);   /* reset DMA machine */
-		while( inb(state->card->iobase+c->port+OFF_CR) & 0x02 ) ;
-		outl((u32)state->card->chandma +
+		I810_IOWRITEB(2, state->card, c->port+OFF_CR);   /* reset DMA machine */
+		while( I810_IOREADB(state->card, c->port+OFF_CR) & 0x02 ) ;
+		I810_IOWRITEL((u32)state->card->chandma +
 		    c->num*sizeof(struct i810_channel),
-		    state->card->iobase+c->port+OFF_BDBAR);
-		CIV_TO_LVI(state->card->iobase+c->port, 0);
+		    state->card, c->port+OFF_BDBAR);
+		CIV_TO_LVI(state->card, c->port, 0);
 
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
@@ -1072,41 +1058,40 @@ static void __i810_update_lvi(struct i810_state *state, int rec)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	int x, port;
-	
-	port = state->card->iobase;
-	if(rec)
-		port += dmabuf->read_channel->port;
-	else
-		port += dmabuf->write_channel->port;
+	int trigger;
+	int count, fragsize;
+	void (*start)(struct i810_state *);
 
-	/* if we are currently stopped, then our CIV is actually set to our
-	 * *last* sg segment and we are ready to wrap to the next.  However,
-	 * if we set our LVI to the last sg segment, then it won't wrap to
-	 * the next sg segment, it won't even get a start.  So, instead, when
-	 * we are stopped, we set both the LVI value and also we increment
-	 * the CIV value to the next sg segment to be played so that when
-	 * we call start_{dac,adc}, things will operate properly
-	 */
-	if (!dmabuf->enable && dmabuf->ready) {
-		if(rec && dmabuf->count < dmabuf->dmasize &&
-		   (dmabuf->trigger & PCM_ENABLE_INPUT))
-		{
-			CIV_TO_LVI(port, 1);
-			__start_adc(state);
-			while( !(inb(port + OFF_CR) & ((1<<4) | (1<<2))) ) ;
-		} else if (!rec && dmabuf->count &&
-			   (dmabuf->trigger & PCM_ENABLE_OUTPUT))
-		{
-			CIV_TO_LVI(port, 1);
-			__start_dac(state);
-			while( !(inb(port + OFF_CR) & ((1<<4) | (1<<2))) ) ;
-		}
+	count = dmabuf->count;
+	if (rec) {
+		port = dmabuf->read_channel->port;
+		trigger = PCM_ENABLE_INPUT;
+		start = __start_adc;
+		count = dmabuf->dmasize - count;
+	} else {
+		port = dmabuf->write_channel->port;
+		trigger = PCM_ENABLE_OUTPUT;
+		start = __start_dac;
 	}
 
-	/* swptr - 1 is the tail of our transfer */
-	x = (dmabuf->dmasize + dmabuf->swptr - 1) % dmabuf->dmasize;
-	x /= dmabuf->fragsize;
-	outb(x, port+OFF_LVI);
+	/* Do not process partial fragments. */
+	fragsize = dmabuf->fragsize;
+	if (count < fragsize)
+		return;
+
+	if (!dmabuf->enable && dmabuf->ready) {
+		if (!(dmabuf->trigger & trigger))
+			return;
+
+		start(state);
+		while (!(I810_IOREADB(state->card, port + OFF_CR) & ((1<<4) | (1<<2))))
+			;
+	}
+
+	/* MASKP2(swptr, fragsize) - 1 is the tail of our transfer */
+	x = MODULOP2(MASKP2(dmabuf->swptr, fragsize) - 1, dmabuf->dmasize);
+	x >>= dmabuf->fragshift;
+	I810_IOWRITEB(x, state->card, port + OFF_LVI);
 }
 
 static void i810_update_lvi(struct i810_state *state, int rec)
@@ -1126,13 +1111,17 @@ static void i810_update_ptr(struct i810_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	unsigned hwptr;
+	unsigned fragmask, dmamask;
 	int diff;
 
-	/* error handling and process wake up for DAC */
+	fragmask = MASKP2(~0, dmabuf->fragsize);
+	dmamask = MODULOP2(~0, dmabuf->dmasize);
+
+	/* error handling and process wake up for ADC */
 	if (dmabuf->enable == ADC_RUNNING) {
 		/* update hardware pointer */
-		hwptr = i810_get_dma_addr(state, 1);
-		diff = (dmabuf->dmasize + hwptr - dmabuf->hwptr) % dmabuf->dmasize;
+		hwptr = i810_get_dma_addr(state, 1) & fragmask;
+		diff = (hwptr - dmabuf->hwptr) & dmamask;
 #if defined(DEBUG_INTERRUPTS) || defined(DEBUG_MMAP)
 		printk("ADC HWP %d,%d,%d\n", hwptr, dmabuf->hwptr, diff);
 #endif
@@ -1144,20 +1133,20 @@ static void i810_update_ptr(struct i810_state *state)
 			/* this is normal for the end of a read */
 			/* only give an error if we went past the */
 			/* last valid sg entry */
-			if((inb(state->card->iobase + PI_CIV) & 31) !=
-			   (inb(state->card->iobase + PI_LVI) & 31)) {
+			if (GET_CIV(state->card, PI_BASE) !=
+			    GET_LVI(state->card, PI_BASE)) {
 				printk(KERN_WARNING "i810_audio: DMA overrun on read\n");
 				dmabuf->error++;
 			}
 		}
-		if (dmabuf->count > dmabuf->userfragsize)
+		if (diff)
 			wake_up(&dmabuf->wait);
 	}
 	/* error handling and process wake up for DAC */
 	if (dmabuf->enable == DAC_RUNNING) {
 		/* update hardware pointer */
-		hwptr = i810_get_dma_addr(state, 0);
-		diff = (dmabuf->dmasize + hwptr - dmabuf->hwptr) % dmabuf->dmasize;
+		hwptr = i810_get_dma_addr(state, 0) & fragmask;
+		diff = (hwptr - dmabuf->hwptr) & dmamask;
 #if defined(DEBUG_INTERRUPTS) || defined(DEBUG_MMAP)
 		printk("DAC HWP %d,%d,%d\n", hwptr, dmabuf->hwptr, diff);
 #endif
@@ -1169,18 +1158,18 @@ static void i810_update_ptr(struct i810_state *state)
 			/* this is normal for the end of a write */
 			/* only give an error if we went past the */
 			/* last valid sg entry */
-			if((inb(state->card->iobase + PO_CIV) & 31) !=
-			   (inb(state->card->iobase + PO_LVI) & 31)) {
+			if (GET_CIV(state->card, PO_BASE) !=
+			    GET_LVI(state->card, PO_BASE)) {
 				printk(KERN_WARNING "i810_audio: DMA overrun on write\n");
 				printk("i810_audio: CIV %d, LVI %d, hwptr %x, "
 					"count %d\n",
-					inb(state->card->iobase + PO_CIV) & 31,
-					inb(state->card->iobase + PO_LVI) & 31,
+					GET_CIV(state->card, PO_BASE),
+					GET_LVI(state->card, PO_BASE),
 					dmabuf->hwptr, dmabuf->count);
 				dmabuf->error++;
 			}
 		}
-		if (dmabuf->count < (dmabuf->dmasize-dmabuf->userfragsize))
+		if (diff)
 			wake_up(&dmabuf->wait);
 	}
 }
@@ -1197,7 +1186,6 @@ static inline int i810_get_free_write_space(struct i810_state *state)
 		dmabuf->swptr = dmabuf->hwptr;
 	}
 	free = dmabuf->dmasize - dmabuf->count;
-	free -= (dmabuf->hwptr % dmabuf->fragsize);
 	if(free < 0)
 		return(0);
 	return(free);
@@ -1215,10 +1203,25 @@ static inline int i810_get_available_read_data(struct i810_state *state)
 		dmabuf->swptr = dmabuf->hwptr;
 	}
 	avail = dmabuf->count;
-	avail -= (dmabuf->hwptr % dmabuf->fragsize);
 	if(avail < 0)
 		return(0);
 	return(avail);
+}
+
+static inline void fill_partial_frag(struct dmabuf *dmabuf)
+{
+	unsigned fragsize;
+	unsigned swptr, len;
+
+	fragsize = dmabuf->fragsize;
+	swptr = dmabuf->swptr;
+	len = fragsize - MODULOP2(dmabuf->swptr, fragsize);
+	if (len == fragsize)
+		return;
+
+	memset(dmabuf->rawbuf + swptr, '\0', len);
+	dmabuf->swptr = MODULOP2(swptr + len, dmabuf->dmasize);
+	dmabuf->count += len;
 }
 
 static int drain_dac(struct i810_state *state, int signals_allowed)
@@ -1235,30 +1238,28 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
 		stop_dac(state);
 		return 0;
 	}
+
+	spin_lock_irqsave(&state->card->lock, flags);
+
+	fill_partial_frag(dmabuf);
+
+	/* 
+	 * This will make sure that our LVI is correct, that our
+	 * pointer is updated, and that the DAC is running.  We
+	 * have to force the setting of dmabuf->trigger to avoid
+	 * any possible deadlocks.
+	 */
+	dmabuf->trigger = PCM_ENABLE_OUTPUT;
+	__i810_update_lvi(state, 0);
+
+	spin_unlock_irqrestore(&state->card->lock, flags);
+
 	add_wait_queue(&dmabuf->wait, &wait);
 	for (;;) {
 
 		spin_lock_irqsave(&state->card->lock, flags);
 		i810_update_ptr(state);
 		count = dmabuf->count;
-		spin_unlock_irqrestore(&state->card->lock, flags);
-
-		if (count <= 0)
-			break;
-
-		/* 
-		 * This will make sure that our LVI is correct, that our
-		 * pointer is updated, and that the DAC is running.  We
-		 * have to force the setting of dmabuf->trigger to avoid
-		 * any possible deadlocks.
-		 */
-		if(!dmabuf->enable) {
-			dmabuf->trigger = PCM_ENABLE_OUTPUT;
-			i810_update_lvi(state,0);
-		}
-                if (signal_pending(current) && signals_allowed) {
-                        break;
-                }
 
 		/* It seems that we have to set the current state to
 		 * TASK_INTERRUPTIBLE every time to make the process
@@ -1269,7 +1270,17 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
 		 * instead of actually sleeping and waiting for an
 		 * interrupt to wake us up!
 		 */
-		set_current_state(TASK_INTERRUPTIBLE);
+		__set_current_state(signals_allowed ?
+				    TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE);
+		spin_unlock_irqrestore(&state->card->lock, flags);
+
+		if (count <= 0)
+			break;
+
+                if (signal_pending(current) && signals_allowed) {
+                        break;
+                }
+
 		/*
 		 * set the timeout to significantly longer than it *should*
 		 * take for the DAC to drain the DMA buffer
@@ -1301,7 +1312,7 @@ static void i810_channel_interrupt(struct i810_card *card)
 		struct i810_state *state = card->states[i];
 		struct i810_channel *c;
 		struct dmabuf *dmabuf;
-		unsigned long port = card->iobase;
+		unsigned long port;
 		u16 status;
 		
 		if(!state)
@@ -1316,12 +1327,12 @@ static void i810_channel_interrupt(struct i810_card *card)
 		} else	/* This can occur going from R/W to close */
 			continue;
 		
-		port+=c->port;
+		port = c->port;
 
 		if(card->pci_id == PCI_DEVICE_ID_SI_7012)
-			status = inw(port + OFF_PICB);
+			status = I810_IOREADW(card, port + OFF_PICB);
 		else
-			status = inw(port + OFF_SR);
+			status = I810_IOREADW(card, port + OFF_SR);
 
 #ifdef DEBUG_INTERRUPTS
 		printk("NUM %d PORT %X IRQ ( ST%d ", c->num, c->port, status);
@@ -1350,12 +1361,11 @@ static void i810_channel_interrupt(struct i810_card *card)
 			if(status & DMA_INT_DCH)
 				printk("DCH -");
 #endif
-			if(dmabuf->enable & DAC_RUNNING)
-				count = dmabuf->count;
-			else
-				count = dmabuf->dmasize - dmabuf->count;
-			if(count > 0) {
-				outb(inb(port+OFF_CR) | 1, port+OFF_CR);
+			count = dmabuf->count;
+			if(dmabuf->enable & ADC_RUNNING)
+				count = dmabuf->dmasize - count;
+			if (count >= (int)dmabuf->fragsize) {
+				I810_IOWRITEB(I810_IOREADB(card, port+OFF_CR) | 1, card, port+OFF_CR);
 #ifdef DEBUG_INTERRUPTS
 				printk(" CONTINUE ");
 #endif
@@ -1371,9 +1381,9 @@ static void i810_channel_interrupt(struct i810_card *card)
 			}
 		}
 		if(card->pci_id == PCI_DEVICE_ID_SI_7012)
-			outw(status & DMA_INT_MASK, port + OFF_PICB);
+			I810_IOWRITEW(status & DMA_INT_MASK, card, port + OFF_PICB);
 		else
-			outw(status & DMA_INT_MASK, port + OFF_SR);
+			I810_IOWRITEW(status & DMA_INT_MASK, card, port + OFF_SR);
 	}
 #ifdef DEBUG_INTERRUPTS
 	printk(")\n");
@@ -1387,7 +1397,7 @@ static irqreturn_t i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_lock(&card->lock);
 
-	status = inl(card->iobase + GLOB_STA);
+	status = I810_IOREADL(card, GLOB_STA);
 
 	if(!(status & INT_MASK)) 
 	{
@@ -1399,7 +1409,7 @@ static irqreturn_t i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		i810_channel_interrupt(card);
 
  	/* clear 'em */
-	outl(status & INT_MASK, card->iobase + GLOB_STA);
+	I810_IOWRITEL(status & INT_MASK, card, GLOB_STA);
 	spin_unlock(&card->lock);
 	return IRQ_HANDLED;
 }
@@ -1408,15 +1418,16 @@ static irqreturn_t i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
    waiting to be copied to the user's buffer.  It is filled by the dma
    machine and drained by this loop. */
 
-static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t i810_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct i810_state *state = (struct i810_state *)file->private_data;
-	struct i810_card *card=state ? state->card : 0;
+	struct i810_card *card=state ? state->card : NULL;
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;
 	unsigned int swptr;
 	int cnt;
+	int pending;
         DECLARE_WAITQUEUE(waita, current);
 
 #ifdef DEBUG2
@@ -1442,6 +1453,8 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 		return -EFAULT;
 	ret = 0;
 
+	pending = 0;
+
         add_wait_queue(&dmabuf->wait, &waita);
 	while (count > 0) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -1455,8 +1468,8 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
                         }
                         continue;
                 }
-		swptr = dmabuf->swptr;
 		cnt = i810_get_available_read_data(state);
+		swptr = dmabuf->swptr;
 		// this is to make the copy_to_user simpler below
 		if(cnt > (dmabuf->dmasize - swptr))
 			cnt = dmabuf->dmasize - swptr;
@@ -1464,15 +1477,6 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 
 		if (cnt > count)
 			cnt = count;
-		/* Lop off the last two bits to force the code to always
-		 * write in full samples.  This keeps software that sets
-		 * O_NONBLOCK but doesn't check the return value of the
-		 * write call from getting things out of state where they
-		 * think a full 4 byte sample was written when really only
-		 * a portion was, resulting in odd sound and stereo
-		 * hysteresis.
-		 */
-		cnt &= ~0x3;
 		if (cnt <= 0) {
 			unsigned long tmo;
 			/*
@@ -1526,7 +1530,7 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 			goto done;
 		}
 
-		swptr = (swptr + cnt) % dmabuf->dmasize;
+		swptr = MODULOP2(swptr + cnt, dmabuf->dmasize);
 
 		spin_lock_irqsave(&card->lock, flags);
 
@@ -1535,7 +1539,7 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
                         continue;
                 }
 		dmabuf->swptr = swptr;
-		dmabuf->count -= cnt;
+		pending = dmabuf->count -= cnt;
 		spin_unlock_irqrestore(&card->lock, flags);
 
 		count -= cnt;
@@ -1543,7 +1547,9 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 		ret += cnt;
 	}
  done:
-	i810_update_lvi(state,1);
+	pending = dmabuf->dmasize - pending;
+	if (dmabuf->enable || pending >= dmabuf->userfragsize)
+		i810_update_lvi(state, 1);
         set_current_state(TASK_RUNNING);
         remove_wait_queue(&dmabuf->wait, &waita);
 
@@ -1552,15 +1558,16 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 
 /* in this loop, dmabuf.count signifies the amount of data that is waiting to be dma to
    the soundcard.  it is drained by the dma machine and filled by this loop. */
-static ssize_t i810_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t i810_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct i810_state *state = (struct i810_state *)file->private_data;
-	struct i810_card *card=state ? state->card : 0;
+	struct i810_card *card=state ? state->card : NULL;
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;
 	unsigned int swptr = 0;
-	int cnt, x;
+	int pending;
+	int cnt;
         DECLARE_WAITQUEUE(waita, current);
 
 #ifdef DEBUG2
@@ -1585,6 +1592,8 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 		return -EFAULT;
 	ret = 0;
 
+	pending = 0;
+
         add_wait_queue(&dmabuf->wait, &waita);
 	while (count > 0) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -1599,8 +1608,8 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
                         continue;
                 }
 
-		swptr = dmabuf->swptr;
 		cnt = i810_get_free_write_space(state);
+		swptr = dmabuf->swptr;
 		/* Bound the maximum size to how much we can copy to the
 		 * dma buffer before we hit the end.  If we have more to
 		 * copy then it will get done in a second pass of this
@@ -1615,15 +1624,6 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 #endif
 		if (cnt > count)
 			cnt = count;
-		/* Lop off the last two bits to force the code to always
-		 * write in full samples.  This keeps software that sets
-		 * O_NONBLOCK but doesn't check the return value of the
-		 * write call from getting things out of state where they
-		 * think a full 4 byte sample was written when really only
-		 * a portion was, resulting in odd sound and stereo
-		 * hysteresis.
-		 */
-		cnt &= ~0x3;
 		if (cnt <= 0) {
 			unsigned long tmo;
 			// There is data waiting to be played
@@ -1668,7 +1668,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 			goto ret;
 		}
 
-		swptr = (swptr + cnt) % dmabuf->dmasize;
+		swptr = MODULOP2(swptr + cnt, dmabuf->dmasize);
 
 		spin_lock_irqsave(&state->card->lock, flags);
                 if (PM_SUSPENDED(card)) {
@@ -1677,19 +1677,16 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
                 }
 
 		dmabuf->swptr = swptr;
-		dmabuf->count += cnt;
+		pending = dmabuf->count += cnt;
 
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 	}
-	if (swptr % dmabuf->fragsize) {
-		x = dmabuf->fragsize - (swptr % dmabuf->fragsize);
-		memset(dmabuf->rawbuf + swptr, '\0', x);
-	}
 ret:
-	i810_update_lvi(state,0);
+	if (dmabuf->enable || pending >= dmabuf->userfragsize)
+		i810_update_lvi(state, 0);
         set_current_state(TASK_RUNNING);
         remove_wait_queue(&dmabuf->wait, &waita);
 
@@ -1783,9 +1780,11 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 	unsigned int i_glob_cnt;
 	int val = 0, ret;
 	struct ac97_codec *codec = state->card->ac97_codec[0];
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 #ifdef DEBUG
-	printk("i810_audio: i810_ioctl, arg=0x%x, cmd=", arg ? *(int *)arg : 0);
+	printk("i810_audio: i810_ioctl, arg=0x%x, cmd=", arg ? *p : 0);
 #endif
 
 	switch (cmd) 
@@ -1794,7 +1793,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #ifdef DEBUG
 		printk("OSS_GETVERSION\n");
 #endif
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 
 	case SNDCTL_DSP_RESET:
 #ifdef DEBUG
@@ -1810,13 +1809,13 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			__stop_adc(state);
 		}
 		if (c != NULL) {
-			outb(2, state->card->iobase+c->port+OFF_CR);   /* reset DMA machine */
-			while ( inb(state->card->iobase+c->port+OFF_CR) & 2 )
+			I810_IOWRITEB(2, state->card, c->port+OFF_CR);   /* reset DMA machine */
+			while ( I810_IOREADB(state->card, c->port+OFF_CR) & 2 )
 				cpu_relax();
-			outl((u32)state->card->chandma +
+			I810_IOWRITEL((u32)state->card->chandma +
 			    c->num*sizeof(struct i810_channel),
-			    state->card->iobase+c->port+OFF_BDBAR);
-			CIV_TO_LVI(state->card->iobase+c->port, 0);
+			    state->card, c->port+OFF_BDBAR);
+			CIV_TO_LVI(state->card, c->port, 0);
 		}
 
 		spin_unlock_irqrestore(&state->card->lock, flags);
@@ -1841,7 +1840,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SPEED\n");
 #endif
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val >= 0) {
 			if (file->f_mode & FMODE_WRITE) {
@@ -1879,7 +1878,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				spin_unlock_irqrestore(&state->card->lock, flags);
 			}
 		}
-		return put_user(dmabuf->rate, (int *)arg);
+		return put_user(dmabuf->rate, p);
 
 	case SNDCTL_DSP_STEREO: /* set stereo or mono channel */
 #ifdef DEBUG
@@ -1891,7 +1890,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		if (dmabuf->enable & ADC_RUNNING) {
 			stop_adc(state);
 		}
-		return put_user(1, (int *)arg);
+		return put_user(1, p);
 
 	case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {
@@ -1905,25 +1904,25 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETBLKSIZE %d\n", dmabuf->userfragsize);
 #endif
-		return put_user(dmabuf->userfragsize, (int *)arg);
+		return put_user(dmabuf->userfragsize, p);
 
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask of supported sample format*/
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETFMTS\n");
 #endif
-		return put_user(AFMT_S16_LE, (int *)arg);
+		return put_user(AFMT_S16_LE, p);
 
 	case SNDCTL_DSP_SETFMT: /* Select sample format */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SETFMT\n");
 #endif
-		return put_user(AFMT_S16_LE, (int *)arg);
+		return put_user(AFMT_S16_LE, p);
 
 	case SNDCTL_DSP_CHANNELS:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_CHANNELS\n");
 #endif
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		if (val > 0) {
@@ -1934,19 +1933,19 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				stop_adc(state);
 			}
 		} else {
-			return put_user(state->card->channels, (int *)arg);
+			return put_user(state->card->channels, p);
 		}
 
 		/* ICH and ICH0 only support 2 channels */
-		if ( state->card->pci_id == PCI_DEVICE_ID_INTEL_82801 
-		     || state->card->pci_id == PCI_DEVICE_ID_INTEL_82901) 
-			return put_user(2, (int *)arg);
+		if ( state->card->pci_id == PCI_DEVICE_ID_INTEL_82801AA_5
+		     || state->card->pci_id == PCI_DEVICE_ID_INTEL_82801AB_5) 
+			return put_user(2, p);
 	
 		/* Multi-channel support was added with ICH2. Bits in */
 		/* Global Status and Global Control register are now  */
 		/* used to indicate this.                             */
 
-                i_glob_cnt = inl(state->card->iobase + GLOB_CNT);
+                i_glob_cnt = I810_IOREADL(state->card, GLOB_CNT);
 
 		/* Current # of channels enabled */
 		if ( i_glob_cnt & 0x0100000 )
@@ -1958,14 +1957,14 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 
 		switch ( val ) {
 			case 2: /* 2 channels is always supported */
-				outl(i_glob_cnt & 0xffcfffff,
-				     state->card->iobase + GLOB_CNT);
+				I810_IOWRITEL(i_glob_cnt & 0xffcfffff,
+				     state->card, GLOB_CNT);
 				/* Do we need to change mixer settings????  */
 				break;
 			case 4: /* Supported on some chipsets, better check first */
 				if ( state->card->channels >= 4 ) {
-					outl((i_glob_cnt & 0xffcfffff) | 0x100000,
-					      state->card->iobase + GLOB_CNT);
+					I810_IOWRITEL((i_glob_cnt & 0xffcfffff) | 0x100000,
+					      state->card, GLOB_CNT);
 					/* Do we need to change mixer settings??? */
 				} else {
 					val = ret;
@@ -1973,8 +1972,8 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				break;
 			case 6: /* Supported on some chipsets, better check first */
 				if ( state->card->channels >= 6 ) {
-					outl((i_glob_cnt & 0xffcfffff) | 0x200000,
-					      state->card->iobase + GLOB_CNT);
+					I810_IOWRITEL((i_glob_cnt & 0xffcfffff) | 0x200000,
+					      state->card, GLOB_CNT);
 					/* Do we need to change mixer settings??? */
 				} else {
 					val = ret;
@@ -1985,7 +1984,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				break;
 		}
 
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
 	case SNDCTL_DSP_POST: /* the user has sent all data and is notifying us */
 		/* we update the swptr to the end of the last sg segment then return */
@@ -2004,7 +2003,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 	case SNDCTL_DSP_SUBDIVIDE:
 		if (dmabuf->subdivision)
 			return -EINVAL;
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != 1 && val != 2 && val != 4)
 			return -EINVAL;
@@ -2016,7 +2015,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		return 0;
 
 	case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		dmabuf->ossfragsize = 1<<(val & 0xffff);
@@ -2089,7 +2088,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		printk("SNDCTL_DSP_GETOSPACE %d, %d, %d, %d\n", abinfo.bytes,
 			abinfo.fragsize, abinfo.fragments, abinfo.fragstotal);
 #endif
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_WRITE))
@@ -2111,7 +2110,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		printk("SNDCTL_DSP_GETOPTR %d, %d, %d, %d\n", cinfo.bytes,
 			cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -2128,7 +2127,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		printk("SNDCTL_DSP_GETISPACE %d, %d, %d, %d\n", abinfo.bytes,
 			abinfo.fragsize, abinfo.fragments, abinfo.fragstotal);
 #endif
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
@@ -2150,7 +2149,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		printk("SNDCTL_DSP_GETIPTR %d, %d, %d, %d\n", cinfo.bytes,
 			cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_NONBLOCK:
 #ifdef DEBUG
@@ -2164,21 +2163,28 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		printk("SNDCTL_DSP_GETCAPS\n");
 #endif
 	    return put_user(DSP_CAP_REALTIME|DSP_CAP_TRIGGER|DSP_CAP_MMAP|DSP_CAP_BIND,
-			    (int *)arg);
+			    p);
 
 	case SNDCTL_DSP_GETTRIGGER:
 		val = 0;
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETTRIGGER 0x%x\n", dmabuf->trigger);
 #endif
-		return put_user(dmabuf->trigger, (int *)arg);
+		return put_user(dmabuf->trigger, p);
 
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 #if defined(DEBUG) || defined(DEBUG_MMAP)
 		printk("SNDCTL_DSP_SETTRIGGER 0x%x\n", val);
 #endif
+		/* silently ignore invalid PCM_ENABLE_xxx bits,
+		 * like the other drivers do
+		 */
+		if (!(file->f_mode & FMODE_READ ))
+			val &= ~PCM_ENABLE_INPUT;
+		if (!(file->f_mode & FMODE_WRITE ))
+			val &= ~PCM_ENABLE_OUTPUT;
 		if((file->f_mode & FMODE_READ) && !(val & PCM_ENABLE_INPUT) && dmabuf->enable == ADC_RUNNING) {
 			stop_adc(state);
 		}
@@ -2186,7 +2192,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			stop_dac(state);
 		}
 		dmabuf->trigger = val;
-		if((file->f_mode & FMODE_WRITE) && (val & PCM_ENABLE_OUTPUT) && !(dmabuf->enable & DAC_RUNNING)) {
+		if((val & PCM_ENABLE_OUTPUT) && !(dmabuf->enable & DAC_RUNNING)) {
 			if (!dmabuf->write_channel) {
 				dmabuf->ready = 0;
 				dmabuf->write_channel = state->card->alloc_pcm_channel(state->card);
@@ -2202,12 +2208,12 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 				dmabuf->swptr = dmabuf->hwptr;
 				dmabuf->count = i810_get_free_write_space(state);
 				dmabuf->swptr = (dmabuf->swptr + dmabuf->count) % dmabuf->dmasize;
-				__i810_update_lvi(state, 0);
 				spin_unlock_irqrestore(&state->card->lock, flags);
-			} else
-				start_dac(state);
+			}
+			i810_update_lvi(state, 0);
+			start_dac(state);
 		}
-		if((file->f_mode & FMODE_READ) && (val & PCM_ENABLE_INPUT) && !(dmabuf->enable & ADC_RUNNING)) {
+		if((val & PCM_ENABLE_INPUT) && !(dmabuf->enable & ADC_RUNNING)) {
 			if (!dmabuf->read_channel) {
 				dmabuf->ready = 0;
 				dmabuf->read_channel = state->card->alloc_rec_pcm_channel(state->card);
@@ -2244,31 +2250,31 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETODELAY %d\n", dmabuf->count);
 #endif
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
 	case SOUND_PCM_READ_RATE:
 #ifdef DEBUG
 		printk("SOUND_PCM_READ_RATE %d\n", dmabuf->rate);
 #endif
-		return put_user(dmabuf->rate, (int *)arg);
+		return put_user(dmabuf->rate, p);
 
 	case SOUND_PCM_READ_CHANNELS:
 #ifdef DEBUG
 		printk("SOUND_PCM_READ_CHANNELS\n");
 #endif
-		return put_user(2, (int *)arg);
+		return put_user(2, p);
 
 	case SOUND_PCM_READ_BITS:
 #ifdef DEBUG
 		printk("SOUND_PCM_READ_BITS\n");
 #endif
-		return put_user(AFMT_S16_LE, (int *)arg);
+		return put_user(AFMT_S16_LE, p);
 
 	case SNDCTL_DSP_SETSPDIF: /* Set S/PDIF Control register */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SETSPDIF\n");
 #endif
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		/* Check to make sure the codec supports S/PDIF transmitter */
@@ -2291,13 +2297,13 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		else 
 			printk(KERN_WARNING "i810_audio: S/PDIF transmitter not avalible.\n");
 #endif
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
 	case SNDCTL_DSP_GETSPDIF: /* Get S/PDIF Control register */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETSPDIF\n");
 #endif
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 
 		/* Check to make sure the codec supports S/PDIF transmitter */
@@ -2310,14 +2316,14 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		} else {
 			val = i810_ac97_get(codec, AC97_SPDIF_CONTROL);
 		}
-		//return put_user((val & 0xcfff), (int *)arg);
-		return put_user(val, (int *)arg);
+		//return put_user((val & 0xcfff), p);
+		return put_user(val, p);
    			
 	case SNDCTL_DSP_GETCHANNELMASK:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETCHANNELMASK\n");
 #endif
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		
 		/* Based on AC'97 DAC support, not ICH hardware */
@@ -2330,13 +2336,13 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		if ( state->card->ac97_features & 0x0140 )
 			val |= DSP_BIND_CENTER_LFE;
 
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 
 	case SNDCTL_DSP_BIND_CHANNEL:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_BIND_CHANNEL\n");
 #endif
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if ( val == DSP_BIND_QUERY ) {
 			val = DSP_BIND_FRONT; /* Always report this as being enabled */
@@ -2404,7 +2410,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 					val &= ~DSP_BIND_CENTER_LFE;
 			}
 		}
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 		
 	case SNDCTL_DSP_MAPINBUF:
 	case SNDCTL_DSP_MAPOUTBUF:
@@ -2496,8 +2502,8 @@ found_virt:
 		} else {
 			i810_set_dac_rate(state, 8000);
 			/* Put the ACLink in 2 channel mode by default */
-			i = inl(card->iobase + GLOB_CNT);
-			outl(i & 0xffcfffff, card->iobase + GLOB_CNT);
+			i = I810_IOREADL(card, GLOB_CNT);
+			I810_IOWRITEL(i & 0xffcfffff, card, GLOB_CNT);
 		}
 	}
 		
@@ -2588,7 +2594,7 @@ static u16 i810_ac97_get_io(struct ac97_codec *dev, u8 reg)
 	int count = 100;
 	u16 reg_set = IO_REG_OFF(dev) | (reg&0x7f);
 	
-	while(count-- && (inb(card->iobase + CAS) & 1)) 
+	while(count-- && (I810_IOREADB(card, CAS) & 1)) 
 		udelay(1);
 	
 	return inw(card->ac97base + reg_set);
@@ -2616,7 +2622,7 @@ static void i810_ac97_set_io(struct ac97_codec *dev, u8 reg, u16 data)
 	int count = 100;
 	u16 reg_set = IO_REG_OFF(dev) | (reg&0x7f);
 	
-	while(count-- && (inb(card->iobase + CAS) & 1)) 
+	while(count-- && (I810_IOREADB(card, CAS) & 1)) 
 		udelay(1);
 	
         outw(data, card->ac97base + reg_set);
@@ -2705,7 +2711,7 @@ static /*const*/ struct file_operations i810_mixer_fops = {
 
 static inline int i810_ac97_exists(struct i810_card *card, int ac97_number)
 {
-	u32 reg = inl(card->iobase + GLOB_STA);
+	u32 reg = I810_IOREADL(card, GLOB_STA);
 	switch (ac97_number) {
 	case 0:
 		return reg & (1<<8);
@@ -2747,6 +2753,26 @@ static int i810_ac97_probe_and_powerup(struct i810_card *card,struct ac97_codec 
 	return i;
 }
 
+static int is_new_ich(u16 pci_id)
+{
+	switch (pci_id) {
+	case PCI_DEVICE_ID_INTEL_82801DB_5:
+	case PCI_DEVICE_ID_INTEL_82801EB_5:
+	case PCI_DEVICE_ID_INTEL_ESB_5:
+	case PCI_DEVICE_ID_INTEL_ICH6_18:
+		return 1;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static inline int ich_use_mmio(struct i810_card *card)
+{
+	return is_new_ich(card->pci_id) && card->use_mmio;
+}
+
 /**
  *	i810_ac97_power_up_bus	-	bring up AC97 link
  *	@card : ICH audio device to power up
@@ -2756,7 +2782,7 @@ static int i810_ac97_probe_and_powerup(struct i810_card *card,struct ac97_codec 
  
 static int i810_ac97_power_up_bus(struct i810_card *card)
 {	
-	u32 reg = inl(card->iobase + GLOB_CNT);
+	u32 reg = I810_IOREADL(card, GLOB_CNT);
 	int i;
 	int primary_codec_id = 0;
 
@@ -2768,14 +2794,14 @@ static int i810_ac97_power_up_bus(struct i810_card *card)
 	reg&=~8;	/* ACLink on */
 	
 	/* At this point we deassert AC_RESET # */
-	outl(reg , card->iobase + GLOB_CNT);
+	I810_IOWRITEL(reg , card, GLOB_CNT);
 
 	/* We must now allow time for the Codec initialisation.
 	   600mS is the specified time */
 	   	
 	for(i=0;i<10;i++)
 	{
-		if((inl(card->iobase+GLOB_CNT)&4)==0)
+		if((I810_IOREADL(card, GLOB_CNT)&4)==0)
 			break;
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
@@ -2794,11 +2820,12 @@ static int i810_ac97_power_up_bus(struct i810_card *card)
 	 *	See if the primary codec comes ready. This must happen
 	 *	before we start doing DMA stuff
 	 */	
-	/* see i810_ac97_init for the next 7 lines (jsaw) */
-	inw(card->ac97base);
-	if ((card->pci_id == PCI_DEVICE_ID_INTEL_ICH4 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH5 ||
-	     card->pci_id == PCI_DEVICE_ID_INTEL_ESB_5 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH6_3)
-	    && (card->use_mmio)) {
+	/* see i810_ac97_init for the next 10 lines (jsaw) */
+	if (card->use_mmio)
+		readw(card->ac97base_mmio);
+	else
+		inw(card->ac97base);
+	if (ich_use_mmio(card)) {
 		primary_codec_id = (int) readl(card->iobase_mmio + SDM) & 0x3;
 		printk(KERN_INFO "i810_audio: Primary codec has ID %d\n",
 		       primary_codec_id);
@@ -2815,7 +2842,10 @@ static int i810_ac97_power_up_bus(struct i810_card *card)
 		else 
 			printk("no response.\n");
 	}
-	inw(card->ac97base);
+	if (card->use_mmio)
+		readw(card->ac97base_mmio);
+	else
+		inw(card->ac97base);
 	return 1;
 }
 
@@ -2840,15 +2870,15 @@ static int __devinit i810_ac97_init(struct i810_card *card)
 	/* to check....                                         */
 
 	card->channels = 2;
-	reg = inl(card->iobase + GLOB_STA);
+	reg = I810_IOREADL(card, GLOB_STA);
 	if ( reg & 0x0200000 )
 		card->channels = 6;
 	else if ( reg & 0x0100000 )
 		card->channels = 4;
 	printk(KERN_INFO "i810_audio: Audio Controller supports %d channels.\n", card->channels);
 	printk(KERN_INFO "i810_audio: Defaulting to base 2 channel mode.\n");
-	reg = inl(card->iobase + GLOB_CNT);
-	outl(reg & 0xffcfffff, card->iobase + GLOB_CNT);
+	reg = I810_IOREADL(card, GLOB_CNT);
+	I810_IOWRITEL(reg & 0xffcfffff, card, GLOB_CNT);
 		
 	for (num_ac97 = 0; num_ac97 < NR_AC97; num_ac97++) 
 		card->ac97_codec[num_ac97] = NULL;
@@ -2859,17 +2889,17 @@ static int __devinit i810_ac97_init(struct i810_card *card)
 	for (num_ac97 = 0; num_ac97 < nr_ac97_max; num_ac97++) {
 		/* codec reset */
 		printk(KERN_INFO "i810_audio: Resetting connection %d\n", num_ac97);
-		if (card->use_mmio) readw(card->ac97base_mmio + 0x80*num_ac97);
-		else inw(card->ac97base + 0x80*num_ac97);
+		if (card->use_mmio)
+			readw(card->ac97base_mmio + 0x80*num_ac97);
+		else
+			inw(card->ac97base + 0x80*num_ac97);
 
 		/* If we have the SDATA_IN Map Register, as on ICH4, we
 		   do not loop thru all possible codec IDs but thru all 
 		   possible IO channels. Bit 0:1 of SDM then holds the 
 		   last codec ID spoken to. 
 		*/
-		if ((card->pci_id == PCI_DEVICE_ID_INTEL_ICH4 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH5 ||
-		     card->pci_id == PCI_DEVICE_ID_INTEL_ESB_5 || card->pci_id == PCI_DEVICE_ID_INTEL_ICH6_3)
-		    && (card->use_mmio)) {
+		if (ich_use_mmio(card)) {
 			ac97_id = (int) readl(card->iobase_mmio + SDM) & 0x3;
 			printk(KERN_INFO "i810_audio: Connection %d with codec id %d\n",
 			       num_ac97, ac97_id);
@@ -3065,7 +3095,7 @@ static void __devinit i810_configure_clocking (void)
 			goto config_out;
 		}
 		dmabuf->count = dmabuf->dmasize;
-		CIV_TO_LVI(card->iobase+dmabuf->write_channel->port, 31);
+		CIV_TO_LVI(card, dmabuf->write_channel->port, -1);
 		local_irq_save(flags);
 		start_dac(state);
 		offset = i810_get_dma_addr(state, 0);
@@ -3109,13 +3139,6 @@ static int __devinit i810_probe(struct pci_dev *pci_dev, const struct pci_device
 		return -ENODEV;
 	}
 	
-	if( pci_resource_start(pci_dev, 1) == 0)
-	{
-		/* MMIO only ICH5 .. here be dragons .. */
-		printk(KERN_ERR "i810_audio: Pure MMIO interfaces not yet supported.\n");
-		return -ENODEV;
-	}
-
 	if ((card = kmalloc(sizeof(struct i810_card), GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "i810_audio: out of memory\n");
 		return -ENOMEM;
@@ -3127,6 +3150,11 @@ static int __devinit i810_probe(struct pci_dev *pci_dev, const struct pci_device
 	card->pci_id = pci_id->device;
 	card->ac97base = pci_resource_start (pci_dev, 0);
 	card->iobase = pci_resource_start (pci_dev, 1);
+
+	if (!(card->ac97base) || !(card->iobase)) {
+		card->ac97base = 0;
+		card->iobase = 0;
+	}
 
 	/* if chipset could have mmio capability, check it */ 
 	if (card_cap[pci_id->driver_data].flags & CAP_MMIO) {
@@ -3140,6 +3168,11 @@ static int __devinit i810_probe(struct pci_dev *pci_dev, const struct pci_device
 			card->ac97base_mmio_phys = 0;
 			card->iobase_mmio_phys = 0;
 		}
+	}
+
+	if (!(card->use_mmio) && (!(card->iobase) || !(card->ac97base))) {
+		printk(KERN_ERR "i810_audio: No I/O resources available.\n");
+		goto out_mem;
 	}
 
 	card->irq = pci_dev->irq;

@@ -138,12 +138,12 @@ restart:
 			 */
 			__d_drop(d);
 			spin_unlock(&dcache_lock);
-			/* release the target kobject in case of
+			/* release the target kobject in case of 
 			 * a symlink
 			 */
 			if (S_ISLNK(d->d_inode->i_mode))
 				kobject_put(d->d_fsdata);
-
+			
 			simple_unlink(dentry->d_inode,d);
 			dput(d);
 			pr_debug(" done\n");
@@ -177,9 +177,10 @@ int sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 	parent = kobj->parent->dentry;
 
 	down(&parent->d_inode->i_sem);
+
 	new_dentry = sysfs_get_dentry(parent, new_name);
 	if (!IS_ERR(new_dentry)) {
-		if (!new_dentry->d_inode) {
+  		if (!new_dentry->d_inode) {
 			error = kobject_set_name(kobj,new_name);
 			if (!error)
 				d_move(kobj->dentry, new_dentry);

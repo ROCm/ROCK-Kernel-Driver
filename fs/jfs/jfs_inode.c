@@ -88,13 +88,5 @@ struct inode *ialloc(struct inode *parent, umode_t mode)
 
 	jfs_info("ialloc returns inode = 0x%p\n", inode);
 
-#ifdef CONFIG_JFS_DMAPI	
-	/* Zero DMAPI fields */
-	memset(&jfs_inode->dmattrs, 0, sizeof(dm_attrs_t));
-	jfs_inode->dmnumrgns = 0;
-	jfs_inode->dmrgns = NULL;
-	inode->i_version = 0;
-#endif	
-
 	return inode;
 }

@@ -145,8 +145,7 @@ IOMMU
    noforce don't force IOMMU usage. Default.
    force  Force IOMMU
    soft   Use software bounce buffering for non 32bit IO. Default on Intel
-          machines
-   noaperture Don't try to fix the aperture as set up by the BIOS.
+          machines. 
 
   swiotlb=pages
 

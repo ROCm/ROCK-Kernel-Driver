@@ -1077,7 +1077,8 @@ marvel_machine_check(u64 vector, u64 la_ptr, struct pt_regs *regs)
 
 	default:
 		/* Don't know it - pass it up.  */
-		return ev7_machine_check(vector, la_ptr, regs);
+		ev7_machine_check(vector, la_ptr, regs);
+		return;
 	}	
 
 	/*

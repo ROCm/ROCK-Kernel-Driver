@@ -41,22 +41,8 @@ typedef unsigned char spinlock_t;
 do {	membar("#LoadLoad");	\
 } while(*((volatile unsigned char *)lock))
 
-static __inline__ void _raw_spin_lock(spinlock_t *lock)
-{
-	__asm__ __volatile__(
-"1:	ldstub		[%0], %%g7\n"
-"	brnz,pn		%%g7, 2f\n"
-"	 membar		#StoreLoad | #StoreStore\n"
-"	.subsection	2\n"
-"2:	ldub		[%0], %%g7\n"
-"	brnz,pt		%%g7, 2b\n"
-"	 membar		#LoadLoad\n"
-"	b,a,pt		%%xcc, 1b\n"
-"	.previous\n"
-	: /* no outputs */
-	: "r" (lock)
-	: "g7", "memory");
-}
+/* arch/sparc64/lib/spinlock.S */
+extern void _raw_spin_lock(spinlock_t *lock);
 
 static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 {
@@ -77,6 +63,8 @@ static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 			     : "r" (lock)
 			     : "memory");
 }
+
+extern void _raw_spin_lock_flags(spinlock_t *lock, unsigned long flags);
 
 #else /* !(CONFIG_DEBUG_SPINLOCK) */
 
@@ -103,6 +91,7 @@ extern int _spin_trylock (spinlock_t *lock);
 #define _raw_spin_trylock(lp)	_spin_trylock(lp)
 #define _raw_spin_lock(lock)	_do_spin_lock(lock, "spin_lock")
 #define _raw_spin_unlock(lock)	_do_spin_unlock(lock)
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
 
@@ -142,6 +131,7 @@ extern void _do_read_lock(rwlock_t *rw, char *str);
 extern void _do_read_unlock(rwlock_t *rw, char *str);
 extern void _do_write_lock(rwlock_t *rw, char *str);
 extern void _do_write_unlock(rwlock_t *rw);
+extern int _do_write_trylock(rwlock_t *rw, char *str);
 
 #define _raw_read_lock(lock) \
 do {	unsigned long flags; \
@@ -170,6 +160,15 @@ do {	unsigned long flags; \
 	_do_write_unlock(lock); \
 	local_irq_restore(flags); \
 } while(0)
+
+#define _raw_write_trylock(lock) \
+({	unsigned long flags; \
+	int val; \
+	local_irq_save(flags); \
+	val = _do_write_trylock(lock, "write_trylock"); \
+	local_irq_restore(flags); \
+	val; \
+})
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
 

@@ -326,6 +326,22 @@ static struct sa1100fb_mach_info brutus_info __initdata = {
 };
 #endif
 
+#ifdef CONFIG_SA1100_COLLIE
+static struct sa1100fb_mach_info collie_info __initdata = {
+	.pixclock	= 171521,	.bpp		= 16,
+	.xres		= 320,		.yres		= 240,
+
+	.hsync_len	= 5,		.vsync_len	= 1,
+	.left_margin	= 11,		.upper_margin	= 2,
+	.right_margin	= 30,		.lower_margin	= 0,
+
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+};
+#endif
+
 #ifdef CONFIG_SA1100_FREEBIRD
 #warning Please check this carefully
 static struct sa1100fb_mach_info freebird_info __initdata = {
@@ -633,6 +649,11 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 #ifdef CONFIG_SA1100_BRUTUS
 	if (machine_is_brutus()) {
 		inf = &brutus_info;
+	}
+#endif
+#ifdef CONFIG_SA1100_COLLIE
+	if (machine_is_collie()) {
+		inf = &collie_info;
 	}
 #endif
 #ifdef CONFIG_SA1100_FREEBIRD
@@ -1053,7 +1074,7 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 	case VESA_NO_BLANKING:
 		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
-			fb_set_cmap(&fbi->fb.cmap, 1, info);
+			fb_set_cmap(&fbi->fb.cmap, info);
 		sa1100fb_schedule_work(fbi, C_ENABLE);
 	}
 	return 0;
@@ -1615,7 +1636,10 @@ static int __init sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
 
 /* Fake monspecs to fill in fbinfo structure */
 static struct fb_monspecs monspecs __initdata = {
-	30000, 70000, 50, 65, 0	/* Generic */
+	.hfmin	= 30000,
+	.hfmax	= 70000,
+	.vfmin	= 50,
+	.vfmax	= 65,
 };
 
 
@@ -1762,8 +1786,6 @@ static int __init sa1100fb_probe(struct device *dev)
 #endif
 
 	/* This driver cannot be unloaded at the moment */
-	MOD_INC_USE_COUNT;
-
 	return 0;
 
 failed:

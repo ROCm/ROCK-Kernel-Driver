@@ -1,7 +1,7 @@
 /*
  * lm90.c - Part of lm_sensors, Linux kernel modules for hardware
  *          monitoring
- * Copyright (C) 2003  Jean Delvare <khali@linux-fr.org>
+ * Copyright (C) 2003-2004  Jean Delvare <khali@linux-fr.org>
  *
  * Based on the lm83 driver. The LM90 is a sensor chip made by National
  * Semiconductor. It reports up to two temperatures (its own plus up to
@@ -10,11 +10,37 @@
  * obtained from National's website at:
  *   http://www.national.com/pf/LM/LM90.html
  *
+ * This driver also supports the LM89 and LM99, two other sensor chips
+ * made by National Semiconductor. Both have an increased remote
+ * temperature measurement accuracy (1 degree), and the LM99
+ * additionally shifts remote temperatures (measured and limits) by 16
+ * degrees, which allows for higher temperatures measurement. The
+ * driver doesn't handle it since it can be done easily in user-space.
+ * Complete datasheets can be obtained from National's website at:
+ *   http://www.national.com/pf/LM/LM89.html
+ *   http://www.national.com/pf/LM/LM99.html
+ * Note that there is no way to differenciate between both chips.
+ *
+ * This driver also supports the LM86, another sensor chip made by
+ * National Semiconductor. It is exactly similar to the LM90 except it
+ * has a higher accuracy.
+ * Complete datasheet can be obtained from National's website at:
+ *   http://www.national.com/pf/LM/LM86.html
+ *
  * This driver also supports the ADM1032, a sensor chip made by Analog
  * Devices. That chip is similar to the LM90, with a few differences
  * that are not handled by this driver. Complete datasheet can be
  * obtained from Analog's website at:
  *   http://products.analog.com/products/info.asp?product=ADM1032
+ * Among others, it has a higher accuracy than the LM90, much like the
+ * LM86 does.
+ *
+ * This driver also supports the MAX6657 and MAX6658, sensor chips made
+ * by Maxim. These chips are similar to the LM86. Complete datasheet
+ * can be obtained at Maxim's website at:
+ *   http://www.maxim-ic.com/quick_view2.cfm/qv_pk/2578
+ * Note that there is no way to differenciate between both chips (but
+ * no need either).
  *
  * Since the LM90 was the first chipset supported by this driver, most
  * comments will refer to this chipset, but are actually general and
@@ -45,9 +71,11 @@
 /*
  * Addresses to scan
  * Address is fully defined internally and cannot be changed.
+ * LM86, LM89, LM90, LM99, ADM1032, MAX6657 and MAX6658 have address 0x4c.
+ * LM89-1, and LM99-1 have address 0x4d.
  */
 
-static unsigned short normal_i2c[] = { 0x4c, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x4c, 0x4d, I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
 static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
@@ -56,7 +84,7 @@ static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
  * Insmod parameters
  */
 
-SENSORS_INSMOD_2(lm90, adm1032);
+SENSORS_INSMOD_5(lm90, adm1032, lm99, lm86, max6657);
 
 /*
  * The LM90 registers
@@ -142,6 +170,7 @@ static struct i2c_driver lm90_driver = {
  */
 
 struct lm90_data {
+	struct i2c_client client;
 	struct semaphore update_lock;
 	char valid; /* zero until following fields are valid */
 	unsigned long last_updated; /* in jiffies */
@@ -260,7 +289,7 @@ static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 
 static int lm90_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, lm90_detect);
 }
@@ -275,22 +304,19 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct lm90_data *data;
 	int err = 0;
 	const char *name = "";
-	u8 reg_config1=0, reg_convrate=0;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		goto exit;
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-	    sizeof(struct lm90_data), GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct lm90_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-	       sizeof(struct lm90_data));
+	memset(data, 0, sizeof(struct lm90_data));
 
-	/* The LM90-specific data is placed right after the common I2C
-	 * client data. */
-	data = (struct lm90_data *) (new_client + 1);
+	/* The common I2C client data is placed right before the
+	   LM90-specific data. */
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -307,43 +333,58 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 	 * requested, so both the detection and the identification steps
 	 * are skipped.
 	 */
-	if (kind < 0) { /* detection */
-		reg_config1 = i2c_smbus_read_byte_data(new_client,
-			      LM90_REG_R_CONFIG1);
-		reg_convrate = i2c_smbus_read_byte_data(new_client,
-			       LM90_REG_R_CONVRATE);
 
-		if ((reg_config1 & 0x2A) != 0x00
-		 || reg_convrate > 0x0A) {
-			dev_dbg(&adapter->dev,
-				"LM90 detection failed at 0x%02x.\n",
-				address);
-			goto exit_free;
-		}
-	}
+	/* Default to an LM90 if forced */
+	if (kind == 0)
+		kind = lm90;
 
-	if (kind <= 0) { /* identification */
-		u8 man_id, chip_id;
+	if (kind < 0) { /* detection and identification */
+		u8 man_id, chip_id, reg_config1, reg_convrate;
 
 		man_id = i2c_smbus_read_byte_data(new_client,
 			 LM90_REG_R_MAN_ID);
 		chip_id = i2c_smbus_read_byte_data(new_client,
 			  LM90_REG_R_CHIP_ID);
+		reg_config1 = i2c_smbus_read_byte_data(new_client,
+			      LM90_REG_R_CONFIG1);
+		reg_convrate = i2c_smbus_read_byte_data(new_client,
+			       LM90_REG_R_CONVRATE);
 		
 		if (man_id == 0x01) { /* National Semiconductor */
-			if (chip_id >= 0x21 && chip_id < 0x30 /* LM90 */
-			 && (kind == 0 /* skip detection */
-			  || ((i2c_smbus_read_byte_data(new_client,
-				LM90_REG_R_CONFIG2) & 0xF8) == 0x00
-			   && reg_convrate <= 0x09))) {
-				kind = lm90;
+			u8 reg_config2;
+
+			reg_config2 = i2c_smbus_read_byte_data(new_client,
+				      LM90_REG_R_CONFIG2);
+
+			if ((reg_config1 & 0x2A) == 0x00
+			 && (reg_config2 & 0xF8) == 0x00
+			 && reg_convrate <= 0x09) {
+				if (address == 0x4C
+				 && (chip_id & 0xF0) == 0x20) { /* LM90 */
+					kind = lm90;
+				} else
+				if ((chip_id & 0xF0) == 0x30) { /* LM89/LM99 */
+					kind = lm99;
+				} else
+				if (address == 0x4C
+				 && (chip_id & 0xF0) == 0x10) { /* LM86 */
+					kind = lm86;
+				}
 			}
-		}
-		else if (man_id == 0x41) { /* Analog Devices */
-			if ((chip_id & 0xF0) == 0x40 /* ADM1032 */
-			 && (kind == 0 /* skip detection */
-			  || (reg_config1 & 0x3F) == 0x00)) {
+		} else
+		if (man_id == 0x41) { /* Analog Devices */
+			if (address == 0x4C
+			 && (chip_id & 0xF0) == 0x40 /* ADM1032 */
+			 && (reg_config1 & 0x3F) == 0x00
+			 && reg_convrate <= 0x0A) {
 				kind = adm1032;
+			}
+		} else
+		if (man_id == 0x4D) { /* Maxim */
+			if (address == 0x4C
+			 && (reg_config1 & 0x1F) == 0
+			 && reg_convrate <= 0x09) {
+			 	kind = max6657;
 			}
 		}
 
@@ -359,6 +400,12 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 		name = "lm90";
 	} else if (kind == adm1032) {
 		name = "adm1032";
+	} else if (kind == lm99) {
+		name = "lm99";
+	} else if (kind == lm86) {
+		name = "lm86";
+	} else if (kind == max6657) {
+		name = "max6657";
 	}
 
 	/* We can fill in the remaining client fields */
@@ -390,7 +437,7 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 exit_free:
-	kfree(new_client);
+	kfree(data);
 exit:
 	return err;
 }
@@ -420,7 +467,7 @@ static int lm90_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

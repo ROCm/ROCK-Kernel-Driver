@@ -303,7 +303,7 @@ int zft_flush_buffers(void)
  */
 static int zft_simple_write(int *cnt,
 			    __u8 *dst_buf, const int seg_sz,
-			    const __u8 *src_buf, const int req_len, 
+			    const __u8 __user *src_buf, const int req_len, 
 			    const zft_position *pos,const zft_volinfo *volume)
 {
 	int space_left;
@@ -379,7 +379,7 @@ static int check_write_access(int req_len,
 
 static int fill_deblock_buf(__u8 *dst_buf, const int seg_sz,
 			    zft_position *pos, const zft_volinfo *volume,
-			    const char *usr_buf, const int req_len)
+			    const char __user *usr_buf, const int req_len)
 {
 	int cnt = 0;
 	int result = 0;
@@ -420,7 +420,7 @@ static int fill_deblock_buf(__u8 *dst_buf, const int seg_sz,
 
 /*  called by the kernel-interface routine "zft_write()"
  */
-int _zft_write(const char* buff, int req_len)
+int _zft_write(const char __user *buff, int req_len)
 {
 	int result = 0;
 	int written = 0;

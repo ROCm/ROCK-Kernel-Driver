@@ -181,6 +181,14 @@ void __elv_add_request(request_queue_t *q, struct request *rq, int where,
 
 	rq->q = q;
 	q->elevator.elevator_add_req_fn(q, rq, where);
+
+	if (blk_queue_plugged(q)) {
+		int nrq = q->rq.count[READ] + q->rq.count[WRITE] - q->in_flight;
+
+		if (nrq == q->unplug_thresh)
+			__generic_unplug_device(q);
+	}
+
 }
 
 void elv_add_request(request_queue_t *q, struct request *rq, int where,
@@ -203,7 +211,7 @@ struct request *elv_next_request(request_queue_t *q)
 	struct request *rq;
 	int ret;
 
-	while ((rq = __elv_next_request(q))) {
+	while ((rq = __elv_next_request(q)) != NULL) {
 		/*
 		 * just mark as started even if we don't start it, a request
 		 * that has been delayed should not be passed by new incoming

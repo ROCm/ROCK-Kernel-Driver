@@ -1,7 +1,7 @@
 #ifndef _M68K_SEMBUF_H
 #define _M68K_SEMBUF_H
 
-/* 
+/*
  * The semid64_ds structure for m68k architecture.
  * Note extra padding because this structure is passed back and forth
  * between kernel and user space.

@@ -21,12 +21,9 @@
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/highmem.h>
 #include <linux/module.h>
-#include <linux/trigevent_hooks.h>
-#include <linux/kprobes.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
 #include <asm/hardirq.h>
 #include <asm/desc.h>
 
@@ -191,11 +188,16 @@ static int __is_prefetch(struct pt_regs *regs, unsigned long addr)
 	return prefetch;
 }
 
-static inline int is_prefetch(struct pt_regs *regs, unsigned long addr)
+static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
+			      unsigned long error_code)
 {
 	if (unlikely(boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
-		     boot_cpu_data.x86 >= 6))
+		     boot_cpu_data.x86 >= 6)) {
+		/* Catch an obscure case of prefetch inside an NX page. */
+		if (nx_enabled && (error_code & 16))
+			return 0;
 		return __is_prefetch(regs, addr);
+	}
 	return 0;
 } 
 
@@ -223,9 +225,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
 	/* get the address */
 	__asm__("movl %%cr2,%0":"=r" (address));
-
-	if (kprobe_running() && kprobe_fault_handler(regs, 14))
-		return;
 
 	/* It's safe to allow irq's after cr2 has been saved */
 	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
@@ -258,7 +257,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		goto bad_area_nosemaphore;
 	} 
 
-	TRIG_EVENT(trap_entry_hook, 14, regs->eip);
 	mm = tsk->mm;
 
 	/*
@@ -268,7 +266,27 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (in_atomic() || !mm)
 		goto bad_area_nosemaphore;
 
-	down_read(&mm->mmap_sem);
+	/* When running in the kernel we expect faults to occur only to
+	 * addresses in user space.  All other faults represent errors in the
+	 * kernel and should generate an OOPS.  Unfortunatly, in the case of an
+	 * erroneous fault occuring in a code path which already holds mmap_sem
+	 * we will deadlock attempting to validate the fault against the
+	 * address space.  Luckily the kernel only validly references user
+	 * space from well defined areas of code, which are listed in the
+	 * exceptions table.
+	 *
+	 * As the vast majority of faults will be valid we will only perform
+	 * the source reference check when there is a possibilty of a deadlock.
+	 * Attempt to lock the address space, if we cannot we then validate the
+	 * source.  If this is invalid we can skip the address space check,
+	 * thus avoiding the deadlock.
+	 */
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		if ((error_code & 4) == 0 &&
+		    !search_exception_tables(regs->eip))
+			goto bad_area_nosemaphore;
+		down_read(&mm->mmap_sem);
+	}
 
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -345,7 +363,6 @@ good_area:
 			tsk->thread.screen_bitmap |= 1 << bit;
 	}
 	up_read(&mm->mmap_sem);
-        TRIG_EVENT(trap_exit_hook);
 	return;
 
 /*
@@ -362,10 +379,8 @@ bad_area_nosemaphore:
 		 * Valid to do another page fault here because this one came 
 		 * from user space.
 		 */
-		if (is_prefetch(regs, address)) {
-			TRIG_EVENT(trap_exit_hook);
+		if (is_prefetch(regs, address, error_code))
 			return;
-		}
 
 		tsk->thread.cr2 = address;
 		/* Kernel addresses are always protection faults */
@@ -374,9 +389,8 @@ bad_area_nosemaphore:
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		/* info.si_code has been set above */
-		info.si_addr = (void *)address;
+		info.si_addr = (void __user *)address;
 		force_sig_info(SIGSEGV, &info, tsk);
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
@@ -391,7 +405,6 @@ bad_area_nosemaphore:
 
 		if (nr == 6) {
 			do_invalid_op(regs, 0);
-			TRIG_EVENT(trap_exit_hook);
 			return;
 		}
 	}
@@ -399,20 +412,17 @@ bad_area_nosemaphore:
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	if (fixup_exception(regs)) {
-		TRIG_EVENT(trap_exit_hook);
+	if (fixup_exception(regs))
 		return;
-	}
 
 	/* 
 	 * Valid to do another page fault here, because if this fault
 	 * had been triggered by is_prefetch fixup_exception would have 
 	 * handled it.
 	 */
- 	if (is_prefetch(regs, address)) {
-		TRIG_EVENT(trap_exit_hook);
+ 	if (is_prefetch(regs, address, error_code))
  		return;
-	}
+
 /*
  * Oops. The kernel tried to access some bad page. We'll have to
  * terminate things with extreme prejudice.
@@ -420,6 +430,14 @@ no_context:
 
 	bust_spinlocks(1);
 
+#ifdef CONFIG_X86_PAE
+	if (error_code & 16) {
+		pte_t *pte = lookup_address(address);
+
+		if (pte && pte_present(*pte) && !pte_exec_kernel(*pte))
+			printk(KERN_CRIT "kernel tried to execute NX-protected page - exploit attempt? (uid: %d)\n", current->uid);
+	}
+#endif
 	if (address < PAGE_SIZE)
 		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
 	else
@@ -472,10 +490,8 @@ do_sigbus:
 		goto no_context;
 
 	/* User space => ok to do another page fault */
-	if (is_prefetch(regs, address)) {
-		TRIG_EVENT(trap_exit_hook);
+	if (is_prefetch(regs, address, error_code))
 		return;
-	}
 
 	tsk->thread.cr2 = address;
 	tsk->thread.error_code = error_code;
@@ -483,9 +499,8 @@ do_sigbus:
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *)address;
+	info.si_addr = (void __user *)address;
 	force_sig_info(SIGBUS, &info, tsk);
-	TRIG_EVENT(trap_exit_hook);
 	return;
 
 vmalloc_fault:
@@ -523,9 +538,6 @@ vmalloc_fault:
 		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))
 			goto no_context;
-		TRIG_EVENT(trap_entry_hook, 14, regs->eip);
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
-	TRIG_EVENT(trap_exit_hook);
 }

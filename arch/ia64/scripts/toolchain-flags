@@ -40,4 +40,14 @@ then
     CPPFLAGS="$CPPFLAGS -DHAVE_MODEL_SMALL_ATTRIBUTE"
 fi
 rm -f $out
+
+# Check whether assembler supports .serialize.{data,instruction} directive.
+
+$CC -c $dir/check-serialize.S -o $out 2>/dev/null
+res=$?
+rm -f $out
+if [ $res -eq 0 ]; then
+    CPPFLAGS="$CPPFLAGS -DHAVE_SERIALIZE_DIRECTIVE"
+fi
+
 echo $CPPFLAGS

@@ -28,7 +28,9 @@
 #include <linux/acpi.h>
 #include <linux/efi.h>
 #include <linux/irq.h>
-#include <asm/pgalloc.h>
+#include <linux/module.h>
+
+#include <asm/pgtable.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
 #include <asm/io.h>
@@ -139,7 +141,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 	idx = FIX_ACPI_END;
 	while (mapped_size < size) {
 		if (--idx < FIX_ACPI_BEGIN)
-			return 0;	/* cannot handle this */
+			return NULL;	/* cannot handle this */
 		phys += PAGE_SIZE;
 		set_fixmap(idx, phys);
 		mapped_size += PAGE_SIZE;
@@ -426,16 +428,6 @@ acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger)
 
 #endif /* CONFIG_ACPI_BUS */
 
-#ifdef CONFIG_X86_IO_APIC
-/* deprecated in favor of acpi_gsi_to_irq */
-int acpi_irq_to_vector(u32 irq)
-{
-	if (use_pci_vector() && !platform_legacy_irq(irq))
- 		irq = IO_APIC_VECTOR(irq);
-	return irq;
-}
-#endif
-
 int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 {
 #ifdef CONFIG_X86_IO_APIC
@@ -446,6 +438,38 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 		*irq = gsi;
 	return 0;
 }
+
+unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
+{
+	unsigned int irq;
+
+#ifdef CONFIG_PCI
+	/*
+	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
+	 */
+	if (acpi_irq_model == ACPI_IRQ_MODEL_PIC) {
+		static u16 irq_mask;
+		extern void eisa_set_level_irq(unsigned int irq);
+
+		if (edge_level == ACPI_LEVEL_SENSITIVE) {
+			if ((gsi < 16) && !((1 << gsi) & irq_mask)) {
+				Dprintk(KERN_DEBUG PREFIX "Setting GSI %u as level-triggered\n", gsi);
+				irq_mask |= (1 << gsi);
+				eisa_set_level_irq(gsi);
+			}
+		}
+	}
+#endif
+
+#ifdef CONFIG_X86_IO_APIC
+	if (acpi_irq_model == ACPI_IRQ_MODEL_IOAPIC) {
+		mp_register_gsi(gsi, edge_level, active_high_low);
+	}
+#endif
+	acpi_gsi_to_irq(gsi, &irq);
+	return irq;
+}
+EXPORT_SYMBOL(acpi_register_gsi);
 
 static unsigned long __init
 acpi_scan_rsdp (
@@ -536,7 +560,7 @@ extern u32 pmtmr_ioport;
 
 static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 {
-	struct fadt_descriptor_rev2 *fadt =0;
+	struct fadt_descriptor_rev2 *fadt = NULL;
 
 	fadt = (struct fadt_descriptor_rev2*) __acpi_map_table(phys,size);
 	if(!fadt) {
@@ -714,13 +738,6 @@ acpi_process_madt(void)
 {
 #ifdef CONFIG_X86_LOCAL_APIC
 	int count, error;
-
-	/* it's still wrong when the apic is disabled later */
-	extern int enable_local_apic;
-	if (enable_local_apic < 0) { 
-		printk(KERN_INFO "ACPI: local apic disabled\n");
-		return;
-	}
 
 	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
 	if (count == 1) {

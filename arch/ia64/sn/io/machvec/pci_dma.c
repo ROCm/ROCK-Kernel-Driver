@@ -391,11 +391,9 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	dma_map = pcibr_dmamap_alloc(vhdl, NULL, size, PCIIO_DMA_DATA | 
 				     MINIMAL_ATE_FLAG(phys_addr, size));
 
-	if (!dma_map) {
-		printk(KERN_ERR "pci_map_single: Unable to allocate anymore "
-		       "32 bit page map entries.\n");
+	/* PMU out of entries */
+	if (!dma_map)
 		return 0;
-	}
 
 	dma_addr = (dma_addr_t) pcibr_dmamap_addr(dma_map, phys_addr, size);
 	dma_map->bd_dma_addr = dma_addr;
@@ -655,6 +653,12 @@ EXPORT_SYMBOL(sn_dma_sync_sg_for_device);
 int
 sn_dma_mapping_error(dma_addr_t dma_addr)
 {
+	/*
+	 * We can only run out of page mapping entries, so if there's
+	 * an error, tell the caller to try again later.
+	 */
+	if (!dma_addr)
+		return -EAGAIN;
 	return 0;
 }
 

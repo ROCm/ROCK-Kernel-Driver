@@ -37,6 +37,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/smp_lock.h>
+#include <linux/device.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/poll.h>
@@ -61,6 +62,7 @@ unsigned long coda_timeout = 30; /* .. secs, then signals will dequeue */
 
 
 struct venus_comm coda_comms[MAX_CODADEVS];
+static struct class_simple *coda_psdev_class;
 
 /*
  * Device operations
@@ -86,7 +88,7 @@ static int coda_psdev_ioctl(struct inode * inode, struct file * filp,
 	switch(cmd) {
 	case CIOC_KERNEL_VERSION:
 		data = CODA_KERNEL_VERSION;
-		return put_user(data, (int *) arg);
+		return put_user(data, (int __user *) arg);
 	default:
 		return -ENOTTY;
 	}
@@ -98,7 +100,7 @@ static int coda_psdev_ioctl(struct inode * inode, struct file * filp,
  *	Receive a message written by Venus to the psdev
  */
  
-static ssize_t coda_psdev_write(struct file *file, const char *buf, 
+static ssize_t coda_psdev_write(struct file *file, const char __user *buf, 
 				size_t nbytes, loff_t *off)
 {
         struct venus_comm *vcp = (struct venus_comm *) file->private_data;
@@ -210,7 +212,7 @@ out:
  *	Read a message from the kernel to Venus
  */
 
-static ssize_t coda_psdev_read(struct file * file, char * buf, 
+static ssize_t coda_psdev_read(struct file * file, char __user * buf, 
 			       size_t nbytes, loff_t *off)
 {
 	DECLARE_WAITQUEUE(wait, current);
@@ -294,7 +296,7 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 		INIT_LIST_HEAD(&vcp->vc_pending);
 		INIT_LIST_HEAD(&vcp->vc_processing);
 		init_waitqueue_head(&vcp->vc_waitq);
-		vcp->vc_sb = 0;
+		vcp->vc_sb = NULL;
 		vcp->vc_seq = 0;
 	}
 	
@@ -358,20 +360,38 @@ static struct file_operations coda_psdev_fops = {
 
 static int init_coda_psdev(void)
 {
-	int i;
+	int i, err = 0;
 	if (register_chrdev(CODA_PSDEV_MAJOR,"coda_psdev",
 				 &coda_psdev_fops)) {
               printk(KERN_ERR "coda_psdev: unable to get major %d\n", 
 		     CODA_PSDEV_MAJOR);
               return -EIO;
 	}
+	coda_psdev_class = class_simple_create(THIS_MODULE, "coda_psdev");
+	if (IS_ERR(coda_psdev_class)) {
+		err = PTR_ERR(coda_psdev_class);
+		goto out_chrdev;
+	}		
 	devfs_mk_dir ("coda");
 	for (i = 0; i < MAX_CODADEVS; i++) {
-		devfs_mk_cdev(MKDEV(CODA_PSDEV_MAJOR, i),
+		class_simple_device_add(coda_psdev_class, MKDEV(CODA_PSDEV_MAJOR,i), 
+				NULL, "cfs%d", i);
+		err = devfs_mk_cdev(MKDEV(CODA_PSDEV_MAJOR, i),
 				S_IFCHR|S_IRUSR|S_IWUSR, "coda/%d", i);
+		if (err)
+			goto out_class;
 	}
 	coda_sysctl_init();
-	return 0;
+	goto out;
+
+out_class:
+	for (i = 0; i < MAX_CODADEVS; i++) 
+		class_simple_device_remove(MKDEV(CODA_PSDEV_MAJOR, i));
+	class_simple_destroy(coda_psdev_class);
+out_chrdev:
+	unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
+out:
+	return err;
 }
 
 
@@ -408,8 +428,11 @@ static int __init init_coda(void)
 	}
 	return 0;
 out:
-	for (i = 0; i < MAX_CODADEVS; i++)
+	for (i = 0; i < MAX_CODADEVS; i++) {
+		class_simple_device_remove(MKDEV(CODA_PSDEV_MAJOR, i));
 		devfs_remove("coda/%d", i);
+	}
+	class_simple_destroy(coda_psdev_class);
 	devfs_remove("coda");
 	unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
 	coda_sysctl_clean();
@@ -427,8 +450,11 @@ static void __exit exit_coda(void)
         if ( err != 0 ) {
                 printk("coda: failed to unregister filesystem\n");
         }
-	for (i = 0; i < MAX_CODADEVS; i++)
+	for (i = 0; i < MAX_CODADEVS; i++) {
+		class_simple_device_remove(MKDEV(CODA_PSDEV_MAJOR, i));
 		devfs_remove("coda/%d", i);
+	}
+	class_simple_destroy(coda_psdev_class);
 	devfs_remove("coda");
 	unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
 	coda_sysctl_clean();

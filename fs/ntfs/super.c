@@ -1,7 +1,7 @@
 /*
  * super.c - NTFS kernel super block handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (c) 2001,2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -9,13 +9,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -31,6 +31,10 @@
 
 #include "ntfs.h"
 #include "sysctl.h"
+#include "logfile.h"
+#include "quota.h"
+#include "dir.h"
+#include "index.h"
 
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;
@@ -102,7 +106,7 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 			if (*v)						\
 				goto needs_val;				\
 		}							\
-	} 
+	}
 #define NTFS_GETOPT(option, variable)					\
 	if (!strcmp(p, option)) {					\
 		if (!v || !*v)						\
@@ -110,14 +114,14 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 		variable = simple_strtoul(ov = v, &v, 0);		\
 		if (*v)							\
 			goto needs_val;					\
-	} 
+	}
 #define NTFS_GETOPT_BOOL(option, variable)				\
 	if (!strcmp(p, option)) {					\
 		BOOL val;						\
 		if (!simple_getbool(v, &val))				\
 			goto needs_bool;				\
 		variable = val;						\
-	} 
+	}
 #define NTFS_GETOPT_OPTIONS_ARRAY(option, variable, opt_array)		\
 	if (!strcmp(p, option)) {					\
 		int _i;							\
@@ -290,6 +294,101 @@ needs_val:
 	return FALSE;
 }
 
+#ifdef NTFS_RW
+
+/**
+ * ntfs_write_volume_flags - write new flags to the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	new flags value for the volume information flags
+ *
+ * Internal function.  You probably want to use ntfs_{set,clear}_volume_flags()
+ * instead (see below).
+ *
+ * Replace the volume information flags on the volume @vol with the value
+ * supplied in @flags.  Note, this overwrites the volume information flags, so
+ * make sure to combine the flags you want to modify with the old flags and use
+ * the result when calling ntfs_write_volume_flags().
+ *
+ * Return 0 on success and -errno on error.
+ */
+static int ntfs_write_volume_flags(ntfs_volume *vol, const VOLUME_FLAGS flags)
+{
+	ntfs_inode *ni = NTFS_I(vol->vol_ino);
+	MFT_RECORD *m;
+	VOLUME_INFORMATION *vi;
+	attr_search_context *ctx;
+	int err;
+
+	ntfs_debug("Entering, old flags = 0x%x, new flags = 0x%x.",
+			vol->vol_flags, flags);
+	if (vol->vol_flags == flags)
+		goto done;
+	BUG_ON(!ni);
+	m = map_mft_record(ni);
+	if (IS_ERR(m)) {
+		err = PTR_ERR(m);
+		goto err_out;
+	}
+	ctx = get_attr_search_ctx(ni, m);
+	if (!ctx) {
+		err = -ENOMEM;
+		goto put_unm_err_out;
+	}
+	if (!lookup_attr(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		err = -EIO;
+		goto put_unm_err_out;
+	}
+	vi = (VOLUME_INFORMATION*)((u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
+	vol->vol_flags = vi->flags = flags;
+	flush_dcache_mft_record_page(ctx->ntfs_ino);
+	mark_mft_record_dirty(ctx->ntfs_ino);
+	put_attr_search_ctx(ctx);
+	unmap_mft_record(ni);
+done:
+	ntfs_debug("Done.");
+	return 0;
+put_unm_err_out:
+	if (ctx)
+		put_attr_search_ctx(ctx);
+	unmap_mft_record(ni);
+err_out:
+	ntfs_error(vol->sb, "Failed with error code %i.", -err);
+	return err;
+}
+
+/**
+ * ntfs_set_volume_flags - set bits in the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	flags to set on the volume
+ *
+ * Set the bits in @flags in the volume information flags on the volume @vol.
+ *
+ * Return 0 on success and -errno on error.
+ */
+static inline int ntfs_set_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
+{
+	flags &= VOLUME_FLAGS_MASK;
+	return ntfs_write_volume_flags(vol, vol->vol_flags | flags);
+}
+
+/**
+ * ntfs_clear_volume_flags - clear bits in the volume information flags
+ * @vol:	ntfs volume on which to modify the flags
+ * @flags:	flags to clear on the volume
+ *
+ * Clear the bits in @flags in the volume information flags on the volume @vol.
+ *
+ * Return 0 on success and -errno on error.
+ */
+static inline int ntfs_clear_volume_flags(ntfs_volume *vol, VOLUME_FLAGS flags)
+{
+	flags &= VOLUME_FLAGS_MASK;
+	return ntfs_write_volume_flags(vol, vol->vol_flags & ~flags);
+}
+
+#endif /* NTFS_RW */
+
 /**
  * ntfs_remount - change the mount options of a mounted ntfs filesystem
  * @sb:		superblock of mounted ntfs filesystem
@@ -298,8 +397,8 @@ needs_val:
  *
  * Change the mount options of an already mounted ntfs filesystem.
  *
- * NOTE: The VFS set the @sb->s_flags remount flags to @flags after
- * ntfs_remount() returns successfully (i.e. returns 0). Otherwise,
+ * NOTE:  The VFS sets the @sb->s_flags remount flags to @flags after
+ * ntfs_remount() returns successfully (i.e. returns 0).  Otherwise,
  * @sb->s_flags are not changed.
  */
 static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
@@ -307,23 +406,89 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 	ntfs_volume *vol = NTFS_SB(sb);
 
 	ntfs_debug("Entering with remount options string: %s", opt);
-
 #ifndef NTFS_RW
 	/* For read-only compiled driver, enforce all read-only flags. */
 	*flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
-#else
+#else /* ! NTFS_RW */
 	/*
 	 * For the read-write compiled driver, if we are remounting read-write,
-	 * make sure there aren't any volume errors.
+	 * make sure there are no volume errors and that no unsupported volume
+	 * flags are set.  Also, empty the logfile journal as it would become
+	 * stale as soon as something is written to the volume and mark the
+	 * volume dirty so that chkdsk is run if the volume is not umounted
+	 * cleanly.  Finally, mark the quotas out of date so Windows rescans
+	 * the volume on boot and updates them.
+	 *
+	 * When remounting read-only, mark the volume clean if no volume errors
+	 * have occured.
 	 */
 	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
+		static const char *es = ".  Cannot remount read-write.";
+
+		/* Remounting read-write. */
 		if (NVolErrors(vol)) {
-			ntfs_error(sb, "Volume has errors and is read-only."
-					"Cannot remount read-write.");
+			ntfs_error(sb, "Volume has errors and is read-only%s",
+					es);
 			return -EROFS;
 		}
-	}
+		if (vol->vol_flags & VOLUME_IS_DIRTY) {
+			ntfs_error(sb, "Volume is dirty and read-only%s", es);
+			return -EROFS;
+		}
+		if (vol->vol_flags & VOLUME_MUST_MOUNT_RO_MASK) {
+			ntfs_error(sb, "Volume has unsupported flags set and "
+					"is read-only%s", es);
+			return -EROFS;
+		}
+		if (ntfs_set_volume_flags(vol, VOLUME_IS_DIRTY)) {
+			ntfs_error(sb, "Failed to set dirty bit in volume "
+					"information flags%s", es);
+			return -EROFS;
+		}
+#if 0
+		// TODO: Enable this code once we start modifying anything that
+		//	 is different between NTFS 1.2 and 3.x...
+		/* Set NT4 compatibility flag on newer NTFS version volumes. */
+		if ((vol->major_ver > 1)) {
+			if (ntfs_set_volume_flags(vol, VOLUME_MOUNTED_ON_NT4)) {
+				ntfs_error(sb, "Failed to set NT4 "
+						"compatibility flag%s", es);
+				NVolSetErrors(vol);
+				return -EROFS;
+			}
+		}
 #endif
+		if (!ntfs_empty_logfile(vol->logfile_ino)) {
+			ntfs_error(sb, "Failed to empty journal $LogFile%s",
+					es);
+			NVolSetErrors(vol);
+			return -EROFS;
+		}
+		if (!ntfs_mark_quotas_out_of_date(vol)) {
+			ntfs_error(sb, "Failed to mark quotas out of date%s",
+					es);
+			NVolSetErrors(vol);
+			return -EROFS;
+		}
+	} else if (!(sb->s_flags & MS_RDONLY) && (*flags & MS_RDONLY)) {
+		/* Remounting read-only. */
+		if (!NVolErrors(vol)) {
+			if (ntfs_clear_volume_flags(vol, VOLUME_IS_DIRTY))
+				ntfs_warning(sb, "Failed to clear dirty bit "
+						"in volume information "
+						"flags.  Run chkdsk.");
+		}
+	}
+	// TODO:  For now we enforce no atime and dir atime updates as they are
+	// not implemented.
+	if ((sb->s_flags & MS_NOATIME) && !(*flags & MS_NOATIME))
+		ntfs_warning(sb, "Atime updates are not implemented yet.  "
+				"Leaving them disabled.");
+	else if ((sb->s_flags & MS_NODIRATIME) && !(*flags & MS_NODIRATIME))
+		ntfs_warning(sb, "Directory atime updates are not implemented "
+				"yet.  Leaving them disabled.");
+	*flags |= MS_NOATIME | MS_NODIRATIME;
+#endif /* ! NTFS_RW */
 
 	// FIXME/TODO: If left like this we will have problems with rw->ro and
 	// ro->rw, as well as with sync->async and vice versa remounts.
@@ -341,7 +506,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 
 	if (!parse_options(vol, opt))
 		return -EINVAL;
-
+	ntfs_debug("Done.");
 	return 0;
 }
 
@@ -397,7 +562,7 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 			le32_to_cpu(b->bpb.large_sectors) || b->bpb.fats)
 		goto not_ntfs;
 	/* Check clusters per file mft record value is valid. */
-	if ((u8)b->clusters_per_mft_record < 0xe1 || 
+	if ((u8)b->clusters_per_mft_record < 0xe1 ||
 			(u8)b->clusters_per_mft_record > 0xf7)
 		switch (b->clusters_per_mft_record) {
 		case 1: case 2: case 4: case 8: case 16: case 32: case 64:
@@ -406,7 +571,7 @@ static BOOL is_boot_sector_ntfs(const struct super_block *sb,
 			goto not_ntfs;
 		}
 	/* Check clusters per index block value is valid. */
-	if ((u8)b->clusters_per_index_record < 0xe1 || 
+	if ((u8)b->clusters_per_index_record < 0xe1 ||
 			(u8)b->clusters_per_index_record > 0xf7)
 		switch (b->clusters_per_index_record) {
 		case 1: case 2: case 4: case 8: case 16: case 32: case 64:
@@ -526,7 +691,7 @@ hotfix_primary_boot_sector:
  * parse_ntfs_boot_sector - parse the boot sector and store the data in @vol
  * @vol:	volume structure to initialise with data from boot sector
  * @b:		boot sector to parse
- * 
+ *
  * Parse the ntfs boot sector @b and store all imporant information therein in
  * the ntfs super block @vol. Return TRUE on success and FALSE on error.
  */
@@ -589,10 +754,10 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	ntfs_debug("vol->mft_record_size_mask = 0x%x",
 			vol->mft_record_size_mask);
 	ntfs_debug("vol->mft_record_size_bits = %i (0x%x)",
-			vol->mft_record_size_bits, vol->mft_record_size_bits); 
+			vol->mft_record_size_bits, vol->mft_record_size_bits);
 	clusters_per_index_record = b->clusters_per_index_record;
 	ntfs_debug("clusters_per_index_record = %i (0x%x)",
-			clusters_per_index_record, clusters_per_index_record); 
+			clusters_per_index_record, clusters_per_index_record);
 	if (clusters_per_index_record > 0)
 		vol->index_record_size = vol->cluster_size <<
 				(ffs(clusters_per_index_record) - 1);
@@ -607,7 +772,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	vol->index_record_size_mask = vol->index_record_size - 1;
 	vol->index_record_size_bits = ffs(vol->index_record_size) - 1;
 	ntfs_debug("vol->index_record_size = %i (0x%x)",
-			vol->index_record_size, vol->index_record_size); 
+			vol->index_record_size, vol->index_record_size);
 	ntfs_debug("vol->index_record_size_mask = 0x%x",
 			vol->index_record_size_mask);
 	ntfs_debug("vol->index_record_size_bits = %i (0x%x)",
@@ -624,7 +789,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		return FALSE;
 	}
 	vol->nr_clusters = ll;
-	ntfs_debug("vol->nr_clusters = 0x%Lx", (long long)vol->nr_clusters);
+	ntfs_debug("vol->nr_clusters = 0x%llx", (long long)vol->nr_clusters);
 	/*
 	 * On an architecture where unsigned long is 32-bits, we restrict the
 	 * volume size to 2TiB (2^41). On a 64-bit architecture, the compiler
@@ -632,10 +797,11 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	 */
 	if (sizeof(unsigned long) < 8) {
 		if ((ll << vol->cluster_size_bits) >= (1ULL << 41)) {
-			ntfs_error(vol->sb, "Volume size (%LuTiB) is too large "
-					"for this architecture. Maximim "
+			ntfs_error(vol->sb, "Volume size (%lluTiB) is too "
+					"large for this architecture. Maximum "
 					"supported is 2TiB. Sorry.",
-					ll >> (40 - vol->cluster_size_bits));
+					(unsigned long long)ll >> (40 -
+					vol->cluster_size_bits));
 			return FALSE;
 		}
 	}
@@ -645,7 +811,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		return FALSE;
 	}
 	vol->mft_lcn = ll;
-	ntfs_debug("vol->mft_lcn = 0x%Lx", (long long)vol->mft_lcn);
+	ntfs_debug("vol->mft_lcn = 0x%llx", (long long)vol->mft_lcn);
 	ll = sle64_to_cpu(b->mftmirr_lcn);
 	if (ll >= vol->nr_clusters) {
 		ntfs_error(vol->sb, "MFTMirr LCN is beyond end of volume. "
@@ -653,9 +819,25 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		return FALSE;
 	}
 	vol->mftmirr_lcn = ll;
-	ntfs_debug("vol->mftmirr_lcn = 0x%Lx", (long long)vol->mftmirr_lcn);
+	ntfs_debug("vol->mftmirr_lcn = 0x%llx", (long long)vol->mftmirr_lcn);
+#ifdef NTFS_RW
+	/*
+	 * Work out the size of the mft mirror in number of mft records. If the
+	 * cluster size is less than or equal to the size taken by four mft
+	 * records, the mft mirror stores the first four mft records. If the
+	 * cluster size is bigger than the size taken by four mft records, the
+	 * mft mirror contains as many mft records as will fit into one
+	 * cluster.
+	 */
+	if (vol->cluster_size <= (4 << vol->mft_record_size_bits))
+		vol->mftmirr_size = 4;
+	else
+		vol->mftmirr_size = vol->cluster_size >>
+				vol->mft_record_size_bits;
+	ntfs_debug("vol->mftmirr_size = %i", vol->mftmirr_size);
+#endif /* NTFS_RW */
 	vol->serial_no = le64_to_cpu(b->volume_serial_number);
-	ntfs_debug("vol->serial_no = 0x%Lx",
+	ntfs_debug("vol->serial_no = 0x%llx",
 			(unsigned long long)vol->serial_no);
 	/*
 	 * Determine MFT zone size. This is not strictly the right place to do
@@ -684,14 +866,277 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 			vol->mft_zone_multiplier);
 	vol->mft_zone_start = vol->mft_lcn;
 	vol->mft_zone_end += vol->mft_lcn;
-	ntfs_debug("vol->mft_zone_start = 0x%Lx",
+	ntfs_debug("vol->mft_zone_start = 0x%llx",
 			(long long)vol->mft_zone_start);
-	ntfs_debug("vol->mft_zone_end = 0x%Lx", (long long)vol->mft_zone_end);
-	/* And another misplaced defaults setting. */
-	if (!vol->on_errors)
-		vol->on_errors = ON_ERRORS_PANIC;
+	ntfs_debug("vol->mft_zone_end = 0x%llx", (long long)vol->mft_zone_end);
 	return TRUE;
 }
+
+#ifdef NTFS_RW
+
+/**
+ * load_and_init_mft_mirror - load and setup the mft mirror inode for a volume
+ * @vol:	ntfs super block describing device whose mft mirror to load
+ *
+ * Return TRUE on success or FALSE on error.
+ */
+static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
+{
+	struct inode *tmp_ino;
+	ntfs_inode *tmp_ni;
+
+	ntfs_debug("Entering.");
+	/* Get mft mirror inode. */
+	tmp_ino = ntfs_iget(vol->sb, FILE_MFTMirr);
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
+			iput(tmp_ino);
+		/* Caller will display error message. */
+		return FALSE;
+	}
+	/*
+	 * Re-initialize some specifics about $MFTMirr's inode as
+	 * ntfs_read_inode() will have set up the default ones.
+	 */
+	/* Set uid and gid to root. */
+	tmp_ino->i_uid = tmp_ino->i_gid = 0;
+	/* Regular file.  No access for anyone. */
+	tmp_ino->i_mode = S_IFREG;
+	/* No VFS initiated operations allowed for $MFTMirr. */
+	tmp_ino->i_op = &ntfs_empty_inode_ops;
+	tmp_ino->i_fop = &ntfs_empty_file_ops;
+	/* Put back our special address space operations. */
+	tmp_ino->i_mapping->a_ops = &ntfs_mft_aops;
+	tmp_ni = NTFS_I(tmp_ino);
+	/* The $MFTMirr, like the $MFT is multi sector transfer protected. */
+	NInoSetMstProtected(tmp_ni);
+	/*
+	 * Set up our little cheat allowing us to reuse the async read io
+	 * completion handler for directories.
+	 */
+	tmp_ni->itype.index.block_size = vol->mft_record_size;
+	tmp_ni->itype.index.block_size_bits = vol->mft_record_size_bits;
+	vol->mftmirr_ino = tmp_ino;
+	ntfs_debug("Done.");
+	return TRUE;
+}
+
+/**
+ * check_mft_mirror - compare contents of the mft mirror with the mft
+ * @vol:	ntfs super block describing device whose mft mirror to check
+ *
+ * Return TRUE on success or FALSE on error.
+ */
+static BOOL check_mft_mirror(ntfs_volume *vol)
+{
+	unsigned long index;
+	struct super_block *sb = vol->sb;
+	ntfs_inode *mirr_ni;
+	struct page *mft_page, *mirr_page;
+	u8 *kmft, *kmirr;
+	run_list_element *rl, rl2[2];
+	int mrecs_per_page, i;
+
+	ntfs_debug("Entering.");
+	/* Compare contents of $MFT and $MFTMirr. */
+	mrecs_per_page = PAGE_CACHE_SIZE / vol->mft_record_size;
+	BUG_ON(!mrecs_per_page);
+	BUG_ON(!vol->mftmirr_size);
+	mft_page = mirr_page = NULL;
+	kmft = kmirr = NULL;
+	index = i = 0;
+	do {
+		u32 bytes;
+
+		/* Switch pages if necessary. */
+		if (!(i % mrecs_per_page)) {
+			if (index) {
+				ntfs_unmap_page(mft_page);
+				ntfs_unmap_page(mirr_page);
+			}
+			/* Get the $MFT page. */
+			mft_page = ntfs_map_page(vol->mft_ino->i_mapping,
+					index);
+			if (IS_ERR(mft_page)) {
+				ntfs_error(sb, "Failed to read $MFT.");
+				return FALSE;
+			}
+			kmft = page_address(mft_page);
+			/* Get the $MFTMirr page. */
+			mirr_page = ntfs_map_page(vol->mftmirr_ino->i_mapping,
+					index);
+			if (IS_ERR(mirr_page)) {
+				ntfs_error(sb, "Failed to read $MFTMirr.");
+				goto mft_unmap_out;
+			}
+			kmirr = page_address(mirr_page);
+			++index;
+		}
+		/* Make sure the record is ok. */
+		if (ntfs_is_baad_recordp(kmft)) {
+			ntfs_error(sb, "Incomplete multi sector transfer "
+					"detected in mft record %i.", i);
+mm_unmap_out:
+			ntfs_unmap_page(mirr_page);
+mft_unmap_out:
+			ntfs_unmap_page(mft_page);
+			return FALSE;
+		}
+		if (ntfs_is_baad_recordp(kmirr)) {
+			ntfs_error(sb, "Incomplete multi sector transfer "
+					"detected in mft mirror record %i.", i);
+			goto mm_unmap_out;
+		}
+		/* Get the amount of data in the current record. */
+		bytes = le32_to_cpu(((MFT_RECORD*)kmft)->bytes_in_use);
+		if (!bytes || bytes > vol->mft_record_size) {
+			bytes = le32_to_cpu(((MFT_RECORD*)kmirr)->bytes_in_use);
+			if (!bytes || bytes > vol->mft_record_size)
+				bytes = vol->mft_record_size;
+		}
+		/* Compare the two records. */
+		if (memcmp(kmft, kmirr, bytes)) {
+			ntfs_error(sb, "$MFT and $MFTMirr (record %i) do not "
+					"match.  Run ntfsfix or chkdsk.", i);
+			goto mm_unmap_out;
+		}
+		kmft += vol->mft_record_size;
+		kmirr += vol->mft_record_size;
+	} while (++i < vol->mftmirr_size);
+	/* Release the last pages. */
+	ntfs_unmap_page(mft_page);
+	ntfs_unmap_page(mirr_page);
+
+	/* Construct the mft mirror run list by hand. */
+	rl2[0].vcn = 0;
+	rl2[0].lcn = vol->mftmirr_lcn;
+	rl2[0].length = (vol->mftmirr_size * vol->mft_record_size +
+			vol->cluster_size - 1) / vol->cluster_size;
+	rl2[1].vcn = rl2[0].length;
+	rl2[1].lcn = LCN_ENOENT;
+	rl2[1].length = 0;
+	/*
+	 * Because we have just read all of the mft mirror, we know we have
+	 * mapped the full run list for it.
+	 */
+	mirr_ni = NTFS_I(vol->mftmirr_ino);
+	down_read(&mirr_ni->run_list.lock);
+	rl = mirr_ni->run_list.rl;
+	/* Compare the two run lists.  They must be identical. */
+	i = 0;
+	do {
+		if (rl2[i].vcn != rl[i].vcn || rl2[i].lcn != rl[i].lcn ||
+				rl2[i].length != rl[i].length) {
+			ntfs_error(sb, "$MFTMirr location mismatch.  "
+					"Run chkdsk.");
+			up_read(&mirr_ni->run_list.lock);
+			return FALSE;
+		}
+	} while (rl2[i++].length);
+	up_read(&mirr_ni->run_list.lock);
+	ntfs_debug("Done.");
+	return TRUE;
+}
+
+/**
+ * load_and_check_logfile - load and check the logfile inode for a volume
+ * @vol:	ntfs super block describing device whose logfile to load
+ *
+ * Return TRUE on success or FALSE on error.
+ */
+static BOOL load_and_check_logfile(ntfs_volume *vol)
+{
+	struct inode *tmp_ino;
+
+	ntfs_debug("Entering.");
+	tmp_ino = ntfs_iget(vol->sb, FILE_LogFile);
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
+			iput(tmp_ino);
+		/* Caller will display error message. */
+		return FALSE;
+	}
+	if (!ntfs_check_logfile(tmp_ino)) {
+		iput(tmp_ino);
+		/* ntfs_check_logfile() will have displayed error output. */
+		return FALSE;
+	}
+	vol->logfile_ino = tmp_ino;
+	ntfs_debug("Done.");
+	return TRUE;
+}
+
+/**
+ * load_and_init_quota - load and setup the quota file for a volume if present
+ * @vol:	ntfs super block describing device whose quota file to load
+ *
+ * Return TRUE on success or FALSE on error.  If $Quota is not present, we
+ * leave vol->quota_ino as NULL and return success.
+ */
+static BOOL load_and_init_quota(ntfs_volume *vol)
+{
+	MFT_REF mref;
+	struct inode *tmp_ino;
+	ntfs_name *name = NULL;
+	static const ntfschar Quota[7] = { const_cpu_to_le16('$'),
+			const_cpu_to_le16('Q'), const_cpu_to_le16('u'),
+			const_cpu_to_le16('o'), const_cpu_to_le16('t'),
+			const_cpu_to_le16('a'), const_cpu_to_le16(0) };
+	static ntfschar Q[3] = { const_cpu_to_le16('$'),
+			const_cpu_to_le16('Q'), const_cpu_to_le16(0) };
+
+	ntfs_debug("Entering.");
+	/*
+	 * Find the inode number for the quota file by looking up the filename
+	 * $Quota in the extended system files directory $Extend.
+	 */
+	down(&vol->extend_ino->i_sem);
+	mref = ntfs_lookup_inode_by_name(NTFS_I(vol->extend_ino), Quota, 6,
+			&name);
+	up(&vol->extend_ino->i_sem);
+	if (IS_ERR_MREF(mref)) {
+		/*
+		 * If the file does not exist, quotas are disabled and have
+		 * never been enabled on this volume, just return success.
+		 */
+		if (MREF_ERR(mref) == -ENOENT) {
+			ntfs_debug("$Quota not present.  Volume does not have "
+					"quotas enabled.");
+			/*
+			 * No need to try to set quotas out of date if they are
+			 * not enabled.
+			 */
+			NVolSetQuotaOutOfDate(vol);
+			return TRUE;
+		}
+		/* A real error occured. */
+		ntfs_error(vol->sb, "Failed to find inode number for $Quota.");
+		return FALSE;
+	}
+	/* We do not care for the type of match that was found. */
+	if (name)
+		kfree(name);
+	/* Get the inode. */
+	tmp_ino = ntfs_iget(vol->sb, MREF(mref));
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
+			iput(tmp_ino);
+		ntfs_error(vol->sb, "Failed to load $Quota.");
+		return FALSE;
+	}
+	vol->quota_ino = tmp_ino;
+	/* Get the $Q index allocation attribute. */
+	tmp_ino = ntfs_index_iget(vol->quota_ino, Q, 2);
+	if (IS_ERR(tmp_ino)) {
+		ntfs_error(vol->sb, "Failed to load $Quota/$Q index.");
+		return FALSE;
+	}
+	vol->quota_q_ino = tmp_ino;
+	ntfs_debug("Done.");
+	return TRUE;
+}
+
+#endif /* NTFS_RW */
 
 /**
  * load_and_init_upcase - load the upcase table for an ntfs volume
@@ -718,12 +1163,12 @@ static BOOL load_and_init_upcase(ntfs_volume *vol)
 	}
 	/*
 	 * The upcase size must not be above 64k Unicode characters, must not
-	 * be zero and must be a multiple of sizeof(uchar_t).
+	 * be zero and must be a multiple of sizeof(ntfschar).
 	 */
-	if (!ino->i_size || ino->i_size & (sizeof(uchar_t) - 1) ||
-			ino->i_size > 64ULL * 1024 * sizeof(uchar_t))
+	if (!ino->i_size || ino->i_size & (sizeof(ntfschar) - 1) ||
+			ino->i_size > 64ULL * 1024 * sizeof(ntfschar))
 		goto iput_upcase_failed;
-	vol->upcase = (uchar_t*)ntfs_malloc_nofs(ino->i_size);
+	vol->upcase = (ntfschar*)ntfs_malloc_nofs(ino->i_size);
 	if (!vol->upcase)
 		goto iput_upcase_failed;
 	index = 0;
@@ -745,8 +1190,8 @@ read_partial_upcase_page:
 			goto read_partial_upcase_page;
 	}
 	vol->upcase_len = ino->i_size >> UCHAR_T_SIZE_BITS;
-	ntfs_debug("Read %Lu bytes from $UpCase (expected %u bytes).",
-			ino->i_size, 64 * 1024 * sizeof(uchar_t));
+	ntfs_debug("Read %llu bytes from $UpCase (expected %zu bytes).",
+			ino->i_size, 64 * 1024 * sizeof(ntfschar));
 	iput(ino);
 	down(&ntfs_lock);
 	if (!default_upcase) {
@@ -813,28 +1258,44 @@ static BOOL load_system_files(ntfs_volume *vol)
 	attr_search_context *ctx;
 
 	ntfs_debug("Entering.");
+#ifdef NTFS_RW
+	/* Get mft mirror inode compare the contents of $MFT and $MFTMirr. */
+	if (!load_and_init_mft_mirror(vol) || !check_mft_mirror(vol)) {
+		static const char *es1 = "Failed to load $MFTMirr";
+		static const char *es2 = "$MFTMirr does not match $MFT";
+		static const char *es3 = ".  Run ntfsfix and/or chkdsk.";
 
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						!vol->mftmirr_ino ? es1 : es2,
+						es3);
+				goto iput_mirr_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s",
+					!vol->mftmirr_ino ? es1 : es2, es3);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s",
+					!vol->mftmirr_ino ? es1 : es2, es3);
+		/* This will prevent a read-write remount. */
+		NVolSetErrors(vol);
+	}
+#endif /* NTFS_RW */
 	/* Get mft bitmap attribute inode. */
 	vol->mftbmp_ino = ntfs_attr_iget(vol->mft_ino, AT_BITMAP, NULL, 0);
 	if (IS_ERR(vol->mftbmp_ino)) {
 		ntfs_error(sb, "Failed to load $MFT/$BITMAP attribute.");
-		return FALSE;
-	}
-
-	/* Get mft mirror inode. */
-	vol->mftmirr_ino = ntfs_iget(sb, FILE_MFTMirr);
-	if (IS_ERR(vol->mftmirr_ino) || is_bad_inode(vol->mftmirr_ino)) {
-		if (!IS_ERR(vol->mftmirr_ino))
-			iput(vol->mftmirr_ino);
-		ntfs_error(sb, "Failed to load $MFTMirr.");
-		goto iput_mftbmp_err_out;
-	}
-	// FIXME: Compare mftmirr with mft and repair if appropriate and not
-	// a read-only mount.
-
-	/* Read upcase table and setup vol->upcase and vol->upcase_len. */
-	if (!load_and_init_upcase(vol))
 		goto iput_mirr_err_out;
+	}
+	/* Read upcase table and setup @vol->upcase and @vol->upcase_len. */
+	if (!load_and_init_upcase(vol))
+		goto iput_mftbmp_err_out;
 	/*
 	 * Get the cluster allocation bitmap inode and verify the size, no
 	 * need for any locking at this stage as we are already running
@@ -889,7 +1350,7 @@ get_ctx_vol_failed:
 			le32_to_cpu(ctx->attr->data.resident.value_length) >
 			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length))
 		goto err_put_vol;
-	/* Setup volume flags and version. */
+	/* Copy the volume flags and version to the ntfs_volume structure. */
 	vol->vol_flags = vi->flags;
 	vol->major_ver = vi->major_ver;
 	vol->minor_ver = vi->minor_ver;
@@ -897,33 +1358,141 @@ get_ctx_vol_failed:
 	unmap_mft_record(NTFS_I(vol->vol_ino));
 	printk(KERN_INFO "NTFS volume version %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
-	/*
-	 * Get the inode for the logfile and empty it if this is a read-write
-	 * mount.
-	 */
-	tmp_ino = ntfs_iget(sb, FILE_LogFile);
-	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
-		if (!IS_ERR(tmp_ino))
-			iput(tmp_ino);
-		ntfs_error(sb, "Failed to load $LogFile.");
-		// FIMXE: We only want to empty the thing so pointless bailing
-		// out. Can recover/ignore.
-		goto iput_vol_err_out;
+#ifdef NTFS_RW
+	/* Make sure that no unsupported volume flags are set. */
+	if (vol->vol_flags & VOLUME_MUST_MOUNT_RO_MASK) {
+		static const char *es1a = "Volume is dirty";
+		static const char *es1b = "Volume has unsupported flags set";
+		static const char *es2 = ".  Run chkdsk and mount in Windows.";
+		const char *es1;
+		
+		es1 = vol->vol_flags & VOLUME_IS_DIRTY ? es1a : es1b;
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						es1, es2);
+				goto iput_vol_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s", es1, es2);
+		/*
+		 * Do not set NVolErrors() because ntfs_remount() re-checks the
+		 * flags which we need to do in case any flags have changed.
+		 */
 	}
-	// FIXME: Empty the logfile, but only if not read-only.
-	// FIXME: What happens if someone remounts rw? We need to empty the file
-	// then. We need a flag to tell us whether we have done it already.
-	iput(tmp_ino);
+	/*
+	 * Get the inode for the logfile, check it and determine if the volume
+	 * was shutdown cleanly.
+	 */
+	if (!load_and_check_logfile(vol) ||
+			!ntfs_is_logfile_clean(vol->logfile_ino)) {
+		static const char *es1a = "Failed to load $LogFile";
+		static const char *es1b = "$LogFile is not clean";
+		static const char *es2 = ".  Mount in Windows.";
+		const char *es1;
+
+		es1 = !vol->logfile_ino ? es1a : es1b;
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						es1, es2);
+				goto iput_logfile_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s", es1, es2);
+		/* This will prevent a read-write remount. */
+		NVolSetErrors(vol);
+	}
+	/* If (still) a read-write mount, mark the volume dirty. */
+	if (!(sb->s_flags & MS_RDONLY) &&
+			ntfs_set_volume_flags(vol, VOLUME_IS_DIRTY)) {
+		static const char *es1 = "Failed to set dirty bit in volume "
+				"information flags";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_logfile_err_out;
+		}
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		/*
+		 * Do not set NVolErrors() because ntfs_remount() might manage
+		 * to set the dirty flag in which case all would be well.
+		 */
+	}
+#if 0
+	// TODO: Enable this code once we start modifying anything that is
+	//	 different between NTFS 1.2 and 3.x...
+	/*
+	 * If (still) a read-write mount, set the NT4 compatibility flag on
+	 * newer NTFS version volumes.
+	 */
+	if (!(sb->s_flags & MS_RDONLY) && (vol->major_ver > 1) &&
+			ntfs_set_volume_flags(vol, VOLUME_MOUNTED_ON_NT4)) {
+		static const char *es1 = "Failed to set NT4 compatibility flag";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_logfile_err_out;
+		}
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		NVolSetErrors(vol);
+	}
+#endif
+	/* If (still) a read-write mount, empty the logfile. */
+	if (!(sb->s_flags & MS_RDONLY) &&
+			!ntfs_empty_logfile(vol->logfile_ino)) {
+		static const char *es1 = "Failed to empty $LogFile";
+		static const char *es2 = ".  Mount in Windows.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_logfile_err_out;
+		}
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		NVolSetErrors(vol);
+	}
+#endif /* NTFS_RW */
 	/*
 	 * Get the inode for the attribute definitions file and parse the
 	 * attribute definitions.
-	 */ 
+	 */
 	tmp_ino = ntfs_iget(sb, FILE_AttrDef);
 	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
 		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
 		ntfs_error(sb, "Failed to load $AttrDef.");
-		goto iput_vol_err_out;
+		goto iput_logfile_err_out;
 	}
 	// FIXME: Parse the attribute definitions.
 	iput(tmp_ino);
@@ -933,7 +1502,7 @@ get_ctx_vol_failed:
 		if (!IS_ERR(vol->root_ino))
 			iput(vol->root_ino);
 		ntfs_error(sb, "Failed to load root directory.");
-		goto iput_vol_err_out;
+		goto iput_logfile_err_out;
 	}
 	/* If on NTFS versions before 3.0, we are done. */
 	if (vol->major_ver < 3)
@@ -949,55 +1518,180 @@ get_ctx_vol_failed:
 	}
 	// FIXME: Initialize security.
 	/* Get the extended system files' directory inode. */
-	tmp_ino = ntfs_iget(sb, FILE_Extend);
-	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
-		if (!IS_ERR(tmp_ino))
-			iput(tmp_ino);
+	vol->extend_ino = ntfs_iget(sb, FILE_Extend);
+	if (IS_ERR(vol->extend_ino) || is_bad_inode(vol->extend_ino)) {
+		if (!IS_ERR(vol->extend_ino))
+			iput(vol->extend_ino);
 		ntfs_error(sb, "Failed to load $Extend.");
 		goto iput_sec_err_out;
 	}
-	// FIXME: Do something. E.g. want to delete the $UsnJrnl if exists.
-	// Note we might be doing this at the wrong level; we might want to
-	// d_alloc_root() and then do a "normal" open(2) of $Extend\$UsnJrnl
-	// rather than using ntfs_iget here, as we don't know the inode number
-	// for the files in $Extend directory.
-	iput(tmp_ino);
+#ifdef NTFS_RW
+	/* Find the quota file, load it if present, and set it up. */
+	if (!load_and_init_quota(vol)) {
+		static const char *es1 = "Failed to load $Quota";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						es1, es2);
+				goto iput_quota_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s", es1, es2);
+		/* This will prevent a read-write remount. */
+		NVolSetErrors(vol);
+	}
+	/* If (still) a read-write mount, mark the quotas out of date. */
+	if (!(sb->s_flags & MS_RDONLY) &&
+			!ntfs_mark_quotas_out_of_date(vol)) {
+		static const char *es1 = "Failed to mark quotas out of date";
+		static const char *es2 = ".  Run chkdsk.";
+
+		/* Convert to a read-only mount. */
+		if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+				ON_ERRORS_CONTINUE))) {
+			ntfs_error(sb, "%s and neither on_errors=continue nor "
+					"on_errors=remount-ro was specified%s",
+					es1, es2);
+			goto iput_quota_err_out;
+		}
+		ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+		NVolSetErrors(vol);
+	}
+	// TODO: Delete or checkpoint the $UsnJrnl if it exists.
+#endif /* NTFS_RW */
 	return TRUE;
+#ifdef NTFS_RW
+iput_quota_err_out:
+	if (vol->quota_q_ino)
+		iput(vol->quota_q_ino);
+	if (vol->quota_ino)
+		iput(vol->quota_ino);
+	iput(vol->extend_ino);
+#endif /* NTFS_RW */
 iput_sec_err_out:
 	iput(vol->secure_ino);
 iput_root_err_out:
 	iput(vol->root_ino);
+iput_logfile_err_out:
+#ifdef NTFS_RW
+	if (vol->logfile_ino)
+		iput(vol->logfile_ino);
 iput_vol_err_out:
+#endif /* NTFS_RW */
 	iput(vol->vol_ino);
 iput_lcnbmp_err_out:
 	iput(vol->lcnbmp_ino);
-iput_mirr_err_out:
-	iput(vol->mftmirr_ino);
 iput_mftbmp_err_out:
 	iput(vol->mftbmp_ino);
+iput_mirr_err_out:
+#ifdef NTFS_RW
+	if (vol->mftmirr_ino)
+		iput(vol->mftmirr_ino);
+#endif /* NTFS_RW */
 	return FALSE;
 }
 
 /**
  * ntfs_put_super - called by the vfs to unmount a volume
- * @vfs_sb:	vfs superblock of volume to unmount
+ * @sb:		vfs superblock of volume to unmount
  *
  * ntfs_put_super() is called by the VFS (from fs/super.c::do_umount()) when
  * the volume is being unmounted (umount system call has been invoked) and it
  * releases all inodes and memory belonging to the NTFS specific part of the
  * super block.
  */
-static void ntfs_put_super(struct super_block *vfs_sb)
+static void ntfs_put_super(struct super_block *sb)
 {
-	ntfs_volume *vol = NTFS_SB(vfs_sb);
+	ntfs_volume *vol = NTFS_SB(sb);
 
 	ntfs_debug("Entering.");
+#ifdef NTFS_RW
+	/*
+	 * Commit all inodes while they are still open in case some of them
+	 * cause others to be dirtied.
+	 */
+	ntfs_commit_inode(vol->vol_ino);
+
+	/* NTFS 3.0+ specific. */
+	if (vol->major_ver >= 3) {
+		if (vol->quota_q_ino)
+			ntfs_commit_inode(vol->quota_q_ino);
+		if (vol->quota_ino)
+			ntfs_commit_inode(vol->quota_ino);
+		if (vol->extend_ino)
+			ntfs_commit_inode(vol->extend_ino);
+		if (vol->secure_ino)
+			ntfs_commit_inode(vol->secure_ino);
+	}
+
+	ntfs_commit_inode(vol->root_ino);
+
+	down_write(&vol->lcnbmp_lock);
+	ntfs_commit_inode(vol->lcnbmp_ino);
+	up_write(&vol->lcnbmp_lock);
+
+	down_write(&vol->mftbmp_lock);
+	ntfs_commit_inode(vol->mftbmp_ino);
+	up_write(&vol->mftbmp_lock);
+
+	if (vol->logfile_ino)
+		ntfs_commit_inode(vol->logfile_ino);
+
+	if (vol->mftmirr_ino)
+		ntfs_commit_inode(vol->mftmirr_ino);
+	ntfs_commit_inode(vol->mft_ino);
+
+	/*
+	 * If a read-write mount and no volume errors have occured, mark the
+	 * volume clean.  Also, re-commit all affected inodes.
+	 */
+	if (!(sb->s_flags & MS_RDONLY)) {
+		if (!NVolErrors(vol)) {
+			if (ntfs_clear_volume_flags(vol, VOLUME_IS_DIRTY))
+				ntfs_warning(sb, "Failed to clear dirty bit "
+						"in volume information "
+						"flags.  Run chkdsk.");
+			ntfs_commit_inode(vol->vol_ino);
+			ntfs_commit_inode(vol->root_ino);
+			if (vol->mftmirr_ino)
+				ntfs_commit_inode(vol->mftmirr_ino);
+			ntfs_commit_inode(vol->mft_ino);
+		} else {
+			ntfs_warning(sb, "Volume has errors.  Leaving volume "
+					"marked dirty.  Run chkdsk.");
+		}
+	}
+#endif /* NTFS_RW */
 
 	iput(vol->vol_ino);
 	vol->vol_ino = NULL;
 
 	/* NTFS 3.0+ specific clean up. */
 	if (vol->major_ver >= 3) {
+#ifdef NTFS_RW
+		if (vol->quota_q_ino) {
+			iput(vol->quota_q_ino);
+			vol->quota_q_ino = NULL;
+		}
+		if (vol->quota_ino) {
+			iput(vol->quota_ino);
+			vol->quota_ino = NULL;
+		}
+#endif /* NTFS_RW */
+		if (vol->extend_ino) {
+			iput(vol->extend_ino);
+			vol->extend_ino = NULL;
+		}
 		if (vol->secure_ino) {
 			iput(vol->secure_ino);
 			vol->secure_ino = NULL;
@@ -1012,13 +1706,58 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 	vol->lcnbmp_ino = NULL;
 	up_write(&vol->lcnbmp_lock);
 
-	iput(vol->mftmirr_ino);
-	vol->mftmirr_ino = NULL;
-
 	down_write(&vol->mftbmp_lock);
 	iput(vol->mftbmp_ino);
 	vol->mftbmp_ino = NULL;
 	up_write(&vol->mftbmp_lock);
+
+#ifdef NTFS_RW
+	if (vol->logfile_ino) {
+		iput(vol->logfile_ino);
+		vol->logfile_ino = NULL;
+	}
+	if (vol->mftmirr_ino) {
+		/* Re-commit the mft mirror and mft just in case. */
+		ntfs_commit_inode(vol->mftmirr_ino);
+		ntfs_commit_inode(vol->mft_ino);
+		iput(vol->mftmirr_ino);
+		vol->mftmirr_ino = NULL;
+	}
+	/*
+	 * If any dirty inodes are left, throw away all mft data page cache
+	 * pages to allow a clean umount.  This should never happen any more
+	 * due to mft.c::ntfs_mft_writepage() cleaning all the dirty pages as
+	 * the underlying mft records are written out and cleaned.  If it does,
+	 * happen anyway, we want to know...
+	 */
+	ntfs_commit_inode(vol->mft_ino);
+	write_inode_now(vol->mft_ino, 1);
+	if (!list_empty(&sb->s_dirty)) {
+		const char *s1, *s2;
+
+		down(&vol->mft_ino->i_sem);
+		truncate_inode_pages(vol->mft_ino->i_mapping, 0);
+		up(&vol->mft_ino->i_sem);
+		write_inode_now(vol->mft_ino, 1);
+		if (!list_empty(&sb->s_dirty)) {
+			static const char *_s1 = "inodes";
+			static const char *_s2 = "";
+			s1 = _s1;
+			s2 = _s2;
+		} else {
+			static const char *_s1 = "mft pages";
+			static const char *_s2 = "They have been thrown "
+					"away.  ";
+			s1 = _s1;
+			s2 = _s2;
+		}
+		ntfs_error(sb, "Dirty %s found at umount time.  %sYou should "
+				"run chkdsk.  Please email "
+				"linux-ntfs-dev@lists.sourceforge.net and say "
+				"that you saw this message.  Thank you.", s1,
+				s2);
+	}
+#endif /* NTFS_RW */
 
 	iput(vol->mft_ino);
 	vol->mft_ino = NULL;
@@ -1026,7 +1765,7 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 	vol->upcase_len = 0;
 	/*
 	 * Decrease the number of mounts and destroy the global default upcase
-	 * table if necessary. Also decrease the number of upcase users if we
+	 * table if necessary.  Also decrease the number of upcase users if we
 	 * are a user.
 	 */
 	down(&ntfs_lock);
@@ -1050,7 +1789,7 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 		unload_nls(vol->nls_map);
 		vol->nls_map = NULL;
 	}
-	vfs_sb->s_fs_info = NULL;
+	sb->s_fs_info = NULL;
 	kfree(vol);
 	return;
 }
@@ -1300,42 +2039,76 @@ static int ntfs_statfs(struct super_block *sb, struct kstatfs *sfs)
 }
 
 /**
- * Super operations for mount time when we don't have enough setup to use the
- * proper functions.
- */
-struct super_operations ntfs_mount_sops = {
-	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
-	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
-	.read_inode	= ntfs_read_inode_mount,  /* VFS: Load inode from disk,
-						     called from iget(). */
-	.clear_inode	= ntfs_clear_big_inode,	  /* VFS: Called when inode is
-						     removed from memory. */
-};
-
-/**
  * The complete super operations.
  */
 struct super_operations ntfs_sops = {
 	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
 	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
-	//.dirty_inode	= ntfs_dirty_inode,	  /* VFS: Called from
-	//					     __mark_inode_dirty(). */
-	//.write_inode	= NULL,		  /* VFS: Write dirty inode to disk. */
-	.put_inode	= ntfs_put_inode, /* VFS: Called just before the inode
-					     reference count is decreased. */
-	//.delete_inode	= NULL,		  /* VFS: Delete inode from disk. Called
-	//				     when i_count becomes 0 and i_nlink
-	//				     is also 0. */
-	.put_super	= ntfs_put_super, /* Syscall: umount. */
-	//write_super	= NULL,		  /* Flush dirty super block to disk. */
-	//write_super_lockfs	= NULL,	  /* ? */
-	//unlockfs	= NULL,		  /* ? */
-	.statfs		= ntfs_statfs,	  /* Syscall: statfs */
-	.remount_fs	= ntfs_remount,	  /* Syscall: mount -o remount. */
+	.put_inode	= ntfs_put_inode,	  /* VFS: Called just before
+						     the inode reference count
+						     is decreased. */
+#ifdef NTFS_RW
+	//.dirty_inode	= NULL,			/* VFS: Called from
+	//					   __mark_inode_dirty(). */
+	.write_inode	= ntfs_write_inode,	/* VFS: Write dirty inode to
+						   disk. */
+	//.drop_inode	= NULL,			/* VFS: Called just after the
+	//					   inode reference count has
+	//					   been decreased to zero.
+	//					   NOTE: The inode lock is
+	//					   held. See fs/inode.c::
+	//					   generic_drop_inode(). */
+	//.delete_inode	= NULL,			/* VFS: Delete inode from disk.
+	//					   Called when i_count becomes
+	//					   0 and i_nlink is also 0. */
+	//.write_super	= NULL,			/* Flush dirty super block to
+	//					   disk. */
+	//.sync_fs	= NULL,			/* ? */
+	//.write_super_lockfs	= NULL,		/* ? */
+	//.unlockfs	= NULL,			/* ? */
+#endif /* NTFS_RW */
+	.put_super	= ntfs_put_super,	/* Syscall: umount. */
+	.statfs		= ntfs_statfs,		/* Syscall: statfs */
+	.remount_fs	= ntfs_remount,		/* Syscall: mount -o remount. */
 	.clear_inode	= ntfs_clear_big_inode,	/* VFS: Called when an inode is
 						   removed from memory. */
-	//.umount_begin	= NULL,		     /* Forced umount. */
-	.show_options	= ntfs_show_options, /* Show mount options in proc. */
+	//.umount_begin	= NULL,			/* Forced umount. */
+	.show_options	= ntfs_show_options,	/* Show mount options in
+						   proc. */
+};
+
+
+/**
+ * Declarations for NTFS specific export operations (fs/ntfs/namei.c).
+ */
+extern struct dentry *ntfs_get_parent(struct dentry *child_dent);
+extern struct dentry *ntfs_get_dentry(struct super_block *sb, void *fh);
+
+/**
+ * Export operations allowing NFS exporting of mounted NTFS partitions.
+ *
+ * We use the default ->decode_fh() and ->encode_fh() for now.  Note that they
+ * use 32 bits to store the inode number which is an unsigned long so on 64-bit
+ * architectures is usually 64 bits so it would all fail horribly on huge
+ * volumes.  I guess we need to define our own encode and decode fh functions
+ * that store 64-bit inode numbers at some point but for now we will ignore the
+ * problem...
+ *
+ * We also use the default ->get_name() helper (used by ->decode_fh() via
+ * fs/exportfs/expfs.c::find_exported_dentry()) as that is completely fs
+ * independent.
+ *
+ * The default ->get_parent() just returns -EACCES so we have to provide our
+ * own and the default ->get_dentry() is incompatible with NTFS due to not
+ * allowing the inode number 0 which is used in NTFS for the system file $MFT
+ * and due to using iget() whereas NTFS needs ntfs_iget().
+ */
+static struct export_operations ntfs_export_ops = {
+	.get_parent	= ntfs_get_parent,	/* Find the parent of a given
+						   directory. */
+	.get_dentry	= ntfs_get_dentry,	/* Find a dentry for the inode
+						   given a file handle
+						   sub-fragment. */
 };
 
 /**
@@ -1366,6 +2139,14 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	ntfs_debug("Entering.");
 #ifndef NTFS_RW
 	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#else
+	if (!(sb->s_flags & MS_NOATIME))
+		ntfs_warning(sb, "Atime updates are not implemented yet.  "
+				"Disabling them.");
+	else if (!(sb->s_flags & MS_NODIRATIME))
+		ntfs_warning(sb, "Directory atime updates are not implemented "
+				"yet.  Disabling them.");
+	sb->s_flags |= MS_NOATIME | MS_NODIRATIME;
 #endif
 	/* Allocate a new ntfs_volume and place it in sb->s_fs_info. */
 	sb->s_fs_info = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
@@ -1383,16 +2164,20 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->mft_ino = NULL;
 	vol->mftbmp_ino = NULL;
 	init_rwsem(&vol->mftbmp_lock);
+#ifdef NTFS_RW
 	vol->mftmirr_ino = NULL;
+	vol->logfile_ino = NULL;
+#endif /* NTFS_RW */
 	vol->lcnbmp_ino = NULL;
 	init_rwsem(&vol->lcnbmp_lock);
 	vol->vol_ino = NULL;
 	vol->root_ino = NULL;
 	vol->secure_ino = NULL;
-	vol->uid = vol->gid = 0;
-	vol->flags = 0;
-	vol->on_errors = 0;
-	vol->mft_zone_multiplier = 0;
+	vol->extend_ino = NULL;
+#ifdef NTFS_RW
+	vol->quota_ino = NULL;
+	vol->quota_q_ino = NULL;
+#endif /* NTFS_RW */
 	vol->nls_map = NULL;
 
 	/*
@@ -1433,7 +2218,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 			ntfs_error(sb, "Not an NTFS volume.");
 		goto err_out_now;
 	}
-	
+
 	/*
 	 * Extract the data from the boot sector and setup the ntfs super block
 	 * using it.
@@ -1448,7 +2233,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 		goto err_out_now;
 	}
 
-	/* 
+	/*
 	 * TODO: When we start coping with sector sizes different from
 	 * NTFS_BLOCK_SIZE, we now probably need to set the blocksize of the
 	 * device (probably to NTFS_BLOCK_SIZE).
@@ -1459,7 +2244,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 
 	/*
 	 * Ntfs allows 63 bits for the file size, i.e. correct would be:
-	 * 	sb->s_maxbytes = ~0ULL >> 1;
+	 *	sb->s_maxbytes = ~0ULL >> 1;
 	 * But the kernel uses a long as the page cache page index which on
 	 * 32-bit architectures is only 32-bits. MAX_LFS_FILESIZE is kernel
 	 * defined to the maximum the page cache page index can cope with
@@ -1474,28 +2259,20 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 * the inode for $MFT which is sufficient to allow our normal inode
 	 * operations and associated address space operations to function.
 	 */
-	/*
-	 * Poison vol->mft_ino so we know whether iget() called into our
-	 * ntfs_read_inode_mount() method.
-	 */
-#define OGIN	((struct inode*)le32_to_cpu(0x4e49474f))	/* OGIN */
-	vol->mft_ino = OGIN;
-	sb->s_op = &ntfs_mount_sops;
-	tmp_ino = iget(vol->sb, FILE_MFT);
-	if (!tmp_ino || tmp_ino != vol->mft_ino || is_bad_inode(tmp_ino)) {
+	sb->s_op = &ntfs_sops;
+	tmp_ino = new_inode(sb);
+	if (!tmp_ino) {
 		if (!silent)
 			ntfs_error(sb, "Failed to load essential metadata.");
-		if (tmp_ino && vol->mft_ino == OGIN)
-			ntfs_error(sb, "BUG: iget() did not call "
-					"ntfs_read_inode_mount() method!\n");
-		if (!tmp_ino)
-			goto cond_iput_mft_ino_err_out_now;
+		goto err_out_now;
+	}
+	tmp_ino->i_ino = FILE_MFT;
+	insert_inode_hash(tmp_ino);
+	if (ntfs_read_inode_mount(tmp_ino) < 0) {
+		if (!silent)
+			ntfs_error(sb, "Failed to load essential metadata.");
 		goto iput_tmp_ino_err_out_now;
 	}
-	/*
-	 * Note: sb->s_op has already been set to &ntfs_sops by our specialized
-	 * ntfs_read_inode_mount() method when it was invoked by iget().
-	 */
 	down(&ntfs_lock);
 	/*
 	 * The current mount is a compression user if the cluster size is
@@ -1544,25 +2321,53 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 			default_upcase = NULL;
 		}
 		up(&ntfs_lock);
+		sb->s_export_op = &ntfs_export_ops;
 		return 0;
 	}
 	ntfs_error(sb, "Failed to allocate root directory.");
 	/* Clean up after the successful load_system_files() call from above. */
+	// TODO: Use ntfs_put_super() instead of repeating all this code...
+	// FIXME: Should mark the volume clean as the error is most likely
+	// 	  -ENOMEM.
 	iput(vol->vol_ino);
 	vol->vol_ino = NULL;
 	/* NTFS 3.0+ specific clean up. */
 	if (vol->major_ver >= 3) {
-		iput(vol->secure_ino);
-		vol->secure_ino = NULL;
+#ifdef NTFS_RW
+		if (vol->quota_q_ino) {
+			iput(vol->quota_q_ino);
+			vol->quota_q_ino = NULL;
+		}
+		if (vol->quota_ino) {
+			iput(vol->quota_ino);
+			vol->quota_ino = NULL;
+		}
+#endif /* NTFS_RW */
+		if (vol->extend_ino) {
+			iput(vol->extend_ino);
+			vol->extend_ino = NULL;
+		}
+		if (vol->secure_ino) {
+			iput(vol->secure_ino);
+			vol->secure_ino = NULL;
+		}
 	}
 	iput(vol->root_ino);
 	vol->root_ino = NULL;
 	iput(vol->lcnbmp_ino);
 	vol->lcnbmp_ino = NULL;
-	iput(vol->mftmirr_ino);
-	vol->mftmirr_ino = NULL;
 	iput(vol->mftbmp_ino);
 	vol->mftbmp_ino = NULL;
+#ifdef NTFS_RW
+	if (vol->logfile_ino) {
+		iput(vol->logfile_ino);
+		vol->logfile_ino = NULL;
+	}
+	if (vol->mftmirr_ino) {
+		iput(vol->mftmirr_ino);
+		vol->mftmirr_ino = NULL;
+	}
+#endif /* NTFS_RW */
 	vol->upcase_len = 0;
 	if (vol->upcase != default_upcase)
 		ntfs_free(vol->upcase);
@@ -1588,12 +2393,9 @@ unl_upcase_iput_tmp_ino_err_out_now:
 	up(&ntfs_lock);
 iput_tmp_ino_err_out_now:
 	iput(tmp_ino);
-cond_iput_mft_ino_err_out_now:
-	if (vol->mft_ino && vol->mft_ino != OGIN && vol->mft_ino != tmp_ino) {
+	if (vol->mft_ino && vol->mft_ino != tmp_ino)
 		iput(vol->mft_ino);
-		vol->mft_ino = NULL;
-	}
-#undef OGIN
+	vol->mft_ino = NULL;
 	/*
 	 * This is needed to get ntfs_clear_extent_inode() called for each
 	 * inode we have ever called ntfs_iget()/iput() on, otherwise we A)
@@ -1640,10 +2442,11 @@ static void ntfs_big_inode_init_once(void *foo, kmem_cache_t *cachep,
 }
 
 /*
- * Slab cache to optimize allocations and deallocations of attribute search
- * contexts.
+ * Slab caches to optimize allocations and deallocations of attribute search
+ * contexts and index contexts, respectively.
  */
 kmem_cache_t *ntfs_attr_ctx_cache;
+kmem_cache_t *ntfs_index_ctx_cache;
 
 /* A global default upcase table and a corresponding reference count. */
 wchar_t *default_upcase = NULL;
@@ -1670,6 +2473,7 @@ static struct file_system_type ntfs_fs_type = {
 };
 
 /* Stable names for the slab caches. */
+static const char ntfs_index_ctx_cache_name[] = "ntfs_index_ctx_cache";
 static const char ntfs_attr_ctx_cache_name[] = "ntfs_attr_ctx_cache";
 static const char ntfs_name_cache_name[] = "ntfs_name_cache";
 static const char ntfs_inode_cache_name[] = "ntfs_inode_cache";
@@ -1696,17 +2500,25 @@ static int __init init_ntfs_fs(void)
 
 	ntfs_debug("Debug messages are enabled.");
 
+	ntfs_index_ctx_cache = kmem_cache_create(ntfs_index_ctx_cache_name,
+			sizeof(ntfs_index_context), 0 /* offset */,
+			SLAB_HWCACHE_ALIGN, NULL /* ctor */, NULL /* dtor */);
+	if (!ntfs_index_ctx_cache) {
+		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
+				ntfs_index_ctx_cache_name);
+		goto ictx_err_out;
+	}
 	ntfs_attr_ctx_cache = kmem_cache_create(ntfs_attr_ctx_cache_name,
 			sizeof(attr_search_context), 0 /* offset */,
 			SLAB_HWCACHE_ALIGN, NULL /* ctor */, NULL /* dtor */);
 	if (!ntfs_attr_ctx_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
 				ntfs_attr_ctx_cache_name);
-		goto ctx_err_out;
+		goto actx_err_out;
 	}
 
 	ntfs_name_cache = kmem_cache_create(ntfs_name_cache_name,
-			(NTFS_MAX_NAME_LEN+1) * sizeof(uchar_t), 0,
+			(NTFS_MAX_NAME_LEN+1) * sizeof(ntfschar), 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!ntfs_name_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
@@ -1715,7 +2527,7 @@ static int __init init_ntfs_fs(void)
 	}
 
 	ntfs_inode_cache = kmem_cache_create(ntfs_inode_cache_name,
-			sizeof(ntfs_inode), 0, 
+			sizeof(ntfs_inode), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, NULL, NULL);
 	if (!ntfs_inode_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
@@ -1724,7 +2536,7 @@ static int __init init_ntfs_fs(void)
 	}
 
 	ntfs_big_inode_cache = kmem_cache_create(ntfs_big_inode_cache_name,
-			sizeof(big_ntfs_inode), 0, 
+			sizeof(big_ntfs_inode), 0,
 			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 			ntfs_big_inode_init_once, NULL);
 	if (!ntfs_big_inode_cache) {
@@ -1755,7 +2567,9 @@ inode_err_out:
 	kmem_cache_destroy(ntfs_name_cache);
 name_err_out:
 	kmem_cache_destroy(ntfs_attr_ctx_cache);
-ctx_err_out:
+actx_err_out:
+	kmem_cache_destroy(ntfs_index_ctx_cache);
+ictx_err_out:
 	if (!err) {
 		printk(KERN_CRIT "NTFS: Aborting NTFS file system driver "
 				"registration...\n");
@@ -1784,17 +2598,20 @@ static void __exit exit_ntfs_fs(void)
 	if (kmem_cache_destroy(ntfs_attr_ctx_cache) && (err = 1))
 		printk(KERN_CRIT "NTFS: Failed to destory %s.\n",
 				ntfs_attr_ctx_cache_name);
+	if (kmem_cache_destroy(ntfs_index_ctx_cache) && (err = 1))
+		printk(KERN_CRIT "NTFS: Failed to destory %s.\n",
+				ntfs_index_ctx_cache_name);
 	if (err)
 		printk(KERN_CRIT "NTFS: This causes memory to leak! There is "
 				"probably a BUG in the driver! Please report "
 				"you saw this message to "
-				"linux-ntfs-dev@lists.sf.net\n");
+				"linux-ntfs-dev@lists.sourceforge.net\n");
 	/* Unregister the ntfs sysctls. */
 	ntfs_sysctl(0);
 }
 
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
-MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2003 Anton Altaparmakov");
+MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2004 Anton Altaparmakov");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 MODULE_PARM(debug_msgs, "i");
@@ -1803,4 +2620,3 @@ MODULE_PARM_DESC(debug_msgs, "Enable debug messages.");
 
 module_init(init_ntfs_fs)
 module_exit(exit_ntfs_fs)
-

@@ -23,6 +23,7 @@ typedef struct {
 
 #define spin_is_locked(x)	((x)->lock != 0)
 #define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 /*
  * Simple spin lock operations.  There are two variants, one clears IRQ's
@@ -165,6 +166,30 @@ static inline void _raw_write_unlock(rwlock_t *rw)
 	: "=m" (rw->lock)
 	: "m" (rw->lock)
 	: "memory");
+}
+
+static inline int _raw_write_trylock(rwlock_t *rw)
+{
+	unsigned int tmp;
+	int ret;
+
+	__asm__ __volatile__(
+	".set\tnoreorder\t\t\t# _raw_write_trylock\n"
+	"li\t%2, 0\n\t"
+	"1:\tll\t%1, %3\n\t"
+	"bnez\t%1, 2f\n\t"
+	"lui\t%1, 0x8000\n\t"
+	"sc\t%1, %0\n\t"
+	"beqz\t%1, 1b\n\t"
+	"sync\n\t"
+	"li\t%2, 1\n\t"
+	".set\treorder\n"
+	"2:"
+	: "=m" (rw->lock), "=&r" (tmp), "=&r" (ret)
+	: "m" (rw->lock)
+	: "memory");
+
+	return ret;
 }
 
 #endif /* _ASM_SPINLOCK_H */

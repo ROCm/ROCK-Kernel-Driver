@@ -26,22 +26,15 @@
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
 #include <linux/version.h>
-#include <linux/dump.h>
-#include <linux/kprobes.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
 #include <linux/eisa.h>
 #endif
-#include <linux/trigevent_hooks.h>
 
 #ifdef CONFIG_MCA
 #include <linux/mca.h>
 #endif
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -49,13 +42,11 @@
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/debugreg.h>
-#include <asm/kwatch.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/nmi.h>
 
 #include <asm/smp.h>
-#include <asm/pgalloc.h>
 #include <asm/arch_hooks.h>
 
 #include <linux/irq.h>
@@ -64,9 +55,6 @@
 #include "mach_traps.h"
 
 asmlinkage int system_call(void);
-#ifdef	CONFIG_KDB
-asmlinkage int kdb_call(void);
-#endif	/* CONFIG_KDB */
 asmlinkage void lcall7(void);
 asmlinkage void lcall27(void);
 
@@ -97,9 +85,6 @@ asmlinkage void segment_not_present(void);
 asmlinkage void stack_segment(void);
 asmlinkage void general_protection(void);
 asmlinkage void page_fault(void);
-#ifdef	CONFIG_KDB
-asmlinkage void page_fault_mca(void);
-#endif	/* CONFIG_KDB */
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
@@ -108,35 +93,76 @@ asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
 
-void show_trace(struct task_struct *task, unsigned long * stack)
+static int valid_stack_ptr(struct task_struct *task, void *p)
+{
+	if (p <= (void *)task->thread_info)
+		return 0;
+	if (kstack_end(p))
+		return 0;
+	return 1;
+}
+
+#ifdef CONFIG_FRAME_POINTER
+static void print_context_stack(struct task_struct *task, unsigned long *stack,
+			 unsigned long ebp)
 {
 	unsigned long addr;
 
-	if (!stack)
-		stack = (unsigned long*)&stack;
+	while (valid_stack_ptr(task, (void *)ebp)) {
+		addr = *(unsigned long *)(ebp + 4);
+		printk(" [<%08lx>] ", addr);
+		print_symbol("%s", addr);
+		printk("\n");
+		ebp = *(unsigned long *)ebp;
+	}
+}
+#else
+static void print_context_stack(struct task_struct *task, unsigned long *stack,
+			 unsigned long ebp)
+{
+	unsigned long addr;
 
-	printk("Call Trace:");
-#ifdef CONFIG_KALLSYMS
-	printk("\n");
-#endif
 	while (!kstack_end(stack)) {
 		addr = *stack++;
-		if (kernel_text_address(addr)) {
-			printk(" [<%08lx>] ", addr);
-			print_symbol("%s\n", addr);
+		if (__kernel_text_address(addr)) {
+			printk(" [<%08lx>]", addr);
+			print_symbol(" %s", addr);
+			printk("\n");
 		}
 	}
-	printk("\n");
 }
+#endif
 
-void show_trace_task(struct task_struct *tsk)
+void show_trace(struct task_struct *task, unsigned long * stack)
 {
-	unsigned long esp = tsk->thread.esp;
+	unsigned long ebp;
 
-	/* User space on another CPU? */
-	if ((esp ^ (unsigned long)tsk->thread_info) & ~(THREAD_SIZE - 1))
+	if (!task)
+		task = current;
+
+	if (!valid_stack_ptr(task, stack)) {
+		printk("Stack pointer is garbage, not printing trace\n");
 		return;
-	show_trace(tsk, (unsigned long *)esp);
+	}
+
+	if (task == current) {
+		/* Grab ebp right from our regs */
+		asm ("movl %%ebp, %0" : "=r" (ebp) : );
+	} else {
+		/* ebp is the last reg pushed by switch_to */
+		ebp = *(unsigned long *) task->thread.esp;
+	}
+
+	while (1) {
+		struct thread_info *context;
+		context = (struct thread_info *)
+			((unsigned long)stack & (~(THREAD_SIZE - 1)));
+		print_context_stack(task, stack, ebp);
+		stack = (unsigned long*)context->previous_esp;
+		if (!stack)
+			break;
+		printk(" =======================\n");
+	}
 }
 
 void show_stack(struct task_struct *task, unsigned long *esp)
@@ -159,7 +185,7 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 			printk("\n       ");
 		printk("%08lx ", *stack++);
 	}
-	printk("\n");
+	printk("\nCall Trace:\n");
 	show_trace(task, esp);
 }
 
@@ -295,11 +321,6 @@ void die(const char * str, struct pt_regs * regs, long err)
 	show_registers(regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
-#ifdef	CONFIG_KDB
-	kdb_diemsg = str;
-	kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
-	dump((char *)str, regs);
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
@@ -330,7 +351,6 @@ static inline unsigned long get_cr2(void)
 static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
-	TRIG_EVENT(trap_entry_hook, trapnr, regs->eip);
 	if (regs->eflags & VM_MASK) {
 		if (vm86)
 			goto vm86_trap;
@@ -348,24 +368,20 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			force_sig_info(signr, info, tsk);
 		else
 			force_sig(signr, tsk);
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 	kernel_trap: {
 		if (!fixup_exception(regs))
 			die(str, regs, error_code);
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 	vm86_trap: {
 		int ret = handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code, trapnr);
 		if (ret) goto trap_signal;
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
-	TRIG_EVENT(trap_exit_hook);
 }
 
 #define DO_ERROR(trapnr, signr, str, name) \
@@ -381,7 +397,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_signo = signr; \
 	info.si_errno = 0; \
 	info.si_code = sicode; \
-	info.si_addr = (void *)siaddr; \
+	info.si_addr = (void __user *)siaddr; \
 	do_trap(trapnr, signr, str, 0, regs, error_code, &info); \
 }
 
@@ -398,11 +414,12 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_signo = signr; \
 	info.si_errno = 0; \
 	info.si_code = sicode; \
-	info.si_addr = (void *)siaddr; \
+	info.si_addr = (void __user *)siaddr; \
 	do_trap(trapnr, signr, str, 1, regs, error_code, &info); \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
+DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_VM86_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->eip)
@@ -419,25 +436,18 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
  
 	if (regs->eflags & VM_MASK)
 		goto gp_in_vm86;
-	
-	if (kprobe_running() && kprobe_fault_handler(regs, 13))
-		return;
 
 	if (!(regs->xcs & 3))
 		goto gp_in_kernel;
 
 	current->thread.error_code = error_code;
 	current->thread.trap_no = 13;
-	TRIG_EVENT(trap_entry_hook, 13, regs->eip);
 	force_sig(SIGSEGV, current);
-	TRIG_EVENT(trap_exit_hook);
 	return;
 
 gp_in_vm86:
 	local_irq_enable();
-	TRIG_EVENT(trap_entry_hook, 13, regs->eip);
 	handle_vm86_fault((struct kernel_vm86_regs *) regs, error_code);
-	TRIG_EVENT(trap_exit_hook);
 	return;
 
 gp_in_kernel:
@@ -480,37 +490,16 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 		return;
 	}
 #endif
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_NMI, reason, regs);
-#endif	/* CONFIG_KDB */
 	printk("Uhhuh. NMI received for unknown reason %02x on CPU %d.\n",
 		reason, smp_processor_id());
 	printk("Dazed and confused, but trying to continue\n");
 	printk("Do you have a strange power saving mode enabled?\n");
 }
 
-#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
-static void
-do_ack_apic_irq(void)
-{
-	ack_APIC_irq();
-}
-#endif	/* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
-
 static void default_do_nmi(struct pt_regs * regs)
 {
 	unsigned char reason = get_nmi_reason();
  
-#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
-	/*
-	 * Call the kernel debugger to see if this NMI is due
-	 * to an KDB requested IPI.  If so, kdb will handle it.
-	 */
-	if (kdb_ipi(regs, do_ack_apic_irq)) {
-		return;
-	}
-#endif	/* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
-
 	if (!(reason & 0xc0)) {
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -547,10 +536,6 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 {
 	int cpu;
 
-#ifndef CONFIG_X86_LOCAL_APIC /* On an machine with APIC enabled NMIs are used to implement a
-				watchdog and will hang the machine if traced. */
-	TRIG_EVENT(trap_entry_hook, 2, regs->eip);
-#endif
 	nmi_enter();
 
 	cpu = smp_processor_id();
@@ -560,7 +545,6 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 		default_do_nmi(regs);
 
 	nmi_exit();
-	TRIG_EVENT(trap_exit_hook);
 }
 
 void set_nmi_callback(nmi_callback_t callback)
@@ -571,23 +555,6 @@ void set_nmi_callback(nmi_callback_t callback)
 void unset_nmi_callback(void)
 {
 	nmi_callback = dummy_nmi_callback;
-}
-
-asmlinkage int do_int3(struct pt_regs *regs, long error_code)
-{
-	if (kprobe_handler(regs))
-		return 1;
-
-#ifdef	CONFIG_KDB
-	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return 0;
-#endif	/* CONFIG_KDB */
-
-	/* This is an interrupt gate, because kprobes wants interrupts
-           disabled.  Normal trap handlers don't. */
-	restore_interrupts(regs);
-	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-	return 0;
 }
 
 /*
@@ -612,24 +579,13 @@ asmlinkage int do_int3(struct pt_regs *regs, long error_code)
  * find every occurrence of the TF bit that could be saved away even
  * by user code)
  */
-asmlinkage int do_debug(struct pt_regs * regs, long error_code)
+asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
 	siginfo_t info;
 
-	if (post_kprobe_handler(regs))
-		return 1;
-
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
-
-	if (kwatch_handler(condition, regs))
-		return 1;
-
-#ifdef	CONFIG_KDB
-	if (kdb(KDB_REASON_DEBUG, error_code, regs))
-		return 0;
-#endif	/* CONFIG_KDB */
 
 	/* It's safe to allow irq's after DR6 has been saved */
 	if (regs->eflags & X86_EFLAGS_IF)
@@ -674,30 +630,28 @@ asmlinkage int do_debug(struct pt_regs * regs, long error_code)
 	/* If this is a kernel mode trap, save the user PC on entry to 
 	 * the kernel, that's what the debugger can make sense of.
 	 */
-	info.si_addr = ((regs->xcs & 3) == 0) ? (void *)tsk->thread.eip : 
-	                                        (void *)regs->eip;
-        TRIG_EVENT(trap_entry_hook, 1, regs->eip);
+	info.si_addr = ((regs->xcs & 3) == 0) ? (void __user *)tsk->thread.eip
+	                                      : (void __user *)regs->eip;
 	force_sig_info(SIGTRAP, &info, tsk);
-        TRIG_EVENT(trap_exit_hook);
 
 	/* Disable additional traps. They'll be re-enabled when
 	 * the signal is delivered.
 	 */
 clear_dr7:
-	load_process_dr7(0);
-	return 0;
+	__asm__("movl %0,%%db7"
+		: /* no output */
+		: "r" (0));
+	return;
 
 debug_vm86:
-        TRIG_EVENT(trap_entry_hook, 1, regs->eip);
 	handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code, 1);
-        TRIG_EVENT(trap_exit_hook);
-	return 0;
+	return;
 
 clear_TF_reenable:
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
 clear_TF:
 	regs->eflags &= ~TF_MASK;
-	return 0;
+	return;
 }
 
 /*
@@ -705,7 +659,7 @@ clear_TF:
  * the correct behaviour even in the presence of the asynchronous
  * IRQ13 behaviour
  */
-void math_error(void *eip)
+void math_error(void __user *eip)
 {
 	struct task_struct * task;
 	siginfo_t info;
@@ -764,10 +718,10 @@ void math_error(void *eip)
 asmlinkage void do_coprocessor_error(struct pt_regs * regs, long error_code)
 {
 	ignore_fpu_irq = 1;
-	math_error((void *)regs->eip);
+	math_error((void __user *)regs->eip);
 }
 
-void simd_math_error(void *eip)
+void simd_math_error(void __user *eip)
 {
 	struct task_struct * task;
 	siginfo_t info;
@@ -821,7 +775,7 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
 	if (cpu_has_xmm) {
 		/* Handle SIMD FPU exceptions on PIII+ processors. */
 		ignore_fpu_irq = 1;
-		simd_math_error((void *)regs->eip);
+		simd_math_error((void __user *)regs->eip);
 	} else {
 		/*
 		 * Handle strange cache flush from user space exception
@@ -842,12 +796,10 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
 asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
 					  long error_code)
 {
-        TRIG_EVENT(trap_entry_hook, 16, regs->eip);
 #if 0
 	/* No need to warn about this any longer. */
 	printk("Ignoring P6 Local APIC Spurious Interrupt Bug...\n");
 #endif
-        TRIG_EVENT(trap_exit_hook);	
 }
 
 /*
@@ -865,8 +817,6 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = thread->task;
 
-	if (kprobe_running() && kprobe_fault_handler(&regs, 7))
-		return;
 	clts();		/* Allow maths ops (or we recurse) */
 	if (!tsk->used_math)
 		init_fpu(tsk);
@@ -880,10 +830,8 @@ asmlinkage void math_emulate(long arg)
 {
 	printk("math-emulation not enabled and no coprocessor found.\n");
 	printk("killing %s.\n",current->comm);
-        TRIG_EVENT(trap_entry_hook, 7, 0);
 	force_sig(SIGFPE,current);
 	schedule();
-        TRIG_EVENT(trap_exit_hook);
 }
 
 #endif /* CONFIG_MATH_EMULATION */
@@ -914,7 +862,6 @@ do { \
 	:"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
 	 "3" ((char *) (addr)),"2" ((seg) << 16)); \
 } while (0)
-
 
 
 /*
@@ -964,7 +911,7 @@ void __init trap_init(void)
 	set_trap_gate(0,&divide_error);
 	set_intr_gate(1,&debug);
 	set_intr_gate(2,&nmi);
-	_set_gate(idt_table+3,14,3,&int3,__KERNEL_CS); /* int3-5 can be called from all */
+	set_system_gate(3,&int3);	/* int3-5 can be called from all */
 	set_system_gate(4,&overflow);
 	set_system_gate(5,&bounds);
 	set_trap_gate(6,&invalid_op);
@@ -975,17 +922,7 @@ void __init trap_init(void)
 	set_trap_gate(11,&segment_not_present);
 	set_trap_gate(12,&stack_segment);
 	set_trap_gate(13,&general_protection);
-#ifdef	CONFIG_KDB
-	if (test_bit(X86_FEATURE_MCE, boot_cpu_data.x86_capability) &&
-	    test_bit(X86_FEATURE_MCA, boot_cpu_data.x86_capability)) {
-		set_intr_gate(14,&page_fault_mca);
-	}
-	else {
-		set_intr_gate(14,&page_fault);
-	}
-#else	/* !CONFIG_KDB */
 	set_intr_gate(14,&page_fault);
-#endif	/* CONFIG_KDB */
 	set_trap_gate(15,&spurious_interrupt_bug);
 	set_trap_gate(16,&coprocessor_error);
 	set_trap_gate(17,&alignment_check);
@@ -995,14 +932,6 @@ void __init trap_init(void)
 	set_trap_gate(19,&simd_coprocessor_error);
 
 	set_system_gate(SYSCALL_VECTOR,&system_call);
-#ifdef	CONFIG_KDB
-	kdb_enablehwfault();
-	/*
-	 * A trap gate, used by the kernel to enter the 
-	 * debugger, preserving all registers.
-	 */
-	set_trap_gate(KDBENTER_VECTOR, &kdb_call);
-#endif	/* CONFIG_KDB */
 
 	/*
 	 * default LDT is a single-entry callgate to lcall7 for iBCS

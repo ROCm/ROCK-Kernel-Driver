@@ -1,7 +1,7 @@
 /*
  * Flash on Cirrus CDB89712
  *
- * $Id: cdb89712.c,v 1.7 2003/05/21 12:45:18 dwmw2 Exp $
+ * $Id: cdb89712.c,v 1.8 2004/07/12 21:59:43 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -23,7 +23,7 @@ static struct mtd_info *flash_mtd;
 struct map_info cdb89712_flash_map = {
 	.name = "flash",
 	.size = FLASH_SIZE,
-	.buswidth = FLASH_WIDTH,
+	.bankwidth = FLASH_WIDTH,
 	.phys = FLASH_START,
 };
 
@@ -93,7 +93,7 @@ static struct mtd_info *sram_mtd;
 struct map_info cdb89712_sram_map = {
 	.name = "SRAM",
 	.size = SRAM_SIZE,
-	.buswidth = SRAM_WIDTH,
+	.bankwidth = SRAM_WIDTH,
 	.phys = SRAM_START,
 };
 
@@ -161,7 +161,7 @@ static struct mtd_info *bootrom_mtd;
 struct map_info cdb89712_bootrom_map = {
 	.name = "BootROM",
 	.size = BOOTROM_SIZE,
-	.buswidth = BOOTROM_WIDTH,
+	.bankwidth = BOOTROM_WIDTH,
 	.phys = BOOTROM_START,
 };
 

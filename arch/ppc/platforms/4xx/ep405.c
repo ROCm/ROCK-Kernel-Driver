@@ -18,6 +18,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/todc.h>
+#include <asm/ocp.h>
 #include <asm/ibm_ocp_pci.h>
 
 #undef DEBUG
@@ -58,6 +59,8 @@ void __init
 ep405_setup_arch(void)
 {
 	ppc4xx_setup_arch();
+
+	ibm_ocp_set_emac(0, 0);
 
 	if (__res.bi_nvramsize == 512*1024) {
 		/* FIXME: we should properly handle NVRTCs of different sizes */

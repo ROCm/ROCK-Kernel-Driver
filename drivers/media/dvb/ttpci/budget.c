@@ -8,6 +8,11 @@
  * Copyright (C) 1999-2002 Ralph  Metzler 
  *                       & Marcus Metzler for convergence integrated media GmbH
  *
+ * 26feb2004 Support for FS Activy Card (Grundig tuner) by
+ *           Michael Dreher <michael@5dot1.de>,
+ *           Oliver Endriss <o.endriss@gmx.de> and
+ *           Andreas 'randy' Weinberger
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -142,6 +147,49 @@ int budget_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 }
 
 
+/*
+ *   Routines for the Fujitsu Siemens Activy budget card
+ *   22 kHz tone and DiSEqC are handled by the frontend.
+ *   Voltage must be set here.
+ */
+static int SetVoltage_Activy (struct budget *budget, fe_sec_voltage_t voltage)
+{
+	struct saa7146_dev *dev=budget->dev;
+
+	DEB_EE(("budget: %p\n",budget));
+
+	switch (voltage) {
+		case SEC_VOLTAGE_13:
+			saa7146_setgpio(dev, 2, SAA7146_GPIO_OUTLO);
+			break;
+		case SEC_VOLTAGE_18:
+			saa7146_setgpio(dev, 2, SAA7146_GPIO_OUTHI);
+			break;
+		default:
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
+
+static int budget_ioctl_activy (struct dvb_frontend *fe, unsigned int cmd, void *arg)
+{
+	struct budget *budget = fe->before_after_data;
+
+	DEB_EE(("budget: %p\n",budget));
+
+	switch (cmd) {
+		case FE_SET_VOLTAGE:
+			return SetVoltage_Activy (budget, (fe_sec_voltage_t) arg);
+		default:
+			return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+
 static int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
 {
 	struct budget *budget = NULL;
@@ -160,6 +208,10 @@ static int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		return err;
 	}
 
+	if (budget->card->type == BUDGET_FS_ACTIVY)
+		dvb_add_frontend_ioctls (budget->dvb_adapter,
+				 budget_ioctl_activy, NULL, budget);
+	else
 	dvb_add_frontend_ioctls (budget->dvb_adapter,
 				 budget_diseqc_ioctl, NULL, budget);
 
@@ -174,6 +226,10 @@ static int budget_detach (struct saa7146_dev* dev)
 	struct budget *budget = (struct budget*) dev->ext_priv;
 	int err;
 
+	if (budget->card->type == BUDGET_FS_ACTIVY)
+		dvb_remove_frontend_ioctls (budget->dvb_adapter,
+				    budget_ioctl_activy, NULL);
+	else
 	dvb_remove_frontend_ioctls (budget->dvb_adapter,
 				    budget_diseqc_ioctl, NULL);
 
@@ -193,6 +249,7 @@ MAKE_BUDGET_INFO(ttbs,	"TT-Budget/WinTV-NOVA-S  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(ttbc,	"TT-Budget/WinTV-NOVA-C  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(ttbt,	"TT-Budget/WinTV-NOVA-T  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(satel,	"SATELCO Multimedia PCI",	BUDGET_TT_HW_DISEQC);
+MAKE_BUDGET_INFO(fsacs, "Fujitsu Siemens Activy Budget-S PCI", BUDGET_FS_ACTIVY);
 /* Uncomment for Budget Patch */
 /*MAKE_BUDGET_INFO(fs_1_3,"Siemens/Technotrend/Hauppauge PCI rev1.3+Budget_Patch", BUDGET_PATCH);*/
 
@@ -203,6 +260,7 @@ static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbc,  0x13c2, 0x1004),
 	MAKE_EXTENSION_PCI(ttbt,  0x13c2, 0x1005),
 	MAKE_EXTENSION_PCI(satel, 0x13c2, 0x1013),
+	MAKE_EXTENSION_PCI(fsacs, 0x1131, 0x4f61),
 	{
 		.vendor    = 0,
 	}

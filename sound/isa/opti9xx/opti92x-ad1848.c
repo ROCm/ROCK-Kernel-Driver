@@ -602,7 +602,11 @@ __skip_base:
 #endif	/* CS4231 || OPTi93X */
 
 	spin_lock_irqsave(&chip->lock, flags);
+#ifndef OPTi93X
+	 outb(irq_bits << 3 | dma_bits, chip->wss_base);
+#else /* OPTi93X */
 	snd_opti9xx_write(chip, OPTi9XX_MC_REG(3), (irq_bits << 3 | dma_bits));
+#endif /* OPTi93X */
 	spin_unlock_irqrestore(&chip->lock, flags);
 
 __skip_resources:

@@ -143,7 +143,7 @@ static int pcf_isa_init(void)
 		}
 	}
 	if (irq > 0) {
-		if (request_irq(irq, pcf_isa_handler, 0, "PCF8584", 0) < 0) {
+		if (request_irq(irq, pcf_isa_handler, 0, "PCF8584", NULL) < 0) {
 			printk(KERN_ERR "i2c-elektor: Request irq%d failed\n", irq);
 			irq = 0;
 		} else
@@ -244,7 +244,7 @@ static int __init i2c_pcfisa_init(void)
  fail:
 	if (irq > 0) {
 		disable_irq(irq);
-		free_irq(irq, 0);
+		free_irq(irq, NULL);
 	}
 
 	if (!mmapped)
@@ -258,7 +258,7 @@ static void i2c_pcfisa_exit(void)
 
 	if (irq > 0) {
 		disable_irq(irq);
-		free_irq(irq, 0);
+		free_irq(irq, NULL);
 	}
 
 	if (!mmapped)

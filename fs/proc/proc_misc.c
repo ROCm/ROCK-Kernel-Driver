@@ -47,7 +47,6 @@
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/div64.h>
 
@@ -67,9 +66,6 @@ extern int get_filesystem_list(char *);
 extern int get_exec_domain_list(char *);
 extern int get_dma_list(char *);
 extern int get_locks_status (char *, char **, off_t, int);
-#ifdef CONFIG_SGI_DS1286
-extern int get_ds1286_status(char *);
-#endif
 
 static int proc_calc_metrics(char *page, char **start, off_t off,
 				 int count, int *eof, int len)
@@ -163,7 +159,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	unsigned long active;
 	unsigned long free;
 	unsigned long vmtot;
-	long cached;
 	struct vmalloc_info vmi;
 
 	get_page_state(&ps);
@@ -181,10 +176,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	vmi = get_vmalloc_info();
 	vmi.used >>= 10;
 	vmi.largest_chunk >>= 10;
-
-	cached = get_page_cache_size()-total_swapcache_pages-i.bufferram;
-	if (cached < 0)
-		cached = 0;
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -215,7 +206,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.totalram),
 		K(i.freeram),
 		K(i.bufferram),
-		K(cached),
+		K(get_page_cache_size()-total_swapcache_pages-i.bufferram),
 		K(total_swapcache_pages),
 		K(active),
 		K(inactive),
@@ -527,21 +518,11 @@ static int filesystems_read_proc(char *page, char **start, off_t off,
 static int cmdline_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	extern char saved_command_line[];
 	int len;
 
 	len = sprintf(page, "%s\n", saved_command_line);
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
-
-#ifdef CONFIG_SGI_DS1286
-static int ds1286_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = get_ds1286_status(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
-}
-#endif
 
 static int locks_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
@@ -569,12 +550,12 @@ static int execdomains_read_proc(char *page, char **start, off_t off,
 static ssize_t
 read_profile(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
-	loff_t p = *ppos;
+	unsigned long p = *ppos;
 	ssize_t read;
 	char * pnt;
 	unsigned int sample_step = 1 << prof_shift;
 
-	if (p < 0 || p >= (prof_len+1)*sizeof(unsigned int))
+	if (p >= (prof_len+1)*sizeof(unsigned int))
 		return 0;
 	if (count > (prof_len+1)*sizeof(unsigned int) - p)
 		count = (prof_len+1)*sizeof(unsigned int) - p;
@@ -588,7 +569,7 @@ read_profile(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	if (copy_to_user(buf,(void *)pnt,count))
 		return -EFAULT;
 	read += count;
-	*ppos = p;
+	*ppos += read;
 	return read;
 }
 
@@ -636,7 +617,7 @@ static ssize_t write_sysrq_trigger(struct file *file, const char __user *buf,
 
 		if (get_user(c, buf))
 			return -EFAULT;
-		handle_sysrq(c, NULL, NULL);
+		__handle_sysrq(c, NULL, NULL);
 	}
 	return count;
 }
@@ -676,9 +657,6 @@ void __init proc_misc_init(void)
 		{"devices",	devices_read_proc},
 		{"filesystems",	filesystems_read_proc},
 		{"cmdline",	cmdline_read_proc},
-#ifdef CONFIG_SGI_DS1286
-		{"rtc",		ds1286_read_proc},
-#endif
 		{"locks",	locks_read_proc},
 		{"execdomains",	execdomains_read_proc},
 		{NULL,}

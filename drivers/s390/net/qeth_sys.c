@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.19.2.7 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.33 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -8,7 +8,7 @@
  * Copyright 2000,2003 IBM Corporation
  *
  * Author(s): Thomas Spatzier <tspat@de.ibm.com>
- * 	      Frank Pavlic <pavlic@de.ibm.com>	
+ * 	      Frank Pavlic <pavlic@de.ibm.com>
  *
  */
 #include <linux/list.h>
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.19.2.7 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.33 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -35,7 +35,7 @@ qeth_dev_state_show(struct device *dev, char *buf)
 	struct qeth_card *card = dev->driver_data;
 	if (!card)
 		return -EINVAL;
-	
+
 	switch (card->state) {
 	case CARD_STATE_DOWN:
 		return sprintf(buf, "DOWN\n");
@@ -63,7 +63,7 @@ qeth_dev_chpid_show(struct device *dev, char *buf)
 	struct qeth_card *card = dev->driver_data;
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%02X\n", card->info.chpid);
 }
 
@@ -75,7 +75,7 @@ qeth_dev_if_name_show(struct device *dev, char *buf)
 	struct qeth_card *card = dev->driver_data;
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%s\n", card->info.if_name);
 }
 
@@ -87,7 +87,7 @@ qeth_dev_card_type_show(struct device *dev, char *buf)
 	struct qeth_card *card = dev->driver_data;
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%s\n", qeth_get_cardname_short(card));
 }
 
@@ -99,7 +99,7 @@ qeth_dev_portno_show(struct device *dev, char *buf)
 	struct qeth_card *card = dev->driver_data;
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%i\n", card->info.portno);
 }
 
@@ -109,20 +109,20 @@ qeth_dev_portno_store(struct device *dev, const char *buf, size_t count)
 	struct qeth_card *card = dev->driver_data;
 	char *tmp;
 	unsigned int portno;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	if ((card->state != CARD_STATE_DOWN) &&
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
-	
+
 	portno = simple_strtoul(buf, &tmp, 16);
 	if ((portno < 0) || (portno > MAX_PORTNO)){
 		PRINT_WARN("portno 0x%X is out of range\n", portno);
 		return -EINVAL;
 	}
-	
+
 	card->info.portno = portno;
 	return count;
 }
@@ -137,7 +137,7 @@ qeth_dev_portname_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	if (card->info.portname_required) {
 		memcpy(portname, card->info.portname + 1, 8);
 		EBCASC(portname, 8);
@@ -152,14 +152,14 @@ qeth_dev_portname_store(struct device *dev, const char *buf, size_t count)
 	struct qeth_card *card = dev->driver_data;
 	char *tmp;
 	int i;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	if ((card->state != CARD_STATE_DOWN) &&
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
-	
+
 	tmp = strsep((char **) &buf, "\n");
 	if ((strlen(tmp) > 8) || (strlen(tmp) < 2))
 		return -EINVAL;
@@ -184,7 +184,7 @@ qeth_dev_checksum_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%s checksumming\n", qeth_get_checksum_str(card));
 }
 
@@ -193,14 +193,14 @@ qeth_dev_checksum_store(struct device *dev, const char *buf, size_t count)
 {
 	struct qeth_card *card = dev->driver_data;
 	char *tmp;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	if ((card->state != CARD_STATE_DOWN) &&
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
-	
+
 	tmp = strsep((char **) &buf, "\n");
 	if (!strcmp(tmp, "sw_checksumming"))
 		card->options.checksum_type = SW_CHECKSUMMING;
@@ -225,7 +225,7 @@ qeth_dev_prioqing_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	switch (card->qdio.do_prio_queueing) {
 	case QETH_PRIO_Q_ING_PREC:
 		return sprintf(buf, "%s\n", "by precedence");
@@ -242,14 +242,14 @@ qeth_dev_prioqing_store(struct device *dev, const char *buf, size_t count)
 {
 	struct qeth_card *card = dev->driver_data;
 	char *tmp;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	if ((card->state != CARD_STATE_DOWN) &&
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
-	
+
 	tmp = strsep((char **) &buf, "\n");
 	if (!strcmp(tmp, "prio_queueing_prec"))
 		card->qdio.do_prio_queueing = QETH_PRIO_Q_ING_PREC;
@@ -287,7 +287,7 @@ qeth_dev_bufcnt_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%i\n", card->qdio.in_buf_pool.buf_count);
 }
 
@@ -298,22 +298,22 @@ qeth_dev_bufcnt_store(struct device *dev, const char *buf, size_t count)
 	char *tmp;
 	int cnt, old_cnt;
 	int rc;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	if ((card->state != CARD_STATE_DOWN) &&
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
-	
+
 	old_cnt = card->qdio.in_buf_pool.buf_count;
 	cnt = simple_strtoul(buf, &tmp, 10);
 	cnt = (cnt < QETH_IN_BUF_COUNT_MIN) ? QETH_IN_BUF_COUNT_MIN :
 		((cnt > QETH_IN_BUF_COUNT_MAX) ? QETH_IN_BUF_COUNT_MAX : cnt);
 	if (old_cnt != cnt) {
 		if ((rc = qeth_realloc_buffer_pool(card, cnt)))
-				PRINT_WARN("Error (%d) while setting "
-					   "buffer count.\n", rc);
+			PRINT_WARN("Error (%d) while setting "
+				   "buffer count.\n", rc);
 	}
 	return count;
 }
@@ -357,7 +357,7 @@ qeth_dev_route4_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_route_show(card, &card->options.route4, buf);
 }
 
@@ -374,21 +374,21 @@ qeth_dev_route_store(struct qeth_card *card, struct qeth_routing_info *route,
 	if (!strcmp(tmp, "no_router")){
 		route->type = NO_ROUTER;
 	} else if (!strcmp(tmp, "primary_connector")) {
-			route->type = PRIMARY_CONNECTOR;
-		} else if (!strcmp(tmp, "secondary_connector")) {
-			route->type = SECONDARY_CONNECTOR;
-		} else if (!strcmp(tmp, "multicast_router")) {
-			route->type = MULTICAST_ROUTER;
+		route->type = PRIMARY_CONNECTOR;
+	} else if (!strcmp(tmp, "secondary_connector")) {
+		route->type = SECONDARY_CONNECTOR;
+	} else if (!strcmp(tmp, "multicast_router")) {
+		route->type = MULTICAST_ROUTER;
 	} else if (!strcmp(tmp, "primary_router")) {
-			route->type = PRIMARY_ROUTER;
-		} else if (!strcmp(tmp, "secondary_router")) {
-			route->type = SECONDARY_ROUTER;
-		} else if (!strcmp(tmp, "multicast_router")) {
-				route->type = MULTICAST_ROUTER;
+		route->type = PRIMARY_ROUTER;
+	} else if (!strcmp(tmp, "secondary_router")) {
+		route->type = SECONDARY_ROUTER;
+	} else if (!strcmp(tmp, "multicast_router")) {
+		route->type = MULTICAST_ROUTER;
 	} else {
 		PRINT_WARN("Invalid routing type '%s'.\n", tmp);
 		return -EINVAL;
-	}		
+	}
 	if (((card->state == CARD_STATE_SOFTSETUP) ||
 	     (card->state == CARD_STATE_UP)) &&
 	    (old_route_type != route->type)){
@@ -404,10 +404,10 @@ static ssize_t
 qeth_dev_route4_store(struct device *dev, const char *buf, size_t count)
 {
 	struct qeth_card *card = dev->driver_data;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_route_store(card, &card->options.route4,
 			            QETH_PROT_IPV4, buf, count);
 }
@@ -422,7 +422,7 @@ qeth_dev_route6_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	if (!qeth_is_supported(card, IPA_IPV6))
 		return sprintf(buf, "%s\n", "n/a");
 
@@ -458,7 +458,7 @@ qeth_dev_add_hhlen_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%i\n", card->options.add_hhlen);
 }
 
@@ -476,7 +476,7 @@ qeth_dev_add_hhlen_store(struct device *dev, const char *buf, size_t count)
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
 
-	i = simple_strtoul(buf, &tmp, 16);
+	i = simple_strtoul(buf, &tmp, 10);
 	if ((i < 0) || (i > MAX_ADD_HHLEN)) {
 		PRINT_WARN("add_hhlen out of range\n");
 		return -EINVAL;
@@ -779,7 +779,7 @@ qeth_dev_ipato_invert4_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%i\n", card->ipato.invert4? 1:0);
 }
 
@@ -829,7 +829,7 @@ qeth_dev_ipato_add_show(char *buf, struct qeth_card *card,
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
 	i += sprintf(buf + i, "\n");
-	
+
 	return i;
 }
 
@@ -867,7 +867,7 @@ qeth_parse_ipatoe(const char* buf, enum qeth_prot_versions proto,
 	}
 	start = end + 1;
 	*mask_bits = simple_strtoul(start, &tmp, 10);
-	
+
 	return 0;
 }
 
@@ -896,7 +896,7 @@ qeth_dev_ipato_add_store(const char *buf, size_t count,
 		kfree(ipatoe);
 		return rc;
 	}
-	
+
 	return count;
 }
 
@@ -904,10 +904,10 @@ static ssize_t
 qeth_dev_ipato_add4_store(struct device *dev, const char *buf, size_t count)
 {
 	struct qeth_card *card = dev->driver_data;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_ipato_add_store(buf, count, card, QETH_PROT_IPV4);
 }
 
@@ -927,7 +927,7 @@ qeth_dev_ipato_del_store(const char *buf, size_t count,
 		return rc;
 
 	qeth_del_ipato_entry(card, proto, addr, mask_bits);
-	
+
 	return count;
 }
 
@@ -953,7 +953,7 @@ qeth_dev_ipato_invert6_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return sprintf(buf, "%i\n", card->ipato.invert6? 1:0);
 }
 
@@ -993,7 +993,7 @@ qeth_dev_ipato_add6_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_ipato_add_show(buf, card, QETH_PROT_IPV6);
 }
 
@@ -1065,7 +1065,7 @@ qeth_dev_vipa_add_show(char *buf, struct qeth_card *card,
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
 	i += sprintf(buf + i, "\n");
-	
+
 	return i;
 }
 
@@ -1111,10 +1111,10 @@ static ssize_t
 qeth_dev_vipa_add4_store(struct device *dev, const char *buf, size_t count)
 {
 	struct qeth_card *card = dev->driver_data;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_vipa_add_store(buf, count, card, QETH_PROT_IPV4);
 }
 
@@ -1159,7 +1159,7 @@ qeth_dev_vipa_add6_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_vipa_add_show(buf, card, QETH_PROT_IPV6);
 }
 
@@ -1228,7 +1228,7 @@ qeth_dev_rxip_add_show(char *buf, struct qeth_card *card,
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
 	i += sprintf(buf + i, "\n");
-	
+
 	return i;
 }
 
@@ -1274,10 +1274,10 @@ static ssize_t
 qeth_dev_rxip_add4_store(struct device *dev, const char *buf, size_t count)
 {
 	struct qeth_card *card = dev->driver_data;
-	
+
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_rxip_add_store(buf, count, card, QETH_PROT_IPV4);
 }
 
@@ -1322,7 +1322,7 @@ qeth_dev_rxip_add6_show(struct device *dev, char *buf)
 
 	if (!card)
 		return -EINVAL;
-	
+
 	return qeth_dev_rxip_add_show(buf, card, QETH_PROT_IPV6);
 }
 
@@ -1375,7 +1375,7 @@ int
 qeth_create_device_attributes(struct device *dev)
 {
 	int ret;
-	
+
 	if ((ret = sysfs_create_group(&dev->kobj, &qeth_device_attr_group)))
 		return ret;
 	if ((ret = sysfs_create_group(&dev->kobj, &qeth_device_ipato_group))){
@@ -1408,7 +1408,7 @@ qeth_remove_device_attributes(struct device *dev)
 /**********************/
 /* DRIVER ATTRIBUTES  */
 /**********************/
-static ssize_t 
+static ssize_t
 qeth_driver_group_store(struct device_driver *ddrv, const char *buf,
 			size_t count)
 {
@@ -1474,7 +1474,7 @@ int
 qeth_create_driver_attributes(void)
 {
 	int rc;
-	
+
 	if ((rc = driver_create_file(&qeth_ccwgroup_driver.driver,
 				     &driver_attr_group)))
 		return rc;

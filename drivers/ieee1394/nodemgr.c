@@ -89,7 +89,7 @@ static struct csr1212_bus_ops nodemgr_csr_ops = {
 };
 
 
-/* 
+/*
  * Basically what we do here is start off retrieving the bus_info block.
  * From there will fill in some info about the node, verify it is of IEEE
  * 1394 type, and that the crc checks out ok. After that we start off with
@@ -103,7 +103,7 @@ static struct csr1212_bus_ops nodemgr_csr_ops = {
  * that's easy to parse by the protocol interface.
  */
 
-/* 
+/*
  * The nodemgr relies heavily on the Driver Model for device callbacks and
  * driver/device mappings. The old nodemgr used to handle all this itself,
  * but now we are much simpler because of the LDM.
@@ -275,7 +275,7 @@ static ssize_t fw_show_ne_bus_options(struct device *dev, char *buf)
 		       ne->busopt.irmc,
 		       ne->busopt.cmc, ne->busopt.isc, ne->busopt.bmc,
 		       ne->busopt.pmc, ne->busopt.generation, ne->busopt.lnkspd,
-		       ne->busopt.max_rec, 
+		       ne->busopt.max_rec,
 		       ne->busopt.max_rom,
 		       ne->busopt.cyc_clk_acc);
 }
@@ -330,7 +330,7 @@ static ssize_t fw_get_ignore_driver(struct device *dev, char *buf)
 	struct unit_directory *ud = container_of(dev, struct unit_directory, device);
 
 	return sprintf(buf, "%d\n", ud->ignore_driver);
-}	
+}
 static DEVICE_ATTR(ignore_driver, S_IWUSR | S_IRUGO, fw_get_ignore_driver, fw_set_ignore_driver);
 
 
@@ -727,7 +727,7 @@ static void nodemgr_update_bus_options(struct node_entry *ne)
 	ne->busopt.max_rom	= (busoptions >> 8) & 0x3;
 	ne->busopt.generation   = (busoptions >> 4) & 0xf;
 	ne->busopt.lnkspd       = busoptions & 0x7;
-	
+
 	HPSB_VERBOSE("NodeMgr: raw=0x%08x irmc=%d cmc=%d isc=%d bmc=%d pmc=%d "
 		     "cyc_clk_acc=%d max_rec=%d max_rom=%d gen=%d lspd=%d",
 		     busoptions, ne->busopt.irmc, ne->busopt.cmc,
@@ -1013,7 +1013,7 @@ static void nodemgr_process_root_directory(struct host_info *hi, struct node_ent
 
 		case CSR1212_KV_ID_UNIT:
 			nodemgr_process_unit_directory(hi, ne, kv, &ud_id, NULL);
-			break;			
+			break;
 
 		case CSR1212_KV_ID_DESCRIPTOR:
 			if (last_key_id == CSR1212_KV_ID_VENDOR) {
@@ -1075,7 +1075,7 @@ do {								\
 
 #undef PUT_ENVP
 
-	envp[i] = 0;
+	envp[i] = NULL;
 
 	return 0;
 }
@@ -1086,7 +1086,7 @@ static int nodemgr_hotplug(struct class_device *cdev, char **envp, int num_envp,
 			   char *buffer, int buffer_size)
 {
 	return -ENODEV;
-} 
+}
 
 #endif /* CONFIG_HOTPLUG */
 
@@ -1152,7 +1152,6 @@ static void nodemgr_update_node(struct node_entry *ne, struct csr1212_csr *csr,
 	ne->generation = generation;
 }
 
-		
 
 
 static void nodemgr_node_scan_one(struct host_info *hi,
@@ -1383,7 +1382,7 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 static int nodemgr_do_irm_duties(struct hpsb_host *host, int cycles)
 {
 	quadlet_t bc;
-        
+
 	/* if irm_id == -1 then there is no IRM on this bus */
 	if (!host->is_irm || host->irm_id == (nodeid_t)-1)
 		return 1;
@@ -1486,7 +1485,7 @@ static int nodemgr_host_thread(void *__hi)
 				refrigerator(0);
 				continue;
 			}
-			printk("nodemgr: received unexpected signal?!\n" );
+			printk("NodeMgr: received unexpected signal?!\n" );
 			break;
 		}
 
@@ -1513,6 +1512,10 @@ static int nodemgr_host_thread(void *__hi)
 			 * start the the waiting over again */
 			while (!down_trylock(&hi->reset_sem))
 				i = 0;
+
+			/* Check the kill_me again */
+			if (hi->kill_me)
+				goto caught_signal;
 		}
 
 		if (!nodemgr_check_irm_capability(host, reset_cycles)) {
@@ -1543,7 +1546,6 @@ static int nodemgr_host_thread(void *__hi)
 
 		up(&nodemgr_serialize);
 	}
-	printk("nodemgr: Exiting due to no down\n");
 
 caught_signal:
 	HPSB_VERBOSE("NodeMgr: Exiting thread");
@@ -1626,7 +1628,7 @@ int hpsb_node_read(struct node_entry *ne, u64 addr,
 			 addr, buffer, length);
 }
 
-int hpsb_node_write(struct node_entry *ne, u64 addr, 
+int hpsb_node_write(struct node_entry *ne, u64 addr,
 		    quadlet_t *buffer, size_t length)
 {
 	unsigned int generation = ne->generation;
@@ -1636,7 +1638,7 @@ int hpsb_node_write(struct node_entry *ne, u64 addr,
 			  addr, buffer, length);
 }
 
-int hpsb_node_lock(struct node_entry *ne, u64 addr, 
+int hpsb_node_lock(struct node_entry *ne, u64 addr,
 		   int extcode, quadlet_t *data, quadlet_t arg)
 {
 	unsigned int generation = ne->generation;
@@ -1714,12 +1716,23 @@ static struct hpsb_highlevel nodemgr_highlevel = {
 	.remove_host =	nodemgr_remove_host,
 };
 
-void init_ieee1394_nodemgr(void)
+int init_ieee1394_nodemgr(void)
 {
-	class_register(&nodemgr_ne_class);
-	class_register(&nodemgr_ud_class);
+	int ret;
+
+	ret = class_register(&nodemgr_ne_class);
+	if (ret < 0)
+		return ret;
+
+	ret = class_register(&nodemgr_ud_class);
+	if (ret < 0) {
+		class_unregister(&nodemgr_ne_class);
+		return ret;
+	}
 
 	hpsb_register_highlevel(&nodemgr_highlevel);
+
+	return 0;
 }
 
 void cleanup_ieee1394_nodemgr(void)

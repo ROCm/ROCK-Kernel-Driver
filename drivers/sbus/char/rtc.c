@@ -85,6 +85,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
 	struct rtc_time rtc_tm;
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd)
 	{
@@ -92,7 +93,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		memset(&rtc_tm, 0, sizeof(struct rtc_time));
 		get_rtc_time(&rtc_tm);
 
-		if (copy_to_user((struct rtc_time*)arg, &rtc_tm, sizeof(struct rtc_time)))
+		if (copy_to_user(argp, &rtc_tm, sizeof(struct rtc_time)))
 			return -EFAULT;
 
 		return 0;
@@ -102,7 +103,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (!capable(CAP_SYS_TIME))
 			return -EPERM;
 
-		if (copy_from_user(&rtc_tm, (struct rtc_time*)arg, sizeof(struct rtc_time)))
+		if (copy_from_user(&rtc_tm, argp, sizeof(struct rtc_time)))
 			return -EFAULT;
 
 		set_rtc_time(&rtc_tm);

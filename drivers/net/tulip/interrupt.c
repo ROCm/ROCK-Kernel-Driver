@@ -113,7 +113,6 @@ int tulip_poll(struct net_device *dev, int *budget)
 	int entry = tp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = *budget;
 	int received = 0;
-	int csr5;
 
 	if (!netif_running(dev))
 		goto done;
@@ -134,6 +133,10 @@ int tulip_poll(struct net_device *dev, int *budget)
 			   tp->rx_ring[entry].status);
 
        do {
+		if (inl(dev->base_addr + CSR5) == 0xffffffff) {
+			printk(KERN_DEBUG " In tulip_poll(), hardware disappeared.\n");
+			break;
+		}
                /* Acknowledge current RX interrupt sources. */
                outl((RxIntr | RxNoBuf), dev->base_addr + CSR5);
  
@@ -255,14 +258,7 @@ int tulip_poll(struct net_device *dev, int *budget)
                 * No idea how to fix this if "playing with fire" will fail
                 * tomorrow (night 011029). If it will not fail, we won
                 * finally: amount of IO did not increase at all. */
-	       csr5 = inl(dev->base_addr + CSR5);
-	       if (csr5 == 0xffffffff) {
-		       printk(KERN_DEBUG "tulip_poll: hardware disappeared.\n");
-		       break;
-	       }
-	       if (!(csr5 & RxIntr))
-		       break;
-       } while (csr5 & RxIntr);
+       } while ((inl(dev->base_addr + CSR5) & RxIntr));
  
 done:
  

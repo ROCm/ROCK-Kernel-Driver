@@ -343,8 +343,9 @@ static struct address_space_operations minix_aops = {
 };
 
 static struct inode_operations minix_symlink_inode_operations = {
-	.readlink	= page_readlink,
-	.follow_link	= page_follow_link,
+	.readlink	= generic_readlink,
+	.follow_link	= page_follow_link_light,
+	.put_link	= page_put_link,
 	.getattr	= minix_getattr,
 };
 
@@ -452,7 +453,7 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 
 	raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
 	if (!raw_inode)
-		return 0;
+		return NULL;
 	raw_inode->i_mode = inode->i_mode;
 	raw_inode->i_uid = fs_high2lowuid(inode->i_uid);
 	raw_inode->i_gid = fs_high2lowgid(inode->i_gid);
@@ -479,7 +480,7 @@ static struct buffer_head * V2_minix_update_inode(struct inode * inode)
 
 	raw_inode = minix_V2_raw_inode(inode->i_sb, inode->i_ino, &bh);
 	if (!raw_inode)
-		return 0;
+		return NULL;
 	raw_inode->i_mode = inode->i_mode;
 	raw_inode->i_uid = fs_high2lowuid(inode->i_uid);
 	raw_inode->i_gid = fs_high2lowgid(inode->i_gid);

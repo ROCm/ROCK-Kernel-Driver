@@ -1,21 +1,9 @@
 #
 # IPv6 configuration
 # 
-config IPV6_SUBTREES
-	bool "IPv6: Subtree support (EXPERIMENTAL)"
-	depends on IPV6
-	---help---
-	  This is needed for Mobility to work correctly, when the home
-	  address of the mobile node is used as it's source address,
-	  the route lookup will find the tunnel device as it is first
-	  doing a route lookup based on source address and then the
-	  destination address.
-
 config IPV6_PRIVACY
 	bool "IPv6: Privacy Extensions (RFC 3041) support"
 	depends on IPV6
-	select CRYPTO
-	select CRYPTO_MD5
 	---help---
 	  Privacy Extensions for Stateless Address Autoconfiguration in IPv6
 	  support.  With this option, additional periodically-alter 
@@ -28,10 +16,6 @@ config IPV6_PRIVACY
 	        echo 2 >/proc/sys/net/ipv6/conf/all/use_tempaddr 
 
 	  See <file:Documentation/networking/ip-sysctl.txt> for details.
-
-config IPV6_NDISC_NEW
-	bool
-	default y
 
 config INET6_AH
 	tristate "IPv6: AH transformation"
@@ -73,12 +57,10 @@ config INET6_IPCOMP
 	  If unsure, say Y.
 
 config IPV6_TUNNEL
-	tristate "IPv6: IPv6-in-IPv6 tunnel (EXPERIMENTAL)"
+	tristate "IPv6: IPv6-in-IPv6 tunnel"
 	depends on IPV6
 	---help---
-	  Support for IPv6-in-IPv6 tunnels described in RFC 2473. This is
-	  needed for mobility to work.
+	  Support for IPv6-in-IPv6 tunnels described in RFC 2473.
 
 	  If unsure, say N.
 
-source net/ipv6/mobile_ip6/Kconfig

@@ -100,7 +100,7 @@ struct video_status {
 
 
 struct video_still_picture {
-        char *iFrame;        /* pointer to a single iframe in memory */
+        char __user *iFrame;        /* pointer to a single iframe in memory */
         int32_t size; 
 };
 

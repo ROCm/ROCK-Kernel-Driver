@@ -20,7 +20,7 @@ static struct pcmcia_irqs irqs[] = {
 	{ 0, IRQ_GPIO_FREEBIRD_CF_BVD, "CF_BVD1" },
 };
 
-static int freebird_pcmcia_init(struct sa1100_pcmcia_socket *skt)
+static int freebird_pcmcia_init(struct soc_pcmcia_socket *skt)
 {
 	/* Enable Linkup CF card */
 	LINKUP_PRC = 0xc0;
@@ -35,12 +35,12 @@ static int freebird_pcmcia_init(struct sa1100_pcmcia_socket *skt)
 
 	skt->irq = IRQ_GPIO_FREEBIRD_CF_IRQ;
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void freebird_pcmcia_shutdown(struct sa1100_pcmcia_socket *skt)
+static void freebird_pcmcia_shutdown(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs);
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs);
 
 	/* Disable CF card */
 	LINKUP_PRC = 0x40;  /* SSP=1   SOE=0 */
@@ -48,7 +48,7 @@ static void freebird_pcmcia_shutdown(struct sa1100_pcmcia_socket *skt)
 }
 
 static void
-freebird_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state *state)
+freebird_pcmcia_socket_state(struct soc_pcmcia_socket *skt, struct pcmcia_state *state)
 {
 	unsigned long levels = LINKUP_PRS;
 //	printk("LINKUP_PRS=%x\n",levels);
@@ -63,7 +63,7 @@ freebird_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_sta
 }
 
 static int
-freebird_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+freebird_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 				 socket_state_t *state)
 {
 	unsigned long value, flags;
@@ -103,14 +103,14 @@ freebird_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void freebird_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void freebird_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void freebird_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void freebird_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 static struct pcmcia_low_level freebird_pcmcia_ops = {

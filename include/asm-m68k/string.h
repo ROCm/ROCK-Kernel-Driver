@@ -73,7 +73,7 @@ static inline char * strncat(char *dest, const char *src, size_t count)
 static inline char * strchr(const char * s, int c)
 {
   const char ch = c;
-  
+
   for(; *s != ch; ++s)
     if (*s == '\0')
       return( NULL );
@@ -85,7 +85,7 @@ static inline char * strchr(const char * s, int c)
 static inline char *strpbrk(const char *cs,const char *ct)
 {
   const char *sc1,*sc2;
-  
+
   for( sc1 = cs; *sc1 != '\0'; ++sc1)
     for( sc2 = ct; *sc2 != '\0'; ++sc2)
       if (*sc1 == *sc2)
@@ -290,9 +290,7 @@ static inline void * __memset_g(void * s, int c, size_t count)
 static inline void * __memset_page(void * s,int c,size_t count)
 {
   unsigned long data, tmp;
-  void *xs, *sp;
-
-  xs = sp = s;
+  void *xs = s;
 
   c = c & 255;
   data = c | (c << 8);
@@ -303,10 +301,11 @@ static inline void * __memset_page(void * s,int c,size_t count)
   if (((unsigned long) s) & 0x0f)
 	  __memset_g(s, c, count);
   else{
-	  *((unsigned long *)(s))++ = data;
-	  *((unsigned long *)(s))++ = data;
-	  *((unsigned long *)(s))++ = data;
-	  *((unsigned long *)(s))++ = data;
+	  unsigned long *sp = s;
+	  *sp++ = data;
+	  *sp++ = data;
+	  *sp++ = data;
+	  *sp++ = data;
 
 	  __asm__ __volatile__("1:\t"
 			       ".chip 68040\n\t"
@@ -315,8 +314,8 @@ static inline void * __memset_page(void * s,int c,size_t count)
 			       "subqw  #8,%2\n\t"
 			       "subqw  #8,%2\n\t"
 			       "dbra   %1,1b\n\t"
-			       : "=a" (s), "=d" (tmp)
-			       : "a" (sp), "0" (s), "1" ((count - 16) / 16 - 1)
+			       : "=a" (sp), "=d" (tmp)
+			       : "a" (s), "0" (sp), "1" ((count - 16) / 16 - 1)
 			       );
   }
 

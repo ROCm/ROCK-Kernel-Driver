@@ -125,7 +125,7 @@
 #include <linux/init.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "pas16.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"

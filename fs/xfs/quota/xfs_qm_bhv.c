@@ -388,7 +388,7 @@ struct bhv_vfsops xfs_qmops = { {
 };
 
 
-static int __init
+void __init
 xfs_qm_init(void)
 {
 	static char	message[] __initdata =
@@ -397,22 +397,16 @@ xfs_qm_init(void)
 	printk(message);
 	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
 	vfs_bhv_set_custom(&xfs_qmops, &xfs_qmcore_xfs);
-	bhv_module_init(XFS_QMOPS, THIS_MODULE, &xfs_qmops);
 	xfs_qm_init_procfs();
-	return 0;
 }
 
-static void __exit
+void __exit
 xfs_qm_exit(void)
 {
-	xfs_qm_cleanup_procfs();
-	bhv_module_exit(XFS_QMOPS);
 	vfs_bhv_clr_custom(&xfs_qmops);
+	xfs_qm_cleanup_procfs();
 	if (qm_dqzone)
 		kmem_cache_destroy(qm_dqzone);
 	if (qm_dqtrxzone)
 		kmem_cache_destroy(qm_dqtrxzone);
 }
-
-module_init(xfs_qm_init);
-module_exit(xfs_qm_exit);

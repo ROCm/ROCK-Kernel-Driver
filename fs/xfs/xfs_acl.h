@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2001-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -61,13 +61,16 @@ typedef struct xfs_acl {
 #define SGI_ACL_DEFAULT_SIZE	(sizeof(SGI_ACL_DEFAULT)-1)
 
 
-#ifdef __KERNEL__
-
 #ifdef CONFIG_XFS_POSIX_ACL
 
 struct vattr;
 struct vnode;
 struct xfs_inode;
+
+extern struct kmem_zone *xfs_acl_zone;
+#define xfs_acl_zone_init(zone, name)	\
+		(zone) = kmem_zone_init(sizeof(xfs_acl_t), name)
+#define xfs_acl_zone_destroy(zone)	kmem_cache_destroy(zone)
 
 extern int xfs_acl_inherit(struct vnode *, struct vattr *, xfs_acl_t *);
 extern int xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
@@ -80,17 +83,10 @@ extern int xfs_acl_vset(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vget(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vremove(struct vnode *vp, int);
 
-extern struct kmem_zone *xfs_acl_zone;
-
 #define _ACL_TYPE_ACCESS	1
 #define _ACL_TYPE_DEFAULT	2
 #define _ACL_PERM_INVALID(perm)	((perm) & ~(ACL_READ|ACL_WRITE|ACL_EXECUTE))
 
-#define _ACL_DECL(a)		xfs_acl_t *(a) = NULL
-#define _ACL_ALLOC(a)		((a) = kmem_zone_alloc(xfs_acl_zone, KM_SLEEP))
-#define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)) : 0)
-#define _ACL_ZONE_INIT(z,name)	((z) = kmem_zone_init(sizeof(xfs_acl_t), name))
-#define _ACL_ZONE_DESTROY(z)	(kmem_cache_destroy(z))
 #define _ACL_INHERIT(c,v,d)	(xfs_acl_inherit(c,v,d))
 #define _ACL_GET_ACCESS(pv,pa)	(xfs_acl_vtoacl(pv,pa,NULL) == 0)
 #define _ACL_GET_DEFAULT(pv,pd)	(xfs_acl_vtoacl(pv,NULL,pd) == 0)
@@ -98,17 +94,19 @@ extern struct kmem_zone *xfs_acl_zone;
 #define _ACL_DEFAULT_EXISTS	xfs_acl_vhasacl_default
 #define _ACL_XFS_IACCESS(i,m,c) (XFS_IFORK_Q(i) ? xfs_acl_iaccess(i,m,c) : -1)
 
+#define _ACL_ALLOC(a)		((a) = kmem_zone_alloc(xfs_acl_zone, KM_SLEEP))
+#define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)) : 0)
+
 #else
+#define xfs_acl_zone_init(zone,name)
+#define xfs_acl_zone_destroy(zone)
 #define xfs_acl_vset(v,p,sz,t)	(-EOPNOTSUPP)
 #define xfs_acl_vget(v,p,sz,t)	(-EOPNOTSUPP)
 #define xfs_acl_vremove(v,t)	(-EOPNOTSUPP)
 #define xfs_acl_vhasacl_access(v)	(0)
 #define xfs_acl_vhasacl_default(v)	(0)
-#define _ACL_DECL(a)		((void)0)
 #define _ACL_ALLOC(a)		(1)	/* successfully allocate nothing */
 #define _ACL_FREE(a)		((void)0)
-#define _ACL_ZONE_INIT(z,name)	((void)0)
-#define _ACL_ZONE_DESTROY(z)	((void)0)
 #define _ACL_INHERIT(c,v,d)	(0)
 #define _ACL_GET_ACCESS(pv,pa)	(0)
 #define _ACL_GET_DEFAULT(pv,pd)	(0)
@@ -116,7 +114,5 @@ extern struct kmem_zone *xfs_acl_zone;
 #define _ACL_DEFAULT_EXISTS	(NULL)
 #define _ACL_XFS_IACCESS(i,m,c) (-1)
 #endif
-
-#endif	/* __KERNEL__ */
 
 #endif	/* __XFS_ACL_H__ */

@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/irq.h -- Machine interrupt handling
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,04  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,04  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -62,6 +62,7 @@ extern void disable_irq (unsigned int irq);
 /* Disable an irq without waiting. */
 extern void disable_irq_nosync (unsigned int irq);
 
+extern int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
 
 #endif /* !__ASSEMBLY__ */
 

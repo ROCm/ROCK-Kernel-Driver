@@ -386,6 +386,7 @@ static int  __init hp100_isa_probe(struct net_device *dev, int addr)
 }
 
 
+#ifndef MODULE
 struct net_device * __init hp100_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct hp100_private));
@@ -420,6 +421,7 @@ struct net_device * __init hp100_probe(int unit)
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init hp100_probe1(struct net_device *dev, int ioaddr,
 			       u_char bus, struct pci_dev *pci_dev)

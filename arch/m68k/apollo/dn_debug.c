@@ -14,9 +14,9 @@ int dn_deb_printf(const char *fmt, ...) {
 		i=vsprintf(current_dbg_ptr,fmt,args);
 		va_end(args);
 		current_dbg_ptr+=i;
-	
+
 		return i;
 	}
-	else 
+	else
 		return 0;
 }

@@ -64,8 +64,6 @@ static void kill_bdev(struct block_device *bdev)
 
 int set_blocksize(struct block_device *bdev, int size)
 {
-	int oldsize;
-
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
 		return -EINVAL;
@@ -74,15 +72,13 @@ int set_blocksize(struct block_device *bdev, int size)
 	if (size < bdev_hardsect_size(bdev))
 		return -EINVAL;
 
-	oldsize = bdev->bd_block_size;
-	if (oldsize == size)
-		return 0;
-
-	/* Ok, we're actually changing the blocksize.. */
-	sync_blockdev(bdev);
-	bdev->bd_block_size = size;
-	bdev->bd_inode->i_blkbits = blksize_bits(size);
-	kill_bdev(bdev);
+	/* Don't change the size if it is same as current */
+	if (bdev->bd_block_size != size) {
+		sync_blockdev(bdev);
+		bdev->bd_block_size = size;
+		bdev->bd_inode->i_blkbits = blksize_bits(size);
+		kill_bdev(bdev);
+	}
 	return 0;
 }
 
@@ -90,12 +86,15 @@ EXPORT_SYMBOL(set_blocksize);
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
-	int bits;
-	if (set_blocksize(sb->s_bdev, size) < 0)
+	int bits = 9; /* 2^9 = 512 */
+
+	if (set_blocksize(sb->s_bdev, size))
 		return 0;
+	/* If we get here, we know size is power of two
+	 * and it's value is between 512 and PAGE_SIZE */
 	sb->s_blocksize = size;
-	for (bits = 9, size >>= 9; size >>= 1; bits++)
-		;
+	for (size >>= 10; size; size >>= 1)
+		++bits;
 	sb->s_blocksize_bits = bits;
 	return sb->s_blocksize;
 }
@@ -238,7 +237,10 @@ static struct inode *bdev_alloc_inode(struct super_block *sb)
 
 static void bdev_destroy_inode(struct inode *inode)
 {
-	kmem_cache_free(bdev_cachep, BDEV_I(inode));
+	struct bdev_inode *bdi = BDEV_I(inode);
+
+	bdi->bdev.bd_inode_backing_dev_info = NULL;
+	kmem_cache_free(bdev_cachep, bdi);
 }
 
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
@@ -303,14 +305,9 @@ struct super_block *blockdev_superblock;
 void __init bdev_cache_init(void)
 {
 	int err;
-	bdev_cachep = kmem_cache_create("bdev_cache",
-					sizeof(struct bdev_inode),
-					0,
-					SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
-					init_once,
-					NULL);
-	if (!bdev_cachep)
-		panic("Cannot create bdev_cache SLAB cache");
+	bdev_cachep = kmem_cache_create("bdev_cache", sizeof(struct bdev_inode),
+			0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT|SLAB_PANIC,
+			init_once, NULL);
 	err = register_filesystem(&bd_type);
 	if (err)
 		panic("Cannot register bdev pseudo-fs");
@@ -834,7 +831,6 @@ struct block_device *lookup_bdev(const char *path)
 	if (!path || !*path)
 		return ERR_PTR(-EINVAL);
 
-	intent_init(&nd.intent, IT_LOOKUP);
 	error = path_lookup(path, LOOKUP_FOLLOW, &nd);
 	if (error)
 		return ERR_PTR(error);

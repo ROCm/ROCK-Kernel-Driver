@@ -474,16 +474,16 @@ clps711xuart_console_write(struct console *co, const char *s,
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++) {
+		do {
+			status = clps_readl(SYSFLG(port));
+		} while (status & SYSFLG_UTXFF);
+		clps_writel(s[i], UARTDR(port));
 		if (s[i] == '\n') {
 			do {
 				status = clps_readl(SYSFLG(port));
 			} while (status & SYSFLG_UTXFF);
 			clps_writel('\r', UARTDR(port));
 		}
-		do {
-			status = clps_readl(SYSFLG(port));
-		} while (status & SYSFLG_UTXFF);
-		clps_writel(s[i], UARTDR(port));
 	}
 
 	/*

@@ -32,10 +32,11 @@ struct thread_info {
  */
 #define INIT_THREAD_INFO(tsk)			\
 {						\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
-	flags:		0,			\
-	cpu:		0,			\
+	.task =		&tsk,			\
+	.exec_domain =	&default_exec_domain,	\
+	.flags =	0,			\
+	.cpu =		0,			\
+	.preempt_count = 1,			\
 	.restart_block	= {			\
 		.fn = do_no_restart_syscall,	\
 	},					\
@@ -59,7 +60,7 @@ static inline struct thread_info *current_thread_info(void)
 		"mov.l	sp, %0 \n\t"
 		"and.l	%1, %0"
 		: "=&r"(ti)
-		: "g" (~(THREAD_SIZE-1))
+		: "i" (~(THREAD_SIZE-1))
 		);
 	return ti;
 }
@@ -79,6 +80,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TI_EXECDOMAIN	4
 #define TI_FLAGS	8
 #define TI_CPU		12
+#define TI_PRE_COUNT	16
 
 #define	PREEMPT_ACTIVE	0x4000000
 

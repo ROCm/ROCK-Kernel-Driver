@@ -22,7 +22,7 @@ struct hfs_btree *hfs_btree_open(struct super_block *sb, u32 id)
 	struct hfs_btree_header_rec *head;
 	struct address_space *mapping;
 	struct page *page;
-	unsigned int shift, size;
+	unsigned int size;
 
 	tree = kmalloc(sizeof(*tree), GFP_KERNEL);
 	if (!tree)
@@ -69,9 +69,7 @@ struct hfs_btree *hfs_btree_open(struct super_block *sb, u32 id)
 		goto fail_page;
 	if (!tree->node_count)
 		goto fail_page;
-	for (shift = 0; size >>= 1; shift += 1)
-		;
-	tree->node_size_shift = shift;
+	tree->node_size_shift = ffs(size) - 1;
 
 	tree->pages_per_bnode = (tree->node_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 

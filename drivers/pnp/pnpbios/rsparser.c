@@ -505,6 +505,11 @@ pnpbios_parse_compatible_ids(unsigned char *p, unsigned char *end, struct pnp_de
 
 		switch (tag) {
 
+		case LARGE_TAG_ANSISTR:
+			strncpy(dev->name, p + 3, len >= PNP_NAME_LEN ? PNP_NAME_LEN - 2 : len);
+			dev->name[len >= PNP_NAME_LEN ? PNP_NAME_LEN - 1 : len] = '\0';
+			break;
+
 		case SMALL_TAG_COMPATDEVID: /* compatible ID */
 			if (len != 4)
 				goto len_err;

@@ -63,7 +63,7 @@ struct usbdevfs_setinterface {
 
 struct usbdevfs_disconnectsignal {
 	unsigned int signr;
-	void *context;
+	void __user *context;
 };
 
 #define USBDEVFS_MAXDRIVERNAME 255
@@ -154,7 +154,6 @@ struct usbdevfs_hub_portinfo {
 
 struct dev_state {
 	struct list_head list;      /* state list */
-	struct rw_semaphore devsem; /* protects modifications to dev (dev == NULL indicating disconnect) */ 
 	struct usb_device *dev;
 	struct file *file;
 	spinlock_t lock;            /* protects the async urb lists */
@@ -163,7 +162,7 @@ struct dev_state {
 	wait_queue_head_t wait;     /* wake up if a request completed */
 	unsigned int discsignr;
 	struct task_struct *disctask;
-	void *disccontext;
+	void __user *disccontext;
 	unsigned long ifclaimed;
 };
 

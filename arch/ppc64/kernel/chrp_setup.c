@@ -135,10 +135,10 @@ chrp_setup_arch(void)
 	/* init to some ~sane value until calibrate_delay() runs */
 	loops_per_jiffy = 50000000;
 
- 	if (ROOT_DEV == 0) {
- 		printk("No ramdisk, default root is /dev/sda2\n");
- 		ROOT_DEV = Root_SDA2;
- 	}
+	if (ROOT_DEV == 0) {
+		printk("No ramdisk, default root is /dev/sda2\n");
+		ROOT_DEV = Root_SDA2;
+	}
 
 	printk("Boot arguments: %s\n", cmd_line);
 
@@ -179,7 +179,7 @@ void __init
 chrp_init2(void)
 {
 	/* Manually leave the kernel version on the panel. */
-	ppc_md.progress("SuSE Linux ppc64\n", 0);
+	ppc_md.progress("Linux ppc64\n", 0);
 	ppc_md.progress(UTS_RELEASE, 0);
 }
 
@@ -189,7 +189,7 @@ chrp_init2(void)
  */
 void __init fwnmi_init(void)
 {
-	long ret;
+	int ret;
 	int ibm_nmi_register = rtas_token("ibm,nmi-register");
 	if (ibm_nmi_register == RTAS_UNKNOWN_SERVICE)
 		return;
@@ -243,11 +243,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		ppc_md.get_irq        = xics_get_irq;
 	}
 
-#ifdef CONFIG_PPC_PSERIES
-	ppc_md.log_error = pSeries_log_error;
-#else
-	ppc_md.log_error = NULL;
-#endif
+	ppc_md.log_error      = pSeries_log_error;
 
 	ppc_md.init           = chrp_init2;
 

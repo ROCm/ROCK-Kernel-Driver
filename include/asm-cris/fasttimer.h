@@ -1,4 +1,4 @@
-/* $Id: fasttimer.h,v 1.2 2002/12/11 13:03:43 starvik Exp $
+/* $Id: fasttimer.h,v 1.3 2004/05/14 10:19:19 starvik Exp $
  * linux/include/asm-cris/fasttimer.h
  *
  * Fast timers for ETRAX100LX
@@ -23,6 +23,8 @@ struct fast_timer{ /* Close to timer_list */
   unsigned long data;
   const char *name;
 };
+
+extern struct fast_timer *fast_timer_list;
 
 void start_one_shot_timer(struct fast_timer *t,
                           fast_timer_function_type *function,

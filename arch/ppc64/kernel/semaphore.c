@@ -17,6 +17,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
 #include <asm/errno.h>
@@ -70,7 +71,7 @@ void __up(struct semaphore *sem)
  * Thus it is only when we decrement count from some value > 0
  * that we have actually got the semaphore.
  */
-void __down(struct semaphore *sem)
+void __sched __down(struct semaphore *sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -99,7 +100,7 @@ void __down(struct semaphore *sem)
 	wake_up(&sem->wait);
 }
 
-int __down_interruptible(struct semaphore * sem)
+int __sched __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;

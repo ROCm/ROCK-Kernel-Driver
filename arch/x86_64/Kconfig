@@ -249,7 +249,6 @@ config SCHED_SMT
 	  cost of slightly increased overhead in some places. If unsure say
 	  N here.
 
-# someone write a better help text please.
 config K8_NUMA
        bool "K8 NUMA support"
        depends on SMP
@@ -257,9 +256,9 @@ config K8_NUMA
 	  Enable NUMA (Non Unified Memory Architecture) support for
 	  AMD Opteron Multiprocessor systems. The kernel will try to allocate
 	  memory used by a CPU on the local memory controller of the CPU
-	  and in the future do more optimizations. This may improve performance 
-	  or it may not. Code is still experimental.
-	  Say N if unsure.
+	  and add some more NUMA awareness to the kernel.
+	  This code is recommended on all multiprocessor Opteron systems
+	  and normally doesn't hurt on others.
 
 config DISCONTIGMEM
        bool
@@ -348,26 +347,6 @@ config PCI_MMCONFIG
 	depends on PCI
 	select ACPI_BOOT
 
-# the drivers/pci/msi.c code needs to be fixed first before enabling
-config PCI_USE_VECTOR
-	bool "Vector-based interrupt indexing"
-	depends on X86_LOCAL_APIC && NOTWORKING
-	default n
-	help
-	   This replaces the current existing IRQ-based index interrupt scheme
-	   with the vector-base index scheme. The advantages of vector base
-	   over IRQ base are listed below:
-	   1) Support MSI implementation.
-	   2) Support future IOxAPIC hotplug
-
-	   Note that this enables MSI, Message Signaled Interrupt, on all
-	   MSI capable device functions detected if users also install the
-	   MSI patch. Message Signal Interrupt enables an MSI-capable
-	   hardware device to send an inbound Memory Write on its PCI bus
-	   instead of asserting IRQ signal on device IRQ pin.
-
-	   If you don't know what to do here, say N.
-
 source "drivers/pci/Kconfig"
 
 source "drivers/pcmcia/Kconfig"
@@ -413,69 +392,13 @@ endmenu
 
 source drivers/Kconfig
 
+source "drivers/firmware/Kconfig"
+
 source fs/Kconfig
 
 source "arch/x86_64/oprofile/Kconfig"
 
 menu "Kernel hacking"
-
-config CRASH_DUMP
-       tristate "Crash dump support (EXPERIMENTAL)"
-       depends on EXPERIMENTAL
-       default n
-       ---help---
-         Say Y here to enable saving an image of system memory when a panic
-         or other error occurs. Dumps can also be forced with the SysRq+d
-         key if MAGIC_SYSRQ is enabled.
-
-config KERNTYPES
-	bool
-	depends on CRASH_DUMP
-	default y
-
-config CRASH_DUMP_BLOCKDEV
-       tristate "Crash dump block device driver"
-       depends on CRASH_DUMP
-       help
-         Say Y to allow saving crash dumps directly to a disk device.
-
-config CRASH_DUMP_NETDEV
-       tristate "Crash dump network device driver"
-       depends on CRASH_DUMP
-       help
-         Say Y to allow saving crash dumps over a network device.
-
-config CRASH_DUMP_MEMDEV
-       bool "Crash dump staged memory driver"
-       depends on CRASH_DUMP
-       help
-         Say Y to allow intermediate saving crash dumps in spare
-         memory pages which would then be written out to disk
-         later.
-
-config CRASH_DUMP_SOFTBOOT
-       bool "Save crash dump across a soft reboot"
-       depends on CRASH_DUMP_MEMDEV
-       help
-         Say Y to allow a crash dump to be preserved in memory
-	 lkcd-kernpages across a soft reboot and written out to disk
-         thereafter. For this to work, CRASH_DUMP must be
-         configured as part of the kernel (not as a module).
-
-config CRASH_DUMP_COMPRESS_RLE
-       tristate "Crash dump RLE compression"
-       depends on CRASH_DUMP
-       help
-         Say Y to allow saving dumps with Run Length Encoding compression.
-
-
-config CRASH_DUMP_COMPRESS_GZIP
-       tristate "Crash dump GZIP compression"
-       select ZLIB_INFLATE
-       select ZLIB_DEFLATE
-       depends on CRASH_DUMP
-       help
-         Say Y to allow saving dumps with Gnu Zip compression.
 
 config DEBUG_KERNEL
 	bool "Kernel debugging"
@@ -581,6 +504,4 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-
-source "rpmify/Kconfig"
 

@@ -352,7 +352,7 @@ acpi_ns_delete_subtree (
 
 
 	parent_handle = start_handle;
-	child_handle = 0;
+	child_handle = NULL;
 	level        = 1;
 
 	/*
@@ -373,14 +373,14 @@ acpi_ns_delete_subtree (
 			/* Check if this object has any children */
 
 			if (ACPI_SUCCESS (acpi_get_next_object (ACPI_TYPE_ANY, child_handle,
-					 0, &dummy))) {
+					 NULL, &dummy))) {
 				/*
 				 * There is at least one child of this object,
 				 * visit the object
 				 */
 				level++;
 				parent_handle = child_handle;
-				child_handle = 0;
+				child_handle = NULL;
 			}
 		}
 		else {

@@ -118,7 +118,7 @@ static void cb_release_cis_mem(struct pcmcia_socket * s)
 		cs_dbg(s, 1, "cb_release_cis_mem()\n");
 		iounmap(s->cb_cis_virt);
 		s->cb_cis_virt = NULL;
-		s->cb_cis_res = 0;
+		s->cb_cis_res = NULL;
 	}
 }
 

@@ -157,7 +157,7 @@ good_area:
  survive:
 	fault = handle_mm_fault(mm, vma, address, write);
 #ifdef DEBUG
- 	printk("handle_mm_fault returns %d\n",fault);
+	printk("handle_mm_fault returns %d\n",fault);
 #endif
 	switch (fault) {
 	case 1:
@@ -186,7 +186,7 @@ out_of_memory:
 		down_read(&mm->mmap_sem);
 		goto survive;
 	}
-	
+
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);

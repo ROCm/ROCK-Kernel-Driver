@@ -34,7 +34,7 @@
 #include <linux/delay.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 
 #include "dmx3191d.h"
 

@@ -27,6 +27,7 @@
 #include <pcmcia/cisreg.h>
 #include "pdaudiocf.h"
 #include <sound/initval.h>
+#include <linux/init.h>
 
 /*
  */

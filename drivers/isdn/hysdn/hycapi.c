@@ -96,7 +96,7 @@ hycapi_remove_ctr(struct capi_ctr *ctrl)
 		}
 	}
 	detach_capi_ctr(ctrl);
-	ctrl->driverdata = 0;
+	ctrl->driverdata = NULL;
 	kfree(card->hyctrlinfo);
 
 		
@@ -678,7 +678,7 @@ attach the capi-driver to the kernel-capi.
 
 ***********************************************************/
 
-int hycapi_init()
+int hycapi_init(void)
 {
 	int i;
 	for(i=0;i<CAPI_MAXAPPL;i++) {

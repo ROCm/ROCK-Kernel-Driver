@@ -162,8 +162,10 @@ bw2_blank(int blank, struct fb_info *info)
 }
 
 static struct sbus_mmap_map bw2_mmap_map[] = {
-	{ 0,			0,			SBUS_MMAP_FBSIZE(1) },
-	{ 0,			0,			0		    }
+	{
+		.size = SBUS_MMAP_FBSIZE(1)
+	},
+	{ .size = 0 }
 };
 
 static int bw2_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)

@@ -22,6 +22,10 @@ DECODER_STATUS_GOOD, the others are just nice things to know.
 #define	DECODER_STATUS_NTSC	8	/* auto detected */
 #define	DECODER_STATUS_SECAM	16	/* auto detected */
 
+struct video_decoder_init {
+	unsigned char len;
+	const unsigned char *data;
+};
 
 #define	DECODER_GET_CAPABILITIES _IOR('d', 1, struct video_decoder_capability)
 #define	DECODER_GET_STATUS    	_IOR('d', 2, int)
@@ -30,6 +34,9 @@ DECODER_STATUS_GOOD, the others are just nice things to know.
 #define	DECODER_SET_OUTPUT	_IOW('d', 5, int)	/* 0 <= output < #outputs */
 #define	DECODER_ENABLE_OUTPUT	_IOW('d', 6, int)	/* boolean output enable control */
 #define	DECODER_SET_PICTURE   	_IOW('d', 7, struct video_picture)
+#define	DECODER_SET_GPIO	_IOW('d', 8, int)	/* switch general purpose pin */
+#define	DECODER_INIT		_IOW('d', 9, struct video_decoder_init)	/* init internal registers at once */
+#define	DECODER_SET_VBI_BYPASS	_IOW('d', 10, int)	/* switch vbi bypass */
 
 #define	DECODER_DUMP		_IO('d', 192)		/* debug hook */
 

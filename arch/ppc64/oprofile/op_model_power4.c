@@ -27,11 +27,6 @@ static int num_counters;
 static int oprofile_running;
 static int mmcra_has_sihv;
 
-/* mmcr values are set in power4_reg_setup, used in power4_cpu_setup */
-static u32 mmcr0_val;
-static u64 mmcr1_val;
-static u32 mmcra_val;
-
 static void power4_reg_setup(struct op_counter_config *ctr,
 			     struct op_system_config *sys,
 			     int num_ctrs)
@@ -40,22 +35,15 @@ static void power4_reg_setup(struct op_counter_config *ctr,
 
 	num_counters = num_ctrs;
 
-	/* 
+	/*
 	 * SIHV / SIPR bits are only implemented on POWER4+ (GQ) and above.
 	 * However we disable it on all POWER4 until we verify it works
 	 * (I was seeing some strange behaviour last time I tried).
 	 *
 	 * It has been verified to work on POWER5 so we enable it there.
 	 */
-	if (!(__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)))
+	if (cur_cpu_spec->cpu_features & CPU_FTR_MMCRA_SIHV)
 		mmcra_has_sihv = 1;
-
-	/* The performance counter event settings are given in the mmcr0, mmcr1 and mmcra
-	   values passed from the user in the op_system_config structure (sys variable).
-	*/
-	mmcr0_val = sys->mmcr0;
-	mmcr1_val = sys->mmcr1;
-	mmcra_val = sys->mmcra;
 
 	for (i = 0; i < num_counters; ++i)
 		reset_value[i] = 0x80000000UL - ctr[i].count;
@@ -67,9 +55,9 @@ extern void ppc64_enable_pmcs(void);
 
 static void power4_cpu_setup(void *unused)
 {
-	unsigned int mmcr0 = mmcr0_val;
-	unsigned long mmcra = mmcra_val;
-        unsigned long hid0;
+	unsigned int mmcr0 = mfspr(SPRN_MMCR0);
+	unsigned long mmcra = mfspr(SPRN_MMCRA);
+
 	ppc64_enable_pmcs();
 
 	/* set the freeze bit */
@@ -80,8 +68,6 @@ static void power4_cpu_setup(void *unused)
 	mmcr0 |= MMCR0_PMC1INTCONTROL|MMCR0_PMCNINTCONTROL;
 	mtspr(SPRN_MMCR0, mmcr0);
 
-	mtspr(SPRN_MMCR1, mmcr1_val);
-
 	mmcra |= MMCRA_SAMPLE_ENABLE;
 	mtspr(SPRN_MMCRA, mmcra);
 
@@ -91,30 +77,12 @@ static void power4_cpu_setup(void *unused)
 	    mfspr(SPRN_MMCR1));
 	dbg("setup on cpu %d, mmcra %lx\n", smp_processor_id(),
 	    mfspr(SPRN_MMCRA));
-
-	/* set the debug bus to extended mode */
-	hid0 = mfspr(HID0);
-	hid0 &= ~(1UL<<(63-17));
-	hid0 |= (1UL<<(63-20));
-
-	__asm__ __volatile__("sync");
-	mtspr(HID0, hid0);
-	hid0 = mfspr(HID0);
-	hid0 = mfspr(HID0);
-	hid0 = mfspr(HID0);
-	hid0 = mfspr(HID0);
-	hid0 = mfspr(HID0);
-	hid0 = mfspr(HID0);
-	__asm__ __volatile__("isync");
-
 }
 
 static void power4_start(struct op_counter_config *ctr)
 {
 	int i;
 	unsigned int mmcr0;
-	int kernel_mode = 0;
-	int user_mode = 0;
 
 	/* set the PMM bit (see comment below) */
 	mtmsrd(mfmsr() | MSR_PMM);
@@ -122,16 +90,6 @@ static void power4_start(struct op_counter_config *ctr)
 	for (i = 0; i < num_counters; ++i) {
 		if (ctr[i].enabled) {
 			ctr_write(i, reset_value[i]);
-
-			if (ctr[i].kernel == 1) {
-				/* All counters will be set the same for kernel
-				   and user counting */
-				kernel_mode = 1;
-			}
-
-			if (ctr[i].user == 1) {
-				user_mode = 1;
-			}
 		} else {
 			ctr_write(i, 0);
 		}
@@ -144,23 +102,6 @@ static void power4_start(struct op_counter_config *ctr)
 	 * all the time
 	 */
 	mmcr0 &= ~MMCR0_PMAO;
-
-	/*
-	* Set the user and kernel modes
-	*/
-	if (kernel_mode == 1)
-		/* count in supervisor mode */
-		mmcr0 &= ~POWER4_MMCR0_KERNEL_DISABLE;
-
-	else
-		mmcr0 |= POWER4_MMCR0_KERNEL_DISABLE;
-	
-	if (user_mode == 1)
-		/* count in problem mode */
-		mmcr0 &= ~POWER4_MMCR0_PROBLEM_DISABLE;
-	
-	else
-		mmcr0 |= POWER4_MMCR0_PROBLEM_DISABLE;
 
 	/*
 	 * now clear the freeze bit, counting will not start until we

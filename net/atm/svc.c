@@ -66,7 +66,7 @@ static void svc_disconnect(struct atm_vcc *vcc)
 	}
 	/* beware - socket is still in use by atmsigd until the last
 	   as_indicate has been answered */
-	while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue))) {
+	while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue)) != NULL) {
 		DPRINTK("LISTEN REL\n");
 		sigd_enq2(NULL,as_reject,vcc,NULL,NULL,&vcc->qos,0);
 		dev_kfree_skb(skb);
@@ -459,7 +459,7 @@ int svc_change_qos(struct atm_vcc *vcc,struct atm_qos *qos)
 
 
 static int svc_setsockopt(struct socket *sock,int level,int optname,
-    char *optval,int optlen)
+    char __user *optval,int optlen)
 {
 	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
@@ -483,7 +483,7 @@ out:
 
 
 static int svc_getsockopt(struct socket *sock,int level,int optname,
-    char *optval,int *optlen)
+    char __user *optval,int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	int error = 0, len;

@@ -16,26 +16,20 @@
 #include <linux/swap.h>
 #include <linux/bio.h>
 #include <linux/swapops.h>
-#include <linux/buffer_head.h>	/* for block_sync_page() */
-#include <linux/mpage.h>
 #include <linux/writeback.h>
-#include <linux/trigevent_hooks.h>
 #include <asm/pgtable.h>
 
-static struct bio *
-get_swap_bio(int gfp_flags, struct page *page, bio_end_io_t end_io)
+static struct bio *get_swap_bio(int gfp_flags, pgoff_t index,
+				struct page *page, bio_end_io_t end_io)
 {
 	struct bio *bio;
 
 	bio = bio_alloc(gfp_flags, 1);
 	if (bio) {
 		struct swap_info_struct *sis;
-		swp_entry_t entry;
+		swp_entry_t entry = { .val = index, };
 
-		BUG_ON(!PageSwapCache(page));
-		entry.val = page->private;
 		sis = get_swap_info_struct(swp_type(entry));
-
 		bio->bi_sector = map_swap_page(sis, swp_offset(entry)) *
 					(PAGE_SIZE >> 9);
 		bio->bi_bdev = sis->bdev;
@@ -91,24 +85,25 @@ static int end_swap_bio_read(struct bio *bio, unsigned int bytes_done, int err)
 int swap_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct bio *bio;
-	int ret = 0;
+	int ret = 0, rw = WRITE;
 
 	if (remove_exclusive_swap_page(page)) {
 		unlock_page(page);
 		goto out;
 	}
-	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
+	bio = get_swap_bio(GFP_NOIO, page->private, page, end_swap_bio_write);
 	if (bio == NULL) {
 		set_page_dirty(page);
 		unlock_page(page);
 		ret = -ENOMEM;
 		goto out;
 	}
-	TRIG_EVENT(mm_swap_out_hook, page);
+	if (wbc->sync_mode == WB_SYNC_ALL)
+		rw |= (1 << BIO_RW_SYNC);
 	inc_page_state(pswpout);
 	set_page_writeback(page);
 	unlock_page(page);
-	submit_bio(WRITE, bio);
+	submit_bio(rw, bio);
 out:
 	return ret;
 }
@@ -120,7 +115,7 @@ int swap_readpage(struct file *file, struct page *page)
 
 	BUG_ON(!PageLocked(page));
 	ClearPageUptodate(page);
-	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);
+	bio = get_swap_bio(GFP_KERNEL, page->private, page, end_swap_bio_read);
 	if (bio == NULL) {
 		unlock_page(page);
 		ret = -ENOMEM;
@@ -132,60 +127,34 @@ out:
 	return ret;
 }
 
-struct address_space_operations swap_aops = {
-	.writepage	= swap_writepage,
-	.readpage	= swap_readpage,
-	.sync_page	= block_sync_page,
-	.set_page_dirty	= __set_page_dirty_nobuffers,
-};
-
+#if defined(CONFIG_SOFTWARE_SUSPEND) || defined(CONFIG_PM_DISK)
 /*
  * A scruffy utility function to read or write an arbitrary swap page
  * and wait on the I/O.  The caller must have a ref on the page.
+ *
+ * We use end_swap_bio_read() even for writes, because it happens to do what
+ * we want.
  */
 int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 {
-	int ret;
-	struct writeback_control swap_wbc = {
-		.sync_mode = WB_SYNC_ALL,
-	};
+	struct bio *bio;
+	int ret = 0;
 
 	lock_page(page);
-	/*
-	 * This library call can be only used to do I/O
-	 * on _private_ pages just allocated with alloc_pages().
-	 */
-	BUG_ON(page->mapping);
-	BUG_ON(PageSwapCache(page));
-	BUG_ON(PageAnon(page));
-	BUG_ON(PageLRU(page));
-	BUG_ON(PageCompound(page));
-	ret = add_to_page_cache(page, &swapper_space, entry.val, GFP_KERNEL);
-	if (unlikely(ret)) {
+
+	bio = get_swap_bio(GFP_KERNEL, entry.val, page, end_swap_bio_read);
+	if (bio == NULL) {
 		unlock_page(page);
-		return ret;
-	}
-	/*
-	 * get one more reference to make page non-exclusive so
-	 * remove_exclusive_swap_page won't mess with it.
-	 */
-	page_cache_get(page);
-
-	if (rw == READ) {
-		ret = swap_readpage(NULL, page);
-		wait_on_page_locked(page);
-	} else {
-		ret = swap_writepage(page, &swap_wbc);
-		wait_on_page_writeback(page);
+		ret = -ENOMEM;
+		goto out;
 	}
 
-	lock_page(page);
-	remove_from_page_cache(page);
-	unlock_page(page);
-	page_cache_release(page);
-	page_cache_release(page);	/* For add_to_page_cache() */
+	submit_bio(rw | (1 << BIO_RW_SYNC), bio);
+	wait_on_page_locked(page);
 
-	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
+	if (!PageUptodate(page) || PageError(page))
 		ret = -EIO;
+out:
 	return ret;
 }
+#endif

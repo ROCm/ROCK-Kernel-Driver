@@ -357,7 +357,7 @@
 #else
 #include <linux/blk.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include "sd.h"
 #endif
 
@@ -3119,6 +3119,7 @@ qla1280_marker(struct scsi_qla_host *ha, int bus, int id, int lun, u8 type)
  * Returns:
  *      0 = success, was able to issue command.
  */
+#ifdef QLA_64BIT_PTR
 static int
 qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 {
@@ -3371,7 +3372,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 	sp->flags |= SRB_SENT;
 	ha->actthreads++;
 	WRT_REG_WORD(&reg->mailbox4, ha->req_ring_index);
-	(void) RD_REG_WORD(&reg->mailbox4);
+	(void) RD_REG_WORD(&reg->mailbox4); /* PCI posted write flush */
 
  out:
 	if (status)
@@ -3381,9 +3382,8 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 
 	return status;
 }
+#else /* !QLA_64BIT_PTR */
 
-
-#ifndef QLA_64BIT_PTR
 /*
  * qla1280_32bit_start_scsi
  *      The start SCSI is responsible for building request packets on
@@ -3640,6 +3640,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 	sp->flags |= SRB_SENT;
 	ha->actthreads++;
 	WRT_REG_WORD(&reg->mailbox4, ha->req_ring_index);
+	(void) RD_REG_WORD(&reg->mailbox4); /* PCI posted write flush */
 
 out:
 	if (status)
@@ -3666,7 +3667,7 @@ static request_t *
 qla1280_req_pkt(struct scsi_qla_host *ha)
 {
 	struct device_reg *reg = ha->iobase;
-	request_t *pkt = 0;
+	request_t *pkt = NULL;
 	int cnt;
 	uint32_t timer;
 
@@ -3751,6 +3752,7 @@ qla1280_isp_cmd(struct scsi_qla_host *ha)
 
 	/* Set chip new ring index. */
 	WRT_REG_WORD(&reg->mailbox4, ha->req_ring_index);
+	(void) RD_REG_WORD(&reg->mailbox4); /* PCI posted write flush */
 
 	LEAVE("qla1280_isp_cmd");
 }
@@ -3772,7 +3774,7 @@ qla1280_isr(struct scsi_qla_host *ha, struct list_head *done_q)
 {
 	struct device_reg *reg = ha->iobase;
 	struct response *pkt;
-	struct srb *sp = 0;
+	struct srb *sp = NULL;
 	uint16_t mailbox[MAILBOX_REGISTER_COUNT];
 	uint16_t *wptr;
 	uint32_t index;
@@ -3789,7 +3791,7 @@ qla1280_isr(struct scsi_qla_host *ha, struct list_head *done_q)
 
 	/* Check for mailbox interrupt. */
 
-	mailbox[0] = RD_REG_WORD(&reg->semaphore);
+	mailbox[0] = RD_REG_WORD_dmasync(&reg->semaphore);
 
 	if (mailbox[0] & BIT_0) {
 		/* Get mailbox data. */
@@ -3830,11 +3832,11 @@ qla1280_isr(struct scsi_qla_host *ha, struct list_head *done_q)
 				if (index < MAX_OUTSTANDING_COMMANDS)
 					sp = ha->outstanding_cmds[index];
 				else
-					sp = 0;
+					sp = NULL;
 
 				if (sp) {
 					/* Free outstanding command slot. */
-					ha->outstanding_cmds[index] = 0;
+					ha->outstanding_cmds[index] = NULL;
 
 					/* Save ISP completion status */
 					CMD_RESULT(sp->cmd) = 0;
@@ -4093,7 +4095,7 @@ qla1280_status_entry(struct scsi_qla_host *ha, struct response *pkt,
 	}
 
 	/* Free outstanding command slot. */
-	ha->outstanding_cmds[handle] = 0;
+	ha->outstanding_cmds[handle] = NULL;
 
 	cmd = sp->cmd;
 
@@ -4186,11 +4188,11 @@ qla1280_error_entry(struct scsi_qla_host *ha, struct response *pkt,
 	if (handle < MAX_OUTSTANDING_COMMANDS)
 		sp = ha->outstanding_cmds[handle];
 	else
-		sp = 0;
+		sp = NULL;
 
 	if (sp) {
 		/* Free outstanding command slot. */
-		ha->outstanding_cmds[handle] = 0;
+		ha->outstanding_cmds[handle] = NULL;
 
 		/* Bad payload or header */
 		if (pkt->entry_status & (BIT_3 + BIT_2)) {

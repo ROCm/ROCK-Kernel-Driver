@@ -17,23 +17,19 @@
  */
 
 #include <linux/fs.h>
+#include <linux/namei.h>
 #include "jfs_incore.h"
 #include "jfs_xattr.h"
 
 static int jfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	char *s = JFS_IP(dentry->d_inode)->i_inline;
-	return vfs_follow_link(nd, s);
-}
-
-static int jfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
-{
-	char *s = JFS_IP(dentry->d_inode)->i_inline;
-	return vfs_readlink(dentry, buffer, buflen, s);
+	nd_set_link(nd, s);
+	return 0;
 }
 
 struct inode_operations jfs_symlink_inode_operations = {
-	.readlink	= jfs_readlink,
+	.readlink	= generic_readlink,
 	.follow_link	= jfs_follow_link,
 	.setxattr	= jfs_setxattr,
 	.getxattr	= jfs_getxattr,

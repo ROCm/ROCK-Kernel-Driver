@@ -167,7 +167,7 @@ static struct i2c_algo_bit_data voo_i2c_bit_data = {
 
 static struct i2c_adapter voodoo3_i2c_adapter = {
 	.owner		= THIS_MODULE,
-	.class		= I2C_ADAP_CLASS_TV_ANALOG, 
+	.class		= I2C_CLASS_TV_ANALOG, 
 	.name		= "I2C Voodoo3/Banshee adapter",
 	.algo_data	= &voo_i2c_bit_data,
 };
@@ -184,7 +184,7 @@ static struct i2c_algo_bit_data voo_ddc_bit_data = {
 
 static struct i2c_adapter voodoo3_ddc_adapter = {
 	.owner		= THIS_MODULE,
-	.class		= I2C_ADAP_CLASS_DDC, 
+	.class		= I2C_CLASS_DDC, 
 	.name		= "DDC Voodoo3/Banshee adapter",
 	.algo_data	= &voo_ddc_bit_data,
 };

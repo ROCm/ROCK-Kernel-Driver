@@ -155,7 +155,7 @@ static void __init com90xx_probe(void)
 		ioaddr = *port;
 
 		if (!request_region(*port, ARCNET_TOTAL_SIZE, "arcnet (90xx)")) {
-			BUGMSG2(D_INIT_REASONS, "(check_region)\n");
+			BUGMSG2(D_INIT_REASONS, "(request_region)\n");
 			BUGMSG2(D_INIT_REASONS, "S1: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
 			*port-- = ports[--numports];
@@ -214,7 +214,7 @@ static void __init com90xx_probe(void)
 		BUGMSG2(D_INIT, "%lXh ", *p);
 
 		if (!request_mem_region(*p, BUFFER_SIZE, "arcnet (90xx)")) {
-			BUGMSG2(D_INIT_REASONS, "(check_mem_region)\n");
+			BUGMSG2(D_INIT_REASONS, "(request_mem_region)\n");
 			BUGMSG2(D_INIT_REASONS, "Stage 3: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
 			*p-- = shmems[--numshmems];

@@ -7,7 +7,7 @@
  * Copyright (C) 2001, 2002 Paul Mundt
  * Copyright (C) 2002 MontaVista Software, Inc.
  * Copyright (C) 2002 TimeSys Corp.
- * Copyright (C) 2003 Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ * Copyright (C) 2003-2004 Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -45,18 +45,13 @@
 /*
  * Bus Control Uint
  */
-extern void vr41xx_bcu_init(void);
 extern unsigned long vr41xx_get_vtclock_frequency(void);
 extern unsigned long vr41xx_get_tclock_frequency(void);
 
 /*
  * Clock Mask Unit
  */
-extern void vr41xx_cmu_init(void);
-extern void vr41xx_clock_supply(unsigned int clock);
-extern void vr41xx_clock_mask(unsigned int clock);
-
-enum {
+typedef enum {
 	PIU_CLOCK,
 	SIU_CLOCK,
 	AIU_CLOCK,
@@ -70,7 +65,10 @@ enum {
 	CEU_CLOCK,
 	ETHER0_CLOCK,
 	ETHER1_CLOCK
-};
+} vr41xx_clock_t;
+
+extern void vr41xx_supply_clock(vr41xx_clock_t clock);
+extern void vr41xx_mask_clock(vr41xx_clock_t clock);
 
 /*
  * Interrupt Control Unit
@@ -129,14 +127,78 @@ enum {
 #define GIU_IRQ_LAST		GIU_IRQ(31)
 #define GIU_IRQ_TO_PIN(x)	((x) - GIU_IRQ_BASE)	/* Pin 0-31 */
 
-extern void (*board_irq_init)(void);
 extern int vr41xx_set_intassign(unsigned int irq, unsigned char intassign);
 extern int vr41xx_cascade_irq(unsigned int irq, int (*get_irq_number)(int irq));
+
+#define PIUINT_COMMAND		0x0040
+#define PIUINT_DATA		0x0020
+#define PIUINT_PAGE1		0x0010
+#define PIUINT_PAGE0		0x0008
+#define PIUINT_DATALOST		0x0004
+#define PIUINT_STATUSCHANGE	0x0001
+
+extern void vr41xx_enable_piuint(uint16_t mask);
+extern void vr41xx_disable_piuint(uint16_t mask);
+
+#define AIUINT_INPUT_DMAEND	0x0800
+#define AIUINT_INPUT_DMAHALT	0x0400
+#define AIUINT_INPUT_DATALOST	0x0200
+#define AIUINT_INPUT_DATA	0x0100
+#define AIUINT_OUTPUT_DMAEND	0x0008
+#define AIUINT_OUTPUT_DMAHALT	0x0004
+#define AIUINT_OUTPUT_NODATA	0x0002
+
+extern void vr41xx_enable_aiuint(uint16_t mask);
+extern void vr41xx_disable_aiuint(uint16_t mask);
+
+#define KIUINT_DATALOST		0x0004
+#define KIUINT_DATAREADY	0x0002
+#define KIUINT_SCAN		0x0001
+
+extern void vr41xx_enable_kiuint(uint16_t mask);
+extern void vr41xx_disable_kiuint(uint16_t mask);
+
+#define DSIUINT_CTS		0x0800
+#define DSIUINT_RXERR		0x0400
+#define DSIUINT_RX		0x0200
+#define DSIUINT_TX		0x0100
+#define DSIUINT_ALL		0x0f00
+
+extern void vr41xx_enable_dsiuint(uint16_t mask);
+extern void vr41xx_disable_dsiuint(uint16_t mask);
+
+#define FIRINT_UNIT		0x0010
+#define FIRINT_RX_DMAEND	0x0008
+#define FIRINT_RX_DMAHALT	0x0004
+#define FIRINT_TX_DMAEND	0x0002
+#define FIRINT_TX_DMAHALT	0x0001
+
+extern void vr41xx_enable_firint(uint16_t mask);
+extern void vr41xx_disable_firint(uint16_t mask);
+
+extern void vr41xx_enable_pciint(void);
+extern void vr41xx_disable_pciint(void);
+
+extern void vr41xx_enable_scuint(void);
+extern void vr41xx_disable_scuint(void);
+
+#define CSIINT_TX_DMAEND	0x0040
+#define CSIINT_TX_DMAHALT	0x0020
+#define CSIINT_TX_DATA		0x0010
+#define CSIINT_TX_FIFOEMPTY	0x0008
+#define CSIINT_RX_DMAEND	0x0004
+#define CSIINT_RX_DMAHALT	0x0002
+#define CSIINT_RX_FIFOEMPTY	0x0001
+
+extern void vr41xx_enable_csiint(uint16_t mask);
+extern void vr41xx_disable_csiint(uint16_t mask);
+
+extern void vr41xx_enable_bcuint(void);
+extern void vr41xx_disable_bcuint(void);
 
 /*
  * Power Management Unit
  */
-extern void vr41xx_pmu_init(void);
 
 /*
  * RTC
@@ -187,22 +249,25 @@ enum {
 /*
  * Serial Interface Unit
  */
-extern void vr41xx_siu_init(int interface, int module);
-extern void vr41xx_siu_ifselect(int interface, int module);
+extern void vr41xx_siu_init(void);
 extern int vr41xx_serial_ports;
 
 /* SIU interfaces */
-enum {
+typedef enum {
 	SIU_RS232C,
 	SIU_IRDA
-};
+} siu_interface_t;
 
 /* IrDA interfaces */
-enum {
-	IRDA_SHARP = 1,
+typedef enum {
+	IRDA_NONE,
+	IRDA_SHARP,
 	IRDA_TEMIC,
 	IRDA_HP
-};
+} irda_module_t;
+
+extern void vr41xx_select_siu_interface(siu_interface_t interface,
+                                        irda_module_t module);
 
 /*
  * Debug Serial Interface Unit
@@ -212,24 +277,71 @@ extern void vr41xx_dsiu_init(void);
 /*
  * PCI Control Unit
  */
-struct vr41xx_pci_address_space {
-	u32 internal_base;
-	u32 address_mask;
-	u32 pci_base;
+#define PCI_MASTER_ADDRESS_MASK	0x7fffffffU
+
+struct pci_master_address_conversion {
+	uint32_t bus_base_address;
+	uint32_t address_mask;
+	uint32_t pci_base_address;
 };
 
-struct vr41xx_pci_address_map {
-	struct vr41xx_pci_address_space *mem1;
-	struct vr41xx_pci_address_space *mem2;
-	struct vr41xx_pci_address_space *io;
+struct pci_target_address_conversion {
+	uint32_t address_mask;
+	uint32_t bus_base_address;
 };
 
-extern void vr41xx_pciu_init(struct vr41xx_pci_address_map *map);
+typedef enum {
+	CANNOT_LOCK_FROM_DEVICE,
+	CAN_LOCK_FROM_DEVICE,
+} pci_exclusive_access_t;
 
-/*
- * MISC
- */
-extern void vr41xx_time_init(void);
-extern void vr41xx_timer_setup(struct irqaction *irq);
+struct pci_mailbox_address {
+	uint32_t base_address;
+};
+
+struct pci_target_address_window {
+	uint32_t base_address;
+};
+
+typedef enum {
+	PCI_ARBITRATION_MODE_FAIR,
+	PCI_ARBITRATION_MODE_ALTERNATE_0,
+	PCI_ARBITRATION_MODE_ALTERNATE_B,
+} pci_arbiter_priority_control_t;
+
+typedef enum {
+	PCI_TAKE_AWAY_GNT_DISABLE,
+	PCI_TAKE_AWAY_GNT_ENABLE,
+} pci_take_away_gnt_mode_t;
+
+struct pci_controller_unit_setup {
+	struct pci_master_address_conversion *master_memory1;
+	struct pci_master_address_conversion *master_memory2;
+
+	struct pci_target_address_conversion *target_memory1;
+	struct pci_target_address_conversion *target_memory2;
+
+	struct pci_master_address_conversion *master_io;
+
+	pci_exclusive_access_t exclusive_access;
+
+	uint32_t pci_clock_max;
+	uint8_t wait_time_limit_from_irdy_to_trdy;	/* Only VR4122 is supported */
+
+	struct pci_mailbox_address *mailbox;
+	struct pci_target_address_window *target_window1;
+	struct pci_target_address_window *target_window2;
+
+	uint8_t master_latency_timer;
+	uint8_t retry_limit;
+
+	pci_arbiter_priority_control_t arbiter_priority_control;
+	pci_take_away_gnt_mode_t take_away_gnt_mode;
+
+	struct resource *mem_resource;
+	struct resource *io_resource;
+};
+
+extern void vr41xx_pciu_setup(struct pci_controller_unit_setup *setup);
 
 #endif /* __NEC_VR41XX_H */

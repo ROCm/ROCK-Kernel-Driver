@@ -30,58 +30,22 @@ int hz(void)
 	return(HZ);
 }
 
-/*
- * Scheduler clock - returns current time in nanosec units.
- */
-unsigned long long sched_clock(void)
-{
-	return (unsigned long long)jiffies_64 * (1000000000 / HZ);
-}
-
 /* Changed at early boot */
 int timer_irq_inited = 0;
 
-static int first_tick;
-static unsigned long long prev_tsc;
-static long long delta;   		/* Deviation per interval */
-
-extern unsigned long long host_hz;
+/* missed_ticks will be modified after kernel memory has been 
+ * write-protected, so this puts it in a section which will be left 
+ * write-enabled.
+ */
+int __attribute__ ((__section__ (".unprotected"))) missed_ticks[NR_CPUS];
 
 void timer_irq(union uml_pt_regs *regs)
 {
-	unsigned long long ticks = 0;
+	int cpu = current->thread_info->cpu, ticks = missed_ticks[cpu];
 
-	if(!timer_irq_inited){
-		/* This is to ensure that ticks don't pile up when
-		 * the timer handler is suspended */
-		first_tick = 0;
-		return;
-	}
-
-	if(first_tick){
-#if defined(CONFIG_UML_REAL_TIME_CLOCK)
-		unsigned long long tsc;
-		/* We've had 1 tick */
-		tsc = time_stamp();
-
-		delta += tsc - prev_tsc;
-		prev_tsc = tsc;
-
-		ticks += (delta * HZ) / host_hz;
-		delta -= (ticks * host_hz) / HZ;
-#else
-		ticks = 1;
-#endif
-	}
-	else {
-		prev_tsc = time_stamp();
-		first_tick = 1;
-	}
-
-	while(ticks > 0){
-		do_IRQ(TIMER_IRQ, regs);
-		ticks--;
-	}
+        if(!timer_irq_inited) return;
+	missed_ticks[cpu] = 0;
+	while(ticks--) do_IRQ(TIMER_IRQ, regs);
 }
 
 void boot_timer_handler(int sig)
@@ -94,15 +58,12 @@ void boot_timer_handler(int sig)
 	do_timer(&regs);
 }
 
-irqreturn_t um_timer(int irq, void *dev, struct pt_regs *regs)
+void um_timer(int irq, void *dev, struct pt_regs *regs)
 {
-	unsigned long flags;
-
 	do_timer(regs);
-	write_seqlock_irqsave(&xtime_lock, flags);
+	write_seqlock(&xtime_lock);
 	timer();
-	write_sequnlock_irqrestore(&xtime_lock, flags);
-	return(IRQ_HANDLED);
+	write_sequnlock(&xtime_lock);
 }
 
 long um_time(int * tloc)
@@ -120,12 +81,12 @@ long um_time(int * tloc)
 long um_stime(int * tptr)
 {
 	int value;
-	struct timespec new;
+	struct timeval new;
 
 	if (get_user(value, tptr))
                 return -EFAULT;
 	new.tv_sec = value;
-	new.tv_nsec = 0;
+	new.tv_usec = 0;
 	do_settimeofday(&new);
 	return 0;
 }
@@ -164,11 +125,9 @@ void __const_udelay(um_udelay_t usecs)
 void timer_handler(int sig, union uml_pt_regs *regs)
 {
 #ifdef CONFIG_SMP
-	local_irq_disable();
 	update_process_times(user_context(UPT_SP(regs)));
-	local_irq_enable();
 #endif
-	if(current_thread->cpu == 0)
+	if(current->thread_info->cpu == 0)
 		timer_irq(regs);
 }
 
@@ -177,7 +136,6 @@ static spinlock_t timer_spinlock = SPIN_LOCK_UNLOCKED;
 unsigned long time_lock(void)
 {
 	unsigned long flags;
-
 	spin_lock_irqsave(&timer_spinlock, flags);
 	return(flags);
 }
@@ -192,8 +150,8 @@ int __init timer_init(void)
 	int err;
 
 	CHOOSE_MODE(user_time_init_tt(), user_time_init_skas());
-	err = request_irq(TIMER_IRQ, um_timer, SA_INTERRUPT, "timer", NULL);
-	if(err != 0)
+	if((err = request_irq(TIMER_IRQ, um_timer, SA_INTERRUPT, "timer", 
+			      NULL)) != 0)
 		printk(KERN_ERR "timer_init : request_irq failed - "
 		       "errno = %d\n", -err);
 	timer_irq_inited = 1;
@@ -201,6 +159,7 @@ int __init timer_init(void)
 }
 
 __initcall(timer_init);
+
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

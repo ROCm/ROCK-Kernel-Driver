@@ -16,6 +16,7 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 #include <asm/bootsetup.h>
+#include <asm/setup.h>
 
 /* Don't add a printk in there. printk relies on the PDA which is not initialized 
    yet. */
@@ -73,6 +74,8 @@ static void __init setup_boot_cpu_data(void)
 	boot_cpu_data.x86_mask = eax & 0xf;
 }
 
+extern char _end[];
+
 void __init x86_64_start_kernel(char * real_mode_data)
 {
 	char *s;
@@ -80,10 +83,9 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	clear_bss();
 	pda_init(0);
 	copy_bootdata(real_mode_data);
-#ifdef CONFIG_SMP	
+#ifdef CONFIG_SMP
 	cpu_set(0, cpu_online_map);
-#endif	
-
+#endif
 	/* default console: */
 	if (!strstr(saved_command_line, "console="))
 		strcat(saved_command_line, " console=tty0"); 
@@ -99,6 +101,10 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	if (strstr(saved_command_line, "disableapic"))
 		disable_apic = 1;
 #endif
+	/* You need early console to see that */
+	if (__pa_symbol(&_end) >= KERNEL_TEXT_SIZE)
+		panic("Kernel too big for kernel mapping\n");
+
 	setup_boot_cpu_data();
 	start_kernel();
 }

@@ -53,7 +53,6 @@
 #include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/mac_via.h>
-#include <asm/pgalloc.h>
 
 #define SREGS_PAD(n)    u16 n;
 
@@ -613,7 +612,6 @@ static struct net_device *dev_macsonic;
 
 MODULE_PARM(sonic_debug, "i");
 MODULE_PARM_DESC(sonic_debug, "macsonic debug level (1-4)");
-MODULE_LICENSE("GPL");
 
 int
 init_module(void)

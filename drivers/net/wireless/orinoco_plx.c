@@ -125,7 +125,6 @@ not have time for a while..
 #include <linux/wireless.h>
 #include <linux/list.h>
 #include <linux/pci.h>
-#include <linux/wireless.h>
 #include <linux/fcntl.h>
 
 #include <pcmcia/cisreg.h>
@@ -325,8 +324,6 @@ static struct pci_driver orinoco_plx_driver = {
 	.id_table	= orinoco_plx_pci_id_table,
 	.probe		= orinoco_plx_init_one,
 	.remove		= __devexit_p(orinoco_plx_remove_one),
-	.suspend	= 0,
-	.resume		= 0,
 };
 
 static char version[] __initdata = "orinoco_plx.c 0.13e (Daniel Barlow <dan@telent.net>, David Gibson <hermes@gibson.dropbear.id.au>)";
@@ -342,7 +339,7 @@ static int __init orinoco_plx_init(void)
 	return pci_module_init(&orinoco_plx_driver);
 }
 
-extern void __exit orinoco_plx_exit(void)
+void __exit orinoco_plx_exit(void)
 {
 	pci_unregister_driver(&orinoco_plx_driver);
 	current->state = TASK_UNINTERRUPTIBLE;

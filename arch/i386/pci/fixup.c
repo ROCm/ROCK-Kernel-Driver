@@ -92,6 +92,15 @@ static void __devinit  pci_fixup_ide_trash(struct pci_dev *d)
 	int i;
 
 	/*
+	 * Runs the fixup only for the first IDE controller
+	 * (Shai Fultheim - shai@ftcon.com)
+	 */
+	static int called = 0;
+	if (called)
+		return;
+	called = 1;
+
+	/*
 	 * There exist PCI IDE controllers which have utter garbage
 	 * in first four base registers. Ignore that.
 	 */
@@ -199,7 +208,7 @@ static void __devinit pci_fixup_transparent_bridge(struct pci_dev *dev)
  * issue another HALT within 80 ns of the initial HALT, the failure condition
  * is avoided.
  */
-static void __devinit pci_fixup_nforce2(struct pci_dev *dev)
+static void __init pci_fixup_nforce2(struct pci_dev *dev)
 {
 	u32 val, fixed_val;
 	u8 rev;
@@ -208,18 +217,22 @@ static void __devinit pci_fixup_nforce2(struct pci_dev *dev)
 
 	/*
 	 * Chip  Old value   New value
-	 * C17   0x1F01FF01  0x1F0FFF01
-	 * C18D  0x9F01FF01  0x9F0FFF01
+	 * C17   0x1F0FFF01  0x1F01FF01
+	 * C18D  0x9F0FFF01  0x9F01FF01
+	 *
+	 * Northbridge chip version may be determined by
+	 * reading the PCI revision ID (0xC1 or greater is C18D).
 	 */
 	fixed_val = rev < 0xC1 ? 0x1F01FF01 : 0x9F01FF01;
 
 	pci_read_config_dword(dev, 0x6c, &val);
- 	/*
- 	 * Apply fixup only if C1 Halt Disconnect is enabled
- 	 * (bit28) because it is not supported on some boards.
- 	 */
+
+	/*
+	 * Apply fixup only if C1 Halt Disconnect is enabled
+	 * (bit28) because it is not supported on some boards.
+	 */
 	if ((val & (1 << 28)) && val != fixed_val) {
-		printk(KERN_WARNING "PCI: nForce2 C1 Halt Disconnet fixup\n");
+		printk(KERN_WARNING "PCI: nForce2 C1 Halt Disconnect fixup\n");
 		pci_write_config_dword(dev, 0x6c, fixed_val);
 	}
 }

@@ -121,6 +121,7 @@
 /*
  * These are the definitions for the Modem Control Register
  */
+#define UART_MCR_AFE	0x20	/* Enable auto-RTS/CTS (TI16C750) */
 #define UART_MCR_LOOP	0x10	/* Enable loopback test mode */
 #define UART_MCR_OUT2	0x08	/* Out2 complement */
 #define UART_MCR_OUT1	0x04	/* Out1 complement */
@@ -141,7 +142,7 @@
 #define UART_MSR_ANY_DELTA 0x0F	/* Any of the delta bits! */
 
 /*
- * The Intel PXA2xx chip defines those bits
+ * The Intel XScale on-chip UARTs define these bits
  */
 #define UART_IER_DMAE	0x80	/* DMA Requests Enable */
 #define UART_IER_UUE	0x40	/* UART Unit Enable */

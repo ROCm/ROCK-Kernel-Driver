@@ -62,20 +62,15 @@ extern struct task_struct *last_task_used_math;
 #ifndef __s390x__
 
 # define TASK_SIZE		(0x80000000UL)
-# define TASK_UNMAPPED_BASE (current->map_base)
-# define __TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
 # define DEFAULT_TASK_SIZE	(0x80000000UL)
 
 #else /* __s390x__ */
 
-# define TASK64_SIZE		(0x40000000000UL)
-# define TASK31_SIZE		(0x80000000UL)
 # define TASK_SIZE		(test_thread_flag(TIF_31BIT) ? \
-					TASK31_SIZE : TASK64_SIZE)
-# define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
-					(current->map_base) : (TASK64_SIZE / 2))
-# define __TASK_UNMAPPED_BASE	(TASK31_SIZE / 2)
-# define DEFAULT_TASK_SIZE	TASK64_SIZE
+					(0x80000000UL) : (0x40000000000UL))
+# define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define DEFAULT_TASK_SIZE	(0x40000000000UL)
 
 #endif /* __s390x__ */
 
@@ -323,6 +318,16 @@ static inline void disabled_wait(unsigned long code)
 		        "m" (dw_psw) : "cc", "0", "1");
 #endif /* __s390x__ */
 }
+
+/*
+ * CPU idle notifier chain.
+ */
+#define CPU_IDLE	0
+#define CPU_NOT_IDLE	1
+
+struct notifier_block;
+int register_idle_notifier(struct notifier_block *nb);
+int unregister_idle_notifier(struct notifier_block *nb);
 
 #endif
 

@@ -27,17 +27,19 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 #include <asm/irq.h>
 #include <asm/mpc8xx.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/8xx_immap.h>
 #include <asm/commproc.h>
+#include <asm/io.h>
+#include <asm/rheap.h>
 
 extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
 
-static	uint	dp_alloc_base;	/* Starting offset in DP ram */
-static	uint	dp_alloc_top;	/* Max offset + 1 */
+static void m8xx_cpm_dpinit(void);
 static	uint	host_buffer;	/* One page of host buffer */
 static	uint	host_end;	/* end + 1 */
 cpm8xx_t	*cpmp;		/* Pointer to comm processor space */
@@ -55,11 +57,10 @@ static	void	alloc_host_memory(void);
 
 #if 1
 void
-m8xx_cpm_reset()
+m8xx_cpm_reset(void)
 {
 	volatile immap_t	 *imp;
 	volatile cpm8xx_t	*commproc;
-	pte_t			*pte;
 
 	imp = (immap_t *)IMAP_ADDR;
 	commproc = (cpm8xx_t *)&imp->im_cpm;
@@ -84,10 +85,8 @@ m8xx_cpm_reset()
 	 */
 	imp->im_siu_conf.sc_sdcr = 1;
 
-	/* Reclaim the DP memory for our use.
-	*/
-	dp_alloc_base = CPM_DATAONLY_BASE;
-	dp_alloc_top = dp_alloc_base + CPM_DATAONLY_SIZE;
+	/* Reclaim the DP memory for our use. */
+	m8xx_cpm_dpinit();
 
 	/* Tell everyone where the comm processor resides.
 	*/
@@ -138,10 +137,8 @@ m8xx_cpm_reset(uint host_page_addr)
 	*/
 	imp->im_siu_conf.sc_sdcr = 1;
 
-	/* Reclaim the DP memory for our use.
-	*/
-	dp_alloc_base = CPM_DATAONLY_BASE;
-	dp_alloc_top = dp_alloc_base + CPM_DATAONLY_SIZE;
+	/* Reclaim the DP memory for our use. */
+	m8xx_cpm_dpinit();
 
 	/* Set the host page for allocation.
 	*/
@@ -257,30 +254,6 @@ cpm_free_handler(int vec)
 	((immap_t *)IMAP_ADDR)->im_cpic.cpic_cimr &= ~(1 << vec);
 }
 
-/* Allocate some memory from the dual ported ram.  We may want to
- * enforce alignment restrictions, but right now everyone is a good
- * citizen.
- */
-uint
-m8xx_cpm_dpalloc(uint size)
-{
-	uint	retloc;
-
-	if ((dp_alloc_base + size) >= dp_alloc_top)
-		return(CPM_DP_NOSPACE);
-
-	retloc = dp_alloc_base;
-	dp_alloc_base += size;
-
-	return(retloc);
-}
-
-uint
-m8xx_cpm_dpalloc_index(void)
-{
-	return dp_alloc_base;
-}
-
 /* We also own one page of host buffer space for the allocation of
  * UART "fifos" and the like.
  */
@@ -313,7 +286,7 @@ m8xx_cpm_hostalloc(uint size)
 #define BRG_UART_CLK_DIV16	(BRG_UART_CLK/16)
 
 void
-m8xx_cpm_setbrg(uint brg, uint rate)
+cpm_setbrg(uint brg, uint rate)
 {
 	volatile uint	*bp;
 
@@ -330,3 +303,97 @@ m8xx_cpm_setbrg(uint brg, uint rate)
 		*bp = (((BRG_UART_CLK_DIV16 / rate) - 1) << 1) |
 						CPM_BRG_EN | CPM_BRG_DIV16;
 }
+
+/*
+ * dpalloc / dpfree bits.
+ */
+static spinlock_t cpm_dpmem_lock;
+/*
+ * 16 blocks should be enough to satisfy all requests
+ * until the memory subsystem goes up...
+ */
+static rh_block_t cpm_boot_dpmem_rh_block[16];
+static rh_info_t cpm_dpmem_info;
+
+#define CPM_DPMEM_ALIGNMENT	8
+
+void m8xx_cpm_dpinit(void)
+{
+	cpm8xx_t *cp = &((immap_t *)IMAP_ADDR)->im_cpm;
+
+	spin_lock_init(&cpm_dpmem_lock);
+
+	/* Initialize the info header */
+	rh_init(&cpm_dpmem_info, CPM_DPMEM_ALIGNMENT,
+			sizeof(cpm_boot_dpmem_rh_block) /
+			sizeof(cpm_boot_dpmem_rh_block[0]),
+			cpm_boot_dpmem_rh_block);
+
+	/*
+	 * Attach the usable dpmem area.
+	 * XXX: This is actually crap.  CPM_DATAONLY_BASE and
+	 * CPM_DATAONLY_SIZE are a subset of the available dparm.  It varies
+	 * with the processor and the microcode patches applied / activated.
+	 * But the following should be at least safe.
+	 */
+	rh_attach_region(&cpm_dpmem_info, (void *)CPM_DATAONLY_BASE, CPM_DATAONLY_SIZE);
+}
+
+/*
+ * Allocate the requested size worth of DP memory.
+ * This function used to return an index into the DPRAM area.
+ * Now it returns the actuall physical address of that area.
+ * use m8xx_cpm_dpram_offset() to get the index
+ */
+uint cpm_dpalloc(uint size, uint align)
+{
+	void *start;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cpm_dpmem_lock, flags);
+	cpm_dpmem_info.alignment = align;
+	start = rh_alloc(&cpm_dpmem_info, size, "commproc");
+	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
+
+	return (uint)start;
+}
+EXPORT_SYMBOL(cpm_dpalloc);
+
+int cpm_dpfree(uint offset)
+{
+	int ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cpm_dpmem_lock, flags);
+	ret = rh_free(&cpm_dpmem_info, (void *)offset);
+	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
+
+	return ret;
+}
+EXPORT_SYMBOL(cpm_dpfree);
+
+uint cpm_dpalloc_fixed(uint offset, uint size, uint align)
+{
+	void *start;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cpm_dpmem_lock, flags);
+	cpm_dpmem_info.alignment = align;
+	start = rh_alloc_fixed(&cpm_dpmem_info, (void *)offset, size, "commproc");
+	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
+
+	return (uint)start;
+}
+EXPORT_SYMBOL(cpm_dpalloc_fixed);
+
+void cpm_dpdump(void)
+{
+	rh_dump(&cpm_dpmem_info);
+}
+EXPORT_SYMBOL(cpm_dpdump);
+
+void *cpm_dpram_addr(uint offset)
+{
+	return ((immap_t *)IMAP_ADDR)->im_cpm.cp_dpmem + offset;
+}
+EXPORT_SYMBOL(cpm_dpram_addr);

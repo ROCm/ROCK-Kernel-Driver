@@ -7,9 +7,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-#ifndef __ASSEMBLY__
-
-#include <asm/memory.h>
 #include <asm/page.h>
 
 struct mm_struct;
@@ -64,16 +61,4 @@ extern struct processor {
 #define cpu_do_idle()			processor._do_idle()
 #define cpu_dcache_clean_area(addr,sz)	processor.dcache_clean_area(addr,sz)
 #define cpu_set_pte(ptep, pte)		processor.set_pte(ptep, pte)
-
-#define cpu_switch_mm(pgd,mm)	processor.switch_mm(__virt_to_phys((unsigned long)(pgd)),mm)
-
-#define cpu_get_pgd()	\
-	({						\
-		unsigned long pg;			\
-		__asm__("mrc	p15, 0, %0, c2, c0, 0"	\
-			 : "=r" (pg) : : "cc");		\
-		pg &= ~0x3fff;				\
-		(pgd_t *)phys_to_virt(pg);		\
-	})
-
-#endif
+#define cpu_do_switch_mm(pgd,mm)	processor.switch_mm(pgd,mm)

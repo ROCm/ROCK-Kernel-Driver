@@ -65,7 +65,7 @@ static int mtu;
 static int bogus_rx;
 static int dma_ctrl = 0x004A0263; 			/* Constrained by errata */
 static int fifo_cfg = 0x0020;				/* Bypass external Tx FIFO. */
-#elif YF_NEW					/* A future perfect board :->.  */
+#elif defined(YF_NEW)					/* A future perfect board :->.  */
 static int dma_ctrl = 0x00CAC277;			/* Override when loading module! */
 static int fifo_cfg = 0x0028;
 #else
@@ -107,12 +107,6 @@ static int gx_fix;
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
 #define yellowfin_debug debug
-
-#if !defined(__OPTIMIZE__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -292,7 +286,7 @@ static struct pci_id_info pci_id_tbl[] = {
 	 FullTxStatus | IsGigabit | HasMulticastBug | HasMACAddrBug | DontUseEeprom},
 	{"Symbios SYM83C885", { 0x07011000, 0xffffffff},
 	 PCI_IOTYPE, YELLOWFIN_SIZE, HasMII | DontUseEeprom },
-	{0,},
+	{NULL,},
 };
 
 static struct pci_device_id yellowfin_pci_tbl[] = {
@@ -448,7 +442,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 
 	np = dev->priv;
 
-	if (pci_request_regions(pdev, dev->name))
+	if (pci_request_regions(pdev, DRV_NAME))
 		goto err_out_free_netdev;
 
 	pci_set_master (pdev);
@@ -811,7 +805,7 @@ static void yellowfin_init_ring(struct net_device *dev)
 #ifdef NO_TXSTATS
 	/* In this mode the Tx ring needs only a single descriptor. */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		yp->tx_skbuff[i] = 0;
+		yp->tx_skbuff[i] = NULL;
 		yp->tx_ring[i].dbdma_cmd = cpu_to_le32(CMD_STOP);
 		yp->tx_ring[i].branch_addr = cpu_to_le32(yp->tx_ring_dma +
 			((i+1)%TX_RING_SIZE)*sizeof(struct yellowfin_desc));
@@ -993,7 +987,7 @@ static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_re
 			pci_unmap_single(yp->pci_dev, yp->tx_ring[entry].addr,
 				skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq(skb);
-			yp->tx_skbuff[entry] = 0;
+			yp->tx_skbuff[entry] = NULL;
 		}
 		if (yp->tx_full
 			&& yp->cur_tx - yp->dirty_tx < TX_QUEUE_SIZE - 4) {
@@ -1201,13 +1195,8 @@ static int yellowfin_rx(struct net_device *dev)
 					break;
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
-#if HAS_IP_COPYSUM
 				eth_copy_and_sum(skb, rx_skb->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len), 
-					rx_skb->tail, pkt_len);
-#endif
 				pci_dma_sync_single_for_device(yp->pci_dev, desc->addr,
 											   yp->rx_buf_sz,
 											   PCI_DMA_FROMDEVICE);
@@ -1331,12 +1320,12 @@ static int yellowfin_close(struct net_device *dev)
 		if (yp->rx_skbuff[i]) {
 			dev_kfree_skb(yp->rx_skbuff[i]);
 		}
-		yp->rx_skbuff[i] = 0;
+		yp->rx_skbuff[i] = NULL;
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		if (yp->tx_skbuff[i])
 			dev_kfree_skb(yp->tx_skbuff[i]);
-		yp->tx_skbuff[i] = 0;
+		yp->tx_skbuff[i] = NULL;
 	}
 
 #ifdef YF_PROTOTYPE			/* Support for prototype hardware errata. */
@@ -1405,7 +1394,7 @@ static void set_rx_mode(struct net_device *dev)
 	outw(cfg_value | 0x1000, ioaddr + Cnfg);
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct yellowfin_private *np = dev->priv;
 	u32 ethcmd;
@@ -1433,11 +1422,11 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct yellowfin_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = np->phys[0] & 0x1f;
 		/* Fall Through */

@@ -118,7 +118,7 @@ void show_mem(void)
 
 	printk("Mem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+	printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 	i = max_mapnr;
 	while (i-- > 0) {
 		total++;
@@ -253,6 +253,12 @@ void __init MMU_init(void)
 	if (__max_memory && total_memory > __max_memory)
 		total_memory = __max_memory;
 	total_lowmem = total_memory;
+#ifdef CONFIG_FSL_BOOKE
+	/* Freescale Book-E parts expect lowmem to be mapped by fixed TLB
+	 * entries, so we need to adjust lowmem to match the amount we can map
+	 * in the fixed entries */
+	adjust_total_lowmem();
+#endif /* CONFIG_FSL_BOOKE */
 	if (total_lowmem > __max_low_memory) {
 		total_lowmem = __max_low_memory;
 #ifndef CONFIG_HIGHMEM
@@ -572,6 +578,16 @@ void flush_dcache_page(struct page *page)
 	clear_bit(PG_arch_1, &page->flags);
 }
 
+void flush_dcache_icache_page(struct page *page)
+{
+#ifdef CONFIG_BOOKE
+	__flush_dcache_icache(kmap(page));
+	kunmap(page);
+#else
+	__flush_dcache_icache_phys(page_to_pfn(page) << PAGE_SHIFT);
+#endif
+
+}
 void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
@@ -614,7 +630,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 			if (vma->vm_mm == current->active_mm)
 				__flush_dcache_icache((void *) address);
 			else
-				__flush_dcache_icache_phys(pfn << PAGE_SHIFT);
+				flush_dcache_icache_page(page);
 			set_bit(PG_arch_1, &page->flags);
 		}
 	}

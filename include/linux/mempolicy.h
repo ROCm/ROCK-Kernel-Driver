@@ -9,19 +9,19 @@
  */
 
 /* Policies */
-#define MPOL_DEFAULT     0
-#define MPOL_PREFERRED    1
-#define MPOL_BIND        2
-#define MPOL_INTERLEAVE  3
+#define MPOL_DEFAULT	0
+#define MPOL_PREFERRED	1
+#define MPOL_BIND	2
+#define MPOL_INTERLEAVE	3
 
 #define MPOL_MAX MPOL_INTERLEAVE
 
 /* Flags for get_mem_policy */
-#define MPOL_F_NODE   (1<<0)  /* return next IL mode instead of node mask */
-#define MPOL_F_ADDR     (1<<1)  /* look up vma using address */
+#define MPOL_F_NODE	(1<<0)	/* return next IL mode instead of node mask */
+#define MPOL_F_ADDR	(1<<1)	/* look up vma using address */
 
 /* Flags for mbind */
-#define MPOL_MF_STRICT  (1<<0)  /* Verify existing pages in the mapping */
+#define MPOL_MF_STRICT	(1<<0)	/* Verify existing pages in the mapping */
 
 #ifdef __KERNEL__
 
@@ -58,7 +58,7 @@ struct vm_area_struct;
  * For MPOL_BIND the zonelist must be always duplicated. mpol_clone() does this.
  */
 struct mempolicy {
-	atomic_t   refcnt;
+	atomic_t refcnt;
 	short policy; 	/* See MPOL_* above */
 	union {
 		struct zonelist  *zonelist;	/* bind */
@@ -118,7 +118,8 @@ static inline int mpol_equal(struct mempolicy *a, struct mempolicy *b)
  * instead of zone lists, so give it special interfaces for now.
  */
 extern int mpol_first_node(struct vm_area_struct *vma, unsigned long addr);
-extern int mpol_node_valid(int nid, struct vm_area_struct *vma, unsigned long addr);
+extern int mpol_node_valid(int nid, struct vm_area_struct *vma,
+			unsigned long addr);
 
 /*
  * Tree of shared policies for a shared memory region.
@@ -146,11 +147,14 @@ static inline void mpol_shared_policy_init(struct shared_policy *info)
 }
 
 int mpol_set_shared_policy(struct shared_policy *info,
-				  struct vm_area_struct *vma,
-				  struct mempolicy *new);
+				struct vm_area_struct *vma,
+				struct mempolicy *new);
 void mpol_free_shared_policy(struct shared_policy *p);
 struct mempolicy *mpol_shared_policy_lookup(struct shared_policy *sp,
 					    unsigned long idx);
+
+extern void numa_default_policy(void);
+extern void numa_policy_init(void);
 
 #else
 
@@ -182,7 +186,8 @@ static inline int mpol_first_node(struct vm_area_struct *vma, unsigned long a)
 	return numa_node_id();
 }
 
-static inline int mpol_node_valid(int nid, struct vm_area_struct *vma, unsigned long a)
+static inline int
+mpol_node_valid(int nid, struct vm_area_struct *vma, unsigned long a)
 {
 	return 1;
 }
@@ -190,8 +195,8 @@ static inline int mpol_node_valid(int nid, struct vm_area_struct *vma, unsigned 
 struct shared_policy {};
 
 static inline int mpol_set_shared_policy(struct shared_policy *info,
-				      struct vm_area_struct *vma,
-				      struct mempolicy *new)
+					struct vm_area_struct *vma,
+					struct mempolicy *new)
 {
 	return -EINVAL;
 }
@@ -212,6 +217,14 @@ mpol_shared_policy_lookup(struct shared_policy *sp, unsigned long idx)
 
 #define vma_policy(vma) NULL
 #define vma_set_policy(vma, pol) do {} while(0)
+
+static inline void numa_policy_init(void)
+{
+}
+
+static inline void numa_default_policy(void)
+{
+}
 
 #endif /* CONFIG_NUMA */
 #endif /* __KERNEL__ */

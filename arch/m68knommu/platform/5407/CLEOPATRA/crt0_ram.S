@@ -124,6 +124,7 @@ _start:
 	nop
 
 
+#ifdef CONFIG_ROMFS_FS
 	/*
 	 *	Move ROM filesystem above bss :-)
 	 */
@@ -144,6 +145,12 @@ _copy_romfs:
 	move.l	%d0, -(%a1)
 	cmp.l	%a0, %a2			/* Check if at end */
 	bne	_copy_romfs
+
+#else /* CONFIG_ROMFS_FS */
+	lea.l	_ebss, %a1
+	move.l	%a1, _ramstart
+#endif /* CONFIG_ROMFS_FS */
+
 
 	/*
 	 *	Zero out the bss region.

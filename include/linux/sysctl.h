@@ -131,18 +131,8 @@ enum
 	KERN_PRINTK_RATELIMIT_BURST=61,	/* int: tune printk ratelimiting */
 	KERN_PTY=62,		/* dir: pty driver */
 	KERN_NGROUPS_MAX=63,	/* int: NGROUPS_MAX */
-	KERN_KDB=64,		/* int: kdb on/off */
-	KERN_S390_HZ_TIMER=65,  /* int: hz timer on or off */
-	KERN_DUMP=66,		/* directory: dump parameters */
-	KERN_MAXTIMESLICE=67,	/* int: nice -20 max timeslice */
-	KERN_MINTIMESLICE=68,	/* int: nice +19 min timeslice */
-	KERN_HZ=69,		/* unsigned long: interal kernel HZ */
-	KERN_SHMUSEHUGEPAGES=70,/* int: back shm with huge pages */
-	KERN_MMAPUSEHUGEPAGES=71,       /* int: back anon mmap with hpages */
-	KERN_HPAGES_MAP_SZ=72,  /* int: min size (MB) of mapping */
-	KERN_XMON=73,		/* int: xmon debugger enabled */
-	KERN_UNSUPPORTED=74,	/* int: allow loading of unsupported modules */
-
+	KERN_SPARC_SCONS_PWROFF=64, /* int: serial console power-off halt */
+	KERN_HZ_TIMER=65,	/* int: hz timer on or off */
 };
 
 
@@ -171,9 +161,10 @@ enum
 	VM_LOWER_ZONE_PROTECTION=20,/* Amount of protection of lower zones */
 	VM_MIN_FREE_KBYTES=21,	/* Minimum free kilobytes to maintain */
 	VM_MAX_MAP_COUNT=22,	/* int: Maximum number of mmaps/address-space */
- 	VM_LAPTOP_MODE=23,      /* vm laptop mode */
- 	VM_BLOCK_DUMP=24,       /* block dump mode */
- 	VM_DISABLE_CAP_MLOCK=25,/* disable CAP_IPC_LOCK checking */
+	VM_LAPTOP_MODE=23,	/* vm laptop mode */
+	VM_BLOCK_DUMP=24,	/* block dump mode */
+	VM_HUGETLB_GROUP=25,	/* permitted hugetlb group */
+	VM_VFS_CACHE_PRESSURE=26, /* dcache/icache reclaim pressure */
 };
 
 
@@ -338,6 +329,16 @@ enum
 	NET_IPV4_IPFRAG_SECRET_INTERVAL=94,
 	NET_TCP_WESTWOOD=95,
 	NET_IPV4_IGMP_MAX_MSF=96,
+	NET_TCP_NO_METRICS_SAVE=97,
+	NET_TCP_VEGAS=98,
+	NET_TCP_VEGAS_ALPHA=99,
+	NET_TCP_VEGAS_BETA=100,
+	NET_TCP_VEGAS_GAMMA=101,
+ 	NET_TCP_BIC=102,
+ 	NET_TCP_BIC_FAST_CONVERGENCE=103,
+	NET_TCP_BIC_LOW_WINDOW=104,
+	NET_TCP_DEFAULT_WIN_SCALE=105,
+	NET_TCP_MODERATE_RCVBUF=106,
 };
 
 enum {
@@ -423,23 +424,6 @@ enum {
 	NET_IPV6_IP6FRAG_TIME=23,
 	NET_IPV6_IP6FRAG_SECRET_INTERVAL=24,
 	NET_IPV6_MLD_MAX_MSF=25,
-	NET_IPV6_MOBILITY=26
-};
-
-/* /proc/sys/net/ipv6/mobility */
-enum {
-	NET_IPV6_MOBILITY_DEBUG=1,
-	NET_IPV6_MOBILITY_TUNNEL_SITELOCAL=2,
-	NET_IPV6_MOBILITY_ROUTER_SOLICITATION_MAX_SENDTIME=3,
-	NET_IPV6_MOBILITY_ROUTER_REACH=4,
-	NET_IPV6_MOBILITY_MDETECT_MECHANISM=5,
-	NET_IPV6_MOBILITY_RETROUT=6,
-	NET_IPV6_MOBILITY_MAX_TNLS=7,
-	NET_IPV6_MOBILITY_MIN_TNLS=8,
-	NET_IPV6_MOBILITY_BINDING_REFRESH=9,
-	NET_IPV6_MOBILITY_BU_F_LLADDR=10,
-	NET_IPV6_MOBILITY_BU_F_KEYMGM=11,
-	NET_IPV6_MOBILITY_BU_F_CN_ACK=12
 };
 
 enum {

@@ -114,7 +114,7 @@ int atm_del_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr)
 }
 
 
-int atm_get_addr(struct atm_dev *dev,struct sockaddr_atmsvc *u_buf,int size)
+int atm_get_addr(struct atm_dev *dev,struct sockaddr_atmsvc __user *buf,int size)
 {
 	unsigned long flags;
 	struct atm_dev_addr *walk;
@@ -134,7 +134,7 @@ int atm_get_addr(struct atm_dev *dev,struct sockaddr_atmsvc *u_buf,int size)
 		memcpy(tmp_bufp++, &walk->addr, sizeof(struct sockaddr_atmsvc));
 	spin_unlock_irqrestore(&dev->lock, flags);
 	error = total > size ? -E2BIG : total;
-	if (copy_to_user(u_buf, tmp_buf, total < size ? total : size))
+	if (copy_to_user(buf, tmp_buf, total < size ? total : size))
 		error = -EFAULT;
 	kfree(tmp_buf);
 	return error;

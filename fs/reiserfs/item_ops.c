@@ -106,7 +106,7 @@ static int sd_unit_num (struct virtual_item * vi)
 
 static void sd_print_vi (struct virtual_item * vi)
 {
-    reiserfs_warning (NULL, "STATDATA, index %d, type 0x%x, %h", 
+    reiserfs_warning (NULL, "STATDATA, index %d, type 0x%x, %h",
 		      vi->vi_index, vi->vi_type, vi->vi_ih);
 }
 
@@ -209,7 +209,7 @@ static int direct_unit_num (struct virtual_item * vi)
 
 static void direct_print_vi (struct virtual_item * vi)
 {
-    reiserfs_warning (NULL, "DIRECT, index %d, type 0x%x, %h", 
+    reiserfs_warning (NULL, "DIRECT, index %d, type 0x%x, %h",
 		      vi->vi_index, vi->vi_type, vi->vi_ih);
 }
 
@@ -302,7 +302,7 @@ static void indirect_print_item (struct item_head * ih, char * item)
     unp = (__u32 *)item;
 
     if (ih_item_len(ih) % UNFM_P_SIZE)
-	reiserfs_warning (NULL, "indirect_print_item: invalid item len");  
+	reiserfs_warning (NULL, "indirect_print_item: invalid item len");
 
     printk ("%d pointers\n[ ", (int)I_UNFM_NUM (ih));
     for (j = 0; j < I_UNFM_NUM (ih); j ++) {
@@ -363,7 +363,7 @@ static int indirect_unit_num (struct virtual_item * vi)
 
 static void indirect_print_vi (struct virtual_item * vi)
 {
-    reiserfs_warning (NULL, "INDIRECT, index %d, type 0x%x, %h", 
+    reiserfs_warning (NULL, "INDIRECT, index %d, type 0x%x, %h",
 		      vi->vi_index, vi->vi_type, vi->vi_ih);
 }
 
@@ -549,7 +549,7 @@ static int direntry_create_vi (struct virtual_node * vn,
     
 	if (l + IH_SIZE != vi->vi_item_len + 
 	    ((is_affected && (vn->vn_mode == M_PASTE || vn->vn_mode == M_CUT)) ? insert_size : 0) ) {
-	    reiserfs_panic (0, "vs-8025: set_entry_sizes: (mode==%c, insert_size==%d), invalid length of directory item",
+	    reiserfs_panic (NULL, "vs-8025: set_entry_sizes: (mode==%c, insert_size==%d), invalid length of directory item",
 			    vn->vn_mode, insert_size);
 	}
     }
@@ -652,7 +652,7 @@ static void direntry_print_vi (struct virtual_item * vi)
     int i;
     struct direntry_uarea * dir_u = vi->vi_uarea;
 
-    reiserfs_warning (NULL, "DIRENTRY, index %d, type 0x%x, %h, flags 0x%x", 
+    reiserfs_warning (NULL, "DIRENTRY, index %d, type 0x%x, %h, flags 0x%x",
 		      vi->vi_index, vi->vi_type, vi->vi_ih, dir_u->flags);
     printk ("%d entries: ", dir_u->entry_count);
     for (i = 0; i < dir_u->entry_count; i ++)

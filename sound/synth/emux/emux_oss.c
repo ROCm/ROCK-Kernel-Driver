@@ -34,7 +34,7 @@
 static int snd_emux_open_seq_oss(snd_seq_oss_arg_t *arg, void *closure);
 static int snd_emux_close_seq_oss(snd_seq_oss_arg_t *arg);
 static int snd_emux_ioctl_seq_oss(snd_seq_oss_arg_t *arg, unsigned int cmd, unsigned long ioarg);
-static int snd_emux_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format, const char *buf, int offs, int count);
+static int snd_emux_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format, const char __user *buf, int offs, int count);
 static int snd_emux_reset_seq_oss(snd_seq_oss_arg_t *arg);
 static int snd_emux_event_oss_input(snd_seq_event_t *ev, int direct, void *private, int atomic, int hop);
 static void reset_port_mode(snd_emux_port_t *port, int midi_mode);
@@ -201,7 +201,7 @@ snd_emux_close_seq_oss(snd_seq_oss_arg_t *arg)
  */
 static int
 snd_emux_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format,
-			    const char *buf, int offs, int count)
+			    const char __user *buf, int offs, int count)
 {
 	snd_emux_t *emu;
 	snd_emux_port_t *p;

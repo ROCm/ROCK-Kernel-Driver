@@ -6,4 +6,9 @@
 #
 
 obj-y := setup.o
+
+ifndef CONFIG_NUMA
+obj-$(CONFIG_IA64_DIG) += topology.o
+endif
+
 obj-$(CONFIG_IA64_GENERIC) += machvec.o

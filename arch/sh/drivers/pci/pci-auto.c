@@ -45,7 +45,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 
-#define	DEBUG
+#undef	DEBUG
 #ifdef 	DEBUG
 #define	DBG(x...)	printk(x)
 #else
@@ -106,7 +106,8 @@ static void __init
 pciauto_setup_bars(struct pci_channel *hose,
 		   int top_bus,
 		   int current_bus,
-		   int pci_devfn)
+		   int pci_devfn,
+		   int bar_limit)
 {
 	u32 bar_response, bar_size, bar_value;
 	u32 bar, addr_mask, bar_nr = 0;
@@ -114,7 +115,8 @@ pciauto_setup_bars(struct pci_channel *hose,
 	u32 * lower_limit;
 	int found_mem64 = 0;
 
-	for (bar = PCI_BASE_ADDRESS_0; bar <= PCI_BASE_ADDRESS_5; bar+=4) {
+	for (bar = PCI_BASE_ADDRESS_0; bar <= bar_limit; bar+=4) {
+#if !defined(CONFIG_SH_HS7751RVOIP) && !defined(CONFIG_SH_RTS7751R2D)
 		u32 bar_addr;
 
 		/* Read the old BAR value */
@@ -123,6 +125,7 @@ pciauto_setup_bars(struct pci_channel *hose,
 					pci_devfn,
 					bar,
 					&bar_addr);
+#endif
 
 		/* Tickle the BAR and get the response */
 		early_write_config_dword(hose, top_bus,
@@ -137,6 +140,7 @@ pciauto_setup_bars(struct pci_channel *hose,
 					bar,
 					&bar_response);
 
+#if !defined(CONFIG_SH_HS7751RVOIP) && !defined(CONFIG_SH_RTS7751R2D)
 		/* 
 		 * Write the old BAR value back out, only update the BAR
 		 * if we implicitly want resources to be updated, which
@@ -147,6 +151,7 @@ pciauto_setup_bars(struct pci_channel *hose,
 					 pci_devfn,
 					 bar,
 					 bar_addr);
+#endif
 
 		/* If BAR is not implemented go to the next BAR */
 		if (!bar_response)
@@ -287,6 +292,11 @@ pciauto_postscan_setup_bridge(struct pci_channel *hose,
 {
 	u32 temp;
 
+	/*
+	 * [jsun] we always bump up baselines a little, so that if there
+	 * nothing behind P2P bridge, we don't wind up overlapping IO/MEM
+	 * spaces.
+	 */
 	pciauto_lower_memspc += 1;
 	pciauto_lower_iospc += 1;
 
@@ -318,93 +328,99 @@ pciauto_postscan_setup_bridge(struct pci_channel *hose,
 
 static void __init
 pciauto_prescan_setup_cardbus_bridge(struct pci_channel *hose,
-                            int top_bus,
-                            int current_bus,
-                            int pci_devfn,
-                            int sub_bus)
+			int top_bus,
+			int current_bus,
+			int pci_devfn,
+			int sub_bus)
 {
-       /* Configure bus number registers */
-       early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
-                               PCI_PRIMARY_BUS, current_bus);
-       early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
-                               PCI_SECONDARY_BUS, sub_bus + 1);
-       early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
-                               PCI_SUBORDINATE_BUS, 0xff);
+	/* Configure bus number registers */
+	early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
+				PCI_PRIMARY_BUS, current_bus);
+	early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
+				PCI_SECONDARY_BUS, sub_bus + 1);
+	early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
+				PCI_SUBORDINATE_BUS, 0xff);
 
-       /* Align memory and I/O to 4KB and 4 byte boundaries. */
-       pciauto_lower_memspc = (pciauto_lower_memspc + (0x1000 - 1))
-               & ~(0x1000 - 1);
-       pciauto_lower_iospc = (pciauto_lower_iospc + (0x4 - 1))
-               & ~(0x4 - 1);
+	/* Align memory and I/O to 4KB and 4 byte boundaries. */
+	pciauto_lower_memspc = (pciauto_lower_memspc + (0x1000 - 1))
+		& ~(0x1000 - 1);
+	pciauto_lower_iospc = (pciauto_lower_iospc + (0x4 - 1))
+		& ~(0x4 - 1);
 
-       early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
-               PCI_CB_MEMORY_BASE_0, pciauto_lower_memspc);
-       early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
-               PCI_CB_IO_BASE_0, pciauto_lower_iospc);  
+	early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
+		PCI_CB_MEMORY_BASE_0, pciauto_lower_memspc);
+	early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
+		PCI_CB_IO_BASE_0, pciauto_lower_iospc);
 }
 
 static void __init
 pciauto_postscan_setup_cardbus_bridge(struct pci_channel *hose,
-                             int top_bus,
-                             int current_bus,
-                             int pci_devfn,
-                             int sub_bus)
+			int top_bus,
+			int current_bus,
+			int pci_devfn,
+			int sub_bus)
 {
-       u32 temp;
+	u32 temp;
 
-       /* 
-        * [jsun] we always bump up baselines a little, so that if there 
-        * nothing behind P2P bridge, we don't wind up overlapping IO/MEM 
-        * spaces.
-        */
-       pciauto_lower_memspc += 1;
-       pciauto_lower_iospc += 1;
+#if !defined(CONFIG_SH_HS7751RVOIP) && !defined(CONFIG_SH_RTS7751R2D)
+	/*
+	 * [jsun] we always bump up baselines a little, so that if there
+	 * nothing behind P2P bridge, we don't wind up overlapping IO/MEM
+	 * spaces.
+	 */
+	pciauto_lower_memspc += 1;
+	pciauto_lower_iospc += 1;
+#endif
 
-       /*
-        * Configure subordinate bus number.  The PCI subsystem
-        * bus scan will renumber buses (reserving three additional
-        * for this PCI<->CardBus bridge for the case where a CardBus
-        * adapter contains a P2P or CB2CB bridge.
-        */
+	/*
+	 * Configure subordinate bus number.  The PCI subsystem
+	 * bus scan will renumber buses (reserving three additional
+	 * for this PCI<->CardBus bridge for the case where a CardBus
+	 * adapter contains a P2P or CB2CB bridge.
+	 */
 
-       early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
-                               PCI_SUBORDINATE_BUS, sub_bus);
+	early_write_config_byte(hose, top_bus, current_bus, pci_devfn,
+				PCI_SUBORDINATE_BUS, sub_bus);
 
-       /*
-        * Reserve an additional 4MB for mem space and 16KB for
-        * I/O space.  This should cover any additional space
-        * requirement of unusual CardBus devices with 
-        * additional bridges that can consume more address space.
-        * 
-        * Although pcmcia-cs currently will reprogram bridge
-        * windows, the goal is to add an option to leave them
-        * alone and use the bridge window ranges as the regions
-        * that are searched for free resources upon hot-insertion
-        * of a device.  This will allow a PCI<->CardBus bridge
-        * configured by this routine to happily live behind a
-        * P2P bridge in a system.
-        */
+	/*
+	 * Reserve an additional 4MB for mem space and 16KB for
+	 * I/O space.  This should cover any additional space
+	 * requirement of unusual CardBus devices with
+	 * additional bridges that can consume more address space.
+	 *
+	 * Although pcmcia-cs currently will reprogram bridge
+	 * windows, the goal is to add an option to leave them
+	 * alone and use the bridge window ranges as the regions
+	 * that are searched for free resources upon hot-insertion
+	 * of a device.  This will allow a PCI<->CardBus bridge
+	 * configured by this routine to happily live behind a
+	 * P2P bridge in a system.
+	 */
+#if defined(CONFIG_SH_HS7751RVOIP) || defined(CONFIG_SH_RTS7751R2D)
+	pciauto_lower_memspc += 0x00400000;
+	pciauto_lower_iospc += 0x00004000;
+#endif
 
-       /* Align memory and I/O to 4KB and 4 byte boundaries. */
-       pciauto_lower_memspc = (pciauto_lower_memspc + (0x1000 - 1))
-               & ~(0x1000 - 1);
-       pciauto_lower_iospc = (pciauto_lower_iospc + (0x4 - 1))
-               & ~(0x4 - 1);
-       /* Set up memory and I/O filter limits, assume 32-bit I/O space */
-       early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
-               PCI_CB_MEMORY_LIMIT_0, pciauto_lower_memspc - 1); 
-       early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
-               PCI_CB_IO_LIMIT_0, pciauto_lower_iospc - 1);
-       
-       /* Enable memory and I/O accesses, enable bus master */
-       early_read_config_dword(hose, top_bus, current_bus, pci_devfn,
-               PCI_COMMAND, &temp);
-       early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
-               PCI_COMMAND, temp | PCI_COMMAND_IO | PCI_COMMAND_MEMORY
-               | PCI_COMMAND_MASTER);
+	/* Align memory and I/O to 4KB and 4 byte boundaries. */
+	pciauto_lower_memspc = (pciauto_lower_memspc + (0x1000 - 1))
+		& ~(0x1000 - 1);
+	pciauto_lower_iospc = (pciauto_lower_iospc + (0x4 - 1))
+		& ~(0x4 - 1);
+	/* Set up memory and I/O filter limits, assume 32-bit I/O space */
+	early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
+		PCI_CB_MEMORY_LIMIT_0, pciauto_lower_memspc - 1);
+	early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
+		PCI_CB_IO_LIMIT_0, pciauto_lower_iospc - 1);
+
+	/* Enable memory and I/O accesses, enable bus master */
+	early_read_config_dword(hose, top_bus, current_bus, pci_devfn,
+		PCI_COMMAND, &temp);
+	early_write_config_dword(hose, top_bus, current_bus, pci_devfn,
+		PCI_COMMAND, temp | PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+		PCI_COMMAND_MASTER);
 }
 
-#define      PCIAUTO_IDE_MODE_MASK           0x05
+#define	PCIAUTO_IDE_MODE_MASK		0x05
 
 static int __init
 pciauto_bus_scan(struct pci_channel *hose, int top_bus, int current_bus)
@@ -455,6 +471,9 @@ pciauto_bus_scan(struct pci_channel *hose, int top_bus, int current_bus)
 		if ((pci_class >> 16) == PCI_CLASS_BRIDGE_PCI) {
 			DBG("        Bridge: primary=%.2x, secondary=%.2x\n",
 				current_bus, sub_bus + 1);
+#if defined(CONFIG_SH_HS7751RVOIP) || defined(CONFIG_SH_RTS7751R2D)
+			pciauto_setup_bars(hose, top_bus, current_bus, pci_devfn, PCI_BASE_ADDRESS_1);
+#endif
 			pciauto_prescan_setup_bridge(hose, top_bus, current_bus,
 						     pci_devfn, sub_bus);
 			DBG("Scanning sub bus %.2x, I/O 0x%.8x, Mem 0x%.8x\n",
@@ -463,26 +482,26 @@ pciauto_bus_scan(struct pci_channel *hose, int top_bus, int current_bus)
 			sub_bus = pciauto_bus_scan(hose, top_bus, sub_bus+1);
 			DBG("Back to bus %.2x\n", current_bus);
 			pciauto_postscan_setup_bridge(hose, top_bus, current_bus,
-						      pci_devfn, sub_bus);
+							pci_devfn, sub_bus);
 			continue;
-                } else if ((pci_class >> 16) == PCI_CLASS_BRIDGE_CARDBUS) {
-                        DBG("  CARDBUS  Bridge: primary=%.2x, secondary=%.2x\n",
-                                current_bus, sub_bus + 1);
-                        DBG("PCI Autoconfig: Found CardBus bridge, device %d function %d\n", PCI_SLOT(pci_devfn), PCI_FUNC(pci_devfn));
-                        /* Place CardBus Socket/ExCA registers */
-                        pciauto_setup_bars(hose, top_bus, current_bus, pci_devfn);
+		} else if ((pci_class >> 16) == PCI_CLASS_BRIDGE_CARDBUS) {
+			DBG("  CARDBUS  Bridge: primary=%.2x, secondary=%.2x\n",
+				current_bus, sub_bus + 1);
+			DBG("PCI Autoconfig: Found CardBus bridge, device %d function %d\n", PCI_SLOT(pci_devfn), PCI_FUNC(pci_devfn));
+			/* Place CardBus Socket/ExCA registers */
+			pciauto_setup_bars(hose, top_bus, current_bus, pci_devfn, PCI_BASE_ADDRESS_0);
  
-                        pciauto_prescan_setup_cardbus_bridge(hose, top_bus, 
-                                        current_bus, pci_devfn, sub_bus);
+			pciauto_prescan_setup_cardbus_bridge(hose, top_bus,
+					current_bus, pci_devfn, sub_bus);
  
-                        DBG("Scanning sub bus %.2x, I/O 0x%.8x, Mem 0x%.8x\n",
-                                sub_bus + 1,
-                                pciauto_lower_iospc, pciauto_lower_memspc);
-                        sub_bus = pciauto_bus_scan(hose, top_bus, sub_bus+1);
-                        DBG("Back to bus %.2x, sub_bus is %x\n", current_bus, sub_bus);
-                        pciauto_postscan_setup_cardbus_bridge(hose, top_bus, 
-                                        current_bus, pci_devfn, sub_bus);
-                        continue;
+			DBG("Scanning sub bus %.2x, I/O 0x%.8x, Mem 0x%.8x\n",
+				sub_bus + 1,
+				pciauto_lower_iospc, pciauto_lower_memspc);
+			sub_bus = pciauto_bus_scan(hose, top_bus, sub_bus+1);
+			DBG("Back to bus %.2x, sub_bus is %x\n", current_bus, sub_bus);
+			pciauto_postscan_setup_cardbus_bridge(hose, top_bus,
+					current_bus, pci_devfn, sub_bus);
+			continue;
 		} else if ((pci_class >> 16) == PCI_CLASS_STORAGE_IDE) {
 
 			unsigned char prg_iface;
@@ -495,7 +514,7 @@ pciauto_bus_scan(struct pci_channel *hose, int top_bus, int current_bus)
 			}
 		}
 
- 		/*
+		/*
 		 * Found a peripheral, enable some standard
 		 * settings
 		 */
@@ -509,7 +528,7 @@ pciauto_bus_scan(struct pci_channel *hose, int top_bus, int current_bus)
 					PCI_LATENCY_TIMER, 0x80);
 
 		/* Allocate PCI I/O and/or memory space */
-		pciauto_setup_bars(hose, top_bus, current_bus, pci_devfn);
+		pciauto_setup_bars(hose, top_bus, current_bus, pci_devfn, PCI_BASE_ADDRESS_5);
 	}
 	return sub_bus;
 }

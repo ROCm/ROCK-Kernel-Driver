@@ -28,7 +28,8 @@
     82801CA/CAM		2483           
     82801DB		24C3   (HW PEC supported, 32 byte buffer not supported)
     82801EB		24D3   (HW PEC supported, 32 byte buffer not supported)
-
+    6300ESB		25A4
+    ICH6		266A
     This driver supports several versions of Intel's I/O Controller Hubs (ICH).
     For SMBus support, they are similar to the PIIX4 and are part
     of Intel's '810' and other chipsets.
@@ -43,6 +44,7 @@
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
+#include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -121,7 +123,8 @@ static int i801_setup(struct pci_dev *dev)
 
 	I801_dev = dev;
 	if ((dev->device == PCI_DEVICE_ID_INTEL_82801DB_3) ||
-	    (dev->device == PCI_DEVICE_ID_INTEL_82801EB_3))
+	    (dev->device == PCI_DEVICE_ID_INTEL_82801EB_3) ||
+	    (dev->device == PCI_DEVICE_ID_INTEL_ESB_4))
 		isich4 = 1;
 	else
 		isich4 = 0;
@@ -205,7 +208,7 @@ static int i801_transaction(void)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		i2c_delay(1);
+		msleep(1);
 		temp = inb_p(SMBHSTSTS);
 	} while ((temp & 0x01) && (timeout++ < MAX_TIMEOUT));
 
@@ -333,7 +336,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i2c_delay(1);
+			msleep(1);
 		}
 		    while ((!(temp & 0x80))
 			   && (timeout++ < MAX_TIMEOUT));
@@ -393,7 +396,7 @@ static int i801_block_transaction(union i2c_smbus_data *data, char read_write,
 		timeout = 0;
 		do {
 			temp = inb_p(SMBHSTSTS);
-			i2c_delay(1);
+			msleep(1);
 		} while ((!(temp & 0x02))
 			   && (timeout++ < MAX_TIMEOUT));
 
@@ -539,7 +542,7 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter i801_adapter = {
 	.owner		= THIS_MODULE,
-	.class		= I2C_ADAP_CLASS_SMBUS,
+	.class		= I2C_CLASS_HWMON,
 	.algo		= &smbus_algorithm,
 	.name		= "unset",
 };
@@ -576,10 +579,22 @@ static struct pci_device_id i801_ids[] = {
 		.subdevice =	PCI_ANY_ID,
 	},
 	{
-		.vendor =   PCI_VENDOR_ID_INTEL,
-		.device =   PCI_DEVICE_ID_INTEL_82801EB_3,
-		.subvendor =    PCI_ANY_ID,
-		.subdevice =    PCI_ANY_ID,
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_82801EB_3,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice =	PCI_ANY_ID,
+	},
+	{
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_ESB_4,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice = 	PCI_ANY_ID,
+	},
+	{
+		.vendor =	PCI_VENDOR_ID_INTEL,
+		.device =	PCI_DEVICE_ID_INTEL_ICH6_16,
+		.subvendor =	PCI_ANY_ID,
+		.subdevice =	PCI_ANY_ID,
 	},
 	{ 0, }
 };

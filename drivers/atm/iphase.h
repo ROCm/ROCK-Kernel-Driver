@@ -68,8 +68,6 @@
 #define IF_IADBG_SUNI_STAT      0x02000000        // suni statistics
 #define IF_IADBG_RESET          0x04000000        
 
-extern	unsigned int	IADebugFlag;
-
 #define IF_IADBG(f) if (IADebugFlag & (f))
 
 #ifdef  CONFIG_ATM_IA_DEBUG   /* Debug build */
@@ -141,7 +139,7 @@ typedef struct {
         int len;
         u32 maddr;
         int status;
-        void *buf;
+        void __user *buf;
 } IA_CMDBUF, *PIA_CMDBUF;
 
 /* cmds */

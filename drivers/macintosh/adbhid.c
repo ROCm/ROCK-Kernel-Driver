@@ -102,7 +102,7 @@ struct adbhid {
 #define FLAG_POWER_FROM_FN	0x00000002
 #define FLAG_EMU_FWDEL_DOWN	0x00000004
 
-static struct adbhid *adbhid[16] = { 0 };
+static struct adbhid *adbhid[16];
 
 static void adbhid_probe(void);
 
@@ -689,7 +689,7 @@ static void adbhid_input_unregister(int id)
 	if (adbhid[id]->keycode)
 		kfree(adbhid[id]->keycode);
 	kfree(adbhid[id]);
-	adbhid[id] = 0;
+	adbhid[id] = NULL;
 }
 
 
@@ -1035,13 +1035,9 @@ init_ms_a3(int id)
 
 static int __init adbhid_init(void)
 {
-#ifdef CONFIG_PPC32
+#ifndef CONFIG_MAC
 	if ( (_machine != _MACH_chrp) && (_machine != _MACH_Pmac) )
 	    return 0;
-#endif
-#ifdef CONFIG_PPC64
-	if (_machine != _MACH_Pmac)
-		return 0;
 #endif
 
 	led_request.complete = 1;

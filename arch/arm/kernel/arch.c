@@ -10,7 +10,6 @@
 #include <asm/elf.h>
 #include <asm/page.h>
 #include <asm/setup.h>
-#include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
 unsigned int vram_size;

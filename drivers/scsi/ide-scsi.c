@@ -51,7 +51,7 @@
 #include <asm/uaccess.h>
 
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <scsi/sg.h>
 
 #define IDESCSI_DEBUG_LOG		0
@@ -146,7 +146,7 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 			idescsi_discard_data (drive, bcount);
 			return;
 		}
-		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
+		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
 		atapi_input_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
@@ -168,7 +168,7 @@ static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsign
 			idescsi_output_zeros (drive, bcount);
 			return;
 		}
-		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
+		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
 		atapi_output_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
@@ -318,6 +318,13 @@ ide_startstop_t idescsi_atapi_error (ide_drive_t *drive, const char *msg, byte s
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 
+	/* retry only "normal" I/O: */
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
+		rq->errors = 1;
+		ide_end_drive_cmd(drive, stat, err);
+		return ide_stopped;
+	}
+
 	if (HWIF(drive)->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT))
 		/* force an abort */
 		HWIF(drive)->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
@@ -333,6 +340,13 @@ ide_startstop_t idescsi_atapi_abort (ide_drive_t *drive, const char *msg)
 
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 	       return ide_stopped;
+
+	/* retry only "normal" I/O: */
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
+		rq->errors = 1;
+		ide_end_drive_cmd(drive, BUSY_STAT, 0);
+		return ide_stopped;
+	}
 
 #if IDESCSI_DEBUG_LOG
 	printk(KERN_WARNING "idescsi_atapi_abort called for %lu\n",
@@ -396,7 +410,7 @@ static int idescsi_end_request (ide_drive_t *drive, int uptodate, int nrsecs)
 			if (!test_bit(PC_WRITING, &pc->flags) && pc->actually_transferred && pc->actually_transferred <= 1024 && pc->buffer) {
 				printk(", rst = ");
 				scsi_buf = pc->scsi_cmd->request_buffer;
-				hexdump(scsi_buf, IDE_MIN(16, pc->scsi_cmd->request_bufflen));
+				hexdump(scsi_buf, min_t(unsigned, 16, pc->scsi_cmd->request_bufflen));
 			} else printk("\n");
 		}
 	}
@@ -413,7 +427,7 @@ static int idescsi_end_request (ide_drive_t *drive, int uptodate, int nrsecs)
 
 static inline unsigned long get_timeout(idescsi_pc_t *pc)
 {
-	return IDE_MAX(WAIT_CMD, pc->timeout - jiffies);
+	return max_t(unsigned long, WAIT_CMD, pc->timeout - jiffies);
 }
 
 static int idescsi_expiry(ide_drive_t *drive)
@@ -580,7 +594,7 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	scsi->pc=pc;							/* Set the current packet command */
 	pc->actually_transferred=0;					/* We haven't transferred any data yet */
 	pc->current_position=pc->buffer;
-	bcount.all = IDE_MIN(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
+	bcount.all = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	feature.all = 0;
 	if (drive->using_dma && rq->bio) {
@@ -745,7 +759,7 @@ static const char *idescsi_info (struct Scsi_Host *host)
 	return "SCSI host adapter emulation for IDE ATAPI devices";
 }
 
-static int idescsi_ioctl (Scsi_Device *dev, int cmd, void *arg)
+static int idescsi_ioctl (Scsi_Device *dev, int cmd, void __user *arg)
 {
 	idescsi_scsi_t *scsi = scsihost_to_idescsi(dev->host);
 
@@ -756,7 +770,7 @@ static int idescsi_ioctl (Scsi_Device *dev, int cmd, void *arg)
 			clear_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
 		return 0;
 	} else if (cmd == SG_GET_TRANSFORM)
-		return put_user(test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform), (int *) arg);
+		return put_user(test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform), (int __user *) arg);
 	return -EINVAL;
 }
 

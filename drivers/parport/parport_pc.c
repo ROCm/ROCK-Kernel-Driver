@@ -2147,7 +2147,7 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	priv->ctr_writable = ~0x10;
 	priv->ecr = 0;
 	priv->fifo_depth = 0;
-	priv->dma_buf = 0;
+	priv->dma_buf = NULL;
 	priv->dma_handle = 0;
 	priv->dev = dev;
 	INIT_LIST_HEAD(&priv->list);
@@ -2632,6 +2632,10 @@ enum parport_pc_pci_cards {
 	oxsemi_840,
 	aks_0100,
 	mobility_pp,
+	netmos_9705,
+	netmos_9805,
+	netmos_9815,
+	netmos_9855,
 };
 
 
@@ -2699,8 +2703,12 @@ static struct parport_pc_pci {
 	 * and 840 locks up if you write 1 to bit 2! */
 	/* oxsemi_954 */		{ 1, { { 0, -1 }, } },
 	/* oxsemi_840 */		{ 1, { { 0, -1 }, } },
-	/* aks_0100 */			{ 1, { { 0, 1 }, } },
+	/* aks_0100 */                  { 1, { { 0, -1 }, } },
 	/* mobility_pp */		{ 1, { { 0, 1 }, } },
+	/* netmos_9705 */               { 1, { { 0, -1 }, } }, /* untested */
+	/* netmos_9805 */               { 1, { { 0, -1 }, } }, /* untested */
+	/* netmos_9815 */               { 2, { { 0, -1 }, { 2, -1 }, } }, /* untested */
+	/* netmos_9855 */               { 2, { { 0, -1 }, { 2, -1 }, } }, /* untested */
 };
 
 static struct pci_device_id parport_pc_pci_tbl[] = {
@@ -2769,6 +2777,15 @@ static struct pci_device_id parport_pc_pci_tbl[] = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, oxsemi_840 },
 	{ PCI_VENDOR_ID_AKS, PCI_DEVICE_ID_AKS_ALADDINCARD,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, aks_0100 },
+	/* NetMos communication controllers */
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9705,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9705 },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9805,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9805 },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9815,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9815 },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9855,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9855 },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci,parport_pc_pci_tbl);
@@ -2955,10 +2972,13 @@ static int __init parport_pc_find_ports (int autoirq, int autodma)
 	/* Onboard SuperIO chipsets that show themselves on the PCI bus. */
 	count += parport_pc_init_superio (autoirq, autodma);
 
-	r = pnp_register_driver (&parport_pc_pnp_driver);
-	if (r >= 0) {
-		pnp_registered_parport = 1;
-		count += r;
+	/* PnP ports, skip detection if SuperIO already found them */
+	if (!count) {
+		r = pnp_register_driver (&parport_pc_pnp_driver);
+		if (r >= 0) {
+			pnp_registered_parport = 1;
+			count += r;
+		}
 	}
 
 	/* ISA ports and whatever (see asm/parport.h). */

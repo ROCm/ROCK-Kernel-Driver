@@ -7,7 +7,7 @@
 
 #ifdef __GNUC__
 
-static __inline__ __u16 ___arch__swab16p(__u16 *addr)
+static __inline__ __u16 ___arch__swab16p(const __u16 *addr)
 {
 	__u16 ret;
 
@@ -17,7 +17,7 @@ static __inline__ __u16 ___arch__swab16p(__u16 *addr)
 	return ret;
 }
 
-static __inline__ __u32 ___arch__swab32p(__u32 *addr)
+static __inline__ __u32 ___arch__swab32p(const __u32 *addr)
 {
 	__u32 ret;
 
@@ -27,7 +27,7 @@ static __inline__ __u32 ___arch__swab32p(__u32 *addr)
 	return ret;
 }
 
-static __inline__ __u64 ___arch__swab64p(__u64 *addr)
+static __inline__ __u64 ___arch__swab64p(const __u64 *addr)
 {
 	__u64 ret;
 

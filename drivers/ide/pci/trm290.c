@@ -3,6 +3,10 @@
  *
  *  Copyright (c) 1997-1998  Mark Lord
  *  May be copied or modified under the terms of the GNU General Public License
+ *
+ *  June 22, 2004 - get rid of check_region
+ *                  Jesper Juhl <juhl-lkml@dif.dk>
+ *
  */
 
 /*
@@ -139,8 +143,6 @@
 #include <linux/ide.h>
 
 #include <asm/io.h>
-
-#include "trm290.h"
 
 static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 {
@@ -302,7 +304,7 @@ static int trm290_ide_dma_test_irq (ide_drive_t *drive)
 /*
  * Invoked from ide-dma.c at boot time.
  */
-void __init init_hwif_trm290 (ide_hwif_t *hwif)
+void __devinit init_hwif_trm290(ide_hwif_t *hwif)
 {
 	unsigned int cfgbase = 0;
 	unsigned long flags;
@@ -374,16 +376,6 @@ void __init init_hwif_trm290 (ide_hwif_t *hwif)
 		if (old != compat && old_mask == 0xff) {
 			/* leave lower 10 bits untouched */
 			compat += (next_offset += 0x400);
-#  if 1
-			if (check_region(compat + 2, 1))
-				printk(KERN_ERR "%s: check_region failure at 0x%04x\n",
-					hwif->name, (compat + 2));
-			/*
-			 * The region check is not needed; however.........
-			 * Since this is the checked in ide-probe.c,
-			 * this is only an assignment.
-			 */
-#  endif
 			hwif->io_ports[IDE_CONTROL_OFFSET] = compat + 2;
 			hwif->OUTW(compat|1, hwif->config_data);
 			new = hwif->INW(hwif->config_data);
@@ -395,12 +387,17 @@ void __init init_hwif_trm290 (ide_hwif_t *hwif)
 #endif
 }
 
+static ide_pci_device_t trm290_chipset __devinitdata = {
+	.name		= "TRM290",
+	.init_hwif	= init_hwif_trm290,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.bootable	= ON_BOARD,
+};
+
 static int __devinit trm290_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &trm290_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &trm290_chipset);
 	return 0;
 }
 

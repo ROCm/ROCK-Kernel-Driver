@@ -137,7 +137,7 @@ static int irda_thread(void *startup)
 
 		/* make swsusp happy with our thread */
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		run_irda_queue();
 	}
@@ -415,7 +415,7 @@ static void irda_config_fsm(void *data)
 		fsm->state = next_state;
 	} while(!delay);
 
-	irda_queue_delayed_request(&fsm->rq, MSECS_TO_JIFFIES(delay));
+	irda_queue_delayed_request(&fsm->rq, msecs_to_jiffies(delay));
 }
 
 /* schedule some device configuration task for execution by kIrDAd

@@ -1,13 +1,40 @@
-This file contains some additional information for the Philips webcams.
-E-mail: webcam@smcc.demon.nl                        Last updated: 2001-09-24
+This file contains some additional information for the Philips and OEM webcams.
+E-mail: webcam@smcc.demon.nl                        Last updated: 2004-01-19
+Site: http://www.smcc.demon.nl/webcam/
 
-The main webpage for the Philips driver is http://www.smcc.demon.nl/webcam/.
-It contains a lot of extra information, a FAQ, and the binary plugin
-'PWCX'. This plugin contains decompression routines that allow you to
-use higher image sizes and framerates; in addition the webcam uses less
-bandwidth on the USB bus (handy if you want to run more than 1 camera
-simultaneously). These routines fall under an NDA, and may therefor not be
-distributed as source; however, its use is completely optional.
+As of this moment, the following cameras are supported:
+ * Philips PCA645
+ * Philips PCA646
+ * Philips PCVC675
+ * Philips PCVC680
+ * Philips PCVC690
+ * Philips PCVC720/40
+ * Philips PCVC730
+ * Philips PCVC740
+ * Philips PCVC750
+ * Askey VC010
+ * Creative Labs Webcam 5
+ * Creative Labs Webcam Pro Ex
+ * Logitech QuickCam 3000 Pro
+ * Logitech QuickCam 4000 Pro
+ * Logitech QuickCam Notebook Pro
+ * Logitech QuickCam Zoom
+ * Logitech QuickCam Orbit
+ * Logitech QuickCam Sphere
+ * Samsung MPC-C10
+ * Samsung MPC-C30
+ * Sotec Afina Eye
+ * AME CU-001
+ * Visionite VCS-UM100
+ * Visionite VCS-UC300
+
+The main webpage for the Philips driver is at the address above. It contains
+a lot of extra information, a FAQ, and the binary plugin 'PWCX'. This plugin
+contains decompression routines that allow you to use higher image sizes and
+framerates; in addition the webcam uses less bandwidth on the USB bus (handy
+if you want to run more than 1 camera simultaneously). These routines fall
+under a NDA, and may therefor not be distributed as source; however, its use
+is completely optional.
 
 You can build this code either into your kernel, or as a module. I recommend
 the latter, since it makes troubleshooting a lot easier. The built-in
@@ -27,14 +54,14 @@ fps
    Specifies the desired framerate. Is an integer in the range of 4-30.
 
 fbufs
-   This parameter specifies the number of internal buffers to use for storing 
+   This paramter specifies the number of internal buffers to use for storing 
    frames from the cam. This will help if the process that reads images from 
-   the cam is a bit slow or momentarily busy. However, on slow machines it
+   the cam is a bit slow or momentarely busy. However, on slow machines it 
    only introduces lag, so choose carefully. The default is 3, which is 
    reasonable. You can set it between 2 and 5.
 
 mbufs
-   This is an integer between 1 and 4. It will tell the module the number of
+   This is an integer between 1 and 10. It will tell the module the number of
    buffers to reserve for mmap(), VIDIOCCGMBUF, VIDIOCMCAPTURE and friends.
    The default is 2, which is adequate for most applications (double
    buffering).
@@ -45,9 +72,9 @@ mbufs
    slack when your program is behind. But you need a multi-threaded or
    forked program to really take advantage of these buffers.
 
-   The absolute maximum is 4, but don't set it too high!  Every buffer takes
-   up 1.22 MB of RAM, so unless you have a lot of memory setting this to
-   something more than 2 is an absolute waste.  This memory is only
+   The absolute maximum is 10, but don't set it too high!  Every buffer takes
+   up 460 KB of RAM, so unless you have a lot of memory setting this to
+   something more than 4 is an absolute waste.  This memory is only
    allocated during open(), so nothing is wasted when the camera is not in
    use.
 
@@ -74,9 +101,10 @@ compression (only useful with the plugin)
    introduce some unwanted artefacts. The default is 2, medium compression.
    See the FAQ on the website for an overview of which modes require
    compression.
-      
-   The compression parameter only applies to the Vesta & ToUCam cameras.
-   The 645 and 646 have fixed compression parameters.      
+
+   The compression parameter does not apply to the 645 and 646 cameras
+   and OEM models derived from those (only a few). Most cams honour this
+   parameter.
 
 leds
    This settings takes 2 integers, that define the on/off time for the LED
@@ -89,14 +117,17 @@ leds
 
      leds=0,0
 
-   the LED never goes on, making it suitable for silent survaillance.
+   the LED never goes on, making it suitable for silent surveillance.
 
    By default the camera's LED is on solid while in use, and turned off
    when the camera is not used anymore.
 
-   This parameter works only with the ToUCam range of cameras (730, 740,
-   750). For other cameras this command is silently ignored, and the LED
-   cannot be controlled.
+   This parameter works only with the ToUCam range of cameras (720, 730, 740,
+   750) and OEMs. For other cameras this command is silently ignored, and 
+   the LED cannot be controlled.
+
+   Finally: this parameters does not take effect UNTIL the first time you
+   open the camera device. Until then, the LED remains on.
 
 dev_hint
    A long standing problem with USB devices is their dynamic nature: you
@@ -126,7 +157,7 @@ dev_hint
                                other cameras will get the first free 
                                available slot (see below).
 
-     dev_hint=645:1,680=2      The PCA645 camera will get /dev/video1,
+     dev_hint=645:1,680:2      The PCA645 camera will get /dev/video1,
                                and a PCVC680 /dev/video2.
                                
      dev_hint=645.0123:3,645.4567:0	The PCA645 camera with serialnumber 
@@ -176,13 +207,16 @@ trace
 
       64   0x40   Show viewport and image sizes                       Off
 
+     128   0x80   PWCX debugging                                      Off
 
    For example, to trace the open() & read() fuctions, sum 8 + 4 = 12,
    so you would supply trace=12 during insmod or modprobe. If
    you want to turn the initialization and probing tracing off, set trace=0.
    The default value for trace is 35 (0x23).
 
-   Example:
+
+
+Example:
      
      # modprobe pwc size=cif fps=15 power_save=1
 
@@ -192,12 +226,11 @@ cameras. Each camera has its own set of buffers.
 size and fps only specify defaults when you open() the device; this is to
 accommodate some tools that don't set the size. You can change these
 settings after open() with the Video4Linux ioctl() calls. The default of
-defaults is QCIF size at 10 fps, BGR order.
+defaults is QCIF size at 10 fps.
 
 The compression parameter is semiglobal; it sets the initial compression
 preference for all camera's, but this parameter can be set per camera with
 the VIDIOCPWCSCQUAL ioctl() call.
 
 All parameters are optional.
-
 

@@ -17,15 +17,27 @@
 
 void (*irq_setup)(void);
 
+#ifdef CONFIG_KGDB
+static int kgdb_flag = 1;
+static int __init nokgdb(char *str)
+{
+	kgdb_flag = 0;
+	return 1;
+}
+__setup("nokgdb", nokgdb);
+#endif
+
 void __init init_IRQ(void)
 {
 #ifdef CONFIG_KGDB
 	extern void breakpoint(void);
 	extern void set_debug_traps(void);
 
-	printk("Wait for gdb client connection ...\n");
-	set_debug_traps();
-	breakpoint();
+	if (kgdb_flag) {
+		printk("Wait for gdb client connection ...\n");
+		set_debug_traps();
+		breakpoint();
+	}
 #endif
 	/* set up default irq controller */
 	init_generic_irq();

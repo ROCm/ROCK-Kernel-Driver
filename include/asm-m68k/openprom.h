@@ -91,92 +91,92 @@ struct linux_bootargs_v2 {
 
 #if defined(CONFIG_SUN3) || defined(CONFIG_SUN3X)
 struct linux_romvec {
-	char		*pv_initsp;		
+	char		*pv_initsp;
 	int		(*pv_startmon)(void);
 
-	int		*diagberr;		
+	int		*diagberr;
 
 	struct linux_arguments_v0 **pv_v0bootargs;
- 	unsigned	*pv_sun3mem;		
+	unsigned	*pv_sun3mem;
 
 	unsigned char	(*pv_getchar)(void);
 	int		(*pv_putchar)(int ch);
-	int		(*pv_nbgetchar)(void);	
+	int		(*pv_nbgetchar)(void);
 	int		(*pv_nbputchar)(int ch);
-	unsigned char	*pv_echo;	
+	unsigned char	*pv_echo;
 	unsigned char	*pv_insource;
 	unsigned char	*pv_outsink;
 
-	int		(*pv_getkey)(void);		
+	int		(*pv_getkey)(void);
 	int		(*pv_initgetkey)(void);
 	unsigned int	*pv_translation;
-	unsigned char	*pv_keybid;		
-	int		*pv_screen_x;		
-	int		*pv_screen_y;		
-	struct keybuf	*pv_keybuf;		
+	unsigned char	*pv_keybid;
+	int		*pv_screen_x;
+	int		*pv_screen_y;
+	struct keybuf	*pv_keybuf;
 
 	char		*pv_monid;
 
-	/* 
-	 * Frame buffer output and terminal emulation 
+	/*
+	 * Frame buffer output and terminal emulation
 	 */
 
-	int		(*pv_fbwritechar)(char);	
-	int		*pv_fbaddr;		
-	char		**pv_font;		
-	int		(*pv_fbwritestr)(char);	
+	int		(*pv_fbwritechar)(char);
+	int		*pv_fbaddr;
+	char		**pv_font;
+	int		(*pv_fbwritestr)(char);
 
 	void		(*pv_reboot)(char *bootstr);
 
-	/* 
-	 * Line input and parsing 
+	/*
+	 * Line input and parsing
 	 */
 
-	unsigned char	*pv_linebuf;		
-	unsigned char	**pv_lineptr;		
-	int		*pv_linesize;		
-	int		(*pv_getline)(void);	
-	unsigned char	(*pv_getnextchar)(void);	
-	unsigned char	(*pv_peeknextchar)(void);	
-	int		*pv_fbthere;		
-	int		(*pv_getnum)(void);		
+	unsigned char	*pv_linebuf;
+	unsigned char	**pv_lineptr;
+	int		*pv_linesize;
+	int		(*pv_getline)(void);
+	unsigned char	(*pv_getnextchar)(void);
+	unsigned char	(*pv_peeknextchar)(void);
+	int		*pv_fbthere;
+	int		(*pv_getnum)(void);
 
 	void		(*pv_printf)(const char *fmt, ...);
 	int		(*pv_printhex)(void);
 
-	unsigned char	*pv_leds;		
-	int		(*pv_setleds)(void);	
+	unsigned char	*pv_leds;
+	int		(*pv_setleds)(void);
 
-	/* 
+	/*
 	 * Non-maskable interrupt  (nmi) information
-	 */ 
+	 */
 
 	int		(*pv_nmiaddr)(void);
 	int		(*pv_abortentry)(void);
-	int		*pv_nmiclock;		
+	int		*pv_nmiclock;
 
 	int		*pv_fbtype;
 
-	/* 
-	 * Assorted other things 
+	/*
+	 * Assorted other things
 	 */
 
 	unsigned	pv_romvers;
-	struct globram  *pv_globram;		
-	char		*pv_kbdzscc;		
+	struct globram  *pv_globram;
+	char		*pv_kbdzscc;
 
-	int		*pv_keyrinit;		
-	unsigned char	*pv_keyrtick; 		
-	unsigned	*pv_memoryavail;	
-	long		*pv_resetaddr;		
-	long		*pv_resetmap;		
-						
-	void		(*pv_halt)(void);	
-	unsigned char	*pv_memorybitmap;	
+	int		*pv_keyrinit;
+	unsigned char	*pv_keyrtick;
+	unsigned	*pv_memoryavail;
+	long		*pv_resetaddr;
+	long		*pv_resetmap;
+
+	void		(*pv_halt)(void);
+	unsigned char	*pv_memorybitmap;
 
 #ifdef CONFIG_SUN3
 	void		(*pv_setctxt)(int ctxt, char *va, int pmeg);
-	void		(*pv_vector_cmd)(void);	
+	void		(*pv_vector_cmd)(void);
 	int		dummy1z;
 	int		dummy2z;
 	int		dummy3z;

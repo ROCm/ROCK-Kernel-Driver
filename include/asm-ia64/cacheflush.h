@@ -29,6 +29,9 @@ do {						\
 	clear_bit(PG_arch_1, &(page)->flags);	\
 } while (0)
 
+#define flush_dcache_mmap_lock(mapping)		do { } while (0)
+#define flush_dcache_mmap_unlock(mapping)	do { } while (0)
+
 extern void flush_icache_range (unsigned long start, unsigned long end);
 
 #define flush_icache_user_range(vma, page, user_addr, len)					\

@@ -270,7 +270,7 @@ rpc_pipe_ioctl(struct inode *ino, struct file *filp,
 			msg = (struct rpc_pipe_msg *)filp->private_data;
 			len += msg->len - msg->copied;
 		}
-		return put_user(len, (int *)arg);
+		return put_user(len, (int __user *)arg);
 	default:
 		return -EINVAL;
 	}
@@ -433,6 +433,7 @@ rpc_lookup_parent(char *path, struct nameidata *nd)
 	nd->dentry = dget(rpc_mount->mnt_root);
 	nd->last_type = LAST_ROOT;
 	nd->flags = LOOKUP_PARENT;
+	nd->depth = 0;
 
 	if (path_walk(path, nd)) {
 		printk(KERN_WARNING "%s: %s failed to find path %s\n",

@@ -39,6 +39,7 @@
 #include <linux/pci.h>
 #include <linux/acpi.h>
 #include <linux/kallsyms.h>
+#include <linux/edd.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -54,6 +55,7 @@
 #include <asm/bootsetup.h>
 #include <asm/smp.h>
 #include <asm/proto.h>
+#include <asm/setup.h>
 
 /*
  * Machine setup..
@@ -64,12 +66,12 @@ struct cpuinfo_x86 boot_cpu_data;
 unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
-int acpi_disabled = 0;
-
+int acpi_disabled;
+EXPORT_SYMBOL(acpi_disabled);
 #ifdef	CONFIG_ACPI_BOOT
 extern int __initdata acpi_ht;
 extern acpi_interrupt_flags	acpi_sci_flags;
-int __initdata acpi_force = 0;
+/* int __initdata acpi_force = 0; */
 #endif
 
 /* For PCI or other memory-mapped resources */
@@ -99,98 +101,121 @@ extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
 
 char command_line[COMMAND_LINE_SIZE];
-char saved_command_line[COMMAND_LINE_SIZE];
 
 struct resource standard_io_resources[] = {
-	{ "dma1", 0x00, 0x1f, IORESOURCE_BUSY },
-	{ "pic1", 0x20, 0x21, IORESOURCE_BUSY },
-	{ "timer", 0x40, 0x5f, IORESOURCE_BUSY },
-	{ "keyboard", 0x60, 0x6f, IORESOURCE_BUSY },
-	{ "dma page reg", 0x80, 0x8f, IORESOURCE_BUSY },
-	{ "pic2", 0xa0, 0xa1, IORESOURCE_BUSY },
-	{ "dma2", 0xc0, 0xdf, IORESOURCE_BUSY },
-	{ "fpu", 0xf0, 0xff, IORESOURCE_BUSY }
+	{ "dma1", 0x00, 0x1f, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "pic1", 0x20, 0x21, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "timer", 0x40, 0x5f, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "keyboard", 0x60, 0x6f, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "dma page reg", 0x80, 0x8f, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "pic2", 0xa0, 0xa1, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "dma2", 0xc0, 0xdf, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "fpu", 0xf0, 0xff, IORESOURCE_BUSY | IORESOURCE_IO }
 };
 
-#define STANDARD_IO_RESOURCES (sizeof(standard_io_resources)/sizeof(struct resource))
+#define STANDARD_IO_RESOURCES \
+	(sizeof standard_io_resources / sizeof standard_io_resources[0])
 
-struct resource code_resource = { "Kernel code", 0x100000, 0 };
-struct resource data_resource = { "Kernel data", 0, 0 };
-struct resource vram_resource = { "Video RAM area", 0xa0000, 0xbffff, IORESOURCE_BUSY };
+#define IORESOURCE_RAM (IORESOURCE_BUSY | IORESOURCE_MEM)
 
-/* System ROM resources */
-#define MAXROMS 6
-static struct resource rom_resources[MAXROMS] = {
-	{ "System ROM", 0xF0000, 0xFFFFF, IORESOURCE_BUSY },
-	{ "Video ROM", 0xc0000, 0xc7fff, IORESOURCE_BUSY }
+struct resource data_resource = { "Kernel data", 0, 0, IORESOURCE_RAM };
+struct resource code_resource = { "Kernel code", 0, 0, IORESOURCE_RAM };
+
+#define IORESOURCE_ROM (IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM)
+
+static struct resource system_rom_resource = { "System ROM", 0xf0000, 0xfffff, IORESOURCE_ROM };
+static struct resource extension_rom_resource = { "Extension ROM", 0xe0000, 0xeffff, IORESOURCE_ROM };
+
+static struct resource adapter_rom_resources[] = {
+	{ "Adapter ROM", 0xc8000, 0, IORESOURCE_ROM },
+	{ "Adapter ROM", 0, 0, IORESOURCE_ROM },
+	{ "Adapter ROM", 0, 0, IORESOURCE_ROM },
+	{ "Adapter ROM", 0, 0, IORESOURCE_ROM },
+	{ "Adapter ROM", 0, 0, IORESOURCE_ROM },
+	{ "Adapter ROM", 0, 0, IORESOURCE_ROM }
 };
+
+#define ADAPTER_ROM_RESOURCES \
+	(sizeof adapter_rom_resources / sizeof adapter_rom_resources[0])
+
+static struct resource video_rom_resource = { "Video ROM", 0xc0000, 0xc7fff, IORESOURCE_ROM };
+static struct resource video_ram_resource = { "Video RAM area", 0xa0000, 0xbffff, IORESOURCE_RAM };
 
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
+static int __init romchecksum(unsigned char *rom, unsigned long length)
+{
+	unsigned char *p, sum = 0;
+
+	for (p = rom; p < rom + length; p++)
+		sum += *p;
+	return sum == 0;
+}
+
 static void __init probe_roms(void)
 {
-	int roms = 1;
-	unsigned long base;
-	unsigned char *romstart;
+	unsigned long start, length, upper;
+	unsigned char *rom;
+	int	      i;
 
-	request_resource(&iomem_resource, rom_resources+0);
-
-	/* Video ROM is standard at C000:0000 - C7FF:0000, check signature */
-	for (base = 0xC0000; base < 0xE0000; base += 2048) {
-		romstart = isa_bus_to_virt(base);
-		if (!romsignature(romstart))
+	/* video rom */
+	upper = adapter_rom_resources[0].start;
+	for (start = video_rom_resource.start; start < upper; start += 2048) {
+		rom = isa_bus_to_virt(start);
+		if (!romsignature(rom))
 			continue;
-		request_resource(&iomem_resource, rom_resources + roms);
-		roms++;
+
+		video_rom_resource.start = start;
+
+		/* 0 < length <= 0x7f * 512, historically */
+		length = rom[2] * 512;
+
+		/* if checksum okay, trust length byte */
+		if (length && romchecksum(rom, length))
+			video_rom_resource.end = start + length - 1;
+
+		request_resource(&iomem_resource, &video_rom_resource);
 		break;
-	}
-
-	/* Extension roms at C800:0000 - DFFF:0000 */
-	for (base = 0xC8000; base < 0xE0000; base += 2048) {
-		unsigned long length;
-
-		romstart = isa_bus_to_virt(base);
-		if (!romsignature(romstart))
-			continue;
-		length = romstart[2] * 512;
-		if (length) {
-			unsigned int i;
-			unsigned char chksum;
-
-			chksum = 0;
-			for (i = 0; i < length; i++)
-				chksum += romstart[i];
-
-			/* Good checksum? */
-			if (!chksum) {
-				rom_resources[roms].start = base;
-				rom_resources[roms].end = base + length - 1;
-				rom_resources[roms].name = "Extension ROM";
-				rom_resources[roms].flags = IORESOURCE_BUSY;
-
-				request_resource(&iomem_resource, rom_resources + roms);
-				roms++;
-				if (roms >= MAXROMS)
-					return;
 			}
+
+	start = (video_rom_resource.end + 1 + 2047) & ~2047UL;
+	if (start < upper)
+		start = upper;
+
+	/* system rom */
+	request_resource(&iomem_resource, &system_rom_resource);
+	upper = system_rom_resource.start;
+
+	/* check for extension rom (ignore length byte!) */
+	rom = isa_bus_to_virt(extension_rom_resource.start);
+	if (romsignature(rom)) {
+		length = extension_rom_resource.end - extension_rom_resource.start + 1;
+		if (romchecksum(rom, length)) {
+			request_resource(&iomem_resource, &extension_rom_resource);
+			upper = extension_rom_resource.start;
 		}
 	}
 
-	/* Final check for motherboard extension rom at E000:0000 */
-	base = 0xE0000;
-	romstart = isa_bus_to_virt(base);
+	/* check for adapter roms on 2k boundaries */
+	for (i = 0; i < ADAPTER_ROM_RESOURCES && start < upper; start += 2048) {
+		rom = isa_bus_to_virt(start);
+		if (!romsignature(rom))
+			continue;
 
-	if (romsignature(romstart)) {
-		rom_resources[roms].start = base;
-		rom_resources[roms].end = base + 65535;
-		rom_resources[roms].name = "Extension ROM";
-		rom_resources[roms].flags = IORESOURCE_BUSY;
+		/* 0 < length <= 0x7f * 512, historically */
+		length = rom[2] * 512;
 
-		request_resource(&iomem_resource, rom_resources + roms);
+		/* but accept any length that fits if checksum okay */
+		if (!length || start + length > upper || !romchecksum(rom, length))
+			continue;
+
+		adapter_rom_resources[i].start = start;
+		adapter_rom_resources[i].end = start + length - 1;
+		request_resource(&iomem_resource, &adapter_rom_resources[i]);
+
+		start = adapter_rom_resources[i++].end & ~2047UL;
 	}
 }
-
-unsigned long crashdump_addr = 0xdeadbeef;
 
 static __init void parse_cmdline_early (char ** cmdline_p)
 {
@@ -222,20 +247,22 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			disable_acpi();
 
 		if (!memcmp(from, "acpi=force", 10)) { 
-			acpi_force = 1;
-			acpi_ht = 1;
+			/* add later when we do DMI horrors: */
+			/* acpi_force = 1; */	
 			acpi_disabled = 0;
 		}
 
 		/* acpi=ht just means: do ACPI MADT parsing 
 		   at bootup, but don't enable the full ACPI interpreter */
 		if (!memcmp(from, "acpi=ht", 7)) { 
-			if (!acpi_force)
+			/* if (!acpi_force) */
 				disable_acpi();
 			acpi_ht = 1; 
 		}
                 else if (!memcmp(from, "pci=noacpi", 10)) 
-                        acpi_noirq_set();
+			acpi_disable_pci();
+		else if (!memcmp(from, "acpi=noirq", 10))
+			acpi_noirq_set();
 
 		else if (!memcmp(from, "acpi_sci=edge", 13))
 			acpi_sci_flags.trigger =  1;
@@ -280,9 +307,6 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 
 		if (!memcmp(from,"oops=panic", 10))
 			panic_on_oops = 1;
-		
-		if (c == ' ' && !memcmp(from, "crashdump=", 10))
-			crashdump_addr = memparse(from+10, &from);
 
 	next_char:
 		c = *(from++);
@@ -376,8 +400,27 @@ static int __init noreplacement_setup(char *s)
 
 __setup("noreplacement", noreplacement_setup); 
 
-#ifdef CONFIG_CRASH_DUMP_SOFTBOOT
-extern void crashdump_reserve(void);
+#if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+struct edd edd;
+#ifdef CONFIG_EDD_MODULE
+EXPORT_SYMBOL(edd);
+#endif
+/**
+ * copy_edd() - Copy the BIOS EDD information
+ *              from boot_params into a safe place.
+ *
+ */
+static inline void copy_edd(void)
+{
+     memcpy(edd.mbr_signature, EDD_MBR_SIGNATURE, sizeof(edd.mbr_signature));
+     memcpy(edd.edd_info, EDD_BUF, sizeof(edd.edd_info));
+     edd.mbr_signature_nr = EDD_MBR_SIG_NR;
+     edd.edd_info_nr = EDD_NR;
+}
+#else
+static inline void copy_edd(void)
+{
+}
 #endif
 
 void __init setup_arch(char **cmdline_p)
@@ -398,6 +441,7 @@ void __init setup_arch(char **cmdline_p)
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
 	setup_memory_region();
+	copy_edd();
 
 	if (!MOUNT_ROOT_RDONLY)
 		root_mountflags &= ~MS_RDONLY;
@@ -485,11 +529,8 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 	paging_init();
-#ifdef CONFIG_CRASH_DUMP_SOFTBOOT
-	crashdump_reserve(); /* Preserve crash dump state from prev boot */
-#endif
 
-	check_ioapic();
+		check_ioapic();
 #ifdef CONFIG_ACPI_BOOT
        /*
         * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
@@ -515,13 +556,13 @@ void __init setup_arch(char **cmdline_p)
 	probe_roms();
 	e820_reserve_resources(); 
 
-	request_resource(&iomem_resource, &vram_resource);
+	request_resource(&iomem_resource, &video_ram_resource);
 
 	{
 	unsigned i;
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
-		request_resource(&ioport_resource, standard_io_resources+i);
+		request_resource(&ioport_resource, &standard_io_resources[i]);
 	}
 
 	/* Will likely break when you have unassigned resources with more
@@ -624,7 +665,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	return r;
 }
 
-static void __init detect_ht(void)
+static void __init detect_ht(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_SMP
 	u32 	eax, ebx, ecx, edx;
@@ -632,6 +673,9 @@ static void __init detect_ht(void)
 	int	initial_apic_id;
 	int 	cpu = smp_processor_id();
 	
+	if (!cpu_has(c, X86_FEATURE_HT))
+		return;
+
 	cpuid(1, &eax, &ebx, &ecx, &edx);
 	smp_num_siblings = (ebx & 0xff0000) >> 16;
 	
@@ -867,7 +911,7 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 			c->x86_model += ((tfms >> 16) & 0xF) << 4;
 		} 
 		if (c->x86_capability[0] & (1<<19)) 
-       		c->x86_clflush_size = ((misc >> 8) & 0xff) * 8;
+			c->x86_clflush_size = ((misc >> 8) & 0xff) * 8;
 	} else {
 		/* Have CPUID level 0 only - unheard of */
 		c->x86 = 4;
@@ -925,10 +969,10 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			display_cacheinfo(c);
 			break;
 	}
-	select_idle_routine(c);	
-	if (cpu_has(c, X86_FEATURE_HT))
-		detect_ht(); 
 
+	select_idle_routine(c);
+	detect_ht(c); 
+		
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are

@@ -251,7 +251,7 @@ LM_REASON irlmp_convert_lap_reason(LAP_REASON);
 
 static inline __u32 irlmp_get_saddr(const struct lsap_cb *self)
 {
-	return (self && !self->lap) ? self->lap->saddr : 0;
+	return (self && self->lap) ? self->lap->saddr : 0;
 }
 
 static inline __u32 irlmp_get_daddr(const struct lsap_cb *self)

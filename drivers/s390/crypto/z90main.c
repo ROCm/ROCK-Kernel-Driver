@@ -5,7 +5,7 @@
  *
  *  Copyright (C)  2001, 2004 IBM Corporation
  *  Author(s): Robert Burroughs (burrough@us.ibm.com)
- *             Eric Rossman (edrossma@us.ibm.com)
+ *	       Eric Rossman (edrossma@us.ibm.com)
  *
  *  Hotplug & misc device support: Jochen Roehrig (roehrig@de.ibm.com)
  *
@@ -16,7 +16,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -50,7 +50,7 @@
 #  error "This kernel is too recent: not supported by this file"
 #endif
 
-#define VERSION_Z90MAIN_C "$Revision: 1.31.2.4 $"
+#define VERSION_Z90MAIN_C "$Revision: 1.31 $"
 
 static char z90cmain_version[] __initdata =
 	"z90main.o (" VERSION_Z90MAIN_C "/"
@@ -116,15 +116,9 @@ extern char z90chardware_version[];
 
 /**
  * Reader should run every READERTIME milliseconds
- * With the 100Hz patch for s390, z90crypt can lock the system solid while
- * under heavy load. We'll try to avoid that.
  */
 #ifndef READERTIME
-#if HZ > 1000
 #define READERTIME 2
-#else
-#define READERTIME 10
-#endif
 #endif
 
 /**
@@ -215,13 +209,18 @@ extern char z90chardware_version[];
 #ifndef Z90CRYPT_NUM_DEVS
 #define Z90CRYPT_NUM_DEVS Z90CRYPT_NUM_APS
 #endif
+#ifndef Z90CRYPT_NUM_TYPES
+#define Z90CRYPT_NUM_TYPES 3
+#endif
 
 /**
  * Buffer size for receiving responses. The maximum Response Size
  * is actually the maximum request size, since in an error condition
  * the request itself may be returned unchanged.
  */
+#ifndef MAX_RESPONSE_SIZE
 #define MAX_RESPONSE_SIZE 0x0000077C
+#endif
 
 /**
  * A count and status-byte mask
@@ -247,7 +246,7 @@ struct device_x {
  * All devices are arranged in a single array: 64 APs
  */
 struct device {
-	int		 dev_type;	    // PCICA, PCICC, PCIXCC
+	int		 dev_type;	    // PCICA, PCICC, or PCIXCC
 	enum devstat	 dev_stat;	    // current device status
 	int		 dev_self_x;	    // Index in array
 	int		 disabled;	    // Set when device is in error
@@ -450,9 +449,9 @@ static struct miscdevice z90crypt_misc_device = {
 /**
  * Documentation values.
  */
-MODULE_AUTHOR("zSeries Linux Crypto Team: Robert H. Burroughs, Eric D. Rossman"
+MODULE_AUTHOR("zLinux Crypto Team: Robert H. Burroughs, Eric D. Rossman"
 	      "and Jochen Roehrig");
-MODULE_DESCRIPTION("zSeries Linux Cryptographic Coprocessor device driver, "
+MODULE_DESCRIPTION("zLinux Cryptographic Coprocessor device driver, "
 		   "Copyright 2001, 2004 IBM Corporation");
 MODULE_LICENSE("GPL");
 module_param(domain, int, 0);
@@ -583,7 +582,7 @@ static int z90_register_ioctl32s(void)
 		return result;
 
 	for(i = 0; i < ARRAY_SIZE(compatible_ioctls); i++) {
-		result = register_ioctl32_conversion(compatible_ioctls[i], 0);
+		result = register_ioctl32_conversion(compatible_ioctls[i],NULL);
 		if (result) {
 			z90_unregister_ioctl32s();
 			return result;
@@ -613,15 +612,10 @@ z90crypt_init_module(void)
 
 	PDEBUG("PID %d\n", PID());
 
-	if ((domain < -1) || (domain > 15)) {
-		PRINTKW("Invalid param: domain = %d.  Not loading.\n", domain);
-		return -EINVAL;
-	}
-
 #ifndef Z90CRYPT_USE_HOTPLUG
 	/* Register as misc device with given minor (or get a dynamic one). */
 	result = misc_register(&z90crypt_misc_device);
-	if (result < 0) {
+	if (result <0) {
 		PRINTKW(KERN_ERR "misc_register (minor %d) failed with %d\n",
 			z90crypt_misc_device.minor, result);
 		return result;
@@ -1046,7 +1040,7 @@ allocate_work_element(struct work_element **we_pp,
 static inline void
 remove_device(struct device *device_p)
 {
-	if (!device_p || (device_p->disabled != 0))
+	if (!device_p || device_p->disabled != 0)
 		return;
 	device_p->disabled = 1;
 	z90crypt.hdware_info->type_mask[device_p->dev_type].disabled_count++;
@@ -1063,28 +1057,25 @@ select_device_type(int *dev_type_p)
 	if (*dev_type_p != ANYDEV) {
 		stat = &z90crypt.hdware_info->type_mask[*dev_type_p];
 		if (stat->st_count >
-		    (stat->disabled_count + stat->user_disabled_count))
+		    stat->disabled_count + stat->user_disabled_count)
 			return 0;
 		return -1;
 	}
 
 	stat = &z90crypt.hdware_info->type_mask[PCICA];
-	if (stat->st_count >
-	    (stat->disabled_count + stat->user_disabled_count)) {
+	if (stat->st_count > stat->disabled_count + stat->user_disabled_count) {
 		*dev_type_p = PCICA;
 		return 0;
 	}
 
 	stat = &z90crypt.hdware_info->type_mask[PCIXCC];
-	if (stat->st_count >
-	    (stat->disabled_count + stat->user_disabled_count)) {
+	if (stat->st_count > stat->disabled_count + stat->user_disabled_count) {
 		*dev_type_p = PCIXCC;
 		return 0;
 	}
 
 	stat = &z90crypt.hdware_info->type_mask[PCICC];
-	if (stat->st_count >
-	    (stat->disabled_count + stat->user_disabled_count)) {
+	if (stat->st_count > stat->disabled_count + stat->user_disabled_count) {
 		*dev_type_p = PCICC;
 		return 0;
 	}
@@ -1108,9 +1099,9 @@ select_device(int *dev_type_p, int *device_nr_p)
 		dev_ptr = z90crypt.device_p[*device_nr_p];
 
 		if (dev_ptr &&
-		    (dev_ptr->dev_stat != DEV_GONE) &&
-		    (dev_ptr->disabled == 0) &&
-		    (dev_ptr->user_disabled == 0)) {
+		    dev_ptr->dev_stat != DEV_GONE &&
+		    dev_ptr->disabled == 0 &&
+		    dev_ptr->user_disabled == 0) {
 			PDEBUG("selected by number, index = %d\n",
 			       *device_nr_p);
 			*dev_type_p = dev_ptr->dev_type;
@@ -1132,11 +1123,11 @@ select_device(int *dev_type_p, int *device_nr_p)
 		indx = index_p->device_index[i];
 		dev_ptr = z90crypt.device_p[indx];
 		if (dev_ptr &&
-		    (dev_ptr->dev_stat != DEV_GONE) &&
-		    (dev_ptr->disabled == 0) &&
-		    (dev_ptr->user_disabled == 0) &&
-		    (devTp == dev_ptr->dev_type) &&
-		    (low_count > dev_ptr->dev_caller_count)) {
+		    dev_ptr->dev_stat != DEV_GONE &&
+		    dev_ptr->disabled == 0 &&
+		    dev_ptr->user_disabled == 0 &&
+		    devTp == dev_ptr->dev_type &&
+		    low_count > dev_ptr->dev_caller_count) {
 			low_count = dev_ptr->dev_caller_count;
 			low_indx = indx;
 		}
@@ -1402,8 +1393,9 @@ unbuild_caller(struct device *device_p, struct caller *caller_p)
 		return;
 	if (caller_p->caller_liste.next && caller_p->caller_liste.prev)
 		if (!list_empty(&caller_p->caller_liste)) {
-			list_del_init(&caller_p->caller_liste);
+			list_del(&caller_p->caller_liste);
 			device_p->dev_caller_count--;
+			INIT_LIST_HEAD(&caller_p->caller_liste);
 		}
 	memset(caller_p->caller_id, 0, sizeof(caller_p->caller_id));
 }
@@ -1621,14 +1613,14 @@ purge_work_element(struct work_element *we_p)
 	spin_lock_irq(&queuespinlock);
 	list_for_each(lptr, &request_list) {
 		if (lptr == &we_p->liste) {
-			list_del_init(lptr);
+			list_del(lptr);
 			requestq_count--;
 			break;
 		}
 	}
 	list_for_each(lptr, &pending_list) {
 		if (lptr == &we_p->liste) {
-			list_del_init(lptr);
+			list_del(lptr);
 			pendingq_count--;
 			break;
 		}
@@ -1846,10 +1838,10 @@ z90crypt_ioctl(struct inode *inode, struct file *filp,
 
 		/* THIS IS DEPRECATED.	USE THE NEW STATUS CALLS */
 	case ICAZ90STATUS:
-		if (deprecated_msg_count < 20) {
+		if (deprecated_msg_count < 100) {
 			PRINTK("deprecated call to ioctl (ICAZ90STATUS)!\n");
 			deprecated_msg_count++;
-			if (deprecated_msg_count == 20)
+			if (deprecated_msg_count == 100)
 				PRINTK("No longer issuing messages related to "
 				       "deprecated call to ICAZ90STATUS.\n");
 		}
@@ -2291,18 +2283,15 @@ receive_from_crypto_device(int index, unsigned char *psmid, int *buff_len_p,
 			if (!memcmp(caller_p->caller_id, psmid,
 				    sizeof(caller_p->caller_id))) {
 				if (!list_empty(&caller_p->caller_liste)) {
-					list_del_init(ptr);
+					list_del(ptr);
 					dev_ptr->dev_caller_count--;
+					INIT_LIST_HEAD(&caller_p->caller_liste);
 					break;
 				}
 			}
 			caller_p = 0;
 		}
 		if (!caller_p) {
-			PRINTKW("Unable to locate PSMID %02X%02X%02X%02X%02X"
-				"%02X%02X%02X in device list\n",
-				psmid[0], psmid[1], psmid[2], psmid[3],
-				psmid[4], psmid[5], psmid[6], psmid[7]);
 			rv = REC_USER_GONE;
 			break;
 		}
@@ -2360,7 +2349,7 @@ helper_send_work(int index)
 		return;
 	requestq_count--;
 	rq_p = list_entry(request_list.next, struct work_element, liste);
-	list_del_init(&rq_p->liste);
+	list_del(&rq_p->liste);
 	rq_p->audit[1] |= FP_REMREQUEST;
 	if (rq_p->devtype == SHRT2DEVPTR(index)->dev_type) {
 		rq_p->devindex = SHRT2LONG(index);
@@ -2419,7 +2408,7 @@ helper_handle_work_element(int index, unsigned char psmid[8], int rc,
 	list_for_each_safe(lptr, tptr, &pending_list) {
 		pq_p = list_entry(lptr, struct work_element, liste);
 		if (!memcmp(pq_p->caller_id, psmid, sizeof(pq_p->caller_id))) {
-			list_del_init(lptr);
+			list_del(lptr);
 			pendingq_count--;
 			pq_p->audit[1] |= FP_NOTPENDING;
 			break;
@@ -2514,18 +2503,21 @@ z90crypt_schedule_reader_timer(void)
 static void
 z90crypt_reader_task(unsigned long ptr)
 {
-	int workavail, index, rc, buff_len;
+	int workavail, remaining, index, rc, buff_len;
 	unsigned char	psmid[8];
 	unsigned char __user *resp_addr;
 	static unsigned char buff[1024];
 
+	PDEBUG("jiffies %ld\n", jiffies);
+
 	/**
 	 * we use workavail = 2 to ensure 2 passes with nothing dequeued before
-	 * exiting the loop. If pendingq_count == 0 after the loop, there is no
-	 * work remaining on the queues.
+	 * exiting the loop. If remaining == 0 after the loop, there is no work
+	 * remaining on the queues.
 	 */
 	resp_addr = 0;
 	workavail = 2;
+	remaining = 0;
 	buff_len = 0;
 	while (workavail) {
 		workavail--;
@@ -2555,14 +2547,19 @@ z90crypt_reader_task(unsigned long ptr)
 			}
 
 			if (rc == REC_FATAL_ERROR)
-				PRINTKW("REC_FATAL_ERROR from device %d!\n",
-					SHRT2LONG(index));
+				remaining = 0;
+			else if (rc != REC_NO_RESPONSE)
+				remaining +=
+					SHRT2DEVPTR(index)->dev_caller_count;
 		}
 		spin_unlock_irq(&queuespinlock);
 	}
 
-	if (pendingq_count)
+	if (remaining) {
+		spin_lock_irq(&queuespinlock);
 		z90crypt_schedule_reader_timer();
+		spin_unlock_irq(&queuespinlock);
+	}
 }
 
 static inline void
@@ -2581,7 +2578,8 @@ z90crypt_config_task(unsigned long ptr)
 
 	PDEBUG("jiffies %ld\n", jiffies);
 
-	rc = refresh_z90crypt(&z90crypt.cdx);
+	if ((rc = refresh_z90crypt(&z90crypt.cdx)))
+		PRINTK("Error %d detected in refresh_z90crypt.\n", rc);
 	/* If return was fatal, don't bother reconfiguring */
 	if ((rc != TSQ_FATAL_ERROR) && (rc != RSQ_FATAL_ERROR))
 		z90crypt_schedule_config_task(CONFIGTIME);
@@ -2608,7 +2606,7 @@ helper_drain_queues(void)
 		pq_p->status[0] |= STAT_FAILED;
 		unbuild_caller(LONG2DEVPTR(pq_p->devindex),
 			       (struct caller *)pq_p->requestptr);
-		list_del_init(lptr);
+		list_del(lptr);
 		pendingq_count--;
 		pq_p->audit[1] |= FP_NOTPENDING;
 		pq_p->audit[1] |= FP_AWAKENING;
@@ -2620,7 +2618,7 @@ helper_drain_queues(void)
 		pq_p = list_entry(lptr, struct work_element, liste);
 		pq_p->retcode = -ENODEV;
 		pq_p->status[0] |= STAT_FAILED;
-		list_del_init(lptr);
+		list_del(lptr);
 		requestq_count--;
 		pq_p->audit[1] |= FP_REMREQUEST;
 		pq_p->audit[1] |= FP_AWAKENING;
@@ -2642,21 +2640,12 @@ helper_timeout_requests(void)
 		pq_p = list_entry(lptr, struct work_element, liste);
 		if (pq_p->requestsent >= timelimit)
 			break;
-		PRINTKW("Purging(PQ) PSMID %02X%02X%02X%02X%02X%02X%02X%02X\n",
-		       ((struct caller *)pq_p->requestptr)->caller_id[0],
-		       ((struct caller *)pq_p->requestptr)->caller_id[1],
-		       ((struct caller *)pq_p->requestptr)->caller_id[2],
-		       ((struct caller *)pq_p->requestptr)->caller_id[3],
-		       ((struct caller *)pq_p->requestptr)->caller_id[4],
-		       ((struct caller *)pq_p->requestptr)->caller_id[5],
-		       ((struct caller *)pq_p->requestptr)->caller_id[6],
-		       ((struct caller *)pq_p->requestptr)->caller_id[7]);
 		pq_p->retcode = -ETIMEOUT;
 		pq_p->status[0] |= STAT_FAILED;
 		/* get this off any caller queue it may be on */
 		unbuild_caller(LONG2DEVPTR(pq_p->devindex),
 			       (struct caller *) pq_p->requestptr);
-		list_del_init(lptr);
+		list_del(lptr);
 		pendingq_count--;
 		pq_p->audit[1] |= FP_TIMEDOUT;
 		pq_p->audit[1] |= FP_NOTPENDING;
@@ -2674,18 +2663,9 @@ helper_timeout_requests(void)
 			pq_p = list_entry(lptr, struct work_element, liste);
 			if (pq_p->requestsent >= timelimit)
 				break;
-		PRINTKW("Purging(RQ) PSMID %02X%02X%02X%02X%02X%02X%02X%02X\n",
-		       ((struct caller *)pq_p->requestptr)->caller_id[0],
-		       ((struct caller *)pq_p->requestptr)->caller_id[1],
-		       ((struct caller *)pq_p->requestptr)->caller_id[2],
-		       ((struct caller *)pq_p->requestptr)->caller_id[3],
-		       ((struct caller *)pq_p->requestptr)->caller_id[4],
-		       ((struct caller *)pq_p->requestptr)->caller_id[5],
-		       ((struct caller *)pq_p->requestptr)->caller_id[6],
-		       ((struct caller *)pq_p->requestptr)->caller_id[7]);
 			pq_p->retcode = -ETIMEOUT;
 			pq_p->status[0] |= STAT_FAILED;
-			list_del_init(lptr);
+			list_del(lptr);
 			requestq_count--;
 			pq_p->audit[1] |= FP_TIMEDOUT;
 			pq_p->audit[1] |= FP_REMREQUEST;
@@ -2757,83 +2737,69 @@ helper_scan_devices(int cdx_array[16], int *cdx_p, int *correct_cdx_found)
 {
 	enum hdstat hd_stat;
 	int q_depth, dev_type;
-	int indx, chkdom, numdomains;
+	int i, j, k;
 
-	q_depth = dev_type = numdomains = 0;
-	for (chkdom = 0; chkdom <= 15; cdx_array[chkdom++] = -1);
-	for (indx = 0; indx < z90crypt.max_count; indx++) {
+	q_depth = dev_type = k = 0;
+	for (i = 0; i < z90crypt.max_count; i++) {
 		hd_stat = HD_NOT_THERE;
-		numdomains = 0;
-		for (chkdom = 0; chkdom <= 15; chkdom++) {
-			hd_stat = query_online(indx, chkdom, MAX_RESET,
+		for (j = 0; j <= 15; cdx_array[j++] = -1);
+		k = 0;
+		for (j = 0; j <= 15; j++) {
+			hd_stat = query_online(i, j, MAX_RESET,
 					       &q_depth, &dev_type);
 			if (hd_stat == HD_TSQ_EXCEPTION) {
 				z90crypt.terminating = 1;
+				PRINTKC("exception taken!\n");
 				break;
 			}
 			if (hd_stat == HD_ONLINE) {
-				cdx_array[numdomains++] = chkdom;
-				if (*cdx_p == chkdom) {
+				cdx_array[k++] = j;
+				if (*cdx_p == j) {
 					*correct_cdx_found  = 1;
 					break;
 				}
 			}
 		}
-		if ((*correct_cdx_found == 1) || (numdomains != 0))
+		if ((*correct_cdx_found == 1) || (k != 0))
 			break;
 		if (z90crypt.terminating)
 			break;
 	}
-	return numdomains;
+	return k;
 }
 
 static inline int
 probe_crypto_domain(int *cdx_p)
 {
 	int cdx_array[16];
-	char cdx_array_text[53], temp[5];
-	int correct_cdx_found, numdomains;
+	int correct_cdx_found, k;
 
 	correct_cdx_found = 0;
-	numdomains = helper_scan_devices(cdx_array, cdx_p, &correct_cdx_found);
+	k = helper_scan_devices(cdx_array, cdx_p, &correct_cdx_found);
 
-	if (z90crypt.terminating) {
-		PRINTKC("Exception taken probing domain. z90crypt will no "
-			"longer function.\n");
-		PRINTKC("Please 1) unload z90crypt, 2) ensure that you have "
-			"devices defined to this LPAR/guest, and then 3) "
-			"load z90crypt.\n");
+	if (z90crypt.terminating)
 		return TSQ_FATAL_ERROR;
-	}
 
 	if (correct_cdx_found)
 		return 0;
 
-	if (numdomains == 0) {
-		PRINTKW("Unable to find crypto domain: No devices found\n");
-		return Z90C_NO_DEVICES;
+	if (k == 0) {
+		*cdx_p = 0;
+		return 0;
 	}
 
-	if (numdomains == 1) {
-		if (*cdx_p == -1) {
+	if (k == 1) {
+		if ((*cdx_p == -1) || !z90crypt.domain_established) {
 			*cdx_p = cdx_array[0];
 			return 0;
 		}
-		PRINTKW("incorrect domain: specified = %d, found = %d\n",
-		       *cdx_p, cdx_array[0]);
-		return Z90C_INCORRECT_DOMAIN;
+		if (*cdx_p != cdx_array[0]) {
+			PRINTK("incorrect domain: specified = %d, found = %d\n",
+			       *cdx_p, cdx_array[0]);
+			return Z90C_INCORRECT_DOMAIN;
+		}
 	}
 
-	numdomains--;
-	sprintf(cdx_array_text, "%d", cdx_array[numdomains]);
-	while (numdomains) {
-		numdomains--;
-		sprintf(temp, ", %d", cdx_array[numdomains]);
-		strcat(cdx_array_text, temp);
-	}
-
-	PRINTKW("ambiguous domain detected: specified = %d, found array = %s\n",
-		*cdx_p, cdx_array_text);
 	return Z90C_AMBIGUOUS_DOMAIN;
 }
 
@@ -2852,14 +2818,25 @@ refresh_z90crypt(int *cdx_p)
 		return TSQ_FATAL_ERROR;
 	rv = 0;
 	if (!z90crypt.hdware_info->hdware_mask.st_count &&
-	    !z90crypt.domain_established) {
+	    !z90crypt.domain_established)
 		rv = probe_crypto_domain(cdx_p);
-		if (z90crypt.terminating)
-			return TSQ_FATAL_ERROR;
-		if (rv == Z90C_NO_DEVICES)
-			return 0; // try later
-		if (rv)
-			return rv;
+	if (z90crypt.terminating)
+		return TSQ_FATAL_ERROR;
+	if (rv) {
+		switch (rv) {
+		case Z90C_AMBIGUOUS_DOMAIN:
+			PRINTK("ambiguous domain detected\n");
+			break;
+		case Z90C_INCORRECT_DOMAIN:
+			PRINTK("incorrect domain specified\n");
+			break;
+		default:
+			PRINTK("probe domain returned %d\n", rv);
+			break;
+		}
+		return rv;
+	}
+	if (*cdx_p) {
 		z90crypt.cdx = *cdx_p;
 		z90crypt.domain_established = 1;
 	}
@@ -3109,7 +3086,7 @@ destroy_z90crypt(void)
 	memset((void *)&z90crypt, 0, sizeof(z90crypt));
 }
 
-static unsigned char static_testmsg[384] = {
+static unsigned char static_testmsg[] = {
 0x00,0x00,0x00,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x00,0x06,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x58,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x43,0x43,
@@ -3141,7 +3118,7 @@ probe_device_type(struct device *devPtr)
 {
 	int rv, dv, i, index, length;
 	unsigned char psmid[8];
-	static unsigned char loc_testmsg[sizeof(static_testmsg)];
+	static unsigned char loc_testmsg[384];
 
 	index = devPtr->dev_self_x;
 	rv = 0;
@@ -3236,7 +3213,7 @@ probe_device_type(struct device *devPtr)
 }
 
 #ifdef Z90CRYPT_USE_HOTPLUG
-static void
+void
 z90crypt_hotplug_event(int dev_major, int dev_minor, int action)
 {
 #ifdef CONFIG_HOTPLUG

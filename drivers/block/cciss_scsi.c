@@ -29,7 +29,7 @@
    physical nor logical disks are presented through the scsi layer. */
 
 #include "../scsi/scsi.h" 
-#include "../scsi/hosts.h" 
+#include <scsi/scsi_host.h> 
 #include <asm/atomic.h>
 #include <linux/timer.h>
 #include <linux/completion.h>
@@ -237,8 +237,7 @@ scsi_cmd_stack_free(int ctlr)
 		printk( "cciss: %d scsi commands are still outstanding.\n",
 			CMD_STACK_SIZE - stk->top);
 		// BUG();
-		printk("WE HAVE A BUG HERE!!! stk=0x%p\n", 
-			stk);
+		printk("WE HAVE A BUG HERE!!! stk=0x%p\n", stk);
 	}
 	size = sizeof(struct cciss_scsi_cmd_stack_elem_t) * CMD_STACK_SIZE;
 

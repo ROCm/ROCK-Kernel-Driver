@@ -153,6 +153,79 @@ static __inline__ int irq_canonicalize(int irq)
 	return irq;
 }
 
+#elif defined(CONFIG_CPM2) && defined(CONFIG_85xx)
+/* Now include the board configuration specific associations.
+*/
+#include <asm/mpc85xx.h>
+
+/* The MPC8560 openpic has  32 internal interrupts and 12 external
+ * interrupts.
+ *
+ * We are "flattening" the interrupt vectors of the cascaded CPM
+ * so that we can uniquely identify any interrupt source with a
+ * single integer.
+ */
+#define NR_CPM_INTS	64
+#define NR_EPIC_INTS	44
+#ifndef NR_8259_INTS
+#define NR_8259_INTS 0
+#endif
+#define NUM_8259_INTERRUPTS NR_8259_INTS
+
+#ifndef CPM_IRQ_OFFSET
+#define CPM_IRQ_OFFSET	0
+#endif
+
+#define NR_IRQS	(NR_EPIC_INTS + NR_CPM_INTS + NR_8259_INTS)
+
+/* These values must be zero-based and map 1:1 with the EPIC configuration.
+ * They are used throughout the 8560 I/O subsystem to generate
+ * interrupt masks, flags, and other control patterns.  This is why the
+ * current kernel assumption of the 8259 as the base controller is such
+ * a pain in the butt.
+ */
+
+#define	SIU_INT_ERROR		((uint)0x00+CPM_IRQ_OFFSET)
+#define	SIU_INT_I2C		((uint)0x01+CPM_IRQ_OFFSET)
+#define	SIU_INT_SPI		((uint)0x02+CPM_IRQ_OFFSET)
+#define	SIU_INT_RISC		((uint)0x03+CPM_IRQ_OFFSET)
+#define	SIU_INT_SMC1		((uint)0x04+CPM_IRQ_OFFSET)
+#define	SIU_INT_SMC2		((uint)0x05+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER1		((uint)0x0c+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER2		((uint)0x0d+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER3		((uint)0x0e+CPM_IRQ_OFFSET)
+#define	SIU_INT_TIMER4		((uint)0x0f+CPM_IRQ_OFFSET)
+#define	SIU_INT_FCC1		((uint)0x20+CPM_IRQ_OFFSET)
+#define	SIU_INT_FCC2		((uint)0x21+CPM_IRQ_OFFSET)
+#define	SIU_INT_FCC3		((uint)0x22+CPM_IRQ_OFFSET)
+#define	SIU_INT_MCC1		((uint)0x24+CPM_IRQ_OFFSET)
+#define	SIU_INT_MCC2		((uint)0x25+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC1		((uint)0x28+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC2		((uint)0x29+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC3		((uint)0x2a+CPM_IRQ_OFFSET)
+#define	SIU_INT_SCC4		((uint)0x2b+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC15		((uint)0x30+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC14		((uint)0x31+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC13		((uint)0x32+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC12		((uint)0x33+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC11		((uint)0x34+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC10		((uint)0x35+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC9		((uint)0x36+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC8		((uint)0x37+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC7		((uint)0x38+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC6		((uint)0x39+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC5		((uint)0x3a+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC4		((uint)0x3b+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC3		((uint)0x3c+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC2		((uint)0x3d+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC1		((uint)0x3e+CPM_IRQ_OFFSET)
+#define	SIU_INT_PC0		((uint)0x3f+CPM_IRQ_OFFSET)
+
+static __inline__ int irq_canonicalize(int irq)
+{
+	return irq;
+}
+
 #else /* CONFIG_40x + CONFIG_8xx */
 /*
  * this is the # irq's for all ppc arch's (pmac/chrp/prep)
@@ -177,17 +250,55 @@ static __inline__ int irq_canonicalize(int irq)
  */
 #define NR_SIU_INTS	64
 
-/* There are many more than these, we will add them as we need them.
-*/
+#define	SIU_INT_ERROR		((uint)0x00)
+#define	SIU_INT_I2C		((uint)0x01)
+#define	SIU_INT_SPI		((uint)0x02)
+#define	SIU_INT_RISC		((uint)0x03)
 #define	SIU_INT_SMC1		((uint)0x04)
 #define	SIU_INT_SMC2		((uint)0x05)
+#define	SIU_INT_IDMA1		((uint)0x06)
+#define	SIU_INT_IDMA2		((uint)0x07)
+#define	SIU_INT_IDMA3		((uint)0x08)
+#define	SIU_INT_IDMA4		((uint)0x09)
+#define	SIU_INT_SDMA		((uint)0x0a)
+#define	SIU_INT_TIMER1		((uint)0x0c)
+#define	SIU_INT_TIMER2		((uint)0x0d)
+#define	SIU_INT_TIMER3		((uint)0x0e)
+#define	SIU_INT_TIMER4		((uint)0x0f)
+#define	SIU_INT_TMCNT		((uint)0x10)
+#define	SIU_INT_PIT		((uint)0x11)
+#define	SIU_INT_IRQ1		((uint)0x13)
+#define	SIU_INT_IRQ2		((uint)0x14)
+#define	SIU_INT_IRQ3		((uint)0x15)
+#define	SIU_INT_IRQ4		((uint)0x16)
+#define	SIU_INT_IRQ5		((uint)0x17)
+#define	SIU_INT_IRQ6		((uint)0x18)
+#define	SIU_INT_IRQ7		((uint)0x19)
 #define	SIU_INT_FCC1		((uint)0x20)
 #define	SIU_INT_FCC2		((uint)0x21)
 #define	SIU_INT_FCC3		((uint)0x22)
+#define	SIU_INT_MCC1		((uint)0x24)
+#define	SIU_INT_MCC2		((uint)0x25)
 #define	SIU_INT_SCC1		((uint)0x28)
 #define	SIU_INT_SCC2		((uint)0x29)
 #define	SIU_INT_SCC3		((uint)0x2a)
 #define	SIU_INT_SCC4		((uint)0x2b)
+#define	SIU_INT_PC15		((uint)0x30)
+#define	SIU_INT_PC14		((uint)0x31)
+#define	SIU_INT_PC13		((uint)0x32)
+#define	SIU_INT_PC12		((uint)0x33)
+#define	SIU_INT_PC11		((uint)0x34)
+#define	SIU_INT_PC10		((uint)0x35)
+#define	SIU_INT_PC9		((uint)0x36)
+#define	SIU_INT_PC8		((uint)0x37)
+#define	SIU_INT_PC7		((uint)0x38)
+#define	SIU_INT_PC6		((uint)0x39)
+#define	SIU_INT_PC5		((uint)0x3a)
+#define	SIU_INT_PC4		((uint)0x3b)
+#define	SIU_INT_PC3		((uint)0x3c)
+#define	SIU_INT_PC2		((uint)0x3d)
+#define	SIU_INT_PC1		((uint)0x3e)
+#define	SIU_INT_PC0		((uint)0x3f)
 
 #endif /* CONFIG_8260 */
 
@@ -210,6 +321,10 @@ static __inline__ int irq_canonicalize(int irq)
 extern unsigned long ppc_cached_irq_mask[NR_MASK_WORDS];
 extern unsigned long ppc_lost_interrupts[NR_MASK_WORDS];
 extern atomic_t ppc_n_lost_interrupts;
+
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
 
 #endif /* _ASM_IRQ_H */
 #endif /* __KERNEL__ */

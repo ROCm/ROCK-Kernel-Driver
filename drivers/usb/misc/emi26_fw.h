@@ -12,12 +12,16 @@
  * and which may not be reproduced, used, sold or transferred to
  * any third party without Emagic's written consent. All Rights Reserved.
  *
+ * Permission is hereby granted for the distribution of this firmware 
+ * image as part of a Linux or other Open Source operating system kernel 
+ * in text or binary form as required. 
+ *
  * This firmware may not be modified and may only be used with the
  * Emagic EMI 2|6 Audio Interface. Distribution and/or Modification of
  * any driver which includes this firmware, in whole or in part,
  * requires the inclusion of this statement.
  */
-INTEL_HEX_RECORD g_bitstream[]={
+static INTEL_HEX_RECORD g_bitstream[]={
 {  16, 0x8010, 0, {0xff,0xff,0xff,0xff,0xaa,0x99,0x55,0x66,0x30,0x00,0x80,0x01,0x00,0x00,0x00,0x07 } },
 {  16, 0x8020, 0, {0x30,0x01,0x60,0x01,0x00,0x00,0x00,0x0b,0x30,0x01,0x20,0x01,0x00,0x80,0x3f,0x2d } },
 {  16, 0x8030, 0, {0x30,0x00,0xc0,0x01,0x00,0x00,0x00,0x00,0x30,0x00,0x80,0x01,0x00,0x00,0x00,0x09 } },
@@ -4406,7 +4410,7 @@ INTEL_HEX_RECORD g_bitstream[]={
  * any driver which includes this firmware, in whole or in part,
  * requires the inclusion of this statement.
  */
-INTEL_HEX_RECORD g_Firmware[] = {
+static INTEL_HEX_RECORD g_Firmware[] = {
 {   3,0x0000,0,{0x02,0x43,0x56} },
 {   3,0x0003,0,{0x02,0x4b,0xcd} },
 {   3,0x000b,0,{0x02,0x4b,0xd2} },
@@ -5669,7 +5673,7 @@ DATE=12.02.2002
  * any driver which includes this firmware, in whole or in part,
  * requires the inclusion of this statement.
  */
-INTEL_HEX_RECORD g_Loader[] = {
+static INTEL_HEX_RECORD g_Loader[] = {
 {   3,0x0000,0,{0x02,0x03,0x1c} },
 {   3,0x0043,0,{0x02,0x04,0x00} },
 {  16,0x0100,0,{0x90,0x7f,0xe9,0xe0,0x24,0x5b,0x60,0x60,0x24,0x02,0x60,0x03,0x02,0x01,0xbe,0x90} },

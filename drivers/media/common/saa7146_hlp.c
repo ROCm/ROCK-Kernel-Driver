@@ -536,13 +536,13 @@ static void saa7146_set_window(struct saa7146_dev *dev, int width, int height, e
 	/* set vertical scale */
 	hps_v_scale = 0; /* all bits get set by the function-call */
 	hps_v_gain  = 0; /* fixme: saa7146_read(dev, HPS_V_GAIN);*/ 
-	calculate_v_scale_registers(dev, field, vv->standard->v_calc, height, &hps_v_scale, &hps_v_gain);
+	calculate_v_scale_registers(dev, field, vv->standard->v_field*2, height, &hps_v_scale, &hps_v_gain);
 
 	/* set horizontal scale */
 	hps_ctrl 	= 0;
 	hps_h_prescale	= 0; /* all bits get set in the function */
 	hps_h_scale	= 0;
-	calculate_h_scale_registers(dev, vv->standard->h_calc, width, vv->hflip, &hps_ctrl, &hps_v_gain, &hps_h_prescale, &hps_h_scale);
+	calculate_h_scale_registers(dev, vv->standard->h_pixels, width, vv->hflip, &hps_ctrl, &hps_v_gain, &hps_h_prescale, &hps_h_scale);
 
 	/* set hyo and hxo */
 	calculate_hxo_and_hyo(vv, &hps_h_scale, &hps_ctrl);

@@ -45,10 +45,10 @@ struct sembuf {
 /* arg for semctl system calls. */
 union semun {
 	int val;			/* value for SETVAL */
-	struct semid_ds *buf;		/* buffer for IPC_STAT & IPC_SET */
-	unsigned short *array;		/* array for GETALL & SETALL */
-	struct seminfo *__buf;		/* buffer for IPC_INFO */
-	void *__pad;
+	struct semid_ds __user *buf;	/* buffer for IPC_STAT & IPC_SET */
+	unsigned short __user *array;	/* array for GETALL & SETALL */
+	struct seminfo __user *__buf;	/* buffer for IPC_INFO */
+	void __user *__pad;
 };
 
 struct  seminfo {
@@ -134,7 +134,22 @@ struct sysv_sem {
 	struct sem_undo_list *undo_list;
 };
 
-void exit_sem(struct task_struct *p);
+#ifdef CONFIG_SYSVIPC
+
+extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
+extern void exit_sem(struct task_struct *tsk);
+
+#else
+static inline int copy_semundo(unsigned long clone_flags, struct task_struct *tsk)
+{
+	return 0;
+}
+
+static inline void exit_sem(struct task_struct *tsk)
+{
+	return;
+}
+#endif
 
 #endif /* __KERNEL__ */
 

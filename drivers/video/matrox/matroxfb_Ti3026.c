@@ -692,7 +692,7 @@ static int Ti3026_preinit(WPMINFO2) {
 
 	ACCESS_FBINFO(outputs[0]).data = MINFO;
 	ACCESS_FBINFO(outputs[0]).output = &ti3026_output;
-	ACCESS_FBINFO(outputs[0]).src = MATROXFB_SRC_CRTC1;
+	ACCESS_FBINFO(outputs[0]).src = ACCESS_FBINFO(outputs[0]).default_src;
 	ACCESS_FBINFO(outputs[0]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
 
 	if (ACCESS_FBINFO(devflags.noinit))

@@ -486,15 +486,21 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 			break;
 		block_in_file++;
 	}
-	if (page_block == 0)
-		buffer_error();
+	BUG_ON(page_block == 0);
 
 	first_unmapped = page_block;
 
 page_is_mapped:
-
 	end_index = i_size >> PAGE_CACHE_SHIFT;
 	if (page->index >= end_index) {
+		/*
+		 * The page straddles i_size.  It must be zeroed out on each
+		 * and every writepage invokation because it may be mmapped.
+		 * "A file is mapped in multiples of the page size.  For a file
+		 * that is not a multiple of the page size, the remaining memory
+		 * is zeroed when mapped, and writes to that region are not
+		 * written out to the file."
+		 */
 		unsigned offset = i_size & (PAGE_CACHE_SIZE - 1);
 		char *kaddr;
 
@@ -621,9 +627,7 @@ mpage_writepages(struct address_space *mapping,
 	struct pagevec pvec;
 	int nr_pages;
 	pgoff_t index;
-	pgoff_t end = -1;		/* Inclusive */
 	int scanned = 0;
-	int is_range = 0;
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
 		wbc->encountered_congestion = 1;
@@ -641,17 +645,9 @@ mpage_writepages(struct address_space *mapping,
 		index = 0;			  /* whole-file sweep */
 		scanned = 1;
 	}
-	if (wbc->start || wbc->end) {
-		index = wbc->start >> PAGE_CACHE_SHIFT;
-		end = wbc->end >> PAGE_CACHE_SHIFT;
-		is_range = 1;
-		scanned = 1;
-	}
 retry:
-	while (!done && (index <= end) && 
-			(nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
-			PAGECACHE_TAG_DIRTY,
-			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1))) {
+	while (!done && (nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
+					PAGECACHE_TAG_DIRTY, PAGEVEC_SIZE))) {
 		unsigned i;
 
 		scanned = 1;
@@ -666,26 +662,12 @@ retry:
 			 * mapping
 			 */
 
-			if (wbc->sync_mode != WB_SYNC_FAST)
-				lock_page(page);
-			else if (TestSetPageLocked(page))
-		                continue;
-
-			if (unlikely(page->mapping != mapping)) {
-				unlock_page(page);
-				continue;
-			}
-
-			if (unlikely(is_range) && page->index > end) {
-				done = 1;
-				unlock_page(page);
-				continue;
-			}
+			lock_page(page);
 
 			if (wbc->sync_mode != WB_SYNC_NONE)
 				wait_on_page_writeback(page);
 
-			if (PageWriteback(page) ||
+			if (page->mapping != mapping || PageWriteback(page) ||
 					!clear_page_dirty_for_io(page)) {
 				unlock_page(page);
 				continue;
@@ -724,8 +706,7 @@ retry:
 		index = 0;
 		goto retry;
 	}
-	if (!is_range)
-		mapping->writeback_index = index;
+	mapping->writeback_index = index;
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;

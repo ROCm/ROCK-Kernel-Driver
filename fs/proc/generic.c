@@ -17,6 +17,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/idr.h>
+#include <linux/namei.h>
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 
@@ -33,7 +34,7 @@ int proc_match(int len, const char *name, struct proc_dir_entry *de)
 	return !memcmp(name, de->name, len);
 }
 
-struct file_operations proc_file_operations = {
+static struct file_operations proc_file_operations = {
 	.llseek		= proc_file_lseek,
 	.read		= proc_file_read,
 	.write		= proc_file_write,
@@ -53,7 +54,6 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 	ssize_t	n, count;
 	char	*start;
 	struct proc_dir_entry * dp;
-	loff_t pos = *ppos;
 
 	dp = PDE(inode);
 	if (!(page = (char*) __get_free_page(GFP_KERNEL)))
@@ -61,13 +61,11 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 
 	while ((nbytes > 0) && !eof) {
 		count = min_t(ssize_t, PROC_BLOCK_SIZE, nbytes);
-		if (pos != (unsigned) pos || pos > INT_MAX)
-			break;
- 
+
 		start = NULL;
 		if (dp->get_info) {
 			/* Handle old net routines */
-			n = dp->get_info(page, &start, pos, count);
+			n = dp->get_info(page, &start, *ppos, count);
 			if (n < count)
 				eof = 1;
 		} else if (dp->read_proc) {
@@ -118,7 +116,7 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 			 *    requested offset advanced by the number of bytes
 			 *    absorbed.
 			 */
-			n = dp->read_proc(page, &start, pos,
+			n = dp->read_proc(page, &start, *ppos,
 					  count, &eof, dp->data);
 		} else
 			break;
@@ -137,12 +135,12 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 				       "proc_file_read: Apparent buffer overflow!\n");
 				n = PAGE_SIZE;
 			}
-			n -= pos;
+			n -= *ppos;
 			if (n <= 0)
 				break;
 			if (n > count)
 				n = count;
-			start = page + pos;
+			start = page + *ppos;
 		} else if (start < page) {
 			if (n > PAGE_SIZE) {
 				printk(KERN_ERR
@@ -175,8 +173,7 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 			break;
 		}
 
-		pos += start < page ? (unsigned long)start : n;
-		*ppos = pos;
+		*ppos += start < page ? (unsigned long)start : n;
 		nbytes -= n;
 		buf += n;
 		retval += n;
@@ -206,7 +203,6 @@ static loff_t
 proc_file_lseek(struct file *file, loff_t offset, int orig)
 {
     lock_kernel();
-    /* FIXME - need proper locking for proc/generic */
 
     switch (orig) {
     case 0:
@@ -300,18 +296,20 @@ static spinlock_t proc_inum_lock = SPIN_LOCK_UNLOCKED; /* protects the above */
  */
 static unsigned int get_inode_number(void)
 {
-	unsigned int i, inum = 0;
+	int i, inum = 0;
+	int error;
 
 retry:
 	if (idr_pre_get(&proc_inum_idr, GFP_KERNEL) == 0)
 		return 0;
 
 	spin_lock(&proc_inum_lock);
-	i = idr_get_new(&proc_inum_idr, NULL);
+	error = idr_get_new(&proc_inum_idr, NULL, &i);
 	spin_unlock(&proc_inum_lock);
-
-	if (i == -1)
+	if (error == -EAGAIN)
 		goto retry;
+	else if (error)
+		return 0;
 
 	inum = (i & MAX_ID_MASK) + PROC_DYNAMIC_FIRST;
 
@@ -331,21 +329,14 @@ static void release_inode_number(unsigned int inum)
 	spin_unlock(&proc_inum_lock);
 }
 
-static int
-proc_readlink(struct dentry *dentry, char __user *buffer, int buflen)
-{
-	char *s = PDE(dentry->d_inode)->data;
-	return vfs_readlink(dentry, buffer, buflen, s);
-}
-
 static int proc_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	char *s = PDE(dentry->d_inode)->data;
-	return vfs_follow_link(nd, s);
+	nd_set_link(nd, PDE(dentry->d_inode)->data);
+	return 0;
 }
 
 static struct inode_operations proc_link_inode_operations = {
-	.readlink	= proc_readlink,
+	.readlink	= generic_readlink,
 	.follow_link	= proc_follow_link,
 };
 

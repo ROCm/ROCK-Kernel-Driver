@@ -65,12 +65,14 @@ config X86_VOYAGER
 
 config X86_NUMAQ
 	bool "NUMAQ (IBM/Sequent)"
+	select DISCONTIGMEM
+	select NUMA
 	help
 	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
 	  multiquad box. This changes the way that processors are bootstrapped,
 	  and uses Clustered Logical APIC addressing mode instead of Flat Logical.
 	  You will need a new lynxer.elf file to flash your firmware with - send
-	  email to Martin.Bligh@us.ibm.com
+	  email to <Martin.Bligh@us.ibm.com>.
 
 config X86_SUMMIT
 	bool "Summit/EXA (IBM x440)"
@@ -102,10 +104,10 @@ config X86_VISWS
 	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
 
 config X86_GENERICARCH
-       bool "Generic architecture (Summit, bigsmp, default)"
+       bool "Generic architecture (Summit, bigsmp, ES7000, default)"
        depends on SMP
        help
-          This option compiles in the Summit, bigsmp, default subarchitectures.
+          This option compiles in the Summit, bigsmp, ES7000, default subarchitectures.
 	  It is intended for a generic binary kernel.
 
 config X86_ES7000
@@ -322,9 +324,13 @@ endchoice
 config X86_GENERIC
        bool "Generic x86 support" 
        help
-       	  Including some tuning for non selected x86 CPUs too.
-	  when it has moderate overhead. This is intended for generic 
-	  distributions kernels.
+	  Instead of just including optimizations for the selected
+	  x86 variant (e.g. PII, Crusoe or Athlon), include some more
+	  generic optimizations as well. This will make the kernel
+	  perform better on x86 CPUs other than that selected.
+
+	  This is really intended for distributors who need more
+	  generic optimizations.
 
 endif
 
@@ -430,11 +436,8 @@ config HPET_TIMER
 	  Choose N to continue using the legacy 8254 timer.
 
 config HPET_EMULATE_RTC
-	def_bool HPET_TIMER && RTC=y
-
-config VSYSCALL_GTOD
-	depends on EXPERIMENTAL
-	bool "VSYSCALL gettimeofday() interface"
+	bool "Provide RTC interrupt"
+	depends on HPET_TIMER && RTC=y
 
 config SMP
 	bool "Symmetric multi-processing support"
@@ -548,6 +551,7 @@ config X86_TSC
 
 config X86_MCE
 	bool "Machine Check Exception"
+	depends on !X86_VOYAGER
 	---help---
 	  Machine Check Exception support allows the processor to notify the
 	  kernel if it detects a problem (e.g. overheating, component failure).
@@ -612,7 +616,7 @@ config I8K
 
 	  For information on utilities to make use of this driver see the
 	  I8K Linux utilities web site at:
-	  <http://www.debian.org/~dz/i8k/>
+	  <http://people.debian.org/~dz/i8k/>
 
 	  Say Y if you intend to run this kernel on a Dell Inspiron 8000.
 	  Say N otherwise.
@@ -823,8 +827,8 @@ config EFI
 	This option is only useful on systems that have EFI firmware
 	and will result in a kernel image that is ~8k larger.  In addition,
 	you must use the latest ELILO loader available at
-	ftp.hpl.hp.com/pub/linux-ia64/ in order to take advantage of kernel
-	initialization using EFI information (neither GRUB nor LILO know
+	<http://elilo.sourceforge.net> in order to take advantage of
+	kernel initialization using EFI information (neither GRUB nor LILO know
 	anything about EFI).  However, even with this option, the resultant
 	kernel should continue to boot on existing non-EFI platforms.
 
@@ -863,15 +867,6 @@ config REGPARM
 
 endmenu
 
-menu "Special options"
-
-config PROC_MM
-	bool "proc/mm support"
-	---help---
-		/proc/mm is used by a User Mode Linux kernel to support SKAS 
-		mode. If you need this, you'll know it.
-
-endmenu
 
 menu "Power management options (ACPI, APM)"
 	depends on !X86_VOYAGER
@@ -1114,25 +1109,6 @@ config PCI_MMCONFIG
 	select ACPI_BOOT
 	default y
 
-config PCI_USE_VECTOR
-	bool "Vector-based interrupt indexing (MSI)"
-	depends on X86_LOCAL_APIC && X86_IO_APIC
-	default n
-	help
-	   This replaces the current existing IRQ-based index interrupt scheme
-	   with the vector-base index scheme. The advantages of vector base
-	   over IRQ base are listed below:
-	   1) Support MSI implementation.
-	   2) Support future IOxAPIC hotplug
-
-	   Note that this allows the device drivers to enable MSI, Message
-	   Signaled Interrupt, on all MSI capable device functions detected.
-	   Message Signal Interrupt enables an MSI-capable hardware device to
-	   send an inbound Memory Write on its PCI bus instead of asserting
-	   IRQ signal on device IRQ pin.
-
-	   If you don't know what to do here, say N.
-
 source "drivers/pci/Kconfig"
 
 config ISA
@@ -1212,63 +1188,6 @@ source "arch/i386/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
-config CRASH_DUMP
-	tristate "Crash dump support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-	default n
-	---help---
-	  Say Y here to enable saving an image of system memory when a panic
-	  or other error occurs. Dumps can also be forced with the SysRq+d
-	  key if MAGIC_SYSRQ is enabled.
-
-config KERNTYPES
-	bool
-	depends on CRASH_DUMP
-	default y
-
-config CRASH_DUMP_BLOCKDEV
-	tristate "Crash dump block device driver"
-	depends on CRASH_DUMP
-	help
-	  Say Y to allow saving crash dumps directly to a disk device.
-
-config CRASH_DUMP_NETDEV
-	tristate "Crash dump network device driver"
-	depends on CRASH_DUMP
-	help
-	  Say Y to allow saving crash dumps over a network device.
-
-config CRASH_DUMP_MEMDEV
-	bool "Crash dump staged memory driver"
-	depends on CRASH_DUMP
-	help
-	  Say Y to allow intermediate saving crash dumps in spare 
-	  memory pages which would then be written out to disk
-	  later.
-
-config CRASH_DUMP_SOFTBOOT
-	bool "Save crash dump across a soft reboot"
-	depends on CRASH_DUMP_MEMDEV
-	help
-	  Say Y to allow a crash dump to be preserved in memory
-	  pages across a soft reboot and written out to disk
-	  thereafter. For this to work, CRASH_DUMP must be 
-	  configured as part of the kernel (not as a module).
-
-config CRASH_DUMP_COMPRESS_RLE
-	tristate "Crash dump RLE compression"
-	depends on CRASH_DUMP
-	help
-	  Say Y to allow saving dumps with Run Length Encoding compression.
-
-config CRASH_DUMP_COMPRESS_GZIP
-	tristate "Crash dump GZIP compression"
-	select ZLIB_INFLATE
-	select ZLIB_DEFLATE
-	depends on CRASH_DUMP
-	help
-	  Say Y to allow saving dumps with Gnu Zip compression.
-
 config DEBUG_KERNEL
 	bool "Kernel debugging"
 	help
@@ -1287,37 +1206,6 @@ config EARLY_PRINTK
 	  it is not recommended because it looks ugly and doesn't cooperate
 	  with klogd/syslogd or the X server. You should normally N here,
 	  unless you want to debug such a crash.
-
-config KPROBES
-	bool "Kprobes"
-	depends on DEBUG_KERNEL
-	help
-	  Kprobes allows you to trap at almost any kernel address, using
-	  register_kprobe(), and providing a callback function.  This is useful
-	  for kernel debugging, non-intrusive instrumentation and testing.  If
-	  in doubt, say "N".
-
-config DEBUGREG
-	bool "Global Debug Registers"
-	depends on DEBUG_KERNEL
-	help
-	  Global debug register settings will be honoured if this is turned on.
-	  If in doubt, say "N".
-
-config KWATCH
-	bool "Kwatch points"
-	depends on DEBUG_KERNEL && DEBUGREG
-	help
-	  This enables kernel-space watchpoints using processor's debug
-	  registers. If in doubt, say "N".
-
-config DPROBES
-	tristate "Dynamic Probes"
-	depends on DEBUG_KERNEL && MODULES && KPROBES
-	help
-	  DProbes provides a higher level interface to kprobes. DProbes
-	  enables you to write probe programs in a RPN language. If
-	  in doubt, say "N".
 
 config DEBUG_STACKOVERFLOW
 	bool "Check for stack overflows"
@@ -1401,84 +1289,14 @@ config FRAME_POINTER
 	  If you don't debug the kernel, you can say N, but we may not be able
 	  to solve problems without frame pointers.
 
-config KDB
-	bool "Built-in Kernel Debugger support"
-	depends on DEBUG_KERNEL
+config 4KSTACKS
+	bool "Use 4Kb for kernel stacks instead of 8Kb"
 	help
-	  This option provides a built-in kernel debugger.  The built-in
-	  kernel debugger contains commands which allow memory to be examined,
-	  instructions to be disassembled and breakpoints to be set.  For details,
-	  see Documentation/kdb/kdb.mm and the manual pages kdb_bt, kdb_ss, etc.
-	  Kdb can also be used via the serial port.  Set up the system to
-	  have a serial console (see Documentation/serial-console.txt).
-	  The Control-A key sequence on the serial port will cause the
-	  kernel debugger to be entered with input from the serial port and
-	  output to the serial console.  If unsure, say N.
-
-config KDB_MODULES
-	tristate "KDB modules"
-	depends on KDB
-	help
-	  KDB can be extended by adding your own modules, in directory
-	  kdb/modules.  This option selects the way that these modules should
-	  be compiled, as free standing modules (select M) or built into the
-	  kernel (select Y).  If unsure say M.
-
-config KDB_OFF
-	bool "KDB off by default"
-	depends on KDB
-	help
-	  Normally kdb is activated by default, as long as CONFIG_KDB is set.
-	  If you want to ship a kernel with kdb support but only have kdb
-	  turned on when the user requests it then select this option.  When
-	  compiled with CONFIG_KDB_OFF, kdb ignores all events unless you boot
-	  with kdb=on or you echo "1" > /proc/sys/kernel/kdb.  This option also
-	  works in reverse, if kdb is normally activated, you can boot with
-	  kdb=off or echo "0" > /proc/sys/kernel/kdb to deactivate kdb. If
-	  unsure, say N.
-
-config KDB_CONTINUE_CATASTROPHIC
-	int "KDB continues after catastrophic errors"
-	depends on KDB
-	default "0"
-	help
-	  This integer controls the behaviour of kdb when the kernel gets a
-  	  catastrophic error, i.e. for a panic, oops, NMI or other watchdog
-  	  tripping.  CONFIG_KDB_CONTINUE_CATASTROPHIC interacts with
-  	  /proc/sys/kernel/kdb and CONFIG_DUMP (if your kernel has the LKCD
-  	  patch).
-  	  When KDB is active (/proc/sys/kernel/kdb == 1) and a catastrophic
-  	  error occurs, nothing extra happens until you type 'go'.
-	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 0 (default).  The first time
-    	  you type 'go', kdb warns you.  The second time you type 'go', KDB
-    	  tries to continue - no guarantees that the kernel is still usable.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 1.  KDB tries to continue - no
-    	  guarantees that the kernel is still usable.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 2.  If your kernel has the LKCD
-    	  patch and LKCD is configured to take a dump then KDB forces a dump.
-    	  Whether or not a dump is taken, KDB forces a reboot.
-  	  When KDB is not active (/proc/sys/kernel/kdb == 0) and a catastrophic
-  	  error occurs, the following steps are automatic, no human
-  	  intervention is required.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 0 (default) or 1.  KDB attempts
-    	  to continue - no guarantees that the kernel is still usable.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 2.  If your kernel has the LKCD
-    	  patch and LKCD is configured to take a dump then KDB automatically
-    	  forces a dump.  Whether or not a dump is taken, KDB forces a
-    	  reboot.
-  	  If you are not sure, say 0.  Read Documentation/kdb/dump.txt before
-  	  setting to 2.
-
-# KDB_USB does not work, the usb code needs to be
-# converted from 2.4.19 to 2.5.40 APIs.  Omit it until somebody
-# fixes CONFIG_KDB_USB.
-#config KDB_USB
-#	bool "Support for USB Keyboard in KDB"
-#	depends on KDB && USB
-#	help
-#	  If you want to use kdb from a USB keyboard then say Y here.  If you
-#	  say N then kdb can only be used from a PC (AT) keyboard or a serial
-#	  console.
+	  If you say Y here the kernel will use a 4Kb stacksize for the
+	  kernel stack attached to each process/thread. This facilitates
+	  running more threads on a system and also reduces the pressure
+	  on the VM subsystem for higher order allocations. This option
+	  will also use IRQ stacks to compensate for the reduced stackspace.
 
 config X86_FIND_SMP_CONFIG
 	bool
@@ -1490,89 +1308,13 @@ config X86_MPPARSE
 	depends on X86_LOCAL_APIC && !X86_VISWS
 	default y
 
-config HOOK
-	tristate "Kernel Hook support"
-	depends on DEBUG_KERNEL 
-	help
-	 The Kernel Hooks Interface is a generalised facility for placing hooks in
-	 arbitrary kernel locations. A hook is a location in the kernel that
-	 calls out of the kernel to a kernel module routine - a hook exit routine.
-	 Read Documentation/hook/HOWTO for more details.
-
-config ASM_HOOK
-	bool
-	default y
-	depends on DEBUG_KERNEL && HOOK
-
-config HOOK_PROCFS
-	bool "/proc interface for hooks" 
-	depends on DEBUG_KERNEL && HOOK
-	
-config TRIGEVENT_HOOKS
-	bool "RAS Instrumentation Hooks"
-	depends on HOOK=y 
-	help 
-	RAS Instrumentation Hooks are kernel hooks to trace system calls and
-	 events used by Linux Trace Toolkit. These hooks may be used by other tools 
-	 also.
-
-	 RAS hooks trace Interprocess communication routines (sys_ipc, sys_msgget, 
-	 sys_semget, sys_shmget etc), IRQ's entry and exit points, Kernel timer 
-	 routines, Kernel threads create routine, Process Management routines (such as 
-	 fork, exec, exit, wait etc), Process Scheduling switch and dispatch routines, 
-	 Signals, Memory Management routines(such as __get_free_pages, __free_pages_ok, 
-	 do_swap_page, swap_writepage etc), Network packets transmit and receive 
-	 routines, Sockets  create, send, receive routines, tasklets, Trap 
-	 entry and exit routines etc.
-
-	 To enable RAS Instrumentation Hooks, say Y. If in doubt, Say N.	
-
-config TRIGEVENT_SYSCALL_HOOK
-	bool " Enable syscall entry/exit hooks"
-	depends on TRIGEVENT_HOOKS
-	help 
-	RAS hooks to enable tracing of system call entry and exit points.
-	 To enable RAS Syscall Hooks, say Y. If in doubt, Say N.	
-
-config LTT
-	bool "Tracing support"
-	depends on TRIGEVENT_HOOKS
-	select RELAYFS_FS
-	---help---
-	  It is possible for the kernel to log important events to a trace
-	  facility. Doing so, enables the use of the generated traces in order
-	  to reconstruct the dynamic behavior of the kernel, and hence the
-	  whole system.
-
-	  The tracing process contains 4 parts :
-	      1) The logging of events by key parts of the kernel.
-	      2) The tracer that keeps the events in a data buffer.
-	      3) A trace daemon that interacts with the tracer and is
-	         notified every time there is a certain quantity of data to
-	         read from the tracer.
-	      4) A trace event data decoder that reads the accumulated data
-	         and formats it in a human-readable format.
-
-	  If you say Y, the first two components will be built into the kernel.
-	  Critical parts of the kernel will call upon the kernel tracing
-	  function. The data is then recorded by the tracer if a trace daemon
-	  is running in user-space and has issued a "start" command.
-
-	  For more information on kernel tracing, the trace daemon or the event
-	  decoder, please check the following address :
-	       http://www.opersys.com/LTT
-
 endmenu
 
 source "security/Kconfig"
 
-source "drivers/ibmcrypto/Kconfig"
-
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-
-source "rpmify/Kconfig"
 
 config X86_SMP
 	bool

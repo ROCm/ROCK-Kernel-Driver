@@ -274,9 +274,6 @@ static void par96_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct baycom_state *bc = netdev_priv(dev);
 
-	if (!dev || !bc || bc->hdrv.magic != HDLCDRV_MAGIC)
-		return;
-
 	baycom_int_freq(bc);
 	/*
 	 * check if transmitter active
@@ -417,7 +414,6 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr,
 {
 	struct baycom_state *bc;
 	struct baycom_ioctl bi;
-	int cmd2;
 
 	if (!dev || !dev->priv ||
 	    ((struct baycom_state *)dev->priv)->hdrv.magic != HDLCDRV_MAGIC) {
@@ -428,8 +424,6 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr,
 
 	if (cmd != SIOCDEVPRIVATE)
 		return -ENOIOCTLCMD;
-	if (get_user(cmd2, (int *)ifr->ifr_data))
-		return -EFAULT;
 	switch (hi->cmd) {
 	default:
 		break;

@@ -1,5 +1,5 @@
 $Id: README.aztcd,v 2.60 1997/11/29 09:51:25 root Exp root $
-          Readme-File /usr/src/Documentation/cdrom/aztcd
+          Readme-File Documentation/cdrom/aztcd
            			for 
 	     AZTECH CD-ROM CDA268-01A, ORCHID CD-3110,
       OKANO/WEARNES CDD110, CONRAD TXC, CyCDROM CR520, CR540
@@ -524,7 +524,7 @@ should try restoring from a backup copy first)!
 
 A reworked and improved version called 'cdtester.c', which has yet more
 features for testing CDROM-drives can be found in
-/usr/src/linux/Documentation/cdrom/sbpcd, written by E.Moenkeberg.
+Documentation/cdrom/sbpcd, written by E.Moenkeberg.
 
 Werner Zimmermann
 Fachhochschule fuer Technik Esslingen

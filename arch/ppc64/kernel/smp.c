@@ -28,12 +28,8 @@
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <linux/err.h>
-#include <linux/dump.h>
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
-#include <linux/kthread.h>
-#include <linux/notifier.h>
-#include <linux/stop_machine.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -56,10 +52,7 @@
 #include <asm/xics.h>
 #include <asm/cputable.h>
 #include <asm/system.h>
-
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif
+#include <asm/rtas.h>
 
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
@@ -75,7 +68,6 @@ EXPORT_SYMBOL(cpu_possible_map);
 struct smp_ops_t *smp_ops;
 
 static volatile unsigned int cpu_callin_map[NR_CPUS];
-static int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
 
 extern unsigned char stab_array[];
 
@@ -83,23 +75,6 @@ extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 extern long register_vpa(unsigned long flags, unsigned long proc,
 			 unsigned long vpa);
-
-#ifdef CONFIG_KDB
-	/* save regs here before calling kdb_ipi */
-struct pt_regs *kdb_smp_regs[NR_CPUS];
-	
-/* called for each processor.. drop each into kdb. */
-static void smp_kdb_stop_proc(void *dummy)
-{
-    kdb_ipi(kdb_smp_regs[smp_processor_id()], NULL);
-}
-	
-void smp_kdb_stop(void)
-{
-    int ret=0;
-    ret = smp_call_function(smp_kdb_stop_proc, NULL, 1, 0);
-}
-#endif
 
 /* Low level assembly function used to backup CPU 0 state */
 extern void __save_cpu_setup(void);
@@ -145,12 +120,10 @@ static void smp_iSeries_message_pass(int target, int msg)
 static int smp_iSeries_numProcs(void)
 {
 	unsigned np, i;
-	struct ItLpPaca * lpPaca;
 
 	np = 0;
         for (i=0; i < NR_CPUS; ++i) {
-                lpPaca = paca[i].xLpPacaPtr;
-                if ( lpPaca->xDynProcStatus < 2 ) {
+                if (paca[i].lppaca.xDynProcStatus < 2) {
 			cpu_set(i, cpu_available_map);
 			cpu_set(i, cpu_possible_map);
 			cpu_set(i, cpu_present_at_boot);
@@ -164,11 +137,9 @@ static int smp_iSeries_probe(void)
 {
 	unsigned i;
 	unsigned np = 0;
-	struct ItLpPaca *lpPaca;
 
 	for (i=0; i < NR_CPUS; ++i) {
-		lpPaca = paca[i].xLpPacaPtr;
-		if (lpPaca->xDynProcStatus < 2) {
+		if (paca[i].lppaca.xDynProcStatus < 2) {
 			/*paca[i].active = 1;*/
 			++np;
 		}
@@ -179,21 +150,18 @@ static int smp_iSeries_probe(void)
 
 static void smp_iSeries_kick_cpu(int nr)
 {
-	struct ItLpPaca *lpPaca;
-
 	BUG_ON(nr < 0 || nr >= NR_CPUS);
 
 	/* Verify that our partition has a processor nr */
-	lpPaca = paca[nr].xLpPacaPtr;
-	if (lpPaca->xDynProcStatus >= 2)
+	if (paca[nr].lppaca.xDynProcStatus >= 2)
 		return;
 
 	/* The processor is currently spinning, waiting
-	 * for the xProcStart field to become non-zero
-	 * After we set xProcStart, the processor will
+	 * for the cpu_start field to become non-zero
+	 * After we set cpu_start, the processor will
 	 * continue on to secondary_start in iSeries_head.S
 	 */
-	paca[nr].xProcStart = 1;
+	paca[nr].cpu_start = 1;
 }
 
 static void __devinit smp_iSeries_setup_cpu(int nr)
@@ -267,7 +235,7 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
  */
 static int query_cpu_stopped(unsigned int pcpu)
 {
-	long cpu_status;
+	int cpu_status;
 	int status, qcss_tok;
 
 	qcss_tok = rtas_token("query-cpu-stopped-state");
@@ -286,9 +254,6 @@ int __cpu_disable(void)
 {
 	/* FIXME: go put this in a header somewhere */
 	extern void xics_migrate_irqs_away(void);
-
-	if (systemcfg->platform != PLATFORM_PSERIES_LPAR)
-		return -ENOSYS;
 
 	systemcfg->processorCount--;
 
@@ -325,7 +290,7 @@ void __cpu_die(unsigned int cpu)
 	 * done here.  Change isolate state to Isolate and
 	 * change allocation-state to Unusable.
 	 */
-	paca[cpu].xProcStart = 0;
+	paca[cpu].cpu_start = 0;
 
 	/* So we can recognize if it fails to come up next time. */
 	cpu_callin_map[cpu] = 0;
@@ -335,6 +300,9 @@ void __cpu_die(unsigned int cpu)
 void cpu_die(void)
 {
 	local_irq_disable();
+	/* Some hardware requires clearing the CPPR, while other hardware does not
+	 * it is safe either way
+	 */
 	pSeriesLP_cppr_info(0, 0);
 	rtas_stop_self();
 	/* Should never get here... */
@@ -420,13 +388,10 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 	}
 
 	/* Fixup atomic count: it exited inside IRQ handler. */
-	((struct task_struct *)paca[lcpu].xCurrent)->thread_info->preempt_count
-		= 0;
-	/* Fixup SLB round-robin so next segment (kernel) goes in segment 0 */
-	paca[lcpu].xStab_data.next_round_robin = 0;
+	paca[lcpu].__current->thread_info->preempt_count	= 0;
 
 	/* At boot this is done in prom.c. */
-	paca[lcpu].xHwProcNum = pcpu;
+	paca[lcpu].hw_cpu_id = pcpu;
 
 	status = rtas_call(rtas_token("start-cpu"), 3, 1, NULL,
 			   pcpu, start_here, lcpu);
@@ -464,6 +429,7 @@ static inline void look_for_more_cpus(void)
 	if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
 		maxcpus *= 2;
 
+
 	if (maxcpus > NR_CPUS) {
 		printk(KERN_WARNING
 		       "Partition configured for %d cpus, "
@@ -476,19 +442,6 @@ static inline void look_for_more_cpus(void)
 	/* Make those cpus (which might appear later) possible too. */
 	for (i = 0; i < maxcpus; i++)
 		cpu_set(i, cpu_possible_map);
-}
-
-int cpu_is_hotpluggable(struct cpu *cpu)
-{
-	/*
-	 * Instead of just checking the platform, we should
-	 * actually go look up the OpenFirmware node for the
-	 * CPU and make sure that this is OK.  Not all LPARs
-	 * support CPU hotplug.
-	 */
-	if (systemcfg->platform != PLATFORM_PSERIES_LPAR)
-		return 0;
-	return 1;
 }
 #else /* ... CONFIG_HOTPLUG_CPU */
 static inline int __devinit smp_startup_cpu(unsigned int lcpu)
@@ -507,12 +460,12 @@ static void smp_pSeries_kick_cpu(int nr)
 	if (!smp_startup_cpu(nr))
 		return;
 
-	/* The processor is currently spinning, waiting
-	 * for the xProcStart field to become non-zero
-	 * After we set xProcStart, the processor will
-	 * continue on to secondary_start
+	/*
+	 * The processor is currently spinning, waiting for the
+	 * cpu_start field to become non-zero After we set cpu_start,
+	 * the processor will continue on to secondary_start
 	 */
-	paca[nr].xProcStart = 1;
+	paca[nr].cpu_start = 1;
 }
 #endif /* CONFIG_PPC_PSERIES */
 
@@ -537,10 +490,8 @@ void vpa_init(int cpu)
 	unsigned long flags;
 
 	/* Register the Virtual Processor Area (VPA) */
-	printk(KERN_INFO "register_vpa: cpu 0x%x\n", cpu);
 	flags = 1UL << (63 - 18);
-	paca[cpu].xLpPaca.xSLBCount = 64; /* SLB restore highwater mark */
-	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].xLpPaca))); 
+	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].lppaca)));
 }
 
 static inline void smp_xics_do_message(int cpu, int msg)
@@ -651,9 +602,6 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 {
 	switch(msg) {
 	case PPC_MSG_CALL_FUNCTION:
-#ifdef CONFIG_KDB
-	        kdb_smp_regs[smp_processor_id()]=regs;
-#endif
 		smp_call_function_interrupt();
 		break;
 	case PPC_MSG_RESCHEDULE: 
@@ -665,16 +613,9 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		/* spare */
 		break;
 #endif
-#if defined(CONFIG_DEBUGGER) || defined(CONFIG_CRASH_DUMP) \
-	|| defined(CONFIG_CRASH_DUMP_MODULE)
-	case PPC_MSG_DEBUGGER_BREAK:
-		if (dump_ipi_function_ptr) {
-			dump_ipi_function_ptr(regs);
-		}
 #ifdef CONFIG_DEBUGGER
-		else
-			debugger_ipi(regs);
-#endif
+	case PPC_MSG_DEBUGGER_BREAK:
+		debugger_ipi(regs);
 		break;
 #endif
 	default:
@@ -696,16 +637,7 @@ void smp_send_debugger_break(int cpu)
 }
 #endif
 
-void dump_send_ipi(int (*dump_ipi_callback)(struct pt_regs *))
-{
-	dump_ipi_function_ptr = dump_ipi_callback;
-	if (dump_ipi_callback) {
-		mb();
-		smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_DEBUGGER_BREAK);
-	}
-}
-
-void stop_this_cpu(void *dummy)
+static void stop_this_cpu(void *dummy)
 {
 	local_irq_disable();
 	while (1)
@@ -757,6 +689,9 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	int ret = -1, cpus;
 	unsigned long timeout;
 
+	/* Can deadlock when called with interrupts disabled */
+	WARN_ON(irqs_disabled());
+
 	data.func = func;
 	data.info = info;
 	atomic_set(&data.started, 0);
@@ -786,7 +721,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 			printk("smp_call_function on cpu %d: other cpus not "
 			       "responding (%d)\n", smp_processor_id(),
 			       atomic_read(&data.started));
-			debugger(0);
+			debugger(NULL);
 			goto out;
 		}
 	}
@@ -801,7 +736,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 				       smp_processor_id(),
 				       atomic_read(&data.finished),
 				       atomic_read(&data.started));
-				debugger(0);
+				debugger(NULL);
 				goto out;
 			}
 		}
@@ -879,7 +814,7 @@ static void __init smp_create_idle(unsigned int cpu)
 	init_idle(p, cpu);
 	unhash_process(p);
 
-	paca[cpu].xCurrent = (u64)p;
+	paca[cpu].__current = p;
 	current_set[cpu] = p->thread_info;
 }
 
@@ -931,7 +866,7 @@ void __devinit smp_prepare_boot_cpu(void)
 	/* cpu_possible is set up in prom.c */
 	cpu_set(boot_cpuid, cpu_online_map);
 
-	paca[boot_cpuid].xCurrent = (u64)current;
+	paca[boot_cpuid].__current = current;
 	current_set[boot_cpuid] = current->thread_info;
 }
 
@@ -942,10 +877,6 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* At boot, don't bother with non-present cpus -JSCHOPP */
 	if (system_state == SYSTEM_BOOTING && !cpu_present_at_boot(cpu))
 		return -ENOENT;
-
-	if (system_state != SYSTEM_BOOTING &&
-	    systemcfg->platform != PLATFORM_PSERIES_LPAR)
-		return -ENOSYS;
 
 	paca[cpu].prof_counter = 1;
 	paca[cpu].prof_multiplier = 1;
@@ -960,13 +891,9 @@ int __devinit __cpu_up(unsigned int cpu)
 
 		tmp = &stab_array[PAGE_SIZE * cpu];
 		memset(tmp, 0, PAGE_SIZE); 
-		paca[cpu].xStab_data.virt = (unsigned long)tmp;
-		paca[cpu].xStab_data.real = virt_to_abs(tmp);
+		paca[cpu].stab_addr = (unsigned long)tmp;
+		paca[cpu].stab_real = virt_to_abs(tmp);
 	}
-
-	/* The information for processor bringup must be written out
-	 * to main store before we release the processor. */
-	mb();
 
 	/* The information for processor bringup must
 	 * be written out to main store before we release
@@ -987,7 +914,7 @@ int __devinit __cpu_up(unsigned int cpu)
 			udelay(100);
 #ifdef CONFIG_HOTPLUG_CPU
 	else
-		/* 
+		/*
 		 * CPUs can take much longer to come up in the
 		 * hotplug case.  Wait five seconds.
 		 */
@@ -1007,6 +934,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (smp_ops->give_timebase)
 		smp_ops->give_timebase();
 
+	/* Wait until cpu puts itself in the online map */
 	while (!cpu_online(cpu))
 		cpu_relax();
 
@@ -1030,8 +958,6 @@ int __devinit start_secondary(void *unused)
 	if (smp_ops->take_timebase)
 		smp_ops->take_timebase();
 
-	get_paca()->yielded = 0;
-
 #ifdef CONFIG_PPC_PSERIES
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		vpa_init(cpu); 
@@ -1047,9 +973,6 @@ int __devinit start_secondary(void *unused)
 #endif
 #endif
 
-	/* Take call_lock. Otherwise smp_call_function can end up
-	 * not waiting for this cpu.
-	 */
 	spin_lock(&call_lock);
 	cpu_set(cpu, cpu_online_map);
 	spin_unlock(&call_lock);
@@ -1084,54 +1007,30 @@ void __init smp_cpus_done(unsigned int max_cpus)
 }
 
 #ifdef CONFIG_SCHED_SMT
-
-/*
- * Other architectures can use cpu_possible_map to initialize the
- * scheduler domains topology.  In ppc64 we cannot do this because
- * we do not necessarily have associativity information for all
- * possible cpus (some "possible" cpus may not be present in the
- * system on LPAR).  So we initialize the topology using cpu_online_map,
- * using a parameterized version of arch_init_sched_domains.  With
- * cpu hotplug, the important thing is to add a new cpu to the topology
- * before it is up and taking interrupts.  We use a CPU_UP_PREPARE
- * notifier for this.
- *
- * N.B. kernel/sched.c::sched_domain_debug() should not be used in
- * conjunction with this implementation, as it uses cpu_possible_map.
- */
-
 #ifdef CONFIG_NUMA
-
 static struct sched_group sched_group_cpus[NR_CPUS];
 static struct sched_group sched_group_phys[NR_CPUS];
 static struct sched_group sched_group_nodes[MAX_NUMNODES];
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 static DEFINE_PER_CPU(struct sched_domain, phys_domains);
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
-
-static __devinit int __arch_init_sched_domains(void *new_mask)
+__init void arch_init_sched_domains(void)
 {
 	int i;
 	struct sched_group *first = NULL, *last = NULL;
-	cpumask_t new_cpu_map = *(cpumask_t *)new_mask;
 
 	/* Set up domains */
-	for_each_cpu_mask(i, new_cpu_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
 		struct sched_domain *node_domain = &per_cpu(node_domains, i);
 		int node = cpu_to_node(i);
-		int sibling = i ^ 0x1;
-		cpumask_t node_cpumask = node_to_cpumask(node);
-		cpumask_t nodemask;
+		cpumask_t nodemask = node_to_cpumask(node);
 		cpumask_t my_cpumask = cpumask_of_cpu(i);
-		cpumask_t sibling_cpumask = cpumask_of_cpu(sibling);
-
-		cpus_and(nodemask, node_cpumask, new_cpu_map);
+		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
 
 		*cpu_domain = SD_SIBLING_INIT;
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT &&
-		    cpu_isset(sibling, new_cpu_map))
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
 			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
 		else
 			cpu_domain->span = my_cpumask;
@@ -1144,12 +1043,12 @@ static __devinit int __arch_init_sched_domains(void *new_mask)
 		phys_domain->groups = &sched_group_phys[first_cpu(cpu_domain->span)];
 
 		*node_domain = SD_NODE_INIT;
-		node_domain->span = new_cpu_map;
+		node_domain->span = cpu_possible_map;
 		node_domain->groups = &sched_group_nodes[node];
 	}
 
 	/* Set up CPU (sibling) groups */
-	for_each_cpu_mask(i, new_cpu_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		int j;
 		first = last = NULL;
@@ -1178,7 +1077,7 @@ static __devinit int __arch_init_sched_domains(void *new_mask)
 		cpumask_t nodemask;
 		struct sched_group *node = &sched_group_nodes[i];
 		cpumask_t node_cpumask = node_to_cpumask(i);
-		cpus_and(nodemask, node_cpumask, new_cpu_map);
+		cpus_and(nodemask, node_cpumask, cpu_possible_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1215,7 +1114,7 @@ static __devinit int __arch_init_sched_domains(void *new_mask)
 		struct sched_group *cpu = &sched_group_nodes[i];
 		cpumask_t nodemask;
 		cpumask_t node_cpumask = node_to_cpumask(i);
-		cpus_and(nodemask, node_cpumask, new_cpu_map);
+		cpus_and(nodemask, node_cpumask, cpu_possible_map);
 
 		if (cpus_empty(nodemask))
 			continue;
@@ -1232,38 +1131,30 @@ static __devinit int __arch_init_sched_domains(void *new_mask)
 	last->next = first;
 
 	mb();
-	for_each_cpu_mask(i, new_cpu_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		cpu_attach_domain(cpu_domain, i);
 	}
-
-	return 0;
 }
-
 #else /* !CONFIG_NUMA */
-
 static struct sched_group sched_group_cpus[NR_CPUS];
 static struct sched_group sched_group_phys[NR_CPUS];
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 static DEFINE_PER_CPU(struct sched_domain, phys_domains);
-
-static __devinit void __arch_init_sched_domains(void *new_mask)
+__init void arch_init_sched_domains(void)
 {
 	int i;
 	struct sched_group *first = NULL, *last = NULL;
-	cpumask_t new_cpu_map = *(cpumask_t *)new_mask;
 
 	/* Set up domains */
-	for_each_cpu_mask(i, new_cpu_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
-		int sibling = i ^ 0x1;
 		cpumask_t my_cpumask = cpumask_of_cpu(i);
-		cpumask_t sibling_cpumask = cpumask_of_cpu(sibling);
+		cpumask_t sibling_cpumask = cpumask_of_cpu(i ^ 0x1);
 
 		*cpu_domain = SD_SIBLING_INIT;
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT &&
-		    cpu_isset(sibling, new_cpu_map))
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
 			cpus_or(cpu_domain->span, my_cpumask, sibling_cpumask);
 		else
 			cpu_domain->span = my_cpumask;
@@ -1271,12 +1162,12 @@ static __devinit void __arch_init_sched_domains(void *new_mask)
 		cpu_domain->groups = &sched_group_cpus[i];
 
 		*phys_domain = SD_CPU_INIT;
-		phys_domain->span = new_cpu_map;
+		phys_domain->span = cpu_possible_map;
 		phys_domain->groups = &sched_group_phys[first_cpu(cpu_domain->span)];
 	}
 
 	/* Set up CPU (sibling) groups */
-	for_each_cpu_mask(i, new_cpu_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		int j;
 		first = last = NULL;
@@ -1302,7 +1193,7 @@ static __devinit void __arch_init_sched_domains(void *new_mask)
 
 	first = last = NULL;
 	/* Set up physical groups */
-	for_each_cpu_mask(i, new_cpu_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		struct sched_group *cpu = &sched_group_phys[i];
 
@@ -1322,60 +1213,10 @@ static __devinit void __arch_init_sched_domains(void *new_mask)
 	last->next = first;
 
 	mb();
-	for_each_cpu_mask(i, new_cpu_map) {
+	for_each_cpu(i) {
 		struct sched_domain *cpu_domain = &per_cpu(cpu_domains, i);
 		cpu_attach_domain(cpu_domain, i);
 	}
 }
 #endif /* CONFIG_NUMA */
-
-#ifdef CONFIG_HOTPLUG_CPU
-
-static int cpu_sched_domain_callback(struct notifier_block *nfb,
-			     unsigned long action,
-			     void *hcpu)
-{
-	struct task_struct *p;
-	unsigned long lcpu = (unsigned long)hcpu;
-	cpumask_t new_mask = cpu_online_map;
-
-	switch (action) {
-	case CPU_UP_PREPARE:
-		cpu_set(lcpu, new_mask);
-		break;
-	case CPU_DEAD:
-	case CPU_UP_CANCELED:
-		break;
-	default:
-		return NOTIFY_OK;
-	}
-
-	/* 
-	 * Cannot use stop_machine_run; the cpucontrol semaphore is
-	 * already held.
-	 */
-	p = __stop_machine_run(__arch_init_sched_domains, &new_mask, NR_CPUS);
-
-	if (IS_ERR(p))
-		return NOTIFY_BAD; /* perhaps a nasty message is ok */
-
-	kthread_stop(p);
-
-	return NOTIFY_OK;
-}
-#endif /* CONFIG_HOTPLUG_CPU */
-
-__init void arch_init_sched_domains(void)
-{
-	__arch_init_sched_domains(&cpu_online_map);
-}
-
-static int __init register_sched_domains_notifier(void)
-{
-	/* This must run after the NUMA notifier. */
-	hotcpu_notifier(cpu_sched_domain_callback, 0);
-	return 0;
-}
-__initcall(register_sched_domains_notifier);
 #endif /* CONFIG_SCHED_SMT */
-

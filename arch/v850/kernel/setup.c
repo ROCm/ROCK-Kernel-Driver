@@ -20,8 +20,10 @@
 #include <linux/major.h>
 #include <linux/root_dev.h>
 #include <linux/mtd/mtd.h>
+#include <linux/init.h>
 
 #include <asm/irq.h>
+#include <asm/setup.h>
 
 #include "mach.h"
 
@@ -40,8 +42,7 @@ extern char _root_fs_image_start __attribute__ ((__weak__));
 extern char _root_fs_image_end __attribute__ ((__weak__));
 
 
-char command_line[512];
-char saved_command_line[512];
+char command_line[COMMAND_LINE_SIZE];
 
 /* Memory not used by the kernel.  */
 static unsigned long total_ram_pages;
@@ -63,8 +64,8 @@ void __init setup_arch (char **cmdline)
 {
 	/* Keep a copy of command line */
 	*cmdline = command_line;
-	memcpy (saved_command_line, command_line, sizeof saved_command_line);
-	saved_command_line[sizeof saved_command_line - 1] = '\0';
+	memcpy (saved_command_line, command_line, COMMAND_LINE_SIZE);
+	saved_command_line[COMMAND_LINE_SIZE - 1] = '\0';
 
 	console_verbose ();
 

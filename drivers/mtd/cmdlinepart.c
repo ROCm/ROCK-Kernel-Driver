@@ -1,5 +1,5 @@
 /*
- * $Id: cmdlinepart.c,v 1.9 2003/05/16 17:08:24 dwmw2 Exp $
+ * $Id: cmdlinepart.c,v 1.14 2004/07/12 12:34:23 dwmw2 Exp $
  *
  * Read flash partition table from command line
  *
@@ -10,7 +10,7 @@
  * mtdparts=<mtddef>[;<mtddef]
  * <mtddef>  := <mtd-id>:<partdef>[,<partdef>]
  * <partdef> := <size>[@offset][<name>][ro]
- * <mtd-id>  := unique id used in mapping driver/device
+ * <mtd-id>  := unique name used in mapping driver/device (mtd->name)
  * <size>    := standard linux memsize OR "-" to denote all remaining space
  * <name>    := '(' NAME ')'
  * 
@@ -94,7 +94,7 @@ static struct mtd_partition * newpart(char *s,
 		if (size < PAGE_SIZE)
 		{
 			printk(KERN_ERR ERRP "partition size too small (%lx)\n", size);
-			return 0;
+			return NULL;
 		}
 	}
 
@@ -121,7 +121,7 @@ static struct mtd_partition * newpart(char *s,
 		if ((p = strchr(name, delim)) == 0)
 		{
 			printk(KERN_ERR ERRP "no closing %c found in partition name\n", delim);
-			return 0;
+			return NULL;
 		}
 		name_len = p - name;
 		s = p + 1;
@@ -148,12 +148,12 @@ static struct mtd_partition * newpart(char *s,
 		if (size == SIZE_REMAINING)
 		{
 			printk(KERN_ERR ERRP "no partitions allowed after a fill-up partition\n");
-			return 0;
+			return NULL;
 		}
 		/* more partitions follow, parse them */
 		if ((parts = newpart(s + 1, &s, num_parts, 
 		                     this_part + 1, &extra_mem, extra_mem_size)) == 0)
-		  return 0;
+		  return NULL;
 	}
 	else
 	{	/* this is the last partition: allocate space for all */
@@ -166,7 +166,7 @@ static struct mtd_partition * newpart(char *s,
 		if (!parts)
 		{
 			printk(KERN_ERR ERRP "out of memory\n");
-			return 0;
+			return NULL;
 		}
 		memset(parts, 0, alloc_size);
 		extra_mem = (unsigned char *)(parts + *num_parts);
@@ -358,14 +358,7 @@ static int __init cmdline_parser_init(void)
 	return register_mtd_parser(&cmdline_parser);
 }
 
-static void __exit cmdline_parser_exit(void)
-{
-	deregister_mtd_parser(&cmdline_parser);
-}
-
 module_init(cmdline_parser_init);
-module_exit(cmdline_parser_exit);
-
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Marius Groeger <mag@sysgo.de>");

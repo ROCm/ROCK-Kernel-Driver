@@ -18,9 +18,8 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
-#include <linux/audit.h>
+#include <linux/backing-dev.h>
 
-#include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
@@ -33,6 +32,9 @@ unsigned long askedalloc, realalloc;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
 int sysctl_overcommit_memory; /* default is heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
+
+int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
+EXPORT_SYMBOL(sysctl_max_map_count);
 
 /*
  * Handle all mappings that got truncated by a "truncate()"
@@ -205,26 +207,24 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 {
 	struct mm_struct *mm = current->mm;
 
-	audit_intercept(AUDIT_brk, brk);
-
 	if (brk < mm->end_code || brk < mm->start_brk || brk > mm->context.end_brk)
-		return audit_lresult(mm->brk);
+		return mm->brk;
 
 	if (mm->brk == brk)
-		return audit_lresult(mm->brk);
+		return mm->brk;
 
 	/*
 	 * Always allow shrinking brk
 	 */
 	if (brk <= mm->brk) {
 		mm->brk = brk;
-		return audit_lresult(brk);
+		return brk;
 	}
 
 	/*
 	 * Ok, looks good - let it rip.
 	 */
-	return audit_lresult(mm->brk = brk);
+	return mm->brk = brk;
 }
 
 /*
@@ -488,7 +488,7 @@ int do_munmap(struct mm_struct * mm, unsigned long addr, size_t len)
 	show_process_blocks();
 #endif	  
 
-	return -EINVAL;
+	return 0;
 }
 
 /* Release all mmaps. */
@@ -571,6 +571,6 @@ unsigned long get_unmapped_area(struct file *file, unsigned long addr,
 	return -ENOMEM;
 }
 
-void anon_vma_init(void)
+void swap_unplug_io_fn(struct backing_dev_info *bdi, struct page *page)
 {
 }

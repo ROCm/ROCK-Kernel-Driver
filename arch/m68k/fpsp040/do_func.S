@@ -4,11 +4,11 @@
 | Do_func performs the unimplemented operation.  The operation
 | to be performed is determined from the lower 7 bits of the
 | extension word (except in the case of fmovecr and fsincos).
-| The opcode and tag bits form an index into a jump table in 
-| tbldo.sa.  Cases of zero, infinity and NaN are handled in 
+| The opcode and tag bits form an index into a jump table in
+| tbldo.sa.  Cases of zero, infinity and NaN are handled in
 | do_func by forcing the default result.  Normalized and
 | denormalized (there are no unnormalized numbers at this
-| point) are passed onto the emulation code.  
+| point) are passed onto the emulation code.
 |
 | CMDREG1B and STAG are extracted from the fsave frame
 | and combined to form the table index.  The function called
@@ -22,8 +22,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 DO_FUNC:	|idnt    2,1 | Motorola 040 Floating Point Software Package
@@ -35,7 +35,7 @@ DO_FUNC:	|idnt    2,1 | Motorola 040 Floating Point Software Package
 	|xref	t_dz2
 	|xref	t_operr
 	|xref	t_inx2
-	|xref 	t_resdnrm
+	|xref	t_resdnrm
 	|xref	dst_nan
 	|xref	src_nan
 	|xref	nrm_set
@@ -68,7 +68,7 @@ do_func:
 | directly.
 |
 	bfextu	CMDREG1B(%a6){#0:#6},%d0 |get opclass and src fields
-	cmpil	#0x17,%d0		|if op class and size fields are $17, 
+	cmpil	#0x17,%d0		|if op class and size fields are $17,
 |				;it is FMOVECR; if not, continue
 	bnes	not_fmovecr
 	jmp	smovcr		|fmovecr; jmp directly to emulation
@@ -76,7 +76,7 @@ do_func:
 not_fmovecr:
 	movew	CMDREG1B(%a6),%d0
 	andl	#0x7F,%d0
-	cmpil	#0x38,%d0		|if the extension is >= $38, 
+	cmpil	#0x38,%d0		|if the extension is >= $38,
 	bge	serror		|it is illegal
 	bfextu	STAG(%a6){#0:#3},%d1
 	lsll	#3,%d0		|make room for STAG
@@ -111,7 +111,7 @@ ld_mzinx:
 	bsr	ld_mzero	|if neg, load neg zero, return here
 	bra	t_inx2		|now, set the inx for the next inst
 |
-| Load a signed zero to fp0; do not set inex2/ainex 
+| Load a signed zero to fp0; do not set inex2/ainex
 |
 	.global	szero
 szero:
@@ -119,7 +119,7 @@ szero:
 	bne	ld_mzero	|if neg, load neg zero
 	bra	ld_pzero	|load positive zero
 |
-| Load a signed infinity to fp0; do not set inex2/ainex 
+| Load a signed infinity to fp0; do not set inex2/ainex
 |
 	.global	sinf
 sinf:
@@ -127,7 +127,7 @@ sinf:
 	bne	ld_minf			|if negative branch
 	bra	ld_pinf
 |
-| Load a signed one to fp0; do not set inex2/ainex 
+| Load a signed one to fp0; do not set inex2/ainex
 |
 	.global	sone
 sone:
@@ -135,7 +135,7 @@ sone:
 	bne	ld_mone
 	bra	ld_pone
 |
-| Load a signed pi/2 to fp0; do not set inex2/ainex 
+| Load a signed pi/2 to fp0; do not set inex2/ainex
 |
 	.global	spi_2
 spi_2:
@@ -160,13 +160,13 @@ sopr_inf:
 	bne	t_operr
 	bra	ld_pinf
 |
-|	FLOGNP1 
+|	FLOGNP1
 |
 	.global	sslognp1
 sslognp1:
 	fmovemx (%a0),%fp0-%fp0
 	fcmpb	#-1,%fp0
-	fbgt	slognp1		
+	fbgt	slognp1
 	fbeq	t_dz2		|if = -1, divide by zero exception
 	fmovel	#0,%FPSR		|clr N flag
 	bra	t_operr		|take care of operands < -1
@@ -186,7 +186,7 @@ setoxm1i:
 |
 	.global	sslogn
 sslogn:
-	btstb	#sign_bit,LOCAL_EX(%a0) 
+	btstb	#sign_bit,LOCAL_EX(%a0)
 	bne	t_operr		|take care of operands < 0
 	cmpiw	#0x3fff,LOCAL_EX(%a0) |test for 1.0 input
 	bne	slogn
@@ -199,7 +199,7 @@ sslogn:
 
 	.global	sslognd
 sslognd:
-	btstb	#sign_bit,LOCAL_EX(%a0) 
+	btstb	#sign_bit,LOCAL_EX(%a0)
 	beq	slognd
 	bra	t_operr		|take care of operands < 0
 
@@ -221,7 +221,7 @@ sslog10:
 
 	.global	sslog10d
 sslog10d:
-	btstb	#sign_bit,LOCAL_EX(%a0) 
+	btstb	#sign_bit,LOCAL_EX(%a0)
 	beq	slog10d
 	bra	t_operr		|take care of operands < 0
 
@@ -243,7 +243,7 @@ sslog2:
 
 	.global	sslog2d
 sslog2d:
-	btstb	#sign_bit,LOCAL_EX(%a0) 
+	btstb	#sign_bit,LOCAL_EX(%a0)
 	beq	slog2d
 	bra	t_operr		|take care of operands < 0
 
@@ -310,7 +310,7 @@ smod_zsn:
 	btstl	#7,%d0		|test if + or -
 	beq	ld_pzero	|if pos then load +0
 	bra	ld_mzero	|else neg load -0
-	
+
 smod_fpn:
 	moveb	ETEMP(%a6),%d1	|get sign of src op
 	moveb	FPTEMP(%a6),%d0	|get sign of dst op
@@ -327,7 +327,7 @@ smod_nrm:
 	fmovel USER_FPCR(%a6),%fpcr |use user's rmode and precision
 	fmovex FPTEMP(%a6),%fp0	|return dest to fp0
 	rts
-		
+
 |
 |	FREM
 |
@@ -372,7 +372,7 @@ prem:
 	lea	premt,%a1
 	movel	(%a1,%d1.w*4),%a1
 	jmp	(%a1)
-	
+
 srem_snan:
 	bra	src_nan
 srem_dnan:
@@ -390,7 +390,7 @@ srem_zsn:
 	btstl	#7,%d0		|test if + or -
 	beq	ld_pzero	|if pos then load +0
 	bra	ld_mzero	|else neg load -0
-	
+
 srem_fpn:
 	moveb	ETEMP(%a6),%d1	|get sign of src op
 	moveb	FPTEMP(%a6),%d0	|get sign of dst op
@@ -424,10 +424,10 @@ pscalet:
 	.long	scl_inf		|  10,00  inf,norm  = +-inf
 	.long	scl_inf		|  10,01  inf,zero  = +-inf
 	.long	scl_opr		|  10,10  inf,inf   = nan with operr
- 	.long	scl_snan	|  10,11  inf,nan   = nan
- 	.long	scl_dnan	|  11,00  nan,norm  = nan
- 	.long	scl_dnan	|  11,01  nan,zero  = nan
- 	.long	scl_dnan	|  11,10  nan,inf   = nan
+	.long	scl_snan	|  10,11  inf,nan   = nan
+	.long	scl_dnan	|  11,00  nan,norm  = nan
+	.long	scl_dnan	|  11,01  nan,zero  = nan
+	.long	scl_dnan	|  11,10  nan,inf   = nan
 	.long	scl_dnan	|  11,11  nan,nan   = nan
 
 	.global	pscale
@@ -478,7 +478,7 @@ ssincosz:
 sincosp:
 	fmovex PZERO,%fp0
 sincoscom:
-  	fmovemx PONE,%fp1-%fp1	|do not allow FPSR to be affected
+	fmovemx PONE,%fp1-%fp1	|do not allow FPSR to be affected
 	bra	sto_cos		|store cosine result
 
 	.global	ssincosi
@@ -498,7 +498,7 @@ ssincosnan:
 	bsr	sto_cos
 	bra	src_nan
 |
-| This code forces default values for the zero, inf, and nan cases 
+| This code forces default values for the zero, inf, and nan cases
 | in the transcendentals code.  The CC bits must be set in the
 | stacked FPSR to be correctly reported.
 |

@@ -25,7 +25,6 @@ struct backing_dev_info default_backing_dev_info = {
 	.state		= 0,
 	.unplug_io_fn	= default_unplug_io_fn,
 };
-
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
 
 /*
@@ -38,7 +37,6 @@ file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
 	ra->ra_pages = mapping->backing_dev_info->ra_pages;
 	ra->average = ra->ra_pages / 2;
 }
-
 EXPORT_SYMBOL(file_ra_state_init);
 
 /*
@@ -351,11 +349,10 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 			struct file *filp, unsigned long offset)
 {
 	unsigned max;
-	unsigned min;
 	unsigned orig_next_size;
 	unsigned actual;
 	int first_access=0;
-	unsigned long preoffset=0;
+	unsigned long average;
 
 	/*
 	 * Here we detect the case where the application is performing
@@ -376,7 +373,6 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	if (max == 0)
 		goto out;	/* No readahead */
 
-	min = get_min_readahead(ra);
 	orig_next_size = ra->next_size;
 
 	if (ra->next_size == 0) {
@@ -396,10 +392,17 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 		if (ra->serial_cnt <= (max * 2))
 			ra->serial_cnt++;
 	} else {
-		ra->average = (ra->average + ra->serial_cnt) / 2;
+		/*
+		 * to avoid rounding errors, ensure that 'average'
+		 * tends towards the value of ra->serial_cnt.
+		 */
+		average = ra->average;
+		if (average < ra->serial_cnt) {
+			average++;
+		}
+		ra->average = (average + ra->serial_cnt) / 2;
 		ra->serial_cnt = 1;
 	}
-	preoffset = ra->prev_page;
 	ra->prev_page = offset;
 
 	if (offset >= ra->start && offset <= (ra->start + ra->size)) {
@@ -459,18 +462,17 @@ do_io:
 		 * ahead window and get some I/O underway for the new
 		 * current window.
 		 */
-		if (!first_access && preoffset >= ra->start &&
-				preoffset < (ra->start + ra->size)) {
-			 /* Heuristic:  If 'n' pages were
-			  * accessed in the current window, there
-			  * is a high probability that around 'n' pages
-			  * shall be used in the next current window.
-			  *
-			  * To minimize lazy-readahead triggered
-			  * in the next current window, read in
-			  * an extra page.
+		if (!first_access) {
+			 /* Heuristic: there is a high probability
+			  * that around  ra->average number of
+			  * pages shall be accessed in the next
+			  * current window.
 			  */
-			ra->next_size = preoffset - ra->start + 2;
+			average = ra->average;
+			if (ra->serial_cnt > average)
+				average = (ra->serial_cnt + ra->average + 1) / 2;
+
+			ra->next_size = min(average , (unsigned long)max);
 		}
 		ra->start = offset;
 		ra->size = ra->next_size;
@@ -494,21 +496,19 @@ do_io:
 		 */
 		if (ra->ahead_start == 0) {
 			/*
-			 * if the average io-size is less than maximum
+			 * If the average io-size is more than maximum
 			 * readahead size of the file the io pattern is
 			 * sequential. Hence  bring in the readahead window
 			 * immediately.
-			 * Else the i/o pattern is random. Bring
-			 * in the readahead window only if the last page of
-			 * the current window is accessed (lazy readahead).
+			 * If the average io-size is less than maximum
+			 * readahead size of the file the io pattern is
+			 * random. Hence don't bother to readahead.
 			 */
-			unsigned long average = ra->average;
-
+			average = ra->average;
 			if (ra->serial_cnt > average)
-				average = (ra->serial_cnt + ra->average) / 2;
+				average = (ra->serial_cnt + ra->average + 1) / 2;
 
-			if ((average >= max) || (offset == (ra->start +
-							ra->size - 1))) {
+			if (average > max) {
 				ra->ahead_start = ra->start + ra->size;
 				ra->ahead_size = ra->next_size;
 				actual = do_page_cache_readahead(mapping, filp,
@@ -554,6 +554,7 @@ void handle_ra_miss(struct address_space *mapping,
 				ra->size = max;
 				ra->ahead_start = 0;
 				ra->ahead_size = 0;
+				ra->average = max / 2;
 			}
 		}
 		ra->prev_page = offset;

@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.137.2.9 $
+ * $Revision: 1.147 $
  */
 
 #include <linux/config.h>
@@ -76,7 +76,7 @@ dasd_alloc_device(void)
 		return ERR_PTR(-ENOMEM);
 	memset(device, 0, sizeof (struct dasd_device));
 	/* open_count = 0 means device online but not in use */
-	atomic_set(&device->open_count, -1); 
+	atomic_set(&device->open_count, -1);
 
 	/* Get two pages for normal block device operations. */
 	device->ccw_mem = (void *) __get_free_pages(GFP_ATOMIC | GFP_DMA, 1);
@@ -918,7 +918,7 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 	DBF_EVENT(DBF_ERR, "Interrupt: bus_id %s CS/DS %04x ip %08x",
 		  cdev->dev.bus_id, ((irb->scsw.cstat<<8)|irb->scsw.dstat),
 		  (unsigned int) intparm);
-	
+
 	/* first of all check for state change pending interrupt */
 	mask = DEV_STAT_ATTENTION | DEV_STAT_DEV_END | DEV_STAT_UNIT_EXCEP;
 	if ((irb->scsw.dstat & mask) == mask) {
@@ -949,12 +949,12 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 	}
 
 	/* Check for clear pending */
-	if (cqr->status == DASD_CQR_CLEAR && 
-	    irb->scsw.fctl & SCSW_FCTL_CLEAR_FUNC) {	
+	if (cqr->status == DASD_CQR_CLEAR &&
+	    irb->scsw.fctl & SCSW_FCTL_CLEAR_FUNC) {
 		cqr->status = DASD_CQR_QUEUED;
 		dasd_clear_timer(device);
 		dasd_schedule_bh(device);
-		return;	
+		return;
 	}
 
  	/* check status - the request might have been killed by dyn detach */
@@ -1225,7 +1225,7 @@ __dasd_start_head(struct dasd_device * device)
 		rc = device->discipline->start_IO(cqr);
 		if (rc == 0)
 			dasd_set_timer(device, cqr->expires);
-		else 
+		else
 			/* Hmpf, try again in 1/2 sec */
 			dasd_set_timer(device, 50);
 	}

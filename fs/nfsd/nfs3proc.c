@@ -24,7 +24,6 @@
 #include <linux/nfsd/cache.h>
 #include <linux/nfsd/xdr3.h>
 #include <linux/nfs3.h>
-#include <linux/nfsacl.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
@@ -437,7 +436,6 @@ nfsd3_proc_readdir(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 	resp->buflen = count;
 	resp->common.err = nfs_ok;
 	resp->buffer = argp->buffer;
-	resp->offset = NULL;
 	resp->rqstp = rqstp;
 	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t*) &argp->cookie, 
 					&resp->common, nfs3svc_encode_entry);
@@ -624,105 +622,6 @@ nfsd3_proc_commit(struct svc_rqst * rqstp, struct nfsd3_commitargs *argp,
 	RETURN_STATUS(nfserr);
 }
 
-#ifdef CONFIG_NFSD_ACL
-/*
- * Get the Access and/or Default ACL of a file.
- */
-static int
-nfsd3_proc_getacl(struct svc_rqst * rqstp, struct nfsd3_getaclargs *argp,
-					   struct nfsd3_getaclres *resp)
-{
-	svc_fh *fh;
-	struct posix_acl *acl;
-	int nfserr = 0;
-
-	fh = fh_copy(&resp->fh, &argp->fh);
-	if ((nfserr = fh_verify(rqstp, &resp->fh, 0, MAY_NOP)))
-		RETURN_STATUS(nfserr_inval);
-	
-	if (argp->mask & ~(NFS3_ACL|NFS3_ACLCNT|NFS3_DFACL|NFS3_DFACLCNT))
-		RETURN_STATUS(nfserr_inval);
-	resp->mask = argp->mask;
-
-	if (resp->mask & (NFS3_ACL|NFS3_ACLCNT)) {
-		acl = nfsd_get_posix_acl(fh, ACL_TYPE_ACCESS);
-		if (IS_ERR(acl)) {
-			int err = PTR_ERR(acl);
-
-			if (err == -ENODATA || err == -EOPNOTSUPP)
-				acl = NULL;
-			else {
-				nfserr = nfserrno(err);
-				goto fail;
-			}
-		}
-		if (acl == NULL) {
-			/* Solaris returns the inode's minimum ACL. */
-
-			struct inode *inode = fh->fh_dentry->d_inode;
-			acl = posix_acl_from_mode(inode->i_mode, GFP_KERNEL);
-		}
-		resp->acl_access = acl;
-	}
-	if (resp->mask & (NFS3_DFACL|NFS3_DFACLCNT)) {
-		/* Check how Solaris handles requests for the Default ACL
-		   of a non-directory! */
-
-		acl = nfsd_get_posix_acl(fh, ACL_TYPE_DEFAULT);
-		if (IS_ERR(acl)) {
-			int err = PTR_ERR(acl);
-
-			if (err == -ENODATA || err == -EOPNOTSUPP)
-				acl = NULL;
-			else {
-				nfserr = nfserrno(err);
-				goto fail;
-			}
-		}
-		resp->acl_default = acl;
-	}
-
-	/* resp->acl_{access,default} are released in nfs3svc_release_getacl. */
-	RETURN_STATUS(0);
-
-fail:
-	posix_acl_release(resp->acl_access);
-	posix_acl_release(resp->acl_default);
-	RETURN_STATUS(nfserr);
-}
-#endif  /* CONFIG_NFSD_ACL */
-
-#ifdef CONFIG_NFSD_ACL
-/*
- * Set the Access and/or Default ACL of a file.
- */
-static int
-nfsd3_proc_setacl(struct svc_rqst * rqstp, struct nfsd3_setaclargs *argp,
-					   struct nfsd3_attrstat *resp)
-{
-	svc_fh *fh;
-	int nfserr = 0;
-
-	fh = fh_copy(&resp->fh, &argp->fh);
-	nfserr = fh_verify(rqstp, &resp->fh, 0, MAY_NOP);
-	
-	if (!nfserr) {
-		nfserr = nfserrno( nfsd_set_posix_acl(
-			fh, ACL_TYPE_ACCESS, argp->acl_access) );
-	}
-	if (!nfserr) {
-		nfserr = nfserrno( nfsd_set_posix_acl(
-			fh, ACL_TYPE_DEFAULT, argp->acl_default) );
-	}
-
-	/* argp->acl_{access,default} may have been allocated in
-	   nfs3svc_decode_setaclargs. */
-	posix_acl_release(argp->acl_access);
-	posix_acl_release(argp->acl_default);
-	RETURN_STATUS(nfserr);
-}
-#endif  /* CONFIG_NFSD_ACL */
-
 
 /*
  * NFSv3 Server procedures.
@@ -740,7 +639,6 @@ nfsd3_proc_setacl(struct svc_rqst * rqstp, struct nfsd3_setaclargs *argp,
 #define nfsd3_attrstatres		nfsd3_attrstat
 #define nfsd3_wccstatres		nfsd3_attrstat
 #define nfsd3_createres			nfsd3_diropres
-#define nfsd3_setaclres			nfsd3_attrstat
 #define nfsd3_voidres			nfsd3_voidargs
 struct nfsd3_voidargs { int dummy; };
 
@@ -761,7 +659,6 @@ struct nfsd3_voidargs { int dummy; };
 #define AT 21		/* attributes */
 #define pAT (1+AT)	/* post attributes - conditional */
 #define WC (7+pAT)	/* WCC attributes */
-#define ACL (1+NFS3_ACL_MAX_ENTRIES*3)  /* Access Control List */
 
 static struct svc_procedure		nfsd_procedures3[22] = {
   PROC(null,	 void,		void,		void,	  RC_NOCACHE, ST),
@@ -795,19 +692,3 @@ struct svc_version	nfsd_version3 = {
 		.vs_dispatch	= nfsd_dispatch,
 		.vs_xdrsize	= NFS3_SVC_XDRSIZE,
 };
-
-#ifdef CONFIG_NFSD_ACL
-struct svc_procedure		nfsd_acl_procedures3[] = {
-  PROC(null,	void,		void,		void,	  RC_NOCACHE, ST),
-  PROC(getacl,	getacl,		getacl,		getacl,	  RC_NOCACHE, ST+1+2*(1+ACL)),
-  PROC(setacl,	setacl,		setacl,		fhandle,  RC_NOCACHE, ST+pAT),
-};
-
-struct svc_version	nfsd_acl_version3 = {
-		.vs_vers	= 3,
-		.vs_nproc	= 3,
-		.vs_proc	nfsd_acl_procedures3,
-		.vs_dispatch	= nfsd_dispatch,
-		.vs_xdrsize	= NFS3_SVC_XDRSIZE,
-};
-#endif  /* CONFIG_NFSD_ACL */

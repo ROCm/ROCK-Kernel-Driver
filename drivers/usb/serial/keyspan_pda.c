@@ -80,12 +80,7 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
+static int debug;
 
 struct ezusb_hex_record {
 	__u16 address;
@@ -226,8 +221,7 @@ static void keyspan_pda_request_unthrottle( struct usb_serial *serial )
 static void keyspan_pda_rx_interrupt (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial;
-       	struct tty_struct *tty;
+       	struct tty_struct *tty = port->tty;
 	unsigned char *data = urb->transfer_buffer;
 	int i;
 	int status;
@@ -249,22 +243,11 @@ static void keyspan_pda_rx_interrupt (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	
-	if (port_paranoia_check (port, "keyspan_pda_rx_interrupt")) {
-		return;
-	}
-
-	serial = port->serial;
-	if (serial_paranoia_check (serial, "keyspan_pda_rx_interrupt")) {
-		return;
-	}
-	
  	/* see if the message is data or a status interrupt */
 	switch (data[0]) {
 	case 0:
 		/* rest of message is rx data */
 		if (urb->actual_length) {
-			tty = serial->port[0]->tty;
 			for (i = 1; i < urb->actual_length ; ++i) {
 				tty_insert_flip_char(tty, data[i], 0);
 			}
@@ -278,7 +261,6 @@ static void keyspan_pda_rx_interrupt (struct urb *urb, struct pt_regs *regs)
 		case 1: /* modemline change */
 			break;
 		case 2: /* tx unthrottle interrupt */
-			tty = serial->port[0]->tty;
 			priv->tx_throttled = 0;
 			/* queue up a wakeup at scheduler time */
 			schedule_work(&priv->wakeup_work);
@@ -633,20 +615,10 @@ exit:
 static void keyspan_pda_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial;
 	struct keyspan_pda_private *priv;
 
 	priv = usb_get_serial_port_data(port);
 
-	if (port_paranoia_check (port, "keyspan_pda_rx_interrupt")) {
-		return;
-	}
-
-	serial = port->serial;
-	if (serial_paranoia_check (serial, "keyspan_pda_rx_interrupt")) {
-		return;
-	}
-	
 	/* queue up a wakeup at scheduler time */
 	schedule_work(&priv->wakeup_work);
 }
@@ -932,6 +904,6 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 

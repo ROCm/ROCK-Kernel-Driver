@@ -31,8 +31,8 @@
 /*
  * file operation structure for tape character frontend
  */
-static ssize_t tapechar_read(struct file *, char *, size_t, loff_t *);
-static ssize_t tapechar_write(struct file *, const char *, size_t, loff_t *);
+static ssize_t tapechar_read(struct file *, char __user *, size_t, loff_t *);
+static ssize_t tapechar_write(struct file *, const char __user *, size_t, loff_t *);
 static int tapechar_open(struct inode *,struct file *);
 static int tapechar_release(struct inode *,struct file *);
 static int tapechar_ioctl(struct inode *, struct file *, unsigned int,
@@ -136,16 +136,13 @@ tapechar_check_idalbuffer(struct tape_device *device, size_t block_size)
  * Tape device read function
  */
 ssize_t
-tapechar_read (struct file *filp, char *data, size_t count, loff_t *ppos)
+tapechar_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 {
 	struct tape_device *device;
 	struct tape_request *request;
 	size_t block_size;
 	int rc;
-	loff_t pos = *ppos;
 
-	/* XXX - driver needs proper read/write/seek locks it seems */
-	
 	DBF_EVENT(6, "TCHAR:read\n");
 	device = (struct tape_device *) filp->private_data;
 	/* Check position. */
@@ -156,7 +153,7 @@ tapechar_read (struct file *filp, char *data, size_t count, loff_t *ppos)
 		 * read work...
 		 */
 		DBF_EVENT(6, "TCHAR:ppos wrong\n");
-		return -ESPIPE;
+		return -EOVERFLOW;
 	}
 
 	/*
@@ -199,13 +196,11 @@ tapechar_read (struct file *filp, char *data, size_t count, loff_t *ppos)
 	if (rc == 0) {
 		rc = block_size - request->rescnt;
 		DBF_EVENT(6, "TCHAR:rbytes:  %x\n", rc);
-		pos += rc;
+		filp->f_pos += rc;
 		/* Copy data from idal buffer to user space. */
 		if (idal_buffer_to_user(device->char_data.idal_buf,
 					data, rc) != 0)
 			rc = -EFAULT;
-		else
-			*ppos = pos;
 	}
 	tape_free_request(request);
 	return rc;
@@ -215,7 +210,7 @@ tapechar_read (struct file *filp, char *data, size_t count, loff_t *ppos)
  * Tape device write function
  */
 ssize_t
-tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
+tapechar_write(struct file *filp, const char __user *data, size_t count, loff_t *ppos)
 {
 	struct tape_device *device;
 	struct tape_request *request;
@@ -223,9 +218,6 @@ tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
 	size_t written;
 	int nblocks;
 	int i, rc;
-	loff_t pos = *ppos;
-
-	/* XXX - driver needs proper read/write/seek locks it seems */
 
 	DBF_EVENT(6, "TCHAR:write\n");
 	device = (struct tape_device *) filp->private_data;
@@ -233,7 +225,7 @@ tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
 	if (ppos != &filp->f_pos) {
 		/* "A request was outside the capabilities of the device." */
 		DBF_EVENT(6, "TCHAR:ppos wrong\n");
-		return -ESPIPE;
+		return -EOVERFLOW;
 	}
 	/* Find out block size and number of blocks */
 	if (device->char_data.block_size != 0) {
@@ -278,7 +270,7 @@ tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
 			break;
 		DBF_EVENT(6, "TCHAR:wbytes: %lx\n",
 			  block_size - request->rescnt);
-		pos += block_size - request->rescnt;
+		filp->f_pos += block_size - request->rescnt;
 		written += block_size - request->rescnt;
 		if (request->rescnt != 0)
 			break;
@@ -305,10 +297,7 @@ tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
 	 * tapemark it doesn't hurt to write two marks again.
 	 */
 	if (!rc)
-	{
 		device->required_tapemarks = 2;
-		*ppos = pos;
-	}
 
 	return rc ? rc : written;
 }
@@ -402,7 +391,7 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 	if (no == MTIOCTOP) {
 		struct mtop op;
 
-		if (copy_from_user(&op, (char *) data, sizeof(op)) != 0)
+		if (copy_from_user(&op, (char __user *) data, sizeof(op)) != 0)
 			return -EFAULT;
 		if (op.mt_count < 0)
 			return -EINVAL;
@@ -449,7 +438,7 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 		if (rc < 0)
 			return rc;
 		pos.mt_blkno = rc;
-		if (copy_to_user((char *) data, &pos, sizeof(pos)) != 0)
+		if (copy_to_user((char __user *) data, &pos, sizeof(pos)) != 0)
 			return -EFAULT;
 		return 0;
 	}
@@ -479,7 +468,7 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 			get.mt_blkno = rc;
 		}
 
-		if (copy_to_user((char *) data, &get, sizeof(get)) != 0)
+		if (copy_to_user((char __user *) data, &get, sizeof(get)) != 0)
 			return -EFAULT;
 
 		return 0;

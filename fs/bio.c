@@ -53,7 +53,7 @@ struct biovec_pool {
  * unsigned short
  */
 
-#define BV(x) { .nr_vecs = x, .name = "biovec-" #x }
+#define BV(x) { .nr_vecs = x, .name = "biovec-"__stringify(x) }
 static struct biovec_pool bvec_array[BIOVEC_NR_POOLS] = {
 	BV(1), BV(4), BV(16), BV(64), BV(128), BV(BIO_MAX_PAGES),
 };
@@ -116,6 +116,8 @@ inline void bio_init(struct bio *bio)
 	bio->bi_idx = 0;
 	bio->bi_phys_segments = 0;
 	bio->bi_hw_segments = 0;
+	bio->bi_hw_front_size = 0;
+	bio->bi_hw_back_size = 0;
 	bio->bi_size = 0;
 	bio->bi_max_vecs = 0;
 	bio->bi_end_io = NULL;
@@ -304,14 +306,15 @@ static int __bio_add_page(request_queue_t *q, struct bio *bio, struct page
 	 * make this too complex.
 	 */
 
-	while (bio_phys_segments(q, bio) >= q->max_phys_segments
-	    || bio_hw_segments(q, bio) >= q->max_hw_segments) {
+	while (bio->bi_phys_segments >= q->max_phys_segments
+	       || bio->bi_hw_segments >= q->max_hw_segments
+	       || BIOVEC_VIRT_OVERSIZE(bio->bi_size)) {
 
 		if (retried_segments)
 			return 0;
 
-		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
 		retried_segments = 1;
+		blk_recount_segments(q, bio);
 	}
 
 	/*
@@ -340,6 +343,11 @@ static int __bio_add_page(request_queue_t *q, struct bio *bio, struct page
 			return 0;
 		}
 	}
+
+	/* If we may be able to merge these biovecs, force a recount */
+	if (bio->bi_vcnt && (BIOVEC_PHYS_MERGEABLE(bvec-1, bvec) ||
+	    BIOVEC_VIRT_MERGEABLE(bvec-1, bvec)))
+		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
 
 	bio->bi_vcnt++;
 	bio->bi_phys_segments++;
@@ -919,9 +927,7 @@ static void __init biovec_init_pools(void)
 		size = bp->nr_vecs * sizeof(struct bio_vec);
 
 		bp->slab = kmem_cache_create(bp->name, size, 0,
-						SLAB_HWCACHE_ALIGN, NULL, NULL);
-		if (!bp->slab)
-			panic("biovec: can't init slab cache\n");
+				SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
 		if (i >= scale)
 			pool_entries >>= 1;
@@ -936,16 +942,16 @@ static void __init biovec_init_pools(void)
 static int __init init_bio(void)
 {
 	bio_slab = kmem_cache_create("bio", sizeof(struct bio), 0,
-					SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!bio_slab)
-		panic("bio: can't create slab cache\n");
-	bio_pool = mempool_create(BIO_POOL_SIZE, mempool_alloc_slab, mempool_free_slab, bio_slab);
+				SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
+	bio_pool = mempool_create(BIO_POOL_SIZE, mempool_alloc_slab,
+				mempool_free_slab, bio_slab);
 	if (!bio_pool)
 		panic("bio: can't create mempool\n");
 
 	biovec_init_pools();
 
-	bio_split_pool = mempool_create(BIO_SPLIT_ENTRIES, bio_pair_alloc, bio_pair_free, NULL);
+	bio_split_pool = mempool_create(BIO_SPLIT_ENTRIES,
+				bio_pair_alloc, bio_pair_free, NULL);
 	if (!bio_split_pool)
 		panic("bio: can't create split pool\n");
 

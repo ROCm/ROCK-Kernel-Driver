@@ -26,6 +26,8 @@
 #include <net/sock.h>
 #include <linux/xattr.h>
 #include <linux/hugetlb.h>
+#include <linux/ptrace.h>
+#include <linux/file.h>
 
 static int dummy_ptrace (struct task_struct *parent, struct task_struct *child)
 {
@@ -116,7 +118,7 @@ static int dummy_vm_enough_memory(long pages)
 
 	vm_acct_memory(pages);
 
-        /*
+	/*
 	 * Sometimes we want to use more memory than we have
 	 */
 	if (sysctl_overcommit_memory == 1)
@@ -169,9 +171,19 @@ static void dummy_bprm_free_security (struct linux_binprm *bprm)
 	return;
 }
 
-static void dummy_bprm_compute_creds (struct linux_binprm *bprm)
+static void dummy_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 {
-	return;
+	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
+		current->mm->dumpable = 0;
+
+		if ((unsafe & ~LSM_UNSAFE_PTRACE_CAP) && !capable(CAP_SETUID)) {
+			bprm->e_uid = current->uid;
+			bprm->e_gid = current->gid;
+		}
+	}
+
+	current->suid = current->euid = current->fsuid = bprm->e_uid;
+	current->sgid = current->egid = current->fsgid = bprm->e_gid;
 }
 
 static int dummy_bprm_set_security (struct linux_binprm *bprm)
@@ -676,7 +688,7 @@ static int dummy_shm_shmctl (struct shmid_kernel *shp, int cmd)
 	return 0;
 }
 
-static int dummy_shm_shmat (struct shmid_kernel *shp, char *shmaddr,
+static int dummy_shm_shmat (struct shmid_kernel *shp, char __user *shmaddr,
 			    int shmflg)
 {
 	return 0;
@@ -708,7 +720,7 @@ static int dummy_sem_semop (struct sem_array *sma,
 	return 0;
 }
 
-static int dummy_netlink_send (struct sk_buff *skb)
+static int dummy_netlink_send (struct sock *sk, struct sk_buff *skb)
 {
 	if (current->euid == 0)
 		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
@@ -738,13 +750,14 @@ static int dummy_unix_may_send (struct socket *sock,
 	return 0;
 }
 
-static int dummy_socket_create (int family, int type, int protocol)
+static int dummy_socket_create (int family, int type,
+				int protocol, int kern)
 {
 	return 0;
 }
 
 static void dummy_socket_post_create (struct socket *sock, int family, int type,
-				      int protocol)
+				      int protocol, int kern)
 {
 	return;
 }
@@ -860,6 +873,9 @@ static int dummy_setprocattr(struct task_struct *p, char *name, void *value, siz
 	return -EINVAL;
 }
 
+
+struct security_operations dummy_security_ops;
+
 #define set_to_dummy_if_null(ops, function)				\
 	do {								\
 		if (!ops->function) {					\
@@ -884,7 +900,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, vm_enough_memory);
 	set_to_dummy_if_null(ops, bprm_alloc_security);
 	set_to_dummy_if_null(ops, bprm_free_security);
-	set_to_dummy_if_null(ops, bprm_compute_creds);
+	set_to_dummy_if_null(ops, bprm_apply_creds);
 	set_to_dummy_if_null(ops, bprm_set_security);
 	set_to_dummy_if_null(ops, bprm_check_security);
 	set_to_dummy_if_null(ops, bprm_secureexec);

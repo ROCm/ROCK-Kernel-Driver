@@ -8,17 +8,21 @@
 #define	MEM_END	0x00800000	/* Memory size 8Mb */
 #endif
 
+#undef CRT_DEBUG
+
+.macro	PUTC CHAR
+#ifdef CRT_DEBUG
+	moveq	#\CHAR, %d7
+	jsr	putc
+#endif
+.endm
+
 	.global	_start
 	.global _rambase
 	.global _ramvec
 	.global	_ramstart
 	.global	_ramend
 	
-.macro	PUTC CHAR
-	moveq	#\CHAR, %d7
-	jsr	putc
-.endm
-
 	.data
 
 /*
@@ -120,6 +124,7 @@ _start:
  * Local functions
  */
  
+#ifdef CRT_DEBUG
 putc:
 	moveb	%d7, 0xfffff907
 1:
@@ -127,3 +132,4 @@ putc:
 	andw	#0x2000, %d7
 	beq	1b
 	rts
+#endif

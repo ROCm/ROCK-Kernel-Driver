@@ -123,7 +123,7 @@
 	 * check the 1250 interrupt registers to figure out what to do
 	 * Need to detect which CPU we're on, now that smp_affinity is supported.
 	 */
-	la	v0, KSEG1 + A_IMR_CPU0_BASE
+	PTR_LA	v0, KSEG1 + A_IMR_CPU0_BASE
 #ifdef CONFIG_SMP
 	lw	t1, TI_CPU($28)
 	sll	t1, IMR_REGISTER_SPACING_SHIFT

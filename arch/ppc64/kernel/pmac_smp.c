@@ -120,7 +120,7 @@ static void __init smp_core99_kick_cpu(int nr)
 
 	/* Put some life in our friend */
 	pmac_call_feature(PMAC_FTR_RESET_CPU, NULL, nr, 0);
-	paca[nr].xProcStart = 1;
+	paca[nr].cpu_start = 1;
 
 	/* FIXME: We wait a bit for the CPU to take the exception, I should
 	 * instead wait for the entry code to set something for me. Well,

@@ -42,6 +42,16 @@ static void blk_unplug_timeout(unsigned long data);
  */
 static kmem_cache_t *request_cachep;
 
+/*
+ * For queue allocation
+ */
+static kmem_cache_t *requestq_cachep;
+
+/*
+ * For io context allocations
+ */
+static kmem_cache_t *iocontext_cachep;
+
 static wait_queue_head_t congestion_wqh[2] = {
 		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[0]),
 		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[1])
@@ -51,8 +61,6 @@ static wait_queue_head_t congestion_wqh[2] = {
  * Controlling structure to kblockd
  */
 static struct workqueue_struct *kblockd_workqueue; 
-
-int dev_check_rdonly(dev_t dev);
 
 unsigned long blk_max_low_pfn, blk_max_pfn;
 
@@ -72,14 +80,7 @@ EXPORT_SYMBOL(blk_max_pfn);
  */
 static inline int queue_congestion_on_threshold(struct request_queue *q)
 {
-	int ret;
-
-	ret = q->nr_requests - (q->nr_requests / 8) + 1;
-
-	if (ret > q->nr_requests)
-		ret = q->nr_requests;
-
-	return ret;
+	return q->nr_congestion_on;
 }
 
 /*
@@ -87,14 +88,22 @@ static inline int queue_congestion_on_threshold(struct request_queue *q)
  */
 static inline int queue_congestion_off_threshold(struct request_queue *q)
 {
-	int ret;
+	return q->nr_congestion_off;
+}
 
-	ret = q->nr_requests - (q->nr_requests / 8) - 1;
+static void blk_queue_congestion_threshold(struct request_queue *q)
+{
+	int nr;
 
-	if (ret < 1)
-		ret = 1;
+	nr = q->nr_requests - (q->nr_requests / 8) + 1;
+	if (nr > q->nr_requests)
+		nr = q->nr_requests;
+	q->nr_congestion_on = nr;
 
-	return ret;
+	nr = q->nr_requests - (q->nr_requests / 8) - 1;
+	if (nr < 1)
+		nr = 1;
+	q->nr_congestion_off = nr;
 }
 
 /*
@@ -144,8 +153,6 @@ struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 		ret = &q->backing_dev_info;
 	return ret;
 }
-
-EXPORT_SYMBOL(blk_get_backing_dev_info);
 
 void blk_queue_activity_fn(request_queue_t *q, activity_fn *fn, void *data)
 {
@@ -233,6 +240,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);
+	blk_queue_congestion_threshold(q);
 
 	q->unplug_thresh = 4;		/* hmm */
 	q->unplug_delay = (3 * HZ) / 1000;	/* 3 milliseconds */
@@ -255,45 +263,6 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 EXPORT_SYMBOL(blk_queue_make_request);
 
 /**
- * blk_queue_ordered - does this queue support ordered writes
- * @q:     the request queue
- * @flag:  see below
- *
- * Description:
- *   For journalled file systems, doing ordered writes on a commit
- *   block instead of explicitly doing wait_on_buffer (which is bad
- *   for performance) can be a big win. Block drivers supporting this
- *   feature should call this function and indicate so.
- *
- **/
-void blk_queue_ordered(request_queue_t *q, int flag)
-{
-	if (flag)
-		set_bit(QUEUE_FLAG_ORDERED, &q->queue_flags);
-	else
-		clear_bit(QUEUE_FLAG_ORDERED, &q->queue_flags);
-}
-
-EXPORT_SYMBOL(blk_queue_ordered);
-
-/**
- * blk_queue_ordered - set function for issuing a flush
- * @q:     the request queue
- * @iff:   the function to be called issuing the flush
- *
- * Description:
- *   If a driver supports issuing a flush command, the support is notified
- *   to the block layer by defining it through this call.
- *
- **/
-void blk_queue_issue_flush_fn(request_queue_t *q, issue_flush_fn *iff)
-{
-	q->issue_flush_fn = iff;
-}
-
-EXPORT_SYMBOL(blk_queue_issue_flush_fn);
-
-/**
  * blk_queue_bounce_limit - set bounce buffer limit for queue
  * @q:  the request queue for the device
  * @dma_addr:   bus address limit
@@ -308,8 +277,6 @@ EXPORT_SYMBOL(blk_queue_issue_flush_fn);
 void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
 {
 	unsigned long bounce_pfn = dma_addr >> PAGE_SHIFT;
-	unsigned long mb = dma_addr >> 20;
-	static request_queue_t *last_q;
 
 	/*
 	 * set appropriate bounce gfp mask -- unfortunately we don't have a
@@ -323,19 +290,7 @@ void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
 	} else
 		q->bounce_gfp = GFP_NOIO;
 
-	/*
-	 * keep this for debugging for now...
-	 */
-	if (dma_addr != BLK_BOUNCE_HIGH && q != last_q) {
-		printk("blk: queue %p, ", q);
-		if (dma_addr == BLK_BOUNCE_ANY)
-			printk("no I/O memory limit\n");
-		else
-			printk("I/O limit %luMb (mask 0x%Lx)\n", mb, (long long) dma_addr);
-	}
-
 	q->bounce_pfn = bounce_pfn;
-	last_q = q;
 }
 
 EXPORT_SYMBOL(blk_queue_bounce_limit);
@@ -862,14 +817,14 @@ EXPORT_SYMBOL(blk_dump_rq_flags);
 void blk_recount_segments(request_queue_t *q, struct bio *bio)
 {
 	struct bio_vec *bv, *bvprv = NULL;
-	int i, nr_phys_segs, nr_hw_segs, seg_size, cluster;
+	int i, nr_phys_segs, nr_hw_segs, seg_size, hw_seg_size, cluster;
 	int high, highprv = 1;
 
 	if (unlikely(!bio->bi_io_vec))
 		return;
 
 	cluster = q->queue_flags & (1 << QUEUE_FLAG_CLUSTER);
-	seg_size = nr_phys_segs = nr_hw_segs = 0;
+	hw_seg_size = seg_size = nr_phys_segs = nr_hw_segs = 0;
 	bio_for_each_segment(bv, bio, i) {
 		/*
 		 * the trick here is making sure that a high page is never
@@ -886,22 +841,35 @@ void blk_recount_segments(request_queue_t *q, struct bio *bio)
 				goto new_segment;
 			if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bv))
 				goto new_segment;
+			if (BIOVEC_VIRT_OVERSIZE(hw_seg_size + bv->bv_len))
+				goto new_hw_segment;
 
 			seg_size += bv->bv_len;
+			hw_seg_size += bv->bv_len;
 			bvprv = bv;
 			continue;
 		}
 new_segment:
-		if (!BIOVEC_VIRT_MERGEABLE(bvprv, bv))
+		if (BIOVEC_VIRT_MERGEABLE(bvprv, bv) &&
+		    !BIOVEC_VIRT_OVERSIZE(hw_seg_size + bv->bv_len)) {
+			hw_seg_size += bv->bv_len;
+		} else {
 new_hw_segment:
+			if (hw_seg_size > bio->bi_hw_front_size)
+				bio->bi_hw_front_size = hw_seg_size;
+			hw_seg_size = BIOVEC_VIRT_START_SIZE(bv) + bv->bv_len;
 			nr_hw_segs++;
+		}
 
 		nr_phys_segs++;
 		bvprv = bv;
 		seg_size = bv->bv_len;
 		highprv = high;
 	}
-
+	if (hw_seg_size > bio->bi_hw_back_size)
+		bio->bi_hw_back_size = hw_seg_size;
+	if (nr_hw_segs == 1 && hw_seg_size > bio->bi_hw_front_size)
+		bio->bi_hw_front_size = hw_seg_size;
 	bio->bi_phys_segments = nr_phys_segs;
 	bio->bi_hw_segments = nr_hw_segs;
 	bio->bi_flags |= (1 << BIO_SEG_VALID);
@@ -934,22 +902,17 @@ EXPORT_SYMBOL(blk_phys_contig_segment);
 int blk_hw_contig_segment(request_queue_t *q, struct bio *bio,
 				 struct bio *nxt)
 {
-	if (!(q->queue_flags & (1 << QUEUE_FLAG_CLUSTER)))
-		return 0;
-
-	if (!BIOVEC_VIRT_MERGEABLE(__BVEC_END(bio), __BVEC_START(nxt)))
+	if (unlikely(!bio_flagged(bio, BIO_SEG_VALID)))
+		blk_recount_segments(q, bio);
+	if (unlikely(!bio_flagged(nxt, BIO_SEG_VALID)))
+		blk_recount_segments(q, nxt);
+	if (!BIOVEC_VIRT_MERGEABLE(__BVEC_END(bio), __BVEC_START(nxt)) ||
+	    BIOVEC_VIRT_OVERSIZE(bio->bi_hw_front_size + bio->bi_hw_back_size))
 		return 0;
 	if (bio->bi_size + nxt->bi_size > q->max_segment_size)
 		return 0;
 
-	/*
-	 * bio and nxt are contigous in memory, check if the queue allows
-	 * these two to be merged into one
-	 */
-	if (BIO_SEG_BOUNDARY(q, bio, nxt))
-		return 1;
-
-	return 0;
+	return 1;
 }
 
 EXPORT_SYMBOL(blk_hw_contig_segment);
@@ -1019,7 +982,8 @@ static inline int ll_new_mergeable(request_queue_t *q,
 
 	if (req->nr_phys_segments + nr_phys_segs > q->max_phys_segments) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
 
@@ -1041,7 +1005,8 @@ static inline int ll_new_hw_segment(request_queue_t *q,
 	if (req->nr_hw_segments + nr_hw_segs > q->max_hw_segments
 	    || req->nr_phys_segments + nr_phys_segs > q->max_phys_segments) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
 
@@ -1057,14 +1022,31 @@ static inline int ll_new_hw_segment(request_queue_t *q,
 static int ll_back_merge_fn(request_queue_t *q, struct request *req, 
 			    struct bio *bio)
 {
+	int len;
+
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
+	if (unlikely(!bio_flagged(req->biotail, BIO_SEG_VALID)))
+		blk_recount_segments(q, req->biotail);
+	if (unlikely(!bio_flagged(bio, BIO_SEG_VALID)))
+		blk_recount_segments(q, bio);
+	len = req->biotail->bi_hw_back_size + bio->bi_hw_front_size;
+	if (BIOVEC_VIRT_MERGEABLE(__BVEC_END(req->biotail), __BVEC_START(bio)) &&
+	    !BIOVEC_VIRT_OVERSIZE(len)) {
+		int mergeable =  ll_new_mergeable(q, req, bio);
 
-	if (BIOVEC_VIRT_MERGEABLE(__BVEC_END(req->biotail), __BVEC_START(bio)))
-		return ll_new_mergeable(q, req, bio);
+		if (mergeable) {
+			if (req->nr_hw_segments == 1)
+				req->bio->bi_hw_front_size = len;
+			if (bio->bi_hw_segments == 1)
+				bio->bi_hw_back_size = len;
+		}
+		return mergeable;
+	}
 
 	return ll_new_hw_segment(q, req, bio);
 }
@@ -1072,14 +1054,31 @@ static int ll_back_merge_fn(request_queue_t *q, struct request *req,
 static int ll_front_merge_fn(request_queue_t *q, struct request *req, 
 			     struct bio *bio)
 {
+	int len;
+
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
+	len = bio->bi_hw_back_size + req->bio->bi_hw_front_size;
+	if (unlikely(!bio_flagged(bio, BIO_SEG_VALID)))
+		blk_recount_segments(q, bio);
+	if (unlikely(!bio_flagged(req->bio, BIO_SEG_VALID)))
+		blk_recount_segments(q, req->bio);
+	if (BIOVEC_VIRT_MERGEABLE(__BVEC_END(bio), __BVEC_START(req->bio)) &&
+	    !BIOVEC_VIRT_OVERSIZE(len)) {
+		int mergeable =  ll_new_mergeable(q, req, bio);
 
-	if (BIOVEC_VIRT_MERGEABLE(__BVEC_END(bio), __BVEC_START(req->bio)))
-		return ll_new_mergeable(q, req, bio);
+		if (mergeable) {
+			if (bio->bi_hw_segments == 1)
+				bio->bi_hw_front_size = len;
+			if (req->nr_hw_segments == 1)
+				req->biotail->bi_hw_back_size = len;
+		}
+		return mergeable;
+	}
 
 	return ll_new_hw_segment(q, req, bio);
 }
@@ -1111,8 +1110,17 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 		return 0;
 
 	total_hw_segments = req->nr_hw_segments + next->nr_hw_segments;
-	if (blk_hw_contig_segment(q, req->biotail, next->bio))
+	if (blk_hw_contig_segment(q, req->biotail, next->bio)) {
+		int len = req->biotail->bi_hw_back_size + next->bio->bi_hw_front_size;
+		/*
+		 * propagate the combined length to the end of the requests
+		 */
+		if (req->nr_hw_segments == 1)
+			req->bio->bi_hw_front_size = len;
+		if (next->nr_hw_segments == 1)
+			next->biotail->bi_hw_back_size = len;
 		total_hw_segments--;
+	}
 
 	if (total_hw_segments > q->max_hw_segments)
 		return 0;
@@ -1168,7 +1176,7 @@ EXPORT_SYMBOL(blk_remove_plug);
 /*
  * remove the plug and let it rip..
  */
-static inline void __generic_unplug_device(request_queue_t *q)
+void __generic_unplug_device(request_queue_t *q)
 {
 	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
@@ -1182,10 +1190,11 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	if (elv_next_request(q))
 		q->request_fn(q);
 }
+EXPORT_SYMBOL(__generic_unplug_device);
 
 /**
  * generic_unplug_device - fire a request queue
- * @data:    The &request_queue_t in question
+ * @q:    The &request_queue_t in question
  *
  * Description:
  *   Linux uses plugging to build bigger requests queues before letting
@@ -1200,11 +1209,10 @@ void generic_unplug_device(request_queue_t *q)
 	__generic_unplug_device(q);
 	spin_unlock_irq(q->queue_lock);
 }
-
 EXPORT_SYMBOL(generic_unplug_device);
 
-static inline void blk_backing_dev_unplug(struct backing_dev_info *bdi,
-					  struct page * page)
+static void blk_backing_dev_unplug(struct backing_dev_info *bdi,
+				   struct page *page)
 {
 	request_queue_t *q = bdi->unplug_io_data;
 
@@ -1214,8 +1222,6 @@ static inline void blk_backing_dev_unplug(struct backing_dev_info *bdi,
 	if (q->unplug_fn)
 		q->unplug_fn(q);
 }
-
-EXPORT_SYMBOL(blk_backing_dev_unplug);
 
 static void blk_unplug_work(void *data)
 {
@@ -1330,7 +1336,7 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (blk_queue_tagged(q))
 		blk_queue_free_tags(q);
 
-	kfree(q);
+	kmem_cache_free(requestq_cachep, q);
 }
 
 EXPORT_SYMBOL(blk_cleanup_queue);
@@ -1394,7 +1400,7 @@ __setup("elevator=", elevator_setup);
 
 request_queue_t *blk_alloc_queue(int gfp_mask)
 {
-	request_queue_t *q = kmalloc(sizeof(*q), gfp_mask);
+	request_queue_t *q = kmem_cache_alloc(requestq_cachep, gfp_mask);
 
 	if (!q)
 		return NULL;
@@ -1483,7 +1489,7 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 out_elv:
 	blk_cleanup_queue(q);
 out_init:
-	kfree(q);
+	kmem_cache_free(requestq_cachep, q);
 	return NULL;
 }
 
@@ -1848,7 +1854,7 @@ struct request *blk_rq_map_user(request_queue_t *q, int rw, void __user *ubuf,
 		rq->data_len = len;
 		return rq;
 	}
-	
+
 	/*
 	 * bio is the err-ptr
 	 */
@@ -1929,74 +1935,6 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 }
 
 EXPORT_SYMBOL(blk_execute_rq);
-
-/**
- * blk_issue_flush - queue a flush
- * @bdev:	blockdev to issue flush for
- * @error_sector:	error sector
- * @wait:	completion event
- *
- * Description:
- *    Issue a flush for the block device in question. Caller can supply
- *    room for storing the error offset in case of a flush error, if they
- *    wish to. Passing in @wait makes the interface async, caller must
- *    wait_for_completion() on its own.
- */
-int blkdev_issue_flush(struct block_device *bdev, sector_t *error_sector)
-{
-	request_queue_t *q;
-
-	if (bdev->bd_disk == NULL)
-		return -ENXIO;
-
-	q = bdev_get_queue(bdev);
-	if (!q)
-		return -ENXIO;
-	if (!q->issue_flush_fn)
-		return -EOPNOTSUPP;
-
-	return q->issue_flush_fn(q, bdev->bd_disk, error_sector);
-}
-
-EXPORT_SYMBOL(blkdev_issue_flush);
-
-/**
- * blkdev_scsi_issue_flush_fn - issue flush for SCSI devices
- * @q:		device queue
- * @disk:	gendisk
- * @error_sector:	error offset
- *
- * Description:
- *    Devices understanding the SCSI command set, can use this function as
- *    a helper for issuing a cache flush. Note: driver is required to store
- *    the error offset (in case of error flushing) in ->sector of struct
- *    request.
- */
-int blkdev_scsi_issue_flush_fn(request_queue_t *q, struct gendisk *disk,
-			       sector_t *error_sector)
-{
-	struct request *rq = blk_get_request(q, WRITE, __GFP_WAIT);
-	int ret;
-
-	rq->flags |= REQ_BLOCK_PC | REQ_SOFTBARRIER;
-	rq->sector = 0;
-	memset(rq->cmd, 0, sizeof(rq->cmd));
-	rq->cmd[0] = 0x35;
-	rq->cmd_len = 12;
-	rq->data = NULL;
-	rq->data_len = 0;
-	rq->timeout = 60 * HZ;
-
-	ret = blk_execute_rq(q, disk, rq);
-
-	if (ret && error_sector)
-		*error_sector = rq->sector;
-
-	blk_put_request(rq);
-	return ret;
-}
-
-EXPORT_SYMBOL(blkdev_scsi_issue_flush_fn);
 
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
@@ -2251,7 +2189,7 @@ EXPORT_SYMBOL(__blk_attempt_remerge);
 static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
-	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, err;
+	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, ra;
 	sector_t sector;
 
 	sector = bio->bi_sector;
@@ -2269,11 +2207,9 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	spin_lock_prefetch(q->queue_lock);
 
-	barrier = bio_barrier(bio);
-	if (barrier && !(q->queue_flags & (1 << QUEUE_FLAG_ORDERED))) {
-		err = -EOPNOTSUPP;
-		goto end_io;
-	}
+	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
+
+	ra = bio->bi_rw & (1 << BIO_RW_AHEAD);
 
 again:
 	spin_lock_irq(q->queue_lock);
@@ -2353,8 +2289,7 @@ get_rq:
 			/*
 			 * READA bit set
 			 */
-			err = -EWOULDBLOCK;
-			if (bio_rw_ahead(bio))
+			if (ra)
 				goto end_io;
 	
 			freereq = get_request_wait(q, rw);
@@ -2365,9 +2300,10 @@ get_rq:
 	req->flags |= REQ_CMD;
 
 	/*
-	 * inherit FAILFAST from bio (for read-ahead, and explicit FAILFAST)
+	 * inherit FAILFAST from bio and don't stack up
+	 * retries for read ahead
 	 */
-	if (bio_rw_ahead(bio) || bio_failfast(bio))
+	if (ra || test_bit(BIO_RW_FAILFAST, &bio->bi_rw))	
 		req->flags |= REQ_FAILFAST;
 
 	/*
@@ -2394,18 +2330,14 @@ get_rq:
 out:
 	if (freereq)
 		__blk_put_request(q, freereq);
+	if (bio_sync(bio))
+		__generic_unplug_device(q);
 
-	if (blk_queue_plugged(q)) {
-		int nrq = q->rq.count[READ] + q->rq.count[WRITE] - q->in_flight;
-
-		if (nrq == q->unplug_thresh || bio_sync(bio))
-			__generic_unplug_device(q);
-	}
 	spin_unlock_irq(q->queue_lock);
 	return 0;
 
 end_io:
-	bio_endio(bio, nr_sectors << 9, err);
+	bio_endio(bio, nr_sectors << 9, -EWOULDBLOCK);
 	return 0;
 }
 
@@ -2522,13 +2454,6 @@ end_io:
 		if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))
 			goto end_io;
 
-		/* this is cfs's dev_rdonly check */
-		if (bio->bi_rw == WRITE &&
-				dev_check_rdonly(bio->bi_bdev->bd_dev)) {
-			bio_endio(bio, bio->bi_size, 0);
-			break;
-		}
-
 		/*
 		 * If this device has partitions, remap block n
 		 * of partition p to block n+start(p) of the disk.
@@ -2551,7 +2476,7 @@ EXPORT_SYMBOL(generic_make_request);
  * interfaces, @bio must be presetup and ready for I/O.
  *
  */
-int submit_bio(int rw, struct bio *bio)
+void submit_bio(int rw, struct bio *bio)
 {
 	int count = bio_sectors(bio);
 
@@ -2565,14 +2490,14 @@ int submit_bio(int rw, struct bio *bio)
 
 	if (unlikely(block_dump)) {
 		char b[BDEVNAME_SIZE];
-		printk("%s(%d): %s block %Lu on %s\n",
+		printk(KERN_DEBUG "%s(%d): %s block %Lu on %s\n",
 			current->comm, current->pid,
 			(rw & WRITE) ? "WRITE" : "READ",
-			(unsigned long long)bio->bi_sector, bdevname(bio->bi_bdev,b));
+			(unsigned long long)bio->bi_sector,
+			bdevname(bio->bi_bdev,b));
 	}
 
 	generic_make_request(bio);
-	return 1;
 }
 
 EXPORT_SYMBOL(submit_bio);
@@ -2656,7 +2581,7 @@ EXPORT_SYMBOL(process_that_request_first);
 
 void blk_recalc_rq_segments(struct request *rq)
 {
-	struct bio *bio;
+	struct bio *bio, *prevbio = NULL;
 	int nr_phys_segs, nr_hw_segs;
 
 	if (!rq->bio)
@@ -2669,6 +2594,13 @@ void blk_recalc_rq_segments(struct request *rq)
 
 		nr_phys_segs += bio_phys_segments(rq->q, bio);
 		nr_hw_segs += bio_hw_segments(rq->q, bio);
+		if (prevbio) {
+			if (blk_phys_contig_segment(rq->q, prevbio, bio))
+				nr_phys_segs--;
+			if (blk_hw_contig_segment(rq->q, prevbio, bio))
+				nr_hw_segs--;
+		}
+		prevbio = bio;
 	}
 
 	rq->nr_phys_segments = nr_phys_segs;
@@ -2712,15 +2644,8 @@ void blk_recalc_rq_sectors(struct request *rq, int nsect)
 static int __end_that_request_first(struct request *req, int uptodate,
 				    int nr_bytes)
 {
-	int total_bytes, bio_nbytes, error, next_idx = 0;
+	int total_bytes, bio_nbytes, error = 0, next_idx = 0;
 	struct bio *bio;
-
-	/*
-	 * extend uptodate bool to allow < 0 value to be direct io error
-	 */
-	error = 0;
-	if (end_io_error(uptodate))
-		error = !uptodate ? -EIO : uptodate;
 
 	/*
 	 * for a REQ_BLOCK_PC request, we want to carry any eventual
@@ -2730,6 +2655,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 		req->errors = 0;
 
 	if (!uptodate) {
+		error = -EIO;
 		if (blk_fs_request(req) && !(req->flags & REQ_QUIET))
 			printk("end_request: I/O error, dev %s, sector %llu\n",
 				req->rq_disk ? req->rq_disk->disk_name : "?",
@@ -2737,7 +2663,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 	}
 
 	total_bytes = bio_nbytes = 0;
-	while ((bio = req->bio)) {
+	while ((bio = req->bio) != NULL) {
 		int nbytes;
 
 		if (nr_bytes >= bio->bi_size) {
@@ -2812,7 +2738,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 /**
  * end_that_request_first - end I/O on a request
  * @req:      the request being processed
- * @uptodate: 1 for success, 0 for I/O error, < 0 for specific error
+ * @uptodate: 0 for I/O error
  * @nr_sectors: number of sectors to end I/O on
  *
  * Description:
@@ -2833,7 +2759,7 @@ EXPORT_SYMBOL(end_that_request_first);
 /**
  * end_that_request_chunk - end I/O on a request
  * @req:      the request being processed
- * @uptodate: 1 for success, 0 for I/O error, < 0 for specific error
+ * @uptodate: 0 for I/O error
  * @nr_bytes: number of bytes to complete
  *
  * Description:
@@ -2860,26 +2786,17 @@ void end_that_request_last(struct request *req)
 	struct gendisk *disk = req->rq_disk;
 	struct completion *waiting = req->waiting;
 
+	if (unlikely(laptop_mode) && blk_fs_request(req))
+		laptop_io_completion();
+
 	if (disk && blk_fs_request(req)) {
 		unsigned long duration = jiffies - req->start_time;
 		switch (rq_data_dir(req)) {
 		    case WRITE:
-			/*
-			 * schedule the writeout of pending dirty data when the disk is idle.
-			 * (Writeback is not postponed by writes, only by reads.)
-			 */
-			if (unlikely(laptop_mode))
-				disk_is_spun_up(0);
 			disk_stat_inc(disk, writes);
 			disk_stat_add(disk, write_ticks, duration);
 			break;
 		    case READ:
-			/*
-			 * schedule the writeout of pending dirty data when the disk is idle.
-			 * (postpone writeback until system is quiescent again.)
-			 */
-			if (unlikely(laptop_mode))
-				disk_is_spun_up(1);
 			disk_stat_inc(disk, reads);
 			disk_stat_add(disk, read_ticks, duration);
 			break;
@@ -2948,8 +2865,6 @@ int kblockd_schedule_work(struct work_struct *work)
 	return queue_work(kblockd_workqueue, work);
 }
 
-EXPORT_SYMBOL(kblockd_schedule_work);
-
 void kblockd_flush(void)
 {
 	flush_workqueue(kblockd_workqueue);
@@ -2962,9 +2877,13 @@ int __init blk_dev_init(void)
 		panic("Failed to create kblockd\n");
 
 	request_cachep = kmem_cache_create("blkdev_requests",
-			sizeof(struct request), 0, 0, NULL, NULL);
-	if (!request_cachep)
-		panic("Can't create request pool slab cache\n");
+			sizeof(struct request), 0, SLAB_PANIC, NULL, NULL);
+
+	requestq_cachep = kmem_cache_create("blkdev_queue",
+			sizeof(request_queue_t), 0, SLAB_PANIC, NULL, NULL);
+
+	iocontext_cachep = kmem_cache_create("blkdev_ioc",
+			sizeof(struct io_context), 0, SLAB_PANIC, NULL, NULL);
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
@@ -2984,7 +2903,7 @@ void put_io_context(struct io_context *ioc)
 	if (atomic_dec_and_test(&ioc->refcount)) {
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
-		kfree(ioc);
+		kmem_cache_free(iocontext_cachep, ioc);
 	}
 }
 
@@ -3023,7 +2942,7 @@ struct io_context *get_io_context(int gfp_flags)
 	local_irq_save(flags);
 	ret = tsk->io_context;
 	if (ret == NULL) {
-		ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
+		ret = kmem_cache_alloc(iocontext_cachep, GFP_ATOMIC);
 		if (ret) {
 			atomic_set(&ret->refcount, 1);
 			ret->pid = tsk->pid;
@@ -3060,58 +2979,6 @@ void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 	*ioc2 = temp;
 }
 
-#define MAX_RDONLY_DEVS		16
-
-static dev_t rdonly_devs[MAX_RDONLY_DEVS] = {0, };
-
-/*
- * Debug code for turning block devices "read-only" (will discard writes
- * silently).  This is for filesystem crash/recovery testing.
- */
-void dev_set_rdonly(struct block_device *bdev, int no_write)
-{
-	if (no_write >= MAX_RDONLY_DEVS) {
-		printk(KERN_ALERT "%s:%d illegal arg %d (max %d)\n",
-				__FILE__, __LINE__, no_write, MAX_RDONLY_DEVS);
-		return;
-	}
-
-	if (bdev) {
-		printk(KERN_WARNING "Turning device %s read-only at %d\n",
-				bdev->bd_disk ? bdev->bd_disk->disk_name : "?",
-				no_write);
-		rdonly_devs[no_write] = bdev->bd_dev;
-	}
-}
-
-void dev_clear_rdonly(int no_write)
-{
-	if (no_write >= MAX_RDONLY_DEVS) {
-		printk(KERN_ALERT "%s:%d illegal arg %d (max %d)\n",
-				__FILE__, __LINE__, no_write, MAX_RDONLY_DEVS);
-		return;
-	}
-
-	if (rdonly_devs[no_write] == 0)
-		return;
-	
-	printk(KERN_WARNING "Clearing read-only at %d\n", no_write);
-	rdonly_devs[no_write] = 0;
-}
-
-int dev_check_rdonly(dev_t dev)
-{
-	int i;
-
-	for (i = 0; i < MAX_RDONLY_DEVS; i++)
-		if (rdonly_devs[i] == dev)
-			return 1;
-	return 0;
-}
-
-EXPORT_SYMBOL(dev_set_rdonly);
-EXPORT_SYMBOL(dev_clear_rdonly);
-EXPORT_SYMBOL(dev_check_rdonly);
 
 /*
  * sysfs parts below
@@ -3150,6 +3017,7 @@ queue_requests_store(struct request_queue *q, const char *page, size_t count)
 	int ret = queue_var_store(&q->nr_requests, page, count);
 	if (q->nr_requests < BLKDEV_MIN_RQ)
 		q->nr_requests = BLKDEV_MIN_RQ;
+	blk_queue_congestion_threshold(q);
 
 	if (rl->count[READ] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, READ);
@@ -3294,21 +3162,3 @@ void blk_unregister_queue(struct gendisk *disk)
 		kobject_put(&disk->kobj);
 	}
 }
-
-barrier_mode_t chosen_barrier_mode = barrier_default;
-
-static int __init barrier_setup (char *str)
-{
-	if (!strcmp (str, "on"))
-		chosen_barrier_mode = barrier_on;
-	else if (!strcmp (str, "off"))
-		chosen_barrier_mode = barrier_off;
-	return 1;
-}
-__setup ("barrier=", barrier_setup);
-
-/* returns true if ide barriers are globally disabled */
-int flush_barriers_disabled(void) {
-	return chosen_barrier_mode == barrier_off;
-}
-EXPORT_SYMBOL(flush_barriers_disabled);

@@ -4,30 +4,21 @@
 #define _SPARC64_PAGE_H
 
 #include <linux/config.h>
+#include <asm/const.h>
 
 #define PAGE_SHIFT   13
-#ifndef __ASSEMBLY__
-/* I have my suspicions... -DaveM */
-#define PAGE_SIZE    (1UL << PAGE_SHIFT)
-#else
-#define PAGE_SIZE    (1 << PAGE_SHIFT)
-#endif
-
+#define PAGE_SIZE    (_AC(1,UL) << PAGE_SHIFT)
 #define PAGE_MASK    (~(PAGE_SIZE-1))
-
 
 #ifdef __KERNEL__
 
 #ifndef __ASSEMBLY__
 
-/* Sparc64 is slow at multiplication, we prefer to use some extra space. */
-#define WANT_PAGE_VIRTUAL 1
-
 extern void _clear_page(void *page);
 #define clear_page(X)	_clear_page((void *)(X))
 struct page;
 extern void clear_user_page(void *addr, unsigned long vaddr, struct page *page);
-#define copy_page(X,Y)	__memcpy((void *)(X), (void *)(Y), PAGE_SIZE)
+#define copy_page(X,Y)	memcpy((void *)(X), (void *)(Y), PAGE_SIZE)
 extern void copy_user_page(void *to, void *from, unsigned long vaddr, struct page *topage);
 
 /* GROSS, defining this makes gcc pass these types as aggregates,
@@ -99,13 +90,13 @@ typedef unsigned long iopgprot_t;
 #endif
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define HPAGE_SIZE		((1UL) << HPAGE_SHIFT)
+#define HPAGE_SIZE		(_AC(1,UL) << HPAGE_SHIFT)
 #define HPAGE_MASK		(~(HPAGE_SIZE - 1UL))
 #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
 #endif
 
 #define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_32BIT) ? \
-				 (0x0000000070000000UL) : (PAGE_OFFSET))
+				 (_AC(0x0000000070000000,UL)) : (PAGE_OFFSET))
 
 #endif /* !(__ASSEMBLY__) */
 
@@ -115,19 +106,21 @@ typedef unsigned long iopgprot_t;
 /* We used to stick this into a hard-coded global register (%g4)
  * but that does not make sense anymore.
  */
-#define PAGE_OFFSET		0xFFFFF80000000000
+#define PAGE_OFFSET		_AC(0xFFFFF80000000000,UL)
+
+#ifndef __ASSEMBLY__
 
 #define __pa(x)			((unsigned long)(x) - PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long) (x) + PAGE_OFFSET))
 
 /* PFNs are real physical page numbers.  However, mem_map only begins to record
  * per-page information starting at pfn_base.  This is to handle systems where
- * the first physical page in the machine is at some huge physical address, such
- * as 4GB.   This is common on a partitioned E10000, for example.
+ * the first physical page in the machine is at some huge physical address,
+ * such as 4GB.   This is common on a partitioned E10000, for example.
  */
+extern struct page *pfn_to_page(unsigned long pfn);
+extern unsigned long page_to_pfn(struct page *);
 
-#define pfn_to_page(pfn)	(mem_map + ((pfn)-(pfn_base)))
-#define page_to_pfn(page)	((unsigned long)(((page) - mem_map) + pfn_base))
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr)>>PAGE_SHIFT)
 
 #define pfn_valid(pfn)		(((pfn)-(pfn_base)) < max_mapnr)
@@ -135,8 +128,6 @@ typedef unsigned long iopgprot_t;
 
 #define virt_to_phys __pa
 #define phys_to_virt __va
-
-#ifndef __ASSEMBLY__
 
 /* The following structure is used to hold the physical
  * memory configuration of the machine.  This is filled in

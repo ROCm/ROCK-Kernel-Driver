@@ -2,8 +2,8 @@
 /*                                                                        */
 /* IBM eServer i/pSeries Virtual Ethernet Device Driver                   */
 /* Copyright (C) 2003 IBM Corp.                                           */
-/*  Originally written by Dave Larson (larson1@us.ibm.com)                */
-/*  Maintained by Santiago Leon (santil@us.ibm.com)                       */
+/*  Dave Larson (larson1@us.ibm.com)                                      */
+/*  Santiago Leon (santil@us.ibm.com)                                     */
 /*                                                                        */
 /*  This program is free software; you can redistribute it and/or modify  */
 /*  it under the terms of the GNU General Public License as published by  */
@@ -55,7 +55,6 @@
 #include <asm/iommu.h>
 #include <asm/vio.h>
 #include <asm/uaccess.h>
-#include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
 #include "ibmveth.h"
@@ -105,12 +104,11 @@ static struct proc_dir_entry *ibmveth_proc_dir;
 
 static const char ibmveth_driver_name[] = "ibmveth";
 static const char ibmveth_driver_string[] = "IBM i/pSeries Virtual Ethernet Driver";
-#define ibmveth_driver_version "1.02"
+static const char ibmveth_driver_version[] = "1.0";
 
-MODULE_AUTHOR("Santiago Leon <santil@us.ibm.com>");
+MODULE_AUTHOR("Dave Larson <larson1@us.ibm.com>");
 MODULE_DESCRIPTION("IBM i/pSeries Virtual Ethernet Driver");
 MODULE_LICENSE("GPL");
-MODULE_VERSION(ibmveth_driver_version);
 
 /* simple methods of getting data from the current rxq entry */
 static inline int ibmveth_rxq_pending_buffer(struct ibmveth_adapter *adapter)
@@ -220,7 +218,6 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 
 		dma_addr = vio_map_single(adapter->vdev, skb->data, pool->buff_size, DMA_FROM_DEVICE);
 
-               pool->free_map[free_index] = 0xffff;
 		pool->dma_addr[index] = dma_addr;
 		pool->skbuff[index] = skb;
 
@@ -235,7 +232,6 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 		lpar_rc = h_add_logical_lan_buffer(adapter->vdev->unit_address, desc.desc);
 		    
 		if(lpar_rc != H_Success) {
-                       pool->free_map[free_index] = index;
 			pool->skbuff[index] = NULL;
 			pool->consumer_index--;
 			vio_unmap_single(adapter->vdev, pool->dma_addr[index], pool->buff_size, DMA_FROM_DEVICE);
@@ -243,6 +239,7 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 			adapter->replenish_add_buff_failure++;
 			break;
 		} else {
+			pool->free_map[free_index] = 0xffff;
 			buffers_added++;
 			adapter->replenish_add_buff_success++;
 		}
@@ -272,6 +269,7 @@ static void ibmveth_replenish_task(struct ibmveth_adapter *adapter)
 	adapter->rx_no_buffer = *(u64*)(((char*)adapter->buffer_list_addr) + 4096 - 8);
 
 	atomic_inc(&adapter->not_replenishing);
+	ibmveth_assert(atomic_read(&adapter->not_replenishing) == 1);
 }
 
 /* kick the replenish tasklet if we need replenishing and it isn't already running */
@@ -530,7 +528,7 @@ static int ibmveth_open(struct net_device *netdev)
 		ibmveth_error_printk("unable to request irq 0x%x, rc %d\n", netdev->irq, rc);
 		do {
 			rc = h_free_logical_lan(adapter->vdev->unit_address);
-		} while (H_isLongBusy(rc) || (rc == H_Busy));
+		} while H_isLongBusy(rc);
 
 		ibmveth_cleanup(adapter);
 		return rc;
@@ -562,7 +560,7 @@ static int ibmveth_close(struct net_device *netdev)
 
 	do {
 		lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
-	} while (H_isLongBusy(lpar_rc) || (lpar_rc == H_Busy));
+	} while H_isLongBusy(lpar_rc);
 
 	if(lpar_rc != H_Success)
 	{
@@ -734,8 +732,6 @@ static int ibmveth_poll(struct net_device *netdev, int *budget)
 		if(ibmveth_rxq_pending_buffer(adapter)) {
 			struct sk_buff *skb;
 
-			rmb();
-
 			if(!ibmveth_rxq_buffer_valid(adapter)) {
 				wmb(); /* suggested by larson1 */
 				adapter->rx_invalid_buffer++;
@@ -905,7 +901,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 	adapter = netdev->priv;
 	memset(adapter, 0, sizeof(adapter));
-	dev->driver_data = netdev;
+	dev->dev.driver_data = netdev;
 
 	adapter->vdev = dev;
 	adapter->netdev = netdev;
@@ -975,7 +971,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 static int __devexit ibmveth_remove(struct vio_dev *dev)
 {
-	struct net_device *netdev = dev->driver_data;
+	struct net_device *netdev = dev->dev.driver_data;
 	struct ibmveth_adapter *adapter = netdev->priv;
 
 	unregister_netdev(netdev);

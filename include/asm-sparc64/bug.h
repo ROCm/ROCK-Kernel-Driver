@@ -3,6 +3,8 @@
 #ifndef _SPARC64_BUG_H
 #define _SPARC64_BUG_H
 
+#include <linux/compiler.h>
+
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 extern void do_BUG(const char *file, int line);
 #define BUG() do {					\

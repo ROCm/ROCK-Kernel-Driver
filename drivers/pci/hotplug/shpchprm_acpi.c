@@ -218,6 +218,10 @@ static void acpi_get__hpp ( struct acpi_bridge	*ab)
 	}
 
 	ab->_hpp = kmalloc (sizeof (struct acpi__hpp), GFP_KERNEL);
+	if (!ab->_hpp) {
+		err ("acpi_shpchprm:%s alloc for _HPP failed\n", path_name);
+		goto free_and_return;
+	}
 	memset(ab->_hpp, 0, sizeof(struct acpi__hpp));
 
 	ab->_hpp->cache_line_size	= nui[0];
@@ -1299,7 +1303,8 @@ static struct acpi_php_slot * get_acpi_slot (
 
 }
 
-void * shpchprm_get_slot(struct slot *slot)
+#if 0
+static void * shpchprm_get_slot(struct slot *slot)
 {
 	struct acpi_bridge	*ab = acpi_bridges_head;
 	struct acpi_php_slot	*aps = get_acpi_slot (ab, slot->number);
@@ -1310,6 +1315,7 @@ void * shpchprm_get_slot(struct slot *slot)
 
 	return (void *)aps;
 }
+#endif
 
 static void shpchprm_dump_func_res( struct pci_func *fun)
 {
@@ -1389,7 +1395,7 @@ static int configure_existing_function(
 
 static int bind_pci_resources_to_slots ( struct controller *ctrl)
 {
-	struct pci_func *func;
+	struct pci_func *func, new_func;
 	int busn = ctrl->bus;
 	int devn, funn;
 	u32	vid;
@@ -1404,11 +1410,19 @@ static int bind_pci_resources_to_slots ( struct controller *ctrl)
 
 			if (vid != 0xFFFFFFFF) {
 				func = shpchp_slot_find(busn, devn, funn);
-				if (!func)
-					continue;
-				configure_existing_function(ctrl, func);
+				if (!func) {
+					memset(&new_func, 0, sizeof(struct pci_func));
+					new_func.bus = busn;
+					new_func.device = devn;
+					new_func.function = funn;
+					new_func.is_a_board = 1;
+					configure_existing_function(ctrl, &new_func);
+					shpchprm_dump_func_res(&new_func);
+				} else {
+					configure_existing_function(ctrl, func);
+					shpchprm_dump_func_res(func);
+				}
 				dbg("aCCF:existing PCI 0x%x Func ResourceDump\n", ctrl->bus);
-				shpchprm_dump_func_res(func);
 			}
 		}
 	}

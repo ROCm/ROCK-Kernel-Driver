@@ -113,6 +113,8 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
+#define DRV_NAME "ns83820"
+
 /* Global parameters.  See MODULE_PARM near the bottom. */
 static int ihr = 2;
 static int reset_phy = 0;
@@ -1087,7 +1089,7 @@ again:
 
 	frag = skb_shinfo(skb)->frags;
 	if (!nr_frags)
-		frag = 0;
+		frag = NULL;
 	extsts = 0;
 	if (skb->ip_summed == CHECKSUM_HW) {
 		extsts |= EXTSTS_IPPKT;
@@ -1190,7 +1192,7 @@ static struct net_device_stats *ns83820_get_stats(struct net_device *ndev)
 	return &dev->stats;
 }
 
-static int ns83820_ethtool_ioctl (struct ns83820 *dev, void *useraddr)
+static int ns83820_ethtool_ioctl (struct ns83820 *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 
@@ -1236,7 +1238,7 @@ static int ns83820_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return ns83820_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return ns83820_ethtool_ioctl(dev, rq->ifr_data);
 
 	default:
 		return -EOPNOTSUPP;
@@ -1851,7 +1853,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 		0);
 
 	err = request_irq(pci_dev->irq, ns83820_irq, SA_SHIRQ,
-			  ndev->name, ndev);
+			  DRV_NAME, ndev);
 	if (err) {
 		printk(KERN_INFO "ns83820: unable to register irq %d\n",
 			pci_dev->irq);

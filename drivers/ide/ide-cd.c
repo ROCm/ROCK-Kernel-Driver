@@ -571,7 +571,7 @@ ide_startstop_t ide_cdrom_error (ide_drive_t *drive, const char *msg, byte stat)
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, stat, err);
 		return ide_stopped;
@@ -605,7 +605,7 @@ ide_startstop_t ide_cdrom_abort (ide_drive_t *drive, const char *msg)
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, BUSY_STAT, 0);
 		return ide_stopped;
@@ -785,14 +785,6 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 				do_end_request = 1;
 		} else if (sense_key == ILLEGAL_REQUEST ||
 			   sense_key == DATA_PROTECT) {
-			/*
-			 * check if this was a write protected media
-			 */
-			if (rq_data_dir(rq) == WRITE) {
-				printk("ide-cd: media marked write protected\n");
-				set_disk_ro(drive->disk, 1);
-			}
-
 			/* No point in retrying after an illegal
 			   request or data protect error.*/
 			ide_dump_status (drive, "command error", stat);
@@ -977,7 +969,7 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
 	struct cdrom_info *info = drive->driver_data;
 
 	/* Number of sectors to read into the buffer. */
-	int sectors_to_buffer = MIN (sectors_to_transfer,
+	int sectors_to_buffer = min_t(int, sectors_to_transfer,
 				     (SECTOR_BUFFER_SIZE >> SECTOR_BITS) -
 				       info->nsectors_buffered);
 
@@ -1003,7 +995,7 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
 
 	/* Throw away any remaining data. */
 	while (sectors_to_transfer > 0) {
-		char dum[SECTOR_SIZE];
+		static char dum[SECTOR_SIZE];
 		HWIF(drive)->atapi_input_bytes(drive, dum, sizeof (dum));
 		--sectors_to_transfer;
 	}
@@ -1126,11 +1118,11 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 
 	/* First, figure out if we need to bit-bucket
 	   any of the leading sectors. */
-	nskip = MIN((int)(rq->current_nr_sectors - bio_cur_sectors(rq->bio)), sectors_to_transfer);
+	nskip = min_t(int, rq->current_nr_sectors - bio_cur_sectors(rq->bio), sectors_to_transfer);
 
 	while (nskip > 0) {
 		/* We need to throw away a sector. */
-		char dum[SECTOR_SIZE];
+		static char dum[SECTOR_SIZE];
 		HWIF(drive)->atapi_input_bytes(drive, dum, sizeof (dum));
 
 		--rq->current_nr_sectors;
@@ -1156,7 +1148,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 			/* Transfer data to the buffers.
 			   Figure out how many sectors we can transfer
 			   to the current buffer. */
-			this_transfer = MIN (sectors_to_transfer,
+			this_transfer = min_t(int, sectors_to_transfer,
 					     rq->current_nr_sectors);
 
 			/* Read this_transfer sectors
@@ -1866,7 +1858,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		/*
 		 * Figure out how many sectors we can transfer
 		 */
-		this_transfer = MIN(sectors_to_transfer,rq->current_nr_sectors);
+		this_transfer = min_t(int, sectors_to_transfer, rq->current_nr_sectors);
 
 		while (this_transfer > 0) {
 			HWIF(drive)->atapi_output_bytes(drive, rq->buffer, SECTOR_SIZE);
@@ -2493,7 +2485,7 @@ static int cdrom_get_toc_entry(ide_drive_t *drive, int track,
 
 /* the generic packet interface to cdrom.c */
 static int ide_cdrom_packet(struct cdrom_device_info *cdi,
-			    struct cdrom_generic_command *cgc)
+			    struct packet_command *cgc)
 {
 	struct request req;
 	ide_drive_t *drive = (ide_drive_t*) cdi->handle;
@@ -2526,7 +2518,7 @@ static
 int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
 			 unsigned int cmd, unsigned long arg)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[16];
 	int stat;
 
@@ -2537,7 +2529,7 @@ int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
  	case CDROMSETSPINDOWN: {
  		char spindown;
  
- 		if (copy_from_user(&spindown, (void *) arg, sizeof(char)))
+ 		if (copy_from_user(&spindown, (void __user *) arg, sizeof(char)))
 			return -EFAULT;
  
                 if ((stat = cdrom_mode_sense(cdi, &cgc, GPMODE_CDROM_PAGE, 0)))
@@ -2556,7 +2548,7 @@ int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
  
  		spindown = buffer[11] & 0x0f;
  
-		if (copy_to_user((void *) arg, &spindown, sizeof (char)))
+		if (copy_to_user((void __user *) arg, &spindown, sizeof (char)))
 			return -EFAULT;
  
  		return 0;
@@ -2820,7 +2812,6 @@ int ide_cdrom_open_real (struct cdrom_device_info *cdi, int purpose)
 	return 0;
 }
 
-
 /*
  * Close down the device.  Invalidate all cached blocks.
  */
@@ -2894,12 +2885,6 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 		devinfo->mask |= CDC_CLOSE_TRAY;
 	if (!CDROM_CONFIG_FLAGS(drive)->mo_drive)
 		devinfo->mask |= CDC_MO_DRIVE;
-	if (!CDROM_CONFIG_FLAGS(drive)->mrw)
-		devinfo->mask |= CDC_MRW;
-	if (!CDROM_CONFIG_FLAGS(drive)->mrw_w)
-		devinfo->mask |= CDC_MRW_W;
-	if (!CDROM_CONFIG_FLAGS(drive)->ram)
-		devinfo->mask |= CDC_RAM;
 
 	devinfo->disk = drive->disk;
 	return register_cdrom(devinfo);
@@ -2910,7 +2895,7 @@ int ide_cdrom_get_capabilities(ide_drive_t *drive, struct atapi_capabilities_pag
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int stat, attempts = 3, size = sizeof(*cap);
 
 	/*
@@ -2936,7 +2921,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
 	struct atapi_capabilities_page cap;
-	int nslots = 1, mrw_write = 0, ram_write = 0;
+	int nslots = 1;
 
 	if (drive->media == ide_optical) {
 		CDROM_CONFIG_FLAGS(drive)->mo_drive = 1;
@@ -2964,17 +2949,6 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 	if (ide_cdrom_get_capabilities(drive, &cap))
 		return 0;
-
-	if (!cdrom_is_mrw(cdi, &mrw_write)) {
-		CDROM_CONFIG_FLAGS(drive)->mrw = 1;
-		if (mrw_write) {
-			CDROM_CONFIG_FLAGS(drive)->mrw_w = 1;
-			CDROM_CONFIG_FLAGS(drive)->ram = 1;
-		}
-	}
-	if (!cdrom_is_random_writable(cdi, &ram_write))
-		if (ram_write)
-			CDROM_CONFIG_FLAGS(drive)->ram = 1;
 
 	if (cap.lock == 0)
 		CDROM_CONFIG_FLAGS(drive)->no_doorlock = 1;
@@ -3054,9 +3028,6 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
         	printk(" CD%s%s", 
         	(CDROM_CONFIG_FLAGS(drive)->cd_r)? "-R" : "", 
         	(CDROM_CONFIG_FLAGS(drive)->cd_rw)? "/RW" : "");
-
-	if (CDROM_CONFIG_FLAGS(drive)->mrw || CDROM_CONFIG_FLAGS(drive)->mrw_w)
-		printk(" CD-MR%s", CDROM_CONFIG_FLAGS(drive)->mrw_w ? "W" : "");
 
         if (CDROM_CONFIG_FLAGS(drive)->is_changer) 
         	printk(" changer w/%d slots", nslots);
@@ -3273,9 +3244,8 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	nslots = ide_cdrom_probe_capabilities (drive);
 
 	/*
-	 * set correct block size and read-only for non-ram media
+	 * set correct block size
 	 */
-	set_disk_ro(drive->disk, !CDROM_CONFIG_FLAGS(drive)->ram);
 	blk_queue_hardsect_size(drive->queue, CD_FRAMESIZE);
 
 #if 0

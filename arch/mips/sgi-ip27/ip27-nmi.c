@@ -222,7 +222,7 @@ cont_nmi_dump(void)
 		if (i == 1000) {
 			for (node=0; node < numnodes; node++)
 				if (NODEPDA(node)->dump_count == 0) {
-					cpu = CNODE_TO_CPU_BASE(node);
+					cpu = node_to_first_cpu(node);
 					for (n=0; n < CNODE_NUM_CPUS(node); cpu++, n++) {
 						CPUMASK_SETB(nmied_cpus, cpu);
 						/*

@@ -124,7 +124,7 @@ pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
 static vertex_hdl_t
 pic_bus1_redist(nasid_t nasid, vertex_hdl_t conn_v)
 {
-	cnodeid_t cnode = NASID_TO_COMPACT_NODEID(nasid);
+	cnodeid_t cnode = nasid_to_cnodeid(nasid);
 	cnodeid_t xbow_peer = -1;
 	char pathname[256], peer_path[256], tmpbuf[256];
 	char *p;
@@ -137,7 +137,7 @@ pic_bus1_redist(nasid_t nasid, vertex_hdl_t conn_v)
 		/* create a path for this widget on the peer Cbrick */
 		/* pcibr widget hw/module/001c11/slab/0/Pbrick/xtalk/12 */
 		/* sprintf(pathname, "%v", conn_v); */
-		xbow_peer = NASID_TO_COMPACT_NODEID(NODEPDA(cnode)->xbow_peer);
+		xbow_peer = nasid_to_cnodeid(NODEPDA(cnode)->xbow_peer);
 		pos = hwgfs_generate_path(conn_v, tmpbuf, 256);
 		strcpy(pathname, &tmpbuf[pos]);
 		p = pathname + strlen("hw/module/001c01/slab/0/");

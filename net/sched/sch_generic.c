@@ -30,6 +30,7 @@
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
+#include <linux/rcupdate.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 
@@ -52,6 +53,18 @@
    qdisc_tree_lock must be grabbed BEFORE dev->queue_lock!
  */
 rwlock_t qdisc_tree_lock = RW_LOCK_UNLOCKED;
+
+void qdisc_lock_tree(struct net_device *dev)
+{
+	write_lock(&qdisc_tree_lock);
+	spin_lock_bh(&dev->queue_lock);
+}
+
+void qdisc_unlock_tree(struct net_device *dev)
+{
+	spin_unlock_bh(&dev->queue_lock);
+	write_unlock(&qdisc_tree_lock);
+}
 
 /* 
    dev->queue_lock serializes queue accesses for this device
@@ -385,8 +398,11 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	sch->enqueue = ops->enqueue;
 	sch->dequeue = ops->dequeue;
 	sch->dev = dev;
-	sch->stats.lock = &dev->queue_lock;
+	sch->stats_lock = &dev->queue_lock;
 	atomic_set(&sch->refcnt, 1);
+	/* enqueue is accessed locklessly - make sure it's visible
+	 * before we set a netdevice's qdisc pointer to sch */
+	smp_wmb();
 	if (!ops->init || ops->init(sch, NULL) == 0)
 		return sch;
 
@@ -404,17 +420,35 @@ void qdisc_reset(struct Qdisc *qdisc)
 		ops->reset(qdisc);
 }
 
+/* this is the rcu callback function to clean up a qdisc when there 
+ * are no further references to it */
+
+static void __qdisc_destroy(struct rcu_head *head)
+{
+	struct Qdisc *qdisc = container_of(head, struct Qdisc, q_rcu);
+	struct Qdisc_ops  *ops = qdisc->ops;
+
+#ifdef CONFIG_NET_ESTIMATOR
+	qdisc_kill_estimator(&qdisc->stats);
+#endif
+	if (ops->reset)
+		ops->reset(qdisc);
+	if (ops->destroy)
+		ops->destroy(qdisc);
+	module_put(ops->owner);
+
+	if (!(qdisc->flags&TCQ_F_BUILTIN))
+		kfree(qdisc);
+}
+
 /* Under dev->queue_lock and BH! */
 
 void qdisc_destroy(struct Qdisc *qdisc)
 {
-	struct Qdisc_ops *ops = qdisc->ops;
-	struct net_device *dev;
+	struct net_device *dev = qdisc->dev;
 
 	if (!atomic_dec_and_test(&qdisc->refcnt))
 		return;
-
-	dev = qdisc->dev;
 
 	if (dev) {
 		struct Qdisc *q, **qp;
@@ -425,16 +459,9 @@ void qdisc_destroy(struct Qdisc *qdisc)
 			}
 		}
 	}
-#ifdef CONFIG_NET_ESTIMATOR
-	qdisc_kill_estimator(&qdisc->stats);
-#endif
-	if (ops->reset)
-		ops->reset(qdisc);
-	if (ops->destroy)
-		ops->destroy(qdisc);
-	module_put(ops->owner);
-	if (!(qdisc->flags&TCQ_F_BUILTIN))
-		kfree(qdisc);
+
+	call_rcu(&qdisc->q_rcu, __qdisc_destroy);
+
 }
 
 
@@ -498,13 +525,11 @@ void dev_deactivate(struct net_device *dev)
 
 void dev_init_scheduler(struct net_device *dev)
 {
-	write_lock(&qdisc_tree_lock);
-	spin_lock_bh(&dev->queue_lock);
+	qdisc_lock_tree(dev);
 	dev->qdisc = &noop_qdisc;
-	spin_unlock_bh(&dev->queue_lock);
 	dev->qdisc_sleeping = &noop_qdisc;
 	dev->qdisc_list = NULL;
-	write_unlock(&qdisc_tree_lock);
+	qdisc_unlock_tree(dev);
 
 	dev_watchdog_init(dev);
 }
@@ -513,8 +538,7 @@ void dev_shutdown(struct net_device *dev)
 {
 	struct Qdisc *qdisc;
 
-	write_lock(&qdisc_tree_lock);
-	spin_lock_bh(&dev->queue_lock);
+	qdisc_lock_tree(dev);
 	qdisc = dev->qdisc_sleeping;
 	dev->qdisc = &noop_qdisc;
 	dev->qdisc_sleeping = &noop_qdisc;
@@ -528,8 +552,7 @@ void dev_shutdown(struct net_device *dev)
 	BUG_TRAP(dev->qdisc_list == NULL);
 	BUG_TRAP(!timer_pending(&dev->watchdog_timer));
 	dev->qdisc_list = NULL;
-	spin_unlock_bh(&dev->queue_lock);
-	write_unlock(&qdisc_tree_lock);
+	qdisc_unlock_tree(dev);
 }
 
 EXPORT_SYMBOL(__netdev_watchdog_up);
@@ -539,4 +562,5 @@ EXPORT_SYMBOL(qdisc_create_dflt);
 EXPORT_SYMBOL(qdisc_destroy);
 EXPORT_SYMBOL(qdisc_reset);
 EXPORT_SYMBOL(qdisc_restart);
-EXPORT_SYMBOL(qdisc_tree_lock);
+EXPORT_SYMBOL(qdisc_lock_tree);
+EXPORT_SYMBOL(qdisc_unlock_tree);

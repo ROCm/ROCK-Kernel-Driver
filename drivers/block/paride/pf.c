@@ -337,7 +337,7 @@ static int pf_open(struct inode *inode, struct file *file)
 static int pf_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct pf_unit *pf = inode->i_bdev->bd_disk->private_data;
-	struct hd_geometry *geo = (struct hd_geometry *) arg;
+	struct hd_geometry __user *geo = (struct hd_geometry __user *) arg;
 	struct hd_geometry g;
 	sector_t capacity;
 
@@ -841,7 +841,7 @@ static inline void next_request(int success)
 /* detach from the calling context - in case the spinlock is held */
 static void do_pf_read(void)
 {
-	ps_set_intr(do_pf_read_start, 0, 0, nice);
+	ps_set_intr(do_pf_read_start, NULL, 0, nice);
 }
 
 static void do_pf_read_start(void)
@@ -887,7 +887,7 @@ static void do_pf_read_drq(void)
 
 static void do_pf_write(void)
 {
-	ps_set_intr(do_pf_write_start, 0, 0, nice);
+	ps_set_intr(do_pf_write_start, NULL, 0, nice);
 }
 
 static void do_pf_write_start(void)

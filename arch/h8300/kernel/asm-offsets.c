@@ -15,6 +15,7 @@
 #include <asm/bootinfo.h>
 #include <asm/irq.h>
 #include <asm/hardirq.h>
+#include <asm/ptrace.h>
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -40,6 +41,22 @@ int main(void)
 	DEFINE(THREAD_KSP, offsetof(struct thread_struct, ksp));
 	DEFINE(THREAD_USP, offsetof(struct thread_struct, usp));
 	DEFINE(THREAD_CCR, offsetof(struct thread_struct, ccr));
+
+	/* offsets into the pt_regs struct */
+	DEFINE(LER0,  offsetof(struct pt_regs, er0)      - sizeof(long));
+	DEFINE(LER1,  offsetof(struct pt_regs, er1)      - sizeof(long));
+	DEFINE(LER2,  offsetof(struct pt_regs, er2)      - sizeof(long));
+	DEFINE(LER3,  offsetof(struct pt_regs, er3)      - sizeof(long));
+	DEFINE(LER4,  offsetof(struct pt_regs, er4)      - sizeof(long));
+	DEFINE(LER5,  offsetof(struct pt_regs, er5)      - sizeof(long));
+	DEFINE(LER6,  offsetof(struct pt_regs, er6)      - sizeof(long));
+	DEFINE(LORIG, offsetof(struct pt_regs, orig_er0) - sizeof(long));
+	DEFINE(LCCR,  offsetof(struct pt_regs, ccr)      - sizeof(long));
+	DEFINE(LVEC,  offsetof(struct pt_regs, vector)   - sizeof(long));
+#if defined(__H8300S__)
+	DEFINE(LEXR,  offsetof(struct pt_regs, exr)      - sizeof(long));
+#endif
+	DEFINE(LRET,  offsetof(struct pt_regs, pc)       - sizeof(long));
 
 	DEFINE(PT_PTRACED, PT_PTRACED);
 	DEFINE(PT_DTRACE, PT_DTRACE);

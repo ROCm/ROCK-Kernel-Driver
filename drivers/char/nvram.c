@@ -250,7 +250,7 @@ static loff_t nvram_llseek(struct file *file,loff_t offset, int origin )
 }
 
 static ssize_t
-nvram_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+nvram_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned char contents[NVRAM_BYTES];
 	unsigned i = *ppos;
@@ -279,7 +279,7 @@ nvram_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-nvram_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+nvram_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned char contents[NVRAM_BYTES];
 	unsigned i = *ppos;
@@ -467,7 +467,7 @@ nvram_init(void)
 		    NVRAM_MINOR);
 		goto out;
 	}
-	if (!create_proc_read_entry("driver/nvram", 0, 0, nvram_read_proc,
+	if (!create_proc_read_entry("driver/nvram", 0, NULL, nvram_read_proc,
 		NULL)) {
 		printk(KERN_ERR "nvram: can't create /proc/driver/nvram\n");
 		ret = -ENOMEM;
@@ -485,7 +485,7 @@ nvram_init(void)
 static void __exit
 nvram_cleanup_module(void)
 {
-	remove_proc_entry("driver/nvram", 0);
+	remove_proc_entry("driver/nvram", NULL);
 	misc_deregister(&nvram_dev);
 }
 

@@ -82,7 +82,6 @@ xfs_bulkstat_one(
 	xfs_dinode_core_t *dic;		/* dinode core info pointer */
 	xfs_inode_t	*ip = NULL;	/* incore inode pointer */
 	xfs_arch_t      arch;           /* these are set according to      */
-	__uint16_t      di_flags;       /* temp */
 
 	dip = (xfs_dinode_t *)dibuff;
 
@@ -166,29 +165,7 @@ xfs_bulkstat_one(
 	buf->bs_mtime.tv_nsec = INT_GET(dic->di_mtime.t_nsec, arch);
 	buf->bs_ctime.tv_sec = INT_GET(dic->di_ctime.t_sec, arch);
 	buf->bs_ctime.tv_nsec = INT_GET(dic->di_ctime.t_nsec, arch);
-	/*
-	 * convert di_flags to bs_xflags.
-	 */
-	di_flags = INT_GET(dic->di_flags, arch);
-
-	buf->bs_xflags =
-		((di_flags & XFS_DIFLAG_REALTIME) ?
-			XFS_XFLAG_REALTIME : 0) |
-		((di_flags & XFS_DIFLAG_PREALLOC) ?
-			XFS_XFLAG_PREALLOC : 0) |
-	        ((di_flags & XFS_DIFLAG_IMMUTABLE) ?
-		        XFS_XFLAG_IMMUTABLE : 0) |
-		((di_flags & XFS_DIFLAG_APPEND) ?
-		        XFS_XFLAG_APPEND : 0) |
-		((di_flags & XFS_DIFLAG_SYNC) ?
-		        XFS_XFLAG_SYNC : 0) |
-		((di_flags & XFS_DIFLAG_NOATIME) ?
-		        XFS_XFLAG_NOATIME : 0) |
-		((di_flags & XFS_DIFLAG_NODUMP) ?
-		        XFS_XFLAG_NODUMP : 0) |
-		(XFS_CFORK_Q_ARCH(dic, arch) ?
-			XFS_XFLAG_HASATTR : 0);
-
+	buf->bs_xflags = xfs_dic2xflags(dic, arch);
 	buf->bs_extsize = INT_GET(dic->di_extsize, arch) << mp->m_sb.sb_blocklog;
 	buf->bs_extents = INT_GET(dic->di_nextents, arch);
 	buf->bs_gen = INT_GET(dic->di_gen, arch);

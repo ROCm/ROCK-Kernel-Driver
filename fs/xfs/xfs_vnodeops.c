@@ -246,25 +246,10 @@ xfs_getattr(
 		goto all_done;
 
 	/*
-	 * convert di_flags to xflags
+	 * Convert di_flags to xflags.
 	 */
-	vap->va_xflags = 0;
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-		vap->va_xflags |= XFS_XFLAG_REALTIME;
-	if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC)
-		vap->va_xflags |= XFS_XFLAG_PREALLOC;
-	if (ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE)
-		vap->va_xflags |= XFS_XFLAG_IMMUTABLE;
-	if (ip->i_d.di_flags & XFS_DIFLAG_APPEND)
-		vap->va_xflags |= XFS_XFLAG_APPEND;
-	if (ip->i_d.di_flags & XFS_DIFLAG_SYNC)
-		vap->va_xflags |= XFS_XFLAG_SYNC;
-	if (ip->i_d.di_flags & XFS_DIFLAG_NOATIME)
-		vap->va_xflags |= XFS_XFLAG_NOATIME;
-	if (ip->i_d.di_flags & XFS_DIFLAG_NODUMP)
-		vap->va_xflags |= XFS_XFLAG_NODUMP;
-	if (XFS_IFORK_Q(ip))
-		vap->va_xflags |= XFS_XFLAG_HASATTR;
+	vap->va_xflags = xfs_dic2xflags(&ip->i_d, ARCH_NOCONVERT);
+
 	/*
 	 * Exit for inode revalidate.  See if any of the rest of
 	 * the fields to be filled in are needed.
@@ -425,11 +410,6 @@ xfs_setattr(
 	}
 
 	xfs_ilock(ip, lock_flags);
-
-	if (_MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
-		code = XFS_ERROR(EACCES);
-		goto error_return;
-	}
 
 	/* boolean: are we the file owner? */
 	file_owner = (current_fsuid(credp) == ip->i_d.di_uid);
@@ -2461,11 +2441,6 @@ xfs_remove(
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	}
 
-	if ((error = _MAC_XFS_IACCESS(ip, MACWRITE, credp))) {
-		REMOVE_DEBUG_TRACE(__LINE__);
-		goto error_return;
-	}
-
 	/*
 	 * Entry must exist since we did a lookup in xfs_lock_dir_and_entry.
 	 */
@@ -2551,8 +2526,6 @@ xfs_remove(
  error1:
 	xfs_bmap_cancel(&free_list);
 	cancel_flags |= XFS_TRANS_ABORT;
-
- error_return:
 	xfs_trans_cancel(tp, cancel_flags);
 	goto std_return;
 
@@ -3119,10 +3092,6 @@ xfs_rmdir(
 
 	ITRACE(cdp);
 	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
-
-	if ((error = _MAC_XFS_IACCESS(cdp, MACWRITE, credp))) {
-		goto error_return;
-	}
 
 	ASSERT(cdp->i_d.di_nlink >= 2);
 	if (cdp->i_d.di_nlink != 2) {

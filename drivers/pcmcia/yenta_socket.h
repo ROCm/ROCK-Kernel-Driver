@@ -113,6 +113,9 @@ struct yenta_socket {
 	struct pcmcia_socket socket;
 	struct cardbus_type *type;
 
+	/* for PCI interrupt probing */
+	unsigned int probe_status;
+
 	/* A few words of private data for special stuff of overrides... */
 	unsigned int private[8];
 

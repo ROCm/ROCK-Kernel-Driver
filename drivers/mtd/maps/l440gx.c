@@ -1,5 +1,5 @@
 /*
- * $Id: l440gx.c,v 1.12 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: l440gx.c,v 1.13 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * BIOS Flash chip on Intel 440GX board.
  *
@@ -46,7 +46,7 @@ void l440gx_set_vpp(struct map_info *map, int vpp)
 struct map_info l440gx_map = {
 	.name = "L440GX BIOS",
 	.size = WINDOW_SIZE,
-	.buswidth = BUSWIDTH,
+	.bankwidth = BUSWIDTH,
 	.phys = WINDOW_ADDR,
 #if 0
 	/* FIXME verify that this is the 

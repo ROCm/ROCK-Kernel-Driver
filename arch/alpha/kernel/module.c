@@ -234,6 +234,10 @@ apply_relocate_add(Elf64_Shdr *sechdrs, const char *strtab,
 			   value was resolved from somewhere else.  */
 			if (sym->st_shndx == SHN_UNDEF)
 				goto reloc_overflow;
+			if ((sym->st_other & STO_ALPHA_STD_GPLOAD) ==
+			    STO_ALPHA_STD_GPLOAD)
+				/* Omit the prologue. */
+				value += 8;
 			/* FALLTHRU */
 		case R_ALPHA_BRADDR:
 			value -= (u64)location + 4;

@@ -71,10 +71,17 @@ config TULIP_MMIO
 config TULIP_NAPI
 	bool "Use NAPI RX polling "
 	depends on TULIP
-	---help---
-	  This is of useful for servers and routers dealing with high network loads.
- 
-	  See <file:Documentation/networking/NAPI_HOWTO.txt>.
+	help
+	  NAPI is a new driver API designed to reduce CPU and interrupt load
+	  when the driver is receiving lots of packets from the card. It is
+	  still somewhat experimental and thus not yet enabled by default.
+
+	  If your estimated Rx load is 10kpps or more, or if the card will be
+	  deployed on potentially unfriendly networks (e.g. in a firewall),
+	  then say Y here.
+
+	  See <file:Documentation/networking/NAPI_HOWTO.txt> for more
+	  information.
 
 	  If in doubt, say N.
 

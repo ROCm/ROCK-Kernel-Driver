@@ -14,7 +14,6 @@
 #include <linux/hugetlb.h>
 
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
 /*

@@ -16,9 +16,13 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 
+#include <scsi/scsi.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
-#include "scsi.h"
+#include <scsi/scsi_request.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -255,7 +259,6 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 	sreq->sr_request->rq_status = RQ_SCSI_BUSY;
 	scsi_do_req(sreq, cmnd, buffer, bufflen, scsi_wait_done,
 			timeout, retries);
-	generic_unplug_device(sreq->sr_device->request_queue);
 	wait_for_completion(&wait);
 	sreq->sr_request->waiting = NULL;
 	if (sreq->sr_request->rq_status != RQ_SCSI_DONE)
@@ -524,7 +527,7 @@ static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
 	 * to queue the remainder of them.
 	 */
 	if (end_that_request_chunk(req, uptodate, bytes)) {
-		int leftover = req->hard_nr_sectors << 9;
+		int leftover = (req->hard_nr_sectors << 9);
 
 		if (blk_pc_request(req))
 			leftover = req->data_len;
@@ -838,8 +841,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			printk("scsi%d: ERROR on channel %d, id %d, lun %d, CDB: ",
 			       cmd->device->host->host_no, (int) cmd->device->channel,
 			       (int) cmd->device->id, (int) cmd->device->lun);
-			print_command(cmd->data_cmnd);
-			print_sense("", cmd);
+			__scsi_print_command(cmd->data_cmnd);
+			scsi_print_sense("", cmd);
 			cmd = scsi_end_request(cmd, 0, block_bytes, 1);
 			return;
 		default:
@@ -863,7 +866,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		       cmd->device->lun, result);
 
 		if (driver_byte(result) & DRIVER_SENSE)
-			print_sense("", cmd);
+			scsi_print_sense("", cmd);
 		/*
 		 * Mark a single buffer as not uptodate.  Queue the remainder.
 		 * We sometimes get this cruft in the event that a medium error
@@ -951,32 +954,26 @@ static int scsi_init_io(struct scsi_cmnd *cmd)
 	return BLKPREP_KILL;
 }
 
-static int scsi_issue_flush_fn(request_queue_t *q, struct gendisk *disk,
-			       sector_t *error_sector)
-{
-	struct scsi_device *sdev = q->queuedata;
-	struct scsi_driver *drv;
-
-	if (sdev->sdev_state != SDEV_RUNNING)
-		return -ENXIO;
-
-	drv = *(struct scsi_driver **) disk->private_data;
-	if (drv->issue_flush)
-		return drv->issue_flush(&sdev->sdev_gendev, error_sector);
-
-	return -EOPNOTSUPP;
-}
-
 static int scsi_prep_fn(struct request_queue *q, struct request *req)
 {
 	struct scsi_device *sdev = q->queuedata;
 	struct scsi_cmnd *cmd;
 	int specials_only = 0;
 
-	if(unlikely(sdev->sdev_state != SDEV_RUNNING)) {
+	/*
+	 * Just check to see if the device is online.  If it isn't, we
+	 * refuse to process any commands.  The device must be brought
+	 * online before trying any recovery commands
+	 */
+	if (unlikely(!scsi_device_online(sdev))) {
+		printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to offline device\n",
+		       sdev->host->host_no, sdev->id, sdev->lun);
+		return BLKPREP_KILL;
+	}
+	if (unlikely(sdev->sdev_state != SDEV_RUNNING)) {
 		/* OK, we're not in a running state don't prep
 		 * user commands */
-		if(sdev->sdev_state == SDEV_DEL) {
+		if (sdev->sdev_state == SDEV_DEL) {
 			/* Device is fully deleted, no commands
 			 * at all allowed down */
 			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to dead device\n",
@@ -1020,18 +1017,6 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		}
 			
 			
-		/*
-		 * Just check to see if the device is online.  If
-		 * it isn't, we refuse to process ordinary commands
-		 * (we will allow specials just in case someone needs
-		 * to send a command to an offline device without bringing
-		 * it back online)
-		 */
-		if(!sdev->online) {
-			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to offline device\n",
-			       sdev->host->host_no, sdev->id, sdev->lun);
-			return BLKPREP_KILL;
-		}
 		/*
 		 * Now try and find a command block that we can use.
 		 */
@@ -1221,6 +1206,18 @@ static void scsi_request_fn(struct request_queue *q)
 		if (!req || !scsi_dev_queue_ready(q, sdev))
 			break;
 
+		if (unlikely(!scsi_device_online(sdev))) {
+			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to offline device\n",
+			       sdev->host->host_no, sdev->id, sdev->lun);
+			blkdev_dequeue_request(req);
+			req->flags |= REQ_QUIET;
+			while (end_that_request_first(req, 0, req->nr_sectors))
+				;
+			end_that_request_last(req);
+			continue;
+		}
+
+
 		/*
 		 * Remove the request from the request list.
 		 */
@@ -1338,8 +1335,7 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
 	blk_queue_segment_boundary(q, shost->dma_boundary);
-	blk_queue_issue_flush_fn(q, scsi_issue_flush_fn);
-
+ 
 	if (!shost->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
 	return q;
@@ -1573,29 +1569,79 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 {
 	enum scsi_device_state oldstate = sdev->sdev_state;
 
-	/* FIXME: eventually we will enforce all the state model
-	 * transitions here */
-
-	if(oldstate == state)
+	if (state == oldstate)
 		return 0;
 
-	switch(state) {
+	switch (state) {
+	case SDEV_CREATED:
+		/* There are no legal states that come back to
+		 * created.  This is the manually initialised start
+		 * state */
+		goto illegal;
+			
 	case SDEV_RUNNING:
-		if(oldstate != SDEV_CREATED && oldstate != SDEV_QUIESCE)
-			return -EINVAL;
+		switch (oldstate) {
+		case SDEV_CREATED:
+		case SDEV_OFFLINE:
+		case SDEV_QUIESCE:
+			break;
+		default:
+			goto illegal;
+		}
 		break;
 
 	case SDEV_QUIESCE:
-		if(oldstate != SDEV_RUNNING)
-			return -EINVAL;
+		switch (oldstate) {
+		case SDEV_RUNNING:
+		case SDEV_OFFLINE:
+			break;
+		default:
+			goto illegal;
+		}
 		break;
 
-	default:
+	case SDEV_OFFLINE:
+		switch (oldstate) {
+		case SDEV_CREATED:
+		case SDEV_RUNNING:
+		case SDEV_QUIESCE:
+			break;
+		default:
+			goto illegal;
+		}
 		break;
+
+	case SDEV_CANCEL:
+		switch (oldstate) {
+		case SDEV_CREATED:
+		case SDEV_RUNNING:
+		case SDEV_OFFLINE:
+			break;
+		default:
+			goto illegal;
+		}
+		break;
+
+	case SDEV_DEL:
+		switch (oldstate) {
+		case SDEV_CANCEL:
+			break;
+		default:
+			goto illegal;
+		}
+		break;
+
 	}
 	sdev->sdev_state = state;
-
 	return 0;
+
+ illegal:
+	dev_printk(KERN_ERR, &sdev->sdev_gendev,
+		   "Illegal state transition %s->%s\n",
+		   scsi_device_state_name(oldstate),
+		   scsi_device_state_name(state));
+	WARN_ON(1);
+	return -EINVAL;
 }
 EXPORT_SYMBOL(scsi_device_set_state);
 
@@ -1618,11 +1664,11 @@ int
 scsi_device_quiesce(struct scsi_device *sdev)
 {
 	int err = scsi_device_set_state(sdev, SDEV_QUIESCE);
-	if(err)
+	if (err)
 		return err;
 
 	scsi_run_queue(sdev->request_queue);
-	while(sdev->device_busy) {
+	while (sdev->device_busy) {
 		schedule_timeout(HZ/5);
 		scsi_run_queue(sdev->request_queue);
 	}
@@ -1642,10 +1688,8 @@ EXPORT_SYMBOL(scsi_device_quiesce);
 void
 scsi_device_resume(struct scsi_device *sdev)
 {
-	if(sdev->sdev_state != SDEV_QUIESCE)
+	if(scsi_device_set_state(sdev, SDEV_RUNNING))
 		return;
-
-	scsi_device_set_state(sdev, SDEV_RUNNING);
 	scsi_run_queue(sdev->request_queue);
 }
 EXPORT_SYMBOL(scsi_device_resume);

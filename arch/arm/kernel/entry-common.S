@@ -22,15 +22,6 @@
 #error "Please fix"
 #endif
 
-/*
- * Our do_softirq out of line code.  See include/asm-arm/hardirq.h for
- * the calling assembly.
- */
-ENTRY(__do_softirq)
-	stmfd	sp!, {r0 - r3, ip, lr}
-	bl	do_softirq
-	ldmfd	sp!, {r0 - r3, ip, pc}
-
 	.align	5
 /*
  * This is the fast syscall return path.  We do as little as

@@ -159,7 +159,7 @@ static inline struct pm_dev *pm_register(pm_dev_t type,
 					 unsigned long id,
 					 pm_callback callback)
 {
-	return 0;
+	return NULL;
 }
 
 static inline void pm_unregister(struct pm_dev *dev) {}
@@ -229,8 +229,9 @@ extern int pm_suspend(u32 state);
 struct device;
 
 struct dev_pm_info {
-#ifdef	CONFIG_PM
 	u32			power_state;
+#ifdef	CONFIG_PM
+	u32			prev_state;
 	u8			* saved_state;
 	atomic_t		pm_users;
 	struct device		* pm_parent;

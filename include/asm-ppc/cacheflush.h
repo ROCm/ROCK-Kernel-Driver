@@ -28,6 +28,9 @@
 #define flush_cache_vunmap(start, end)	do { } while (0)
 
 extern void flush_dcache_page(struct page *page);
+#define flush_dcache_mmap_lock(mapping)		do { } while (0)
+#define flush_dcache_mmap_unlock(mapping)	do { } while (0)
+
 extern void flush_icache_range(unsigned long, unsigned long);
 extern void flush_icache_user_range(struct vm_area_struct *vma,
 		struct page *page, unsigned long addr, int len);
@@ -41,6 +44,6 @@ do { memcpy(dst, src, len); \
 
 extern void __flush_dcache_icache(void *page_va);
 extern void __flush_dcache_icache_phys(unsigned long physaddr);
-
+extern void flush_dcache_icache_page(struct page *page);
 #endif /* _PPC_CACHEFLUSH_H */
 #endif /* __KERNEL__ */

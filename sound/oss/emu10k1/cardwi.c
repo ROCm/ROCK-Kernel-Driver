@@ -304,7 +304,7 @@ void emu10k1_wavein_getxfersize(struct wiinst *wiinst, u32 * size)
 	}
 }
 
-static void copy_block(u8 *dst, u8 * src, u32 str, u32 len, u8 cov)
+static void copy_block(u8 __user *dst, u8 * src, u32 str, u32 len, u8 cov)
 {
 	if (cov == 1)
 		__copy_to_user(dst, src + str, len);
@@ -321,7 +321,7 @@ static void copy_block(u8 *dst, u8 * src, u32 str, u32 len, u8 cov)
 	}
 }
 
-void emu10k1_wavein_xferdata(struct wiinst *wiinst, u8 * data, u32 * size)
+void emu10k1_wavein_xferdata(struct wiinst *wiinst, u8 __user *data, u32 * size)
 {
 	struct wavein_buffer *buffer = &wiinst->buffer;
 	u32 sizetocopy, sizetocopy_now, start;
