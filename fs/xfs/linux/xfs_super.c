@@ -477,9 +477,8 @@ xfs_blkdev_get(
 
 	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
 	if (error) {
-		printk("XFS: Invalid device [%s], error=%d\n",
-				name, error);
-		return error;
+		printk("XFS: Invalid device [%s], error=%d\n", name, error);
+		return -error;
 	}
 
 	/* I think we actually want bd_acquire here..  --hch */
@@ -498,7 +497,8 @@ void
 xfs_blkdev_put(
 	struct block_device	*bdev)
 {
-	blkdev_put(bdev, BDEV_FS);
+	if (bdev)
+		blkdev_put(bdev, BDEV_FS);
 }
 
 void
