@@ -287,6 +287,24 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	return 0;
 }
 
+
+/*
+ * psmouse_reset() resets the mouse into power-on state.
+ */
+int psmouse_reset(struct psmouse *psmouse)
+{
+	unsigned char param[2];
+
+	if (psmouse_command(psmouse, param, PSMOUSE_CMD_RESET_BAT))
+		return -1;
+
+	if (param[0] != PSMOUSE_RET_BAT && param[1] != PSMOUSE_RET_ID)
+		return -1;
+
+	return 0;
+}
+
+
 /*
  * Genius NetMouse magic init.
  */
@@ -416,6 +434,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
  * pass through port it could get disabled while probing for protocol
  * extensions.
  */
+		psmouse_reset(psmouse);
 		psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS);
 	}
 
@@ -540,8 +559,8 @@ static void psmouse_activate(struct psmouse *psmouse)
 static void psmouse_cleanup(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
-	unsigned char param[2];
-	psmouse_command(psmouse, param, PSMOUSE_CMD_RESET_BAT);
+
+	psmouse_reset(psmouse);
 }
 
 /*
