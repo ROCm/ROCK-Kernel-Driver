@@ -41,6 +41,9 @@
 	CREATE_VPTE_OFFSET2(%g4, %g6)			! Create VPTE offset
 	ldxa		[%g3 + %g6] ASI_P, %g5		! Load VPTE
 1:	brgez,pn	%g5, 3f				! Not valid, branch out
+	 sethi		%hi(_PAGE_EXEC), %g4		! Delay-slot
+	andcc		%g5, %g4, %g0			! Executable?
+	be,pn		%xcc, 3f			! Nope, branch.
 	 nop						! Delay-slot
 2:	stxa		%g5, [%g0] ASI_ITLB_DATA_IN	! Load PTE into TLB
 	retry						! Trap return
@@ -69,9 +72,6 @@ winfix_trampoline:
 	done						! Do it to it
 
 /* ITLB ** ICACHE line 4: Unused...	*/
-	nop
-	nop
-	nop
 	nop
 	nop
 	nop
