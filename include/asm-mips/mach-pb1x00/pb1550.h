@@ -3,6 +3,7 @@
  * Board Registers defines.
  *
  * Copyright 2004 Embedded Edge LLC.
+ * Copyright 2005 Ralf Baechle (ralf@linux-mips.org)
  *
  * ########################################################################
  *
@@ -26,7 +27,18 @@
 #ifndef __ASM_PB1550_H
 #define __ASM_PB1550_H
 
+#include <linux/config.h>
 #include <linux/types.h>
+
+#define DBDMA_AC97_TX_CHAN DSCR_CMD0_PSC1_TX
+#define DBDMA_AC97_RX_CHAN DSCR_CMD0_PSC1_RX
+#define DBDMA_I2S_TX_CHAN DSCR_CMD0_PSC3_TX
+#define DBDMA_I2S_RX_CHAN DSCR_CMD0_PSC3_RX
+
+#define SPI_PSC_BASE        PSC0_BASE_ADDR
+#define AC97_PSC_BASE       PSC1_BASE_ADDR
+#define SMBUS_PSC_BASE      PSC2_BASE_ADDR
+#define I2S_PSC_BASE        PSC3_BASE_ADDR
 
 #define BCSR_PHYS_ADDR 0xAF000000
 
