@@ -81,7 +81,7 @@ static inline void presto_unlock(struct inode *dir)
 /*
  * these are initialized in super.c
  */
-extern int presto_permission(struct inode *inode, int mask);
+extern int presto_permission(struct inode *inode, int mask, struct nameidata *nd);
 static int izo_authorized_uid = 0;
 
 int izo_dentry_is_ilookup(struct dentry *dentry, ino_t *id,
@@ -239,7 +239,7 @@ struct dentry *presto_add_ilookup_dentry(struct dentry *parent,
         return de;
 }
 
-struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry)
+struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
         int rc = 0;
         struct dentry *de;
@@ -286,7 +286,7 @@ struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry)
                                 (dir, dentry, ino, generation);
                         is_ilookup = 1;
                 } else
-                        de = iops->lookup(dir, dentry);
+                        de = iops->lookup(dir, dentry, nd);
 #if 0
         }
 #endif
@@ -412,7 +412,8 @@ int presto_prep(struct dentry *dentry, struct presto_cache **cache,
         return 0;
 }
 
-static int presto_create(struct inode * dir, struct dentry * dentry, int mode)
+static int presto_create(struct inode * dir, struct dentry * dentry, int mode,
+                struct nameidata *nd)
 {
         int error;
         struct presto_cache *cache;
@@ -829,7 +830,7 @@ int presto_rename(struct inode *old_dir, struct dentry *old_dentry,
  * appropriate permission function. Thus we do not worry here about ACLs
  * or EAs. -SHP
  */
-int presto_permission(struct inode *inode, int mask)
+int presto_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
         unsigned short mode = inode->i_mode;
         struct presto_cache *cache;
@@ -851,11 +852,11 @@ int presto_permission(struct inode *inode, int mask)
 
                 if ( S_ISREG(mode) && fiops && fiops->permission ) {
                         EXIT;
-                        return fiops->permission(inode, mask);
+                        return fiops->permission(inode, mask, nd);
                 }
                 if ( S_ISDIR(mode) && diops && diops->permission ) {
                         EXIT;
-                        return diops->permission(inode, mask);
+                        return diops->permission(inode, mask, nd);
                 }
         }
 
@@ -866,7 +867,7 @@ int presto_permission(struct inode *inode, int mask)
          * the VFS permission function.
          */
         inode->i_op->permission = NULL;
-        rc = permission(inode, mask);
+        rc = permission(inode, mask, nd);
         inode->i_op->permission = &presto_permission;
 
         EXIT;

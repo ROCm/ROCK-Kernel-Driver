@@ -731,7 +731,7 @@ static int can_set_xattr(struct inode *inode, const char *name,
 #ifdef CONFIG_JFS_POSIX_ACL
 	return jfs_permission_have_sem(inode, MAY_WRITE);
 #else
-	return permission(inode, MAY_WRITE);
+	return permission(inode, MAY_WRITE, NULL);
 #endif
 }
 
@@ -893,7 +893,7 @@ static int can_get_xattr(struct inode *inode, const char *name)
 	else
 		return jfs_permission_have_sem(inode, MAY_READ);
 #else
-	return permission(inode, MAY_READ);
+	return permission(inode, MAY_READ, NULL);
 #endif
 }
 

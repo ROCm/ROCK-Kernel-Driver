@@ -198,7 +198,7 @@ out:
  *	      to tell read_inode to read fnode or not.
  */
 
-struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
+struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;

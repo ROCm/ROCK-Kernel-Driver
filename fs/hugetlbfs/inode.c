@@ -462,7 +462,7 @@ static int hugetlbfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	return retval;
 }
 
-static int hugetlbfs_create(struct inode *dir, struct dentry *dentry, int mode)
+static int hugetlbfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	return hugetlbfs_mknod(dir, dentry, mode | S_IFREG, 0);
 }

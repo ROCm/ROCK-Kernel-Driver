@@ -639,7 +639,7 @@ static inline void unlock_super(struct super_block * sb)
 /*
  * VFS helper functions..
  */
-extern int vfs_create(struct inode *, struct dentry *, int);
+extern int vfs_create(struct inode *, struct dentry *, int, struct nameidata *);
 extern int vfs_mkdir(struct inode *, struct dentry *, int);
 extern int vfs_mknod(struct inode *, struct dentry *, int, dev_t);
 extern int vfs_symlink(struct inode *, struct dentry *, const char *);
@@ -730,8 +730,8 @@ struct file_operations {
 };
 
 struct inode_operations {
-	int (*create) (struct inode *,struct dentry *,int);
-	struct dentry * (*lookup) (struct inode *,struct dentry *);
+	int (*create) (struct inode *,struct dentry *,int, struct nameidata *);
+	struct dentry * (*lookup) (struct inode *,struct dentry *, struct nameidata *);
 	int (*link) (struct dentry *,struct inode *,struct dentry *);
 	int (*unlink) (struct inode *,struct dentry *);
 	int (*symlink) (struct inode *,struct dentry *,const char *);
@@ -743,7 +743,7 @@ struct inode_operations {
 	int (*readlink) (struct dentry *, char __user *,int);
 	int (*follow_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);
-	int (*permission) (struct inode *, int);
+	int (*permission) (struct inode *, int, struct nameidata *);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
@@ -1121,7 +1121,7 @@ extern int do_remount_sb(struct super_block *sb, int flags,
 extern sector_t bmap(struct inode *, sector_t);
 extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);
-extern int permission(struct inode *, int);
+extern int permission(struct inode *, int, struct nameidata *);
 extern int vfs_permission(struct inode *, int);
 extern int get_write_access(struct inode *);
 extern int deny_write_access(struct file *);
@@ -1291,7 +1291,7 @@ extern int simple_prepare_write(struct file *file, struct page *page,
 extern int simple_commit_write(struct file *file, struct page *page,
 				unsigned offset, unsigned to);
 
-extern struct dentry *simple_lookup(struct inode *, struct dentry *);
+extern struct dentry *simple_lookup(struct inode *, struct dentry *, struct nameidata *);
 extern ssize_t generic_read_dir(struct file *, char __user *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;
 extern struct inode_operations simple_dir_inode_operations;

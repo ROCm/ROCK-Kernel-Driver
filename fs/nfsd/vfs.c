@@ -924,7 +924,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	err = nfserr_perm;
 	switch (type) {
 	case S_IFREG:
-		err = vfs_create(dirp, dchild, iap->ia_mode);
+		err = vfs_create(dirp, dchild, iap->ia_mode, NULL);
 		break;
 	case S_IFDIR:
 		err = vfs_mkdir(dirp, dchild, iap->ia_mode);
@@ -1067,7 +1067,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		goto out;
 	}
 
-	err = vfs_create(dirp, dchild, iap->ia_mode);
+	err = vfs_create(dirp, dchild, iap->ia_mode, NULL);
 	if (err < 0)
 		goto out_nfserr;
 
@@ -1584,12 +1584,12 @@ nfsd_permission(struct svc_export *exp, struct dentry *dentry, int acc)
 	    inode->i_uid == current->fsuid)
 		return 0;
 
-	err = permission(inode, acc & (MAY_READ|MAY_WRITE|MAY_EXEC));
+	err = permission(inode, acc & (MAY_READ|MAY_WRITE|MAY_EXEC), NULL);
 
 	/* Allow read access to binaries even when mode 111 */
 	if (err == -EACCES && S_ISREG(inode->i_mode) &&
 	    acc == (MAY_READ | MAY_OWNER_OVERRIDE))
-		err = permission(inode, MAY_EXEC);
+		err = permission(inode, MAY_EXEC, NULL);
 
 	return err? nfserrno(err) : 0;
 }

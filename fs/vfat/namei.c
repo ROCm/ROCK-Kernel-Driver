@@ -45,7 +45,7 @@ static int vfat_hashi(struct dentry *parent, struct qstr *qstr);
 static int vfat_hash(struct dentry *parent, struct qstr *qstr);
 static int vfat_cmpi(struct dentry *dentry, struct qstr *a, struct qstr *b);
 static int vfat_cmp(struct dentry *dentry, struct qstr *a, struct qstr *b);
-static int vfat_revalidate(struct dentry *dentry, int);
+static int vfat_revalidate(struct dentry *dentry, struct nameidata *nd);
 
 static struct dentry_operations vfat_dentry_ops[4] = {
 	{
@@ -68,7 +68,7 @@ static struct dentry_operations vfat_dentry_ops[4] = {
 	}
 };
 
-static int vfat_revalidate(struct dentry *dentry, int flags)
+static int vfat_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	PRINTK1(("vfat_revalidate: %s\n", dentry->d_name.name));
 	spin_lock(&dcache_lock);
@@ -860,7 +860,7 @@ static int vfat_find(struct inode *dir,struct qstr* qname,
 	return res ? res : -ENOENT;
 }
 
-struct dentry *vfat_lookup(struct inode *dir,struct dentry *dentry)
+struct dentry *vfat_lookup(struct inode *dir,struct dentry *dentry, struct nameidata *nd)
 {
 	int res;
 	struct vfat_slot_info sinfo;
@@ -912,7 +912,8 @@ error:
 	return dentry;
 }
 
-int vfat_create(struct inode *dir,struct dentry* dentry,int mode)
+int vfat_create(struct inode *dir,struct dentry* dentry,int mode,
+		struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode = NULL;

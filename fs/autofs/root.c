@@ -18,7 +18,7 @@
 #include "autofs_i.h"
 
 static int autofs_root_readdir(struct file *,void *,filldir_t);
-static struct dentry *autofs_root_lookup(struct inode *,struct dentry *);
+static struct dentry *autofs_root_lookup(struct inode *,struct dentry *, struct nameidata *);
 static int autofs_root_symlink(struct inode *,struct dentry *,const char *);
 static int autofs_root_unlink(struct inode *,struct dentry *);
 static int autofs_root_rmdir(struct inode *,struct dentry *);
@@ -144,7 +144,7 @@ static int try_to_fill_dentry(struct dentry *dentry, struct super_block *sb, str
  * yet completely filled in, and revalidate has to delay such
  * lookups..
  */
-static int autofs_revalidate(struct dentry * dentry, int flags)
+static int autofs_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode * dir;
 	struct autofs_sb_info *sbi;
@@ -195,7 +195,7 @@ static struct dentry_operations autofs_dentry_operations = {
 	.d_revalidate	= autofs_revalidate,
 };
 
-static struct dentry *autofs_root_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *autofs_root_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct autofs_sb_info *sbi;
 	int oz_mode;
@@ -230,7 +230,7 @@ static struct dentry *autofs_root_lookup(struct inode *dir, struct dentry *dentr
 	d_add(dentry, NULL);
 
 	up(&dir->i_sem);
-	autofs_revalidate(dentry, 0);
+	autofs_revalidate(dentry, nd);
 	down(&dir->i_sem);
 
 	/*

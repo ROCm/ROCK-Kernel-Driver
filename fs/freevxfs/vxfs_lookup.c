@@ -51,7 +51,7 @@
 #define VXFS_BLOCK_PER_PAGE(sbp)  ((PAGE_CACHE_SIZE / (sbp)->s_blocksize))
 
 
-static struct dentry *	vxfs_lookup(struct inode *, struct dentry *);
+static struct dentry *	vxfs_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int		vxfs_readdir(struct file *, void *, filldir_t);
 
 struct inode_operations vxfs_dir_inode_ops = {
@@ -193,6 +193,7 @@ vxfs_inode_by_name(struct inode *dip, struct dentry *dp)
  * vxfs_lookup - lookup pathname component
  * @dip:	dir in which we lookup
  * @dp:		dentry we lookup
+ * @nd:		lookup nameidata
  *
  * Description:
  *   vxfs_lookup tries to lookup the pathname component described
@@ -203,7 +204,7 @@ vxfs_inode_by_name(struct inode *dip, struct dentry *dp)
  *   in the return pointer.
  */
 static struct dentry *
-vxfs_lookup(struct inode *dip, struct dentry *dp)
+vxfs_lookup(struct inode *dip, struct dentry *dp, struct nameidata *nd)
 {
 	struct inode		*ip = NULL;
 	ino_t			ino;

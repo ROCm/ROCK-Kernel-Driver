@@ -367,7 +367,7 @@ smb_file_release(struct inode *inode, struct file * file)
  * privileges, so we need our own check for this.
  */
 static int
-smb_file_permission(struct inode *inode, int mask)
+smb_file_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	int mode = inode->i_mode;
 	int error = 0;

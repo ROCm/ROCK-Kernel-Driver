@@ -21,7 +21,7 @@
 #include "internal.h"
 
 
-static struct dentry *afs_mntpt_lookup(struct inode *dir, struct dentry *dentry);
+static struct dentry *afs_mntpt_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *);
 static int afs_mntpt_open(struct inode *inode, struct file *file);
 
 struct file_operations afs_mntpt_file_operations = {
@@ -93,7 +93,7 @@ int afs_mntpt_check_symlink(afs_vnode_t *vnode)
 /*
  * no valid lookup procedure on this sort of dir
  */
-static struct dentry *afs_mntpt_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *afs_mntpt_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	return ERR_PTR(-EREMOTE);
 } /* end afs_mntpt_lookup() */

@@ -642,7 +642,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 /* Find a file in a directory. If the file exists, return its
    corresponding dentry.  */
 static struct dentry *
-jffs_lookup(struct inode *dir, struct dentry *dentry)
+jffs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct jffs_file *d;
 	struct jffs_file *f;
@@ -1273,7 +1273,8 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
  * with d_instantiate().
  */
 static int
-jffs_create(struct inode *dir, struct dentry *dentry, int mode)
+jffs_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	struct jffs_raw_inode raw_inode;
 	struct jffs_control *c;

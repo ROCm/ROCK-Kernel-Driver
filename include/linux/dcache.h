@@ -10,6 +10,7 @@
 #include <linux/rcupdate.h>
 #include <asm/bug.h>
 
+struct nameidata;
 struct vfsmount;
 
 /*
@@ -106,7 +107,7 @@ struct dentry {
 #define DNAME_INLINE_LEN	(sizeof(struct dentry)-offsetof(struct dentry,d_iname))
  
 struct dentry_operations {
-	int (*d_revalidate)(struct dentry *, int);
+	int (*d_revalidate)(struct dentry *, struct nameidata *);
 	int (*d_hash) (struct dentry *, struct qstr *);
 	int (*d_compare) (struct dentry *, struct qstr *, struct qstr *);
 	int (*d_delete)(struct dentry *);

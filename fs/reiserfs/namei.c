@@ -316,7 +316,7 @@ static int reiserfs_find_entry (struct inode * dir, const char * name, int namel
 }
 
 
-static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dentry)
+static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
     int retval;
     struct inode * inode = NULL;
@@ -558,7 +558,8 @@ static int new_inode_init(struct inode *inode, struct inode *dir, int mode) {
     return 0 ;
 }
 
-static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
+static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
     int retval;
     struct inode * inode;
