@@ -436,17 +436,21 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
  * Within any given configuration, each interface may have several
  * alternative settings.  These are often used to control levels of
  * bandwidth consumption.  For example, the default setting for a high
- * speed interrupt endpoint may not send more than about 4KBytes per
- * microframe, and isochronous endpoints may never be part of a an
+ * speed interrupt endpoint may not send more than 64 bytes per microframe,
+ * while interrupt transfers of up to 3KBytes per microframe are legal.
+ * Also, isochronous endpoints may never be part of an
  * interface's default setting.  To access such bandwidth, alternate
- * interface setting must be made current.
+ * interface settings must be made current.
  *
  * Note that in the Linux USB subsystem, bandwidth associated with
- * an endpoint in a given alternate setting is not reserved until an
+ * an endpoint in a given alternate setting is not reserved until an URB
  * is submitted that needs that bandwidth.  Some other operating systems
  * allocate bandwidth early, when a configuration is chosen.
  *
  * This call is synchronous, and may not be used in an interrupt context.
+ * Also, drivers must not change altsettings while urbs are scheduled for
+ * endpoints in that interface; all such urbs must first be completed
+ * (perhaps forced by unlinking).
  *
  * Returns zero on success, or else the status code returned by the
  * underlying usb_control_msg() call.
