@@ -137,7 +137,7 @@ eeprom_set_semaphore(struct e100_private *adapter)
 	u16 data = 0;
 	unsigned long expiration_time = jiffies + HZ / 100 + 1;
 
-	while (time_before(jiffies, expiration_time)) {
+	do {
 		// Get current value of General Control 2
 		data = readb(&CSR_GENERAL_CONTROL2_FIELD(adapter));
 
@@ -154,10 +154,12 @@ eeprom_set_semaphore(struct e100_private *adapter)
 			return true;
 		}
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1+(HZ-1)/100);
-	}
-	return false;
+		if (time_before(jiffies, expiration_time))
+			yield();
+		else
+			return false;
+
+	} while (true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -579,17 +581,16 @@ eeprom_wait_cmd_done(struct e100_private *adapter)
 
 	eeprom_stand_by(adapter);
 
-	while (time_before(jiffies, expiration_time)) {
+	do {
 		rmb();
 		x = readw(&CSR_EEPROM_CONTROL_FIELD(adapter));
 		if (x & EEDO)
 			return true;
-
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1+(HZ-1)/100);
-	}
-
-	return false;
+		if (time_before(jiffies, expiration_time))
+			yield();
+		else
+			return false;
+	} while (true);
 }
 
 //----------------------------------------------------------------------------------------

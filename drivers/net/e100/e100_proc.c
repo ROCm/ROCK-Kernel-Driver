@@ -97,7 +97,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifdef E100_CONFIG_PROC_FS
 #include "e100.h"
-
+/* MDI sleep time is at least 50 ms, in jiffies */
+#define MDI_SLEEP_TIME ((HZ / 20) + 1)
 /***************************************************************************/
 /*       /proc File System Interaface Support Functions                    */
 /***************************************************************************/
@@ -230,7 +231,7 @@ set_led(struct e100_private *bdp, u16 led_mdi_op)
 	spin_unlock_bh(&bdp->mdi_access_lock);
 
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(SLEEP_TIME);
+	schedule_timeout(MDI_SLEEP_TIME);
 
 	spin_lock_bh(&bdp->mdi_access_lock);
 

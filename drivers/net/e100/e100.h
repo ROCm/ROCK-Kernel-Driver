@@ -138,10 +138,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define TX_THRSHLD     8
 
-/* sleep time is at least 50 ms, in jiffies */
-#define SLEEP_TIME ((HZ / 20) + 1)
-#define CUS_TIMEOUT 1000
-
 /* IFS parameters */
 #define MIN_NUMBER_OF_TRANSMITS_100 1000
 #define MIN_NUMBER_OF_TRANSMITS_10  100
@@ -1018,6 +1014,14 @@ extern unsigned char e100_selftest(struct e100_private *bdp, u32 *st_timeout,
 				   u32 *st_result);
 extern unsigned char e100_get_link_state(struct e100_private *bdp);
 extern unsigned char e100_wait_scb(struct e100_private *bdp);
+
+#ifndef yield
+#define yield()					\
+        do {					\
+                current->policy |= SCHED_YIELD;	\
+                schedule();			\
+        } while (0)                                     
+#endif
 
 extern void e100_deisolate_driver(struct e100_private *bdp,
 				  u8 recover, u8 full_reset);

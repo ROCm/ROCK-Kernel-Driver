@@ -653,7 +653,7 @@ static void
 e100_force_speed_duplex(struct e100_private *bdp)
 {
 	u16 control;
-	int neg_timeout = 2 * HZ;	//2 sec in jiffies
+	unsigned long expires;
 
 	bdp->flags |= DF_SPEED_FORCED;
 
@@ -696,20 +696,18 @@ e100_force_speed_duplex(struct e100_private *bdp)
 	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, control);
 
 	/* loop must run at least once */
+	expires = jiffies + 2 * HZ;
 	do {
-		spin_unlock_bh(&(bdp->mdi_access_lock));
-
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(SLEEP_TIME);
-
-		spin_lock_bh(&(bdp->mdi_access_lock));
-
-		if (e100_update_link_state(bdp)) {
+		if (e100_update_link_state(bdp) || 
+		    time_after(jiffies, expires)) {
 			break;
+		} else {
+			spin_unlock_bh(&(bdp->mdi_access_lock));
+			yield();
+			spin_lock_bh(&(bdp->mdi_access_lock));
 		}
-		neg_timeout -= SLEEP_TIME;
 
-	} while (neg_timeout > 0);
+	} while (true);
 
 	spin_unlock_bh(&(bdp->mdi_access_lock));
 }
@@ -819,7 +817,7 @@ static void
 e100_auto_neg(struct e100_private *bdp, unsigned char force_restart)
 {
 	u16 stat_reg;
-	unsigned int i;
+	unsigned long expires;
 
 	bdp->flags &= ~DF_SPEED_FORCED;
 
@@ -840,22 +838,21 @@ e100_auto_neg(struct e100_private *bdp, unsigned char force_restart)
 			       BMCR_ANENABLE | BMCR_ANRESTART);
 
 		/* wait for autoneg to complete (up to 3 seconds) */
-		for (i = 0; i < 60; i++) {
+		expires = jiffies + HZ * 3;
+		do {
 			/* now re-read the value. Sticky so read twice */
 			e100_mdi_read(bdp, MII_BMSR, bdp->phy_addr, &stat_reg);
 			e100_mdi_read(bdp, MII_BMSR, bdp->phy_addr, &stat_reg);
 
-			if (stat_reg & BMSR_ANEGCOMPLETE)
+			if ((stat_reg & BMSR_ANEGCOMPLETE) ||
+			    time_after(jiffies, expires) ) {
 				goto exit;
-
-			spin_unlock_bh(&(bdp->mdi_access_lock));
-
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(SLEEP_TIME);
-
-			spin_lock_bh(&(bdp->mdi_access_lock));
-
-		}
+			} else {
+				spin_unlock_bh(&(bdp->mdi_access_lock));
+				yield();
+				spin_lock_bh(&(bdp->mdi_access_lock));
+			}
+		} while (true);
 	}
 
 exit:

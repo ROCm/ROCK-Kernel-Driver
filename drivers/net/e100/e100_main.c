@@ -165,7 +165,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.23-pre2"
+#define E100_VERSION  "2.0.24-pre1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -2705,7 +2705,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	cb_header_t *ntcb_hdr;
 	unsigned long lock_flag;
 	unsigned long expiration_time;
-	unsigned char rc = false;
+	unsigned char rc = true;
 
 	ntcb_hdr = (cb_header_t *) command->non_tx_cmd;	/* get hdr of non tcb cmd */
 
@@ -2740,6 +2740,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	if (!e100_wait_exec_cmplx(bdp, command->dma_addr, SCB_CUC_START)) {
 		spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
+		rc = false;
 		goto exit;
 	}
 
@@ -2748,20 +2749,21 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	/* now wait for completion of non-cu CB up to 20 msec */
 	expiration_time = jiffies + HZ / 50 + 1;
-	while (time_before(jiffies, expiration_time)) {
-		rmb();
-		if ((ntcb_hdr->cb_status &
+	rmb();
+	while (!(ntcb_hdr->cb_status &
 		     __constant_cpu_to_le16(CB_STATUS_COMPLETE))) {
-			rc = true;
+
+		if (time_before(jiffies, expiration_time)) {
+			spin_unlock_bh(&(bdp->bd_non_tx_lock));
+			yield();
+			spin_lock_bh(&(bdp->bd_non_tx_lock));
+		} else {
+			rc = false;
 			goto exit;
 		}
-		spin_unlock_bh(&(bdp->bd_non_tx_lock));
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-		spin_lock_bh(&(bdp->bd_non_tx_lock));
+		rmb();
 	}
 
-	/* didn't get a C bit assume command failed */
 exit:
 	e100_free_non_tx_cmd(bdp, command);
 
