@@ -40,6 +40,7 @@ void initrd_init(void);
 
 extern int end_that_request_first(struct request *, int, int);
 extern void end_that_request_last(struct request *);
+struct request *elv_next_request(request_queue_t *q);
 
 static inline void blkdev_dequeue_request(struct request *req)
 {
@@ -47,38 +48,6 @@ static inline void blkdev_dequeue_request(struct request *req)
 
 	if (req->q)
 		elv_remove_request(req->q, req);
-}
-
-extern inline struct request *elv_next_request(request_queue_t *q)
-{
-	struct request *rq;
-
-	while ((rq = __elv_next_request(q))) {
-		rq->flags |= REQ_STARTED;
-
-		if (&rq->queuelist == q->last_merge)
-			q->last_merge = NULL;
-
-		if ((rq->flags & REQ_DONTPREP) || !q->prep_rq_fn)
-			break;
-
-		/*
-		 * all ok, break and return it
-		 */
-		if (!q->prep_rq_fn(q, rq))
-			break;
-
-		/*
-		 * prep said no-go, kill it
-		 */
-		blkdev_dequeue_request(rq);
-		if (end_that_request_first(rq, 0, rq->nr_sectors))
-			BUG();
-
-		end_that_request_last(rq);
-	}
-
-	return rq;
 }
 
 #define _elv_add_request_core(q, rq, where, plug)			\
