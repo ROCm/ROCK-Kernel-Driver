@@ -30,8 +30,8 @@
 #include <linux/ctype.h>
 #include <linux/init.h>
 
-#include "capiutil.h"
-#include "capicmd.h"
+#include <linux/isdn/capiutil.h>
+#include <linux/isdn/capicmd.h>
 #include "capidrv.h"
 
 static char *revision = "$Revision: 1.39.6.7 $";

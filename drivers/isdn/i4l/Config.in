@@ -39,7 +39,6 @@ source drivers/isdn/sc/Config.in
 source drivers/isdn/act2000/Config.in
 source drivers/isdn/eicon/Config.in
 source drivers/isdn/tpam/Config.in
-source drivers/isdn/avmb1/Config.in
 source drivers/isdn/hysdn/Config.in
 
 endmenu

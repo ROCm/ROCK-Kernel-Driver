@@ -402,7 +402,7 @@ isdn_all_eaz(int di, int ch)
  * Begin of a CAPI like LL<->HL interface, currently used only for 
  * supplementary service (CAPI 2.0 part III)
  */
-#include "avmb1/capicmd.h"  /* this should be moved in a common place */
+#include <linux/isdn/capicmd.h>
 
 int
 isdn_capi_rec_hl_msg(capi_msg *cm) {
