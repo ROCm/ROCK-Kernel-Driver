@@ -124,6 +124,8 @@
 		* create a function for rx refill (Manfred Spraul)
 		* combine drain_ring and init_ring (Manfred Spraul)
 		* oom handling (Manfred Spraul)
+		* hands_off instead of playing with netif_device_{de,a}ttach
+		  (Manfred Spraul)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -648,6 +650,7 @@ struct netdev_private {
 	unsigned int cur_tx, dirty_tx;
 	unsigned int rx_buf_sz;				/* Based on MTU+slack. */
 	int oom;
+	int hands_off;		/* Do not touch the nic registers */
 	/* These values are keep track of the transceiver/media in use. */
 	unsigned int full_duplex;
 	/* Rx filter. */
@@ -791,6 +794,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	np->iosize = iosize;
 	spin_lock_init(&np->lock);
 	np->msg_enable = debug;
+	np->hands_off = 0;
 
 	/* Reset the chip to erase previous misconfiguration. */
 	natsemi_reload_eeprom(dev);
@@ -1396,7 +1400,7 @@ static void tx_timeout(struct net_device *dev)
 
 	disable_irq(dev->irq);
 	spin_lock_irq(&np->lock);
-	if (netif_device_present(dev)) {
+	if (!np->hands_off) {
 		if (netif_msg_tx_err(np))
 			printk(KERN_WARNING 
 				"%s: Transmit timed out, status %#08x,"
@@ -1409,7 +1413,7 @@ static void tx_timeout(struct net_device *dev)
 		init_registers(dev);
 	} else {
 		printk(KERN_WARNING 
-			"%s: tx_timeout while in suspended state?\n",
+			"%s: tx_timeout while in hands_off state?\n",
 		   	dev->name);
 	}
 	spin_unlock_irq(&np->lock);
@@ -1584,7 +1588,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	spin_lock_irq(&np->lock);
 	
-	if (netif_device_present(dev)) {
+	if (!np->hands_off) {
 		np->tx_ring[entry].cmd_status = cpu_to_le32(DescOwn | skb->len);
 		/* StrongARM: Explicitly cache flush np->tx_ring and 
 		 * skb->data,skb->len. */
@@ -1663,15 +1667,15 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	long ioaddr = dev->base_addr;
 	int boguscnt = max_interrupt_work;
 
-	if (!netif_device_present(dev))
+	if (np->hands_off)
 		return;
 	do {
 		/* Reading automatically acknowledges all int sources. */
 		u32 intr_status = readl(ioaddr + IntrStatus);
 
 		if (netif_msg_intr(np))
-			printk(KERN_DEBUG "%s: Interrupt, status %#08x.\n",
-				   dev->name, intr_status);
+			printk(KERN_DEBUG "%s: Interrupt, status %#08x, mask %#08x.\n",
+				   dev->name, intr_status, readl(ioaddr + IntrMask));
 
 		if (intr_status == 0)
 			break;
@@ -1863,7 +1867,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 
 	/* The chip only need report frame silently dropped. */
 	spin_lock_irq(&np->lock);
- 	if (netif_running(dev) && netif_device_present(dev))
+ 	if (netif_running(dev) && !np->hands_off)
  		__get_stats(dev);
 	spin_unlock_irq(&np->lock);
 
@@ -1951,7 +1955,7 @@ static void set_rx_mode(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	spin_lock_irq(&np->lock);
-	if (netif_device_present(dev))
+	if (!np->hands_off)
 		__set_rx_mode(dev);
 	spin_unlock_irq(&np->lock);
 }
@@ -2478,9 +2482,6 @@ static int netdev_close(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
 
-	netif_stop_queue(dev);
-	netif_carrier_off(dev);
-
 	if (netif_msg_ifdown(np))
 		printk(KERN_DEBUG 
 			"%s: Shutting down ethercard, status was %#04x.\n",
@@ -2491,13 +2492,31 @@ static int netdev_close(struct net_device *dev)
 			dev->name, np->cur_tx, np->dirty_tx, 
 			np->cur_rx, np->dirty_rx);
 
-	del_timer_sync(&np->timer);
+	/*
+	 * FIXME: what if someone tries to close a device
+	 * that is suspended?
+	 * Should we reenable the nic to switch to
+	 * the final WOL settings?
+	 */
 
+ 	del_timer_sync(&np->timer);
 	disable_irq(dev->irq);
 	spin_lock_irq(&np->lock);
-
-	/* Disable and clear interrupts */
+	/* Disable interrupts, and flush posted writes */
 	writel(0, ioaddr + IntrEnable);
+	readl(ioaddr + IntrEnable);
+	np->hands_off = 1;
+	spin_unlock_irq(&np->lock);
+	enable_irq(dev->irq);
+
+	free_irq(dev->irq, dev);
+
+	/* Interrupt disabled, interrupt handler released,
+	 * queue stopped, timer deleted, rtnl_lock held
+	 * All async codepaths that access the driver are disabled.
+	 */
+ 	spin_lock_irq(&np->lock);
+	np->hands_off = 0;
 	readl(ioaddr + IntrMask);
 	readw(ioaddr + MIntrStatus);
 
@@ -2510,19 +2529,9 @@ static int netdev_close(struct net_device *dev)
 	__get_stats(dev);
 	spin_unlock_irq(&np->lock);
 
-	/* race: shared irq and as most nics the DP83815
-	 * reports _all_ interrupt conditions in IntrStatus, even
-	 * disabled ones.
-	 * packet received after disable_irq, but before stop_rxtx
-	 * --> race. intr_handler would restart the rx process.
-	 * netif_device_{de,a}tach around {enable,free}_irq.
-	 */
-	netif_device_detach(dev);
-	enable_irq(dev->irq);
-	free_irq(dev->irq, dev);
-	netif_device_attach(dev);
 	/* clear the carrier last - an interrupt could reenable it otherwise */
 	netif_carrier_off(dev);
+	netif_stop_queue(dev);
 
 	dump_ring(dev);
 	drain_ring(dev);
@@ -2591,9 +2600,9 @@ static int natsemi_suspend (struct pci_dev *pdev, u32 state)
 		spin_lock_irq(&np->lock);
 
 		writel(0, ioaddr + IntrEnable);
+		np->hands_off = 1;
 		natsemi_stop_rxtx(dev);
 		netif_stop_queue(dev);
-		netif_device_detach(dev);
 
 		spin_unlock_irq(&np->lock);
 		enable_irq(dev->irq);
@@ -2617,9 +2626,8 @@ static int natsemi_suspend (struct pci_dev *pdev, u32 state)
 				writel(np->SavedClkRun, ioaddr + ClkRun);
 			}
 		}
-	} else {
-		netif_device_detach(dev);
 	}
+	netif_device_detach(dev);
 	rtnl_unlock();
 	return 0;
 }
@@ -2634,20 +2642,23 @@ static int natsemi_resume (struct pci_dev *pdev)
 	if (netif_device_present(dev))
 		goto out;
 	if (netif_running(dev)) {
+		BUG_ON(!np->hands_off);
 		pci_enable_device(pdev);
 	/*	pci_power_on(pdev); */
 		
 		natsemi_reset(dev);
 		init_ring(dev);
+		disable_irq(dev->irq);
 		spin_lock_irq(&np->lock);
+		np->hands_off = 0;
 		init_registers(dev);
 		netif_device_attach(dev);
 		spin_unlock_irq(&np->lock);
+		enable_irq(dev->irq);
 
 		mod_timer(&np->timer, jiffies + 1*HZ);
-	} else {
-		netif_device_attach(dev);
 	}
+	netif_device_attach(dev);
 out:
 	rtnl_unlock();
 	return 0;
