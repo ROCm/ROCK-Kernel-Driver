@@ -195,8 +195,5 @@ extern void print_properties(struct device_node *node);
 extern int prom_n_addr_cells(struct device_node* np);
 extern int prom_n_size_cells(struct device_node* np);
 extern void prom_get_irq_senses(unsigned char *senses, int off, int max);
-extern void prom_drawstring(const char *c);
-extern void prom_drawhex(unsigned long v);
-extern void prom_drawchar(char c);
 
 #endif /* _PPC64_PROM_H */

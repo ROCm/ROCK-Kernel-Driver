@@ -220,10 +220,15 @@ static int rtasd(void *unused)
 	current->nice = sys_sched_get_priority_max(SCHED_FIFO) + 1;
 #endif
 
-	cpu = 0;
-	set_cpus_allowed(current, 1UL << cpu_logical_map(cpu));
+repeat:
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu))
+			continue;
 
-	while(1) {
+		DEBUG("scheduling on %d\n", cpu);
+		set_cpus_allowed(current, 1UL << cpu);
+		DEBUG("watchdog scheduled on cpu %d\n", smp_processor_id());
+
 		do {
 			memset(logdata, 0, rtas_error_log_max);
 			error = rtas_call(event_scan, 4, 1, NULL,
@@ -239,31 +244,23 @@ static int rtasd(void *unused)
 
 		} while(error == 0);
 
-		DEBUG("watchdog scheduled on cpu %d\n", smp_processor_id());
-
-		cpu++;
-		if (cpu >= smp_num_cpus) {
-
-			if (first_pass && surveillance_requested) {
-				DEBUG("enabling surveillance\n");
-				if (enable_surveillance())
-					goto error_vfree;
-				DEBUG("surveillance enabled\n");
-			}
-
-			first_pass = 0;
-			cpu = 0;
-		}
-
-		set_cpus_allowed(current, 1UL << cpu_logical_map(cpu));
-
-
 		/* Check all cpus for pending events before sleeping*/
 		if (!first_pass) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout((HZ*60/rtas_event_scan_rate) / 2);
 		}
 	}
+
+	if (first_pass && surveillance_requested) {
+		DEBUG("enabling surveillance\n");
+		if (enable_surveillance())
+			goto error_vfree;
+		DEBUG("surveillance enabled\n");
+	} else {
+		first_pass = 0;
+	}
+
+	goto repeat;
 
 error_vfree:
 	vfree(rtas_log_buf);

@@ -59,7 +59,9 @@ ppc64_pmc_stab(int file)
 	stab_faults = stab_capacity_castouts = stab_invalidations = n = 0;
 
 	if (file == -1) {
-		for (i = 0;  i < smp_num_cpus; i++) {
+		for (i = 0;  i < NR_CPUS; i++) {
+			if (!cpu_online(i))
+				continue;
 			stab_faults += pmc_sw_cpu[i].stab_faults;
 			stab_capacity_castouts += pmc_sw_cpu[i].stab_capacity_castouts;
 			stab_invalidations += pmc_sw_cpu[i].stab_invalidations;

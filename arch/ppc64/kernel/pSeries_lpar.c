@@ -33,6 +33,7 @@
 #include <linux/pci.h>
 #include <asm/naca.h>
 #include <asm/tlbflush.h>
+#include <asm/tlb.h>
 
 /* Status return values */
 #define H_Success	0
@@ -308,7 +309,7 @@ static void pSeriesLP_qirr_info(int n_cpu , u8 value)
 {
 	unsigned long lpar_rc;
 
-	lpar_rc = plpar_ipi(get_hard_smp_processor_id(n_cpu),value);
+	lpar_rc = plpar_ipi(n_cpu, value);
 	if (lpar_rc != H_Success) {
 		panic(" bad return code qirr -ipi  - rc = %lx \n", lpar_rc); 
 	}
@@ -646,10 +647,8 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
 {
 	unsigned long lpar_rc;
 	unsigned long flags;
-	flags = (newpp & 3) | H_AVPN;
+	flags = (newpp & 7) | H_AVPN;
 	unsigned long vpn = va >> PAGE_SHIFT;
-
-	udbg_printf("updatepp\n");
 
 	lpar_rc = plpar_pte_protect(flags, slot, (vpn >> 4) & ~0x7fUL);
 
@@ -775,15 +774,14 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 				   int local)
 {
 	int i;
-	struct tlb_batch_data *ptes =
-		&tlb_batch_array[smp_processor_id()][0];
 	unsigned long flags;
+	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
 
 	spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
-	for (i = 0; i < number; i++) {
-		flush_hash_page(context, ptes->addr, ptes->pte, local);
-		ptes++;
-	}
+
+	for (i = 0; i < number; i++)
+		flush_hash_page(context, batch->addr[i], batch->pte[i], local);
+
 	spin_unlock_irqrestore(&pSeries_lpar_tlbie_lock, flags);
 }
 

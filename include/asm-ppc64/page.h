@@ -33,24 +33,13 @@
 #ifndef __ASSEMBLY__
 #include <asm/naca.h>
 
-#define STRICT_MM_TYPECHECKS
+#undef STRICT_MM_TYPECHECKS
 
 #define REGION_SIZE   4UL
-#define OFFSET_SIZE   60UL
 #define REGION_SHIFT  60UL
-#define OFFSET_SHIFT  0UL
 #define REGION_MASK   (((1UL<<REGION_SIZE)-1UL)<<REGION_SHIFT)
 #define REGION_STRIDE (1UL << REGION_SHIFT)
 
-typedef union ppc64_va {
-        struct {
-                unsigned long off : OFFSET_SIZE;  /* intra-region offset */
-                unsigned long reg : REGION_SIZE;  /* region number */
-        } f;
-        unsigned long l;
-        void *p;
-} ppc64_va;
-       
 static __inline__ void clear_page(void *addr)
 {
 	unsigned long lines, line_size;
@@ -70,8 +59,8 @@ static __inline__ void clear_page(void *addr)
 
 extern void copy_page(void *to, void *from);
 struct page;
-extern void clear_user_page(void *page, unsigned long vaddr);
-extern void copy_user_page(void *to, void *from, unsigned long vaddr);
+extern void clear_user_page(void *page, unsigned long vaddr, struct page *pg);
+extern void copy_user_page(void *to, void *from, unsigned long vaddr, struct page *p);
 
 #ifdef STRICT_MM_TYPECHECKS
 /*
@@ -215,8 +204,15 @@ static inline int get_order(unsigned long size)
 #define __a2p(x) ((void *) absolute_to_phys(x))
 #define __a2v(x) ((void *) __va(absolute_to_phys(x)))
 
+#ifdef CONFIG_DISCONTIGMEM
+#define page_to_pfn(page) \
+		((page) - page_zone(page)->zone_mem_map + \
+		(page_zone(page)->zone_start_paddr >> PAGE_SHIFT))
+#define pfn_to_page(pfn)	discontigmem_pfn_to_page(pfn)
+#else
 #define pfn_to_page(pfn)	(mem_map + (pfn))
-#define page_to_pfn(pfn)	((unsigned long)((pfn) - mem_map))
+#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
+#endif
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
 #define pfn_valid(pfn)		((pfn) < max_mapnr)

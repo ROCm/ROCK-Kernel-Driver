@@ -24,6 +24,10 @@
  * End Change Activity 
  */
 
+#include <linux/config.h>
+#include <linux/proc_fs.h>
+#include <linux/spinlock.h>
+
 #include <asm/proc_fs.h>
 #include <asm/paca.h>
 #include <asm/iSeries/ItLpPaca.h>
@@ -33,12 +37,10 @@
 #include <asm/processor.h>
 #include <asm/time.h>
 #include <asm/iSeries/LparData.h>
-
-#include <linux/proc_fs.h>
-#include <linux/spinlock.h>
 #include <asm/pmc.h>
 #include <asm/uaccess.h>
 #include <asm/naca.h>
+#include <asm/rtas.h>
 
 
 static int proc_pmc_control_mode = 0;
@@ -100,21 +102,26 @@ void proc_ppc64_init(void)
 	if (!proc_ppc64_root) return;
 	spin_unlock(&proc_ppc64_lock);
 
-#ifdef CONFIG_PPC_EEH
-	eeh_init_proc(proc_ppc64_root);
-#endif
+	/* Placeholder for rtas interfaces. */
+	rtas_proc_dir = proc_mkdir("rtas", proc_ppc64_root);
+
 
 	proc_ppc64_pmc_root = proc_mkdir("pmc", proc_ppc64_root);
 
 	proc_ppc64_pmc_system_root = proc_mkdir("system", proc_ppc64_pmc_root);
-	for (i = 0; i < naca->processorCount; i++) {
-		sprintf(buf, "cpu%ld", i); 
-		proc_ppc64_pmc_cpu_root[i] = proc_mkdir(buf, proc_ppc64_pmc_root);
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i)) {
+			sprintf(buf, "cpu%ld", i); 
+			proc_ppc64_pmc_cpu_root[i] =
+				proc_mkdir(buf, proc_ppc64_pmc_root);
+		}
 	}
 
 
 	/* Create directories for the software counters. */
-	for (i = 0; i < naca->processorCount; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		ent = create_proc_entry("stab", S_IRUGO | S_IWUSR, 
 					proc_ppc64_pmc_cpu_root[i]);
 		if (ent) {
@@ -153,7 +160,9 @@ void proc_ppc64_init(void)
 	}
 
 	/* Create directories for the hardware counters. */
-	for (i = 0; i < naca->processorCount; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		ent = create_proc_entry("hardware", S_IRUGO | S_IWUSR, 
 					proc_ppc64_pmc_cpu_root[i]);
 		if (ent) {
@@ -189,7 +198,9 @@ int proc_ppc64_pmc_find_file(void *data)
 	   (unsigned long) proc_ppc64_pmc_system_root) {
 		return(-1); 
 	} else {
-		for (i = 0; i < naca->processorCount; i++) {
+		for (i = 0; i < NR_CPUS; i++) {
+			if (!cpu_online(i))
+				continue;
 			if ((unsigned long)data ==
 			   (unsigned long)proc_ppc64_pmc_cpu_root[i]) {
 				return(i); 
@@ -324,6 +335,7 @@ void pmc_proc_init(struct proc_dir_entry *iSeries_proc)
     if (!ent) return;
     ent->nlink = 1;
     ent->data = (void *)0;
+    ent->size = 0;
     ent->read_proc = proc_get_titanTod;
     ent->write_proc = NULL;
 
@@ -380,9 +392,10 @@ int proc_get_lpevents
 			(unsigned long)xItLpQueue.xLpIntCountByType[i] );
 	}
 	len += sprintf( page+len, "\n  events processed by processor:\n" );
-	for (i=0; i<naca->processorCount; ++i) {
-		len += sprintf( page+len, "    CPU%02d  %10u\n",
-			i, paca[i].lpEvent_count );
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (cpu_online(i))
+			len += sprintf( page+len, "    CPU%02d  %10u\n",
+				i, paca[i].lpEvent_count );
 	}
 
 	return pmc_calc_metrics( page, start, off, count, eof, len );
