@@ -45,9 +45,6 @@ static void mraid_mm_teardown_dma_pools(mraid_mmadp_t *);
 #ifdef CONFIG_COMPAT
 static int mraid_mm_compat_ioctl(unsigned int, unsigned int, unsigned long,
 		struct file *);
-#else
-#define register_ioctl32_conversion(a,b)	do{}while(0)
-#define unregister_ioctl32_conversion(a)	do{}while(0)
 #endif
 
 MODULE_AUTHOR("LSI Logic Corporation");
