@@ -52,6 +52,7 @@ main(void)
 	DEFINE(THREAD_VR0, offsetof(struct thread_struct, vr[0]));
 	DEFINE(THREAD_VRSAVE, offsetof(struct thread_struct, vrsave));
 	DEFINE(THREAD_VSCR, offsetof(struct thread_struct, vscr));
+	DEFINE(THREAD_USED_VR, offsetof(struct thread_struct, used_vr));
 #endif /* CONFIG_ALTIVEC */
 	/* Interrupt register frame */
 	DEFINE(STACK_FRAME_OVERHEAD, STACK_FRAME_OVERHEAD);
@@ -101,7 +102,7 @@ main(void)
 	DEFINE(_XER, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, xer));
 	DEFINE(_DAR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dar));
 	DEFINE(_DSISR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
-	/* The PowerPC 400-class processors have neither the DAR nor the DSISR
+	/* The PowerPC 400-class & Book-E processors have neither the DAR nor the DSISR
 	 * SPRs. Hence, we overload them to hold the similar DEAR and ESR SPRs
 	 * for such processors.  For critical interrupts we use them to
 	 * hold SRR0 and SRR1.
