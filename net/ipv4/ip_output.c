@@ -135,9 +135,10 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 	iph->version  = 4;
 	iph->ihl      = 5;
 	iph->tos      = inet->tos;
-	iph->frag_off = 0;
 	if (ip_dont_fragment(sk, &rt->u.dst))
-		iph->frag_off |= htons(IP_DF);
+		iph->frag_off = __constant_htons(IP_DF);
+	else
+		iph->frag_off = 0;
 	iph->ttl      = inet->ttl;
 	iph->daddr    = rt->rt_dst;
 	iph->saddr    = rt->rt_src;
@@ -308,9 +309,6 @@ static inline int ip_queue_xmit2(struct sk_buff *skb)
 	if (skb->len > rt->u.dst.pmtu)
 		goto fragment;
 
-	if (ip_dont_fragment(sk, &rt->u.dst))
-		iph->frag_off |= __constant_htons(IP_DF);
-
 	ip_select_ident(iph, &rt->u.dst, sk);
 
 	/* Add an IP checksum. */
@@ -324,7 +322,6 @@ fragment:
 		/* Reject packet ONLY if TCP might fragment
 		 * it itself, if were careful enough.
 		 */
-		iph->frag_off |= __constant_htons(IP_DF);
 		NETDEBUG(printk(KERN_DEBUG "sending pkt_too_big to self\n"));
 
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
@@ -385,7 +382,10 @@ packet_routed:
 	iph = (struct iphdr *) skb_push(skb, sizeof(struct iphdr) + (opt ? opt->optlen : 0));
 	*((__u16 *)iph)	= htons((4 << 12) | (5 << 8) | (inet->tos & 0xff));
 	iph->tot_len = htons(skb->len);
-	iph->frag_off = 0;
+	if (ip_dont_fragment(sk, &rt->u.dst))
+		iph->frag_off = __constant_htons(IP_DF);
+	else
+		iph->frag_off = 0;
 	iph->ttl      = inet->ttl;
 	iph->protocol = sk->protocol;
 	iph->saddr    = rt->rt_src;
@@ -452,7 +452,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 
 	mtu = rt->u.dst.pmtu;
 	if (ip_dont_fragment(sk, &rt->u.dst))
-		df = htons(IP_DF);
+		df = __constant_htons(IP_DF);
 
 	length -= sizeof(struct iphdr);
 
@@ -573,7 +573,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 				/*
 				 *	Any further fragments will have MF set.
 				 */
-				mf = htons(IP_MF);
+				mf = __constant_htons(IP_MF);
 			}
 			if (rt->rt_type == RTN_MULTICAST)
 				iph->ttl = inet->mc_ttl;
@@ -672,7 +672,7 @@ int ip_build_xmit(struct sock *sk,
 	 */
 	df = 0;
 	if (ip_dont_fragment(sk, &rt->u.dst))
-		df = htons(IP_DF);
+		df = __constant_htons(IP_DF);
 
 	/* 
 	 *	Fast path for unfragmented frames without options. 
@@ -776,7 +776,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	 */
 
 	offset = (ntohs(iph->frag_off) & IP_OFFSET) << 3;
-	not_last_frag = iph->frag_off & htons(IP_MF);
+	not_last_frag = iph->frag_off & __constant_htons(IP_MF);
 
 	/*
 	 *	Keep copying data until we run out.
@@ -861,7 +861,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		 *		   last fragment then keep MF on each bit
 		 */
 		if (left > 0 || not_last_frag)
-			iph->frag_off |= htons(IP_MF);
+			iph->frag_off |= __constant_htons(IP_MF);
 		ptr += len;
 		offset += len;
 
