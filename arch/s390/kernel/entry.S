@@ -18,6 +18,7 @@
 #include <asm/ptrace.h>
 #include <asm/thread_info.h>
 #include <asm/offsets.h>
+#include <asm/unistd.h>
 
 /*
  * Stack layout for the system_call stack entry.
@@ -97,8 +98,7 @@ entry_base:
         stam    %a0,%a15,SP_AREGS(%r15)   # store access registers to kst.
         mvc     SP_AREGS+8(12,%r15),__LC_SAVE_AREA+12 # store ac. regs
         mvc     SP_PSW(8,%r15),\psworg    # move user PSW to stack
-        la      %r0,\psworg               # store trap indication
-        st      %r0,SP_TRAP(%r15)
+	mvc	SP_TRAP(4,%r15),BASED(.L\psworg) # store trap indication
         xc      0(4,%r15),0(%r15)         # clear back chain
         .endm
 
@@ -179,12 +179,18 @@ system_call:
 	SAVE_ALL_BASE
         SAVE_ALL __LC_SVC_OLD_PSW,1
 	lh	%r7,0x8a	  # get svc number from lowcore
-        GET_THREAD_INFO           # load pointer to task_struct to R9
-	sll	%r7,2
         stosm   24(%r15),0x03     # reenable interrupts
+        GET_THREAD_INFO           # load pointer to task_struct to R9
+	sla	%r7,2             # *4 and test for svc 0
+	bnz	BASED(sysc_do_restart)  # svc number > 0
+	# svc 0: system call number in %r1
+	cl	%r1,BASED(.Lnr_syscalls)
+	bnl	BASED(sysc_do_restart)
+	lr	%r7,%r1           # copy svc number to %r7
+	sla	%r7,2             # *4
 sysc_do_restart:
-        l       %r8,sys_call_table-entry_base(%r7,%r13) # get system call addr.
 	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+        l       %r8,sys_call_table-entry_base(%r7,%r13) # get system call addr.
         bo      BASED(sysc_tracesys)
         basr    %r14,%r8          # call sys_xxxx
         st      %r2,SP_R2(%r15)   # store return value (change R2 on stack)
@@ -247,7 +253,7 @@ sysc_restart:
 	ni	__TI_flags+3(%r9),255-_TIF_RESTART_SVC # clear TIF_RESTART_SVC
 	stosm	24(%r15),0x03          # reenable interrupts
 	l	%r7,SP_R2(%r15)        # load new svc number
-	sll	%r7,2
+	sla	%r2,2
 	mvc	SP_R2(4,%r15),SP_ORIG_R2(%r15) # restore first argument
 	lm	%r2,%r6,SP_R2(%r15)    # load svc arguments
 	b	BASED(sysc_do_restart) # restart svc
@@ -260,9 +266,10 @@ sysc_tracesys:
 	srl	%r7,2
 	st	%r7,SP_R2(%r15)
 	basr	%r14,%r1
+	clc	SP_R2(4,%r15),BASED(.Lnr_syscalls)
+	bl	BASED(sysc_tracego)
 	l	%r7,SP_R2(%r15)        # strace might have changed the 
-	n	%r7,BASED(.Lc256)      #  system call
-	sll	%r7,2
+	sll	%r7,2                  #  system call
 	l	%r8,sys_call_table-entry_base(%r7,%r13)
 sysc_tracego:
 	lm	%r3,%r6,SP_R3(%r15)
@@ -617,9 +624,15 @@ sys_call_table:
 	.long  sys_epoll_wait
 	.long  sys_set_tid_address
 	.long  sys_fadvise64
-	.rept  255-253
-	.long  sys_ni_syscall
-	.endr
+	.long  sys_timer_create
+	.long  sys_timer_settime	 /* 255 */
+	.long  sys_timer_gettime
+	.long  sys_timer_getoverrun
+	.long  sys_timer_delete
+	.long  sys_clock_settime
+	.long  sys_clock_gettime
+	.long  sys_clock_getres
+	.long  sys_clock_nanosleep
 
 /*
  * Program check handler routine
@@ -694,12 +707,19 @@ pgm_per_only:
 #
 pgm_svcper:
 	SAVE_ALL __LC_SVC_OLD_PSW,1
-        GET_THREAD_INFO           # load pointer to task_struct to R9
+	lh	%r7,0x8a	  # get svc number from lowcore
         stosm   24(%r15),0x03     # reenable interrupts
-	lh	%r8,0x8a	  # get svc number from lowcore
-        sll     %r8,2
-        l       %r8,sys_call_table-entry_base(%r8,%r13) # get system call addr.
+        GET_THREAD_INFO           # load pointer to task_struct to R9
+        sla     %r7,2             # *4 and test for svc 0
+	bnz	BASED(pgm_svcstd) # svc number > 0 ?
+	# svc 0: system call number in %r1
+	cl	%r1,BASED(.Lnr_syscalls)
+	bnl	BASED(pgm_svcstd)
+	lr	%r7,%r1           # copy svc number to %r7
+	sla	%r7,2             # *4
+pgm_svcstd:
 	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+        l       %r8,sys_call_table-entry_base(%r7,%r13) # get system call addr.
         bo      BASED(pgm_tracesys)
         basr    %r14,%r8          # call sys_xxxx
         st      %r2,SP_R2(%r15)   # store return value (change R2 on stack)
@@ -725,13 +745,14 @@ pgm_svcper_nosig:
 #
 pgm_tracesys:
         l       %r1,BASED(.Ltrace)
-	mvc	SP_R2(%r15),BASED(.Lc_ENOSYS)
+	srl	%r7,2
+	st	%r7,SP_R2(%r15)
         basr    %r14,%r1
-	clc	SP_R2(4,%r15),BASED(.Lc256)
-	bnl	BASED(pgm_svc_go)
-	l	%r8,SP_R2(%r15)   # strace changed the syscall
-	sll     %r8,2
-	l	%r8,sys_call_table-entry_base(%r8,%r13)
+	clc	SP_R2(4,%r15),BASED(.Lnr_syscalls)
+	bl	BASED(pgm_svc_go)
+	l	%r7,SP_R2(%r15)   # strace changed the syscall
+	sll     %r7,2
+	l	%r8,sys_call_table-entry_base(%r7,%r13)
 pgm_svc_go:
 	lm      %r3,%r6,SP_R3(%r15)
 	l       %r2,SP_ORIG_R2(%r15)
@@ -922,7 +943,12 @@ restart_go:
 .Lc_ENOSYS:    .long  -ENOSYS
 .Lc_pactive:   .long  PREEMPT_ACTIVE
 .Lc0xff:       .long  0xff
-.Lc256:        .long  256
+.Lnr_syscalls: .long  NR_syscalls
+.L0x018:       .long  0x018
+.L0x020:       .long  0x020
+.L0x028:       .long  0x028
+.L0x030:       .long  0x030
+.L0x038:       .long  0x038
 
 /*
  * Symbol constants
