@@ -2435,6 +2435,8 @@ static int m3_resume(snd_card_t *card, unsigned int state)
 	if (chip->suspend_mem == NULL)
 		return 0;
 
+	pci_set_master(pci);
+
 	/* first lets just bring everything back. .*/
 	snd_m3_outw(chip, 0, 0x54);
 	snd_m3_outw(chip, 0, 0x56);
