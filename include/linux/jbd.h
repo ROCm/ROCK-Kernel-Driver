@@ -33,6 +33,15 @@
 
 #define journal_oom_retry 1
 
+/*
+ * Define JBD_PARANIOD_IOFAIL to cause a kernel BUG() if ext3 finds
+ * certain classes of error which can occur due to failed IOs.  Under
+ * normal use we want ext3 to continue after such errors, because
+ * hardware _can_ fail, but for debugging purposes when running tests on
+ * known-good hardware we may want to trap these errors.
+ */
+#undef JBD_PARANOID_IOFAIL
+
 #ifdef CONFIG_JBD_DEBUG
 /*
  * Define JBD_EXPENSIVE_CHECKING to enable more expensive internal
@@ -256,6 +265,23 @@ void buffer_assertion_failure(struct buffer_head *bh);
 #else
 #define J_ASSERT(assert)	do { } while (0)
 #endif		/* JBD_ASSERTIONS */
+
+#if defined(JBD_PARANOID_IOFAIL)
+#define J_EXPECT(expr, why...)		J_ASSERT(expr)
+#define J_EXPECT_BH(bh, expr, why...)	J_ASSERT_BH(bh, expr)
+#define J_EXPECT_JH(jh, expr, why...)	J_ASSERT_JH(jh, expr)
+#else
+#define __journal_expect(expr, why...)					     \
+	do {								     \
+		if (!(expr)) {						     \
+			printk(KERN_ERR "EXT3-fs unexpected failure: %s;\n", # expr); \
+			printk(KERN_ERR ## why);			     \
+		}							     \
+	} while (0)
+#define J_EXPECT(expr, why...)		__journal_expect(expr, ## why)
+#define J_EXPECT_BH(bh, expr, why...)	__journal_expect(expr, ## why)
+#define J_EXPECT_JH(jh, expr, why...)	__journal_expect(expr, ## why)
+#endif
 
 enum jbd_state_bits {
 	BH_JBD			/* Has an attached ext3 journal_head */
