@@ -2108,7 +2108,6 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 	    || ((dir == SNDRV_PCM_STREAM_CAPTURE) && (nr_ch > 2)))
 		return -EBUSY;
 
-	spin_lock(&vortex->lock);
 	if (dma >= 0) {
 		en = 0;
 		vortex_adb_checkinout(vortex,
@@ -2304,7 +2303,6 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 		}
 	}
 	vortex->dma_adb[dma].nr_ch = nr_ch;
-	spin_unlock(&vortex->lock);
 
 #if 0
 	/* AC97 Codec channel setup. FIXME: this has no effect on some cards !! */
@@ -2433,22 +2431,28 @@ static irqreturn_t vortex_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	if (source & IRQ_PCMOUT) {
 		/* ALSA period acknowledge. */
+		spin_lock(&vortex->lock);
 		for (i = 0; i < NR_ADB; i++) {
 			if (vortex->dma_adb[i].fifo_status == FIFO_START) {
 				if (vortex_adbdma_bufshift(vortex, i)) ;
+				spin_unlock(&vortex->lock);
 				snd_pcm_period_elapsed(vortex->dma_adb[i].
 						       substream);
+				spin_lock(&vortex->lock);
 			}
 		}
 #ifndef CHIP_AU8810
 		for (i = 0; i < NR_WT; i++) {
 			if (vortex->dma_wt[i].fifo_status == FIFO_START) {
 				if (vortex_wtdma_bufshift(vortex, i)) ;
+				spin_unlock(&vortex->lock);
 				snd_pcm_period_elapsed(vortex->dma_wt[i].
 						       substream);
+				spin_lock(&vortex->lock);
 			}
 		}
 #endif
+		spin_unlock(&vortex->lock);
 		handled = 1;
 	}
 	//Acknowledge the Timer interrupt
