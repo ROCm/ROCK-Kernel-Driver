@@ -67,7 +67,7 @@ struct usb_idmouse {
 };
 
 /* local function prototypes */
-static ssize_t idmouse_read(struct file *file, char *buffer,
+static ssize_t idmouse_read(struct file *file, char __user *buffer,
 				size_t count, loff_t * ppos);
 
 static int idmouse_open(struct inode *inode, struct file *file);
@@ -274,7 +274,7 @@ static int idmouse_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t idmouse_read(struct file *file, char *buffer, size_t count,
+static ssize_t idmouse_read(struct file *file, char __user *buffer, size_t count,
 				loff_t * ppos)
 {
 	struct usb_idmouse *dev;
@@ -343,7 +343,7 @@ static int idmouse_probe(struct usb_interface *interface,
 		USB_ENDPOINT_XFER_BULK)) {
 
 		/* we found a bulk in endpoint */
-		buffer_size = endpoint->wMaxPacketSize;
+		buffer_size = le16_to_cpu(endpoint->wMaxPacketSize);
 		dev->bulk_in_size = buffer_size;
 		dev->bulk_in_endpointAddr = endpoint->bEndpointAddress;
 		dev->bulk_in_buffer =
