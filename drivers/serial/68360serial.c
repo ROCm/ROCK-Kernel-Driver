@@ -36,7 +36,6 @@
 #include <linux/fcntl.h>
 #include <linux/ptrace.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <asm/irq.h>

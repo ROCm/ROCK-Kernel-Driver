@@ -404,11 +404,20 @@ static struct miscdevice rtc_gen_dev =
 
 int __init rtc_generic_init(void)
 {
+	int retval;
 
-		printk(KERN_INFO "Generic RTC Driver v%s\n", RTC_VERSION);
+	printk(KERN_INFO "Generic RTC Driver v%s\n", RTC_VERSION);
 
-	misc_register(&rtc_gen_dev);
-	create_proc_read_entry ("driver/rtc", 0, 0, gen_rtc_read_proc, NULL);
+	retval = misc_register(&rtc_gen_dev);
+	if(retval < 0)
+		return retval;
+
+#ifdef CONFIG_PROC_FS
+	if((create_proc_read_entry ("driver/rtc", 0, 0, gen_rtc_read_proc, NULL)) == NULL){
+		misc_deregister(&rtc_gen_dev);
+		return -ENOMEM;
+	}
+#endif
 
 	return 0;
 }

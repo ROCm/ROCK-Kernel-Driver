@@ -15,6 +15,7 @@
 #include <linux/swap.h>
 #include <linux/fs.h>
 #include <linux/highmem.h>
+#include <linux/rmap-locking.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -81,7 +82,9 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-static int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
+static int
+copy_one_pte(struct mm_struct *mm, pte_t *src, pte_t *dst,
+		struct pte_chain **pte_chainp)
 {
 	int error = 0;
 	pte_t pte;
@@ -101,17 +104,25 @@ static int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 		}
 		set_pte(dst, pte);
 		if (page)
-			page_add_rmap(page, dst);
+			*pte_chainp = page_add_rmap(page, dst, *pte_chainp);
 	}
 	return error;
 }
 
-static int move_one_page(struct vm_area_struct *vma, unsigned long old_addr, unsigned long new_addr)
+static int
+move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
+		unsigned long new_addr)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	int error = 0;
 	pte_t *src, *dst;
+	struct pte_chain *pte_chain;
 
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
+	if (!pte_chain) {
+		error = -ENOMEM;
+		goto out;
+	}
 	spin_lock(&mm->page_table_lock);
 	src = get_one_pte_map_nested(mm, old_addr);
 	if (src) {
@@ -127,12 +138,14 @@ static int move_one_page(struct vm_area_struct *vma, unsigned long old_addr, uns
 		dst = alloc_one_pte_map(mm, new_addr);
 		if (src == NULL)
 			src = get_one_pte_map_nested(mm, old_addr);
-		error = copy_one_pte(mm, src, dst);
+		error = copy_one_pte(mm, src, dst, &pte_chain);
 		pte_unmap_nested(src);
 		pte_unmap(dst);
 	}
 	flush_tlb_page(vma, old_addr);
 	spin_unlock(&mm->page_table_lock);
+	pte_chain_free(pte_chain);
+out:
 	return error;
 }
 

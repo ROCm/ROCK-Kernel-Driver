@@ -587,7 +587,9 @@ static int __ncptcp_rcv_proc(struct ncp_server *server) {
 				}
 #endif				
 				type = ntohs(server->rcv.buf.type);
+#ifdef CONFIG_NCPFS_PACKET_SIGNING				
 cont:;				
+#endif
 				if (type != NCP_REPLY) {
 					if (datalen - 8 <= sizeof(server->unexpected_packet.data)) {
 						*(__u16*)(server->unexpected_packet.data) = htons(type);

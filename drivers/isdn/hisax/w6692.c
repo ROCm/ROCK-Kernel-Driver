@@ -844,16 +844,14 @@ setup_w6692(struct IsdnCard *card)
 	printk(KERN_INFO "Found: %s %s, I/O base: 0x%x, irq: %d\n",
 	       id_list[cs->subtyp].vendor_name, id_list[cs->subtyp].card_name,
 	       pci_ioaddr, pci_irq);
-	if (check_region((cs->hw.w6692.iobase), 256)) {
+	if (!request_region((cs->hw.w6692.iobase), 256,
+			    id_list[cs->subtyp].card_name)) {
 		printk(KERN_WARNING
 		       "HiSax: %s I/O ports %x-%x already in use\n",
 		       id_list[cs->subtyp].card_name,
 		       cs->hw.w6692.iobase,
 		       cs->hw.w6692.iobase + 255);
 		return (0);
-	} else {
-		request_region(cs->hw.w6692.iobase, 256,
-			       id_list[cs->subtyp].card_name);
 	}
 #else
 	printk(KERN_WARNING "HiSax: W6692 and NO_PCI_BIOS\n");

@@ -250,15 +250,14 @@ setup_s0box(struct IsdnCard *card)
 	cs->hw.teles3.hscxfifo[0] = cs->hw.teles3.hscx[0] + 0x3e;
 	cs->hw.teles3.hscxfifo[1] = cs->hw.teles3.hscx[1] + 0x3e;
 	cs->irq = card->para[0];
-	if (check_region(cs->hw.teles3.cfg_reg,8)) {
+	if (!request_region(cs->hw.teles3.cfg_reg,8, "S0Box parallel I/O")) {
 		printk(KERN_WARNING
 		       "HiSax: %s ports %x-%x already in use\n",
 		       CardType[cs->typ],
                        cs->hw.teles3.cfg_reg,
                        cs->hw.teles3.cfg_reg + 7);
 		return 0;
-	} else
-		request_region(cs->hw.teles3.cfg_reg, 8, "S0Box parallel I/O");
+	} 
 	printk(KERN_INFO
 	       "HiSax: %s config irq:%d isac:0x%x  cfg:0x%x\n",
 	       CardType[cs->typ], cs->irq,

@@ -196,13 +196,12 @@ get_io_range(struct IsdnCardState *cs)
 	
 	for (i=0;i<64;i++) {
 		adr = cs->hw.spt.cfg_reg + i *1024;
-		if (check_region(adr, 8)) {
+		if (!request_region(adr, 8, "sportster")) {
 			printk(KERN_WARNING
 				"HiSax: %s config port %x-%x already in use\n",
 				CardType[cs->typ], adr, adr + 8);
 			break;
-		} else
-			request_region(adr, 8, "sportster");
+		}
 	}
 	if (i==64)
 		return(1);

@@ -58,16 +58,15 @@ extern char *linux_banner;
 static int init(void *);
 
 extern void init_IRQ(void);
-extern void init_modules(void);
 extern void sock_init(void);
 extern void fork_init(unsigned long);
-extern void extable_init(void);
 extern void mca_init(void);
 extern void sbus_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
 extern void buffer_init(void);
 extern void pidhash_init(void);
+extern void pidmap_init(void);
 extern void pte_chain_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
@@ -391,9 +390,9 @@ asmlinkage void __init start_kernel(void)
 		   &__stop___param - &__start___param,
 		   &unknown_bootoption);
 	trap_init();
-	extable_init();
 	rcu_init();
 	init_IRQ();
+	pidhash_init();
 	sched_init();
 	softirq_init();
 	time_init();
@@ -419,7 +418,7 @@ asmlinkage void __init start_kernel(void)
 	page_address_init();
 	mem_init();
 	kmem_cache_sizes_init();
-	pidhash_init();
+	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();
 	fork_init(num_physpages);

@@ -13,6 +13,7 @@
 
 #include <linux/sunrpc/msg_prot.h>
 #include <linux/sunrpc/cache.h>
+#include <linux/string.h>
 
 struct svc_cred {
 	uid_t			cr_uid;
@@ -111,7 +112,11 @@ extern struct auth_domain *auth_unix_lookup(struct in_addr addr);
 extern int auth_unix_forget_old(struct auth_domain *dom);
 extern void svcauth_unix_purge(void);
 
-extern int name_hash(char *name, int size);
+extern int hash_mem(char *buf, int len, int bits);
+static inline int hash_str(char *name, int bits)
+{
+	return hash_mem(name, strlen(name), bits);
+}
 
 extern struct cache_detail auth_domain_cache, ip_map_cache;
 

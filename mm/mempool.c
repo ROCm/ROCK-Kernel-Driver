@@ -87,7 +87,13 @@ mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 	}
 	return pool;
 }
+EXPORT_SYMBOL(mempool_create);
 
+/*
+ * mempool_resize is disabled for now, because it has no callers.  Feel free
+ * to turn it back on if needed.
+ */
+#if 0
 /**
  * mempool_resize - resize an existing memory pool
  * @pool:       pointer to the memory pool which was allocated via
@@ -143,16 +149,21 @@ int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
 		if (!element)
 			goto out;
 		spin_lock_irqsave(&pool->lock, flags);
-		if (pool->curr_nr < pool->min_nr)
+		if (pool->curr_nr < pool->min_nr) {
 			add_element(pool, element);
-		else
-			kfree(element);		/* Raced */
+		} else {
+			spin_unlock_irqrestore(&pool->lock, flags);
+			pool->free(element, pool->pool_data);	/* Raced */
+			spin_lock_irqsave(&pool->lock, flags);
+		}
 	}
 out_unlock:
 	spin_unlock_irqrestore(&pool->lock, flags);
 out:
 	return 0;
 }
+EXPORT_SYMBOL(mempool_resize);
+#endif
 
 /**
  * mempool_destroy - deallocate a memory pool
@@ -169,6 +180,7 @@ void mempool_destroy(mempool_t *pool)
 		BUG();		/* There were outstanding elements */
 	free_pool(pool);
 }
+EXPORT_SYMBOL(mempool_destroy);
 
 /**
  * mempool_alloc - allocate an element from a specific memory pool
@@ -230,6 +242,7 @@ repeat_alloc:
 
 	goto repeat_alloc;
 }
+EXPORT_SYMBOL(mempool_alloc);
 
 /**
  * mempool_free - return an element to the pool.
@@ -255,6 +268,7 @@ void mempool_free(void *element, mempool_t *pool)
 	}
 	pool->free(element, pool->pool_data);
 }
+EXPORT_SYMBOL(mempool_free);
 
 /*
  * A commonly used alloc and free fn.
@@ -264,17 +278,11 @@ void *mempool_alloc_slab(int gfp_mask, void *pool_data)
 	kmem_cache_t *mem = (kmem_cache_t *) pool_data;
 	return kmem_cache_alloc(mem, gfp_mask);
 }
+EXPORT_SYMBOL(mempool_alloc_slab);
 
 void mempool_free_slab(void *element, void *pool_data)
 {
 	kmem_cache_t *mem = (kmem_cache_t *) pool_data;
 	kmem_cache_free(mem, element);
 }
-
-EXPORT_SYMBOL(mempool_create);
-EXPORT_SYMBOL(mempool_resize);
-EXPORT_SYMBOL(mempool_destroy);
-EXPORT_SYMBOL(mempool_alloc);
-EXPORT_SYMBOL(mempool_free);
-EXPORT_SYMBOL(mempool_alloc_slab);
 EXPORT_SYMBOL(mempool_free_slab);

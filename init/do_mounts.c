@@ -13,6 +13,7 @@
 #include <linux/suspend.h>
 #include <linux/root_dev.h>
 #include <linux/mount.h>
+#include <linux/dirent.h>
 #include <linux/security.h>
 
 #include <linux/nfs_fs.h>
@@ -324,22 +325,32 @@ static int __init mount_nfs_root(void)
 #endif
 
 #ifdef CONFIG_DEVFS_FS
+
+/*
+ * If the dir will fit in *buf, return its length.  If it won't fit, return
+ * zero.  Return -ve on error.
+ */
 static int __init do_read_dir(int fd, void *buf, int len)
 {
 	long bytes, n;
 	char *p = buf;
 	lseek(fd, 0, 0);
 
-	for (bytes = 0, p = buf; bytes < len; bytes += n, p+=n) {
-		n = sys_getdents64(fd, p, len - bytes);
+	for (bytes = 0; bytes < len; bytes += n) {
+		n = sys_getdents64(fd, p + bytes, len - bytes);
 		if (n < 0)
-			return -1;
+			return n;
 		if (n == 0)
 			return bytes;
 	}
 	return 0;
 }
 
+/*
+ * Try to read all of a directory.  Returns the contents at *p, which
+ * is kmalloced memory.  Returns the number of bytes read at *len.  Returns
+ * NULL on error.
+ */
 static void * __init read_dir(char *path, int *len)
 {
 	int size;
@@ -349,7 +360,7 @@ static void * __init read_dir(char *path, int *len)
 	if (fd < 0)
 		return NULL;
 
-	for (size = 1<<9; size < (1<<18); size <<= 1) {
+	for (size = 1 << 9; size <= (1 << MAX_ORDER); size <<= 1) {
 		void *p = kmalloc(size, GFP_KERNEL);
 		int n;
 		if (!p)
@@ -361,6 +372,8 @@ static void * __init read_dir(char *path, int *len)
 			return p;
 		}
 		kfree(p);
+		if (n == -EINVAL)
+			continue;	/* Try a larger buffer */
 		if (n < 0)
 			break;
 	}
@@ -368,14 +381,6 @@ static void * __init read_dir(char *path, int *len)
 	return NULL;
 }
 #endif
-
-struct linux_dirent64 {
-	u64		d_ino;
-	s64		d_off;
-	unsigned short	d_reclen;
-	unsigned char	d_type;
-	char		d_name[0];
-};
 
 static int __init find_in_devfs(char *path, dev_t dev)
 {

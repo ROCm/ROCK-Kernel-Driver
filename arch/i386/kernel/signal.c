@@ -617,4 +617,6 @@ void do_notify_resume(struct pt_regs *regs, sigset_t *oldset,
 	/* deal with pending signal delivery */
 	if (thread_info_flags & _TIF_SIGPENDING)
 		do_signal(regs,oldset);
+	
+	clear_thread_flag(TIF_IRET);
 }

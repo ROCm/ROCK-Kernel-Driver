@@ -578,10 +578,19 @@ static int super_90_validate(mddev_t *mddev, mdk_rdev_t *rdev)
 		mddev->level = sb->level;
 		mddev->layout = sb->layout;
 		mddev->raid_disks = sb->raid_disks;
-		mddev->state = sb->state;
 		mddev->size = sb->size;
 		mddev->events = md_event(sb);
-	
+
+		if (sb->state & (1<<MD_SB_CLEAN))
+			mddev->recovery_cp = MaxSector;
+		else {
+			if (sb->events_hi == sb->cp_events_hi && 
+				sb->events_lo == sb->cp_events_lo) {
+				mddev->recovery_cp = sb->recovery_cp;
+			} else
+				mddev->recovery_cp = 0;
+		}
+
 		memcpy(mddev->uuid+0, &sb->set_uuid0, 4);
 		memcpy(mddev->uuid+4, &sb->set_uuid1, 4);
 		memcpy(mddev->uuid+8, &sb->set_uuid2, 4);
@@ -657,9 +666,21 @@ static void super_90_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 	sb->md_minor = mddev->__minor;
 	sb->not_persistent = !mddev->persistent;
 	sb->utime = mddev->utime;
-	sb->state = mddev->state;
+	sb->state = 0;
 	sb->events_hi = (mddev->events>>32);
 	sb->events_lo = (u32)mddev->events;
+
+	if (mddev->in_sync)
+	{
+		sb->recovery_cp = mddev->recovery_cp;
+		sb->cp_events_hi = (mddev->events>>32);
+		sb->cp_events_lo = (u32)mddev->events;
+		if (mddev->recovery_cp == MaxSector) {
+			printk(KERN_INFO "md: marking sb clean...\n");
+			sb->state = (1<< MD_SB_CLEAN);
+		}
+	} else
+		sb->recovery_cp = 0;
 
 	sb->layout = mddev->layout;
 	sb->chunk_size = mddev->chunk_size;
@@ -1198,7 +1219,7 @@ static int analyze_sbs(mddev_t * mddev)
 		goto abort;
 	}
 
-	if ((mddev->state != (1 << MD_SB_CLEAN)) && ((mddev->level == 1) ||
+	if ((mddev->recovery_cp != MaxSector) && ((mddev->level == 1) ||
 			(mddev->level == 4) || (mddev->level == 5)))
 		printk(NOT_CLEAN_IGNORE, mdidx(mddev));
 
@@ -1469,13 +1490,11 @@ static int do_md_run(mddev_t * mddev)
 		mddev->pers = NULL;
 		return -EINVAL;
 	}
-
-	mddev->in_sync = (mddev->state & (1<<MD_SB_CLEAN));
-	/* if personality doesn't have "sync_request", then
-	 * a dirty array doesn't mean anything
-	 */
 	if (mddev->pers->sync_request)
-		mddev->state &= ~(1 << MD_SB_CLEAN);
+		mddev->in_sync = 0;
+	else
+		mddev->in_sync = 1;
+	
 	md_update_sb(mddev);
 	md_recover_arrays();
 	set_capacity(disk, md_size[mdidx(mddev)]<<1);
@@ -1502,6 +1521,8 @@ static int restart_array(mddev_t *mddev)
 		if (!mddev->ro)
 			goto out;
 
+		mddev->in_sync = 0;
+		md_update_sb(mddev);
 		mddev->ro = 0;
 		set_disk_ro(disk, 0);
 
@@ -1541,7 +1562,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 	if (mddev->pers) {
 		if (mddev->sync_thread) {
 			if (mddev->recovery_running > 0)
-				mddev->recovery_running = -EINTR;
+				mddev->recovery_running = -1;
 			md_unregister_thread(mddev->sync_thread);
 			mddev->sync_thread = NULL;
 		}
@@ -1567,14 +1588,8 @@ static int do_md_stop(mddev_t * mddev, int ro)
 				mddev->ro = 0;
 		}
 		if (mddev->raid_disks) {
-			/*
-			 * mark it clean only if there was no resync
-			 * interrupted.
-			 */
-			if (mddev->in_sync) {
-				printk(KERN_INFO "md: marking sb clean...\n");
-				mddev->state |= 1 << MD_SB_CLEAN;
-			}
+			/* mark array as shutdown cleanly */
+			mddev->in_sync = 1;
 			md_update_sb(mddev);
 		}
 		if (ro)
@@ -1840,7 +1855,9 @@ static int get_array_info(mddev_t * mddev, void * arg)
 	info.not_persistent= !mddev->persistent;
 
 	info.utime         = mddev->utime;
-	info.state         = mddev->state;
+	info.state         = 0;
+	if (mddev->recovery_cp == MaxSector)
+		info.state = (1<<MD_SB_CLEAN);
 	info.active_disks  = active;
 	info.working_disks = working;
 	info.failed_disks  = failed;
@@ -2111,7 +2128,10 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 	/* don't set __minor, it is determined by which /dev/md* was
 	 * openned
 	 */
-	mddev->state         = info->state;
+	if (info->state & (1<<MD_SB_CLEAN))
+		mddev->recovery_cp = MaxSector;
+	else
+		mddev->recovery_cp = 0;
 	mddev->persistent    = ! info->not_persistent;
 
 	mddev->layout        = info->layout;
@@ -2742,7 +2762,7 @@ int unregister_md_personality(int pnum)
 
 void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors)
 {
-	rdev->bdev->bd_disk->sync_io += nr_sectors;
+	rdev->bdev->bd_contains->bd_disk->sync_io += nr_sectors;
 }
 
 static int is_mddev_idle(mddev_t *mddev)
@@ -2754,7 +2774,7 @@ static int is_mddev_idle(mddev_t *mddev)
 
 	idle = 1;
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		struct gendisk *disk = rdev->bdev->bd_disk;
+		struct gendisk *disk = rdev->bdev->bd_contains->bd_disk;
 		curr_events = disk->read_sectors + disk->write_sectors - disk->sync_io;
 		if ((curr_events - rdev->last_events) > 32) {
 			rdev->last_events = curr_events;
@@ -2770,7 +2790,8 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 	atomic_sub(blocks, &mddev->recovery_active);
 	wake_up(&mddev->recovery_wait);
 	if (!ok) {
-		mddev->recovery_running = -EIO;
+		mddev->recovery_error = -EIO;
+		mddev->recovery_running = -1;
 		md_recover_arrays();
 		// stop recovery, signal do_sync ....
 	}
@@ -2815,8 +2836,10 @@ static void md_do_sync(void *data)
 				printk(KERN_INFO "md: delaying resync of md%d until md%d "
 				       "has finished resync (they share one or more physical units)\n",
 				       mdidx(mddev), mdidx(mddev2));
-				if (mddev < mddev2) /* arbitrarily yield */
+				if (mddev < mddev2) {/* arbitrarily yield */
 					mddev->curr_resync = 1;
+					yield();
+				}
 				if (wait_event_interruptible(resync_wait,
 							     mddev2->curr_resync < 2)) {
 					flush_curr_signals();
@@ -2839,7 +2862,7 @@ static void md_do_sync(void *data)
 	is_mddev_idle(mddev); /* this also initializes IO event counters */
 	for (m = 0; m < SYNC_MARKS; m++) {
 		mark[m] = jiffies;
-		mark_cnt[m] = 0;
+		mark_cnt[m] = mddev->recovery_cp;
 	}
 	last_mark = 0;
 	mddev->resync_mark = mark[last_mark];
@@ -2855,7 +2878,13 @@ static void md_do_sync(void *data)
 	atomic_set(&mddev->recovery_active, 0);
 	init_waitqueue_head(&mddev->recovery_wait);
 	last_check = 0;
-	for (j = 0; j < max_sectors;) {
+
+	mddev->recovery_error = 0;
+
+	if (mddev->recovery_cp)
+		printk(KERN_INFO "md: resuming recovery of md%d from checkpoint.\n", mdidx(mddev));
+
+	for (j = mddev->recovery_cp; j < max_sectors;) {
 		int sectors;
 
 		sectors = mddev->pers->sync_request(mddev, j, currspeed < sysctl_speed_limit_min);
@@ -2925,16 +2954,25 @@ static void md_do_sync(void *data)
 	 */
  out:
 	wait_event(mddev->recovery_wait, !atomic_read(&mddev->recovery_active));
+
+	if (mddev->recovery_running < 0 && 
+		!mddev->recovery_error && mddev->curr_resync > 2)
+	{
+		/* interrupted but no write errors */
+		printk(KERN_INFO "md: checkpointing recovery of md%d.\n", mdidx(mddev));
+		mddev->recovery_cp = mddev->curr_resync;
+	}
+
 	/* tell personality that we are finished */
 	mddev->pers->sync_request(mddev, max_sectors, 1);
  skip:
 	mddev->curr_resync = 0;
 	if (err)
-		mddev->recovery_running = err;
+		mddev->recovery_running = -1;
 	if (mddev->recovery_running > 0)
 		mddev->recovery_running = 0;
 	if (mddev->recovery_running == 0)
-		mddev->in_sync = 1;
+		mddev->recovery_cp = MaxSector;
 	md_recover_arrays();
 }
 
@@ -3015,14 +3053,16 @@ void md_do_recovery(void *data)
 			ITERATE_RDEV(mddev,rdev,rtmp)
 				if (rdev->raid_disk < 0
 				    && !rdev->faulty) {
-					if (mddev->pers->hot_add_disk(mddev,rdev))
+					if (mddev->pers->hot_add_disk(mddev,rdev)) {
 						mddev->spares++;
+						mddev->recovery_cp = 0;
+					}
 					else
 						break;
 				}
 		}
 
-		if (!mddev->spares && mddev->in_sync) {
+		if (!mddev->spares && (mddev->recovery_cp == MaxSector )) {
 			/* nothing we can do ... */
 			goto unlock;
 		}

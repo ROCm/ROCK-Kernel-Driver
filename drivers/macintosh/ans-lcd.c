@@ -140,6 +140,7 @@ int __init
 anslcd_init(void)
 {
 	int a;
+	int retval;
 	struct device_node* node;
 
 	node = find_devices("lcd");
@@ -150,7 +151,12 @@ anslcd_init(void)
 
 	anslcd_ptr = (volatile unsigned char*)ioremap(ANSLCD_ADDR, 0x20);
 	
-	misc_register(&anslcd_dev);
+	retval = misc_register(&anslcd_dev);
+	if(retval < 0){
+		printk(KERN_INFO "LCD: misc_register failed\n");
+		iounmap(anslcd_ptr);
+		return retval;
+	}
 
 #ifdef DEBUG
 	printk(KERN_DEBUG "LCD: init\n");

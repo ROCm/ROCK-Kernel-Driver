@@ -28,6 +28,8 @@
 #define	LEVEL_MULTIPATH		(-4)
 #define	LEVEL_LINEAR		(-1)
 
+#define MaxSector (~(sector_t)0)
+
 static inline int pers_to_level (int pers)
 {
 	switch (pers) {
@@ -198,7 +200,6 @@ struct mddev_s
 	int				level, layout;
 	int				raid_disks;
 	int				max_disks;
-	unsigned long			state;
 	sector_t			size; /* used size of component devices */
 	__u64				events;
 
@@ -215,6 +216,7 @@ struct mddev_s
 	 * it can only be set > 0 under reconfig_sem
 	 */
 	int				recovery_running;
+	int				recovery_error;	/* error from recovery write */
 	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
@@ -226,6 +228,7 @@ struct mddev_s
 
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
+	sector_t			recovery_cp;
 
 	request_queue_t			queue;	/* for plugging ... */
 

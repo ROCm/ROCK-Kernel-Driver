@@ -214,15 +214,13 @@ setup_mic(struct IsdnCard *card)
 	cs->hw.mic.isac = cs->hw.mic.cfg_reg + MIC_ISAC;
 	cs->hw.mic.hscx = cs->hw.mic.cfg_reg + MIC_HSCX;
 
-	if (check_region((cs->hw.mic.cfg_reg), bytecnt)) {
+	if (!request_region((cs->hw.mic.cfg_reg), bytecnt, "mic isdn")) {
 		printk(KERN_WARNING
 		       "HiSax: %s config port %x-%x already in use\n",
 		       CardType[card->typ],
 		       cs->hw.mic.cfg_reg,
 		       cs->hw.mic.cfg_reg + bytecnt);
 		return (0);
-	} else {
-		request_region(cs->hw.mic.cfg_reg, bytecnt, "mic isdn");
 	}
 
 	printk(KERN_INFO

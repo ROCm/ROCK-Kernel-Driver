@@ -14,6 +14,7 @@
 #include <linux/mman.h>
 #include <linux/signal.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -285,7 +286,7 @@ static void do_kernel_fault(struct pt_regs *regs, int si_code, int fault_code,
 	
 		/* Look in asi.h: All _S asis have LS bit set */
 		if ((asi & 0x1) &&
-		    (fixup = search_exception_table (regs->tpc, &g2))) {
+		    (fizup = search_extables_range(regs->tpc, &g2))) {
 			regs->tpc = fixup;
 			regs->tnpc = regs->tpc + 4;
 			regs->u_regs[UREG_G2] = g2;

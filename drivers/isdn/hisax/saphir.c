@@ -265,15 +265,14 @@ setup_saphir(struct IsdnCard *card)
 	cs->hw.saphir.hscx = card->para[1] + HSCX_DATA;
 	cs->hw.saphir.ale = card->para[1] + ADDRESS_REG;
 	cs->irq = card->para[0];
-	if (check_region((cs->hw.saphir.cfg_reg), 6)) {
+	if (!request_region((cs->hw.saphir.cfg_reg), 6, "saphir")) {
 		printk(KERN_WARNING
 			"HiSax: %s config port %x-%x already in use\n",
 			CardType[card->typ],
 			cs->hw.saphir.cfg_reg,
 			cs->hw.saphir.cfg_reg + 5);
 		return (0);
-	} else
-		request_region(cs->hw.saphir.cfg_reg,6, "saphir");
+	}
 
 	printk(KERN_INFO
 	       "HiSax: %s config irq:%d io:0x%X\n",

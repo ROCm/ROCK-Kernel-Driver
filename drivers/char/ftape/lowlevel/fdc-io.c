@@ -1209,7 +1209,7 @@ static int fdc_request_regions(void)
 	TRACE_FUN(ft_t_flow);
 
 	if (ft_mach2 || ft_probe_fc10) {
-		if (check_region(fdc.sra, 8) < 0) {
+		if (!request_region(fdc.sra, 8, "fdc (ft)")) {
 #ifndef BROKEN_FLOPPY_DRIVER
 			TRACE_EXIT -EBUSY;
 #else
@@ -1217,10 +1217,8 @@ static int fdc_request_regions(void)
 "address 0x%03x occupied (by floppy driver?), using it anyway", fdc.sra);
 #endif
 		}
-		request_region(fdc.sra, 8, "fdc (ft)");
 	} else {
-		if (check_region(fdc.sra, 6) < 0 || 
-		    check_region(fdc.dir, 1) < 0) {
+		if (!request_region(fdc.sra, 6, "fdc (ft)")) {
 #ifndef BROKEN_FLOPPY_DRIVER
 			TRACE_EXIT -EBUSY;
 #else
@@ -1228,8 +1226,15 @@ static int fdc_request_regions(void)
 "address 0x%03x occupied (by floppy driver?), using it anyway", fdc.sra);
 #endif
 		}
-		request_region(fdc.sra, 6, "fdc (ft)");
-		request_region(fdc.sra + 7, 1, "fdc (ft)");
+		if (!request_region(fdc.sra + 7, 1, "fdc (ft)")) {
+#ifndef BROKEN_FLOPPY_DRIVER
+			release_region(fdc.sra, 6);
+			TRACE_EXIT -EBUSY;
+#else
+			TRACE(ft_t_warn,
+"address 0x%03x occupied (by floppy driver?), using it anyway", fdc.sra + 7);
+#endif
+		}
 	}
 	TRACE_EXIT 0;
 }

@@ -16,4 +16,17 @@ struct dirent64 {
 	char		d_name[256];
 };
 
+#ifdef __KERNEL__
+
+struct linux_dirent64 {
+	u64		d_ino;
+	s64		d_off;
+	unsigned short	d_reclen;
+	unsigned char	d_type;
+	char		d_name[0];
+};
+
+#endif	/* __KERNEL__ */
+
+
 #endif

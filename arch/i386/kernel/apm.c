@@ -718,7 +718,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
  *	same format.
  */
 
-static int __init apm_driver_version(u_short *val)
+static int apm_driver_version(u_short *val)
 {
 	u32	eax;
 

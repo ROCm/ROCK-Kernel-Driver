@@ -24,6 +24,7 @@
 #include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#include <linux/hash.h>
 
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -59,12 +60,9 @@ static inline int svc_expkey_hash(struct svc_expkey *item)
 	int hash = item->ek_fsidtype;
 	char * cp = (char*)item->ek_fsid;
 	int len = (item->ek_fsidtype==0)?8:4;
-	while (len--)
-		hash += *cp++;
-	cp = (char*)&item->ek_client;
-	len = sizeof(item->ek_client);
-	while (len--)
-		hash += *cp++;
+
+	hash ^= hash_mem(cp, len, EXPKEY_HASHBITS);
+	hash ^= hash_ptr(item->ek_client, EXPKEY_HASHBITS);
 	return hash & EXPKEY_HASHMASK;
 }
 
@@ -239,17 +237,12 @@ static struct cache_head *export_table[EXPORT_HASHMAX];
 
 static inline int svc_export_hash(struct svc_export *item)
 {
-	void *k[2];
-	unsigned char *cp;
-	int rv, i;
-	k[0] = item->ex_client;
-	k[1] = item->ex_dentry;
+	int rv;
 
-	cp = (char*)k;
-	rv = 0;
-	for (i=0; i<sizeof(k); i++)
-		rv ^= cp[i];
-	return rv & EXPORT_HASHMASK;
+	rv = hash_ptr(item->ex_client, EXPORT_HASHBITS);
+	rv ^= hash_ptr(item->ex_dentry, EXPORT_HASHBITS);
+	rv ^= hash_ptr(item->ex_mnt, EXPORT_HASHBITS);
+	return rv;
 }
 
 void svc_export_put(struct cache_head *item, struct cache_detail *cd)
