@@ -1286,7 +1286,14 @@ static void release_dev(struct file * filp)
 	}
 	
 	/*
-	 * Make sure that the tty's task queue isn't activated. 
+	 * Prevent flush_to_ldisc() from rescheduling the work for later.  Then
+	 * kill any delayed work.
+	 */
+	clear_bit(TTY_DONT_FLIP, &tty->flags);
+	cancel_delayed_work(&tty->flip.work);
+
+	/*
+	 * Wait for ->hangup_work and ->flip.work handlers to terminate
 	 */
 	flush_scheduled_work();
 

@@ -29,16 +29,16 @@ match_pid(const struct sk_buff *skb, pid_t pid)
 	task_lock(p);
 	files = p->files;
 	if(files) {
-		read_lock(&files->file_lock);
+		spin_lock(&files->file_lock);
 		for (i=0; i < files->max_fds; i++) {
 			if (fcheck_files(files, i) == skb->sk->socket->file) {
-				read_unlock(&files->file_lock);
+				spin_unlock(&files->file_lock);
 				task_unlock(p);
 				read_unlock(&tasklist_lock);
 				return 1;
 			}
 		}
-		read_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 	}
 	task_unlock(p);
 out:
@@ -62,14 +62,14 @@ match_sid(const struct sk_buff *skb, pid_t sid)
 		task_lock(p);
 		files = p->files;
 		if (files) {
-			read_lock(&files->file_lock);
+			spin_lock(&files->file_lock);
 			for (i=0; i < files->max_fds; i++) {
 				if (fcheck_files(files, i) == file) {
 					found = 1;
 					break;
 				}
 			}
-			read_unlock(&files->file_lock);
+			spin_unlock(&files->file_lock);
 		}
 		task_unlock(p);
 		if (found)

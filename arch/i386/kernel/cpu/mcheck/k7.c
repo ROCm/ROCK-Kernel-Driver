@@ -92,8 +92,4 @@ void __init amd_mcheck_init(struct cpuinfo_x86 *c)
 	set_in_cr4 (X86_CR4_MCE);
 	printk (KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n",
 		smp_processor_id());
-
-#ifdef CONFIG_X86_MCE_NONFATAL
-	init_nonfatal_mce_checker();
-#endif
 }

@@ -274,8 +274,14 @@ nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 	err = nfs_flush_file(inode, NULL, 0, 0, 0);
 	if (err < 0)
 		goto out;
-	if (is_sync)
+	if (wbc->sync_mode == WB_SYNC_HOLD)
+		goto out;
+	if (is_sync && wbc->sync_mode == WB_SYNC_ALL) {
 		err = nfs_wb_all(inode);
+	} else
+		nfs_commit_file(inode, NULL, 0, 0, 0);
+	/* Avoid races. Tell upstream we've done all we were told to do */
+	wbc->nr_to_write = 0;
 out:
 	return err;
 }
@@ -363,6 +369,7 @@ nfs_mark_request_dirty(struct nfs_page *req)
 	nfs_list_add_request(req, &nfsi->dirty);
 	nfsi->ndirty++;
 	spin_unlock(&nfs_wreq_lock);
+	inc_page_state(nr_dirty);
 	mark_inode_dirty(inode);
 }
 
@@ -390,6 +397,7 @@ nfs_mark_request_commit(struct nfs_page *req)
 	nfs_list_add_request(req, &nfsi->commit);
 	nfsi->ncommit++;
 	spin_unlock(&nfs_wreq_lock);
+	inc_page_state(nr_unstable);
 	mark_inode_dirty(inode);
 }
 #endif
@@ -457,6 +465,7 @@ nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, un
 	int	res;
 	res = nfs_scan_list(&nfsi->dirty, dst, file, idx_start, npages);
 	nfsi->ndirty -= res;
+	sub_page_state(nr_dirty,res);
 	if ((nfsi->ndirty == 0) != list_empty(&nfsi->dirty))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.ndirty.\n");
 	return res;
@@ -481,6 +490,7 @@ nfs_scan_commit(struct inode *inode, struct list_head *dst, struct file *file, u
 	int	res;
 	res = nfs_scan_list(&nfsi->commit, dst, file, idx_start, npages);
 	nfsi->ncommit -= res;
+	sub_page_state(nr_unstable,res);
 	if ((nfsi->ncommit == 0) != list_empty(&nfsi->commit))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.ncommit.\n");
 	return res;

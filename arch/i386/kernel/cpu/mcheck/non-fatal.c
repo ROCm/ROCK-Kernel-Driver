@@ -11,6 +11,7 @@
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/smp.h>
+#include <linux/module.h>
 
 #include <asm/processor.h> 
 #include <asm/system.h>
@@ -65,7 +66,7 @@ static void mce_timerfunc (unsigned long data)
 	add_timer (&mce_timer);
 }	
 
-void init_nonfatal_mce_checker()
+static int __init init_nonfatal_mce_checker(void)
 {
 	if (timerset == 0) {
 		/* Set the timer to check for non-fatal
@@ -78,4 +79,6 @@ void init_nonfatal_mce_checker()
 		timerset = 1;
 		printk(KERN_INFO "Machine check exception polling timer started.\n");
 	}
+	return 0;
 }
+module_init(init_nonfatal_mce_checker);
