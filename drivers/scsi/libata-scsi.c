@@ -229,15 +229,14 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	tf->hob_lbam = 0;
 	tf->hob_lbah = 0;
 	tf->protocol = qc->dev->xfer_protocol;
+	tf->device |= ATA_LBA;
 
 	if (scsicmd[0] == READ_10 || scsicmd[0] == READ_6 ||
 	    scsicmd[0] == READ_16) {
 		tf->command = qc->dev->read_cmd;
-		VPRINTK("reading\n");
 	} else {
 		tf->command = qc->dev->write_cmd;
 		tf->flags |= ATA_TFLAG_WRITE;
-		VPRINTK("writing\n");
 	}
 
 	if (scsicmd[0] == READ_10 || scsicmd[0] == WRITE_10) {
@@ -258,7 +257,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 			qc->nsect = scsicmd[8];
 		}
-		tf->device |= ATA_LBA;
 
 		tf->nsect = scsicmd[8];
 		tf->lbal = scsicmd[5];
@@ -303,7 +301,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 			qc->nsect = scsicmd[13];
 		}
-		tf->device |= ATA_LBA;
 
 		tf->nsect = scsicmd[13];
 		tf->lbal = scsicmd[9];
