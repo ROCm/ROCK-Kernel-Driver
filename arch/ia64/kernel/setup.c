@@ -647,7 +647,6 @@ cpu_init (void)
 	cpu_info = cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
 #ifdef CONFIG_NUMA
 	cpu_info->node_data = get_node_data_ptr();
-	cpu_info->nodeid = boot_get_local_nodeid();
 #endif
 
 	/*
