@@ -1679,7 +1679,7 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 	cmap_len = riva_get_cmap_len(&info->var);
 	fb_alloc_cmap(&info->cmap, cmap_len, 0);	
 
-	info->pixmap.size = 64 * 1024;
+	info->pixmap.size = 8 * 1024;
 	info->pixmap.buf_align = 4;
 	info->pixmap.scan_align = 4;
 	info->pixmap.flags = FB_PIXMAP_SYSTEM;
@@ -1866,10 +1866,10 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	default_par = (struct riva_par *) info->par;
 	default_par->pdev = pd;
 
-	info->pixmap.addr = kmalloc(64 * 1024, GFP_KERNEL);
+	info->pixmap.addr = kmalloc(8 * 1024, GFP_KERNEL);
 	if (info->pixmap.addr == NULL)
 		goto err_out_kfree;
-	memset(info->pixmap.addr, 0, 64 * 1024);
+	memset(info->pixmap.addr, 0, 8 * 1024);
 
 	if (pci_enable_device(pd)) {
 		printk(KERN_ERR PFX "cannot enable PCI device\n");

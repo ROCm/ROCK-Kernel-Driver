@@ -41,7 +41,7 @@ config FB
 config FB_MODE_HELPERS
         bool "Enable Video Mode Handling Helpers"
         depends on FB
-	default y
+	default n
 	---help---
 	  This enables functions for handling video modes using the
 	  Generalized Timing Formula and the EDID parser. A few drivers rely
@@ -61,10 +61,10 @@ config FB_TILEBLITTING
 	 parameters in terms of number of tiles instead of number of pixels.
 	 For example, to draw a single character, instead of using bitmaps,
 	 an index to an array of bitmaps will be used.  To clear or move a
-	 rectangular section of a screen, the rectangle willbe described in
+	 rectangular section of a screen, the rectangle will be described in
 	 terms of number of tiles in the x- and y-axis.
 
-	 This is particularly important to one driver, the matroxfb.  If
+	 This is particularly important to one driver, matroxfb.  If
 	 unsure, say N.
 
 config FB_CIRRUS

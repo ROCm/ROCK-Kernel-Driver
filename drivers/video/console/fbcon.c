@@ -337,24 +337,24 @@ __setup("fbcon=", fb_console_setup);
 
 static int search_fb_in_map(int idx)
 {
-	int i;
+	int i, retval = 0;
 
 	for (i = 0; i < MAX_NR_CONSOLES; i++) {
 		if (con2fb_map[i] == idx)
-			return 1;
+			retval = 1;
 	}
-	return 0;
+	return retval;
 }
 
 static int search_for_mapped_con(void)
 {
-	int i;
+	int i, retval = 0;
 
 	for (i = 0; i < MAX_NR_CONSOLES; i++) {
 		if (con2fb_map[i] != -1)
-			return 1;
+			retval = 1;
 	}
-	return 0;
+	return retval;
 }
 
 static int fbcon_takeover(int show_logo)

@@ -51,7 +51,7 @@
      *  Frame buffer device initialization and setup routines
      */
 
-#define FBPIXMAPSIZE	16384
+#define FBPIXMAPSIZE	(1024 * 8)
 
 static struct notifier_block *fb_notifier_list;
 struct fb_info *registered_fb[FB_MAX];
@@ -1309,8 +1309,7 @@ fbmem_init(void)
 }
 module_init(fbmem_init);
 
-#define NR_FB_DRIVERS 64
-static char *video_options[NR_FB_DRIVERS];
+static char *video_options[FB_MAX];
 static int ofonly;
 
 /**
@@ -1331,7 +1330,7 @@ int fb_get_options(char *name, char **option)
 		retval = 1;
 
 	if (name_len && !retval) {
-		for (i = 0; i < NR_FB_DRIVERS; i++) {
+		for (i = 0; i < FB_MAX; i++) {
 			if (video_options[i] == NULL)
 				continue;
 			opt_len = strlen(video_options[i]);
@@ -1373,7 +1372,7 @@ int __init video_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-	for (i = 0; i < NR_FB_DRIVERS; i++) {
+	for (i = 0; i < FB_MAX; i++) {
 		if (!strncmp(options, "ofonly", 6))
 			ofonly = 1;
 		if (video_options[i] == NULL) {

@@ -1874,12 +1874,12 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 	par = (struct i810fb_par *) info->par;
 	par->dev = dev;
 
-	if (!(info->pixmap.addr = kmalloc(64*1024, GFP_KERNEL))) {
+	if (!(info->pixmap.addr = kmalloc(8*1024, GFP_KERNEL))) {
 		i810fb_release_resource(info, par);
 		return -ENOMEM;
 	}
-	memset(info->pixmap.addr, 0, 64*1024);
-	info->pixmap.size = 64*1024;
+	memset(info->pixmap.addr, 0, 8*1024);
+	info->pixmap.size = 8*1024;
 	info->pixmap.buf_align = 8;
 	info->pixmap.flags = FB_PIXMAP_SYSTEM;
 
