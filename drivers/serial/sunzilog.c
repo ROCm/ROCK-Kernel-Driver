@@ -1145,11 +1145,11 @@ static struct zilog_layout * __init get_zs_sun4u(int chip)
 static struct zilog_layout * __init get_zs_sun4cmd(int chip)
 {
 	struct linux_prom_irqs irq_info[2];
-	unsigned long mapped_addr;
-	int zsnode, chipid, cpunode;
+	unsigned long mapped_addr = 0;
+	int zsnode, chipid, cpunode, bbnode;
 
 	if (sparc_cpu_model == sun4d) {
-		int bbnode, walk, no;
+		int walk, no;
 
 		zsnode = 0;
 		bbnode = 0;
@@ -1242,7 +1242,7 @@ static struct zilog_layout * __init get_zs_sun4cmd(int chip)
 		} else if (zilog_irq != irq_info[0].pri) {
 			prom_printf("SunZilog: Inconsistent IRQ layout for Zilog %d.\n",
 				    chip);
-			promt_halt();
+			prom_halt();
 		}
 		break;
 	}
@@ -1283,7 +1283,7 @@ static struct zilog_layout * __init get_zs(int chip)
 		zilog_irq = 12;
 		res.end = (res.start + (8 - 1));
 		res.flags = IORESOURCE_IO;
-		return sbus_ioremap(&res, 0, 8, "SunZilog");
+		return (struct zilog_layout *) sbus_ioremap(&res, 0, 8, "SunZilog");
 	}
 
 	return get_zs_sun4cmd(chip);
