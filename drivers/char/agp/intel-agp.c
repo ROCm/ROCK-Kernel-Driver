@@ -1382,7 +1382,8 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 		name = "E7205";
 		break;
 	default:
-		printk(KERN_ERR PFX "Unsupported Intel chipset (device id: %04x)\n",
+		if (cap_ptr)
+			printk(KERN_WARNING PFX "Unsupported Intel chipset (device id: %04x)\n",
 			    pdev->device);
 		agp_put_bridge(bridge);
 		return -ENODEV;
