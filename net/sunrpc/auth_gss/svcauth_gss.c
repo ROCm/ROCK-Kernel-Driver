@@ -406,7 +406,11 @@ static int rsc_parse(struct cache_detail *cd,
 		if (len < 0)
 			goto out;
 		gm = gss_mech_get_by_name(buf);
+		status = -EOPNOTSUPP;
+		if (!gm)
+			goto out;
 
+		status = -EINVAL;
 		/* mech-specific data: */
 		len = qword_get(&mesg, buf, mlen);
 		if (len < 0) {
