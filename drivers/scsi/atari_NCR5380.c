@@ -769,9 +769,7 @@ int NCR5380_proc_info (char *buffer, char **start, off_t offset,
 	}					\
     } while (0)
 
-    for (instance = first_instance; instance && HOSTNO != hostno;
-	 instance = instance->next)
-	;
+    instance = scsi_host_hn_get(hostno);
     if (!instance)
 	return(-ESRCH);
     hostdata = (struct NCR5380_hostdata *)instance->hostdata;
