@@ -151,6 +151,7 @@ static int PCI_RefinedAccessConfig(struct pci_bus *bus, unsigned int devfn, u8 o
  */
 int cpqhp_set_irq (u8 bus_num, u8 dev_num, u8 int_pin, u8 irq_num)
 {
+#if !defined(CONFIG_X86_IO_APIC)	
 	int rc;
 	u16 temp_word;
 	struct pci_dev fakedev;
@@ -175,6 +176,7 @@ int cpqhp_set_irq (u8 bus_num, u8 dev_num, u8 int_pin, u8 irq_num)
 	// This should only be for x86 as it sets the Edge Level Control Register
 	outb((u8) (temp_word & 0xFF), 0x4d0);
 	outb((u8) ((temp_word & 0xFF00) >> 8), 0x4d1);
+#endif
 
 	return 0;
 }
