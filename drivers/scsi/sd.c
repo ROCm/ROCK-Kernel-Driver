@@ -629,7 +629,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 
 	/* An error occurred */
 	if (driver_byte(result) != 0 && 	/* An error occured */
-	    SCpnt->sense_buffer[0] != 0xF0) {	/* Sense data is valid */
+	    SCpnt->sense_buffer[0] == 0xF0) {	/* Sense data is valid */
 		switch (SCpnt->sense_buffer[2]) {
 		case MEDIUM_ERROR:
 			error_sector = (SCpnt->sense_buffer[3] << 24) |
