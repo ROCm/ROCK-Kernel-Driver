@@ -309,7 +309,7 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 			owner_dev);
 
 		PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pconn_vhdl,
-			    "pcibr_intr_alloc: xtalk_intr=0x%x\n", xtalk_intr));
+			    "pcibr_intr_alloc: xtalk_intr=0x%lx\n", xtalk_intr));
 
 		/* both an assert and a runtime check on this:
 		 * we need to check in non-DEBUG kernels, and
@@ -385,8 +385,8 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 		&pcibr_soft->bs_intr[pcibr_int_bit].bsi_pcibr_intr_wrap.iw_list;
 
 	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pconn_vhdl,
-			"Bridge bit 0x%x wrap=0x%x\n", pcibr_int_bit,
-			pcibr_soft->bs_intr[pcibr_int_bit].bsi_pcibr_intr_wrap));
+			"Bridge bit 0x%x wrap=0x%lx\n", pcibr_int_bit,
+			&(pcibr_soft->bs_intr[pcibr_int_bit].bsi_pcibr_intr_wrap)));
 
 	    if (compare_and_swap_ptr((void **) intr_list_p, NULL, intr_entry)) {
 		/* we are the first interrupt on this bridge bit.
@@ -452,6 +452,8 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
     hub_intr = (hub_intr_t)xtalk_intr;
     pcibr_intr->bi_irq = hub_intr->i_bit;
     pcibr_intr->bi_cpu = hub_intr->i_cpuid;
+    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pconn_vhdl,
+		"pcibr_intr_alloc complete: pcibr_intr=0x%lx\n", pcibr_intr));
     return pcibr_intr;
 }
 
@@ -543,8 +545,8 @@ pcibr_intr_connect(pcibr_intr_t pcibr_intr, intr_func_t intr_func, intr_arg_t in
 	return -1;
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pcibr_intr->bi_dev,
-		"pcibr_intr_connect: intr_func=0x%x\n",
-		pcibr_intr));
+		"pcibr_intr_connect: intr_func=0x%lx, intr_arg=0x%lx\n",
+		intr_func, intr_arg));
 
     pcibr_intr->bi_func = intr_func;
     pcibr_intr->bi_arg = intr_arg;
