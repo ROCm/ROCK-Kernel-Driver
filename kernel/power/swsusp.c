@@ -76,7 +76,6 @@ extern char __nosave_begin, __nosave_end;
 
 /* Variables to be preserved over suspend */
 int pagedir_order_check;
-int nr_copy_pages_check;
 
 extern char resume_file[];
 static dev_t resume_device;
@@ -568,6 +567,7 @@ static void copy_data_pages(void)
 	struct zone *zone;
 	unsigned long zone_pfn;
 	struct pbe * pbe = pagedir_nosave;
+	int pages_copied = 0;
 	
 	for_each_zone(zone) {
 		if (is_highmem(zone))
@@ -576,13 +576,17 @@ static void copy_data_pages(void)
 			if (saveable(zone, &zone_pfn)) {
 				struct page * page;
 				page = pfn_to_page(zone_pfn + zone->zone_start_pfn);
+
 				pbe->orig_address = (long) page_address(page);
 				/* copy_page is no usable for copying task structs. */
 				memcpy((void *)pbe->address, (void *)pbe->orig_address, PAGE_SIZE);
 				pbe++;
+				pages_copied++;
 			}
 		}
 	}
+	BUG_ON(pages_copied > nr_copy_pages);
+	nr_copy_pages = pages_copied;
 }
 
 
@@ -772,7 +776,6 @@ static int swsusp_alloc(void)
 		return error;
 	}
 
-	nr_copy_pages_check = nr_copy_pages;
 	pagedir_order_check = pagedir_order;
 	return 0;
 }
@@ -863,7 +866,6 @@ int swsusp_suspend(void)
 
 asmlinkage int swsusp_restore(void)
 {
-	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
 	
 	/* Even mappings of "global" things (vmalloc) need to be fixed */
