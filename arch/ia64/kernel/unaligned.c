@@ -1305,11 +1305,7 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	 * handler into reading an arbitrary kernel addresses...
 	 */
 	if (!user_mode(regs)) {
-#ifdef GAS_HAS_LOCAL_TAGS
-		fix = search_exception_table(regs->cr_iip + ia64_psr(regs)->ri);
-#else
-		fix = search_exception_table(regs->cr_iip);
-#endif
+		fix = SEARCH_EXCEPTION_TABLE(regs);
 	}
 	if (user_mode(regs) || fix.cont) {
 		if ((current->thread.flags & IA64_THREAD_UAC_SIGBUS) != 0)

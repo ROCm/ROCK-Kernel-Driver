@@ -18,7 +18,7 @@
 # define PREFETCH_LINES	9	// magic number
 #else
 # define L3_LINE_SIZE	128	// McKinley L3 line size
-# define PREFETCH_LINES	7	// magic number
+# define PREFETCH_LINES	12	// magic number
 #endif
 
 #define saved_lc	r2

@@ -15,6 +15,8 @@
 
 #include <linux/config.h>
 
+#include <linux/compiler.h>
+
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
 #include <asm/system.h>
@@ -184,6 +186,10 @@
  */
 #define IA64_USEC_PER_CYC_SHIFT	41
 
+#define __HAVE_ARCH_PER_CPU
+
+#define THIS_CPU(var)	(var)
+
 #ifndef __ASSEMBLY__
 
 #include <linux/threads.h>
@@ -195,6 +201,11 @@
 #include <asm/rse.h>
 #include <asm/unwind.h>
 #include <asm/atomic.h>
+
+extern unsigned long __per_cpu_offset[NR_CPUS];
+
+#define per_cpu(var, cpu)	(*(__typeof__(&(var))) ((void *) &(var) + __per_cpu_offset[cpu]))
+#define this_cpu(var)		(var)
 
 /* like above but expressed as bitfields for more efficient access: */
 struct ia64_psr {
@@ -239,7 +250,7 @@ struct ia64_psr {
  * CPU type, hardware bug flags, and per-CPU state.  Frequently used
  * state comes earlier:
  */
-struct cpuinfo_ia64 {
+extern struct cpuinfo_ia64 {
 	/* irq_stat must be 64-bit aligned */
 	union {
 		struct {
@@ -249,7 +260,6 @@ struct cpuinfo_ia64 {
 		__u64 irq_and_bh_counts;
 	} irq_stat;
 	__u32 softirq_pending;
-	__u32 phys_stacked_size_p8;	/* size of physical stacked registers + 8 */
 	__u64 itm_delta;	/* # of clock cycles between clock ticks */
 	__u64 itm_next;		/* interval timer mask value to use for next clock tick */
 	__u64 *pgd_quick;
@@ -282,41 +292,15 @@ struct cpuinfo_ia64 {
 	__u64 prof_multiplier;
 	__u32 pfm_syst_wide;
 	__u32 pfm_dcr_pp;
-	/* this is written to by *other* CPUs: */
-	__u64 ipi_operation ____cacheline_aligned;
 #endif
-#ifdef CONFIG_NUMA
-	void *node_directory;
-	int numa_node_id;
-	struct cpuinfo_ia64 *cpu_data[NR_CPUS];
-#endif
-	/* Platform specific word.  MUST BE LAST IN STRUCT */
-	__u64 platform_specific;
-} __attribute__ ((aligned (PAGE_SIZE))) ;
+} cpu_info __per_cpu_data;
 
 /*
  * The "local" data pointer.  It points to the per-CPU data of the currently executing
  * CPU, much like "current" points to the per-task data of the currently executing task.
  */
-#define local_cpu_data		((struct cpuinfo_ia64 *) PERCPU_ADDR)
-
-/*
- * On NUMA systems, cpu_data for each cpu is allocated during cpu_init() & is allocated on
- * the node that contains the cpu. This minimizes off-node memory references.  cpu_data
- * for each cpu contains an array of pointers to the cpu_data structures of each of the
- * other cpus.
- *
- * On non-NUMA systems, cpu_data is a static array allocated at compile time.  References
- * to the cpu_data of another cpu is done by direct references to the appropriate entry of
- * the array.
- */
-#ifdef CONFIG_NUMA
-# define cpu_data(cpu)		local_cpu_data->cpu_data[cpu]
-# define numa_node_id()		(local_cpu_data->numa_node_id)
-#else
-  extern struct cpuinfo_ia64 _cpu_data[NR_CPUS];
-# define cpu_data(cpu)		(&_cpu_data[cpu])
-#endif
+#define local_cpu_data		(&this_cpu(cpu_info))
+#define cpu_data(cpu)		(&per_cpu(cpu_info, cpu))
 
 extern void identify_cpu (struct cpuinfo_ia64 *);
 extern void print_cpu_info (struct cpuinfo_ia64 *);
