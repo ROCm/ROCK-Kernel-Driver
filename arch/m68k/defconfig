@@ -177,7 +177,7 @@ CONFIG_NETDEVICES=y
 # CONFIG_PPP is not set
 # CONFIG_EQUALIZER is not set
 # CONFIG_ARIADNE is not set
-# CONFIG_ARIADNE2 is not set
+# CONFIG_ZORRO8390 is not set
 # CONFIG_A2065 is not set
 # CONFIG_HYDRA is not set
 
