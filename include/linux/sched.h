@@ -487,6 +487,7 @@ extern unsigned long prof_len;
 extern unsigned long prof_shift;
 
 extern void FASTCALL(__wake_up(wait_queue_head_t *q, unsigned int mode, int nr));
+extern void FASTCALL(__wake_up_locked(wait_queue_head_t *q, unsigned int mode));
 extern void FASTCALL(__wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr));
 extern void FASTCALL(sleep_on(wait_queue_head_t *q));
 extern long FASTCALL(sleep_on_timeout(wait_queue_head_t *q,
@@ -504,6 +505,7 @@ extern void FASTCALL(sched_exit(task_t * p));
 #define wake_up_interruptible(x)	__wake_up((x),TASK_INTERRUPTIBLE, 1)
 #define wake_up_interruptible_nr(x, nr)	__wake_up((x),TASK_INTERRUPTIBLE, nr)
 #define wake_up_interruptible_all(x)	__wake_up((x),TASK_INTERRUPTIBLE, 0)
+#define	wake_up_locked(x)		__wake_up_locked((x), TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE)
 #ifdef CONFIG_SMP
 #define wake_up_interruptible_sync(x)   __wake_up_sync((x),TASK_INTERRUPTIBLE, 1)
 #else
@@ -696,6 +698,25 @@ do {									\
 	remove_wait_queue(&wq, &__wait);				\
 } while (0)
 	
+/*
+ * Must be called with the spinlock in the wait_queue_head_t held.
+ */
+static inline void add_wait_queue_exclusive_locked(wait_queue_head_t *q,
+						   wait_queue_t * wait)
+{
+	wait->flags |= WQ_FLAG_EXCLUSIVE;
+	__add_wait_queue_tail(q,  wait);
+}
+
+/*
+ * Must be called with the spinlock in the wait_queue_head_t held.
+ */
+static inline void remove_wait_queue_locked(wait_queue_head_t *q,
+					    wait_queue_t * wait)
+{
+	__remove_wait_queue(q,  wait);
+}
+
 #define wait_event_interruptible(wq, condition)				\
 ({									\
 	int __ret = 0;							\
