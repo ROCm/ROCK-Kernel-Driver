@@ -1408,7 +1408,7 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	assert(tp != NULL);
 	assert(ioaddr != NULL);
 
-	cur_rx = tp->cur_rx % RX_BUF_SIZE;
+	cur_rx = tp->cur_rx % NUM_RX_DESC;
 
 	while (!(le32_to_cpu(tp->RxDescArray[cur_rx].status) & OWNbit)) {
 		u32 status = le32_to_cpu(tp->RxDescArray[cur_rx].status);
