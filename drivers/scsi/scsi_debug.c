@@ -861,8 +861,7 @@ static int scsi_debug_release(struct Scsi_Host * hpnt)
 	if (++num_releases == num_present) {
 #ifdef DRIVERFS_SUPPORT
 		do_remove_driverfs_files();
-		remove_driver(&sdebug_driverfs_driver);
-		// driver_unregister(&sdebug_driverfs_driver);
+		driver_unregister(&sdebug_driverfs_driver);
 #endif
 		vfree(fake_storep);
 		vfree(devInfop);

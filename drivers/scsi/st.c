@@ -3994,7 +3994,7 @@ static void __exit exit_st(void)
 		kfree(scsi_tapes);
 	}
 	st_template.dev_max = 0;
-	remove_driver(&st_template.scsi_driverfs_driver);
+	driver_unregister(&st_template.scsi_driverfs_driver);
 	printk(KERN_INFO "st: Unloaded.\n");
 }
 

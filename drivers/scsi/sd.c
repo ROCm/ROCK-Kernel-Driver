@@ -1549,7 +1549,7 @@ static void __exit exit_sd(void)
 	for (k = 0; k < N_USED_SD_MAJORS; k++)
 		blk_dev[SD_MAJOR(k)].queue = NULL;
 	sd_template.dev_max = 0;
-	remove_driver(&sd_template.scsi_driverfs_driver);
+	driver_unregister(&sd_template.scsi_driverfs_driver);
 
 	unregister_reboot_notifier(&sd_notifier_block);
 }

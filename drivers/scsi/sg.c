@@ -1659,7 +1659,7 @@ exit_sg(void)
 		sg_dev_arr = NULL;
 	}
 	sg_template.dev_max = 0;
-	remove_driver(&sg_template.scsi_driverfs_driver);
+	driver_unregister(&sg_template.scsi_driverfs_driver);
 }
 
 static int
