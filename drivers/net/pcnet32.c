@@ -1022,10 +1022,11 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
      *	starting until the packet is loaded. Strike one for reliability, lose
      *	one for latency - although on PCI this isnt a big loss. Older chips
      *	have FIFO's smaller than a packet, so you can't do this.
+     *	Turn on BCR18:BurstRdEn and BCR18:BurstWrEn.
      */
 
     if (fset) {
-	a->write_bcr(ioaddr, 18, (a->read_bcr(ioaddr, 18) | 0x0800));
+	a->write_bcr(ioaddr, 18, (a->read_bcr(ioaddr, 18) | 0x0860));
 	a->write_csr(ioaddr, 80, (a->read_csr(ioaddr, 80) & 0x0C00) | 0x0c00);
 	dxsuflo = 1;
 	ltint = 1;
