@@ -3717,8 +3717,8 @@ static int __devinit bttv_probe(struct pci_dev *dev,
 	/* initialize structs / fill in defaults */
         init_MUTEX(&btv->lock);
         init_MUTEX(&btv->reslock);
-        btv->s_lock    = SPIN_LOCK_UNLOCKED;
-        btv->gpio_lock = SPIN_LOCK_UNLOCKED;
+        spin_lock_init(&btv->s_lock);
+        spin_lock_init(&btv->gpio_lock);
         init_waitqueue_head(&btv->gpioq);
         init_waitqueue_head(&btv->i2c_queue);
         INIT_LIST_HEAD(&btv->c.subs);

@@ -1090,7 +1090,7 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 
 static void ttusb_dec_init_tasklet(struct ttusb_dec *dec)
 {
-	dec->urb_frame_list_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dec->urb_frame_list_lock);
 	INIT_LIST_HEAD(&dec->urb_frame_list);
 	tasklet_init(&dec->urb_tasklet, ttusb_dec_process_urb_frame_list,
 		     (unsigned long)dec);
@@ -1401,7 +1401,7 @@ static void ttusb_dec_exit_tasklet(struct ttusb_dec *dec)
 static void ttusb_dec_init_filters(struct ttusb_dec *dec)
 {
 	INIT_LIST_HEAD(&dec->filter_info_list);
-	dec->filter_info_list_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dec->filter_info_list_lock);
 }
 
 static void ttusb_dec_exit_filters(struct ttusb_dec *dec)
