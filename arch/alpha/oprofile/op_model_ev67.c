@@ -130,15 +130,16 @@ enum profileme_counters {
 	PM_NUM_COUNTERS
 };
 
-static void
-op_add_pm(unsigned long pc, unsigned long counter,
+static inline void
+op_add_pm(unsigned long pc, int kern, unsigned long counter,
 	  struct op_counter_config *ctr, unsigned long event)
 {
 	unsigned long fake_counter = 2 + event;
 	if (counter == 1)
 		fake_counter += PM_NUM_COUNTERS;
 	if (ctr[fake_counter].enabled)
-		oprofile_add_sample(pc, fake_counter, smp_processor_id());
+		oprofile_add_sample(pc, kern, fake_counter,
+				    smp_processor_id());
 }
 
 static void
@@ -146,6 +147,7 @@ ev67_handle_interrupt(unsigned long which, struct pt_regs *regs,
 		      struct op_counter_config *ctr)
 {
 	unsigned long pmpc, pctr_ctl;
+	int kern = !user_mode(regs);
 	int mispredict = 0;
 	union {
 		unsigned long v;
@@ -195,27 +197,27 @@ ev67_handle_interrupt(unsigned long which, struct pt_regs *regs,
 			   to PALcode. Recognize ITB miss by PALcode
 			   offset address, and get actual PC from
 			   EXC_ADDR.  */
-			oprofile_add_sample(regs->pc, which,
+			oprofile_add_sample(regs->pc, kern, which,
 					    smp_processor_id());
 			if ((pmpc & ((1 << 15) - 1)) ==  581)
-				op_add_pm(regs->pc, which, ctr, PM_ITB_MISS);
+				op_add_pm(regs->pc, kern, which,
+					  ctr, PM_ITB_MISS);
 			/* Most other bit and counter values will be
 			   those for the first instruction in the
 			   fault handler, so we're done.  */
 			return;
 		case TRAP_REPLAY:
-			if (i_stat.fields.load_store)
-				op_add_pm(pmpc, which, ctr, PM_LOAD_STORE);
-			else
-				op_add_pm(pmpc, which, ctr, PM_REPLAY);
+			op_add_pm(pmpc, kern, which, ctr,
+				  (i_stat.fields.load_store
+				   ? PM_LOAD_STORE : PM_REPLAY));
 			break;
 		case TRAP_DTB_DOUBLE_MISS_3:
 		case TRAP_DTB_DOUBLE_MISS_4:
 		case TRAP_DTB_SINGLE_MISS:
-			op_add_pm(pmpc, which, ctr, PM_DTB_MISS);
+			op_add_pm(pmpc, kern, which, ctr, PM_DTB_MISS);
 			break;
 		case TRAP_UNALIGNED:
-			op_add_pm(pmpc, which, ctr, PM_UNALIGNED);
+			op_add_pm(pmpc, kern, which, ctr, PM_UNALIGNED);
 			break;
 		case TRAP_INVALID0:
 		case TRAP_FP_DISABLED:
@@ -235,21 +237,21 @@ ev67_handle_interrupt(unsigned long which, struct pt_regs *regs,
 		   set.  */
 		if (i_stat.fields.mispredict) {
 			mispredict = 1;
-			op_add_pm(pmpc, which, ctr, PM_MISPREDICT);
+			op_add_pm(pmpc, kern, which, ctr, PM_MISPREDICT);
 		}
 	}
 
-	oprofile_add_sample(pmpc, which, smp_processor_id());
+	oprofile_add_sample(pmpc, kern, which, smp_processor_id());
 
 	pctr_ctl = wrperfmon(5, 0);
 	if (pctr_ctl & (1UL << 27))
-		op_add_pm(pmpc, which, ctr, PM_STALLED);
+		op_add_pm(pmpc, kern, which, ctr, PM_STALLED);
 
 	/* Unfortunately, TAK is undefined on mispredicted branches.
 	   ??? It is also undefined for non-cbranch insns, should
 	   check that.  */
 	if (!mispredict && pctr_ctl & (1UL << 0))
-		op_add_pm(pmpc, which, ctr, PM_TAKEN);
+		op_add_pm(pmpc, kern, which, ctr, PM_TAKEN);
 }
 
 struct op_axp_model op_model_ev67 = {
@@ -257,7 +259,7 @@ struct op_axp_model op_model_ev67 = {
 	.cpu_setup		= ev67_cpu_setup,
 	.reset_ctr		= ev67_reset_ctr,
 	.handle_interrupt	= ev67_handle_interrupt,
-	.cpu			= "alpha/ev67",
+	.cpu_type		= "alpha/ev67",
 	.num_counters		= 20,
 	.can_set_proc_mode	= 0,
 };

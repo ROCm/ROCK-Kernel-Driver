@@ -186,7 +186,8 @@ ev5_handle_interrupt(unsigned long which, struct pt_regs *regs,
 		     struct op_counter_config *ctr)
 {
 	/* Record the sample.  */
-	oprofile_add_sample(regs->pc, which, smp_processor_id());
+	oprofile_add_sample(regs->pc, !user_mode(regs),
+			    which, smp_processor_id());
 }
 
 
@@ -195,7 +196,7 @@ struct op_axp_model op_model_ev5 = {
 	.cpu_setup		= ev5_cpu_setup,
 	.reset_ctr		= ev5_reset_ctr,
 	.handle_interrupt	= ev5_handle_interrupt,
-	.cpu			= "alpha/ev5",
+	.cpu_type		= "alpha/ev5",
 	.num_counters		= 3,
 	.can_set_proc_mode	= 1,
 };
@@ -205,7 +206,7 @@ struct op_axp_model op_model_pca56 = {
 	.cpu_setup		= ev5_cpu_setup,
 	.reset_ctr		= ev5_reset_ctr,
 	.handle_interrupt	= ev5_handle_interrupt,
-	.cpu			= "alpha/pca56",
+	.cpu_type		= "alpha/pca56",
 	.num_counters		= 3,
 	.can_set_proc_mode	= 1,
 };
