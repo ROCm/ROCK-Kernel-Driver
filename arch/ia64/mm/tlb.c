@@ -35,10 +35,10 @@
 		1 << _PAGE_SIZE_4K )
 
 struct ia64_ctx ia64_ctx = {
-	.lock =	SPIN_LOCK_UNLOCKED,
-	.next =	1,
-	.limit =(1 << 15) - 1,		/* start out with the safe (architected) limit */
-	.max_ctx = ~0U
+	.lock =		SPIN_LOCK_UNLOCKED,
+	.next =		1,
+	.limit =	(1 << 15) - 1,		/* start out with the safe (architected) limit */
+	.max_ctx =	~0U
 };
 
 /*

@@ -93,7 +93,7 @@ die (const char *str, struct pt_regs *regs, long err)
 		int lock_owner;
 		int lock_owner_depth;
 	} die = {
-		.lock =		SPIN_LOCK_UNLOCKED,
+		.lock =			SPIN_LOCK_UNLOCKED,
 		.lock_owner =		-1,
 		.lock_owner_depth =	0
 	};
