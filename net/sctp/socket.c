@@ -55,7 +55,6 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/compiler.h>
 #include <linux/kernel.h>
 #include <linux/wait.h>
 #include <linux/time.h>
@@ -63,6 +62,7 @@
 #include <linux/fcntl.h>
 #include <linux/poll.h>
 #include <linux/init.h>
+#include <linux/crypto.h>
 
 #include <net/ip.h>
 #include <net/icmp.h>
@@ -82,13 +82,14 @@
 /* Forward declarations for internal helper functions. */
 static int sctp_writeable(struct sock *sk);
 static inline int sctp_wspace(struct sctp_association *asoc);
-static inline void sctp_set_owner_w(sctp_chunk_t *chunk);
+static inline void sctp_set_owner_w(struct sctp_chunk *chunk);
 static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static int sctp_wait_for_accept(struct sock *sk, long timeo);
+static void sctp_wait_for_close(struct sock *sk, long timeo);
 static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
@@ -96,31 +97,33 @@ static int sctp_do_bind(struct sock *, union sctp_addr *, int);
 static int sctp_autobind(struct sock *sk);
 static void sctp_sock_migrate(struct sock *, struct sock *,
 			      struct sctp_association *, sctp_socket_type_t);
+static char *sctp_hmac_alg = SCTP_COOKIE_HMAC_ALG;
 
 /* Look up the association by its id.  If this is not a UDP-style
  * socket, the ID field is always ignored.
  */
-sctp_association_t *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
+struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 {
-	sctp_association_t *asoc = NULL;
+	struct sctp_association *asoc = NULL;
 
-	/* If this is not a UDP-style socket, assoc id should be 
+	/* If this is not a UDP-style socket, assoc id should be
 	 * ignored.
 	 */
-	if (SCTP_SOCKET_UDP != sctp_sk(sk)->type) {
+	if (!sctp_style(sk, UDP)) {
 		if (!list_empty(&sctp_sk(sk)->ep->asocs))
 			asoc = list_entry(sctp_sk(sk)->ep->asocs.next,
-					  sctp_association_t, asocs);
+					  struct sctp_association, asocs);
 		return asoc;
 	}
 
 	/* First, verify that this is a kernel address. */
 	if (sctp_is_valid_kaddr((unsigned long) id)) {
-		sctp_association_t *temp = (sctp_association_t *) id;
+		struct sctp_association *temp;
 
-		/* Verify that this _is_ an sctp_association_t
+		/* Verify that this _is_ an sctp_association
 		 * data structure and if so, that the socket matches.
 		 */
+		temp = (struct sctp_association *)id;
 		if ((SCTP_ASSOC_EYECATCHER == temp->eyecatcher) &&
 		    (temp->base.sk == sk))
 			asoc = temp;
@@ -188,13 +191,12 @@ static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
 	return af;
 }
 
-
 /* Bind a local address either to an endpoint or to an association.  */
 SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
-	sctp_endpoint_t *ep = sp->ep;
-	sctp_bind_addr_t *bp = &ep->base.bind_addr;
+	struct sctp_endpoint *ep = sp->ep;
+	struct sctp_bind_addr *bp = &ep->base.bind_addr;
 	struct sctp_af *af;
 	unsigned short snum;
 	int ret = 0;
@@ -260,7 +262,7 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	/* Copy back into socket for getsockname() use. */
 	if (!ret) {
 		inet_sk(sk)->sport = htons(inet_sk(sk)->num);
-		af->to_sk(addr, sk);
+		af->to_sk_saddr(addr, sk);
 	}
 
 	return ret;
@@ -450,12 +452,12 @@ err_bindx_add:
 	/* Add these addresses to all associations on this endpoint.  */
 	if (retval >= 0) {
 		struct list_head *pos;
-		sctp_endpoint_t *ep;
-		sctp_association_t *asoc;
+		struct sctp_endpoint *ep;
+		struct sctp_association *asoc;
 		ep = sctp_sk(sk)->ep;
 
 		list_for_each(pos, &ep->asocs) {
-			asoc = list_entry(pos, sctp_association_t, asocs);
+			asoc = list_entry(pos, struct sctp_association, asocs);
 
 			sctp_addip_addr_config(asoc,
 					       SCTP_PARAM_ADD_IP,
@@ -485,9 +487,9 @@ err_bindx_add:
 int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
-	sctp_endpoint_t *ep = sp->ep;
+	struct sctp_endpoint *ep = sp->ep;
 	int cnt;
-	sctp_bind_addr_t *bp = &ep->base.bind_addr;
+	struct sctp_bind_addr *bp = &ep->base.bind_addr;
 	int retval = 0;
 	union sctp_addr saveaddr;
 
@@ -570,12 +572,12 @@ err_bindx_rem:
 	/* Remove these addresses from all associations on this endpoint.  */
 	if (retval >= 0) {
 		struct list_head *pos;
-		sctp_endpoint_t *ep;
-		sctp_association_t *asoc;
+		struct sctp_endpoint *ep;
+		struct sctp_association *asoc;
 
 		ep = sctp_sk(sk)->ep;
 		list_for_each(pos, &ep->asocs) {
-			asoc = list_entry(pos, sctp_association_t, asocs);
+			asoc = list_entry(pos, struct sctp_association, asocs);
 			sctp_addip_addr_config(asoc, SCTP_PARAM_DEL_IP,
 					       addrs, addrcnt);
 		}
@@ -637,7 +639,7 @@ SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk,
 
 	/* Alloc space for the address array in kernel memory.  */
 	kaddrs = (struct sockaddr_storage *) kmalloc(addrssize, GFP_KERNEL);
-	if (unlikely(NULL == kaddrs))
+	if (unlikely(!kaddrs))
 		return -ENOMEM;
 
 	if (copy_from_user(kaddrs, addrs, addrssize)) {
@@ -670,14 +672,45 @@ SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk,
  *
  * If sd in the close() call is a branched-off socket representing only
  * one association, the shutdown is performed on that association only.
+ *
+ * 4.1.6 close() - TCP Style Syntax
+ *
+ * Applications use close() to gracefully close down an association.
+ *
+ * The syntax is:
+ *
+ *    int close(int sd);
+ *
+ *      sd      - the socket descriptor of the association to be closed.
+ *
+ * After an application calls close() on a socket descriptor, no further
+ * socket operations will succeed on that descriptor.
+ *
+ * API 7.1.4 SO_LINGER
+ *
+ * An application using the TCP-style socket can use this option to
+ * perform the SCTP ABORT primitive.  The linger option structure is:
+ *
+ *  struct  linger {
+ *     int     l_onoff;                // option on/off
+ *     int     l_linger;               // linger time
+ * };
+ *
+ * To enable the option, set l_onoff to 1.  If the l_linger value is set
+ * to 0, calling close() is the same as the ABORT primitive.  If the
+ * value is set to a negative value, the setsockopt() call will return
+ * an error.  If the value is set to a positive value linger_time, the
+ * close() can be blocked for at most linger_time ms.  If the graceful
+ * shutdown phase does not finish during this period, close() will
+ * return but the graceful shutdown phase continues in the system.
  */
 SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 {
-	sctp_endpoint_t *ep;
-	sctp_association_t *asoc;
+	struct sctp_endpoint *ep;
+	struct sctp_association *asoc;
 	struct list_head *pos, *temp;
 
-	SCTP_DEBUG_PRINTK("sctp_close(sk: 0x%p...)\n", sk);
+	printk("sctp_close(sk: 0x%p, timeout:%ld)\n", sk, timeout);
 
 	sctp_lock_sock(sk);
 	sk->shutdown = SHUTDOWN_MASK;
@@ -686,13 +719,34 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 
 	/* Walk all associations on a socket, not on an endpoint.  */
 	list_for_each_safe(pos, temp, &ep->asocs) {
-		asoc = list_entry(pos, sctp_association_t, asocs);
-		sctp_primitive_SHUTDOWN(asoc, NULL);
+		asoc = list_entry(pos, struct sctp_association, asocs);
+
+		if (sctp_style(sk, TCP)) {
+			/* A closed association can still be in the list if
+			 * it belongs to a TCP-style listening socket that is
+			 * not yet accepted. If so, free it. If not, send an
+			 * ABORT or SHUTDOWN based on the linger options.
+			 */
+			if (sctp_state(asoc, CLOSED)) {
+				sctp_unhash_established(asoc);
+				sctp_association_free(asoc);
+
+			} else if (test_bit(SOCK_LINGER, &sk->flags) &&
+				   !sk->lingertime)
+				sctp_primitive_ABORT(asoc, NULL);
+			else
+				sctp_primitive_SHUTDOWN(asoc, NULL);
+		} else
+			sctp_primitive_SHUTDOWN(asoc, NULL);
 	}
 
 	/* Clean up any skbs sitting on the receive queue.  */
 	skb_queue_purge(&sk->receive_queue);
 	skb_queue_purge(&sctp_sk(sk)->pd_lobby);
+
+	/* On a TCP-style socket, block for at most linger_time if set. */
+	if (sctp_style(sk, TCP) && timeout)
+		sctp_wait_for_close(sk, timeout);
 
 	/* This will run the backlog queue.  */
 	sctp_release_sock(sk);
@@ -715,6 +769,16 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	sock_put(sk);
 
 	SCTP_DBG_OBJCNT_DEC(sock);
+}
+
+/* Handle EPIPE error. */
+static int sctp_error(struct sock *sk, int flags, int err)
+{
+	if (err == -EPIPE)
+		err = sock_error(sk) ? : -EPIPE;
+	if (err == -EPIPE && !(flags & MSG_NOSIGNAL))
+		send_sig(SIGPIPE, current, 0);
+	return err;
 }
 
 /* API 3.1.3 sendmsg() - UDP Style Syntax
@@ -746,10 +810,10 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			     struct msghdr *msg, int msg_len)
 {
 	struct sctp_opt *sp;
-	sctp_endpoint_t *ep;
-	sctp_association_t *new_asoc=NULL, *asoc=NULL;
-	struct sctp_transport *transport;
-	sctp_chunk_t *chunk = NULL;
+	struct sctp_endpoint *ep;
+	struct sctp_association *new_asoc=NULL, *asoc=NULL;
+	struct sctp_transport *transport, *chunk_tp;
+	struct sctp_chunk *chunk;
 	union sctp_addr to;
 	struct sockaddr *msg_name = NULL;
 	struct sctp_sndrcvinfo default_sinfo = { 0 };
@@ -761,7 +825,9 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	sctp_scope_t scope;
 	long timeo;
 	__u16 sinfo_flags = 0;
-	struct sk_buff_head chunks;
+	struct sctp_datamsg *datamsg;
+	struct list_head *pos;
+	int msg_flags = msg->msg_flags;
 
 	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %d)\n",
 			  sk, msg, msg_len);
@@ -771,6 +837,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	ep = sp->ep;
 
 	SCTP_DEBUG_PRINTK("Using endpoint: %s.\n", ep->debug_name);
+
+	/* We cannot send a message over a TCP-style listening socket. */
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING)) {
+		err = -EPIPE;
+		goto out_nounlock;
+	}
 
 	/* Parse out the SCTP CMSGs.  */
 	err = sctp_msghdr_parse(msg, &cmsgs);
@@ -785,7 +857,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	 * the address we will send to.
 	 * For a peeled-off socket, msg_name is ignored.
 	 */
-	if ((SCTP_SOCKET_UDP_HIGH_BANDWIDTH != sp->type) && msg->msg_name) {
+	if (!sctp_style(sk, UDP_HIGH_BANDWIDTH) && msg->msg_name) {
 		int msg_namelen = msg->msg_namelen;
 
 		err = sctp_verify_addr(sk, (union sctp_addr *)msg->msg_name,
@@ -816,6 +888,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	SCTP_DEBUG_PRINTK("msg_len: %Zd, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
+	/* MSG_EOF or MSG_ABORT cannot be set on a TCP-style socket. */
+	if (sctp_style(sk, TCP) && (sinfo_flags & (MSG_EOF | MSG_ABORT))) {
+		err = -EINVAL;
+		goto out_nounlock;
+	}
+
 	/* If MSG_EOF is set, no data can be sent. Disallow sending zero
 	 * length messages when MSG_EOF|MSG_ABORT is not set.
 	 * If MSG_ABORT is set, the message length could be non zero with
@@ -827,11 +905,19 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		goto out_nounlock;
 	}
 
-	sctp_lock_sock(sk);
+	/* If MSG_ADDR_OVER is set, there must be an address
+	 * specified in msg_name.
+	 */
+	if ((sinfo_flags & MSG_ADDR_OVER) && (!msg->msg_name)) {
+		err = -EINVAL;
+		goto out_nounlock;
+	}
 
 	transport = NULL;
 
 	SCTP_DEBUG_PRINTK("About to look up association.\n");
+
+	sctp_lock_sock(sk);
 
 	/* If a msg_name has been specified, assume this is to be used.  */
 	if (msg_name) {
@@ -839,10 +925,13 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		asoc = sctp_endpoint_lookup_assoc(ep, &to, &transport);
 		if (!asoc) {
 			/* If we could not find a matching association on the
-			 * endpoint, make sure that there is no peeled-off
-			 * association on another socket.
+			 * endpoint, make sure that it is not a TCP-style
+			 * socket that already has an association or there is
+			 * no peeled-off association on another socket.
 			 */
-			if (sctp_endpoint_is_peeled_off(ep, &to)) {
+			if ((sctp_style(sk, TCP) &&
+			     sctp_sstate(sk, ESTABLISHED)) ||
+			    sctp_endpoint_is_peeled_off(ep, &to)) {
 				err = -EADDRNOTAVAIL;
 				goto out_unlock;
 			}
@@ -850,14 +939,24 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	} else {
 		asoc = sctp_id2assoc(sk, associd);
 		if (!asoc) {
-			err = -EINVAL;
+			err = -EPIPE;
 			goto out_unlock;
 		}
 	}
 
 	if (asoc) {
-		SCTP_DEBUG_PRINTK("Just looked up association: "
-				  "%s. \n", asoc->debug_name);
+		SCTP_DEBUG_PRINTK("Just looked up association: %p.\n", asoc);
+
+		/* We cannot send a message on a TCP-style SCTP_SS_ESTABLISHED
+		 * socket that has an association in CLOSED state. This can
+		 * happen when an accepted socket has an association that is
+		 * already CLOSED.
+		 */
+		if (sctp_state(asoc, CLOSED) && sctp_style(sk, TCP)) {
+			err = -EPIPE;
+			goto out_unlock;
+		}
+
 		if (sinfo_flags & MSG_EOF) {
 			SCTP_DEBUG_PRINTK("Shutting down association: %p\n",
 					  asoc);
@@ -1004,69 +1103,76 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			goto out_free;
 	}
 
-	/* Break the message into multiple chunks of maximum size. */
-	skb_queue_head_init(&chunks);
-	err = sctp_datachunks_from_user(asoc, sinfo, msg, msg_len, &chunks);
-	if (err)
-		goto out_free;
+	/* If an address is passed with the sendto/sendmsg call, it is used
+	 * to override the primary destination address in the TCP model, or
+	 * when MSG_ADDR_OVER flag is set in the UDP model.
+	 */
+	if ((sctp_style(sk, TCP) && msg_name) ||
+	    (sinfo_flags & MSG_ADDR_OVER)) {
+		chunk_tp = sctp_assoc_lookup_paddr(asoc, &to);
+		if (!chunk_tp) {
+			err = -EINVAL;
+			goto out_free;
+		}
+	} else
+		chunk_tp = NULL;
 
 	/* Auto-connect, if we aren't connected already. */
-	if (SCTP_STATE_CLOSED == asoc->state) {
+	if (sctp_state(asoc, CLOSED)) {
 		err = sctp_primitive_ASSOCIATE(asoc, NULL);
 		if (err < 0)
 			goto out_free;
 		SCTP_DEBUG_PRINTK("We associated primitively.\n");
 	}
 
+	/* Break the message into multiple chunks of maximum size. */
+	datamsg = sctp_datamsg_from_user(asoc, sinfo, msg, msg_len);
+	if (!datamsg) {
+		err = -ENOMEM;
+		goto out_free;
+	}
+
 	/* Now send the (possibly) fragmented message. */
-	while ((chunk = (sctp_chunk_t *)__skb_dequeue(&chunks))) {
+	list_for_each(pos, &datamsg->chunks) {
+		chunk = list_entry(pos, struct sctp_chunk, frag_list);
+		sctp_datamsg_track(chunk);
 
 		/* Do accounting for the write space.  */
 		sctp_set_owner_w(chunk);
 
-		/* This flag, in the UDP model, requests the SCTP stack to
-		 * override the primary destination address with the
-		 * address found with the sendto/sendmsg call.
-		 */
-		if (sinfo_flags & MSG_ADDR_OVER) {
-			if (!msg->msg_name) {
-				err = -EINVAL;
-				goto out_free;
-			}
-			chunk->transport = sctp_assoc_lookup_paddr(asoc, &to);
-			if (!chunk->transport) {
-				err = -EINVAL;
-				goto out_free;
-			}
-		}
+		chunk->transport = chunk_tp;
 
-		/* Send it to the lower layers.  */
-		sctp_primitive_SEND(asoc, chunk);
+		/* Send it to the lower layers.  Note:  all chunks
+		 * must either fail or succeed.   The lower layer
+		 * works that way today.  Keep it that way or this
+		 * breaks.
+		 */
+		err = sctp_primitive_SEND(asoc, chunk);
+		/* Did the lower layer accept the chunk? */
+		if (err)
+			sctp_chunk_free(chunk);
 		SCTP_DEBUG_PRINTK("We sent primitively.\n");
 	}
 
-	if (!err) {
+	sctp_datamsg_free(datamsg);
+	if (err)
+		goto out_free;
+	else
 		err = msg_len;
-		goto out_unlock;
-	}
+
 	/* If we are already past ASSOCIATE, the lower
 	 * layers are responsible for association cleanup.
 	 */
-	goto out_free_chunk;
+	goto out_unlock;
 
 out_free:
 	if (new_asoc)
 		sctp_association_free(asoc);
-
-out_free_chunk:
-	if (chunk)
-		sctp_free_chunk(chunk);
-
 out_unlock:
 	sctp_release_sock(sk);
 
 out_nounlock:
-	return err;
+	return sctp_error(sk, msg_flags, err);
 
 #if 0
 do_sock_err:
@@ -1134,8 +1240,9 @@ static int sctp_skb_pull(struct sk_buff *skb, int len)
  */
 static struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);
 
-SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-			     int len, int noblock, int flags, int *addr_len)
+SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
+			     struct msghdr *msg, int len, int noblock,
+			     int flags, int *addr_len)
 {
 	struct sctp_ulpevent *event = NULL;
 	struct sctp_opt *sp = sctp_sk(sk);
@@ -1151,12 +1258,11 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 
 	sctp_lock_sock(sk);
 
-	if ((SCTP_SOCKET_TCP == sp->type) &&
-	    (SCTP_SS_ESTABLISHED != sk->state)) {
+	if (sctp_style(sk, TCP) && !sctp_sstate(sk, ESTABLISHED)) {
 		err = -ENOTCONN;
 		goto out;
 	}
-	
+
 	skb = sctp_skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
 		goto out;
@@ -1259,7 +1365,7 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 	struct sctp_opt *sp = sctp_sk(sk);
 
 	/* Applicable to UDP-style socket only */
-	if (SCTP_SOCKET_TCP == sp->type)
+	if (sctp_style(sk, TCP))
 		return -EOPNOTSUPP;
 	if (optlen != sizeof(int))
 		return -EINVAL;
@@ -1271,10 +1377,10 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 }
 
 static int sctp_setsockopt_peer_addr_params(struct sock *sk,
-						   char *optval, int optlen)
+					    char *optval, int optlen)
 {
 	struct sctp_paddrparams params;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	union sctp_addr *addr;
 	struct sctp_transport *trans;
 	int error;
@@ -1329,8 +1435,7 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	return 0;
 }
 
-static int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
-					  int optlen)
+static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 {
 	if (optlen != sizeof(struct sctp_initmsg))
 		return -EINVAL;
@@ -1340,7 +1445,6 @@ static int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
 }
 
 /*
- *
  * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
@@ -1358,7 +1462,7 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 						char *optval, int optlen)
 {
 	struct sctp_sndrcvinfo info;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 
 	if (optlen != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -1413,7 +1517,6 @@ static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 }
 
 /*
- *
  * 7.1.5 SCTP_NODELAY
  *
  * Turn on/off any Nagle-like algorithm.  This means that packets are
@@ -1424,15 +1527,61 @@ static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 static int sctp_setsockopt_nodelay(struct sock *sk, char *optval,
 					int optlen)
 {
-	__u8 val;
+	int val;
 
-	if (optlen < sizeof(__u8))
+	if (optlen < sizeof(int))
 		return -EINVAL;
-
-	if (get_user(val, (__u8 *)optval))
+	if (get_user(val, (int *)optval))
 		return -EFAULT;
 
 	sctp_sk(sk)->nodelay = (val == 0) ? 0 : 1;
+	return 0;
+}
+
+/*
+ * 7.1.16 Set/clear IPv4 mapped addresses (SCTP_I_WANT_MAPPED_V4_ADDR)
+ *
+ * This socket option is a boolean flag which turns on or off mapped V4
+ * addresses.  If this option is turned on and the socket is type
+ * PF_INET6, then IPv4 addresses will be mapped to V6 representation.
+ * If this option is turned off, then no mapping will be done of V4
+ * addresses and a user will receive both PF_INET6 and PF_INET type
+ * addresses on the socket.
+ */
+static int sctp_setsockopt_mappedv4(struct sock *sk, char *optval, int optlen)
+{
+	int val;
+
+	if (optlen < sizeof(int))
+		return -EINVAL;
+	if (get_user(val, (int *)optval))
+		return -EFAULT;
+	/* FIXME: Put real support here. */
+
+	return -ENOPROTOOPT;
+}
+
+/*
+ * 7.1.17 Set the maximum fragrmentation size (SCTP_MAXSEG)
+ *
+ * This socket option specifies the maximum size to put in any outgoing
+ * SCTP chunk.  If a message is larger than this size it will be
+ * fragmented by SCTP into the specified size.  Note that the underlying
+ * SCTP implementation may fragment into smaller sized chunks when the
+ * PMTU of the underlying association is smaller than the value set by
+ * the user.
+ */
+static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
+{
+	int val;
+
+	if (optlen < sizeof(int))
+		return -EINVAL;
+	if (get_user(val, (int *)optval))
+		return -EFAULT;
+	if ((val < 8) || (val > SCTP_MAX_CHUNK_LEN))
+		return -EINVAL;
+	sctp_sk(sk)->user_frag = val;
 
 	return 0;
 }
@@ -1526,20 +1675,22 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	case SCTP_INITMSG:
 		retval = sctp_setsockopt_initmsg(sk, optval, optlen);
 		break;
-
 	case SCTP_SET_DEFAULT_SEND_PARAM:
 		retval = sctp_setsockopt_default_send_param(sk, optval,
 							    optlen);
 		break;
-
 	case SCTP_SET_PEER_PRIMARY_ADDR:
 		retval = sctp_setsockopt_peer_prim(sk, optval, optlen);
 		break;
-
 	case SCTP_NODELAY:
 		retval = sctp_setsockopt_nodelay(sk, optval, optlen);
 		break;
-
+	case SCTP_I_WANT_MAPPED_V4_ADDR:
+		retval = sctp_setsockopt_mappedv4(sk, optval, optlen);
+		break;
+	case SCTP_MAXSEG:
+		retval = sctp_setsockopt_maxseg(sk, optval, optlen);
+		break;
 	default:
 		retval = -ENOPROTOOPT;
 		break;
@@ -1572,10 +1723,11 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 			     int addr_len)
 {
 	struct sctp_opt *sp;
-	sctp_endpoint_t *ep;
-	sctp_association_t *asoc;
+	struct sctp_endpoint *ep;
+	struct sctp_association *asoc;
 	struct sctp_transport *transport;
 	union sctp_addr to;
+	struct sctp_af *af;
 	sctp_scope_t scope;
 	long timeo;
 	int err = 0;
@@ -1590,12 +1742,11 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 
 	/* connect() cannot be done on a socket that is already in ESTABLISHED
 	 * state - UDP-style peeled off socket or a TCP-style socket that
-	 * is already connected. 
+	 * is already connected.
 	 * It cannot be done even on a TCP-style listening socket.
 	 */
-	if ((SCTP_SS_ESTABLISHED == sk->state) ||
-	    ((SCTP_SOCKET_TCP == sp->type) &&
-	     (SCTP_SS_LISTENING == sk->state))) {
+	if (sctp_sstate(sk, ESTABLISHED) ||
+	    (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))) {
 		err = -EISCONN;
 		goto out_unlock;
 	}
@@ -1663,6 +1814,11 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 		goto out_unlock;
 	}
 
+	/* Initialize sk's dport and daddr for getpeername() */
+	inet_sk(sk)->dport = htons(asoc->peer.port);
+	af = sctp_get_af_specific(to.sa.sa_family);
+	af->to_sk_daddr(&to, sk);
+
 	timeo = sock_sndtimeo(sk, sk->socket->file->f_flags & O_NONBLOCK);
 	err = sctp_wait_for_connect(asoc, &timeo);
 
@@ -1690,21 +1846,21 @@ SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 	struct sctp_opt *sp;
 	struct sctp_endpoint *ep;
 	struct sock *newsk = NULL;
-	struct sctp_association *assoc;
+	struct sctp_association *asoc;
 	long timeo;
 	int error = 0;
- 
+
 	sctp_lock_sock(sk);
 
 	sp = sctp_sk(sk);
 	ep = sp->ep;
 
-	if (SCTP_SOCKET_TCP != sp->type) {
+	if (!sctp_style(sk, TCP)) {
 		error = -EOPNOTSUPP;
 		goto out;
 	}
 
-	if (SCTP_SS_LISTENING != sk->state) {
+	if (!sctp_sstate(sk, LISTENING)) {
 		error = -EINVAL;
 		goto out;
 	}
@@ -1715,21 +1871,21 @@ SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 	if (error)
 		goto out;
 
-	/* We treat the list of associations on the endpoint as the accept 
-	 * queue and pick the first association on the list. 
+	/* We treat the list of associations on the endpoint as the accept
+	 * queue and pick the first association on the list.
 	 */
-	assoc = list_entry(ep->asocs.next, struct sctp_association, asocs);
+	asoc = list_entry(ep->asocs.next, struct sctp_association, asocs);
 
-	newsk = sp->pf->create_accept_sk(sk, assoc); 
+	newsk = sp->pf->create_accept_sk(sk, asoc);
 	if (!newsk) {
 		error = -ENOMEM;
 		goto out;
 	}
 
 	/* Populate the fields of the newsk from the oldsk and migrate the
-	 * assoc to the newsk.
-	 */ 
-	sctp_sock_migrate(sk, newsk, assoc, SCTP_SOCKET_TCP);
+	 * asoc to the newsk.
+	 */
+	sctp_sock_migrate(sk, newsk, asoc, SCTP_SOCKET_TCP);
 
 out:
 	sctp_release_sock(sk);
@@ -1737,10 +1893,10 @@ out:
 	return newsk;
 }
 
-/* FIXME: Write Comments. */
+/* The SCTP ioctl handler. */
 SCTP_STATIC int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 {
-	return -EOPNOTSUPP; /* STUB */
+	return -ENOIOCTLCMD;
 }
 
 /* This is the function which gets called during socket creation to
@@ -1749,7 +1905,7 @@ SCTP_STATIC int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
  */
 SCTP_STATIC int sctp_init_sock(struct sock *sk)
 {
-	sctp_endpoint_t *ep;
+	struct sctp_endpoint *ep;
 	struct sctp_protocol *proto;
 	struct sctp_opt *sp;
 
@@ -1800,7 +1956,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 * enable the events needed.  By default, UDP-style
 	 * sockets enable io and association change notifications.
 	 */
-	if (SCTP_SOCKET_UDP == sp->type) {
+	if (sctp_style(sk, UDP)) {
 		sp->subscribe.sctp_data_io_event     = 1;
 		sp->subscribe.sctp_association_event = 1;
 	}
@@ -1819,12 +1975,19 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* Turn on/off any Nagle-like algorithm.  */
 	sp->nodelay           = 1;
 
+	/* Enable by default. */
+	sp->v4mapped          = 1;
+
 	/* Auto-close idle associations after the configured
 	 * number of seconds.  A value of 0 disables this
 	 * feature.  Configure through the SCTP_AUTOCLOSE socket option,
 	 * for UDP-style sockets only.
 	 */
 	sp->autoclose         = 0;
+
+	/* User specified fragmentation limit. */
+	sp->user_frag         = 0;
+
 	sp->pf = sctp_get_pf_specific(sk->family);
 
 	/* Control variables for partial data delivery. */
@@ -1835,11 +1998,12 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 * change the data structure relationships, this may still
 	 * be useful for storing pre-connect address information.
 	 */
-	ep = sctp_endpoint_new(proto, sk, GFP_KERNEL);
-	if (NULL == ep)
+	ep = sctp_endpoint_new(sk, GFP_KERNEL);
+	if (!ep)
 		return -ENOMEM;
 
 	sp->ep = ep;
+	sp->hmac = NULL;
 
 	SCTP_DBG_OBJCNT_INC(sock);
 	return 0;
@@ -1848,7 +2012,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 /* Cleanup any SCTP per socket resources.  */
 SCTP_STATIC int sctp_destroy_sock(struct sock *sk)
 {
-	sctp_endpoint_t *ep;
+	struct sctp_endpoint *ep;
 
 	SCTP_DEBUG_PRINTK("sctp_destroy_sock(sk: %p)\n", sk);
 
@@ -1859,11 +2023,38 @@ SCTP_STATIC int sctp_destroy_sock(struct sock *sk)
 	return 0;
 }
 
-/* FIXME: Comments needed.  */
+/* API 4.1.7 shutdown() - TCP Style Syntax
+ *     int shutdown(int socket, int how);
+ *
+ *     sd      - the socket descriptor of the association to be closed.
+ *     how     - Specifies the type of shutdown.  The  values  are
+ *               as follows:
+ *               SHUT_RD
+ *                     Disables further receive operations. No SCTP
+ *                     protocol action is taken.
+ *               SHUT_WR
+ *                     Disables further send operations, and initiates
+ *                     the SCTP shutdown sequence.
+ *               SHUT_RDWR
+ *                     Disables further send  and  receive  operations
+ *                     and initiates the SCTP shutdown sequence.
+ */
 SCTP_STATIC void sctp_shutdown(struct sock *sk, int how)
 {
-	/* UDP-style sockets do not support shutdown. */
-	/* STUB */
+	struct sctp_endpoint *ep;
+	struct sctp_association *asoc;
+
+	if (!sctp_style(sk, TCP))
+		return;
+
+	if (how & SEND_SHUTDOWN) {
+		ep = sctp_sk(sk)->ep;
+		if (!list_empty(&ep->asocs)) {
+			asoc = list_entry(ep->asocs.next,
+					  struct sctp_association, asocs);
+			sctp_primitive_SHUTDOWN(asoc, NULL);
+		}
+	}
 }
 
 /* 7.2.1 Association Status (SCTP_STATUS)
@@ -1877,7 +2068,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 				       int *optlen)
 {
 	struct sctp_status status;
-	sctp_association_t *assoc = NULL;
+	struct sctp_association *asoc = NULL;
 	struct sctp_transport *transport;
 	sctp_assoc_t associd;
 	int retval = 0;
@@ -1893,22 +2084,26 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	}
 
 	associd = status.sstat_assoc_id;
-	assoc = sctp_id2assoc(sk, associd);
-	if (!assoc) {
+	asoc = sctp_id2assoc(sk, associd);
+	if (!asoc) {
 		retval = -EINVAL;
 		goto out;
 	}
 
-	transport = assoc->peer.primary_path;
+	transport = asoc->peer.primary_path;
 
-	status.sstat_assoc_id = sctp_assoc2id(assoc);
-	status.sstat_state = assoc->state;
-	status.sstat_rwnd =  assoc->peer.rwnd;
-	status.sstat_unackdata = assoc->unack_data;
-	status.sstat_penddata = assoc->peer.tsn_map.pending_data;
-	status.sstat_instrms = assoc->c.sinit_max_instreams;
-	status.sstat_outstrms = assoc->c.sinit_num_ostreams;
-	status.sstat_fragmentation_point = assoc->frag_point;
+	status.sstat_assoc_id = sctp_assoc2id(asoc);
+	status.sstat_state = asoc->state;
+	status.sstat_rwnd =  asoc->peer.rwnd;
+	status.sstat_unackdata = asoc->unack_data;
+	status.sstat_penddata = asoc->peer.tsn_map.pending_data;
+	status.sstat_instrms = asoc->c.sinit_max_instreams;
+	status.sstat_outstrms = asoc->c.sinit_num_ostreams;
+	/* Just in time frag_point update. */
+	if (sctp_sk(sk)->user_frag)
+		asoc->frag_point
+			= min_t(int, asoc->frag_point, sctp_sk(sk)->user_frag);
+	status.sstat_fragmentation_point = asoc->frag_point;
 	status.sstat_primary.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
 	memcpy(&status.sstat_primary.spinfo_address,
 	       &(transport->ipaddr), sizeof(union sctp_addr));
@@ -1965,7 +2160,7 @@ static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, in
 static int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
 {
 	/* Applicable to UDP-style socket only */
-	if (SCTP_SOCKET_TCP == sctp_sk(sk)->type)
+	if (sctp_style(sk, TCP))
 		return -EOPNOTSUPP;
 	if (len != sizeof(int))
 		return -EINVAL;
@@ -1975,33 +2170,29 @@ static int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int
 }
 
 /* Helper routine to branch off an association to a new socket.  */
-SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newsock)
+SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
+				struct socket **sockp)
 {
-	struct sock *oldsk = assoc->base.sk;
-	struct sock *newsk;
-	struct socket *tmpsock;
+	struct sock *sk = asoc->base.sk;
+	struct socket *sock;
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
 	 * socket, nor is this supported for tcp style sockets.
 	 */
-	if (SCTP_SOCKET_UDP != sctp_sk(oldsk)->type)
-		return -EOPNOTSUPP;
+	if (!sctp_style(sk, UDP))
+		return -EINVAL;
 
 	/* Create a new socket.  */
-	err = sock_create(oldsk->family, SOCK_SEQPACKET, IPPROTO_SCTP,
-			  &tmpsock);
+	err = sock_create(sk->family, SOCK_SEQPACKET, IPPROTO_SCTP, &sock);
 	if (err < 0)
 		return err;
 
-	newsk = tmpsock->sk;
-
 	/* Populate the fields of the newsk from the oldsk and migrate the
-	 * assoc to the newsk.
-	 */ 
-	sctp_sock_migrate(oldsk, newsk, assoc, SCTP_SOCKET_UDP_HIGH_BANDWIDTH);
-
-	*newsock = tmpsock;
+	 * asoc to the newsk.
+	 */
+	sctp_sock_migrate(sk, sock->sk, asoc, SCTP_SOCKET_UDP_HIGH_BANDWIDTH);
+	*sockp = sock;
 
 	return err;
 }
@@ -2011,22 +2202,22 @@ static int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval, int *
 	sctp_peeloff_arg_t peeloff;
 	struct socket *newsock;
 	int retval = 0;
-	sctp_association_t *assoc;
+	struct sctp_association *asoc;
 
 	if (len != sizeof(sctp_peeloff_arg_t))
 		return -EINVAL;
 	if (copy_from_user(&peeloff, optval, len))
 		return -EFAULT;
 
-	assoc = sctp_id2assoc(sk, peeloff.associd);
-	if (NULL == assoc) {
+	asoc = sctp_id2assoc(sk, peeloff.associd);
+	if (!asoc) {
 		retval = -EINVAL;
 		goto out;
 	}
 
-	SCTP_DEBUG_PRINTK("%s: sk: %p assoc: %p\n", __FUNCTION__, sk, assoc);
+	SCTP_DEBUG_PRINTK("%s: sk: %p asoc: %p\n", __FUNCTION__, sk, asoc);
 
-	retval = sctp_do_peeloff(assoc, &newsock);
+	retval = sctp_do_peeloff(asoc, &newsock);
 	if (retval < 0)
 		goto out;
 
@@ -2037,8 +2228,8 @@ static int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval, int *
 		goto out;
 	}
 
-	SCTP_DEBUG_PRINTK("%s: sk: %p assoc: %p newsk: %p sd: %d\n",
-			  __FUNCTION__, sk, assoc, newsock->sk, retval);
+	SCTP_DEBUG_PRINTK("%s: sk: %p asoc: %p newsk: %p sd: %d\n",
+			  __FUNCTION__, sk, asoc, newsock->sk, retval);
 
 	/* Return the fd mapped to the new socket.  */
 	peeloff.sd = retval;
@@ -2049,11 +2240,11 @@ out:
 	return retval;
 }
 
-static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len, 
+static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 						char *optval, int *optlen)
 {
 	struct sctp_paddrparams params;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	union sctp_addr *addr;
 	struct sctp_transport *trans;
 
@@ -2088,7 +2279,9 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 
 	if (copy_to_user(optval, &params, len))
 		return -EFAULT;
-	*optlen = len;
+
+	if (put_user(len, optlen))
+		return -EFAULT;
 
 	return 0;
 }
@@ -2102,11 +2295,11 @@ static int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval, int *
 	return 0;
 }
 
-static int sctp_getsockopt_peer_addrs_num(struct sock *sk, int len, 
+static int sctp_getsockopt_peer_addrs_num(struct sock *sk, int len,
 					char *optval, int *optlen)
 {
 	sctp_assoc_t id;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
 
@@ -2135,7 +2328,7 @@ static int sctp_getsockopt_peer_addrs_num(struct sock *sk, int len,
 static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
 				char *optval, int *optlen)
 {
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
@@ -2176,8 +2369,8 @@ static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 						char *optval, int *optlen)
 {
 	sctp_assoc_t id;
-	sctp_bind_addr_t *bp;
-	sctp_association_t *asoc;
+	struct sctp_bind_addr *bp;
+	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
 
@@ -2214,8 +2407,8 @@ static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 					char *optval, int *optlen)
 {
-	sctp_bind_addr_t *bp;
-	sctp_association_t *asoc;
+	struct sctp_bind_addr *bp;
+	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
@@ -2317,7 +2510,7 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
 					int len, char *optval, int *optlen)
 {
 	struct sctp_sndrcvinfo info;
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 
 	if (len != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -2350,20 +2543,76 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
  * integer boolean flag.
  */
 
-static int sctp_getsockopt_nodelay(struct sock *sk, int len, 
-					char *optval, int *optlen)
+static int sctp_getsockopt_nodelay(struct sock *sk, int len,
+				   char *optval, int *optlen)
 {
-	__u8 val;
+	int val;
 
-	if (len < sizeof(__u8))
+	if (len < sizeof(int))
 		return -EINVAL;
 
-	len = sizeof(__u8);
+	len = sizeof(int);
 	val = (sctp_sk(sk)->nodelay == 1);
 	if (put_user(len, optlen))
 		return -EFAULT;
 	if (copy_to_user(optval, &val, len))
 		return -EFAULT;
+	return 0;
+}
+/*
+ * 7.1.16 Set/clear IPv4 mapped addresses (SCTP_I_WANT_MAPPED_V4_ADDR)
+ *
+ * This socket option is a boolean flag which turns on or off mapped V4
+ * addresses.  If this option is turned on and the socket is type
+ * PF_INET6, then IPv4 addresses will be mapped to V6 representation.
+ * If this option is turned off, then no mapping will be done of V4
+ * addresses and a user will receive both PF_INET6 and PF_INET type
+ * addresses on the socket.
+ */
+static int sctp_getsockopt_mappedv4(struct sock *sk, int len,
+				    char *optval, int *optlen)
+{
+	int val;
+	if (len < sizeof(int))
+		return -EINVAL;
+
+	len = sizeof(int);
+	/* FIXME: Until we have support, return disabled. */
+	val = 0;
+	if (put_user(len, optlen))
+		return -EFAULT;
+	if (copy_to_user(optval, &val, len))
+		return -EFAULT;
+
+	return 0;
+}
+
+/*
+ * 7.1.17 Set the maximum fragrmentation size (SCTP_MAXSEG)
+ *
+ * This socket option specifies the maximum size to put in any outgoing
+ * SCTP chunk.  If a message is larger than this size it will be
+ * fragmented by SCTP into the specified size.  Note that the underlying
+ * SCTP implementation may fragment into smaller sized chunks when the
+ * PMTU of the underlying association is smaller than the value set by
+ * the user.
+ */
+static int sctp_getsockopt_maxseg(struct sock *sk, int len,
+				  char *optval, int *optlen)
+{
+	int val;
+
+	if (len < sizeof(int))
+		return -EINVAL;
+
+	len = sizeof(int);
+
+	val = sctp_sk(sk)->user_frag;
+	if (put_user(len, optlen))
+		return -EFAULT;
+	if (copy_to_user(optval, &val, len))
+		return -EFAULT;
+
 	return 0;
 }
 
@@ -2418,7 +2667,7 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		retval = sctp_getsockopt_initmsg(sk, len, optval, optlen);
 		break;
 	case SCTP_GET_PEER_ADDRS_NUM:
-		retval = sctp_getsockopt_peer_addrs_num(sk, len, optval, 
+		retval = sctp_getsockopt_peer_addrs_num(sk, len, optval,
 							optlen);
 		break;
 	case SCTP_GET_LOCAL_ADDRS_NUM:
@@ -2442,6 +2691,12 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_getsockopt_nodelay(sk, len, optval, optlen);
+		break;
+	case SCTP_I_WANT_MAPPED_V4_ADDR:
+		retval = sctp_getsockopt_mappedv4(sk, len, optval, optlen);
+		break;
+	case SCTP_MAXSEG:
+		retval = sctp_getsockopt_maxseg(sk, len, optval, optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;
@@ -2553,7 +2808,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	}
 
 
-	if (pp != NULL && pp->sk != NULL) {
+	if (pp && pp->sk) {
 		/* We had a port hash table hit - there is an
 		 * available port (pp != NULL) and it is being
 		 * used by other socket (pp->sk != NULL); that other
@@ -2578,7 +2833,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * in an endpoint.
 		 */
 		for ( ; sk2 != NULL; sk2 = sk2->bind_next) {
-			sctp_endpoint_t *ep2;
+			struct sctp_endpoint *ep2;
 			ep2 = sctp_sk(sk2)->ep;
 
 			if (sk_reuse && sk2->reuse)
@@ -2601,18 +2856,17 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	/* If there was a hash table miss, create a new port.  */
 	ret = 1;
 
-	if (pp == NULL && (pp = sctp_bucket_create(head, snum)) == NULL)
+	if (!pp && !(pp = sctp_bucket_create(head, snum)))
 		goto fail_unlock;
 
 	/* In either case (hit or miss), make sure fastreuse is 1 only
 	 * if sk->reuse is too (that is, if the caller requested
 	 * SO_REUSEADDR on this socket -sk-).
 	 */
-	if (pp->sk == NULL) {
+	if (!pp->sk)
 		pp->fastreuse = sk->reuse ? 1 : 0;
-	} else if (pp->fastreuse && sk->reuse == 0) {
+	else if (pp->fastreuse && sk->reuse == 0)
 		pp->fastreuse = 0;
-	}
 
 	/* We are set, so fill up all the data in the hash table
 	 * entry, tie the socket list information with the rest of the
@@ -2669,15 +2923,15 @@ static int sctp_get_port(struct sock *sk, unsigned short snum)
 SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
-	sctp_endpoint_t *ep = sp->ep;
+	struct sctp_endpoint *ep = sp->ep;
 
 	/* Only UDP style sockets that are not peeled off are allowed to
 	 * listen().
 	 */
-	if (SCTP_SOCKET_UDP != sp->type)
+	if (!sctp_style(sk, UDP))
 		return -EINVAL;
 
-	if (sk->state == SCTP_SS_LISTENING)
+	if (sctp_sstate(sk, LISTENING))
 		return 0;
 
 	/*
@@ -2702,15 +2956,15 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 /*
  * 4.1.3 listen() - TCP Style Syntax
  *
- *   Applications uses listen() to ready the SCTP endpoint for accepting 
+ *   Applications uses listen() to ready the SCTP endpoint for accepting
  *   inbound associations.
  */
 SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
-	sctp_endpoint_t *ep = sp->ep;
+	struct sctp_endpoint *ep = sp->ep;
 
-	if (sk->state == SCTP_SS_LISTENING)
+	if (sctp_sstate(sk, LISTENING))
 		return 0;
 
 	/*
@@ -2739,15 +2993,25 @@ SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 int sctp_inet_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
-	int err;
+	struct crypto_tfm *tfm=NULL;
+	int err = -EINVAL;
+
+	if (unlikely(backlog < 0))
+		goto out;
 
 	sctp_lock_sock(sk);
 
-	err = -EINVAL;
 	if (sock->state != SS_UNCONNECTED)
 		goto out;
-	if (unlikely(backlog < 0))
-		goto out;
+
+	/* Allocate HMAC for generating cookie. */
+	if (sctp_hmac_alg) {
+		tfm = sctp_crypto_alloc_tfm(sctp_hmac_alg, 0);
+		if (!tfm) {
+			err = -ENOSYS;
+			goto out;
+		}
+	}
 
 	switch (sock->type) {
 	case SOCK_SEQPACKET:
@@ -2756,14 +3020,21 @@ int sctp_inet_listen(struct socket *sock, int backlog)
 	case SOCK_STREAM:
 		err = sctp_stream_listen(sk, backlog);
 		break;
-
 	default:
-		goto out;
+		break;
 	};
+	if (err)
+		goto cleanup;
 
+	/* Store away the transform reference. */
+	sctp_sk(sk)->hmac = tfm;
 out:
 	sctp_release_sock(sk);
 	return err;
+cleanup:
+	if (tfm)
+		sctp_crypto_free_tfm(tfm);
+	goto out;
 }
 
 /*
@@ -2782,9 +3053,18 @@ out:
 unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 {
 	struct sock *sk = sock->sk;
+	struct sctp_opt *sp = sctp_sk(sk);
 	unsigned int mask;
 
 	poll_wait(file, sk->sleep, wait);
+
+	/* A TCP-style listening socket becomes readable when the accept queue
+	 * is not empty.
+	 */
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
+		return (!list_empty(&sp->ep->asocs)) ?
+		       	(POLLIN | POLLRDNORM) : 0;
+
 	mask = 0;
 
 	/* Is there any exceptional events?  */
@@ -2798,19 +3078,9 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	    (sk->shutdown & RCV_SHUTDOWN))
 		mask |= POLLIN | POLLRDNORM;
 
-	/*
-	 * FIXME: We need to set SCTP_SS_DISCONNECTING for TCP-style and
-	 * peeled off sockets.  Additionally, TCP-style needs to consider
-	 * other establishment conditions.
-	 */
-	if (SCTP_SOCKET_UDP != sctp_sk(sk)->type) {
-		/* The association is going away.  */
-		if (SCTP_SS_DISCONNECTING == sk->state)
-			mask |= POLLHUP;
-		/* The association is either gone or not ready.  */
-		if (SCTP_SS_CLOSED == sk->state)
-			return mask;
-	}
+	/* The association is either gone or not ready.  */
+	if (!sctp_style(sk, UDP) && sctp_sstate(sk, CLOSED))
+		return mask;
 
 	/* Is it writable?  */
 	if (sctp_writeable(sk)) {
@@ -2967,7 +3237,7 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 		/* Strictly check lengths following example in SCM code.  */
 		switch (cmsg->cmsg_type) {
 		case SCTP_INIT:
-			/* SCTP Socket API Extension (draft 1)
+			/* SCTP Socket API Extension
 			 * 5.2.1 SCTP Initiation Structure (SCTP_INIT)
 			 *
 			 * This cmsghdr structure provides information for
@@ -2987,7 +3257,7 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 			break;
 
 		case SCTP_SNDRCV:
-			/* SCTP Socket API Extension (draft 1)
+			/* SCTP Socket API Extension
 			 * 5.2.2 SCTP Header Information Structure(SCTP_SNDRCV)
 			 *
 			 * This cmsghdr structure specifies SCTP options for
@@ -3002,7 +3272,8 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 			    CMSG_LEN(sizeof(struct sctp_sndrcvinfo)))
 				return -EINVAL;
 
-			cmsgs->info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
+			cmsgs->info =
+				(struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
 
 			/* Minimally, validate the sinfo_flags. */
 			if (cmsgs->info->sinfo_flags &
@@ -3026,10 +3297,9 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 {
 	int error;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
-	__set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue_exclusive(sk->sleep, &wait);
+	prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 
 	/* Socket errors? */
 	error = sock_error(sk);
@@ -3049,8 +3319,7 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	error = -ENOTCONN;
 
 	/* Is there a good reason to think that we may receive some data?  */
-	if ((list_empty(&sctp_sk(sk)->ep->asocs)) &&
-	    (sk->state != SCTP_SS_LISTENING))
+	if (list_empty(&sctp_sk(sk)->ep->asocs) && !sctp_sstate(sk, LISTENING))
 		goto out;
 
 	/* Handle signals.  */
@@ -3067,16 +3336,14 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	sctp_lock_sock(sk);
 
 ready:
-	remove_wait_queue(sk->sleep, &wait);
-	__set_current_state(TASK_RUNNING);
+	finish_wait(sk->sleep, &wait);
 	return 0;
 
 interrupted:
 	error = sock_intr_errno(*timeo_p);
 
 out:
-	remove_wait_queue(sk->sleep, &wait);
-	__set_current_state(TASK_RUNNING);
+	finish_wait(sk->sleep, &wait);
 	*err = error;
 	return error;
 }
@@ -3085,13 +3352,14 @@ out:
  * Note: This is pretty much the same routine as in core/datagram.c
  * with a few changes to make lksctp work.
  */
-static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags, int noblock, int *err)
+static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags,
+					      int noblock, int *err)
 {
 	int error;
 	struct sk_buff *skb;
 	long timeo;
 
-	/* Caller is allowed not to check sk->err before skb_recv_datagram()  */
+	/* Caller is allowed not to check sk->err before calling.  */
 	error = sock_error(sk);
 	if (error)
 		goto no_packet;
@@ -3126,6 +3394,9 @@ static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags, int no
 		if (skb)
 			return skb;
 
+		if (sk->shutdown & RCV_SHUTDOWN)
+			break;
+
 		/* User doesn't want to wait.  */
 		error = -EAGAIN;
 		if (!timeo)
@@ -3140,7 +3411,7 @@ no_packet:
 }
 
 /* Verify that this is a valid address. */
-static inline int sctp_verify_addr(struct sock *sk, union sctp_addr *addr, 
+static inline int sctp_verify_addr(struct sock *sk, union sctp_addr *addr,
 				   int len)
 {
 	struct sctp_af *af;
@@ -3161,7 +3432,7 @@ static inline int sctp_verify_addr(struct sock *sk, union sctp_addr *addr,
 }
 
 /* Get the sndbuf space available at the time on the association.  */
-static inline int sctp_wspace(sctp_association_t *asoc)
+static inline int sctp_wspace(struct sctp_association *asoc)
 {
 	struct sock *sk = asoc->base.sk;
 	int amt = 0;
@@ -3181,9 +3452,9 @@ static inline int sctp_wspace(sctp_association_t *asoc)
  * destructor in the data chunk skb for the purpose of the sndbuf space
  * tracking.
  */
-static inline void sctp_set_owner_w(sctp_chunk_t *chunk)
+static inline void sctp_set_owner_w(struct sctp_chunk *chunk)
 {
-	sctp_association_t *asoc = chunk->asoc;
+	struct sctp_association *asoc = chunk->asoc;
 	struct sock *sk = asoc->base.sk;
 
 	/* The sndbuf space is tracked per association.  */
@@ -3191,14 +3462,14 @@ static inline void sctp_set_owner_w(sctp_chunk_t *chunk)
 
 	chunk->skb->destructor = sctp_wfree;
 	/* Save the chunk pointer in skb for sctp_wfree to use later.  */
-	*((sctp_chunk_t **)(chunk->skb->cb)) = chunk;
+	*((struct sctp_chunk **)(chunk->skb->cb)) = chunk;
 
 	asoc->sndbuf_used += SCTP_DATA_SNDSIZE(chunk);
 	sk->wmem_queued += SCTP_DATA_SNDSIZE(chunk);
 }
 
 /* If sndbuf has changed, wake up per association sndbuf waiters.  */
-static void __sctp_write_space(sctp_association_t *asoc)
+static void __sctp_write_space(struct sctp_association *asoc)
 {
 	struct sock *sk = asoc->base.sk;
 	struct socket *sock = sk->socket;
@@ -3228,12 +3499,12 @@ static void __sctp_write_space(sctp_association_t *asoc)
  */
 static void sctp_wfree(struct sk_buff *skb)
 {
-	sctp_association_t *asoc;
-	sctp_chunk_t *chunk;
+	struct sctp_association *asoc;
+	struct sctp_chunk *chunk;
 	struct sock *sk;
 
 	/* Get the saved chunk pointer.  */
-	chunk = *((sctp_chunk_t **)(skb->cb));
+	chunk = *((struct sctp_chunk **)(skb->cb));
 	asoc = chunk->asoc;
 	sk = asoc->base.sk;
 	asoc->sndbuf_used -= SCTP_DATA_SNDSIZE(chunk);
@@ -3244,24 +3515,24 @@ static void sctp_wfree(struct sk_buff *skb)
 }
 
 /* Helper function to wait for space in the sndbuf.  */
-static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
+static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 				int msg_len)
 {
 	struct sock *sk = asoc->base.sk;
 	int err = 0;
 	long current_timeo = *timeo_p;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	SCTP_DEBUG_PRINTK("wait_for_sndbuf: asoc=%p, timeo=%ld, msg_len=%d\n",
 	                  asoc, (long)(*timeo_p), msg_len);
 
-	/* Wait on the association specific sndbuf space. */
-	add_wait_queue_exclusive(&asoc->wait, &wait);
-
 	/* Increment the association's refcnt.  */
 	sctp_association_hold(asoc);
+
+	/* Wait on the association specific sndbuf space. */
 	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait_exclusive(&asoc->wait, &wait,
+					  TASK_INTERRUPTIBLE);
 		if (!*timeo_p)
 			goto do_nonblock;
 		if (sk->err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
@@ -3283,12 +3554,11 @@ static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
 	}
 
 out:
-	remove_wait_queue(&asoc->wait, &wait);
+	finish_wait(&asoc->wait, &wait);
 
 	/* Release the association's refcnt.  */
 	sctp_association_put(asoc);
 
-	__set_current_state(TASK_RUNNING);
 	return err;
 
 do_error:
@@ -3307,12 +3577,12 @@ do_nonblock:
 /* If socket sndbuf has changed, wake up all per association waiters.  */
 void sctp_write_space(struct sock *sk)
 {
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 	struct list_head *pos;
 
 	/* Wake up the tasks in each wait queue.  */
 	list_for_each(pos, &((sctp_sk(sk))->ep->asocs)) {
-		asoc = list_entry(pos, sctp_association_t, asocs);
+		asoc = list_entry(pos, struct sctp_association, asocs);
 		__sctp_write_space(asoc);
 	}
 }
@@ -3341,32 +3611,33 @@ static int sctp_writeable(struct sock *sk)
 /* Wait for an association to go into ESTABLISHED state. If timeout is 0,
  * returns immediately with EINPROGRESS.
  */
-static int sctp_wait_for_connect(sctp_association_t *asoc, long *timeo_p)
+static int sctp_wait_for_connect(struct sctp_association *asoc, long *timeo_p)
 {
 	struct sock *sk = asoc->base.sk;
 	int err = 0;
 	long current_timeo = *timeo_p;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	SCTP_DEBUG_PRINTK("%s: asoc=%p, timeo=%ld\n", __FUNCTION__, asoc,
 			  (long)(*timeo_p));
-
-	add_wait_queue_exclusive(&asoc->wait, &wait);
 
 	/* Increment the association's refcnt.  */
 	sctp_association_hold(asoc);
 
 	for (;;) {
-		__set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait_exclusive(&asoc->wait, &wait,
+					  TASK_INTERRUPTIBLE);
 		if (!*timeo_p)
 			goto do_nonblock;
+		if (sk->shutdown & RCV_SHUTDOWN)
+			break;
 		if (sk->err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
 		    asoc->base.dead)
 			goto do_error;
 		if (signal_pending(current))
 			goto do_interrupted;
 
-		if (asoc->state == SCTP_STATE_ESTABLISHED)
+		if (sctp_state(asoc, ESTABLISHED))
 			break;
 
 		/* Let another process have a go.  Since we are going
@@ -3380,12 +3651,10 @@ static int sctp_wait_for_connect(sctp_association_t *asoc, long *timeo_p)
 	}
 
 out:
-	remove_wait_queue(&asoc->wait, &wait);
+	finish_wait(&asoc->wait, &wait);
 
 	/* Release the association's refcnt.  */
 	sctp_association_put(asoc);
-
-	__set_current_state(TASK_RUNNING);
 
 	return err;
 
@@ -3406,14 +3675,14 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 {
 	struct sctp_endpoint *ep;
 	int err = 0;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	ep = sctp_sk(sk)->ep;
 
-	add_wait_queue_exclusive(sk->sleep, &wait);
 
 	for (;;) {
-		__set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+
 		if (list_empty(&ep->asocs)) {
 			sctp_release_sock(sk);
 			timeo = schedule_timeout(timeo);
@@ -3421,7 +3690,7 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 		}
 
 		err = -EINVAL;
-		if (sk->state != SCTP_SS_LISTENING)
+		if (!sctp_sstate(sk, LISTENING))
 			break;
 
 		err = 0;
@@ -3437,21 +3706,37 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 			break;
 	}
 
-	remove_wait_queue(sk->sleep, &wait);
-	__set_current_state(TASK_RUNNING);
+	finish_wait(sk->sleep, &wait);
 
 	return err;
 }
 
-/* Populate the fields of the newsk from the oldsk and migrate the assoc 
+void sctp_wait_for_close(struct sock *sk, long timeout)
+{
+	DEFINE_WAIT(wait);
+
+	do {
+		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+		if (list_empty(&sctp_sk(sk)->ep->asocs))
+			break;
+		sctp_release_sock(sk);
+		timeout = schedule_timeout(timeout);
+		sctp_lock_sock(sk);
+	} while (!signal_pending(current) && timeout);
+
+	finish_wait(sk->sleep, &wait);
+}
+
+/* Populate the fields of the newsk from the oldsk and migrate the assoc
  * and its messages to the newsk.
- */ 
-void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
-		  struct sctp_association *assoc, sctp_socket_type_t type)
+ */
+static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
+			      struct sctp_association *assoc,
+			      sctp_socket_type_t type)
 {
 	struct sctp_opt *oldsp = sctp_sk(oldsk);
 	struct sctp_opt *newsp = sctp_sk(newsk);
-	sctp_endpoint_t *newep = newsp->ep;
+	struct sctp_endpoint *newep = newsp->ep;
 	struct sk_buff *skb, *tmp;
 	struct sctp_ulpevent *event;
 
@@ -3466,6 +3751,7 @@ void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 * copy.
 	 */
 	newsp->ep = newep;
+	newsp->hmac = NULL;
 
 	/* Move any messages in the old socket's receive queue that are for the
 	 * peeled off association to the new socket's receive queue.
@@ -3524,9 +3810,15 @@ void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	/* Migrate the association to the new socket. */
 	sctp_assoc_migrate(assoc, newsk);
 
+	/* If the association on the newsk is already closed before accept()
+	 * is called, set RCV_SHUTDOWN flag.
+	 */
+	if (sctp_state(assoc, CLOSED) && sctp_style(newsk, TCP))
+		newsk->shutdown |= RCV_SHUTDOWN;
+
 	newsk->state = SCTP_SS_ESTABLISHED;
 }
- 
+
 /* This proto struct describes the ULP interface for SCTP.  */
 struct proto sctp_prot = {
 	.name        =	"SCTP",

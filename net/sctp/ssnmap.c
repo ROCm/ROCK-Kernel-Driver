@@ -53,11 +53,11 @@ static inline size_t sctp_ssnmap_size(__u16 in, __u16 out)
 /* Create a new sctp_ssnmap.
  * Allocate room to store at least 'len' contiguous TSNs.
  */
-struct sctp_ssnmap *sctp_ssnmap_new(__u16 in, __u16 out, int priority)
+struct sctp_ssnmap *sctp_ssnmap_new(__u16 in, __u16 out, int gfp)
 {
 	struct sctp_ssnmap *retval;
 
-	retval = kmalloc(sctp_ssnmap_size(in, out), priority);
+	retval = kmalloc(sctp_ssnmap_size(in, out), gfp);
 
 	if (!retval)
 		goto fail;
