@@ -427,7 +427,7 @@ static int psmouse_extensions(struct psmouse *psmouse,
 		}
 
 		if (max_proto > PSMOUSE_IMEX) {
-			if (synaptics_init(psmouse) == 0)
+			if (!set_properties || synaptics_init(psmouse) == 0)
 				return PSMOUSE_SYNAPTICS;
 /*
  * Some Synaptics touchpads can emulate extended protocols (like IMPS/2).
