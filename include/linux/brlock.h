@@ -34,7 +34,6 @@
 
 /* Register bigreader lock indices here. */
 enum brlock_indices {
-	BR_GLOBALIRQ_LOCK,
 	BR_NETPROTO_LOCK,
 	BR_LLC_LOCK,
 	__BR_END

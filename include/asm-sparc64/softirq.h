@@ -6,7 +6,7 @@
 #ifndef __SPARC64_SOFTIRQ_H
 #define __SPARC64_SOFTIRQ_H
 
-#include <asm/preempt.h>
+#include <linux/preempt.h>
 #include <asm/hardirq.h>
 #include <asm/system.h>		/* for membar() */
 

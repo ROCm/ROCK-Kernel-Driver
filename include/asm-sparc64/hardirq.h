@@ -16,7 +16,6 @@
 typedef struct {
 	unsigned int __softirq_pending;
 	unsigned int __unused_1;
-#warning DaveM kill SMP irq brlock... no longer needed...
 	unsigned int __unused_2;
 	unsigned int __unused_3;
 	unsigned int __syscall_count;
