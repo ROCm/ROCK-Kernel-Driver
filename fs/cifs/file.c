@@ -423,6 +423,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	return rc;
 }
 
+#if 0
 static int
 cifs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
@@ -434,6 +435,7 @@ cifs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 	FreeXid(xid);
 	return rc;
 }
+#endif
 
 static int
 cifs_writepage(struct page* page, struct writeback_control *wbc)
@@ -635,7 +637,7 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		}
 
 		page_cache_get(page);
-		target = kmap(page);
+		target = kmap_atomic(page,KM_USER0);
 
 		if(PAGE_CACHE_SIZE > bytes_read) {
 			memcpy(target,data,bytes_read);
@@ -649,7 +651,7 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 			__pagevec_lru_add(plru_pvec);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
-		kunmap(page);
+		kunmap_atomic(page,KM_USER0);
 		unlock_page(page);
 		page_cache_release(page);
 		data += PAGE_CACHE_SIZE;

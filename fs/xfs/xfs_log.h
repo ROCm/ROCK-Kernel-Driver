@@ -164,6 +164,8 @@ void	  xfs_log_move_tail(struct xfs_mount	*mp,
 int	  xfs_log_notify(struct xfs_mount	*mp,
 			 void			*iclog,
 			 xfs_log_callback_t	*callback_entry);
+int	  xfs_log_release_iclog(struct xfs_mount *mp,
+			 void			 *iclog_hndl);
 int	  xfs_log_reserve(struct xfs_mount *mp,
 			  int		   length,
 			  int		   count,

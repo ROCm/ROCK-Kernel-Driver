@@ -809,19 +809,6 @@ shut_us_down:
 	}
 
 	/*
-	 * Once all the items of the transaction have been copied
-	 * to the in core log we can release them.  Do that here.
-	 * This will free descriptors pointing to items which were
-	 * not logged since there is nothing more to do with them.
-	 * For items which were logged, we will keep pointers to them
-	 * so they can be unpinned after the transaction commits to disk.
-	 * This will also stamp each modified meta-data item with
-	 * the commit lsn of this transaction for dependency tracking
-	 * purposes.
-	 */
-	xfs_trans_unlock_items(tp, commit_lsn);
-
-	/*
 	 * Once the transaction has committed, unused
 	 * reservations need to be released and changes to
 	 * the superblock need to be reflected in the in-core
@@ -856,12 +843,36 @@ shut_us_down:
 	tp->t_logcb.cb_arg = tp;
 
 	/* We need to pass the iclog buffer which was used for the
-	 * transaction commit record into this function, attach
-	 * the callback to it, and then release it. This will guarantee
-	 * that we do callbacks on the transaction in the correct order.
+	 * transaction commit record into this function, and attach
+	 * the callback to it. The callback must be attached before
+	 * the items are unlocked to avoid racing with other threads
+	 * waiting for an item to unlock.
 	 */
 	error = xfs_log_notify(mp, commit_iclog, &(tp->t_logcb));
 #endif
+
+	/*
+	 * Once all the items of the transaction have been copied
+	 * to the in core log and the callback is attached, the
+	 * items can be unlocked.
+	 *
+	 * This will free descriptors pointing to items which were
+	 * not logged since there is nothing more to do with them.
+	 * For items which were logged, we will keep pointers to them
+	 * so they can be unpinned after the transaction commits to disk.
+	 * This will also stamp each modified meta-data item with
+	 * the commit lsn of this transaction for dependency tracking
+	 * purposes.
+	 */
+	xfs_trans_unlock_items(tp, commit_lsn);
+
+	/*
+	 * Now that the xfs_trans_committed callback has been attached,
+	 * and the items are released we can finally allow the iclog to
+	 * go to disk.
+	 */
+	error = xfs_log_release_iclog(mp, commit_iclog);
+
 	/*
 	 * If the transaction needs to be synchronous, then force the
 	 * log out now and wait for it.

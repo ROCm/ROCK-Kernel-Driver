@@ -525,7 +525,6 @@ static void receive_kbd_ms_chars(struct uart_sunsu_port *up, struct pt_regs *reg
 				up->kbd_id = 0;
 				return;
 			}
-			kbd_pt_regs = regs;
 #ifdef CONFIG_SERIO
 			serio_interrupt(&up->serio, ch, 0, regs);
 #endif

@@ -10,6 +10,7 @@
  *		David S. Miller	<davem@redhat.com>
  *		Alexey Kuznetsov <kuznet@ms2.inr.ac.ru>
  *		Kunihiro Ishiguro <kunihiro@ipinfusion.com>
+ *		Kazunori MIYAZAWA / USAGI Project <miyazawa@linux-ipv6.org>
  */
 
 #include <linux/config.h>

@@ -70,6 +70,7 @@ sesInfoAlloc(void)
 		memset(ret_buf, 0, sizeof (struct cifsSesInfo));
 		write_lock(&GlobalSMBSeslock);
 		atomic_inc(&sesInfoAllocCount);
+		ret_buf->status = CifsNew;
 		list_add(&ret_buf->cifsSessionList, &GlobalSMBSessionList);
 		init_MUTEX(&ret_buf->sesSem);
 		write_unlock(&GlobalSMBSeslock);
@@ -111,6 +112,7 @@ tconInfoAlloc(void)
 		atomic_inc(&tconInfoAllocCount);
 		list_add(&ret_buf->cifsConnectionList,
 			 &GlobalTreeConnectionList);
+		ret_buf->tidStatus = CifsNew;
 		INIT_LIST_HEAD(&ret_buf->openFileList);
 		init_MUTEX(&ret_buf->tconSem);
 		write_unlock(&GlobalSMBSeslock);
