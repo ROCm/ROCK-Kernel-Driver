@@ -45,6 +45,10 @@ prototypes:
 	int (*revalidate) (struct dentry *);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct dentry *, struct iattr *);
+	int (*setxattr) (struct dentry *, const char *, void *, size_t, int);
+	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
+	ssize_t (*listxattr) (struct dentry *, char *, size_t);
+	int (*removexattr) (struct dentry *, const char *);
 
 locking rules:
 	all may block
@@ -61,12 +65,13 @@ readlink:	no	no
 follow_link:	no	no
 truncate:	no	yes		(see below)
 setattr:	yes	if ATTR_SIZE
-permssion:	yes	no
+permission:	yes	no
 getattr:				(see below)
 revalidate:	no			(see below)
-setxattr:	DOCUMENT_ME
-getxattr:	DOCUMENT_ME
-removexattr:	DOCUMENT_ME
+setxattr:	yes	no
+getxattr:	yes	no
+listxattr:	yes	no
+removexattr:	yes	no
 	Additionally, ->rmdir(), ->unlink() and ->rename() have ->i_sem on
 victim.
 	cross-directory ->rename() has (per-superblock) ->s_vfs_rename_sem.
