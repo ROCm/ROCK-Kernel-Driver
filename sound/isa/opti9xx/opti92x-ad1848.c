@@ -1945,7 +1945,7 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 	chip = (opti9xx_t *)card->private_data;
 
 #ifdef CONFIG_PNP
-	if (isapnp && (hw = snd_card_opti9xx_pnp(chip, pcard, pid)) > 0) {
+	if (isapnp && pcard && (hw = snd_card_opti9xx_pnp(chip, pcard, pid)) > 0) {
 		switch (hw) {
 		case 0x0924:
 			hw = OPTi9XX_HW_82C924;
@@ -2202,6 +2202,9 @@ static int __init alsa_card_opti9xx_init(void)
 
 	cards = pnp_register_card_driver(&opti9xx_pnpc_driver);
 	if (cards == 0 && (error = snd_card_opti9xx_probe(NULL, NULL)) < 0) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&opti9xx_pnpc_driver);
+#endif
 #ifdef MODULE
 #ifdef OPTi93X
 		printk(KERN_ERR "no OPTi 82C93x soundcard found\n");

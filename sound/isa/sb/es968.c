@@ -224,10 +224,13 @@ static struct pnp_card_driver es968_pnpc_driver = {
 static int __init alsa_card_es968_init(void)
 {
 	int res = pnp_register_card_driver(&es968_pnpc_driver);
-#ifdef MODULE
 	if (res == 0)
+	{
+		pnp_unregister_card_driver(&es968_pnpc_driver);
+#ifdef MODULE
 		snd_printk(KERN_ERR "no ES968 based soundcards found\n");
 #endif
+	}
 	return res < 0 ? res : 0;
 }
 

@@ -365,8 +365,10 @@ static int __init alsa_card_azt2320_init(void)
 
 	cards += pnp_register_card_driver(&azt2320_pnpc_driver);
 #ifdef MODULE
-	if (!cards)
+	if (!cards) {
+		pnp_unregister_card_driver(&azt2320_pnpc_driver);
 		snd_printk(KERN_ERR "no AZT2320 based soundcards found\n");
+	}
 #endif
 	return cards ? 0 : -ENODEV;
 }
