@@ -134,6 +134,7 @@ static struct vm_region *vm_region_find(struct vm_region *head, unsigned long ad
  * This allocates one page of cache-coherent memory space and returns
  * both the virtual and a "dma" address to that space.
  */
+static
 void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 		       unsigned long cache_flags)
 {
@@ -209,7 +210,6 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
  no_page:
 	return NULL;
 }
-EXPORT_SYMBOL(consistent_alloc);
 
 /*
  * Since we have the DMA mask available to us here, we could try to do
@@ -243,7 +243,7 @@ EXPORT_SYMBOL(dma_alloc_writecombine);
 /*
  * free a page as defined by the above mapping.
  */
-void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
+void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr_t handle)
 {
 	struct vm_region *c;
 	unsigned long flags;
@@ -253,7 +253,7 @@ void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
 
 	spin_lock_irqsave(&consistent_lock, flags);
 
-	c = vm_region_find(&consistent_head, (unsigned long)vaddr);
+	c = vm_region_find(&consistent_head, (unsigned long)cpu_addr);
 	if (!c)
 		goto no_area;
 
@@ -302,7 +302,7 @@ void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
 	       "invalid area: %p\n", vaddr);
 	dump_stack();
 }
-EXPORT_SYMBOL(consistent_free);
+EXPORT_SYMBOL(dma_free_coherent);
 
 /*
  * Initialise the consistent memory allocation.
