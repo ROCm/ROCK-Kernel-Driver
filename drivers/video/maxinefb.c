@@ -42,7 +42,6 @@
 #include <asm/bootinfo.h>
 
 static struct fb_info fb_info;
-static struct display disp;
 
 static struct fb_var_screeninfo maxinefb_defined = {
 	.xres =		1024,
@@ -113,8 +112,6 @@ static int maxinefb_setcolreg(unsigned regno, unsigned red, unsigned green,
 static struct fb_ops maxinefb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= maxinefb_setcolreg,	
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -156,23 +153,16 @@ int __init maxinefb_init(void)
 		 */
 	}
 
-	/* Let there be consoles... */
-
-	strcpy(fb_info.modename, "Maxine onboard graphics 1024x768x8");
-	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &maxinefb_ops;
 	fb_info.screen_base = (char *) maxinefb_fix.smem_start;
 	fb_info.var = maxinefb_defined;
 	fb_info.fix = maxinefb_fix;
-	fb_info.disp = &disp;
 	fb_info.currcon = -1;
-	fb_info.switch_con = gen_switch;
 	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
-	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info) < 0)
 		return 1;

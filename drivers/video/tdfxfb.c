@@ -170,8 +170,6 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *image);
 static struct fb_ops tdfxfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_check_var	= tdfxfb_check_var,
 	.fb_set_par	= tdfxfb_set_par,
 	.fb_setcolreg	= tdfxfb_setcolreg,
@@ -192,8 +190,6 @@ static unsigned long do_lfb_size(unsigned short);
 /*
  * Driver data 
  */
-static struct tdfx_par default_par;
-
 static int  nopan   = 0;
 static int  nowrap  = 1;      // not implemented (yet)
 static int  inverse = 0;
@@ -204,59 +200,59 @@ static char *mode_option __initdata = NULL;
  * ------------------------------------------------------------------------- */
 
 #ifdef VGA_REG_IO 
-static inline  u8 vga_inb(u32 reg) { return inb(reg); }
-static inline u16 vga_inw(u32 reg) { return inw(reg); }
-static inline u16 vga_inl(u32 reg) { return inl(reg); }
+static inline  u8 vga_inb(struct tdfx_par *par, u32 reg) { return inb(reg); }
+static inline u16 vga_inw(struct tdfx_par *par, u32 reg) { return inw(reg); }
+static inline u16 vga_inl(struct tdfx_par *par, u32 reg) { return inl(reg); }
 
-static inline void vga_outb(u32 reg,  u8 val) { outb(val, reg); }
-static inline void vga_outw(u32 reg, u16 val) { outw(val, reg); }
-static inline void vga_outl(u32 reg, u32 val) { outl(val, reg); }
+static inline void vga_outb(struct tdfx_par *par, u32 reg,  u8 val) { outb(val, reg); }
+static inline void vga_outw(struct tdfx_par *par, u32 reg, u16 val) { outw(val, reg); }
+static inline void vga_outl(struct tdfx_par *par, u32 reg, u32 val) { outl(val, reg); }
 #else
-static inline  u8 vga_inb(u32 reg) { 
-	return inb(default_par.iobase + reg - 0x300); 
+static inline  u8 vga_inb(struct tdfx_par *par, u32 reg) { 
+	return inb(par->iobase + reg - 0x300); 
 }
-static inline u16 vga_inw(u32 reg) { 
-	return inw(default_par.iobase + reg - 0x300); 
+static inline u16 vga_inw(struct tdfx_par *par, u32 reg) { 
+	return inw(par->iobase + reg - 0x300); 
 }
-static inline u16 vga_inl(u32 reg) { 
-	return inl(default_par.iobase + reg - 0x300); 
+static inline u16 vga_inl(struct tdfx_par *par, u32 reg) { 
+	return inl(par->iobase + reg - 0x300); 
 }
-static inline void vga_outb(u32 reg,  u8 val) { 
-	outb(val, default_par.iobase + reg - 0x300); 
+static inline void vga_outb(struct tdfx_par *par, u32 reg,  u8 val) { 
+	outb(val, par->iobase + reg - 0x300); 
 }
-static inline void vga_outw(u32 reg, u16 val) { 
-	outw(val, default_par.iobase + reg - 0x300); 
+static inline void vga_outw(struct tdfx_par *par, u32 reg, u16 val) { 
+	outw(val, par->iobase + reg - 0x300); 
 }
-static inline void vga_outl(u32 reg, u32 val) { 
-	outl(val, default_par.iobase + reg - 0x300); 
+static inline void vga_outl(struct tdfx_par *par, u32 reg, u32 val) { 
+	outl(val, par->iobase + reg - 0x300); 
 }
 #endif
 
-static inline void gra_outb(u32 idx, u8 val) {
+static inline void gra_outb(struct tdfx_par *par, u32 idx, u8 val) {
 	vga_outb(GRA_I, idx); vga_outb(GRA_D, val);
 }
 
-static inline u8 gra_inb(u32 idx) {
+static inline u8 gra_inb(struct tdfx_par *par, u32 idx) {
 	vga_outb(GRA_I, idx); return vga_inb(GRA_D);
 }
 
-static inline void seq_outb(u32 idx, u8 val) {
+static inline void seq_outb(struct tdfx_par *par, u32 idx, u8 val) {
 	vga_outb(SEQ_I, idx); vga_outb(SEQ_D, val);
 }
 
-static inline u8 seq_inb(u32 idx) {
+static inline u8 seq_inb(struct tdfx_par *par, u32 idx) {
 	vga_outb(SEQ_I, idx); return vga_inb(SEQ_D);
 }
 
-static inline void crt_outb(u32 idx, u8 val) {
+static inline void crt_outb(struct tdfx_par *par, u32 idx, u8 val) {
 	vga_outb(CRT_I, idx); vga_outb(CRT_D, val);
 }
 
-static inline u8 crt_inb(u32 idx) {
+static inline u8 crt_inb(struct tdfx_par *par, u32 idx) {
 	vga_outb(CRT_I, idx); return vga_inb(CRT_D);
 }
 
-static inline void att_outb(u32 idx, u8 val) 
+static inline void att_outb(struct tdfx_par *par, u32 idx, u8 val) 
 {
 	unsigned char tmp;
 	
@@ -265,7 +261,7 @@ static inline void att_outb(u32 idx, u8 val)
 	vga_outb(ATT_IW, val);
 }
 
-static inline u8 att_inb(u32 idx) 
+static inline u8 att_inb(struct tdfx_par *par, u32 idx) 
 {
 	unsigned char tmp;
 
@@ -300,36 +296,36 @@ static inline void vga_disable_palette(void)
 	vga_outb(ATT_IW, 0x00);
 }
 
-static inline void vga_enable_palette(void)
+static inline void vga_enable_palette(struct tdfx_par *par)
 {
 	vga_inb(IS1_R);
 	vga_outb(ATT_IW, 0x20);
 }
 
-static inline u32 tdfx_inl(unsigned int reg) 
+static inline u32 tdfx_inl(struct tdfx_par *par, unsigned int reg) 
 {
-	return readl(default_par.regbase_virt + reg);
+	return readl(par->regbase_virt + reg);
 }
 
-static inline void tdfx_outl(unsigned int reg, u32 val)
+static inline void tdfx_outl(struct tdfx_par *par, unsigned int reg, u32 val)
 {
-	writel(val, default_par.regbase_virt + reg);
+	writel(val, par->regbase_virt + reg);
 }
 
-static inline void banshee_make_room(int size)
+static inline void banshee_make_room(struct tdfx_par *par, int size)
 {
-	while((tdfx_inl(STATUS) & 0x1f) < size);
+	while((tdfx_inl(par, STATUS) & 0x1f) < size);
 }
  
-static inline void banshee_wait_idle(void)
+static inline void banshee_wait_idle(struct tdfx_par *par)
 {
 	int i = 0;
 
 	banshee_make_room(1);
-	tdfx_outl(COMMAND_3D, COMMAND_3D_NOP);
+	tdfx_outl(par, COMMAND_3D, COMMAND_3D_NOP);
 
 	while(1) {
-		i = (tdfx_inl(STATUS) & STATUS_BUSY) ? 0 : i + 1;
+		i = (tdfx_inl(par, STATUS) & STATUS_BUSY) ? 0 : i + 1;
 		if(i == 3) break;
 	}
 }
@@ -337,11 +333,11 @@ static inline void banshee_wait_idle(void)
 /*
  * Set the color of a palette entry in 8bpp mode 
  */
-static inline void do_setpalentry(unsigned regno, u32 c)
+static inline void do_setpalentry(struct tdfx_par *par, unsigned regno, u32 c)
 {  
 	banshee_make_room(2);
-	tdfx_outl(DACADDR, regno);
-	tdfx_outl(DACDATA, c);
+	tdfx_outl(par, DACADDR, regno);
+	tdfx_outl(par, DACDATA, c);
 }
 
 static u32 do_calc_pll(int freq, int* freq_out) 
@@ -979,6 +975,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
                                   const struct pci_device_id *id)
 {
 	struct fb_info *info;
+	struct tdfx_par *par;
 	int size, err;
 
 	if ((err = pci_enable_device(pdev))) {
@@ -986,33 +983,33 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 		return err;
 	}
 
-	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
-			sizeof(u32) * 16, GFP_KERNEL);
+	info = kmalloc(sizeof(struct fb_info) + sizeof(struct tdfx_par) +
+			sizeof(u32) * 17, GFP_KERNEL);
 
 	if (!info)	return -ENOMEM;
 		
-	memset(info, 0, sizeof(info) + sizeof(struct display) + sizeof(u32) * 16);
+	memset(info, 0, sizeof(info) + sizeof(struct tdfx_par) + sizeof(u32) * 17);
      
 	/* Configure the default fb_fix_screeninfo first */
 	switch (pdev->device) {
 		case PCI_DEVICE_ID_3DFX_BANSHEE:	
 			strcat(tdfx_fix.id, " Banshee");
-			default_par.max_pixclock = BANSHEE_MAX_PIXCLOCK;
+			par->max_pixclock = BANSHEE_MAX_PIXCLOCK;
 			break;
 		case PCI_DEVICE_ID_3DFX_VOODOO3:
 			strcat(tdfx_fix.id, " Voodoo3");
-			default_par.max_pixclock = VOODOO3_MAX_PIXCLOCK;
+			par->max_pixclock = VOODOO3_MAX_PIXCLOCK;
 			break;
 		case PCI_DEVICE_ID_3DFX_VOODOO5:
 			strcat(tdfx_fix.id, " Voodoo5");
-			default_par.max_pixclock = VOODOO5_MAX_PIXCLOCK;
+			par->max_pixclock = VOODOO5_MAX_PIXCLOCK;
 			break;
 	}
 
 	tdfx_fix.mmio_start = pci_resource_start(pdev, 0);
 	tdfx_fix.mmio_len = pci_resource_len(pdev, 0);
-	default_par.regbase_virt = ioremap_nocache(tdfx_fix.mmio_start, tdfx_fix.mmio_len);
-	if (!default_par.regbase_virt) {
+	par->regbase_virt = ioremap_nocache(tdfx_fix.mmio_start, tdfx_fix.mmio_len);
+	if (!par->regbase_virt) {
 		printk("fb: Can't remap %s register area.\n", tdfx_fix.id);
 		goto out_err;
 	}
@@ -1050,7 +1047,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 		goto out_err;
 	}
 
-	default_par.iobase = pci_resource_start(pdev, 2);
+	par->iobase = pci_resource_start(pdev, 2);
     
 	if (!request_region(pci_resource_start(pdev, 2),
 	    pci_resource_len(pdev, 2), "tdfx iobase")) {
@@ -1073,15 +1070,13 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->node		= NODEV;
 	info->fbops		= &tdfxfb_ops;
 	info->fix		= tdfx_fix; 	
-	info->par		= &default_par;
-	info->disp		= (struct display *)(info + 1);	
-	info->pseudo_palette	= (void *)(info->disp + 1); 
+	info->par		= (struct tdfx_par *)(info + 1);	
+	info->pseudo_palette	= (void *)(info->par + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
 
-	/* The below feilds will go away !!!! */
+	/* The below fields will go away !!!! */
 	strcpy(info->modename, info->fix.id);
 	info->currcon		= -1;
-	info->switch_con	= gen_switch;			 
 	info->updatevar		= gen_update_var;
 
 	if (!mode_option)
@@ -1110,10 +1105,11 @@ out_err:
 	/*
 	 * Cleanup after anything that was remapped/allocated.
 	 */
-	if (default_par.regbase_virt)
-		iounmap(default_par.regbase_virt);
+	if (par->regbase_virt)
+		iounmap(par->regbase_virt);
 	if (info->screen_base)
 		iounmap(info->screen_base);
+	kfree(par);
 	kfree(info);
 	return -ENXIO;
 }
