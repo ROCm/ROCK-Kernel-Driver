@@ -41,7 +41,7 @@ static char		message[256];	/* keep it off the stack */
 static spinlock_t 	xfs_err_lock = SPIN_LOCK_UNLOCKED;
 
 /* Translate from CE_FOO to KERN_FOO, err_level(CE_FOO) == KERN_FOO */
-#define MAX_XFS_ERR_LEVEL	7
+#define XFS_MAX_ERR_LEVEL	7
 static char		*err_level[XFS_MAX_ERR_LEVEL+1] =
 					{KERN_EMERG, KERN_ALERT, KERN_CRIT,
 					 KERN_ERR, KERN_WARNING, KERN_NOTICE,
