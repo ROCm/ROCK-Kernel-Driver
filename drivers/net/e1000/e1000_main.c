@@ -1580,40 +1580,28 @@ e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 
 static inline int
 e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
-	unsigned int first)
+	unsigned int first, unsigned int max_per_txd)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
-	struct e1000_tx_desc *tx_desc;
 	struct e1000_buffer *buffer_info;
-	unsigned int len = skb->len, max_per_txd = E1000_MAX_DATA_PER_TXD;
+	unsigned int len = skb->len;
 	unsigned int offset = 0, size, count = 0, i;
 #ifdef MAX_SKB_FRAGS
 #ifdef NETIF_F_TSO
-	unsigned int mss;
+	unsigned int mss = skb_shinfo(skb)->tso_size;
 #endif
 	unsigned int nr_frags;
 	unsigned int f;
 #endif
 
 #ifdef MAX_SKB_FRAGS
-#ifdef NETIF_F_TSO
-	mss = skb_shinfo(skb)->tso_size;
-	/* The controller does a simple calculation to 
-	 * make sure there is enough room in the FIFO before
-	 * initiating the DMA for each buffer.  The calc is:
-	 * 4 = ceil(buffer len/mss).  To make sure we don't
-	 * overrun the FIFO, adjust the max buffer len if mss
-	 * drops. */
-	if(mss)
-		max_per_txd = min(mss << 2, max_per_txd);
-#endif
 	nr_frags = skb_shinfo(skb)->nr_frags;
 	len -= skb->data_len;
 #endif
 
 	i = tx_ring->next_to_use;
 
-	while(len && count < E1000_DESC_UNUSED(&adapter->tx_ring)) {
+	while(len) {
 		buffer_info = &tx_ring->buffer_info[i];
 		size = min(len, max_per_txd);
 #ifdef NETIF_F_TSO
@@ -1651,7 +1639,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 		len = frag->size;
 		offset = frag->page_offset;
 
-		while(len && count < E1000_DESC_UNUSED(&adapter->tx_ring)) {
+		while(len) {
 			buffer_info = &tx_ring->buffer_info[i];
 			size = min(len, max_per_txd);
 #ifdef NETIF_F_TSO
@@ -1684,46 +1672,6 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 		}
 	}
 #endif
-
-	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count + 2) {
-
-		/* There aren't enough descriptors available to queue up
-		 * this send (need: count + 1 context desc + 1 desc gap
-		 * to keep tail from touching head), so undo the mapping
-		 * and abort the send.  We could have done the check before
-		 * we mapped the skb, but because of all the workarounds
-		 * (above), it's too difficult to predict how many we're
-		 * going to need.*/
-		i = tx_ring->next_to_use;
-
-		if(i == first) {
-			/* Cleanup after e1000_tx_[csum|tso] scribbling
-			 * on descriptors. */
-			tx_desc = E1000_TX_DESC(*tx_ring, first);
-			tx_desc->buffer_addr = 0;
-			tx_desc->lower.data = 0;
-			tx_desc->upper.data = 0;
-		}
-
-		while(count--) {
-			buffer_info = &tx_ring->buffer_info[i];
-
-			if(buffer_info->dma) {
-				pci_unmap_page(adapter->pdev,
-					       buffer_info->dma,
-					       buffer_info->length,
-					       PCI_DMA_TODEVICE);
-				buffer_info->dma = 0;
-			}
-
-			if(++i == tx_ring->count) i = 0;
-		}
-
-		tx_ring->next_to_use = first;
-
-		return 0;
-	}
-
 	i = (i == 0) ? tx_ring->count - 1 : i - 1;
 	tx_ring->buffer_info[i].skb = skb;
 	tx_ring->buffer_info[first].next_to_watch = i;
@@ -1774,7 +1722,7 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 	 * know there are new descriptors to fetch.  (Only
 	 * applicable for weak-ordered memory model archs,
 	 * such as IA-64). */
-	mb();
+	wmb();
 
 	tx_ring->next_to_use = i;
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
@@ -1818,21 +1766,72 @@ no_fifo_stall_required:
 	return 0;
 }
 
+#define TXD_USE_COUNT(S, X) (((S) / (X)) + (((S) % (X)) ? 1 : 0))
 static int
 e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
-	unsigned int first;
+	unsigned int first, max_per_txd = E1000_MAX_DATA_PER_TXD;
 	unsigned int tx_flags = 0;
 	unsigned long flags;
-	int count;
-
+	unsigned int len = skb->len;
+	int count = 0;
+#ifdef NETIF_F_TSO
+	unsigned int mss;
+#endif
+#ifdef MAX_SKB_FRAGS
+	unsigned int nr_frags = skb_shinfo(skb)->nr_frags;
+	unsigned int f;
+	len -= skb->data_len;
+#endif
 	if(skb->len <= 0) {
 		dev_kfree_skb_any(skb);
 		return 0;
 	}
 
+#ifdef NETIF_F_TSO
+	mss = skb_shinfo(skb)->tso_size;
+	/* The controller does a simple calculation to 
+	 * make sure there is enough room in the FIFO before
+	 * initiating the DMA for each buffer.  The calc is:
+	 * 4 = ceil(buffer len/mss).  To make sure we don't
+	 * overrun the FIFO, adjust the max buffer len if mss
+	 * drops. */
+	if(mss)
+		max_per_txd = min(mss << 2, max_per_txd);
+	
+	if((skb_shinfo(skb)->tso_size) || (skb->ip_summed == CHECKSUM_HW))
+		count++;
+	count++;	/*for sentinel desc*/
+#else
+	if(skb->ip_summed == CHECKSUM_HW)
+		count++;
+#endif
+	count += TXD_USE_COUNT(len, max_per_txd);
+	
+	if(adapter->pcix_82544)
+		count++;
+
+#ifdef MAX_SKB_FRAGS
+	nr_frags = skb_shinfo(skb)->nr_frags;
+	for(f = 0; f < nr_frags; f++)
+		count += TXD_USE_COUNT(skb_shinfo(skb)->frags[f].size,
+		                       max_per_txd);
+	if(adapter->pcix_82544)
+		count += nr_frags;
+#endif
+
+	
 	spin_lock_irqsave(&adapter->tx_lock, flags);
+
+	/* need: count +  2 desc gap to keep tail from touching 
+	 * head, so try next time */
+	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count + 2 ) {
+		netif_stop_queue(netdev);
+		spin_unlock_irqrestore(&adapter->tx_lock, flags);
+		return 1;
+	}
+	
 
 	if(adapter->hw.mac_type == e1000_82547) {
 		if(e1000_82547_fifo_workaround(adapter, skb)) {
@@ -1842,6 +1841,8 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 			return 1;
 		}
 	}
+
+	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 
 #ifdef NETIF_F_HW_VLAN_TX
 	if(adapter->vlgrp && vlan_tx_tag_present(skb)) {
@@ -1857,18 +1858,10 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	else if(e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
 
-	if((count = e1000_tx_map(adapter, skb, first)))
-		e1000_tx_queue(adapter, count, tx_flags);
-	else {
-		netif_stop_queue(netdev);
-		spin_unlock_irqrestore(&adapter->tx_lock, flags);
-		return 1;
-	}
+	e1000_tx_queue(adapter, e1000_tx_map(adapter, skb, first, max_per_txd), tx_flags);
 
 	netdev->trans_start = jiffies;
 
-	spin_unlock_irqrestore(&adapter->tx_lock, flags);
-	
 	return 0;
 }
 
@@ -2242,7 +2235,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	unsigned int i, eop;
 	boolean_t cleaned = FALSE;
 
-	spin_lock(&adapter->tx_lock);
+
+
 
 	i = tx_ring->next_to_clean;
 	eop = tx_ring->buffer_info[i].next_to_watch;
@@ -2284,6 +2278,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	}
 
 	tx_ring->next_to_clean = i;
+
+	spin_lock(&adapter->tx_lock);
 
 	if(cleaned && netif_queue_stopped(netdev) && netif_carrier_ok(netdev))
 		netif_wake_queue(netdev);
@@ -2489,7 +2485,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 			 * know there are new descriptors to fetch.  (Only
 			 * applicable for weak-ordered memory model archs,
 			 * such as IA-64). */
-			mb();
+			wmb();
 
 			E1000_WRITE_REG(&adapter->hw, RDT, i);
 		}
