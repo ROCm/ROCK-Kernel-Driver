@@ -65,7 +65,7 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 	if (ictx->entry) {
 		if (ictx->is_in_root) {
 			if (ictx->actx)
-				put_attr_search_ctx(ictx->actx);
+				ntfs_attr_put_search_ctx(ictx->actx);
 			if (ictx->base_ni)
 				unmap_mft_record(ictx->base_ni);
 		} else {
@@ -134,7 +134,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	INDEX_ENTRY *ie;
 	INDEX_ALLOCATION *ia;
 	u8 *index_end;
-	attr_search_context *actx;
+	ntfs_attr_search_ctx *actx;
 	int rc, err = 0;
 	VCN vcn, old_vcn;
 	struct address_space *ia_mapping;
@@ -162,7 +162,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 				-PTR_ERR(m));
 		return PTR_ERR(m);
 	}
-	actx = get_attr_search_ctx(base_ni, m);
+	actx = ntfs_attr_get_search_ctx(base_ni, m);
 	if (unlikely(!actx)) {
 		err = -ENOMEM;
 		goto err_out;
@@ -269,7 +269,7 @@ done:
 	 * We are done with the index root and the mft record.  Release them,
 	 * otherwise we deadlock with ntfs_map_page().
 	 */
-	put_attr_search_ctx(actx);
+	ntfs_attr_put_search_ctx(actx);
 	unmap_mft_record(base_ni);
 	m = NULL;
 	actx = NULL;
@@ -448,7 +448,7 @@ unm_err_out:
 	ntfs_unmap_page(page);
 err_out:
 	if (actx)
-		put_attr_search_ctx(actx);
+		ntfs_attr_put_search_ctx(actx);
 	if (m)
 		unmap_mft_record(base_ni);
 	return err;

@@ -946,7 +946,7 @@ err_out:
 int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 {
 	ntfs_inode *base_ni;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *mrec;
 	int err = 0;
 
@@ -961,14 +961,14 @@ int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 	mrec = map_mft_record(base_ni);
 	if (IS_ERR(mrec))
 		return PTR_ERR(mrec);
-	ctx = get_attr_search_ctx(base_ni, mrec);
+	ctx = ntfs_attr_get_search_ctx(base_ni, mrec);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto err_out;
 	}
 	if (!ntfs_attr_lookup(ni->type, ni->name, ni->name_len, CASE_SENSITIVE,
 			vcn, NULL, 0, ctx)) {
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		err = -ENOENT;
 		goto err_out;
 	}
@@ -987,7 +987,7 @@ int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 	}
 	up_write(&ni->runlist.lock);
 
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 err_out:
 	unmap_mft_record(base_ni);
 	return err;
@@ -1199,7 +1199,7 @@ lock_retry_remap:
  */
 BOOL ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
-		const u8 *val, const u32 val_len, attr_search_context *ctx)
+		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
 	ATTR_RECORD *a;
 	ntfs_volume *vol;
@@ -1440,13 +1440,13 @@ err_out:
  * in there and return it.
  *
  * On first search @ctx->ntfs_ino must be the base mft record and @ctx must
- * have been obtained from a call to get_attr_search_ctx().  On subsequent
+ * have been obtained from a call to ntfs_attr_get_search_ctx().  On subsequent
  * calls @ctx->ntfs_ino can be any extent inode, too (@ctx->base_ntfs_ino is
  * then the base inode).
  *
  * After finishing with the attribute/mft record you need to call
- * put_attr_search_ctx() to cleanup the search context (unmapping any mapped
- * inodes, etc).
+ * ntfs_attr_put_search_ctx() to cleanup the search context (unmapping any
+ * mapped inodes, etc).
  *
  * Return TRUE if the search was successful and FALSE if not.  When TRUE,
  * @ctx->attr is the found attribute and it is in mft record @ctx->mrec.  When
@@ -1459,7 +1459,7 @@ err_out:
 static BOOL ntfs_external_attr_find(const ATTR_TYPES type,
 		const ntfschar *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const VCN lowest_vcn,
-		const u8 *val, const u32 val_len, attr_search_context *ctx)
+		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
 	ntfs_inode *base_ni, *ni;
 	ntfs_volume *vol;
@@ -1692,7 +1692,7 @@ not_found:
 	 *
 	 * FIXME: Do we really want to do this here? Think about it... (AIA)
 	 */
-	reinit_attr_search_ctx(ctx);
+	ntfs_attr_reinit_search_ctx(ctx);
 	ntfs_attr_find(type, name, name_len, ic, val, val_len, ctx);
 	ntfs_debug("Done, not found.");
 	return FALSE;
@@ -1711,14 +1711,14 @@ not_found:
  *
  * Find an attribute in an ntfs inode. On first search @ctx->ntfs_ino must
  * be the base mft record and @ctx must have been obtained from a call to
- * get_attr_search_ctx().
+ * ntfs_attr_get_search_ctx().
  *
  * This function transparently handles attribute lists and @ctx is used to
  * continue searches where they were left off at.
  *
  * After finishing with the attribute/mft record you need to call
- * put_attr_search_ctx() to cleanup the search context (unmapping any mapped
- * inodes, etc).
+ * ntfs_attr_put_search_ctx() to cleanup the search context (unmapping any
+ * mapped inodes, etc).
  *
  * Return TRUE if the search was successful and FALSE if not. When TRUE,
  * @ctx->attr is the found attribute and it is in mft record @ctx->mrec. When
@@ -1729,7 +1729,7 @@ not_found:
 BOOL ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
-		attr_search_context *ctx)
+		ntfs_attr_search_ctx *ctx)
 {
 	ntfs_inode *base_ni;
 
@@ -1748,14 +1748,14 @@ BOOL ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 }
 
 /**
- * init_attr_search_ctx - initialize an attribute search context
+ * ntfs_attr_init_search_ctx - initialize an attribute search context
  * @ctx:	attribute search context to initialize
  * @ni:		ntfs inode with which to initialize the search context
  * @mrec:	mft record with which to initialize the search context
  *
  * Initialize the attribute search context @ctx with @ni and @mrec.
  */
-static inline void init_attr_search_ctx(attr_search_context *ctx,
+static inline void ntfs_attr_init_search_ctx(ntfs_attr_search_ctx *ctx,
 		ntfs_inode *ni, MFT_RECORD *mrec)
 {
 	ctx->mrec = mrec;
@@ -1770,7 +1770,7 @@ static inline void init_attr_search_ctx(attr_search_context *ctx,
 }
 
 /**
- * reinit_attr_search_ctx - reinitialize an attribute search context
+ * ntfs_attr_reinit_search_ctx - reinitialize an attribute search context
  * @ctx:	attribute search context to reinitialize
  *
  * Reinitialize the attribute search context @ctx, unmapping an associated
@@ -1779,7 +1779,7 @@ static inline void init_attr_search_ctx(attr_search_context *ctx,
  * This is used when a search for a new attribute is being started to reset
  * the search context to the beginning.
  */
-void reinit_attr_search_ctx(attr_search_context *ctx)
+void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
 {
 	if (likely(!ctx->base_ntfs_ino)) {
 		/* No attribute list. */
@@ -1791,40 +1791,39 @@ void reinit_attr_search_ctx(attr_search_context *ctx)
 	} /* Attribute list. */
 	if (ctx->ntfs_ino != ctx->base_ntfs_ino)
 		unmap_extent_mft_record(ctx->ntfs_ino);
-	init_attr_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
+	ntfs_attr_init_search_ctx(ctx, ctx->base_ntfs_ino, ctx->base_mrec);
 	return;
 }
 
 /**
- * get_attr_search_ctx - allocate and initialize a new attribute search context
+ * ntfs_attr_get_search_ctx - allocate/initialize a new attribute search context
  * @ni:		ntfs inode with which to initialize the search context
  * @mrec:	mft record with which to initialize the search context
  *
  * Allocate a new attribute search context, initialize it with @ni and @mrec,
  * and return it. Return NULL if allocation failed.
  */
-attr_search_context *get_attr_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
+ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 {
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 
 	ctx = kmem_cache_alloc(ntfs_attr_ctx_cache, SLAB_NOFS);
 	if (ctx)
-		init_attr_search_ctx(ctx, ni, mrec);
+		ntfs_attr_init_search_ctx(ctx, ni, mrec);
 	return ctx;
 }
 
 /**
- * put_attr_search_ctx - release an attribute search context
+ * ntfs_attr_put_search_ctx - release an attribute search context
  * @ctx:	attribute search context to free
  *
  * Release the attribute search context @ctx, unmapping an associated extent
  * mft record if present.
  */
-void put_attr_search_ctx(attr_search_context *ctx)
+void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 {
 	if (ctx->base_ntfs_ino && ctx->ntfs_ino != ctx->base_ntfs_ino)
 		unmap_extent_mft_record(ctx->ntfs_ino);
 	kmem_cache_free(ntfs_attr_ctx_cache, ctx);
 	return;
 }
-

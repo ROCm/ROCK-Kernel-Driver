@@ -43,7 +43,7 @@ typedef enum {
 } LCN_SPECIAL_VALUES;
 
 /**
- * attr_search_context - used in attribute search functions
+ * ntfs_attr_search_ctx - used in attribute search functions
  * @mrec:	buffer containing mft record to search
  * @attr:	attribute record in @mrec where to begin/continue search
  * @is_first:	if true ntfs_attr_lookup() begins search with @attr, else after
@@ -69,7 +69,7 @@ typedef struct {
 	ntfs_inode *base_ntfs_ino;
 	MFT_RECORD *base_mrec;
 	ATTR_RECORD *base_attr;
-} attr_search_context;
+} ntfs_attr_search_ctx;
 
 extern runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl);
@@ -83,12 +83,12 @@ extern runlist_element *ntfs_find_vcn(ntfs_inode *ni, const VCN vcn,
 
 extern BOOL ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic, const u8 *val,
-		const u32 val_len, attr_search_context *ctx);
+		const u32 val_len, ntfs_attr_search_ctx *ctx);
 
 BOOL ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
-		attr_search_context *ctx);
+		ntfs_attr_search_ctx *ctx);
 
 extern int load_attribute_list(ntfs_volume *vol, runlist *rl, u8 *al_start,
 		const s64 size, const s64 initialized_size);
@@ -100,9 +100,9 @@ static inline s64 attribute_value_length(const ATTR_RECORD *a)
 	return sle64_to_cpu(a->data.non_resident.data_size);
 }
 
-extern void reinit_attr_search_ctx(attr_search_context *ctx);
-extern attr_search_context *get_attr_search_ctx(ntfs_inode *ni,
+extern void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx);
+extern ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni,
 		MFT_RECORD *mrec);
-extern void put_attr_search_ctx(attr_search_context *ctx);
+extern void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx);
 
 #endif /* _LINUX_NTFS_ATTRIB_H */
