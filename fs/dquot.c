@@ -74,6 +74,7 @@
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/security.h>
+#include <linux/kmod.h>
 
 #include <asm/uaccess.h>
 
@@ -96,6 +97,7 @@ spinlock_t dq_data_lock = SPIN_LOCK_UNLOCKED;
 
 static char *quotatypes[] = INITQFNAMES;
 static struct quota_format_type *quota_formats;	/* List of registered formats */
+static struct quota_module_name module_names[] = INIT_QUOTA_MODULE_NAMES;
 
 int register_quota_format(struct quota_format_type *fmt)
 {
@@ -123,8 +125,19 @@ static struct quota_format_type *find_quota_format(int id)
 
 	spin_lock(&dq_list_lock);
 	for (actqf = quota_formats; actqf && actqf->qf_fmt_id != id; actqf = actqf->qf_next);
-	if (actqf && !try_module_get(actqf->qf_owner))
-		actqf = NULL;
+	if (!actqf || !try_module_get(actqf->qf_owner)) {
+		int qm;
+
+		for (qm = 0; module_names[qm].qm_fmt_id && module_names[qm].qm_fmt_id != id; qm++);
+		if (!module_names[qm].qm_fmt_id || request_module(module_names[qm].qm_mod_name)) {
+			actqf = NULL;
+			goto out;
+		}
+		for (actqf = quota_formats; actqf && actqf->qf_fmt_id != id; actqf = actqf->qf_next);
+		if (actqf && !try_module_get(actqf->qf_owner))
+			actqf = NULL;
+	}
+out:
 	spin_unlock(&dq_list_lock);
 	return actqf;
 }
