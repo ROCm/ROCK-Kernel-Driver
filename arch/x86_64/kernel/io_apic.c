@@ -928,8 +928,7 @@ void /*__init*/ print_local_APIC(void * dummy)
 
 void print_all_local_APICs (void)
 {
-	smp_call_function(print_local_APIC, NULL, 1, 1);
-	print_local_APIC(NULL);
+	on_each_cpu(print_local_APIC, NULL, 1, 1);
 }
 
 void /*__init*/ print_PIC(void)

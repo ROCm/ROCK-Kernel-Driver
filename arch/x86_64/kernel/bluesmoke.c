@@ -111,11 +111,7 @@ static void mce_checkregs (void *info)
 {
 	u32 low, high;
 	int i;
-	unsigned int *cpu = info;
 
-	BUG_ON (*cpu != smp_processor_id());
-
-	preempt_disable();
 	for (i=0; i<banks; i++) {
 		rdmsr(MSR_IA32_MC0_STATUS+i*4, low, high);
 
@@ -130,20 +126,12 @@ static void mce_checkregs (void *info)
 			wmb();
 		}
 	}
-	preempt_enable();
 }
 
 
 static void mce_timerfunc (unsigned long data)
 {
-	unsigned int i;
-
-	for (i=0; i<smp_num_cpus; i++) {
-		if (i == smp_processor_id())
-			mce_checkregs(&i);
-		else
-			smp_call_function (mce_checkregs, &i, 1, 1);
-	}
+	on_each_cpu (mce_checkregs, NULL, 1, 1);
 
 	/* Refresh the timer. */
 	mce_timer.expires = jiffies + MCE_RATE;

@@ -228,8 +228,7 @@ static void do_machine_restart(void * __unused)
 void machine_restart_smp(char * __unused) 
 {
 	cpu_restart_map = cpu_online_map;
-        smp_call_function(do_machine_restart, NULL, 0, 0);
-	do_machine_restart(NULL);
+        on_each_cpu(do_machine_restart, NULL, 0, 0);
 }
 
 static void do_machine_halt(void * __unused)
@@ -247,8 +246,7 @@ static void do_machine_halt(void * __unused)
 
 void machine_halt_smp(void)
 {
-        smp_call_function(do_machine_halt, NULL, 0, 0);
-	do_machine_halt(NULL);
+        on_each_cpu(do_machine_halt, NULL, 0, 0);
 }
 
 static void do_machine_power_off(void * __unused)
@@ -266,8 +264,7 @@ static void do_machine_power_off(void * __unused)
 
 void machine_power_off_smp(void)
 {
-        smp_call_function(do_machine_power_off, NULL, 0, 0);
-	do_machine_power_off(NULL);
+        on_each_cpu(do_machine_power_off, NULL, 0, 0);
 }
 
 /*
@@ -339,8 +336,7 @@ void smp_ptlb_callback(void *info)
 
 void smp_ptlb_all(void)
 {
-        smp_call_function(smp_ptlb_callback, NULL, 0, 1);
-	local_flush_tlb();
+        on_each_cpu(smp_ptlb_callback, NULL, 0, 1);
 }
 
 /*
@@ -400,8 +396,10 @@ void smp_ctl_set_bit(int cr, int bit) {
 	parms.end_ctl = cr;
 	parms.orvals[cr] = 1 << bit;
 	parms.andvals[cr] = 0xFFFFFFFF;
+	preempt_disable();
 	smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         __ctl_set_bit(cr, bit);
+	preempt_enable();
 }
 
 /*
@@ -414,8 +412,10 @@ void smp_ctl_clear_bit(int cr, int bit) {
 	parms.end_ctl = cr;
 	parms.orvals[cr] = 0x00000000;
 	parms.andvals[cr] = ~(1 << bit);
+	preempt_disable();
 	smp_call_function(smp_ctl_bit_callback, &parms, 0, 1);
         __ctl_clear_bit(cr, bit);
+	preempt_enable();
 }
 
 /*

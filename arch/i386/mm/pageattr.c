@@ -130,11 +130,8 @@ __change_page_attr(struct page *page, pgprot_t prot, struct page **oldpage)
 } 
 
 static inline void flush_map(void)
-{	
-#ifdef CONFIG_SMP 
-	smp_call_function(flush_kernel_map, NULL, 1, 1);
-#endif	
-	flush_kernel_map(NULL);
+{
+	on_each_cpu(flush_kernel_map, NULL, 1, 1);
 }
 
 struct deferred_page { 

@@ -25,16 +25,10 @@ flush_page_to_ram(struct page *page)
 
 extern void flush_cache_all_local(void);
 
-#ifdef CONFIG_SMP
 static inline void flush_cache_all(void)
 {
-	smp_call_function((void (*)(void *))flush_cache_all_local, NULL, 1, 1);
-	flush_cache_all_local();
+	on_each_cpu((void (*)(void *))flush_cache_all_local, NULL, 1, 1);
 }
-#else
-#define flush_cache_all flush_cache_all_local
-#endif
-
 
 /* The following value needs to be tuned and probably scaled with the
  * cache size.

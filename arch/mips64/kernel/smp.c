@@ -195,8 +195,7 @@ static void flush_tlb_all_ipi(void *info)
 
 void flush_tlb_all(void)
 {
-	smp_call_function(flush_tlb_all_ipi, 0, 1, 1);
-	_flush_tlb_all();
+	on_each_cpu(flush_tlb_all_ipi, 0, 1, 1);
 }
 
 static void flush_tlb_mm_ipi(void *mm)
@@ -219,6 +218,8 @@ static void flush_tlb_mm_ipi(void *mm)
 
 void flush_tlb_mm(struct mm_struct *mm)
 {
+	preempt_disable();
+
 	if ((atomic_read(&mm->mm_users) != 1) || (current->mm != mm)) {
 		smp_call_function(flush_tlb_mm_ipi, (void *)mm, 1, 1);
 	} else {
@@ -228,6 +229,8 @@ void flush_tlb_mm(struct mm_struct *mm)
 				CPU_CONTEXT(i, mm) = 0;
 	}
 	_flush_tlb_mm(mm);
+
+	preempt_enable();
 }
 
 struct flush_tlb_data {
@@ -246,6 +249,8 @@ static void flush_tlb_range_ipi(void *info)
 
 void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
+	preempt_disable();
+
 	if ((atomic_read(&mm->mm_users) != 1) || (current->mm != mm)) {
 		struct flush_tlb_data fd;
 
@@ -260,6 +265,8 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned l
 				CPU_CONTEXT(i, mm) = 0;
 	}
 	_flush_tlb_range(mm, start, end);
+
+	preempt_enable();
 }
 
 static void flush_tlb_page_ipi(void *info)
@@ -271,6 +278,8 @@ static void flush_tlb_page_ipi(void *info)
 
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 {
+	preempt_disable();
+
 	if ((atomic_read(&vma->vm_mm->mm_users) != 1) || (current->mm != vma->vm_mm)) {
 		struct flush_tlb_data fd;
 
@@ -284,5 +293,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 				CPU_CONTEXT(i, vma->vm_mm) = 0;
 	}
 	_flush_tlb_page(vma, page);
+
+	preempt_enable();
 }
 

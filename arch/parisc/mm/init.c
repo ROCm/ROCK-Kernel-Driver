@@ -974,8 +974,7 @@ void flush_tlb_all(void)
 	    do_recycle++;
 	}
 	spin_unlock(&sid_lock);
-	smp_call_function((void (*)(void *))flush_tlb_all_local, NULL, 1, 1);
-	flush_tlb_all_local();
+	on_each_cpu((void (*)(void *))flush_tlb_all_local, NULL, 1, 1);
 	if (do_recycle) {
 	    spin_lock(&sid_lock);
 	    recycle_sids(recycle_ndirty,recycle_dirty_array);

@@ -95,8 +95,7 @@ static int nmi_setup(void)
 	 * without actually triggering any NMIs as this will
 	 * break the core code horrifically.
 	 */
-	smp_call_function(nmi_cpu_setup, NULL, 0, 1);
-	nmi_cpu_setup(0);
+	on_each_cpu(nmi_cpu_setup, NULL, 0, 1);
 	set_nmi_callback(nmi_callback);
 	oprofile_pmdev = set_nmi_pm_callback(oprofile_pm_callback);
 	return 0;
@@ -148,8 +147,7 @@ static void nmi_shutdown(void)
 {
 	unset_nmi_pm_callback(oprofile_pmdev);
 	unset_nmi_callback();
-	smp_call_function(nmi_cpu_shutdown, NULL, 0, 1);
-	nmi_cpu_shutdown(0);
+	on_each_cpu(nmi_cpu_shutdown, NULL, 0, 1);
 }
 
  
@@ -162,8 +160,7 @@ static void nmi_cpu_start(void * dummy)
 
 static int nmi_start(void)
 {
-	smp_call_function(nmi_cpu_start, NULL, 0, 1);
-	nmi_cpu_start(0);
+	on_each_cpu(nmi_cpu_start, NULL, 0, 1);
 	return 0;
 }
  
@@ -177,8 +174,7 @@ static void nmi_cpu_stop(void * dummy)
  
 static void nmi_stop(void)
 {
-	smp_call_function(nmi_cpu_stop, NULL, 0, 1);
-	nmi_cpu_stop(0);
+	on_each_cpu(nmi_cpu_stop, NULL, 0, 1);
 }
 
 

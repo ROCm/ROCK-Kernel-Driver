@@ -39,8 +39,7 @@ static struct pdc_btlb_info btlb_info;
 void
 flush_data_cache(void)
 {
-	smp_call_function((void (*)(void *))flush_data_cache_local, NULL, 1, 1);
-	flush_data_cache_local();
+	on_each_cpu((void (*)(void *))flush_data_cache_local, NULL, 1, 1);
 }
 #endif
 

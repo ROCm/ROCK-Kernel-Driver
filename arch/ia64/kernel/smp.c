@@ -206,18 +206,18 @@ smp_send_reschedule_all (void)
 void
 smp_flush_tlb_all (void)
 {
-	smp_call_function((void (*)(void *))local_flush_tlb_all, 0, 1, 1);
-	local_flush_tlb_all();
+	on_each_cpu((void (*)(void *))local_flush_tlb_all, 0, 1, 1);
 }
 
 void
 smp_flush_tlb_mm (struct mm_struct *mm)
 {
-	local_finish_flush_tlb_mm(mm);
-
 	/* this happens for the common case of a single-threaded fork():  */
 	if (likely(mm == current->active_mm && atomic_read(&mm->mm_users) == 1))
+	{
+		local_finish_flush_tlb_mm(mm);
 		return;
+	}
 
 	/*
 	 * We could optimize this further by using mm->cpu_vm_mask to track which CPUs
@@ -226,7 +226,7 @@ smp_flush_tlb_mm (struct mm_struct *mm)
 	 * anyhow, and once a CPU is interrupted, the cost of local_flush_tlb_all() is
 	 * rather trivial.
 	 */
-	smp_call_function((void (*)(void *))local_finish_flush_tlb_mm, mm, 1, 1);
+	on_each_cpu((void (*)(void *))local_finish_flush_tlb_mm, mm, 1, 1);
 }
 
 /*

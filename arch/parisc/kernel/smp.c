@@ -401,7 +401,7 @@ static int __init maxcpus(char *str)
 __setup("maxcpus=", maxcpus);
 
 /*
- * Flush all other CPU's tlb and then mine.  Do this with smp_call_function()
+ * Flush all other CPU's tlb and then mine.  Do this with on_each_cpu()
  * as we want to ensure all TLB's flushed before proceeding.
  */
 
@@ -410,8 +410,7 @@ extern void flush_tlb_all_local(void);
 void
 smp_flush_tlb_all(void)
 {
-	smp_call_function((void (*)(void *))flush_tlb_all_local, NULL, 1, 1);
-	flush_tlb_all_local();
+	on_each_cpu((void (*)(void *))flush_tlb_all_local, NULL, 1, 1);
 }
 
 

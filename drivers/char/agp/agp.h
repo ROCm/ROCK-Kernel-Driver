@@ -42,9 +42,8 @@ static void ipi_handler(void *null)
 
 static void __attribute__((unused)) global_cache_flush(void)
 {
-	if (smp_call_function(ipi_handler, NULL, 1, 1) != 0)
+	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
 		panic(PFX "timed out waiting for the other CPUs!\n");
-	flush_agp_cache();
 }
 #else
 static inline void global_cache_flush(void)

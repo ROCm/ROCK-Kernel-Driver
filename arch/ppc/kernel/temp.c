@@ -194,10 +194,7 @@ static void tau_timeout_smp(unsigned long unused)
 
 	/* schedule ourselves to be run again */
 	mod_timer(&tau_timer, jiffies + shrink_timer) ;
-#ifdef CONFIG_SMP
-	smp_call_function(tau_timeout, NULL, 1, 0);
-#endif
-	tau_timeout(NULL);
+	on_each_cpu(tau_timeout, NULL, 1, 0);
 }
 
 /*
@@ -239,10 +236,7 @@ int __init TAU_init(void)
 	tau_timer.expires = jiffies + shrink_timer;
 	add_timer(&tau_timer);
 	
-#ifdef CONFIG_SMP
-	smp_call_function(TAU_init_smp, NULL, 1, 0);
-#endif
-	TAU_init_smp(NULL);
+	on_each_cpu(TAU_init_smp, NULL, 1, 0);
 	
 	printk("Thermal assist unit ");
 #ifdef CONFIG_TAU_INT

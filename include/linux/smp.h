@@ -10,9 +10,10 @@
 
 #ifdef CONFIG_SMP
 
+#include <linux/preempt.h>
 #include <linux/kernel.h>
 #include <linux/compiler.h>
-#include <linux/threads.h>
+#include <linux/thread_info.h>
 #include <asm/smp.h>
 #include <asm/bug.h>
 
@@ -52,6 +53,21 @@ extern void smp_cpus_done(unsigned int max_cpus);
  */
 extern int smp_call_function (void (*func) (void *info), void *info,
 			      int retry, int wait);
+
+/*
+ * Call a function on all processors
+ */
+static inline int on_each_cpu(void (*func) (void *info), void *info,
+			      int retry, int wait)
+{
+	int ret = 0;
+
+	preempt_disable();
+	ret = smp_call_function(func, info, retry, wait);
+	func(info);
+	preempt_enable();
+	return ret;
+}
 
 /*
  * True once the per process idle is forked
@@ -96,6 +112,7 @@ void smp_prepare_boot_cpu(void);
 #define hard_smp_processor_id()			0
 #define smp_threads_ready			1
 #define smp_call_function(func,info,retry,wait)	({ 0; })
+#define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
 static inline void smp_send_reschedule(int cpu) { }
 static inline void smp_send_reschedule_all(void) { }
 #define cpu_online_map				1

@@ -1403,10 +1403,7 @@ static void invalidate_bh_lru(void *arg)
 	
 static void invalidate_bh_lrus(void)
 {
-	preempt_disable();
-	invalidate_bh_lru(NULL);
-	smp_call_function(invalidate_bh_lru, NULL, 1, 1);
-	preempt_enable();
+	on_each_cpu(invalidate_bh_lru, NULL, 1, 1);
 }
 
 void set_bh_page(struct buffer_head *bh,
