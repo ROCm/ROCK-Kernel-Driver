@@ -71,6 +71,7 @@ int acpi_ht __initdata = 1;	/* enable HT */
 int acpi_lapic;
 int acpi_ioapic;
 int acpi_strict;
+EXPORT_SYMBOL(acpi_strict);
 
 acpi_interrupt_flags acpi_sci_flags __initdata;
 int acpi_sci_override_gsi __initdata;
@@ -829,9 +830,15 @@ acpi_boot_init (void)
 	 */
 	error = acpi_blacklisted();
 	if (error) {
-		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
-		disable_acpi();
-		return error;
+		extern int acpi_force;
+
+		if (acpi_force) {
+			printk(KERN_WARNING PREFIX "acpi=force override\n");
+		} else {
+			printk(KERN_WARNING PREFIX "Disabling ACPI support\n");
+			disable_acpi();
+			return error;
+		}
 	}
 
 	/*

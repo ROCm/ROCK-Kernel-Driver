@@ -1,4 +1,11 @@
 /*
+ * Copyright (C) 2004 Matthew Wilcox <matthew@wil.cx>
+ * Copyright (C) 2004 Intel Corp.
+ *
+ * This code is released under the GNU General Public License version 2.
+ */
+
+/*
  * mmconfig.c - Low-level direct PCI config space access via MMCONFIG
  */
 
