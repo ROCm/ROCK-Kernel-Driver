@@ -11,7 +11,7 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 
-static void *alloc_and_zero(unsigned long size)
+void *module_alloc(unsigned long size)
 {
 	void *ret;
 
@@ -34,22 +34,6 @@ void module_free(struct module *mod, void *module_region)
 	vfree(module_region);
 	/* FIXME: If module_region == mod->init_region, trim exception
            table entries. */
-}
-
-void *module_core_alloc(const Elf32_Ehdr *hdr,
-			const Elf32_Shdr *sechdrs,
-			const char *secstrings,
-			struct module *module)
-{
-	return alloc_and_zero(module->core_size);
-}
-
-void *module_init_alloc(const Elf32_Ehdr *hdr,
-			const Elf32_Shdr *sechdrs,
-			const char *secstrings,
-			struct module *module)
-{
-	return alloc_and_zero(module->init_size);
 }
 
 int apply_relocate(Elf32_Shdr *sechdrs,
