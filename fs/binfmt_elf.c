@@ -146,7 +146,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	if (k_platform) {
 		size_t len = strlen(k_platform) + 1;
 
-#if defined(__i386__) && defined(CONFIG_SMP)
+#ifdef CONFIG_X86_HT
 		/*
 		 * In some cases (e.g. Hyper-Threading), we want to avoid L1
 		 * evictions by the processes running on the same package. One

@@ -85,12 +85,24 @@ ifdef CONFIG_MCYRIXIII
 CFLAGS += -march=i586
 endif
 
+ifdef CONFIG_VISWS
+MACHINE	:= mach-visws
+else
+MACHINE	:= mach-generic
+endif
+
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 
-SUBDIRS += arch/i386/kernel arch/i386/mm arch/i386/lib
+SUBDIRS += arch/i386/kernel arch/i386/mm arch/i386/lib \
+		arch/i386/$(MACHINE)
 
-CORE_FILES := arch/i386/kernel/kernel.o arch/i386/mm/mm.o $(CORE_FILES)
+CORE_FILES := arch/i386/kernel/kernel.o arch/i386/mm/mm.o \
+		arch/i386/$(MACHINE)/$(MACHINE).o $(CORE_FILES)
+
 LIBS := $(TOPDIR)/arch/i386/lib/lib.a $(LIBS) $(TOPDIR)/arch/i386/lib/lib.a
+
+CFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
+AFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
 
 ifdef CONFIG_MATH_EMULATION
 SUBDIRS += arch/i386/math-emu
