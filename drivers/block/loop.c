@@ -688,7 +688,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		if (!aops->prepare_write || !aops->commit_write)
 			lo_flags |= LO_FLAGS_READ_ONLY;
 
-		lo_blocksize = inode->i_blocksize;
+		lo_blocksize = inode->i_blksize;
 		lo_flags |= LO_FLAGS_DO_BMAP;
 		error = 0;
 	} else
