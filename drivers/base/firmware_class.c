@@ -254,7 +254,7 @@ out:
 	return retval;
 }
 static struct bin_attribute firmware_attr_data_tmpl = {
-	.attr = {.name = "data", .mode = 0644},
+	.attr = {.name = "data", .mode = 0644, .owner = THIS_MODULE},
 	.size = 0,
 	.read = firmware_data_read,
 	.write = firmware_data_write,
