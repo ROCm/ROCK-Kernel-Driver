@@ -11,11 +11,12 @@
 #include <asm/uaccess.h>
 
 struct poll_table_page;
+struct poll_table_struct;
+
+typedef void (*poll_queue_proc)(struct file *, wait_queue_head_t *, struct poll_table_struct *);
 
 typedef struct poll_table_struct {
-	int queue;
-	void *priv;
-	void (*qproc)(void *, wait_queue_head_t *);
+	poll_queue_proc qproc;
 	int error;
 	struct poll_table_page * table;
 } poll_table;
@@ -25,16 +26,12 @@ extern void __pollwait(struct file * filp, wait_queue_head_t * wait_address, pol
 static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p)
 {
 	if (p && wait_address)
-		__pollwait(filp, wait_address, p);
+		p->qproc(filp, wait_address, p);
 }
 
-static inline void poll_initwait_ex(poll_table* pt, int queue,
-				    void (*qproc)(void *, wait_queue_head_t *),
-				    void *priv)
+static inline void poll_initwait_ex(poll_table* pt, poll_queue_proc qproc)
 {
-	pt->queue = queue;
 	pt->qproc = qproc;
-	pt->priv = priv;
 	pt->error = 0;
 	pt->table = NULL;
 }
@@ -42,7 +39,7 @@ static inline void poll_initwait_ex(poll_table* pt, int queue,
 static inline void poll_initwait(poll_table* pt)
 {
 
-	poll_initwait_ex(pt, 1, NULL, NULL);
+	poll_initwait_ex(pt, __pollwait);
 }
 
 extern void poll_freewait(poll_table* pt);
