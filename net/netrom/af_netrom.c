@@ -57,8 +57,8 @@ int sysctl_netrom_link_fails_count                = NR_DEFAULT_FAILS;
 
 static unsigned short circuit = 0x101;
 
-HLIST_HEAD(nr_list);
-static spinlock_t nr_list_lock;
+static HLIST_HEAD(nr_list);
+static spinlock_t nr_list_lock = SPIN_LOCK_UNLOCKED;
 
 static struct proto_ops nr_proto_ops;
 
