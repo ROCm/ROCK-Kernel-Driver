@@ -25,4 +25,6 @@ struct sk_buff;
 extern void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
 						   struct sk_buff *skb));
 extern void llc_remove_pack(int type);
+
+extern void llc_set_station_handler(void (*handler)(struct sk_buff *skb));
 #endif /* LLC_MAC_H */

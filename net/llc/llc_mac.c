@@ -12,15 +12,10 @@
  * See the GNU General Public License for more details.
  */
 #include <linux/netdevice.h>
-#include <linux/if_arp.h>
-#include <linux/if_tr.h>
-#include <linux/rtnetlink.h>
 #include <net/llc_mac.h>
 #include <net/llc_pdu.h>
 #include <net/llc_sap.h>
 #include <net/llc_main.h>
-#include <net/llc_evnt.h>
-#include <linux/trdevice.h>
 
 #if 0
 #define dprintk(args...) printk(KERN_DEBUG args)
@@ -28,13 +23,19 @@
 #define dprintk(args...)
 #endif
 
-static void llc_station_rcv(struct sk_buff *skb);
+/*
+ * Packet handler for the station, registerable because in the minimal
+ * LLC core that is taking shape only the very minimal subset of LLC that
+ * is needed for things like IPX, Appletalk, etc will stay, with all the
+ * rest in the llc1 and llc2 modules.
+ */
+static void (*llc_station_handler)(struct sk_buff *skb);
 
 /*
  * Packet handlers for LLC_DEST_SAP and LLC_DEST_CONN.
  */
 static void (*llc_type_handlers[2])(struct llc_sap *sap,
-				 struct sk_buff *skb);
+				    struct sk_buff *skb);
 
 void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
 					    struct sk_buff *skb))
@@ -47,6 +48,11 @@ void llc_remove_pack(int type)
 {
 	if (type == LLC_DEST_SAP || type == LLC_DEST_CONN)
 		llc_type_handlers[type] = NULL;
+}
+
+void llc_set_station_handler(void (*handler)(struct sk_buff *skb))
+{
+	llc_station_handler = handler;
 }
 
 /**
@@ -147,11 +153,8 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (unlikely(!llc_fixup_skb(skb)))
 		goto drop;
 	pdu = llc_pdu_sn_hdr(skb);
-	if (unlikely(!pdu->dsap)) { /* NULL DSAP, refer to station */
-		dprintk("%s: calling llc_station_rcv!\n", __FUNCTION__);
-		llc_station_rcv(skb);
-		goto out;
-	}
+	if (unlikely(!pdu->dsap)) /* NULL DSAP, refer to station */
+	       goto handle_station;
 	sap = llc_sap_find(pdu->dsap);
 	if (unlikely(!sap)) {/* unknown SAP */
 		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__,
@@ -175,22 +178,13 @@ out:
 drop:
 	kfree_skb(skb);
 	goto out;
-}
-
-/*
- *	llc_station_rcv - send received pdu to the station state machine
- *	@skb: received frame.
- *
- *	Sends data unit to station state machine.
- */
-static void llc_station_rcv(struct sk_buff *skb)
-{
-	struct llc_station_state_ev *ev = llc_station_ev(skb);
-
-	ev->type   = LLC_STATION_EV_TYPE_PDU;
-	ev->reason = 0;
-	llc_station_state_process(&llc_main_station, skb);
+handle_station:
+	if (!llc_station_handler)
+		goto drop;
+	llc_station_handler(skb);
+	goto out;
 }
 
 EXPORT_SYMBOL(llc_add_pack);
 EXPORT_SYMBOL(llc_remove_pack);
+EXPORT_SYMBOL(llc_set_station_handler);

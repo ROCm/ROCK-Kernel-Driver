@@ -250,6 +250,21 @@ static u16 llc_exec_station_trans_actions(struct llc_station *station,
 	return rc;
 }
 
+/*
+ *	llc_station_rcv - send received pdu to the station state machine
+ *	@skb: received frame.
+ *
+ *	Sends data unit to station state machine.
+ */
+static void llc_station_rcv(struct sk_buff *skb)
+{
+	struct llc_station_state_ev *ev = llc_station_ev(skb);
+
+	ev->type   = LLC_STATION_EV_TYPE_PDU;
+	ev->reason = 0;
+	llc_station_state_process(&llc_main_station, skb);
+}
+
 /**
  *	llc_alloc_frame - allocates sk_buff for frame
  *
@@ -303,6 +318,7 @@ static int __init llc_init(void)
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
 		goto err;
+	llc_set_station_handler(llc_station_rcv);
 	ev = llc_station_ev(skb);
 	memset(ev, 0, sizeof(*ev));
 	if (dev_base->next)
@@ -330,6 +346,7 @@ static void __exit llc_exit(void)
 {
 	dev_remove_pack(&llc_packet_type);
 	dev_remove_pack(&llc_tr_packet_type);
+	llc_set_station_handler(NULL);
 }
 
 module_init(llc_init);
