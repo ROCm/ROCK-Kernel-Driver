@@ -47,7 +47,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <asm/uaccess.h>
 
 

@@ -97,7 +97,7 @@
 #include <linux/errno.h>	/* return codes */
 #include <linux/string.h>	/* inline memset(), etc. */
 #include <linux/module.h>	/* support for loadable modules */
-#include <linux/sched.h>	/* for jiffies, HZ, etc. */
+#include <linux/jiffies.h>	/* for jiffies, HZ, etc. */
 #include <linux/sdladrv.h>	/* API definitions */
 #include <linux/sdlasfm.h>	/* SDLA firmware module definitions */
 #include <linux/sdlapci.h>	/* SDLA PCI hardware definitions */

@@ -69,7 +69,7 @@
  **************************************************************************/
 
 #include <linux/version.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <asm/io.h>
 #include "i60uscsi.h"
 

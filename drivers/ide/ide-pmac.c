@@ -33,7 +33,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/ide.h>

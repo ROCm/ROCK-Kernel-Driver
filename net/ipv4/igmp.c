@@ -76,7 +76,7 @@
 #include <asm/system.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/string.h>
 #include <linux/socket.h>
 #include <linux/sockios.h>

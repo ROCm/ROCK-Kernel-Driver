@@ -31,7 +31,7 @@
 #include "debug.h"
 #include "sddr55.h"
 
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 

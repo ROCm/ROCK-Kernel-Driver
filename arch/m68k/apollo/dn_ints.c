@@ -1,6 +1,6 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/kernel_stat.h>
 
 #include <asm/system.h>

@@ -13,6 +13,7 @@ extern unsigned long event;
 #include <linux/types.h>
 #include <linux/times.h>
 #include <linux/timex.h>
+#include <linux/jiffies.h>
 #include <linux/rbtree.h>
 #include <linux/thread_info.h>
 
@@ -481,12 +482,6 @@ extern void free_uid(struct user_struct *);
 
 #include <asm/current.h>
 
-/*
- * The 64-bit value is not volatile - you MUST NOT read it
- * without holding read_lock_irq(&xtime_lock)
- */
-extern u64 jiffies_64;
-extern unsigned long volatile jiffies;
 extern unsigned long itimer_ticks;
 extern unsigned long itimer_next;
 extern void do_timer(struct pt_regs *);

@@ -20,7 +20,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/wait.h>
