@@ -175,6 +175,7 @@ struct freq_attr;
 struct cpufreq_driver {
 	struct module           *owner;
 	char			name[CPUFREQ_NAME_LEN];
+	u8			flags;
 
 	/* needed by all drivers */
 	int	(*init)		(struct cpufreq_policy *policy);
@@ -191,6 +192,11 @@ struct cpufreq_driver {
 	int	(*resume)	(struct cpufreq_policy *policy);
 	struct freq_attr	**attr;
 };
+
+/* flags */
+
+#define CPUFREQ_STICKY	0x01	/* the driver isn't removed even if 
+				   all ->init() calls failed */
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);

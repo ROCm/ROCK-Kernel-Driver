@@ -120,6 +120,21 @@ config X86_SPEEDSTEP_CENTRINO
 	  
 	  If in doubt, say N.
 
+config X86_SPEEDSTEP_CENTRINO_TABLE
+	bool
+	depends on X86_SPEEDSTEP_CENTRINO
+	default y
+
+config X86_SPEEDSTEP_CENTRINO_ACPI
+	bool "Use ACPI tables to decode valid frequency/voltage pairs (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	depends on ((X86_SPEEDSTEP_CENTRINO = "m" && ACPI_PROCESSOR) || (X86_SPEEDSTEP_CENTRINO = "y" && ACPI_PROCESSOR = "y"))
+	help
+	  Use primarily the information provided in the BIOS ACPI tables
+	  to determine valid CPU frequency and voltage pairings.
+
+	  If in doubt, say Y.
+
 config X86_SPEEDSTEP_ICH
 	tristate "Intel Speedstep on ICH-M chipsets (ioport interface)"
 	depends on CPU_FREQ_TABLE
@@ -160,6 +175,16 @@ config X86_SPEEDSTEP_LIB
 	tristate
 	depends on (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI || X86_P4_CLOCKMOD)
 	default (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI || X86_P4_CLOCKMOD)
+
+config X86_SPEEDSTEP_RELAXED_CAP_CHECK
+	bool "Relaxed speedstep capability checks"
+	depends on (X86_SPEEDSTEP_SMI || X86_SPEEDSTEP_ICH)
+	help
+	  Don't perform all checks for a speedstep capable system which would 
+	  normally be done. Some ancient or strange systems, though speedstep 
+	  capable, don't always indicate that they are speedstep capable. This 
+	  option let's the probing code bypass some of those checks if the
+	  parameter "relaxed_check=1" is passed to the module.
 
 config X86_LONGRUN
 	tristate "Transmeta LongRun"

@@ -165,7 +165,8 @@ static void elanfreq_set_cpu_state (unsigned int state) {
 
 
 /**
- *	elanfreq_validatespeed: test if frequency range is valid 
+ *	elanfreq_validatespeed: test if frequency range is valid
+ *      @policy: the policy to validate
  *
  *	This function checks if a given frequency range in kHz is valid 
  *      for the hardware supported by the driver. 
