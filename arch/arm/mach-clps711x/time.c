@@ -35,7 +35,7 @@ static unsigned long clps711x_gettimeoffset(void)
 {
 	unsigned long hwticks;
 	hwticks = LATCH - (clps_readl(TC2D) & 0xffff);	/* since last underflow */
-	return (hwticks * tick) / LATCH;
+	return (hwticks * (tick_nsec / 1000)) / LATCH;
 }
 
 void __init clps711x_setup_timer(void)
