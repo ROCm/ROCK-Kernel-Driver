@@ -555,10 +555,10 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 			/* It is currently in pagevec_release() */
 			SetPageLRU(page);
 			list_add(&page->lru, &zone->active_list);
-			continue;
+		} else {
+			page_cache_get(page);
+			list_add(&page->lru, &l_hold);
 		}
-		page_cache_get(page);
-		list_add(&page->lru, &l_hold);
 		nr_pages--;
 	}
 	spin_unlock_irq(&zone->lru_lock);
