@@ -2408,66 +2408,6 @@ acpi_processor_get_info (
 	return_VALUE(0);
 }
 
-
-static int
-acpi_processor_start(
-	struct acpi_device	*device)
-{
-	int			result = 0;
-	acpi_status		status = AE_OK;
-	u32			i = 0;
-	struct acpi_processor	*pr;
-
-	ACPI_FUNCTION_TRACE("acpi_processor_start");
-
-	pr = acpi_driver_data(device);
-
-	result = acpi_processor_get_info(pr);
-	if (result) {
-		/* Processor is physically not present */
-		return_VALUE(0);
-	}
-
-	BUG_ON((pr->id >= NR_CPUS) || (pr->id < 0));
-
-	processors[pr->id] = pr;
-
-	result = acpi_processor_add_fs(device);
-	if (result)
-		goto end;
-
-	status = acpi_install_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY,
-		acpi_processor_notify, pr);
-	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Error installing device notify handler\n"));
-	}
-
-	/*
-	 * Install the idle handler if processor power management is supported.
-	 * Note that the default idle handler (default_idle) will be used on
-	 * platforms that only support C1.
-	 */
-	if ((pr->id == 0) && (pr->flags.power)) {
-		pm_idle_save = pm_idle;
-		pm_idle = acpi_processor_idle;
-	}
-
-	printk(KERN_INFO PREFIX "%s [%s] (supports",
-		acpi_device_name(device), acpi_device_bid(device));
-	for (i=1; i<ACPI_C_STATE_COUNT; i++)
-		if (pr->power.states[i].valid)
-			printk(" C%d", i);
-	if (pr->flags.throttling)
-		printk(", %d throttling states", pr->throttling.state_count);
-	printk(")\n");
-end:
-
-	return_VALUE(result);
-}
-
-
-
 static int
 acpi_processor_start(
 	struct acpi_device	*device)
@@ -2591,6 +2531,8 @@ acpi_processor_add (
 	strcpy(acpi_device_name(device), ACPI_PROCESSOR_DEVICE_NAME);
 	strcpy(acpi_device_class(device), ACPI_PROCESSOR_CLASS);
 	acpi_driver_data(device) = pr;
+
+	return_VALUE(0);
 }
 
 
