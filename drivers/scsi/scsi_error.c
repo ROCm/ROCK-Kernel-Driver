@@ -84,7 +84,7 @@ int scsi_eh_scmd_add(struct scsi_cmnd *scmd, int eh_flag)
 	 * serial_number
 	 */
 	scmd->serial_number_at_timeout = scmd->serial_number;
-	list_add_tail(&scmd->eh_list, &shost->eh_cmd_list);
+	list_add_tail(&scmd->eh_entry, &shost->eh_cmd_q);
 	shost->in_recovery = 1;
 	shost->host_failed++;
 	if (shost->host_busy == shost->host_failed) {
@@ -208,10 +208,11 @@ int scsi_block_when_processing_errors(Scsi_Device *sdev)
 #if CONFIG_SCSI_LOGGING
 /**
  * scsi_eh_prt_fail_stats - Log info on failures.
- * @sc_list:	List for failed cmds.
  * @shost:	scsi host being recovered.
+ * @work_q:	Queue of scsi cmds to process.
  **/
-static inline void scsi_eh_prt_fail_stats(struct Scsi_Host *shost)
+static inline void scsi_eh_prt_fail_stats(struct Scsi_Host *shost,
+					  struct list_head *work_q)
 {
 	struct scsi_cmnd *scmd;
 	struct scsi_device *sdev;
@@ -222,7 +223,7 @@ static inline void scsi_eh_prt_fail_stats(struct Scsi_Host *shost)
 
 
 	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		list_for_each_entry(scmd, &shost->eh_cmd_list, eh_list) {
+		list_for_each_entry(scmd, work_q, eh_entry) {
 			if (scmd->device == sdev) {
 				++total_failures;
 				if (scsi_eh_eflags_chk(scmd,
@@ -650,8 +651,7 @@ static int scsi_eh_retry_cmd(Scsi_Cmnd *scmd)
 /**
  * scsi_eh_finish_cmd - Handle a cmd that eh is finished with.
  * @scmd:	Original SCSI cmd that eh has finished.
- * @shost:	SCSI host that cmd originally failed on.
- * @done_list:	list_head for processed commands.
+ * @done_q:	Queue for processed commands.
  *
  * Notes:
  *    We don't want to use the normal command completion while we are are
@@ -660,10 +660,10 @@ static int scsi_eh_retry_cmd(Scsi_Cmnd *scmd)
  *    keep a list of pending commands for final completion, and once we
  *    are ready to leave error handling we handle completion for real.
  **/
-static void scsi_eh_finish_cmd(Scsi_Cmnd *scmd, struct Scsi_Host *shost,
-			       struct list_head *done_list )
+static void scsi_eh_finish_cmd(Scsi_Cmnd *scmd,
+			       struct list_head *done_q )
 {
-	shost->host_failed--;
+	scmd->device->host->host_failed--;
 	scmd->state = SCSI_STATE_BHQUEUE;
 	scsi_eh_eflags_clr_all(scmd);
 
@@ -673,13 +673,13 @@ static void scsi_eh_finish_cmd(Scsi_Cmnd *scmd, struct Scsi_Host *shost,
 	 */
 	scsi_setup_cmd_retry(scmd);
 
-	list_move_tail(&scmd->eh_list, done_list);
+	list_move_tail(&scmd->eh_entry, done_q);
 }
 
 /**
  * scsi_eh_get_sense - Get device sense data.
- * @shost:	scsi host being recovered.
- * @done_list:	list_head for processed commands.
+ * @work_q:	Queue of commands to process.
+ * @done_q:	Queue of proccessed commands..
  *
  * Description:
  *    See if we need to request sense information.  if so, then get it
@@ -697,15 +697,15 @@ static void scsi_eh_finish_cmd(Scsi_Cmnd *scmd, struct Scsi_Host *shost,
  *
  *    In 2.5 this capability will be going away.
  **/
-static int scsi_eh_get_sense(struct Scsi_Host *shost,
-			     struct list_head *done_list)
+static int scsi_eh_get_sense(struct list_head *work_q,
+			     struct list_head *done_q)
 {
 	int rtn;
 	struct list_head *lh, *lh_sf;
 	Scsi_Cmnd *scmd;
 
-	list_for_each_safe(lh, lh_sf, &shost->eh_cmd_list) {
-		scmd = list_entry(lh, struct scsi_cmnd, eh_list);
+	list_for_each_safe(lh, lh_sf, work_q) {
+		scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
 		if (scsi_eh_eflags_chk(scmd, SCSI_EH_CANCEL_CMD) ||
 		    SCSI_SENSE_VALID(scmd))
 			continue;
@@ -730,7 +730,7 @@ static int scsi_eh_get_sense(struct Scsi_Host *shost,
 		 * upper level.
 		 */
 		if (rtn == SUCCESS)
-			scsi_eh_finish_cmd(scmd, shost, done_list);
+			scsi_eh_finish_cmd(scmd, done_q);
 		if (rtn != NEEDS_RETRY)
 			continue;
 
@@ -749,10 +749,10 @@ static int scsi_eh_get_sense(struct Scsi_Host *shost,
 		/*
 		 * we eventually hand this one back to the top level.
 		 */
-		scsi_eh_finish_cmd(scmd, shost, done_list);
+		scsi_eh_finish_cmd(scmd, done_q);
 	}
 
-	return list_empty(&shost->eh_cmd_list);
+	return list_empty(work_q);
 }
 
 /**
@@ -844,7 +844,7 @@ retry_tur:
 /**
  * scsi_eh_abort_cmds - abort canceled commands.
  * @shost:	scsi host being recovered.
- * @done_list:	list_head for processed commands.
+ * @eh_done_q:	list_head for processed commands.
  *
  * Decription:
  *    Try and see whether or not it makes sense to try and abort the
@@ -853,15 +853,15 @@ retry_tur:
  *    no sense to try and abort the command, since as far as the shost
  *    adapter is concerned, it isn't running.
  **/
-static int scsi_eh_abort_cmds(struct Scsi_Host *shost,
-			      struct list_head *done_list)
+static int scsi_eh_abort_cmds(struct list_head *work_q,
+			      struct list_head *done_q)
 {
 	int rtn;
 	struct list_head *lh, *lh_sf;
 	struct scsi_cmnd *scmd;
 
-	list_for_each_safe(lh, lh_sf, &shost->eh_cmd_list) {
-		scmd = list_entry(lh, struct scsi_cmnd, eh_list);
+	list_for_each_safe(lh, lh_sf, work_q) {
+		scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
 		if (!scsi_eh_eflags_chk(scmd, SCSI_EH_CANCEL_CMD))
 			continue;
 		SCSI_LOG_ERROR_RECOVERY(3, printk("%s: aborting cmd:"
@@ -871,7 +871,7 @@ static int scsi_eh_abort_cmds(struct Scsi_Host *shost,
 		if (rtn == SUCCESS) {
 			scsi_eh_eflags_clr(scmd,  SCSI_EH_CANCEL_CMD);
 			if (!scmd->device->online || !scsi_eh_tur(scmd)) {
-				scsi_eh_finish_cmd(scmd, shost, done_list);
+				scsi_eh_finish_cmd(scmd, done_q);
 			}
 				
 		} else
@@ -882,7 +882,7 @@ static int scsi_eh_abort_cmds(struct Scsi_Host *shost,
 							  scmd));
 	}
 
-	return list_empty(&shost->eh_cmd_list);
+	return list_empty(work_q);
 }
 
 /**
@@ -920,7 +920,7 @@ static int scsi_try_bus_device_reset(Scsi_Cmnd *scmd)
 /**
  * scsi_eh_bus_device_reset - send bdr if needed
  * @shost:	scsi host being recovered.
- * @done_list:	list_head for processed commands.
+ * @eh_done_q:	list_head for processed commands.
  *
  * Notes:
  *    Try a bus device reset.  still, look to see whether we have multiple
@@ -929,7 +929,8 @@ static int scsi_try_bus_device_reset(Scsi_Cmnd *scmd)
  *    a bus_reset instead. 
  **/
 static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
-				    struct list_head *done_list)
+				    struct list_head *work_q,
+				    struct list_head *done_q)
 {
 	int rtn;
 	struct list_head *lh, *lh_sf;
@@ -938,7 +939,7 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
 
 	list_for_each_entry(sdev, &shost->my_devices, siblings) {
 		bdr_scmd = NULL;
-		list_for_each_entry(scmd, &shost->eh_cmd_list, eh_list)
+		list_for_each_entry(scmd, work_q, eh_entry)
 			if (scmd->device == sdev) {
 				bdr_scmd = scmd;
 				break;
@@ -954,14 +955,13 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
 		if (rtn == SUCCESS) {
 			if (!sdev->online || !scsi_eh_tur(bdr_scmd)) {
 				list_for_each_safe(lh, lh_sf,
-						   &shost->eh_cmd_list) {
+						   work_q) {
 					scmd = list_entry(lh, struct
 							  scsi_cmnd,
-							  eh_list);
+							  eh_entry);
 					if (scmd->device == sdev)
 						scsi_eh_finish_cmd(scmd,
-								   shost,
-								   done_list);
+								   done_q);
 				}
 			}
 		} else {
@@ -973,7 +973,7 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
 		}
 	}
 
-	return list_empty(&shost->eh_cmd_list);
+	return list_empty(work_q);
 }
 
 /**
@@ -1053,10 +1053,11 @@ static int scsi_try_host_reset(Scsi_Cmnd *scmd)
 /**
  * scsi_eh_bus_reset - send a bus reset 
  * @shost:	scsi host being recovered.
- * @done_list:	list_head for processed commands.
+ * @eh_done_q:	list_head for processed commands.
  **/
 static int scsi_eh_bus_reset(struct Scsi_Host *shost,
-			     struct list_head *done_list)
+			     struct list_head *work_q,
+			     struct list_head *done_q)
 {
 	int rtn;
 	struct list_head *lh, *lh_sf;
@@ -1073,7 +1074,7 @@ static int scsi_eh_bus_reset(struct Scsi_Host *shost,
 
 	for (channel = 0; channel <= shost->max_channel; channel++) {
 		chan_scmd = NULL;
-		list_for_each_entry(scmd, &shost->eh_cmd_list, eh_list) {
+		list_for_each_entry(scmd, work_q, eh_entry) {
 			if (channel == scmd->device->channel) {
 				chan_scmd = scmd;
 				break;
@@ -1091,15 +1092,14 @@ static int scsi_eh_bus_reset(struct Scsi_Host *shost,
 						  channel));
 		rtn = scsi_try_bus_reset(chan_scmd);
 		if (rtn == SUCCESS) {
-			list_for_each_safe(lh, lh_sf, &shost->eh_cmd_list) {
+			list_for_each_safe(lh, lh_sf, work_q) {
 				scmd = list_entry(lh, struct scsi_cmnd,
-						  eh_list);
+						  eh_entry);
 				if (channel == scmd->device->channel)
 					if (!scmd->device->online ||
 					    !scsi_eh_tur(scmd))
 						scsi_eh_finish_cmd(scmd,
-								   shost,
-								   done_list);
+								   done_q);
 			}
 		} else {
 			SCSI_LOG_ERROR_RECOVERY(3, printk("%s: BRST"
@@ -1108,35 +1108,34 @@ static int scsi_eh_bus_reset(struct Scsi_Host *shost,
 							  channel));
 		}
 	}
-	return list_empty(&shost->eh_cmd_list);
+	return list_empty(work_q);
 }
 
 /**
  * scsi_eh_host_reset - send a host reset 
- * @shost:	scsi host being recovered.
- * @done_list:	list_head for processed commands.
+ * @work_q:	list_head for processed commands.
+ * @done_q:	list_head for processed commands.
  **/
-static int scsi_eh_host_reset(struct Scsi_Host *shost,
-			      struct list_head *done_list)
+static int scsi_eh_host_reset(struct list_head *work_q,
+			      struct list_head *done_q)
 {
 	int rtn;
 	struct list_head *lh, *lh_sf;
 	Scsi_Cmnd *scmd;
 
-	if (!list_empty(&shost->eh_cmd_list)) {
-		scmd = list_entry(shost->eh_cmd_list.next,
-				  struct scsi_cmnd, eh_list);
+	if (!list_empty(work_q)) {
+		scmd = list_entry(work_q->next,
+				  struct scsi_cmnd, eh_entry);
 
 		SCSI_LOG_ERROR_RECOVERY(3, printk("%s: Sending HRST\n"
 						  , current->comm));
 
 		rtn = scsi_try_host_reset(scmd);
 		if (rtn == SUCCESS) {
-			list_for_each_safe(lh, lh_sf, &shost->eh_cmd_list) {
-				scmd = list_entry(lh, struct scsi_cmnd, eh_list);
+			list_for_each_safe(lh, lh_sf, work_q) {
+				scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
 				if (!scmd->device->online || !scsi_eh_tur(scmd)) 
-					scsi_eh_finish_cmd(scmd, shost,
-							   done_list);
+					scsi_eh_finish_cmd(scmd, done_q);
 			}
 		} else {
 			SCSI_LOG_ERROR_RECOVERY(3, printk("%s: HRST"
@@ -1144,27 +1143,27 @@ static int scsi_eh_host_reset(struct Scsi_Host *shost,
 							  current->comm));
 		}
 	}
-	return list_empty(&shost->eh_cmd_list);
+	return list_empty(work_q);
 }
 
 /**
  * scsi_eh_offline_sdevs - offline scsi devices that fail to recover
- * @shost:	scsi host being recovered.
- * @done_list:	list_head for processed commands.
+ * @work_q:	list_head for processed commands.
+ * @done_q:	list_head for processed commands.
  *
  **/
-static void scsi_eh_offline_sdevs(struct Scsi_Host *shost,
-				  struct list_head *done_list)
+static void scsi_eh_offline_sdevs(struct list_head *work_q,
+				  struct list_head *done_q)
 {
 	struct list_head *lh, *lh_sf;
 	Scsi_Cmnd *scmd;
 
-	list_for_each_safe(lh, lh_sf, &shost->eh_cmd_list) {
-		scmd = list_entry(lh, struct scsi_cmnd, eh_list);
+	list_for_each_safe(lh, lh_sf, work_q) {
+		scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
 		printk(KERN_INFO "scsi: Device offlined - not"
 		       		" ready after error recovery: host"
 				" %d channel %d id %d lun %d\n",
-				shost->host_no,
+				scmd->device->host->host_no,
 				scmd->device->channel,
 				scmd->device->id,
 				scmd->device->lun);
@@ -1174,7 +1173,7 @@ static void scsi_eh_offline_sdevs(struct Scsi_Host *shost,
 			 * FIXME: Handle lost cmds.
 			 */
 		}
-		scsi_eh_finish_cmd(scmd, shost, done_list);
+		scsi_eh_finish_cmd(scmd, done_q);
 	}
 	return;
 }
@@ -1469,8 +1468,6 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 
 	ASSERT_LOCK(shost->host_lock, 0);
 
-	shost->in_recovery = 0;
-
 	/*
 	 * If the door was locked, we need to insert a door lock request
 	 * onto the head of the SCSI request queue for the device.  There
@@ -1487,6 +1484,8 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 */
 	SCSI_LOG_ERROR_RECOVERY(3, printk("%s: waking up host to restart\n",
 					  __FUNCTION__));
+
+	shost->in_recovery = 0;
 
 	wake_up(&shost->host_wait);
 
@@ -1513,32 +1512,31 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 /**
  * scsi_eh_ready_devs - check device ready state and recover if not.
  * @shost: 	host to be recovered.
- * @done_list:	list_head for processed commands.
+ * @eh_done_q:	list_head for processed commands.
  *
  **/
 static void scsi_eh_ready_devs(struct Scsi_Host *shost,
-			       struct list_head *done_list)
+			       struct list_head *work_q,
+			       struct list_head *done_q)
 {
-	if (scsi_eh_bus_device_reset(shost, done_list))
-		if (scsi_eh_bus_reset(shost, done_list))
-			if (scsi_eh_host_reset(shost, done_list))
-				scsi_eh_offline_sdevs(shost, done_list);
+	if (scsi_eh_bus_device_reset(shost, work_q, done_q))
+		if (scsi_eh_bus_reset(shost, work_q, done_q))
+			if (scsi_eh_host_reset(work_q, done_q))
+				scsi_eh_offline_sdevs(work_q, done_q);
 }
 
 /**
- * scsi_eh_flush_done_list - finish processed commands or retry them.
- * @shost: 	host to be recovered.
- * @done_list:	list_head of processed commands.
+ * scsi_eh_flush_done_q - finish processed commands or retry them.
+ * @done_q:	list_head of processed commands.
  *
  **/
-static void scsi_eh_flush_done_list(struct Scsi_Host *shost,
-				    struct list_head *done_list)
+static void scsi_eh_flush_done_q(struct list_head *done_q)
 {
 	struct list_head *lh, *lh_sf;
 	Scsi_Cmnd *scmd;
 
-	list_for_each_safe(lh, lh_sf, done_list) {
-		scmd = list_entry(lh, struct scsi_cmnd, eh_list);
+	list_for_each_safe(lh, lh_sf, done_q) {
+		scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
 		list_del_init(lh);
 		if (!scmd->device->online) {
 			 scmd->result |= (DRIVER_TIMEOUT << 24);
@@ -1549,7 +1547,7 @@ static void scsi_eh_flush_done_list(struct Scsi_Host *shost,
 					       " cmd: %p\n",
 						  current->comm,
 						  scmd));
-				scsi_retry_command(scmd);
+				scsi_queue_insert(scmd, SCSI_MLQUEUE_EH_RETRY);
 				continue;
 			}
 		}
@@ -1585,15 +1583,21 @@ static void scsi_eh_flush_done_list(struct Scsi_Host *shost,
  **/
 static void scsi_unjam_host(struct Scsi_Host *shost)
 {
-	LIST_HEAD(done_list);
+	unsigned long flags;
+	LIST_HEAD(eh_work_q);
+	LIST_HEAD(eh_done_q);
 
-	SCSI_LOG_ERROR_RECOVERY(1, scsi_eh_prt_fail_stats(shost));
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_splice_init(&shost->eh_cmd_q, &eh_work_q);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 
-	if (!scsi_eh_get_sense(shost, &done_list))
-		if (!scsi_eh_abort_cmds(shost, &done_list))
-			scsi_eh_ready_devs(shost, &done_list);
+	SCSI_LOG_ERROR_RECOVERY(1, scsi_eh_prt_fail_stats(shost, &eh_work_q));
 
-	scsi_eh_flush_done_list(shost, &done_list);
+	if (!scsi_eh_get_sense(&eh_work_q, &eh_done_q))
+		if (!scsi_eh_abort_cmds(&eh_work_q, &eh_done_q))
+			scsi_eh_ready_devs(shost, &eh_work_q, &eh_done_q);
+
+	scsi_eh_flush_done_q(&eh_done_q);
 }
 
 /**

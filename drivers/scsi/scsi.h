@@ -727,7 +727,7 @@ struct scsi_cmnd {
 
 	struct list_head list;  /* scsi_cmnd participates in queue lists */
 
-	struct list_head eh_list; /* Used to place us on the host eh list */
+	struct list_head eh_entry; /* entry for the host eh_cmd_q */
 	int eh_state;		/* Used for state tracking in error handlr */
 	int eh_eflags;		/* Used by error handlr */
 	void (*done) (struct scsi_cmnd *);	/* Mid-level done function */
@@ -852,6 +852,7 @@ struct scsi_cmnd {
  */
 #define SCSI_MLQUEUE_HOST_BUSY   0x1055
 #define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
+#define SCSI_MLQUEUE_EH_RETRY    0x1057
 
 /*
  * old style reset request from external source

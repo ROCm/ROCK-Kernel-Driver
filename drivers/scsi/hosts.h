@@ -384,7 +384,7 @@ struct Scsi_Host
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
 
-    struct list_head	eh_cmd_list;
+    struct list_head	eh_cmd_q;
     struct task_struct    * ehandler;  /* Error recovery thread. */
     struct semaphore      * eh_wait;   /* The error recovery thread waits on
                                           this. */

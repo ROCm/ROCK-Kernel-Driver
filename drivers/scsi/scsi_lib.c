@@ -117,7 +117,7 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	 */
 	if (reason == SCSI_MLQUEUE_HOST_BUSY)
 		host->host_blocked = host->max_host_blocked;
-	else
+	else if (reason == SCSI_MLQUEUE_DEVICE_BUSY)
 		device->device_blocked = device->max_device_blocked;
 
 	/*
