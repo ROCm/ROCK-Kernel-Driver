@@ -7062,7 +7062,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	 */
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
 	    ((tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) &&
-	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750))
+	     tp->pci_chip_rev_id == CHIPREV_ID_5750_A0))
 		tp->tg3_flags |= TG3_FLAG_5701_REG_WRITE_BUG;
 
 	if ((pci_state_reg & PCISTATE_BUS_SPEED_HIGH) != 0)
