@@ -30,35 +30,67 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-/*
- * This file contains globals needed by XFS that were normally defined
- * somewhere else in IRIX.
- */
+#include <xfs.h>
 
-#include "xfs.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_bit.h"
+static void sync_timeout(unsigned long __data)
+{
+	struct task_struct * p = (struct task_struct *) __data;
 
-/*
- * System memory size - used to scale certain data structures in XFS.
- */
-unsigned long xfs_physmem;
+	wake_up_process(p);
+}
 
-/*
- * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
- * other XFS code uses these values.
- */
-xfs_param_t xfs_params = { 0, 1, 0, 0, 0, 3, 30 * HZ };
+#define SYNCD_FLAGS	(SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR)
 
-/*
- * Global system credential structure.
- */
-cred_t sys_cred_val, *sys_cred = &sys_cred_val;
+int syncd(void *arg)
+{
+	vfs_t			*vfsp = (vfs_t *) arg;
+	int			error;
+	struct timer_list	timer;
 
-/* Export XFS symbols used by xfsidbg */
-EXPORT_SYMBOL(xfs_next_bit);
-EXPORT_SYMBOL(xfs_contig_bits);
-EXPORT_SYMBOL(xfs_bmbt_get_all);
-#if ARCH_CONVERT != ARCH_NOCONVERT
-EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
-#endif
+	daemonize("xfs_syncd");
+
+	vfsp->vfs_sync_task = current;
+	wmb();
+	wake_up(&vfsp->vfs_wait_sync_task);
+
+	init_timer(&timer);
+	timer.data = (unsigned long)current;
+	timer.function = sync_timeout;
+
+	do {
+		mod_timer(&timer, jiffies + xfs_params.sync_interval);
+		interruptible_sleep_on(&vfsp->vfs_sync);
+
+		if (!(vfsp->vfs_flag & VFS_RDONLY))
+			VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
+	} while (!(vfsp->vfs_flag & VFS_UMOUNT));
+
+	del_timer_sync(&timer);
+	vfsp->vfs_sync_task = NULL;
+	wmb();
+	wake_up(&vfsp->vfs_wait_sync_task);
+	return 0;
+}
+
+int
+linvfs_start_syncd(vfs_t *vfsp)
+{
+	int pid;
+
+	pid = kernel_thread(syncd, (void *) vfsp,
+			CLONE_VM | CLONE_FS | CLONE_FILES);
+	if (pid < 0)
+		return pid;
+	wait_event(vfsp->vfs_wait_sync_task, vfsp->vfs_sync_task);
+	return 0;
+}
+
+void
+linvfs_stop_syncd(vfs_t *vfsp)
+{
+	vfsp->vfs_flag |= VFS_UMOUNT;
+	wmb();
+
+	wake_up(&vfsp->vfs_sync);
+	wait_event(vfsp->vfs_wait_sync_task, !vfsp->vfs_sync_task);
+}

@@ -331,9 +331,10 @@ destroy_inodecache( void )
 }
 
 /*
- * We do not actually write the inode here, just mark the
- * super block dirty so that sync_supers calls us and
- * forces the flush.
+ * Attempt to flush the inode, this will actually fail
+ * if the inode is pinned, but we dirty the inode again
+ * at the point when it is unpinned after a log write,
+ * since this is when the inode itself becomes flushable. 
  */
 STATIC void
 linvfs_write_inode(
@@ -348,8 +349,6 @@ linvfs_write_inode(
 		if (sync)
 			flags |= FLUSH_SYNC;
 		VOP_IFLUSH(vp, flags, error);
-		if (error == EAGAIN)
-			inode->i_sb->s_dirt = 1;
 	}
 }
 
@@ -376,9 +375,11 @@ linvfs_put_super(
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	int			error;
 
+	linvfs_stop_syncd(vfsp);
 	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_DELWRI, NULL, error);
-	if (error == 0)
+	if (error == 0) {
 		VFS_UNMOUNT(vfsp, 0, NULL, error);
+	}
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
 		printk("%s: vfsp/0x%p left dangling!\n", __FUNCTION__, vfsp);
@@ -395,10 +396,13 @@ linvfs_write_super(
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	int			error;
 
-	sb->s_dirt = 0;
-	if (sb->s_flags & MS_RDONLY)
+	if (sb->s_flags & MS_RDONLY) {
+		sb->s_dirt = 0; /* paranoia */
 		return;
-	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR, NULL, error);
+	}
+	/* Push the log and superblock a little */
+	VFS_SYNC(vfsp, SYNC_FSDATA, NULL, error);
+	sb->s_dirt = 0;
 }
 
 STATIC int
@@ -652,7 +656,8 @@ linvfs_fill_super(
 		goto fail_vnrele;
 	if (is_bad_inode(sb->s_root->d_inode))
 		goto fail_vnrele;
-
+	if (linvfs_start_syncd(vfsp))
+		goto fail_vnrele;
 	vn_trace_exit(rootvp, __FUNCTION__, (inst_t *)__return_address);
 
 	kmem_free(args, sizeof(*args));

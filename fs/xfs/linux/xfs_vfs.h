@@ -48,6 +48,9 @@ typedef struct vfs {
 	fsid_t			*vfs_altfsid;	/* An ID fixed for life of FS */
 	bhv_head_t		vfs_bh;		/* head of vfs behavior chain */
 	struct super_block	*vfs_super;	/* Linux superblock structure */
+	struct task_struct	*vfs_sync_task;
+	wait_queue_head_t	vfs_sync;
+	wait_queue_head_t	vfs_wait_sync_task;
 } vfs_t;
 
 #define vfs_fbhv		vfs_bh.bh_first	/* 1st on vfs behavior chain */
@@ -78,7 +81,8 @@ typedef enum {
 #define VFS_RDONLY		0x0001	/* read-only vfs */
 #define VFS_GRPID		0x0002	/* group-ID assigned from directory */
 #define VFS_DMI			0x0004	/* filesystem has the DMI enabled */
-#define VFS_END			0x0004	/* max flag */
+#define VFS_UMOUNT		0x0008	/* unmount in progress */
+#define VFS_END			0x0008	/* max flag */
 
 #define SYNC_ATTR		0x0001	/* sync attributes */
 #define SYNC_CLOSE		0x0002	/* close file system down */
@@ -86,6 +90,7 @@ typedef enum {
 #define SYNC_WAIT		0x0008	/* wait for i/o to complete */
 #define SYNC_FSDATA		0x0020	/* flush fs data (e.g. superblocks) */
 #define SYNC_BDFLUSH		0x0010	/* BDFLUSH is calling -- don't block */
+
 
 typedef int	(*vfs_mount_t)(bhv_desc_t *,
 				struct xfs_mount_args *, struct cred *);

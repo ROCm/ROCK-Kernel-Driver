@@ -976,6 +976,8 @@ xfs_iread(
 			XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	}
 
+	INIT_LIST_HEAD(&ip->i_reclaim);
+
 	/*
 	 * The inode format changed when we moved the link count and
 	 * made it 32 bits long.  If this is an old format inode,
@@ -2625,6 +2627,15 @@ xfs_iunpin(
 	ASSERT(atomic_read(&ip->i_pincount) > 0);
 
 	if (atomic_dec_and_test(&ip->i_pincount)) {
+		vnode_t	*vp = XFS_ITOV_NULL(ip);
+
+		/* make sync come back and flush this inode */
+		if (vp) {
+			struct inode	*inode = LINVFS_GET_IP(vp);
+
+			mark_inode_dirty_sync(inode);
+		}
+
 		wake_up(&ip->i_ipin_wait);
 	}
 }
@@ -3640,6 +3651,8 @@ xfs_ichgtime(xfs_inode_t *ip,
 	 */
 	SYNCHRONIZE();
 	ip->i_update_core = 1;
+	if (!(inode->i_state & I_LOCK))
+		mark_inode_dirty(inode);
 }
 
 #ifdef XFS_ILOCK_TRACE

@@ -49,6 +49,7 @@ typedef struct xfs_param {
 	ulong	symlink_mode;	/* Symlink creat mode affected by umask. */
 	ulong	panic_mask;	/* bitmask to specify panics on errors.  */
 	ulong	error_level;	/* Degree of reporting for internal probs*/
+	ulong	sync_interval;	/* time between sync calls		 */
 } xfs_param_t;
 
 /*
@@ -73,6 +74,7 @@ enum {
 	XFS_SYMLINK_MODE = 4,
 	XFS_PANIC_MASK = 5,
 	XFS_ERRLEVEL = 6,
+	XFS_SYNC_INTERVAL = 7,
 };
 
 extern xfs_param_t	xfs_params;

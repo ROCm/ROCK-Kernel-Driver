@@ -546,6 +546,7 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
+	INIT_LIST_HEAD(&mp->m_del_inodes);
 
 
 	if (XFS_SB_VERSION_HASLOGV2(sbp)) {
@@ -601,7 +602,6 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 					sbp->sb_inopblock);
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
 }
-
 /*
  * xfs_mountfs
  *
