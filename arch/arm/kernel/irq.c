@@ -47,7 +47,7 @@
 #define MAX_IRQ_CNT	100000
 
 static volatile unsigned long irq_err_count;
-static spinlock_t irq_controller_lock;
+static spinlock_t irq_controller_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(irq_pending);
 
 struct irqdesc irq_desc[NR_IRQS];
