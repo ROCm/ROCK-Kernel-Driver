@@ -169,6 +169,9 @@
  *				use the current PCI-mapping API, update	*
  *				command-queuing.			*
  *	2.1b  04/04/13  GL	Fix for 64-bit platforms		*
+ *	2.1b1 04/01/31	GL	(applied 05.04) Remove internal		*
+ *				command-queuing.			*
+ *	2.1b2 04/02/01	CH	(applied 05.04) Fix error-handling	*
  ***********************************************************************/
 
 /* Uncomment SA_INTERRUPT, if the driver refuses to share its IRQ with other devices */
@@ -752,37 +755,6 @@ static PSRB dc390_find_cmd_in_SRBq (PSCSICMD cmd, PSRB queue)
     return q;
 }
 #endif
-    
-
-/* Append to Query List */
-static void dc390_Query_append( PSCSICMD cmd, PACB pACB )
-{
-	dc390_cmd_scp_t *cmdq = (dc390_cmd_scp_t *)&cmd->SCp;
-
-	DEBUG0(printk ("DC390: Append cmd %li to Query\n", cmd->pid));
-
-	list_add_tail(&cmdq->list, &pACB->cmdq);
-	pACB->QueryCnt++;
-	pACB->CmdOutOfSRB++;
-}
-
-
-/* Return next cmd from Query list */
-static PSCSICMD dc390_Query_get ( PACB pACB )
-{
-	PSCSICMD  pcmd;
-	dc390_cmd_scp_t *cmdq;
-	if (list_empty(&pACB->cmdq))
-		return NULL;
-
-	pcmd = (PSCSICMD) list_entry(pACB->cmdq.next, struct scsi_cmnd_list, scp.list);
-	DEBUG0(printk ("DC390: Get cmd %li from Query\n", pcmd->pid));
-	cmdq = (dc390_cmd_scp_t *)&pcmd->SCp;
-	list_del(&cmdq->list);
-	pACB->QueryCnt--;
-	return pcmd;
-}
-
 
 /* Return next free SRB */
 static __inline__ PSRB dc390_Free_get ( PACB pACB )
@@ -1114,37 +1086,6 @@ static void dc390_BuildSRB (Scsi_Cmnd* pcmd, PDCB pDCB, PSRB pSRB)
     /* KG: deferred PCI mapping to dc390_StartSCSI */
 }
 
-/* Put cmnd from Query to Waiting list and send next Waiting cmnd */
-static void dc390_Query_to_Waiting (PACB pACB)
-{
-    Scsi_Cmnd *pcmd;
-    PSRB   pSRB;
-    PDCB   pDCB;
-
-    if( pACB->ACBFlag & (RESET_DETECT+RESET_DONE+RESET_DEV) )
-	return;
-
-    while (pACB->QueryCnt)
-    {
-	pSRB = dc390_Free_get ( pACB );
-	if (!pSRB) return;
-	pcmd = dc390_Query_get ( pACB );
-	if (!pcmd) { dc390_Free_insert (pACB, pSRB); return; } /* should not happen */
-	pDCB = dc390_findDCB (pACB, pcmd->device->id, pcmd->device->lun);
-	if (!pDCB) 
-	{
-		dc390_Free_insert (pACB, pSRB);
-		printk (KERN_ERR "DC390: Command in queue to non-existing device!\n");
-		pcmd->result = MK_RES(DRIVER_ERROR,DID_ERROR,0,0);
-		DC390_UNLOCK_ACB_NI;
-		pcmd->done (pcmd);
-		DC390_LOCK_ACB_NI;
-	}
-	dc390_BuildSRB (pcmd, pDCB, pSRB);
-	dc390_Waiting_append ( pDCB, pSRB );
-    }
-}
-
 /***********************************************************************
  * Function : static int DC390_queue_command (Scsi_Cmnd *cmd,
  *					       void (*done)(Scsi_Cmnd *))
@@ -1177,10 +1118,7 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 	       cmd->cmnd[0],cmd->device->id,cmd->device->lun,cmd->pid, cmd->buffer));
 
     DC390_LOCK_ACB;
-    
-    /* Assume BAD_TARGET; will be cleared later */
-    cmd->result = DID_BAD_TARGET << 16;
-   
+
     /* TODO: Change the policy: Always accept TEST_UNIT_READY or INQUIRY 
      * commands and alloc a DCB for the device if not yet there. DCB will
      * be removed in dc390_SRBdone if SEL_TIMEOUT */
@@ -1190,17 +1128,6 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 
     else if( (pACB->scan_devices) && (cmd->cmnd[0] == READ_6) )
 	pACB->scan_devices = 0;
-
-    if ( ( cmd->device->id >= pACB->pScsiHost->max_id ) || 
-	 (cmd->device->lun >= pACB->pScsiHost->max_lun) )
-    {
-/*	printk ("DC390: Ignore target %d lun %d\n",
-		cmd->device->id, cmd->device->lun); */
-	DC390_UNLOCK_ACB;
-	//return (1);
-	done (cmd);
-	return (0);
-    }
 
     if( (pACB->scan_devices || cmd->cmnd[0] == TEST_UNIT_READY || cmd->cmnd[0] == INQUIRY) && 
        !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun)) )
@@ -1212,14 +1139,7 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 	  {
 	    printk (KERN_ERR "DC390: kmalloc for DCB failed, target %02x lun %02x\n", 
 		    cmd->device->id, cmd->device->lun);
-	    DC390_UNLOCK_ACB;
-	    printk ("DC390: No DCB in queue_command!\n");
-#ifdef USE_NEW_EH
-	    return (1);
-#else
-	    done (cmd);
-	    return (0);
-#endif
+	    goto fail;
 	  }
             
     }
@@ -1227,10 +1147,7 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     {
 	printk(KERN_INFO "DC390: Ignore target %02x lun %02x\n",
 		cmd->device->id, cmd->device->lun); 
-	DC390_UNLOCK_ACB;
-	//return (1);
-	done (cmd);
-	return (0);
+	goto fail;
     }
     else
     {
@@ -1239,60 +1156,37 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 	 {  /* should never happen */
 	    printk (KERN_ERR "DC390: no DCB failed, target %02x lun %02x\n", 
 		    cmd->device->id, cmd->device->lun);
-	    DC390_UNLOCK_ACB;
-	    printk ("DC390: No DCB in queuecommand (2)!\n");
-#ifdef USE_NEW_EH
-	    return (1);
-#else
-	    done (cmd);
-	    return (0);
-#endif
+	    goto fail;
 	 }
     }
 
     pACB->Cmds++;
     cmd->scsi_done = done;
     cmd->result = 0;
-	
-    dc390_Query_to_Waiting (pACB);
 
-    if( pACB->QueryCnt ) /* Unsent commands ? */
-    {
-	DEBUG0(printk ("DC390: QueryCnt != 0\n"));
-	dc390_Query_append ( cmd, pACB );
-	dc390_Waiting_process (pACB);
-    }
-    else if (pDCB->pWaitingSRB)
-    {
- 	pSRB = dc390_Free_get ( pACB );
-	DEBUG0(if (!pSRB) printk ("DC390: No free SRB but Waiting\n"); else printk ("DC390: Free SRB w/ Waiting\n"));
-	if (!pSRB) dc390_Query_append (cmd, pACB);
-	else 
-	  {
-	    dc390_BuildSRB (cmd, pDCB, pSRB);
-	    dc390_Waiting_append (pDCB, pSRB);
-	  }
-	dc390_Waiting_process (pACB);
-    }
-    else
-    {
- 	pSRB = dc390_Free_get ( pACB );
-	DEBUG0(if (!pSRB) printk ("DC390: No free SRB w/o Waiting\n"); else printk ("DC390: Free SRB w/o Waiting\n"));
-	if (!pSRB)
-	{
-	    dc390_Query_append (cmd, pACB);
-	    dc390_Waiting_process (pACB);
-	}
-	else 
-	{
-	    dc390_BuildSRB (cmd, pDCB, pSRB);
-	    dc390_SendSRB (pACB, pSRB);
-	}
-    }
+    pSRB = dc390_Free_get(pACB);
+    if (!pSRB)
+	    goto requeue;
+
+    dc390_BuildSRB(cmd, pDCB, pSRB);
+    if (pDCB->pWaitingSRB) {
+	    dc390_Waiting_append(pDCB, pSRB);
+	    dc390_Waiting_process(pACB);
+    } else
+	    dc390_SendSRB(pACB, pSRB);
 
     DC390_UNLOCK_ACB;
     DEBUG1(printk (KERN_DEBUG " ... command (pid %li) queued successfully.\n", cmd->pid));
     return(0);
+
+ requeue:
+    DC390_UNLOCK_ACB;
+    return 1;
+ fail:
+    DC390_UNLOCK_ACB;
+    cmd->result = DID_BAD_TARGET << 16;
+    done(cmd);
+    return 0;
 }
 
 /* We ignore mapping problems, as we expect everybody to respect 
@@ -1499,21 +1393,6 @@ int DC390_abort (Scsi_Cmnd *cmd)
     printk ("DC390: Abort command (pid %li, Device %02i-%02i)\n",
 	    cmd->pid, cmd->device->id, cmd->device->lun);
 
-    /* First scan Query list */
-    if( pACB->QueryCnt )
-    {
-	struct scsi_cmnd_list *t, *pcmd_l;
-	list_for_each_entry_safe(pcmd_l, t, &pACB->cmdq, scp.list)
-		if( (struct scsi_cmnd*)pcmd_l == cmd )
-		{
-			/* Found: Dequeue */
-			list_del(&pcmd_l->scp.list);
-			pACB->QueryCnt--;
-			status = SCSI_ABORT_SUCCESS;
-			goto  ABO_X;
-		}
-    }
-	
     pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
     if( !pDCB ) goto  NOT_RUN;
 
@@ -1971,8 +1850,6 @@ void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index)
     pACB->pActiveDCB = NULL;
     pACB->pFreeSRB = pACB->SRB_array;
     pACB->SRBCount = MAX_SRB_CNT;
-    pACB->QueryCnt = 0;
-    INIT_LIST_HEAD(&pACB->cmdq);
     pACB->AdapterIndex = index;
     pACB->status = 0;
     psh->this_id = dc390_eepromBuf[index][EE_ADAPT_SCSI_ID];
@@ -2772,7 +2649,6 @@ int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
 {
   int dev, spd, spd1;
   char *pos = buffer;
-  struct scsi_cmnd_list *cl;
   PACB pACB;
   PDCB pDCB;
   DC390_AFLAGS;
@@ -2843,9 +2719,6 @@ int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
       SPRINTF ("      %02i\n", pDCB->MaxCommand);
       pDCB = pDCB->pNextDCB;
      }
-    SPRINTF ("Commands in Queues: Query: %li:", pACB->QueryCnt);
-    list_for_each_entry(cl, &pACB->cmdq, scp.list)
-	SPRINTF (" %li", ((struct scsi_cmnd*)cl)->pid);
     if (timer_pending(&pACB->Waiting_Timer)) SPRINTF ("Waiting queue timer running\n");
     else SPRINTF ("\n");
     pDCB = pACB->pLinkDCB;

@@ -1152,7 +1152,6 @@ dc390_Disconnect( PACB pACB )
 	    pSRB = psrb;
 	}
 	pDCB->pGoingSRB = 0;
-	dc390_Query_to_Waiting (pACB);
 	dc390_Waiting_process (pACB);
     }
     else
@@ -1634,7 +1633,6 @@ ckc_e:
     pcmd->scsi_done (pcmd);
     DC390_LOCK_ACB_NI;
 
-    dc390_Query_to_Waiting (pACB);
     dc390_Waiting_process (pACB);
     return;
 }
@@ -1681,7 +1679,6 @@ dc390_DoingSRB_Done( PACB pACB, PSCSICMD cmd )
 	pdcb->TagMask = 0;
 	pdcb = pdcb->pNextDCB;
     } while( pdcb != pDCB );
-    dc390_Query_to_Waiting (pACB);
 }
 
 
