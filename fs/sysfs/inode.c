@@ -855,6 +855,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 }
 
 EXPORT_SYMBOL(sysfs_create_file);
+EXPORT_SYMBOL(sysfs_update_file);
 EXPORT_SYMBOL(sysfs_remove_file);
 EXPORT_SYMBOL(sysfs_create_link);
 EXPORT_SYMBOL(sysfs_remove_link);
