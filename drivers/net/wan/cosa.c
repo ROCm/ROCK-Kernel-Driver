@@ -642,11 +642,11 @@ static void sppp_channel_init(struct channel_data *chan)
 		return;
 	}
 	chan->pppdev.dev = d;
-	sppp_attach(&chan->pppdev);
 	d->base_addr = chan->cosa->datareg;
 	d->irq = chan->cosa->irq;
 	d->dma = chan->cosa->dma;
 	d->priv = chan;
+	sppp_attach(&chan->pppdev);
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(d);
