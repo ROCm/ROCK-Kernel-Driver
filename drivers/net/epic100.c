@@ -378,7 +378,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	int irq;
 	struct net_device *dev;
 	struct epic_private *ep;
-	int i, option = 0, duplex = 0;
+	int i, ret, option = 0, duplex = 0;
 	void *ring_space;
 	dma_addr_t ring_dma;
 
@@ -392,28 +392,32 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	
 	card_idx++;
 	
-	i = pci_enable_device(pdev);
-	if (i)
-		return i;
+	ret = pci_enable_device(pdev);
+	if (ret)
+		goto out;
 	irq = pdev->irq;
 
 	if (pci_resource_len(pdev, 0) < pci_id_tbl[chip_idx].io_size) {
 		printk (KERN_ERR "card %d: no PCI region space\n", card_idx);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err_out_disable;
 	}
 	
 	pci_set_master(pdev);
 
+	ret = pci_request_regions(pdev, DRV_NAME);
+	if (ret < 0)
+		goto err_out_disable;
+
+	ret = -ENOMEM;
+
 	dev = alloc_etherdev(sizeof (*ep));
 	if (!dev) {
 		printk (KERN_ERR "card %d: no memory for eth device\n", card_idx);
-		return -ENOMEM;
+		goto err_out_free_res;
 	}
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
-
-	if (pci_request_regions(pdev, DRV_NAME))
-		goto err_out_free_netdev;
 
 #ifdef USE_IO_OPS
 	ioaddr = pci_resource_start (pdev, 0);
@@ -422,7 +426,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	ioaddr = (long) ioremap (ioaddr, pci_resource_len (pdev, 1));
 	if (!ioaddr) {
 		printk (KERN_ERR DRV_NAME " %d: ioremap failed\n", card_idx);
-		goto err_out_free_res;
+		goto err_out_free_netdev;
 	}
 #endif
 
@@ -544,9 +548,9 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->tx_timeout = &epic_tx_timeout;
 
-	i = register_netdev(dev);
-	if (i)
-		goto err_out_unmap_tx;
+	ret = register_netdev(dev);
+	if (ret < 0)
+		goto err_out_unmap_rx;
 
 	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ",
 		   dev->name, pci_id_tbl[chip_idx].name, ioaddr, dev->irq);
@@ -554,19 +558,24 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 		printk("%2.2x:", dev->dev_addr[i]);
 	printk("%2.2x.\n", dev->dev_addr[i]);
 
-	return 0;
+out:
+	return ret;
 
+err_out_unmap_rx:
+	pci_free_consistent(pdev, RX_TOTAL_SIZE, ep->rx_ring, ep->rx_ring_dma);
 err_out_unmap_tx:
 	pci_free_consistent(pdev, TX_TOTAL_SIZE, ep->tx_ring, ep->tx_ring_dma);
 err_out_iounmap:
 #ifndef USE_IO_OPS
 	iounmap(ioaddr);
-err_out_free_res:
-#endif
-	pci_release_regions(pdev);
 err_out_free_netdev:
+#endif
 	free_netdev(dev);
-	return -ENODEV;
+err_out_free_res:
+	pci_release_regions(pdev);
+err_out_disable:
+	pci_disable_device(pdev);
+	goto out;
 }
 
 /* Serial EEPROM section. */
@@ -591,6 +600,13 @@ err_out_free_netdev:
 #define EE_READ64_CMD	(6 << 6)
 #define EE_READ256_CMD	(6 << 8)
 #define EE_ERASE_CMD	(7 << 6)
+
+static void epic_disable_int(struct net_device *dev, struct epic_private *ep)
+{
+	long ioaddr = dev->base_addr;
+
+	outl(0x00000000, ioaddr + INTMASK);
+}
 
 static int __devinit read_eeprom(long ioaddr, int location)
 {
@@ -1276,8 +1292,12 @@ static int epic_close(struct net_device *dev)
 			   dev->name, (int)inl(ioaddr + INTSTAT));
 
 	del_timer_sync(&ep->timer);
-	epic_pause(dev);
+
+	epic_disable_int(dev, ep);
+
 	free_irq(dev->irq, dev);
+
+	epic_pause(dev);
 
 	/* Free all the skbuffs in the Rx queue. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
@@ -1476,6 +1496,7 @@ static void __devexit epic_remove_one (struct pci_dev *pdev)
 #endif
 	pci_release_regions(pdev);
 	free_netdev(dev);
+	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 	/* pci_power_off(pdev, -1); */
 }
