@@ -303,33 +303,8 @@ dch_bh(void *data)
 static void 
 dch_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u8 *ptr;
-
-	if ((cs->debug &L1_DEB_ISAC) && !(cs->debug &L1_DEB_ISAC_FIFO))
-		debugl1(cs, "dch_empty_fifo()");
-
-  // message too large, remove
-	if ((cs->rcvidx + count) >= MAX_DFRAME_LEN_L1) {
-		if (cs->debug &L1_DEB_WARN)
-			debugl1(cs, "dch_empty_fifo() incoming message too large");
-	  ipacx_write_reg(cs, IPACX_CMDRD, 0x80); // RMC
-		cs->rcvidx = 0;
-		return;
-	}
-  
-	ptr = cs->rcvbuf + cs->rcvidx;
-	cs->rcvidx += count;
-  
-	ipacx_read_fifo(cs, ptr, count);
+	recv_empty_fifo_d(cs, count);
 	ipacx_write_reg(cs, IPACX_CMDRD, 0x80); // RMC
-  
-	if (cs->debug &L1_DEB_ISAC_FIFO) {
-		char *t = cs->dlog;
-
-		t += sprintf(t, "dch_empty_fifo() cnt %d", count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, cs->dlog);
-	}
 }
 
 //----------------------------------------------------------
@@ -370,7 +345,6 @@ dch_fill_fifo(struct IsdnCardState *cs)
 static inline void 
 dch_int(struct IsdnCardState *cs)
 {
-	struct sk_buff *skb;
 	u8 istad, rstad;
 	int count;
 
@@ -381,32 +355,25 @@ dch_int(struct IsdnCardState *cs)
 		if ((rstad &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstad &0x80))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "dch_int(): invalid frame");
+					debugl1(cs, "dch_int(): invalid frame");
 			if ((rstad &0x40))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "dch_int(): RDO");
+					debugl1(cs, "dch_int(): RDO");
 			if (!(rstad &0x20))
 				if (cs->debug &L1_DEB_WARN) 
-          debugl1(cs, "dch_int(): CRC error");
-	    ipacx_write_reg(cs, IPACX_CMDRD, 0x80);  // RMC
+					debugl1(cs, "dch_int(): CRC error");
+			ipacx_write_reg(cs, IPACX_CMDRD, 0x80);  // RMC
+			cs->rcvidx = 0;
 		} else {  // received frame ok
 			count = ipacx_read_reg(cs, IPACX_RBCLD);
-      if (count) count--; // RSTAB is last byte
+			// FIXME this looks flaky
+			if (count) count--; // RSTAB is last byte
 			count &= D_FIFO_SIZE-1;
-			if (count == 0) count = D_FIFO_SIZE;
+			if (count == 0)
+				count = D_FIFO_SIZE;
 			dch_empty_fifo(cs, count);
-			if ((count = cs->rcvidx) > 0) {
-	      cs->rcvidx = 0;
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "HiSax dch_int(): receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), cs->rcvbuf, count);
-					skb_queue_tail(&cs->rq, skb);
-				}
-			}
-    }
-	  cs->rcvidx = 0;
-		sched_d_event(cs, D_RCVBUFREADY);
+			recv_rme_d(cs);
+		}
 	}
 
 	if (istad &0x40) {  // RPF

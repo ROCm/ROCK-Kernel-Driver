@@ -415,18 +415,46 @@ xmit_fill_fifo_d(struct IsdnCardState *cs, int fifo_size, int *count, int *more)
 }
 
 static inline void
+recv_empty_fifo_d(struct IsdnCardState *cs, int count)
+{
+	u8 *p;
+
+	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
+		debugl1(cs, __FUNCTION__);
+
+	if (cs->rcvidx + count > MAX_DFRAME_LEN_L1) {
+		if (cs->debug & L1_DEB_WARN)
+			debugl1(cs, "%s: incoming packet too large", __FUNCTION__);
+		cs->rcvidx = 0;
+		return;
+	}
+	p = cs->rcvbuf + cs->rcvidx;
+	cs->rcvidx += count;
+	cs->dc_hw_ops->read_fifo(cs, p, count);
+
+	if (cs->debug & L1_DEB_ISAC_FIFO) {
+		char *t = cs->dlog;
+
+		t += sprintf(t, "%s cnt %d", __FUNCTION__, count);
+		QuickHex(t, p, count);
+		debugl1(cs, cs->dlog);
+	}
+}
+
+static inline void
 recv_empty_fifo_b(struct BCState *bcs, int count)
 {
 	u8 *p;
 	struct IsdnCardState *cs = bcs->cs;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hscx_empty_fifo");
+		debugl1(cs, __FUNCTION__);
 
 	if (bcs->rcvidx + count > HSCX_BUFMAX) {
 		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "hscx_empty_fifo: incoming packet too large");
+			debugl1(cs, "%s: incoming packet too large", __FUNCTION__);
 		bcs->rcvidx = 0;
+		return;
 	}
 	p = bcs->rcvbuf + bcs->rcvidx;
 	bcs->rcvidx += count;
@@ -440,6 +468,28 @@ recv_empty_fifo_b(struct BCState *bcs, int count)
 		QuickHex(t, p, count);
 		debugl1(cs, bcs->blog);
 	}
+}
+
+/* RME - receive message end */
+static inline void
+recv_rme_d(struct IsdnCardState *cs)
+{
+	struct sk_buff *skb;
+	int count;
+
+	count = cs->rcvidx - 1;
+	cs->rcvidx = 0;
+	if (count == 0)
+		return;
+
+	skb = dev_alloc_skb(count);
+	if (!skb) {
+		printk(KERN_WARNING "HiSax: %s: out of memory\n", __FUNCTION__);
+		return;
+	}
+	memcpy(skb_put(skb, count), cs->rcvbuf, count);
+	skb_queue_tail(&cs->rq, skb);
+	sched_d_event(cs, D_RCVBUFREADY);
 }
 
 static inline void
@@ -467,6 +517,7 @@ recv_rme_b(struct BCState *bcs)
 	sched_b_event(bcs, B_RCVBUFREADY);
 }
 
+/* RPF - receive pull full */
 static inline void
 recv_rpf_b(struct BCState *bcs)
 {
