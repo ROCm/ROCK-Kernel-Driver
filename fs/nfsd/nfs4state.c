@@ -1302,6 +1302,18 @@ nfs4_upgrade_open(struct svc_rqst *rqstp, struct svc_fh *cur_fh, struct nfs4_sta
 		status = get_write_access(inode);
 		if (status)
 			return nfserrno(status);
+		if (open->op_truncate) {
+			struct iattr iattr = {
+				.ia_valid = ATTR_SIZE,
+				.ia_size = 0,
+			};
+			status = nfsd_setattr(rqstp, cur_fh, &iattr, 0,
+					(time_t)0);
+			if (status) {
+				put_write_access(inode);
+				return status;
+			}
+		}
 
 		/* remember the open */
 		filp->f_mode = (filp->f_mode | FMODE_WRITE) & ~FMODE_READ;
@@ -1332,7 +1344,6 @@ nfs4_set_claim_prev(struct nfsd4_open *open, int *status)
 int
 nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
-	struct iattr iattr;
 	struct nfs4_stateowner *sop = open->op_stateowner;
 	struct nfs4_file *fp = NULL;
 	struct inode *ino;
@@ -1383,18 +1394,23 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 		if ((status = nfs4_new_open(rqstp, &stp, current_fh, flags)))
 			goto out;
 		init_stateid(stp, fp, sop, open);
+		if (open->op_truncate) {
+			struct iattr iattr = {
+				.ia_valid = ATTR_SIZE,
+				.ia_size = 0,
+			};
+			status = nfsd_setattr(rqstp, current_fh, &iattr, 0,
+					(time_t)0);
+			if (status) {
+				release_stateid(stp, OPEN_STATE);
+				goto out;
+			}
+		}
 	}
 	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n",
 	            stp->st_stateid.si_boot, stp->st_stateid.si_stateownerid,
 	            stp->st_stateid.si_fileid, stp->st_stateid.si_generation);
 
-	if (open->op_truncate) {
-		iattr.ia_valid = ATTR_SIZE;
-		iattr.ia_size = 0;
-		status = nfsd_setattr(rqstp, current_fh, &iattr, 0, (time_t)0);
-		if (status)
-			goto out;
-	}
 	memcpy(&open->op_stateid, &stp->st_stateid, sizeof(stateid_t));
 
 	open->op_delegate_type = NFS4_OPEN_DELEGATE_NONE;
