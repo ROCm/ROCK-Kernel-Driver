@@ -235,36 +235,42 @@ typedef struct {
 do { \
 	preempt_disable(); \
 	_raw_spin_lock(lock); \
+	__acquire(lock); \
 } while(0)
 
 #define _write_lock(lock) \
 do { \
 	preempt_disable(); \
 	_raw_write_lock(lock); \
+	__acquire(lock); \
 } while(0)
  
 #define _read_lock(lock)	\
 do { \
 	preempt_disable(); \
 	_raw_read_lock(lock); \
+	__acquire(lock); \
 } while(0)
 
 #define _spin_unlock(lock) \
 do { \
 	_raw_spin_unlock(lock); \
 	preempt_enable(); \
+	__release(lock); \
 } while (0)
 
 #define _write_unlock(lock) \
 do { \
 	_raw_write_unlock(lock); \
 	preempt_enable(); \
+	__release(lock); \
 } while(0)
 
 #define _read_unlock(lock) \
 do { \
 	_raw_read_unlock(lock); \
 	preempt_enable(); \
+	__release(lock); \
 } while(0)
 
 #define _spin_lock_irqsave(lock, flags) \
@@ -272,6 +278,7 @@ do {	\
 	local_irq_save(flags); \
 	preempt_disable(); \
 	_raw_spin_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _spin_lock_irq(lock) \
@@ -279,6 +286,7 @@ do { \
 	local_irq_disable(); \
 	preempt_disable(); \
 	_raw_spin_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _spin_lock_bh(lock) \
@@ -286,6 +294,7 @@ do { \
 	local_bh_disable(); \
 	preempt_disable(); \
 	_raw_spin_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _read_lock_irqsave(lock, flags) \
@@ -293,6 +302,7 @@ do {	\
 	local_irq_save(flags); \
 	preempt_disable(); \
 	_raw_read_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _read_lock_irq(lock) \
@@ -300,6 +310,7 @@ do { \
 	local_irq_disable(); \
 	preempt_disable(); \
 	_raw_read_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _read_lock_bh(lock) \
@@ -307,6 +318,7 @@ do { \
 	local_bh_disable(); \
 	preempt_disable(); \
 	_raw_read_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _write_lock_irqsave(lock, flags) \
@@ -314,6 +326,7 @@ do {	\
 	local_irq_save(flags); \
 	preempt_disable(); \
 	_raw_write_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _write_lock_irq(lock) \
@@ -321,6 +334,7 @@ do { \
 	local_irq_disable(); \
 	preempt_disable(); \
 	_raw_write_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _write_lock_bh(lock) \
@@ -328,6 +342,7 @@ do { \
 	local_bh_disable(); \
 	preempt_disable(); \
 	_raw_write_lock(lock); \
+	__acquire(lock); \
 } while (0)
 
 #define _spin_unlock_irqrestore(lock, flags) \
@@ -335,12 +350,7 @@ do { \
 	_raw_spin_unlock(lock); \
 	local_irq_restore(flags); \
 	preempt_enable(); \
-} while (0)
-
-#define _raw_spin_unlock_irqrestore(lock, flags) \
-do { \
-	_raw_spin_unlock(lock); \
-	local_irq_restore(flags); \
+	__release(lock); \
 } while (0)
 
 #define _spin_unlock_irq(lock) \
@@ -348,6 +358,7 @@ do { \
 	_raw_spin_unlock(lock); \
 	local_irq_enable(); \
 	preempt_enable(); \
+	__release(lock); \
 } while (0)
 
 #define _spin_unlock_bh(lock) \
@@ -355,6 +366,7 @@ do { \
 	_raw_spin_unlock(lock); \
 	preempt_enable(); \
 	local_bh_enable(); \
+	__release(lock); \
 } while (0)
 
 #define _write_unlock_bh(lock) \
@@ -362,6 +374,7 @@ do { \
 	_raw_write_unlock(lock); \
 	preempt_enable(); \
 	local_bh_enable(); \
+	__release(lock); \
 } while (0)
 
 #define _read_unlock_irqrestore(lock, flags) \
@@ -369,6 +382,7 @@ do { \
 	_raw_read_unlock(lock); \
 	local_irq_restore(flags); \
 	preempt_enable(); \
+	__release(lock); \
 } while (0)
 
 #define _write_unlock_irqrestore(lock, flags) \
@@ -376,6 +390,7 @@ do { \
 	_raw_write_unlock(lock); \
 	local_irq_restore(flags); \
 	preempt_enable(); \
+	__release(lock); \
 } while (0)
 
 #define _read_unlock_irq(lock)	\
@@ -383,6 +398,7 @@ do { \
 	_raw_read_unlock(lock);	\
 	local_irq_enable();	\
 	preempt_enable();	\
+	__release(lock); \
 } while (0)
 
 #define _read_unlock_bh(lock)	\
@@ -390,6 +406,7 @@ do { \
 	_raw_read_unlock(lock);	\
 	local_bh_enable();	\
 	preempt_enable();	\
+	__release(lock); \
 } while (0)
 
 #define _write_unlock_irq(lock)	\
@@ -397,6 +414,7 @@ do { \
 	_raw_write_unlock(lock);	\
 	local_irq_enable();	\
 	preempt_enable();	\
+	__release(lock); \
 } while (0)
 
 #endif /* !SMP */

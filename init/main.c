@@ -441,6 +441,7 @@ static void __init smp_init(void)
  */
 
 static void noinline rest_init(void)
+	__releases(kernel_lock)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
