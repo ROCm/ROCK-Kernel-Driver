@@ -179,8 +179,13 @@ repeat:
 			spin_unlock(&old_base->lock);
 			goto repeat;
 		}
-	} else
+	} else {
 		spin_lock(&new_base->lock);
+		if (timer->base != old_base) {
+			spin_unlock(&new_base->lock);
+			goto repeat;
+		}
+	}
 
 	/*
 	 * Delete the previous timeout (if there was any), and install
