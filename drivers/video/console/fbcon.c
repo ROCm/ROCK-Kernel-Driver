@@ -1160,10 +1160,11 @@ static __inline__ void ypan_up(struct vc_data *vc, int count)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
-	
+	struct fbcon_ops *ops = (struct fbcon_ops *) info->fbcon_par;
+
 	p->yscroll += count;
 	if (p->yscroll > p->vrows - vc->vc_rows) {
-		fbcon_bmove(vc, p->vrows - vc->vc_rows,
+		ops->bmove(vc, info, p->vrows - vc->vc_rows,
 			    0, 0, 0, vc->vc_rows, vc->vc_cols);
 		p->yscroll -= p->vrows - vc->vc_rows;
 	}
@@ -1207,10 +1208,11 @@ static __inline__ void ypan_down(struct vc_data *vc, int count)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
+	struct fbcon_ops *ops = (struct fbcon_ops *) info->fbcon_par;
 	
 	p->yscroll -= count;
 	if (p->yscroll < 0) {
-		fbcon_bmove(vc, 0, 0, p->vrows - vc->vc_rows,
+		ops->bmove(vc, info, 0, 0, p->vrows - vc->vc_rows,
 			    0, vc->vc_rows, vc->vc_cols);
 		p->yscroll += p->vrows - vc->vc_rows;
 	}
@@ -1461,6 +1463,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
+	struct fbcon_ops *ops = (struct fbcon_ops *) info->fbcon_par;
 	int scroll_partial = info->flags & FBINFO_PARTIAL_PAN_OK;
 
 	if (!info->fbops->fb_blank && console_blanked)
@@ -1487,10 +1490,10 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 			goto redraw_up;
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
-			fbcon_bmove(vc, t + count, 0, t, 0,
+			ops->bmove(vc, info, t + count, 0, t, 0,
 				    b - t - count, vc->vc_cols);
-			fbcon_clear(vc, b - count, 0, count,
-					 vc->vc_cols);
+			ops->clear(vc, info, b - count, 0, count,
+				  vc->vc_cols);
 			break;
 
 		case SCROLL_WRAP_MOVE:
@@ -1571,9 +1574,9 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 			count = vc->vc_rows;
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
-			fbcon_bmove(vc, t, 0, t + count, 0,
+			ops->bmove(vc, info, t, 0, t + count, 0,
 				    b - t - count, vc->vc_cols);
-			fbcon_clear(vc, t, 0, count, vc->vc_cols);
+			ops->clear(vc, info, t, 0, count, vc->vc_cols);
 			break;
 
 		case SCROLL_WRAP_MOVE:
@@ -1948,6 +1951,7 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	}
 
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
+	info->cursor.flash = (!blank);
 
 	if (!info->fbops->fb_blank) {
 		if (blank) {
