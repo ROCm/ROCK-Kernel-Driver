@@ -2643,7 +2643,7 @@ int register_netdevice(struct net_device *dev)
 	ASSERT_RTNL();
 
 	/* When net_device's are persistent, this will be fatal. */
-	WARN_ON(dev->reg_state != NETREG_UNINITIALIZED);
+	BUG_ON(dev->reg_state != NETREG_UNINITIALIZED);
 
 	spin_lock_init(&dev->queue_lock);
 	spin_lock_init(&dev->xmit_lock);
@@ -2788,6 +2788,8 @@ static void netdev_wait_allrefs(struct net_device *dev)
  *	unregister_netdevice(y2);
  *      ...
  *	rtnl_unlock();
+ *	free_netdev(y1);
+ *	free_netdev(y2);
  *
  * We are invoked by rtnl_unlock() after it drops the semaphore.
  * This allows us to deal with problems:
@@ -2827,7 +2829,7 @@ void netdev_run_todo(void)
 			break;
 
 		case NETREG_UNREGISTERING:
-			class_device_unregister(&dev->class_dev);
+			class_device_del(&dev->class_dev);
 			dev->reg_state = NETREG_UNREGISTERED;
 
 			netdev_wait_allrefs(dev);
@@ -2856,6 +2858,29 @@ void netdev_run_todo(void)
 	up(&net_todo_run_mutex);
 }
 
+/**
+ *	free_netdev - free network device
+ *	@dev: device
+ *
+ *	This function does the last stage of destroying an allocated device 
+ * 	interface. The reference to the device object is released.  
+ *	If this is the last reference then it will be freed.
+ */
+void free_netdev(struct net_device *dev)
+{
+	/*  Compatiablity with error handling in drivers */
+	if (dev->reg_state == NETREG_UNINITIALIZED) {
+		kfree(dev);
+		return;
+	}
+
+	BUG_ON(dev->reg_state != NETREG_UNREGISTERED);
+	dev->reg_state = NETREG_RELEASED;
+
+	/* will free via class release */
+	class_device_put(&dev->class_dev);
+}
+ 
 /* Synchronize with packet receive processing. */
 void synchronize_net(void) 
 {
