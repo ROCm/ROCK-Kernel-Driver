@@ -115,6 +115,15 @@ extern const struct fp_ext fp_Inf;
 	__res;							\
 })
 
+#define fp_conv_long2ext(dest, src) ({				\
+	register struct fp_ext *__dest asm ("a0") = dest;	\
+	register int __src asm ("d0") = src;			\
+								\
+	asm volatile ("jsr fp_conv_ext2long"			\
+			: : "d" (__src), "a" (__dest)		\
+			: "a1", "d1", "d2", "memory");		\
+})
+
 #else /* __ASSEMBLY__ */
 
 /*
