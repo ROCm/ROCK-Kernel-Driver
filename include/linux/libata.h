@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>
 #include <asm/io.h>
 #include <linux/ata.h>
+#include <linux/workqueue.h>
 
 /*
  * compile-time options
@@ -113,9 +114,6 @@ enum {
 	ATA_QCFLAG_SG		= (1 << 4), /* have s/g table? */
 	ATA_QCFLAG_POLL		= (1 << 5), /* polling, no interrupts */
 
-	/* struct ata_engine atomic flags (use test_bit, etc.) */
-	ATA_EFLG_ACTIVE		= 0,	/* engine is active */
-
 	/* various lengths of time */
 	ATA_TMOUT_EDD		= 5 * HZ,	/* hueristic */
 	ATA_TMOUT_PIO		= 30 * HZ,
@@ -144,13 +142,6 @@ enum {
 	THR_IDLE		= (THR_PROBE_FAILED + 1),
 	THR_PROBE_SUCCESS	= (THR_IDLE + 1),
 	THR_PROBE_START		= (THR_PROBE_SUCCESS + 1),
-	THR_PIO_POLL		= (THR_PROBE_START + 1),
-	THR_PIO_TMOUT		= (THR_PIO_POLL + 1),
-	THR_PIO			= (THR_PIO_TMOUT + 1),
-	THR_PIO_LAST		= (THR_PIO + 1),
-	THR_PIO_LAST_POLL	= (THR_PIO_LAST + 1),
-	THR_PIO_ERR		= (THR_PIO_LAST_POLL + 1),
-	THR_PACKET		= (THR_PIO_ERR + 1),
 
 	/* SATA port states */
 	PORT_UNKNOWN		= 0,
@@ -161,6 +152,17 @@ enum {
 	 * but not numberspace
 	 */
 	ATA_QCFLAG_TIMEOUT	= (1 << 0),
+};
+
+enum pio_task_states {
+	PIO_ST_UNKNOWN,
+	PIO_ST_IDLE,
+	PIO_ST_POLL,
+	PIO_ST_TMOUT,
+	PIO_ST,
+	PIO_ST_LAST,
+	PIO_ST_LAST_POLL,
+	PIO_ST_ERR,
 };
 
 /* forward declarations */
@@ -224,7 +226,6 @@ struct ata_queued_cmd {
 	struct scsi_cmnd	*scsicmd;
 	void			(*scsidone)(struct scsi_cmnd *);
 
-	struct list_head	node;
 	unsigned long		flags;		/* ATA_QCFLAG_xxx */
 	unsigned int		tag;
 	unsigned int		n_elem;
@@ -239,7 +240,7 @@ struct ata_queued_cmd {
 
 	ata_qc_cb_t		callback;
 
-	struct semaphore	sem;
+	struct completion	*waiting;
 
 	void			*private_data;
 };
@@ -271,11 +272,6 @@ struct ata_device {
 	u8			write_cmd;	/* opcode to use on write */
 };
 
-struct ata_engine {
-	unsigned long		flags;
-	struct list_head	q;
-};
-
 struct ata_port {
 	struct Scsi_Host	*host;	/* our co-allocated scsi host */
 	struct ata_port_operations	*ops;
@@ -296,8 +292,6 @@ struct ata_port {
 	unsigned int		udma_mask;
 	unsigned int		cbl;	/* cable type; ATA_CBL_xxx */
 
-	struct ata_engine	eng;
-
 	struct ata_device	device[ATA_MAX_DEVICES];
 
 	struct ata_queued_cmd	qcmd[ATA_MAX_QUEUE];
@@ -307,16 +301,17 @@ struct ata_port {
 	struct ata_host_stats	stats;
 	struct ata_host_set	*host_set;
 
-	struct semaphore	sem;
 	struct semaphore	probe_sem;
 
 	unsigned int		thr_state;
-	int			time_to_die;
-	pid_t			thr_pid;
-	struct completion	thr_exited;
-	struct semaphore	thr_sem;
-	struct timer_list	thr_timer;
-	unsigned long		thr_timeout;
+
+	struct work_struct	packet_task;
+
+	struct work_struct	pio_task;
+	unsigned int		pio_task_state;
+	unsigned long		pio_task_timeout;
+
+	struct work_struct	probe_task;
 
 	void			*private_data;
 };
@@ -392,6 +387,8 @@ extern void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_tf_read_pio(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf);
+extern void ata_tf_to_fis(struct ata_taskfile *tf, u8 *fis, u8 pmp);
+extern void ata_tf_from_fis(u8 *fis, struct ata_taskfile *tf);
 extern u8 ata_check_status_pio(struct ata_port *ap);
 extern u8 ata_check_status_mmio(struct ata_port *ap);
 extern void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf);
