@@ -1047,8 +1047,6 @@ void __exit i8042_exit(void)
 		sysdev_class_unregister(&kbc_sysclass);
 	}
 
-	del_timer_sync(&i8042_timer);
-
 	i8042_controller_cleanup();
 
 	if (i8042_kbd_values.exists)
@@ -1061,6 +1059,7 @@ void __exit i8042_exit(void)
 		if (i8042_mux_values[i].exists)
 			serio_unregister_port(i8042_mux_port + i);
 
+	del_timer_sync(&i8042_timer);
 	tasklet_kill(&i8042_tasklet);
 
 	i8042_platform_exit();
