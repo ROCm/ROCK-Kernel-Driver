@@ -600,8 +600,9 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 			BUG();	/* No I/O resource for this PHB? */
 
 		if (request_resource(&ioport_resource, res))
-			printk(KERN_ERR "Failed to request IO"
-					"on hose %d\n", 0 /* FIXME */);
+			printk(KERN_ERR "Failed to request IO on "
+					"PCI domain %d\n", pci_domain_nr(bus));
+
 
 		for (i = 0; i < 3; ++i) {
 			res = &hose->mem_resources[i];
@@ -609,8 +610,9 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 				BUG();	/* No memory resource for this PHB? */
 			bus->resource[i+1] = res;
 			if (res->flags && request_resource(&iomem_resource, res))
-				printk(KERN_ERR "Failed to request MEM"
-						"on hose %d\n", 0 /* FIXME */);
+				printk(KERN_ERR "Failed to request MEM on "
+						"PCI domain %d\n",
+						pci_domain_nr(bus));
 		}
 	} else if (pci_probe_only &&
 		   (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
