@@ -54,6 +54,12 @@ extern __u32 sysctl_rmem_max;
 #include <linux/mroute.h>
 #include <linux/igmp.h>
 #include <net/xfrm.h>
+#if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
+#include <net/ah.h>
+#endif
+#if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
+#include <net/esp.h>
+#endif
 
 extern struct net_proto_family inet_family_ops;
 
