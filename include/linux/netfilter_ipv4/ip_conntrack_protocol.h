@@ -45,6 +45,10 @@ struct ip_conntrack_protocol
 	/* Called when a conntrack entry is destroyed */
 	void (*destroy)(struct ip_conntrack *conntrack);
 
+	/* Has to decide if a expectation matches one packet or not */
+	int (*exp_matches_pkt)(struct ip_conntrack_expect *exp,
+			       struct sk_buff **pskb);
+
 	/* Module (if any) which this is connected to. */
 	struct module *me;
 };

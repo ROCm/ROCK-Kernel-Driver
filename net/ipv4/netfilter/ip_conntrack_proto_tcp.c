@@ -7,6 +7,9 @@
 #include <linux/in.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
+
+#include <net/tcp.h>
+
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 #include <linux/netfilter_ipv4/ip_conntrack_protocol.h>
 #include <linux/netfilter_ipv4/lockhelp.h>
@@ -227,7 +230,19 @@ static int tcp_new(struct ip_conntrack *conntrack,
 	return 1;
 }
 
+static int tcp_exp_matches_pkt(struct ip_conntrack_expect *exp,
+			       struct sk_buff **pskb)
+{
+	struct iphdr *iph = (*pskb)->nh.iph;
+	struct tcphdr *tcph = (struct tcphdr *)((u_int32_t *)iph + iph->ihl);
+	unsigned int datalen;
+
+	datalen = (*pskb)->len - iph->ihl*4 - tcph->doff*4;
+
+	return between(exp->seq, ntohl(tcph->seq), ntohl(tcph->seq) + datalen);
+}
+
 struct ip_conntrack_protocol ip_conntrack_protocol_tcp
 = { { NULL, NULL }, IPPROTO_TCP, "tcp",
     tcp_pkt_to_tuple, tcp_invert_tuple, tcp_print_tuple, tcp_print_conntrack,
-    tcp_packet, tcp_new, NULL, NULL };
+    tcp_packet, tcp_new, NULL, tcp_exp_matches_pkt, NULL };
