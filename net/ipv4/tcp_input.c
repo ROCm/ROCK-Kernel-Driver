@@ -463,6 +463,8 @@ void tcp_rcv_space_adjust(struct sock *sk)
 		tp->rcvq_space.space = space;
 
 		if (sysctl_tcp_moderate_rcvbuf) {
+			int new_clamp = space;
+
 			/* Receive space grows, normalize in order to
 			 * take into account packet headers and sk_buff
 			 * structure overhead.
@@ -472,10 +474,16 @@ void tcp_rcv_space_adjust(struct sock *sk)
 				space = 1;
 			rcvmem = (tp->advmss + MAX_TCP_HEADER +
 				  16 + sizeof(struct sk_buff));
+			while (tcp_win_from_space(rcvmem) < tp->advmss)
+				rcvmem += 128;
 			space *= rcvmem;
 			space = min(space, sysctl_tcp_rmem[2]);
-			if (space > sk->sk_rcvbuf)
+			if (space > sk->sk_rcvbuf) {
 				sk->sk_rcvbuf = space;
+
+				/* Make the window clamp follow along.  */
+				tp->window_clamp = new_clamp;
+			}
 		}
 	}
 	
