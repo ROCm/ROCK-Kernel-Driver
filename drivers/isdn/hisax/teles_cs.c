@@ -1,42 +1,23 @@
+/* $Id: teles_cs.c,v 1.1.2.2 2004/01/25 15:07:06 keil Exp $ */
 /*======================================================================
 
-    An elsa_cs PCMCIA client driver
+    A teles S0 PCMCIA client driver
 
-    This driver is for the Elsa PCM ISDN Cards, i.e. the MicroLink
+    Based on skeleton by David Hinds, dhinds@allegro.stanford.edu
+    Written by Christof Petig, christof.petig@wtal.de
+    
+    Also inspired by ELSA PCMCIA driver 
+    by Klaus Lichtenwalder <Lichtenwalder@ACM.org>
+    
+    Extentions to new hisax_pcmcia by Karsten Keil
 
-
-    The contents of this file are subject to the Mozilla Public
-    License Version 1.1 (the "License"); you may not use this file
-    except in compliance with the License. You may obtain a copy of
-    the License at http://www.mozilla.org/MPL/
-
-    Software distributed under the License is distributed on an "AS
-    IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-    implied. See the License for the specific language governing
-    rights and limitations under the License.
-
-    The initial developer of the original code is David A. Hinds
-    <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
-    are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
-
-    Modifications from dummy_cs.c are Copyright (C) 1999-2001 Klaus
-    Lichtenwalder <Lichtenwalder@ACM.org>. All Rights Reserved.
-
-    Alternatively, the contents of this file may be used under the
-    terms of the GNU General Public License version 2 (the "GPL"), in
-    which case the provisions of the GPL are applicable instead of the
-    above.  If you wish to allow the use of your version of this file
-    only under the terms of the GPL and not to allow others to use
-    your version of this file under the MPL, indicate your decision
-    by deleting the provisions above and replace them with the notice
-    and other provisions required by the GPL.  If you do not delete
-    the provisions above, a recipient may use your version of this
-    file under either the MPL or the GPL.
+    minor changes to be compatible with kernel 2.4.x
+    by Jan.Schubert@GMX.li
 
 ======================================================================*/
 
-#include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
@@ -55,9 +36,9 @@
 #include <pcmcia/ds.h>
 #include "hisax_cfg.h"
 
-MODULE_DESCRIPTION("ISDN4Linux: PCMCIA client driver for Elsa PCM cards");
-MODULE_AUTHOR("Klaus Lichtenwalder");
-MODULE_LICENSE("Dual MPL/GPL");
+MODULE_DESCRIPTION("ISDN4Linux: PCMCIA client driver for Teles PCMCIA cards");
+MODULE_AUTHOR("Christof Petig, christof.petig@wtal.de, Karsten Keil, kkeil@suse.de");
+MODULE_LICENSE("GPL");
 
 /*
    All the PCMCIA modules use PCMCIA_DEBUG to control debugging.  If
@@ -72,7 +53,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 static char *version =
-"elsa_cs.c $Revision: 1.2.2.4 $ $Date: 2004/01/25 15:07:06 $ (K.Lichtenwalder)";
+"teles_cs.c 2.10 2002/07/30 22:23:34 kkeil";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -101,13 +82,13 @@ MODULE_PARM(protocol, "i");
    It will be called by Card Services when an appropriate card status
    event is received.  The config() and release() entry points are
    used to configure or release a socket, in response to card insertion
-   and ejection events.  They are invoked from the elsa_cs event
+   and ejection events.  They are invoked from the teles_cs event
    handler.
 */
 
-static void elsa_cs_config(dev_link_t *link);
-static void elsa_cs_release(dev_link_t *link);
-static int elsa_cs_event(event_t event, int priority,
+static void teles_cs_config(dev_link_t *link);
+static void teles_cs_release(dev_link_t *link);
+static int teles_cs_event(event_t event, int priority,
                           event_callback_args_t *args);
 
 /*
@@ -116,8 +97,8 @@ static int elsa_cs_event(event_t event, int priority,
    needed to manage one actual PCMCIA card.
 */
 
-static dev_link_t *elsa_cs_attach(void);
-static void elsa_cs_detach(dev_link_t *);
+static dev_link_t *teles_attach(void);
+static void teles_detach(dev_link_t *);
 
 /*
    The dev_info variable is the "key" that is used to match up this
@@ -125,10 +106,10 @@ static void elsa_cs_detach(dev_link_t *);
    database.
 */
 
-static dev_info_t dev_info = "elsa_cs";
+static dev_info_t dev_info = "teles_cs";
 
 /*
-   A linked list of "instances" of the elsa_cs device.  Each actual
+   A linked list of "instances" of the teles_cs device.  Each actual
    PCMCIA card corresponds to one device instance, and is described
    by one dev_link_t structure (defined in ds.h).
 
@@ -172,7 +153,7 @@ typedef struct local_info_t {
 
 /*======================================================================
 
-    elsa_cs_attach() creates an "instance" of the driver, allocatingx
+    teles_attach() creates an "instance" of the driver, allocatingx
     local data structures for one device.  The device is registered
     with Card Services.
 
@@ -182,14 +163,14 @@ typedef struct local_info_t {
 
 ======================================================================*/
 
-static dev_link_t *elsa_cs_attach(void)
+static dev_link_t *teles_attach(void)
 {
     client_reg_t client_reg;
     dev_link_t *link;
     local_info_t *local;
     int ret, i;
 
-    DEBUG(0, "elsa_cs_attach()\n");
+    DEBUG(0, "teles_attach()\n");
 
     /* Allocate space for private device-specific data */
     local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
@@ -215,9 +196,9 @@ static dev_link_t *elsa_cs_attach(void)
       and attributes of IO windows) are fixed by the nature of the
       device, and can be hard-wired here.
     */
-    link->io.NumPorts1 = 8;
+    link->io.NumPorts1 = 96;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
-    link->io.IOAddrLines = 3;
+    link->io.IOAddrLines = 5;
 
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;
@@ -232,18 +213,18 @@ static dev_link_t *elsa_cs_attach(void)
         CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
         CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
         CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
-    client_reg.event_handler = &elsa_cs_event;
+    client_reg.event_handler = &teles_cs_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
     ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != CS_SUCCESS) {
         cs_error(link->handle, RegisterClient, ret);
-        elsa_cs_detach(link);
+        teles_detach(link);
         return NULL;
     }
 
     return link;
-} /* elsa_cs_attach */
+} /* teles_attach */
 
 /*======================================================================
 
@@ -254,13 +235,13 @@ static dev_link_t *elsa_cs_attach(void)
 
 ======================================================================*/
 
-static void elsa_cs_detach(dev_link_t *link)
+static void teles_detach(dev_link_t *link)
 {
     dev_link_t **linkp;
     local_info_t *info = link->priv;
     int ret;
 
-    DEBUG(0, "elsa_cs_detach(0x%p)\n", link);
+    DEBUG(0, "teles_detach(0x%p)\n", link);
 
     /* Locate device structure */
     for (linkp = &dev_list; *linkp; linkp = &(*linkp)->next)
@@ -269,7 +250,7 @@ static void elsa_cs_detach(dev_link_t *link)
         return;
 
     if (link->state & DEV_CONFIG)
-        elsa_cs_release(link);
+        teles_cs_release(link);
 
     /*
        If the device is currently configured and active, we won't
@@ -278,7 +259,7 @@ static void elsa_cs_detach(dev_link_t *link)
        detach().
     */
     if (link->state & DEV_CONFIG) {
-      DEBUG(0, "elsa_cs: detach postponed, '%s' "
+      DEBUG(0, "teles_cs: detach postponed, '%s' "
                "still locked\n", link->dev->dev_name);
         link->state |= DEV_STALE_LINK;
         return;
@@ -295,11 +276,11 @@ static void elsa_cs_detach(dev_link_t *link)
     *linkp = link->next;
     kfree(info);
 
-} /* elsa_cs_detach */
+} /* teles_detach */
 
 /*======================================================================
 
-    elsa_cs_config() is scheduled to run after a CARD_INSERTION event
+    teles_cs_config() is scheduled to run after a CARD_INSERTION event
     is received, to configure the PCMCIA socket, and to make the
     device available to the system.
 
@@ -328,7 +309,7 @@ static int next_tuple(client_handle_t handle, tuple_t *tuple,
     return get_tuple(handle, tuple, parse);
 }
 
-static void elsa_cs_config(dev_link_t *link)
+static void teles_cs_config(dev_link_t *link)
 {
     client_handle_t handle;
     tuple_t tuple;
@@ -339,7 +320,7 @@ static void elsa_cs_config(dev_link_t *link)
     cistpl_cftable_entry_t *cf = &parse.cftable_entry;
     IsdnCard_t icard;
 
-    DEBUG(0, "elsa_config(0x%p)\n", link);
+    DEBUG(0, "teles_config(0x%p)\n", link);
     handle = link->handle;
     dev = link->priv;
 
@@ -370,13 +351,13 @@ static void elsa_cs_config(dev_link_t *link)
     i = first_tuple(handle, &tuple, &parse);
     while (i == CS_SUCCESS) {
         if ( (cf->io.nwin > 0) && cf->io.win[0].base) {
-            printk(KERN_INFO "(elsa_cs: looks like the 96 model)\n");
+            printk(KERN_INFO "(teles_cs: looks like the 96 model)\n");
             link->conf.ConfigIndex = cf->index;
             link->io.BasePort1 = cf->io.win[0].base;
             i = pcmcia_request_io(link->handle, &link->io);
             if (i == CS_SUCCESS) break;
         } else {
-          printk(KERN_INFO "(elsa_cs: looks like the 97 model)\n");
+          printk(KERN_INFO "(teles_cs: looks like the 97 model)\n");
           link->conf.ConfigIndex = cf->index;
           for (i = 0, j = 0x2f0; j > 0x100; j -= 0x10) {
             link->io.BasePort1 = j;
@@ -408,7 +389,7 @@ static void elsa_cs_config(dev_link_t *link)
 
     /* At this point, the dev_node_t structure(s) should be
        initialized and arranged in a linked list at link->dev. *//*  */
-    sprintf(dev->node.dev_name, "elsa");
+    sprintf(dev->node.dev_name, "teles");
     dev->node.major = dev->node.minor = 0x0;
 
     link->dev = &dev->node;
@@ -434,35 +415,35 @@ static void elsa_cs_config(dev_link_t *link)
     icard.para[0] = link->irq.AssignedIRQ;
     icard.para[1] = link->io.BasePort1;
     icard.protocol = protocol;
-    icard.typ = ISDN_CTYPE_ELSA_PCMCIA;
+    icard.typ = ISDN_CTYPE_TELESPCMCIA;
     
     i = hisax_init_pcmcia(link, &(((local_info_t*)link->priv)->busy), &icard);
     if (i < 0) {
-    	printk(KERN_ERR "elsa_cs: failed to initialize Elsa PCMCIA %d at i/o %#x\n",
+    	printk(KERN_ERR "teles_cs: failed to initialize Teles PCMCIA %d at i/o %#x\n",
     		i, link->io.BasePort1);
-    	elsa_cs_release(link);
+    	teles_cs_release(link);
     } else
     	((local_info_t*)link->priv)->cardnr = i;
 
     return;
 cs_failed:
     cs_error(link->handle, last_fn, i);
-    elsa_cs_release(link);
-} /* elsa_cs_config */
+    teles_cs_release(link);
+} /* teles_cs_config */
 
 /*======================================================================
 
-    After a card is removed, elsa_cs_release() will unregister the net
+    After a card is removed, teles_cs_release() will unregister the net
     device, and release the PCMCIA configuration.  If the device is
     still open, this will be postponed until it is closed.
 
 ======================================================================*/
 
-static void elsa_cs_release(dev_link_t *link)
+static void teles_cs_release(dev_link_t *link)
 {
     local_info_t *local = link->priv;
 
-    DEBUG(0, "elsa_cs_release(0x%p)\n", link);
+    DEBUG(0, "teles_cs_release(0x%p)\n", link);
 
     if (local) {
     	if (local->cardnr >= 0) {
@@ -482,9 +463,9 @@ static void elsa_cs_release(dev_link_t *link)
     link->state &= ~DEV_CONFIG;
 
     if (link->state & DEV_STALE_LINK)
-        elsa_cs_detach(link);
+        teles_detach(link);
 
-} /* elsa_cs_release */
+} /* teles_cs_release */
 
 /*======================================================================
 
@@ -500,25 +481,25 @@ static void elsa_cs_release(dev_link_t *link)
 
 ======================================================================*/
 
-static int elsa_cs_event(event_t event, int priority,
+static int teles_cs_event(event_t event, int priority,
                           event_callback_args_t *args)
 {
     dev_link_t *link = args->client_data;
     local_info_t *dev = link->priv;
 
-    DEBUG(1, "elsa_cs_event(%d)\n", event);
+    DEBUG(1, "teles_cs_event(%d)\n", event);
 
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
         link->state &= ~DEV_PRESENT;
         if (link->state & DEV_CONFIG) {
             ((local_info_t*)link->priv)->busy = 1;
-	    elsa_cs_release(link);
+	    teles_cs_release(link);
         }
         break;
     case CS_EVENT_CARD_INSERTION:
         link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
-        elsa_cs_config(link);
+        teles_cs_config(link);
         break;
     case CS_EVENT_PM_SUSPEND:
         link->state |= DEV_SUSPEND;
@@ -539,30 +520,30 @@ static int elsa_cs_event(event_t event, int priority,
         break;
     }
     return 0;
-} /* elsa_cs_event */
+} /* teles_cs_event */
 
-static struct pcmcia_driver elsa_cs_driver = {
+static struct pcmcia_driver teles_cs_driver = {
 	.owner		= THIS_MODULE,
 	.drv		= {
-		.name	= "elsa_cs",
+		.name	= "teles_cs",
 	},
-	.attach		= elsa_cs_attach,
-	.detach		= elsa_cs_detach,
+	.attach		= teles_attach,
+	.detach		= teles_detach,
 };
 
-static int __init init_elsa_cs(void)
+static int __init init_teles_cs(void)
 {
-	return pcmcia_register_driver(&elsa_cs_driver);
+	return pcmcia_register_driver(&teles_cs_driver);
 }
 
-static void __exit exit_elsa_cs(void)
+static void __exit exit_teles_cs(void)
 {
-	pcmcia_unregister_driver(&elsa_cs_driver);
+	pcmcia_unregister_driver(&teles_cs_driver);
 
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL)
-		elsa_cs_detach(dev_list);
+		teles_detach(dev_list);
 }
 
-module_init(init_elsa_cs);
-module_exit(exit_elsa_cs);
+module_init(init_teles_cs);
+module_exit(exit_teles_cs);

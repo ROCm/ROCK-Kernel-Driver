@@ -1,4 +1,4 @@
-/* $Id: mic.c,v 1.10.6.2 2001/09/23 22:24:50 kai Exp $
+/* $Id: mic.c,v 1.12.2.4 2004/01/13 23:48:39 keil Exp $
  *
  * low level stuff for mic cards
  *
@@ -18,8 +18,7 @@
 
 extern const char *CardType[];
 
-const char *mic_revision = "$Revision: 1.10.6.2 $";
-static spinlock_t mic_lock = SPIN_LOCK_UNLOCKED;
+const char *mic_revision = "$Revision: 1.12.2.4 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -31,146 +30,210 @@ static spinlock_t mic_lock = SPIN_LOCK_UNLOCKED;
 /* CARD_ADR (Write) */
 #define MIC_RESET      0x3	/* same as DOS driver */
 
-static inline u8
-readreg(struct IsdnCardState *cs, unsigned int adr, u8 off)
+static inline u_char
+readreg(unsigned int ale, unsigned int adr, u_char off)
 {
-	u8 ret;
-	unsigned long flags;
+	register u_char ret;
 
-	spin_lock_irqsave(&mic_lock, flags);
-	byteout(cs->hw.mic.adr, off);
+	byteout(ale, off);
 	ret = bytein(adr);
-	spin_unlock_irqrestore(&mic_lock, flags);
-
 	return (ret);
 }
 
 static inline void
-writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
+readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&mic_lock, flags);
-	byteout(cs->hw.mic.adr, off);
-	byteout(adr, data);
-	spin_unlock_irqrestore(&mic_lock, flags);
-}
-
-static inline void
-readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
-{
-	byteout(cs->hw.mic.adr, off);
+	byteout(ale, off);
 	insb(adr, data, size);
 }
 
+
 static inline void
-writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
+writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	byteout(cs->hw.mic.adr, off);
+	byteout(ale, off);
+	byteout(adr, data);
+}
+
+static inline void
+writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+{
+	byteout(ale, off);
 	outsb(adr, data, size);
 }
 
-static u8
-isac_read(struct IsdnCardState *cs, u8 offset)
+/* Interface functions */
+
+static u_char
+ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
-	return readreg(cs, cs->hw.mic.isac, offset);
+	return (readreg(cs->hw.mic.adr, cs->hw.mic.isac, offset));
 }
 
 static void
-isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	writereg(cs, cs->hw.mic.isac, offset, value);
+	writereg(cs->hw.mic.adr, cs->hw.mic.isac, offset, value);
 }
 
 static void
-isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	readfifo(cs, cs->hw.mic.isac, 0, data, size);
+	readfifo(cs->hw.mic.adr, cs->hw.mic.isac, 0, data, size);
 }
 
 static void
-isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	writefifo(cs, cs->hw.mic.isac, 0, data, size);
+	writefifo(cs->hw.mic.adr, cs->hw.mic.isac, 0, data, size);
 }
 
-static struct dc_hw_ops isac_ops = {
-	.read_reg   = isac_read,
-	.write_reg  = isac_write,
-	.read_fifo  = isac_read_fifo,
-	.write_fifo = isac_write_fifo,
-};
-
-static u8
-hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
+static u_char
+ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
-	return readreg(cs, cs->hw.mic.hscx, offset + (hscx ? 0x40 : 0));
+	return (readreg(cs->hw.mic.adr,
+			cs->hw.mic.hscx, offset + (hscx ? 0x40 : 0)));
 }
 
 static void
-hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 {
-	writereg(cs, cs->hw.mic.hscx, offset + (hscx ? 0x40 : 0), value);
+	writereg(cs->hw.mic.adr,
+		 cs->hw.mic.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
-static void
-hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+/*
+ * fast interrupt HSCX stuff goes here
+ */
+
+#define READHSCX(cs, nr, reg) readreg(cs->hw.mic.adr, \
+		cs->hw.mic.hscx, reg + (nr ? 0x40 : 0))
+#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.mic.adr, \
+		cs->hw.mic.hscx, reg + (nr ? 0x40 : 0), data)
+
+#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.mic.adr, \
+		cs->hw.mic.hscx, (nr ? 0x40 : 0), ptr, cnt)
+
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.mic.adr, \
+		cs->hw.mic.hscx, (nr ? 0x40 : 0), ptr, cnt)
+
+#include "hscx_irq.c"
+
+static irqreturn_t
+mic_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
-	readfifo(cs, cs->hw.mic.hscx, hscx ? 0x40 : 0, data, size);
+	struct IsdnCardState *cs = dev_id;
+	u_char val;
+	u_long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	val = readreg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_ISTA + 0x40);
+      Start_HSCX:
+	if (val)
+		hscx_int_main(cs, val);
+	val = readreg(cs->hw.mic.adr, cs->hw.mic.isac, ISAC_ISTA);
+      Start_ISAC:
+	if (val)
+		isac_interrupt(cs, val);
+	val = readreg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_ISTA + 0x40);
+	if (val) {
+		if (cs->debug & L1_DEB_HSCX)
+			debugl1(cs, "HSCX IntStat after IntRoutine");
+		goto Start_HSCX;
+	}
+	val = readreg(cs->hw.mic.adr, cs->hw.mic.isac, ISAC_ISTA);
+	if (val) {
+		if (cs->debug & L1_DEB_ISAC)
+			debugl1(cs, "ISAC IntStat after IntRoutine");
+		goto Start_ISAC;
+	}
+	writereg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_MASK, 0xFF);
+	writereg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_MASK + 0x40, 0xFF);
+	writereg(cs->hw.mic.adr, cs->hw.mic.isac, ISAC_MASK, 0xFF);
+	writereg(cs->hw.mic.adr, cs->hw.mic.isac, ISAC_MASK, 0x0);
+	writereg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_MASK, 0x0);
+	writereg(cs->hw.mic.adr, cs->hw.mic.hscx, HSCX_MASK + 0x40, 0x0);
+	spin_unlock_irqrestore(&cs->lock, flags);
+	return IRQ_HANDLED;
 }
 
-static void
-hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+void
+release_io_mic(struct IsdnCardState *cs)
 {
-	writefifo(cs, cs->hw.mic.hscx, hscx ? 0x40 : 0, data, size);
+	int bytecnt = 8;
+
+	if (cs->hw.mic.cfg_reg)
+		release_region(cs->hw.mic.cfg_reg, bytecnt);
 }
 
-static struct bc_hw_ops hscx_ops = {
-	.read_reg   = hscx_read,
-	.write_reg  = hscx_write,
-	.read_fifo  = hscx_read_fifo,
-	.write_fifo = hscx_write_fifo,
-};
-
-static struct card_ops mic_ops = {
-	.init     = inithscxisac,
-	.release  = hisax_release_resources,
-	.irq_func = hscxisac_irq,
-};
-
-static int __init
-mic_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+static int
+mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	cs->irq = card->para[0];
-	cs->hw.mic.cfg_reg = card->para[1];
-	cs->hw.mic.adr = cs->hw.mic.cfg_reg + MIC_ADR;
-	cs->hw.mic.isac = cs->hw.mic.cfg_reg + MIC_ISAC;
-	cs->hw.mic.hscx = cs->hw.mic.cfg_reg + MIC_HSCX;
+	u_long flags;
 
-	if (!request_io(&cs->rs, cs->hw.mic.cfg_reg, 8, "mic isdn"))
-		goto err;
-  
-	printk(KERN_INFO "mic: defined at 0x%x IRQ %d\n",
-	       cs->hw.mic.cfg_reg, cs->irq);
-
-	cs->card_ops = &mic_ops;
-	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-		goto err;
-	return 0;
- err:
-	hisax_release_resources(cs);
-	return -EBUSY;
+	switch (mt) {
+		case CARD_RESET:
+			return(0);
+		case CARD_RELEASE:
+			release_io_mic(cs);
+			return(0);
+		case CARD_INIT:
+			spin_lock_irqsave(&cs->lock, flags);
+			inithscx(cs); /* /RTSA := ISAC RST */
+			inithscxisac(cs, 3);
+			spin_unlock_irqrestore(&cs->lock, flags);
+			return(0);
+		case CARD_TEST:
+			return(0);
+	}
+	return(0);
 }
 
 int __init
 setup_mic(struct IsdnCard *card)
 {
+	int bytecnt;
+	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, mic_revision);
 	printk(KERN_INFO "HiSax: mic driver Rev. %s\n", HiSax_getrev(tmp));
+	if (cs->typ != ISDN_CTYPE_MIC)
+		return (0);
 
-	if (mic_probe(card->cs, card) < 0)
-		return 0;
-	return 1;
+	bytecnt = 8;
+	cs->hw.mic.cfg_reg = card->para[1];
+	cs->irq = card->para[0];
+	cs->hw.mic.adr = cs->hw.mic.cfg_reg + MIC_ADR;
+	cs->hw.mic.isac = cs->hw.mic.cfg_reg + MIC_ISAC;
+	cs->hw.mic.hscx = cs->hw.mic.cfg_reg + MIC_HSCX;
+
+	if (!request_region(cs->hw.mic.cfg_reg, bytecnt, "mic isdn")) {
+		printk(KERN_WARNING
+		       "HiSax: %s config port %x-%x already in use\n",
+		       CardType[card->typ],
+		       cs->hw.mic.cfg_reg,
+		       cs->hw.mic.cfg_reg + bytecnt);
+		return (0);
+	}
+	printk(KERN_INFO "mic: defined at 0x%x IRQ %d\n",
+		cs->hw.mic.cfg_reg, cs->irq);
+	setup_isac(cs);
+	cs->readisac = &ReadISAC;
+	cs->writeisac = &WriteISAC;
+	cs->readisacfifo = &ReadISACfifo;
+	cs->writeisacfifo = &WriteISACfifo;
+	cs->BC_Read_Reg = &ReadHSCX;
+	cs->BC_Write_Reg = &WriteHSCX;
+	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->cardmsg = &mic_card_msg;
+	cs->irq_func = &mic_interrupt;
+	ISACVersion(cs, "mic:");
+	if (HscxVersion(cs, "mic:")) {
+		printk(KERN_WARNING
+		    "mic: wrong HSCX versions check IO address\n");
+		release_io_mic(cs);
+		return (0);
+	}
+	return (1);
 }

@@ -591,10 +591,9 @@ handle_ack(act2000_card *card, act2000_chan *chan, __u8 blocknr) {
 	struct actcapi_msg *m;
 	int ret = 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&card->lock, flags);
 	skb = skb_peek(&card->ackq);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock, flags);
         if (!skb) {
 		printk(KERN_WARNING "act2000: handle_ack nothing found!\n");
 		return 0;
@@ -614,10 +613,9 @@ handle_ack(act2000_card *card, act2000_chan *chan, __u8 blocknr) {
 				chan->queued = 0;
                         return ret;
                 }
-		save_flags(flags);
-		cli();
+                spin_lock_irqsave(&card->lock, flags);
                 tmp = skb_peek((struct sk_buff_head *)tmp);
-		restore_flags(flags);
+                spin_unlock_irqrestore(&card->lock, flags);
                 if ((tmp == skb) || (tmp == NULL)) {
 			/* reached end of queue */
 			printk(KERN_WARNING "act2000: handle_ack nothing found!\n");

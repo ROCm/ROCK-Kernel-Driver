@@ -1,4 +1,4 @@
-/* $Id: concap.h,v 1.2.8.1 2001/09/23 22:25:05 kai Exp $
+/* $Id: concap.h,v 1.3.2.2 2004/01/12 23:08:35 keil Exp $
  *
  * Copyright 1997 by Henner Eisen <eis@baty.hanse.de>
  *
@@ -31,6 +31,7 @@ struct concap_proto{
 	struct net_device *net_dev;	/* net device using our service  */
 	struct concap_device_ops *dops;	/* callbacks provided by device */
  	struct concap_proto_ops  *pops;	/* callbacks provided by us */
+ 	spinlock_t lock;
 	int flags;
 	void *proto_data;		/* protocol specific private data, to
 					   be accessed via *pops methods only*/

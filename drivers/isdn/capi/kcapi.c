@@ -1,4 +1,4 @@
-/* $Id: kcapi.c,v 1.21.6.8 2001/09/23 22:24:33 kai Exp $
+/* $Id: kcapi.c,v 1.1.2.4 2004/02/10 01:07:11 keil Exp $
  * 
  * Kernel CAPI 2.0 Module
  * 
@@ -31,7 +31,7 @@
 #include <linux/b1lli.h>
 #endif
 
-static char *revision = "$Revision: 1.21.6.8 $";
+static char *revision = "$Revision: 1.1.2.4 $";
 
 /* ------------------------------------------------------------- */
 
@@ -61,7 +61,7 @@ static char capi_manufakturer[64] = "AVM Berlin";
 #define NCCI2CTRL(ncci)    (((ncci) >> 24) & 0x7f)
 
 LIST_HEAD(capi_drivers);
-spinlock_t capi_drivers_lock = SPIN_LOCK_UNLOCKED;
+rwlock_t capi_drivers_list_lock = RW_LOCK_UNLOCKED;
 
 struct capi20_appl *capi_applications[CAPI_MAXAPPL];
 struct capi_ctr *capi_cards[CAPI_MAXCONTR];
@@ -309,12 +309,10 @@ static void recv_handler(void *dummy)
 			continue;
 		}
 
-		if (   CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3
-		    && CAPIMSG_SUBCOMMAND(skb->data) == CAPI_IND) {
+		if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_IND)
 			ap->nrecvdatapkt++;
-		} else {
+		else
 			ap->nrecvctlpkt++;
-		}
 		ap->recv_message(ap, skb);
 	}
 }
@@ -497,6 +495,28 @@ int detach_capi_ctr(struct capi_ctr *card)
 }
 
 EXPORT_SYMBOL(detach_capi_ctr);
+
+void register_capi_driver(struct capi_driver *driver)
+{
+	unsigned long flags;
+
+	write_lock_irqsave(&capi_drivers_list_lock, flags);
+	list_add_tail(&driver->list, &capi_drivers);
+	write_unlock_irqrestore(&capi_drivers_list_lock, flags);
+}
+
+EXPORT_SYMBOL(register_capi_driver);
+
+void unregister_capi_driver(struct capi_driver *driver)
+{
+	unsigned long flags;
+
+	write_lock_irqsave(&capi_drivers_list_lock, flags);
+	list_del(&driver->list);
+	write_unlock_irqrestore(&capi_drivers_list_lock, flags);
+}
+
+EXPORT_SYMBOL(unregister_capi_driver);
 
 /* ------------------------------------------------------------- */
 /* -------- CAPI2.0 Interface ---------------------------------- */
@@ -704,12 +724,68 @@ EXPORT_SYMBOL(capi20_get_profile);
 static int old_capi_manufacturer(unsigned int cmd, void *data)
 {
 	avmb1_loadandconfigdef ldef;
+	avmb1_extcarddef cdef;
 	avmb1_resetdef rdef;
+	capicardparams cparams;
 	struct capi_ctr *card;
+	struct capi_driver *driver = 0;
 	capiloaddata ldata;
+	struct list_head *l;
+	unsigned long flags;
 	int retval;
 
 	switch (cmd) {
+	case AVMB1_ADDCARD:
+	case AVMB1_ADDCARD_WITH_TYPE:
+		if (cmd == AVMB1_ADDCARD) {
+		   if ((retval = copy_from_user((void *) &cdef, data,
+					    sizeof(avmb1_carddef))))
+			   return retval;
+		   cdef.cardtype = AVM_CARDTYPE_B1;
+		} else {
+		   if ((retval = copy_from_user((void *) &cdef, data,
+					    sizeof(avmb1_extcarddef))))
+			   return retval;
+		}
+		cparams.port = cdef.port;
+		cparams.irq = cdef.irq;
+		cparams.cardnr = cdef.cardnr;
+
+		read_lock_irqsave(&capi_drivers_list_lock, flags);
+                switch (cdef.cardtype) {
+			case AVM_CARDTYPE_B1:
+				list_for_each(l, &capi_drivers) {
+					driver = list_entry(l, struct capi_driver, list);
+					if (strcmp(driver->name, "b1isa") == 0)
+						break;
+				}
+				break;
+			case AVM_CARDTYPE_T1:
+				list_for_each(l, &capi_drivers) {
+					driver = list_entry(l, struct capi_driver, list);
+					if (strcmp(driver->name, "t1isa") == 0)
+						break;
+				}
+				break;
+			default:
+				driver = 0;
+				break;
+		}
+		if (!driver) {
+			read_unlock_irqrestore(&capi_drivers_list_lock, flags);
+			printk(KERN_ERR "kcapi: driver not loaded.\n");
+			return -EIO;
+		}
+		if (!driver->add_card) {
+			read_unlock_irqrestore(&capi_drivers_list_lock, flags);
+			printk(KERN_ERR "kcapi: driver has no add card function.\n");
+			return -EIO;
+		}
+
+		retval = driver->add_card(driver, &cparams);
+		read_unlock_irqrestore(&capi_drivers_list_lock, flags);
+		return retval;
+
 	case AVMB1_LOAD:
 	case AVMB1_LOAD_AND_CONFIG:
 
@@ -831,6 +907,43 @@ int capi20_manufacturer(unsigned int cmd, void *data)
 		printk(KERN_INFO "kcapi: contr %d set trace=%d\n",
 			card->cnr, card->traceflag);
 		return 0;
+	}
+	case KCAPI_CMD_ADDCARD:
+	{
+		struct list_head *l;
+		struct capi_driver *driver = 0;
+		capicardparams cparams;
+		kcapi_carddef cdef;
+		int retval;
+
+		if ((retval = copy_from_user((void *) &cdef, data,
+							sizeof(cdef))))
+			return retval;
+
+		cparams.port = cdef.port;
+		cparams.irq = cdef.irq;
+		cparams.membase = cdef.membase;
+		cparams.cardnr = cdef.cardnr;
+		cparams.cardtype = 0;
+		cdef.driver[sizeof(cdef.driver)-1] = 0;
+
+		list_for_each(l, &capi_drivers) {
+			driver = list_entry(l, struct capi_driver, list);
+			if (strcmp(driver->name, cdef.driver) == 0)
+				break;
+		}
+		if (driver == 0) {
+			printk(KERN_ERR "kcapi: driver \"%s\" not loaded.\n",
+					cdef.driver);
+			return -ESRCH;
+		}
+
+		if (!driver->add_card) {
+			printk(KERN_ERR "kcapi: driver \"%s\" has no add card function.\n", cdef.driver);
+			return -EIO;
+		}
+
+		return driver->add_card(driver, &cparams);
 	}
 
 	default:

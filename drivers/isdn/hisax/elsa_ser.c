@@ -1,4 +1,4 @@
-/* $Id: elsa_ser.c,v 2.10.6.4 2001/09/23 22:24:47 kai Exp $
+/* $Id: elsa_ser.c,v 2.14.2.2 2004/01/12 22:52:26 keil Exp $
  *
  * stuff for the serial modem on ELSA cards
  *
@@ -26,11 +26,10 @@
 //#define SERIAL_DEBUG_REG 1
 
 #ifdef SERIAL_DEBUG_REG
-static u8 deb[32];
+static u_char deb[32];
 const char *ModemIn[] = {"RBR","IER","IIR","LCR","MCR","LSR","MSR","SCR"};
 const char *ModemOut[] = {"THR","IER","FCR","LCR","MCR","LSR","MSR","SCR"};
 #endif
-static spinlock_t elsa_ser_lock = SPIN_LOCK_UNLOCKED;
 
 static char *MInit_1 = "AT&F&C1E0&D2\r\0";
 static char *MInit_2 = "ATL2M1S64=13\r\0";
@@ -111,7 +110,6 @@ static void change_speed(struct IsdnCardState *cs, int baud)
 	int	quot = 0, baud_base;
 	unsigned cval, fcr = 0;
 	int	bits;
-	unsigned long	flags;
 
 
 	/* byte size and parity */
@@ -135,22 +133,16 @@ static void change_speed(struct IsdnCardState *cs, int baud)
 	serial_outp(cs, UART_IER, cs->hw.elsa.IER);
 
 	debugl1(cs,"modem quot=0x%x", quot);
-	spin_lock_irqsave(&elsa_ser_lock, flags);
 	serial_outp(cs, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
 	serial_outp(cs, UART_DLL, quot & 0xff);		/* LS of divisor */
 	serial_outp(cs, UART_DLM, quot >> 8);		/* MS of divisor */
 	serial_outp(cs, UART_LCR, cval);		/* reset DLAB */
 	serial_inp(cs, UART_RX);
-	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 static int mstartup(struct IsdnCardState *cs)
 {
-	unsigned long flags;
 	int	retval=0;
-
-
-	spin_lock_irqsave(&elsa_ser_lock, flags);
 
 	/*
 	 * Clear the FIFO buffers and disable them
@@ -207,7 +199,6 @@ static int mstartup(struct IsdnCardState *cs)
 	change_speed(cs, BASE_BAUD);
 	cs->hw.elsa.MFlag = 1;
 errout:
-	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 	return retval;
 }
 
@@ -217,15 +208,11 @@ errout:
  */
 static void mshutdown(struct IsdnCardState *cs)
 {
-	unsigned long	flags;
-
 
 #ifdef SERIAL_DEBUG_OPEN
 	printk(KERN_DEBUG"Shutting down serial ....");
 #endif
 	
-	spin_lock_irqsave(&elsa_ser_lock, flags);  /* Disable interrupts */
-
 	/*
 	 * clear delta_msr_wait queue to avoid mem leaks: we may free the irq
 	 * here so the queue might never be waken up
@@ -245,7 +232,6 @@ static void mshutdown(struct IsdnCardState *cs)
 	serial_outp(cs, UART_FCR, (UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT));
 	serial_inp(cs, UART_RX);    /* read data port to reset things */
 	
-	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 #ifdef SERIAL_DEBUG_OPEN
 	printk(" done\n");
 #endif
@@ -255,14 +241,12 @@ inline int
 write_modem(struct BCState *bcs) {
 	int ret=0;
 	struct IsdnCardState *cs = bcs->cs;
-	u_int count, len, fp;
-	unsigned long flags;
+	int count, len, fp;
 	
 	if (!bcs->tx_skb)
 		return 0;
 	if (bcs->tx_skb->len <= 0)
 		return 0;
-	spin_lock_irqsave(&elsa_ser_lock, flags);
 	len = bcs->tx_skb->len;
 	if (len > MAX_MODEM_BUF - cs->hw.elsa.transcnt)
 		len = MAX_MODEM_BUF - cs->hw.elsa.transcnt;
@@ -288,14 +272,33 @@ write_modem(struct BCState *bcs) {
 			cs->hw.elsa.IER |= UART_IER_THRI;
 		serial_outp(cs, UART_IER, cs->hw.elsa.IER);
 	}
-	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 	return(ret);
 }
 
-static void
-modem_fill(struct BCState *bcs)
-{
-	xmit_xpr_b(bcs);
+inline void
+modem_fill(struct BCState *bcs) {
+		
+	if (bcs->tx_skb) {
+		if (bcs->tx_skb->len) {
+			write_modem(bcs);
+			return;
+		} else {
+			if (bcs->st->lli.l1writewakeup &&
+				(PACKET_NOACK != bcs->tx_skb->pkt_type))
+					bcs->st->lli.l1writewakeup(bcs->st,
+						bcs->hw.hscx.count);
+			dev_kfree_skb_any(bcs->tx_skb);
+			bcs->tx_skb = NULL;
+		}
+	}
+	if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
+		bcs->hw.hscx.count = 0;
+		test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
+		write_modem(bcs);
+	} else {
+		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
+		schedule_event(bcs, B_XMTBUFREADY);
+	}
 }
 
 static inline void receive_chars(struct IsdnCardState *cs,
@@ -329,7 +332,7 @@ static inline void receive_chars(struct IsdnCardState *cs,
 				cs->hw.elsa.rcvcnt);
 			skb_queue_tail(& cs->hw.elsa.bcs->rqueue, skb);
 		}
-		sched_b_event(cs->hw.elsa.bcs, B_RCVBUFREADY);
+		schedule_event(cs->hw.elsa.bcs, B_RCVBUFREADY);
 	} else {
 		char tmp[128];
 		char *t = tmp;
@@ -375,6 +378,7 @@ static inline void transmit_chars(struct IsdnCardState *cs, int *intr_done)
 	}
 }
 
+
 static void rs_interrupt_elsa(int irq, struct IsdnCardState *cs)
 {
 	int status, iir, msr;
@@ -419,10 +423,10 @@ close_elsastate(struct BCState *bcs)
 {
 	modehscx(bcs, 0, bcs->channel);
 	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->rcvbuf) {
+		if (bcs->hw.hscx.rcvbuf) {
 			if (bcs->mode != L1_MODE_MODEM)
-				kfree(bcs->rcvbuf);
-			bcs->rcvbuf = NULL;
+				kfree(bcs->hw.hscx.rcvbuf);
+			bcs->hw.hscx.rcvbuf = NULL;
 		}
 		skb_queue_purge(&bcs->rqueue);
 		skb_queue_purge(&bcs->squeue);
@@ -435,16 +439,13 @@ close_elsastate(struct BCState *bcs)
 }
 
 void
-modem_write_cmd(struct IsdnCardState *cs, u8 *buf, u_int len) {
-	u_int count, fp;
-	u8 *msg = buf;
-	unsigned long flags;
+modem_write_cmd(struct IsdnCardState *cs, u_char *buf, int len) {
+	int count, fp;
+	u_char *msg = buf;
 	
 	if (!len)
 		return;
-	spin_lock_irqsave(&elsa_ser_lock, flags);
 	if (len > (MAX_MODEM_BUF - cs->hw.elsa.transcnt)) {
-		spin_unlock_irqrestore(&elsa_ser_lock, flags);
 		return;
 	}
 	fp = cs->hw.elsa.transcnt + cs->hw.elsa.transp;
@@ -465,16 +466,13 @@ modem_write_cmd(struct IsdnCardState *cs, u8 *buf, u_int len) {
 		cs->hw.elsa.IER |= UART_IER_THRI;
 		serial_outp(cs, UART_IER, cs->hw.elsa.IER);
 	}
-	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 void
 modem_set_init(struct IsdnCardState *cs) {
-	unsigned long flags;
 	int timeout;
 
 #define RCV_DELAY 20000	
-	spin_lock_irqsave(&elsa_ser_lock, flags);
 	modem_write_cmd(cs, MInit_1, strlen(MInit_1));
 	timeout = 1000;
 	while(timeout-- && cs->hw.elsa.transcnt)
@@ -517,16 +515,13 @@ modem_set_init(struct IsdnCardState *cs) {
 		udelay(1000);
 	debugl1(cs, "msi tout=%d", timeout);
 	udelay(RCV_DELAY);
-	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 void
 modem_set_dial(struct IsdnCardState *cs, int outgoing) {
-	unsigned long flags;
 	int timeout;
 #define RCV_DELAY 20000	
 
-	spin_lock_irqsave(&elsa_ser_lock, flags);
 	modem_write_cmd(cs, MInit_speed28800, strlen(MInit_speed28800));
 	timeout = 1000;
 	while(timeout-- && cs->hw.elsa.transcnt)
@@ -542,40 +537,39 @@ modem_set_dial(struct IsdnCardState *cs, int outgoing) {
 		udelay(1000);
 	debugl1(cs, "msi tout=%d", timeout);
 	udelay(RCV_DELAY);
-	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 void
 modem_l2l1(struct PStack *st, int pr, void *arg)
 {
+	struct BCState *bcs = st->l1.bcs;
 	struct sk_buff *skb = arg;
-	unsigned long flags;
+	u_long flags;
 
 	if (pr == (PH_DATA | REQUEST)) {
-		spin_lock_irqsave(&elsa_ser_lock, flags);
-		if (st->l1.bcs->tx_skb) {
-			skb_queue_tail(&st->l1.bcs->squeue, skb);
-			spin_unlock_irqrestore(&elsa_ser_lock, flags);
+		spin_lock_irqsave(&bcs->cs->lock, flags);
+		if (bcs->tx_skb) {
+			skb_queue_tail(&bcs->squeue, skb);
 		} else {
-			st->l1.bcs->tx_skb = skb;
-			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			st->l1.bcs->count = 0;
-			spin_unlock_irqrestore(&elsa_ser_lock, flags);
-			write_modem(st->l1.bcs);
+			bcs->tx_skb = skb;
+			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
+			bcs->hw.hscx.count = 0;
+			write_modem(bcs);
 		}
+		spin_unlock_irqrestore(&bcs->cs->lock, flags);
 	} else if (pr == (PH_ACTIVATE | REQUEST)) {
-		test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
-		L1L2(st, PH_ACTIVATE | CONFIRM, NULL);
-		set_arcofi(st->l1.bcs->cs, st->l1.bc);
-		mstartup(st->l1.bcs->cs);
-		modem_set_dial(st->l1.bcs->cs, test_bit(FLG_ORIG, &st->l2.flag));
-		st->l1.bcs->cs->hw.elsa.MFlag=2;
+		test_and_set_bit(BC_FLG_ACTIV, &bcs->Flag);
+		st->l1.l1l2(st, PH_ACTIVATE | CONFIRM, NULL);
+		set_arcofi(bcs->cs, st->l1.bc);
+		mstartup(bcs->cs);
+		modem_set_dial(bcs->cs, test_bit(FLG_ORIG, &st->l2.flag));
+		bcs->cs->hw.elsa.MFlag=2;
 	} else if (pr == (PH_DEACTIVATE | REQUEST)) {
-		test_and_clear_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
-		st->l1.bcs->cs->dc.isac.arcofi_bc = st->l1.bc;
-		arcofi_fsm(st->l1.bcs->cs, ARCOFI_START, &ARCOFI_XOP_0);
-		interruptible_sleep_on(&st->l1.bcs->cs->dc.isac.arcofi_wait);
-		st->l1.bcs->cs->hw.elsa.MFlag=1;
+		test_and_clear_bit(BC_FLG_ACTIV, &bcs->Flag);
+		bcs->cs->dc.isac.arcofi_bc = st->l1.bc;
+		arcofi_fsm(bcs->cs, ARCOFI_START, &ARCOFI_XOP_0);
+		interruptible_sleep_on(&bcs->cs->dc.isac.arcofi_wait);
+		bcs->cs->hw.elsa.MFlag=1;
 	} else {
 		printk(KERN_WARNING"ElsaSer: unknown pr %x\n", pr);
 	}
@@ -591,24 +585,22 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 		case L1_MODE_TRANS:
 			if (open_hscxstate(st->l1.hardware, bcs))
 				return (-1);
-			st->l1.l2l1 = hscx_l2l1;
-			// bcs->cs->BC_Send_Data = hscx_fill_fifo; FIXME
+			st->l2.l2l1 = hscx_l2l1;
 			break;
 		case L1_MODE_MODEM:
 			bcs->mode = L1_MODE_MODEM;
 			if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-				bcs->rcvbuf = bcs->cs->hw.elsa.rcvbuf;
+				bcs->hw.hscx.rcvbuf = bcs->cs->hw.elsa.rcvbuf;
 				skb_queue_head_init(&bcs->rqueue);
 				skb_queue_head_init(&bcs->squeue);
 			}
 			bcs->tx_skb = NULL;
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 			bcs->event = 0;
-			bcs->rcvidx = 0;
+			bcs->hw.hscx.rcvidx = 0;
 			bcs->tx_cnt = 0;
 			bcs->cs->hw.elsa.bcs = bcs;
-			st->l1.l2l1 = modem_l2l1;
-//			bcs->cs->bc_l1_ops = &modem_l1_ops;
+			st->l2.l2l1 = modem_l2l1;
 			break;
 	}
 	st->l1.bcs = bcs;
@@ -618,17 +610,13 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
-static struct bc_l1_ops modem_l1_ops = {
-	.fill_fifo = modem_fill,
-	.open      = setstack_elsa,
-	.close     = close_elsastate,
-};
-
 void
-init_modem(struct IsdnCardState *cs)
-{
-	cs->bc_l1_ops = &modem_l1_ops;
+init_modem(struct IsdnCardState *cs) {
 
+	cs->bcs[0].BC_SetStack = setstack_elsa;
+	cs->bcs[1].BC_SetStack = setstack_elsa;
+	cs->bcs[0].BC_Close = close_elsastate;
+	cs->bcs[1].BC_Close = close_elsastate;
 	if (!(cs->hw.elsa.rcvbuf = kmalloc(MAX_MODEM_BUF,
 		GFP_ATOMIC))) {
 		printk(KERN_WARNING

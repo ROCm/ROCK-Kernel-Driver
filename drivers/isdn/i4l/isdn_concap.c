@@ -1,12 +1,16 @@
-/* Linux ISDN subsystem, protocol encapsulation
+/* $Id: isdn_concap.c,v 1.1.2.2 2004/01/12 22:37:19 keil Exp $
+ * 
+ * Linux ISDN subsystem, protocol encapsulation
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
 /* Stuff to support the concap_proto by isdn4linux. isdn4linux - specific
  * stuff goes here. Stuff that depends only on the concap protocol goes to
  * another -- protocol specific -- source file.
+ *
  */
 
 
@@ -15,7 +19,7 @@
 #include "isdn_net.h"
 #include <linux/concap.h>
 #include "isdn_concap.h"
-#include <linux/if_arp.h>
+
 
 /* The following set of device service operations are for encapsulation
    protocols that require for reliable datalink semantics. That means:
@@ -35,8 +39,7 @@
    */
 
 
-static int
-isdn_concap_dl_data_req(struct concap_proto *concap, struct sk_buff *skb)
+int isdn_concap_dl_data_req(struct concap_proto *concap, struct sk_buff *skb)
 {
 	struct net_device *ndev = concap -> net_dev;
 	isdn_net_dev *nd = ((isdn_net_local *) ndev->priv)->netdev;
@@ -55,8 +58,7 @@ isdn_concap_dl_data_req(struct concap_proto *concap, struct sk_buff *skb)
 }
 
 
-static int
-isdn_concap_dl_connect_req(struct concap_proto *concap)
+int isdn_concap_dl_connect_req(struct concap_proto *concap)
 {
 	struct net_device *ndev = concap -> net_dev;
 	isdn_net_local *lp = (isdn_net_local *) ndev->priv;
@@ -69,8 +71,7 @@ isdn_concap_dl_connect_req(struct concap_proto *concap)
 	return ret;
 }
 
-static int
-isdn_concap_dl_disconn_req(struct concap_proto *concap)
+int isdn_concap_dl_disconn_req(struct concap_proto *concap)
 {
 	IX25DEBUG( "isdn_concap_dl_disconn_req: %s \n", concap -> net_dev -> name);
 
@@ -97,8 +98,7 @@ struct concap_device_ops isdn_concap_demand_dial_dops = {
    this sourcefile does not need to include any protocol specific header
    files. For now:
    */
-struct concap_proto *
-isdn_concap_new( int encap )
+struct concap_proto * isdn_concap_new( int encap )
 {
 	switch ( encap ) {
 	case ISDN_NET_ENCAP_X25IFACE:
@@ -106,146 +106,3 @@ isdn_concap_new( int encap )
 	}
 	return NULL;
 }
-
-static int
-isdn_x25_open(isdn_net_local *lp)
-{
-	struct net_device * dev = & lp -> netdev -> dev;
-	struct concap_proto * cprot = lp -> netdev -> ind_priv;
-	struct concap_proto * dops = lp -> inl_priv;
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();                  /* Avoid glitch on writes to CMD regs */
-	if( cprot -> pops && dops )
-		cprot -> pops -> restart ( cprot, dev, dops );
-	restore_flags(flags);
-	return 0;
-}
-
-static void
-isdn_x25_close(isdn_net_local *lp)
-{
-	struct concap_proto * cprot = lp -> netdev -> ind_priv;
-
-	if( cprot && cprot -> pops ) cprot -> pops -> close( cprot );
-}
-
-static void
-isdn_x25_connected(isdn_net_local *lp)
-{
-	struct concap_proto *cprot = lp -> netdev -> ind_priv;
-	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
-
-	/* try if there are generic concap receiver routines */
-	if( pops )
-		if( pops->connect_ind)
-			pops->connect_ind(cprot);
-
-	isdn_net_device_wake_queue(lp);
-}
-
-static void
-isdn_x25_disconnected(isdn_net_local *lp)
-{
-	struct concap_proto *cprot = lp -> netdev -> ind_priv;
-	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
-
-	/* try if there are generic encap protocol
-	   receiver routines and signal the closure of
-	   the link */
-	if( pops  &&  pops -> disconn_ind )
-		pops -> disconn_ind(cprot);
-}
-
-static int
-isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
-{
-/* At this point hard_start_xmit() passes control to the encapsulation
-   protocol (if present).
-   For X.25 auto-dialing is completly bypassed because:
-   - It does not conform with the semantics of a reliable datalink
-     service as needed by X.25 PLP.
-   - I don't want that the interface starts dialing when the network layer
-     sends a message which requests to disconnect the lapb link (or if it
-     sends any other message not resulting in data transmission).
-   Instead, dialing will be initiated by the encapsulation protocol entity
-   when a dl_establish request is received from the upper layer.
-*/
-	isdn_net_local *lp = (isdn_net_local *) dev->priv;
-	struct concap_proto * cprot = lp -> netdev -> ind_priv;
-	int ret = cprot -> pops -> encap_and_xmit ( cprot , skb);
-
-	if (ret)
-		netif_stop_queue(dev);
-		
-	return ret;
-}
-
-static void 
-isdn_x25_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb)
-{
-	isdn_net_local *lp = &p->local;
-	struct concap_proto *cprot = lp -> netdev -> ind_priv;
-
-	/* try if there are generic sync_device receiver routines */
-	if(cprot) 
-		if(cprot -> pops)
-			if( cprot -> pops -> data_ind) {
-				cprot -> pops -> data_ind(cprot,skb);
-				return;
-			}
-}
-
-static void
-isdn_x25_init(struct net_device *dev)
-{
-	unsigned long flags;
-
-	isdn_net_local *lp = dev->priv;
-
-	/* ... ,  prepare for configuration of new one ... */
-	switch ( lp->p_encap ){
-	case ISDN_NET_ENCAP_X25IFACE:
-		lp -> inl_priv = &isdn_concap_reliable_dl_dops;
-	}
-	/* ... and allocate new one ... */
-	p -> cprot = isdn_concap_new( cfg -> p_encap );
-	/* p -> cprot == NULL now if p_encap is not supported
-	   by means of the concap_proto mechanism */
-	if (!p->cprot)
-		return -EINVAL;
-
-	return 0;
-}
-
-static void
-isdn_x25_cleanup(isdn_net_dev *p)
-{
-	isdn_net_local *lp = &p->local;
-	struct concap_proto * cprot = p -> cprot;
-	unsigned long flags;
-	
-	/* delete old encapsulation protocol if present ... */
-	save_flags(flags);
-	cli(); /* avoid races with incoming events trying to
-		  call cprot->pops methods */
-	if( cprot && cprot -> pops )
-		cprot -> pops -> proto_del ( cprot );
-	p -> cprot = NULL;
-	lp -> inl_priv = NULL;
-	restore_flags(flags);
-}
-
-struct isdn_netif_ops isdn_x25_ops = {
-	.hard_start_xmit     = isdn_x25_start_xmit,
-	.flags               = IFF_NOARP | IFF_POINTOPOINT,
-	.type                = ARPHRD_X25,
-	.receive             = isdn_x25_receive,
-	.connected           = isdn_x25_connected,
-	.disconnected        = isdn_x25_disconnected,
-	.init                = isdn_x25_init,
-	.cleanup             = isdn_x25_cleanup,
-	.open                = isdn_x25_open,
-	.close               = isdn_x25_close,
-};

@@ -21,10 +21,8 @@ static act2000_card *irq2card_map[16];
 static void
 act2000_isa_delay(long t)
 {
-        sti();
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(t);
-        sti();
 }
 
 /*
@@ -64,8 +62,10 @@ act2000_isa_detect(unsigned short portbase)
 {
         int ret = 0;
 
-        if (!check_region(portbase, ISA_REGION))
+	if (request_region(portbase, ACT2000_PORTLEN, "act2000isa")) {
                 ret = act2000_isa_reset(portbase);
+		release_region(portbase, ISA_REGION);
+	}
         return ret;
 }
 
@@ -177,14 +177,13 @@ act2000_isa_config_port(act2000_card * card, unsigned short portbase)
                 release_region(card->port, ISA_REGION);
                 card->flags &= ~ACT2000_FLAGS_PVALID;
         }
-        if (!check_region(portbase, ISA_REGION)) {
-                if (request_region(portbase, ACT2000_PORTLEN, card->regname) == NULL)
-			return -EIO;
+	if (request_region(portbase, ACT2000_PORTLEN, card->regname) == NULL)
+		return -EBUSY;
+	else {
                 card->port = portbase;
                 card->flags |= ACT2000_FLAGS_PVALID;
                 return 0;
         }
-        return -EBUSY;
 }
 
 /*
@@ -195,8 +194,7 @@ act2000_isa_release(act2000_card * card)
 {
         unsigned long flags;
 
-        save_flags(flags);
-        cli();
+        spin_lock_irqsave(&card->lock, flags);
         if (card->flags & ACT2000_FLAGS_IVALID) {
                 free_irq(card->irq, NULL);
                 irq2card_map[card->irq] = NULL;
@@ -205,7 +203,7 @@ act2000_isa_release(act2000_card * card)
         if (card->flags & ACT2000_FLAGS_PVALID)
                 release_region(card->port, ISA_REGION);
         card->flags &= ~ACT2000_FLAGS_PVALID;
-        restore_flags(flags);
+        spin_unlock_irqrestore(&card->lock, flags);
 }
 
 static int
@@ -316,8 +314,7 @@ act2000_isa_send(act2000_card * card)
         if (test_and_set_bit(ACT2000_LOCK_TX, (void *) &card->ilock) != 0)
 		return;
 	while (1) {
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&card->lock, flags);
 		if (!(card->sbuf)) {
 			if ((card->sbuf = skb_dequeue(&card->sndq))) {
 				card->ack_msg = card->sbuf->data;
@@ -330,7 +327,7 @@ act2000_isa_send(act2000_card * card)
 				}
 			}
 		}
-		restore_flags(flags);
+		spin_unlock_irqrestore(&card->lock, flags);
 		if (!(card->sbuf)) {
 			/* No more data to send */
 			test_and_clear_bit(ACT2000_LOCK_TX, (void *) &card->ilock);

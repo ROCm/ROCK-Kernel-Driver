@@ -108,6 +108,6 @@
 #define milliseconds(x)	(x/(1000/HZ))
 
 /* Determine if a channel number is valid for the adapter */
-#define IS_VALID_CHANNEL(y,x)	((x>0) && (x <= adapter[y]->channels))
+#define IS_VALID_CHANNEL(y,x)	((x>0) && (x <= sc_adapter[y]->channels))
 
 #endif

@@ -12,13 +12,26 @@
  */
 
 
+
+
+#define BYTE							unsigned char
+#define WORD							unsigned int
+#define rByteAMD(cs, reg)					cs->readisac(cs, reg)
+#define wByteAMD(cs, reg, val)					cs->writeisac(cs, reg, val)
+#define rWordAMD(cs, reg)					ReadWordAmd7930(cs, reg)
+#define wWordAMD(cs, reg, val)					WriteWordAmd7930(cs, reg, val)
+#define HIBYTE(w)						((unsigned char)((w & 0xff00) / 256))
+#define LOBYTE(w)						((unsigned char)(w & 0x00ff))
+
+#define AmdIrqOff(cs)						cs->dc.amd7930.setIrqMask(cs, 0)
+#define AmdIrqOn(cs)						cs->dc.amd7930.setIrqMask(cs, 1)
+
 #define AMD_CR		0x00
 #define AMD_DR		0x01
 
 
 #define DBUSY_TIMER_VALUE 80
 
-void Amd7930_interrupt(struct IsdnCardState *cs, unsigned char irflags);
-void Amd7930_init(struct IsdnCardState *cs);
-int  amd7930_setup(struct IsdnCardState *cs, struct dc_hw_ops *amd7930_ops,
-		   void (*set_irq_mask)(struct IsdnCardState *, u8 val));
+extern void Amd7930_interrupt(struct IsdnCardState *, unsigned char);
+extern void Amd7930_init(struct IsdnCardState *);
+extern void setup_Amd7930(struct IsdnCardState *);

@@ -1,4 +1,4 @@
-/* $Id: c4.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
+/* $Id: c4.c,v 1.1.2.2 2004/01/16 21:09:27 keil Exp $
  * 
  * Module for AVM C4 & C2 card.
  * 
@@ -31,6 +31,10 @@
 
 #undef CONFIG_C4_DEBUG
 #undef CONFIG_C4_POLLDEBUG
+
+/* ------------------------------------------------------------- */
+
+static char *revision = "$Revision: 1.1.2.2 $";
 
 /* ------------------------------------------------------------- */
 
@@ -404,18 +408,14 @@ static int c4_detect(avmcard *card)
 static void c4_dispatch_tx(avmcard *card)
 {
 	avmcard_dmainfo *dma = card->dma;
-	unsigned long flags;
 	struct sk_buff *skb;
 	u8 cmd, subcmd;
 	u16 len;
 	u32 txlen;
 	void *p;
-	
-	save_flags(flags);
-	cli();
+
 
 	if (card->csr & DBELL_DOWN_ARM) { /* tx busy */
-	        restore_flags(flags);
 		return;
 	}
 
@@ -424,7 +424,6 @@ static void c4_dispatch_tx(avmcard *card)
 #ifdef CONFIG_C4_DEBUG
 		printk(KERN_DEBUG "%s: tx underrun\n", card->name);
 #endif
-	        restore_flags(flags);
 		return;
 	}
 
@@ -470,7 +469,6 @@ static void c4_dispatch_tx(avmcard *card)
 
 	c4outmeml(card->mbase+DOORBELL, DBELL_DOWN_ARM);
 
-	restore_flags(flags);
 	dev_kfree_skb_any(skb);
 }
 
@@ -664,11 +662,15 @@ static void c4_handle_rx(avmcard *card)
 
 static irqreturn_t c4_handle_interrupt(avmcard *card)
 {
-	u32 status = c4inmeml(card->mbase+DOORBELL);
+	u32 status;
+
+	spin_lock(&card->lock);
+	status = c4inmeml(card->mbase+DOORBELL);
 
 	if (status & DBELL_RESET_HOST) {
 		u_int i;
 		c4outmeml(card->mbase+PCI_OUT_INT_MASK, 0x0c);
+		spin_unlock(&card->lock);
 		if (card->nlogcontr == 0)
 			return IRQ_HANDLED;
 		printk(KERN_ERR "%s: unexpected reset\n", card->name);
@@ -683,8 +685,10 @@ static irqreturn_t c4_handle_interrupt(avmcard *card)
 	}
 
 	status &= (DBELL_UP_HOST | DBELL_DOWN_HOST);
-	if (!status)
+	if (!status) {
+		spin_unlock(&card->lock);
 		return IRQ_HANDLED;
+	}
 	c4outmeml(card->mbase+DOORBELL, status);
 
 	if ((status & DBELL_UP_HOST) != 0) {
@@ -705,6 +709,7 @@ static irqreturn_t c4_handle_interrupt(avmcard *card)
 			c4_dispatch_tx(card);
 		}
 	}
+	spin_unlock(&card->lock);
 	return IRQ_HANDLED;
 }
 
@@ -767,6 +772,7 @@ static int queue_sendconfigword(avmcard *card, u32 val)
 static int queue_sendconfig(avmcard *card, char cval[4])
 {
 	struct sk_buff *skb;
+	unsigned long flags;
 	void *p;
 
 	skb = alloc_skb(3+4, GFP_ATOMIC);
@@ -786,7 +792,10 @@ static int queue_sendconfig(avmcard *card, char cval[4])
 	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
+	
+	spin_lock_irqsave(&card->lock, flags);
 	c4_dispatch_tx(card);
+	spin_unlock_irqrestore(&card->lock, flags);
 	return 0;
 }
 
@@ -835,7 +844,6 @@ static int c4_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	unsigned long flags;
 	int retval;
 
 	if ((retval = c4_load_t4file(card, &data->firmware))) {
@@ -844,9 +852,6 @@ static int c4_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 		c4_reset(card);
 		return retval;
 	}
-
-	save_flags(flags);
-	cli();
 
 	card->csr = 0;
 	c4outmeml(card->mbase+MBOX_UP_LEN, 0);
@@ -862,7 +867,6 @@ static int c4_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 	c4outmeml(card->mbase+MBOX_UP_ADDR, card->dma->recvbuf.dmaaddr);
 	c4outmeml(card->mbase+MBOX_UP_LEN, card->dma->recvbuf.size);
 	c4outmeml(card->mbase+DOORBELL, DBELL_UP_ARM);
-	restore_flags(flags);
 
 	if (data->configuration.len > 0 && data->configuration.data) {
 		retval = c4_send_config(card, &data->configuration);
@@ -885,8 +889,13 @@ void c4_reset_ctr(struct capi_ctr *ctrl)
 	avmcard *card = ((avmctrl_info *)(ctrl->driverdata))->card;
 	avmctrl_info *cinfo;
 	u_int i;
+	unsigned long flags;
+
+	spin_lock_irqsave(&card->lock, flags);
 
  	c4_reset(card);
+
+	spin_unlock_irqrestore(&card->lock, flags);
 
         for (i=0; i < card->nr_controllers; i++) {
 		cinfo = &card->ctrlinfo[i];
@@ -931,6 +940,7 @@ void c4_register_appl(struct capi_ctr *ctrl,
 	avmcard *card = cinfo->card;
 	struct sk_buff *skb;
 	int want = rp->level3cnt;
+	unsigned long flags;
 	int nconn;
 	void *p;
 
@@ -958,7 +968,10 @@ void c4_register_appl(struct capi_ctr *ctrl,
 		skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 		skb_queue_tail(&card->dma->send_queue, skb);
+	
+		spin_lock_irqsave(&card->lock, flags);
 		c4_dispatch_tx(card);
+		spin_unlock_irqrestore(&card->lock, flags);
 	}
 }
 
@@ -968,6 +981,7 @@ void c4_release_appl(struct capi_ctr *ctrl, u16 appl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
+	unsigned long flags;
 	struct sk_buff *skb;
 	void *p;
 
@@ -988,7 +1002,9 @@ void c4_release_appl(struct capi_ctr *ctrl, u16 appl)
 
 		skb_put(skb, (u8 *)p - (u8 *)skb->data);
 		skb_queue_tail(&card->dma->send_queue, skb);
+		spin_lock_irqsave(&card->lock, flags);
 		c4_dispatch_tx(card);
+		spin_unlock_irqrestore(&card->lock, flags);
 	}
 }
 
@@ -1000,6 +1016,7 @@ static u16 c4_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
 	u16 retval = CAPI_NOERROR;
+	unsigned long flags;
 
  	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_REQ) {
 		retval = capilib_data_b3_req(&cinfo->ncci_head,
@@ -1009,7 +1026,9 @@ static u16 c4_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	}
 	if (retval == CAPI_NOERROR) {
 		skb_queue_tail(&card->dma->send_queue, skb);
+		spin_lock_irqsave(&card->lock, flags);
 		c4_dispatch_tx(card);
+		spin_unlock_irqrestore(&card->lock, flags);
 	} else {
 		dev_kfree_skb_any(skb);
 	}
@@ -1164,6 +1183,7 @@ static int c4_add_card(struct capicardparams *p, struct pci_dev *dev,
 
 	for (i=0; i < nr_controllers ; i++) {
 		cinfo = &card->ctrlinfo[i];
+		cinfo->capi_ctrl.owner = THIS_MODULE;
 		cinfo->capi_ctrl.driver_name   = "c4";
 		cinfo->capi_ctrl.driverdata    = cinfo;
 		cinfo->capi_ctrl.register_appl = c4_register_appl;
@@ -1174,7 +1194,6 @@ static int c4_add_card(struct capicardparams *p, struct pci_dev *dev,
 		cinfo->capi_ctrl.procinfo      = c4_procinfo;
 		cinfo->capi_ctrl.ctr_read_proc = c4_read_proc;
 		strcpy(cinfo->capi_ctrl.name, card->name);
-		cinfo->capi_ctrl.owner = THIS_MODULE;
 
 		retval = attach_capi_ctr(&cinfo->capi_ctrl);
 		if (retval) {
@@ -1247,13 +1266,44 @@ static struct pci_driver c4_pci_driver = {
        .remove         = c4_remove,
 };
 
+static struct capi_driver capi_driver_c2 = {
+	.name		= "c2",
+	.revision	= "1.0",
+};
+
+static struct capi_driver capi_driver_c4 = {
+	.name		= "c4",
+	.revision	= "1.0",
+};
+
 static int __init c4_init(void)
 {
-	return pci_module_init(&c4_pci_driver);
+	char *p;
+	char rev[32];
+	int err;
+
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strlcpy(rev, p + 2, 32);
+		if ((p = strchr(rev, '$')) != 0 && p > rev)
+		   *(p-1) = 0;
+	} else
+		strcpy(rev, "1.0");
+
+	err = pci_module_init(&c4_pci_driver);
+	if (!err) {
+		strlcpy(capi_driver_c2.revision, rev, 32);
+		register_capi_driver(&capi_driver_c2);
+		strlcpy(capi_driver_c4.revision, rev, 32);
+		register_capi_driver(&capi_driver_c4);
+		printk(KERN_INFO "c4: revision %s\n", rev);
+	}
+	return err;
 }
 
 static void __exit c4_exit(void)
 {
+	unregister_capi_driver(&capi_driver_c2);
+	unregister_capi_driver(&capi_driver_c4);
 	pci_unregister_driver(&c4_pci_driver);
 }
 

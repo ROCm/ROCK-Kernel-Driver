@@ -39,7 +39,7 @@ printk(KERN_DEBUG "%s: " format "\n" , __FUNCTION__ , ## arg); \
 
 
 static void __attribute__((unused))
-dump_packet(const char *name,const u8 *data,int pkt_len)
+dump_packet(const char *name,const u_char *data,int pkt_len)
 {
 #define DUMP_HDR_SIZE 20
 #define DUMP_TLR_SIZE 8

@@ -1,4 +1,4 @@
-/* $Id: capifs.h,v 1.2.6.2 2001/09/23 22:24:33 kai Exp $
+/* $Id: capifs.h,v 1.1.2.2 2004/01/16 21:09:26 keil Exp $
  * 
  * Copyright 2000 by Carsten Paeth <calle@calle.de>
  *
@@ -7,5 +7,5 @@
  *
  */
 
-void capifs_new_ncci(char type, unsigned int num, dev_t device);
-void capifs_free_ncci(char type, unsigned int num);
+void capifs_new_ncci(unsigned int num, dev_t device);
+void capifs_free_ncci(unsigned int num);

@@ -1,4 +1,6 @@
-/* Linux ISDN subsystem, tty_fax AT-command emulator
+/* $Id: isdn_ttyfax.c,v 1.1.2.2 2004/01/12 22:37:19 keil Exp $
+ *
+ * Linux ISDN subsystem, tty_fax AT-command emulator (linklevel).
  *
  * Copyright 1999    by Armin Schindler (mac@melware.de)
  * Copyright 1999    by Ralf Spachmann (mel@melware.de)
@@ -6,6 +8,7 @@
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
 #undef ISDN_TTY_FAX_STAT_DEBUG
@@ -16,7 +19,25 @@
 #include "isdn_tty.h"
 #include "isdn_ttyfax.h"
 
+
+static char *isdn_tty_fax_revision = "$Revision: 1.1.2.2 $";
+
 #define PARSE_ERROR1 { isdn_tty_fax_modem_result(1, info); return 1; }
+
+static char *
+isdn_getrev(const char *revision)
+{
+	char *rev;
+	char *p;
+
+	if ((p = strchr(revision, ':'))) {
+		rev = p + 2;
+		p = strchr(rev, '$');
+		*--p = 0;
+	} else
+		rev = "???";
+	return rev;
+}
 
 /*
  * Fax Class 2 Modem results
@@ -53,7 +74,7 @@ isdn_tty_fax_modem_result(int code, modem_info * info)
 		case 2:	/* +FCON */
 			/* Append CPN, if enabled */
 			if ((m->mdmreg[REG_CPNFCON] & BIT_CPNFCON) &&
-				(!(info->isdn_slot->usage & ISDN_USAGE_OUTGOING))) {
+				(!(dev->usage[info->isdn_channel] & ISDN_USAGE_OUTGOING))) {
 				sprintf(rs, "/%s", m->cpn);
 				isdn_tty_at_cout(rs, info);
 			}
@@ -265,7 +286,7 @@ isdn_tty_fax_bitorder(modem_info * info, struct sk_buff *skb)
 	__u8 RightMask;
 	__u8 fBit;
 	__u8 Data;
-	u_int i;
+	int i;
 
 	if (!info->fax->bor) {
 		for (i = 0; i < skb->len; i++) {
@@ -301,9 +322,8 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 	static char *cmd[] =
 	{"AE", "TS", "RS", "TM", "RM", "TH", "RH"};
 	isdn_ctrl c;
-	int par;
-	struct isdn_slot *slot;
-	unsigned long flags;
+	int par, i;
+	u_long flags;
 
 	for (c.parm.aux.cmd = 0; c.parm.aux.cmd < 7; c.parm.aux.cmd++)
 		if (!strncmp(p[0], cmd[c.parm.aux.cmd], 2))
@@ -340,32 +360,46 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 		default:
 			PARSE_ERROR1;
 	}
+	c.command = ISDN_CMD_FAXCMD;
 #ifdef ISDN_TTY_FAX_CMD_DEBUG
 	printk(KERN_DEBUG "isdn_tty_cmd_FCLASS1 %d/%d/%d)\n",
 	       c.parm.aux.cmd, c.parm.aux.subcmd, c.parm.aux.para[0]);
 #endif
-	if (!info->isdn_slot) {
-		save_flags(flags);
-		cli();
+	if (info->isdn_driver < 0) {
 		if ((c.parm.aux.subcmd == AT_EQ_VALUE) ||
 		    (c.parm.aux.subcmd == AT_COMMAND)) {
-			restore_flags(flags);
 			PARSE_ERROR1;
 		}
+		spin_lock_irqsave(&dev->lock, flags);
 		/* get a temporary connection to the first free fax driver */
-		slot = isdn_get_free_slot(ISDN_USAGE_FAX, ISDN_PROTO_L2_FAX,
-				       ISDN_PROTO_L3_FCLASS1, -1, -1, "00");
-		if (!slot) {
-			restore_flags(flags);
+		i = isdn_get_free_channel(ISDN_USAGE_FAX, ISDN_PROTO_L2_FAX,
+					  ISDN_PROTO_L3_FCLASS1, -1, -1, "00");
+		if (i < 0) {
+			spin_unlock_irqrestore(&dev->lock, flags);
 			PARSE_ERROR1;
 		}
-		info->isdn_slot = slot;
-		isdn_slot_command(slot, ISDN_CMD_FAXCMD, &c);
-		isdn_slot_free(slot);
-		info->isdn_slot = NULL;
-		restore_flags(flags);
+		info->isdn_driver = dev->drvmap[i];
+		info->isdn_channel = dev->chanmap[i];
+		info->drv_index = i;
+		dev->m_idx[i] = info->line;
+		spin_unlock_irqrestore(&dev->lock, flags);
+		c.driver = info->isdn_driver;
+		c.arg = info->isdn_channel;
+		isdn_command(&c);
+		spin_lock_irqsave(&dev->lock, flags);
+		isdn_free_channel(info->isdn_driver, info->isdn_channel,
+				  ISDN_USAGE_FAX);
+		info->isdn_driver = -1;
+		info->isdn_channel = -1;
+		if (info->drv_index >= 0) {
+			dev->m_idx[info->drv_index] = -1;
+			info->drv_index = -1;
+		}
+		spin_unlock_irqrestore(&dev->lock, flags);
 	} else {
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &c);
+		c.driver = info->isdn_driver;
+		c.arg = info->isdn_channel;
+		isdn_command(&c);
 	}
 	return 1;
 }
@@ -766,7 +800,10 @@ isdn_tty_cmd_FCLASS2(char **p, modem_info * info)
 			printk(KERN_DEBUG "isdn_tty: Fax FDR\n");
 #endif
 			f->code = ISDN_TTY_FAX_DR;
-			isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &cmd);
+			cmd.driver = info->isdn_driver;
+			cmd.arg = info->isdn_channel;
+			cmd.command = ISDN_CMD_FAXCMD;
+			isdn_command(&cmd);
 			if (f->phase == ISDN_FAX_PHASE_B) {
 				f->phase = ISDN_FAX_PHASE_C;
 			} else if (f->phase == ISDN_FAX_PHASE_D) {
@@ -818,7 +855,10 @@ isdn_tty_cmd_FCLASS2(char **p, modem_info * info)
 #endif
 		if ((f->phase == ISDN_FAX_PHASE_B) || (f->phase == ISDN_FAX_PHASE_D)) {
 			f->code = ISDN_TTY_FAX_DT;
-			isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &cmd);
+			cmd.driver = info->isdn_driver;
+			cmd.arg = info->isdn_channel;
+			cmd.command = ISDN_CMD_FAXCMD;
+			isdn_command(&cmd);
 			if (f->phase == ISDN_FAX_PHASE_D) {
 				f->phase = ISDN_FAX_PHASE_C;
 				isdn_tty_fax_modem_result(7, info);	/* CONNECT */
@@ -873,7 +913,10 @@ isdn_tty_cmd_FCLASS2(char **p, modem_info * info)
 				PARSE_ERROR1;
 			f->fet = par;
 			f->code = ISDN_TTY_FAX_ET;
-			isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &cmd);
+			cmd.driver = info->isdn_driver;
+			cmd.arg = info->isdn_channel;
+			cmd.command = ISDN_CMD_FAXCMD;
+			isdn_command(&cmd);
 #ifdef ISDN_TTY_FAX_STAT_DEBUG
 			printk(KERN_DEBUG "isdn_tty: Fax FET=%d\n", par);
 #endif
@@ -1043,7 +1086,8 @@ isdn_tty_cmd_FCLASS2(char **p, modem_info * info)
 #ifdef ISDN_TTY_FAX_STAT_DEBUG
 		printk(KERN_DEBUG "isdn_tty: FREV?\n");
 #endif
-		sprintf(rs, "\r\nRev: 1.0");
+		strcpy(rss, isdn_tty_fax_revision);
+		sprintf(rs, "\r\nRev: %s", isdn_getrev(rss));
 		isdn_tty_at_cout(rs, info);
 		return 0;
 	}
