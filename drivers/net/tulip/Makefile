@@ -4,7 +4,7 @@
 # Makefile for the Linux "Tulip" family network device drivers.
 #
 
-O_TARGET := tulip_net.o
+O_TARGET := built-in.o
 
 obj-y		:=
 obj-m		:=
