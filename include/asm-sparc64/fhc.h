@@ -86,10 +86,10 @@ struct fhc_regs {
 #define  FHC_BSR_NIA		0x0000001c /* Jumper, bit 18 in PROM space       */
 #define  FHC_BSR_SI		0x00000001 /* Spare input pin value              */
 #define FHC_PREGS_ECC	0x40UL	/* FHC ECC Control Register (16 bits) */
-#define FHC_PREGS_JCTRL	0x50UL	/* FHC JTAG Control Register */
+#define FHC_PREGS_JCTRL	0xf0UL	/* FHC JTAG Control Register */
 #define  FHC_JTAG_CTRL_MENAB	0x80000000 /* Indicates this is JTAG Master	 */
 #define  FHC_JTAG_CTRL_MNONE	0x40000000 /* Indicates no JTAG Master present	 */
-#define FHC_PREGS_JCMD	0x60UL	/* FHC JTAG Command Register */
+#define FHC_PREGS_JCMD	0x100UL	/* FHC JTAG Command Register */
 	unsigned long			ireg;	/* FHC IGN reg */
 #define FHC_IREG_IGN	0x00UL	/* This FHC's IGN */
 	unsigned long			ffregs;	/* FHC fanfail regs */

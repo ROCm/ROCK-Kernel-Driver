@@ -65,24 +65,27 @@ struct page *mem_map_zero;
 
 int bigkernel = 0;
 
-int do_check_pgt_cache(int low, int high)
-{
-        int freed = 0;
+/* XXX Tune this... */
+#define PGT_CACHE_LOW	25
+#define PGT_CACHE_HIGH	50
 
-	if (pgtable_cache_size > high) {
+void check_pgt_cache(void)
+{
+	preempt_disable();
+	if (pgtable_cache_size > PGT_CACHE_HIGH) {
 		do {
 #ifdef CONFIG_SMP
 			if (pgd_quicklist)
-				free_pgd_slow(get_pgd_fast()), freed++;
+				free_pgd_slow(get_pgd_fast());
 #endif
 			if (pte_quicklist[0])
-				free_pte_slow(pte_alloc_one_fast(NULL, 0)), freed++;
+				free_pte_slow(pte_alloc_one_fast(NULL, 0));
 			if (pte_quicklist[1])
-				free_pte_slow(pte_alloc_one_fast(NULL, 1 << (PAGE_SHIFT + 10))), freed++;
-		} while (pgtable_cache_size > low);
+				free_pte_slow(pte_alloc_one_fast(NULL, 1 << (PAGE_SHIFT + 10)));
+		} while (pgtable_cache_size > PGT_CACHE_LOW);
 	}
-#ifndef CONFIG_SMP 
-        if (pgd_cache_size > high / 4) {
+#ifndef CONFIG_SMP
+        if (pgd_cache_size > PGT_CACHE_HIGH / 4) {
 		struct page *page, *page2;
                 for (page2 = NULL, page = (struct page *)pgd_quicklist; page;) {
                         if ((unsigned long)page->pprev_hash == 3) {
@@ -94,12 +97,11 @@ int do_check_pgt_cache(int low, int high)
                                 page->pprev_hash = NULL;
                                 pgd_cache_size -= 2;
                                 __free_page(page);
-                                freed++;
                                 if (page2)
                                         page = page2->next_hash;
                                 else
                                         page = (struct page *)pgd_quicklist;
-                                if (pgd_cache_size <= low / 4)
+                                if (pgd_cache_size <= PGT_CACHE_LOW / 4)
                                         break;
                                 continue;
                         }
@@ -108,7 +110,7 @@ int do_check_pgt_cache(int low, int high)
                 }
         }
 #endif
-        return freed;
+	preempt_enable();
 }
 
 #ifdef CONFIG_DEBUG_DCFLUSH
@@ -143,7 +145,7 @@ __inline__ void flush_dcache_page_impl(struct page *page)
 static __inline__ void set_dcache_dirty(struct page *page)
 {
 	unsigned long mask = smp_processor_id();
-	unsigned long non_cpu_bits = (1UL << 24UL) - 1UL;
+	unsigned long non_cpu_bits = ~((NR_CPUS - 1UL) << 24UL);
 	mask = (mask << 24) | (1UL << PG_dcache_dirty);
 	__asm__ __volatile__("1:\n\t"
 			     "ldx	[%2], %%g7\n\t"
@@ -166,6 +168,7 @@ static __inline__ void clear_dcache_dirty_cpu(struct page *page, unsigned long c
 			     "1:\n\t"
 			     "ldx	[%2], %%g7\n\t"
 			     "srlx	%%g7, 24, %%g5\n\t"
+			     "and	%%g5, %3, %%g5\n\t"
 			     "cmp	%%g5, %0\n\t"
 			     "bne,pn	%%icc, 2f\n\t"
 			     " andn	%%g7, %1, %%g5\n\t"
@@ -175,7 +178,8 @@ static __inline__ void clear_dcache_dirty_cpu(struct page *page, unsigned long c
 			     " membar	#StoreLoad | #StoreStore\n"
 			     "2:"
 			     : /* no outputs */
-			     : "r" (cpu), "r" (mask), "r" (&page->flags)
+			     : "r" (cpu), "r" (mask), "r" (&page->flags),
+			       "i" (NR_CPUS - 1UL)
 			     : "g5", "g7");
 }
 
@@ -189,7 +193,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t p
 	if (VALID_PAGE(page) &&
 	    page->mapping &&
 	    ((pg_flags = page->flags) & (1UL << PG_dcache_dirty))) {
-		int cpu = (pg_flags >> 24);
+		int cpu = ((pg_flags >> 24) & (NR_CPUS - 1UL));
 
 		/* This is just to optimize away some function calls
 		 * in the SMP case.
@@ -212,8 +216,8 @@ void flush_dcache_page(struct page *page)
 	int dirty_cpu = dcache_dirty_cpu(page);
 
 	if (page->mapping &&
-	    page->mapping->i_mmap == NULL &&
-	    page->mapping->i_mmap_shared == NULL) {
+	    list_empty(&page->mapping->i_mmap) &&
+	    list_empty(&page->mapping->i_mmap_shared)) {
 		if (dirty) {
 			if (dirty_cpu == smp_processor_id())
 				return;
@@ -244,7 +248,7 @@ static inline void flush_cache_pte_range(struct mm_struct *mm, pmd_t *pmd, unsig
 
 	if (pmd_none(*pmd))
 		return;
-	ptep = pte_offset(pmd, address);
+	ptep = pte_offset_map(pmd, address);
 	offset = address & ~PMD_MASK;
 	if (offset + size > PMD_SIZE)
 		size = PMD_SIZE - offset;
@@ -267,6 +271,7 @@ static inline void flush_cache_pte_range(struct mm_struct *mm, pmd_t *pmd, unsig
 				flush_dcache_page_all(mm, page);
 		}
 	}
+	pte_unmap(ptep - 1);
 }
 
 static inline void flush_cache_pmd_range(struct mm_struct *mm, pgd_t *dir, unsigned long address, unsigned long size)
@@ -389,7 +394,7 @@ unsigned long prom_virt_to_phys(unsigned long promva, int *error)
 			*error = 1;
 		return(0);
 	}
-	ptep = (pte_t *)pmd_page(*pmdp) + ((promva >> 13) & 0x3ff);
+	ptep = (pte_t *)__pmd_page(*pmdp) + ((promva >> 13) & 0x3ff);
 	if (!pte_present(*ptep)) {
 		if (error)
 			*error = 1;
@@ -466,7 +471,7 @@ static void inherit_prom_mappings(void)
 					memset(ptep, 0, BASE_PAGE_SIZE);
 					pmd_set(pmdp, ptep);
 				}
-				ptep = (pte_t *)pmd_page(*pmdp) +
+				ptep = (pte_t *)__pmd_page(*pmdp) +
 						((vaddr >> 13) & 0x3ff);
 
 				val = trans[i].data;
@@ -1133,11 +1138,20 @@ struct pgtable_cache_struct pgt_quicklists;
 #else
 #define DC_ALIAS_SHIFT	0
 #endif
-pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-	struct page *page = alloc_pages(GFP_KERNEL, DC_ALIAS_SHIFT);
-	unsigned long color = VPTE_COLOR(address);
+	struct page *page;
+	unsigned long color;
 
+	{
+		pte_t *ptep = pte_alloc_one_fast(mm, address);
+
+		if (ptep)
+			return ptep;
+	}
+
+	color = VPTE_COLOR(address);
+	page = alloc_pages(GFP_KERNEL, DC_ALIAS_SHIFT);
 	if (page) {
 		unsigned long *to_free;
 		unsigned long paddr;
@@ -1159,9 +1173,11 @@ pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 
 #if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
 		/* Now free the other one up, adjust cache size. */
+		preempt_disable();
 		*to_free = (unsigned long) pte_quicklist[color ^ 0x1];
 		pte_quicklist[color ^ 0x1] = to_free;
 		pgtable_cache_size++;
+		preempt_enable();
 #endif
 
 		return pte;

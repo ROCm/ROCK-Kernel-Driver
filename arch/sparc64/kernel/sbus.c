@@ -628,11 +628,11 @@ void sbus_set_sbus64(struct sbus_dev *sdev, int bursts)
 
 /* SBUS SYSIO INO number to Sparc PIL level. */
 static unsigned char sysio_ino_to_pil[] = {
-	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 0 */
-	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 1 */
-	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 2 */
-	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 3 */
-	3, /* Onboard SCSI */
+	0, 4, 4, 7, 5, 7, 8, 9,		/* SBUS slot 0 */
+	0, 4, 4, 7, 5, 7, 8, 9,		/* SBUS slot 1 */
+	0, 4, 4, 7, 5, 7, 8, 9,		/* SBUS slot 2 */
+	0, 4, 4, 7, 5, 7, 8, 9,		/* SBUS slot 3 */
+	4, /* Onboard SCSI */
 	5, /* Onboard Ethernet */
 /*XXX*/	8, /* Onboard BPP */
 	0, /* Bogon */

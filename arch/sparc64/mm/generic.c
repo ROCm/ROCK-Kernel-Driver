@@ -101,10 +101,11 @@ static inline int io_remap_pmd_range(pmd_t * pmd, unsigned long address, unsigne
 		end = PGDIR_SIZE;
 	offset -= address;
 	do {
-		pte_t * pte = pte_alloc(current->mm, pmd, address);
+		pte_t * pte = pte_alloc_map(current->mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		io_remap_pte_range(pte, address, end - address, address + offset, prot, space);
+		pte_unmap(pte);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address < end);

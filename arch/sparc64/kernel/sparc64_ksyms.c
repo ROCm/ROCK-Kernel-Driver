@@ -249,7 +249,7 @@ EXPORT_SYMBOL(_sigpause_common);
 /* Should really be in linux/kernel/ksyms.c */
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
-EXPORT_SYMBOL(pte_alloc_one);
+EXPORT_SYMBOL(pte_alloc_one_kernel);
 #ifndef CONFIG_SMP
 EXPORT_SYMBOL(pgt_quicklists);
 #endif

@@ -36,6 +36,95 @@
 #define LOW_OBP_ADDRESS		0x00000000f0000000
 #define HI_OBP_ADDRESS		0x0000000100000000
 
+#ifndef __ASSEMBLY__
+
+/* Cache and TLB flush operations. */
+
+/* These are the same regardless of whether this is an SMP kernel or not. */
+#define flush_cache_mm(__mm) \
+	do { if ((__mm) == current->mm) flushw_user(); } while(0)
+extern void flush_cache_range(struct vm_area_struct *, unsigned long, unsigned long);
+#define flush_cache_page(vma, page) \
+	flush_cache_mm((vma)->vm_mm)
+
+
+/* 
+ * On spitfire, the icache doesn't snoop local stores and we don't
+ * use block commit stores (which invalidate icache lines) during
+ * module load, so we need this.
+ */
+extern void flush_icache_range(unsigned long start, unsigned long end);
+
+extern void __flush_dcache_page(void *addr, int flush_icache);
+extern void __flush_icache_page(unsigned long);
+extern void flush_dcache_page_impl(struct page *page);
+#ifdef CONFIG_SMP
+extern void smp_flush_dcache_page_impl(struct page *page, int cpu);
+extern void flush_dcache_page_all(struct mm_struct *mm, struct page *page);
+#else
+#define smp_flush_dcache_page_impl(page,cpu) flush_dcache_page_impl(page)
+#define flush_dcache_page_all(mm,page) flush_dcache_page_impl(page)
+#endif
+
+extern void __flush_dcache_range(unsigned long start, unsigned long end);
+
+extern void __flush_cache_all(void);
+
+extern void __flush_tlb_all(void);
+extern void __flush_tlb_mm(unsigned long context, unsigned long r);
+extern void __flush_tlb_range(unsigned long context, unsigned long start,
+			      unsigned long r, unsigned long end,
+			      unsigned long pgsz, unsigned long size);
+extern void __flush_tlb_page(unsigned long context, unsigned long page, unsigned long r);
+
+#ifndef CONFIG_SMP
+
+#define flush_cache_all()	__flush_cache_all()
+#define flush_tlb_all()		__flush_tlb_all()
+
+#define flush_tlb_mm(__mm) \
+do { if(CTX_VALID((__mm)->context)) \
+	__flush_tlb_mm(CTX_HWBITS((__mm)->context), SECONDARY_CONTEXT); \
+} while(0)
+
+#define flush_tlb_range(__vma, start, end) \
+do { if(CTX_VALID((__vma)->vm_mm->context)) { \
+	unsigned long __start = (start)&PAGE_MASK; \
+	unsigned long __end = PAGE_ALIGN(end); \
+	__flush_tlb_range(CTX_HWBITS((__vma)->vm_mm->context), __start, \
+			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
+			  (__end - __start)); \
+     } \
+} while(0)
+
+#define flush_tlb_page(vma, page) \
+do { struct mm_struct *__mm = (vma)->vm_mm; \
+     if(CTX_VALID(__mm->context)) \
+	__flush_tlb_page(CTX_HWBITS(__mm->context), (page)&PAGE_MASK, \
+			 SECONDARY_CONTEXT); \
+} while(0)
+
+#else /* CONFIG_SMP */
+
+extern void smp_flush_cache_all(void);
+extern void smp_flush_tlb_all(void);
+extern void smp_flush_tlb_mm(struct mm_struct *mm);
+extern void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
+				unsigned long end);
+extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
+
+#define flush_cache_all()	smp_flush_cache_all()
+#define flush_tlb_all()		smp_flush_tlb_all()
+#define flush_tlb_mm(mm)	smp_flush_tlb_mm(mm)
+#define flush_tlb_range(vma, start, end) \
+	smp_flush_tlb_range(vma, start, end)
+#define flush_tlb_page(vma, page) \
+	smp_flush_tlb_page((vma)->vm_mm, page)
+
+#endif /* ! CONFIG_SMP */
+
+#endif /* ! __ASSEMBLY__ */
+
 /* XXX All of this needs to be rethought so we can take advantage
  * XXX cheetah's full 64-bit virtual address space, ie. no more hole
  * XXX in the middle like on spitfire. -DaveM
@@ -215,7 +304,8 @@ extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 	(pmd_val(*(pmdp)) = (__pa((unsigned long) (ptep)) >> 11UL))
 #define pgd_set(pgdp, pmdp)	\
 	(pgd_val(*(pgdp)) = (__pa((unsigned long) (pmdp)) >> 11UL))
-#define pmd_page(pmd)			((unsigned long) __va((pmd_val(pmd)<<11UL)))
+#define __pmd_page(pmd)			((unsigned long) __va((pmd_val(pmd)<<11UL)))
+#define pmd_page(pmd) 			virt_to_page((void *)__pmd_page(pmd))
 #define pgd_page(pgd)			((unsigned long) __va((pgd_val(pgd)<<11UL)))
 #define pte_none(pte) 			(!pte_val(pte))
 #define pte_present(pte)		(pte_val(pte) & _PAGE_PRESENT)
@@ -264,8 +354,13 @@ extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 					((address >> PMD_SHIFT) & (REAL_PTRS_PER_PMD-1)))
 
 /* Find an entry in the third-level page table.. */
-#define pte_offset(dir, address)	((pte_t *) pmd_page(*(dir)) + \
+#define __pte_offset(dir, address)	((pte_t *) __pmd_page(*(dir)) + \
 					((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+#define pte_offset_kernel		__pte_offset
+#define pte_offset_map			__pte_offset
+#define pte_offset_map_nested		__pte_offset
+#define pte_unmap(pte)			do { } while (0)
+#define pte_unmap_nested(pte)		do { } while (0)
 
 extern pgd_t swapper_pg_dir[1];
 
@@ -312,10 +407,10 @@ sun4u_get_pte (unsigned long addr)
 		return addr & _PAGE_PADDR;
 	if ((addr >= LOW_OBP_ADDRESS) && (addr < HI_OBP_ADDRESS))
 		return prom_virt_to_phys(addr, 0);
-	pgdp = pgd_offset_k (addr);
-	pmdp = pmd_offset (pgdp, addr);
-	ptep = pte_offset (pmdp, addr);
-	return pte_val (*ptep) & _PAGE_PADDR;
+	pgdp = pgd_offset_k(addr);
+	pmdp = pmd_offset(pgdp, addr);
+	ptep = pte_offset_kernel(pmdp, addr);
+	return pte_val(*ptep) & _PAGE_PADDR;
 }
 
 extern __inline__ unsigned long
@@ -350,11 +445,18 @@ extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, u
 extern unsigned long get_fb_unmapped_area(struct file *filp, unsigned long, unsigned long, unsigned long, unsigned long);
 #define HAVE_ARCH_FB_UNMAPPED_AREA
 
-#endif /* !(__ASSEMBLY__) */
-
 /*
  * No page table caches to initialise
  */
 #define pgtable_cache_init()	do { } while (0)
+
+extern void check_pgt_cache(void);
+
+extern void flush_dcache_page(struct page *page);
+
+/* This is unnecessary on the SpitFire since D-CACHE is write-through. */
+#define flush_page_to_ram(page)			do { } while (0)
+
+#endif /* !(__ASSEMBLY__) */
 
 #endif /* !(_SPARC64_PGTABLE_H) */
