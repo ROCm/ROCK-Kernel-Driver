@@ -18,7 +18,7 @@
 extern unsigned long loops_per_jiffy;
 #endif 
 
-extern __inline__ void __delay(unsigned long loops)
+static __inline__ void __delay(unsigned long loops)
 {
 	__asm__ __volatile__(
 "	b,pt	%%xcc, 1f\n"
@@ -32,7 +32,7 @@ extern __inline__ void __delay(unsigned long loops)
 	: "cc");
 }
 
-extern __inline__ void __udelay(unsigned long usecs, unsigned long lps)
+static __inline__ void __udelay(unsigned long usecs, unsigned long lps)
 {
 	usecs *= 0x00000000000010c6UL;		/* 2**32 / 1000000 */
 

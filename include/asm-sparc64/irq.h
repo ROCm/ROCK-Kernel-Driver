@@ -133,21 +133,21 @@ extern int request_fast_irq(unsigned int irq,
 			    unsigned long flags, __const__ char *devname,
 			    void *dev_id);
 
-extern __inline__ void set_softint(unsigned long bits)
+static __inline__ void set_softint(unsigned long bits)
 {
 	__asm__ __volatile__("wr	%0, 0x0, %%set_softint"
 			     : /* No outputs */
 			     : "r" (bits));
 }
 
-extern __inline__ void clear_softint(unsigned long bits)
+static __inline__ void clear_softint(unsigned long bits)
 {
 	__asm__ __volatile__("wr	%0, 0x0, %%clear_softint"
 			     : /* No outputs */
 			     : "r" (bits));
 }
 
-extern __inline__ unsigned long get_softint(void)
+static __inline__ unsigned long get_softint(void)
 {
 	unsigned long retval;
 
