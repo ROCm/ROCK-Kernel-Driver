@@ -18,6 +18,7 @@
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <asm/pci-bridge.h>
+#include <asm/prom.h>
 #ifndef CONFIG_PM
 #	define CONFIG_PM
 #endif
