@@ -2087,7 +2087,6 @@ S:	Maintained
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff
 M:	R.E.Wolff@BitWizard.nl
-M:	io8-linux@specialix.co.uk
 L:	linux-kernel@vger.kernel.org ?
 S:	Supported
 
