@@ -361,7 +361,7 @@ void ia64_elf32_init(struct pt_regs *regs);
 /* This macro yields a string that ld.so will use to load
    implementation specific libraries for optimization.  Not terribly
    relevant until we have real hardware to play with... */
-#define ELF_PLATFORM	0
+#define ELF_PLATFORM	NULL
 
 #ifdef __KERNEL__
 # define SET_PERSONALITY(EX,IBCS2)				\
@@ -439,7 +439,7 @@ void ia64_elf32_init(struct pt_regs *regs);
 	 | ((((sd) >> IA32_SEG_DB) & 0x1) << SEG_DB)						 \
 	 | ((((sd) >> IA32_SEG_G) & 0x1) << SEG_G))
 
-#define IA32_IOBASE	0x2000000000000000 /* Virtual address for I/O space */
+#define IA32_IOBASE	0x2000000000000000UL /* Virtual address for I/O space */
 
 #define IA32_CR0	0x80000001	/* Enable PG and PE bits */
 #define IA32_CR4	0x600		/* MMXEX and FXSR on */
@@ -556,8 +556,8 @@ struct user_regs_struct32 {
 };
 
 /* Prototypes for use in elfcore32.h */
-extern int save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save);
-extern int save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save);
+extern int save_ia32_fpstate (struct task_struct *, struct ia32_user_i387_struct __user *);
+extern int save_ia32_fpxstate (struct task_struct *, struct ia32_user_fxsr_struct __user *);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

@@ -60,4 +60,6 @@
 # error HARDIRQ_BITS is too low!
 #endif
 
+extern void __iomem *ipi_base_addr;
+
 #endif /* _ASM_IA64_HARDIRQ_H */

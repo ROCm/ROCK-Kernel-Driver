@@ -67,9 +67,9 @@ check_pgt_cache (void)
 	if (pgtable_cache_size > (u64) high) {
 		do {
 			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast(0));
+				free_page((unsigned long)pgd_alloc_one_fast(NULL));
 			if (pmd_quicklist)
-				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
+				free_page((unsigned long)pmd_alloc_one_fast(NULL, 0));
 		} while (pgtable_cache_size > (u64) low);
 	}
 	preempt_enable();
@@ -460,9 +460,9 @@ ia64_pfn_valid (unsigned long pfn)
 	char byte;
 	struct page *pg = pfn_to_page(pfn);
 
-	return     (__get_user(byte, (char *) pg) == 0)
+	return     (__get_user(byte, (char __user *) pg) == 0)
 		&& ((((u64)pg & PAGE_MASK) == (((u64)(pg + 1) - 1) & PAGE_MASK))
-			|| (__get_user(byte, (char *) (pg + 1) - 1) == 0));
+			|| (__get_user(byte, (char __user *) (pg + 1) - 1) == 0));
 }
 EXPORT_SYMBOL(ia64_pfn_valid);
 
