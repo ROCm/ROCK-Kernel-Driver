@@ -378,10 +378,10 @@ static int sw_parse(unsigned char *buf, struct sw *sw)
 			for (j = 0; j < 6; j++)
 				input_report_key(dev, sw_btn[SW_ID_FSP][j], !GB(j+10,1));
 
-			input_report_key(dev, BTN_TR,     GB(26,1));
-			input_report_key(dev, BTN_START,  GB(27,1));
-			input_report_key(dev, BTN_MODE,   GB(38,1));
-			input_report_key(dev, BTN_SELECT, GB(39,1));
+			input_report_key(dev, BTN_TR,     !GB(26,1));
+			input_report_key(dev, BTN_START,  !GB(27,1));
+			input_report_key(dev, BTN_MODE,   !GB(38,1));
+			input_report_key(dev, BTN_SELECT, !GB(39,1));
 
 			input_sync(dev);
 
@@ -602,7 +602,6 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 		gameport->phys, gameport->io, gameport->speed);
 
 	i = sw_read_packet(gameport, buf, SW_LENGTH, 0);		/* Read normal packet */
-	m |= sw_guess_mode(buf, i);					/* Data packet (1-bit) can carry mode info [FSP] */
 	udelay(SW_TIMEOUT);
 	dbg("Init 1: Mode %d. Length %d.", m , i);
 
@@ -676,6 +675,8 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 					} else
 					sw->type = SW_ID_PP;
 					break;
+				case 66:
+					sw->bits = 3;
 				case 198:
 					sw->length = 22;
 				case 64:
