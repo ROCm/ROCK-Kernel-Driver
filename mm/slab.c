@@ -2355,7 +2355,7 @@ static void drain_array_locked(kmem_cache_t *cachep,
 	int tofree;
 
 	check_spinlock_acquired(cachep);
-	if (ac->touched) {
+	if (ac->touched && !force) {
 		ac->touched = 0;
 	} else if (ac->avail) {
 		tofree = force ? ac->avail : (ac->limit+4)/5;
