@@ -919,6 +919,7 @@ void usb_disconnect(struct usb_device **pdev)
 	release_address(udev);
 	usbfs_remove_device(udev);
 	up(&udev->serialize);
+	usb_remove_sysfs_dev_files(udev);
 	device_unregister(&udev->dev);
 }
 

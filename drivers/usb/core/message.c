@@ -827,6 +827,7 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 			interface = dev->actconfig->interface[i];
 			dev_dbg (&dev->dev, "unregistering interface %s\n",
 				interface->dev.bus_id);
+			usb_remove_sysfs_intf_files(interface);
 			device_del (&interface->dev);
 		}
 
