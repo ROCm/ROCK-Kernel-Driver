@@ -262,8 +262,7 @@ write_out_data_locked:
 				if (!jbd_trylock_bh_state(bh)) {
 					spin_unlock(&journal->j_list_lock);
 					schedule();
-					spin_lock(&journal->j_list_lock);
-					break;
+					goto write_out_data;
 				}
 				__journal_unfile_buffer(jh);
 				jh->b_transaction = NULL;
