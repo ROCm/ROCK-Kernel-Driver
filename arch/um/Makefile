@@ -12,8 +12,7 @@ SHELL := /bin/bash
 filechk_gen_header = $<
 
 core-y			+= $(ARCH_DIR)/kernel/		\
-			   $(ARCH_DIR)/drivers/		\
-			   $(ARCH_DIR)/sys-$(SUBARCH)/
+			   $(ARCH_DIR)/drivers/
 
 # Have to precede the include because the included Makefiles reference them.
 SYMLINK_HEADERS = archparam.h system.h sigcontext.h processor.h ptrace.h \
@@ -37,6 +36,9 @@ SYS_DIR		:= $(ARCH_DIR)/include/sysdep-$(SUBARCH)
 
 include $(srctree)/$(ARCH_DIR)/Makefile-$(SUBARCH)
 include $(srctree)/$(ARCH_DIR)/Makefile-os-$(OS)
+
+core-y += $(SUBARCH_CORE)
+libs-y += $(SUBARCH_LIBS)
 
 # -Derrno=kernel_errno - This turns all kernel references to errno into
 # kernel_errno to separate them from the libc errno.  This allows -fno-common
