@@ -34,12 +34,14 @@
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 #include <linux/workqueue.h>
 #include <linux/nmi.h>
 #include <acpi/acpi.h>
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <asm/uaccess.h>
+#include <linux/vmalloc.h>
 
 #ifdef CONFIG_ACPI_EFI
 #include <linux/efi.h>
@@ -136,7 +138,33 @@ acpi_os_free(void *ptr)
 {
 	kfree(ptr);
 }
-
+ #ifdef CONFIG_ACPI_INITRD
+ unsigned char* get_dsdt_from_initrd(unsigned char *start, unsigned char *end)
+ {
+        unsigned char *data;
+        unsigned char signature[] = "INITRDDSDT123DSDT123";
+ 
+        if (start == NULL)
+                return NULL;
+        printk(KERN_INFO "Looking for DSDT in initrd ...");
+        if (!memcmp(start, "DSDT", 4)) {
+                printk(" found at beginning!\n");
+                return start;
+        }
+        end-=sizeof(signature)+5; /* don't scan above end, signature+\0+DSDT */
+        for (data=start; data < end ; ++data) {
+                if (!memcmp(data, signature, sizeof(signature)-1)) {
+                        if (!memcmp(data+sizeof(signature), "DSDT", 4)) {
+                                printk(" found (at offset %u)!\n", data+sizeof(signature)-start);
+                                return data+sizeof(signature);
+                        }
+                }
+        }
+        printk(" not found!\n");
+ 
+        return NULL;
+ }
+ #endif
 acpi_status
 acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
 {
@@ -227,11 +255,26 @@ acpi_status
 acpi_os_table_override (struct acpi_table_header *existing_table,
 			struct acpi_table_header **new_table)
 {
-	if (!existing_table || !new_table)
-		return AE_BAD_PARAMETER;
-
-	*new_table = NULL;
-	return AE_OK;
+ #ifdef CONFIG_ACPI_INITRD
+        extern unsigned long initrd_start, initrd_end;
+        unsigned char* new_dsdt=NULL;
+ 
+ #endif
+         if (!existing_table || !new_table)
+                 return AE_BAD_PARAMETER;
+  
+ #ifdef CONFIG_ACPI_INITRD
+        if (strncmp(existing_table->signature, "DSDT", 4) == 0 &&
+                (new_dsdt=get_dsdt_from_initrd((unsigned char*)initrd_start,
+                        (unsigned char*)initrd_end)) != NULL)
+                *new_table = (struct acpi_table_header*)new_dsdt;
+        else
+                *new_table = NULL;
+ #else
+         *new_table = NULL;
+ #endif
+ 
+         return AE_OK;
 }
 
 static irqreturn_t
