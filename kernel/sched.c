@@ -3483,6 +3483,22 @@ int cond_resched_lock(spinlock_t * lock)
 
 EXPORT_SYMBOL(cond_resched_lock);
 
+int __sched cond_resched_softirq(void)
+{
+	BUG_ON(!in_softirq());
+
+	if (need_resched()) {
+		__local_bh_enable();
+		__cond_resched();
+		local_bh_disable();
+		return 1;
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL(cond_resched_softirq);
+
+
 /**
  * yield - yield the current processor to other threads.
  *

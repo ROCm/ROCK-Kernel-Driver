@@ -1069,9 +1069,12 @@ static inline int need_resched(void)
  * cond_resched() and cond_resched_lock(): latency reduction via
  * explicit rescheduling in places that are safe. The return
  * value indicates whether a reschedule was done in fact.
+ * cond_resched_lock() will drop the spinlock before scheduling,
+ * cond_resched_softirq() will enable bhs before scheduling.
  */
 extern int cond_resched(void);
 extern int cond_resched_lock(spinlock_t * lock);
+extern int cond_resched_softirq(void);
 
 /*
  * Does a critical section need to be broken due to another
