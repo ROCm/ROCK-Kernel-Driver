@@ -1235,7 +1235,7 @@ int __init tridentfb_init(void)
 	}
 
 	output("fb%d: %s frame buffer device %dx%d-%dbpp\n",
-	   GET_FB_IDX(fb_info.gen.info.node), fb_info.gen.info.modename,default_var.xres,
+	   minor(fb_info.gen.info.node), fb_info.gen.info.modename,default_var.xres,
 	   default_var.yres,default_var.bits_per_pixel);
 	return 0;
 }
