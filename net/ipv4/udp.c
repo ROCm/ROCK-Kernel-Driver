@@ -1122,15 +1122,15 @@ int udp_rcv(struct sk_buff *skb)
 	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
 		goto no_header;
 
-	ulen = ntohs(skb->h.uh->len);
+	uh = skb->h.uh;
+
+	ulen = ntohs(uh->len);
 
 	if (ulen > len || ulen < sizeof(*uh))
 		goto short_packet;
 
 	if (pskb_trim(skb, ulen))
 		goto short_packet;
-
-  	uh = skb->h.uh;
 
 	if (udp_checksum_init(skb, uh, ulen, saddr, daddr) < 0)
 		goto csum_error;
@@ -1161,7 +1161,14 @@ int udp_rcv(struct sk_buff *skb)
 	return(0);
 
 short_packet:
-	NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "UDP: short packet: %d/%d\n", ulen, len));
+	NETDEBUG(if (net_ratelimit())
+		printk(KERN_DEBUG "UDP: short packet: From %u.%u.%u.%u:%u %d/%d to %u.%u.%u.%u:%u\n",
+			NIPQUAD(saddr),
+			ntohs(uh->source),
+			ulen,
+			len,
+			NIPQUAD(daddr),
+			ntohs(uh->dest)));
 no_header:
 	UDP_INC_STATS_BH(UdpInErrors);
 	kfree_skb(skb);
