@@ -145,7 +145,7 @@ struct vm_operations_struct {
  *
  * TODO: make this structure smaller, it could be as small as 32 bytes.
  */
-typedef struct page {
+struct page {
 	struct list_head list;		/* ->mapping has some page lists. */
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
 	unsigned long index;		/* Our offset within mapping. */
@@ -170,7 +170,7 @@ typedef struct page {
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
 #endif /* CONFIG_HIGMEM || WANT_PAGE_VIRTUAL */
-} mem_map_t;
+};
 
 /*
  * Methods to modify the page usage count.
@@ -306,7 +306,7 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 #define NOPAGE_OOM	((struct page *) (-1))
 
 /* The array of struct pages */
-extern mem_map_t * mem_map;
+extern struct page *mem_map;
 
 extern void show_free_areas(void);
 extern void show_free_areas_node(pg_data_t *pgdat);

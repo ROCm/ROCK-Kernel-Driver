@@ -172,8 +172,8 @@ extern pg_data_t contig_page_data;
 
 #endif /* !CONFIG_DISCONTIGMEM */
 
-#define MAP_ALIGN(x)	((((x) % sizeof(mem_map_t)) == 0) ? (x) : ((x) + \
-		sizeof(mem_map_t) - ((x) % sizeof(mem_map_t))))
+#define MAP_ALIGN(x)	((((x) % sizeof(struct page)) == 0) ? (x) : ((x) + \
+		sizeof(struct page) - ((x) % sizeof(struct page))))
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
