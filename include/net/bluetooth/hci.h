@@ -68,7 +68,9 @@ enum {
 	HCI_ENCRYPT,
 	HCI_INQUIRY,
 
-	HCI_RAW
+	HCI_RAW,
+
+	HCI_SECMGR
 };
 
 /* HCI ioctl defines */
@@ -91,7 +93,8 @@ enum {
 #define HCISETLINKMODE	_IOW('H', 226, int)
 #define HCISETACLMTU	_IOW('H', 227, int)
 #define HCISETSCOMTU	_IOW('H', 228, int)
-#define HCISETRAWVND	_IOW('H', 229, int)
+
+#define HCISETSECMGR	_IOW('H', 230, int)
 
 #define HCIINQUIRY	_IOR('H', 240, int)
 
@@ -324,18 +327,26 @@ struct hci_cp_inquiry {
 #define OCF_INQUIRY_CANCEL	0x0002
 
 #define OCF_LINK_KEY_REPLY	0x000B
-#define OCF_LINK_KEY_NEG_REPLY	0x000C
 struct hci_cp_link_key_reply {
 	bdaddr_t bdaddr;
 	__u8     link_key[16];
 } __attribute__ ((packed));
 
+#define OCF_LINK_KEY_NEG_REPLY	0x000C
+struct hci_cp_link_key_neg_reply {
+	bdaddr_t bdaddr;
+} __attribute__ ((packed));
+
 #define OCF_PIN_CODE_REPLY	0x000D
-#define OCF_PIN_CODE_NEG_REPLY	0x000E
 struct hci_cp_pin_code_reply {
 	bdaddr_t bdaddr;
 	__u8     pin_len;
 	__u8     pin_code[16];
+} __attribute__ ((packed));
+
+#define OCF_PIN_CODE_NEG_REPLY	0x000E
+struct hci_cp_pin_code_neg_reply {
+	bdaddr_t bdaddr;
 } __attribute__ ((packed));
 
 #define OCF_CHANGE_CONN_PTYPE	0x000F
