@@ -4412,7 +4412,7 @@ static void __devinit arch_destroy_sched_domains(void)
 
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
-#define SCHED_DOMAIN_DEBUG
+#undef SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
 static void sched_domain_debug(void)
 {
