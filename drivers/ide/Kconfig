@@ -734,10 +734,10 @@ config BLK_DEV_PDC202XX_NEW
 
 # FIXME - probably wants to be one for old and for new
 config PDC202XX_FORCE
-	bool "Special FastTrak Feature"
+	bool "Enable controller even if disabled by BIOS"
 	depends on BLK_DEV_PDC202XX_NEW=y
 	help
-	  For FastTrak enable overriding BIOS.
+	  Enable the PDC202xx controller even if it has been disabled in the BIOS setup.
 
 config BLK_DEV_SVWKS
 	tristate "ServerWorks OSB4/CSB5/CSB6 chipsets support"
