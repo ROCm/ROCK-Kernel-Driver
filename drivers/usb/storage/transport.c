@@ -154,10 +154,9 @@ static int usb_stor_msg_common(struct us_data *us, int timeout)
 	 * easier than always having the caller tell us whether the
 	 * transfer buffer has already been mapped. */
 	us->current_urb->transfer_flags =
-			(us->current_urb->transfer_buffer == us->iobuf)
-			? URB_ASYNC_UNLINK | URB_NO_SETUP_DMA_MAP
-				| URB_NO_TRANSFER_DMA_MAP
-			: URB_ASYNC_UNLINK | URB_NO_SETUP_DMA_MAP;
+			URB_ASYNC_UNLINK | URB_NO_SETUP_DMA_MAP;
+	if (us->current_urb->transfer_buffer == us->iobuf)
+		us->current_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 	us->current_urb->transfer_dma = us->iobuf_dma;
 	us->current_urb->setup_dma = us->cr_dma;
 
