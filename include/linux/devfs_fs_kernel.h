@@ -67,11 +67,6 @@ extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
 extern int devfs_only (void);
 extern int devfs_register_tape (devfs_handle_t de);
 extern void devfs_unregister_tape(int num);
-extern void devfs_register_series (devfs_handle_t dir, const char *format,
-				   unsigned int num_entries,
-				   unsigned int flags, unsigned int major,
-				   unsigned int minor_start,
-				   umode_t mode, void *ops, void *info);
 extern int devfs_alloc_major (char type);
 extern void devfs_dealloc_major (char type, int major);
 extern dev_t devfs_alloc_devnum (char type);
@@ -178,17 +173,6 @@ static inline int devfs_register_tape (devfs_handle_t de)
 static inline void devfs_unregister_tape(int num)
 {
 }
-static inline void devfs_register_series (devfs_handle_t dir,
-					  const char *format,
-					  unsigned int num_entries,
-					  unsigned int flags,
-					  unsigned int major,
-					  unsigned int minor_start,
-					  umode_t mode, void *ops, void *info)
-{
-    return;
-}
-
 static inline int devfs_alloc_major (char type)
 {
     return -1;
