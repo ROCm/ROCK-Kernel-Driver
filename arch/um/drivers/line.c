@@ -89,14 +89,25 @@ static int flush_buffer(struct line *line)
 	return(line->head == line->tail);
 }
 
-int line_write(struct line *lines, struct tty_struct *tty, const char *buf, 
-	       int len)
+int line_write(struct line *lines, struct tty_struct *tty, int from_user,
+	       const char *buf, int len)
 {
 	struct line *line;
+	char *new;
 	unsigned long flags;
 	int n, err, i;
 
 	if(tty->stopped) return 0;
+
+	if(from_user){
+		new = kmalloc(len, GFP_KERNEL);
+		if(new == NULL)
+			return(0);
+		n = copy_from_user(new, buf, len);
+		if(n == len)
+			return(-EFAULT);
+		buf = new;
+	}
 
 	i = minor(tty->device) - tty->driver.minor_start;
 	line = &lines[i];
@@ -522,7 +533,7 @@ static void winch_cleanup(void)
 	list_for_each(ele, &winch_handlers){
 		winch = list_entry(ele, struct winch, list);
 		close(winch->fd);
-		if(winch->pid != -1) os_kill_process(winch->pid);
+		if(winch->pid != -1) os_kill_process(winch->pid, 0);
 	}
 }
 
