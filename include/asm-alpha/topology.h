@@ -43,6 +43,9 @@ static inline int __node_to_cpu_mask(int node)
 # define __node_to_memblk(node)		(node)
 # define __memblk_to_node(memblk)	(memblk)
 
+/* Cross-node load balancing interval. */
+# define NODE_BALANCE_RATE 10
+
 #else /* CONFIG_NUMA */
 # include <asm-generic/topology.h>
 #endif /* !CONFIG_NUMA */
