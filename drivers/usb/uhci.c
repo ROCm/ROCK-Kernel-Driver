@@ -1264,20 +1264,29 @@ static int uhci_submit_bulk(struct urb *urb, struct urb *eurb)
 			data);
 
 		data += pktsze;
-		len -= pktsze;
+		len -= maxsze;
 
 		usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe),
 			usb_pipeout(urb->pipe));
 	} while (len > 0);
 
+	/*
+	 * USB_ZERO_PACKET means adding a 0-length packet, if
+	 * direction is OUT and the transfer_length was an
+	 * exact multiple of maxsze, hence
+	 * (len = transfer_length - N * maxsze) == 0
+	 * however, if transfer_length == 0, the zero packet
+	 * was already prepared above.
+	 */
 	if (usb_pipeout(urb->pipe) && (urb->transfer_flags & USB_ZERO_PACKET) &&
-	   urb->transfer_buffer_length) {
+	   !len && urb->transfer_buffer_length) {
 		td = uhci_alloc_td(uhci, urb->dev);
 		if (!td)
 			return -ENOMEM;
 
 		uhci_add_td_to_urb(urb, td);
-		uhci_fill_td(td, status, destination | UHCI_NULL_DATA_SIZE |
+		uhci_fill_td(td, status, destination |
+			(UHCI_NULL_DATA_SIZE << 21) |
 			(usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe),
 			 usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE),
 			data);
