@@ -864,16 +864,24 @@ out_unlock:
  *	Exceptional case: normally we are not allowed to unhash a busy
  * directory. In this case, however, we can do it - no aliasing problems
  * due to the way we treat inodes.
+ *
+ * Rewrite the inode's ownerships here because the owning task may have
+ * performed a setuid(), etc.
  */
-static int pid_revalidate(struct dentry * dentry, struct nameidata *nd)
+static int pid_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
-	if (pid_alive(proc_task(dentry->d_inode)))
+	if (pid_alive(proc_task(dentry->d_inode))) {
+		struct task_struct *task = proc_task(dentry->d_inode);
+
+		dentry->d_inode->i_uid = task->euid;
+		dentry->d_inode->i_gid = task->egid;
 		return 1;
+	}
 	d_drop(dentry);
 	return 0;
 }
 
-static int pid_fd_revalidate(struct dentry * dentry, struct nameidata *nd)
+static int pid_fd_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	struct task_struct *task = proc_task(dentry->d_inode);
 	int fd = proc_type(dentry->d_inode) - PROC_PID_FD_DIR;
@@ -889,6 +897,8 @@ static int pid_fd_revalidate(struct dentry * dentry, struct nameidata *nd)
 		if (fcheck_files(files, fd)) {
 			spin_unlock(&files->file_lock);
 			put_files_struct(files);
+			dentry->d_inode->i_uid = task->euid;
+			dentry->d_inode->i_gid = task->egid;
 			return 1;
 		}
 		spin_unlock(&files->file_lock);
