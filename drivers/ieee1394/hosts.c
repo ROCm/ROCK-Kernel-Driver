@@ -103,6 +103,7 @@ static int alloc_hostnum_cb(struct hpsb_host *host, void *__data)
  * Return Value: a pointer to the &hpsb_host if succesful, %NULL if
  * no memory was available.
  */
+static DECLARE_MUTEX(host_num_alloc);
 
 struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 				  struct device *dev)
@@ -148,14 +149,12 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
         h->topology_map = h->csr.topology_map + 3;
         h->speed_map = (u8 *)(h->csr.speed_map + 2);
 
-	while (1) {
-		if (!nodemgr_for_each_host(&hostnum, alloc_hostnum_cb)) {
-			h->id = hostnum;
-			break;
-		}
+	down(&host_num_alloc);
 
+	while (nodemgr_for_each_host(&hostnum, alloc_hostnum_cb))
 		hostnum++;
-	}
+
+	h->id = hostnum;
 
 	memcpy(&h->device, &nodemgr_dev_template_host, sizeof(h->device));
 	h->device.parent = dev;
@@ -168,6 +167,8 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 	device_register(&h->device);
 	class_device_register(&h->class_dev);
 	get_device(&h->device);
+
+	up(&host_num_alloc);
 
 	return h;
 }
