@@ -681,6 +681,10 @@ static int do_add_mount(struct nameidata *nd, char *type, int flags,
 	if (nd->mnt->mnt_sb == mnt->mnt_sb && nd->mnt->mnt_root == nd->dentry)
 		goto unlock;
 
+	err = -EINVAL;
+	if (S_ISLNK(mnt->mnt_root->d_inode->i_mode))
+		goto unlock;
+
 	mnt->mnt_flags = mnt_flags;
 	err = graft_tree(mnt, nd);
 unlock:
