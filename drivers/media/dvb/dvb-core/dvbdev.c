@@ -73,7 +73,7 @@ static int dvb_device_open(struct inode *inode, struct file *file)
 {
 	struct dvb_device *dvbdev;
 	
-	dvbdev = dvbdev_find_device (minor(inode->i_rdev));
+	dvbdev = dvbdev_find_device (iminor(inode));
 
 	if (dvbdev && dvbdev->fops) {
 		int err = 0;

@@ -130,7 +130,7 @@ static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int acq_open(struct inode *inode, struct file *file)
 {
-	if ((minor(inode->i_rdev) == WATCHDOG_MINOR)) {
+	if ((iminor(inode) == WATCHDOG_MINOR)) {
 		spin_lock(&acq_lock);
 		if(acq_is_open) {
 			spin_unlock(&acq_lock);
@@ -152,7 +152,7 @@ static int acq_open(struct inode *inode, struct file *file)
 
 static int acq_close(struct inode *inode, struct file *file)
 {
-	if(minor(inode->i_rdev)==WATCHDOG_MINOR) {
+	if(iminor(inode)==WATCHDOG_MINOR) {
 		spin_lock(&acq_lock);
 		if (expect_close)
 			inb_p(WDT_STOP);

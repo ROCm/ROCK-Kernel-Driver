@@ -441,7 +441,7 @@ int __init eeprom_init(void)
 static int eeprom_open(struct inode * inode, struct file * file)
 {
 
-  if(minor(inode->i_rdev) != EEPROM_MINOR_NR)
+  if(iminor(inode) != EEPROM_MINOR_NR)
      return -ENXIO;
   if(major(inode->i_rdev) != EEPROM_MAJOR_NR)
      return -ENXIO;

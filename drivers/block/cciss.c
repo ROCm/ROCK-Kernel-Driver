@@ -357,7 +357,7 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
 static int cciss_open(struct inode *inode, struct file *filep)
 {
 	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_open %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
@@ -372,7 +372,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
 	 * for "raw controller".
 	 */
 	if (hba[ctlr]->drv[dsk].nr_blocks == 0) {
-		if (minor(inode->i_rdev) != 0)
+		if (iminor(inode) != 0)
 			return -ENXIO;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
@@ -387,7 +387,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
 static int cciss_release(struct inode *inode, struct file *filep)
 {
 	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_release %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
@@ -407,7 +407,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		unsigned int cmd, unsigned long arg)
 {
 	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_ioctl: Called with cmd=%x %lx\n", cmd, arg);

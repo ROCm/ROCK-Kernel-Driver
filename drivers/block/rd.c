@@ -270,7 +270,7 @@ static struct backing_dev_info rd_backing_dev_info = {
 
 static int rd_open(struct inode * inode, struct file * filp)
 {
-	unsigned unit = minor(inode->i_rdev);
+	unsigned unit = iminor(inode);
 
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().

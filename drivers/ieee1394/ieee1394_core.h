@@ -202,7 +202,7 @@ void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
 /* return the index (within a minor number block) of a file */
 static inline unsigned char ieee1394_file_to_instance(struct file *file)
 {
-	unsigned char minor = minor(file->f_dentry->d_inode->i_rdev);
+	unsigned char minor = iminor(file->f_dentry->d_inode);
 	
 	/* return lower 4 bits */
 	return minor & 0xF;

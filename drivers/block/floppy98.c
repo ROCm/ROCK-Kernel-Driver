@@ -3844,9 +3844,9 @@ static int floppy_open(struct inode * inode, struct file * filp)
 		}
 	}
 
-	UDRS->fd_device = minor(inode->i_rdev);
-	set_capacity(disks[drive], floppy_sizes[minor(inode->i_rdev)]);
-	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
+	UDRS->fd_device = iminor(inode);
+	set_capacity(disks[drive], floppy_sizes[iminor(inode)]);
+	if (old_dev != -1 && old_dev != iminor(inode)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
 	}

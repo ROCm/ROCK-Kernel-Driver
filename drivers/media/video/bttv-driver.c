@@ -2758,7 +2758,7 @@ static unsigned int bttv_poll(struct file *file, poll_table *wait)
 
 static int bttv_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct bttv *btv = NULL;
 	struct bttv_fh *fh;
 	enum v4l2_buf_type type = 0;
@@ -2894,7 +2894,7 @@ struct video_device bttv_vbi_template =
 
 static int radio_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct bttv *btv = NULL;
 	u32 v = 400*16;
 	unsigned int i;

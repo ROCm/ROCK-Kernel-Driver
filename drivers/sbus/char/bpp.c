@@ -440,7 +440,7 @@ static spinlock_t bpp_open_lock = SPIN_LOCK_UNLOCKED;
  */
 static int bpp_open(struct inode *inode, struct file *f)
 {
-      unsigned minor = minor(inode->i_rdev);
+      unsigned minor = iminor(inode);
       int ret;
 
       spin_lock(&bpp_open_lock);
@@ -470,7 +470,7 @@ static int bpp_open(struct inode *inode, struct file *f)
  */
 static int bpp_release(struct inode *inode, struct file *f)
 {
-      unsigned minor = minor(inode->i_rdev);
+      unsigned minor = iminor(inode);
 
       spin_lock(&bpp_open_lock);
       instances[minor].opened = 0;
@@ -634,7 +634,7 @@ static long read_ecp(unsigned minor, char *c, unsigned long cnt)
 static ssize_t bpp_read(struct file *f, char *c, size_t cnt, loff_t * ppos)
 {
       long rc;
-      const unsigned minor = minor(f->f_dentry->d_inode->i_rdev);
+      unsigned minor = iminor(f->f_dentry->d_inode);
       if (minor >= BPP_NO) return -ENODEV;
       if (!instances[minor].present) return -ENODEV;
 
@@ -787,7 +787,7 @@ static long write_ecp(unsigned minor, const char *c, unsigned long cnt)
 static ssize_t bpp_write(struct file *f, const char *c, size_t cnt, loff_t * ppos)
 {
       long errno = 0;
-      const unsigned minor = minor(f->f_dentry->d_inode->i_rdev);
+      unsigned minor = iminor(f->f_dentry->d_inode);
       if (minor >= BPP_NO) return -ENODEV;
       if (!instances[minor].present) return -ENODEV;
 
@@ -813,7 +813,7 @@ static int bpp_ioctl(struct inode *inode, struct file *f, unsigned int cmd,
 {
       int errno = 0;
 
-      unsigned minor = minor(inode->i_rdev);
+      unsigned minor = iminor(inode);
       if (minor >= BPP_NO) return -ENODEV;
       if (!instances[minor].present) return -ENODEV;
 

@@ -1446,7 +1446,7 @@ static void do_fd_request(request_queue_t * q)
 static int fd_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long param)
 {
-	int drive = minor(inode->i_rdev) & 3;
+	int drive = iminor(inode) & 3;
 	static struct floppy_struct getprm;
 
 	switch(cmd){
@@ -1570,8 +1570,8 @@ static void fd_probe(int dev)
  */
 static int floppy_open(struct inode *inode, struct file *filp)
 {
-	int drive = minor(inode->i_rdev) & 3;
-	int system =  (minor(inode->i_rdev) & 4) >> 2;
+	int drive = iminor(inode) & 3;
+	int system =  (iminor(inode) & 4) >> 2;
 	int old_dev;
 	unsigned long flags;
 
@@ -1618,7 +1618,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 static int floppy_release(struct inode * inode, struct file * filp)
 {
-	int drive = minor(inode->i_rdev) & 3;
+	int drive = iminor(inode) & 3;
 
 	if (unit[drive].dirty == 1) {
 		del_timer (flush_track_timer + drive);

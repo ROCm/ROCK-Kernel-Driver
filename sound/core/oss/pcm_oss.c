@@ -1681,7 +1681,7 @@ static int snd_pcm_oss_open_file(struct file *file,
 
 static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	int cardnum = SNDRV_MINOR_OSS_CARD(minor);
 	int device;
 	int err;

@@ -43,7 +43,7 @@ static struct file_operations raw_ctl_fops;	     /* forward declaration */
  */
 static int raw_open(struct inode *inode, struct file *filp)
 {
-	const int minor = minor(inode->i_rdev);
+	const int minor = iminor(inode);
 	struct block_device *bdev;
 	int err;
 
@@ -92,7 +92,7 @@ out:
  */
 static int raw_release(struct inode *inode, struct file *filp)
 {
-	const int minor= minor(inode->i_rdev);
+	const int minor= iminor(inode);
 	struct block_device *bdev;
 
 	down(&raw_mutex);

@@ -1838,7 +1838,7 @@ static void __init config_types( void )
 static int floppy_open( struct inode *inode, struct file *filp )
 {
 	struct atari_floppy_struct *p = inode->i_bdev->bd_disk->private_data;
-	int type  = minor(inode->i_rdev) >> 2;
+	int type  = iminor(inode) >> 2;
 
 	DPRINT(("fd_open: type=%d\n",type));
 	if (p->ref && p->type != type)

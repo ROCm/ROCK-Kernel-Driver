@@ -712,7 +712,7 @@ static int adb_open(struct inode *inode, struct file *file)
 {
 	struct adbdev_state *state;
 
-	if (minor(inode->i_rdev) > 0 || adb_controller == NULL)
+	if (iminor(inode) > 0 || adb_controller == NULL)
 		return -ENXIO;
 	state = kmalloc(sizeof(struct adbdev_state), GFP_KERNEL);
 	if (state == 0)

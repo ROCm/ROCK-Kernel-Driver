@@ -279,7 +279,7 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 	int idx;
 
 	lock_kernel();
-	idx = minor(inode->i_rdev);
+	idx = iminor(inode);
 	if(idx >= MAX_CODADEVS) {
 		unlock_kernel();
 		return -ENODEV;

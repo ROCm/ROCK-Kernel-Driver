@@ -377,7 +377,7 @@ extern tub_t *tubfindbyirq(int);
  */
 extern inline tub_t *INODE2TUB(struct inode *ip)
 {
-	unsigned int minor = minor(ip->i_rdev);
+	unsigned int minor = iminor(ip);
 	tub_t *tubp = NULL;
 	if (minor == 0 && current->tty) {
 		if (current->tty->driver == tty3270_driver)

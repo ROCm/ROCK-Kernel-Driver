@@ -2567,7 +2567,7 @@ static int mixer_ioctl(struct cs4281_state *s, unsigned int cmd,
 
 static int cs4281_open_mixdev(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct cs4281_state *s=NULL;
 	struct list_head *entry;
 
@@ -3624,7 +3624,7 @@ static int cs4281_release(struct inode *inode, struct file *file)
 
 static int cs4281_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct cs4281_state *s=NULL;
 	struct list_head *entry;
 
@@ -3966,7 +3966,7 @@ static unsigned int cs4281_midi_poll(struct file *file,
 static int cs4281_midi_open(struct inode *inode, struct file *file)
 {
 	unsigned long flags, temp1;
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct cs4281_state *s=NULL;
 	struct list_head *entry;
 	list_for_each(entry, &cs4281_devs)

@@ -857,7 +857,7 @@ static irqreturn_t vrc5477_ac97_interrupt(int irq, void *dev_id, struct pt_regs 
 
 static int vrc5477_ac97_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct list_head *list;
 	struct vrc5477_ac97_state *s;
 
@@ -1569,7 +1569,7 @@ static int vrc5477_ac97_ioctl(struct inode *inode, struct file *file,
 
 static int vrc5477_ac97_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;

@@ -1726,7 +1726,7 @@ static irqreturn_t qic02_tape_interrupt(int irq, void *dev_id,
 
 static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
 {
-	int type = minor(filp->f_dentry->d_inode->i_rdev);
+	int type = iminor(filp->f_dentry->d_inode);
 	unsigned short flags = filp->f_flags;
 	unsigned long bytes_todo, bytes_done, total_bytes_done = 0;
 	int stat;
@@ -1904,7 +1904,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_
  */
 static ssize_t qic02_tape_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 {
-	int type = minor(filp->f_dentry->d_inode->i_rdev);
+	int type = iminor(filp->f_dentry->d_inode);
 	unsigned short flags = filp->f_flags;
 	unsigned long bytes_todo, bytes_done, total_bytes_done = 0;
 
@@ -2070,7 +2070,7 @@ static int qic02_tape_open(struct inode *inode, struct file *filp)
 static int qic02_tape_open_no_use_count(struct inode *inode,
 					struct file *filp)
 {
-	int type = minor(inode->i_rdev);
+	int type = iminor(inode);
 	unsigned short flags = filp->f_flags;
 	unsigned short dens = 0;
 	int s;
@@ -2265,7 +2265,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 
 static int qic02_tape_release(struct inode *inode, struct file *filp)
 {
-	int type = minor(inode->i_rdev);
+	int type = iminor(inode);
 
 	if (TP_DIAGS(type)) {
 		printk("qic02_tape_release: dev=tpqic2(%d)\n", type);

@@ -2357,17 +2357,14 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	char b[BDEVNAME_SIZE];
-	unsigned int minor;
+	unsigned int minor = iminor(inode);
 	int err = 0;
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
 	mddev_t *mddev = NULL;
-	kdev_t dev;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	dev = inode->i_rdev;
-	minor = minor(dev);
 	if (minor >= MAX_MD_DEVS) {
 		MD_BUG();
 		return -EINVAL;
@@ -2606,7 +2603,7 @@ static int md_open(struct inode *inode, struct file *file)
 	/*
 	 * Succeed if we can find or allocate a mddev structure.
 	 */
-	mddev_t *mddev = mddev_find(minor(inode->i_rdev));
+	mddev_t *mddev = mddev_find(iminor(inode));
 	int err = -ENOMEM;
 
 	if (!mddev)

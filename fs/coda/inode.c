@@ -123,7 +123,7 @@ static int get_device_index(struct coda_mount_data *data)
 		return -1;
 	}
 
-	idx = minor(inode->i_rdev);
+	idx = iminor(inode);
 	fput(file);
 
 	if(idx < 0 || idx >= MAX_CODADEVS) {

@@ -467,6 +467,11 @@ static inline void i_size_write(struct inode *inode, loff_t i_size)
 #endif
 }
 
+static inline unsigned iminor(struct inode *inode)
+{
+	return minor(inode->i_rdev);
+}
+
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */

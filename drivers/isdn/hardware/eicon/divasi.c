@@ -432,7 +432,7 @@ static int um_idi_open(struct inode *inode, struct file *file)
 
 static int um_idi_release(struct inode *inode, struct file *file)
 {
-	unsigned int adapter_nr = minor(inode->i_rdev);
+	unsigned int adapter_nr = iminor(inode);
 	int ret = 0;
 
 	if (!(file->private_data)) {

@@ -93,7 +93,7 @@ asmlinkage unsigned long sunos_mmap(unsigned long addr, unsigned long len,
 	 */
 	if (file) {
 		if(major(file->f_dentry->d_inode->i_rdev) == MEM_MAJOR &&
-		   minor(file->f_dentry->d_inode->i_rdev) == 5) {
+		   iminor(file->f_dentry->d_inode) == 5) {
 			flags |= MAP_ANONYMOUS;
 			fput(file);
 			file = 0;

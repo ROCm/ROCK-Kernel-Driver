@@ -150,7 +150,7 @@ z2_open( struct inode *inode, struct file *filp )
 	sizeof( z2ram_map[0] );
     int rc = -ENOMEM;
 
-    device = minor( inode->i_rdev );
+    device = iminor(inode);
 
     if ( current_device != -1 && current_device != device )
     {

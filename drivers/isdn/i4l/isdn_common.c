@@ -1432,7 +1432,7 @@ static struct file_operations isdn_status_fops =
 static int
 isdn_ctrl_open(struct inode *ino, struct file *file)
 {
-	unsigned int minor = minor(ino->i_rdev);
+	unsigned int minor = iminor(ino);
 	struct isdn_slot *slot = get_slot_by_minor(minor - ISDN_MINOR_CTRL);
 
 	if (!slot)
@@ -1795,7 +1795,7 @@ static struct file_operations isdn_ctrl_fops =
 static int
 isdn_open(struct inode * inode, struct file * file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	int err = -ENODEV;
 	struct file_operations *old_fops, *new_fops = NULL;
 	

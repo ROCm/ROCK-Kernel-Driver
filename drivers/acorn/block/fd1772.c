@@ -1455,8 +1455,8 @@ static void config_types(void)
 
 static int floppy_open(struct inode *inode, struct file *filp)
 {
-	int drive = minor(inode->i_rdev) & 3;
-	int type =  minor(inode->i_rdev) >> 2;
+	int drive = iminor(inode) & 3;
+	int type =  iminor(inode) >> 2;
 	int old_dev = fd_device[drive];
 
 	if (fd_ref[drive] && old_dev != type)
@@ -1490,7 +1490,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 static int floppy_release(struct inode *inode, struct file *filp)
 {
-	int drive = minor(inode->i_rdev) & 3;
+	int drive = iminor(inode) & 3;
 
 	if (fd_ref[drive] < 0)
 		fd_ref[drive] = 0;
