@@ -29,7 +29,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Driver for the Cirrus PD6729 PCI-PCMCIA bridge");
-MODULE_AUTHOR("Jun Komuro <komurojun@mbn.nifty.com>");
+MODULE_AUTHOR("Jun Komuro <komurojun-mbn@nifty.com>");
 
 #define MAX_SOCKETS 2
 
