@@ -47,7 +47,6 @@
 #endif	/* CS4231 */
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
-#define SNDRV_LEGACY_FIND_FREE_IOPORT
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
 #define SNDRV_GET_ID
@@ -323,6 +322,16 @@ static char * snd_opti9xx_names[] = {
 	"82C930",	"82C931",	"82C933"
 };
 
+
+static long snd_legacy_find_free_ioport(long *port_table, long size)
+{
+	while (*port_table != -1) {
+		if (!check_region(*port_table, size))
+			return *port_table;
+		port_table++;
+	}
+	return -1;
+}
 
 static int __init snd_opti9xx_init(opti9xx_t *chip, unsigned short hardware)
 {
