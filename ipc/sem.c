@@ -63,6 +63,7 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 #include "util.h"
 
@@ -115,6 +116,7 @@ void __init sem_init (void)
 static int newary (key_t key, int nsems, int semflg)
 {
 	int id;
+	int retval;
 	struct sem_array *sma;
 	int size;
 
@@ -133,8 +135,16 @@ static int newary (key_t key, int nsems, int semflg)
 	sma->sem_perm.mode = (semflg & S_IRWXUGO);
 	sma->sem_perm.key = key;
 
+	sma->sem_perm.security = NULL;
+	retval = security_ops->sem_alloc_security(sma);
+	if (retval) {
+		ipc_free(sma, size);
+		return retval;
+	}
+
 	id = ipc_addid(&sem_ids, &sma->sem_perm, sc_semmni);
 	if(id == -1) {
+		security_ops->sem_free_security(sma);
 		ipc_free(sma, size);
 		return -ENOSPC;
 	}
@@ -417,6 +427,7 @@ static void freeary (int id)
 
 	used_sems -= sma->sem_nsems;
 	size = sizeof (*sma) + sma->sem_nsems * sizeof (struct sem);
+	security_ops->sem_free_security(sma);
 	ipc_free(sma, size);
 }
 

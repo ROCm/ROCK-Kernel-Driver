@@ -572,6 +572,50 @@ struct swap_info_struct;
  * 	is being reparented to the init task.
  *	@p contains the task_struct for the kernel thread.
  *
+ * Security hooks affecting all System V IPC operations.
+ *
+ * @ipc_permission:
+ *	Check permissions for access to IPC
+ *	@ipcp contains the kernel IPC permission structure
+ *	@flag contains the desired (requested) permission set
+ *	Return 0 if permission is granted.
+ *
+ * Security hooks for System V IPC Message Queues
+ *
+ * @msg_queue_alloc_security:
+ *	Allocate and attach a security structure to the
+ *	msq->q_perm.security field. The security field is initialized to
+ *	NULL when the structure is first created.
+ *	@msq contains the message queue structure to be modified.
+ *	Return 0 if operation was successful and permission is granted.
+ * @msg_queue_free_security:
+ *	Deallocate security structure for this message queue.
+ *	@msq contains the message queue structure to be modified.
+ *
+ * Security hooks for System V Shared Memory Segments
+ *
+ * @shm_alloc_security:
+ *	Allocate and attach a security structure to the shp->shm_perm.security
+ *	field.  The security field is initialized to NULL when the structure is
+ *	first created.
+ *	@shp contains the shared memory structure to be modified.
+ *	Return 0 if operation was successful and permission is granted.
+ * @shm_free_security:
+ *	Deallocate the security struct for this memory segment.
+ *	@shp contains the shared memory structure to be modified.
+ *
+ * Security hooks for System V Semaphores
+ *
+ * @sem_alloc_security:
+ *	Allocate and attach a security structure to the sma->sem_perm.security
+ *	field.  The security field is initialized to NULL when the structure is
+ *	first created.
+ *	@sma contains the semaphore structure
+ *	Return 0 if operation was successful and permission is granted.
+ * @sem_free_security:
+ *	deallocate security struct for this semaphore
+ *	@sma contains the semaphore structure.
+ *
  * @ptrace:
  *	Check permission before allowing the @parent process to trace the
  *	@child process.
@@ -785,6 +829,17 @@ struct security_operations {
 			   unsigned long arg5);
 	void (*task_kmod_set_label) (void);
 	void (*task_reparent_to_init) (struct task_struct * p);
+
+	int (*ipc_permission) (struct kern_ipc_perm * ipcp, short flag);
+
+	int (*msg_queue_alloc_security) (struct msg_queue * msq);
+	void (*msg_queue_free_security) (struct msg_queue * msq);
+
+	int (*shm_alloc_security) (struct shmid_kernel * shp);
+	void (*shm_free_security) (struct shmid_kernel * shp);
+
+	int (*sem_alloc_security) (struct sem_array * sma);
+	void (*sem_free_security) (struct sem_array * sma);
 
 	/* allow module stacking */
 	int (*register_security) (const char *name,

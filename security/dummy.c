@@ -493,6 +493,42 @@ static void dummy_task_reparent_to_init (struct task_struct *p)
 	return;
 }
 
+static int dummy_ipc_permission (struct kern_ipc_perm *ipcp, short flag)
+{
+	return 0;
+}
+
+
+static int dummy_msg_queue_alloc_security (struct msg_queue *msq)
+{
+	return 0;
+}
+
+static void dummy_msg_queue_free_security (struct msg_queue *msq)
+{
+	return;
+}
+
+static int dummy_shm_alloc_security (struct shmid_kernel *shp)
+{
+	return 0;
+}
+
+static void dummy_shm_free_security (struct shmid_kernel *shp)
+{
+	return;
+}
+
+static int dummy_sem_alloc_security (struct sem_array *sma)
+{
+	return 0;
+}
+
+static void dummy_sem_free_security (struct sem_array *sma)
+{
+	return;
+}
+
 static int dummy_register (const char *name, struct security_operations *ops)
 {
 	return -EINVAL;
@@ -595,6 +631,17 @@ struct security_operations dummy_security_ops = {
 	.task_prctl =			dummy_task_prctl,
 	.task_kmod_set_label =		dummy_task_kmod_set_label,
 	.task_reparent_to_init =	dummy_task_reparent_to_init,
+
+	.ipc_permission =		dummy_ipc_permission,
+	
+	.msg_queue_alloc_security =	dummy_msg_queue_alloc_security,
+	.msg_queue_free_security =	dummy_msg_queue_free_security,
+	
+	.shm_alloc_security =		dummy_shm_alloc_security,
+	.shm_free_security =		dummy_shm_free_security,
+	
+	.sem_alloc_security =		dummy_sem_alloc_security,
+	.sem_free_security =		dummy_sem_free_security,
 
 	.register_security =		dummy_register,
 	.unregister_security =		dummy_unregister,

@@ -679,6 +679,41 @@ static void cap_task_reparent_to_init (struct task_struct *p)
 	return;
 }
 
+static int cap_ipc_permission (struct kern_ipc_perm *ipcp, short flag)
+{
+	return 0;
+}
+
+static int cap_msg_queue_alloc_security (struct msg_queue *msq)
+{
+	return 0;
+}
+
+static void cap_msg_queue_free_security (struct msg_queue *msq)
+{
+	return;
+}
+
+static int cap_shm_alloc_security (struct shmid_kernel *shp)
+{
+	return 0;
+}
+
+static void cap_shm_free_security (struct shmid_kernel *shp)
+{
+	return;
+}
+
+static int cap_sem_alloc_security (struct sem_array *sma)
+{
+	return 0;
+}
+
+static void cap_sem_free_security (struct sem_array *sma)
+{
+	return;
+}
+
 static int cap_register (const char *name, struct security_operations *ops)
 {
 	return -EINVAL;
@@ -781,6 +816,17 @@ static struct security_operations capability_ops = {
 	.task_prctl =			cap_task_prctl,
 	.task_kmod_set_label =		cap_task_kmod_set_label,
 	.task_reparent_to_init =	cap_task_reparent_to_init,
+
+	.ipc_permission =		cap_ipc_permission,
+
+	.msg_queue_alloc_security =	cap_msg_queue_alloc_security,
+	.msg_queue_free_security =	cap_msg_queue_free_security,
+	
+	.shm_alloc_security =		cap_shm_alloc_security,
+	.shm_free_security =		cap_shm_free_security,
+	
+	.sem_alloc_security =		cap_sem_alloc_security,
+	.sem_free_security =		cap_sem_free_security,
 
 	.register_security =		cap_register,
 	.unregister_security =		cap_unregister,

@@ -24,6 +24,7 @@
 #include <linux/mman.h>
 #include <linux/proc_fs.h>
 #include <linux/shmem_fs.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 
 #include "util.h"
@@ -115,6 +116,7 @@ static void shm_destroy (struct shmid_kernel *shp)
 	shm_unlock(shp->id);
 	shmem_lock(shp->shm_file, 0);
 	fput (shp->shm_file);
+	security_ops->shm_free_security(shp);
 	kfree (shp);
 }
 
@@ -185,6 +187,13 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_perm.key = key;
 	shp->shm_flags = (shmflg & S_IRWXUGO);
 
+	shp->shm_perm.security = NULL;
+	error = security_ops->shm_alloc_security(shp);
+	if (error) {
+		kfree(shp);
+		return error;
+	}
+
 	sprintf (name, "SYSV%08x", key);
 	file = shmem_file_setup(name, size, VM_ACCOUNT);
 	error = PTR_ERR(file);
@@ -213,6 +222,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 no_id:
 	fput(file);
 no_file:
+	security_ops->shm_free_security(shp);
 	kfree(shp);
 	return error;
 }

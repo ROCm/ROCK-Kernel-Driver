@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/list.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 #include "util.h"
 
@@ -89,6 +90,7 @@ void __init msg_init (void)
 static int newque (key_t key, int msgflg)
 {
 	int id;
+	int retval;
 	struct msg_queue *msq;
 
 	msq  = (struct msg_queue *) kmalloc (sizeof (*msq), GFP_KERNEL);
@@ -98,8 +100,16 @@ static int newque (key_t key, int msgflg)
 	msq->q_perm.mode = (msgflg & S_IRWXUGO);
 	msq->q_perm.key = key;
 
+	msq->q_perm.security = NULL;
+	retval = security_ops->msg_queue_alloc_security(msq);
+	if (retval) {
+		kfree(msq);
+		return retval;
+	}
+
 	id = ipc_addid(&msg_ids, &msq->q_perm, msg_ctlmni);
 	if(id == -1) {
+		security_ops->msg_queue_free_security(msq);
 		kfree(msq);
 		return -ENOSPC;
 	}
@@ -271,6 +281,7 @@ static void freeque (int id)
 		free_msg(msg);
 	}
 	atomic_sub(msq->q_cbytes, &msg_bytes);
+	security_ops->msg_queue_free_security(msq);
 	kfree(msq);
 }
 

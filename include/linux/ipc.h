@@ -63,6 +63,7 @@ struct kern_ipc_perm
 	gid_t		cgid;
 	mode_t		mode; 
 	unsigned long	seq;
+	void		*security;
 };
 
 #endif /* __KERNEL__ */
