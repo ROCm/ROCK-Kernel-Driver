@@ -12,6 +12,7 @@
 #include <linux/bio.h>
 #include <linux/kernel.h>
 #include <linux/blk.h>
+#include <asm/hardirq.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
 

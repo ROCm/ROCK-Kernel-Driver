@@ -16,14 +16,13 @@
  * Michael A. Griffith <grif@acm.org>
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/errno.h>
-#include <linux/stat.h>
 #include <linux/blk.h>
 #include <asm/uaccess.h>
 
