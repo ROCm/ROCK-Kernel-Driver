@@ -67,6 +67,25 @@ smb_data_ready(struct sock *sk, int len)
 	smbiod_wake_up();
 }
 
+/*
+ * Called when there's room in the TCP send queue.
+ * Just wake up smbiod so it can retry sending.
+ */
+void
+smb_write_space(struct sock *sk)
+{
+	struct smb_sb_info *server = server_from_socket(sk->sk_socket);
+	void (*write_space)(struct sock *) = server->write_space;
+
+	/* Invoke the original sk_write_space callback.
+	 * I don't think we actually need to do this, but I'll
+	 * do that for symmetry with smb_data_ready above.
+	 */
+	write_space(sk);
+	VERBOSE("(%p)\n", sk);
+	smbiod_wake_up();
+}
+
 int
 smb_valid_socket(struct inode * inode)
 {

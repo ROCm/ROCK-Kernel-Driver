@@ -45,7 +45,9 @@ static DECLARE_WAIT_QUEUE_HEAD(smbiod_wait);
 static LIST_HEAD(smb_servers);
 static spinlock_t servers_lock = SPIN_LOCK_UNLOCKED;
 
-#define SMBIOD_DATA_READY	(1<<0)
+#define SMBIOD_DATA_READY	0
+#define SMBIOD_BACKOFF		1
+
 static long smbiod_flags;
 
 static int smbiod(void *);
@@ -240,7 +242,7 @@ static void smbiod_handle_request(struct smb_sb_info *server)
 /*
  * Do some IO for one server.
  */
-static void smbiod_doio(struct smb_sb_info *server)
+static int smbiod_doio(struct smb_sb_info *server)
 {
 	int result;
 	int maxwork = 7;
@@ -268,6 +270,18 @@ static void smbiod_doio(struct smb_sb_info *server)
 
 	do {
 		result = smb_request_send_server(server);
+		if (result == -EAGAIN) {
+			/* TCP was unable to allocate memory.
+			 * Set the backoff flag, but *not* DATA_READY.
+			 * If there are no new requests in the queue,
+			 * this will cause smbiod to back off and
+			 * not retry until
+			 *  a)	we receive a write_space callback from TCP
+			 *  b)  we slept for one second.
+			 */
+			set_bit(SMBIOD_BACKOFF, &smbiod_flags);
+			goto out;
+		}
 		if (result < 0) {
 			server->state = CONN_INVALID;
 			smbiod_retry(server);
@@ -300,9 +314,28 @@ static int smbiod(void *unused)
 		struct smb_sb_info *server;
 		struct list_head *pos, *n;
 
-		/* FIXME: Use poll? */
-		wait_event_interruptible(smbiod_wait,
-			 test_bit(SMBIOD_DATA_READY, &smbiod_flags));
+		/* smbiod should use a more sophisticated approach
+		 * to polling the socket... this is an ugly hack.
+		 */
+		if (test_bit(SMBIOD_BACKOFF, &smbiod_flags)) {
+			/* We tried to transmit some requests, but received
+			 * EAGAIN. Either the TCP send queue is full, or
+			 * we're low on memory. Go to sleep.
+			 * If this was due to a full receive queue, the
+			 * write_space callback handler will wake us.
+			 *
+			 * If it was low memory, we'll just sleep a little
+			 * to let the VM do its job.
+			 */
+			wait_event_interruptible_timeout(smbiod_wait,
+				 test_bit(SMBIOD_DATA_READY, &smbiod_flags),
+				 HZ);
+			clear_bit(SMBIOD_BACKOFF, &smbiod_flags);
+		} else {
+			wait_event_interruptible(smbiod_wait,
+				 test_bit(SMBIOD_DATA_READY, &smbiod_flags));
+		}
+
 		if (signal_pending(current)) {
 			spin_lock(&servers_lock);
 			smbiod_state = SMBIOD_DEAD;

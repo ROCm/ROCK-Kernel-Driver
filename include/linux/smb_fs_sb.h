@@ -66,8 +66,10 @@ struct smb_sb_info {
 	u32                smb_len;
 	u32                smb_read;
 
-        /* We use our own data_ready callback, but need the original one */
+        /* We use our own data_ready and write_space callbacks,
+	 * but need the original ones */
         void *data_ready;
+	void *write_space;
 
 	/* nls pointers for codepage conversions */
 	struct nls_table *remote_nls;
