@@ -965,6 +965,8 @@ static int irq_affinity_write_proc(struct file *file, const char __user *buffer,
 		return -EIO;
 
 	err = parse_hex_value(buffer, count, &new_value);
+	if (err)
+		return err;
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
