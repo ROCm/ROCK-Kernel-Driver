@@ -166,7 +166,7 @@ static int shrink_slab(long scanned,  unsigned int gfp_mask)
 }
 
 /* Must be called with page's pte_chain_lock held. */
-static inline int page_mapping_inuse(struct page * page)
+static inline int page_mapping_inuse(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
@@ -178,8 +178,14 @@ static inline int page_mapping_inuse(struct page * page)
 	if (!mapping)
 		return 0;
 
+	/* Be more reluctant to reclaim swapcache than pagecache */
+	if (PageSwapCache(page))
+		return 1;
+
 	/* File is mmap'd by somebody. */
-	if (!list_empty(&mapping->i_mmap) || !list_empty(&mapping->i_mmap_shared))
+	if (!list_empty(&mapping->i_mmap))
+		return 1;
+	if (!list_empty(&mapping->i_mmap_shared))
 		return 1;
 
 	return 0;
