@@ -818,12 +818,6 @@ int jfs_link(struct dentry *old_dentry,
 	jFYI(1,
 	     ("jfs_link: %s %s\n", old_dentry->d_name.name,
 	      dentry->d_name.name));
-/* The checks for links between filesystems and permissions are
-   handled by the VFS layer                                     */
-
-	/* JFS does NOT support link() on directories */
-	if (S_ISDIR(ip->i_mode))
-		return -EPERM;
 
 	IWRITE_LOCK_LIST(2, dir, ip);
 
