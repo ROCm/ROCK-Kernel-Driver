@@ -382,6 +382,8 @@ static inline int pneigh_alloc_flag(void)
 	return GFP_KERNEL;
 }
 
+#define LOCALLY_ENQUEUED -2
+
 #endif
 #endif
 

@@ -625,6 +625,10 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 	h->tp_snaplen = snaplen;
 	h->tp_mac = macoff;
 	h->tp_net = netoff;
+	if (skb->stamp.tv_sec == 0) { 
+		do_gettimeofday(&skb->stamp);
+		sock_enable_timestamp(sk);
+	}
 	h->tp_sec = skb->stamp.tv_sec;
 	h->tp_usec = skb->stamp.tv_usec;
 
@@ -1461,13 +1465,8 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 			return put_user(amount, (int *)arg);
 		}
 		case SIOCGSTAMP:
-			if (!sk->sk_stamp.tv_sec)
-				return -ENOENT;
-			if (copy_to_user((void *)arg, &sk->sk_stamp,
-					 sizeof(struct timeval)))
-				return -EFAULT;
-			break;
-
+			return sock_get_timestamp(sk, (struct timeval *)arg);
+			
 #ifdef CONFIG_INET
 		case SIOCADDRT:
 		case SIOCDELRT:
