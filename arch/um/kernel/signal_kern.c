@@ -167,7 +167,7 @@ int do_signal(int error)
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
-int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
+long sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 {
 	sigset_t saveset;
 
@@ -187,7 +187,7 @@ int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	}
 }
 
-int sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
+long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 {
 	sigset_t saveset, newset;
 
@@ -245,7 +245,7 @@ int sys_sigaction(int sig, const struct old_sigaction __user *act,
 	return ret;
 }
 
-int sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+long sys_sigaltstack(const stack_t *uss, stack_t *uoss)
 {
 	return(do_sigaltstack(uss, uoss, PT_REGS_SP(&current->thread.regs)));
 }
@@ -263,7 +263,7 @@ static int copy_sc_from_user(struct pt_regs *to, void *from,
 	return(ret);
 }
 
-int sys_sigreturn(struct pt_regs regs)
+long sys_sigreturn(struct pt_regs regs)
 {
 	void __user *sc = sp_to_sc(PT_REGS_SP(&current->thread.regs));
 	void __user *mask = sp_to_mask(PT_REGS_SP(&current->thread.regs));
@@ -281,7 +281,7 @@ int sys_sigreturn(struct pt_regs regs)
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 
-int sys_rt_sigreturn(struct pt_regs regs)
+long sys_rt_sigreturn(struct pt_regs regs)
 {
 	unsigned long sp = PT_REGS_SP(&current->thread.regs);
 	struct ucontext __user *uc = sp_to_uc(sp);

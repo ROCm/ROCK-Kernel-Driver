@@ -84,7 +84,7 @@ static inline pid_t setsid(void)
 	KERNEL_CALL(pid_t, sys_setsid)
 }
 
-static inline long lseek(unsigned int fd, off_t offset, unsigned int whence)
+static inline off_t lseek(unsigned int fd, off_t offset, unsigned int whence)
 {
 	KERNEL_CALL(long, sys_lseek, fd, offset, whence)
 }
@@ -102,13 +102,12 @@ static inline int write(unsigned int fd, char * buf, int len)
 long sys_mmap2(unsigned long addr, unsigned long len,
 		unsigned long prot, unsigned long flags,
 		unsigned long fd, unsigned long pgoff);
-int sys_execve(char *file, char **argv, char **env);
+long sys_execve(char *file, char **argv, char **env);
 long sys_clone(unsigned long clone_flags, unsigned long newsp,
 		int *parent_tid, int *child_tid);
 long sys_fork(void);
 long sys_vfork(void);
-int sys_pipe(unsigned long *fildes);
-int sys_ptrace(long request, long pid, long addr, long data);
+long sys_pipe(unsigned long *fildes);
 struct sigaction;
 asmlinkage long sys_rt_sigaction(int sig,
 				const struct sigaction __user *act,
