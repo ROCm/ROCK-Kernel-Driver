@@ -6,8 +6,8 @@
  *		 2000-2001 Christoph Rohland
  *		 2000-2001 SAP AG
  *		 2002 Red Hat Inc.
- * Copyright (C) 2002-2003 Hugh Dickins.
- * Copyright (C) 2002-2003 VERITAS Software Corporation.
+ * Copyright (C) 2002-2004 Hugh Dickins.
+ * Copyright (C) 2002-2004 VERITAS Software Corporation.
  * Copyright (C) 2004 Andi Kleen, SuSE Labs
  *
  * This file is released under the GPL.
@@ -2099,7 +2099,7 @@ struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags)
 	if (IS_ERR(shm_mnt))
 		return (void *)shm_mnt;
 
-	if (size > SHMEM_MAX_BYTES)
+	if (size < 0 || size > SHMEM_MAX_BYTES)
 		return ERR_PTR(-EINVAL);
 
 	if (shmem_acct_size(flags, size))
@@ -2133,7 +2133,7 @@ struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags)
 	file->f_mapping = inode->i_mapping;
 	file->f_op = &shmem_file_operations;
 	file->f_mode = FMODE_WRITE | FMODE_READ;
-	return(file);
+	return file;
 
 close_file:
 	put_filp(file);
