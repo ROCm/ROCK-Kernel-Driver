@@ -629,7 +629,7 @@ xconfig: scripts/kconfig/qconf
 	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
 
 menuconfig: scripts/kconfig/mconf
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts lxdialog
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts/lxdialog
 	./scripts/kconfig/mconf arch/$(ARCH)/Kconfig
 
 config: scripts/kconfig/conf

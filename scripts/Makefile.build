@@ -40,12 +40,14 @@ endif
 ifdef L_TARGET
 L_TARGET := $(obj)/$(L_TARGET)
 else
+ifneq ($(strip $(obj-y) $(obj-m) $(obj-n) $(obj-)),)
 O_TARGET := $(obj)/built-in.o
+endif
 endif
 
 __build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
 	 $(if $(KBUILD_MODULES),$(obj-m)) \
-	 $(subdir-ym)
+	 $(subdir-ym) $(build-targets)
 	@:
 
 # Compile C sources (.c)
