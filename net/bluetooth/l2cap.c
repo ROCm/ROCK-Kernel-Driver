@@ -1313,15 +1313,18 @@ static int l2cap_build_conf_rsp(struct sock *sk, void *data, int *result)
 {
 	struct l2cap_conf_rsp *rsp = data;
 	void *ptr = rsp->data;
+	u16 flags = 0;
 
 	BT_DBG("sk %p complete %d", sk, result ? 1 : 0);
 
 	if (result)
 		*result = l2cap_conf_output(sk, &ptr);
+	else
+		flags = 0x0001;
 
 	rsp->scid   = __cpu_to_le16(l2cap_pi(sk)->dcid);
 	rsp->result = __cpu_to_le16(result ? *result : 0);
-	rsp->flags  = __cpu_to_le16(0);
+	rsp->flags  = __cpu_to_le16(flags);
 
 	return ptr - data;
 }
@@ -1434,7 +1437,7 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	case L2CAP_CR_SUCCESS:
 		sk->state = BT_CONFIG;
 		l2cap_pi(sk)->dcid = dcid;
-		l2cap_pi(sk)->conf_state |= CONF_REQ_SENT;
+		l2cap_pi(sk)->conf_state |= L2CAP_CONF_REQ_SENT;
 
 		l2cap_send_req(conn, L2CAP_CONF_REQ, l2cap_build_conf_req(sk, req), req);
 		break;
@@ -1469,7 +1472,7 @@ static inline int l2cap_config_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 
 	l2cap_parse_conf_req(sk, req->data, cmd->len - sizeof(*req));
 
-	if (flags & 0x01) {
+	if (flags & 0x0001) {
 		/* Incomplete config. Send empty response. */
 		l2cap_send_rsp(conn, cmd->ident, L2CAP_CONF_RSP, l2cap_build_conf_rsp(sk, rsp, NULL), rsp);
 		goto unlock;
@@ -1482,12 +1485,12 @@ static inline int l2cap_config_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 		goto unlock;
 
 	/* Output config done */
-	l2cap_pi(sk)->conf_state |= CONF_OUTPUT_DONE;
+	l2cap_pi(sk)->conf_state |= L2CAP_CONF_OUTPUT_DONE;
 
-	if (l2cap_pi(sk)->conf_state & CONF_INPUT_DONE) {
+	if (l2cap_pi(sk)->conf_state & L2CAP_CONF_INPUT_DONE) {
 		sk->state = BT_CONNECTED;
 		l2cap_chan_ready(sk);
-	} else if (!(l2cap_pi(sk)->conf_state & CONF_REQ_SENT)) {
+	} else if (!(l2cap_pi(sk)->conf_state & L2CAP_CONF_REQ_SENT)) {
 		u8 req[64];
 		l2cap_send_req(conn, L2CAP_CONF_REQ, l2cap_build_conf_req(sk, req), req);
 	}
@@ -1532,9 +1535,9 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 		goto done;
 
 	/* Input config done */
-	l2cap_pi(sk)->conf_state |= CONF_INPUT_DONE;
+	l2cap_pi(sk)->conf_state |= L2CAP_CONF_INPUT_DONE;
 
-	if (l2cap_pi(sk)->conf_state & CONF_OUTPUT_DONE) {
+	if (l2cap_pi(sk)->conf_state & L2CAP_CONF_OUTPUT_DONE) {
 		sk->state = BT_CONNECTED;
 		l2cap_chan_ready(sk);
 	}

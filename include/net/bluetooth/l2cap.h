@@ -231,9 +231,9 @@ struct l2cap_pinfo {
 	struct sock 		*prev_c;
 };
 
-#define CONF_REQ_SENT    0x01
-#define CONF_INPUT_DONE  0x02
-#define CONF_OUTPUT_DONE 0x04
+#define L2CAP_CONF_REQ_SENT    0x01
+#define L2CAP_CONF_INPUT_DONE  0x02
+#define L2CAP_CONF_OUTPUT_DONE 0x04
 
 void l2cap_load(void);
 
