@@ -1170,7 +1170,7 @@ static void nodemgr_node_scan_one(struct host_info *hi,
 	guid = ((u64)be32_to_cpu(csr->bus_info_data[3]) << 32) | be32_to_cpu(csr->bus_info_data[4]);
 	ne = find_entry_by_guid(guid);
 
-	if (ne->host != host && ne->in_limbo) {
+	if (ne && ne->host != host && ne->in_limbo) {
 		/* Must have moved this device from one host to another */
 		nodemgr_remove_ne(ne);
 		ne = NULL;

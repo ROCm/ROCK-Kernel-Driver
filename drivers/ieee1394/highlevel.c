@@ -62,13 +62,14 @@ static struct hl_host_info *hl_get_hostinfo(struct hpsb_highlevel *hl,
 
 	read_lock(&hl->host_info_lock);
 	list_for_each_entry(hi, &hl->host_info_list, list) {
-		if (hi->host == host)
-			break;
-		hi = NULL;
+		if (hi->host == host) {
+			read_unlock(&hl->host_info_lock);
+			return hi;
+		}
 	}
 	read_unlock(&hl->host_info_lock);
 
-	return hi;
+	return NULL;
 }
 
 
