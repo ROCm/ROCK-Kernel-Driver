@@ -169,6 +169,29 @@ static int do_ccw_entry(const char *filename,
 	return 1;
 }
 
+/* looks like: "pnp:dD" */
+static int do_pnp_entry(const char *filename,
+			struct pnp_device_id *id, char *alias)
+{
+	sprintf(alias, "pnp:d%s", id->id);
+	return 1;
+}
+
+/* looks like: "pnp:cCdD..." */
+static int do_pnp_card_entry(const char *filename,
+			struct pnp_card_device_id *id, char *alias)
+{
+	int i;
+
+	sprintf(alias, "pnp:c%s", id->id);
+	for (i = 0; i < PNP_MAX_DEVICES; i++) {
+		if (! *id->devs[i].id)
+			break;
+		sprintf(alias + strlen(alias), "d%s", id->devs[i].id);
+	}
+	return 1;
+}
+
 /* Ignore any prefix, eg. v850 prepends _ */
 static inline int sym_is(const char *symbol, const char *name)
 {
@@ -235,6 +258,12 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
 	else if (sym_is(symname, "__mod_ccw_device_table"))
 		do_table(symval, sym->st_size, sizeof(struct ccw_device_id),
 			 do_ccw_entry, mod);
+	else if (sym_is(symname, "__mod_pnp_device_table"))
+		do_table(symval, sym->st_size, sizeof(struct pnp_device_id),
+			 do_pnp_entry, mod);
+	else if (sym_is(symname, "__mod_pnp_card_device_table"))
+		do_table(symval, sym->st_size, sizeof(struct pnp_card_device_id),
+			 do_pnp_card_entry, mod);
 }
 
 /* Now add out buffered information to the generated C source */
