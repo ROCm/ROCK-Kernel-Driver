@@ -19,6 +19,7 @@
 #include <asm/thread_info.h>
 #include <asm/glue.h>
 #include <asm/ptrace.h>
+#include <asm/vfpmacros.h>
 
 #include "entry-header.S"
 
@@ -1198,8 +1199,13 @@ call_fpe:	enable_irq r10				@ Enable interrupts
 		mov	pc, lr				@ CP#7
 		mov	pc, lr				@ CP#8
 		mov	pc, lr				@ CP#9
+#ifdef CONFIG_VFP
+		b	do_vfp				@ CP#10 (VFP)
+		b	do_vfp				@ CP#11 (VFP)
+#else
 		mov	pc, lr				@ CP#10 (VFP)
 		mov	pc, lr				@ CP#11 (VFP)
+#endif
 		mov	pc, lr				@ CP#12
 		mov	pc, lr				@ CP#13
 		mov	pc, lr				@ CP#14 (Debug)
@@ -1260,6 +1266,13 @@ ENTRY(__switch_to)
 		ldr	r3, [r2, #TI_CPU_DOMAIN]!
 		stmia	ip, {r4 - sl, fp, sp, lr}	@ Store most regs on stack
 		mcr	p15, 0, r3, c3, c0, 0		@ Set domain register
+#ifdef CONFIG_VFP
+		@ Always disable VFP so we can lazily save/restore the old
+		@ state. This occurs in the context of the previous thread.
+		VFPFMRX	r4, FPEXC
+		bic	r4, r4, #FPEXC_ENABLE
+		VFPFMXR	FPEXC, r4
+#endif
 		ldmib	r2, {r4 - sl, fp, sp, pc}	@ Load all regs saved previously
 
 		__INIT
