@@ -1484,13 +1484,19 @@ static int reiserfs_new_symlink (struct reiserfs_transaction_handle *th,
 /* inserts the stat data into the tree, and then calls
    reiserfs_new_directory (to insert ".", ".." item if new object is
    directory) or reiserfs_new_symlink (to insert symlink body if new
-   object is symlink) or nothing (if new object is regular file) */
-struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
-				   struct inode * dir, int mode, 
-				   const char * symname, 
-				   int i_size, /* 0 for regular, EMTRY_DIR_SIZE for dirs,
-						  strlen (symname) for symlinks)*/
-				   struct dentry *dentry, struct inode *inode, int * err)
+   object is symlink) or nothing (if new object is regular file) 
+
+   NOTE! uid and gid must already be set in the inode.  If we return
+   non-zero due to an error, we have to drop the quota previously allocated
+   for the fresh inode.  This can only be done outside a transaction, so
+   if we return non-zero, we also end the transaction.  */
+int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
+			struct inode * dir, int mode, 
+			const char * symname, 
+                        /* 0 for regular, EMTRY_DIR_SIZE for dirs, 
+			   strlen (symname) for symlinks)*/
+		         loff_t i_size, struct dentry *dentry, 
+			 struct inode *inode)
 {
     struct super_block * sb;
     INITIALIZE_PATH (path_to_key);
@@ -1498,72 +1504,40 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     struct item_head ih;
     struct stat_data sd;
     int retval;
+    int err;
   
     if (!dir || !dir->i_nlink) {
-	*err = -EPERM;
-	iput(inode) ;
-	return NULL;
+	err = -EPERM;
+	goto out_bad_inode;
     }
 
     sb = dir->i_sb;
-    inode->i_flags = 0;//inode->i_sb->s_flags;
 
     /* item head of new item */
     ih.ih_key.k_dir_id = INODE_PKEY (dir)->k_objectid;
     ih.ih_key.k_objectid = cpu_to_le32 (reiserfs_get_unused_objectid (th));
     if (!ih.ih_key.k_objectid) {
-	iput(inode) ;
-	*err = -ENOMEM;
-	return NULL;
+	err = -ENOMEM;
+	goto out_bad_inode ;
     }
     if (old_format_only (sb))
-      /* not a perfect generation count, as object ids can be reused, but this
-      ** is as good as reiserfs can do right now.
-      ** note that the private part of inode isn't filled in yet, we have
-      ** to use the directory.
-      */
-      inode->i_generation = le32_to_cpu (INODE_PKEY (dir)->k_objectid);
+	/* not a perfect generation count, as object ids can be reused, but 
+	** this is as good as reiserfs can do right now.
+	** note that the private part of inode isn't filled in yet, we have
+	** to use the directory.
+	*/
+	inode->i_generation = le32_to_cpu (INODE_PKEY (dir)->k_objectid);
     else
 #if defined( USE_INODE_GENERATION_COUNTER )
-      inode->i_generation = 
-	le32_to_cpu( REISERFS_SB(sb) -> s_rs -> s_inode_generation );
+	inode->i_generation = le32_to_cpu(REISERFS_SB(sb)->s_rs->s_inode_generation);
 #else
-      inode->i_generation = ++event;
+	inode->i_generation = ++event;
 #endif
-    if (old_format_only (sb))
-	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
-    else
-	make_le_item_head (&ih, 0, KEY_FORMAT_3_6, SD_OFFSET, TYPE_STAT_DATA, SD_SIZE, MAX_US_INT);
-
-
-    /* key to search for correct place for new stat data */
-    _make_cpu_key (&key, KEY_FORMAT_3_6, le32_to_cpu (ih.ih_key.k_dir_id),
-		   le32_to_cpu (ih.ih_key.k_objectid), SD_OFFSET, TYPE_STAT_DATA, 3/*key length*/);
-
-    /* find proper place for inserting of stat data */
-    retval = search_item (sb, &key, &path_to_key);
-    if (retval == IO_ERROR) {
-	iput (inode);
-	*err = -EIO;
-	return NULL;
-    }
-    if (retval == ITEM_FOUND) {
-	pathrelse (&path_to_key);
-	iput (inode);
-	*err = -EEXIST;
-	return NULL;
-    }
 
     /* fill stat data */
-    inode->i_mode = mode;
     inode->i_nlink = (S_ISDIR (mode) ? 2 : 1);
-    inode->i_uid = current->fsuid;
-    if (dir->i_mode & S_ISGID) {
-	inode->i_gid = dir->i_gid;
-	if (S_ISDIR(mode))
-	    inode->i_mode |= S_ISGID;
-    } else
-	inode->i_gid = current->fsgid;
+
+    /* uid and gid must already be set by the caller for quota init */
 
     inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
     inode->i_size = i_size;
@@ -1578,18 +1552,38 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     REISERFS_I(inode)->i_trans_id = 0;
     REISERFS_I(inode)->i_trans_index = 0;
 
+    if (old_format_only (sb))
+	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
+    else
+	make_le_item_head (&ih, 0, KEY_FORMAT_3_6, SD_OFFSET, TYPE_STAT_DATA, SD_SIZE, MAX_US_INT);
+
+    /* key to search for correct place for new stat data */
+    _make_cpu_key (&key, KEY_FORMAT_3_6, le32_to_cpu (ih.ih_key.k_dir_id),
+		   le32_to_cpu (ih.ih_key.k_objectid), SD_OFFSET, TYPE_STAT_DATA, 3/*key length*/);
+
+    /* find proper place for inserting of stat data */
+    retval = search_item (sb, &key, &path_to_key);
+    if (retval == IO_ERROR) {
+	err = -EIO;
+	goto out_bad_inode;
+    }
+    if (retval == ITEM_FOUND) {
+	pathrelse (&path_to_key);
+	err = -EEXIST;
+	goto out_bad_inode;
+    }
+
     if (old_format_only (sb)) {
 	if (inode->i_uid & ~0xffff || inode->i_gid & ~0xffff) {
 	    pathrelse (&path_to_key);
 	    /* i_uid or i_gid is too big to be stored in stat data v3.5 */
-	    iput (inode);
-	    *err = -EINVAL;
-	    return NULL;
+	    err = -EINVAL;
+	    goto out_bad_inode;
 	}
 	inode2sd_v1 (&sd, inode);
-    } else
+    } else {
 	inode2sd (&sd, inode);
-
+    }
     // these do not go to on-disk stat data
     inode->i_ino = le32_to_cpu (ih.ih_key.k_objectid);
     inode->i_blksize = PAGE_SIZE;
@@ -1610,10 +1604,9 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     /* insert the stat data into the tree */
     retval = reiserfs_insert_item (th, &path_to_key, &key, &ih, (char *)(&sd));
     if (retval) {
-	iput (inode);
-	*err = retval;
+	err = retval;
 	reiserfs_check_path(&path_to_key) ;
-	return NULL;
+	goto out_bad_inode;
     }
 
     if (S_ISDIR(mode)) {
@@ -1628,19 +1621,35 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 	retval = reiserfs_new_symlink (th, &ih, &path_to_key, symname, i_size);
     }
     if (retval) {
-      inode->i_nlink = 0;
-	iput (inode);
-	*err = retval;
+	err = retval;
 	reiserfs_check_path(&path_to_key) ;
-	return NULL;
+	journal_end(th, th->t_super, th->t_blocks_allocated);
+	goto out_inserted_sd;
     }
 
     insert_inode_hash (inode);
-    // we do not mark inode dirty: on disk content matches to the
-    // in-core one
+    reiserfs_update_sd(th, inode);
     reiserfs_check_path(&path_to_key) ;
 
-    return inode;
+    return 0;
+
+/* it looks like you can easily compress these two goto targets into
+ * one.  Keeping it like this doesn't actually hurt anything, and they
+ * are place holders for what the quota code actually needs.
+ */
+out_bad_inode:
+    /* Invalidate the object, nothing was inserted yet */
+    INODE_PKEY(inode)->k_objectid = 0;
+
+    /* dquot_drop must be done outside a transaction */
+    journal_end(th, th->t_super, th->t_blocks_allocated) ;
+    make_bad_inode(inode);
+
+out_inserted_sd:
+    inode->i_nlink = 0;
+    th->t_trans_id = 0; /* so the caller can't use this handle later */
+    iput(inode);
+    return err;
 }
 
 /*

@@ -552,6 +552,40 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     return 0;
 }
 
+/* quota utility function, call if you've had to abort after calling
+** new_inode_init, and have not called reiserfs_new_inode yet.
+** This should only be called on inodes that do not hav stat data
+** inserted into the tree yet.
+*/
+static int drop_new_inode(struct inode *inode) {
+    make_bad_inode(inode) ;
+    iput(inode) ;
+    return 0 ;
+}
+
+/* utility function that does setup for reiserfs_new_inode.  
+** DQUOT_ALLOC_INODE cannot be called inside a transaction, so we had
+** to pull some bits of reiserfs_new_inode out into this func.
+** Yes, the actual quota calls are missing, they are part of the quota
+** patch.
+*/
+static int new_inode_init(struct inode *inode, struct inode *dir, int mode) {
+
+    /* the quota init calls have to know who to charge the quota to, so
+    ** we have to set uid and gid here
+    */
+    inode->i_uid = current->fsuid;
+    inode->i_mode = mode;
+
+    if (dir->i_mode & S_ISGID) {
+        inode->i_gid = dir->i_gid;
+        if (S_ISDIR(mode))
+            inode->i_mode |= S_ISGID;
+    } else {
+        inode->i_gid = current->fsgid;
+    }
+    return 0 ;
+}
 
 //
 // a portion of this function, particularly the VFS interface portion,
@@ -564,7 +598,6 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
 {
     int retval;
     struct inode * inode;
-    int windex ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 ;
     struct reiserfs_transaction_handle th ;
 
@@ -572,16 +605,16 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
     if (!inode) {
 	return -ENOMEM ;
     }
+    retval = new_inode_init(inode, dir, mode);
+    if (retval)
+        return retval;
+
     lock_kernel();
     journal_begin(&th, dir->i_sb, jbegin_count) ;
     th.t_caller = "create" ;
-    windex = push_journal_writer("reiserfs_create") ;
-    inode = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode, &retval);
-    if (!inode) {
-	pop_journal_writer(windex) ;
-	journal_end(&th, dir->i_sb, jbegin_count) ;
-	unlock_kernel();
-	return retval;
+    retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
+    if (retval) {
+        goto out_failed;
     }
 	
     inode->i_op = &reiserfs_file_inode_operations;
@@ -593,22 +626,19 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
     if (retval) {
 	inode->i_nlink--;
 	reiserfs_update_sd (&th, inode);
-	pop_journal_writer(windex) ;
-	// FIXME: should we put iput here and have stat data deleted
-	// in the same transactioin
 	journal_end(&th, dir->i_sb, jbegin_count) ;
 	iput (inode);
-	unlock_kernel();
-	return retval;
+	goto out_failed;
     }
     reiserfs_update_inode_transaction(inode) ;
     reiserfs_update_inode_transaction(dir) ;
 
     d_instantiate(dentry, inode);
-    pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+
+out_failed:
     unlock_kernel();
-    return 0;
+    return retval;
 }
 
 
@@ -623,7 +653,6 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
 {
     int retval;
     struct inode * inode;
-    int windex ;
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
@@ -631,16 +660,16 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     if (!inode) {
 	return -ENOMEM ;
     }
+    retval = new_inode_init(inode, dir, mode);
+    if (retval)
+        return retval;
+
     lock_kernel();
     journal_begin(&th, dir->i_sb, jbegin_count) ;
-    windex = push_journal_writer("reiserfs_mknod") ;
 
-    inode = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode, &retval);
-    if (!inode) {
-	pop_journal_writer(windex) ;
-	journal_end(&th, dir->i_sb, jbegin_count) ;
-	unlock_kernel();
-	return retval;
+    retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
+    if (retval) {
+        goto out_failed;
     }
 
     init_special_inode(inode, mode, rdev) ;
@@ -656,18 +685,17 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     if (retval) {
 	inode->i_nlink--;
 	reiserfs_update_sd (&th, inode);
-	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
 	iput (inode);
-	unlock_kernel();
-	return retval;
+	goto out_failed;
     }
 
     d_instantiate(dentry, inode);
-    pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+
+out_failed:
     unlock_kernel();
-    return 0;
+    return retval;
 }
 
 
@@ -682,33 +710,33 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
 {
     int retval;
     struct inode * inode;
-    int windex ;
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
+    mode = S_IFDIR | mode;
     inode = new_inode(dir->i_sb) ;
     if (!inode) {
 	return -ENOMEM ;
     }
+    retval = new_inode_init(inode, dir, mode);
+    if (retval)
+        return retval;
+
     lock_kernel();
     journal_begin(&th, dir->i_sb, jbegin_count) ;
-    windex = push_journal_writer("reiserfs_mkdir") ;
 
     /* inc the link count now, so another writer doesn't overflow it while
     ** we sleep later on.
     */
     INC_DIR_INODE_NLINK(dir)
 
-    mode = S_IFDIR | mode;
-    inode = reiserfs_new_inode (&th, dir, mode, 0/*symlink*/,
-				old_format_only (dir->i_sb) ? EMPTY_DIR_SIZE_V1 : EMPTY_DIR_SIZE,
-				dentry, inode, &retval);
-    if (!inode) {
-	pop_journal_writer(windex) ;
+    retval = reiserfs_new_inode (&th, dir, mode, 0/*symlink*/,
+				old_format_only (dir->i_sb) ? 
+				EMPTY_DIR_SIZE_V1 : EMPTY_DIR_SIZE,
+				dentry, inode);
+    if (retval) {
 	dir->i_nlink-- ;
-	journal_end(&th, dir->i_sb, jbegin_count) ;
-	unlock_kernel();
-	return retval;
+	goto out_failed;
     }
     reiserfs_update_inode_transaction(inode) ;
     reiserfs_update_inode_transaction(dir) ;
@@ -723,21 +751,19 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
 	inode->i_nlink = 0;
 	DEC_DIR_INODE_NLINK(dir);
 	reiserfs_update_sd (&th, inode);
-	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
 	iput (inode);
-	unlock_kernel();
-	return retval;
+	goto out_failed;
     }
 
     // the above add_entry did not update dir's stat data
     reiserfs_update_sd (&th, dir);
 
     d_instantiate(dentry, inode);
-    pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+out_failed:
     unlock_kernel();
-    return 0;
+    return retval;
 }
 
 static inline int reiserfs_empty_dir(struct inode *inode) {
@@ -942,43 +968,43 @@ static int reiserfs_symlink (struct inode * dir, struct dentry * dentry, const c
     struct inode * inode;
     char * name;
     int item_len;
-    int windex ;
     struct reiserfs_transaction_handle th ;
+    int mode = S_IFLNK | S_IRWXUGO;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
-
 
     inode = new_inode(dir->i_sb) ;
     if (!inode) {
 	return -ENOMEM ;
     }
+    retval = new_inode_init(inode, dir, mode);
+    if (retval) {
+        return retval;
+    }
 
+    lock_kernel();
     item_len = ROUND_UP (strlen (symname));
     if (item_len > MAX_DIRECT_ITEM_LEN (dir->i_sb->s_blocksize)) {
-	iput(inode) ;
-	return -ENAMETOOLONG;
+	retval =  -ENAMETOOLONG;
+	drop_new_inode(inode);
+	goto out_failed;
     }
   
-    lock_kernel();
     name = reiserfs_kmalloc (item_len, GFP_NOFS, dir->i_sb);
     if (!name) {
-	iput(inode) ;
-	unlock_kernel();
-	return -ENOMEM;
+	drop_new_inode(inode);
+	retval =  -ENOMEM;
+	goto out_failed;
     }
     memcpy (name, symname, strlen (symname));
     padd_item (name, item_len, strlen (symname));
 
     journal_begin(&th, dir->i_sb, jbegin_count) ;
-    windex = push_journal_writer("reiserfs_symlink") ;
 
-    inode = reiserfs_new_inode (&th, dir, S_IFLNK | S_IRWXUGO, name, strlen (symname), dentry,
-				inode, &retval);
+    retval = reiserfs_new_inode (&th, dir, mode, name, strlen (symname), 
+                                 dentry, inode);
     reiserfs_kfree (name, item_len, dir->i_sb);
-    if (inode == 0) { /* reiserfs_new_inode iputs for us */
-	pop_journal_writer(windex) ;
-	journal_end(&th, dir->i_sb, jbegin_count) ;
-	unlock_kernel();
-	return retval;
+    if (retval) { /* reiserfs_new_inode iputs for us */
+	goto out_failed;
     }
 
     reiserfs_update_inode_transaction(inode) ;
@@ -996,18 +1022,16 @@ static int reiserfs_symlink (struct inode * dir, struct dentry * dentry, const c
     if (retval) {
 	inode->i_nlink--;
 	reiserfs_update_sd (&th, inode);
-	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
 	iput (inode);
-	unlock_kernel();
-	return retval;
+	goto out_failed;
     }
 
     d_instantiate(dentry, inode);
-    pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+out_failed:
     unlock_kernel();
-    return 0;
+    return retval;
 }
 
 
