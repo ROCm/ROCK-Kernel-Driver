@@ -230,6 +230,9 @@ extern syscall_handler_t sys_io_submit;
 extern syscall_handler_t sys_io_cancel;
 extern syscall_handler_t sys_exit_group;
 extern syscall_handler_t sys_lookup_dcookie;
+extern syscall_handler_t sys_epoll_create;
+extern syscall_handler_t sys_epoll_ctl;
+extern syscall_handler_t sys_epoll_wait;
 
 #if CONFIG_NFSD
 #define NFSSERVCTL sys_nfsserctl
@@ -241,7 +244,7 @@ extern syscall_handler_t um_mount;
 extern syscall_handler_t um_time;
 extern syscall_handler_t um_stime;
 
-#define LAST_GENERIC_SYSCALL __NR_lookup_dcookie
+#define LAST_GENERIC_SYSCALL __NR_sys_epoll_wait
 
 #if LAST_GENERIC_SYSCALL > LAST_ARCH_SYSCALL
 #define LAST_SYSCALL LAST_GENERIC_SYSCALL
@@ -481,6 +484,9 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_free_hugepages ] = sys_ni_syscall,
 	[ __NR_exit_group ] = sys_exit_group,
 	[ __NR_lookup_dcookie ] = sys_lookup_dcookie,
+	[ __NR_sys_epoll_create ] = sys_epoll_create,
+	[ __NR_sys_epoll_ctl ] = sys_epoll_ctl,
+	[ __NR_sys_epoll_wait ] = sys_epoll_wait,
 
 	ARCH_SYSCALLS
 	[ LAST_SYSCALL + 1 ... NR_syscalls ] = 
