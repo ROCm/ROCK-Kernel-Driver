@@ -246,7 +246,7 @@ static void ax_changedmtu(struct ax_disp *ax)
 		return;
 	}
 
-	spin_lock_bh(ax->buflock);
+	spin_lock_bh(&ax->buflock);
 
 	oxbuff    = ax->xbuff;
 	ax->xbuff = xbuff;
@@ -277,7 +277,7 @@ static void ax_changedmtu(struct ax_disp *ax)
 	ax->mtu      = dev->mtu + 73;
 	ax->buffsize = len;
 
-	spin_unlock_bh(ax->buflock);
+	spin_unlock_bh(&ax->buflock);
 
 	if (oxbuff != NULL)
 		kfree(oxbuff);
@@ -305,7 +305,7 @@ static void ax_bump(struct ax_disp *ax)
 	struct sk_buff *skb;
 	int count;
 
-	spin_lock_bh(ax->buflock);
+	spin_lock_bh(&ax->buflock);
 	if (ax->rbuff[0] > 0x0f) {
 		if (ax->rbuff[0] & 0x20) {
 		        ax->crcmode = CRC_MODE_FLEX;
@@ -322,7 +322,7 @@ static void ax_bump(struct ax_disp *ax)
                         *ax->rbuff &= ~0x20;
 		}
  	}
-	spin_unlock_bh(ax->buflock);
+	spin_unlock_bh(&ax->buflock);
 
 	count = ax->rcount;
 
@@ -333,9 +333,9 @@ static void ax_bump(struct ax_disp *ax)
 	}
 
 	skb->dev      = ax->dev;
-	spin_lock_bh(ax->buflock);
+	spin_lock_bh(&ax->buflock);
 	memcpy(skb_put(skb,count), ax->rbuff, count);
-	spin_unlock_bh(ax->buflock);
+	spin_unlock_bh(&ax->buflock);
 	skb->mac.raw  = skb->data;
 	skb->protocol = htons(ETH_P_AX25);
 	netif_rx(skb);
@@ -363,7 +363,7 @@ static void ax_encaps(struct ax_disp *ax, unsigned char *icp, int len)
 
 	p = icp;
 
-	spin_lock_bh(ax->buflock);
+	spin_lock_bh(&ax->buflock);
         switch (ax->crcmode) {
 	         unsigned short crc;
 
@@ -386,7 +386,7 @@ static void ax_encaps(struct ax_disp *ax, unsigned char *icp, int len)
 	ax->xleft = count - actual;
 	ax->xhead = ax->xbuff + actual;
 
-	spin_unlock_bh(ax->buflock);
+	spin_unlock_bh(&ax->buflock);
 }
 
 /*
@@ -759,18 +759,18 @@ static void kiss_unesc(struct ax_disp *ax, unsigned char s)
 			break;
 	}
 
-	spin_lock_bh(ax->buflock);
+	spin_lock_bh(&ax->buflock);
 	if (!test_bit(AXF_ERROR, &ax->flags)) {
 		if (ax->rcount < ax->buffsize) {
 			ax->rbuff[ax->rcount++] = s;
-			spin_unlock_bh(ax->buflock);
+			spin_unlock_bh(&ax->buflock);
 			return;
 		}
 
 		ax->rx_over_errors++;
 		set_bit(AXF_ERROR, &ax->flags);
 	}
-	spin_unlock_bh(ax->buflock);
+	spin_unlock_bh(&ax->buflock);
 }
 
 
