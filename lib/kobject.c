@@ -285,7 +285,11 @@ int kobject_register(struct kobject * kobj)
 	if (kobj) {
 		kobject_init(kobj);
 		error = kobject_add(kobj);
-		WARN_ON(error);
+		if (error) {
+			printk("kobject_register failed for %s (%d)\n",
+			       kobj->name,error);
+			dump_stack();
+		}
 	} else
 		error = -EINVAL;
 	return error;
