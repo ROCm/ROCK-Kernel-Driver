@@ -638,10 +638,9 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 	int i;	
 
 #ifdef EXT2FS_DEBUG
-	struct ext2_super_block * es;
+	struct ext2_super_block *es;
 	unsigned long bitmap_count = 0;
 	struct buffer_head *bitmap_bh = NULL;
-	int i;
 
 	lock_super (sb);
 	es = EXT2_SB(sb)->s_es;
@@ -658,7 +657,7 @@ unsigned long ext2_count_free_inodes (struct super_block * sb)
 			continue;
 
 		x = ext2_count_free(bitmap_bh, EXT2_INODES_PER_GROUP(sb) / 8);
-		printk ("group %d: stored = %d, counted = %lu\n",
+		printk("group %d: stored = %d, counted = %u\n",
 			i, le16_to_cpu(desc->bg_free_inodes_count), x);
 		bitmap_count += x;
 	}
