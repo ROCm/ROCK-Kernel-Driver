@@ -2571,19 +2571,8 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			goto done_unlock;
 
 		case RUN_ARRAY:
-		{
 			err = do_md_run (mddev);
-			/*
-			 * we have to clean up the mess if
-			 * the array cannot be run for some
-			 * reason ...
-			 * ->pers will not be set, to superblock will
-			 * not be updated.
-			 */
-			if (err)
-				do_md_stop (mddev, 0);
 			goto done_unlock;
-		}
 
 		default:
 			if (_IOC_TYPE(cmd) == MD_MAJOR)
