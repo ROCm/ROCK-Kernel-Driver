@@ -66,6 +66,10 @@ struct auth_domain {
  *      GARBAGE - rpc garbage_args error
  *      SYSERR - rpc system_err error
  *      DENIED - authp holds reason for denial.
+ *      COMPLETE - the reply is encoded already and ready to be sent; no
+ *		further processing is necessary.  (This is used for processing
+ *		null procedure calls which are used to set up encryption
+ *		contexts.)
  *
  *   accept is passed the proc number so that it can accept NULL rpc requests
  *   even if it cannot authenticate the client (as is sometimes appropriate).
@@ -98,6 +102,7 @@ extern struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR];
 #define	SVC_DROP	6
 #define	SVC_DENIED	7
 #define	SVC_PENDING	8
+#define	SVC_COMPLETE	9
 
 
 extern int	svc_authenticate(struct svc_rqst *rqstp, u32 *authp);

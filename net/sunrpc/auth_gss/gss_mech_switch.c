@@ -162,6 +162,23 @@ gss_mech_get_by_OID(struct xdr_netobj *mech_type)
 	return gm;
 }
 
+struct gss_api_mech *
+gss_mech_get_by_name(char *name)
+{
+	struct gss_api_mech	*pos, *gm = NULL;
+
+	spin_lock(&registered_mechs_lock);
+	list_for_each_entry(pos, &registered_mechs, gm_list) {
+		if (0 == strcmp(name, pos->gm_ops->name)) {
+			gm = gss_mech_get(pos);
+			break;
+		}
+	}
+	spin_unlock(&registered_mechs_lock);
+	return gm;
+
+}
+
 int
 gss_mech_put(struct gss_api_mech * gm)
 {
