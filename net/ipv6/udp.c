@@ -591,12 +591,12 @@ static void udpv6_mcast_deliver(struct udphdr *uh,
 			if (!buff)
 				continue;
 		}
-		if (sock_queue_rcv_skb(sk2, buff) >= 0)
+		if (udpv6_queue_rcv_skb(sk2, buff) >= 0)
 			buff = NULL;
 	}
 	if (buff)
 		kfree_skb(buff);
-	if (sock_queue_rcv_skb(sk, skb) < 0) {
+	if (udpv6_queue_rcv_skb(sk, skb) < 0) {
 free_skb:
 		kfree_skb(skb);
 	}
