@@ -108,45 +108,47 @@ struct urb * usb_get_urb(struct urb *urb)
  *
  * Successful submissions return 0; otherwise this routine returns a
  * negative error number.  If the submission is successful, the complete()
- * fuction of the urb will be called when the USB host driver is
- * finished with the urb (either a successful transmission, or some
- * error case.)
- *
- * Unreserved Bandwidth Transfers:
- *
- * Bulk or control requests complete only once.  When the completion
+ * callback from the urb will be called exactly once, when the USB core and
+ * host controller driver are finished with the urb.  When the completion
  * function is called, control of the URB is returned to the device
  * driver which issued the request.  The completion handler may then
  * immediately free or reuse that URB.
  *
- * Bulk URBs may be queued by submitting an URB to an endpoint before
- * previous ones complete.  This can maximize bandwidth utilization by
- * letting the USB controller start work on the next URB without any
- * delay to report completion (scheduling and processing an interrupt)
- * and then submit that next request.
- *
  * For control endpoints, the synchronous usb_control_msg() call is
  * often used (in non-interrupt context) instead of this call.
+ * That is often used through convenience wrappers, for the requests
+ * that are standardized in the USB 2.0 specification.  For bulk
+ * endpoints, a synchronous usb_bulk_msg() call is available.
+ *
+ * Request Queuing:
+ *
+ * URBs may be submitted to endpoints before previous ones complete, to
+ * minimize the impact of interrupt latencies and system overhead on data
+ * throughput.  This is required for continuous isochronous data streams,
+ * and may also be required for some kinds of interrupt transfers. Such
+ * queueing also maximizes bandwidth utilization by letting USB controllers
+ * start work on later requests before driver software has finished the
+ * completion processing for earlier requests.
+ *
+ * Bulk and Isochronous URBs may always be queued.  At this writing, all
+ * mainstream host controller drivers support queueing for control and
+ * interrupt transfer requests.
  *
  * Reserved Bandwidth Transfers:
  *
- * Periodic URBs (interrupt or isochronous) are performed repeatedly.
+ * Periodic transfers (interrupt or isochronous) are performed repeatedly,
+ * using the interval specified in the urb.  Submitting the first urb to
+ * the endpoint reserves the bandwidth necessary to make those transfers.
+ * If the USB subsystem can't allocate sufficient bandwidth to perform
+ * the periodic request, submitting such a periodic request should fail.
  *
- * For interrupt requests this is (currently) automagically done
- * until the original request is aborted.  When the completion callback
- * indicates the URB has been unlinked (with a special status code),
- * control of that URB returns to the device driver.  Otherwise, the
- * completion handler does not control the URB, and should not change
- * any of its fields.
- *
- * For isochronous requests, the completion handler is expected to
- * submit an urb, typically resubmitting its parameter, until drivers
- * stop wanting data transfers.  (For example, audio playback might have
- * finished, or a webcam turned off.)
- *
- * If the USB subsystem can't reserve sufficient bandwidth to perform
- * the periodic request, and bandwidth reservation is being done for
- * this controller, submitting such a periodic request will fail.
+ * Device drivers must explicitly request that repetition, by ensuring that
+ * some URB is always on the endpoint's queue (except possibly for short
+ * periods during completion callacks).  When there is no longer an urb
+ * queued, the endpoint's bandwidth reservation is canceled.  This means
+ * drivers can use their completion handlers to ensure they keep bandwidth
+ * they need, by reinitializing and resubmitting the just-completed urb
+ * until the driver longer needs that periodic bandwidth.
  *
  * Memory Flags:
  *
@@ -356,8 +358,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  * This routine cancels an in-progress request.  The requests's
  * completion handler will be called with a status code indicating
  * that the request has been canceled, and that control of the URB
- * has been returned to that device driver.  This is the only way
- * to stop an interrupt transfer, so long as the device is connected.
+ * has been returned to that device driver.
  *
  * When the USB_ASYNC_UNLINK transfer flag for the URB is clear, this
  * request is synchronous.  Success is indicated by returning zero,

@@ -383,10 +383,16 @@ static int hc_reset (struct ohci_hcd *ohci)
 
 	/* SMM owns the HC?  not for long! */
 	if (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
-		temp = 50;	/* arbitrary: half second */
+		dbg ("USB HC TakeOver from BIOS/SMM");
+
+		/* this timeout is arbitrary.  we make it long, so systems
+		 * depending on usb keyboards may be usable even if the
+		 * BIOS/SMM code seems pretty broken.
+		 */
+		temp = 500;	/* arbitrary: five seconds */
+
 		writel (OHCI_INTR_OC, &ohci->regs->intrenable);
 		writel (OHCI_OCR, &ohci->regs->cmdstatus);
-		dbg ("USB HC TakeOver from SMM");
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 			wait_ms (10);
 			if (--temp == 0) {

@@ -20,7 +20,6 @@
 #include <asm/unaligned.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <scsi/scsicam.h>
 
 static int setsize(unsigned long capacity, unsigned int *cyls, unsigned int *hds,
@@ -44,7 +43,7 @@ unsigned char *scsi_bios_ptable(struct block_device *dev)
 }
 
 /*
- * Function : int scsicam_bios_param (Disk *disk, struct block_device *bdev, int *ip)
+ * Function : int scsicam_bios_param (struct block_device *bdev, ector_t capacity, int *ip)
  *
  * Purpose : to determine the BIOS mapping used for a drive in a 
  *      SCSI-CAM system, storing the results in ip as required
@@ -54,42 +53,45 @@ unsigned char *scsi_bios_ptable(struct block_device *dev)
  *
  */
 
-int scsicam_bios_param(Disk * disk,	/* SCSI disk */
-		       struct block_device *bdev,
-		  int *ip /* Heads, sectors, cylinders in that order */ )
+int scsicam_bios_param(struct block_device *bdev, sector_t capacity, int *ip)
 {
-	int ret_code;
-	int size = disk->capacity;
-	unsigned long temp_cyl;
-	unsigned char *p = scsi_bios_ptable(bdev);
+	unsigned char *p;
+	int ret;
 
+	p = scsi_bios_ptable(bdev);
 	if (!p)
 		return -1;
 
 	/* try to infer mapping from partition table */
-	ret_code = scsi_partsize(p, (unsigned long) size, (unsigned int *) ip + 2,
-		       (unsigned int *) ip + 0, (unsigned int *) ip + 1);
+	ret = scsi_partsize(p, (unsigned long)capacity, (unsigned int *)ip + 2,
+			       (unsigned int *)ip + 0, (unsigned int *)ip + 1);
 	kfree(p);
 
-	if (ret_code == -1) {
+	if (ret == -1) {
 		/* pick some standard mapping with at most 1024 cylinders,
 		   and at most 62 sectors per track - this works up to
 		   7905 MB */
-		ret_code = setsize((unsigned long) size, (unsigned int *) ip + 2,
-		       (unsigned int *) ip + 0, (unsigned int *) ip + 1);
+		ret = setsize((unsigned long)capacity, (unsigned int *)ip + 2,
+		       (unsigned int *)ip + 0, (unsigned int *)ip + 1);
 	}
+
 	/* if something went wrong, then apparently we have to return
 	   a geometry with more than 1024 cylinders */
-	if (ret_code || ip[0] > 255 || ip[1] > 63) {
-		ip[0] = 64;
-		ip[1] = 32;
-		temp_cyl = size / (ip[0] * ip[1]);
-		if (temp_cyl > 65534) {
+	if (ret || ip[0] > 255 || ip[1] > 63) {
+		if ((capacity >> 11) > 65534) {
 			ip[0] = 255;
 			ip[1] = 63;
+		} else {
+			ip[0] = 64;
+			ip[1] = 32;
 		}
-		ip[2] = size / (ip[0] * ip[1]);
+
+		if (capacity > 65535*63*255)
+			ip[2] = 65535;
+		else
+			ip[2] = (unsigned long)capacity / (ip[0] * ip[1]);
 	}
+
 	return 0;
 }
 

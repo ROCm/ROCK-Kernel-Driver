@@ -658,10 +658,10 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
  * Notes:       This could be called either from an interrupt context or a
  *              normal process context.
  */
-static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
+int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 {
 	struct Scsi_Host *host = cmd->host;
-	unsigned long flags;
+	struct scsi_device *device = cmd->device;
 
 	SCSI_LOG_MLQUEUE(1,
 		 printk("Inserting command %p into mlqueue\n", cmd));
@@ -688,7 +688,7 @@ static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	if (reason == SCSI_MLQUEUE_HOST_BUSY) {
 		host->host_blocked = host->max_host_blocked;
 	} else {
-                cmd->device->device_blocked = cmd->device->max_device_blocked;
+		device->device_blocked = device->max_device_blocked;
 	}
 
 	/*
@@ -702,14 +702,19 @@ static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	 * Decrement the counters, since these commands are no longer
 	 * active on the host/device.
 	 */
-	spin_lock_irqsave(cmd->host->host_lock, flags);
-	cmd->host->host_busy--;
-	cmd->device->device_busy--;
-	spin_unlock_irqrestore(cmd->host->host_lock, flags);
+	scsi_host_busy_dec_and_test(host, device);
 
 	/*
 	 * Insert this command at the head of the queue for it's device.
 	 * It will go before all other commands that are already in the queue.
+	 *
+	 * NOTE: there is magic here about the way the queue is
+	 * plugged if we have no outstanding commands.
+	 * scsi_insert_special_cmd eventually calls
+	 * blk_queue_insert().  Although this *doesn't* plug the
+	 * queue, it does call the request function.  The SCSI request
+	 * function detects the blocked condition and plugs the queue
+	 * appropriately.
 	 */
 	scsi_insert_special_cmd(cmd, 1);
 	return 0;
@@ -1991,6 +1996,11 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	tpnt->next = scsi_devicelist;
 	scsi_devicelist = tpnt;
 
+	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
+	tpnt->scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
+
+	driver_register(&tpnt->scsi_driverfs_driver);
+
 	/*
 	 * First scan the devices that we know about, and see if we notice them.
 	 */
@@ -2019,33 +2029,33 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	     shpnt = scsi_host_get_next(shpnt)) {
 		for (SDpnt = shpnt->host_queue; SDpnt;
 		     SDpnt = SDpnt->next) {
+			scsi_build_commandblocks(SDpnt);
+			if (SDpnt->current_queue_depth == 0) {
+				out_of_space = 1;
+				continue;
+			}
 			if (tpnt->attach)
 				(*tpnt->attach) (SDpnt);
+
 			/*
 			 * If this driver attached to the device, and don't have any
 			 * command blocks for this device, allocate some.
 			 */
-			if (SDpnt->attached && SDpnt->current_queue_depth == 0) {
+			if (SDpnt->attached)
 				SDpnt->online = TRUE;
-				scsi_build_commandblocks(SDpnt);
-				if (SDpnt->current_queue_depth == 0)
-					out_of_space = 1;
-			}
+			else
+				scsi_release_commandblocks(SDpnt);
 		}
 	}
 
-	/*
-	 * This does any final handling that is required.
-	 */
-	if (tpnt->finish && tpnt->nr_dev)
-		(*tpnt->finish) ();
 	MOD_INC_USE_COUNT;
 
 	if (out_of_space) {
 		scsi_unregister_device(tpnt);	/* easiest way to clean up?? */
 		return 1;
-	} else
-		return 0;
+	}
+
+	return 0;
 }
 
 int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
@@ -2061,6 +2071,8 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	 */
 	if (GET_USE_COUNT(tpnt->module) != 0)
 		goto error_out;
+
+	driver_unregister(&tpnt->scsi_driverfs_driver);
 
 	/*
 	 * Next, detach the devices from the driver.

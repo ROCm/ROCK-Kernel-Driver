@@ -752,8 +752,7 @@ static int get_async_struct(int line, struct async_struct **ret_info)
 	info->flags = sstate->flags;
 	info->xmit_fifo_size = sstate->xmit_fifo_size;
 	info->line = line;
-	info->tqueue.routine = do_softint;
-	info->tqueue.data = info;
+	INIT_WORK(&info->work, do_softint, info);
 	info->state = sstate;
 	if (sstate->info) {
 		kfree(info);

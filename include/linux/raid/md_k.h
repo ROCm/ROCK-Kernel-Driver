@@ -258,11 +258,6 @@ static inline int mdidx (mddev_t * mddev)
 	return mddev->__minor;
 }
 
-static inline kdev_t mddev_to_kdev(mddev_t * mddev)
-{
-	return mk_kdev(MD_MAJOR, mdidx(mddev));
-}
-
 extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
 
 /*

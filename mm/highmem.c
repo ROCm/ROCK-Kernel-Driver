@@ -366,34 +366,13 @@ static int bounce_end_io_read_isa(struct bio *bio, unsigned int bytes_done, int 
 	return 0;
 }
 
-void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
+void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig, int bio_gfp,
+			mempool_t *pool)
 {
 	struct page *page;
 	struct bio *bio = NULL;
-	int i, rw = bio_data_dir(*bio_orig), bio_gfp;
+	int i, rw = bio_data_dir(*bio_orig);
 	struct bio_vec *to, *from;
-	mempool_t *pool;
-	unsigned long pfn = q->bounce_pfn;
-	int gfp = q->bounce_gfp;
-
-	BUG_ON((*bio_orig)->bi_idx);
-
-	/*
-	 * for non-isa bounce case, just check if the bounce pfn is equal
-	 * to or bigger than the highest pfn in the system -- in that case,
-	 * don't waste time iterating over bio segments
-	 */
-	if (!(gfp & GFP_DMA)) {
-		if (pfn >= blk_max_pfn)
-			return;
-
-		bio_gfp = GFP_NOHIGHIO;
-		pool = page_pool;
-	} else {
-		BUG_ON(!isa_page_pool);
-		bio_gfp = GFP_NOIO;
-		pool = isa_page_pool;
-	}
 
 	bio_for_each_segment(from, *bio_orig, i) {
 		page = from->bv_page;
@@ -401,7 +380,7 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 		/*
 		 * is destination page below bounce pfn?
 		 */
-		if ((page - page_zone(page)->zone_mem_map) + (page_zone(page)->zone_start_pfn) < pfn)
+		if ((page - page_zone(page)->zone_mem_map) + (page_zone(page)->zone_start_pfn) < q->bounce_pfn)
 			continue;
 
 		/*
@@ -412,11 +391,11 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 
 		to = bio->bi_io_vec + i;
 
-		to->bv_page = mempool_alloc(pool, gfp);
+		to->bv_page = mempool_alloc(pool, q->bounce_gfp);
 		to->bv_len = from->bv_len;
 		to->bv_offset = from->bv_offset;
 
-		if (rw & WRITE) {
+		if (rw == WRITE) {
 			char *vto, *vfrom;
 
 			vto = page_address(to->bv_page) + to->bv_offset;
@@ -437,15 +416,16 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 	 * pages
 	 */
 	bio_for_each_segment(from, *bio_orig, i) {
-		to = &bio->bi_io_vec[i];
+		to = bio_iovec_idx(bio, i);
 		if (!to->bv_page) {
 			to->bv_page = from->bv_page;
 			to->bv_len = from->bv_len;
-			to->bv_offset = to->bv_offset;
+			to->bv_offset = from->bv_offset;
 		}
 	}
 
 	bio->bi_bdev = (*bio_orig)->bi_bdev;
+	bio->bi_flags |= (1 << BIO_BOUNCED);
 	bio->bi_sector = (*bio_orig)->bi_sector;
 	bio->bi_rw = (*bio_orig)->bi_rw;
 
@@ -454,19 +434,48 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 	bio->bi_size = (*bio_orig)->bi_size;
 
 	if (pool == page_pool) {
-		if (rw & WRITE)
-			bio->bi_end_io = bounce_end_io_write;
-		else
+		bio->bi_end_io = bounce_end_io_write;
+		if (rw == READ)
 			bio->bi_end_io = bounce_end_io_read;
 	} else {
-		if (rw & WRITE)
-			bio->bi_end_io = bounce_end_io_write_isa;
-		else
+		bio->bi_end_io = bounce_end_io_write_isa;
+		if (rw == READ)
 			bio->bi_end_io = bounce_end_io_read_isa;
 	}
 
 	bio->bi_private = *bio_orig;
 	*bio_orig = bio;
+}
+
+inline void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
+{
+	mempool_t *pool;
+	int bio_gfp;
+
+	BUG_ON((*bio_orig)->bi_idx);
+
+	/*
+	 * for non-isa bounce case, just check if the bounce pfn is equal
+	 * to or bigger than the highest pfn in the system -- in that case,
+	 * don't waste time iterating over bio segments
+	 */
+	if (!(q->bounce_gfp & GFP_DMA)) {
+		if (q->bounce_pfn >= blk_max_pfn)
+			return;
+
+		bio_gfp = GFP_NOHIGHIO;
+		pool = page_pool;
+	} else {
+		BUG_ON(!isa_page_pool);
+
+		bio_gfp = GFP_NOIO;
+		pool = isa_page_pool;
+	}
+
+	/*
+	 * slow path
+	 */
+	__blk_queue_bounce(q, bio_orig, bio_gfp, pool);
 }
 
 #if defined(CONFIG_DEBUG_HIGHMEM) && defined(CONFIG_HIGHMEM)

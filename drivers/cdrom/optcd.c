@@ -74,15 +74,16 @@
 #include <linux/devfs_fs_kernel.h>
 
 #include <asm/io.h>
-
-#define MAJOR_NR OPTICS_CDROM_MAJOR
-#define QUEUE (&opt_queue)
 #include <linux/blk.h>
 
 #include <linux/cdrom.h>
 #include "optcd.h"
 
 #include <asm/uaccess.h>
+
+#define MAJOR_NR OPTICS_CDROM_MAJOR
+#define QUEUE (&opt_queue)
+#define CURRENT elv_next_request(&opt_queue)
 
 
 /* Debug support */

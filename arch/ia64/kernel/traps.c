@@ -54,8 +54,8 @@ trap_init (void)
 	if (ia64_boot_param->fpswa) {
 		/* FPSWA fixup: make the interface pointer a kernel virtual address: */
 		fpswa_interface = __va(ia64_boot_param->fpswa);
-		major = fpswa_interface->revision & 0xffff;
-		minor = fpswa_interface->revision >> 16;
+		major = fpswa_interface->revision >> 16;
+		minor = fpswa_interface->revision & 0xffff;
 	}
 	printk("fpswa interface at %lx (rev %d.%d)\n", ia64_boot_param->fpswa, major, minor);
 }
@@ -69,7 +69,6 @@ bust_spinlocks (int yes)
 {
 	int loglevel_save = console_loglevel;
 
-	spin_lock_init(&timerlist_lock);
 	if (yes) {
 		oops_in_progress = 1;
 		return;

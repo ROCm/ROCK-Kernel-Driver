@@ -116,7 +116,6 @@ int sym53c8xx_release(struct Scsi_Host *);
 	eh_device_reset_handler:sym53c8xx_eh_device_reset_handler,	\
 	eh_bus_reset_handler:	sym53c8xx_eh_bus_reset_handler,		\
 	eh_host_reset_handler:	sym53c8xx_eh_host_reset_handler,	\
-	bios_param:		scsicam_bios_param,			\
 	can_queue:		0,					\
 	this_id:		7,					\
 	sg_tablesize:		0,					\

@@ -54,7 +54,6 @@ extern int el2_probe(struct net_device *dev);
 extern int ne_probe(struct net_device *dev);
 extern int hp_probe(struct net_device *dev);
 extern int hp_plus_probe(struct net_device *dev);
-extern int znet_probe(struct net_device *);
 extern int express_probe(struct net_device *);
 extern int eepro_probe(struct net_device *);
 extern int el3_probe(struct net_device *);
@@ -269,9 +268,6 @@ static struct devprobe isa_probes[] __initdata = {
 #endif
 #ifdef CONFIG_ETH16I
 	{eth16i_probe, 0},	/* ICL EtherTeam 16i/32 */
-#endif
-#ifdef CONFIG_ZNET		/* Zenith Z-Note and some IBM Thinkpads. */
-	{znet_probe, 0},
 #endif
 #ifdef CONFIG_EEXPRESS		/* Intel EtherExpress */
 	{express_probe, 0},

@@ -924,12 +924,12 @@ static int scsi_debug_abort(Scsi_Cmnd * SCpnt)
 	return SUCCESS;
 }
 
-static int scsi_debug_biosparam(Disk * disk, struct block_device * bdev, 
-				int *info)
+static int scsi_debug_biosparam(struct scsi_device *sdev,
+		struct block_device * bdev, sector_t capacity, int *info)
 {
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
 		printk(KERN_INFO "scsi_debug: biosparam\n");
-	/* int size = disk->capacity; */
+	/* int size = capacity; */
 	info[0] = N_HEAD;
 	info[1] = N_SECTOR;
 	info[2] = N_CYLINDER;

@@ -282,18 +282,20 @@ sys_free_hugepages (unsigned long  addr)
 	extern int free_hugepages(struct vm_area_struct *);
 	int retval;
 
-	vma = find_vma(mm, addr);
-	if (!vma || !is_vm_hugetlb_page(vma) || (vma->vm_start != addr))
-		return -EINVAL;
-
 	down_write(&mm->mmap_sem);
 	{
+		vma = find_vma(mm, addr);
+		if (!vma || !is_vm_hugetlb_page(vma) || (vma->vm_start != addr))
+			retval = -EINVAL;
+			goto out;
+
 		spin_lock(&mm->page_table_lock);
 		{
 			retval = free_hugepages(vma);
 		}
 		spin_unlock(&mm->page_table_lock);
 	}
+out:
 	up_write(&mm->mmap_sem);
 	return retval;
 }

@@ -778,16 +778,20 @@ static void fr_destroy(hdlc_device *hdlc)
 
 int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
-	fr_proto *fr_s = &ifr->ifr_settings->ifs_hdlc.fr;
+	fr_proto *fr_s = ifr->ifr_settings.ifs_ifsu.fr;
 	const size_t size = sizeof(fr_proto);
 	fr_proto new_settings;
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	fr_proto_pvc pvc;
 	int result;
 
-	switch (ifr->ifr_settings->type) {
+	switch (ifr->ifr_settings.type) {
 	case IF_GET_PROTO:
-		ifr->ifr_settings->type = IF_PROTO_FR;
+		ifr->ifr_settings.type = IF_PROTO_FR;
+		if (ifr->ifr_settings.size < size) {
+			ifr->ifr_settings.size = size; /* data size wanted */
+			return -ENOBUFS;
+		}
 		if (copy_to_user(fr_s, &hdlc->state.fr.settings, size))
 			return -EFAULT;
 		return 0;
@@ -847,12 +851,12 @@ int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&pvc, &ifr->ifr_settings->ifs_hdlc.fr_pvc,
+		if (copy_from_user(&pvc, ifr->ifr_settings.ifs_ifsu.fr_pvc,
 				   sizeof(fr_proto_pvc)))
 			return -EFAULT;
 
 		return fr_pvc(hdlc, pvc.dlci,
-			      ifr->ifr_settings->type == IF_PROTO_FR_ADD_PVC);
+			      ifr->ifr_settings.type == IF_PROTO_FR_ADD_PVC);
 	}
 
 	return -EINVAL;

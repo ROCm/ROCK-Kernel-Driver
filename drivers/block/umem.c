@@ -548,12 +548,7 @@ static void process_page(unsigned long data)
 
 		return_bio = bio->bi_next;
 		bio->bi_next = NULL;
-		/* should use bio_endio(), however already cleared
-		 * BIO_UPTODATE. so set bio->bi_size = 0 manually to indicate
-		 * completely done
-		 */
-		bio->bi_size = 0;
-		bio->bi_end_io(bio, bytes, 0);
+		bio_endio(bio, bio->bi_size, 0);
 	}
 }
 
@@ -1041,7 +1036,7 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 
         spin_lock_init(&card->lock);
 
-	dev->driver_data = card;
+	pci_set_drvdata(dev, card);
 
 	if (pci_write_cmd != 0x0F) 	/* If not Memory Write & Invalidate */
 		pci_write_cmd = 0x07;	/* then Memory Write command */
@@ -1100,7 +1095,7 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 */
 static void mm_pci_remove(struct pci_dev *dev)
 {
-	struct cardinfo *card = dev->driver_data;
+	struct cardinfo *card = pci_get_drvdata(dev);
 
 	tasklet_kill(&card->tasklet);
 	iounmap(card->csr_remap);

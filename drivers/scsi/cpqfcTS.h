@@ -12,7 +12,8 @@ extern int cpqfcTS_abort(Scsi_Cmnd *);
 extern int cpqfcTS_reset(Scsi_Cmnd *, unsigned int);
 extern int cpqfcTS_eh_abort(Scsi_Cmnd *Cmnd);
 extern int cpqfcTS_eh_device_reset(Scsi_Cmnd *);
-extern int cpqfcTS_biosparam(Disk *, struct block_device *, int[]);
+extern int cpqfcTS_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int[]);
 extern int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg);
 
 // note: since Tachyon TS supports an extended scatter/gather
@@ -28,8 +29,6 @@ extern int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg);
  queuecommand:           cpqfcTS_queuecommand,   \
  eh_device_reset_handler:   cpqfcTS_eh_device_reset,   \
  eh_abort_handler:       cpqfcTS_eh_abort,       \
- reset:                  cpqfcTS_reset,          \
- abort:                  cpqfcTS_abort,		 \
  bios_param:             cpqfcTS_biosparam,      \
  can_queue:              CPQFCTS_REQ_QUEUE_LEN,  \
  this_id:                -1,                     \

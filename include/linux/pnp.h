@@ -245,10 +245,10 @@ struct pnp_dev *pnp_find_dev(struct pnp_card *card,
 
 /* just in case anyone decides to call these without PnP Support Enabled */
 static inline int pnp_protocol_register(struct pnp_protocol *protocol) { return -ENODEV; }
-static inline void pnp_protocol_unregister(struct pnp_protocol *protocol) { ; )
+static inline void pnp_protocol_unregister(struct pnp_protocol *protocol) { }
 static inline int pnp_init_device(struct pnp_dev *dev) { return -ENODEV; }
 static inline int pnp_add_device(struct pnp_dev *dev) { return -ENODEV; }
-static inline void pnp_remove_device(struct pnp_dev *dev) { ; }
+static inline void pnp_remove_device(struct pnp_dev *dev) { }
 static inline struct pnp_resources * pnp_build_resource(struct pnp_dev *dev, int dependent) { return NULL; }
 static inline struct pnp_resources * pnp_find_resources(struct pnp_dev *dev, int depnum) { return NULL; }
 static inline int pnp_get_max_depnum(struct pnp_dev *dev) { return -ENODEV; }

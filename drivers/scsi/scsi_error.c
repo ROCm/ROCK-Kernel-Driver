@@ -1145,14 +1145,18 @@ static void scsi_eh_offline_sdevs(Scsi_Cmnd *sc_todo, struct Scsi_Host *shost)
 		if (!scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_ERR))
 			continue;
 
-		printk(KERN_INFO "%s: Device offlined - not"
+		printk(KERN_INFO "scsi: Device offlined - not"
 				" ready or command retry failed"
 				" after error recovery: host"
 				" %d channel %d id %d lun %d\n",
-				__FUNCTION__, shost->host_no,
+				shost->host_no,
 				scmd->device->channel,
 				scmd->device->id,
 				scmd->device->lun);
+
+		if (scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_TIMEOUT))
+			scmd->result |= (DRIVER_TIMEOUT << 24);
+
 		scmd->device->online = FALSE;
 		scsi_eh_finish_cmd(scmd, shost);
 	}

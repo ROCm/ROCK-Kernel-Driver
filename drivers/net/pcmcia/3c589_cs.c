@@ -14,11 +14,13 @@
     distributed according to the terms of the GNU General Public License,
     incorporated herein by reference.
     Donald Becker may be reached at becker@scyld.com
+    
+    Updated for 2.5.x by Alan Cox <alan@redhat.com>
 
 ======================================================================*/
 
 #define DRV_NAME	"3c589_cs"
-#define DRV_VERSION	"1.162"
+#define DRV_VERSION	"1.162-ac"
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -111,9 +113,10 @@ struct el3_private {
     struct net_device_stats stats;
     /* For transceiver monitoring */
     struct timer_list	media;
-    u_short		media_status;
-    u_short		fast_poll;
-    u_long		last_irq;
+    u16			media_status;
+    u16			fast_poll;
+    unsigned long	last_irq;
+    spinlock_t		lock;
 };
 
 static char *if_names[] = { "auto", "10baseT", "10base2", "AUI" };
@@ -148,13 +151,13 @@ DRV_NAME ".c " DRV_VERSION " 2001/10/13 00:08:50 (David Hinds)";
 /*====================================================================*/
 
 static void tc589_config(dev_link_t *link);
-static void tc589_release(u_long arg);
+static void tc589_release(unsigned long arg);
 static int tc589_event(event_t event, int priority,
 		       event_callback_args_t *args);
 
-static u_short read_eeprom(ioaddr_t ioaddr, int index);
+static u16 read_eeprom(ioaddr_t ioaddr, int index);
 static void tc589_reset(struct net_device *dev);
-static void media_check(u_long arg);
+static void media_check(unsigned long arg);
 static int el3_config(struct net_device *dev, struct ifmap *map);
 static int el3_open(struct net_device *dev);
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev);
@@ -223,11 +226,13 @@ static dev_link_t *tc589_attach(void)
     lp = kmalloc(sizeof(*lp), GFP_KERNEL);
     if (!lp) return NULL;
     memset(lp, 0, sizeof(*lp));
+    spin_lock_init(&lp->lock);
+    
     link = &lp->link; dev = &lp->dev;
     link->priv = dev->priv = link->irq.Instance = lp;
     
     link->release.function = &tc589_release;
-    link->release.data = (u_long)link;
+    link->release.data = (unsigned long)link;
     link->io.NumPorts1 = 16;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
@@ -302,9 +307,9 @@ static void tc589_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer(&link->release);
+    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	tc589_release((u_long)link);
+	tc589_release((unsigned long)link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -340,14 +345,14 @@ static void tc589_config(dev_link_t *link)
     struct net_device *dev = &lp->dev;
     tuple_t tuple;
     cisparse_t parse;
-    u_short buf[32], *phys_addr;
+    u16 buf[32], *phys_addr;
     int last_fn, last_ret, i, j, multi = 0;
     ioaddr_t ioaddr;
     char *ram_split[] = {"5:3", "3:1", "1:1", "3:5"};
     
     DEBUG(0, "3c589_config(0x%p)\n", link);
 
-    phys_addr = (u_short *)dev->dev_addr;
+    phys_addr = (u16 *)dev->dev_addr;
     tuple.Attributes = 0;
     tuple.DesiredTuple = CISTPL_CONFIG;
     CS_CHECK(GetFirstTuple, handle, &tuple);
@@ -391,7 +396,7 @@ static void tc589_config(dev_link_t *link)
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
     if (register_netdev(dev) != 0) {
-	printk(KERN_NOTICE "3c589_cs: register_netdev() failed\n");
+	printk(KERN_ERR "3c589_cs: register_netdev() failed\n");
 	goto failed;
     }
     
@@ -409,7 +414,7 @@ static void tc589_config(dev_link_t *link)
 	for (i = 0; i < 3; i++)
 	    phys_addr[i] = htons(read_eeprom(ioaddr, i));
 	if (phys_addr[0] == 0x6060) {
-	    printk(KERN_NOTICE "3c589_cs: IO port conflict at 0x%03lx"
+	    printk(KERN_ERR "3c589_cs: IO port conflict at 0x%03lx"
 		   "-0x%03lx\n", dev->base_addr, dev->base_addr+15);
 	    goto failed;
 	}
@@ -427,7 +432,7 @@ static void tc589_config(dev_link_t *link)
     if ((if_port >= 0) && (if_port <= 3))
 	dev->if_port = if_port;
     else
-	printk(KERN_NOTICE "3c589_cs: invalid if_port requested\n");
+	printk(KERN_ERR "3c589_cs: invalid if_port requested\n");
     
     printk(KERN_INFO "%s: 3Com 3c%s, io %#3lx, irq %d, hw_addr ",
 	   dev->name, (multi ? "562" : "589"), dev->base_addr,
@@ -443,7 +448,7 @@ static void tc589_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    tc589_release((u_long)link);
+    tc589_release((unsigned long)link);
     return;
     
 } /* tc589_config */
@@ -456,7 +461,7 @@ failed:
     
 ======================================================================*/
 
-static void tc589_release(u_long arg)
+static void tc589_release(unsigned long arg)
 {
     dev_link_t *link = (dev_link_t *)arg;
 
@@ -545,7 +550,7 @@ static void tc589_wait_for_completion(struct net_device *dev, int cmd)
     while (--i > 0)
 	if (!(inw(dev->base_addr + EL3_STATUS) & 0x1000)) break;
     if (i == 0)
-	printk(KERN_NOTICE "%s: command 0x%04x did not complete!\n",
+	printk(KERN_WARNING "%s: command 0x%04x did not complete!\n",
 	       dev->name, cmd);
 }
 
@@ -553,7 +558,7 @@ static void tc589_wait_for_completion(struct net_device *dev, int cmd)
   Read a word from the EEPROM using the regular EEPROM access register.
   Assume that we are in register window zero.
 */
-static u_short read_eeprom(ioaddr_t ioaddr, int index)
+static u16 read_eeprom(ioaddr_t ioaddr, int index)
 {
     int i;
     outw(EEPROM_READ + index, ioaddr + 10);
@@ -741,7 +746,7 @@ static int el3_open(struct net_device *dev)
     
     tc589_reset(dev);
     lp->media.function = &media_check;
-    lp->media.data = (u_long)lp;
+    lp->media.data = (unsigned long)lp;
     lp->media.expires = jiffies + HZ;
     add_timer(&lp->media);
 
@@ -756,7 +761,7 @@ static void el3_tx_timeout(struct net_device *dev)
     struct el3_private *lp = (struct el3_private *)dev->priv;
     ioaddr_t ioaddr = dev->base_addr;
     
-    printk(KERN_NOTICE "%s: Transmit timed out!\n", dev->name);
+    printk(KERN_WARNING "%s: Transmit timed out!\n", dev->name);
     dump_status(dev);
     lp->stats.tx_errors++;
     dev->trans_start = jiffies;
@@ -832,7 +837,8 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
     DEBUG(3, "%s: interrupt, status %4.4x.\n",
 	  dev->name, inw(ioaddr + EL3_STATUS));
-    
+
+    spin_lock(&lp->lock);    
     while ((status = inw(ioaddr + EL3_STATUS)) &
 	(IntLatch | RxComplete | StatsFull)) {
 	if (!netif_device_present(dev) ||
@@ -867,7 +873,7 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		EL3WINDOW(4);
 		fifo_diag = inw(ioaddr + 4);
 		EL3WINDOW(1);
-		printk(KERN_NOTICE "%s: adapter failure, FIFO diagnostic"
+		printk(KERN_WARNING "%s: adapter failure, FIFO diagnostic"
 		       " register %04x.\n", dev->name, fifo_diag);
 		if (fifo_diag & 0x0400) {
 		    /* Tx overrun */
@@ -885,7 +891,7 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	
 	if (++i > 10) {
-	    printk(KERN_NOTICE "%s: infinite loop in interrupt, "
+	    printk(KERN_ERR "%s: infinite loop in interrupt, "
 		   "status %4.4x.\n", dev->name, status);
 	    /* Clear all interrupts */
 	    outw(AckIntr | 0xFF, ioaddr + EL3_CMD);
@@ -896,18 +902,19 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     }
 
     lp->last_irq = jiffies;
+    spin_unlock(&lp->lock);    
     DEBUG(3, "%s: exiting interrupt, status %4.4x.\n",
 	  dev->name, inw(ioaddr + EL3_STATUS));
     return;
 }
 
-static void media_check(u_long arg)
+static void media_check(unsigned long arg)
 {
     struct el3_private *lp = (struct el3_private *)(arg);
     struct net_device *dev = &lp->dev;
     ioaddr_t ioaddr = dev->base_addr;
-    u_short media, errs;
-    u_long flags;
+    u16 media, errs;
+    unsigned long flags;
 
     if (!netif_device_present(dev)) goto reschedule;
 
@@ -917,7 +924,7 @@ static void media_check(u_long arg)
     if ((inw(ioaddr + EL3_STATUS) & IntLatch) &&
 	(inb(ioaddr + EL3_TIMER) == 0xff)) {
 	if (!lp->fast_poll)
-	    printk(KERN_INFO "%s: interrupt(s) dropped!\n", dev->name);
+	    printk(KERN_WARNING "%s: interrupt(s) dropped!\n", dev->name);
 	el3_interrupt(dev->irq, lp, NULL);
 	lp->fast_poll = HZ;
     }
@@ -927,9 +934,10 @@ static void media_check(u_long arg)
 	add_timer(&lp->media);
 	return;
     }
-    
-    save_flags(flags);
-    cli();
+
+    /* lp->lock guards the EL3 window. Window should always be 1 except
+       when the lock is held */
+    spin_lock_irqsave(&lp->lock, flags);    
     EL3WINDOW(4);
     media = inw(ioaddr+WN4_MEDIA) & 0xc810;
 
@@ -974,7 +982,7 @@ static void media_check(u_long arg)
     }
     
     EL3WINDOW(1);
-    restore_flags(flags);
+    spin_unlock_irqrestore(&lp->lock, flags);    
 
 reschedule:
     lp->media.expires = jiffies + HZ;
@@ -988,10 +996,9 @@ static struct net_device_stats *el3_get_stats(struct net_device *dev)
     dev_link_t *link = &lp->link;
 
     if (DEV_OK(link)) {
-	save_flags(flags);
-	cli();
+    	spin_lock_irqsave(&lp->lock, flags);
 	update_stats(dev);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lp->lock, flags);
     }
     return &lp->stats;
 }
@@ -1001,6 +1008,8 @@ static struct net_device_stats *el3_get_stats(struct net_device *dev)
   single-threaded if the device is active. This is expected to be a rare
   operation, and it's simpler for the rest of the driver to assume that
   window 1 is always valid rather than use a special window-state variable.
+  
+  Caller must hold the lock for this
 */
 static void update_stats(struct net_device *dev)
 {
@@ -1079,7 +1088,7 @@ static int el3_rx(struct net_device *dev)
 	tc589_wait_for_completion(dev, RxDiscard);
     }
     if (worklimit == 0)
-	printk(KERN_NOTICE "%s: too much work in el3_rx!\n", dev->name);
+	printk(KERN_WARNING "%s: too much work in el3_rx!\n", dev->name);
     return 0;
 }
 
@@ -1088,7 +1097,7 @@ static void set_multicast_list(struct net_device *dev)
     struct el3_private *lp = dev->priv;
     dev_link_t *link = &lp->link;
     ioaddr_t ioaddr = dev->base_addr;
-    u_short opts = SetRxFilter | RxStation | RxBroadcast;
+    u16 opts = SetRxFilter | RxStation | RxBroadcast;
 
     if (!(DEV_OK(link))) return;
     if (dev->flags & IFF_PROMISC)
@@ -1135,7 +1144,7 @@ static int el3_close(struct net_device *dev)
 
     link->open--;
     netif_stop_queue(dev);
-    del_timer(&lp->media);
+    del_timer_sync(&lp->media);
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
     
@@ -1152,8 +1161,7 @@ static int __init init_3c589_cs(void)
     DEBUG(0, "%s\n", version);
     CardServices(GetCardServicesInfo, &serv);
     if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "3c589_cs: Card Services release "
-	       "does not match!\n");
+	printk(KERN_ERR "3c589_cs: Card Services release does not match!\n");
 	return -1;
     }
     register_pccard_driver(&dev_info, &tc589_attach, &tc589_detach);

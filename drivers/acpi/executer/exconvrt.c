@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 39 $
+ *              $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -510,7 +510,7 @@ acpi_ex_convert_to_string (
 
 		new_buf [index-1] = 0;
 		ret_desc->buffer.pointer = new_buf;
-		ret_desc->string.length = ACPI_STRLEN ((char *) new_buf);
+		ret_desc->string.length = (u32) ACPI_STRLEN ((char *) new_buf);
 
 		/* Return the new buffer descriptor */
 
@@ -587,7 +587,7 @@ acpi_ex_convert_to_target_type (
 	case ARGI_INTEGER_REF:      /* Handles Increment, Decrement cases */
 
 		switch (destination_type) {
-		case INTERNAL_TYPE_REGION_FIELD:
+		case ACPI_TYPE_LOCAL_REGION_FIELD:
 			/*
 			 * Named field can always handle conversions
 			 */
@@ -612,8 +612,8 @@ acpi_ex_convert_to_target_type (
 		switch (destination_type) {
 		case ACPI_TYPE_INTEGER:
 		case ACPI_TYPE_BUFFER_FIELD:
-		case INTERNAL_TYPE_BANK_FIELD:
-		case INTERNAL_TYPE_INDEX_FIELD:
+		case ACPI_TYPE_LOCAL_BANK_FIELD:
+		case ACPI_TYPE_LOCAL_INDEX_FIELD:
 			/*
 			 * These types require an Integer operand.  We can convert
 			 * a Buffer or a String to an Integer if necessary.

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 108 $
+ *              $Revision: 110 $
  *
  *****************************************************************************/
 
@@ -707,7 +707,7 @@ acpi_ds_init_object_from_op (
 	case ACPI_TYPE_STRING:
 
 		obj_desc->string.pointer = op->common.value.string;
-		obj_desc->string.length = ACPI_STRLEN (op->common.value.string);
+		obj_desc->string.length = (u32) ACPI_STRLEN (op->common.value.string);
 
 		/*
 		 * The string is contained in the ACPI table, don't ever try
@@ -721,7 +721,7 @@ acpi_ds_init_object_from_op (
 		break;
 
 
-	case INTERNAL_TYPE_REFERENCE:
+	case ACPI_TYPE_LOCAL_REFERENCE:
 
 		switch (op_info->type) {
 		case AML_TYPE_LOCAL_VARIABLE:

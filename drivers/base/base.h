@@ -54,8 +54,13 @@ extern void interface_remove(struct device_class *, struct device *);
 
 #ifdef CONFIG_HOTPLUG
 extern int dev_hotplug(struct device *dev, const char *action);
+extern int class_hotplug(struct device *dev, const char *action);
 #else
 static inline int dev_hotplug(struct device *dev, const char *action)
+{
+	return 0;
+}
+static int class_hotplug(struct device *dev, const char *action)
 {
 	return 0;
 }

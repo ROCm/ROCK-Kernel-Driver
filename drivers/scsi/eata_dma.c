@@ -86,7 +86,6 @@
 #endif
 #include <linux/blk.h>
 #include "scsi.h"
-#include "sd.h"
 #include "hosts.h"
 #include "eata_dma.h"
 #include "eata_dma_proc.h" 

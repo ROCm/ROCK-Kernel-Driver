@@ -114,14 +114,15 @@
 
 
 #ifndef ASM
-int pas16_abort(Scsi_Cmnd *);
-int pas16_biosparam(Disk *, struct block_device *, int*);
-int pas16_detect(Scsi_Host_Template *);
-int pas16_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int pas16_bus_reset(Scsi_Cmnd *);
-int pas16_host_reset(Scsi_Cmnd *);
-int pas16_device_reset(Scsi_Cmnd *);
-int pas16_proc_info (char *buffer ,char **start, off_t offset,
+static int pas16_abort(Scsi_Cmnd *);
+static int pas16_biosparam(struct scsi_device *, struct block_device *,
+			   sector_t, int*);
+static int pas16_detect(Scsi_Host_Template *);
+static int pas16_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int pas16_bus_reset(Scsi_Cmnd *);
+static int pas16_host_reset(Scsi_Cmnd *);
+static int pas16_device_reset(Scsi_Cmnd *);
+static int pas16_proc_info (char *buffer ,char **start, off_t offset,
 		     int length, int hostno, int inout);
 
 #ifndef NULL

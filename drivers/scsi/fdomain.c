@@ -1690,15 +1690,16 @@ static int fdomain_16x0_device_reset(Scsi_Cmnd *SCpnt)
   return FAILED;
 }
 
-#include "sd.h"
 #include <scsi/scsi_ioctl.h>
 
-static int fdomain_16x0_biosparam(Scsi_Disk *disk, struct block_device *bdev, int *info_array)
+static int fdomain_16x0_biosparam(struct scsi_device *sdev,
+		struct block_device *bdev,
+		sector_t capacity, int *info_array)
 {
    int              drive;
    unsigned char    buf[512 + sizeof (Scsi_Ioctl_Command)];
    Scsi_Ioctl_Command *sic = (Scsi_Ioctl_Command *) buf;
-   int		    size      = disk->capacity;
+   int		    size      = capacity;
    unsigned char    *data     = sic->data;
    unsigned char    do_read[] = { READ_6, 0, 0, 0, 1, 0 };
    int              retcode;
@@ -1793,7 +1794,7 @@ static int fdomain_16x0_biosparam(Scsi_Disk *disk, struct block_device *bdev, in
       sic->inlen  = 0;		/* zero bytes out */
       sic->outlen = 512;		/* one sector in */
       memcpy( data, do_read, sizeof( do_read ) );
-      retcode = kernel_scsi_ioctl( disk->device,
+      retcode = kernel_scsi_ioctl( sdev,
 				   SCSI_IOCTL_SEND_COMMAND,
 				   sic );
       if (!retcode				    /* SCSI command ok */

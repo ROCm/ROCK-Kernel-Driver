@@ -1313,7 +1313,8 @@ int qla1280_release(struct Scsi_Host *);
 int qla1280_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int qla1280_abort(Scsi_Cmnd *);
 int qla1280_reset(Scsi_Cmnd *, unsigned int);
-int qla1280_biosparam(Disk *, struct block_device *, int[]);
+int qla1280_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int[]);
 static int qla1280_slave_attach(Scsi_Device *);
 void qla1280_intr_handler(int, void *, struct pt_regs *);
 void qla1280_setup(char *s, int *dummy);
@@ -1324,25 +1325,12 @@ void qla1280_setup(char *s, int *dummy);
  */
 
 #define QLA1280_LINUX_TEMPLATE {				\
-	next: NULL,						\
-	module: NULL,						\
-	proc_dir: NULL,						\
 	proc_info: qla1280_proc_info,				\
 	name: "Qlogic ISP 1280/12160",				\
 	detect: qla1280_detect,					\
 	release: qla1280_release,				\
 	info: qla1280_info,					\
-	ioctl: NULL,						\
-	command: NULL,						\
 	queuecommand: qla1280_queuecommand,			\
-	eh_strategy_handler: NULL,				\
-	eh_abort_handler: NULL,					\
-	eh_device_reset_handler: NULL,				\
-	eh_bus_reset_handler: NULL,				\
-	eh_host_reset_handler: NULL,				\
-/*	use_new_eh_code: 0, */					\
-	abort: qla1280_abort,					\
-	reset: qla1280_reset,					\
 	slave_attach: qla1280_slave_attach,			\
 	bios_param: qla1280_biosparam,				\
 	can_queue: 255,		/* max simultaneous cmds      */\

@@ -45,7 +45,6 @@
 #include <linux/isapnp.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include "sym53c416.h"
 
 #define VERSION_STRING        "Version 1.0.0-ac"
@@ -715,7 +714,6 @@ int __init sym53c416_detect(Scsi_Host_Template *tpnt)
 				if(shpnt==NULL)
 					continue;
 				spin_lock_irqsave(&sym53c416_lock, flags);
-				/* FIXME: Request_irq with CLI is not safe */
 				/* Request for specified IRQ */
 				if(request_irq(hosts[i].irq, sym53c416_intr_handle, 0, ID, shpnt))
 				{
@@ -800,12 +798,20 @@ static int sym53c416_command(Scsi_Cmnd *SCpnt)
 
 static int sym53c416_abort(Scsi_Cmnd *SCpnt)
 {
-	/* printk("sym53c416_abort\n"); */
-	/* We don't know how to abort for the moment */
-	return SCSI_ABORT_SNOOZE;
+	return FAILED;
 }
 
-static int sym53c416_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
+static int sym53c416_bus_reset(Scsi_Cmnd *SCpnt)
+{
+	return FAILED;
+}
+
+static int sym53c416_device_reset(Scsi_Cmnd *SCpnt)
+{
+	return FAILED;
+}
+
+static int sym53c416_host_reset(Scsi_Cmnd *SCpnt)
 {
 	int base;
 	int scsi_id = -1;	
@@ -813,7 +819,7 @@ static int sym53c416_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 
 	/* printk("sym53c416_reset\n"); */
 	base = SCpnt->host->io_port;
-	/* search scsi_id */
+	/* search scsi_id - fixme, we shouldnt need to iterate for this! */
 	for(i = 0; i < host_index && scsi_id != -1; i++)
 		if(hosts[i].base == base)
 			scsi_id = hosts[i].scsi_id;
@@ -821,14 +827,25 @@ static int sym53c416_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 	outb(NOOP | PIO_MODE, base + COMMAND_REG);
 	outb(RESET_SCSI_BUS, base + COMMAND_REG);
 	sym53c416_init(base, scsi_id);
-	return SCSI_RESET_PENDING;
+	return SUCCESS;
 }
 
-static int sym53c416_bios_param(Disk *disk, struct block_device *dev, int *ip)
+static int sym53c416_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, shost);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	return 0;
+}
+
+static int sym53c416_bios_param(struct scsi_device *sdev,
+		struct block_device *dev,
+		sector_t capacity, int *ip)
 {
 	int size;
 
-	size = disk->capacity;
+	size = capacity;
 	ip[0] = 64;				/* heads                        */
 	ip[1] = 32;				/* sectors                      */
 	if((ip[2] = size >> 11) > 1024)		/* cylinders, test for big disk */

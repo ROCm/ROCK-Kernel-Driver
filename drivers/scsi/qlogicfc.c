@@ -62,8 +62,7 @@
 #include <linux/spinlock.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-
-#include "sd.h"
+#include "scsi.h"
 #include "hosts.h"
 
 #define pci64_dma_hi32(a) ((u32) (0xffffffff & (((u64)(a))>>32)))
@@ -1787,9 +1786,10 @@ int isp2x00_reset(Scsi_Cmnd * Cmnd, unsigned int reset_flags)
 }
 
 
-int isp2x00_biosparam(Disk * disk, struct block_device *n, int ip[])
+int isp2x00_biosparam(struct scsi_device *sdev, struct block_device *n,
+		sector_t capacity, int ip[])
 {
-	int size = disk->capacity;
+	int size = capacity;
 
 	ENTER("isp2x00_biosparam");
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 111 $
+ *              $Revision: 113 $
  *
  *****************************************************************************/
 
@@ -242,11 +242,11 @@ acpi_status
 acpi_ex_opcode_2A_1T_1R (
 	acpi_walk_state         *walk_state)
 {
-	acpi_operand_object     **operand   = &walk_state->operands[0];
+	acpi_operand_object     **operand = &walk_state->operands[0];
 	acpi_operand_object     *return_desc = NULL;
 	acpi_operand_object     *temp_desc = NULL;
 	u32                     index;
-	acpi_status             status      = AE_OK;
+	acpi_status             status = AE_OK;
 	ACPI_SIZE               length;
 
 
@@ -379,7 +379,7 @@ acpi_ex_opcode_2A_1T_1R (
 
 		/* Set the string length */
 
-		return_desc->string.length = length;
+		return_desc->string.length = (u32) length;
 		break;
 
 
@@ -393,7 +393,7 @@ acpi_ex_opcode_2A_1T_1R (
 
 		/* Create the internal return object */
 
-		return_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_REFERENCE);
+		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_LOCAL_REFERENCE);
 		if (!return_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;

@@ -246,9 +246,8 @@ static int n2_close(struct net_device *dev)
 
 static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	union line_settings *line = &ifr->ifr_settings->ifs_line;
 	const size_t size = sizeof(sync_serial_settings);
-	sync_serial_settings new_line;
+	sync_serial_settings new_line, *line = ifr->ifr_settings.ifs_ifsu.sync;
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 
@@ -261,10 +260,14 @@ static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (cmd != SIOCWANDEV)
 		return hdlc_ioctl(dev, ifr, cmd);
 
-	switch(ifr->ifr_settings->type) {
+	switch(ifr->ifr_settings.type) {
 	case IF_GET_IFACE:
-		ifr->ifr_settings->type = IF_IFACE_SYNC_SERIAL;
-		if (copy_to_user(&line->sync, &port->settings, size))
+		ifr->ifr_settings.type = IF_IFACE_SYNC_SERIAL;
+		if (ifr->ifr_settings.size < size) {
+			ifr->ifr_settings.size = size; /* data size wanted */
+			return -ENOBUFS;
+		}
+		if (copy_to_user(line, &port->settings, size))
 			return -EFAULT;
 		return 0;
 
@@ -272,7 +275,7 @@ static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&new_line, &line->sync, size))
+		if (copy_from_user(&new_line, line, size))
 			return -EFAULT;
 
 		if (new_line.clock_type != CLOCK_EXT &&

@@ -707,9 +707,9 @@ struct hd_driveid {
 					 * 12
 					 * 11:0
 					 */
-	unsigned short	words161_175[14];/* Reserved for CFA */
-	unsigned short	words176_205[31];/* Current Media Serial Number */
-	unsigned short	words206_254[48];/* reserved words 206-254 */
+	unsigned short	words161_175[15];/* Reserved for CFA */
+	unsigned short	words176_205[30];/* Current Media Serial Number */
+	unsigned short	words206_254[49];/* reserved words 206-254 */
 	unsigned short	integrity_word;	/* (word 255)
 					 * 15:8 Checksum
 					 *  7:0 Signature

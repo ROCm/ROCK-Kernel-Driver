@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 76 $
+ *              $Revision: 77 $
  *
  *****************************************************************************/
 
@@ -87,7 +87,7 @@ acpi_ut_create_internal_object_dbg (
 			return_PTR (NULL);
 		}
 
-		second_object->common.type = INTERNAL_TYPE_EXTRA;
+		second_object->common.type = ACPI_TYPE_LOCAL_EXTRA;
 		second_object->common.reference_count = 1;
 
 		/* Link the second object to the first */
@@ -352,7 +352,7 @@ acpi_ut_get_simple_object_size (
 		break;
 
 
-	case INTERNAL_TYPE_REFERENCE:
+	case ACPI_TYPE_LOCAL_REFERENCE:
 
 		switch (internal_object->reference.opcode) {
 		case AML_INT_NAMEPATH_OP:

@@ -17,7 +17,8 @@ extern const char *simscsi_info (struct Scsi_Host *);
 extern int simscsi_queuecommand (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 extern int simscsi_abort (Scsi_Cmnd *);
 extern int simscsi_reset (Scsi_Cmnd *, unsigned int);
-extern int simscsi_biosparam (Disk *, struct block_device *, int[]);
+extern int simscsi_biosparam (struct scsi_device *, struct block_device *,
+		sector_t, int[]);
 
 #define SIMSCSI {					\
 	detect:			simscsi_detect,		\

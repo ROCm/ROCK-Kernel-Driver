@@ -118,7 +118,7 @@ static void presto_put_super(struct super_block *sb)
         int err;
 
         ENTRY;
-        cache = presto_cache_find(to_kdev_t(sb->s_dev));
+        cache = presto_cache_find(sb);
         if (!cache) {
                 EXIT;
                 goto exit;

@@ -13,6 +13,5 @@ sunrpc-y := clnt.o xprt.o sched.o \
 	    sunrpc_syms.o cache.o
 sunrpc-$(CONFIG_PROC_FS) += stats.o
 sunrpc-$(CONFIG_SYSCTL) += sysctl.o
-sunrpc-objs := $(sunrpc-y)
 
 include $(TOPDIR)/Rules.make

@@ -118,12 +118,12 @@
 #include <linux/sched.h>
 #include <asm/io.h>
 #include <linux/blk.h>
+#include <linux/delay.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "pas16.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"
-#include "sd.h"
 
 #include <linux/stat.h>
 #include <linux/init.h>
@@ -450,7 +450,7 @@ int __init pas16_detect(Scsi_Host_Template * tpnt)
 	    instance->irq = NCR5380_probe_irq(instance, PAS16_IRQS);
 
 	if (instance->irq != IRQ_NONE) 
-	    if (request_irq(instance->irq, do_pas16_intr, SA_INTERRUPT, "pas16", instance)) {
+	    if (request_irq(instance->irq, pas16_intr, SA_INTERRUPT, "pas16", instance)) {
 		printk("scsi%d : IRQ%d not free, interrupts disabled\n", 
 		    instance->host_no, instance->irq);
 		instance->irq = IRQ_NONE;
@@ -505,9 +505,10 @@ int __init pas16_detect(Scsi_Host_Template * tpnt)
  * and matching the H_C_S coordinates to what DOS uses.
  */
 
-int pas16_biosparam(Disk * disk, struct block_device *dev, int * ip)
+int pas16_biosparam(struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int * ip)
 {
-  int size = disk->capacity;
+  int size = capacity;
   ip[0] = 64;
   ip[1] = 32;
   ip[2] = size >> 11;		/* I think I have it as /(32*64) */

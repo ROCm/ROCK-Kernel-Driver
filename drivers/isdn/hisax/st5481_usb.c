@@ -182,21 +182,28 @@ static void usb_int_complete(struct urb *urb)
 	u_char irqbyte;
 	struct st5481_adapter *adapter = urb->context;
 	int j;
+	int status;
 
-	if (urb->status < 0) {
-		if (urb->status != -ENOENT) {
-			WARN("urb status %d",urb->status);
-			urb->actual_length = 0;
-		} else {
-			DBG(1,"urb killed");
-			return; // Give up
-		}
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		DBG(1, "urb shutting down with status: %d", urb->status);
+		return;
+	default:
+		WARN("nonzero urb status received: %d", urb->status);
+		goto exit;
 	}
+
 	
 	DBG_PACKET(1, data, INT_PKT_SIZE);
 		
 	if (urb->actual_length == 0) {
-		return;
+		goto exit;
 	}
 
 	irqbyte = data[MPINT];
@@ -221,6 +228,11 @@ static void usb_int_complete(struct urb *urb)
 		adapter->bcs[j].b_out.flow_event |= data[FFINT_B1 + j];
 
 	urb->actual_length = 0;
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		WARN("usb_submit_urb failed with result %d", status);
 }
 
 /* ======================================================================

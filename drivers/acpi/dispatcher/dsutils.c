@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 95 $
+ *              $Revision: 96 $
  *
  ******************************************************************************/
 
@@ -431,7 +431,7 @@ acpi_ds_create_operand (
 		/* Get the object type of the argument */
 
 		op_info = acpi_ps_get_opcode_info (opcode);
-		if (op_info->object_type == INTERNAL_TYPE_INVALID) {
+		if (op_info->object_type == ACPI_TYPE_INVALID) {
 			return_ACPI_STATUS (AE_NOT_IMPLEMENTED);
 		}
 

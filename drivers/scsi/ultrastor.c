@@ -143,7 +143,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "ultrastor.h"
-#include "sd.h"
 #include<linux/stat.h>
 
 #define FALSE 0
@@ -1020,9 +1019,10 @@ int ultrastor_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 
 }
 
-int ultrastor_biosparam(Disk * disk, struct block_device *dev, int * dkinfo)
+int ultrastor_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int * dkinfo)
 {
-    int size = disk->capacity;
+    int size = capacity;
     unsigned int s = config.heads * config.sectors;
 
     dkinfo[0] = config.heads;

@@ -49,7 +49,6 @@
 /* #include <scsi/scsicam.h> This include file is currently busted */
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include "BusLogic.h"
 #include "FlashPoint.c"
 
@@ -4219,17 +4218,16 @@ int BusLogic_ResetCommand(SCSI_Command_T *Command, unsigned int ResetFlags)
   the BIOS, and a warning may be displayed.
 */
 unsigned char *scsi_bios_ptable(struct block_device *);
-int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *Device,
-				int *Parameters)
+int BusLogic_BIOSDiskParameters(struct scsi_device *sdev, struct block_device *Device,
+				sector_t capacity, int *Parameters)
 {
-  BusLogic_HostAdapter_T *HostAdapter =
-    (BusLogic_HostAdapter_T *) Disk->device->host->hostdata;
+  BusLogic_HostAdapter_T *HostAdapter = (BusLogic_HostAdapter_T *) sdev->host->hostdata;
   BIOS_DiskParameters_T *DiskParameters = (BIOS_DiskParameters_T *) Parameters;
   unsigned char *buf;
   if (HostAdapter->ExtendedTranslationEnabled &&
-      Disk->capacity >= 2*1024*1024 /* 1 GB in 512 byte sectors */)
+      capacity >= 2*1024*1024 /* 1 GB in 512 byte sectors */)
     {
-      if (Disk->capacity >= 4*1024*1024 /* 2 GB in 512 byte sectors */)
+      if (capacity >= 4*1024*1024 /* 2 GB in 512 byte sectors */)
 	{
 	  DiskParameters->Heads = 255;
 	  DiskParameters->Sectors = 63;
@@ -4246,7 +4244,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *Device,
       DiskParameters->Sectors = 32;
     }
   DiskParameters->Cylinders =
-    (unsigned long)Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
+    (unsigned long)capacity / (DiskParameters->Heads * DiskParameters->Sectors);
   buf = scsi_bios_ptable(Device);
   if (buf == NULL) return 0;
   /*
@@ -4290,7 +4288,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *Device,
 	  PartitionEntryEndSector = FirstPartitionEntry->end_sector & 0x3F;
 	}
       DiskParameters->Cylinders =
-	(unsigned long)Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
+	(unsigned long)capacity / (DiskParameters->Heads * DiskParameters->Sectors);
       if (PartitionNumber < 4 &&
 	  PartitionEntryEndSector == DiskParameters->Sectors)
 	{

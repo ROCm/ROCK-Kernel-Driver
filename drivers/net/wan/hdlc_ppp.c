@@ -82,9 +82,9 @@ int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	int result;
 
-	switch (ifr->ifr_settings->type) {
+	switch (ifr->ifr_settings.type) {
 	case IF_GET_PROTO:
-		ifr->ifr_settings->type = IF_PROTO_PPP;
+		ifr->ifr_settings.type = IF_PROTO_PPP;
 		return 0; /* return protocol only, no settable parameters */
 
 	case IF_PROTO_PPP:

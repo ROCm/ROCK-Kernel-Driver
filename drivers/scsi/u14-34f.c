@@ -1,6 +1,15 @@
 /*
  *      u14-34f.c - Low-level driver for UltraStor 14F/34F SCSI host adapters.
  *
+ *      10 Oct 2002 Rev. 7.70 for linux 2.5.42
+ *        + Foreport from revision 6.70.
+ *
+ *      25 Jun 2002 Rev. 6.70 for linux 2.4.19
+ *        + Fixed endian-ness problem due to bitfields.
+ *
+ *      21 Feb 2002 Rev. 6.52 for linux 2.4.18
+ *        + Backport from rev. 7.22 (use io_request_lock).
+ *
  *      20 Feb 2002 Rev. 7.22 for linux 2.5.5
  *        + Remove any reference to virt_to_bus().
  *        + Fix pio hang while detecting multiple HBAs.
@@ -382,7 +391,6 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <asm/dma.h>
 #include <asm/irq.h>
 #include "u14-34f.h"
@@ -392,6 +400,10 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/spinlock.h>
+
+#if !defined(__BIG_ENDIAN_BITFIELD) && !defined(__LITTLE_ENDIAN_BITFIELD)
+#error "Adjust your <asm/byteorder.h> defines"
+#endif
 
 /* Values for the PRODUCT_ID ports for the 14/34F */
 #define PRODUCT_ID1  0x56
@@ -459,7 +471,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #define REG_CONFIG2       7
 #define REG_OGM           8
 #define REG_ICM           12
-#define REGION_SIZE       13
+#define REGION_SIZE       13UL
 #define BSY_ASSERTED      0x01
 #define IRQ_ASSERTED      0x01
 #define CMD_RESET         0xc0
@@ -481,14 +493,21 @@ struct sg_list {
 
 /* MailBox SCSI Command Packet */
 struct mscp {
-   unsigned char opcode: 3;             /* type of command */
-   unsigned char xdir: 2;               /* data transfer direction */
-   unsigned char dcn: 1;                /* disable disconnect */
-   unsigned char ca: 1;                 /* use cache (if available) */
-   unsigned char sg: 1;                 /* scatter/gather operation */
-   unsigned char target: 3;             /* SCSI target id */
-   unsigned char channel: 2;            /* SCSI channel number */
-   unsigned char lun: 3;                /* SCSI logical unit number */
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+   unsigned char sg:1, ca:1, dcn:1, xdir:2, opcode:3;
+   unsigned char lun: 3, channel:2, target:3;
+#else
+   unsigned char opcode: 3,             /* type of command */
+                 xdir: 2,               /* data transfer direction */
+                 dcn: 1,                /* disable disconnect */
+                 ca: 1,                 /* use cache (if available) */
+                 sg: 1;                 /* scatter/gather operation */
+   unsigned char target: 3,             /* SCSI target id */
+                 channel: 2,            /* SCSI channel number */
+                 lun: 3;                /* SCSI logical unit number */
+#endif
+
    unsigned int data_address PACKED;    /* transfer data pointer */
    unsigned int data_len PACKED;        /* length in bytes */
    unsigned int link_address PACKED;    /* for linking command chains */
@@ -730,17 +749,27 @@ static inline int port_detect \
            };
 
    struct config_1 {
-      unsigned char bios_segment: 3;
-      unsigned char removable_disks_as_fixed: 1;
-      unsigned char interrupt: 2;
-      unsigned char dma_channel: 2;
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+      unsigned char dma_channel: 2, interrupt:2,
+                    removable_disks_as_fixed:1, bios_segment: 3;
+#else
+      unsigned char bios_segment: 3, removable_disks_as_fixed: 1,
+                    interrupt: 2, dma_channel: 2;
+#endif
+
       } config_1;
 
    struct config_2 {
-      unsigned char ha_scsi_id: 3;
-      unsigned char mapping_mode: 2;
-      unsigned char bios_drive_number: 1;
-      unsigned char tfr_port: 2;
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+      unsigned char tfr_port: 2, bios_drive_number: 1,
+                    mapping_mode: 2, ha_scsi_id: 3;
+#else
+      unsigned char ha_scsi_id: 3, mapping_mode: 2,
+                    bios_drive_number: 1, tfr_port: 2;
+#endif
+
       } config_2;
 
    char name[16];
@@ -1452,15 +1481,16 @@ int u14_34f_reset(Scsi_Cmnd *SCarg) {
    return do_reset(SCarg);
 }
 
-int u14_34f_biosparam(Disk *disk, struct block_device *bdev, int *dkinfo) {
+int u14_34f_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *dkinfo) {
    unsigned int j = 0;
-   int size = disk->capacity;
+   int size = capacity;
 
    dkinfo[0] = HD(j)->heads;
    dkinfo[1] = HD(j)->sectors;
    dkinfo[2] = size / (HD(j)->heads * HD(j)->sectors);
 
-   if (ext_tran && (scsicam_bios_param(disk, bdev, dkinfo) < 0)) {
+   if (ext_tran && (scsicam_bios_param(bdev, capacity, dkinfo) < 0)) {
       dkinfo[0] = 255;
       dkinfo[1] = 63;
       dkinfo[2] = size / (dkinfo[0] * dkinfo[1]);

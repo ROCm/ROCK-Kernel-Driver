@@ -17,7 +17,8 @@ extern int ibmmca_command (Scsi_Cmnd *);
 extern int ibmmca_queuecommand (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 extern int ibmmca_abort (Scsi_Cmnd *);
 extern int ibmmca_reset (Scsi_Cmnd *, unsigned int);
-extern int ibmmca_biosparam (Disk *, struct block_device *, int *);
+extern int ibmmca_biosparam (struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
 /*structure for /proc filesystem */
 extern struct proc_dir_entry proc_scsi_ibmmca;

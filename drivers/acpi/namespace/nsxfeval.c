@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfeval - Public interfaces to the ACPI subsystem
  *                         ACPI Object evaluation interfaces
- *              $Revision: 2 $
+ *              $Revision: 3 $
  *
  ******************************************************************************/
 
@@ -373,8 +373,8 @@ acpi_walk_namespace (
 
 	/* Parameter validation */
 
-	if ((type > ACPI_TYPE_MAX)  ||
-		(!max_depth)            ||
+	if ((type > ACPI_TYPE_EXTERNAL_MAX) ||
+		(!max_depth)                    ||
 		(!user_function)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}

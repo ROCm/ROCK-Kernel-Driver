@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 143 $
+ *              $Revision: 144 $
  *
  *****************************************************************************/
 
@@ -642,7 +642,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) != ACPI_DESC_TYPE_NAMED) {
 			switch (ACPI_GET_OBJECT_TYPE (operand[0])) {
-			case INTERNAL_TYPE_REFERENCE:
+			case ACPI_TYPE_LOCAL_REFERENCE:
 				/*
 				 * This is a Deref_of (Local_x | Arg_x)
 				 *

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 84 $
+ *              $Revision: 85 $
  *
  ******************************************************************************/
 
@@ -30,6 +30,98 @@
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utmisc")
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_print_string
+ *
+ * PARAMETERS:  String          - Null terminated ASCII string
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Dump an ASCII string with support for ACPI-defined escape
+ *              sequences.
+ *
+ ******************************************************************************/
+
+void
+acpi_ut_print_string (
+	char                    *string,
+	u8                      max_length)
+{
+	u32                     i;
+
+
+	if (!string) {
+		acpi_os_printf ("<\"NULL STRING PTR\">");
+		return;
+	}
+
+	acpi_os_printf ("\"");
+	for (i = 0; string[i] && (i < max_length); i++) {
+		/* Escape sequences */
+
+		switch (string[i]) {
+		case 0x07:
+			acpi_os_printf ("\\a");      /* BELL */
+			break;
+
+		case 0x08:
+			acpi_os_printf ("\\b");     /* BACKSPACE */
+			break;
+
+		case 0x0C:
+			acpi_os_printf ("\\f");     /* FORMFEED */
+			break;
+
+		case 0x0A:
+			acpi_os_printf ("\\n");     /* LINEFEED */
+			break;
+
+		case 0x0D:
+			acpi_os_printf ("\\r");     /* CARRIAGE RETURN*/
+			break;
+
+		case 0x09:
+			acpi_os_printf ("\\t");     /* HORIZONTAL TAB */
+			break;
+
+		case 0x0B:
+			acpi_os_printf ("\\v");     /* VERTICAL TAB */
+			break;
+
+		case '\'':                      /* Single Quote */
+		case '\"':                      /* Double Quote */
+		case '\\':                      /* Backslash */
+			acpi_os_printf ("\\%c", (int) string[i]);
+			break;
+
+		default:
+
+			/* Check for printable character or hex escape */
+
+			if (ACPI_IS_PRINT (string[i]))
+			{
+				/* This is a normal character */
+
+				acpi_os_printf ("%c", (int) string[i]);
+			}
+			else
+			{
+				/* All others will be Hex escapes */
+
+				acpi_os_printf ("\\x%2.2X", (s32) string[i]);
+			}
+			break;
+		}
+	}
+	acpi_os_printf ("\"");
+
+	if (i == max_length && string[i]) {
+		acpi_os_printf ("...");
+	}
+}
 
 
 /*******************************************************************************

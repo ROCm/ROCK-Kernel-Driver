@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 63 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -286,7 +286,6 @@ acpi_tb_init_table_descriptor (
 
 	table_desc->type                = table_info->type;
 	table_desc->pointer             = table_info->pointer;
-	table_desc->base_pointer        = table_info->base_pointer;
 	table_desc->length              = table_info->length;
 	table_desc->allocation          = table_info->allocation;
 	table_desc->aml_start           = (u8 *) (table_desc->pointer + 1),
@@ -480,12 +479,12 @@ acpi_tb_delete_single_table (
 
 		case ACPI_MEM_ALLOCATED:
 
-			ACPI_MEM_FREE (table_desc->base_pointer);
+			ACPI_MEM_FREE (table_desc->pointer);
 			break;
 
 		case ACPI_MEM_MAPPED:
 
-			acpi_os_unmap_memory (table_desc->base_pointer, table_desc->length);
+			acpi_os_unmap_memory (table_desc->pointer, table_desc->length);
 			break;
 
 		default:

@@ -650,7 +650,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 {
 	struct file	*file;
 	struct inode	*inode;
-	kdev_t		dev = to_kdev_t(bdev->bd_dev);
 	struct block_device *lo_device;
 	int		lo_flags = 0;
 	int		error;
@@ -702,7 +701,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	    || !(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
-	set_device_ro(dev, (lo_flags & LO_FLAGS_READ_ONLY) != 0);
+	set_device_ro(bdev, (lo_flags & LO_FLAGS_READ_ONLY) != 0);
 
 	lo->lo_device = lo_device;
 	lo->lo_flags = lo_flags;

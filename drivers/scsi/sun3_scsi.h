@@ -84,7 +84,6 @@ info:			sun3scsi_info,					\
 queuecommand:		sun3scsi_queue_command,				\
 abort:			sun3scsi_abort,			 		\
 reset:			sun3scsi_reset,					\
-bios_param:		scsicam_bios_param,	/* biosparam */		\
 can_queue:		CAN_QUEUE,		/* can queue */		\
 this_id:		7,			/* id */		\
 sg_tablesize:		SG_ALL,			/* sg_tablesize */	\

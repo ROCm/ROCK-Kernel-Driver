@@ -52,7 +52,8 @@ int advansys_release(struct Scsi_Host *);
 const char *advansys_info(struct Scsi_Host *);
 int advansys_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int advansys_reset(Scsi_Cmnd *);
-int advansys_biosparam(Disk *, struct block_device *, int[]);
+int advansys_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int[]);
 static int advansys_slave_attach(Scsi_Device *);
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE < ASC_LINUX_VERSION(2,3,28)

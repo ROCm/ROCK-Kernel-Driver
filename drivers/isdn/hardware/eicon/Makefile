@@ -26,6 +26,3 @@ obj-$(CONFIG_ISDN_DIVAS)               += divadidd.o divas.o
 obj-$(CONFIG_ISDN_DIVAS_MAINT)         += diva_mnt.o
 obj-$(CONFIG_ISDN_DIVAS_USERIDI)       += diva_idi.o
 obj-$(CONFIG_ISDN_DIVAS_DIVACAPI)      += divacapi.o
-
-include $(TOPDIR)/Rules.make
-

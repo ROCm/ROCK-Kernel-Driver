@@ -728,8 +728,8 @@ static void cpc_tty_rx_work(void * data)
 															
 				if (cpc_tty->tty && (cpc_tty->tty->ldisc.receive_buf)) { 
 					CPC_TTY_DBG("%s: call line disc. receive_buf\n",cpc_tty->name);
-					cpc_tty->tty->ldisc.receive_buf(cpc_tty->tty, buf->data, 
-													&flags, buf->size);
+					cpc_tty->tty->ldisc.receive_buf(cpc_tty->tty, (char *)(buf->data), 
+					&flags, buf->size);
 				}	
 				cpc_tty->buf_rx.first = cpc_tty->buf_rx.first->next;
 				kfree((unsigned char *)buf);

@@ -63,6 +63,8 @@ struct hd_struct {
 	sector_t nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
 	struct device *hd_driverfs_dev;  /* support driverfs hiearchy     */
+	unsigned reads, read_sectors, writes, write_sectors;
+	int policy;
 };
 
 #define GENHD_FL_REMOVABLE  1
@@ -93,10 +95,22 @@ struct gendisk {
 	struct device *driverfs_dev;
 	struct device disk_dev;
 
+	struct timer_rand_state *random;
+	int policy;
+
 	unsigned sync_io;		/* RAID */
+	unsigned read_sectors, write_sectors;
 	unsigned reads, writes;
-	unsigned rio, wio;
+	unsigned read_merges, write_merges;
+	unsigned read_ticks, write_ticks;
+	unsigned io_ticks;
+	int in_flight;
+	unsigned long stamp, stamp_idle;
+	unsigned time_in_queue;
 };
+
+/* drivers/block/ll_rw_blk.c */
+extern void disk_round_stats(struct gendisk *disk);
 
 /* drivers/block/genhd.c */
 extern void add_disk(struct gendisk *disk);
@@ -278,7 +292,7 @@ extern void put_disk(struct gendisk *disk);
 extern void blk_register_region(dev_t dev, unsigned long range,
 			struct module *module,
 			struct gendisk *(*probe)(dev_t, int *, void *),
-			void (*lock)(dev_t, void *),
+			int (*lock)(dev_t, void *),
 			void *data);
 extern void blk_unregister_region(dev_t dev, unsigned long range);
 

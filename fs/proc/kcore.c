@@ -99,6 +99,8 @@ static ssize_t read_kcore(struct file *file, char *buf, size_t count, loff_t *pp
 }
 #else /* CONFIG_KCORE_AOUT */
 
+#define	KCORE_BASE	PAGE_OFFSET
+
 #define roundup(x, y)  ((((x)+((y)-1))/(y))*(y))
 
 /* An ELF note in memory */
@@ -118,7 +120,7 @@ static size_t get_kcore_size(int *num_vma, size_t *elf_buflen)
 	struct vm_struct *m;
 
 	*num_vma = 0;
-	size = ((size_t)high_memory - PAGE_OFFSET + PAGE_SIZE);
+	size = ((size_t)high_memory - KCORE_BASE + PAGE_SIZE);
 	if (!vmlist) {
 		*elf_buflen = PAGE_SIZE;
 		return (size);
@@ -126,15 +128,15 @@ static size_t get_kcore_size(int *num_vma, size_t *elf_buflen)
 
 	for (m=vmlist; m; m=m->next) {
 		try = (size_t)m->addr + m->size;
-		if (try > size)
-			size = try;
+		if (try > KCORE_BASE + size)
+			size = try - KCORE_BASE;
 		*num_vma = *num_vma + 1;
 	}
 	*elf_buflen =	sizeof(struct elfhdr) + 
 			(*num_vma + 2)*sizeof(struct elf_phdr) + 
 			3 * sizeof(struct memelfnote);
 	*elf_buflen = PAGE_ALIGN(*elf_buflen);
-	return (size - PAGE_OFFSET + *elf_buflen);
+	return size + *elf_buflen;
 }
 
 
@@ -237,7 +239,7 @@ static void elf_kcore_store_hdr(char *bufp, int num_vma, int dataoff)
 	offset += sizeof(struct elf_phdr);
 	phdr->p_type	= PT_LOAD;
 	phdr->p_flags	= PF_R|PF_W|PF_X;
-	phdr->p_offset	= dataoff;
+	phdr->p_offset	= PAGE_OFFSET - KCORE_BASE + dataoff;
 	phdr->p_vaddr	= PAGE_OFFSET;
 	phdr->p_paddr	= __pa(PAGE_OFFSET);
 	phdr->p_filesz	= phdr->p_memsz = ((unsigned long)high_memory - PAGE_OFFSET);
@@ -254,7 +256,7 @@ static void elf_kcore_store_hdr(char *bufp, int num_vma, int dataoff)
 
 		phdr->p_type	= PT_LOAD;
 		phdr->p_flags	= PF_R|PF_W|PF_X;
-		phdr->p_offset	= (size_t)m->addr - PAGE_OFFSET + dataoff;
+		phdr->p_offset	= (size_t)m->addr - KCORE_BASE + dataoff;
 		phdr->p_vaddr	= (size_t)m->addr;
 		phdr->p_paddr	= __pa(m->addr);
 		phdr->p_filesz	= phdr->p_memsz	= m->size;
@@ -385,9 +387,9 @@ static ssize_t read_kcore(struct file *file, char *buffer, size_t buflen, loff_t
 	/*
 	 * Fill the remainder of the buffer from kernel VM space.
 	 * We said in the ELF header that the data which starts
-	 * at 'elf_buflen' is virtual address PAGE_OFFSET. --rmk
+	 * at 'elf_buflen' is virtual address KCORE_BASE. --rmk
 	 */
-	start = PAGE_OFFSET + (*fpos - elf_buflen);
+	start = KCORE_BASE + (*fpos - elf_buflen);
 	if ((tsz = (PAGE_SIZE - (start & ~PAGE_MASK))) > buflen)
 		tsz = buflen;
 		

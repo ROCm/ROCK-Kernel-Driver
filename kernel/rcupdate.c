@@ -192,7 +192,8 @@ static void rcu_process_callbacks(unsigned long unused)
 void rcu_check_callbacks(int cpu, int user)
 {
 	if (user || 
-	    (idle_cpu(cpu) && !in_softirq() && hardirq_count() <= 1))
+	    (idle_cpu(cpu) && !in_softirq() && 
+				hardirq_count() <= (1 << HARDIRQ_SHIFT)))
 		RCU_qsctr(cpu)++;
 	tasklet_schedule(&RCU_tasklet(cpu));
 }

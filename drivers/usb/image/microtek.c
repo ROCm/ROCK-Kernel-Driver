@@ -137,7 +137,6 @@
 #include <linux/blk.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/sd.h"
 
 #include "microtek.h"
 
@@ -915,10 +914,6 @@ static int mts_usb_probe (struct usb_interface *intf,
 		return -ENODEV;
 	}
 
-
-	/* I don't understand the following fully (it's from usb-storage) -- John */
-
-	/* set the interface -- STALL is an acceptable response here */
 	result = usb_set_interface(dev, altsetting->bInterfaceNumber, 0);
 
 	MTS_DEBUG("usb_set_interface returned %d.\n",result);
@@ -926,12 +921,7 @@ static int mts_usb_probe (struct usb_interface *intf,
 	{
 	case 0: /* no error */
 		break;
-		
-	case -EPIPE:
-		usb_clear_halt(dev, usb_sndctrlpipe(dev, 0));
-		MTS_DEBUG( "clearing clearing stall on control interface\n" );
-		break;
-		
+
 	default:
 		MTS_DEBUG( "unknown error %d from usb_set_interface\n",
 			(int)result );

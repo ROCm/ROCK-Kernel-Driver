@@ -14,6 +14,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/blk.h>
 #include <linux/kmod.h>
@@ -297,6 +298,14 @@ static ssize_t part_size_read(struct device *dev,
 	struct hd_struct *p = dev->driver_data;
 	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)p->nr_sects);
 }
+static ssize_t part_stat_read(struct device *dev,
+			char *page, size_t count, loff_t off)
+{
+	struct hd_struct *p = dev->driver_data;
+	return off ? 0 : sprintf(page, "%8u %8llu %8u %8llu\n",
+				p->reads, (u64)p->read_sectors,
+				p->writes, (u64)p->write_sectors);
+}
 static struct device_attribute part_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
 	.show	= part_dev_read
@@ -309,6 +318,10 @@ static struct device_attribute part_attr_size = {
 	.attr = {.name = "size", .mode = S_IRUGO },
 	.show	= part_size_read
 };
+static struct device_attribute part_attr_stat = {
+	.attr = {.name = "stat", .mode = S_IRUGO },
+	.show	= part_stat_read
+};
 
 void delete_partition(struct gendisk *disk, int part)
 {
@@ -318,10 +331,12 @@ void delete_partition(struct gendisk *disk, int part)
 		return;
 	p->start_sect = 0;
 	p->nr_sects = 0;
+	p->reads = p->writes = p->read_sectors = p->write_sectors = 0;
 	devfs_unregister(p->de);
 	dev = p->hd_driverfs_dev;
 	p->hd_driverfs_dev = NULL;
 	if (dev) {
+		device_remove_file(dev, &part_attr_stat);
 		device_remove_file(dev, &part_attr_size);
 		device_remove_file(dev, &part_attr_start);
 		device_remove_file(dev, &part_attr_dev);
@@ -355,6 +370,7 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	device_create_file(dev, &part_attr_dev);
 	device_create_file(dev, &part_attr_start);
 	device_create_file(dev, &part_attr_size);
+	device_create_file(dev, &part_attr_stat);
 	p->hd_driverfs_dev = dev;
 }
 
@@ -377,6 +393,27 @@ static ssize_t disk_size_read(struct device *dev,
 	struct gendisk *disk = dev->driver_data;
 	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)get_capacity(disk));
 }
+static inline unsigned MSEC(unsigned x)
+{
+	return x * 1000 / HZ;
+}
+static ssize_t disk_stat_read(struct device *dev,
+			char *page, size_t count, loff_t off)
+{
+	struct gendisk *disk = dev->driver_data;
+	disk_round_stats(disk);
+	return off ? 0 : sprintf(page,
+		"%8u %8u %8llu %8u "
+		"%8u %8u %8llu %8u "
+		"%8u %8u %8u"
+		"\n",
+		disk->reads, disk->read_merges, (u64)disk->read_sectors,
+		MSEC(disk->read_ticks),
+		disk->writes, disk->write_merges, (u64)disk->write_sectors,
+		MSEC(disk->write_ticks),
+		disk->in_flight, MSEC(disk->io_ticks),
+		MSEC(disk->time_in_queue));
+}
 static struct device_attribute disk_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
 	.show	= disk_dev_read
@@ -388,6 +425,10 @@ static struct device_attribute disk_attr_range = {
 static struct device_attribute disk_attr_size = {
 	.attr = {.name = "size", .mode = S_IRUGO },
 	.show	= disk_size_read
+};
+static struct device_attribute disk_attr_stat = {
+	.attr = {.name = "stat", .mode = S_IRUGO },
+	.show	= disk_stat_read
 };
 
 static void disk_driverfs_symlinks(struct gendisk *disk)
@@ -459,6 +500,7 @@ void register_disk(struct gendisk *disk)
 	device_create_file(dev, &disk_attr_dev);
 	device_create_file(dev, &disk_attr_range);
 	device_create_file(dev, &disk_attr_size);
+	device_create_file(dev, &disk_attr_stat);
 	disk_driverfs_symlinks(disk);
 
 	if (disk->flags & GENHD_FL_CD)
@@ -511,8 +553,8 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	bdev->bd_invalidated = 0;
 	for (p = 1; p < disk->minors; p++)
 		delete_partition(disk, p);
-	if (bdev->bd_op->revalidate_disk)
-		bdev->bd_op->revalidate_disk(disk);
+	if (disk->fops->revalidate_disk)
+		disk->fops->revalidate_disk(disk);
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
 		return res;
 	for (p = 1; p < state->limit; p++) {
@@ -569,10 +611,19 @@ void del_gendisk(struct gendisk *disk)
 	disk->capacity = 0;
 	disk->flags &= ~GENHD_FL_UP;
 	unlink_gendisk(disk);
+	disk->reads = disk->writes = 0;
+	disk->read_sectors = disk->write_sectors = 0;
+	disk->read_merges = disk->write_merges = 0;
+	disk->read_ticks = disk->write_ticks = 0;
+	disk->in_flight = 0;
+	disk->io_ticks = 0;
+	disk->time_in_queue = 0;
+	disk->stamp = disk->stamp_idle = 0;
 	devfs_remove_partitions(disk);
 	device_remove_file(&disk->disk_dev, &disk_attr_dev);
 	device_remove_file(&disk->disk_dev, &disk_attr_range);
 	device_remove_file(&disk->disk_dev, &disk_attr_size);
+	device_remove_file(&disk->disk_dev, &disk_attr_stat);
 	driverfs_remove_file(&disk->disk_dev.dir, "device");
 	if (disk->driverfs_dev) {
 		driverfs_remove_file(&disk->driverfs_dev->dir, "block");
@@ -613,9 +664,12 @@ char *partition_name(dev_t dev)
 	 */
 	hd = get_gendisk(dev, &part);
 	dname->name = NULL;
-	if (hd)
+	if (hd) {
 		dname->name = disk_name(hd, part, dname->namebuf);
-	put_disk(hd);
+		if (hd->fops->owner)
+			__MOD_DEC_USE_COUNT(hd->fops->owner);
+		put_disk(hd);
+	}
 	if (!dname->name) {
 		sprintf(dname->namebuf, "[dev %s]", kdevname(to_kdev_t(dev)));
 		dname->name = dname->namebuf;

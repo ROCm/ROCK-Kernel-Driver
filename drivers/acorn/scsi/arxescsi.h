@@ -49,7 +49,6 @@ name:				"ARXE SCSI card",	\
 detect:				arxescsi_detect,	\
 release:			arxescsi_release,	\
 info:				arxescsi_info,		\
-bios_param:			scsicam_bios_param,	\
 can_queue:			CAN_QUEUE,		\
 this_id:			SCSI_ID,		\
 sg_tablesize:			SG_ALL,			\

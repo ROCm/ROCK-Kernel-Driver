@@ -33,7 +33,8 @@ static int        fdomain_16x0_bus_reset(Scsi_Cmnd *);
 static int        fdomain_16x0_host_reset(Scsi_Cmnd *); 
 static int        fdomain_16x0_device_reset(Scsi_Cmnd *); 
 static int        fdomain_16x0_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-static int        fdomain_16x0_biosparam(Disk *, struct block_device *, int * );
+static int        fdomain_16x0_biosparam(struct scsi_device *,
+		struct block_device *, sector_t, int * );
 static int        fdomain_16x0_proc_info(char *buffer, char **start, off_t offset,
 				   int length, int hostno, int inout );
 static int        fdomain_16x0_release(struct Scsi_Host *shpnt);

@@ -799,23 +799,13 @@ queue_next:
 	if (creq->nr_phys_segments > SG_MAX)
 		BUG();
 
-	if (h->ctlr != major(creq->rq_dev)-MAJOR_NR || h->ctlr > nr_ctlr)
-	{
-		printk(KERN_WARNING "doreq cmd for %d, %x at %p\n",
-				h->ctlr, minor(creq->rq_dev), creq);
-		blkdev_dequeue_request(creq);
-		complete_buffers(creq->bio, 0);
-		end_that_request_last(creq);
-		goto startio;
-	}
-
 	if ((c = cmd_alloc(h,1)) == NULL)
 		goto startio;
 
 	blkdev_dequeue_request(creq);
 
 	c->ctlr = h->ctlr;
-	c->hdr.unit = minor(creq->rq_dev) >> NWD_SHIFT;
+	c->hdr.unit = (drv_info_t *)(creq->rq_disk->private_data) - h->drv;
 	c->hdr.size = sizeof(rblk_t) >> 2;
 	c->size += sizeof(rblk_t);
 

@@ -34,8 +34,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/byteorder.h>
-
-#include "sd.h"
+#include "scsi.h"
 #include "hosts.h"
 #include "qlogicisp.h"
 
@@ -1237,9 +1236,10 @@ int isp1020_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
 }
 
 
-int isp1020_biosparam(Disk *disk, struct block_device *n, int ip[])
+int isp1020_biosparam(struct scsi_device *sdev, struct block_device *n,
+		sector_t capacity, int ip[])
 {
-	int size = disk->capacity;
+	int size = capacity;
 
 	ENTER("isp1020_biosparam");
 

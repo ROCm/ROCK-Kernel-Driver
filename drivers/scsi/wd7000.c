@@ -179,7 +179,6 @@
 #include <linux/init.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <scsi/scsicam.h>
 
 #define ANY2SCSI_INLINE		/* undef this to use old macros */
@@ -1692,16 +1691,17 @@ static int wd7000_host_reset(Scsi_Cmnd * SCpnt)
  *  This was borrowed directly from aha1542.c. (Zaga)
  */
 
-static int wd7000_biosparam(Disk * disk, struct block_device *bdev, int *ip)
+static int wd7000_biosparam(struct scsi_device *sdev,
+		struct block_device *bdev, sector_t capacity, int *ip)
 {
-	dprintk("wd7000_biosparam: dev=%s, size=%d, ", bdevname(bdev), disk->capacity);
+	dprintk("wd7000_biosparam: dev=%s, size=%d, ", bdevname(bdev), capacity);
 
 	/*
 	 * try default translation
 	 */
 	ip[0] = 64;
 	ip[1] = 32;
-	ip[2] = disk->capacity >> 11;
+	ip[2] = capacity >> 11;
 
 	/*
 	 * for disks >1GB do some guessing
@@ -1712,12 +1712,12 @@ static int wd7000_biosparam(Disk * disk, struct block_device *bdev, int *ip)
 		/*
 		 * try to figure out the geometry from the partition table
 		 */
-		if ((scsicam_bios_param(disk, bdev, info) < 0) || !(((info[0] == 64) && (info[1] == 32)) || ((info[0] == 255) && (info[1] == 63)))) {
+		if ((scsicam_bios_param(bdev, capacity, info) < 0) || !(((info[0] == 64) && (info[1] == 32)) || ((info[0] == 255) && (info[1] == 63)))) {
 			printk("wd7000_biosparam: unable to verify geometry for disk with >1GB.\n" "                  using extended translation.\n");
 
 			ip[0] = 255;
 			ip[1] = 63;
-			ip[2] = (unsigned long) disk->capacity / (255 * 63);
+			ip[2] = (unsigned long) capacity / (255 * 63);
 		} else {
 			ip[0] = info[0];
 			ip[1] = info[1];

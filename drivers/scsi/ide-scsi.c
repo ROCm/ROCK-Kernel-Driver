@@ -51,7 +51,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <scsi/sg.h>
 
 #define IDESCSI_DEBUG_LOG		0
@@ -502,23 +501,6 @@ static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *r
 	return ide_stopped;
 }
 
-static int idescsi_do_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
-{
-	/* need to figure out how to parse scsi-atapi media type */
-	return -ENOTTY;
-}
-
-static int idescsi_ide_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
-static void idescsi_ide_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static ide_drive_t *idescsi_drives[MAX_HWIFS * MAX_DRIVES];
 
 static void idescsi_add_settings(ide_drive_t *drive)
@@ -564,6 +546,7 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	if (ide_unregister_subdriver(drive))
 		return 1;
 	drive->driver_data = NULL;
+	drive->disk->fops = ide_fops;
 	kfree(scsi);
 	return 0;
 }
@@ -574,29 +557,46 @@ static int idescsi_attach(ide_drive_t *drive);
  *	IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idescsi_driver = {
-	owner:			THIS_MODULE,
-	name:			"ide-scsi",
-	version:		IDESCSI_VERSION,
-	media:			ide_scsi,
-	busy:			0,
-	supports_dma:		1,
-	supports_dsc_overlap:	0,
-	attach:			idescsi_attach,
-	cleanup:		idescsi_cleanup,
-	standby:		NULL,
-	flushcache:		NULL,
-	do_request:		idescsi_do_request,
-	end_request:		idescsi_end_request,
-	ioctl:			idescsi_do_ioctl,
-	open:			idescsi_ide_open,
-	release:		idescsi_ide_release,
-	media_change:		NULL,
-	revalidate:		NULL,
-	pre_reset:		NULL,
-	capacity:		NULL,
-	special:		NULL,
-	proc:			NULL,
-	drives:			LIST_HEAD_INIT(idescsi_driver.drives),
+	.owner			= THIS_MODULE,
+	.name			= "ide-scsi",
+	.version		= IDESCSI_VERSION,
+	.media			= ide_scsi,
+	.busy			= 0,
+	.supports_dma		= 1,
+	.supports_dsc_overlap	= 0,
+	.attach			= idescsi_attach,
+	.cleanup		= idescsi_cleanup,
+	.do_request		= idescsi_do_request,
+	.end_request		= idescsi_end_request,
+	.drives			= LIST_HEAD_INIT(idescsi_driver.drives),
+};
+
+static int idescsi_ide_open(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	drive->usage++;
+	return 0;
+}
+
+static int idescsi_ide_release(struct inode *inode, struct file *filp)
+{
+	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	drive->usage--;
+	return 0;
+}
+
+static int idescsi_ide_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	struct block_device *bdev = inode->i_bdev;
+	return generic_ide_ioctl(bdev, cmd, arg);
+}
+
+static struct block_device_operations idescsi_ops = {
+	.owner		= THIS_MODULE,
+	.open		= idescsi_ide_open,
+	.release	= idescsi_ide_release,
+	.ioctl		= idescsi_ide_ioctl,
 };
 
 static int idescsi_attach(ide_drive_t *drive)
@@ -623,6 +623,7 @@ static int idescsi_attach(ide_drive_t *drive)
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++)
 		;
 	idescsi_setup (drive, scsi, id);
+	drive->disk->fops = &idescsi_ops;
 	return 0;
 failed:
 	return 1;
@@ -840,9 +841,10 @@ int idescsi_reset (Scsi_Cmnd *cmd, unsigned int resetflags)
 	return SCSI_RESET_SUCCESS;
 }
 
-static int idescsi_bios(Disk *disk, struct block_device *dev, int *parm)
+static int idescsi_bios(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *parm)
 {
-	ide_drive_t *drive = idescsi_drives[disk->device->id];
+	ide_drive_t *drive = idescsi_drives[sdev->id];
 
 	if (drive->bios_cyl && drive->bios_head && drive->bios_sect) {
 		parm[0] = drive->bios_head;
@@ -860,8 +862,6 @@ static Scsi_Host_Template idescsi_template = {
 	info:		idescsi_info,
 	ioctl:		idescsi_ioctl,
 	queuecommand:	idescsi_queue,
-	abort:		idescsi_abort,
-	reset:		idescsi_reset,
 	bios_param:	idescsi_bios,
 	can_queue:	10,
 	this_id:	-1,

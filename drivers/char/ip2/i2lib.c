@@ -84,8 +84,8 @@ static void iiSendPendingMail(i2eBordStrPtr);
 static void serviceOutgoingFifo(i2eBordStrPtr);
 
 // Functions defined in ip2.c as part of interrupt handling
-static void do_input(i2ChanStrPtr);
-static void do_status(i2ChanStrPtr);
+static void do_input(void *);
+static void do_status(void *);
 
 //***************
 //* Debug  Data *
@@ -333,10 +333,8 @@ i2InitChannels ( i2eBordStrPtr pB, int nChannels, i2ChanStrPtr pCh)
 		pCh->ClosingWaitTime  = 30*HZ;
 
 		// Initialize task queue objects
-		pCh->tqueue_input.routine = (void(*)(void*)) do_input;
-		pCh->tqueue_input.data = pCh;
-		pCh->tqueue_status.routine = (void(*)(void*)) do_status;
-		pCh->tqueue_status.data = pCh;
+		INIT_WORK(&pCh->tqueue_input, do_input, pCh);
+		INIT_WORK(&pCh->tqueue_status, do_status, pCh);
 
 #ifdef IP2DEBUG_TRACE
 		pCh->trace = ip2trace;

@@ -15,7 +15,3 @@ obj-$(CONFIG_ISDN_DRV_ACT2000)		+= act2000/
 obj-$(CONFIG_ISDN_DRV_EICON)		+= eicon/
 obj-$(CONFIG_HYSDN)			+= hysdn/
 obj-$(CONFIG_ISDN_DRV_TPAM)		+= tpam/
-
-# The global Rules.make.
-
-include $(TOPDIR)/Rules.make

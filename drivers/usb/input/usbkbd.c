@@ -87,7 +87,17 @@ static void usb_kbd_irq(struct urb *urb)
 	struct usb_kbd *kbd = urb->context;
 	int i;
 
-	if (urb->status) return;
+	switch (urb->status) {
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		goto resubmit;
+	}
 
 	for (i = 0; i < 8; i++)
 		input_report_key(&kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);
@@ -112,6 +122,13 @@ static void usb_kbd_irq(struct urb *urb)
 	input_sync(&kbd->dev);
 
 	memcpy(kbd->old, kbd->new, 8);
+
+resubmit:
+	i = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (i)
+		err ("can't resubmit intr, %s-%s/input0, status %d",
+				kbd->usbdev->bus->bus_name,
+				kbd->usbdev->devpath, i);
 }
 
 int usb_kbd_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)

@@ -348,8 +348,6 @@ struct block_device {
 	struct inode *		bd_inode;
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
 	int			bd_openers;
-	struct block_device_operations *bd_op;
-	struct request_queue	*bd_queue;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
 	void *			bd_holder;
@@ -1096,7 +1094,6 @@ extern void bd_release(struct block_device *);
 extern void blk_run_queues(void);
 
 /* fs/devices.c */
-extern struct block_device_operations *get_blkfops(unsigned int);
 extern int register_chrdev(unsigned int, const char *, struct file_operations *);
 extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);

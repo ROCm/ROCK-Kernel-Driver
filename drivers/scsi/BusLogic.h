@@ -41,7 +41,6 @@ typedef struct pci_dev PCI_Device_T;
 typedef Scsi_Host_Template SCSI_Host_Template_T;
 typedef struct Scsi_Host SCSI_Host_T;
 typedef struct scsi_device SCSI_Device_T;
-typedef struct scsi_disk SCSI_Disk_T;
 typedef struct scsi_cmnd SCSI_Command_T;
 typedef struct scatterlist SCSI_ScatterList_T;
 
@@ -55,10 +54,8 @@ extern int BusLogic_DetectHostAdapter(SCSI_Host_Template_T *);
 extern int BusLogic_ReleaseHostAdapter(SCSI_Host_T *);
 extern int BusLogic_QueueCommand(SCSI_Command_T *,
 				 void (*CompletionRoutine)(SCSI_Command_T *));
-extern int BusLogic_AbortCommand(SCSI_Command_T *);
-extern int BusLogic_ResetCommand(SCSI_Command_T *, unsigned int);
-extern int BusLogic_BIOSDiskParameters(SCSI_Disk_T *, struct block_device *,
-				       int *);
+extern int BusLogic_BIOSDiskParameters(struct scsi_device *,
+		struct block_device *, sector_t, int *);
 extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
 extern int BusLogic_SlaveAttach(SCSI_Device_T *);
 
@@ -75,8 +72,6 @@ extern int BusLogic_SlaveAttach(SCSI_Device_T *);
     release:        BusLogic_ReleaseHostAdapter,  /* Release Host Adapter   */ \
     info:           BusLogic_DriverInfo,	  /* Driver Info Function   */ \
     queuecommand:   BusLogic_QueueCommand,	  /* Queue Command Function */ \
-    abort:          BusLogic_AbortCommand,	  /* Abort Command Function */ \
-    reset:          BusLogic_ResetCommand,	  /* Reset Command Function */ \
     slave_attach:   BusLogic_SlaveAttach,	  /* Configure a SCSI_Device*/ \
     bios_param:     BusLogic_BIOSDiskParameters,  /* BIOS Disk Parameters   */ \
     unchecked_isa_dma: 1,			  /* Default Initial Value  */ \

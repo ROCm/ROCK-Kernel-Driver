@@ -41,7 +41,6 @@
 #include <asm/ecard.h>
 #include <asm/pgtable.h>
 
-#include "../../scsi/sd.h"
 #include "../../scsi/hosts.h"
 #include "fas216.h"
 #include "scsi.h"
@@ -556,7 +555,6 @@ static Scsi_Host_Template eesox_template = {
 	.detect				= eesoxscsi_detect,
 	.release			= eesoxscsi_release,
 	.info				= eesoxscsi_info,
-	.bios_param			= scsicam_bios_param,
 	.can_queue			= 1,
 	.this_id			= 7,
 	.sg_tablesize			= SG_ALL,

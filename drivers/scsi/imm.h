@@ -80,7 +80,6 @@
 #include  <linux/interrupt.h>
 
 #include  <asm/io.h>
-#include  "sd.h"
 #include  "hosts.h"
 /* batteries not included :-) */
 
@@ -161,7 +160,8 @@ int imm_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int imm_abort(Scsi_Cmnd *);
 int imm_reset(Scsi_Cmnd *);
 int imm_proc_info(char *, char **, off_t, int, int, int);
-int imm_biosparam(Disk *, struct block_device *, int *);
+int imm_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
 #define IMM {	proc_name:			"imm",			\
 		proc_info:			imm_proc_info,		\

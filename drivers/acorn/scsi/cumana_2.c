@@ -35,7 +35,6 @@
 #include <asm/irq.h>
 #include <asm/pgtable.h>
 
-#include "../../scsi/sd.h"
 #include "../../scsi/hosts.h"
 #include "fas216.h"
 #include "scsi.h"
@@ -559,7 +558,6 @@ static Scsi_Host_Template cumanascsi2_template = {
 	.detect				= cumanascsi_2_detect,
 	.release			= cumanascsi_2_release,
 	.info				= cumanascsi_2_info,
-	.bios_param			= scsicam_bios_param,
 	.can_queue			= 1,
 	.this_id			= 7,
 	.sg_tablesize			= SG_ALL,

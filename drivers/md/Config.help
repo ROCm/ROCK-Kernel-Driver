@@ -1,25 +1,6 @@
-CONFIG_BLK_DEV_LVM
-  This driver lets you combine several hard disks, hard disk
-  partitions, multiple devices or even loop devices (for evaluation
-  purposes) into a volume group.  Imagine a volume group as a kind of
-  virtual disk. Logical volumes, which can be thought of as virtual
-  partitions, can be created in the volume group.  You can resize
-  volume groups and logical volumes after creation time, corresponding
-  to new capacity needs.  Logical volumes are accessed as block
-  devices named /dev/VolumeGroupName/LogicalVolumeName.
-
-  For details see <file:Documentation/LVM-HOWTO>.  You will need
-  supporting user space software; location is in
-  <file:Documentation/Changes>.
-
-  If you want to compile this support as a module ( = code which can
-  be inserted in and removed from the running kernel whenever you
-  want), say M here and read <file:Documentation/modules.txt>.  The
-  module will be called lvm-mod.o.
-
 CONFIG_MD
   Support multiple physical spindles through a single logical device.
-  Required for RAID and logical volume management (LVM).
+  Required for RAID and logical volume management.
 
 CONFIG_BLK_DEV_MD
   This driver lets you combine several hard disk partitions into one
@@ -122,3 +103,15 @@ CONFIG_MD_MULTIPATH
 
   If unsure, say N.
 
+CONFIG_BLK_DEV_DM
+  Device-mapper is a low level volume manager.  It works by allowing
+  people to specify mappings for ranges of logical sectors.  Various
+  mapping types are available, in addition people may write their own
+  modules containing custom mappings if they wish.
+
+  Higher level volume managers such as LVM2 use this driver.
+
+  If you want to compile this as a module, say M here and read 
+  <file:Documentation/modules.txt>.  The module will be called dm-mod.o.
+
+  If unsure, say N.

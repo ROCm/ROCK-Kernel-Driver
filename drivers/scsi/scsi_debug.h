@@ -8,7 +8,8 @@ static int scsi_debug_release(struct Scsi_Host *);
 /* static int scsi_debug_command(Scsi_Cmnd *); */
 static int scsi_debug_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int scsi_debug_ioctl(Scsi_Device *, int, void *);
-static int scsi_debug_biosparam(Disk *, struct block_device *, int[]);
+static int scsi_debug_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int[]);
 static int scsi_debug_abort(Scsi_Cmnd *);
 static int scsi_debug_bus_reset(Scsi_Cmnd *);
 static int scsi_debug_device_reset(Scsi_Cmnd *);

@@ -52,7 +52,6 @@
 #include <asm/dma.h>
 
 #define MAJOR_NR XT_DISK_MAJOR
-#define DEVICE_NR(device) (minor(device) >> 6)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -129,8 +128,8 @@ static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 static struct gendisk *xd_gendisk[2];
 
 static struct block_device_operations xd_fops = {
-	owner:		THIS_MODULE,
-	ioctl:		xd_ioctl,
+	.owner	= THIS_MODULE,
+	.ioctl	= xd_ioctl,
 };
 static DECLARE_WAIT_QUEUE_HEAD(xd_wait_int);
 static u_char xd_drives, xd_irq = 5, xd_dma = 3, xd_maxsectors;
@@ -143,6 +142,8 @@ static struct timer_list xd_watchdog_int;
 
 static volatile u_char xd_error;
 static int nodma = XD_DONT_USE_DMA;
+
+static struct request_queue xd_queue;
 
 static devfs_handle_t devfs_handle = NULL;
 
@@ -177,7 +178,7 @@ static int __init xd_init(void)
 		goto out1;
 	}
 	devfs_handle = devfs_mk_dir (NULL, "xd", NULL);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_xd_request, &xd_lock);
+	blk_init_queue(&xd_queue, do_xd_request, &xd_lock);
 	if (xd_detect(&controller,&address)) {
 
 		printk("Detected a%s controller (type %d) at address %06x\n",
@@ -193,11 +194,6 @@ static int __init xd_init(void)
 		
 		printk("Detected %d hard drive%s (using IRQ%d & DMA%d)\n",
 			xd_drives,xd_drives == 1 ? "" : "s",xd_irq,xd_dma);
-		for (i = 0; i < xd_drives; i++)
-			printk(" xd%c: CHS=%d/%d/%d\n",'a'+i,
-				xd_info[i].cylinders,xd_info[i].heads,
-				xd_info[i].sectors);
-
 	}
 
 	err = -ENODEV;
@@ -205,13 +201,20 @@ static int __init xd_init(void)
 		goto out3;
 
 	for (i = 0; i < xd_drives; i++) {
+		XD_INFO *p = &xd_info[i];
 		struct gendisk *disk = alloc_disk(64);
 		if (!disk)
 			goto Enomem;
+		p->unit = i;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<6;
 		sprintf(disk->disk_name, "xd%c", i+'a');
 		disk->fops = &xd_fops;
+		disk->private_data = p;
+		disk->queue = &xd_queue;
+		set_capacity(disk, p->heads * p->cylinders * p->sectors);
+		printk(" %s: CHS=%d/%d/%d\n", disk->disk_name,
+			p->cylinders, p->heads, p->sectors);
 		xd_gendisk[i] = disk;
 	}
 
@@ -227,14 +230,10 @@ static int __init xd_init(void)
 	}
 
 	/* xd_maxsectors depends on controller - so set after detection */
-	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), xd_maxsectors);
+	blk_queue_max_sectors(&xd_queue, xd_maxsectors);
 
-	for (i = 0; i < xd_drives; i++) {
-		struct gendisk *disk = xd_gendisk[i];
-		set_capacity(disk, xd_info[i].heads * xd_info[i].cylinders *
-				xd_info[i].sectors);
-		add_disk(disk);
-	}
+	for (i = 0; i < xd_drives; i++)
+		add_disk(xd_gendisk[i]);
 
 	return 0;
 
@@ -246,7 +245,7 @@ out4:
 out3:
 	release_region(xd_iobase,4);
 out2:
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&xd_queue);
 	unregister_blkdev(MAJOR_NR, "xd");
 out1:
 	if (xd_dma_buffer)
@@ -286,55 +285,50 @@ static u_char __init xd_detect (u_char *controller, unsigned int *address)
 /* do_xd_request: handle an incoming request */
 static void do_xd_request (request_queue_t * q)
 {
-	u_int block,count,retry;
-	int code;
-
 	if (xdc_busy)
 		return;
 
-	while (1) {
-		int unit;
-		code = 0;
-		/* do some checking on the request structure */
-		if (blk_queue_empty(QUEUE))
-			return;
+	while (!blk_queue_empty(q)) {
+		struct request *req = elv_next_request(q);
+		unsigned block = req->sector;
+		unsigned count = req->nr_sectors;
+		int rw = rq_data_dir(req);
+		XD_INFO *disk = req->rq_disk->private_data;
+		int res = 0;
+		int retry;
 
-		unit = DEVICE_NR(CURRENT->rq_dev);
-		if (unit < xd_drives
-		    && (CURRENT->flags & REQ_CMD)
-		    && CURRENT->sector + CURRENT->nr_sectors
-		         <= get_capacity(xd_gendisk[unit])) {
-			block = CURRENT->sector;
-			count = CURRENT->nr_sectors;
-
-			switch (rq_data_dir(CURRENT)) {
-				case READ:
-				case WRITE:
-					for (retry = 0; (retry < XD_RETRIES) && !code; retry++)
-						code = xd_readwrite(rq_data_dir(CURRENT),unit,
-							CURRENT->buffer,block,count);
-					break;
-				default:
-					printk("do_xd_request: unknown request\n");
-					break;
-			}
+		if (!(req->flags & REQ_CMD)) {
+			end_request(req, 0);
+			continue;
 		}
-		end_request(CURRENT, code);	/* wrap up, 0 = fail, 1 = success */
+		if (block + count > get_capacity(req->rq_disk)) {
+			end_request(req, 0);
+			continue;
+		}
+		if (rw != READ && rw != WRITE) {
+			printk("do_xd_request: unknown request\n");
+			end_request(req, 0);
+			continue;
+		}
+		for (retry = 0; (retry < XD_RETRIES) && !res; retry++)
+			res = xd_readwrite(rw, disk, req->buffer, block, count);
+		end_request(req, res);	/* wrap up, 0 = fail, 1 = success */
 	}
 }
 
 /* xd_ioctl: handle device ioctl's */
 static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 {
-	int dev = DEVICE_NR(inode->i_rdev);
+	XD_INFO *p = inode->i_bdev->bd_disk->private_data;
+
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{
 			struct hd_geometry g;
 			struct hd_geometry *geometry = (struct hd_geometry *) arg;
-			g.heads = xd_info[dev].heads;
-			g.sectors = xd_info[dev].sectors;
-			g.cylinders = xd_info[dev].cylinders;
+			g.heads = p->heads;
+			g.sectors = p->sectors;
+			g.cylinders = p->cylinders;
 			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user(geometry, &g, sizeof g) ? -EFAULT : 0;
 		}
@@ -364,8 +358,9 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 }
 
 /* xd_readwrite: handle a read/write request */
-static int xd_readwrite (u_char operation,u_char drive,char *buffer,u_int block,u_int count)
+static int xd_readwrite (u_char operation,XD_INFO *p,char *buffer,u_int block,u_int count)
 {
+	int drive = p->unit;
 	u_char cmdblk[6],sense[4];
 	u_short track,cylinder;
 	u_char head,sector,control,mode = PIO_MODE,temp;
@@ -378,16 +373,16 @@ static int xd_readwrite (u_char operation,u_char drive,char *buffer,u_int block,
 
 	spin_unlock_irq(&xd_lock);
 
-	control = xd_info[drive].control;
+	control = p->control;
 	if (!xd_dma_buffer)
 		xd_dma_buffer = (char *)xd_dma_mem_alloc(xd_maxsectors * 0x200);
 	while (count) {
 		temp = count < xd_maxsectors ? count : xd_maxsectors;
 
-		track = block / xd_info[drive].sectors;
-		head = track % xd_info[drive].heads;
-		cylinder = track / xd_info[drive].heads;
-		sector = block % xd_info[drive].sectors;
+		track = block / p->sectors;
+		head = track % p->heads;
+		cylinder = track / p->heads;
+		sector = block % p->sectors;
 
 #ifdef DEBUG_READWRITE
 		printk("xd_readwrite: drive = %d, head = %d, cylinder = %d, sector = %d, count = %d\n",drive,head,cylinder,sector,temp);
@@ -1057,7 +1052,7 @@ void cleanup_module(void)
 		del_gendisk(xd_gendisk[i]);
 		put_disk(xd_gendisk[i]);
 	}
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&xd_queue);
 	release_region(xd_iobase,4);
 	devfs_unregister (devfs_handle);
 	if (xd_drives) {

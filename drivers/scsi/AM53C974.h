@@ -60,7 +60,6 @@ struct AM53C974_hostdata {
     queuecommand:   AM53C974_queue_command,	  \
     abort:          AM53C974_abort,    		  \
     reset:          AM53C974_reset,    		  \
-    bios_param:     scsicam_bios_param,		  \
     can_queue:      12,                 	  \
     this_id:        -1,                           \
     sg_tablesize:   SG_ALL,            		  \

@@ -31,10 +31,10 @@
 #include <linux/signal.h>
 #include <linux/stat.h>
 #include <linux/version.h>
+#include <linux/delay.h>
 
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 
 #include "dmx3191d.h"
 
@@ -52,7 +52,7 @@
 #include "NCR5380.c"
 
 
-int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
+static int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 	int boards = 0;
 	struct Scsi_Host *instance = NULL;
 	struct pci_dev *pdev = NULL;
@@ -90,7 +90,7 @@ int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 		instance->irq = pdev->irq;
 		NCR5380_init(instance, FLAG_NO_PSEUDO_DMA | FLAG_DTC3181E);
 
-		if (request_irq(pdev->irq, dmx3191d_do_intr, SA_SHIRQ,
+		if (request_irq(pdev->irq, dmx3191d_intr, SA_SHIRQ,
 				DMX3191D_DRIVER_NAME, instance)) {
 			printk(KERN_WARNING "dmx3191: IRQ %d not available - switching to polled mode.\n", pdev->irq);
 			/* Steam powered scsi controllers run without an IRQ
@@ -103,13 +103,13 @@ int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 	return boards;
 }
 
-const char * dmx3191d_info(struct Scsi_Host *host) {
+static const char * dmx3191d_info(struct Scsi_Host *host) {
 	static const char *info ="Domex DMX3191D";
 
 	return info;
 }
 
-int dmx3191d_release_resources(struct Scsi_Host *instance)
+static int dmx3191d_release_resources(struct Scsi_Host *instance)
 {
 	release_region(instance->io_port, DMX3191D_REGION);
 	if(instance->irq!=IRQ_NONE)

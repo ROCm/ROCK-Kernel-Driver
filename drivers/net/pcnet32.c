@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.27a"
-#define DRV_RELDATE	"10.02.2002"
+#define DRV_VERSION	"1.27b"
+#define DRV_RELDATE	"01.10.2002"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -95,6 +95,8 @@ static int rx_copybreak = 200;
 #define PCNET32_PORT_FD	      0x80
 
 #define PCNET32_DMA_MASK 0xffffffff
+
+#define PCNET32_WATCHDOG_TIMEOUT (jiffies + (2 * HZ))
 
 /*
  * table to translate option values from tulip
@@ -211,6 +213,8 @@ static int full_duplex[MAX_UNITS];
  *	   fix pci probe not increment cards_found
  *	   FD auto negotiate error workaround for xSeries250
  *	   clean up and using new mii module
+ * v1.27b  Sep 30 2002 Kent Yoder <yoder1@us.ibm.com>
+ * 	   Added timer for cable connection state changes.
  */
 
 
@@ -318,6 +322,7 @@ struct pcnet32_private {
 	mii:1;				/* mii port available */
     struct net_device	*next;
     struct mii_if_info mii_if;
+    struct timer_list	watchdog_timer;
 };
 
 static void pcnet32_probe_vlbus(void);
@@ -333,6 +338,7 @@ static int  pcnet32_close(struct net_device *);
 static struct net_device_stats *pcnet32_get_stats(struct net_device *);
 static void pcnet32_set_multicast_list(struct net_device *);
 static int  pcnet32_ioctl(struct net_device *, struct ifreq *, int);
+static void pcnet32_watchdog(struct net_device *);
 static int mdio_read(struct net_device *dev, int phy_id, int reg_num);
 static void mdio_write(struct net_device *dev, int phy_id, int reg_num, int val);
 
@@ -777,6 +783,13 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	}
     }
 
+    /* Set the mii phy_id so that we can query the link state */
+    if (lp->mii)
+	lp->mii_if.phy_id = ((lp->a.read_bcr (ioaddr, 33)) >> 5) & 0x1f;
+
+    init_timer (&lp->watchdog_timer);
+    lp->watchdog_timer.data = (unsigned long) dev;
+    lp->watchdog_timer.function = (void *) &pcnet32_watchdog;
     
     /* The PCNET32-specific entries in the device structure. */
     dev->open = &pcnet32_open;
@@ -901,6 +914,12 @@ pcnet32_open(struct net_device *dev)
 
     netif_start_queue(dev);
 
+    /* If we have mii, print the link status and start the watchdog */
+    if (lp->mii) {
+	mii_check_media (&lp->mii_if, 1, 1);
+	mod_timer (&(lp->watchdog_timer), PCNET32_WATCHDOG_TIMEOUT);
+    }
+    
     i = 0;
     while (i++ < 100)
 	if (lp->a.read_csr (ioaddr, 0) & 0x0100)
@@ -1371,6 +1390,8 @@ pcnet32_close(struct net_device *dev)
     struct pcnet32_private *lp = dev->priv;
     int i;
 
+    del_timer_sync(&lp->watchdog_timer);
+
     netif_stop_queue(dev);
 
     lp->stats.rx_missed_errors = lp->a.read_csr (ioaddr, 112);
@@ -1649,6 +1670,17 @@ static int pcnet32_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	}
     }
     return -EOPNOTSUPP;
+}
+
+static void pcnet32_watchdog(struct net_device *dev)
+{
+    struct pcnet32_private *lp = dev->priv;
+
+    /* Print the link status if it has changed */
+    if (lp->mii)
+	mii_check_media (&lp->mii_if, 1, 0);
+
+    mod_timer (&(lp->watchdog_timer), PCNET32_WATCHDOG_TIMEOUT);
 }
 
 static struct pci_driver pcnet32_driver = {

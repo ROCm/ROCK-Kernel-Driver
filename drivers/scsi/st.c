@@ -3965,14 +3965,8 @@ static int __init init_st(void)
 		st_max_sg_segs);
 
 	if (register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
-		if (scsi_register_device(&st_template) == 0) {
-			st_template.scsi_driverfs_driver.name = 
-				(char *)st_template.tag;
-			st_template.scsi_driverfs_driver.bus = 
-				&scsi_driverfs_bus_type;
-			driver_register(&st_template.scsi_driverfs_driver);
+		if (scsi_register_device(&st_template) == 0)
 			return 0;
-		}
 	}
 
 	printk(KERN_ERR "Unable to get major %d for SCSI tapes\n", MAJOR_NR);
@@ -3992,7 +3986,6 @@ static void __exit exit_st(void)
 		kfree(scsi_tapes);
 	}
 	st_template.dev_max = 0;
-	driver_unregister(&st_template.scsi_driverfs_driver);
 	printk(KERN_INFO "st: Unloaded.\n");
 }
 

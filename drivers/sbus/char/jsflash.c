@@ -592,7 +592,7 @@ static int jsfd_init(void)
 		disk->private_data = jdp;
 		disk->queue = &jsf_queue;
 		add_disk(disk);
-		set_device_ro(MKDEV(JSFD_MAJOR, i), 1);
+		set_disk_ro(disk, 1);
 	}
 	return 0;
 out:
