@@ -332,24 +332,11 @@ static unsigned int get_cur_freq(unsigned int cpu)
 		/*
 		 * On some CPUs, we can see transient MSR values (which are
 		 * not present in _PSS), while CPU is doing some automatic
-		 * P-state transition (like TM2). Allow CPU to stabilize at
-		 * some freq and retry.
-		 * If we continue to see transients for long time, just return
-		 * the lowest possible frequency as best guess.
+		 * P-state transition (like TM2). Get the last freq set 
+		 * in PERF_CTL.
 		 */
-		int retries = 0;
-#define MAX_EXTRACT_CLOCK_RETRIES	5
-		while (clock_freq == 0 && retries < MAX_EXTRACT_CLOCK_RETRIES) {
-			udelay(100);
-			retries++;
-			rdmsr(MSR_IA32_PERF_STATUS, l, h);
-			clock_freq = extract_clock(l, cpu, 0);
-		}
-
-		if (clock_freq == 0) {
-			rdmsr(MSR_IA32_PERF_STATUS, l, h);
-			clock_freq = extract_clock(l, cpu, 1);
-		}
+		rdmsr(MSR_IA32_PERF_CTL, l, h);
+		clock_freq = extract_clock(l, cpu, 1);
 	}
 
 	set_cpus_allowed(current, saved_mask);
