@@ -1023,6 +1023,8 @@ asmlinkage void smp_error_interrupt(void)
 }
 
 int disable_apic; 
+/* just used to communicate with shared i386 code: */
+int enable_local_apic = 1; 
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is
@@ -1036,6 +1038,7 @@ int __init APIC_init_uniprocessor (void)
 	}
 	if (!cpu_has_apic) { 
 		disable_apic = 1;
+		enable_local_apic = -1; 
 		printk(KERN_INFO "Apic disabled by BIOS\n");
 		return -1;
 	}
@@ -1062,12 +1065,14 @@ int __init APIC_init_uniprocessor (void)
 
 static __init int setup_disableapic(char *str) 
 { 
+	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 
 
 static __init int setup_nolapic(char *str) 
 { 
+	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 
