@@ -60,6 +60,8 @@ static unsigned long get_offset_tsc(void)
 static void mark_offset_tsc(void)
 {
 	int count;
+	int countmp;
+	static int count1=0, count2=LATCH;
 	/*
 	 * It is important that these two operations happen almost at
 	 * the same time. We do the RDTSC stuff first, since it's
@@ -82,6 +84,20 @@ static void mark_offset_tsc(void)
 	count = inb_p(0x40);    /* read the latched count */
 	count |= inb(0x40) << 8;
 	spin_unlock(&i8253_lock);
+
+	if (pit_latch_buggy) {
+		/* get center value of last 3 time lutch */
+		if ((count2 >= count && count >= count1)
+		    || (count1 >= count && count >= count2)) {
+			count2 = count1; count1 = count;
+		} else if ((count1 >= count2 && count2 >= count)
+			   || (count >= count2 && count2 >= count1)) {
+			countmp = count;count = count2;
+			count2 = count1;count1 = countmp;
+		} else {
+			count2 = count1; count1 = count; count = count1;
+		}
+	}
 
 	count = ((LATCH-1) - count) * TICK_SIZE;
 	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
@@ -111,10 +127,12 @@ static unsigned long __init calibrate_tsc(void)
 	 * Set the Gate high, program CTC channel 2 for mode 0,
 	 * (interrupt on terminal count mode), binary count,
 	 * load 5 * LATCH count, (LSB and MSB) to begin countdown.
+	 *
+	 * Some devices need a delay here.
 	 */
 	outb(0xb0, 0x43);			/* binary, mode 0, LSB/MSB, Ch 2 */
-	outb(CALIBRATE_LATCH & 0xff, 0x42);	/* LSB of count */
-	outb(CALIBRATE_LATCH >> 8, 0x42);	/* MSB of count */
+	outb_p(CALIBRATE_LATCH & 0xff, 0x42);	/* LSB of count */
+	outb_p(CALIBRATE_LATCH >> 8, 0x42);       /* MSB of count */
 
 	{
 		unsigned long startlow, starthigh;
@@ -238,8 +256,6 @@ static int init_tsc(void)
  	 *	moaned if you have the only one in the world - you fix it!
  	 */
  
- 	dodgy_tsc();
- 	
 	if (cpu_has_tsc) {
 		unsigned long tsc_quotient = calibrate_tsc();
 		if (tsc_quotient) {
