@@ -1,14 +1,14 @@
+EXTRA_TARGETS := mk_task mk_task_kern.o
+
 include $(TOPDIR)/Rules.make
 
-all : mk_task
+$(obj)/mk_task: $(obj)/mk_task_user.o $(obj)/mk_task_kern.o
+	$(CC) -o $@ $^
 
-mk_task : mk_task_user.o mk_task_kern.o
-	$(CC) -o mk_task mk_task_user.o mk_task_kern.o
+$(obj)/mk_task_user.o: $(src)/mk_task_user.c
+	$(CC) -o $@ -c $< 
 
-mk_task_user.o : mk_task_user.c
-	$(CC) -c $< 
+clean:
+	$(RM) $(EXTRA_TARGETS)
 
-clean :
-	$(RM) mk_task *.o *~
-
-archmrproper : clean
+archmrproper:
