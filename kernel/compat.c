@@ -310,7 +310,7 @@ asmlinkage long compat_sys_getrlimit (unsigned int resource,
 	return ret;
 }
 
-static long put_compat_rusage(struct compat_rusage __user *ru, struct rusage *r)
+int put_compat_rusage(const struct rusage *r, struct compat_rusage __user *ru)
 {
 	if (!access_ok(VERIFY_WRITE, ru, sizeof(*ru)) ||
 	    __put_user(r->ru_utime.tv_sec, &ru->ru_utime.tv_sec) ||
@@ -348,7 +348,7 @@ asmlinkage long compat_sys_getrusage(int who, struct compat_rusage __user *ru)
 	if (ret)
 		return ret;
 
-	if (put_compat_rusage(ru, &r))
+	if (put_compat_rusage(&r, ru))
 		return -EFAULT;
 
 	return 0;
@@ -374,7 +374,7 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
 		set_fs (old_fs);
 
 		if (ret > 0) {
-			if (put_compat_rusage(ru, &r)) 
+			if (put_compat_rusage(&r, ru))
 				return -EFAULT;
 			if (stat_addr && put_user(status, stat_addr))
 				return -EFAULT;

@@ -957,16 +957,64 @@ static int eligible_child(pid_t pid, int options, task_t *p)
 	return 1;
 }
 
+static int wait_noreap_copyout(task_t *p, pid_t pid, uid_t uid,
+			       int why, int status,
+			       struct siginfo __user *infop)
+{
+	int retval = getrusage(p, RUSAGE_BOTH, &infop->si_rusage);
+	put_task_struct(p);
+	if (!retval)
+		retval = put_user(SIGCHLD, &infop->si_signo);
+	if (!retval)
+		retval = put_user(0, &infop->si_errno);
+	if (!retval)
+		retval = put_user((short)why, &infop->si_code);
+	if (!retval)
+		retval = put_user(pid, &infop->si_pid);
+	if (!retval)
+		retval = put_user(uid, &infop->si_uid);
+	if (!retval)
+		retval = put_user(status, &infop->si_status);
+	if (!retval)
+		retval = pid;
+	return retval;
+}
+
 /*
  * Handle sys_wait4 work for one task in state TASK_ZOMBIE.  We hold
  * read_lock(&tasklist_lock) on entry.  If we return zero, we still hold
  * the lock and this task is uninteresting.  If we return nonzero, we have
  * released the lock and the system call should return.
  */
-static int wait_task_zombie(task_t *p, unsigned int __user *stat_addr, struct rusage __user *ru)
+static int wait_task_zombie(task_t *p, int noreap,
+			    struct siginfo __user *infop,
+			    int __user *stat_addr, struct rusage __user *ru)
 {
 	unsigned long state;
 	int retval;
+	int status;
+
+	if (unlikely(noreap)) {
+		pid_t pid = p->pid;
+		uid_t uid = p->uid;
+		int exit_code = p->exit_code;
+		int why, status;
+
+		if (unlikely(p->state != TASK_ZOMBIE))
+			return 0;
+		if (unlikely(p->exit_signal == -1 && p->ptrace == 0))
+			return 0;
+		get_task_struct(p);
+		read_unlock(&tasklist_lock);
+		if ((exit_code & 0x7f) == 0) {
+			why = CLD_EXITED;
+			status = exit_code >> 8;
+		} else {
+			why = (exit_code & 0x80) ? CLD_DUMPED : CLD_KILLED;
+			status = exit_code & 0x7f;
+		}
+		return wait_noreap_copyout(p, pid, uid, why, status, infop);
+	}
 
 	/*
 	 * Try to move the task's state to DEAD
@@ -977,12 +1025,13 @@ static int wait_task_zombie(task_t *p, unsigned int __user *stat_addr, struct ru
 		BUG_ON(state != TASK_DEAD);
 		return 0;
 	}
-	if (unlikely(p->exit_signal == -1 && p->ptrace == 0))
+	if (unlikely(p->exit_signal == -1 && p->ptrace == 0)) {
 		/*
 		 * This can only happen in a race with a ptraced thread
 		 * dying on another processor.
 		 */
 		return 0;
+	}
 
 	/*
 	 * Now we are sure this task is interesting, and no other
@@ -991,12 +1040,32 @@ static int wait_task_zombie(task_t *p, unsigned int __user *stat_addr, struct ru
 	read_unlock(&tasklist_lock);
 
 	retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
-	if (!retval && stat_addr) {
-		if (p->signal->group_exit)
-			retval = put_user(p->signal->group_exit_code, stat_addr);
-		else
-			retval = put_user(p->exit_code, stat_addr);
+	status = p->signal->group_exit
+		? p->signal->group_exit_code : p->exit_code;
+	if (!retval && stat_addr)
+		retval = put_user(status, stat_addr);
+	if (!retval && infop)
+		retval = put_user(SIGCHLD, &infop->si_signo);
+	if (!retval && infop)
+		retval = put_user(0, &infop->si_errno);
+	if (!retval && infop) {
+		int why;
+
+		if ((status & 0x7f) == 0) {
+			why = CLD_EXITED;
+			status >>= 8;
+		} else {
+			why = (status & 0x80) ? CLD_DUMPED : CLD_KILLED;
+			status &= 0x7f;
+		}
+		retval = put_user((short)why, &infop->si_code);
+		if (!retval)
+			retval = put_user(status, &infop->si_status);
 	}
+	if (!retval && infop)
+		retval = put_user(p->pid, &infop->si_pid);
+	if (!retval && infop)
+		retval = put_user(p->uid, &infop->si_uid);
 	if (retval) {
 		p->state = TASK_ZOMBIE;
 		return retval;
@@ -1009,8 +1078,9 @@ static int wait_task_zombie(task_t *p, unsigned int __user *stat_addr, struct ru
 			__ptrace_unlink(p);
 			p->state = TASK_ZOMBIE;
 			/*
-			 * If this is not a detached task, notify the parent.  If it's
-			 * still not detached after that, don't release it now.
+			 * If this is not a detached task, notify the parent.
+			 * If it's still not detached after that, don't release
+			 * it now.
 			 */
 			if (p->exit_signal != -1) {
 				do_notify_parent(p, p->exit_signal);
@@ -1032,9 +1102,9 @@ static int wait_task_zombie(task_t *p, unsigned int __user *stat_addr, struct ru
  * the lock and this task is uninteresting.  If we return nonzero, we have
  * released the lock and the system call should return.
  */
-static int wait_task_stopped(task_t *p, int delayed_group_leader,
-			     unsigned int __user *stat_addr,
-			     struct rusage __user *ru)
+static int wait_task_stopped(task_t *p, int delayed_group_leader, int noreap,
+			     struct siginfo __user *infop,
+			     int __user *stat_addr, struct rusage __user *ru)
 {
 	int retval, exit_code;
 
@@ -1057,6 +1127,21 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader,
 	 */
 	get_task_struct(p);
 	read_unlock(&tasklist_lock);
+
+	if (unlikely(noreap)) {
+		pid_t pid = p->pid;
+		uid_t uid = p->uid;
+		int why = (p->ptrace & PT_PTRACED) ? CLD_TRAPPED : CLD_STOPPED;
+
+		exit_code = p->exit_code;
+		if (unlikely(!exit_code) ||
+		    unlikely(p->state > TASK_STOPPED))
+			goto bail_ref;
+		return wait_noreap_copyout(p, pid, uid,
+					   why, (exit_code << 8) | 0x7f,
+					   infop);
+	}
+
 	write_lock_irq(&tasklist_lock);
 
 	/*
@@ -1082,6 +1167,7 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader,
 		 * resumed, or it resumed and then died.
 		 */
 		write_unlock_irq(&tasklist_lock);
+bail_ref:
 		put_task_struct(p);
 		read_lock(&tasklist_lock);
 		return 0;
@@ -1096,6 +1182,20 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader,
 	retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
 	if (!retval && stat_addr)
 		retval = put_user((exit_code << 8) | 0x7f, stat_addr);
+	if (!retval && infop)
+		retval = put_user(SIGCHLD, &infop->si_signo);
+	if (!retval && infop)
+		retval = put_user(0, &infop->si_errno);
+	if (!retval && infop)
+		retval = put_user((short)((p->ptrace & PT_PTRACED)
+					  ? CLD_TRAPPED : CLD_STOPPED),
+				  &infop->si_code);
+	if (!retval && infop)
+		retval = put_user(exit_code, &infop->si_status);
+	if (!retval && infop)
+		retval = put_user(p->pid, &infop->si_pid);
+	if (!retval && infop)
+		retval = put_user(p->uid, &infop->si_uid);
 	if (!retval)
 		retval = p->pid;
 	put_task_struct(p);
@@ -1104,14 +1204,12 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader,
 	return retval;
 }
 
-asmlinkage long sys_wait4(pid_t pid,unsigned int __user *stat_addr, int options, struct rusage __user *ru)
+static long do_wait(pid_t pid, int options, struct siginfo __user *infop,
+		    int __user *stat_addr, struct rusage __user *ru)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct task_struct *tsk;
 	int flag, retval;
-
-	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
-		return -EINVAL;
 
 	add_wait_queue(&current->wait_chldexit,&wait);
 repeat:
@@ -1138,25 +1236,60 @@ repeat:
 				    !(p->ptrace & PT_PTRACED))
 					continue;
 				retval = wait_task_stopped(p, ret == 2,
+							   (options & WNOWAIT),
+							   infop,
 							   stat_addr, ru);
 				if (retval != 0) /* He released the lock.  */
-					goto end_wait4;
+					goto end;
 				break;
 			case TASK_ZOMBIE:
 				/*
 				 * Eligible but we cannot release it yet:
 				 */
 				if (ret == 2)
+					goto check_continued;
+				if (!likely(options & WEXITED))
 					continue;
-				retval = wait_task_zombie(p, stat_addr, ru);
+				retval = wait_task_zombie(
+					p, (options & WNOWAIT),
+					infop, stat_addr, ru);
 				if (retval != 0) /* He released the lock.  */
-					goto end_wait4;
+					goto end;
+				break;
+			case TASK_DEAD:
+				continue;
+			default:
+check_continued:
+				if (!unlikely(options & WCONTINUED))
+					continue;
+				if (unlikely(!p->signal))
+					continue;
+				spin_lock_irq(&p->sighand->siglock);
+				if (p->signal->stop_state < 0) {
+					pid_t pid;
+					uid_t uid;
+
+					if (!(options & WNOWAIT))
+						p->signal->stop_state = 0;
+					spin_unlock_irq(&p->sighand->siglock);
+					pid = p->pid;
+					uid = p->uid;
+					get_task_struct(p);
+					read_unlock(&tasklist_lock);
+					retval = wait_noreap_copyout(p, pid,
+							uid, CLD_CONTINUED,
+							SIGCONT, infop);
+					BUG_ON(retval == 0);
+					goto end;
+				}
+				spin_unlock_irq(&p->sighand->siglock);
 				break;
 			}
 		}
 		if (!flag) {
-			list_for_each (_p,&tsk->ptrace_children) {
-				p = list_entry(_p,struct task_struct,ptrace_list);
+			list_for_each(_p, &tsk->ptrace_children) {
+				p = list_entry(_p, struct task_struct,
+						ptrace_list);
 				if (!eligible_child(pid, options, p))
 					continue;
 				flag = 1;
@@ -1169,22 +1302,82 @@ repeat:
 		if (tsk->signal != current->signal)
 			BUG();
 	} while (tsk != current);
+
 	read_unlock(&tasklist_lock);
 	if (flag) {
 		retval = 0;
 		if (options & WNOHANG)
-			goto end_wait4;
+			goto end;
 		retval = -ERESTARTSYS;
 		if (signal_pending(current))
-			goto end_wait4;
+			goto end;
 		schedule();
 		goto repeat;
 	}
 	retval = -ECHILD;
-end_wait4:
+end:
 	current->state = TASK_RUNNING;
 	remove_wait_queue(&current->wait_chldexit,&wait);
+	if (infop) {
+		if (retval > 0)
+		retval = 0;
+		else {
+			/*
+			 * For a WNOHANG return, clear out all the fields
+			 * we would set so the user can easily tell the
+			 * difference.
+			 */
+			if (!retval)
+				retval = put_user(0, &infop->si_signo);
+			if (!retval)
+				retval = put_user(0, &infop->si_errno);
+			if (!retval)
+				retval = put_user(0, &infop->si_code);
+			if (!retval)
+				retval = put_user(0, &infop->si_pid);
+			if (!retval)
+				retval = put_user(0, &infop->si_uid);
+			if (!retval)
+				retval = put_user(0, &infop->si_status);
+		}
+	}
 	return retval;
+}
+
+asmlinkage long sys_waitid(int which, pid_t pid,
+			   struct siginfo __user *infop, int options)
+{
+	if (options & ~(WNOHANG|WNOWAIT|WEXITED|WSTOPPED|WCONTINUED))
+		return -EINVAL;
+	if (!(options & (WEXITED|WSTOPPED|WCONTINUED)))
+		return -EINVAL;
+
+	switch (which) {
+	case P_ALL:
+		pid = -1;
+		break;
+	case P_PID:
+		if (pid <= 0)
+			return -EINVAL;
+		break;
+	case P_PGID:
+		if (pid <= 0)
+			return -EINVAL;
+		pid = -pid;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return do_wait(pid, options, infop, NULL, &infop->si_rusage);
+}
+
+asmlinkage long sys_wait4(pid_t pid, unsigned int *stat_addr,
+				int options, struct rusage *ru)
+{
+	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
+		return -EINVAL;
+	return do_wait(pid, options | WEXITED, NULL, stat_addr, ru);
 }
 
 #ifdef __ARCH_WANT_SYS_WAITPID

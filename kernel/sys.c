@@ -1540,37 +1540,43 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
  * reaped till shortly after the call to getrusage(), in both cases the
  * task being examined is in a frozen state so the counters won't change.
  */
+
+
+void k_getrusage(struct task_struct *p, int who, struct rusage *r)
+{
+	memset((char *) r, 0, sizeof *r);
+	switch (who) {
+		case RUSAGE_SELF:
+			jiffies_to_timeval(p->utime, &r->ru_utime);
+			jiffies_to_timeval(p->stime, &r->ru_stime);
+			r->ru_nvcsw = p->nvcsw;
+			r->ru_nivcsw = p->nivcsw;
+			r->ru_minflt = p->min_flt;
+			r->ru_majflt = p->maj_flt;
+			break;
+		case RUSAGE_CHILDREN:
+			jiffies_to_timeval(p->cutime, &r->ru_utime);
+			jiffies_to_timeval(p->cstime, &r->ru_stime);
+			r->ru_nvcsw = p->cnvcsw;
+			r->ru_nivcsw = p->cnivcsw;
+			r->ru_minflt = p->cmin_flt;
+			r->ru_majflt = p->cmaj_flt;
+			break;
+		default:
+			jiffies_to_timeval(p->utime + p->cutime, &r->ru_utime);
+			jiffies_to_timeval(p->stime + p->cstime, &r->ru_stime);
+			r->ru_nvcsw = p->nvcsw + p->cnvcsw;
+			r->ru_nivcsw = p->nivcsw + p->cnivcsw;
+			r->ru_minflt = p->min_flt + p->cmin_flt;
+			r->ru_majflt = p->maj_flt + p->cmaj_flt;
+			break;
+	}
+}
+
 int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 {
 	struct rusage r;
-
-	memset((char *) &r, 0, sizeof(r));
-	switch (who) {
-		case RUSAGE_SELF:
-			jiffies_to_timeval(p->utime, &r.ru_utime);
-			jiffies_to_timeval(p->stime, &r.ru_stime);
-			r.ru_nvcsw = p->nvcsw;
-			r.ru_nivcsw = p->nivcsw;
-			r.ru_minflt = p->min_flt;
-			r.ru_majflt = p->maj_flt;
-			break;
-		case RUSAGE_CHILDREN:
-			jiffies_to_timeval(p->cutime, &r.ru_utime);
-			jiffies_to_timeval(p->cstime, &r.ru_stime);
-			r.ru_nvcsw = p->cnvcsw;
-			r.ru_nivcsw = p->cnivcsw;
-			r.ru_minflt = p->cmin_flt;
-			r.ru_majflt = p->cmaj_flt;
-			break;
-		default:
-			jiffies_to_timeval(p->utime + p->cutime, &r.ru_utime);
-			jiffies_to_timeval(p->stime + p->cstime, &r.ru_stime);
-			r.ru_nvcsw = p->nvcsw + p->cnvcsw;
-			r.ru_nivcsw = p->nivcsw + p->cnivcsw;
-			r.ru_minflt = p->min_flt + p->cmin_flt;
-			r.ru_majflt = p->maj_flt + p->cmaj_flt;
-			break;
-	}
+	k_getrusage(p, who, &r);
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
 }
 

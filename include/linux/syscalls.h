@@ -162,6 +162,8 @@ asmlinkage long sys_exit(int error_code);
 asmlinkage void sys_exit_group(int error_code);
 asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
 				int options, struct rusage __user *ru);
+asmlinkage long sys_waitid(int which, pid_t pid,
+			   	struct siginfo __user *infop, int options);
 asmlinkage long sys_waitpid(pid_t pid, unsigned int __user *stat_addr, int options);
 asmlinkage long sys_set_tid_address(int __user *tidptr);
 asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,

@@ -287,6 +287,8 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
+	/* 1 if group stopped since last SIGCONT, -1 if SIGCONT since report */
+  	int			stop_state;
 
 	/* POSIX.1b Interval Timers */
 	struct list_head posix_timers;
