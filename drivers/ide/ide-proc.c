@@ -790,5 +790,5 @@ void proc_ide_destroy(void)
 {
 	remove_proc_entry("ide/drivers", proc_ide_root);
 	destroy_proc_ide_interfaces();
-	remove_proc_entry("ide", 0);
+	remove_proc_entry("ide", NULL);
 }

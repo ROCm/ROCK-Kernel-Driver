@@ -187,9 +187,9 @@ int __init journal_init_revoke_caches(void)
 void journal_destroy_revoke_caches(void)
 {
 	kmem_cache_destroy(revoke_record_cache);
-	revoke_record_cache = 0;
+	revoke_record_cache = NULL;
 	kmem_cache_destroy(revoke_table_cache);
-	revoke_table_cache = 0;
+	revoke_table_cache = NULL;
 }
 
 /* Initialise the revoke table for a given journal to a given size. */

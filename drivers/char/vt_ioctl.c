@@ -100,7 +100,7 @@ do_kdsk_ioctl(int cmd, struct kbentry __user *user_kbe, int perm, struct kbd_str
 			/* disallocate map */
 			key_map = key_maps[s];
 			if (s && key_map) {
-			    key_maps[s] = 0;
+			    key_maps[s] = NULL;
 			    if (key_map[0] == U(K_ALLOCATED)) {
 					kfree(key_map);
 					keymap_count--;

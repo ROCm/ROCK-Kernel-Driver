@@ -732,8 +732,8 @@ static inline void free_vm86_irq(int irqnumber)
 {
 	unsigned long flags;
 
-	free_irq(irqnumber,0);
-	vm86_irqs[irqnumber].tsk = 0;
+	free_irq(irqnumber, NULL);
+	vm86_irqs[irqnumber].tsk = NULL;
 
 	spin_lock_irqsave(&irqbits_lock, flags);	
 	irqbits &= ~(1 << irqnumber);
@@ -783,7 +783,7 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 			if (!((1 << sig) & ALLOWED_SIGS)) return -EPERM;
 			if (invalid_vm86_irq(irq)) return -EPERM;
 			if (vm86_irqs[irq].tsk) return -EPERM;
-			ret = request_irq(irq, &irq_handler, 0, VM86_IRQNAME, 0);
+			ret = request_irq(irq, &irq_handler, 0, VM86_IRQNAME, NULL);
 			if (ret) return ret;
 			vm86_irqs[irq].sig = sig;
 			vm86_irqs[irq].tsk = current;

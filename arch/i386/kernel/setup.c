@@ -1204,7 +1204,7 @@ static struct nop {
 } noptypes[] = { 
      { X86_FEATURE_K8, k8_nops }, 
      { X86_FEATURE_K7, k7_nops }, 
-     { -1, 0 }
+     { -1, NULL }
 }; 
 
 /* Replace instructions with better alternatives for this CPU type.

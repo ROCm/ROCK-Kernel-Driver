@@ -165,7 +165,7 @@ config AGP_EFFICEON
 	tristate "Transmeta Efficeon support"
 	depends on AGP && X86 && !X86_64
 	help
-	  This option fives you AGP support for the Transmeta Efficeon
+	  This option gives you AGP support for the Transmeta Efficeon
 	  series processors with integrated northbridges.
 
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to

@@ -116,7 +116,7 @@ void __init sem_init (void)
 	ipc_init_ids(&sem_ids,sc_semmni);
 
 #ifdef CONFIG_PROC_FS
-	create_proc_read_entry("sysvipc/sem", 0, 0, sysvipc_sem_read_proc, NULL);
+	create_proc_read_entry("sysvipc/sem", 0, NULL, sysvipc_sem_read_proc, NULL);
 #endif
 }
 

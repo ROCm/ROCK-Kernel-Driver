@@ -2533,7 +2533,7 @@ static int __init uhci_hcd_init(void)
 	}
 
 #ifdef CONFIG_PROC_FS
-	uhci_proc_root = create_proc_entry("driver/uhci", S_IFDIR, 0);
+	uhci_proc_root = create_proc_entry("driver/uhci", S_IFDIR, NULL);
 	if (!uhci_proc_root)
 		goto proc_failed;
 #endif
@@ -2556,7 +2556,7 @@ init_failed:
 up_failed:
 
 #ifdef CONFIG_PROC_FS
-	remove_proc_entry("driver/uhci", 0);
+	remove_proc_entry("driver/uhci", NULL);
 
 proc_failed:
 #endif
@@ -2576,7 +2576,7 @@ static void __exit uhci_hcd_cleanup(void)
 		warn("not all urb_priv's were freed!");
 
 #ifdef CONFIG_PROC_FS
-	remove_proc_entry("driver/uhci", 0);
+	remove_proc_entry("driver/uhci", NULL);
 #endif
 
 	if (errbuf)

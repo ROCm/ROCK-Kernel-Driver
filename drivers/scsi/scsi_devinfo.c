@@ -492,7 +492,7 @@ void scsi_exit_devinfo(void)
 	struct scsi_dev_info_list *devinfo;
 
 #ifdef CONFIG_SCSI_PROC_FS
-	remove_proc_entry("scsi/device_info", 0);
+	remove_proc_entry("scsi/device_info", NULL);
 #endif
 
 	list_for_each_safe(lh, lh_next, &scsi_dev_info_list) {

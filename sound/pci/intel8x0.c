@@ -2617,7 +2617,7 @@ static struct shortname_table {
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },
-	{ 0, 0 },
+	{ 0, NULL },
 };
 
 static int __devinit snd_intel8x0_probe(struct pci_dev *pci,

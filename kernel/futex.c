@@ -276,7 +276,7 @@ static void wake_futex(struct futex_q *q)
 	 * The waiting task can free the futex_q as soon as this is written,
 	 * without taking any locks.  This must come last.
 	 */
-	q->lock_ptr = 0;
+	q->lock_ptr = NULL;
 }
 
 /*

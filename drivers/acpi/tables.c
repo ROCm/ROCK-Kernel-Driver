@@ -286,7 +286,7 @@ acpi_get_table_header_early (
 			*header = (void *) __acpi_map_table(fadt->V1_dsdt,
 					sizeof(struct acpi_table_header));
 		} else
-			*header = 0;
+			*header = NULL;
 
 		if (!*header) {
 			printk(KERN_WARNING PREFIX "Unable to map DSDT\n");

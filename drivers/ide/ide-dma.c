@@ -100,7 +100,7 @@ static const struct drive_list_entry drive_whitelist [] = {
 	{ "CONNER CTMA 4000"	,       "ALL"		},
 	{ "CONNER CTT8000-A"	,       "ALL"		},
 	{ "ST34342A"		,	"ALL"		},
-	{ 0			,	0		}
+	{ NULL			,	NULL		}
 };
 
 static const struct drive_list_entry drive_blacklist [] = {
@@ -138,7 +138,7 @@ static const struct drive_list_entry drive_blacklist [] = {
 	{ "PLEXTOR CD-R PX-W8432T",	"ALL"		},
 	{ "ATAPI CD-ROM DRIVE 40X MAXIMUM",	"ALL"		},
 	{ "_NEC DV5800A",               "ALL"           },  
-	{ 0			,	0		}
+	{ NULL			,	NULL		}
 
 };
 

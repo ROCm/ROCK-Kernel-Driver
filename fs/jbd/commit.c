@@ -362,7 +362,7 @@ write_out_data:
 	 */
 	commit_transaction->t_state = T_COMMIT;
 
-	descriptor = 0;
+	descriptor = NULL;
 	bufs = 0;
 	while (commit_transaction->t_buffers) {
 
