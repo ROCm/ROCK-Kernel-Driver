@@ -154,7 +154,6 @@ LOG     :=      $(patsubst %.sgml, %.log, $(BOOKS))
 OUT     :=      $(patsubst %.sgml, %.out, $(BOOKS))
 
 clean:
-	@rm -f core *~
 	@rm -f $(BOOKS)
 	@rm -f $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
 	@rm -f $(PNG-parportbook) $(EPS-parportbook)
