@@ -15,6 +15,7 @@ obj-$(CONFIG_ANSLCD)		+= ans-lcd.o
 obj-$(CONFIG_ADB_PMU)		+= via-pmu.o
 obj-$(CONFIG_ADB_CUDA)		+= via-cuda.o
 obj-$(CONFIG_PMAC_APM_EMU)	+= apm_emu.o
+obj-$(CONFIG_G5_SMU)		+= smu.o
 
 obj-$(CONFIG_ADB)		+= adb.o
 obj-$(CONFIG_ADB_MACII)		+= via-macii.o

@@ -28,6 +28,8 @@ extern void flush_icache_user_range(struct vm_area_struct *vma,
 
 extern void flush_dcache_range(unsigned long start, unsigned long stop);
 extern void flush_dcache_phys_range(unsigned long start, unsigned long stop);
+extern void flush_inval_dcache_phys_range(unsigned long start,
+					  unsigned long stop);
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
 do { memcpy(dst, src, len); \

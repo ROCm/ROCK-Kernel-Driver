@@ -153,7 +153,7 @@ extern void pmu_resume(void);
 
 extern void pmu_enable_irled(int on);
 
-extern void pmu_restart(void);
+extern void pmu_restart(char *cmd);
 extern void pmu_shutdown(void);
 extern void pmu_unlock(void);
 

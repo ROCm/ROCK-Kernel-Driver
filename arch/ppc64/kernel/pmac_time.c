@@ -42,6 +42,7 @@ extern void setup_default_decr(void);
 extern unsigned long ppc_tb_freq;
 extern unsigned long ppc_proc_freq;
 
+#ifdef CONFIG_ADB_PMU
 /* Apparently the RTC stores seconds since 1 Jan 1904 */
 #define RTC_OFFSET	2082844800
 
@@ -123,6 +124,7 @@ void __init pmac_get_boot_time(struct rtc_time *tm)
 		dst ? "on" : "off");
 #endif
 }
+#endif
 
 /*
  * Query the OF and get the decr frequency.

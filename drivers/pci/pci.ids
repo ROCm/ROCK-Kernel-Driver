@@ -2189,6 +2189,14 @@
 	0049  K2 HT-PCI Bridge
 	004b  U3 AGP
 	004c  K2 GMAC (Sun GEM)
+	004f  Shasta Mac I/O
+	0050  Shasta IDE
+	0051  Shasta (Sun GEM)
+	0052  Shasta FireWire
+	0053  Shasta PCI Bridge
+	0054  Shasta PCI Bridge
+	0055  Shasta PCI Bridge
+	0058  U3L AGP Bridge
 	1645  Tigon3 Gigabit Ethernet NIC (BCM5701)
 106c  Hyundai Electronics America
 	8801  Dual Pentium ISA/PCI Motherboard

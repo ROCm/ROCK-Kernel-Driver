@@ -476,7 +476,7 @@ pmac_restart(char *cmd)
 #endif /* CONFIG_ADB_CUDA */
 #ifdef CONFIG_ADB_PMU
 	case SYS_CTRLER_PMU:
-		pmu_restart();
+		pmu_restart(cmd);
 		break;
 #endif /* CONFIG_ADB_PMU */
 	default: ;

@@ -1741,7 +1741,7 @@ pmu_enable_irled(int on)
 }
 
 void __pmac
-pmu_restart(void)
+pmu_restart (char *cmd)
 {
 	struct adb_request req;
 

@@ -77,7 +77,6 @@ config PPC_PMAC
 	depends on PPC_MULTIPLATFORM
 	bool "  Apple G5 based machines"
 	default y
-	select ADB_PMU
 	select U3_DART
 
 config PPC_MAPLE

@@ -89,7 +89,8 @@ enum {
 	controller_kl_ata3,	/* KeyLargo ATA-3 */
 	controller_kl_ata4,	/* KeyLargo ATA-4 */
 	controller_un_ata6,	/* UniNorth2 ATA-6 */
-	controller_k2_ata6	/* K2 ATA-6 */
+	controller_k2_ata6,	/* K2 ATA-6 */
+	controller_sh_ata6,	/* Shasta ATA-6 */
 };
 
 static const char* model_name[] = {
@@ -99,6 +100,7 @@ static const char* model_name[] = {
 	"KeyLargo ATA-4",	/* KeyLargo ATA-4 (UDMA/66) */
 	"UniNorth ATA-6",	/* UniNorth2 ATA-6 (UDMA/100) */
 	"K2 ATA-6",		/* K2 ATA-6 (UDMA/100) */
+	"Shasta ATA-6",		/* Shasta ATA-6 (UDMA/133) */
 };
 
 /*
@@ -121,6 +123,15 @@ static const char* model_name[] = {
 #define SYSCLK_TICKS_66(t)	(((t) + IDE_SYSCLK_66_NS - 1) / IDE_SYSCLK_66_NS)
 #define IDE_SYSCLK_NS		30	/* 33Mhz cell */
 #define IDE_SYSCLK_66_NS	15	/* 66Mhz cell */
+
+/* 133Mhz cell, found in shasta.
+ * See comments about 100 Mhz Uninorth 2...
+ * Note that PIO_MASK and MDMA_MASK seem to overlap
+ */
+#define TR_133_PIOREG_PIO_MASK		0xff000fff
+#define TR_133_PIOREG_MDMA_MASK		0x00fff800
+#define TR_133_UDMAREG_UDMA_MASK	0x0003ffff
+#define TR_133_UDMAREG_UDMA_EN		0x00000001
 
 /* 100Mhz cell, found in Uninorth 2. I don't have much infos about
  * this one yet, it appears as a pci device (106b/0033) on uninorth
@@ -321,6 +332,48 @@ static struct kauai_timing	kauai_udma_timings[] __pmacdata =
 	{ 20	, 0x00002921 },
 	{ 0	, 0 },
 };
+
+static struct kauai_timing	shasta_pio_timings[] __pmacdata =
+{
+	{ 930	, 0x08000fff },
+	{ 600	, 0x0A000c97 },
+	{ 383	, 0x07000712 },
+	{ 360	, 0x040003cd },
+	{ 330	, 0x040003cd },
+	{ 300	, 0x040003cd },
+	{ 270	, 0x040003cd },
+	{ 240	, 0x040003cd },
+	{ 239	, 0x040003cd },
+	{ 180	, 0x0400028b },
+	{ 120	, 0x0400010a }
+};
+
+static struct kauai_timing	shasta_mdma_timings[] __pmacdata =
+{
+	{ 1260	, 0x00fff000 },
+	{ 480	, 0x00820800 },
+	{ 360	, 0x00820800 },
+	{ 270	, 0x00820800 },
+	{ 240	, 0x00820800 },
+	{ 210	, 0x00820800 },
+	{ 180	, 0x00820800 },
+	{ 150	, 0x0028b000 },
+	{ 120	, 0x001ca000 },
+	{ 0	, 0 },
+};
+
+static struct kauai_timing	shasta_udma133_timings[] __pmacdata =
+{
+        { 120   , 0x00035901, },
+        { 90    , 0x000348b1, },
+	{ 60    , 0x00033881, },
+	{ 45    , 0x00033861, },
+	{ 30    , 0x00033841, },
+	{ 20    , 0x00033031, },
+	{ 15    , 0x00033021, },
+	{ 0	, 0 },
+};
+
 
 static inline u32
 kauai_lookup_timing(struct kauai_timing* table, int cycle_time)
@@ -547,7 +600,9 @@ pmac_ide_do_update_timings(ide_drive_t *drive)
 	if (pmif == NULL)
 		return;
 
-	if (pmif->kind == controller_un_ata6 || pmif->kind == controller_k2_ata6)
+	if (pmif->kind == controller_sh_ata6 ||
+	    pmif->kind == controller_un_ata6 ||
+	    pmif->kind == controller_k2_ata6)
 		pmac_ide_kauai_selectproc(drive);
 	else
 		pmac_ide_selectproc(drive);
@@ -665,6 +720,14 @@ pmac_ide_tuneproc(ide_drive_t *drive, u8 pio)
 	pio = ide_get_best_pio_mode(drive, pio, 4, &d);
 
 	switch (pmif->kind) {
+	case controller_sh_ata6: {
+		/* 133Mhz cell */
+		u32 tr = kauai_lookup_timing(shasta_pio_timings, d.cycle_time);
+		if (tr == 0)
+			return;
+		*timings = ((*timings) & ~TR_133_PIOREG_PIO_MASK) | tr;
+		break;
+		}
 	case controller_un_ata6:
 	case controller_k2_ata6: {
 		/* 100Mhz cell */
@@ -776,6 +839,26 @@ set_timings_udma_ata6(u32 *pio_timings, u32 *ultra_timings, u8 speed)
 }
 
 /*
+ * Calculate Shasta ATA/133 UDMA timings
+ */
+static int __pmac
+set_timings_udma_shasta(u32 *pio_timings, u32 *ultra_timings, u8 speed)
+{
+	struct ide_timing *t = ide_timing_find_mode(speed);
+	u32 tr;
+
+	if (speed > XFER_UDMA_6 || t == NULL)
+		return 1;
+	tr = kauai_lookup_timing(shasta_udma133_timings, (int)t->udma);
+	if (tr == 0)
+		return 1;
+	*ultra_timings = ((*ultra_timings) & ~TR_133_UDMAREG_UDMA_MASK) | tr;
+	*ultra_timings = (*ultra_timings) | TR_133_UDMAREG_UDMA_EN;
+
+	return 0;
+}
+
+/*
  * Calculate MDMA timings for all cells
  */
 static int __pmac
@@ -803,6 +886,7 @@ set_timings_mdma(ide_drive_t *drive, int intf_type, u32 *timings, u32 *timings2,
 		cycleTime = 150;
 	/* Get the proper timing array for this controller */
 	switch(intf_type) {
+	        case controller_sh_ata6:
 		case controller_un_ata6:
 		case controller_k2_ata6:
 			break;
@@ -836,6 +920,14 @@ set_timings_mdma(ide_drive_t *drive, int intf_type, u32 *timings, u32 *timings2,
 #endif
 	}
 	switch(intf_type) {
+	case controller_sh_ata6: {
+		/* 133Mhz cell */
+		u32 tr = kauai_lookup_timing(shasta_mdma_timings, cycleTime);
+		if (tr == 0)
+			return 1;
+		*timings = ((*timings) & ~TR_133_PIOREG_MDMA_MASK) | tr;
+		*timings2 = (*timings2) & ~TR_133_UDMAREG_UDMA_EN;
+		}
 	case controller_un_ata6:
 	case controller_k2_ata6: {
 		/* 100Mhz cell */
@@ -930,9 +1022,13 @@ pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
 	
 	switch(speed) {
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
+		case XFER_UDMA_6:
+		        if (pmif->kind != controller_sh_ata6)
+				return 1;
 		case XFER_UDMA_5:
 			if (pmif->kind != controller_un_ata6 &&
-			    pmif->kind != controller_k2_ata6)
+			    pmif->kind != controller_k2_ata6 &&
+			    pmif->kind != controller_sh_ata6)
 				return 1;
 		case XFER_UDMA_4:
 		case XFER_UDMA_3:
@@ -946,6 +1042,8 @@ pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
 			else if (pmif->kind == controller_un_ata6
 				 || pmif->kind == controller_k2_ata6)
 				ret = set_timings_udma_ata6(timings, timings2, speed);
+			else if (pmif->kind == controller_sh_ata6)
+				ret = set_timings_udma_shasta(timings, timings2, speed);
 			else
 				ret = 1;		
 			break;
@@ -992,6 +1090,10 @@ sanitize_timings(pmac_ide_hwif_t *pmif)
 	unsigned int value, value2 = 0;
 	
 	switch(pmif->kind) {
+		case controller_sh_ata6:
+			value = 0x0a820c97;
+			value2 = 0x00033031;
+			break;
 		case controller_un_ata6:
 		case controller_k2_ata6:
 			value = 0x08618a92;
@@ -1142,7 +1244,9 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 
 	pmif->cable_80 = 0;
 	pmif->broken_dma = pmif->broken_dma_warn = 0;
-	if (device_is_compatible(np, "kauai-ata"))
+	if (device_is_compatible(np, "shasta-ata"))
+		pmif->kind = controller_sh_ata6;
+	else if (device_is_compatible(np, "kauai-ata"))
 		pmif->kind = controller_un_ata6;
 	else if (device_is_compatible(np, "K2-UATA"))
 		pmif->kind = controller_k2_ata6;
@@ -1163,7 +1267,8 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 
 	/* Get cable type from device-tree */
 	if (pmif->kind == controller_kl_ata4 || pmif->kind == controller_un_ata6
-	    || pmif->kind == controller_k2_ata6) {
+	    || pmif->kind == controller_k2_ata6
+	    || pmif->kind == controller_sh_ata6) {
 		char* cable = get_property(np, "cable-type", NULL);
 		if (cable && !strncmp(cable, "80-", 3))
 			pmif->cable_80 = 1;
@@ -1217,7 +1322,9 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	hwif->drives[0].unmask = 1;
 	hwif->drives[1].unmask = 1;
 	hwif->tuneproc = pmac_ide_tuneproc;
-	if (pmif->kind == controller_un_ata6 || pmif->kind == controller_k2_ata6)
+	if (pmif->kind == controller_un_ata6
+	    || pmif->kind == controller_k2_ata6
+	    || pmif->kind == controller_sh_ata6)
 		hwif->selectproc = pmac_ide_kauai_selectproc;
 	else
 		hwif->selectproc = pmac_ide_selectproc;
@@ -1442,11 +1549,7 @@ pmac_ide_pci_attach(struct pci_dev *pdev, const struct pci_device_id *id)
 	pmif->dma_regs = base + 0x1000;
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */	
 
-	/* We use the OF node irq mapping */
-	if (np->n_intrs == 0)
 		pmif->irq = pdev->irq;
-	else
-		pmif->irq = np->intrs[0].line;
 
 	pci_set_drvdata(pdev, hwif);
 
@@ -1530,6 +1633,8 @@ static struct pci_device_id pmac_ide_pci_match[] = {
 	{ PCI_VENDOR_ID_APPLE, PCI_DEVIEC_ID_APPLE_UNI_N_ATA, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_IPID_ATA100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_K2_ATA100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_SH_ATA,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 };
 
 static struct pci_driver pmac_ide_pci_driver = {
@@ -1737,8 +1842,13 @@ pmac_ide_udma_enable(ide_drive_t *drive, u16 mode)
 	timing_local[1] = *timings2;
 	
 	/* Calculate timings for interface */
-	if (pmif->kind == controller_un_ata6 || pmif->kind == controller_k2_ata6)
+	if (pmif->kind == controller_un_ata6
+	    || pmif->kind == controller_k2_ata6)
 		ret = set_timings_udma_ata6(	&timing_local[0],
+						&timing_local[1],
+						mode);
+	else if (pmif->kind == controller_sh_ata6)
+		ret = set_timings_udma_shasta(	&timing_local[0],
 						&timing_local[1],
 						mode);
 	else
@@ -1791,14 +1901,19 @@ pmac_ide_dma_check(ide_drive_t *drive)
 		short mode;
 		
 		map = XFER_MWDMA;
-		if (pmif->kind == controller_kl_ata4 || pmif->kind == controller_un_ata6
-		    || pmif->kind == controller_k2_ata6) {
+		if (pmif->kind == controller_kl_ata4
+		    || pmif->kind == controller_un_ata6
+		    || pmif->kind == controller_k2_ata6
+		    || pmif->kind == controller_sh_ata6) {
 			map |= XFER_UDMA;
 			if (pmif->cable_80) {
 				map |= XFER_UDMA_66;
 				if (pmif->kind == controller_un_ata6 ||
-				    pmif->kind == controller_k2_ata6)
+				    pmif->kind == controller_k2_ata6 ||
+				    pmif->kind == controller_sh_ata6)
 					map |= XFER_UDMA_100;
+				if (pmif->kind == controller_sh_ata6)
+					map |= XFER_UDMA_133;
 			}
 		}
 		mode = ide_find_best_mode(drive, map);
@@ -2028,6 +2143,11 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 
 	hwif->atapi_dma = 1;
 	switch(pmif->kind) {
+		case controller_sh_ata6:
+			hwif->ultra_mask = pmif->cable_80 ? 0x7f : 0x07;
+			hwif->mwdma_mask = 0x07;
+			hwif->swdma_mask = 0x00;
+			break;
 		case controller_un_ata6:
 		case controller_k2_ata6:
 			hwif->ultra_mask = pmif->cable_80 ? 0x3f : 0x07;

@@ -88,6 +88,14 @@ extern  int powersave_nap;
 int sccdbg;
 
 extern void udbg_init_scc(struct device_node *np);
+#ifdef CONFIG_G5_SMU
+int __openfirmware smu_init (void);
+void __pmac smu_get_rtc_time (struct rtc_time *time);
+int  __pmac smu_set_rtc_time (struct rtc_time *time);
+void __init smu_get_boot_time (struct rtc_time *tm);
+void __pmac smu_shutdown (void);
+void __pmac smu_restart (char *cmd);
+#endif
 
 void __pmac pmac_show_cpuinfo(struct seq_file *m)
 {
@@ -155,8 +163,33 @@ void __init pmac_setup_arch(void)
 	/* We can NAP */
 	powersave_nap = 1;
 
+#ifdef CONFIG_G5_SMU
+	/* Initialize the SMU */
+	if (smu_init() > 0) {
+		ppc_md.power_off = &smu_shutdown;
+		ppc_md.halt = &smu_shutdown;
+		ppc_md.restart = &smu_restart;
+		ppc_md.get_boot_time = &smu_get_boot_time;
+		ppc_md.set_rtc_time = &smu_set_rtc_time;
+		ppc_md.get_rtc_time = &smu_get_rtc_time;
+	} else 
+#endif
+#ifdef CONFIG_ADB_PMU
+	{
 	/* Initialize the PMU */
-	find_via_pmu();
+		if (find_via_pmu() > 0) {
+			ppc_md.power_off = &pmu_shutdown;
+			ppc_md.halt = &pmu_shutdown;
+			ppc_md.restart = &pmu_restart;
+			ppc_md.get_boot_time = &pmac_get_boot_time;
+			ppc_md.set_rtc_time = &pmac_set_rtc_time;
+			ppc_md.get_rtc_time = &pmac_get_rtc_time;
+		}
+	}
+#else
+	{
+	}
+#endif
 
 	/* Init NVRAM access */
 	pmac_nvram_init();
@@ -217,21 +250,6 @@ void __pmac note_bootable_part(dev_t dev, int part, int goodness)
 		boot_dev = 0;
 		current_root_goodness = goodness;
 	}
-}
-
-void __pmac pmac_restart(char *cmd)
-{
-	pmu_restart();
-}
-
-void __pmac pmac_power_off(void)
-{
-	pmu_shutdown();
-}
-
-void __pmac pmac_halt(void)
-{
-	pmac_power_off();
 }
 
 #ifdef CONFIG_BOOTX_TEXT
@@ -449,12 +467,12 @@ struct machdep_calls __initdata pmac_md = {
 	.init_IRQ		= pmac_init_IRQ,
 	.get_irq		= mpic_get_irq,
 	.pcibios_fixup		= pmac_pcibios_fixup,
-	.restart		= pmac_restart,
-	.power_off		= pmac_power_off,
-	.halt			= pmac_halt,
-       	.get_boot_time		= pmac_get_boot_time,
-       	.set_rtc_time		= pmac_set_rtc_time,
-       	.get_rtc_time		= pmac_get_rtc_time,
+	.restart		= NULL,
+	.power_off		= NULL,
+	.halt			= NULL,
+       	.get_boot_time		= NULL,
+       	.set_rtc_time		= NULL,
+       	.get_rtc_time		= NULL,
       	.calibrate_decr		= pmac_calibrate_decr,
 	.feature_call		= pmac_do_feature_call,
 	.progress		= pmac_progress,

@@ -39,6 +39,8 @@
 #define DBG(x...)
 #endif
 
+extern int pmac_pci_read_irq_line(struct pci_dev *pci_dev);
+
 /* XXX Could be per-controller, but I don't think we risk anything by
  * assuming we won't have both UniNorth and Bandit */
 static int has_uninorth;
@@ -663,7 +665,7 @@ void __init pmac_pcibios_fixup(void)
 	struct pci_dev *dev = NULL;
 
 	for_each_pci_dev(dev)
-		pci_read_irq_line(dev);
+ 		pmac_pci_read_irq_line(dev);
 
 	pci_fix_bus_sysdata();
 
@@ -776,3 +778,19 @@ static void fixup_k2_sata(struct pci_dev* dev)
 	}
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SERVERWORKS, 0x0240, fixup_k2_sata);
+
+int pmac_pci_read_irq_line(struct pci_dev *pci_dev)
+{
+	struct device_node *node;
+
+	node = pci_device_to_OF_node(pci_dev);
+	if (node == NULL)
+		return -1;	
+	if (node->n_intrs == 0)
+		return -1;	
+	pci_dev->irq = node->intrs[0].line;
+	pci_write_config_byte(pci_dev, PCI_INTERRUPT_LINE, pci_dev->irq);
+
+	return 0;
+}
+EXPORT_SYMBOL(pmac_pci_read_irq_line);

@@ -78,6 +78,12 @@ config ADB_PMU
 	  this device; you should do so if your machine is one of those
 	  mentioned above.
 
+config G5_SMU
+	bool "Support for SMU  based PowerMacs"
+	depends on PPC_PMAC64
+	help
+	  * TODO *
+
 config PMAC_PBOOK
 	bool "Power management support for PowerBooks"
 	depends on ADB_PMU
