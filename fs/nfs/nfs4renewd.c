@@ -70,7 +70,7 @@ renewd(struct rpc_task *task)
 		timeout = (2 * lease) / 3 + last - jiffies;
 	else {
 		/* Queue an asynchronous RENEW. */
-		nfs4_proc_renew(server);
+		nfs4_proc_async_renew(server, NULL);
 		timeout = (2 * lease) / 3;
 	}
 

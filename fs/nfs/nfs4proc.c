@@ -429,18 +429,6 @@ nfs4_setup_rename(struct nfs4_compound *cp, struct qstr *old, struct qstr *new,
 }
 
 static void
-nfs4_setup_renew(struct nfs4_compound *cp)
-{
-	struct nfs4_client **client_state = GET_OP(cp, renew);
-
-	*client_state = cp->server->nfs4_state;
-
-	OPNUM(cp) = OP_RENEW;
-	cp->req_nops++;
-	cp->renew_index = cp->req_nops;
-}
-
-static void
 nfs4_setup_restorefh(struct nfs4_compound *cp)
 {
         OPNUM(cp) = OP_RESTOREFH;
@@ -1648,55 +1636,28 @@ nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 }
 
 /*
- * nfs4_proc_renew(): This is not one of the nfs_rpc_ops; it is a special
+ * nfs4_proc_async_renew(): This is not one of the nfs_rpc_ops; it is a special
  * standalone procedure for queueing an asynchronous RENEW.
  */
-struct renew_desc {
-	struct rpc_task		task;
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[1];
-};
-
 static void
 renew_done(struct rpc_task *task)
 {
-	struct nfs4_compound *cp = (struct nfs4_compound *) task->tk_msg.rpc_argp;
-	process_lease(cp);
-}
-
-static void
-renew_release(struct rpc_task *task)
-{
-	kfree(task->tk_calldata);
+	struct nfs_server *server = (struct nfs_server *)task->tk_msg.rpc_resp;
+	unsigned long timestamp = (unsigned long)task->tk_calldata;
+	renew_lease(server, timestamp);
 }
 
 int
-nfs4_proc_renew(struct nfs_server *server)
+nfs4_proc_async_renew(struct nfs_server *server, struct rpc_cred *cred)
 {
-	struct renew_desc *rp;
-	struct rpc_task *task;
-	struct nfs4_compound *cp;
 	struct rpc_message msg = {
-		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_COMPOUND],
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_RENEW],
+		.rpc_argp	= server->nfs4_state,
+		.rpc_resp	= server,
+		.rpc_cred	= cred,
 	};
 
-	rp = (struct renew_desc *) kmalloc(sizeof(*rp), GFP_KERNEL);
-	if (!rp)
-		return -ENOMEM;
-	cp = &rp->compound;
-	task = &rp->task;
-	
-	nfs4_setup_compound(cp, rp->ops, server, "renew");
-	nfs4_setup_renew(cp);
-	
-	msg.rpc_argp = cp;
-	msg.rpc_resp = cp;
-	rpc_init_task(task, server->client, renew_done, RPC_TASK_ASYNC);
-	rpc_call_setup(task, &msg, 0);
-	task->tk_calldata = rp;
-	task->tk_release = renew_release;
-	
-	return rpc_execute(task);
+	return rpc_call_async(server->client, &msg, 0, renew_done, (void *)jiffies);
 }
 
 /*

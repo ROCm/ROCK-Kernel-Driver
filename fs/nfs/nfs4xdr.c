@@ -90,6 +90,8 @@ extern int			nfs_stat_to_errno(int);
 #define decode_pre_write_getattr_maxsz	op_decode_hdr_maxsz + 5
 #define encode_post_write_getattr_maxsz	op_encode_hdr_maxsz + 2
 #define decode_post_write_getattr_maxsz	op_decode_hdr_maxsz + 13
+#define encode_renew_maxsz	op_encode_hdr_maxsz + 3
+#define decode_renew_maxsz	op_decode_hdr_maxsz
 
 #define NFS4_enc_compound_sz	1024  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	1024  /* XXX: large enough? */
@@ -159,6 +161,10 @@ extern int			nfs_stat_to_errno(int);
 #define NFS4_dec_setattr_sz     compound_decode_hdr_maxsz + \
                                 decode_putfh_maxsz + \
                                 op_decode_hdr_maxsz + 3
+#define NFS4_enc_renew_sz	compound_encode_hdr_maxsz + \
+				encode_renew_maxsz
+#define NFS4_dec_renew_sz	compound_decode_hdr_maxsz + \
+				decode_renew_maxsz
 
 
 static struct {
@@ -889,9 +895,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_RENAME:
 			status = encode_rename(xdr, &cp->ops[i].u.rename);
 			break;
-		case OP_RENEW:
-			status = encode_renew(xdr, cp->ops[i].u.renew);
-			break;
 		case OP_RESTOREFH:
 			status = encode_restorefh(xdr);
 			break;
@@ -1129,6 +1132,22 @@ nfs4_xdr_enc_commit(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *arg
 	status = encode_post_write_getattr(&xdr);
 out:
 	return status;
+}
+
+/*
+ * a RENEW request
+ */
+static int
+nfs4_xdr_enc_renew(struct rpc_rqst *req, uint32_t *p, struct nfs4_client *clp)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 1,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	return encode_renew(&xdr, clp);
 }
 
 /*
@@ -2137,9 +2156,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_RENAME:
 			status = decode_rename(xdr, &op->u.rename);
 			break;
-		case OP_RENEW:
-			status = decode_renew(xdr);
-			break;
 		case OP_SAVEFH:
 			status = decode_savefh(xdr);
 			break;
@@ -2387,6 +2403,23 @@ out:
 	return status;
 }
 
+/*
+ * Decode RENEW response
+ */
+static int
+nfs4_xdr_dec_renew(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_renew(&xdr);
+	return status;
+}
+
 uint32_t *
 nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
@@ -2443,6 +2476,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
   PROC(CLOSE,		enc_close,	dec_close),
   PROC(SETATTR,		enc_setattr,	dec_setattr),
+  PROC(RENEW,		enc_renew,	dec_renew),
 };
 
 struct rpc_version		nfs_version4 = {

@@ -545,7 +545,7 @@ struct nfs4_state {
 
 
 /* nfs4proc.c */
-extern int nfs4_proc_renew(struct nfs_server *server);
+extern int nfs4_proc_async_renew(struct nfs_server *server, struct rpc_cred *);
 extern int nfs4_do_close(struct inode *, struct nfs4_state *);
 
 /* nfs4renewd.c */
