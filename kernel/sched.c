@@ -995,10 +995,10 @@ static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, 
 	if (likely(!busiest))
 		goto out;
 
-	*imbalance = (max_load - nr_running) / 2;
+	*imbalance = max_load - nr_running;
 
 	/* It needs an at least ~25% imbalance to trigger balancing. */
-	if (!idle && (*imbalance < (max_load + 3)/4)) {
+	if (!idle && ((*imbalance)*4 < max_load)) {
 		busiest = NULL;
 		goto out;
 	}
@@ -1008,7 +1008,7 @@ static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, 
 	 * Make sure nothing changed since we checked the
 	 * runqueue length.
 	 */
-	if (busiest->nr_running <= nr_running + 1) {
+	if (busiest->nr_running <= nr_running) {
 		spin_unlock(&busiest->lock);
 		busiest = NULL;
 	}
@@ -1057,6 +1057,12 @@ static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
 		goto out;
 
 	now = sched_clock();
+	/*
+	 * We only want to steal a number of tasks equal to 1/2 the imbalance,
+	 * otherwise we'll just shift the imbalance to the new queue:
+	 */
+	imbalance /= 2;
+
 	/*
 	 * We first consider expired tasks. Those will likely not be
 	 * executed in the near future, and they are most likely to
