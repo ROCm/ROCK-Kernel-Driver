@@ -177,8 +177,8 @@ static int ciCompare(struct component_name * key, dtpage_t * p, int si,
 static void dtGetKey(dtpage_t * p, int i, struct component_name * key,
 		     int flag);
 
-static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
-			       int ri, struct component_name * key, int flag);
+static int ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
+			      int ri, struct component_name * key, int flag);
 
 static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 			  ddata_t * data, struct dt_lock **);
@@ -1152,9 +1152,16 @@ static int dtSplitUp(tid_t tid,
 			if ((sp->header.flag & BT_ROOT && skip > 1) ||
 			    sp->header.prev != 0 || skip > 1) {
 				/* compute uppercase router prefix key */
-				ciGetLeafPrefixKey(lp,
-						   lp->header.nextindex - 1,
-						   rp, 0, &key, sbi->mntflag);
+				rc = ciGetLeafPrefixKey(lp,
+							lp->header.nextindex-1,
+							rp, 0, &key,
+							sbi->mntflag);
+				if (rc) {
+					DT_PUTPAGE(lmp);
+					DT_PUTPAGE(rmp);
+					DT_PUTPAGE(smp);
+					goto splitOut;
+				}
 			} else {
 				/* next to leftmost entry of
 				   lowest internal level */
@@ -3713,18 +3720,28 @@ static int ciCompare(struct component_name * key,	/* search key */
  *	     from two adjacent leaf entries
  *	     across page boundary
  *
- * return:
- *	Number of prefix bytes needed to distinguish b from a.
+ * return: non-zero on error
+ *	
  */
-static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
+static int ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 			       int ri, struct component_name * key, int flag)
 {
 	int klen, namlen;
 	wchar_t *pl, *pr, *kname;
-	wchar_t lname[JFS_NAME_MAX + 1];
-	struct component_name lkey = { 0, lname };
-	wchar_t rname[JFS_NAME_MAX + 1];
-	struct component_name rkey = { 0, rname };
+	struct component_name lkey;
+	struct component_name rkey;
+
+	lkey.name = (wchar_t *) kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t),
+					GFP_KERNEL);
+	if (lkey.name == NULL)
+		return -ENOSPC;
+
+	rkey.name = (wchar_t *) kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t),
+					GFP_KERNEL);
+	if (rkey.name == NULL) {
+		kfree(lkey.name);
+		return -ENOSPC;
+	}
 
 	/* get left and right key */
 	dtGetKey(lp, li, &lkey, flag);
@@ -3749,7 +3766,7 @@ static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 		*kname = *pr;
 		if (*pl != *pr) {
 			key->namlen = klen + 1;
-			return;
+			goto free_names;
 		}
 	}
 
@@ -3760,7 +3777,10 @@ static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 	} else			/* l->namelen == r->namelen */
 		key->namlen = klen;
 
-	return;
+free_names:
+	kfree(lkey.name);
+	kfree(rkey.name);
+	return 0;
 }
 
 
