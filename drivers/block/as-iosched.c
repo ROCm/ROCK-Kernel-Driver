@@ -915,7 +915,7 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	}
 
 	if (!blk_fs_request(rq))
-		return;
+		goto out;
 
 	if (ad->changed_batch && ad->nr_dispatched == 1) {
 		kblockd_schedule_work(&ad->antic_work);
@@ -1458,8 +1458,10 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 
 	/* barriers must flush the reorder queue */
 	if (unlikely(rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER)
-			&& where == ELEVATOR_INSERT_SORT))
+			&& where == ELEVATOR_INSERT_SORT)) {
+		WARN_ON(1);
 		where = ELEVATOR_INSERT_BACK;
+	}
 
 	switch (where) {
 		case ELEVATOR_INSERT_BACK:
