@@ -32,6 +32,7 @@ unsigned int TXRDY, RXRDY, DLAB;
 extern void xmon_printf(const char *fmt, ...);
 static int xmon_expect(const char *str, unsigned int timeout);
 
+static int use_serial;
 static int use_screen;
 static int via_modem;
 static int xmon_use_sccb;
@@ -115,14 +116,13 @@ xmon_map_scc(void)
 {
 #ifdef CONFIG_ALL_PPC
 	volatile unsigned char *base;
-
-	use_screen = 0;
 	
 	if (_machine == _MACH_Pmac) {
 		struct device_node *np;
 		unsigned long addr;
 #ifdef CONFIG_BOOTX_TEXT
-		if (!machine_is_compatible("iMac")) {
+		if (!use_screen && !use_serial
+		    && !machine_is_compatible("iMac")) {
 			/* see if there is a keyboard in the device tree
 			   with a parent of type "adb" */
 			for (np = find_devices("keyboard"); np; np = np->next)
