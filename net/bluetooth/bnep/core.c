@@ -180,7 +180,7 @@ static int bnep_ctrl_set_mcfilter(struct bnep_session *s, u8 *data, int len)
 		s->mc_filter = 0;
 
 		/* Always send broadcast */
-		set_bit(bnep_mc_hash(s->dev.broadcast), (ulong *) &s->mc_filter);
+		set_bit(bnep_mc_hash(s->dev->broadcast), (ulong *) &s->mc_filter);
 
 		/* Add address ranges to the multicast hash */
 		for (; n > 0; n--) {
@@ -293,7 +293,7 @@ static u8 __bnep_rx_hlen[] = {
 
 static inline int bnep_rx_frame(struct bnep_session *s, struct sk_buff *skb)
 {
-	struct net_device *dev = &s->dev;
+	struct net_device *dev = s->dev;
 	struct sk_buff *nskb;
 	u8 type;
 
@@ -451,7 +451,7 @@ send:
 static int bnep_session(void *arg)
 {
 	struct bnep_session *s = arg;
-	struct net_device *dev = &s->dev;
+	struct net_device *dev = s->dev;
 	struct sock *sk = s->sock->sk;
 	struct sk_buff *skb;
 	wait_queue_t wait;
@@ -501,7 +501,7 @@ static int bnep_session(void *arg)
 	__bnep_unlink_session(s);
 
 	up_write(&bnep_session_sem);
-	kfree(s);
+	kfree(dev);
 	return 0;
 }
 
@@ -517,10 +517,13 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 	baswap((void *) dst, &bt_sk(sock->sk)->dst);
 	baswap((void *) src, &bt_sk(sock->sk)->src);
 
-	s = kmalloc(sizeof(struct bnep_session), GFP_KERNEL);
-	if (!s) 
-		return -ENOMEM;
-	memset(s, 0, sizeof(struct bnep_session));
+	/* session struct allocated as private part of net_device */
+	dev = alloc_netdev(sizeof(struct bnep_session),
+			   (*req->device) ? req->device : "bnep%d",
+			   bnep_net_setup);
+	if (!dev) 
+		return ENOMEM;
+
 
 	down_write(&bnep_session_sem);
 
@@ -530,20 +533,15 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 		goto failed;
 	}
 
-	dev = &s->dev;
-	
-	if (*req->device)
-		strcpy(dev->name, req->device);
-	else
-		strcpy(dev->name, "bnep%d");
+	s = dev->priv;
 
-	memset(dev->broadcast, 0xff, ETH_ALEN);
-	
 	/* This is rx header therefore addresses are swapped.
 	 * ie eh.h_dest is our local address. */
 	memcpy(s->eh.h_dest,   &src, ETH_ALEN);
 	memcpy(s->eh.h_source, &dst, ETH_ALEN);
+	memcpy(dev->dev_addr, s->eh.h_dest, ETH_ALEN);
 
+	s->dev = dev;
 	s->sock  = sock;
 	s->role  = req->role;
 	s->state = BT_CONNECTED;
@@ -569,8 +567,6 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 	s->proto_filter[2].end   = htons(0x86DD);
 #endif
 	
-	dev->init = bnep_net_init;
-	dev->priv = s;
 	err = register_netdev(dev);
 	if (err) {
 		goto failed;
@@ -592,7 +588,7 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 
 failed:
 	up_write(&bnep_session_sem);
-	kfree(s);
+	kfree(dev);
 	return err;
 }
 
@@ -624,7 +620,7 @@ int bnep_del_connection(struct bnep_conndel_req *req)
 static void __bnep_copy_ci(struct bnep_conninfo *ci, struct bnep_session *s)
 {
 	memcpy(ci->dst, s->eh.h_source, ETH_ALEN);
-	strcpy(ci->device, s->dev.name);
+	strcpy(ci->device, s->dev->name);
 	ci->flags = s->flags;
 	ci->state = s->state;
 	ci->role  = s->role;
