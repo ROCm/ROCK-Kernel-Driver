@@ -40,7 +40,9 @@ extern int		eth_header_parse(struct sk_buff *skb,
 					 unsigned char *haddr);
 
 extern struct net_device *alloc_etherdev(int sizeof_priv);
-static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, int len, int base)
+static inline void eth_copy_and_sum (struct sk_buff *dest, 
+				     const unsigned char *src, 
+				     int len, int base)
 {
 	memcpy (dest->data, src, len);
 }
@@ -55,7 +57,7 @@ static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, i
  *
  * Return true if the address is valid.
  */
-static inline int is_valid_ether_addr( u8 *addr )
+static inline int is_valid_ether_addr( const u8 *addr )
 {
 	const char zaddr[6] = {0,};
 
