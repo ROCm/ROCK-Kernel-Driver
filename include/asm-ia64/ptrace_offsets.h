@@ -11,9 +11,64 @@
  *
  *	struct uarea {
  *		struct ia64_fpreg fph[96];		// f32-f127
- *		struct switch_stack sw;
- *		struct pt_regs pt;
- *		unsigned long rsvd1[712];
+ *		unsigned long nat_bits;
+ *		unsigned long empty1;
+ *		struct ia64_fpreg f2;			// f2-f5
+ *			.
+ *			.
+ *		struct ia64_fpreg f5;
+ *		struct ia64_fpreg f10;			// f10-f31
+ *			.
+ *			.
+ *		struct ia64_fpreg f31;
+ *		unsigned long r4;			// r4-r7
+ *			.
+ *			.
+ *		unsigned long r7;
+ *		unsigned long b1;			// b1-b5
+ *			.
+ *			.
+ *		unsigned long b5;
+ *		unsigned long ar_ec;
+ *		unsigned long ar_lc;
+ *		unsigned long empty2[5];
+ *		unsigned long cr_ipsr;
+ *		unsigned long cr_iip;
+ *		unsigned long cfm;
+ *		unsigned long ar_unat;
+ *		unsigned long ar_pfs;
+ *		unsigned long ar_rsc;
+ *		unsigned long ar_rnat;
+ *		unsigned long ar_bspstore;
+ *		unsigned long pr;
+ *		unsigned long b6;
+ *		unsigned long ar_bsp;
+ *		unsigned long r1;
+ *		unsigned long r2;
+ *		unsigned long r3;
+ *		unsigned long r12;
+ *		unsigned long r13;
+ *		unsigned long r14;
+ *		unsigned long r15;
+ *		unsigned long r8;
+ *		unsigned long r9;
+ *		unsigned long r10;
+ *		unsigned long r11;
+ *		unsigned long r16;
+ *			.
+ *			.
+ *		unsigned long r31;
+ *		unsigned long ar_ccv;
+ *		unsigned long ar_fpsr;
+ *		unsigned long b0;
+ *		unsigned long b7;
+ *		unsigned long f6;
+ *		unsigned long f7;
+ *		unsigned long f8;
+ *		unsigned long f9;
+ *		unsigned long ar_csd;
+ *		unsigned long ar_ssd;
+ *		unsigned long rsvd1[710];
  *		unsigned long dbr[8];
  *		unsigned long rsvd2[504];
  *		unsigned long ibr[8];
@@ -119,7 +174,7 @@
 #define PT_F125			0x05d0
 #define PT_F126			0x05e0
 #define PT_F127			0x05f0
-/* switch stack: */
+
 #define PT_NAT_BITS		0x0600
 
 #define PT_F2			0x0610
@@ -162,7 +217,6 @@
 #define PT_AR_EC		0x0800
 #define PT_AR_LC		0x0808
 
-/* pt_regs */
 #define PT_CR_IPSR		0x0830
 #define PT_CR_IIP		0x0838
 #define PT_CFM			0x0840
@@ -209,6 +263,8 @@
 #define PT_F7			0x0990
 #define PT_F8			0x09a0
 #define PT_F9			0x09b0
+#define PT_AR_CSD		0x09c0
+#define PT_AR_SSD		0x09c8
 
 #define PT_DBR			0x2000	/* data breakpoint registers */
 #define PT_IBR			0x3000	/* instruction breakpoint registers */

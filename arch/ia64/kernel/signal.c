@@ -115,18 +115,28 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 	err |= __get_user(cfm, &sc->sc_cfm);
 	err |= __get_user(um, &sc->sc_um);			/* user mask */
 	err |= __get_user(scr->pt.ar_rsc, &sc->sc_ar_rsc);
-	err |= __get_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
 	err |= __get_user(scr->pt.ar_unat, &sc->sc_ar_unat);
 	err |= __get_user(scr->pt.ar_fpsr, &sc->sc_ar_fpsr);
 	err |= __get_user(scr->pt.ar_pfs, &sc->sc_ar_pfs);
 	err |= __get_user(scr->pt.pr, &sc->sc_pr);		/* predicates */
 	err |= __get_user(scr->pt.b0, &sc->sc_br[0]);		/* b0 (rp) */
-	err |= __get_user(scr->pt.b6, &sc->sc_br[6]);		/* b6 */
-	err |= __get_user(scr->pt.b7, &sc->sc_br[7]);		/* b7 */
-	err |= __copy_from_user(&scr->pt.r1, &sc->sc_gr[1], 3*8);	/* r1-r3 */
+	err |= __copy_from_user(&scr->pt.r1, &sc->sc_gr[1], 8);	/* r1 */
 	err |= __copy_from_user(&scr->pt.r8, &sc->sc_gr[8], 4*8);	/* r8-r11 */
-	err |= __copy_from_user(&scr->pt.r12, &sc->sc_gr[12], 4*8);	/* r12-r15 */
-	err |= __copy_from_user(&scr->pt.r16, &sc->sc_gr[16], 16*8);	/* r16-r31 */
+	err |= __copy_from_user(&scr->pt.r12, &sc->sc_gr[12], 2*8);	/* r12-r13 */
+	err |= __copy_from_user(&scr->pt.r15, &sc->sc_gr[15], 8);	/* r15 */
+
+	if ((flags & IA64_SC_FLAG_IN_SYSCALL)==0)
+	{
+		/* Restore most scratch-state only when not in syscall. */
+		err |= __get_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
+		err |= __get_user(scr->pt.ar_csd, &sc->sc_ar25);	/* ar.csd */
+		err |= __get_user(scr->pt.ar_ssd, &sc->sc_ar26);	/* ar.ssd */
+		err |= __get_user(scr->pt.b6, &sc->sc_br[6]);		/* b6 */
+		err |= __get_user(scr->pt.b7, &sc->sc_br[7]);		/* b7 */
+		err |= __copy_from_user(&scr->pt.r2, &sc->sc_gr[2], 2*8);	/* r2-r3 */
+		err |= __copy_from_user(&scr->pt.r14, &sc->sc_gr[14], 8);	/* r14 */
+		err |= __copy_from_user(&scr->pt.r16, &sc->sc_gr[16], 16*8);	/* r16-r31 */
+	}
 
 	scr->pt.cr_ifs = cfm | (1UL << 63);
 
@@ -358,21 +368,42 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 	err |= __put_user(cfm, &sc->sc_cfm);
 	err |= __put_user(scr->pt.cr_ipsr & IA64_PSR_UM, &sc->sc_um);
 	err |= __put_user(scr->pt.ar_rsc, &sc->sc_ar_rsc);
-	err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
 	err |= __put_user(scr->pt.ar_unat, &sc->sc_ar_unat);		/* ar.unat */
 	err |= __put_user(scr->pt.ar_fpsr, &sc->sc_ar_fpsr);		/* ar.fpsr */
 	err |= __put_user(scr->pt.ar_pfs, &sc->sc_ar_pfs);
 	err |= __put_user(scr->pt.pr, &sc->sc_pr);			/* predicates */
 	err |= __put_user(scr->pt.b0, &sc->sc_br[0]);			/* b0 (rp) */
-	err |= __put_user(scr->pt.b6, &sc->sc_br[6]);			/* b6 */
-	err |= __put_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
-
-	err |= __copy_to_user(&sc->sc_gr[1], &scr->pt.r1, 3*8);		/* r1-r3 */
+	err |= __copy_to_user(&sc->sc_gr[1], &scr->pt.r1, 8);		/* r1 */
 	err |= __copy_to_user(&sc->sc_gr[8], &scr->pt.r8, 4*8);		/* r8-r11 */
-	err |= __copy_to_user(&sc->sc_gr[12], &scr->pt.r12, 4*8);	/* r12-r15 */
-	err |= __copy_to_user(&sc->sc_gr[16], &scr->pt.r16, 16*8);	/* r16-r31 */
-
+	err |= __copy_to_user(&sc->sc_gr[12], &scr->pt.r12, 2*8);	/* r12-r13 */
+	err |= __copy_to_user(&sc->sc_gr[15], &scr->pt.r15, 8);		/* r15 */
 	err |= __put_user(scr->pt.cr_iip + ia64_psr(&scr->pt)->ri, &sc->sc_ip);
+
+	if (flags & IA64_SC_FLAG_IN_SYSCALL)
+	{
+		/* Clear scratch registers if the signal interrupted a system call. */
+		err |= __clear_user(&sc->sc_ar_ccv, 8);
+		err |= __clear_user(&sc->sc_ar25,8);				/* ar.csd */
+		err |= __clear_user(&sc->sc_ar26,8);				/* ar.ssd */
+		err |= __clear_user(&sc->sc_br[6],8);				/* b6 */
+		err |= __clear_user(&sc->sc_br[7],8);				/* b7 */
+
+		err |= __clear_user(&sc->sc_gr[2], 2*8);			/* r2-r3 */
+		err |= __clear_user(&sc->sc_gr[14],8);				/* r14 */
+		err |= __clear_user(&sc->sc_gr[16],16*8);			/* r16-r31 */
+	} else
+	{
+		/* Copy scratch registers to sigcontext if the signal did not interrupt a syscall. */
+		err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);
+		err |= __put_user(scr->pt.ar_csd, &sc->sc_ar25);		/* ar.csd */
+		err |= __put_user(scr->pt.ar_ssd, &sc->sc_ar26);		/* ar.ssd */
+		err |= __put_user(scr->pt.b6, &sc->sc_br[6]);			/* b6 */
+		err |= __put_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
+
+		err |= __copy_to_user(&sc->sc_gr[2], &scr->pt.r2, 2*8);		/* r2-r3 */
+		err |= __copy_to_user(&sc->sc_gr[14], &scr->pt.r14, 8);		/* r14 */
+		err |= __copy_to_user(&sc->sc_gr[16], &scr->pt.r16, 16*8);	/* r16-r31 */
+	}
 	return err;
 }
 

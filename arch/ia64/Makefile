@@ -18,7 +18,7 @@ LDFLAGS_MODULE	+= -T arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
 EXTRA		:=
 
-cflags-y	:= -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
+cflags-y	:= -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f12-f15,f32-f127 \
 		   -falign-functions=32 -frename-registers
 CFLAGS_KERNEL	:= -mconstant-gp
 

@@ -60,30 +60,26 @@ ia32_load_segment_descriptors (struct task_struct *task)
 	regs->r27 = load_desc(regs->r16 >>  0);		/* DSD */
 	regs->r28 = load_desc(regs->r16 >> 32);		/* FSD */
 	regs->r29 = load_desc(regs->r16 >> 48);		/* GSD */
-	task->thread.csd = load_desc(regs->r17 >>  0);	/* CSD */
-	task->thread.ssd = load_desc(regs->r17 >> 16);	/* SSD */
+	regs->ar_csd = load_desc(regs->r17 >>  0);	/* CSD */
+	regs->ar_ssd = load_desc(regs->r17 >> 16);	/* SSD */
 }
 
 void
 ia32_save_state (struct task_struct *t)
 {
-	unsigned long eflag, fsr, fcr, fir, fdr, csd, ssd;
+	unsigned long eflag, fsr, fcr, fir, fdr;
 
 	asm ("mov %0=ar.eflag;"
 	     "mov %1=ar.fsr;"
 	     "mov %2=ar.fcr;"
 	     "mov %3=ar.fir;"
 	     "mov %4=ar.fdr;"
-	     "mov %5=ar.csd;"
-	     "mov %6=ar.ssd;"
-	     : "=r"(eflag), "=r"(fsr), "=r"(fcr), "=r"(fir), "=r"(fdr), "=r"(csd), "=r"(ssd));
+	     : "=r"(eflag), "=r"(fsr), "=r"(fcr), "=r"(fir), "=r"(fdr));
 	t->thread.eflag = eflag;
 	t->thread.fsr = fsr;
 	t->thread.fcr = fcr;
 	t->thread.fir = fir;
 	t->thread.fdr = fdr;
-	t->thread.csd = csd;
-	t->thread.ssd = ssd;
 	ia64_set_kr(IA64_KR_IO_BASE, t->thread.old_iob);
 	ia64_set_kr(IA64_KR_TSSD, t->thread.old_k1);
 }
@@ -91,7 +87,7 @@ ia32_save_state (struct task_struct *t)
 void
 ia32_load_state (struct task_struct *t)
 {
-	unsigned long eflag, fsr, fcr, fir, fdr, csd, ssd, tssd;
+	unsigned long eflag, fsr, fcr, fir, fdr, tssd;
 	struct pt_regs *regs = ia64_task_regs(t);
 	int nr = get_cpu();	/* LDT and TSS depend on CPU number: */
 
@@ -100,8 +96,6 @@ ia32_load_state (struct task_struct *t)
 	fcr = t->thread.fcr;
 	fir = t->thread.fir;
 	fdr = t->thread.fdr;
-	csd = t->thread.csd;
-	ssd = t->thread.ssd;
 	tssd = load_desc(_TSS(nr));					/* TSSD */
 
 	asm volatile ("mov ar.eflag=%0;"
@@ -109,9 +103,7 @@ ia32_load_state (struct task_struct *t)
 		      "mov ar.fcr=%2;"
 		      "mov ar.fir=%3;"
 		      "mov ar.fdr=%4;"
-		      "mov ar.csd=%5;"
-		      "mov ar.ssd=%6;"
-		      :: "r"(eflag), "r"(fsr), "r"(fcr), "r"(fir), "r"(fdr), "r"(csd), "r"(ssd));
+		      :: "r"(eflag), "r"(fsr), "r"(fcr), "r"(fir), "r"(fdr));
 	current->thread.old_iob = ia64_get_kr(IA64_KR_IO_BASE);
 	current->thread.old_k1 = ia64_get_kr(IA64_KR_TSSD);
 	ia64_set_kr(IA64_KR_IO_BASE, IA32_IOBASE);

@@ -179,8 +179,10 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
  *    datasel    ar.fdr(32:47)
  *
  *    _st[(0+TOS)%8]   f8
- *    _st[(1+TOS)%8]   f9                    (f8, f9 from ptregs)
- *      : :            :                     (f10..f15 from live reg)
+ *    _st[(1+TOS)%8]   f9
+ *    _st[(2+TOS)%8]   f10
+ *    _st[(3+TOS)%8]   f11                   (f8..f11 from ptregs)
+ *      : :            :                     (f12..f15 from live reg)
  *      : :            :
  *    _st[(7+TOS)%8]   f15                   TOS=sw.top(bits11:13)
  *
@@ -262,8 +264,8 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	__put_user( 0, &save->magic); //#define X86_FXSR_MAGIC   0x0000
 
 	/*
-	 * save f8 and f9  from pt_regs
-	 * save f10..f15 from live register set
+	 * save f8..f11  from pt_regs
+	 * save f12..f15 from live register set
 	 */
 	/*
 	 *  Find the location where f8 has to go in fp reg stack.  This depends on
@@ -278,11 +280,11 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	copy_to_user(&save->_st[(0+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
 	ia64f2ia32f(fpregp, &ptp->f9);
 	copy_to_user(&save->_st[(1+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
-
-	__stfe(fpregp, 10);
+	ia64f2ia32f(fpregp, &ptp->f10);
 	copy_to_user(&save->_st[(2+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
-	__stfe(fpregp, 11);
+	ia64f2ia32f(fpregp, &ptp->f11);
 	copy_to_user(&save->_st[(3+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+
 	__stfe(fpregp, 12);
 	copy_to_user(&save->_st[(4+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
 	__stfe(fpregp, 13);
@@ -394,8 +396,8 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	asm volatile ( "mov ar.fdr=%0;" :: "r"(fdr));
 
 	/*
-	 * restore f8, f9 onto pt_regs
-	 * restore f10..f15 onto live registers
+	 * restore f8..f11 onto pt_regs
+	 * restore f12..f15 onto live registers
 	 */
 	/*
 	 *  Find the location where f8 has to go in fp reg stack.  This depends on
@@ -411,11 +413,11 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	ia32f2ia64f(&ptp->f8, fpregp);
 	copy_from_user(fpregp, &save->_st[(1+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
 	ia32f2ia64f(&ptp->f9, fpregp);
-
 	copy_from_user(fpregp, &save->_st[(2+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
-	__ldfe(10, fpregp);
+	ia32f2ia64f(&ptp->f10, fpregp);
 	copy_from_user(fpregp, &save->_st[(3+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
-	__ldfe(11, fpregp);
+	ia32f2ia64f(&ptp->f11, fpregp);
+
 	copy_from_user(fpregp, &save->_st[(4+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
 	__ldfe(12, fpregp);
 	copy_from_user(fpregp, &save->_st[(5+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
@@ -738,11 +740,11 @@ restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *
 
 #define COPY(ia64x, ia32x)	err |= __get_user(regs->ia64x, &sc->ia32x)
 
-#define copyseg_gs(tmp)		(regs->r16 |= (unsigned long) tmp << 48)
-#define copyseg_fs(tmp)		(regs->r16 |= (unsigned long) tmp << 32)
+#define copyseg_gs(tmp)		(regs->r16 |= (unsigned long) (tmp) << 48)
+#define copyseg_fs(tmp)		(regs->r16 |= (unsigned long) (tmp) << 32)
 #define copyseg_cs(tmp)		(regs->r17 |= tmp)
-#define copyseg_ss(tmp)		(regs->r17 |= (unsigned long) tmp << 16)
-#define copyseg_es(tmp)		(regs->r16 |= (unsigned long) tmp << 16)
+#define copyseg_ss(tmp)		(regs->r17 |= (unsigned long) (tmp) << 16)
+#define copyseg_es(tmp)		(regs->r16 |= (unsigned long) (tmp) << 16)
 #define copyseg_ds(tmp)		(regs->r16 |= tmp)
 
 #define COPY_SEG(seg)					\

@@ -218,8 +218,9 @@ static u16 fr_info[32]={
 	RSW(f2), RSW(f3), RSW(f4), RSW(f5),
 
 	RPT(f6), RPT(f7), RPT(f8), RPT(f9),
+	RPT(f10), RPT(f11),
 
-	RSW(f10), RSW(f11), RSW(f12), RSW(f13), RSW(f14),
+	RSW(f12), RSW(f13), RSW(f14),
 	RSW(f15), RSW(f16), RSW(f17), RSW(f18), RSW(f19),
 	RSW(f20), RSW(f21), RSW(f22), RSW(f23), RSW(f24),
 	RSW(f25), RSW(f26), RSW(f27), RSW(f28), RSW(f29),

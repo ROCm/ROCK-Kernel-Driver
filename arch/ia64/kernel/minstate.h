@@ -18,7 +18,7 @@
 #define rARRNAT		r24
 #define rARBSPSTORE	r23
 #define rKRBS		r22
-#define rB6		r21
+#define rB0		r21
 #define rR1		r20
 
 /*
@@ -110,20 +110,21 @@
  * we can pass interruption state as arguments to a handler.
  */
 #define DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA)							  \
+	MINSTATE_GET_CURRENT(r16);	/* M (or M;;I) */					  \
 	mov rARRSC=ar.rsc;		/* M */							  \
-	mov rARUNAT=ar.unat;		/* M */							  \
 	mov rR1=r1;			/* A */							  \
-	MINSTATE_GET_CURRENT(r1);	/* M (or M;;I) */					  \
+	mov rARUNAT=ar.unat;		/* M */							  \
 	mov rCRIPSR=cr.ipsr;		/* M */							  \
 	mov rARPFS=ar.pfs;		/* I */							  \
 	mov rCRIIP=cr.iip;		/* M */							  \
-	mov rB6=b6;			/* I */	/* rB6 = branch reg 6 */			  \
+	mov r21=ar.fpsr;		/* M */							  \
 	COVER;				/* B;; (or nothing) */					  \
 	;;											  \
-	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r1;						  \
+	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r16;						  \
 	;;											  \
 	ld1 r17=[r16];				/* load current->thread.on_ustack flag */	  \
 	st1 [r16]=r0;				/* clear current->thread.on_ustack flag */	  \
+	adds r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16						  \
 	/* switch from user to kernel RBS: */							  \
 	;;											  \
 	invala;				/* M */							  \
@@ -131,59 +132,65 @@
 	cmp.eq pKStk,pUStk=r0,r17;		/* are we in kernel mode already? (psr.cpl==0) */ \
 	;;											  \
 	MINSTATE_START_SAVE_MIN									  \
-	add r17=L1_CACHE_BYTES,r1			/* really: biggest cache-line size */	  \
-	;;											  \
-	st8 [r1]=rCRIPSR;	/* save cr.ipsr */						  \
-	lfetch.fault.excl.nt1 [r17],L1_CACHE_BYTES;						  \
-	add r16=16,r1;					/* initialize first base pointer */	  \
+	adds r17=2*L1_CACHE_BYTES,r1;			/* really: biggest cache-line size */	  \
+	adds r16=PT(CR_IPSR),r1;								  \
 	;;											  \
 	lfetch.fault.excl.nt1 [r17],L1_CACHE_BYTES;						  \
+	st8 [r16]=rCRIPSR;	/* save cr.ipsr */						  \
 	;;											  \
 	lfetch.fault.excl.nt1 [r17];								  \
-	adds r17=8,r1;					/* initialize second base pointer */	  \
+	tbit.nz p15,p0=rCRIPSR,IA64_PSR_I_BIT;							  \
+	mov rCRIPSR=b0										  \
+	;;											  \
+	adds r16=PT(R8),r1;	/* initialize first base pointer */				  \
+	adds r17=PT(R9),r1;	/* initialize second base pointer */	  			  \
 (pKStk)	mov r18=r0;		/* make sure r18 isn't NaT */					  \
 	;;											  \
-	st8 [r17]=rCRIIP,16;	/* save cr.iip */						  \
-	st8 [r16]=rCRIFS,16;	/* save cr.ifs */						  \
+.mem.offset 0,0;                st8.spill [r16]=r8,16;                                            \
+.mem.offset 8,0;                st8.spill [r17]=r9,16;                                            \
+        ;;                                                                                        \
+.mem.offset 0,0;                st8.spill [r16]=r10,24;                                           \
+.mem.offset 8,0;                st8.spill [r17]=r11,24;                                           \
+        ;;                                                                                        \
+	st8 [r16]=rCRIIP,16;	/* save cr.iip */						  \
+	st8 [r17]=rCRIFS,16;	/* save cr.ifs */						  \
 (pUStk)	sub r18=r18,rKRBS;	/* r18=RSE.ndirty*8 */						  \
+	mov r8=ar.ccv; 										  \
+	mov r9=ar.csd; 										  \
+	mov r10=ar.ssd;										  \
+	movl r11=FPSR_DEFAULT;   /* L-unit */    						  \
 	;;											  \
-	st8 [r17]=rARUNAT,16;	/* save ar.unat */						  \
-	st8 [r16]=rARPFS,16;	/* save ar.pfs */						  \
+	st8 [r16]=rARUNAT,16;	/* save ar.unat */						  \
+	st8 [r17]=rARPFS,16;	/* save ar.pfs */						  \
 	shl r18=r18,16;		/* compute ar.rsc to be used for "loadrs" */			  \
 	;;											  \
-	st8 [r17]=rARRSC,16;	/* save ar.rsc */						  \
-(pUStk)	st8 [r16]=rARRNAT,16;	/* save ar.rnat */						  \
-(pKStk)	adds r16=16,r16;	/* skip over ar_rnat field */					  \
+	st8 [r16]=rARRSC,16;	/* save ar.rsc */						  \
+(pUStk)	st8 [r17]=rARRNAT,16;	/* save ar.rnat */						  \
+(pKStk)	adds r17=16,r17;	/* skip over ar_rnat field */					  \
 	;;			/* avoid RAW on r16 & r17 */					  \
-(pUStk)	st8 [r17]=rARBSPSTORE,16;	/* save ar.bspstore */					  \
-	st8 [r16]=rARPR,16;	/* save predicates */						  \
-(pKStk)	adds r17=16,r17;	/* skip over ar_bspstore field */				  \
+(pUStk)	st8 [r16]=rARBSPSTORE,16;	/* save ar.bspstore */					  \
+	st8 [r17]=rARPR,16;	/* save predicates */						  \
+(pKStk)	adds r16=16,r16;	/* skip over ar_bspstore field */				  \
 	;;											  \
-	st8 [r17]=rB6,16;	/* save b6 */							  \
-	st8 [r16]=r18,16;	/* save ar.rsc value for "loadrs" */				  \
-	tbit.nz p15,p0=rCRIPSR,IA64_PSR_I_BIT							  \
-	;;											  \
-.mem.offset 8,0;	st8.spill [r17]=rR1,16;	/* save original r1 */				  \
-.mem.offset 0,0;	st8.spill [r16]=r2,16;							  \
-	;;											  \
-.mem.offset 8,0;	st8.spill [r17]=r3,16;							  \
-.mem.offset 0,0;	st8.spill [r16]=r12,16;							  \
-	adds r2=IA64_PT_REGS_R16_OFFSET,r1;							  \
-	;;											  \
-.mem.offset 8,0;	st8.spill [r17]=r13,16;							  \
-.mem.offset 0,0;	st8.spill [r16]=r14,16;							  \
+	st8 [r16]=rCRIPSR,16;	/* save b0 */							  \
+	st8 [r17]=r18,16;	/* save ar.rsc value for "loadrs" */				  \
 	cmp.eq pNonSys,pSys=r0,r0	/* initialize pSys=0, pNonSys=1 */			  \
 	;;											  \
-.mem.offset 8,0;	st8.spill [r17]=r15,16;							  \
-.mem.offset 0,0;	st8.spill [r16]=r8,16;							  \
-	dep r14=-1,r0,61,3;									  \
-	;;											  \
-.mem.offset 8,0;	st8.spill [r17]=r9,16;							  \
-.mem.offset 0,0;	st8.spill [r16]=r10,16;							  \
+.mem.offset 0,0;	st8.spill [r16]=rR1,16;	/* save original r1 */				  \
+.mem.offset 8,0;	st8.spill [r17]=r12,16;							  \
 	adds r12=-16,r1;	/* switch to kernel memory stack (with 16 bytes of scratch) */	  \
 	;;											  \
-.mem.offset 8,0;	st8.spill [r17]=r11,16;							  \
+.mem.offset 0,0;	st8.spill [r16]=r13,16;							  \
+.mem.offset 8,0;	st8.spill [r17]=r21,16;	/* save ar.fpsr */				  \
 	mov r13=IA64_KR(CURRENT);	/* establish `current' */				  \
+	;;											  \
+.mem.offset 0,0;	st8.spill [r16]=r15,16;							  \
+.mem.offset 8,0;	st8.spill [r17]=r14,16;							  \
+	dep r14=-1,r0,61,3;									  \
+	;;											  \
+.mem.offset 0,0;	st8.spill [r16]=r2,16;							  \
+.mem.offset 8,0;	st8.spill [r17]=r3,16;							  \
+	adds r2=IA64_PT_REGS_R16_OFFSET,r1;							  \
 	;;											  \
 	EXTRA;											  \
 	movl r1=__gp;		/* establish kernel global pointer */				  \
@@ -191,9 +198,7 @@
 	MINSTATE_END_SAVE_MIN
 
 /*
- * SAVE_REST saves the remainder of pt_regs (with psr.ic on).  This
- * macro guarantees to preserve all predicate registers, r8, r9, r10,
- * r11, r14, and r15.
+ * SAVE_REST saves the remainder of pt_regs (with psr.ic on).
  *
  * Assumed state upon entry:
  *	psr.ic: on
@@ -202,49 +207,52 @@
  */
 #define SAVE_REST				\
 .mem.offset 0,0;	st8.spill [r2]=r16,16;	\
-	;;					\
 .mem.offset 8,0;	st8.spill [r3]=r17,16;	\
+	;;					\
 .mem.offset 0,0;	st8.spill [r2]=r18,16;	\
-	;;					\
 .mem.offset 8,0;	st8.spill [r3]=r19,16;	\
+	;;					\
 .mem.offset 0,0;	st8.spill [r2]=r20,16;	\
-	;;					\
-	mov r16=ar.ccv;		/* M-unit */	\
-	movl r18=FPSR_DEFAULT	/* L-unit */	\
-	;;					\
-	mov r17=ar.fpsr;	/* M-unit */	\
-	mov ar.fpsr=r18;	/* M-unit */	\
-	;;					\
 .mem.offset 8,0;	st8.spill [r3]=r21,16;	\
-.mem.offset 0,0;	st8.spill [r2]=r22,16;	\
-	mov r18=b0;				\
+	mov r18=b6;				\
 	;;					\
+.mem.offset 0,0;	st8.spill [r2]=r22,16;	\
 .mem.offset 8,0;	st8.spill [r3]=r23,16;	\
-.mem.offset 0,0;	st8.spill [r2]=r24,16;	\
 	mov r19=b7;				\
 	;;					\
+.mem.offset 0,0;	st8.spill [r2]=r24,16;	\
 .mem.offset 8,0;	st8.spill [r3]=r25,16;	\
+	;;					\
 .mem.offset 0,0;	st8.spill [r2]=r26,16;	\
-	;;					\
 .mem.offset 8,0;	st8.spill [r3]=r27,16;	\
+	;;					\
 .mem.offset 0,0;	st8.spill [r2]=r28,16;	\
-	;;					\
 .mem.offset 8,0;	st8.spill [r3]=r29,16;	\
+	;;					\
 .mem.offset 0,0;	st8.spill [r2]=r30,16;	\
-	;;					\
 .mem.offset 8,0;	st8.spill [r3]=r31,16;	\
-	st8 [r2]=r16,16;	/* ar.ccv */	\
 	;;					\
-	st8 [r3]=r17,16;	/* ar.fpsr */	\
-	st8 [r2]=r18,16;	/* b0 */	\
-	;;					\
-	st8 [r3]=r19,16+8;	/* b7 */	\
-	;;					\
+	mov ar.fpsr=r11;        /* M-unit */    \
+	st8 [r2]=r8,8;         /* ar_ccv */     \
+	adds r3=16,r3;                          \
+	;;                                      \
 	stf.spill [r2]=f6,32;			\
 	stf.spill [r3]=f7,32;			\
 	;;					\
 	stf.spill [r2]=f8,32;			\
-	stf.spill [r3]=f9,32
+	stf.spill [r3]=f9,32;                   \
+	adds r24=PT(B6)+16,r12              	\
+	;;                                      \
+	stf.spill [r2]=f10,32;                  \
+	stf.spill [r3]=f11,32;			\
+	adds r25=PT(B7)+16,r12      	        \
+	;;					\
+	st8 [r24]=r18,16;       /* b6 */    	\
+	st8 [r25]=r19,16;       /* b7 */    	\
+	;;					\
+	st8 [r24]=r9;        	/* ar.csd */    \
+	st8 [r25]=r10;      	/* ar.ssd */    \
+	;;
 
 #define SAVE_MIN_WITH_COVER	DO_SAVE_MIN(cover, mov rCRIFS=cr.ifs,)
 #define SAVE_MIN_WITH_COVER_R19	DO_SAVE_MIN(cover, mov rCRIFS=cr.ifs, mov r15=r19)

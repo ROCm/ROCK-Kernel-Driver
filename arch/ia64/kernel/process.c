@@ -102,6 +102,7 @@ show_regs (struct pt_regs *regs)
 	       regs->ar_rnat, regs->ar_bspstore, regs->pr);
 	printk("ldrs: %016lx ccv : %016lx fpsr: %016lx\n",
 	       regs->loadrs, regs->ar_ccv, regs->ar_fpsr);
+	printk("csd : %016lx ssd : %016lx\n", regs->ar_csd, regs->ar_ssd);
 	printk("b0  : %016lx b6  : %016lx b7  : %016lx\n", regs->b0, regs->b6, regs->b7);
 	printk("f6  : %05lx%016lx f7  : %05lx%016lx\n",
 	       regs->f6.u.bits[1], regs->f6.u.bits[0],
@@ -109,6 +110,9 @@ show_regs (struct pt_regs *regs)
 	printk("f8  : %05lx%016lx f9  : %05lx%016lx\n",
 	       regs->f8.u.bits[1], regs->f8.u.bits[0],
 	       regs->f9.u.bits[1], regs->f9.u.bits[0]);
+	printk("f10  : %05lx%016lx f11  : %05lx%016lx\n",
+	       regs->f10.u.bits[1], regs->f10.u.bits[0],
+	       regs->f11.u.bits[1], regs->f11.u.bits[0]);
 
 	printk("r1  : %016lx r2  : %016lx r3  : %016lx\n", regs->r1, regs->r2, regs->r3);
 	printk("r8  : %016lx r9  : %016lx r10 : %016lx\n", regs->r8, regs->r9, regs->r10);
@@ -471,6 +475,8 @@ do_copy_task_regs (struct task_struct *task, struct unw_frame_info *info, void *
 	dst[52] = pt->ar_pfs;	/* UNW_AR_PFS is == to pt->cr_ifs for interrupt frames */
 	unw_get_ar(info, UNW_AR_LC, &dst[53]);
 	unw_get_ar(info, UNW_AR_EC, &dst[54]);
+	unw_get_ar(info, UNW_AR_CSD, &dst[55]);
+	unw_get_ar(info, UNW_AR_SSD, &dst[56]);
 }
 
 void

@@ -1798,12 +1798,16 @@ put_fpreg (int regno, struct _fpreg_ia32 *reg, struct pt_regs *ptp, struct switc
 		ia64f2ia32f(f, &ptp->f9);
 		break;
 	      case 2:
+		ia64f2ia32f(f, &ptp->f10);
+		break;
 	      case 3:
+		ia64f2ia32f(f, &ptp->f11);
+		break;
 	      case 4:
 	      case 5:
 	      case 6:
 	      case 7:
-		ia64f2ia32f(f, &swp->f10 + (regno - 2));
+		ia64f2ia32f(f, &swp->f12 + (regno - 4));
 		break;
 	}
 	copy_to_user(reg, f, sizeof(*reg));
@@ -1824,12 +1828,16 @@ get_fpreg (int regno, struct _fpreg_ia32 *reg, struct pt_regs *ptp, struct switc
 		copy_from_user(&ptp->f9, reg, sizeof(*reg));
 		break;
 	      case 2:
+		copy_from_user(&ptp->f10, reg, sizeof(*reg));
+		break;
 	      case 3:
+		copy_from_user(&ptp->f11, reg, sizeof(*reg));
+		break;
 	      case 4:
 	      case 5:
 	      case 6:
 	      case 7:
-		copy_from_user(&swp->f10 + (regno - 2), reg, sizeof(*reg));
+		copy_from_user(&swp->f12 + (regno - 4), reg, sizeof(*reg));
 		break;
 	}
 	return;

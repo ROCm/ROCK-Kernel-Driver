@@ -147,7 +147,7 @@ extern void ia64_init_addr_space (void);
  *	b0-b7
  *	ip cfm psr
  *	ar.rsc ar.bsp ar.bspstore ar.rnat
- *	ar.ccv ar.unat ar.fpsr ar.pfs ar.lc ar.ec
+ *	ar.ccv ar.unat ar.fpsr ar.pfs ar.lc ar.ec ar.csd ar.ssd
  */
 #define ELF_NGREG	128	/* we really need just 72 but let's leave some headroom... */
 #define ELF_NFPREG	128	/* f0 and f1 could be omitted, but so what... */

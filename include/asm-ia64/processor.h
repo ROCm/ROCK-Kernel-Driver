@@ -243,8 +243,6 @@ struct thread_struct {
 	__u64 fcr;			/* IA32 floating pt control reg */
 	__u64 fir;			/* IA32 fp except. instr. reg */
 	__u64 fdr;			/* IA32 fp except. data reg */
-	__u64 csd;			/* IA32 code selector descriptor */
-	__u64 ssd;			/* IA32 stack selector descriptor */
 	__u64 old_k1;			/* old value of ar.k1 */
 	__u64 old_iob;			/* old IOBase value */
 # define INIT_THREAD_IA32	.eflag =	0,			\
@@ -252,8 +250,6 @@ struct thread_struct {
 				.fcr =		0x17800000037fULL,	\
 				.fir =		0,			\
 				.fdr =		0,			\
-				.csd =		0,			\
-				.ssd =		0,			\
 				.old_k1 =	0,			\
 				.old_iob =	0,
 #else
@@ -328,11 +324,15 @@ struct thread_struct {
 		regs->r24 = 0; regs->r25 = 0; regs->r26 = 0; regs->r27 = 0;			\
 		regs->r28 = 0; regs->r29 = 0; regs->r30 = 0; regs->r31 = 0;			\
 		regs->ar_ccv = 0;								\
+		regs->ar_csd = 0;                                                               \
+		regs->ar_ssd = 0;                                                               \
 		regs->b0 = 0; regs->b7 = 0;							\
 		regs->f6.u.bits[0] = 0; regs->f6.u.bits[1] = 0;					\
 		regs->f7.u.bits[0] = 0; regs->f7.u.bits[1] = 0;					\
 		regs->f8.u.bits[0] = 0; regs->f8.u.bits[1] = 0;					\
 		regs->f9.u.bits[0] = 0; regs->f9.u.bits[1] = 0;					\
+		regs->f10.u.bits[0] = 0; regs->f10.u.bits[1] = 0;				\
+		regs->f11.u.bits[0] = 0; regs->f11.u.bits[1] = 0;				\
 	}											\
 } while (0)
 

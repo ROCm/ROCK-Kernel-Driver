@@ -26,7 +26,9 @@ enum unw_application_register {
 	UNW_AR_EC,
 	UNW_AR_FPSR,
 	UNW_AR_RSC,
-	UNW_AR_CCV
+	UNW_AR_CCV,
+	UNW_AR_CSD,
+	UNW_AR_SSD
 };
 
 /*

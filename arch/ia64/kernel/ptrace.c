@@ -29,6 +29,8 @@
 #include <asm/perfmon.h>
 #endif
 
+#define offsetof(type,field)    ((unsigned long) &((type *) 0)->field)
+
 /*
  * Bits in the PSR that we allow ptrace() to change:
  *	be, up, ac, mfl, mfh (the user mask; five bits total)
@@ -669,9 +671,12 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 		else
 			ia64_flush_fph(child);
 		ptr = (unsigned long *) ((unsigned long) &child->thread.fph + addr);
-	} else if (addr >= PT_F10 && addr < PT_F15 + 16) {
+	} else if ((addr >= PT_F10) && (addr < PT_F11 + 16)) {
+		/* scratch registers untouched by kernel (saved in pt_regs) */
+		ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, f10) + addr - PT_F10);
+	} else if (addr >= PT_F12 && addr < PT_F15 + 16) {
 		/* scratch registers untouched by kernel (saved in switch_stack) */
-		ptr = (unsigned long *) ((long) sw + addr - PT_NAT_BITS);
+		ptr = (unsigned long *) ((long) sw + (addr - PT_NAT_BITS - 32));
 	} else if (addr < PT_AR_LC + 8) {
 		/* preserved state: */
 		unsigned long nat_bits, scratch_unat, dummy = 0;
@@ -807,22 +812,69 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 			else
 				return ia64_peek(child, sw, urbs_end, rnat_addr, data);
 
-				   case PT_R1:  case PT_R2:  case PT_R3:
+		      case PT_R1:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r1));
+			break;
+
+		       case PT_R2:  case PT_R3:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r2) + addr - PT_R2);
+			break;
 		      case PT_R8:  case PT_R9:  case PT_R10: case PT_R11:
-		      case PT_R12: case PT_R13: case PT_R14: case PT_R15:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r8)+  addr - PT_R8);
+			break;
+		      case PT_R12: case PT_R13:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r12)+  addr - PT_R12);
+			break;
+		      case PT_R14:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r14));
+			break;
+		      case PT_R15:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r15));
+			break;
 		      case PT_R16: case PT_R17: case PT_R18: case PT_R19:
 		      case PT_R20: case PT_R21: case PT_R22: case PT_R23:
 		      case PT_R24: case PT_R25: case PT_R26: case PT_R27:
 		      case PT_R28: case PT_R29: case PT_R30: case PT_R31:
-		      case PT_B0:  case PT_B6:  case PT_B7:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r16) + addr - PT_R16);
+			break;
+		      case PT_B0:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, b0));
+			break;
+		      case PT_B6:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, b6));
+			break;
+		      case PT_B7:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, b7));
+			break;
 		      case PT_F6:  case PT_F6+8: case PT_F7: case PT_F7+8:
 		      case PT_F8:  case PT_F8+8: case PT_F9: case PT_F9+8:
-		      case PT_AR_BSPSTORE:
-		      case PT_AR_RSC: case PT_AR_UNAT: case PT_AR_PFS:
-		      case PT_AR_CCV: case PT_AR_FPSR: case PT_CR_IIP: case PT_PR:
-			/* scratch register */
-			ptr = (unsigned long *) ((long) pt + addr - PT_CR_IPSR);
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, f6) + addr - PT_F6);
 			break;
+		      case PT_AR_BSPSTORE:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_bspstore));
+			break;
+		      case PT_AR_RSC:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_rsc));
+			break;
+		      case PT_AR_UNAT:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_unat));
+			break;
+		      case PT_AR_PFS:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_pfs));
+			break;
+		      case PT_AR_CCV:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_ccv));
+			break;
+		      case PT_AR_FPSR:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_fpsr));
+			break;
+		      case PT_CR_IIP:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, cr_iip));
+			break;
+		      case PT_PR:
+			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, pr));
+			break;
+			/* scratch register */
 
 		      default:
 			/* disallow accessing anything else... */
@@ -830,6 +882,8 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 				addr);
 			return -1;
 		}
+	} else if (addr <= PT_AR_SSD) {
+		ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_csd) + addr - PT_AR_CSD);
 	} else {
 		/* access debug registers */
 
@@ -936,7 +990,8 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 
 	/* gr1-gr3 */
 
-	retval |= __copy_to_user(&ppr->gr[1], &pt->r1, sizeof(long) * 3);
+	retval |= __copy_to_user(&ppr->gr[1], &pt->r1, sizeof(long));
+	retval |= __copy_to_user(&ppr->gr[2], &pt->r2, sizeof(long) *2);
 
 	/* gr4-gr7 */
 
@@ -950,7 +1005,9 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 
 	/* gr12-gr15 */
 
-	retval |= __copy_to_user(&ppr->gr[12], &pt->r12, sizeof(long) * 4);
+	retval |= __copy_to_user(&ppr->gr[12], &pt->r12, sizeof(long) * 2);
+	retval |= __copy_to_user(&ppr->gr[14], &pt->r14, sizeof(long));
+	retval |= __copy_to_user(&ppr->gr[15], &pt->r15, sizeof(long));
 
 	/* gr16-gr31 */
 
@@ -978,13 +1035,13 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 0);
 	}
 
-	/* fr6-fr9 */
+	/* fr6-fr11 */
 
-	retval |= __copy_to_user(&ppr->fr[6], &pt->f6, sizeof(struct ia64_fpreg) * 4);
+	retval |= __copy_to_user(&ppr->fr[6], &pt->f6, sizeof(struct ia64_fpreg) * 6);
 
-	/* fp scratch regs(10-15) */
+	/* fp scratch regs(12-15) */
 
-	retval |= __copy_to_user(&ppr->fr[10], &sw->f10, sizeof(struct ia64_fpreg) * 6);
+	retval |= __copy_to_user(&ppr->fr[12], &sw->f12, sizeof(struct ia64_fpreg) * 4);
 
 	/* fr16-fr31 */
 
@@ -1061,7 +1118,8 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 
 	/* gr1-gr3 */
 
-	retval |= __copy_from_user(&pt->r1, &ppr->gr[1], sizeof(long) * 3);
+	retval |= __copy_from_user(&pt->r1, &ppr->gr[1], sizeof(long));
+	retval |= __copy_from_user(&pt->r2, &ppr->gr[2], sizeof(long) * 2);
 
 	/* gr4-gr7 */
 
@@ -1079,7 +1137,9 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 
 	/* gr12-gr15 */
 
-	retval |= __copy_from_user(&pt->r12, &ppr->gr[12], sizeof(long) * 4);
+	retval |= __copy_from_user(&pt->r12, &ppr->gr[12], sizeof(long) * 2);
+	retval |= __copy_from_user(&pt->r14, &ppr->gr[14], sizeof(long));
+	retval |= __copy_from_user(&pt->r15, &ppr->gr[15], sizeof(long));
 
 	/* gr16-gr31 */
 
@@ -1107,13 +1167,13 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 1);
 	}
 
-	/* fr6-fr9 */
+	/* fr6-fr11 */
 
-	retval |= __copy_from_user(&pt->f6, &ppr->fr[6], sizeof(ppr->fr[6]) * 4);
+	retval |= __copy_from_user(&pt->f6, &ppr->fr[6], sizeof(ppr->fr[6]) * 6);
 
-	/* fp scratch regs(10-15) */
+	/* fp scratch regs(12-15) */
 
-	retval |= __copy_from_user(&sw->f10, &ppr->fr[10], sizeof(ppr->fr[10]) * 6);
+	retval |= __copy_from_user(&sw->f12, &ppr->fr[12], sizeof(ppr->fr[12]) * 4);
 
 	/* fr16-fr31 */
 

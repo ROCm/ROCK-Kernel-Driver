@@ -4,6 +4,7 @@
  * Preserved registers that are shared between code in ivt.S and entry.S.  Be
  * careful not to step on these!
  */
+#define pLvSys		p1	/* set 1 if leave from syscall; otherwise, set 0*/
 #define pKStk		p2	/* will leave_kernel return to kernel-stacks? */
 #define pUStk		p3	/* will leave_kernel return to user-stacks? */
 #define pSys		p4	/* are we processing a (synchronous) system call? */
