@@ -197,8 +197,4 @@ int Pci2000_BiosParam		(struct scsi_device *sdev,
 					struct block_device *bdev,
 					sector_t capacity, int geom[]);
 
-#ifndef NULL
-	#define NULL 0
-#endif
-
 #endif

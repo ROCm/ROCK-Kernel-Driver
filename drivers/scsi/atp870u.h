@@ -28,10 +28,6 @@ static int atp870u_release(struct Scsi_Host *);
 #define ATP870U_SCATTER 128
 #define ATP870U_CMDLUN 1
 
-#ifndef NULL
-#define NULL 0
-#endif
-
 extern const char *atp870u_info(struct Scsi_Host *);
 
 #endif

@@ -67,9 +67,6 @@
 #define UDWORD  unsigned long
 #define U32     u32
 
-#ifndef NULL
-#define NULL     0		/* zero          */
-#endif
 #ifndef FAILURE
 #define FAILURE  (-1)
 #endif

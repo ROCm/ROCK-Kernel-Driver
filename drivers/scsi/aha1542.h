@@ -146,8 +146,4 @@ static int aha1542_biosparam(struct scsi_device *, struct block_device *,
 #define AHA1542_SCATTER 16
 #define AHA1542_CMDLUN 1
 
-#ifndef NULL
-	#define NULL 0
-#endif
-
 #endif

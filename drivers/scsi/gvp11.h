@@ -18,10 +18,6 @@ int wd33c93_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int wd33c93_abort(Scsi_Cmnd *);
 int wd33c93_reset(Scsi_Cmnd *, unsigned int);
 
-#ifndef NULL
-#define NULL 0
-#endif
-
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2
 #endif

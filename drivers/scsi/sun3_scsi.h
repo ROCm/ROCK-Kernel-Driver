@@ -36,11 +36,6 @@
 #ifndef SUN3_NCR5380_H
 #define SUN3_NCR5380_H
 
-#ifndef NULL
-#define NULL 0
-#endif
-
-
 #define SUN3SCSI_PUBLIC_RELEASE 1
 
 /*
