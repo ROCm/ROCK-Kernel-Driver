@@ -62,6 +62,9 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 #endif
 }
 
+#define deactivate_mm(tsk, mm) \
+	asm("movl %0,%%fs ; movl %0,%%gs": :"r" (0))
+
 #define activate_mm(prev, next) \
 	switch_mm((prev),(next),NULL,smp_processor_id())
 

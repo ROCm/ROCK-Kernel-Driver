@@ -12,6 +12,8 @@
 #define get_mmu_context(task) do ; while(0)
 #define activate_context(tsk) do ; while(0)
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 static inline void activate_mm(struct mm_struct *old, struct mm_struct *new)
 {
 }

@@ -111,6 +111,8 @@ extern inline void destroy_context(struct mm_struct *mm)
 #endif
 }
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 /*
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.

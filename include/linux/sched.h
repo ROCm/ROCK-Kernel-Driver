@@ -566,7 +566,7 @@ static inline void mmdrop(struct mm_struct * mm)
 /* mmput gets rid of the mappings and all user-space */
 extern void mmput(struct mm_struct *);
 /* Remove the current tasks stale references to the old mm_struct */
-extern void mm_release(void);
+extern void mm_release(struct task_struct *, struct mm_struct *);
 
 extern int  copy_thread(int, unsigned long, unsigned long, unsigned long, struct task_struct *, struct pt_regs *);
 extern void flush_thread(void);

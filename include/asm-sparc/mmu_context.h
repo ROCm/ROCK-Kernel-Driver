@@ -30,6 +30,8 @@ BTFIXUPDEF_CALL(void, switch_mm, struct mm_struct *, struct mm_struct *, struct 
 
 #define switch_mm(old_mm, mm, tsk, cpu) BTFIXUP_CALL(switch_mm)(old_mm, mm, tsk, cpu)
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 /* Activate a new MM instance for the current task. */
 #define activate_mm(active_mm, mm) switch_mm((active_mm), (mm), NULL, smp_processor_id())
 

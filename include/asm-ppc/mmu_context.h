@@ -160,6 +160,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	set_context(next->context, next->pgd);
 }
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 /*
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.
