@@ -4,8 +4,9 @@
  Copyright (c) 1995 Strom Systems, Inc. under the terms of the GNU
  General Public License. Written by Martin Kolinek, December 1995.
  Further development by: Chris Beauregard, Klaus Kudielka, Michael Lang
- See the file README.ibmmca for a detailed description of this driver,
- the commandline arguments and the history of its development.
+ See the file Documentation/scsi/ibmmca.txt for a detailed description
+ of this driver, the commandline arguments and the history of its
+ development.
  See the WWW-page: http://www.uni-mainz.de/~langm000/linux.html for latest
  updates, info and ADF-files for adapters supported by this driver.
 

@@ -32,8 +32,6 @@ README.DAC960
 	- info on Mylex DAC960/DAC1100 PCI RAID Controller Driver for Linux
 README.moxa
 	- release notes for Moxa mutiport serial card.
-README.nsp_cs.eng
-	- info on WorkBiT NinjaSCSI-3/32Bi driver.
 SAK.txt
 	- info on Secure Attention Keys.
 SubmittingDrivers
@@ -188,10 +186,8 @@ s390/
 	- directory with info on using Linux on the IBM S390.
 sh/
 	- directory with info on porting Linux to a new architecture.
-scsi-generic.txt
-	- info on the sg driver for generic (non-disk/CD/tape) SCSI devices.
-scsi.txt
-	- short blurb on using SCSI support as a module.
+scsi/
+	- directory with info on Linux scsi support.
 serial-console.txt
 	- how to set up Linux with a serial line console as the default.
 sgi-visws.txt

@@ -1,6 +1,6 @@
 /*
   SCSI Tape Driver for Linux version 1.1 and newer. See the accompanying
-  file README.st for more information.
+  file Documentation/scsi/st.txt for more information.
 
   History:
 

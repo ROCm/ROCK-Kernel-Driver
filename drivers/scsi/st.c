@@ -1,6 +1,6 @@
 /*
    SCSI Tape Driver for Linux version 1.1 and newer. See the accompanying
-   file README.st for more information.
+   file Documentation/scsi/st.txt for more information.
 
    History:
    Rewritten from Dwayne Forsyth's SCSI tape driver by Kai Makisara.
@@ -3574,7 +3574,7 @@ static void validate_options(void)
 }
 
 #ifndef MODULE
-/* Set the boot options. Syntax is defined in README.st.
+/* Set the boot options. Syntax is defined in Documenation/scsi/st.txt.
  */
 static int __init st_setup(char *str)
 {

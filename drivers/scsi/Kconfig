@@ -15,7 +15,7 @@ config BLK_DEV_SD
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called sd_mod.o.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.  Do not compile this driver as a
+	  <file:Documentation/scsi/scsi.txt>.  Do not compile this driver as a
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI disk. In this case, do not compile the driver
 	  for your SCSI host adapter (below) as a module either.
@@ -27,14 +27,14 @@ config CHR_DEV_ST
 	  If you want to use a SCSI tape drive under Linux, say Y and read the
 	  SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>, and
-	  <file:drivers/scsi/README.st> in the kernel source.  This is NOT for
+	  <file:Documentation/scsi/st.txt> in the kernel source.  This is NOT for
 	  SCSI CD-ROMs.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called st.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config CHR_DEV_OSST
 	tristate "SCSI OnStream SC-x0 tape support"
@@ -49,7 +49,7 @@ config CHR_DEV_OSST
 	  tapes (QIC-157) and can be driven by the standard driver st.
 	  For more information, you may have a look at the SCSI-HOWTO
 	  <http://www.linuxdoc.org/docs.html#howto>  and
-	  <file:drivers/scsi/README.osst>  in the kernel source.
+	  <file:Documentation/scsi/osst.txt>  in the kernel source.
 	  More info on the OnStream driver may be found on
 	  <http://linux1.onstream.nl/test/>
 	  Please also have a look at the standard st docu, as most of it
@@ -59,7 +59,7 @@ config CHR_DEV_OSST
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called osst.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config BLK_DEV_SR
 	tristate "SCSI CDROM support"
@@ -74,7 +74,7 @@ config BLK_DEV_SR
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called sr_mod.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config BLK_DEV_SR_VENDOR
 	bool "Enable vendor-specific extensions (for SCSI CDROM)"
@@ -103,13 +103,13 @@ config CHR_DEV_SG
 	  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
 	  For other devices, it's possible that you'll have to write the
 	  driver software yourself. Please read the file
-	  <file:Documentation/scsi-generic.txt> for more information.
+	  <file:Documentation/scsi/scsi-generic.txt> for more information.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
-	  say N.
+	  <file:Documentation/scsi/scsi.txt>. The module will be called sg.o.
+	  If unsure, say N.
 
 comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
 	depends on SCSI
@@ -235,7 +235,7 @@ config SCSI_AHA152X
 
 	  It is explained in section 3.3 of the SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>. You might also want to
-	  read the file <file:drivers/scsi/README.aha152x>.
+	  read the file <file:Documentation/scsi/aha152x.txt>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -315,7 +315,7 @@ config SCSI_AIC7XXX_OLD
 	  Information on the configuration options for this controller can be
 	  found by checking the help file for each of the available
 	  configuration options. You should read
-	  <file:drivers/scsi/aic7xxx_old/README.aic7xxx> at a minimum before
+	  <file:Documentation/scsi/aic7xxx_old.txt> at a minimum before
 	  contacting the maintainer with any questions.  The SCSI-HOWTO,
 	  available from <http://www.linuxdoc.org/docs.html#howto>, can also
 	  be of great help.
@@ -335,7 +335,7 @@ config SCSI_DPT_I2O
 	help
 	  This driver supports all of Adaptec's I2O based RAID controllers as 
 	  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
-	  driver by Deanna Bonds.  See <file:drivers/scsi/README.dpti>.
+	  driver by Deanna Bonds.  See <file:Documentation/scsi/dpti.txt>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -362,7 +362,7 @@ config SCSI_IN2000
 	depends on SCSI
 	help
 	  This is support for an ISA bus SCSI host adapter.  You'll find more
-	  information in <file:drivers/scsi/README.in2000>. If it doesn't work
+	  information in <file:Documentation/scsi/in2000.txt>. If it doesn't work
 	  out of the box, you may have to change the jumpers for IRQ or
 	  address selection.
 
@@ -377,7 +377,7 @@ config SCSI_AM53C974
 	depends on !X86_64 && SCSI && PCI
 	---help---
 	  This is support for the AM53/79C974 SCSI host adapters.  Please read
-	  <file:drivers/scsi/README.AM53C974> for details.  Also, the
+	  <file:Documentation/scsi/AM53C974.txt> for details.  Also, the
 	  SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>, is for you.
 
@@ -409,8 +409,8 @@ config SCSI_BUSLOGIC
 	  This is support for BusLogic MultiMaster and FlashPoint SCSI Host
 	  Adapters. Consult the SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>, and the files
-	  <file:drivers/scsi/README.BusLogic> and
-	  <file:drivers/scsi/README.FlashPoint> for more information. If this
+	  <file:Documentation/scsi/BusLogic.txt> and
+	  <file:Documentation/scsi/FlashPoint.txt> for more information. If this
 	  driver does not work correctly without modification, please contact
 	  the author, Leonard N. Zubkoff, by email to lnz@dandelion.com.
 
@@ -454,7 +454,7 @@ config SCSI_DTC3280
 	  This is support for DTC 3180/3280 SCSI Host Adapters.  Please read
 	  the SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>, and the file
-	  <file:drivers/scsi/README.dtc3x80>.
+	  <file:Documentation/scsi/dtc3x80.txt>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -648,7 +648,7 @@ config SCSI_GENERIC_NCR53C400
 	  for the Trantor T130B in its default configuration; you might have
 	  to pass a command line option to the kernel at boot time if it does
 	  not detect your card.  See the file
-	  <file:drivers/scsi/README.g_NCR5380> for details.
+	  <file:Documentation/scsi/g_NCR5380.txt> for details.
 
 config SCSI_IBMMCA
 	tristate "IBMMCA SCSI support"
@@ -781,7 +781,7 @@ config SCSI_PPA
 	  newer drives)", below.
 
 	  For more information about this driver and how to use it you should
-	  read the file <file:drivers/scsi/README.ppa>.  You should also read
+	  read the file <file:Documentation/scsi/ppa.txt>.  You should also read
 	  the SCSI-HOWTO, which is available from
 	  <http://www.linuxdoc.org/docs.html#howto>.  If you use this driver,
 	  you will still be able to use the parallel port for other tasks,
@@ -810,7 +810,7 @@ config SCSI_IMM
 	  here and Y to "IOMEGA Parallel Port (ppa - older drives)", above.
 
 	  For more information about this driver and how to use it you should
-	  read the file <file:drivers/scsi/README.ppa>.  You should also read
+	  read the file <file:Documentation/scsi/ppa.txt>.  You should also read
 	  the SCSI-HOWTO, which is available from
 	  <http://www.linuxdoc.org/docs.html#howto>.  If you use this driver,
 	  you will still be able to use the parallel port for other tasks,
@@ -916,7 +916,7 @@ config SCSI_NCR53C7xx
 	  <http://www.linuxdoc.org/docs.html#howto>.  If it doesn't work out
 	  of the box, you may have to change some settings in
 	  <file:drivers/scsi/53c7,8xx.h>.  Please read
-	  <file:drivers/scsi/README.ncr53c7xx> for the available boot time
+	  <file:Documentation/scsi/ncr53c7xx.txt> for the available boot time
 	  command line options.
 
 	  Note: there is another driver for the 53c8xx family of controllers
@@ -1048,7 +1048,7 @@ config SCSI_NCR53C8XX
 	  only one may be active at a time.  If you have a 53c8xx board, you
 	  probably do not want to use the "NCR53c7,8xx SCSI support".
 
-	  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+	  Please read <file:Documentation/scsi/ncr53c8xx.txt> for more
 	  information.
 
 config SCSI_SYM53C8XX
@@ -1075,7 +1075,7 @@ config SCSI_SYM53C8XX
 	  SYM53C8XX driver, thus allowing the NCR53C8XX driver to attach them.
 	  The 'excl' option is also supported by the NCR53C8XX driver.
 
-	  Please read <file:drivers/scsi/README.ncr53c8xx> for more
+	  Please read <file:Documentation/scsi/ncr53c8xx.txt> for more
 	  information.
 
 config SCSI_NCR53C8XX_DEFAULT_TAGS
@@ -1301,7 +1301,7 @@ config SCSI_QLOGIC_FAS
 	  SCSI support"), below.
 
 	  Information about this driver is contained in
-	  <file:drivers/scsi/README.qlogicfas>.  You should also read the
+	  <file:Documentation/scsi/qlogicfas.txt>.  You should also read the
 	  SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
@@ -1321,7 +1321,7 @@ config SCSI_QLOGIC_ISP
 	  If you say Y here, make sure to choose "BIOS" at the question "PCI
 	  access mode".
 
-	  Please read the file <file:drivers/scsi/README.qlogicisp>.  You
+	  Please read the file <file:Documentation/scsi/qlogicisp.txt>.  You
 	  should also read the SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
@@ -1422,7 +1422,7 @@ config SCSI_DC390T
 	  chip, e.g. Tekram DC390(T), DawiControl 2974 and some onboard
 	  PCscsi/PCnet (Am53/79C974) solutions.
 
-	  Documentation can be found in <file:drivers/scsi/README.tmscsim>.
+	  Documentation can be found in <file:Documentation/scsi/tmscsim.txt>.
 
 	  Note that this driver does NOT support Tekram DC390W/U/F, which are
 	  based on NCR/Symbios chips. Use "NCR53C8XX SCSI support" for those.
@@ -1442,7 +1442,7 @@ config SCSI_DC390T_NOGENSUPP
 	  EEPROM to get initial values for its settings, such as speed,
 	  termination, etc.  If it can't find this EEPROM, it will use
 	  defaults or the user supplied boot/module parameters.  For details
-	  on driver configuration see <file:drivers/scsi/README.tmscsim>.
+	  on driver configuration see <file:Documentation/scsi/tmscsim.txt>.
 
 	  If you say Y here and if no EEPROM is found, the driver gives up and
 	  thus only supports Tekram DC390(T) adapters.  This can be useful if

@@ -662,7 +662,7 @@ config SCSI
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called scsi_mod.o.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI device.
 
@@ -683,7 +683,7 @@ config BLK_DEV_SD
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called sd_mod.o.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.  Do not compile this driver as a
+	  <file:Documentation/scsi/scsi.txt>.  Do not compile this driver as a
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI disk. In this case, do not compile the driver
 	  for your SCSI host adapter (below) as a module either.
@@ -712,14 +712,14 @@ config CHR_DEV_ST
 	  If you want to use a SCSI tape drive under Linux, say Y and read the
 	  SCSI-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>, and
-	  <file:drivers/scsi/README.st> in the kernel source.  This is NOT for
-	  SCSI CD-ROMs.
+	  <file:Documentation/scsi/st.txt> in the kernel source.  This is NOT
+	  for SCSI CD-ROMs.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called st.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config CHR_DEV_OSST
 	tristate "SCSI OnStream SC-x0 tape support"
@@ -734,7 +734,7 @@ config CHR_DEV_OSST
 	  tapes (QIC-157) and can be driven by the standard driver st.
 	  For more information, you may have a look at the SCSI-HOWTO
 	  <http://www.linuxdoc.org/docs.html#howto>  and
-	  <file:drivers/scsi/README.osst>  in the kernel source.
+	  <file:Documentation/scsi/osst.txt>  in the kernel source.
 	  More info on the OnStream driver may be found on
 	  <http://linux1.onstream.nl/test/>
 	  Please also have a look at the standard st docu, as most of it
@@ -744,7 +744,7 @@ config CHR_DEV_OSST
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called osst.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config BLK_DEV_SR
 	tristate "SCSI CDROM support"
@@ -759,7 +759,7 @@ config BLK_DEV_SR
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called sr_mod.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.
+	  <file:Documentation/scsi/scsi.txt>.
 
 config BLK_DEV_SR_VENDOR
 	bool "Enable vendor-specific extensions (for SCSI CDROM)"
@@ -805,13 +805,13 @@ config CHR_DEV_SG
 	  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
 	  For other devices, it's possible that you'll have to write the
 	  driver software yourself. Please read the file
-	  <file:Documentation/scsi-generic.txt> for more information.
+	  <file:Documentation/scsi/scsi-generic.txt> for more information.
 
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
-	  say N.
+	  <file:Documentation/scsi/scsi.txt>. The module will be called sg.o.
+	  If unsure, say N.
 
 comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
 	depends on SCSI

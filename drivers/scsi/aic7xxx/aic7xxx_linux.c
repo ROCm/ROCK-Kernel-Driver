@@ -1074,7 +1074,7 @@ ahc_linux_detect(Scsi_Host_Template *template)
 		aic7xxx_setup(aic7xxx);
 	if (dummy_buffer[0] != 'P')
 		printk(KERN_WARNING
-"aic7xxx: Please read the file /usr/src/linux/drivers/scsi/README.aic7xxx\n"
+"aic7xxx: Please read the file /usr/src/linux/Documentation/scsi/aic7xxx.txt\n"
 "aic7xxx: to see the proper way to specify options to the aic7xxx module\n"
 "aic7xxx: Specifically, don't use any commas when passing arguments to\n"
 "aic7xxx: insmod or else it might trash certain memory areas.\n");

@@ -5,7 +5,8 @@
     copyright            : (C) 2001 by Adaptec
     email                : deanna_bonds@adaptec.com
 
-    See README.dpti for history, notes, license info, and credits
+    See Documentation/scsi/dpti.txt for history, notes, license info
+    and credits
  ***************************************************************************/
 
 /***************************************************************************
