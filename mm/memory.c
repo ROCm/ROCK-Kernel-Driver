@@ -1424,7 +1424,7 @@ void unmap_mapping_range(struct address_space *mapping,
 
 	spin_lock(&mapping->i_mmap_lock);
 	/* Protect against page fault */
-	atomic_inc(&mapping->truncate_count);
+	mapping->truncate_count++;
 
 	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
 		unmap_mapping_range_list(&mapping->i_mmap, &details);
@@ -1726,7 +1726,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct page * new_page;
 	struct address_space *mapping = NULL;
 	pte_t entry;
-	int sequence = 0;
+	unsigned int sequence = 0;
 	int ret = VM_FAULT_MINOR;
 	int anon = 0;
 
@@ -1738,9 +1738,8 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	if (vma->vm_file) {
 		mapping = vma->vm_file->f_mapping;
-		sequence = atomic_read(&mapping->truncate_count);
+		sequence = mapping->truncate_count;
 	}
-	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
 retry:
 	cond_resched();
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, &ret);
@@ -1774,9 +1773,8 @@ retry:
 	 * invalidated this page.  If unmap_mapping_range got called,
 	 * retry getting the page.
 	 */
-	if (mapping &&
-	      (unlikely(sequence != atomic_read(&mapping->truncate_count)))) {
-		sequence = atomic_read(&mapping->truncate_count);
+	if (mapping && unlikely(sequence != mapping->truncate_count)) {
+		sequence = mapping->truncate_count;
 		spin_unlock(&mm->page_table_lock);
 		page_cache_release(new_page);
 		goto retry;

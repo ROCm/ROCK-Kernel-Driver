@@ -661,7 +661,6 @@ static struct blkmtd_dev *add_device(char *devname, int readonly, int erase_size
 
 	memset(dev, 0, sizeof(struct blkmtd_dev));
 	dev->blkdev = bdev;
-	atomic_set(&(dev->blkdev->bd_inode->i_mapping->truncate_count), 0);
 	if(!readonly) {
 		init_MUTEX(&dev->wrbuf_mutex);
 	}
