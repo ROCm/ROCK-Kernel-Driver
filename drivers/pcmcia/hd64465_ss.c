@@ -968,6 +968,8 @@ static struct device_driver hd64465_driver = {
 	.name = "hd64465-pcmcia",
 	.bus = &platform_bus_type,
 	.devclass = &pcmcia_socket_class,
+	.suspend = pcmcia_socket_dev_suspend,
+	.resume = pcmcia_socket_dev_resume,
 };
 
 static struct platform_device hd64465_device = {

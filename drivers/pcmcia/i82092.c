@@ -42,11 +42,23 @@ static struct pci_device_id i82092aa_pci_ids[] = {
 };
 MODULE_DEVICE_TABLE(pci, i82092aa_pci_ids);
 
+static int i82092aa_socket_suspend (struct pci_dev *dev, u32 state)
+{
+	return pcmcia_socket_dev_suspend(&dev->dev, state, 0);
+}
+
+static int i82092aa_socket_resume (struct pci_dev *dev)
+{
+	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
+}
+
 static struct pci_driver i82092aa_pci_drv = {
 	.name           = "i82092aa",
 	.id_table       = i82092aa_pci_ids,
 	.probe          = i82092aa_pci_probe,
 	.remove         = __devexit_p(i82092aa_pci_remove),
+	.suspend        = i82092aa_socket_suspend,
+	.resume         = i82092aa_socket_resume,
 	.driver		= {
 		.devclass = &pcmcia_socket_class,
 	},
@@ -302,11 +314,6 @@ static int to_cycles(int ns)
 		return 0;
 }
     
-static int to_ns(int cycles)
-{
-	return cycle_time*cycles;
-}
-
 
 /* Interrupt handler functionality */
 

@@ -1020,6 +1020,8 @@ static struct device_driver sa1100_pcmcia_driver = {
 	.name		= "sa11x0-pcmcia",
 	.bus		= &platform_bus_type,
 	.devclass	= &pcmcia_socket_class,
+	.suspend 	= pcmcia_socket_dev_suspend,
+	.resume 	= pcmcia_socket_dev_resume,
 };
 
 static struct platform_device sa1100_pcmcia_device = {

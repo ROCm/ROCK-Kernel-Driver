@@ -257,16 +257,6 @@ static int __devexit pcmcia_remove(struct device *dev)
 	return 0;
 }
 
-static int pcmcia_suspend(struct device *dev, u32 state, u32 level)
-{
-	return 0;
-}
-
-static int pcmcia_resume(struct device *dev, u32 level)
-{
-	return 0;
-}
-
 static struct sa1111_driver pcmcia_driver = {
 	.drv = {
 		.name		= "sa1111-pcmcia",
@@ -274,8 +264,8 @@ static struct sa1111_driver pcmcia_driver = {
 		.devclass	= &pcmcia_socket_class,
 		.probe		= pcmcia_probe,
 		.remove		= __devexit_p(pcmcia_remove),
-		.suspend	= pcmcia_suspend,
-		.resume		= pcmcia_resume,
+		.suspend 	= pcmcia_socket_dev_suspend,
+		.resume 	= pcmcia_socket_dev_resume,
 	},
 	.devid			= SA1111_DEVID_PCMCIA,
 };

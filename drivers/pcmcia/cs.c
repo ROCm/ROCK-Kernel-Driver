@@ -111,13 +111,6 @@ INT_MODULE_PARM(cis_speed,	300);		/* ns */
 /* Access speed for IO windows */
 INT_MODULE_PARM(io_speed,	0);		/* ns */
 
-/* Optional features */
-#ifdef CONFIG_PM
-INT_MODULE_PARM(do_apm,		1);
-#else
-INT_MODULE_PARM(do_apm,		0);
-#endif
-
 #ifdef PCMCIA_DEBUG
 INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
 static const char *version =
@@ -348,7 +341,6 @@ int pcmcia_register_socket(struct device *dev)
 		/* base address = 0, map = 0 */
 		s->cis_mem.flags = 0;
 		s->cis_mem.speed = cis_speed;
-		s->use_bus_pm = cls_d->use_bus_pm;
 		s->erase_busy.next = s->erase_busy.prev = &s->erase_busy;
 		spin_lock_init(&s->lock);
     
@@ -756,33 +748,47 @@ void pcmcia_resume_socket (socket_info_t *s)
 	parse_events(s, SS_DETECT);
 }
 
-static int handle_pm_event(struct pm_dev *dev, pm_request_t rqst, void *data)
+
+int pcmcia_socket_dev_suspend(struct device * dev, u32 state, u32 level)
 {
-    int i;
-    socket_info_t *s;
+	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
+	socket_info_t *s;
+	int i;
 
-    /* only for busses that don't suspend/resume slots directly */
+	if ((!cls_d) || (level != SUSPEND_SAVE_STATE))
+		return 0;
 
-    switch (rqst) {
-    case PM_SUSPEND:
-	DEBUG(1, "cs: received suspend notification\n");
-	for (i = 0; i < sockets; i++) {
-	    s = socket_table [i];
-	    if (!s->use_bus_pm)
-		pcmcia_suspend_socket (socket_table [i]);
+	s = (socket_info_t *) cls_d->s_info;
+
+	for (i = 0; i < cls_d->nsock; i++) {
+		pcmcia_suspend_socket(s);
+		s++;
 	}
-	break;
-    case PM_RESUME:
-	DEBUG(1, "cs: received resume notification\n");
-	for (i = 0; i < sockets; i++) {
-	    s = socket_table [i];
-	    if (!s->use_bus_pm)
-		pcmcia_resume_socket (socket_table [i]);
+
+	return 0;
+}
+EXPORT_SYMBOL(pcmcia_socket_dev_suspend);
+
+int pcmcia_socket_dev_resume(struct device * dev, u32 level)
+{
+	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
+	socket_info_t *s;
+	int i;
+
+	if ((!cls_d) || (level != RESUME_RESTORE_STATE))
+		return 0;
+
+	s = (socket_info_t *) cls_d->s_info;
+
+	for (i = 0; i < cls_d->nsock; i++) {
+		pcmcia_resume_socket(s);
+		s++;
 	}
-	break;
-    }
-    return 0;
-} /* handle_pm_event */
+
+	return 0;
+}
+EXPORT_SYMBOL(pcmcia_socket_dev_resume);
+
 
 /*======================================================================
 
@@ -2429,8 +2435,6 @@ static int __init init_pcmcia_cs(void)
     printk(KERN_INFO "  %s\n", options);
     DEBUG(0, "%s\n", version);
     devclass_register(&pcmcia_socket_class);
-    if (do_apm)
-	pm_register(PM_SYS_DEV, PM_SYS_PCMCIA, handle_pm_event);
 #ifdef CONFIG_PROC_FS
     proc_pccard = proc_mkdir("pccard", proc_bus);
 #endif
@@ -2446,8 +2450,6 @@ static void __exit exit_pcmcia_cs(void)
 	remove_proc_entry("pccard", proc_bus);
     }
 #endif
-    if (do_apm)
-	pm_unregister_all(handle_pm_event);
     release_resource_db();
     devclass_unregister(&pcmcia_socket_class);
 }
