@@ -1643,6 +1643,11 @@ int journal_try_to_free_buffers(journal_t *journal,
 	bh = head;
 	do {
 		jbd_lock_bh_state(bh);
+		/*
+		 * We don't have to worry about the buffer being pulled off its
+		 * journal_head in here, because __try_to_free_cp_buf runs
+		 * under jbd_lock_bh_state()
+		 */
 		if (buffer_jbd(bh) &&
 				!__journal_try_to_free_buffer(journal, bh)) {
 			jbd_unlock_bh_state(bh);
