@@ -151,7 +151,7 @@ int default_idle(void)
 		}
 
 		schedule();
-		if (cpu_is_offline(smp_processor_id()) && system_running)
+		if (cpu_is_offline(smp_processor_id()) && system_state == SYSTEM_RUNNING)
 			cpu_die();
 	}
 
@@ -239,7 +239,7 @@ int dedicated_idle(void)
 		HMT_medium();
 		lpaca->xLpPaca.xIdle = 0;
 		schedule();
-		if (cpu_is_offline(smp_processor_id()) && system_running)
+		if (cpu_is_offline(smp_processor_id()) && system_state == SYSTEM_RUNNING)
 			cpu_die();
 	}
 	return 0;
@@ -250,7 +250,7 @@ int shared_idle(void)
 	struct paca_struct *lpaca = get_paca();
 
 	while (1) {
-		if (cpu_is_offline(smp_processor_id()) && system_running)
+		if (cpu_is_offline(smp_processor_id()) && system_state == SYSTEM_RUNNING)
 			cpu_die();
 
 		/* Indicate to the HV that we are idle.  Now would be

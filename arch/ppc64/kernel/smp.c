@@ -465,7 +465,7 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 
 	/* At boot time the cpus are already spinning in hold
 	 * loops, so nothing to do. */
- 	if (!system_running)
+ 	if (system_state == SYSTEM_BOOTING)
 		return 1;
 
 	pcpu = find_physical_cpu_to_start(get_hard_smp_processor_id(lcpu));
@@ -969,7 +969,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	int c;
 
 	/* At boot, don't bother with non-present cpus -JSCHOPP */
-	if (!system_running && !cpu_present_at_boot(cpu))
+	if (system_state == SYSTEM_BOOTING && !cpu_present_at_boot(cpu))
 		return -ENOENT;
 
 	paca[cpu].prof_counter = 1;
