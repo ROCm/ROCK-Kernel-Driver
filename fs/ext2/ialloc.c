@@ -599,7 +599,9 @@ got:
 	ei->i_dir_start_lookup = 0;
 	ei->i_state = EXT2_STATE_NEW;
 	ext2_set_inode_flags(inode);
+	spin_lock(&sbi->s_next_gen_lock);
 	inode->i_generation = sbi->s_next_generation++;
+	spin_unlock(&sbi->s_next_gen_lock);
 	insert_inode_hash(inode);
 
 	if (DQUOT_ALLOC_INODE(inode)) {
