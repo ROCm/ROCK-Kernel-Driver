@@ -40,7 +40,8 @@ static inline char *strdup(const char *s)
 static void afs_i_init_once(void *foo, kmem_cache_t *cachep, unsigned long flags);
 
 static struct super_block *afs_get_sb(struct file_system_type *fs_type,
-				      int flags, char *dev_name, void *data);
+				      int flags, const char *dev_name,
+				      void *data);
 
 static struct inode *afs_alloc_inode(struct super_block *sb);
 
@@ -407,10 +408,9 @@ static int afs_fill_super(struct super_block *sb, void *_data, int silent)
  * get an AFS superblock
  * - TODO: don't use get_sb_nodev(), but rather call sget() directly
  */
-static struct super_block *afs_get_sb(struct file_system_type *fs_type,
-				      int flags,
-				      char *dev_name,
-				      void *options)
+static struct super_block *
+afs_get_sb(struct file_system_type *fs_type, int flags,
+	   const char *dev_name, void *options)
 {
 	struct super_block *sb;
 	void *data[2] = { dev_name, options };

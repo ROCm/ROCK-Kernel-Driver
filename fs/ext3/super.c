@@ -2029,7 +2029,7 @@ static int ext3_sync_dquot(struct dquot *dquot)
 #endif
 
 static struct super_block *ext3_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, ext3_fill_super);
 }

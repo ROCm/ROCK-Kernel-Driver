@@ -372,8 +372,9 @@ static void jfs_unlockfs(struct super_block *sb)
 			txResume(sb);
 	}
 }
-static struct super_block *jfs_get_sb(struct file_system_type *fs_type,
-		int flags, char *dev_name, void *data)
+
+static struct super_block *jfs_get_sb(struct file_system_type *fs_type, 
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, jfs_fill_super);
 }

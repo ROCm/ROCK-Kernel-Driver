@@ -99,7 +99,7 @@ static int udf_statfs(struct super_block *, struct statfs *);
 
 /* UDF filesystem type */
 static struct super_block *udf_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, udf_fill_super);
 }

@@ -187,8 +187,9 @@ static int presto_set_channel(struct presto_cache *cache, char *channel)
 
 /* We always need to remove the presto options before passing 
    mount options to cache FS */
-struct super_block * presto_get_sb(struct file_system_type *izo_type, 
-                                   int flags, char *devname, void * data)
+struct super_block *
+presto_get_sb(struct file_system_type *izo_type, int flags,
+	      const char *devname, void *data)
 {
         struct file_system_type *fstype;
         struct presto_cache *cache = NULL;

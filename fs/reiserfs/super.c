@@ -1395,12 +1395,10 @@ static int reiserfs_statfs (struct super_block * s, struct statfs * buf)
 }
 
 static struct super_block*
-get_super_block (struct file_system_type *fs_type,
-		 int                      flags,
-		 char                    *dev_name,
-		 void                    *data)
+get_super_block (struct file_system_type *fs_type, int flags,
+		 const char *dev_name, void *data)
 {
-	return get_sb_bdev (fs_type, flags, dev_name, data, reiserfs_fill_super);
+	return get_sb_bdev(fs_type, flags, dev_name, data, reiserfs_fill_super);
 }
 
 static int __init

@@ -25,7 +25,7 @@ struct proc_dir_entry *proc_sys_root;
 #endif
 
 static struct super_block *proc_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_single(fs_type, flags, data, proc_fill_super);
 }

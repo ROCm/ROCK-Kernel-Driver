@@ -7,8 +7,6 @@
 #include <linux/mount.h>
 #include <linux/vfs.h>
 
-extern struct vfsmount *do_kern_mount(const char *, int, char *, void *);
-
 int simple_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		   struct kstat *stat)
 {

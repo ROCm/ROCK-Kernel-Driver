@@ -919,7 +919,8 @@ struct file_system_type {
 	const char *name;
 	struct subsystem subsys;
 	int fs_flags;
-	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
+	struct super_block *(*get_sb) (struct file_system_type *, int,
+				       const char *, void *);
 	void (*kill_sb) (struct super_block *);
 	struct module *owner;
 	struct file_system_type * next;
@@ -927,7 +928,7 @@ struct file_system_type {
 };
 
 struct super_block *get_sb_bdev(struct file_system_type *fs_type,
-	int flags, char *dev_name, void * data,
+	int flags, const char *dev_name, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
 struct super_block *get_sb_single(struct file_system_type *fs_type,
 	int flags, void *data,
@@ -1117,7 +1118,7 @@ extern void sync_filesystems(int wait);
 extern void emergency_sync(void);
 extern void emergency_remount(void);
 extern int do_remount_sb(struct super_block *sb, int flags,
-			void *data, int force);
+			 void *data, int force);
 extern sector_t bmap(struct inode *, sector_t);
 extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);

@@ -989,7 +989,7 @@ static int ext2_statfs (struct super_block * sb, struct statfs * buf)
 }
 
 static struct super_block *ext2_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, ext2_fill_super);
 }

@@ -489,7 +489,7 @@ static void fs_remove_file (struct dentry *dentry)
 static struct file_system_type usbdevice_fs_type;
 
 static struct super_block *usb_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	if (fs_type == &usbdevice_fs_type)
 		printk (KERN_INFO "Please use the 'usbfs' filetype instead, "

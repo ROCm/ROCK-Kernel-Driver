@@ -1192,7 +1192,7 @@ static int nfs_compare_super(struct super_block *sb, void *data)
 }
 
 static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *raw_data)
+	int flags, const char *dev_name, void *raw_data)
 {
 	int error;
 	struct nfs_server *server;
@@ -1421,7 +1421,7 @@ nfs_copy_user_string(char *dst, struct nfs_string *src, int maxlen)
 }
 
 static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *raw_data)
+	int flags, const char *dev_name, void *raw_data)
 {
 	int error;
 	struct nfs_server *server;

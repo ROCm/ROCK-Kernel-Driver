@@ -23,7 +23,6 @@
 #include <linux/mount.h>
 #include <asm/uaccess.h>
 
-extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
 extern int __init init_rootfs(void);
 extern int __init fs_subsys_init(void);
 
@@ -39,7 +38,7 @@ static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 	return tmp & hash_mask;
 }
 
-struct vfsmount *alloc_vfsmnt(char *name)
+struct vfsmount *alloc_vfsmnt(const char *name)
 {
 	struct vfsmount *mnt = kmem_cache_alloc(mnt_cache, GFP_KERNEL); 
 	if (mnt) {
@@ -63,8 +62,7 @@ struct vfsmount *alloc_vfsmnt(char *name)
 
 void free_vfsmnt(struct vfsmount *mnt)
 {
-	if (mnt->mnt_devname)
-		kfree(mnt->mnt_devname);
+	kfree(mnt->mnt_devname);
 	kmem_cache_free(mnt_cache, mnt);
 }
 

@@ -916,8 +916,8 @@ befs_statfs(struct super_block *sb, struct statfs *buf)
 }
 
 static struct super_block *
-befs_get_sb(struct file_system_type *fs_type, int flags, char *dev_name,
-		void *data)
+befs_get_sb(struct file_system_type *fs_type, int flags, const char *dev_name,
+	    void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, befs_fill_super);
 }

@@ -57,13 +57,14 @@ unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
 struct task_struct * oplockThread = NULL;
 
 extern int cifs_mount(struct super_block *, struct cifs_sb_info *, char *,
-			char *);
+			const char *);
 extern int cifs_umount(struct super_block *, struct cifs_sb_info *);
 void cifs_proc_init(void);
 void cifs_proc_clean(void);
 
 static int
-cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
+cifs_read_super(struct super_block *sb, void *data,
+		const char *devname, int silent)
 {
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb;
@@ -251,7 +252,7 @@ struct super_operations cifs_super_ops = {
 
 static struct super_block *
 cifs_get_sb(struct file_system_type *fs_type,
-	    int flags, char *dev_name, void *data)
+	    int flags, const char *dev_name, void *data)
 {
 	int rc;
 	struct super_block *sb = sget(fs_type, NULL, set_anon_super, NULL);
