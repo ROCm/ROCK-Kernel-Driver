@@ -189,7 +189,8 @@ static inline int proc_type(struct inode *inode)
 	return PROC_I(inode)->type;
 }
 
-int proc_pid_stat(struct task_struct*,char*);
+int proc_tid_stat(struct task_struct*,char*);
+int proc_tgid_stat(struct task_struct*,char*);
 int proc_pid_status(struct task_struct*,char*);
 int proc_pid_statm(struct task_struct*,char*);
 
@@ -1315,9 +1316,12 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			ei->op.proc_read = proc_pid_status;
 			break;
 		case PROC_TID_STAT:
+			inode->i_fop = &proc_info_file_operations;
+			ei->op.proc_read = proc_tid_stat;
+			break;
 		case PROC_TGID_STAT:
 			inode->i_fop = &proc_info_file_operations;
-			ei->op.proc_read = proc_pid_stat;
+			ei->op.proc_read = proc_tgid_stat;
 			break;
 		case PROC_TID_CMDLINE:
 		case PROC_TGID_CMDLINE:

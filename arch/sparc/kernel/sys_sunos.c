@@ -178,7 +178,7 @@ asmlinkage int sunos_brk(unsigned long brk)
 	 * Check against rlimit and stack..
 	 */
 	retval = -ENOMEM;
-	rlim = current->rlim[RLIMIT_DATA].rlim_cur;
+	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;
 	if (rlim >= RLIM_INFINITY)
 		rlim = ~0;
 	if (brk - current->mm->end_code > rlim)

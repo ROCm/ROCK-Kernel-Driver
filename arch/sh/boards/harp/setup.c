@@ -54,3 +54,38 @@ int __init platform_setup(void)
 
 	return 0;
 }
+
+/*
+ * pcibios_map_platform_irq
+ *
+ * This is board specific and returns the IRQ for a given PCI device.
+ * It is used by the PCI code (arch/sh/kernel/st40_pci*)
+ *
+ */
+
+#define HARP_PCI_IRQ    1
+#define HARP_BRIDGE_IRQ 2
+#define OVERDRIVE_SLOT0_IRQ 0
+
+
+int __init pcibios_map_platform_irq(struct pci_dev *dev, u8 slot, u8 pin)
+{
+	switch (slot) {
+#ifdef CONFIG_SH_STB1_HARP
+	case 2:		/*This is the PCI slot on the */
+		return HARP_PCI_IRQ;
+	case 1:		/* this is the bridge */
+		return HARP_BRIDGE_IRQ;
+#elif defined(CONFIG_SH_STB1_OVERDRIVE)
+	case 1:
+	case 2:
+	case 3:
+		return slot - 1;
+#else
+#error Unknown board
+#endif
+	default:
+		return -1;
+	}
+}
+

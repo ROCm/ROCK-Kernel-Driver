@@ -464,7 +464,6 @@ static __inline__ _syscall1(int,dup,int,fd)
 static __inline__ _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
 static __inline__ _syscall3(int,open,const char *,file,int,flag,int,mode)
 static __inline__ _syscall1(int,close,int,fd)
-static __inline__ _syscall1(int,_exit,int,exitcode)
 static __inline__ _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
 static __inline__ _syscall1(int,delete_module,const char *,name)
 

@@ -9243,6 +9243,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
 	    {
               /* duplicate PCI entry, skip it */
 	      kfree(temp_p);
+	      temp_p = NULL;
               continue;
 	    }
 	    current_p = current_p->next;

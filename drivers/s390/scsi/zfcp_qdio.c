@@ -12,6 +12,7 @@
  *      Raimund Schroeder <raimund.schroeder@de.ibm.com>
  *      Wolfgang Taphorn
  *      Heiko Carstens <heiko.carstens@de.ibm.com>
+ *      Andreas Herrmann <aherrman@de.ibm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +29,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_QDIO_C_REVISION "$Revision: 1.19 $"
+#define ZFCP_QDIO_C_REVISION "$Revision: 1.20 $"
 
 #include "zfcp_ext.h"
 

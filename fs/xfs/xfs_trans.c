@@ -131,7 +131,7 @@ xfs_trans_alloc(
 	xfs_mount_t	*mp,
 	uint		type)
 {
-	vfs_check_frozen(XFS_MTOVFS(mp)->vfs_super, SB_FREEZE_TRANS);
+	fs_check_frozen(XFS_MTOVFS(mp), SB_FREEZE_TRANS);
 	atomic_inc(&mp->m_active_trans);
 
 	return (_xfs_trans_alloc(mp, type));

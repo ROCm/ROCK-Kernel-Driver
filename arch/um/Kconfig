@@ -143,7 +143,6 @@ config SMP
         will appear to be running simultaneously.  If the host is a
         multiprocessor, then UML processes may run simultaneously, depending
         on the host scheduler.
-        CONFIG_SMP will be set to whatever this option is set to.
         It is safe to leave this unchanged.
 
 config NR_CPUS
@@ -179,6 +178,7 @@ config KERNEL_HALF_GIGS
 
 config HIGHMEM
 	bool "Highmem support"
+	depends on BROKEN
 
 config KERNEL_STACK_ORDER
 	int "Kernel stack size order"
@@ -226,6 +226,7 @@ source "crypto/Kconfig"
 source "lib/Kconfig"
 
 menu "SCSI support"
+depends on BROKEN
 
 config SCSI
 	tristate "SCSI support"
@@ -242,6 +243,8 @@ endmenu
 
 source "drivers/md/Kconfig"
 
-source "drivers/mtd/Kconfig"
+if BROKEN
+	source "drivers/mtd/Kconfig"
+endif
 
 source "arch/um/Kconfig.debug"

@@ -521,7 +521,7 @@ struct ahc_dma_seg {
 
 struct sg_map_node {
 	bus_dmamap_t		 sg_dmamap;
-	bus_addr_t		 sg_physaddr;
+	dma_addr_t		 sg_physaddr;
 	struct ahc_dma_seg*	 sg_vaddr;
 	SLIST_ENTRY(sg_map_node) links;
 };
@@ -584,7 +584,7 @@ struct scb {
 	struct scb_platform_data *platform_data;
 	struct sg_map_node	 *sg_map;
 	struct ahc_dma_seg 	 *sg_list;
-	bus_addr_t		  sg_list_phys;
+	dma_addr_t		  sg_list_phys;
 	u_int			  sg_count;/* How full ahc_dma_seg is */
 };
 
@@ -611,10 +611,10 @@ struct scb_data {
 	 */
 	bus_dma_tag_t	 hscb_dmat;	/* dmat for our hardware SCB array */
 	bus_dmamap_t	 hscb_dmamap;
-	bus_addr_t	 hscb_busaddr;
+	dma_addr_t	 hscb_busaddr;
 	bus_dma_tag_t	 sense_dmat;
 	bus_dmamap_t	 sense_dmamap;
-	bus_addr_t	 sense_busaddr;
+	dma_addr_t	 sense_busaddr;
 	bus_dma_tag_t	 sg_dmat;	/* dmat for our sg segments */
 	SLIST_HEAD(, sg_map_node) sg_maps;
 	uint8_t	numscbs;
@@ -1069,14 +1069,14 @@ struct ahc_softc {
 	bus_dma_tag_t		  parent_dmat;
 	bus_dma_tag_t		  shared_data_dmat;
 	bus_dmamap_t		  shared_data_dmamap;
-	bus_addr_t		  shared_data_busaddr;
+	dma_addr_t		  shared_data_busaddr;
 
 	/*
 	 * Bus address of the one byte buffer used to
 	 * work-around a DMA bug for chips <= aic7880
 	 * in target mode.
 	 */
-	bus_addr_t		  dma_bug_buf;
+	dma_addr_t		  dma_bug_buf;
 
 	/* Number of enabled target mode device on this card */
 	u_int			  enabled_luns;

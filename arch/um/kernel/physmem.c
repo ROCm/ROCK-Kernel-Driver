@@ -8,6 +8,7 @@
 #include "linux/slab.h"
 #include "linux/vmalloc.h"
 #include "linux/bootmem.h"
+#include "linux/module.h"
 #include "asm/types.h"
 #include "asm/pgtable.h"
 #include "kern_util.h"
@@ -36,7 +37,7 @@ static struct rb_node **find_rb(void *virt)
 	struct phys_desc *d;
 
 	while(*n != NULL){
-		d = rb_entry(n, struct phys_desc, rb);
+		d = rb_entry(*n, struct phys_desc, rb);
 		if(d->virt == virt)
 			return(n);
 
@@ -56,7 +57,7 @@ static struct phys_desc *find_phys_mapping(void *virt)
 	if(*n == NULL)
 		return(NULL);
 
-	return(rb_entry(n, struct phys_desc, rb));
+	return(rb_entry(*n, struct phys_desc, rb));
 }
 
 static void insert_phys_mapping(struct phys_desc *desc)
@@ -219,6 +220,10 @@ void physmem_forget_descriptor(int fd)
 	list_del(&desc->list);
 	kfree(desc);
 }
+
+EXPORT_SYMBOL(physmem_forget_descriptor);
+EXPORT_SYMBOL(physmem_remove_mapping);
+EXPORT_SYMBOL(physmem_subst_mapping);
 
 void arch_free_page(struct page *page, int order)
 {

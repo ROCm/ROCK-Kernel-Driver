@@ -145,9 +145,8 @@ mpc8560ads_setup_arch(void)
 
 static irqreturn_t cpm2_cascade(int irq, void *dev_id, struct pt_regs *regs)
 {
-	while ((irq = cpm2_get_irq(regs)) >= 0) {
-		ppc_irq_dispatch_handler(regs, irq);
-	}
+	while ((irq = cpm2_get_irq(regs)) >= 0)
+		__do_IRQ(irq, regs);
 	return IRQ_HANDLED;
 }
 

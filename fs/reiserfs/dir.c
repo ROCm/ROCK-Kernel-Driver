@@ -26,10 +26,13 @@ struct file_operations reiserfs_dir_operations = {
 
 int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) {
   struct inode *inode = dentry->d_inode;
+  int err;
   reiserfs_write_lock(inode->i_sb);
-  reiserfs_commit_for_inode(inode) ;
+  err = reiserfs_commit_for_inode(inode) ;
   reiserfs_write_unlock(inode->i_sb) ;
-  return 0 ;
+  if (err < 0)
+      return err;
+  return 0;
 }
 
 

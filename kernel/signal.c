@@ -20,6 +20,7 @@
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/ptrace.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
@@ -269,7 +270,7 @@ static struct sigqueue *__sigqueue_alloc(void)
 	struct sigqueue *q = NULL;
 
 	if (atomic_read(&current->user->sigpending) <
-			current->rlim[RLIMIT_SIGPENDING].rlim_cur)
+			current->signal->rlim[RLIMIT_SIGPENDING].rlim_cur)
 		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
 	if (q) {
 		INIT_LIST_HEAD(&q->list);
@@ -764,7 +765,7 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 	   pass on the info struct.  */
 
 	if (atomic_read(&t->user->sigpending) <
-			t->rlim[RLIMIT_SIGPENDING].rlim_cur)
+			t->signal->rlim[RLIMIT_SIGPENDING].rlim_cur)
 		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
 
 	if (q) {
@@ -913,7 +914,7 @@ __group_complete_signal(int sig, struct task_struct *p)
 	 * Don't bother zombies and stopped tasks (but
 	 * SIGKILL will punch through stopped state)
 	 */
-	mask = TASK_DEAD | TASK_ZOMBIE | TASK_TRACED;
+	mask = EXIT_DEAD | EXIT_ZOMBIE | TASK_TRACED;
 	if (sig != SIGKILL)
 		mask |= TASK_STOPPED;
 
@@ -1069,7 +1070,7 @@ void zap_other_threads(struct task_struct *p)
 		/*
 		 * Don't bother with already dead threads
 		 */
-		if (t->state & (TASK_ZOMBIE|TASK_DEAD))
+		if (t->exit_state & (EXIT_ZOMBIE|EXIT_DEAD))
 			continue;
 
 		/*

@@ -438,7 +438,7 @@ static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 		case 0x0F00: /* bf/s lab */
 			ret = handle_unaligned_delayslot(regs);
 			if (ret==0) {
-#if defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_CPU_SH4) || defined(CONFIG_SH7705_CACHE_32KB)
 				if ((regs->sr & 0x00000001) != 0)
 					regs->pc += 4; /* next after slot */
 				else
@@ -451,7 +451,7 @@ static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 		case 0x0D00: /* bt/s lab */
 			ret = handle_unaligned_delayslot(regs);
 			if (ret==0) {
-#if defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_CPU_SH4) || defined(CONFIG_SH7705_CACHE_32KB)
 				if ((regs->sr & 0x00000001) == 0)
 					regs->pc += 4; /* next after slot */
 				else

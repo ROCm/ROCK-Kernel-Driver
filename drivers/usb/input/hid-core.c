@@ -926,6 +926,8 @@ static void hid_irq_in(struct urb *urb, struct pt_regs *regs)
 		case -ENOENT:
 		case -ESHUTDOWN:
 			return;
+		case -ETIMEDOUT:	/* NAK */
+			break;
 		default:		/* error */
 			warn("input irq status %d received", urb->status);
 	}
@@ -1865,8 +1867,8 @@ hiddev_init_fail:
 
 static void __exit hid_exit(void)
 {
-	hiddev_exit();
 	usb_deregister(&hid_driver);
+	hiddev_exit();
 }
 
 module_init(hid_init);

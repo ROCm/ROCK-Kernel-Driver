@@ -65,7 +65,7 @@ struct sh_machine_vector
 	void (*mv_heartbeat)(void);
 
 	void *(*mv_consistent_alloc)(struct device *, size_t, dma_addr_t *, int);
-	void (*mv_consistent_free)(struct device *, size_t, void *, dma_addr_t);
+	int (*mv_consistent_free)(struct device *, size_t, void *, dma_addr_t);
 };
 
 extern struct sh_machine_vector sh_mv;

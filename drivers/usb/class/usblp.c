@@ -397,10 +397,6 @@ static void usblp_cleanup (struct usblp *usblp)
 {
 	info("usblp%d: removed", usblp->minor);
 
-	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
-			usblp->writebuf, usblp->writeurb->transfer_dma);
-	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
-			usblp->readbuf, usblp->readurb->transfer_dma);
 	kfree (usblp->device_id_string);
 	kfree (usblp->statusbuf);
 	usb_free_urb(usblp->writeurb);
@@ -1159,6 +1155,10 @@ static void usblp_disconnect(struct usb_interface *intf)
 	usb_set_intfdata (intf, NULL);
 
 	usblp_unlink_urbs(usblp);
+	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+			usblp->writebuf, usblp->writeurb->transfer_dma);
+	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+			usblp->readbuf, usblp->readurb->transfer_dma);
 
 	if (!usblp->used)
 		usblp_cleanup (usblp);

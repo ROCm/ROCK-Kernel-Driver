@@ -181,7 +181,7 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask,
 	struct shrinker *shrinker;
 
 	if (scanned == 0)
-		return 0;
+		scanned = SWAP_CLUSTER_MAX;
 
 	if (!down_read_trylock(&shrinker_rwsem))
 		return 0;
@@ -1065,7 +1065,8 @@ scan:
 			total_reclaimed += sc.nr_reclaimed;
 			if (zone->all_unreclaimable)
 				continue;
-			if (zone->pages_scanned > zone->present_pages * 2)
+			if (zone->pages_scanned >= (zone->nr_active +
+							zone->nr_inactive) * 4)
 				zone->all_unreclaimable = 1;
 			/*
 			 * If we've done a decent amount of scanning and
@@ -1102,8 +1103,10 @@ out:
 
 		zone->prev_priority = zone->temp_priority;
 	}
-	if (!all_zones_ok)
+	if (!all_zones_ok) {
+		cond_resched();
 		goto loop_again;
+	}
 
 	return total_reclaimed;
 }

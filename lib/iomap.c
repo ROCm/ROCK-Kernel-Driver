@@ -1,5 +1,7 @@
 /*
  * Implement the default iomap interfaces
+ *
+ * (C) Copyright 2004 Linus Torvalds
  */
 #include <linux/pci.h>
 #include <linux/module.h>

@@ -11,12 +11,14 @@
 #include <linux/errno.h>
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 #include <asm/uaccess.h>
 
 
 asmlinkage long
 sys_pciconfig_read(unsigned long bus, unsigned long dfn,
-		   unsigned long off, unsigned long len, void *buf)
+		   unsigned long off, unsigned long len,
+		   void __user *buf)
 {
 	struct pci_dev *dev;
 	u8 byte;
@@ -88,7 +90,8 @@ error:
 
 asmlinkage long
 sys_pciconfig_write(unsigned long bus, unsigned long dfn,
-		    unsigned long off, unsigned long len, void *buf)
+		    unsigned long off, unsigned long len,
+		    void __user *buf)
 {
 	struct pci_dev *dev;
 	u8 byte;

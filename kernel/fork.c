@@ -86,7 +86,7 @@ EXPORT_SYMBOL(free_task);
 
 void __put_task_struct(struct task_struct *tsk)
 {
-	WARN_ON(!(tsk->state & (TASK_DEAD | TASK_ZOMBIE)));
+	WARN_ON(!(tsk->exit_state & (EXIT_DEAD | EXIT_ZOMBIE)));
 	WARN_ON(atomic_read(&tsk->usage));
 	WARN_ON(tsk == current);
 
@@ -249,8 +249,8 @@ void __init fork_init(unsigned long mempages)
 	if(max_threads < 20)
 		max_threads = 20;
 
-	init_task.rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
-	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
+	init_task.signal->rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
+	init_task.signal->rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
 }
 
 static struct task_struct *dup_task_struct(struct task_struct *orig)
@@ -762,8 +762,17 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 
 	for (i = open_files; i != 0; i--) {
 		struct file *f = *old_fds++;
-		if (f)
+		if (f) {
 			get_file(f);
+		} else {
+			/*
+			 * The fd may be claimed in the fd bitmap but not yet
+			 * instantiated in the files array if a sibling thread
+			 * is partway through open().  So make sure that this
+			 * fd is available to the new process.
+			 */
+			FD_CLR(open_files - i, newf->open_fds);
+		}
 		*new_fds++ = f;
 	}
 	spin_unlock(&oldf->file_lock);
@@ -872,6 +881,10 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->nvcsw = sig->nivcsw = sig->cnvcsw = sig->cnivcsw = 0;
 	sig->min_flt = sig->maj_flt = sig->cmin_flt = sig->cmaj_flt = 0;
 
+	task_lock(current->group_leader);
+	memcpy(sig->rlim, current->signal->rlim, sizeof sig->rlim);
+	task_unlock(current->group_leader);
+
 	return 0;
 }
 
@@ -941,7 +954,7 @@ static task_t *copy_process(unsigned long clone_flags,
 
 	retval = -EAGAIN;
 	if (atomic_read(&p->user->processes) >=
-			p->rlim[RLIMIT_NPROC].rlim_cur) {
+			p->signal->rlim[RLIMIT_NPROC].rlim_cur) {
 		if (!capable(CAP_SYS_ADMIN) && !capable(CAP_SYS_RESOURCE) &&
 				p->user != &root_user)
 			goto bad_fork_free;
@@ -992,7 +1005,7 @@ static task_t *copy_process(unsigned long clone_flags,
 
 	p->utime = p->stime = 0;
 	p->lock_depth = -1;		/* -1 = no lock */
-	p->start_time = get_jiffies_64();
+	do_posix_clock_monotonic_gettime(&p->start_time);
 	p->security = NULL;
 	p->io_context = NULL;
 	p->io_wait = NULL;
@@ -1049,6 +1062,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	/* ok, now we should be set up.. */
 	p->exit_signal = (clone_flags & CLONE_THREAD) ? -1 : (clone_flags & CSIGNAL);
 	p->pdeath_signal = 0;
+	p->exit_state = 0;
 
 	/* Perform scheduler related setup */
 	sched_fork(p);
@@ -1146,7 +1160,8 @@ fork_out:
 bad_fork_cleanup_namespace:
 	exit_namespace(p);
 bad_fork_cleanup_mm:
-	mmput(p->mm);
+	if (p->mm)
+		mmput(p->mm);
 bad_fork_cleanup_signal:
 	exit_signal(p);
 bad_fork_cleanup_sighand:

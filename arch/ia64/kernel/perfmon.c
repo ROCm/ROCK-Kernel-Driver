@@ -2287,7 +2287,8 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	 * if ((mm->total_vm << PAGE_SHIFT) + len> task->rlim[RLIMIT_AS].rlim_cur)
 	 * 	return -ENOMEM;
 	 */
-	if (size > task->rlim[RLIMIT_MEMLOCK].rlim_cur) return -ENOMEM;
+	if (size > task->signal->rlim[RLIMIT_MEMLOCK].rlim_cur)
+		return -EAGAIN;
 
 	/*
 	 * We do the easy to undo allocations first.
@@ -2592,7 +2593,7 @@ pfm_task_incompatible(pfm_context_t *ctx, struct task_struct *task)
 		return -EINVAL;
 	}
 
-	if (task->state == TASK_ZOMBIE) {
+	if (task->exit_state == EXIT_ZOMBIE) {
 		DPRINT(("cannot attach to  zombie task [%d]\n", task->pid));
 		return -EBUSY;
 	}

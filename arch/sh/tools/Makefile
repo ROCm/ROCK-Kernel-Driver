@@ -10,7 +10,6 @@
 # Shamelessly cloned from ARM.
 #
 
-include/asm-sh/machtypes.h: $(obj)/machgen.sh $(obj)/mach-types
+include/asm-sh/machtypes.h: $(src)/gen-mach-types $(src)/mach-types
 	@echo '  Generating $@'
-	@$(CONFIG_SHELL) $(obj)/machgen.sh $(obj)/mach-types > $@
-
+	$(Q)$(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }

@@ -3,7 +3,7 @@
  *
  * G2 bus DMA support
  *
- * Copyright (C) 2003  Paul Mundt
+ * Copyright (C) 2003, 2004  Paul Mundt
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -59,104 +59,102 @@ static struct irqaction g2_dma_irq = {
 	.flags		= SA_INTERRUPT,
 };
 
-static int g2_enable_dma(struct dma_info *info)
+static int g2_enable_dma(struct dma_channel *chan)
 {
-	unsigned int chan = info->chan;
+	unsigned int chan_nr = chan->chan;
 
-	g2_dma->channel[chan].chan_enable = 1;
-	g2_dma->channel[chan].xfer_enable = 1;
+	g2_dma->channel[chan_nr].chan_enable = 1;
+	g2_dma->channel[chan_nr].xfer_enable = 1;
 
 	return 0;
 }
 
-static int g2_disable_dma(struct dma_info *info)
+static int g2_disable_dma(struct dma_channel *chan)
 {
-	unsigned int chan = info->chan;
+	unsigned int chan_nr = chan->chan;
 
-	g2_dma->channel[chan].chan_enable = 0;
-	g2_dma->channel[chan].xfer_enable = 0;
+	g2_dma->channel[chan_nr].chan_enable = 0;
+	g2_dma->channel[chan_nr].xfer_enable = 0;
 
 	return 0;
 }
 
-static int g2_xfer_dma(struct dma_info *info)
+static int g2_xfer_dma(struct dma_channel *chan)
 {
-	unsigned int chan = info->chan;
+	unsigned int chan_nr = chan->chan;
 
-	if (info->sar & 31) {
-		printk("g2dma: unaligned source 0x%lx\n", info->sar);
+	if (chan->sar & 31) {
+		printk("g2dma: unaligned source 0x%lx\n", chan->sar);
 		return -EINVAL;
 	}
 
-	if (info->dar & 31) {
-		printk("g2dma: unaligned dest 0x%lx\n", info->dar);
+	if (chan->dar & 31) {
+		printk("g2dma: unaligned dest 0x%lx\n", chan->dar);
 		return -EINVAL;
 	}
 
 	/* Align the count */
-	if (info->count & 31)
-		info->count = (info->count + (32 - 1)) & ~(32 - 1);
+	if (chan->count & 31)
+		chan->count = (chan->count + (32 - 1)) & ~(32 - 1);
 
 	/* Fixup destination */
-	info->dar += 0xa0800000;
+	chan->dar += 0xa0800000;
 
 	/* Fixup direction */
-	info->mode = !info->mode;
+	chan->mode = !chan->mode;
 
-	flush_icache_range((unsigned long)info->sar, info->count);
+	flush_icache_range((unsigned long)chan->sar, chan->count);
 
-	g2_disable_dma(info);
+	g2_disable_dma(chan);
 
-	g2_dma->channel[chan].g2_addr	= info->dar & 0x1fffffe0;
-	g2_dma->channel[chan].root_addr = info->sar & 0x1fffffe0;
-	g2_dma->channel[chan].size	= (info->count & ~31) | 0x80000000;
-	g2_dma->channel[chan].direction = info->mode;
+	g2_dma->channel[chan_nr].g2_addr   = chan->dar & 0x1fffffe0;
+	g2_dma->channel[chan_nr].root_addr = chan->sar & 0x1fffffe0;
+	g2_dma->channel[chan_nr].size	   = (chan->count & ~31) | 0x80000000;
+	g2_dma->channel[chan_nr].direction = chan->mode;
 
 	/*
 	 * bit 0 - ???
 	 * bit 1 - if set, generate a hardware event on transfer completion
 	 * bit 2 - ??? something to do with suspend?
 	 */
-	g2_dma->channel[chan].ctrl	= 5; /* ?? */
+	g2_dma->channel[chan_nr].ctrl	= 5; /* ?? */
 
-	g2_enable_dma(info);
-	
+	g2_enable_dma(chan);
+
 	/* debug cruft */
 	pr_debug("count, sar, dar, mode, ctrl, chan, xfer: %ld, 0x%08lx, "
 		 "0x%08lx, %ld, %ld, %ld, %ld\n",
-		 g2_dma->channel[chan].size,
-		 g2_dma->channel[chan].root_addr,
-		 g2_dma->channel[chan].g2_addr,
-		 g2_dma->channel[chan].direction,
-		 g2_dma->channel[chan].ctrl,
-		 g2_dma->channel[chan].chan_enable,
-		 g2_dma->channel[chan].xfer_enable);
+		 g2_dma->channel[chan_nr].size,
+		 g2_dma->channel[chan_nr].root_addr,
+		 g2_dma->channel[chan_nr].g2_addr,
+		 g2_dma->channel[chan_nr].direction,
+		 g2_dma->channel[chan_nr].ctrl,
+		 g2_dma->channel[chan_nr].chan_enable,
+		 g2_dma->channel[chan_nr].xfer_enable);
 
 	return 0;
 }
 
 static struct dma_ops g2_dma_ops = {
-	.name		= "G2 DMA",
 	.xfer		= g2_xfer_dma,
+};
+
+static struct dma_info g2_dma_info = {
+	.name		= "G2 DMA",
+	.nr_channels	= 4,
+	.ops		= &g2_dma_ops,
+	.flags		= DMAC_CHANNELS_TEI_CAPABLE,
 };
 
 static int __init g2_dma_init(void)
 {
-	int i, base;
-
 	setup_irq(HW_EVENT_G2_DMA, &g2_dma_irq);
 
 	/* Magic */
 	g2_dma->wait_state	= 27;
 	g2_dma->magic		= 0x4659404f;
 
-	/* G2 channels come after on-chip and pvr2 */
-	base = ONCHIP_NR_DMA_CHANNELS + PVR2_NR_DMA_CHANNELS;
-
-	for (i = 0; i < G2_NR_DMA_CHANNELS; i++)
-		dma_info[base + i].ops = &g2_dma_ops;
-	
-	return register_dmac(&g2_dma_ops);
+	return register_dmac(&g2_dma_info);
 }
 
 static void __exit g2_dma_exit(void)

@@ -1778,7 +1778,7 @@ static struct pci_driver agp_intel_pci_driver = {
 	.name		= "agpgart-intel",
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,
-	.remove		= agp_intel_remove,
+	.remove		= __devexit_p(agp_intel_remove),
 	.resume		= agp_intel_resume,
 };
 

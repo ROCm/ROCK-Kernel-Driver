@@ -32,7 +32,7 @@
 
 #define H8300_TIMER_FREQ CONFIG_CPU_CLOCK*1000/8192 /* Timer input freq. */
 
-int platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
+void __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
 	/* setup 8bit timer ch2 */
 	ctrl_outb(H8300_TIMER_FREQ / HZ, TCORA2);      /* set interval */
@@ -69,7 +69,7 @@ void platform_timer_eoi(void)
 
 #define H8300_TIMER_FREQ CONFIG_CPU_CLOCK*1000/8 /* Timer input freq. */
 
-int platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
+void __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
 	*(unsigned short *)GRA= H8300_TIMER_FREQ / HZ;  /* set interval */
 	*(unsigned short *)TCNT=0;                      /* clear counter */

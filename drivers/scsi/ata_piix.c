@@ -184,7 +184,7 @@ static struct ata_port_info piix_port_info[] = {
 #else
 		.mwdma_mask	= 0x00, /* mwdma broken */
 #endif
-		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
+		.udma_mask	= 0x3f, /* udma0-5 */
 		.port_ops	= &piix_pata_ops,
 	},
 
@@ -209,7 +209,7 @@ static struct ata_port_info piix_port_info[] = {
 #else
 		.mwdma_mask	= 0x00, /* mwdma broken */
 #endif
-		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
+		.udma_mask	= ATA_UDMA_MASK_40C,
 		.port_ops	= &piix_pata_ops,
 	},
 
@@ -252,7 +252,7 @@ MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
  *	piix_pata_cbl_detect - Probe host controller cable detect info
  *	@ap: Port for which cable detect info is desired
  *
- *	Read 80c cable indicator from SATA PCI device's PCI config
+ *	Read 80c cable indicator from ATA PCI device's PCI config
  *	register.  This register is normally set by firmware (BIOS).
  *
  *	LOCKING:
@@ -268,7 +268,7 @@ static void piix_pata_cbl_detect(struct ata_port *ap)
 		goto cbl40;
 
 	/* check BIOS cable detect results */
-	mask = ap->port_no == 0 ? PIIX_80C_PRI : PIIX_80C_SEC;
+	mask = ap->hard_port_no == 0 ? PIIX_80C_PRI : PIIX_80C_SEC;
 	pci_read_config_byte(pdev, PIIX_IOCFG, &tmp);
 	if ((tmp & mask) == 0)
 		goto cbl40;
@@ -294,7 +294,7 @@ cbl40:
 static void piix_pata_phy_reset(struct ata_port *ap)
 {
 	if (!pci_test_config_bits(ap->host_set->pdev,
-				  &piix_enable_bits[ap->port_no])) {
+				  &piix_enable_bits[ap->hard_port_no])) {
 		ata_port_disable(ap);
 		printk(KERN_INFO "ata%u: port disabled. ignoring.\n", ap->id);
 		return;
@@ -327,8 +327,8 @@ static int piix_sata_probe (struct ata_port *ap)
 	int orig_mask, mask, i;
 	u8 pcs;
 
-	mask = (PIIX_PORT_PRESENT << ap->port_no) |
-	       (PIIX_PORT_ENABLED << ap->port_no);
+	mask = (PIIX_PORT_PRESENT << ap->hard_port_no) |
+	       (PIIX_PORT_ENABLED << ap->hard_port_no);
 
 	pci_read_config_byte(pdev, ICH5_PCS, &pcs);
 	orig_mask = (int) pcs & 0xff;
@@ -345,7 +345,7 @@ static int piix_sata_probe (struct ata_port *ap)
 		mask = (PIIX_PORT_PRESENT << i) | (PIIX_PORT_ENABLED << i);
 
 		if ((orig_mask & mask) == mask)
-			if (combined || (i == ap->port_no))
+			if (combined || (i == ap->hard_port_no))
 				return 1;
 	}
 
@@ -394,7 +394,7 @@ static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev)
 	unsigned int pio	= adev->pio_mode - XFER_PIO_0;
 	struct pci_dev *dev	= ap->host_set->pdev;
 	unsigned int is_slave	= (adev->devno != 0);
-	unsigned int master_port= ap->port_no ? 0x42 : 0x40;
+	unsigned int master_port= ap->hard_port_no ? 0x42 : 0x40;
 	unsigned int slave_port	= 0x44;
 	u16 master_data;
 	u8 slave_data;
@@ -412,10 +412,10 @@ static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev)
 		/* enable PPE, IE and TIME */
 		master_data |= 0x0070;
 		pci_read_config_byte(dev, slave_port, &slave_data);
-		slave_data &= (ap->port_no ? 0x0f : 0xf0);
+		slave_data &= (ap->hard_port_no ? 0x0f : 0xf0);
 		slave_data |=
 			(timings[pio][0] << 2) |
-			(timings[pio][1] << (ap->port_no ? 4 : 0));
+			(timings[pio][1] << (ap->hard_port_no ? 4 : 0));
 	} else {
 		master_data &= 0xccf8;
 		/* enable PPE, IE and TIME */
@@ -445,9 +445,9 @@ static void piix_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 {
 	unsigned int udma	= adev->dma_mode; /* FIXME: MWDMA too */
 	struct pci_dev *dev	= ap->host_set->pdev;
-	u8 maslave		= ap->port_no ? 0x42 : 0x40;
+	u8 maslave		= ap->hard_port_no ? 0x42 : 0x40;
 	u8 speed		= udma;
-	unsigned int drive_dn	= (ap->port_no ? 2 : 0) + adev->devno;
+	unsigned int drive_dn	= (ap->hard_port_no ? 2 : 0) + adev->devno;
 	int a_speed		= 3 << (drive_dn * 4);
 	int u_flag		= 1 << drive_dn;
 	int v_flag		= 0x01 << drive_dn;
