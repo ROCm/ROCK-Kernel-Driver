@@ -54,6 +54,11 @@
 */
 #define ALLOW_IOV_BYPASS
 
+#ifdef CONFIG_PROC_FS
+  /* turn it off for now; without per-CPU counters, it's too much of a scalability bottleneck: */
+# define SBA_PROC_FS 0
+#endif
+
 /*
 ** If a device prefetches beyond the end of a valid pdir entry, it will cause
 ** a hard failure, ie. MCA.  Version 3.0 and later of the zx1 LBA should
@@ -193,7 +198,7 @@ struct ioc {
 	} saved[DELAYED_RESOURCE_CNT];
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 #define SBA_SEARCH_SAMPLE	0x100
 	unsigned long avg_search[SBA_SEARCH_SAMPLE];
 	unsigned long avg_idx;	/* current index into avg_search */
@@ -517,7 +522,7 @@ static int
 sba_alloc_range(struct ioc *ioc, size_t size)
 {
 	unsigned int pages_needed = size >> IOVP_SHIFT;
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	unsigned long itc_start = ia64_get_itc();
 #endif
 	unsigned long pide;
@@ -551,7 +556,7 @@ sba_alloc_range(struct ioc *ioc, size_t size)
 		(uint) ((unsigned long) ioc->res_hint - (unsigned long) ioc->res_map),
 		ioc->res_bitshift );
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	{
 		unsigned long itc_end = ia64_get_itc();
 		unsigned long tmp = itc_end - itc_start;
@@ -593,7 +598,7 @@ sba_free_range(struct ioc *ioc, dma_addr_t iova, size_t size)
 		__FUNCTION__, (uint) iova, size,
 		bits_not_wanted, m, pide, res_ptr, *res_ptr);
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->used_pages -= bits_not_wanted;
 #endif
 
@@ -785,7 +790,7 @@ sba_map_single(struct device *dev, void *addr, size_t size, int dir)
  		** Device is bit capable of DMA'ing to the buffer...
 		** just return the PCI address of ptr
  		*/
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		spin_lock_irqsave(&ioc->res_lock, flags);
 		ioc->msingle_bypass++;
 		spin_unlock_irqrestore(&ioc->res_lock, flags);
@@ -811,7 +816,7 @@ sba_map_single(struct device *dev, void *addr, size_t size, int dir)
 		panic("Sanity check failed");
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->msingle_calls++;
 	ioc->msingle_pages += size >> IOVP_SHIFT;
 #endif
@@ -870,7 +875,7 @@ void sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size, int dir)
 		/*
 		** Address does not fall w/in IOVA, must be bypassing
 		*/
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		spin_lock_irqsave(&ioc->res_lock, flags);
 		ioc->usingle_bypass++;
 		spin_unlock_irqrestore(&ioc->res_lock, flags);
@@ -895,7 +900,7 @@ void sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size, int dir)
 	size = ROUNDUP(size, IOVP_SIZE);
 
 	spin_lock_irqsave(&ioc->res_lock, flags);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->usingle_calls++;
 	ioc->usingle_pages += size >> IOVP_SHIFT;
 #endif
@@ -1078,7 +1083,7 @@ sba_fill_pdir(
 			cnt += dma_offset;
 			dma_offset=0;	/* only want offset on first chunk */
 			cnt = ROUNDUP(cnt, IOVP_SIZE);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 			ioc->msg_pages += cnt >> IOVP_SHIFT;
 #endif
 			do {
@@ -1268,7 +1273,7 @@ int sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents, int di
 			sg->dma_length = sg->length;
 			sg->dma_address = virt_to_phys(sba_sg_address(sg));
 		}
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		spin_lock_irqsave(&ioc->res_lock, flags);
 		ioc->msg_bypass++;
 		spin_unlock_irqrestore(&ioc->res_lock, flags);
@@ -1281,7 +1286,7 @@ int sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents, int di
 		sglist->dma_length = sglist->length;
 		sglist->dma_address = sba_map_single(dev, sba_sg_address(sglist), sglist->length,
 						     dir);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		/*
 		** Should probably do some stats counting, but trying to
 		** be precise quickly starts wasting CPU time.
@@ -1300,7 +1305,7 @@ int sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents, int di
 	}
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->msg_calls++;
 #endif
 
@@ -1363,7 +1368,7 @@ void sba_unmap_sg (struct device *dev, struct scatterlist *sglist, int nents, in
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->usg_calls++;
 #endif
 
@@ -1376,7 +1381,7 @@ void sba_unmap_sg (struct device *dev, struct scatterlist *sglist, int nents, in
 	while (nents && sglist->dma_length) {
 
 		sba_unmap_single(dev, sglist->dma_address, sglist->dma_length, dir);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		/*
 		** This leaves inconsistent data in the stats, but we can't
 		** tell which sg lists were mapped by map_single and which
@@ -1704,7 +1709,7 @@ ioc_init(u64 hpa, void *handle)
 **
 **************************************************************************/
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 static void *
 ioc_start(struct seq_file *s, loff_t *pos)
 {
@@ -1950,7 +1955,7 @@ sba_init(void)
 	}
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc_proc_init();
 #endif
 	return 0;
