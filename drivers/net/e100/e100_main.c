@@ -121,14 +121,13 @@ extern void e100_config_wol(struct e100_private *bdp);
 extern u32 e100_run_diag(struct net_device *dev, u64 *test_info, u32 flags);
 static int e100_ethtool_test(struct net_device *, struct ifreq *);
 static int e100_ethtool_gstrings(struct net_device *, struct ifreq *);
-static char *test_strings[] = {
-	"E100_EEPROM_TEST_FAIL",
-	"E100_CHIP_TIMEOUT",
-	"E100_ROM_TEST_FAIL",
-	"E100_REG_TEST_FAIL",
-	"E100_MAC_TEST_FAIL",
-	"E100_LPBK_MAC_FAIL",
-	"E100_LPBK_PHY_FAIL"
+static char test_strings[][ETH_GSTRING_LEN] = {
+	"Link test     (on/offline)",
+	"Eeprom test   (on/offline)",
+	"Self test        (offline)",
+	"Mac loopback     (offline)",
+	"Phy loopback     (offline)",
+	"Cable diagnostic (offline)"
 };
 
 static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
@@ -3500,14 +3499,14 @@ e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 	struct ethtool_test *info;
 	int rc = -EFAULT;
 
-	info = kmalloc(sizeof(*info) + E100_MAX_TEST_RES * sizeof(u64),
+	info = kmalloc(sizeof(*info) + max_test_res * sizeof(u64),
 		       GFP_ATOMIC);
 
 	if (!info)
 		return -ENOMEM;
 
 	memset((void *) info, 0, sizeof(*info) +
-				 E100_MAX_TEST_RES * sizeof(u64));
+				 max_test_res * sizeof(u64));
 
 	if (copy_from_user(info, ifr->ifr_data, sizeof(*info)))
 		goto exit;
@@ -3515,7 +3514,7 @@ e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 	info->flags = e100_run_diag(dev, info->data, info->flags);
 
 	if (!copy_to_user(ifr->ifr_data, info,
-			 sizeof(*info) + E100_MAX_TEST_RES * sizeof(u64)))
+			 sizeof(*info) + max_test_res * sizeof(u64)))
 		rc = 0;
 exit:
 	kfree(info);
@@ -3590,7 +3589,7 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 	info.n_stats = E100_STATS_LEN;
 	info.regdump_len  = E100_REGS_LEN * sizeof(u32);
 	info.eedump_len = (bdp->eeprom_size << 1);	
-	info.testinfo_len = E100_MAX_TEST_RES;
+	info.testinfo_len = max_test_res;
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
 		return -EFAULT;
 
@@ -3940,15 +3939,15 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 	switch (info.string_set) {
 	case ETH_SS_TEST: {
 		int ret = 0;
-		if (info.len > E100_MAX_TEST_RES)
-			info.len = E100_MAX_TEST_RES;
+		if (info.len > max_test_res)
+			info.len = max_test_res;
 		strings = kmalloc(info.len * ETH_GSTRING_LEN, GFP_ATOMIC);
 		if (!strings)
 			return -ENOMEM;
 		memset(strings, 0, info.len * ETH_GSTRING_LEN);
 
 		for (i = 0; i < info.len; i++) {
-			sprintf(strings + i * ETH_GSTRING_LEN, "%-31s",
+			sprintf(strings + i * ETH_GSTRING_LEN, "%s",
 				test_strings[i]);
 		}
 		if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
