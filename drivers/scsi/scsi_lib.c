@@ -14,6 +14,7 @@
 #include <linux/mempool.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 
 #include "scsi.h"
 #include "hosts.h"
