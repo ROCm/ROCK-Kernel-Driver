@@ -2484,8 +2484,10 @@ kdbm_pb_flags(int argc, const char **argv, const char **envp, struct pt_regs *re
 static void
 print_pagebuf(
 	xfs_buf_t	*pb,
-	unsigned long addr)
+	unsigned long	addr)
 {
+	unsigned long	age = (xfs_buf_age_centisecs * HZ) / 100;
+
 	kdb_printf("xfs_buf_t at 0x%lx\n", addr);
 	kdb_printf("  pb_flags %s\n", pb_flags(pb->pb_flags));
 	kdb_printf("  pb_target 0x%p pb_hold %d pb_next 0x%p pb_prev 0x%p\n",
@@ -2500,15 +2502,15 @@ print_pagebuf(
 		   (unsigned long long) pb->pb_file_offset,
 		   (unsigned long long) pb->pb_buffer_length,
 		   pb->pb_addr);
-	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx pb_locked %d\n",
-		   pb->pb_bn,
+	kdb_printf("  pb_bn 0x%llx pb_count_desired 0x%lx pb_locked %d\n",
+		   (unsigned long long)pb->pb_bn,
 		   (unsigned long) pb->pb_count_desired, (int)pb->pb_locked);
-	kdb_printf("  pb_queuetime %ld (%ld/%ld) pb_io_remaining %d pb_error %u\n",
-		   pb->pb_queuetime, jiffies, pb->pb_queuetime + xfs_age_buffer,
-		   pb->pb_io_remaining.counter, pb->pb_error);
-	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
+	kdb_printf("  pb_queuetime %ld (now=%ld/age=%ld) pb_io_remaining %d\n",
+		   pb->pb_queuetime, jiffies, pb->pb_queuetime + age,
+		   pb->pb_io_remaining.counter);
+	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p pb_error %u\n",
 		   pb->pb_page_count, pb->pb_offset,
-		   pb->pb_pages);
+		   pb->pb_pages, pb->pb_error);
 #if 0
 	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
 		   pb->pb_iodonesema.count.counter,
