@@ -4063,7 +4063,7 @@ static void PXC200_muxsel(struct bttv *btv, unsigned int input)
 	  return;
 	}
 
-	rc=bttv_I2CRead(btv,(PX_I2C_PIC<<1),0);
+	rc=bttv_I2CRead(btv,(PX_I2C_PIC<<1),NULL);
 	if (!(rc & PX_CFG_PXC200F)) {
 	  printk(KERN_DEBUG "bttv%d: PXC200_muxsel: not PXC200F rc:%d \n", btv->c.nr,rc);
 	  return;

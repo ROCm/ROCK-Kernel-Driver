@@ -1126,7 +1126,7 @@ static int amb_open (struct atm_vcc * atm_vcc)
 	  } else {
 	    r = round_up;
 	  }
-	  error = make_rate (pcr, r, &tx_rate_bits, 0);
+	  error = make_rate (pcr, r, &tx_rate_bits, NULL);
 	  tx_vc_bits = TX_UBR_CAPPED;
 	  tx_frame_bits = TX_FRAME_CAPPED;
 	}
@@ -1333,7 +1333,7 @@ static void amb_close (struct atm_vcc * atm_vcc) {
       PRINTK (KERN_ERR, "%s vcc=%p rxer[vci]=%p",
 	      "arghhh! we're going to die!",
 	      vcc, dev->rxer[vci]);
-    dev->rxer[vci] = 0;
+    dev->rxer[vci] = NULL;
     while (command_do (dev, &cmd))
       schedule();
     

@@ -203,7 +203,7 @@ static int ptable_alloc(void) {
 					  PAGE_SIZE,
 					  meye.mchip_ptable_toc,
 					  meye.mchip_dmahandle);
-			meye.mchip_ptable_toc = 0;
+			meye.mchip_ptable_toc = NULL;
 			meye.mchip_dmahandle = 0;
 			return -1;
 		}
@@ -232,7 +232,7 @@ static void ptable_free(void) {
 				  meye.mchip_dmahandle);
 
 	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
-	meye.mchip_ptable_toc = 0;
+	meye.mchip_ptable_toc = NULL;
 	meye.mchip_dmahandle = 0;
 }
 

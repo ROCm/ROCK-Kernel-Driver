@@ -2667,7 +2667,7 @@ static void ia_close(struct atm_vcc *vcc)
            }                                 
            // Drain the packets
            rx_dle_intr(vcc->dev); 
-           iadev->rx_open[vcc->vci] = 0;
+           iadev->rx_open[vcc->vci] = NULL;
         }
 	kfree(INPH_IA_VCC(vcc));  
         ia_vcc = NULL;

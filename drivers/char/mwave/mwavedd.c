@@ -179,7 +179,7 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 		case IOCTL_MW_READ_DATA:
 		case IOCTL_MW_READCLEAR_DATA: {
 			MW_READWRITE rReadData;
-			unsigned short __user *pusBuffer = 0;
+			unsigned short __user *pusBuffer = NULL;
 	
 			if( copy_from_user(&rReadData, arg,
 						sizeof(MW_READWRITE)) )
@@ -200,7 +200,7 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 	
 		case IOCTL_MW_READ_INST: {
 			MW_READWRITE rReadData;
-			unsigned short __user *pusBuffer = 0;
+			unsigned short __user *pusBuffer = NULL;
 	
 			if( copy_from_user(&rReadData, arg,
 						sizeof(MW_READWRITE)) )
@@ -221,7 +221,7 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 	
 		case IOCTL_MW_WRITE_DATA: {
 			MW_READWRITE rWriteData;
-			unsigned short __user *pusBuffer = 0;
+			unsigned short __user *pusBuffer = NULL;
 	
 			if( copy_from_user(&rWriteData, arg,
 						sizeof(MW_READWRITE)) )
@@ -242,7 +242,7 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 	
 		case IOCTL_MW_WRITE_INST: {
 			MW_READWRITE rWriteData;
-			unsigned short __user *pusBuffer = 0;
+			unsigned short __user *pusBuffer = NULL;
 	
 			if( copy_from_user(&rWriteData, arg,
 						sizeof(MW_READWRITE)) )

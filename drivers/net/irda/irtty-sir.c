@@ -584,7 +584,7 @@ static void irtty_close(struct tty_struct *tty)
 	 */
 
 	/* we are dead now */
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 
 	sirdev_put_instance(priv->dev);
 

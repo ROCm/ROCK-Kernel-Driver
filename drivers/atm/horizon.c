@@ -1184,7 +1184,7 @@ static void tx_schedule (hrz_dev * const dev, int irq) {
 	// tx_regions == 0
 	// that's all folks - end of frame
 	struct sk_buff * skb = dev->tx_skb;
-	dev->tx_iovec = 0;
+	dev->tx_iovec = NULL;
 	
 	// VC layer stats
 	atomic_inc(&ATM_SKB(skb)->vcc->stats->tx);
@@ -1761,7 +1761,7 @@ static int hrz_send (struct atm_vcc * atm_vcc, struct sk_buff * skb) {
     if (tx_iovcnt) {
       // scatter gather transfer
       dev->tx_regions = tx_iovcnt;
-      dev->tx_iovec = 0;		/* @@@ needs rewritten */
+      dev->tx_iovec = NULL;		/* @@@ needs rewritten */
       dev->tx_bytes = 0;
       PRINTD (DBG_TX|DBG_BUS, "TX start scatter-gather transfer (iovec %p, len %d)",
 	      skb->data, tx_len);
@@ -1771,7 +1771,7 @@ static int hrz_send (struct atm_vcc * atm_vcc, struct sk_buff * skb) {
     } else {
       // simple transfer
       dev->tx_regions = 0;
-      dev->tx_iovec = 0;
+      dev->tx_iovec = NULL;
       dev->tx_bytes = tx_len;
       dev->tx_addr = skb->data;
       PRINTD (DBG_TX|DBG_BUS, "TX start simple transfer (addr %p, len %d)",
@@ -2278,7 +2278,7 @@ static int hrz_open (struct atm_vcc *atm_vcc)
 	// we take "the PCR" as a rate-cap
 	// not reserved
 	vcc.tx_rate = 0;
-	make_rate (dev, 1<<30, round_nearest, &vcc.tx_pcr_bits, 0);
+	make_rate (dev, 1<<30, round_nearest, &vcc.tx_pcr_bits, NULL);
 	vcc.tx_xbr_bits = ABR_RATE_TYPE;
 	break;
       }
@@ -2583,7 +2583,7 @@ static void hrz_close (struct atm_vcc * atm_vcc) {
       PRINTK (KERN_ERR, "%s atm_vcc=%p rxer[channel]=%p",
 	      "arghhh! we're going to die!",
 	      atm_vcc, dev->rxer[channel]);
-    dev->rxer[channel] = 0;
+    dev->rxer[channel] = NULL;
   }
   
   // atomically release our rate reservation
@@ -2806,8 +2806,8 @@ static int __init hrz_probe (void) {
 	
 	dev->tx_regions = 0;
 	dev->tx_bytes = 0;
-	dev->tx_skb = 0;
-	dev->tx_iovec = 0;
+	dev->tx_skb = NULL;
+	dev->tx_iovec = NULL;
 	
 	dev->tx_cell_count = 0;
 	dev->rx_cell_count = 0;

@@ -424,17 +424,15 @@ v4l_fbuffer_alloc (struct file *file)
 						ZR_DEVNAME(zr), size >> 10);
 					return -ENOBUFS;
 				}
-				fh->v4l_buffers.buffer[0].fbuffer = 0;
-				fh->v4l_buffers.buffer[0].fbuffer_phys =
-				    pmem;
-				fh->v4l_buffers.buffer[0].fbuffer_bus =
-				    pmem;
+				fh->v4l_buffers.buffer[0].fbuffer = NULL;
+				fh->v4l_buffers.buffer[0].fbuffer_phys = pmem;
+				fh->v4l_buffers.buffer[0].fbuffer_bus = pmem;
 				dprintk(4,
 					KERN_INFO
 					"%s: v4l_fbuffer_alloc() - using %d KB high memory\n",
 					ZR_DEVNAME(zr), size >> 10);
 			} else {
-				fh->v4l_buffers.buffer[i].fbuffer = 0;
+				fh->v4l_buffers.buffer[i].fbuffer = NULL;
 				fh->v4l_buffers.buffer[i].fbuffer_phys =
 				    pmem + i * fh->v4l_buffers.buffer_size;
 				fh->v4l_buffers.buffer[i].fbuffer_bus =

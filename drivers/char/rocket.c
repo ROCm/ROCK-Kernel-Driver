@@ -1115,7 +1115,7 @@ static void rp_close(struct tty_struct *tty, struct file *filp)
 	} else {
 		if (info->xmit_buf) {
 			free_page((unsigned long) info->xmit_buf);
-			info->xmit_buf = 0;
+			info->xmit_buf = NULL;
 		}
 	}
 	info->flags &= ~(ROCKET_INITIALIZED | ROCKET_CLOSING | ROCKET_NORMAL_ACTIVE);
@@ -1292,7 +1292,7 @@ static int set_config(struct r_port *info, struct rocket_config __user *new_info
 		if ((new_serial.flags & ~ROCKET_USR_MASK) != (info->flags & ~ROCKET_USR_MASK))
 			return -EPERM;
 		info->flags = ((info->flags & ~ROCKET_USR_MASK) | (new_serial.flags & ROCKET_USR_MASK));
-		configure_r_port(info, 0);
+		configure_r_port(info, NULL);
 		return 0;
 	}
 
@@ -1309,7 +1309,7 @@ static int set_config(struct r_port *info, struct rocket_config __user *new_info
 	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_WARP)
 		info->tty->alt_speed = 460800;
 
-	configure_r_port(info, 0);
+	configure_r_port(info, NULL);
 	return 0;
 }
 
@@ -1572,7 +1572,7 @@ static void rp_hangup(struct tty_struct *tty)
 
 	info->count = 0;
 	info->flags &= ~ROCKET_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 
 	cp = &info->channel;
 	sDisRxFIFO(cp);

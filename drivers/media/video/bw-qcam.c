@@ -660,7 +660,7 @@ long qc_capture(struct qcam_device * q, char *buf, unsigned long len)
 			}
 			pixels_read += bytes;
 		}
-		(void) qc_readbytes(q, 0);	/* reset state machine */
+		(void) qc_readbytes(q, NULL);	/* reset state machine */
 		
 		/* Grabbing an entire frame from the quickcam is a lengthy
 		   process. We don't (usually) want to busy-block the
