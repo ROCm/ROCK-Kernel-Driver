@@ -1,6 +1,6 @@
 /* Linux driver for Philips webcam 
    Various miscellaneous functions and tables.
-   (C) 1999-2001 Nemosoft Unv. (webcam@smcc.demon.nl)
+   (C) 1999-2002 Nemosoft Unv. (webcam@smcc.demon.nl)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by

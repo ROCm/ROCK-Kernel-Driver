@@ -1,6 +1,6 @@
 /* Linux driver for Philips webcam 
    Decompression frontend.
-   (C) 1999-2001 Nemosoft Unv. (webcam@smcc.demon.nl)
+   (C) 1999-2002 Nemosoft Unv. (webcam@smcc.demon.nl)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -77,7 +77,7 @@ int pwc_decompress(struct pwc_device *pdev)
 {
 	struct pwc_frame_buf *fbuf;
 	int n, line, col, stride;
-	void *yuv, *image, *dst;
+	void *yuv, *image;
 	u16 *src;
 	u16 *dsty, *dstu, *dstv;
 
@@ -114,19 +114,6 @@ int pwc_decompress(struct pwc_device *pdev)
 		   to get the desired output format/size.
 		 */
 		switch (pdev->vpalette) {
-		case VIDEO_PALETTE_YUV420:
-			/* Calculate byte offsets per line in image & view */
-			n   = (pdev->image.x * 3) / 2;
-			col = (pdev->view.x  * 3) / 2;
-			/* Offset into image */
-			dst = image + (pdev->view.x * pdev->offset.y + pdev->offset.x) * 3 / 2;
-			for (line = 0; line < pdev->image.y; line++) {
-				memcpy(dst, yuv, n);
-				yuv += n;
-				dst += col;
-			}
-			break;
-
 		case VIDEO_PALETTE_YUV420P:
 			/* 
 			 * We do some byte shuffling here to go from the 
@@ -163,17 +150,20 @@ int pwc_decompress(struct pwc_device *pdev)
 					dstu += (stride >> 1);
 			}
 			break;
+		default:
+			Err("Unsupported palette!");
+			break;
 		}
 	}
 	else { 
 		/* Compressed; the decompressor routines will write the data 
-		   in interlaced or planar format immediately.
+		   in planar format immediately.
 		 */
 		if (pdev->decompressor)
 			pdev->decompressor->decompress(
 				&pdev->image, &pdev->view, &pdev->offset,
-				yuv, image, 
-				pdev->vpalette == VIDEO_PALETTE_YUV420P ? 1 : 0,
+				yuv, image,
+				1,
 				pdev->decompress_data, pdev->vbandlength);
 		else
 			return -ENXIO; /* No such device or address: missing decompressor */

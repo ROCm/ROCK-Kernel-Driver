@@ -255,6 +255,15 @@ MODULE PARAMETERS:
 	might be necessary if your camera has a custom lens assembly. This has
 	no effect with video capture devices.
 
+  NAME: ov518_color
+  TYPE: integer (Boolean)
+  DEFAULT: 0 (off)
+  DESC: Enable OV518 color support. This is off by default since it doesn't
+	work most of the time. If you want to try it, you must also load
+	ov518_decomp with the "nouv=0" parameter. If you get improper colors or
+	diagonal lines through the image, restart your video app and try again.
+	Repeat as necessary.
+
 WORKING FEATURES:
  o Color streaming/capture at most widths and heights that are multiples of 8.
  o Monochrome (use force_palette=1 to enable)

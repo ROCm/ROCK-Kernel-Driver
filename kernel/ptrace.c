@@ -101,7 +101,8 @@ int ptrace_attach(struct task_struct *task)
 	/* the same process cannot be attached many times */
 	if (task->ptrace & PT_PTRACED)
 		goto bad;
-	if ((retval = security_ptrace(current, task)))
+	retval = security_ptrace(current, task);
+	if (retval)
 		goto bad;
 
 	/* Go */

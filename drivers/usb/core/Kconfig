@@ -38,18 +38,6 @@ config USB_DEVICEFS
 
 	  Most users want to say Y here.
 
-config USB_LONG_TIMEOUT
-	bool "Long timeout for slow-responding devices (some MGE Ellipse UPSes)"
-	depends on USB
-	help
-	  This option makes the standard time out a bit longer.  Basically,
-	  some devices are just slow to respond, so this makes usb more
-	  patient.  There should be no harm in selecting this, but it is
-	  needed for some MGE Ellipse UPSes.
-
-	  If you have an MGE Ellipse UPS, or you see timeouts in HID
-	  transactions, say Y; otherwise say N.
-
 config USB_BANDWIDTH
 	bool "Enforce USB bandwidth allocation (EXPERIMENTAL)"
 	depends on USB && EXPERIMENTAL

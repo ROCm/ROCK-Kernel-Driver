@@ -101,7 +101,8 @@ static int newque (key_t key, int msgflg)
 	msq->q_perm.key = key;
 
 	msq->q_perm.security = NULL;
-	if ((retval = security_msg_queue_alloc(msq))) {
+	retval = security_msg_queue_alloc(msq);
+	if (retval) {
 		ipc_rcu_free(msq, sizeof(*msq));
 		return retval;
 	}

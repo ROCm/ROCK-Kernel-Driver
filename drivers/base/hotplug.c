@@ -35,6 +35,8 @@
 #define BUFFER_SIZE	1024	/* should be enough memory for the env */
 #define NUM_ENVP	32	/* number of env pointers */
 
+static char prefix [] = "devices";	/* /sys/devices/... */
+
 static int do_hotplug (struct device *dev, char *argv1, const char *action,
 			int (* hotplug) (struct device *, char **, int, char *, int))
 {
@@ -72,7 +74,7 @@ static int do_hotplug (struct device *dev, char *argv1, const char *action,
 	}
 
 	dev_length = get_devpath_length (dev);
-	dev_length += strlen("root");
+	dev_length += strlen(prefix);
 	dev_path = kmalloc (dev_length, GFP_KERNEL);
 	if (!dev_path) {
 		kfree (buffer);
@@ -80,7 +82,7 @@ static int do_hotplug (struct device *dev, char *argv1, const char *action,
 		return -ENOMEM;
 	}
 	memset (dev_path, 0x00, dev_length);
-	strcpy (dev_path, "root");
+	strcpy (dev_path, prefix);
 	fill_devpath (dev, dev_path, dev_length);
 
 	argv [0] = hotplug_path;

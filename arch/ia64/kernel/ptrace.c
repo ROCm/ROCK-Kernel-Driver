@@ -1101,7 +1101,8 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		/* are we already being traced? */
 		if (current->ptrace & PT_PTRACED)
 			goto out;
-		if ((ret = security_ptrace(current->parent, current)))
+		ret = security_ptrace(current->parent, current);
+		if (ret)
 			goto out;
 		current->ptrace |= PT_PTRACED;
 		ret = 0;

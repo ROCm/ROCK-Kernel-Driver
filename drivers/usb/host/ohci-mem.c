@@ -14,7 +14,8 @@
  *	- data used only by the HCD ... kmalloc is fine
  *	- async and periodic schedules, shared by HC and HCD ... these
  *	  need to use pci_pool or pci_alloc_consistent
- *	- driver buffers, read/written by HC ... single shot DMA mapped 
+ *	- driver buffers, read/written by HC ... the hcd glue or the
+ *	  device driver provides us with dma addresses
  *
  * There's also PCI "register" data, which is memory mapped.
  * No memory seen by this driver is pagable.
@@ -40,95 +41,6 @@ static void ohci_hcd_free (struct usb_hcd *hcd)
 }
 
 /*-------------------------------------------------------------------------*/
-
-/* Recover a TD/ED using its collision chain */
-static inline void *
-dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)
-{
-	struct hash_t * scan = entry->head;
-	while (scan && scan->dma != dma)
-		scan = scan->next;
-	return scan ? scan->virt : 0;
-}
-
-static inline struct td *
-dma_to_td (struct ohci_hcd *hc, dma_addr_t td_dma)
-{
-	td_dma &= TD_MASK;
-	return (struct td *) dma_to_ed_td(&(hc->td_hash [TD_HASH_FUNC(td_dma)]),
-				      td_dma);
-}
-
-// FIXME:  when updating the hashtables this way, mem_flags is unusable...
-
-/* Add a hash entry for a TD/ED; return true on success */
-static inline int
-hash_add_ed_td (
-	struct hash_list_t *entry,
-	void *virt,
-	dma_addr_t dma,
-	int mem_flags
-)
-{
-	struct hash_t * scan;
-	
-	scan = (struct hash_t *) kmalloc (sizeof *scan, mem_flags);
-	if (!scan)
-		return 0;
-	
-	if (!entry->tail) {
-		entry->head = entry->tail = scan;
-	} else {
-		entry->tail->next = scan;
-		entry->tail = scan;
-	}
-	
-	scan->virt = virt;
-	scan->dma = dma;
-	scan->next = NULL;
-	return 1;
-}
-
-static inline int
-hash_add_td (struct ohci_hcd *hc, struct td *td, int mem_flags)
-{
-	return hash_add_ed_td (&(hc->td_hash [TD_HASH_FUNC (td->td_dma)]),
-			td, td->td_dma, mem_flags);
-}
-
-
-static inline void
-hash_free_ed_td (struct hash_list_t *entry, void *virt)
-{
-	struct hash_t *scan, *prev;
-	scan = prev = entry->head;
-
-	// Find and unlink hash entry
-	while (scan && scan->virt != virt) {
-		prev = scan;
-		scan = scan->next;
-	}
-	if (scan) {
-		if (scan == entry->head) {
-			if (entry->head == entry->tail)
-				entry->head = entry->tail = NULL;
-			else
-				entry->head = scan->next;
-		} else if (scan == entry->tail) {
-			entry->tail = prev;
-			prev->next = NULL;
-		} else
-			prev->next = scan->next;
-		kfree(scan);
-	}
-}
-
-static inline void
-hash_free_td (struct ohci_hcd *hc, struct td * td)
-{
-	hash_free_ed_td (&(hc->td_hash[TD_HASH_FUNC(td->td_dma)]), td);
-}
-
 
 static int ohci_mem_init (struct ohci_hcd *ohci)
 {
@@ -161,6 +73,21 @@ static void ohci_mem_cleanup (struct ohci_hcd *ohci)
 	}
 }
 
+/*-------------------------------------------------------------------------*/
+
+/* ohci "done list" processing needs this mapping */
+static inline struct td *
+dma_to_td (struct ohci_hcd *hc, dma_addr_t td_dma)
+{
+	struct td *td;
+
+	td_dma &= TD_MASK;
+	td = hc->td_hash [TD_HASH_FUNC(td_dma)];
+	while (td && td->td_dma != td_dma)
+		td = td->td_hash;
+	return td;
+}
+
 /* TDs ... */
 static struct td *
 td_alloc (struct ohci_hcd *hc, int mem_flags)
@@ -170,12 +97,17 @@ td_alloc (struct ohci_hcd *hc, int mem_flags)
 
 	td = pci_pool_alloc (hc->td_cache, mem_flags, &dma);
 	if (td) {
+		int	hash;
+
+		/* in case hc fetches it, make it look dead */
+		memset (td, 0, sizeof *td);
+		td->hwNextTD = cpu_to_le32 (dma);
 		td->td_dma = dma;
+
 		/* hash it for later reverse mapping */
-		if (!hash_add_td (hc, td, mem_flags)) {
-			pci_pool_free (hc->td_cache, td, dma);
-			return NULL;
-		}
+		hash = TD_HASH_FUNC (dma);
+		td->td_hash = hc->td_hash [hash];
+		hc->td_hash [hash] = td;
 	}
 	return td;
 }
@@ -183,10 +115,18 @@ td_alloc (struct ohci_hcd *hc, int mem_flags)
 static void
 td_free (struct ohci_hcd *hc, struct td *td)
 {
-	hash_free_td (hc, td);
+	struct td	**prev = &hc->td_hash [TD_HASH_FUNC (td->td_dma)];
+
+	while (*prev && *prev != td)
+		prev = &(*prev)->td_hash;
+	if (*prev)
+		*prev = td->td_hash;
+	else
+		dev_dbg (*hc->hcd.controller, "bad hash for td %p\n", td);
 	pci_pool_free (hc->td_cache, td, td->td_dma);
 }
 
+/*-------------------------------------------------------------------------*/
 
 /* EDs ... */
 static struct ed *
