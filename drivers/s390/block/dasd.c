@@ -168,11 +168,9 @@ dasd_state_new_to_known(struct dasd_device *device)
 
 	snprintf(buf, sizeof(buf), "dasd/%04x/device",
 		 _ccw_device_get_device_number(device->cdev));
-	device->devfs_entry = devfs_register(NULL, buf, 0,
-					     major(kdev),
-					     minor(kdev) << DASD_PARTN_BITS,
-					     devfs_perm,
-					     &dasd_device_operations, NULL);
+	devfs_register(NULL, buf, 0,
+			major(kdev), minor(kdev) << DASD_PARTN_BITS,
+			devfs_perm, &dasd_device_operations, NULL);
 	device->state = DASD_STATE_KNOWN;
 	return 0;
 }
@@ -184,8 +182,8 @@ static inline void
 dasd_state_known_to_new(struct dasd_device * device)
 {
 	/* Remove device entry and devfs directory. */
-	devfs_unregister(device->devfs_entry);
-	devfs_unregister(device->gdp->de);
+	devfs_remove("dasd/%04x/device",
+			_ccw_device_get_device_number(device->cdev));
 
 	/* Forget the discipline information. */
 	device->discipline = NULL;

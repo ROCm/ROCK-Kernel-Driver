@@ -264,7 +264,6 @@ extern struct dasd_discipline dasd_diag_discipline;
 struct dasd_device {
 	/* Block device stuff. */
 	struct gendisk *gdp;
-	devfs_handle_t devfs_entry;
 	request_queue_t *request_queue;
 	spinlock_t request_queue_lock;
 	unsigned long blocks;		/* size of volume in blocks */

@@ -338,7 +338,6 @@ extern int tty3270_proc_misc;
 extern enum tubwhat tty3270_proc_what;
 extern struct tty_driver tty3270_driver;
 #ifdef CONFIG_DEVFS_FS
-extern devfs_handle_t fs3270_devfs_dir;
 extern void fs3270_devfs_register(tub_t *);
 extern void fs3270_devfs_unregister(tub_t *);
 #endif
