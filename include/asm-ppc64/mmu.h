@@ -13,6 +13,7 @@
 #ifndef _PPC64_MMU_H_
 #define _PPC64_MMU_H_
 
+#include <linux/config.h>
 #include <asm/page.h>
 
 #ifndef __ASSEMBLY__

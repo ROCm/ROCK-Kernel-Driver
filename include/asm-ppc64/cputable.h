@@ -15,6 +15,8 @@
 #ifndef __ASM_PPC_CPUTABLE_H
 #define __ASM_PPC_CPUTABLE_H
 
+#include <linux/config.h>
+
 /* Exposed to userland CPU features - Must match ppc32 definitions */
 #define PPC_FEATURE_32			0x80000000
 #define PPC_FEATURE_64			0x40000000

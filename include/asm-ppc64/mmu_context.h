@@ -1,6 +1,7 @@
 #ifndef __PPC64_MMU_CONTEXT_H
 #define __PPC64_MMU_CONTEXT_H
 
+#include <linux/config.h>
 #include <linux/spinlock.h>	
 #include <linux/kernel.h>	
 #include <linux/mm.h>	
