@@ -38,7 +38,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"sata_via"
-#define DRV_VERSION	"0.20"
+#define DRV_VERSION	"1.0"
 
 enum {
 	via_sata		= 0,
@@ -138,6 +138,7 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("SCSI low-level driver for VIA SATA controllers");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, svia_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 static u32 svia_scr_read (struct ata_port *ap, unsigned int sc_reg)
 {

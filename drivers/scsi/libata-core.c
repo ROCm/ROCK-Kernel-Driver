@@ -67,6 +67,7 @@ static struct workqueue_struct *ata_wq;
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);
 
 /**
  *	ata_tf_load - send taskfile registers to host controller

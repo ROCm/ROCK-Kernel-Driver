@@ -40,7 +40,7 @@
 #include "sata_promise.h"
 
 #define DRV_NAME	"sata_sx4"
-#define DRV_VERSION	"0.50"
+#define DRV_VERSION	"0.7"
 
 
 enum {
@@ -1492,6 +1492,7 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Promise SATA low-level driver");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, pdc_sata_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 module_init(pdc_sata_init);
 module_exit(pdc_sata_exit);

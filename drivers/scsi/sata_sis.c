@@ -38,7 +38,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sis"
-#define DRV_VERSION	"0.10"
+#define DRV_VERSION	"0.5"
 
 enum {
 	sis_180			= 0,
@@ -128,6 +128,7 @@ MODULE_AUTHOR("Uwe Koziolek");
 MODULE_DESCRIPTION("low-level driver for Silicon Integratad Systems SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sis_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 static unsigned int get_scr_cfg_addr(unsigned int port_no, unsigned int sc_reg)
 {

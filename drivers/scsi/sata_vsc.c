@@ -26,7 +26,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_vsc"
-#define DRV_VERSION	"0.01"
+#define DRV_VERSION	"1.0"
 
 /* Interrupt register offsets (from chip base address) */
 #define VSC_SATA_INT_STAT_OFFSET	0x00
@@ -393,6 +393,7 @@ MODULE_AUTHOR("Jeremy Higdon");
 MODULE_DESCRIPTION("low-level driver for Vitesse VSC7174 SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, vsc_sata_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 module_init(vsc_sata_init);
 module_exit(vsc_sata_exit);

@@ -40,7 +40,7 @@
 #include "sata_promise.h"
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"1.00"
+#define DRV_VERSION	"1.01"
 
 
 enum {
@@ -661,6 +661,7 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Promise SATA TX2/TX4 low-level driver");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, pdc_ata_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 module_init(pdc_ata_init);
 module_exit(pdc_ata_exit);

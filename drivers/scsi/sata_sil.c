@@ -38,7 +38,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sil"
-#define DRV_VERSION	"0.54"
+#define DRV_VERSION	"0.8"
 
 enum {
 	sil_3112		= 0,
@@ -190,6 +190,7 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("low-level driver for Silicon Image SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sil_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 static void sil_post_set_mode (struct ata_port *ap)
 {
