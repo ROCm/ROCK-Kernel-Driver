@@ -399,6 +399,7 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 #endif
 
+#ifdef CONFIG_PPC_PSERIES
 	/* Hack -- add console=ttySn,9600 if necessary */
 	if(strstr(cmd_line, "console=") == NULL) {
 		struct device_node *prom_stdout = find_path_device(of_stdout_device);
@@ -434,6 +435,7 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 			}
 		}
 	}
+#endif
 
 	/* Look for mem= option on command line */
 	if (strstr(cmd_line, "mem=")) {
