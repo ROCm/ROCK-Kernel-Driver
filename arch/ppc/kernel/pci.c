@@ -33,6 +33,7 @@
 unsigned long isa_io_base     = 0;
 unsigned long isa_mem_base    = 0;
 unsigned long pci_dram_offset = 0;
+int pcibios_assign_bus_offset = 1;
 
 void pcibios_make_OF_bus_map(void);
 
@@ -1263,7 +1264,7 @@ pcibios_init(void)
 		bus = pci_scan_bus(hose->first_busno, hose->ops, hose);
 		hose->last_busno = bus->subordinate;
 		if (pci_assign_all_busses || next_busno <= hose->last_busno)
-			next_busno = hose->last_busno+1;
+			next_busno = hose->last_busno + pcibios_assign_bus_offset;
 	}
 	pci_bus_count = next_busno;
 
