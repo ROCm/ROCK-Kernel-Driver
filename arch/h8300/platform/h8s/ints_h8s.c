@@ -63,7 +63,8 @@ const static struct irq_pins irq_assign_table1[16]={
 	{H8300_GPIO_P2,H8300_GPIO_B6},{H8300_GPIO_P2,H8300_GPIO_B7},
 };
 
-#define IRQ_GPIO_MAP(irqbit,port,bit)				  \
+/* IRQ to GPIO pinno transrate */
+#define IRQ_GPIO_MAP(irqbit,irq,port,bit)			  \
 do {								  \
 	if (*(volatile unsigned short *)ITSR & irqbit) {	  \
 		port = irq_assign_table1[irq - EXT_IRQ0].port_no; \
@@ -79,7 +80,7 @@ int h8300_enable_irq_pin(unsigned int irq)
 	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ15) {
 		unsigned short ptn = 1 << (irq - EXT_IRQ0);
 		unsigned int port_no,bit_no;
-		IRQ_GPIO_MAP(ptn,port_no,bit_no);
+		IRQ_GPIO_MAP(ptn,irq,port_no,bit_no);
 		if (H8300_GPIO_RESERVE(port_no, bit_no) == 0)
 			return -EBUSY;                   /* pin already use */
 		H8300_GPIO_DDR(port_no, bit_no, H8300_GPIO_INPUT);
