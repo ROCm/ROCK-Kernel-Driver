@@ -50,7 +50,7 @@ static u_char nibbletab_cfb2[]={
 
 void fbcon_cfb2_setup(struct display *p)
 {
-    p->next_line = p->line_length ? p->line_length : p->var.xres_virtual>>2;
+    p->next_line = p->fb_info->fix.line_length ? p->fb_info->fix.line_length : p->var.xres_virtual>>2;
     p->next_plane = 0;
 }
 

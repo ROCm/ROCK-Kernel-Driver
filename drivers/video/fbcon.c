@@ -2344,7 +2344,7 @@ static int __init fbcon_show_logo( void )
 
 #if defined(CONFIG_FBCON_IPLAN2P2) || defined(CONFIG_FBCON_IPLAN2P4) || \
     defined(CONFIG_FBCON_IPLAN2P8)
-	    int line_length = p->line_length;
+	    int line_length = info->fix.line_length;
 
 	    /* for support of Atari interleaved planes */
 #define MAP_X(x)	(line_length ? (x) : ((x) & ~1)*depth + ((x) & 1))
@@ -2388,12 +2388,12 @@ static int __init fbcon_show_logo( void )
 #if defined(CONFIG_FBCON_MFB) || defined(CONFIG_FBCON_AFB) || \
     defined(CONFIG_FBCON_ILBM) || defined(CONFIG_FBCON_HGA)
 
-	if (depth == 1 && (p->fix.type == FB_TYPE_PACKED_PIXELS ||
-			   p->fix.type == FB_TYPE_PLANES ||
-			   p->fix.type == FB_TYPE_INTERLEAVED_PLANES)) {
+	if (depth == 1 && (info->fix.type == FB_TYPE_PACKED_PIXELS ||
+			   info->fix.type == FB_TYPE_PLANES ||
+			   info->fix.type == FB_TYPE_INTERLEAVED_PLANES)) {
 
 	    /* monochrome */
-	    unsigned char inverse = p->inverse || p->visual == FB_VISUAL_MONO01
+	    unsigned char inverse = p->inverse || info->fix.visual == FB_VISUAL_MONO01
 		? 0x00 : 0xff;
 
 	    int is_hga = !strncmp(p->fb_info->modename, "HGA", 3);

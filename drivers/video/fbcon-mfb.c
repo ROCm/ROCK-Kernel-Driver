@@ -25,8 +25,8 @@
 
 void fbcon_mfb_setup(struct display *p)
 {
-    if (p->line_length)
-	p->next_line = p->line_length;
+    if (p->fb_info->fix.line_length)
+	p->next_line = p->fb_info->fix.line_length;
     else
 	p->next_line = p->var.xres_virtual>>3;
     p->next_plane = 0;
