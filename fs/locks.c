@@ -1342,6 +1342,39 @@ out:
 	return error;
 }
 
+ /**
+ *	setlease        -       sets a lease on an open file
+ *	@filp: file pointer
+ *	@arg: type of lease to obtain
+ *	@lease: file_lock to use
+ *
+ *	Call this to establish a lease on the file.
+ *	The fl_lmops fl_break function is required by break_lease
+ */
+
+int setlease(struct file *filp, long arg, struct file_lock **lease)
+{
+	struct dentry *dentry = filp->f_dentry;
+	struct inode *inode = dentry->d_inode;
+	int error;
+
+	if ((current->fsuid != inode->i_uid) && !capable(CAP_LEASE))
+		return -EACCES;
+	if (!S_ISREG(inode->i_mode))
+		return -EINVAL;
+	error = security_file_lock(filp, arg);
+	if (error)
+		return error;
+
+	lock_kernel();
+	error = __setlease(filp, arg, lease);
+	unlock_kernel();
+
+	return error;
+}
+
+EXPORT_SYMBOL(setlease);
+
 /**
  *	fcntl_setlease	-	sets a lease on an open file
  *	@fd: open file descriptor
