@@ -17,15 +17,11 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
-#include <linux/console.h>
-#include <linux/selection.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 
 #include <asm/io.h>
 #include <asm/mtrr.h>
-
-#include <video/fbcon.h>
 
 #define dac_reg	(0x3c8)
 #define dac_val	(0x3c9)
@@ -49,7 +45,6 @@ static struct fb_fix_screeninfo vesafb_fix __initdata = {
 	.accel	= FB_ACCEL_NONE,
 };
 
-static struct display disp;
 static struct fb_info fb_info;
 static u32 pseudo_palette[17];
 
@@ -64,7 +59,7 @@ static void            (*pmi_pal)(void);
 
 /* --------------------------------------------------------------------- */
 
-static int vesafb_pan_display(struct fb_var_screeninfo *var, int con,
+static int vesafb_pan_display(struct fb_var_screeninfo *var,
                               struct fb_info *info)
 {
 	int offset;
@@ -175,21 +170,17 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= vesafb_setcolreg,
 	.fb_pan_display	= vesafb_pan_display,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= soft_cursor,
 };
 
 int __init vesafb_setup(char *options)
 {
 	char *this_opt;
-	
-	fb_info.fontname[0] = '\0';
 	
 	if (!options || !*options)
 		return 0;
@@ -211,8 +202,6 @@ int __init vesafb_setup(char *options)
 			pmi_setpal=1;
 		else if (! strcmp(this_opt, "mtrr"))
 			mtrr=1;
-		else if (!strncmp(this_opt, "font:", 5))
-			strcpy(fb_info.fontname, this_opt+5);
 	}
 	return 0;
 }
@@ -351,27 +340,20 @@ int __init vesafb_init(void)
 		}
 	}
 	
-	strcpy(fb_info.modename, vesafb_fix.id);
-	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &vesafb_ops;
 	fb_info.var = vesafb_defined;
 	fb_info.fix = vesafb_fix;
-	fb_info.currcon = -1;
-	fb_info.disp = &disp;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, video_cmap_len, 0);
-	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info)<0)
 		return -EINVAL;
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(fb_info.node), fb_info.fix.id);
+	       minor(fb_info.node), fb_info.fix.id);
 	return 0;
 }
 

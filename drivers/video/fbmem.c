@@ -24,7 +24,6 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/tty.h>
-#include <linux/console.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #ifdef CONFIG_KMOD
@@ -42,8 +41,9 @@
 #include <asm/pgtable.h>
 
 #include <linux/fb.h>
-#include <video/fbcon.h>
-
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+#include "console/fbcon.h"
+#endif
     /*
      *  Frame buffer device initialization and setup routines
      */
@@ -130,9 +130,9 @@ extern int stifb_init(void);
 extern int stifb_setup(char*);
 extern int pmagbafb_init(void);
 extern int pmagbbfb_init(void);
-extern void maxinefb_init(void);
+extern int maxinefb_init(void);
 extern int tx3912fb_init(void);
-extern void tx3912fb_setup(char*);
+extern int tx3912fb_setup(char*);
 extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
 extern int e1355fb_init(void);
@@ -356,11 +356,6 @@ static int num_pref_init_funcs __initdata = 0;
 
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
-extern int fbcon_softback_size; 
-
-static int first_fb_vc;
-static int last_fb_vc = MAX_NR_CONSOLES-1;
-static int fbcon_is_default = 1;
 
 #ifdef CONFIG_FB_OF
 static int ofonly __initdata = 0;
@@ -376,8 +371,8 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 	for (fi = registered_fb; fi < &registered_fb[FB_MAX] && len < 4000; fi++)
 		if (*fi)
 			clen += sprintf(buf + clen, "%d %s\n",
-				        GET_FB_IDX((*fi)->node),
-				        (*fi)->modename);
+				        minor((*fi)->node),
+				        (*fi)->fix.id);
 	*start = buf + offset;
 	if (clen > offset)
 		clen -= offset;
@@ -391,12 +386,15 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 
 	if (!info || ! info->screen_base)
 		return -ENODEV;
 
+	if (info->fbops->fb_read)
+		return info->fbops->fb_read(file, buf, count, ppos);
+	
 	if (p >= info->fix.smem_len)
 	    return 0;
 	if (count >= info->fix.smem_len)
@@ -420,13 +418,16 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	int err;
 
 	if (!info || !info->screen_base)
 		return -ENODEV;
 
+	if (info->fbops->fb_write)
+		return info->fbops->fb_write(file, buf, count, ppos);
+	
 	if (p > info->fix.smem_len)
 	    return -ENOSPC;
 	if (count >= info->fix.smem_len)
@@ -459,17 +460,91 @@ static void try_to_load(int fb)
 }
 #endif /* CONFIG_KMOD */
 
+int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+        int xoffset = var->xoffset;
+        int yoffset = var->yoffset;
+        int err;
+
+        if (xoffset < 0 || yoffset < 0 ||
+            xoffset + info->var.xres > info->var.xres_virtual ||
+            yoffset + info->var.yres > info->var.yres_virtual)
+                return -EINVAL;
+        if (info->fbops->fb_pan_display) {
+                if ((err = info->fbops->fb_pan_display(var, info)))
+                        return err;
+                else
+                        return -EINVAL;
+        }
+        info->var.xoffset = var->xoffset;
+        info->var.yoffset = var->yoffset;
+        if (var->vmode & FB_VMODE_YWRAP)
+                info->var.vmode |= FB_VMODE_YWRAP;
+        else
+                info->var.vmode &= ~FB_VMODE_YWRAP;
+        return 0;
+}
+
+int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	int err;
+
+	if (memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
+		if (!info->fbops->fb_check_var) {
+			*var = info->var;
+			return 0;
+		}
+
+		if ((err = info->fbops->fb_check_var(var, info)))
+			return err;
+
+		if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
+			info->var = *var;
+
+			if (info->fbops->fb_set_par)
+				info->fbops->fb_set_par(info);
+
+			fb_pan_display(&info->var, info);
+
+			fb_set_cmap(&info->cmap, 1, info);
+		}
+	}
+	return 0;
+}
+
+int
+fb_blank(int blank, struct fb_info *info)
+{	
+	u16 black[info->cmap.len];
+	struct fb_cmap cmap;
+	
+	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
+		return 0;
+	if (blank) { 
+		memset(black, 0, info->cmap.len * sizeof(u16));
+		cmap.red = cmap.green = cmap.blue = black;
+		if (info->cmap.transp)
+			cmap.transp = black;
+		cmap.start = info->cmap.start;
+		cmap.len = info->cmap.len;
+	} else
+		cmap = info->cmap;
+	return fb_set_cmap(&cmap, 1, info);
+}
+
 static int 
 fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	 unsigned long arg)
 {
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
-	struct fb_cmap cmap;
 	struct fb_var_screeninfo var;
 	struct fb_fix_screeninfo fix;
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	struct fb_con2fbmap con2fb;
+#endif
+	struct fb_cmap cmap;
 	int i;
 	
 	if (! fb)
@@ -481,11 +556,8 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		i = var.activate & FB_ACTIVATE_ALL
-			    ? set_all_vcs(fbidx, fb, &var, info)
-			    : fb->fb_set_var(&var, PROC_CONSOLE(info), info);
-		if (i)
-			return i;
+		i = fb_set_var(&var, info);
+		if (i) return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return 0;
@@ -494,21 +566,20 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		return (fb->fb_set_cmap(&cmap, 0, PROC_CONSOLE(info), info));
+		return (fb_set_cmap(&cmap, 0, info));
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		return (fb->fb_get_cmap(&cmap, 0, PROC_CONSOLE(info), info));
+		fb_copy_cmap(&info->cmap, &cmap, 0);
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		if (fb->fb_pan_display == NULL)
-			return (var.xoffset || var.yoffset) ? -EINVAL : 0;
-		if ((i=fb->fb_pan_display(&var, PROC_CONSOLE(info), info)))
+		if ((i = fb_pan_display(&var, info)))
 			return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return i;
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
 			return -EFAULT;
@@ -537,22 +608,20 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		    for (i = 0; i < MAX_NR_CONSOLES; i++)
 			set_con2fb_map(i, con2fb.framebuffer);
 		return 0;
+#endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
-		if (fb->fb_blank == NULL)
-			return -EINVAL;
-		return fb->fb_blank(arg, info);
+		return fb_blank(arg, info);
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;
-		return fb->fb_ioctl(inode, file, cmd, arg, PROC_CONSOLE(info),
-				    info);
+		return fb->fb_ioctl(inode, file, cmd, arg, info);
 	}
 }
 
 static int 
 fb_mmap(struct file *file, struct vm_area_struct * vma)
 {
-	int fbidx = GET_FB_IDX(file->f_dentry->d_inode->i_rdev);
+	int fbidx = minor(file->f_dentry->d_inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
 	unsigned long off;
@@ -648,28 +717,10 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 #endif /* !sparc32 */
 }
 
-#if 1 /* to go away in 2.5.0 */
-int GET_FB_IDX(kdev_t rdev)
-{
-    int fbidx = minor(rdev);
-    if (fbidx >= 32) {
-	int newfbidx = fbidx >> 5;
-	static int warned;
-	if (!(warned & (1<<newfbidx))) {
-	    warned |= 1<<newfbidx;
-	    printk("Warning: Remapping obsolete /dev/fb* minor %d to %d\n",
-		   fbidx, newfbidx);
-	}
-	fbidx = newfbidx;
-    }
-    return fbidx;
-}
-#endif
-
 static int
 fb_open(struct inode *inode, struct file *file)
 {
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info;
 	int res = 0;
 
@@ -679,12 +730,12 @@ fb_open(struct inode *inode, struct file *file)
 #endif /* CONFIG_KMOD */
 	if (!(info = registered_fb[fbidx]))
 		return -ENODEV;
-	if (info->fbops->owner)
-		__MOD_INC_USE_COUNT(info->fbops->owner);
+	if (!try_module_get(info->fbops->owner))
+		return -ENODEV;
 	if (info->fbops->fb_open) {
 		res = info->fbops->fb_open(info,1);
-		if (res && info->fbops->owner)
-			__MOD_DEC_USE_COUNT(info->fbops->owner);
+		if (res)
+			module_put(info->fbops->owner);
 	}
 	return res;
 }
@@ -692,15 +743,14 @@ fb_open(struct inode *inode, struct file *file)
 static int 
 fb_release(struct inode *inode, struct file *file)
 {
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info;
 
 	lock_kernel();
 	info = registered_fb[fbidx];
 	if (info->fbops->fb_release)
 		info->fbops->fb_release(info,1);
-	if (info->fbops->owner)
-		__MOD_DEC_USE_COUNT(info->fbops->owner);
+	module_put(info->fbops->owner);
 	unlock_kernel();
 	return 0;
 }
@@ -718,6 +768,9 @@ static struct file_operations fb_fops = {
 #endif
 };
 
+static devfs_handle_t devfs_handle;
+
+
 /**
  *	register_framebuffer - registers a frame buffer device
  *	@fb_info: frame buffer info structure
@@ -731,10 +784,8 @@ static struct file_operations fb_fops = {
 int
 register_framebuffer(struct fb_info *fb_info)
 {
-	int i, j;
-	char name_buf[12];
-	static int fb_ever_opened[FB_MAX];
-	static int first = 1;
+	char name_buf[8];
+	int i;
 
 	if (num_registered_fb == FB_MAX)
 		return -ENXIO;
@@ -744,35 +795,11 @@ register_framebuffer(struct fb_info *fb_info)
 			break;
 	fb_info->node = mk_kdev(FB_MAJOR, i);
 	registered_fb[i] = fb_info;
-	if (!fb_ever_opened[i]) {
-		struct module *owner = fb_info->fbops->owner;
-		/*
-		 *  We assume initial frame buffer devices can be opened this
-		 *  many times
-		 */
-		for (j = 0; j < MAX_NR_CONSOLES; j++)
-			if (con2fb_map[j] == i) {
-				if (owner)
-					__MOD_INC_USE_COUNT(owner);
-				if (!fb_info->fbops->fb_open)
-					continue;
-				if (!fb_info->fbops->fb_open(fb_info,0))
-					continue;
-				if (owner)
-					__MOD_DEC_USE_COUNT(owner);
-			}
-		fb_ever_opened[i] = 1;
-	}
-
-	if (first) {
-		first = 0;
-		take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
-	}
-	sprintf (name_buf, "fb/%d", i);
-	devfs_register(NULL, name_buf, DEVFS_FL_DEFAULT,
-		       FB_MAJOR, i, S_IFCHR | S_IRUGO | S_IWUGO,
-		       &fb_fops, NULL);
-
+	sprintf (name_buf, "%d", i);
+	fb_info->devfs_handle =
+	    devfs_register (devfs_handle, name_buf, DEVFS_FL_DEFAULT,
+			    FB_MAJOR, i, S_IFCHR | S_IRUGO | S_IWUGO,
+			    &fb_fops, NULL);
 	return 0;
 }
 
@@ -790,15 +817,15 @@ register_framebuffer(struct fb_info *fb_info)
 int
 unregister_framebuffer(struct fb_info *fb_info)
 {
-	int i, j;
+	int i;
 
-	i = GET_FB_IDX(fb_info->node);
-	for (j = 0; j < MAX_NR_CONSOLES; j++)
-		if (con2fb_map[j] == i)
-			return -EBUSY;
+	i = minor(fb_info->node);
 	if (!registered_fb[i])
 		return -EINVAL;
-	devfs_remove("fb/%d", i);
+	devfs_unregister (fb_info->devfs_handle);
+	fb_info->devfs_handle = NULL;
+	devfs_unregister (fb_info->devfs_lhandle);
+	fb_info->devfs_lhandle = NULL;
 	registered_fb[i]=NULL;
 	num_registered_fb--;
 	return 0;
@@ -821,7 +848,7 @@ fbmem_init(void)
 
 	create_proc_read_entry("fb", 0, 0, fbmem_read_proc, NULL);
 
-	devfs_mk_dir (NULL, "fb", NULL);
+	devfs_handle = devfs_mk_dir (NULL, "fb", NULL);
 	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
 		printk("unable to get major %d for fb devs\n", FB_MAJOR);
 
@@ -862,44 +889,7 @@ int __init video_setup(char *options)
 
     if (!options || !*options)
 	    return 0;
-	    
-    if (!strncmp(options, "scrollback:", 11)) {
-	    options += 11;
-	    if (*options) {
-		fbcon_softback_size = simple_strtoul(options, &options, 0);
-		if (*options == 'k' || *options == 'K') {
-			fbcon_softback_size *= 1024;
-			options++;
-		}
-		if (*options != ',')
-			return 0;
-		options++;
-	    } else
-	        return 0;
-    }
-
-    if (!strncmp(options, "map:", 4)) {
-	    options += 4;
-	    if (*options)
-		    for (i = 0, j = 0; i < MAX_NR_CONSOLES; i++) {
-			    if (!options[j])
-				    j = 0;
-			    con2fb_map[i] = (options[j++]-'0') % FB_MAX;
-		    }
-	    return 0;
-    }
-    
-    if (!strncmp(options, "vc:", 3)) {
-	    options += 3;
-	    if (*options)
-		first_fb_vc = simple_strtoul(options, &options, 10) - 1;
-	    if (first_fb_vc < 0)
-		first_fb_vc = 0;
-	    if (*options++ == '-')
-		last_fb_vc = simple_strtoul(options, &options, 10) - 1;
-	    fbcon_is_default = 0;
-    }
-
+	   
 #ifdef CONFIG_FB_OF
     if (!strcmp(options, "ofonly")) {
 	    ofonly = 1;
@@ -947,8 +937,5 @@ EXPORT_SYMBOL(register_framebuffer);
 EXPORT_SYMBOL(unregister_framebuffer);
 EXPORT_SYMBOL(registered_fb);
 EXPORT_SYMBOL(num_registered_fb);
-#if 1 /* to go away in 2.5.0 */
-EXPORT_SYMBOL(GET_FB_IDX);
-#endif
 
 MODULE_LICENSE("GPL");
