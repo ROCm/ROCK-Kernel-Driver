@@ -1,6 +1,6 @@
 /* $Id: cmd64x.c,v 1.21 2000/01/30 23:23:16
  *
- * linux/drivers/ide/cmd64x.c		Version 1.30	Sept 10, 2002
+ * linux/drivers/ide/pci/cmd64x.c		Version 1.30	Sept 10, 2002
  *
  * cmd64x.c: Enable interrupts at initialization time on Ultra/PCI machines.
  *           Note, this driver is not used at all on other systems because
@@ -596,7 +596,7 @@ static unsigned int __init init_chipset_cmd64x (struct pci_dev *dev, const char 
 #ifdef __i386__
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_byte(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
+		printk(KERN_INFO "%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 #endif
 
@@ -604,7 +604,7 @@ static unsigned int __init init_chipset_cmd64x (struct pci_dev *dev, const char 
 		case PCI_DEVICE_ID_CMD_643:
 			break;
 		case PCI_DEVICE_ID_CMD_646:
-			printk("%s: chipset revision 0x%02X, ", name, class_rev);
+			printk(KERN_INFO "%s: chipset revision 0x%02X, ", name, class_rev);
 			switch(class_rev) {
 				case 0x07:
 				case 0x05:
