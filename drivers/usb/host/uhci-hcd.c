@@ -332,17 +332,7 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 	/* Grab the last QH */
 	lqh = list_entry(skelqh->list.prev, struct uhci_qh, list);
 
-	/*
-	 * Patch this endpoint's URB's QHs to point to the next skelqh:
-	 *    skelqh --> ... lqh --> newqh --> next skelqh
-	 * Do this first, so the HC always sees the right QH after this one.
-	 */
-	list_for_each (tmp, &urbp->queue_list) {
-		struct urb_priv *turbp =
-			list_entry(tmp, struct urb_priv, queue_list);
-
-		turbp->qh->link = lqh->link;
-	}
+	/* Point to the next skelqh */
 	urbp->qh->link = lqh->link;
 	wmb();				/* Ordering is important */
 
