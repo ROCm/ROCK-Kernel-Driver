@@ -285,14 +285,14 @@ get_high_mem (unsigned long size)
 	for (i = 0; i < size; i++) {
 		/* Check if it is memory */
 		c = i & 0xff;
-		mem[i] = c;
-		if (mem[i] != c)
+		writeb(c, mem + i);
+		if (readb(mem + i) != c)
 			break;
 		c = 255 - c;
-		mem[i] = c;
-		if (mem[i] != c)
+		writeb(c, mem + i);
+		if (readb(mem + i) != c)
 			break;
-		mem[i] = 0;	/* zero out memory */
+		writeb(0, mem + i);	/* zero out memory */
 
 		/* give the kernel air to breath */
 		if ((i & 0x3ffff) == 0x3ffff)
