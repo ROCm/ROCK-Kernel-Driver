@@ -7,6 +7,8 @@
  *
  * Linux developers:
  *  Alexander Kjeldaas <astor@fast.no>
+ *  Herbert Valerio Riedel <hvr@hvrlab.org>
+ *  Kyle McMartin <kyle@debian.org>
  *  Adam J. Richter <adam@yggdrasil.com> (conversion to 2.5 API).
  *
  * This program is free software; you can redistribute it and/or modify

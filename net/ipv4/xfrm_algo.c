@@ -310,6 +310,7 @@ struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx)
  */
 void xfrm_probe_algs(void)
 {
+#ifdef CONFIG_CRYPTO
 	int i, status;
 	
 	BUG_ON(in_softirq());
@@ -325,6 +326,7 @@ void xfrm_probe_algs(void)
 		if (ealg_list[i].available != status)
 			ealg_list[i].available = status;
 	}
+#endif
 }
 
 int xfrm_count_auth_supported(void)
