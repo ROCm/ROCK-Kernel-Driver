@@ -129,7 +129,7 @@ static void sca_msci_intr(port_t *port)
 	sca_out(stat & ST1_UDRN, MSCI0_OFFSET + ST1, card);
 
 	if (stat & ST1_UDRN) {
-		struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+		struct net_device_stats *stats = hdlc_stats(dev);
 		stats->tx_errors++; /* TX Underrun error detected */
 		stats->tx_fifo_errors++;
 	}

@@ -1774,7 +1774,7 @@ void cpc_tx_timeout(struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
 	uclong flags;
 	ucchar ilar;
@@ -1802,7 +1802,7 @@ int cpc_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
 	uclong flags;
 #ifdef PC300_DEBUG_TX
@@ -1885,7 +1885,7 @@ void cpc_net_rx(struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
 #ifdef PC300_DEBUG_RX
 	int i;
@@ -1974,7 +1974,7 @@ static void sca_tx_intr(pc300dev_t *dev)
 	pc300_t *card = (pc300_t *)chan->card; 
 	int ch = chan->channel; 
 	volatile pcsca_bd_t * ptdescr; 
-	struct net_device_stats *stats = &dev_to_hdlc(dev->dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev->dev);
 
     /* Clean up descriptors from previous transmission */
 	ptdescr = (pcsca_bd_t *)(card->hw.rambase +
@@ -2817,7 +2817,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 static struct net_device_stats *cpc_get_stats(struct net_device *dev)
 {
-	return &dev_to_hdlc(dev)->stats;
+	return hdlc_stats(dev);
 }
 
 static int clock_rate_calc(uclong rate, uclong clock, int *br_io)

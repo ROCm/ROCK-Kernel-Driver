@@ -256,9 +256,9 @@ static inline void sca_msci_intr(port_t *port)
 	sca_out(stat & (ST1_UDRN | ST1_CDCD), msci + ST1, card);
 
 	if (stat & ST1_UDRN) {
-		hdlc_device *hdlc = dev_to_hdlc(port_to_dev(port));
-		hdlc->stats.tx_errors++; /* TX Underrun error detected */
-		hdlc->stats.tx_fifo_errors++;
+		struct net_device_stats *stats = hdlc_stats(port_to_dev(port));
+		stats->tx_errors++; /* TX Underrun error detected */
+		stats->tx_fifo_errors++;
 	}
 
 	if (stat & ST1_CDCD)
@@ -272,7 +272,7 @@ static inline void sca_msci_intr(port_t *port)
 static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u16 rxin)
 {
 	struct net_device *dev = port_to_dev(port);
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	struct sk_buff *skb;
 	u16 len;
 	u32 buff;
@@ -330,7 +330,7 @@ static inline void sca_rx_intr(port_t *port)
 	u16 dmac = get_dmac_rx(port);
 	card_t *card = port_to_card(port);
 	u8 stat = sca_in(DSR_RX(phy_node(port)), card); /* read DMA Status */
-	struct net_device_stats *stats = &dev_to_hdlc(port_to_dev(port))->stats;
+	struct net_device_stats *stats = hdlc_stats(port_to_dev(port));
 
 	/* Reset DSR status bits */
 	sca_out((stat & (DSR_EOT | DSR_EOM | DSR_BOF | DSR_COF)) | DSR_DWE,
@@ -378,7 +378,7 @@ static inline void sca_rx_intr(port_t *port)
 static inline void sca_tx_intr(port_t *port)
 {
 	struct net_device *dev = port_to_dev(port);
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	u16 dmac = get_dmac_tx(port);
 	card_t* card = port_to_card(port);
 	u8 stat;

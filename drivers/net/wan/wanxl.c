@@ -175,7 +175,7 @@ static inline void wanxl_cable_intr(port_t *port)
 static inline void wanxl_tx_intr(port_t *port)
 {
 	struct net_device *dev = port_to_dev(port);
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	while (1) {
                 desc_t *desc = &get_status(port)->tx_descs[port->tx_in];
 		struct sk_buff *skb = port->tx_skbs[port->tx_in];
@@ -214,7 +214,7 @@ static inline void wanxl_rx_intr(card_t *card)
 		struct sk_buff *skb = card->rx_skbs[card->rx_in];
 		port_t *port = card->ports[desc->stat & PACKET_PORT_MASK];
 		struct net_device *dev = port_to_dev(port);
-		struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+		struct net_device_stats *stats = hdlc_stats(dev);
 
 		if ((desc->stat & PACKET_PORT_MASK) > card->n_ports)
 			printk(KERN_CRIT "wanXL %s: received packet for"
@@ -480,14 +480,13 @@ static int wanxl_close(struct net_device *dev)
 
 static struct net_device_stats *wanxl_get_stats(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
+	struct net_device_stats *stats = hdlc_stats(dev);
 	port_t *port = dev_to_port(dev);
 
-	hdlc->stats.rx_over_errors = get_status(port)->rx_overruns;
-	hdlc->stats.rx_frame_errors = get_status(port)->rx_frame_errors;
-	hdlc->stats.rx_errors = hdlc->stats.rx_over_errors +
-		hdlc->stats.rx_frame_errors;
-        return &hdlc->stats;
+	stats->rx_over_errors = get_status(port)->rx_overruns;
+	stats->rx_frame_errors = get_status(port)->rx_frame_errors;
+	stats->rx_errors = stats->rx_over_errors + stats->rx_frame_errors;
+        return stats;
 }
 
 

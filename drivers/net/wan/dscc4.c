@@ -636,7 +636,7 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
 				struct net_device *dev)
 {
 	struct RxFD *rx_fd = dpriv->rx_fd + dpriv->rx_current%RX_RING_SIZE;
-	struct net_device_stats *stats = &dpriv->hdlc.stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	struct pci_dev *pdev = dpriv->pci_priv->pdev;
 	struct sk_buff *skb;
 	int pkt_len;
@@ -1547,7 +1547,7 @@ try:
 
 	if (state & SccEvt) {
 		if (state & Alls) {
-			struct net_device_stats *stats = &dpriv->hdlc.stats;
+			struct net_device_stats *stats = hdlc_stats(dev);
 			struct sk_buff *skb;
 			struct TxFD *tx_fd;
 
@@ -1675,7 +1675,7 @@ try:
 		}
 		if (state & Err) {
 			printk(KERN_INFO "%s: Tx ERR\n", dev->name);
-			dev_to_hdlc(dev)->stats.tx_errors++;
+			hdlc_stats(dev)->tx_errors++;
 			state &= ~Err;
 		}
 	}
@@ -1811,7 +1811,7 @@ try:
 				if (!(rx_fd->state2 & DataComplete))
 					break;
 				if (rx_fd->state2 & FrameAborted) {
-					dev_to_hdlc(dev)->stats.rx_over_errors++;
+					hdlc_stats(dev)->rx_over_errors++;
 					rx_fd->state1 |= Hold;
 					rx_fd->state2 = 0x00000000;
 					rx_fd->end = 0xbabeface;

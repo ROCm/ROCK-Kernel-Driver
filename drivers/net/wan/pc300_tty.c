@@ -452,7 +452,7 @@ static int cpc_tty_write(struct tty_struct *tty, int from_user,
 		(from_user)?"from user" : "from kernel",count);
 	
 	pc300chan = (pc300ch_t *)((pc300dev_t*)cpc_tty->pc300dev)->chan; 
-	stats = &dev_to_hdlc(((pc300dev_t*)cpc_tty->pc300dev)->dev)->stats;
+	stats = hdlc_stats(((pc300dev_t*)cpc_tty->pc300dev)->dev);
 	card = (pc300_t *) pc300chan->card;
 	ch = pc300chan->channel; 
 
@@ -738,7 +738,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 	pc300_t *card = (pc300_t *)pc300chan->card; 
 	int ch = pc300chan->channel; 
 	volatile pcsca_bd_t * ptdescr; 
-	struct net_device_stats *stats = &dev_to_hdlc(pc300dev->dev)->stats; 
+	struct net_device_stats *stats = hdlc_stats(pc300dev->dev);
 	int rx_len, rx_aux; 
 	volatile unsigned char status; 
 	unsigned short first_bd = pc300chan->rx_first_bd;
@@ -914,7 +914,7 @@ static int cpc_tty_send_to_card(pc300dev_t *dev,void* buf, int len)
 	pc300ch_t *chan = (pc300ch_t *)dev->chan; 
 	pc300_t *card = (pc300_t *)chan->card; 
 	int ch = chan->channel; 
-	struct net_device_stats *stats = &dev_to_hdlc(dev->dev)->stats; 
+	struct net_device_stats *stats = hdlc_stats(dev->dev);
 	unsigned long flags; 
 	volatile pcsca_bd_t * ptdescr; 
 	int i, nchar;

@@ -652,7 +652,7 @@ fst_intr_rx ( struct fst_card_info *card, struct fst_port_info *port )
         unsigned short len;
         struct sk_buff *skb;
 	struct net_device *dev = port_to_dev(port);
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
         int i;
 
 
@@ -837,8 +837,8 @@ fst_intr ( int irq, void *dev_id, struct pt_regs *regs )
                          * always load up the entire packet for DMA.
                          */
                         dbg ( DBG_TX,"Tx underflow port %d\n", event & 0x03 );
-                        dev_to_hdlc(port_to_dev(port))->stats.tx_errors++;
-                        dev_to_hdlc(port_to_dev(port))->stats.tx_fifo_errors++;
+                        hdlc_stats(port_to_dev(port))->tx_errors++;
+                        hdlc_stats(port_to_dev(port))->tx_fifo_errors++;
                         break;
 
                 case INIT_CPLT:
@@ -1346,7 +1346,7 @@ static void
 fst_tx_timeout ( struct net_device *dev )
 {
         struct fst_port_info *port;
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 
         dbg ( DBG_INTR | DBG_TX,"tx_timeout\n");
 
@@ -1366,7 +1366,7 @@ fst_tx_timeout ( struct net_device *dev )
 static int
 fst_start_xmit ( struct sk_buff *skb, struct net_device *dev )
 {
-	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
         struct fst_card_info *card;
         struct fst_port_info *port;
         unsigned char dmabits;

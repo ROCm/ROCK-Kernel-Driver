@@ -238,6 +238,12 @@ static __inline__ void hdlc_proto_detach(hdlc_device *hdlc)
 }
 
 
+static __inline__ struct net_device_stats *hdlc_stats(struct net_device *dev)
+{
+	return &dev_to_hdlc(dev)->stats;
+}
+
+
 static __inline__ unsigned short hdlc_type_trans(struct sk_buff *skb,
 						 struct net_device *dev)
 {
