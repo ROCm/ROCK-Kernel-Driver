@@ -522,7 +522,7 @@ void __sctp_hash_endpoint(struct sctp_endpoint *ep)
 {
 	struct sctp_ep_common **epp;
 	struct sctp_ep_common *epb;
-	sctp_hashbucket_t *head;
+	struct sctp_hashbucket *head;
 
 	epb = &ep->base;
 
@@ -550,7 +550,7 @@ void sctp_hash_endpoint(struct sctp_endpoint *ep)
 /* Remove endpoint from the hash table.  */
 void __sctp_unhash_endpoint(struct sctp_endpoint *ep)
 {
-	sctp_hashbucket_t *head;
+	struct sctp_hashbucket *head;
 	struct sctp_ep_common *epb;
 
 	epb = &ep->base;
@@ -582,7 +582,7 @@ void sctp_unhash_endpoint(struct sctp_endpoint *ep)
 /* Look up an endpoint. */
 struct sctp_endpoint *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr)
 {
-	sctp_hashbucket_t *head;
+	struct sctp_hashbucket *head;
 	struct sctp_ep_common *epb;
 	struct sctp_endpoint *ep;
 	int hash;
@@ -619,7 +619,7 @@ void __sctp_hash_established(struct sctp_association *asoc)
 {
 	struct sctp_ep_common **epp;
 	struct sctp_ep_common *epb;
-	sctp_hashbucket_t *head;
+	struct sctp_hashbucket *head;
 
 	epb = &asoc->base;
 
@@ -649,7 +649,7 @@ void sctp_unhash_established(struct sctp_association *asoc)
 /* Remove association from the hash table.  */
 void __sctp_unhash_established(struct sctp_association *asoc)
 {
-	sctp_hashbucket_t *head;
+	struct sctp_hashbucket *head;
 	struct sctp_ep_common *epb;
 
 	epb = &asoc->base;
@@ -677,7 +677,7 @@ struct sctp_association *__sctp_lookup_association(
 					const union sctp_addr *peer,
 					struct sctp_transport **pt)
 {
-	sctp_hashbucket_t *head;
+	struct sctp_hashbucket *head;
 	struct sctp_ep_common *epb;
 	struct sctp_association *asoc;
 	struct sctp_transport *transport;

@@ -2333,7 +2333,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 
 		if (af && af->is_ce(chunk->skb) && asoc->peer.ecn_capable) {
 			/* Do real work as sideffect. */
-			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE, 
+			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE,
 					SCTP_U32(tsn));
 		}
 	}
@@ -2374,7 +2374,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 	 * PMTU.  In cases, such as loopback, this might be a rather
 	 * large spill over.
 	 */
-	if (!asoc->rwnd || asoc->rwnd_over || 
+	if (!asoc->rwnd || asoc->rwnd_over ||
 	    (datalen > asoc->rwnd + asoc->frag_point)) {
 
 		/* If this is the next TSN, consider reneging to make
@@ -2593,7 +2593,7 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 
 		if (af && af->is_ce(chunk->skb) && asoc->peer.ecn_capable) {
 			/* Do real work as sideffect. */
-			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE, 
+			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE,
 					SCTP_U32(tsn));
 		}
 	}
@@ -2739,6 +2739,9 @@ sctp_disposition_t sctp_sf_eat_sack_6_2(const struct sctp_endpoint *ep,
 
 	/* Pull the SACK chunk from the data buffer */
 	sackh = sctp_sm_pull_sack(chunk);
+	/* Was this a bogus SACK? */
+	if (!sackh)
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 	chunk->subh.sack_hdr = sackh;
 	ctsn = ntohl(sackh->cum_tsn_ack);
 
@@ -4405,22 +4408,27 @@ sctp_disposition_t sctp_sf_timer_ignore(const struct sctp_endpoint *ep,
  ********************************************************************/
 
 /* Pull the SACK chunk based on the SACK header. */
-sctp_sackhdr_t *sctp_sm_pull_sack(struct sctp_chunk *chunk)
+struct sctp_sackhdr *sctp_sm_pull_sack(struct sctp_chunk *chunk)
 {
-	sctp_sackhdr_t *sack;
+	struct sctp_sackhdr *sack;
+	unsigned int len;
 	__u16 num_blocks;
 	__u16 num_dup_tsns;
 
-	/* FIXME:  Protect ourselves from reading too far into
+	/* Protect ourselves from reading too far into
 	 * the skb from a bogus sender.
 	 */
-	sack = (sctp_sackhdr_t *) chunk->skb->data;
-	skb_pull(chunk->skb, sizeof(sctp_sackhdr_t));
+	sack = (struct sctp_sackhdr *) chunk->skb->data;
 
 	num_blocks = ntohs(sack->num_gap_ack_blocks);
 	num_dup_tsns = ntohs(sack->num_dup_tsns);
+	len = sizeof(struct sctp_sackhdr);
+	len = (num_blocks + num_dup_tsns) * sizeof(__u32);
+	if (len > chunk->skb->len)
+		return NULL;
 
-	skb_pull(chunk->skb, (num_blocks + num_dup_tsns) * sizeof(__u32));
+	skb_pull(chunk->skb, len);
+
 	return sack;
 }
 

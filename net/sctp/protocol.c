@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -74,6 +74,9 @@ static struct sctp_pf *sctp_pf_inet_specific;
 static struct sctp_af *sctp_af_v4_specific;
 static struct sctp_af *sctp_af_v6_specific;
 
+kmem_cache_t *sctp_chunk_cachep;
+kmem_cache_t *sctp_bucket_cachep;
+
 extern struct net_proto_family inet_family_ops;
 
 extern int sctp_snmp_proc_init(void);
@@ -106,10 +109,12 @@ __init int sctp_proc_init(void)
 	return rc;
 }
 
-/* Clean up the proc fs entry for the SCTP protocol. */
+/* Clean up the proc fs entry for the SCTP protocol. 
+ * Note: Do not make this __exit as it is used in the init error
+ * path.
+ */
 void sctp_proc_exit(void)
 {
-
 	sctp_snmp_proc_exit();
 
 	if (proc_net_sctp) {
@@ -928,6 +933,22 @@ __init int sctp_init(void)
 	inet_register_protosw(&sctp_seqpacket_protosw);
 	inet_register_protosw(&sctp_stream_protosw);
 
+	/* Allocate a cache pools. */
+	sctp_bucket_cachep = kmem_cache_create("sctp_bind_bucket",
+					       sizeof(struct sctp_bind_bucket),
+					       0, SLAB_HWCACHE_ALIGN,
+					       NULL, NULL);
+
+	if (!sctp_bucket_cachep)
+		goto err_bucket_cachep;
+
+	sctp_chunk_cachep = kmem_cache_create("sctp_chunk",
+					       sizeof(struct sctp_chunk),
+					       0, SLAB_HWCACHE_ALIGN,
+					       NULL, NULL);
+	if (!sctp_chunk_cachep)
+		goto err_chunk_cachep;
+
 	/* Allocate and initialise sctp mibs.  */
 	status = init_sctp_mibs();
 	if (status)
@@ -984,8 +1005,8 @@ __init int sctp_init(void)
 
 	/* Allocate and initialize the association hash table.  */
 	sctp_proto.assoc_hashsize = 4096;
-	sctp_proto.assoc_hashbucket = (sctp_hashbucket_t *)
-		kmalloc(4096 * sizeof(sctp_hashbucket_t), GFP_KERNEL);
+	sctp_proto.assoc_hashbucket = (struct sctp_hashbucket *)
+		kmalloc(4096 * sizeof(struct sctp_hashbucket), GFP_KERNEL);
 	if (!sctp_proto.assoc_hashbucket) {
 		printk(KERN_ERR "SCTP: Failed association hash alloc.\n");
 		status = -ENOMEM;
@@ -998,8 +1019,8 @@ __init int sctp_init(void)
 
 	/* Allocate and initialize the endpoint hash table.  */
 	sctp_proto.ep_hashsize = 64;
-	sctp_proto.ep_hashbucket = (sctp_hashbucket_t *)
-		kmalloc(64 * sizeof(sctp_hashbucket_t), GFP_KERNEL);
+	sctp_proto.ep_hashbucket = (struct sctp_hashbucket *)
+		kmalloc(64 * sizeof(struct sctp_hashbucket), GFP_KERNEL);
 	if (!sctp_proto.ep_hashbucket) {
 		printk(KERN_ERR "SCTP: Failed endpoint_hash alloc.\n");
 		status = -ENOMEM;
@@ -1013,8 +1034,8 @@ __init int sctp_init(void)
 
 	/* Allocate and initialize the SCTP port hash table.  */
 	sctp_proto.port_hashsize = 4096;
-	sctp_proto.port_hashtable = (sctp_bind_hashbucket_t *)
-		kmalloc(4096 * sizeof(sctp_bind_hashbucket_t), GFP_KERNEL);
+	sctp_proto.port_hashtable = (struct sctp_bind_hashbucket *)
+		kmalloc(4096 * sizeof(struct sctp_bind_hashbucket),GFP_KERNEL);
 	if (!sctp_proto.port_hashtable) {
 		printk(KERN_ERR "SCTP: Failed bind hash alloc.");
 		status = -ENOMEM;
@@ -1071,6 +1092,10 @@ err_ahash_alloc:
 	sctp_proc_exit();
 	cleanup_sctp_mibs();
 err_init_mibs:
+	kmem_cache_destroy(sctp_chunk_cachep);
+err_chunk_cachep:
+	kmem_cache_destroy(sctp_bucket_cachep);
+err_bucket_cachep:
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
 	inet_unregister_protosw(&sctp_seqpacket_protosw);
 	inet_unregister_protosw(&sctp_stream_protosw);
@@ -1100,6 +1125,9 @@ __exit void sctp_exit(void)
 	kfree(sctp_proto.assoc_hashbucket);
 	kfree(sctp_proto.ep_hashbucket);
 	kfree(sctp_proto.port_hashtable);
+
+	kmem_cache_destroy(sctp_chunk_cachep);
+	kmem_cache_destroy(sctp_bucket_cachep);
 
 	sctp_dbg_objcnt_exit();
 	sctp_proc_exit();
