@@ -1065,9 +1065,9 @@ static int devinet_sysctl_forward(ctl_table *ctl, int write,
 	return ret;
 }
 
-static int ipv4_doint_and_flush(ctl_table *ctl, int write,
-				struct file* filp, void *buffer,
-				size_t *lenp)
+int ipv4_doint_and_flush(ctl_table *ctl, int write,
+			 struct file* filp, void *buffer,
+			 size_t *lenp)
 {
 	int *valp = ctl->data;
 	int val = *valp;
@@ -1079,10 +1079,10 @@ static int ipv4_doint_and_flush(ctl_table *ctl, int write,
 	return ret;
 }
 
-static int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
-					 void *oldval, size_t *oldlenp,
-					 void *newval, size_t newlen, 
-					 void **context)
+int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
+				  void *oldval, size_t *oldlenp,
+				  void *newval, size_t newlen, 
+				  void **context)
 {
 	int *valp = table->data;
 	int new;
