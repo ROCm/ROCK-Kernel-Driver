@@ -32,7 +32,7 @@
  */
 asmlinkage void do_page_fault(int datammu, unsigned long esr0, unsigned long ear0)
 {
-	struct vm_area_struct *vma, *prev_vma;
+	struct vm_area_struct *vma;
 	struct mm_struct *mm;
 	unsigned long _pme, lrai, lrad, fixup;
 	siginfo_t info;
@@ -120,12 +120,7 @@ asmlinkage void do_page_fault(int datammu, unsigned long esr0, unsigned long ear
 		}
 	}
 
-	/* find_vma_prev is just a bit slower, because it cannot use
-	 * the mmap_cache, so we run it only in the growsdown slow
-	 * path and we leave find_vma in the fast path.
-	 */
-	find_vma_prev(current->mm, ear0, &prev_vma);
-	if (expand_stack(vma, ear0, prev_vma))
+	if (expand_stack(vma, ear0))
 		goto bad_area;
 
 /*
