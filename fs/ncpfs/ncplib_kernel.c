@@ -606,12 +606,10 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 		goto out;
 	if (!(create_attributes & aDIR))
 		target->opened = 1;
-	target->server_file_handle = ncp_reply_dword(server, 0);
-	target->open_create_action = ncp_reply_byte(server, 4);
 
 	/* in target there's a new finfo to fill */
 	ncp_extract_file_info(ncp_reply_data(server, 6), &(target->i));
-	ConvertToNWfromDWORD(target->server_file_handle, target->file_handle);
+	ConvertToNWfromDWORD(ncp_reply_dword(server, 0), target->file_handle);
 
 out:
 	ncp_unlock_server(server);

@@ -111,7 +111,6 @@ void ncp_update_inode(struct inode *inode, struct ncp_entry_info *nwinfo)
 	NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
 #endif
 	NCP_FINFO(inode)->access = nwinfo->access;
-	NCP_FINFO(inode)->server_file_handle = nwinfo->server_file_handle;
 	memcpy(NCP_FINFO(inode)->file_handle, nwinfo->file_handle,
 			sizeof(nwinfo->file_handle));
 	DPRINTK("ncp_update_inode: updated %s, volnum=%d, dirent=%u\n",

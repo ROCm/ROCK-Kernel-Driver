@@ -22,7 +22,6 @@ struct ncp_inode_info {
 	struct semaphore open_sem;
 	atomic_t	opened;
 	int	access;
-	__u32	server_file_handle;
 	__u8	file_handle[6];
 	struct inode vfs_inode;
 };
