@@ -16,42 +16,12 @@
 #include <linux/atmsvc.h>
 #include <linux/atmmpc.h>
 #include <net/atmclip.h>
+#include <linux/atmlec.h>
 #include <asm/ioctls.h>
 
 #include "resources.h"
 #include "signaling.h"		/* for WAITING and sigd_attach */
 
-#if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
-#include <linux/atmlec.h>
-#include "lec.h"
-#include "lec_arpc.h"
-struct atm_lane_ops *atm_lane_ops;
-static DECLARE_MUTEX(atm_lane_ops_mutex);
-
-void atm_lane_ops_set(struct atm_lane_ops *hook)
-{
-	down(&atm_lane_ops_mutex);
-	atm_lane_ops = hook;
-	up(&atm_lane_ops_mutex);
-}
-
-int try_atm_lane_ops(void)
-{
-	down(&atm_lane_ops_mutex);
-	if (atm_lane_ops && try_module_get(atm_lane_ops->owner)) {
-		up(&atm_lane_ops_mutex);
-		return 1;
-	}
-	up(&atm_lane_ops_mutex);
-	return 0;
-}
-
-#if defined(CONFIG_ATM_LANE_MODULE) || defined(CONFIG_ATM_MPOA_MODULE)
-EXPORT_SYMBOL(atm_lane_ops);
-EXPORT_SYMBOL(try_atm_lane_ops);
-EXPORT_SYMBOL(atm_lane_ops_set);
-#endif
-#endif
 
 static DECLARE_MUTEX(ioctl_mutex);
 static LIST_HEAD(ioctl_list);
@@ -137,47 +107,6 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			if (!error)
 				sock->state = SS_CONNECTED;
 			goto done;
-#if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
-                case ATMLEC_CTRL:
-                        if (!capable(CAP_NET_ADMIN)) {
-				error = -EPERM;
-				goto done;
-			}
-#if defined(CONFIG_ATM_LANE_MODULE)
-                        if (!atm_lane_ops)
-				request_module("lec");
-#endif
-			if (try_atm_lane_ops()) {
-				error = atm_lane_ops->lecd_attach(vcc, (int) arg);
-				module_put(atm_lane_ops->owner);
-				if (error >= 0)
-					sock->state = SS_CONNECTED;
-			} else
-				error = -ENOSYS;
-			goto done;
-                case ATMLEC_MCAST:
-			if (!capable(CAP_NET_ADMIN)) {
-				error = -EPERM;
-				goto done;
-			}
-			if (try_atm_lane_ops()) {
-				error = atm_lane_ops->mcast_attach(vcc, (int) arg);
-				module_put(atm_lane_ops->owner);
-			} else
-				error = -ENOSYS;
-			goto done;
-                case ATMLEC_DATA:
-			if (!capable(CAP_NET_ADMIN)) {
-				error = -EPERM;
-				goto done;
-			}
-			if (try_atm_lane_ops()) {
-				error = atm_lane_ops->vcc_attach(vcc, (void *) arg);
-				module_put(atm_lane_ops->owner);
-			} else
-				error = -ENOSYS;
-			goto done;
-#endif
 		default:
 			break;
 	}
@@ -186,6 +115,8 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		request_module("mpoa");
 	if (cmd == ATMARPD_CTRL)
 		request_module("clip");
+	if (cmd == ATMLEC_CTRL)
+		request_module("lec");
 
 	error = -ENOIOCTLCMD;
 

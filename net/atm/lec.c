@@ -839,16 +839,6 @@ lecd_attach(struct atm_vcc *vcc, int arg)
         return i;
 }
 
-static struct atm_lane_ops __atm_lane_ops = 
-{
-	.lecd_attach =	lecd_attach,
-	.mcast_attach =	lec_mcast_attach,
-	.vcc_attach = 	lec_vcc_attach,
-	.get_lec = 	get_dev_lec,
-	.owner = 	THIS_MODULE
-};
-
-
 #ifdef CONFIG_PROC_FS
 static char* lec_arp_get_status_string(unsigned char status)
 {
@@ -1096,6 +1086,44 @@ static struct file_operations lec_seq_fops = {
 };
 #endif
 
+static int lane_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+{
+	struct atm_vcc *vcc = ATM_SD(sock);
+	int err = 0;
+	
+	switch (cmd) {
+		case ATMLEC_CTRL: 
+		case ATMLEC_MCAST:
+		case ATMLEC_DATA:
+			if (!capable(CAP_NET_ADMIN))
+				return -EPERM;
+			break;
+		default:
+			return -ENOIOCTLCMD;
+	}
+
+	switch (cmd) {
+		case ATMLEC_CTRL:
+			err = lecd_attach(vcc, (int) arg);
+			if (err >= 0)
+				sock->state = SS_CONNECTED;
+			break;
+		case ATMLEC_MCAST:
+			err = lec_mcast_attach(vcc, (int) arg);
+			break;
+		case ATMLEC_DATA:
+			err = lec_vcc_attach(vcc, (void *) arg);
+			break;
+	}
+
+	return err;
+}
+
+static struct atm_ioctl lane_ioctl_ops = {
+	.owner  = THIS_MODULE,
+	.ioctl  = lane_ioctl,
+};
+
 static int __init lane_module_init(void)
 {
 #ifdef CONFIG_PROC_FS
@@ -1106,7 +1134,7 @@ static int __init lane_module_init(void)
 		p->proc_fops = &lec_seq_fops;
 #endif
 
-        atm_lane_ops_set(&__atm_lane_ops);
+	register_atm_ioctl(&lane_ioctl_ops);
         printk("lec.c: " __DATE__ " " __TIME__ " initialized\n");
         return 0;
 }
@@ -1118,7 +1146,7 @@ static void __exit lane_module_cleanup(void)
 
 	remove_proc_entry("lec", atm_proc_root);
 
-        atm_lane_ops_set(NULL);
+	deregister_atm_ioctl(&lane_ioctl_ops);
 
         for (i = 0; i < MAX_LEC_ITF; i++) {
                 if (dev_lec[i] != NULL) {
