@@ -1,7 +1,7 @@
 		    IBM ThinkPad ACPI Extras Driver
 
-                            Version 0.7
-                          23 October 2004
+                            Version 0.8
+                          8 November 2004
 
                Borislav Deianov <borislav@users.sf.net>
 		      http://ibm-acpi.sf.net/
