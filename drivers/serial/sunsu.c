@@ -1362,7 +1362,7 @@ static void sunsu_console_write(struct console *co, const char *s,
 
 static kdev_t sunsu_console_device(struct console *co)
 {
-	return mk_kdev(TTY_MAJOR, 64 + co->index);
+	return mk_kdev(sunsu_reg.major, sunsu_reg.minor + co->index);
 }
 
 /*
@@ -1378,6 +1378,9 @@ static int __init sunsu_console_setup(struct console *co, char *options)
 	int bits = 8;
 	int parity = 'n';
 	int flow = 'n';
+
+	printk("Console: ttyS%d (SU)\n",
+	       (sunsu_reg.minor - 64) + co->index);
 
 	/*
 	 * Check whether an invalid uart number has been specified, and
@@ -1414,15 +1417,23 @@ static struct console sunsu_cons = {
 
 static int __init sunsu_serial_console_init(void)
 {
-	int index;
+	int i;
 
 	if (con_is_present())
 		return 0;
 
-	index = serial_console - 1;
-	if (sunsu_ports[index].port_node == 0)
+	for (i = 0; i < UART_NR; i++) {
+		int this_minor = sunsu_reg.minor + i;
+
+		if ((this_minor - 64) == (serial_console - 1))
+			break;
+	}
+	if (i == UART_NR)
 		return 0;
-	sunsu_cons.index = index;
+	if (sunsu_ports[i].port_node == 0)
+		return 0;
+
+	sunsu_cons.index = i;
 	register_console(&sunsu_cons);
 	return 0;
 }
