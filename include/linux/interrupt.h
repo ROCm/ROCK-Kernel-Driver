@@ -7,6 +7,7 @@
 #include <linux/linkage.h>
 #include <linux/bitops.h>
 #include <linux/preempt.h>
+#include <linux/cpumask.h>
 #include <asm/atomic.h>
 #include <asm/hardirq.h>
 #include <asm/ptrace.h>
@@ -35,7 +36,7 @@ typedef int irqreturn_t;
 struct irqaction {
 	irqreturn_t (*handler)(int, void *, struct pt_regs *);
 	unsigned long flags;
-	unsigned long mask;
+	cpumask_t mask;
 	const char *name;
 	void *dev_id;
 	struct irqaction *next;

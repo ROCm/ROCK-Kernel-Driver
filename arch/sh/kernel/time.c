@@ -391,7 +391,7 @@ static int __init sh_pclk_setup(char *str)
 }
 __setup("sh_pclk=", sh_pclk_setup);
 
-static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
+static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer", NULL, NULL};
 
 void get_current_frequency_divisors(unsigned int *ifc, unsigned int *bfc, unsigned int *pfc)
 {

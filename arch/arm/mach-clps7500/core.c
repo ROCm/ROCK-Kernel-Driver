@@ -188,7 +188,7 @@ static struct irqchip clps7500_no_chip = {
 	.unmask	= cl7500_no_action,
 };
 
-static struct irqaction irq_isa = { no_action, 0, 0, "isa", NULL, NULL };
+static struct irqaction irq_isa = { no_action, 0, CPU_MASK_NONE, "isa", NULL, NULL };
 
 static void __init clps7500_init_irq(void)
 {

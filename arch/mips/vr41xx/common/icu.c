@@ -288,7 +288,7 @@ static struct hw_interrupt_type giuint_irq_type = {
 
 /*=======================================================================*/
 
-static struct irqaction icu_cascade = {no_action, 0, 0, "cascade", NULL, NULL};
+static struct irqaction icu_cascade = {no_action, 0, CPU_MASK_NONE, "cascade", NULL, NULL};
 
 static void __init vr41xx_icu_init(void)
 {

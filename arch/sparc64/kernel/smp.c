@@ -414,9 +414,6 @@ static __inline__ void spitfire_xcall_deliver(u64 data0, u64 data1, u64 data2, c
  * packet, but we have no use for that.  However we do take advantage of
  * the new pipelining feature (ie. dispatch to multiple cpus simultaneously).
  */
-#if NR_CPUS > 32
-#error Fixup cheetah_xcall_deliver Dave...
-#endif
 static void cheetah_xcall_deliver(u64 data0, u64 data1, u64 data2, cpumask_t mask)
 {
 	u64 pstate, ver;

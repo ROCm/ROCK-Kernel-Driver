@@ -416,7 +416,7 @@ request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs
 
 	action->handler = handler;
 	action->flags = irqflags;
-	action->mask = 0;
+	cpus_clear(action->mask);
 	action->name = devname;
 	action->next = NULL;
 	action->dev_id = dev_id;

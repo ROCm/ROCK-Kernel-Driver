@@ -253,7 +253,7 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  */
 
 static struct irqaction irq2  = { timer_interrupt, SA_SHIRQ | SA_INTERRUPT,
-				  0, "timer", NULL, NULL};
+				  CPU_MASK_NONE, "timer", NULL, NULL};
 
 void __init
 time_init(void)

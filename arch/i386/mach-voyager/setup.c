@@ -17,7 +17,7 @@ void __init pre_intr_init_hook(void)
 /*
  * IRQ2 is cascade interrupt to second interrupt controller
  */
-static struct irqaction irq2 = { no_action, 0, 0, "cascade", NULL, NULL};
+static struct irqaction irq2 = { no_action, 0, CPU_MASK_NONE, "cascade", NULL, NULL};
 
 void __init intr_init_hook(void)
 {
@@ -40,7 +40,7 @@ void __init trap_init_hook(void)
 {
 }
 
-static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
+static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer", NULL, NULL};
 
 void __init time_init_hook(void)
 {
