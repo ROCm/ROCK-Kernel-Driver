@@ -105,6 +105,10 @@ Also check for any RFCs which may relate to the use of specific algorithms,
 as well as general application notes such as RFC2451 ("The ESP CBC-Mode
 Cipher Algorithms").
 
+It's a good idea to avoid using lots of macros and use inlined functions
+instead, as gcc does a good job with inlining, while excessive use of
+macros can cause compilation problems on some platforms.
+
 
 BUGS
 
@@ -167,7 +171,7 @@ Original developers of the initial set of crypto algorithms:
   Dana L. How (DES)
   Andrew Tridgell and Steve French (MD4)
   Colin Plumb (MD5)
-  Steve Raid (SHA1)
+  Steve Reid (SHA1)
   Jean-Luc Cooke (SHA256)
   Kazunori Miyazawa / USAGI (HMAC)
 

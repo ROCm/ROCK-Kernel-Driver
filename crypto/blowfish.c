@@ -23,7 +23,7 @@
 #include <linux/crypto.h>
 
 #define BF_BLOCK_SIZE 8
-#define BF_MIN_KEY_SIZE 8
+#define BF_MIN_KEY_SIZE 4
 #define BF_MAX_KEY_SIZE 56
 
 struct bf_ctx {

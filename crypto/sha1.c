@@ -5,7 +5,7 @@
  *
  * Derived from cryptoapi implementation, adapted for in-place
  * scatterlist interface.  Originally based on the public domain
- * implementation written by Steve Raid.
+ * implementation written by Steve Reid.
  *
  * Copyright (c) Alan Smithee.
  * Copyright (c) Andrew McDonald <andrew@mcdonald.org.uk>

@@ -55,9 +55,9 @@ config CRYPTO_BLOWFISH
 	help
 	  Blowfish cipher algorithm, by Bruce Schneier.
 	  
-	  This is a fast cipher which can use variable length key from 32
-	  bits to 448 bits.  It's fast, simple and specifically designed for
-	  use on "large microprocessors".
+	  This is a variable key length cipher which can use keys from 32
+	  bits to 448 bits in length.  It's fast, simple and specifically
+	  designed for use on "large microprocessors".
 	  
 	  See also:
 	  http://www.counterpane.com/blowfish.html
