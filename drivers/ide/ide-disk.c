@@ -1702,11 +1702,22 @@ static int idedisk_cleanup (ide_drive_t *drive)
 
 static int idedisk_attach(ide_drive_t *drive);
 
+static void ide_device_shutdown(struct device *dev)
+{
+	ide_drive_t *drive = container_of(dev, ide_drive_t, gendev);
+
+	printk("Shutdown: %s\n", drive->name);
+	dev->bus->suspend(dev, PM_SUSPEND_STANDBY);
+}
+
 /*
  *      IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idedisk_driver = {
 	.owner			= THIS_MODULE,
+	.gen_driver = {
+		.shutdown	= ide_device_shutdown,
+	},
 	.name			= "ide-disk",
 	.version		= IDEDISK_VERSION,
 	.media			= ide_disk,
