@@ -463,6 +463,7 @@ static void destroy_serial(struct kref *kref)
 			kfree(port->bulk_in_buffer);
 			kfree(port->bulk_out_buffer);
 			kfree(port->interrupt_in_buffer);
+			kfree(port->interrupt_out_buffer);
 		}
 	}
 
@@ -814,6 +815,7 @@ static void port_release(struct device *dev)
 	kfree(port->bulk_in_buffer);
 	kfree(port->bulk_out_buffer);
 	kfree(port->interrupt_in_buffer);
+	kfree(port->interrupt_out_buffer);
 	kfree(port);
 }
 
