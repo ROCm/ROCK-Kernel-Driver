@@ -54,6 +54,7 @@ MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keybo
 
 extern unsigned int i8042_dmi_noloop;
 static unsigned int i8042_noloop;
+extern unsigned int i8042_dmi_noloop;
 
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");

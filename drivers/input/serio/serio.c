@@ -68,8 +68,8 @@ struct serio_event {
 };
 
 
-spinlock_t serio_event_lock = SPIN_LOCK_UNLOCKED;	/* protects serio_event_list */
-static DECLARE_MUTEX(serio_sem);			/* protects serio_list and serio_dev_list */
+static spinlock_t serio_event_lock = SPIN_LOCK_UNLOCKED;	/* protects serio_event_list */
+static DECLARE_MUTEX(serio_sem);				/* protects serio_list and serio_dev_list */
 static LIST_HEAD(serio_list);
 static LIST_HEAD(serio_dev_list);
 static LIST_HEAD(serio_event_list);
@@ -99,16 +99,21 @@ static void serio_find_dev(struct serio *serio)
 static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
 static DECLARE_COMPLETION(serio_exited);
 
-static void serio_invalidate_pending_events(struct serio *serio)
+static void serio_remove_pending_events(struct serio *serio)
 {
+	struct list_head *node, *next;
 	struct serio_event *event;
 	unsigned long flags;
 
 	spin_lock_irqsave(&serio_event_lock, flags);
 
-	list_for_each_entry(event, &serio_event_list, node)
-		if (event->serio == serio)
-			event->serio = NULL;
+	list_for_each_safe(node, next, &serio_event_list) {
+		event = container_of(node, struct serio_event, node);
+		if (event->serio == serio) {
+			list_del_init(node);
+			kfree(event);
+		}
+	}
 
 	spin_unlock_irqrestore(&serio_event_lock, flags);
 }
@@ -137,9 +142,6 @@ void serio_handle_events(void)
 
 		down(&serio_sem);
 
-		if (event->serio == NULL) /*!!!*/
-			goto event_done;
-
 		switch (event->type) {
 			case SERIO_REGISTER_PORT :
 				__serio_register_port(event->serio);
@@ -163,7 +165,7 @@ void serio_handle_events(void)
 			default:
 				break;
 		}
-event_done:
+
 		up(&serio_sem);
 		kfree(event);
 	}
@@ -224,7 +226,7 @@ irqreturn_t serio_interrupt(struct serio *serio,
 
 	spin_lock_irqsave(&serio->lock, flags);
 
-        if (serio->dev && serio->dev->interrupt) {
+        if (likely(serio->dev)) {
                 ret = serio->dev->interrupt(serio, data, dfl, regs);
 	} else {
 		if (!dfl) {
@@ -294,7 +296,7 @@ void serio_unregister_port_delayed(struct serio *serio)
  */
 void __serio_unregister_port(struct serio *serio)
 {
-	serio_invalidate_pending_events(serio);
+	serio_remove_pending_events(serio);
 	list_del_init(&serio->node);
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);
