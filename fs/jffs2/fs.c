@@ -20,6 +20,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <linux/vfs.h>
 #include "nodelist.h"
 
