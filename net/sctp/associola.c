@@ -936,6 +936,9 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 void sctp_assoc_update(struct sctp_association *asoc,
 		       struct sctp_association *new)
 {
+	struct sctp_transport *trans;
+	struct list_head *pos, *temp;
+
 	/* Copy in new parameters of peer. */
 	asoc->c = new->c;
 	asoc->peer.rwnd = new->peer.rwnd;
@@ -944,20 +947,19 @@ void sctp_assoc_update(struct sctp_association *asoc,
 	sctp_tsnmap_init(&asoc->peer.tsn_map, SCTP_TSN_MAP_SIZE,
 			 asoc->peer.i.initial_tsn);
 
-	/* FIXME:
-	 *    Do we need to copy primary_path etc?
-	 *
-	 *    More explicitly, addresses may have been removed and
-	 *    this needs accounting for.
-	 */
+	/* Remove any peer addresses not present in the new association. */
+	list_for_each_safe(pos, temp, &asoc->peer.transport_addr_list) {
+		trans = list_entry(pos, struct sctp_transport, transports);
+		if (!sctp_assoc_lookup_paddr(new, &trans->ipaddr))
+			sctp_assoc_del_peer(asoc, &trans->ipaddr);
+	}
 
 	/* If the case is A (association restart), use
 	 * initial_tsn as next_tsn. If the case is B, use
 	 * current next_tsn in case data sent to peer
 	 * has been discarded and needs retransmission.
 	 */
-	if (sctp_state(asoc, ESTABLISHED)) {
-
+	if (asoc->state >= SCTP_STATE_ESTABLISHED) {
 		asoc->next_tsn = new->next_tsn;
 		asoc->ctsn_ack_point = new->ctsn_ack_point;
 		asoc->adv_peer_ack_point = new->adv_peer_ack_point;
@@ -968,6 +970,15 @@ void sctp_assoc_update(struct sctp_association *asoc,
 		sctp_ssnmap_clear(asoc->ssnmap);
 
 	} else {
+		/* Add any peer addresses from the new association. */
+		list_for_each(pos, &new->peer.transport_addr_list) {
+			trans = list_entry(pos, struct sctp_transport,
+					   transports);
+			if (!sctp_assoc_lookup_paddr(asoc, &trans->ipaddr))
+				sctp_assoc_add_peer(asoc, &trans->ipaddr,
+						    GFP_ATOMIC);
+		}
+
 		asoc->ctsn_ack_point = asoc->next_tsn - 1;
 		asoc->adv_peer_ack_point = asoc->ctsn_ack_point;
 		if (!asoc->ssnmap) {
@@ -976,7 +987,6 @@ void sctp_assoc_update(struct sctp_association *asoc,
 			new->ssnmap = NULL;
 		}
 	}
-
 }
 
 /* Update the retran path for sending a retransmitted packet.
