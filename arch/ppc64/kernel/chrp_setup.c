@@ -140,8 +140,6 @@ chrp_setup_arch(void)
 		ROOT_DEV = Root_SDA2;
 	}
 
-	printk("Boot arguments: %s\n", cmd_line);
-
 	fwnmi_init();
 
 #ifndef CONFIG_PPC_ISERIES
