@@ -102,6 +102,27 @@ rtas_token(const char *service)
 	return tokp ? *tokp : RTAS_UNKNOWN_SERVICE;
 }
 
+/*
+ * Return the firmware-specified size of the error log buffer
+ *  for all rtas calls that require an error buffer argument.
+ *  This includes 'check-exception' and 'rtas-last-error'.
+ */
+int rtas_get_error_log_max(void)
+{
+	static int rtas_error_log_max;
+	if (rtas_error_log_max)
+		return rtas_error_log_max;
+
+	rtas_error_log_max = rtas_token ("rtas-error-log-max");
+	if ((rtas_error_log_max == RTAS_UNKNOWN_SERVICE) ||
+	    (rtas_error_log_max > RTAS_ERROR_LOG_MAX)) {
+		printk (KERN_WARNING "RTAS: bad log buffer size %d\n", rtas_error_log_max);
+		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
+	}
+	return rtas_error_log_max;
+}
+
+
 /** Return a copy of the detailed error text associated with the
  *  most recent failed call to rtas.  Because the error text
  *  might go stale if there are any other intervening rtas calls,
@@ -114,12 +135,7 @@ __fetch_rtas_last_error(void)
 	struct rtas_args err_args, save_args;
 	u32 bufsz;
 
-	bufsz = rtas_token ("rtas-error-log-max");
-	if ((bufsz == RTAS_UNKNOWN_SERVICE) ||
-	    (bufsz > RTAS_ERROR_LOG_MAX)) {
-		printk (KERN_WARNING "RTAS: bad log buffer size %d\n", bufsz);
-		bufsz = RTAS_ERROR_LOG_MAX;
-	}
+	bufsz = rtas_get_error_log_max();
 
 	err_args.token = rtas_token("rtas-last-error");
 	err_args.nargs = 2;
@@ -539,26 +555,6 @@ void rtas_stop_self(void)
 	enter_rtas(__pa(rtas_args));
 
 	panic("Alas, I survived.\n");
-}
-
-/*
- * Return the firmware-specified size of the error log buffer
- *  for all rtas calls that require an error buffer argument.
- *  This includes 'check-exception' and 'rtas-last-error'.
- */
-int rtas_get_error_log_max(void)
-{
-	static int rtas_error_log_max;
-	if (rtas_error_log_max)
-		return rtas_error_log_max;
-
-	rtas_error_log_max = rtas_token ("rtas-error-log-max");
-	if ((rtas_error_log_max == RTAS_UNKNOWN_SERVICE) ||
-	    (rtas_error_log_max > RTAS_ERROR_LOG_MAX)) {
-		printk (KERN_WARNING "RTAS: bad log buffer size %d\n", rtas_error_log_max);
-		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
-	}
-	return rtas_error_log_max;
 }
 
 /*

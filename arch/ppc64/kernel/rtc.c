@@ -356,7 +356,7 @@ void pSeries_get_boot_time(struct rtc_time *rtc_tm)
 		}
 	} while (error == RTAS_CLOCK_BUSY && (__get_tb() < max_wait_tb));
 
-	if (error != 0) {
+	if (error != 0 && printk_ratelimit()) {
 		printk(KERN_WARNING "error: reading the clock failed (%d)\n",
 			error);
 		return;
@@ -384,7 +384,7 @@ void pSeries_get_rtc_time(struct rtc_time *rtc_tm)
 	do {
 		error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
 		if (error == RTAS_CLOCK_BUSY || rtas_is_extended_busy(error)) {
-			if (in_interrupt()) {
+			if (in_interrupt() && printk_ratelimit()) {
 				printk(KERN_WARNING "error: reading clock would delay interrupt\n");
 				return;	/* delay not allowed */
 			}
@@ -395,7 +395,7 @@ void pSeries_get_rtc_time(struct rtc_time *rtc_tm)
 		}
 	} while (error == RTAS_CLOCK_BUSY && (__get_tb() < max_wait_tb));
 
-        if (error != 0) {
+        if (error != 0 && printk_ratelimit()) {
                 printk(KERN_WARNING "error: reading the clock failed (%d)\n",
 		       error);
 		return;
@@ -430,7 +430,7 @@ int pSeries_set_rtc_time(struct rtc_time *tm)
 		}
 	} while (error == RTAS_CLOCK_BUSY && (__get_tb() < max_wait_tb));
 
-        if (error != 0)
+        if (error != 0 && printk_ratelimit())
                 printk(KERN_WARNING "error: setting the clock failed (%d)\n",
 		       error); 
 
