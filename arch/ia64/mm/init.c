@@ -29,7 +29,7 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 /* References to section boundaries: */
 extern char _stext, _etext, _edata, __init_begin, __init_end;
