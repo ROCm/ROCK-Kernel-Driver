@@ -904,9 +904,9 @@ static inline unsigned char *pskb_pull(struct sk_buff *skb, unsigned int len)
 
 static inline int pskb_may_pull(struct sk_buff *skb, unsigned int len)
 {
-	if (len <= skb_headlen(skb))
+	if (likely(len <= skb_headlen(skb)))
 		return 1;
-	if (len > skb->len)
+	if (unlikely(len > skb->len))
 		return 0;
 	return __pskb_pull_tail(skb, len-skb_headlen(skb)) != NULL;
 }
