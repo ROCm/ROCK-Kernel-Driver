@@ -538,7 +538,6 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 inline void signal_wake_up(struct task_struct *t, int resume)
 {
 	unsigned int mask;
-	int woken;
 
 	set_tsk_thread_flag(t, TIF_SIGPENDING);
 
@@ -552,10 +551,7 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 	mask = TASK_INTERRUPTIBLE;
 	if (resume)
 		mask |= TASK_STOPPED;
-	woken = 0;
-	if (t->state & mask)
-		woken = wake_up_state(t, mask);
-	if (!woken)
+	if (!wake_up_state(t, mask))
 		kick_process(t);
 }
 
