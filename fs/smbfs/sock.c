@@ -68,7 +68,7 @@ _recvfrom(struct socket *socket, unsigned char *ubuf, int size, unsigned flags)
 static struct smb_sb_info *
 server_from_socket(struct socket *socket)
 {
-	return socket->sk->user_data;
+	return socket->sk->sk_user_data;
 }
 
 /*
@@ -77,7 +77,7 @@ server_from_socket(struct socket *socket)
 void
 smb_data_ready(struct sock *sk, int len)
 {
-	struct smb_sb_info *server = server_from_socket(sk->socket);
+	struct smb_sb_info *server = server_from_socket(sk->sk_socket);
 	void (*data_ready)(struct sock *, int) = server->data_ready;
 
 	data_ready(sk, len);
@@ -117,7 +117,7 @@ smb_close_socket(struct smb_sb_info *server)
 		struct socket *sock = server_sock(server);
 
 		VERBOSE("closing socket %p\n", sock);
-		sock->sk->data_ready = server->data_ready;
+		sock->sk->sk_data_ready = server->data_ready;
 		server->sock_file = NULL;
 		fput(file);
 	}
@@ -226,7 +226,7 @@ smb_receive_header(struct smb_sb_info *server)
 	sock = server_sock(server);
 	if (!sock)
 		goto out;
-	if (sock->sk->state != TCP_ESTABLISHED)
+	if (sock->sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
 	if (!server->smb_read) {
@@ -290,7 +290,7 @@ smb_receive_drop(struct smb_sb_info *server)
 	sock = server_sock(server);
 	if (!sock)
 		goto out;
-	if (sock->sk->state != TCP_ESTABLISHED)
+	if (sock->sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
 	fs = get_fs();
@@ -345,7 +345,7 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 	sock = server_sock(server);
 	if (!sock)
 		goto out;
-	if (sock->sk->state != TCP_ESTABLISHED)
+	if (sock->sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
 	fs = get_fs();
@@ -400,7 +400,7 @@ smb_send_request(struct smb_request *req)
 	sock = server_sock(server);
 	if (!sock)
 		goto out;
-	if (sock->sk->state != TCP_ESTABLISHED)
+	if (sock->sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
 	msg.msg_name = NULL;
