@@ -23,6 +23,9 @@
 #include <linux/pci.h>
 #endif
 #include <linux/pm.h>
+#ifdef CONFIG_HIGHMEM
+#include <linux/highmem.h>
+#endif
 
 #include <asm/oplib.h>
 #include <asm/delay.h>
@@ -197,6 +200,12 @@ EXPORT_SYMBOL(pci_dma_sync_single);
 /* Actually, ioremap/iounmap are not PCI specific. But it is ok for drivers. */
 EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(iounmap);
+#endif
+
+/* in arch/sparc/mm/highmem.c */
+#ifdef CONFIG_HIGHMEM
+EXPORT_SYMBOL(kmap_atomic);
+EXPORT_SYMBOL(kunmap_atomic);
 #endif
 
 /* Solaris/SunOS binary compatibility */

@@ -38,6 +38,8 @@
 #include <asm/a.out.h>
 #include <asm/mmu_context.h>
 #include <asm/io-unit.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 /* Now the cpu specific definitions. */
 #include <asm/viking.h>

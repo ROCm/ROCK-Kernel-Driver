@@ -40,7 +40,7 @@ typedef unsigned char spinlock_t;
 do {	membar("#LoadLoad");	\
 } while(*((volatile unsigned char *)lock))
 
-extern __inline__ void _raw_spin_lock(spinlock_t *lock)
+static __inline__ void _raw_spin_lock(spinlock_t *lock)
 {
 	__asm__ __volatile__(
 "1:	ldstub		[%0], %%g7\n"
@@ -57,7 +57,7 @@ extern __inline__ void _raw_spin_lock(spinlock_t *lock)
 	: "g7", "memory");
 }
 
-extern __inline__ int _raw_spin_trylock(spinlock_t *lock)
+static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 {
 	unsigned int result;
 	__asm__ __volatile__("ldstub [%1], %0\n\t"
@@ -68,7 +68,7 @@ extern __inline__ int _raw_spin_trylock(spinlock_t *lock)
 	return (result == 0);
 }
 
-extern __inline__ void _raw_spin_unlock(spinlock_t *lock)
+static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 {
 	__asm__ __volatile__("membar	#StoreStore | #LoadStore\n\t"
 			     "stb	%%g0, [%0]"

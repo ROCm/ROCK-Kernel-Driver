@@ -1095,18 +1095,9 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		sigset_t *mask = &current->blocked;
 		unsigned long signr = 0;
 
-		local_irq_disable();
-		if (current->sig->shared_pending.head) {
-			spin_lock(&current->sig->siglock);
-			signr = dequeue_signal(&current->sig->shared_pending, mask, &info);
-			spin_unlock(&current->sig->siglock);
-		}
-		if (!signr) {
-			spin_lock(&current->sig->siglock);
-			signr = dequeue_signal(&current->pending, mask, &info);
-			spin_unlock(&current->sig->siglock);
-		}
-		local_irq_enable();
+		spin_lock_irq(&current->sig->siglock);
+		signr = dequeue_signal(mask, &info);
+		spin_unlock_irq(&current->sig->siglock);
 
 		if (!signr)
 			break;

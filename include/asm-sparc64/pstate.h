@@ -85,32 +85,4 @@
 #define VERS_MAXTL	0x000000000000ff00	/* Maximum Trap Level.		*/
 #define VERS_MAXWIN	0x000000000000001f	/* Maximum Reg Window Index.	*/
 
-#if defined(__KERNEL__) && !defined(__ASSEMBLY__)
-#define set_pstate(bits)					\
-	__asm__ __volatile__(					\
-		"rdpr      %%pstate, %%g1\n\t"			\
-		"or        %%g1, %0, %%g1\n\t"			\
-		"wrpr      %%g1, 0x0, %%pstate\n\t"		\
-		: /* no outputs */				\
-		: "i" (bits)					\
-		: "g1")
-
-#define clear_pstate(bits)					\
-	__asm__ __volatile__(					\
-		"rdpr      %%pstate, %%g1\n\t"			\
-		"andn        %%g1, %0, %%g1\n\t"		\
-		"wrpr      %%g1, 0x0, %%pstate\n\t"		\
-		: /* no outputs */				\
-		: "i" (bits)					\
-		: "g1")
-
-#define change_pstate(bits)					\
-	__asm__ __volatile__(					\
-		"rdpr      %%pstate, %%g1\n\t"			\
-		"wrpr      %%g1, %0, %%pstate\n\t"		\
-		: /* no outputs */				\
-		: "i" (bits)					\
-		: "g1")
-#endif
-
 #endif /* !(_SPARC64_PSTATE_H) */

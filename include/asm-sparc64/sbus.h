@@ -27,12 +27,12 @@
  * numbers + offsets, and vice versa.
  */
 
-extern __inline__ unsigned long sbus_devaddr(int slotnum, unsigned long offset)
+static __inline__ unsigned long sbus_devaddr(int slotnum, unsigned long offset)
 {
   return (unsigned long) (SUN_SBUS_BVADDR+((slotnum)<<28)+(offset));
 }
 
-extern __inline__ int sbus_dev_slot(unsigned long dev_addr)
+static __inline__ int sbus_dev_slot(unsigned long dev_addr)
 {
   return (int) (((dev_addr)-SUN_SBUS_BVADDR)>>28);
 }
