@@ -33,6 +33,7 @@
 #include <linux/quotaops.h>
 #include <linux/string.h>
 #include <linux/buffer_head.h>
+#include <linux/mpage.h>
 
 /*
  * SEARCH_FROM_ZERO forces each block allocation to search from the start
@@ -1340,9 +1341,15 @@ out_fail:
 
 static int ext3_readpage(struct file *file, struct page *page)
 {
-	return block_read_full_page(page,ext3_get_block);
+	return mpage_readpage(page, ext3_get_block);
 }
 
+static int
+ext3_readpages(struct address_space *mapping,
+		struct list_head *pages, unsigned nr_pages)
+{
+	return mpage_readpages(mapping, pages, nr_pages, ext3_get_block);
+}
 
 static int ext3_flushpage(struct page *page, unsigned long offset)
 {
@@ -1359,6 +1366,7 @@ static int ext3_releasepage(struct page *page, int wait)
 
 struct address_space_operations ext3_aops = {
 	readpage:	ext3_readpage,		/* BKL not held.  Don't need */
+	readpages:	ext3_readpages,		/* BKL not held.  Don't need */
 	writepage:	ext3_writepage,		/* BKL not held.  We take it */
 	sync_page:	block_sync_page,
 	prepare_write:	ext3_prepare_write,	/* BKL not held.  We take it */
