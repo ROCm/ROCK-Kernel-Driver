@@ -62,8 +62,12 @@
 	verify_area( VERIFY_READ, uaddr, size )
 #define DRM_COPY_FROM_USER_UNCHECKED(arg1, arg2, arg3) 	\
 	__copy_from_user(arg1, arg2, arg3)
+#define DRM_COPY_TO_USER_UNCHECKED(arg1, arg2, arg3)	\
+	__copy_to_user(arg1, arg2, arg3)
 #define DRM_GET_USER_UNCHECKED(val, uaddr)		\
 	__get_user(val, uaddr)
+#define DRM_PUT_USER_UNCHECKED(uaddr, val)		\
+	__put_user(val, uaddr)
 
 
 /** 'malloc' without the overhead of DRM(alloc)() */

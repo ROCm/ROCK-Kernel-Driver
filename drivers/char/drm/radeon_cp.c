@@ -855,7 +855,8 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 
 	/* Initialize the memory controller */
 	RADEON_WRITE( RADEON_MC_FB_LOCATION,
-		      (dev_priv->gart_vm_start - 1) & 0xffff0000 );
+		      ( ( dev_priv->gart_vm_start - 1 ) & 0xffff0000 )
+		    | ( dev_priv->fb_location >> 16 ) );
 
 #if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci ) {
@@ -1071,13 +1072,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	dev_priv->depth_offset	= init->depth_offset;
 	dev_priv->depth_pitch	= init->depth_pitch;
 
-	dev_priv->front_pitch_offset = (((dev_priv->front_pitch/64) << 22) |
-					(dev_priv->front_offset >> 10));
-	dev_priv->back_pitch_offset = (((dev_priv->back_pitch/64) << 22) |
-				       (dev_priv->back_offset >> 10));
-	dev_priv->depth_pitch_offset = (((dev_priv->depth_pitch/64) << 22) |
-					(dev_priv->depth_offset >> 10));
-
 	/* Hardware state for depth clears.  Remove this if/when we no
 	 * longer clear the depth buffer with a 3D rectangle.  Hard-code
 	 * all values to prevent unwanted 3D state from slipping through
@@ -1204,9 +1198,26 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 			   dev_priv->buffers->handle );
 	}
 
+	dev_priv->fb_location = ( RADEON_READ( RADEON_MC_FB_LOCATION )
+				& 0xffff ) << 16;
+
+	dev_priv->front_pitch_offset = (((dev_priv->front_pitch/64) << 22) |
+					( ( dev_priv->front_offset
+					  + dev_priv->fb_location ) >> 10 ) );
+
+	dev_priv->back_pitch_offset = (((dev_priv->back_pitch/64) << 22) |
+				       ( ( dev_priv->back_offset
+					 + dev_priv->fb_location ) >> 10 ) );
+
+	dev_priv->depth_pitch_offset = (((dev_priv->depth_pitch/64) << 22) |
+					( ( dev_priv->depth_offset
+					  + dev_priv->fb_location ) >> 10 ) );
+
 
 	dev_priv->gart_size = init->gart_size;
-	dev_priv->gart_vm_start = RADEON_READ( RADEON_CONFIG_APER_SIZE );
+	dev_priv->gart_vm_start = dev_priv->fb_location
+				+ RADEON_READ( RADEON_CONFIG_APER_SIZE );
+
 #if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci )
 		dev_priv->gart_buffers_offset = (dev_priv->buffers->offset

@@ -73,6 +73,8 @@ typedef struct drm_radeon_private {
 	drm_radeon_ring_buffer_t ring;
 	drm_radeon_sarea_t *sarea_priv;
 
+	u32 fb_location;
+
 	int gart_size;
 	u32 gart_vm_start;
 	unsigned long gart_buffers_offset;
@@ -184,6 +186,7 @@ extern int radeon_cp_indirect( DRM_IOCTL_ARGS );
 extern int radeon_cp_vertex2( DRM_IOCTL_ARGS );
 extern int radeon_cp_cmdbuf( DRM_IOCTL_ARGS );
 extern int radeon_cp_getparam( DRM_IOCTL_ARGS );
+extern int radeon_cp_setparam( DRM_IOCTL_ARGS );
 extern int radeon_cp_flip( DRM_IOCTL_ARGS );
 
 extern int radeon_mem_alloc( DRM_IOCTL_ARGS );
@@ -239,6 +242,7 @@ extern void radeon_do_release(drm_device_t *dev);
 #define RADEON_CRTC2_OFFSET		0x0324
 #define RADEON_CRTC2_OFFSET_CNTL	0x0328
 
+#define RADEON_RB3D_COLOROFFSET		0x1c40
 #define RADEON_RB3D_COLORPITCH		0x1c48
 
 #define RADEON_DP_GUI_MASTER_CNTL	0x146c
@@ -332,6 +336,7 @@ extern void radeon_do_release(drm_device_t *dev);
 #define RADEON_PP_MISC			0x1c14
 #define RADEON_PP_ROT_MATRIX_0		0x1d58
 #define RADEON_PP_TXFILTER_0		0x1c54
+#define RADEON_PP_TXOFFSET_0		0x1c5c
 #define RADEON_PP_TXFILTER_1		0x1c6c
 #define RADEON_PP_TXFILTER_2		0x1c84
 

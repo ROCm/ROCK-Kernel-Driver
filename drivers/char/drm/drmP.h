@@ -490,6 +490,9 @@ typedef struct drm_file {
 	struct drm_device *dev;
 	int 		  remove_auth_on_close;
 	unsigned long     lock_count;
+#ifdef DRIVER_FILE_FIELDS
+	DRIVER_FILE_FIELDS;
+#endif
 } drm_file_t;
 
 /** Wait queue */
