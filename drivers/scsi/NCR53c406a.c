@@ -55,7 +55,6 @@
 #include <linux/spinlock.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "NCR53c406a.h"
 
 /* ============================================================= */
 
