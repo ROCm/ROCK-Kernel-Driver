@@ -1365,6 +1365,13 @@ out:
 	return err;
 }
 
+/* 7.1.12 Enable/Disable message fragmentation (SCTP_DISABLE_FRAGMENTS)
+ *
+ * This option is a on/off flag.  If enabled no SCTP message
+ * fragmentation will be performed.  Instead if a message being sent
+ * exceeds the current PMTU size, the message will NOT be sent and
+ * instead a error will be indicated to the user.
+ */
 static int sctp_setsockopt_disable_fragments(struct sock *sk,
 						    char *optval, int optlen)
 {
@@ -1391,6 +1398,17 @@ static int sctp_setsockopt_events(struct sock *sk, char *optval,
 	return 0;
 }
 
+/* 7.1.8 Automatic Close of associations (SCTP_AUTOCLOSE)
+ *
+ * This socket option is applicable to the UDP-style socket only.  When
+ * set it will cause associations that are idle for more than the
+ * specified number of seconds to automatically close.  An association
+ * being idle is defined an association that has NOT sent or received
+ * user data.  The special value of '0' indicates that no automatic
+ * close of any associations should be performed.  The option expects an
+ * integer defining the number of seconds of idle time before an
+ * association is closed.
+ */
 static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 					    int optlen)
 {
@@ -1408,6 +1426,37 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 	return 0;
 }
 
+/* 7.1.13 Peer Address Parameters (SCTP_SET_PEER_ADDR_PARAMS)
+ *
+ * Applications can enable or disable heartbeats for any peer address of
+ * an association, modify an address's heartbeat interval, force a
+ * heartbeat to be sent immediately, and adjust the address's maximum
+ * number of retransmissions sent before an address is considered
+ * unreachable.  The following structure is used to access and modify an
+ * address's parameters:
+ *
+ *  struct sctp_paddrparams {
+ *      sctp_assoc_t            spp_assoc_id;
+ *      struct sockaddr_storage spp_address;
+ *      uint32_t                spp_hbinterval;
+ *      uint16_t                spp_pathmaxrxt;
+ *  };
+ *
+ *   spp_assoc_id    - (UDP style socket) This is filled in the application,
+ *                     and identifies the association for this query.
+ *   spp_address     - This specifies which address is of interest.
+ *   spp_hbinterval  - This contains the value of the heartbeat interval,
+ *                     in milliseconds.  A value of 0, when modifying the
+ *                     parameter, specifies that the heartbeat on this
+ *                     address should be disabled. A value of UINT32_MAX
+ *                     (4294967295), when modifying the parameter,
+ *                     specifies that a heartbeat should be sent
+ *                     immediately to the peer address, and the current
+ *                     interval should remain unchanged.
+ *   spp_pathmaxrxt  - This contains the maximum number of
+ *                     retransmissions before this address shall be
+ *                     considered unreachable.
+ */ 
 static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 					    char *optval, int optlen)
 {
@@ -1460,6 +1509,17 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	return 0;
 }
 
+/* 7.1.3 Initialization Parameters (SCTP_INITMSG)
+ *
+ * Applications can specify protocol parameters for the default association
+ * initialization.  The option name argument to setsockopt() and getsockopt()
+ * is SCTP_INITMSG.
+ *
+ * Setting initialization parameters is effective only on an unconnected
+ * socket (for UDP-style sockets only future associations are effected
+ * by the change).  With TCP-style sockets, this option is inherited by
+ * sockets derived from a listener socket.
+ */
 static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 {
 	if (optlen != sizeof(struct sctp_initmsg))
@@ -1470,7 +1530,7 @@ static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 }
 
 /*
- * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
@@ -2160,6 +2220,64 @@ out:
 	return (retval);
 }
 
+
+/* 7.2.2 Peer Address Information (SCTP_GET_PEER_ADDR_INFO)
+ *
+ * Applications can retrieve information about a specific peer address
+ * of an association, including its reachability state, congestion
+ * window, and retransmission timer values.  This information is
+ * read-only.
+ */
+static int sctp_getsockopt_peer_addr_info(struct sock *sk, int len,
+					  char *optval, int *optlen)
+{
+	struct sctp_paddrinfo pinfo;
+	struct sctp_transport *transport;
+	int retval = 0;
+
+	if (len != sizeof(pinfo)) {
+		retval = -EINVAL;
+		goto out;
+	}
+
+	if (copy_from_user(&pinfo, optval, sizeof(pinfo))) {
+		retval = -EFAULT;
+		goto out;
+	}
+
+	transport = sctp_addr_id2transport(sk, &pinfo.spinfo_address,
+					   pinfo.spinfo_assoc_id);
+	if (!transport)
+		return -EINVAL;
+
+	pinfo.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
+	pinfo.spinfo_state = transport->active;
+	pinfo.spinfo_cwnd = transport->cwnd;
+	pinfo.spinfo_srtt = transport->srtt;
+	pinfo.spinfo_rto = transport->rto;
+	pinfo.spinfo_mtu = transport->pmtu;
+
+	if (put_user(len, optlen)) {
+		retval = -EFAULT;
+		goto out;
+	}
+
+	if (copy_to_user(optval, &pinfo, len)) {
+		retval = -EFAULT;
+		goto out;
+	}
+
+out:
+	return (retval);
+}
+
+/* 7.1.12 Enable/Disable message fragmentation (SCTP_DISABLE_FRAGMENTS)
+ *
+ * This option is a on/off flag.  If enabled no SCTP message
+ * fragmentation will be performed.  Instead if a message being sent
+ * exceeds the current PMTU size, the message will NOT be sent and
+ * instead a error will be indicated to the user.
+ */
 static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 						    char *optval, int *optlen)
 {
@@ -2177,6 +2295,11 @@ static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 	return 0;
 }
 
+/* 7.1.15 Set notification and ancillary events (SCTP_SET_EVENTS)
+ *
+ * This socket option is used to specify various notifications and
+ * ancillary data the user wishes to receive.
+ */
 static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, int *optlen)
 {
 	if (len != sizeof(struct sctp_event_subscribe))
@@ -2186,6 +2309,17 @@ static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, in
 	return 0;
 }
 
+/* 7.1.8 Automatic Close of associations (SCTP_AUTOCLOSE)
+ *
+ * This socket option is applicable to the UDP-style socket only.  When
+ * set it will cause associations that are idle for more than the
+ * specified number of seconds to automatically close.  An association
+ * being idle is defined an association that has NOT sent or received
+ * user data.  The special value of '0' indicates that no automatic
+ * close of any associations should be performed.  The option expects an
+ * integer defining the number of seconds of idle time before an
+ * association is closed.
+ */
 static int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
 {
 	/* Applicable to UDP-style socket only */
@@ -2269,6 +2403,37 @@ out:
 	return retval;
 }
 
+/* 7.1.13 Peer Address Parameters (SCTP_SET_PEER_ADDR_PARAMS)
+ *
+ * Applications can enable or disable heartbeats for any peer address of
+ * an association, modify an address's heartbeat interval, force a
+ * heartbeat to be sent immediately, and adjust the address's maximum
+ * number of retransmissions sent before an address is considered
+ * unreachable.  The following structure is used to access and modify an
+ * address's parameters:
+ *
+ *  struct sctp_paddrparams {
+ *      sctp_assoc_t            spp_assoc_id;
+ *      struct sockaddr_storage spp_address;
+ *      uint32_t                spp_hbinterval;
+ *      uint16_t                spp_pathmaxrxt;
+ *  };
+ *
+ *   spp_assoc_id    - (UDP style socket) This is filled in the application,
+ *                     and identifies the association for this query.
+ *   spp_address     - This specifies which address is of interest.
+ *   spp_hbinterval  - This contains the value of the heartbeat interval,
+ *                     in milliseconds.  A value of 0, when modifying the
+ *                     parameter, specifies that the heartbeat on this
+ *                     address should be disabled. A value of UINT32_MAX
+ *                     (4294967295), when modifying the parameter,
+ *                     specifies that a heartbeat should be sent
+ *                     immediately to the peer address, and the current
+ *                     interval should remain unchanged.
+ *   spp_pathmaxrxt  - This contains the maximum number of
+ *                     retransmissions before this address shall be
+ *                     considered unreachable.
+ */ 
 static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 						char *optval, int *optlen)
 {
@@ -2308,6 +2473,17 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	return 0;
 }
 
+/* 7.1.3 Initialization Parameters (SCTP_INITMSG)
+ *
+ * Applications can specify protocol parameters for the default association
+ * initialization.  The option name argument to setsockopt() and getsockopt()
+ * is SCTP_INITMSG.
+ *
+ * Setting initialization parameters is effective only on an unconnected
+ * socket (for UDP-style sockets only future associations are effected
+ * by the change).  With TCP-style sockets, this option is inherited by
+ * sockets derived from a listener socket.
+ */
 static int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval, int *optlen)
 {
 	if (len != sizeof(struct sctp_initmsg))
@@ -2513,7 +2689,7 @@ static int sctp_getsockopt_peer_prim(struct sock *sk, int len,
 
 /*
  *
- * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
@@ -2728,6 +2904,10 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_MAXSEG:
 		retval = sctp_getsockopt_maxseg(sk, len, optval, optlen);
+		break;
+	case SCTP_GET_PEER_ADDR_INFO:
+		retval = sctp_getsockopt_peer_addr_info(sk, len, optval,
+							optlen);
 		break;
 	default:
 		retval = -ENOPROTOOPT;

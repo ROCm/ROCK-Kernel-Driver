@@ -108,7 +108,7 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	peer->last_time_used = jiffies;
 	peer->last_time_ecne_reduced = jiffies;
 
-	peer->active = 1;
+	peer->active = SCTP_ACTIVE;
 	peer->hb_allowed = 0;
 
 	/* Initialize the default path max_retrans.  */
