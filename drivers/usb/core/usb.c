@@ -925,7 +925,6 @@ void usb_disconnect(struct usb_device **pdev)
 
 	/* Decrement the reference count, it'll auto free everything when */
 	/* it hits 0 which could very well be now */
-	/* FIXME the decrement in device_unregister() should suffice ... */
 	usb_put_dev(dev);
 }
 
