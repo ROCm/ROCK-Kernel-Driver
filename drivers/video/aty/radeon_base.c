@@ -1865,7 +1865,7 @@ static int radeon_set_backlight_enable(int on, int level, void *data)
 	lvds_gen_cntl |= (LVDS_BL_MOD_EN | LVDS_BLON);
 	if (on && (level > BACKLIGHT_OFF)) {
 		lvds_gen_cntl |= LVDS_DIGON;
-		if (!lvds_gen_cntl & LVDS_ON) {
+		if (!(lvds_gen_cntl & LVDS_ON)) {
 			lvds_gen_cntl &= ~LVDS_BLON;
 			OUTREG(LVDS_GEN_CNTL, lvds_gen_cntl);
 			(void)INREG(LVDS_GEN_CNTL);
