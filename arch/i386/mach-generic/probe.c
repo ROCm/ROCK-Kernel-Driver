@@ -20,6 +20,7 @@ extern struct genapic apic_bigsmp;
 extern struct genapic apic_default;
 
 struct genapic *genapic = &apic_default;
+EXPORT_SYMBOL(genapic);
 
 struct genapic *apic_probe[] __initdata = { 
 	&apic_summit,
