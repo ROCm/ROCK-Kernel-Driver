@@ -2667,7 +2667,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 	}
 
 	total_bytes = bio_nbytes = 0;
-	while ((bio = req->bio)) {
+	while ((bio = req->bio) != NULL) {
 		int nbytes;
 
 		if (nr_bytes >= bio->bi_size) {
