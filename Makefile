@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 5
 SUBLEVEL = 69
-EXTRAVERSION =
+EXTRAVERSION = $(CONFIG_RELEASE)-$(CONFIG_CFGNAME)
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
