@@ -2172,6 +2172,17 @@ config HIPPI
 	  under Linux, say Y here (you must also remember to enable the driver
 	  for your HIPPI card below). Most people will say N here.
 
+config IBMVETH
+	tristate "IBM LAN Virtual Ethernet support"
+	depends on NETDEVICES && NET_ETHERNET && PPC_PSERIES
+	---help---
+	  This driver supports virtual ethernet adapters on newer IBM iSeries
+	  and pSeries systems.
+
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>. The module will
+	  be called ibmveth.
+
 config ROADRUNNER
 	tristate "Essential RoadRunner HIPPI PCI adapter support (EXPERIMENTAL)"
 	depends on HIPPI && PCI
