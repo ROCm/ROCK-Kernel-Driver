@@ -33,12 +33,12 @@
 
 
 struct eni_free {
-	unsigned long start;		/* counting in bytes */
+	void __iomem *start;		/* counting in bytes */
 	int order;
 };
 
 struct eni_tx {
-	unsigned long send;		/* base, 0 if unused */
+	void __iomem *send;		/* base, 0 if unused */
 	int prescaler;			/* shaping prescaler */
 	int resolution;			/* shaping divider */
 	unsigned long tx_pos;		/* current TX write position */
@@ -51,7 +51,7 @@ struct eni_tx {
 
 struct eni_vcc {
 	int (*rx)(struct atm_vcc *vcc);	/* RX function, NULL if none */
-	unsigned long recv;		/* receive buffer */
+	void __iomem *recv;		/* receive buffer */
 	unsigned long words;		/* its size in words */
 	unsigned long descr;		/* next descriptor (RX) */
 	unsigned long rx_pos;		/* current RX descriptor pos */
@@ -72,13 +72,13 @@ struct eni_dev {
 	u32 events;			/* pending events */
 	/*-------------------------------- base pointers into Midway address
 					   space */
-	unsigned long phy;		/* PHY interface chip registers */
-	unsigned long reg;		/* register base */
-	unsigned long ram;		/* RAM base */
-	unsigned long vci;		/* VCI table */
-	unsigned long rx_dma;		/* RX DMA queue */
-	unsigned long tx_dma;		/* TX DMA queue */
-	unsigned long service;		/* service list */
+	void __iomem *phy;		/* PHY interface chip registers */
+	void __iomem *reg;		/* register base */
+	void __iomem *ram;		/* RAM base */
+	void __iomem *vci;		/* VCI table */
+	void __iomem *rx_dma;		/* RX DMA queue */
+	void __iomem *tx_dma;		/* TX DMA queue */
+	void __iomem *service;		/* service list */
 	/*-------------------------------- TX part */
 	struct eni_tx tx[NR_CHAN];	/* TX channels */
 	struct eni_tx *ubr;		/* UBR channel */
