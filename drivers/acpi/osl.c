@@ -677,6 +677,92 @@ acpi_os_queue_for_execution(
 	return_ACPI_STATUS (status);
 }
 
+/*
+ * Allocate the memory for a spinlock and initialize it.
+ */
+acpi_status
+acpi_os_create_lock (
+	acpi_handle	*out_handle)
+{
+	spinlock_t *lock_ptr;
+
+	ACPI_FUNCTION_TRACE ("os_create_lock");
+
+	lock_ptr = acpi_os_allocate(sizeof(spinlock_t));
+
+	spin_lock_init(lock_ptr);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Creating spinlock[%p].\n", lock_ptr));
+
+	*out_handle = lock_ptr;
+
+	return_ACPI_STATUS (AE_OK);
+}
+
+
+/*
+ * Deallocate the memory for a spinlock.
+ */
+void
+acpi_os_delete_lock (
+	acpi_handle	handle)
+{
+	ACPI_FUNCTION_TRACE ("os_create_lock");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Deleting spinlock[%p].\n", handle));
+
+	acpi_os_free(handle);
+
+	return_VOID;
+}
+
+/*
+ * Acquire a spinlock.
+ *
+ * handle is a pointer to the spinlock_t.
+ * flags is *not* the result of save_flags - it is an ACPI-specific flag variable
+ *   that indicates whether we are at interrupt level.
+ */
+void
+acpi_os_acquire_lock (
+	acpi_handle	handle,
+	u32		flags)
+{
+	ACPI_FUNCTION_TRACE ("os_acquire_lock");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Acquiring spinlock[%p] from %s level\n", handle,
+		((flags & ACPI_NOT_ISR) ? "non-interrupt" : "interrupt")));
+
+	if (flags & ACPI_NOT_ISR)
+		ACPI_DISABLE_IRQS();
+
+	spin_lock(handle);
+
+	return_VOID;
+}
+
+
+/*
+ * Release a spinlock. See above.
+ */
+void
+acpi_os_release_lock (
+	acpi_handle	handle,
+	u32		flags)
+{
+	ACPI_FUNCTION_TRACE ("os_release_lock");
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Releasing spinlock[%p] from %s level\n", handle,
+		((flags & ACPI_NOT_ISR) ? "non-interrupt" : "interrupt")));
+
+	spin_unlock(handle);
+
+	if (flags & ACPI_NOT_ISR)
+		ACPI_ENABLE_IRQS();
+
+	return_VOID;
+}
+
 
 acpi_status
 acpi_os_create_semaphore(

@@ -239,6 +239,7 @@ struct acpi_object_device
 {
 	ACPI_OBJECT_COMMON_HEADER
 	ACPI_COMMON_NOTIFY_INFO
+	struct acpi_gpe_block_info              *gpe_block;
 };
 
 

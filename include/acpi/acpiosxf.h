@@ -147,6 +147,27 @@ acpi_os_signal_semaphore (
 	acpi_handle                     handle,
 	u32                             units);
 
+acpi_status
+acpi_os_create_lock (
+	acpi_handle                     *out_handle);
+
+void
+acpi_os_delete_lock (
+	acpi_handle                     handle);
+
+void
+acpi_os_acquire_lock (
+	acpi_handle                     handle,
+	u32                             flags);
+
+void
+acpi_os_release_lock (
+	acpi_handle                     handle,
+	u32                             flags);
+
+#define ACPI_NOT_ISR        1
+#define ACPI_ISR            0
+
 
 /*
  * Memory allocation and mapping

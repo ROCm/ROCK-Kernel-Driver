@@ -525,7 +525,8 @@ acpi_ev_terminate (void)
 	acpi_status                     status;
 	struct acpi_gpe_block_info      *gpe_block;
 	struct acpi_gpe_block_info      *next_gpe_block;
-	struct acpi_gpe_event_info      *gpe_event_info;
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info;
+	struct acpi_gpe_xrupt_info      *next_gpe_xrupt_info;
 
 
 	ACPI_FUNCTION_TRACE ("ev_terminate");
@@ -537,46 +538,29 @@ acpi_ev_terminate (void)
 		 * In all cases, on error, print a message but obviously we don't abort.
 		 */
 
-		/*
-		 * Disable all fixed events
-		 */
+		/* Disable all fixed events */
+
 		for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
-			status = acpi_disable_event ((u32) i, ACPI_EVENT_FIXED, 0);
+			status = acpi_disable_event ((u32) i, 0);
 			if (ACPI_FAILURE (status)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable fixed event %d\n", (u32) i));
 			}
 		}
 
-		/*
-		 * Disable all GPEs
-		 */
-		gpe_block = acpi_gbl_gpe_block_list_head;
-		while (gpe_block) {
-			gpe_event_info = gpe_block->event_info;
-			for (i = 0; i < (gpe_block->register_count * 8); i++) {
-				status = acpi_hw_disable_gpe (gpe_event_info);
-				if (ACPI_FAILURE (status)) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable GPE %d\n", (u32) i));
-				}
+		/* Disable all GPEs in all GPE blocks */
 
-				gpe_event_info++;
-			}
+		status = acpi_ev_walk_gpe_list (acpi_hw_disable_gpe_block);
 
-			gpe_block = gpe_block->next;
-		}
+		/* Remove SCI handler */
 
-		/*
-		 * Remove SCI handler
-		 */
 		status = acpi_ev_remove_sci_handler ();
 		if (ACPI_FAILURE(status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not remove SCI handler\n"));
 		}
 	}
 
-	/*
-	 * Return to original mode if necessary
-	 */
+	/* Return to original mode if necessary */
+
 	if (acpi_gbl_original_mode == ACPI_SYS_MODE_LEGACY) {
 		status = acpi_disable ();
 		if (ACPI_FAILURE (status)) {
@@ -584,19 +568,23 @@ acpi_ev_terminate (void)
 		}
 	}
 
-	/*
-	 * Free global GPE blocks and related info structures
-	 */
-	gpe_block = acpi_gbl_gpe_block_list_head;
-	while (gpe_block) {
-		next_gpe_block = gpe_block->next;
-		ACPI_MEM_FREE (gpe_block->event_info);
-		ACPI_MEM_FREE (gpe_block->register_info);
-		ACPI_MEM_FREE (gpe_block);
+	/* Free global GPE blocks and related info structures */
 
-		gpe_block = next_gpe_block;
+	gpe_xrupt_info = acpi_gbl_gpe_xrupt_list_head;
+	while (gpe_xrupt_info) {
+		gpe_block = gpe_xrupt_info->gpe_block_list_head;
+		while (gpe_block) {
+			next_gpe_block = gpe_block->next;
+			ACPI_MEM_FREE (gpe_block->event_info);
+			ACPI_MEM_FREE (gpe_block->register_info);
+			ACPI_MEM_FREE (gpe_block);
+
+			gpe_block = next_gpe_block;
+		}
+		next_gpe_xrupt_info = gpe_xrupt_info->next;
+		ACPI_MEM_FREE (gpe_xrupt_info);
+		gpe_xrupt_info = next_gpe_xrupt_info;
 	}
-
 	return_VOID;
 }
 

@@ -52,26 +52,26 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ev_sci_handler
+ * FUNCTION:    acpi_ev_sci_xrupt_handler
  *
  * PARAMETERS:  Context   - Calling Context
  *
  * RETURN:      Status code indicates whether interrupt was handled.
  *
  * DESCRIPTION: Interrupt handler that will figure out what function or
- *              control method to call to deal with a SCI.  Installed
- *              using BU interrupt support.
+ *              control method to call to deal with a SCI.
  *
  ******************************************************************************/
 
 static u32 ACPI_SYSTEM_XFACE
-acpi_ev_sci_handler (
+acpi_ev_sci_xrupt_handler (
 	void                            *context)
 {
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_list = context;
 	u32                             interrupt_handled = ACPI_INTERRUPT_NOT_HANDLED;
 
 
-	ACPI_FUNCTION_TRACE("ev_sci_handler");
+	ACPI_FUNCTION_TRACE("ev_sci_xrupt_handler");
 
 
 	/*
@@ -85,11 +85,51 @@ acpi_ev_sci_handler (
 	 */
 	interrupt_handled |= acpi_ev_fixed_event_detect ();
 
+/* TBD: What if there are no GPEs defined? */
+
 	/*
 	 * GPEs:
 	 * Check for and dispatch any GPEs that have occurred
 	 */
-	interrupt_handled |= acpi_ev_gpe_detect ();
+	interrupt_handled |= acpi_ev_gpe_detect (gpe_xrupt_list);
+
+	return_VALUE (interrupt_handled);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_gpe_xrupt_handler
+ *
+ * PARAMETERS:  Context   - Calling Context
+ *
+ * RETURN:      Status code indicates whether interrupt was handled.
+ *
+ * DESCRIPTION: Handler for GPE Block Device interrupts
+ *
+ ******************************************************************************/
+
+u32 ACPI_SYSTEM_XFACE
+acpi_ev_gpe_xrupt_handler (
+	void                            *context)
+{
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_list = context;
+	u32                             interrupt_handled = ACPI_INTERRUPT_NOT_HANDLED;
+
+
+	ACPI_FUNCTION_TRACE("ev_gpe_xrupt_handler");
+
+
+	/*
+	 * We are guaranteed by the ACPI CA initialization/shutdown code that
+	 * if this interrupt handler is installed, ACPI is enabled.
+	 */
+
+	/*
+	 * GPEs:
+	 * Check for and dispatch any GPEs that have occurred
+	 */
+	interrupt_handled |= acpi_ev_gpe_detect (gpe_xrupt_list);
 
 	return_VALUE (interrupt_handled);
 }
@@ -117,7 +157,7 @@ acpi_ev_install_sci_handler (void)
 
 
 	status = acpi_os_install_interrupt_handler ((u32) acpi_gbl_FADT->sci_int,
-			   acpi_ev_sci_handler, NULL);
+			   acpi_ev_sci_xrupt_handler, acpi_gbl_gpe_xrupt_list_head);
 	return_ACPI_STATUS (status);
 }
 
@@ -153,7 +193,7 @@ acpi_ev_remove_sci_handler (void)
 	/* Just let the OS remove the handler and disable the level */
 
 	status = acpi_os_remove_interrupt_handler ((u32) acpi_gbl_FADT->sci_int,
-			   acpi_ev_sci_handler);
+			   acpi_ev_sci_xrupt_handler);
 
 	return_ACPI_STATUS (status);
 }

@@ -102,7 +102,7 @@ acpi_install_fixed_event_handler (
 	acpi_gbl_fixed_event_handlers[event].handler = handler;
 	acpi_gbl_fixed_event_handlers[event].context = context;
 
-	status = acpi_enable_event (event, ACPI_EVENT_FIXED, 0);
+	status = acpi_enable_event (event, 0);
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Could not enable fixed event.\n"));
 
@@ -160,7 +160,7 @@ acpi_remove_fixed_event_handler (
 
 	/* Disable the event before removing the handler */
 
-	status = acpi_disable_event(event, ACPI_EVENT_FIXED, 0);
+	status = acpi_disable_event (event, 0);
 
 	/* Always Remove the handler */
 
@@ -471,8 +471,8 @@ unlock_and_exit:
  *
  * FUNCTION:    acpi_install_gpe_handler
  *
- * PARAMETERS:  gpe_number      - The GPE number.  The numbering scheme is
- *                                bank 0 first, then bank 1.
+ * PARAMETERS:  gpe_number      - The GPE number within the GPE block
+ *              gpe_block       - GPE block (NULL == FADT GPEs)
  *              Type            - Whether this GPE should be treated as an
  *                                edge- or level-triggered interrupt.
  *              Handler         - Address of the handler
@@ -486,6 +486,7 @@ unlock_and_exit:
 
 acpi_status
 acpi_install_gpe_handler (
+	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	u32                             type,
 	acpi_gpe_handler                handler,
@@ -504,42 +505,45 @@ acpi_install_gpe_handler (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	/* Ensure that we have a valid GPE number */
-
-	gpe_event_info = acpi_ev_get_gpe_event_info (gpe_number);
-	if (!gpe_event_info) {
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
-	}
-
 	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
+	}
+
+	/* Ensure that we have a valid GPE number */
+
+	gpe_event_info = acpi_ev_get_gpe_event_info (gpe_device, gpe_number);
+	if (!gpe_event_info) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
 	}
 
 	/* Make sure that there isn't a handler there already */
 
 	if (gpe_event_info->handler) {
 		status = AE_ALREADY_EXISTS;
-		goto cleanup;
+		goto unlock_and_exit;
 	}
 
 	/* Install the handler */
 
+	acpi_os_acquire_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
 	gpe_event_info->handler = handler;
 	gpe_event_info->context = context;
-	gpe_event_info->type  = (u8) type;
+	gpe_event_info->flags = (u8) type;
+	acpi_os_release_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
 
 	/* Clear the GPE (of stale events), the enable it */
 
 	status = acpi_hw_clear_gpe (gpe_event_info);
 	if (ACPI_FAILURE (status)) {
-		goto cleanup;
+		goto unlock_and_exit;
 	}
 
 	status = acpi_hw_enable_gpe (gpe_event_info);
 
 
-cleanup:
+unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
@@ -550,6 +554,7 @@ cleanup:
  * FUNCTION:    acpi_remove_gpe_handler
  *
  * PARAMETERS:  gpe_number      - The event to remove a handler
+ *              gpe_block       - GPE block (NULL == FADT GPEs)
  *              Handler         - Address of the handler
  *
  * RETURN:      Status
@@ -560,6 +565,7 @@ cleanup:
 
 acpi_status
 acpi_remove_gpe_handler (
+	acpi_handle                     gpe_device,
 	u32                             gpe_number,
 	acpi_gpe_handler                handler)
 {
@@ -576,23 +582,24 @@ acpi_remove_gpe_handler (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
+	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
 	/* Ensure that we have a valid GPE number */
 
-	gpe_event_info = acpi_ev_get_gpe_event_info (gpe_number);
+	gpe_event_info = acpi_ev_get_gpe_event_info (gpe_device, gpe_number);
 	if (!gpe_event_info) {
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
 	}
 
 	/* Disable the GPE before removing the handler */
 
 	status = acpi_hw_disable_gpe (gpe_event_info);
 	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
-	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+		goto unlock_and_exit;
 	}
 
 	/* Make sure that the installed handler is the same */
@@ -600,16 +607,18 @@ acpi_remove_gpe_handler (
 	if (gpe_event_info->handler != handler) {
 		(void) acpi_hw_enable_gpe (gpe_event_info);
 		status = AE_BAD_PARAMETER;
-		goto cleanup;
+		goto unlock_and_exit;
 	}
 
 	/* Remove the handler */
 
+	acpi_os_acquire_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
 	gpe_event_info->handler = NULL;
 	gpe_event_info->context = NULL;
+	acpi_os_release_lock (acpi_gbl_gpe_lock, ACPI_NOT_ISR);
 
 
-cleanup:
+unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
