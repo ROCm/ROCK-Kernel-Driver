@@ -749,7 +749,7 @@ static void uhci_inc_fsbr(struct uhci *uhci, struct urb *urb)
 
 	if ((!(urb->transfer_flags & USB_NO_FSBR)) && !urbp->fsbr) {
 		urbp->fsbr = 1;
-		if (!uhci->fsbr++)
+		if (!uhci->fsbr++ && !uhci->fsbrtimeout)
 			uhci->skel_term_qh->link = uhci->skel_hs_control_qh->dma_handle | UHCI_PTR_QH;
 	}
 
@@ -2742,6 +2742,11 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 	/* Reset here so we don't get any interrupts from an old setup */
 	/*  or broken setup */
 	reset_hc(uhci);
+
+	uhci->fsbr = 0;
+	uhci->fsbrtimeout = 0;
+
+	uhci->is_suspended = 0;
 
 	spin_lock_init(&uhci->qh_remove_list_lock);
 	INIT_LIST_HEAD(&uhci->qh_remove_list);
