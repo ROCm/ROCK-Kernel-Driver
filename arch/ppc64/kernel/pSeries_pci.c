@@ -128,7 +128,10 @@ rtas_write_config_##size(struct device_node *dn, int offset, type val) { \
 } \
 int __chrp \
 rtas_pci_write_config_##size(struct pci_dev *dev, int offset, type val) { \
-	return rtas_write_config_##size(pci_device_to_OF_node(dev), offset, val); \
+	struct device_node*  dn = pci_device_to_OF_node(dev); \
+	int  ret = rtas_write_config_##size(dn, offset, val); \
+	/* udbg_printf("write bus=%x, devfn=%x, ret=%d phb=%lx, dn=%lx\n", dev->bus->number, dev->devfn, ret, dn ? dn->phb : 0, dn); */ \
+	return ret ? PCIBIOS_DEVICE_NOT_FOUND : PCIBIOS_SUCCESSFUL; \
 }
 
 RTAS_PCI_READ_OP(byte, u8 *, 1)
