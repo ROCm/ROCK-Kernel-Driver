@@ -707,6 +707,11 @@ static int cdrom_open_write(struct cdrom_device_info *cdi)
 		ret = cdrom_mrw_open_write(cdi);
 	else if (CDROM_CAN(CDC_DVD_RAM))
 		ret = cdrom_dvdram_open_write(cdi);
+	/*
+	 * needs to really check whether media is writeable
+	 */
+	else if (CDROM_CAN(CDC_MO_DRIVE))
+		ret = 0;
 
 	return ret;
 }
@@ -733,29 +738,34 @@ int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 	int ret;
 
 	cdinfo(CD_OPEN, "entering cdrom_open\n"); 
-	ret = -EROFS;
-	if (fp->f_mode & FMODE_WRITE) {
-		if (!(CDROM_CAN(CDC_RAM) || CDROM_CAN(CDC_MO_DRIVE)))
-			goto out;
-		if (cdrom_open_write(cdi))
-			goto out;
-	}
 
 	/* if this was a O_NONBLOCK open and we should honor the flags,
 	 * do a quick open without drive/disc integrity checks. */
-	if ((fp->f_flags & O_NONBLOCK) && (cdi->options & CDO_USE_FFLAGS))
+	cdi->use_count++;
+	if ((fp->f_flags & O_NONBLOCK) && (cdi->options & CDO_USE_FFLAGS)) {
 		ret = cdi->ops->open(cdi, 1);
-	else
+	} else {
+		if (fp->f_mode & FMODE_WRITE) {
+			ret = -EROFS;
+			if (!CDROM_CAN(CDC_RAM))
+				goto err;
+			if (cdrom_open_write(cdi))
+				goto err;
+		}
 		ret = open_for_data(cdi);
+	}
 
-	if (!ret)
-		cdi->use_count++;
+	if (ret)
+		goto err;
 
-	cdinfo(CD_OPEN, "Use count for \"/dev/%s\" now %d\n", cdi->name, cdi->use_count);
+	cdinfo(CD_OPEN, "Use count for \"/dev/%s\" now %d\n",
+			cdi->name, cdi->use_count);
 	/* Do this on open.  Don't wait for mount, because they might
 	    not be mounting, but opening with O_NONBLOCK */
 	check_disk_change(ip->i_bdev);
-out:
+	return 0;
+err:
+	cdi->use_count--;
 	return ret;
 }
 

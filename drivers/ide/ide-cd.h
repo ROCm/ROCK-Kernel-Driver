@@ -39,7 +39,7 @@
  * typical timeout for packet command
  */
 #define ATAPI_WAIT_PC		(60 * HZ)
-#define ATAPI_WAIT_BUSY		(5 * HZ)
+#define ATAPI_WAIT_WRITE_BUSY	(10 * HZ)
 
 /************************************************************************/
 

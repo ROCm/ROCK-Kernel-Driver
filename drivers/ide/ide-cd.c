@@ -790,7 +790,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 				 * devices will return this error while flushing
 				 * data from cache */
 				if (!rq->errors)
-					info->write_timeout = jiffies + ATAPI_WAIT_BUSY;
+					info->write_timeout = jiffies + ATAPI_WAIT_WRITE_BUSY;
 				rq->errors = 1;
 				if (time_after(jiffies, info->write_timeout))
 					do_end_request = 1;
@@ -2950,6 +2950,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 	if (drive->media == ide_optical) {
 		CDROM_CONFIG_FLAGS(drive)->mo_drive = 1;
+		CDROM_CONFIG_FLAGS(drive)->ram = 1;
 		printk("%s: ATAPI magneto-optical drive\n", drive->name);
 		return nslots;
 	}
@@ -3281,9 +3282,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	/*
 	 * set correct block size and read-only for non-ram media
 	 */
-	set_disk_ro(drive->disk,
-		!(CDROM_CONFIG_FLAGS(drive)->ram ||
-			CDROM_CONFIG_FLAGS(drive)->mo_drive));
+	set_disk_ro(drive->disk, !CDROM_CONFIG_FLAGS(drive)->ram);
 	blk_queue_hardsect_size(drive->queue, CD_FRAMESIZE);
 
 #if 0
