@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_gram.y#28 $
+ * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_gram.y#29 $
  *
  * $FreeBSD$
  */
@@ -209,7 +209,7 @@ static int  is_download_const(expression_t *immed);
 
 %type <value> export ret f1_opcode f2_opcode jmp_jc_jnc_call jz_jnz je_jne
 
-%type <value> numerical_value mode_value mode_list macro_arglist
+%type <value> mode_value mode_list macro_arglist
 
 %left '|'
 %left '&'
@@ -781,17 +781,6 @@ macro_arglist:
 		}
 		$$ = $1 + 1;
 		add_macro_arg($3, $1);
-	}
-;
-
-numerical_value:
-	T_NUMBER
-	{
-		$$ = $1;
-	}
-|	'-' T_NUMBER
-	{
-		$$ = -$2;
 	}
 ;
 
