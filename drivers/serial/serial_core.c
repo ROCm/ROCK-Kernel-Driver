@@ -175,8 +175,6 @@ static int uart_startup(struct uart_state *state, int init_hw)
 		uart_circ_clear(&info->xmit);
 	}
 
-	port->mctrl = 0;
-
 	retval = port->ops->startup(port);
 	if (retval == 0) {
 		if (init_hw) {
@@ -1873,9 +1871,6 @@ uart_set_options(struct uart_port *port, struct console *co,
 
 	if (flow == 'r')
 		termios.c_cflag |= CRTSCTS;
-
-	if (!port->ops)
-		return 0;	/* "console=" on ia64 */
 
 	port->ops->set_termios(port, &termios, NULL);
 	co->cflag = termios.c_cflag;
