@@ -285,6 +285,9 @@ struct device {
 
 	struct list_head	dma_pools;	/* dma pools (if dma'ble) */
 
+	struct dma_coherent_mem	*dma_mem; /* internal for coherent mem
+					     override */
+
 	void	(*release)(struct device * dev);
 };
 
