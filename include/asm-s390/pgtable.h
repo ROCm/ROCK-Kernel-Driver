@@ -719,14 +719,14 @@ extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
  * information in the lowcore.
  * Bit 21 and bit 22 are the page invalid bit and the page protection
  * bit. We set both to indicate a swapped page.
- * Bit 31 is used as the software page present bit. If a page is
- * swapped this obviously has to be zero.
- * This leaves the bits 1-19 and bits 24-30 to store type and offset.
- * We use the 7 bits from 24-30 for the type and the 19 bits from 1-19
- * for the offset.
- * 0|     offset      |0110|type |0
- * 00000000001111111111222222222233
- * 01234567890123456789012345678901
+ * Bit 30 and 31 are used to distinguish the different page types. For
+ * a swapped page these bits need to be zero.
+ * This leaves the bits 1-19 and bits 24-29 to store type and offset.
+ * We use the 5 bits from 25-29 for the type and the 20 bits from 1-19
+ * plus 24 for the offset.
+ * 0|     offset        |0110|o|type |00|
+ * 0 0000000001111111111 2222 2 22222 33
+ * 0 1234567890123456789 0123 4 56789 01
  *
  * 64 bit swap entry format:
  * A page-table entry has some bits we have to treat in a special way.
@@ -736,29 +736,25 @@ extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
  * information in the lowcore.
  * Bit 53 and bit 54 are the page invalid bit and the page protection
  * bit. We set both to indicate a swapped page.
- * Bit 63 is used as the software page present bit. If a page is
- * swapped this obviously has to be zero.
- * This leaves the bits 0-51 and bits 56-62 to store type and offset.
- * We use the 7 bits from 56-62 for the type and the 52 bits from 0-51
- * for the offset.
- * |                     offset                       |0110|type |0
- * 0000000000111111111122222222223333333333444444444455555555556666
- * 0123456789012345678901234567890123456789012345678901234567890123
+ * Bit 62 and 63 are used to distinguish the different page types. For
+ * a swapped page these bits need to be zero.
+ * This leaves the bits 0-51 and bits 56-61 to store type and offset.
+ * We use the 5 bits from 57-61 for the type and the 53 bits from 0-51
+ * plus 56 for the offset.
+ * |                      offset                        |0110|o|type |00|
+ *  0000000000111111111122222222223333333333444444444455 5555 5 55566 66
+ *  0123456789012345678901234567890123456789012345678901 2345 6 78901 23
  */
 extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 {
 	pte_t pte;
-	pte_val(pte) = (type << 1) | (offset << 12) | _PAGE_INVALID_SWAP;
-#ifndef __s390x__
-	BUG_ON((pte_val(pte) & 0x80000901) != 0);
-#else /* __s390x__ */
-	BUG_ON((pte_val(pte) & 0x901) != 0);
-#endif /* __s390x__ */
+	pte_val(pte) = _PAGE_INVALID_SWAP | ((type & 0x1f) << 2) |
+		((offset & 1) << 7) | ((offset & 0xffffe) << 11);
 	return pte;
 }
 
-#define __swp_type(entry)	(((entry).val >> 1) & 0x3f)
-#define __swp_offset(entry)	((entry).val >> 12)
+#define __swp_type(entry)	(((entry).val >> 2) & 0x1f)
+#define __swp_offset(entry)	(((entry).val >> 11) | (((entry).val >> 7) & 1))
 #define __swp_entry(type,offset) ((swp_entry_t) { pte_val(mk_swap_pte((type),(offset))) })
 
 #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })

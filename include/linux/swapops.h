@@ -15,11 +15,11 @@
 /*
  * Store a type+offset into a swp_entry_t in an arch-independent format
  */
-static inline swp_entry_t swp_entry(unsigned type, pgoff_t offset)
+static inline swp_entry_t swp_entry(unsigned long type, pgoff_t offset)
 {
 	swp_entry_t ret;
 
-	ret.val = ((unsigned long)type << SWP_TYPE_SHIFT(ret)) |
+	ret.val = (type << SWP_TYPE_SHIFT(ret)) |
 			(offset & SWP_OFFSET_MASK(ret));
 	return ret;
 }
