@@ -948,7 +948,6 @@ static Scsi_Host_Template idescsi_template = {
 };
 
 static struct device     idescsi_primary = {
-	.name		= "Ide-scsi Parent",
 	.bus_id		= "ide-scsi",
 };
 static struct bus_type   idescsi_emu_bus = {
