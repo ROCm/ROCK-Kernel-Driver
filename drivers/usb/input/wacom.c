@@ -593,8 +593,10 @@ static int wacom_open(struct input_dev *dev)
 		return 0;
 
 	wacom->irq->dev = wacom->usbdev;
-	if (usb_submit_urb(wacom->irq, GFP_KERNEL))
+	if (usb_submit_urb(wacom->irq, GFP_KERNEL)) {
+		wacom->open--;
 		return -EIO;
+	}
 
 	return 0;
 }
@@ -619,7 +621,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 		return -ENOMEM;
 	memset(wacom, 0, sizeof(struct wacom));
 
-	wacom->data = usb_buffer_alloc(dev, 10, SLAB_ATOMIC, &wacom->data_dma);
+	wacom->data = usb_buffer_alloc(dev, 10, GFP_KERNEL, &wacom->data_dma);
 	if (!wacom->data) {
 		kfree(wacom);
 		return -ENOMEM;
