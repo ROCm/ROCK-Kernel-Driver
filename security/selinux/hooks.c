@@ -1380,7 +1380,7 @@ static void selinux_capset_set(struct task_struct *target, kernel_cap_t *effecti
 	if (error)
 		return;
 
-	return secondary_ops->capset_set(target, effective, inheritable, permitted);
+	secondary_ops->capset_set(target, effective, inheritable, permitted);
 }
 
 static int selinux_capable(struct task_struct *tsk, int cap)
@@ -3545,7 +3545,7 @@ static int selinux_msg_msg_alloc_security(struct msg_msg *msg)
 
 static void selinux_msg_msg_free_security(struct msg_msg *msg)
 {
-	return msg_msg_free_security(msg);
+	msg_msg_free_security(msg);
 }
 
 /* message queue security operations */
