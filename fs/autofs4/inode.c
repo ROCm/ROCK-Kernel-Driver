@@ -203,6 +203,7 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 	sbi->oz_pgrp = process_group(current);
 	sbi->sb = s;
 	sbi->version = 0;
+	sbi->sub_version = 0;
 	sbi->queues = NULL;
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
@@ -244,6 +245,7 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 	}
 
 	sbi->version = maxproto > AUTOFS_MAX_PROTO_VERSION ? AUTOFS_MAX_PROTO_VERSION : maxproto;
+	sbi->sub_version = AUTOFS_PROTO_SUBVERSION;
 
 	DPRINTK(("autofs: pipe fd = %d, pgrp = %u\n", pipefd, sbi->oz_pgrp));
 	pipe = fget(pipefd);
