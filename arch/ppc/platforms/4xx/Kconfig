@@ -11,9 +11,6 @@ choice
 	depends on 40x
 	default WALNUT
 
-config ARCTIC2
-	bool "Arctic II"
-
 config ASH
 	bool "Ash"
 
@@ -38,9 +35,6 @@ config OAK
 
 	  More information on these boards is available at:
 	  <http://www.chips.ibm.com/products/powerpc/tools/evk_pn.html#GCX>.
-
-config RAINIER
-	bool "Rainier"
 
 config REDWOOD_4
 	bool "Redwood-4"
@@ -139,7 +133,7 @@ config BOOKE
 
 config IBM_OCP
 	bool
-	depends on ARCTIC || ASH || BEECH || CEDAR || CPCI405 || EBONY || EP405 || OCOTEA || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
+	depends on ASH || BEECH || CEDAR || CPCI405 || EBONY || EP405 || OCOTEA || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
 	default y
 
 config IBM_EMAC4
@@ -173,8 +167,7 @@ config 405GPR
 
 config 405LP
 	bool
-	depends on ARCTIC2 || BEECH
-	default y
+	depends on CEDAR
 
 config STB03xxx
 	bool
@@ -183,36 +176,12 @@ config STB03xxx
 
 config EMBEDDEDBOOT
 	bool
-	depends on EP405 || RAINIER
+	depends on EP405
 	default y
 
 config IBM_OPENBIOS
 	bool
 	depends on ASH || BEECH || CEDAR || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
-	default y
-
-config IBM_PIBS
-	bool
-	depends on ARCTIC2
-	default y
-
-config PPC4xx_DMA
-	bool "PPC4xx DMA controller support"
-	depends on 4xx
-
-config STBXXX_DMA
-	bool
-	depends on STB03xxx && PPC4xx_DMA
-	default y
-
-config PPC4xx_EDMA
-	bool
-	depends on !STB03xxx && PPC4xx_DMA
-	default y
-
-config OCP
-	bool
-	depends on IBM_OCP
 	default y
 
 config 405_DMA
@@ -236,11 +205,6 @@ config UART0_TTYS1
 
 endchoice
 
-config GEN550_KGDB
-	bool
-	depends on EBONY
-	default y
-
 config SERIAL_SICC
 	bool "SICC Serial port support"
 	depends on STB03xxx
@@ -254,10 +218,4 @@ config SERIAL_SICC_CONSOLE
 	bool
 	depends on SERIAL_SICC && UART0_TTYS1
 	default y
-
-config 405LP_PM_BUTTON
-	bool
-	depends on 405LP
-	default y
-
 endmenu

@@ -878,9 +878,6 @@ config SONYPI
 	  To compile this driver as a module, choose M here: the
 	  module will be called sonypi.
 
-config IBM_GPIO
-	tristate "IBM GPIO"
-	depends on IBM_OCP
 
 menu "Ftape, the floppy tape device driver"
 

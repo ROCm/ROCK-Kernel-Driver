@@ -198,8 +198,6 @@ config MII
 
 source "drivers/net/arm/Kconfig"
 
-source "drivers/net/ibm_ocp/Kconfig"
-
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
 	depends on NET_ETHERNET && PPC_PMAC
@@ -243,17 +241,6 @@ config OAKNET
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called oaknet.
-
-config ARCTIC_ENET
-	tristate "Arctic-III development sled ethernet support"
-	depends on NET_ETHERNET && ARCTIC2
-	help
-	  
-	  If you have an IBM Arctic III with an RTL8019AS ethernet
-	  chip on the development sled, say Y.  Otherwise, say N.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called arctic_enet.
 
 config ARIADNE
 	tristate "Ariadne support"

@@ -657,20 +657,6 @@ embed_config(bd_t **bdp)
 #endif /* WILLOW */
 
 #ifdef CONFIG_XILINX_ML300
-/* SAATODO: Remove this when CONFIG_XILINX_ML300_MACADDR is removed. */
-static int
-char2dec(char c)
-{
-	if ('0' <= c && c <= '9')
-		return c - '0';
-	else if ('a' <= c && c <= 'f')
-		return c - 'a' + 10;
-	else if ('A' <= c && c <= 'F')
-		return c - 'A' + 10;
-	else
-		return -1;
-}
-
 void
 embed_config(bd_t ** bdp)
 {
@@ -703,36 +689,6 @@ embed_config(bd_t ** bdp)
 	bd->bi_memsize = XPAR_DDR_0_SIZE;
 	bd->bi_intfreq = XPAR_CORE_CLOCK_FREQ_HZ;
 	bd->bi_busfreq = XPAR_PLB_CLOCK_FREQ_HZ;
-
-	/* SAATODO: Use board's MAC address once that is defined. */
-	if (1) {
-		char MAC_string[] = CONFIG_XILINX_ML300_MACADDR;
-		int good_addr = 1;
-
-		if (sizeof (MAC_string) != 13)
-			good_addr = 0;
-		else {
-			char *s = MAC_string;
-			cp = bd->bi_enetaddr;
-
-			while (s < MAC_string + 12) {
-				int msn, lsn;
-				msn = char2dec(*s++);
-				lsn = char2dec(*s++);
-				if (msn < 0 || lsn < 0) {
-					good_addr = 0;
-					break;
-				}
-				*cp++ = msn << 4 | lsn;
-			}
-		}
-		if (!good_addr) {
-			cp = (u_char *) def_enet_addr;
-			for (i = 0; i < 6; i++) {
-				bd->bi_enetaddr[i] = *cp++;
-			}
-		}
-	}
 }
 #endif /* CONFIG_XILINX_ML300 */
 
@@ -817,52 +773,6 @@ embed_config(bd_t **bdp)
 }
 #endif /* CONFIG_BEECH */
 #endif /* CONFIG_IBM_OPENBIOS */
-
-#ifdef CONFIG_ARCTIC2
-/* Several bootloaders have been used on the Arctic.  We assume either
- * SSX or PIBS */
-
-#define SSX_BIOS_ADDR 		0xFFFF0000
-#define SSX_BIOS_GET_BOARD_INFO 0
-#define	PIBS_BOARD_INFO_VECTOR	0xFFF62004
-
-struct ssx_bios_id {
-	unsigned int boot_branch;	/* Branch to bootcode */
-	char ssx_bios[8];		/* "SSX BIOS" (no \0) */
-	void (*bios_entry_point)(unsigned int, bd_t *); /* Call bios_entry_point(cmd, &data) */
-};
-
-extern int memcmp(const void *s1, const void *s2, size_t n);
-
-static void get_board_info(bd_t **bdp)
-{
-	struct ssx_bios_id *ssx = (struct ssx_bios_id *)SSX_BIOS_ADDR;
-
-	/* Check for SSX signature */
-
-	if (memcmp(&ssx->ssx_bios, "SSX BIOS", 8) == 0) {
-		ssx->bios_entry_point(SSX_BIOS_GET_BOARD_INFO, *bdp);
-	} else {
-		/* It's not SSX, so assume PIBS */
-		typedef void (*PFV)(bd_t *bd);
-		((PFV)(*(unsigned long *)PIBS_BOARD_INFO_VECTOR))(*bdp);
-	}
-}
-
-void embed_config(bd_t **bdp)
-{
-        *bdp = &bdinfo;
-	get_board_info(bdp);
-#if 0
-	/* Enable RefClk/4 mode for both UARTs */
-	mtdcr(DCRN_CPC0_CR0, mfdcr(DCRN_CPC0_CR0) | 0x30000000);
-#endif
-#if 0
-	timebase_period_ns = 1000000000 / bdinfo.bi_tbfreq;
-#endif
-}
-
-#endif
 
 #ifdef CONFIG_EP405
 #include <linux/serial_reg.h>

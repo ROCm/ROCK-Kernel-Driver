@@ -44,12 +44,6 @@ zimageinitrd-$(CONFIG_IBM_OPENBIOS)	:= zImage.initrd-TREE
    tftpimage-$(CONFIG_IBM_OPENBIOS)	:= /tftpboot/zImage.$(end-y)
         misc-$(CONFIG_IBM_OPENBIOS)	:= misc-embedded.o
 
-      zimage-$(CONFIG_IBM_PIBS)		:= zImage-TREE
-zimageinitrd-$(CONFIG_IBM_PIBS)		:= zImage.initrd-TREE
-         end-$(CONFIG_IBM_PIBS)		:= treeboot
-   tftpimage-$(CONFIG_IBM_PIBS)		:= /tftpboot/zImage.$(end-y)
-        misc-$(CONFIG_IBM_PIBS)		:= misc-embedded.o
-
    tftpimage-$(CONFIG_EMBEDDEDBOOT)	:=  /tftpboot/zImage.embedded
         misc-$(CONFIG_EMBEDDEDBOOT)	:= misc-embedded.o
 
@@ -65,7 +59,7 @@ zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
   entrypoint-$(CONFIG_OCOTEA)		:= 0x01000000
    tftpimage-$(CONFIG_OCOTEA)		:= /tftpboot/zImage.$(end-y)
 
-     extra.o-$(CONFIG_EV64260)		:= misc-ev64260.o
+     extra.o-$(CONFIG_EV64260)		:= direct.o misc-ev64260.o
    tftpimage-$(CONFIG_EV64260)		:= /tftpboot/zImage.ev64260
    cacheflag-$(CONFIG_EV64260)		:= -include $(clear_L2_L3)
 

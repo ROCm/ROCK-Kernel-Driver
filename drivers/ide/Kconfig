@@ -995,15 +995,6 @@ config IDE_EXT_DIRECT
 
 endchoice
 
-config BLK_DEV_IDE_STB04xxx
-	bool "STB04xxx (Redwood-5) IDE support"
-	depends on BLK_DEV_IDE && REDWOOD_5
-	help
-	  This option provides support for IDE on IBM STB04xxx Redwood-5
-	  systems.
-
-	  If unsure, say N.
-
 # no isa -> no vlb
 config IDE_CHIPSETS
 	bool "Other IDE chipset support"

@@ -32,15 +32,6 @@
 #include <linux/config.h>
 #include <asm/ibm4xx.h>
 
-/* See beech.c for a concise diagram of the Beech physical memory map. */
-
-#define PPC4xx_ONB_IO_PADDR    ((uint)0xef600000)
-#define PPC4xx_ONB_IO_VADDR    PPC4xx_ONB_IO_PADDR
-#define PPC4xx_ONB_IO_SIZE     ((uint)4*1024)
-#define PVR_405LP     0x41F10000
-#define PVR_405LP_1_0 (PVR_405LP | 0x0890)
-#define PVR_405LP_1_1 (PVR_405LP | 0x0991)
-
 /* Machine-specific register naming for the 4xx processors is a mess. It seems
    that everyone had a different idea on how to prefix/abbreviate/configure the
    DCR numbers and MMIO addresses.  I'm no different! For the 405LP we have
@@ -206,16 +197,6 @@
 #define DCRN_EBC0_BnCR(bank) (bank)
 #define DCRN_EBC0_BnAP(bank) (0x10 + (bank))
 
-#define EBC_CFG_RTC		0x38000000
-#define EBC_CFG_RTC_16		0x00000000
-#define EBC_CFG_RTC_32		0x08000000
-#define EBC_CFG_RTC_64		0x10000000
-#define EBC_CFG_RTC_128		0x18000000
-#define EBC_CFG_RTC_256		0x20000000
-#define EBC_CFG_RTC_512		0x28000000
-#define EBC_CFG_RTC_1024	0x30000000
-#define EBC_CFG_RTC_2048	0x38000000
-
 /* Offsets for LCD Controller DCRs */
 
 #define DCRN_LCD0_DER    0x80010000	/* Display Enable Regsiter */
@@ -329,15 +310,6 @@
 
 #define TDES0_IO_BASE  0xef600b00
 
-/* The PCMCIA controller driver 4xx_pccf.c is responsible for the EBC setup of
-   PCMCIA.  Externally, EBC bank selects 3..7 take on PCMCIA functions when
-   PCMCIA is enabled. */
-
-#define PCCF_4XX_PADDR		(0xf0000000UL)
-#define PCCF_4XX_SIZE		(32 * 1024 * 1024)
-#define PCCF_4XX_MACRO_IRQ	UIC_IRQ_EIR5
-#define PCCF_4XX_CARD_IRQ	UIC_IRQ_EIR6
-
 /*****************************************************************************
  * CPM bits for the 405LP.
  *****************************************************************************/
@@ -403,14 +375,45 @@
 #define UIC_IRQ_EIR5  30	/* External IRQ 5 */
 #define UIC_IRQ_EIR6  31	/* External IRQ 6 */
 
-/* Serial port definitions are per-board. */
+/*****************************************************************************
+ * Serial port definitions
+ *****************************************************************************/
+
+#ifdef CONFIG_SERIAL_MANY_PORTS
+#define RS_TABLE_SIZE	64
+#else
+#define RS_TABLE_SIZE	4
+#endif
+
+#define UART0_INT	UIC_IRQ_U0
+#define UART1_INT	UIC_IRQ_U1
+#define UART0_IO_BASE	0xEF600300
+#define UART1_IO_BASE	0xEF600400
+
+#define STD_UART_OP(num)					\
+	{ 0, BASE_BAUD, 0, UART##num##_INT,			\
+		(ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST),	\
+		iomem_base:(u8 *) UART##num##_IO_BASE,		\
+		io_type: SERIAL_IO_MEM},
+
+#if defined(CONFIG_UART0_TTYS0)
+#define SERIAL_DEBUG_IO_BASE    UART0_IO_BASE
+#define SERIAL_PORT_DFNS        \
+        STD_UART_OP(0)          \
+        STD_UART_OP(1)
+#endif
+
+#if defined(CONFIG_UART0_TTYS1)
+#define SERIAL_DEBUG_IO_BASE    UART1_IO_BASE
+#define SERIAL_PORT_DFNS        \
+        STD_UART_OP(1)          \
+        STD_UART_OP(0)
+#endif
 
 #ifndef __ASSEMBLY__
 
 #include <linux/types.h>
-#include <linux/rtc.h>
 #include <asm/system.h>
-#include <platforms/4xx/ibm405lp_pm.h>
 
 /****************************************************************************
  * DCR type structures and field definitions for DCRs manipulated by the 405LP
@@ -419,15 +422,10 @@
 
 /* APM0_CFG - APM Configuration Register */
 
-/* Three bits were added in 405LP 1.1.  The new defs. *should* work for 1.0 if
-   we're careful - and we really shouldn't be using 1.0 for APM anyway. */
-
 typedef union {
 	u32 reg;
 	struct {
-		unsigned int rsvd:14;
-		unsigned int rtcmd:2;	/* RTC mode - Don't Change it! */
-		unsigned int rst:1;	/* Reset after Cryo sleep */
+		unsigned int rsvd:17;
 		unsigned int isp:1;	/* Initiate Sleep */
 		unsigned int ewt:1;	/* Enable Watchdog Timer */
 		unsigned int sm:2;	/* Sleep Mode */
@@ -438,38 +436,92 @@ typedef union {
 	} fields;
 } apm0_cfg_t;
 
-#define APM0_CFG_MASK 0xfffc0000 /* AND to clear all non-reserved fields */
-
-/* DPM can only set the power control bit and initiate sleep bit.
-   The initiate sleep bit is included so that we can be sure it's clear
-   whenever changing voltages. */
-
-#define APM0_CFG_DPM_MASK 0xffffbf7f
-
-#define APM0_CFG_SM_CLOCK_SUSPEND	0
-#define APM0_CFG_SM_POWER_DOWN		1
-#define APM0_CFG_SM_CRYO_STANDBY	2
+#define APM0_CFG_MASK 0xffff8000	/* AND to clear all non-reserved fields */
 
 /* APM0_SR - APM Status Register */
 
 typedef union {
 	u32 reg;
 	struct {
-		unsigned int rsvd0:20;
+		unsigned int rsvd:17;
 		unsigned int cdet:1;	/* Clock Detect */
 		unsigned int en:1;	/* APM Enable Indicator */
-		unsigned int pfr:1;	/* Power Fail Reset? */
 		unsigned int rset:1;	/* Processor Reset by APM? */
+		unsigned int pfr:1;	/* Power Fail Reset? */
 		unsigned int rsrt:1;	/* Restart Successful? */
 		unsigned int sdwn:1;	/* Shutdown Complete */
-	        unsigned int sigm:1;	/* Signature mismatch */
-	        unsigned int pap:1;	/* Previous APM phase */
-                unsigned int rsvd1:3;
+		unsigned int errc:8;	/* Error Code */
 		unsigned int v:1;	/* Valid Bit */
 	} fields;
 } apm0_sr_t;
 
-#define APM0_SR_MASK 0xfffff00e	/* AND to clear all non-reserved fields */
+#define APM0_SR_MASK 0xffff8000	/* AND to clear all non-reserved fields */
+
+/* APM0_IER -- APM Interrupt Enable Register
+   APM0_IPR -- APM Interrupt Polarity Register
+   APM0_ISR -- APM Interrupt Status Register
+   APM0_ITR -- APM Interrupt Trigger Register
+
+   The interrupts are also accessed via standard interrupt numbers:
+
+   59 : Wake-up Input 0
+   60 : Wake-up Input 1
+   61 : Wake-up Input 2
+   62 : Real-Time Clock Interrupt
+*/
+
+typedef union {
+	u32 reg;
+	struct {
+		unsigned int rsvd:27;
+		unsigned int wi0e:1;
+		unsigned int wi1e:1;
+		unsigned int wi2e:1;
+		unsigned int cie:1;
+		unsigned int v:1;
+	} fields;
+} apm0_ier_t;
+
+typedef union {
+	u32 reg;
+	struct {
+		unsigned int rsvd:27;
+		unsigned int wi0p:1;
+		unsigned int wi1p:1;
+		unsigned int wi2p:1;
+		unsigned int cip:1;
+		unsigned int v:1;
+	} fields;
+} apm0_ipr_t;
+
+typedef union {
+	u32 reg;
+	struct {
+		unsigned int rsvd:27;
+		unsigned int wi0s:1;
+		unsigned int wi1s:1;
+		unsigned int wi2s:1;
+		unsigned int cis:1;
+		unsigned int v:1;
+	} fields;
+} apm0_isr_t;
+
+typedef union {
+	u32 reg;
+	struct {
+		unsigned int rsvd:27;
+		unsigned int wi0t:1;
+		unsigned int wi1t:1;
+		unsigned int wi2t:1;
+		unsigned int cit:1;
+		unsigned int v:1;
+	} fields;
+} apm0_itr_t;
+
+#define APM0_IER_MASK 0xffffffe0	/* AND to clear all non-reserved fields */
+#define APM0_IPR_MASK 0xffffffe0	/* AND to clear all non-reserved fields */
+#define APM0_ISR_MASK 0xffffffe0	/* AND to clear all non-reserved fields */
+#define APM0_ITR_MASK 0xffffffe0	/* AND to clear all non-reserved fields */
 
 /* CPC0_PLLMR - PLL Mode Register */
 
@@ -478,17 +530,16 @@ typedef union {
 	struct {
 		unsigned int pmul:5;	/* PLL Multiplier */
 		unsigned int pdiv:5;	/* PLL Divider */
-		unsigned int tun:1;	/* PLL Tuning Control */
-		unsigned int bps:1;     /* Bypass SysClk through PLL Divider */
-                unsigned int rsvd0:8;   /* Reserved */
+		unsigned int tun:10;	/* PLL Tuning Control */
 		unsigned int db2:1;	/* Divide VCO by 2 Select */
 		unsigned int csel:2;	/* PLL Clock Output Select */
-		unsigned int rsvd1:8;	/* Reserved */
+		unsigned int rsvd:8;	/* Reserved */
 		unsigned int v:1;	/* Valid bit */
 	} fields;
 } cpc0_pllmr_t;
 
-#define CPC0_PLLMR_MASK 0x000ff1fe	/* AND to clear all non-reserved fields */
+#define CPC0_PLLMR_MASK 0x000001fe	/* AND to clear all non-reserved fields */
+#define CPC0_PLLMR_RTVFS_MASK CPC0_PLLMR_MASK	/* All bits controlled by RTVFS */
 
 /* The PLL multiplier/divider are always multiples of 4. */
 
@@ -496,13 +547,13 @@ typedef union {
 #define CPC0_PLLMR_MULDIV_DECODE(n) (((n) + 1) * 4)
 #define CPC0_PLLMR_MULDIV_MAX 128
 
-#define CPC0_PLLMR_TUN_HIGH 0x1  	/* High-band tuning */
-#define CPC0_PLLMR_TUN_LOW  0x0 	/* Low-band tuning */
+#define CPC0_PLLMR_TUN_HIGH 0x200	/* High-band tuning */
+#define CPC0_PLLMR_TUN_LOW  0x000	/* Low-band tuning */
 
 #define CPC0_PLLMR_CSEL_REFCLK  0	/* System Reference Clock */
 #define CPC0_PLLMR_CSEL_PLLVCO  1	/* PLL VCO */
 #define CPC0_PLLMR_CSEL_RTC     2	/* RTC */
-#define CPC0_PLLMR_CSEL_RSVD    3	/* Reserved */
+#define CPC0_PLLMR_CSEL_EBCPLB5 3	/* EBC-PLB divisor is 5 ??? */
 
 /* CPC0_CGCR0 - Clock Generation and Control Register 0 */
 
@@ -520,6 +571,8 @@ typedef union {
 } cpc0_cgcr0_t;
 
 #define CPC0_CGCR0_MASK 0x00001fff	/* AND to clear all non-reserved fields */
+#define CPC0_CGCR0_RTVFS_MASK 0x0001ffff	/* AND to clear all rtvfs-modified
+						   fields */
 
 #define CPC0_CGCR0_SCSEL_OFF  0	/* SysClkOut driven low (low power) */
 #define CPC0_CGCR0_SCSEL_CPU  1	/* Select CPU clock as SysClkOut */
@@ -540,6 +593,8 @@ typedef union {
 } cpc0_cgcr1_t;
 
 #define CPC0_CGCR1_MASK 0x00007fff	/* AND to clear all non-reserved fields */
+#define CPC0_CGCR1_RTVFS_MASK 0x0001ffff	/* AND to clear all rtvfs-modified
+						   fields */
 
 /* 5-bit clock dividers are directly encoded, except that an encoding of 0
    indicates divide-by-32. */
@@ -753,6 +808,7 @@ typedef union {
 } sdram0_rtr_t;
 
 #define SDRAM0_RTR_MASK 0xc007ffff	/* AND to clear non-reserved fields */
+#define SDRAM0_RTR_RTVFS_MASK SDRAM0_RTR_MASK
 
 #define SDRAM0_RTR_IV(n) (((n) & 0x3ff8) >> 2)
 
@@ -774,6 +830,7 @@ typedef union {
 } sdram0_tr_t;
 
 #define SDRAM0_TR_MASK 0xfe703fe0	/* AND to clear non-reserved fields */
+#define SDRAM0_TR_RTVFS_MASK SDRAM0_TR_MASK
 
 #define SDRAM0_TR_ENCODE(n) ((n) - 1)
 #define SDRAM0_TR_ENCODE_RFTA(n) ((n) - 4)
@@ -791,11 +848,6 @@ typedef union {
 } sla0_slpmd_t;
 
 #define SLA0_SLPMD_MASK 0x07dfffff	/* AND to clear all non-reserved fields */
-
-/* these defines are for the DV bits of RTC0_CR0 */
-#define RTC_DVBITS_4MHZ		0	/* 4.194304 MHz */
-#define RTC_DVBITS_1MHZ		1	/* 1.048576 MHz */
-#define RTC_DVBITS_33KHZ	2	/*   32.768 kHz */
 
 /* Several direct-write DCRs on the 405LP have an interlock requirement,
    implemented by a "valid" bit in the low-order bit.  This routine handles the
@@ -833,39 +885,12 @@ do {                                                                        \
  ****************************************************************************/
 
 int ibm405lp_set_pixclk(unsigned pixclk_min, unsigned pixclk_max);
-int ibm405lp_setup_pccf(volatile u16 **vaddr, unsigned long *io_base,
-			unsigned long *mem_base);
-void ibm405lp_setup_cpm(void);
+
+void ibm405lp_reset_sdram(u32 new_rtr, u32 new_tr);
 
 extern int (*set_pixclk_hook) (unsigned pixclk_min, unsigned pixclk_max);
 extern unsigned last_pixclk_min;
 extern unsigned last_pixclk_max;
-
-extern long ibm405lp_time_init(void);
-extern unsigned long ibm405lp_get_rtc_time(void);
-extern int ibm405lp_set_rtc_time(unsigned long nowtime);
-extern void ibm405lp_set_rtc_sqw(unsigned long rsbits);
-extern void ibm405lp_set_rtc_alm_time(struct rtc_time *alm_time);
-extern void ibm405lp_get_rtc_alm_time(struct rtc_time *alm_time);
-
-/* APM0 interrupt routines are in ibm405lp.c */
-
-#define APM0_IRQ_MASK 0xffffffe0 /* AND to clear all non-reserved fields */
-
-#define APM0_IRQ_WUI0 27
-#define APM0_IRQ_WUI1 28
-#define APM0_IRQ_WUI2 29
-#define APM0_IRQ_RTC  30
-
-void ibm405lp_apm_dcr_delay(void);
-#define ibm405lp_rtc_dcr_delay() ibm405lp_apm_dcr_delay();
-void ibm405lp_apm_irq_ack(unsigned apm_irq);
-void ibm405lp_apm_irq_setup(unsigned apm_irq,
-			    unsigned trigger, unsigned polarity);
-void ibm405lp_apm_irq_enable(unsigned apm_irq);
-void ibm405lp_apm_irq_disable(unsigned apm_irq);
-int ibm405lp_apm_irq_status(unsigned apm_irq);
-void ibm405lp_setup_apm_pic(void);
 
 #endif				/* __ASSEMBLY__ */
 
