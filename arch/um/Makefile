@@ -77,7 +77,7 @@ $(ARCH_DIR)/vmlinux.lds.S :
 	touch $@
 
 linux: scripts $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) \
-	arch/um/uml.lds.s vmlinux
+	arch/um/uml.lds.s $(ARCH_DIR)/main.o vmlinux
 	$(CC) -Wl,-T,arch/um/uml.lds.s -o $@ $(LINK_PROFILE) \
 	$(LINK_WRAPS) -static vmlinux -L/usr/lib -lutil
 
