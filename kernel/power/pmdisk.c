@@ -76,14 +76,15 @@ struct link {
 
 
 struct pmdisk_info {
-	u32		version_code;
-	unsigned long	num_physpages;
-	char		machine[8];
-	char		version[20];
-	int		cpus;
-	unsigned long	image_pages;
-	swp_entry_t	pagedir_start;
-};
+	struct new_utsname	uts;
+	u32			version_code;
+	unsigned long		num_physpages;
+	int			cpus;
+	unsigned long		image_pages;
+	unsigned long		pagedir_pages;
+	swp_entry_t		pagedir[768];
+} __attribute__((aligned(PAGE_SIZE))) pmdisk_info;
+
 
 
 #define PMDISK_SIG	"pmdisk-swap1"
@@ -93,7 +94,7 @@ struct pmdisk_header {
 	swp_entry_t pmdisk_info;
 	char	orig_sig[10];
 	char	sig[10];
-};
+} __attribute__((packed, aligned(PAGE_SIZE))) pmdisk_header;
 
 /*
  * XXX: We try to keep some more pages free so that I/O operations succeed
@@ -115,43 +116,31 @@ struct pmdisk_header {
 static unsigned short swapfile_used[MAX_SWAPFILES];
 static unsigned short root_swap;
 
+
 static int mark_swapfiles(swp_entry_t prev)
 {
-	swp_entry_t entry;
-	struct pmdisk_header * hdr;
 	int error;
 
-	printk( "S" );
-
-	if (root_swap == 0xFFFF)  /* ignored */
-		return -EINVAL;
-
-	hdr = (struct pmdisk_header *)get_zeroed_page(GFP_ATOMIC);
-	if (!hdr)
-		return -ENOMEM;
-
-	/* XXX: this is dirty hack to get first page of swap file */
-	entry = swp_entry(root_swap, 0);
-	rw_swap_page_sync(READ, entry, virt_to_page((unsigned long)hdr));
-
-
-	if (!memcmp("SWAP-SPACE",hdr->sig,10) ||
-	    !memcmp("SWAPSPACE2",hdr->sig,10)) {
-		memcpy(hdr->orig_sig,hdr->sig,10);
-		memcpy(hdr->sig,PMDISK_SIG,10);
-		hdr->pmdisk_info = prev;
-
-		error = rw_swap_page_sync(WRITE, entry,
-					  virt_to_page((unsigned long)hdr));
+	rw_swap_page_sync(READ, 
+			  swp_entry(root_swap, 0),
+			  virt_to_page((unsigned long)&pmdisk_header));
+	if (!memcmp("SWAP-SPACE",pmdisk_header.sig,10) ||
+	    !memcmp("SWAPSPACE2",pmdisk_header.sig,10)) {
+		memcpy(pmdisk_header.orig_sig,pmdisk_header.sig,10);
+		memcpy(pmdisk_header.sig,PMDISK_SIG,10);
+		pmdisk_header.pmdisk_info = prev;
+		error = rw_swap_page_sync(WRITE, 
+					  swp_entry(root_swap, 0),
+					  virt_to_page((unsigned long)
+						       &pmdisk_header));
 	} else {
 		pr_debug("pmdisk: Partition is not swap space.\n");
 		error = -ENODEV;
 	}
-	free_page((unsigned long)hdr);
 	return error;
 }
 
-static void read_swapfiles(void) /* This is called before saving image */
+static int read_swapfiles(void) /* This is called before saving image */
 {
 	int i, len;
 	
@@ -182,6 +171,7 @@ static void read_swapfiles(void) /* This is called before saving image */
 		}
 	}
 	swap_list_unlock();
+	return (root_swap != 0xffff) ? 0 : -ENODEV;
 }
 
 
@@ -275,7 +265,7 @@ static int write_data(void)
 		error = write_swap_page((pm_pagedir_nosave+i)->address,
 					&((pm_pagedir_nosave+i)->swap_address));
 	}
-	printk( "|\n" );
+	printk(" %d Pages done.\n",i);
 	return error;
 }
 
@@ -286,17 +276,11 @@ static int write_data(void)
 
 static void free_pagedir_entries(void)
 {
-	int num = SUSPEND_PD_PAGES(pmdisk_pages);
-	struct link * link;
-	swp_entry_t entry;
+	int num = pmdisk_info.pagedir_pages;
 	int i;
 
-	for (i = 0; i < num; i++) {
-		link = (struct link *)((char *) pm_pagedir_nosave)+i;
-		entry = link->next;
-		if (entry.val)
-			swap_free(entry);
-	}
+	for (i = 0; i < num; i++)
+		swap_free(pmdisk_info.pagedir[i]);
 }
 
 
@@ -305,25 +289,53 @@ static void free_pagedir_entries(void)
  *	@last:	Last swap entry we write (needed for header).
  */
 
-static int write_pagedir(swp_entry_t * last)
+static int write_pagedir(void)
 {
-	int nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
-	struct link * link;
-	swp_entry_t prev = {0};
+	unsigned long addr = (unsigned long)pm_pagedir_nosave;
 	int error = 0;
+	int n = SUSPEND_PD_PAGES(pmdisk_pages);
 	int i;
 
-	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
-	for (i = 0; i < nr_pgdir_pages && !error; i++) {
-		link = (struct link *)((char *) pm_pagedir_nosave + i * PAGE_SIZE);
-		printk( "." );
-		link->next = prev;
-		error = write_swap_page((unsigned long)link,&prev);
-	}
-	*last = prev;
+	pmdisk_info.pagedir_pages = n;
+	printk( "Writing pagedir (%d pages)\n", n);
+	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE)
+		error = write_swap_page(addr,&pmdisk_info.pagedir[i]);
 	return error;
 }
 
+
+#ifdef DEBUG
+static void dump_pmdisk_info(void)
+{
+	printk(" pmdisk: Version: %u\n",pmdisk_info.version_code);
+	printk(" pmdisk: Num Pages: %ld\n",pmdisk_info.num_physpages);
+	printk(" pmdisk: UTS Sys: %s\n",pmdisk_info.uts.sysname);
+	printk(" pmdisk: UTS Node: %s\n",pmdisk_info.uts.nodename);
+	printk(" pmdisk: UTS Release: %s\n",pmdisk_info.uts.release);
+	printk(" pmdisk: UTS Version: %s\n",pmdisk_info.uts.version);
+	printk(" pmdisk: UTS Machine: %s\n",pmdisk_info.uts.machine);
+	printk(" pmdisk: UTS Domain: %s\n",pmdisk_info.uts.domainname);
+	printk(" pmdisk: CPUs: %d\n",pmdisk_info.cpus);
+	printk(" pmdisk: Image: %ld Pages\n",pmdisk_info.image_pages);
+	printk(" pmdisk: Pagedir: %ld Pages\n",pmdisk_info.pagedir_pages);
+}
+#else
+static void dump_pmdisk_info(void)
+{
+
+}
+#endif
+
+static void init_header(void)
+{
+	memset(&pmdisk_info,0,sizeof(pmdisk_info));
+	pmdisk_info.version_code = LINUX_VERSION_CODE;
+	pmdisk_info.num_physpages = num_physpages;
+	memcpy(&pmdisk_info.uts,&system_utsname,sizeof(system_utsname));
+
+	pmdisk_info.cpus = num_online_cpus();
+	pmdisk_info.image_pages = pmdisk_pages;
+}
 
 /**
  *	write_header - Fill and write the suspend header.
@@ -337,25 +349,10 @@ static int write_pagedir(swp_entry_t * last)
 
 static int write_header(swp_entry_t * entry)
 {
-	struct pmdisk_info * hdr;
-	int error;
-
-	hdr = (struct pmdisk_info *)get_zeroed_page(GFP_ATOMIC);
-	if (!hdr)
-		return -ENOMEM;
-
-	hdr->version_code = LINUX_VERSION_CODE;
-	hdr->num_physpages = num_physpages;
-	strncpy(hdr->machine, system_utsname.machine, 8);
-	strncpy(hdr->version, system_utsname.version, 20);
-
-	hdr->cpus = num_online_cpus();
-	hdr->image_pages = pmdisk_pages;
-	hdr->pagedir_start = *entry;
-	error = write_swap_page((unsigned long)hdr,entry);
-	free_page((unsigned long)hdr);
-	return error;
+	dump_pmdisk_info();
+	return write_swap_page((unsigned long)&pmdisk_info,entry);
 }
+
 
 
 /**
@@ -368,17 +365,18 @@ static int write_suspend_image(void)
 	int error;
 	swp_entry_t prev = { 0 };
 
+	init_header();
+
 	if ((error = write_data()))
 		goto FreeData;
 
-	if ((error = write_pagedir(&prev)))
+	if ((error = write_pagedir()))
 		goto FreePagedir;
 
 	if ((error = write_header(&prev)))
 		goto FreePagedir;
 
 	error = mark_swapfiles(prev);
-	printk( "|\n" );
  Done:
 	return error;
  FreePagedir:
@@ -631,7 +629,9 @@ int pmdisk_suspend(void)
 {
 	int error = 0;
 
-	read_swapfiles();
+	if ((error = read_swapfiles()))
+		return error;
+
 	drain_local_pages();
 
 	pm_pagedir_nosave = NULL;
@@ -925,38 +925,26 @@ write_page(pgoff_t page_off, void * page)
 extern dev_t __init name_to_dev_t(const char *line);
 
 
-#define next_entry(link)	(link)->next
-
-
-static int __init check_sig(swp_entry_t * next)
+static int __init check_sig(void)
 {
-	struct pmdisk_header * hdr;
 	int error;
 
-	hdr = (struct pmdisk_header *)get_zeroed_page(GFP_ATOMIC);
-	if (!hdr)
-		return -ENOMEM;
-
-	if ((error = read_page(0,hdr)))
-		goto Done;
-
-	if (!memcmp(PMDISK_SIG,hdr->sig,10)) {
-		memcpy(hdr->sig,hdr->orig_sig,10);
-		*next = hdr->pmdisk_info;
+	memset(&pmdisk_header,0,sizeof(pmdisk_header));
+	if ((error = read_page(0,&pmdisk_header)))
+		return error;
+	if (!memcmp(PMDISK_SIG,pmdisk_header.sig,10)) {
+		memcpy(pmdisk_header.sig,pmdisk_header.orig_sig,10);
 
 		/*
 		 * Reset swap signature now.
 		 */
-		error = write_page(0,hdr);
+		error = write_page(0,&pmdisk_header);
 	} else { 
 		pr_debug(KERN_ERR "pmdisk: Invalid partition type.\n");
-		error = -EINVAL;
+		return -EINVAL;
 	}
-
 	if (!error)
 		pr_debug("pmdisk: Signature found, resuming\n");
- Done:
-	free_page((unsigned long)hdr);
 	return error;
 }
 
@@ -966,78 +954,70 @@ static int __init check_sig(swp_entry_t * next)
  * I really don't think that it's foolproof but more than nothing..
  */
 
-static const char * __init sanity_check(struct pmdisk_info * hdr)
+static const char * __init sanity_check(void)
 {
-	if(hdr->version_code != LINUX_VERSION_CODE)
-		return "Incorrect kernel version";
-	if(hdr->num_physpages != num_physpages)
-		return "Incorrect memory size";
-	if(strncmp(hdr->machine, system_utsname.machine, 8))
-		return "Incorrect machine type";
-	if(strncmp(hdr->version, system_utsname.version, 20))
-		return "Incorrect version";
-	if(hdr->cpus != num_online_cpus())
-		return "Incorrect number of cpus";
+	dump_pmdisk_info();
+	if(pmdisk_info.version_code != LINUX_VERSION_CODE)
+		return "kernel version";
+	if(pmdisk_info.num_physpages != num_physpages)
+		return "memory size";
+	if (strcmp(pmdisk_info.uts.sysname,system_utsname.sysname))
+		return "system type";
+	if (strcmp(pmdisk_info.uts.release,system_utsname.release))
+		return "kernel release";
+	if (strcmp(pmdisk_info.uts.version,system_utsname.version))
+		return "version";
+	if (strcmp(pmdisk_info.uts.machine,system_utsname.machine))
+		return "machine";
+	if(pmdisk_info.cpus != num_online_cpus())
+		return "number of cpus";
 	return 0;
 }
 
 
-static int __init check_header(swp_entry_t * next)
+static int __init check_header(void)
 {
-	struct pmdisk_info * hdr;
 	const char * reason = NULL;
 	int error;
 
-	hdr = (struct pmdisk_info *)get_zeroed_page(GFP_ATOMIC);
-	if (!hdr)
-		return -ENOMEM;
+	init_header();
 
-	if ((error = read_page(swp_offset(*next), hdr)))
-		goto Done;
+	if ((error = read_page(swp_offset(pmdisk_header.pmdisk_info), 
+			       &pmdisk_info)))
+		return error;
 
  	/* Is this same machine? */
-	if ((reason = sanity_check(hdr))) {
+	if ((reason = sanity_check())) {
 		printk(KERN_ERR "pmdisk: Resume mismatch: %s\n",reason);
-		error = -EPERM;
-		goto Done;
+		return -EPERM;
 	}
-
-	*next = hdr->pagedir_start;
-	pmdisk_pages = hdr->image_pages;
- Done:
-	free_page((unsigned long)hdr);
+	pmdisk_pages = pmdisk_info.image_pages;
 	return error;
 }
 
 
-static int __init read_pagedir(swp_entry_t start)
+static int __init read_pagedir(void)
 {
-	int i, nr_pgdir_pages;
-	swp_entry_t entry = start;
+	unsigned long addr;
+	int i, n = pmdisk_info.pagedir_pages;
 	int error = 0;
 
-	nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
-	pagedir_order = get_bitmask_order(nr_pgdir_pages);
+	pagedir_order = get_bitmask_order(n);
 
-	pm_pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
-	if (!pm_pagedir_nosave)
+	addr =__get_free_pages(GFP_ATOMIC, pagedir_order);
+	if (!addr)
 		return -ENOMEM;
+	pm_pagedir_nosave = (struct pbe *)addr;
 
-	pr_debug("pmdisk: sReading pagedir\n");
+	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
 
-	/* We get pages in reverse order of saving! */
-	for (i = nr_pgdir_pages-1; i >= 0 && !error; i--) {
-		void * data = ((char *)pm_pagedir_nosave) + i * PAGE_SIZE;
-		unsigned long offset = swp_offset(entry);
-
-		if (offset) {
-			if (!(error = read_page(offset, data)))
-				entry = next_entry((struct link *)data);
-		} else
+	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
+		unsigned long offset = swp_offset(pmdisk_info.pagedir[i]);
+		if (offset)
+			error = read_page(offset, (void *)addr);
+		else
 			error = -EFAULT;
 	}
-	if (swp_offset(entry))
-		error = -E2BIG;
 	if (error)
 		free_pages((unsigned long)pm_pagedir_nosave,pagedir_order);
 	return error;
@@ -1064,21 +1044,20 @@ static int __init read_image_data(void)
 		error = read_page(swp_offset(p->swap_address),
 				  (void *)p->address);
 	}
-	printk(" %d done|\n",i);
+	printk(" %d done.\n",i);
 	return error;
 }
 
 
 static int __init read_suspend_image(void)
 {
-	swp_entry_t next;
 	int error = 0;
 
-	if ((error = check_sig(&next)))
+	if ((error = check_sig()))
 		return error;
-	if ((error = check_header(&next)))
+	if ((error = check_header()))
 		return error;
-	if ((error = read_pagedir(next)))
+	if ((error = read_pagedir()))
 		return error;
 	if ((error = relocate_pagedir()))
 		goto FreePagedir;
