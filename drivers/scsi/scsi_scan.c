@@ -168,6 +168,7 @@ struct dev_info scsi_static_device_list[] __initdata = {
 	{"DELL", "PV530F", NULL, BLIST_SPARSELUN},
 	{"EMC", "SYMMETRIX", NULL, BLIST_SPARSELUN | BLIST_LARGELUN | BLIST_FORCELUN},
 	{"HP", "A6189A", NULL, BLIST_SPARSELUN | BLIST_LARGELUN},	/* HP VA7400 */
+	{"HP", "OPEN-", "*", BLIST_SPARSELUN | BLIST_LARGELUN}, /* HP XP Arrays */
 	{"CMD", "CRA-7280", NULL, BLIST_SPARSELUN},	/* CMD RAID Controller */
 	{"CNSI", "G7324", NULL, BLIST_SPARSELUN},	/* Chaparral G7324 RAID */
 	{"CNSi", "G8324", NULL, BLIST_SPARSELUN},	/* Chaparral G8324 RAID */
@@ -181,6 +182,12 @@ struct dev_info scsi_static_device_list[] __initdata = {
 	{"COMPAQ", "MSA1000", NULL, BLIST_FORCELUN},
 	{"HP", "C1557A", NULL, BLIST_FORCELUN},
 	{"IBM", "AuSaV1S2", NULL, BLIST_FORCELUN},
+	{"FSC", "CentricStor", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
+	{"DDN", "SAN DataDirector", "*", BLIST_SPARSELUN},
+	{"HITACHI", "DF400", "*", BLIST_SPARSELUN},
+	{"HITACHI", "DF500", "*", BLIST_SPARSELUN},
+	{"HITACHI", "DF600", "*", BLIST_SPARSELUN},
+	{"IBM", "ProFibre 4000R", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
 	{ NULL, NULL, NULL, 0 },
 };
 
