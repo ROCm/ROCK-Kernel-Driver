@@ -2871,6 +2871,11 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	struct atapi_capabilities_page cap;
 	int nslots = 1;
 
+	if (drive->media == ide_optical) {
+		printk("%s: ATAPI magneto-optical drive\n", drive->name);
+		return nslots;
+	}
+
 	if (CDROM_CONFIG_FLAGS(drive)->nec260) {
 		CDROM_CONFIG_FLAGS(drive)->no_eject = 0;                       
 		CDROM_CONFIG_FLAGS(drive)->audio_play = 1;       
@@ -3337,7 +3342,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 		goto failed;
 	if (!drive->present)
 		goto failed;
-	if (drive->media != ide_cdrom)
+	if (drive->media != ide_cdrom && drive->media != ide_optical)
 		goto failed;
 	/* skip drives that we were told to ignore */
 	if (ignore != NULL) {
