@@ -1011,8 +1011,6 @@ static void ethdev_setup(struct net_device *dev)
 	ether_setup(dev);
 
 	spin_lock_init(&ei_local->page_lock);
-
-	return 0;
 }
 
 /**
