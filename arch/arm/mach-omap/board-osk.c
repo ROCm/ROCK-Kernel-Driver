@@ -89,7 +89,7 @@ static void __init osk_map_io(void)
 
 MACHINE_START(OMAP_OSK, "TI-OSK")
 	MAINTAINER("Dirk Behme <dirk.behme@de.bosch.com>")
-	BOOT_MEM(0x10000000, 0xe0000000, 0xe0000000)
+	BOOT_MEM(0x10000000, 0xfff00000, 0xfef00000)
 	BOOT_PARAMS(0x10000100)
 	MAPIO(osk_map_io)
 	INITIRQ(osk_init_irq)
