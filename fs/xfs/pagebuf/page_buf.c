@@ -1395,7 +1395,6 @@ next_chunk:
 			break;
 
 		offset = 0;
-
 		sector += nbytes >> BBSHIFT;
 		size -= nbytes;
 		total_nr_pages--;
@@ -1403,15 +1402,11 @@ next_chunk:
 
 submit_io:
 	if (likely(bio->bi_size)) {
-		if (pb->pb_flags & PBF_READ) {
-			submit_bio(READ, bio);
-		} else {
-			submit_bio(WRITE, bio);
-		}
-
+		submit_bio((pb->pb_flags & PBF_READ) ? READ : WRITE, bio);
 		if (size)
 			goto next_chunk;
 	} else {
+		bio_put(bio);
 		pagebuf_ioerror(pb, EIO);
 	}
 
