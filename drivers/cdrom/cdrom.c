@@ -695,6 +695,35 @@ static int cdrom_mrw_open_write(struct cdrom_device_info *cdi)
 	return ret;
 }
 
+static int mo_open_write(struct cdrom_device_info *cdi)
+{
+	struct cdrom_generic_command cgc;
+	char buffer[255];
+	int ret;
+
+	init_cdrom_command(&cgc, &buffer, 4, CGC_DATA_READ);
+	cgc.quiet = 1;
+
+	/*
+	 * obtain write protect information as per
+	 * drivers/scsi/sd.c:sd_read_write_protect_flag
+	 */
+
+	ret = cdrom_mode_sense(cdi, &cgc, GPMODE_ALL_PAGES, 0);
+	if (ret)
+		ret = cdrom_mode_sense(cdi, &cgc, GPMODE_VENDOR_PAGE, 0);
+	if (ret) {
+		cgc.buflen = 255;
+		ret = cdrom_mode_sense(cdi, &cgc, GPMODE_ALL_PAGES, 0);
+	}
+
+	/* drive gave us no info, let the user go ahead */
+	if (ret)
+		return 0;
+
+	return buffer[3] & 0x80;
+}
+
 /*
  * returns 0 for ok to open write, non-0 to disallow
  */
@@ -706,11 +735,8 @@ static int cdrom_open_write(struct cdrom_device_info *cdi)
 		ret = cdrom_mrw_open_write(cdi);
 	else if (CDROM_CAN(CDC_DVD_RAM))
 		ret = cdrom_dvdram_open_write(cdi);
-	/*
-	 * needs to really check whether media is writeable
-	 */
 	else if (CDROM_CAN(CDC_MO_DRIVE))
-		ret = 0;
+		ret = mo_open_write(cdi);
 
 	return ret;
 }
