@@ -75,6 +75,7 @@ struct module {
 	struct module *next;
 	const char *name;
 	struct symbol *unres;
+	int seen;
 };
 
 static struct module *modules;
@@ -318,6 +319,39 @@ add_versions(struct buffer *b, struct module *mod)
 }
 
 void
+add_depends(struct buffer *b, struct module *mod, struct module *modules)
+{
+	struct symbol *s;
+	struct module *m;
+	int first = 1;
+
+	for (m = modules; m; m = m->next) {
+		if (strcmp(m->name, "vmlinux") == 0)
+			m->seen = 1;
+		else 
+			m->seen = 0;
+	}
+
+	buf_printf(b, "\n");
+	buf_printf(b, "static const char __module_depends[]\n");
+	buf_printf(b, "__attribute__((section(\".modinfo\"))) =\n");
+	buf_printf(b, "\"depends=");
+	for (s = mod->unres; s; s = s->next) {
+		if (!s->module)
+			continue;
+
+		if (s->module->seen)
+			continue;
+
+		s->module->seen = 1;
+		buf_printf(b, "%s%s", first ? "" : ",",
+			   strrchr(s->module->name, '/') + 1);
+		first = 0;
+	}
+	buf_printf(b, "\";\n");
+}
+
+void
 write_if_changed(struct buffer *b, const char *fname)
 {
 	char *tmp;
@@ -387,6 +421,7 @@ main(int argc, char **argv)
 
 		add_header(&buf);
 		add_versions(&buf, mod);
+		add_depends(&buf, mod, modules);
 
 		sprintf(fname, "%s.ver.c", mod->name);
 		write_if_changed(&buf, fname);
