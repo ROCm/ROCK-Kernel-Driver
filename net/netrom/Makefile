@@ -7,7 +7,6 @@ obj-$(CONFIG_NETROM) += netrom.o
 netrom-y		:= af_netrom.o nr_dev.o nr_in.o nr_loopback.o \
 			   nr_out.o nr_route.o nr_subr.o nr_timer.o
 netrom-$(CONFIG_SYSCTL)	+= sysctl_net_netrom.o
-netrom-objs		:= $(netrom-y)
 
 include $(TOPDIR)/Rules.make
 

@@ -65,5 +65,3 @@ hisax-objs += $(hisax-objs-y)
 
 CERT := $(shell cd $(src); md5sum -c md5sums.asc > /dev/null 2> /dev/null ;echo $$?)
 CFLAGS_cert.o := -DCERTIFICATION=$(CERT)
-
-include $(TOPDIR)/Rules.make
