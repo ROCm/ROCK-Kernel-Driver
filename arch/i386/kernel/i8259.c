@@ -22,6 +22,7 @@
 #include <asm/desc.h>
 #include <asm/apic.h>
 #include <asm/arch_hooks.h>
+#include <asm/i8259.h>
 
 #include <linux/irq.h>
 
@@ -47,7 +48,7 @@ static void end_8259A_irq (unsigned int irq)
 
 void mask_and_ack_8259A(unsigned int);
 
-static unsigned int startup_8259A_irq(unsigned int irq)
+unsigned int startup_8259A_irq(unsigned int irq)
 { 
 	enable_8259A_irq(irq);
 	return 0; /* never anything pending */
@@ -71,11 +72,7 @@ static struct hw_interrupt_type i8259A_irq_type = {
 /*
  * This contains the irq mask for both 8259A irq controllers,
  */
-static unsigned int cached_irq_mask = 0xffff;
-
-#define __byte(x,y) 	(((unsigned char *)&(y))[x])
-#define cached_21	(__byte(0,cached_irq_mask))
-#define cached_A1	(__byte(1,cached_irq_mask))
+unsigned int cached_irq_mask = 0xffff;
 
 /*
  * Not all IRQs can be routed through the IO-APIC, eg. on certain (older)
