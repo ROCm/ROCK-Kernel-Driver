@@ -44,7 +44,7 @@ static int pci_device_probe(struct device * dev)
 	drv = to_pci_driver(dev->driver);
 	pci_dev = to_pci_dev(dev);
 
-	if (drv->probe) {
+	if (!pci_dev->driver && drv->probe) {
 		const struct pci_device_id *id;
 
 		id = pci_match_device(drv->id_table, pci_dev);
