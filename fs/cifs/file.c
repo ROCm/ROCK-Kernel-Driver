@@ -145,6 +145,7 @@ cifs_open(struct inode *inode, struct file *file)
 			pCifsFile->pfile = file; /* needed for writepage */
 			pCifsFile->pInode = inode;
 			pCifsFile->invalidHandle = FALSE;
+			pCifsFile->closePend     = FALSE;
 			write_lock(&file->f_owner.lock);
 			write_lock(&GlobalSMBSeslock);
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
@@ -325,7 +326,8 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
         	if(open_file == NULL) {
 			break;
 		} else {
-			if(open_file->invalidHandle == FALSE) {
+			if((open_file->invalidHandle == FALSE) && 
+			   (open_file->closePend     == FALSE)) {
 				list_move(&open_file->tlist,&pTcon->openFileList); 
 				continue;
 			}
@@ -372,8 +374,17 @@ cifs_close(struct inode *inode, struct file *file)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
-		rc = CIFSSMBClose(xid,pTcon,pSMBFile->netfid);
+		pSMBFile->closePend    = TRUE;
 		write_lock(&file->f_owner.lock);
+		if(pTcon) {
+			/* no sense reconnecting to close a file that is
+				already closed */
+			if (pTcon->tidStatus != CifsNeedReconnect) {
+				write_unlock(&file->f_owner.lock);
+				rc = CIFSSMBClose(xid,pTcon,pSMBFile->netfid);
+				write_lock(&file->f_owner.lock);
+			}
+		}
 		list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
 		write_unlock(&file->f_owner.lock);
@@ -638,23 +649,27 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		
 
 	cifsInode = CIFS_I(mapping->host);
-	read_lock(&GlobalSMBSeslock); /* BB switch to semaphore */
+	read_lock(&GlobalSMBSeslock); 
 	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
 		/* We check if file is open for writing first */
 		if((open_file->pfile) && 
 		   ((open_file->pfile->f_flags & O_RDWR) || 
 			(open_file->pfile->f_flags & O_WRONLY))) {
+			read_unlock(&GlobalSMBSeslock);
 			bytes_written = cifs_write(open_file->pfile, write_data,
 					to-from, &offset);
+			read_lock(&GlobalSMBSeslock);
 		/* Does mm or vfs already set times? */
 			inode->i_atime = inode->i_mtime = CURRENT_TIME;
 			if ((bytes_written > 0) && (offset)) {
 				rc = 0;
-				break;
 			} else if(bytes_written < 0) {
 				rc = bytes_written;
 			}
+			break;  /* now that we found a valid file handle
+				and tried to write to it we are done, no
+				sense continuing to loop looking for another */
 		}
 		if(tmp->next == NULL) {
 			cFYI(1,("File instance %p removed",tmp));

@@ -185,7 +185,12 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				 sizeof (struct smb_hdr) -
 				 1 /* RFC1001 header and SMB header */ ,
 				 MSG_PEEK /* flags see socket.h */ );
-		if (length < 0) {
+		if (server->tcpStatus == CifsNeedReconnect) {
+			cFYI(1,("Reconnecting after server stopped responding"));
+			cifs_reconnect(server);
+			csocket = server->ssocket;
+			continue;
+		} else if (length < 0) {
 			if (length == -ECONNRESET) {
 				cERROR(1, ("Connection reset by peer "));
 				cifs_reconnect(server);
@@ -758,8 +763,13 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 			*csocket = NULL;
 			return rc;
 	    } else {
-		/* BB other socket options to set KEEPALIVE, timeouts? NODELAY? */
+		/* BB other socket options to set KEEPALIVE, NODELAY? */
+			struct timeval tval;
+			tval.tv_sec = 10;
 			cFYI(1,("Socket created"));
+		        sock_setsockopt(*csocket, SOL_SOCKET, SO_RCVTIMEO,
+                	        (char*)&tval, sizeof(struct timeval));
+
 		}
 	}
 

@@ -237,6 +237,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		else {
 			cFYI(1,("No response buffer"));
 			DeleteMidQEntry(midQ);
+			ses->server->tcpStatus = CifsNeedReconnect;
 			return -EIO;
 		}
 	}

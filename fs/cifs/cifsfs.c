@@ -595,8 +595,8 @@ static int cifs_oplock_thread(void * dummyarg)
 				pTcon = oplock_item->tcon;
 				inode = oplock_item->pinode;
 				netfid = oplock_item->netfid;
-				DeleteOplockQEntry(oplock_item);
 				spin_unlock(&GlobalMid_Lock);
+				DeleteOplockQEntry(oplock_item);
 				if (S_ISREG(inode->i_mode)) 
 					rc = filemap_fdatawrite(inode->i_mapping);
 				else

@@ -1,6 +1,7 @@
 Version 0.94
 ------------
-Fix to list processing in reopen_files.
+Fix to list processing in reopen_files. Fix reconnection when server hung
+but tcpip session still alive.
 
 Version 0.93
 ------------
