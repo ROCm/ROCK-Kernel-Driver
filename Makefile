@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 7
-EXTRAVERSION =-rc2
+EXTRAVERSION =-rc3
 NAME=Zonked Quokka
 
 # *DOCUMENTATION*
@@ -1062,6 +1062,7 @@ versioncheck:
 
 buildcheck:
 	$(PERL) scripts/reference_discarded.pl
+	$(PERL) scripts/reference_init.pl
 
 endif #ifeq ($(config-targets),1)
 endif #ifeq ($(mixed-targets),1)
