@@ -738,7 +738,7 @@ static void __exit shaper_exit (void)
 {
 	int i;
 
-	for (i = 0; i < shapers; i++)
+	for (i = 0; i < shapers_registered; i++)
 		unregister_netdev(&devs[i]);
 
 	kfree(devs);
