@@ -409,9 +409,10 @@ acpi_ns_delete_children (
 
 		ACPI_MEM_TRACKING (acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].total_freed++);
 
+#ifdef ACPI_DEBUG_OUTPUT
 		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Object %p, Remaining %X\n",
 			child_node, acpi_gbl_current_node_count));
-
+#endif 
 		/*
 		 * Detach an object if there is one, then free the child node
 		 */

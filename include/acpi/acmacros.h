@@ -604,7 +604,18 @@
 #define ACPI_DUMP_PATHNAME(a,b,c,d)
 #define ACPI_DUMP_RESOURCE_LIST(a)
 #define ACPI_DUMP_BUFFER(a,b)
+
+
+#ifdef ACPI_DEBUG_LITE
+/* compiler must optimize, no solution to only integrate
+   this in preprocessing directives found */
+#define ACPI_DEBUG_PRINT_SUB(L, LINE, DB_INFO, A...) (L == ACPI_LV_ERROR || L == ACPI_LV_WARN) ? \
+ (ACPI_REPORT_WARNING ((A))) : (0)
+#define ACPI_DEBUG_PRINT(pl)  ACPI_DEBUG_PRINT_SUB pl
+#else
 #define ACPI_DEBUG_PRINT(pl)
+#endif
+
 #define ACPI_DEBUG_PRINT_RAW(pl)
 #define ACPI_BREAK_MSG(a)
 

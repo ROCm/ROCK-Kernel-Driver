@@ -159,9 +159,10 @@ acpi_ex_resolve_operands (
 
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
-
+#ifdef ACPI_DEBUG_OUTPUT
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode %X [%s] required_operand_types=%8.8X \n",
 		opcode, op_info->name, arg_types));
+#endif
 
 	/*
 	 * Normal exit is with (arg_types == 0) at end of argument list.
@@ -232,10 +233,9 @@ acpi_ex_resolve_operands (
 					break;
 
 				default:
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					ACPI_REPORT_ERROR ((
 						"Operand is a Reference, Unknown Reference Opcode %X [%s]\n",
-						obj_desc->reference.opcode,
-						(acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name));
+						obj_desc->reference.opcode));
 
 					return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 				}

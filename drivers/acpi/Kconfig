@@ -356,11 +356,14 @@ config ACPI_INITRD
 	  one found in the initrd, the DSDT from the BIOS is used. Even you do not 
 	  need a new one at the moment, you may want to use a better implemented 
 	  DSDT later. It is save to say yes here
-config ACPI_ENABLE_OBJECT_CACHE
-	bool "Enable ACPI object cache"
-	depends on ACPI
-	default y
-	help
-	  Improves performance for ACPI drivers especially when ACPI_DEBUG is
-          compiled in.
+config ACPI_DEBUG_LITE
+       bool "Print ACPI errors and warnings"
+       depends on ACPI
+       default n
+       help
+         Full ACPI_DEBUG output slows down the system significantly,
+	 even if not enabled during runtime.
+	 This variable takes care that errors and warnings will still be printed,
+	 but higher debug levels can not be enabled any more during runtime.
+
 endmenu

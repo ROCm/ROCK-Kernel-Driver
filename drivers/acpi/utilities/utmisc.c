@@ -736,8 +736,8 @@ acpi_ut_acquire_mutex (
 		acpi_gbl_mutex_info[mutex_id].owner_id = this_thread_id;
 	}
 	else {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Thread %X could not acquire Mutex [%s] %s\n",
-				 this_thread_id, acpi_ut_get_mutex_name (mutex_id),
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Thread %X could not acquire Mutex %s\n",
+				 this_thread_id,
 				 acpi_format_exception (status)));
 	}
 
@@ -783,8 +783,7 @@ acpi_ut_release_mutex (
 	 */
 	if (acpi_gbl_mutex_info[mutex_id].owner_id == ACPI_MUTEX_NOT_ACQUIRED) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Mutex [%s] is not acquired, cannot release\n",
-				acpi_ut_get_mutex_name (mutex_id)));
+				"Mutex is not acquired, cannot release\n"));
 
 		return (AE_NOT_ACQUIRED);
 	}
@@ -800,10 +799,11 @@ acpi_ut_release_mutex (
 			if (i == mutex_id) {
 				continue;
 			}
-
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX,
 					"Invalid release order: owns [%s], releasing [%s]\n",
-					acpi_ut_get_mutex_name (i), acpi_ut_get_mutex_name (mutex_id)));
+					acpi_ut_get_mutex_name(i), acpi_ut_get_mutex_name (mutex_id)));
+
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid Mutex release order\n"));
 
 			return (AE_RELEASE_DEADLOCK);
 		}
@@ -816,8 +816,8 @@ acpi_ut_release_mutex (
 	status = acpi_os_signal_semaphore (acpi_gbl_mutex_info[mutex_id].mutex, 1);
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Thread %X could not release Mutex [%s] %s\n",
-				 this_thread_id, acpi_ut_get_mutex_name (mutex_id),
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Thread %X could not release Mutex %s\n",
+				 this_thread_id, 
 				 acpi_format_exception (status)));
 	}
 	else {
@@ -1477,6 +1477,7 @@ acpi_ut_report_warning (
 	acpi_os_printf ("%8s-%04d: *** Warning: ", module_name, line_number);
 }
 
+EXPORT_SYMBOL(acpi_ut_report_warning);
 
 /*******************************************************************************
  *

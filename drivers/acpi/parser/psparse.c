@@ -680,10 +680,12 @@ acpi_ps_parse_loop (
 			op->common.aml_offset = walk_state->aml_offset;
 
 			if (walk_state->op_info) {
+#ifdef ACPI_DEBUG_OUTPUT
 				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
 					"Opcode %4.4X [%s] Op %p Aml %p aml_offset %5.5X\n",
 					 (u32) op->common.aml_opcode, walk_state->op_info->name,
 					 op, parser_state->aml, op->common.aml_offset));
+#endif
 			}
 		}
 

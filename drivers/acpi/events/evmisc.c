@@ -132,6 +132,7 @@ acpi_ev_queue_notify_request (
 	 * For value 0x80 (Status Change) on the power button or sleep button,
 	 * initiate soft-off or sleep operation?
 	 */
+#ifdef ACPI_DEBUG_OUTPUT
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 		"Dispatching Notify(%X) on node %p\n", notify_value, node));
 
@@ -143,7 +144,7 @@ acpi_ev_queue_notify_request (
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: 0x%2.2X **Device Specific**\n",
 				notify_value));
 	}
-
+#endif
 	/* Get the notify object attached to the NS Node */
 
 	obj_desc = acpi_ns_get_attached_object (node);
