@@ -635,6 +635,7 @@ static void __devexit ne2k_pci_remove_one (struct pci_dev *pdev)
 
 	unregister_netdev(dev);
 	release_region(dev->base_addr, NE_IO_EXTENT);
+	kfree(dev->priv);
 	kfree(dev);
 	pci_set_drvdata(pdev, NULL);
 }
