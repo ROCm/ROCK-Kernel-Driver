@@ -112,6 +112,7 @@ reiserfs_mark_inode_private(struct inode *inode)
 #else
 
 #define is_reiserfs_priv_object(inode) 0
+#define reiserfs_mark_inode_private(inode)
 #define reiserfs_getxattr NULL
 #define reiserfs_setxattr NULL
 #define reiserfs_listxattr NULL
