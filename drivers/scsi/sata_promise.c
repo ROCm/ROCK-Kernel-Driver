@@ -1172,13 +1172,16 @@ static void pdc_sata_setup_port(struct ata_ioports *port, unsigned long base)
 {
 	port->cmd_addr		= base;
 	port->data_addr		= base;
+	port->feature_addr	=
 	port->error_addr	= base + 0x4;
 	port->nsect_addr	= base + 0x8;
 	port->lbal_addr		= base + 0xc;
 	port->lbam_addr		= base + 0x10;
 	port->lbah_addr		= base + 0x14;
 	port->device_addr	= base + 0x18;
-	port->cmdstat_addr	= base + 0x1c;
+	port->command_addr	=
+	port->status_addr	= base + 0x1c;
+	port->altstatus_addr	=
 	port->ctl_addr		= base + 0x38;
 }
 
