@@ -54,13 +54,8 @@
 #define HAVE_EXPMASK
 #endif
 
-enum req {
-	req_readbytes,
-	req_reset
-};
-
 struct ecard_request {
-	enum req	req;
+	void		(*fn)(struct ecard_request *);
 	ecard_t		*ec;
 	unsigned int	address;
 	unsigned int	length;
@@ -131,15 +126,14 @@ slot_to_ecard(unsigned int slot)
 #define POD_INT_ADDR(x)	((volatile unsigned char *)\
 			 ((BUS_ADDR((x)) - IO_BASE) + IO_START))
 
-static inline void ecard_task_reset(struct ecard_request *req)
+static void ecard_task_reset(struct ecard_request *req)
 {
 	struct expansion_card *ec = req->ec;
 	if (ec->loader)
 		ecard_loader_reset(POD_INT_ADDR(ec->podaddr), ec->loader);
 }
 
-static void
-ecard_task_readbytes(struct ecard_request *req)
+static void ecard_task_readbytes(struct ecard_request *req)
 {
 	unsigned char *buf = (unsigned char *)req->buffer;
 	volatile unsigned char *base_addr =
@@ -206,19 +200,6 @@ ecard_task_readbytes(struct ecard_request *req)
 		}
 	}
 
-}
-
-static void ecard_do_request(struct ecard_request *req)
-{
-	switch (req->req) {
-	case req_readbytes:
-		ecard_task_readbytes(req);
-		break;
-
-	case req_reset:
-		ecard_task_reset(req);
-		break;
-	}
 }
 
 static DECLARE_WAIT_QUEUE_HEAD(ecard_wait);
@@ -298,7 +279,7 @@ ecard_task(void * unused)
 
 		req = xchg(&ecard_req, NULL);
 		if (req != NULL) {
-			ecard_do_request(req);
+			req->fn(req);
 			complete(req->complete);
 		}
 	}
@@ -340,7 +321,7 @@ ecard_readbytes(void *addr, ecard_t *ec, int off, int len, int useld)
 {
 	struct ecard_request req;
 
-	req.req		= req_readbytes;
+	req.fn		= ecard_task_readbytes;
 	req.ec		= ec;
 	req.address	= off;
 	req.length	= len;
@@ -1150,7 +1131,7 @@ static void ecard_drv_shutdown(struct device *dev)
 	if (drv->shutdown)
 		drv->shutdown(ec);
 	ecard_release(ec);
-	req.req = req_reset;
+	req.fn = ecard_task_reset;
 	req.ec = ec;
 	ecard_call(&req);
 }
