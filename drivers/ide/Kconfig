@@ -273,15 +273,6 @@ config IDE_TASK_IOCTL
 
 	  If you are unsure, say N here.
 
-config IDE_TASKFILE_IO
-	bool 'IDE Taskfile IO (EXPERIMENTAL)'
-	depends on EXPERIMENTAL
-	default n
-	---help---
-	  Use new taskfile IO code.
-
-	  It is safe to say Y to this question, in most cases.
-
 comment "IDE chipset support/bugfixes"
 
 config IDE_GENERIC
@@ -1006,19 +997,6 @@ config BLK_DEV_HT6560B
 	  of the Holtek card, and permits faster I/O speeds to be set as well.
 	  See the <file:Documentation/ide.txt> and
 	  <file:drivers/ide/legacy/ht6560b.c> files for more info.
-
-config BLK_DEV_PDC4030
-	tristate "PROMISE DC4030 support (EXPERIMENTAL)"
-	depends on BLK_DEV_IDEDISK && EXPERIMENTAL
-	help
-	  This driver provides support for the secondary IDE interface and
-	  cache of the original Promise IDE chipsets, e.g. DC4030 and DC5030.
-	  It is nothing to do with the later range of Promise UDMA chipsets -
-	  see the PDC_202XX support for these. CD-ROM and TAPE devices are not
-	  supported (and probably never will be since I don't think the cards
-	  support them). This driver is enabled at runtime using the "ide0=dc4030"
-	  or "ide1=dc4030" kernel boot parameter. See the
-	  <file:drivers/ide/legacy/pdc4030.c> file for more info.
 
 config BLK_DEV_QD65XX
 	tristate "QDI QD65xx support"

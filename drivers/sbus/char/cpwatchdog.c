@@ -743,7 +743,7 @@ ebus_done:
 	}
 
 	wd_dev.regs = 
-		ioremap(edev->resource[0].start, sizeof(struct wd_regblk));
+		ioremap(edev->resource[0].start, 4 * WD_TIMER_REGSZ); /* ? */
 
 	if(NULL == wd_dev.regs) {
 		printk("%s: unable to map registers\n", WD_OBPNAME);

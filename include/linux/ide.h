@@ -242,7 +242,7 @@ typedef int (ide_ack_intr_t)(struct hwif_s *);
 typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 		ide_cmd640,	ide_dtc2278,	ide_ali14xx,
 		ide_qd65xx,	ide_umc8672,	ide_ht6560b,
-		ide_pdc4030,	ide_rz1000,	ide_trm290,
+		ide_rz1000,	ide_trm290,
 		ide_cmd646,	ide_cy82c693,	ide_4drives,
 		ide_pmac,	ide_etrax100,	ide_acorn,
 		ide_forced
@@ -832,8 +832,6 @@ typedef struct hwif_s {
 #if 0
 	ide_hwif_ops_t	*hwifops;
 #else
-	/* routine is for HBA specific IDENTITY operations */
-	int	(*identify)(ide_drive_t *);
 	/* routine to tune PIO mode for drives */
 	void	(*tuneproc)(ide_drive_t *, u8);
 	/* routine to retune DMA modes for drives */

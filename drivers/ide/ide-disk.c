@@ -71,10 +71,6 @@
 #include <asm/io.h>
 #include <asm/div64.h>
 
-/* FIXME: some day we shouldn't need to look in here! */
-
-#include "legacy/pdc4030.h"
-
 /*
  * lba_capacity_is_ok() performs a sanity check on the claimed "lba_capacity"
  * value for this drive (from its reported identification information).
@@ -120,8 +116,6 @@ static int lba_capacity_is_ok (struct hd_driveid *id)
 	return 0;	/* lba_capacity value may be bad */
 }
 
-#ifndef CONFIG_IDE_TASKFILE_IO
-
 /*
  * __ide_do_rw_disk() issues READ and WRITE commands to a disk,
  * using LBA if supported, or CHS otherwise, to address sectors.
@@ -149,6 +143,8 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl, IDE_CONTROL_REG);
+
+	/* FIXME: SELECT_MASK(drive, 0) ? */
 
 	if (drive->select.b.lba) {
 		if (drive->addressing == 1) {
@@ -254,6 +250,7 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 			command = lba48 ? WIN_WRITE_EXT : WIN_WRITE;
 		}
 
+		/* FIXME: ->OUTBSYNC ? */
 		hwif->OUTB(command, IDE_COMMAND_REG);
 
 		pre_task_out_intr(drive, rq);
@@ -262,168 +259,11 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 }
 EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
 
-#else /* CONFIG_IDE_TASKFILE_IO */
-
-static ide_startstop_t chs_rw_disk(ide_drive_t *, struct request *, unsigned long);
-static ide_startstop_t lba_28_rw_disk(ide_drive_t *, struct request *, unsigned long);
-static ide_startstop_t lba_48_rw_disk(ide_drive_t *, struct request *, unsigned long long);
-
-/*
- * __ide_do_rw_disk() issues READ and WRITE commands to a disk,
- * using LBA if supported, or CHS otherwise, to address sectors.
- * It also takes care of issuing special DRIVE_CMDs.
- */
-ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
-{
-	/*
-	 * 268435455  == 137439 MB or 28bit limit
-	 *
-	 * need to add split taskfile operations based on 28bit threshold.
-	 */
-	if (drive->addressing == 1)		/* 48-bit LBA */
-		return lba_48_rw_disk(drive, rq, (unsigned long long) block);
-	if (drive->select.b.lba)		/* 28-bit LBA */
-		return lba_28_rw_disk(drive, rq, (unsigned long) block);
-
-	/* 28-bit CHS : DIE DIE DIE piece of legacy crap!!! */
-	return chs_rw_disk(drive, rq, (unsigned long) block);
-}
-EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
-
-static u8 get_command(ide_drive_t *drive, struct request *rq, ide_task_t *task)
-{
-	unsigned int lba48 = (drive->addressing == 1) ? 1 : 0;
-	unsigned int dma = drive->using_dma;
-
-	if (drive->hwif->no_lba48_dma && lba48 && dma) {
-		if (rq->sector + rq->nr_sectors > 1ULL << 28)
-			dma = 0;
-	}
-
-	if (!dma) {
-		ide_init_sg_cmd(drive, rq);
-		ide_map_sg(drive, rq);
-	}
-
-	if (rq_data_dir(rq) == READ) {
-		task->command_type = IDE_DRIVE_TASK_IN;
-		if (dma)
-			return lba48 ? WIN_READDMA_EXT : WIN_READDMA;
-		task->handler = &task_in_intr;
-		if (drive->mult_count) {
-			task->data_phase = TASKFILE_MULTI_IN;
-			return lba48 ? WIN_MULTREAD_EXT : WIN_MULTREAD;
-		}
-		task->data_phase = TASKFILE_IN;
-		return lba48 ? WIN_READ_EXT : WIN_READ;
-	} else {
-		task->command_type = IDE_DRIVE_TASK_RAW_WRITE;
-		if (dma)
-			return lba48 ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
-		task->prehandler = &pre_task_out_intr;
-		task->handler = &task_out_intr;
-		if (drive->mult_count) {
-			task->data_phase = TASKFILE_MULTI_OUT;
-			return lba48 ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
-		}
-		task->data_phase = TASKFILE_OUT;
-		return lba48 ? WIN_WRITE_EXT : WIN_WRITE;
-	}
-}
-
-static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
-{
-	ide_task_t		args;
-	int			sectors;
-	ata_nsector_t		nsectors;
-	unsigned int track	= (block / drive->sect);
-	unsigned int sect	= (block % drive->sect) + 1;
-	unsigned int head	= (track % drive->head);
-	unsigned int cyl	= (track / drive->head);
-
-	nsectors.all = (u16) rq->nr_sectors;
-
-	pr_debug("%s: CHS=%u/%u/%u\n", drive->name, cyl, head, sect);
-
-	memset(&args, 0, sizeof(ide_task_t));
-
-	sectors	= (rq->nr_sectors == 256) ? 0x00 : rq->nr_sectors;
-
-	args.tfRegister[IDE_NSECTOR_OFFSET]	= sectors;
-	args.tfRegister[IDE_SECTOR_OFFSET]	= sect;
-	args.tfRegister[IDE_LCYL_OFFSET]	= cyl;
-	args.tfRegister[IDE_HCYL_OFFSET]	= (cyl>>8);
-	args.tfRegister[IDE_SELECT_OFFSET]	= head;
-	args.tfRegister[IDE_SELECT_OFFSET]	|= drive->select.all;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
-	args.rq					= (struct request *) rq;
-	rq->special				= (ide_task_t *)&args;
-	drive->hwif->data_phase = args.data_phase;
-	return do_rw_taskfile(drive, &args);
-}
-
-static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
-{
-	ide_task_t		args;
-	int			sectors;
-	ata_nsector_t		nsectors;
-
-	nsectors.all = (u16) rq->nr_sectors;
-
-	memset(&args, 0, sizeof(ide_task_t));
-
-	sectors = (rq->nr_sectors == 256) ? 0x00 : rq->nr_sectors;
-
-	args.tfRegister[IDE_NSECTOR_OFFSET]	= sectors;
-	args.tfRegister[IDE_SECTOR_OFFSET]	= block;
-	args.tfRegister[IDE_LCYL_OFFSET]	= (block>>=8);
-	args.tfRegister[IDE_HCYL_OFFSET]	= (block>>=8);
-	args.tfRegister[IDE_SELECT_OFFSET]	= ((block>>8)&0x0f);
-	args.tfRegister[IDE_SELECT_OFFSET]	|= drive->select.all;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
-	args.rq					= (struct request *) rq;
-	rq->special				= (ide_task_t *)&args;
-	drive->hwif->data_phase = args.data_phase;
-	return do_rw_taskfile(drive, &args);
-}
-
 /*
  * 268435455  == 137439 MB or 28bit limit
  * 320173056  == 163929 MB or 48bit addressing
  * 1073741822 == 549756 MB or 48bit addressing fake drive
  */
-
-static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long long block)
-{
-	ide_task_t		args;
-	int			sectors;
-	ata_nsector_t		nsectors;
-
-	nsectors.all = (u16) rq->nr_sectors;
-
-	memset(&args, 0, sizeof(ide_task_t));
-
-	sectors = (rq->nr_sectors == 65536) ? 0 : rq->nr_sectors;
-
-	args.tfRegister[IDE_NSECTOR_OFFSET]	= sectors;
-	args.hobRegister[IDE_NSECTOR_OFFSET]	= sectors >> 8;
-	args.tfRegister[IDE_SECTOR_OFFSET]	= block;	/* low lba */
-	args.tfRegister[IDE_LCYL_OFFSET]	= (block>>=8);	/* mid lba */
-	args.tfRegister[IDE_HCYL_OFFSET]	= (block>>=8);	/* hi  lba */
-	args.tfRegister[IDE_SELECT_OFFSET]	= drive->select.all;
-	args.tfRegister[IDE_COMMAND_OFFSET]	= get_command(drive, rq, &args);
-	args.hobRegister[IDE_SECTOR_OFFSET]	= (block>>=8);	/* low lba */
-	args.hobRegister[IDE_LCYL_OFFSET]	= (block>>=8);	/* mid lba */
-	args.hobRegister[IDE_HCYL_OFFSET]	= (block>>=8);	/* hi  lba */
-	args.hobRegister[IDE_SELECT_OFFSET]	= drive->select.all;
-	args.hobRegister[IDE_CONTROL_OFFSET_HOB]= (drive->ctl|0x80);
-	args.rq					= (struct request *) rq;
-	rq->special				= (ide_task_t *)&args;
-	drive->hwif->data_phase = args.data_phase;
-	return do_rw_taskfile(drive, &args);
-}
-
-#endif /* CONFIG_IDE_TASKFILE_IO */
 
 static ide_startstop_t ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
@@ -862,6 +702,8 @@ static sector_t idedisk_capacity (ide_drive_t *drive)
 {
 	return drive->capacity64 - drive->sect0;
 }
+
+#define IS_PDC4030_DRIVE	0
 
 static ide_startstop_t idedisk_special (ide_drive_t *drive)
 {

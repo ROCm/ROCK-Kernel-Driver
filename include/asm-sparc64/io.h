@@ -114,7 +114,7 @@ extern void insl(void __iomem *addr, void *dst, unsigned long count);
 #define iowrite32_rep(a,s,c)	outsl(a,s,c)
 
 /* Memory functions, same as I/O accesses on Ultra. */
-static inline u8 _readb(void __iomem *addr)
+static inline u8 _readb(volatile void __iomem *addr)
 {	u8 ret;
 
 	__asm__ __volatile__("lduba\t[%1] %2, %0\t/* pci_readb */"
@@ -123,7 +123,7 @@ static inline u8 _readb(void __iomem *addr)
 	return ret;
 }
 
-static inline u16 _readw(void __iomem *addr)
+static inline u16 _readw(volatile void __iomem *addr)
 {	u16 ret;
 
 	__asm__ __volatile__("lduha\t[%1] %2, %0\t/* pci_readw */"
@@ -133,7 +133,7 @@ static inline u16 _readw(void __iomem *addr)
 	return ret;
 }
 
-static inline u32 _readl(void __iomem *addr)
+static inline u32 _readl(volatile void __iomem *addr)
 {	u32 ret;
 
 	__asm__ __volatile__("lduwa\t[%1] %2, %0\t/* pci_readl */"
@@ -143,7 +143,7 @@ static inline u32 _readl(void __iomem *addr)
 	return ret;
 }
 
-static inline u64 _readq(void __iomem *addr)
+static inline u64 _readq(volatile void __iomem *addr)
 {	u64 ret;
 
 	__asm__ __volatile__("ldxa\t[%1] %2, %0\t/* pci_readq */"
@@ -153,28 +153,28 @@ static inline u64 _readq(void __iomem *addr)
 	return ret;
 }
 
-static inline void _writeb(u8 b, void __iomem *addr)
+static inline void _writeb(u8 b, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stba\t%r0, [%1] %2\t/* pci_writeb */"
 			     : /* no outputs */
 			     : "Jr" (b), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static inline void _writew(u16 w, void __iomem *addr)
+static inline void _writew(u16 w, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stha\t%r0, [%1] %2\t/* pci_writew */"
 			     : /* no outputs */
 			     : "Jr" (w), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static inline void _writel(u32 l, void __iomem *addr)
+static inline void _writel(u32 l, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stwa\t%r0, [%1] %2\t/* pci_writel */"
 			     : /* no outputs */
 			     : "Jr" (l), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static inline void _writeq(u64 q, void __iomem *addr)
+static inline void _writeq(u64 q, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stxa\t%r0, [%1] %2\t/* pci_writeq */"
 			     : /* no outputs */
@@ -444,9 +444,16 @@ out:
 /* On sparc64 we have the whole physical IO address space accessible
  * using physically addressed loads and stores, so this does nothing.
  */
-#define ioremap(__offset, __size)	((void __iomem *)(__offset))
+static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+{
+	return (void __iomem *)offset;
+}
+
 #define ioremap_nocache(X,Y)		ioremap((X),(Y))
-#define iounmap(__addr)			do { (void)(__addr); } while(0)
+
+static inline void iounmap(void __iomem *addr)
+{
+}
 
 #define ioread8(X)			readb(X)
 #define ioread16(X)			readw(X)
