@@ -1081,14 +1081,15 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 	/* NP is the buffer we will be loading */
 	np=lp->tx_ring[lp->tx_ring_head].p; 
 
-	/* We will need this to flush the buffer out */
-	lp->tx_ring[lp->tx_ring_head].skb=skb;
-   	   
    	if (skb->len < ETH_ZLEN) {
    		skb = skb_padto(skb, ETH_ZLEN);
    		if (skb == NULL)
    			goto out;
    	}
+
+	/* We will need this to flush the buffer out */
+	lp->tx_ring[lp->tx_ring_head].skb = skb;
+   	   
 	np->length = (skb->len < ETH_ZLEN) ? ETH_ZLEN : skb->len; 
 			
 	np->data	= isa_virt_to_bus(skb->data);
