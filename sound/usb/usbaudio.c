@@ -1223,7 +1223,7 @@ static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 
 	/* set interface */
 	if (subs->interface != fmt->iface || subs->format != fmt->altset_idx) {
-		if (usb_set_interface(dev, fmt->iface, fmt->altset_idx) < 0) {
+		if (usb_set_interface(dev, fmt->iface, fmt->altsetting) < 0) {
 			snd_printk(KERN_ERR "%d:%d:%d: usb_set_interface failed\n",
 				   dev->devnum, fmt->iface, fmt->altsetting);
 			return -EIO;
@@ -2532,7 +2532,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 			return err;
 		}
 		/* try to set the interface... */
-		usb_set_interface(chip->dev, iface_no, i);
+		usb_set_interface(chip->dev, iface_no, altno);
 		init_usb_pitch(chip->dev, iface_no, alts, fp);
 		init_usb_sample_rate(chip->dev, iface_no, alts, fp, fp->rate_max);
 	}
