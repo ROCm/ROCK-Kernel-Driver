@@ -25,6 +25,8 @@
 #include "cifsglob.h"
 #include "cifsproto.h"
 #include "cifs_debug.h"
+#include "smberr.h"
+#include "nterr.h"
 
 extern kmem_cache_t *cifs_req_cachep;
 extern struct task_struct * oplockThread;
@@ -369,8 +371,22 @@ is_valid_oplock_break(struct smb_hdr *buf)
 	cFYI(1,("Checking for oplock break"));    
 	if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
 		return FALSE;
-	if(pSMB->hdr.Flags & SMBFLG_RESPONSE)
-		return FALSE; /* server sends us "request" here */
+	if(pSMB->hdr.Flags & SMBFLG_RESPONSE) {
+		/* no sense logging error on invalid handle on oplock
+		   break - harmless race between close request and oplock
+		   break response is expected from time to time writing out
+		   large dirty files cached on the client */
+		if ((NT_STATUS_INVALID_HANDLE) == 
+		   le32_to_cpu(pSMB->hdr.Status.CifsError)) { 
+			cFYI(1,("invalid handle on oplock break"));
+			return TRUE;
+		} else if (ERRbadfid == 
+		   le16_to_cpu(pSMB->hdr.Status.DosError.Error)) {
+			return TRUE;	  
+		} else {
+			return FALSE; /* on valid oplock brk we get "request" */
+		}
+	}
 	if(pSMB->hdr.WordCount != 8)
 		return FALSE;
 

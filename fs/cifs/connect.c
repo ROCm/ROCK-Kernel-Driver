@@ -317,9 +317,10 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		}
 	}
 	/* BB add code to lock SMB sessions while releasing */
+        server->tsk = NULL;
 	if(server->ssocket) {
 		sock_release(csocket);
-	    server->ssocket = NULL;
+		server->ssocket = NULL;
 	}
 	set_fs(temp_fs);
 	if (smb_buffer) /* buffer usually freed in free_mid - need to free it on error or exit */
@@ -1064,8 +1065,6 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 						CIFSSMBLogoff(xid, pSesInfo);
 					if(pSesInfo->server->tsk)
 						send_sig(SIGKILL,pSesInfo->server->tsk,1);
-					else
-						cFYI(1,("Can not wake captive thread on cleanup of failed mount"));
 					set_current_state(TASK_INTERRUPTIBLE);
 					schedule_timeout(HZ / 4);	/* give captive thread time to exit */
 				} else

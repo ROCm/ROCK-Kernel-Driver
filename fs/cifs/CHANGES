@@ -1,4 +1,10 @@
-Verison 0.95
+Version 0.96
+------------
+Fix oops (in send_sig) caused by CIFS unmount code trying to
+wake up the demultiplex thread after it had exited. Do not log
+error on harmless oplock release of closed handle.
+
+Version 0.95
 ------------
 Fix unsafe global variable usage and password hash failure on gcc 3.3.1
 Fix problem reconnecting secondary mounts to same server after session 
