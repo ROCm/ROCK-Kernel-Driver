@@ -137,7 +137,8 @@ enum unw_insn_opcode {
 	UNW_INSN_SETNAT_MEMSTK,		/* s[dst+1].nat.type = MEMSTK;
 					   s[dst+1].nat.off = *s.pri_unat - s[dst] */
 	UNW_INSN_SETNAT_TYPE,		/* s[dst+1].nat.type = val */
-	UNW_INSN_LOAD			/* s[dst] = *s[val] */
+	UNW_INSN_LOAD,			/* s[dst] = *s[val] */
+	UNW_INSN_MOVE_SCRATCH,		/* s[dst] = scratch reg "val" */
 };
 
 struct unw_insn {

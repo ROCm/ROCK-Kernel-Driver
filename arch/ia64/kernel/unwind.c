@@ -227,12 +227,21 @@ pt_regs_off (unsigned long reg)
 	return off;
 }
 
+static void
+dump_info_pt(struct unw_frame_info *info, const char *func)
+{
+	/* WAR for no struct pt_regs, may be caused by bad unwind data.  KAO */
+	if (!info->pt) {
+		dprintk("unwind.%s: sp 0x%lx pt 0x%lx, set to 0x%lx\n", func, info->sp, info->pt, info->sp - 16);
+		info->pt = info->sp - 16;
+	}
+}
+
 int
 unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char *nat, int write)
 {
 	unsigned long *addr, *nat_addr, nat_mask = 0, dummy_nat;
 	struct unw_ireg *ireg;
-	struct pt_regs *pt;
 
 	if ((unsigned) regnum - 1 >= 127) {
 		dprintk("unwind: trying to access non-existent r%u\n", regnum);
@@ -298,11 +307,8 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 			}
 		} else {
 			/* access a scratch register */
-			if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-				pt = (struct pt_regs *) info->psp - 1;
-			else
-				pt = (struct pt_regs *) info->sp - 1;
-			addr = (unsigned long *) ((long) pt + pt_regs_off(regnum));
+			dump_info_pt(info,  __FUNCTION__);
+			addr = (unsigned long *) (info->pt + pt_regs_off(regnum));
 			if (info->pri_unat_loc)
 				nat_addr = info->pri_unat_loc;
 			else
@@ -348,10 +354,8 @@ unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-		pt = (struct pt_regs *) info->psp - 1;
-	else
-		pt = (struct pt_regs *) info->sp - 1;
+	dump_info_pt(info,  __FUNCTION__);
+	pt = (struct pt_regs *)info->pt;
 	switch (regnum) {
 		/* scratch: */
 	      case 0: addr = &pt->b0; break;
@@ -387,10 +391,8 @@ unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, 
 		return -1;
 	}
 
-	if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-		pt = (struct pt_regs *) info->psp - 1;
-	else
-		pt = (struct pt_regs *) info->sp - 1;
+	dump_info_pt(info,  __FUNCTION__);
+	pt = (struct pt_regs *)info->pt;
 
 	if (regnum <= 5) {
 		addr = *(&info->f2_loc + (regnum - 2));
@@ -428,10 +430,8 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	unsigned long *addr;
 	struct pt_regs *pt;
 
-	if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
-		pt = (struct pt_regs *) info->psp - 1;
-	else
-		pt = (struct pt_regs *) info->sp - 1;
+	dump_info_pt(info,  __FUNCTION__);
+	pt = (struct pt_regs *)info->pt;
 
 	switch (regnum) {
 	      case UNW_AR_BSP:
@@ -1339,8 +1339,9 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 			}
 			val = unw.preg_index[UNW_REG_R4 + (rval - 4)];
 		} else {
-			opc = UNW_INSN_ADD_SP;
-			val = -sizeof(struct pt_regs) + pt_regs_off(rval);
+			/* register got spilled to a scratch register */
+			opc = UNW_INSN_MOVE_SCRATCH;
+			val = pt_regs_off(rval);
 		}
 		break;
 
@@ -1350,10 +1351,9 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 		else if (rval >= 16 && rval <= 31)
 			val = unw.preg_index[UNW_REG_F16 + (rval - 16)];
 		else {
-			opc = UNW_INSN_ADD_SP;
-			val = -sizeof(struct pt_regs);
+			opc = UNW_INSN_MOVE_SCRATCH;
 			if (rval <= 9)
-				val += struct_offset(struct pt_regs, f6) + 16*(rval - 6);
+				val = struct_offset(struct pt_regs, f6) + 16*(rval - 6);
 			else
 				dprintk("unwind: kernel may not touch f%lu\n", rval);
 		}
@@ -1363,14 +1363,13 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 		if (rval >= 1 && rval <= 5)
 			val = unw.preg_index[UNW_REG_B1 + (rval - 1)];
 		else {
-			opc = UNW_INSN_ADD_SP;
-			val = -sizeof(struct pt_regs);
+			opc = UNW_INSN_MOVE_SCRATCH;
 			if (rval == 0)
-				val += struct_offset(struct pt_regs, b0);
+				val = struct_offset(struct pt_regs, b0);
 			else if (rval == 6)
-				val += struct_offset(struct pt_regs, b6);
+				val = struct_offset(struct pt_regs, b6);
 			else
-				val += struct_offset(struct pt_regs, b7);
+				val = struct_offset(struct pt_regs, b7);
 		}
 		break;
 
@@ -1642,6 +1641,17 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 			s[dst] = s[val];
 			break;
 
+		      case UNW_INSN_MOVE_SCRATCH:
+			if (state->pt) {
+				dump_info_pt(state,  __FUNCTION__);
+				s[dst] = state->pt+val;
+			}
+			else {
+				s[dst] = 0;
+				dprintk("unwind.%s: no state->pt, dst=%ld, val=%ld\n", __FUNCTION__, dst, val);
+			}
+			break;
+
 		      case UNW_INSN_MOVE_STACKED:
 			s[dst] = (unsigned long) ia64_rse_skip_regs((unsigned long *)state->bsp,
 								    val);
@@ -1774,10 +1784,11 @@ unw_unwind (struct unw_frame_info *info)
 	pr = info->pr;
 	num_regs = 0;
 	if ((info->flags & UNW_FLAG_INTERRUPT_FRAME)) {
+		info->pt = info->sp + 16;
 		if ((pr & (1UL << pNonSys)) != 0)
 			num_regs = *info->cfm_loc & 0x7f;		/* size of frame */
 		info->pfs_loc =
-			(unsigned long *) (info->sp + 16 + struct_offset(struct pt_regs, ar_pfs));
+			(unsigned long *) (info->pt + struct_offset(struct pt_regs, ar_pfs));
 	} else
 		num_regs = (*info->cfm_loc >> 7) & 0x7f;	/* size of locals */
 	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->bsp, -num_regs);
@@ -1874,6 +1885,7 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 	info->task = t;
 	info->sw  = sw;
 	info->sp = info->psp = (unsigned long) (sw + 1) - 16;
+	info->pt = 0;
 	info->cfm_loc = &sw->ar_pfs;
 	sol = (*info->cfm_loc >> 7) & 0x7f;
 	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->regstk.top, -sol);
