@@ -2014,6 +2014,7 @@ static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
 static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 {
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
+	struct fbcon_ops *ops = info->fbcon_par;
 	int active = !fbcon_is_inactive(vc, info);
 
 	if (mode_switch) {
@@ -2037,18 +2038,14 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	}
 
  	if (active) {
-		struct fbcon_ops *ops = info->fbcon_par;
+		if (ops->blank_state != blank) {
+			ops->blank_state = blank;
+			fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
+			ops->cursor_flash = (!blank);
 
- 		fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
- 		ops->cursor_flash = (!blank);
-
- 		if (ops->blank_state != blank) {
- 			if (info->fbops->fb_blank &&
- 			    info->fbops->fb_blank(blank, info))
- 				fbcon_generic_blank(vc, info, blank);
-
- 			ops->blank_state = blank;
- 		}
+			if (fb_blank(info, blank))
+				fbcon_generic_blank(vc, info, blank);
+		}
 
  		if (!blank)
  			update_screen(vc->vc_num);
