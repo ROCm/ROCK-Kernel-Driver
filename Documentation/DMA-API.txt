@@ -22,7 +22,7 @@ To get the dma_ API, you must #include <linux/dma-mapping.h>
 
 void *
 dma_alloc_coherent(struct device *dev, size_t size,
-			     dma_addr_t *dma_handle)
+			     dma_addr_t *dma_handle, int flag)
 void *
 pci_alloc_consistent(struct pci_dev *dev, size_t size,
 			     dma_addr_t *dma_handle)
@@ -42,6 +42,12 @@ address space) or NULL if the allocation failed.
 Note: consistent memory can be expensive on some platforms, and the
 minimum allocation length may be as big as a page, so you should
 consolidate your requests for consistent memory as much as possible.
+
+The flag parameter (dma_alloc_coherent only) allows the caller to
+specify the GFP_ flags (see kmalloc) for the allocation (the
+implementation may chose to ignore flags that affect the location of
+the returned memory, like GFP_DMA).  For pci_alloc_consistent, you
+must assume GFP_ATOMIC behaviour.
 
 void
 dma_free_coherent(struct device *dev, size_t size, void *cpu_addr
@@ -261,7 +267,7 @@ API at all.
 
 void *
 dma_alloc_noncoherent(struct device *dev, size_t size,
-			       dma_addr_t *dma_handle)
+			       dma_addr_t *dma_handle, int flag)
 
 Identical to dma_alloc_coherent() except that the platform will
 choose to return either consistent or non-consistent memory as it sees
