@@ -551,8 +551,8 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 				      struct sctp_association *asoc)
 {
 	struct sock *newsk;
-	struct inet_opt *inet = inet_sk(sk);
-	struct inet_opt *newinet;
+	struct inet_sock *inet = inet_sk(sk);
+	struct inet_sock *newinet;
 
 	newsk = sk_alloc(PF_INET, GFP_KERNEL, sk->sk_prot->slab_obj_size,
 			 sk->sk_prot->slab);

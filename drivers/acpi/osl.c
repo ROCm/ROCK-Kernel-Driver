@@ -40,6 +40,7 @@
 #include <acpi/acpi.h>
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
+#include <acpi/processor.h>
 #include <asm/uaccess.h>
 
 #include <linux/efi.h>
@@ -356,7 +357,7 @@ acpi_os_get_timer (void)
 	if (!t)
 		printk(KERN_ERR PREFIX "acpi_os_get_timer() TBD\n");
 
-	return(++t);
+	return ++t;
 }
 
 acpi_status
@@ -635,7 +636,7 @@ acpi_os_write_pci_configuration (
 	acpi_integer		value,
 	u32			width)
 {
-	return (AE_SUPPORT);
+	return AE_SUPPORT;
 }
 
 acpi_status
@@ -645,7 +646,7 @@ acpi_os_read_pci_configuration (
 	void			*value,
 	u32			width)
 {
-	return (AE_SUPPORT);
+	return AE_SUPPORT;
 }
 
 void
@@ -1155,7 +1156,7 @@ __setup("acpi_wake_gpes_always_on", acpi_wake_gpes_always_on_setup);
  * max_cstate is defined in the base kernel so modules can
  * change it w/o depending on the state of the processor module.
  */
-unsigned int max_cstate = ACPI_C_STATES_MAX;
+unsigned int max_cstate = ACPI_PROCESSOR_MAX_POWER;
 
 
 EXPORT_SYMBOL(max_cstate);

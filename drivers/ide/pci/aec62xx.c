@@ -321,12 +321,12 @@ static void __devinit init_dma_aec62xx(ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __devinit init_setup_aec62xx(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_aec62xx(struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __devinit init_setup_aec6x80(struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_aec6x80(struct pci_dev *dev, ide_pci_device_t *d)
 {
 	unsigned long bar4reg = pci_resource_start(dev, 4);
 
@@ -340,7 +340,7 @@ static void __devinit init_setup_aec6x80(struct pci_dev *dev, ide_pci_device_t *
 			strcpy(d->name, "AEC6280R");
 	}
 
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
 /**
@@ -356,8 +356,7 @@ static int __devinit aec62xx_init_one(struct pci_dev *dev, const struct pci_devi
 {
 	ide_pci_device_t *d = &aec62xx_chipsets[id->driver_data];
 
-	d->init_setup(dev, d);
-	return 0;
+	return d->init_setup(dev, d);
 }
 
 static struct pci_device_id aec62xx_pci_tbl[] = {

@@ -200,7 +200,6 @@ extern void fib_select_default(const struct flowi *flp, struct fib_result *res);
 
 /* Exported by fib_frontend.c */
 extern void		ip_fib_init(void);
-extern void		fib_flush(void);
 extern int inet_rtm_delroute(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg);
 extern int inet_rtm_newroute(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg);
 extern int inet_rtm_getroute(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg);
@@ -226,7 +225,6 @@ extern struct fib_table *fib_hash_init(int id);
 extern int inet_rtm_delrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg);
 extern int inet_rtm_newrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg);
 extern int inet_dump_rules(struct sk_buff *skb, struct netlink_callback *cb);
-extern u32 fib_rules_map_destination(u32 daddr, struct fib_result *res);
 #ifdef CONFIG_NET_CLS_ROUTE
 extern u32 fib_rules_tclass(struct fib_result *res);
 #endif

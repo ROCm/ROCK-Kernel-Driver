@@ -101,7 +101,7 @@ int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 #ifdef CONFIG_ACPI_NUMA
 /* Proximity bitmap length; _PXM is at most 255 (8 bit)*/
 #define MAX_PXM_DOMAINS (256)
-extern int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
+extern int __devinitdata pxm_to_nid_map[MAX_PXM_DOMAINS];
 extern int __initdata nid_to_pxm_map[MAX_NUMNODES];
 #endif
 

@@ -292,7 +292,7 @@ struct subsys_list_struct {
 #define INTEGRATED_SCSI          101
 
 /* List of possible IBM-SCSI-adapters */
-struct subsys_list_struct subsys_list[] = {
+static struct subsys_list_struct subsys_list[] = {
 	{0x8efc, "IBM SCSI-2 F/W Adapter"},	/* special = 0 */
 	{0x8efd, "IBM 7568 Industrial Computer SCSI Adapter w/Cache"},	/* special = 1 */
 	{0x8ef8, "IBM Expansion Unit SCSI Controller"},	/* special = 2 */

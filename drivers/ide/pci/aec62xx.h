@@ -61,8 +61,8 @@ static struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
 #define BUSCLOCK(D)	\
 	((struct chipset_bus_clock_list_entry *) pci_get_drvdata((D)))
 
-static void init_setup_aec6x80(struct pci_dev *, ide_pci_device_t *);
-static void init_setup_aec62xx(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_aec6x80(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_aec62xx(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_aec62xx(struct pci_dev *, const char *);
 static void init_hwif_aec62xx(ide_hwif_t *);
 static void init_dma_aec62xx(ide_hwif_t *, unsigned long);

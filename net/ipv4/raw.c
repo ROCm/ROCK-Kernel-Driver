@@ -109,7 +109,7 @@ struct sock *__raw_v4_lookup(struct sock *sk, unsigned short num,
 	struct hlist_node *node;
 
 	sk_for_each_from(sk, node) {
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 
 		if (inet->num == num 					&&
 		    !(inet->daddr && inet->daddr != raddr) 		&&
@@ -181,7 +181,7 @@ out:
 
 void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
 	int err = 0;
@@ -263,7 +263,7 @@ static int raw_send_hdrinc(struct sock *sk, void *from, int length,
 			struct rtable *rt, 
 			unsigned int flags)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	int hh_len;
 	struct iphdr *iph;
 	struct sk_buff *skb;
@@ -374,7 +374,7 @@ static void raw_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
 static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		       size_t len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipcm_cookie ipc;
 	struct rtable *rt = NULL;
 	int free = 0;
@@ -537,7 +537,7 @@ static void raw_close(struct sock *sk, long timeout)
 /* This gets rid of all the nasties in af_inet. -DaveM */
 static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct sockaddr_in *addr = (struct sockaddr_in *) uaddr;
 	int ret = -EINVAL;
 	int chk_addr_ret;
@@ -562,10 +562,10 @@ out:	return ret;
  *	we return it, otherwise we block.
  */
 
-int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		size_t len, int noblock, int flags, int *addr_len)
+static int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+		       size_t len, int noblock, int flags, int *addr_len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	size_t copied = 0;
 	int err = -EOPNOTSUPP;
 	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;
@@ -802,7 +802,7 @@ static void raw_seq_stop(struct seq_file *seq, void *v)
 
 static __inline__ char *get_raw_sock(struct sock *sp, char *tmpbuf, int i)
 {
-	struct inet_opt *inet = inet_sk(sp);
+	struct inet_sock *inet = inet_sk(sp);
 	unsigned int dest = inet->daddr,
 		     src = inet->rcv_saddr;
 	__u16 destp = 0,

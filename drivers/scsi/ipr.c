@@ -312,6 +312,8 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"9041: Array protection temporarily suspended"},
 	{0x066B0200, 0, 1,
 	"9030: Array no longer protected due to missing or failed disk unit"},
+	{0x066B8200, 0, 1,
+	"9042: Corrupt array parity detected on specified device"},
 	{0x07270000, 0, 0,
 	"Failure due to other device"},
 	{0x07278000, 0, 1,
@@ -542,7 +544,7 @@ static int ipr_save_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
 		return -EIO;
 	}
 
-	if (pci_read_config_word(ioa_cfg->pdev, pcix_cmd_reg,
+	if (pci_read_config_word(ioa_cfg->pdev, pcix_cmd_reg + PCI_X_CMD,
 				 &ioa_cfg->saved_pcix_cmd_reg) != PCIBIOS_SUCCESSFUL) {
 		dev_err(&ioa_cfg->pdev->dev, "Failed to save PCI-X command register\n");
 		return -EIO;
@@ -564,7 +566,7 @@ static int ipr_set_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
 	int pcix_cmd_reg = pci_find_capability(ioa_cfg->pdev, PCI_CAP_ID_PCIX);
 
 	if (pcix_cmd_reg) {
-		if (pci_write_config_word(ioa_cfg->pdev, pcix_cmd_reg,
+		if (pci_write_config_word(ioa_cfg->pdev, pcix_cmd_reg + PCI_X_CMD,
 					  ioa_cfg->saved_pcix_cmd_reg) != PCIBIOS_SUCCESSFUL) {
 			dev_err(&ioa_cfg->pdev->dev, "Failed to setup PCI-X command register\n");
 			return -EIO;
@@ -3904,7 +3906,8 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 		ioarcb->cmd_pkt.flags_lo |= ipr_get_task_attributes(scsi_cmd);
 	}
 
-	if (!ipr_is_gscsi(res) && scsi_cmd->cmnd[0] >= 0xC0)
+	if (scsi_cmd->cmnd[0] >= 0xC0 &&
+	    (!ipr_is_gscsi(res) || scsi_cmd->cmnd[0] == IPR_QUERY_RSRC_STATE))
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
 
 	if (ipr_is_ioa_resource(res) && scsi_cmd->cmnd[0] == MODE_SELECT)

@@ -298,7 +298,7 @@ static void irda_connect_indication(void *instance, void *sap,
  *    Accept incoming connection
  *
  */
-void irda_connect_response(struct irda_sock *self)
+static void irda_connect_response(struct irda_sock *self)
 {
 	struct sk_buff *skb;
 
@@ -1155,7 +1155,7 @@ static int irda_create(struct socket *sock, int protocol)
  *    Destroy socket
  *
  */
-void irda_destroy_socket(struct irda_sock *self)
+static void irda_destroy_socket(struct irda_sock *self)
 {
 	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 

@@ -32,6 +32,29 @@
 #ifndef _I810_DRV_H_
 #define _I810_DRV_H_
 
+/* General customization:
+ */
+
+#define DRIVER_AUTHOR		"VA Linux Systems Inc."
+
+#define DRIVER_NAME		"i810"
+#define DRIVER_DESC		"Intel i810"
+#define DRIVER_DATE		"20030605"
+
+/* Interface history
+ *
+ * 1.1   - XFree86 4.1
+ * 1.2   - XvMC interfaces
+ *       - XFree86 4.2
+ * 1.2.1 - Disable copying code (leave stub ioctls for backwards compatibility)
+ *       - Remove requirement for interrupt (leave stubs again)
+ * 1.3   - Add page flipping.
+ * 1.4   - fix DRM interface
+ */
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		4
+#define DRIVER_PATCHLEVEL	0
+
 typedef struct drm_i810_buf_priv {
    	u32 *in_use;
    	int my_use_idx;
@@ -99,7 +122,7 @@ extern int  i810_dma_init(struct inode *inode, struct file *filp,
 extern int  i810_dma_cleanup(drm_device_t *dev);
 extern int  i810_flush_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg);
-extern void i810_reclaim_buffers(struct file *filp);
+extern void i810_reclaim_buffers(drm_device_t *dev, struct file *filp);
 extern int  i810_getage(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long arg);
 extern int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
@@ -127,17 +150,21 @@ extern int i810_dma_mc(struct inode *inode, struct file *filp,
 
 extern void i810_dma_quiescent(drm_device_t *dev);
 
-int i810_dma_vertex(struct inode *inode, struct file *filp,
+extern int i810_dma_vertex(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg);
 
-int i810_swap_bufs(struct inode *inode, struct file *filp,
+extern int i810_swap_bufs(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg);
 
-int i810_clear_bufs(struct inode *inode, struct file *filp,
+extern int i810_clear_bufs(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg);
 
-int i810_flip_bufs(struct inode *inode, struct file *filp,
+extern int i810_flip_bufs(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg);
+
+extern int i810_driver_dma_quiescent(drm_device_t *dev);
+extern void i810_driver_release(drm_device_t *dev, struct file *filp);
+extern void i810_driver_pretakedown(drm_device_t *dev);
 
 #define I810_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)

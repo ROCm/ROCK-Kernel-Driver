@@ -1647,7 +1647,7 @@ static __inline__ int tcp_packet_delayed(struct tcp_opt *tp)
 #if FASTRETRANS_DEBUG > 1
 static void DBGUNDO(struct sock *sk, struct tcp_opt *tp, const char *msg)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	printk(KERN_DEBUG "Undo %s %u.%u.%u.%u/%u c%u l%u ss%u/%u p%u\n",
 	       msg,
 	       NIPQUAD(inet->daddr), ntohs(inet->dport),
@@ -2786,7 +2786,7 @@ static void westwood_update_window(struct sock *sk, __u32 now)
  * straight forward and doesn't need any particular care.
  */
 
-void __tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
+static void __tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
@@ -2795,6 +2795,12 @@ void __tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
 	tp->westwood.bk += westwood_acked(sk);
 	tp->westwood.snd_una = tp->snd_una;
 	tp->westwood.rtt_min = westwood_update_rttmin(sk);
+}
+
+static inline void tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
+{
+        if (tcp_is_westwood(tcp_sk(sk)))
+                __tcp_westwood_fast_bw(sk, skb);
 }
 
 
@@ -2867,7 +2873,7 @@ static inline __u32 westwood_acked_count(struct sock *sk)
  * dupack. But we need to be careful in such case.
  */
 
-void __tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
+static void __tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
@@ -2875,6 +2881,12 @@ void __tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
 
 	tp->westwood.bk += westwood_acked_count(sk);
 	tp->westwood.rtt_min = westwood_update_rttmin(sk);
+}
+
+static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
+{
+        if (tcp_is_westwood(tcp_sk(sk)))
+                __tcp_westwood_slow_bw(sk, skb);
 }
 
 /* This routine deals with incoming acks, but not outgoing ones. */

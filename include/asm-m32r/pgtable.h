@@ -1,6 +1,8 @@
 #ifndef _ASM_M32R_PGTABLE_H
 #define _ASM_M32R_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 /* $Id$ */
 
 /*

@@ -40,6 +40,9 @@ static inline void *__constant_memcpy(void *to, const void *from, __kernel_size_
 
 	if(n <= 32) {
 		__builtin_memcpy(to, from, n);
+	} else if (((unsigned int) to & 7) != 0) {
+		/* Destination is not aligned on the double-word boundary */
+		__memcpy(to, from, n);
 	} else {
 		switch(n) {
 		case PAGE_SIZE:

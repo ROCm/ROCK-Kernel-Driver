@@ -155,7 +155,6 @@ static int print_unex = 1;
 #include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
-#include <linux/version.h>
 #define FDPATCHES
 #include <linux/fdreg.h>
 
@@ -4596,8 +4595,6 @@ static void __init parse_floppy_cfg_string(char *cfg)
 
 int init_module(void)
 {
-	printk(KERN_INFO "inserting floppy driver for " UTS_RELEASE "\n");
-
 	if (floppy)
 		parse_floppy_cfg_string(floppy);
 	return floppy_init();

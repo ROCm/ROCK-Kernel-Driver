@@ -277,6 +277,7 @@ acpi_tb_get_table_rsdt (
 
 	acpi_tb_get_rsdt_address (&address);
 
+	table_info.type = ACPI_TABLE_XSDT;
 	status = acpi_tb_get_table (&address, &table_info);
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not get the RSDT/XSDT, %s\n",

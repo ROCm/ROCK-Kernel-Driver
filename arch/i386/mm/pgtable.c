@@ -62,6 +62,7 @@ void show_mem(void)
 static void set_pte_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 
@@ -70,7 +71,12 @@ static void set_pte_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 		BUG();
 		return;
 	}
-	pmd = pmd_offset(pgd, vaddr);
+	pud = pud_offset(pgd, vaddr);
+	if (pud_none(*pud)) {
+		BUG();
+		return;
+	}
+	pmd = pmd_offset(pud, vaddr);
 	if (pmd_none(*pmd)) {
 		BUG();
 		return;
@@ -95,6 +101,7 @@ static void set_pte_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 
 	if (vaddr & (PMD_SIZE-1)) {		/* vaddr is misaligned */
@@ -110,7 +117,8 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 		printk ("set_pmd_pfn: pgd_none\n");
 		return; /* BUG(); */
 	}
-	pmd = pmd_offset(pgd, vaddr);
+	pud = pud_offset(pgd, vaddr);
+	pmd = pmd_offset(pud, vaddr);
 	set_pmd(pmd, pfn_pmd(pfn, flags));
 	/*
 	 * It's enough to flush this one mapping.
@@ -252,6 +260,6 @@ void pgd_free(pgd_t *pgd)
 	if (PTRS_PER_PMD > 1)
 		for (i = 0; i < USER_PTRS_PER_PGD; ++i)
 			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
-	/* in the non-PAE case, clear_page_tables() clears user pgd entries */
+	/* in the non-PAE case, clear_page_range() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
 }

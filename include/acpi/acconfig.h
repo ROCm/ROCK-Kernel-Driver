@@ -64,7 +64,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20041105
+#define ACPI_CA_VERSION                 0x20041210
 
 /*
  * OS name, used for the _OS object.  The _OS object is essentially obsolete,
@@ -99,7 +99,7 @@
 
 /* Version of ACPI supported */
 
-#define ACPI_CA_SUPPORT_LEVEL           2
+#define ACPI_CA_SUPPORT_LEVEL           3
 
 /* String size constants */
 

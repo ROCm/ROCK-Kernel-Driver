@@ -91,7 +91,7 @@
 #define PGDIR_SHIFT		(PAGE_SHIFT + 2*(PAGE_SHIFT-3))
 #define PGDIR_SIZE		(__IA64_UL(1) << PGDIR_SHIFT)
 #define PGDIR_MASK		(~(PGDIR_SIZE-1))
-#define PTRS_PER_PGD		(__IA64_UL(1) << (PAGE_SHIFT-3))
+#define PTRS_PER_PGD		(1UL << (PAGE_SHIFT-3))
 #define USER_PTRS_PER_PGD	(5*PTRS_PER_PGD/8)	/* regions 0-4 are user regions */
 #define FIRST_USER_PGD_NR	0
 
@@ -104,7 +104,7 @@
 #define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3))
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
-#define PTRS_PER_PMD	(__IA64_UL(1) << (PAGE_SHIFT-3))
+#define PTRS_PER_PMD	(1UL << (PAGE_SHIFT-3))
 
 /*
  * Definitions for third level:
@@ -254,11 +254,12 @@ ia64_phys_addr_valid (unsigned long addr)
 #define pmd_page_kernel(pmd)		((unsigned long) __va(pmd_val(pmd) & _PFN_MASK))
 #define pmd_page(pmd)			virt_to_page((pmd_val(pmd) + PAGE_OFFSET))
 
-#define pgd_none(pgd)			(!pgd_val(pgd))
-#define pgd_bad(pgd)			(!ia64_phys_addr_valid(pgd_val(pgd)))
-#define pgd_present(pgd)		(pgd_val(pgd) != 0UL)
-#define pgd_clear(pgdp)			(pgd_val(*(pgdp)) = 0UL)
-#define pgd_page(pgd)			((unsigned long) __va(pgd_val(pgd) & _PFN_MASK))
+#define pud_none(pud)			(!pud_val(pud))
+#define pud_bad(pud)			(!ia64_phys_addr_valid(pud_val(pud)))
+#define pud_present(pud)		(pud_val(pud) != 0UL)
+#define pud_clear(pudp)			(pud_val(*(pudp)) = 0UL)
+
+#define pud_page(pud)			((unsigned long) __va(pud_val(pud) & _PFN_MASK))
 
 /*
  * The following have defined behavior only work if pte_present() is true.
@@ -328,7 +329,7 @@ pgd_offset (struct mm_struct *mm, unsigned long address)
 
 /* Find an entry in the second-level page table.. */
 #define pmd_offset(dir,addr) \
-	((pmd_t *) pgd_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
+	((pmd_t *) pud_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
 
 /*
  * Find an entry in the third-level page table.  This looks more complicated than it
@@ -561,5 +562,6 @@ do {											\
 #define __HAVE_ARCH_PTE_SAME
 #define __HAVE_ARCH_PGD_OFFSET_GATE
 #include <asm-generic/pgtable.h>
+#include <asm-generic/pgtable-nopud.h>
 
 #endif /* _ASM_IA64_PGTABLE_H */

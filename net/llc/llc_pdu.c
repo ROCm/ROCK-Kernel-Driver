@@ -80,19 +80,6 @@ void llc_pdu_decode_pf_bit(struct sk_buff *skb, u8 *pf_bit)
 }
 
 /**
- *	llc_pdu_decode_cr_bit - extracts command response bit from LLC header
- *	@skb: input skb that c/r bit must be extracted from it.
- *	@cr_bit: command/response bit (0 or 1).
- *
- *	This function extracts command/response bit from LLC header. this bit
- *	is right bit of source SAP.
- */
-void llc_pdu_decode_cr_bit(struct sk_buff *skb, u8 *cr_bit)
-{
-	*cr_bit = llc_pdu_un_hdr(skb)->ssap & LLC_PDU_CMD_RSP_MASK;
-}
-
-/**
  *	llc_pdu_init_as_disc_cmd - Builds DISC PDU
  *	@skb: Address of the skb to build
  *	@p_bit: The P bit to set in the PDU

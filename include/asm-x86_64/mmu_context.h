@@ -40,10 +40,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		write_pda(active_mm, next);
 #endif
 		set_bit(cpu, &next->cpu_vm_mask);
-		/* Re-load page tables */
-		*read_pda(level4_pgt) = __pa(next->pgd) | _PAGE_TABLE;
-		__flush_tlb();
-
+		asm volatile("movq %0,%%cr3" :: "r" (__pa(next->pgd)) : "memory");
 		if (unlikely(next->context.ldt != prev->context.ldt)) 
 			load_LDT_nolock(&next->context, cpu);
 	}

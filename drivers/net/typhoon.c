@@ -1687,8 +1687,7 @@ typhoon_rx(struct typhoon *tp, struct basic_ring *rxRing, volatile u32 * ready,
 		skb = rxb->skb;
 		dma_addr = rxb->dma_addr;
 
-		rxaddr += sizeof(struct rx_desc);
-		rxaddr %= RX_ENTRIES * sizeof(struct rx_desc);
+		typhoon_inc_rx_index(&rxaddr, 1);
 
 		if(rx->flags & TYPHOON_RX_ERROR) {
 			typhoon_recycle_rx_skb(tp, idx);

@@ -541,7 +541,7 @@ static void DoC2k_init(struct mtd_info *mtd)
 			printk(KERN_NOTICE
 			       "Ignoring DiskOnChip 2000 at 0x%lX - already configured\n",
 			       this->physadr);
-			iounmap((void *) this->virtadr);
+			iounmap(this->virtadr);
 			kfree(mtd);
 			return;
 		}
@@ -573,7 +573,7 @@ static void DoC2k_init(struct mtd_info *mtd)
 	default:
 		printk("Unknown ChipID 0x%02x\n", this->ChipID);
 		kfree(mtd);
-		iounmap((void *) this->virtadr);
+		iounmap(this->virtadr);
 		return;
 	}
 
@@ -612,7 +612,7 @@ static void DoC2k_init(struct mtd_info *mtd)
 
 	if (!this->totlen) {
 		kfree(mtd);
-		iounmap((void *) this->virtadr);
+		iounmap(this->virtadr);
 	} else {
 		this->nextdoc = doc2klist;
 		doc2klist = mtd;
@@ -1293,7 +1293,7 @@ static void __exit cleanup_doc2000(void)
 
 		del_mtd_device(mtd);
 
-		iounmap((void *) this->virtadr);
+		iounmap(this->virtadr);
 		kfree(this->chips);
 		kfree(mtd);
 	}

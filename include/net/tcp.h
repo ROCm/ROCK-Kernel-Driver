@@ -196,7 +196,7 @@ struct tcp_tw_bucket {
 	unsigned char		tw_rcv_wscale;
 	__u16			tw_sport;
 	/* Socket demultiplex comparisons on incoming packets. */
-	/* these five are in inet_opt */
+	/* these five are in inet_sock */
 	__u32			tw_daddr
 		__attribute__((aligned(TCP_ADDRCMP_ALIGN_BYTES)));
 	__u32			tw_rcv_saddr;
@@ -315,7 +315,6 @@ static inline void tcp_tw_put(struct tcp_tw_bucket *tw)
 extern atomic_t tcp_orphan_count;
 extern int tcp_tw_count;
 extern void tcp_time_wait(struct sock *sk, int state, int timeo);
-extern void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo);
 extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 
 
@@ -2018,21 +2017,6 @@ static inline void tcp_westwood_update_rtt(struct tcp_opt *tp, __u32 rtt_seq)
 {
         if (tcp_is_westwood(tp))
                 tp->westwood.rtt = rtt_seq;
-}
-
-void __tcp_westwood_fast_bw(struct sock *, struct sk_buff *);
-void __tcp_westwood_slow_bw(struct sock *, struct sk_buff *);
-
-static inline void tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
-{
-        if (tcp_is_westwood(tcp_sk(sk)))
-                __tcp_westwood_fast_bw(sk, skb);
-}
-
-static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
-{
-        if (tcp_is_westwood(tcp_sk(sk)))
-                __tcp_westwood_slow_bw(sk, skb);
 }
 
 static inline __u32 __tcp_westwood_bw_rttmin(const struct tcp_opt *tp)

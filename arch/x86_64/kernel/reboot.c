@@ -74,7 +74,7 @@ static void reboot_warm(void)
 	local_irq_disable(); 
 		
 	/* restore identity mapping */
-	init_level4_pgt[0] = __pml4(__pa(level3_ident_pgt) | 7); 
+	init_level4_pgt[0] = __pgd(__pa(level3_ident_pgt) | 7); 
 	__flush_tlb_all(); 
 
 	/* Move the trampoline to low memory */

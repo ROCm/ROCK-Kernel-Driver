@@ -357,8 +357,7 @@ static ide_pci_device_t cs5530_chipset __devinitdata = {
 
 static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &cs5530_chipset);
-	return 0;
+	return ide_setup_pci_device(dev, &cs5530_chipset);
 }
 
 static struct pci_device_id cs5530_pci_tbl[] = {

@@ -150,6 +150,8 @@ running once the system is up.
 			debugging. After system has booted up, it can be set
 			via /proc/acpi/debug_level.
 
+	acpi_fake_ecdt	[HW,ACPI] Workaround failure due to BIOS lacking ECDT
+
 	ad1816=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>
 			See also Documentation/sound/oss/AD1816.

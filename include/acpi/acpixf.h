@@ -345,11 +345,11 @@ acpi_disable_event (
 	u32                             event,
 	u32                             flags);
 
-#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_clear_event (
 	u32                             event);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_event_status (
 	u32                             event,

@@ -491,6 +491,8 @@ static __init int intel_router_probe(struct irq_router *r, struct pci_dev *route
 		case PCI_DEVICE_ID_INTEL_ESB_1:
 		case PCI_DEVICE_ID_INTEL_ICH6_0:
 		case PCI_DEVICE_ID_INTEL_ICH6_1:
+		case PCI_DEVICE_ID_INTEL_ICH7_0:
+		case PCI_DEVICE_ID_INTEL_ICH7_1:
 			r->name = "PIIX/ICH";
 			r->get = pirq_piix_get;
 			r->set = pirq_piix_set;
@@ -1022,7 +1024,7 @@ void pcibios_penalize_isa_irq(int irq)
 int pirq_enable_irq(struct pci_dev *dev)
 {
 	u8 pin;
-	extern int interrupt_line_quirk;
+	extern int via_interrupt_line_quirk;
 	struct pci_dev *temp_dev;
 
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
@@ -1080,7 +1082,7 @@ int pirq_enable_irq(struct pci_dev *dev)
 	}
 	/* VIA bridges use interrupt line for apic/pci steering across
 	   the V-Link */
-	else if (interrupt_line_quirk)
+	else if (via_interrupt_line_quirk)
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq & 15);
 	return 0;
 }

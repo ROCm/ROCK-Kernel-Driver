@@ -45,11 +45,6 @@ static inline void wrusp(unsigned long usp) {
  */
 #define TASK_UNMAPPED_BASE	0
 
-/*
- * Bus types
- */
-#define MCA_bus 0
-
 struct thread_struct {
 	unsigned long  ksp;		/* kernel stack pointer */
 	unsigned long  usp;		/* user stack pointer */

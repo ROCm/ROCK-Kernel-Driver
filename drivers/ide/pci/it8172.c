@@ -270,9 +270,8 @@ static int __devinit it8172_init_one(struct pci_dev *dev, const struct pci_devic
 {
         if ((!(PCI_FUNC(dev->devfn) & 1) ||
             (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
-                return 1; /* IT8172 is more than only a IDE controller */
-	ide_setup_pci_device(dev, &it8172_chipsets[id->driver_data]);
-	return 0;
+		return -ENODEV; /* IT8172 is more than an IDE controller */
+	return ide_setup_pci_device(dev, &it8172_chipsets[id->driver_data]);
 }
 
 static struct pci_device_id it8172_pci_tbl[] = {

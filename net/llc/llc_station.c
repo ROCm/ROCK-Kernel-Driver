@@ -642,7 +642,7 @@ static void llc_station_service_events(void)
  *	Queues an event (on the station event queue) for handling by the
  *	station state machine and attempts to process any queued-up events.
  */
-void llc_station_state_process(struct sk_buff *skb)
+static void llc_station_state_process(struct sk_buff *skb)
 {
 	spin_lock_bh(&llc_main_station.ev_q.lock);
 	skb_queue_tail(&llc_main_station.ev_q.list, skb);

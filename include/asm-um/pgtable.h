@@ -7,6 +7,8 @@
 #ifndef __UM_PGTABLE_H
 #define __UM_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 #include "linux/sched.h"
 #include "asm/processor.h"
 #include "asm/page.h"

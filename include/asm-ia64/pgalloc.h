@@ -79,11 +79,10 @@ pgd_free (pgd_t *pgd)
 }
 
 static inline void
-pgd_populate (struct mm_struct *mm, pgd_t *pgd_entry, pmd_t *pmd)
+pud_populate (struct mm_struct *mm, pud_t *pud_entry, pmd_t *pmd)
 {
-	pgd_val(*pgd_entry) = __pa(pmd);
+	pud_val(*pud_entry) = __pa(pmd);
 }
-
 
 static inline pmd_t*
 pmd_alloc_one_fast (struct mm_struct *mm, unsigned long addr)

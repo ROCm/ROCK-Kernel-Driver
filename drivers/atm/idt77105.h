@@ -77,7 +77,6 @@
 
 #ifdef __KERNEL__
 int idt77105_init(struct atm_dev *dev) __init;
-int idt77105_stop(struct atm_dev *dev);
 #endif
 
 /*

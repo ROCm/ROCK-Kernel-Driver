@@ -237,7 +237,7 @@ struct php_ctlr_state_s {
 static spinlock_t hpc_event_lock;
 
 DEFINE_DBG_BUFFER		/* Debug string buffer for entire HPC defined here */
-static struct php_ctlr_state_s *php_ctlr_list_head = 0;	/* HPC state linked list */
+static struct php_ctlr_state_s *php_ctlr_list_head; /* HPC state linked list */
 static int ctlr_seq_num = 0;	/* Controller sequence # */
 static spinlock_t list_lock;
 

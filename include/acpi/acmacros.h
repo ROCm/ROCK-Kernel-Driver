@@ -55,6 +55,7 @@
 
 #define ACPI_SET_BIT(target,bit)        ((target) |= (bit))
 #define ACPI_CLEAR_BIT(target,bit)      ((target) &= ~(bit))
+#define ACPI_MIN(a,b)                   (((a)<(b))?(a):(b))
 
 
 #if ACPI_MACHINE_WIDTH == 16
@@ -487,19 +488,19 @@
  * The first parameter should be the procedure name as a quoted string.  This is declared
  * as a local string ("_proc_name) so that it can be also used by the function exit macros below.
  */
-#define ACPI_FUNCTION_NAME(a)               struct acpi_debug_print_info _dbg; \
-												_dbg.component_id = _COMPONENT; \
-												_dbg.proc_name   = a; \
-												_dbg.module_name = _THIS_MODULE;
+#define ACPI_FUNCTION_NAME(a)               struct acpi_debug_print_info _debug_info; \
+												_debug_info.component_id = _COMPONENT; \
+												_debug_info.proc_name  = a; \
+												_debug_info.module_name = _THIS_MODULE;
 
 #define ACPI_FUNCTION_TRACE(a)              ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace(__LINE__,&_dbg)
+												acpi_ut_trace(__LINE__,&_debug_info)
 #define ACPI_FUNCTION_TRACE_PTR(a,b)        ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace_ptr(__LINE__,&_dbg,(void *)b)
+												acpi_ut_trace_ptr(__LINE__,&_debug_info,(void *)b)
 #define ACPI_FUNCTION_TRACE_U32(a,b)        ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace_u32(__LINE__,&_dbg,(u32)b)
+												acpi_ut_trace_u32(__LINE__,&_debug_info,(u32)b)
 #define ACPI_FUNCTION_TRACE_STR(a,b)        ACPI_FUNCTION_NAME(a) \
-												acpi_ut_trace_str(__LINE__,&_dbg,(char *)b)
+												acpi_ut_trace_str(__LINE__,&_debug_info,(char *)b)
 
 #define ACPI_FUNCTION_ENTRY()               acpi_ut_track_stack_ptr()
 
@@ -516,10 +517,10 @@
 #define ACPI_DO_WHILE0(a)               a
 #endif
 
-#define return_VOID                     ACPI_DO_WHILE0 ({acpi_ut_exit(__LINE__,&_dbg);return;})
-#define return_ACPI_STATUS(s)           ACPI_DO_WHILE0 ({acpi_ut_status_exit(__LINE__,&_dbg,(s));return((s));})
-#define return_VALUE(s)                 ACPI_DO_WHILE0 ({acpi_ut_value_exit(__LINE__,&_dbg,(acpi_integer)(s));return((s));})
-#define return_PTR(s)                   ACPI_DO_WHILE0 ({acpi_ut_ptr_exit(__LINE__,&_dbg,(u8 *)(s));return((s));})
+#define return_VOID                     ACPI_DO_WHILE0 ({acpi_ut_exit(__LINE__,&_debug_info);return;})
+#define return_ACPI_STATUS(s)           ACPI_DO_WHILE0 ({acpi_ut_status_exit(__LINE__,&_debug_info,(s));return((s));})
+#define return_VALUE(s)                 ACPI_DO_WHILE0 ({acpi_ut_value_exit(__LINE__,&_debug_info,(acpi_integer)(s));return((s));})
+#define return_PTR(s)                   ACPI_DO_WHILE0 ({acpi_ut_ptr_exit(__LINE__,&_debug_info,(u8 *)(s));return((s));})
 
 /* Conditional execution */
 

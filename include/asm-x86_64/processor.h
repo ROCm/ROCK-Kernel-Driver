@@ -157,17 +157,11 @@ static inline void clear_in_cr4 (unsigned long mask)
 		:"ax");
 }
 
-/*
- * Bus types
- */
-#define MCA_bus 0
-#define MCA_bus__is_a_macro
-
 
 /*
- * User space process size: 512GB - 1GB (default).
+ * User space process size. 47bits.
  */
-#define TASK_SIZE	(0x0000007fc0000000UL)
+#define TASK_SIZE	(0x800000000000)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.

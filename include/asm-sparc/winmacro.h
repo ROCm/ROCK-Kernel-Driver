@@ -112,9 +112,12 @@
 	and      %idreg, 0xc, %idreg; \
 	ld       [%idreg + %dest_reg], %dest_reg;
 
-/* Sliiick. We have a Linux current register :) -jj */
-#define LOAD_CURRENT4D(dest_reg) \
-	lda	 [%g0] ASI_M_VIKING_TMP2, %dest_reg;
+#define LOAD_CURRENT4D(dest_reg, idreg) \
+	lda	 [%g0] ASI_M_VIKING_TMP1, %idreg; \
+	sethi	%hi(C_LABEL(current_set)), %dest_reg; \
+	sll	%idreg, 2, %idreg; \
+	or	%dest_reg, %lo(C_LABEL(current_set)), %dest_reg; \
+	ld	[%idreg + %dest_reg], %dest_reg;
 
 /* Blackbox - take care with this... - check smp4m and smp4d before changing this. */
 #define LOAD_CURRENT(dest_reg, idreg) 					\

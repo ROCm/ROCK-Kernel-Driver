@@ -95,7 +95,7 @@ acpi_ex_add_table (
 
 	ACPI_MEMSET (&table_info, 0, sizeof (struct acpi_table_desc));
 
-	table_info.type        = 5;
+	table_info.type        = ACPI_TABLE_SSDT;
 	table_info.pointer     = table;
 	table_info.length      = (acpi_size) table->length;
 	table_info.allocation  = ACPI_MEM_ALLOCATED;

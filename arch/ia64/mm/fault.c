@@ -51,6 +51,7 @@ static int
 mapped_kernel_page_is_present (unsigned long address)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *ptep, pte;
 
@@ -58,7 +59,11 @@ mapped_kernel_page_is_present (unsigned long address)
 	if (pgd_none(*pgd) || pgd_bad(*pgd))
 		return 0;
 
-	pmd = pmd_offset(pgd, address);
+	pud = pud_offset(pgd, address);
+	if (pud_none(*pud) || pud_bad(*pud))
+		return 0;
+
+	pmd = pmd_offset(pud, address);
 	if (pmd_none(*pmd) || pmd_bad(*pmd))
 		return 0;
 

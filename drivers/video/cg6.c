@@ -689,6 +689,9 @@ static void cg6_init_one(struct sbus_dev *sdev)
 	all->par.physbase = sdev->reg_addrs[0].phys_addr;
 
 	sbusfb_fill_var(&all->info.var, sdev->prom_node, 8);
+	all->info.var.red.length = 8;
+	all->info.var.green.length = 8;
+	all->info.var.blue.length = 8;
 
 	linebytes = prom_getintdefault(sdev->prom_node, "linebytes",
 				       all->info.var.xres);
@@ -732,6 +735,7 @@ static void cg6_init_one(struct sbus_dev *sdev)
 		return;
 	}
 
+	fb_set_cmap(&all->info.cmap, &all->info);
 	cg6_init_fix(&all->info, linebytes);
 
 	if (register_framebuffer(&all->info) < 0) {

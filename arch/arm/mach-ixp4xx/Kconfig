@@ -36,6 +36,14 @@ config MACH_IXDPG425
 	  IXDPG425 Development Platform (Also known as Montajade).
 	  For more information on this platform, see Documentation/arm/IXP4xx.
 
+config MACH_IXDP465
+	bool "IXDP465"
+	help
+	  Say 'Y' here if you want your kernel to support Intel's
+	  IXDP465 Development Platform (Also known as BMP).
+	  For more information on this platform, see Documentation/arm/IXP4xx.
+
+
 #
 # IXCDP1100 is the exact same HW as IXDP425, but with a different machine 
 # number from the bootloader due to marketing monkeys, so we just enable it 
@@ -58,7 +66,15 @@ config ARCH_PRPMC1100
 #
 config	ARCH_IXDP4XX
 	bool
-	depends on ARCH_IXDP425 || ARCH_AVILA
+	depends on ARCH_IXDP425 || ARCH_AVILA || MACH_IXDP465
+	default y
+
+#
+# Certain registers and IRQs are only enabled if supporting IXP465 CPUs
+#
+config CPU_IXP46X
+	bool
+	depends on MACH_IXDP465
 	default y
 
 comment "IXP4xx Options"

@@ -3460,15 +3460,15 @@ static int i810_pm_resume(struct pci_dev *dev)
 }	
 #endif /* CONFIG_PM */
 
-MODULE_AUTHOR("");
+MODULE_AUTHOR("The Linux kernel team");
 MODULE_DESCRIPTION("Intel 810 audio support");
 MODULE_LICENSE("GPL");
-MODULE_PARM(ftsodell, "i");
-MODULE_PARM(clocking, "i");
-MODULE_PARM(strict_clocking, "i");
-MODULE_PARM(spdif_locked, "i");
+module_param(ftsodell, int, 0444);
+module_param(clocking, uint, 0444);
+module_param(strict_clocking, int, 0444);
+module_param(spdif_locked, int, 0444);
 
-#define I810_MODULE_NAME "intel810_audio"
+#define I810_MODULE_NAME "i810_audio"
 
 static struct pci_driver i810_pci_driver = {
 	.name		= I810_MODULE_NAME,

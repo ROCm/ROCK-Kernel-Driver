@@ -242,6 +242,13 @@ static struct file_operations acpi_video_device_EDID_fops = {
 	.release	= single_release,
 };
 
+static char	device_decode[][30] = {
+	"motherboard VGA device",
+	"PCI VGA device",
+	"AGP VGA device",
+	"UNKNOWN",
+};
+
 static void acpi_video_device_notify ( acpi_handle handle, u32 event, void *data);
 static void acpi_video_device_rebind( struct acpi_video_bus *video);
 static void acpi_video_device_bind( struct acpi_video_bus *video, struct acpi_video_device *device);
@@ -1117,12 +1124,6 @@ acpi_video_bus_POST_seq_show (
 	struct acpi_video_bus	*video = (struct acpi_video_bus *) seq->private;
 	int			status;
 	unsigned long		id;
-	char			device_decode[][30] = {
-					"motherboard VGA device",
-					"PCI VGA device",
-					"AGP VGA device",
-					"UNKNOWN",
-	};
 
 	ACPI_FUNCTION_TRACE("acpi_video_bus_POST_seq_show");
 
@@ -1523,7 +1524,7 @@ static int acpi_video_device_enumerate(struct acpi_video_bus *video)
 		dod->package.count));
 
 	active_device_list= kmalloc(
- 		dod->package.count*sizeof(struct acpi_video_enumerated_device),
+ 		(1+dod->package.count)*sizeof(struct acpi_video_enumerated_device),
 	       	GFP_KERNEL);
 
 	if (!active_device_list) {

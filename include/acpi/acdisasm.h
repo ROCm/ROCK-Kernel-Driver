@@ -317,6 +317,12 @@ acpi_dm_dword_descriptor (
 	u32                             level);
 
 void
+acpi_dm_extended_descriptor (
+	struct asl_extended_address_desc   *resource,
+	u32                             length,
+	u32                             level);
+
+void
 acpi_dm_qword_descriptor (
 	struct asl_qword_address_desc   *resource,
 	u32                             length,

@@ -1,0 +1,26 @@
+config INFINIBAND_MTHCA
+	tristate "Mellanox HCA support"
+	depends on PCI && INFINIBAND
+	---help---
+	  This is a low-level driver for Mellanox InfiniHost host
+	  channel adapters (HCAs), including the MT23108 PCI-X HCA
+	  ("Tavor") and the MT25208 PCI Express HCA ("Arbel").
+
+config INFINIBAND_MTHCA_DEBUG
+	bool "Verbose debugging output"
+	depends on INFINIBAND_MTHCA
+	default n
+	---help---
+	  This option causes the mthca driver produce a bunch of debug
+	  messages.  Select this is you are developing the driver or
+	  trying to diagnose a problem.
+
+config INFINIBAND_MTHCA_SSE_DOORBELL
+	bool "SSE doorbell code"
+	depends on INFINIBAND_MTHCA && X86 && !X86_64
+	default n
+	---help---
+	  This option will have the mthca driver use SSE instructions
+	  to ring hardware doorbell registers.  This may improve
+	  performance for some workloads, but the driver will not run
+	  on processors without SSE instructions.

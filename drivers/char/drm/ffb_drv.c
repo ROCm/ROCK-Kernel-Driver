@@ -210,9 +210,7 @@ unsigned long ffb_get_unmapped_area(struct file *filp,
 	return addr;
 }
 
-#include "drm_core.h"
-
-/* This functions must be here since it references DRM(numdevs)
+/* This functions must be here since it references drm_numdevs)
  * which drm_drv.h declares.
  */
 static int ffb_presetup(drm_device_t *dev)
@@ -227,13 +225,13 @@ static int ffb_presetup(drm_device_t *dev)
 		return -ENODEV;
 
 	/* Find our instance number by finding our device in dev structure */
-	for (i = 0; i < DRM(numdevs); i++) {
-		temp_dev = &(DRM(device)[i]);
+	for (i = 0; i < drm_numdevs; i++) {
+		temp_dev = &(drm_device[i]);
 		if(temp_dev == dev)
 			break;
 	}
 
-	if (i == DRM(numdevs))
+	if (i == drm_numdevs)
 		return -ENODEV;
 
 	ffb_priv = kmalloc(sizeof(ffb_dev_priv_t), GFP_KERNEL);
@@ -311,12 +309,12 @@ void ffb_driver_register_fns(drm_device_t *dev)
 {
 	ffb_set_context_ioctls();
 	DRM(fops).get_unmapped_area = ffb_get_unmapped_area;
-	dev->fn_tbl.release = ffb_driver_release;
-	dev->fn_tbl.presetup = ffb_presetup;
-	dev->fn_tbl.pretakedown = ffb_driver_pretakedown;
-	dev->fn_tbl.postcleanup = ffb_driver_postcleanup;
-	dev->fn_tbl.kernel_context_switch = ffb_context_switch;
-	dev->fn_tbl.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock;
-	dev->fn_tbl.get_map_ofs = ffb_driver_get_map_ofs;
-	dev->fn_tbl.get_reg_ofs = ffb_driver_get_reg_ofs;
+	dev->driver.release = ffb_driver_release;
+	dev->driver.presetup = ffb_presetup;
+	dev->driver.pretakedown = ffb_driver_pretakedown;
+	dev->driver.postcleanup = ffb_driver_postcleanup;
+	dev->driver.kernel_context_switch = ffb_context_switch;
+	dev->driver.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock;
+	dev->driver.get_map_ofs = ffb_driver_get_map_ofs;
+	dev->driver.get_reg_ofs = ffb_driver_get_reg_ofs;
 }

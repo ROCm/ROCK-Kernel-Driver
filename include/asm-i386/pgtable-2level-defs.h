@@ -12,8 +12,6 @@
  * the i386 is two-level, so we don't really have any
  * PMD directory physically.
  */
-#define PMD_SHIFT	22
-#define PTRS_PER_PMD	1
 
 #define PTRS_PER_PTE	1024
 

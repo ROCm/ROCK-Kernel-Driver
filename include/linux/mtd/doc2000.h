@@ -89,8 +89,8 @@
 #define WriteDOC_(d, adr, reg)  do{ *(volatile __u16 *)(((unsigned long)adr)+((reg)<<1)) = (__u16)d; wmb();} while(0)
 #define DOC_IOREMAP_LEN 0x4000
 #else
-#define ReadDOC_(adr, reg)      readb((void __iomem *)(((unsigned long)adr) + (reg)))
-#define WriteDOC_(d, adr, reg)  writeb(d, (void __iomem *)(((unsigned long)adr) + (reg)))
+#define ReadDOC_(adr, reg)      readb((void __iomem *)(adr) + (reg))
+#define WriteDOC_(d, adr, reg)  writeb(d, (void __iomem *)(adr) + (reg))
 #define DOC_IOREMAP_LEN 0x2000
 
 #endif

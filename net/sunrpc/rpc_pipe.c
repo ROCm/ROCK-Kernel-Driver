@@ -276,12 +276,7 @@ rpc_pipe_ioctl(struct inode *ino, struct file *filp,
 	}
 }
 
-struct inode_operations rpc_pipe_iops = {
-	.lookup		= simple_lookup,
-};
-
-
-struct file_operations rpc_pipe_fops = {
+static struct file_operations rpc_pipe_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
 	.read		= rpc_pipe_read,
@@ -595,7 +590,7 @@ __rpc_rmdir(struct inode *dir, struct dentry *dentry)
 	return 0;
 }
 
-struct dentry *
+static struct dentry *
 rpc_lookup_negative(char *path, struct nameidata *nd)
 {
 	struct dentry *dentry;

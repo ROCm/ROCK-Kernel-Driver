@@ -1294,6 +1294,11 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	int using_pio = (dev->flags & ATA_DFLAG_PIO);
 	int nodata = (cmd->sc_data_direction == SCSI_DATA_NONE);
 
+	if (!using_pio)
+		/* Check whether ATAPI DMA is safe */
+		if (ata_check_atapi_dma(qc))
+			using_pio = 1;
+
 	memcpy(&qc->cdb, scsicmd, qc->ap->cdb_len);
 
 	qc->complete_fn = atapi_qc_complete;

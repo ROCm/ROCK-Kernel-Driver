@@ -682,7 +682,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
-	siginfo_t info;
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
@@ -705,36 +704,29 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	/* Save debug status register where ptrace can see it */
 	tsk->thread.debugreg[6] = condition;
 
-	/* Mask out spurious TF errors due to lazy TF clearing */
+	/*
+	 * Single-stepping through TF: make sure we ignore any events in
+	 * kernel space (but re-enable TF when returning to user mode).
+	 * And if the event was due to a debugger (PT_DTRACE), clear the
+	 * TF flag so that register information is correct.
+	 */
 	if (condition & DR_STEP) {
 		/*
-		 * The TF error should be masked out only if the current
-		 * process is not traced and if the TRAP flag has been set
-		 * previously by a tracing process (condition detected by
-		 * the PT_DTRACE flag); remember that the i386 TRAP flag
-		 * can be modified by the process itself in user mode,
-		 * allowing programs to debug themselves without the ptrace()
-		 * interface.
+		 * We already checked v86 mode above, so we can
+		 * check for kernel mode by just checking the CPL
+		 * of CS.
 		 */
 		if ((regs->xcs & 3) == 0)
 			goto clear_TF_reenable;
-		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
-			goto clear_TF;
+
+		if (likely(tsk->ptrace & PT_DTRACE)) {
+			tsk->ptrace &= ~PT_DTRACE;
+			regs->eflags &= ~TF_MASK;
+		}
 	}
 
 	/* Ok, finally something we can handle */
-	tsk->thread.trap_no = 1;
-	tsk->thread.error_code = error_code;
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = TRAP_BRKPT;
-	
-	/* If this is a kernel mode trap, save the user PC on entry to 
-	 * the kernel, that's what the debugger can make sense of.
-	 */
-	info.si_addr = ((regs->xcs & 3) == 0) ? (void __user *)tsk->thread.eip
-	                                      : (void __user *)regs->eip;
-	force_sig_info(SIGTRAP, &info, tsk);
+	send_sigtrap(tsk, regs, error_code);
 
 	/* Disable additional traps. They'll be re-enabled when
 	 * the signal is delivered.
@@ -751,7 +743,6 @@ debug_vm86:
 
 clear_TF_reenable:
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
-clear_TF:
 	regs->eflags &= ~TF_MASK;
 	return;
 }
@@ -1004,9 +995,11 @@ static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 void __init trap_init(void)
 {
 #ifdef CONFIG_EISA
-	if (isa_readl(0x0FFFD9) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
+	void __iomem *p = ioremap(0x0FFFD9, 4);
+	if (readl(p) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
 		EISA_bus = 1;
 	}
+	iounmap(p);
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC

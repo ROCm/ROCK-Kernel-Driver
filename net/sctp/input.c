@@ -393,7 +393,7 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 	struct sctp_endpoint *ep;
 	struct sctp_association *asoc;
 	struct sctp_transport *transport;
-	struct inet_opt *inet;
+	struct inet_sock *inet;
 	char *saveip, *savesctp;
 	int err;
 

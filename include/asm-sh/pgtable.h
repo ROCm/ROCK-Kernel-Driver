@@ -1,6 +1,8 @@
 #ifndef __ASM_SH_PGTABLE_H
 #define __ASM_SH_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 /*
  * Copyright (C) 1999 Niibe Yutaka
  * Copyright (C) 2002, 2003, 2004 Paul Mundt

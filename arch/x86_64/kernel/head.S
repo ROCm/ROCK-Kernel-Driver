@@ -225,7 +225,6 @@ ENTRY(init_level4_pgt)
 	.quad	0x0000000000103007		/* -> level3_kernel_pgt */
 
 .org 0x2000
-/* Kernel does not "know" about 4-th level of page tables. */
 ENTRY(level3_ident_pgt)
 	.quad	0x0000000000104007
 	.fill	511,8,0

@@ -45,11 +45,8 @@ extern void qla2x00_restart_queues(scsi_qla_host_t *, uint8_t);
 extern void qla2x00_rescan_fcports(scsi_qla_host_t *);
 
 extern void qla2x00_tgt_free(scsi_qla_host_t *ha, uint16_t t);
-extern os_tgt_t *qla2x00_tgt_alloc(scsi_qla_host_t *, uint16_t);
-extern os_lun_t * qla2x00_lun_alloc(scsi_qla_host_t *, uint16_t, uint16_t);
 
 extern int qla2x00_abort_isp(scsi_qla_host_t *);
-
 
 /*
  * Global Data in qla_os.c source file.
@@ -82,9 +79,6 @@ extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
 
 extern void qla2x00_cmd_timeout(srb_t *);
 
-extern int qla2x00_queuecommand(struct scsi_cmnd *,
-    void (*)(struct scsi_cmnd *));
-
 extern int __qla2x00_suspend_lun(scsi_qla_host_t *, os_lun_t *, int, int, int);
 
 extern void qla2x00_done(scsi_qla_host_t *);
@@ -92,16 +86,10 @@ extern void qla2x00_next(scsi_qla_host_t *);
 extern void qla2x00_flush_failover_q(scsi_qla_host_t *, os_lun_t *);
 extern void qla2x00_reset_lun_fo_counts(scsi_qla_host_t *, os_lun_t *);
 
-extern int qla2x00_check_tgt_status(scsi_qla_host_t *, struct scsi_cmnd *);
-extern int qla2x00_check_port_status(scsi_qla_host_t *, fc_port_t *);
-
 extern void qla2x00_extend_timeout(struct scsi_cmnd *, int);
-extern srb_t * qla2x00_get_new_sp (scsi_qla_host_t *ha);
 
 extern void qla2x00_mark_device_lost(scsi_qla_host_t *, fc_port_t *, int);
 extern void qla2x00_mark_all_devices_lost(scsi_qla_host_t *);
-
-extern int qla2x00_get_prop_xstr(scsi_qla_host_t *, char *, uint8_t *, int);
 
 extern void qla2x00_abort_queues(scsi_qla_host_t *, uint8_t);
 
@@ -112,8 +100,6 @@ extern int qla2x00_down_timeout(struct semaphore *, unsigned long);
 /*
  * Global Function Prototypes in qla_iocb.c source file.
  */
-extern request_t *qla2x00_req_pkt(scsi_qla_host_t *);
-extern request_t *qla2x00_ms_req_pkt(scsi_qla_host_t *, srb_t *);
 extern void qla2x00_isp_cmd(scsi_qla_host_t *);
 
 extern uint16_t qla2x00_calc_iocbs_32(uint16_t);
@@ -127,9 +113,6 @@ int __qla2x00_marker(scsi_qla_host_t *, uint16_t, uint16_t, uint8_t);
 /*
  * Global Function Prototypes in qla_mbx.c source file.
  */
-extern int
-qla2x00_mailbox_command(scsi_qla_host_t *, mbx_cmd_t *);
-
 extern int
 qla2x00_load_ram(scsi_qla_host_t *, dma_addr_t, uint16_t, uint16_t);
 
@@ -150,13 +133,6 @@ extern int
 qla2x00_set_fw_options(scsi_qla_host_t *, uint16_t *);
 
 extern int
-qla2x00_read_ram_word(scsi_qla_host_t *, uint16_t, uint16_t *);
-extern int
-qla2x00_write_ram_word(scsi_qla_host_t *, uint16_t, uint16_t);
-extern int
-qla2x00_write_ram_word_ext(scsi_qla_host_t *, uint32_t, uint16_t);
-
-extern int
 qla2x00_mbx_reg_test(scsi_qla_host_t *);
 
 extern int
@@ -167,9 +143,6 @@ qla2x00_issue_iocb(scsi_qla_host_t *, void *, dma_addr_t, size_t);
 
 extern int
 qla2x00_abort_command(scsi_qla_host_t *, srb_t *);
-
-extern int
-qla2x00_abort_device(scsi_qla_host_t *, uint16_t, uint16_t);
 
 #if USE_ABORT_TGT
 extern int
@@ -198,9 +171,6 @@ qla2x00_get_firmware_state(scsi_qla_host_t *, uint16_t *);
 extern int
 qla2x00_get_port_name(scsi_qla_host_t *, uint16_t, uint8_t *, uint8_t);
 
-extern uint8_t
-qla2x00_get_link_status(scsi_qla_host_t *, uint16_t, link_stat_t *, uint16_t *);
-
 extern int
 qla2x00_lip_reset(scsi_qla_host_t *);
 
@@ -224,19 +194,6 @@ extern int
 qla2x00_get_id_list(scsi_qla_host_t *, void *, dma_addr_t, uint16_t *);
 
 extern int
-qla2x00_lun_reset(scsi_qla_host_t *, uint16_t, uint16_t);
-
-extern int
-qla2x00_send_rnid_mbx(scsi_qla_host_t *, uint16_t, uint8_t, dma_addr_t,
-    size_t, uint16_t *);
-
-extern int
-qla2x00_set_rnid_params_mbx(scsi_qla_host_t *, dma_addr_t, size_t, uint16_t *);
-
-extern int
-qla2x00_get_rnid_params_mbx(scsi_qla_host_t *, dma_addr_t, size_t, uint16_t *);
-
-extern int
 qla2x00_get_resource_cnts(scsi_qla_host_t *, uint16_t *, uint16_t *, uint16_t *,
     uint16_t *);
 
@@ -255,6 +212,7 @@ extern void qla2x00_process_response_queue(struct scsi_qla_host *);
  */
 extern void qla2x00_lock_nvram_access(scsi_qla_host_t *);
 extern void qla2x00_unlock_nvram_access(scsi_qla_host_t *);
+extern void qla2x00_release_nvram_protection(scsi_qla_host_t *);
 extern uint16_t qla2x00_get_nvram_word(scsi_qla_host_t *, uint32_t);
 extern void qla2x00_write_nvram_word(scsi_qla_host_t *, uint32_t, uint16_t);
 /*

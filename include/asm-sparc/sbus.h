@@ -106,6 +106,8 @@ extern void sbus_set_sbus64(struct sbus_dev *, int);
 /* These yield IOMMU mappings in consistent mode. */
 extern void *sbus_alloc_consistent(struct sbus_dev *, long, u32 *dma_addrp);
 extern void sbus_free_consistent(struct sbus_dev *, long, void *, u32);
+void prom_adjust_ranges(struct linux_prom_ranges *, int,
+			struct linux_prom_ranges *, int);
 
 #define SBUS_DMA_BIDIRECTIONAL	DMA_BIDIRECTIONAL
 #define SBUS_DMA_TODEVICE	DMA_TO_DEVICE

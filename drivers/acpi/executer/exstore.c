@@ -295,56 +295,45 @@ acpi_ex_store_object_to_index (
 	switch (index_desc->reference.target_type) {
 	case ACPI_TYPE_PACKAGE:
 		/*
-		 * Storing to a package element is not simple.  The source must be
-		 * evaluated and converted to the type of the destination and then the
-		 * source is copied into the destination - we can't just point to the
-		 * source object.
-		 */
-		/*
+		 * Storing to a package element. Copy the object and replace
+		 * any existing object with the new object. No implicit
+		 * conversion is performed.
+		 *
 		 * The object at *(index_desc->Reference.Where) is the
 		 * element within the package that is to be modified.
 		 * The parent package object is at index_desc->Reference.Object
 		 */
 		obj_desc = *(index_desc->reference.where);
 
-		/* Do the conversion/store */
-
-		status = acpi_ex_store_object_to_object (source_desc, obj_desc, &new_desc,
-				  walk_state);
+		status = acpi_ut_copy_iobject_to_iobject (source_desc, &new_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Could not store object to indexed package element\n"));
 			return_ACPI_STATUS (status);
 		}
 
-		/*
-		 * If a new object was created, we must install it as the new
-		 * package element
-		 */
-		if (new_desc != obj_desc) {
-			acpi_ut_remove_reference (obj_desc);
-			*(index_desc->reference.where) = new_desc;
+		if (obj_desc) {
+			/* Decrement reference count by the ref count of the parent package */
 
-			/* If same as the original source, add a reference */
-
-			if (new_desc == source_desc) {
-				acpi_ut_add_reference (new_desc);
-			}
-
-			/* Increment reference count by the ref count of the parent package -1 */
-
-			for (i = 1; i < ((union acpi_operand_object *) index_desc->reference.object)->common.reference_count; i++) {
-				acpi_ut_add_reference (new_desc);
+			for (i = 0; i < ((union acpi_operand_object *) index_desc->reference.object)->common.reference_count; i++) {
+				acpi_ut_remove_reference (obj_desc);
 			}
 		}
+
+		*(index_desc->reference.where) = new_desc;
+
+		/* Increment reference count by the ref count of the parent package -1 */
+
+		for (i = 1; i < ((union acpi_operand_object *) index_desc->reference.object)->common.reference_count; i++) {
+			acpi_ut_add_reference (new_desc);
+		}
+
 		break;
 
 
 	case ACPI_TYPE_BUFFER_FIELD:
 
 		/*
-		 * Store into a Buffer (not actually a real buffer_field) at a
-		 * location defined by an Index.
+		 * Store into a Buffer or String (not actually a real buffer_field)
+		 * at a location defined by an Index.
 		 *
 		 * The first 8-bit element of the source object is written to the
 		 * 8-bit Buffer location defined by the Index destination object,
@@ -352,10 +341,13 @@ acpi_ex_store_object_to_index (
 		 */
 
 		/*
-		 * Make sure the target is a Buffer
+		 * Make sure the target is a Buffer or String. An error should
+		 * not happen here, since the reference_object was constructed
+		 * by the INDEX_OP code.
 		 */
 		obj_desc = index_desc->reference.object;
-		if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_BUFFER) {
+		if ((ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_BUFFER) &&
+			(ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_STRING)) {
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
@@ -372,13 +364,11 @@ acpi_ex_store_object_to_index (
 			break;
 
 		case ACPI_TYPE_BUFFER:
-
-			value = source_desc->buffer.pointer[0];
-			break;
-
 		case ACPI_TYPE_STRING:
 
-			value = (u8) source_desc->string.pointer[0];
+			/* Note: Takes advantage of common string/buffer fields */
+
+			value = source_desc->buffer.pointer[0];
 			break;
 
 		default:

@@ -279,10 +279,3 @@ void __init xfrm4_init(void)
 	xfrm4_policy_init();
 }
 
-void __exit xfrm4_fini(void)
-{
-	//xfrm4_input_fini();
-	xfrm4_policy_fini();
-	xfrm4_state_fini();
-}
-

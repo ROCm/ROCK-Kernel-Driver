@@ -355,11 +355,11 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 #define PXM_FLAG_LEN ((MAX_PXM_DOMAINS + 1)/32)
 
 static int __initdata srat_num_cpus;			/* number of cpus */
-static u32 __initdata pxm_flag[PXM_FLAG_LEN];
+static u32 __devinitdata pxm_flag[PXM_FLAG_LEN];
 #define pxm_bit_set(bit)	(set_bit(bit,(void *)pxm_flag))
 #define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
 /* maps to convert between proximity domain and logical node ID */
-int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
+int __devinitdata pxm_to_nid_map[MAX_PXM_DOMAINS];
 int __initdata nid_to_pxm_map[MAX_NUMNODES];
 static struct acpi_table_slit __initdata *slit_table;
 
@@ -651,6 +651,110 @@ acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 	}
 	return 0;
 }
+
+/*
+ *  ACPI based hotplug CPU support
+ */
+#ifdef CONFIG_ACPI_HOTPLUG_CPU
+static
+int
+acpi_map_cpu2node(acpi_handle handle, int cpu, long physid)
+{
+#ifdef CONFIG_ACPI_NUMA
+	int 			pxm_id;
+
+	pxm_id = acpi_get_pxm(handle);
+
+	/*
+	 * Assuming that the container driver would have set the proximity
+	 * domain and would have initialized pxm_to_nid_map[pxm_id] && pxm_flag
+	 */
+	node_cpuid[cpu].nid = (pxm_id < 0) ? 0:
+			pxm_to_nid_map[pxm_id];
+
+	node_cpuid[cpu].phys_id =  physid;
+#endif
+	return(0);
+}
+
+
+int
+acpi_map_lsapic(acpi_handle handle, int *pcpu)
+{
+	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object *obj;
+	struct acpi_table_lsapic *lsapic;
+	cpumask_t tmp_map;
+	long physid;
+	int cpu;
+ 
+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
+		return -EINVAL;
+
+	if (!buffer.length ||  !buffer.pointer)
+		return -EINVAL;
+ 
+	obj = buffer.pointer;
+	if (obj->type != ACPI_TYPE_BUFFER ||
+	    obj->buffer.length < sizeof(*lsapic)) {
+		acpi_os_free(buffer.pointer);
+		return -EINVAL;
+	}
+
+	lsapic = (struct acpi_table_lsapic *)obj->buffer.pointer;
+
+	if ((lsapic->header.type != ACPI_MADT_LSAPIC) ||
+	    (!lsapic->flags.enabled)) {
+		acpi_os_free(buffer.pointer);
+		return -EINVAL;
+	}
+
+	physid = ((lsapic->id <<8) | (lsapic->eid));
+
+	acpi_os_free(buffer.pointer);
+	buffer.length = ACPI_ALLOCATE_BUFFER;
+	buffer.pointer = NULL;
+
+	cpus_complement(tmp_map, cpu_present_map);
+	cpu = first_cpu(tmp_map);
+	if(cpu >= NR_CPUS)
+		return -EINVAL;
+
+	acpi_map_cpu2node(handle, cpu, physid);
+
+ 	cpu_set(cpu, cpu_present_map);
+	ia64_cpu_to_sapicid[cpu] = physid;
+	ia64_acpiid_to_sapicid[lsapic->acpi_id] = ia64_cpu_to_sapicid[cpu];
+
+	*pcpu = cpu;
+	return(0);
+}
+EXPORT_SYMBOL(acpi_map_lsapic);
+
+
+int
+acpi_unmap_lsapic(int cpu)
+{
+	int i;
+
+	for (i=0; i<MAX_SAPICS; i++) {
+ 		if (ia64_acpiid_to_sapicid[i] == ia64_cpu_to_sapicid[cpu]) {
+ 			ia64_acpiid_to_sapicid[i] = -1;
+ 			break;
+ 		}
+ 	}
+	ia64_cpu_to_sapicid[cpu] = -1;
+	cpu_clear(cpu,cpu_present_map);
+
+#ifdef CONFIG_ACPI_NUMA
+	/* NUMA specific cleanup's */
+#endif
+
+	return(0);
+}
+EXPORT_SYMBOL(acpi_unmap_lsapic);
+#endif /* CONFIG_ACPI_HOTPLUG_CPU */
+ 
 
 #ifdef CONFIG_NUMA
 acpi_status __init

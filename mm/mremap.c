@@ -25,19 +25,24 @@
 static pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd))
 		goto end;
-	if (pgd_bad(*pgd)) {
-		pgd_ERROR(*pgd);
-		pgd_clear(pgd);
+
+	pud = pud_offset(pgd, addr);
+	if (pud_none(*pud))
+		goto end;
+	if (pud_bad(*pud)) {
+		pud_ERROR(*pud);
+		pud_clear(pud);
 		goto end;
 	}
 
-	pmd = pmd_offset(pgd, addr);
+	pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd))
 		goto end;
 	if (pmd_bad(*pmd)) {
@@ -58,12 +63,17 @@ end:
 static pte_t *get_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd))
 		return NULL;
-	pmd = pmd_offset(pgd, addr);
+
+	pud = pud_offset(pgd, addr);
+	if (pud_none(*pud))
+		return NULL;
+	pmd = pmd_offset(pud, addr);
 	if (!pmd_present(*pmd))
 		return NULL;
 	return pte_offset_map(pmd, addr);
@@ -71,10 +81,17 @@ static pte_t *get_one_pte_map(struct mm_struct *mm, unsigned long addr)
 
 static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
+	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
-	pmd = pmd_alloc(mm, pgd_offset(mm, addr), addr);
+	pgd = pgd_offset(mm, addr);
+
+	pud = pud_alloc(mm, pgd, addr);
+	if (!pud)
+		return NULL;
+	pmd = pmd_alloc(mm, pud, addr);
 	if (pmd)
 		pte = pte_alloc_map(mm, pmd, addr);
 	return pte;

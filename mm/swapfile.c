@@ -486,27 +486,27 @@ static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
-	unsigned long address, unsigned long size,
+static unsigned long unuse_pud(struct vm_area_struct * vma, pud_t *pud,
+        unsigned long address, unsigned long size, unsigned long offset,
 	swp_entry_t entry, struct page *page)
 {
 	pmd_t * pmd;
-	unsigned long offset, end;
+	unsigned long end;
 	unsigned long foundaddr;
 
-	if (pgd_none(*dir))
+	if (pud_none(*pud))
 		return 0;
-	if (pgd_bad(*dir)) {
-		pgd_ERROR(*dir);
-		pgd_clear(dir);
+	if (pud_bad(*pud)) {
+		pud_ERROR(*pud);
+		pud_clear(pud);
 		return 0;
 	}
-	pmd = pmd_offset(dir, address);
-	offset = address & PGDIR_MASK;
-	address &= ~PGDIR_MASK;
+	pmd = pmd_offset(pud, address);
+	offset += address & PUD_MASK;
+	address &= ~PUD_MASK;
 	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
+	if (end > PUD_SIZE)
+		end = PUD_SIZE;
 	if (address >= end)
 		BUG();
 	do {
@@ -521,12 +521,48 @@ static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
+static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *pgd,
+	unsigned long address, unsigned long size,
+	swp_entry_t entry, struct page *page)
+{
+	pud_t * pud;
+	unsigned long offset;
+	unsigned long foundaddr;
+	unsigned long end;
+
+	if (pgd_none(*pgd))
+		return 0;
+	if (pgd_bad(*pgd)) {
+		pgd_ERROR(*pgd);
+		pgd_clear(pgd);
+		return 0;
+	}
+	pud = pud_offset(pgd, address);
+	offset = address & PGDIR_MASK;
+	address &= ~PGDIR_MASK;
+	end = address + size;
+	if (end > PGDIR_SIZE)
+		end = PGDIR_SIZE;
+	BUG_ON (address >= end);
+	do {
+		foundaddr = unuse_pud(vma, pud, address, end - address,
+					        offset, entry, page);
+		if (foundaddr)
+			return foundaddr;
+		address = (address + PUD_SIZE) & PUD_MASK;
+		pud++;
+	} while (address && (address < end));
+	return 0;
+}
+
+/* vma->vm_mm->page_table_lock is held */
 static unsigned long unuse_vma(struct vm_area_struct * vma,
 	swp_entry_t entry, struct page *page)
 {
-	pgd_t *pgdir;
-	unsigned long start, end;
+	pgd_t *pgd;
+	unsigned long start, end, next;
 	unsigned long foundaddr;
+	int i;
 
 	if (page->mapping) {
 		start = page_address_in_vma(page, vma);
@@ -538,15 +574,18 @@ static unsigned long unuse_vma(struct vm_area_struct * vma,
 		start = vma->vm_start;
 		end = vma->vm_end;
 	}
-	pgdir = pgd_offset(vma->vm_mm, start);
-	do {
-		foundaddr = unuse_pgd(vma, pgdir, start, end - start,
-						entry, page);
+	pgd = pgd_offset(vma->vm_mm, start);
+	for (i = pgd_index(start); i <= pgd_index(end-1); i++) {
+		next = (start + PGDIR_SIZE) & PGDIR_MASK;
+		if (next > end || next <= start)
+			next = end;
+		foundaddr = unuse_pgd(vma, pgd, start, next - start, entry, page);
 		if (foundaddr)
 			return foundaddr;
-		start = (start + PGDIR_SIZE) & PGDIR_MASK;
-		pgdir++;
-	} while (start && (start < end));
+		start = next;
+		i++;
+		pgd++;
+	}
 	return 0;
 }
 

@@ -4322,12 +4322,12 @@ advansys_detect(struct scsi_host_template *tpnt)
     int                 ioport = 0;
     int                 share_irq = FALSE;
     int                 iolen = 0;
+    struct device	*dev = NULL;
 #ifdef CONFIG_PCI
     int                 pci_init_search = 0;
     struct pci_dev      *pci_devicep[ASC_NUM_BOARD_SUPPORTED];
     int                 pci_card_cnt_max = 0;
     int                 pci_card_cnt = 0;
-    struct device	*dev = NULL;
     struct pci_dev      *pci_devp = NULL;
     int                 pci_device_id_cnt = 0;
     unsigned int        pci_device_id[ASC_PCI_DEVICE_ID_CNT] = {
@@ -8944,7 +8944,7 @@ DvcAdvWritePCIConfigByte(
 #ifdef CONFIG_PCI
     pci_write_config_byte(to_pci_dev(asc_dvc->cfg->dev), offset, byte_data);
 #else /* CONFIG_PCI */
-    return 0;
+    return;
 #endif /* CONFIG_PCI */
 }
 
@@ -12014,13 +12014,13 @@ AscInitFromAscDvcVar(
     PortAddr            iop_base;
     ushort              cfg_msw;
     ushort              warn_code;
-    ushort              pci_device_id;
+    ushort              pci_device_id = 0;
 
     iop_base = asc_dvc->iop_base;
+#ifdef CONFIG_PCI
     if (asc_dvc->cfg->dev)
         pci_device_id = to_pci_dev(asc_dvc->cfg->dev)->device;
-    else
-	pci_device_id = 0;
+#endif
     warn_code = 0;
     cfg_msw = AscGetChipCfgMsw(iop_base);
     if ((cfg_msw & ASC_CFG_MSW_CLR_MASK) != 0) {
