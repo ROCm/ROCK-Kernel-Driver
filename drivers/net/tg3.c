@@ -4541,7 +4541,10 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tg3_chip_reset(tp);
 
-	tw32(GRC_MODE, tp->grc_mode);
+	val = tr32(GRC_MODE);
+	val &= GRC_MODE_HOST_STACKUP;
+	tw32(GRC_MODE, val | tp->grc_mode);
+
 	tg3_write_mem(tp,
 		      NIC_SRAM_FIRMWARE_MBOX,
 		      NIC_SRAM_FIRMWARE_MBOX_MAGIC1);
@@ -6716,6 +6719,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	u32 misc_ctrl_reg;
 	u32 cacheline_sz_reg;
 	u32 pci_state_reg, grc_misc_cfg;
+	u32 val;
 	u16 pci_cmd;
 	int err;
 
@@ -6912,7 +6916,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	udelay(40);
 
 	/* Initialize data/descriptor byte/word swapping. */
-	tw32(GRC_MODE, tp->grc_mode);
+	val = tr32(GRC_MODE);
+	val &= GRC_MODE_HOST_STACKUP;
+	tw32(GRC_MODE, val | tp->grc_mode);
 
 	tg3_switch_clocks(tp);
 
