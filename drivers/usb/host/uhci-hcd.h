@@ -383,8 +383,6 @@ struct urb_priv {
 					/*  a control transfer, retrigger */
 					/*  the status phase */
 
-	int status;			/* Final status */
-
 	unsigned long inserttime;	/* In jiffies */
 	unsigned long fsbrtime;		/* In jiffies */
 

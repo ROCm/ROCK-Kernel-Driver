@@ -1462,11 +1462,14 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
 
+	if (urb->status != -EINPROGRESS)	/* URB already unlinked! */
+		goto out;
+
 	eurb = uhci_find_urb_ep(uhci, urb);
 
 	if (!uhci_alloc_urb_priv(uhci, urb)) {
-		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 
 	switch (usb_pipetype(urb->pipe)) {
@@ -1514,10 +1517,11 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 
 		return ret;
 	}
+	ret = 0;
 
+out:
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-
-	return 0;
+	return ret;
 }
 
 /*
@@ -1527,7 +1531,7 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
  */
 static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 {
-	int ret = -EINVAL;
+	int ret = -EINPROGRESS;
 	unsigned long flags;
 	struct urb_priv *urbp;
 
@@ -1535,10 +1539,8 @@ static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 
 	urbp = (struct urb_priv *)urb->hcpriv;
 
-	if (urb->status != -EINPROGRESS) {
-		info("uhci_transfer_result: called for URB %p not in flight?", urb);
+	if (urb->status != -EINPROGRESS)	/* URB already dequeued */
 		goto out;
-	}
 
 	switch (usb_pipetype(urb->pipe)) {
 	case PIPE_CONTROL:
@@ -1555,10 +1557,9 @@ static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 		break;
 	}
 
-	urbp->status = ret;
-
 	if (ret == -EINPROGRESS)
 		goto out;
+	urb->status = ret;
 
 	switch (usb_pipetype(urb->pipe)) {
 	case PIPE_CONTROL:
@@ -1606,10 +1607,6 @@ static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb)
 	struct list_head *head, *tmp;
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 	int prevactive = 1;
-
-	/* We can get called when urbp allocation fails, so check */
-	if (!urbp)
-		return;
 
 	uhci_dec_fsbr(uhci, urb);	/* Safe since it checks */
 
@@ -1660,13 +1657,6 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 	unsigned long flags;
 	struct urb_priv *urbp = urb->hcpriv;
 
-	/* If this is an interrupt URB that is being killed in urb->complete, */
-	/* then just set its status and return */
-	if (!urbp) {
-	  urb->status = -ECONNRESET;
-	  return 0;
-	}
-
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
 
 	list_del_init(&urbp->urb_list);
@@ -1678,7 +1668,7 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 	/* If we're the first, set the next interrupt bit */
 	if (list_empty(&uhci->urb_remove_list))
 		uhci_set_next_interrupt(uhci);
-	list_add(&urbp->urb_list, &uhci->urb_remove_list);
+	list_add_tail(&urbp->urb_list, &uhci->urb_remove_list);
 
 	spin_unlock(&uhci->urb_remove_list_lock);
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
@@ -1844,17 +1834,11 @@ static void uhci_free_pending_tds(struct uhci_hcd *uhci)
 
 static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs)
 {
-	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	int status;
 	unsigned long flags;
 
 	spin_lock_irqsave(&urb->lock, flags);
-	status = urbp->status;
 	uhci_destroy_urb_priv(uhci, urb);
-
- 	if (urb->status != -ENOENT && urb->status != -ECONNRESET)
-		urb->status = status;
 	spin_unlock_irqrestore(&urb->lock, flags);
 
 	usb_hcd_giveback_urb(hcd, urb, regs);
@@ -1885,7 +1869,7 @@ static void uhci_finish_completion(struct usb_hcd *hcd, struct pt_regs *regs)
 	spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
 }
 
-static void uhci_remove_pending_qhs(struct uhci_hcd *uhci)
+static void uhci_remove_pending_urbps(struct uhci_hcd *uhci)
 {
 	struct list_head *tmp, *head;
 	unsigned long flags;
@@ -1898,11 +1882,7 @@ static void uhci_remove_pending_qhs(struct uhci_hcd *uhci)
 		struct urb *urb = urbp->urb;
 
 		tmp = tmp->next;
-
 		list_del_init(&urbp->urb_list);
-
-		urbp->status = urb->status = -ECONNRESET;
-
 		uhci_add_complete(uhci, urb);
 	}
 	spin_unlock_irqrestore(&uhci->urb_remove_list_lock, flags);
@@ -1942,7 +1922,7 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 
 	uhci_free_pending_tds(uhci);
 
-	uhci_remove_pending_qhs(uhci);
+	uhci_remove_pending_urbps(uhci);
 
 	uhci_clear_next_interrupt(uhci);
 
@@ -2467,7 +2447,7 @@ static void uhci_stop(struct usb_hcd *hcd)
 	 */
 	uhci_free_pending_qhs(uhci);
 	uhci_free_pending_tds(uhci);
-	uhci_remove_pending_qhs(uhci);
+	uhci_remove_pending_urbps(uhci);
 
 	reset_hc(uhci);
 
