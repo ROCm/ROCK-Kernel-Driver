@@ -12,7 +12,7 @@ config EDD
 	help
 	  Say Y or M here if you want to enable BIOS Enhanced Disk Drive
 	  Services real mode BIOS calls to determine which disk
-	  BIOS tries boot from.  This information is then exported via driverfs.
+	  BIOS tries boot from.  This information is then exported via sysfs.
 
 	  This option is experimental, but believed to be safe,
 	  and most disk controller BIOS vendors do not yet implement this feature.
