@@ -1451,7 +1451,7 @@ config A2091_SCSI
 
 config GVP11_SCSI
 	tristate "GVP Series II WD33C93A support"
-	depends on ZORRO && SCSI
+	depends on ZORRO && SCSI && BROKEN
 	---help---
 	  If you have a Great Valley Products Series II SCSI controller,
 	  answer Y. Also say Y if you have a later model of GVP SCSI
