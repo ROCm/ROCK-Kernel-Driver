@@ -17,10 +17,7 @@
 #include <asm/system.h>
 #include <asm/mmu_context.h>
 
-extern void except_vec0_generic(void);
-extern void except_vec0_r4000(void);
-extern void except_vec1_generic(void);
-extern void except_vec1_r10k(void);
+extern void build_tlb_refill_handler(void);
 
 #define NTLB_ENTRIES       64
 #define NTLB_ENTRIES_HALF  32
@@ -88,7 +85,7 @@ void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				idx = read_c0_index();
 				write_c0_entrylo0(0);
 				write_c0_entrylo1(0);
-				write_c0_entryhi(KSEG0);
+				write_c0_entryhi(CKSEG0);
 				if(idx < 0)
 					continue;
 				tlb_write_indexed();
@@ -126,7 +123,7 @@ void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 			idx = read_c0_index();
 			write_c0_entrylo0(0);
 			write_c0_entrylo1(0);
-			write_c0_entryhi(KSEG0 + (idx << (PAGE_SHIFT+1)));
+			write_c0_entryhi(CKSEG0 + (idx << (PAGE_SHIFT+1)));
 			if (idx < 0)
 				continue;
 			tlb_write_indexed();
@@ -154,7 +151,7 @@ void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 		idx = read_c0_index();
 		write_c0_entrylo0(0);
 		write_c0_entrylo1(0);
-		write_c0_entryhi(KSEG0);
+		write_c0_entryhi(CKSEG0);
 		if (idx < 0)
 			goto finish;
 		tlb_write_indexed();
@@ -184,7 +181,7 @@ void local_flush_tlb_one(unsigned long page)
 	write_c0_entrylo1(0);
 	if (idx >= 0) {
 		/* Make sure all entries differ. */
-		write_c0_entryhi(KSEG0+(idx<<(PAGE_SHIFT+1)));
+		write_c0_entryhi(CKSEG0+(idx<<(PAGE_SHIFT+1)));
 		tlb_write_indexed();
 	}
 	write_c0_entryhi(oldpid);
@@ -257,14 +254,5 @@ void __init tlb_init(void)
 
 	/* Did I tell you that ARC SUCKS?  */
 
-#ifdef CONFIG_MIPS32
-	memcpy((void *)KSEG0, &except_vec0_r4000, 0x80);
-	memcpy((void *)(KSEG0 + 0x080), &except_vec1_generic, 0x80);
-	flush_icache_range(KSEG0, KSEG0 + 0x100);
-#endif
-#ifdef CONFIG_MIPS64
-	memcpy((void *)(CKSEG0 + 0x000), &except_vec0_generic, 0x80);
-	memcpy((void *)(CKSEG0 + 0x080), except_vec1_r10k, 0x80);
-	flush_icache_range(CKSEG0 + 0x80, CKSEG0 + 0x100);
-#endif
+	build_tlb_refill_handler();
 }

@@ -23,15 +23,10 @@
 #include <linux/blkdev.h>
 #include <linux/bootmem.h>
 #include <linux/smp.h>
+#include <linux/initrd.h>
 
 #include <asm/bootinfo.h>
 #include <asm/reboot.h>
-
-#ifdef CONFIG_EMBEDDED_RAMDISK
-/* These are symbols defined by the ramdisk linker script */
-extern unsigned char __rd_start;
-extern unsigned char __rd_end;
-#endif
 
 #define MAX_RAM_SIZE ((CONFIG_SIBYTE_STANDALONE_RAM_SIZE * 1024 * 1024) - 1)
 
@@ -40,17 +35,6 @@ static __init void prom_meminit(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 	unsigned long initrd_pstart;
 	unsigned long initrd_pend;
-
-#ifdef CONFIG_EMBEDDED_RAMDISK
-	/* If we're using an embedded ramdisk, then __rd_start and __rd_end
-	   are defined by the linker to be on either side of the ramdisk
-	   area.  Otherwise, initrd_start should be defined by kernel command
-	   line arguments */
-	if (initrd_start == 0) {
-		initrd_start = (unsigned long)&__rd_start;
-		initrd_end = (unsigned long)&__rd_end;
-	}
-#endif
 
 	initrd_pstart = __pa(initrd_start);
 	initrd_pend = __pa(initrd_end);

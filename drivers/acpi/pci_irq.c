@@ -173,13 +173,18 @@ acpi_pci_irq_add_prt (
 	int			bus)
 {
 	acpi_status			status = AE_OK;
-	char				pathname[ACPI_PATHNAME_MAX] = {0};
+	char				*pathname = NULL;
 	struct acpi_buffer		buffer = {0, NULL};
 	struct acpi_pci_routing_table	*prt = NULL;
 	struct acpi_pci_routing_table	*entry = NULL;
 	static int			first_time = 1;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_add_prt");
+
+	pathname = (char *) kmalloc(ACPI_PATHNAME_MAX, GFP_KERNEL);
+	if(!pathname)
+		return_VALUE(-ENOMEM);
+	memset(pathname, 0, ACPI_PATHNAME_MAX);
 
 	if (first_time) {
 		acpi_prt.count = 0;
@@ -209,12 +214,15 @@ acpi_pci_irq_add_prt (
 	if (status != AE_BUFFER_OVERFLOW) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PRT [%s]\n",
 			acpi_format_exception(status)));
+		kfree(pathname);
 		return_VALUE(-ENODEV);
 	}
 
 	prt = kmalloc(buffer.length, GFP_KERNEL);
-	if (!prt)
+	if (!prt){
+		kfree(pathname);
 		return_VALUE(-ENOMEM);
+	}
 	memset(prt, 0, buffer.length);
 	buffer.pointer = prt;
 
@@ -222,6 +230,7 @@ acpi_pci_irq_add_prt (
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PRT [%s]\n",
 			acpi_format_exception(status)));
+		kfree(pathname);
 		kfree(buffer.pointer);
 		return_VALUE(-ENODEV);
 	}
@@ -234,6 +243,7 @@ acpi_pci_irq_add_prt (
 			((unsigned long) entry + entry->length);
 	}
 
+	kfree(pathname);
 	kfree(prt);
 
 	return_VALUE(0);

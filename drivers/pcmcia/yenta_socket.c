@@ -653,6 +653,7 @@ static void yenta_close(struct pci_dev *dev)
 	yenta_free_resources(sock);
 
 	pci_release_regions(dev);
+	pci_disable_device(dev);
 	pci_set_drvdata(dev, NULL);
 }
 

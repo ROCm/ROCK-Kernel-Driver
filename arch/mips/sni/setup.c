@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997, 1998, 2000, 2003, 2004 by Ralf Baechle
+ * Copyright (C) 1996, 97, 98, 2000, 03, 04 Ralf Baechle (ralf@linux-mips.org)
  */
 #include <linux/config.h>
 #include <linux/eisa.h>
@@ -27,7 +27,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mc146818-time.h>
-#include <asm/pci_channel.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>

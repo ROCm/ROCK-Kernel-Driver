@@ -527,7 +527,7 @@ static void ax8817x_interrupt_complete(struct urb *urb, struct pt_regs *regs)
 				devdbg(dev, "ax8817x - Link Status is: %d", link);
 			}
 		}
-		usb_submit_urb(data->int_urb, GFP_KERNEL);
+		usb_submit_urb(data->int_urb, GFP_ATOMIC);
 	}
 }
 

@@ -120,7 +120,7 @@ extern u8 sgi_ioc_reset, sgi_ioc_write;
 struct sgioc_regs {
 	struct pi1_regs pport;
 	u32 _unused0[2];
-	struct sgioc_uart_regs serport;
+	struct sgioc_uart_regs uart;
 	struct sgioc_keyb_regs kbdmouse;
 	u8 _gcsel[3];
 	volatile u8 gcsel;

@@ -40,11 +40,13 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	return irq_tab[slot][pin];
 }
 
-void __init pcibios_fixup_irqs(void)
+/* Do platform specific device initialization at pci_enable_device() time */
+int pcibios_plat_dev_init(struct pci_dev *dev)
 {
+	return 0;
 }
 
-#if CONFIG_KGDB
+#ifdef CONFIG_KGDB
 /*
  * The PCI scan may have moved the saa9730 I/O address, so reread
  * the address here.
@@ -61,6 +63,6 @@ static void atlas_saa9730_base_fixup (struct pci_dev *pdev)
 }
 
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_PHILIPS, PCI_DEVICE_ID_PHILIPS_SAA9730,
-	atlas_saa9730_base_fixup);
+	 atlas_saa9730_base_fixup);
 
 #endif

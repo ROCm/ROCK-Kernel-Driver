@@ -494,10 +494,9 @@ static int visor_write (struct usb_serial_port *port, const unsigned char *buf, 
 	spin_lock_irqsave(&priv->lock, flags);
 	if (priv->outstanding_urbs > URB_UPPER_LIMIT) {
 		spin_unlock_irqrestore(&priv->lock, flags);
-		dev_dbg(&port->dev, "write limit hit\n");
+		dbg("%s - write limit hit\n", __FUNCTION__);
 		return 0;
 	}
-	++priv->outstanding_urbs;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	buffer = kmalloc (count, GFP_ATOMIC);

@@ -45,7 +45,7 @@ static struct irqaction cascade_mv64340 = {
 	no_action, SA_INTERRUPT, CPU_MASK_NONE, "MV64340-Cascade", NULL, NULL
 };
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	/*
 	 * Clear all of the interrupts while we change the able around a bit.
@@ -55,7 +55,6 @@ void __init init_IRQ(void)
 
 	/* Sets the first-level interrupt dispatcher. */
 	set_except_vector(0, jaguar_handle_int);
-	init_generic_irq();
 	mips_cpu_irq_init(0);
 	rm7k_cpu_irq_init(8);
 

@@ -65,7 +65,6 @@ static void gt64120_irq(int irq, void *dev_id, struct pt_regs *regs)
  */
 void gt64120_time_init(void)
 {
-	extern irq_desc_t irq_desc[NR_IRQS];
 	static struct irqaction timer;
 
 	/* Disable timer first */

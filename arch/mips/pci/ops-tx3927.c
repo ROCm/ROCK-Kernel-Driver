@@ -4,6 +4,7 @@
  *              ahennessy@mvista.com
  *
  * Copyright (C) 2000-2001 Toshiba Corporation
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
  *
  * Based on arch/mips/ddb5xxx/ddb5477/pci_ops.c
  *
@@ -38,7 +39,6 @@
 #include <linux/init.h>
 
 #include <asm/addrspace.h>
-#include <asm/pci_channel.h>
 #include <asm/jmr3927/jmr3927.h>
 #include <asm/debug.h>
 

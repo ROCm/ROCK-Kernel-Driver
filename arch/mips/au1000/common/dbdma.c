@@ -37,9 +37,12 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <asm/mach-au1x00/au1000.h>
 #include <asm/mach-au1x00/au1xxx_dbdma.h>
 #include <asm/system.h>
+
+#if defined(CONFIG_SOC_AU1550) || defined(CONFIG_SOC_AU1200)
 
 /*
  * The Descriptor Based DMA supports up to 16 channels.
@@ -63,6 +66,7 @@ static int dbdma_initialized;
 static void au1xxx_dbdma_init(void);
 
 typedef struct dbdma_device_table {
+	u32		dev_id;
 	u32		dev_flags;
 	u32		dev_tsize;
 	u32		dev_devwidth;
@@ -89,63 +93,115 @@ typedef struct dbdma_chan_config {
 #define DEV_FLAGS_IN		(1 << 3)
 
 static dbdev_tab_t dbdev_tab[] = {
+#ifdef CONFIG_SOC_AU1550
 	/* UARTS */
-	{ DEV_FLAGS_OUT, 0, 8, 0x11100004, 0, 0 },
-	{ DEV_FLAGS_IN, 0, 8, 0x11100000, 0, 0 },
-	{ DEV_FLAGS_OUT, 0, 8, 0x11400004, 0, 0 },
-	{ DEV_FLAGS_IN, 0, 8, 0x11400000, 0, 0 },
+	{ DSCR_CMD0_UART0_TX, DEV_FLAGS_OUT, 0, 8, 0x11100004, 0, 0 },
+	{ DSCR_CMD0_UART0_RX, DEV_FLAGS_IN, 0, 8, 0x11100000, 0, 0 },
+	{ DSCR_CMD0_UART3_TX, DEV_FLAGS_OUT, 0, 8, 0x11400004, 0, 0 },
+	{ DSCR_CMD0_UART3_RX, DEV_FLAGS_IN, 0, 8, 0x11400000, 0, 0 },
 
 	/* EXT DMA */
-	{ 0, 0, 0, 0x00000000, 0, 0 },
-	{ 0, 0, 0, 0x00000000, 0, 0 },
-	{ 0, 0, 0, 0x00000000, 0, 0 },
-	{ 0, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_DMA_REQ0, 0, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_DMA_REQ1, 0, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_DMA_REQ2, 0, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_DMA_REQ3, 0, 0, 0, 0x00000000, 0, 0 },
 
 	/* USB DEV */
-	{ DEV_FLAGS_IN, 4, 8, 0x10200000, 0, 0 },
-	{ DEV_FLAGS_OUT, 4, 8, 0x10200004, 0, 0 },
-	{ DEV_FLAGS_OUT, 4, 8, 0x10200008, 0, 0 },
-	{ DEV_FLAGS_OUT, 4, 8, 0x1020000c, 0, 0 },
-	{ DEV_FLAGS_IN, 4, 8, 0x10200010, 0, 0 },
-	{ DEV_FLAGS_IN, 4, 8, 0x10200014, 0, 0 },
+	{ DSCR_CMD0_USBDEV_RX0, DEV_FLAGS_IN, 4, 8, 0x10200000, 0, 0 },
+	{ DSCR_CMD0_USBDEV_TX0, DEV_FLAGS_OUT, 4, 8, 0x10200004, 0, 0 },
+	{ DSCR_CMD0_USBDEV_TX1, DEV_FLAGS_OUT, 4, 8, 0x10200008, 0, 0 },
+	{ DSCR_CMD0_USBDEV_TX2, DEV_FLAGS_OUT, 4, 8, 0x1020000c, 0, 0 },
+	{ DSCR_CMD0_USBDEV_RX3, DEV_FLAGS_IN, 4, 8, 0x10200010, 0, 0 },
+	{ DSCR_CMD0_USBDEV_RX4, DEV_FLAGS_IN, 4, 8, 0x10200014, 0, 0 },
 
 	/* PSC 0 */
-	{ DEV_FLAGS_OUT, 0, 0, 0x11a0001c, 0, 0 },
-	{ DEV_FLAGS_IN, 0, 0, 0x11a0001c, 0, 0 },
+	{ DSCR_CMD0_PSC0_TX, DEV_FLAGS_OUT, 0, 0, 0x11a0001c, 0, 0 },
+	{ DSCR_CMD0_PSC0_RX, DEV_FLAGS_IN, 0, 0, 0x11a0001c, 0, 0 },
 
 	/* PSC 1 */
-	{ DEV_FLAGS_OUT, 0, 0, 0x11b0001c, 0, 0 },
-	{ DEV_FLAGS_IN, 0, 0, 0x11b0001c, 0, 0 },
+	{ DSCR_CMD0_PSC1_TX, DEV_FLAGS_OUT, 0, 0, 0x11b0001c, 0, 0 },
+	{ DSCR_CMD0_PSC1_RX, DEV_FLAGS_IN, 0, 0, 0x11b0001c, 0, 0 },
 
 	/* PSC 2 */
-	{ DEV_FLAGS_OUT, 0, 0, 0x10a0001c, 0, 0 },
-	{ DEV_FLAGS_IN, 0, 0, 0x10a0001c, 0, 0 },
+	{ DSCR_CMD0_PSC2_TX, DEV_FLAGS_OUT, 0, 0, 0x10a0001c, 0, 0 },
+	{ DSCR_CMD0_PSC2_RX, DEV_FLAGS_IN, 0, 0, 0x10a0001c, 0, 0 },
 
 	/* PSC 3 */
-	{ DEV_FLAGS_OUT, 0, 0, 0x10b0001c, 0, 0 },
-	{ DEV_FLAGS_IN, 0, 0, 0x10b0001c, 0, 0 },
+	{ DSCR_CMD0_PSC3_TX, DEV_FLAGS_OUT, 0, 0, 0x10b0001c, 0, 0 },
+	{ DSCR_CMD0_PSC3_RX, DEV_FLAGS_IN, 0, 0, 0x10b0001c, 0, 0 },
 
-	{ 0, 0, 0, 0x00000000, 0, 0 },	/* PCI */
-	{ 0, 0, 0, 0x00000000, 0, 0 },	/* NAND */
+	{ DSCR_CMD0_PCI_WRITE, 0, 0, 0, 0x00000000, 0, 0 },	/* PCI */
+	{ DSCR_CMD0_NAND_FLASH, 0, 0, 0, 0x00000000, 0, 0 },	/* NAND */
 
 	/* MAC 0 */
-	{ DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
-	{ DEV_FLAGS_OUT, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_MAC0_RX, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_MAC0_TX, DEV_FLAGS_OUT, 0, 0, 0x00000000, 0, 0 },
 
 	/* MAC 1 */
-	{ DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
-	{ DEV_FLAGS_OUT, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_MAC1_RX, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_MAC1_TX, DEV_FLAGS_OUT, 0, 0, 0x00000000, 0, 0 },
 
-	/* reserved */
-	{ DEV_FLAGS_INUSE, 0, 0, 0x00000000, 0, 0 },
-	{ DEV_FLAGS_INUSE, 0, 0, 0x00000000, 0, 0 },
+#endif /* CONFIG_SOC_AU1550 */
 
-	/* Memory */
-	{ DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },	/* throttle */
-	{ DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },	/* always */
+#ifdef CONFIG_SOC_AU1200
+	{ DSCR_CMD0_UART0_TX, DEV_FLAGS_OUT, 0, 8, 0x11100004, 0, 0 },
+	{ DSCR_CMD0_UART0_RX, DEV_FLAGS_IN, 0, 8, 0x11100000, 0, 0 },
+	{ DSCR_CMD0_UART1_TX, DEV_FLAGS_OUT, 0, 8, 0x11200004, 0, 0 },
+	{ DSCR_CMD0_UART1_RX, DEV_FLAGS_IN, 0, 8, 0x11200000, 0, 0 },
+
+	{ DSCR_CMD0_DMA_REQ0, 0, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_DMA_REQ1, 0, 0, 0, 0x00000000, 0, 0 },
+
+	{ DSCR_CMD0_MAE_BE, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_MAE_FE, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_MAE_BOTH, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_LCD, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+
+	{ DSCR_CMD0_SDMS_TX0, DEV_FLAGS_OUT, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_SDMS_RX0, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_SDMS_TX1, DEV_FLAGS_OUT, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_SDMS_RX1, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+
+	{ DSCR_CMD0_AES_TX, DEV_FLAGS_OUT, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_AES_RX, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+
+	{ DSCR_CMD0_PSC0_TX, DEV_FLAGS_OUT, 0, 0, 0x11a0001c, 0, 0 },
+	{ DSCR_CMD0_PSC0_RX, DEV_FLAGS_IN, 0, 0, 0x11a0001c, 0, 0 },
+	{ DSCR_CMD0_PSC0_SYNC, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+
+	{ DSCR_CMD0_PSC1_TX, DEV_FLAGS_OUT, 0, 0, 0x11b0001c, 0, 0 },
+	{ DSCR_CMD0_PSC1_RX, DEV_FLAGS_IN, 0, 0, 0x11b0001c, 0, 0 },
+	{ DSCR_CMD0_PSC1_SYNC, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+
+	{ DSCR_CMD0_CIM_RXA, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_CIM_RXB, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_CIM_RXC, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_CIM_SYNC, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+
+	{ DSCR_CMD0_NAND_FLASH, DEV_FLAGS_IN, 0, 0, 0x00000000, 0, 0 },
+
+#endif // CONFIG_SOC_AU1200
+
+	{ DSCR_CMD0_THROTTLE, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
+	{ DSCR_CMD0_ALWAYS, DEV_FLAGS_ANYUSE, 0, 0, 0x00000000, 0, 0 },
 };
 
+#define DBDEV_TAB_SIZE (sizeof(dbdev_tab) / sizeof(dbdev_tab_t))
+
 static chan_tab_t *chan_tab_ptr[NUM_DBDMA_CHANS];
+
+static dbdev_tab_t *
+find_dbdev_id (u32 id)
+{
+	int i;
+	dbdev_tab_t *p;
+	for (i = 0; i < DBDEV_TAB_SIZE; ++i) {
+		p = &dbdev_tab[i];
+		if (p->dev_id == id)
+			return p;
+	}
+	return NULL;
+}
 
 /* Allocate a channel and return a non-zero descriptor if successful.
 */
@@ -172,8 +228,9 @@ au1xxx_dbdma_chan_alloc(u32 srcid, u32 destid,
 	if ((srcid > DSCR_NDEV_IDS) || (destid > DSCR_NDEV_IDS))
 		return 0;
 
-	stp = &dbdev_tab[srcid];
-	dtp = &dbdev_tab[destid];
+	if ((stp = find_dbdev_id(srcid)) == NULL) return 0;
+	if ((dtp = find_dbdev_id(destid)) == NULL) return 0;
+
 	used = 0;
 	rv = 0;
 
@@ -212,7 +269,7 @@ au1xxx_dbdma_chan_alloc(u32 srcid, u32 destid,
 				/* If kmalloc fails, it is caught below same
 				 * as a channel not available.
 				 */
-				ctp = (chan_tab_t *)kmalloc(sizeof(chan_tab_t), GFP_KERNEL);
+				ctp = kmalloc(sizeof(chan_tab_t), GFP_KERNEL);
 				chan_tab_ptr[i] = ctp;
 				ctp->chan_index = chan = i;
 				break;
@@ -313,7 +370,7 @@ au1xxx_dbdma_ring_alloc(u32 chanid, int entries)
 	 * and if we try that first we are likely to not waste larger
 	 * slabs of memory.
 	 */
-	desc_base = (u32)kmalloc(entries * sizeof(au1x_ddma_desc_t), GFP_KERNEL);
+	desc_base = kmalloc(entries * sizeof(au1x_ddma_desc_t), GFP_KERNEL);
 	if (desc_base == 0)
 		return 0;
 
@@ -324,7 +381,7 @@ au1xxx_dbdma_ring_alloc(u32 chanid, int entries)
 		kfree((const void *)desc_base);
 		i = entries * sizeof(au1x_ddma_desc_t);
 		i += (sizeof(au1x_ddma_desc_t) - 1);
-		if ((desc_base = (u32)kmalloc(i, GFP_KERNEL)) == 0)
+		if ((desc_base = kmalloc(i, GFP_KERNEL)) == 0)
 			return 0;
 
 		desc_base = ALIGN_ADDR(desc_base, sizeof(au1x_ddma_desc_t));
@@ -337,8 +394,8 @@ au1xxx_dbdma_ring_alloc(u32 chanid, int entries)
 
 	/* Initialize the rings with as much information as we know.
 	 */
-	srcid = stp - dbdev_tab;	/* Index is channel device ID */
-	destid = dtp - dbdev_tab;
+	srcid = stp->dev_id;
+	destid = dtp->dev_id;
 
 	cmd0 = cmd1 = src1 = dest1 = 0;
 	src0 = dest0 = 0;
@@ -691,7 +748,7 @@ au1xxx_dbdma_chan_free(u32 chanid)
 	kfree(ctp);
 }
 
-static void
+static irqreturn_t
 dbdma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32	intstat;
@@ -718,6 +775,7 @@ dbdma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	ctp->cur_ptr = phys_to_virt(DSCR_GET_NXTPTR(dp->dscr_nxtptr));
 
+	return IRQ_HANDLED;
 }
 
 static void
@@ -773,3 +831,6 @@ au1xxx_dbdma_dump(u32 chanid)
 		dp = phys_to_virt(DSCR_GET_NXTPTR(dp->dscr_nxtptr));
 	} while (dp != ctp->chan_desc_base);
 }
+
+#endif /* defined(CONFIG_SOC_AU1550) || defined(CONFIG_SOC_AU1200) */
+

@@ -11,8 +11,6 @@
 #include <linux/profile.h>
 #include <asm/atomic.h>
 
-extern void mask_irq(unsigned int irq);
-extern void unmask_irq(unsigned int irq);
 extern void disable_8259A_irq(unsigned int irq);
 extern void enable_8259A_irq(unsigned int irq);
 extern int i8259A_irq_pending(unsigned int irq);

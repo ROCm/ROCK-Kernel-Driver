@@ -88,8 +88,8 @@
 
 
 /* TX4927 Configuration registers (64-bit registers) */
-#define TX4927_CONFIG_BASE                       0xe300
-#define TX4927_CONFIG_CCFG                       0xe300
+#define TX4927_CONFIG_BASE                       0xe000
+#define TX4927_CONFIG_CCFG                       0xe000
 #define TX4927_CONFIG_CCFG_RESERVED_42_63                BM_63_42
 #define TX4927_CONFIG_CCFG_WDRST                         BM_41_41
 #define TX4927_CONFIG_CCFG_WDREXEN                       BM_40_40
@@ -124,14 +124,14 @@
 #define TX4927_CONFIG_CCFG_ENDIAN                        BM_02_02
 #define TX4927_CONFIG_CCFG_ARMODE                        BM_01_01
 #define TX4927_CONFIG_CCFG_ACEHOLD                       BM_00_00
-#define TX4927_CONFIG_REVID                      0xe308 
+#define TX4927_CONFIG_REVID                      0xe008
 #define TX4927_CONFIG_REVID_RESERVED_32_63               BM_32_63
 #define TX4927_CONFIG_REVID_PCODE                        BM_16_31
 #define TX4927_CONFIG_REVID_MJERREV                      BM_12_15
 #define TX4927_CONFIG_REVID_MINEREV                      BM_08_11
 #define TX4927_CONFIG_REVID_MJREV                        BM_04_07
 #define TX4927_CONFIG_REVID_MINREV                       BM_00_03
-#define TX4927_CONFIG_PCFG                       0xe310 
+#define TX4927_CONFIG_PCFG                       0xe010
 #define TX4927_CONFIG_PCFG_RESERVED_57_63                BM_57_63
 #define TX4927_CONFIG_PCFG_DRVDATA                       BM_56_56
 #define TX4927_CONFIG_PCFG_DRVCB                         BM_55_55
@@ -197,10 +197,10 @@
 #define TX4927_CONFIG_PCFG_DMASEL0_SIO1                  BM_00_00
 #define TX4927_CONFIG_PCFG_DMASEL0_ACLC0                 BM_01_01
 #define TX4927_CONFIG_PCFG_DMASEL0_ACLC2                 BM_00_01
-#define TX4927_CONFIG_TOEA                       0xe318 
+#define TX4927_CONFIG_TOEA                       0xe018
 #define TX4927_CONFIG_TOEA_RESERVED_36_63                BM_36_63
 #define TX4927_CONFIG_TOEA_TOEA                          BM_00_35
-#define TX4927_CONFIG_CLKCTR                     0xe320 
+#define TX4927_CONFIG_CLKCTR                     0xe020
 #define TX4927_CONFIG_CLKCTR_RESERVED_26_63              BM_26_63
 #define TX4927_CONFIG_CLKCTR_ACLCKD                      BM_25_25
 #define TX4927_CONFIG_CLKCTR_PIOCKD                      BM_24_24
@@ -223,7 +223,7 @@
 #define TX4927_CONFIG_CLKCTR_TM2RST                      BM_02_02
 #define TX4927_CONFIG_CLKCTR_SIO0RST                     BM_01_01
 #define TX4927_CONFIG_CLKCTR_SIO1RST                     BM_00_00
-#define TX4927_CONFIG_GARBC                      0xe330 
+#define TX4927_CONFIG_GARBC                      0xe030
 #define TX4927_CONFIG_GARBC_RESERVED_10_63               BM_10_63
 #define TX4927_CONFIG_GARBC_SET_09                       BM_09_09
 #define TX4927_CONFIG_GARBC_ARBMD                        BM_08_08
@@ -243,7 +243,7 @@
 #define TX4927_CONFIG_GARBC_PRIORITY_H3_PDMAC            BM_00_00
 #define TX4927_CONFIG_GARBC_PRIORITY_H3_DMAC             BM_01_01
 #define TX4927_CONFIG_GARBC_PRIORITY_H3_BAD_VALUE        BM_00_01
-#define TX4927_CONFIG_RAMP                       0xe348 
+#define TX4927_CONFIG_RAMP                       0xe048
 #define TX4927_CONFIG_RAMP_RESERVED_20_63                BM_20_63
 #define TX4927_CONFIG_RAMP_RAMP                          BM_00_19
 #define TX4927_CONFIG_LIMIT                      0xefff
@@ -456,7 +456,7 @@
 #define TX4927_ACLC_ACINTSTS            0xf710
 #define TX4927_ACLC_ACINTMSTS           0xf714
 #define TX4927_ACLC_ACINTEN             0xf718
-#define TX4927_ACLC_ACINTDIS            0xfR71c
+#define TX4927_ACLC_ACINTDIS            0xf71c
 #define TX4927_ACLC_ACSEMAPH            0xf720
 #define TX4927_ACLC_ACGPIDAT            0xf740
 #define TX4927_ACLC_ACGPODAT            0xf744

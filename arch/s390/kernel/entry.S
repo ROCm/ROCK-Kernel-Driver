@@ -229,6 +229,8 @@ sysc_sigpending:
 	basr	%r14,%r1               # call do_signal
 	tm	__TI_flags+3(%r9),_TIF_RESTART_SVC
 	bo	BASED(sysc_restart)
+	tm	__TI_flags+3(%r9),_TIF_SINGLE_STEP
+	bo	BASED(sysc_singlestep)
 	b	BASED(sysc_leave)      # out of here, do NOT recheck
 
 #

@@ -41,7 +41,7 @@ static void ip32_machine_power_off(void) __attribute__((noreturn));
 
 static void ip32_machine_restart(char *cmd)
 {
-	crime_write(CRIME_CONTROL_HARD_RESET, CRIME_CONTROL);
+	crime->control = CRIME_CONTROL_HARD_RESET;
 	while (1);
 }
 
@@ -83,9 +83,9 @@ static void power_timeout(unsigned long data)
 
 static void blink_timeout(unsigned long data)
 {
-	unsigned long led = mace_perif_ctrl_read(misc) ^ MACEISA_LED_RED;
-	mace_perif_ctrl_write(led, misc);
-	mod_timer(&blink_timer, jiffies+data);
+	unsigned long led = mace->perif.ctrl.misc ^ MACEISA_LED_RED;
+	mace->perif.ctrl.misc = led;
+	mod_timer(&blink_timer, jiffies + data);
 }
 
 static void debounce(unsigned long data)
@@ -165,8 +165,8 @@ static int panic_event(struct notifier_block *this, unsigned long event,
 	has_paniced = 1;
 
 	/* turn off the green LED */
-	led = mace_perif_ctrl_read(misc) | MACEISA_LED_GREEN;
-	mace_perif_ctrl_write(led, misc);
+	led = mace->perif.ctrl.misc | MACEISA_LED_GREEN;
+	mace->perif.ctrl.misc = led;
 
 	blink_timer.data = PANIC_FREQ;
 	blink_timeout(PANIC_FREQ);
@@ -181,10 +181,10 @@ static struct notifier_block panic_block = {
 static __init int ip32_reboot_setup(void)
 {
 	/* turn on the green led only */
-	unsigned long led = mace_perif_ctrl_read(misc);
+	unsigned long led = mace->perif.ctrl.misc;
 	led |= MACEISA_LED_RED;
 	led &= ~MACEISA_LED_GREEN;
-	mace_perif_ctrl_write(led, misc);
+	mace->perif.ctrl.misc = led;
 
 	_machine_restart = ip32_machine_restart;
 	_machine_halt = ip32_machine_halt;

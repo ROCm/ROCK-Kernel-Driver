@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.33 $
+ * $Revision: 1.34 $
  */
 
 #include <linux/config.h>
@@ -25,6 +25,9 @@
 #define PRINTK_HEADER "dasd_devmap:"
 
 #include "dasd_int.h"
+
+kmem_cache_t *dasd_page_cache;
+EXPORT_SYMBOL(dasd_page_cache);
 
 /*
  * dasd_devmap_t is used to store the features and the relation
@@ -233,6 +236,20 @@ dasd_parse_keyword( char *parsestring ) {
 		dasd_probeonly = 1;
 		MESSAGE(KERN_INFO, "%s",
 			"turning to probeonly mode");
+                return residual_str;
+        }
+        if (strncmp ("fixedbuffers", parsestring, length) == 0) {
+		if (dasd_page_cache)
+			return residual_str;
+		dasd_page_cache =
+			kmem_cache_create("dasd_page_cache", PAGE_SIZE, 0,
+					  SLAB_CACHE_DMA, NULL, NULL );
+		if (!dasd_page_cache)
+			MESSAGE(KERN_WARNING, "%s", "Failed to create slab, "
+				"fixed buffer mode disabled.");
+		else
+			MESSAGE (KERN_INFO, "%s",
+				 "turning on fixed buffer mode");
                 return residual_str;
         }
 	return ERR_PTR(-EINVAL);

@@ -129,9 +129,24 @@ static int o2micro_override(struct yenta_socket *socket)
 	 * ok to write to both registers on all O2 bridges.
 	 * from Eric Still, 02Micro.
 	 */
+	u8 a, b;
+
 	if (PCI_FUNC(socket->dev->devfn) == 0) {
-		config_writeb(socket, 0x94, 0xCA);
-		config_writeb(socket, 0xD4, 0xCA);
+		a = config_readb(socket, 0x94);
+		b = config_readb(socket, 0xD4);
+
+		printk(KERN_INFO "Yenta O2: res at 0x94/0xD4: %02x/%02x\n", a, b);
+
+		switch (socket->dev->device) {
+		case PCI_DEVICE_ID_O2_6832:
+			printk(KERN_INFO "Yenta O2: old bridge, not enabling read prefetch / write burst\n");
+			break;
+
+		default:
+			printk(KERN_INFO "Yenta O2: enabling read prefetch/write burst\n");
+			config_writeb(socket, 0x94, a | 0x0a);
+			config_writeb(socket, 0xD4, b | 0x0a);
+		}
 	}
 
 	return 0;

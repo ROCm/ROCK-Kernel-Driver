@@ -137,13 +137,26 @@ static int
 blkdev_get_blocks(struct inode *inode, sector_t iblock,
 		unsigned long max_blocks, struct buffer_head *bh, int create)
 {
-	if ((iblock + max_blocks) > max_block(I_BDEV(inode)))
-		return -EIO;
+	sector_t end_block = max_block(I_BDEV(inode));
+
+	if ((iblock + max_blocks) > end_block) {
+		max_blocks = end_block - iblock;
+		if ((long)max_blocks <= 0) {
+			if (create)
+				return -EIO;	/* write fully beyond EOF */
+			/*
+			 * It is a read which is fully beyond EOF.  We return
+			 * a !buffer_mapped buffer
+			 */
+			max_blocks = 0;
+		}
+	}
 
 	bh->b_bdev = I_BDEV(inode);
 	bh->b_blocknr = iblock;
 	bh->b_size = max_blocks << inode->i_blkbits;
-	set_buffer_mapped(bh);
+	if (max_blocks)
+		set_buffer_mapped(bh);
 	return 0;
 }
 

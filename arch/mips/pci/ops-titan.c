@@ -58,15 +58,15 @@ static int titan_read_config(struct pci_bus *bus, unsigned int devfn, int reg,
 
 	switch (size) {
 	case 1:
-		TITAN_READ_8(data_reg + (reg & 0x3), val);
+		*val = TITAN_READ_8(data_reg + (~reg & 0x3));
 		break;
 
 	case 2:
-		TITAN_READ_16(data_reg + (reg & 0x2), val);
+		*val = TITAN_READ_16(data_reg + (~reg & 0x2));
 		break;
 
 	case 4:
-		TITAN_READ(data_reg, val);
+		*val = TITAN_READ(data_reg);
 		break;
 	}
 
@@ -98,11 +98,11 @@ static int titan_write_config(struct pci_bus *bus, unsigned int devfn, int reg,
 	/* write the data */
 	switch (size) {
 	case 1:
-		TITAN_WRITE_8(data_reg + (reg & 0x3), val);
+		TITAN_WRITE_8(data_reg + (~reg & 0x3), val);
 		break;
 
 	case 2:
-		TITAN_WRITE_16(data_reg + (reg & 0x2), val);
+		TITAN_WRITE_16(data_reg + (~reg & 0x2), val);
 		break;
 
 	case 4:
@@ -120,16 +120,3 @@ struct pci_ops titan_pci_ops = {
 	titan_read_config,
 	titan_write_config,
 };
-
-void __init pcibios_init(void)
-{
-	/* 
-	 * XXX These values below need to change
-	 */
-	ioport_resource.start = 0xe0000000;
-	ioport_resource.end   = 0xe0000000 + 0x20000000 - 1;
-	iomem_resource.start  = 0xc0000000;
-	iomem_resource.end    = 0xc0000000 + 0x20000000 - 1;
-
-	pci_scan_bus(0, &titan_pci_ops, NULL);
-}

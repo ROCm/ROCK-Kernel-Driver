@@ -100,6 +100,7 @@ static inline void check_wait(void)
 	case CPU_R5000:
 	case CPU_NEVADA:
 	case CPU_RM7000:
+	case CPU_RM9000:
 	case CPU_TX49XX:
 	case CPU_4KC:
 	case CPU_4KEC:

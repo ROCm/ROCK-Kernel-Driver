@@ -73,7 +73,7 @@ static void __init serial_init(void)
 #endif
 	s.irq = SEADINT_UART0;
 	s.uartclk = SEAD_BASE_BAUD * 16;
-	s.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST | UPF_RESOURCES | ASYNC_AUTO_IRQ;
+	s.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST | ASYNC_AUTO_IRQ;
 	s.iotype = 0;
 	s.regshift = 3;
 

@@ -33,7 +33,7 @@
 
 #include <linux/config.h>
 
-#if defined(CONFIG_KGDB)
+#ifdef CONFIG_KGDB
 #include <asm/serial.h>
 
 /*

@@ -162,8 +162,6 @@ static inline void check_acpi_pci(void) { }
 
 #endif
 
-extern int (*platform_rename_gsi)(int ioapic, int gsi);
-
 #ifdef CONFIG_ACPI_PCI
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
 static inline void acpi_disable_pci(void) 

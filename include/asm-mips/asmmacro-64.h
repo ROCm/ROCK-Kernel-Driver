@@ -15,6 +15,7 @@
 
 	.macro	fpu_save_16even thread tmp=t0
 	cfc1	\tmp, fcr31
+	sdc1	$f0,  THREAD_FPR0(\thread)
 	sdc1	$f2,  THREAD_FPR2(\thread)
 	sdc1	$f4,  THREAD_FPR4(\thread)
 	sdc1	$f6,  THREAD_FPR6(\thread)
@@ -50,6 +51,14 @@
 	sdc1	$f27, THREAD_FPR27(\thread)
 	sdc1	$f29, THREAD_FPR29(\thread)
 	sdc1	$f31, THREAD_FPR31(\thread)
+	.endm
+
+	.macro	fpu_save_double thread status tmp1 tmp2
+	sll	\tmp2, \tmp1, 5
+	bgez	\tmp2, 2f
+	fpu_save_16odd \thread
+2:
+	fpu_save_16even \thread \tmp1			# clobbers t1
 	.endm
 
 	.macro	fpu_restore_16even thread tmp=t0
@@ -90,6 +99,15 @@
 	ldc1	$f27, THREAD_FPR27(\thread)
 	ldc1	$f29, THREAD_FPR29(\thread)
 	ldc1	$f31, THREAD_FPR31(\thread)
+	.endm
+
+	.macro	fpu_restore_double thread tmp
+	mfc0	t0, CP0_STATUS
+	sll	t1, t0, 5
+	bgez	t1, 1f				# 16 register mode?
+
+	fpu_restore_16odd a0
+1:	fpu_restore_16even a0, t0		# clobbers t0
 	.endm
 
 	.macro	cpu_save_nonscratch thread

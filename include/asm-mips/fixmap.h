@@ -14,7 +14,6 @@
 #define _ASM_FIXMAP_H
 
 #include <linux/config.h>
-#include <linux/kernel.h>
 #include <asm/page.h>
 #ifdef CONFIG_HIGHMEM
 #include <linux/threads.h>

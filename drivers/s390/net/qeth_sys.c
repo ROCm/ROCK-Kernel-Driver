@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.35 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.40 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.35 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.40 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -876,21 +876,31 @@ qeth_dev_ipato_add_show(char *buf, struct qeth_card *card,
 {
 	struct qeth_ipato_entry *ipatoe;
 	unsigned long flags;
-	char addr_str[49];
+	char addr_str[40];
+	int entry_len; /* length of 1 entry string, differs between v4 and v6 */
 	int i = 0;
 
 	if (qeth_check_layer2(card))
 		return -EPERM;
 
+	entry_len = (proto == QETH_PROT_IPV4)? 12 : 40;
+	/* add strlen for "/<mask>\n" */
+	entry_len += (proto == QETH_PROT_IPV4)? 5 : 6;
 	spin_lock_irqsave(&card->ip_lock, flags);
 	list_for_each_entry(ipatoe, &card->ipato.entries, entry){
 		if (ipatoe->proto != proto)
 			continue;
+		/* String must not be longer than PAGE_SIZE. So we check if
+		 * string length gets near PAGE_SIZE. Then we can savely display
+		 * the next IPv6 address (worst case, compared to IPv4) */
+		if ((PAGE_SIZE - i) <= entry_len)
+			break;
 		qeth_ipaddr_to_string(proto, ipatoe->addr, addr_str);
-		i += sprintf(buf + i, "%s/%i\n", addr_str, ipatoe->mask_bits);
+		i += snprintf(buf + i, PAGE_SIZE - i,
+			      "%s/%i\n", addr_str, ipatoe->mask_bits);
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
-	i += sprintf(buf + i, "\n");
+	i += snprintf(buf + i, PAGE_SIZE - i, "\n");
 
 	return i;
 }
@@ -1122,24 +1132,32 @@ qeth_dev_vipa_add_show(char *buf, struct qeth_card *card,
 			enum qeth_prot_versions proto)
 {
 	struct qeth_ipaddr *ipaddr;
-	char addr_str[49];
+	char addr_str[40];
+	int entry_len; /* length of 1 entry string, differs between v4 and v6 */
 	unsigned long flags;
 	int i = 0;
 
 	if (qeth_check_layer2(card))
 		return -EPERM;
 
+	entry_len = (proto == QETH_PROT_IPV4)? 12 : 40;
+	entry_len += 2; /* \n + terminator */
 	spin_lock_irqsave(&card->ip_lock, flags);
 	list_for_each_entry(ipaddr, &card->ip_list, entry){
 		if (ipaddr->proto != proto)
 			continue;
 		if (ipaddr->type != QETH_IP_TYPE_VIPA)
 			continue;
+		/* String must not be longer than PAGE_SIZE. So we check if
+		 * string length gets near PAGE_SIZE. Then we can savely display
+		 * the next IPv6 address (worst case, compared to IPv4) */
+		if ((PAGE_SIZE - i) <= entry_len)
+			break;
 		qeth_ipaddr_to_string(proto, (const u8 *)&ipaddr->u, addr_str);
-		i += sprintf(buf + i, "%s\n", addr_str);
+		i += snprintf(buf + i, PAGE_SIZE - i, "%s\n", addr_str);
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
-	i += sprintf(buf + i, "\n");
+	i += snprintf(buf + i, PAGE_SIZE - i, "\n");
 
 	return i;
 }
@@ -1295,24 +1313,32 @@ qeth_dev_rxip_add_show(char *buf, struct qeth_card *card,
 		       enum qeth_prot_versions proto)
 {
 	struct qeth_ipaddr *ipaddr;
-	char addr_str[49];
+	char addr_str[40];
+	int entry_len; /* length of 1 entry string, differs between v4 and v6 */
 	unsigned long flags;
 	int i = 0;
 
 	if (qeth_check_layer2(card))
 		return -EPERM;
 
+	entry_len = (proto == QETH_PROT_IPV4)? 12 : 40;
+	entry_len += 2; /* \n + terminator */
 	spin_lock_irqsave(&card->ip_lock, flags);
 	list_for_each_entry(ipaddr, &card->ip_list, entry){
 		if (ipaddr->proto != proto)
 			continue;
 		if (ipaddr->type != QETH_IP_TYPE_RXIP)
 			continue;
+		/* String must not be longer than PAGE_SIZE. So we check if
+		 * string length gets near PAGE_SIZE. Then we can savely display
+		 * the next IPv6 address (worst case, compared to IPv4) */
+		if ((PAGE_SIZE - i) <= entry_len)
+			break;
 		qeth_ipaddr_to_string(proto, (const u8 *)&ipaddr->u, addr_str);
-		i += sprintf(buf + i, "%s\n", addr_str);
+		i += snprintf(buf + i, PAGE_SIZE - i, "%s\n", addr_str);
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
-	i += sprintf(buf + i, "\n");
+	i += snprintf(buf + i, PAGE_SIZE - i, "\n");
 
 	return i;
 }

@@ -68,7 +68,7 @@
 		MFC0	k1, CP0_CONTEXT
 		dsra	k1, 23
 		lui	k0, %hi(pgd_current)
-		daddiu	k0, %lo(pgd_current)
+		addiu	k0, %lo(pgd_current)
 		dsubu	k1, k0
 		lui	k0, %hi(kernelsp)
 		daddu	k1, k0

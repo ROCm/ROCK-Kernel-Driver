@@ -24,7 +24,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.116 $"
+#define VERSION_QETH_H 		"$Revision: 1.124 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -330,10 +330,6 @@ qeth_is_ipa_enabled(struct qeth_ipa_info *ipa, enum qeth_ipa_funcs func)
 #define QETH_WATERMARK_PACK_FUZZ 1
 
 #define QETH_IP_HEADER_SIZE 40
-/* VLAN defines */
-#define QETH_EXT_HDR_VLAN_FRAME        0x01
-#define QETH_EXT_HDR_TOKEN_ID          0x02
-#define QETH_EXT_HDR_INCLUDE_VLAN_TAG  0x04
 
 struct qeth_hdr_layer3 {
 	__u8  id;
@@ -392,10 +388,12 @@ enum qeth_header_ids {
 	QETH_HEADER_TYPE_LAYER2 = 0x02,
 };
 /* flags for qeth_hdr.ext_flags */
-#define QETH_HDR_EXT_VLAN_FRAME      0x01
-#define QETH_HDR_EXT_CSUM_HDR_REQ    0x10
-#define QETH_HDR_EXT_CSUM_TRANSP_REQ 0x20
-#define QETH_HDR_EXT_SRC_MAC_ADDR    0x08
+#define QETH_HDR_EXT_VLAN_FRAME       0x01
+#define QETH_HDR_EXT_TOKEN_ID         0x02
+#define QETH_HDR_EXT_INCLUDE_VLAN_TAG 0x04
+#define QETH_HDR_EXT_SRC_MAC_ADDR     0x08
+#define QETH_HDR_EXT_CSUM_HDR_REQ     0x10
+#define QETH_HDR_EXT_CSUM_TRANSP_REQ  0x20
 
 static inline int
 qeth_is_last_sbale(struct qdio_buffer_element *sbale)
@@ -557,6 +555,7 @@ enum qeth_ip_types {
 	QETH_IP_TYPE_NORMAL,
 	QETH_IP_TYPE_VIPA,
 	QETH_IP_TYPE_RXIP,
+	QETH_IP_TYPE_DEL_ALL_MC,
 };
 
 enum qeth_cmd_buffer_state {
@@ -713,8 +712,7 @@ struct qeth_card_options {
  */
 enum qeth_threads {
 	QETH_SET_IP_THREAD  = 1,
-	QETH_SET_MC_THREAD  = 2,
-	QETH_RECOVER_THREAD = 4,
+	QETH_RECOVER_THREAD = 2,
 };
 
 struct qeth_card {
@@ -748,7 +746,7 @@ struct qeth_card {
 	volatile unsigned long thread_running_mask;
 	spinlock_t ip_lock;
 	struct list_head ip_list;
-	struct list_head ip_tbd_list;
+	struct list_head *ip_tbd_list;
 	struct qeth_ipato ipato;
 	struct list_head cmd_waiter_list;
 	/* QDIO buffer handling */

@@ -435,7 +435,7 @@ EXPORT_SYMBOL(acpi_disable_event);
  * DESCRIPTION: Clear an ACPI event (fixed)
  *
  ******************************************************************************/
-#ifdef ACPI_FUTURE_USAGE
+
 acpi_status
 acpi_clear_event (
 	u32                             event)
@@ -462,7 +462,6 @@ acpi_clear_event (
 	return_ACPI_STATUS (status);
 }
 EXPORT_SYMBOL(acpi_clear_event);
-#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

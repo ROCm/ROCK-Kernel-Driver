@@ -1,5 +1,6 @@
 /*
  * wakeup.c - support wakeup devices
+ * Copyright (C) 2004 Li Shaohua <shaohua.li@intel.com>
  */
 
 #include <linux/init.h>
@@ -13,14 +14,16 @@
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("wakeup_devices")
 
+extern struct list_head	acpi_wakeup_device_list;
+extern spinlock_t acpi_device_lock;
+
+#ifdef CONFIG_ACPI_SLEEP
 /**
  * acpi_enable_wakeup_device_prep - prepare wakeup devices
  *	@sleep_state:	ACPI state
  * Enable all wakup devices power if the devices' wakeup level
  * is higher than requested sleep level
  */
-extern struct list_head	acpi_wakeup_device_list;
-extern spinlock_t acpi_device_lock;
 
 void
 acpi_enable_wakeup_device_prep(
@@ -179,3 +182,28 @@ static int __init acpi_wakeup_device_init(void)
 }
 
 late_initcall(acpi_wakeup_device_init);
+#endif
+
+/*
+ * Disable all wakeup GPEs before power off.
+ * 
+ * Since acpi_enter_sleep_state() will disable all
+ * RUNTIME GPEs, we simply mark all GPES that
+ * are not enabled for wakeup from S5 as RUNTIME.
+ */
+void acpi_wakeup_gpe_poweroff_prepare(void)
+{
+	struct list_head * node, * next;
+
+	list_for_each_safe(node, next, &acpi_wakeup_device_list) {
+		struct acpi_device * dev = container_of(node,
+			struct acpi_device, wakeup_list);
+
+		/* The GPE can wakeup system from S5, don't touch it */
+		if ((u32)dev->wakeup.sleep_state == ACPI_STATE_S5)
+			continue;
+		/* acpi_set_gpe_type will automatically disable GPE */
+		acpi_set_gpe_type(dev->wakeup.gpe_device,
+			dev->wakeup.gpe_number, ACPI_GPE_TYPE_RUNTIME);
+	}
+}

@@ -56,8 +56,6 @@ unsigned int PCI_DMA_BUS_IS_PHYS;
 
 EXPORT_SYMBOL(PCI_DMA_BUS_IS_PHYS);
 
-extern void * __rd_start, * __rd_end;
-
 /*
  * Setup information
  *
@@ -194,6 +192,68 @@ static inline void parse_cmdline_early(void)
 	}
 }
 
+static inline int parse_rd_cmdline(unsigned long* rd_start, unsigned long* rd_end)
+{
+	/*
+	 * "rd_start=0xNNNNNNNN" defines the memory address of an initrd
+	 * "rd_size=0xNN" it's size
+	 */
+	unsigned long start = 0;
+	unsigned long size = 0;
+	unsigned long end;
+	char cmd_line[CL_SIZE];
+	char *start_str;
+	char *size_str;
+	char *tmp;
+
+	strcpy(cmd_line, command_line);
+	*command_line = 0;
+	tmp = cmd_line;
+	/* Ignore "rd_start=" strings in other parameters. */
+	start_str = strstr(cmd_line, "rd_start=");
+	if (start_str && start_str != cmd_line && *(start_str - 1) != ' ')
+		start_str = strstr(start_str, " rd_start=");
+	while (start_str) {
+		if (start_str != cmd_line)
+			strncat(command_line, tmp, start_str - tmp);
+		start = memparse(start_str + 9, &start_str);
+		tmp = start_str + 1;
+		start_str = strstr(start_str, " rd_start=");
+	}
+	if (*tmp)
+		strcat(command_line, tmp);
+
+	strcpy(cmd_line, command_line);
+	*command_line = 0;
+	tmp = cmd_line;
+	/* Ignore "rd_size" strings in other parameters. */
+	size_str = strstr(cmd_line, "rd_size=");
+	if (size_str && size_str != cmd_line && *(size_str - 1) != ' ')
+		size_str = strstr(size_str, " rd_size=");
+	while (size_str) {
+		if (size_str != cmd_line)
+			strncat(command_line, tmp, size_str - tmp);
+		size = memparse(size_str + 8, &size_str);
+		tmp = size_str + 1;
+		size_str = strstr(size_str, " rd_size=");
+	}
+	if (*tmp)
+		strcat(command_line, tmp);
+
+#ifdef CONFIG_MIPS64
+	/* HACK: Guess if the sign extension was forgotten */
+	if (start > 0x0000000080000000 && start < 0x00000000ffffffff)
+		start |= 0xffffffff00000000;
+#endif
+
+	end = start + size;
+	if (start && end) {
+		*rd_start = start;
+		*rd_end = end;
+		return 1;
+	}
+	return 0;
+}
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE - 1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
@@ -205,30 +265,42 @@ static inline void parse_cmdline_early(void)
 static inline void bootmem_init(void)
 {
 	unsigned long start_pfn;
+	unsigned long reserved_end = (unsigned long)&_end;
 #ifndef CONFIG_SGI_IP27
-	unsigned long bootmap_size, max_low_pfn, first_usable_pfn;
+	unsigned long first_usable_pfn;
+	unsigned long bootmap_size;
 	int i;
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
-	unsigned long tmp;
-	unsigned long *initrd_header;
+	int initrd_reserve_bootmem = 0;
 
-	tmp = (((unsigned long)&_end + PAGE_SIZE-1) & PAGE_MASK) - 8;
-	if (tmp < (unsigned long)&_end)
-		tmp += PAGE_SIZE;
-	initrd_header = (unsigned long *)tmp;
-	if (initrd_header[0] == 0x494E5244) {
-		initrd_start = (unsigned long)&initrd_header[2];
-		initrd_end = initrd_start + initrd_header[1];
+	/* Board specific code should have set up initrd_start and initrd_end */
+ 	ROOT_DEV = Root_RAM0;
+	if (parse_rd_cmdline(&initrd_start, &initrd_end)) {
+		reserved_end = max(reserved_end, initrd_end);
+		initrd_reserve_bootmem = 1;
+	} else {
+		unsigned long tmp;
+		unsigned long *initrd_header;
+
+		tmp = ((reserved_end + PAGE_SIZE-1) & PAGE_MASK) - 8;
+		if (tmp < reserved_end)
+			tmp += PAGE_SIZE;
+		initrd_header = (unsigned long *)tmp;
+		if (initrd_header[0] == 0x494E5244) {
+			initrd_start = (unsigned long)&initrd_header[2];
+			initrd_end = initrd_start + initrd_header[1];
+			reserved_end = max(reserved_end, initrd_end);
+			initrd_reserve_bootmem = 1;
+		}
 	}
-	start_pfn = PFN_UP(CPHYSADDR((&_end)+(initrd_end - initrd_start) + PAGE_SIZE));
-#else
+#endif	/* CONFIG_BLK_DEV_INITRD */
+
 	/*
 	 * Partially used pages are not usable - thus
 	 * we are rounding upwards.
 	 */
-	start_pfn = PFN_UP(CPHYSADDR(&_end));
-#endif	/* CONFIG_BLK_DEV_INITRD */
+	start_pfn = PFN_UP(CPHYSADDR(reserved_end));
 
 #ifndef CONFIG_SGI_IP27
 	/* Find the highest page frame number we have available.  */
@@ -341,21 +413,14 @@ static inline void bootmem_init(void)
 
 	/* Reserve the bootmap memory.  */
 	reserve_bootmem(PFN_PHYS(first_usable_pfn), bootmap_size);
-#endif
+#endif /* CONFIG_SGI_IP27 */
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	/* Board specific code should have set up initrd_start and initrd_end */
-	ROOT_DEV = Root_RAM0;
-	if (&__rd_start != &__rd_end) {
-		initrd_start = (unsigned long)&__rd_start;
-		initrd_end = (unsigned long)&__rd_end;
-	}
 	initrd_below_start_ok = 1;
 	if (initrd_start) {
 		unsigned long initrd_size = ((unsigned char *)initrd_end) - ((unsigned char *)initrd_start);
 		printk("Initial ramdisk at: 0x%p (%lu bytes)\n",
-		       (void *)initrd_start,
-		       initrd_size);
+		       (void *)initrd_start, initrd_size);
 
 		if (CPHYSADDR(initrd_end) > PFN_PHYS(max_low_pfn)) {
 			printk("initrd extends beyond end of memory "
@@ -363,7 +428,11 @@ static inline void bootmem_init(void)
 			       sizeof(long) * 2, CPHYSADDR(initrd_end),
 			       sizeof(long) * 2, PFN_PHYS(max_low_pfn));
 			initrd_start = initrd_end = 0;
+			initrd_reserve_bootmem = 0;
 		}
+
+		if (initrd_reserve_bootmem)
+			reserve_bootmem(CPHYSADDR(initrd_start), initrd_size);
 	}
 #endif /* CONFIG_BLK_DEV_INITRD  */
 }
@@ -453,30 +522,9 @@ static void __init do_earlyinitcalls(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	unsigned int status;
-
 	cpu_probe();
 	prom_init();
 	cpu_report();
-
-#ifdef CONFIG_MIPS32
-	/* Disable coprocessors and set FPU for 16/32 FPR register model */
-	status = read_c0_status();
-	status &= ~(ST0_CU1|ST0_CU2|ST0_CU3|ST0_KX|ST0_SX|ST0_FR);
-	status |= ST0_CU0;
-	write_c0_status(status);
-#endif
-#ifdef CONFIG_MIPS64
-	/*
-	 * On IP27, I am seeing the TS bit set when the kernel is loaded.
-	 * Maybe because the kernel is in ckseg0 and not xkphys? Clear it
-	 * anyway ...
-	 */
-	status = read_c0_status();
-	status &= ~(ST0_BEV|ST0_TS|ST0_CU1|ST0_CU2|ST0_CU3);
-	status |= (ST0_CU0|ST0_KX|ST0_SX|ST0_FR);
-	write_c0_status(status);
-#endif
 
 #if defined(CONFIG_VT)
 #if defined(CONFIG_VGA_CONSOLE)

@@ -24,36 +24,6 @@
 
 #define TLB_OPTIMIZE /* If you are paranoid, disable this. */
 
-	.text
-	.set	mips1
-	.set	noreorder
-
-	__INIT
-
-	/* TLB refill, R[23]00 version */
-	LEAF(except_vec0_r2300)
-	.set	noat
-	.set	mips1
-	mfc0	k0, CP0_BADVADDR
-	lw	k1, pgd_current			# get pgd pointer
-	srl	k0, k0, 22
-	sll	k0, k0, 2
-	addu	k1, k1, k0
-	mfc0	k0, CP0_CONTEXT
-	lw	k1, (k1)
-	and	k0, k0, 0xffc
-	addu	k1, k1, k0
-	lw	k0, (k1)
-	nop
-	mtc0	k0, CP0_ENTRYLO0
-	mfc0	k1, CP0_EPC
-	tlbwr
-	jr	k1
-	rfe
-	END(except_vec0_r2300)
-
-	__FINIT
-
 	/* ABUSE of CPP macros 101. */
 
 	/* After this macro runs, the pte faulted on is

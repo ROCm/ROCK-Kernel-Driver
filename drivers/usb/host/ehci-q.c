@@ -175,6 +175,8 @@ static void qtd_copy_status (
 
 static void
 ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
+__releases(ehci->lock)
+__acquires(ehci->lock)
 {
 	if (likely (urb->hcpriv != 0)) {
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;

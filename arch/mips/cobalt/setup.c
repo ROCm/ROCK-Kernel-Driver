@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997 by Ralf Baechle
+ * Copyright (C) 1996, 1997, 2004 by Ralf Baechle (ralf@linux-mips.org)
  * Copyright (C) 2001, 2002, 2003 by Liam Davies (ldavies@agile.tv)
  *
  */
@@ -15,7 +15,6 @@
 #include <linux/init.h>
 
 #include <asm/bootinfo.h>
-#include <asm/pci_channel.h>
 #include <asm/time.h>
 #include <asm/io.h>
 #include <asm/irq.h>
