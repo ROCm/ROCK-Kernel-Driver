@@ -280,6 +280,7 @@ struct mdk_personality_s
 	int (*spare_active) (mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 	int (*resize) (mddev_t *mddev, sector_t sectors);
+	int (*reshape) (mddev_t *mddev, int raid_disks);
 };
 
 

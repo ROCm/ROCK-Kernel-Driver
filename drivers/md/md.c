@@ -2388,18 +2388,23 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 static int update_array_info(mddev_t *mddev, mdu_array_info_t *info)
 {
 	int rv = 0;
+	int cnt = 0;
 
 	if (mddev->major_version != info->major_version ||
 	    mddev->minor_version != info->minor_version ||
 /*	    mddev->patch_version != info->patch_version || */
 	    mddev->ctime         != info->ctime         ||
 	    mddev->level         != info->level         ||
-	    mddev->raid_disks    != info->raid_disks    ||
 	    mddev->layout        != info->layout        ||
 	    !mddev->persistent	 != info->not_persistent||
 	    mddev->chunk_size    != info->chunk_size    )
 		return -EINVAL;
-	/* that leaves only size */
+	/* Check there is only one change */
+	if (mddev->size != info->size) cnt++;
+	if (mddev->raid_disks != info->raid_disks) cnt++;
+	if (cnt == 0) return 0;
+	if (cnt > 1) return -EINVAL;
+
 	if (mddev->size != info->size) {
 		mdk_rdev_t * rdev;
 		struct list_head *tmp;
@@ -2431,6 +2436,28 @@ static int update_array_info(mddev_t *mddev, mdu_array_info_t *info)
 				return -ENOSPC;
 		}
 		rv = mddev->pers->resize(mddev, (sector_t)info->size *2);
+		if (!rv) {
+			struct block_device *bdev;
+
+			bdev = bdget_disk(mddev->gendisk, 0);
+			if (bdev) {
+				down(&bdev->bd_inode->i_sem);
+				i_size_write(bdev->bd_inode, mddev->array_size << 10);
+				up(&bdev->bd_inode->i_sem);
+				bdput(bdev);
+			}
+		}
+	}
+	if (mddev->raid_disks    != info->raid_disks) {
+		/* change the number of raid disks */
+		if (mddev->pers->reshape == NULL)
+			return -EINVAL;
+		if (info->raid_disks <= 0 ||
+		    info->raid_disks >= mddev->max_disks)
+			return -EINVAL;
+		if (mddev->sync_thread)
+			return -EBUSY;
+		rv = mddev->pers->reshape(mddev, info->raid_disks);
 		if (!rv) {
 			struct block_device *bdev;
 
