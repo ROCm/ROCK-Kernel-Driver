@@ -51,7 +51,7 @@ int task_has_security(struct task_struct *tsk,
 		return -EACCES;
 
 	return avc_has_perm(tsec->sid, SECINITSID_SECURITY,
-			    SECCLASS_SECURITY, perms, NULL, NULL);
+			    SECCLASS_SECURITY, perms, NULL);
 }
 
 enum sel_inos {
