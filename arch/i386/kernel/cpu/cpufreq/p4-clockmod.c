@@ -48,8 +48,7 @@ enum {
 
 
 static int has_N44_O17_errata[NR_CPUS];
-static int stock_freq;
-
+static unsigned int stock_freq;
 
 static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 {
@@ -175,6 +174,54 @@ static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_verify(policy, &p4clockmod_table[0]);
 }
 
+/* copied from speedstep_lib, made SMP-compatible */
+static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
+{
+	u32 msr_lo, msr_hi, mult;
+	unsigned int fsb = 0;
+
+	if (c->x86 != 0xF) {
+		printk(KERN_DEBUG PFX "Unknown P4. Please send an e-mail to <linux@brodo.de>\n");
+		return 0;
+	}
+
+	rdmsr(0x2c, msr_lo, msr_hi);
+
+	/* printk(KERN_DEBUG PFX "P4 - MSR_EBC_FREQUENCY_ID: 0x%x 0x%x\n", msr_lo, msr_hi); */
+	/* decode the FSB: see IA-32 Intel (C) Architecture Software 
+	 * Developer's Manual, Volume 3: System Prgramming Guide,
+	 * revision #12 in Table B-1: MSRs in the Pentium 4 and
+	 * Intel Xeon Processors, on page B-4 and B-5.
+	 */
+	if (c->x86_model < 2)
+		fsb = 100 * 1000;
+	else {
+		u8 fsb_code = (msr_lo >> 16) & 0x7;
+		switch (fsb_code) {
+		case 0:
+			fsb = 100 * 1000;
+			break;
+		case 1:
+			fsb = 13333 * 10;
+			break;
+		case 2:
+			fsb = 200 * 1000;
+			break;
+		}
+	}
+
+	if (!fsb) {
+		printk(KERN_DEBUG PFX "couldn't detect FSB speed. Please send an e-mail to <linux@brodo.de>\n");
+		printk(KERN_DEBUG PFX "P4 - MSR_EBC_FREQUENCY_ID: 0x%x 0x%x\n", msr_lo, msr_hi);
+	}
+
+	/* Multiplier. */
+	mult = msr_lo >> 24;
+
+	return (fsb * mult);
+}
+
+ 
 
 static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 {
@@ -192,15 +239,10 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 		has_N44_O17_errata[policy->cpu] = 1;
 	}
 	
-	/* get frequency */
-	if (!stock_freq) {
-		if (cpu_khz)
-			stock_freq = cpu_khz;
-		else {
-			printk(KERN_INFO PFX "unknown core frequency - please use module parameter 'stock_freq'\n");
-			return -EINVAL;
-		}
-	}
+	/* get max frequency */
+	stock_freq = cpufreq_p4_get_frequency(c);
+	if (!stock_freq)
+		return -EINVAL;
 
 	/* table init */
 	for (i=1; (p4clockmod_table[i].frequency != CPUFREQ_TABLE_END); i++) {
@@ -268,8 +310,6 @@ static void __exit cpufreq_p4_exit(void)
 	cpufreq_unregister_driver(&p4clockmod_driver);
 }
 
-
-MODULE_PARM(stock_freq, "i");
 
 MODULE_AUTHOR ("Zwane Mwaikambo <zwane@commfireservices.com>");
 MODULE_DESCRIPTION ("cpufreq driver for Pentium(TM) 4/Xeon(TM)");
