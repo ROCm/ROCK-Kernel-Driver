@@ -82,9 +82,8 @@ static inline void down(struct semaphore * sem)
 	/*
 	 * Try to get the semaphore, take the slow path if we fail.
 	 */
-	if (atomic_dec_return(&sem->count) < 0)
+	if (unlikely(atomic_dec_return(&sem->count) < 0))
 		__down(sem);
-	smp_wmb();
 }
 
 static inline int down_interruptible(struct semaphore * sem)
@@ -96,23 +95,18 @@ static inline int down_interruptible(struct semaphore * sem)
 #endif
 	might_sleep();
 
-	if (atomic_dec_return(&sem->count) < 0)
+	if (unlikely(atomic_dec_return(&sem->count) < 0))
 		ret = __down_interruptible(sem);
-	smp_wmb();
 	return ret;
 }
 
 static inline int down_trylock(struct semaphore * sem)
 {
-	int ret;
-
 #ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	ret = atomic_dec_if_positive(&sem->count) < 0;
-	smp_wmb();
-	return ret;
+	return atomic_dec_if_positive(&sem->count) < 0;
 }
 
 static inline void up(struct semaphore * sem)
@@ -121,8 +115,7 @@ static inline void up(struct semaphore * sem)
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	smp_wmb();
-	if (atomic_inc_return(&sem->count) <= 0)
+	if (unlikely(atomic_inc_return(&sem->count) <= 0))
 		__up(sem);
 }
 
