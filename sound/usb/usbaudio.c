@@ -1182,7 +1182,7 @@ static int snd_usb_hw_params(snd_pcm_substream_t *substream,
 		struct usb_host_config *config = subs->dev->actconfig;
 		struct usb_host_interface *alts;
 		struct usb_interface *iface;
-		iface = &config->interface[fmt->iface];
+		iface = config->interface[fmt->iface];
 		alts = &iface->altsetting[fmt->altset_idx];
 		ret = init_usb_sample_rate(subs->dev, subs->interface, alts, fmt, rate);
 		if (ret < 0)
