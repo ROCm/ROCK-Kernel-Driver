@@ -47,7 +47,7 @@ static char *xbuf;
 static char *tvmem;
 
 static void
-hexdump(unsigned char *buf, size_t len)
+hexdump(unsigned char *buf, unsigned int len)
 {
 	while (len--)
 		printk("%02x", *buf++);
@@ -59,19 +59,19 @@ static void
 test_md5(void)
 {
 	char *p;
-	int i;
+	unsigned int i;
 	struct scatterlist sg[2];
 	char result[128];
 	struct crypto_tfm *tfm;
 	struct md5_testvec *md5_tv;
 	struct hmac_md5_testvec *hmac_md5_tv;
-	size_t tsize;
+	unsigned int tsize;
 
 	printk("\ntesting md5\n");
 
 	tsize = sizeof (md5_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -86,7 +86,7 @@ test_md5(void)
 	}
 
 	for (i = 0; i < MD5_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 		memset(result, 0, sizeof (result));
 
 		p = md5_tv[i].plaintext;
@@ -134,7 +134,7 @@ test_md5(void)
 
 	tsize = sizeof (hmac_md5_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -143,7 +143,7 @@ test_md5(void)
 	hmac_md5_tv = (void *) tvmem;
 
 	for (i = 0; i < HMAC_MD5_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 		memset(result, 0, sizeof (result));
 
 		p = hmac_md5_tv[i].plaintext;
@@ -194,18 +194,18 @@ static void
 test_md4(void)
 {
 	char *p;
-	int i;
+	unsigned int i;
 	struct scatterlist sg[1];
 	char result[128];
 	struct crypto_tfm *tfm;
 	struct md4_testvec *md4_tv;
-	size_t tsize;
+	unsigned int tsize;
 
 	printk("\ntesting md4\n");
 
 	tsize = sizeof (md4_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -220,7 +220,7 @@ test_md4(void)
 	}
 
 	for (i = 0; i < MD4_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 		memset(result, 0, sizeof (result));
 
 		p = md4_tv[i].plaintext;
@@ -244,19 +244,19 @@ static void
 test_sha1(void)
 {
 	char *p;
-	int i;
+	unsigned int i;
 	struct crypto_tfm *tfm;
 	struct sha1_testvec *sha1_tv;
 	struct hmac_sha1_testvec *hmac_sha1_tv;
 	struct scatterlist sg[2];
-	size_t tsize;
+	unsigned int tsize;
 	char result[SHA1_DIGEST_SIZE];
 
 	printk("\ntesting sha1\n");
 
 	tsize = sizeof (sha1_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -271,7 +271,7 @@ test_sha1(void)
 	}
 
 	for (i = 0; i < SHA1_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 		memset(result, 0, sizeof (result));
 
 		p = sha1_tv[i].plaintext;
@@ -318,7 +318,7 @@ test_sha1(void)
 
 	tsize = sizeof (hmac_sha1_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -327,7 +327,7 @@ test_sha1(void)
 	hmac_sha1_tv = (void *) tvmem;
 
 	for (i = 0; i < HMAC_SHA1_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 		memset(result, 0, sizeof (result));
 
 		p = hmac_sha1_tv[i].plaintext;
@@ -377,8 +377,8 @@ test_sha1(void)
 void
 test_des(void)
 {
-	int ret, i, len;
-	size_t tsize;
+	unsigned int ret, i, len;
+	unsigned int tsize;
 	char *p, *q;
 	struct crypto_tfm *tfm;
 	char *key;
@@ -390,7 +390,7 @@ test_des(void)
 
 	tsize = sizeof (des_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -405,7 +405,7 @@ test_des(void)
 	}
 
 	for (i = 0; i < DES_ENC_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 
 		key = des_tv[i].key;
 		tfm->crt_flags |= CRYPTO_TFM_REQ_WEAK_KEY;
@@ -815,7 +815,7 @@ test_des(void)
 
 	tsize = sizeof (des_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -823,7 +823,7 @@ test_des(void)
 	des_tv = (void *) tvmem;
 
 	for (i = 0; i < DES_DEC_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 
 		key = des_tv[i].key;
 
@@ -975,7 +975,7 @@ test_des(void)
 
 	tsize = sizeof (des_cbc_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -991,7 +991,7 @@ test_des(void)
 	}
 	
 	for (i = 0; i < DES_CBC_ENC_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 
 		key = des_tv[i].key;
 
@@ -1088,7 +1088,7 @@ test_des(void)
 
 	tsize = sizeof (des_cbc_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -1098,7 +1098,7 @@ test_des(void)
 	printk("\ntesting des cbc decryption\n");
 
 	for (i = 0; i < DES_CBC_DEC_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 
 		tfm->crt_flags = 0;
 		key = des_tv[i].key;
@@ -1189,14 +1189,13 @@ test_des(void)
 
       out:
 	crypto_free_tfm(tfm);
-	return;
 }
 
 void
 test_des3_ede(void)
 {
-	int ret, i, len;
-	size_t tsize;
+	unsigned int ret, i, len;
+	unsigned int tsize;
 	char *p, *q;
 	struct crypto_tfm *tfm;
 	char *key;
@@ -1208,7 +1207,7 @@ test_des3_ede(void)
 
 	tsize = sizeof (des3_ede_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -1223,7 +1222,7 @@ test_des3_ede(void)
 	}
 
 	for (i = 0; i < DES3_EDE_ENC_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 
 		key = des_tv[i].key;
 		ret = crypto_cipher_setkey(tfm, key, 24);
@@ -1257,7 +1256,7 @@ test_des3_ede(void)
 
 	tsize = sizeof (des3_ede_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
 		       TVMEMSIZE);
 		return;
 	}
@@ -1266,7 +1265,7 @@ test_des3_ede(void)
 	des_tv = (void *) tvmem;
 
 	for (i = 0; i < DES3_EDE_DEC_TEST_VECTORS; i++) {
-		printk("test %d:\n", i + 1);
+		printk("test %u:\n", i + 1);
 
 		key = des_tv[i].key;
 		ret = crypto_cipher_setkey(tfm, key, 24);
@@ -1298,7 +1297,6 @@ test_des3_ede(void)
 
       out:
 	crypto_free_tfm(tfm);
-	return;
 }
 
 static void

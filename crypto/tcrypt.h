@@ -370,7 +370,7 @@ struct sha1_testvec {
 #define DES3_EDE_DEC_TEST_VECTORS	3
 
 struct des_tv {
-	int len;
+	unsigned int len;
 	int fail;
 	char key[24];
 	char iv[8];

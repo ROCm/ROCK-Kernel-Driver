@@ -41,7 +41,7 @@ static inline int crypto_cipher_flags(u32 flags)
 }
 
 #ifdef CONFIG_KMOD
-void crypto_alg_autoload(char *name);
+void crypto_alg_autoload(const char *name);
 #endif
 
 int crypto_init_digest_flags(struct crypto_tfm *tfm, u32 flags);

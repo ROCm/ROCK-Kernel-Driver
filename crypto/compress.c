@@ -23,14 +23,10 @@
  * lossless Quadruple ROT13 compression.
  */
 static void crypto_compress(struct crypto_tfm *tfm)
-{
-	return;
-}
+{ }
 
 static void crypto_decompress(struct crypto_tfm *tfm)
-{
-	return;
-}
+{ }
 
 int crypto_init_compress_flags(struct crypto_tfm *tfm, u32 flags)
 {

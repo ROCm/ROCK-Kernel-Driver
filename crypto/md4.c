@@ -37,7 +37,7 @@ struct md4_ctx {
 	u64 byte_count;
 };
 
-static u32 lshift(u32 x, int s)
+static u32 lshift(u32 x, unsigned int s)
 {
 	x &= 0xFFFFFFFF;
 	return ((x << s) & 0xFFFFFFFF) | (x >> (32 - s));
@@ -63,7 +63,7 @@ static inline u32 H(u32 x, u32 y, u32 z)
 #define ROUND3(a,b,c,d,k,s) (a = lshift(a + H(b,c,d) + k + (u32)0x6ED9EBA1,s))
 
 /* XXX: this stuff can be optimized */
-static inline void le32_to_cpu_array(u32 *buf, unsigned words)
+static inline void le32_to_cpu_array(u32 *buf, unsigned int words)
 {
 	while (words--) {
 		__le32_to_cpus(buf);
@@ -71,7 +71,7 @@ static inline void le32_to_cpu_array(u32 *buf, unsigned words)
 	}
 }
 
-static inline void cpu_to_le32_array(u32 *buf, unsigned words)
+static inline void cpu_to_le32_array(u32 *buf, unsigned int words)
 {
 	while (words--) {
 		__cpu_to_le32s(buf);
@@ -162,7 +162,7 @@ static void md4_init(void *ctx)
 	mctx->byte_count = 0;
 }
 
-static void md4_update(void *ctx, const u8 *data, size_t len)
+static void md4_update(void *ctx, const u8 *data, unsigned int len)
 {
 	struct md4_ctx *mctx = ctx;
 	const u32 avail = sizeof(mctx->block) - (mctx->byte_count & 0x3f);
@@ -195,7 +195,7 @@ static void md4_update(void *ctx, const u8 *data, size_t len)
 static void md4_final(void *ctx, u8 *out)
 {
 	struct md4_ctx *mctx = ctx;
-	const int offset = mctx->byte_count & 0x3f;
+	const unsigned int offset = mctx->byte_count & 0x3f;
 	char *p = (char *)mctx->block + offset;
 	int padding = 56 - (offset + 1);
 

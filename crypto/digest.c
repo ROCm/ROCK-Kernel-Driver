@@ -23,12 +23,12 @@
 static void init(struct crypto_tfm *tfm)
 {
 	tfm->__crt_alg->cra_digest.dia_init(tfm->crt_ctx);
-	return;
 }
 
-static void update(struct crypto_tfm *tfm, struct scatterlist *sg, size_t nsg)
+static void update(struct crypto_tfm *tfm,
+                   struct scatterlist *sg, unsigned int nsg)
 {
-	int i;
+	unsigned int i;
 	
 	for (i = 0; i < nsg; i++) {
 		char *p = crypto_kmap(sg[i].page) + sg[i].offset;
@@ -37,19 +37,17 @@ static void update(struct crypto_tfm *tfm, struct scatterlist *sg, size_t nsg)
 		crypto_kunmap(p);
 		crypto_yield(tfm);
 	}
-	return;
 }
 
 static void final(struct crypto_tfm *tfm, u8 *out)
 {
 	tfm->__crt_alg->cra_digest.dia_final(tfm->crt_ctx, out);
-	return;
 }
 
 static void digest(struct crypto_tfm *tfm,
-                   struct scatterlist *sg, size_t nsg, u8 *out)
+                   struct scatterlist *sg, unsigned int nsg, u8 *out)
 {
-	int i;
+	unsigned int i;
 
 	tfm->crt_digest.dit_init(tfm);
 		
@@ -61,13 +59,12 @@ static void digest(struct crypto_tfm *tfm,
 		crypto_yield(tfm);
 	}
 	crypto_digest_final(tfm, out);
-	return;
 }
 
-static void hmac(struct crypto_tfm *tfm, u8 *key, size_t keylen,
-                 struct scatterlist *sg, size_t nsg, u8 *out)
+static void hmac(struct crypto_tfm *tfm, u8 *key, unsigned int keylen,
+                 struct scatterlist *sg, unsigned int nsg, u8 *out)
 {
-	int i;
+	unsigned int i;
 	struct scatterlist tmp;
 	char ipad[crypto_tfm_alg_blocksize(tfm) + 1];
 	char opad[crypto_tfm_alg_blocksize(tfm) + 1];
@@ -112,7 +109,6 @@ static void hmac(struct crypto_tfm *tfm, u8 *key, size_t keylen,
 	
 	crypto_digest_update(tfm, &tmp, 1);
 	crypto_digest_final(tfm, out);
-	return;
 }
 
 int crypto_init_digest_flags(struct crypto_tfm *tfm, u32 flags)

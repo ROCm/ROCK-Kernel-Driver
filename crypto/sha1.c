@@ -116,10 +116,10 @@ static void sha1_init(void *ctx)
 	*sctx = initstate;
 }
 
-static void sha1_update(void *ctx, const u8 *data, size_t len)
+static void sha1_update(void *ctx, const u8 *data, unsigned int len)
 {
 	struct sha1_ctx *sctx = ctx;
-	unsigned i, j;
+	unsigned int i, j;
 
 	j = (sctx->count >> 3) & 0x3f;
 	sctx->count += len << 3;

@@ -34,7 +34,7 @@ static inline void crypto_alg_put(struct crypto_alg *alg)
 		__MOD_DEC_USE_COUNT(alg->cra_module);
 }
 
-struct crypto_alg *crypto_alg_lookup(char *name)
+struct crypto_alg *crypto_alg_lookup(const char *name)
 {
 	struct crypto_alg *q, *alg = NULL;
 	
@@ -68,7 +68,6 @@ static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 	
 	default:
 		BUG();
-		
 	}
 	
 	return -EINVAL;
@@ -95,7 +94,7 @@ static void crypto_init_ops(struct crypto_tfm *tfm)
 	}
 }
 
-struct crypto_tfm *crypto_alloc_tfm(char *name, u32 flags)
+struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 {
 	struct crypto_tfm *tfm = NULL;
 	struct crypto_alg *alg;
@@ -176,8 +175,8 @@ int crypto_register_alg(struct crypto_alg *alg)
 	}
 	
 	if (crypto_alg_blocksize_check(alg)) {
-		printk(KERN_WARNING "%s: blocksize %Zd exceeds max. "
-		       "size %d\n", __FUNCTION__, alg->cra_blocksize,
+		printk(KERN_WARNING "%s: blocksize %u exceeds max. "
+		       "size %u\n", __FUNCTION__, alg->cra_blocksize,
 		       CRYPTO_MAX_CIPHER_BLOCK_SIZE);
 		ret = -EINVAL;
 	}
@@ -242,16 +241,16 @@ static int c_show(struct seq_file *m, void *p)
 	seq_printf(m, "name       : %s\n", alg->cra_name);
 	seq_printf(m, "module     : %s\n", alg->cra_module ?
 					alg->cra_module->name : "[static]");
-	seq_printf(m, "blocksize  : %Zd\n", alg->cra_blocksize);
+	seq_printf(m, "blocksize  : %u\n", alg->cra_blocksize);
 	
 	switch (alg->cra_flags & CRYPTO_ALG_TYPE_MASK) {
 	case CRYPTO_ALG_TYPE_CIPHER:
-		seq_printf(m, "keysize    : %Zd\n", alg->cra_cipher.cia_keysize);
-		seq_printf(m, "ivsize     : %Zd\n", alg->cra_cipher.cia_ivsize);
+		seq_printf(m, "keysize    : %u\n", alg->cra_cipher.cia_keysize);
+		seq_printf(m, "ivsize     : %u\n", alg->cra_cipher.cia_ivsize);
 		break;
 		
 	case CRYPTO_ALG_TYPE_DIGEST:
-		seq_printf(m, "digestsize : %Zd\n",
+		seq_printf(m, "digestsize : %u\n",
 		           alg->cra_digest.dia_digestsize);
 		break;
 	}

@@ -65,17 +65,18 @@ struct scatterlist;
  * via crypto_register_alg() and crypto_unregister_alg().
  */
 struct cipher_alg {
-	size_t cia_keysize;
-	size_t cia_ivsize;
-	int (*cia_setkey)(void *ctx, const u8 *key, size_t keylen, int *flags);
-	void (*cia_encrypt)(void *ctx, u8 *dst, u8 *src);
-	void (*cia_decrypt)(void *ctx, u8 *dst, u8 *src);
+	unsigned int cia_keysize;
+	unsigned int cia_ivsize;
+	int (*cia_setkey)(void *ctx, const u8 *key,
+	                  unsigned int keylen, u32 *flags);
+	void (*cia_encrypt)(void *ctx, u8 *dst, const u8 *src);
+	void (*cia_decrypt)(void *ctx, u8 *dst, const u8 *src);
 };
 
 struct digest_alg {
-	size_t dia_digestsize;
+	unsigned int dia_digestsize;
 	void (*dia_init)(void *ctx);
-	void (*dia_update)(void *ctx, const u8 *data, size_t len);
+	void (*dia_update)(void *ctx, const u8 *data, unsigned int len);
 	void (*dia_final)(void *ctx, u8 *out);
 };
 
@@ -90,10 +91,10 @@ struct compress_alg {
 
 struct crypto_alg {
 	struct list_head cra_list;
-	int cra_flags;
-	size_t cra_blocksize;
-	size_t cra_ctxsize;
-	char cra_name[CRYPTO_MAX_ALG_NAME];
+	u32 cra_flags;
+	unsigned int cra_blocksize;
+	unsigned int cra_ctxsize;
+	const char cra_name[CRYPTO_MAX_ALG_NAME];
 
 	union {
 		struct cipher_alg cipher;
@@ -120,22 +121,24 @@ struct crypto_tfm;
 struct cipher_tfm {
 	void *cit_iv;
 	u32 cit_mode;
-	int (*cit_setkey)(struct crypto_tfm *tfm, const u8 *key, size_t keylen);
+	int (*cit_setkey)(struct crypto_tfm *tfm,
+	                  const u8 *key, unsigned int keylen);
 	int (*cit_encrypt)(struct crypto_tfm *tfm,
-	                   struct scatterlist *sg, size_t nsg);
+	                   struct scatterlist *sg, unsigned int nsg);
 	int (*cit_decrypt)(struct crypto_tfm *tfm,
-	                   struct scatterlist *sg, size_t nsg);
+	                   struct scatterlist *sg, unsigned int nsg);
 };
 
 struct digest_tfm {
 	void (*dit_init)(struct crypto_tfm *tfm);
 	void (*dit_update)(struct crypto_tfm *tfm,
-	                   struct scatterlist *sg, size_t nsg);
+	                   struct scatterlist *sg, unsigned int nsg);
 	void (*dit_final)(struct crypto_tfm *tfm, u8 *out);
 	void (*dit_digest)(struct crypto_tfm *tfm, struct scatterlist *sg,
-	                   size_t nsg, u8 *out);
-	void (*dit_hmac)(struct crypto_tfm *tfm, u8 *key, size_t keylen,
-	                 struct scatterlist *sg, size_t nsg, u8 *out);
+	                   unsigned int nsg, u8 *out);
+	void (*dit_hmac)(struct crypto_tfm *tfm, u8 *key,
+	                 unsigned int keylen, struct scatterlist *sg,
+	                 unsigned int nsg, u8 *out);
 };
 
 struct compress_tfm {
@@ -150,7 +153,7 @@ struct compress_tfm {
 struct crypto_tfm {
 
 	void *crt_ctx;
-	int crt_flags;
+	u32 crt_flags;
 	
 	union {
 		struct cipher_tfm cipher;
@@ -174,13 +177,13 @@ struct crypto_tfm {
  * crypto_free_tfm() frees up the transform and any associated resources,
  * then drops the refcount on the associated algorithm.
  */
-struct crypto_tfm *crypto_alloc_tfm(char *alg_name, u32 tfm_flags);
+struct crypto_tfm *crypto_alloc_tfm(const char *alg_name, u32 tfm_flags);
 void crypto_free_tfm(struct crypto_tfm *tfm);
 
 /*
  * Transform helpers which query the underlying algorithm.
  */
-static inline char *crypto_tfm_alg_name(struct crypto_tfm *tfm)
+static inline const char *crypto_tfm_alg_name(struct crypto_tfm *tfm)
 {
 	return tfm->__crt_alg->cra_name;
 }
@@ -200,22 +203,22 @@ static inline u32 crypto_tfm_alg_type(struct crypto_tfm *tfm)
 	return tfm->__crt_alg->cra_flags & CRYPTO_ALG_TYPE_MASK;
 }
 
-static inline size_t crypto_tfm_alg_keysize(struct crypto_tfm *tfm)
+static inline unsigned int crypto_tfm_alg_keysize(struct crypto_tfm *tfm)
 {
 	return tfm->__crt_alg->cra_cipher.cia_keysize;
 }
 
-static inline size_t crypto_tfm_alg_ivsize(struct crypto_tfm *tfm)
+static inline unsigned int crypto_tfm_alg_ivsize(struct crypto_tfm *tfm)
 {
 	return tfm->__crt_alg->cra_cipher.cia_ivsize;
 }
 
-static inline size_t crypto_tfm_alg_blocksize(struct crypto_tfm *tfm)
+static inline unsigned int crypto_tfm_alg_blocksize(struct crypto_tfm *tfm)
 {
 	return tfm->__crt_alg->cra_blocksize;
 }
 
-static inline size_t crypto_tfm_alg_digestsize(struct crypto_tfm *tfm)
+static inline unsigned int crypto_tfm_alg_digestsize(struct crypto_tfm *tfm)
 {
 	return tfm->__crt_alg->cra_digest.dia_digestsize;
 }
@@ -230,7 +233,8 @@ static inline void crypto_digest_init(struct crypto_tfm *tfm)
 }
 
 static inline void crypto_digest_update(struct crypto_tfm *tfm,
-                                        struct scatterlist *sg, size_t nsg)
+                                        struct scatterlist *sg,
+                                        unsigned int nsg)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_update(tfm, sg, nsg);
@@ -244,15 +248,16 @@ static inline void crypto_digest_final(struct crypto_tfm *tfm, u8 *out)
 
 static inline void crypto_digest_digest(struct crypto_tfm *tfm,
                                         struct scatterlist *sg,
-                                        size_t nsg, u8 *out)
+                                        unsigned int nsg, u8 *out)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_digest(tfm, sg, nsg, out);
 }
-                                        
-static inline void crypto_digest_hmac(struct crypto_tfm *tfm, u8 *key,
-                                      size_t keylen, struct scatterlist *sg,
-                                      size_t nsg, u8 *out)
+
+static inline void crypto_digest_hmac(struct crypto_tfm *tfm,
+                                      u8 *key, unsigned int keylen,
+                                      struct scatterlist *sg,
+                                      unsigned int nsg, u8 *out)
                                       
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
@@ -260,35 +265,37 @@ static inline void crypto_digest_hmac(struct crypto_tfm *tfm, u8 *key,
 }
 
 static inline int crypto_cipher_setkey(struct crypto_tfm *tfm,
-                                       const u8 *key, size_t keylen)
+                                       const u8 *key, unsigned int keylen)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->crt_cipher.cit_setkey(tfm, key, keylen);
 }
 
 static inline int crypto_cipher_encrypt(struct crypto_tfm *tfm,
-                                        struct scatterlist *sg, size_t nsg)
+                                        struct scatterlist *sg,
+                                        unsigned int nsg)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->crt_cipher.cit_encrypt(tfm, sg, nsg);
 }                                        
 
 static inline int crypto_cipher_decrypt(struct crypto_tfm *tfm,
-                                        struct scatterlist *sg, size_t nsg)
+                                        struct scatterlist *sg,
+                                        unsigned int nsg)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	return tfm->crt_cipher.cit_decrypt(tfm, sg, nsg);
 }
 
 static inline void crypto_cipher_set_iv(struct crypto_tfm *tfm,
-                                        u8 *src, size_t len)
+                                        const u8 *src, unsigned int len)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	memcpy(tfm->crt_cipher.cit_iv, src, len);
 }
 
 static inline void crypto_cipher_get_iv(struct crypto_tfm *tfm,
-                                        u8 *dst, size_t len)
+                                        u8 *dst, unsigned int len)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	memcpy(dst, tfm->crt_cipher.cit_iv, len);

@@ -21,8 +21,7 @@
  * A far more intelligent version of this is planned.  For now, just
  * try an exact match on the name of the algorithm.
  */
-void crypto_alg_autoload(char *name)
+void crypto_alg_autoload(const char *name)
 {
 	request_module(name);
-	return;
 }

@@ -124,7 +124,7 @@ static inline void md5_transform(u32 *hash, u32 const *in)
 }
 
 /* XXX: this stuff can be optimized */
-static inline void le32_to_cpu_array(u32 *buf, unsigned words)
+static inline void le32_to_cpu_array(u32 *buf, unsigned int words)
 {
 	while (words--) {
 		__le32_to_cpus(buf);
@@ -132,7 +132,7 @@ static inline void le32_to_cpu_array(u32 *buf, unsigned words)
 	}
 }
 
-static inline void cpu_to_le32_array(u32 *buf, unsigned words)
+static inline void cpu_to_le32_array(u32 *buf, unsigned int words)
 {
 	while (words--) {
 		__cpu_to_le32s(buf);
@@ -157,7 +157,7 @@ static void md5_init(void *ctx)
 	mctx->byte_count = 0;
 }
 
-static void md5_update(void *ctx, const u8 *data, size_t len)
+static void md5_update(void *ctx, const u8 *data, unsigned int len)
 {
 	struct md5_ctx *mctx = ctx;
 	const u32 avail = sizeof(mctx->block) - (mctx->byte_count & 0x3f);
@@ -190,7 +190,7 @@ static void md5_update(void *ctx, const u8 *data, size_t len)
 static void md5_final(void *ctx, u8 *out)
 {
 	struct md5_ctx *mctx = ctx;
-	const int offset = mctx->byte_count & 0x3f;
+	const unsigned int offset = mctx->byte_count & 0x3f;
 	char *p = (char *)mctx->block + offset;
 	int padding = 56 - (offset + 1);
 

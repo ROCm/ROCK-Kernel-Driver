@@ -20,7 +20,7 @@
 #include <asm/scatterlist.h>
 #include "internal.h"
 
-typedef void (cryptfn_t)(void *, u8 *, u8 *);
+typedef void (cryptfn_t)(void *, u8 *, const u8 *);
 typedef void (procfn_t)(struct crypto_tfm *, u8 *, cryptfn_t, int enc);
 
 static inline void xor_64(u8 *a, const u8 *b)
@@ -29,10 +29,9 @@ static inline void xor_64(u8 *a, const u8 *b)
 	((u32 *)a)[1] ^= ((u32 *)b)[1];
 }
 
-static inline size_t sglen(struct scatterlist *sg, size_t nsg)
+static inline unsigned int sglen(struct scatterlist *sg, unsigned int nsg)
 {
-	int i;
-	size_t n;
+	unsigned int i, n;
 	
 	for (i = 0, n = 0; i < nsg; i++)
 		n += sg[i].length;
@@ -44,21 +43,21 @@ static inline size_t sglen(struct scatterlist *sg, size_t nsg)
  * Do not call this unless the total length of all of the fragments 
  * has been verified as multiple of the block size.
  */
-static int copy_chunks(struct crypto_tfm *tfm, u8 *buf,
-                       struct scatterlist *sg, int sgidx,
-                       int rlen, int *last, int in)
+static unsigned int copy_chunks(struct crypto_tfm *tfm, u8 *buf,
+                                struct scatterlist *sg, unsigned int sgidx,
+                                unsigned int rlen, unsigned int *last, int in)
 {
-	int i, copied, coff, j, aligned;
-	size_t bsize = crypto_tfm_alg_blocksize(tfm);
+	unsigned int i, copied, coff, j, aligned;
+	unsigned int bsize = crypto_tfm_alg_blocksize(tfm);
 
 	for (i = sgidx, j = copied = 0, aligned = 0 ; copied < bsize; i++) {
-		int len = sg[i].length;
-		int clen;
+		unsigned int len = sg[i].length;
+		unsigned int clen;
 		char *p;
 
 		if (copied) {
 			coff = 0;
-			clen = min_t(int, len,  bsize - copied);
+			clen = min(len,  bsize - copied);
 			
 			if (len == bsize - copied)
 				aligned = 1;	/* last + right aligned */
@@ -83,16 +82,18 @@ static int copy_chunks(struct crypto_tfm *tfm, u8 *buf,
 	return i - sgidx - 2 + aligned;
 }
 
-static inline int gather_chunks(struct crypto_tfm *tfm, u8 *buf,
-                                struct scatterlist *sg,
-                                int sgidx, int rlen, int *last)
+static inline unsigned int gather_chunks(struct crypto_tfm *tfm, u8 *buf,
+                                         struct scatterlist *sg,
+                                         unsigned int sgidx, unsigned int rlen,
+                                         unsigned int *last)
 {
 	return copy_chunks(tfm, buf, sg, sgidx, rlen, last, 1);
 }
 
-static inline int scatter_chunks(struct crypto_tfm *tfm, u8 *buf,
-                                 struct scatterlist *sg,
-                                 int sgidx, int rlen, int *last)
+static inline unsigned int scatter_chunks(struct crypto_tfm *tfm, u8 *buf,
+                                          struct scatterlist *sg,
+                                          unsigned int sgidx, unsigned int rlen,
+                                          unsigned int *last)
 {
 	return copy_chunks(tfm, buf, sg, sgidx, rlen, last, 0);
 }
@@ -111,10 +112,10 @@ static inline int scatter_chunks(struct crypto_tfm *tfm, u8 *buf,
  * and the block offset (boff).
  */
 static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
-                 size_t nsg, cryptfn_t crfn, procfn_t prfn, int enc)
+                 unsigned int nsg, cryptfn_t crfn, procfn_t prfn, int enc)
 {
-	int i, coff;
-	size_t bsize = crypto_tfm_alg_blocksize(tfm);
+	unsigned int i, coff;
+	unsigned int bsize = crypto_tfm_alg_blocksize(tfm);
 	u8 tmp[CRYPTO_MAX_CIPHER_BLOCK_SIZE];
 
 	if (sglen(sg, nsg) % bsize) {
@@ -123,8 +124,8 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 	}
 
 	for (i = 0, coff = 0; i < nsg; i++) {
-		int n = 0, boff = 0;
-		int len = sg[i].length - coff;
+		unsigned int n = 0, boff = 0;
+		unsigned int len = sg[i].length - coff;
 		char *p = crypto_kmap(sg[i].page) + sg[i].offset + coff;
 
 		while (len) {
@@ -185,41 +186,42 @@ static void ecb_process(struct crypto_tfm *tfm, u8 *block,
 	fn(tfm->crt_ctx, block, block);
 }
 
-static int setkey(struct crypto_tfm *tfm, const u8 *key, size_t keylen)
+static int setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
 {
 	return tfm->__crt_alg->cra_cipher.cia_setkey(tfm->crt_ctx, key,
 	                                             keylen, &tfm->crt_flags);
 }
 
 static int ecb_encrypt(struct crypto_tfm *tfm,
-                       struct scatterlist *sg, size_t nsg)
+                       struct scatterlist *sg, unsigned int nsg)
 {
 	return crypt(tfm, sg, nsg,
 	             tfm->__crt_alg->cra_cipher.cia_encrypt, ecb_process, 1);
 }
 
 static int ecb_decrypt(struct crypto_tfm *tfm,
-                       struct scatterlist *sg, size_t nsg)
+                       struct scatterlist *sg, unsigned int nsg)
 {
 	return crypt(tfm, sg, nsg,
 	             tfm->__crt_alg->cra_cipher.cia_decrypt, ecb_process, 1);
 }
 
 static int cbc_encrypt(struct crypto_tfm *tfm,
-                       struct scatterlist *sg, size_t nsg)
+                       struct scatterlist *sg, unsigned int nsg)
 {
 	return crypt(tfm, sg, nsg,
 	             tfm->__crt_alg->cra_cipher.cia_encrypt, cbc_process, 1);
 }
 
 static int cbc_decrypt(struct crypto_tfm *tfm,
-                       struct scatterlist *sg, size_t nsg)
+                       struct scatterlist *sg, unsigned int nsg)
 {
 	return crypt(tfm, sg, nsg,
 	             tfm->__crt_alg->cra_cipher.cia_decrypt, cbc_process, 0);
 }
 
-static int nocrypt(struct crypto_tfm *tfm, struct scatterlist *sg, size_t nsg)
+static int nocrypt(struct crypto_tfm *tfm,
+                   struct scatterlist *sg, unsigned int nsg)
 {
 	return -ENOSYS;
 }

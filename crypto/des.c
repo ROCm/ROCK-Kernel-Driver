@@ -278,7 +278,7 @@ const static u8 parity[] = {
 };
 
 
-static void des_small_fips_encrypt(u32 *expkey, u8 *dst, u8 *src)
+static void des_small_fips_encrypt(u32 *expkey, u8 *dst, const u8 *src)
 {
 	u32 x, y, z;
 	
@@ -648,10 +648,9 @@ static void des_small_fips_encrypt(u32 *expkey, u8 *dst, u8 *src)
 	dst[6] = y;
 	y >>= 8;
 	dst[7] = y;
-	return;
 }
 
-static void des_small_fips_decrypt(u32 *expkey, u8 *dst, u8 *src)
+static void des_small_fips_decrypt(u32 *expkey, u8 *dst, const u8 *src)
 {
 	u32 x, y, z;
 	
@@ -1021,14 +1020,13 @@ static void des_small_fips_decrypt(u32 *expkey, u8 *dst, u8 *src)
 	dst[6] = y;
 	y >>= 8;
 	dst[7] = y;
-	return;
 }
 
 /*
  * RFC2451: Weak key checks SHOULD be performed.
  */
 
-static int setkey(u32 *expkey, const u8 *key, size_t keylen, int *flags)
+static int setkey(u32 *expkey, const u8 *key, unsigned int keylen, u32 *flags)
 {
 	const u8 *k;
 	u8 *b0, *b1;
@@ -1177,17 +1175,17 @@ not_weak:
 	return 0;
 }
 
-static int des_setkey(void *ctx, const u8 *key, size_t keylen, int *flags)
+static int des_setkey(void *ctx, const u8 *key, unsigned int keylen, u32 *flags)
 {
 	return setkey(((struct des_ctx *)ctx)->expkey, key, keylen, flags);
 }
 
-static void des_encrypt(void *ctx, u8 *dst, u8 *src)
+static void des_encrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	des_small_fips_encrypt(((struct des_ctx *)ctx)->expkey, dst, src);
 }
 
-static void des_decrypt(void *ctx, u8 *dst, u8 *src)
+static void des_decrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	des_small_fips_decrypt(((struct des_ctx *)ctx)->expkey, dst, src);
 }
@@ -1205,9 +1203,10 @@ static void des_decrypt(void *ctx, u8 *dst, u8 *src)
  *   property.
  *
  */
-static int des3_ede_setkey(void *ctx, const u8 *key, size_t keylen, int *flags)
+static int des3_ede_setkey(void *ctx, const u8 *key,
+                           unsigned int keylen, u32 *flags)
 {
-	int i, off;
+	unsigned int i, off;
 	struct des3_ede_ctx *dctx = ctx;
 
 	if (keylen != DES3_EDE_KEY_SIZE) {
@@ -1232,26 +1231,22 @@ static int des3_ede_setkey(void *ctx, const u8 *key, size_t keylen, int *flags)
 	return 0;
 }
 
-static void des3_ede_encrypt(void *ctx, u8 *dst, u8 *src)
+static void des3_ede_encrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct des3_ede_ctx *dctx = ctx;
 	
 	des_small_fips_encrypt(dctx->expkey, dst, src);
 	des_small_fips_decrypt(&dctx->expkey[DES_EXPKEY_WORDS], dst, dst);
 	des_small_fips_encrypt(&dctx->expkey[DES_EXPKEY_WORDS * 2], dst, dst);
-
-	return;
 }
 
-static void des3_ede_decrypt(void *ctx, u8 *dst, u8 *src)
+static void des3_ede_decrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct des3_ede_ctx *dctx = ctx;
 
 	des_small_fips_decrypt(&dctx->expkey[DES_EXPKEY_WORDS * 2], dst, src);
 	des_small_fips_encrypt(&dctx->expkey[DES_EXPKEY_WORDS], dst, dst);
 	des_small_fips_decrypt(dctx->expkey, dst, dst);
-	
-	return;
 }
 
 static struct crypto_alg des_alg = {
