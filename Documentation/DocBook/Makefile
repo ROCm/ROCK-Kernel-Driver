@@ -88,9 +88,9 @@ IMG-parportbook := parport-share.fig parport-multi.fig parport-structure.fig
 IMG-parportbook2 := $(addprefix Documentation/DocBook/,$(IMG-parportbook))
 EPS-parportbook := $(patsubst %.fig,%.eps, $(IMG-parportbook2))
 PNG-parportbook := $(patsubst %.fig,%.png, $(IMG-parportbook2))
-Documentation/DocBook/parportbook.ps: $(EPS-parportbook)
-Documentation/DocBook/parportbook.html Documentation/DocBook/parportbook.pdf:\
-	$(PNG-parportbook)
+Documentation/DocBook/parportbook.html:	$(PNG-parportbook)
+Documentation/DocBook/parportbook.ps Documentation/DocBook/parportbook.pdf:\
+	$(EPS-parportbook)
 
 ###
 # Rules to generate postscript, PDF and HTML
@@ -99,48 +99,44 @@ Documentation/DocBook/parportbook.html Documentation/DocBook/parportbook.pdf:\
 	@(which db2ps > /dev/null 2>&1) || \
 	 (echo "*** You need to install DocBook stylesheets ***"; \
 	  exit 1)
-	@echo '  DB2PS   $@'
-	@db2ps -o $(dir $@) $<
+	$(call do_cmd,DB2PS   $@,db2ps -o $(dir $@) $<)
 
 %.pdf : %.sgml
 	@(which db2pdf > /dev/null 2>&1) || \
 	 (echo "*** You need to install DocBook stylesheets ***"; \
 	  exit 1)
-	@echo '  DB2PDF  $@'
-	@db2pdf -o $(dir $@) $<
+	$(call do_cmd,DB2PDF  $@,db2pdf -o $(dir $@) $<)
 
 %.html:	%.sgml
 	@(which db2html > /dev/null 2>&1) || \
 	 (echo "*** You need to install DocBook stylesheets ***"; \
 	  exit 1)
 	@rm -rf $@ $(patsubst %.html,%,$@)
-	@echo '  DB2HTML $@'
-	@db2html -o $(patsubst %.html,%,$@) $< && \
+	$(call do_cmd,DB2HTML $@,db2html -o $(patsubst %.html,%,$@) $< && \
          echo '<a HREF="$(patsubst %.html,%,$(notdir $@))/book1.html">\
-         Goto $(patsubst %.html,%,$(notdir $@))</a><p>' > $@
+         Goto $(patsubst %.html,%,$(notdir $@))</a><p>' > $@)
 	@if [ ! -z "$(PNG-$(basename $(notdir $@)))" ]; then \
             cp $(PNG-$(basename $(notdir $@))) $(patsubst %.html,%,$@); fi
 
 ###
 # Rules to generate postscripts and PNG imgages from .fig format files
 %.eps: %.fig
-	@echo '  FIG2DEV -Leps $@'
-	@fig2dev -Leps $< $@
+	$(call do_cmd,FIG2DEV -Leps $@,fig2dev -Leps $< $@)
 
 %.png: %.fig
-	@echo '  FIG2DEV -Lpng $@'
-	fig2dev -Lpng $< $@
+	$(call do_cmd,FIG2DEV -Lpng $@,fig2dev -Lpng $< $@)
 
 ###
 # Rule to convert a .c file to inline SGML documentation
 %.sgml: %.c
 	@echo '  Generating $@'
-	@echo "<programlisting>" > $@
-	@expand --tabs=8 < $< | \
-	sed -e "s/&/\\&amp;/g" \
-	     -e "s/</\\&lt;/g" \
-	     -e "s/>/\\&gt;/g" >> $@
-	@echo "</programlisting>" >> $@
+	@(                            \
+	   echo "<programlisting>";   \
+	   expand --tabs=8 < $< |     \
+	   sed -e "s/&/\\&amp;/g"     \
+	       -e "s/</\\&lt;/g"      \
+	       -e "s/>/\\&gt;/g";     \
+	   echo "</programlisting>")  > $@
 
 ###
 # Help targets as used by the top-level makefile
