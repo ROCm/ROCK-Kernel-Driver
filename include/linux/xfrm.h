@@ -42,7 +42,6 @@ struct xfrm_selector
 	__u8	proto;
 	int	ifindex;
 	uid_t	user;
-	void	*owner;
 };
 
 #define XFRM_INF (~(u64)0)
