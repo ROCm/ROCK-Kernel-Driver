@@ -1,0 +1,6 @@
+mainmenu_option next_comment
+comment 'Intel PXA250/210 Implementations'
+dep_bool '  Intel DBPXA250 Development Platform' CONFIG_ARCH_LUBBOCK $CONFIG_ARCH_PXA
+dep_bool '  Accelent Xscale IDP' CONFIG_ARCH_PXA_IDP $CONFIG_ARCH_PXA
+endmenu
+

@@ -6,7 +6,6 @@
  */
 struct task_struct;
 
-#include "asm/arch/irq.h"
 #include "asm/ptrace.h"
 
 #undef NR_IRQS

@@ -5,7 +5,7 @@
 obj-$(CONFIG_SMB_FS) += smbfs.o
 
 smbfs-objs := proc.o dir.o cache.o sock.o inode.o file.o ioctl.o getopt.o \
-		smbiod.o request.o
+		symlink.o smbiod.o request.o
 
 # If you want debugging output, you may add these flags to the EXTRA_CFLAGS
 # SMBFS_PARANOIA should normally be enabled.
@@ -24,7 +24,8 @@ include $(TOPDIR)/Rules.make
 #
 
 # getopt.c not included. It is intentionally separate
-SRC = proc.c dir.c cache.c sock.c inode.c file.c ioctl.c smbiod.c request.c
+SRC = proc.c dir.c cache.c sock.c inode.c file.c ioctl.c smbiod.c request.c \
+	symlink.c
 
 proto:
 	-rm -f proto.h

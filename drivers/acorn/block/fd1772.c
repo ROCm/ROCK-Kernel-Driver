@@ -204,7 +204,6 @@ static struct archy_disk_type {
 #define MAX_DISK_SIZE 720
 
 static struct gendisk disks[FD_MAX_UNIT];
-static char names[FD_MAX_UNIT][4];
 
 /* current info on each unit */
 static struct archy_floppy_struct {
@@ -1589,8 +1588,7 @@ int fd1772_init(void)
 		disks[i].major = MAJOR_NR;
 		disks[i].first_minor = 0;
 		disks[i].fops = &floppy_fops;
-		sprintf(names[i], "fd%d", i);
-		disks[i].major_name = names[i];
+		sprintf(disks[i].disk_name, "fd%d", i);
 		set_capacity(&disks[i], MAX_DISK_SIZE * 2);
 	}
 	blk_set_probe(MAJOR_NR, floppy_find);

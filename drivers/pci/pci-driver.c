@@ -6,6 +6,7 @@
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include "pci.h"
 
 /*
  *  Registration of PCI drivers and handling of hot-pluggable devices.
@@ -199,8 +200,9 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
 }
 
 struct bus_type pci_bus_type = {
-	name:	"pci",
-	match:	pci_bus_match,
+	name:		"pci",
+	match:		pci_bus_match,
+	hotplug:	pci_hotplug,
 };
 
 static int __init pci_driver_init(void)

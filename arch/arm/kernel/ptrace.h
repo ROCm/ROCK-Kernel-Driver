@@ -8,7 +8,7 @@
  * published by the Free Software Foundation.
  */
 extern void __ptrace_cancel_bpt(struct task_struct *);
-extern int ptrace_set_bpt(struct task_struct *);
+extern void ptrace_set_bpt(struct task_struct *);
 extern void ptrace_break(struct task_struct *, struct pt_regs *);
 
 /*

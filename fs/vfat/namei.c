@@ -890,7 +890,6 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 	struct msdos_dir_entry *dummy_de;
 	struct buffer_head *dummy_bh;
 	int dummy_ino;
-	loff_t dummy;
 
 	dir_slots = (struct msdos_dir_slot *)
 	       kmalloc(sizeof(struct msdos_dir_slot) * MSDOS_SLOTS, GFP_KERNEL);
@@ -900,15 +899,6 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 	len = qname->len;
 	while (len && qname->name[len-1] == '.')
 		len--;
-	res = fat_search_long(dir, qname->name, len,
-			      (MSDOS_SB(sb)->options.name_check != 's')
-			      || !MSDOS_SB(sb)->options.posixfs,
-			      &dummy, &dummy);
-	if (res > 0) /* found */
-		res = -EEXIST;
-	if (res)
-		goto cleanup;
-
 	res = vfat_build_slots(dir, qname->name, len,
 			       dir_slots, &slots, is_dir);
 	if (res < 0)

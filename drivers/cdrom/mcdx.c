@@ -1210,7 +1210,7 @@ int __init mcdx_init_drive(int drive)
 	disk->major = MAJOR_NR;
 	disk->first_minor = drive;
 	disk->minor_shift = 0;
-	disk->major_name = stuffp->info.name;
+	strcpy(disk->disk_name, stuffp->info.name);
 	disk->fops = &mcdx_bdops;
 	disk->flags = GENHD_FL_CD;
 

@@ -31,7 +31,7 @@ static rwlock_t gendisk_lock;
 /*
  * Global kernel list of partitioning information.
  */
-static struct gendisk *gendisk_head;
+static LIST_HEAD(gendisk_list);
 
 /*
  *  TEMPORARY KLUDGE.
@@ -66,7 +66,7 @@ static void add_gendisk(struct gendisk *gp)
 		p = kmalloc(size, GFP_KERNEL);
 		if (!p) {
 			printk(KERN_ERR "out of memory; no partitions for %s\n",
-				gp->major_name);
+				gp->disk_name);
 			gp->minor_shift = 0;
 		} else
 			memset(p, 0, size);
@@ -75,16 +75,17 @@ static void add_gendisk(struct gendisk *gp)
 
 	write_lock(&gendisk_lock);
 	list_add(&gp->list, &gendisks[gp->major].list);
-	gp->next = gendisk_head;
-	gendisk_head = gp;
+	if (gp->minor_shift)
+		list_add_tail(&gp->full_list, &gendisk_list);
+	else
+		INIT_LIST_HEAD(&gp->full_list);
 	write_unlock(&gendisk_lock);
 }
 
 void add_disk(struct gendisk *disk)
 {
 	add_gendisk(disk);
-	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-			1<<disk->minor_shift, disk->fops, get_capacity(disk));
+	register_disk(disk);
 }
 
 EXPORT_SYMBOL(add_disk);
@@ -92,13 +93,8 @@ EXPORT_SYMBOL(del_gendisk);
 
 void unlink_gendisk(struct gendisk *disk)
 {
-	struct gendisk **p;
 	write_lock(&gendisk_lock);
-	for (p = &gendisk_head; *p; p = &((*p)->next))
-		if (*p == disk)
-			break;
-	if (*p)
-		*p = (*p)->next;
+	list_del_init(&disk->full_list);
 	list_del_init(&disk->list);
 	write_unlock(&gendisk_lock);
 }
@@ -111,13 +107,14 @@ void unlink_gendisk(struct gendisk *disk)
  * information for the given device @dev.
  */
 struct gendisk *
-get_gendisk(kdev_t dev)
+get_gendisk(dev_t dev, int *part)
 {
 	struct gendisk *disk;
 	struct list_head *p;
-	int major = major(dev);
-	int minor = minor(dev);
+	int major = MAJOR(dev);
+	int minor = MINOR(dev);
 
+	*part = 0;
 	read_lock(&gendisk_lock);
 	if (gendisks[major].get) {
 		disk = gendisks[major].get(minor);
@@ -131,6 +128,7 @@ get_gendisk(kdev_t dev)
 		if (disk->first_minor + (1<<disk->minor_shift) <= minor)
 			continue;
 		read_unlock(&gendisk_lock);
+		*part = minor - disk->first_minor;
 		return disk;
 	}
 	read_unlock(&gendisk_lock);
@@ -143,21 +141,21 @@ EXPORT_SYMBOL(get_gendisk);
 /* iterator */
 static void *part_start(struct seq_file *part, loff_t *pos)
 {
-	loff_t k = *pos;
-	struct gendisk *sgp;
+	struct list_head *p;
+	loff_t l = *pos;
 
 	read_lock(&gendisk_lock);
-	for (sgp = gendisk_head; sgp; sgp = sgp->next) {
-		if (!k--)
-			return sgp;
-	}
+	list_for_each(p, &gendisk_list)
+		if (!l--)
+			return list_entry(p, struct gendisk, full_list);
 	return NULL;
 }
 
 static void *part_next(struct seq_file *part, void *v, loff_t *pos)
 {
+	struct list_head *p = ((struct gendisk *)v)->full_list.next;
 	++*pos;
-	return ((struct gendisk *)v)->next;
+	return p==&gendisk_list ? NULL : list_entry(p, struct gendisk, full_list);
 }
 
 static void part_stop(struct seq_file *part, void *v)
@@ -171,11 +169,11 @@ static int show_partition(struct seq_file *part, void *v)
 	int n;
 	char buf[64];
 
-	if (sgp == gendisk_head)
+	if (&sgp->full_list == gendisk_list.next)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
 	/* Don't show non-partitionable devices or empty devices */
-	if (!sgp->minor_shift || !get_capacity(sgp))
+	if (!get_capacity(sgp))
 		return 0;
 
 	/* show the full disk and all non-0 size partitions of it */
@@ -238,3 +236,18 @@ int __init device_init(void)
 __initcall(device_init);
 
 EXPORT_SYMBOL(disk_devclass);
+
+struct gendisk *alloc_disk(void)
+{
+	struct gendisk *disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+	if (disk)
+		memset(disk, 0, sizeof(struct gendisk));
+	return disk;
+}
+
+void put_disk(struct gendisk *disk)
+{
+	kfree(disk);
+}
+EXPORT_SYMBOL(alloc_disk);
+EXPORT_SYMBOL(put_disk);

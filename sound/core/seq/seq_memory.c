@@ -128,14 +128,14 @@ int snd_seq_dump_var_event(const snd_seq_event_t *event, snd_seq_dump_func_t fun
  * expand the variable length event to linear buffer space.
  */
 
-static int copy_in_kernel(char **bufptr, const void *src, int size)
+static int seq_copy_in_kernel(char **bufptr, const void *src, int size)
 {
 	memcpy(*bufptr, src, size);
 	*bufptr += size;
 	return 0;
 }
 
-static int copy_in_user(char **bufptr, const void *src, int size)
+static int seq_copy_in_user(char **bufptr, const void *src, int size)
 {
 	if (copy_to_user(*bufptr, src, size))
 		return -EFAULT;
@@ -164,8 +164,8 @@ int snd_seq_expand_var_event(const snd_seq_event_t *event, int count, char *buf,
 		return newlen;
 	}
 	err = snd_seq_dump_var_event(event,
-				     in_kernel ? (snd_seq_dump_func_t)copy_in_kernel :
-				     (snd_seq_dump_func_t)copy_in_user,
+				     in_kernel ? (snd_seq_dump_func_t)seq_copy_in_kernel :
+				     (snd_seq_dump_func_t)seq_copy_in_user,
 				     &buf);
 	return err < 0 ? err : newlen;
 }

@@ -1361,7 +1361,7 @@ static struct gendisk cm206_gendisk = {
 	.major		= MAJOR_NR,
 	.first_minor	= 0,
 	.minor_shift	= 0,
-	.major_name	= "cm206",
+	.disk_name	= "cm206",
 	.fops		= &cm206_bdops,
 	.flags		= GENHD_FL_CD,
 };

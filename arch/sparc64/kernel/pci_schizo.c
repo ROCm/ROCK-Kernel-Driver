@@ -1071,7 +1071,7 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 	u64 tmp;
 
 	/* Build IRQs and register handlers. */
-	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_UE_INO);
+	irq = schizo_irq_build(pbm_b, NULL, (portid << 6) | SCHIZO_UE_INO);
 	if (request_irq(irq, schizo_ue_intr,
 			SA_SHIRQ, "SCHIZO UE", p) < 0) {
 		prom_printf("SCHIZO%d: Cannot register UE interrupt.\n",
@@ -1082,7 +1082,7 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 	tmp = readl(bucket->imap);
 	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_UE_INO) + 4));
 
-	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_CE_INO);
+	irq = schizo_irq_build(pbm_b, NULL, (portid << 6) | SCHIZO_CE_INO);
 	if (request_irq(irq, schizo_ce_intr,
 			SA_SHIRQ, "SCHIZO CE", p) < 0) {
 		prom_printf("SCHIZO%d: Cannot register CE interrupt.\n",
@@ -1102,9 +1102,9 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 	}
 	bucket = __bucket(irq);
 	tmp = upa_readl(bucket->imap);
-	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_PCIERR_A_INO) + 4));
+	upa_writel(tmp, (base + SCHIZO_PBM_A_REGS_OFF + schizo_imap_offset(SCHIZO_PCIERR_A_INO) + 4));
 
-	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_PCIERR_B_INO);
+	irq = schizo_irq_build(pbm_b, NULL, (portid << 6) | SCHIZO_PCIERR_B_INO);
 	if (request_irq(irq, schizo_pcierr_intr,
 			SA_SHIRQ, "SCHIZO PCIERR", pbm_b) < 0) {
 		prom_printf("SCHIZO%d(PBMB): Cannot register PciERR interrupt.\n",
@@ -1115,7 +1115,7 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 	tmp = upa_readl(bucket->imap);
 	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_PCIERR_B_INO) + 4));
 
-	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_SERR_INO);
+	irq = schizo_irq_build(pbm_b, NULL, (portid << 6) | SCHIZO_SERR_INO);
 	if (request_irq(irq, schizo_safarierr_intr,
 			SA_SHIRQ, "SCHIZO SERR", p) < 0) {
 		prom_printf("SCHIZO%d(PBMB): Cannot register SafariERR interrupt.\n",

@@ -39,7 +39,7 @@ static int __init pfs168_init(void)
 	return sa1111_init(NULL, 0x40000000, IRQ_GPIO25);
 }
 
-__initcall(pfs168_init);
+arch_initcall(pfs168_init);
 
 
 static void __init pfs168_init_irq(void)

@@ -364,6 +364,11 @@ M:	kas@fi.muni.cz
 W:	http://www.fi.muni.cz/~kas/cosa/
 S:	Maintained
 
+CPU FREQUENCY DRIVERS
+L:      cpufreq@www.linux.org.uk
+W:      http://www.brodo.de/cpufreq/
+S:      Maintained
+
 CPUID/MSR DRIVER
 P:	H. Peter Anvin
 M:	hpa@zytor.com
@@ -1132,7 +1137,6 @@ NETWORKING [GENERAL]
 P:	Networking Team
 M:	netdev@oss.sgi.com
 L:	linux-net@vger.kernel.org
-W:	http://www.uk.linux.org/NetNews.html (2.0 only)
 S:	Maintained
 
 NETWORKING [IPv4/IPv6]

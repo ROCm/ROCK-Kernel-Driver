@@ -3192,7 +3192,7 @@ static struct gendisk scd_gendisk = {
 	.major		= MAJOR_NR,
 	.first_minor	= 0,
 	.minor_shift	= 0,
-	.major_name	= "cdu31a",
+	.disk_name	= "cdu31a",
 	.fops		= &scd_bdops,
 	.flags		= GENHD_FL_CD,
 };

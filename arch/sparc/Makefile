@@ -31,20 +31,21 @@ CFLAGS := $(CFLAGS) -m32 -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7
 endif
 
 #LDFLAGS_vmlinux = -N -Ttext 0xf0004000
+#  Since 2.5.40, the first stage is left not btfix-ed.
+#  Actual linking is done with "make image".
+LDFLAGS_vmlinux = -r
 
 HEAD := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
 
 core-y += arch/sparc/kernel/ arch/sparc/mm/ arch/sparc/math-emu/
 libs-y += arch/sparc/prom/ arch/sparc/lib/
 
-# This one has to come last
-SUBDIRS += arch/sparc/boot
-CORE_FILES_NO_BTFIX := $(addsuffix built-in.o,$(core-y))
-CORE_FILES += arch/sparc/boot/btfix.o
-
 # Export what is needed by arch/sparc/boot/Makefile
-export	CORE_FILES_NO_BTFIX
+export CORE_FILES
 export INIT
+
+image: vmlinux
+	$(MAKE) -C arch/sparc/boot image
 
 archclean:
 	rm -f $(TOPDIR)/vmlinux.aout

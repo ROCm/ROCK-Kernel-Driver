@@ -340,12 +340,15 @@ static void llc_conn_send_pdus(struct sock *sk)
 		struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 		if (!LLC_PDU_TYPE_IS_I(pdu) &&
-		    !(skb->dev->flags & IFF_LOOPBACK))
+		    !(skb->dev->flags & IFF_LOOPBACK)) {
+			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
+
 			skb_queue_tail(&llc_sk(sk)->pdu_unack_q, skb);
-		mac_send_pdu(skb);
-		if (LLC_PDU_TYPE_IS_I(pdu) ||
-		    (skb->dev && skb->dev->flags & IFF_LOOPBACK))
-			kfree_skb(skb);
+			if (!skb2)
+				break;
+			skb = skb2;
+		}
+		dev_queue_xmit(skb);
 	}
 }
 

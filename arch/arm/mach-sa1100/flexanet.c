@@ -143,14 +143,6 @@ static int flexanet_serial_init(void)
 }
 
 
-static int __init flexanet_init(void)
-{
-	return 0;
-}
-
-__initcall(flexanet_init);
-
-
 static struct map_desc flexanet_io_desc[] __initdata = {
  /* virtual     physical    length      type */
   { 0xf0000000, 0x10000000, 0x00001000, MT_DEVICE }, /* Board Control Register */

@@ -73,15 +73,14 @@ struct hd_struct {
 struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
-	const char *major_name;		/* name of major driver */
 	int minor_shift;		/* number of times minor is shifted to
 					   get real minor */
-
+	char disk_name[16];		/* name of major driver */
 	struct hd_struct *part;		/* [indexed by minor] */
-	struct gendisk *next;
 	struct block_device_operations *fops;
 	sector_t capacity;
 	struct list_head list;
+	struct list_head full_list;
 
 	int flags;
 	int number;			/* devfs crap */
@@ -95,7 +94,7 @@ struct gendisk {
 extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);
-extern struct gendisk *get_gendisk(kdev_t dev);
+extern struct gendisk *get_gendisk(dev_t dev, int *part);
 static inline unsigned long get_start_sect(struct block_device *bdev)
 {
 	return bdev->bd_offset;
@@ -263,12 +262,16 @@ char *disk_name (struct gendisk *hd, int part, char *buf);
 extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
 extern void update_partition(struct gendisk *disk, int part);
 
+extern struct gendisk *alloc_disk(void);
+extern void put_disk(struct gendisk *disk);
+
 /* will go away */
 extern void blk_set_probe(int major, struct gendisk *(p)(int));
 
 static inline unsigned int disk_index (kdev_t dev)
 {
-	struct gendisk *g = get_gendisk(dev);
+	int part;
+	struct gendisk *g = get_gendisk(kdev_t_to_nr(dev), &part);
 	return g ? (minor(dev) >> g->minor_shift) : 0;
 }
 

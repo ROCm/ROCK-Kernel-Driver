@@ -225,7 +225,7 @@ static int __init pm_init(void)
 	return 0;
 }
 
-__initcall(pm_init);
+fs_initcall(pm_init);
 
 #endif
 

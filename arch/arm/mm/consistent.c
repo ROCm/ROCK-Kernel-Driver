@@ -98,7 +98,8 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *handl
 {
 	int gfp = GFP_KERNEL;
 
-	if (hwdev == NULL || hwdev->dma_mask != 0xffffffff)
+	if (hwdev == NULL || dev_is_sa1111(hwdev) ||
+	    hwdev->dma_mask != 0xffffffff)
 		gfp |= GFP_DMA;
 
 	return consistent_alloc(gfp, size, handle);

@@ -1,0 +1,10 @@
+mainmenu_option next_comment
+comment 'IOP310 Implementation Options'
+dep_bool '  IQ80310' CONFIG_ARCH_IQ80310 $CONFIG_ARCH_IOP310
+comment 'IOP310 Chipset Features'
+dep_bool 'Support Intel 80312 Application Accelerator Unit (EXPERIMENTAL)' CONFIG_IOP310_AAU $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+dep_bool 'Support Intel 80312 DMA (EXPERIMENTAL)' CONFIG_IOP310_DMA $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+dep_bool 'Support Intel 80312 Messaging Unit (EXPERIMENTAL)' CONFIG_IOP310_MU $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+dep_bool 'Support Intel 80312 Performance Monitor (EXPERIMENTAL)' CONFIG_IOP310_PMON $CONFIG_ARCH_IOP310 $CONFIG_EXPERIMENTAL
+endmenu
+

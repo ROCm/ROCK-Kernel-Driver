@@ -133,7 +133,8 @@ static void h3100_control_egpio( enum ipaq_egpio_type x, int setp )
 
 	/*
 	if ( x != IPAQ_EGPIO_VPP_ON ) {
-		printk(__FUNCTION__ " : type=%d (%s) gpio=0x%x (0x%x) egpio=0x%x (0x%x) setp=%d\n",
+		printk("%s: type=%d (%s) gpio=0x%x (0x%x) egpio=0x%x (0x%x) setp=%d\n",
+		       __FUNCTION__,
 		       x, egpio_names[x], GPLR, gpio, h3600_egpio, egpio, setp );
 	}
 	*/

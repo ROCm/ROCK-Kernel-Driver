@@ -50,6 +50,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include <linux/wavefront.h>
@@ -79,6 +80,7 @@ static struct wf_mpu_config *phys_dev = &devs[0];
 static struct wf_mpu_config *virt_dev = &devs[1];
 
 static void start_uart_mode (void);
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 
 #define	OUTPUT_READY	0x40
 #define	INPUT_AVAIL	0x80
@@ -365,8 +367,8 @@ wf_mpuintr (int irq, void *dev_id, struct pt_regs *dummy)
 	}
 
 	if (mi->m_busy) return;
+	spin_lock(&lock);
 	mi->m_busy = 1;
-	sti (); 
 
 	if (!input_dev) {
 		input_dev = physical_dev;
@@ -406,6 +408,7 @@ wf_mpuintr (int irq, void *dev_id, struct pt_regs *dummy)
 	} while (input_avail() && n-- > 0);
 
 	mi->m_busy = 0;
+	spin_unlock(&lock);
 }
 
 static int
@@ -486,18 +489,17 @@ wf_mpu_out (int dev, unsigned char midi_byte)
 		for (timeout = 30000; timeout > 0 && !output_ready ();
 		     timeout--);
       
-		save_flags (flags);
-		cli ();
+		spin_lock_irqsave(&lock,flags);
       
 		if (!output_ready ()) {
 			printk (KERN_WARNING "WF-MPU: Send switch "
 				"byte timeout\n");
-			restore_flags (flags);
+			spin_unlock_irqrestore(&lock,flags);
 			return 0;
 		}
       
 		write_data (switchch);
-		restore_flags (flags);
+		spin_unlock_irqrestore(&lock,flags);
 	} 
 
 	lastoutdev = dev;
@@ -511,16 +513,15 @@ wf_mpu_out (int dev, unsigned char midi_byte)
 
 	for (timeout = 30000; timeout > 0 && !output_ready (); timeout--);
 
-	save_flags (flags);
-	cli ();
+	spin_lock_irqsave(&lock,flags);
 	if (!output_ready ()) {
+		spin_unlock_irqrestore(&lock,flags);
 		printk (KERN_WARNING "WF-MPU: Send data timeout\n");
-		restore_flags (flags);
 		return 0;
 	}
 
 	write_data (midi_byte);
-	restore_flags (flags);
+	spin_unlock_irqrestore(&lock,flags);
 
 	return 1;
 }
@@ -768,14 +769,13 @@ virtual_midi_disable (void)
 {
 	unsigned long flags;
 
-	save_flags (flags);
-	cli();
+	spin_lock_irqsave(&lock,flags);
 
 	wf_mpu_close (virt_dev->devno);
 	/* no synth on virt_dev, so no need to call wf_mpu_synth_close() */
 	phys_dev->isvirtual = 0;
 
-	restore_flags (flags);
+	spin_unlock_irqrestore(&lock,flags);
 
 	return 0;
 }
@@ -858,8 +858,7 @@ start_uart_mode (void)
 	int             ok, i;
 	unsigned long   flags;
 
-	save_flags (flags);
-	cli ();
+	spin_lock_irqsave(&lock,flags);
 
 	/* XXX fix me */
 
@@ -875,6 +874,6 @@ start_uart_mode (void)
 		}
 	}
 
-	restore_flags (flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 #endif

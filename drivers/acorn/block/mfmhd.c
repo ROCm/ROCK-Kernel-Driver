@@ -884,13 +884,13 @@ static struct gendisk mfm_gendisk[2] = {
 {
 	.major		= MAJOR_NR,
 	.first_minor	= 0,
-	.major_name	= "mfma",
+	.disk_name	= "mfma",
 	.minor_shift	= 6,
 },
 {
 	.major		= MAJOR_NR,
 	.first_minor	= 64,
-	.major_name	= "mfmb",
+	.disk_name	= "mfmb",
 	.minor_shift	= 6,
 };
 
@@ -1020,7 +1020,7 @@ static void mfm_geometry(int drive)
 	struct gendisk *disk = mfm_gendisk + drive;
 	if (p->cylinders)
 		printk ("%s: %dMB CHS=%d/%d/%d LCC=%d RECOMP=%d\n",
-			disk->major_name,
+			disk->disk_name,
 			p->cylinders * p->heads * p->sectors / 4096,
 			p->cylinders, p->heads, p->sectors,
 			p->lowcurrent, p->precomp);

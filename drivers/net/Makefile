@@ -57,7 +57,7 @@ obj-$(CONFIG_TC35815) += tc35815.o
 obj-$(CONFIG_SK98LIN) += sk98lin/
 obj-$(CONFIG_SKFP) += skfp/
 obj-$(CONFIG_VIA_RHINE) += via-rhine.o mii.o
-obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o
+obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o mii.o
 
 #
 # end link order section
@@ -71,7 +71,7 @@ obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_proc.o
 
 obj-$(CONFIG_WINBOND_840) += mii.o
 obj-$(CONFIG_SUNDANCE) += sundance.o mii.o
-obj-$(CONFIG_HAMACHI) += hamachi.o
+obj-$(CONFIG_HAMACHI) += hamachi.o mii.o
 obj-$(CONFIG_NET) += Space.o setup.o net_init.o loopback.o
 obj-$(CONFIG_SEEQ8005) += seeq8005.o
 obj-$(CONFIG_ETHERTAP) += ethertap.o
@@ -194,5 +194,3 @@ obj-$(CONFIG_IRDA) += irda/
 
 include $(TOPDIR)/Rules.make
 
-clean:
-	rm -f core *.o *.a *.s

@@ -34,7 +34,6 @@
  * Physical DRAM offset.
  */
 #define PHYS_OFFSET	(0xa0000000UL)
-#define PHYS_TO_NID(addr)	(0)
 
 /*
  * physical vs virtual ram conversion

@@ -3347,10 +3347,10 @@ jffs_garbage_collect_thread(void *ptr)
 	current->session = 1;
 	current->pgrp = 1;
 	init_completion(&c->gc_thread_comp); /* barrier */ 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	siginitsetinv (&current->blocked, sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP) | sigmask(SIGCONT));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	strcpy(current->comm, "jffs_gcd");
 
 	D1(printk (KERN_NOTICE "jffs_garbage_collect_thread(): Starting infinite loop.\n"));
@@ -3378,9 +3378,9 @@ jffs_garbage_collect_thread(void *ptr)
 			siginfo_t info;
 			unsigned long signr;
 
-			spin_lock_irq(&current->sigmask_lock);
+			spin_lock_irq(&current->sig->siglock);
 			signr = dequeue_signal(&current->blocked, &info);
-			spin_unlock_irq(&current->sigmask_lock);
+			spin_unlock_irq(&current->sig->siglock);
 
 			switch(signr) {
 			case SIGSTOP:

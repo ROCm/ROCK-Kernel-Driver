@@ -90,8 +90,6 @@
  * memory bank.  For those systems, simply undefine CONFIG_DISCONTIGMEM.
  */
 
-#ifdef CONFIG_ARCH_EDB7211
-
 #ifdef CONFIG_DISCONTIGMEM
 /*
  * Because of the wide memory address space between physical RAM banks on the 
@@ -154,12 +152,6 @@
 #define NODE_MAX_MEM_SIZE	(1<<NODE_MAX_MEM_SHIFT)
 
 #endif /* CONFIG_DISCONTIGMEM */
-
-#endif	/* CONFIG_ARCH_EDB7211 */
-
-#ifndef PFN_TO_NID
-#define PFN_TO_NID(pfn)		(0)
-#endif
 
 #endif
 

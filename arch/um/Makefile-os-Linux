@@ -3,5 +3,4 @@
 # Licensed under the GPL
 #
 
-SUBDIRS += $(ARCH_DIR)/os-$(OS)/drivers
-LIBS += $(ARCH_DIR)/os-$(OS)/drivers/drivers.o
+core-y		+= $(ARCH_DIR)/os-$(OS)/

@@ -254,4 +254,4 @@ static int __init sa1100_dram_init(void)
 	return ret;
 }
 
-__initcall(sa1100_dram_init);
+core_initcall(sa1100_dram_init);

@@ -70,7 +70,6 @@ source drivers/mtd/Config.in
 source drivers/serial/Config.in
 if [ "$CONFIG_SUN4" != "y" ]; then
    source drivers/sbus/char/Config.in
-   source drivers/sbus/audio/Config.in
 fi
 
 mainmenu_option next_comment
@@ -223,9 +222,15 @@ source drivers/input/Config.in
 
 source fs/Config.in
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   source net/bluetooth/Config.in
+tristate 'Sound card support' CONFIG_SOUND
+if [ "$CONFIG_SOUND" != "n" ]; then
+   source sound/Config.in
 fi
+endmenu
+
+source drivers/usb/Config.in
+
+source net/bluetooth/Config.in
 
 mainmenu_option next_comment
 comment 'Watchdog'

@@ -13,6 +13,12 @@
  *      2 of the License, or (at your option) any later version.
  */
 
+/*
+ * 	Changes:
+ * 	Yuji SEKIYA @USAGI:	Support default route on router node;
+ * 				remove ip6_null_entry from the top of
+ * 				routing table.
+ */
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -248,9 +254,6 @@ static struct fib6_node * fib6_add_1(struct fib6_node *root, void *addr,
 
 	fn = root;
 
-	if (plen == 0)
-		return fn;
-
 	do {
 		key = (struct rt6key *)((u8 *)fn->leaf + offset);
 
@@ -427,6 +430,17 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt)
 
 	ins = &fn->leaf;
 
+	if (fn->fn_flags&RTN_TL_ROOT &&
+	    fn->leaf == &ip6_null_entry &&
+	    !(rt->rt6i_flags & (RTF_DEFAULT | RTF_ADDRCONF | RTF_ALLONLINK)) ){
+		/*
+		 * The top fib of ip6 routing table includes ip6_null_entry.
+		 */
+		fn->leaf = rt;
+		rt->u.next = NULL;
+		goto out;
+	}
+
 	for (iter = fn->leaf; iter; iter=iter->u.next) {
 		/*
 		 *	Search for duplicates
@@ -462,6 +476,7 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt)
 	 *	insert node
 	 */
 
+out:
 	rt->u.next = iter;
 	*ins = rt;
 	rt->rt6i_node = fn;
@@ -675,7 +690,7 @@ struct fib6_node * fib6_lookup(struct fib6_node *root, struct in6_addr *daddr,
 
 	fn = fib6_lookup_1(root, args);
 
-	if (fn == NULL)
+	if (fn == NULL || fn->fn_flags & RTN_TL_ROOT)
 		fn = root;
 
 	return fn;
@@ -896,6 +911,9 @@ static void fib6_del_route(struct fib6_node *fn, struct rt6_info **rtp)
 	read_unlock(&fib6_walker_lock);
 
 	rt->u.next = NULL;
+
+	if (fn->leaf == NULL && fn->fn_flags&RTN_TL_ROOT)
+		fn->leaf = &ip6_null_entry;
 
 	/* If it was last route, expunge its radix tree node */
 	if (fn->leaf == NULL) {

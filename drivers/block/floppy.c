@@ -777,7 +777,7 @@ static int disk_change(int drive)
 				DPRINT("Disk type is undefined after "
 				       "disk change\n");
 			current_type[drive] = NULL;
-			floppy_sizes[TOMINOR(drive)] = MAX_DISK_SIZE;
+			floppy_sizes[TOMINOR(drive)] = MAX_DISK_SIZE << 1;
 		}
 
 		/*USETF(FD_DISK_NEWCHANGE);*/
@@ -1009,8 +1009,7 @@ static struct tq_struct floppy_tq;
 static void schedule_bh( void (*handler)(void*) )
 {
 	floppy_tq.routine = (void *)(void *) handler;
-	queue_task(&floppy_tq, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_task(&floppy_tq);
 }
 
 static struct timer_list fd_timer;
@@ -2425,8 +2424,7 @@ static void rw_interrupt(void)
 				return;
 			}
 			current_type[current_drive] = _floppy;
-			floppy_sizes[TOMINOR(current_drive) ]= 
-				(_floppy->size+1)>>1;
+			floppy_sizes[TOMINOR(current_drive) ]= _floppy->size;
 			break;
 	}
 
@@ -2435,7 +2433,7 @@ static void rw_interrupt(void)
 			DPRINT("Auto-detected floppy type %s in fd%d\n",
 				_floppy->name,current_drive);
 		current_type[current_drive] = _floppy;
-		floppy_sizes[TOMINOR(current_drive)] = (_floppy->size+1) >> 1;
+		floppy_sizes[TOMINOR(current_drive)] = _floppy->size;
 		probing = 0;
 	}
 
@@ -3344,7 +3342,7 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 		floppy_type[type].name="user format";
 		for (cnt = type << 2; cnt < (type << 2) + 4; cnt++)
 			floppy_sizes[cnt]= floppy_sizes[cnt+0x80]=
-				(floppy_type[type].size+1)>>1;
+				floppy_type[type].size+1;
 		process_fd_request();
 		for (cnt = 0; cnt < N_DRIVE; cnt++){
 			if (ITYPE(drive_state[cnt].fd_device) == type &&
@@ -3363,7 +3361,7 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 		if (buffer_drive == drive)
 			SUPBOUND(buffer_max, user_params[drive].sect);
 		current_type[drive] = &user_params[drive];
-		floppy_sizes[drive] = (user_params[drive].size+1) >> 1;
+		floppy_sizes[drive] = user_params[drive].size;
 		if (cmd == FDDEFPRM)
 			DRS->keep_data = -1;
 		else
@@ -3537,7 +3535,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		case FDCLRPRM:
 			LOCK_FDC(drive,1);
 			current_type[drive] = NULL;
-			floppy_sizes[drive] = MAX_DISK_SIZE;
+			floppy_sizes[drive] = MAX_DISK_SIZE << 1;
 			UDRS->keep_data = 0;
 			return invalidate_drive(inode->i_bdev);
 		case FDSETPRM:
@@ -3710,11 +3708,6 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	int old_dev;
 	int try;
 	char *tmp;
-
-	if (!filp) {
-		DPRINT("Weird, open called with filp=0\n");
-		return -EIO;
-	}
 
 	filp->private_data = (void*) 0;
 
@@ -3926,6 +3919,7 @@ static int floppy_revalidate(kdev_t dev)
 #define NO_GEOM (!current_type[drive] && !TYPE(dev))
 	int drive=DRIVE(dev);
 	int cf;
+	int res = 0;
 
 	if (UTESTF(FD_DISK_CHANGED) ||
 	    UTESTF(FD_VERIFY) ||
@@ -3951,14 +3945,15 @@ static int floppy_revalidate(kdev_t dev)
 			UDRS->generation++;
 		if (NO_GEOM){
 			/* auto-sensing */
-			return floppy_read_block_0(dev);
+			res = floppy_read_block_0(dev);
+		} else {
+			if (cf)
+				poll_drive(0, FD_RAW_NEED_DISK);
+			process_fd_request();
 		}
-		if (cf)
-			poll_drive(0, FD_RAW_NEED_DISK);
-		process_fd_request();
 	}
 	set_capacity(&disks[drive], floppy_sizes[minor(dev)]);
-	return 0;
+	return res;
 }
 
 static struct block_device_operations floppy_fops = {
@@ -4254,17 +4249,16 @@ int __init floppy_init(void)
 		disks[i].major = MAJOR_NR;
 		disks[i].first_minor = TOMINOR(i);
 		disks[i].fops = &floppy_fops;
-		sprintf(names[i], "fd%d", i);
-		disks[i].major_name = names[i];
+		sprintf(disks[i].disk_name, "fd%d", i);
 	}
 
 	blk_set_probe(MAJOR_NR, floppy_find);
 
 	for (i=0; i<256; i++)
 		if (ITYPE(i))
-			floppy_sizes[i] = (floppy_type[ITYPE(i)].size+1) >> 1;
+			floppy_sizes[i] = floppy_type[ITYPE(i)].size;
 		else
-			floppy_sizes[i] = MAX_DISK_SIZE;
+			floppy_sizes[i] = MAX_DISK_SIZE << 1;
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
@@ -4361,7 +4355,7 @@ int __init floppy_init(void)
 	if (have_no_fdc) 
 	{
 		DPRINT("no floppy controllers found\n");
-		run_task_queue(&tq_immediate);
+		flush_scheduled_tasks();
 		if (usage_count)
 			floppy_release_irq_and_dma();
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));

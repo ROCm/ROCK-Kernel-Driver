@@ -233,10 +233,10 @@ adb_probe_task(void *x)
 {
 	strcpy(current->comm, "kadbprobe");
 	
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	sigfillset(&current->blocked);
 	flush_signals(current);
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	printk(KERN_INFO "adb: starting probe task...\n");
 	do_adb_reset_bus();

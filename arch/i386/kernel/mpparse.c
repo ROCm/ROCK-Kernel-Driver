@@ -1038,7 +1038,7 @@ void __init mp_config_ioapic_for_sci(int irq)
 	status = acpi_get_firmware_table("APIC", 1, ACPI_LOGICAL_ADDRESSING,
 		(acpi_table_header **) &madt);
 	if (ACPI_SUCCESS(status)) {
-		madt_end = madt + madt->header.length;
+		madt_end = (unsigned long)madt + madt->header.length;
 
 		entry = (struct acpi_table_int_src_ovr *)
                 ((unsigned long) madt + sizeof(struct acpi_table_madt));

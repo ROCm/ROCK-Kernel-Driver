@@ -139,12 +139,14 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	retval->dev = pdev;
 
 	if (pdev) {
+		int	do_add;
 		spin_lock_irqsave (&pools_lock, flags);
+		do_add = list_empty (&pdev->pools);
 		/* note:  not currently insisting "name" be unique */
-		if (list_empty (&pdev->pools))
-			device_create_file (&pdev->dev, &dev_attr_pools);
 		list_add (&retval->pools, &pdev->pools);
 		spin_unlock_irqrestore (&pools_lock, flags);
+		if (do_add)
+			device_create_file (&pdev->dev, &dev_attr_pools);
 	} else
 		INIT_LIST_HEAD (&retval->pools);
 

@@ -227,6 +227,8 @@ static struct isapnp_card_id snd_card_pnpids[] __devinitdata = {
 	ISAPNP_CS4232('C','S','C',0x4336,0x0000,0x0010,0x0003),
 	/* Typhoon Soundsystem PnP - CS4236B */
 	ISAPNP_CS4232('C','S','C',0x4536,0x0000,0x0010,0x0003),
+	/* Crystal CX4235-XQ3 EP - CS4235 */
+	ISAPNP_CS4232('C','S','C',0x4625,0x0100,0x0110,0x0103),
 	/* TerraTec AudioSystem EWS64XL - CS4236B */
 	ISAPNP_CS4232('C','S','C',0xa836,0xa800,0xa810,0xa803),
 	/* TerraTec AudioSystem EWS64XL - CS4236B */

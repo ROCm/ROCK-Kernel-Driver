@@ -53,8 +53,7 @@ else
   endif
 endif
 
-core-y				+= arch/ppc/kernel/ arch/ppc/platforms/
-				   arch/ppc/mm/     arch/ppc/lib/
+core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ arch/ppc/mm/ arch/ppc/lib/
 core-$(CONFIG_MATH_EMULATION)	+= arch/ppc/math-emu/
 core-$(CONFIG_XMON)		+= arch/ppc/xmon/
 core-$(CONFIG_APUS)		+= arch/ppc/amiga/

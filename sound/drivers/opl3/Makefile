@@ -16,7 +16,7 @@ endif
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS100) += snd-opl3-lib.o
 obj-$(CONFIG_SND_AZT2320) += snd-opl3-lib.o
-obj-$(CONFIG_SND_DT0197H) += snd-opl3-lib.o
+obj-$(CONFIG_SND_DT019X) += snd-opl3-lib.o
 obj-$(CONFIG_SND_ES18XX) += snd-opl3-lib.o
 obj-$(CONFIG_SND_OPL3SA2) += snd-opl3-lib.o
 obj-$(CONFIG_SND_AD1816A) += snd-opl3-lib.o
@@ -41,7 +41,7 @@ obj-$(CONFIG_SND_YMFPCI) += snd-opl3-lib.o
 ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_ALS100) += snd-opl3-synth.o
   obj-$(CONFIG_SND_AZT2320) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_DT0197H) += snd-opl3-synth.o
+  obj-$(CONFIG_SND_DT019X) += snd-opl3-synth.o
   obj-$(CONFIG_SND_ES18XX) += snd-opl3-synth.o
   obj-$(CONFIG_SND_OPL3SA2) += snd-opl3-synth.o
   obj-$(CONFIG_SND_AD1816A) += snd-opl3-synth.o

@@ -149,8 +149,10 @@ int br_handle_frame(struct sk_buff *skb)
 		goto handle_special_frame;
 
 	if (p->state == BR_STATE_FORWARDING) {
-		if (br_should_route_hook && br_should_route_hook(&skb))
+		if (br_should_route_hook && br_should_route_hook(&skb)) {
+			read_unlock(&br->lock);
 			return -1;
+		}
 
 		NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
 			br_handle_frame_finish);

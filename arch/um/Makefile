@@ -36,9 +36,8 @@ ARCH_SUBDIRS = $(ARCH_DIR)/drivers $(ARCH_DIR)/kernel \
 SUBDIRS += $(ARCH_SUBDIRS)
 
 core-y			+= $(ARCH_DIR)/kernel/		 \
-			+= $(ARCH_DIR)/drivers/          \
-			+= $(ARCH_DIR)/sys-$(SUBARCH)/	 \
-			+= $(ARCH_DIR)/os-$(OS)/
+			   $(ARCH_DIR)/drivers/          \
+			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
 libs-$(CONFIG_PT_PROXY)	+= $(ARCH_DIR)/ptproxy/
 
@@ -53,15 +52,17 @@ CFLAGS += $(DEBUG) $(PROFILE) $(ARCH_CFLAGS) -D__arch_um__ \
 	-DSUBARCH=\"$(SUBARCH)\" -D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) \
 	-Derrno=kernel_errno
 
-LDFLAGS += -r
-
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
 SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
 
-$(ARCH_DIR)/link.ld: $(ARCH_DIR)/link.ld.in
-	m4 -DSTART=$$(($(TOP_ADDR) - $(SIZE))) -DELF_ARCH=$(ELF_ARCH) \
-		-DELF_FORMAT=$(ELF_FORMAT) $< > $@
+$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S
+	$(call if_changed_dep,as_s_S)
+
+AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
+	-DELF_ARCH=$(ELF_ARCH) -DELF_FORMAT=\"$(ELF_FORMAT)\" -P -C -Uum
+
+LDFLAGS_vmlinux = -r $(ARCH_DIR)/main.o
 
 SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 	include/asm-um/sigcontext.h include/asm-um/processor.h \
@@ -72,11 +73,13 @@ ARCH_SYMLINKS = include/asm-um/arch arch/um/include/sysdep arch/um/os \
 
 GEN_HEADERS = $(ARCH_DIR)/include/task.h
 
-linux: scripts $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) $(ARCH_DIR)/main.o \
-	vmlinux $(ARCH_DIR)/link.ld
-	mv vmlinux vmlinux.o
-	$(CC) -Wl,-T,$(ARCH_DIR)/link.ld $(LINK_PROFILE) $(LINK_WRAPS) \
-		-o linux -static $(ARCH_DIR)/main.o vmlinux.o -L/usr/lib -lutil
+$(ARCH_DIR)/vmlinux.lds.S :
+	touch $@
+
+linux: scripts $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) \
+	arch/um/uml.lds.s $(ARCH_DIR)/main.o vmlinux
+	$(CC) -Wl,-T,arch/um/uml.lds.s -o $@ $(LINK_PROFILE) \
+	$(LINK_WRAPS) -static vmlinux -L/usr/lib -lutil
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))

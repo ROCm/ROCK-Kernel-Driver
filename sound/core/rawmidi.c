@@ -943,7 +943,7 @@ static ssize_t snd_rawmidi_read(struct file *file, char *buf, size_t count, loff
 		spin_lock_irq(&runtime->lock);
 		while (!snd_rawmidi_ready(substream)) {
 			wait_queue_t wait;
-			if (file->f_flags & O_NONBLOCK) {
+			if ((file->f_flags & O_NONBLOCK) != 0 || result > 0) {
 				spin_unlock_irq(&runtime->lock);
 				return result > 0 ? result : -EAGAIN;
 			}

@@ -473,7 +473,7 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 		np->mii_if.full_duplex = 1;
 
 	if (np->mii_if.full_duplex)
-		np->mii_if.duplex_lock = 1;
+		np->mii_if.force_media = 1;
 
 	/* The chip-specific entries in the device structure. */
 	dev->open = &netdev_open;
@@ -773,7 +773,7 @@ static int update_link(struct net_device *dev)
 		duplex = (negotiated & LPA_100FULL) || ((negotiated & 0x02C0) == LPA_10FULL);
 		fasteth = negotiated & 0x380;
 	}
-	duplex |= np->mii_if.duplex_lock;
+	duplex |= np->mii_if.force_media;
 	/* remove fastether and fullduplex */
 	result = np->csr6 & ~0x20000200;
 	if (duplex)

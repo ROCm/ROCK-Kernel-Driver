@@ -51,9 +51,7 @@ static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int snd_external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int snd_thinkpad[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-#ifndef CONFIG_SND_CS46XX_ACCEPT_VALID
 static int snd_mmap_valid[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-#endif
 
 MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_index, "Index value for the CS46xx soundcard.");
@@ -70,11 +68,9 @@ MODULE_PARM_SYNTAX(snd_external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC)
 MODULE_PARM(snd_thinkpad, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_thinkpad, "Force to enable Thinkpad's CLKRUN control.");
 MODULE_PARM_SYNTAX(snd_thinkpad, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-#ifndef CONFIG_SND_CS46XX_ACCEPT_VALID
 MODULE_PARM(snd_mmap_valid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_mmap_valid, "Support OSS mmap.");
 MODULE_PARM_SYNTAX(snd_mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-#endif
 
 static struct pci_device_id snd_cs46xx_ids[] __devinitdata = {
         { 0x1013, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4280 */
@@ -109,11 +105,7 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#ifdef CONFIG_SND_CS46XX_ACCEPT_VALID
-	chip->accept_valid = 1;
-#else
 	chip->accept_valid = snd_mmap_valid[dev];
-#endif
 	if ((err = snd_cs46xx_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;

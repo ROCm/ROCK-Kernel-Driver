@@ -65,4 +65,4 @@ static int __init minicache_init(void)
 	return 0;
 }
 
-__initcall(minicache_init);
+core_initcall(minicache_init);

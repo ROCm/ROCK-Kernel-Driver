@@ -39,7 +39,6 @@
 #include <linux/devfs_fs_kernel.h>
 
 static struct gendisk disks[2];
-static char names[2][4];
 
 #define MAX_FLOPPIES	2
 
@@ -1046,8 +1045,7 @@ int swim3_init(void)
 			disk->major = MAJOR_NR;
 			disk->first_minor = i;
 			disk->fops = &floppy_fops;
-			sprintf(names[i], "fd%d", i);
-			disk->major_name = names[i];
+			sprintf(disk->disk_name, "fd%d", i);
 			set_capacity(disk, 2880);
 			add_disk(disk);
 		}

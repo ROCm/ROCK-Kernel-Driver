@@ -1,0 +1,15 @@
+mainmenu_option next_comment
+comment 'Archimedes/A5000 Implementations'
+# These architectures will be combined.  However, until this
+# is complete...  Note that the ARC will take precedence over
+# A5K
+comment 'Archimedes/A5000 Implementations (select only ONE)'
+dep_bool '  Archimedes' CONFIG_ARCH_ARC $CONFIG_ARCH_ARCA5K
+dep_bool '  A5000' CONFIG_ARCH_A5K $CONFIG_ARCH_ARCA5K
+
+if [ "$CONFIG_ARCH_ARCA5K" = "y" ]; then
+   bool '2MB physical memory' CONFIG_PAGESIZE_16
+fi
+
+endmenu
+

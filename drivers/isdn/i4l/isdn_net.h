@@ -11,7 +11,10 @@
  *
  */
 
-			      /* Definitions for hupflags:                */
+#include <linux/kernel.h>
+#include <linux/netdevice.h>
+#include <linux/isdn.h>
+  			      /* Definitions for hupflags:                */
 #define ISDN_CHARGEHUP   4      /* We want to use the charge mechanism      */
 #define ISDN_INHUP       8      /* Even if incoming, close after huptimeout */
 #define ISDN_MANCHARGE  16      /* Charge Interval manually set             */
@@ -29,6 +32,8 @@
 #define CISCO_SLARP_REPLY     1
 #define CISCO_SLARP_KEEPALIVE 2
 
+extern void isdn_net_init_module(void);
+
 extern int isdn_net_new(char *, struct net_device *);
 extern int isdn_net_newslave(char *);
 extern int isdn_net_rm(char *);
@@ -41,7 +46,7 @@ extern int isdn_net_getphones(isdn_net_ioctl_phone *, char *);
 extern int isdn_net_getpeer(isdn_net_ioctl_phone *, isdn_net_ioctl_phone *);
 extern int isdn_net_delphone(isdn_net_ioctl_phone *);
 extern int isdn_net_find_icall(int, int, int, setup_parm *);
-extern void isdn_net_hangup(isdn_net_local *);
+extern void isdn_net_hangup(isdn_net_dev *);
 extern void isdn_net_hangup_all(void);
 extern int isdn_net_force_hangup(char *);
 extern int isdn_net_force_dial(char *);
@@ -50,6 +55,14 @@ extern int isdn_net_rcv_skb(int, struct sk_buff *);
 extern int isdn_net_dial_req(isdn_net_local *);
 extern void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb);
+extern int isdn_net_online(isdn_net_dev *idev);
+
+static inline void
+isdn_net_reset_huptimer(isdn_net_dev *idev, isdn_net_dev *idev2)
+{
+	idev->huptimer = 0;
+	idev2->huptimer = 0;
+}
 
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
 
@@ -133,6 +146,23 @@ static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
 	}
 	lp->next = lp->last = lp;	/* (re)set own pointers */
 	spin_unlock_irqrestore(&master_lp->netdev->queue_lock, flags);
+}
+
+/*
+ * wake up the network -> net_device queue.
+ * For slaves, wake the corresponding master interface.
+ */
+static inline void isdn_net_device_wake_queue(isdn_net_local *lp)
+{
+	if (lp->master) 
+		netif_wake_queue(lp->master);
+	else
+		netif_wake_queue(&lp->netdev->dev);
+}
+
+static inline int isdn_net_bound(isdn_net_dev *idev)
+{
+	return idev->isdn_slot >= 0;
 }
 
 static inline int

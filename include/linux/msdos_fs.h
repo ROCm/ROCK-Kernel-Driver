@@ -68,9 +68,9 @@
 	MSDOS_SB(s)->fat_bits == 16 ? BAD_FAT16 : BAD_FAT12)
 
 /* standard EOF */
-#define EOF_FAT12 0xFF8
-#define EOF_FAT16 0xFFF8
-#define EOF_FAT32 0xFFFFFF8
+#define EOF_FAT12 0xFFF
+#define EOF_FAT16 0xFFFF
+#define EOF_FAT32 0xFFFFFFF
 #define EOF_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? EOF_FAT32 : \
 	MSDOS_SB(s)->fat_bits == 16 ? EOF_FAT16 : EOF_FAT12)
 

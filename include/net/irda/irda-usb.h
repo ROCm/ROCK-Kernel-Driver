@@ -127,7 +127,7 @@ struct irda_class_desc {
 struct irda_usb_cb {
 	struct irda_class_desc *irda_desc;
 	struct usb_device *usbdev;	/* init: probe_irda */
-	unsigned int ifnum;		/* Interface number of the USB dev. */
+	struct usb_interface *usbintf;	/* init: probe_irda */
 	int netopen;			/* Device is active for network */
 	int present;			/* Device is present on the bus */
 	__u32 capability;		/* Capability of the hardware */

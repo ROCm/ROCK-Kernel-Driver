@@ -65,13 +65,6 @@
 */
 static int reiserfs_mounted_fs_count = 0 ;
 
-/* wake this up when you add something to the commit thread task queue */
-DECLARE_WAIT_QUEUE_HEAD(reiserfs_commit_thread_wait) ;
-
-/* wait on this if you need to be sure you task queue entries have been run */
-static DECLARE_WAIT_QUEUE_HEAD(reiserfs_commit_thread_done) ;
-DECLARE_TASK_QUEUE(reiserfs_commit_thread_tq) ;
-
 #define JOURNAL_TRANS_HALF 1018   /* must be correct to keep the desc and commit
 				     structs at 4k */
 #define BUFNR 64 /*read ahead */
@@ -1339,12 +1332,9 @@ static int do_journal_release(struct reiserfs_transaction_handle *th, struct sup
     do_journal_end(&myth, p_s_sb,1, FLUSH_ALL) ;
   }
 
-  /* we decrement before we wake up, because the commit thread dies off
-  ** when it has been woken up and the count is <= 0
-  */
   reiserfs_mounted_fs_count-- ;
-  wake_up(&reiserfs_commit_thread_wait) ;
-  sleep_on(&reiserfs_commit_thread_done) ;
+  /* wait for all commits to finish */
+  flush_scheduled_tasks();
 
   release_journal_dev( p_s_sb, SB_JOURNAL( p_s_sb ) );
   free_journal_ram(p_s_sb) ;
@@ -1815,6 +1805,10 @@ struct reiserfs_journal_commit_task {
 static void reiserfs_journal_commit_task_func(struct reiserfs_journal_commit_task *ct) {
 
   struct reiserfs_journal_list *jl ;
+
+  /* FIXMEL: is this needed? */
+  lock_kernel();
+
   jl = SB_JOURNAL_LIST(ct->p_s_sb) + ct->jindex ;
 
   flush_commit_list(ct->p_s_sb, SB_JOURNAL_LIST(ct->p_s_sb) + ct->jindex, 1) ; 
@@ -1824,6 +1818,7 @@ static void reiserfs_journal_commit_task_func(struct reiserfs_journal_commit_tas
     kupdate_one_transaction(ct->p_s_sb, jl) ;
   }
   reiserfs_kfree(ct->self, sizeof(struct reiserfs_journal_commit_task), ct->p_s_sb) ;
+  unlock_kernel();
 }
 
 static void setup_commit_task_arg(struct reiserfs_journal_commit_task *ct,
@@ -1850,57 +1845,13 @@ static void commit_flush_async(struct super_block *p_s_sb, int jindex) {
   ct = reiserfs_kmalloc(sizeof(struct reiserfs_journal_commit_task), GFP_NOFS, p_s_sb) ;
   if (ct) {
     setup_commit_task_arg(ct, p_s_sb, jindex) ;
-    queue_task(&(ct->task), &reiserfs_commit_thread_tq);
-    wake_up(&reiserfs_commit_thread_wait) ;
+    schedule_task(&ct->task) ;
   } else {
 #ifdef CONFIG_REISERFS_CHECK
     reiserfs_warning("journal-1540: kmalloc failed, doing sync commit\n") ;
 #endif
     flush_commit_list(p_s_sb, SB_JOURNAL_LIST(p_s_sb) + jindex, 1) ;
   }
-}
-
-/*
-** this is the commit thread.  It is started with kernel_thread on
-** FS mount, and journal_release() waits for it to exit.
-**
-** It could do a periodic commit, but there is a lot code for that
-** elsewhere right now, and I only wanted to implement this little
-** piece for starters.
-**
-** All we do here is sleep on the j_commit_thread_wait wait queue, and
-** then run the per filesystem commit task queue when we wakeup.
-*/
-static int reiserfs_journal_commit_thread(void *nullp) {
-
-  daemonize() ;
-
-  spin_lock_irq(&current->sigmask_lock);
-  sigfillset(&current->blocked);
-  recalc_sigpending();
-  spin_unlock_irq(&current->sigmask_lock);
-
-  sprintf(current->comm, "kreiserfsd") ;
-  lock_kernel() ;
-  while(1) {
-
-    while(TQ_ACTIVE(reiserfs_commit_thread_tq)) {
-      run_task_queue(&reiserfs_commit_thread_tq) ;
-    }
-
-    /* if there aren't any more filesystems left, break */
-    if (reiserfs_mounted_fs_count <= 0) {
-      run_task_queue(&reiserfs_commit_thread_tq) ;
-      break ;
-    }
-    wake_up(&reiserfs_commit_thread_done) ;
-    if (current->flags & PF_FREEZE)
-      refrigerator(PF_IOTHREAD);
-    interruptible_sleep_on_timeout(&reiserfs_commit_thread_wait, 5 * HZ) ;
-  }
-  unlock_kernel() ;
-  wake_up(&reiserfs_commit_thread_done) ;
-  return 0 ;
 }
 
 static void journal_list_init(struct super_block *p_s_sb) {
@@ -2175,10 +2126,6 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
     return 0;
 
   reiserfs_mounted_fs_count++ ;
-  if (reiserfs_mounted_fs_count <= 1) {
-    kernel_thread((void *)(void *)reiserfs_journal_commit_thread, NULL,
-                  CLONE_FS | CLONE_FILES | CLONE_VM) ;
-  }
   return 0 ;
 
 }

@@ -47,9 +47,9 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 fi
 tristate '802.1Q VLAN Support' CONFIG_VLAN_8021Q
 
-tristate 'ANSI/IEEE 802.2 Data link layer protocol' CONFIG_LLC
+tristate 'ANSI/IEEE 802.2 Data link layer protocol (IPX, Appletalk)' CONFIG_LLC
 if [ "$CONFIG_LLC" != "n" ]; then
-   tristate '  LLC sockets interface' CONFIG_LLC_UI
+   bool '  LLC sockets interface' CONFIG_LLC_UI
 fi
 
 dep_tristate 'The IPX protocol' CONFIG_IPX $CONFIG_LLC

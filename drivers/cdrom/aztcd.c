@@ -1695,7 +1695,7 @@ static struct gendisk azt_disk = {
 	.first_minor = 0,
 	.minor_shift = 0,
 	.fops = &azt_fops,
-	.major_name = "aztcd"
+	.disk_name = "aztcd"
 };
 
 /*

@@ -7,6 +7,11 @@
 #ifndef _ORINOCO_H
 #define _ORINOCO_H
 
+#include <linux/types.h>
+#include <linux/spinlock.h>
+#include <linux/netdevice.h>
+#include <linux/wireless.h>
+#include <linux/tqueue.h>
 #include "hermes.h"
 
 /* To enable debug messages */

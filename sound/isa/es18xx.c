@@ -78,6 +78,7 @@
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
 #define SNDRV_LEGACY_AUTO_PROBE

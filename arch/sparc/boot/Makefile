@@ -20,25 +20,23 @@ btfixupprep: btfixupprep.c
 	$(HOSTCC) $(HOSTCFLAGS) -o btfixupprep btfixupprep.c
 
 clean:
-	rm -f btfixupprep piggyback tftpboot.img btfix.o btfix.s
+	rm -f btfixupprep piggyback tftpboot.img btfix.o btfix.s image
 
-#BTOBJS := $(HEAD) init/main.o init/version.o
 BTOBJS := $(HEAD) $(INIT)
-BTLIBS := $(CORE_FILES_NO_BTFIX) $(LIBS) \
+BTLIBS := $(CORE_FILES) $(LIBS) \
 	$(DRIVERS) $(NETWORKS)
 
-# I wanted to make this depend upon BTOBJS so that a parallel
-# build would work, but this fails because $(HEAD) cannot work
-# properly as it will cause head.o to be built with the implicit
-# rules not the ones in kernel/Makefile.  Someone please fix. --DaveM
-vmlinux.o: FORCE
-	$(LD) $(LDFLAGS) -r $(patsubst %,$(TOPDIR)/%,$(BTOBJS)) \
+# Actual linking
+image: btfix.o
+	$(LD) $(LDFLAGS) -T ../vmlinux.lds.s \
+		$(patsubst %,$(TOPDIR)/%,$(BTOBJS)) \
 		--start-group \
 		$(patsubst %,$(TOPDIR)/%,$(BTLIBS)) \
-		--end-group -o vmlinux.o
+		btfix.o \
+		--end-group -o image
 
-btfix.s: btfixupprep vmlinux.o
-	$(OBJDUMP) -x vmlinux.o | ./btfixupprep > btfix.s
+btfix.s: btfixupprep $(TOPDIR)/vmlinux
+	$(OBJDUMP) -x $(TOPDIR)/vmlinux | ./btfixupprep > btfix.s
 
 btfix.o: btfix.s
 	$(CC) -c -o btfix.o btfix.s

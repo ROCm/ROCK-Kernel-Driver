@@ -20,8 +20,11 @@
 
 #define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/sched.h>
 #include <linux/smp_lock.h>
+#include <linux/init.h>
 #include <linux/time.h>
+#include <linux/init.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <asm/uaccess.h>
@@ -31,6 +34,10 @@
  * register/unregister mappers
  * exported for other modules
  */
+
+MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
+MODULE_DESCRIPTION("ioctl32 wrapper for ALSA");
+MODULE_LICENSE("GPL");
 
 int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *));
 int unregister_ioctl32_conversion(unsigned int cmd);
@@ -79,7 +86,7 @@ struct sndrv_ctl_elem_list32 {
 	u32 count;
 	u32 pids;
 	unsigned char reserved[50];
-};
+} /* don't set packed attribute here */;
 
 #define CVT_sndrv_ctl_elem_list()\
 {\
@@ -90,8 +97,43 @@ struct sndrv_ctl_elem_list32 {
 	CPTR(pids);\
 }
 
-DEFINE_ALSA_IOCTL(ctl_elem_list);
+static int _snd_ioctl32_ctl_elem_list(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+{
+	struct sndrv_ctl_elem_list32 data32;
+	struct sndrv_ctl_elem_list data;
+	mm_segment_t oldseg = get_fs();
+	int err;
 
+	set_fs(KERNEL_DS);
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
+		err = -EFAULT;
+		goto __err;
+	}
+	memset(&data, 0, sizeof(data));
+	data.offset = data32.offset;
+	data.space = data32.space;
+	data.used = data32.used;
+	data.count = data32.count;
+	data.pids = A(data32.pids);
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	if (err < 0)
+		goto __err;
+	/* copy the result */
+	data32.offset = data.offset;
+	data32.space = data.space;
+	data32.used = data.used;
+	data32.count = data.count;
+	//data.pids = data.pids;
+	if (copy_to_user((void*)arg, &data32, sizeof(data32))) {
+		err = -EFAULT;
+		goto __err;
+	}
+ __err:
+	set_fs(oldseg);
+	return err;
+}
+
+DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_list, ctl_elem_list, SNDRV_CTL_IOCTL_ELEM_LIST);
 
 /*
  * control element info
@@ -123,22 +165,31 @@ struct sndrv_ctl_elem_info32 {
 		unsigned char reserved[128];
 	} value;
 	unsigned char reserved[64];
-};
+} __attribute__((packed));
 
-static int snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file)
+static int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	struct sndrv_ctl_elem_info data;
 	struct sndrv_ctl_elem_info32 data32;
 	int err;
+	mm_segment_t oldseg = get_fs();
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
-		return -EFAULT;
+	set_fs(KERNEL_DS);
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
+		err = -EFAULT;
+		goto __err;
+	}
 	memset(&data, 0, sizeof(data));
 	data.id = data32.id;
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, cmd, (unsigned long)&data);
+	/* we need to copy the item index.
+	 * hope this doesn't break anything..
+	 */
+	data.value.enumerated.item = data32.value.enumerated.item;
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
 	if (err < 0)
-		return err;
+		goto __err;
 	/* restore info to 32bit */
+	data32.id = data.id;
 	data32.type = data.type;
 	data32.access = data.access;
 	data32.count = data.count;
@@ -147,12 +198,12 @@ static int snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned
 	case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
 	case SNDRV_CTL_ELEM_TYPE_INTEGER:
 		data32.value.integer.min = data.value.integer.min;
-		data32.value.integer.max = data.value.integer.min;
+		data32.value.integer.max = data.value.integer.max;
 		data32.value.integer.step = data.value.integer.step;
 		break;
 	case SNDRV_CTL_ELEM_TYPE_INTEGER64:
 		data32.value.integer64.min = data.value.integer64.min;
-		data32.value.integer64.max = data.value.integer64.min;
+		data32.value.integer64.max = data.value.integer64.max;
 		data32.value.integer64.step = data.value.integer64.step;
 		break;
 	case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
@@ -165,14 +216,17 @@ static int snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned
 		break;
 	}
 	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
-		return -EFAULT;
+		err = -EFAULT;
+ __err:
+	set_fs(oldseg);
 	return err;
 }
 
+DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_info, ctl_elem_info, SNDRV_CTL_IOCTL_ELEM_INFO);
 
 struct sndrv_ctl_elem_value32 {
 	struct sndrv_ctl_elem_id id;
-	unsigned int indirect: 1;
+	unsigned int indirect;	/* bit-field causes misalignment */
         union {
 		union {
 			s32 value[128];
@@ -193,7 +247,7 @@ struct sndrv_ctl_elem_value32 {
 		struct sndrv_aes_iec958 iec958;
         } value;
         unsigned char reserved[128];
-};
+} __attribute__((packed));
 
 
 /* hmm, it's so hard to retrieve the value type from the control id.. */
@@ -221,25 +275,33 @@ static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
 }
 
 
-static int snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file)
+static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	// too big?
 	struct sndrv_ctl_elem_value data;
 	struct sndrv_ctl_elem_value32 data32;
 	int err, i;
 	int type;
+	mm_segment_t oldseg = get_fs();
+
+	set_fs(KERNEL_DS);
+
 	/* FIXME: check the sane ioctl.. */
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
-		return -EFAULT;
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
+		err = -EFAULT;
+		goto __err;
+	}
 	memset(&data, 0, sizeof(data));
 	data.id = data32.id;
 	data.indirect = data32.indirect;
 	if (data.indirect) /* FIXME: this is not correct for long arrays */
 		data.value.integer.value_ptr = (void*)TO_PTR(data32.value.integer.value_ptr);
 	type = get_ctl_type(file, &data.id);
-	if (type < 0)
-		return type;
+	if (type < 0) {
+		err = type;
+		goto __err;
+	}
 	if (! data.indirect) {
 		switch (type) {
 		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
@@ -263,45 +325,50 @@ static int snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigne
 			data.value.iec958 = data32.value.iec958;
 			break;
 		default:
+			printk("unknown type %d\n", type);
 			break;
 		}
 	}
 
-	err = file->f_op->ioctl(file->f_dentry->d_inode, file, cmd, (unsigned long)&data);
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
 	if (err < 0)
-		return err;
+		goto __err;
 	/* restore info to 32bit */
 	if (! data.indirect) {
 		switch (type) {
 		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
 		case SNDRV_CTL_ELEM_TYPE_INTEGER:
 			for (i = 0; i < 128; i++)
-				data.value.integer.value[i] = data32.value.integer.value[i];
+				data32.value.integer.value[i] = data.value.integer.value[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_INTEGER64:
 			for (i = 0; i < 64; i++)
-				data.value.integer64.value[i] = data32.value.integer64.value[i];
+				data32.value.integer64.value[i] = data.value.integer64.value[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
 			for (i = 0; i < 128; i++)
-				data.value.enumerated.item[i] = data32.value.enumerated.item[i];
+				data32.value.enumerated.item[i] = data.value.enumerated.item[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_BYTES:
-			memcpy(data.value.bytes.data, data32.value.bytes.data,
+			memcpy(data32.value.bytes.data, data.value.bytes.data,
 			       sizeof(data.value.bytes.data));
 			break;
 		case SNDRV_CTL_ELEM_TYPE_IEC958:
-			data.value.iec958 = data32.value.iec958;
+			data32.value.iec958 = data.value.iec958;
 			break;
 		default:
 			break;
 		}
 	}
 	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
-		return -EFAULT;
+		err = -EFAULT;
+ __err:
+	set_fs(oldseg);
 	return err;
 }
 
+DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_read, ctl_elem_value, SNDRV_CTL_IOCTL_ELEM_READ);
+DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_write, ctl_elem_value, SNDRV_CTL_IOCTL_ELEM_WRITE);
 
 /*
  */
@@ -321,8 +388,8 @@ static struct ioctl32_mapper control_mappers[] = {
 	{ SNDRV_CTL_IOCTL_CARD_INFO , NULL },
 	{ SNDRV_CTL_IOCTL_ELEM_LIST32, AP(ctl_elem_list) },
 	{ SNDRV_CTL_IOCTL_ELEM_INFO32, AP(ctl_elem_info) },
-	{ SNDRV_CTL_IOCTL_ELEM_READ32, AP(ctl_elem_value) },
-	{ SNDRV_CTL_IOCTL_ELEM_WRITE32, AP(ctl_elem_value) },
+	{ SNDRV_CTL_IOCTL_ELEM_READ32, AP(ctl_elem_read) },
+	{ SNDRV_CTL_IOCTL_ELEM_WRITE32, AP(ctl_elem_write) },
 	{ SNDRV_CTL_IOCTL_ELEM_LOCK, NULL },
 	{ SNDRV_CTL_IOCTL_ELEM_UNLOCK, NULL },
 	{ SNDRV_CTL_IOCTL_SUBSCRIBE_EVENTS, NULL },
@@ -393,6 +460,8 @@ static int __init snd_ioctl32_init(void)
 		return err;
 	}
 #endif
+
+	return 0;
 }
 
 module_init(snd_ioctl32_init)

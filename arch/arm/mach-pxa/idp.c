@@ -9,6 +9,8 @@
  *
  *  2001-09-13: Cliff Brake <cbrake@accelent.com>
  *              Initial code
+ *
+ * Expected command line: mem=32M initrd=0xa1000000,4M root=/dev/ram ramdisk=8192
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -28,8 +30,6 @@
 #include <asm/mach/map.h>
 
 #include "generic.h"
-
-#define PXA_IDP_REV02
 
 #ifndef PXA_IDP_REV02
 /* shadow registers for write only registers */
@@ -103,8 +103,18 @@ static void __init idp_map_io(void)
 	pxa_map_io();
 	iotable_init(idp_io_desc, ARRAY_SIZE(idp_io_desc));
 
-	set_GPIO_IRQ_edge(IRQ_TO_GPIO_2_80(TOUCH_PANEL_IRQ), TOUCH_PANEL_IRQ_EDGE);
+	set_irq_type(IRQ_TO_GPIO_2_80(TOUCH_PANEL_IRQ), TOUCH_PANEL_IRQ_EDGE);
+
+	// serial ports 2 & 3
+	pxa_gpio_mode(GPIO42_BTRXD_MD);
+	pxa_gpio_mode(GPIO43_BTTXD_MD);
+	pxa_gpio_mode(GPIO44_BTCTS_MD);
+	pxa_gpio_mode(GPIO45_BTRTS_MD);
+	pxa_gpio_mode(GPIO46_STRXD_MD);
+	pxa_gpio_mode(GPIO47_STTXD_MD);
+
 }
+
 
 MACHINE_START(PXA_IDP, "Accelent Xscale IDP")
 	MAINTAINER("Accelent Systems Inc.")

@@ -1670,7 +1670,7 @@ static struct gendisk sjcd_disk =
 	.first_minor = 0,
 	.minor_shift = 0,
 	.fops = &sjcd_fops,
-	.major_name = "sjcd"
+	.disk_name = "sjcd"
 };
 
 /*

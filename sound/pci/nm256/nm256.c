@@ -892,7 +892,7 @@ static snd_pcm_ops_t snd_nm256_capture_ops = {
 #endif
 };
 
-static int __init
+static int __devinit
 snd_nm256_pcm(nm256_t *chip, int device)
 {
 	snd_pcm_t *pcm;
@@ -1188,21 +1188,31 @@ snd_nm256_ac97_reset(ac97_t *ac97)
 }
 
 /* create an ac97 mixer interface */
-static int __init
+static int __devinit
 snd_nm256_mixer(nm256_t *chip)
 {
 	ac97_t ac97;
-	int err;
+	int i;
+	/* looks like nm256 hangs up when unexpected registers are touched... */
+	static int mixer_regs[] = {
+		AC97_MASTER, AC97_HEADPHONE, AC97_MASTER_MONO,
+		AC97_PC_BEEP, AC97_PHONE, AC97_MIC, AC97_LINE,
+		AC97_VIDEO, AC97_AUX, AC97_PCM, AC97_REC_SEL,
+		AC97_REC_GAIN, AC97_GENERAL_PURPOSE, AC97_3D_CONTROL,
+		AC97_EXTENDED_ID, AC97_EXTENDED_STATUS,
+		AC97_VENDOR_ID1, AC97_VENDOR_ID2,
+		-1
+	};
 
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.init = snd_nm256_ac97_reset;
+	ac97.reset = snd_nm256_ac97_reset;
 	ac97.write = snd_nm256_ac97_write;
 	ac97.read = snd_nm256_ac97_read;
+	ac97.limited_regs = 1;
+	for (i = 0; mixer_regs[i] >= 0; i++)
+		set_bit(mixer_regs[i], ac97.reg_accessed);
 	ac97.private_data = chip;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
-		return err;
-
-	return 0;
+	return snd_ac97_mixer(chip->card, &ac97, &chip->ac97);
 }
 
 /* 
@@ -1211,7 +1221,7 @@ snd_nm256_mixer(nm256_t *chip)
  * RAM.
  */
 
-static int __init
+static int __devinit
 snd_nm256_peek_for_sig(nm256_t *chip)
 {
 	/* The signature is located 1K below the end of video RAM.  */
@@ -1346,7 +1356,7 @@ static int snd_nm256_free(nm256_t *chip)
 	if (chip->streams[SNDRV_PCM_STREAM_CAPTURE].running)
 		snd_nm256_capture_stop(chip);
 
-	if(chip->irq >= 0)
+	if (chip->irq >= 0)
 		synchronize_irq(chip->irq);
 
 	if (chip->cport)
@@ -1374,7 +1384,7 @@ static int snd_nm256_dev_free(snd_device_t *device)
 	return snd_nm256_free(chip);
 }
 
-static int __init
+static int __devinit
 snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		 int play_bufsize, int capt_bufsize,
 		 int force_load,

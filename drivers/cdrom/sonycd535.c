@@ -1460,7 +1460,7 @@ static struct gendisk cdu_disk =
 	.first_minor = 0,
 	.minor_shift = 0,
 	.fops = &cdu_fops,
-	.major_name = "cdu",
+	.disk_name = "cdu",
 };
 
 /*

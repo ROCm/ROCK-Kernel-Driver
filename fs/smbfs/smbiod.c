@@ -18,6 +18,7 @@
 #include <linux/file.h>
 #include <linux/dcache.h>
 #include <linux/smp_lock.h>
+#include <linux/module.h>
 #include <net/ip.h>
 
 #include <linux/smb_fs.h>
@@ -31,7 +32,14 @@
 #include "request.h"
 #include "proto.h"
 
-static int smbiod_pid = -1;
+enum smbiod_state {
+	SMBIOD_DEAD,
+	SMBIOD_STARTING,
+	SMBIOD_RUNNING,
+};
+
+static enum smbiod_state smbiod_state = SMBIOD_DEAD;
+static pid_t smbiod_pid;
 static DECLARE_WAIT_QUEUE_HEAD(smbiod_wait);
 static LIST_HEAD(smb_servers);
 static spinlock_t servers_lock = SPIN_LOCK_UNLOCKED;
@@ -41,14 +49,13 @@ static long smbiod_flags;
 
 static int smbiod(void *);
 static void smbiod_start(void);
-static void smbiod_stop(void);
 
 /*
  * called when there's work for us to do
  */
 void smbiod_wake_up()
 {
-	if (smbiod_pid == -1)
+	if (smbiod_state == SMBIOD_DEAD)
 		return;
 	set_bit(SMBIOD_DATA_READY, &smbiod_flags);
 	wake_up_interruptible(&smbiod_wait);
@@ -59,18 +66,16 @@ void smbiod_wake_up()
  */
 static void smbiod_start()
 {
-	if (smbiod_pid != -1)
+	pid_t pid;
+	if (smbiod_state != SMBIOD_DEAD)
 		return;
-	smbiod_pid = kernel_thread(smbiod, NULL, 0);
-}
+	smbiod_state = SMBIOD_STARTING;
+	spin_unlock(&servers_lock);
+	pid = kernel_thread(smbiod, NULL, 0);
 
-/*
- * stop smbiod if there are no open connections
- */
-static void smbiod_stop()
-{
-	if (smbiod_pid != -1 && list_empty(&smb_servers))
-		kill_proc(smbiod_pid, SIGKILL, 1);
+	spin_lock(&servers_lock);
+	smbiod_state = SMBIOD_RUNNING;
+	smbiod_pid = pid;
 }
 
 /*
@@ -86,19 +91,18 @@ void smbiod_register_server(struct smb_sb_info *server)
 }
 
 /*
- * unregister a server & stop smbiod if necessary
+ * Unregister a server
+ * Must be called with the server lock held.
  */
 void smbiod_unregister_server(struct smb_sb_info *server)
 {
 	spin_lock(&servers_lock);
 	list_del_init(&server->entry);
 	VERBOSE("%p\n", server);
-	smbiod_stop();
 	spin_unlock(&servers_lock);
 
-	smb_lock_server(server);
+	smbiod_wake_up();
 	smbiod_flush(server);
-	smb_unlock_server(server);
 }
 
 void smbiod_flush(struct smb_sb_info *server)
@@ -277,12 +281,13 @@ out:
  */
 static int smbiod(void *unused)
 {
+	MOD_INC_USE_COUNT;
 	daemonize();
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	siginitsetinv(&current->blocked, sigmask(SIGKILL));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	strcpy(current->comm, "smbiod");
 
@@ -295,32 +300,40 @@ static int smbiod(void *unused)
 		/* FIXME: Use poll? */
 		wait_event_interruptible(smbiod_wait,
 			 test_bit(SMBIOD_DATA_READY, &smbiod_flags));
-		if (signal_pending(current))
+		if (signal_pending(current)) {
+			spin_lock(&servers_lock);
+			smbiod_state = SMBIOD_DEAD;
+			spin_unlock(&servers_lock);
 			break;
+		}
 
 		clear_bit(SMBIOD_DATA_READY, &smbiod_flags);
 
-		/*
-		 * We must hold the servers_lock while looking for servers
-		 * to check or else we have a race with put_super.
-		 */
 		spin_lock(&servers_lock);
+		if (list_empty(&smb_servers)) {
+			smbiod_state = SMBIOD_DEAD;
+			spin_unlock(&servers_lock);
+			break;
+		}
+
 		list_for_each_safe(pos, n, &smb_servers) {
 			server = list_entry(pos, struct smb_sb_info, entry);
 			VERBOSE("checking server %p\n", server);
-			smb_lock_server(server);
-			spin_unlock(&servers_lock);
 
-			smbiod_doio(server);
+			if (server->state == CONN_VALID) {
+				spin_unlock(&servers_lock);
 
-			smb_unlock_server(server);
-			spin_lock(&servers_lock);
+				smb_lock_server(server);
+				smbiod_doio(server);
+				smb_unlock_server(server);
+
+				spin_lock(&servers_lock);
+			}
 		}
 		spin_unlock(&servers_lock);
 	}
 
 	VERBOSE("SMB Kernel thread exiting (%d) ...\n", current->pid);
-	smbiod_pid = -1;
-
+	MOD_DEC_USE_COUNT;
 	return 0;
 }
