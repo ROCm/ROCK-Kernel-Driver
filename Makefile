@@ -209,7 +209,7 @@ define rule_link_vmlinux
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
-vmlinux: $(CONFIGURATION) $(vmlinux-objs) dummy
+vmlinux: $(CONFIGURATION) $(vmlinux-objs) FORCE
 	$(call if_changed_rule,link_vmlinux)
 
 #	The actual objects are generated when descending, 
@@ -219,7 +219,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
-$(SUBDIRS): dummy include/linux/version.h include/config/MARKER
+$(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
 	@$(MAKE) -C $@
 
 # Configuration
@@ -327,7 +327,7 @@ else # CONFIG_MODULES
 # ---------------------------------------------------------------------------
 # Modules not configured
 
-modules modules_install: dummy
+modules modules_install: FORCE
 	@echo
 	@echo "The present kernel configuration has modules disabled."
 	@echo "Type 'make config' and enable loadable module support."
@@ -474,13 +474,13 @@ checkincludes:
 
 # Generate tags for editors
 
-TAGS: dummy
+TAGS: FORCE
 	{ find include/asm-${ARCH} -name '*.h' -print ; \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
 	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
 
 # 	Exuberant ctags works better with -I
-tags: dummy
+tags: FORCE
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
 	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \

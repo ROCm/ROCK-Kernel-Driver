@@ -209,7 +209,7 @@ archsymlinks:
 
 vmlinux: arch/arm/vmlinux.lds
 
-arch/arm/vmlinux.lds: $(LDSCRIPT) dummy
+arch/arm/vmlinux.lds: $(LDSCRIPT) FORCE
 	@sed 's/TEXTADDR/$(TEXTADDR)/;s/DATAADDR/$(DATAADDR)/' $(LDSCRIPT) >$@
 
 bzImage zImage zinstall Image bootpImage install: vmlinux

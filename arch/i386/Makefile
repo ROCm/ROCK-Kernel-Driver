@@ -107,8 +107,6 @@ MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/i386/vmlinux.lds
 
-FORCE: ;
-
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper archdep
 

@@ -37,7 +37,7 @@ endif
 head.o: head.S
 	$(CC) $(AFLAGS) -ansi -c $*.S -o $*.o
 
-check_asm: dummy
+check_asm: FORCE
 	@if [ ! -r $(HPATH)/asm/asm_offsets.h ] ; then \
 	  touch $(HPATH)/asm/asm_offsets.h ; \
 	fi

@@ -82,10 +82,10 @@ cramfs:
 
 clinux: vmlinux.bin decompress.bin rescue.bin
 
-decompress.bin: dummy
+decompress.bin: FORCE
 	@make -C arch/cris/boot/compressed decompress.bin
 
-rescue.bin: dummy
+rescue.bin: FORCE
 	@make -C arch/cris/boot/rescue rescue.bin
 
 zImage: vmlinux.bin

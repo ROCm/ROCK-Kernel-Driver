@@ -74,8 +74,6 @@ MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/x86_64/vmlinux.lds
 
-FORCE: ;
-
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper archdep checkoffset
 

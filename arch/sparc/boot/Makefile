@@ -30,7 +30,7 @@ BTLIBS := $(CORE_FILES_NO_BTFIX) $(FILESYSTEMS) \
 # build would work, but this fails because $(HEAD) cannot work
 # properly as it will cause head.o to be built with the implicit
 # rules not the ones in kernel/Makefile.  Someone please fix. --DaveM
-vmlinux.o: dummy
+vmlinux.o: FORCE
 	$(LD) -r $(patsubst %,$(TOPDIR)/%,$(BTOBJS)) \
 		--start-group \
 		$(patsubst %,$(TOPDIR)/%,$(BTLIBS)) \

@@ -33,11 +33,11 @@ offsets.h: print_offsets
 
 comma	:= ,
 
-print_offsets: print_offsets.c FORCE_RECOMPILE
+print_offsets: print_offsets.c FORCE
 	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
 		print_offsets.c -o $@
 
-FORCE_RECOMPILE:
+FORCE:
 
 else
 
