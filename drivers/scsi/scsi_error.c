@@ -211,8 +211,7 @@ static inline void scsi_eh_prt_fail_stats(struct Scsi_Host *shost,
 	int cmd_cancel = 0;
 	int devices_failed = 0;
 
-
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		list_for_each_entry(scmd, work_q, eh_entry) {
 			if (scmd->device == sdev) {
 				++total_failures;
@@ -850,7 +849,7 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
 	struct scsi_device *sdev;
 	int rtn;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		bdr_scmd = NULL;
 		list_for_each_entry(scmd, work_q, eh_entry)
 			if (scmd->device == sdev) {
@@ -1363,9 +1362,10 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 * onto the head of the SCSI request queue for the device.  There
 	 * is no point trying to lock the door of an off-line device.
 	 */
-	list_for_each_entry(sdev, &shost->my_devices, siblings)
+	shost_for_each_device(sdev, shost) {
 		if (sdev->online && sdev->locked)
 			scsi_eh_lock_door(sdev);
+	}
 
 	/*
 	 * next free up anything directly waiting upon the host.  this
@@ -1621,7 +1621,7 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
 {
 	struct scsi_device *sdev;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		if (channel == sdev->channel) {
 			sdev->was_reset = 1;
 			sdev->expecting_cc_ua = 1;
@@ -1655,7 +1655,7 @@ void scsi_report_device_reset(struct Scsi_Host *shost, int channel, int target)
 {
 	struct scsi_device *sdev;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		if (channel == sdev->channel &&
 		    target == sdev->id) {
 			sdev->was_reset = 1;

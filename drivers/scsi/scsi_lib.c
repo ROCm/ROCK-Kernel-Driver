@@ -462,7 +462,7 @@ void scsi_run_host_queues(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings)
+	shost_for_each_device(sdev, shost)
 		scsi_run_queue(sdev->request_queue);
 }
 

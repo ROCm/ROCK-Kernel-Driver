@@ -112,6 +112,9 @@ extern int scsi_device_cancel(struct scsi_device *, int);
 extern int scsi_device_get(struct scsi_device *);
 extern void scsi_device_put(struct scsi_device *);
 
+#define shost_for_each_device(sdev, shost) \
+	list_for_each_entry((sdev), &((shost)->my_devices), siblings)
+
 extern void scsi_adjust_queue_depth(struct scsi_device *, int, int);
 extern int scsi_track_queue_full(struct scsi_device *, int);
 
