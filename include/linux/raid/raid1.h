@@ -55,6 +55,7 @@ struct r1bio_s {
 					    * used from IRQ handlers
 					    */
 	sector_t		sector;
+	int			sectors;
 	unsigned long		state;
 	mddev_t			*mddev;
 	/*
