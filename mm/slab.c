@@ -805,13 +805,13 @@ static inline void *kmem_getpages(kmem_cache_t *cachep, unsigned long flags)
 	void *addr;
 
 	flags |= cachep->gfpflags;
-	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
-		atomic_add(1<<cachep->gfporder, &slab_reclaim_pages);
 	addr = (void*)__get_free_pages(flags, cachep->gfporder);
 	if (addr) {
 		int i = (1 << cachep->gfporder);
 		struct page *page = virt_to_page(addr);
 
+		if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
+			atomic_add(i, &slab_reclaim_pages);
 		while (i--) {
 			SetPageSlab(page);
 			page++;
