@@ -166,7 +166,7 @@ static void __sctp_get_local_addr_list(struct sctp_protocol *proto)
 
 	read_lock(&dev_base_lock);
 	for (dev = dev_base; dev; dev = dev->next) {
-		list_for_each(pos, &proto->address_families) {
+		__list_for_each(pos, &proto->address_families) {
 			af = list_entry(pos, struct sctp_af, list);
 			af->copy_addrlist(&proto->local_addr_list, dev);
 		}
