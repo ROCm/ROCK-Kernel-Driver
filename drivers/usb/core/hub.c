@@ -461,7 +461,7 @@ static int hub_configure(struct usb_hub *hub,
 	usb_fill_int_urb(hub->urb, dev, pipe, *hub->buffer, maxp, hub_irq,
 		hub, endpoint->bInterval);
 	hub->urb->transfer_dma = hub->buffer_dma;
-	hub->urb->transfer_flags |= URB_NO_DMA_MAP;
+	hub->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 	ret = usb_submit_urb(hub->urb, GFP_KERNEL);
 	if (ret) {
 		message = "couldn't submit status urb";

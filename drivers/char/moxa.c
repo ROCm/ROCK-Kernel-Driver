@@ -339,7 +339,6 @@ int moxa_init(void)
 {
 	int i, n, numBoards;
 	struct moxa_str *ch;
-	int ret1, ret2;
 
 	printk(KERN_INFO "MOXA Intellio family driver version %s\n", MOXA_VERSION);
 	moxaDriver = alloc_tty_driver(MAX_PORTS + 1);
@@ -615,7 +614,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	}
 	ch->asyncflags |= ASYNC_CLOSING;
 
-	ch->cflag = *tty->termios->c_cflag;
+	ch->cflag = tty->termios->c_cflag;
 	if (ch->asyncflags & ASYNC_INITIALIZED) {
 		setup_empty_event(tty);
 		tty_wait_until_sent(tty, 30 * HZ);	/* 30 seconds timeout */

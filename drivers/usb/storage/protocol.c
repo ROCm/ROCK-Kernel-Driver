@@ -82,6 +82,10 @@ static void fix_inquiry_data(Scsi_Cmnd *srb)
 	if (srb->cmnd[0] != INQUIRY)
 		return;
 
+	/* oddly short buffer -- bail out */
+	if (srb->request_bufflen < 3)
+		return;
+
 	data_ptr = find_data_location(srb);
 
 	if ((data_ptr[2] & 7) == 2)

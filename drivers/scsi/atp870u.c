@@ -829,25 +829,6 @@ oktosend:
 
 }
 
-static void internal_done(Scsi_Cmnd * SCpnt)
-{
-	SCpnt->SCp.Status++;
-}
-
-static int atp870u_command(Scsi_Cmnd * SCpnt)
-{
-
-	atp870u_queuecommand(SCpnt, internal_done);
-
-	SCpnt->SCp.Status = 0;
-	while (!SCpnt->SCp.Status)
-	{
-		cpu_relax();
-		barrier();
-	}
-	return SCpnt->result;
-}
-
 static unsigned char fun_scam(struct atp_unit *dev, unsigned short int *val)
 {
 	unsigned int tmport;
@@ -2728,7 +2709,6 @@ static Scsi_Host_Template driver_template = {
 	.detect			= atp870u_detect,
 	.release		= atp870u_release,
 	.info			= atp870u_info,
-	.command		= atp870u_command,
 	.queuecommand		= atp870u_queuecommand,
 	.eh_abort_handler	= atp870u_abort,
 	.bios_param		= atp870u_biosparam,

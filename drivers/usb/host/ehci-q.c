@@ -88,7 +88,6 @@ qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len,
 static inline void
 qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
 {
-	qh->hw_current = 0;
 	qh->hw_qtd_next = QTD_NEXT (qtd->qtd_dma);
 	qh->hw_alt_next = EHCI_LIST_END;
 
@@ -98,8 +97,6 @@ qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
 }
 
 /*-------------------------------------------------------------------------*/
-
-#define IS_SHORT_READ(token) (QTD_LENGTH (token) != 0 && QTD_PID (token) == 1)
 
 static void qtd_copy_status (
 	struct ehci_hcd *ehci,
@@ -279,16 +276,15 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 		/* hardware copies qtd out of qh overlay */
 		rmb ();
 		token = le32_to_cpu (qtd->hw_token);
-		stopped = stopped
-			|| (HALT_BIT & qh->hw_token) != 0
-			|| (ehci->hcd.state == USB_STATE_HALT);
 
 		/* always clean up qtds the hc de-activated */
 		if ((token & QTD_STS_ACTIVE) == 0) {
 
-			/* magic dummy for short reads; won't advance */
-			if (IS_SHORT_READ (token)
-					&& !(token & QTD_STS_HALT)
+			if ((token & QTD_STS_HALT) != 0) {
+				stopped = 1;
+
+			/* magic dummy for some short reads; qh won't advance */
+			} else if (IS_SHORT_READ (token)
 					&& (qh->hw_alt_next & QTD_MASK)
 						== ehci->async->hw_alt_next) {
 				stopped = 1;
@@ -296,10 +292,13 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 			}
 
 		/* stop scanning when we reach qtds the hc is using */
-		} else if (likely (!stopped)) {
+		} else if (likely (!stopped
+				&& HCD_IS_RUNNING (ehci->hcd.state))) {
 			break;
 
 		} else {
+			stopped = 1;
+
 			/* ignore active urbs unless some previous qtd
 			 * for the urb faulted (including short read) or
 			 * its urb was canceled.  we may patch qh or qtds.
@@ -358,12 +357,20 @@ halt:
 	qh->qh_state = state;
 
 	/* update qh after fault cleanup */
-	if (unlikely ((HALT_BIT & qh->hw_token) != 0)) {
-		qh_update (ehci, qh,
-			list_empty (&qh->qtd_list)
-				? qh->dummy
-				: list_entry (qh->qtd_list.next,
-					struct ehci_qtd, qtd_list));
+	if (unlikely (stopped != 0)
+			/* some EHCI 0.95 impls will overlay dummy qtds */ 
+			|| qh->hw_qtd_next == EHCI_LIST_END) {
+		if (list_empty (&qh->qtd_list))
+			end = qh->dummy;
+		else {
+			end = list_entry (qh->qtd_list.next,
+					struct ehci_qtd, qtd_list);
+			/* first qtd may already be partially processed */
+			if (cpu_to_le32 (end->qtd_dma) == qh->hw_current)
+				end = 0;
+		}
+		if (end)
+			qh_update (ehci, qh, end);
 	}
 
 	return count;
@@ -683,12 +690,11 @@ done:
 
 	/* NOTE:  if (PIPE_INTERRUPT) { scheduler sets s-mask } */
 
-	/* init as halted, toggle clear, advance to dummy */
+	/* init as live, toggle clear, advance to dummy */
 	qh->qh_state = QH_STATE_IDLE;
 	qh->hw_info1 = cpu_to_le32 (info1);
 	qh->hw_info2 = cpu_to_le32 (info2);
 	qh_update (ehci, qh, qh->dummy);
-	qh->hw_token = cpu_to_le32 (QTD_STS_HALT);
 	usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe), !is_input, 1);
 	return qh;
 }
@@ -787,11 +793,6 @@ static struct ehci_qh *qh_append_tds (
 				}
 			}
 		}
-
-		/* FIXME:  changing config or interface setting is not
-		 * supported yet.  preferred fix is for usbcore to tell
-		 * us to clear out each endpoint's state, but...
-		 */
 
 		/* usb_clear_halt() means qh data toggle gets reset */
 		if (unlikely (!usb_gettoggle (urb->dev,

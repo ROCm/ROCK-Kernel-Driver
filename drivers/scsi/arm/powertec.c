@@ -296,7 +296,6 @@ static Scsi_Host_Template powertecscsi_template = {
 	.proc_info			= powertecscsi_proc_info,
 	.name				= "PowerTec SCSI",
 	.info				= powertecscsi_info,
-	.command			= fas216_command,
 	.queuecommand			= fas216_queue_command,
 	.eh_host_reset_handler		= fas216_eh_host_reset,
 	.eh_bus_reset_handler		= fas216_eh_bus_reset,

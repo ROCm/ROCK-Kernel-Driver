@@ -195,12 +195,12 @@ static int ip_map_parse(struct cache_detail *cd,
 	ipm.m_addr.s_addr =
 		htonl((((((b1<<8)|b2)<<8)|b3)<<8)|b4);
 	ipm.h.flags = 0;
-	if (dom)
+	if (dom) {
 		ipm.m_client = container_of(dom, struct unix_domain, h);
-	else
+		ipm.m_add_change = ipm.m_client->addr_changes;
+	} else
 		set_bit(CACHE_NEGATIVE, &ipm.h.flags);
 	ipm.h.expiry_time = expiry;
-	ipm.m_add_change = ipm.m_client->addr_changes;
 
 	ipmp = ip_map_lookup(&ipm, 1);
 	if (ipmp)

@@ -121,6 +121,7 @@ sim710_probe_common(struct device *dev, unsigned long base_addr,
 	hostdata->differential = differential;
 	hostdata->clock = clock;
 	hostdata->chip710 = 1;
+	NCR_700_set_io_mapped(hostdata);
 
 	/* and register the chip */
 	if((host = NCR_700_detect(&sim710_driver_template, hostdata)) == NULL) {
@@ -143,7 +144,7 @@ sim710_probe_common(struct device *dev, unsigned long base_addr,
 	return 0;
 
  out_unregister:
-	scsi_unregister(host);
+	scsi_host_put(host);
  out_release:
 	release_region(host->base, 64);
  out_free:
@@ -294,12 +295,17 @@ sim710_eisa_probe(struct device *dev)
 	unsigned char irq, differential = 0, scsi_id = 7;
 
 	if(strcmp(edev->id.sig, "HWP0C80") == 0) {
+		__u8 val;
 		eisa_irqs =  eisa_hwp_irqs;
 		irq_index = (inb(io_addr + 0xc85) & 0x7) - 1;
-#if 0
-		/* this doesn't seem to work at the moment */
-		scsi_id = ffs(inb(io_addr + 0x4));
-#endif
+
+		val = inb(io_addr + 0x4);
+		scsi_id = ffs(val) - 1;
+
+		if(scsi_id > 7 || (val & ~(1<<scsi_id)) != 0) {
+			printk(KERN_ERR "sim710.c, EISA card %s has incorrect scsi_id, setting to 7\n", dev->name);
+			scsi_id = 7;
+		}
 	} else {
 		eisa_irqs = eisa_cpq_irqs;
 		irq_index = inb(io_addr + 0xc88) & 0x07;

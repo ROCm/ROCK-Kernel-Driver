@@ -604,5 +604,6 @@ EXPORT_SYMBOL(__per_cpu_offset);
 /* debug */
 EXPORT_SYMBOL(dump_stack);
 EXPORT_SYMBOL(ptrace_notify);
+EXPORT_SYMBOL(console_printk);
 
-EXPORT_SYMBOL(current_kernel_time); 
+EXPORT_SYMBOL(current_kernel_time);

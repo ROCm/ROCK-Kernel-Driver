@@ -95,7 +95,10 @@
 			*(.initcall6.init)				      \
 			*(.initcall7.init)				      \
 		. = ALIGN (4) ;						      \
-		___initcall_end = . ;
+		___initcall_end = . ;					      \
+		___con_initcall_start = .;				      \
+			*(.con_initcall.init)				      \
+		___con_initcall_end = .;
 
 /* Contents of `init' section for a kernel that's loaded into RAM.  */
 #define RAMK_INIT_CONTENTS						      \
@@ -232,5 +235,15 @@ _jiffies = _jiffies_64 ;
 #  include "rte_ma1_cb-rom.ld"
 # else
 #  include "rte_ma1_cb.ld"
+# endif
+#endif
+
+#ifdef CONFIG_RTE_CB_NB85E
+# ifdef CONFIG_ROM_KERNEL
+#  include "rte_nb85e_cb-rom.ld"
+# elif defined(CONFIG_RTE_CB_MULTI)
+#  include "rte_nb85e_cb-multi.ld"
+# else
+#  include "rte_nb85e_cb.ld"
 # endif
 #endif

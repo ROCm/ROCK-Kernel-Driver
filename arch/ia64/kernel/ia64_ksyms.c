@@ -65,6 +65,9 @@ EXPORT_SYMBOL(ia64_pfn_valid);
 
 #include <asm/processor.h>
 EXPORT_SYMBOL(cpu_info__per_cpu);
+#ifdef CONFIG_SMP
+EXPORT_SYMBOL(__per_cpu_offset);
+#endif
 EXPORT_SYMBOL(kernel_thread);
 
 #include <asm/system.h>
@@ -88,6 +91,7 @@ EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_call_function_single);
 EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(phys_cpu_present_map);
 EXPORT_SYMBOL(ia64_cpu_to_sapicid);
 #else /* !CONFIG_SMP */
 
@@ -124,6 +128,18 @@ EXPORT_SYMBOL_NOVERS(__udivdi3);
 EXPORT_SYMBOL_NOVERS(__moddi3);
 EXPORT_SYMBOL_NOVERS(__umoddi3);
 
+#if defined(CONFIG_MD_RAID5) || defined(CONFIG_MD_RAID5_MODULE)
+extern void xor_ia64_2(void);
+extern void xor_ia64_3(void);
+extern void xor_ia64_4(void);
+extern void xor_ia64_5(void);
+
+EXPORT_SYMBOL_NOVERS(xor_ia64_2);
+EXPORT_SYMBOL_NOVERS(xor_ia64_3);
+EXPORT_SYMBOL_NOVERS(xor_ia64_4);
+EXPORT_SYMBOL_NOVERS(xor_ia64_5);
+#endif
+
 extern unsigned long ia64_iobase;
 EXPORT_SYMBOL(ia64_iobase);
 
@@ -147,10 +163,15 @@ EXPORT_SYMBOL(efi_dir);
 EXPORT_SYMBOL(ia64_mv);
 #endif
 EXPORT_SYMBOL(machvec_noop);
+EXPORT_SYMBOL(machvec_memory_fence);
+EXPORT_SYMBOL(zero_page_memmap_ptr);
 #ifdef CONFIG_PERFMON
 #include <asm/perfmon.h>
-EXPORT_SYMBOL(pfm_install_alternate_syswide_subsystem);
-EXPORT_SYMBOL(pfm_remove_alternate_syswide_subsystem);
+EXPORT_SYMBOL(pfm_register_buffer_fmt);
+EXPORT_SYMBOL(pfm_unregister_buffer_fmt);
+EXPORT_SYMBOL(pfm_mod_fast_read_pmds);
+EXPORT_SYMBOL(pfm_mod_read_pmds);
+EXPORT_SYMBOL(pfm_mod_write_pmcs);
 #endif
 
 #ifdef CONFIG_NUMA
@@ -169,10 +190,25 @@ EXPORT_SYMBOL(unw_access_fr);
 EXPORT_SYMBOL(unw_access_ar);
 EXPORT_SYMBOL(unw_access_pr);
 
-#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
-extern void ia64_spinlock_contention_pre3_4 (void);
+#ifdef CONFIG_SMP
+# if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+/*
+ * This is not a normal routine and we don't want a function descriptor for it, so we use
+ * a fake declaration here.
+ */
+extern char ia64_spinlock_contention_pre3_4;
 EXPORT_SYMBOL(ia64_spinlock_contention_pre3_4);
-#else
-extern void ia64_spinlock_contention (void);
+# else
+/*
+ * This is not a normal routine and we don't want a function descriptor for it, so we use
+ * a fake declaration here.
+ */
+extern char ia64_spinlock_contention;
 EXPORT_SYMBOL(ia64_spinlock_contention);
+# endif
 #endif
+
+EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
+
+#include <linux/pm.h>
+EXPORT_SYMBOL(pm_idle);

@@ -128,4 +128,11 @@ compat_ptr (compat_uptr_t uptr)
 	return (void *) (unsigned long) uptr;
 }
 
+static __inline__ void *
+compat_alloc_user_space (long len)
+{
+	struct pt_regs *regs = ia64_task_regs(current);
+	return (void *) ((regs->r12 & -16) - len);
+}
+
 #endif /* _ASM_IA64_COMPAT_H */

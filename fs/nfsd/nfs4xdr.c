@@ -1039,6 +1039,7 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 	*p++ = htonl((u32)(n));					\
 } while (0)
 #define WRITEMEM(ptr,nbytes)     do {				\
+	*(p + XDR_QUADLEN(nbytes) -1) = 0;                      \
 	memcpy(p, ptr, nbytes);					\
 	p += XDR_QUADLEN(nbytes);				\
 } while (0)
@@ -1425,6 +1426,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	u32 *p = cd->buffer;
 	u32 *attrlenp;
 	struct dentry *dentry;
+	struct svc_export *exp = cd->rd_fhp->fh_export;
 	u32 bmval0, bmval1;
 	int nfserr = 0;
 
@@ -1454,9 +1456,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	if ((bmval0 & ~(FATTR4_WORD0_RDATTR_ERROR | FATTR4_WORD0_FILEID)) || bmval1)  {
 		/*
 		 * "Heavyweight" case: we have no choice except to
-		 * call nfsd4_encode_fattr().  As far as I know,
-		 * only Windows clients will trigger this code
-		 * path.
+		 * call nfsd4_encode_fattr(). 
 		 */
 		dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
 		if (IS_ERR(dentry)) {
@@ -1464,10 +1464,25 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 			goto error;
 		}
 
-		nfserr = nfsd4_encode_fattr(NULL, cd->rd_fhp->fh_export,
-					    dentry, p, &buflen, cd->rd_bmval);
-		dput(dentry);
+		if (d_mountpoint(dentry)) {
+			if ((nfserr = nfsd_cross_mnt(cd->rd_rqstp, &dentry, 
+					 &exp))) {	
+			/* 
+			 * -EAGAIN is the only error returned from 
+			 * nfsd_cross_mnt() and it indicates that an 
+			 * up-call has  been initiated to fill in the export 
+			 * options on exp.  When the answer comes back,
+			 * this call will be retried.
+			 */
+				dput(dentry);
+				nfserr = nfserr_dropit;
+				goto error;
+			}
 
+		}
+
+		nfserr = nfsd4_encode_fattr(NULL, exp,
+				dentry, p, &buflen, cd->rd_bmval);
 		if (!nfserr) {
 			p += buflen;
 			goto out;

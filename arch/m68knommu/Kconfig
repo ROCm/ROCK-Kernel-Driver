@@ -501,16 +501,7 @@ config KCORE_AOUT
 config KCORE_ELF
 	default y
 
-config BINFMT_FLAT
-	tristate "Kernel support for flat binaries"
-	help
-	  Support uClinux FLAT format binaries.
-
-config BINFMT_ZFLAT
-	bool "  Enable ZFLAT support"
-	depends on BINFMT_FLAT
-	help
-	  Supoprt FLAT format compressed binaries
+source "fs/Kconfig.binfmt"
 
 endmenu
 

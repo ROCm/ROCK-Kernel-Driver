@@ -115,6 +115,8 @@ struct cache_deferred_req {
 	struct list_head	recent; /* on fifo */
 	struct cache_head	*item;  /* cache item we wait on */
 	time_t			recv_time;
+	void			*owner; /* we might need to discard all defered requests
+					 * owned by someone */
 	void			(*revisit)(struct cache_deferred_req *req,
 					   int too_many);
 };
@@ -168,12 +170,14 @@ RTN *FNAME ARGS										\
 		tmp = container_of(*hp, RTN, MEMBER);					\
 		if (TEST) { /* found a match */						\
 											\
+			if (set == 1 && test_bit(CACHE_VALID, &tmp->MEMBER.flags) && !new) \
+				break;							\
+											\
 			atomic_inc(&tmp->MEMBER.refcnt);				\
 			if (set) {							\
-				if (set!= 2 && test_bit(CACHE_VALID, &tmp->MEMBER.flags))\
+				if (set == 1 && test_bit(CACHE_VALID, &tmp->MEMBER.flags))\
 				{ /* need to swap in new */				\
 					RTN *t2;					\
-					if (!new) break;				\
 											\
 					new->MEMBER.next = tmp->MEMBER.next;		\
 					*hp = &new->MEMBER;				\
@@ -242,6 +246,7 @@ RTN *FNAME ARGS										\
 
 extern void cache_defer_req(struct cache_req *req, struct cache_head *item);
 extern void cache_revisit_request(struct cache_head *item);
+extern void cache_clean_deferred(void *owner);
 
 static inline struct cache_head  *cache_get(struct cache_head *h)
 {

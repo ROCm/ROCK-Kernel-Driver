@@ -544,46 +544,6 @@ static irqreturn_t do_ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
 
 #if QL_USE_IRQ
 
-static void qlidone(Scsi_Cmnd * cmd)
-{
-}				/* null function */
-
-#endif
-
-/*
- *	Synchronous command processing
- */
- 
-static int qlogicfas_command(Scsi_Cmnd * cmd)
-{
-	int k;
-#if QL_USE_IRQ
-	if (qlirq >= 0) {
-		qlogicfas_queuecommand(cmd, qlidone);
-		while (qlcmd != NULL)
-		{
-			cpu_relax();
-			barrier();
-		}
-		return cmd->result;
-	}
-#endif
-
-	/*
-	 *	Non-irq version
-	 */
-	 
-	if (cmd->device->id == qinitid)
-		return (DID_BAD_TARGET << 16);
-	ql_icmd(cmd);
-	if ((k = ql_wai()))
-		return (k << 16);
-	return ql_pcmd(cmd);
-
-}
-
-#if QL_USE_IRQ
-
 /*
  *	Queued command
  */
@@ -739,6 +699,18 @@ int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 	return (__qlogicfas_detect(sht) != NULL);
 }
 
+static int qlogicfas_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /* 
  *	Return bios parameters 
  */
@@ -826,8 +798,8 @@ Scsi_Host_Template qlogicfas_driver_template = {
 	.name			= "qlogicfas",
 	.proc_name		= "qlogicfas",
 	.detect			= qlogicfas_detect,
+	.release		= qlogicfas_release,
 	.info			= qlogicfas_info,
-	.command		= qlogicfas_command,
 	.queuecommand		= qlogicfas_queuecommand,
 	.eh_abort_handler	= qlogicfas_abort,
 	.eh_bus_reset_handler	= qlogicfas_bus_reset,

@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_PCIBR_PRIVATE_H
 #define _ASM_SN_PCI_PCIBR_PRIVATE_H
@@ -16,6 +16,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/pci.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pciio_private.h>
 #include <asm/sn/ksys/l1.h>
@@ -45,7 +46,7 @@ cfg_p pcibr_slot_config_addr(bridge_t *, pciio_slot_t, int);
 cfg_p pcibr_func_config_addr(bridge_t *, pciio_bus_t bus, pciio_slot_t, pciio_function_t, int);
 unsigned pcibr_slot_config_get(bridge_t *, pciio_slot_t, int);
 unsigned pcibr_func_config_get(bridge_t *, pciio_slot_t, pciio_function_t, int);
-void pcibr_debug(uint32_t, devfs_handle_t, char *, ...);
+void pcibr_debug(uint32_t, vertex_hdl_t, char *, ...);
 void pcibr_slot_config_set(bridge_t *, pciio_slot_t, int, unsigned);
 void pcibr_func_config_set(bridge_t *, pciio_slot_t, pciio_function_t, int, 
 								unsigned);
@@ -171,6 +172,7 @@ struct pcibr_intr_s {
     unsigned                bi_ibits;	/* which Bridge interrupt bit(s) */
     pcibr_soft_t            bi_soft;	/* shortcut to soft info */
     struct pcibr_intr_cbuf_s bi_ibuf;	/* circular buffer of wrap ptrs */
+    unsigned		bi_last_intr;	/* For Shub lb lost intr. bug */
 };
 
 
@@ -254,11 +256,7 @@ struct pcibr_intr_list_s {
 struct pcibr_intr_wrap_s {
     pcibr_soft_t            iw_soft;	/* which bridge */
     volatile bridgereg_t   *iw_stat;	/* ptr to b_int_status */
-#ifdef CONFIG_IA64_SGI_SN1
-    bridgereg_t             iw_intr;	/* bit in b_int_status */
-#else
     bridgereg_t             iw_ibit;	/* bit in b_int_status */
-#endif
     pcibr_intr_list_t       iw_list;	/* ghostbusters! */
     int			    iw_hdlrcnt;	/* running handler count */
     int			    iw_shared;  /* if Bridge bit is shared */
@@ -293,6 +291,8 @@ struct pcibr_intr_wrap_s {
 #define PCIBR_BRIDGETYPE_PIC		2
 #define IS_XBRIDGE_SOFT(ps) (ps->bs_bridge_type == PCIBR_BRIDGETYPE_XBRIDGE)
 #define IS_PIC_SOFT(ps)     (ps->bs_bridge_type == PCIBR_BRIDGETYPE_PIC)
+#define IS_PIC_BUSNUM_SOFT(ps, bus)	\
+		(IS_PIC_SOFT(ps) && ((ps)->bs_busnum == (bus)))
 #define IS_BRIDGE_SOFT(ps)  (ps->bs_bridge_type == PCIBR_BRIDGETYPE_BRIDGE)
 #define IS_XBRIDGE_OR_PIC_SOFT(ps) (IS_XBRIDGE_SOFT(ps) || IS_PIC_SOFT(ps))
 
@@ -348,13 +348,13 @@ struct pcibr_intr_wrap_s {
  */
 
 struct pcibr_soft_s {
-    devfs_handle_t          bs_conn;		/* xtalk connection point */
-    devfs_handle_t          bs_vhdl;		/* vertex owned by pcibr */
+    vertex_hdl_t          bs_conn;		/* xtalk connection point */
+    vertex_hdl_t          bs_vhdl;		/* vertex owned by pcibr */
     uint64_t                bs_int_enable;	/* Mask of enabled intrs */
     bridge_t               *bs_base;		/* PIO pointer to Bridge chip */
     char                   *bs_name;		/* hw graph name */
     xwidgetnum_t            bs_xid;		/* Bridge's xtalk ID number */
-    devfs_handle_t          bs_master;		/* xtalk master vertex */
+    vertex_hdl_t          bs_master;		/* xtalk master vertex */
     xwidgetnum_t            bs_mxid;		/* master's xtalk ID number */
     pciio_slot_t            bs_first_slot;      /* first existing slot */
     pciio_slot_t            bs_last_slot;       /* last existing slot */
@@ -372,9 +372,6 @@ struct pcibr_soft_s {
     short		    bs_int_ate_size;	/* number of internal ates */
     short		    bs_bridge_type;	/* see defines above */
     short		    bs_bridge_mode;	/* see defines above */
-#ifdef CONFIG_IA64_SGI_SN1
-#define bs_xbridge	    bs_bridge_type
-#endif
     int                     bs_rev_num;		/* revision number of Bridge */
 
     /* bs_dma_flags are the forced dma flags used on all DMAs. Used for
@@ -382,9 +379,6 @@ struct pcibr_soft_s {
      */
     unsigned                bs_dma_flags;	/* forced DMA flags */
 
-#ifdef CONFIG_IA64_SGI_SN1
-    l1sc_t                 *bs_l1sc;            /* io brick l1 system cntr */
-#endif
     moduleid_t		    bs_moduleid;	/* io brick moduleid */
     short		    bs_bricktype;	/* io brick type */
 
@@ -394,7 +388,7 @@ struct pcibr_soft_s {
      */
     spinlock_t              bs_lock;
     
-    devfs_handle_t	    bs_noslot_conn;	/* NO-SLOT connection point */
+    vertex_hdl_t	    bs_noslot_conn;	/* NO-SLOT connection point */
     pcibr_info_t	    bs_noslot_info;
     struct pcibr_soft_slot_s {
 	/* information we keep about each CFG slot */
@@ -411,7 +405,7 @@ struct pcibr_soft_s {
 	 */
 	int                     has_host;
 	pciio_slot_t            host_slot;
-	devfs_handle_t		slot_conn;
+	vertex_hdl_t		slot_conn;
 
         /* PCI Hot-Plug status word */
         int 			slot_status;
@@ -531,13 +525,8 @@ struct pcibr_soft_s {
     int                     bs_rrb_avail[2];
     int                     bs_rrb_res[8];
     int                     bs_rrb_res_dflt[8];
-#ifdef CONFIG_IA64_SGI_SN1
-    int                     bs_rrb_valid[16];
-    int                     bs_rrb_valid_dflt[16];
-#else
     int			    bs_rrb_valid[8][4];
     int			    bs_rrb_valid_dflt[8][4];
-#endif
     struct {
 	/* Each Bridge interrupt bit has a single XIO
 	 * interrupt channel allocated.
@@ -578,7 +567,7 @@ struct pcibr_soft_s {
 #ifdef LATER
 	toid_t                  bserr_toutid;	/* Timeout started by errintr */
 #endif	/* LATER */
-	iopaddr_t               bserr_addr;	/* Address where error occurred */
+	iopaddr_t               bserr_addr;	/* Address where error occured */
 	uint64_t		bserr_intstat;	/* interrupts active at error dump */
     } bs_errinfo;
 
@@ -599,16 +588,6 @@ struct pcibr_soft_s {
      * in Megabytes), and they generally tend to take once and never
      * release. 
      */
-#ifdef CONFIG_IA64_SGI_SN1
-    struct br_pcisp_info {
-        iopaddr_t               pci_io_base;
-        iopaddr_t               pci_io_last;
-        iopaddr_t               pci_swin_base;
-        iopaddr_t               pci_swin_last;
-        iopaddr_t               pci_mem_base;
-        iopaddr_t               pci_mem_last;
-    } bs_spinfo;
-#endif	/* CONFIG_IA64_SGI_SN1 */
     struct pciio_win_map_s	bs_io_win_map;	/* I/O addr space */
     struct pciio_win_map_s	bs_swin_map;	/* Small window addr space */
     struct pciio_win_map_s	bs_mem_win_map;	/* Memory addr space */
@@ -655,8 +634,6 @@ struct pcibr_hints_s {
     pcibr_intr_bits_f	   *ph_intr_bits;	/* map PCI INT[ABCD] to Bridge Int(n) */
 };
 
-extern int              pcibr_prefetch_enable_rev, pcibr_wg_enable_rev;
-
 /*
  * Number of bridge non-fatal error interrupts we can see before
  * we decide to disable that interrupt.
@@ -689,7 +666,6 @@ extern int              pcibr_prefetch_enable_rev, pcibr_wg_enable_rev;
 #define NEW(ptr)	NEWA(ptr,1)
 #define DEL(ptr)	DELA(ptr,1)
 
-#ifndef CONFIG_IA64_SGI_SN1
 /*
  * Additional PIO spaces per slot are
  * recorded in this structure.
@@ -701,7 +677,6 @@ struct pciio_piospace_s {
     iopaddr_t               start;	/* Starting address of the PIO space */
     size_t                  count;	/* size of PIO space */
 };
-#endif	/* CONFIG_IA64_SGI_SN1 */
 
 /* Use io spin locks. This ensures that all the PIO writes from a particular
  * CPU to a particular IO device are synched before the start of the next
@@ -715,11 +690,9 @@ struct pciio_piospace_s {
 #define pcibr_unlock(pcibr_soft, s)	
 #endif	/* PCI_LATER */
 
-#ifndef CONFIG_IA64_SGI_SN1
 #define PCIBR_VALID_SLOT(ps, s)     (s < PCIBR_NUM_SLOTS(ps))
 #define PCIBR_D64_BASE_UNSET    (0xFFFFFFFFFFFFFFFF)
 #define PCIBR_D32_BASE_UNSET    (0xFFFFFFFF)
-#endif
 #define INFO_LBL_PCIBR_ASIC_REV "_pcibr_asic_rev"
 
 #define PCIBR_SOFT_LIST 1
@@ -728,8 +701,35 @@ typedef struct pcibr_list_s *pcibr_list_p;
 struct pcibr_list_s {
 	pcibr_list_p            bl_next;
 	pcibr_soft_t            bl_soft;
-	devfs_handle_t          bl_vhdl;
+	vertex_hdl_t          bl_vhdl;
 };
 #endif /* PCIBR_SOFT_LIST */
+
+
+// Devices per widget: 2 buses, 2 slots per bus, 8 functions per slot.
+#define DEV_PER_WIDGET (2*2*8)
+
+struct sn_flush_device_list {
+	int bus;
+	int pin;
+	struct bar_list {
+		unsigned long start;
+		unsigned long end;
+	} bar_list[PCI_ROM_RESOURCE];
+	unsigned long force_int_addr;
+	volatile unsigned long flush_addr;
+	spinlock_t flush_lock;
+};
+
+struct sn_flush_nasid_entry  {
+        struct sn_flush_device_list **widget_p;
+        unsigned long        iio_itte1;
+        unsigned long        iio_itte2;
+        unsigned long        iio_itte3;
+        unsigned long        iio_itte4;
+        unsigned long        iio_itte5;
+        unsigned long        iio_itte6;
+        unsigned long        iio_itte7;
+};
 
 #endif				/* _ASM_SN_PCI_PCIBR_PRIVATE_H */

@@ -492,8 +492,9 @@ extern int usb_disabled(void);
  */
 #define URB_SHORT_NOT_OK	0x0001	/* report short reads as errors */
 #define URB_ISO_ASAP		0x0002	/* iso-only, urb->start_frame ignored */
-#define URB_NO_DMA_MAP		0x0004	/* urb->*_dma are valid on submit */
-#define URB_ASYNC_UNLINK	0x0008	/* usb_unlink_urb() returns asap */
+#define URB_NO_TRANSFER_DMA_MAP	0x0004	/* urb->transfer_dma valid on submit */
+#define URB_NO_SETUP_DMA_MAP	0x0008	/* urb->setup_dma valid on submit */
+#define URB_ASYNC_UNLINK	0x0010	/* usb_unlink_urb() returns asap */
 #define URB_NO_FSBR		0x0020	/* UHCI-specific */
 #define URB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
 #define URB_NO_INTERRUPT	0x0080	/* HINT: no non-error interrupt needed */
@@ -531,14 +532,15 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  *	submission, unlinking, or operation are handled.  Different
  *	kinds of URB can use different flags.
  * @transfer_buffer:  This identifies the buffer to (or from) which
- * 	the I/O request will be performed (unless URB_NO_DMA_MAP is set).
- *	This buffer must be suitable for DMA; allocate it with kmalloc()
- *	or equivalent.  For transfers to "in" endpoints, contents of
- *	this buffer will be modified.  This buffer is used for data
+ * 	the I/O request will be performed (unless URB_NO_TRANSFER_DMA_MAP
+ *	is set).  This buffer must be suitable for DMA; allocate it with
+ *	kmalloc() or equivalent.  For transfers to "in" endpoints, contents
+ *	of this buffer will be modified.  This buffer is used for data
  *	phases of control transfers.
- * @transfer_dma: When transfer_flags includes URB_NO_DMA_MAP, the device
- * 	driver is saying that it provided this DMA address, which the host
- * 	controller driver should use instead of the transfer_buffer.
+ * @transfer_dma: When transfer_flags includes URB_NO_TRANSFER_DMA_MAP,
+ *	the device driver is saying that it provided this DMA address,
+ *	which the host controller driver should use in preference to the
+ *	transfer_buffer.
  * @transfer_buffer_length: How big is transfer_buffer.  The transfer may
  *	be broken up into chunks according to the current maximum packet
  *	size for the endpoint, which is a function of the configuration
@@ -553,11 +555,10 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * @setup_packet: Only used for control transfers, this points to eight bytes
  *	of setup data.  Control transfers always start by sending this data
  *	to the device.  Then transfer_buffer is read or written, if needed.
- *	(Not used when URB_NO_DMA_MAP is set.)
- * @setup_dma: For control transfers with URB_NO_DMA_MAP set, the device
- * 	driver has provided this DMA address for the setup packet.  The
- * 	host controller driver should use this instead of setup_buffer.
- * 	If there is a data phase, its buffer is identified by transfer_dma.
+ * @setup_dma: For control transfers with URB_NO_SETUP_DMA_MAP set, the
+ *	device driver has provided this DMA address for the setup packet.
+ *	The host controller driver should use this in preference to
+ *	setup_packet.
  * @start_frame: Returns the initial frame for interrupt or isochronous
  *	transfers.
  * @number_of_packets: Lists the number of ISO transfer buffers.
@@ -589,13 +590,15 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * bounce buffer or talking to an IOMMU),
  * although they're cheap on commodity x86 and ppc hardware.
  *
- * Alternatively, drivers may pass the URB_NO_DMA_MAP transfer flag, which
- * tells the host controller driver that no such mapping is needed since
- * the device driver is DMA-aware.  For example, they might allocate a DMA
- * buffer with usb_buffer_alloc(), or call usb_buffer_map().
- * When this transfer flag is provided, host controller drivers will use the
- * dma addresses found in the transfer_dma and/or setup_dma fields rather than
- * determing a dma address themselves.
+ * Alternatively, drivers may pass the URB_NO_xxx_DMA_MAP transfer flags,
+ * which tell the host controller driver that no such mapping is needed since
+ * the device driver is DMA-aware.  For example, a device driver might
+ * allocate a DMA buffer with usb_buffer_alloc() or call usb_buffer_map().
+ * When these transfer flags are provided, host controller drivers will
+ * attempt to use the dma addresses found in the transfer_dma and/or
+ * setup_dma fields rather than determining a dma address themselves.  (Note
+ * that transfer_buffer and setup_packet must still be set because not all
+ * host controllers use DMA, nor do virtual root hubs).
  *
  * Initialization:
  *
@@ -614,7 +617,11 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * should always terminate with a short packet, even if it means adding an
  * extra zero length packet.
  *
- * Control URBs must provide a setup_packet.
+ * Control URBs must provide a setup_packet.  The setup_packet and
+ * transfer_buffer may each be mapped for DMA or not, independently of
+ * the other.  The transfer_flags bits URB_NO_TRANSFER_DMA_MAP and
+ * URB_NO_SETUP_DMA_MAP indicate which buffers have already been mapped.
+ * URB_NO_SETUP_DMA_MAP is ignored for non-control URBs.
  *
  * Interrupt UBS must provide an interval, saying how often (in milliseconds
  * or, for highspeed devices, 125 microsecond units)
