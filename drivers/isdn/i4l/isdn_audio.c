@@ -564,8 +564,8 @@ isdn_audio_eval_dtmf(modem_info * info)
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 			save_flags(flags);
 			cli();
-			di = info->isdn_driver;
-			ch = info->isdn_channel;
+			di = isdn_slot_driver(info->isdn_slot);
+			ch = isdn_slot_channel(info->isdn_slot);
 			__skb_queue_tail(&dev->drv[di]->rpqueue[ch], skb);
 			dev->drv[di]->rcvcount[ch] += 2;
 			restore_flags(flags);
@@ -685,8 +685,8 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	ISDN_AUDIO_SKB_LOCK(skb) = 0;
 	save_flags(flags);
 	cli();
-	di = info->isdn_driver;
-	ch = info->isdn_channel;
+	di = isdn_slot_driver(info->isdn_slot);
+	ch = isdn_slot_channel(info->isdn_slot);
 	__skb_queue_tail(&dev->drv[di]->rpqueue[ch], skb);
 	dev->drv[di]->rcvcount[ch] += 2;
 	restore_flags(flags);
