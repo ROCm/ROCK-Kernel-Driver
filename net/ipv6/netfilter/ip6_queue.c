@@ -262,7 +262,8 @@ ipq_build_packet_message(struct ipq_queue_entry *entry, int *errp)
 	}
 	
 	if (data_len)
-		memcpy(pmsg->payload, entry->skb->data, data_len);
+		if (skb_copy_bits(entry->skb, 0, pmsg->payload, data_len))
+			BUG();
 		
 	nlh->nlmsg_len = skb->tail - old_tail;
 	return skb;
@@ -366,6 +367,8 @@ ipq_mangle_ipv6(ipq_verdict_msg_t *v, struct ipq_queue_entry *e)
 		}
 		skb_put(e->skb, diff);
 	}
+	if (!skb_ip_make_writable(&e->skb, v->data_len))
+		return -ENOMEM;
 	memcpy(e->skb->data, v->payload, v->data_len);
 	e->skb->nfcache |= NFC_ALTERED;
 
