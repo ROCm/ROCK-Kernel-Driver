@@ -185,11 +185,14 @@ do_more:
 	if (err)
 		goto error_return;
 
+	jbd_lock_bh_state(bitmap_bh);
+	
 	for (i = 0; i < count; i++) {
 		/*
 		 * An HJ special.  This is expensive...
 		 */
 #ifdef CONFIG_JBD_DEBUG
+		jbd_unlock_bh_state(bitmap_bh);
 		{
 			struct buffer_head *debug_bh;
 			debug_bh = sb_find_get_block(sb, block + i);
@@ -202,6 +205,7 @@ do_more:
 				__brelse(debug_bh);
 			}
 		}
+		jbd_lock_bh_state(bitmap_bh);
 #endif
 		/* @@@ This prevents newly-allocated data from being
 		 * freed and then reallocated within the same
@@ -243,6 +247,7 @@ do_more:
 			dquot_freed_blocks++;
 		}
 	}
+	jbd_unlock_bh_state(bitmap_bh);
 
 	spin_lock(sb_bgl_lock(sbi, block_group));
 	gdp->bg_free_blocks_count =
@@ -289,11 +294,12 @@ error_return:
  * data-writes at some point, and disable it for metadata allocations or
  * sync-data inodes.
  */
-static int ext3_test_allocatable(int nr, struct buffer_head *bh)
+static inline int ext3_test_allocatable(int nr, struct buffer_head *bh,
+					int have_access)
 {
 	if (ext3_test_bit(nr, bh->b_data))
 		return 0;
-	if (!buffer_jbd(bh) || !bh2jh(bh)->b_committed_data)
+	if (!have_access || !buffer_jbd(bh) || !bh2jh(bh)->b_committed_data)
 		return 1;
 	return !ext3_test_bit(nr, bh2jh(bh)->b_committed_data);
 }
@@ -305,8 +311,8 @@ static int ext3_test_allocatable(int nr, struct buffer_head *bh)
  * the initial goal; then for a free byte somewhere in the bitmap; then
  * for any free bit in the bitmap.
  */
-static int find_next_usable_block(int start,
-			struct buffer_head *bh, int maxblocks)
+static int find_next_usable_block(int start, struct buffer_head *bh,
+				int maxblocks, int have_access)
 {
 	int here, next;
 	char *p, *r;
@@ -322,7 +328,8 @@ static int find_next_usable_block(int start,
 		 */
 		int end_goal = (start + 63) & ~63;
 		here = ext3_find_next_zero_bit(bh->b_data, end_goal, start);
-		if (here < end_goal && ext3_test_allocatable(here, bh))
+		if (here < end_goal &&
+			ext3_test_allocatable(here, bh, have_access))
 			return here;
 		
 		ext3_debug ("Bit not found near goal\n");
@@ -345,7 +352,7 @@ static int find_next_usable_block(int start,
 	r = memscan(p, 0, (maxblocks - here + 7) >> 3);
 	next = (r - ((char *) bh->b_data)) << 3;
 	
-	if (next < maxblocks && ext3_test_allocatable(next, bh))
+	if (next < maxblocks && ext3_test_allocatable(next, bh, have_access))
 		return next;
 	
 	/* The bitmap search --- search forward alternately
@@ -357,13 +364,13 @@ static int find_next_usable_block(int start,
 						 maxblocks, here);
 		if (next >= maxblocks)
 			return -1;
-		if (ext3_test_allocatable(next, bh))
+		if (ext3_test_allocatable(next, bh, have_access))
 			return next;
 
-		J_ASSERT_BH(bh, bh2jh(bh)->b_committed_data);
-		here = ext3_find_next_zero_bit
-			((unsigned long *) bh2jh(bh)->b_committed_data, 
-			 maxblocks, next);
+		if (have_access)
+			here = ext3_find_next_zero_bit
+				((unsigned long *) bh2jh(bh)->b_committed_data, 
+			 	maxblocks, next);
 	}
 	return -1;
 }
@@ -402,17 +409,18 @@ ext3_try_to_allocate(struct super_block *sb, handle_t *handle, int group,
 
 	*errp = 0;
 
-	if (goal >= 0 && ext3_test_allocatable(goal, bitmap_bh))
+	if (goal >= 0 && ext3_test_allocatable(goal, bitmap_bh, 0))
 		goto got;
 
 repeat:
 	goal = find_next_usable_block(goal, bitmap_bh,
-				EXT3_BLOCKS_PER_GROUP(sb));
+				EXT3_BLOCKS_PER_GROUP(sb), have_access);
 	if (goal < 0)
 		goto fail;
 
 	for (i = 0;
-		i < 7 && goal > 0 && ext3_test_allocatable(goal - 1, bitmap_bh);
+		i < 7 && goal > 0 && 
+			ext3_test_allocatable(goal - 1, bitmap_bh, have_access);
 		i++, goal--);
 
 got:
@@ -429,6 +437,7 @@ got:
 			*errp = fatal;
 			goto fail;
 		}
+		jbd_lock_bh_state(bitmap_bh);
 		have_access = 1;
 	}
 
@@ -444,6 +453,7 @@ got:
 	}
 
 	BUFFER_TRACE(bitmap_bh, "journal_dirty_metadata for bitmap block");
+	jbd_unlock_bh_state(bitmap_bh);
 	fatal = ext3_journal_dirty_metadata(handle, bitmap_bh);
 	if (fatal) {
 		*errp = fatal;
@@ -454,6 +464,7 @@ got:
 fail:
 	if (have_access) {
 		BUFFER_TRACE(bitmap_bh, "journal_release_buffer");
+		jbd_unlock_bh_state(bitmap_bh);
 		ext3_journal_release_buffer(handle, bitmap_bh);
 	}
 	return -1;
@@ -611,14 +622,19 @@ allocated:
 			brelse(debug_bh);
 		}
 	}
-#endif
+	jbd_lock_bh_state(bitmap_bh);
 	spin_lock(sb_bgl_lock(sbi, group_no));
-	if (buffer_jbd(bitmap_bh) && bh2jh(bitmap_bh)->b_committed_data)
-		J_ASSERT_BH(bitmap_bh,
-			!ext3_test_bit(ret_block,
-					bh2jh(bitmap_bh)->b_committed_data));
+	if (buffer_jbd(bitmap_bh) && bh2jh(bitmap_bh)->b_committed_data) {
+		if (ext3_test_bit(ret_block,
+				bh2jh(bitmap_bh)->b_committed_data)) {
+			printk("%s: block was unexpectedly set in "
+				"b_committed_data\n", __FUNCTION__);
+		}
+	}
 	ext3_debug("found bit %d\n", ret_block);
 	spin_unlock(sb_bgl_lock(sbi, group_no));
+	jbd_unlock_bh_state(bitmap_bh);
+#endif
 
 	/* ret_block was blockgroup-relative.  Now it becomes fs-relative */
 	ret_block = target_block;

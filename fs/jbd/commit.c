@@ -640,6 +640,7 @@ skip_commit: /* The journal should be unlocked by now. */
 		 *
 		 * Otherwise, we can just throw away the frozen data now.
 		 */
+		jbd_lock_bh_state(jh2bh(jh));
 		if (jh->b_committed_data) {
 			kfree(jh->b_committed_data);
 			jh->b_committed_data = NULL;
@@ -651,6 +652,7 @@ skip_commit: /* The journal should be unlocked by now. */
 			kfree(jh->b_frozen_data);
 			jh->b_frozen_data = NULL;
 		}
+		jbd_unlock_bh_state(jh2bh(jh));
 
 		spin_lock(&journal_datalist_lock);
 		cp_transaction = jh->b_cp_transaction;
