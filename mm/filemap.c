@@ -117,10 +117,6 @@ static inline int sync_page(struct page *page)
  * cleansing writeback.  The difference between these two operations is that
  * if a dirty page/buffer is encountered, it must be waited upon, and not just
  * skipped over.
- *
- * The PF_SYNC flag is set across this operation and the various functions
- * which care about this distinction must use called_for_sync() to find out
- * which behaviour they should implement.
  */
 int filemap_fdatawrite(struct address_space *mapping)
 {
@@ -133,12 +129,10 @@ int filemap_fdatawrite(struct address_space *mapping)
 	if (mapping->backing_dev_info->memory_backed)
 		return 0;
 
-	current->flags |= PF_SYNC;
 	write_lock(&mapping->page_lock);
 	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
 	write_unlock(&mapping->page_lock);
 	ret = do_writepages(mapping, &wbc);
-	current->flags &= ~PF_SYNC;
 	return ret;
 }
 

@@ -671,7 +671,7 @@ int shmem_unuse(swp_entry_t entry, struct page *page)
 /*
  * Move the page from the page cache to the swap cache.
  */
-static int shmem_writepage(struct page *page)
+static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct shmem_inode_info *info;
 	swp_entry_t *entry, swap;

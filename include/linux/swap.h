@@ -65,6 +65,7 @@ typedef struct {
 struct sysinfo;
 struct address_space;
 struct zone;
+struct writeback_control;
 
 /*
  * A swap extent maps a range of a swapfile's PAGE_SIZE pages onto a range of
@@ -180,7 +181,7 @@ extern int shmem_unuse(swp_entry_t entry, struct page *page);
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */
 extern int swap_readpage(struct file *, struct page *);
-extern int swap_writepage(struct page *);
+extern int swap_writepage(struct page *page, struct writeback_control *wbc);
 extern int rw_swap_page_sync(int, swp_entry_t, struct page *);
 
 /* linux/mm/swap_state.c */

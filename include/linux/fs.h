@@ -278,7 +278,7 @@ struct address_space;
 struct writeback_control;
 
 struct address_space_operations {
-	int (*writepage)(struct page *);
+	int (*writepage)(struct page *page, struct writeback_control *wbc);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
 

@@ -319,13 +319,19 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto keep_locked;
 			if (test_clear_page_dirty(page)) {
 				int res;
+				struct writeback_control wbc = {
+					.sync_mode = WB_SYNC_NONE,
+					.nr_to_write = SWAP_CLUSTER_MAX,
+					.nonblocking = 1,
+					.for_reclaim = 1,
+				};
 
 				write_lock(&mapping->page_lock);
 				list_move(&page->list, &mapping->locked_pages);
 				write_unlock(&mapping->page_lock);
 
 				SetPageReclaim(page);
-				res = mapping->a_ops->writepage(page);
+				res = mapping->a_ops->writepage(page, &wbc);
 
 				if (res == WRITEPAGE_ACTIVATE) {
 					ClearPageReclaim(page);

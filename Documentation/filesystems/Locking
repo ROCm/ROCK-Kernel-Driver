@@ -133,10 +133,10 @@ unlocks and drops the reference.
 
 --------------------------- address_space_operations --------------------------
 prototypes:
-	int (*writepage)(struct page *);
+	int (*writepage)(struct page *page, struct writeback_control *wbc);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
-	int (*writepages)(struct address_space *, int *nr_to_write);
+	int (*writepages)(struct address_space *, struct writeback_control *);
 	int (*set_page_dirty)(struct page *page);
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
@@ -172,15 +172,16 @@ I/O against them.  They come unlocked upon I/O completion.
 
 	->writepage() is used for two purposes: for "memory cleansing" and for
 "sync".  These are quite different operations and the behaviour may differ
-depending upon the mode.  (Yes, there should be two a_ops for this, or
-writepage should take a writeback_control*)
+depending upon the mode.
 
-If writepage is called for sync (current->flags & PF_SYNC) then it *must*
-write the page, even if that would involve blocking on in-progress I/O.
+If writepage is called for sync (wbc->sync_mode != WBC_SYNC_NONE) then
+it *must* start I/O against the page, even if that would involve
+blocking on in-progress I/O.
 
-If writepage is called for memory cleansing (!(current->flags & PF_SYNC))
-then its role is to get as much writeout underway as possible.  So writepage
-should try to avoid blocking against currently-in-progress I/O.
+If writepage is called for memory cleansing (sync_mode ==
+WBC_SYNC_NONE) then its role is to get as much writeout underway as
+possible.  So writepage should try to avoid blocking against
+currently-in-progress I/O.
 
 If the filesystem is not called for "sync" and it determines that it
 would need to block against in-progress I/O to be able to start new I/O

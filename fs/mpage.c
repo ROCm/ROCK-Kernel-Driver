@@ -327,7 +327,7 @@ EXPORT_SYMBOL(mpage_readpage);
  */
 static struct bio *
 mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
-			sector_t *last_block_in_bio, int *ret)
+	sector_t *last_block_in_bio, int *ret, struct writeback_control *wbc)
 {
 	struct inode *inode = page->mapping->host;
 	const unsigned blkbits = inode->i_blkbits;
@@ -501,7 +501,7 @@ alloc_new:
 confused:
 	if (bio)
 		bio = mpage_bio_submit(WRITE, bio);
-	*ret = page->mapping->a_ops->writepage(page);
+	*ret = page->mapping->a_ops->writepage(page, wbc);
 out:
 	return bio;
 }
@@ -554,9 +554,8 @@ mpage_writepages(struct address_space *mapping,
 	sector_t last_block_in_bio = 0;
 	int ret = 0;
 	int done = 0;
-	int sync = called_for_sync();
 	struct pagevec pvec;
-	int (*writepage)(struct page *);
+	int (*writepage)(struct page *page, struct writeback_control *wbc);
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
 		blk_run_queues();
@@ -574,7 +573,7 @@ mpage_writepages(struct address_space *mapping,
 		struct page *page = list_entry(mapping->io_pages.prev,
 					struct page, list);
 		list_del(&page->list);
-		if (PageWriteback(page) && !sync) {
+		if (PageWriteback(page) && wbc->sync_mode == WB_SYNC_NONE) {
 			if (PageDirty(page)) {
 				list_add(&page->list, &mapping->dirty_pages);
 				continue;
@@ -600,16 +599,16 @@ mpage_writepages(struct address_space *mapping,
 
 		lock_page(page);
 
-		if (sync)
+		if (wbc->sync_mode != WB_SYNC_NONE)
 			wait_on_page_writeback(page);
 
 		if (page->mapping == mapping && !PageWriteback(page) &&
 					test_clear_page_dirty(page)) {
 			if (writepage) {
-				ret = (*writepage)(page);
+				ret = (*writepage)(page, wbc);
 			} else {
 				bio = mpage_writepage(bio, page, get_block,
-						&last_block_in_bio, &ret);
+					&last_block_in_bio, &ret, wbc);
 			}
 			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;

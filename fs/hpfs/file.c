@@ -98,9 +98,9 @@ int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_
 	return 0;
 }
 
-static int hpfs_writepage(struct page *page)
+static int hpfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page,hpfs_get_block);
+	return block_write_full_page(page,hpfs_get_block, wbc);
 }
 static int hpfs_readpage(struct file *file, struct page *page)
 {

@@ -1632,8 +1632,8 @@ EXPORT_SYMBOL(unmap_underlying_metadata);
  * with submit_bh().  At the address_space level PageWriteback prevents this
  * contention from occurring.
  */
-static int __block_write_full_page(struct inode *inode,
-			struct page *page, get_block_t *get_block)
+static int __block_write_full_page(struct inode *inode, struct page *page,
+			get_block_t *get_block, struct writeback_control *wbc)
 {
 	int err;
 	unsigned long block;
@@ -1705,7 +1705,7 @@ static int __block_write_full_page(struct inode *inode,
 	do {
 		get_bh(bh);
 		if (buffer_mapped(bh) && buffer_dirty(bh)) {
-			if (called_for_sync()) {
+			if (wbc->sync_mode != WB_SYNC_NONE) {
 				lock_buffer(bh);
 			} else {
 				if (test_set_buffer_locked(bh)) {
@@ -2485,7 +2485,8 @@ out:
 /*
  * The generic ->writepage function for buffer-backed address_spaces
  */
-int block_write_full_page(struct page *page, get_block_t *get_block)
+int block_write_full_page(struct page *page, get_block_t *get_block,
+			struct writeback_control *wbc)
 {
 	struct inode * const inode = page->mapping->host;
 	const unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT;
@@ -2494,7 +2495,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 
 	/* Is the page fully inside i_size? */
 	if (page->index < end_index)
-		return __block_write_full_page(inode, page, get_block);
+		return __block_write_full_page(inode, page, get_block, wbc);
 
 	/* Is the page fully outside i_size? (truncate in progress) */
 	offset = inode->i_size & (PAGE_CACHE_SIZE-1);
@@ -2514,7 +2515,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 	memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
 	flush_dcache_page(page);
 	kunmap_atomic(kaddr, KM_USER0);
-	return __block_write_full_page(inode, page, get_block);
+	return __block_write_full_page(inode, page, get_block, wbc);
 }
 
 sector_t generic_block_bmap(struct address_space *mapping, sector_t block,

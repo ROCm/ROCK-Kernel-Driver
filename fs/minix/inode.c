@@ -316,9 +316,9 @@ static int minix_get_block(struct inode *inode, sector_t block,
 		return V2_minix_get_block(inode, block, bh_result, create);
 }
 
-static int minix_writepage(struct page *page)
+static int minix_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page,minix_get_block);
+	return block_write_full_page(page, minix_get_block, wbc);
 }
 static int minix_readpage(struct file *file, struct page *page)
 {

@@ -412,6 +412,9 @@ int write_one_page(struct page *page, int wait)
 {
 	struct address_space *mapping = page->mapping;
 	int ret = 0;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_ALL,
+	};
 
 	BUG_ON(!PageLocked(page));
 
@@ -424,7 +427,7 @@ int write_one_page(struct page *page, int wait)
 		list_add(&page->list, &mapping->locked_pages);
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
-		ret = mapping->a_ops->writepage(page);
+		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
 			if (PageError(page))

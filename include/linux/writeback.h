@@ -42,6 +42,7 @@ struct writeback_control {
 	int nonblocking;		/* Don't get stuck on request queues */
 	int encountered_congestion;	/* An output: a queue is full */
 	int for_kupdate;		/* A kupdate writeback */
+	int for_reclaim;		/* Invoked from the page allocator */
 };
 
 /*
@@ -87,14 +88,5 @@ int do_writepages(struct address_space *mapping, struct writeback_control *wbc);
 extern int nr_pdflush_threads;	/* Global so it can be exported to sysctl
 				   read-only. */
 
-
-/*
- * Tell the writeback paths that they are being called for a "data integrity"
- * operation such as fsync().
- */
-static inline int called_for_sync(void)
-{
-	return current->flags & PF_SYNC;
-}
 
 #endif		/* WRITEBACK_H */
