@@ -12,6 +12,7 @@
 #include <linux/device.h>
 
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/hardware/amba.h>
 #include <asm/sizes.h>
 
@@ -41,6 +42,23 @@ static int amba_match(struct device *dev, struct device_driver *drv)
 	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
 }
 
+#ifdef CONFIG_HOTPLUG
+static int amba_hotplug(struct device *dev, char **envp, int nr_env, char *buf, int bufsz)
+{
+	struct amba_device *pcdev = to_amba_device(dev);
+
+	if (nr_env < 2)
+		return -ENOMEM;
+
+	snprintf(buf, bufsz, "AMBA_ID=%08lx", pcdev->periphid);
+	*envp++ = buf;
+	*envp++ = NULL;
+	return 0;
+}
+#else
+#define amba_hotplug NULL
+#endif
+
 static int amba_suspend(struct device *dev, u32 state)
 {
 	struct amba_driver *drv = to_amba_driver(dev->driver);
@@ -68,6 +86,7 @@ static int amba_resume(struct device *dev)
 static struct bus_type amba_bustype = {
 	.name		= "amba",
 	.match		= amba_match,
+	.hotplug	= amba_hotplug,
 	.suspend	= amba_suspend,
 	.resume		= amba_resume,
 };
@@ -149,27 +168,19 @@ static void amba_device_release(struct device *dev)
 	kfree(d);
 }
 
-static ssize_t show_id(struct device *_dev, char *buf)
-{
-	struct amba_device *dev = to_amba_device(_dev);
-	return sprintf(buf, "%08x\n", dev->periphid);
-}
-static DEVICE_ATTR(id, S_IRUGO, show_id, NULL);
+#define amba_attr(name,fmt,arg...)				\
+static ssize_t show_##name(struct device *_dev, char *buf)	\
+{								\
+	struct amba_device *dev = to_amba_device(_dev);		\
+	return sprintf(buf, fmt, arg);				\
+}								\
+static DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
 
-static ssize_t show_irq(struct device *_dev, char *buf)
-{
-	struct amba_device *dev = to_amba_device(_dev);
-	return sprintf(buf, "%u\n", dev->irq);
-}
-static DEVICE_ATTR(irq, S_IRUGO, show_irq, NULL);
-
-static ssize_t show_res(struct device *_dev, char *buf)
-{
-	struct amba_device *dev = to_amba_device(_dev);
-	return sprintf(buf, "\t%08lx\t%08lx\t%08lx\n",
-			dev->res.start, dev->res.end, dev->res.flags);
-}
-static DEVICE_ATTR(resource, S_IRUGO, show_res, NULL);
+amba_attr(id, "%08x\n", dev->periphid);
+amba_attr(irq0, "%u\n", dev->irq[0]);
+amba_attr(irq1, "%u\n", dev->irq[1]);
+amba_attr(resource, "\t%08lx\t%08lx\t%08lx\n",
+	  dev->res.start, dev->res.end, dev->res.flags);
 
 /**
  *	amba_device_register - register an AMBA device
@@ -208,10 +219,17 @@ int amba_device_register(struct amba_device *dev, struct resource *parent)
 		if (cid == 0xb105f00d)
 			dev->periphid = pid;
 
-		ret = device_register(&dev->dev);
+		if (dev->periphid)
+			ret = device_register(&dev->dev);
+		else
+			ret = -ENODEV;
+
 		if (ret == 0) {
 			device_create_file(&dev->dev, &dev_attr_id);
-			device_create_file(&dev->dev, &dev_attr_irq);
+			if (dev->irq[0] != NO_IRQ)
+				device_create_file(&dev->dev, &dev_attr_irq0);
+			if (dev->irq[1] != NO_IRQ)
+				device_create_file(&dev->dev, &dev_attr_irq1);
 			device_create_file(&dev->dev, &dev_attr_resource);
 		} else {
  out:
@@ -237,7 +255,85 @@ void amba_device_unregister(struct amba_device *dev)
 	device_unregister(&dev->dev);
 }
 
+
+struct find_data {
+	struct amba_device *dev;
+	struct device *parent;
+	const char *busid;
+	unsigned int id;
+	unsigned int mask;
+};
+
+static int amba_find_match(struct device *dev, void *data)
+{
+	struct find_data *d = data;
+	struct amba_device *pcdev = to_amba_device(dev);
+	int r;
+
+	r = (pcdev->periphid & d->mask) == d->id;
+	if (d->parent)
+		r &= d->parent == dev->parent;
+	if (d->busid)
+		r &= strcmp(dev->bus_id, d->busid) == 0;
+
+	if (r) {
+		get_device(dev);
+		d->dev = pcdev;
+	}
+
+	return r;
+}
+
+/**
+ *	amba_find_device - locate an AMBA device given a bus id
+ *	@busid: bus id for device (or NULL)
+ *	@parent: parent device (or NULL)
+ *	@id: peripheral ID (or 0)
+ *	@mask: peripheral ID mask (or 0)
+ *
+ *	Return the AMBA device corresponding to the supplied parameters.
+ *	If no device matches, returns NULL.
+ *
+ *	NOTE: When a valid device is found, its refcount is
+ *	incremented, and must be decremented before the returned
+ *	reference.
+ */
+struct amba_device *
+amba_find_device(const char *busid, struct device *parent, unsigned int id,
+		 unsigned int mask)
+{
+	struct find_data data;
+
+	data.dev = NULL;
+	data.parent = parent;
+	data.busid = busid;
+	data.id = id;
+	data.mask = mask;
+
+	bus_for_each_dev(&amba_bustype, NULL, &data, amba_find_match);
+
+	return data.dev;
+}
+
+int amba_request_regions(struct amba_device *dev, const char *name)
+{
+	int ret = 0;
+
+	if (!request_mem_region(dev->res.start, SZ_4K, name))
+		ret = -EBUSY;
+
+	return ret;
+}
+
+void amba_release_regions(struct amba_device *dev)
+{
+	release_mem_region(dev->res.start, SZ_4K);
+}
+
 EXPORT_SYMBOL(amba_driver_register);
 EXPORT_SYMBOL(amba_driver_unregister);
 EXPORT_SYMBOL(amba_device_register);
 EXPORT_SYMBOL(amba_device_unregister);
+EXPORT_SYMBOL(amba_find_device);
+EXPORT_SYMBOL(amba_request_regions);
+EXPORT_SYMBOL(amba_release_regions);

@@ -25,7 +25,7 @@ static struct amba_device rtc_device = {
 		.end	= INTEGRATOR_RTC_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_RTCINT,
+	.irq		= { IRQ_RTCINT, NO_IRQ },
 	.periphid	= 0x00041030,
 };
 
@@ -38,7 +38,7 @@ static struct amba_device uart0_device = {
 		.end	= INTEGRATOR_UART0_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_UARTINT0,
+	.irq		= { IRQ_UARTINT0, NO_IRQ },
 	.periphid	= 0x0041010,
 };
 
@@ -51,7 +51,7 @@ static struct amba_device uart1_device = {
 		.end	= INTEGRATOR_UART1_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_UARTINT1,
+	.irq		= { IRQ_UARTINT1, NO_IRQ },
 	.periphid	= 0x0041010,
 };
 
@@ -64,7 +64,7 @@ static struct amba_device kmi0_device = {
 		.end	= KMI0_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_KMIINT0,
+	.irq		= { IRQ_KMIINT0, NO_IRQ },
 	.periphid	= 0x00041050,
 };
 
@@ -77,7 +77,7 @@ static struct amba_device kmi1_device = {
 		.end	= KMI1_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_KMIINT1,
+	.irq		= { IRQ_KMIINT1, NO_IRQ },
 	.periphid	= 0x00041050,
 };
 
