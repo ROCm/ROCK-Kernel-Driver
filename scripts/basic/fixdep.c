@@ -104,7 +104,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <ctype.h>
-#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define INT_CONF ntohl(0x434f4e46)
 #define INT_ONFI ntohl(0x4f4e4649)
