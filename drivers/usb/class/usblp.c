@@ -359,7 +359,6 @@ static int usblp_open(struct inode *inode, struct file *file)
 	file->private_data = usblp;
 
 	usblp->writeurb->transfer_buffer_length = 0;
-	usblp->writeurb->status = 0;
 	usblp->wcomplete = 1; /* we begin writeable */
 	usblp->rcomplete = 0;
 
