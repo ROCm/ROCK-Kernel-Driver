@@ -9,9 +9,11 @@
 #ifdef CONFIG_COMPAT
 
 #include <linux/stat.h>
+#include <linux/param.h>	/* for HZ */
 #include <asm/compat.h>
 
-#define compat_jiffies_to_clock_t(x)	((x) / (HZ / COMPAT_USER_HZ))
+#define compat_jiffies_to_clock_t(x)	\
+		(((unsigned long)(x) * COMPAT_USER_HZ) / HZ)
 
 struct compat_utimbuf {
 	compat_time_t		actime;
