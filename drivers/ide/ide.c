@@ -284,7 +284,7 @@ int drive_is_flashcard(struct ata_device *drive)
 	return 0;
 }
 
-int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate, int nr_secs)
+int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate, unsigned int nr_secs)
 {
 	unsigned long flags;
 	int ret = 1;
@@ -1199,14 +1199,14 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 		if (timer_pending(&channel->timer))
 			printk(KERN_ERR "ide_set_handler: timer already active\n");
 #endif
-		set_bit(IDE_SLEEP, &channel->active);
+		set_bit(IDE_SLEEP, channel->active);
 		mod_timer(&channel->timer, sleep);
 		/* we purposely leave hwgroup busy while sleeping */
 	} else {
 		/* Ugly, but how can we sleep for the lock otherwise? perhaps
 		 * from tq_disk? */
 		ide_release_lock(&irq_lock);/* for atari only */
-		clear_bit(IDE_BUSY, &channel->active);
+		clear_bit(IDE_BUSY, channel->active);
 	}
 
 	return NULL;
@@ -1225,7 +1225,7 @@ static void queue_commands(struct ata_device *drive)
 	for (;;) {
 		struct request *rq = NULL;
 
-		if (!test_bit(IDE_BUSY, &ch->active))
+		if (!test_bit(IDE_BUSY, ch->active))
 			printk(KERN_ERR "%s: error: not busy while queueing!\n", drive->name);
 
 		/* Abort early if we can't queue another command. for non
@@ -1234,13 +1234,13 @@ static void queue_commands(struct ata_device *drive)
 		 */
 		if (!ata_can_queue(drive)) {
 			if (!ata_pending_commands(drive))
-				clear_bit(IDE_BUSY, &ch->active);
+				clear_bit(IDE_BUSY, ch->active);
 			break;
 		}
 
 		drive->sleep = 0;
 
-		if (test_bit(IDE_DMA, &ch->active)) {
+		if (test_bit(IDE_DMA, ch->active)) {
 			printk(KERN_ERR "%s: error: DMA in progress...\n", drive->name);
 			break;
 		}
@@ -1258,7 +1258,7 @@ static void queue_commands(struct ata_device *drive)
 
 		if (!(rq = elv_next_request(&drive->queue))) {
 			if (!ata_pending_commands(drive))
-				clear_bit(IDE_BUSY, &ch->active);
+				clear_bit(IDE_BUSY, ch->active);
 			drive->rq = NULL;
 			break;
 		}
@@ -1305,7 +1305,7 @@ static void do_request(struct ata_channel *channel)
 	ide_get_lock(&irq_lock, ata_irq_request, hwgroup);/* for atari only: POSSIBLY BROKEN HERE(?) */
 //	__cli();	/* necessary paranoia: ensure IRQs are masked on local CPU */
 
-	while (!test_and_set_bit(IDE_BUSY, &channel->active)) {
+	while (!test_and_set_bit(IDE_BUSY, channel->active)) {
 		struct ata_channel *ch;
 		struct ata_device *drive;
 
@@ -1408,8 +1408,8 @@ void ide_timer_expiry(unsigned long data)
 		 * complain about anything.
 		 */
 
-		if (test_and_clear_bit(IDE_SLEEP, &ch->active))
-			clear_bit(IDE_BUSY, &ch->active);
+		if (test_and_clear_bit(IDE_SLEEP, ch->active))
+			clear_bit(IDE_BUSY, ch->active);
 	} else {
 		struct ata_device *drive = ch->drive;
 		if (!drive) {
@@ -1419,7 +1419,7 @@ void ide_timer_expiry(unsigned long data)
 			ide_startstop_t startstop;
 
 			/* paranoia */
-			if (!test_and_set_bit(IDE_BUSY, &ch->active))
+			if (!test_and_set_bit(IDE_BUSY, ch->active))
 				printk(KERN_ERR "%s: ide_timer_expiry: IRQ handler was not busy??\n", drive->name);
 			if ((expiry = ch->expiry) != NULL) {
 				/* continue */
@@ -1470,7 +1470,7 @@ void ide_timer_expiry(unsigned long data)
 			spin_lock_irq(ch->lock);
 
 			if (startstop == ide_stopped)
-				clear_bit(IDE_BUSY, &ch->active);
+				clear_bit(IDE_BUSY, ch->active);
 		}
 	}
 
@@ -1593,7 +1593,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 		goto out_lock;
 	}
 	/* paranoia */
-	if (!test_and_set_bit(IDE_BUSY, &ch->active))
+	if (!test_and_set_bit(IDE_BUSY, ch->active))
 		printk(KERN_ERR "%s: %s: hwgroup was not busy!?\n", drive->name, __FUNCTION__);
 	ch->handler = NULL;
 	del_timer(&ch->timer);
@@ -1617,7 +1617,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 	set_recovery_timer(drive->channel);
 	if (startstop == ide_stopped) {
 		if (!ch->handler) {	/* paranoia */
-			clear_bit(IDE_BUSY, &ch->active);
+			clear_bit(IDE_BUSY, ch->active);
 			do_request(ch);
 		} else {
 			printk("%s: %s: huh? expected NULL handler on exit\n", drive->name, __FUNCTION__);
@@ -1951,7 +1951,9 @@ void ide_unregister(struct ata_channel *ch)
 		free_irq(ch->irq, ch);
 	if (n_ch == 1) {
 		kfree(ch->lock);
+		kfree(ch->active);
 		ch->lock = NULL;
+		ch->active = NULL;
 	}
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
@@ -2133,7 +2135,7 @@ int ide_spin_wait_hwgroup(struct ata_device *drive)
 
 	spin_lock_irq(drive->channel->lock);
 
-	while (test_bit(IDE_BUSY, &drive->channel->active)) {
+	while (test_bit(IDE_BUSY, drive->channel->active)) {
 
 		spin_unlock_irq(drive->channel->lock);
 

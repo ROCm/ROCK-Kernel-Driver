@@ -324,9 +324,9 @@ static void piix_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_tim
  * by upper layers.
  */
 
-static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
+static int piix_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	int err, T, UT, umul = 1;
 
@@ -364,7 +364,7 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void piix_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void piix_tune_drive(struct ata_device *drive, unsigned char pio)
 {
 	if (!((piix_enabled >> drive->channel->unit) & 1))
 		return;

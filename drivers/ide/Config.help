@@ -304,6 +304,7 @@ CONFIG_BLK_DEV_AEC62XX
   The ATP850U/UF is an UltraDMA 33 chipset base.
   The ATP860 is an UltraDMA 66 chipset base.
   The ATP860M(acintosh) version is an UltraDMA 66 chipset base.
+  The ATP865 is an ATA100/133 chipset.
 
   Please read the comments at the top of <file:drivers/ide/aec62xx.c>.
   If you say Y here, then say Y to "Use DMA by default when available"
@@ -311,6 +312,12 @@ CONFIG_BLK_DEV_AEC62XX
 
 CONFIG_AEC62XX_TUNING
   Please read the comments at the top of <file:drivers/ide/aec62xx.c>.
+  If unsure, say N.
+
+CONFIG_AEC6280_BURST
+  Use burst mode for DMA transfers. Higher speed, but causes more load
+  on the bus.
+
   If unsure, say N.
 
 CONFIG_BLK_DEV_ALI15X3

@@ -142,7 +142,7 @@
 
 #include "pcihost.h"
 
-static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
+static void trm290_prepare_drive(struct ata_device *drive, unsigned int use_dma)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned int reg;
@@ -170,7 +170,7 @@ static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 	__restore_flags(flags);	/* local CPU only */
 }
 
-static void trm290_selectproc (ide_drive_t *drive)
+static void trm290_selectproc(struct ata_device *drive)
 {
 	trm290_prepare_drive(drive, drive->using_dma);
 }

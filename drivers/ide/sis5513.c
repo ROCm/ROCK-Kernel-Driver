@@ -409,18 +409,43 @@ static int sis_get_info (char *buffer, char **addr, off_t offset, int count)
 byte sis_proc = 0;
 extern char *ide_xfer_verbose (byte xfer_rate);
 
+static int sis5513_ratemask(struct ata_device *drive)
+{
+	int map = 0;
+
+	switch(chipset_family) {
+		case ATA_133:	/* map |= XFER_UDMA_133; */
+		case ATA_100:
+		case ATA_100a:
+			map |= XFER_UDMA_100;
+		case ATA_66:
+			map |= XFER_UDMA_66;
+		case ATA_33:
+			map |= XFER_UDMA;
+			break;
+		case ATA_16:
+		case ATA_00:
+		default:
+			return 0;
+	}
+
+	if (!eighty_ninty_three(drive))
+		return XFER_UDMA;
+
+	return map;
+}
 
 /*
  * Configuration functions
  */
 /* Enables per-drive prefetch and postwrite */
-static void config_drive_art_rwp (ide_drive_t *drive)
+static void config_drive_art_rwp(struct ata_device *drive)
 {
 	struct ata_channel *hwif = drive->channel;
-	struct pci_dev *dev	= hwif->pci_dev;
+	struct pci_dev *dev = hwif->pci_dev;
 
-	byte reg4bh		= 0;
-	byte rw_prefetch	= (0x11 << drive->dn);
+	u8 reg4bh = 0;
+	u8 rw_prefetch = (0x11 << drive->dn);
 
 #ifdef DEBUG
 	printk("SIS5513: config_drive_art_rwp, drive %d\n", drive->dn);
@@ -440,7 +465,7 @@ static void config_drive_art_rwp (ide_drive_t *drive)
 
 
 /* Set per-drive active and recovery time */
-static void config_art_rwp_pio (ide_drive_t *drive, byte pio)
+static void config_art_rwp_pio(struct ata_device *drive, u8 pio)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
@@ -523,9 +548,9 @@ static void config_art_rwp_pio (ide_drive_t *drive, byte pio)
 #endif
 }
 
-static int config_chipset_for_pio (ide_drive_t *drive, byte pio)
+static int config_chipset_for_pio(struct ata_device *drive, u8 pio)
 {
-	byte speed;
+	u8 speed;
 
 	switch(pio) {
 		case 4:		speed = XFER_PIO_4; break;
@@ -540,7 +565,7 @@ static int config_chipset_for_pio (ide_drive_t *drive, byte pio)
 	return ide_config_drive_speed(drive, speed);
 }
 
-static int sis5513_tune_chipset (ide_drive_t *drive, byte speed)
+static int sis5513_tune_chipset(struct ata_device *drive, u8 speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
@@ -615,69 +640,35 @@ static int sis5513_tune_chipset (ide_drive_t *drive, byte speed)
 	return ((int) ide_config_drive_speed(drive, speed));
 }
 
-static void sis5513_tune_drive (ide_drive_t *drive, byte pio)
+static void sis5513_tune_drive(struct ata_device *drive, u8 pio)
 {
 	(void) config_chipset_for_pio(drive, pio);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-/*
- * ((id->hw_config & 0x4000|0x2000) && (drive->channel->udma_four))
- */
-static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
+static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 {
-	struct hd_driveid *id = drive->id;
-	struct ata_channel *hwif = drive->channel;
-
-	byte			speed = 0;
-
-	byte unit		= (drive->select.b.unit & 0x01);
-	byte udma_66		= eighty_ninty_three(drive);
+	int map;
+	u8 mode;
 
 #ifdef DEBUG
-	printk("SIS5513: config_chipset_for_dma, drive %d, ultra %d\n",
-	       drive->dn, ultra);
+	printk("SIS5513: config_chipset_for_dma, drive %d, udma %d\n",
+	       drive->dn, udma);
 #endif
 
-	if ((id->dma_ultra & 0x0020) && ultra && udma_66 && (chipset_family >= ATA_100a))
-		speed = XFER_UDMA_5;
-	else if ((id->dma_ultra & 0x0010) && ultra && udma_66 && (chipset_family >= ATA_66))
-		speed = XFER_UDMA_4;
-	else if ((id->dma_ultra & 0x0008) && ultra && udma_66 && (chipset_family >= ATA_66))
-		speed = XFER_UDMA_3;
-	else if ((id->dma_ultra & 0x0004) && ultra && (chipset_family >= ATA_33))
-		speed = XFER_UDMA_2;
-	else if ((id->dma_ultra & 0x0002) && ultra && (chipset_family >= ATA_33))
-		speed = XFER_UDMA_1;
-	else if ((id->dma_ultra & 0x0001) && ultra && (chipset_family >= ATA_33))
-		speed = XFER_UDMA_0;
-	else if (id->dma_mword & 0x0004)
-		speed = XFER_MW_DMA_2;
-	else if (id->dma_mword & 0x0002)
-		speed = XFER_MW_DMA_1;
-	else if (id->dma_mword & 0x0001)
-		speed = XFER_MW_DMA_0;
-	else if (id->dma_1word & 0x0004)
-		speed = XFER_SW_DMA_2;
-	else if (id->dma_1word & 0x0002)
-		speed = XFER_SW_DMA_1;
-	else if (id->dma_1word & 0x0001)
-		speed = XFER_SW_DMA_0;
+	if (udma)
+		map = sis5513_ratemask(drive);
 	else
+		map = XFER_SWDMA | XFER_MWDMA;
+
+	mode = ata_timing_mode(drive, map);
+	if (mode < XFER_SW_DMA_0)
 		return 0;
 
-	outb(inb(hwif->dma_base+2)|(1<<(5+unit)), hwif->dma_base+2);
-
-	sis5513_tune_chipset(drive, speed);
-
-	return ((int)	((id->dma_ultra >> 11) & 7) ? 1 :
-			((id->dma_ultra >> 8) & 7) ? 1 :
-			((id->dma_mword >> 8) & 7) ? 1 :
-			((id->dma_1word >> 8) & 7) ? 1 :
-						     0);
+	return !sis5513_tune_chipset(drive, mode);
 }
 
-static int config_drive_xfer_rate (ide_drive_t *drive)
+static int config_drive_xfer_rate(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	int on = 0;

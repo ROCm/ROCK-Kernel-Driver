@@ -447,6 +447,7 @@ struct ata_channel {
 	 * between differen queues sharing the same irq line.
 	 */
 	spinlock_t *lock;
+	unsigned long *active;		/* active processing request */
 
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	struct timer_list timer;				/* failsafe timer */
@@ -454,7 +455,6 @@ struct ata_channel {
 	unsigned long poll_timeout;				/* timeout value during polled operations */
 	struct ata_device *drive;				/* last serviced drive */
 
-	unsigned long active;		/* active processing request */
 
 	ide_ioreg_t io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t hw;				/* hardware info */
@@ -642,7 +642,7 @@ extern int noautodma;
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #include <linux/blk.h>
 
-extern int __ide_end_request(struct ata_device *, struct request *, int, int);
+extern int __ide_end_request(struct ata_device *, struct request *, int, unsigned int);
 extern int ide_end_request(struct ata_device *drive, struct request *, int);
 
 /*
@@ -784,11 +784,9 @@ void ide_init_subdrivers (void);
 
 extern struct block_device_operations ide_fops[];
 
-#ifdef CONFIG_BLK_DEV_IDE
 /* Probe for devices attached to the systems host controllers.
  */
-extern int ideprobe_init (void);
-#endif
+extern int ideprobe_init(void);
 #ifdef CONFIG_BLK_DEV_IDEDISK
 extern int idedisk_init (void);
 #endif

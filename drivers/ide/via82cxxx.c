@@ -303,9 +303,9 @@ static void via_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timi
  * by upper layers.
  */
 
-static int via_set_drive(ide_drive_t *drive, unsigned char speed)
+static int via_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	unsigned int T, UT;
 
@@ -345,7 +345,7 @@ static int via_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void via82cxxx_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void via82cxxx_tune_drive(struct ata_device *drive, unsigned char pio)
 {
 	if (!((via_enabled >> drive->channel->unit) & 1))
 		return;
@@ -493,22 +493,8 @@ static unsigned int __init via82cxxx_init_chipset(struct pci_dev *dev)
  */
 
 	pci_read_config_byte(isa, PCI_REVISION_ID, &t);
-	printk(KERN_INFO "VP_IDE: VIA %s (rev %02x) IDE %s controller on pci%s\n",
+	printk(KERN_INFO "VP_IDE: VIA %s (rev %02x) ATA %s controller on PCI %s\n",
 		via_config->name, t, via_dma[via_config->flags & VIA_UDMA], dev->slot_name);
-
-/*
- * Setup /proc/ide/via entry.
- */
-
-#if 0 && defined(CONFIG_PROC_FS)
-	if (!via_proc) {
-		via_base = pci_resource_start(dev, 4);
-		bmide_dev = dev;
-		isa_dev = isa;
-		via_display_info = &via_get_info;
-		via_proc = 1;
-	}
-#endif
 
 	return 0;
 }

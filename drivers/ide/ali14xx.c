@@ -106,11 +106,11 @@ static void outReg (byte data, byte reg)
  * This function computes timing parameters
  * and sets controller registers accordingly.
  */
-static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
+static void ali14xx_tune_drive(struct ata_device *drive, u8 pio)
 {
 	int driveNum;
 	int time1, time2;
-	byte param1, param2, param3, param4;
+	u8 param1, param2, param3, param4;
 	unsigned long flags;
 	struct ata_timing *t;
 
