@@ -215,9 +215,11 @@ static void mqueue_delete_inode(struct inode *inode)
 
 	clear_inode(inode);
 
-	spin_lock(&mq_lock);
-	queues_count--;
-	spin_unlock(&mq_lock);
+	if (info->messages) {
+		spin_lock(&mq_lock);
+		queues_count--;
+		spin_unlock(&mq_lock);
+	}
 }
 
 static int mqueue_create(struct inode *dir, struct dentry *dentry,
