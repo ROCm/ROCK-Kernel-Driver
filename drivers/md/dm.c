@@ -217,14 +217,8 @@ static int queue_io(struct mapped_device *md, struct bio *bio)
  */
 static inline void dec_pending(struct dm_io *io, int error)
 {
-	static spinlock_t _uptodate_lock = SPIN_LOCK_UNLOCKED;
-	unsigned long flags;
-
-	if (error) {
-		spin_lock_irqsave(&_uptodate_lock, flags);
+	if (error)
 		io->error = error;
-		spin_unlock_irqrestore(&_uptodate_lock, flags);
-	}
 
 	if (atomic_dec_and_test(&io->io_count)) {
 		if (atomic_dec_and_test(&io->md->pending))
