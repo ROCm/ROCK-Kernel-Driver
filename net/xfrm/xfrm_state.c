@@ -513,7 +513,7 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 		maxspi = ntohl(maxspi);
 		for (h=0; h<maxspi-minspi+1; h++) {
 			spi = minspi + net_random()%(maxspi-minspi+1);
-			x0 = xfrm_state_lookup(&x->id.daddr, minspi, x->id.proto, x->props.family);
+			x0 = xfrm_state_lookup(&x->id.daddr, htonl(spi), x->id.proto, x->props.family);
 			if (x0 == NULL)
 				break;
 			xfrm_state_put(x0);
