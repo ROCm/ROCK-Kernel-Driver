@@ -842,7 +842,6 @@ static void ub_urb_complete(struct urb *urb, struct pt_regs *pt)
 {
 	struct ub_dev *sc = urb->context;
 
-	del_timer(&sc->work_timer);
 	ub_complete(&sc->work_done);
 	tasklet_schedule(&sc->tasklet);
 }
@@ -853,6 +852,7 @@ static void ub_scsi_action(unsigned long _dev)
 	unsigned long flags;
 
 	spin_lock_irqsave(&sc->lock, flags);
+	del_timer(&sc->work_timer);
 	ub_scsi_dispatch(sc);
 	spin_unlock_irqrestore(&sc->lock, flags);
 }
