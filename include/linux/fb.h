@@ -2,6 +2,7 @@
 #define _LINUX_FB_H
 
 #include <asm/types.h>
+#include <linux/list.h>
 
 /* Definitions of frame buffers						*/
 
@@ -711,6 +712,7 @@ extern void framebuffer_release(struct fb_info *info);
 #define FB_MODE_IS_VESA		4
 #define FB_MODE_IS_CALCULATED	8
 #define FB_MODE_IS_FIRST	16
+#define FB_MODE_IS_FROM_VAR     32
 
 extern int fbmon_valid_timings(u_int pixclock, u_int htotal, u_int vtotal,
 			       const struct fb_info *fb_info);
@@ -729,6 +731,22 @@ extern void fb_destroy_modedb(struct fb_videomode *modedb);
 /* drivers/video/modedb.c */
 #define VESA_MODEDB_SIZE 34
 extern const struct fb_videomode vesa_modes[];
+extern void fb_var_to_videomode(struct fb_videomode *mode,
+				struct fb_var_screeninfo *var);
+extern void fb_videomode_to_var(struct fb_var_screeninfo *var,
+				struct fb_videomode *mode);
+extern int fb_mode_is_equal(struct fb_videomode *mode1,
+			    struct fb_videomode *mode2);
+extern int fb_add_videomode(struct fb_videomode *mode, struct list_head *head);
+extern void fb_delete_videomode(struct fb_videomode *mode,
+				struct list_head *head);
+extern struct fb_videomode *fb_match_mode(struct fb_var_screeninfo *var,
+					  struct list_head *head);
+extern struct fb_videomode *fb_find_best_mode(struct fb_var_screeninfo *var,
+					      struct list_head *head);
+extern void fb_destroy_modelist(struct list_head *head);
+extern void fb_videomode_to_modelist(struct fb_videomode *modedb, int num,
+				     struct list_head *head);
 
 /* drivers/video/fbcmap.c */
 extern int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp);
@@ -755,6 +773,11 @@ struct fb_videomode {
 	u32 sync;
 	u32 vmode;
 	u32 flag;
+};
+
+struct fb_modelist {
+	struct list_head list;
+	struct fb_videomode mode;
 };
 
 extern int fb_find_mode(struct fb_var_screeninfo *var,
