@@ -434,14 +434,11 @@ static inline int check_supported_cpu(unsigned int cpu)
 		goto out;
 
 	eax = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
-	if ((eax & CPUID_XFAM_MOD) == ATHLON64_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Althon 64 Processor found\n");
-	} else if ((eax & CPUID_XFAM_MOD) == OPTERON_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Opteron Processor found\n");
-	} else {
-		printk(KERN_INFO PFX
-		       "AMD Athlon 64 or AMD Opteron processor required\n");
-		goto out;
+	if (((eax & CPUID_USE_XFAM_XMOD) != CPUID_USE_XFAM_XMOD) ||
+	    ((eax & CPUID_XFAM) != CPUID_XFAM_K8) ||
+	    ((eax & CPUID_XMOD) > CPUID_XMOD_REV_E)) {
+		printk(KERN_INFO PFX "Processor cpuid %x not supported\n", eax);
+ 		goto out;
 	}
 
 	eax = cpuid_eax(CPUID_GET_MAX_CAPABILITIES);
@@ -686,6 +683,13 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 			continue;
 		}
+
+		/* verify voltage is OK - BIOSs are using "off" to indicate invalid */
+		if (vid == 0x1f) {
+			dprintk(KERN_INFO PFX "invalid vid %u, ignoring\n", vid);
+ 			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+ 			continue;
+ 		}
 
 		if (powernow_table[i].frequency != (data->acpi_data.states[i].core_frequency * 1000)) {
 			printk(KERN_INFO PFX "invalid freq entries %u kHz vs. %u kHz\n", 
