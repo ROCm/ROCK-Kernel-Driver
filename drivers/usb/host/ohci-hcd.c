@@ -92,6 +92,7 @@
 #endif
 
 #include <linux/usb.h>
+#include <linux/version.h>
 #include "../core/hcd.h"
 
 #include <asm/io.h>
