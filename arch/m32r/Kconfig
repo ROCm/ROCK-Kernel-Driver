@@ -1,0 +1,621 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.txt.
+#
+
+mainmenu "Linux Kernel Configuration"
+
+config M32R
+	bool
+	default y
+
+config SBUS
+	bool
+
+config UID16
+	bool
+	default y
+
+config GENERIC_ISA_DMA
+	bool
+	default y
+
+source "init/Kconfig"
+
+
+menu "Processor type and features"
+
+choice
+	prompt "Platform Type"
+	default PLAT_MAPPI
+
+config PLAT_MAPPI
+	bool "Mappi-I"
+	help
+	  The Mappi-I is an FPGA board for SOC (System-On-a-Chip) prototyping.
+	  You can operate a Linux system on this board by using an M32R
+	  softmacro core, which is a fully-synthesizable functional model
+	  described in Verilog-HDL.
+
+	  The Mappi-I board was the first platform, which had been used
+	  to port and develop a Linux system for the M32R processor.
+	  Currently, the Mappi-II, an heir to the Mappi-I, is available.
+
+config PLAT_USRV
+	bool "uServer"
+
+config PLAT_M32700UT
+	bool "M32700UT"
+	help
+	  The M3T-M32700UT is an evaluation board based on uT-Engine
+	  specification.  This board has an M32700 (Chaos) evaluation chip.
+	  You can say Y for SMP, because the M32700 is a single chip
+	  multiprocessor.
+
+config PLAT_OPSPUT
+	bool "OPSPUT"
+	help
+	  The OPSPUT is an evaluation board based on uT-Engine
+	  specification.  This board has a OPSP-REP chip.
+
+config PLAT_OAKS32R
+	bool "OAKS32R"
+	help
+	  The OAKS32R is a tiny, inexpensive evaluation board.
+	  Please note that if you say Y here and choose chip "M32102",
+	  say N for MMU and select a no-MMU version kernel, otherwise
+	  a kernel with MMU support will not work, because the M32102
+	  is a microcontroller for embedded systems and it has no MMU.
+
+config PLAT_MAPPI2
+       bool "Mappi-II(M3A-ZA36/M3A-ZA52)"
+
+endchoice
+
+choice
+	prompt "Processor family"
+	default CHIP_M32700
+
+config CHIP_M32700
+	bool "M32700 (Chaos)"
+
+config CHIP_M32102
+	bool "M32102"
+
+config CHIP_VDEC2
+       bool "VDEC2"
+
+config CHIP_OPSP
+       bool "OPSP"
+
+endchoice
+
+config MMU
+	bool "Support for memory management hardware"
+	depends on CHIP_M32700 || CHIP_VDEC2 || CHIP_OPSP
+	default y
+
+config TLB_ENTRIES
+       int "TLB Entries"
+       depends on CHIP_M32700 || CHIP_VDEC2 || CHIP_OPSP
+       default 32 if CHIP_M32700 || CHIP_OPSP
+       default 16 if CHIP_VDEC2
+
+
+config ISA_M32R
+        bool
+	depends on CHIP_M32102
+	default y
+
+config ISA_M32R2
+	bool
+	depends on CHIP_M32700 || CHIP_VDEC2 || CHIP_OPSP
+	default y
+
+config ISA_DSP_LEVEL2
+	bool
+	depends on CHIP_M32700 || CHIP_OPSP
+	default y
+
+config ISA_DUAL_ISSUE
+	bool
+	depends on CHIP_M32700 || CHIP_OPSP
+	default y
+
+config BUS_CLOCK
+	int "Bus Clock [Hz] (integer)"
+	default "70000000" if PLAT_MAPPI
+	default "25000000" if PLAT_USRV
+	default "50000000" if PLAT_M32700UT
+	default "50000000" if PLAT_OPSPUT
+	default "33333333" if PLAT_OAKS32R
+	default "20000000" if PLAT_MAPPI2
+
+config TIMER_DIVIDE
+	int "Timer divider (integer)"
+	default "128"
+
+config CPU_LITTLE_ENDIAN
+        bool "Generate little endian code"
+	default n
+
+config MEMORY_START
+	hex "Physical memory start address (hex)"
+	default "08000000" if PLAT_MAPPI || PLAT_MAPPI2
+	default "08000000" if PLAT_USRV
+	default "08000000" if PLAT_M32700UT
+	default "08000000" if PLAT_OPSPUT
+	default "01000000" if PLAT_OAKS32R
+
+config MEMORY_SIZE
+	hex "Physical memory size (hex)"
+	default "04000000" if PLAT_MAPPI || PLAT_MAPPI2
+	default "02000000" if PLAT_USRV
+	default "01000000" if PLAT_M32700UT
+	default "01000000" if PLAT_OPSPUT
+	default "00800000" if PLAT_OAKS32R
+
+config NOHIGHMEM
+	bool
+	default y
+
+config DISCONTIGMEM
+	bool "Internal RAM Support"
+	depends on CHIP_M32700 || CHIP_M32102 || CHIP_VDEC2 || CHIP_OPSP
+	default y
+
+config IRAM_START
+	hex "Internal memory start address (hex)"
+	default "00f00000"
+	depends on (CHIP_M32700 || CHIP_M32102 || CHIP_VDEC2 || CHIP_OPSP) && DISCONTIGMEM
+
+config IRAM_SIZE
+	hex "Internal memory size (hex)"
+	depends on (CHIP_M32700 || CHIP_M32102 || CHIP_VDEC2 || CHIP_OPSP) && DISCONTIGMEM
+	default "00080000" if CHIP_M32700
+	default "00010000" if CHIP_M32102 || CHIP_OPSP
+	default "00008000" if CHIP_VDEC2
+
+#
+# Define implied options from the CPU selection here
+#
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	depends on M32R
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default n
+
+config PREEMPT
+	bool "Preemptible Kernel"
+	help
+	  This option reduces the latency of the kernel when reacting to
+	  real-time or interactive events by allowing a low priority process to
+	  be preempted even if it is in kernel mode executing a system call.
+	  This allows applications to run more reliably even when the system is
+	  under load.
+
+	  Say Y here if you are building a kernel for a desktop, embedded
+	  or real-time system.  Say N if you are unsure.
+
+config HAVE_DEC_LOCK
+	bool
+	depends on (SMP || PREEMPT)
+	default n
+
+config SMP
+	bool "Symmetric multi-processing support"
+	---help---
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, like most personal computers, say N. If
+	  you have a system with more than one CPU, say Y.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  machines, but will use only one CPU of a multiprocessor machine. If
+	  you say Y here, the kernel will run on many, but not all,
+	  singleprocessor machines. On a singleprocessor machine, the kernel
+	  will run faster if you say N here.
+
+	  Note that if you say Y here and choose architecture "586" or
+	  "Pentium" under "Processor family", the kernel will not work on 486
+	  architectures. Similarly, multiprocessor kernels for the "PPro"
+	  architecture may not work on all Pentium based boards.
+
+	  People using multiprocessor machines who say Y here should also say
+	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
+	  Management" code will be disabled if you say Y here.
+
+	  See also the <file:Documentation/smp.tex>,
+	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
+	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you don't know what to do here, say N.
+
+config CHIP_M32700_TS1
+	bool "Workaround code for the M32700 TS1 chip's bug"
+	depends on (CHIP_M32700 && SMP)
+	default n
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	range 2 32
+	depends on SMP
+	default "2"
+	help
+	  This allows you to specify the maximum number of CPUs which this
+	  kernel will support.  The maximum supported value is 32 and the
+	  minimum value which makes sense is 2.
+
+	  This is purely to save memory - each supported CPU adds
+	  approximately eight kilobytes to the kernel image.
+
+# Common NUMA Features
+config NUMA
+	bool "Numa Memory Allocation Support"
+	depends on SMP
+	default n
+
+source "arch/m32r/drivers/Kconfig"
+
+# turning this on wastes a bunch of space.
+# Summit needs it only when NUMA is on
+config BOOT_IOREMAP
+	bool
+	depends on NUMA
+	default n
+
+endmenu
+
+
+menu "Power management options (ACPI, APM)"
+
+source kernel/power/Kconfig
+
+config APM
+	tristate "Advanced Power Management BIOS support"
+	depends on PM
+	---help---
+	  APM is a BIOS specification for saving power using several different
+	  techniques. This is mostly useful for battery powered laptops with
+	  APM compliant BIOSes. If you say Y here, the system time will be
+	  reset after a RESUME operation, the /proc/apm device will provide
+	  battery status information, and user-space programs will receive
+	  notification of APM "events" (e.g. battery status change).
+
+	  If you select "Y" here, you can disable actual use of the APM
+	  BIOS by passing the "apm=off" option to the kernel at boot time.
+
+	  Note that the APM support is almost completely disabled for
+	  machines with more than one CPU.
+
+	  In order to use APM, you will need supporting software. For location
+	  and more information, read <file:Documentation/pm.txt> and the
+	  Battery Powered Linux mini-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver does not spin down disk drives (see the hdparm(8)
+	  manpage ("man 8 hdparm") for that), and it doesn't turn off
+	  VESA-compliant "green" monitors.
+
+	  This driver does not support the TI 4000M TravelMate and the ACER
+	  486/DX4/75 because they don't have compliant BIOSes. Many "green"
+	  desktop machines also don't have compliant BIOSes, and this driver
+	  may cause those machines to panic during the boot phase.
+
+	  Generally, if you don't have a battery in your machine, there isn't
+	  much point in using this driver and you should say N. If you get
+	  random kernel OOPSes or reboots that don't seem to be related to
+	  anything, try disabling/enabling this option (or disabling/enabling
+	  APM in your BIOS).
+
+	  Some other things you should try when experiencing seemingly random,
+	  "weird" problems:
+
+	  1) make sure that you have enough swap space and that it is
+	  enabled.
+	  2) pass the "no-hlt" option to the kernel
+	  3) switch on floating point emulation in the kernel and pass
+	  the "no387" option to the kernel
+	  4) pass the "floppy=nodma" option to the kernel
+	  5) pass the "mem=4M" option to the kernel (thereby disabling
+	  all but the first 4 MB of RAM)
+	  6) make sure that the CPU is not over clocked.
+	  7) read the sig11 FAQ at <http://www.bitwizard.nl/sig11/>
+	  8) disable the cache from your BIOS settings
+	  9) install a fan for the video card or exchange video RAM
+	  10) install a better fan for the CPU
+	  11) exchange RAM chips
+	  12) exchange the motherboard.
+
+	  To compile this driver as a module ( = code which can be inserted in
+	  and removed from the running kernel whenever you want), say M here
+	  and read <file:Documentation/modules.txt>. The module will be called
+	  apm.
+
+config APM_IGNORE_USER_SUSPEND
+	bool "Ignore USER SUSPEND"
+	depends on APM
+	help
+	  This option will ignore USER SUSPEND requests. On machines with a
+	  compliant APM BIOS, you want to say N. However, on the NEC Versa M
+	  series notebooks, it is necessary to say Y because of a BIOS bug.
+
+config APM_DO_ENABLE
+	bool "Enable PM at boot time"
+	depends on APM
+	---help---
+	  Enable APM features at boot time. From page 36 of the APM BIOS
+	  specification: "When disabled, the APM BIOS does not automatically
+	  power manage devices, enter the Standby State, enter the Suspend
+	  State, or take power saving steps in response to CPU Idle calls."
+	  This driver will make CPU Idle calls when Linux is idle (unless this
+	  feature is turned off -- see "Do CPU IDLE calls", below). This
+	  should always save battery power, but more complicated APM features
+	  will be dependent on your BIOS implementation. You may need to turn
+	  this option off if your computer hangs at boot time when using APM
+	  support, or if it beeps continuously instead of suspending. Turn
+	  this off if you have a NEC UltraLite Versa 33/C or a Toshiba
+	  T400CDT. This is off by default since most machines do fine without
+	  this feature.
+
+config APM_CPU_IDLE
+	bool "Make CPU Idle calls when idle"
+	depends on APM
+	help
+	  Enable calls to APM CPU Idle/CPU Busy inside the kernel's idle loop.
+	  On some machines, this can activate improved power savings, such as
+	  a slowed CPU clock rate, when the machine is idle. These idle calls
+	  are made after the idle loop has run for some length of time (e.g.,
+	  333 mS). On some machines, this will cause a hang at boot time or
+	  whenever the CPU becomes idle. (On machines with more than one CPU,
+	  this option does nothing.)
+
+config APM_DISPLAY_BLANK
+	bool "Enable console blanking using APM"
+	depends on APM
+	help
+	  Enable console blanking using the APM. Some laptops can use this to
+	  turn off the LCD backlight when the screen blanker of the Linux
+	  virtual console blanks the screen. Note that this is only used by
+	  the virtual console screen blanker, and won't turn off the backlight
+	  when using the X Window system. This also doesn't have anything to
+	  do with your VESA-compliant power-saving monitor. Further, this
+	  option doesn't work for all laptops -- it might not turn off your
+	  backlight at all, or it might print a lot of errors to the console,
+	  especially if you are using gpm.
+
+config APM_RTC_IS_GMT
+	bool "RTC stores time in GMT"
+	depends on APM
+	help
+	  Say Y here if your RTC (Real Time Clock a.k.a. hardware clock)
+	  stores the time in GMT (Greenwich Mean Time). Say N if your RTC
+	  stores localtime.
+
+	  It is in fact recommended to store GMT in your RTC, because then you
+	  don't have to worry about daylight savings time changes. The only
+	  reason not to use GMT in your RTC is if you also run a broken OS
+	  that doesn't understand GMT.
+
+config APM_ALLOW_INTS
+	bool "Allow interrupts during APM BIOS calls"
+	depends on APM
+	help
+	  Normally we disable external interrupts while we are making calls to
+	  the APM BIOS as a measure to lessen the effects of a badly behaving
+	  BIOS implementation.  The BIOS should reenable interrupts if it
+	  needs to.  Unfortunately, some BIOSes do not -- especially those in
+	  many of the newer IBM Thinkpads.  If you experience hangs when you
+	  suspend, try setting this to Y.  Otherwise, say N.
+
+config APM_REAL_MODE_POWER_OFF
+	bool "Use real mode APM BIOS call to power off"
+	depends on APM
+	help
+	  Use real mode APM BIOS calls to switch off the computer. This is
+	  a work-around for a number of buggy BIOSes. Switch this option on if
+	  your computer crashes instead of powering off properly.
+
+endmenu
+
+
+menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
+
+config PCI
+	bool "PCI support"
+	default n
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+choice
+	prompt "PCI access mode"
+	depends on PCI
+	default PCI_GOANY
+
+config PCI_GOBIOS
+	bool "BIOS"
+	---help---
+	  On PCI systems, the BIOS can be used to detect the PCI devices and
+	  determine their configuration. However, some old PCI motherboards
+	  have BIOS bugs and may crash if this is done. Also, some embedded
+	  PCI-based systems don't have any BIOS at all. Linux can also try to
+	  detect the PCI hardware directly without using the BIOS.
+
+	  With this option, you can specify how Linux should detect the PCI
+	  devices. If you choose "BIOS", the BIOS will be used, if you choose
+	  "Direct", the BIOS won't be used, and if you choose "Any", the
+	  kernel will try the direct access method and falls back to the BIOS
+	  if that doesn't work. If unsure, go with the default, which is
+	  "Any".
+
+config PCI_GODIRECT
+	bool "Direct"
+
+config PCI_GOANY
+	bool "Any"
+
+endchoice
+
+config PCI_BIOS
+	bool
+	depends on PCI && (PCI_GOBIOS || PCI_GOANY)
+	default y
+
+config PCI_DIRECT
+	bool
+ 	depends on PCI && (PCI_GODIRECT || PCI_GOANY)
+	default y
+
+source "drivers/pci/Kconfig"
+
+config ISA
+	bool "ISA support"
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config EISA
+	bool "EISA support"
+	depends on ISA
+	---help---
+	  The Extended Industry Standard Architecture (EISA) bus was
+	  developed as an open alternative to the IBM MicroChannel bus.
+
+	  The EISA bus provided some of the features of the IBM MicroChannel
+	  bus while maintaining backward compatibility with cards made for
+	  the older ISA bus.  The EISA bus saw limited use between 1988 and
+	  1995 when it was made obsolete by the PCI bus.
+
+	  Say Y here if you are building a kernel for an EISA-based machine.
+
+	  Otherwise, say N.
+
+source "drivers/eisa/Kconfig"
+
+source "drivers/pcmcia/Kconfig"
+
+source "drivers/pci/hotplug/Kconfig"
+
+endmenu
+
+
+menu "Executable file formats"
+
+source "fs/Kconfig.binfmt"
+
+endmenu
+
+source "drivers/Kconfig"
+
+source "fs/Kconfig"
+
+source "arch/m32r/oprofile/Kconfig"
+
+menu "Kernel hacking"
+
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+	help
+	  Say Y here if you are developing drivers or trying to debug and
+	  identify kernel problems.
+
+config DEBUG_STACKOVERFLOW
+	bool "Check for stack overflows"
+	depends on DEBUG_KERNEL
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to have the kernel do limited verification on memory
+	  allocation as well as poisoning memory on free to catch use of freed
+	  memory.
+
+config DEBUG_IOVIRT
+	bool "Memory mapped I/O debugging"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here to get warned whenever an attempt is made to do I/O on
+	  obviously invalid addresses such as those generated when ioremap()
+	  calls are forgotten.  Memory mapped I/O will go through an extra
+	  check to catch access to unmapped ISA addresses, an access method
+	  that can still be used by old drivers that are being ported from
+	  2.0/2.2.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, you will have some control over the system even
+	  if the system crashes for example during kernel debugging (e.g., you
+	  will be able to flush the buffer cache to disk, reboot the system
+	  immediately or dump some status information). This is accomplished
+	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
+	  also works on a serial console (on PC hardware at least), if you
+	  send a BREAK and then within 5 seconds a command keypress. The
+	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
+	  unless you really know what this hack does.
+
+config DEBUG_SPINLOCK
+	bool "Spinlock debugging"
+	depends on DEBUG_KERNEL
+	help
+	  Say Y here and build SMP to catch missing spinlock initialization
+	  and certain other kinds of spinlock errors commonly made.  This is
+	  best used in conjunction with the NMI watchdog so that spinlock
+	  deadlocks are also debuggable.
+
+config DEBUG_PAGEALLOC
+	bool "Page alloc debugging"
+	depends on DEBUG_KERNEL
+	help
+	  Unmap pages from the kernel linear mapping after free_pages().
+	  This results in a large slowdown, but helps to find certain types
+	  of memory corruptions.
+
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
+	help
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use gdb to debug the kernel.
+	  If you don't debug the kernel, you can say N.
+
+config DEBUG_SPINLOCK_SLEEP
+	bool "Sleep-inside-spinlock checking"
+	help
+	  If you say Y here, various routines which may sleep will become very
+	  noisy if they are called with a spinlock held.
+
+config FRAME_POINTER
+	bool "Compile the kernel with frame pointers"
+	help
+	  If you say Y here the resulting kernel image will be slightly larger
+	  and slower, but it will give very useful debugging information.
+	  If you don't debug the kernel, you can say N, but we may not be able
+	  to solve problems without frame pointers.
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+

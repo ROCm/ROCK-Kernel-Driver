@@ -1,0 +1,42 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.txt.
+#
+
+menu "M32R drivers"
+
+config M32RPCC
+	bool "M32R PCMCIA I/F"
+	depends on CHIP_M32700
+
+config M32R_NE2000
+	bool "On board NE2000 Network Interface Chip"
+	depends on PLAT_MAPPI || PLAT_OAKS32R
+
+config M32R_CFC
+	bool "CF I/F Controller"
+	depends on PLAT_USRV || PLAT_M32700UT || PLAT_MAPPI2 || PLAT_OPSPUT
+
+config M32700UT_CFC
+	bool
+	depends on M32R_CFC
+	default y
+
+config CFC_NUM
+	int "CF I/F number"
+	depends on PLAT_USRV || PLAT_M32700UT
+	default "1" if PLAT_USRV || PLAT_M32700UT || PLAT_MAPPI2 || PLAT_OPSPUT
+
+config MTD_M32R
+	bool "Flash device mapped on M32R"
+	depends on PLAT_USRV || PLAT_M32700UT || PLAT_MAPPI2
+
+config M32R_SMC91111
+	bool "On board SMC91111 Network Interface Chip"
+	depends on PLAT_M32700UT || PLAT_MAPPI2 || PLAT_OPSPUT
+
+config M32700UT_DS1302
+	bool "DS1302 Real Time Clock support"
+	depends on PLAT_M32700UT || PLAT_OPSPUT
+
+endmenu
