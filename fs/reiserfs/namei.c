@@ -1289,7 +1289,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	}
 
 	RFALSE( S_ISDIR(old_inode_mode) && 
-		 !reiserfs_buffer_prepared(dot_dot_de.de_bh), "" );
+		 !buffer_journal_prepared(dot_dot_de.de_bh), "" );
 
 	break;
     }

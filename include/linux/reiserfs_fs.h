@@ -1711,13 +1711,28 @@ struct reiserfs_journal_header {
 #define journal_bread(s, block) __bread(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 
 enum reiserfs_bh_state_bits {
-    BH_JDirty = BH_PrivateStart,
+    BH_JDirty = BH_PrivateStart, /* buffer is in current transaction */
     BH_JDirty_wait,
-    BH_JNew,
+    BH_JNew,                     /* disk block was taken off free list before
+                                  * being in a finished transaction, or
+                                  * written to disk. Can be reused immed. */
     BH_JPrepared,
     BH_JRestore_dirty,
     BH_JTest, // debugging only will go away
 };
+
+BUFFER_FNS(JDirty, journaled);
+TAS_BUFFER_FNS(JDirty, journaled);
+BUFFER_FNS(JDirty_wait, journal_dirty);
+TAS_BUFFER_FNS(JDirty_wait, journal_dirty);
+BUFFER_FNS(JNew, journal_new);
+TAS_BUFFER_FNS(JNew, journal_new);
+BUFFER_FNS(JPrepared, journal_prepared);
+TAS_BUFFER_FNS(JPrepared, journal_prepared);
+BUFFER_FNS(JRestore_dirty, journal_restore_dirty);
+TAS_BUFFER_FNS(JRestore_dirty, journal_restore_dirty);
+BUFFER_FNS(JTest, journal_test);
+TAS_BUFFER_FNS(JTest, journal_test);
 
 /*
 ** transaction handle which is passed around for all journal calls
@@ -1796,36 +1811,7 @@ int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
 int reiserfs_in_journal(struct super_block *p_s_sb, int bmap_nr, int bit_nr, int searchall, b_blocknr_t *next) ;
 int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
 
-int buffer_journaled(const struct buffer_head *bh) ;
-int mark_buffer_journal_new(struct buffer_head *bh) ;
 int reiserfs_allocate_list_bitmaps(struct super_block *s, struct reiserfs_list_bitmap *, int) ;
-
-				/* why is this kerplunked right here? */
-static inline int reiserfs_buffer_prepared(const struct buffer_head *bh) {
-  if (bh && test_bit(BH_JPrepared, &bh->b_state))
-    return 1 ;
-  else
-    return 0 ;
-}
-
-/* buffer was journaled, waiting to get to disk */
-static inline int buffer_journal_dirty(const struct buffer_head *bh) {
-  if (bh)
-    return test_bit(BH_JDirty_wait, &bh->b_state) ;
-  else
-    return 0 ;
-}
-static inline int mark_buffer_notjournal_dirty(struct buffer_head *bh) {
-  if (bh)
-    clear_bit(BH_JDirty_wait, &bh->b_state) ;
-  return 0 ;
-}
-static inline int mark_buffer_notjournal_new(struct buffer_head *bh) {
-  if (bh) {
-    clear_bit(BH_JNew, &bh->b_state) ;
-  }
-  return 0 ;
-}
 
 void add_save_link (struct reiserfs_transaction_handle * th,
 					struct inode * inode, int truncate);

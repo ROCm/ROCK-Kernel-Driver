@@ -122,7 +122,7 @@ static void init_journal_hash(struct super_block *p_s_sb) {
 static int reiserfs_clean_and_file_buffer(struct buffer_head *bh) {
   if (bh) {
     clear_buffer_dirty(bh);
-    clear_bit(BH_JTest, &bh->b_state);
+    clear_buffer_journal_test(bh);
   }
   return 0 ;
 }
@@ -388,41 +388,9 @@ static void free_cnode(struct super_block *p_s_sb, struct reiserfs_journal_cnode
   SB_JOURNAL(p_s_sb)->j_cnode_free_list = cn ;
 }
 
-static int clear_prepared_bits(struct buffer_head *bh) {
-  clear_bit(BH_JPrepared, &bh->b_state) ;
-  clear_bit(BH_JRestore_dirty, &bh->b_state) ;
-  return 0 ;
-}
-
-/* buffer is in current transaction */
-inline int buffer_journaled(const struct buffer_head *bh) {
-  if (bh)
-    return test_bit(BH_JDirty, &bh->b_state) ;
-  else
-    return 0 ;
-}
-
-/* disk block was taken off free list before being in a finished transation, or written to disk
-** journal_new blocks can be reused immediately, for any purpose
-*/ 
-inline int buffer_journal_new(const struct buffer_head *bh) {
-  if (bh) 
-    return test_bit(BH_JNew, &bh->b_state) ;
-  else
-    return 0 ;
-}
-
-inline int mark_buffer_journal_new(struct buffer_head *bh) {
-  if (bh) {
-    set_bit(BH_JNew, &bh->b_state) ;
-  }
-  return 0 ;
-}
-
-inline int mark_buffer_not_journaled(struct buffer_head *bh) {
-  if (bh) 
-    clear_bit(BH_JDirty, &bh->b_state) ;
-  return 0 ;
+static void clear_prepared_bits(struct buffer_head *bh) {
+  clear_buffer_journal_prepared (bh);
+  clear_buffer_journal_restore_dirty (bh);
 }
 
 /* utility function to force a BUG if it is called without the big
@@ -628,9 +596,9 @@ static void reiserfs_end_ordered_io(struct buffer_head *bh, int uptodate) {
 static void submit_logged_buffer(struct buffer_head *bh) {
     get_bh(bh) ;
     bh->b_end_io = reiserfs_end_buffer_io_sync ;
-    mark_buffer_notjournal_new(bh) ;
+    clear_buffer_journal_new (bh);
     clear_buffer_dirty(bh) ;
-    if (!test_and_clear_bit(BH_JTest, &bh->b_state))
+    if (!test_clear_buffer_journal_test (bh))
         BUG();
     if (!buffer_uptodate(bh))
         BUG();
@@ -1383,7 +1351,7 @@ free_cnode:
 	/* note, we must clear the JDirty_wait bit after the up to date
 	** check, otherwise we race against our flushpage routine
 	*/
-	if (!test_and_clear_bit(BH_JDirty_wait, &cn->bh->b_state))
+        if (!test_clear_buffer_journal_dirty (cn->bh))
 	    BUG();
 
         /* undo the inc from journal_mark_dirty */
@@ -1476,7 +1444,7 @@ static int write_one_transaction(struct super_block *s,
 	    lock_buffer(tmp_bh);
 	    if (cn->bh && can_dirty(cn) && buffer_dirty(tmp_bh)) {
 		if (!buffer_journal_dirty(tmp_bh) ||
-		    reiserfs_buffer_prepared(tmp_bh))
+		    buffer_journal_prepared(tmp_bh))
 		    BUG();
 		add_to_chunk(chunk, tmp_bh, NULL, write_chunk);
 		ret++;
@@ -1517,11 +1485,11 @@ static int dirty_one_transaction(struct super_block *s,
 	     * or restored.  If restored, we need to make sure
 	     * it actually gets marked dirty
 	     */
-	    mark_buffer_notjournal_new(cn->bh) ;
-	    if (test_bit(BH_JPrepared, &cn->bh->b_state)) {
-	        set_bit(BH_JRestore_dirty, &cn->bh->b_state);
+            clear_buffer_journal_new (cn->bh);
+            if (buffer_journal_prepared (cn->bh)) {
+                set_buffer_journal_restore_dirty (cn->bh);
 	    } else {
-	        set_bit(BH_JTest, &cn->bh->b_state);
+                set_buffer_journal_test (cn->bh);
 	        mark_buffer_dirty(cn->bh);
 	    }
         } 
@@ -2777,8 +2745,8 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   }
   p_s_sb->s_dirt = 1;
 
-  prepared = test_and_clear_bit(BH_JPrepared, &bh->b_state) ;
-  clear_bit(BH_JRestore_dirty, &bh->b_state);
+  prepared = test_clear_buffer_journal_prepared (bh);
+  clear_buffer_journal_restore_dirty (bh);
   /* already in this transaction, we are done */
   if (buffer_journaled(bh)) {
     PROC_INFO_INC( p_s_sb, journal.mark_dirty_already );
@@ -2812,14 +2780,14 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   if (buffer_journal_dirty(bh)) {
     count_already_incd = 1 ;
     PROC_INFO_INC( p_s_sb, journal.mark_dirty_notjournal );
-    mark_buffer_notjournal_dirty(bh) ;
+    clear_buffer_journal_dirty (bh);
   }
 
   if (SB_JOURNAL(p_s_sb)->j_len > SB_JOURNAL(p_s_sb)->j_len_alloc) {
     SB_JOURNAL(p_s_sb)->j_len_alloc = SB_JOURNAL(p_s_sb)->j_len + JOURNAL_PER_BALANCE_CNT ;
   }
 
-  set_bit(BH_JDirty, &bh->b_state) ;
+  set_buffer_journaled (bh);
 
   /* now put this guy on the end */
   if (!cn) {
@@ -2913,10 +2881,10 @@ static int remove_from_transaction(struct super_block *p_s_sb, b_blocknr_t block
   }
   if (bh)
 	remove_journal_hash(p_s_sb, SB_JOURNAL(p_s_sb)->j_hash_table, NULL, bh->b_blocknr, 0) ; 
-  mark_buffer_not_journaled(bh) ; /* don't log this one */
+  clear_buffer_journaled  (bh); /* don't log this one */
 
   if (!already_cleaned) {
-    mark_buffer_notjournal_dirty(bh) ; 
+    clear_buffer_journal_dirty (bh);
     put_bh(bh) ;
     if (atomic_read(&(bh->b_count)) < 0) {
       reiserfs_warning (p_s_sb, "journal-1752: remove from trans, b_count < 0");
@@ -3183,7 +3151,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
   }
   /* if it is journal new, we just remove it from this transaction */
   if (bh && buffer_journal_new(bh)) {
-    mark_buffer_notjournal_new(bh) ;
+    clear_buffer_journal_new (bh);
     clear_prepared_bits(bh) ;
     reiserfs_clean_and_file_buffer(bh) ;
     cleaned = remove_from_transaction(p_s_sb, blocknr, cleaned) ;
@@ -3213,7 +3181,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
 	    /* remove_from_transaction will brelse the buffer if it was 
 	    ** in the current trans
 	    */
-	    mark_buffer_notjournal_dirty(cn->bh) ;
+            clear_buffer_journal_dirty (cn->bh);
 	    cleaned = 1 ;
 	    put_bh(cn->bh) ;
 	    if (atomic_read(&(cn->bh->b_count)) < 0) {
@@ -3320,18 +3288,18 @@ void reiserfs_restore_prepared_buffer(struct super_block *p_s_sb,
     if (!bh) {
 	return ;
     }
-    if (test_and_clear_bit(BH_JRestore_dirty, &bh->b_state) &&
+    if (test_clear_buffer_journal_restore_dirty (bh) &&
 	buffer_journal_dirty(bh)) {
 	struct reiserfs_journal_cnode *cn;
 	cn = get_journal_hash_dev(p_s_sb,
 	                          SB_JOURNAL(p_s_sb)->j_list_hash_table,
 				  bh->b_blocknr);
 	if (cn && can_dirty(cn)) {
-	    set_bit(BH_JTest, &bh->b_state);
+            set_buffer_journal_test (bh);
 	    mark_buffer_dirty(bh);
         }
     }
-    clear_bit(BH_JPrepared, &bh->b_state) ;
+    clear_buffer_journal_prepared (bh);
 }
 
 extern struct tree_balance *cur_tb ;
@@ -3351,10 +3319,10 @@ int reiserfs_prepare_for_journal(struct super_block *p_s_sb,
 	    return 0;
 	lock_buffer(bh);
     }
-    set_bit(BH_JPrepared, &bh->b_state);
+    set_buffer_journal_prepared (bh);
     if (test_clear_buffer_dirty(bh) && buffer_journal_dirty(bh))  {
-	clear_bit(BH_JTest, &bh->b_state);
-	set_bit(BH_JRestore_dirty, &bh->b_state);
+        clear_buffer_journal_test (bh);
+        set_buffer_journal_restore_dirty (bh);
     }
     unlock_buffer(bh);
     return 1;
@@ -3499,7 +3467,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   */
   trans_half = journal_trans_half(p_s_sb->s_blocksize);
   for (i = 0, cn = SB_JOURNAL(p_s_sb)->j_first ; cn ; cn = cn->next, i++) {
-    if (test_bit(BH_JDirty, &cn->bh->b_state) ) {
+    if (buffer_journaled (cn->bh)) {
       jl_cn = get_cnode(p_s_sb) ;
       if (!jl_cn) {
         reiserfs_panic(p_s_sb, "journal-1676, get_cnode returned NULL\n") ;
@@ -3555,9 +3523,9 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   cn = SB_JOURNAL(p_s_sb)->j_first ;
   jindex = 1 ; /* start at one so we don't get the desc again */
   while(cn) {
-    clear_bit(BH_JNew, &(cn->bh->b_state)) ;
+    clear_buffer_journal_new (cn->bh);
     /* copy all the real blocks into log area.  dirty log blocks */
-    if (test_bit(BH_JDirty, &cn->bh->b_state)) {
+    if (buffer_journaled (cn->bh)) {
       struct buffer_head *tmp_bh ;
       char *addr;
       struct page *page;
@@ -3571,8 +3539,8 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
       kunmap(page);
       mark_buffer_dirty(tmp_bh);
       jindex++ ;
-      set_bit(BH_JDirty_wait, &(cn->bh->b_state)) ; 
-      clear_bit(BH_JDirty, &(cn->bh->b_state)) ;
+      set_buffer_journal_dirty (cn->bh);
+      clear_buffer_journaled (cn->bh);
     } else {
       /* JDirty cleared sometime during transaction.  don't log this one */
       reiserfs_warning(p_s_sb, "journal-2048: do_journal_end: BAD, buffer in journal hash, but not JDirty!") ;
