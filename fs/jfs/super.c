@@ -82,6 +82,8 @@ extern void jfs_write_inode(struct inode *inode, int wait);
 extern struct dentry *jfs_get_parent(struct dentry *dentry);
 extern int jfs_extendfs(struct super_block *, s64, int);
 
+extern struct dentry_operations jfs_ci_dentry_operations;
+
 #ifdef PROC_FS_JFS		/* see jfs_debug.h */
 extern void jfs_proc_init(void);
 extern void jfs_proc_clean(void);
@@ -445,6 +447,9 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root = d_alloc_root(inode);
 	if (!sb->s_root)
 		goto out_no_root;
+
+	if (sbi->mntflag & JFS_OS2)
+		sb->s_root->d_op = &jfs_ci_dentry_operations;
 
 	/* logical blocks are represented by 40 bits in pxd_t, etc. */
 	sb->s_maxbytes = ((u64) sb->s_blocksize) << 40;
