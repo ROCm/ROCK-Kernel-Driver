@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2002 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -246,7 +246,7 @@ struct sctp_paddr_change {
  *   event that happened to the address.  They include:
  */
 enum sctp_spc_state {
-	SCTP_ADDR_REACHABLE,
+	SCTP_ADDR_AVAILABLE,
 	SCTP_ADDR_UNREACHABLE,
 	SCTP_ADDR_REMOVED,
 	SCTP_ADDR_ADDED,

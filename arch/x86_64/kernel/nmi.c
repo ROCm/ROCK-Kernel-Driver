@@ -33,6 +33,20 @@
 #include <asm/proto.h>
 #include <asm/kdebug.h>
 
+/*
+ * lapic_nmi_owner tracks the ownership of the lapic NMI hardware:
+ * - it may be reserved by some other driver, or not
+ * - when not reserved by some other driver, it may be used for
+ *   the NMI watchdog, or not
+ *
+ * This is maintained separately from nmi_active because the NMI
+ * watchdog may also be driven from the I/O APIC timer.
+ */
+static spinlock_t lapic_nmi_owner_lock = SPIN_LOCK_UNLOCKED;
+static unsigned int lapic_nmi_owner;
+#define LAPIC_NMI_WATCHDOG	(1<<0)
+#define LAPIC_NMI_RESERVED	(1<<1)
+
 /* nmi_active:
  * +1: the lapic NMI watchdog is active, but can be disabled
  *  0: the lapic NMI watchdog has not been set up, and cannot
@@ -122,6 +136,7 @@ int __init check_nmi_watchdog (void)
 			       cpu,
 			       cpu_pda[cpu].__nmi_count);
 			nmi_active = 0;
+			lapic_nmi_owner &= ~LAPIC_NMI_WATCHDOG;
 			return -1;
 		}
 	}
@@ -157,7 +172,7 @@ int __init setup_nmi_watchdog(char *str)
 
 __setup("nmi_watchdog=", setup_nmi_watchdog);
 
-void disable_lapic_nmi_watchdog(void)
+static void disable_lapic_nmi_watchdog(void)
 {
 	if (nmi_active <= 0)
 		return;
@@ -174,12 +189,39 @@ void disable_lapic_nmi_watchdog(void)
 	nmi_watchdog = 0;
 }
 
-void enable_lapic_nmi_watchdog(void)
+static void enable_lapic_nmi_watchdog(void)
 {
 	if (nmi_active < 0) {
 		nmi_watchdog = NMI_LOCAL_APIC;
 		setup_apic_nmi_watchdog();
 	}
+}
+
+int reserve_lapic_nmi(void)
+{
+	unsigned int old_owner;
+
+	spin_lock(&lapic_nmi_owner_lock);
+	old_owner = lapic_nmi_owner;
+	lapic_nmi_owner |= LAPIC_NMI_RESERVED;
+	spin_unlock(&lapic_nmi_owner_lock);
+	if (old_owner & LAPIC_NMI_RESERVED)
+		return -EBUSY;
+	if (old_owner & LAPIC_NMI_WATCHDOG)
+		disable_lapic_nmi_watchdog();
+	return 0;
+}
+
+void release_lapic_nmi(void)
+{
+	unsigned int new_owner;
+
+	spin_lock(&lapic_nmi_owner_lock);
+	new_owner = lapic_nmi_owner & ~LAPIC_NMI_RESERVED;
+	lapic_nmi_owner = new_owner;
+	spin_unlock(&lapic_nmi_owner_lock);
+	if (new_owner & LAPIC_NMI_WATCHDOG)
+		enable_lapic_nmi_watchdog();
 }
 
 void disable_timer_nmi_watchdog(void)
@@ -236,7 +278,7 @@ static int __init init_lapic_nmi_sysfs(void)
 {
 	int error;
 
-	if (nmi_active == 0)
+	if (nmi_active == 0 || nmi_watchdog != NMI_LOCAL_APIC)
 		return 0;
 
 	error = sysdev_class_register(&nmi_sysclass);
@@ -298,6 +340,7 @@ void setup_apic_nmi_watchdog(void)
 	default:
 		return;
 	}
+	lapic_nmi_owner = LAPIC_NMI_WATCHDOG;
 	nmi_active = 1;
 }
 
@@ -405,8 +448,8 @@ void unset_nmi_callback(void)
 
 EXPORT_SYMBOL(nmi_active);
 EXPORT_SYMBOL(nmi_watchdog);
-EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
-EXPORT_SYMBOL(enable_lapic_nmi_watchdog);
+EXPORT_SYMBOL(reserve_lapic_nmi);
+EXPORT_SYMBOL(release_lapic_nmi);
 EXPORT_SYMBOL(disable_timer_nmi_watchdog);
 EXPORT_SYMBOL(enable_timer_nmi_watchdog);
 EXPORT_SYMBOL(touch_nmi_watchdog);

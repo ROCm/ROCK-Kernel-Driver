@@ -77,3 +77,6 @@ typedef struct {
 	u32	num_entries;
 	hcdp_dev_t	hcdp_dev[MAX_HCDP_DEVICES];
 } hcdp_t;
+
+#define HCDP_PCI_UART(x) (x->pci_func & 1UL<<7)
+#define HCDP_IRQ_SUPPORTED(x) (x->pci_func & 1UL<<6)

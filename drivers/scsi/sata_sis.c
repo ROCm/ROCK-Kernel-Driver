@@ -34,10 +34,21 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sis"
-#define DRV_VERSION	"0.04"
+#define DRV_VERSION	"0.10"
 
 enum {
 	sis_180			= 0,
+	SIS_SCR_PCI_BAR		= 5,
+
+	/* PCI configuration registers */
+	SIS_GENCTL		= 0x54, /* IDE General Control register */
+	SIS_SCR_BASE		= 0xc0, /* sata0 phy SCR registers */
+	SIS_SATA1_OFS		= 0x10, /* offset from sata0->sata1 phy regs */
+
+	/* random bits */
+	SIS_FLAG_CFGSCR		= (1 << 30), /* host flag: SCRs via PCI cfg */
+
+	GENCTL_IOMAPPED_SCR	= (1 << 26), /* if set, SCRs are in IO space */
 };
 
 static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
@@ -98,20 +109,54 @@ MODULE_DESCRIPTION("low-level driver for Silicon Integratad Systems SATA control
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sis_pci_tbl);
 
+static unsigned int get_scr_cfg_addr(unsigned int port_no, unsigned int sc_reg)
+{
+	unsigned int addr = SIS_SCR_BASE + (4 * sc_reg);
+
+	if (port_no)
+		addr += SIS_SATA1_OFS;
+	return addr;
+}
+
+static u32 sis_scr_cfg_read (struct ata_port *ap, unsigned int sc_reg)
+{
+	unsigned int cfg_addr = get_scr_cfg_addr(ap->port_no, sc_reg);
+	u32 val;
+
+	if (sc_reg == SCR_ERROR) /* doesn't exist in PCI cfg space */
+		return 0xffffffff;
+	pci_read_config_dword(ap->host_set->pdev, cfg_addr, &val);
+	return val;
+}
+
+static void sis_scr_cfg_write (struct ata_port *ap, unsigned int scr, u32 val)
+{
+	unsigned int cfg_addr = get_scr_cfg_addr(ap->port_no, scr);
+
+	if (scr == SCR_ERROR) /* doesn't exist in PCI cfg space */
+		return;
+	pci_write_config_dword(ap->host_set->pdev, cfg_addr, val);
+}
 
 static u32 sis_scr_read (struct ata_port *ap, unsigned int sc_reg)
 {
-	if (sc_reg >= 16)
+	if (sc_reg > SCR_CONTROL)
 		return 0xffffffffU;
 
+	if (ap->flags & SIS_FLAG_CFGSCR)
+		return sis_scr_cfg_read(ap, sc_reg);
 	return inl(ap->ioaddr.scr_addr + (sc_reg * 4));
 }
 
 static void sis_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val)
 {
-	if (sc_reg >= 16)
+	if (sc_reg > SCR_CONTROL)
 		return;
-	outl(val, ap->ioaddr.scr_addr + (sc_reg * 4));
+
+	if (ap->flags & SIS_FLAG_CFGSCR)
+		sis_scr_cfg_write(ap, sc_reg, val);
+	else
+		outl(val, ap->ioaddr.scr_addr + (sc_reg * 4));
 }
 
 /* move to PCI layer, integrate w/ MSI stuff */
@@ -130,6 +175,7 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct ata_probe_ent *probe_ent = NULL;
 	int rc;
+	u32 genctl;
 
 	rc = pci_enable_device(pdev);
 	if (rc)
@@ -159,6 +205,23 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->sht = &sis_sht;
 	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
 				ATA_FLAG_NO_LEGACY;
+
+	/* check and see if the SCRs are in IO space or PCI cfg space */
+	pci_read_config_dword(pdev, SIS_GENCTL, &genctl);
+	if ((genctl & GENCTL_IOMAPPED_SCR) == 0)
+		probe_ent->host_flags |= SIS_FLAG_CFGSCR;
+	
+	/* if hardware thinks SCRs are in IO space, but there are
+	 * no IO resources assigned, change to PCI cfg space.
+	 */
+	if ((!(probe_ent->host_flags & SIS_FLAG_CFGSCR)) &&
+	    ((pci_resource_start(pdev, SIS_SCR_PCI_BAR) == 0) ||
+	     (pci_resource_len(pdev, SIS_SCR_PCI_BAR) < 128))) {
+		genctl &= ~GENCTL_IOMAPPED_SCR;
+		pci_write_config_dword(pdev, SIS_GENCTL, genctl);
+		probe_ent->host_flags |= SIS_FLAG_CFGSCR;
+	}
+
 	probe_ent->pio_mask = 0x03;
 	probe_ent->udma_mask = 0x7f;
 	probe_ent->port_ops = &sis_ops;
@@ -168,14 +231,18 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->port[0].ctl_addr =
 		pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS;
 	probe_ent->port[0].bmdma_addr = pci_resource_start(pdev, 4);
-	probe_ent->port[0].scr_addr = pci_resource_start(pdev, 5);
+	if (!(probe_ent->host_flags & SIS_FLAG_CFGSCR))
+		probe_ent->port[0].scr_addr =
+			pci_resource_start(pdev, SIS_SCR_PCI_BAR);
 
 	probe_ent->port[1].cmd_addr = pci_resource_start(pdev, 2);
 	ata_std_ports(&probe_ent->port[1]);
 	probe_ent->port[1].ctl_addr =
 		pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS;
 	probe_ent->port[1].bmdma_addr = pci_resource_start(pdev, 4) + 8;
-	probe_ent->port[1].scr_addr = pci_resource_start(pdev, 5) + 64;
+	if (!(probe_ent->host_flags & SIS_FLAG_CFGSCR))
+		probe_ent->port[1].scr_addr =
+			pci_resource_start(pdev, SIS_SCR_PCI_BAR) + 64;
 
 	probe_ent->n_ports = 2;
 	probe_ent->irq = pdev->irq;

@@ -1469,7 +1469,7 @@ _GLOBAL(__start_initialization_pSeries)
 	mr	r23,r3			/* Save phys address we are running at */
 
 	/* Setup some critical 970 SPRs before switching MMU off */
-	bl	.__power4_cpu_preinit
+	bl	.__970_cpu_preinit
 
 	li	r24,0			/* cpu # */
 

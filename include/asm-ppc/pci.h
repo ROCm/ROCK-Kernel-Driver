@@ -290,6 +290,11 @@ pci_dac_dma_sync_single_for_device(struct pci_dev *pdev, dma64_addr_t dma_addr, 
 	/* Nothing to do. */
 }
 
+static inline int pci_dma_mapping_error(dma_addr_t dma_addr)
+{
+	return 0;
+}
+
 /* Return the index of the PCI controller for device PDEV. */
 #define pci_domain_nr(bus) ((struct pci_controller *)(bus)->sysdata)->index
 

@@ -733,3 +733,47 @@ valid_phys_addr_range (unsigned long phys_addr, unsigned long *size)
 	return 0;
 }
 
+int __init
+efi_uart_console_only(void)
+{
+	efi_status_t status;
+	char *s, name[] = "ConOut";
+	efi_guid_t guid = EFI_GLOBAL_VARIABLE_GUID;
+	efi_char16_t *utf16, name_utf16[32];
+	unsigned char data[1024];
+	unsigned long size = sizeof(data);
+	struct efi_generic_dev_path *hdr, *end_addr;
+	int uart = 0;
+
+	/* Convert to UTF-16 */
+	utf16 = name_utf16;
+	s = name;
+	while (*s)
+		*utf16++ = *s++ & 0x7f;
+	*utf16 = 0;
+
+	status = efi.get_variable(name_utf16, &guid, NULL, &size, data);
+	if (status != EFI_SUCCESS) {
+		printk(KERN_ERR "No EFI %s variable?\n", name);
+		return 0;
+	}
+
+	hdr = (struct efi_generic_dev_path *) data;
+	end_addr = (struct efi_generic_dev_path *) ((u8 *) data + size);
+	while (hdr < end_addr) {
+		if (hdr->type == EFI_DEV_MSG &&
+		    hdr->sub_type == EFI_DEV_MSG_UART)
+			uart = 1;
+		else if (hdr->type == EFI_DEV_END_PATH ||
+			  hdr->type == EFI_DEV_END_PATH2) {
+			if (!uart)
+				return 0;
+			if (hdr->sub_type == EFI_DEV_END_ENTIRE)
+				return 1;
+			uart = 0;
+		}
+		hdr = (struct efi_generic_dev_path *) ((u8 *) hdr + hdr->length);
+	}
+	printk(KERN_ERR "Malformed %s value\n", name);
+	return 0;
+}

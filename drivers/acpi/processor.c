@@ -1190,6 +1190,7 @@ acpi_cpufreq_add_file (
 		entry->proc_fops = &acpi_processor_perf_fops;
 		entry->proc_fops->write = acpi_processor_write_performance;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 	return_VOID;
 }
@@ -2066,6 +2067,7 @@ acpi_processor_add_fs (
 		if (!acpi_device_dir(device))
 			return_VALUE(-ENODEV);
 	}
+	acpi_device_dir(device)->owner = THIS_MODULE;
 
 	/* 'info' [R] */
 	entry = create_proc_entry(ACPI_PROCESSOR_FILE_INFO,
@@ -2077,6 +2079,7 @@ acpi_processor_add_fs (
 	else {
 		entry->proc_fops = &acpi_processor_info_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'power' [R] */
@@ -2089,6 +2092,7 @@ acpi_processor_add_fs (
 	else {
 		entry->proc_fops = &acpi_processor_power_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'throttling' [R/W] */
@@ -2102,6 +2106,7 @@ acpi_processor_add_fs (
 		entry->proc_fops = &acpi_processor_throttling_fops;
 		entry->proc_fops->write = acpi_processor_write_throttling;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'limit' [R/W] */
@@ -2115,6 +2120,7 @@ acpi_processor_add_fs (
 		entry->proc_fops = &acpi_processor_limit_fops;
 		entry->proc_fops->write = acpi_processor_write_limit;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	return_VALUE(0);
@@ -2128,6 +2134,11 @@ acpi_processor_remove_fs (
 	ACPI_FUNCTION_TRACE("acpi_processor_remove_fs");
 
 	if (acpi_device_dir(device)) {
+		remove_proc_entry(ACPI_PROCESSOR_FILE_INFO,acpi_device_dir(device));
+		remove_proc_entry(ACPI_PROCESSOR_FILE_POWER,acpi_device_dir(device));
+		remove_proc_entry(ACPI_PROCESSOR_FILE_THROTTLING,
+			acpi_device_dir(device));
+		remove_proc_entry(ACPI_PROCESSOR_FILE_LIMIT,acpi_device_dir(device));
 		remove_proc_entry(acpi_device_bid(device), acpi_processor_dir);
 		acpi_device_dir(device) = NULL;
 	}
@@ -2385,6 +2396,7 @@ acpi_processor_init (void)
 	acpi_processor_dir = proc_mkdir(ACPI_PROCESSOR_CLASS, acpi_root_dir);
 	if (!acpi_processor_dir)
 		return_VALUE(-ENODEV);
+	acpi_processor_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_processor_driver);
 	if (result < 0) {

@@ -583,9 +583,13 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				disable_acpi();
 			acpi_ht = 1;
 		}
-
-		/* "pci=noacpi" disables ACPI interrupt routing */
+		
+		/* "pci=noacpi" disable ACPI IRQ routing and PCI scan */
 		else if (!memcmp(from, "pci=noacpi", 10)) {
+			acpi_disable_pci();
+		}
+		/* "acpi=noirq" disables ACPI interrupt routing */
+		else if (!memcmp(from, "acpi=noirq", 10)) {
 			acpi_noirq_set();
 		}
 
@@ -600,6 +604,11 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 
 		else if (!memcmp(from, "acpi_sci=low", 12))
 			acpi_sci_flags.polarity = 3;
+
+#ifdef CONFIG_X86_IO_APIC
+		else if (!memcmp(from, "acpi_skip_timer_override", 24))
+			acpi_skip_timer_override = 1;
+#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */

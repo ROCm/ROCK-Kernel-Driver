@@ -215,9 +215,11 @@ static void mqueue_delete_inode(struct inode *inode)
 
 	clear_inode(inode);
 
-	spin_lock(&mq_lock);
-	queues_count--;
-	spin_unlock(&mq_lock);
+	if (info->messages) {
+		spin_lock(&mq_lock);
+		queues_count--;
+		spin_unlock(&mq_lock);
+	}
 }
 
 static int mqueue_create(struct inode *dir, struct dentry *dentry,
@@ -811,9 +813,9 @@ asmlinkage long sys_mq_timedsend(mqd_t mqdes, const char __user *u_msg_ptr,
 			wait.msg = (void *) msg_ptr;
 			wait.state = STATE_NONE;
 			ret = wq_sleep(info, SEND, timeout, &wait);
-			if (ret < 0)
-				free_msg(msg_ptr);
 		}
+		if (ret < 0)
+			free_msg(msg_ptr);
 	} else {
 		receiver = wq_get_first_waiter(info, RECV);
 		if (receiver) {
