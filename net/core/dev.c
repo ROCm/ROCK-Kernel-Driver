@@ -1125,7 +1125,7 @@ int call_netdevice_notifiers(unsigned long val, void *v)
 void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct packet_type *ptype;
-	do_gettimeofday(&skb->stamp);
+	net_timestamp(&skb->stamp);
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
@@ -1546,9 +1546,9 @@ int netif_rx(struct sk_buff *skb)
 		return NET_RX_DROP;
 	}
 #endif
-
+	
 	if (!skb->stamp.tv_sec)
-		do_gettimeofday(&skb->stamp);
+		net_timestamp(&skb->stamp);
 
 	/*
 	 * The code is rearranged so that the path is the most
@@ -1710,7 +1710,7 @@ int netif_receive_skb(struct sk_buff *skb)
 #endif
 
 	if (!skb->stamp.tv_sec)
-		do_gettimeofday(&skb->stamp);
+		net_timestamp(&skb->stamp);
 
 	skb_bond(skb);
 

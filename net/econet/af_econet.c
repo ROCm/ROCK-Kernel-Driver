@@ -665,10 +665,8 @@ static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 
 	switch(cmd) {
 		case SIOCGSTAMP:
-			if (!sk->sk_stamp.tv_sec)
-				return -ENOENT;
-			return copy_to_user((void *)arg, &sk->sk_stamp,
-					  sizeof(struct timeval)) ? -EFAULT : 0;
+			return sock_get_timestamp(sk,(struct timeval *)arg);
+
 		case SIOCSIFADDR:
 		case SIOCGIFADDR:
 			return ec_dev_ioctl(sock, cmd, (void *)arg);

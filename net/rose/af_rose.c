@@ -1269,12 +1269,8 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	}
 
 	case SIOCGSTAMP:
-		if (sk != NULL) {
-			if (!sk->sk_stamp.tv_sec)
-				return -ENOENT;
-			return copy_to_user((void *)arg, &sk->sk_stamp,
-					  sizeof(struct timeval)) ? -EFAULT : 0;
-		}
+		if (sk != NULL) 
+			return sock_get_timestamp(sk, (struct timeval *)arg);
 		return -EINVAL;
 
 	case SIOCGIFADDR:
