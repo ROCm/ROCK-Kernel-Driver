@@ -85,9 +85,7 @@ linvfs_unwritten_convert(
 	vnode_t		*vp = XFS_BUF_FSPRIVATE(bp, vnode_t *);
 	int		error;
 
-	if (atomic_read(&bp->pb_hold) < 1) 
-		BUG();
-
+	BUG_ON(atomic_read(&bp->pb_hold) < 1);
 	VOP_BMAP(vp, XFS_BUF_OFFSET(bp), XFS_BUF_SIZE(bp),
 			BMAP_UNWRITTEN, NULL, NULL, error);
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
@@ -672,9 +670,10 @@ page_state_convert(
 	/* Are we off the end of the file ? */
 	end_index = i_size_read(inode) >> PAGE_CACHE_SHIFT;
 	if (page->index >= end_index) {
-		unsigned remaining = i_size_read(inode) & (PAGE_CACHE_SIZE-1);
-		if ((page->index >= end_index+1) || !remaining) {
-			return -EIO;
+		if ((page->index >= end_index + 1) ||
+		    !(i_size_read(inode) & (PAGE_CACHE_SIZE - 1))) {
+			err = -EIO;
+			goto error;
 		}
 	}
 
