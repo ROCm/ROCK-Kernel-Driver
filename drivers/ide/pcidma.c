@@ -541,9 +541,10 @@ int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *
 
 	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
 	if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
+		/* FIXME: this should never happen */
 		struct ata_taskfile *args = rq->special;
 
-		outb(args->taskfile.command, IDE_COMMAND_REG);
+		outb(args->cmd, IDE_COMMAND_REG);
 	} else if (drive->addressing) {
 		outb(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
 	} else {

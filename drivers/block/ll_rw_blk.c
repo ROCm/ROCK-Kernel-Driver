@@ -490,11 +490,21 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 	}
 }
 
-static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
-			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
-			   "REQ_DONTPREP", "REQ_QUEUED", "REQ_DRIVE_CMD",
-			   "REQ_DRIVE_ACB", "REQ_PC", "REQ_BLOCK_PC",
-			   "REQ_SENSE", "REQ_SPECIAL" };
+static char *rq_flags[] = {
+	"REQ_RW",
+	"REQ_RW_AHEAD",
+	"REQ_BARRIER",
+	"REQ_CMD",
+	"REQ_NOMERGE",
+	"REQ_STARTED",
+	"REQ_DONTPREP",
+	"REQ_QUEUED",
+	"REQ_DRIVE_ACB",
+	"REQ_PC",
+	"REQ_BLOCK_PC",
+	"REQ_SENSE",
+	"REQ_SPECIAL"
+};
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
 {

@@ -1864,9 +1864,12 @@ static int idetape_end_request(struct ata_device *drive, struct request *rq, int
 				idetape_increase_max_pipeline_stages (drive);
 		}
 	}
-	ide_end_drive_cmd(drive, rq, 0);
+	blkdev_dequeue_request(rq);
+	drive->rq = NULL;
+	end_that_request_last(rq);
+
 	if (remove_stage)
-		idetape_remove_stage_head (drive);
+		idetape_remove_stage_head(drive);
 	if (tape->active_data_request == NULL)
 		clear_bit(IDETAPE_PIPELINE_ACTIVE, &tape->flags);
 	spin_unlock_irqrestore(&tape->spinlock, flags);

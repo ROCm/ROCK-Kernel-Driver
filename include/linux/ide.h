@@ -253,11 +253,11 @@ typedef union {
 	unsigned all			: 8;	/* all of the bits together */
 	struct {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
-		unsigned XXX_head	: 4;	/* always zeros here */
+		unsigned head		: 4;	/* always zeros here */
 		unsigned unit		: 1;	/* drive select number: 0/1 */
-		unsigned XXX_bit5	: 1;	/* always 1 */
+		unsigned bit5		: 1;	/* always 1 */
 		unsigned lba		: 1;	/* using LBA instead of CHS */
-		unsigned XXX_bit7	: 1;	/* always 1 */
+		unsigned bit7		: 1;	/* always 1 */
 #elif defined(__BIG_ENDIAN_BITFIELD)
 		unsigned bit7		: 1;
 		unsigned lba		: 1;
@@ -666,11 +666,12 @@ extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t)
 /*
  * Clean up after success/failure of an explicit drive cmd.
  */
-extern void ide_end_drive_cmd(struct ata_device *, struct request *, u8);
+extern void ide_end_drive_cmd(struct ata_device *, struct request *);
 
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
 	struct hd_drive_task_hdr  hobfile;
+	u8 cmd;					/* actual ATA command */
 	int command_type;
 	ide_startstop_t (*prehandler)(struct ata_device *, struct request *);
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);

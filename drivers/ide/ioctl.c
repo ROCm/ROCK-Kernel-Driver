@@ -23,6 +23,7 @@
 #include <linux/errno.h>
 #include <linux/blkpg.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
 #include <linux/cdrom.h>
 #include <linux/device.h>
 
@@ -33,42 +34,67 @@
 #include "ioctl.h"
 
 /*
+ * Invoked on completion of a special DRIVE_CMD.
+ */
+static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *rq)
+{
+	struct ata_taskfile *ar = rq->special;
+
+	ide__sti();	/* local CPU only */
+	if (!ata_status(drive, 0, DRQ_STAT) && ar->taskfile.sector_number) {
+		int retries = 10;
+
+		ata_read(drive, rq->buffer, ar->taskfile.sector_number * SECTOR_WORDS);
+
+		while (!ata_status(drive, 0, BUSY_STAT) && retries--)
+			udelay(100);
+	}
+
+	if (!ata_status(drive, READY_STAT, BAD_STAT))
+		return ata_error(drive, rq, __FUNCTION__); /* already calls ide_end_drive_cmd */
+	ide_end_drive_cmd(drive, rq);
+
+	return ide_stopped;
+}
+
+/*
  * Implement generic ioctls invoked from userspace to imlpement specific
  * functionality.
  *
  * Unfortunately every single low level programm out there is using this
  * interface.
  */
-static int cmd_ioctl(struct ata_device *drive, unsigned long arg)
+static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 {
 	int err = 0;
 	u8 vals[4];
 	u8 *argbuf = vals;
-	u8 pio = 0;
 	int argsize = 4;
 	struct ata_taskfile args;
 	struct request rq;
-
-	memset(&rq, 0, sizeof(rq));
-	rq.flags = REQ_DRIVE_CMD;
-
-	/* If empty parameter file - wait for drive ready.
-	 */
-	if (!arg)
-		return ide_do_drive_cmd(drive, &rq, ide_wait);
 
 	/* Second phase.
 	 */
 	if (copy_from_user(vals, (void *)arg, 4))
 		return -EFAULT;
 
+	memset(&rq, 0, sizeof(rq));
+	rq.flags = REQ_DRIVE_ACB;
+
+	memset(&args, 0, sizeof(args));
+
 	args.taskfile.feature = vals[2];
-	args.taskfile.sector_count = vals[3];
-	args.taskfile.sector_number = vals[1];
-	args.taskfile.low_cylinder = 0x00;
-	args.taskfile.high_cylinder = 0x00;
+	args.taskfile.sector_count = vals[1];
+	args.taskfile.sector_number = vals[3];
+	if (vals[0] == WIN_SMART) {
+		args.taskfile.low_cylinder = 0x4f;
+		args.taskfile.high_cylinder = 0xc2;
+	} else {
+		args.taskfile.low_cylinder = 0x00;
+		args.taskfile.high_cylinder = 0x00;
+	}
 	args.taskfile.device_head = 0x00;
-	args.taskfile.command = vals[0];
+	args.cmd = vals[0];
 
 	if (vals[3]) {
 		argsize = 4 + (SECTOR_WORDS * 4 * vals[3]);
@@ -79,63 +105,18 @@ static int cmd_ioctl(struct ata_device *drive, unsigned long arg)
 		memset(argbuf + 4, 0, argsize - 4);
 	}
 
-	/*
-	 * Always make sure the transfer reate has been setup.
-	 *
-	 * FIXME: what about setting up the drive with ->tuneproc?
-	 *
-	 * Backside of HDIO_DRIVE_CMD call of SETFEATURES_XFER.
-	 * 1 : Safe to update drive->id DMA registers.
-	 * 0 : OOPs not allowed.
-	 */
-	if ((args.taskfile.command == WIN_SETFEATURES) &&
-	    (args.taskfile.sector_number >= XFER_SW_DMA_0) &&
-	    (args.taskfile.feature == SETFEATURES_XFER) &&
-	    (drive->id->dma_ultra ||
-	     drive->id->dma_mword ||
-	     drive->id->dma_1word)) {
-		pio = vals[1];
-		/*
-		 * Verify that we are doing an approved SETFEATURES_XFER with
-		 * respect to the hardware being able to support request.
-		 * Since some hardware can improperly report capabilties, we
-		 * check to see if the host adapter in combination with the
-		 * device (usually a disk) properly detect and acknowledge each
-		 * end of the ribbon.
-		 */
-		if (args.taskfile.sector_number > XFER_UDMA_2) {
-			if (!drive->channel->udma_four) {
-				printk(KERN_WARNING "%s: Speed warnings UDMA > 2 is not functional.\n",
-						drive->channel->name);
-				goto abort;
-			}
-#ifndef CONFIG_IDEDMA_IVB
-			if (!(drive->id->hw_config & 0x6000))
-#else
-			if (!(drive->id->hw_config & 0x2000) ||
-			    !(drive->id->hw_config & 0x4000))
-#endif
-			{
-				printk(KERN_WARNING "%s: Speed warnings UDMA > 2 is not functional.\n",
-						drive->name);
-				goto abort;
-			}
-		}
-	}
-
 	/* Issue ATA command and wait for completion.
 	 */
-	rq.buffer = argbuf;
+	args.handler = drive_cmd_intr;
+
+	rq.buffer = argbuf + 4;
+	rq.special = &args;
 	err = ide_do_drive_cmd(drive, &rq, ide_wait);
 
-	if (!err && pio) {
-		/* active-retuning-calls future */
-		/* FIXME: what about the setup for the drive?! */
-		if (drive->channel->speedproc)
-			drive->channel->speedproc(drive, pio);
-	}
+	argbuf[0] = drive->status;
+	argbuf[1] = args.taskfile.feature;
+	argbuf[2] = args.taskfile.sector_count;
 
-abort:
 	if (copy_to_user((void *)arg, argbuf, argsize))
 		err = -EFAULT;
 
@@ -153,7 +134,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 {
 	unsigned int major, minor;
 	struct ata_device *drive;
-//	struct request rq;
 	kdev_t dev;
 
 	dev = inode->i_rdev;
@@ -354,10 +334,14 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			return 0;
 
 		case HDIO_DRIVE_CMD:
-			if (!capable(CAP_SYS_RAWIO))
-				return -EACCES;
+			if (!arg) {
+				if (ide_spin_wait_hwgroup(drive))
+					return -EBUSY;
+				else
+					return 0;
+			}
 
-			return cmd_ioctl(drive, arg);
+			return do_cmd_ioctl(drive, arg);
 
 		/*
 		 * uniform packet command handling

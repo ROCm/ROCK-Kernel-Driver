@@ -620,7 +620,7 @@ static int idefloppy_end_request(struct ata_device *drive, struct request *rq, i
 
 #if IDEFLOPPY_DEBUG_LOG
 	printk (KERN_INFO "Reached idefloppy_end_request\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
+#endif
 
 	switch (uptodate) {
 		case 0: error = IDEFLOPPY_ERROR_GENERAL; break;
@@ -632,12 +632,16 @@ static int idefloppy_end_request(struct ata_device *drive, struct request *rq, i
 	/* Why does this happen? */
 	if (!rq)
 		return 0;
+
 	if (!(rq->flags & IDEFLOPPY_RQ)) {
 		ide_end_request(drive, rq, uptodate);
 		return 0;
 	}
+
 	rq->errors = error;
-	ide_end_drive_cmd (drive, rq, 0);
+	blkdev_dequeue_request(rq);
+	drive->rq = NULL;
+	end_that_request_last(rq);
 
 	return 0;
 }

@@ -60,7 +60,7 @@ static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request 
 	struct ata_taskfile *args = rq->special;
 
 	ide__sti();
-	ide_end_drive_cmd(drive, rq, GET_ERR());
+	ide_end_drive_cmd(drive, rq);
 	kfree(args);
 
 	return ide_stopped;
@@ -118,7 +118,7 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	BUG_ON(!rq);
 
 	rq->special = args;
-	args->taskfile.command = WIN_NOP;
+	args->cmd = WIN_NOP;
 	args->handler = tcq_nop_handler;
 	args->command_type = IDE_DRIVE_TASK_NO_DATA;
 
@@ -407,7 +407,7 @@ static int check_autopoll(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 
 	args.taskfile.feature = 0x01;
-	args.taskfile.command = WIN_NOP;
+	args.cmd = WIN_NOP;
 	ide_cmd_type_parser(&args);
 
 	/*
@@ -442,7 +442,7 @@ static int configure_tcq(struct ata_device *drive)
 
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_WCACHE;
-	args.taskfile.command = WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
 	if (ide_raw_taskfile(drive, &args)) {
@@ -456,7 +456,7 @@ static int configure_tcq(struct ata_device *drive)
 	 */
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_DIS_RI;
-	args.taskfile.command = WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
 	if (ide_raw_taskfile(drive, &args)) {
@@ -470,7 +470,7 @@ static int configure_tcq(struct ata_device *drive)
 	 */
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_SI;
-	args.taskfile.command = WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
 	if (ide_raw_taskfile(drive, &args)) {
@@ -554,7 +554,7 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	ata_irq_enable(drive, 0);
 #endif
 
-	OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+	OUT_BYTE(args->cmd, IDE_COMMAND_REG);
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
 		ide_dump_status(drive, rq, "queued start", stat);

@@ -311,34 +311,34 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 }
 
 ide_startstop_t ata_taskfile(struct ata_device *drive,
-		struct ata_taskfile *args, struct request *rq)
+		struct ata_taskfile *ar, struct request *rq)
 {
 	struct hd_driveid *id = drive->id;
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
-	if (args->handler != task_mulout_intr) {
+	if (ar->handler != task_mulout_intr) {
 		ata_irq_enable(drive, 1);
 		ata_mask(drive);
 	}
 
 	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400) &&
 	    (drive->addressing == 1))
-		ata_out_regfile(drive, &args->hobfile);
+		ata_out_regfile(drive, &ar->hobfile);
 
-	ata_out_regfile(drive, &args->taskfile);
+	ata_out_regfile(drive, &ar->taskfile);
 
 	{
 		u8 HIHI = (drive->addressing) ? 0xE0 : 0xEF;
-		OUT_BYTE((args->taskfile.device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
+		OUT_BYTE((ar->taskfile.device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
 	}
-	if (args->handler != NULL) {
+	if (ar->handler != NULL) {
 
 		/* This is apparently supposed to reset the wait timeout for
 		 * the interrupt to accur.
 		 */
 
-		ide_set_handler(drive, args->handler, WAIT_CMD, NULL);
-		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+		ide_set_handler(drive, ar->handler, WAIT_CMD, NULL);
+		OUT_BYTE(ar->cmd, IDE_COMMAND_REG);
 
 		/*
 		 * Warning check for race between handler and prehandler for
@@ -346,8 +346,8 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		 * inside the boundaries of the seek, we should be okay.
 		 */
 
-		if (args->prehandler != NULL)
-			return args->prehandler(drive, rq);
+		if (ar->prehandler != NULL)
+			return ar->prehandler(drive, rq);
 	} else {
 		/*
 		 * FIXME: this is a gross hack, need to unify tcq dma proc and
@@ -358,21 +358,20 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 			return ide_started;
 
 		/* for dma commands we don't set the handler */
-		if (args->taskfile.command == WIN_WRITEDMA
-		 || args->taskfile.command == WIN_WRITEDMA_EXT)
+		if (ar->cmd == WIN_WRITEDMA  || ar->cmd == WIN_WRITEDMA_EXT)
 			return !udma_write(drive, rq);
-		else if (args->taskfile.command == WIN_READDMA
-		      || args->taskfile.command == WIN_READDMA_EXT)
+		else if (ar->cmd == WIN_READDMA
+		      || ar->cmd == WIN_READDMA_EXT)
 			return !udma_read(drive, rq);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
-		else if (args->taskfile.command == WIN_WRITEDMA_QUEUED
-		      || args->taskfile.command == WIN_WRITEDMA_QUEUED_EXT
-		      || args->taskfile.command == WIN_READDMA_QUEUED
-		      || args->taskfile.command == WIN_READDMA_QUEUED_EXT)
+		else if (ar->cmd == WIN_WRITEDMA_QUEUED
+		      || ar->cmd == WIN_WRITEDMA_QUEUED_EXT
+		      || ar->cmd == WIN_READDMA_QUEUED
+		      || ar->cmd == WIN_READDMA_QUEUED_EXT)
 			return udma_tcq_taskfile(drive, rq);
 #endif
 		else {
-			printk("ata_taskfile: unknown command %x\n", args->taskfile.command);
+			printk("ata_taskfile: unknown command %x\n", ar->cmd);
 			return ide_stopped;
 		}
 	}
@@ -396,18 +395,18 @@ ide_startstop_t recal_intr(struct ata_device *drive, struct request *rq)
  */
 ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 {
-	struct ata_taskfile *args = rq->special;
+	struct ata_taskfile *ar = rq->special;
 
 	ide__sti();	/* local CPU only */
 
 	if (!ata_status(drive, READY_STAT, BAD_STAT)) {
 		/* Keep quiet for NOP because it is expected to fail. */
-		if (args && args->taskfile.command != WIN_NOP)
+		if (ar && ar->cmd != WIN_NOP)
 			return ata_error(drive, rq, __FUNCTION__);
 	}
 
-	if (args)
-		ide_end_drive_cmd(drive, rq, GET_ERR());
+	if (ar)
+		ide_end_drive_cmd(drive, rq);
 
 	return ide_stopped;
 }
@@ -466,8 +465,8 @@ static ide_startstop_t pre_task_out_intr(struct ata_device *drive, struct reques
 	}
 
 	/* (ks/hs): Fixed Multi Write */
-	if ((args->taskfile.command != WIN_MULTWRITE) &&
-	    (args->taskfile.command != WIN_MULTWRITE_EXT)) {
+	if ((args->cmd != WIN_MULTWRITE) &&
+	    (args->cmd != WIN_MULTWRITE_EXT)) {
 		unsigned long flags;
 		char *buf = ide_map_rq(rq, &flags);
 		/* For Write_sectors we need to stuff the first sector */
@@ -569,7 +568,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 	args->prehandler = NULL;
 	args->handler = NULL;
 
-	switch(args->taskfile.command) {
+	switch (args->cmd) {
 		case WIN_IDENTIFY:
 		case WIN_PIDENTIFY:
 			args->handler = task_in_intr;
@@ -817,13 +816,6 @@ int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *args)
 
 	memset(&rq, 0, sizeof(rq));
 	rq.flags = REQ_DRIVE_ACB;
-
-#if 0
-	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
-		rq.current_nr_sectors = rq.nr_sectors
-			= (args->hobfile.sector_count << 8)
-			| args->taskfile.sector_count;
-#endif
 	rq.special = args;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);

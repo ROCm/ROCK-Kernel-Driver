@@ -242,7 +242,11 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 		ide_end_request(drive, rq, uptodate);
 		return 0;
 	}
-	ide_end_drive_cmd(drive, rq, 0);
+
+	blkdev_dequeue_request(rq);
+	drive->rq = NULL;
+	end_that_request_last(rq);
+
 	if (rq->errors >= ERROR_MAX) {
 		pc->s.scsi_cmd->result = DID_ERROR << 16;
 		if (log)

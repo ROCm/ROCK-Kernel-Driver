@@ -630,7 +630,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 	outb(taskfile->low_cylinder, IDE_LCYL_REG);
 	outb(taskfile->high_cylinder, IDE_HCYL_REG);
 	outb(taskfile->device_head, IDE_SELECT_REG);
-	outb(taskfile->command, IDE_COMMAND_REG);
+	outb(args->cmd, IDE_COMMAND_REG);
 
 	switch (rq_data_dir(rq)) {
 	case READ:
@@ -708,7 +708,7 @@ ide_startstop_t promise_do_request(struct ata_device *drive, struct request *rq,
 	args.taskfile.low_cylinder	= (block>>=8);
 	args.taskfile.high_cylinder	= (block>>=8);
 	args.taskfile.device_head	= ((block>>8)&0x0f)|drive->select.all;
-	args.taskfile.command		= (rq_data_dir(rq)==READ)?PROMISE_READ:PROMISE_WRITE;
+	args.cmd			= (rq_data_dir(rq)==READ)?PROMISE_READ:PROMISE_WRITE;
 
 	/* We can't call ide_cmd_type_parser here, since it won't understand
 	   our command, but that doesn't matter, since we don't use the

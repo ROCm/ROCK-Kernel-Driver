@@ -395,38 +395,30 @@ static inline u32 read_24(struct ata_device *drive)
  *
  * Should be called under lock held.
  */
-void ide_end_drive_cmd(struct ata_device *drive, struct request *rq, u8 err)
+void ide_end_drive_cmd(struct ata_device *drive, struct request *rq)
 {
-	if (rq->flags & REQ_DRIVE_CMD) {
-		u8 *args = rq->buffer;
-		rq->errors = !ata_status(drive, READY_STAT, BAD_STAT);
-		if (args) {
-			args[0] = drive->status;
-			args[1] = err;
-			args[2] = IN_BYTE(IDE_NSECTOR_REG);
-		}
-	} else if (rq->flags & REQ_DRIVE_ACB) {
-		struct ata_taskfile *args = rq->special;
+	if (rq->flags & REQ_DRIVE_ACB) {
+		struct ata_taskfile *ar = rq->special;
 
 		rq->errors = !ata_status(drive, READY_STAT, BAD_STAT);
-		if (args) {
-			args->taskfile.feature = err;
-			args->taskfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
-			args->taskfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
-			args->taskfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
-			args->taskfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
-			args->taskfile.device_head = IN_BYTE(IDE_SELECT_REG);
-			args->taskfile.command = drive->status;
+		if (ar) {
+			ar->taskfile.feature = IN_BYTE(IDE_ERROR_REG);
+			ar->taskfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
+			ar->taskfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
+			ar->taskfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
+			ar->taskfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
+			ar->taskfile.device_head = IN_BYTE(IDE_SELECT_REG);
+			ar->cmd = drive->status;
 			if ((drive->id->command_set_2 & 0x0400) &&
 			    (drive->id->cfs_enable_2 & 0x0400) &&
 			    (drive->addressing == 1)) {
 				/* The following command goes to the hob file! */
 				OUT_BYTE(0x80, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
-				args->hobfile.feature = IN_BYTE(IDE_FEATURE_REG);
-				args->hobfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
-				args->hobfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
-				args->hobfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
-				args->hobfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
+				ar->hobfile.feature = IN_BYTE(IDE_FEATURE_REG);
+				ar->hobfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
+				ar->hobfile.sector_number = IN_BYTE(IDE_SECTOR_REG);
+				ar->hobfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
+				ar->hobfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
 			}
 		}
 	}
@@ -583,7 +575,7 @@ static int do_recalibrate(struct ata_device *drive)
 
 		memset(&args, 0, sizeof(args));
 		args.taskfile.sector_count = drive->sect;
-		args.taskfile.command = WIN_RESTORE;
+		args.cmd = WIN_RESTORE;
 		args.handler = recal_intr;
 		ata_taskfile(drive, &args, NULL);
 	}
@@ -602,10 +594,12 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
 	err = ide_dump_status(drive, rq, msg, stat);
 	if (!drive || !rq)
 		return ide_stopped;
+
 	/* retry only "normal" I/O: */
 	if (!(rq->flags & REQ_CMD)) {
 		rq->errors = 1;
-		ide_end_drive_cmd(drive, rq, err);
+		ide_end_drive_cmd(drive, rq);
+
 		return ide_stopped;
 	}
 	/* other bits are useless when BUSY */
@@ -644,30 +638,6 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
 		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
 			return do_recalibrate(drive);
 	}
-
-	return ide_stopped;
-}
-
-/*
- * Invoked on completion of a special DRIVE_CMD.
- */
-static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *rq)
-{
-	u8 *args = rq->buffer;
-
-	ide__sti();	/* local CPU only */
-	if (!ata_status(drive, 0, DRQ_STAT) && args && args[3]) {
-		int retries = 10;
-
-		ata_read(drive, &args[4], args[3] * SECTOR_WORDS);
-
-		while (!ata_status(drive, 0, BUSY_STAT) && retries--)
-			udelay(100);
-	}
-
-	if (!ata_status(drive, READY_STAT, BAD_STAT))
-		return ata_error(drive, rq, __FUNCTION__); /* already calls ide_end_drive_cmd */
-	ide_end_drive_cmd(drive, rq, GET_ERR());
 
 	return ide_stopped;
 }
@@ -775,53 +745,20 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		}
 	}
 
-	/* This issues a special drive command, usually initiated by ioctl()
-	 * from the external hdparm program.
+	/* This issues a special drive command.
 	 */
 	if (rq->flags & REQ_DRIVE_ACB) {
-		struct ata_taskfile *args = rq->special;
+		struct ata_taskfile *ar = rq->special;
 
-		if (!(args))
+		if (!(ar))
 			goto args_error;
 
-		ata_taskfile(drive, args, NULL);
+		ata_taskfile(drive, ar, NULL);
 
-		if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
-		     (args->command_type == IDE_DRIVE_TASK_OUT)) &&
-				args->prehandler && args->handler)
-			return args->prehandler(drive, rq);
-
-		return ide_started;
-	}
-
-	if (rq->flags & REQ_DRIVE_CMD) {
-		u8 *args = rq->buffer;
-
-		if (!(args))
-			goto args_error;
-#ifdef DEBUG
-		printk("%s: DRIVE_CMD ", drive->name);
-		printk("cmd=0x%02x ", args[0]);
-		printk(" sc=0x%02x ", args[1]);
-		printk(" fr=0x%02x ", args[2]);
-		printk(" xx=0x%02x\n", args[3]);
-#endif
-		ide_set_handler(drive, drive_cmd_intr, WAIT_CMD, NULL);
-		ata_irq_enable(drive, 1);
-		ata_mask(drive);
-		if (args[0] == WIN_SMART) {
-			struct hd_drive_task_hdr regfile;
-			regfile.feature = args[2];
-			regfile.sector_count = args[3];
-			regfile.sector_number = args[1];
-			regfile.low_cylinder = 0x4f;
-			regfile.high_cylinder = 0xc2;
-			ata_out_regfile(drive, &regfile);
-		} else {
-			OUT_BYTE(args[2], IDE_FEATURE_REG);
-			OUT_BYTE(args[1], IDE_NSECTOR_REG);
-		}
-		OUT_BYTE(args[0], IDE_COMMAND_REG);
+		if (((ar->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
+		     (ar->command_type == IDE_DRIVE_TASK_OUT)) &&
+				ar->prehandler && ar->handler)
+			return ar->prehandler(drive, rq);
 
 		return ide_started;
 	}
@@ -863,7 +800,7 @@ args_error:
 #ifdef DEBUG
 	printk("%s: DRIVE_CMD (null)\n", drive->name);
 #endif
-	ide_end_drive_cmd(drive, rq, GET_ERR());
+	ide_end_drive_cmd(drive, rq);
 
 	return ide_stopped;
 }
