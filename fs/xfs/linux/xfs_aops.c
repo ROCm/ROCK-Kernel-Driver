@@ -609,7 +609,7 @@ linvfs_get_block_core(
 
 	if (blocks) {
 		size = (pbmap.pbm_bsize - pbmap.pbm_delta); 
-		bh_result->b_size = min(size, blocks << inode->i_blkbits);
+		bh_result->b_size = min_t(ssize_t, size, blocks << inode->i_blkbits);
 	}
 
 	return 0;
