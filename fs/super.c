@@ -151,47 +151,17 @@ static int grab_super(struct super_block *s)
 	yield();
 	return 0;
 }
- 
-/**
- *	insert_super	-	put superblock on the lists
- *	@s:	superblock in question
- *	@type:	filesystem type it will belong to
- *
- *	Associates superblock with fs type and puts it on per-type and global
- *	superblocks' lists.  Should be called with sb_lock held; drops it.
- *
- *	NOTE: the super_blocks ordering here is important: writeback wants
- *	the blockdev superblock to be at super_blocks.next.
- */
-static void insert_super(struct super_block *s, struct file_system_type *type)
-{
-	s->s_type = type;
-	list_add(&s->s_list, super_blocks.prev);
-	list_add(&s->s_instances, &type->fs_supers);
-	spin_unlock(&sb_lock);
-	get_filesystem(type);
-}
 
 /**
- *	remove_super	-	makes superblock unreachable
- *	@s:	superblock in question
+ *	generic_shutdown_super	-	common helper for ->kill_sb()
+ *	@sb: superblock to kill
  *
- *	Removes superblock from the lists, and unlocks it.  @s should have
- *	no active references by that time and after remove_super() it's
- *	essentially in rundown mode - all remaining references are temporary,
- *	no new references of any sort are going to appear and all holders
- *	of temporary ones will eventually drop them.  At that point superblock
- *	itself will be destroyed; all its contents is already gone.
+ *	generic_shutdown_super() does all fs-independent work on superblock
+ *	shutdown.  Typical ->kill_sb() should pick all fs-specific objects
+ *	that need destruction out of superblock, call generic_shutdown_super()
+ *	and release aforementioned objects.  Note: dentries and inodes _are_
+ *	taken care of and do not need specific handling.
  */
-static void remove_super(struct super_block *s)
-{
-	spin_lock(&sb_lock);
-	list_del(&s->s_list);
-	list_del(&s->s_instances);
-	spin_unlock(&sb_lock);
-	up_write(&s->s_umount);
-}
-
 void generic_shutdown_super(struct super_block *sb)
 {
 	struct dentry *root = sb->s_root;
@@ -224,9 +194,20 @@ void generic_shutdown_super(struct super_block *sb)
 		unlock_kernel();
 		unlock_super(sb);
 	}
-	remove_super(sb);
+	spin_lock(&sb_lock);
+	list_del(&sb->s_list);
+	list_del(&sb->s_instances);
+	spin_unlock(&sb_lock);
+	up_write(&sb->s_umount);
 }
 
+/**
+ *	sget	-	find or create a superblock
+ *	@type:	filesystem type superblock should belong to
+ *	@test:	comparison callback
+ *	@set:	setup callback
+ *	@data:	argument to each of them
+ */
 struct super_block *sget(struct file_system_type *type,
 			int (*test)(struct super_block *,void *),
 			int (*set)(struct super_block *,void *),
@@ -253,10 +234,15 @@ retry:
 	}
 	err = set(s, data);
 	if (err) {
+		spin_unlock(&sb_lock);
 		destroy_super(s);
 		return ERR_PTR(err);
 	}
-	insert_super(s, type);
+	s->s_type = type;
+	list_add(&s->s_list, super_blocks.prev);
+	list_add(&s->s_instances, &type->fs_supers);
+	spin_unlock(&sb_lock);
+	get_filesystem(type);
 	return s;
 }
 
@@ -427,12 +413,6 @@ int set_anon_super(struct super_block *s, void *data)
 	return 0;
 }
 
-struct super_block *get_anon_super(struct file_system_type *type,
-	int (*compare)(struct super_block *,void *), void *data)
-{
-	return sget(type, compare, set_anon_super, data);
-}
- 
 void kill_anon_super(struct super_block *sb)
 {
 	int slot = minor(sb->s_dev);
@@ -512,7 +492,10 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		goto out1;
 
 	s = sget(fs_type, test_bdev_super, set_bdev_super, bdev);
-	if (s->s_root) {
+	if (IS_ERR(s)) {
+		bd_release(bdev);
+		blkdev_put(bdev, BDEV_FS);
+	} else if (s->s_root) {
 		if ((flags ^ s->s_flags) & MS_RDONLY) {
 			up_write(&s->s_umount);
 			deactivate_super(s);
@@ -557,7 +540,7 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int (*fill_super)(struct super_block *, void *, int))
 {
 	int error;
-	struct super_block *s = get_anon_super(fs_type, NULL, NULL);
+	struct super_block *s = sget(fs_type, NULL, set_anon_super, NULL);
 
 	if (IS_ERR(s))
 		return s;
@@ -583,9 +566,10 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int))
 {
+	struct super_block *s;
 	int error;
-	struct super_block *s = get_anon_super(fs_type, compare_single, NULL);
 
+	s = sget(fs_type, compare_single, set_anon_super, NULL);
 	if (IS_ERR(s))
 		return s;
 	if (!s->s_root) {
