@@ -84,9 +84,9 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  \n\tServerNOS: %s\tCapabilities: 0x%x",
+			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  \n\tServerNOS: %s\tCapabilities: 0x%x\n\tSMB session status: %d\tTCP session status: %d",
 				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
-				ses->serverOS, ses->serverNOS, ses->capabilities);
+				ses->serverOS, ses->serverNOS, ses->capabilities,ses->status,ses->server->tcpStatus);
 		buf += length;
 		if(ses->server)
 			buf += sprintf(buf, "\n\tLocal Users To Same Server: %d SecMode: 0x%x",
@@ -106,13 +106,13 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) %s Uses: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\n\tPathComponentMax: %d",
+			    "\n%d) %s Uses: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\n\tPathComponentMax: %d Status: %d",
 			    i, tcon->treeName,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,
 			    tcon->fsDevInfo.DeviceCharacteristics,
 			    tcon->fsAttrInfo.Attributes,
-			    tcon->fsAttrInfo.MaxPathNameComponentLength);
+			    tcon->fsAttrInfo.MaxPathNameComponentLength,tcon->tidStatus);
 		buf += length;        
 		if (tcon->fsDevInfo.DeviceType == FILE_DEVICE_DISK)
 			length = sprintf(buf, " type: DISK ");
