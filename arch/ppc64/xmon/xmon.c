@@ -15,6 +15,8 @@
 #include <linux/mm.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
+#include <linux/kallsyms.h>
+
 #include <asm/ptrace.h>
 #include <asm/string.h>
 #include <asm/prom.h>
@@ -27,6 +29,7 @@
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
+
 #include "nonstdio.h"
 #include "privinst.h"
 
@@ -59,7 +62,6 @@ struct bpt {
 	unsigned instr;
 	unsigned long count;
 	unsigned char enabled;
-	char funcname[64];	/* function name for humans */
 };
 
 #define NBPTS	16
@@ -79,10 +81,6 @@ static void memex(void);
 static int bsesc(void);
 static void dump(void);
 static void prdump(unsigned long, long);
-#ifdef __MWERKS__
-static void prndump(unsigned, int);
-static int nvreadb(unsigned);
-#endif
 static int ppc_inst_dump(unsigned long, long);
 void print_address(unsigned long);
 static int getsp(void);
@@ -105,7 +103,6 @@ static void take_input(char *);
 static unsigned long read_spr(int);
 static void write_spr(int, unsigned long);
 static void super_regs(void);
-static void print_sysmap(void);
 static void remove_bpts(void);
 static void insert_bpts(void);
 static struct bpt *at_breakpoint(unsigned long pc);
@@ -181,6 +178,13 @@ static int xmon_trace[NR_CPUS];
 
 static struct pt_regs *xmon_regs[NR_CPUS];
 
+void __xmon_print_symbol(const char *fmt, unsigned long address);
+#define xmon_print_symbol(fmt, addr)		\
+do {						\
+	__check_printsym_format(fmt, "");	\
+	__xmon_print_symbol(fmt, addr);		\
+} while(0)
+
 /*
  * Stuff for reading and writing memory safely
  */
@@ -208,42 +212,6 @@ extern inline void sync(void)
  Note that the LR (ret addr) may not be saved in the current frame if
  no functions have been called from the current function.
  */
-
-/*
- A traceback table typically follows each function.
- The find_tb_table() func will fill in this struct.  Note that the struct
- is not an exact match with the encoded table defined by the ABI.  It is
- defined here more for programming convenience.
- */
-struct tbtable {
-	unsigned long	flags;		/* flags: */
-#define TBTAB_FLAGSGLOBALLINK	(1L<<47)
-#define TBTAB_FLAGSISEPROL	(1L<<46)
-#define TBTAB_FLAGSHASTBOFF	(1L<<45)
-#define TBTAB_FLAGSINTPROC	(1L<<44)
-#define TBTAB_FLAGSHASCTL	(1L<<43)
-#define TBTAB_FLAGSTOCLESS	(1L<<42)
-#define TBTAB_FLAGSFPPRESENT	(1L<<41)
-#define TBTAB_FLAGSNAMEPRESENT	(1L<<38)
-#define TBTAB_FLAGSUSESALLOCA	(1L<<37)
-#define TBTAB_FLAGSSAVESCR	(1L<<33)
-#define TBTAB_FLAGSSAVESLR	(1L<<32)
-#define TBTAB_FLAGSSTORESBC	(1L<<31)
-#define TBTAB_FLAGSFIXUP	(1L<<30)
-#define TBTAB_FLAGSPARMSONSTK	(1L<<0)
-	unsigned char	fp_saved;	/* num fp regs saved f(32-n)..f31 */
-	unsigned char	gpr_saved;	/* num gpr's saved */
-	unsigned char	fixedparms;	/* num fixed point parms */
-	unsigned char	floatparms;	/* num float parms */
-	unsigned char	parminfo[32];	/* types of args.  null terminated */
-#define TBTAB_PARMFIXED 1
-#define TBTAB_PARMSFLOAT 2
-#define TBTAB_PARMDFLOAT 3
-	unsigned int	tb_offset;	/* offset from start of func */
-	unsigned long	funcstart;	/* addr of start of function */
-	char		name[64];	/* name of function (null terminated)*/
-};
-static int find_tb_table(unsigned long codeaddr, struct tbtable *tab);
 
 #define SURVEILLANCE_TOKEN	9000
 
@@ -302,8 +270,7 @@ xmon(struct pt_regs *excp)
 			std	29,232(%0)\n\
 			std	30,240(%0)\n\
 			std	31,248(%0)" : : "b" (&regs));
-		/* Fetch the link reg for this stack frame.
-		 NOTE: the prev printf fills in the lr. */
+
 		regs.nip = regs.link = ((unsigned long *)(regs.gpr[1]))[2];
 		regs.msr = get_msr();
 		regs.ctr = get_ctr();
@@ -378,7 +345,9 @@ xmon_bpt(struct pt_regs *regs)
 		xmon_trace[smp_processor_id()] = BRSTEP;
 		regs->msr |= MSR_SE;
 	} else {
-		printf("Stopped at breakpoint %x (%lx %s)\n", (bp - bpts)+1, bp->address, bp->funcname);
+		printf("Stopped at breakpoint %x (%lx ", (bp - bpts) + 1,
+			bp->address);
+		xmon_print_symbol("%s)\n", bp->address);
 		xmon(regs);
 	}
 	return 1;
@@ -576,9 +545,6 @@ cmds(struct pt_regs *excp)
 			else
 				excprint(excp);
 			break;
-		case 'M':
-			print_sysmap();
-			break;
 		case 'S':
 			super_regs();
 			break;
@@ -768,7 +734,6 @@ bpt_cmds(void)
 	unsigned long a;
 	int mode, i;
 	struct bpt *bp;
-	struct tbtable tab;
 
 	cmd = inchar();
 	switch (cmd) {
@@ -824,7 +789,9 @@ bpt_cmds(void)
 			if (bp == 0) {
 				printf("No breakpoint at %x\n", a);
 			} else {
-				printf("Cleared breakpoint %x (%lx %s)\n", (bp - bpts)+1, bp->address, bp->funcname);
+				printf("Cleared breakpoint %x (%lx ", 
+					(bp - bpts) + 1, bp->address);
+				xmon_print_symbol("%s)\n", bp->address);
 				bp->enabled = 0;
 			}
 		}
@@ -858,8 +825,11 @@ bpt_cmds(void)
 				printf("   inst   %.16lx %8x\n", iabr.address & ~3,
 				       iabr.count);
 			for (bp = bpts, bpnum = 1; bp < &bpts[NBPTS]; ++bp, ++bpnum)
-				if (bp->enabled)
-					printf("%2x trap   %.16lx %8x  %s\n", bpnum, bp->address, bp->count, bp->funcname);
+				if (bp->enabled) {
+					printf("%2x trap   %.16lx %8x  ",
+						bpnum, bp->address, bp->count);
+					xmon_print_symbol("%s\n", bp->address);
+				}
 			break;
 		}
 		bp = at_breakpoint(a);
@@ -876,14 +846,9 @@ bpt_cmds(void)
 		bp->address = a;
 		bp->count = 0;
 		scanhex(&bp->count);
-		/* Find the function name just once. */
-		bp->funcname[0] = '\0';
-		if (find_tb_table(bp->address, &tab) && tab.name[0]) {
-			/* Got a nice name for it. */
-			int delta = bp->address - tab.funcstart;
-			sprintf(bp->funcname, "%s+0x%x", tab.name, delta);
-		}
-		printf("Set breakpoint %2x trap   %.16lx %8x  %s\n", (bp-bpts)+1, bp->address, bp->count, bp->funcname);
+		printf("Set breakpoint %2x trap   %.16lx %8x  ", (bp-bpts) + 1, 
+			bp->address, bp->count);
+		xmon_print_symbol("%s\n", bp->address);
 		break;
 	}
 }
@@ -920,7 +885,6 @@ backtrace(struct pt_regs *excp)
 	unsigned long lr;
 	unsigned long stack[3];
 	struct pt_regs regs;
-	struct tbtable tab;
 	int framecount;
 	char *funcname;
 	/* declare these as raw ptrs so we don't get func descriptors */
@@ -966,14 +930,8 @@ backtrace(struct pt_regs *excp)
 				break;
 			printf("exception: %lx %s regs %lx\n", regs.trap, getvecname(regs.trap), sp+112);
 			printf("                  %.16lx", regs.nip);
-			if ((regs.nip & 0xffffffff00000000UL) &&
-			    find_tb_table(regs.nip, &tab)) {
-				int delta = regs.nip-tab.funcstart;
-				if (delta < 0)
-					printf("  <unknown code>");
-				else
-					printf("  %s+0x%x", tab.name, delta);
-			}
+			if (regs.nip & 0xffffffff00000000UL)
+				xmon_print_symbol("  %s", regs.nip);
 			printf("\n");
                         if (regs.gpr[1] < sp) {
                             printf("<Stack drops into userspace %.16lx>\n", regs.gpr[1]);
@@ -984,13 +942,8 @@ backtrace(struct pt_regs *excp)
 			if (mread(sp, stack, sizeof(stack)) != sizeof(stack))
 				break;
 		} else {
-			if (stack[2] && find_tb_table(stack[2], &tab)) {
-				int delta = stack[2]-tab.funcstart;
-				if (delta < 0)
-					printf("  <unknown code>");
-				else
-					printf("  %s+0x%x", tab.name, delta);
-			}
+			if (stack[2])
+				xmon_print_symbol("  %s", stack[2]);
 			printf("\n");
 		}
 		if (stack[0] && stack[0] <= sp) {
@@ -1019,8 +972,6 @@ spinlock_t exception_print_lock = SPIN_LOCK_UNLOCKED;
 void
 excprint(struct pt_regs *fp)
 {
-	struct task_struct *c;
-	struct tbtable tab;
 	unsigned long flags;
 
 	spin_lock_irqsave(&exception_print_lock, flags);
@@ -1029,21 +980,13 @@ excprint(struct pt_regs *fp)
 	printf("cpu %d: ", smp_processor_id());
 #endif /* CONFIG_SMP */
 
-	printf("Vector: %lx %s at  [%lx]\n", fp->trap, getvecname(fp->trap), fp);
+	printf("Vector: %lx %s at [%lx]\n", fp->trap, getvecname(fp->trap), fp);
 	printf("    pc: %lx", fp->nip);
-	if (find_tb_table(fp->nip, &tab) && tab.name[0]) {
-		/* Got a nice name for it */
-		int delta = fp->nip - tab.funcstart;
-		printf(" (%s+0x%x)", tab.name, delta);
-	}
-	printf("\n");
+	xmon_print_symbol(" (%s)\n", fp->nip);
+
 	printf("    lr: %lx", fp->link);
-	if (find_tb_table(fp->link, &tab) && tab.name[0]) {
-		/* Got a nice name for it */
-		int delta = fp->link - tab.funcstart;
-		printf(" (%s+0x%x)", tab.name, delta);
-	}
-	printf("\n");
+	xmon_print_symbol(" (%s)\n", fp->link);
+
 	printf("    sp: %lx\n", fp->gpr[1]);
 	printf("   msr: %lx\n", fp->msr);
 
@@ -1052,13 +995,11 @@ excprint(struct pt_regs *fp)
 		printf(" dsisr: %lx\n", fp->dsisr);
 	}
 
-	/* XXX: need to copy current or we die.  Why? */
-	c = current;
-	printf("  current = 0x%lx\n", c);
+	printf("  current = 0x%lx\n", current);
 	printf("  paca    = 0x%lx\n", get_paca());
-	if (c) {
-		printf("  current = %lx, pid = %ld, comm = %s\n",
-		       c, c->pid, c->comm);
+	if (current) {
+		printf("    pid   = %ld, comm = %s\n",
+		       current->pid, current->comm);
 	}
 
 	spin_unlock_irqrestore(&exception_print_lock, flags);
@@ -1146,14 +1087,6 @@ write_spr(int n, unsigned long val)
 static unsigned long regno;
 extern char exc_prolog;
 extern char dec_exc;
-
-void
-print_sysmap(void)
-{
-	extern char *sysmap;
-	if ( sysmap )
-		printf("System.map: \n%s", sysmap);
-}
 
 void
 super_regs()
@@ -1922,111 +1855,52 @@ char *str;
 	lineptr = str;
 }
 
-
-/* Starting at codeaddr scan forward for a tbtable and fill in the
- given table.  Return non-zero if successful at doing something.
- */
-static int
-find_tb_table(unsigned long codeaddr, struct tbtable *tab)
+/* xmon version of __print_symbol */
+void __xmon_print_symbol(const char *fmt, unsigned long address)
 {
-	unsigned long codeaddr_max;
-	unsigned long tbtab_start;
-	int nr;
-	int instr;
-	int num_parms;
+	char *modname;
+	const char *name;
+	unsigned long offset, size;
+	char namebuf[128];
 
-	/* don't look for traceback table in userspace */
-	if (codeaddr < PAGE_OFFSET)
-		return 0;
-
-	if (tab == NULL)
-		return 0;
-	memset(tab, 0, sizeof(tab));
-
-	/* Scan instructions starting at codeaddr for 128k max */
-	for (codeaddr_max = codeaddr + 128*1024*4;
-	     codeaddr < codeaddr_max;
-	     codeaddr += 4) {
-		nr = mread(codeaddr, &instr, 4);
-		if (nr != 4)
-			return 0;	/* Bad read.  Give up promptly. */
-		if (instr == 0) {
-			/* table should follow. */
-			int version;
-			unsigned long flags;
-			tbtab_start = codeaddr;	/* save it to compute func start addr */
-			codeaddr += 4;
-			nr = mread(codeaddr, &flags, 8);
-			if (nr != 8)
-				return 0;	/* Bad read or no tb table. */
-			tab->flags = flags;
-			version = (flags >> 56) & 0xff;
-			if (version != 0)
-				continue;	/* No tb table here. */
-			/* Now, like the version, some of the flags are values
-			 that are more conveniently extracted... */
-			tab->fp_saved = (flags >> 24) & 0x3f;
-			tab->gpr_saved = (flags >> 16) & 0x3f;
-			tab->fixedparms = (flags >> 8) & 0xff;
-			tab->floatparms = (flags >> 1) & 0x7f;
-			codeaddr += 8;
-			num_parms = tab->fixedparms + tab->floatparms;
-			if (num_parms) {
-				unsigned int parminfo;
-				int parm;
-				if (num_parms > 32)
-					return 1;	/* incomplete */
-				nr = mread(codeaddr, &parminfo, 4);
-				if (nr != 4)
-					return 1;	/* incomplete */
-				/* decode parminfo...32 bits.
-				 A zero means fixed.  A one means float and the
-				 following bit determines single (0) or double (1).
-				 */
-				for (parm = 0; parm < num_parms; parm++) {
-					if (parminfo & 0x80000000) {
-						parminfo <<= 1;
-						if (parminfo & 0x80000000)
-							tab->parminfo[parm] = TBTAB_PARMDFLOAT;
-						else
-							tab->parminfo[parm] = TBTAB_PARMSFLOAT;
-					} else {
-						tab->parminfo[parm] = TBTAB_PARMFIXED;
-					}
-					parminfo <<= 1;
-				}
-				codeaddr += 4;
-			}
-			if (flags & TBTAB_FLAGSHASTBOFF) {
-				nr = mread(codeaddr, &tab->tb_offset, 4);
-				if (nr != 4)
-					return 1;	/* incomplete */
-				if (tab->tb_offset > 0) {
-					tab->funcstart = tbtab_start - tab->tb_offset;
-				}
-				codeaddr += 4;
-			}
-			/* hand_mask appears to be always be omitted. */
-			if (flags & TBTAB_FLAGSHASCTL) {
-				/* Assume this will never happen for C or asm */
-				return 1;	/* incomplete */
-			}
-			if (flags & TBTAB_FLAGSNAMEPRESENT) {
-				short namlen;
-				nr = mread(codeaddr, &namlen, 2);
-				if (nr != 2)
-					return 1;	/* incomplete */
-				if (namlen >= sizeof(tab->name))
-					namlen = sizeof(tab->name)-1;
-				codeaddr += 2;
-				nr = mread(codeaddr, tab->name, namlen);
-				tab->name[namlen] = '\0';
-				codeaddr += namlen;
-			}
-			return 1;
-		}
+	if (setjmp(bus_error_jmp) == 0) {
+		debugger_fault_handler = handle_fault;
+		sync();
+		name = kallsyms_lookup(address, &size, &offset, &modname,
+				       namebuf);
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+	} else {
+		name = "symbol lookup failed";
 	}
-	return 0;	/* hit max...sorry. */
+
+	debugger_fault_handler = 0;
+
+	if (!name) {
+		char addrstr[sizeof("0x%lx") + (BITS_PER_LONG*3/10)];
+
+		sprintf(addrstr, "0x%lx", address);
+		printf(fmt, addrstr);
+		return;
+	}
+
+	if (modname) {
+		/* This is pretty small. */
+		char buffer[sizeof("%s+%#lx/%#lx [%s]")
+			   + strlen(name) + 2*(BITS_PER_LONG*3/10)
+			   + strlen(modname)];
+
+		sprintf(buffer, "%s+%#lx/%#lx [%s]",
+			name, offset, size, modname);
+		printf(fmt, buffer);
+	} else {
+		char buffer[sizeof("%s+%#lx/%#lx")
+			   + strlen(name) + 2*(BITS_PER_LONG*3/10)];
+
+		sprintf(buffer, "%s+%#lx/%#lx", name, offset, size);
+		printf(fmt, buffer);
+	}
 }
 
 void
