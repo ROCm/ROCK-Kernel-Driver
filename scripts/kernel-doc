@@ -105,10 +105,7 @@ use strict;
 # enums and typedefs. Instead of the function name you must write the name 
 # of the declaration;  the struct/union/enum/typedef must always precede 
 # the name. Nesting of declarations is not supported. 
-# Use the argument mechanism to document members or constants. In 
-# structs and unions you must declare one member per declaration 
-# (comma-separated members are not allowed -  the parser does not support 
-# this).
+# Use the argument mechanism to document members or constants.
 # e.g.
 # /**
 #  * struct my_struct - short description
@@ -1318,22 +1315,40 @@ sub create_parameterlist($$$) {
 	    $param = $1;
 	    $type = $arg;
 	    $type =~ s/([^\(]+\(\*)$param/$1/;
+	    push_parameter($param, $type, $file);
 	} else {
 	    # evil magic to get fixed array parameters to work
 	    $arg =~ s/(.+\s+)(.+)\[.*/$1* $2/;
-	    my @args = split('\s', $arg);
-	
-	    $param = pop @args;
-	    if ($param =~ m/^(\*+)(.*)/) {
-	        $param = $2;
-		push @args, $1;
-	    } 
-	    elsif ($param =~ m/(.*?)\s*:\s*(\d+)/) {
-	        $param = $1;
-	        push @args, ":$2";
+
+	    $arg =~ s/\s*:\s*/:/g;
+
+	    my @args = split('\s*,\s*', $arg);
+	    if ($args[0] =~ m/\*/) {
+		$args[0] =~ s/(\*+)\s*/ $1/;
 	    }
-	    $type = join " ", @args;
+	    my @first_arg = split('\s+', shift @args);
+	    unshift(@args, pop @first_arg);
+	    $type = join " ", @first_arg;
+
+	    foreach $param (@args) {
+		if ($param =~ m/^(\*+)\s*(.*)/) {
+		    push_parameter($2, "$type $1", $file);
+		}
+		elsif ($param =~ m/(.*?):(\d+)/) {
+		    push_parameter($1, "$type:$2", $file)
+		}
+		else {
+		    push_parameter($param, $type, $file);
+		}
+	    }
 	}
+    }
+}
+
+sub push_parameter($$$) {
+	my $param = shift;
+	my $type = shift;
+	my $file = shift;
 
 	if ($type eq "" && $param eq "...")
 	{
@@ -1362,7 +1377,6 @@ sub create_parameterlist($$$) {
 
 	push @parameterlist, $param;
 	$parametertypes{$param} = $type;
-    }
 }
 
 ##
