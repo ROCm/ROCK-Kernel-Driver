@@ -274,6 +274,9 @@ struct snd_opl3 {
 	snd_timer_t *timer2;
 	spinlock_t timer_lock;
 
+	void *private_data;
+	void (*private_free)(opl3_t *);
+
 	spinlock_t reg_lock;
 	snd_card_t *card;		/* The card that this belongs to */
 	int used;			/* usage flag - exclusive */
@@ -314,6 +317,8 @@ struct snd_opl3 {
 
 /* opl3.c */
 void snd_opl3_interrupt(snd_hwdep_t * hw);
+int snd_opl3_new(snd_card_t *card, unsigned short hardware, opl3_t **ropl3);
+int snd_opl3_init(opl3_t *opl3);
 int snd_opl3_create(snd_card_t * card,
 		    unsigned long l_port, unsigned long r_port,
 		    unsigned short hardware,

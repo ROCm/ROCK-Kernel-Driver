@@ -656,7 +656,7 @@ static int usX2Y_rate_set(usX2Ydev_t *usX2Y, int rate)
 		if (us) {
 			us->submitted =	2*NOOF_SETRATE_URBS;
 			for (i = 0; i < NOOF_SETRATE_URBS; ++i) {
-				usb_unlink_urb(us->urb[i]);
+				usb_kill_urb(us->urb[i]);
 				usb_free_urb(us->urb[i]);
 			}
 			usX2Y->US04 = NULL;
@@ -671,7 +671,7 @@ static int usX2Y_rate_set(usX2Ydev_t *usX2Y, int rate)
 
 static int usX2Y_format_set(usX2Ydev_t *usX2Y, snd_pcm_format_t format)
 {
-	int alternate, unlink_err, err;
+	int alternate, err;
 	struct list_head* p;
 	if (format == SNDRV_PCM_FORMAT_S24_3LE) {
 		alternate = 2;
@@ -683,15 +683,13 @@ static int usX2Y_format_set(usX2Ydev_t *usX2Y, snd_pcm_format_t format)
 	list_for_each(p, &usX2Y->chip.midi_list) {
 		snd_usbmidi_input_stop(p);
 	}
-	unlink_err = usb_unlink_urb(usX2Y->In04urb);
+	usb_kill_urb(usX2Y->In04urb);
 	if ((err = usb_set_interface(usX2Y->chip.dev, 0, alternate))) {
 		snd_printk("usb_set_interface error \n");
 		return err;
 	}
-	if (0 == unlink_err) {
-		usX2Y->In04urb->dev = usX2Y->chip.dev;
-		err = usb_submit_urb(usX2Y->In04urb, GFP_KERNEL);
-	}
+	usX2Y->In04urb->dev = usX2Y->chip.dev;
+	err = usb_submit_urb(usX2Y->In04urb, GFP_KERNEL);
 	list_for_each(p, &usX2Y->chip.midi_list) {
 		snd_usbmidi_input_start(p);
 	}
@@ -824,20 +822,20 @@ static int snd_usX2Y_pcm_prepare(snd_pcm_substream_t *substream)
 			subs->prepared = 1;
 		}
 		while (subs->submitted_urbs)
-		for (u = 0; u < NRURBS; u++) {
-			snd_printdd("%i\n", subs->urb[u]->status);
-			while(subs->urb[u]->status  ||  NULL != subs->urb[u]->hcpriv) {
-				signed long timeout;
-				snd_printdd("ep=%i waiting for urb=%p status=%i hcpriv=%p\n",
-					   subs->endpoint, subs->urb[u],
-					   subs->urb[u]->status, subs->urb[u]->hcpriv);
-				set_current_state(TASK_INTERRUPTIBLE);
-				timeout = schedule_timeout(HZ/10);
-				if (signal_pending(current)) {
-					return -ERESTARTSYS;
+			for (u = 0; u < NRURBS; u++) {
+				snd_printdd("%i\n", subs->urb[u]->status);
+				while(subs->urb[u]->status  ||  NULL != subs->urb[u]->hcpriv) {
+					signed long timeout;
+					snd_printdd("ep=%i waiting for urb=%p status=%i hcpriv=%p\n",
+						    subs->endpoint, subs->urb[u],
+						    subs->urb[u]->status, subs->urb[u]->hcpriv);
+					set_current_state(TASK_INTERRUPTIBLE);
+					timeout = schedule_timeout(HZ/10);
+					if (signal_pending(current)) {
+						return -ERESTARTSYS;
+					}
 				}
 			}
-		}
 		subs->completed_urb = NULL;
 		subs->next_urb_complete = -1;
 		subs->stalled = 0;

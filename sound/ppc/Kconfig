@@ -13,6 +13,11 @@ config SND_POWERMAC
 	tristate "PowerMac (AWACS, DACA, Burgundy, Tumbler, Keywest)"
 	depends on SND && I2C && INPUT
 	select SND_PCM
+	help
+	  Say Y here to include support for the integrated sound device.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-powermac.
 
 endmenu
 

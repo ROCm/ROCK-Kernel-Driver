@@ -1516,7 +1516,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	}
 	chip->addr = pci_resource_start(pci, 0);
 	chip->remap_addr = ioremap_nocache(chip->addr, pci_resource_len(pci, 0));
-	if (chip->remap_addr == 0) {
+	if (chip->remap_addr == NULL) {
 		snd_printk(KERN_ERR "AC'97 space ioremap problem\n");
 		snd_atiixp_free(chip);
 		return -EIO;
@@ -1585,8 +1585,10 @@ static int __devinit snd_atiixp_probe(struct pci_dev *pci,
 
 	snd_atiixp_chip_start(chip);
 
-	sprintf(card->longname, "%s rev %x at 0x%lx, irq %i",
-		card->shortname, revision, chip->addr, chip->irq);
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s rev %x with %s at %#lx, irq %i", card->shortname, revision,
+		 chip->ac97[0] ? snd_ac97_get_short_name(chip->ac97[0]) : "?",
+		 chip->addr, chip->irq);
 
 	snd_card_set_pm_callback(card, snd_atiixp_suspend, snd_atiixp_resume, chip);
 

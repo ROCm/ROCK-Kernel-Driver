@@ -623,11 +623,6 @@ static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *
 	unsigned int status;
 	unsigned int i;
 
-#if 0
-	/* FIXME: does it work on via823x? */
-	if (chip->chip_type != TYPE_VIA686)
-		goto _skip_sgd;
-#endif
 	status = inl(VIAREG(chip, SGD_SHADOW));
 	if (! (status & chip->intr_mask)) {
 		if (chip->rmidi)
@@ -635,7 +630,6 @@ static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *
 			return snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
 		return IRQ_NONE;
 	}
-// _skip_sgd:
 
 	/* check status for each stream */
 	spin_lock(&chip->reg_lock);
@@ -1547,6 +1541,13 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 }
 
 static struct ac97_quirk ac97_quirks[] = {
+	{
+		.vendor = 0x1106,
+		.device = 0x4161,
+		.codec_id = 0x56494161, /* VT1612A */
+		.name = "Soltek SL-75DRV5",
+		.type = AC97_TUNE_NONE
+	},
 	{	/* FIXME: which codec? */
 		.vendor = 0x1106,
 		.device = 0x4161,
@@ -1606,6 +1607,7 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 		return err;
 	chip->ac97_bus->private_free = snd_via82xx_mixer_free_ac97_bus;
 	chip->ac97_bus->clock = chip->ac97_clock;
+	chip->ac97_bus->shared_type = AC97_SHARED_TYPE_VIA;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
@@ -2095,10 +2097,11 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1071, .device = 0x8375, .action = VIA_DXS_NO_VRA }, /* Vobis/Yakumo/Mitac notebook */
 		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
 		{ .vendor = 0x1106, .device = 0x4161, .action = VIA_DXS_NO_VRA }, /* ASRock K7VT2 */
+		{ .vendor = 0x1106, .device = 0x4552, .action = VIA_DXS_NO_VRA }, /* QDI Kudoz 7X/600-6AL */
 		{ .vendor = 0x1106, .device = 0xaa01, .action = VIA_DXS_NO_VRA }, /* EPIA MII */
 		{ .vendor = 0x1297, .device = 0xa232, .action = VIA_DXS_ENABLE }, /* Shuttle ?? */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
-		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_NO_VRA }, /* Gigabyte GA-7VAXP (FIXME: or DXS_ENABLE?) */
+		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x147b, .device = 0x1401, .action = VIA_DXS_ENABLE }, /* ABIT KD7(-RAID) */
 		{ .vendor = 0x14ff, .device = 0x0403, .action = VIA_DXS_ENABLE }, /* Twinhead mobo */
 		{ .vendor = 0x1462, .device = 0x3800, .action = VIA_DXS_ENABLE }, /* MSI KT266 */
@@ -2235,8 +2238,9 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 	for (i = 0; i < chip->num_devs; i++)
 		snd_via82xx_channel_reset(chip, &chip->devs[i]);
 
-	sprintf(card->longname, "%s at 0x%lx, irq %d",
-		card->shortname, chip->port, chip->irq);
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s with %s at %#lx, irq %d", card->shortname,
+		 snd_ac97_get_short_name(chip->ac97), chip->port, chip->irq);
 
 	snd_via82xx_proc_init(chip);
 

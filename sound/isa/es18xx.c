@@ -419,6 +419,11 @@ static void snd_es18xx_rate_set(es18xx_t *chip,
 		
 	if ((chip->caps & ES18XX_PCM2) && mode == DAC2) {
 		snd_es18xx_mixer_write(chip, 0x70, bits);
+		/*
+		 * Comment from kernel oss driver:
+		 * FKS: fascinating: 0x72 doesn't seem to work.
+		 */
+		snd_es18xx_write(chip, 0xA2, div0);
 		snd_es18xx_mixer_write(chip, 0x72, div0);
 	} else {
 		snd_es18xx_write(chip, 0xA1, bits);
