@@ -21,6 +21,7 @@
 #include <asm/io.h>
 #include <asm/hardware/icst525.h>
 #include <asm/hardware/amba.h>
+#include <asm/hardware/amba_clcd.h>
 #include <asm/arch/lm.h>
 #include <asm/arch/impd1.h>
 #include <asm/sizes.h>
@@ -87,10 +88,198 @@ void impd1_tweak_control(struct device *dev, u32 mask, u32 val)
 
 EXPORT_SYMBOL(impd1_tweak_control);
 
+/*
+ * CLCD support
+ */
+#define PANEL		PROSPECTOR
+
+#define LTM10C209		1
+#define PROSPECTOR		2
+#define SVGA			3
+#define VGA			4
+
+#if PANEL == VGA
+#define PANELTYPE	vga
+static struct clcd_panel vga = {
+	.mode		= {
+		.name		= "VGA",
+		.refresh	= 60,
+		.xres		= 640,
+		.yres		= 480,
+		.pixclock	= 39721,
+		.left_margin	= 40,
+		.right_margin	= 24,
+		.upper_margin	= 32,
+		.lower_margin	= 11,
+		.hsync_len	= 96,
+		.vsync_len	= 2,
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD | TIM2_IPC,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.connector	= IMPD1_CTRL_DISP_VGA,
+	.bpp		= 16,
+	.grayscale	= 0,
+};
+
+#elif PANEL == SVGA
+#define PANELTYPE	svga
+static struct clcd_panel svga = {
+	.mode		= {
+		.name		= "SVGA",
+		.refresh	= 0,
+		.xres		= 800,
+		.yres		= 600,
+		.pixclock	= 27778,
+		.left_margin	= 20,
+		.right_margin	= 20,
+		.upper_margin	= 5,
+		.lower_margin	= 5,
+		.hsync_len	= 164,
+		.vsync_len	= 62,
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.connector	= IMPD1_CTRL_DISP_VGA,
+	.bpp		= 16,
+	.grayscale	= 0,
+};
+
+#elif PANEL == PROSPECTOR
+#define PANELTYPE	prospector
+static struct clcd_panel prospector = {
+	.mode		= {
+		.name		= "PROSPECTOR",
+		.refresh	= 0,
+		.xres		= 640,
+		.yres		= 480,
+		.pixclock	= 40000,
+		.left_margin	= 33,
+		.right_margin	= 64,
+		.upper_margin	= 36,
+		.lower_margin	= 7,
+		.hsync_len	= 64,
+		.vsync_len	= 25,
+		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.fixedtimings	= 1,
+	.connector	= IMPD1_CTRL_DISP_LCD,
+	.bpp		= 16,
+	.grayscale	= 0,
+};
+
+#elif PANEL == LTM10C209
+#define PANELTYPE	ltm10c209
+/*
+ * Untested.
+ */
+static struct clcd_panel ltm10c209 = {
+	.mode		= {
+		.name		= "LTM10C209",
+		.refresh	= 0,
+		.xres		= 640,
+		.yres		= 480,
+		.pixclock	= 40000,
+		.left_margin	= 20,
+		.right_margin	= 20,
+		.upper_margin	= 19,
+		.lower_margin	= 19,
+		.hsync_len	= 20,
+		.vsync_len	= 10,
+		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_BCD,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.fixedtimings	= 1,
+	.connector	= IMPD1_CTRL_DISP_LCD,
+	.bpp		= 16,
+	.grayscale	= 0,
+};
+#endif
+
+/*
+ * Disable all display connectors on the interface module.
+ */
+static void impd1fb_clcd_disable(struct clcd_fb *fb)
+{
+	impd1_tweak_control(fb->dev->dev.parent, IMPD1_CTRL_DISP_MASK, 0);
+}
+
+/*
+ * Enable the relevant connector on the interface module.
+ */
+static void impd1fb_clcd_enable(struct clcd_fb *fb)
+{
+	impd1_tweak_control(fb->dev->dev.parent, IMPD1_CTRL_DISP_MASK,
+			fb->panel->connector | IMPD1_CTRL_DISP_ENABLE);
+}
+
+static int impd1fb_clcd_setup(struct clcd_fb *fb)
+{
+	unsigned long framebase = fb->dev->res.start + 0x01000000;
+	unsigned long framesize = SZ_1M;
+	int ret = 0;
+
+	fb->panel = &PANELTYPE;
+
+	if (!request_mem_region(framebase, framesize, "clcd framebuffer")) {
+		printk(KERN_ERR "IM-PD1: unable to reserve framebuffer\n");
+		return -EBUSY;
+	}
+
+	fb->fb.screen_base = ioremap(framebase, framesize);
+	if (!fb->fb.screen_base) {
+		printk(KERN_ERR "IM-PD1: unable to map framebuffer\n");
+		ret = -ENOMEM;
+		goto free_buffer;
+	}
+
+	fb->fb.fix.smem_start	= framebase;
+	fb->fb.fix.smem_len	= framesize;
+
+	return 0;
+
+ free_buffer:
+	release_mem_region(framebase, framesize);
+	return ret;
+}
+
+static void impd1fb_clcd_remove(struct clcd_fb *fb)
+{
+	iounmap(fb->fb.screen_base);
+	release_mem_region(fb->fb.fix.smem_start, fb->fb.fix.smem_len);
+}
+
+static struct clcd_board impd1_clcd_data = {
+	.name		= "IM-PD/1",
+	.check		= clcdfb_check,
+	.decode		= clcdfb_decode,
+	.disable	= impd1fb_clcd_disable,
+	.enable		= impd1fb_clcd_enable,
+	.setup		= impd1fb_clcd_setup,
+	.remove		= impd1fb_clcd_remove,
+};
+
 struct impd1_device {
 	unsigned long	offset;
 	unsigned int	irq[2];
 	unsigned int	id;
+	void		*platform_data;
 };
 
 static struct impd1_device impd1_devs[] = {
@@ -133,6 +322,7 @@ static struct impd1_device impd1_devs[] = {
 		.offset	= 0x01000000,
 		.irq	= { 11 },
 		.id	= 0x00041110,
+		.platform_data = &impd1_clcd_data,
 	}
 };
 
@@ -202,6 +392,7 @@ static int impd1_probe(struct lm_device *dev)
 		d->irq[0]	= dev->irq;
 		d->irq[1]	= dev->irq;
 		d->periphid	= idev->id;
+		d->dev.platform_data = idev->platform_data;
 
 		ret = amba_device_register(d, &dev->resource);
 		if (ret) {
