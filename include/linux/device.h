@@ -69,7 +69,6 @@ struct bus_type {
 	struct subsystem	drvsubsys;
 	struct subsystem	devsubsys;
 	struct list_head	devices;
-	struct list_head	drivers;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
@@ -119,7 +118,6 @@ struct device_driver {
 
 	struct semaphore	unload_sem;
 	struct kobject		kobj;
-	struct list_head	bus_list;
 	struct list_head	class_list;
 	struct list_head	devices;
 
