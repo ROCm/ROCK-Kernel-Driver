@@ -181,8 +181,6 @@ EXPORT_SYMBOL(ip_queue_xmit);
 EXPORT_SYMBOL(memcpy_fromiovecend);
 EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
 /* UDP/TCP exported functions for TCPv6 */
-EXPORT_SYMBOL(tcp_write_wakeup);
-EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_check_req);
 EXPORT_SYMBOL(tcp_child_process);
 EXPORT_SYMBOL(tcp_parse_options);
@@ -193,20 +191,14 @@ EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_rcv_state_process);
 EXPORT_SYMBOL(tcp_timewait_state_process);
 EXPORT_SYMBOL(tcp_create_openreq_child);
-EXPORT_SYMBOL(tcp_simple_retransmit);
-EXPORT_SYMBOL(tcp_transmit_skb);
-EXPORT_SYMBOL(tcp_connect);
-EXPORT_SYMBOL(tcp_make_synack);
 EXPORT_SYMBOL(tcp_tw_deschedule);
 EXPORT_SYMBOL(tcp_delete_keepalive_timer);
 EXPORT_SYMBOL(tcp_reset_keepalive_timer);
-EXPORT_SYMBOL(tcp_sync_mss);
 EXPORT_SYMBOL(net_statistics); 
 EXPORT_SYMBOL(sysctl_tcp_reordering);
 EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(tcp_cwnd_application_limited);
 
-EXPORT_SYMBOL(tcp_write_xmit);
 
 
 extern int sysctl_tcp_tw_recycle;
