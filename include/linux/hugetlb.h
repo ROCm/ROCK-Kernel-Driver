@@ -19,6 +19,7 @@ int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 void huge_page_release(struct page *);
 int hugetlb_report_meminfo(char *);
 int is_hugepage_mem_enough(size_t);
+unsigned long hugetlb_total_pages(void);
 struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma,
 			unsigned long address, int write);
 struct vm_area_struct *hugepage_vma(struct mm_struct *mm,
@@ -52,6 +53,10 @@ int prepare_hugepage_range(unsigned long addr, unsigned long len);
 #else /* !CONFIG_HUGETLB_PAGE */
 
 static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
+{
+	return 0;
+}
+static inline unsigned long hugetlb_total_pages(void)
 {
 	return 0;
 }

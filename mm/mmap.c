@@ -489,9 +489,13 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	int correct_wcount = 0;
 	int error;
 	struct rb_node ** rb_link, * rb_parent;
+	int accountable = 1;
 	unsigned long charged = 0;
 
 	if (file) {
+		if (is_file_hugepages(file))
+			accountable = 0;
+
 		if (!file->f_op || !file->f_op->mmap)
 			return -ENODEV;
 
@@ -608,7 +612,8 @@ munmap_back:
 	    > current->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
 
-	if (!(flags & MAP_NORESERVE) || sysctl_overcommit_memory > 1) {
+	if (accountable && (!(flags & MAP_NORESERVE) ||
+			sysctl_overcommit_memory > 1)) {
 		if (vm_flags & VM_SHARED) {
 			/* Check memory availability in shmem_file_setup? */
 			vm_flags |= VM_ACCOUNT;
