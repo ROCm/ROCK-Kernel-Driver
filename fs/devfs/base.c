@@ -763,7 +763,6 @@ struct directory_type
 
 struct bdev_type
 {
-    struct block_device_operations *ops;
     dev_t dev;
 };
 
@@ -1491,7 +1490,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     } else if (S_ISBLK (mode)) {
 	de->u.bdev.dev = dev;
 	de->u.cdev.autogen = devnum != 0;
-	de->u.bdev.ops = ops;
     } else {
 	PRINTK ("(%s): illegal mode: %x\n", name, mode);
 	devfs_put (de);
@@ -1515,6 +1513,52 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     devfs_put (dir);
     return de;
 }   /*  End Function devfs_register  */
+
+
+int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
+{
+	struct devfs_entry *dir = NULL, *de;
+	char buf[64];
+	va_list args;
+	int error, n;
+
+	if (!S_ISBLK(mode)) {
+		printk(KERN_WARNING "%s: invalide mode (%u) for %s\n",
+				__FUNCTION__, mode, buf);
+		return -EINVAL;
+	}
+
+	va_start(args, fmt);
+	n = vsnprintf(buf, 64, fmt, args);
+	if (n >= 64 || !buf[0]) {
+		printk(KERN_WARNING "%s: invalid format string\n",
+				__FUNCTION__);
+		return -EINVAL;
+	}
+
+	de = _devfs_prepare_leaf(&dir, buf, mode);
+	if (!de) {
+		printk(KERN_WARNING "%s: could not prepare leaf for %s\n",
+				__FUNCTION__, buf);
+		return -ENOMEM;		/* could be more accurate... */
+	}
+
+	de->u.bdev.dev = dev;
+
+	error = _devfs_append_entry(dir, de, NULL);
+	if (error) {
+		printk(KERN_WARNING "%s: could not append to parent for %s\n",
+				__FUNCTION__, buf);
+		goto out;
+	}
+
+	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED);
+ out:
+	devfs_put(dir);
+	return error;
+}
+
+EXPORT_SYMBOL(devfs_mk_bdev);
 
 
 /**
