@@ -1060,9 +1060,11 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	/* Default machine type. */
 	_naca->platform = PLATFORM_PSERIES;
 
+#if 0
 	/* Reset klimit to take into account the embedded system map */
 	if (RELOC(embedded_sysmap_end))
 		RELOC(klimit) = __va(PAGE_ALIGN(RELOC(embedded_sysmap_end)));
+#endif
 
 	/* Get a handle to the prom entry point before anything else */
 	_prom->entry = pp;
