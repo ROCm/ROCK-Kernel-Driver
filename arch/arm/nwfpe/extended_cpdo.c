@@ -89,11 +89,11 @@ static floatx80 (* const monadic_extended[16])(floatx80 rFm) =
    [NRM_CODE >> 20] = floatx80_mvf,
 };
 
-unsigned int ExtendedCPDO(const unsigned int opcode)
+unsigned int ExtendedCPDO(const unsigned int opcode, FPREG *rFd)
 {
    FPA11 *fpa11 = GET_FPA11();
-   floatx80 rFm, rFd;
-   unsigned int Fd, Fm, opc;
+   floatx80 rFm;
+   unsigned int Fm, opc;
 
    //printk("ExtendedCPDO(0x%08x)\n",opcode);
    
@@ -147,7 +147,7 @@ unsigned int ExtendedCPDO(const unsigned int opcode)
 
       if (dyadic_extended[opc >> 20])
       {
-         rFd = dyadic_extended[opc >> 20](rFn, rFm);
+         rFd->fExtended = dyadic_extended[opc >> 20](rFn, rFm);
       }
       else
       {
@@ -158,16 +158,13 @@ unsigned int ExtendedCPDO(const unsigned int opcode)
    {
       if (monadic_extended[opc >> 20])
       {
-         rFd = monadic_extended[opc >> 20](rFm);
+         rFd->fExtended = monadic_extended[opc >> 20](rFm);
       }
       else
       {
          return 0;
       }
    }
-
-   Fd = getFd(opcode);
-   fpa11->fpreg[Fd].fExtended = rFd;
 
    return 1;
 }

@@ -85,11 +85,11 @@ static float32 (* const monadic_single[16])(float32 rFm) =
    [NRM_CODE >> 20] = float32_mvf,
 };
 
-unsigned int SingleCPDO(const unsigned int opcode)
+unsigned int SingleCPDO(const unsigned int opcode, FPREG *rFd)
 {
    FPA11 *fpa11 = GET_FPA11();
-   float32 rFm, rFd;
-   unsigned int Fd, Fm, opc;
+   float32 rFm;
+   unsigned int Fm, opc;
 
    Fm = getFm(opcode);
    if (CONSTANT_FM(opcode))
@@ -115,7 +115,7 @@ unsigned int SingleCPDO(const unsigned int opcode)
           dyadic_single[opc >> 20])
       {
          rFn = fpa11->fpreg[Fn].fSingle;
-         rFd = dyadic_single[opc >> 20](rFn, rFm);
+         rFd->fSingle = dyadic_single[opc >> 20](rFn, rFm);
       }
       else
       {
@@ -126,16 +126,13 @@ unsigned int SingleCPDO(const unsigned int opcode)
    {
       if (monadic_single[opc >> 20])
       {
-         rFd = monadic_single[opc >> 20](rFm);
+         rFd->fSingle = monadic_single[opc >> 20](rFm);
       }
       else
       {
          return 0;
       }
    }
-
-   Fd = getFd(opcode);
-   fpa11->fpreg[Fd].fSingle = rFd;
 
    return 1;
 }

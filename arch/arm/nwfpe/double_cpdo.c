@@ -103,11 +103,11 @@ static float64 (* const monadic_double[16])(float64 rFm) =
    [NRM_CODE >> 20] = float64_mvf,
 };
 
-unsigned int DoubleCPDO(const unsigned int opcode)
+unsigned int DoubleCPDO(const unsigned int opcode, FPREG *rFd)
 {
    FPA11 *fpa11 = GET_FPA11();
-   float64 rFm, rFd;
-   unsigned int Fd, Fm, opc;
+   float64 rFm;
+   unsigned int Fm, opc;
 
    //printk("DoubleCPDO(0x%08x)\n",opcode);
    
@@ -153,7 +153,7 @@ unsigned int DoubleCPDO(const unsigned int opcode)
 
       if (dyadic_double[opc >> 20])
       {
-         rFd = dyadic_double[opc >> 20](rFn, rFm);
+         rFd->fDouble = dyadic_double[opc >> 20](rFn, rFm);
       }
       else
       {
@@ -164,16 +164,13 @@ unsigned int DoubleCPDO(const unsigned int opcode)
    {
       if (monadic_double[opc >> 20])
       {
-         rFd = monadic_double[opc >> 20](rFm);
+         rFd->fDouble = monadic_double[opc >> 20](rFm);
       }
       else
       {
          return 0;
       }
    }
-
-   Fd = getFd(opcode);
-   fpa11->fpreg[Fd].fDouble = rFd;
 
    return 1;
 }
