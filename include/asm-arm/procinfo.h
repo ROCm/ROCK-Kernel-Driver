@@ -24,13 +24,13 @@ struct processor;
  *
  * NOTE! The following structure is defined by assembly
  * language, NOT C code.  For more information, check:
- *  arch/arm/mm/proc-*.S and arch/arm/kernel/head-armv.S
+ *  arch/arm/mm/proc-*.S and arch/arm/kernel/head.S
  */
 struct proc_info_list {
 	unsigned int		cpu_val;
 	unsigned int		cpu_mask;
-	unsigned long		__cpu_mmu_flags;	/* used by head-armv.S */
-	unsigned long		__cpu_flush;		/* used by head-armv.S */
+	unsigned long		__cpu_mmu_flags;	/* used by head.S */
+	unsigned long		__cpu_flush;		/* used by head.S */
 	const char		*arch_name;
 	const char		*elf_name;
 	unsigned int		elf_hwcap;
