@@ -37,7 +37,7 @@
 #ifdef __KERNEL__
 
 #define SONYPI_DRIVER_MAJORVERSION	 1
-#define SONYPI_DRIVER_MINORVERSION	15
+#define SONYPI_DRIVER_MINORVERSION	16
 
 #define SONYPI_DEVICE_MODEL_TYPE1	1
 #define SONYPI_DEVICE_MODEL_TYPE2	2
@@ -165,6 +165,7 @@ static struct sonypi_irq_list sonypi_type2_irq_list[] = {
 #define SONYPI_ZOOM_MASK			0x00000100
 #define SONYPI_THUMBPHRASE_MASK			0x00000200
 #define SONYPI_MEYE_MASK			0x00000400
+#define SONYPI_MEMORYSTICK_MASK			0x00000800
 
 struct sonypi_event {
 	u8	data;
@@ -262,7 +263,7 @@ static struct sonypi_event sonypi_lidev[] = {
 
 /* The set of possible zoom events */
 static struct sonypi_event sonypi_zoomev[] = {
-	{ 0x3a, SONYPI_EVENT_ZOOM_PRESSED },
+	{ 0x39, SONYPI_EVENT_ZOOM_PRESSED },
 	{ 0, 0 }
 };
 
@@ -276,6 +277,13 @@ static struct sonypi_event sonypi_thumbphraseev[] = {
 static struct sonypi_event sonypi_meyeev[] = {
 	{ 0x00, SONYPI_EVENT_MEYE_FACE },
 	{ 0x01, SONYPI_EVENT_MEYE_OPPOSITE },
+	{ 0, 0 }
+};
+
+/* The set of possible memorystick events */
+static struct sonypi_event sonypi_memorystickev[] = {
+	{ 0x53, SONYPI_EVENT_MEMORYSTICK_INSERT },
+	{ 0x54, SONYPI_EVENT_MEMORYSTICK_EJECT },
 	{ 0, 0 }
 };
 
@@ -303,6 +311,7 @@ struct sonypi_eventtypes {
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_HELP_MASK, sonypi_helpev },
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_ZOOM_MASK, sonypi_zoomev },
 	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_THUMBPHRASE_MASK, sonypi_thumbphraseev },
+	{ SONYPI_DEVICE_MODEL_TYPE2, 0x08, SONYPI_MEMORYSTICK_MASK, sonypi_memorystickev },
 
 	{ 0, 0, 0, 0 }
 };

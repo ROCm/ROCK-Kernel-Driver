@@ -235,7 +235,7 @@ xfs_acl_vget(
 		if (kind == _ACL_TYPE_ACCESS) {
 			vattr_t va;
 
-			va.va_mask = AT_MODE;
+			va.va_mask = XFS_AT_MODE;
 			VOP_GETATTR(vp, &va, 0, sys_cred, error);
 			if (error)
 				goto out;
@@ -372,7 +372,7 @@ xfs_acl_allow_set(
 		return EROFS;
 	if ((error = _MAC_VACCESS(vp, NULL, VWRITE)))
 		return error;
-	va.va_mask = AT_UID;
+	va.va_mask = XFS_AT_UID;
 	VOP_GETATTR(vp, &va, 0, NULL, error);
 	if (error)
 		return error;
@@ -702,7 +702,7 @@ xfs_acl_vtoacl(
 		xfs_acl_get_attr(vp, access_acl, _ACL_TYPE_ACCESS, 0, &error);
 		if (!error) {
 			/* Got the ACL, need the mode... */
-			va.va_mask = AT_MODE;
+			va.va_mask = XFS_AT_MODE;
 			VOP_GETATTR(vp, &va, 0, sys_cred, error);
 		}
 
@@ -800,12 +800,12 @@ xfs_acl_setmode(
 	 * Copy the u::, g::, o::, and m:: bits from the ACL into the
 	 * mode.  The m:: bits take precedence over the g:: bits.
 	 */
-	va.va_mask = AT_MODE;
+	va.va_mask = XFS_AT_MODE;
 	VOP_GETATTR(vp, &va, 0, sys_cred, error);
 	if (error)
 		return error;
 
-	va.va_mask = AT_MODE;
+	va.va_mask = XFS_AT_MODE;
 	va.va_mode &= ~(S_IRWXU|S_IRWXG|S_IRWXO);
 	ap = acl->acl_entry;
 	for (i = 0; i < acl->acl_cnt; ++i) {

@@ -1112,6 +1112,12 @@ W:	http://www.acc.umu.se/~mcalinux/
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+MOTION EYE VAIO PICTUREBOOK CAMERA DRIVER
+P:	Stelian Pop
+M:	stelian@popies.net
+W:	http://popies.net/meye/
+S:	Maintained
+
 MOUSE AND MISC DEVICES [GENERAL]
 P:	Alessandro Rubini
 M:	rubini@ipvvis.unipv.it
@@ -1563,6 +1569,12 @@ SONIC NETWORK DRIVER
 P:	Thomas Bogendoerfer
 M:	tsbogend@alpha.franken.de
 L:	linux-net@vger.kernel.org
+S:	Maintained
+
+SONY VAIO CONTROL DEVICE DRIVER
+P:	Stelian Pop
+M:	stelian@popies.net
+W:	http://popies.net/sonypi/
 S:	Maintained
 
 SOUND

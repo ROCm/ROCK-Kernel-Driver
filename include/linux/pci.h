@@ -383,7 +383,6 @@ struct pci_dev {
 	u8		rom_base_reg;	/* which config register controls the ROM */
 
 	struct pci_driver *driver;	/* which driver has allocated this device */
-	void		*driver_data;	/* data private to the driver */
 	u64		dma_mask;	/* Mask of the bits of bus address this
 					   device implements.  Normally this is
 					   0xffffffff.  You only need to change
@@ -787,17 +786,17 @@ static inline int pci_module_init(struct pci_driver *drv)
 	  pci_resource_start((dev),(bar)) + 1))
 
 /* Similar to the helpers above, these manipulate per-pci_dev
- * driver-specific data.  Currently stored as pci_dev::driver_data,
- * a void pointer, but it is not present on older kernels.
+ * driver-specific data.  They are really just a wrapper around
+ * the generic device structure functions of these calls.
  */
 static inline void *pci_get_drvdata (struct pci_dev *pdev)
 {
-	return pdev->driver_data;
+	return dev_get_drvdata(&pdev->dev);
 }
 
 static inline void pci_set_drvdata (struct pci_dev *pdev, void *data)
 {
-	pdev->driver_data = data;
+	dev_set_drvdata(&pdev->dev, data);
 }
 
 /*

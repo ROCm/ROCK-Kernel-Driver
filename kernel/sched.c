@@ -1192,6 +1192,16 @@ void complete(struct completion *x)
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 
+void complete_all(struct completion *x)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&x->wait.lock, flags);
+	x->done += UINT_MAX/2;
+	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0, 0);
+	spin_unlock_irqrestore(&x->wait.lock, flags);
+}
+
 void wait_for_completion(struct completion *x)
 {
 	might_sleep();

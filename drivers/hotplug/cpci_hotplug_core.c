@@ -891,16 +891,17 @@ cleanup_slots(void)
 	return;
 }
 
-static int __init
-cpci_hotplug_init(void)
+int __init
+cpci_hotplug_init(int debug)
 {
 	spin_lock_init(&list_lock);
+	cpci_debug = debug;
 
 	info(DRIVER_DESC " version: " DRIVER_VERSION);
 	return 0;
 }
 
-static void __exit
+void __exit
 cpci_hotplug_exit(void)
 {
 	/*
@@ -909,14 +910,6 @@ cpci_hotplug_exit(void)
 	cleanup_slots();
 }
 
-module_init(cpci_hotplug_init);
-module_exit(cpci_hotplug_exit);
-
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_LICENSE("GPL");
-MODULE_PARM(cpci_debug, "i");
-MODULE_PARM_DESC(cpci_debug, "Debugging mode");
 
 EXPORT_SYMBOL_GPL(cpci_hp_register_controller);
 EXPORT_SYMBOL_GPL(cpci_hp_unregister_controller);

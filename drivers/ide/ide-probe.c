@@ -639,12 +639,6 @@ void probe_hwif (ide_hwif_t *hwif)
 
 	if (hwif->noprobe)
 		return;
-#ifdef CONFIG_BLK_DEV_IDE
-	if (hwif->io_ports[IDE_DATA_OFFSET] == HD_DATA) {
-		extern void probe_cmos_for_drives(ide_hwif_t *);
-		probe_cmos_for_drives(hwif);
-	}
-#endif
 
 	if ((hwif->chipset != ide_4drives || !hwif->mate || !hwif->mate->present) &&
 #if CONFIG_BLK_DEV_PDC4030

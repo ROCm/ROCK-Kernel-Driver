@@ -328,9 +328,7 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
-	init_MUTEX(&mm->core_sem);
-	init_waitqueue_head(&mm->core_wait);
-	atomic_set(&mm->core_waiters, 0);
+	mm->core_waiters = 0;
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
 	mm->ioctx_list_lock = RW_LOCK_UNLOCKED;
 	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
@@ -800,7 +798,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->start_time = jiffies;
 	p->security = NULL;
 
-	p->core_waiter = 0;
 	retval = -ENOMEM;
 	if (security_task_alloc(p))
 		goto bad_fork_cleanup;
