@@ -91,7 +91,7 @@ struct usblp {
 	struct usb_device 	*dev;			/* USB device */
 	devfs_handle_t		devfs;			/* devfs device */
 	struct semaphore	sem;			/* locks this struct, especially "dev" */
-	struct urb		readurb, writeurb;	/* The urbs */
+	struct urb		*readurb, *writeurb;	/* The urbs */
 	wait_queue_head_t	wait;			/* Zzzzz ... */
 	int			readcount;		/* Counter for reads */
 	int			ifnum;			/* Interface number */
@@ -253,15 +253,15 @@ static int usblp_open(struct inode *inode, struct file *file)
 	usblp->used = 1;
 	file->private_data = usblp;
 
-	usblp->writeurb.transfer_buffer_length = 0;
-	usblp->writeurb.status = 0;
+	usblp->writeurb->transfer_buffer_length = 0;
+	usblp->writeurb->status = 0;
 	usblp->wcomplete = 1; /* we begin writeable */
 	usblp->rcomplete = 0;
 
 	if (usblp->bidir) {
 		usblp->readcount = 0;
-		usblp->readurb.dev = usblp->dev;
-		if (usb_submit_urb(&usblp->readurb, GFP_KERNEL) < 0) {
+		usblp->readurb->dev = usblp->dev;
+		if (usb_submit_urb(usblp->readurb, GFP_KERNEL) < 0) {
 			retval = -EIO;
 			usblp->used = 0;
 			file->private_data = NULL;
@@ -278,8 +278,10 @@ static void usblp_cleanup (struct usblp *usblp)
 	usblp_table [usblp->minor] = NULL;
 	info ("usblp%d: removed", usblp->minor);
 
-	kfree (usblp->writeurb.transfer_buffer);
+	kfree (usblp->writeurb->transfer_buffer);
 	kfree (usblp->device_id_string);
+	usb_free_urb(usblp->writeurb);
+	usb_free_urb(usblp->readurb);
 	kfree (usblp);
 }
 
@@ -292,8 +294,8 @@ static int usblp_release(struct inode *inode, struct file *file)
 	usblp->used = 0;
 	if (usblp->dev) {
 		if (usblp->bidir)
-			usb_unlink_urb(&usblp->readurb);
-		usb_unlink_urb(&usblp->writeurb);
+			usb_unlink_urb(usblp->readurb);
+		usb_unlink_urb(usblp->writeurb);
 		up(&usblp->sem);
 	} else 		/* finish cleanup from disconnect */
 		usblp_cleanup (usblp);
@@ -306,8 +308,8 @@ static unsigned int usblp_poll(struct file *file, struct poll_table_struct *wait
 {
 	struct usblp *usblp = file->private_data;
 	poll_wait(file, &usblp->wait, wait);
- 	return ((!usblp->bidir || usblp->readurb.status  == -EINPROGRESS) ? 0 : POLLIN  | POLLRDNORM)
- 			       | (usblp->writeurb.status == -EINPROGRESS  ? 0 : POLLOUT | POLLWRNORM);
+ 	return ((!usblp->bidir || usblp->readurb->status  == -EINPROGRESS) ? 0 : POLLIN  | POLLRDNORM)
+ 			       | (usblp->writeurb->status == -EINPROGRESS  ? 0 : POLLOUT | POLLWRNORM);
 }
 
 static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
@@ -423,12 +425,12 @@ static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, 
 			return -ENODEV;
 		}
 
-		if (usblp->writeurb.status != 0) {
+		if (usblp->writeurb->status != 0) {
 			if (usblp->quirks & USBLP_QUIRK_BIDIR) {
 				if (!usblp->wcomplete)
 					err("usblp%d: error %d writing to printer",
-						usblp->minor, usblp->writeurb.status);
-				err = usblp->writeurb.status;
+						usblp->minor, usblp->writeurb->status);
+				err = usblp->writeurb->status;
 			} else
 				err = usblp_check_status(usblp, err);
 			up (&usblp->sem);
@@ -440,23 +442,23 @@ static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, 
 			continue;
 		}
 
-		writecount += usblp->writeurb.transfer_buffer_length;
-		usblp->writeurb.transfer_buffer_length = 0;
+		writecount += usblp->writeurb->transfer_buffer_length;
+		usblp->writeurb->transfer_buffer_length = 0;
 
 		if (writecount == count) {
 			up (&usblp->sem);
 			break;
 		}
 
-		usblp->writeurb.transfer_buffer_length = (count - writecount) < USBLP_BUF_SIZE ?
-							 (count - writecount) : USBLP_BUF_SIZE;
+		usblp->writeurb->transfer_buffer_length = (count - writecount) < USBLP_BUF_SIZE ?
+							  (count - writecount) : USBLP_BUF_SIZE;
 
-		if (copy_from_user(usblp->writeurb.transfer_buffer, buffer + writecount,
-				usblp->writeurb.transfer_buffer_length)) return -EFAULT;
+		if (copy_from_user(usblp->writeurb->transfer_buffer, buffer + writecount,
+				usblp->writeurb->transfer_buffer_length)) return -EFAULT;
 
-		usblp->writeurb.dev = usblp->dev;
+		usblp->writeurb->dev = usblp->dev;
 		usblp->wcomplete = 0;
-		if (usb_submit_urb(&usblp->writeurb, GFP_KERNEL)) {
+		if (usb_submit_urb(usblp->writeurb, GFP_KERNEL)) {
 			count = -EIO;
 			up (&usblp->sem);
 			break;
@@ -516,29 +518,29 @@ static ssize_t usblp_read(struct file *file, char *buffer, size_t count, loff_t 
 		goto done;
 	}
 
-	if (usblp->readurb.status) {
+	if (usblp->readurb->status) {
 		err("usblp%d: error %d reading from printer",
-			usblp->minor, usblp->readurb.status);
-		usblp->readurb.dev = usblp->dev;
+			usblp->minor, usblp->readurb->status);
+		usblp->readurb->dev = usblp->dev;
  		usblp->readcount = 0;
-		usb_submit_urb(&usblp->readurb, GFP_KERNEL);
+		usb_submit_urb(usblp->readurb, GFP_KERNEL);
 		count = -EIO;
 		goto done;
 	}
 
-	count = count < usblp->readurb.actual_length - usblp->readcount ?
-		count :	usblp->readurb.actual_length - usblp->readcount;
+	count = count < usblp->readurb->actual_length - usblp->readcount ?
+		count :	usblp->readurb->actual_length - usblp->readcount;
 
-	if (copy_to_user(buffer, usblp->readurb.transfer_buffer + usblp->readcount, count)) {
+	if (copy_to_user(buffer, usblp->readurb->transfer_buffer + usblp->readcount, count)) {
 		count = -EFAULT;
 		goto done;
 	}
 
-	if ((usblp->readcount += count) == usblp->readurb.actual_length) {
+	if ((usblp->readcount += count) == usblp->readurb->actual_length) {
 		usblp->readcount = 0;
-		usblp->readurb.dev = usblp->dev;
+		usblp->readurb->dev = usblp->dev;
 		usblp->rcomplete = 0;
-		if (usb_submit_urb(&usblp->readurb, GFP_KERNEL)) {
+		if (usb_submit_urb(usblp->readurb, GFP_KERNEL)) {
 			count = -EIO;
 			goto done;
 		}
@@ -668,24 +670,42 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 
 	init_waitqueue_head(&usblp->wait);
 
+	usblp->writeurb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!usblp->writeurb) {
+		err("out of memory");
+		kfree(usblp);
+		return NULL;
+	}
+	usblp->readurb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!usblp->readurb) {
+		err("out of memory");
+		usb_free_urb(usblp->writeurb);
+		kfree(usblp);
+		return NULL;
+	}
+
 	if (!(buf = kmalloc(USBLP_BUF_SIZE * (bidir ? 2 : 1), GFP_KERNEL))) {
 		err("out of memory");
+		usb_free_urb(usblp->writeurb);
+		usb_free_urb(usblp->readurb);
 		kfree(usblp);
 		return NULL;
 	}
 
 	if (!(usblp->device_id_string = kmalloc(DEVICE_ID_SIZE, GFP_KERNEL))) {
 		err("out of memory");
+		usb_free_urb(usblp->writeurb);
+		usb_free_urb(usblp->readurb);
 		kfree(usblp);
 		kfree(buf);
 		return NULL;
 	}
 
-	FILL_BULK_URB(&usblp->writeurb, dev, usb_sndbulkpipe(dev, epwrite->bEndpointAddress),
+	FILL_BULK_URB(usblp->writeurb, dev, usb_sndbulkpipe(dev, epwrite->bEndpointAddress),
 		buf, 0, usblp_bulk_write, usblp);
 
 	if (bidir)
-		FILL_BULK_URB(&usblp->readurb, dev, usb_rcvbulkpipe(dev, epread->bEndpointAddress),
+		FILL_BULK_URB(usblp->readurb, dev, usb_rcvbulkpipe(dev, epread->bEndpointAddress),
 			buf + USBLP_BUF_SIZE, USBLP_BUF_SIZE, usblp_bulk_read, usblp);
 
 	/* Get the device_id string if possible. FIXME: Could make this kmalloc(length). */
@@ -737,9 +757,9 @@ static void usblp_disconnect(struct usb_device *dev, void *ptr)
 	lock_kernel();
 	usblp->dev = NULL;
 
-	usb_unlink_urb(&usblp->writeurb);
+	usb_unlink_urb(usblp->writeurb);
 	if (usblp->bidir)
-		usb_unlink_urb(&usblp->readurb);
+		usb_unlink_urb(usblp->readurb);
 
 	if (!usblp->used)
 		usblp_cleanup (usblp);
