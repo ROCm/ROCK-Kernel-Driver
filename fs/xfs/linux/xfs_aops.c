@@ -184,13 +184,13 @@ map_buffer_at_offset(
 	int			block_bits,
 	xfs_iomap_t		*iomapp)
 {
-	page_buf_daddr_t	bn;
+	xfs_daddr_t		bn;
 	loff_t			delta;
 	int			sector_shift;
 
 	ASSERT(!(iomapp->iomap_flags & IOMAP_HOLE));
 	ASSERT(!(iomapp->iomap_flags & IOMAP_DELAY));
-	ASSERT(iomapp->iomap_bn != PAGE_BUF_DADDR_NULL);
+	ASSERT(iomapp->iomap_bn != IOMAP_DADDR_NULL);
 
 	delta = page->index;
 	delta <<= PAGE_CACHE_SHIFT;
@@ -870,8 +870,8 @@ linvfs_get_block_core(
 	if (retpbbm == 0)
 		return 0;
 
-	if (iomap.iomap_bn != PAGE_BUF_DADDR_NULL) {
-		page_buf_daddr_t	bn;
+	if (iomap.iomap_bn != IOMAP_DADDR_NULL) {
+		xfs_daddr_t		bn;
 		loff_t			delta;
 
 		/* For unwritten extents do not report a disk address on
