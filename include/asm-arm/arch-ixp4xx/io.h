@@ -292,7 +292,7 @@ __ixp4xx_outb(u8 value, u32 addr)
 }
 
 static inline void 
-__ixp4xx_outsb(u32 io_addr, u8 *vaddr, u32 count)
+__ixp4xx_outsb(u32 io_addr, const u8 *vaddr, u32 count)
 {
 	while (count--)
 		outb(*vaddr++, io_addr);
@@ -309,7 +309,7 @@ __ixp4xx_outw(u16 value, u32 addr)
 }
 
 static inline void 
-__ixp4xx_outsw(u32 io_addr, u16 *vaddr, u32 count)
+__ixp4xx_outsw(u32 io_addr, const u16 *vaddr, u32 count)
 {
 	while (count--)
 		outw(cpu_to_le16(*vaddr++), io_addr);
@@ -322,7 +322,7 @@ __ixp4xx_outl(u32 value, u32 addr)
 }
 
 static inline void 
-__ixp4xx_outsl(u32 io_addr, u32 *vaddr, u32 count)
+__ixp4xx_outsl(u32 io_addr, const u32 *vaddr, u32 count)
 {
 	while (count--)
 		outl(*vaddr++, io_addr);
