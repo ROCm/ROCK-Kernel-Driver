@@ -101,7 +101,7 @@ acpi_table_print (
 	else
 		name = header->signature;
 
-	printk(KERN_INFO PREFIX "%.4s (v%3.3d %6.6s %8.8s 0x%08x %.4s 0x%08x) @ 0x%p\n",
+	printk(KERN_DEBUG PREFIX "%.4s (v%3.3d %6.6s %8.8s 0x%08x %.4s 0x%08x) @ 0x%p\n",
 		name, header->revision, header->oem_id,
 		header->oem_table_id, header->oem_revision,
 		header->asl_compiler_id, header->asl_compiler_revision,
@@ -587,7 +587,7 @@ acpi_table_init (void)
 		return -ENODEV;
 	}
 
-	printk(KERN_INFO PREFIX "RSDP (v%3.3d %6.6s                                    ) @ 0x%p\n",
+	printk(KERN_DEBUG PREFIX "RSDP (v%3.3d %6.6s                                ) @ 0x%p\n",
 		rsdp->revision, rsdp->oem_id, (void *) rsdp_phys);
 
 	if (rsdp->revision < 2)
