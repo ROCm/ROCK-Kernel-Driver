@@ -88,7 +88,7 @@ void proc_device_tree_add_node(struct device_node *np, struct proc_dir_entry *de
 	child = NULL;
 	while ((child = of_get_next_child(np, child))) {
 		p = strrchr(child->full_name, '/');
-		if (p == 0)
+		if (!p)
 			p = child->full_name;
 		else
 			++p;
