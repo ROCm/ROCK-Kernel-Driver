@@ -200,12 +200,12 @@ config IKCONFIG_PROC
 
 
 menuconfig EMBEDDED
-	bool "Remove kernel features (for embedded systems)"
+	bool "Configure standard kernel features (for small systems)"
 	help
-	  This option allows certain base kernel features to be removed from
-	  the build.  This is for specialized environments which can tolerate
-	  a "non-standard" kernel.  Only use this if you really know what you
-	  are doing.
+	  This option allows certain base kernel options and settings
+          to be disabled or tweaked. This is for specialized
+          environments which can tolerate a "non-standard" kernel.
+          Only use this if you really know what you are doing.
 
 config KALLSYMS
 	 bool "Load all symbols for debugging/kksymoops" if EMBEDDED
