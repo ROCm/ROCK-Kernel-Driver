@@ -470,7 +470,7 @@ e1000_probe(struct pci_dev *pdev,
 	adapter->phy_info_timer.function = &e1000_update_phy_info;
 	adapter->phy_info_timer.data = (unsigned long) adapter;
 
-	INIT_TQUEUE(&adapter->tx_timeout_task, 
+	INIT_WORK(&adapter->tx_timeout_task, 
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
 	register_netdev(netdev);
@@ -1542,7 +1542,7 @@ e1000_tx_timeout(struct net_device *netdev)
 	struct e1000_adapter *adapter = netdev->priv;
 
 	/* Do the reset outside of interrupt context */
-	schedule_task(&adapter->tx_timeout_task);
+	schedule_work(&adapter->tx_timeout_task);
 }
 
 static void

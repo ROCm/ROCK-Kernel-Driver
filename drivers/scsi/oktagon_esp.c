@@ -40,7 +40,7 @@
 #include <asm/amigahw.h>
 
 #ifdef USE_BOTTOM_HALF
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #endif
 
@@ -77,9 +77,7 @@ static void dma_commit(void *opaque);
 long oktag_to_io(long *paddr, long *addr, long len);
 long oktag_from_io(long *addr, long *paddr, long len);
 
-static struct tq_struct tq_fake_dma = {
-    routine:	dma_commit,
-};
+static DECLARE_WORK(tq_fake_dma, dma_commit, NULL);
 
 #define DMA_MAXTRANSFER 0x8000
 
@@ -515,9 +513,7 @@ static void dma_irq_exit(struct NCR_ESP *esp)
 #ifdef USE_BOTTOM_HALF
 	if(dma_on)
 	 {
-	  tq_fake_dma.sync = 0;
-	  queue_task(&tq_fake_dma,&tq_immediate);
-	  mark_bh(IMMEDIATE_BH);
+	  schedule_work(&tq_fake_dma);
 	 }
 #else
 	while(len && !dma_irq_p(esp))

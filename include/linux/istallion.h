@@ -79,7 +79,7 @@ typedef struct {
 	wait_queue_head_t	close_wait;
 	wait_queue_head_t	raw_wait;
 #endif
-	struct tq_struct	tqhangup;
+	struct work_struct	tqhangup;
 	struct termios		normaltermios;
 	struct termios		callouttermios;
 	asysigs_t		asig;

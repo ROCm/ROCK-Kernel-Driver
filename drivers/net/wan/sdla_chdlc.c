@@ -163,10 +163,10 @@ typedef struct chdlc_private_area
 	
 	unsigned char interface_down;
 
-	/* Polling task queue. Each interface
-         * has its own task queue, which is used
+	/* Polling work queue entry. Each interface
+         * has its own work queue entry, which is used
          * to defer events from the interrupt */
-	struct tq_struct poll_task;
+	struct work_struct poll_work;
 	struct timer_list poll_delay_timer;
 
 	u8 gateway;
@@ -262,8 +262,8 @@ static void timer_intr(sdla_t *);
 
 #if defined(LINUX_2_1) || defined(LINUX_2_4)
   /* Bottom half handlers */
-  static void chdlc_bh (netdevice_t *);
-  static int chdlc_bh_cleanup (netdevice_t *);
+  static void chdlc_work (netdevice_t *);
+  static int chdlc_work_cleanup (netdevice_t *);
   static int bh_enqueue (netdevice_t *, struct sk_buff *);
 #endif
 
@@ -930,13 +930,8 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 	dev->init = &if_init;
 	dev->priv = chdlc_priv_area;
 
-	/* Initialize the polling task routine */
-#ifndef LINUX_2_4
-	chdlc_priv_area->poll_task.next = NULL;
-#endif
-	chdlc_priv_area->poll_task.sync=0;
-	chdlc_priv_area->poll_task.routine = (void*)(void*)chdlc_poll;
-	chdlc_priv_area->poll_task.data = dev;
+	/* Initialize the polling work routine */
+	INIT_WORK(&chdlc_priv_area->poll_work, (void*)(void*)chdlc_poll, dev);
 
 	/* Initialize the polling delay timer */
 	init_timer(&chdlc_priv_area->poll_delay_timer);
@@ -1052,15 +1047,11 @@ static int if_open (netdevice_t* dev)
 		return -EBUSY;
 
 #if defined(LINUX_2_1) || defined(LINUX_2_4)
-	/* Initialize the task queue */
+	/* Initialize the work queue entry */
 	chdlc_priv_area->tq_working=0;
 
-#ifndef LINUX_2_4
-	chdlc_priv_area->common.wanpipe_task.next = NULL;
-#endif
-	chdlc_priv_area->common.wanpipe_task.sync = 0;
-	chdlc_priv_area->common.wanpipe_task.routine = (void *)(void *)chdlc_bh;
-	chdlc_priv_area->common.wanpipe_task.data = dev;
+	INIT_WORK(&chdlc_priv_area->common.wanpipe_work,
+			(void *)(void *)chdlc_work, dev);
 
 	/* Allocate and initialize BH circular buffer */
 	/* Add 1 to MAX_BH_BUFF so we don't have test with (MAX_BH_BUFF-1) */
@@ -1863,7 +1854,7 @@ static int chdlc_error (sdla_t *card, int err, CHDLC_MAILBOX_STRUCT *mb)
  *       PREPROCESSOR STATEMENT ABOVE, UNLESS YOU KNOW WHAT YOU ARE
  *       DOING */
 
-static void chdlc_bh (netdevice_t * dev)
+static void chdlc_work (netdevice_t * dev)
 {
 	chdlc_private_area_t* chan = dev->priv;
 	sdla_t *card = chan->card;
@@ -1883,7 +1874,7 @@ static void chdlc_bh (netdevice_t * dev)
 			if (chan->common.sk == NULL || chan->common.func == NULL){
 				++card->wandev.stats.rx_dropped;
 				wan_dev_kfree_skb(skb, FREE_READ);
-				chdlc_bh_cleanup(dev);
+				chdlc_work_cleanup(dev);
 				continue;
 			}
 
@@ -1893,10 +1884,10 @@ static void chdlc_bh (netdevice_t * dev)
 				atomic_set(&chan->common.receive_block,1);
 				return;
 			}else{
-				chdlc_bh_cleanup(dev);
+				chdlc_work_cleanup(dev);
 			}
 		}else{
-			chdlc_bh_cleanup(dev);
+			chdlc_work_cleanup(dev);
 		}
 	}	
 	clear_bit(0, &chan->tq_working);
@@ -1904,7 +1895,7 @@ static void chdlc_bh (netdevice_t * dev)
 	return;
 }
 
-static int chdlc_bh_cleanup (netdevice_t *dev)
+static int chdlc_work_cleanup (netdevice_t *dev)
 {
 	chdlc_private_area_t* chan = dev->priv;
 
@@ -2214,10 +2205,8 @@ static void rx_intr (sdla_t* card)
 
 		bh_enqueue(dev, skb);
 
-		if (!test_and_set_bit(0,&chdlc_priv_area->tq_working)){
-			wanpipe_queue_tq(&chdlc_priv_area->common.wanpipe_task);
-		        wanpipe_mark_bh();
-		}
+		if (!test_and_set_bit(0,&chdlc_priv_area->tq_working))
+			wanpipe_queue_work(&chdlc_priv_area->common.wanpipe_work);
 #endif
 	}else{
 		/* FIXME: we should check to see if the received packet is a 
@@ -3776,7 +3765,7 @@ static void chdlc_poll (netdevice_t *dev)
  * trigger_chdlc_poll
  *
  * Description:
- * 	Add a chdlc_poll() task into a tq_scheduler bh handler
+ * 	Add a chdlc_poll() work entry into the keventd work queue
  *      for a specific dlci/interface.  This will kick
  *      the fr_poll() routine at a later time. 
  *
@@ -3804,12 +3793,7 @@ static void trigger_chdlc_poll (netdevice_t *dev)
 	if (test_bit(PERI_CRIT,&card->wandev.critical)){
 		return; 
 	}
-#ifdef LINUX_2_4
-	schedule_task(&chdlc_priv_area->poll_task);
-#else
-	queue_task(&chdlc_priv_area->poll_task, &tq_scheduler);
-#endif
-	return;
+	schedule_work(&chdlc_priv_area->poll_work);
 }
 
 
@@ -3856,14 +3840,10 @@ static void wanpipe_tty_trigger_tx_irq(sdla_t *card)
 
 static void wanpipe_tty_trigger_poll(sdla_t *card)
 {
-#ifdef LINUX_2_4
-	schedule_task(&card->tty_task_queue);
-#else
-	queue_task(&card->tty_task_queue, &tq_scheduler);
-#endif
+	schedule_work(&card->tty_work);
 }
 
-static void tty_poll_task (void* data)
+static void tty_poll_work (void* data)
 {
 	sdla_t *card = (sdla_t*)data;
 	struct tty_struct *tty;
@@ -4736,8 +4716,7 @@ int wanpipe_tty_init(sdla_t *card)
 	state->icount.overrun = state->icount.brk = 0;
 	state->irq = card->wandev.irq; 
 
-	card->tty_task_queue.routine = tty_poll_task;
-	card->tty_task_queue.data = (void*)card;
+	INIT_WORK(&card->tty_work, tty_poll_work, (void*)card);
 	return 0;
 }
 

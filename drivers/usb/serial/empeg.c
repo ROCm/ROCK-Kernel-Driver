@@ -362,7 +362,7 @@ static void empeg_write_bulk_callback (struct urb *urb)
 		return;
 	}
 
-	schedule_task(&port->tqueue);
+	schedule_work(&port->work);
 }
 
 

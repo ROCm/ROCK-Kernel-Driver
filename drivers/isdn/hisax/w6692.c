@@ -135,16 +135,14 @@ void
 W6692_sched_event(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	queue_task(&cs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&cs->tqueue);
 }
 
 static void
 W6692B_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	queue_task(&bcs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->tqueue);
 }
 
 static void
@@ -889,7 +887,7 @@ void resetW6692(struct IsdnCardState *cs)
 void __init initW6692(struct IsdnCardState *cs, int part)
 {
 	if (part & 1) {
-		cs->tqueue.routine = (void *) (void *) W6692_bh;
+		INIT_WORK(&cs->tqueue, (void *) (void *) W6692_bh, NULL);
 		cs->setstack_d = setstack_W6692;
 		cs->DC_Close = DC_Close_W6692;
 		cs->dbusytimer.function = (void *) dbusy_timer_handler;

@@ -36,7 +36,7 @@ typedef struct {
     int mode;			/* Transfer mode                */
     int host;			/* Host number (for proc)       */
     Scsi_Cmnd *cur_cmd;		/* Current queued command       */
-    struct tq_struct imm_tq;	/* Polling interrupt stuff       */
+    struct work_struct imm_tq;		/* Polling interrupt stuff       */
     unsigned long jstart;	/* Jiffies at start             */
     unsigned failed:1;		/* Failure flag                 */
     unsigned dp:1;		/* Data phase present           */
@@ -51,7 +51,6 @@ typedef struct {
 	mode:		IMM_AUTODETECT,	\
 	host:		-1,		\
 	cur_cmd:	NULL,		\
-	imm_tq:		{ routine: imm_interrupt },    \
 	jstart:		0,		\
 	failed:		0,		\
 	dp:		0,		\
@@ -896,9 +895,8 @@ static void imm_interrupt(void *data)
 	return;
     }
     if (imm_engine(tmp, cmd)) {
-	tmp->imm_tq.data = (void *) tmp;
-	tmp->imm_tq.sync = 0;
-	queue_task(&tmp->imm_tq, &tq_timer);
+	INIT_WORK(&tmp->imm_tq, imm_interrupt, (void *)tmp);
+	schedule_delayed_work(&tmp->imm_tq, 1);
 	return;
     }
     /* Command must of completed hence it is safe to let go... */
@@ -1103,10 +1101,8 @@ int imm_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 
     imm_pb_claim(host_no);
 
-    imm_hosts[host_no].imm_tq.data = imm_hosts + host_no;
-    imm_hosts[host_no].imm_tq.sync = 0;
-    queue_task(&imm_hosts[host_no].imm_tq, &tq_immediate);
-    mark_bh(IMMEDIATE_BH);
+    INIT_WORK(&imm_hosts[host_no].imm_tq, imm_interrupt, imm_hosts + host_no);
+    schedule_work(&imm_hosts[host_no].imm_tq);
 
     return 0;
 }

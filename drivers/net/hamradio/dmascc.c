@@ -36,7 +36,7 @@
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/sockios.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/version.h>
 #include <asm/atomic.h>
 #include <asm/bitops.h>
@@ -225,7 +225,7 @@ struct scc_priv {
   char rx_buf[NUM_RX_BUF][BUF_SIZE];
   int rx_len[NUM_RX_BUF];
   int rx_ptr;
-  struct tq_struct rx_task;
+  struct work_struct rx_work;
   int rx_head, rx_tail, rx_count;
   int rx_over;
   char tx_buf[NUM_TX_BUF][BUF_SIZE];
@@ -569,8 +569,7 @@ int __init setup_adapter(int card_base, int type, int n) {
     priv->param.clocks = TCTRxCP | RCRTxCP;
     priv->param.persist = 256;
     priv->param.dma = -1;
-    priv->rx_task.routine = rx_bh;
-    priv->rx_task.data = priv;
+    INIT_WORK(&priv->rx_work, rx_bh, priv);
     dev->priv = priv;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
     if (sizeof(dev->name) == sizeof(char *)) dev->name = priv->name;
@@ -1072,9 +1071,7 @@ static void special_condition(struct scc_priv *priv, int rc) {
 	  priv->rx_len[priv->rx_head] = cb;
 	  priv->rx_head = (priv->rx_head + 1) % NUM_RX_BUF;
 	  priv->rx_count++;
-	  /* Mark bottom half handler */
-	  queue_task(&priv->rx_task, &tq_immediate);
-	  mark_bh(IMMEDIATE_BH);
+	  schedule_work(&priv->rx_work);
 	} else {
 	  priv->stats.rx_errors++;
 	  priv->stats.rx_over_errors++;

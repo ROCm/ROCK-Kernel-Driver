@@ -31,7 +31,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/slab.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/proc_fs.h>
 #include <linux/pci.h>
 #include "cpqphp.h"

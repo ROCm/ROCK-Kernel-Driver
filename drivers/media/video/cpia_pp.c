@@ -32,7 +32,7 @@
 #include <linux/parport.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/smp_lock.h>
 
 #include <linux/kmod.h>
@@ -137,7 +137,7 @@ static int parport_ptr = 0;
 struct pp_cam_entry {
 	struct pardevice *pdev;
 	struct parport *port;
-	struct tq_struct cb_task;
+	struct work_struct cb_task;
 	int open_count;
 	wait_queue_head_t wq_stream;
 	/* image state flags */
@@ -518,8 +518,7 @@ static int cpia_pp_registerCallback(void *privdata, void (*cb)(void *cbdata), vo
 	int retval = 0;
 	
 	if(cam->port->irq != PARPORT_IRQ_NONE) {
-		cam->cb_task.routine = cb;
-		cam->cb_task.data = cbdata;
+		INIT_WORK(&cam->cb_task, cb, cbdata);
 	} else {
 		retval = -1;
 	}

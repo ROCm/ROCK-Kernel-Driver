@@ -2896,8 +2896,7 @@ idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 		if (stat & SAR_STAT_FBQ3A)
 			card->irqstat[8]++;
 
-		queue_task(&card->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&card->tqueue);
 	}
 
 out:
@@ -3737,8 +3736,7 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	card->pcidev = pcidev;
 	sprintf(card->name, "idt77252-%d", card->index);
 
-	card->tqueue.routine = idt77252_softint;
-	card->tqueue.data = (void *)card;
+	INIT_WORK(&card->tqueue, idt77252_softint, (void *)card);
 
 	membase = pci_resource_start(pcidev, 1);
 	srambase = pci_resource_start(pcidev, 2);

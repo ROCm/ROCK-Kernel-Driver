@@ -323,7 +323,7 @@ receive_chars(struct uart_sunsu_port *up, unsigned char *status, struct pt_regs 
 
 	do {
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			tty->flip.tqueue.routine((void *)tty);
+			tty->flip.work.func((void *)tty);
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 				return; // if TTY_DONT_FLIP is set
 		}

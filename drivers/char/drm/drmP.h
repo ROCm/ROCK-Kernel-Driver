@@ -66,7 +66,7 @@
 #include <linux/types.h>
 #include <linux/agp_backend.h>
 #endif
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/poll.h>
 #include <asm/pgalloc.h>
 #include "drm.h"
@@ -575,7 +575,7 @@ typedef struct drm_device {
 	int		  last_checked;	/* Last context checked for DMA	   */
 	int		  last_context;	/* Last current context		   */
 	unsigned long	  last_switch;	/* jiffies at last context switch  */
-	struct tq_struct  tq;
+	struct work_struct		  work;
 	cycles_t	  ctx_start;
 	cycles_t	  lck_start;
 #if __HAVE_DMA_HISTOGRAM

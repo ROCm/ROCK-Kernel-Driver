@@ -41,7 +41,7 @@
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/timer.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
@@ -80,7 +80,7 @@ static struct sa1100_pcmcia_socket sa1100_pcmcia_socket[SA1100_PCMCIA_MAX_SOCK];
 static struct pcmcia_low_level *pcmcia_low_level;
 
 static struct timer_list poll_timer;
-static struct tq_struct sa1100_pcmcia_task;
+static struct work_struct sa1100_pcmcia_task;
 
 /*
  * sa1100_pcmcia_default_mecr_timing
@@ -324,9 +324,7 @@ static void sa1100_pcmcia_task_handler(void *data)
   } while(all_events);
 }  /* sa1100_pcmcia_task_handler() */
 
-static struct tq_struct sa1100_pcmcia_task = {
-	routine: sa1100_pcmcia_task_handler
-};
+static DECLARE_WORK(sa1100_pcmcia_task, sa1100_pcmcia_task_handler, NULL);
 
 
 /* sa1100_pcmcia_poll_event()
@@ -339,7 +337,7 @@ static void sa1100_pcmcia_poll_event(unsigned long dummy)
   poll_timer.function = sa1100_pcmcia_poll_event;
   poll_timer.expires = jiffies + SA1100_PCMCIA_POLL_PERIOD;
   add_timer(&poll_timer);
-  schedule_task(&sa1100_pcmcia_task);
+  schedule_work(&sa1100_pcmcia_task);
 }
 
 
@@ -355,7 +353,7 @@ static void sa1100_pcmcia_poll_event(unsigned long dummy)
 static void sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
   DEBUG(3, "%s(): servicing IRQ %d\n", __FUNCTION__, irq);
-  schedule_task(&sa1100_pcmcia_task);
+  schedule_work(&sa1100_pcmcia_task);
 }
 
 
@@ -1087,7 +1085,7 @@ void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops)
 
 	ops->shutdown();
 
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 
 	pcmcia_low_level = NULL;
 }

@@ -101,7 +101,7 @@ struct sa1100fb_info {
 	volatile u_char		task_state;
 	struct semaphore	ctrlr_sem;
 	wait_queue_head_t	ctrlr_wait;
-	struct tq_struct	task;
+	struct work_struct	task;
 
 #ifdef CONFIG_PM
 	struct pm_dev		*pm;

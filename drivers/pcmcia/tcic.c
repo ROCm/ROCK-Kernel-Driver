@@ -49,7 +49,7 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -550,9 +550,7 @@ static void tcic_bh(void *dummy)
 	}
 }
 
-static struct tq_struct tcic_task = {
-	routine:	tcic_bh
-};
+static DECLARE_WORK(tcic_task, tcic_bh, NULL);
 
 static void tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
@@ -596,7 +594,7 @@ static void tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 		spin_lock(&pending_event_lock);
 		pending_events[i] |= events;
 		spin_unlock(&pending_event_lock);
-		schedule_task(&tcic_task);
+		schedule_work(&tcic_task);
 	}
     }
 

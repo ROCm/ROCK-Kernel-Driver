@@ -767,7 +767,7 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_info *);
 static void set_ctrlr_state(struct sa1100fb_info *fbi, u_int state);
 
-static inline void sa1100fb_schedule_task(struct sa1100fb_info *fbi, u_int state)
+static inline void sa1100fb_schedule_work(struct sa1100fb_info *fbi, u_int state)
 {
 	unsigned long flags;
 
@@ -787,7 +787,7 @@ static inline void sa1100fb_schedule_task(struct sa1100fb_info *fbi, u_int state
 
 	if (state != (u_int)-1) {
 		fbi->task_state = state;
-		schedule_task(&fbi->task);
+		schedule_work(&fbi->task);
 	}
 	local_irq_restore(flags);
 }
@@ -1140,14 +1140,14 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			for (i = 0; i < fbi->palette_size; i++)
 				sa1100fb_setpalettereg(i, 0, 0, 0, 0, info);
-		sa1100fb_schedule_task(fbi, C_DISABLE);
+		sa1100fb_schedule_work(fbi, C_DISABLE);
 		break;
 
 	case VESA_NO_BLANKING:
 		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			fb_set_cmap(&fbi->fb.cmap, 1, info);
-		sa1100fb_schedule_task(fbi, C_ENABLE);
+		sa1100fb_schedule_work(fbi, C_ENABLE);
 	}
 	return 0;
 }
@@ -1285,7 +1285,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
 	if ((LCCR0 != fbi->reg_lccr0)       || (LCCR1 != fbi->reg_lccr1) ||
 	    (LCCR2 != fbi->reg_lccr2)       || (LCCR3 != fbi->reg_lccr3) ||
 	    (DBAR1 != fbi->dbar1) || (DBAR2 != fbi->dbar2))
-		sa1100fb_schedule_task(fbi, C_REENABLE);
+		sa1100fb_schedule_work(fbi, C_REENABLE);
 
 	return 0;
 }
@@ -1778,7 +1778,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	fbi->fb.disp->inverse		= inf->cmap_inverse;
 
 	init_waitqueue_head(&fbi->ctrlr_wait);
-	INIT_TQUEUE(&fbi->task, sa1100fb_task, fbi);
+	INIT_WORK(&fbi->task, sa1100fb_task, fbi);
 	init_MUTEX(&fbi->ctrlr_sem);
 
 	return fbi;

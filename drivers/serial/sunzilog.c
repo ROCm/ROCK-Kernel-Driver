@@ -338,7 +338,7 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 		unsigned char ch, r1;
 
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			tty->flip.tqueue.routine((void *)tty);
+			tty->flip.work.func((void *)tty);
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 				return;
 		}

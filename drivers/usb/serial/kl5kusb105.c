@@ -577,7 +577,7 @@ static void klsi_105_write_bulk_callback ( struct urb *urb)
 	}
 
 	/* from generic_write_bulk_callback */
-	schedule_task(&port->tqueue);
+	schedule_work(&port->work);
 } /* klsi_105_write_bulk_completion_callback */
 
 

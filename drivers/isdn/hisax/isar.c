@@ -447,8 +447,7 @@ static void
 isar_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	queue_task(&bcs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->tqueue);
 }
 
 static inline void
@@ -1561,7 +1560,7 @@ isar_setup(struct IsdnCardState *cs)
 		cs->bcs[i].mode = 0;
 		cs->bcs[i].hw.isar.dpath = i + 1;
 		modeisar(&cs->bcs[i], 0, 0);
-		cs->bcs[i].tqueue.routine = (void *) (void *) isar_bh;
+		INIT_WORK(&cs->bcs[i].tqueue, (void *) (void *) isar_bh, NULL);
 	}
 }
 

@@ -89,7 +89,7 @@ typedef struct _raw3215_info {
         int written;                  /* number of bytes in write requests */
 	devstat_t devstat;	      /* device status structure for do_IO */
 	struct tty_struct *tty;	      /* pointer to tty structure if present */
-	struct tq_struct tqueue;      /* task queue to bottom half */
+	struct work_struct tqueue;      /* task queue to bottom half */
 	raw3215_req *queued_read;     /* pointer to queued read requests */
 	raw3215_req *queued_write;    /* pointer to queued write requests */
 	wait_queue_head_t empty_wait; /* wait queue for flushing */
@@ -379,10 +379,8 @@ static inline void raw3215_sched_bh(raw3215_info *raw)
         raw->flags |= RAW3215_BH_PENDING;
 	INIT_LIST_HEAD(&raw->tqueue.list);
 	raw->tqueue.sync = 0;
-        raw->tqueue.routine = raw3215_softint;
-        raw->tqueue.data = raw;
-        queue_task(&raw->tqueue, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+	INIT_WORK(&raw->tqueue, raw3215_softint, raw);
+        schedule_work(&raw->tqueue);
 }
 
 /*
@@ -867,8 +865,7 @@ static int tty3215_open(struct tty_struct *tty, struct file * filp)
 			kfree(raw);
 			return -ENOMEM;
 		}
-		raw->tqueue.routine = raw3215_softint;
-		raw->tqueue.data = raw;
+		INIT_WORK(&raw->tqueue, raw3215_softint, raw);
                 init_waitqueue_head(&raw->empty_wait);
 		raw3215[line] = raw;
 	}
@@ -1097,8 +1094,7 @@ void __init con3215_init(void)
 	/* Find the first console */
 	raw->irq = raw3215_find_dev(0);
 	raw->flags |= RAW3215_FIXED;
-	raw->tqueue.routine = raw3215_softint;
-	raw->tqueue.data = raw;
+	INIT_WORK(&raw->tqueue, raw3215_softint, raw);
         init_waitqueue_head(&raw->empty_wait);
 
 	/* Request the console irq */

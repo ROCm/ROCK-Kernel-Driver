@@ -112,7 +112,7 @@
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 #include <linux/ethtool.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
@@ -201,7 +201,7 @@ struct usbnet {
 	struct sk_buff_head	done;
 	struct tasklet_struct	bh;
 
-	struct tq_struct	kevent;
+	struct work_struct			kevent;
 	unsigned long		flags;
 #		define EVENT_TX_HALT	0
 #		define EVENT_RX_HALT	1
@@ -1278,13 +1278,13 @@ static void defer_bh (struct usbnet *dev, struct sk_buff *skb)
 
 /* some work can't be done in tasklets, so we use keventd
  *
- * NOTE:  annoying asymmetry:  if it's active, schedule_task() fails,
+ * NOTE:  annoying asymmetry:  if it's active, schedule_work() fails,
  * but tasklet_schedule() doesn't.  hope the failure is rare.
  */
 static void defer_kevent (struct usbnet *dev, int work)
 {
 	set_bit (work, &dev->flags);
-	if (!schedule_task (&dev->kevent))
+	if (!schedule_work (&dev->kevent))
 		err ("%s: kevent %d may have been dropped",
 			dev->net.name, work);
 	else
@@ -1965,7 +1965,7 @@ static void usbnet_disconnect (struct usb_interface *intf)
 	mutex_unlock (&usbnet_mutex);
 
 	// assuming we used keventd, it must quiesce too
-	flush_scheduled_tasks ();
+	flush_scheduled_work ();
 
 	kfree (dev);
 	usb_put_dev (xdev);
@@ -2016,7 +2016,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	skb_queue_head_init (&dev->done);
 	dev->bh.func = usbnet_bh;
 	dev->bh.data = (unsigned long) dev;
-	INIT_TQUEUE (&dev->kevent, kevent, dev);
+	INIT_WORK (&dev->kevent, kevent, dev);
 
 	// set up network interface records
 	net = &dev->net;

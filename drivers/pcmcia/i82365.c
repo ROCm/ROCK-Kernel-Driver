@@ -46,7 +46,7 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/bitops.h>
@@ -931,9 +931,7 @@ static void pcic_bh(void *dummy)
 	}
 }
 
-static struct tq_struct pcic_task = {
-	routine:	pcic_bh
-};
+static DECLARE_WORK(pcic_task, pcic_bh, NULL);
 
 static unsigned long last_detect_jiffies;
 
@@ -990,7 +988,7 @@ static void pcic_interrupt(int irq, void *dev,
 		    spin_lock(&pending_event_lock);
 		    pending_events[i] |= events;
 		    spin_unlock(&pending_event_lock);
-		    schedule_task(&pcic_task);
+		    schedule_work(&pcic_task);
 	    }
 	    active |= events;
 	}

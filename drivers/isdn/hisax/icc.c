@@ -191,8 +191,7 @@ void
 icc_sched_event(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	queue_task(&cs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&cs->tqueue);
 }
 
 void
@@ -625,7 +624,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 void __init
 initicc(struct IsdnCardState *cs)
 {
-	cs->tqueue.routine = (void *) (void *) icc_bh;
+	INIT_WORK(&cs->tqueue, (void *) (void *) icc_bh, NULL);
 	cs->setstack_d = setstack_icc;
 	cs->DC_Close = DC_Close_icc;
 	cs->dc.icc.mon_tx = NULL;

@@ -136,7 +136,7 @@ struct i2o_lan_local {
 	u8 sgl_max;			/* max SGLs in one message frame */
 	u32 m;				/* IOP address of the batch msg frame */
 
-	struct tq_struct i2o_batch_send_task;
+	struct work_struct i2o_batch_send_task;
 	int send_active;
 	struct sk_buff **i2o_fbl;	/* Free bucket list (to reuse skbs) */
 	int i2o_fbl_tail;

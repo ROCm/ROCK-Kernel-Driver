@@ -507,7 +507,7 @@ static void mct_u232_write_bulk_callback (struct urb *urb)
 		
 	} else {
 		/* from generic_write_bulk_callback */
-		schedule_task(&port->tqueue);
+		schedule_work(&port->work);
 	}
 
 	return;

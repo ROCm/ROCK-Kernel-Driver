@@ -10,7 +10,6 @@
 #define _LINUX_SUNRPC_SCHED_H_
 
 #include <linux/timer.h>
-#include <linux/tqueue.h>
 #include <linux/sunrpc/types.h>
 #include <linux/wait.h>
 

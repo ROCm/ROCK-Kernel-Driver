@@ -161,8 +161,7 @@ static __inline__ void isdn_net_dec_frame_cnt(isdn_net_local *lp)
 
 	if (!(isdn_net_device_busy(lp))) {
 		if (!skb_queue_empty(&lp->super_tx_queue)) {
-			queue_task(&lp->tqueue, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
+			schedule_work(&lp->tqueue);
 		} else {
 			isdn_net_device_wake_queue(lp);
 		}
@@ -852,8 +851,7 @@ void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb)
 		// we can't grab the lock from irq context, 
 		// so we just queue the packet
 		skb_queue_tail(&lp->super_tx_queue, skb); 
-		queue_task(&lp->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&lp->tqueue);
 		return;
 	}
 
@@ -1595,9 +1593,7 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->local.netdev = netdev;
 	netdev->local.next = &netdev->local;
 
-	netdev->local.tqueue.sync = 0;
-	netdev->local.tqueue.routine = isdn_net_softint;
-	netdev->local.tqueue.data = &netdev->local;
+	INIT_WORK(&netdev->local.tqueue, isdn_net_softint, &netdev->local);
 	spin_lock_init(&netdev->local.xmit_lock);
 
 	netdev->isdn_slot = -1;

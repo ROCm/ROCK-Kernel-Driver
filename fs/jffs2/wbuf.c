@@ -75,7 +75,7 @@ void jffs2_wbuf_timeout (unsigned long data)
 	* to sleep on flash write
 	*/
 	D1(printk(KERN_DEBUG "jffs2_wbuf_timeout(): timer expired\n"));
-	schedule_task(&c->wbuf_task);
+	schedule_work(&c->wbuf_task);
 }
 
 /*

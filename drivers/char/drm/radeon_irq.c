@@ -69,7 +69,7 @@ void DRM(dma_service)( DRM_IRQ_ARGS )
 
 	atomic_inc(&dev_priv->irq_received);
 #ifdef __linux__
-	schedule_task(&dev->tq);
+	schedule_work(&dev->work);
 #endif /* __linux__ */
 #ifdef __FreeBSD__
 	taskqueue_enqueue(taskqueue_swi, &dev->task);

@@ -345,9 +345,7 @@ init_bcstate(struct IsdnCardState *cs,
 
 	bcs->cs = cs;
 	bcs->channel = bc;
-	bcs->tqueue.sync = 0;
-	bcs->tqueue.routine = (void *) (void *) BChannel_bh;
-	bcs->tqueue.data = bcs;
+	INIT_WORK(&bcs->tqueue, (void *) (void *) BChannel_bh, bcs);
 	bcs->BC_SetStack = NULL;
 	bcs->BC_Close = NULL;
 	bcs->Flag = 0;

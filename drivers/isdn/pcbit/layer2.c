@@ -30,7 +30,7 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/mm.h>
 #include <linux/skbuff.h>
 
@@ -81,8 +81,7 @@ static void pcbit_firmware_bug(struct pcbit_dev *dev);
 static __inline__ void
 pcbit_sched_delivery(struct pcbit_dev *dev)
 {
-	queue_task(&dev->qdelivery, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&dev->qdelivery);
 }
 
 

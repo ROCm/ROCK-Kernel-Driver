@@ -918,7 +918,7 @@ static void whiteheat_write_callback(struct urb *urb)
 
 	usb_serial_port_softint((void *)port);
 
-	schedule_task(&port->tqueue);
+	schedule_work(&port->work);
 }
 
 

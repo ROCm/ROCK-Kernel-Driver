@@ -200,7 +200,7 @@ struct sci_port {
 	void (*init_pins)(struct sci_port* port, unsigned int cflag);
 	unsigned int old_cflag;
 	struct async_icount icount;
-	struct tq_struct tqueue;
+	struct work_struct tqueue;
 	unsigned long event;
 };
 

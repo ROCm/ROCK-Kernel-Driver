@@ -132,7 +132,7 @@ struct mpt_lan_priv {
 	u32 total_received;
 	struct net_device_stats stats;	/* Per device statistics */
 
-	struct tq_struct post_buckets_task;
+	struct work_struct post_buckets_task;
 	unsigned long post_buckets_active;
 };
 
@@ -876,10 +876,9 @@ mpt_lan_wake_post_buckets_task(struct net_device *dev, int priority)
 	
 	if (test_and_set_bit(0, &priv->post_buckets_active) == 0) {
 		if (priority) {
-			queue_task(&priv->post_buckets_task, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
+			schedule_work(&priv->post_buckets_task);
 		} else {
-			queue_task(&priv->post_buckets_task, &tq_timer);
+			schedule_delayed_work(&priv->post_buckets_task, 1);
 			dioprintk((KERN_INFO MYNAM ": post_buckets queued on "
 				   "timer.\n"));
 		}
@@ -1365,9 +1364,8 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 	priv->mpt_dev = mpt_dev;
 	priv->pnum = pnum;
 
-	memset(&priv->post_buckets_task, 0, sizeof(struct tq_struct));
-	priv->post_buckets_task.routine = mpt_lan_post_receive_buckets;
-	priv->post_buckets_task.data = dev;
+	memset(&priv->post_buckets_task, 0, sizeof(struct work_struct));
+	INIT_WORK(&priv->post_buckets_task, mpt_lan_post_receive_buckets, dev);
 	priv->post_buckets_active = 0;
 
 	dlprintk((KERN_INFO MYNAM "@%d: bucketlen = %d\n",

@@ -17,7 +17,6 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
-#include <linux/tqueue.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
@@ -43,7 +42,6 @@ struct psmouse {
 	struct serio *serio;
 	char *vendor;
 	char *name;
-	struct tq_struct tq;
 	unsigned char cmdbuf[8];
 	unsigned char packet[8];
 	unsigned char cmdcnt;

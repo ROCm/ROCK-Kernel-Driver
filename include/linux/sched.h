@@ -172,9 +172,6 @@ extern unsigned long cache_decay_ticks;
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
 asmlinkage void schedule(void);
 
-extern int start_context_thread(void);
-extern int current_is_keventd(void);
-
 struct namespace;
 
 /* Maximum number of active map areas.. This is a random (large) number */

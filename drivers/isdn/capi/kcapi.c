@@ -20,7 +20,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/skbuff.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/capi.h>
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
@@ -69,8 +69,8 @@ struct capi_ctr *capi_cards[CAPI_MAXCONTR];
 static int ncards;
 static struct sk_buff_head recv_queue;
 
-static struct tq_struct tq_state_notify;
-static struct tq_struct tq_recv_notify;
+static struct work_struct tq_state_notify;
+static struct work_struct tq_recv_notify;
 
 /* -------- ref counting -------------------------------------- */
 
@@ -234,7 +234,7 @@ static int notify_push(unsigned int cmd, u32 controller,
 	 * user process, not in bh.
 	 */
 	MOD_INC_USE_COUNT;
-	if (schedule_task(&tq_state_notify) == 0)
+	if (schedule_work(&tq_state_notify) == 0)
 		MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -359,8 +359,7 @@ void capi_ctr_handle_message(struct capi_ctr * card, u16 appl, struct sk_buff *s
 
 	}
 	skb_queue_tail(&recv_queue, skb);
-	queue_task(&tq_recv_notify, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&tq_recv_notify);
 	return;
 
 error:
@@ -875,11 +874,8 @@ static int __init kcapi_init(void)
 
 	skb_queue_head_init(&recv_queue);
 
-	tq_state_notify.routine = notify_handler;
-	tq_state_notify.data = 0;
-
-	tq_recv_notify.routine = recv_handler;
-	tq_recv_notify.data = 0;
+	INIT_WORK(&tq_state_notify, notify_handler, NULL);
+	INIT_WORK(&tq_recv_notify, recv_handler, NULL);
 
         kcapi_proc_init();
 

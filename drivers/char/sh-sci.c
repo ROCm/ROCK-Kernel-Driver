@@ -431,8 +431,7 @@ static int sci_set_real_termios(void *ptr)
 static inline void sci_sched_event(struct sci_port *port, int event)
 {
 	port->event |= 1 << event;
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&port->tqueue);
 }
 
 static void sci_transmit_chars(struct sci_port *port)
@@ -825,8 +824,7 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 	port->gs.count++;
 
 	port->event = 0;
-	port->tqueue.routine = do_softint;
-	port->tqueue.data = port;
+	INIT_WORK(&port->tqueue, do_softint, port);
 
 	/*
 	 * Start up serial port
