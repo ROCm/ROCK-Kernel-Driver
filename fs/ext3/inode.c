@@ -2385,7 +2385,9 @@ has_buffer:
 
 int ext3_get_inode_loc(struct inode *inode, struct ext3_iloc *iloc)
 {
-	return __ext3_get_inode_loc(inode, iloc, 1);
+	/* We have all inode data except xattrs in memory here. */
+	return __ext3_get_inode_loc(inode, iloc,
+		!(EXT3_I(inode)->i_state & EXT3_STATE_XATTR));
 }
 
 void ext3_set_inode_flags(struct inode *inode)
@@ -2490,6 +2492,16 @@ void ext3_read_inode(struct inode * inode)
 	for (block = 0; block < EXT3_N_BLOCKS; block++)
 		ei->i_data[block] = raw_inode->i_block[block];
 	INIT_LIST_HEAD(&ei->i_orphan);
+
+	ei->i_extra_isize =
+		(EXT3_INODE_SIZE(inode->i_sb) > EXT3_GOOD_OLD_INODE_SIZE) ?
+		le16_to_cpu(raw_inode->i_extra_isize) : 0;
+	if (ei->i_extra_isize) {
+		__le32 *magic = (void *)raw_inode + EXT3_GOOD_OLD_INODE_SIZE +
+				ei->i_extra_isize;
+		if (le32_to_cpu(*magic))
+			 ei->i_state |= EXT3_STATE_XATTR;
+	}
 
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext3_file_inode_operations;
@@ -2625,6 +2637,9 @@ static int ext3_do_update_inode(handle_t *handle,
 		}
 	} else for (block = 0; block < EXT3_N_BLOCKS; block++)
 		raw_inode->i_block[block] = ei->i_data[block];
+
+	if (EXT3_INODE_SIZE(inode->i_sb) > EXT3_GOOD_OLD_INODE_SIZE)
+		raw_inode->i_extra_isize = cpu_to_le16(ei->i_extra_isize);
 
 	BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
 	rc = ext3_journal_dirty_metadata(handle, bh);

@@ -195,7 +195,7 @@ struct ext3_group_desc
  */
 #define EXT3_STATE_JDATA		0x00000001 /* journaled data exists */
 #define EXT3_STATE_NEW			0x00000002 /* inode is newly created */
-
+#define EXT3_STATE_XATTR		0x00000004 /* has in-inode xattrs */
 
 /* Used to pass group descriptor data when online resize is done */
 struct ext3_new_group_input {
@@ -293,6 +293,8 @@ struct ext3_inode {
 			__u32	m_i_reserved2[2];
 		} masix2;
 	} osd2;				/* OS dependent 2 */
+	__le16	i_extra_isize;
+	__le16	i_pad1;
 };
 
 #define i_size_high	i_dir_acl

@@ -31,6 +31,10 @@ struct ext3_xattr_header {
 	__u32	h_reserved[4];	/* zero right now */
 };
 
+struct ext3_xattr_ibody_header {
+	__le32	h_magic;	/* magic number for identification */
+};
+
 struct ext3_xattr_entry {
 	__u8	e_name_len;	/* length of name */
 	__u8	e_name_index;	/* attribute name index */
