@@ -48,22 +48,6 @@ struct isdn_slot {
 
 static struct isdn_slot slot[ISDN_MAX_CHANNELS]; 
 
-static char *isdn_revision = "$Revision: 1.114.6.16 $";
-
-extern char *isdn_net_revision;
-extern char *isdn_tty_revision;
-#ifdef CONFIG_ISDN_PPP
-extern char *isdn_ppp_revision;
-#else
-static char *isdn_ppp_revision = ": none $";
-#endif
-#ifdef CONFIG_ISDN_AUDIO
-extern char *isdn_audio_revision;
-#else
-static char *isdn_audio_revision = ": none $";
-#endif
-extern char *isdn_v110_revision;
-
 #if defined(CONFIG_ISDN_DIVERSION) || defined(CONFIG_ISDN_DIVERSION_MODULE)
 static isdn_divert_if *divert_if; /* = NULL */
 #else
@@ -2074,21 +2058,6 @@ isdn_hard_header_len(void)
  *****************************************************************************
  */
 
-static char *
-isdn_getrev(const char *revision)
-{
-	char *rev;
-	char *p;
-
-	if ((p = strchr(revision, ':'))) {
-		rev = p + 2;
-		p = strchr(rev, '$');
-		*--p = 0;
-	} else
-		rev = "???";
-	return rev;
-}
-
 #ifdef CONFIG_DEVFS_FS
 
 static devfs_handle_t devfs_handle;
@@ -2176,7 +2145,6 @@ static int __init isdn_init(void)
 {
 	int i;
 	int retval;
-	char tmprev[50];
 
 	dev = vmalloc(sizeof(*dev));
 	if (!dev) {
@@ -2215,26 +2183,9 @@ static int __init isdn_init(void)
 	}
 #endif                          /* CONFIG_ISDN_PPP */
 
-	strcpy(tmprev, isdn_revision);
-	printk(KERN_NOTICE "ISDN subsystem Rev: %s/", isdn_getrev(tmprev));
-	strcpy(tmprev, isdn_tty_revision);
-	printk("%s/", isdn_getrev(tmprev));
-	strcpy(tmprev, isdn_net_revision);
-	printk("%s/", isdn_getrev(tmprev));
-	strcpy(tmprev, isdn_ppp_revision);
-	printk("%s/", isdn_getrev(tmprev));
-	strcpy(tmprev, isdn_audio_revision);
-	printk("%s/", isdn_getrev(tmprev));
-	strcpy(tmprev, isdn_v110_revision);
-	printk("%s", isdn_getrev(tmprev));
-
-#ifdef MODULE
-	printk(" loaded\n");
-#else
-	printk("\n");
-#endif
-	isdn_info_update();
 	isdn_net_init();
+	printk(KERN_NOTICE "ISDN subsystem initialized\n");
+	isdn_info_update();
 	return 0;
 
  err_tty_modem:

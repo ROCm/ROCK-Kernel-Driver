@@ -564,8 +564,6 @@ isdn_ppp_lp_push_header(void *priv, struct sk_buff *skb, u16 proto);
 static void
 isdn_ppp_dev_kick_up(void *priv);
 
-char *isdn_ppp_revision = "$Revision: 1.85.6.9 $";
-
 /*
  * frame log (debug)
  */

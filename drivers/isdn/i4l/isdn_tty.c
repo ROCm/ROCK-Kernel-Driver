@@ -51,9 +51,6 @@ static int bit2si[8] =
 static int si2bit[8] =
 {4, 1, 4, 4, 4, 4, 4, 4};
 
-char *isdn_tty_revision = "$Revision: 1.94.6.9 $";
-
-
 /* isdn_tty_try_read() is called from within isdn_tty_rcv_skb()
  * to stuff incoming data directly into a tty's flip-buffer. This
  * is done to speed up tty-receiving if the receive-queue is empty.

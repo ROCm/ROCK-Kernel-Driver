@@ -16,8 +16,6 @@
 
 #undef ISDN_V110_DEBUG
 
-char *isdn_v110_revision = "$Revision: 1.5.6.4 $";
-
 #define V110_38400 255
 #define V110_19200  15
 #define V110_9600    3

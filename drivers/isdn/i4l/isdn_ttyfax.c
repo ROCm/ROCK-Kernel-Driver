@@ -16,9 +16,6 @@
 #include "isdn_tty.h"
 #include "isdn_ttyfax.h"
 
-
-static char *isdn_tty_fax_revision = "$Revision: 1.7.6.2 $";
-
 #define PARSE_ERROR1 { isdn_tty_fax_modem_result(1, info); return 1; }
 
 static char *

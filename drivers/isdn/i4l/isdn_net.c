@@ -33,8 +33,6 @@
 #include "isdn_concap.h"
 #include "isdn_ciscohdlck.h"
 
-char *isdn_net_revision = "$Revision: 1.140.6.11 $";
-
 // ISDN_NET_ENCAP_IPTYP
 // ethernet type field
 // ======================================================================

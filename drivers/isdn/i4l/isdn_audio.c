@@ -15,8 +15,6 @@
 #include "isdn_audio.h"
 #include "isdn_common.h"
 
-char *isdn_audio_revision = "$Revision: 1.21.6.3 $";
-
 /*
  * Misc. lookup-tables.
  */
