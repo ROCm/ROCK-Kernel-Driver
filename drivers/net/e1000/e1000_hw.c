@@ -135,6 +135,41 @@ e1000_phy_init_script(struct e1000_hw *hw)
 
         e1000_write_phy_reg(hw,IGP01E1000_PHY_PAGE_SELECT,0x0000);
         e1000_write_phy_reg(hw,0x0000,0x3300);
+
+
+        if(hw->mac_type == e1000_82547) {
+            uint16_t fused, fine, coarse;
+
+            /* Move to analog registers page */
+            e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT, 
+                                IGP01E1000_ANALOG_REGS_PAGE);
+
+            e1000_read_phy_reg(hw, IGP01E1000_ANALOG_SPARE_FUSE_STATUS, &fused);
+
+            if(!(fused & IGP01E1000_ANALOG_SPARE_FUSE_ENABLED)) {
+                e1000_read_phy_reg(hw, IGP01E1000_ANALOG_FUSE_STATUS, &fused);
+
+                fine = fused & IGP01E1000_ANALOG_FUSE_FINE_MASK;
+                coarse = fused & IGP01E1000_ANALOG_FUSE_COARSE_MASK;
+
+                if(coarse > IGP01E1000_ANALOG_FUSE_COARSE_THRESH) {
+                    coarse -= IGP01E1000_ANALOG_FUSE_COARSE_10;
+                    fine -= IGP01E1000_ANALOG_FUSE_FINE_1;
+                } else if(coarse == IGP01E1000_ANALOG_FUSE_COARSE_THRESH)
+                    fine -= IGP01E1000_ANALOG_FUSE_FINE_10;
+
+                fused = (fused & IGP01E1000_ANALOG_FUSE_POLY_MASK) | 
+                        (fine & IGP01E1000_ANALOG_FUSE_FINE_MASK) | 
+                        (coarse & IGP01E1000_ANALOG_FUSE_COARSE_MASK);
+
+                e1000_write_phy_reg(hw, IGP01E1000_ANALOG_FUSE_CONTROL, fused);
+                e1000_write_phy_reg(hw, IGP01E1000_ANALOG_FUSE_BYPASS, 
+                                    IGP01E1000_ANALOG_FUSE_ENABLE_SW_CONTROL);
+            }
+            /* Return to first page of registers */
+            e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT,
+                                IGP01E1000_IEEE_REGS_PAGE);
+        }
     }
 }
 
