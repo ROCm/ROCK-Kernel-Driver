@@ -1010,33 +1010,6 @@ unit_directory_error:
 		kfree(ud);
 }
 
-static void dump_directories (struct node_entry *ne)
-{
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-	struct list_head *l;
-
-	HPSB_DEBUG("vendor_id=0x%06x [%s], capabilities=0x%06x",
-		   ne->vendor_id, ne->vendor_name ?: "Unknown",
-		   ne->capabilities);
-	list_for_each (l, &ne->unit_directories) {
-		struct unit_directory *ud = list_entry (l, struct unit_directory, node_list);
-		HPSB_DEBUG("unit directory:");
-		if (ud->flags & UNIT_DIRECTORY_VENDOR_ID)
-			HPSB_DEBUG("  vendor_id=0x%06x [%s]",
-				   ud->vendor_id,
-				   ud->vendor_name ?: "Unknown");
-		if (ud->flags & UNIT_DIRECTORY_MODEL_ID)
-			HPSB_DEBUG("  model_id=0x%06x [%s]",
-				   ud->model_id,
-				   ud->model_name ?: "Unknown");
-		if (ud->flags & UNIT_DIRECTORY_SPECIFIER_ID)
-			HPSB_DEBUG("  sw_specifier_id=0x%06x ", ud->specifier_id);
-		if (ud->flags & UNIT_DIRECTORY_VERSION)
-			HPSB_DEBUG("  sw_version=0x%06x ", ud->version);
-	}
-#endif
-	return;
-}
 
 static void nodemgr_process_root_directory(struct host_info *hi, struct node_entry *ne)
 {
@@ -1104,8 +1077,6 @@ static void nodemgr_process_root_directory(struct host_info *hi, struct node_ent
 			break;
 		}
 	}
-
-	dump_directories(ne);
 }
 
 #ifdef CONFIG_HOTPLUG
