@@ -4177,9 +4177,11 @@ static int airo_get_freq(struct net_device *dev,
 	struct airo_info *local = dev->priv;
 	StatusRid status_rid;		/* Card status info */
 
-	readStatusRid(local, &status_rid);
+	if ((local->config.opmode & 0xFF) == MODE_STA_ESS)
+		status_rid.channel = local->config.channelSet;
+	else
+		readStatusRid(local, &status_rid);
 
-	/* Will return zero in infrastructure mode */
 #ifdef WEXT_USECHANNELS
 	fwrq->m = ((int)status_rid.channel) + 1;
 	fwrq->e = 0;
