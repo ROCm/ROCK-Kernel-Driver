@@ -55,7 +55,7 @@ u8 hfs_bnode_read_u8(struct hfs_bnode *node, int off)
 	u8 data;
 	// optimize later...
 	hfs_bnode_read(node, &data, off, 1);
-	return be16_to_cpu(data);
+	return data;
 }
 
 void hfs_bnode_read_key(struct hfs_bnode *node, void *key, int off)
