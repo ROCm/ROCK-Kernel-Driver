@@ -601,6 +601,7 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 {
 	long cpu = (long)hcpu;
 	kmem_cache_t* cachep;
+	struct list_head *p;
 
 	switch (action) {
 	case CPU_UP_PREPARE:
