@@ -47,7 +47,7 @@ QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; $$config =
 
 $(obj)/config.o : $(obj)/config.c
 
-quiet_cmd_quote = QUOTE $@
+quiet_cmd_quote = QUOTE   $@
 cmd_quote = $(PERL) -e $(QUOTE) < $< > $@
 
 targets += config.c
