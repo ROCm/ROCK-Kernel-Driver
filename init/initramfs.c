@@ -248,7 +248,6 @@ static int __init do_name(void)
 		next_state = Reset;
 		return 0;
 	}
-	printk(KERN_INFO "-> %s\n", collected);
 	if (S_ISREG(mode)) {
 		if (maybe_link() >= 0) {
 			wfd = sys_open(collected, O_WRONLY|O_CREAT, mode);
@@ -261,11 +260,13 @@ static int __init do_name(void)
 	} else if (S_ISDIR(mode)) {
 		sys_mkdir(collected, mode);
 		sys_chown(collected, uid, gid);
+		sys_chmod(collected, mode);
 	} else if (S_ISBLK(mode) || S_ISCHR(mode) ||
 		   S_ISFIFO(mode) || S_ISSOCK(mode)) {
 		if (maybe_link() == 0) {
 			sys_mknod(collected, mode, rdev);
 			sys_chown(collected, uid, gid);
+			sys_chmod(collected, mode);
 		}
 	} else
 		panic("populate_root: bogus mode: %o\n", mode);

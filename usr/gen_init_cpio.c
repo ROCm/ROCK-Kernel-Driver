@@ -212,7 +212,7 @@ error:
 
 int main (int argc, char *argv[])
 {
-	cpio_mkdir("/dev", 0700, 0, 0);
+	cpio_mkdir("/dev", 0755, 0, 0);
 	cpio_mknod("/dev/console", 0600, 0, 0, 'c', 5, 1);
 	cpio_mkdir("/root", 0700, 0, 0);
 	cpio_trailer();
