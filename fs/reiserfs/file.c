@@ -365,7 +365,7 @@ int reiserfs_allocate_blocks_for_region(
     // it means there are no existing in-tree representation for file area
     // we are going to overwrite, so there is nothing to scan through for holes.
     for ( curr_block = 0, itempos = path.pos_in_item ; curr_block < blocks_to_allocate && res == POSITION_FOUND ; ) {
-
+retry:
 	if ( itempos >= ih_item_len(ih)/UNFM_P_SIZE ) {
 	    /* We run out of data in this indirect item, let's look for another
 	       one. */
@@ -422,8 +422,8 @@ int reiserfs_allocate_blocks_for_region(
 		    bh=get_last_bh(&path);
 		    ih=get_ih(&path);
 		    item = get_item(&path);
-		    // Itempos is still the same
-		    continue;
+		    itempos = path.pos_in_item;
+		    goto retry;
 		}
 		modifying_this_item = 1;
 	    }
@@ -856,8 +856,12 @@ int reiserfs_prepare_file_region_for_write(
 			/* Try to find next item */
 			res = search_for_position_by_key(inode->i_sb, &key, &path);
 			/* Abort if no more items */
-			if ( res != POSITION_FOUND )
+			if ( res != POSITION_FOUND ) {
+			    /* make sure later loops don't use this item */
+			    itembuf = NULL;
+			    item = NULL;
 			    break;
+			}
 
 			/* Update information about current indirect item */
 			itembuf = get_last_bh( &path );
