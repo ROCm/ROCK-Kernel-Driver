@@ -2788,11 +2788,8 @@ static const struct atmdev_ops ops = {
 	.getsockopt	= NULL,
 	.setsockopt	= NULL,
 	.send		= lanai_send,
-	.sg_send	= NULL,		/* no scatter-gather on card */
-	.send_oam	= NULL,		/* OAM support not in linux yet */
 	.phy_put	= NULL,
 	.phy_get	= NULL,
-	.feedback	= NULL,
 	.change_qos	= lanai_change_qos,
 	.proc_read	= lanai_proc_read
 };

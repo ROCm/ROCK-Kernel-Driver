@@ -2190,7 +2190,7 @@ static void __devexit sis900_remove(struct pci_dev *pci_dev)
 	pci_free_consistent(pci_dev, TX_TOTAL_SIZE, sis_priv->tx_ring,
 		sis_priv->tx_ring_dma);
 	unregister_netdev(net_dev);
-	kfree(net_dev);
+	free_netdev(net_dev);
 	pci_release_regions(pci_dev);
 	pci_set_drvdata(pci_dev, NULL);
 }

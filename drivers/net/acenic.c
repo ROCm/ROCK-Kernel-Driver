@@ -955,7 +955,7 @@ static void __exit ace_module_cleanup(void)
 		}
 
 		ace_init_cleanup(root_dev);
-		kfree(root_dev);
+		free_netdev(root_dev);
 		root_dev = next;
 	}
 }

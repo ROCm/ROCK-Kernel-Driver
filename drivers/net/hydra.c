@@ -226,7 +226,7 @@ static void __exit hydra_cleanup(void)
 	unregister_netdev(dev);
 	free_irq(IRQ_AMIGA_PORTS, dev);
 	release_mem_region(ZTWO_PADDR(dev->base_addr)-HYDRA_NIC_BASE, 0x10000);
-	kfree(dev);
+	free_netdev(dev);
 	root_hydra_dev = next;
     }
 }

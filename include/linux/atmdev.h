@@ -335,15 +335,16 @@ struct atm_dev {
 	struct list_head dev_list;	/* linkage */
 };
 
-
-/*
- * ioctl, getsockopt, setsockopt, and sg_send are optional and can be set to
- * NULL. */
-
+ 
 /* OF: send_Oam Flags */
 
-#define ATM_OF_IMMED	1	/* Attempt immediate delivery */
-#define ATM_OF_INRATE	2	/* Attempt in-rate delivery */
+#define ATM_OF_IMMED  1		/* Attempt immediate delivery */
+#define ATM_OF_INRATE 2		/* Attempt in-rate delivery */
+
+
+/*
+ * ioctl, getsockopt, and setsockopt are optional and can be set to NULL.
+ */
 
 struct atmdev_ops { /* only send is required */
 	void (*dev_close)(struct atm_dev *dev);
@@ -355,23 +356,14 @@ struct atmdev_ops { /* only send is required */
 	int (*setsockopt)(struct atm_vcc *vcc,int level,int optname,
 	    void *optval,int optlen);
 	int (*send)(struct atm_vcc *vcc,struct sk_buff *skb);
-	int (*sg_send)(struct atm_vcc *vcc,unsigned long start,
-	    unsigned long size);
-#if 0 /* keep the current hack for now */
-	int (*send_iovec)(struct atm_vcc *vcc,struct iovec *iov,int size,
-	    void (*discard)(struct atm_vcc *vcc,void *user),void *user);
-#endif
 	int (*send_oam)(struct atm_vcc *vcc,void *cell,int flags);
 	void (*phy_put)(struct atm_dev *dev,unsigned char value,
 	    unsigned long addr);
 	unsigned char (*phy_get)(struct atm_dev *dev,unsigned long addr);
-	void (*feedback)(struct atm_vcc *vcc,struct sk_buff *skb,
-	    unsigned long start,unsigned long dest,int len);
 	int (*change_qos)(struct atm_vcc *vcc,struct atm_qos *qos,int flags);
 	int (*proc_read)(struct atm_dev *dev,loff_t *pos,char *page);
 	struct module *owner;
 };
-
 
 struct atmphy_ops {
 	int (*start)(struct atm_dev *dev);

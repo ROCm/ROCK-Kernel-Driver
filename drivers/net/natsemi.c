@@ -2552,7 +2552,7 @@ static void __devexit natsemi_remove1 (struct pci_dev *pdev)
 	unregister_netdev (dev);
 	pci_release_regions (pdev);
 	iounmap ((char *) dev->base_addr);
-	kfree (dev);
+	free_netdev (dev);
 	pci_set_drvdata(pdev, NULL);
 }
 

@@ -609,7 +609,7 @@ static int net_remove(char *str)
 	unregister_netdev(dev);
 
 	list_del(&device->list);
-	kfree(device);
+	free_netdev(device);
 	return(0);
 }
 

@@ -3348,7 +3348,7 @@ static void __exit happy_meal_cleanup_module(void)
 			pci_release_regions(hp->happy_dev);
 		}
 #endif
-		kfree(dev);
+		free_netdev(dev);
 
 		root_happy_dev = next;
 	}

@@ -730,7 +730,7 @@ e100_clear_structs(struct net_device *dev)
 
 	e100_dealloc_space(bdp);
 	pci_set_drvdata(bdp->pdev, NULL);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static void __devexit

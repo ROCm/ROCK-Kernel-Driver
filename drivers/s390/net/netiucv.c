@@ -1654,7 +1654,7 @@ netiucv_free_netdevice(struct net_device *dev)
 			kfree_fsm(privptr->fsm);
 		kfree(privptr);
 	}
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static ssize_t

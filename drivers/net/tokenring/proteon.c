@@ -436,7 +436,7 @@ void cleanup_module(void)
 		free_irq(dev->irq, dev);
 		free_dma(dev->dma);
 		tmsdev_term(dev);
-		kfree(dev);
+		free_netdev(dev);
 		this_card = proteon_card_list;
 		proteon_card_list = this_card->next;
 		kfree(this_card);

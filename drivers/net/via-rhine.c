@@ -1893,7 +1893,7 @@ static void __devexit via_rhine_remove_one (struct pci_dev *pdev)
 	iounmap((char *)(dev->base_addr));
 #endif
 
-	kfree(dev);
+	free_netdev(dev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }

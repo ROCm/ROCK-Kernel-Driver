@@ -1176,7 +1176,7 @@ static int __init yam_init_driver(void)
  error:
 	while (--i >= 0) {
 		unregister_netdev(yam_devs[i]);
-		kfree(yam_devs[i]);
+		free_netdev(yam_devs[i]);
 	}
 	return err;
 }

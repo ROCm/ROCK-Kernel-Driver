@@ -229,7 +229,7 @@ static void __devexit tms_pci_detach (struct pci_dev *pdev)
 	release_region(dev->base_addr, TMS_PCI_IO_EXTENT);
 	free_irq(dev->irq, dev);
 	tmsdev_term(dev);
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }
 
