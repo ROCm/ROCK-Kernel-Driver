@@ -1,7 +1,7 @@
 /*
  * XFS filesystem operations.
  *
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -229,7 +229,10 @@ xfs_start_flags(
 		mp->m_swidth = ap->swidth;
 	}
 
-	if (ap->logbufs != 0 && ap->logbufs != -1 &&
+	if (ap->logbufs != -1 &&
+#if defined(DEBUG) || defined(XLOG_NOLOG)
+	    ap->logbufs != 0 &&
+#endif
 	    (ap->logbufs < XLOG_MIN_ICLOGS ||
 	     ap->logbufs > XLOG_MAX_ICLOGS)) {
 		cmn_err(CE_WARN,
