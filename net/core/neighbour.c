@@ -631,9 +631,8 @@ static void neigh_connect(struct neighbour *neigh)
 static void neigh_periodic_timer(unsigned long arg)
 {
 	struct neigh_table *tbl = (struct neigh_table *)arg;
-	unsigned long now = jiffies;
-	int i;
-
+	struct neighbour *n, **np;
+	unsigned long expire, now = jiffies;
 
 	write_lock(&tbl->lock);
 
@@ -649,41 +648,49 @@ static void neigh_periodic_timer(unsigned long arg)
 				neigh_rand_reach_time(p->base_reachable_time);
 	}
 
-	for (i = 0; i <= tbl->hash_mask; i++) {
-		struct neighbour *n, **np;
+	np = &tbl->hash_buckets[tbl->hash_chain_gc];
+	tbl->hash_chain_gc = ((tbl->hash_chain_gc + 1) & tbl->hash_mask);
 
-		np = &tbl->hash_buckets[i];
-		while ((n = *np) != NULL) {
-			unsigned state;
+	while ((n = *np) != NULL) {
+		unsigned int state;
 
-			write_lock(&n->lock);
+		write_lock(&n->lock);
 
-			state = n->nud_state;
-			if (state & (NUD_PERMANENT | NUD_IN_TIMER)) {
-				write_unlock(&n->lock);
-				goto next_elt;
-			}
-
-			if (time_before(n->used, n->confirmed))
-				n->used = n->confirmed;
-
-			if (atomic_read(&n->refcnt) == 1 &&
-			    (state == NUD_FAILED ||
-			     time_after(now, n->used + n->parms->gc_staletime))) {
-				*np = n->next;
-				n->dead = 1;
-				write_unlock(&n->lock);
-				neigh_release(n);
-				continue;
-			}
+		state = n->nud_state;
+		if (state & (NUD_PERMANENT | NUD_IN_TIMER)) {
 			write_unlock(&n->lock);
+			goto next_elt;
+		}
+
+		if (time_before(n->used, n->confirmed))
+			n->used = n->confirmed;
+
+		if (atomic_read(&n->refcnt) == 1 &&
+		    (state == NUD_FAILED ||
+		     time_after(now, n->used + n->parms->gc_staletime))) {
+			*np = n->next;
+			n->dead = 1;
+			write_unlock(&n->lock);
+			neigh_release(n);
+			continue;
+		}
+		write_unlock(&n->lock);
 
 next_elt:
-			np = &n->next;
-		}
+		np = &n->next;
 	}
 
-	mod_timer(&tbl->gc_timer, now + tbl->gc_interval);
+ 	/* Cycle through all hash buckets every base_reachable_time/2 ticks.
+ 	 * ARP entry timeouts range from 1/2 base_reachable_time to 3/2
+ 	 * base_reachable_time.
+	 */
+	expire = tbl->parms.base_reachable_time >> 1;
+	expire /= (tbl->hash_mask + 1);
+	if (!expire)
+		expire = 1;
+
+ 	mod_timer(&tbl->gc_timer, now + expire);
+
 	write_unlock(&tbl->lock);
 }
 
@@ -1324,8 +1331,7 @@ void neigh_table_init(struct neigh_table *tbl)
 	init_timer(&tbl->gc_timer);
 	tbl->gc_timer.data     = (unsigned long)tbl;
 	tbl->gc_timer.function = neigh_periodic_timer;
-	tbl->gc_timer.expires  = now + tbl->gc_interval +
-				 tbl->parms.reachable_time;
+	tbl->gc_timer.expires  = now + 1;
 	add_timer(&tbl->gc_timer);
 
 	init_timer(&tbl->proxy_timer);

@@ -176,6 +176,7 @@ struct neigh_table
 	struct neighbour	**hash_buckets;
 	unsigned int		hash_mask;
 	__u32			hash_rnd;
+	unsigned int		hash_chain_gc;
 	struct pneigh_entry	**phash_buckets;
 };
 
