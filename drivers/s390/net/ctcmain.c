@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.58 2004/03/24 10:51:56 ptiedem Exp $
+ * $Id: ctcmain.c,v 1.59 2004/04/21 17:10:13 ptiedem Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.58 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.59 $
  *
  */
 
@@ -319,7 +319,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.58 $";
+	char vbuf[] = "$Revision: 1.59 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -2045,6 +2045,32 @@ extract_channel_media(char *name)
 	return ret;
 }
 
+static long
+__ctc_check_irb_error(struct ccw_device *cdev, struct irb *irb)
+{
+	if (!IS_ERR(irb))
+		return 0;
+
+	switch (PTR_ERR(irb)) {
+	case -EIO:
+		ctc_pr_warn("i/o-error on device %s\n", cdev->dev.bus_id);
+//		CTC_DBF_TEXT(trace, 2, "ckirberr");
+//		CTC_DBF_TEXT_(trace, 2, "  rc%d", -EIO);
+		break;
+	case -ETIMEDOUT:
+		ctc_pr_warn("timeout on device %s\n", cdev->dev.bus_id);
+//		CTC_DBF_TEXT(trace, 2, "ckirberr");
+//		CTC_DBF_TEXT_(trace, 2, "  rc%d", -ETIMEDOUT);
+		break;
+	default:
+		ctc_pr_warn("unknown error %ld on device %s\n", PTR_ERR(irb),
+			   cdev->dev.bus_id);
+//		CTC_DBF_TEXT(trace, 2, "ckirberr");
+//		CTC_DBF_TEXT(trace, 2, "  rc???");
+	}
+	return PTR_ERR(irb);
+}
+
 /**
  * Main IRQ handler.
  *
@@ -2058,6 +2084,9 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	struct channel *ch;
 	struct net_device *dev;
 	struct ctc_priv *priv;
+
+	if (__ctc_check_irb_error(cdev, irb))
+		return;
 
 	/* Check for unsolicited interrupts. */
 	if (!cdev->dev.driver_data) {

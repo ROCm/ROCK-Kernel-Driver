@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.49 2004/04/15 06:37:54 braunu Exp $
+ * $Id: netiucv.c,v 1.51 2004/04/23 08:11:21 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.49 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.51 $
  *
  */
 
@@ -169,10 +169,10 @@ static __inline__ int netiucv_test_and_set_busy(struct net_device *dev)
 }
 
 static __u8 iucv_host[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-static __u8 iucvMagic[16] = {
-	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
-	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
-};
+//static __u8 iucvMagic[16] = {
+//	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+//	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
+//};
 
 /**
  * This mask means the 16-byte IUCV "magic" and the origin userid must
@@ -693,13 +693,20 @@ static void
 conn_action_connreject(fsm_instance *fi, int event, void *arg)
 {
 	struct iucv_event *ev = (struct iucv_event *)arg;
-	// struct iucv_connection *conn = ev->conn;
+	struct iucv_connection *conn = ev->conn;
+	struct net_device *netdev = conn->netdev;
 	iucv_ConnectionPending *eib = (iucv_ConnectionPending *)ev->data;
 	__u8 udata[16];
 
 	pr_debug("%s() called\n", __FUNCTION__);
 
 	iucv_sever(eib->ippathid, udata);
+	if (eib->ippathid != conn->pathid) {
+		printk(KERN_INFO
+			"%s: IR pathid %d does not match original pathid %d\n",
+			netdev->name, eib->ippathid, conn->pathid);
+		iucv_sever(conn->pathid, udata);
+	}
 }
 
 static void
@@ -715,7 +722,12 @@ conn_action_connack(fsm_instance *fi, int event, void *arg)
 
 	fsm_deltimer(&conn->timer);
 	fsm_newstate(fi, CONN_STATE_IDLE);
-	conn->pathid = eib->ippathid;
+	if (eib->ippathid != conn->pathid) {
+		printk(KERN_INFO
+			"%s: IR pathid %d does not match original pathid %d\n",
+			netdev->name, eib->ippathid, conn->pathid);
+		conn->pathid = eib->ippathid;
+	}
 	netdev->tx_queue_len = eib->ipmsglim;
 	fsm_event(privptr->fsm, DEV_EVENT_CONUP, netdev);
 }
@@ -759,9 +771,14 @@ conn_action_start(fsm_instance *fi, int event, void *arg)
 	struct iucv_connection *conn = ev->conn;
 	__u16 msglimit;
 	int rc;
+	__u8 iucvMagic[16] = {
+	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+        0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
+	};
 
 	pr_debug("%s() called\n", __FUNCTION__);
 
+	memcpy(iucvMagic, conn->netdev->name, IFNAMSIZ);
 	if (conn->handle == 0) {
 		conn->handle =
 			iucv_register_program(iucvMagic, conn->userid, mask,
@@ -1882,7 +1899,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.49 $";
+	char vbuf[] = "$Revision: 1.51 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

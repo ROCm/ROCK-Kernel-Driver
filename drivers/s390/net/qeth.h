@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.100 $"
+#define VERSION_QETH_H 		"$Revision: 1.102 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -398,11 +398,6 @@ struct qeth_qdio_q {
 	struct qdio_buffer qdio_bufs[QDIO_MAX_BUFFERS_PER_Q];
 	struct qeth_qdio_buffer bufs[QDIO_MAX_BUFFERS_PER_Q];
 	/*
-	 * buf_to_process means "buffer primed by hardware,
-	 * has to be read in by driver"; current state PRIMED
-	 */
-	volatile int next_buf_to_process;
-	/*
 	 * buf_to_init means "buffer must be initialized by driver and must
 	 * be made available for hardware" -> state is set to EMPTY
 	 */
@@ -493,8 +488,7 @@ enum qeth_card_states {
 	CARD_STATE_DOWN,
 	CARD_STATE_HARDSETUP,
 	CARD_STATE_SOFTSETUP,
-	CARD_STATE_UP_LAN_OFFLINE,
-	CARD_STATE_UP_LAN_ONLINE,
+	CARD_STATE_UP,
 	CARD_STATE_RECOVER,
 };
 
@@ -981,24 +975,27 @@ qeth_setrouting_v4(struct qeth_card *);
 extern int
 qeth_setrouting_v6(struct qeth_card *);
 
-int
+extern int
 qeth_add_ipato_entry(struct qeth_card *, struct qeth_ipato_entry *);
 
-void
+extern void
 qeth_del_ipato_entry(struct qeth_card *, enum qeth_prot_versions, u8 *, int);
 
-int
+extern int
 qeth_add_vipa(struct qeth_card *, enum qeth_prot_versions, const u8 *);
 
-void
+extern void
 qeth_del_vipa(struct qeth_card *, enum qeth_prot_versions, const u8 *);
 
-int
+extern int
 qeth_add_rxip(struct qeth_card *, enum qeth_prot_versions, const u8 *);
 
-void
+extern void
 qeth_del_rxip(struct qeth_card *, enum qeth_prot_versions, const u8 *);
 
-void
+extern void
 qeth_schedule_recovery(struct qeth_card *);
+
+extern int
+qeth_realloc_buffer_pool(struct qeth_card *, int);
 #endif /* __QETH_H__ */
