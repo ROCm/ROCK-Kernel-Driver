@@ -38,9 +38,9 @@ typedef struct {
 #define irq_exit()		(preempt_count() -= IRQ_OFFSET)
 
 #ifndef CONFIG_SMP
-# define synchronize_irq()	barrier()
+# define synchronize_irq(irq)	barrier()
 #else
- extern void synchronize_irq(void);
+ extern void synchronize_irq(unsigned int irq);
 #endif
 
 #endif /* !(__SPARC64_HARDIRQ_H) */
