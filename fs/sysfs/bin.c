@@ -1,5 +1,9 @@
 /*
  * bin.c - binary file operations for sysfs.
+ *
+ * Copyright (c) 2003 Patrick Mochel
+ * Copyright (c) 2003 Matthew Wilcox
+ * Copyright (c) 2004 Silicon Graphics, Inc.
  */
 
 #undef DEBUG
@@ -19,6 +23,9 @@ fill_read(struct dentry *dentry, char *buffer, loff_t off, size_t count)
 {
 	struct bin_attribute * attr = to_bin_attr(dentry);
 	struct kobject * kobj = to_kobj(dentry->d_parent);
+
+	if (!attr->read)
+		return -EINVAL;
 
 	return attr->read(kobj, buffer, off, count);
 }
@@ -63,6 +70,9 @@ flush_write(struct dentry *dentry, char *buffer, loff_t offset, size_t count)
 	struct bin_attribute *attr = to_bin_attr(dentry);
 	struct kobject *kobj = to_kobj(dentry->d_parent);
 
+	if (!attr->write)
+		return -EINVAL;
+
 	return attr->write(kobj, buffer, offset, count);
 }
 
@@ -92,6 +102,18 @@ static ssize_t write(struct file * file, const char __user * userbuf,
 	return count;
 }
 
+static int mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct dentry *dentry = file->f_dentry;
+	struct bin_attribute *attr = to_bin_attr(dentry);
+	struct kobject *kobj = to_kobj(dentry->d_parent);
+
+	if (!attr->mmap)
+		return -EINVAL;
+
+	return attr->mmap(kobj, attr, vma);
+}
+
 static int open(struct inode * inode, struct file * file)
 {
 	struct kobject *kobj = sysfs_get_kobject(file->f_dentry->d_parent);
@@ -107,9 +129,9 @@ static int open(struct inode * inode, struct file * file)
 		goto Done;
 
 	error = -EACCES;
-	if ((file->f_mode & FMODE_WRITE) && !attr->write)
+	if ((file->f_mode & FMODE_WRITE) && !(attr->write || attr->mmap))
 		goto Error;
-	if ((file->f_mode & FMODE_READ) && !attr->read)
+	if ((file->f_mode & FMODE_READ) && !(attr->read || attr->mmap))
 		goto Error;
 
 	error = -ENOMEM;
@@ -144,6 +166,7 @@ static int release(struct inode * inode, struct file * file)
 struct file_operations bin_fops = {
 	.read		= read,
 	.write		= write,
+	.mmap		= mmap,
 	.llseek		= generic_file_llseek,
 	.open		= open,
 	.release	= release,

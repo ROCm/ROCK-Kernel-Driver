@@ -1610,8 +1610,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	int n;
 
 	for (n = 0; hid_blacklist[n].idVendor; n++)
-		if ((hid_blacklist[n].idVendor == dev->descriptor.idVendor) &&
-			(hid_blacklist[n].idProduct == dev->descriptor.idProduct))
+		if ((hid_blacklist[n].idVendor == le16_to_cpu(dev->descriptor.idVendor)) &&
+			(hid_blacklist[n].idProduct == le16_to_cpu(dev->descriptor.idProduct)))
 				quirks = hid_blacklist[n].quirks;
 
 	if (quirks & HID_QUIRK_IGNORE)
@@ -1730,7 +1730,9 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	} else if (usb_string(dev, dev->descriptor.iProduct, buf, 128) > 0) {
 			snprintf(hid->name, 128, "%s", buf);
 	} else
-		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
+		snprintf(hid->name, 128, "%04x:%04x", 
+			 le16_to_cpu(dev->descriptor.idVendor),
+			 le16_to_cpu(dev->descriptor.idProduct));
 
 	usb_make_path(dev, buf, 64);
 	snprintf(hid->phys, 64, "%s/input%d", buf,

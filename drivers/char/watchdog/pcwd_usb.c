@@ -571,12 +571,6 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 	char fw_ver_str[20];
 	unsigned char option_switches, dummy;
 
-	/* See if the device offered us matches what we can accept */
-	if ((udev->descriptor.idVendor != USB_PCWD_VENDOR_ID) ||
-	    (udev->descriptor.idProduct != USB_PCWD_PRODUCT_ID)) {
-		return -ENODEV;
-	}
-
 	cards_found++;
 	if (cards_found > 1) {
 		printk(KERN_ERR PFX "This driver only supports 1 device\n");
@@ -621,7 +615,7 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 	usb_pcwd->udev = udev;
 	usb_pcwd->interface = interface;
 	usb_pcwd->interface_number = iface_desc->desc.bInterfaceNumber;
-	usb_pcwd->intr_size = (endpoint->wMaxPacketSize > 8 ? endpoint->wMaxPacketSize : 8);
+	usb_pcwd->intr_size = (le16_to_cpu(endpoint->wMaxPacketSize) > 8 ? le16_to_cpu(endpoint->wMaxPacketSize) : 8);
 
 	/* set up the memory buffer's */
 	if (!(usb_pcwd->intr_buffer = usb_buffer_alloc(udev, usb_pcwd->intr_size, SLAB_ATOMIC, &usb_pcwd->intr_dma))) {

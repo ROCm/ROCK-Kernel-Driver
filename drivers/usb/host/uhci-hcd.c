@@ -46,7 +46,7 @@
 #include <linux/unistd.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
-#include <linux/proc_fs.h>
+#include <linux/debugfs.h>
 #include <linux/pm.h>
 #include <linux/dmapool.h>
 #include <linux/dma-mapping.h>
@@ -74,7 +74,7 @@ Alan Stern"
  * debug = 0, no debugging messages
  * debug = 1, dump failed URB's except for stalls
  * debug = 2, dump all failed URB's (including stalls)
- *            show all queues in /proc/driver/uhci/[pci_addr]
+ *            show all queues in /debug/uhci/[pci_addr]
  * debug = 3, show all TD's in URB's when dumping
  */
 #ifdef DEBUG
@@ -1255,7 +1255,9 @@ static struct urb *uhci_find_urb_ep(struct uhci_hcd *uhci, struct urb *urb)
 	return NULL;
 }
 
-static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
+static int uhci_urb_enqueue(struct usb_hcd *hcd,
+		struct usb_host_endpoint *ep,
+		struct urb *urb, int mem_flags)
 {
 	int ret;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
@@ -1889,7 +1891,7 @@ static int start_hc(struct uhci_hcd *uhci)
 	uhci->state_end = jiffies + HZ;
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 
-        uhci->hcd.state = USB_STATE_RUNNING;
+        uhci_to_hcd(uhci)->state = USB_STATE_RUNNING;
 	return 0;
 }
 
@@ -1927,12 +1929,10 @@ static void release_uhci(struct uhci_hcd *uhci)
 		uhci->fl = NULL;
 	}
 
-#ifdef CONFIG_PROC_FS
-	if (uhci->proc_entry) {
-		remove_proc_entry(uhci->hcd.self.bus_name, uhci_proc_root);
-		uhci->proc_entry = NULL;
+	if (uhci->dentry) {
+		debugfs_remove(uhci->dentry);
+		uhci->dentry = NULL;
 	}
-#endif
 }
 
 static int uhci_reset(struct usb_hcd *hcd)
@@ -1972,25 +1972,17 @@ static int uhci_start(struct usb_hcd *hcd)
 	unsigned io_size;
 	dma_addr_t dma_handle;
 	struct usb_device *udev;
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *ent;
-#endif
+	struct dentry *dentry;
 
 	io_size = pci_resource_len(to_pci_dev(uhci_dev(uhci)), hcd->region);
 
-#ifdef CONFIG_PROC_FS
-	ent = create_proc_entry(hcd->self.bus_name, S_IFREG|S_IRUGO|S_IWUSR, uhci_proc_root);
-	if (!ent) {
-		dev_err(uhci_dev(uhci), "couldn't create uhci proc entry\n");
+	dentry = debugfs_create_file(hcd->self.bus_name, S_IFREG|S_IRUGO|S_IWUSR, uhci_debugfs_root, uhci, &uhci_debug_operations);
+	if (!dentry) {
+		dev_err(uhci_dev(uhci), "couldn't create uhci debugfs entry\n");
 		retval = -ENOMEM;
-		goto err_create_proc_entry;
+		goto err_create_debug_entry;
 	}
-
-	ent->data = uhci;
-	ent->proc_fops = &uhci_proc_operations;
-	ent->size = 0;
-	uhci->proc_entry = ent;
-#endif
+	uhci->dentry = dentry;
 
 	uhci->fsbr = 0;
 	uhci->fsbrtimeout = 0;
@@ -2149,7 +2141,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	udev->speed = USB_SPEED_FULL;
 
-	if (hcd_register_root(udev, &uhci->hcd) != 0) {
+	if (hcd_register_root(udev, hcd) != 0) {
 		dev_err(uhci_dev(uhci), "unable to start root hub\n");
 		retval = -ENOMEM;
 		goto err_start_root_hub;
@@ -2192,13 +2184,10 @@ err_create_td_pool:
 	uhci->fl = NULL;
 
 err_alloc_fl:
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry(hcd->self.bus_name, uhci_proc_root);
-	uhci->proc_entry = NULL;
+	debugfs_remove(uhci->dentry);
+	uhci->dentry = NULL;
 
-err_create_proc_entry:
-#endif
-
+err_create_debug_entry:
 	return retval;
 }
 
@@ -2275,62 +2264,18 @@ static int uhci_resume(struct usb_hcd *hcd)
 		if ((rc = start_hc(uhci)) != 0)
 			return rc;
 	}
-	uhci->hcd.state = USB_STATE_RUNNING;
+	hcd->state = USB_STATE_RUNNING;
 	return 0;
 }
 #endif
 
-static struct usb_hcd *uhci_hcd_alloc(void)
-{
-	struct uhci_hcd *uhci;
-
-	uhci = (struct uhci_hcd *)kmalloc(sizeof(*uhci), GFP_KERNEL);
-	if (!uhci)
-		return NULL;
-
-	memset(uhci, 0, sizeof(*uhci));
-	uhci->hcd.product_desc = "UHCI Host Controller";
-	return &uhci->hcd;
-}
-
-/* Are there any URBs for a particular device/endpoint on a given list? */
-static int urbs_for_ep_list(struct list_head *head,
-		struct hcd_dev *hdev, int ep)
-{
-	struct urb_priv *urbp;
-
-	list_for_each_entry(urbp, head, urb_list) {
-		struct urb *urb = urbp->urb;
-
-		if (hdev == urb->dev->hcpriv && ep ==
-				(usb_pipeendpoint(urb->pipe) |
-				 usb_pipein(urb->pipe)))
-			return 1;
-	}
-	return 0;
-}
-
-/* Are there any URBs for a particular device/endpoint? */
-static int urbs_for_ep(struct uhci_hcd *uhci, struct hcd_dev *hdev, int ep)
-{
-	int rc;
-
-	spin_lock_irq(&uhci->schedule_lock);
-	rc = (urbs_for_ep_list(&uhci->urb_list, hdev, ep) ||
-			urbs_for_ep_list(&uhci->complete_list, hdev, ep) ||
-			urbs_for_ep_list(&uhci->urb_remove_list, hdev, ep));
-	spin_unlock_irq(&uhci->schedule_lock);
-	return rc;
-}
-
 /* Wait until all the URBs for a particular device/endpoint are gone */
 static void uhci_hcd_endpoint_disable(struct usb_hcd *hcd,
-		struct hcd_dev *hdev, int endpoint)
+		struct usb_host_endpoint *ep)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
-	wait_event_interruptible(uhci->waitqh,
-			!urbs_for_ep(uhci, hdev, endpoint));
+	wait_event_interruptible(uhci->waitqh, list_empty(&ep->urb_list));
 }
 
 static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
@@ -2342,6 +2287,8 @@ static const char hcd_name[] = "uhci_hcd";
 
 static const struct hc_driver uhci_driver = {
 	.description =		hcd_name,
+	.product_desc =		"UHCI Host Controller",
+	.hcd_priv_size =	sizeof(struct uhci_hcd),
 
 	/* Generic hardware linkage */
 	.irq =			uhci_irq,
@@ -2355,8 +2302,6 @@ static const struct hc_driver uhci_driver = {
 	.resume =		uhci_resume,
 #endif
 	.stop =			uhci_stop,
-
-	.hcd_alloc =		uhci_hcd_alloc,
 
 	.urb_enqueue =		uhci_urb_enqueue,
 	.urb_dequeue =		uhci_urb_dequeue,
@@ -2405,11 +2350,9 @@ static int __init uhci_hcd_init(void)
 			goto errbuf_failed;
 	}
 
-#ifdef CONFIG_PROC_FS
-	uhci_proc_root = create_proc_entry("driver/uhci", S_IFDIR, NULL);
-	if (!uhci_proc_root)
-		goto proc_failed;
-#endif
+	uhci_debugfs_root = debugfs_create_dir("uhci", NULL);
+	if (!uhci_debugfs_root)
+		goto debug_failed;
 
 	uhci_up_cachep = kmem_cache_create("uhci_urb_priv",
 		sizeof(struct urb_priv), 0, 0, NULL, NULL);
@@ -2427,12 +2370,9 @@ init_failed:
 		warn("not all urb_priv's were freed!");
 
 up_failed:
+	debugfs_remove(uhci_debugfs_root);
 
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry("driver/uhci", NULL);
-
-proc_failed:
-#endif
+debug_failed:
 	if (errbuf)
 		kfree(errbuf);
 
@@ -2448,9 +2388,7 @@ static void __exit uhci_hcd_cleanup(void)
 	if (kmem_cache_destroy(uhci_up_cachep))
 		warn("not all urb_priv's were freed!");
 
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry("driver/uhci", NULL);
-#endif
+	debugfs_remove(uhci_debugfs_root);
 
 	if (errbuf)
 		kfree(errbuf);
