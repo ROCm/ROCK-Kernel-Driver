@@ -285,8 +285,8 @@ export MODLIB
 
 vmlinux-objs := $(HEAD) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
 
-quiet_cmd_link_vmlinux = LD      $@
-define cmd_link_vmlinux
+quiet_cmd_ld_tmp_vmlinux = LD      $@
+define cmd_ld_tmp_vmlinux
 	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(HEAD) $(init-y) \
 	--start-group \
 	$(core-y) \
@@ -294,21 +294,19 @@ define cmd_link_vmlinux
 	$(drivers-y) \
 	$(net-y) \
 	--end-group \
-	$(filter $(kallsyms.o),$^) \
 	-o $@
 endef
 
 #	set -e makes the rule exit immediately on error
 
-define rule_vmlinux
+define rule_ld_tmp_vmlinux
 	set -e
 	echo '  Generating build number'
 	. scripts/mkversion > .tmp_version
 	mv -f .tmp_version .version
 	+$(call descend,init,)
-	$(call cmd,link_vmlinux)
-	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
-	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+	$(call cmd,ld_tmp_vmlinux)
+	echo 'cmd_$@ := $(cmd_ld_tmp_vmlinux)' > $(@D)/.$(@F).cmd
 endef
 
 LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
@@ -317,33 +315,42 @@ LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 
 ifdef CONFIG_KALLSYMS
 
-kallsyms.o := .tmp_kallsyms.o
+final-objs += .tmp_kallsyms.o
 
 quiet_cmd_kallsyms = KSYM    $@
-cmd_kallsyms = $(KALLSYMS) $< > $@
+define cmd_kallsyms
+	$(KALLSYMS) $< > $@
+endef
 
 .tmp_kallsyms.o: .tmp_vmlinux
 	$(call cmd,kallsyms)
 
-# 	After generating .tmp_vmlinux just like vmlinux, decrement the version
-#	number again, so the final vmlinux gets the same one.
-#	Ignore return value of 'expr'.
+endif
 
-define rule_.tmp_vmlinux
-	$(rule_vmlinux)
-	if expr 0`cat .version` - 1 > .tmp_version; then true; fi
-	mv -f .tmp_version .version
-endef
+#	Link a temporary vmlinux for postprocessing
+#	(e.g. kallsyms)
 
 .tmp_vmlinux: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
-	$(call if_changed_rule,.tmp_vmlinux)
-
-endif
+	$(call if_changed_rule,ld_tmp_vmlinux)
 
 #	Finally the vmlinux rule
 
-vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/vmlinux.lds.s FORCE
-	$(call if_changed_rule,vmlinux)
+quiet_cmd_ld_vmlinux = LD      $(echo_target)
+cmd_ld_vmlinux = $(LD) $(LDFLAGS) $(LDFLAGS_$(@F)) \
+	       $(filter-out FORCE,$^) -o $@
+
+define rule_ld_vmlinux
+	set -e
+	$(call cmd,ld_vmlinux)
+	echo 'cmd_$@ := $(cmd_ld_vmlinux)' > $(@D)/.$(@F).cmd
+	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+endef
+
+#	Link the actual vmlinux, which is temporary one from above,
+#	and possibly additional sections given in $(final-objs)
+
+vmlinux: .tmp_vmlinux $(final-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
+	$(call if_changed_rule,ld_vmlinux)
 
 #	The actual objects are generated when descending, 
 #	make sure no implicit rule kicks in
@@ -860,6 +867,17 @@ cmd_files := $(wildcard .*.cmd $(foreach f,$(targets),$(dir $(f)).$(notdir $(f))
 ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
+
+# function to only execute the passed command if necessary
+
+if_changed = $(if $(strip $? \
+		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
+			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
+	@set -e; \
+	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(cmd_$(1)); \
+	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd)
+
 
 # execute the command and also postprocess generated .d dependencies
 # file
