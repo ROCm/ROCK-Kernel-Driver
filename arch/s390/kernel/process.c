@@ -196,8 +196,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
         /* new return point is ret_from_fork */
         frame->gprs[8] = (unsigned long) ret_from_fork;
-	/* start disabled because of schedule_tick and rq->lock being held */
-	frame->childregs.psw.mask &= ~0x03000000;
 
         /* fake return stack for resume(), don't go back to schedule */
         frame->gprs[9]  = (unsigned long) frame;
@@ -213,6 +211,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 	p->thread.ar4 = get_fs().ar4;
         /* Don't copy debug registers */
         memset(&p->thread.per_info,0,sizeof(p->thread.per_info));
+
+	/* Set a new TLS ?  */
+	if (clone_flags & CLONE_SETTLS)
+		frame->childregs.acrs[0] = regs->gprs[6];
         return 0;
 }
 
@@ -335,7 +337,7 @@ unsigned long get_wchan(struct task_struct *p)
 	int count = 0;
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
-	stack_page = (unsigned long) p;
+	stack_page = (unsigned long) p->thread_info;
 	r15 = p->thread.ksp;
         if (!stack_page || r15 < stack_page || r15 >= 8188+stack_page)
                 return 0;

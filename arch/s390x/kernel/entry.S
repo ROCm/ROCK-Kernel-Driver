@@ -644,7 +644,8 @@ sys_call_table:
 	.long  SYSCALL(sys_epoll_ctl,sys_ni_syscall)
 	.long  SYSCALL(sys_epoll_wait,sys_ni_syscall)
 	.long  SYSCALL(sys_set_tid_address,sys_ni_syscall)
-        .rept  255-252
+	.long  SYSCALL(sys_fadvise64,sys_ni_syscall)
+        .rept  255-253
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
 	.endr
 

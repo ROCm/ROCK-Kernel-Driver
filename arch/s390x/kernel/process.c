@@ -203,6 +203,19 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 	p->thread.ar4 = get_fs().ar4;
         /* Don't copy debug registers */
         memset(&p->thread.per_info,0,sizeof(p->thread.per_info));
+
+	/* Set a new TLS ?  */
+	if (clone_flags & CLONE_SETTLS) {
+		if (current->thread.flags & S390_FLAG_31BIT) {
+			frame->childregs.acrs[0] =
+				(unsigned int) regs->gprs[6];
+		} else {
+			frame->childregs.acrs[0] =
+				(unsigned int)(regs->gprs[6] >> 32);
+			frame->childregs.acrs[1] =
+				(unsigned int) regs->gprs[6];
+		}
+	}
         return 0;
 }
 
@@ -319,7 +332,7 @@ unsigned long get_wchan(struct task_struct *p)
         int count = 0;
         if (!p || p == current || p->state == TASK_RUNNING)
                 return 0;
-        stack_page = (unsigned long) p;
+	stack_page = (unsigned long) p->thread_info;
         r15 = p->thread.ksp;
         if (!stack_page || r15 < stack_page || r15 >= 16380+stack_page)
                 return 0;

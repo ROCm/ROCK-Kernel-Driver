@@ -159,6 +159,9 @@ struct sigaction {
 struct k_sigaction {
         struct sigaction sa;
 };
+
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
+
 #else
 /* Here we must cater to libcs that poke about in kernel headers.  */
 
@@ -174,8 +177,6 @@ struct sigaction {
 
 #define sa_handler      _u._sa_handler
 #define sa_sigaction    _u._sa_sigaction
-
-#define ptrace_signal_deliver(regs, cookie) do { } while (0)
 
 #endif /* __KERNEL__ */
 

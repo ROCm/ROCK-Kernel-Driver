@@ -248,6 +248,7 @@
 #define __NR_epoll_ctl		250
 #define __NR_epoll_wait		251
 #define __NR_set_tid_address	252
+#define __NR_fadvise64		253
 
 
 /* user-visible error numbers are in the range -1 - -122: see <asm-s390/errno.h> */

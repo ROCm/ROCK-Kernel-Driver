@@ -233,7 +233,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
  * all memory ops have completed wrt other CPU's ( see 7-15 POP  DJB ).
  */
 
-#define eieio()  __asm__ __volatile__ ("BCR 15,0") 
+#define eieio()  __asm__ __volatile__ ( "bcr 15,0" : : : "memory" ) 
 # define SYNC_OTHER_CORES(x)   eieio() 
 #define mb()    eieio()
 #define rmb()   eieio()
