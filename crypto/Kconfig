@@ -138,7 +138,7 @@ config CRYPTO_AES
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO
-	default y if INET_IPCOMP=y || INET_IPCOMP=m
+	default y if INET_IPCOMP=y || INET_IPCOMP=m || INET6_IPCOMP=y || INET6_IPCOMP=m
 	help
 	  This is the Deflate algorithm (RFC1951), specified for use in
 	  IPSec with the IPCOMP protocol (RFC3173, RFC2394).
