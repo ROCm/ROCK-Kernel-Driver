@@ -304,7 +304,7 @@ static void ide_pio_sector(ide_drive_t *drive, unsigned int write)
 	else
 		taskfile_input_data(drive, buf, SECTOR_WORDS);
 
-	kunmap_atomic(page, KM_BIO_SRC_IRQ);
+	kunmap_atomic(buf, KM_BIO_SRC_IRQ);
 #ifdef CONFIG_HIGHMEM
 	local_irq_restore(flags);
 #endif
