@@ -308,6 +308,10 @@ ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
 endif
 
+ifdef CONFIG_DEBUG_INFO
+CFLAGS		+= -g
+endif
+
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
 # images.  Uncomment if you want to place them anywhere other than root.

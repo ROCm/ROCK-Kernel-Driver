@@ -870,6 +870,15 @@ config DEBUG_SEMAPHORE
 	  verbose debugging messages.  If you suspect a semaphore problem or a
 	  kernel hacker asks for this option then say Y.  Otherwise say N.
 
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
+	help
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use gdb to debug the kernel.
+	  If you don't debug the kernel, you can say N.
+
 endmenu
 
 source "security/Kconfig"
