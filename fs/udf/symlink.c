@@ -126,5 +126,5 @@ out:
  * symlinks can't do much...
  */
 struct address_space_operations udf_symlink_aops = {
-	readpage:		udf_symlink_filler,
+	.readpage		= udf_symlink_filler,
 };

@@ -144,11 +144,11 @@ out:
 }
 
 struct address_space_operations udf_adinicb_aops = {
-	readpage:		udf_adinicb_readpage,
-	writepage:		udf_adinicb_writepage,
-	sync_page:		block_sync_page,
-	prepare_write:		udf_adinicb_prepare_write,
-	commit_write:		udf_adinicb_commit_write,
+	.readpage		= udf_adinicb_readpage,
+	.writepage		= udf_adinicb_writepage,
+	.sync_page		= block_sync_page,
+	.prepare_write		= udf_adinicb_prepare_write,
+	.commit_write		= udf_adinicb_commit_write,
 };
 
 static ssize_t udf_file_write(struct file * file, const char * buf,
@@ -358,16 +358,16 @@ static int udf_open_file(struct inode * inode, struct file * filp)
 }
 
 struct file_operations udf_file_operations = {
-	read:			generic_file_read,
-	ioctl:			udf_ioctl,
-	open:			udf_open_file,
-	mmap:			generic_file_mmap,
-	write:			udf_file_write,
-	release:		udf_release_file,
-	fsync:			udf_fsync_file,
-	sendfile:		generic_file_sendfile,
+	.read			= generic_file_read,
+	.ioctl			= udf_ioctl,
+	.open			= udf_open_file,
+	.mmap			= generic_file_mmap,
+	.write			= udf_file_write,
+	.release		= udf_release_file,
+	.fsync			= udf_fsync_file,
+	.sendfile		= generic_file_sendfile,
 };
 
 struct inode_operations udf_file_inode_operations = {
-	truncate:		udf_truncate,
+	.truncate		= udf_truncate,
 };

@@ -1304,13 +1304,13 @@ end_rename:
 }
 
 struct inode_operations udf_dir_inode_operations = {
-	lookup:				udf_lookup,
-	create:				udf_create,
-	link:				udf_link,
-	unlink:				udf_unlink,
-	symlink:			udf_symlink,
-	mkdir:				udf_mkdir,
-	rmdir:				udf_rmdir,
-	mknod:				udf_mknod,
-	rename:				udf_rename,
+	.lookup				= udf_lookup,
+	.create				= udf_create,
+	.link				= udf_link,
+	.unlink				= udf_unlink,
+	.symlink			= udf_symlink,
+	.mkdir				= udf_mkdir,
+	.rmdir				= udf_rmdir,
+	.mknod				= udf_mknod,
+	.rename				= udf_rename,
 };
